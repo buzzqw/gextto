@@ -2,6 +2,8 @@ package gextto
 
 import (
 	"database/sql"
+	"net/http"
+	"os"
 	"path/filepath"
 	"strconv"
 	"testing"
@@ -85,5 +87,76 @@ func TestCompactSkipsADatabaseWithoutFreeSpace(t *testing.T) {
 	}
 	if connectionWorthCompacting(db) {
 		t.Fatal("compact did not vacuum")
+	}
+}
+
+// TestSeriesRenameApplyDoesNotProcessARenamedFileTwice is the regression for
+// the library check that renamed Wolf Like Me S01E05/E06 at every pass: the
+// tracked paths were collected after the renames from the stale database paths,
+// so the archive scan saw the just-renamed file as untracked and renamed it
+// again (a no-op counted as a rename).
+func TestSeriesRenameApplyDoesNotProcessARenamedFileTwice(t *testing.T) {
+	tmdbTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		http.NotFound(w, r)
+	})
+
+	s := newTestAppState(t)
+	// LatestConfig must fall back to s.cfg, where this test adds the series:
+	// a directory is not a readable config file, so LoadConfig returns an
+	// error instead of the defaults.
+	s.config_path = t.TempDir()
+	cfg := s.cfg
+	cfg.RenameEpisodes = true
+	cfg.RenameFormat = "full"
+	key := "test-key"
+	cfg.TmdbAPIKey = &key
+
+	archiveDir := filepath.Join(t.TempDir(), "Show")
+	if err := os.MkdirAll(archiveDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	cfg.Series = []SeriesConfig{{Name: "Show", ArchivePath: archiveDir, TmdbID: "1", Enabled: true}}
+	source := filepath.Join(archiveDir, "Show.S01E05.mkv")
+	if err := os.WriteFile(source, []byte("video"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	seriesName := "Show"
+	season, episode := int64(1), int64(5)
+	title := "Show - S01E05 - Episodio 5 - [1080p][h265][EAC3 5.1][IT+EN]"
+	if _, err := s.db.db.Exec("INSERT INTO series(name) VALUES (?1)", seriesName); err != nil {
+		t.Fatal(err)
+	}
+	var seriesID int64
+	if err := s.db.db.QueryRow("SELECT id FROM series WHERE name=?1", seriesName).Scan(&seriesID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.db.db.Exec("INSERT INTO episodes(series_id,season,episode,title,downloaded_at,archive_path) VALUES (?1,?2,?3,?4,'2026-01-01 00:00:00',?5)",
+		seriesID, season, episode, title, source); err != nil {
+		t.Fatal(err)
+	}
+
+	_, value := seriesRenameApply(s, seriesName, true, false, false)
+	result, ok := value.(map[string]any)
+	if !ok {
+		t.Fatalf("result = %#v", value)
+	}
+	if got := bg_countKey(result, "renamed_count"); got != 1 {
+		t.Fatalf("renamed_count = %d, want 1 (the same file was processed twice)", got)
+	}
+	items, _ := result["items"].([]any)
+	if len(items) != 1 {
+		t.Fatalf("items = %d, want 1: %#v", len(items), items)
+	}
+
+	// A second pass has nothing left to do: the spelling of the audio label is
+	// kept and no probe can move the file again.
+	_, value = seriesRenameApply(s, seriesName, true, false, false)
+	result, _ = value.(map[string]any)
+	if got := bg_countKey(result, "renamed_count"); got != 0 {
+		t.Fatalf("second pass renamed_count = %d, want 0", got)
+	}
+	if items, _ := result["items"].([]any); len(items) != 0 {
+		t.Fatalf("second pass items = %d, want 0: %#v", len(items), items)
 	}
 }

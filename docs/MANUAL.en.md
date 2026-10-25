@@ -1440,7 +1440,11 @@ The complete list of actions and parameters is in [Appendix C](#appendix-c-refer
   files with no language tag are left untouched. Files of torrents still in the
   session are protected, and emptied sub-folders are removed. The rename
   verification also performs this cleanup automatically, and upgrade cleanup now
-  also honours the "hard" upgrade reasons (resolution/source/HDR/repack).
+  also honours the "hard" upgrade reasons (resolution/source/HDR/repack). It
+  keeps the spelling of the tags already in the name (for example `EAC3` or
+  `ddp`, `DV` or `DV HDR10`): it does not rename a file just to change the form
+  of the same codec, and a file that is already correct is not renamed a second
+  time within the same check.
 - **Import file** — a tab to import a video already on disk that Gextto did not
   download: see *Importing a file that already exists*.
 - **Archive SQL maintenance** — an advanced, destructive tab for the release
@@ -1600,7 +1604,10 @@ the others.
   errors). Every cycle prints a **SOURCE REPORT** with each source's outcome,
   the filter decisions, and download events (start, metadata, completion, any
   NAS move and archive import). Torrent messages always include the readable
-  name or title; torrent hashes are hidden from the user-facing log.
+  name or title; torrent hashes are hidden from the user-facing log. Periodic
+  lines do not repeat at every check: the gx-torrent memory release appears when
+  the idle period starts and then every six hours, and a warning about a broken
+  source returns at most every six hours.
 - **Acquisition ID and download history** — lines about a download end with
   `acq: 7f3a2c`: a short ID that stays the same from the start of the download
   to its arrival in the library, for torrents and eD2k downloads alike (also

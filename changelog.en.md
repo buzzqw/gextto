@@ -13,6 +13,12 @@ manual is online: [English](docs/MANUAL.en.md) ·
 [italiano](docs/MANUAL.it.md). For reports:
 [GitHub issues](https://github.com/buzzqw/gextto/issues).
 
+## 25 October 2026
+
+- **The library check no longer renames the same episode back and forth.** The periodic name check compared two ways of writing the same audio (`EAC3` and `ddp`) and, depending on which answer arrived first, renamed the file every six hours: "Wolf Like Me" S01E05 and S01E06 changed name on every pass and the count said "4 renamed" for two files. The check now keeps the spelling already in the name and renames only when the codec is really different; a file that is already correct is not renamed a second time within the same check. The same applies to HDR (`DV` and `DV HDR10`) and to movies.
+
+- **Fewer repeated lines in the log.** The gx-torrent log no longer repeats "memory released: no active downloads for …" every ten minutes: it writes the line when the idle period starts and then at most every six hours, while still releasing memory every ten minutes. The "Searches need attention" reminder for a source that stays broken arrives at most once every six hours (it was hourly) and the summary of a partly useful pack appears once, not at every re-check. The mircrew login reason, which the service returns in Italian, is now in English in the log and in the notification; the original text stays in the detail.
+
 ## 24 October 2026
 
 - **Copies of the same release no longer multiply, and one is a spare for the other.** The same torrent often comes from several sources (feed and search of the same indexer, Jackett, Prowlarr, indexarr), and sites that only give a `.torrent` link made it look like a different release every time. Gextto now merges the copies when they have the same infohash (even when it is declared next to the `.torrent` link or written in base32) and, when the infohash is missing, when name and size match within rounding. When in doubt it does not merge: two different infohashes, or names that differ in group, resolution, language, PROPER or episode, stay separate releases. Of a merged release it uses the copy with the best swarm and keeps the others as spares: when the chosen link fails or is in quarantine, it tries the same release from another source right away instead of waiting for the next cycle. The log shows a line «🔁 … trying the same release from …». In the manual search every torrent appears once.

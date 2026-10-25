@@ -22,7 +22,10 @@ import (
 const (
 	cycleMonitorFirstPass = 2 * time.Minute
 	cycleMonitorPeriod    = 30 * time.Minute
-	cycleMonitorHeartbeat = time.Hour
+	// cycleMonitorHeartbeat is one reminder per scheduled search cycle: the
+	// transition already logs the problem, and an hourly reminder repeated the
+	// same sentence for a source that stayed broken for days.
+	cycleMonitorHeartbeat = 6 * time.Hour
 	// cycleMonitorHistory is how many recent cycles the warnings look at.
 	cycleMonitorHistory = 12
 	// cycleSourceFailCount is how many times a single source may fail across the

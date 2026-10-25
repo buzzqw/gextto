@@ -1119,6 +1119,162 @@ func multiEpisodeRange(name string) (season, first, last int64, ok bool) {
 	return season, first, last, true
 }
 
+// namingTagGroups returns the bracket and parenthesis groups of a file stem.
+// The rename templates put the quality tags there, so a token found in a group
+// is the audio/HDR value the file already uses, not a word of its title.
+func namingTagGroups(stem string) []string {
+	groups := []string{}
+	for _, pattern := range []string{`\[([^\]]*)\]`, `\(([^\)]*)\)`} {
+		for _, match := range utils.MustCachedRegex(pattern).FindAllStringSubmatch(stem, -1) {
+			if len(match) > 1 {
+				groups = append(groups, match[1])
+			}
+		}
+	}
+	return groups
+}
+
+// namingAudioToken returns the audio codec as written in a file name ("EAC3",
+// "ddp", "DTS-HD"), so a repair keeps the spelling the file already carries.
+// MediaInfo calls E-AC-3 "EAC3" and ffprobe calls it "ddp": a repair that
+// switched between the two aliases renamed the same episode back and forth on
+// every pass, depending on which probe answered first.
+func namingAudioToken(name string) string {
+	pattern := utils.MustCachedRegex(`(?i)(?:^|[^a-z])(e-?ac-?3|dd\+|ddp|dts[- ]?hd(?:[- ]?hra)?|dts[- ]?x|dts|truehd|ac-?3|aac|flac|opus|mp3)(?:[^a-z]|$)`)
+	scan := func(value string) string {
+		match := pattern.FindStringSubmatchIndex(value)
+		if match == nil {
+			return ""
+		}
+		token := value[match[2]:match[3]]
+		// "EAC3 Atmos" is one label: keep the object-audio bit so a repair does
+		// not drop it just because the token scan stopped at the codec.
+		if strings.HasPrefix(strings.ToLower(strings.TrimLeft(value[match[1]:], " .-_")), "atmos") {
+			token += " Atmos"
+		}
+		return token
+	}
+	stem := fileStem(name)
+	groups := namingTagGroups(stem)
+	for _, group := range groups {
+		if token := scan(group); token != "" {
+			return token
+		}
+	}
+	// Bracketed names keep their tags in the groups: scanning the title too
+	// would read a word of the episode ("DTS", "AC3") as a codec.
+	if len(groups) == 0 {
+		return scan(stem)
+	}
+	return ""
+}
+
+// namingAudioFamily groups the spellings of the same audio codec.
+func namingAudioFamily(value string) string {
+	lowered := strings.ToLower(strings.TrimSpace(value))
+	lowered = strings.TrimSuffix(lowered, " atmos")
+	switch lowered {
+	case "ddp", "dd+", "eac3", "e-ac-3", "eac-3", "dolby digital plus":
+		return "ddp"
+	case "ac3", "ac-3", "dolby digital":
+		return "ac3"
+	case "truehd", "true hd":
+		return "truehd"
+	case "dts-hd", "dts hd", "dtshd", "dts-hd-hra", "dts-hd hra", "dts-hd ma", "dts-hd-ma":
+		return "dts-hd"
+	case "dtsx", "dts-x", "dts:x":
+		return "dts-x"
+	case "dts", "aac", "flac", "opus", "mp3":
+		return lowered
+	}
+	return ""
+}
+
+// namingAudio returns the audio token to render in the target name: the
+// spelling already in the file when it means the same codec, otherwise the
+// probe result (a real correction), otherwise the release value.
+func namingAudio(name string, release models.Quality, media mediaTags) string {
+	audio := release.Audio
+	if token := namingAudioToken(name); token != "" {
+		audio = token
+	}
+	if media.AudioCodec != nil {
+		family := namingAudioFamily(*media.AudioCodec)
+		if family != "" && family != namingAudioFamily(audio) {
+			audio = *media.AudioCodec
+		}
+	}
+	return audio
+}
+
+// namingHDRToken returns the HDR label as written in a file name. As with the
+// audio token, the spelling must not change just because one pass has a probe
+// result and the next one falls back to the name.
+func namingHDRToken(name string) string {
+	pattern := utils.MustCachedRegex(`(?i)(?:^|[^a-z0-9])(dv[ .-]?hdr ?10\+?|dovi|dv|hdr10\+|hdr10plus|hdr10|hlg|hdr)(?:[^a-z0-9]|$)`)
+	scan := func(value string) string {
+		if match := pattern.FindStringSubmatch(value); match != nil {
+			return match[1]
+		}
+		return ""
+	}
+	stem := fileStem(name)
+	groups := namingTagGroups(stem)
+	for _, group := range groups {
+		if token := scan(group); token != "" {
+			return token
+		}
+	}
+	if len(groups) == 0 {
+		return scan(stem)
+	}
+	return ""
+}
+
+// namingHDR keeps the label already in the file when no probe contradicts it:
+// a probe result only wins when it says something new, never when it merely
+// says less ("DV" against an existing "DV HDR10").
+func namingHDR(name string, release models.Quality, media mediaTags) string {
+	hdr := release.HDR
+	if token := namingHDRToken(name); token != "" {
+		hdr = token
+	}
+	if media.HDR != nil && !strings.EqualFold(strings.TrimSpace(*media.HDR), strings.TrimSpace(hdr)) {
+		if hdr == "" {
+			hdr = *media.HDR
+		} else if !hdrAlreadyCovered(hdr, *media.HDR) {
+			hdr = *media.HDR
+		}
+	}
+	return hdr
+}
+
+// hdrAlreadyCovered reports whether the existing label already carries every
+// hint of the probe result, ignoring the order and the punctuation ("DV HDR10"
+// covers "DV", and "DVHDR" covers "DV HDR10").
+func hdrAlreadyCovered(existing, probe string) bool {
+	tokens := func(value string) map[string]bool {
+		lowered := strings.ToLower(value)
+		out := map[string]bool{}
+		for _, token := range []string{"dv", "hdr10plus", "hdr10", "hlg", "hdr"} {
+			if strings.Contains(lowered, token) {
+				out[token] = true
+			}
+		}
+		return out
+	}
+	have, want := tokens(existing), tokens(probe)
+	if len(want) == 0 {
+		return true
+	}
+	for token := range want {
+		if !have[token] && !(token == "hdr10" && have["hdr10plus"]) {
+			return false
+		}
+	}
+	return true
+}
+
 // episodeTarget computes the (source, target) rename pair for an episode
 // (implementation of `episode_target`).
 func episodeTarget(
@@ -1218,14 +1374,8 @@ func episodeTarget(
 	if media.VideoCodec != nil {
 		codec = *media.VideoCodec
 	}
-	audio := release.Quality.Audio
-	if media.AudioCodec != nil {
-		audio = *media.AudioCodec
-	}
-	hdr := release.Quality.HDR
-	if media.HDR != nil {
-		hdr = *media.HDR
-	}
+	audio := namingAudio(filepath.Base(source), release.Quality, media)
+	hdr := namingHDR(filepath.Base(source), release.Quality, media)
 	defaultLanguage := cfg.DefaultLanguage()
 	language := defaultLanguage
 	if media.Languages != nil && *media.Languages != "" {
@@ -1409,14 +1559,8 @@ func RenameMovie(
 	if media.VideoCodec != nil {
 		codec = *media.VideoCodec
 	}
-	audio := release.Quality.Audio
-	if media.AudioCodec != nil {
-		audio = *media.AudioCodec
-	}
-	hdr := release.Quality.HDR
-	if media.HDR != nil {
-		hdr = *media.HDR
-	}
+	audio := namingAudio(filepath.Base(source), release.Quality, media)
+	hdr := namingHDR(filepath.Base(source), release.Quality, media)
 	audioParts := []string{}
 	if audio != "" {
 		audioParts = append(audioParts, audio)

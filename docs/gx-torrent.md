@@ -1797,7 +1797,9 @@ using fixed values.
   upload) below the queue's slow-rate threshold** the daemon calls
   `debug.FreeOSMemory` (at most
   once every 10 minutes) and logs `memory released`; the caches rebuild on the
-  next transfer. On the N97 the RSS went from 550 MB to 35–40 MB
+  next transfer. The line is written when the idle period starts and then at
+  most every 6 hours, so a daemon that stays idle for a day does not fill the
+  log with the same sentence. On the N97 the RSS went from 550 MB to 35–40 MB
   ([`measurements.md`](measurements.md) §4.1).
 - The Health panel and `GET /api/v1/stats` show the effective cache, the
   chosen target (`cache_read_mb`, `cache_write_mb`), the **reason**

@@ -1488,7 +1488,10 @@ L'elenco completo delle azioni e dei parametri è nell'[Appendice C](#appendice-
   ancora in sessione sono protetti e le sottocartelle svuotate vengono rimosse.
   La verifica di rinomina esegue la stessa pulizia automaticamente e la pulizia
   degli upgrade ora rispetta anche i motivi "forti" (risoluzione/sorgente/HDR/
-  repack).
+  repack). La verifica mantiene la grafia dei tag già presenti nel nome (per
+  esempio `EAC3` o `ddp`, `DV` o `DV HDR10`): non rinomina un file solo per
+  cambiare la forma dello stesso codec, e un file già corretto non viene
+  rinominato una seconda volta nello stesso controllo.
 - **Importa file** — tab per importare un video già sul disco che Gextto non
   ha scaricato: vedi *Importare un file già presente*.
 - **Manutenzione SQL dell'archivio** — tab avanzato e distruttivo per
@@ -1658,7 +1661,10 @@ la pulizia degli altri.
   sorgente, le decisioni dei filtri e gli eventi di download (avvio, metadati,
   completamento, eventuale spostamento su NAS e importazione in archivio). I
   messaggi torrent includono sempre nome o titolo leggibile; gli hash torrent
-  sono nascosti nel log utente.
+  sono nascosti nel log utente. Le righe periodiche non si ripetono a ogni
+  controllo: la liberazione della memoria di gx-torrent compare quando il riposo
+  inizia e poi ogni sei ore, e un avviso su una sorgente guasta torna al massimo
+  ogni sei ore.
 - **ID acquisizione e storia dei download** — le righe che riguardano un
   download finiscono con `acq: 7f3a2c`: un ID corto che resta lo stesso
   dall'avvio del download all'arrivo in libreria, per i torrent come per i

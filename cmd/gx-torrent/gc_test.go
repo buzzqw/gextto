@@ -55,3 +55,16 @@ func TestMemoryReleaseDue(t *testing.T) {
 		})
 	}
 }
+
+func TestMemoryLogDueAggregatesTheIdlePeriod(t *testing.T) {
+	now := time.Date(2026, 10, 25, 12, 0, 0, 0, time.UTC)
+	if !memoryLogDue(now, time.Time{}) {
+		t.Fatal("the first release after a download must be logged")
+	}
+	if memoryLogDue(now, now.Add(-10*time.Minute)) {
+		t.Fatal("the ten-minute release must not repeat the sentence")
+	}
+	if !memoryLogDue(now, now.Add(-memoryLogEvery)) {
+		t.Fatal("the idle release must be logged again after memoryLogEvery")
+	}
+}

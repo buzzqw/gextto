@@ -30,6 +30,11 @@ const (
 	idleBeforeRelease = 5 * time.Minute
 	// memoryReleaseEvery bounds how often the idle release runs.
 	memoryReleaseEvery = 10 * time.Minute
+	// memoryLogEvery bounds how often the idle release is worth a log line. The
+	// release itself runs every ten minutes, but repeating "no active downloads
+	// for 30h" every ten minutes floods the log: the first release after a
+	// download and then one line per period are what the operator needs.
+	memoryLogEvery = 6 * time.Hour
 )
 
 // memoryReleaseDue reports whether an idle daemon should return free heap to
@@ -54,6 +59,9 @@ func memoryReleaseDue(now, lastActive, lastRelease time.Time) bool {
 func (d *Daemon) maybeReleaseMemory(now time.Time, moving bool) {
 	if moving {
 		d.lastDownloadAt = now
+		// A new idle period: its first release is news again, even when the
+		// previous period logged a few minutes ago.
+		d.lastMemoryLogAt = time.Time{}
 		return
 	}
 	lastActive := d.lastDownloadAt
@@ -65,5 +73,15 @@ func (d *Daemon) maybeReleaseMemory(now time.Time, moving bool) {
 	}
 	d.lastMemoryReleaseAt = now
 	debug.FreeOSMemory()
-	logf("memory released: no active downloads for %s", now.Sub(lastActive).Round(time.Minute))
+	if memoryLogDue(now, d.lastMemoryLogAt) {
+		d.lastMemoryLogAt = now
+		logf("memory released: no active downloads for %s", now.Sub(lastActive).Round(time.Minute))
+	}
+}
+
+// memoryLogDue limits the idle-release line: the memory is still returned
+// every ten minutes, but the sentence is written once when the idle period
+// starts and then every memoryLogEvery.
+func memoryLogDue(now, lastLog time.Time) bool {
+	return lastLog.IsZero() || now.Sub(lastLog) >= memoryLogEvery
 }

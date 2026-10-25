@@ -235,3 +235,15 @@ func TestInspectActivePacksRespectsTheSetting(t *testing.T) {
 		t.Fatal("inspection ran while the setting was off")
 	}
 }
+
+func TestSameEpisodeSetIgnoresOrderAndDuplicates(t *testing.T) {
+	if !sameEpisodeSet([]int64{3, 1, 2}, []int64{1, 2, 3, 3}) {
+		t.Fatal("the same episode set must match")
+	}
+	if sameEpisodeSet([]int64{1, 2}, []int64{1, 2, 3}) {
+		t.Fatal("a different episode set must not match")
+	}
+	if !sameEpisodeSet(nil, []int64{}) {
+		t.Fatal("two empty sets must match")
+	}
+}

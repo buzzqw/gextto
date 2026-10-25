@@ -118,6 +118,7 @@ when a change is meant to be an optimisation. A single pass is noise.
 | `BenchmarkSeedPolicyPass` (10 seed rules, 100 torrents) | 41.4 µs, 5.2 KB, 128 allocs per pass | what the seed rules add to one `EnforceSeedPolicy` pass (every few seconds), plus one `torrent_meta` query only when rules exist; measured 2026-10-17 on the N97 |
 | `BenchmarkMergeDuplicateReleases` (24,000 releases, 8,000 copies) | 48–54 ms, 48.2 MB, 192,198 allocs (the input copy alone is ~15 ms, 13.6 MB); the previous key-only dedup on the same input 45–52 ms, 37.7 MB, 120,002 allocs | one pass per cycle and per search; identities are computed once per release, so the extra name/size match costs about the same CPU and ~10 MB of short-lived memory; measured 2026-10-24 on the N97 while the test suite was running |
 | `BenchmarkPayloadContentPath` (2,000-file torrent) | Original 207 ns, 64 B, 1 alloc; NoSubfolder 1.65 µs, 0 allocs | the `content_path` every list refresh now computes per torrent (content layout); measured 2026-10-17 on the N97 |
+| `BenchmarkNamingTags` (audio + HDR label for one name) | 16.5 µs/op, 2.08 KB, 33 allocs | once per episode at the 6-hour library check (~21 ms for 1,278 files); keeps the existing spelling so the check does not rename a file back and forth; measured 2026-10-25 on the N97 |
 
 ## 4. Investigations and decisions
 

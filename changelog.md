@@ -14,6 +14,12 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
 [changelog.en.md](changelog.en.md). Per segnalazioni:
 [issue su GitHub](https://github.com/buzzqw/gextto/issues).
 
+## 25 ottobre 2026
+
+- **La verifica della libreria non rinomina più lo stesso episodio avanti e indietro.** Il controllo periodico dei nomi confrontava due modi di scrivere lo stesso audio (`EAC3` e `ddp`) e, a seconda di quale risposta arrivava per prima, rinominava il file ogni sei ore: «Wolf Like Me» S01E05 e S01E06 cambiavano nome a ogni passaggio e il conteggio diceva «4 rinominati» per due file. Ora la verifica mantiene la grafia già presente nel nome e rinomina solo quando il codec è davvero diverso; un file già corretto non viene più rinominato una seconda volta nello stesso controllo. Vale anche per l'HDR (`DV` e `DV HDR10`) e per i film.
+
+- **Meno righe ripetute nel log.** Il log di gx-torrent non ripete più «memory released: no active downloads for …» ogni dieci minuti: scrive la riga quando il riposo inizia e poi al massimo ogni sei ore, continuando a liberare la memoria ogni dieci minuti. Il promemoria «Searches need attention» per una sorgente che resta guasta arriva al massimo una volta ogni sei ore (prima ogni ora) e il riepilogo di un pack parzialmente utile compare una volta sola, non a ogni ricontrollo. Il motivo del login di mircrew, che il servizio restituisce in italiano, ora è in inglese nel log e nella notifica; il testo originale resta nel dettaglio.
+
 ## 24 ottobre 2026
 
 - **Le copie della stessa release non si moltiplicano più, e una fa da riserva all'altra.** Lo stesso torrent arriva spesso da più fonti (feed e ricerca dello stesso indexer, Jackett, Prowlarr, indexarr) e i siti che danno solo il link `.torrent` lo facevano sembrare ogni volta una release diversa. Ora Gextto unisce le copie quando hanno lo stesso infohash (anche se dichiarato accanto al link `.torrent` o scritto in base32) e, quando l'infohash manca, quando nome e dimensione coincidono a meno dell'arrotondamento. Nel dubbio non unisce: due infohash diversi, o nomi che differiscono per gruppo, risoluzione, lingua, PROPER o episodio, restano release distinte. Della release unita usa la copia con lo swarm migliore e tiene le altre come riserva: se il link scelto non funziona o è in quarantena, prova subito la stessa release da un'altra fonte invece di aspettare il ciclo successivo. Nel log compare una riga «🔁 … trying the same release from …». Nella ricerca manuale ogni torrent compare una volta sola.

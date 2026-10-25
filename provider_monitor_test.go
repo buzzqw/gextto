@@ -7,6 +7,19 @@ import (
 	"time"
 )
 
+func TestProviderLoginReasonIsEnglish(t *testing.T) {
+	for raw, want := range map[string]string{
+		"credenziali rifiutate o verifica richiesta": "credentials rejected or verification required",
+		"sessione non autenticata":                   "session not authenticated",
+		"":                                           "",
+		"totally new failure":                        "",
+	} {
+		if got := providerLoginReason(raw); got != want {
+			t.Errorf("providerLoginReason(%q) = %q, want %q", raw, got, want)
+		}
+	}
+}
+
 // TestProviderLoginStateNotifiesAfterGrace covers the decision the monitor
 // takes: silence during the grace, one notice when it expires, at most one more
 // every providerLoginNotifyInterval, and a single recovery notice.

@@ -422,9 +422,11 @@ type Daemon struct {
 	cacheAppliedAt time.Time
 
 	// Idle memory release (gc.go): lastDownloadAt is the last tick with an
-	// active download, lastMemoryReleaseAt the last debug.FreeOSMemory call.
+	// active download, lastMemoryReleaseAt the last debug.FreeOSMemory call,
+	// lastMemoryLogAt the last time the idle release was written to the log.
 	lastDownloadAt      time.Time
 	lastMemoryReleaseAt time.Time
+	lastMemoryLogAt     time.Time
 
 	// classCached is the storage class of the download dir, refreshed without
 	// holding d.mu: statfs on an unresponsive network mount can block for a

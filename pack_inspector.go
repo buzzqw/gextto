@@ -14,6 +14,7 @@ package gextto
 
 import (
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/buzzqw/gextto/internal/logging"
@@ -276,8 +277,21 @@ func applyPackFilePriorities(
 	if skippedLabels := episodeRangeLabel(*release.Season, skippedEpisodes); skippedLabels != "" {
 		message += " · skipped: " + skippedLabels
 	}
-	logging.Info(message, "hash", hash, "kept_episodes", episodeList(keptEpisodes), "skipped_episodes", episodeList(skippedEpisodes))
+	// The verdict is re-checked every packInspectionSettled, but the answer
+	// and the priorities do not change: log it once, as news, and keep the
+	// periodic re-check at debug level.
+	if sameEpisodeSet(release.SkippedEpisodes, skippedEpisodes) {
+		logging.Debug(message, "hash", hash, "kept_episodes", episodeList(keptEpisodes), "skipped_episodes", episodeList(skippedEpisodes))
+	} else {
+		logging.Info(message, "hash", hash, "kept_episodes", episodeList(keptEpisodes), "skipped_episodes", episodeList(skippedEpisodes))
+	}
 	return true
+}
+
+// sameEpisodeSet reports whether two episode lists name the same set, ignoring
+// order and duplicates.
+func sameEpisodeSet(left, right []int64) bool {
+	return slices.Equal(uniqueSortedInt64(left), uniqueSortedInt64(right))
 }
 
 // seriesGapsForSeason returns the known missing episodes of one season.

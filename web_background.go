@@ -181,6 +181,20 @@ func seriesRenameApply(s *AppState, name string, execute, force, sourceOnly bool
 	alreadyOk := []string{}
 	considered := 0
 	withPath := 0
+	// Files known to the database. It is built before the renames, then kept up
+	// to date with every new target: building it afterwards from the stale
+	// episode paths left a file renamed in this pass looking untracked, so the
+	// archive scan below processed it a second time (and renamed it again).
+	trackedPaths := map[string]bool{}
+	for _, episode := range episodes {
+		if episode.ArchivePath == nil {
+			continue
+		}
+		candidate := *episode.ArchivePath
+		if _, err := os.Stat(candidate); err == nil {
+			trackedPaths[filepath.Clean(candidate)] = true
+		}
+	}
 
 	for _, episode := range episodes {
 		considered++
@@ -216,6 +230,9 @@ func seriesRenameApply(s *AppState, name string, execute, force, sourceOnly bool
 			path = matches[0]
 		}
 		withPath++
+		// A directory stored as the archive path is resolved to the real file
+		// above: mark that file as tracked, not just the directory.
+		trackedPaths[filepath.Clean(path)] = true
 
 		// The source (which MediaInfo does not provide) is recovered from the
 		// ORIGINAL release title, not from the current file name: if an earlier
@@ -303,6 +320,9 @@ func seriesRenameApply(s *AppState, name string, execute, force, sourceOnly bool
 			continue
 		}
 		logging.Debug("rename file", "series", series.Name, "season", episode.Season, "episode", episode.Episode, "from", path, "to", target, "execute", execute)
+		// The file now lives at target: the scan must not mistake it for an
+		// untracked copy of the same episode.
+		trackedPaths[filepath.Clean(target)] = true
 		if execute {
 			// The renamed file has a new path: update the DB, otherwise the next
 			// preview no longer finds the file.
@@ -331,16 +351,6 @@ func seriesRenameApply(s *AppState, name string, execute, force, sourceOnly bool
 	// The database may not know about files copied manually or by an older
 	// post-processing run. Scan the series archive as well, so those files are
 	// renamed and, when an existing episode is better, moved to trash.
-	trackedPaths := map[string]bool{}
-	for _, episode := range episodes {
-		if episode.ArchivePath == nil {
-			continue
-		}
-		candidate := *episode.ArchivePath
-		if _, err := os.Stat(candidate); err == nil {
-			trackedPaths[filepath.Clean(candidate)] = true
-		}
-	}
 	// Source-restore mode does not scan untracked files: the source is recovered
 	// only from the original title in the DB.
 	if sourceOnly {
@@ -464,8 +474,11 @@ func seriesRenameApply(s *AppState, name string, execute, force, sourceOnly bool
 				}
 				continue
 			}
-			if target == "" {
-				// No rename needed: link the existing file.
+			if target == "" || SamePath(file, target) {
+				// No rename needed: link the existing file. RenameEpisode
+				// returns the target even when the name already matches (it
+				// still applies the sidecars), so without this guard the scan
+				// logged and counted a no-op rename every cycle.
 				bg_linkArchiveFile(s.db, series.Name, season, episodeNumber, cfg, file)
 				continue
 			}

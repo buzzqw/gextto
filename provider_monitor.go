@@ -15,6 +15,7 @@ package gextto
 // again.
 
 import (
+	"strings"
 	"time"
 
 	"github.com/buzzqw/gextto/internal/logging"
@@ -73,6 +74,27 @@ func (s *providerLoginState) observe(failed bool, reason string, now time.Time) 
 	return ""
 }
 
+// providerLoginReason renders the login error answered by the service in
+// English: the log is read by the operator, and the service happens to answer
+// in Italian. A message we do not know is not guessed: the caller logs the
+// generic sentence and keeps the original at debug level.
+func providerLoginReason(raw string) string {
+	lowered := strings.ToLower(strings.TrimSpace(raw))
+	switch {
+	case lowered == "":
+		return ""
+	case strings.Contains(lowered, "credenziali rifiutate") ||
+		strings.Contains(lowered, "verifica richiesta") ||
+		strings.Contains(lowered, "credenziali non valide"):
+		return "credentials rejected or verification required"
+	case strings.Contains(lowered, "sessione non autenticata") ||
+		strings.Contains(lowered, "sessione scaduta") ||
+		strings.Contains(lowered, "non autenticat"):
+		return "session not authenticated"
+	}
+	return ""
+}
+
 // providerLoginWorker probes the mircrew-indexer login periodically and
 // notifies when it has been broken for longer than the grace period.
 func providerLoginWorker(state *AppState) {
@@ -90,6 +112,14 @@ func providerLoginWorker(state *AppState) {
 			if reachable {
 				if reason == "" && failed {
 					reason = "sessione non autenticata"
+				}
+				if failed {
+					if english := providerLoginReason(reason); english != "" {
+						reason = english
+					} else {
+						logging.Debug("provider login detail", "source", indexer.Name, "reason", reason)
+						reason = "login failed (details at debug level)"
+					}
 				}
 				switch loginState.observe(failed, reason, time.Now()) {
 				case "failed":
