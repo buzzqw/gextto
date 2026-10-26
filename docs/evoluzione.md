@@ -527,7 +527,7 @@ binary-tree routing table, host names (bootstrap routers, a magnet's `dht=` node
 resolved off the main loop so a hung resolver never stalls it, a non-blocking `AddNode`
 (a peer's PORT hint is dropped rather than waited on), tokens bound to source address and scope, an opt-in
 anti-Sybil cap per subnet, and the **feeds** of BEP 46. Robustness: parser fuzzing in
-CI (`make fuzz-smoke`, 23 targets, seeds in `testdata/fuzz`), a bounded bencode screen
+CI (`make fuzz-smoke`, 24 targets, seeds in `testdata/fuzz`), a bounded bencode screen
 before the decoder on every hand-written path, snub and session ban with TTL, IP
 filter, and hostile hash-request headers (bogus root, bad length, huge proof, overflow)
 refused without a panic. Diagnostics: uTP socket, dial, accept, error, RTO and SYN-drop counters, merge

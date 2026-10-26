@@ -231,9 +231,41 @@ func TestDetachCompletedArchivedSinglesHonorsAutoRemove(t *testing.T) {
 	}
 	cfg.Transfer.AutoRemoveCompleted = false
 	session := &stubTorrentSession{list: []models.TorrentView{view}}
-	DetachCompletedArchivedSingles(cfg, session, db)
+	DetachCompletedArchivedSingles(cfg, session, db, nil)
 	if len(session.removed) != 0 {
 		t.Fatalf("auto_remove_completed=false detached: %v", session.removed)
+	}
+}
+
+// TestDetachCompletedArchivedSinglesRechecksAfterTheInterval pins the cache of
+// the recovery pass: a torrent found not to be detached is skipped until its
+// recheck time, then detached once its download source is gone.
+func TestDetachCompletedArchivedSinglesRechecksAfterTheInterval(t *testing.T) {
+	db, cfg, view, source, _ := seedTestSetup(t)
+	cfg.Transfer.AutoRemoveCompleted = true
+	session := &stubTorrentSession{list: []models.TorrentView{view}}
+	notDetachable := map[string]time.Time{}
+	DetachCompletedArchivedSingles(cfg, session, db, notDetachable)
+	if len(session.removed) != 0 {
+		t.Fatalf("a single whose source still exists was detached: %v", session.removed)
+	}
+	if _, cached := notDetachable[view.Hash]; !cached {
+		t.Fatal("the verdict was not remembered")
+	}
+	if err := os.Remove(source); err != nil {
+		t.Fatal(err)
+	}
+	DetachCompletedArchivedSingles(cfg, session, db, notDetachable)
+	if len(session.removed) != 0 {
+		t.Fatalf("detached before the recheck interval: %v", session.removed)
+	}
+	notDetachable[view.Hash] = time.Now().Add(-time.Second)
+	DetachCompletedArchivedSingles(cfg, session, db, notDetachable)
+	if len(session.removed) != 1 {
+		t.Fatalf("not detached after the recheck interval: %v", session.removed)
+	}
+	if _, cached := notDetachable[view.Hash]; cached {
+		t.Fatal("a detached torrent kept its cache entry")
 	}
 }
 

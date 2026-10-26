@@ -32,7 +32,6 @@ import (
 	"net/http"
 	"net/url"
 	"path/filepath"
-	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -2776,26 +2775,61 @@ type v2LogsView struct {
 	ProblemsOnly bool
 }
 
-var v2LogHighlight = []struct {
-	re    *regexp.Regexp
-	class string
-}{
-	{regexp.MustCompile(`\b(ERROR)\b`), "hl-err"},
-	{regexp.MustCompile(`\b(WARN|WARNING)\b`), "hl-warn"},
-	{regexp.MustCompile(`\b(completed|completato|archived|archiviato|moved|approved|approvato)\b`), "hl-ok"},
-	{regexp.MustCompile(`\b(indexer|feed|source|sorgente|scraping|engine)\b`), "hl-src"},
-	{regexp.MustCompile(`\b(upgrade|score|punteggio)\b`), "hl-score"},
-	{regexp.MustCompile(`\b(filter|filtered|rejected|scartato|skipped|blocklist|stalled)\b`), "hl-filter"},
+// v2LogHighlight maps the highlighted words to their class. The words are
+// matched whole and case-sensitively, as `\bword\b` would match them.
+var v2LogHighlight = map[string]string{
+	"ERROR": "hl-err",
+	"WARN":  "hl-warn", "WARNING": "hl-warn",
+	"completed": "hl-ok", "completato": "hl-ok", "archived": "hl-ok", "archiviato": "hl-ok",
+	"moved": "hl-ok", "approved": "hl-ok", "approvato": "hl-ok",
+	"indexer": "hl-src", "feed": "hl-src", "source": "hl-src", "sorgente": "hl-src",
+	"scraping": "hl-src", "engine": "hl-src",
+	"upgrade": "hl-score", "score": "hl-score", "punteggio": "hl-score",
+	"filter": "hl-filter", "filtered": "hl-filter", "rejected": "hl-filter", "scartato": "hl-filter",
+	"skipped": "hl-filter", "blocklist": "hl-filter", "stalled": "hl-filter",
 }
 
+// v2LogWordByte reports whether c is a word character of `\b` (ASCII letters,
+// digits and underscore).
+func v2LogWordByte(c byte) bool {
+	return c == '_' || ('0' <= c && c <= '9') || ('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z')
+}
+
+// v2HighlightLogLine escapes a log line and wraps the words of v2LogHighlight
+// in their span. The log page refreshes 500 lines every 5 seconds, so the line
+// is scanned once instead of running a regular expression per class.
 func v2HighlightLogLine(line string) template.HTML {
 	escaped := stdhtml.EscapeString(line)
-	for _, rule := range v2LogHighlight {
-		if rule.re.MatchString(escaped) {
-			escaped = rule.re.ReplaceAllString(escaped, `<span class="`+rule.class+`">$1</span>`)
+	var out strings.Builder
+	last := 0
+	for i := 0; i < len(escaped); {
+		if !v2LogWordByte(escaped[i]) {
+			i++
+			continue
 		}
+		j := i + 1
+		for j < len(escaped) && v2LogWordByte(escaped[j]) {
+			j++
+		}
+		if class, ok := v2LogHighlight[escaped[i:j]]; ok {
+			if last == 0 {
+				out.Grow(len(escaped) + 64)
+			}
+			out.WriteString(escaped[last:i])
+			out.WriteString(`<span class="`)
+			out.WriteString(class)
+			out.WriteString(`">`)
+			out.WriteString(escaped[i:j])
+			out.WriteString(`</span>`)
+			last = j
+		}
+		i = j
 	}
-	return template.HTML(escaped)
+	if last == 0 {
+		return template.HTML(escaped)
+	}
+	out.WriteString(escaped[last:])
+	return template.HTML(out.String())
 }
 
 // v2LogLineIsProblem reports whether a log line is a WARN or ERROR line

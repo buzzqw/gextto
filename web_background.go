@@ -698,6 +698,8 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 	packInspectionChecked := map[string]packInspectionCheck{}
 	// Startup torrents found not in error, skipped for notErrorRecheckInterval.
 	notErrorChecked := map[string]time.Time{}
+	// Torrents found not to be detached, skipped for notDetachableRecheckInterval.
+	notDetachable := map[string]time.Time{}
 	storageMoveRetries := map[string]StorageMoveRetry{}
 	seedCopyWarnings := map[string]time.Time{}
 	// Storage moves are asynchronous. Keep post-seeding moves protected until
@@ -1465,7 +1467,7 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 			TrimMemory()
 		}
 		DetachErrorTorrents(torrents, db, startupHashes, notErrorChecked)
-		DetachCompletedArchivedSingles(cfg, torrents, db)
+		DetachCompletedArchivedSingles(cfg, torrents, db, notDetachable)
 		RejectActivePackIdentityMismatches(torrents, db, packIdentityChecked)
 		InspectActivePacks(cfg, torrents, db, packInspectionChecked)
 		// Remove completed torrents that have finished seeding before the seed

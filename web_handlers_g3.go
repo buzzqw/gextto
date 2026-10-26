@@ -312,6 +312,8 @@ func LibraryView(w http.ResponseWriter, r *http.Request, s *AppState) {
 	if err != nil || seasonCounts == nil {
 		seasonCounts = map[string][][2]int64{}
 	}
+	// One read of the whole library instead of five queries per series.
+	library, libraryErr := s.db.AllSeriesEpisodes()
 	seriesItems := make([]any, 0, len(cfg.Series))
 	for index := range cfg.Series {
 		series := cfg.Series[index]
@@ -322,9 +324,9 @@ func LibraryView(w http.ResponseWriter, r *http.Request, s *AppState) {
 				ignoredSeasons = append(ignoredSeasons, season)
 			}
 		}
-		episodes, err := s.db.EpisodesForSeries(series.Name, ignoredSeasons)
-		if err != nil {
-			episodes = nil
+		var episodes []EpisodeView
+		if libraryErr == nil {
+			episodes = library.Episodes(series.Name, ignoredSeasons)
 		}
 		total := int64(len(episodes))
 		downloaded := int64(0)

@@ -601,24 +601,50 @@ func DetachErrorTorrents(torrents TorrentSession, db *Database, startupHashes ma
 	}
 }
 
+// notDetachableRecheckInterval is how long DetachCompletedArchivedSingles
+// trusts that a torrent is not to be detached before checking it again.
+const notDetachableRecheckInterval = 30 * time.Second
+
 // DetachCompletedArchivedSingles implements `detach_completed_archived_singles`.
-func DetachCompletedArchivedSingles(cfg *Config, torrents TorrentSession, db *Database) {
+// notDetachable, when not nil, remembers until when a torrent was found not to
+// be detached, so the 750 ms tick does not query the database and stat the
+// archive for every seeding torrent.
+func DetachCompletedArchivedSingles(cfg *Config, torrents TorrentSession, db *Database, notDetachable map[string]time.Time) {
 	// Completed singles stay in the session (shown as completed) unless the
 	// user asked for automatic removal; this recovery pass must not remove
 	// them behind the user's back.
 	if cfg != nil && !cfg.Transfer.AutoRemoveCompleted {
 		return
 	}
-	for _, torrent := range torrents.List() {
+	now := time.Now()
+	list := torrents.List()
+	if notDetachable != nil && len(notDetachable) > 2*len(list)+16 {
+		for hash, until := range notDetachable {
+			if !now.Before(until) {
+				delete(notDetachable, hash)
+			}
+		}
+	}
+	keep := func(hash string) {
+		if notDetachable != nil {
+			notDetachable[hash] = now.Add(notDetachableRecheckInterval)
+		}
+	}
+	for _, torrent := range list {
+		if until, ok := notDetachable[torrent.Hash]; ok && now.Before(until) {
+			continue
+		}
 		// The cheap row first: the metadata (a JSON decode) is read only for
 		// a completed and archived torrent.
 		status, processed, _ := db.TorrentStatusProcessed(torrent.Hash)
 		completed := status != nil && *status == "completed"
 		if !completed || processed == nil || strings.TrimSpace(*processed) == "" {
+			keep(torrent.Hash)
 			continue
 		}
 		meta, _ := db.TorrentMeta(torrent.Hash)
 		if meta != nil && meta.Release.IsPack {
+			keep(torrent.Hash)
 			continue
 		}
 		processedPath := *processed
@@ -631,8 +657,10 @@ func DetachCompletedArchivedSingles(cfg *Config, torrents TorrentSession, db *Da
 		_, processedErr := os.Stat(processedPath)
 		_, sourceErr := os.Stat(source)
 		if processedErr != nil || sourceErr == nil {
+			keep(torrent.Hash)
 			continue
 		}
+		delete(notDetachable, torrent.Hash)
 		_, err := torrents.Remove(torrent.Hash, false)
 		if err != nil {
 			logging.Warn("failed to detach completed single after recovery",

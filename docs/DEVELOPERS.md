@@ -171,7 +171,10 @@ Templates and Go code write interface texts in Italian; the rendered HTML is
 translated with the bundled catalogs `internal_translations.yml` (English),
 `_de`, `_fr`, `_es` and `_pl`, whose keys are the Italian strings. Every new
 text needs an entry in all five catalogs (a test checks that they share the
-same keys). Texts built outside the templates use `uiText(s, "…")`. The TUI has
+same keys). Texts built outside the templates use `uiText(s, "…")`. The catalogs are
+merged into the translation database at startup only when they changed: a hash of
+them is kept in the `translation_seed` table, and deleting a language clears it, so
+that language's bundled rows come back at the next start. The TUI has
 its own six-language catalog (IT, EN, DE, FR, ES, PL) in `internal/tui/i18n.go`; daemon log lines are
 English only.
 
@@ -264,7 +267,7 @@ changing UI templates, styles or client-side interaction code.
 
 The network-facing parsers have Go fuzz targets. Run them before touching the
 `internal/gxcore` codecs, the DHT packets, the `.torrent`/magnet/RSS/Torznab
-parsing or the MSE/peer-wire handshake:
+parsing, the IP filter or the MSE/peer-wire handshake:
 
 ```bash
 make fuzz-smoke                # 30s per target (FUZZ_TIME default)

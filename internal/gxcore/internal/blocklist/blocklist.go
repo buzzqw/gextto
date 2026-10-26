@@ -10,7 +10,6 @@ import (
 	"net"
 	"slices"
 	"sort"
-	"strconv"
 	"strings"
 	"sync"
 )
@@ -172,9 +171,11 @@ type ipRange struct {
 //
 // IPv4 rules and the formats below; IPv6 CIDR rules go to a separate list.
 func parseCIDR(b []byte) (r ipRange, err error) {
-	line := string(b)
-	if !strings.Contains(line, "-") {
-		_, ipnet, perr := net.ParseCIDR(line)
+	// The range forms are parsed on the bytes of the line: a filter has
+	// hundreds of thousands of rules, and strings per line would allocate tens
+	// of megabytes at every load.
+	if bytes.IndexByte(b, '-') < 0 {
+		_, ipnet, perr := net.ParseCIDR(string(b))
 		if perr != nil {
 			err = perr
 			return
@@ -187,28 +188,29 @@ func parseCIDR(b []byte) (r ipRange, err error) {
 		r.last = r.first | ^binary.BigEndian.Uint32(ipnet.Mask)
 		return
 	}
-	if comma := strings.Index(line, ","); comma >= 0 {
+	line := b
+	if comma := bytes.IndexByte(line, ','); comma >= 0 {
 		// eMule: "first - last , level , description". Level >= 128 allows.
-		fields := strings.Split(line, ",")
-		if len(fields) >= 2 {
-			if level, lerr := strconv.Atoi(strings.TrimSpace(fields[1])); lerr == nil && level >= 128 {
-				err = errAllowRule
-				return
-			}
+		level := line[comma+1:]
+		if next := bytes.IndexByte(level, ','); next >= 0 {
+			level = level[:next]
 		}
-		line = fields[0]
-	} else if colon := strings.LastIndex(line, ":"); colon >= 0 {
+		if n, ok := parseDecimal(bytes.TrimSpace(level)); ok && n >= 128 {
+			err = errAllowRule
+			return
+		}
+		line = line[:comma]
+	} else if colon := bytes.LastIndexByte(line, ':'); colon >= 0 {
 		line = line[colon+1:]
 	}
-	left, right, _ := strings.Cut(line, "-")
-	first := parseIPv4(left)
-	last := parseIPv4(right)
-	if first == nil || last == nil {
+	left, right, _ := bytes.Cut(line, []byte{'-'})
+	first, okFirst := parseIPv4(left)
+	last, okLast := parseIPv4(right)
+	if !okFirst || !okLast {
 		err = errNotIPv4Address
 		return
 	}
-	r.first = binary.BigEndian.Uint32(first)
-	r.last = binary.BigEndian.Uint32(last)
+	r.first, r.last = first, last
 	if r.last < r.first {
 		r.first, r.last = r.last, r.first
 	}
@@ -216,20 +218,60 @@ func parseCIDR(b []byte) (r ipRange, err error) {
 }
 
 // parseIPv4 accepts zero-padded octets (eMule writes 001.002.003.004).
-func parseIPv4(s string) net.IP {
-	parts := strings.Split(strings.TrimSpace(s), ".")
-	if len(parts) != 4 {
-		return nil
-	}
-	ip := make(net.IP, 4)
-	for i, part := range parts {
-		n, err := strconv.Atoi(part)
-		if err != nil || n < 0 || n > 255 {
-			return nil
+func parseIPv4(s []byte) (uint32, bool) {
+	s = bytes.TrimSpace(s)
+	var v uint32
+	for i := 0; i < 4; i++ {
+		part := s
+		if dot := bytes.IndexByte(s, '.'); dot >= 0 {
+			if i == 3 {
+				return 0, false
+			}
+			part, s = s[:dot], s[dot+1:]
+		} else if i < 3 {
+			return 0, false
 		}
-		ip[i] = byte(n)
+		n, ok := parseDecimal(part)
+		if !ok || n < 0 || n > 255 {
+			return 0, false
+		}
+		v = v<<8 | uint32(n)
 	}
-	return ip
+	return v, true
+}
+
+// parseDecimal reads a base-10 integer with an optional sign and the range of
+// strconv.Atoi, without converting the bytes to a string.
+func parseDecimal(s []byte) (int, bool) {
+	negative := false
+	if len(s) > 0 && (s[0] == '+' || s[0] == '-') {
+		negative = s[0] == '-'
+		s = s[1:]
+	}
+	if len(s) == 0 {
+		return 0, false
+	}
+	var u uint64
+	for _, c := range s {
+		if c < '0' || c > '9' {
+			return 0, false
+		}
+		d := uint64(c - '0')
+		if u > (math.MaxUint64-d)/10 {
+			return 0, false
+		}
+		u = u*10 + d
+	}
+	if negative {
+		if u > 1<<63 {
+			return 0, false
+		}
+		return int(-int64(u)), true
+	}
+	if u > math.MaxInt64 {
+		return 0, false
+	}
+	return int(u), true
 }
 
 // ip6Range is an inclusive IPv6 range (F4 IPv6).

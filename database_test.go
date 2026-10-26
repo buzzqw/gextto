@@ -648,6 +648,43 @@ func TestExcludesIgnoredSeasonsFromSeriesEpisodes(t *testing.T) {
 	}
 }
 
+// TestAllSeriesEpisodesMatchesEpisodesForSeries pins the library index to the
+// per-series read: same episodes, flags, air dates and order for every series.
+func TestAllSeriesEpisodesMatchesEpisodesForSeries(t *testing.T) {
+	db := newTestDB(t)
+	for _, stmt := range []string{
+		"INSERT INTO series(id,name,ignored_seasons) VALUES (1,'Show','[3]'),(2,'Other','not json'),(3,'Empty',NULL)",
+		"INSERT INTO episodes(series_id,season,episode,title,quality_score,downloaded_at,archive_path,magnet_hash) VALUES (1,1,1,'Show.S01E01',900,'2026-01-01','/lib/Show - S01E01.mkv','AAAA'),(1,1,3,'Show.S01E03',800,NULL,NULL,'bbbb'),(1,3,1,'Show.S03E01',800,NULL,NULL,NULL),(1,2,0,'Show.S02E00',100,NULL,NULL,NULL),(2,1,2,'Other.S01E02',700,NULL,NULL,'cccc')",
+		"INSERT INTO torrent_meta(hash,status,error,updated_at) VALUES ('aaaa','completed','',datetime('now')),('BBBB','error','stalled',datetime('now'))",
+		"INSERT INTO series_metadata(series_name,season,episode_count,updated_at) VALUES ('Show',1,4,datetime('now')),('Show',2,2,datetime('now')),('Show',3,1,datetime('now')),('Other',1,2,datetime('now')),('Ghost',1,1,datetime('now'))",
+		"INSERT INTO episode_metadata(series_name,season,episode,air_date,updated_at) VALUES ('Show',1,1,'2026-01-01',datetime('now')),('Show',1,2,'2026-01-08',datetime('now')),('Other',1,1,'2025-05-05',datetime('now'))",
+		"INSERT INTO ignored_episodes(series_name,season,episode) VALUES ('Show',1,2),('Other',1,2)",
+	} {
+		if _, err := db.db.Exec(stmt); err != nil {
+			t.Fatalf("%s: %v", stmt, err)
+		}
+	}
+	index, err := db.AllSeriesEpisodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"Show", "Other", "Empty", "Ghost", "Missing"} {
+		for _, extra := range [][]int64{nil, {2}, {1, 3}} {
+			want, err := db.EpisodesForSeries(name, extra)
+			if err != nil {
+				t.Fatal(err)
+			}
+			got := index.Episodes(name, extra)
+			if !reflect.DeepEqual(got, want) {
+				t.Fatalf("%s %v:\n index  %+v\n single %+v", name, extra, got, want)
+			}
+		}
+	}
+	if items := index.Episodes("Show", nil); len(items) != 6 {
+		t.Fatalf("Show has %d episodes, want 6 (S01E01-04, S02E01-02, S03 ignored)", len(items))
+	}
+}
+
 func TestExcludesConfigSeasonsPassedAsExtraIgnored(t *testing.T) {
 	db := newTestDB(t)
 	if _, err := db.db.Exec("INSERT INTO series(id,name) VALUES (1,'Show')"); err != nil {

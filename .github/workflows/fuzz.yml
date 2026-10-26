@@ -1,7 +1,8 @@
 name: Fuzz
 
 # Fuzzing of every network-facing parser (make fuzz-smoke): the DHT, bencode,
-# magnet, BEP 10/52, tracker, Torznab, RSS, MSE and the peer-wire handshake.
+# magnet, BEP 10/52, tracker, Torznab, RSS, MSE, the IP filter and the
+# peer-wire handshake.
 # Triggers, chosen so it never runs while someone is working on this machine:
 #   - nightly (03:41 UTC), a 2m pass per target;
 #   - on a push to main that touches an engine or parser path, a 30s pass (a

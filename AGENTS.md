@@ -224,7 +224,7 @@ not to break.
   cycle: `gh run list` is slow and must be run **on request**.
 - `make fuzz-smoke` — short fuzzing of the network-facing parsers (DHT, bencode
   `.torrent`, magnet, BEP 10 extension, BEP 52 file tree, trackers, Torznab,
-  RSS, MSE), `FUZZ_TIME` seconds per target (default 30s, e.g. `FUZZ_TIME=2m`
+  RSS, MSE, IP filter), `FUZZ_TIME` seconds per target (default 30s, e.g. `FUZZ_TIME=2m`
   for a serious pass). It is not part of `make test`; crashes found must be
   fixed and their inputs committed as seeds in `testdata/fuzz`. See
   `docs/evoluzione.md` §6.

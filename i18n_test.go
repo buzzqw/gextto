@@ -471,3 +471,50 @@ func TestSeedAppliesTranslationFixesOnlyToUntouchedRows(t *testing.T) {
 		t.Fatalf("user translation overwritten: %q", got)
 	}
 }
+
+// TestSeedDefaultTranslationsSkipsUnchangedCatalogs pins the restart fast path:
+// the same catalogs are not merged again, a new catalog version is.
+func TestSeedDefaultTranslationsSkipsUnchangedCatalogs(t *testing.T) {
+	db := openTestI18nDb(t)
+	if _, err := db.SeedDefaultTranslations(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.db.Exec("DELETE FROM translations WHERE lang = 'eng' AND key = 'Cartelle osservate'"); err != nil {
+		t.Fatal(err)
+	}
+	if added, err := db.SeedDefaultTranslations(); err != nil || added != 0 {
+		t.Fatalf("seed with unchanged catalogs = %d, %v; want 0 rows, no merge", added, err)
+	}
+	if _, err := db.db.Exec("UPDATE translation_seed SET digest = 'older catalogs'"); err != nil {
+		t.Fatal(err)
+	}
+	if added, err := db.SeedDefaultTranslations(); err != nil || added != 1 {
+		t.Fatalf("seed after a catalog change = %d, %v; want the missing row back", added, err)
+	}
+	dict, err := db.Dictionary("en")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := dict["Cartelle osservate"]; got != "Watched folders" {
+		t.Fatalf("merged translation = %q, want Watched folders", got)
+	}
+}
+
+// BenchmarkSeedDefaultTranslationsReseed measures the seeding a restart pays on
+// a database that already holds the bundled catalogs.
+func BenchmarkSeedDefaultTranslationsReseed(b *testing.B) {
+	db, err := OpenI18nDb(filepath.Join(b.TempDir(), "gextto_config.db"))
+	if err != nil {
+		b.Fatalf("open i18n db: %v", err)
+	}
+	b.Cleanup(func() { _ = db.db.Close() })
+	if _, err := db.SeedDefaultTranslations(); err != nil {
+		b.Fatalf("first seed: %v", err)
+	}
+	b.ReportAllocs()
+	for b.Loop() {
+		if _, err := db.SeedDefaultTranslations(); err != nil {
+			b.Fatalf("reseed: %v", err)
+		}
+	}
+}

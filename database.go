@@ -826,7 +826,18 @@ type Database struct {
 	archiveResetStart  time.Time
 	archiveResetCount  int
 	archiveResetWarned bool
+
+	// seenCounts caches SeenCounts for seenCountsTTL: the dashboard and the
+	// status API (polled by the TUI) ask for it often, and the counts only
+	// move when a cycle reads the feeds.
+	seenCountsMu sync.Mutex
+	seenCountsAt time.Time
+	seenMovies   int64
+	seenSeries   int64
 }
+
+// seenCountsTTL is how long SeenCounts reuses its last answer.
+const seenCountsTTL = 30 * time.Second
 
 // Close closes the underlying SQLite connection. The OS reclaims the handle at
 // process exit, but an explicit close keeps shutdown deterministic and lets the
@@ -3381,60 +3392,107 @@ func (d *Database) UnarchivedEpisodesForSeries(seriesName string, ignoredSeasons
 // EpisodesForSeries returns every episode of a series, merging the configured
 // ignored seasons with the DB ones.
 func (d *Database) EpisodesForSeries(seriesName string, extraIgnored []int64) ([]EpisodeView, error) {
-	ignoredSeasons := make(map[int64]struct{})
-	var ignoredJSON string
-	err := d.db.QueryRow("SELECT COALESCE(ignored_seasons,'[]') FROM series WHERE name=?1", seriesName).Scan(&ignoredJSON)
-	if err == nil {
-		var seasons []int64
-		if json.Unmarshal([]byte(ignoredJSON), &seasons) == nil {
-			for _, season := range seasons {
-				ignoredSeasons[season] = struct{}{}
+	sources, err := d.loadSeriesEpisodeSources(seriesName, true)
+	if err != nil {
+		return nil, err
+	}
+	return sources.Episodes(seriesName, extraIgnored), nil
+}
+
+// SeriesEpisodeIndex holds the episode rows of every series, read with one
+// query per table, so a view of the whole library does not query each series
+// on its own. Episodes assembles the same list as EpisodesForSeries.
+type SeriesEpisodeIndex struct {
+	ignoredSeasons  map[string][]int64
+	airDates        map[string]map[[2]int64]string
+	ignoredEpisodes map[string]map[[2]int64]struct{}
+	episodes        map[string][]EpisodeView
+	expected        map[string][][2]int64
+}
+
+// AllSeriesEpisodes reads the SeriesEpisodeIndex of the whole library.
+func (d *Database) AllSeriesEpisodes() (*SeriesEpisodeIndex, error) {
+	return d.loadSeriesEpisodeSources("", false)
+}
+
+// loadSeriesEpisodeSources reads the rows of one series (single) or of all.
+func (d *Database) loadSeriesEpisodeSources(seriesName string, single bool) (*SeriesEpisodeIndex, error) {
+	index := &SeriesEpisodeIndex{
+		ignoredSeasons:  map[string][]int64{},
+		airDates:        map[string]map[[2]int64]string{},
+		ignoredEpisodes: map[string]map[[2]int64]struct{}{},
+		episodes:        map[string][]EpisodeView{},
+		expected:        map[string][][2]int64{},
+	}
+	var args []any
+	seriesFilter, metadataFilter := "", ""
+	if single {
+		args = []any{seriesName}
+		seriesFilter, metadataFilter = " WHERE name=?1", " WHERE series_name=?1"
+	}
+	scan := func(query string, row func(*sql.Rows) error) error {
+		rows, err := d.db.Query(query, args...)
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			if err := row(rows); err != nil {
+				return err
 			}
 		}
-	} else if !errors.Is(err, sql.ErrNoRows) {
-		return nil, err
+		return rows.Err()
 	}
-	for _, season := range extraIgnored {
-		ignoredSeasons[season] = struct{}{}
-	}
-	airDates := make(map[[2]int64]string)
-	airRows, err := d.db.Query("SELECT season,episode,air_date FROM episode_metadata WHERE series_name=?1", seriesName)
-	if err != nil {
-		return nil, err
-	}
-	for airRows.Next() {
-		var season, episode int64
-		var airDate string
-		if err := airRows.Scan(&season, &episode, &airDate); err != nil {
-			airRows.Close()
-			return nil, err
+	if err := scan("SELECT name,COALESCE(ignored_seasons,'[]') FROM series"+seriesFilter, func(rows *sql.Rows) error {
+		var name, ignoredJSON string
+		if err := rows.Scan(&name, &ignoredJSON); err != nil {
+			return err
 		}
-		airDates[[2]int64{season, episode}] = airDate
-	}
-	if err := airRows.Err(); err != nil {
-		airRows.Close()
-		return nil, err
-	}
-	airRows.Close()
-	ignoredEpisodes := make(map[[2]int64]struct{})
-	ignoredRows, err := d.db.Query("SELECT season,episode FROM ignored_episodes WHERE series_name=?1", seriesName)
-	if err != nil {
-		return nil, err
-	}
-	for ignoredRows.Next() {
-		var season, episode int64
-		if err := ignoredRows.Scan(&season, &episode); err != nil {
-			ignoredRows.Close()
-			return nil, err
+		var seasons []int64
+		if json.Unmarshal([]byte(ignoredJSON), &seasons) == nil {
+			index.ignoredSeasons[name] = seasons
 		}
-		ignoredEpisodes[[2]int64{season, episode}] = struct{}{}
-	}
-	if err := ignoredRows.Err(); err != nil {
-		ignoredRows.Close()
+		return nil
+	}); err != nil {
 		return nil, err
 	}
-	ignoredRows.Close()
-	rows, err := d.db.Query(`SELECT e.id,s.name,e.season,e.episode,COALESCE(e.title,''),e.quality_score,
+	if err := scan("SELECT series_name,season,episode,air_date FROM episode_metadata"+metadataFilter, func(rows *sql.Rows) error {
+		var name, airDate string
+		var season, episode int64
+		if err := rows.Scan(&name, &season, &episode, &airDate); err != nil {
+			return err
+		}
+		dates := index.airDates[name]
+		if dates == nil {
+			dates = map[[2]int64]string{}
+			index.airDates[name] = dates
+		}
+		dates[[2]int64{season, episode}] = airDate
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+	if err := scan("SELECT series_name,season,episode FROM ignored_episodes"+metadataFilter, func(rows *sql.Rows) error {
+		var name string
+		var season, episode int64
+		if err := rows.Scan(&name, &season, &episode); err != nil {
+			return err
+		}
+		ignored := index.ignoredEpisodes[name]
+		if ignored == nil {
+			ignored = map[[2]int64]struct{}{}
+			index.ignoredEpisodes[name] = ignored
+		}
+		ignored[[2]int64{season, episode}] = struct{}{}
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+	episodeFilter := ""
+	if single {
+		episodeFilter = "s.name=?1 AND "
+	}
+	if err := scan(`SELECT e.id,s.name,e.season,e.episode,COALESCE(e.title,''),e.quality_score,
                     e.downloaded_at,e.archive_path,COALESCE(e.size_bytes,0),e.magnet_hash,
                     e.magnet_link,
                     CASE WHEN e.downloaded_at IS NOT NULL THEN 'downloaded'
@@ -3443,63 +3501,62 @@ func (d *Database) EpisodesForSeries(seriesName string, extraIgnored []int64) ([
              FROM episodes e
              JOIN series s ON s.id=e.series_id
              LEFT JOIN torrent_meta t ON lower(t.hash)=lower(e.magnet_hash)
-             WHERE s.name=?1 AND e.episode > 0
-             ORDER BY e.season,e.episode`, seriesName)
-	if err != nil {
-		return nil, err
-	}
-	items := make([]EpisodeView, 0)
-	for rows.Next() {
+             WHERE `+episodeFilter+`e.episode > 0
+             ORDER BY e.season,e.episode`, func(rows *sql.Rows) error {
 		var item EpisodeView
 		var downloadedAt, archivePath, magnetHash, magnetLink sql.NullString
 		if err := rows.Scan(&item.ID, &item.SeriesName, &item.Season, &item.Episode, &item.Title, &item.QualityScore, &downloadedAt, &archivePath, &item.SizeBytes, &magnetHash, &magnetLink, &item.Status, &item.Error); err != nil {
-			rows.Close()
-			return nil, err
+			return err
 		}
-		item.AirDate = airDates[[2]int64{item.Season, item.Episode}]
 		item.DownloadedAt = nullStringPtr(downloadedAt)
 		item.ArchivePath = nullStringPtr(archivePath)
 		item.MagnetHash = nullStringPtr(magnetHash)
 		item.MagnetLink = nullStringPtr(magnetLink)
-		_, item.Ignored = ignoredEpisodes[[2]int64{item.Season, item.Episode}]
-		items = append(items, item)
-	}
-	if err := rows.Err(); err != nil {
-		rows.Close()
+		index.episodes[item.SeriesName] = append(index.episodes[item.SeriesName], item)
+		return nil
+	}); err != nil {
 		return nil, err
 	}
-	rows.Close()
-	filtered := items[:0]
-	for _, item := range items {
+	if err := scan("SELECT series_name,season,episode_count FROM series_metadata"+metadataFilter+" ORDER BY season", func(rows *sql.Rows) error {
+		var name string
+		var season, count int64
+		if err := rows.Scan(&name, &season, &count); err != nil {
+			return err
+		}
+		index.expected[name] = append(index.expected[name], [2]int64{season, count})
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+	return index, nil
+}
+
+// Episodes returns every episode of a series, as EpisodesForSeries does.
+func (index *SeriesEpisodeIndex) Episodes(seriesName string, extraIgnored []int64) []EpisodeView {
+	ignoredSeasons := make(map[int64]struct{})
+	for _, season := range index.ignoredSeasons[seriesName] {
+		ignoredSeasons[season] = struct{}{}
+	}
+	for _, season := range extraIgnored {
+		ignoredSeasons[season] = struct{}{}
+	}
+	airDates := index.airDates[seriesName]
+	ignoredEpisodes := index.ignoredEpisodes[seriesName]
+	stored := index.episodes[seriesName]
+	items := make([]EpisodeView, 0, len(stored))
+	for _, item := range stored {
 		if _, ok := ignoredSeasons[item.Season]; ok {
 			continue
 		}
-		filtered = append(filtered, item)
+		item.AirDate = airDates[[2]int64{item.Season, item.Episode}]
+		_, item.Ignored = ignoredEpisodes[[2]int64{item.Season, item.Episode}]
+		items = append(items, item)
 	}
-	items = filtered
 	present := make(map[[2]int64]struct{}, len(items))
 	for _, item := range items {
 		present[[2]int64{item.Season, item.Episode}] = struct{}{}
 	}
-	expectedRows, err := d.db.Query("SELECT season,episode_count FROM series_metadata WHERE series_name=?1 ORDER BY season", seriesName)
-	if err != nil {
-		return nil, err
-	}
-	expected := make([][2]int64, 0)
-	for expectedRows.Next() {
-		var season, count int64
-		if err := expectedRows.Scan(&season, &count); err != nil {
-			expectedRows.Close()
-			return nil, err
-		}
-		expected = append(expected, [2]int64{season, count})
-	}
-	if err := expectedRows.Err(); err != nil {
-		expectedRows.Close()
-		return nil, err
-	}
-	expectedRows.Close()
-	for _, pair := range expected {
+	for _, pair := range index.expected[seriesName] {
 		season, count := pair[0], pair[1]
 		if _, ok := ignoredSeasons[season]; ok {
 			continue
@@ -3530,9 +3587,9 @@ func (d *Database) EpisodesForSeries(seriesName string, extraIgnored []int64) ([
 		}
 	}
 	// Titolo mostrato nel dettaglio serie: il nome del file rinominato.
-	for index := range items {
-		if items[index].ArchivePath != nil {
-			items[index].RenamedTitle = renamedFileTitle(*items[index].ArchivePath)
+	for i := range items {
+		if items[i].ArchivePath != nil {
+			items[i].RenamedTitle = renamedFileTitle(*items[i].ArchivePath)
 		}
 	}
 	sort.SliceStable(items, func(i, j int) bool {
@@ -3541,7 +3598,7 @@ func (d *Database) EpisodesForSeries(seriesName string, extraIgnored []int64) ([
 		}
 		return items[i].Episode < items[j].Episode
 	})
-	return items, nil
+	return items
 }
 
 // DownloadedMovies returns the downloaded movies of the history view.
@@ -5646,6 +5703,7 @@ func (d *Database) PruneKeyword(keyword string) (int, error) {
 
 // PruneKeywords removes the rows matching every keyword.
 func (d *Database) PruneKeywords(keywords []string) (int, error) {
+	defer d.forgetSeenCounts()
 	terms := normalizedKeywordTerms(keywords)
 	if len(terms) == 0 {
 		return 0, nil
@@ -5841,6 +5899,11 @@ func (d *Database) SearchKeywords(keywords []string, limit int) ([]any, error) {
 // SeenCounts returns the number of distinct "seen in feed" groups
 // (movies, series).
 func (d *Database) SeenCounts() (int64, int64, error) {
+	d.seenCountsMu.Lock()
+	defer d.seenCountsMu.Unlock()
+	if !d.seenCountsAt.IsZero() && time.Since(d.seenCountsAt) < seenCountsTTL {
+		return d.seenMovies, d.seenSeries, nil
+	}
 	var movies int64
 	if err := d.db.QueryRow("SELECT COUNT(DISTINCT group_key) FROM movie_feed_seen WHERE group_key IS NOT NULL AND group_key <> ''").Scan(&movies); err != nil {
 		return 0, 0, err
@@ -5849,7 +5912,15 @@ func (d *Database) SeenCounts() (int64, int64, error) {
 	if err := d.db.QueryRow("SELECT COUNT(DISTINCT group_key) FROM series_feed_seen WHERE group_key IS NOT NULL AND group_key <> ''").Scan(&series); err != nil {
 		return 0, 0, err
 	}
+	d.seenCountsAt, d.seenMovies, d.seenSeries = time.Now(), movies, series
 	return movies, series, nil
+}
+
+// forgetSeenCounts drops the cached SeenCounts after rows were removed.
+func (d *Database) forgetSeenCounts() {
+	d.seenCountsMu.Lock()
+	d.seenCountsAt = time.Time{}
+	d.seenCountsMu.Unlock()
 }
 
 // PrunePreview counts what `cleanup` + `prune_seen_older_than` would remove,
@@ -5884,6 +5955,7 @@ func (d *Database) PrunePreview(retainCycles, errorAgeDays, seenDays int64) (Pru
 
 // PruneSeenByIDs deletes specific "seen in feed" rows by id.
 func (d *Database) PruneSeenByIDs(movieIDs, seriesIDs []int64) (int, int, error) {
+	defer d.forgetSeenCounts()
 	movies := 0
 	for index, id := range movieIDs {
 		if index >= 1000 {
@@ -5925,6 +5997,7 @@ func retentionDays(days, minimum int64) int {
 
 // PruneSeenOlderThan deletes the "seen" releases older than `days` days.
 func (d *Database) PruneSeenOlderThan(days int64) (int, error) {
+	defer d.forgetSeenCounts()
 	if days <= 0 {
 		return 0, nil
 	}

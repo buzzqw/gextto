@@ -88,6 +88,7 @@ fuzz-smoke:
 	  "internal/torznab:FuzzParse" \
 	  "internal/gxcore/internal/metainfo:FuzzMetaInfoNew FuzzNewV2Info FuzzParseFileTree FuzzParseInfo" \
 	  "internal/gxcore/internal/magnet:FuzzNew" \
+	  "internal/gxcore/internal/blocklist:FuzzParseCIDRMatchesReference" \
 	  "internal/gxcore/internal/peerprotocol:FuzzExtensionMessageUnmarshal FuzzHolepunchUnmarshal FuzzHashRequestHeader" \
 	  "internal/gxcore/internal/tracker:FuzzDecodePeersCompact" \
 	  "internal/gxcore/internal/tracker/httptracker:FuzzParsePeersDictionary" \

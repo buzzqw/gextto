@@ -70,12 +70,15 @@ with the live service or a standalone instance as stated.
 
 | Area | Figure today | Build | Reproduce with |
 |---|---|---|---|
-| gx-torrent idle | **60–64 MB RSS** (44–48 MB anonymous), 1–2 % CPU | 226 | clean restart with 3 seeds and 1 download, full IP filter; `ps`/`/proc` |
+| gx-torrent idle | **38.8 MB RSS** (23.0 MB anonymous, peak 39.1 MB), **0.58 %** of a core over 240 s; 2026-10-26 | 260 | live service, 2 seeds and 1 download, full IP filter (172,740 rules); `GX_TORRENT_PPROF` CPU profile, `/proc/<pid>/status` |
 | gx-torrent idle after a burst | **550 MB → 35–40 MB RSS** after 5 min below the slow-rate threshold; log line `memory released` | 248 | 7 torrents (4 stalled, 3 seeds), full IP filter; `/proc/<pid>/status`, `gx-torrent.log` |
 | gx-torrent under load | **44–48 % of a core at 8–9 MB/s**, ~0.35–0.43 CPU per peer; picker 9 % of the profile | 226 | the peer-reader load test (9–10 releases, Auto, collector every 5 s, pprof 45 s) |
 | Automatic peer cap | **55 per torrent, 300 in all** on this 4-core/16 GiB host; with 9 active torrents **−36 % peers and −12 % CPU** against a fixed 55 per torrent, throughput within the swarm noise (−4 %) | 1934 (engine 245) | `GX_MEASURE_AUTO=1` / `GX_MEASURE_MAXCONN`, 9 public ISOs together, 150 s × 2 interleaved rounds (§4.1) |
 | Memory under load | RssAnon peak **1105 MB** with 10 torrents and the NFS write cache; **507 MB outside the two caches** | 226 | same load, `pprof` heap at the end |
 | gexttod at rest | **46 CPU ticks/min (~0.7 %)**, 0 directory opens per 20 s, no write probe on the NAS | 1785 | `GEXTTO_PPROF`, `strace`, `/proc` over 60 s |
+| gexttod at rest (2026-10-26) | **0.35 %** of a core over 240 s, 6.8 MB live heap, 73 MB RSS | 2035 | live service, `GEXTTO_PPROF` CPU profile and heap |
+| gexttod restart: translation merge | **0.85 s CPU, 45 MB, 1.03 M allocs → 3 ms, 2.5 MB, 35 allocs** when the bundled catalogs did not change | 2037 | `BenchmarkSeedDefaultTranslationsReseed` |
+| Web UI CPU per request (live) | Series **112 → 37 ms**, log tail (refreshed every 5 s) **28 → 5 ms**, dashboard **25–36 → 18–19 ms**, archive 39–40 ms, downloads 10 ms | 2038 | `/proc/<pid>/stat` ticks over 30 requests per page, N97, 55 series, 1,863 episodes |
 | gexttod in the first minutes | **0.39 % of a core**, stale-temp sweep 0.21 s, 8 new TLS connections in 300 s | 1790 | profile from start, `strace -e connect` |
 | Feed archive | **258 MB**, 307,477 rows after the 2026-10-21 dedup (was 480 MB, 610,254), one row per listing; Archive page 7–23 ms | 1935 | live `gextto_archive.db`, `dbstat`, `/api/archive` |
 | Archive insert | **40.9–41.8 ms per 1,000 releases** (3.00 MB, 50,528 allocs) | 1791 | `BenchmarkArchiveSaveBatch` |
@@ -101,6 +104,9 @@ when a change is meant to be an optimisation. A single pass is noise.
 |---|---|---|
 | `BenchmarkEngineLoggerFiltered` vs `Forwarded` | 151–175 vs 730–785 ns/op, 3 vs 6 allocs/op | records below the handler threshold are discarded before formatting, so `Debugf`/`Infof` on the hot paths allocate nothing at WARNING |
 | `BenchmarkBlocked` (IP filter) | 18.6 / 37.7 ns/op, 0 allocs | sorted merged intervals with binary search |
+| `BenchmarkLoad` (IP filter, 172,000 P2P and eMule rules) | 56.5–58.6 ms, 39.7 MB, 882,032 allocs → **32.6–33.1 ms, 6.6 MB, 32 allocs** | ranges parsed on the bytes of the line instead of `strings.Split`; `FuzzParseCIDRMatchesReference` holds it to the old parser (4.95 M lines in 60 s); measured 2026-10-26 on the N97 |
+| `BenchmarkV2HighlightLogLine` vs `…Regexp` | **0.91–0.95 µs, 576 B, 2 allocs** vs 58.6–67.3 µs, 2.3 KB, 18 allocs per line | log page highlighting: one word scan instead of six `\b` regexps; output identical on 36,521 live log lines and a 45 s fuzz; measured 2026-10-26 on the N97 |
+| `BenchmarkSeedDefaultTranslationsReseed` | 841–1,025 ms, 45.3 MB, 1,027,628 allocs → **3.1–3.7 ms, 2.5 MB, 35 allocs** | a restart with unchanged catalogs only hashes them; measured 2026-10-26 on the N97 |
 | `BenchmarkPickerRarestSteady` | ~105 / 143.5 µs/op, 0 allocs | piece picker, steady state |
 | `BenchmarkTickUnchokeSeeding` | 1.3 / 1.64 µs/op, 1 alloc | unchoker tick; 50 synthetic peers ≈1.1 µs, 896 B, 1 alloc |
 | `BenchmarkPrefillFromUnrelatedV2` (16 candidates) | 1.49 / 1.58 µs/op, 128 B, 16 allocs | one-shot cost of the Phase 2 merge scan; no steady-state path |
@@ -231,6 +237,17 @@ verdict is reused for 60 s. The stale-temp sweep uses `WalkDir` and stats only t
 names. One TMDB transport is shared and the calendar is bounded to 8 lookups with a
 15 min cache. `RemoveSeededCompleted`, `DetachCompletedArchivedSingles` and
 `DetachErrorTorrents` query only what the session view does not already rule out.
+
+**Profile of 26 October 2026** (build 2035–2037, live service, 3 torrents): at rest
+gexttod spends 0.35 % of a core; what is left is the stale-temp sweep after a start, the
+latency guard's TCP probes (real network measurements) and the recovery pass that
+detaches completed singles, which now remembers a "not to detach" verdict for 30 s
+instead of querying the database and stat-ing the archive for every seeding torrent at
+every 750 ms tick. The CPU worth taking was in three places: the restart (translation
+merge, above), the pages (the Series page matched every gap against every series name
+and ran five queries per series; the log tail ran six regular expressions on each of
+500 lines every 5 s) and the dashboard's seen-release count, a `COUNT(DISTINCT)` over
+64,000 rows now reused for 30 s.
 
 **gx-torrent at rest** (same session): **1.45 % of a core**, of which 41 % syscalls and
 ~50 % `runtime.findRunnable` — uTP state packets and sends, incoming MSE handshakes

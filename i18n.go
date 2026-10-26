@@ -1,8 +1,10 @@
 package gextto
 
 import (
+	"crypto/sha256"
 	"database/sql"
 	_ "embed"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"sort"
@@ -156,6 +158,10 @@ func OpenI18nDb(path string) (*I18nDb, error) {
 		_ = db.Close()
 		return nil, fmt.Errorf("create settings table: %w", err)
 	}
+	if _, err := db.Exec("CREATE TABLE IF NOT EXISTS translation_seed (id INTEGER PRIMARY KEY CHECK (id = 1), digest TEXT NOT NULL);"); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("create translation seed table: %w", err)
+	}
 	return &I18nDb{db: db}, nil
 }
 
@@ -280,10 +286,40 @@ func (i *I18nDb) SetBulk(lang string, values map[string]string) error {
 	return tx.Commit()
 }
 
+// bundledTranslationsDigest fingerprints the bundled catalogs and fixes, so a
+// restart with the same catalogs can skip the merge.
+func bundledTranslationsDigest() string {
+	sum := sha256.New()
+	for _, raw := range []string{defaultTranslations, defaultGermanTranslations, defaultFrenchTranslations, defaultSpanishTranslations, defaultPolishTranslations, translationFixes} {
+		fmt.Fprintf(sum, "%d:", len(raw))
+		_, _ = sum.Write([]byte(raw))
+	}
+	return hex.EncodeToString(sum.Sum(nil))
+}
+
 // SeedDefaultTranslations merges the bundled default translations into the
 // database without overwriting existing entries. It returns how many rows were
-// added.
+// added. Parsing the catalogs and probing every key costs about a second of
+// CPU, so the merge is skipped while the database records the same catalogs as
+// already merged; deleting a language clears that record.
 func (i *I18nDb) SeedDefaultTranslations() (int, error) {
+	digest := bundledTranslationsDigest()
+	var seeded string
+	if err := i.db.QueryRow("SELECT digest FROM translation_seed WHERE id = 1").Scan(&seeded); err == nil && seeded == digest {
+		return 0, nil
+	}
+	inserted, err := i.mergeDefaultTranslations()
+	if err != nil {
+		return inserted, err
+	}
+	if _, err := i.db.Exec("INSERT INTO translation_seed(id, digest) VALUES (1, ?1) ON CONFLICT(id) DO UPDATE SET digest = excluded.digest", digest); err != nil {
+		return inserted, fmt.Errorf("record merged translations: %w", err)
+	}
+	return inserted, nil
+}
+
+// mergeDefaultTranslations does the merge SeedDefaultTranslations describes.
+func (i *I18nDb) mergeDefaultTranslations() (int, error) {
 	defer i.invalidateCache()
 	type parsedCatalog struct {
 		name     string
@@ -437,6 +473,10 @@ func (i *I18nDb) DeleteLang(lang string) (int, error) {
 	defer i.invalidateCache()
 	res, err := i.db.Exec("DELETE FROM translations WHERE lang=?1", storageLanguage(lang))
 	if err != nil {
+		return 0, err
+	}
+	// The bundled rows of the language come back at the next start.
+	if _, err := i.db.Exec("DELETE FROM translation_seed"); err != nil {
 		return 0, err
 	}
 	affected, err := res.RowsAffected()

@@ -868,9 +868,21 @@ func libraryGaps(s *AppState) ([]libraryGap, error) {
 	cfg := latestConfig(s)
 	airDates, _ := s.db.EpisodeAirDates()
 	result := []libraryGap{}
+	// The gaps of a season share one match: FindSeriesMatch tries every
+	// configured name and alias, so it runs once per series and season.
+	type seriesSeason struct {
+		series string
+		season int64
+	}
+	matches := map[seriesSeason]*SeriesConfig{}
 	for _, gap := range items {
-		season := gap.Season
-		series := cfg.FindSeriesMatch(gap.Series, &season)
+		key := seriesSeason{series: gap.Series, season: gap.Season}
+		series, known := matches[key]
+		if !known {
+			season := gap.Season
+			series = cfg.FindSeriesMatch(gap.Series, &season)
+			matches[key] = series
+		}
 		if series == nil {
 			continue
 		}
