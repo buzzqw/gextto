@@ -608,6 +608,37 @@ func recordTorrentErrorNotice(hash, kind string, now time.Time) bool {
 	return true
 }
 
+// indexerTestText is the user-facing line of the indexer test button: a
+// sentence with the indexer's name, where it is and what it answered, instead
+// of a trail of internal fields.
+func indexerTestText(kind, name, host string, reachable, ok bool, status int, torznabError string) string {
+	label := strings.TrimSpace(name)
+	if label == "" {
+		label = strings.TrimSpace(kind)
+	}
+	if label == "" {
+		label = "indexer"
+	}
+	kindTag := ""
+	if kind != "" && !strings.EqualFold(kind, "torznab") && !strings.EqualFold(kind, label) {
+		kindTag = " (" + kind + ")"
+	}
+	where := ""
+	if host = strings.TrimSpace(host); host != "" {
+		where = " at " + host
+	}
+	switch {
+	case !reachable:
+		return fmt.Sprintf("⚠️ The indexer «%s»%s%s did not answer the test: the service is unreachable", label, kindTag, where)
+	case torznabError != "":
+		return fmt.Sprintf("⚠️ The indexer «%s»%s%s answered the test with a Torznab error", label, kindTag, where)
+	case !ok:
+		return fmt.Sprintf("⚠️ The indexer «%s»%s%s answered the test with HTTP %d", label, kindTag, where, status)
+	default:
+		return fmt.Sprintf("✅ The indexer «%s»%s%s answered the test (HTTP %d)", label, kindTag, where, status)
+	}
+}
+
 // mediaInfoMismatchText explains a file whose real quality differs from the
 // release title stored in the database. It is the line that makes a stale
 // upgrade row visible: "the file says 480p h264, the recorded release says

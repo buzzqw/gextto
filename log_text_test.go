@@ -318,3 +318,59 @@ func TestCycleModeLabelNamesEveryKind(t *testing.T) {
 		}
 	}
 }
+
+func TestIndexerTestTextIsASentence(t *testing.T) {
+	cases := []struct {
+		name      string
+		kind      string
+		indexer   string
+		host      string
+		reachable bool
+		ok        bool
+		status    int
+		torznab   string
+		want      string
+	}{
+		{
+			name: "indexarr", kind: "indexarr", indexer: "indexarr", host: "192.168.1.161",
+			reachable: true, ok: true, status: 200,
+			want: "✅ The indexer «indexarr» at 192.168.1.161 answered the test (HTTP 200)",
+		},
+		{
+			name: "custom manager", kind: "indexarr", indexer: "my arr", host: "nas",
+			reachable: true, ok: true, status: 200,
+			want: "✅ The indexer «my arr» (indexarr) at nas answered the test (HTTP 200)",
+		},
+		{
+			name: "direct torznab", kind: "torznab", indexer: "mircrew", host: "192.168.1.161",
+			reachable: true, ok: false, status: 200, torznab: "Torznab 100: invalid API key",
+			want: "⚠️ The indexer «mircrew» at 192.168.1.161 answered the test with a Torznab error",
+		},
+		{
+			name: "unreachable", kind: "jackett", indexer: "jackett", host: "nas",
+			reachable: false, ok: false, status: 0,
+			want: "⚠️ The indexer «jackett» at nas did not answer the test: the service is unreachable",
+		},
+		{
+			name: "http error", kind: "prowlarr", indexer: "prowlarr", host: "nas",
+			reachable: true, ok: false, status: 500,
+			want: "⚠️ The indexer «prowlarr» at nas answered the test with HTTP 500",
+		},
+		{
+			name: "no host", kind: "indexarr", indexer: "indexarr",
+			reachable: true, ok: true, status: 200,
+			want: "✅ The indexer «indexarr» answered the test (HTTP 200)",
+		},
+	}
+	for _, test := range cases {
+		t.Run(test.name, func(t *testing.T) {
+			got := indexerTestText(test.kind, test.indexer, test.host, test.reachable, test.ok, test.status, test.torznab)
+			if got != test.want {
+				t.Fatalf("indexerTestText = %q, want %q", got, test.want)
+			}
+			if strings.Contains(got, " · ") || strings.Contains(got, "kind:") || strings.Contains(got, "error:") {
+				t.Fatalf("the line still carries internal fields: %q", got)
+			}
+		})
+	}
+}

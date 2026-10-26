@@ -371,19 +371,21 @@ func IndexerTest(w http.ResponseWriter, r *http.Request, s *AppState) {
 	case !ok:
 		message = fmt.Sprintf("HTTP %d", status)
 	}
-	// A direct Torznab service (e.g. mircrew-indexer) is neither Jackett nor
-	// Prowlarr: managerKind falls back to Jackett, which mislabels it.
+	// A direct Torznab service (e.g. mircrew-indexer) is neither a manager nor
+	// a known product: it is shown as "torznab" instead of guessing Jackett.
 	kind := "torznab"
 	if isManagerSource(input) {
 		kind = managerKind(input)
 	}
-	logging.Info("indexer test",
-		"kind", kind,
-		"name", strings.TrimSpace(input.Name),
-		"host", domain_of(rawURL),
-		"ok", ok,
-		"status", status,
-		"error", message)
+	text := indexerTestText(kind, input.Name, domain_of(rawURL), reachable, ok, status, torznabError)
+	if ok {
+		logging.Info(text)
+	} else {
+		logging.Warn(text)
+	}
+	if torznabError != "" {
+		logging.Debug("indexer test detail", "name", strings.TrimSpace(input.Name), "error", torznabError)
+	}
 	jsonResponse(w, map[string]any{
 		"ok":        ok,
 		"reachable": reachable,
