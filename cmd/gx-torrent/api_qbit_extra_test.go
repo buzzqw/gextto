@@ -402,11 +402,17 @@ func TestQbitTorrentsInfoCategoryTagAndState(t *testing.T) {
 		getJSONInto(t, srv.URL+"/api/v2/torrents/info?"+query, &list)
 		return len(list)
 	}
-	// The category/tag live in the published snapshot: wait until they show up.
-	deadline := time.Now().Add(3 * time.Second)
-	for count("category=movies") != 1 && time.Now().Before(deadline) {
-		time.Sleep(20 * time.Millisecond)
+	// The category and the tags live in the published snapshot and can land in
+	// two different publishes: wait for each of them, or the assertions below
+	// race the publisher (CI failed with "tag=sonarr returned 0, want 1").
+	waitCount := func(query string) {
+		deadline := time.Now().Add(3 * time.Second)
+		for count(query) != 1 && time.Now().Before(deadline) {
+			time.Sleep(20 * time.Millisecond)
+		}
 	}
+	waitCount("category=movies")
+	waitCount("tag=sonarr")
 	if n := count("category=movies"); n != 1 {
 		t.Fatalf("category=movies returned %d, want 1", n)
 	}
