@@ -66,7 +66,7 @@ change. `/ui` is not served. For operational checks use
 | GET | `/api/backup/settings` | backup settings |
 | POST | `/api/backup/settings` | save the backup settings |
 | POST | `/api/backup/test-ftp` | test the FTP backup destination |
-| GET | `/api/blocklist` | blocked releases |
+| GET | `/api/blocklist` | blocked releases, each with the expiry of a temporary block (empty = permanent) |
 | POST | `/api/blocklist/{hash}/remove` | remove a blocklist entry |
 | GET | `/api/browse_dir` | list a directory for the folder picker (?path=; files=video also lists its video files) |
 | GET | `/api/browser-handlers/download` | download a browser integration script or .desktop file |

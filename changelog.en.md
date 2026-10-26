@@ -15,6 +15,8 @@ manual is online: [English](docs/MANUAL.en.md) ·
 
 ## 26 October 2026
 
+- **A 4K without seeders is back in play when its swarm revives.** When Gextto gave up on a download because nobody in the swarm had the complete file, the release stayed blocklisted forever: if the 4K came back to life a week later it was never tried again and the 1080p stayed. The block now lasts a configurable period (seven days by default, in *Stalled torrents → Let a release without seeders back in after*; 0 keeps it blocked forever) and when it expires the release is back among the candidates: if it has found seeders in the meantime it is downloaded as an upgrade, while until then the copy in the library stays where it is. On the Blocklist page the new *Expires* column shows the date, or "forever" for the blocks you decide, and the log says when the release can be tried again.
+
 - **qBittorrent 5.3: the engine works again with 5.2 and 5.3 too.** With qBittorrent 5.2 and 5.3 Gextto could no longer reach the Web API (the login answer changed), so the engine looked unreachable; since 5.0 torrents added paused started at once and the per-torrent seed limits were refused. Gextto now understands both generations of the Web API and works with qBittorrent-nox 4.6 and later, including the 5.3 release installed by managed mode. No setting needs to change: update Gextto and restart the service.
 
 - **The indexer test speaks naturally.** The log line is no longer a row of technical fields ("indexer test · kind: … · name: … · host: … · ok: … · status: …"): it is now a sentence, for example "✅ The indexer «indexarr» at 192.168.1.161 answered the test (HTTP 200)", or "⚠️ The indexer «indexarr» … did not answer the test: the service is unreachable" when the service does not answer.

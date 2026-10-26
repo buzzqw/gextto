@@ -128,6 +128,7 @@ var uiSettingMetaByKey = map[string]uiSettingMeta{
 	"torrent_stall_retry_min":       {Unit: "minuti"},
 	"torrent_stall_giveup_min":      {Unit: "minuti", Zero: "0 = mai"},
 	"torrent_dead_swarm_giveup_min": {Unit: "minuti", Zero: "0 = usa la soglia generale"},
+	"torrent_dead_swarm_blocklist_days": {Unit: "giorni", Zero: "0 = per sempre"},
 
 	// Identità annunciata dal motore gx-torrent.
 	"gxtorrent_client_identity": {Kind: "select", Options: []uiFormOption{

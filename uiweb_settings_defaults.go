@@ -82,6 +82,7 @@ var uiSettingDefaults = map[string]string{
 	"torrent_stall_retry_min":             "60",
 	"torrent_stall_giveup_min":            "20160",
 	"torrent_dead_swarm_giveup_min":       "30",
+	"torrent_dead_swarm_blocklist_days":   "7",
 	"torrent_sequential":                  "false",
 	"torrent_first_last":                  "false",
 	"torrent_active_downloads":            "3",

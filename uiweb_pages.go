@@ -1744,6 +1744,7 @@ func uiTableSpecFor(view string) (uiTableSpec, bool) {
 				{Key: "reason", Label: "Motivo"},
 				{Key: "kind", Label: "Tipo"},
 				{Key: "created_at", Label: "Aggiunto"},
+				{Key: "expires_at", Label: "Scade", Format: "expiry"},
 			}),
 			ActionsJSON: uiJSON([]uiAction{
 				{Label: "Rimuovi", Class: "danger", Method: "POST", Path: "/api/blocklist/{hash}/remove", Body: "{}", Confirm: "Rimuovere questa voce dalla blocklist?"},

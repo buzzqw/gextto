@@ -940,10 +940,19 @@ func (d *Database) migrate() error {
 		{"blocklist", "episode", "INTEGER"},
 		{"blocklist", "movie_name", "TEXT DEFAULT ''"},
 		{"blocklist", "movie_year", "INTEGER"},
+		// A release dropped for a dead swarm is blocked only for a while: the
+		// swarm can revive and the better copy must be picked up later.
+		{"blocklist", "expires_at", "TEXT"},
 	} {
 		if err := ensureColumn(d.db, column.table, column.name, column.definition); err != nil {
 			logging.Warn("schema migration: cannot ensure column", "table", column.table, "column", column.name, "error", err)
 		}
+	}
+	// Entries already blocked for a dead swarm get the default expiry too, so an
+	// installation that upgrades does not keep them blocked forever. The next
+	// failure follows the configured period instead.
+	if _, err := d.db.Exec("UPDATE blocklist SET expires_at = datetime(created_at, '+7 days') WHERE lower(reason) = 'dead_swarm' AND (expires_at IS NULL OR expires_at = '')"); err != nil {
+		logging.Warn("schema migration: cannot set the expiry of the dead-swarm blocks", "error", err)
 	}
 	// "Visti nei feed": tutte le release che passano dalle sorgenti.
 	if _, err := d.db.Exec(databaseFeedSeenSchema); err != nil {
@@ -2305,17 +2314,40 @@ func (d *Database) MovieMediaInfo(name string, year *int64) (map[string]any, err
 	return parseMediaInfoJSON(raw), nil
 }
 
+// blocklistAliveSQL is the condition a row must satisfy to still count: an
+// entry with no expiry, or one whose expiry is in the future. A dead-swarm
+// block is temporary, so the release can be chosen again once its swarm
+// revives; the operator's own blocklist entries have no expiry and stay.
+const blocklistAliveSQL = `(expires_at IS NULL OR expires_at = '' OR expires_at > ?1)`
+
+// purgeExpiredBlocklist deletes the entries whose block has expired. It runs
+// with the cycle snapshot and when the page is read, so an expired entry does
+// not linger in the database and in the UI.
+func (d *Database) purgeExpiredBlocklist(now time.Time) {
+	result, err := d.db.Exec("DELETE FROM blocklist WHERE expires_at IS NOT NULL AND expires_at <> '' AND expires_at <= ?1", sqliteTimestamp(now))
+	if err != nil {
+		logging.Debug("could not remove the expired blocklist entries", "error", err)
+		return
+	}
+	if removed, raErr := result.RowsAffected(); raErr == nil && removed > 0 {
+		logging.Debug("expired blocklist entries removed; those releases can be chosen again", "count", removed)
+	}
+}
+
 // IsBlocklisted reports whether a hash is in the blocklist.
 func (d *Database) IsBlocklisted(hash string) (bool, error) {
 	var exists bool
-	err := d.db.QueryRow("SELECT EXISTS(SELECT 1 FROM blocklist WHERE magnet_hash=?1)", strings.ToLower(hash)).Scan(&exists)
+	err := d.db.QueryRow("SELECT EXISTS(SELECT 1 FROM blocklist WHERE "+blocklistAliveSQL+" AND magnet_hash=?2)",
+		nowSQLite(), strings.ToLower(hash)).Scan(&exists)
 	return exists, err
 }
 
 // BlocklistedHashes loads the immutable blocklist snapshot used during one
-// orchestration cycle.
+// orchestration cycle. Entries whose block has expired are dropped first: they
+// are no longer a block, so the cycle must be free to pick those releases.
 func (d *Database) BlocklistedHashes() (map[string]struct{}, error) {
-	rows, err := d.db.Query("SELECT lower(magnet_hash) FROM blocklist")
+	d.purgeExpiredBlocklist(time.Now())
+	rows, err := d.db.Query("SELECT lower(magnet_hash) FROM blocklist WHERE " + blocklistAliveSQL, nowSQLite())
 	if err != nil {
 		return nil, err
 	}
@@ -2331,8 +2363,15 @@ func (d *Database) BlocklistedHashes() (map[string]struct{}, error) {
 	return hashes, rows.Err()
 }
 
-// Blocklist adds a release to the blocklist.
+// Blocklist adds a release to the blocklist for good.
 func (d *Database) Blocklist(release *models.Release, reason string) error {
+	return d.BlocklistUntil(release, reason, time.Time{})
+}
+
+// BlocklistUntil adds a release to the blocklist until `until`; after that the
+// entry stops counting and the release returns among the candidates. A zero
+// `until` means forever (see Blocklist).
+func (d *Database) BlocklistUntil(release *models.Release, reason string, until time.Time) error {
 	hash, err := releaseIdentityHash(release)
 	if err != nil {
 		return err
@@ -2343,25 +2382,33 @@ func (d *Database) Blocklist(release *models.Release, reason string) error {
 		movieName = release.Title
 		movieYear = release.Year
 	}
+	var expiresAt any
+	if !until.IsZero() {
+		expiresAt = sqliteTimestamp(until)
+	}
 	_, err = d.db.Exec(
-		"INSERT OR REPLACE INTO blocklist(magnet_hash,title,reason,created_at,kind,series_name,season,episode,movie_name,movie_year) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)",
-		hash, release.Title, reason, nowSQLite(), release.Kind, release.Series, release.Season, release.Episode, movieName, movieYear,
+		"INSERT OR REPLACE INTO blocklist(magnet_hash,title,reason,created_at,kind,series_name,season,episode,movie_name,movie_year,expires_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11)",
+		hash, release.Title, reason, nowSQLite(), release.Kind, release.Series, release.Season, release.Episode, movieName, movieYear, expiresAt,
 	)
 	return err
 }
 
-// BlocklistEntries returns the blocklist entries for the UI/API.
+// BlocklistEntries returns the blocklist entries for the UI/API. Expired
+// entries are dropped first, so the page never shows a block that no longer
+// applies.
 func (d *Database) BlocklistEntries(limit int64) ([]any, error) {
-	rows, err := d.db.Query("SELECT magnet_hash,title,reason,created_at,COALESCE(kind,''),COALESCE(series_name,''),season,episode,COALESCE(movie_name,''),movie_year FROM blocklist ORDER BY created_at DESC LIMIT ?1", clampInt64(limit, 1, 1000))
+	d.purgeExpiredBlocklist(time.Now())
+	rows, err := d.db.Query("SELECT magnet_hash,title,reason,created_at,COALESCE(kind,''),COALESCE(series_name,''),season,episode,COALESCE(movie_name,''),movie_year,COALESCE(expires_at,'') FROM blocklist WHERE "+blocklistAliveSQL+" ORDER BY created_at DESC LIMIT ?2",
+		nowSQLite(), clampInt64(limit, 1, 1000))
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 	entries := make([]any, 0)
 	for rows.Next() {
-		var hash, title, reason, createdAt, kind, seriesName, movieName string
+		var hash, title, reason, createdAt, kind, seriesName, movieName, expiresAt string
 		var season, episode, movieYear sql.NullInt64
-		if err := rows.Scan(&hash, &title, &reason, &createdAt, &kind, &seriesName, &season, &episode, &movieName, &movieYear); err != nil {
+		if err := rows.Scan(&hash, &title, &reason, &createdAt, &kind, &seriesName, &season, &episode, &movieName, &movieYear, &expiresAt); err != nil {
 			return nil, err
 		}
 		var seasonValue, episodeValue, movieYearValue any
@@ -2385,6 +2432,7 @@ func (d *Database) BlocklistEntries(limit int64) ([]any, error) {
 			"episode":     episodeValue,
 			"movie_name":  movieName,
 			"movie_year":  movieYearValue,
+			"expires_at":  expiresAt,
 		})
 	}
 	return entries, rows.Err()

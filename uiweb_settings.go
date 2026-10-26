@@ -246,6 +246,7 @@ var uiSettingsIndex = []uiSettingDef{
 	{Key: "torrent_stall_retry_min", Label: "Riprova i torrent bloccati ogni", Tab: "seeding", Group: "Torrent bloccati"},
 	{Key: "torrent_stall_giveup_min", Label: "Rimuovi i torrent bloccati dopo", Tab: "seeding", Group: "Torrent bloccati"},
 	{Key: "torrent_dead_swarm_giveup_min", Label: "Rimuovi i torrent senza seeder dopo", Tab: "seeding", Group: "Torrent bloccati"},
+	{Key: "torrent_dead_swarm_blocklist_days", Label: "Riammetti una release senza seeder dopo", Tab: "seeding", Group: "Torrent bloccati"},
 	{Key: "stall_alternative_after_min", Label: "Prova un'alternativa dopo (stallo)", Tab: "seeding", Group: "Torrent bloccati"},
 	{Key: "stall_alternative_score_drop", Label: "Punteggio in meno per l'alternativa", Tab: "seeding", Group: "Torrent bloccati"},
 

@@ -2382,6 +2382,7 @@ spazio del `tmpfs`, come prima.
 | Riprova i torrent bloccati ogni | Intervallo tra i tentativi di reannounce dei torrent stalled. *(Unità: minuti)* |
 | Rimuovi i torrent bloccati dopo | Dopo questo periodo senza progresso il torrent viene rimosso automaticamente. Imposta 0 per disattivare completamente la rimozione automatica per stallo. *(Unità: minuti; 0 = mai)* |
 | Rimuovi i torrent senza seeder dopo | Stallo con zero seeder (dead swarm): rimosso dopo questo periodo, più breve, e la puntata viene ricercata di nuovo subito. Imposta 0 per usare la soglia generale. *(Unità: minuti; 0 = usa la soglia generale)* |
+| Riammetti una release senza seeder dopo | Una release abbandonata perché lo swarm non aveva seeder resta in blocklist per questo periodo, poi torna fra i candidati: così un 4K che nel frattempo ha trovato seeder può essere scaricato come upgrade. La copia già in libreria resta nel frattempo. Imposta 0 per tenerla bloccata per sempre. *(Unità: giorni; 0 = per sempre)* |
 
 ### Dove salvare
 

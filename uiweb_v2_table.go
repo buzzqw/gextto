@@ -920,6 +920,14 @@ func v2Fmt(value any, format string) string {
 		return v2CompactDateTime(v2String(value))
 	case "date":
 		return v2CompactDate(v2String(value))
+	case "expiry":
+		// An empty expiry is a block that stays: the operator blocklists a
+		// release by hand, or the behaviour is set to permanent.
+		raw := strings.TrimSpace(v2String(value))
+		if raw == "" {
+			return "per sempre"
+		}
+		return v2CompactDate(raw)
 	}
 	return v2String(value)
 }

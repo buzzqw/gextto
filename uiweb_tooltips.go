@@ -16,6 +16,7 @@ var uiSettingTooltipText = map[string]string{
 	"torrent_stall_retry_min":              "Intervallo tra i tentativi di reannounce dei torrent stalled.",
 	"torrent_stall_giveup_min":             "Dopo questo periodo senza progresso il torrent viene rimosso automaticamente. Imposta 0 per disattivare completamente la rimozione automatica per stallo.",
 	"torrent_dead_swarm_giveup_min":        "Stallo con zero seeder (dead swarm): rimosso dopo questo periodo, più breve, e la puntata viene ricercata di nuovo subito. Imposta 0 per usare la soglia generale.",
+	"torrent_dead_swarm_blocklist_days":    "Una release abbandonata perché lo swarm non aveva seeder resta in blocklist per questo periodo: quando scade torna fra i candidati, così un 4K che nel frattempo ha trovato seeder può essere scaricato come upgrade. 0 la tiene bloccata per sempre.",
 	"torrent_sequential":                   "Scarica i file in ordine sequenziale invece che a pezzi sparsi.",
 	"torrent_first_last":                   "Scarica per primi l'inizio e la fine di ogni file in tutti i nuovi torrent, poi prosegue normalmente: utile per guardare un video mentre scarica. Vale con ogni motore; i torrent già in corso non cambiano.",
 	"torrent_active_downloads":             "Valore base dei download attivi; con la coda dinamica viene adattato a runtime.",

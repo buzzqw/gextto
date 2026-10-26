@@ -209,7 +209,11 @@ each other), and a healthy swarm earns a small bonus capped below
 `upgrade_min_score_diff`. A source that does not report seeders (the `-1` sentinel,
 most RSS/feed releases) stays neutral, and the adjustment is never folded into
 `ReleaseScore`, so archived files and the UI keep the plain score. Quality stays
-sovereign: a dead 4K still beats a healthy 1080p.
+sovereign: a dead 4K still beats a healthy 1080p. A release abandoned for a dead
+swarm is blocklisted only for a while (`torrent_dead_swarm_blocklist_days`, seven
+days by default): when the block expires the release returns among the candidates,
+so a better copy whose swarm has revived is still picked up as an upgrade, while
+the operator's own blocklist entries stay forever.
 
 **A vanished library volume is not a mass deletion.** Resetting an episode because
 its file is gone (`archiveFileConfirmedMissing`) is bounded: at most

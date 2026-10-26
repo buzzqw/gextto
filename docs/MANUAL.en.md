@@ -2307,6 +2307,7 @@ files. When the memory cannot be read, only the `tmpfs` space counts, as before.
 | Retry stalled torrents every | Interval between reannounce attempts for stalled torrents. *(Unit: minutes)* |
 | Remove stalled torrents after | After this period without progress, the torrent is removed automatically. Set 0 to completely disable automatic removal due to stalling. *(Unit: minutes; 0 = never)* |
 | Remove torrents without seeders after | Stall with zero seeders (dead swarm): removed after this shorter period, and the episode is searched again right away. Set 0 to use the general threshold. *(Unit: minutes; 0 = use the general threshold)* |
+| Let a release without seeders back in after | A release abandoned because its swarm had no seeders stays blocklisted for this period, then it is back among the candidates: a 4K that has found seeders in the meantime can be downloaded as an upgrade. The copy already in the library stays meanwhile. Set 0 to keep it blocked forever. *(Unit: days; 0 = forever)* |
 
 ### Where to store
 

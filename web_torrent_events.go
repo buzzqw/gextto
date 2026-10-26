@@ -818,6 +818,23 @@ func tev_upgradeHasLibraryCopy(db *Database, hash string) bool {
 	return false
 }
 
+// tev_deadSwarmBlocklistTTL is how long a release abandoned for a dead swarm
+// stays blocklisted. A swarm can revive, so the release returns among the
+// candidates after this window and can still be picked up as an upgrade; zero
+// keeps it blocked forever.
+func tev_deadSwarmBlocklistTTL(cfg *Config) time.Duration {
+	days := numberSettingInt(cfg.Settings, "torrent_dead_swarm_blocklist_days", 7)
+	if days <= 0 {
+		return 0
+	}
+	// A century is already forever for a swarm; the cap keeps an absurd value
+	// from overflowing the duration and turning into a negative date.
+	if days > 36500 {
+		days = 36500
+	}
+	return time.Duration(days) * 24 * time.Hour
+}
+
 // tev_abandonTorrent removes a download that cannot complete, restores the
 // previous library copy when it was an upgrade, blocklists the release and
 // clears the gap so the next search can look for another version.
@@ -831,8 +848,13 @@ func tev_abandonTorrent(cfg *Config, db *Database, torrents TorrentSession, noti
 	restored, _ := db.RestoreUpgrade(torrent.Hash)
 	restored = restored || salvageRestored
 	_ = db.MarkTorrentError(torrent.Hash, code)
+	ttl := tev_deadSwarmBlocklistTTL(cfg)
 	if metadata != nil {
-		_ = db.Blocklist(&metadata.Release, "dead_swarm")
+		if ttl > 0 {
+			_ = db.BlocklistUntil(&metadata.Release, "dead_swarm", time.Now().Add(ttl))
+		} else {
+			_ = db.Blocklist(&metadata.Release, "dead_swarm")
+		}
 	}
 	nextStep := "the next search will look for another version"
 	if hasLibraryCopy {
@@ -841,8 +863,12 @@ func tev_abandonTorrent(cfg *Config, db *Database, torrents TorrentSession, noti
 	if salvaged > 0 {
 		nextStep = "the next search will look for the episodes still missing"
 	}
-	logging.Warn(fmt.Sprintf("❌ Gave up on %s: %s. It is removed; %s.",
-		tev_userLabel(db, torrent), why, nextStep), "hash", torrent.Hash)
+	revival := ""
+	if ttl > 0 {
+		revival = fmt.Sprintf(" It can be tried again in %s.", countLabel(int64(ttl/(24*time.Hour)), "day", "days"))
+	}
+	logging.Warn(fmt.Sprintf("❌ Gave up on %s: %s. It is removed; %s.%s",
+		tev_userLabel(db, torrent), why, nextStep, revival), "hash", torrent.Hash)
 	if tev_removeFailedTorrent(torrents, torrent.Hash) {
 		_ = db.MarkTorrentRemovedAt(torrent.Hash)
 	}
