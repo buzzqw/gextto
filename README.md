@@ -54,7 +54,7 @@ one.
 | **Footprint** | 60–64 MB and 1–2 % of a core idle; 44–48 % of one Intel N97 core at 8–9 MB/s |
 | **Protocol** | BitTorrent v1, v2 and hybrid (BEP 52) · 34 BEPs implemented and tested ([list](docs/bep.md)) |
 | **Network** | TCP + uTP on one port · UPnP, NAT-PMP, PCP · BEP 55 holepunching · SOCKS5/HTTP proxy · VPN killswitch |
-| **Automation** | TV series, movies, comics · Torznab (Jackett, Prowlarr) · RSS · web search · stuck-download replacement |
+| **Automation** | TV series, movies, comics · Torznab (Jackett, Prowlarr, indexarr) · RSS · web search · stuck-download replacement |
 | **Integrations** | Jellyfin, Plex, Jellyseerr (v3 API subset), aMule (eD2k and Kad), Telegram, e-mail, Discord/Slack/ntfy/Gotify/Pushover, iCal |
 | **Interfaces** | Web UI (SSR + HTMX, pure Go, installable PWA) · terminal TUI over SSH · JSON API |
 | **Build** | Pure Go (`CGO_ENABLED=0`) · Linux x86_64/aarch64 · gx-torrent also on Windows |
@@ -192,11 +192,13 @@ checkout: `git pull --ff-only && ./scripts/update.sh`.
   episodes that exist.
 - **Stuck-download recovery.** A download that stops progressing, or a magnet
   stuck waiting for metadata, is superseded by a valid alternative after a
-  configurable window; the abandoned release is blocklisted.
+  configurable window; the abandoned release is blocklisted (one abandoned
+  for lack of seeders only for a configurable period, so it is retried if the
+  swarm recovers).
 - **Sources.** RSS feeds, HTML listings (ext.to, TorrentGalaxy, Corsaro),
-  Torznab indexers and the Jackett/Prowlarr managers, web search, optional
+  Torznab indexers and the Jackett/Prowlarr/indexarr managers, web search, optional
   FlareSolverr. The managers are searched **one indexer at a time**, each at the
-  pace it really serves, a tracker present in both only once, a slow tracker
+  pace it really serves, a tracker present in more than one only once, a slow tracker
   costing only its own results.
 - **eD2k and Kad through aMule, when torrents find nothing.** Optional and off by
   default: Gextto drives an `amuled` you run (External Connections protocol,
@@ -451,8 +453,8 @@ the UI, bottom right.
 Gextto is a **download automation tool**. It does not host, index or distribute
 any copyrighted content.
 
-- It connects to **indexers you configure** (Jackett, Prowlarr, public RSS
-  feeds). It ships no index of its own.
+- It connects to **indexers you configure** (Jackett, Prowlarr, indexarr, public
+  RSS feeds). It ships no index of its own.
 - What you download is **your responsibility**. Use Gextto only for content you
   have the right to access — public domain, Creative Commons, or media you own.
 - BitTorrent and the engines Gextto drives are neutral technology; this project

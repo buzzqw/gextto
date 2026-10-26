@@ -55,7 +55,7 @@ altro.
 | **Consumi** | 60–64 MB e 1–2 % di un core a riposo; 44–48 % di un core Intel N97 a 8–9 MB/s |
 | **Protocollo** | BitTorrent v1, v2 e ibrido (BEP 52) · 34 BEP implementati e testati ([elenco](docs/bep.md)) |
 | **Rete** | TCP + uTP su una porta · UPnP, NAT-PMP, PCP · holepunching BEP 55 · proxy SOCKS5/HTTP · killswitch VPN |
-| **Automazione** | Serie TV, film, fumetti · Torznab (Jackett, Prowlarr) · RSS · ricerca web · sostituzione dei download bloccati |
+| **Automazione** | Serie TV, film, fumetti · Torznab (Jackett, Prowlarr, indexarr) · RSS · ricerca web · sostituzione dei download bloccati |
 | **Integrazioni** | Jellyfin, Plex, Jellyseerr (sottoinsieme API v3), aMule (eD2k e Kad), Telegram, e-mail, Discord/Slack/ntfy/Gotify/Pushover, iCal |
 | **Interfacce** | Web UI (SSR + HTMX, Go puro, PWA installabile) · TUI da terminale via SSH · API JSON |
 | **Build** | Go puro (`CGO_ENABLED=0`) · Linux x86_64/aarch64 · gx-torrent anche su Windows |
@@ -196,11 +196,13 @@ un checkout: `git pull --ff-only && ./scripts/update.sh`.
   legge entro gli episodi che esistono.
 - **Recupero dei download bloccati.** Un download che smette di avanzare, o un
   magnet fermo in attesa dei metadati, viene sostituito da un'alternativa valida
-  dopo una finestra configurabile; la release abbandonata va in blocklist.
+  dopo una finestra configurabile; la release abbandonata va in blocklist (quella
+  abbandonata per mancanza di seeder solo per un periodo configurabile, così
+  viene riprovata se lo swarm si riprende).
 - **Sorgenti.** Feed RSS, elenchi HTML (ext.to, TorrentGalaxy, Corsaro),
-  indexer Torznab e i gestori Jackett/Prowlarr, ricerca web, FlareSolverr
+  indexer Torznab e i gestori Jackett/Prowlarr/indexarr, ricerca web, FlareSolverr
   opzionale. I gestori vengono interrogati **un indexer alla volta**, ognuno al
-  ritmo che regge davvero, un tracker presente in entrambi una volta sola, e un
+  ritmo che regge davvero, un tracker presente in più gestori una volta sola, e un
   tracker lento perde solo i propri risultati.
 - **eD2k e Kad tramite aMule, quando i torrent non trovano nulla.** Opzionale e
   spento di default: Gextto pilota un `amuled` che fai girare tu (protocollo
@@ -469,8 +471,8 @@ basso a destra.
 Gextto è uno **strumento di automazione dei download**. Non ospita, indicizza né
 distribuisce contenuti protetti da diritto d'autore.
 
-- Si collega agli **indexer che configuri tu** (Jackett, Prowlarr, feed RSS
-  pubblici). Non include alcun indice proprio.
+- Si collega agli **indexer che configuri tu** (Jackett, Prowlarr, indexarr, feed
+  RSS pubblici). Non include alcun indice proprio.
 - Ciò che scarichi è **una tua responsabilità**. Usa Gextto solo per contenuti a
   cui hai diritto di accedere — pubblico dominio, Creative Commons o media che
   possiedi.
