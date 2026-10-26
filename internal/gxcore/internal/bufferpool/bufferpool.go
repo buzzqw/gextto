@@ -30,6 +30,15 @@ func (p *Pool) Get(datalen int) Buffer {
 	return b
 }
 
+// GetUncleared is Get without zeroing Data. It is only for a caller that
+// overwrites every byte of Data before anything reads it — a block read with
+// io.ReadFull, a piece whose blocks cover it whole — and saves a clear of the
+// buffer per block and per piece on the download path.
+func (p *Pool) GetUncleared(datalen int) Buffer {
+	backing := p.pool.Get().(*[]byte)
+	return Buffer{Data: (*backing)[:datalen], buf: backing, pool: p}
+}
+
 // Buffer is a pooled byte slice. Data is the working window; buf is the
 // full backing array returned to the pool on Release.
 type Buffer struct {

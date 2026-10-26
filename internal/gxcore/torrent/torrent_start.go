@@ -384,7 +384,14 @@ func (t *torrent) startSinglePieceDownloader(pe *peer.Peer) (started bool) {
 	if pi == nil {
 		return false
 	}
-	pd := piecedownloader.New(pi, pe, allowedFast, t.piecePool.Get(int(pi.Length)))
+	// The blocks of a piece without padding cover all of it before it is
+	// hashed, so its buffer needs no clearing; padding bytes are never
+	// received and must read as zero.
+	buf := t.piecePool.GetUncleared(int(pi.Length))
+	if pi.Data.HasPadding() {
+		clear(buf.Data)
+	}
+	pd := piecedownloader.New(pi, pe, allowedFast, buf)
 	t.prefillBlocks(pd)
 	if m := t.pieceDownloaders[pe]; m != nil {
 		if _, ok := m[pi.Index]; ok {

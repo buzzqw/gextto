@@ -305,6 +305,21 @@ func (t *torrent) selectedBytes() (total, done int64) {
 	}
 	skip := t.skippedPieces(t.skippedInfoFiles())
 	pieceLength := int64(t.info().PieceLength)
+	if n := t.info().NumPieces; skip == nil && n > 0 && (t.bitfield == nil || t.bitfield.Len() == n) {
+		// Every piece wanted: the size of the torrent, and the done pieces
+		// from a popcount instead of a test per piece.
+		lastLength := t.info().Length - pieceLength*int64(n-1)
+		total = pieceLength*int64(n-1) + lastLength
+		if t.bitfield != nil {
+			have := int64(t.bitfield.Count())
+			if t.bitfield.Test(n - 1) {
+				done = (have-1)*pieceLength + lastLength
+			} else {
+				done = have * pieceLength
+			}
+		}
+		return total, done
+	}
 	for i := uint32(0); i < t.info().NumPieces; i++ {
 		if skip != nil && skip[i] {
 			continue

@@ -107,6 +107,16 @@ func newTestDaemonWith(t *testing.T, network NetworkOptions) *Daemon {
 
 // newTestDaemonFull is newTestDaemonWith with a standalone settings store, set
 // before the run loop starts (so no goroutine reads the field concurrently).
+// testDaemonTick is the queue tick of the test daemons: 50 ms keeps the tests
+// fast, GX_TEST_TICK (a Go duration, e.g. 3s as in production) lets a
+// measurement profile the engine with the real sampling load.
+func testDaemonTick() time.Duration {
+	if d, err := time.ParseDuration(os.Getenv("GX_TEST_TICK")); err == nil && d > 0 {
+		return d
+	}
+	return 50 * time.Millisecond
+}
+
 func newTestDaemonFull(t testing.TB, network NetworkOptions, store *settings.Store) *Daemon {
 	t.Helper()
 	// Touch t.TempDir first: its cleanup (removing the whole per-test temp tree)
@@ -128,7 +138,7 @@ func newTestDaemonFull(t testing.TB, network NetworkOptions, store *settings.Sto
 		Network:     network,
 		Settings:    store,
 		Debug:       os.Getenv("GX_TEST_DEBUG") == "1",
-		Tick:        50 * time.Millisecond,
+		Tick:        testDaemonTick(),
 		ProbeWindow: time.Minute,
 		// Opt-in mmap storage, so the local-swarm harness can exercise the
 		// ranged-flush path under real concurrent piece writes.

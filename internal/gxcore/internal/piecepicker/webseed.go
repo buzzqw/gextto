@@ -139,10 +139,16 @@ func (p *PiecePicker) peerStealsFromWebseed(pe *peer.Peer) *myPiece {
 // findGaps lists the BEP 19 gaps — runs of webseed-fetchable pieces —
 // capped at maxWebseedPieces per gap.
 func (p *PiecePicker) findGaps() []Range {
-	a := make([]Range, 0, len(p.pieces)/2)
+	return p.appendGaps(make([]Range, 0, len(p.pieces)/2))
+}
+
+// appendGaps appends the webseed gaps to dst. The pieces are read in place: a
+// copy of each one per call was most of the cost of a pick.
+func (p *PiecePicker) appendGaps(dst []Range) []Range {
 	var inGap bool
 	var begin uint32
-	for _, pi := range p.pieces {
+	for i := range p.pieces {
+		pi := &p.pieces[i]
 		if !inGap {
 			if pi.AvailableForWebseed() {
 				begin = pi.Index
@@ -153,29 +159,54 @@ func (p *PiecePicker) findGaps() []Range {
 		r := Range{Begin: begin, End: pi.Index}
 		switch {
 		case !pi.AvailableForWebseed():
-			a = append(a, r)
+			dst = append(dst, r)
 			inGap = false
 		case r.Len() == p.maxWebseedPieces:
-			a = append(a, r)
+			dst = append(dst, r)
 			begin = pi.Index
 		}
 	}
 	if inGap {
-		a = append(a, Range{Begin: begin, End: uint32(len(p.pieces))})
+		dst = append(dst, Range{Begin: begin, End: uint32(len(p.pieces))})
 	}
-	return a
+	return dst
 }
 
 // pickLastPieceOfSmallestGap offers a peer the tail-most fetchable piece of
 // the smallest gap first, skipping requested pieces, ones the peer lacks,
-// and choked non-allowed-fast ones.
+// and choked non-allowed-fast ones. It runs at every pick of every peer
+// while a webseed downloads, so the gaps go to reused buffers and are ordered
+// by a counting sort on their length (bounded by maxWebseedPieces).
 func (p *PiecePicker) pickLastPieceOfSmallestGap(pe *peer.Peer) *myPiece {
-	gaps := p.findGaps()
+	p.gapScratch = p.appendGaps(p.gapScratch[:0])
+	gaps := p.gapScratch
 	if len(gaps) == 0 {
 		return nil
 	}
-	slices.SortFunc(gaps, func(a, b Range) int { return cmp.Compare(a.Len(), b.Len()) })
+	longest := 0
 	for _, gap := range gaps {
+		longest = max(longest, gap.Len())
+	}
+	if cap(p.gapCounts) < longest+2 {
+		p.gapCounts = make([]int, longest+2)
+	}
+	counts := p.gapCounts[:longest+2]
+	clear(counts)
+	for _, gap := range gaps {
+		counts[gap.Len()+1]++
+	}
+	for i := 1; i < len(counts); i++ {
+		counts[i] += counts[i-1]
+	}
+	if cap(p.gapOrder) < len(gaps) {
+		p.gapOrder = make([]Range, len(gaps))
+	}
+	order := p.gapOrder[:len(gaps)]
+	for _, gap := range gaps {
+		order[counts[gap.Len()]] = gap
+		counts[gap.Len()]++
+	}
+	for _, gap := range order {
 		// int: the loop runs below zero.
 		for i := int(gap.End - 1); i >= int(gap.Begin); i-- {
 			mp := &p.pieces[i]

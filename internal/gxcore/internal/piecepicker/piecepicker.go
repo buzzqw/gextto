@@ -32,7 +32,14 @@ type PiecePicker struct {
 	maxDuplicateDownload int
 	maxWebseedPieces     int
 	available            uint32
-	endgame              bool
+
+	// gapScratch, gapOrder and gapCounts are reused by every peer pick while
+	// a webseed downloads (pickLastPieceOfSmallestGap), which used to allocate
+	// and sort a gap list per pick.
+	gapScratch []Range
+	gapOrder   []Range
+	gapCounts  []int
+	endgame    bool
 
 	// highPriority counts the high-priority pieces (RefreshPriorities), so
 	// pickHigh skips its full scan when there are none, the usual case.
@@ -60,7 +67,7 @@ type myPiece struct {
 	// holders counts the connected peers that have the piece. Who they are
 	// is in each peer's bitfield (heldBy); a holder list cost one pointer per
 	// piece and peer (35 MB of heap with 150 peers on three ISOs).
-	holders uint32
+	holders   uint32
 	Requested sliceset.SliceSet[peer.Peer]
 	Snubbed   sliceset.SliceSet[peer.Peer]
 	Choked    sliceset.SliceSet[peer.Peer]

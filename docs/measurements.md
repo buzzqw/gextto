@@ -51,7 +51,7 @@ Cheap probes and opt-in tests, all outside CI:
 | `make measure-seeding` | local swarm, seeder plus 3 leechers by default, distinct `127.0.0.x` addresses. `GX_MEASURE_SUPERSEED=1` compares super-seeding, `GX_MEASURE_MESH=1` connects the leechers to each other, `GX_MEASURE_LEECHERS=N` sets the size |
 | `make measure-choking` | the choking campaign: a real **libtorrent** leecher on loopback (`scripts/libtorrent-leech.py`, needs `python3-libtorrent`), plus a real-swarm half that needs an inbound port |
 | `make measure-pipeline` | the adaptive request queue at shallow (4/4), default (50/250) and deep (200/500) depth; the knobs travel in `NetworkOptions` (`MaxRequestsOut`/`DefaultRequestsOut`) |
-| `make measure-realswarm GX_MEASURE_REAL=<public.torrent>` | a public torrent with DHT, trackers and uTP (`GX_MEASURE_REAL_SECONDS`, default 120 s): peers, uTP split, socket counters. A comma-separated list runs all the torrents together, all active, and adds the CPU of the process and the CPU per 100 MB. A run that sees no peer fails, so it cannot pass hollow |
+| `make measure-realswarm GX_MEASURE_REAL=<public.torrent>` | a public torrent with DHT, trackers and uTP (`GX_MEASURE_REAL_SECONDS`, default 120 s): peers, uTP split, socket counters. A comma-separated list runs all the torrents together, all active, and adds the CPU of the process and the CPU per 100 MB. A run that sees no peer fails, so it cannot pass hollow. The test daemons tick every 50 ms; `GX_TEST_TICK=3s` gives them the production tick, without which the per-tick statistics and peer snapshots weigh about 60 times more in a profile than they do in the service |
 | `make measure-merge3` | Swarm Merging Phase 3 on real ISOs (§4.8) |
 | `make measure-dht` | the public DHT: routing-table fill and query success (`GX_MEASURE_DHT=5m`, `GX_MEASURE_DHT_INFOHASH=<40 hex>`) |
 | `TestMeasureLatencyGuard` | the latency guard against a second instance and a competing download on the real line (`GX_MEASURE_LATENCY_GUARD`, `GX_MEASURE_COMPETITOR_URL`) |
@@ -73,6 +73,8 @@ with the live service or a standalone instance as stated.
 | gx-torrent idle | **38.8 MB RSS** (23.0 MB anonymous, peak 39.1 MB), **0.58 %** of a core over 240 s; 2026-10-26 | 260 | live service, 2 seeds and 1 download, full IP filter (172,740 rules); `GX_TORRENT_PPROF` CPU profile, `/proc/<pid>/status` |
 | gx-torrent idle after a burst | **550 MB → 35–40 MB RSS** after 5 min below the slow-rate threshold; log line `memory released` | 248 | 7 torrents (4 stalled, 3 seeds), full IP filter; `/proc/<pid>/status`, `gx-torrent.log` |
 | gx-torrent under load | **44–48 % of a core at 8–9 MB/s**, ~0.35–0.43 CPU per peer; picker 9 % of the profile | 226 | the peer-reader load test (9–10 releases, Auto, collector every 5 s, pprof 45 s) |
+| gx-torrent under load, public ISOs (2026-10-26) | **2.0–4.3 s of CPU per 100 MB**, 18–37 % of a core at 8.2–8.8 MB/s, 116–132 peers; the spread between runs of the same binary is wider than the change measured (§4.1) | 261 | 5 public ISOs (Arch, Debian DVD and netinst, Ubuntu desktop and server) for 180 s, automatic peer cap, `GX_TEST_TICK=3s`, data under `~/.cache` |
+| gx-torrent loopback transfer (2026-10-26) | **234–274 MB/s, 7.5–8.3 s of CPU per 1.09 GiB** for seeder and leecher together, 100 MiB peak RSS | 261 | `GX_MEASURE_DL=8:134217728`, `GOMAXPROCS=2`, `CPUQuota=200%`, three interleaved rounds against the previous build |
 | Automatic peer cap | **55 per torrent, 300 in all** on this 4-core/16 GiB host; with 9 active torrents **−36 % peers and −12 % CPU** against a fixed 55 per torrent, throughput within the swarm noise (−4 %) | 1934 (engine 245) | `GX_MEASURE_AUTO=1` / `GX_MEASURE_MAXCONN`, 9 public ISOs together, 150 s × 2 interleaved rounds (§4.1) |
 | Memory under load | RssAnon peak **1105 MB** with 10 torrents and the NFS write cache; **507 MB outside the two caches** | 226 | same load, `pprof` heap at the end |
 | gexttod at rest | **46 CPU ticks/min (~0.7 %)**, 0 directory opens per 20 s, no write probe on the NAS | 1785 | `GEXTTO_PPROF`, `strace`, `/proc` over 60 s |
@@ -108,6 +110,7 @@ when a change is meant to be an optimisation. A single pass is noise.
 | `BenchmarkV2HighlightLogLine` vs `…Regexp` | **0.91–0.95 µs, 576 B, 2 allocs** vs 58.6–67.3 µs, 2.3 KB, 18 allocs per line | log page highlighting: one word scan instead of six `\b` regexps; output identical on 36,521 live log lines and a 45 s fuzz; measured 2026-10-26 on the N97 |
 | `BenchmarkSeedDefaultTranslationsReseed` | 841–1,025 ms, 45.3 MB, 1,027,628 allocs → **3.1–3.7 ms, 2.5 MB, 35 allocs** | a restart with unchanged catalogs only hashes them; measured 2026-10-26 on the N97 |
 | `BenchmarkPickerRarestSteady` | ~105 / 143.5 µs/op, 0 allocs | piece picker, steady state |
+| `BenchmarkPickerSmallestGapWebseeds` (15,000 pieces) | 238–246 µs, 64 KB, 1 alloc → **79–81 µs, 0 allocs** per pick | the pick every peer makes while a webseed downloads: gaps into reused buffers, pieces read in place, counting sort on the gap length; measured 2026-10-26 on the N97 |
 | `BenchmarkTickUnchokeSeeding` | 1.3 / 1.64 µs/op, 1 alloc | unchoker tick; 50 synthetic peers ≈1.1 µs, 896 B, 1 alloc |
 | `BenchmarkPrefillFromUnrelatedV2` (16 candidates) | 1.49 / 1.58 µs/op, 128 B, 16 allocs | one-shot cost of the Phase 2 merge scan; no steady-state path |
 | `BenchmarkMergeCandidatesUnrelated` (32 torrents) | ~265 ns/op, 0 allocs | filter paid when nothing is reusable |
@@ -157,6 +160,24 @@ total transfer rate below the queue's slow rate the daemon calls `debug.FreeOSMe
 return the 1 MB piece buffers that the per-torrent `sync.Pool`s would otherwise keep
 reachable until the next collection: on the N97 the RSS went from 550 MB to 35–40 MB
 with 7 torrents and no active transfer.
+
+**Profile under load, 26 October 2026** (N97, five public ISOs together, 180 s, production
+tick). Where the CPU goes: syscalls and the Go scheduler's wake-ups about 50 % (one
+goroutine per connection, every segment that arrives), RC4 of the MSE stream 9–10 %,
+SHA-1 piece checks 5–7 % (with SHA-NI), TLS of the HTTPS webseeds 2–3 %: costs of the
+protocol and of the traffic itself. What was the engine's own: zeroing every pool buffer
+before use (1.9 %), now skipped where the buffer is overwritten whole — a block read
+with `io.ReadFull`, a piece whose blocks cover it (pieces with BEP 47 padding are still
+zeroed, `TestPaddedTorrentTransfer`); and the webseed pick, which allocated and sorted the
+gap list for every peer pick (2.4 %, 3× cheaper now). The statistics the tick reads sum the done bytes with a
+popcount of the bitfield when no file is skipped, instead of a test per piece. Three alternated rounds on loopback
+and two on the public swarm do not separate the builds: the public runs of the same
+binary spread from 2.0 to 4.3 s per 100 MB with the peers and uTP share they get, so the
+gain is stated by the profile share and the micro-benchmarks, not by a throughput figure.
+Kept as they are: the per-peer read cache allocates its 128 KiB blocks per upload (it
+follows the upload rate, 1–2 MB/s on this line), and RC4 is chosen whenever the peer
+offers it, as libtorrent does; plaintext would save that share at the price of the
+obfuscation, which is the user's choice (`-encryption`).
 
 **Piece picker.** With ~200 peers it reads the peer bitfield (O(1)), keeps a count per
 piece and a counter of high-priority pieces, and touches only the pieces a disconnecting
@@ -504,7 +525,7 @@ Closed with a measurement, so they are not retried without new data:
 | `io_uring` / AIO | the disk is at 5.8–7.4 GB/s, far above any network speed; Go exposes it only with a dependency or cgo, and the mmap path is already asynchronous |
 | Batched uTP datagram I/O (`recvmmsg`/`sendmmsg`) | measured again on a uTP-heavy path (2026-10-21): on the loopback benchmark `Socket.writeTo` is 44 % of the CPU (58 % is `Syscall6`), but in the real-swarm profile it is **8.3 %** of the samples (36 % syscalls, reads and TCP included). Batching would remove at most that share, while adding a copy per datagram and a sender queue; at the live rate it saves well under 1 % of a core. Reopen only on a uTP-only session above 8 MB/s |
 | Contiguous-write coalescing | the page cache already merges adjacent writebacks |
-| Rarity buckets, watermark cursor in `pickSequential`/`pickFileEdge`, `PieceDownloader` bitmask, `clear(b.Data)` in `bufferpool`, `FADV_RANDOM`, `saveLocked` outside `d.mu`, `/proc/meminfo` under `d.mu` | no measurement justified the cost |
+| Rarity buckets, watermark cursor in `pickSequential`/`pickFileEdge`, `PieceDownloader` bitmask, `FADV_RANDOM`, `saveLocked` outside `d.mu`, `/proc/meminfo` under `d.mu` | no measurement justified the cost |
 | Upsert with two conflict targets (archive) | +17 ms per 1,000 releases against `INSERT OR IGNORE` + refresh |
 | `idx_archive_title`, expression index on `lower(magnet_hash)` | never used by the queries; only write time and space |
 | Multi-path `get_peers` | `peers_confirmed_multi` was 0 in both real runs |

@@ -24,6 +24,17 @@ type ReadWriterAt interface {
 // boundary (or padding).
 type Piece []FileSection
 
+// HasPadding reports whether a section of the piece is padding: those bytes
+// are never received, so the piece buffer must start zeroed.
+func (p Piece) HasPadding() bool {
+	for _, sec := range p {
+		if sec.Padding {
+			return true
+		}
+	}
+	return false
+}
+
 // ReadAt implements io.ReaderAt, serving len(b) bytes from piece offset off.
 // Used when uploading blocks. It reads section by section straight from
 // storage — no SectionReader/MultiReader chain, zero allocations — with the

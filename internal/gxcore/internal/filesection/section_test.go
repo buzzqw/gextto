@@ -119,3 +119,12 @@ func TestWriteSkipsPadding(t *testing.T) {
 		t.Fatalf("files = %q %q", fa.data, fb.data)
 	}
 }
+
+func TestHasPadding(t *testing.T) {
+	if (Piece{{Length: 4}, {Length: 8}}).HasPadding() {
+		t.Fatal("a piece without padding sections reported padding")
+	}
+	if !(Piece{{Length: 4}, {Length: 2, Padding: true}}).HasPadding() {
+		t.Fatal("a padding section was not reported")
+	}
+}

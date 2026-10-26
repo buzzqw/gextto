@@ -365,7 +365,9 @@ func (p *PeerReader) parseHashMessage(length uint32, reject, withHashes bool) (a
 // silence instead of readTimeout. A slow peer that keeps sending bytes is
 // kept. Stops release the buffer instead of leaking it.
 func (p *PeerReader) readPiece(length uint32) (buf bufferpool.Buffer, err error) {
-	buf = blockPool.Get(int(length))
+	// ReadFull fills the whole block before it is used; on an error it is
+	// released unread.
+	buf = blockPool.GetUncleared(int(length))
 	defer func() {
 		if err != nil {
 			buf.Release()
