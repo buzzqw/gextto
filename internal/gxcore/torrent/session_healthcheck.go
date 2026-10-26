@@ -15,19 +15,48 @@ func (s *Session) checkTorrent(t *torrent) {
 	for {
 		select {
 		case <-time.After(s.config.HealthCheckInterval):
-			timeout := time.NewTimer(s.config.HealthCheckTimeout)
-			select {
-			case t.commandC <- func() {}:
-				timeout.Stop()
-			case <-t.closeC:
+			if !s.waitRunLoop(t) {
 				return
-			case <-timeout.C:
-				crash(t.id, "Torrent (id="+t.id+") does not respond.")
 			}
 		case <-t.closeC:
 			return
 		case <-s.closeC:
 			return
+		}
+	}
+}
+
+// waitRunLoop posts the liveness probe and reports false when the torrent or
+// the session closes first. A loop still inside a data flush is slow, not
+// stuck — on a network share one fdatasync can outlast the timeout — so the
+// wait goes on while the flush lasts, with one warning instead of a crash.
+func (s *Session) waitRunLoop(t *torrent) bool {
+	warned := false
+	for {
+		timeout := time.NewTimer(s.config.HealthCheckTimeout)
+		select {
+		case t.commandC <- func() {}:
+			timeout.Stop()
+			if warned {
+				t.log.Infof("The disk answered again: %q is running normally", t.Name())
+			}
+			return true
+		case <-t.closeC:
+			timeout.Stop()
+			return false
+		case <-s.closeC:
+			timeout.Stop()
+			return false
+		case <-timeout.C:
+			since := t.syncingSince.Load()
+			if since == 0 {
+				crash(t.id, "Torrent (id="+t.id+") does not respond.")
+			}
+			if !warned {
+				t.log.Warningf("Writing %q to disk has taken %s: the storage is slow to answer (a busy network share?), waiting for it",
+					t.Name(), time.Since(time.Unix(0, since)).Round(time.Second))
+				warned = true
+			}
 		}
 	}
 }

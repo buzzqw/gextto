@@ -10,6 +10,8 @@ import (
 // t.files belongs to it — and it precedes every resume-bitfield write, so a
 // persisted bit always describes bytes already durable (no O_SYNC writes).
 func (t *torrent) syncPieces() {
+	t.syncingSince.Store(time.Now().UnixNano())
+	defer t.syncingSince.Store(0)
 	for _, f := range t.files {
 		if f.Storage == nil {
 			continue

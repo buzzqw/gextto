@@ -211,6 +211,11 @@ type torrent struct {
 	// reads off the run loop (phase 1). See localmerge.go.
 	localData atomic.Pointer[localDataSnapshot]
 
+	// syncingSince is when the running data flush started (UnixNano), 0 when
+	// none is running. The health check reads it off the run loop to tell a
+	// slow disk from a stuck loop.
+	syncingSince atomic.Int64
+
 	// mergedPieces holds merge re-verified pieces for the verifier to skip
 	// (consumed by startVerifier). See localmerge.go.
 	mergedPieces map[uint32]bool
