@@ -106,6 +106,10 @@ const (
 	// the visible sawtooth; the floor only applies while the cap is active.
 	latencyGuardMinFloorDownKiB = 128
 	latencyGuardMinFloorUpKiB   = 64
+	// latencyGuardIdleKiB: below this in both directions nothing is
+	// transferring. The DHT and the peer keep-alives never go fully silent, so
+	// "zero" would never release a cap left over from the last download.
+	latencyGuardIdleKiB = 16
 )
 
 // latencyGuardTargets are probed when no target is configured: Google and
@@ -131,7 +135,27 @@ func (m guardMode) String() string {
 type guardDirection struct {
 	clamp  autospeed.Clamp
 	active bool
+	// knee is the cap at which the latency last degraded (0 = not seen yet).
+	// The quick ramp stops below it, the cap then climbs by riseKiB to a
+	// plateau just under it and stays there, trying to pass it once every
+	// latencyGuardKneeProbe. The quarter step jumped straight back over the
+	// knee after every cut and kept the line queued most of the time.
+	knee int64
+	// cutAt and riseAt are the last moves near the knee, probeAt the last try
+	// above the plateau. The current latency is a median of several probes,
+	// so it shows a move only some seconds later: until it can, the cap does
+	// not move again.
+	cutAt, riseAt, probeAt time.Time
 }
+
+// latencyGuardCutSettle is how long the median of the recent probes takes to
+// reflect a move of the cap: more than half of its samples must be taken
+// after the queue had a probe interval to follow it.
+const latencyGuardCutSettle = (latencyGuardRecent/2 + 2) * latencyGuardProbeEvery
+
+// latencyGuardKneeProbe is how often the cap tries to pass a known knee: the
+// line may have more room now (someone else stopped, the swarm grew).
+const latencyGuardKneeProbe = time.Minute
 
 // start caps the direction at value.
 func (d *guardDirection) start(value int64) {
@@ -155,7 +179,55 @@ func (d *guardDirection) step(now time.Time, high bool, rateKiB, ceilingKiB, flo
 		ceiling = max(d.clamp.Value, rateKiB*2)
 	}
 	loading := rateKiB >= d.clamp.Value/2
-	return d.clamp.StepRamp(now, high && loading, ceiling, floor, riseKiB)
+	high = high && loading
+	before := d.clamp.Value
+	if now.Sub(d.cutAt) < latencyGuardCutSettle {
+		return before
+	}
+	if d.knee > 0 && before > d.knee && !high && now.Sub(d.riseAt) >= latencyGuardCutSettle {
+		// A try above the knee held: the line has more room, ramp again.
+		d.knee = 0
+	}
+	approach, plateau := d.knee*85/100, d.knee*9/10
+	near := d.knee > 0 && before >= approach
+	if near && !high {
+		if now.Sub(d.riseAt) < latencyGuardCutSettle {
+			return before
+		}
+		if before >= plateau && now.Sub(d.probeAt) < latencyGuardKneeProbe {
+			return before
+		}
+	}
+	var value int64
+	if near {
+		// Near the knee the step is a twentieth of it, so a slow line is not
+		// pushed over its knee by a step sized for a fast one.
+		rise := max(d.knee/20, 1)
+		if riseKiB < rise {
+			rise = riseKiB
+		}
+		value = d.clamp.StepBy(now, high, ceiling, floor, rise)
+		if value > plateau && before < plateau {
+			value = plateau
+			d.clamp.Value = value
+		}
+	} else {
+		value = d.clamp.StepRamp(now, high, ceiling, floor, riseKiB)
+		if d.knee > 0 && value > approach {
+			value = max(approach, before)
+			d.clamp.Value = value
+		}
+	}
+	switch {
+	case high && value < before:
+		d.knee, d.cutAt = before, now
+	case value > before:
+		d.riseAt = now
+		if near && before >= plateau {
+			d.probeAt = now
+		}
+	}
+	return value
 }
 
 // latencyGuard is the Auto speed's latency controller. The zero value is not
@@ -173,6 +245,7 @@ type latencyGuard struct {
 	restAt         time.Time
 	trialUntil     time.Time
 	trialLoaded    time.Duration // the latency when the trial started
+	trialHigh      bool          // whether that latency was already high
 	trialSamples   []time.Duration
 	cooldownUntil  time.Time
 	haveSample     bool
@@ -370,7 +443,7 @@ func (g *latencyGuard) update(now time.Time, auto bool, line lineGuess, downByte
 			break
 		}
 		if high || !trusted {
-			g.startTrialLocked(now, current, rateDown, rateUp, loadDown, loadUp)
+			g.startTrialLocked(now, current, high, rateDown, rateUp, loadDown, loadUp)
 		}
 	case guardTrial:
 		if now.Sub(g.trialUntil.Add(-latencyGuardTrial)) >= latencyGuardTrialSettle {
@@ -383,8 +456,25 @@ func (g *latencyGuard) update(now time.Time, auto bool, line lineGuess, downByte
 		if len(g.trialSamples) > 0 {
 			measured = medianDuration(g.trialSamples)
 		}
-		if dropped := fellFrom(measured, g.trialLoaded); dropped && (g.rest == 0 || !trusted || measured < g.rest) {
+		dropped := fellFrom(measured, g.trialLoaded)
+		if dropped && (g.rest == 0 || !trusted || measured < g.rest) {
 			g.rest, g.restAt = measured, now
+		}
+		if !dropped && !g.trialHigh {
+			// The trial only checked a stale reference: the ping was good at
+			// full speed and backing off did not lower it, so there is no queue
+			// at all. That latency is the line at rest, and the line goes back
+			// to Gextto. Reading "did not fall" as "still high" here was what
+			// cut a good line to the floor and held it there.
+			rest := measured
+			if g.trialLoaded < rest {
+				rest = g.trialLoaded
+			}
+			if g.rest == 0 || !trusted || rest < g.rest {
+				g.rest, g.restAt = rest, now
+			}
+			g.releaseLocked(now)
+			break
 		}
 		// The trial measured the line at a reduced rate. From here the
 		// controller ramps up while the ping stays good and cuts when it
@@ -395,13 +485,14 @@ func (g *latencyGuard) update(now time.Time, auto bool, line lineGuess, downByte
 		if !trusted {
 			// The idle reference was never seen: use the latency measured
 			// during the trial as the loaded reference and treat a clear fall
-			// as the new rest.
-			high = !fellFrom(current, g.trialLoaded)
+			// as the new rest. A latency that is not even high against the
+			// window's minimum is never high.
+			high = high && !fellFrom(current, g.trialLoaded)
 			if !high {
 				g.rest, g.restAt = current, now
 			}
 		}
-		if rateDown == 0 && rateUp == 0 {
+		if rateDown < latencyGuardIdleKiB && rateUp < latencyGuardIdleKiB {
 			// Nothing is transferring: there is no queue to protect and no
 			// reason to keep a stale cap for the next download.
 			g.releaseLocked(now)
@@ -460,10 +551,11 @@ func fellFrom(latency, loaded time.Duration) bool {
 }
 
 // startTrialLocked backs the loading directions off to latencyGuardTrialShare.
-func (g *latencyGuard) startTrialLocked(now time.Time, loaded time.Duration, rateDown, rateUp int64, loadDown, loadUp bool) {
+func (g *latencyGuard) startTrialLocked(now time.Time, loaded time.Duration, high bool, rateDown, rateUp int64, loadDown, loadUp bool) {
 	g.mode = guardTrial
 	g.trialUntil = now.Add(latencyGuardTrial)
 	g.trialLoaded = loaded
+	g.trialHigh = high
 	g.trialSamples = g.trialSamples[:0]
 	g.controlLocked(rateDown, rateUp, loadDown, loadUp, latencyGuardTrialShare)
 	g.mode = guardTrial

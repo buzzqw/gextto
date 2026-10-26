@@ -343,6 +343,21 @@ high means someone else is on the line. The router's UPnP WAN counters decide fi
 they answer. The lowest reference is kept for 6 h, so one disturbed trial cannot blind
 the guard.
 
+**Controller on a model line** (`TestLatencyGuardSitsBelowTheKnee`,
+`GX_LOG_GUARD_KNEE=1`; 2026-10-26, Intel N97, build 2039). The line answers 20 ms up
+to its capacity and 60 ms above it or uncapped; ten minutes (300 probes) after a
+one-minute warm-up. Before: the cap climbed +25 % after every cut and jumped back over
+the capacity; after: it remembers the knee and sits at 90 % of it, probing once a
+minute.
+
+| Line | Ping high, before | Ping high, after | Line used, before → after |
+|---|---|---|---|
+| 800 KiB/s | 228 of 300 | 66 of 300 | 96 % → 94 % |
+| 4,000 KiB/s | 174 of 300 | 29 of 300 | 95 % → 96 % |
+| 20,000 KiB/s | 172 of 300 | 6 of 300 | 95 % → 95 % |
+
+The extra cost is a few comparisons per 2 s probe: no measurable CPU or memory.
+
 ### 4.6 Swarm: seeding, choking, pipelining
 
 **Current figures.** The unchoker holds its properties on the synthetic harness (fast

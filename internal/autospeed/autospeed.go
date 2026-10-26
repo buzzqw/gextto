@@ -139,6 +139,12 @@ func (c *Clamp) StepRamp(now time.Time, high bool, ceilingKiB, floorKiB, riseKiB
 	return c.step(now, high, ceilingKiB, floorKiB, max(c.Value/4, riseKiB))
 }
 
+// StepBy is Step with a fixed upward step of riseKiB: the slow, additive
+// probing a controller uses near a cap where the latency already degraded.
+func (c *Clamp) StepBy(now time.Time, high bool, ceilingKiB, floorKiB, riseKiB int64) int64 {
+	return c.step(now, high, ceilingKiB, floorKiB, max(riseKiB, 1))
+}
+
 // step is the shared move: cut by 15 % when high, otherwise grow by riseKiB.
 // A ceilingKiB <= 0 means no hard ceiling: the cap can grow without a fixed
 // maximum, and only the latency (or the caller's own limit) stops it.

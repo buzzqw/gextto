@@ -4,6 +4,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -77,26 +78,35 @@ func TestLatencyGuardControlsItsOwnQueue(t *testing.T) {
 // that replaces the old 64 KiB/s sawtooth.
 func TestLatencyGuardRampsUpWhileThePingIsGood(t *testing.T) {
 	r := newGuardRun()
-	// The line is good up to 4000 KiB/s and high above it.
+	// The line is good up to 4000 KiB/s and high above it (and uncapped).
 	line := func(downCap int64) time.Duration {
-		if downCap > 4000 {
+		if downCap == 0 || downCap > 4000 {
 			return 60 * time.Millisecond
 		}
 		return 20 * time.Millisecond
 	}
+	// The line was seen at rest before the download started: without any
+	// idle sample a flat 60 ms is just how the line is, not a queue.
+	r.g.probe.Record(r.now, 20*time.Millisecond)
 	for i := 0; i < 8; i++ { // trial and reference
 		r.step(line, 9000)
 	}
 	peak := int64(0)
+	bad := 0
 	for i := 0; i < 60; i++ {
 		d, _ := r.step(line, 9000)
 		peak = max(peak, d)
+		// Around the knee the cap probes above it and is cut back, so a
+		// single instant can be bad: what counts is where it spends its time.
+		if i >= 30 && r.g.status().LatencyMs > 40 {
+			bad++
+		}
 	}
 	if peak < 3000 {
 		t.Fatalf("the cap never ramped toward the line: peak %d KiB/s", peak)
 	}
-	if st := r.g.status(); st.LatencyMs > 40 {
-		t.Fatalf("the controller settled with a bad ping: %+v", st)
+	if bad >= 8 {
+		t.Fatalf("the controller settled with a bad ping: %d of the last 30 steps: %+v", bad, r.g.status())
 	}
 }
 
@@ -335,6 +345,88 @@ func TestV2DownloadsShowsTheLatencyGuard(t *testing.T) {
 	for _, want := range []string{`role="status"`, "61/20 ms", "DL 4200 KiB/s"} {
 		if !strings.Contains(string(body), want) {
 			t.Errorf("downloads page lacks %q", want)
+		}
+	}
+}
+
+// TestLatencyGuardDoesNotThrottleAGoodLine: with no fresh idle reference the
+// guard runs a trial even though the ping is good at full speed. The trial
+// cannot make the latency fall (there is no queue to drain), and that must not
+// be read as "still high": the line goes back to Gextto instead of being cut
+// to the floor and held there while the ping stays at rest.
+func TestLatencyGuardDoesNotThrottleAGoodLine(t *testing.T) {
+	r := newGuardRun()
+	good := func(int64) time.Duration { return 15 * time.Millisecond }
+	minCap := int64(-1)
+	for i := 0; i < 150; i++ {
+		if d, _ := r.step(good, 5000); d > 0 && (minCap < 0 || d < minCap) {
+			minCap = d
+		}
+	}
+	if d, _ := r.g.caps(); d != 0 {
+		t.Fatalf("a good line is still capped at %d KiB/s (lowest %d): %+v", d, minCap, r.g.status())
+	}
+	if minCap >= 0 && minCap < 2000 {
+		t.Fatalf("a good line was cut to %d KiB/s", minCap)
+	}
+}
+
+// TestLatencyGuardReleasesWhenOnlyTheDHTIsTalking: under a cap, the DHT's
+// background traffic is not a transfer and must not keep the cap alive.
+func TestLatencyGuardReleasesWhenOnlyTheDHTIsTalking(t *testing.T) {
+	r := newGuardRun()
+	for i := 0; i < 12; i++ {
+		r.step(ownQueue, 9000)
+	}
+	if d, _ := r.g.caps(); d == 0 {
+		t.Fatal("setup: the guard did not cap its own queue")
+	}
+	r.now = r.now.Add(latencyGuardProbeEvery)
+	r.g.probe.Record(r.now, 20*time.Millisecond)
+	if d, u, _ := r.g.update(r.now, true, r.line, 3*1024, 2*1024); d != 0 || u != 0 {
+		t.Fatalf("DHT chatter kept the caps at %d/%d KiB/s", d, u)
+	}
+}
+
+// TestLatencyGuardSitsBelowTheKnee: on a line that queues above its capacity
+// the cap settles just under it instead of climbing back over it after every
+// cut. Over ten minutes the ping is bad for a small share of the time and the
+// line is still used almost fully. GX_LOG_GUARD_KNEE=1 prints the figures
+// recorded in docs/measurements.md.
+func TestLatencyGuardSitsBelowTheKnee(t *testing.T) {
+	for _, capacity := range []int64{800, 4000, 20000} {
+		r := newGuardRun()
+		line := func(downCap int64) time.Duration {
+			if downCap == 0 || downCap > capacity {
+				return 60 * time.Millisecond
+			}
+			return 20 * time.Millisecond
+		}
+		r.g.probe.Record(r.now, 20*time.Millisecond)
+		bad, used := 0, int64(0)
+		const warmup, steps = 30, 300
+		for i := 0; i < warmup+steps; i++ {
+			d, _ := r.step(line, 30000)
+			if i < warmup {
+				continue
+			}
+			if r.g.status().LatencyMs > 40 {
+				bad++
+			}
+			if d == 0 || d > capacity {
+				d = capacity
+			}
+			used += d
+		}
+		share := used * 100 / (capacity * steps)
+		if os.Getenv("GX_LOG_GUARD_KNEE") != "" {
+			t.Logf("line %d KiB/s: ping high %d of %d steps, line used %d%%", capacity, bad, steps, share)
+		}
+		if bad > steps/4 {
+			t.Errorf("line %d KiB/s: the ping was high %d of %d steps", capacity, bad, steps)
+		}
+		if share < 90 {
+			t.Errorf("line %d KiB/s: only %d%% of the line used", capacity, share)
 		}
 	}
 }

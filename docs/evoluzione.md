@@ -347,13 +347,22 @@ is learned when the guard is free.
 slow or unreachable cannot fake a bad line. The current latency is the median of the
 last five samples (10 s); the idle reference is a trial's measure, kept for 6 h, or the
 lowest of the 10-minute window. A high latency (above `baseline × 1.5` **and**
-`baseline + 20 ms`) starts an 8 s trial at 60 %; after it the controller ramps **up**
-(+25 % or 512/64 KiB/s every 3 s) while the ping is good and cuts 15 % when it degrades,
-with floors of 128 KiB/s down and 64 KiB/s up. It does not release just because the
-latency fell: that is the moment the line can be pushed again. The ceiling is the
+`baseline + 20 ms`), or an idle reference that is missing or older than 6 h, starts an
+8 s trial at 60 %. A trial that started from a good ping and does not lower it found no
+queue: its latency becomes the reference and the line goes back to Gextto. Otherwise the
+controller ramps **up** (+25 % or 512/64 KiB/s every 3 s) while the ping is good and
+cuts 15 % when it degrades, with floors of 128 KiB/s down and 64 KiB/s up. It does not
+release just because the latency fell: that is the moment the line can be pushed again.
+A cut remembers the cap that degraded the ping (the knee): the quick ramp stops at 85 %
+of it, the cap then climbs by a twentieth of the knee (at most 512/64 KiB/s) to a
+plateau at 90 % and stays there, trying to pass the knee once a minute; a try that holds
+forgets the knee and the quick ramp resumes. Because the current latency is a median of
+five probes, the cap does not move again for 8 s after a step near the knee, so one
+late reading cannot stack a second cut or a second rise on the first. The ceiling is the
 **line maximum entered by the user** (`torrent_line_max_down_kib`, `_up_kib`; 0 =
 unknown), or twice the rate actually delivered when the line is unknown — there is no
-hard-coded speed cap. An idle line or leaving Auto drops the cap.
+hard-coded speed cap. An idle line (both directions under 16 KiB/s, which is DHT and
+keep-alive chatter) or leaving Auto drops the cap.
 
 The router is optional: `torrent_auto_latency_source` is `both` (default: the ping
 decides, the UPnP WAN counters are only a diagnostic), `ping` (the router is not read at
