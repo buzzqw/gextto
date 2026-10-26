@@ -15,6 +15,10 @@ manual is online: [English](docs/MANUAL.en.md) ·
 
 ## 26 October 2026
 
+- **qBittorrent 5.3: the engine works again with 5.2 and 5.3 too.** With qBittorrent 5.2 and 5.3 Gextto could no longer reach the Web API (the login answer changed), so the engine looked unreachable; since 5.0 torrents added paused started at once and the per-torrent seed limits were refused. Gextto now understands both generations of the Web API and works with qBittorrent-nox 4.6 and later, including the 5.3 release installed by managed mode. No setting needs to change: update Gextto and restart the service.
+
+- **The indexer test speaks naturally.** The log line is no longer a row of technical fields ("indexer test · kind: … · name: … · host: … · ok: … · status: …"): it is now a sentence, for example "✅ The indexer «indexarr» at 192.168.1.161 answered the test (HTTP 200)", or "⚠️ The indexer «indexarr» … did not answer the test: the service is unreachable" when the service does not answer.
+
 - **indexarr is a manager type of its own.** In the *Integrations → Torznab indexers* list and in the initial setup you can now choose **indexarr** as the type, with the base URL (normally `http://host:8484`) and the API key; it no longer has to pass for Jackett. Gextto uses its native `/api` Torznab endpoint for the aggregate search and the Jackett-compatible paths to read the indexer list and query one tracker at a time, as it already does with Jackett and Prowlarr. The indexer test and the health check use `t=caps` and recognise indexarr, so a wrong API key or URL is reported like for the other managers. Entries already configured as Jackett keep working: to use the native endpoint, change the type to **indexarr**.
 
 ## 25 October 2026

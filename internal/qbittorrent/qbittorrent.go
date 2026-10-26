@@ -90,9 +90,12 @@ func New(cfg Config) (*Client, error) {
 
 // AddOptions are the add-time parameters shared by magnets and .torrent files.
 type AddOptions struct {
-	SavePath   string
-	Category   string
-	Tags       string
+	SavePath string
+	Category string
+	Tags     string
+	// Paused adds the torrent stopped. qBittorrent 4.x calls this parameter
+	// "paused", 5.x replaced it with "stopped": both are sent so the same
+	// request is understood by either release.
 	Paused     bool
 	Sequential bool
 	FirstLast  bool
@@ -338,6 +341,15 @@ func (c *Client) Login(ctx context.Context) error {
 	if status == http.StatusForbidden {
 		return fmt.Errorf("%w: banned or too many attempts", ErrAuth)
 	}
+	// qBittorrent up to 5.1 answers 200 with "Ok."; 5.2 and later answer 204
+	// with no body. A 200 with any other body (for example "Fails." on 4.x)
+	// is a failed login.
+	if status == http.StatusNoContent {
+		c.mu.Lock()
+		c.loggedIn = true
+		c.mu.Unlock()
+		return nil
+	}
 	if status != http.StatusOK {
 		return fmt.Errorf("%w: HTTP %d", ErrAuth, status)
 	}
@@ -440,7 +452,10 @@ func (c *Client) add(ctx context.Context, magnet, torrentPath string, opts AddOp
 	field("category", opts.Category)
 	field("tags", opts.Tags)
 	if opts.Paused {
+		// qBittorrent 4.x reads "paused", 5.x reads "stopped": send both and
+		// let the running release ignore the parameter it does not know.
 		field("paused", "true")
+		field("stopped", "true")
 	}
 	if opts.Sequential {
 		field("sequentialDownload", "true")
@@ -542,25 +557,24 @@ func (c *Client) SetTorrentUploadLimit(ctx context.Context, limit int64, hashes 
 	return c.postForm(ctx, "/api/v2/torrents/setUploadLimit", form)
 }
 
-// SetShareLimits sets per-torrent share ratio and seeding time limits.
-// ratio: -2 = use global, -1 = infinite, >=0 explicit. minutes follows the same
-// convention (-2 global, -1 infinite, >=0 minutes).
-func (c *Client) SetShareLimits(ctx context.Context, ratio float64, minutes int64, hashes ...string) error {
-	form := url.Values{
-		"hashes":           {joinHashes(hashes)},
-		"ratioLimit":       {strconv.FormatFloat(ratio, 'f', -1, 64)},
-		"seedingTimeLimit": {strconv.FormatInt(minutes, 10)},
-	}
-	return c.postForm(ctx, "/api/v2/torrents/setShareLimits", form)
-}
-
-// SetInactiveSeedingTimeLimit sets the per-torrent inactivity limit (minutes).
-// qBittorrent applies the same setShareLimits endpoint used for the ratio and
-// total seeding time; a torrent that uploads nothing for this long stops.
-func (c *Client) SetInactiveSeedingTimeLimit(ctx context.Context, minutes int64, hashes ...string) error {
+// SetShareLimits sets the per-torrent share limits in one request.
+// ratio: -2 = use global, -1 = infinite, >=0 explicit. minutes and
+// inactiveMinutes follow the same convention (-2 global, -1 infinite, >=0
+// minutes).
+//
+// qBittorrent 4.6+ requires all three limits in the same call; 5.2+ also
+// requires shareLimitAction and 5.3+ shareLimitsMode. Both are sent with the
+// special value "Default" (follow the global setting), which is also what the
+// older releases assume when the fields are absent; releases that do not know
+// a field ignore it.
+func (c *Client) SetShareLimits(ctx context.Context, ratio float64, minutes, inactiveMinutes int64, hashes ...string) error {
 	form := url.Values{
 		"hashes":                   {joinHashes(hashes)},
-		"inactiveSeedingTimeLimit": {strconv.FormatInt(minutes, 10)},
+		"ratioLimit":               {strconv.FormatFloat(ratio, 'f', -1, 64)},
+		"seedingTimeLimit":         {strconv.FormatInt(minutes, 10)},
+		"inactiveSeedingTimeLimit": {strconv.FormatInt(inactiveMinutes, 10)},
+		"shareLimitAction":         {"Default"},
+		"shareLimitsMode":          {"Default"},
 	}
 	return c.postForm(ctx, "/api/v2/torrents/setShareLimits", form)
 }

@@ -47,6 +47,13 @@ before exposing anything.
 The configuration lives in `~/.config/qBittorrent/qBittorrent.conf` for the
 user that runs it (a different `--profile` or a container image moves it).
 
+Gextto works with **qBittorrent-nox 4.6 and later**, including the **5.3**
+releases, and speaks both Web API conventions: the older login (`200` with
+`Ok.`) and the newer one (`204` with no body), the 4.x `paused` flag and the
+5.x `stopped` flag on `torrents/add`, and the full share-limit request that
+5.2 and 5.3 require. There is nothing to configure for this: the same settings
+work with either release.
+
 ### 1.2 Enable the Web UI
 
 Gextto talks to qBittorrent **only through its Web API**, which is part of the

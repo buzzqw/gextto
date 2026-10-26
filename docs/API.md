@@ -667,5 +667,8 @@ off) and the web seed editing calls: `torrents/addWebSeeds` and
 `torrents/removeWebSeeds` take `hash` and `urls` separated by `|`;
 `torrents/editWebSeed` takes `hash`, `origUrl` and `newUrl`. They answer 404 for
 an unknown torrent, 400 for a URL that is not http(s), 409 when `origUrl` is not
-a web seed of the torrent.
+a web seed of the torrent. `torrents/add` also accepts the 5.x `stopped` flag
+(4.x clients send `paused`), and `torrents/setShareLimits` accepts the 5.2/5.3
+`shareLimitsMode` and `shareLimitAction` fields, which the daemon ignores because
+it has a single share-limit action.
 

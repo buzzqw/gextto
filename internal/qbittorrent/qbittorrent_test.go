@@ -3,6 +3,7 @@ package qbittorrent
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -18,6 +19,8 @@ type fakeQbit struct {
 	token         string
 	logins        int
 	stopSupported bool
+	loginStatus   int
+	loginBody     string
 	lastAdd       url.Values
 	lastDelete    url.Values
 	lastLocation  url.Values
@@ -42,6 +45,13 @@ func (f *fakeQbit) serveHTTP(w http.ResponseWriter, r *http.Request) {
 		f.logins++
 		f.token = "sid-" + strings.Repeat("x", f.logins)
 		http.SetCookie(w, &http.Cookie{Name: "SID", Value: f.token, Path: "/"})
+		if f.loginStatus != 0 {
+			w.WriteHeader(f.loginStatus)
+			if f.loginBody != "" {
+				_, _ = w.Write([]byte(f.loginBody))
+			}
+			return
+		}
 		_, _ = w.Write([]byte("Ok."))
 		return
 	}
@@ -98,6 +108,18 @@ func (f *fakeQbit) serveHTTP(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	case "/api/v2/torrents/setShareLimits":
 		_ = r.ParseForm()
+		// qBittorrent 5.3 rejects the call unless every limit and the mode and
+		// action are present: the fake enforces the same contract so a partial
+		// request cannot pass the tests.
+		for _, required := range []string{
+			"hashes", "ratioLimit", "seedingTimeLimit", "inactiveSeedingTimeLimit",
+			"shareLimitAction", "shareLimitsMode",
+		} {
+			if !r.PostForm.Has(required) {
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+		}
 		f.lastShareLimits = r.PostForm
 		w.WriteHeader(http.StatusOK)
 	case "/api/v2/torrents/setForceStart":
@@ -179,6 +201,34 @@ func TestLoginAndVersion(t *testing.T) {
 	}
 }
 
+func TestLoginAcceptsNoContent(t *testing.T) {
+	// qBittorrent 5.2 and later answer the login with 204 and no body (the
+	// older releases answered 200 "Ok.").
+	fake, client := newFakeServer(t)
+	fake.mu.Lock()
+	fake.loginStatus = http.StatusNoContent
+	fake.mu.Unlock()
+	ctx := context.Background()
+	if err := client.Login(ctx); err != nil {
+		t.Fatalf("Login: %v", err)
+	}
+	if _, err := client.Torrents(ctx); err != nil {
+		t.Fatalf("Torrents after a 204 login: %v", err)
+	}
+}
+
+func TestLoginRejectsFailedBody(t *testing.T) {
+	// qBittorrent 4.x reports wrong credentials with 200 "Fails.".
+	fake, client := newFakeServer(t)
+	fake.mu.Lock()
+	fake.loginStatus = http.StatusOK
+	fake.loginBody = "Fails."
+	fake.mu.Unlock()
+	if err := client.Login(context.Background()); !errors.Is(err, ErrAuth) {
+		t.Fatalf("Login error = %v, want ErrAuth", err)
+	}
+}
+
 func TestSessionRefreshOnForbidden(t *testing.T) {
 	fake, client := newFakeServer(t)
 	ctx := context.Background()
@@ -216,7 +266,7 @@ func TestAddMagnetSendsFields(t *testing.T) {
 	if fake.lastAdd.Get("savepath") != "/data/completed" || fake.lastAdd.Get("category") != "gextto" {
 		t.Fatalf("add fields = %v", fake.lastAdd)
 	}
-	if fake.lastAdd.Get("paused") != "true" || fake.lastAdd.Get("sequentialDownload") != "true" {
+	if fake.lastAdd.Get("paused") != "true" || fake.lastAdd.Get("stopped") != "true" || fake.lastAdd.Get("sequentialDownload") != "true" {
 		t.Fatalf("add flags = %v", fake.lastAdd)
 	}
 }
@@ -232,19 +282,6 @@ func TestAddMagnetSendsInactiveSeedingLimit(t *testing.T) {
 	}
 	if got := fake.lastAdd.Get("inactiveSeedingTimeLimit"); got != "30" {
 		t.Fatalf("inactiveSeedingTimeLimit = %q, want 30", got)
-	}
-}
-
-func TestSetInactiveSeedingTimeLimit(t *testing.T) {
-	fake, client := newFakeServer(t)
-	if err := client.SetInactiveSeedingTimeLimit(context.Background(), 45, "ABC"); err != nil {
-		t.Fatalf("SetInactiveSeedingTimeLimit: %v", err)
-	}
-	if got := fake.lastShareLimits.Get("inactiveSeedingTimeLimit"); got != "45" {
-		t.Fatalf("inactiveSeedingTimeLimit = %q, want 45", got)
-	}
-	if got := fake.lastShareLimits.Get("hashes"); got != "abc" {
-		t.Fatalf("hashes = %q, want abc", got)
 	}
 }
 
@@ -370,11 +407,19 @@ func TestFilePrioritiesAndTrackers(t *testing.T) {
 func TestShareLimitsForceStartAndPreferences(t *testing.T) {
 	fake, client := newFakeServer(t)
 	ctx := context.Background()
-	if err := client.SetShareLimits(ctx, 1.5, 1440, "abc"); err != nil {
+	if err := client.SetShareLimits(ctx, 1.5, 1440, 30, "abc"); err != nil {
 		t.Fatalf("SetShareLimits: %v", err)
 	}
-	if fake.lastShareLimits.Get("ratioLimit") != "1.5" || fake.lastShareLimits.Get("seedingTimeLimit") != "1440" {
-		t.Fatalf("share limits form = %v", fake.lastShareLimits)
+	for field, want := range map[string]string{
+		"ratioLimit":               "1.5",
+		"seedingTimeLimit":         "1440",
+		"inactiveSeedingTimeLimit": "30",
+		"shareLimitAction":         "Default",
+		"shareLimitsMode":          "Default",
+	} {
+		if got := fake.lastShareLimits.Get(field); got != want {
+			t.Fatalf("share limits %s = %q, want %q (form %v)", field, got, want, fake.lastShareLimits)
+		}
 	}
 	if err := client.SetForceStart(ctx, true, "abc"); err != nil {
 		t.Fatalf("SetForceStart: %v", err)

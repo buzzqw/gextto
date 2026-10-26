@@ -1198,7 +1198,10 @@ attivo, così si vede a colpo d'occhio cosa sta trasferendo i file).
   le **mappature percorsi** `locale=remoto` quando i due processi vedono percorsi
   diversi; senza mappature Gextto verifica che i percorsi necessari esistano in
   locale. Se un percorso non è traducibile, l'attivazione viene rifiutata, così
-  uno spostamento non può finire nella cartella sbagliata. La **modalità gestita**
+  uno spostamento non può finire nella cartella sbagliata. Funziona con
+  **qBittorrent-nox 4.6 e successivi, compresa la 5.3**: parla sia le convenzioni
+  della Web API 4.x sia quelle 5.x (login, pausa all'aggiunta, limiti di seed) e
+  non richiede impostazioni diverse. La **modalità gestita**
   scarica l'ultima release statica di qBittorrent-nox, la installa nella cartella
   dell'applicazione (accanto a `gexttod`), la avvia/ferma col servizio e la
   aggiorna con backup e rollback; un watchdog la riavvia dopo un'uscita inattesa

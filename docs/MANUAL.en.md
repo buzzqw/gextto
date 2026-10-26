@@ -1164,7 +1164,10 @@ what is transferring the files is visible at a glance).
   `local=remote` **path mappings** whenever the two processes see different
   paths; with no mappings Gextto checks that the required paths exist locally. If
   a path cannot be translated, activation is refused so a move can never target
-  the wrong folder. **Managed mode** downloads the latest qBittorrent-nox static
+  the wrong folder. It works with **qBittorrent-nox 4.6 and later, including
+  5.3**: it speaks both the 4.x and the 5.x Web API conventions (login, adding
+  paused, share limits) and needs no different settings. **Managed mode**
+  downloads the latest qBittorrent-nox static
   release, installs it in the application folder (next to `gexttod`), starts and
   stops it with the service and updates it with backup and rollback; a watchdog
   restarts it after an unexpected exit and, after repeated crashes, runs the

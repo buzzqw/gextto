@@ -408,6 +408,17 @@ func TestQbittorrentEngineAddAndLimits(t *testing.T) {
 	if fake.forms["/api/v2/torrents/setShareLimits"].Get("seedingTimeLimit") != "2880" {
 		t.Fatalf("seeding time = %v", fake.forms["/api/v2/torrents/setShareLimits"])
 	}
+	// No inactivity rule: the limit is explicitly set back to the global one,
+	// because qBittorrent requires the field in every call.
+	if got := fake.forms["/api/v2/torrents/setShareLimits"].Get("inactiveSeedingTimeLimit"); got != "-2" {
+		t.Fatalf("inactiveSeedingTimeLimit = %q, want -2", got)
+	}
+	if got := fake.forms["/api/v2/torrents/setShareLimits"].Get("shareLimitAction"); got != "Default" {
+		t.Fatalf("shareLimitAction = %q, want Default", got)
+	}
+	if got := fake.forms["/api/v2/torrents/setShareLimits"].Get("shareLimitsMode"); got != "Default" {
+		t.Fatalf("shareLimitsMode = %q, want Default", got)
+	}
 	engine.cfg.Transfer.SeedRatio = 1.5
 	engine.cfg.Transfer.SeedTimeDays = 7
 	engine.cfg.Transfer.SeedIdleMinutes = 30

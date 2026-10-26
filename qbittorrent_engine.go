@@ -1367,13 +1367,15 @@ func (e *qbittorrentEngine) SetLimits(hash string, downloadLimit, uploadLimit in
 		case seedDays == 0:
 			minutes = -1
 		}
-		if err := e.client.SetShareLimits(ctx, ratio, minutes, hash); err != nil {
-			return false, err
-		}
+		// The inactivity limit travels in the same request: qBittorrent
+		// rejects the call unless all three limits are present. -2 means
+		// "use the global value", which clears a limit Gextto no longer wants.
+		inactive := int64(-2)
 		if idle := e.inactiveSeedMinutes(seedRatio, seedDays); idle > 0 {
-			if err := e.client.SetInactiveSeedingTimeLimit(ctx, idle, hash); err != nil {
-				return false, err
-			}
+			inactive = idle
+		}
+		if err := e.client.SetShareLimits(ctx, ratio, minutes, inactive, hash); err != nil {
+			return false, err
 		}
 		applied = true
 	}

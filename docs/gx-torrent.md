@@ -644,7 +644,8 @@ In standalone the daemon also exposes a **qBittorrent-compatible API**
 (`torrents/categories`, `createCategory`, `removeCategories`, `setCategory`,
 `torrents/tags`, `createTags`, `deleteTags`, `addTags`, `removeTags`; category
 and tag also travel on `torrents/add`), `torrents/properties|files|trackers`
-and `torrents/reannounce|setLocation` (plus the 5.x aliases `stop`/`start`),
+and `torrents/reannounce|setLocation` (plus the 5.x aliases `stop`/`start` and
+the 5.x `stopped` flag on `torrents/add`, accepted next to `paused`),
 `torrents/toggleSequentialDownload|setSuperSeeding|addTrackers|removeTrackers|editTracker|filePrio|export|setForceStart|setAutoManagement|setDownloadLimit|setUploadLimit|setShareLimits`,
 `transfer/downloadLimit|uploadLimit|setDownloadLimit|setUploadLimit`, `sync/maindata` (with incremental `rid`) and
 `sync/torrentPeers` (which reports `rid: 0`), and `content_path` in

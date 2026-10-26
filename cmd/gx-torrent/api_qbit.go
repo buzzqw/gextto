@@ -919,7 +919,9 @@ func (d *Daemon) handleQbitDelete(w http.ResponseWriter, r *http.Request) {
 
 // handleQbitAdd accepts "urls" (magnet links and .torrent URLs, one per line)
 // and an uploaded .torrent (multipart field "torrents"), plus savepath, paused,
-// sequentialDownload and firstLastPiecePrio, the way Sonarr and Radarr send them.
+// sequentialDownload and firstLastPiecePrio, the way Sonarr and Radarr send
+// them. qBittorrent 4.x calls the "add stopped" flag "paused", 5.x "stopped":
+// both are accepted.
 func (d *Daemon) handleQbitAdd(w http.ResponseWriter, r *http.Request) {
 	savePath := strings.TrimSpace(r.FormValue("savepath"))
 	category := strings.TrimSpace(r.FormValue("category"))
@@ -934,7 +936,8 @@ func (d *Daemon) handleQbitAdd(w http.ResponseWriter, r *http.Request) {
 		// A category carries its own save path, like qBittorrent.
 		savePath = d.categorySavePath(category)
 	}
-	paused := formBool(r, "paused")
+	// qBittorrent 4.x sends "paused", 5.x renamed the flag to "stopped".
+	paused := formBool(r, "paused") || formBool(r, "stopped")
 	sequential := formBool(r, "sequentialDownload")
 	firstLast := formBool(r, "firstLastPiecePrio")
 	layout := d.qbitContentLayout(r)

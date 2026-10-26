@@ -410,3 +410,30 @@ func TestQbitAddNumericBooleans(t *testing.T) {
 		return meta != nil && meta.UserPaused
 	})
 }
+
+// TestQbitAddStoppedFlag covers the qBittorrent 5.x name of the "add without
+// starting" flag: 4.x clients send paused, 5.x send stopped.
+func TestQbitAddStoppedFlag(t *testing.T) {
+	d := newTestDaemon(t)
+	srv := httptest.NewServer(d.routesQbit())
+	defer srv.Close()
+
+	const hash = "1123456789abcdef0123456789abcdef01234567"
+	resp, err := http.PostForm(srv.URL+"/api/v2/torrents/add", url.Values{
+		"urls":    {"magnet:?xt=urn:btih:" + hash},
+		"stopped": {"true"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("add status = %d", resp.StatusCode)
+	}
+	waitFor(t, "magnet added stopped", func() bool {
+		d.mu.Lock()
+		defer d.mu.Unlock()
+		_, meta := d.findLocked(hash)
+		return meta != nil && meta.UserPaused
+	})
+}
