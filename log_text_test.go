@@ -374,3 +374,12 @@ func TestIndexerTestTextIsASentence(t *testing.T) {
 		})
 	}
 }
+
+func TestGxExitTextIsASentence(t *testing.T) {
+	if got, want := gxExitText("exit status 2", 1, 10*time.Minute), "❌ gx-torrent stopped unexpectedly (exit status 2): Gextto restarts it"; got != want {
+		t.Errorf("first stop = %q, want %q", got, want)
+	}
+	if got, want := gxExitText("exit status 2", 3, 10*time.Minute), "❌ gx-torrent stopped unexpectedly (exit status 2): Gextto restarts it; it has stopped 3 times in the last 10 minutes"; got != want {
+		t.Errorf("third stop = %q, want %q", got, want)
+	}
+}

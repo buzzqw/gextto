@@ -76,6 +76,10 @@ func TestFailedImportsDaily(t *testing.T) {
 	if err := db.RecordAcquisitionEvent(logging.Event{At: now, Level: logging.LevelError, Hash: "abc", Message: "torrent completion handling failed"}); err != nil {
 		t.Fatal(err)
 	}
+	// The current wording of the same failure counts too.
+	if err := db.RecordAcquisitionEvent(logging.Event{At: now, Level: logging.LevelError, Hash: "abd", Message: "❌ «Silo S02E09» finished downloading but could not be processed: disk full"}); err != nil {
+		t.Fatal(err)
+	}
 	// A non-import error must not be counted.
 	if err := db.RecordAcquisitionEvent(logging.Event{At: now, Level: logging.LevelError, Hash: "def", Message: "some unrelated error"}); err != nil {
 		t.Fatal(err)
@@ -85,8 +89,8 @@ func TestFailedImportsDaily(t *testing.T) {
 	if err != nil {
 		t.Fatalf("FailedImportsDaily: %s", err)
 	}
-	if len(daily) != 1 || daily[0].Count != 1 {
-		t.Fatalf("daily = %+v, want one day with count 1", daily)
+	if len(daily) != 1 || daily[0].Count != 2 {
+		t.Fatalf("daily = %+v, want one day with count 2", daily)
 	}
 	if want := time.Now().UTC().Format("2006-01-02"); daily[0].Day != want {
 		t.Errorf("day = %q, want %q", daily[0].Day, want)

@@ -2,6 +2,7 @@ package gextto
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	"github.com/buzzqw/gextto/internal/logging"
@@ -76,7 +77,7 @@ func NewAppState(
 		if updated, err := db.SyncScoresWithSettings(cfg); err != nil {
 			logging.Warn("stored score refresh failed", "error", err)
 		} else if updated > 0 {
-			logging.Info("stored quality scores refreshed after a scoring change", "updated", updated)
+			logging.Info(fmt.Sprintf("The scoring settings changed: %s updated", countLabel(updated, "stored score", "stored scores")))
 		}
 	}
 	return state

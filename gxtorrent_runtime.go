@@ -587,10 +587,10 @@ func (e *gxTorrentEngine) superviseManagedProcess() {
 			rollbackTried = true
 			if binary, err := gxTorrentBinary(); err == nil {
 				if rolled, rollErr := rollbackGxTorrentBinary(binary); rollErr != nil {
-					logging.Error("gx-torrent binary rollback failed", "error", rollErr.Error())
+					logging.Error(fmt.Sprintf("Could not restore the previous gx-torrent binary: %v", rollErr))
 				} else if rolled {
-					logging.Error("gx-torrent cannot stay up: restoring the previous binary",
-						"crashes", budget.len(), "binary", binary)
+					logging.Error(fmt.Sprintf("❌ gx-torrent stopped %s in a short time: restoring the previous version of %s",
+						countLabel(budget.len(), "time", "times"), binary))
 					e.notifyEvent("engine_rollback", map[string]any{"binary": binary, "crashes": budget.len()})
 					budget = newBudget()
 					unstable = 0
@@ -600,8 +600,8 @@ func (e *gxTorrentEngine) superviseManagedProcess() {
 			}
 		}
 		if applyEngineFallback(context.Background(), e.cfg, BackendGxTorrent, e.notifier) {
-			logging.Error("gx-torrent cannot stay up: switching engine and restarting the service",
-				"crashes", budget.len(), "window_minutes", int(budget.window.Minutes()))
+			logging.Error(fmt.Sprintf("❌ gx-torrent stopped %s in %s: switching engine and restarting the service",
+				countLabel(budget.len(), "time", "times"), logDuration(budget.window)))
 			e.processMu.Lock()
 			process := e.process
 			e.processMu.Unlock()
@@ -613,9 +613,9 @@ func (e *gxTorrentEngine) superviseManagedProcess() {
 		pause := gxUnstablePause(unstable)
 		unstable++
 		startSettings.SafeMode = true
-		logging.Error("gx-torrent cannot stay up and no alternative engine is available: transfers stopped, retrying in safe mode (without uTP and holepunch)",
-			"crashes", budget.len(), "window_minutes", int(budget.window.Minutes()),
-			"retry_in", pause.String(), "crash_log", filepath.Join(e.cfg.DataDir, "gx-torrent", "gx-torrent.crash.log"))
+		logging.Error(fmt.Sprintf("❌ gx-torrent stopped %s in %s and no other engine is available: transfers are stopped and it is retried in safe mode (without uTP and holepunching) in %s; the reason is in %s",
+			countLabel(budget.len(), "time", "times"), logDuration(budget.window), logDuration(pause),
+			filepath.Join(e.cfg.DataDir, "gx-torrent", "gx-torrent.crash.log")))
 		e.notifyEvent("engine_unstable", map[string]any{
 			"crashes":       budget.len(),
 			"retry_minutes": int(pause.Minutes()),
@@ -673,7 +673,7 @@ func (e *gxTorrentEngine) superviseManagedProcess() {
 		if logExit == "" {
 			logExit = "unexpected exit"
 		}
-		logging.Error("managed gx-torrent exited unexpectedly", "error", logExit, "restarts_in_window", budget.len()+1)
+		logging.Error(gxExitText(logExit, budget.len()+1, budget.window))
 		e.notifyEvent("engine_crashed", map[string]any{"error": exit, "restarts_in_window": budget.len() + 1})
 		if budget.register(time.Now()) && budgetExhausted() {
 			return
@@ -712,7 +712,7 @@ func (e *gxTorrentEngine) superviseManagedProcess() {
 			_ = restarted.Stop()
 			return
 		}
-		logging.Info("managed gx-torrent restarted after an unexpected exit", "restart", budget.len())
+		logging.Info("✅ gx-torrent is running again after the unexpected stop")
 		e.notifyEvent("engine_restarted", map[string]any{"restarts_in_window": budget.len()})
 	}
 }
@@ -857,14 +857,14 @@ func gxEnsureIPFilter(cfg *Config, force bool) bool {
 	defer cancel()
 	data, errMessage := gh7_fetch_ipfilter(ctx, target)
 	if errMessage != "" {
-		logging.Warn("IP filter download failed; keeping the previous list", "url", target, "error", errMessage)
+		logging.Warn(fmt.Sprintf("⚠️ Could not download the IP filter from %s (%s): keeping the previous list", target, errMessage))
 		return false
 	}
 	if err := os.WriteFile(path, data, 0o644); err != nil {
-		logging.Warn("cannot store the IP filter", "path", path, "error", err)
+		logging.Warn(fmt.Sprintf("⚠️ Could not save the IP filter to %s: %v", path, err))
 		return false
 	}
-	logging.Info("IP filter updated", "path", path, "bytes", len(data))
+	logging.Info(fmt.Sprintf("🛡️ IP filter updated: %s saved to %s", formatBytes(int64(len(data))), path))
 	return true
 }
 

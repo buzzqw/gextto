@@ -242,7 +242,7 @@ func v2Ed2kCommand(cfg *Config, action, address, url string) (string, string, bo
 	if err != nil {
 		return "Comando non riuscito:", err.Error(), true
 	}
-	logging.Info("eD2k command sent to aMule", "action", action)
+	logging.Info(fmt.Sprintf("Sent the «%s» command to aMule", action))
 	return done, "", false
 }
 

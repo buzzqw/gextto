@@ -82,7 +82,7 @@ func RunCycleDomain(
 		if updated, err := db.SyncScoresWithSettings(cfg); err != nil {
 			logging.Warn("stored score refresh failed", "error", err)
 		} else if updated > 0 {
-			logging.Info("stored quality scores refreshed after a scoring change", "updated", updated)
+			logging.Info(fmt.Sprintf("The scoring settings changed: %s updated", countLabel(updated, "stored score", "stored scores")))
 		}
 	}
 	// The guided tuning's slow loop: once per cycle, re-fit the values the system
@@ -576,11 +576,8 @@ func RunCycleDomain(
 					// Logged only when it found something: a gap with nothing on
 					// eD2k either would repeat the same line every cycle.
 					if found := len(foundResults[index]) - before; found > 0 {
-						logging.Info("gap-fill eD2k fallback",
-							"series", candidate.Series.Name,
-							"season", candidate.Season,
-							"episode", candidate.Episode,
-							"found", found)
+						logging.Info(fmt.Sprintf("🔎 eD2k found %s for the missing %s S%02dE%02d",
+							countLabel(found, "candidate", "candidates"), candidate.Series.Name, candidate.Season, candidate.Episode))
 					}
 				}
 				logging.Debug("gap-fill live search completed",
@@ -839,16 +836,11 @@ func RunCycleDomain(
 					if failures, qerr := db.RecordTorrentLinkFailure(*release.TorrentURL, err.Error(), time.Now()); qerr != nil {
 						logging.Debug("could not record the failed torrent link", "error", qerr)
 					} else if failures == torrentLinkFailureLimit {
-						logging.Info("torrent link quarantined after repeated failures",
-							"target", releaseTarget(&release),
-							"source", release.Source,
-							"retry_in", torrentLinkQuarantine(failures).String())
+						logging.Info(fmt.Sprintf("🚫 The .torrent link of %s from %s failed again: it is set aside for %s",
+							releaseTarget(&release), release.Source, logDuration(torrentLinkQuarantine(failures))))
 					}
 					stats.Error("torrent_link")
-					logging.Warn("torrent link resolution failed",
-						"target", releaseTarget(&release),
-						"source", release.Source,
-						"error", err)
+					logging.Warn(fmt.Sprintf("⚠️ Could not fetch the .torrent of %s from %s: %v", releaseTarget(&release), release.Source, err))
 					if source := strings.TrimSpace(release.Source); source != "" {
 						noteTorrentLinkFailure(linkFailures, source, *release.TorrentURL, err, notifier)
 					}
@@ -1749,11 +1741,7 @@ func reconcilePackIdentityFromMagnet(release *models.Release) {
 	if corrected == nil {
 		return
 	}
-	logging.Warn("correcting season-pack identity from torrent display name",
-		"title", release.Title,
-		"torrent_name", displayName,
-		"declared_season", release.Season,
-		"torrent_season", corrected.Season)
+	logging.Warn(fmt.Sprintf("🔧 «%s» is named «%s» in the torrent: the pack is filed by the torrent name", release.Title, displayName))
 	*release = *corrected
 }
 

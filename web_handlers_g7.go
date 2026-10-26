@@ -761,7 +761,7 @@ func ArchiveEntries(w http.ResponseWriter, r *http.Request, s *AppState) {
 						logging.Warn("archive web search seen recording failed", "error", err)
 					}
 				}
-				logging.Info("archive web search completed", "query", term, "results", len(results))
+				logging.Info(fmt.Sprintf("🔎 The web search for «%s» found %s", term, countLabel(len(results), "result", "results")))
 			}
 		}
 	}
@@ -1233,7 +1233,8 @@ func SearchEpisode(w http.ResponseWriter, r *http.Request, s *AppState) {
 			feedMatches++
 		}
 	}
-	logging.Info("manual episode search completed", "series", seriesName, "season", season, "episode", episode, "results", len(results), "feed_matches", feedMatches)
+	logging.Info(fmt.Sprintf("🔎 Search for %s S%02dE%02d: %s, %d from the feeds",
+		seriesName, season, episode, countLabel(len(results), "result", "results"), feedMatches))
 	_ = s.db.MarkGapSearched(series.Name, season, episode)
 	jsonResponse(w, map[string]any{
 		"ok":           true,

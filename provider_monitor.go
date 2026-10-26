@@ -15,6 +15,7 @@ package gextto
 // again.
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
@@ -123,8 +124,7 @@ func providerLoginWorker(state *AppState) {
 				}
 				switch loginState.observe(failed, reason, time.Now()) {
 				case "failed":
-					logging.Warn("provider login failing: check the credentials in the service",
-						"source", indexer.Name, "reason", reason)
+					logging.Warn(fmt.Sprintf("⚠️ %s refuses the login (%s): check the credentials in the service", indexer.Name, reason))
 					if state.notifier != nil {
 						_ = state.notifier.NotifyEvent("provider_login_failed", map[string]any{
 							"source": indexer.Name,
@@ -132,7 +132,7 @@ func providerLoginWorker(state *AppState) {
 						})
 					}
 				case "recovered":
-					logging.Info("provider login recovered", "source", indexer.Name)
+					logging.Info(fmt.Sprintf("✅ %s accepts the login again", indexer.Name))
 					if state.notifier != nil {
 						_ = state.notifier.NotifyEvent("provider_login_recovered", map[string]any{
 							"source": indexer.Name,

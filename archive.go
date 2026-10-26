@@ -171,7 +171,7 @@ func migrateArchiveMagnetKey(db *sql.DB) error {
 		// The data is migrated; only the file size waits for the next VACUUM.
 		logging.Warn("archive: VACUUM after the migration failed", "error", err.Error())
 	}
-	logging.Info("archive: table rebuilt", "duration", time.Since(started).Round(time.Millisecond).String())
+	logging.Info(fmt.Sprintf("The release archive was rebuilt in %s", logDuration(time.Since(started))))
 	return nil
 }
 
@@ -257,7 +257,8 @@ func migrateArchiveOneRowPerHash(db *sql.DB) error {
 		if _, err := db.Exec("VACUUM"); err != nil {
 			logging.Warn("archive: VACUUM after the dedup failed", "error", err.Error())
 		}
-		logging.Info("archive: one row per torrent", "duplicates_removed", removed, "duration", time.Since(started).Round(time.Millisecond).String())
+		logging.Info(fmt.Sprintf("The release archive now keeps one row per torrent: %s removed in %s",
+			countLabel(removed, "duplicate", "duplicates"), logDuration(time.Since(started))))
 	}
 	return nil
 }
@@ -919,7 +920,8 @@ func applyArchiveRetention(cfg *Config, archive *Archive) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	logging.Info("release archive cleanup", "removed", removed, "days", days, "keep_min", keep)
+	logging.Info(fmt.Sprintf("🧹 Release archive cleanup: %s older than %s removed, keeping at least %s",
+		countLabel(removed, "release", "releases"), countLabel(days, "day", "days"), countLabel(keep, "release", "releases")))
 	return removed, nil
 }
 

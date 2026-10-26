@@ -197,13 +197,13 @@ collect:
 		if timeout != nil {
 			wait := time.Until(deadline)
 			if wait <= 0 {
-				logging.Warn("web search timed out; keeping completed sources", "query", query, "timeout_secs", int64(timeout.Seconds()))
+				logging.Warn(fmt.Sprintf("⏱️ The web search for «%s» ran out of its %s: keeping the sources that answered", query, logDuration(*timeout)))
 				break collect
 			}
 			select {
 			case item = <-resultsChannel:
 			case <-time.After(wait):
-				logging.Warn("web search timed out; keeping completed sources", "query", query, "timeout_secs", int64(timeout.Seconds()))
+				logging.Warn(fmt.Sprintf("⏱️ The web search for «%s» ran out of its %s: keeping the sources that answered", query, logDuration(*timeout)))
 				break collect
 			}
 		} else {

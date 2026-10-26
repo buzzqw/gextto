@@ -405,12 +405,8 @@ func ed2kManualEpisodeFallback(ctx context.Context, engine *Engine, cfg *Config,
 		accepted = append(accepted, release)
 	}
 	if len(accepted) > 0 || time.Since(started) > 2*time.Second {
-		logging.Info("manual eD2k fallback",
-			"series", series.Name,
-			"season", season,
-			"episode", episode,
-			"candidates", len(accepted),
-			"elapsed_ms", time.Since(started).Milliseconds())
+		logging.Info(fmt.Sprintf("🔎 eD2k search for %s S%02dE%02d: %s in %s",
+			series.Name, season, episode, countLabel(len(accepted), "candidate", "candidates"), logDuration(time.Since(started))))
 	}
 	return accepted
 }
@@ -800,11 +796,8 @@ func ed2kManualSeasonFallback(ctx context.Context, engine *Engine, cfg *Config, 
 		accepted = append(accepted, release)
 	}
 	if len(accepted) > 0 || time.Since(started) > 2*time.Second {
-		logging.Info("manual eD2k season fallback",
-			"series", series.Name,
-			"season", season,
-			"candidates", len(accepted),
-			"elapsed_ms", time.Since(started).Milliseconds())
+		logging.Info(fmt.Sprintf("🔎 eD2k search for %s season %d: %s in %s",
+			series.Name, season, countLabel(len(accepted), "candidate", "candidates"), logDuration(time.Since(started))))
 	}
 	return accepted
 }

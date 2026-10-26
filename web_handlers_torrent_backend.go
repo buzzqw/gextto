@@ -189,7 +189,7 @@ func V2SettingsQbittorrentMappings(w http.ResponseWriter, r *http.Request, s *Ap
 	proposal, added, err := proposeQbittorrentMappings(cfg)
 	switch {
 	case err != nil:
-		logging.Warn("cannot read qBittorrent folders for the path mapping", "error", err.Error())
+		logging.Warn(fmt.Sprintf("⚠️ Could not read the qBittorrent folders to propose the path mapping: %v", err))
 		status, isErr = "qBittorrent non raggiungibile: controlla URL e credenziali.", true
 	case added == 0:
 		status = "I percorsi sono già coperti: nessuna mappatura da aggiungere."

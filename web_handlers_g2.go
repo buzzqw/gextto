@@ -555,12 +555,8 @@ func manualSearch(w http.ResponseWriter, r *http.Request, s *AppState, includeRe
 		jsonError(w, http.StatusBadRequest, uiText(s, "la ricerca deve contenere da 1 a 256 caratteri"))
 		return
 	}
-	searchScope := "classic"
-	if includeRejected {
-		searchScope = "dashboard"
-	}
 	startedAt := time.Now()
-	logging.Info("manual search started", "query", query, "scope", searchScope)
+	logging.Info(fmt.Sprintf("🔎 Searching for «%s» by hand", query))
 	cfg := latestConfig(s)
 	manualSearchBudget := 90 * time.Second
 	if includeRejected {
@@ -593,7 +589,8 @@ func manualSearch(w http.ResponseWriter, r *http.Request, s *AppState, includeRe
 		results = append(results, SearchED2KManual(ctx, cfg, query)...)
 	}
 	if ctx.Err() == context.DeadlineExceeded {
-		logging.Warn("manual search budget expired; keeping completed search results", "query", query, "timeout_secs", int64(manualSearchBudget.Seconds()), "results", len(results))
+		logging.Warn(fmt.Sprintf("⏱️ The search for «%s» ran out of its %s: keeping the %s found so far",
+			query, logDuration(manualSearchBudget), countLabel(len(results), "result", "results")))
 		// searchOneWithDB deliberately preserves releases received before the
 		// deadline. The v2 dashboard must show those partial RSS/indexer/web
 		// results instead of throwing them away and falling back to the archive.
@@ -623,7 +620,8 @@ func manualSearch(w http.ResponseWriter, r *http.Request, s *AppState, includeRe
 	sort.SliceStable(results, func(i, j int) bool {
 		return results[i].Score > results[j].Score
 	})
-	logging.Info("manual search completed", "query", query, "scope", searchScope, "results", len(results), "duration_ms", time.Since(startedAt).Milliseconds())
+	logging.Info(fmt.Sprintf("🔎 The search for «%s» found %s in %s",
+		query, countLabel(len(results), "result", "results"), logDuration(time.Since(startedAt))))
 	jsonResponse(w, map[string]any{"ok": true, "query": query, "results": results})
 }
 
@@ -790,7 +788,7 @@ func RenameAll(w http.ResponseWriter, r *http.Request, s *AppState) {
 			s.rename_progress.Message = fmt.Sprintf("completed with %d error(s)", errors)
 		}
 		s.rename_progress_mu.Unlock()
-		logging.Info("background rename-all finished", "total", total, "errors", errors, "job_id", jobID)
+		logging.Info(fmt.Sprintf("✏️ Renaming the whole library finished: %s checked%s", countLabel(total, "item", "items"), cycleErrorsSuffix(errors)))
 	}); err != nil {
 		s.rename_progress_mu.Lock()
 		s.rename_progress.Running = false
@@ -1119,7 +1117,8 @@ func SeriesSearchMissing(w http.ResponseWriter, r *http.Request, s *AppState) {
 	for _, gap := range gaps {
 		_ = s.db.MarkGapSearched(series.Name, gap[0], gap[1])
 	}
-	logging.Info("manual missing search completed", "series", series.Name, "episodes", len(gaps), "results", len(results))
+	logging.Info(fmt.Sprintf("🔎 Search for the missing episodes of %s: %s for %s",
+		series.Name, countLabel(len(results), "result", "results"), countLabel(len(gaps), "episode", "episodes")))
 	episodes := make([]map[string]any, 0, len(gaps))
 	for _, gap := range gaps {
 		episodes = append(episodes, map[string]any{"season": gap[0], "episode": gap[1]})

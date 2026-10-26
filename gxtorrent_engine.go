@@ -715,7 +715,7 @@ func (e *gxTorrentEngine) sync() error {
 		e.lastErr = err.Error()
 		e.mu.Unlock()
 		if wasConnected {
-			logging.Warn("gx-torrent unreachable", "url", e.settings.BaseURL, "error", err)
+			logging.Warn(fmt.Sprintf("⚠️ gx-torrent does not answer at %s: %v", e.settings.BaseURL, err))
 		}
 		return err
 	}
@@ -1931,7 +1931,7 @@ func (e *gxTorrentEngine) LoadIPFilter(path string) (int, error) {
 	if err := e.do(http.MethodPost, "/api/v1/ipfilter", strings.NewReader(form.Encode()), "application/x-www-form-urlencoded", &result); err != nil {
 		return 0, err
 	}
-	logging.Info("IP filter loaded", "rules", result.Rules, "path", path)
+	logging.Info(fmt.Sprintf("🛡️ IP filter loaded into gx-torrent: %s from %s", countLabel(result.Rules, "rule", "rules"), path))
 	return result.Rules, nil
 }
 

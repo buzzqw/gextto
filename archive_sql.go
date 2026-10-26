@@ -456,9 +456,13 @@ func (a *Archive) DeleteArchiveSQL(ctx context.Context, operation ArchiveSQLOper
 	// A large DELETE leaves a large WAL; truncate it before returning so the
 	// maintenance operation does not leave write amplification for later.
 	if err := a.Checkpoint(); err != nil {
-		logging.Warn("archive sql maintenance checkpoint failed", "operation", operation.ID, "error", err)
+		logging.Warn(fmt.Sprintf("⚠️ Archive maintenance «%s»: could not compact the database log afterwards: %v", operation.ID, err))
 	}
-	logging.Info("archive sql maintenance deleted rows", "operation", operation.ID, "language", normalizedLanguage, "rows", removed)
+	languageNote := ""
+	if normalizedLanguage != "" {
+		languageNote = " in " + normalizedLanguage
+	}
+	logging.Info(fmt.Sprintf("🧹 Archive maintenance «%s» removed %s%s", operation.ID, countLabel(removed, "release", "releases"), languageNote))
 	return removed, nil
 }
 

@@ -711,7 +711,7 @@ func RunNow(w http.ResponseWriter, r *http.Request, s *AppState) {
 		running = false
 	}
 	if !s.manualCyclePending.CompareAndSwap(false, true) {
-		logging.Info("manual cycle request coalesced", "domain", gh1_domainLabel(domain))
+		logging.Info(fmt.Sprintf("A %s cycle is already waiting to start: this request joins it", gh1_domainLabel(domain)))
 		jsonStatus(w, http.StatusAccepted, map[string]any{
 			"ok":      true,
 			"started": false,

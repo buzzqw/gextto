@@ -195,9 +195,8 @@ func InspectActivePacks(cfg *Config, torrents TorrentEngine, db *Database, check
 		if removeErr != nil {
 			logging.Warn("could not remove the useless pack", "hash", candidate.torrent.Hash, "error", removeErr.Error())
 		} else if removed {
-			logging.Info("useless pack removed during download",
-				"hash", candidate.torrent.Hash, "name", candidate.torrent.Name,
-				"downloaded_bytes", candidate.torrent.TotalDone)
+			logging.Info(fmt.Sprintf("🧹 Removed «%s» while it was downloading: none of its files is useful (%s downloaded)",
+				candidate.torrent.Name, formatBytes(candidate.torrent.TotalDone)), "hash", candidate.torrent.Hash)
 		}
 		delete(checked, candidate.torrent.Hash)
 	}

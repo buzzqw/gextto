@@ -788,8 +788,7 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 			continue
 		}
 		if ok, err := torrents.ForceRecheck(torrent.Hash); err == nil && ok {
-			logging.Info("startup re-check of an unarchived completed torrent",
-				"hash", torrent.Hash, "name", torrent.Name)
+			logging.Info(fmt.Sprintf("🔍 «%s» finished downloading but never reached the library: checking its files again", torrent.Name), "hash", torrent.Hash)
 		}
 	}
 	// Only torrents restored at startup can be considered "leftover failures".
@@ -1392,7 +1391,7 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 					"error":            handleErr.Error(),
 					"upgrade_restored": restored,
 				})
-				logging.Error("torrent completion handling failed", "error", handleErr, "hash", hash, "name", event.Name)
+				logging.Error(fmt.Sprintf("❌ «%s» finished downloading but could not be processed: %v", event.Name, handleErr), "hash", hash)
 				processed = false
 			}
 			if processed && (event.Kind == "torrent_finished" || event.Kind == "storage_moved") {
@@ -1635,8 +1634,8 @@ func restoreTorrentMoves(torrents TorrentSession, db *Database, retries map[stri
 	}
 	if len(saved) > 0 {
 		names := bg_restoredTorrentNames(torrents, db, bg_torrentHashes(saved))
-		logging.Info("restored pending storage moves", "torrents", len(saved),
-			"names", bg_restoredTorrentNamesLine(names, 8))
+		logging.Info(fmt.Sprintf("📦 %s still to be moved after the restart: %s",
+			countLabel(len(saved), "download is", "downloads are"), bg_restoredTorrentNamesLine(names, 8)))
 	}
 	return persisted
 }
@@ -2045,7 +2044,7 @@ func ipFilterRefreshWorker(state *AppState) {
 			logging.Warn("IP filter refresh failed", "error", err.Error())
 			continue
 		}
-		logging.Info("IP filter refreshed", "rules", rules, "path", path)
+		logging.Info(fmt.Sprintf("🛡️ IP filter refreshed: %s from %s", countLabel(rules, "rule", "rules"), path))
 	}
 }
 
@@ -2157,7 +2156,7 @@ func bg_cleanupEmptyTempDirs(cfg *Config, torrents TorrentSession) {
 		if err := os.RemoveAll(path); err != nil {
 			logging.Debug("could not remove empty temp folder", "dir", path, "error", err)
 		} else {
-			logging.Info("removed empty temp folder", "dir", path)
+			logging.Info(fmt.Sprintf("🧹 Removed the empty temporary folder %s", path))
 		}
 	}
 }
@@ -2230,7 +2229,7 @@ func housekeepingWorker(state *AppState) {
 		// even when that switch is off. It never touches downloaded files, the
 		// library or the download history: only the searchable catalogue rows.
 		if _, err := applyArchiveRetention(cfg, state.archive); err != nil {
-			logging.Warn("release archive cleanup failed", "error", err)
+			logging.Warn(fmt.Sprintf("⚠️ The release archive cleanup failed: %v", err))
 		}
 		if !state.SleepBackground(housekeepingInterval(cfg)) {
 			return

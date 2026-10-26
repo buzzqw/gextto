@@ -307,13 +307,15 @@ type DailyCount struct {
 
 // FailedImportsDaily counts failed library imports per day over the last `days`
 // days, newest first. An import failure is an ERROR acquisition event with the
-// completion-handling failure message or the integrity-validation refusal (both
-// logged with the torrent hash at the import choke point).
+// completion-handling failure message (the current wording or the earlier
+// «completion handling failed», still in older history) or the
+// integrity-validation refusal (both logged with the torrent hash at the
+// import choke point).
 func (d *Database) FailedImportsDaily(days int) ([]DailyCount, error) {
 	since := time.Now().UTC().AddDate(0, 0, -clampInt(days, 1, 90)).Format(acquisitionTimeLayout)
 	rows, err := d.db.Query(`SELECT substr(at,1,10), COUNT(*) FROM acquisition_events
 		WHERE at >= ?1 AND level='ERROR'
-		AND (message LIKE '%completion handling failed%' OR message LIKE '%not archiving%')
+		AND (message LIKE '%could not be processed%' OR message LIKE '%completion handling failed%' OR message LIKE '%not archiving%')
 		GROUP BY 1 ORDER BY 1 DESC`, since)
 	if err != nil {
 		return nil, err

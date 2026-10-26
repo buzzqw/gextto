@@ -1,6 +1,7 @@
 package gextto
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/buzzqw/gextto/internal/logging"
@@ -21,11 +22,8 @@ import (
 func crossOriginGuard(next http.Handler) http.Handler {
 	protection := http.NewCrossOriginProtection()
 	protection.SetDenyHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		logging.Warn("cross-origin request refused",
-			"method", r.Method,
-			"path", r.URL.Path,
-			"origin", r.Header.Get("Origin"),
-			"site", r.Header.Get("Sec-Fetch-Site"))
+		logging.Warn(fmt.Sprintf("🛡️ Refused a request to %s %s coming from another site (%s)",
+			r.Method, r.URL.Path, r.Header.Get("Origin")))
 		if requestWantsJSON(r) {
 			jsonError(w, http.StatusForbidden, "cross-origin request refused")
 			return

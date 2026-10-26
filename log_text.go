@@ -712,3 +712,14 @@ func seedFinishedLead(name string, reason *string) string {
 	*reason = ""
 	return lead
 }
+
+// gxExitText is the line written when the managed gx-torrent stops on its own:
+// what it said when it stopped and, after the first stop, how many times it
+// has stopped in the restart window.
+func gxExitText(reason string, stops int, window time.Duration) string {
+	text := fmt.Sprintf("❌ gx-torrent stopped unexpectedly (%s): Gextto restarts it", reason)
+	if stops > 1 {
+		text += fmt.Sprintf("; it has stopped %s in the last %s", countLabel(stops, "time", "times"), logDuration(window))
+	}
+	return text
+}

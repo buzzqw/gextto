@@ -1288,11 +1288,11 @@ func gh0_addParsedRelease(ctx context.Context, s *AppState, release models.Relea
 		defer recoverGoroutine("g0 background")
 		added, err := engine.Add(source, cfg)
 		if err != nil {
-			logging.Error("manual torrent add failed", "title", title, "error", err)
+			logging.Error(fmt.Sprintf("❌ Could not add «%s» to the downloads: %v", title, err))
 		} else if added {
-			logging.Info("manual torrent queued", "title", title)
+			logging.Info(fmt.Sprintf("📥 «%s» added to the downloads by hand", title))
 		} else {
-			logging.Info("manual torrent already queued", "title", title)
+			logging.Info(fmt.Sprintf("«%s» is already among the downloads", title))
 		}
 	}()
 	return http.StatusAccepted, map[string]any{"ok": true, "title": release.Title, "queued": true}
@@ -1591,7 +1591,7 @@ func RunHousekeepingNow(w http.ResponseWriter, r *http.Request, s *AppState) {
 	// torrents.
 	archiveRemoved, err := applyArchiveRetention(latestConfig(s), s.archive)
 	if err != nil {
-		logging.Warn("release archive cleanup failed", "error", err)
+		logging.Warn(fmt.Sprintf("⚠️ The release archive cleanup failed: %v", err))
 	}
 	jsonStatus(w, http.StatusOK, map[string]any{"ok": true, "report": report, "archive_removed": archiveRemoved})
 }

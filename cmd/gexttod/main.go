@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	gextto "github.com/buzzqw/gextto"
 	"github.com/buzzqw/gextto/internal/cache"
@@ -170,8 +171,8 @@ func runDaemon(dryRun bool, configOption *string) error {
 	}
 
 	if conflicts := gextto.ListenConflicts(&cfg); len(conflicts) > 0 {
-		logging.Warn("listen address already in use: stop the other instance (legacy extto/rextto or a previous Gextto) before starting",
-			"addresses", conflicts)
+		logging.Warn(fmt.Sprintf("⚠️ The address %s is already in use: stop the other instance (legacy extto/rextto or a previous Gextto) before starting",
+			strings.Join(conflicts, ", ")))
 	}
 
 	if engine := gextto.ApplyEngineOverride(&cfg); engine != "" {
@@ -198,7 +199,7 @@ func runDaemon(dryRun bool, configOption *string) error {
 	logCheckpoint("comics", comics.Checkpoint)
 	logCheckpoint("config", i18n.Checkpoint)
 	if serveErr != nil {
-		logging.Error("web server stopped with error", "error", serveErr)
+		logging.Error(fmt.Sprintf("❌ The web interface stopped: %v", serveErr))
 	}
 	closeLog()
 	return serveErr

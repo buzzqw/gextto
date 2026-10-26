@@ -389,11 +389,11 @@ func gh4_addParsedRelease(s *AppState, release models.Release) (int, any) {
 		added, err := s.activeEngine().Add(source, s.cfg)
 		switch {
 		case err != nil:
-			logging.Error("manual torrent add failed", "title", title, "error", err.Error(), "hash", logHash)
+			logging.Error(fmt.Sprintf("❌ Could not add «%s» to the downloads: %v", title, err), "hash", logHash)
 		case added:
-			logging.Info("manual torrent queued", "title", title, "score", score, "hash", logHash)
+			logging.Info(fmt.Sprintf("📥 «%s» added to the downloads by hand (score %v)", title, score), "hash", logHash)
 		default:
-			logging.Info("manual torrent already queued", "title", title, "hash", logHash)
+			logging.Info(fmt.Sprintf("«%s» is already among the downloads", title), "hash", logHash)
 		}
 	}()
 	return http.StatusAccepted, map[string]any{"ok": true, "title": title, "queued": true}
@@ -697,7 +697,7 @@ func CleanupDatabase(w http.ResponseWriter, r *http.Request, s *AppState) {
 	cfg := latestConfig(s)
 	archiveRemoved, archiveErr := applyArchiveRetention(cfg, s.archive)
 	if archiveErr != nil {
-		logging.Warn("release archive cleanup failed", "error", archiveErr)
+		logging.Warn(fmt.Sprintf("⚠️ The release archive cleanup failed: %v", archiveErr))
 	}
 	report, err := s.db.Cleanup(1000, 30)
 	if err != nil {

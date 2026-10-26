@@ -403,53 +403,57 @@ func TestFTP(host, user, password, remotePath string) FtpTestReport {
 		User: user,
 		Path: strings.TrimSpace(remotePath),
 	}
-	logging.Info("FTP test: connecting", "host", report.Host, "user", report.User, "endpoint", ftpEndpoint(host))
+	logging.Info(fmt.Sprintf("FTP test: connecting to %s as %s", ftpEndpoint(host), report.User))
 	conn, err := ftp.Dial(ftpEndpoint(host))
 	if err != nil {
-		logging.Info("FTP test: connection failed", "host", report.Host, "error", err)
+		logging.Info(fmt.Sprintf("FTP test: could not connect to %s: %v", report.Host, err))
 		report.Error = errorString(fmt.Sprintf("connessione fallita: %s", err))
 		return report
 	}
 	if err := conn.Login(user, password); err != nil {
-		logging.Info("FTP test: login failed", "host", report.Host, "user", report.User, "error", err)
+		logging.Info(fmt.Sprintf("FTP test: %s refused the login of %s: %v", report.Host, report.User, err))
 		report.Error = errorString(fmt.Sprintf("login fallito: %s", err))
 		_ = conn.Quit()
 		return report
 	}
 	report.LoggedIn = true
-	logging.Info("FTP test: login ok", "host", report.Host, "user", report.User)
+	logging.Info(fmt.Sprintf("FTP test: logged in to %s as %s", report.Host, report.User))
 	if report.Path != "" {
 		if err := conn.ChangeDir(report.Path); err != nil {
-			logging.Info("FTP test: remote path not accessible", "host", report.Host, "path", report.Path, "error", err)
+			logging.Info(fmt.Sprintf("FTP test: the folder %s on %s cannot be opened: %v", report.Path, report.Host, err))
 			report.Error = errorString(fmt.Sprintf("cartella '%s': %s", report.Path, err))
 			_ = conn.Quit()
 			return report
 		}
 		report.EnteredPath = true
-		logging.Info("FTP test: remote path ok", "host", report.Host, "path", report.Path)
+		logging.Info(fmt.Sprintf("FTP test: the folder %s on %s is reachable", report.Path, report.Host))
 	}
 	testFile := fmt.Sprintf("gextto-test-%s.txt", backupUUID())
 	report.TestFile = testFile
 	payload := []byte("Gextto FTP test file\n")
 	reader := &countingReader{reader: strings.NewReader(string(payload))}
 	if err := conn.Stor(testFile, reader); err != nil {
-		logging.Info("FTP test: probe upload failed", "host", report.Host, "path", report.Path, "remote", testFile, "error", err)
+		logging.Info(fmt.Sprintf("FTP test: could not upload the test file to %s: %v", report.Host, err))
 		report.Error = errorString(fmt.Sprintf("upload del file di prova fallito: %s", err))
 		_ = conn.Quit()
 		return report
 	}
 	report.Uploaded = true
-	logging.Info("FTP test: probe file uploaded", "host", report.Host, "path", report.Path, "remote", testFile, "bytes", reader.count)
+	logging.Info(fmt.Sprintf("FTP test: test file %s uploaded to %s (%s)", testFile, report.Host, formatBytes(int64(reader.count))))
 	if err := conn.Delete(testFile); err != nil {
 		// The upload already proved write access; deletion is best-effort.
-		logging.Info("FTP test: could not remove probe file", "host", report.Host, "remote", testFile, "error", err)
+		logging.Info(fmt.Sprintf("FTP test: the test file %s stayed on %s: %v", testFile, report.Host, err))
 		report.Error = errorString(fmt.Sprintf("file di prova caricato ma non rimosso: %s", err))
 	} else {
 		report.Deleted = true
-		logging.Info("FTP test: probe file removed", "host", report.Host, "remote", testFile)
+		logging.Info(fmt.Sprintf("FTP test: test file %s removed", testFile))
 	}
 	_ = conn.Quit()
-	logging.Info("FTP test completed", "host", report.Host, "path", report.Path, "ok", report.OK())
+	if report.OK() {
+		logging.Info(fmt.Sprintf("✅ FTP test on %s passed: backups can be written there", report.Host))
+	} else {
+		logging.Info(fmt.Sprintf("⚠️ FTP test on %s did not pass", report.Host))
+	}
 	return report
 }
 

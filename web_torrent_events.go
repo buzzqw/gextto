@@ -519,8 +519,7 @@ func RetryStorageMoves(torrents TorrentSession, moveRequests map[string]struct{}
 			logging.Debug("storage move already running in the engine; waiting for it", "name", torrent.Name, "destination", destination)
 		} else if err != nil {
 			delete(moveRequests, hash)
-			logging.Warn("storage move retry failed synchronously",
-				"hash", hash, "name", torrent.Name, "destination", destination, "error", err.Error())
+			logging.Warn(fmt.Sprintf("⚠️ Could not move «%s» to %s (%v): it will be retried", torrent.Name, destination, err), "hash", hash)
 			tev_scheduleStorageMoveRetry(retries, hash, destination, postSeed, now)
 		} else if moved {
 			if entry, ok := retries[hash]; ok {
@@ -1489,11 +1488,9 @@ func RemoveSeededCompleted(cfg *Config, torrents TorrentSession, db *Database, p
 				_ = db.MarkTorrentRemovedAt(torrent.Hash)
 			}
 			if target, moveErr := MoveToTrash(source, *cfg.TrashPath); moveErr != nil {
-				logging.Error("could not move seeded archived folder to trash",
-					"hash", torrent.Hash, "name", torrent.Name, "source", source, "error", moveErr.Error())
+				logging.Error(fmt.Sprintf("❌ Could not move «%s» to the trash after seeding (%s): %v", torrent.Name, source, moveErr), "hash", torrent.Hash)
 			} else {
-				logging.Info("seeded archived folder moved to trash",
-					"hash", torrent.Hash, "name", torrent.Name, "source", source, "trash", target)
+				logging.Info(fmt.Sprintf("🗑️ «%s» finished seeding and its download folder moved to the trash: %s", torrent.Name, target), "hash", torrent.Hash)
 			}
 			continue
 		}
@@ -2060,9 +2057,9 @@ func tev_cleanupOrphanedRamdisk(ramdisk string, torrents TorrentSession) {
 			result = os.Remove(path)
 		}
 		if result != nil {
-			logging.Warn("could not remove orphaned RAM disk data", "path", path, "error", result.Error())
+			logging.Warn(fmt.Sprintf("⚠️ Could not remove %s from the RAM disk, which no download uses any more: %v", path, result))
 		} else {
-			logging.Info("removed orphaned RAM disk data", "path", path)
+			logging.Info(fmt.Sprintf("🧹 Removed %s from the RAM disk: no download uses it any more", path))
 		}
 	}
 }
@@ -2303,8 +2300,7 @@ func tev_discardCompletedSource(cfg *Config, db *Database, torrents TorrentSessi
 	if cfg.TrashPath != nil && cfg.CleanupAction != "delete" {
 		target, err := MoveToTrash(source, *cfg.TrashPath)
 		if err != nil {
-			logging.Error("could not move rejected completed download to trash",
-				"hash", event.Hash, "name", event.Name, "source", source, "error", err.Error())
+			logging.Error(fmt.Sprintf("❌ Could not move the rejected download «%s» to the trash (%s): %v", event.Name, source, err), "hash", event.Hash)
 		} else {
 			logging.Debug(fmt.Sprintf("rejected completed download moved to trash — «%s» · %s → %s", event.Name, source, target), "hash", event.Hash)
 		}
@@ -3525,8 +3521,7 @@ func HandleTorrentEvent(cfg *Config, torrents TorrentSession, db *Database, move
 				fallbackDestination = alternative
 			}
 			tev_scheduleStorageMoveRetry(retries, event.Hash, fallbackDestination, false, time.Now())
-			logging.Warn("completed torrent storage move failed synchronously",
-				"hash", event.Hash, "name", event.Name, "error", err.Error())
+			logging.Warn(fmt.Sprintf("⚠️ Could not move the completed «%s» (%v): it will be retried", event.Name, err), "hash", event.Hash)
 		} else if moved {
 			retries[strings.ToLower(event.Hash)] = StorageMoveRetry{
 				destination: destination,
@@ -3630,8 +3625,7 @@ func HandleTorrentEvent(cfg *Config, torrents TorrentSession, db *Database, move
 			// not leave an incomplete download stopped forever.
 			if current != nil && current.State == "paused" && current.AutoManaged && current.Progress < 99.99 {
 				if resumed, rerr := torrents.Resume(event.Hash); rerr == nil && resumed {
-					logging.Info("download resumed after storage move",
-						"hash", event.Hash, "name", event.Name, "progress", current.Progress)
+					logging.Info(fmt.Sprintf("▶️ «%s» resumed after its files were moved (%s done)", event.Name, logPercent(current.Progress)), "hash", event.Hash)
 				}
 				_, _ = torrents.Reannounce(event.Hash)
 			}

@@ -7,6 +7,7 @@ package gextto
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -166,7 +167,7 @@ func v2ArchiveSQLPreviewResult(ctx context.Context, s *AppState, operation Archi
 	defer cancel()
 	preview, err := s.archive.PreviewArchiveSQL(previewCtx, operation, language)
 	if err != nil {
-		logging.Error("archive sql preview failed", "operation", operation.ID, "language", language, "error", err)
+		logging.Error(fmt.Sprintf("❌ Could not preview the archive maintenance «%s»: %v", operation.ID, err))
 		result.Error = "Anteprima non riuscita."
 		return result
 	}

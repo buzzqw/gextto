@@ -71,13 +71,13 @@ func BackupTestFtp(w http.ResponseWriter, r *http.Request, s *AppState) {
 	password := pick(input.Password, "backup_ftp_password")
 	path := pick(input.Path, "backup_ftp_path")
 	if host == "" || user == "" || password == "" {
-		logging.Info("FTP test skipped: missing configuration", "host", host, "user", user, "path", path, "password_configured", password != "")
+		logging.Info("FTP test not run: the server, user and password are all needed")
 		jsonError(w, http.StatusBadRequest, "host, utente e password FTP sono obbligatori")
 		return
 	}
 	// Always 200 so the UI can show exactly which step succeeded/failed.
 	report := TestFTP(host, user, password, path)
-	logging.Info("FTP test result",
+	logging.Debug("FTP test result",
 		"host", report.Host,
 		"path", report.Path,
 		"test_file", report.TestFile,
@@ -1231,11 +1231,11 @@ func gh3AddParsedRelease(s *AppState, release models.Release) (int, any) {
 		added, err := s.activeEngine().Add(source, s.cfg)
 		switch {
 		case err != nil:
-			logging.Error("manual torrent add failed", "title", title, "error", err.Error(), "hash", logHash)
+			logging.Error(fmt.Sprintf("❌ Could not add «%s» to the downloads: %v", title, err), "hash", logHash)
 		case added:
-			logging.Info("manual torrent queued", "title", title, "score", score, "hash", logHash)
+			logging.Info(fmt.Sprintf("📥 «%s» added to the downloads by hand (score %v)", title, score), "hash", logHash)
 		default:
-			logging.Info("manual torrent already queued", "title", title, "hash", logHash)
+			logging.Info(fmt.Sprintf("«%s» is already among the downloads", title), "hash", logHash)
 		}
 	}()
 	return http.StatusAccepted, map[string]any{"ok": true, "title": title, "queued": true}

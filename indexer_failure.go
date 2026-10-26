@@ -13,6 +13,7 @@ package gextto
 // new break is news again.
 
 import (
+	"fmt"
 	"strings"
 	"sync"
 	"time"
@@ -95,8 +96,8 @@ func notifyIndexerFailure(notifier *Notifier, source string, failures int, reaso
 		source = "indexer"
 	}
 	reason = indexerFailureReason(reason)
-	logging.Warn("indexer failing repeatedly: re-login or disable it in the searches",
-		"source", source, "failed_links", failures, "error", reason)
+	logging.Warn(fmt.Sprintf("⚠️ The indexer %s keeps failing (%s did not download: %s): sign in to it again or disable it in the searches",
+		source, countLabel(failures, "link", "links"), reason))
 	if !claimIndexerFailureNotice(source, time.Now()) || notifier == nil {
 		return
 	}
