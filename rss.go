@@ -16,6 +16,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -2340,7 +2341,67 @@ func fetchTorznabFlareSolverr(ctx context.Context, indexer IndexerConfig, query 
 		}
 		return items, err
 	}
-	return parse_feed_body(body, indexer.Name)
+	items, err := parse_feed_body(body, indexer.Name)
+	if err == nil && managerKind(indexer) == ManagerIndexarr {
+		items = append(items, fetchIndexarrMorePages(ctx, fullURL, headers, body, indexer.Name)...)
+	}
+	return items, err
+}
+
+// indexarrMaxResults bounds the pages read from one indexarr search. indexarr
+// returns at most 100 results a page; a broad title can match thousands.
+const indexarrMaxResults = 1000
+
+// indexarrPageSize is the limit every Torznab request asks for.
+const indexarrPageSize = 100
+
+var torznabResponseTotal = regexp.MustCompile(`<newznab:response[^>]*\btotal="(\d+)"`)
+
+// fetchIndexarrMorePages reads the pages after the first of an indexarr
+// search. indexarr keeps the merged result set for two minutes, so the
+// following pages cost a few milliseconds and never search the sites again.
+// A page that fails ends the reading: the results already read are kept.
+func fetchIndexarrMorePages(ctx context.Context, firstURL string, headers map[string]string, firstBody, source string) []models.Release {
+	match := torznabResponseTotal.FindStringSubmatch(firstBody)
+	if match == nil {
+		return nil
+	}
+	total, err := strconv.Atoi(match[1])
+	if err != nil {
+		return nil
+	}
+	if total > indexarrMaxResults {
+		total = indexarrMaxResults
+	}
+	if strings.Count(firstBody, "<item>") == 0 {
+		return nil
+	}
+	// The offset moves by the requested page size: indexarr can return a page
+	// a few items short (a release it cannot render) with more pages after it.
+	var out []models.Release
+	for offset := indexarrPageSize; offset < total && ctx.Err() == nil; offset += indexarrPageSize {
+		response, err := httpDo(ctx, defaultHTTPClient, http.MethodGet, firstURL+"&offset="+strconv.Itoa(offset), headers, nil, "")
+		if err != nil {
+			logging.Debug("indexarr page could not be read", "offset", offset, "error", torznabShortReason(err))
+			return out
+		}
+		payload, readErr := readLimitedBody(response.Body, maxFeedResponseBytes)
+		response.Body.Close()
+		if readErr != nil || response.StatusCode != http.StatusOK {
+			logging.Debug("indexarr page could not be read", "offset", offset, "status", response.StatusCode)
+			return out
+		}
+		page := string(payload)
+		items, err := parse_feed_body(page, source)
+		if err != nil {
+			return out
+		}
+		out = append(out, items...)
+		if strings.Count(page, "<item>") == 0 {
+			return out
+		}
+	}
+	return out
 }
 
 // torznabShortReason is the readable cause of a failed Torznab request: the

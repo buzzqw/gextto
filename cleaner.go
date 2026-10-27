@@ -273,21 +273,49 @@ func handleDuplicate(file string, cfg *Config) error {
 // removed because a better release replaced it, so the reason is visible in the
 // log instead of only a bare count.
 func logInferiorFileReplaced(cfg *Config, file, replacement string) {
+	logInferiorCopiesReplaced(cfg, []string{file}, replacement)
+}
+
+// logInferiorCopiesReplaced logs one line for the copies of one old file (the
+// same name in more than one folder of the library).
+func logInferiorCopiesReplaced(cfg *Config, files []string, replacement string) {
+	if len(files) == 0 {
+		return
+	}
 	action := "is in the trash"
 	if cfg.CleanupAction == "delete" {
 		action = "was deleted"
 	}
-	logging.Info(fmt.Sprintf("🗑️ Replaced with a better version: «%s»; the old file «%s» %s",
-		filepath.Base(replacement), filepath.Base(file), action))
-	logging.Debug("inferior file replaced", "file", file, "replacement", replacement)
+	copies := ""
+	if len(files) > 1 {
+		copies = fmt.Sprintf(" (%d copies in different folders)", len(files))
+		action = "are in the trash"
+		if cfg.CleanupAction == "delete" {
+			action = "were deleted"
+		}
+	}
+	logging.Info(fmt.Sprintf("🗑️ Replaced with a better version: «%s»; the old file «%s»%s %s",
+		filepath.Base(replacement), filepath.Base(files[0]), copies, action))
+	for _, file := range files {
+		logging.Debug("inferior file replaced", "file", file, "replacement", replacement)
+	}
 }
 
-// logRemovedFiles logs one "replaced" line per removed file. Used by the
+// logRemovedFiles logs one "replaced" line per removed file name. Used by the
 // callers that do not emit a combined upgrade line of their own (background
 // cleanup and post-processing); the completion handler logs a single line.
 func logRemovedFiles(cfg *Config, files []string, replacement string) {
+	var order []string
+	byName := map[string][]string{}
 	for _, file := range files {
-		logInferiorFileReplaced(cfg, file, replacement)
+		name := filepath.Base(file)
+		if _, seen := byName[name]; !seen {
+			order = append(order, name)
+		}
+		byName[name] = append(byName[name], file)
+	}
+	for _, name := range order {
+		logInferiorCopiesReplaced(cfg, byName[name], replacement)
 	}
 }
 

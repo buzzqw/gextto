@@ -203,6 +203,11 @@ func torrentFetchFailureReason(body io.Reader) string {
 	if err != nil && len(payload) == 0 {
 		return ""
 	}
+	// A Torznab error (indexarr, Jackett) is reduced to its code and
+	// description: the raw XML only makes the log line unreadable.
+	if torznabError := TorznabError(string(payload)); torznabError != "" {
+		return boundReason(utils.RedactURLSecrets(torznabError), torrentFetchReasonLimit)
+	}
 	reason := strings.Join(strings.Fields(strings.ToValidUTF8(string(payload), " ")), " ")
 	reason = strings.TrimSpace(utils.RedactURLSecrets(reason))
 	return boundReason(reason, torrentFetchReasonLimit)

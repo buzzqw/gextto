@@ -12,6 +12,14 @@ package gextto
 // own results. A tracker listed in both managers is searched once, through
 // the lane that answers faster; the indexers Prowlarr reports as failing are
 // skipped. When the list cannot be read the manager is queried as before.
+//
+// indexarr is the exception: it is always searched through its own /api
+// aggregate. It already queries its sources in parallel, answers as soon as
+// the fast ones have, keeps the slow ones running in the background, merges
+// the duplicates and names the site of each result (jackettindexer). Measured
+// on 2026-10-27, one lane per indexarr source turned every title into 46
+// requests and a 104-title search into 3 min 40 s, held back by the two slots
+// of its slowest source; the aggregate answers the same title in 2.6 s.
 
 import (
 	"context"
@@ -303,7 +311,7 @@ func expandSearchLanes(ctx context.Context, indexers []IndexerConfig) []searchLa
 		switch {
 		case !isManagerSource(indexer):
 			lanes = append(lanes, searchLane{indexer: indexer, health: indexer.Name, key: "plain\x00" + indexer.Name + "\x00" + indexer.URL, slots: laneSlotsPlain, timeout: indexerRequestTimeout})
-		case !managerLanes:
+		case !managerLanes || managerKind(indexer) == ManagerIndexarr:
 			lanes = append(lanes, aggregateLane(indexer))
 		default:
 			list, ok := managerIndexersCached(ctx, indexer)

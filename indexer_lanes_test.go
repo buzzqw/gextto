@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -227,67 +228,59 @@ func TestManagerWithoutListFallsBackToTheAggregate(t *testing.T) {
 	}
 }
 
-// TestIndexarrSearchedPerIndexer pins indexarr's first-class lane behaviour:
-// the indexer list and the per-indexer searches use the Jackett-compatible
-// paths, while the aggregate /api endpoint is not touched.
-func TestIndexarrSearchedPerIndexer(t *testing.T) {
+// TestIndexarrSearchedThroughItsAggregate pins indexarr's behaviour: one
+// request to its own /api endpoint per title, never the per-indexer lanes,
+// with the following pages read up to the total indexarr reports.
+func TestIndexarrSearchedThroughItsAggregate(t *testing.T) {
 	resetLaneState()
-	var listCalls, laneCalls, aggregateCalls atomic.Int64
+	var laneCalls, pages atomic.Int64
+	const total = 230
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch {
-		case strings.HasPrefix(r.URL.Path, "/api/v2.0/indexers/all/results/torznab"):
-			listCalls.Add(1)
-			fmt.Fprint(w, `<?xml version="1.0"?><indexers><indexer id="limetorrents" configured="true"><title>LimeTorrents</title></indexer><indexer id="1337x" configured="true"><title>1337x</title></indexer></indexers>`)
-		case strings.HasPrefix(r.URL.Path, "/api/v2.0/indexers/"):
-			parts := strings.Split(r.URL.Path, "/")
-			id := ""
-			if len(parts) > 4 {
-				id = parts[4]
-			}
+		if r.URL.Path != "/api" {
 			laneCalls.Add(1)
-			if r.URL.Query().Get("t") == "caps" {
-				fmt.Fprint(w, `<caps><searching><search available="yes" supportedParams="q"/><tv-search available="yes" supportedParams="q,season,ep"/></searching></caps>`)
-				return
-			}
-			hash := fmt.Sprintf("%040x", len(id)*1000)
-			fmt.Fprintf(w, `<?xml version="1.0"?><rss><channel><item><title>Show S01E01 1080p %s</title><link>magnet:?xt=urn:btih:%s</link></item></channel></rss>`, id, hash)
-		case r.URL.Path == "/api":
-			aggregateCalls.Add(1)
-			fmt.Fprint(w, `<?xml version="1.0"?><rss><channel><item><title>SHOULD-NOT-BE-USED</title><link>magnet:?xt=urn:btih:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa</link></item></channel></rss>`)
-		default:
 			http.NotFound(w, r)
+			return
 		}
+		if r.URL.Query().Get("t") == "caps" {
+			fmt.Fprint(w, `<caps><searching><search available="yes" supportedParams="q"/><tv-search available="yes" supportedParams="q,season,ep"/></searching></caps>`)
+			return
+		}
+		pages.Add(1)
+		offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
+		var b strings.Builder
+		fmt.Fprintf(&b, `<?xml version="1.0"?><rss xmlns:torznab="http://torznab.com/schemas/2015/feed" xmlns:newznab="http://www.newznab.com/DTD/2010/feeds/attributes/"><channel><newznab:response offset="%d" total="%d"/>`, offset, total)
+		for i := offset; i < offset+100 && i < total; i++ {
+			if i == 150 {
+				continue // a short page must not end the reading
+			}
+			fmt.Fprintf(&b, `<item><title>Show S01E01 1080p WEB x264-G%d</title><link>magnet:?xt=urn:btih:%040x</link><size>900000000</size><torznab:attr name="jackettindexer" value="Site %d"/></item>`, i, i+1, i%3)
+		}
+		b.WriteString(`</channel></rss>`)
+		fmt.Fprint(w, b.String())
 	}))
 	t.Cleanup(server.Close)
 	cfg := &Config{Indexers: []IndexerConfig{{Name: "indexarr", URL: server.URL, APIKey: "k", Enabled: true, Manager: ManagerIndexarr}}}
-	got := searchOneWithDBType(context.Background(), cfg, "Show S01E01", nil, nil, nil, true, searchTypeTV, false)
-	if listCalls.Load() == 0 || laneCalls.Load() == 0 {
-		t.Fatalf("indexarr list=%d lanes=%d, want both used", listCalls.Load(), laneCalls.Load())
+	lanes := expandSearchLanes(context.Background(), cfg.Indexers)
+	if len(lanes) != 1 || lanes[0].health != "indexarr" {
+		t.Fatalf("lanes = %+v, want the single indexarr aggregate", lanes)
 	}
-	if aggregateCalls.Load() != 0 {
-		t.Fatalf("the aggregate /api was queried %d times with working lanes", aggregateCalls.Load())
+	got, err := FetchTorznab(context.Background(), cfg.Indexers[0], "Show S01E01")
+	if err != nil {
+		t.Fatal(err)
 	}
-	if len(got) == 0 {
-		t.Fatal("no release from the indexarr lanes")
+	if len(got) != total-1 {
+		t.Fatalf("releases = %d, want all %d across the pages", len(got), total-1)
 	}
-	for _, release := range got {
-		if strings.Contains(release.Title, "SHOULD-NOT-BE-USED") {
-			t.Fatal("the aggregate result was used")
-		}
+	if pages.Load() != 3 {
+		t.Fatalf("pages read = %d, want 3", pages.Load())
 	}
-	names := []string{}
-	for _, lane := range expandSearchLanes(context.Background(), cfg.Indexers) {
-		names = append(names, lane.health)
-	}
-	joined := strings.Join(names, ",")
-	if !strings.Contains(joined, "indexarr · LimeTorrents") || !strings.Contains(joined, "indexarr · 1337x") {
-		t.Fatalf("lanes = %v", names)
+	if laneCalls.Load() != 0 {
+		t.Fatalf("per-indexer paths queried %d times", laneCalls.Load())
 	}
 }
 
-// TestIndexarrAggregateUsesNativeEndpoint pins the fallback: when the indexer
-// list cannot be read, the aggregate goes to indexarr's own /api endpoint, not
-// to the Jackett all-indexers path.
+// TestIndexarrAggregateUsesNativeEndpoint pins the endpoint: the search goes
+// to indexarr's own /api, never to the Jackett all-indexers path or its list.
 func TestIndexarrAggregateUsesNativeEndpoint(t *testing.T) {
 	resetLaneState()
 	var aggregate, jackettPath atomic.Int64
@@ -297,7 +290,7 @@ func TestIndexarrAggregateUsesNativeEndpoint(t *testing.T) {
 			fmt.Fprint(w, `<?xml version="1.0"?><rss><channel></channel></rss>`)
 			return
 		}
-		if strings.HasPrefix(r.URL.Path, "/api/v2.0/indexers/all/results/torznab") {
+		if strings.HasPrefix(r.URL.Path, "/api/v2.0/indexers/") {
 			jackettPath.Add(1)
 			http.Error(w, "nope", http.StatusUnauthorized)
 			return
@@ -308,10 +301,10 @@ func TestIndexarrAggregateUsesNativeEndpoint(t *testing.T) {
 	cfg := &Config{Indexers: []IndexerConfig{{Name: "indexarr", URL: server.URL, APIKey: "k", Enabled: true, Manager: ManagerIndexarr}}}
 	searchOneWithDBType(context.Background(), cfg, "Show S01E01", nil, nil, nil, true, searchTypeTV, false)
 	if aggregate.Load() == 0 {
-		t.Fatal("the native /api aggregate was not queried after the list failed")
+		t.Fatal("the native /api aggregate was not queried")
 	}
-	if jackettPath.Load() != 1 {
-		t.Fatalf("the indexer list was queried %d times, want 1", jackettPath.Load())
+	if jackettPath.Load() != 0 {
+		t.Fatalf("the Jackett paths were queried %d times", jackettPath.Load())
 	}
 }
 

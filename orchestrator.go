@@ -813,63 +813,82 @@ func RunCycleDomain(
 		// the same cycle instead of leaving the episode for the next one.
 		mirrorUsable := mirrorNotQuarantined(quarantinedLinks)
 		linkResolved := true
-		for strings.TrimSpace(release.Magnet) == "" && release.TorrentURL != nil {
-			magnet, path, err := resolveTorrentURL(ctx, engine, cfg, *release.TorrentURL, &release.Title)
-			if err != nil {
-				failedSource := release.Source
-				if errors.Is(err, errTorrentNotAvailable) {
-					// The indexer knows the release but cannot serve it yet
-					// (mircrew: "no magnet for this request" until the topic
-					// is thanked, or a login that needs renewing). It is not
-					// a dead link: keep it eligible, no cycle error and no
-					// strike. The next cycle retries it. It still counts for
-					// the "indexer keeps failing" notice.
-					logging.Debug("torrent link not available yet",
-						"target", releaseTarget(&release),
-						"source", release.Source,
-						"error", err)
-					noteTorrentLinkFailure(linkFailures, release.Source, *release.TorrentURL, err, notifier)
-				} else {
-					// Two failures in different cycles mean the link is dead:
-					// quarantine it so the archive stops proposing it (and the
-					// cycle stops counting it as an error) until the retry.
-					if failures, qerr := db.RecordTorrentLinkFailure(*release.TorrentURL, err.Error(), time.Now()); qerr != nil {
-						logging.Debug("could not record the failed torrent link", "error", qerr)
-					} else if failures == torrentLinkFailureLimit {
-						logging.Info(fmt.Sprintf("🚫 The .torrent link of %s from %s failed again: it is set aside for %s",
-							releaseTarget(&release), release.Source, logDuration(torrentLinkQuarantine(failures))))
+		resolveLink := func() {
+			for strings.TrimSpace(release.Magnet) == "" && release.TorrentURL != nil {
+				magnet, path, err := resolveTorrentURL(ctx, engine, cfg, *release.TorrentURL, &release.Title)
+				if err != nil {
+					failedSource := release.Source
+					if errors.Is(err, errTorrentNotAvailable) {
+						// The indexer knows the release but cannot serve it yet
+						// (mircrew: "no magnet for this request" until the topic
+						// is thanked, or a login that needs renewing). It is not
+						// a dead link: keep it eligible, no cycle error and no
+						// strike. The next cycle retries it. It still counts for
+						// the "indexer keeps failing" notice.
+						logging.Debug("torrent link not available yet",
+							"target", releaseTarget(&release),
+							"source", release.Source,
+							"error", err)
+						noteTorrentLinkFailure(linkFailures, release.Source, *release.TorrentURL, err, notifier)
+					} else {
+						// Two failures in different cycles mean the link is dead:
+						// quarantine it so the archive stops proposing it (and the
+						// cycle stops counting it as an error) until the retry.
+						if failures, qerr := db.RecordTorrentLinkFailure(*release.TorrentURL, err.Error(), time.Now()); qerr != nil {
+							logging.Debug("could not record the failed torrent link", "error", qerr)
+						} else if failures == torrentLinkFailureLimit {
+							logging.Info(fmt.Sprintf("🚫 The .torrent link of %s from %s failed again: it is set aside for %s",
+								releaseTarget(&release), release.Source, logDuration(torrentLinkQuarantine(failures))))
+						}
+						stats.Error("torrent_link")
+						logging.Warn(fmt.Sprintf("⚠️ Could not fetch the .torrent of %s from %s: %v", releaseTarget(&release), release.Source, err))
+						if source := strings.TrimSpace(release.Source); source != "" {
+							noteTorrentLinkFailure(linkFailures, source, *release.TorrentURL, err, notifier)
+						}
 					}
-					stats.Error("torrent_link")
-					logging.Warn(fmt.Sprintf("⚠️ Could not fetch the .torrent of %s from %s: %v", releaseTarget(&release), release.Source, err))
-					if source := strings.TrimSpace(release.Source); source != "" {
-						noteTorrentLinkFailure(linkFailures, source, *release.TorrentURL, err, notifier)
+					if switchToMirror(&release, mirrorUsable) {
+						logging.Info(fmt.Sprintf("🔁 %s: the link from %s did not work, trying the same release from %s",
+							logTarget(&release), failedSource, release.Source))
+						continue
+					}
+					linkResolved = false
+					break
+				}
+				// The link works: forget any previous failure so it is eligible
+				// again if the indexer breaks later.
+				_ = db.ClearTorrentLinkFailure(*release.TorrentURL)
+				clearIndexerFailureNotice(release.Source)
+				release.Magnet = magnet
+				// The feed was persisted before selection. Replace its
+				// short-lived Jackett URL with the stable magnet so a later
+				// archive search can use it without re-downloading an already
+				// expired link. Skipped in dry-run: it rewrites the archive DB.
+				if !cfg.DryRun {
+					if err := archive.CanonicalizeRelease(&release, release.Magnet); err != nil {
+						logging.Warn("could not canonicalize archived torrent URL", "error", err)
 					}
 				}
-				if switchToMirror(&release, mirrorUsable) {
-					logging.Info(fmt.Sprintf("🔁 %s: the link from %s did not work, trying the same release from %s",
-						logTarget(&release), failedSource, release.Source))
-					continue
-				}
-				linkResolved = false
-				break
-			}
-			// The link works: forget any previous failure so it is eligible
-			// again if the indexer breaks later.
-			_ = db.ClearTorrentLinkFailure(*release.TorrentURL)
-			clearIndexerFailureNotice(release.Source)
-			release.Magnet = magnet
-			// The feed was persisted before selection. Replace its
-			// short-lived Jackett URL with the stable magnet so a later
-			// archive search can use it without re-downloading an already
-			// expired link. Skipped in dry-run: it rewrites the archive DB.
-			if !cfg.DryRun {
-				if err := archive.CanonicalizeRelease(&release, release.Magnet); err != nil {
-					logging.Warn("could not canonicalize archived torrent URL", "error", err)
+				if path != "" {
+					torrentFile = &path
 				}
 			}
-			if path != "" {
-				torrentFile = &path
+		}
+		// A link whose infohash the indexer declared (indexarr, Jackett and
+		// Prowlarr with "extended") is opened only for the release that is
+		// actually downloaded. The decision needs only the hash: opening the
+		// link of every candidate cost minutes per cycle, and an aggregator that
+		// counts downloads (indexarr) counted each candidate as one. An
+		// in-progress pack still needs its file list for the decision.
+		deferredHash := ""
+		if strings.TrimSpace(release.Magnet) == "" && release.TorrentURL != nil && IsTorrentURL(*release.TorrentURL) &&
+			!(release.IsPack && release.InProgressEpisodes > 0) {
+			if hash := canonicalInfoHash(release.InfoHash); len(hash) == 40 {
+				deferredHash = hash
+				release.Magnet = "magnet:?xt=urn:btih:" + hash
 			}
+		}
+		if deferredHash == "" {
+			resolveLink()
 		}
 		if !linkResolved {
 			continue
@@ -904,7 +923,11 @@ func RunCycleDomain(
 				if delayMinutes > 0 && !bypassDelay {
 					logging.Info(fmt.Sprintf("⏳ %s: waiting %s before downloading, in case a better version appears",
 						logTarget(&release), logDuration(time.Duration(delayMinutes)*time.Minute)))
-					if err := db.QueuePendingScored(&release, delayMinutes, releaseScore); err != nil {
+					pending := release
+					if deferredHash != "" {
+						pending.Magnet = "" // the queue keeps the link, not the bare hash
+					}
+					if err := db.QueuePendingScored(&pending, delayMinutes, releaseScore); err != nil {
 						return nil, err
 					}
 					skips.Waiting++
@@ -917,7 +940,11 @@ func RunCycleDomain(
 			if delayMinutes > 0 && !bypassDelay {
 				logging.Info(fmt.Sprintf("⏳ %s: waiting %s before downloading, in case a better version appears",
 					logTarget(&release), logDuration(time.Duration(delayMinutes)*time.Minute)))
-				if err := db.QueuePendingMovieScored(&release, delayMinutes, releaseScore); err != nil {
+				pending := release
+				if deferredHash != "" {
+					pending.Magnet = "" // the queue keeps the link, not the bare hash
+				}
+				if err := db.QueuePendingMovieScored(&pending, delayMinutes, releaseScore); err != nil {
 					return nil, err
 				}
 				skips.Waiting++
@@ -1075,6 +1102,18 @@ func RunCycleDomain(
 						"path", checkPath, "free", logging.HumanBytes(*free), "minimum", logging.HumanBytes(*floor))
 					continue
 				}
+			}
+			if deferredHash != "" {
+				release.Magnet = ""
+				resolveLink()
+				if !linkResolved {
+					continue
+				}
+				if hash, ok := utils.MagnetHash(release.Magnet); ok && hash != deferredHash {
+					logging.Debug("the downloaded torrent has another infohash than the one declared",
+						"target", releaseTarget(&release), "declared", deferredHash, "real", hash)
+				}
+				reconcilePackIdentityFromMagnet(&release)
 			}
 			add := func() (bool, error) {
 				if release.Ed2kLink != "" {

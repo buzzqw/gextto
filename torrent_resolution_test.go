@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/buzzqw/gextto/internal/utils"
@@ -254,5 +255,67 @@ func TestFetchTorrentPlainNotFoundIsNotTransient(t *testing.T) {
 	_, _, err := engine.FetchTorrent(context.Background(), server.URL+"/dl/gone")
 	if err == nil || errors.Is(err, errTorrentNotAvailable) {
 		t.Fatalf("a plain 404 should stay a dead link, got %v", err)
+	}
+}
+
+// TestRunCycleOpensDeclaredHashLinksOnlyForTheDownload pins the deferred link:
+// a candidate whose infohash the indexer declared is decided on that hash, and
+// its link is opened only when it is downloaded. An aggregator that counts
+// downloads (indexarr) must not count the candidates already in the library.
+func TestRunCycleOpensDeclaredHashLinksOnlyForTheDownload(t *testing.T) {
+	const libraryHash = "1111111111111111111111111111111111111111"
+	const newHash = "2222222222222222222222222222222222222222"
+	opened := map[string]int{}
+	var mu sync.Mutex
+	var server *httptest.Server
+	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/feed.xml":
+			w.Header().Set("Content-Type", "application/xml")
+			fmt.Fprintf(w, `<rss xmlns:torznab="http://torznab.com/schemas/2015/feed"><channel>
+<item><title>Show.S01E01.1080p.WEB-DL.H.265</title><link>%[1]s/dl/1.torrent</link><size>900000000</size><torznab:attr name="infohash" value="%[2]s"/></item>
+<item><title>Show.S01E02.1080p.WEB-DL.H.265</title><link>%[1]s/dl/2.torrent</link><size>900000000</size><torznab:attr name="infohash" value="%[3]s"/></item>
+</channel></rss>`, server.URL, libraryHash, newHash)
+		case strings.HasPrefix(r.URL.Path, "/dl/"):
+			mu.Lock()
+			opened[r.URL.Path]++
+			mu.Unlock()
+			hash := libraryHash
+			if r.URL.Path == "/dl/2.torrent" {
+				hash = newHash
+			}
+			http.Redirect(w, r, "magnet:?xt=urn:btih:"+hash+"&dn=Show&tr=udp%3A%2F%2Ftracker.example.com%3A1337%2Fannounce", http.StatusFound)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	state := newCycleState(t)
+	if _, err := state.db.db.Exec("INSERT INTO series(id,name) VALUES (1,'Show')"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := state.db.db.Exec("INSERT INTO episodes(id,series_id,season,episode,title,quality_score,downloaded_at) VALUES (1,1,1,1,'Show.S01E01.1080p.WEB-DL.H.265',1900,datetime('now'))"); err != nil {
+		t.Fatal(err)
+	}
+	cfg := *state.cfg
+	cfg.Series = []SeriesConfig{{Name: "Show", Enabled: true}}
+	cfg.FeedURLs = []string{server.URL + "/feed.xml"}
+	cfg.Indexers = nil
+	cfg.WebsearchEngines = nil
+	cfg.DryRun = true
+
+	domain := "series"
+	stats, err := RunCycleDomain(context.Background(), &cfg, state.engine, state.db, state.archive, state.comics, state.notifier, state.activeEngine(), &domain)
+	if err != nil {
+		t.Fatalf("RunCycleDomain: %v", err)
+	}
+	if stats.DownloadsStarted != 1 {
+		t.Fatalf("DownloadsStarted = %d, want 1", stats.DownloadsStarted)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if opened["/dl/1.torrent"] != 0 || opened["/dl/2.torrent"] != 1 {
+		t.Fatalf("links opened = %v, want only the downloaded one, once", opened)
 	}
 }
