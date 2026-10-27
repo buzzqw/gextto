@@ -116,9 +116,11 @@ remux goes to a hidden sibling and replaces the library file only after a re-pro
 proves the stream set, the duration and the per-track A/V offsets; the rename swaps
 the directory entry, so a hardlink shared with a seeding torrent keeps the old
 inode and the swarm is not disturbed. The queue runs outside the torrent event
-loop. The score cannot turn into a re-download: the name is untouched, and the size
-bonus (at most 100 points) and the audio codec read from the remaining track stay
-below the 200-point upgrade threshold and outside `technicalScoreGain`.
+loop, and every cleaned file sends one notification on the configured channels
+with the file name, the removed tracks and the space saved. The score cannot turn
+into a re-download: the name is untouched, and the size bonus (at most 100 points)
+and the audio codec read from the remaining track stay below the 200-point upgrade
+threshold and outside `technicalScoreGain`.
 
 **Upgrades** (`upgrade_until.go`, `upgrade_until_score`, 0 = off): with a score at
 or above the threshold the copy is no longer replaced; REPACK and PROPER are always

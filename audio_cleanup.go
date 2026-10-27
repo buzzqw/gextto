@@ -665,12 +665,40 @@ func audioCleanupLastLine(value string) string {
 // ---------------------------------------------------------------------------
 
 type audioCleanupJob struct {
-	path   string
-	key    string
-	opts   AudioCleanupOptions
-	series *string
-	db     *Database
-	hash   string
+	path     string
+	key      string
+	opts     AudioCleanupOptions
+	series   *string
+	db       *Database
+	hash     string
+	notifier *Notifier
+}
+
+// audioCleanupNotificationData is the payload of the per-file notification.
+func audioCleanupNotificationData(path string, report AudioCleanupReport) map[string]any {
+	name := filepath.Base(path)
+	return map[string]any{
+		"title":       name,
+		"file":        name,
+		"path":        path,
+		"removed":     len(report.Dropped),
+		"saved_bytes": report.SavedBytes,
+		"size_bytes":  report.NewSize,
+		"backend":     report.Backend,
+	}
+}
+
+// notifyAudioCleanup sends one event per cleaned file on every configured
+// channel (Telegram, webhook, email), so a series pack produces one message
+// per episode.
+func notifyAudioCleanup(notifier *Notifier, path string, report AudioCleanupReport) {
+	if notifier == nil {
+		return
+	}
+	if err := notifier.NotifyEvent("audio_cleanup", audioCleanupNotificationData(path, report)); err != nil {
+		logging.Warn("audio cleanup notification could not be sent",
+			"path", path, "error", err.Error())
+	}
 }
 
 var (
@@ -748,6 +776,7 @@ func scheduleAudioCleanup(cfg *Config, db *Database, path, hash string, series *
 	}
 
 	audioCleanupWorkerOnce.Do(func() { go audioCleanupWorker() })
+	notifier := FromConfig(cfg)
 	for _, file := range files {
 		key, err := filepath.Abs(file)
 		if err != nil {
@@ -756,7 +785,7 @@ func scheduleAudioCleanup(cfg *Config, db *Database, path, hash string, series *
 		if _, already := audioCleanupQueued.LoadOrStore(key, struct{}{}); already {
 			continue
 		}
-		job := audioCleanupJob{path: file, key: key, opts: opts, series: series, db: db, hash: hash}
+		job := audioCleanupJob{path: file, key: key, opts: opts, series: series, db: db, hash: hash, notifier: notifier}
 		select {
 		case audioCleanupQueue <- job:
 		default:
@@ -791,6 +820,7 @@ func audioCleanupProcess(job audioCleanupJob) {
 					"path", job.path, "error", err.Error())
 			}
 		}
+		notifyAudioCleanup(job.notifier, job.path, report)
 		logging.Info(fmt.Sprintf("🎧 «%s»: %d audio track(s) in another language removed, %s saved",
 			filepath.Base(job.path), len(report.Dropped), logging.HumanBytesI64(report.SavedBytes)),
 			"path", job.path, "backend", report.Backend)

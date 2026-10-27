@@ -364,6 +364,57 @@ func TestAudioCleanupLanguageIsAComboWithSuggestions(t *testing.T) {
 	}
 }
 
+func TestAudioCleanupNotificationContent(t *testing.T) {
+	report := AudioCleanupReport{
+		NewSize:    35 << 30,
+		SavedBytes: 2 << 30,
+		Backend:    "mkvmerge",
+		Dropped:    []AudioTrackInfo{{Index: 2}, {Index: 3}},
+	}
+	data := audioCleanupNotificationData("/library/Film (2026).mkv", report)
+	body := formatEvent("audio_cleanup", data)
+	for _, want := range []string{"Film (2026).mkv", "Tracce rimosse: 2", "2.00 GB", "mkvmerge"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("notification body misses %q:\n%s", want, body)
+		}
+	}
+	if subject := formatEmailSubject("audio_cleanup", data); !strings.Contains(subject, "Film (2026).mkv") {
+		t.Errorf("email subject misses the file name: %s", subject)
+	}
+}
+
+func TestAudioCleanupNotificationIsDelivered(t *testing.T) {
+	var event string
+	var payload map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&body); err == nil {
+			event, _ = body["event"].(string)
+			payload, _ = body["data"].(map[string]any)
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(server.Close)
+
+	notifier := NewNotifier()
+	notifier.webhookURL = &server.URL
+	notifier.webhookFormat = "gextto"
+	notifyAudioCleanup(notifier, "/library/Film.mkv", AudioCleanupReport{
+		NewSize: 1000, SavedBytes: 250, Backend: "ffmpeg",
+		Dropped: []AudioTrackInfo{{Index: 2}},
+	})
+
+	if event != "audio_cleanup" {
+		t.Fatalf("event = %q, want audio_cleanup", event)
+	}
+	if payload["file"] != "Film.mkv" {
+		t.Fatalf("file = %v, want Film.mkv", payload["file"])
+	}
+	if removed, _ := payload["removed"].(float64); removed != 1 {
+		t.Fatalf("removed = %v, want 1", payload["removed"])
+	}
+}
+
 func TestRunAudioCleanupKeepsItalianAndTiming(t *testing.T) {
 	requireAudioTools(t)
 	path := filepath.Join(t.TempDir(), "film.mkv")

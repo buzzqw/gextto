@@ -657,6 +657,8 @@ func formatEmailSubject(event string, data map[string]any) string {
 		return fmt.Sprintf("Gextto: %s — %s", messages.Pick("Fumetto in download", "Comic download started"), itemLabel)
 	case "comic_completed":
 		return fmt.Sprintf("Gextto: %s — %s", messages.Pick("Fumetto scaricato", "Comic downloaded"), itemLabel)
+	case "audio_cleanup":
+		return fmt.Sprintf("Gextto: %s — %s", messages.Pick("Tracce audio rimosse", "Audio tracks removed"), itemLabel)
 	case "comic_error":
 		return fmt.Sprintf("Gextto: %s — %s", messages.Pick("Errore fumetto", "Comic error"), itemLabel)
 	case "comic_pending":
@@ -994,6 +996,24 @@ func formatEvent(event string, data map[string]any) string {
 			formatBytes(size),
 			messages.Pick("File salvato nella cartella fumetti", "File saved in the comics folder"),
 			text("path"),
+		)
+	case "audio_cleanup":
+		removed, _ := jsonInt(mapLookup(data, "removed"))
+		saved, _ := jsonInt(mapLookup(data, "saved_bytes"))
+		size, _ := jsonInt(mapLookup(data, "size_bytes"))
+		return fmt.Sprintf(
+			"%s\n\n📄 %s: %s\n🔇 %s: %d\n💾 %s: %s\n📦 %s: %s\n⚙️ %s: %s",
+			messages.Pick("🎧 TRACCE AUDIO IN ALTRE LINGUE RIMOSSE", "🎧 AUDIO TRACKS IN OTHER LANGUAGES REMOVED"),
+			messages.Pick("File", "File"),
+			text("file"),
+			messages.Pick("Tracce rimosse", "Tracks removed"),
+			removed,
+			messages.Pick("Spazio risparmiato", "Space saved"),
+			formatBytes(saved),
+			messages.Pick("Nuova dimensione", "New size"),
+			formatBytes(size),
+			messages.Pick("Motore", "Engine"),
+			text("backend"),
 		)
 	case "comic_error":
 		return fmt.Sprintf(
