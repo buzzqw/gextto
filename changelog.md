@@ -14,6 +14,10 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
 [changelog.en.md](changelog.en.md). Per segnalazioni:
 [issue su GitHub](https://github.com/buzzqw/gextto/issues).
 
+## 28 ottobre 2026
+
+- **Le release eD2k di indexarr si scaricano anche in automatico.** indexarr manda per i link eD2k un numero di seed e peer pari a zero, perché sulla rete eD2k l'indexer non può contarli. Gextto li leggeva come «nessuno condivide il file» e, nella ricerca automatica, rifiutava ogni release eD2k di indexarr come morta: si poteva scaricarla solo a mano. Ora per un link eD2k quei numeri vengono ignorati e le fonti le trova aMule, come per i link che Gextto trova da solo. Non c'è nulla da configurare.
+
 ## 27 ottobre 2026
 
 - **I link eD2k arrivano anche da indexarr.** Se in indexarr aggiungi una fonte eD2k (per esempio il forum DDUnlimited), i suoi risultati ora arrivano a Gextto come link `ed2k://` e non vengono più scartati perché non hanno un magnet o un `.torrent`. Gextto li mostra come rete eD2k nella ricerca e nell'archivio, e al momento dello scarico li accoda in aMule come quelli che trova da solo; il client torrent non viene toccato. Non c'è nulla da configurare: basta che la fonte sia abilitata in indexarr e che l'indexer indexarr sia già fra le sorgenti di Gextto. Con indexarr la ricerca aspetta fino a 45 secondi (invece dei 5 delle altre fonti) per dare tempo alla fonte eD2k di aprire le pagine dei topic; Sonarr, Radarr e gli altri programmi non ricevono questa attesa e restano come prima.

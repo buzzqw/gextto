@@ -318,17 +318,13 @@ func parse_feed_body(body, source string) ([]models.Release, error) {
 							size = int64(math.Round(*sizeBytes))
 						}
 						if release := ParseEd2kRelease(title, ed2kLink, itemSource, size, 0, discoveredAt); release != nil {
+							// An eD2k file has no swarm the indexer can count:
+							// a Torznab seeders/peers attribute on it is a
+							// placeholder (indexarr wrote 0/0), and 0/0 would
+							// make the swarm gate refuse every eD2k release as
+							// "dead_swarm_empty". The count stays unknown and
+							// aMule finds the sources.
 							release.GUID = guid
-							if seeders != nil {
-								release.Seeders = *seeders
-							} else {
-								release.Seeders = -1
-							}
-							if peers != nil {
-								release.Peers = *peers
-							} else {
-								release.Peers = -1
-							}
 							out = append(out, *release)
 						}
 					} else if release := ParseReleaseSource(title, magnet, torrentPtr, itemSource, discoveredAt); release != nil {

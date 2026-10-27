@@ -618,3 +618,36 @@ func TestIsEd2kURL(t *testing.T) {
 		}
 	}
 }
+
+// indexarr writes seeders/leechers/peers 0 on an eD2k item (no swarm to
+// count). The parser must keep the count unknown, or the swarm gate refuses
+// every eD2k release as an empty swarm.
+func TestParseFeedBodyEd2kIgnoresSwarmCounters(t *testing.T) {
+	const link = "ed2k://|file|Rare%20Movie%201974.avi|700000000|0123456789abcdef0123456789abcdef|/"
+	body := `<rss xmlns:torznab="http://torznab.com/schemas/2015/feed"><channel>
+		<item>
+			<title>Rare Movie 1974 1080p</title>
+			<guid>0123456789abcdef0123456789abcdef</guid>
+			<link>` + link + `</link>
+			<enclosure url="` + link + `" length="700000000" type="application/x-ed2k"/>
+			<torznab:attr name="seeders" value="0"/>
+			<torznab:attr name="leechers" value="0"/>
+			<torznab:attr name="peers" value="0"/>
+			<torznab:attr name="ed2k" value="` + link + `"/>
+		</item>
+	</channel></rss>`
+	releases, err := parse_feed_body(body, "indexarr:DDUnlimited")
+	if err != nil {
+		t.Fatalf("parse_feed_body: %v", err)
+	}
+	if len(releases) != 1 {
+		t.Fatalf("len = %d, want 1", len(releases))
+	}
+	release := releases[0]
+	if release.Seeders != -1 || release.Peers != -1 {
+		t.Fatalf("seeders/peers = %d/%d, want -1/-1", release.Seeders, release.Peers)
+	}
+	if blocked := swarmBlockReason(&release, "new"); blocked != "" {
+		t.Fatalf("eD2k release blocked by the swarm gate: %s", blocked)
+	}
+}

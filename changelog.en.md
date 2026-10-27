@@ -13,6 +13,10 @@ manual is online: [English](docs/MANUAL.en.md) ·
 [italiano](docs/MANUAL.it.md). For reports:
 [GitHub issues](https://github.com/buzzqw/gextto/issues).
 
+## 28 October 2026
+
+- **indexarr eD2k releases now download automatically too.** For eD2k links indexarr sends a seed and peer count of zero, because on the eD2k network the indexer cannot count them. Gextto read that as "nobody shares this file" and, in the automatic search, refused every indexarr eD2k release as dead: it could only be downloaded by hand. Now those numbers are ignored for an eD2k link and aMule finds the sources, as with the links Gextto finds by itself. Nothing to configure.
+
 ## 27 October 2026
 
 - **eD2k links now arrive from indexarr too.** If you add an eD2k source in indexarr (for example the DDUnlimited forum), its results now reach Gextto as `ed2k://` links instead of being discarded because they carry no magnet or `.torrent`. Gextto shows them as the eD2k network in search and in the archive, and queues them in aMule when you download, exactly like the ones it finds by itself; the torrent client is not involved. Nothing to configure: the source only has to be enabled in indexarr and the indexarr indexer already among Gextto's sources. With indexarr a search waits up to 45 seconds (instead of the 5 used for other sources) so the eD2k source can open the topic pages; Sonarr, Radarr and the other programs do not get this wait and stay as before.
