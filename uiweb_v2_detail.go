@@ -16,6 +16,7 @@ import (
 	"strings"
 
 	"github.com/buzzqw/gextto/internal/logging"
+	"github.com/buzzqw/gextto/internal/models"
 	"github.com/buzzqw/gextto/internal/utils"
 )
 
@@ -122,51 +123,63 @@ type v2SourcesView struct {
 	Results     []v2SourceRow
 }
 
+// v2SourceRowFromRelease builds one table row from a release. The same row is
+// used by the episode modal and by the whole-series missing search.
+func v2SourceRowFromRelease(release *models.Release, origin string, season, episode int64) v2SourceRow {
+	link := release.Magnet
+	if strings.TrimSpace(link) == "" && release.TorrentURL != nil {
+		link = *release.TorrentURL
+	}
+	ed2kLink := release.Ed2kLink
+	sourceLabel := v2SourceLabel(release.Source)
+	if release.Network == "ed2k" || ed2kLink != "" {
+		// An eD2k result has a network name, not a host: v2SourceLabel would
+		// misread it.
+		sourceLabel = "eD2k/Kad"
+	}
+	keyLink := link
+	if strings.TrimSpace(keyLink) == "" {
+		keyLink = ed2kLink
+	}
+	body, _ := json.Marshal(map[string]any{
+		"items": []map[string]string{{"title": release.Title, "magnet": link, "source": release.Source, "ed2k_link": ed2kLink}},
+	})
+	row := v2SourceRow{
+		Title:     release.Title,
+		Source:    sourceLabel,
+		Origin:    origin,
+		Score:     release.Score,
+		SizeBytes: release.SizeBytes,
+		Magnet:    uiMagnetURL(link),
+		Key:       v2SourceKey(keyLink, release.Title),
+	}
+	if season > 0 && episode > 0 {
+		row.Episode = fmt.Sprintf("S%02dE%02d", season, episode)
+	}
+	if strings.TrimSpace(link) != "" || strings.TrimSpace(ed2kLink) != "" {
+		row.Body = string(body)
+	}
+	return row
+}
+
 // v2SourceRowsFrom turns the JSON `results` of an episode search into rows.
 // The episode is filled when the payload carries it (the missing-episodes bulk
 // search), so the same table can name the episode each release belongs to.
 func v2SourceRowsFrom(entries []map[string]any) []v2SourceRow {
 	rows := make([]v2SourceRow, 0, len(entries))
 	for _, entry := range entries {
-		release, _ := entry["release"].(map[string]any)
-		if release == nil {
-			release = entry
+		raw, _ := json.Marshal(entry["release"])
+		if raw == nil || string(raw) == "null" {
+			raw, _ = json.Marshal(entry)
 		}
-		title := v2String(release["title"])
-		source := v2String(release["source"])
-		link := v2String(release["magnet"])
-		if link == "" {
-			link = v2String(release["torrent_url"])
-		}
-		ed2kLink := v2String(release["ed2k_link"])
-		sourceLabel := v2SourceLabel(source)
-		if v2String(release["network"]) == "ed2k" || ed2kLink != "" {
-			// An eD2k result has a network name, not a host: v2SourceLabel would
-			// misread it.
-			sourceLabel = "eD2k/Kad"
-		}
-		keyLink := link
-		if strings.TrimSpace(keyLink) == "" {
-			keyLink = ed2kLink
-		}
-		body, _ := json.Marshal(map[string]any{
-			"items": []map[string]string{{"title": title, "magnet": link, "source": source, "ed2k_link": ed2kLink}},
-		})
-		row := v2SourceRow{
-			Title:     title,
-			Source:    sourceLabel,
-			Origin:    v2String(entry["origin"]),
-			Score:     int64(v2Float(entry["score"])),
-			SizeBytes: int64(v2Float(release["size_bytes"])),
-			Magnet:    uiMagnetURL(link),
-			Key:       v2SourceKey(keyLink, title),
+		var release models.Release
+		if json.Unmarshal(raw, &release) != nil {
+			continue
 		}
 		season, episode := int64(v2Float(entry["season"])), int64(v2Float(entry["episode"]))
-		if season > 0 && episode > 0 {
-			row.Episode = fmt.Sprintf("S%02dE%02d", season, episode)
-		}
-		if strings.TrimSpace(link) != "" || strings.TrimSpace(ed2kLink) != "" {
-			row.Body = string(body)
+		row := v2SourceRowFromRelease(&release, v2String(entry["origin"]), season, episode)
+		if score := int64(v2Float(entry["score"])); score != 0 {
+			row.Score = score
 		}
 		rows = append(rows, row)
 	}

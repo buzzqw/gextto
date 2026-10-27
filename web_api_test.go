@@ -438,6 +438,40 @@ func TestSeriesSearchMissingRefreshesNewSeriesMetadata(t *testing.T) {
 	}
 }
 
+func TestSeriesSearchMissingHasNoEpisodeCap(t *testing.T) {
+	tmdbTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/tv/1399" {
+			t.Fatalf("TMDB path = %q, want /tv/1399", r.URL.Path)
+		}
+		tmdbWriteJSON(t, w, `{"seasons":[{"season_number":1,"episode_count":20}]}`)
+	})
+
+	state := newTestAppState(t)
+	key := "test-key"
+	cfg := *state.cfg
+	cfg.TmdbAPIKey = &key
+	cfg.Series = []SeriesConfig{{Name: "No Cap", Seasons: "1+", TmdbID: "1399", Enabled: true}}
+	state.config_cache = &ConfigCache{
+		generation: ConfigGeneration(),
+		cfg:        &cfg,
+		valid:      true,
+	}
+
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+	status, body := webPostJSON(t, server, "/api/series/No%20Cap/search-missing", `{}`)
+	if status != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", status, body)
+	}
+	decoded := map[string]any{}
+	if err := json.Unmarshal(body, &decoded); err != nil {
+		t.Fatalf("decode response: %v (%s)", err, body)
+	}
+	if decoded["searched"] != float64(20) || decoded["total"] != float64(20) {
+		t.Fatalf("searched=%v total=%v, want 20 and 20 (%s)", decoded["searched"], decoded["total"], body)
+	}
+}
+
 func TestWebApiI18n(t *testing.T) {
 	state := newTestAppState(t)
 	server := httptest.NewServer(Router(state))

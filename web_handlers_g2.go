@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/buzzqw/gextto/internal/logging"
@@ -974,21 +975,31 @@ func SendMagnet(w http.ResponseWriter, r *http.Request, s *AppState) {
 }
 
 // SeriesSearchMissing implements `series_search_missing`.
-func SeriesSearchMissing(w http.ResponseWriter, r *http.Request, s *AppState) {
-	name := pathParam(r, "name")
-	cfg := latestConfig(s)
-	series := gh2_findSeries(cfg, name)
-	if series == nil {
-		jsonError(w, http.StatusNotFound, "series not found")
-		return
-	}
+// gh2_missingSearchOutcome is the result of a whole-series missing search.
+type gh2_missingSearchOutcome struct {
+	Results       []gh2_episodeResult
+	Gaps          [][2]int64
+	TotalMissing  int
+	MetadataReady bool
+}
+
+// gh2_missingSearchProgress reports how many episodes the live search has
+// finished and which phase is running ("episodes" or "ed2k").
+type gh2_missingSearchProgress func(done, total int, phase string)
+
+// gh2_searchMissingEpisodes searches every missing episode of one series: the
+// local archive and feeds first, then each episode on the indexers, then eD2k
+// per season when the operator enabled the fallback. There is no cap: a series
+// with a hundred gaps is searched in full, and the caller can report progress.
+func gh2_searchMissingEpisodes(ctx context.Context, s *AppState, cfg *Config, series *SeriesConfig, progress gh2_missingSearchProgress) gh2_missingSearchOutcome {
+	outcome := gh2_missingSearchOutcome{}
 	// A newly added series may not have season counts yet. Populate them before
 	// calculating gaps so the first manual search does not misleadingly report
 	// zero episodes just because the background refresh has not run.
 	if metadataConfigured(cfg) {
 		stale, err := s.db.SeriesMetadataStale(series.Name, 24)
 		if err != nil || stale {
-			if err := refreshSeriesMetadataForSearch(r.Context(), cfg, s.db, series); err != nil {
+			if err := refreshSeriesMetadataForSearch(ctx, cfg, s.db, series); err != nil {
 				logging.Debug("manual missing search: metadata refresh unavailable", "series", series.Name, "error", err)
 			}
 		}
@@ -998,7 +1009,6 @@ func SeriesSearchMissing(w http.ResponseWriter, r *http.Request, s *AppState) {
 		allGaps = nil
 	}
 	gaps := make([][2]int64, 0, len(allGaps))
-	totalMissing := 0
 	for _, gap := range allGaps {
 		if containsInt64(series.IgnoredSeasons, gap[0]) {
 			continue
@@ -1006,26 +1016,37 @@ func SeriesSearchMissing(w http.ResponseWriter, r *http.Request, s *AppState) {
 		if !SeasonAllowedForScan(series.Seasons, gap[0]) {
 			continue
 		}
-		totalMissing++
-		if len(gaps) < 15 {
-			gaps = append(gaps, gap)
-		}
+		gaps = append(gaps, gap)
+	}
+	outcome.Gaps = gaps
+	outcome.TotalMissing = len(gaps)
+	if progress != nil {
+		progress(0, len(gaps), "episodes")
 	}
 	liveReleases := make([][]models.Release, len(gaps))
 	if s.engine != nil && len(gaps) > 0 {
 		// A generic title query can return only recent episodes and miss an old
-		// gap. Search every displayed gap with the structured TV identity, while
-		// keeping the manual fan-out bounded.
+		// gap. Search every gap with the structured TV identity, a few at a
+		// time so the indexers are not flooded.
 		sem := make(chan struct{}, 3)
 		var wg sync.WaitGroup
+		var done atomic.Int64
+	search:
 		for index, gap := range gaps {
+			select {
+			case sem <- struct{}{}:
+			case <-ctx.Done():
+				break search
+			}
 			wg.Add(1)
-			sem <- struct{}{}
 			go func(index int, season, episode int64) {
 				defer recoverGoroutine("search missing episode")
 				defer wg.Done()
 				defer func() { <-sem }()
-				liveReleases[index] = s.engine.SearchSeriesEpisode(r.Context(), cfg, series, season, episode, true)
+				liveReleases[index] = s.engine.SearchSeriesEpisode(ctx, cfg, series, season, episode, true)
+				if progress != nil {
+					progress(int(done.Add(1)), len(gaps), "episodes")
+				}
 			}(index, gap[0], gap[1])
 		}
 		wg.Wait()
@@ -1069,7 +1090,10 @@ func SeriesSearchMissing(w http.ResponseWriter, r *http.Request, s *AppState) {
 				continue
 			}
 			searched[season] = true
-			candidates := ed2kManualSeasonFallback(r.Context(), s.engine, cfg, series, season)
+			if progress != nil {
+				progress(len(gaps), len(gaps), "ed2k")
+			}
+			candidates := ed2kManualSeasonFallback(ctx, s.engine, cfg, series, season)
 			if len(candidates) == 0 {
 				continue
 			}
@@ -1112,8 +1136,11 @@ func SeriesSearchMissing(w http.ResponseWriter, r *http.Request, s *AppState) {
 		deduped = append(deduped, result)
 	}
 	results = deduped
+	for index := range results {
+		results[index].Release.Score = cfg.ReleaseScore(&results[index].Release)
+	}
 	sort.SliceStable(results, func(i, j int) bool {
-		return cfg.ReleaseScore(&results[i].Release) > cfg.ReleaseScore(&results[j].Release)
+		return results[i].Release.Score > results[j].Release.Score
 	})
 	// Persist what the search found, exactly like a single-episode search: the
 	// archive can then answer the next click locally instead of throwing the
@@ -1140,19 +1167,33 @@ func SeriesSearchMissing(w http.ResponseWriter, r *http.Request, s *AppState) {
 	}
 	logging.Info(fmt.Sprintf("🔎 Search for the missing episodes of %s: %s for %s",
 		series.Name, countLabel(len(results), "result", "results"), countLabel(len(gaps), "episode", "episodes")))
-	episodes := make([]map[string]any, 0, len(gaps))
-	for _, gap := range gaps {
+	seasonMetadata, _ := s.db.SeriesSeasonCounts(series.Name)
+	outcome.Results = results
+	outcome.MetadataReady = len(seasonMetadata) > 0 || len(allGaps) > 0
+	return outcome
+}
+
+func SeriesSearchMissing(w http.ResponseWriter, r *http.Request, s *AppState) {
+	name := pathParam(r, "name")
+	cfg := latestConfig(s)
+	series := gh2_findSeries(cfg, name)
+	if series == nil {
+		jsonError(w, http.StatusNotFound, "series not found")
+		return
+	}
+	outcome := gh2_searchMissingEpisodes(r.Context(), s, cfg, series, nil)
+	episodes := make([]map[string]any, 0, len(outcome.Gaps))
+	for _, gap := range outcome.Gaps {
 		episodes = append(episodes, map[string]any{"season": gap[0], "episode": gap[1]})
 	}
-	seasonMetadata, _ := s.db.SeriesSeasonCounts(series.Name)
 	jsonStatus(w, http.StatusOK, map[string]any{
 		"ok":                 true,
 		"series":             series.Name,
-		"searched":           len(gaps),
-		"total":              totalMissing,
+		"searched":           len(outcome.Gaps),
+		"total":              outcome.TotalMissing,
 		"episodes":           episodes,
-		"results":            results,
-		"metadata_available": len(seasonMetadata) > 0 || len(allGaps) > 0,
+		"results":            outcome.Results,
+		"metadata_available": outcome.MetadataReady,
 	})
 }
 

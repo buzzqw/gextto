@@ -694,11 +694,14 @@ episodes as buttons (`S04E03`):
 
 - **a click on an episode** searches it and opens the results, first from the
   local archive and then online, each with **Download**;
-- **Search missing** searches up to 15 missing episodes of that series and lists
-  what it finds right there, each with its episode and **Download**: it downloads
-  nothing by itself and, when the series has more than 15 missing episodes, it
-  says so;
+- **Search missing** searches every missing episode of that series, in the
+  background too: the tab shows how far it is and you can cancel it; when it
+  ends it lists what it found right there, each with its episode and
+  **Download**. It downloads nothing by itself;
 - **Filter by series** shows only the series containing the typed text.
+
+Episodes that have not aired yet are not missing: a series still in production
+does not appear, and an episode with a known future air date waits for its day.
 
 The old address of the *Missing* page leads to this tab.
 

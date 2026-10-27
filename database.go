@@ -2848,6 +2848,32 @@ func splitForcedGapKey(key string) (string, int64) {
 	return key, 0
 }
 
+// seriesNeverAired reports whether the metadata says the series has not aired
+// any episode yet. Only an explicit pre-release status counts: an empty status
+// (the TVDB path does not provide one) or an unknown series must never hide
+// real gaps.
+func seriesNeverAired(status, _ string) bool {
+	switch strings.TrimSpace(status) {
+	case "In Production", "Planned", "Pilot", "Upcoming":
+		return true
+	}
+	return false
+}
+
+// airDateInFuture reports whether a known air date is still ahead. An empty or
+// unparsable date stays false, so a gap is never hidden for lack of data.
+func airDateInFuture(airDate string) bool {
+	airDate = strings.TrimSpace(airDate)
+	if airDate == "" {
+		return false
+	}
+	parsed, err := time.Parse("2006-01-02", airDate)
+	if err != nil {
+		return false
+	}
+	return parsed.After(time.Now())
+}
+
 // ArchiveGaps computes the missing episodes for every series/season.
 func (d *Database) ArchiveGaps() ([]SeriesGap, error) {
 	type seasonTargetKey struct {
@@ -2897,6 +2923,38 @@ func (d *Database) ArchiveGaps() ([]SeriesGap, error) {
 		return nil, err
 	}
 	metaRows.Close()
+	// A series still in production has no gaps: the planned episode count is not
+	// a promise that the episodes are out.
+	neverAired := make(map[string]bool)
+	statusRows, err := d.db.Query("SELECT series_name,status,last_air_date FROM series_status")
+	if err != nil {
+		return nil, err
+	}
+	for statusRows.Next() {
+		var name, status, lastAirDate string
+		if err := statusRows.Scan(&name, &status, &lastAirDate); err != nil {
+			statusRows.Close()
+			return nil, err
+		}
+		if seriesNeverAired(status, lastAirDate) {
+			neverAired[name] = true
+		}
+	}
+	if err := statusRows.Err(); err != nil {
+		statusRows.Close()
+		return nil, err
+	}
+	statusRows.Close()
+	// An episode whose air date is still ahead is not missing yet, even when the
+	// season count already includes it.
+	future := make(map[airDateKey]bool)
+	if airDates, err := d.EpisodeAirDates(); err == nil {
+		for key, date := range airDates {
+			if airDateInFuture(date) {
+				future[key] = true
+			}
+		}
+	}
 	// Materialize the three sets once.
 	completePacks := make(map[seasonTargetKey]struct{})
 	packRows, err := d.db.Query("SELECT s.name,e.season,COALESCE(e.title,''),COALESCE(e.original_title,'') FROM episodes e JOIN series s ON s.id=e.series_id WHERE e.episode=0 AND (e.downloaded_at IS NOT NULL OR EXISTS(SELECT 1 FROM torrent_meta t WHERE t.hash=e.magnet_hash AND t.status NOT IN ('error','removed')))")
@@ -3005,6 +3063,9 @@ func (d *Database) ArchiveGaps() ([]SeriesGap, error) {
 	})
 	gaps := make([]SeriesGap, 0)
 	for _, key := range keys {
+		if neverAired[key.Series] {
+			continue
+		}
 		maxEpisode := seasonTargets[key]
 		episodes := present[key]
 		forcedEpisodes := forced[forcedGapKey(key.Series, key.Season)]
@@ -3033,6 +3094,9 @@ func (d *Database) ArchiveGaps() ([]SeriesGap, error) {
 			// A forced gap overrides the ignored set and is fetched again.
 			if _, forcedHere := forcedEpisodes[episode]; !forcedHere {
 				if _, ok := ignored[key][episode]; ok {
+					continue
+				}
+				if future[airDateKey{Series: key.Series, Season: key.Season, Episode: episode}] {
 					continue
 				}
 			}
@@ -3102,6 +3166,31 @@ func (d *Database) activeDownloadEpisodes() (activeDownloads, error) {
 
 // ArchiveGapsForSeries is the same gap calculation restricted to one series.
 func (d *Database) ArchiveGapsForSeries(seriesName string) ([][2]int64, error) {
+	var status, lastAirDate string
+	if err := d.db.QueryRow("SELECT status,last_air_date FROM series_status WHERE series_name=?1", seriesName).Scan(&status, &lastAirDate); err == nil && seriesNeverAired(status, lastAirDate) {
+		return [][2]int64{}, nil
+	}
+	future := make(map[[2]int64]bool)
+	airRows, err := d.db.Query("SELECT season,episode,air_date FROM episode_metadata WHERE series_name=?1 AND air_date<>''", seriesName)
+	if err != nil {
+		return nil, err
+	}
+	for airRows.Next() {
+		var season, episode int64
+		var airDate string
+		if err := airRows.Scan(&season, &episode, &airDate); err != nil {
+			airRows.Close()
+			return nil, err
+		}
+		if airDateInFuture(airDate) {
+			future[[2]int64{season, episode}] = true
+		}
+	}
+	if err := airRows.Err(); err != nil {
+		airRows.Close()
+		return nil, err
+	}
+	airRows.Close()
 	targets := make(map[int64]int64)
 	rows, err := d.db.Query("SELECT season,MAX(episode) FROM episodes WHERE series_id=(SELECT id FROM series WHERE name=?1) GROUP BY season", seriesName)
 	if err != nil {
@@ -3259,6 +3348,9 @@ func (d *Database) ArchiveGapsForSeries(seriesName string) ([][2]int64, error) {
 				if _, ok := ignored[[2]int64{season, episode}]; ok {
 					continue
 				}
+				if future[[2]int64{season, episode}] {
+					continue
+				}
 			}
 			if downloading.episode(seriesName, season, episode) {
 				continue
@@ -3291,6 +3383,31 @@ func (d *Database) EpisodeAirDates() (map[airDateKey]string, error) {
 // UnarchivedEpisodesForSeries returns the expected episodes of a series that do
 // not have an archive path yet (manual "Cerca mancanti").
 func (d *Database) UnarchivedEpisodesForSeries(seriesName string, ignoredSeasons []int64) ([][2]int64, error) {
+	var status, lastAirDate string
+	if err := d.db.QueryRow("SELECT status,last_air_date FROM series_status WHERE series_name=?1", seriesName).Scan(&status, &lastAirDate); err == nil && seriesNeverAired(status, lastAirDate) {
+		return [][2]int64{}, nil
+	}
+	future := make(map[[2]int64]bool)
+	airRows, err := d.db.Query("SELECT season,episode,air_date FROM episode_metadata WHERE series_name=?1 AND air_date<>''", seriesName)
+	if err != nil {
+		return nil, err
+	}
+	for airRows.Next() {
+		var season, episode int64
+		var airDate string
+		if err := airRows.Scan(&season, &episode, &airDate); err != nil {
+			airRows.Close()
+			return nil, err
+		}
+		if airDateInFuture(airDate) {
+			future[[2]int64{season, episode}] = true
+		}
+	}
+	if err := airRows.Err(); err != nil {
+		airRows.Close()
+		return nil, err
+	}
+	airRows.Close()
 	targets := make(map[int64]int64)
 	metaRows, err := d.db.Query("SELECT season,episode_count FROM series_metadata WHERE series_name=?1", seriesName)
 	if err != nil {
@@ -3381,6 +3498,9 @@ func (d *Database) UnarchivedEpisodesForSeries(seriesName string, ignoredSeasons
 				continue
 			}
 			if _, ok := archived[[2]int64{season, episode}]; ok {
+				continue
+			}
+			if future[[2]int64{season, episode}] {
 				continue
 			}
 			missing = append(missing, [2]int64{season, episode})

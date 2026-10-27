@@ -2467,6 +2467,87 @@ func TestCheckMovieScoredPrefersExactYear(t *testing.T) {
 	}
 }
 
+func TestGapsSkipSeriesNotYetAired(t *testing.T) {
+	db := newTestDB(t)
+	if _, err := db.db.Exec("INSERT INTO series(name) VALUES ('Unreleased')"); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.SaveSeriesMetadata("Unreleased", [][2]int64{{1, 2}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.SaveSeriesStatus("Unreleased", "In Production", ""); err != nil {
+		t.Fatal(err)
+	}
+	gaps, err := db.ArchiveGaps()
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertEqual(t, gaps, []SeriesGap{})
+	missing, err := db.UnarchivedEpisodesForSeries("Unreleased", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertEqual(t, missing, [][2]int64{})
+	perSeries, err := db.ArchiveGapsForSeries("Unreleased")
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertEqual(t, perSeries, [][2]int64{})
+}
+
+func TestGapsKeepSeriesWithUnknownStatus(t *testing.T) {
+	db := newTestDB(t)
+	if _, err := db.db.Exec("INSERT INTO series(name) VALUES ('Unknown')"); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.SaveSeriesMetadata("Unknown", [][2]int64{{1, 1}}); err != nil {
+		t.Fatal(err)
+	}
+	// The TVDB path has no status: an empty one must not hide the gap.
+	if err := db.SaveSeriesStatus("Unknown", "", ""); err != nil {
+		t.Fatal(err)
+	}
+	gaps, err := db.ArchiveGaps()
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertEqual(t, gaps, []SeriesGap{{Series: "Unknown", Season: 1, Episode: 1}})
+}
+
+func TestGapsSkipEpisodesNotAiredYet(t *testing.T) {
+	db := newTestDB(t)
+	if _, err := db.db.Exec("INSERT INTO series(name) VALUES ('Airing')"); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.SaveSeriesMetadata("Airing", [][2]int64{{1, 3}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.SaveSeriesStatus("Airing", "Returning Series", "2026-10-01"); err != nil {
+		t.Fatal(err)
+	}
+	tomorrow := time.Now().AddDate(0, 0, 1).Format("2006-01-02")
+	if err := db.SaveEpisodeAirDates("Airing", []EpisodeAirDate{
+		{Season: 1, Episode: 1, AirDate: "2026-10-01"},
+		{Season: 1, Episode: 2, AirDate: tomorrow},
+		{Season: 1, Episode: 3, AirDate: ""},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	gaps, err := db.ArchiveGaps()
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertEqual(t, gaps, []SeriesGap{
+		{Series: "Airing", Season: 1, Episode: 1},
+		{Series: "Airing", Season: 1, Episode: 3},
+	})
+	missing, err := db.UnarchivedEpisodesForSeries("Airing", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertEqual(t, missing, [][2]int64{{1, 1}, {1, 3}})
+}
+
 func TestArchiveGapsSkipEpisodesAlreadyDownloading(t *testing.T) {
 	db := newTestDB(t)
 	if _, err := db.db.Exec("INSERT INTO series(name) VALUES ('Show')"); err != nil {

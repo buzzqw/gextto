@@ -90,7 +90,7 @@ func TestGapSearchResultListsTheReleases(t *testing.T) {
 	body := buffer.String()
 	for _, want := range []string{
 		"Risultati:", "Puntate cercate:", "S06E03", "FBI S06E03 1080p ITA",
-		"Scarica", "La serie ha", "40", "Nessun download automatico",
+		"Scarica", "Nessun download automatico",
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("missing %q in:\n%s", want, body)
@@ -98,5 +98,31 @@ func TestGapSearchResultListsTheReleases(t *testing.T) {
 	}
 	if strings.Contains(body, "clicca una puntata") {
 		t.Fatalf("old hint still in:\n%s", body)
+	}
+}
+
+// TestGapSearchRunningShowsProgressAndCancel: the whole-series search runs as a
+// background job, so the panel must say how far it is and offer a way to stop it
+// instead of holding an HTTP request open.
+func TestGapSearchRunningShowsProgressAndCancel(t *testing.T) {
+	view := v2GapSearchResult{
+		Running:  true,
+		JobID:    "job-1",
+		Filter:   "fbi",
+		Slot:     "3",
+		Progress: v2GapSearchProgress{Done: 3, Total: 52, Phase: "episodes"},
+	}
+	var buffer bytes.Buffer
+	if err := v2Templates.ExecuteTemplate(&buffer, "v2_gap_search_result", view); err != nil {
+		t.Fatalf("render: %v", err)
+	}
+	body := buffer.String()
+	for _, want := range []string{
+		"Ricerca in corso:", "3/52", "puntate…", "Annulla",
+		"/series/gaps/search/status?job=job-1", "/series/gaps/search/cancel",
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("missing %q in:\n%s", want, body)
+		}
 	}
 }
