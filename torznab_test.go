@@ -268,3 +268,15 @@ func TestLiveProwlarrSearch(t *testing.T) {
 		t.Fatal("prowlarr returned no usable releases")
 	}
 }
+
+func TestIndexarrURLAsksForLongerLiveWindow(t *testing.T) {
+	indexarr := IndexerConfig{Name: "indexarr", URL: "http://host:8788", APIKey: "secret", Enabled: true}
+	full := torznabRequestURL(indexarr, "Show S01E02", nil)
+	if !strings.Contains(full, "live_wait=45") {
+		t.Fatalf("indexarr URL %q missing live_wait=45", full)
+	}
+	jackett := IndexerConfig{Name: "Jackett", URL: "http://host:9117", APIKey: "secret", Enabled: true}
+	if strings.Contains(torznabRequestURL(jackett, "Show S01E02", nil), "live_wait") {
+		t.Fatal("Jackett URL must not carry the indexarr-only live_wait")
+	}
+}

@@ -1308,7 +1308,10 @@ magnet o `.torrent`. Gextto li riconosce dal `<link>` (e dall'attributo `ed2k`),
 li mostra come rete **eD2k** e li accoda in aMule al momento dello scarico: non
 passano dal client torrent. La ricerca aggregata li include quando il titolo non
 è già coperto da un torrent; per vederli tutti si può aggiungere
-`indexer_type=ed2k` alla richiesta Torznab.
+`indexer_type=ed2k` alla richiesta Torznab. Per dare tempo alla fonte eD2k di
+aprire i topic, Gextto chiede a indexarr un'attesa fino a 45 secondi solo per le
+proprie ricerche (`live_wait=45`); le altre sorgenti e gli altri programmi non
+cambiano.
 
 Con Jackett e Prowlarr Gextto legge l'elenco degli indexer dal manager
 e ne interroga **uno alla volta** (l'endpoint Torznab del singolo indexer per

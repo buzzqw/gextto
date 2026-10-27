@@ -2224,6 +2224,12 @@ func torznabRequestURLForType(indexer IndexerConfig, query string, externalIDs [
 			}
 		}
 	}
+	// indexarr can hold an eD2k source: the link is on the topic page and the
+	// forum needs a browser session, so the first answer gets a longer window
+	// than the 5-second default. Sonarr and Radarr do not send this parameter.
+	if managerKind(indexer) == ManagerIndexarr {
+		appendPair("live_wait", "45")
+	}
 	appendPair("apikey", indexer.APIKey)
 	fullURL := endpoint
 	if len(pairs) > 0 {
