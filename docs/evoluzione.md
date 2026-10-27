@@ -76,17 +76,16 @@ qBittorrent-nox, §6); explainability of the choices; search also from web engin
 lightness (a Go binary and SQLite against a .NET stack); simplicity (health, backup
 and maintenance built in).
 
-**Honest snapshot against Sonarr/Radarr:** they are still deeper at **selection**
+**Honest snapshot against Sonarr/Radarr:** they are deeper at **selection**
 (ordered qualities, cutoffs, custom formats, a delay per profile) and at the
 **ecosystem/API** (full `/api/v3`, of which Gextto implements the Jellyseerr
-subset). Gextto now has **named profiles generated from its per-title
-overrides**, **manual import** (matching an existing file, choosing what it
-replaces and where it goes) and the v3 subset; it parses multi-episode, specials
-and daily releases, records every episode of a multi-episode file and names it
-with the episode range. It is better at single scope, integrated engine,
-explainability, footprint and simplicity. The verdict is unchanged: **an
-alternative for new installations**, without claiming parity. What remains is in
-§8.
+subset). Gextto has **named profiles generated from its per-title overrides**,
+**manual import** (matching an existing file, choosing what it replaces and
+where it goes) and the v3 subset; it parses multi-episode, specials and daily
+releases, records every episode of a multi-episode file and names it with the
+episode range. It is better at single scope, integrated engine, explainability,
+footprint and simplicity: **an alternative for new installations**, without
+claiming parity. What remains is in §8.
 
 **Differences that are choices, not gaps:** indexers through an external manager
 (cleaner and safer separation) and **no usenet** (torrent, HTTP and web seed; in the
@@ -98,7 +97,7 @@ Italian context usenet is marginal).
 on by default). Episodes in a folder, season packs and episodes in copy mode enter
 the library as hardlinks: the link is created with a hidden name and then renamed,
 so the torrent file is never touched. When the link is impossible (different
-filesystems, RAM disk, shares without hardlinks) the file is copied as before, with
+filesystems, RAM disk, shares without hardlinks) the file is copied, with
 a log line per pair of disks. The two names are peers, not like symlinks: deleting
 the name in the download leaves the archive intact (only the seed is interrupted),
 and the data disappears only by deleting both. Movies are not involved: they are
@@ -349,7 +348,7 @@ per day. Torrent log lines carry an `acq:` ID and are stored in `acquisition_eve
 
 **Speed policies: a rule and an exception.** The rule is one choice in Configuration
 (`torrent_speed_mode`, not stored: it reads and writes `torrent_speed_auto` and
-`torrent_sched_enabled`, so older settings need no migration): Auto, fixed limits, or a
+`torrent_sched_enabled`): Auto, fixed limits, or a
 per-weekday schedule with one choice per day (Off, Limit or Auto) and, outside the
 windows, Auto or the fixed limits. The exception is set from the Bandwidth menu in
 Downloads: Auto or a limit, for 1/3/6/12 h or until removed. It wins over the rule,
@@ -384,7 +383,7 @@ keep-alive chatter) or leaving Auto drops the cap.
 
 The router is optional: `torrent_auto_latency_source` is `both` (default: the ping
 decides, the UPnP WAN counters are only a diagnostic), `ping` (the router is not read at
-all), or `router` (legacy: yield only to the devices the router sees, release when they
+all), or `router` (yield only to the devices the router sees, release when they
 leave). Background noise below 256 KiB/s is not "someone else"; the detector needs a
 majority of five reads. Peaks below 128 KiB/s are not recorded, so a dead swarm cannot
 become the tuning's ceiling. The first cap of a session is logged at once with the
@@ -397,8 +396,7 @@ digest every 15 minutes — number of steps, download and upload range, current 
 — while every single step stays in the debug log: the control loop moves the cap
 every minute and a line per step buried the rest of the log. The Downloads badge
 shows latency, reference and caps; `GET /api/torrents/temp-limits` carries
-`latency_guard`. Measurements: [`measurements.md`](measurements.md) §4.5 (historical
-figures, from the trial/router design).
+`latency_guard`. The numbers are in [`measurements.md`](measurements.md) §4.5.
 
 **Streaming and DLNA.** The streaming endpoint sends the `Content-Type` from the file
 extension, answers HEAD and refcounts readers per file. The DLNA/UPnP server is opt-in:
@@ -428,8 +426,8 @@ run time, cached for 10 minutes and never copied into the configuration: Prowlar
 Prowlarr serves each indexer one search at a time, an aggregate answers when its
 slowest indexer has, and a search Gextto abandons at its timeout **keeps running
 inside Prowlarr** and queues the next ones behind it. Six concurrent aggregates with
-timeouts snowball until even a single search waits 120 s (measured, recovered once
-the backlog drained). Each lane therefore has its own slots: 1 for a Prowlarr indexer,
+timeouts snowball until even a single search waits for minutes
+([`measurements.md`](measurements.md) §4.4). Each lane therefore has its own slots: 1 for a Prowlarr indexer,
 which serves no more anyway, and 2 for Jackett and indexarr, which answer in parallel
 and cache. At most one search per Prowlarr indexer is ever outstanding. Each lane also
 has its own timeout (90 s for Prowlarr, since waiting costs less than abandoning; 45 s
@@ -442,11 +440,9 @@ Prowlarr and indexarr) is searched **once**, through the lane that answers faste
 lane never measured is tried first, so each is tried once. The indexers Prowlarr reports as failing are skipped, the
 capabilities are each indexer's own instead of the intersection an aggregate needs,
 and an interactive search does not queue behind the cycle's. If the list cannot be
-read, the manager is queried as an aggregate, as before (indexarr uses its native
-`/api`, Jackett and Prowlarr their own aggregate endpoints). The earlier prototype
-that
-**duplicated** the indexer list into Gextto's configuration (reverted below) is not
-this: nothing is duplicated, the list is read from the manager every time.
+read, the manager is queried as an aggregate (indexarr uses its native
+`/api`, Jackett and Prowlarr their own aggregate endpoints). Nothing is duplicated
+in Gextto's configuration: the list is read from the manager every time.
 
 - The manager type can be **declared** (`manager` in `config.go` and the UI, with
   `jackett`, `prowlarr` and `indexarr` choices) instead
@@ -456,11 +452,9 @@ this: nothing is duplicated, the list is read from the manager every time.
   manager's health (Prowlarr `indexerstatus`) is shown in *Sources*: a broken or
   disabled indexer is visible instead of giving zero results in silence
   (`indexer_health.go`).
-- **Categories were removed**: an aggregate serves both series and movies, so a
-  static category per indexer is useless or harmful (a TV query with the "movie"
-  category returns nothing).
-- A prototype that duplicated the indexer list was built, measured and **reverted**:
-  no stability gain, only configuration drift.
+- **No category per indexer**: an aggregate serves both series and movies, so a
+  static category is useless or harmful (a TV query with the "movie" category
+  returns nothing).
 - Prowlarr's search API **ignores** season/episode and external-id (measured): they
   are not forwarded, and `type` has no observed effect either. **Jackett's** own
   indexer API redirects to the login, but its Torznab `t=indexers` lists the
@@ -469,19 +463,11 @@ this: nothing is duplicated, the list is read from the manager every time.
   and `internal/torznab` infers the right one from the `:9117` port or from the
   name, with an automatic fallback on 404, shared between Gextto and gx-torrent.
 
-**Measurements (same library, same host).** The numbers behind the choices:
-
-| Scenario | Latency | Results |
-|---|---|---|
-| Aggregate with a broken indexer enabled | 60 s (timeout) | 0 |
-| Healthy indexer called directly | 0.25–2.4 s | 40–100 |
-| Aggregate after disabling the broken one in the manager | 2–4 s | 156–240 |
-
 **FlareSolverr.** Persistent sessions per domain, with a short TTL and destruction,
 instead of a browser per request; when the mode is not supported it falls back to
 stateless. It is **never used for the indexer managers**: Jackett and Prowlarr handle
 Cloudflare on their own, and a 403 or network error there is reported as it is
-instead of wasting 20–30 s masking the cause. `solution.status` is respected: a page
+instead of spending the request timeout masking the cause. `solution.status` is respected: a page
 "solved but in error" is not interpreted as content.
 
 ### 5. What Gextto deliberately does not do
@@ -489,28 +475,34 @@ instead of wasting 20–30 s masking the cause. `solution.status` is respected: 
 Recorded with the reason, so the ground is not re-covered:
 
 - **`*arr` `/api/v3` compatibility**, quality profiles and custom formats: the
-  differences are published instead (§1); what a partial compatibility would require
-  is in §8.
+  differences are published instead (§1). Only the Jellyseerr subset of v3 exists
+  (`docs/API.md`); the rest stays out.
 - **Multi-user authentication**: remote exposure is the reverse proxy's job
   (`docs/SECURITY.md`).
 - **Usenet**: torrent, HTTP and web seed; in the Italian context usenet is marginal.
-- **Write-back cache in the engine**: the measurement gives `write_cache=0` (storage
-  and download stay in step), so there would be no gain; to be reopened only with
-  storage genuinely slower than the network.
-- **Specialist fields in the add form**: no request, it would be preventive fluff.
+- **Write-back cache in the engine**: the measurement says the storage keeps up with
+  the download ([`measurements.md`](measurements.md) §4.10), so there would be no gain;
+  to be reopened only with storage genuinely slower than the network.
+- **Specialist fields in the add form**: it would be preventive fluff, nothing
+  needs them.
 - **A content layout in Gextto's Add dialog**: Gextto addresses a download by its
   content root and renames it into the library anyway, so the layout of the download
   folder buys nothing there and a root-less download would break the import. The
   engine has it (Original, Subfolder, NoSubfolder) for gx-torrent standalone and its
   qBittorrent API (§6).
-- **A UI benchmark as a performance test in CI**: SSR rendering costs ~1–3 ms/page,
-  it is not a problem.
+- **A UI benchmark as a performance test in CI**: SSR rendering is a few
+  milliseconds per page and is not a problem.
 - **A cache cap on slow storage (NFS)**: the cache self-regulates
   (`cmd/gx-torrent/cache.go`, tuner `cacheSizes`).
-- **Trakt**: deliberately removed (`TestTraktIntegrationRoutesRemoved`).
-- Already present, listed because they were asked for: webhook HMAC, event hook,
-  title aliases, blocklist, delay profiles, season packs, subtitles in the score,
+- **Trakt**: not supported, by choice (`TestTraktIntegrationRoutesRemoved`).
+- **Present, and not open items**: webhook HMAC, event hook, title aliases,
+  blocklist, delay profiles, season packs, subtitles in the score,
   Discover/Popular TMDB.
+
+Engine designs rejected on a measurement — `io_uring`/AIO, batched uTP datagrams,
+multi-path `get_peers`, the anti-Sybil cap on by default, contiguous-write
+coalescing, super-seeding by default — are in
+[`measurements.md`](measurements.md) §4.10, with the number that closed them.
 
 ---
 
@@ -540,9 +532,9 @@ add/remove, tracker scrape (BEP 48, HTTP and UDP), a runtime sequential toggle, 
 seed, **super-seeding** (BEP 16) and **holepunching** (BEP 55, peer relay over uTP). Port
 mapping and NAT: **PCP** (RFC 6887, our own minimal client, tried after UPnP and before
 NAT-PMP), UPnP and NAT-PMP, and NAT detection (`portcheck`: `reflected_port`,
-`nat_mapping`, `natHint`) — the BEP 42 `ip` field does not arrive on the public DHT
-(0 observations), so the datum shows only where nodes include it. Storage: mmap opt-in
-with a **ranged flush**, `O_SYNC` removed with `fdatasync`, bad-storage and write-error
+`nat_mapping`, `natHint`) — the BEP 42 `ip` field rarely arrives on the public DHT,
+so the datum shows only where nodes include it. Storage: mmap opt-in
+with a **ranged flush**, durability with `fdatasync`, bad-storage and write-error
 diagnosis in the error line, a guard that turns an mmap fault into an I/O error on the
 torrent, and a **disk guard** that pauses and resumes downloads when a folder falls
 below the free-space threshold while seeding continues. Streaming: a reader with seek
@@ -555,7 +547,12 @@ DHT: our own module (`internal/dht`, BEP 5/32/33/42/43/44/46) with a bucket-less
 binary-tree routing table, host names (bootstrap routers, a magnet's `dht=` nodes)
 resolved off the main loop so a hung resolver never stalls it, a non-blocking `AddNode`
 (a peer's PORT hint is dropped rather than waited on), tokens bound to source address and scope, an opt-in
-anti-Sybil cap per subnet, and the **feeds** of BEP 46. Robustness: parser fuzzing in
+anti-Sybil cap per subnet, and the **feeds** of BEP 46. It is **not replaced by a
+third-party DHT library**: it shares one UDP socket with uTP, chooses the family of
+that socket (dual-stack `udp`, `udp4`, `udp6`) and serves every torrent's lookups,
+scrapes and feeds from one request channel, where an external library expects its own
+socket and a traversal object per torrent; no measurement shows it behind
+([`measurements.md`](measurements.md) §4.7). Robustness: parser fuzzing in
 CI (`make fuzz-smoke`, 24 targets, seeds in `testdata/fuzz`), a bounded bencode screen
 before the decoder on every hand-written path, snub and session ban with TTL, IP
 filter, and hostile hash-request headers (bogus root, bad length, huge proof, overflow)
@@ -590,25 +587,23 @@ The standalone **self-update** is described in §3.
 **Swarm Merging** (file sharing between torrents). Different swarms holding **the same
 file** collaborate: a torrent reuses the pieces another one already has instead of
 downloading them again, which revives seedless torrents when the content exists
-elsewhere in the session. The match is by **structure** — an identical piece layout, or
-an equal v2 per-file Merkle root — never by the BEP 38 `similar`/`collections` hints,
-which are only read and reported: the structure is what makes the reuse safe. The
-reused bytes are always **verified against the destination's own hashes** before being
-written, so no unverified byte reaches the storage. What is in place: **Phase 1** (same
-layout, A's hash verifies the piece), **Phase 2** (v2 per-file Merkle root, so identical
-files with different layouts), **Phase 3** (reuse at **16 KiB block** granularity from
-partially covered pieces, `storePartialBlocks`/`prefillBlocks`), **Phase 4** (two v1
-torrents with different piece lengths, matched by file path and length, whole pieces
-only, a candidate dropped after 64 failed verifications), the **resume path** (the merge
-also runs when a torrent is reloaded from resume data, so a restart does not lose the
-block-level reuse) and the **later-sibling trigger** (a torrent that gains verified
-pieces wakes the others, with a write-drain gate and no ping-pong). Within one pass each
-reused piece is read and written **once** even with several candidates, the pieces the
-merge verified are handed to the verifier without re-reading them (`Verifier.Skip`), and
-the merge runs off the run loop. Private torrents are excluded: if A **or** B is
-private the merge is disabled (**BEP 27 guard**, not an option). There is deliberately
-no ED2K-style content hash: for v1 the match is by path and length, because those hashes
-are not in the `.torrent` and would need a private index. The measurements are in §4.8 of
+elsewhere in the session. The match is by **structure**: an identical piece layout, an
+equal v2 per-file Merkle root (identical files with different layouts), two v1 torrents
+with different piece lengths matched by path and length (whole pieces only, a candidate
+dropped after 64 failed verifications), or reuse at **16 KiB block** granularity from
+partially covered pieces (`storePartialBlocks`/`prefillBlocks`). The BEP 38
+`similar`/`collections` hints are never used, only read and reported: the structure is
+what makes the reuse safe. The reused bytes are always **verified against the
+destination's own hashes** before being written, so no unverified byte reaches the
+storage. The merge also runs when a torrent is reloaded from resume data, so a restart
+does not lose the block-level reuse, and a torrent that gains verified pieces wakes the
+others (with a write-drain gate and no ping-pong). Within one pass each reused piece is
+read and written **once** even with several candidates, the pieces the merge verified are
+handed to the verifier without re-reading them (`Verifier.Skip`), and the merge runs off
+the run loop. Private torrents are excluded: if A **or** B is private the merge is
+disabled (**BEP 27 guard**, not an option). There is deliberately no ED2K-style content
+hash: for v1 the match is by path and length, because those hashes are not in the
+`.torrent` and would need a private index. The measurements are in §4.8 of
 [`measurements.md`](measurements.md), the cost when nothing is reusable in §3.
 
 **Ping-Based Auto-Speed** (anti-bufferbloat, standalone). A probe measures every second
@@ -645,16 +640,13 @@ what the campaign in [`measurements.md`](measurements.md) §4.6 and the open ite
 tuning and measurement, not capability: the **choking quality** on a real swarm (the
 deterministic harness is the net, the swarm is the verification), the **pipelining**
 ceiling beyond a local pair (the 10 Gbps target needs hardware that is not here), the
-**disk I/O** (`fdatasync` and opt-in mmap today, measured at ~5.8 GB/s buffered and
-~7.4 GB/s mmap; `O_DIRECT`/`io_uring` and contiguous writes are not justified by a
-measurement), the **graduated file priority** with mixed priorities, and the **DHT**
-levers (multi-path closed with data, the anti-Sybil cap kept as a hint, §4 of
-[`measurements.md`](measurements.md)). Each has its gate in §8.
+**disk I/O** (`fdatasync` and opt-in mmap today; `O_DIRECT`/`io_uring` and contiguous
+writes are rejected in [`measurements.md`](measurements.md) §4.10), the **graduated
+file priority** with mixed priorities, and the **DHT** levers (multi-path and the
+anti-Sybil hint, also in §4.10). Each has its gate in §8.
 
-Wishlist, outside those: **WebTorrent/WebRTC** (niche, a lot of work) and alternative
-storages (blob, bolt, sqlite: not needed). Postponed: **replacing `internal/dht` with an
-external DHT** — the API model differs (per-torrent traversal against a request channel)
-and it would drop the dual-stack/shared-socket patches, so it stays our own module.
+Not in the plan: **WebTorrent/WebRTC** (niche, a lot of work) and alternative
+storages (blob, bolt, sqlite: not needed).
 Out of scope by choice (in [`bep.md`](bep.md)): BEP 8/17/18/22/26/28/30/34/35/45/50/51,
 WebTorrent, native I2P (reachable through a SOCKS5/HTTP proxy). What remains open, with
 its gate and its evidence, is in §8.
@@ -732,8 +724,7 @@ The decision to use aMule instead of a native client rests on two facts kept in
 [`measurements.md`](measurements.md): the measured Kad coverage of missing
 episodes is modest, and a native client competitive with eMule needs a source
 and queue scheduler of the same depth, which is not worth its cost for a
-last-resort source. The native daemon is preserved in the history, at commit
-`9f4e2b9` (the last `gx-ed2k` build, removed from the tree right after).
+last-resort source.
 
 Open points:
 
@@ -746,32 +737,32 @@ Open points:
   the same path, which holds when both run on one machine. A remote core would
   need a path mapping like `qbittorrent_path_mappings`.
 
-The fallback is an explicit opt-in, not a pending decision: measured Kad
-coverage of real gaps is **7–13 %** (`measurements.md` §4.10) and one real
-library reports about **10 of 100** missing episodes found through it. That is
-enough to keep the switch, not to enable it by default: a new installation must
-not contact eD2k unless its operator asks.
+The fallback is an explicit opt-in: the measured Kad coverage of real gaps
+([`measurements.md`](measurements.md) §4.10) is enough to keep the switch, not to
+enable it by default, so a new installation does not contact eD2k unless its operator
+asks.
 
 **Waiting for a measurement or a host.**
 
-- **Choking on a real swarm.** The controlled evidence is healthy (§4.6 of [`measurements.md`](measurements.md)): a real
-  libtorrent leecher is served at full speed on loopback and reciprocation works
-  (leechers exchange 2.52 MB, the seed's upload drops to 1.84×). What is missing is a
+- **Choking on a real swarm.** The controlled evidence is healthy (§4.6 of
+  [`measurements.md`](measurements.md)): a real
+  libtorrent leecher is served at full speed on loopback and reciprocation works.
+  What is missing is a
   swarm where peers download *from* us, which needs a host with a **reachable inbound
-  port** (this one is behind a NAT: the seeding harness finds 0 peers). Gate: a campaign
+  port** (this one is behind a NAT: the seeding harness finds no peers). Gate: a campaign
   against libtorrent/qBittorrent on the same public torrent with the same policy and
   metrics (upload efficiency while seeding, reciprocation, first-block time, stall
   rate). Only a gap would justify touching `internal/unchoker`.
 - **uTP acknowledgements stay one per data packet.** A state packet goes out
-  500 µs after a data packet (`pendingSendStateDelay`), so only bursts share one. Under
-  a saturated line with ~130 peers each connection receives a packet every ~13 ms, and
-  the ACK sends cost as much as the datagram reads (~3 % of a core at 8 MB/s,
-  [`measurements.md`](measurements.md)). Coalescing them would need a delay of 20 ms or
-  more, which inflates the RTT the sender's RTO is built on. The CPU saving does not
+  500 µs after a data packet (`pendingSendStateDelay`), so only bursts share one. On a
+  saturated line each connection receives a packet every few milliseconds, and the ACK
+  sends cost about as much as the datagram reads (the figures are in
+  [`measurements.md`](measurements.md) §4.10). Coalescing them would need a delay of 20 ms or
+  more, which inflates the RTT the sender's RTO is built on: the CPU saving does not
   justify that change in the transport's congestion behaviour. Batched datagram I/O
-  (`recvmmsg`/`sendmmsg`) cuts syscalls without touching the protocol timing, but on a
-  measured saturated swarm uTP made under 1 % of the syscall time (TCP carried the
-  bytes). Gate: the same `strace -c` on a uTP-heavy session (open inbound port) showing
+  (`recvmmsg`/`sendmmsg`) cuts syscalls without touching the protocol timing, but in the
+  measured saturated swarm uTP carried a negligible share of the syscall time (TCP
+  carried the bytes). Gate: the same `strace -c` on a uTP-heavy session (open inbound port) showing
   `recvfrom`/`sendto` as a real share.
 - **Graduated file priority (0–7)** with mixed-priority files: so far measured only
   indirectly.
@@ -783,66 +774,32 @@ not contact eD2k unless its operator asks.
   a low latency (a call, a game) fills no queue. In `both`/`router` the router's WAN
   counters see that user; in `ping` the router is deliberately not read, so such a user
   is not protected (the operator chose to tune on the ping alone). Gate: a measurement
-  with a real call or game next to a saturated download, in `both` and in `ping`. The
-  current controller no longer releases after a calm spell at the ceiling: it keeps the
-  cap while Auto is on and drops it when the line is idle or Auto ends.
+  with a real call or game next to a saturated download, in `both` and in `ping`.
 - **DHT feeds**: the resolver and the publisher (signing and storing a feed, with
   the BEP 44 outgoing client as its consumer) exist; what remains is a real
   multi-client audience for the feeds (§4.7 of [`measurements.md`](measurements.md)).
 - **WebTorrent/WebRTC**: the WebSocket tracker's practical value stays limited until
   WebRTC is done, since the reference tracker serves only WebRTC peers to a WebSocket
   client (§6).
-- **10 Gbps pipelining**: the local single-pair ceiling is ~162 MB/s (multi-piece
-  included); measuring further needs a multi-peer swarm on a fast link, neither
-  available here.
-
+- **10 Gbps pipelining**: the local single-pair ceiling is far below the target
+  (multi-piece included, [`measurements.md`](measurements.md) §4.6); measuring further
+  needs a multi-peer swarm on a fast link, neither available here.
 - **Parallel requests per web seed.** One range download runs per web seed at a time;
-  on a source that answers each file slowly (archive.org, ~3 s per request) a torrent of
-  many small files is bound by that latency, and eight parallel requests measured ~2.5×
-  faster with `curl` ([`measurements.md`](measurements.md) §4.9). Gate: a torrent served
+  on a source that answers each file slowly (archive.org, seconds per request) a torrent
+  of many small files is bound by that latency, and parallel requests were faster with
+  `curl` ([`measurements.md`](measurements.md) §4.9). Gate: a torrent served
   mostly by web seeds where the parallel version beats the current one on the same source.
 
 **Product surface.** The torrent table is virtualised above 500 rows, the DLNA
 library folder field proposes the configured Download folder, and the Watch
-folders section says that the `.torrent` files are downloaded. No open item
-remains here.
+folders section says that the `.torrent` files are downloaded.
 
-**The gap with Sonarr/Radarr** (§1), by value per effort, after a study and without
-copying code (Sonarr is GPLv3, Gextto EUPL-1.2):
+**The gap with Sonarr/Radarr** (§1) is closed by the named profiles, the `/api/v3`
+subset and the manual import; the only open piece is the acceptance test of the v3
+subset against a real Jellyseerr, whose calls decide any correction.
 
-- **Named profiles as templates**: *Configuration → Quality and upgrades → Quality
-  profiles*, with a generated profile for every combination of quality, minimum
-  audio, language, subtitles and upgrade switch in the library (a title's own
-  exclusions make no profile), "Default" first and a stable id per profile; the
-  generation stops at the first save of the list. A profile is copied into a title
-  (from Jellyseerr or from *Edit selected* in the Series and Movies tables,
-  which also edits many titles at once); it does not govern it. The *Sonarr* semantics (ordered qualities,
-  cutoff, custom formats) stay out by choice (§1).
-- **A `/api/v3` subset for Jellyseerr** (`system/status`, `qualityprofile`,
-  `languageprofile`, `rootfolder`, `tag`, `series/lookup` + `POST series`,
-  `movie/lookup` + `POST movie`, `PUT series`/`PUT movie`, `queue`), following the
-  calls Jellyseerr makes (lookup by `tvdb:`/`tmdb:` id, only the monitored
-  seasons, the library id in the answer); full compatibility is not claimed, and
-  a real Jellyseerr run remains the acceptance test.
-- **Manual import**: the *Import file* tab of Maintenance matches an existing file, lets the
-  operator correct series/movie/season/episode and destination, replaces an existing
-  copy only on request and records every episode of a multi-episode file.
-
-**Closed with data**, so the ground is not re-covered: replacing `internal/dht` with an
-external DHT (the API model differs and it would drop the dual-stack/shared-socket
-patches); **enforcing** the anti-Sybil cap (no node exceeds any candidate threshold, so
-it stays a hint, off by default); the **multi-path `get_peers`** rewrite
-(`peers_confirmed_multi` was 0 in both real measurements); **ordering the merge
-candidates by reusable bytes** (superseded by the dedup, no measurable gain);
-`O_DIRECT`/`io_uring` (the disk is not the bottleneck); a write-back cache in the engine
-(`write_cache=0`); a UI benchmark as a CI performance test (SSR rendering is ~1–3 ms per
-page); a **file pool** (an LRU of open files): every file of a running torrent stays
-open, one descriptor each, and that is cheap and linear up to 20,000 files in one
-torrent — the only limit was the descriptor ceiling, which the engine now raises and
-never lowers (`setNoFile`).
-
-**Baseline.** `scripts/measure-baseline.sh` runs the cheap harnesses — and the network
-ones when their environment is set — and writes a dated baseline, the reference a later
-round compares against; the numbers stay in [`measurements.md`](measurements.md). What
-remains is the real-swarm choking campaign, which needs the host with a reachable
-inbound port, and whatever that campaign justifies.
+**Closed items** are in [`measurements.md`](measurements.md) §4.9 (many files in one
+torrent, no open-file pool) and §4.10 (the rejected engine designs, each with the
+number that closed it), and among the choices of §5. What is listed here waits for a
+measurement or for a host: the real-swarm choking campaign needs a machine with a
+reachable inbound port, and it decides the rest.

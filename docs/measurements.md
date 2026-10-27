@@ -308,6 +308,13 @@ titles, 6 at a time):
 | Requests | 205 answered, 0 failed |
 | Releases | 5,935 |
 
+**Why one indexer at a time** (same library, same host): an aggregate with a broken
+indexer enabled waits for the timeout (60 s) and returns nothing; a healthy indexer
+called directly answers in 0.25–2.4 s with 40–100 releases; the aggregate, with the
+broken indexer disabled in the manager, answers in 2–4 s with 156–240. Six concurrent
+aggregates with timeouts snowball until even a single search waits 120 s, recovered
+once the backlog drained.
+
 **Choices behind these figures.** Each manager indexer is a lane, read from the manager
 at run time (10 min cache, never copied into the configuration): Prowlarr
 `/api/v1/search?indexerIds=`, Jackett the indexer's Torznab endpoint. Prowlarr serves
@@ -538,6 +545,7 @@ Closed with a measurement, so they are not retried without new data:
 | Idea | Why it was closed |
 |---|---|
 | `io_uring` / AIO | the disk is at 5.8–7.4 GB/s, far above any network speed; Go exposes it only with a dependency or cgo, and the mmap path is already asynchronous |
+| Write-back cache in the engine | the storage keeps up with the download (`write_cache=0` in the live service), so there is nothing to absorb; reopen only with storage slower than the network |
 | Batched uTP datagram I/O (`recvmmsg`/`sendmmsg`) | measured again on a uTP-heavy path (2026-10-21): on the loopback benchmark `Socket.writeTo` is 44 % of the CPU (58 % is `Syscall6`), but in the real-swarm profile it is **8.3 %** of the samples (36 % syscalls, reads and TCP included). Batching would remove at most that share, while adding a copy per datagram and a sender queue; at the live rate it saves well under 1 % of a core. Reopen only on a uTP-only session above 8 MB/s |
 | Contiguous-write coalescing | the page cache already merges adjacent writebacks |
 | Rarity buckets, watermark cursor in `pickSequential`/`pickFileEdge`, `PieceDownloader` bitmask, `FADV_RANDOM`, `saveLocked` outside `d.mu`, `/proc/meminfo` under `d.mu` | no measurement justified the cost |
@@ -547,7 +555,14 @@ Closed with a measurement, so they are not retried without new data:
 | Anti-Sybil cap on by default | the routing table is not concentrated and legitimate CGNAT/mobile subnets would be capped |
 | Choking changes | reciprocation works locally and against libtorrent |
 | Super-seeding by default | no upload reduction on the measurable swarms, and ~24 % slower locally |
+| Ordering the merge candidates by reusable bytes | superseded by the dedup, no measurable gain |
 | Latency guard: fixed 100 MB/s ceiling, current-rate ceiling, 64 KiB/s floor, low-peak anchor | the cap either locked to a slow sample or was an arbitrary number; the current controller ramps on the Google/Cloudflare ping, uses the user's line maximum (or 2× the delivered rate) and cuts only on a real latency rise |
+
+**Not a measurement but a model:** replacing `internal/dht` with a third-party library
+was considered and not done — the internal one shares a UDP socket with uTP, chooses
+that socket's family and serves every torrent from a single request channel, where an
+external library expects its own socket and a traversal per torrent. The state is in
+[`evoluzione.md`](evoluzione.md) §6.
 
 **Postponed, with a reason:** qBittorrent's `renameFile`/`renameFolder` (needs rename
 support in the engine: a feature of its own); graduated file priority with
@@ -862,3 +877,7 @@ extracted folder) and `build-release.sh` checks it; `install.sh` keeps `gexttod.
   add it to §4 and, when rejected, to §4.10.
 - Compare before and after with `-count`/`benchstat` or an interleaved A/B. One pass on a
   public swarm cannot rank a parameter.
+- `scripts/measure-baseline.sh` runs the cheap harnesses — and the network ones when their
+  environment is set — and writes a dated baseline, the reference a later round compares
+  against. A round that changes nothing still re-runs it, so a regression shows up as a
+  difference from the previous date.
