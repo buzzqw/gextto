@@ -402,9 +402,11 @@ figures, from the trial/router design).
 
 **Streaming and DLNA.** The streaming endpoint sends the `Content-Type` from the file
 extension, answers HEAD and refcounts readers per file. The DLNA/UPnP server is opt-in:
-SSDP, ContentDirectory, ConnectionManager, GENA events, HTTP Range, subtitles, library
-folders on the NAS and artwork from the Jellyfin/Kodi images; LAN-only by construction.
-Details in [`gx-torrent.md`](gx-torrent.md), *DLNA media server*.
+SSDP, ContentDirectory with title search (`Search`), ConnectionManager, GENA events,
+HTTP Range, subtitles, library folders on the NAS (with a **Download folder** shortcut
+next to them) and artwork from the Jellyfin/Kodi images; `X_MS_MediaReceiverRegistrar`
+lets Xbox and Windows Media Player browse it. LAN-only by construction. Details in
+[`gx-torrent.md`](gx-torrent.md), *DLNA media server*.
 
 **In-app updates.** gx-torrent standalone checks `release.json` (only commits that touch
 the daemon are offered), verifies SHA-256, test-runs the new binary, swaps it keeping
@@ -634,8 +636,7 @@ partially downloaded v2 file can serve block hashes too; a request is capped at 
 hashes so the leaves read on the torrent loop stay bounded) and the v1 cross-layout
 merge above. Caveats: the reference `bittorrent-tracker` returns only
 WebRTC peers to a WebSocket client, so a native client gets no TCP peers there — the
-real unlock would be WebRTC, which is not done — and only the **resolver** side of BEP 46
-exists, not the publisher (signing).
+real unlock would be WebRTC, which is not done.
 
 **What is missing.** Feature-wise the engine covers what libtorrent covers for this
 use. What libtorrent has and gx-core does not is **exposure**: twenty years of runs in
