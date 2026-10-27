@@ -98,6 +98,7 @@ func runDaemon(dryRun bool, configOption *string) error {
 		filter = env
 	}
 	logging.SetLevel(filter)
+	gextto.WarnIfAudioCleanupUnavailable(&cfg)
 	for _, warning := range dirWarnings {
 		logging.Warn("a configured folder is not available; Gextto starts anyway, fix the path in Configuration", "folder", warning)
 	}

@@ -6019,3 +6019,4 @@ spa:
   "Cosa fare quando ci sono più tracce nella lingua scelta: tenerle tutte, solo la migliore o solo la prima.": "Qué hacer cuando hay varias pistas en el idioma elegido: conservarlas todas, solo la mejor o solo la primera."
   "Solo la migliore": "Solo la mejor"
   "Solo la prima": "Solo la primera"
+  "Servono ffprobe, ffmpeg e mkvmerge: installali e riavvia Gextto per attivare la pulizia.": "Se necesitan ffprobe, ffmpeg y mkvmerge: instálalos y reinicia Gextto para activar la limpieza."

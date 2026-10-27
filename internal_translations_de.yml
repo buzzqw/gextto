@@ -6072,3 +6072,4 @@ deu:
   "Cosa fare quando ci sono più tracce nella lingua scelta: tenerle tutte, solo la migliore o solo la prima.": "Was tun, wenn mehrere Spuren in der gewählten Sprache vorhanden sind: alle behalten, nur die beste oder nur die erste."
   "Solo la migliore": "Nur die beste"
   "Solo la prima": "Nur die erste"
+  "Servono ffprobe, ffmpeg e mkvmerge: installali e riavvia Gextto per attivare la pulizia.": "ffprobe, ffmpeg und mkvmerge sind erforderlich: installiere sie und starte Gextto neu, um die Bereinigung zu aktivieren."

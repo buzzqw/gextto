@@ -2397,8 +2397,8 @@ spazio del `tmpfs`, come prima.
 | Rinomina episodi | Rinomina i file scaricati usando i metadati TMDB (o TVDB senza chiave TMDB). |
 | Film come file singoli (spiana le cartelle) | Se Sì, un film arrivato dentro una cartella torrent viene spostato nella cartella film come file singolo, portando con sé sottotitoli e artwork. Se No, resta nella sua cartella. |
 | Verifica dei file rinominati ogni | Ogni quante ore verificare che i file archiviati/rinominati siano ancora presenti. *(Unità: ore)* |
-| Rimuovi le tracce audio in altre lingue | Se Sì, dopo l'importazione Gextto tiene solo le tracce audio nella lingua scelta e toglie le altre, senza ricodificare il video: qualità, HDR e sincronizzazione restano quelli del file originale. Il file viene toccato solo se c'è più di una traccia audio e almeno una è dichiarata nella lingua scelta; la sostituzione avviene solo dopo un controllo su tracce, durata e sincronizzazione. |
-| Lingua audio da tenere | Codice della lingua da conservare, per esempio ita o eng. Solo le tracce con questo tag vengono tenute; una traccia senza lingua non viene considerata. |
+| Rimuovi le tracce audio in altre lingue | Se Sì, dopo l'importazione Gextto tiene solo le tracce audio nella lingua scelta e toglie le altre, senza ricodificare il video: qualità, HDR e sincronizzazione restano quelli del file originale. Il file viene toccato solo se c'è più di una traccia audio e almeno una è dichiarata nella lingua scelta; la sostituzione avviene solo dopo un controllo su tracce, durata e sincronizzazione. L'opzione si attiva solo se ffprobe, ffmpeg e mkvmerge sono installati; altrimenti la riga resta bloccata con un avviso. |
+| Lingua audio da tenere | Scegli dalla lista (italiano, inglese, francese…) o scrivi il codice a 2-3 lettere, per esempio ita o eng. Solo le tracce con questo tag vengono tenute; una traccia senza lingua non viene considerata. |
 | Se ci sono più tracce nella lingua scelta | Tenerle tutte, solo la migliore (più canali e bitrate) o solo la prima. |
 
 **Lingue dei metadati**

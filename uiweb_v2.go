@@ -2422,7 +2422,14 @@ func v2SettingsViewFrom(s *AppState, tab, highlight, mode string) v2SettingsView
 				unused.Fields = append(unused.Fields, v2Field{uiSettingField: field})
 				continue
 			}
-			converted.Fields = append(converted.Fields, v2Field{uiSettingField: field})
+			rendered := v2Field{uiSettingField: field}
+			if field.Key == audioCleanupSetting && settingTruthy(field.Value) && !AudioCleanupAvailable() {
+				// Already on but a tool vanished: keep it editable so it can be
+				// switched off, and say that nothing is being cleaned.
+				rendered.Status = audioCleanupUnavailableNote
+				rendered.Error = true
+			}
+			converted.Fields = append(converted.Fields, rendered)
 		}
 		for _, subgroup := range group.Subgroups {
 			convertedSubgroup := v2SettingSubgroup{Title: subgroup.Title, Hint: subgroup.Hint, Grid: subgroup.Grid}

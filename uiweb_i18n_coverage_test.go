@@ -47,7 +47,9 @@ var i18nAllowlist = map[string]bool{
 	// Language endonyms shown in the interface-language selector, and the
 	// "Comic" prefix of a download title.
 	"Deutsch": true, "English": true, "Español": true, "Français": true,
-	"Italiano": true, "Polski": true, "Comic": true,
+	"Italiano": true, "Polski": true, "Português": true, "Nederlands": true,
+	"Svenska": true, "Norsk": true, "Dansk": true, "Suomi": true,
+	"Čeština": true, "Magyar": true, "Română": true, "Türkçe": true, "Comic": true,
 	// Transport protocol name.
 	"TCP": true,
 	// eD2k/Kad protocol names and the link placeholder.

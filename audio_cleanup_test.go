@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -258,6 +260,107 @@ func makeAudioCleanupFixture(t *testing.T, path string, tracks []testAudioTrack)
 	args = append(args, path)
 	if output, err := exec.Command("ffmpeg", args...).CombinedOutput(); err != nil {
 		t.Fatalf("cannot build the fixture: %v\n%s", err, output)
+	}
+}
+
+func TestAudioCleanupMissingTools(t *testing.T) {
+	original := audioCleanupLookPath
+	defer func() { audioCleanupLookPath = original }()
+
+	present := map[string]bool{"ffprobe": true, "ffmpeg": true, "mkvmerge": true}
+	audioCleanupLookPath = func(name string) (string, error) {
+		if present[name] {
+			return "/usr/bin/" + name, nil
+		}
+		return "", exec.ErrNotFound
+	}
+	if !AudioCleanupAvailable() {
+		t.Fatal("all tools present, want available")
+	}
+	delete(present, "mkvmerge")
+	if AudioCleanupAvailable() {
+		t.Fatal("mkvmerge missing, want unavailable")
+	}
+	missing := AudioCleanupMissingTools()
+	if len(missing) != 1 || missing[0] != "mkvmerge" {
+		t.Fatalf("missing = %v, want [mkvmerge]", missing)
+	}
+	delete(present, "ffprobe")
+	missing = AudioCleanupMissingTools()
+	if len(missing) != 2 || missing[0] != "ffprobe" || missing[1] != "mkvmerge" {
+		t.Fatalf("missing = %v, want [ffprobe mkvmerge]", missing)
+	}
+}
+
+func TestAudioCleanupSettingRequiresTools(t *testing.T) {
+	original := audioCleanupLookPath
+	defer func() { audioCleanupLookPath = original }()
+	audioCleanupLookPath = func(string) (string, error) { return "", exec.ErrNotFound }
+
+	if err := validateSettingValue(audioCleanupSetting, "true", nil); err == nil {
+		t.Fatal("enabling the cleanup without the tools must be refused")
+	}
+	if err := validateSettingValue(audioCleanupSetting, "false", nil); err != nil {
+		t.Fatalf("disabling the cleanup must always work: %v", err)
+	}
+}
+
+func TestAudioCleanupBlockedInSettingsWhenToolsMissing(t *testing.T) {
+	original := audioCleanupLookPath
+	defer func() { audioCleanupLookPath = original }()
+	audioCleanupLookPath = func(string) (string, error) { return "", exec.ErrNotFound }
+
+	state := newTestAppState(t)
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+
+	code, body := v2Request(t, server, http.MethodGet, "/settings/body?tab=rename", nil)
+	if code != http.StatusOK {
+		t.Fatalf("settings page -> %d", code)
+	}
+	index := strings.Index(body, `id="input-audio_cleanup"`)
+	if index < 0 {
+		t.Fatal("the audio cleanup option is missing from the settings page")
+	}
+	start := strings.LastIndex(body[:index], "<input")
+	end := index + strings.Index(body[index:], ">")
+	if start < 0 || end <= index {
+		t.Fatal("cannot read the audio cleanup input tag")
+	}
+	tag := body[start : end+1]
+	if !strings.Contains(tag, "disabled") {
+		t.Fatalf("the switch must be disabled when a tool is missing: %s", tag)
+	}
+	if !strings.Contains(body, audioCleanupUnavailableNote) {
+		t.Fatal("the missing-tools warning is not rendered")
+	}
+	if strings.Contains(body, `id="save-audio_cleanup"`) {
+		t.Fatal("a blocked option must not offer the save button")
+	}
+}
+
+func TestAudioCleanupLanguageIsAComboWithSuggestions(t *testing.T) {
+	state := newTestAppState(t)
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+
+	code, body := v2Request(t, server, http.MethodGet, "/settings/body?tab=rename", nil)
+	if code != http.StatusOK {
+		t.Fatalf("settings page -> %d", code)
+	}
+	if !strings.Contains(body, `list="list-audio_cleanup_language"`) {
+		t.Fatal("the language field is not a combo with suggestions")
+	}
+	if !strings.Contains(body, `<option value="ita">Italiano</option>`) {
+		t.Fatal("the Italian suggestion is missing")
+	}
+	index := strings.Index(body, `id="input-audio_cleanup_language"`)
+	if index < 0 {
+		t.Fatal("the language input is missing")
+	}
+	tag := body[strings.LastIndex(body[:index], "<input") : index+strings.Index(body[index:], ">")]
+	if !strings.Contains(tag, "list=") || strings.Contains(tag, "disabled") {
+		t.Fatalf("the language field must stay a free-text input with suggestions: %s", tag)
 	}
 }
 

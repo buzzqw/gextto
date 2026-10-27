@@ -680,6 +680,43 @@ var (
 	audioCleanupToolWarn   sync.Once
 )
 
+// audioCleanupUnavailableNote is shown (and translated) when the option cannot
+// be enabled because one of the external tools is missing.
+const audioCleanupUnavailableNote = "Servono ffprobe, ffmpeg e mkvmerge: installali e riavvia Gextto per attivare la pulizia."
+
+// audioCleanupLookPath is a variable so tests can simulate a missing tool.
+var audioCleanupLookPath = exec.LookPath
+
+// AudioCleanupMissingTools lists the external binaries the feature needs and
+// that are not on PATH. All three are required: ffprobe decides, ffmpeg is the
+// fallback remuxer, mkvmerge is the preferred one for Matroska.
+func AudioCleanupMissingTools() []string {
+	missing := make([]string, 0, 3)
+	for _, tool := range []string{"ffprobe", "ffmpeg", "mkvmerge"} {
+		if _, err := audioCleanupLookPath(tool); err != nil {
+			missing = append(missing, tool)
+		}
+	}
+	return missing
+}
+
+// AudioCleanupAvailable reports whether the feature can run at all.
+func AudioCleanupAvailable() bool {
+	return len(AudioCleanupMissingTools()) == 0
+}
+
+// WarnIfAudioCleanupUnavailable logs once at startup when the feature is on but
+// a tool vanished, so the operator knows why nothing is being cleaned.
+func WarnIfAudioCleanupUnavailable(cfg *Config) {
+	if cfg == nil || !settingsBool(cfg, audioCleanupSetting, false) {
+		return
+	}
+	if missing := AudioCleanupMissingTools(); len(missing) > 0 {
+		logging.Warn(fmt.Sprintf("audio cleanup is enabled but %s is missing, so no file will be cleaned until it is installed and Gextto restarted",
+			strings.Join(missing, ", ")))
+	}
+}
+
 // scheduleAudioCleanup queues the files of an imported release. It is a no-op
 // unless the feature is enabled in the settings, and it never blocks the
 // caller: a slow remux must not stall the torrent event loop.
@@ -690,7 +727,8 @@ func scheduleAudioCleanup(cfg *Config, db *Database, path, hash string, series *
 	}
 	if !AudioCleanupAvailable() {
 		audioCleanupToolWarn.Do(func() {
-			logging.Warn("audio cleanup is enabled but ffprobe/ffmpeg are not installed, so no file will be cleaned")
+			logging.Warn(fmt.Sprintf("audio cleanup is enabled but %s is missing, so no file will be cleaned",
+				strings.Join(AudioCleanupMissingTools(), ", ")))
 		})
 		return
 	}
@@ -759,23 +797,4 @@ func audioCleanupProcess(job audioCleanupJob) {
 	default:
 		logging.Debug("audio cleanup skipped", "path", job.path, "reason", report.SkipReason)
 	}
-}
-
-var (
-	audioCleanupAvailableOnce sync.Once
-	audioCleanupAvailableFlag bool
-)
-
-// AudioCleanupAvailable reports whether the feature can run at all: ffprobe to
-// decide and at least one remuxer to apply the decision.
-func AudioCleanupAvailable() bool {
-	audioCleanupAvailableOnce.Do(func() {
-		if !Available() {
-			return
-		}
-		_, mkvErr := exec.LookPath("mkvmerge")
-		_, ffmpegErr := exec.LookPath("ffmpeg")
-		audioCleanupAvailableFlag = mkvErr == nil || ffmpegErr == nil
-	})
-	return audioCleanupAvailableFlag
 }

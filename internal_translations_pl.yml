@@ -6013,3 +6013,4 @@ pol:
   "Cosa fare quando ci sono più tracce nella lingua scelta: tenerle tutte, solo la migliore o solo la prima.": "Co zrobić, gdy w wybranym języku jest kilka ścieżek: zachować wszystkie, tylko najlepszą lub tylko pierwszą."
   "Solo la migliore": "Tylko najlepszą"
   "Solo la prima": "Tylko pierwszą"
+  "Servono ffprobe, ffmpeg e mkvmerge: installali e riavvia Gextto per attivare la pulizia.": "Wymagane są ffprobe, ffmpeg i mkvmerge: zainstaluj je i uruchom ponownie Gextto, aby włączyć czyszczenie."

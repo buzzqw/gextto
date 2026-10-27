@@ -134,6 +134,11 @@ type uiSettingField struct {
 	// DisabledEngine is the active engine named by DisabledNote, so the page
 	// can render the note as a translatable sentence plus the engine name.
 	DisabledEngine string
+	// Blocked marks a field that cannot be changed in this environment, for
+	// example a feature whose external tools are missing. Unlike Disabled it
+	// stays in its own section and explains what is missing.
+	Blocked     bool
+	BlockedNote string
 	// Options is set for Kind=="select": a fixed list to choose from.
 	Options []uiFormOption
 	// Week is set for Kind=="week": the per-day bandwidth schedule rows.
@@ -569,6 +574,12 @@ func uiSettingsPageFrom(s *AppState, activeTab, mode string) uiSettingsPage {
 			value = speedModeOf(cfg)
 		}
 		field := uiSettingFieldFor(def.Key, def.Label, value)
+		if def.Key == audioCleanupSetting && !settingTruthy(value) && !AudioCleanupAvailable() {
+			// Off and missing tools: the switch cannot be turned on, and the row
+			// says why. It stays in its section (Blocked, not Disabled).
+			field.Blocked = true
+			field.BlockedNote = audioCleanupUnavailableNote
+		}
 		// An unsaved per-day schedule shows the single window it replaces.
 		if field.Kind == "week" && strings.TrimSpace(value) == "" {
 			field.Week = uiWeekRowsFrom(speedScheduleWeek(cfg))
@@ -1348,6 +1359,10 @@ func uiApplySettingMeta(field *uiSettingField, stored string) {
 				options = append([]uiFormOption{{Value: selected, Label: selected + " (personalizzata)", Selected: true}}, options...)
 			}
 			field.Kind, field.Options = "select", options
+		case "combo":
+			// A text field with suggestions: the list is a convenience, a code
+			// that is not listed can still be typed.
+			field.Kind, field.Options = "combo", meta.Options
 		}
 		// The stored value alone cannot tell a boolean or a number when the key
 		// was never saved or uses another spelling ("1"): the default can.

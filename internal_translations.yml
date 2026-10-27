@@ -5409,3 +5409,4 @@ eng:
   "Cosa fare quando ci sono più tracce nella lingua scelta: tenerle tutte, solo la migliore o solo la prima.": "What to do when several tracks are in the chosen language: keep them all, only the best one or only the first."
   "Solo la migliore": "Only the best"
   "Solo la prima": "Only the first"
+  "Servono ffprobe, ffmpeg e mkvmerge: installali e riavvia Gextto per attivare la pulizia.": "ffprobe, ffmpeg and mkvmerge are required: install them and restart Gextto to enable the cleanup."

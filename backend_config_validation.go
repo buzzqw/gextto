@@ -185,6 +185,9 @@ func validateSettingValue(key, value string, cfg *Config) error {
 			return err
 		}
 	}
+	if key == audioCleanupSetting && settingTruthy(value) && !AudioCleanupAvailable() {
+		return fmt.Errorf("audio cleanup needs ffprobe, ffmpeg and mkvmerge to be installed")
+	}
 	if key == audioCleanupLanguageSetting {
 		if err := validateAudioCleanupLanguage(value); err != nil {
 			return err

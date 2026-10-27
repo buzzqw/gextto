@@ -2322,8 +2322,8 @@ files. When the memory cannot be read, only the `tmpfs` space counts, as before.
 | Rename episodes | Renames downloaded files using TMDB metadata (or TVDB without a TMDB key). |
 | Movies as single files (flatten folders) | If Yes, a movie that arrives inside a torrent folder is moved to the movies folder as a single file, with its subtitles and artwork. If No, it stays in its folder. |
 | Check renamed files every | How many hours between checks that archived/renamed files are still present. *(Unit: hours)* |
-| Remove audio tracks in other languages | If Yes, after importing Gextto keeps only the audio tracks in the chosen language and removes the others, without re-encoding the video: quality, HDR and sync stay those of the original file. A file is touched only when it has more than one audio track and at least one is tagged in the chosen language; it is replaced only after a check on tracks, duration and sync. |
-| Audio language to keep | Code of the language to keep, for example ita or eng. Only tracks with this tag are kept; an untagged track is not considered. |
+| Remove audio tracks in other languages | If Yes, after importing Gextto keeps only the audio tracks in the chosen language and removes the others, without re-encoding the video: quality, HDR and sync stay those of the original file. A file is touched only when it has more than one audio track and at least one is tagged in the chosen language; it is replaced only after a check on tracks, duration and sync. The option can be enabled only when ffprobe, ffmpeg and mkvmerge are installed; otherwise the row stays blocked with a warning. |
+| Audio language to keep | Choose from the list (Italian, English, French…) or type the two or three letter code, for example ita or eng. Only tracks with this tag are kept; an untagged track is not considered. |
 | When several tracks are in the chosen language | Keep them all, only the best one (more channels and bitrate) or only the first. |
 
 **Metadata languages**
