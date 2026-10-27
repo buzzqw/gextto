@@ -55,7 +55,7 @@ const (
 	queryConcurrency    = 6
 	feedConcurrency     = 4
 	feedFetchBudget     = 75 * time.Second
-	manualSearchTimeout = 15 * time.Second
+	manualSearchTimeout = 15 * time.Second // per web source in a manual search
 	// A full library can take several minutes: keep the operator informed while
 	// bounded title searches are still in flight, without logging every title.
 	searchProgressInterval = time.Minute
@@ -623,7 +623,8 @@ func (e *Engine) SearchQuery(ctx context.Context, cfg *Config, query string) []m
 }
 
 // SearchQueryManual is the interactive search: Torznab indexers stay available
-// for their whole search, while the web engines get a short overall budget.
+// for their whole search, while each web engine gets a short budget of its own
+// once it starts, so a source waiting for a slot is not cut off unseen.
 func (e *Engine) SearchQueryManual(ctx context.Context, cfg *Config, query string) []models.Release {
 	timeout := manualSearchTimeout
 	return searchOneWithDB(ctx, cfg, query, nil, &timeout, e.db, false)

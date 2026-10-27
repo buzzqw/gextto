@@ -15,6 +15,8 @@ manual is online: [English](docs/MANUAL.en.md) ·
 
 ## 27 October 2026
 
+- **The web search no longer cuts every source together after 15 seconds.** There used to be a single 15-second budget for all the web sources of a search, and it included the wait in the queue: with eight engines and four slots, the second half might never start. Now each engine gets its own 15 seconds from when it starts, so none is skipped just because it was waiting; the answers already received are kept. A single engine slower than 15 seconds is still left behind for that search, but it no longer stops the others and no longer floods the log: the detail goes to the debug log.
+
 - **A series that has not aired yet no longer shows up as missing.** When the metadata says a series is still "In Production" (or planned), Gextto does not treat the announced episodes as missing: it used to infer them from the planned season count and the *Missing* tab listed series that had not aired yet. The same goes for an episode with a known future air date. Real gaps are unchanged.
 
 - **«Search missing» shows what it found.** The missing-episode search for a series used to say only how many results it had found ("Found 1 result for 15 episodes") and then threw them away: to see one you had to guess the right episode and search it by hand. Now the *Missing* tab lists the results under the series, with the episode, the title, the source and a **Download** button. The search no longer stops at the first 15 episodes: it covers all of them, runs in the background with visible progress and a cancel button, and downloads nothing by itself. Torrent results also stay in the local archive, so searching the single episode finds them at once.

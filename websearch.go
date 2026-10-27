@@ -101,8 +101,10 @@ func Search(ctx context.Context, cfg *Config, query string) []models.Release {
 	return SearchWithTimeout(ctx, cfg, query, nil)
 }
 
-// SearchWithTimeout runs a web search with an optional total budget. Unlike an
-// external timeout it keeps the answers already received from fast sources.
+// SearchWithTimeout runs a web search with an optional per-source budget: each
+// engine gets that long once it starts, so a source queued behind the shared
+// limiter is not cut off before it has had its turn. Answers already received
+// are always kept.
 func SearchWithTimeout(ctx context.Context, cfg *Config, query string, timeout *time.Duration) []models.Release {
 	raw := searchWithTimeoutRaw(ctx, cfg, query, timeout)
 	var releases []models.Release
@@ -168,8 +170,22 @@ func searchWithTimeoutRaw(ctx context.Context, cfg *Config, query string, timeou
 				return
 			}
 			defer func() { <-webEngineLimiter }()
-			found, err := runWebEngine(ctx, engine, query, flaresolverr)
+			engineCtx := ctx
+			if timeout != nil {
+				var cancel context.CancelFunc
+				engineCtx, cancel = context.WithTimeout(ctx, *timeout)
+				defer cancel()
+			}
+			found, err := runWebEngine(engineCtx, engine, query, flaresolverr)
 			if err != nil {
+				if engineCtx.Err() == context.DeadlineExceeded && ctx.Err() == nil {
+					// This source did not answer within its own budget. Keep the
+					// answers from the faster ones, and do not put a healthy
+					// source in cooldown because it was merely slow.
+					logging.Debug("web engine search timed out", "engine", engine, "query", query, "budget", logDuration(*timeout))
+					resultsChannel <- outcome{}
+					return
+				}
 				redacted := utils.RedactURLSecrets(err.Error())
 				logging.SourceFail("web", engine, redacted)
 				// A cancelled or expired parent context is not the engine's
@@ -187,34 +203,21 @@ func searchWithTimeoutRaw(ctx context.Context, cfg *Config, query string, timeou
 		}(engine)
 	}
 	var results []webResult
-	var deadline time.Time
-	if timeout != nil {
-		deadline = time.Now().Add(*timeout)
-	}
 collect:
 	for completed := 0; completed < active; completed++ {
-		var item outcome
-		if timeout != nil {
-			wait := time.Until(deadline)
-			if wait <= 0 {
-				logging.Warn(fmt.Sprintf("⏱️ The web search for «%s» ran out of its %s: keeping the sources that answered", query, logDuration(*timeout)))
-				break collect
+		select {
+		case item := <-resultsChannel:
+			results = append(results, item.found...)
+			if item.failure != "" {
+				// Aggregate per cycle instead of logging once per query.
+				engineFailuresMu.Lock()
+				engineFailures[item.failure]++
+				engineFailuresMu.Unlock()
 			}
-			select {
-			case item = <-resultsChannel:
-			case <-time.After(wait):
-				logging.Warn(fmt.Sprintf("⏱️ The web search for «%s» ran out of its %s: keeping the sources that answered", query, logDuration(*timeout)))
-				break collect
-			}
-		} else {
-			item = <-resultsChannel
-		}
-		results = append(results, item.found...)
-		if item.failure != "" {
-			// Aggregate per cycle instead of logging once per query.
-			engineFailuresMu.Lock()
-			engineFailures[item.failure]++
-			engineFailuresMu.Unlock()
+		case <-ctx.Done():
+			// The caller gave up: return what is already here. Every engine
+			// still sends into the buffered channel, so none is left blocked.
+			break collect
 		}
 	}
 	seen := map[string]struct{}{}
