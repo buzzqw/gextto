@@ -139,8 +139,11 @@ type uiSettingField struct {
 	// stays in its own section and explains what is missing.
 	Blocked     bool
 	BlockedNote string
-	// Options is set for Kind=="select": a fixed list to choose from.
+	// Options is set for Kind=="select" and Kind=="langcombo": a fixed list to
+	// choose from. Custom marks a langcombo whose value is not in the list: the
+	// free-text field is shown with the stored code.
 	Options []uiFormOption
+	Custom  bool
 	// Week is set for Kind=="week": the per-day bandwidth schedule rows.
 	Week []uiWeekRow
 	// Hint is the descriptive tooltip shown on the label (ported from rextto).
@@ -1359,10 +1362,20 @@ func uiApplySettingMeta(field *uiSettingField, stored string) {
 				options = append([]uiFormOption{{Value: selected, Label: selected + " (personalizzata)", Selected: true}}, options...)
 			}
 			field.Kind, field.Options = "select", options
-		case "combo":
-			// A text field with suggestions: the list is a convenience, a code
-			// that is not listed can still be typed.
-			field.Kind, field.Options = "combo", meta.Options
+		case "langcombo":
+			// A native dropdown with an «Other language…» entry that reveals a
+			// free-text field, so any ISO 639 code can be typed.
+			selected := strings.TrimSpace(field.Value)
+			options := make([]uiFormOption, 0, len(meta.Options)+1)
+			found := false
+			for _, option := range meta.Options {
+				option.Selected = option.Value == selected
+				found = found || option.Selected
+				options = append(options, option)
+			}
+			options = append(options, uiFormOption{Value: "__custom__", Label: "Altra lingua…", Selected: !found})
+			field.Kind, field.Options = "langcombo", options
+			field.Custom = !found
 		}
 		// The stored value alone cannot tell a boolean or a number when the key
 		// was never saved or uses another spelling ("1"): the default can.

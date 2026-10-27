@@ -339,7 +339,7 @@ func TestAudioCleanupBlockedInSettingsWhenToolsMissing(t *testing.T) {
 	}
 }
 
-func TestAudioCleanupLanguageIsAComboWithSuggestions(t *testing.T) {
+func TestAudioCleanupLanguageIsADropdownWithCustomOption(t *testing.T) {
 	state := newTestAppState(t)
 	server := httptest.NewServer(Router(state))
 	t.Cleanup(server.Close)
@@ -348,19 +348,27 @@ func TestAudioCleanupLanguageIsAComboWithSuggestions(t *testing.T) {
 	if code != http.StatusOK {
 		t.Fatalf("settings page -> %d", code)
 	}
-	if !strings.Contains(body, `list="list-audio_cleanup_language"`) {
-		t.Fatal("the language field is not a combo with suggestions")
+	if !strings.Contains(body, "data-v2-lang-combo") {
+		t.Fatal("the language field is not a dropdown")
 	}
-	if !strings.Contains(body, `<option value="ita">Italiano</option>`) {
-		t.Fatal("the Italian suggestion is missing")
+	if !strings.Contains(body, `<option value="ita" selected>Italiano (ita)</option>`) {
+		t.Fatal("the Italian option is missing or not selected")
+	}
+	if !strings.Contains(body, `value="__custom__"`) || !strings.Contains(body, "data-v2-lang-custom") {
+		t.Fatal("the free-text «other language» option is missing")
 	}
 	index := strings.Index(body, `id="input-audio_cleanup_language"`)
 	if index < 0 {
-		t.Fatal("the language input is missing")
+		t.Fatal("the language field is missing")
 	}
-	tag := body[strings.LastIndex(body[:index], "<input") : index+strings.Index(body[index:], ">")]
-	if !strings.Contains(tag, "list=") || strings.Contains(tag, "disabled") {
-		t.Fatalf("the language field must stay a free-text input with suggestions: %s", tag)
+	start := strings.LastIndex(body[:index], "<select")
+	end := index + strings.Index(body[index:], ">")
+	if start < 0 || end <= index {
+		t.Fatal("cannot read the language select tag")
+	}
+	tag := body[start : end+1]
+	if !strings.Contains(tag, `name="value"`) || strings.Contains(tag, "disabled") {
+		t.Fatalf("the language dropdown must be editable: %s", tag)
 	}
 }
 

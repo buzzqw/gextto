@@ -1152,8 +1152,45 @@
       toggle.checked = storageGet("gextto_settings_keys") === "1";
       showKeys(toggle.checked);
     }
+    syncLanguageCombos(document);
     refreshAll();
   }
+
+  // The audio language is a native dropdown with an «Other language…» entry:
+  // choosing it reveals a free-text field, so any ISO 639 code can be typed.
+  function applyLanguageCombo(select, input, focus) {
+    var custom = select.value === "__custom__";
+    input.hidden = !custom;
+    if (custom) {
+      select.removeAttribute("name");
+      input.setAttribute("name", "value");
+      if (focus) input.focus();
+    } else {
+      select.setAttribute("name", "value");
+      input.removeAttribute("name");
+      input.value = "";
+    }
+  }
+
+  function syncLanguageCombos(root) {
+    var scope = root && root.querySelectorAll ? root : document;
+    var selects = scope.querySelectorAll("[data-v2-lang-combo]");
+    for (var i = 0; i < selects.length; i++) {
+      var select = selects[i];
+      var input = select.parentNode ? select.parentNode.querySelector("[data-v2-lang-custom]") : null;
+      if (!input) continue;
+      if (select.getAttribute("data-v2-lang-ready") !== "1") {
+        select.setAttribute("data-v2-lang-ready", "1");
+        (function (select, input) {
+          select.addEventListener("change", function () { applyLanguageCombo(select, input, true); });
+        })(select, input);
+      }
+      applyLanguageCombo(select, input, false);
+    }
+  }
+  document.addEventListener("htmx:afterSwap", function (event) {
+    syncLanguageCombos(event.target || document);
+  });
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", initSettingsView);
   else initSettingsView();
 

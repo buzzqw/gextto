@@ -141,7 +141,7 @@ var uiSettingMetaByKey = map[string]uiSettingMeta{
 
 	// Libreria e rinomina
 	"rename_verify_interval": {Unit: "ore"},
-	"audio_cleanup_language": {Kind: "combo", DependsOn: "audio_cleanup", Options: []uiFormOption{
+	"audio_cleanup_language": {Kind: "langcombo", DependsOn: "audio_cleanup", Options: []uiFormOption{
 		{Value: "ita", Label: "Italiano"},
 		{Value: "eng", Label: "English"},
 		{Value: "fra", Label: "Français"},
