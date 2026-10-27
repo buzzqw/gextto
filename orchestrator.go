@@ -880,7 +880,8 @@ func RunCycleDomain(
 		// actually downloaded. The decision needs only the hash: opening the
 		// link of every candidate cost minutes per cycle, and an aggregator that
 		// counts downloads (indexarr) counted each candidate as one. An
-		// in-progress pack still needs its file list for the decision.
+		// in-progress pack is checked against its file list after the link is
+		// opened (staleInProgressPack).
 		//
 		// A link without a declared hash (a MirCrew topic whose magnet indexarr
 		// fetches on demand) gets a provisional identity derived from the link:
@@ -889,8 +890,7 @@ func RunCycleDomain(
 		// is then made again with the real hash (blocklist, live downloads).
 		deferredHash := ""
 		provisional := false
-		if strings.TrimSpace(release.Magnet) == "" && release.TorrentURL != nil && IsTorrentURL(*release.TorrentURL) &&
-			!(release.IsPack && release.InProgressEpisodes > 0) {
+		if strings.TrimSpace(release.Magnet) == "" && release.TorrentURL != nil && IsTorrentURL(*release.TorrentURL) {
 			if hash := canonicalInfoHash(release.InfoHash); len(hash) == 40 {
 				deferredHash = hash
 			} else {
@@ -1047,29 +1047,39 @@ func RunCycleDomain(
 		// the .torrent is updated. The file list is already here: keep the pack
 		// when it holds at least one episode we need (a gap or a real upgrade),
 		// and skip it only when everything inside is already better on disk.
-		if torrentFile != nil && release.IsPack && release.InProgressEpisodes > 0 {
-			reason, checkErr := incompletePackReason(
-				*torrentFile, &release, gapEpisodes, archiveIndex,
-				releaseScore, cfg.UpgradeMinScoreDiff, cfg.UpgradeUntilScore, forbidUpgrade, cfg.Settings,
-			)
-			if checkErr != nil {
-				logging.Debug("could not read the pack torrent contents",
-					"target", releaseTarget(&release), "error", checkErr)
-			} else if reason != "" {
-				logging.Warn(fmt.Sprintf("⏭️ Season pack skipped — «%s» · %s", release.Title, reason),
-					"target", releaseTarget(&release))
-				if !cfg.DryRun {
-					if release.TorrentURL != nil {
-						if qerr := db.QuarantineTorrentLink(*release.TorrentURL, reason, time.Now(), 7*24*time.Hour); qerr != nil {
-							logging.Debug("could not quarantine the stale pack link", "error", qerr)
+		// staleInProgressPack reads the file list of an in-progress pack and
+		// skips it when everything inside is already better on disk. It can
+		// only refuse, so a deferred link is checked once it is opened for a
+		// release that would be downloaded.
+		staleInProgressPack := func() bool {
+			if torrentFile != nil && release.IsPack && release.InProgressEpisodes > 0 {
+				reason, checkErr := incompletePackReason(
+					*torrentFile, &release, gapEpisodes, archiveIndex,
+					releaseScore, cfg.UpgradeMinScoreDiff, cfg.UpgradeUntilScore, forbidUpgrade, cfg.Settings,
+				)
+				if checkErr != nil {
+					logging.Debug("could not read the pack torrent contents",
+						"target", releaseTarget(&release), "error", checkErr)
+				} else if reason != "" {
+					logging.Warn(fmt.Sprintf("⏭️ Season pack skipped — «%s» · %s", release.Title, reason),
+						"target", releaseTarget(&release))
+					if !cfg.DryRun {
+						if release.TorrentURL != nil {
+							if qerr := db.QuarantineTorrentLink(*release.TorrentURL, reason, time.Now(), 7*24*time.Hour); qerr != nil {
+								logging.Debug("could not quarantine the stale pack link", "error", qerr)
+							}
+						}
+						if berr := db.Blocklist(&release, "in_progress_pack_incomplete"); berr != nil {
+							logging.Debug("could not blocklist the stale pack", "error", berr)
 						}
 					}
-					if berr := db.Blocklist(&release, "in_progress_pack_incomplete"); berr != nil {
-						logging.Debug("could not blocklist the stale pack", "error", berr)
-					}
+					return true
 				}
-				continue
 			}
+			return false
+		}
+		if staleInProgressPack() {
+			continue
 		}
 		approvalContext := &models.ApprovalContext{
 			Archive:           archiveIndex,
@@ -1148,6 +1158,9 @@ func RunCycleDomain(
 				}
 			}
 			if deferredHash != "" && !resolveDeferred() {
+				continue
+			}
+			if staleInProgressPack() {
 				continue
 			}
 			add := func() (bool, error) {
