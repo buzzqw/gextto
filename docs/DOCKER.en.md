@@ -350,6 +350,8 @@ them or copy them with an incremental tool.
   `gextto-update.path` service: update with `git pull` + compose.
 - Jackett/Prowlarr/FlareSolverr/aMule have their own updates; `AUTO_UPDATE=true`
   for Jackett is convenient but can change version without your intervention.
+- The image ships `ffprobe`, `ffmpeg` and `mkvmerge`: they serve the optional
+  audio cleanup and do not need to be installed by hand.
 - The image builds from source: the first build takes a few minutes and pulls
   `golang:1.27` and Debian slim.
 

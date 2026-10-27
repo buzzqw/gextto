@@ -2980,6 +2980,9 @@ func tev_completeTorrentOptions(cfg *Config, db *Database, torrents TorrentSessi
 	// the release replaced existing files, one combined "updated" line is
 	// emitted instead of the import line plus one line per removed file.
 	logLibraryImport(cfg, event.Hash, logTarget(release), size, processedPath, suffix, replaced)
+	// The file is in its final place: queue the optional audio cleanup. It runs
+	// in its own worker and never blocks the torrent event loop.
+	scheduleAudioCleanup(cfg, db, processedPath, event.Hash, release.Series)
 	if !preserveSource && cfg.Transfer.AutoRemoveCompleted && (recoveredExisting || (renamedSet && !SamePath(processedPath, path))) {
 		removed, err := torrents.Remove(event.Hash, false)
 		if err != nil {

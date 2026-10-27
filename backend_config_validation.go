@@ -185,7 +185,37 @@ func validateSettingValue(key, value string, cfg *Config) error {
 			return err
 		}
 	}
+	if key == audioCleanupLanguageSetting {
+		if err := validateAudioCleanupLanguage(value); err != nil {
+			return err
+		}
+	}
+	if key == audioCleanupPolicySetting {
+		switch strings.ToLower(strings.TrimSpace(value)) {
+		case "", audioCleanupPolicyAll, audioCleanupPolicyBest, audioCleanupPolicyFirst:
+		default:
+			return fmt.Errorf("%s must be all, best or first", key)
+		}
+	}
 	return validatePathSetting(key, value, cfg)
+}
+
+// validateAudioCleanupLanguage accepts an empty value (the default, "ita") or
+// a two/three letter ISO 639 code. The tag is compared case-insensitively.
+func validateAudioCleanupLanguage(value string) error {
+	code := strings.ToLower(strings.TrimSpace(value))
+	if code == "" {
+		return nil
+	}
+	if len(code) < 2 || len(code) > 3 {
+		return fmt.Errorf("%s must be a two or three letter language code", audioCleanupLanguageSetting)
+	}
+	for _, character := range code {
+		if character < 'a' || character > 'z' {
+			return fmt.Errorf("%s must be a two or three letter language code", audioCleanupLanguageSetting)
+		}
+	}
+	return nil
 }
 
 // validateLatencyTarget accepts an empty value (the built-in targets), a host

@@ -35,6 +35,10 @@ altro.
 - La libreria è protetta da hardlink durante il seeding, da una guardia dei
   mount che distingue una condivisione smontata da file cancellati e da un
   cestino.
+- Le tracce audio straniere si possono togliere all'importazione: un'opzione
+  tiene solo quelle nella tua lingua (italiano per impostazione predefinita) e
+  rimuove le altre, copiando video e audio senza ricodificare e controllando
+  durata e sincronizzazione prima di sostituire il file.
 - Il motore è codice Go nostro: BitTorrent v1, v2 e ibrido, TCP e uTP su una
   porta, holepunching, DHT IPv6, streaming. Su uno swarm reale di Ubuntu scarica
   a 9,3–9,4 MB/s dove libtorrent arriva a 6,3–7,1 MB/s, e a riposo occupa

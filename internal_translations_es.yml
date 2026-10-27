@@ -6009,3 +6009,13 @@ spa:
   "Valori attuali": "Valores actuales"
   "Scegliendo un profilo e salvando, i suoi valori vengono copiati in questo titolo; le esclusioni qui sotto si sommano alle sue.": "Al elegir un perfil y guardar, sus valores se copian en este título; las exclusiones de abajo se suman a las del perfil."
   "Scegliendo un profilo e salvando, qualità, audio minimo, lingua, sottotitoli e permetti upgrade del profilo vengono copiati in questo titolo": "Al elegir un perfil y guardar, la calidad, el audio mínimo, el idioma, los subtítulos y permitir mejoras del perfil se copian en este título"
+
+  # Audio cleanup after import
+  "Rimuovi le tracce audio in altre lingue": "Quitar las pistas de audio en otros idiomas"
+  "Lingua audio da tenere": "Idioma de audio que se conserva"
+  "Se ci sono più tracce nella lingua scelta": "Si hay varias pistas en el idioma elegido"
+  "Dopo l'importazione tiene solo le tracce audio nella lingua scelta e rimuove le altre, senza ricodificare il video. Il file viene toccato solo se c'è più di una traccia audio e almeno una è dichiarata nella lingua scelta.": "Tras la importación conserva solo las pistas de audio en el idioma elegido y elimina las demás, sin recodificar el vídeo. Un archivo solo se toca si tiene más de una pista de audio y al menos una está declarada en el idioma elegido."
+  "Codice della lingua da tenere, ad esempio ita o eng. Vengono conservate solo le tracce con questo tag.": "Código del idioma que se conserva, por ejemplo ita o eng. Solo se conservan las pistas con esta etiqueta."
+  "Cosa fare quando ci sono più tracce nella lingua scelta: tenerle tutte, solo la migliore o solo la prima.": "Qué hacer cuando hay varias pistas en el idioma elegido: conservarlas todas, solo la mejor o solo la primera."
+  "Solo la migliore": "Solo la mejor"
+  "Solo la prima": "Solo la primera"

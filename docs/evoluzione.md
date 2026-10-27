@@ -104,6 +104,22 @@ the name in the download leaves the archive intact (only the seed is interrupted
 and the data disappears only by deleting both. Movies are not involved: they are
 already moved with the torrent, so there is no copy.
 
+**Audio cleanup on import** (`audio_cleanup.go`, `audio_cleanup`, off by default).
+After a file reaches its final library path, a single background worker keeps only
+the audio tracks tagged in the chosen language (`audio_cleanup_language`, `ita` by
+default) and removes the others. Every stream is copied — with mkvmerge for
+Matroska, ffmpeg elsewhere — so no video frame or audio packet is re-encoded and
+quality, HDR metadata and the A/V timing stay the source's. A file with one audio
+track, with no track tagged in the language, or with nothing to remove is left
+alone; a track whose language is missing is never guessed from its title. The
+remux goes to a hidden sibling and replaces the library file only after a re-probe
+proves the stream set, the duration and the per-track A/V offsets; the rename swaps
+the directory entry, so a hardlink shared with a seeding torrent keeps the old
+inode and the swarm is not disturbed. The queue runs outside the torrent event
+loop. The score cannot turn into a re-download: the name is untouched, and the size
+bonus (at most 100 points) and the audio codec read from the remaining track stay
+below the 200-point upgrade threshold and outside `technicalScoreGain`.
+
 **Upgrades** (`upgrade_until.go`, `upgrade_until_score`, 0 = off): with a score at
 or above the threshold the copy is no longer replaced; REPACK and PROPER are always
 accepted. It applies to the cycle, missing episodes, season packs and movies, and

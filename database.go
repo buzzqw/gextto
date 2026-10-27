@@ -2358,7 +2358,7 @@ func (d *Database) IsBlocklisted(hash string) (bool, error) {
 // are no longer a block, so the cycle must be free to pick those releases.
 func (d *Database) BlocklistedHashes() (map[string]struct{}, error) {
 	d.purgeExpiredBlocklist(time.Now())
-	rows, err := d.db.Query("SELECT lower(magnet_hash) FROM blocklist WHERE " + blocklistAliveSQL, nowSQLite())
+	rows, err := d.db.Query("SELECT lower(magnet_hash) FROM blocklist WHERE "+blocklistAliveSQL, nowSQLite())
 	if err != nil {
 		return nil, err
 	}
@@ -4925,6 +4925,25 @@ func (d *Database) MarkTorrentCompletedUnarchived(hash, name string) (bool, erro
 
 // MarkReleaseCompleted marks a torrent as completed, updating every episode
 // covered by the release.
+// UpdateArchivedSizeAfterCleanup keeps the archived row's size aligned with a
+// file whose foreign audio tracks were removed after the import. Episodes are
+// matched by archive path (one row per file, packs included); the movie by its
+// magnet hash, since the movies table does not store the file path.
+func (d *Database) UpdateArchivedSizeAfterCleanup(hash, path string, sizeBytes int64) error {
+	if d == nil || sizeBytes <= 0 {
+		return nil
+	}
+	if _, err := d.db.Exec("UPDATE episodes SET size_bytes=?1 WHERE archive_path=?2", sizeBytes, path); err != nil {
+		return err
+	}
+	if strings.TrimSpace(hash) != "" {
+		if _, err := d.db.Exec("UPDATE movies SET size_bytes=?1 WHERE magnet_hash=?2", sizeBytes, strings.ToLower(hash)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (d *Database) MarkReleaseCompleted(release *models.Release, path string, sizeBytes int64) error {
 	tx, err := d.db.Begin()
 	if err != nil {

@@ -354,6 +354,8 @@ escludili o copiali con uno strumento incrementale.
 - I container Jackett/Prowlarr/FlareSolverr/aMule hanno i loro aggiornamenti;
   `AUTO_UPDATE=true` per Jackett è comodo ma può cambiare versione senza un
   tuo intervento.
+- L'immagine include `ffprobe`, `ffmpeg` e `mkvmerge`: servono alla pulizia
+  opzionale delle tracce audio e non vanno installati a mano.
 - L'immagine compila dal sorgente: il primo build richiede qualche minuto e
   scarica l'immagine `golang:1.27` e Debian slim.
 

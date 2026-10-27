@@ -6055,3 +6055,13 @@ fra:
   "Valori attuali": "Valeurs actuelles"
   "Scegliendo un profilo e salvando, i suoi valori vengono copiati in questo titolo; le esclusioni qui sotto si sommano alle sue.": "Choisir un profil et enregistrer copie ses valeurs dans ce titre ; les exclusions ci-dessous s'ajoutent à celles du profil."
   "Scegliendo un profilo e salvando, qualità, audio minimo, lingua, sottotitoli e permetti upgrade del profilo vengono copiati in questo titolo": "Choisir un profil et enregistrer copie dans ce titre la qualité, l'audio minimum, la langue, les sous-titres et l'autorisation des mises à niveau du profil"
+
+  # Audio cleanup after import
+  "Rimuovi le tracce audio in altre lingue": "Supprimer les pistes audio dans d'autres langues"
+  "Lingua audio da tenere": "Langue audio à conserver"
+  "Se ci sono più tracce nella lingua scelta": "S'il y a plusieurs pistes dans la langue choisie"
+  "Dopo l'importazione tiene solo le tracce audio nella lingua scelta e rimuove le altre, senza ricodificare il video. Il file viene toccato solo se c'è più di una traccia audio e almeno una è dichiarata nella lingua scelta.": "Après l'importation, ne conserve que les pistes audio dans la langue choisie et supprime les autres, sans réencoder la vidéo. Un fichier n'est modifié que s'il contient plus d'une piste audio et qu'au moins une est déclarée dans la langue choisie."
+  "Codice della lingua da tenere, ad esempio ita o eng. Vengono conservate solo le tracce con questo tag.": "Code de la langue à conserver, par exemple ita ou eng. Seules les pistes portant ce tag sont conservées."
+  "Cosa fare quando ci sono più tracce nella lingua scelta: tenerle tutte, solo la migliore o solo la prima.": "Que faire lorsqu'il y a plusieurs pistes dans la langue choisie : les conserver toutes, seulement la meilleure ou seulement la première."
+  "Solo la migliore": "Seulement la meilleure"
+  "Solo la prima": "Seulement la première"

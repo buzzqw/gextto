@@ -28,6 +28,33 @@ import (
 	"github.com/buzzqw/gextto/internal/models"
 )
 
+// AudioTrackInfo is one audio stream exactly as the container declares it.
+// The release name is only a hint; these fields are what the file really
+// carries, so the audio cleanup can decide without trusting any filename.
+type AudioTrackInfo struct {
+	Index      int     `json:"index"`
+	Codec      string  `json:"codec"`
+	Language   string  `json:"language,omitempty"`
+	Title      string  `json:"title,omitempty"`
+	Channels   int64   `json:"channels,omitempty"`
+	Bitrate    int64   `json:"bitrate,omitempty"`
+	Default    bool    `json:"default,omitempty"`
+	Forced     bool    `json:"forced,omitempty"`
+	Commentary bool    `json:"commentary,omitempty"`
+	StartTime  float64 `json:"start_time,omitempty"`
+	HasStart   bool    `json:"-"`
+}
+
+// StreamInfo is one stream of the container, in file order. The cleanup needs
+// the full list to prove that nothing but the chosen audio tracks changed.
+type StreamInfo struct {
+	Index     int     `json:"index"`
+	Type      string  `json:"type"`
+	Codec     string  `json:"codec"`
+	StartTime float64 `json:"start_time,omitempty"`
+	HasStart  bool    `json:"-"`
+}
+
 // MediaInfo is the parsed result of probing a media file.
 type MediaInfo struct {
 	Container string `json:"container"`
@@ -37,11 +64,13 @@ type MediaInfo struct {
 	VideoCodec string `json:"video_codec"`
 	BitDepth   int64  `json:"bit_depth"`
 	// HDR is "", "HDR10", "HDR10+", "HLG", "DV", "DV HDR10", ...
-	HDR               string   `json:"hdr"`
-	AudioCodec        string   `json:"audio_codec"`
-	AudioChannels     int64    `json:"audio_channels"`
-	AudioLanguages    []string `json:"audio_languages"`
-	SubtitleLanguages []string `json:"subtitle_languages"`
+	HDR               string           `json:"hdr"`
+	AudioCodec        string           `json:"audio_codec"`
+	AudioChannels     int64            `json:"audio_channels"`
+	AudioLanguages    []string         `json:"audio_languages"`
+	AudioTracks       []AudioTrackInfo `json:"audio_tracks,omitempty"`
+	Streams           []StreamInfo     `json:"streams,omitempty"`
+	SubtitleLanguages []string         `json:"subtitle_languages"`
 	// RuntimeSeconds is the duration in seconds, rounded.
 	RuntimeSeconds int64 `json:"runtime_seconds"`
 }
@@ -174,6 +203,23 @@ func miText(value any) (string, bool) {
 
 func miStreamText(stream map[string]any, key string) (string, bool) {
 	return miText(stream[key])
+}
+
+// miTextValue is miStreamText without the presence flag, for struct fields.
+func miTextValue(stream map[string]any, key string) string {
+	value, _ := miStreamText(stream, key)
+	return value
+}
+
+// miIntTextValue reads an integer that ffprobe encodes as a JSON string
+// (`bit_rate`, the `BPS` tag) with a numeric fallback.
+func miIntTextValue(value any) int64 {
+	if text, ok := miText(value); ok {
+		if parsed, err := strconv.ParseInt(text, 10, 64); err == nil {
+			return parsed
+		}
+	}
+	return miAsI64(value)
 }
 
 // miAsI64 mirrors encoding/json's `Value::as_i64`: only integer JSON numbers
@@ -323,6 +369,25 @@ func ParseFfprobe(root map[string]any) MediaInfo {
 		info.HDR = HDRFromStream(video)
 	}
 
+	for _, item := range streams {
+		stream, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		entry := StreamInfo{
+			Index: int(miAsI64(stream["index"])),
+			Type:  miTextValue(stream, "codec_type"),
+			Codec: miTextValue(stream, "codec_name"),
+		}
+		if start, ok := miText(stream["start_time"]); ok {
+			if seconds, err := strconv.ParseFloat(start, 64); err == nil {
+				entry.StartTime = seconds
+				entry.HasStart = true
+			}
+		}
+		info.Streams = append(info.Streams, entry)
+	}
+
 	var firstAudio map[string]any
 	for _, item := range streams {
 		stream, ok := item.(map[string]any)
@@ -336,14 +401,39 @@ func ParseFfprobe(root map[string]any) MediaInfo {
 		if firstAudio == nil {
 			firstAudio = stream
 		}
+		track := AudioTrackInfo{
+			Index:    int(miAsI64(stream["index"])),
+			Codec:    miTextValue(stream, "codec_name"),
+			Channels: miAsI64(stream["channels"]),
+			Bitrate:  miIntTextValue(stream["bit_rate"]),
+		}
 		if tags, ok := stream["tags"].(map[string]any); ok {
 			if language, ok := miText(tags["language"]); ok {
-				language = strings.ToLower(language)
-				if !slices.Contains(info.AudioLanguages, language) {
-					info.AudioLanguages = append(info.AudioLanguages, language)
+				track.Language = strings.ToLower(language)
+				if !slices.Contains(info.AudioLanguages, track.Language) {
+					info.AudioLanguages = append(info.AudioLanguages, track.Language)
 				}
 			}
+			if title, ok := miText(tags["title"]); ok {
+				track.Title = title
+				lower := strings.ToLower(title)
+				track.Commentary = strings.Contains(lower, "comment") || strings.Contains(lower, "commento")
+			}
+			if track.Bitrate == 0 {
+				track.Bitrate = miIntTextValue(tags["BPS"])
+			}
 		}
+		if disposition, ok := stream["disposition"].(map[string]any); ok {
+			track.Default = miAsI64(disposition["default"]) != 0
+			track.Forced = miAsI64(disposition["forced"]) != 0
+		}
+		if start, ok := miText(stream["start_time"]); ok {
+			if seconds, err := strconv.ParseFloat(start, 64); err == nil {
+				track.StartTime = seconds
+				track.HasStart = true
+			}
+		}
+		info.AudioTracks = append(info.AudioTracks, track)
 	}
 	if firstAudio != nil {
 		info.AudioCodec, _ = miStreamText(firstAudio, "codec_name")

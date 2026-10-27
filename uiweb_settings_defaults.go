@@ -166,6 +166,9 @@ var uiSettingDefaults = map[string]string{
 	"quality_profiles":       "[]",
 	"cleanup_upgrades":       "true",
 	"movies_flat_files":      "yes",
+	"audio_cleanup":          "false",
+	"audio_cleanup_language": "ita",
+	"audio_cleanup_policy":   "all",
 	"upgrade_min_score_diff": "200",
 	"upgrade_until_score":    "0",
 	// A stuck download keeps retrying, but after this long without progress the

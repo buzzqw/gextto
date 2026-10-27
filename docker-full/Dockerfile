@@ -29,8 +29,13 @@ RUN CGO_ENABLED=0 go build -trimpath -buildvcs=false \
 FROM debian:12-slim
 # tini reaps the managed gx-torrent child and forwards SIGTERM; curl is used by
 # the compose healthcheck and by people troubleshooting in the container.
+# ffmpeg brings ffprobe (the media probe) and the remux fallback; MKVToolNix
+# brings mkvmerge, the preferred remuxer for Matroska. Together they implement
+# the optional audio cleanup: without them Gextto starts normally and simply
+# leaves the files alone.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates curl tini tzdata \
+    && apt-get install -y --no-install-recommends \
+        ca-certificates curl ffmpeg mkvtoolnix tini tzdata \
     && rm -rf /var/lib/apt/lists/* \
     && useradd -r -u 1000 -m -d /data gextto \
     && mkdir -p /data /media /library /amule/incoming /amule/temp \

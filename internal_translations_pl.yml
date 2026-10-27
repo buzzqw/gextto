@@ -6003,3 +6003,13 @@ pol:
   "Valori attuali": "Bieżące wartości"
   "Scegliendo un profilo e salvando, i suoi valori vengono copiati in questo titolo; le esclusioni qui sotto si sommano alle sue.": "Wybranie profilu i zapis kopiuje jego wartości do tego tytułu; wykluczenia poniżej dodają się do wykluczeń profilu."
   "Scegliendo un profilo e salvando, qualità, audio minimo, lingua, sottotitoli e permetti upgrade del profilo vengono copiati in questo titolo": "Wybranie profilu i zapis kopiuje do tego tytułu jakość, minimalne audio, język, napisy i zezwolenie na ulepszenia z profilu"
+
+  # Audio cleanup after import
+  "Rimuovi le tracce audio in altre lingue": "Usuwaj ścieżki audio w innych językach"
+  "Lingua audio da tenere": "Język audio do zachowania"
+  "Se ci sono più tracce nella lingua scelta": "Gdy jest kilka ścieżek w wybranym języku"
+  "Dopo l'importazione tiene solo le tracce audio nella lingua scelta e rimuove le altre, senza ricodificare il video. Il file viene toccato solo se c'è più di una traccia audio e almeno una è dichiarata nella lingua scelta.": "Po imporcie zachowuje tylko ścieżki audio w wybranym języku, a pozostałe usuwa, bez ponownego kodowania wideo. Plik jest modyfikowany tylko wtedy, gdy ma więcej niż jedną ścieżkę audio i co najmniej jedna jest oznaczona wybranym językiem."
+  "Codice della lingua da tenere, ad esempio ita o eng. Vengono conservate solo le tracce con questo tag.": "Kod języka do zachowania, na przykład ita lub eng. Zachowywane są tylko ścieżki z tym znacznikiem."
+  "Cosa fare quando ci sono più tracce nella lingua scelta: tenerle tutte, solo la migliore o solo la prima.": "Co zrobić, gdy w wybranym języku jest kilka ścieżek: zachować wszystkie, tylko najlepszą lub tylko pierwszą."
+  "Solo la migliore": "Tylko najlepszą"
+  "Solo la prima": "Tylko pierwszą"

@@ -34,6 +34,10 @@ one.
   release keeps its reason in the log.
 - The library is protected by hardlinks while seeding, a mount guard that tells
   an unmounted share from deleted files, and a recycle bin.
+- Foreign audio can be dropped on import: an optional setting keeps only the
+  tracks in your language (Italian by default) and removes the rest, copying
+  video and audio without re-encoding and checking duration and A/V sync before
+  replacing the file.
 - The engine is our own Go code: BitTorrent v1, v2 and hybrid, TCP and uTP on
   one port, holepunching, IPv6 DHT, streaming. On a real Ubuntu swarm it
   downloads at 9.3–9.4 MB/s where libtorrent gets 6.3–7.1 MB/s, and it idles at

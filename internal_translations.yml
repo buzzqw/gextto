@@ -5399,3 +5399,13 @@ eng:
   "Valori attuali": "Current values"
   "Scegliendo un profilo e salvando, i suoi valori vengono copiati in questo titolo; le esclusioni qui sotto si sommano alle sue.": "Choosing a profile and saving copies its values into this title; the exclusions below are added to the profile's."
   "Scegliendo un profilo e salvando, qualità, audio minimo, lingua, sottotitoli e permetti upgrade del profilo vengono copiati in questo titolo": "Choosing a profile and saving copies its quality, minimum audio, language, subtitles and allow-upgrades into this title"
+
+  # Audio cleanup after import
+  "Rimuovi le tracce audio in altre lingue": "Remove audio tracks in other languages"
+  "Lingua audio da tenere": "Audio language to keep"
+  "Se ci sono più tracce nella lingua scelta": "When several tracks are in the chosen language"
+  "Dopo l'importazione tiene solo le tracce audio nella lingua scelta e rimuove le altre, senza ricodificare il video. Il file viene toccato solo se c'è più di una traccia audio e almeno una è dichiarata nella lingua scelta.": "After importing, keeps only the audio tracks in the chosen language and removes the others, without re-encoding the video. A file is touched only when it has more than one audio track and at least one is tagged in the chosen language."
+  "Codice della lingua da tenere, ad esempio ita o eng. Vengono conservate solo le tracce con questo tag.": "Code of the language to keep, for example ita or eng. Only tracks with this tag are kept."
+  "Cosa fare quando ci sono più tracce nella lingua scelta: tenerle tutte, solo la migliore o solo la prima.": "What to do when several tracks are in the chosen language: keep them all, only the best one or only the first."
+  "Solo la migliore": "Only the best"
+  "Solo la prima": "Only the first"
