@@ -14,6 +14,10 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
 [changelog.en.md](changelog.en.md). Per segnalazioni:
 [issue su GitHub](https://github.com/buzzqw/gextto/issues).
 
+## 27 ottobre 2026
+
+- **Con indexarr, gli errori di download indicano il sito giusto.** indexarr ora dice per ogni risultato da quale sito arriva, come già faceva Jackett, e Gextto lo mostra come «indexarr:MirCrew». Quando un sito dietro indexarr continua a fallire (per esempio un login MirCrew scaduto), il log non dice più «indexarr continua a fallire: accedi di nuovo o disattivalo», che portava fuori strada: dice quale sito fallisce e di controllarne il login dentro indexarr. Lo stesso vale per i siti dietro Jackett e Prowlarr. Gextto riconosce indexarr anche sulla sua nuova porta 8788 (la 8484 resta riconosciuta) e la procedura guidata propone il nuovo indirizzo. Se in indexarr attivi «Fai passare i download magnet da indexarr», Gextto continua a funzionare come prima: scarica dal link di indexarr, segue il rinvio al magnet e riconosce i doppioni dall'infohash; indexarr può così contare quali fonti ti hanno davvero dato i download.
+
 ## 26 ottobre 2026
 
 - **La velocità Auto non resta più bloccata al minimo con la linea libera.** Ogni sei ore il riferimento del ping «a riposo» scade e Gextto fa una breve prova rallentando i download. Se il ping era già buono, la prova non poteva farlo scendere, e Gextto lo leggeva come «la linea è ancora intasata»: tagliava la velocità fino a 128 KB/s e la teneva lì per tutto il download, con il ping perfetto. Bisognava passare a mano su *Senza limite* e poi tornare su Auto. Ora una prova che parte da un ping buono e non lo abbassa restituisce la linea a Gextto, e il limite cade anche quando resta solo il traffico di fondo della rete DHT. In più, quando il ping peggiora, Auto ricorda la velocità alla quale è successo e si ferma appena sotto, riprovando una volta al minuto, invece di risalire subito oltre: su una linea satura il ping resta alto per una frazione del tempo di prima, con la stessa banda usata. Non c'è nulla da configurare.

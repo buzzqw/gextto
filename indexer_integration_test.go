@@ -42,6 +42,17 @@ func TestExplicitManagerOverridesHeuristic(t *testing.T) {
 	if !isManagerSource(heuristicIndexarr) {
 		t.Fatal("indexarr must be a manager source (no FlareSolverr)")
 	}
+	// The port alone identifies indexarr: 8788 is the current default, 8484
+	// the old one.
+	for _, address := range []string{"http://host:8788", "http://host:8484"} {
+		byPort := IndexerConfig{Name: "aggregator", URL: address, Enabled: true}
+		if got := managerKind(byPort); got != ManagerIndexarr {
+			t.Errorf("%s manager = %q, want indexarr", address, got)
+		}
+		if !isManagerSource(byPort) {
+			t.Errorf("%s must be a manager source", address)
+		}
+	}
 }
 
 func TestIndexerTestHandler(t *testing.T) {

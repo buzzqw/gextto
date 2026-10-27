@@ -1033,7 +1033,7 @@ tab, è nell'[Appendice A](#appendice-a-riferimento--configurazione).
   `http://host:9117`, e la relativa API key: Gextto costruisce l'endpoint Torznab
   `/api/v2.0/indexers/all/results/torznab/api`. Il controllo di salute usa
   `t=caps` con la stessa API key, quindi verifica l'API e non soltanto la home di
-  Jackett. Per indexarr l'URL base è di solito `http://host:8484`: la ricerca
+  Jackett. Per indexarr l'URL base è di solito `http://host:8788`: la ricerca
   aggregata usa l'endpoint nativo `/api`, mentre l'elenco degli indexer e le
   singole lane usano i percorsi compatibili con Jackett. Nei risultati la
   sorgente può apparire come `jackett:NomeTracker` o `indexarr:NomeTracker`.
@@ -1294,7 +1294,7 @@ Per indexarr:
 1. copia la API key da indexarr;
 2. in Gextto aggiungi una riga alla lista *Indexer Torznab* e scegli **indexarr**
    come tipo;
-3. inserisci l'URL base, ad esempio `http://indexarr:8484`, e la API key;
+3. inserisci l'URL base, ad esempio `http://indexarr:8788`, e la API key;
 4. salva e premi **Verifica**;
 5. controlla *Salute → Stato API*.
 
@@ -1305,7 +1305,7 @@ così il proprio timeout e la propria salute, senza che il più lento blocchi gl
 altri. Se l'elenco non è leggibile torna alla ricerca aggregata: per Jackett è
 `/api/v2.0/indexers/all/results/torznab/api`, per indexarr è il suo `/api`. Non
 aggiungere il percorso Torznab all'URL base: basta l'indirizzo del manager
-(Prowlarr normalmente sulla porta `9696`, indexarr sulla `8484`). Un percorso
+(Prowlarr normalmente sulla porta `9696`, indexarr sulla `8788`). Un percorso
 Torznab personalizzato già completo va lasciato come endpoint esplicito.
 
 Un indexer può essere raggiungibile ma non sano: per esempio Jackett può
@@ -1849,14 +1849,14 @@ dopo 30 secondi.
 - **Una sorgente non risponde** — controlla *Integrazioni → Verifica sorgenti*
   e il pannello stato sorgenti; per Jackett verifica URL base, API key e che
   almeno un indexer sia abilitato in Jackett; per indexarr controlla la API key
-  e che l'URL base sia quello di indexarr (di solito porta `8484`). Gli errori
+  e che l'URL base sia quello di indexarr (di solito porta `8788`). Gli errori
   Torznab vengono mostrati anche quando il manager risponde HTTP 200. I siti
   protetti da Cloudflare richiedono un FlareSolverr funzionante.
 - **Jackett è raggiungibile ma mostra errore API** — copia nuovamente la API key,
   controlla che almeno un indexer sia abilitato in Jackett e verifica che l'URL
   inserito in Gextto sia quello base corretto. Non aggiungere due volte il
   percorso `/api/v2.0/indexers/all/results/torznab/api`. Lo stesso vale per
-  indexarr: usa l'URL base (`http://host:8484`), non un percorso già completo,
+  indexarr: usa l'URL base (`http://host:8788`), non un percorso già completo,
   e scegli **indexarr** come tipo.
 - **Non scarica nulla** — verifica la *modalità attiva*, che serie/film siano
   abilitati, e controlla filtri qualità/lingua e il limite di spazio libero.

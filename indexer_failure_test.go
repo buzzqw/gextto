@@ -80,3 +80,15 @@ func TestNoteTorrentLinkFailureCountsDistinctLinks(t *testing.T) {
 		t.Fatalf("a source-less failure was counted: %+v", failures)
 	}
 }
+
+func TestAggregatedSourceNamesTheSite(t *testing.T) {
+	manager, site, ok := aggregatedSource("indexarr:MirCrew")
+	if !ok || manager != "indexarr" || site != "MirCrew" {
+		t.Fatalf("aggregatedSource = %q, %q, %v", manager, site, ok)
+	}
+	for _, plain := range []string{"mircrew", "indexarr:", ":site", ""} {
+		if _, _, ok := aggregatedSource(plain); ok {
+			t.Errorf("%q split as an aggregated source", plain)
+		}
+	}
+}

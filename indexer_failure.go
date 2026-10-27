@@ -96,8 +96,16 @@ func notifyIndexerFailure(notifier *Notifier, source string, failures int, reaso
 		source = "indexer"
 	}
 	reason = indexerFailureReason(reason)
-	logging.Warn(fmt.Sprintf("⚠️ The indexer %s keeps failing (%s did not download: %s): sign in to it again or disable it in the searches",
-		source, countLabel(failures, "link", "links"), reason))
+	if manager, site, ok := aggregatedSource(source); ok {
+		// Results of an aggregator (indexarr, Jackett, Prowlarr) carry the site
+		// behind them: the login to fix is that site's, inside the aggregator,
+		// not the aggregator itself.
+		logging.Warn(fmt.Sprintf("⚠️ The site %s keeps failing through %s (%s did not download: %s): open %s and check that site's login, or disable it there",
+			site, manager, countLabel(failures, "link", "links"), reason, manager))
+	} else {
+		logging.Warn(fmt.Sprintf("⚠️ The indexer %s keeps failing (%s did not download: %s): sign in to it again or disable it in the searches",
+			source, countLabel(failures, "link", "links"), reason))
+	}
 	if !claimIndexerFailureNotice(source, time.Now()) || notifier == nil {
 		return
 	}
@@ -121,4 +129,17 @@ func boundReason(reason string, limit int) string {
 		return reason
 	}
 	return strings.TrimSpace(string(runes[:limit])) + "…"
+}
+
+// aggregatedSource splits a "manager:site" source, the form the Torznab
+// parser gives to a result that names its site (Jackett's jackettindexer
+// attribute, also written by indexarr).
+func aggregatedSource(source string) (string, string, bool) {
+	manager, site, found := strings.Cut(source, ":")
+	manager = strings.TrimSpace(manager)
+	site = strings.TrimSpace(site)
+	if !found || manager == "" || site == "" {
+		return "", "", false
+	}
+	return manager, site, true
 }

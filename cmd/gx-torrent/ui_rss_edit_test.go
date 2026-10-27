@@ -107,7 +107,7 @@ func TestSetupPageOffersFolderPickerAndIndexerPresets(t *testing.T) {
 		`class="browse"`, `data-target="download-dir"`, `data-target="temp-dir"`,
 		`id="browse-overlay"`, `/ui/browse-dir`,
 		`id="indexer-name"`, `name="indexer-name"`,
-		`data-url="http://127.0.0.1:9696"`, `data-url="http://127.0.0.1:9117"`, `data-url="http://127.0.0.1:8484"`,
+		`data-url="http://127.0.0.1:9696"`, `data-url="http://127.0.0.1:9117"`, `data-url="http://127.0.0.1:8788"`,
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("the wizard is missing %q", want)
@@ -134,7 +134,7 @@ func TestSetupFillsIndexerURLFromPreset(t *testing.T) {
 		t.Fatalf("setup: %d", rec.Code)
 	}
 	got = d.opts.Settings.Get(indexersSettingKey, "")
-	if !strings.Contains(got, `"url":"http://127.0.0.1:8484"`) {
+	if !strings.Contains(got, `"url":"http://127.0.0.1:8788"`) {
 		t.Fatalf("indexers = %q, want the indexarr preset URL", got)
 	}
 }

@@ -624,7 +624,7 @@ clearable, so that an archive installation keeps the downloads next to itself. T
 **Indexer** field is a drop-down of the already supported products (Prowlarr,
 Jackett, indexarr, MIRCrew, others): choosing Prowlarr, Jackett or indexarr
 pre-fills the URL with their usual local address and port
-(`127.0.0.1:9696` / `127.0.0.1:9117` / `127.0.0.1:8484`), still editable. The wizard writes
+(`127.0.0.1:9696` / `127.0.0.1:9117` / `127.0.0.1:8788`), still editable. The wizard writes
 `settings.json` and marks the setup as completed; language and bandwidth limits apply
 immediately (if the limits are not applied, the error is shown on the page and the
 setup is not marked as completed), folder and port at the next startup (the

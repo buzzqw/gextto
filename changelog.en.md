@@ -13,6 +13,10 @@ manual is online: [English](docs/MANUAL.en.md) ·
 [italiano](docs/MANUAL.it.md). For reports:
 [GitHub issues](https://github.com/buzzqw/gextto/issues).
 
+## 27 October 2026
+
+- **With indexarr, download errors name the right site.** indexarr now says which site each result comes from, as Jackett already did, and Gextto shows it as "indexarr:MirCrew". When a site behind indexarr keeps failing (for example an expired MirCrew login), the log no longer says "indexarr keeps failing: sign in again or disable it", which was misleading: it names the failing site and tells you to check its login inside indexarr. The same applies to sites behind Jackett and Prowlarr. Gextto also recognises indexarr on its new port 8788 (8484 is still recognised) and the setup wizard suggests the new address. If you enable "Send magnet downloads through indexarr" in indexarr, Gextto keeps working as before: it downloads from indexarr's link, follows the redirect to the magnet and spots duplicates by infohash, so indexarr can count which sources actually gave you your downloads.
+
 ## 26 October 2026
 
 - **Auto speed no longer stays stuck at the minimum on a free line.** Every six hours the reference of the "at rest" ping expires and Gextto runs a short trial, slowing the downloads down. If the ping was already good, the trial could not lower it, and Gextto read that as "the line is still congested": it cut the speed down to 128 KB/s and kept it there for the whole download, with a perfect ping. You had to switch to *No limit* by hand and then back to Auto. Now a trial that starts from a good ping and does not lower it gives the line back to Gextto, and the cap is also dropped when only the background traffic of the DHT network is left. Also, when the ping degrades, Auto remembers the speed at which it happened and settles just below it, trying again once a minute, instead of climbing straight back over it: on a saturated line the ping is high for a fraction of the time it was, with the same bandwidth used. There is nothing to configure.

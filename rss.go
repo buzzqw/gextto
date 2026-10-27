@@ -1695,8 +1695,10 @@ func managerKind(indexer IndexerConfig) string {
 		strings.Contains(lowerName, "prowlarr") {
 		return ManagerProwlarr
 	}
-	if strings.Contains(lowerURL, "indexarr") || strings.Contains(lowerURL, ":8484") ||
-		strings.Contains(lowerName, "indexarr") {
+	// indexarr listens on 8788 since it moved away from qBittorrent's port;
+	// 8484 is its old default and still identifies older installations.
+	if strings.Contains(lowerURL, "indexarr") || strings.Contains(lowerURL, ":8788") ||
+		strings.Contains(lowerURL, ":8484") || strings.Contains(lowerName, "indexarr") {
 		return ManagerIndexarr
 	}
 	return ManagerJackett
@@ -1728,7 +1730,7 @@ func isManagerSource(indexer IndexerConfig) bool {
 	return strings.Contains(lowerURL, "prowlarr") || strings.Contains(lowerURL, "jackett") ||
 		strings.Contains(lowerURL, "indexarr") ||
 		strings.Contains(lowerURL, ":9696") || strings.Contains(lowerURL, ":9117") ||
-		strings.Contains(lowerURL, ":8484") ||
+		strings.Contains(lowerURL, ":8788") || strings.Contains(lowerURL, ":8484") ||
 		strings.Contains(lowerName, "prowlarr") || strings.Contains(lowerName, "jackett") ||
 		strings.Contains(lowerName, "indexarr")
 }
