@@ -1298,12 +1298,16 @@ Per indexarr:
 4. salva e premi **Verifica**;
 5. controlla *Salute → Stato API*.
 
-Con Jackett, Prowlarr e indexarr Gextto legge l'elenco degli indexer dal manager
+Con Jackett e Prowlarr Gextto legge l'elenco degli indexer dal manager
 e ne interroga **uno alla volta** (l'endpoint Torznab del singolo indexer per
-Jackett e indexarr, la ricerca per `indexerIds` per Prowlarr): ogni tracker ha
+Jackett, la ricerca per `indexerIds` per Prowlarr): ogni tracker ha
 così il proprio timeout e la propria salute, senza che il più lento blocchi gli
 altri. Se l'elenco non è leggibile torna alla ricerca aggregata: per Jackett è
-`/api/v2.0/indexers/all/results/torznab/api`, per indexarr è il suo `/api`. Non
+`/api/v2.0/indexers/all/results/torznab/api`. **indexarr** invece si interroga
+sempre in una volta sola, con una ricerca per titolo sul suo `/api`: interroga da
+sé le sue fonti in parallelo, unisce i doppioni e dice per ogni risultato da quale
+sito arriva, quindi espanderlo in una ricerca per sito moltiplicherebbe solo le
+richieste. Non
 aggiungere il percorso Torznab all'URL base: basta l'indirizzo del manager
 (Prowlarr normalmente sulla porta `9696`, indexarr sulla `8788`). Un percorso
 Torznab personalizzato già completo va lasciato come endpoint esplicito.
@@ -2703,7 +2707,8 @@ base (es. `http://192.168.1.10:9118`) o con quello che finisce in `/api`: Gextto
 usa `<base>/api`, la stessa regola di gx-torrent, quindi l'indirizzo da scrivere
 è identico nei due. Le ricerche automatiche hanno un budget di **100 secondi per titolo**: un
 indexer dietro Prowlarr può attendere fino a **90 secondi** (Prowlarr serve una
-ricerca alla volta per indexer), un indexer diretto, Jackett o indexarr fino a **45**. Una
+ricerca alla volta per indexer), un indexer diretto o dietro Jackett fino a **45**,
+indexarr fino a **90** (una ricerca per titolo su tutto il manager). Una
 lane la cui coda supererebbe il budget viene saltata senza contare come errore,
 così un tracker lento non ferma il ciclo. Se un indexer su un indirizzo locale o di rete privata chiude la
 connessione o non risponde, Gextto **non** ritenta via FlareSolverr (Cloudflare

@@ -315,6 +315,13 @@ broken indexer disabled in the manager, answers in 2–4 s with 156–240. Six c
 aggregates with timeouts snowball until even a single search waits 120 s, recovered
 once the backlog drained.
 
+**indexarr as one aggregate** (27 October 2026, live library on the N97, the run that
+changed the behaviour): expanded into one lane per indexarr source, every title became
+46 requests and a 104-title search took 3 min 40 s, held back by the two slots of its
+slowest source; through indexarr's own `/api` the same title is answered in 2.6 s, the
+indexer phase goes from 3 min 40 s to 1 min 23 s and the whole cycle from 12 to 5
+minutes.
+
 **Choices behind these figures.** Each manager indexer is a lane, read from the manager
 at run time (10 min cache, never copied into the configuration): Prowlarr
 `/api/v1/search?indexerIds=`, Jackett the indexer's Torznab endpoint. Prowlarr serves

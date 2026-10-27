@@ -1261,12 +1261,16 @@ For indexarr:
 4. save and click **Verify**;
 5. check *Health → API status*.
 
-With Jackett, Prowlarr and indexarr Gextto reads the manager's indexer list and
-queries them **one at a time** (the single indexer's Torznab endpoint for Jackett
-and indexarr, the `indexerIds` search for Prowlarr): each tracker gets its own
+With Jackett and Prowlarr Gextto reads the manager's indexer list and
+queries them **one at a time** (the single indexer's Torznab endpoint for Jackett,
+the `indexerIds` search for Prowlarr): each tracker gets its own
 timeout and health, so the slowest one no longer holds the others. If the list
-cannot be read it falls back to the aggregate search: `/api/v2.0/indexers/all/results/torznab/api`
-for Jackett, its native `/api` for indexarr. Do not append the Torznab path to
+cannot be read it falls back to the aggregate search
+`/api/v2.0/indexers/all/results/torznab/api` for Jackett. **indexarr** is always
+queried in a single pass instead, one search per title on its `/api`: it queries
+its own sources in parallel, merges duplicates and names the site of every
+result, so expanding it into one search per site would only multiply the
+requests. Do not append the Torznab path to
 the base URL: the manager's address is enough (Prowlarr normally on port `9696`,
 indexarr on `8788`). A custom full Torznab endpoint stays an explicit endpoint.
 
@@ -2625,7 +2629,8 @@ its base address (e.g. `http://192.168.1.10:9118`) or one ending in `/api`:
 Gextto uses `<base>/api`, the same rule as gx-torrent, so the address to type is
 identical in both. Automatic searches have a **100-second budget per title**: an indexer behind
 Prowlarr may wait up to **90 seconds** (Prowlarr serves one search at a time per
-indexer), a direct indexer, Jackett or indexarr up to **45**. A lane whose queue would
+indexer), a direct indexer or one behind Jackett up to **45**, indexarr up to
+**90** (one search per title over the whole manager). A lane whose queue would
 outlast the budget is skipped without counting as a failure, so one slow tracker
 does not stop the cycle. When an
 indexer on a local or private-network address drops the connection or does not

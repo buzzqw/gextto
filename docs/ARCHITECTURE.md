@@ -98,13 +98,23 @@ qBittorrent-nox.
 | `config.go` | the `Config` model: read/write, generation, defaults. |
 | `database.go` | SQLite store: series, movies, torrents, feed history, provider backoff. |
 | `sqlite.go` | opening a SQLite DB with shared pragmas. |
-| `indexer_lanes.go` | Jackett, Prowlarr and indexarr searched one indexer at a time: lanes read from the manager's list (10 min cache), per-lane slots, timeout, health and budget skip, cross-manager dedup by tracker. |
+| `indexer_lanes.go` | Jackett and Prowlarr searched one indexer at a time: lanes read from the manager's list (10 min cache), per-lane slots, timeout, health and budget skip, cross-manager dedup by tracker. indexarr is one aggregate lane instead: it already queries its own sources in parallel and names the site of each result. |
 | `archive.go` | durable catalogue of archived releases (SQLite + FTS5 on titles): one row per magnet, stable indexer guid (for `.torrent`-only listings) or exact URL (`magnet_key`, a 16-byte digest) and one per infohash (`idx_archive_hash`; a new listing of a known torrent refreshes its row). The guid keeps one row when Jackett regenerates its download URL at every request. |
 | `archive_sql.go` | small engine for the curated `scripts/sql/*.sql` operations: loads them (embedded), validates one read-only SELECT or one DELETE, binds the selected language marker arrays to `:tokens`/`:raw`, runs previews and transactional deletions. |
 | `migrate.go` | migration of the data directory. |
 | `backup.go` | database backups (manual and scheduled). |
 | `library_alias.go` | helper for library persistence. |
 | `web_inputs_extra.go` | input structs of the web APIs. |
+| `transfer_policy.go` | transfer policy shared by every engine: download path (RAM disk included), free-space budget, torrent diagnosis and path helpers. |
+| `seed_rules.go` | how long a completed torrent keeps seeding: the torrent's own limits, then the first seed rule matching its origin, then the global ones. |
+| `speed_mode.go`, `speed_schedule.go` | the speed rule as one choice (Auto, fixed limits, per-weekday schedule) and the per-day table it is read from and written to. |
+| `setting_provenance.go` | where a setting's value came from (`auto`/`manual`), so the guided tuning never proposes over a value the operator saved. |
+| `restart_cause.go` | why the daemon started again, so a restart that followed an update is not read as instability by the tuning. |
+| `tuning.go`, `system_probe.go`, `sysinfo.go` | guided tuning: the machine facts read (memory, CPU, volumes, filesystem type, device ids), never written, and the proposal built from them with its reason. |
+| `null_engine.go` | placeholder backend when no transfer engine could be activated: lists nothing and refuses every operation with a capability error, so UI and automation keep working. |
+| `backend_config_validation.go` | field-specific validation of the engine settings from the settings page, instead of a typo surfacing at the next restart. |
+| `torrent_restore.go` | downloads lost by an unclean stop, added again from their magnet in the folder that already holds their data. |
+| `pending_queue.go` | the delay-profile queue with how long each title has waited, read-only, for the observability panel. |
 
 ### Media pipeline (release → archive)
 | File | Role |
@@ -119,6 +129,14 @@ qBittorrent-nox.
 | `mediainfo.go` | actual inspection of files via `ffprobe`. |
 | `comics.go` | comics: scraper, DB, HTTP download, dedicated cycle. |
 | `comicinfo.go` | writing of `ComicInfo.xml` into directly downloaded CBZ files. |
+| `audio_cleanup.go` | audio tracks in other languages removed after the import: video and the kept audio copied packet by packet, no re-encoding (mkvmerge for Matroska, ffmpeg otherwise), a re-probe of tracks, duration and A/V offsets before the library file is replaced. |
+| `mediainfo_gate.go` | an upgrade is confirmed by probing both files with ffprobe: an attribute the streams do not show (resolution, video codec, audio family and channels, HDR10/HLG) discards the release, blocklists it and restores the archived row. |
+| `manual_import.go` | manual import of a file already on disk: parse the name, match a configured series or movie, propose the archive destination, replace an existing copy only on request. |
+| `upgrade_impact.go` | "what would the next cycles replace?": the archived releases replayed through the series decision in dry-run. |
+| `pack_precheck.go` | an in-progress pack read from its `.torrent` file list before it is downloaded, so a pack that does not hold the wanted episode is not downloaded at all. |
+| `pack_inspector.go` | a pack inspected as soon as its metadata arrives (a magnet has none until the swarm answers): a pack with nothing useful is removed and its upgrade backup restored. |
+| `orphan_cleanup.go` | guided cleanup of the download folders: entries no live torrent owns and whose videos all have a library copy at equal or better quality. |
+| `fileops.go` | long-running copies and moves registered so a shutdown waits for them: no half-copied file left in the library. |
 
 ### Sources, search and metadata
 | File | Role |
@@ -130,6 +148,8 @@ qBittorrent-nox.
 | `uiweb_v2_ed2k.go` | the eD2k page: aMule status, servers, Kad, search, pasted links. |
 | `indexer_health.go` | indexer health (Prowlarr). |
 | `tmdb.go` / `tvdb.go` | TMDB and TheTVDB metadata. |
+| `series_metadata.go`, `tvdb_metadata.go` | where the series metadata comes from: TMDB when its key is set, otherwise TVDB with the same calls and result shapes. |
+| `anime.go` | absolute anime episode numbers mapped onto the seasons TMDB uses, for the series marked as anime. |
 | `integrations.go` | base URLs of the external integrations. |
 | `media_refresh.go` | targeted (per-folder) refresh of Jellyfin and Plex, with fallback to a full refresh. |
 | `calendar_ics.go` | iCal calendar `/feed/calendar.ics`: arrivals, original airings, local movie releases. |
@@ -175,6 +195,14 @@ qBittorrent-nox.
 | `health.go` | health report (dashboard/endpoint). |
 | `acquisition.go` + `web_handlers_acquisitions.go` | download history: the log lines with a torrent hash (field `acq: <id>` of `internal/logging`) saved in `acquisition_events`; `/api/acquisitions` API, *History* tab and 📜 in the UI. |
 | `health_monitor.go` | monitor that logs the `degraded` state with reason and recovery. |
+| `cycle_monitor.go` | warnings when a source keeps failing or no cycle has completed cleanly for too long, read from the same history the Health page shows. |
+| `provider_monitor.go` | the forum login of the `mircrew-indexer` service watched through its `/status`: it keeps answering Torznab requests with a broken login, so no cycle failure would reveal it. |
+| `security_origin.go` | cross-site state-changing requests refused (`net/http.CrossOriginProtection`), because the LAN bypasses the login. |
+| `update_check.go` | the in-app side of updates: `release.json`, the newer build and the commits it brings, and the update request the root unit acts on. |
+| `web_compress.go` | gzip of the HTML pages and the shared assets. |
+| `ed2k_api.go` | JSON API of the aMule integration (download queue and actions, bandwidth limits, aMule log) used by the TUI and the bandwidth menu. |
+| `local_process.go` | resource usage of an external process on this machine, for the aMule badge: nothing to read when aMule runs elsewhere. |
+| `log_text.go` | helpers for the user-facing log lines: short sentences, rounded numbers with units, titles instead of internal identifiers. |
 | `jobs.go` | background job manager. |
 
 ### Server-side UI (`uiweb` v2)
@@ -188,6 +216,9 @@ qBittorrent-nox.
 | `uiweb_settings.go`, `uiweb_settings_meta.go`, `uiweb_settings_defaults.go`, `uiweb_tooltips.go` | Configuration page: areas, sections and index with the panel (`Group`) of each setting; units, special values, control type and the toggle it depends on; defaults; descriptions. |
 | `uiweb_v2.go` | v2 shell (HTMX), fragment routing and rendering. |
 | `uiweb_v2_dashboard.go`, `uiweb_v2_downloads.go`, `uiweb_v2_detail.go`, `uiweb_v2_search.go`, `uiweb_v2_comics.go`, `uiweb_v2_maintenance.go`, `uiweb_v2_archive_sql.go` | dedicated v2 pages. |
+| `uiweb_v2_gaps.go`, `uiweb_v2_import.go`, `uiweb_v2_library_layout.go`, `uiweb_v2_ports.go` | *Missing* tab grouped by series and season, manual-import page, poster view of the library, peer-port panel. |
+| `uiweb_v2_settings_insights.go`, `uiweb_v2_settings_mode.go`, `uiweb_v2_tuning.go` | Configuration: read-only insights next to the controls, the Facilitata/Esperto switch, the *Gestione automatica* card. |
+| `uiweb_v2_theme.go`, `uiweb_bandwidth_history.go` | theme picker (saved themes on the server, the active one per browser) and the bandwidth chart of the dashboard. |
 | `uiweb_v2_sections.go` | pages composed of sections (Maintenance, Integrations). |
 | `uiweb_v2_settings_extras.go` | structured editors of the v2 Configuration. |
 | `uiweb_v2_table.go` | generic server-side table renderer. |
