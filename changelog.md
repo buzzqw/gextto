@@ -16,6 +16,8 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
 
 ## 27 ottobre 2026
 
+- **I link eD2k arrivano anche da indexarr.** Se in indexarr aggiungi una fonte eD2k (per esempio il forum DDUnlimited), i suoi risultati ora arrivano a Gextto come link `ed2k://` e non vengono più scartati perché non hanno un magnet o un `.torrent`. Gextto li mostra come rete eD2k nella ricerca e nell'archivio, e al momento dello scarico li accoda in aMule come quelli che trova da solo; il client torrent non viene toccato. Non c'è nulla da configurare: basta che la fonte sia abilitata in indexarr e che l'indexer indexarr sia già fra le sorgenti di Gextto.
+
 - **La ricerca web non taglia più tutte le fonti insieme dopo 15 secondi.** Prima c'era un unico budget di 15 secondi per tutte le fonti web della ricerca, e comprendeva anche l'attesa in coda: con otto motori e quattro posti, la seconda metà poteva non partire nemmeno. Ora ogni motore ha i suoi 15 secondi da quando inizia, quindi nessuno viene escluso solo perché era in attesa; le risposte già arrivate restano. Un singolo motore più lento di 15 secondi viene ancora lasciato indietro per quella ricerca, ma non ferma gli altri e non riempie più il log di avvisi: il dettaglio finisce nel log di debug.
 
 - **Una serie non ancora uscita non compare più fra i mancanti.** Se i metadati dicono che una serie è ancora «In produzione» (o pianificata), Gextto non considera mancanti le puntate annunciate: prima le ricavava dal numero previsto per la stagione e la scheda *Mancanti* mostrava serie che non erano ancora andate in onda. Lo stesso vale per una puntata con una data di messa in onda futura già conosciuta. I buchi veri restano quelli di sempre.

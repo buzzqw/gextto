@@ -1264,6 +1264,13 @@ For indexarr:
 4. save and click **Verify**;
 5. check *Health → API status*.
 
+An indexarr source with the eD2k protocol returns `ed2k://` links instead of
+magnets or `.torrent` files. Gextto recognises them from `<link>` (and from the
+`ed2k` attribute), shows them as the **eD2k** network and queues them in aMule
+when you download: they never go through the torrent client. The aggregate
+search includes them when the title is not already covered by a torrent; add
+`indexer_type=ed2k` to the Torznab request to see them all.
+
 With Jackett and Prowlarr Gextto reads the manager's indexer list and
 queries them **one at a time** (the single indexer's Torznab endpoint for Jackett,
 the `indexerIds` search for Prowlarr): each tracker gets its own

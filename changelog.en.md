@@ -15,6 +15,8 @@ manual is online: [English](docs/MANUAL.en.md) ·
 
 ## 27 October 2026
 
+- **eD2k links now arrive from indexarr too.** If you add an eD2k source in indexarr (for example the DDUnlimited forum), its results now reach Gextto as `ed2k://` links instead of being discarded because they carry no magnet or `.torrent`. Gextto shows them as the eD2k network in search and in the archive, and queues them in aMule when you download, exactly like the ones it finds by itself; the torrent client is not involved. Nothing to configure: the source only has to be enabled in indexarr and the indexarr indexer already among Gextto's sources.
+
 - **The web search no longer cuts every source together after 15 seconds.** There used to be a single 15-second budget for all the web sources of a search, and it included the wait in the queue: with eight engines and four slots, the second half might never start. Now each engine gets its own 15 seconds from when it starts, so none is skipped just because it was waiting; the answers already received are kept. A single engine slower than 15 seconds is still left behind for that search, but it no longer stops the others and no longer floods the log: the detail goes to the debug log.
 
 - **A series that has not aired yet no longer shows up as missing.** When the metadata says a series is still "In Production" (or planned), Gextto does not treat the announced episodes as missing: it used to infer them from the planned season count and the *Missing* tab listed series that had not aired yet. The same goes for an episode with a known future air date. Real gaps are unchanged.

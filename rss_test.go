@@ -568,3 +568,53 @@ func TestFeedRetryUsesIPv4AfterATransientFailure(t *testing.T) {
 		t.Fatalf("body = %q, want the IPv4 retry to have fetched it", body)
 	}
 }
+
+// An indexarr eD2k source puts the ed2k:// link in <link> (and in the ed2k
+// attribute). Gextto must keep it as an eD2k release, not discard it because
+// there is no magnet or .torrent, and aMule gets it at download time.
+func TestParseFeedBodyReadsEd2kLink(t *testing.T) {
+	const link = "ed2k://|file|Rare%20Movie%201974.avi|700000000|0123456789abcdef0123456789abcdef|/"
+	body := `<rss xmlns:torznab="http://torznab.com/schemas/2015/feed"><channel>
+		<item>
+			<title>Rare Movie 1974 1080p</title>
+			<guid>0123456789abcdef0123456789abcdef</guid>
+			<link>` + link + `</link>
+			<size>700000000</size>
+			<torznab:attr name="ed2k" value="` + link + `"/>
+		</item>
+	</channel></rss>`
+	releases, err := parse_feed_body(body, "indexarr:DDUnlimited")
+	if err != nil {
+		t.Fatalf("parse_feed_body: %v", err)
+	}
+	if len(releases) != 1 {
+		t.Fatalf("len = %d, want 1", len(releases))
+	}
+	release := releases[0]
+	if release.Ed2kLink != link || release.Network != "ed2k" {
+		t.Fatalf("release = %+v", release)
+	}
+	if release.Magnet != "" || release.TorrentURL != nil {
+		t.Fatalf("eD2k release also has a torrent identity: %+v", release)
+	}
+	if release.SizeBytes != 700000000 {
+		t.Fatalf("size = %d, want 700000000", release.SizeBytes)
+	}
+	if release.GUID != "0123456789abcdef0123456789abcdef" {
+		t.Fatalf("guid = %q", release.GUID)
+	}
+	if release.Seeders != -1 || release.Peers != -1 {
+		t.Fatalf("seeders/peers = %d/%d, want -1/-1", release.Seeders, release.Peers)
+	}
+}
+
+func TestIsEd2kURL(t *testing.T) {
+	if !IsEd2kURL("ed2k://|file|film.mkv|10|0123456789abcdef0123456789abcdef|/") {
+		t.Fatal("valid eD2k link rejected")
+	}
+	for _, value := range []string{"", "https://example.com/film.torrent", "magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef"} {
+		if IsEd2kURL(value) {
+			t.Errorf("accepted %q", value)
+		}
+	}
+}

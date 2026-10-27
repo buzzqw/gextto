@@ -757,6 +757,13 @@ func ParseReleaseAt(title, magnet, source string, discoveredAt time.Time) *model
 // IsTorrentURL is true per un link HTTP(S) che punta a un file `.torrent`.
 // Jackett does not use a `.torrent` suffix: its download links are
 // `/dl/<indexer>/?path=...`.
+// IsEd2kURL reports an eD2k file link. Torznab results from an indexarr eD2k
+// source carry it in <link> (and in the ed2k attribute); the release is queued
+// in aMule, not downloaded as a torrent.
+func IsEd2kURL(value string) bool {
+	return strings.HasPrefix(strings.ToLower(strings.TrimSpace(value)), "ed2k://|file|")
+}
+
 func IsTorrentURL(value string) bool {
 	value = strings.TrimSpace(value)
 	parsed, err := url.Parse(value)

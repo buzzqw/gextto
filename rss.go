@@ -85,6 +85,7 @@ func apply_torznab_attr(
 	peers **int64,
 	magnet *string,
 	infohash *string,
+	ed2kLink *string,
 ) {
 	name, _ := attribute(start, "name")
 	name = strings.ToLower(name)
@@ -96,6 +97,10 @@ func apply_torznab_attr(
 		}
 	case "infohash":
 		*infohash = strings.TrimSpace(value)
+	case "ed2k":
+		if IsEd2kURL(value) {
+			*ed2kLink = strings.TrimSpace(value)
+		}
 	case "seeders":
 		if parsed, err := strconv.ParseInt(strings.TrimSpace(value), 10, 64); err == nil && parsed >= 0 {
 			*seeders = &parsed
@@ -139,6 +144,7 @@ func parse_feed_body(body, source string) ([]models.Release, error) {
 	torrentURL := ""
 	guid := ""
 	infohash := ""
+	ed2kLink := ""
 	description := ""
 	itemSource := source
 	var sizeBytes *float64
@@ -171,6 +177,7 @@ func parse_feed_body(body, source string) ([]models.Release, error) {
 				torrentURL = ""
 				guid = ""
 				infohash = ""
+				ed2kLink = ""
 				description = ""
 				itemSource = source
 				sizeBytes = nil
@@ -206,7 +213,7 @@ func parse_feed_body(body, source string) ([]models.Release, error) {
 							itemSource = fmt.Sprintf("%s:%s", source, strings.TrimSpace(value))
 						}
 					}
-					apply_torznab_attr(event, &sizeBytes, &seeders, &peers, &magnet, &infohash)
+					apply_torznab_attr(event, &sizeBytes, &seeders, &peers, &magnet, &infohash, &ed2kLink)
 				}
 				value, ok := attribute(event, "href")
 				if !ok {
@@ -215,6 +222,8 @@ func parse_feed_body(body, source string) ([]models.Release, error) {
 				if ok {
 					if found := magnet_in(value); found != "" {
 						magnet = found
+					} else if IsEd2kURL(value) {
+						ed2kLink = strings.TrimSpace(value)
 					} else if IsTorrentURL(value) {
 						torrentURL = value
 					}
@@ -267,6 +276,9 @@ func parse_feed_body(body, source string) ([]models.Release, error) {
 				if found := magnet_in(value); found != "" {
 					magnet = found
 				}
+				if current == "link" && IsEd2kURL(value) {
+					ed2kLink = value
+				}
 				if current == "link" && IsTorrentURL(value) {
 					torrentURL = value
 				}
@@ -300,7 +312,26 @@ func parse_feed_body(body, source string) ([]models.Release, error) {
 					if magnet == "" && infohash != "" && torrentPtr == nil {
 						magnet = prowlarrInfoHashMagnet(infohash, title)
 					}
-					if release := ParseReleaseSource(title, magnet, torrentPtr, itemSource, discoveredAt); release != nil {
+					if ed2kLink != "" {
+						var size int64
+						if sizeBytes != nil {
+							size = int64(math.Round(*sizeBytes))
+						}
+						if release := ParseEd2kRelease(title, ed2kLink, itemSource, size, 0, discoveredAt); release != nil {
+							release.GUID = guid
+							if seeders != nil {
+								release.Seeders = *seeders
+							} else {
+								release.Seeders = -1
+							}
+							if peers != nil {
+								release.Peers = *peers
+							} else {
+								release.Peers = -1
+							}
+							out = append(out, *release)
+						}
+					} else if release := ParseReleaseSource(title, magnet, torrentPtr, itemSource, discoveredAt); release != nil {
 						release.GUID = guid
 						if magnet == "" {
 							// The link stays the transfer; the declared hash
