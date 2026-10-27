@@ -260,7 +260,8 @@ func TestFetchTorrentPlainNotFoundIsNotTransient(t *testing.T) {
 
 // TestRunCycleOpensDeclaredHashLinksOnlyForTheDownload pins the deferred link:
 // a candidate whose infohash the indexer declared is decided on that hash, and
-// its link is opened only when it is downloaded. An aggregator that counts
+// its link is opened only when it is downloaded. A link without a declared
+// hash is judged on its title first and opened only when it would be. An aggregator that counts
 // downloads (indexarr) must not count the candidates already in the library.
 func TestRunCycleOpensDeclaredHashLinksOnlyForTheDownload(t *testing.T) {
 	const libraryHash = "1111111111111111111111111111111111111111"
@@ -275,15 +276,15 @@ func TestRunCycleOpensDeclaredHashLinksOnlyForTheDownload(t *testing.T) {
 			fmt.Fprintf(w, `<rss xmlns:torznab="http://torznab.com/schemas/2015/feed"><channel>
 <item><title>Show.S01E01.1080p.WEB-DL.H.265</title><link>%[1]s/dl/1.torrent</link><size>900000000</size><torznab:attr name="infohash" value="%[2]s"/></item>
 <item><title>Show.S01E02.1080p.WEB-DL.H.265</title><link>%[1]s/dl/2.torrent</link><size>900000000</size><torznab:attr name="infohash" value="%[3]s"/></item>
+<item><title>Show.S01E01.720p.WEB-DL.H.264</title><link>%[1]s/dl/3.torrent</link><size>700000000</size></item>
+<item><title>Show.S01E03.1080p.WEB-DL.H.265</title><link>%[1]s/dl/4.torrent</link><size>900000000</size></item>
 </channel></rss>`, server.URL, libraryHash, newHash)
 		case strings.HasPrefix(r.URL.Path, "/dl/"):
 			mu.Lock()
 			opened[r.URL.Path]++
 			mu.Unlock()
-			hash := libraryHash
-			if r.URL.Path == "/dl/2.torrent" {
-				hash = newHash
-			}
+			hash := map[string]string{"/dl/1.torrent": libraryHash, "/dl/2.torrent": newHash,
+				"/dl/3.torrent": "3333333333333333333333333333333333333333", "/dl/4.torrent": "4444444444444444444444444444444444444444"}[r.URL.Path]
 			http.Redirect(w, r, "magnet:?xt=urn:btih:"+hash+"&dn=Show&tr=udp%3A%2F%2Ftracker.example.com%3A1337%2Fannounce", http.StatusFound)
 		default:
 			http.NotFound(w, r)
@@ -310,12 +311,14 @@ func TestRunCycleOpensDeclaredHashLinksOnlyForTheDownload(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RunCycleDomain: %v", err)
 	}
-	if stats.DownloadsStarted != 1 {
-		t.Fatalf("DownloadsStarted = %d, want 1", stats.DownloadsStarted)
+	if stats.DownloadsStarted != 2 {
+		t.Fatalf("DownloadsStarted = %d, want 2", stats.DownloadsStarted)
 	}
 	mu.Lock()
 	defer mu.Unlock()
-	if opened["/dl/1.torrent"] != 0 || opened["/dl/2.torrent"] != 1 {
-		t.Fatalf("links opened = %v, want only the downloaded one, once", opened)
+	// 1 and 3 are S01E01, already in the library; 2 declares its hash and 4
+	// does not, and both are downloaded.
+	if opened["/dl/1.torrent"] != 0 || opened["/dl/3.torrent"] != 0 || opened["/dl/2.torrent"] != 1 || opened["/dl/4.torrent"] != 1 {
+		t.Fatalf("links opened = %v, want only the downloaded ones, once each", opened)
 	}
 }

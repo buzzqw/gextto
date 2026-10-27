@@ -16,6 +16,8 @@ package gextto
 
 import (
 	"context"
+	"crypto/sha1"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"math"
@@ -879,13 +881,40 @@ func RunCycleDomain(
 		// link of every candidate cost minutes per cycle, and an aggregator that
 		// counts downloads (indexarr) counted each candidate as one. An
 		// in-progress pack still needs its file list for the decision.
+		//
+		// A link without a declared hash (a MirCrew topic whose magnet indexarr
+		// fetches on demand) gets a provisional identity derived from the link:
+		// the candidate is judged on its title and quality first, and the link
+		// is opened only when that judgement would download it. The decision
+		// is then made again with the real hash (blocklist, live downloads).
 		deferredHash := ""
+		provisional := false
 		if strings.TrimSpace(release.Magnet) == "" && release.TorrentURL != nil && IsTorrentURL(*release.TorrentURL) &&
 			!(release.IsPack && release.InProgressEpisodes > 0) {
 			if hash := canonicalInfoHash(release.InfoHash); len(hash) == 40 {
 				deferredHash = hash
-				release.Magnet = "magnet:?xt=urn:btih:" + hash
+			} else {
+				deferredHash = provisionalLinkHash(*release.TorrentURL)
+				provisional = true
 			}
+			release.Magnet = "magnet:?xt=urn:btih:" + deferredHash
+		}
+		// resolveDeferred opens the deferred link and replaces the hash-only
+		// magnet with the real one (and the .torrent file when there is one).
+		resolveDeferred := func() bool {
+			release.Magnet = ""
+			resolveLink()
+			if !linkResolved {
+				return false
+			}
+			if hash, ok := utils.MagnetHash(release.Magnet); ok && hash != deferredHash && !provisional {
+				logging.Debug("the downloaded torrent has another infohash than the one declared",
+					"target", releaseTarget(&release), "declared", deferredHash, "real", hash)
+			}
+			reconcilePackIdentityFromMagnet(&release)
+			deferredHash = ""
+			provisional = false
+			return true
 		}
 		if deferredHash == "" {
 			resolveLink()
@@ -923,11 +952,14 @@ func RunCycleDomain(
 				if delayMinutes > 0 && !bypassDelay {
 					logging.Info(fmt.Sprintf("⏳ %s: waiting %s before downloading, in case a better version appears",
 						logTarget(&release), logDuration(time.Duration(delayMinutes)*time.Minute)))
-					pending := release
-					if deferredHash != "" {
-						pending.Magnet = "" // the queue keeps the link, not the bare hash
+					// The queue keeps only the magnet: a provisional identity must
+					// become the real one first.
+					if provisional {
+						if !resolveDeferred() {
+							continue
+						}
 					}
-					if err := db.QueuePendingScored(&pending, delayMinutes, releaseScore); err != nil {
+					if err := db.QueuePendingScored(&release, delayMinutes, releaseScore); err != nil {
 						return nil, err
 					}
 					skips.Waiting++
@@ -940,11 +972,14 @@ func RunCycleDomain(
 			if delayMinutes > 0 && !bypassDelay {
 				logging.Info(fmt.Sprintf("⏳ %s: waiting %s before downloading, in case a better version appears",
 					logTarget(&release), logDuration(time.Duration(delayMinutes)*time.Minute)))
-				pending := release
-				if deferredHash != "" {
-					pending.Magnet = "" // the queue keeps the link, not the bare hash
+				// The queue keeps only the magnet: a provisional identity must
+				// become the real one first.
+				if provisional {
+					if !resolveDeferred() {
+						continue
+					}
 				}
-				if err := db.QueuePendingMovieScored(&pending, delayMinutes, releaseScore); err != nil {
+				if err := db.QueuePendingMovieScored(&release, delayMinutes, releaseScore); err != nil {
 					return nil, err
 				}
 				skips.Waiting++
@@ -1054,6 +1089,15 @@ func RunCycleDomain(
 		if err != nil {
 			return nil, err
 		}
+		if approved && provisional {
+			if !resolveDeferred() {
+				continue
+			}
+			approved, approvalReason, err = evaluateReleaseApproval(db, &release, releaseScore, cfg.UpgradeMinScoreDiff, approvalContext, forbidUpgrade, true)
+			if err != nil {
+				return nil, err
+			}
+		}
 		score := releaseScore
 		fromArchive := strings.HasPrefix(release.Source, "archive:")
 		decisionReason := approvalReason
@@ -1103,17 +1147,8 @@ func RunCycleDomain(
 					continue
 				}
 			}
-			if deferredHash != "" {
-				release.Magnet = ""
-				resolveLink()
-				if !linkResolved {
-					continue
-				}
-				if hash, ok := utils.MagnetHash(release.Magnet); ok && hash != deferredHash {
-					logging.Debug("the downloaded torrent has another infohash than the one declared",
-						"target", releaseTarget(&release), "declared", deferredHash, "real", hash)
-				}
-				reconcilePackIdentityFromMagnet(&release)
+			if deferredHash != "" && !resolveDeferred() {
+				continue
 			}
 			add := func() (bool, error) {
 				if release.Ed2kLink != "" {
@@ -1889,6 +1924,13 @@ func resolveTorrentURL(ctx context.Context, engine *Engine, cfg *Config, rawURL 
 		return "", "", err
 	}
 	return "magnet:?xt=urn:btih:" + hash, path, nil
+}
+
+// provisionalLinkHash is a stand-in identity for a .torrent link whose
+// infohash is not known yet: stable for the link, never a real torrent's.
+func provisionalLinkHash(link string) string {
+	sum := sha1.Sum([]byte("gextto-provisional\x00" + link))
+	return hex.EncodeToString(sum[:])
 }
 
 // promoteTorrentURLMagnet repairs a legacy/malformed release that carries a
