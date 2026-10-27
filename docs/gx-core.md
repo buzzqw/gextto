@@ -170,10 +170,10 @@ flowchart TB
 (`cmd/gx-torrent/contract_test.go`) run at every build to prove that Gextto's path is
 untouched — that test is the gate that makes everything else harmless. The **mode** is
 decided at startup and never changed. The **shared modules** — `internal/queue`,
-`internal/webui`, `internal/rss`, `internal/torznab` — are shared by the two uses;
-extracting RSS and search from Gextto's root package was a **code** consequence, not a
-choice of will, because the root package could not be imported by the daemon without
-dragging all of Gextto along. The **engine** is our own code and stays so
+`internal/webui`, `internal/rss`, `internal/torznab` — are shared by the two uses: they
+cannot live in Gextto's root package, which the daemon cannot import without dragging
+all of Gextto along. The
+**engine** is our own code and stays so
 ([`evoluzione.md`](evoluzione.md) §7): what it still needs is written here, not copied.
 
 ## 5. The RSS manager and Wanted
@@ -212,7 +212,7 @@ the state vocabulary is explained by a legend on the page.
 
 ## 6. What is missing and what is decided
 
-**Still open.**
+**Open.**
 
 - **Post-processing on completion**: notifications are complete (webhook, Telegram,
   e-mail; events `download_complete`, `feed_match`, `feed_error`); Gextto's completion
@@ -224,9 +224,9 @@ the state vocabulary is explained by a legend on the page.
   `container image`); publishing it to a registry is not done.
 - **Distribution targets**: Linux (amd64/arm64) and Windows are covered; macOS is not
   decided.
-- **Password hash**: bcrypt today, the same as Gextto; argon2id was floated as a
-  stronger option but is not adopted anywhere.
-- **Where the shared modules live**: inside this repository (today) or in a module of its
+- **Password hash**: bcrypt, the same as Gextto; argon2id is stronger but is not used
+  anywhere.
+- **Where the shared modules live**: inside this repository or in a module of its
   own.
 - **i18n**: the six languages of the page are assumed to be enough for the standalone
   product; extending the catalogue is not decided.

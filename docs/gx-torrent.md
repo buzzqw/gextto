@@ -1512,18 +1512,19 @@ Merging is **disabled if one side is a private torrent** (BEP 27): mixing
 private swarms violates the tracker rules. It is independent of the **BEP 38**
 hints, which serve to *report* the candidates.
 
-The merge has three phases:
+The merge matches by structure, in four ways:
 
-- **Phase 1 — identical layout.** Same `piece length`, same length and same
+- **Identical layout.** Same `piece length`, same length and same
   hashes at the same indices: the pieces are directly interchangeable and are
   matched piece by piece.
-- **Phase 2 — v2, per-file Merkle root.** The files are matched by their BEP 52
+- **v2, per-file Merkle root.** The files are matched by their BEP 52
   per-file `pieces root` (and length), so the same file is shared even when the
   two torrents use a **different piece length**: the destination piece's bytes
   are reassembled from the source's verified pieces and **each destination piece
-  is verified against its own hash** before it is written. There is no v1
-  different-layout heuristic (§6 of [`evoluzione.md`](evoluzione.md)).
-- **Phase 3 — v2, 16 KiB blocks.** When the source has verified only part of
+  is verified against its own hash** before it is written. There is no content
+  hash to match v1 files: the v1 cross-layout case is matched by path and length
+  (§6 of [`evoluzione.md`](evoluzione.md)).
+- **v2, 16 KiB blocks.** When the source has verified only part of
   the source pieces a destination piece spans, the verified blocks are written
   and only the missing blocks are requested from peers; the piece is verified
   whole once complete. If that check fails, the local blocks are dropped and
@@ -1531,7 +1532,7 @@ The merge has three phases:
   the Debian and Arch ISOs with a source 75% complete: 25% of the file from the
   network instead of 100% ([`measurements.md`](measurements.md) §4.8, harness
   `scripts/phase3-env.sh` + `TestMeasureMergePhase3`).
-- **Phase 4 — v1, a different piece length.** Two **v1** torrents matched by
+- **v1, a different piece length.** Two **v1** torrents matched by
   file **path and length** share **whole** pieces even when their piece grids
   differ: each destination piece is assembled from verified source pieces and
   checked against its own hash before it is written. v1 has no per-block hash,
