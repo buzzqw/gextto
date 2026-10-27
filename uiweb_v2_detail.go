@@ -103,6 +103,7 @@ func V2SeriesSave(w http.ResponseWriter, r *http.Request, s *AppState) {
 
 type v2SourceRow struct {
 	Title     string
+	Episode   string
 	Source    string
 	Origin    string
 	Score     int64
@@ -113,42 +114,20 @@ type v2SourceRow struct {
 }
 
 type v2SourcesView struct {
-	Label     string
-	Hint      string
-	OnlineURL string
-	Redirect  string
-	Results   []v2SourceRow
+	Label       string
+	Hint        string
+	OnlineURL   string
+	Redirect    string
+	ShowEpisode bool
+	Results     []v2SourceRow
 }
 
-// v2EpisodeResultsView builds the modal view for one episode, either from the
-// sources already collected (live=false) or from a fresh online search
-// (live=true).
-func v2EpisodeResultsView(s *AppState, series, season, episode string, live bool) v2SourcesView {
-	view := v2SourcesView{Label: "S" + season + "E" + episode}
-	if series == "" || season == "" || episode == "" {
-		return view
-	}
-	view.Redirect = "/?view=series&series=" + url.QueryEscape(series)
-	base := "/api/episodes/" + url.PathEscape(series) + "/" + url.PathEscape(season) + "/" + url.PathEscape(episode)
-	path := base + "/sources"
-	method := http.MethodGet
-	var body []byte
-	if live {
-		path = base + "/search"
-		method = http.MethodPost
-		body = []byte("{}")
-	}
-	raw, status := v2InternalJSON(s, method, path, nil, body)
-	if status >= 400 {
-		return view
-	}
-	var payload struct {
-		Results []map[string]any `json:"results"`
-	}
-	if json.Unmarshal(raw, &payload) != nil {
-		return view
-	}
-	for _, entry := range payload.Results {
+// v2SourceRowsFrom turns the JSON `results` of an episode search into rows.
+// The episode is filled when the payload carries it (the missing-episodes bulk
+// search), so the same table can name the episode each release belongs to.
+func v2SourceRowsFrom(entries []map[string]any) []v2SourceRow {
+	rows := make([]v2SourceRow, 0, len(entries))
+	for _, entry := range entries {
 		release, _ := entry["release"].(map[string]any)
 		if release == nil {
 			release = entry
@@ -182,11 +161,47 @@ func v2EpisodeResultsView(s *AppState, series, season, episode string, live bool
 			Magnet:    uiMagnetURL(link),
 			Key:       v2SourceKey(keyLink, title),
 		}
+		season, episode := int64(v2Float(entry["season"])), int64(v2Float(entry["episode"]))
+		if season > 0 && episode > 0 {
+			row.Episode = fmt.Sprintf("S%02dE%02d", season, episode)
+		}
 		if strings.TrimSpace(link) != "" || strings.TrimSpace(ed2kLink) != "" {
 			row.Body = string(body)
 		}
-		view.Results = append(view.Results, row)
+		rows = append(rows, row)
 	}
+	return rows
+}
+
+// v2EpisodeResultsView builds the modal view for one episode, either from the
+// sources already collected (live=false) or from a fresh online search
+// (live=true).
+func v2EpisodeResultsView(s *AppState, series, season, episode string, live bool) v2SourcesView {
+	view := v2SourcesView{Label: "S" + season + "E" + episode}
+	if series == "" || season == "" || episode == "" {
+		return view
+	}
+	view.Redirect = "/?view=series&series=" + url.QueryEscape(series)
+	base := "/api/episodes/" + url.PathEscape(series) + "/" + url.PathEscape(season) + "/" + url.PathEscape(episode)
+	path := base + "/sources"
+	method := http.MethodGet
+	var body []byte
+	if live {
+		path = base + "/search"
+		method = http.MethodPost
+		body = []byte("{}")
+	}
+	raw, status := v2InternalJSON(s, method, path, nil, body)
+	if status >= 400 {
+		return view
+	}
+	var payload struct {
+		Results []map[string]any `json:"results"`
+	}
+	if json.Unmarshal(raw, &payload) != nil {
+		return view
+	}
+	view.Results = v2SourceRowsFrom(payload.Results)
 	return view
 }
 

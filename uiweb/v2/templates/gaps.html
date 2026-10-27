@@ -21,7 +21,7 @@
 <section class="panel v2-gaps">
   <div class="panel-head"><h3>Puntate mancanti</h3><small class="muted">{{.Total}} <span>puntate in</span> {{.SeriesCount}} <span>serie</span></small></div>
   <div class="panel-body">
-    <p class="hint">Un clic su una puntata la cerca e mostra i risultati, ognuno con «Scarica». «Cerca mancanti» cerca tutte le puntate mancanti di quella serie.</p>
+    <p class="hint">Un clic su una puntata la cerca e mostra i risultati, ognuno con «Scarica». «Cerca mancanti» cerca fino a 15 puntate mancanti per serie e mostra qui i risultati: non scarica nulla da solo.</p>
     <form class="toolbar" method="get" action="/">
       <input type="hidden" name="view" value="series" />
       <input type="hidden" name="tab" value="gaps" />
@@ -35,11 +35,12 @@
       <div class="v2-gap-body">
         <form class="toolbar" hx-post="/series/gaps/search" hx-target="#v2-gap-result-{{$i}}" hx-swap="innerHTML" hx-disabled-elt="find button[type=submit]" hx-indicator="#v2-gap-busy-{{$i}}">
           <input type="hidden" name="series" value="{{$s.Name}}" />
-          <button class="btn sm primary" type="submit" title="Cerca tutte le puntate mancanti di questa serie sulle sorgenti configurate">Cerca mancanti</button>
+          <input type="hidden" name="filter" value="{{$.Filter}}" />
+          <button class="btn sm primary" type="submit" title="Cerca fino a 15 puntate mancanti di questa serie sulle sorgenti configurate">Cerca mancanti</button>
           <a class="btn sm" href="/?view=series&amp;series={{$s.PathName}}" title="Apri la scheda della serie">Apri la serie</a>
           <span id="v2-gap-busy-{{$i}}" class="htmx-indicator muted">Ricerca in corso, può richiedere un minuto…</span>
-          <span id="v2-gap-result-{{$i}}" role="status" aria-live="polite"></span>
         </form>
+        <div id="v2-gap-result-{{$i}}" class="v2-gap-result" role="status" aria-live="polite"></div>
         {{range $s.Seasons}}
         <div class="v2-gap-season">
           <span class="v2-gap-season-label"><span>Stagione</span> {{.Season}}</span>
@@ -54,5 +55,10 @@
 {{end}}
 
 {{define "v2_gap_search_result"}}
-{{if .Error}}<span class="err">{{.Error}}</span>{{else if not .Episodes}}<span class="ok">Nessuna puntata mancante da cercare.</span>{{else if .Results}}<span class="ok"><span>Trovati</span> {{.Results}} <span>risultati per</span> {{.Episodes}} <span>puntate: clicca una puntata per vederli e scaricarli.</span></span>{{else}}<span class="muted"><span>Nessun risultato per le</span> {{.Episodes}} <span>puntate cercate.</span></span>{{end}}
+{{if .Error}}<p class="err">{{.Error}}</p>{{else if not .Episodes}}<p class="ok">Nessuna puntata mancante da cercare.</p>{{else}}
+<p class="ok"><span>Risultati:</span> {{.Results}} · <span>Puntate cercate:</span> {{.Episodes}}.</p>
+{{if gt .Total .Episodes}}<p class="muted"><span>La serie ha</span> {{.Total}} <span>puntate mancanti: la ricerca copre le prime</span> {{.Episodes}}.</p>{{end}}
+{{if .Sources.Results}}{{template "v2_sources_rows" .Sources}}{{else}}<p class="muted"><span>Nessun risultato per le</span> {{.Episodes}} <span>puntate cercate.</span></p>{{end}}
+<p class="hint"><span>Nessun download automatico: scegli un risultato e premi «Scarica».</span></p>
+{{end}}
 {{end}}

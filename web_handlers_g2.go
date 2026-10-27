@@ -998,6 +998,7 @@ func SeriesSearchMissing(w http.ResponseWriter, r *http.Request, s *AppState) {
 		allGaps = nil
 	}
 	gaps := make([][2]int64, 0, len(allGaps))
+	totalMissing := 0
 	for _, gap := range allGaps {
 		if containsInt64(series.IgnoredSeasons, gap[0]) {
 			continue
@@ -1005,9 +1006,9 @@ func SeriesSearchMissing(w http.ResponseWriter, r *http.Request, s *AppState) {
 		if !SeasonAllowedForScan(series.Seasons, gap[0]) {
 			continue
 		}
-		gaps = append(gaps, gap)
-		if len(gaps) == 15 {
-			break
+		totalMissing++
+		if len(gaps) < 15 {
+			gaps = append(gaps, gap)
 		}
 	}
 	liveReleases := make([][]models.Release, len(gaps))
@@ -1114,6 +1115,26 @@ func SeriesSearchMissing(w http.ResponseWriter, r *http.Request, s *AppState) {
 	sort.SliceStable(results, func(i, j int) bool {
 		return cfg.ReleaseScore(&results[i].Release) > cfg.ReleaseScore(&results[j].Release)
 	})
+	// Persist what the search found, exactly like a single-episode search: the
+	// archive can then answer the next click locally instead of throwing the
+	// result away with this response.
+	if len(results) > 0 {
+		releases := make([]models.Release, 0, len(results))
+		for _, result := range results {
+			releases = append(releases, result.Release)
+		}
+		if s.archive != nil {
+			if err := s.archive.SaveBatch(releases, cfg); err != nil {
+				logging.Warn("failed to save missing-episode search results to archive",
+					"series", series.Name, "error", err)
+			}
+		}
+		if s.db != nil {
+			if err := s.db.RecordSeenBatch(releases, cfg); err != nil {
+				logging.Warn("missing-episode search seen recording failed", "error", err)
+			}
+		}
+	}
 	for _, gap := range gaps {
 		_ = s.db.MarkGapSearched(series.Name, gap[0], gap[1])
 	}
@@ -1128,6 +1149,7 @@ func SeriesSearchMissing(w http.ResponseWriter, r *http.Request, s *AppState) {
 		"ok":                 true,
 		"series":             series.Name,
 		"searched":           len(gaps),
+		"total":              totalMissing,
 		"episodes":           episodes,
 		"results":            results,
 		"metadata_available": len(seasonMetadata) > 0 || len(allGaps) > 0,

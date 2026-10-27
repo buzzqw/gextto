@@ -3129,8 +3129,8 @@
 {{define "v2_sources_rows"}}
 {{if .Results}}
 <div class="table-wrap"><table class="data-table">
-  <thead><tr><th scope="col">Titolo</th><th scope="col">Sorgente</th><th scope="col">Punteggio</th><th scope="col">Dimensione</th><th scope="col">Azioni</th></tr></thead>
-  <tbody>{{range .Results}}<tr>
+  <thead><tr>{{if .ShowEpisode}}<th scope="col">Puntata</th>{{end}}<th scope="col">Titolo</th><th scope="col">Sorgente</th><th scope="col">Punteggio</th><th scope="col">Dimensione</th><th scope="col">Azioni</th></tr></thead>
+  <tbody>{{range .Results}}<tr>{{if $.ShowEpisode}}<td class="nowrap">{{.Episode}}</td>{{end}}
     <td class="truncate" title="{{.Title}}">{{.Title}}</td>
     <td>{{.Source}}</td><td class="numeric">{{.Score}}</td><td class="numeric">{{if .SizeBytes}}{{bytes .SizeBytes}}{{else}}—{{end}}</td>
     <td class="row-actions">{{if .Magnet}}<button class="btn sm" type="button" data-v2-copy="{{.Magnet}}" title="Copia il link magnet negli appunti">Copia magnet</button>{{end}}{{if .Body}}{{template "v2_action_btn" (dict "Redirect" $.Redirect "Path" "/api/archive/batch-download" "Method" "POST" "Body" .Body "Label" "Scarica" "Class" "primary" "Title" "Aggiungi questa release ai download")}}{{end}}</td>

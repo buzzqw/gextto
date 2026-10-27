@@ -116,11 +116,15 @@ func v2GapsViewFrom(gaps []libraryGap, filter string) v2GapsView {
 }
 
 // v2GapSearchResult is the outcome shown next to a series after "Cerca
-// mancanti".
+// mancanti". It carries the releases themselves, not just their count: the
+// search used to report "1 result" and then throw it away, leaving no way to
+// see or download it.
 type v2GapSearchResult struct {
 	Error    string
 	Results  int
 	Episodes int
+	Total    int
+	Sources  v2SourcesView
 }
 
 // V2SeriesGapsSearch is POST /series/gaps/search: it searches every missing
@@ -128,13 +132,19 @@ type v2GapSearchResult struct {
 func V2SeriesGapsSearch(w http.ResponseWriter, r *http.Request, s *AppState) {
 	view := v2GapSearchResult{}
 	name := strings.TrimSpace(r.FormValue("series"))
+	redirect := "/?view=series&tab=gaps"
+	if filter := strings.TrimSpace(r.FormValue("filter")); filter != "" {
+		redirect += "&f=" + url.QueryEscape(filter)
+	}
+	view.Sources = v2SourcesView{Redirect: redirect, ShowEpisode: true}
 	if name == "" {
 		view.Error = "Serie non indicata."
 	} else {
 		raw, status := v2InternalJSON(s, http.MethodPost, "/api/series/"+url.PathEscape(name)+"/search-missing", nil, []byte("{}"))
 		var payload struct {
-			Results  []any `json:"results"`
-			Episodes []any `json:"episodes"`
+			Results  []map[string]any `json:"results"`
+			Episodes []any            `json:"episodes"`
+			Total    int              `json:"total"`
 		}
 		if status >= http.StatusBadRequest {
 			view.Error = v2JSONError(raw)
@@ -142,7 +152,13 @@ func V2SeriesGapsSearch(w http.ResponseWriter, r *http.Request, s *AppState) {
 				view.Error = "Ricerca non riuscita."
 			}
 		} else if json.Unmarshal(raw, &payload) == nil {
-			view.Results, view.Episodes = len(payload.Results), len(payload.Episodes)
+			view.Episodes = len(payload.Episodes)
+			view.Total = payload.Total
+			if view.Total < view.Episodes {
+				view.Total = view.Episodes
+			}
+			view.Sources.Results = v2SourceRowsFrom(payload.Results)
+			view.Results = len(view.Sources.Results)
 		}
 	}
 	dict, eng := v2Dictionaries(s)

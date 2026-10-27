@@ -1,6 +1,8 @@
 package gextto
 
 import (
+	"bytes"
+	"strings"
 	"testing"
 )
 
@@ -36,5 +38,65 @@ func TestGapsGroupedBySeriesAndSeason(t *testing.T) {
 	filtered := v2GapsViewFrom(gaps, "fbi")
 	if filtered.SeriesCount != 2 || filtered.Total != 3 || !filtered.Open {
 		t.Fatalf("filtered = %+v", filtered)
+	}
+}
+
+// TestGapSearchRowsCarryTheEpisode: the bulk search used to report only a
+// number, so the operator could not tell which episode a result belonged to.
+// The row keeps the episode code next to the release.
+func TestGapSearchRowsCarryTheEpisode(t *testing.T) {
+	rows := v2SourceRowsFrom([]map[string]any{{
+		"release": map[string]any{
+			"title":  "FBI S06E03 1080p ITA",
+			"magnet": "magnet:?xt=urn:btih:" + strings.Repeat("a", 40),
+			"source": "indexer.one",
+		},
+		"origin":  "indexer",
+		"season":  float64(6),
+		"episode": float64(3),
+	}})
+	if len(rows) != 1 {
+		t.Fatalf("rows = %+v", rows)
+	}
+	if rows[0].Episode != "S06E03" || rows[0].Title != "FBI S06E03 1080p ITA" || rows[0].Body == "" {
+		t.Fatalf("row = %+v", rows[0])
+	}
+}
+
+// TestGapSearchResultListsTheReleases: the panel after "Cerca mancanti" must
+// show the releases with their Download button, not only a count with a hint
+// to click an episode, and it must say that nothing was downloaded.
+func TestGapSearchResultListsTheReleases(t *testing.T) {
+	view := v2GapSearchResult{
+		Results:  1,
+		Episodes: 15,
+		Total:    40,
+		Sources: v2SourcesView{
+			Redirect:    "/?view=series&tab=gaps",
+			ShowEpisode: true,
+			Results: []v2SourceRow{{
+				Title:   "FBI S06E03 1080p ITA",
+				Episode: "S06E03",
+				Source:  "indexer.one",
+				Score:   90,
+				Body:    `{"items":[{"title":"FBI S06E03 1080p ITA","magnet":"magnet:?xt=urn:btih:` + strings.Repeat("a", 40) + `"}]}`,
+			}},
+		},
+	}
+	var buffer bytes.Buffer
+	if err := v2Templates.ExecuteTemplate(&buffer, "v2_gap_search_result", view); err != nil {
+		t.Fatalf("render: %v", err)
+	}
+	body := buffer.String()
+	for _, want := range []string{
+		"Risultati:", "Puntate cercate:", "S06E03", "FBI S06E03 1080p ITA",
+		"Scarica", "La serie ha", "40", "Nessun download automatico",
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("missing %q in:\n%s", want, body)
+		}
+	}
+	if strings.Contains(body, "clicca una puntata") {
+		t.Fatalf("old hint still in:\n%s", body)
 	}
 }

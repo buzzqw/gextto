@@ -710,9 +710,9 @@ stagione e le puntate come pulsanti (`S04E03`):
 
 - **un clic su una puntata** la cerca e apre i risultati, prima dall'archivio
   locale e poi online, ognuno con **Scarica**;
-- **Cerca mancanti** cerca tutte le puntate mancanti di quella serie e, finita
-  la ricerca, scrive accanto quanti risultati ha trovato; poi un clic sulle
-  puntate li mostra;
+- **Cerca mancanti** cerca fino a 15 puntate mancanti di quella serie e mostra
+  lì i risultati trovati, ognuno con la puntata e **Scarica**: non scarica nulla
+  da solo e, se la serie ha più di 15 puntate mancanti, lo dice;
 - **Filtra per serie** mostra solo le serie che contengono il testo scritto.
 
 Il vecchio indirizzo della pagina *Mancanti* porta a questa scheda.
