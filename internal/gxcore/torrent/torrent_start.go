@@ -398,7 +398,10 @@ func (t *torrent) startSinglePieceDownloader(pe *peer.Peer) (started bool) {
 			t.crash("peer already has a piece downloader for this piece")
 		}
 	}
-	t.log.Debugf("requesting piece #%d from peer %s", pi.Index, pe.IP())
+	if t.log.DebugEnabled() {
+		// pe.IP() allocates a string: skip it when the line is dropped anyway.
+		t.log.Debugf("requesting piece #%d from peer %s", pi.Index, pe.IP())
+	}
 	if t.pieceDownloaders[pe] == nil {
 		t.pieceDownloaders[pe] = make(map[uint32]*piecedownloader.PieceDownloader)
 	}

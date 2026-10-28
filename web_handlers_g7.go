@@ -312,7 +312,7 @@ func gh7_finalize_episode_search_results(results []gh7_episode_result, cfg *Conf
 		deduped = append(deduped, result)
 	}
 	sort.SliceStable(deduped, func(i, j int) bool {
-		return cfg.ReleaseScore(&deduped[i].Release) > cfg.ReleaseScore(&deduped[j].Release)
+		return deduped[i].Score > deduped[j].Score
 	})
 	return deduped
 }

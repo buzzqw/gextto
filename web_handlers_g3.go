@@ -1088,9 +1088,21 @@ func gh3ManualSearch(s *AppState, query string, kad ...bool) (int, any) {
 		deduped = append(deduped, release)
 	}
 	results = deduped
-	sort.SliceStable(results, func(i, j int) bool {
-		return cfg.ReleaseScore(&results[i]) > cfg.ReleaseScore(&results[j])
-	})
+	// The score is a function of the release and of the settings, so it is
+	// computed once per result instead of at every comparison: the sort called
+	// ReleaseScore (series lookup + score breakdown) O(n log n) times.
+	type scoredRelease struct {
+		release models.Release
+		score   int64
+	}
+	ranked := make([]scoredRelease, len(results))
+	for i := range results {
+		ranked[i] = scoredRelease{release: results[i], score: cfg.ReleaseScore(&results[i])}
+	}
+	sort.SliceStable(ranked, func(i, j int) bool { return ranked[i].score > ranked[j].score })
+	for i := range ranked {
+		results[i] = ranked[i].release
+	}
 	return http.StatusOK, map[string]any{"ok": true, "query": query, "results": results}
 }
 

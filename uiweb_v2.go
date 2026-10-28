@@ -901,10 +901,11 @@ func V2HealthTilePartial(w http.ResponseWriter, r *http.Request, s *AppState) {
 }
 
 // V2HealthQueuePartial refreshes the "Coda titoli" and "Import falliti" panels
-// without reloading the page.
+// without reloading the page. The fragment shows only those two lists: it reads
+// them from the database instead of paying the whole health check every minute.
 func V2HealthQueuePartial(w http.ResponseWriter, r *http.Request, s *AppState) {
 	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_health_queue", uiHealthDataFrom(s), dict, eng)
+	v2Render(w, http.StatusOK, "v2_health_queue", uiHealthQueueFrom(s), dict, eng)
 }
 
 // V2Empty clears a modal container.
@@ -1349,7 +1350,10 @@ func v2TorrentsViewFrom(s *AppState, r *http.Request, message string, isErr bool
 		rows = filtered
 	}
 	v2SortRows(rows, sortKey, dir)
-	settings := uiDownloadsPageFor(s)
+	// Only the chrome around the table is needed here: the torrent snapshot is
+	// already in `data`, and asking for the whole page would list the engine and
+	// sort again on every poll.
+	settings := uiDownloadsChromeFor(s, latestConfig(s))
 	auto := r.FormValue("auto")
 	if auto == "" {
 		auto = r.FormValue("auto_state")

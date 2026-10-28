@@ -85,6 +85,7 @@ with the live service or a standalone instance as stated.
 | Feed archive | **258 MB**, 307,477 rows after the 2026-10-21 dedup (was 480 MB, 610,254), one row per listing; Archive page 7–23 ms | 1935 | live `gextto_archive.db`, `dbstat`, `/api/archive` |
 | Archive insert | **40.9–41.8 ms per 1,000 releases** (3.00 MB, 50,528 allocs) | 1791 | `BenchmarkArchiveSaveBatch` |
 | Archive search (standalone) | **7.4 ms** on 100,000 releases, 49× faster than before | — | `BenchmarkFeedArchiveSearch` |
+| Archive content-filter page | the candidate scan used to copy the `magnet` text of **all 364,348 rows — 138,090,257 B (~131.7 MiB) — per request**; now it reads `id,title` (28.8 MB of titles) and loads the ≤500 visible rows with one `id IN (…)` query | 2072 | live `gextto_archive.db`: `SELECT count(*), sum(length(magnet)), sum(length(title)) FROM archive` |
 | Piece picker | `RarestManyPeers` **13.8 µs**, bitfield update+disconnect **65–68 µs** | 228 | `go test -bench . ./internal/gxcore/internal/piecepicker` |
 | uTP loopback | **131–139 MB/s**, 5.6 KB and 99 allocs per op | 224 | `BenchmarkTransferLoopback` |
 | Storage | **~5.8 GB/s** buffered, **~7.4 GB/s** mmap; 16 KiB writes on NFS **81 MiB/s** | — | `BenchmarkStorageWrite`, `BenchmarkStorageWriteMmap`, NFS harness |
@@ -104,7 +105,7 @@ when a change is meant to be an optimisation. A single pass is noise.
 
 | Benchmark | Current figure | Note |
 |---|---|---|
-| `BenchmarkEngineLoggerFiltered` vs `Forwarded` | 151–175 vs 730–785 ns/op, 3 vs 6 allocs/op | records below the handler threshold are discarded before formatting, so `Debugf`/`Infof` on the hot paths allocate nothing at WARNING |
+| `BenchmarkEngineLoggerFiltered` vs `Forwarded` | **36–38 ns/op, 40 B, 1 alloc** vs 778–799 ns/op, 424 B, 6 allocs | the level methods (`Debug`, `Debugf`, …) now check the threshold **before** `fmt.Sprint`/`Sprintf`, so a record the handler would drop costs no formatting; the remaining alloc is the variadic slice of the call itself, which `DebugEnabled()` removes where the arguments are expensive. Before the change: 151–175 ns/op, 3 allocs/op. Measured 2026-10-28 on the N97 (`go test ./internal/gxcore/logging/ -run XXX -bench BenchmarkEngineLogger -benchmem -count=3`) |
 | `BenchmarkBlocked` (IP filter) | 18.6 / 37.7 ns/op, 0 allocs | sorted merged intervals with binary search |
 | `BenchmarkLoad` (IP filter, 172,000 P2P and eMule rules) | 56.5–58.6 ms, 39.7 MB, 882,032 allocs → **32.6–33.1 ms, 6.6 MB, 32 allocs** | ranges parsed on the bytes of the line instead of `strings.Split`; `FuzzParseCIDRMatchesReference` holds it to the old parser (4.95 M lines in 60 s); measured 2026-10-26 on the N97 |
 | `BenchmarkV2HighlightLogLine` vs `…Regexp` | **0.91–0.95 µs, 576 B, 2 allocs** vs 58.6–67.3 µs, 2.3 KB, 18 allocs per line | log page highlighting: one word scan instead of six `\b` regexps; output identical on 36,521 live log lines and a 45 s fuzz; measured 2026-10-26 on the N97 |

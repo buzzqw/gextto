@@ -563,12 +563,9 @@ func uiIntegrationSections(s *AppState, cfg *Config) []uiPageSection {
 // tag and temporary-limit panels of the classic interface.
 func uiDownloadsPageFor(s *AppState) uiDownloadsPage {
 	cfg := latestConfig(s)
-	page := uiDownloadsPage{
-		Torrents:            uiTorrentsDataFrom(s),
-		Speed:               uiSpeedStateFor(cfg, s.latency_guard.status()),
-		AutoRemoveCompleted: settingsBool(cfg, "auto_remove_completed", false),
-		TagOptions:          uiDownloadTagOptions(s, cfg),
-	}
+	page := uiDownloadsChromeFor(s, cfg)
+	page.Torrents = uiTorrentsDataFrom(s)
+	page.TagOptions = uiDownloadTagOptions(s, cfg)
 	page.Panels = []uiPageSection{
 		sectionTable(uiTableSpec{
 			Title:    "Storico download",
@@ -586,6 +583,17 @@ func uiDownloadsPageFor(s *AppState) uiDownloadsPage {
 		}),
 	}
 	return page
+}
+
+// uiDownloadsChromeFor builds the part of the download page around the torrent
+// table: the speed panel and the auto-remove flag. The table poll already has
+// the torrent snapshot in hand, and building it twice meant listing the engine
+// twice and sorting twice on every refresh.
+func uiDownloadsChromeFor(s *AppState, cfg *Config) uiDownloadsPage {
+	return uiDownloadsPage{
+		Speed:               uiSpeedStateFor(cfg, s.latency_guard.status()),
+		AutoRemoveCompleted: settingsBool(cfg, "auto_remove_completed", false),
+	}
 }
 
 // uiSettingString returns a setting value or the empty string.

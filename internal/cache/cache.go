@@ -63,28 +63,39 @@ func Get(key string) (string, bool) {
 // Set stores a value and bounds the cache size.
 func Set(key, value string) {
 	mu.Lock()
-	defer mu.Unlock()
 	state.data[key] = value
 	state.next++
 	state.seq[key] = state.next
 	state.dirty = true
-	if len(state.data) > maxEntries {
-		// Keep the evictTo most recently set entries.
-		keys := make([]string, 0, len(state.data))
-		for k := range state.data {
-			keys = append(keys, k)
+	if len(state.data) <= maxEntries {
+		mu.Unlock()
+		return
+	}
+	// Snapshot the keys and their insertion order, then sort outside the lock:
+	// ordering 5000 keys is the slow part, and it used to block every Get and
+	// Set of every crawler goroutine.
+	keys := make([]string, 0, len(state.data))
+	orders := make(map[string]uint64, len(state.data))
+	for k := range state.data {
+		keys = append(keys, k)
+		orders[k] = state.seq[k]
+	}
+	mu.Unlock()
+
+	sort.Slice(keys, func(i, j int) bool { return orders[keys[i]] > orders[keys[j]] })
+	drop := keys[evictTo:]
+
+	mu.Lock()
+	defer mu.Unlock()
+	for _, k := range drop {
+		// Keep entries re-set while the sort ran: their order moved to the top,
+		// so they are the most recent and must survive. A later Set trims the
+		// few rows still over the limit.
+		if state.seq[k] != orders[k] {
+			continue
 		}
-		sort.Slice(keys, func(i, j int) bool { return state.seq[keys[i]] > state.seq[keys[j]] })
-		kept := make(map[string]string, evictTo)
-		keptSeq := make(map[string]uint64, evictTo)
-		for _, k := range keys[:evictTo] {
-			kept[k] = state.data[k]
-			if order, ok := state.seq[k]; ok {
-				keptSeq[k] = order
-			}
-		}
-		state.data = kept
-		state.seq = keptSeq
+		delete(state.data, k)
+		delete(state.seq, k)
 	}
 }
 
@@ -108,15 +119,24 @@ func Save() {
 		mu.Unlock()
 		return
 	}
+	// Remember which change this write carries: if Set runs while the file is
+	// being written, the cache stays dirty so the next Save repeats it. A
+	// failed write also stays dirty instead of being forgotten.
+	generation := state.next
 	payload, err := json.Marshal(state.data)
-	state.dirty = false
 	mu.Unlock()
 	if err != nil {
 		return
 	}
 	if err := utils.AtomicWrite(path, payload); err != nil {
 		logWarn("magnet cache write failed", path, err)
+		return
 	}
+	mu.Lock()
+	if state.next == generation {
+		state.dirty = false
+	}
+	mu.Unlock()
 }
 
 func logWarn(msg, path string, err error) {

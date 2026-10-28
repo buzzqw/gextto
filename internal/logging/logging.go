@@ -54,8 +54,13 @@ var (
 	logMu     sync.Mutex
 	logWriter io.Writer = os.Stdout
 	minLevel            = LevelInfo
-	filePath  string
+	// minLevelAtomic mirrors minLevel for Enabled: hot loops call it once per
+	// item, and they must not queue on the mutex logf takes for every line.
+	minLevelAtomic atomic.Int32
+	filePath       string
 )
+
+func init() { minLevelAtomic.Store(int32(LevelInfo)) }
 
 // Init configures the rotating file writer and returns a close function.
 func Init(dir, base string, maxBytes int64, maxFiles int) func() {
@@ -102,14 +107,14 @@ func SetLevel(filter string) {
 	}
 	logMu.Lock()
 	minLevel = level
+	minLevelAtomic.Store(int32(level))
 	logMu.Unlock()
 }
 
-// Enabled reports whether the given level is currently logged.
+// Enabled reports whether the given level is currently logged. Hot loops use it
+// to skip building arguments that only a discarded line would read.
 func Enabled(level Level) bool {
-	logMu.Lock()
-	defer logMu.Unlock()
-	return level >= minLevel
+	return level >= Level(minLevelAtomic.Load())
 }
 
 // problemCount counts the WARN and ERROR lines written since start-up.

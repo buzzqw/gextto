@@ -717,26 +717,34 @@ func (a *Archive) BrowseContentFilteredPage(query string, filters []string, page
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-
 	items := []ArchiveEntry{}
 	var total int64
 	start := int64((page - 1) * limit)
+	ids := make([]int64, 0, limit)
 	for rows.Next() {
-		var entry ArchiveEntry
-		if err := rows.Scan(&entry.ID, &entry.Title, &entry.Magnet, &entry.Source, &entry.QualityScore, &entry.AddedAt); err != nil {
+		var id int64
+		var title string
+		if err := rows.Scan(&id, &title); err != nil {
+			_ = rows.Close()
 			return nil, err
 		}
-		if !titleIsContentFiltered(entry.Title, filters) {
+		if !titleIsContentFiltered(title, filters) {
 			continue
 		}
-		if total >= start && len(items) < limit {
-			entry.Release = ParseRelease(entry.Title, entry.Magnet, "archive:"+entry.Source)
-			items = append(items, entry)
+		if total >= start && len(ids) < limit {
+			ids = append(ids, id)
 		}
 		total++
 	}
 	if err := rows.Err(); err != nil {
+		_ = rows.Close()
+		return nil, err
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	items, err = a.entriesByIDs(ids)
+	if err != nil {
 		return nil, err
 	}
 	pages := int((total + int64(limit) - 1) / int64(limit))
@@ -761,9 +769,7 @@ func (a *Archive) DeleteContentFiltered(query string, filters []string) (int, er
 	for rows.Next() {
 		var id int64
 		var title string
-		var magnet, source, addedAt string
-		var quality int64
-		if err := rows.Scan(&id, &title, &magnet, &source, &quality, &addedAt); err != nil {
+		if err := rows.Scan(&id, &title); err != nil {
 			_ = rows.Close()
 			return 0, err
 		}
@@ -781,9 +787,13 @@ func (a *Archive) DeleteContentFiltered(query string, filters []string) (int, er
 	return a.DeleteIDs(ids)
 }
 
+// contentFilterCandidates returns id and title of every archived release
+// matching the text query. Titles are all the content filter needs: the magnet
+// column alone is about 140 MB on a full archive, and copying it for every
+// candidate on every page view was the bulk of the work.
 func (a *Archive) contentFilterCandidates(query string) (*sql.Rows, error) {
 	includes, excludes := parseArchiveFilter(query)
-	selectSQL := "SELECT archive.id,archive.title,archive.magnet,COALESCE(archive.source,'archive'),COALESCE(archive.quality_score,0),archive.added_at FROM archive"
+	selectSQL := "SELECT archive.id,archive.title FROM archive"
 	if len(includes) > 0 {
 		return a.db.Query(selectSQL+" JOIN archive_fts ON archive_fts.rowid=archive.id WHERE archive_fts MATCH ?1 ORDER BY archive.added_at DESC,archive.id DESC", ftsMatchExpression(includes, excludes))
 	}
@@ -797,6 +807,40 @@ func (a *Archive) contentFilterCandidates(query string) (*sql.Rows, error) {
 		args[index] = "%" + word + "%"
 	}
 	return a.db.Query(selectSQL+" WHERE "+strings.Join(where, " AND ")+" ORDER BY archive.added_at DESC,archive.id DESC", args...)
+}
+
+// entriesByIDs loads the full rows of the given archive ids, keeping the order
+// of the ids. It exists because the content-filter scan reads only id and title
+// of every row and then needs the whole row for the few rows it shows.
+func (a *Archive) entriesByIDs(ids []int64) ([]ArchiveEntry, error) {
+	if len(ids) == 0 {
+		return []ArchiveEntry{}, nil
+	}
+	placeholders := make([]string, len(ids))
+	args := make([]any, len(ids))
+	for index, id := range ids {
+		placeholders[index] = "?" + strconv.Itoa(index+1)
+		args[index] = id
+	}
+	rows, err := a.db.Query("SELECT id,title,magnet,COALESCE(source,'archive'),COALESCE(quality_score,0),added_at FROM archive WHERE id IN ("+strings.Join(placeholders, ",")+")", args...)
+	if err != nil {
+		return nil, err
+	}
+	entries, err := scanArchiveEntries(rows)
+	if err != nil {
+		return nil, err
+	}
+	byID := make(map[int64]ArchiveEntry, len(entries))
+	for _, entry := range entries {
+		byID[entry.ID] = entry
+	}
+	ordered := make([]ArchiveEntry, 0, len(ids))
+	for _, id := range ids {
+		if entry, ok := byID[id]; ok {
+			ordered = append(ordered, entry)
+		}
+	}
+	return ordered, nil
 }
 
 // DeleteIDs deletes the given row ids, ignoring non-positive ids.

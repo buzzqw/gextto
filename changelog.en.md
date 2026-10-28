@@ -15,6 +15,8 @@ manual is online: [English](docs/MANUAL.en.md) ·
 
 ## 28 October 2026
 
+- **The interface costs less and answers sooner.** The archive content-filter page copied the magnet text of all 364,348 releases on every visit — 131 MB read to show at most 500 rows: it now reads only the titles and loads the visible page with a separate query. The Downloads table no longer lists the torrents twice on every refresh (one every 5 seconds while the page is open), the *Title queue* panel of the Health page no longer runs the whole health check every minute, the torrent list uses an index instead of sorting the whole table, and gx-torrent's debug lines are no longer built when the log is at WARNING. Nothing to configure.
+
 - **The log says why a download ends and that the library copy stays.** When an already archived season pack finished seeding and its download copy went to the trash, the log only said that the folder had moved to the trash: it looked as if the whole pack had been thrown away. The line now says which limit ended the seed ("seed time reached", "ratio reached"…) and that the library copy stays, with its path. If the move to the trash fails, the message still says where the good copy is. Nothing to configure.
 
 - **Weekly Packs arrive as soon as they are downloadable.** GetComics publishes a pack's page before its download links, and the comics check runs once a week: the pack waited for the next check, about a week. Now, on every regular cycle, Gextto rechecks only the packs already recorded but not downloaded yet and queues one as soon as its link appears, without redoing the comics check. The pack of the week of 21 October, waiting since the 23rd, is taken at the next cycle.

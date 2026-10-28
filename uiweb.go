@@ -643,6 +643,22 @@ func uiHealthDataFrom(s *AppState) uiHealthData {
 	return data
 }
 
+// uiHealthQueueFrom builds the only two panels of the Salute page that refresh
+// by themselves: the pending titles and the failed imports. It reads them
+// without running the health check (trash walk, statfs on every mount, log
+// tail), which the "Coda titoli" fragment does not show and would otherwise pay
+// every minute for every open page.
+func uiHealthQueueFrom(s *AppState) uiHealthData {
+	var data uiHealthData
+	if queue, err := s.db.PendingQueue(time.Now().UTC()); err == nil {
+		data.Queued = uiQueueRowsFrom(queue)
+	}
+	if failed, err := s.db.FailedImportsDaily(uiHealthFailedImportDays); err == nil {
+		data.FailedImports = uiDailyRowsFrom(failed)
+	}
+	return data
+}
+
 // uiHealthCycleRows is how many recent cycles the Salute "Ricerche" panel shows.
 const uiHealthCycleRows = 12
 

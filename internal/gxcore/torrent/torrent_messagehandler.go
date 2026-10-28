@@ -249,7 +249,9 @@ func (t *torrent) noteBitfield(pe *peer.Peer, msg peerprotocol.BitfieldMessage) 
 		t.closePeer(pe)
 		return
 	}
-	pe.Logger().Debugln("Received bitfield:", bf.Hex())
+	if log := pe.Logger(); log.DebugEnabled() {
+		log.Debugln("Received bitfield:", bf.Hex())
+	}
 	for i := uint32(0); i < bf.Len(); i++ {
 		if !bf.Test(i) {
 			continue
@@ -302,7 +304,9 @@ func (t *torrent) noteAllowedFast(pe *peer.Peer, msg peerprotocol.AllowedFastMes
 		t.closePeer(pe)
 		return
 	}
-	pe.Logger().Debug("Peer ", pe.String(), " has allowed fast for piece #", msg.Index)
+	if log := pe.Logger(); log.DebugEnabled() {
+		log.Debug("Peer ", pe.String(), " has allowed fast for piece #", msg.Index)
+	}
 	if t.piecePicker != nil {
 		t.piecePicker.HandleAllowedFast(pe, msg.Index)
 	}
@@ -440,7 +444,9 @@ func (t *torrent) noteCancel(pe *peer.Peer, msg peerprotocol.CancelMessage) {
 // only log), learns our reflected address, and boots the metadata, v2-layer
 // and PEX exchanges the peer offers — PEX skipped on private swarms.
 func (t *torrent) noteExtensionHandshake(pe *peer.Peer, msg peerprotocol.ExtensionHandshakeMessage) {
-	pe.Logger().Debugln("extension handshake received:", msg)
+	if log := pe.Logger(); log.DebugEnabled() {
+		log.Debugln("extension handshake received:", msg)
+	}
 	if pe.ExtensionHandshake != nil {
 		pe.Logger().Debugln("peer changed extensions")
 		return

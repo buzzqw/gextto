@@ -1039,6 +1039,12 @@ func (d *Database) migrate() error {
 	if _, err := d.db.Exec("CREATE INDEX IF NOT EXISTS idx_movies_name_year ON movies(name, year); CREATE INDEX IF NOT EXISTS idx_torrent_meta_series_lower ON torrent_meta(lower(series_name), season, episode); CREATE INDEX IF NOT EXISTS idx_pending_downloads_lookup ON pending_downloads(series_id, season, episode);"); err != nil {
 		logging.Warn("schema migration: hot-path indexes failed", "error", err)
 	}
+	// idx_torrent_meta_updated serves the torrent list: it orders by updated_at,
+	// which had no index, so every listing scanned the table and sorted it in a
+	// temporary B-tree.
+	if _, err := d.db.Exec("CREATE INDEX IF NOT EXISTS idx_torrent_meta_updated ON torrent_meta(updated_at DESC);"); err != nil {
+		logging.Warn("The database could not create the index that orders torrents by their last update", "error", err)
+	}
 	return nil
 }
 

@@ -391,7 +391,9 @@ func RunCycleDomain(
 		slices.Sort(episodes)
 		// Only at debug: the full list of open gaps is noisy. The log reports a
 		// gap when it is actually filled.
-		logging.Debug(fmt.Sprintf("→ %s S%02d gap: %s", key.Series, key.Season, episodesLabel(episodes)))
+		if logging.Enabled(logging.LevelDebug) {
+			logging.Debug(fmt.Sprintf("→ %s S%02d gap: %s", key.Series, key.Season, episodesLabel(episodes)))
+		}
 	}
 
 	gapLimit := 0
@@ -787,15 +789,17 @@ func RunCycleDomain(
 	}
 	stats.Candidates = len(best)
 	logging.Info(fmt.Sprintf("🎯 %s match your titles and filters; choosing what to download", countLabel(int64(len(best)), "release", "releases")))
-	for i := range best {
-		release := &best[i]
-		logging.Debug("candidate ready for evaluation",
-			"target", releaseTarget(release),
-			"kind", release.Kind,
-			"episodes", episodesLabel(release.EpisodeRange),
-			"gap_episodes", episodesLabel(gapEpisodesForRelease(release, gapTargets)),
-			"source", release.Source,
-			"score", cfg.AcquisitionScore(release))
+	if logging.Enabled(logging.LevelDebug) {
+		for i := range best {
+			release := &best[i]
+			logging.Debug("candidate ready for evaluation",
+				"target", releaseTarget(release),
+				"kind", release.Kind,
+				"episodes", episodesLabel(release.EpisodeRange),
+				"gap_episodes", episodesLabel(gapEpisodesForRelease(release, gapTargets)),
+				"source", release.Source,
+				"score", cfg.AcquisitionScore(release))
+		}
 	}
 
 	// Advanced setting: refuse to start downloads when the download disk is

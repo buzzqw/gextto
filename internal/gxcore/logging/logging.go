@@ -108,6 +108,9 @@ type Logger interface {
 	Debug(args ...interface{})
 	Debugf(format string, args ...interface{})
 	Debugln(args ...interface{})
+	// DebugEnabled reports whether DEBUG records reach the log, so a hot call
+	// site can skip building a value only the message would use.
+	DebugEnabled() bool
 }
 
 var (
@@ -165,6 +168,14 @@ func Debugf(format string, args ...interface{}) {
 }
 func Debugln(args ...interface{}) { DefaultLogger.Debugln(args...) }
 
+// DebugEnabled reports whether DEBUG records reach the log. A hot path uses it
+// to skip building values only the message would use (a hex encoding, a peer
+// description, an IP string): the variadic arguments are boxed by the caller even
+// when the level drops the record, so the guard belongs at the call site.
+func DebugEnabled() bool {
+	return DefaultLogger.DebugEnabled()
+}
+
 // logger is the default Logger implementation.
 type logger struct {
 	name      string
@@ -185,15 +196,20 @@ func (l *logger) SetLevel(level Level) { l.level = level }
 func (l *logger) SetHandler(b Handler) { l.handler = b }
 func (l *logger) SetCallDepth(n int)   { l.callDepth = n }
 
-func (l *logger) emit(level Level, message string) {
+// enabled reports whether a record at this level reaches the log. It is the
+// same threshold emit applies, exposed so the level methods can skip the
+// formatting (fmt.Sprint, fmt.Sprintf) of a record that would be dropped, and
+// so hot call sites can avoid building expensive arguments at all.
+func (l *logger) enabled(level Level) bool {
 	if l.engine {
-		// Drop records the engine handler would filter out anyway, before
-		// building the record, so hot paths stay cheap when the daemon runs at
-		// WARNING. The threshold mirrors the installed handler.
-		if level > Level(engineLevel.Load()) {
-			return
-		}
-	} else if level > l.level {
+		// The threshold mirrors the installed engine handler.
+		return level <= Level(engineLevel.Load())
+	}
+	return level <= l.level
+}
+
+func (l *logger) emit(level Level, message string) {
+	if !l.enabled(level) {
 		return
 	}
 	_, file, line, ok := runtime.Caller(l.callDepth + 2)
@@ -234,36 +250,104 @@ func (l *logger) Panicln(args ...interface{}) {
 	panic(fmt.Sprintln(args...))
 }
 
-func (l *logger) Critical(args ...interface{}) { l.emit(CRITICAL, fmt.Sprint(args...)) }
+// The level methods check the threshold before formatting: a record below the
+// level is dropped without the fmt.Sprint/Sprintf allocation. The engine logs at
+// WARNING by default, so the debug lines on the per-message and per-block paths
+// used to build a string (and its arguments) for nothing.
+
+func (l *logger) Critical(args ...interface{}) {
+	if l.enabled(CRITICAL) {
+		l.emit(CRITICAL, fmt.Sprint(args...))
+	}
+}
 func (l *logger) Criticalf(format string, args ...interface{}) {
-	l.emit(CRITICAL, fmt.Sprintf(format, args...))
+	if l.enabled(CRITICAL) {
+		l.emit(CRITICAL, fmt.Sprintf(format, args...))
+	}
 }
-func (l *logger) Criticalln(args ...interface{}) { l.emit(CRITICAL, fmt.Sprintln(args...)) }
-func (l *logger) Error(args ...interface{})      { l.emit(ERROR, fmt.Sprint(args...)) }
+func (l *logger) Criticalln(args ...interface{}) {
+	if l.enabled(CRITICAL) {
+		l.emit(CRITICAL, fmt.Sprintln(args...))
+	}
+}
+func (l *logger) Error(args ...interface{}) {
+	if l.enabled(ERROR) {
+		l.emit(ERROR, fmt.Sprint(args...))
+	}
+}
 func (l *logger) Errorf(format string, args ...interface{}) {
-	l.emit(ERROR, fmt.Sprintf(format, args...))
+	if l.enabled(ERROR) {
+		l.emit(ERROR, fmt.Sprintf(format, args...))
+	}
 }
-func (l *logger) Errorln(args ...interface{}) { l.emit(ERROR, fmt.Sprintln(args...)) }
-func (l *logger) Warning(args ...interface{}) { l.emit(WARNING, fmt.Sprint(args...)) }
+func (l *logger) Errorln(args ...interface{}) {
+	if l.enabled(ERROR) {
+		l.emit(ERROR, fmt.Sprintln(args...))
+	}
+}
+func (l *logger) Warning(args ...interface{}) {
+	if l.enabled(WARNING) {
+		l.emit(WARNING, fmt.Sprint(args...))
+	}
+}
 func (l *logger) Warningf(format string, args ...interface{}) {
-	l.emit(WARNING, fmt.Sprintf(format, args...))
+	if l.enabled(WARNING) {
+		l.emit(WARNING, fmt.Sprintf(format, args...))
+	}
 }
-func (l *logger) Warningln(args ...interface{}) { l.emit(WARNING, fmt.Sprintln(args...)) }
-func (l *logger) Notice(args ...interface{})    { l.emit(NOTICE, fmt.Sprint(args...)) }
+func (l *logger) Warningln(args ...interface{}) {
+	if l.enabled(WARNING) {
+		l.emit(WARNING, fmt.Sprintln(args...))
+	}
+}
+func (l *logger) Notice(args ...interface{}) {
+	if l.enabled(NOTICE) {
+		l.emit(NOTICE, fmt.Sprint(args...))
+	}
+}
 func (l *logger) Noticef(format string, args ...interface{}) {
-	l.emit(NOTICE, fmt.Sprintf(format, args...))
+	if l.enabled(NOTICE) {
+		l.emit(NOTICE, fmt.Sprintf(format, args...))
+	}
 }
-func (l *logger) Noticeln(args ...interface{}) { l.emit(NOTICE, fmt.Sprintln(args...)) }
-func (l *logger) Info(args ...interface{})     { l.emit(INFO, fmt.Sprint(args...)) }
+func (l *logger) Noticeln(args ...interface{}) {
+	if l.enabled(NOTICE) {
+		l.emit(NOTICE, fmt.Sprintln(args...))
+	}
+}
+func (l *logger) Info(args ...interface{}) {
+	if l.enabled(INFO) {
+		l.emit(INFO, fmt.Sprint(args...))
+	}
+}
 func (l *logger) Infof(format string, args ...interface{}) {
-	l.emit(INFO, fmt.Sprintf(format, args...))
+	if l.enabled(INFO) {
+		l.emit(INFO, fmt.Sprintf(format, args...))
+	}
 }
-func (l *logger) Infoln(args ...interface{}) { l.emit(INFO, fmt.Sprintln(args...)) }
-func (l *logger) Debug(args ...interface{})  { l.emit(DEBUG, fmt.Sprint(args...)) }
+func (l *logger) Infoln(args ...interface{}) {
+	if l.enabled(INFO) {
+		l.emit(INFO, fmt.Sprintln(args...))
+	}
+}
+func (l *logger) Debug(args ...interface{}) {
+	if l.enabled(DEBUG) {
+		l.emit(DEBUG, fmt.Sprint(args...))
+	}
+}
 func (l *logger) Debugf(format string, args ...interface{}) {
-	l.emit(DEBUG, fmt.Sprintf(format, args...))
+	if l.enabled(DEBUG) {
+		l.emit(DEBUG, fmt.Sprintf(format, args...))
+	}
 }
-func (l *logger) Debugln(args ...interface{}) { l.emit(DEBUG, fmt.Sprintln(args...)) }
+func (l *logger) Debugln(args ...interface{}) {
+	if l.enabled(DEBUG) {
+		l.emit(DEBUG, fmt.Sprintln(args...))
+	}
+}
+
+// DebugEnabled reports whether DEBUG records reach the log.
+func (l *logger) DebugEnabled() bool { return l.enabled(DEBUG) }
 
 // engineHandler is the handler shared by the loggers the engine creates. It is
 // guarded because a new session may replace it while other sessions' goroutines
