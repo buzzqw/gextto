@@ -53,3 +53,17 @@ func TestSeedEndReason(t *testing.T) {
 		}
 	}
 }
+
+// TestSeedRemovalReason makes sure a torrent removed while paused, before any
+// limit was reached, does not claim a limit that never fired.
+func TestSeedRemovalReason(t *testing.T) {
+	if got := seedRemovalReason(false, false, false); got != "seed stopped" {
+		t.Fatalf("paused torrent without limits: reason = %q, want seed stopped", got)
+	}
+	if got := seedRemovalReason(true, false, false); got != "ratio reached" {
+		t.Fatalf("ratio limit: reason = %q", got)
+	}
+	if got := seedRemovalReason(false, false, true); got != "no upload while seeding" {
+		t.Fatalf("idle limit: reason = %q", got)
+	}
+}

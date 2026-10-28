@@ -1520,7 +1520,7 @@ func RemoveSeededCompleted(cfg *Config, torrents TorrentSession, db *Database, p
 			if processed != nil && strings.TrimSpace(*processed) != "" {
 				libraryNote = "the library copy stays in " + *processed
 			}
-			reason := seedEndReason(ratioReached, timeLimitReached, idleReached)
+			reason := seedRemovalReason(ratioReached, timeLimitReached, idleReached)
 			if target, moveErr := MoveToTrash(source, *cfg.TrashPath); moveErr != nil {
 				logging.Error(fmt.Sprintf("❌ Could not move the download copy of «%s» to the trash after seeding (%s); %s: %v", torrent.Name, source, libraryNote, moveErr), "hash", torrent.Hash)
 			} else {

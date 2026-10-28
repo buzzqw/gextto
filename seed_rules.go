@@ -299,6 +299,16 @@ func seedEndReason(ratioReached, timeReached, idleReached bool) string {
 	}
 }
 
+// seedRemovalReason is the reason shown when a completed torrent leaves at the
+// end of the seed. A torrent that reached no limit was paused (by the user or
+// by the engine): the line must not claim a limit that was not reached.
+func seedRemovalReason(ratioReached, timeReached, idleReached bool) string {
+	if !ratioReached && !timeReached && !idleReached {
+		return "seed stopped"
+	}
+	return seedEndReason(ratioReached, timeReached, idleReached)
+}
+
 // seedPolicy resolves the limits of the torrents seen in one pass. It reads the
 // origins from the database once, and only when rules exist.
 type seedPolicy struct {
