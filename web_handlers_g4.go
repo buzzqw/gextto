@@ -296,7 +296,7 @@ func gh4_scanArchivePath(db *Database, series *SeriesConfig, path string, cfg *C
 		return 0, 0, err
 	}
 	found := 0
-	updated := 0
+	records := make([]ArchiveFileRecord, 0, len(files))
 	for _, file := range files {
 		name := filepath.Base(file)
 		season, episode, ok := gh4_parseSeasonEpisode(name)
@@ -310,21 +310,40 @@ func gh4_scanArchivePath(db *Database, series *SeriesConfig, path string, cfg *C
 			continue
 		}
 		found++
-		var size int64
-		if fileInfo, statErr := os.Stat(file); statErr == nil {
-			size = fileInfo.Size()
-		}
-		title := strings.TrimSuffix(name, filepath.Ext(name))
-		if strings.TrimSpace(title) == "" {
-			title = name
-		}
-		qualityScore := cfg.FileScore(file, "series", series.Name)
-		if syncErr := db.SyncArchiveFileScored(series.Name, season, episode, title, file, size, qualityScore); syncErr != nil {
-			return found, updated, syncErr
-		}
-		updated++
+		records = append(records, ArchiveFileRecord{
+			Season:       season,
+			Episode:      episode,
+			Title:        archiveFileTitle(name),
+			Path:         file,
+			SizeBytes:    archiveFileSize(file),
+			QualityScore: cfg.FileScore(file, "series", series.Name),
+		})
 	}
-	return found, updated, nil
+	// One transaction for the whole series instead of one commit per file. The
+	// returned count stays "files updated", as the page has always reported it:
+	// a range file is one file even when it registers several episodes.
+	if _, batchErr := db.SyncArchiveFilesScored(series.Name, records); batchErr != nil {
+		return found, 0, batchErr
+	}
+	return found, found, nil
+}
+
+// archiveFileTitle is the episode title a scanned file carries: its name
+// without the extension, or the bare name when nothing is left.
+func archiveFileTitle(name string) string {
+	title := strings.TrimSuffix(name, filepath.Ext(name))
+	if strings.TrimSpace(title) == "" {
+		return name
+	}
+	return title
+}
+
+// archiveFileSize is the size of a scanned file, or 0 when it cannot be read.
+func archiveFileSize(path string) int64 {
+	if info, err := os.Stat(path); err == nil {
+		return info.Size()
+	}
+	return 0
 }
 
 // gh4_archiveImportBusyContains reports whether a series archive is currently

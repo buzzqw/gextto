@@ -256,3 +256,34 @@ func BenchmarkArchiveReadDuringFullScan(b *testing.B) {
 	b.StopTimer()
 	shutdown()
 }
+
+// BenchmarkSyncArchiveFilesScored measures the same library scan, batched: one
+// transaction per 500 files instead of one commit per file.
+func BenchmarkSyncArchiveFilesScored(b *testing.B) {
+	dir := b.TempDir()
+	db, err := OpenDatabase(filepath.Join(dir, "gextto.db"))
+	if err != nil {
+		b.Fatalf("OpenDatabase: %v", err)
+	}
+	b.Cleanup(func() { _ = db.Close() })
+	path := filepath.Join(dir, "episode.mkv")
+	if err := os.WriteFile(path, []byte("x"), 0o644); err != nil {
+		b.Fatalf("WriteFile: %v", err)
+	}
+	const files = 500
+	records := make([]ArchiveFileRecord, files)
+	for index := range records {
+		records[index] = ArchiveFileRecord{
+			Season: 1, Episode: int64(index + 1),
+			Title: "Bench Series S01E01 1080p WEB-DL", Path: path,
+			SizeBytes: 1024, QualityScore: 1000,
+		}
+	}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for range b.N {
+		if _, err := db.SyncArchiveFilesScored("Bench Series", records); err != nil {
+			b.Fatalf("SyncArchiveFilesScored: %v", err)
+		}
+	}
+}

@@ -13,6 +13,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 	"unicode"
@@ -1221,39 +1222,136 @@ func (c *Config) FindSeriesMatch(name string, season *int64) *SeriesConfig {
 		}
 		return true
 	}
-	candidates := func(series *SeriesConfig) []string {
-		values := make([]string, 0, len(series.Aliases)+1)
-		values = append(values, series.Name)
-		values = append(values, series.Aliases...)
-		return values
-	}
+	// The configured names are indexed once and reused while the series list
+	// does not change: without it the tolerant pass re-normalised every name and
+	// alias of the library for every release (milliseconds per release).
+	index := configuredSeriesIndex(c.Series)
+	return c.findSeriesMatchIndexed(normalized, season, eligible, index)
+}
+
+// findSeriesMatchIndexed is FindSeriesMatch with the prepared index.
+func (c *Config) findSeriesMatchIndexed(normalized string, season *int64, eligible func(*SeriesConfig) bool, index *seriesNameIndex) *SeriesConfig {
 	// Prefer an exact normalized name over a tolerant suffix match. This keeps
 	// similarly named monitored series distinct (for example `Scrubs` and
 	// `Scrubs 2026`) while still accepting release years and technical suffixes
 	// when no exact configuration exists.
-	for index := range c.Series {
-		series := &c.Series[index]
-		if !eligible(series) {
-			continue
-		}
-		for _, candidate := range candidates(series) {
-			if NormalizeSeriesName(candidate) == normalized {
-				return series
-			}
+	for _, position := range index.exact[normalized] {
+		series := &c.Series[position]
+		if eligible(series) {
+			return series
 		}
 	}
-	for index := range c.Series {
-		series := &c.Series[index]
+	rightKey := seriesNameKey(normalized)
+	rightWords := strings.Fields(rightKey)
+	for position := range c.Series {
+		series := &c.Series[position]
 		if !eligible(series) {
 			continue
 		}
-		for _, candidate := range candidates(series) {
-			if SeriesNamesMatch(candidate, normalized) {
+		for _, candidate := range index.candidates[position] {
+			if seriesKeyWordsMatch(candidate.key, rightKey, candidate.words, rightWords) {
 				return series
 			}
 		}
 	}
 	return nil
+}
+
+// seriesNameIndex is the prepared form of the configured series list: the exact
+// key of every name and alias, and the comparison key with its words for the
+// tolerant pass.
+type seriesNameIndex struct {
+	fingerprint uint64
+	count       int
+	exact       map[string][]int32
+	candidates  [][]seriesCandidateKey
+}
+
+// seriesCandidateKey is one configured name or alias, ready to be compared with
+// a release name.
+type seriesCandidateKey struct {
+	key   string
+	words []string
+}
+
+var (
+	seriesNameIndexMu    sync.Mutex
+	seriesNameIndexCache *seriesNameIndex
+)
+
+// configuredSeriesIndex returns the index for the given series list, rebuilding
+// it only when the list content changed. The fingerprint makes the cache safe
+// against in-place edits of a Config (a handler appending a series), which a
+// pointer-keyed cache would miss.
+func configuredSeriesIndex(series []SeriesConfig) *seriesNameIndex {
+	fingerprint := seriesFingerprint(series)
+	seriesNameIndexMu.Lock()
+	defer seriesNameIndexMu.Unlock()
+	if cached := seriesNameIndexCache; cached != nil && cached.fingerprint == fingerprint && cached.count == len(series) {
+		return cached
+	}
+	index := buildSeriesNameIndex(series, fingerprint)
+	seriesNameIndexCache = index
+	return index
+}
+
+// buildSeriesNameIndex prepares every configured name and alias.
+func buildSeriesNameIndex(series []SeriesConfig, fingerprint uint64) *seriesNameIndex {
+	index := &seriesNameIndex{
+		fingerprint: fingerprint,
+		count:       len(series),
+		exact:       make(map[string][]int32, len(series)),
+		candidates:  make([][]seriesCandidateKey, len(series)),
+	}
+	for position := range series {
+		values := make([]string, 0, len(series[position].Aliases)+1)
+		values = append(values, series[position].Name)
+		values = append(values, series[position].Aliases...)
+		pairs := make([]seriesCandidateKey, 0, len(values))
+		for _, value := range values {
+			index.exact[NormalizeSeriesName(value)] = append(index.exact[NormalizeSeriesName(value)], int32(position))
+			key := seriesNameKey(value)
+			pairs = append(pairs, seriesCandidateKey{key: key, words: strings.Fields(key)})
+		}
+		index.candidates[position] = pairs
+	}
+	return index
+}
+
+// seriesFingerprint hashes the fields the match depends on: the names, the
+// aliases and the season filters that decide whether a series is eligible. It
+// costs one pass over the configured names and is paid once per lookup.
+func seriesFingerprint(series []SeriesConfig) uint64 {
+	const (
+		offset = 14695981039346656037
+		prime  = 1099511628211
+	)
+	hash := uint64(offset)
+	add := func(value string) {
+		for index := 0; index < len(value); index++ {
+			hash ^= uint64(value[index])
+			hash *= prime
+		}
+		hash ^= 0xff // separator, so ("ab","c") and ("a","bc") differ
+		hash *= prime
+	}
+	for position := range series {
+		entry := &series[position]
+		add(entry.Name)
+		add(entry.Seasons)
+		if entry.Enabled {
+			add("1")
+		} else {
+			add("0")
+		}
+		for _, season := range entry.IgnoredSeasons {
+			add(strconv.FormatInt(season, 10))
+		}
+		for _, alias := range entry.Aliases {
+			add(alias)
+		}
+	}
+	return hash
 }
 
 // FindSeriesByName finds a configured series by name/alias ignoring the

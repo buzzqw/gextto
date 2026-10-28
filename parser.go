@@ -101,11 +101,29 @@ func NormalizeSeriesName(value string) string {
 
 // SeriesNamesMatch confronta due nomi di serie.
 func SeriesNamesMatch(a, b string) bool {
-	left := matchingName(stripYearTokens(NormalizeSeriesName(a)))
-	right := matchingName(stripYearTokens(NormalizeSeriesName(b)))
-	if tokensMatch(left, right) ||
-		tokensMatchWithReleaseSuffix(left, right) ||
-		tokensMatchWithReleaseSuffix(right, left) {
+	return seriesKeysMatch(seriesNameKey(a), seriesNameKey(b))
+}
+
+// seriesNameKey is the form of a name SeriesNamesMatch compares: normalised,
+// with the year tokens stripped and cut into words. It is pure, so a caller that
+// compares one release against every configured series can compute the keys of
+// the configured side once (see configuredSeriesIndex).
+func seriesNameKey(value string) string {
+	return matchingName(stripYearTokens(NormalizeSeriesName(value)))
+}
+
+// seriesKeysMatch compares two values already reduced by seriesNameKey.
+func seriesKeysMatch(left, right string) bool {
+	return seriesKeyWordsMatch(left, right, strings.Fields(left), strings.Fields(right))
+}
+
+// seriesKeyWordsMatch is the comparison itself. The words are passed in because
+// the configured side keeps them precomputed: the tolerant pass compares a
+// release name against every series name and alias of the library.
+func seriesKeyWordsMatch(left, right string, leftWords, rightWords []string) bool {
+	if tokensMatchWords(leftWords, rightWords) ||
+		tokensMatchWithReleaseSuffixWords(leftWords, rightWords) ||
+		tokensMatchWithReleaseSuffixWords(rightWords, leftWords) {
 		return true
 	}
 	// Titoli "stilizzati" (es. `PLUR1BUS` per *Pluribus*): confronta una
@@ -115,9 +133,11 @@ func SeriesNamesMatch(a, b string) bool {
 	if hasASCIIDigit(left) != hasASCIIDigit(right) {
 		foldedLeft := leetFold(left)
 		foldedRight := leetFold(right)
-		if tokensMatch(foldedLeft, foldedRight) ||
-			tokensMatchWithReleaseSuffix(foldedLeft, foldedRight) ||
-			tokensMatchWithReleaseSuffix(foldedRight, foldedLeft) {
+		foldedLeftWords := strings.Fields(foldedLeft)
+		foldedRightWords := strings.Fields(foldedRight)
+		if tokensMatchWords(foldedLeftWords, foldedRightWords) ||
+			tokensMatchWithReleaseSuffixWords(foldedLeftWords, foldedRightWords) ||
+			tokensMatchWithReleaseSuffixWords(foldedRightWords, foldedLeftWords) {
 			return true
 		}
 	}
@@ -209,8 +229,12 @@ func foldLatinCharacter(character rune) rune {
 // tags. It intentionally only accepts suffixes, so `New Tricks` does not match
 // `Old Dog New Tricks`.
 func tokensMatchWithReleaseSuffix(configured, candidate string) bool {
-	configuredWords := strings.Fields(configured)
-	candidateWords := strings.Fields(candidate)
+	return tokensMatchWithReleaseSuffixWords(strings.Fields(configured), strings.Fields(candidate))
+}
+
+// tokensMatchWithReleaseSuffixWords is tokensMatchWithReleaseSuffix on words
+// that are already split.
+func tokensMatchWithReleaseSuffixWords(configuredWords, candidateWords []string) bool {
 	if len(candidateWords) <= len(configuredWords) || !tokensMatchPrefix(configuredWords, candidateWords) {
 		return false
 	}
@@ -251,8 +275,11 @@ func tokensMatch(left, right string) bool {
 	if left == right {
 		return true
 	}
-	leftWords := strings.Fields(left)
-	rightWords := strings.Fields(right)
+	return tokensMatchWords(strings.Fields(left), strings.Fields(right))
+}
+
+// tokensMatchWords is tokensMatch on words that are already split.
+func tokensMatchWords(leftWords, rightWords []string) bool {
 	if len(leftWords) != len(rightWords) {
 		return false
 	}

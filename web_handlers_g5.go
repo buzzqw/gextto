@@ -197,7 +197,7 @@ func gh5_scanArchivePath(db *Database, series *SeriesConfig, path string, cfg *C
 		return 0, 0, err
 	}
 	found := 0
-	updated := 0
+	records := make([]ArchiveFileRecord, 0, len(files))
 	for _, file := range files {
 		name := filepath.Base(file)
 		season, episodes, ok := gh5_parseSeasonEpisodes(name)
@@ -212,23 +212,27 @@ func gh5_scanArchivePath(db *Database, series *SeriesConfig, path string, cfg *C
 			continue
 		}
 		found++
-		var size int64
-		if fileInfo, statErr := os.Stat(file); statErr == nil {
-			size = fileInfo.Size()
-		}
-		title := strings.TrimSuffix(name, filepath.Ext(name))
-		if strings.TrimSpace(title) == "" {
-			title = name
-		}
+		title := archiveFileTitle(name)
+		size := archiveFileSize(file)
 		qualityScore := cfg.FileScore(file, "series", series.Name)
 		for _, episode := range episodes {
-			if syncErr := db.SyncArchiveFileScored(series.Name, season, episode, title, file, size, qualityScore); syncErr != nil {
-				return found, updated, syncErr
-			}
+			records = append(records, ArchiveFileRecord{
+				Season:       season,
+				Episode:      episode,
+				Title:        title,
+				Path:         file,
+				SizeBytes:    size,
+				QualityScore: qualityScore,
+			})
 		}
-		updated++
 	}
-	return found, updated, nil
+	// One transaction for the whole series instead of one commit per file. The
+	// returned count stays "files updated", as the page has always reported it:
+	// a range file is one file even when it registers several episodes.
+	if _, batchErr := db.SyncArchiveFilesScored(series.Name, records); batchErr != nil {
+		return found, 0, batchErr
+	}
+	return found, found, nil
 }
 
 // ---------------------------------------------------------------------------
