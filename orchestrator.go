@@ -2358,6 +2358,10 @@ func runComicsIfDue(ctx context.Context, cfg *Config, db *Database, comics *Comi
 	// waiting for the automatic interval; otherwise the Comics button appears
 	// to do nothing when the next scheduled check is not due yet.
 	if !requested && comicsInterval != 0 && saturatingSub(nowTs, lastComicsCheck) < comicsInterval {
+		// The full comics check is not due, but a weekly pack whose links were
+		// published after its page, or whose download failed, must not wait for
+		// the whole week: retrying it costs one page read per pending pack.
+		retryPendingWeeklyPacks(ctx, cfg, db, comics, notifier, torrents, nil)
 		return
 	}
 	downloaded, runErr := RunComicsCycle(ctx, comics, NewGetComicsClient(), notifier, cfg.DownloadDir, torrents, db, cfg)

@@ -898,7 +898,10 @@ changes nothing: it reloads the table with the filter you typed.
   when you deleted its folder after reading it. The log line also says why it
   downloads it: a new pack of the week, or the download link that became
   available after the pack was found without one, or that it was already
-  downloaded and is left alone. Direct
+  downloaded and is left alone. A pack found before GetComics published its
+  links does not wait for the next weekly check: Gextto rechecks only the packs
+  still waiting at every cycle and queues one as soon as its link appears.
+  Direct
   HTTP downloads appear in **Downloads in session** with status, bytes, progress,
   speed and pause/resume actions. A comic completed by its own pipeline shows as
   **Completed · archived** at 100% even when the pack's torrent is paused and

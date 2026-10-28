@@ -16,6 +16,8 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
 
 ## 28 ottobre 2026
 
+- **I Weekly Pack arrivano appena sono scaricabili.** GetComics pubblica la pagina del pack prima dei link di download, e il controllo fumetti gira una volta a settimana: il pack restava in attesa fino al controllo successivo, cioè circa una settimana. Ora a ogni ciclo normale Gextto ricontrolla solo i pack già registrati ma non ancora scaricati e li accoda appena il link compare, senza rifare il controllo dei fumetti. Il pack della settimana del 21 ottobre, fermo dal 23, viene preso al prossimo ciclo.
+
 - **I fumetti monitorati seguono la serie, non solo l'albo scelto.** Un monitor con il numero nel titolo («Poison Ivy #41», «Spawn #373») veniva confrontato solo con quel numero: il giro automatico non trovava mai i numeri nuovi, che comparivano soltanto cercandoli a mano. Ora il controllo periodico scarica anche i numeri successivi della stessa serie; numeri precedenti, albi di altre serie e raccolte restano esclusi. Il post scelto in *Aggiungi fumetto* viene scaricato così com'è, e da lì in avanti la serie prosegue da sola.
 
 - **La pagina Salute mostra solo le sorgenti davvero configurate.** Se toglievi un indexer dalle integrazioni, o lo disattivavi, la sua riga restava in *Salute → Stato provider* con l'ultimo errore, come se fosse ancora in uso (per esempio «mircrew indexerr»). Ora la tabella elenca solo gli indexer presenti e attivi e i feed configurati, e la riga di una sorgente rimossa viene dimenticata: se la riaggiungi riparte senza il vecchio backoff. Non c'è nulla da configurare.

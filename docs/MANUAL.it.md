@@ -920,7 +920,10 @@ elenco** invece non modifica nulla: rilegge la tabella con il filtro scritto.
   ripreso nemmeno se dopo averlo letto hai cancellato la cartella. La riga del
   log spiega anche il perché: nuovo pack della settimana, link di download
   arrivato dopo che il pack era stato trovato senza, oppure già scaricato in
-  passato e quindi lasciato stare.
+  passato e quindi lasciato stare. Un pack trovato prima che GetComics
+  pubblicasse i link non aspetta il controllo settimanale successivo: Gextto
+  ricontrolla a ogni ciclo solo i pack in attesa e lo accoda appena il link
+  compare.
   I download HTTP diretti compaiono in **Download in sessione** con stato,
   byte, progressione, velocità e azioni pausa/riprendi.
   Un fumetto completato dal suo pipeline compare come **Completato · archiviato**

@@ -642,6 +642,66 @@ func TestComicsCycleDownloadsLaterIssuesOfAMonitoredSeries(t *testing.T) {
 	}
 }
 
+// comicTestTorrentEngine records the magnets handed to it, so a test can see
+// that a weekly pack was queued.
+type comicTestTorrentEngine struct {
+	mockTorrentEngine
+	added []string
+}
+
+func (e *comicTestTorrentEngine) AddWithPath(magnet string, cfg *Config, preferredPath *string) (bool, error) {
+	e.added = append(e.added, magnet)
+	return true, nil
+}
+
+// TestRetryPendingWeeklyPacksTakesThePackWhenLinksAppear covers the weekly pack
+// that GetComics publishes before its download links: the comics check is
+// weekly, so without the retry the pack waited for the next full check.
+func TestRetryPendingWeeklyPacksTakesThePackWhenLinksAppear(t *testing.T) {
+	const packDate = "2026-10-21"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/blog/"+packDate+"-weekly-pack/" {
+			http.NotFound(w, r)
+			return
+		}
+		fmt.Fprint(w, `<html><body><a href="magnet:?xt=urn:btih:8fd17ab42ed591c4cda1e92a8657dd9b13981411&amp;dn=2026.10.21%20Weekly%20Pack">MAGNET</a></body></html>`)
+	}))
+	defer server.Close()
+
+	db := openTestComicsDb(t)
+	defer db.Close()
+	if err := db.SetSetting("weekly_enabled", "yes"); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.SetSetting("weekly_from_date", "2026-09-07"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.UpsertWeeklyLinks(packDate, "", ""); err != nil {
+		t.Fatal(err)
+	}
+	mainDB, err := OpenDatabase(filepath.Join(t.TempDir(), "gextto.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mainDB.Close()
+	engine := &comicTestTorrentEngine{}
+	cfg := &Config{DataDir: t.TempDir(), DownloadDir: t.TempDir()}
+	client := &GetComicsClient{client: server.Client(), baseURL: server.URL}
+
+	retryPendingWeeklyPacks(context.Background(), cfg, mainDB, db, NewNotifier(), engine, client)
+
+	sent, err := db.WeeklySent(packDate)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !sent {
+		t.Fatal("the pack with a link now available was not marked as sent")
+	}
+	if len(engine.added) != 1 {
+		t.Fatalf("magnets queued = %d, want 1", len(engine.added))
+	}
+}
+
 func TestMonitoredHistoryAndWeeklyRecordsAreIdempotent(t *testing.T) {
 	db := openTestComicsDb(t)
 	id, err := db.AddMonitored("Example", "tag/example", "2026-01-01", "comics")

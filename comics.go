@@ -674,6 +674,30 @@ func (d *ComicsDb) PendingWeekly() ([]WeeklyPending, error) {
 	return items, rows.Err()
 }
 
+// PendingWeeklyWithoutLinks returns the recorded packs whose page was found
+// before GetComics published a download link, oldest first. They are kept apart
+// from PendingWeekly because they are not ready to download yet: their page has
+// to be read again.
+func (d *ComicsDb) PendingWeeklyWithoutLinks(fromDate string) ([]string, error) {
+	rows, err := d.db.Query(
+		"SELECT pack_date FROM comics_weekly WHERE sent_at IS NULL AND COALESCE(magnet,'')='' AND COALESCE(torrent_url,'')='' AND pack_date>=?1 ORDER BY pack_date",
+		strings.TrimSpace(fromDate),
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []string{}
+	for rows.Next() {
+		var date string
+		if err := rows.Scan(&date); err != nil {
+			return nil, err
+		}
+		items = append(items, date)
+	}
+	return items, rows.Err()
+}
+
 // ---------------------------------------------------------------------------
 // In-process HTTP download registry: two mutex-protected maps, with one
 // goroutine per active download.
@@ -2189,6 +2213,68 @@ func sendWeeklyPack(db *ComicsDb, client *GetComicsClient, torrents TorrentEngin
 		return true, nil
 	}
 	return false, nil
+}
+
+// retryPendingWeeklyPacks looks again, between the scheduled weekly checks, at
+// the packs that are recorded but not downloaded yet: a download that failed, a
+// pack whose page GetComics published before its links, or a pack that was in
+// transfer when it was first seen. The comics check runs once a week, but
+// GetComics adds a pack's download links a few days after the page: waiting for
+// the next weekly check delivered every pack about a week late.
+func retryPendingWeeklyPacks(ctx context.Context, cfg *Config, db *Database, comics *ComicsDb, notifier *Notifier, torrents TorrentEngine, client *GetComicsClient) {
+	if comics == nil || cfg == nil || cfg.DryRun {
+		return
+	}
+	enabled, err := comics.Setting("weekly_enabled", "no")
+	if err != nil || !settingTruthy(enabled) {
+		return
+	}
+	if client == nil {
+		client = NewGetComicsClient()
+	}
+	target := weeklyPackDirectory(cfg, cfg.DownloadDir)
+	// Packs that already have a link: a previous download failed, or the pack
+	// was recorded by an earlier check and never sent.
+	if pending, err := comics.PendingWeekly(); err == nil {
+		for _, pack := range pending {
+			if ctx.Err() != nil {
+				return
+			}
+			queueWeeklyPack(comics, client, torrents, notifier, target, db, cfg, pack.PackDate, pack.Magnet, pack.TorrentURL, "", "it was recorded earlier and had not been downloaded yet")
+		}
+	}
+	// Packs whose page exists without a download link yet: read the page again
+	// and take the pack as soon as GetComics publishes the link.
+	fromDate, err := comics.Setting("weekly_from_date", "")
+	if err != nil {
+		return
+	}
+	waiting, err := comics.PendingWeeklyWithoutLinks(fromDate)
+	if err != nil {
+		return
+	}
+	for _, date := range waiting {
+		if ctx.Err() != nil {
+			return
+		}
+		_, links, err := client.WeeklyLinks(date)
+		if err != nil {
+			continue
+		}
+		magnet := firstComicString(links.Magnets)
+		torrentURL := firstComicString(links.Torrents)
+		directURL := firstComicString(links.DownloadNow)
+		if directURL == "" {
+			directURL = firstComicString(links.Direct)
+		}
+		if magnet == "" && torrentURL == "" && directURL == "" {
+			continue
+		}
+		if _, err := comics.UpsertWeeklyLinks(date, magnet, torrentURL); err != nil {
+			continue
+		}
+		queueWeeklyPack(comics, client, torrents, notifier, target, db, cfg, date, magnet, torrentURL, directURL, "its download link is available now")
+	}
 }
 
 // ---------------------------------------------------------------------------
