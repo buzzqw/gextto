@@ -151,6 +151,12 @@ func (e ErrCapabilityUnavailable) Error() string {
 	return fmt.Sprintf("torrent backend %q does not support %q", e.Backend, e.Capability)
 }
 
+// ErrTorrentMoving reports that the engine is relocating a torrent's payload
+// and refuses to change it (file priorities, start, pause) until the move
+// ends. It is a postponement, not a failure: callers retry at the next
+// inspection without a warning. Backends map their own wording onto it.
+var ErrTorrentMoving = errors.New("the torrent payload is being moved")
+
 // Backend identifiers accepted by `torrent_backend`.
 const (
 	BackendQbittorrent = "qbittorrent"

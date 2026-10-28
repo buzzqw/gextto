@@ -7,7 +7,7 @@ separata, ma sono rappresentati nella voce della modifica a cui appartengono.
 Per il dettaglio tecnico restano i commit e i documenti in `docs/`.
 
 La versione installata è quella mostrata da Gextto (`<serie>.<build>`, per
-esempio `1.1.1961`): il terzo numero è sempre la build, il secondo si alza a
+esempio `1.2.2066`): il terzo numero è sempre la build, il secondo si alza a
 mano quando si apre una nuova serie. Il manuale
 aggiornato è online: [italiano](docs/MANUAL.it.md) ·
 [English](docs/MANUAL.en.md). La versione inglese di questo changelog è
@@ -15,6 +15,12 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
 [issue su GitHub](https://github.com/buzzqw/gextto/issues).
 
 ## 28 ottobre 2026
+
+- **«Cerca mancanti» non tiene più ferma la scheda della serie.** Il pulsante nella scheda di una serie avviava la ricerca e lasciava la pagina in attesa per minuti, tanto più a lungo quante più puntate mancavano. Ora avvia la stessa ricerca in background della scheda *Mancanti*: la pagina dice a che punto è, si può annullare e, quando finisce, elenca i risultati con **Scarica** restando sulla serie. Anche la ricerca avviata da un programma esterno o dal terminale risponde entro 90 secondi con le puntate già controllate (il campo `complete` dice se ha finito) invece di restare appesa, e una ricerca annullata segna come cercate solo le puntate che ha davvero guardato: il passaggio approfondito non salta le altre per un giorno.
+
+- **La copia fuori profilo compare anche nella ricerca manuale.** Quando per un episodio mancante non esiste nessuna copia nel profilo qualità, l'elenco di *Cerca mancanti* e della singola puntata mostra ora la copia nella lingua richiesta con il badge «🆘 ultima risorsa»: è quella che Gextto prenderebbe da solo, invece di far leggere «nessun risultato» per un episodio che poi scaricava. Lo stesso vale per una copia che si trova solo nell'archivio locale: il ciclo la può prendere come ultima risorsa, prima restava invisibile.
+
+- **Una serie «in produzione» che ha già trasmesso non perde più le puntate mancanti.** Gextto considerava senza buchi ogni serie con stato «In produzione» o «Pianificata», anche se una puntata era già andata in onda: i suoi mancanti sparivano dalla scheda *Mancanti*. Ora lo stato conta solo se la serie non ha mai trasmesso; una data di ultima messa in onda conosciuta lo scavalca.
 
 - **Gextto passa alla serie 1.2.** Da questa build la versione è `1.2.<build>` (la prima è la 1.2.2065); il numero di build continua da dove era. gx-torrent resta nella sua serie. Il controllo degli aggiornamenti confronta commit e build, quindi un'installazione 1.1 vede la 1.2 come aggiornamento normale.
 
@@ -30,13 +36,13 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
 
 - **Le release eD2k di indexarr si scaricano anche in automatico.** indexarr manda per i link eD2k un numero di seed e peer pari a zero, perché sulla rete eD2k l'indexer non può contarli. Gextto li leggeva come «nessuno condivide il file» e, nella ricerca automatica, rifiutava ogni release eD2k di indexarr come morta: si poteva scaricarla solo a mano. Ora per un link eD2k quei numeri vengono ignorati e le fonti le trova aMule, come per i link che Gextto trova da solo. Non c'è nulla da configurare.
 
-- **I download eD2k presi da indexarr compaiono nel suo Log → Download.** Prima Gextto leggeva il link diretto `ed2k` e lo accodava in aMule senza dire niente a indexarr: per indexarr quel download non era mai avvenuto e il contatore eD2k restava a zero. Ora, quando il risultato arriva da un indexer che espone anche un link di download HTTP (indexarr, o Jackett e Prowlarr con lo stesso schema), Gextto lo apre una volta prima di accodare il file: indexarr registra il download e la fonte che l'ha fornito. Il trasferimento resta il link `ed2k://` diretto; il rinvio non viene seguito e un errore dell'avviso non blocca il download. Con un link `ed2k://` diretto non cambia nulla.
+- **I download eD2k presi da indexarr compaiono nel suo Log → Download.** Prima Gextto leggeva il link diretto `ed2k` e lo accodava in aMule senza dire niente a indexarr: per indexarr quel download non era mai avvenuto e il contatore eD2k restava a zero. Ora, quando il risultato arriva da un indexer che espone anche un link di download HTTP (indexarr, o Jackett e Prowlarr con lo stesso schema), Gextto lo apre una volta quando il file è in coda, senza far aspettare il download: indexarr registra il download e la fonte che l'ha fornito. Il trasferimento resta il link `ed2k://` diretto; il rinvio non viene seguito e un errore dell'avviso non blocca il download. Con un link `ed2k://` diretto non cambia nulla.
 
 ## 27 ottobre 2026
 
 - **I link eD2k arrivano anche da indexarr.** Se in indexarr aggiungi una fonte eD2k (per esempio il forum DDUnlimited), i suoi risultati ora arrivano a Gextto come link `ed2k://` e non vengono più scartati perché non hanno un magnet o un `.torrent`. Gextto li mostra come rete eD2k nella ricerca e nell'archivio, e al momento dello scarico li accoda in aMule come quelli che trova da solo; il client torrent non viene toccato. Non c'è nulla da configurare: basta che la fonte sia abilitata in indexarr e che l'indexer indexarr sia già fra le sorgenti di Gextto. Con indexarr la ricerca aspetta fino a 45 secondi (invece dei 5 delle altre fonti) per dare tempo alla fonte eD2k di aprire le pagine dei topic; Sonarr, Radarr e gli altri programmi non ricevono questa attesa e restano come prima.
 
-- **La ricerca web non taglia più tutte le fonti insieme dopo 15 secondi.** Prima c'era un unico budget di 15 secondi per tutte le fonti web della ricerca, e comprendeva anche l'attesa in coda: con otto motori e quattro posti, la seconda metà poteva non partire nemmeno. Ora ogni motore ha i suoi 15 secondi da quando inizia, quindi nessuno viene escluso solo perché era in attesa; le risposte già arrivate restano. Un singolo motore più lento di 15 secondi viene ancora lasciato indietro per quella ricerca, ma non ferma gli altri e non riempie più il log di avvisi: il dettaglio finisce nel log di debug.
+- **La ricerca web non taglia più tutte le fonti insieme dopo 15 secondi.** Prima c'era un unico budget di 15 secondi per tutte le fonti web della ricerca, e comprendeva anche l'attesa in coda: con otto motori e quattro posti, la seconda metà poteva non partire nemmeno. Ora ogni motore ha i suoi 15 secondi da quando inizia, quindi nessuno viene escluso solo perché era in attesa; le risposte già arrivate restano. Un singolo motore più lento di 15 secondi viene ancora lasciato indietro per quella ricerca, ma non ferma gli altri e non riempie più il log di avvisi: il dettaglio finisce nel log di debug. Con più motori dei posti disponibili il tempo complessivo della ricerca può allungarsi: prima la seconda metà veniva comunque tagliata.
 
 - **Una serie non ancora uscita non compare più fra i mancanti.** Se i metadati dicono che una serie è ancora «In produzione» (o pianificata), Gextto non considera mancanti le puntate annunciate: prima le ricavava dal numero previsto per la stagione e la scheda *Mancanti* mostrava serie che non erano ancora andate in onda. Lo stesso vale per una puntata con una data di messa in onda futura già conosciuta. I buchi veri restano quelli di sempre.
 

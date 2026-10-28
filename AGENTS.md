@@ -134,10 +134,10 @@ not to break.
   read the same file (`build_number`, the current value). CI does not use
   `github.run_number`: the build and `release.json` take the value from the
   file, so the installed version has the **same** version as the checkout. The
-  version shown is `<series>.<build>`, where the series is `1.1` and the third
-  number is **always the build** (`1.1.1961`). The second number is raised
+  version shown is `<series>.<build>`, where the series is `1.2` and the third
+  number is **always the build** (`1.2.2066`). The second number is raised
   **by hand** in `version_series`, only when a new series is deliberately
-  started (`1.2.2000`); there is no automatic rollover. The version, the full
+  started (`1.3.2100`); there is no automatic rollover. The version, the full
   build and the commit it was compiled from are shown at the bottom of the
   **Maintenance** page. To move the build forward, run `make build` and commit
   the updated file. After a `git pull` that changes `build_number`, rebuild to
@@ -351,7 +351,7 @@ itself (or rolls back).
   (both rotated at 5 MB × 4); `gx-torrent.crash.log` only for crashes.
 - Check: `systemctl --user status gextto`;
   `curl -s http://127.0.0.1:5000/api/status` (field `version` = Gextto's
-  version, `<series>.<build>`: `1.1.1961`, with the series raised by hand);
+  version, `<series>.<build>`: `1.2.2066`, with the series raised by hand);
   `curl -s http://127.0.0.1:8890/api/v1/health` (gx-torrent daemon:
   `version` = its own `<series>.<build>`, `pid`, `fingerprint`).
 

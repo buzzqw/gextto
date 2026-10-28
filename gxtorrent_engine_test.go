@@ -2,6 +2,7 @@ package gextto
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -1361,5 +1362,19 @@ func TestGxTorrentFilesCheckIsCached(t *testing.T) {
 	engine.missingTorrentFilesLocked(map[string]models.TorrentView{}, later)
 	if len(engine.torrentFilesOK) != 0 {
 		t.Fatalf("removed torrents must be dropped from the cache")
+	}
+}
+
+// TestGxAPIErrorNamesTheMovingTorrent: the automation postpones file priorities
+// while the daemon relocates the payload; it must test errors.Is on the contract
+// error, not the wording of one backend.
+func TestGxAPIErrorNamesTheMovingTorrent(t *testing.T) {
+	moving := gxAPIError{Status: http.StatusConflict, Message: "the torrent is being moved"}
+	if !errors.Is(moving, ErrTorrentMoving) {
+		t.Fatal("a moving torrent is not reported as ErrTorrentMoving")
+	}
+	other := gxAPIError{Status: http.StatusBadRequest, Message: "invalid hash"}
+	if errors.Is(other, ErrTorrentMoving) {
+		t.Fatal("an unrelated rejection matched ErrTorrentMoving")
 	}
 }

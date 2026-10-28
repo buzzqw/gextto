@@ -2932,11 +2932,17 @@
 <div class="view">
   <div class="toolbar">
     <a class="btn sm" href="/?view=series" title="Torna all'elenco delle serie">← Serie TV</a>
-        {{template "v2_action_btn" (dict "Redirect" (printf "/?view=series&series=%s" .PathName) "Path" (printf "/api/series/%s/search-missing" .PathName) "Method" "POST" "Body" "{}" "Label" "Cerca mancanti" "Class" "primary" "Title" "Cerca le release per gli episodi mancanti")}}
+    <form class="toolbar" hx-post="/series/gaps/search" hx-target="#v2-gap-result-series" hx-swap="innerHTML" hx-disabled-elt="find button[type=submit]" hx-indicator="#v2-series-gap-busy">
+      <input type="hidden" name="series" value="{{.Name}}" />
+      <input type="hidden" name="slot" value="series" />
+      <button class="btn sm primary" type="submit" title="Cerca in background le puntate mancanti di questa serie sulle sorgenti configurate: la scheda mostra l'avanzamento e i risultati">Cerca mancanti</button>
+      <span id="v2-series-gap-busy" class="htmx-indicator muted">Avvio della ricerca…</span>
+    </form>
     {{template "v2_action_btn" (dict "Redirect" (printf "/?view=series&series=%s" .PathName) "Path" (printf "/api/series/%s/scan-archive" .PathName) "Method" "POST" "Body" "{}" "Label" "Scansiona archivio" "Class" "" "Title" "Scansiona l'archivio per questa serie")}}
     {{template "v2_action_btn" (dict "Redirect" (printf "/?view=series&series=%s" .PathName) "Path" (printf "/api/series/%s/metadata" .PathName) "Method" "POST" "Body" "{}" "Label" "Aggiorna da TMDB" "Class" "" "Title" "Aggiorna i metadati TMDB")}}
     <button class="btn sm" type="button" hx-get="/series/rename-preview?series={{.PathName | urlquery}}" hx-target="#v2-rename-preview" hx-swap="innerHTML" title="Mostra le rinomine proposte senza toccare i file">Anteprima rinomina</button>
   </div>
+  <div id="v2-gap-result-series" class="v2-gap-result" role="status" aria-live="polite"></div>
   <div id="v2-rename-preview"></div>
 
   <div class="panel">
@@ -3132,7 +3138,7 @@
 <div class="table-wrap"><table class="data-table">
   <thead><tr>{{if .ShowEpisode}}<th scope="col">Puntata</th>{{end}}<th scope="col">Titolo</th><th scope="col">Sorgente</th><th scope="col">Punteggio</th><th scope="col">Dimensione</th><th scope="col">Azioni</th></tr></thead>
   <tbody>{{range .Results}}<tr>{{if $.ShowEpisode}}<td class="nowrap">{{.Episode}}</td>{{end}}
-    <td class="truncate" title="{{.Title}}">{{.Title}}</td>
+    <td class="truncate" title="{{.Title}}">{{.Title}}{{if .LastResort}} <span class="badge warn" title="Ultima risorsa: episodio mancante preso fuori dalla risoluzione del profilo perché era l'unica copia nella lingua richiesta. L'upgrade lo sostituisce appena esce una copia nel profilo.">🆘 ultima risorsa</span>{{end}}</td>
     <td>{{.Source}}</td><td class="numeric">{{.Score}}</td><td class="numeric">{{if .SizeBytes}}{{bytes .SizeBytes}}{{else}}—{{end}}</td>
     <td class="row-actions">{{if .Magnet}}<button class="btn sm" type="button" data-v2-copy="{{.Magnet}}" title="Copia il link magnet negli appunti">Copia magnet</button>{{end}}{{if .Body}}{{template "v2_action_btn" (dict "Redirect" $.Redirect "Path" "/api/archive/batch-download" "Method" "POST" "Body" .Body "Label" "Scarica" "Class" "primary" "Title" "Aggiungi questa release ai download")}}{{end}}</td>
   </tr>{{end}}</tbody>

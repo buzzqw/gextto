@@ -103,15 +103,16 @@ func V2SeriesSave(w http.ResponseWriter, r *http.Request, s *AppState) {
 }
 
 type v2SourceRow struct {
-	Title     string
-	Episode   string
-	Source    string
-	Origin    string
-	Score     int64
-	SizeBytes int64
-	Magnet    template.URL
-	Body      string
-	Key       string
+	Title      string
+	Episode    string
+	Source     string
+	Origin     string
+	Score      int64
+	SizeBytes  int64
+	Magnet     template.URL
+	Body       string
+	Key        string
+	LastResort bool
 }
 
 type v2SourcesView struct {
@@ -145,13 +146,14 @@ func v2SourceRowFromRelease(release *models.Release, origin string, season, epis
 		"items": []map[string]string{{"title": release.Title, "magnet": link, "source": release.Source, "ed2k_link": ed2kLink}},
 	})
 	row := v2SourceRow{
-		Title:     release.Title,
-		Source:    sourceLabel,
-		Origin:    origin,
-		Score:     release.Score,
-		SizeBytes: release.SizeBytes,
-		Magnet:    uiMagnetURL(link),
-		Key:       v2SourceKey(keyLink, release.Title),
+		Title:      release.Title,
+		Source:     sourceLabel,
+		Origin:     origin,
+		Score:      release.Score,
+		SizeBytes:  release.SizeBytes,
+		Magnet:     uiMagnetURL(link),
+		Key:        v2SourceKey(keyLink, release.Title),
+		LastResort: release.LastResort,
 	}
 	if season > 0 && episode > 0 {
 		row.Episode = fmt.Sprintf("S%02dE%02d", season, episode)

@@ -1,6 +1,7 @@
 package gextto
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -75,5 +76,39 @@ func TestDuplicateCopiesKeepTheLastResortMark(t *testing.T) {
 		if !merged[0].LastResort {
 			t.Fatalf("merged copy lost the last resort mark: %+v", merged[0])
 		}
+	}
+}
+
+// TestManualSearchListsTheLastResortCopy: the cycle takes a copy outside the
+// profile when the gap has nothing better; the manual search filtered it out,
+// so the operator read "no results" for something Gextto was about to download.
+func TestManualSearchListsTheLastResortCopy(t *testing.T) {
+	cfg := DefaultConfig()
+	series := SeriesConfig{Name: "FBI: International", Seasons: "1+", Quality: "720p-1080p", Language: "ita"}
+	sd := models.Release{
+		Title:     "FBI International 3x01 480p ITA",
+		Kind:      "series",
+		Magnet:    "magnet:?xt=urn:btih:" + strings.Repeat("b", 40),
+		Quality:   models.Quality{Resolution: "480p", Language: "ita", Languages: []string{"ita"}},
+		SizeBytes: 700000000,
+	}
+	hd := models.Release{
+		Title:   "FBI International 3x01 1080p ITA",
+		Kind:    "series",
+		Magnet:  "magnet:?xt=urn:btih:" + strings.Repeat("c", 40),
+		Quality: models.Quality{Resolution: "1080p", Language: "ita", Languages: []string{"ita"}},
+	}
+	sources := []gh2_episodeSource{
+		{Release: sd, Origin: episodeOriginIndexer},
+		{Release: hd, Origin: episodeOriginIndexer},
+	}
+	if got := gh2_lastResortEpisodeSources(sources, &cfg, &series); len(got) != 1 || !got[0].Release.LastResort {
+		t.Fatalf("last resorts = %+v, want the 480p copy marked", got)
+	}
+	// A copy within the profile is never labelled: the table would say last
+	// resort for a normal download.
+	cfg.Settings["gap_last_resort"] = "false"
+	if got := gh2_lastResortEpisodeSources([]gh2_episodeSource{{Release: sd, Origin: episodeOriginIndexer}}, &cfg, &series); len(got) != 0 {
+		t.Fatalf("the switch must turn the listing off: %+v", got)
 	}
 }

@@ -2851,8 +2851,13 @@ func splitForcedGapKey(key string) (string, int64) {
 // seriesNeverAired reports whether the metadata says the series has not aired
 // any episode yet. Only an explicit pre-release status counts: an empty status
 // (the TVDB path does not provide one) or an unknown series must never hide
-// real gaps.
-func seriesNeverAired(status, _ string) bool {
+// real gaps. A known last air date wins over the status: a show the source still
+// lists as "In Production" but that has already broadcast an episode keeps its
+// gaps.
+func seriesNeverAired(status, lastAirDate string) bool {
+	if strings.TrimSpace(lastAirDate) != "" {
+		return false
+	}
 	switch strings.TrimSpace(status) {
 	case "In Production", "Planned", "Pilot", "Upcoming":
 		return true
@@ -4044,42 +4049,29 @@ func (d *Database) SeriesSeasonCountsBulk() (map[string][][2]int64, error) {
 	return counts, rows.Err()
 }
 
-// GapRecentlySearched reports whether a gap was searched in the last `hours`.
-func (d *Database) GapRecentlySearched(seriesName string, season, episode, hours int64) (bool, error) {
-	var found sql.NullString
-	err := d.db.QueryRow("SELECT last_searched_at FROM gap_search_log WHERE series_name=?1 AND season=?2 AND episode=?3", seriesName, season, episode).Scan(&found)
-	if errors.Is(err, sql.ErrNoRows) {
-		return false, nil
-	}
+// GapSearchedTimes returns when every gap in the search log was last searched
+// online. One query for the whole set: the deep pass asks about every open gap,
+// and a point query per gap would grow with the library.
+func (d *Database) GapSearchedTimes() (map[gapTarget]time.Time, error) {
+	rows, err := d.db.Query("SELECT series_name, season, episode, last_searched_at FROM gap_search_log")
 	if err != nil {
-		return false, err
+		return nil, err
 	}
-	if !found.Valid {
-		return false, nil
+	defer rows.Close()
+	times := map[gapTarget]time.Time{}
+	for rows.Next() {
+		var key gapTarget
+		var raw string
+		if err := rows.Scan(&key.Series, &key.Season, &key.Episode, &raw); err != nil {
+			return nil, err
+		}
+		// An unreadable time stays out of the log: the gap counts as never
+		// searched, which is the safe direction.
+		if value, ok := utils.ParseTimestamp(raw); ok {
+			times[key] = value
+		}
 	}
-	value, ok := utils.ParseTimestamp(found.String)
-	if !ok {
-		return false, nil
-	}
-	return int64(time.Now().UTC().Sub(value).Hours()) < hours, nil
-}
-
-// GapLastSearched returns when a gap was last searched online; ok is false for
-// a gap never searched (or with an unreadable time).
-func (d *Database) GapLastSearched(seriesName string, season, episode int64) (time.Time, bool, error) {
-	var found sql.NullString
-	err := d.db.QueryRow("SELECT last_searched_at FROM gap_search_log WHERE series_name=?1 AND season=?2 AND episode=?3", seriesName, season, episode).Scan(&found)
-	if errors.Is(err, sql.ErrNoRows) {
-		return time.Time{}, false, nil
-	}
-	if err != nil {
-		return time.Time{}, false, err
-	}
-	if !found.Valid {
-		return time.Time{}, false, nil
-	}
-	value, ok := utils.ParseTimestamp(found.String)
-	return value, ok, nil
+	return times, rows.Err()
 }
 
 // MarkGapSearched records the last search time of a gap.

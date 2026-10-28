@@ -57,9 +57,11 @@
 
 {{define "v2_gap_search_result"}}
 {{if .Running}}
-<div hx-get="/series/gaps/search/status?job={{.JobID}}&amp;filter={{.Filter | urlquery}}&amp;slot={{.Slot}}" hx-trigger="every 2s" hx-swap="outerHTML" role="status" aria-live="polite">
-  <p class="muted">{{if .Queued}}<span>Ricerca in coda…</span>{{else if eq .Progress.Phase "ed2k"}}<span>Ricerca in corso: controllo eD2k/Kad delle stagioni…</span>{{else}}<span>Ricerca in corso:</span> {{.Progress.Done}}/{{.Progress.Total}} <span>puntate…</span>{{end}}</p>
-  <form hx-post="/series/gaps/search/cancel" hx-target="#v2-gap-result-{{.Slot}}" hx-swap="innerHTML">
+<div hx-get="/series/gaps/search/status?job={{.JobID}}&amp;filter={{.Filter | urlquery}}&amp;slot={{.Slot}}" hx-trigger="every 2s" hx-swap="outerHTML">
+  <p class="muted" role="status" aria-live="polite">{{if .Queued}}<span>Ricerca in coda…</span>{{else if eq .Progress.Phase "ed2k"}}<span>Ricerca in corso: controllo eD2k/Kad delle stagioni…</span>{{else}}<span>Ricerca in corso:</span> {{.Progress.Done}}/{{.Progress.Total}} <span>puntate…</span>{{end}}</p>
+  {{/* Kept across the two-second refresh: replacing it would take the keyboard
+       focus away from «Annulla» while the search runs. */}}
+  <form id="v2-gap-cancel-{{.JobID}}" hx-preserve="true" hx-post="/series/gaps/search/cancel" hx-target="#v2-gap-result-{{.Slot}}" hx-swap="innerHTML">
     <input type="hidden" name="job" value="{{.JobID}}" />
     <input type="hidden" name="filter" value="{{.Filter}}" />
     <input type="hidden" name="slot" value="{{.Slot}}" />

@@ -7,13 +7,19 @@ separate line, but are represented in the entry of the change they accompany.
 Technical detail stays in the commits and in `docs/`.
 
 The installed version is the one shown by Gextto (`<series>.<build>`, for
-example `1.1.1961`): the third number is always the build and the second is
+example `1.2.2066`): the third number is always the build and the second is
 raised by hand when a new series is started. The updated
 manual is online: [English](docs/MANUAL.en.md) ·
 [italiano](docs/MANUAL.it.md). For reports:
 [GitHub issues](https://github.com/buzzqw/gextto/issues).
 
 ## 28 October 2026
+
+- **«Search missing» no longer holds the series page.** The button on a series page started the search and left the page waiting for minutes, longer the more episodes were missing. It now starts the same background search as the *Missing* tab: the page shows how far it is, you can cancel it and, when it ends, it lists the results with **Download** without leaving the series. A search started by an external program or from the terminal answers within 90 seconds with the episodes it has checked so far (`complete` says whether it finished) instead of staying open, and a cancelled search marks as searched only the episodes it actually looked at: the deep pass does not skip the others for a day.
+
+- **The outside-profile copy now appears in the manual search too.** When a missing episode has no copy within the quality profile, the list of *Search missing* and of the single episode now shows the copy in the requested language with the «🆘 last resort» badge: it is the one Gextto would take by itself, instead of reading «no results» for an episode it then downloaded. The same holds for a copy only the local archive has: the cycle can take it as a last resort, where it used to stay invisible.
+
+- **A series «in production» that has already broadcast no longer loses its missing episodes.** Gextto treated every series with the status «In Production» or «Planned» as having no gaps, even when an episode had already aired: its missing episodes disappeared from the *Missing* tab. The status now counts only when the series has never broadcast; a known last air date overrides it.
 
 - **Gextto moves to the 1.2 series.** From this build the version is `1.2.<build>` (the first is 1.2.2065); the build number carries on where it was. gx-torrent keeps its own series. The update check compares commit and build, so a 1.1 install sees 1.2 as a normal update.
 
@@ -29,13 +35,13 @@ manual is online: [English](docs/MANUAL.en.md) ·
 
 - **indexarr eD2k releases now download automatically too.** For eD2k links indexarr sends a seed and peer count of zero, because on the eD2k network the indexer cannot count them. Gextto read that as "nobody shares this file" and, in the automatic search, refused every indexarr eD2k release as dead: it could only be downloaded by hand. Now those numbers are ignored for an eD2k link and aMule finds the sources, as with the links Gextto finds by itself. Nothing to configure.
 
-- **eD2k downloads taken from indexarr now show up in its Log → Download.** Gextto used to read the direct `ed2k` link and queue it in aMule without telling indexarr: for indexarr that download never happened, and the eD2k counter stayed at zero. Now, when the result comes from an indexer that also exposes an HTTP download link (indexarr, or Jackett and Prowlarr with the same shape), Gextto opens it once before queueing the file: indexarr records the download and the source that provided it. The transfer remains the direct `ed2k://` link; the redirect is not followed and a failed note never blocks the download. A direct `ed2k://` link behaves as before.
+- **eD2k downloads taken from indexarr now show up in its Log → Download.** Gextto used to read the direct `ed2k` link and queue it in aMule without telling indexarr: for indexarr that download never happened, and the eD2k counter stayed at zero. Now, when the result comes from an indexer that also exposes an HTTP download link (indexarr, or Jackett and Prowlarr with the same shape), Gextto opens it once when the file is queued, without making the download wait: indexarr records the download and the source that provided it. The transfer remains the direct `ed2k://` link; the redirect is not followed and a failed note never blocks the download. A direct `ed2k://` link behaves as before.
 
 ## 27 October 2026
 
 - **eD2k links now arrive from indexarr too.** If you add an eD2k source in indexarr (for example the DDUnlimited forum), its results now reach Gextto as `ed2k://` links instead of being discarded because they carry no magnet or `.torrent`. Gextto shows them as the eD2k network in search and in the archive, and queues them in aMule when you download, exactly like the ones it finds by itself; the torrent client is not involved. Nothing to configure: the source only has to be enabled in indexarr and the indexarr indexer already among Gextto's sources. With indexarr a search waits up to 45 seconds (instead of the 5 used for other sources) so the eD2k source can open the topic pages; Sonarr, Radarr and the other programs do not get this wait and stay as before.
 
-- **The web search no longer cuts every source together after 15 seconds.** There used to be a single 15-second budget for all the web sources of a search, and it included the wait in the queue: with eight engines and four slots, the second half might never start. Now each engine gets its own 15 seconds from when it starts, so none is skipped just because it was waiting; the answers already received are kept. A single engine slower than 15 seconds is still left behind for that search, but it no longer stops the others and no longer floods the log: the detail goes to the debug log.
+- **The web search no longer cuts every source together after 15 seconds.** There used to be a single 15-second budget for all the web sources of a search, and it included the wait in the queue: with eight engines and four slots, the second half might never start. Now each engine gets its own 15 seconds from when it starts, so none is skipped just because it was waiting; the answers already received are kept. A single engine slower than 15 seconds is still left behind for that search, but it no longer stops the others and no longer floods the log: the detail goes to the debug log. With more engines than slots the search as a whole can take longer: the second half used to be cut anyway.
 
 - **A series that has not aired yet no longer shows up as missing.** When the metadata says a series is still "In Production" (or planned), Gextto does not treat the announced episodes as missing: it used to infer them from the planned season count and the *Missing* tab listed series that had not aired yet. The same goes for an episode with a known future air date. Real gaps are unchanged.
 

@@ -148,7 +148,7 @@ func v2GapSearchRedirect(filter string) string {
 
 func v2GapSearchResultFromOutcome(outcome gh2_missingSearchOutcome, redirect string) v2GapSearchResult {
 	view := v2GapSearchResult{
-		Episodes: len(outcome.Gaps),
+		Episodes: outcome.Searched,
 		Total:    outcome.TotalMissing,
 		Sources:  v2SourcesView{Redirect: redirect, ShowEpisode: true},
 	}
@@ -168,10 +168,11 @@ func V2SeriesGapsSearch(w http.ResponseWriter, r *http.Request, s *AppState) {
 	name := strings.TrimSpace(r.FormValue("series"))
 	filter := strings.TrimSpace(r.FormValue("filter"))
 	slot := strings.TrimSpace(r.FormValue("slot"))
+	redirect := v2GapSearchRedirect(filter)
 	view := v2GapSearchResult{
 		Filter:  filter,
 		Slot:    slot,
-		Sources: v2SourcesView{Redirect: v2GapSearchRedirect(filter), ShowEpisode: true},
+		Sources: v2SourcesView{Redirect: redirect, ShowEpisode: true},
 	}
 	if name == "" {
 		view.Error = "Serie non indicata."
@@ -180,8 +181,18 @@ func V2SeriesGapsSearch(w http.ResponseWriter, r *http.Request, s *AppState) {
 	} else if series := gh2_findSeries(cfg, name); series == nil {
 		view.Error = "Serie non trovata."
 	} else {
+		if slot == "series" {
+			// Started from the series page: the Download buttons of the results
+			// must come back there, not to the Missing tab.
+			redirect = "/?view=series&series=" + url.QueryEscape(series.Name)
+			view.Sources.Redirect = redirect
+		}
 		job, created := s.jobs.Create("missing-search", "missing-search:"+strings.ToLower(series.Name))
-		if created {
+		if job == nil {
+			// The manager is closed (the daemon is shutting down): there is no
+			// job to show, and a nil dereference would take the page with it.
+			view.Error = "Ricerca non avviata."
+		} else if created {
 			if err := s.jobs.Start(job.ID, func(ctx context.Context, jobID string) {
 				outcome := gh2_searchMissingEpisodes(ctx, s, cfg, series, func(done, total int, phase string) {
 					progress := 0.0
@@ -196,7 +207,7 @@ func V2SeriesGapsSearch(w http.ResponseWriter, r *http.Request, s *AppState) {
 				if ctx.Err() != nil {
 					return
 				}
-				s.jobs.SetResult(jobID, v2GapSearchResultFromOutcome(outcome, v2GapSearchRedirect(filter)))
+				s.jobs.SetResult(jobID, v2GapSearchResultFromOutcome(outcome, redirect))
 				s.jobs.SetProgress(jobID, 1, "done")
 			}); err != nil {
 				s.jobs.Fail(job.ID, err)
@@ -251,7 +262,8 @@ func V2SeriesGapsSearchStatus(w http.ResponseWriter, r *http.Request, s *AppStat
 				view = result
 				view.Filter = filter
 				view.Slot = slot
-				view.Sources.Redirect = v2GapSearchRedirect(filter)
+				// The redirect was decided when the job started: the Missing
+				// tab comes back to the tab, the series page to the series.
 				view.Running = false
 			} else {
 				view.Error = "Ricerca non riuscita."

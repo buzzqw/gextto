@@ -594,6 +594,15 @@ unavailable download, temp or trash folder is a **warning** and is fixable from 
 interface. Verified in a systemd container
 (install, upgrade, restore offline in dry-run).
 
+### eD2k grab note off the request path — 28 October 2026
+
+Intel N97, build **1.2.2067**, command
+`CGO_ENABLED=0 go test -run TestAddEd2kReleaseNotesTheGrabToTheIndexer -v -count=3 .`
+(fake aMule core and a local indexer that answers with a 302): `addEd2kRelease` returns
+in **0.31–0.54 ms** and the indexer note runs in its own goroutine. Before, the note was
+awaited inline with a 4 s budget, so a batch of ten eD2k results could add **40 s** to
+the request. The test fails if the call waits more than 500 ms.
+
 ### eD2k and Kad through aMule — live, 20 October 2026
 
 The native `gx-ed2k` daemon measured in the sections below is retired (its last

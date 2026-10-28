@@ -317,6 +317,27 @@ func gh7_finalize_episode_search_results(results []gh7_episode_result, cfg *Conf
 	return deduped
 }
 
+// gh7_last_resort_episode_results lists the copies that miss only the
+// resolution of the profile, marked as the last resort: the caller uses them
+// only when the episode has nothing within the profile, exactly as the
+// automatic gap pass does.
+func gh7_last_resort_episode_results(results []gh7_episode_result, cfg *Config, series SeriesConfig) []gh7_episode_result {
+	kept := make([]gh7_episode_result, 0, len(results))
+	for _, result := range results {
+		if !cfg.ReleaseAllowed(&result.Release) {
+			continue
+		}
+		if !cfg.SeriesLastResortAllowed(&series, &result.Release.Quality, result.Release.Title) {
+			continue
+		}
+		result.Release.LastResort = true
+		result.Score = cfg.ReleaseScore(&result.Release)
+		kept = append(kept, result)
+	}
+	sort.SliceStable(kept, func(i, j int) bool { return kept[i].Score > kept[j].Score })
+	return kept
+}
+
 // gh7_search_series_episode_sources searches stored + live sources for an
 // episode, keeping the origin on every result.
 func gh7_search_series_episode_sources(ctx context.Context, s *AppState, cfg *Config, series SeriesConfig, season, episode int64) []gh7_episode_result {
@@ -339,6 +360,11 @@ func gh7_search_series_episode_sources(ctx context.Context, s *AppState, cfg *Co
 			results = append(results, gh7_episode_result{Release: release, Origin: episodeOriginED2K})
 		}
 		final = gh7_finalize_episode_search_results(results, cfg, series)
+	}
+	if len(final) == 0 {
+		// The cycle takes such a copy as a last resort; the manual search must
+		// show it, marked, instead of pretending the episode has no source.
+		final = gh7_last_resort_episode_results(results, cfg, series)
 	}
 	return final
 }

@@ -312,6 +312,15 @@ func (e gxAPIError) Error() string {
 	return fmt.Sprintf("gx-torrent: HTTP %d", e.Status)
 }
 
+// Is maps the daemon's sentences onto the named errors of the engine contract,
+// so callers test errors.Is instead of matching the wording of one backend.
+func (e gxAPIError) Is(target error) bool {
+	if target == ErrTorrentMoving {
+		return strings.Contains(e.Message, "is being moved")
+	}
+	return false
+}
+
 func (e *gxTorrentEngine) do(method, path string, body io.Reader, contentType string, out any) error {
 	ctx, cancel := context.WithTimeout(context.Background(), e.settings.Timeout)
 	defer cancel()

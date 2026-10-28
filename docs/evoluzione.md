@@ -222,6 +222,13 @@ as evidence: those intents wait. The decision itself is still evaluated twice on
 purpose — a read-only evaluation before the add and the committing one after it —
 so a refused add writes nothing and the commit never trusts a stale state.
 
+**A duplicate is not a failure.** When the engine or aMule already holds the file,
+the add answers "rejected" and the cycle counts nothing: the summary lists real
+failures only. The same rule keeps a pack whose data is being relocated quiet —
+`ErrTorrentMoving` postpones the file priorities to the next inspection — and the
+reconciliation only marks a torrent the engine no longer has: eD2k rows, which live
+in aMule, are left to aMule.
+
 **Swarm health in the choice, not in the quality score.** The cycle score is
 quality + subtitles + size; the swarm enters the acquisition decision only, through
 `AcquisitionScore` (`config.go`): a definitively empty swarm (0 seeders and 0 peers) is
@@ -250,6 +257,32 @@ event worker forever.
 a watched folder or from the phone — and a season with a season pack in progress are
 not missing, neither in the cycle nor in the series tab; a download in error makes
 them missing again.
+
+**Searching the gaps** (`orchestrator.go` phase 1, the deep pass and
+`uiweb_v2_gaps.go`). Every cycle the archive is searched for every gap; every
+`gap_deep_interval_hours` a deep pass searches a few of them online
+(`gap_deep_max_per_cycle`, `gap_fill_max_per_series`), the never-searched ones
+first and one series at a time starting after the series served last
+(`gap_deep_cursor`), then the ones searched longest ago (`gap_search_log`). A gap
+searched online is left alone for `gap_research_hours`. An announced episode is not
+a gap: a series with a pre-release status and no aired episode, and an episode with
+a future air date, stay out of the tab and out of the cycle.
+
+**A copy outside the profile, as the last resort** (`gap_last_resort`, on by
+default). When an episode has no copy within the series profile, the cycle takes the
+copy in the requested language that misses only the resolution — unknown or outside
+the range — from the indexers, from eD2k or from the local archive, and records the
+download with reason `last_resort`; the upgrade replaces it as soon as a copy within
+the profile appears. Language, subtitles, audio and the exclusions always apply. The
+search dialogs list the same copy with the 🆘 badge.
+
+**The whole-series manual search** (`web_handlers_g2.go`, `uiweb_v2_gaps.go`).
+*Search missing* runs as a background job with live progress and a cancel button and
+covers every gap; the results stay in the archive and are listed with their episode,
+source and a Download each. The synchronous `/api/series/{name}/search-missing`
+keeps a 90-second budget, so a caller such as the TUI receives the episodes searched
+so far and `complete` instead of a request left open. An interrupted search marks
+only the gaps whose search actually ran.
 
 **Re-downloading an episode.** The ↻ *Re-download* action in the series detail moves
 the archived file to the trash, deletes the episode row and records a **forced gap**
@@ -733,6 +766,17 @@ single search once per episode). Accepted automatic results need an exact
 episode, a recognised quality and enough sources; a manual search shows every
 match. eD2k names are a claim, the MD4 hash is the identity, and MediaInfo
 validation after the download is the second line of defence.
+
+eD2k results also arrive from an eD2k source behind indexarr: the feed parser reads
+the `ed2k://` link from `<link>` and from the `ed2k` attribute, ignores the
+seeders/peers the indexer writes (an indexer cannot count eD2k sources, and a zero
+would read as a dead swarm), and asks indexarr for a longer live window
+(`live_wait=45`) only on Gextto's own searches. When such a file is queued in
+aMule, the indexer's HTTP download link is opened once, off the request path, so
+indexarr records the grab; a failed note never blocks the download. aMule's files
+are kept out of the torrent reconciliation: a download that lives in aMule is never
+"missing from session", and a row an earlier version marked that way returns to the
+queue.
 
 The decision to use aMule instead of a native client rests on two facts kept in
 [`measurements.md`](measurements.md): the measured Kad coverage of missing

@@ -144,43 +144,51 @@ func addEd2kRelease(cfg *Config, release *models.Release) (bool, error) {
 	return true, nil
 }
 
-// noteEd2kGrab asks the indexer's download link before the file is handed to
-// aMule. indexarr answers with a redirect to the ed2k:// link and records the
-// grab, so its Log → Download shows which source fed the file; Jackett and
-// Prowlarr see their normal download link. The redirect is not followed and
-// every error is ignored: the file is already queued, and a missing note must
-// never block or fail the download. A direct ed2k:// link has no URL to call.
+// noteEd2kGrab asks the indexer's download link once, when the file has just
+// been queued in aMule, and returns at once: the call is a note for the
+// indexer, not part of the download. indexarr answers with a redirect to the
+// ed2k:// link and records the grab, so its Log → Download shows which source
+// fed the file; Jackett and Prowlarr see their normal download link. The
+// redirect is not followed and every error is ignored: the file is already
+// queued, and a missing note must never block or fail the download. A direct
+// ed2k:// link has no URL to call.
+//
+// Off the request path on purpose: the indexer may take seconds, and a batch
+// add of ten eD2k results must not wait for ten notes.
 func noteEd2kGrab(rawURL string) {
 	rawURL = strings.TrimSpace(rawURL)
 	if !strings.HasPrefix(rawURL, "http://") && !strings.HasPrefix(rawURL, "https://") {
 		return
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Second)
-	defer cancel()
-	host := rawURL
-	if parsed, parseErr := url.Parse(rawURL); parseErr == nil {
-		host = parsed.Host
-	}
-	request, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
-	if err != nil {
-		// Never log the URL: it carries the indexer's API key.
-		logging.Debug("eD2k grab note skipped", "host", host)
-		return
-	}
-	client := &http.Client{
-		Timeout: 4 * time.Second,
-		CheckRedirect: func(*http.Request, []*http.Request) error {
-			// The redirect body is the ed2k:// link; aMule gets it directly.
-			return http.ErrUseLastResponse
-		},
-	}
-	response, err := client.Do(request)
-	if err != nil {
-		logging.Debug("eD2k grab note failed", "host", host)
-		return
-	}
-	_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, 4096))
-	_ = response.Body.Close()
+	go func() {
+		defer recoverGoroutine("eD2k grab note")
+		ctx, cancel := context.WithTimeout(context.Background(), 4*time.Second)
+		defer cancel()
+		host := rawURL
+		if parsed, parseErr := url.Parse(rawURL); parseErr == nil {
+			host = parsed.Host
+		}
+		request, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
+		if err != nil {
+			// Never log the URL: it carries the indexer's API key.
+			logging.Debug("eD2k grab note skipped", "host", host)
+			return
+		}
+		client := &http.Client{
+			Timeout: 4 * time.Second,
+			CheckRedirect: func(*http.Request, []*http.Request) error {
+				// The redirect body is the ed2k:// link; aMule gets it directly.
+				return http.ErrUseLastResponse
+			},
+		}
+		response, err := client.Do(request)
+		if err != nil {
+			logging.Debug("eD2k grab note failed", "host", host)
+			return
+		}
+		_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, 4096))
+		_ = response.Body.Close()
+	}()
 }
 
 // Ed2kDownloadAction pauses, resumes or removes a download by MD4 hash. A

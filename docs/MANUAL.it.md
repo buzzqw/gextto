@@ -713,12 +713,18 @@ stagione e le puntate come pulsanti (`S04E03`):
 - **Cerca mancanti** cerca tutte le puntate mancanti di quella serie, anche in
   background: la scheda dice a che punto è e puoi annullare; quando finisce
   elenca lì i risultati trovati, ognuno con la puntata e **Scarica**. Non scarica
-  nulla da solo;
+  nulla da solo. Lo stesso pulsante nella scheda della serie avvia la stessa
+  ricerca in background e ne mostra l'avanzamento e i risultati lì;
 - **Filtra per serie** mostra solo le serie che contengono il testo scritto.
 
 Le puntate non ancora andate in onda non sono mancanti: una serie ancora in
-produzione non compare, e una puntata con una data futura conosciuta aspetta il
-suo turno.
+produzione che non ha mai trasmesso non compare, e una puntata con una data
+futura conosciuta aspetta il suo turno.
+
+Se per una puntata non c'è nessuna copia nel profilo qualità, l'elenco mostra
+l'unica copia nella lingua richiesta con il badge **🆘 ultima risorsa**: è quella
+che Gextto prenderebbe da solo, e l'upgrade la sostituisce appena esce una copia
+nel profilo. Vale anche per una copia che si trova solo nell'archivio locale.
 
 Il vecchio indirizzo della pagina *Mancanti* porta a questa scheda.
 
@@ -1311,9 +1317,9 @@ passano dal client torrent. La ricerca aggregata li include quando il titolo non
 `indexer_type=ed2k` alla richiesta Torznab. Per dare tempo alla fonte eD2k di
 aprire i topic, Gextto chiede a indexarr un'attesa fino a 45 secondi solo per le
 proprie ricerche (`live_wait=45`); le altre sorgenti e gli altri programmi non
-cambiano. Prima di accodare in aMule un file preso da indexarr, Gextto apre una
-volta il suo link di download: indexarr registra così il download e la fonte
-che l'ha fornito in *Log → Download*. Il file scaricato resta il link `ed2k://`
+cambiano. Quando accoda in aMule un file preso da indexarr, Gextto apre una volta il suo
+link di download, senza far aspettare il download: indexarr registra così il
+download e la fonte che l'ha fornito in *Log → Download*. Il file scaricato resta il link `ed2k://`
 e, se il link di download non risponde, il download parte lo stesso.
 
 Con Jackett e Prowlarr Gextto legge l'elenco degli indexer dal manager

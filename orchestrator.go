@@ -450,6 +450,16 @@ func RunCycleDomain(
 	livePerSeries := map[string]int{}
 	archiveHits := 0
 	gapTargets := map[gapTarget]struct{}{}
+	// Copies the archive holds only outside the profile: the cycle may take
+	// them as a last resort, but only after the online search for the same gap
+	// found nothing better, like the live ones.
+	archiveLastResorts := map[gapTarget][]models.Release{}
+	// One query for the search times of every gap: a point query per gap made
+	// the deep pass cost grow with the library.
+	searchTimes, err := db.GapSearchedTimes()
+	if err != nil {
+		return nil, err
+	}
 	for i := range archiveGaps {
 		gapTargets[gapTarget{Series: archiveGaps[i].Series, Season: archiveGaps[i].Season, Episode: archiveGaps[i].Episode}] = struct{}{}
 	}
@@ -481,11 +491,16 @@ func RunCycleDomain(
 					}
 					continue
 				}
-				if !cfg.SeriesReleaseAllowed(series, &release.Quality, release.Title) {
-					continue
-				}
 				canonicalName := series.Name
 				release.Series = &canonicalName
+				if !cfg.SeriesReleaseAllowed(series, &release.Quality, release.Title) {
+					if cfg.SeriesLastResortAllowed(series, &release.Quality, release.Title) {
+						release.LastResort = true
+						key := gapTarget{Series: canonicalName, Season: gap.Season, Episode: gap.Episode}
+						archiveLastResorts[key] = append(archiveLastResorts[key], *release)
+					}
+					continue
+				}
 				logging.Debug("archive release found",
 					"series", gap.Series,
 					"season", gap.Season,
@@ -504,10 +519,9 @@ func RunCycleDomain(
 		if !isDeep {
 			continue
 		}
-		last, searched, err := db.GapLastSearched(gap.Series, gap.Season, gap.Episode)
-		if err != nil {
-			return nil, err
-		}
+		// The log is keyed by the configured name, which may differ from the
+		// archive title when the gap came in through an alias.
+		last, searched := searchTimes[gapTarget{Series: series.Name, Season: gap.Season, Episode: gap.Episode}]
 		if searched && int64(time.Now().UTC().Sub(last).Hours()) < gapResearchHours {
 			continue
 		}
@@ -607,6 +621,18 @@ func RunCycleDomain(
 					logging.Info(fmt.Sprintf("🆘 Nothing within the quality profile for the missing %s S%02dE%02d: %s in the right language but outside the resolution, taken as a last resort",
 						candidate.Series.Name, candidate.Season, candidate.Episode,
 						countLabel(int64(len(lastResorts[index])), "copy", "copies")))
+				}
+				// The archive may hold the only copy, outside the profile: the
+				// live search does not look there, so the pass adds it now that
+				// every online source has answered.
+				if len(foundResults[index]) == 0 {
+					key := gapTarget{Series: candidate.Series.Name, Season: candidate.Season, Episode: candidate.Episode}
+					if archived := archiveLastResorts[key]; len(archived) > 0 {
+						foundResults[index] = archived
+						logging.Info(fmt.Sprintf("🆘 Nothing within the quality profile for the missing %s S%02dE%02d: %s from the release archive, taken as a last resort",
+							candidate.Series.Name, candidate.Season, candidate.Episode,
+							countLabel(int64(len(archived)), "copy", "copies")))
+					}
 				}
 				logging.Debug("gap-fill live search completed",
 					"series", candidate.Series.Name,

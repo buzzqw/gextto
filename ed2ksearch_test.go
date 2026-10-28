@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -354,23 +355,32 @@ func TestEd2kLinkAddAndDownloadActions(t *testing.T) {
 
 // A feed that proxies the eD2k link (indexarr /dl) keeps that HTTP link as
 // GrabURL: it is not the transfer, only the call that lets the indexer count
-// the download. A direct ed2k:// link has no GrabURL.
+// the download. A direct ed2k:// link has no GrabURL. The note runs off the
+// request path, so the test waits for it instead of reading a counter.
 func TestAddEd2kReleaseNotesTheGrabToTheIndexer(t *testing.T) {
 	core, cfg := ed2kTestCore(t, nil)
-	var hits int
+	var hits atomic.Int32
 	indexer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		hits++
+		hits.Add(1)
 		w.Header().Set("Location", "ed2k://|file|x.mkv|10|aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa|/")
 		w.WriteHeader(http.StatusFound)
 	}))
 	defer indexer.Close()
 	const link = "ed2k://|file|Rare%20Show%20S03E01.mkv|900000000|bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb|/"
 	release := &models.Release{Ed2kLink: link, GrabURL: indexer.URL + "/dl/7.torrent?apikey=secret"}
+	started := time.Now()
 	if added, err := addEd2kRelease(cfg, release); !added || err != nil {
 		t.Fatalf("addEd2kRelease = %v, %v", added, err)
 	}
-	if hits != 1 {
-		t.Fatalf("indexer grab notes = %d, want 1", hits)
+	elapsed := time.Since(started)
+	t.Logf("addEd2kRelease returned in %s with the indexer note still pending", elapsed)
+	if elapsed > 500*time.Millisecond {
+		t.Fatalf("addEd2kRelease waited %s for the indexer note: it must not block", elapsed)
+	}
+	for deadline := time.Now().Add(2 * time.Second); hits.Load() == 0 && time.Now().Before(deadline); time.Sleep(10 * time.Millisecond) {
+	}
+	if got := hits.Load(); got != 1 {
+		t.Fatalf("indexer grab notes = %d, want 1", got)
 	}
 	if len(core.Downloads()) != 1 {
 		t.Fatalf("aMule queue = %+v", core.Downloads())

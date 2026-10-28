@@ -2,6 +2,7 @@ package gextto
 
 import (
 	"bytes"
+	"os"
 	"strings"
 	"testing"
 )
@@ -124,5 +125,51 @@ func TestGapSearchRunningShowsProgressAndCancel(t *testing.T) {
 		if !strings.Contains(body, want) {
 			t.Fatalf("missing %q in:\n%s", want, body)
 		}
+	}
+}
+
+// TestGapSearchRowsCarryTheLastResortMark: the panel lists the outside-profile
+// copy the cycle would take, so it must say what it is instead of showing a
+// 480p download as a normal result.
+func TestGapSearchRowsCarryTheLastResortMark(t *testing.T) {
+	rows := v2SourceRowsFrom([]map[string]any{{
+		"release": map[string]any{
+			"title":       "FBI S06E03 480p ITA",
+			"magnet":      "magnet:?xt=urn:btih:" + strings.Repeat("a", 40),
+			"source":      "indexer.one",
+			"last_resort": true,
+		},
+		"origin": "indexer",
+	}})
+	if len(rows) != 1 || !rows[0].LastResort {
+		t.Fatalf("rows = %+v", rows)
+	}
+	var buffer bytes.Buffer
+	if err := v2Templates.ExecuteTemplate(&buffer, "v2_sources_rows", v2SourcesView{ShowEpisode: true, Results: rows}); err != nil {
+		t.Fatalf("render: %v", err)
+	}
+	if !strings.Contains(buffer.String(), "ultima risorsa") {
+		t.Fatalf("badge missing:\n%s", buffer.String())
+	}
+}
+
+// TestSeriesDetailStartsTheBackgroundSearch: the detail page used to call the
+// synchronous /api/series/{name}/search-missing, which has no episode cap any
+// more: with a series full of gaps it held the request open for minutes. It
+// must use the same background job as the Missing tab.
+func TestSeriesDetailStartsTheBackgroundSearch(t *testing.T) {
+	raw, err := os.ReadFile("uiweb/v2/templates/v2.html")
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := string(raw)
+	if strings.Contains(body, "/api/series/%s/search-missing") {
+		t.Fatal("the series detail page still calls the synchronous missing search")
+	}
+	if !strings.Contains(body, `hx-post="/series/gaps/search"`) {
+		t.Fatal("the series detail page does not start the background missing search")
+	}
+	if !strings.Contains(body, `id="v2-gap-result-series"`) {
+		t.Fatal("the series detail page has no target for the search job")
 	}
 }

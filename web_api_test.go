@@ -470,6 +470,11 @@ func TestSeriesSearchMissingHasNoEpisodeCap(t *testing.T) {
 	if decoded["searched"] != float64(20) || decoded["total"] != float64(20) {
 		t.Fatalf("searched=%v total=%v, want 20 and 20 (%s)", decoded["searched"], decoded["total"], body)
 	}
+	// With no engine there is nothing to wait for: the answer is complete and
+	// says so, so a partial one (the deadline) is recognisable.
+	if decoded["complete"] != true {
+		t.Fatalf("complete=%v, want true (%s)", decoded["complete"], body)
+	}
 }
 
 func TestWebApiI18n(t *testing.T) {

@@ -761,27 +761,34 @@ func TestTorrentMetadataRoundTripsAndCompletionUpdatesNormalizedState(t *testing
 		{Series: "Example", Season: 1, Episode: 4},
 		{Series: "Example", Season: 1, Episode: 5},
 	})
-	searched, err := db.GapRecentlySearched("Example", 1, 2, 23)
+	key := gapTarget{Series: "Example", Season: 1, Episode: 2}
+	times, err := db.GapSearchedTimes()
 	if err != nil {
 		t.Fatal(err)
 	}
-	assertTrue(t, !searched, "non ancora cercato")
+	if _, searched := times[key]; searched {
+		t.Fatal("a gap never searched must not be in the log")
+	}
 	if err := db.MarkGapSearched("Example", 1, 2); err != nil {
 		t.Fatal(err)
 	}
-	searched, err = db.GapRecentlySearched("Example", 1, 2, 23)
+	times, err = db.GapSearchedTimes()
 	if err != nil {
 		t.Fatal(err)
 	}
-	assertTrue(t, searched, "appena cercato")
+	if _, searched := times[key]; !searched {
+		t.Fatal("a gap just searched must be in the log")
+	}
 	if err := db.ClearGapSearched("Example", 1, 2); err != nil {
 		t.Fatal(err)
 	}
-	searched, err = db.GapRecentlySearched("Example", 1, 2, 23)
+	times, err = db.GapSearchedTimes()
 	if err != nil {
 		t.Fatal(err)
 	}
-	assertTrue(t, !searched, "throttle cleared after ClearGapSearched")
+	if _, searched := times[key]; searched {
+		t.Fatal("throttle cleared after ClearGapSearched")
+	}
 	if err := db.RegisterTorrent(&release); err != nil {
 		t.Fatal(err)
 	}
@@ -2493,6 +2500,29 @@ func TestGapsSkipSeriesNotYetAired(t *testing.T) {
 		t.Fatal(err)
 	}
 	assertEqual(t, perSeries, [][2]int64{})
+}
+
+func TestGapsKeepSeriesInProductionThatAlreadyAired(t *testing.T) {
+	db := newTestDB(t)
+	if _, err := db.db.Exec("INSERT INTO series(name) VALUES ('Still Producing')"); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.SaveSeriesMetadata("Still Producing", [][2]int64{{1, 2}}); err != nil {
+		t.Fatal(err)
+	}
+	// The source still calls it "In Production", but an episode has aired: the
+	// status alone must not hide the real gap.
+	if err := db.SaveSeriesStatus("Still Producing", "In Production", "2026-10-01"); err != nil {
+		t.Fatal(err)
+	}
+	gaps, err := db.ArchiveGaps()
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertEqual(t, gaps, []SeriesGap{
+		{Series: "Still Producing", Season: 1, Episode: 1},
+		{Series: "Still Producing", Season: 1, Episode: 2},
+	})
 }
 
 func TestGapsKeepSeriesWithUnknownStatus(t *testing.T) {

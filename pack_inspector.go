@@ -13,9 +13,9 @@ package gextto
 // chooses when to accept that trade.
 
 import (
+	"errors"
 	"fmt"
 	"slices"
-	"strings"
 	"time"
 
 	"github.com/buzzqw/gextto/internal/logging"
@@ -255,7 +255,7 @@ func applyPackFilePriorities(
 	}
 	ok, err := torrents.SetFilePriorities(hash, priorities)
 	if err != nil {
-		if strings.Contains(err.Error(), "the torrent is being moved") {
+		if errors.Is(err, ErrTorrentMoving) {
 			// The engine moves the data (to the RAM disk or out of it) and
 			// refuses changes meanwhile; the next inspection applies them.
 			// Every 30 s for a ten-minute move it filled the log with warnings.

@@ -697,11 +697,20 @@ episodes as buttons (`S04E03`):
 - **Search missing** searches every missing episode of that series, in the
   background too: the tab shows how far it is and you can cancel it; when it
   ends it lists what it found right there, each with its episode and
-  **Download**. It downloads nothing by itself;
+  **Download**. It downloads nothing by itself. The same button on the series
+  page starts the same background search and shows its progress and results
+  there;
 - **Filter by series** shows only the series containing the typed text.
 
 Episodes that have not aired yet are not missing: a series still in production
-does not appear, and an episode with a known future air date waits for its day.
+that has never broadcast does not appear, and an episode with a known future air
+date waits for its day.
+
+When an episode has no copy within the quality profile, the list shows the only
+copy in the requested language with the **🆘 last resort** badge: it is the one
+Gextto would take by itself, and the upgrade replaces it as soon as a copy
+within the profile appears. This also holds for a copy that only the local
+archive has.
 
 The old address of the *Missing* page leads to this tab.
 
@@ -1272,9 +1281,9 @@ search includes them when the title is not already covered by a torrent; add
 `indexer_type=ed2k` to the Torznab request to see them all. To give the eD2k
 source time to open its topics, Gextto asks indexarr for a wait of up to 45
 seconds only on its own searches (`live_wait=45`); other sources and other
-programs are unchanged. Before queueing an indexarr file in aMule, Gextto opens
-its download link once: indexarr records the download and the source that
-provided it in *Log → Download*. The file transferred stays the `ed2k://` link,
+programs are unchanged. When it queues an indexarr file in aMule, Gextto opens its
+download link once, without making the download wait: indexarr records the
+download and the source that provided it in *Log → Download*. The file transferred stays the `ed2k://` link,
 and if the download link does not answer the download starts all the same.
 
 With Jackett and Prowlarr Gextto reads the manager's indexer list and

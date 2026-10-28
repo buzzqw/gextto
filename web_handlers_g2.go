@@ -264,6 +264,26 @@ func gh2_finalizeEpisodeSearchResults(results []gh2_episodeSource, cfg *Config, 
 	return deduped
 }
 
+// gh2_lastResortEpisodeSources lists the copies of a gap that miss only the
+// resolution of the profile, marked as the last resort. The caller uses them
+// only when the gap has nothing within the profile, after every source
+// (indexers, archive, eD2k) has answered: the same rule the automatic cycle
+// applies, so the panel shows what the cycle would actually take.
+func gh2_lastResortEpisodeSources(results []gh2_episodeSource, cfg *Config, series *SeriesConfig) []gh2_episodeSource {
+	kept := make([]gh2_episodeSource, 0, len(results))
+	for _, result := range results {
+		if !cfg.ReleaseAllowed(&result.Release) {
+			continue
+		}
+		if !cfg.SeriesLastResortAllowed(series, &result.Release.Quality, result.Release.Title) {
+			continue
+		}
+		result.Release.LastResort = true
+		kept = append(kept, result)
+	}
+	return kept
+}
+
 // AddDownloadTag implements `add_download_tag`.
 func AddDownloadTag(w http.ResponseWriter, r *http.Request, s *AppState) {
 	var input DownloadTagInput
@@ -976,10 +996,15 @@ func SendMagnet(w http.ResponseWriter, r *http.Request, s *AppState) {
 
 // SeriesSearchMissing implements `series_search_missing`.
 // gh2_missingSearchOutcome is the result of a whole-series missing search.
+// Searched is how many gaps were actually looked up: a synchronous caller stops
+// at its deadline and gets the partial answer, while the background job goes on
+// to the end.
 type gh2_missingSearchOutcome struct {
 	Results       []gh2_episodeResult
 	Gaps          [][2]int64
 	TotalMissing  int
+	Searched      int
+	Complete      bool
 	MetadataReady bool
 }
 
@@ -991,6 +1016,11 @@ type gh2_missingSearchProgress func(done, total int, phase string)
 // local archive and feeds first, then each episode on the indexers, then eD2k
 // per season when the operator enabled the fallback. There is no cap: a series
 // with a hundred gaps is searched in full, and the caller can report progress.
+//
+// The context is the whole budget: a synchronous caller gives it a deadline and
+// receives the episodes looked up so far, while the background job gives it the
+// cancel button. Only the gaps whose search actually ran are marked as
+// searched, so an interrupted pass does not push them behind the deep interval.
 func gh2_searchMissingEpisodes(ctx context.Context, s *AppState, cfg *Config, series *SeriesConfig, progress gh2_missingSearchProgress) gh2_missingSearchOutcome {
 	outcome := gh2_missingSearchOutcome{}
 	// A newly added series may not have season counts yet. Populate them before
@@ -1024,6 +1054,14 @@ func gh2_searchMissingEpisodes(ctx context.Context, s *AppState, cfg *Config, se
 		progress(0, len(gaps), "episodes")
 	}
 	liveReleases := make([][]models.Release, len(gaps))
+	searchedGaps := make([]bool, len(gaps))
+	if s.engine == nil {
+		// Nothing to ask online (dry run or a deliberately engine-less daemon):
+		// the gaps were covered by the archive and the stored results.
+		for index := range searchedGaps {
+			searchedGaps[index] = true
+		}
+	}
 	if s.engine != nil && len(gaps) > 0 {
 		// A generic title query can return only recent episodes and miss an old
 		// gap. Search every gap with the structured TV identity, a few at a
@@ -1044,6 +1082,9 @@ func gh2_searchMissingEpisodes(ctx context.Context, s *AppState, cfg *Config, se
 				defer wg.Done()
 				defer func() { <-sem }()
 				liveReleases[index] = s.engine.SearchSeriesEpisode(ctx, cfg, series, season, episode, true)
+				if ctx.Err() == nil {
+					searchedGaps[index] = true
+				}
 				if progress != nil {
 					progress(int(done.Add(1)), len(gaps), "episodes")
 				}
@@ -1051,6 +1092,7 @@ func gh2_searchMissingEpisodes(ctx context.Context, s *AppState, cfg *Config, se
 		}
 		wg.Wait()
 	}
+	cancelled := ctx.Err() != nil
 	results := []gh2_episodeResult{}
 	perGap := make([][]gh2_episodeSource, len(gaps))
 	for index, gap := range gaps {
@@ -1072,9 +1114,15 @@ func gh2_searchMissingEpisodes(ctx context.Context, s *AppState, cfg *Config, se
 	// filtered results, so a stored release rejected by quality or language
 	// does not hide the gap. One query per season (not per episode) keeps the
 	// wait bounded: aMule serialises its searches.
-	if ed2kFallbackEligible(cfg) {
+	//
+	// A caller that has already given up does not start it: aMule answers one
+	// season at a time and the wait is minutes.
+	if ed2kFallbackEligible(cfg) && !cancelled {
 		searched := map[int64]bool{}
 		for _, gap := range gaps {
+			if ctx.Err() != nil {
+				break
+			}
 			season := gap[0]
 			if searched[season] {
 				continue
@@ -1112,7 +1160,14 @@ func gh2_searchMissingEpisodes(ctx context.Context, s *AppState, cfg *Config, se
 	}
 	for index, gap := range gaps {
 		season, episode := gap[0], gap[1]
-		for _, result := range accepted[index] {
+		listed := accepted[index]
+		if len(listed) == 0 {
+			// Nothing within the profile: show the copies in the right language
+			// that miss only the resolution, marked, exactly as the cycle would
+			// take them for this episode.
+			listed = gh2_lastResortEpisodeSources(perGap[index], cfg, series)
+		}
+		for _, result := range listed {
 			results = append(results, gh2_episodeResult{
 				Release: result.Release,
 				Origin:  result.Origin,
@@ -1162,16 +1217,37 @@ func gh2_searchMissingEpisodes(ctx context.Context, s *AppState, cfg *Config, se
 			}
 		}
 	}
-	for _, gap := range gaps {
+	for index, gap := range gaps {
+		if !searchedGaps[index] {
+			continue
+		}
 		_ = s.db.MarkGapSearched(series.Name, gap[0], gap[1])
 	}
-	logging.Info(fmt.Sprintf("🔎 Search for the missing episodes of %s: %s for %s",
-		series.Name, countLabel(len(results), "result", "results"), countLabel(len(gaps), "episode", "episodes")))
+	// Searched is what the caller may rely on: a synchronous call that hit its
+	// deadline returns a partial set, and says so with Complete.
+	for _, ok := range searchedGaps {
+		if ok {
+			outcome.Searched++
+		}
+	}
+	outcome.Complete = !cancelled && outcome.Searched == len(gaps)
+	if cancelled {
+		logging.Info(fmt.Sprintf("🔎 Search for the missing episodes of %s stopped early: %s for %d of %d episodes",
+			series.Name, countLabel(len(results), "result", "results"), outcome.Searched, len(gaps)))
+	} else {
+		logging.Info(fmt.Sprintf("🔎 Search for the missing episodes of %s: %s for %s",
+			series.Name, countLabel(len(results), "result", "results"), countLabel(len(gaps), "episode", "episodes")))
+	}
 	seasonMetadata, _ := s.db.SeriesSeasonCounts(series.Name)
 	outcome.Results = results
 	outcome.MetadataReady = len(seasonMetadata) > 0 || len(allGaps) > 0
 	return outcome
 }
+
+// missingSearchSyncBudget is how long the synchronous API call waits before
+// answering with the episodes it has already searched. The UI runs the same
+// search as a background job: no deadline, live progress and a cancel button.
+const missingSearchSyncBudget = 90 * time.Second
 
 func SeriesSearchMissing(w http.ResponseWriter, r *http.Request, s *AppState) {
 	name := pathParam(r, "name")
@@ -1181,7 +1257,9 @@ func SeriesSearchMissing(w http.ResponseWriter, r *http.Request, s *AppState) {
 		jsonError(w, http.StatusNotFound, "series not found")
 		return
 	}
-	outcome := gh2_searchMissingEpisodes(r.Context(), s, cfg, series, nil)
+	ctx, cancel := context.WithTimeout(r.Context(), missingSearchSyncBudget)
+	defer cancel()
+	outcome := gh2_searchMissingEpisodes(ctx, s, cfg, series, nil)
 	episodes := make([]map[string]any, 0, len(outcome.Gaps))
 	for _, gap := range outcome.Gaps {
 		episodes = append(episodes, map[string]any{"season": gap[0], "episode": gap[1]})
@@ -1189,8 +1267,9 @@ func SeriesSearchMissing(w http.ResponseWriter, r *http.Request, s *AppState) {
 	jsonStatus(w, http.StatusOK, map[string]any{
 		"ok":                 true,
 		"series":             series.Name,
-		"searched":           len(outcome.Gaps),
+		"searched":           outcome.Searched,
 		"total":              outcome.TotalMissing,
+		"complete":           outcome.Complete,
 		"episodes":           episodes,
 		"results":            outcome.Results,
 		"metadata_available": outcome.MetadataReady,
