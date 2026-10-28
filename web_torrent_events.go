@@ -1462,10 +1462,11 @@ func RemoveSeededCompleted(cfg *Config, torrents TorrentSession, db *Database, p
 		// reached none of them and is not paused is skipped by the check below
 		// whatever the database says, so it costs no query at every tick.
 		limits := policy.limitsFor(&torrent)
-		ratioReached, timeReached := limits.ratioReached(&torrent), limits.timeReached(&torrent)
+		ratioReached, timeLimitReached := limits.ratioReached(&torrent), limits.timeReached(&torrent)
 		// A seed stopped for inactivity ended its seed like one that reached
 		// its time limit.
-		timeReached = timeReached || (limits.IdleSeconds != nil && seedIdle.reached(torrent.Hash))
+		idleReached := limits.IdleSeconds != nil && seedIdle.reached(torrent.Hash)
+		timeReached := timeLimitReached || idleReached
 		if !ratioReached && !timeReached && torrent.State != "paused" {
 			continue
 		}
@@ -1515,10 +1516,15 @@ func RemoveSeededCompleted(cfg *Config, torrents TorrentSession, db *Database, p
 			if removed {
 				_ = db.MarkTorrentRemovedAt(torrent.Hash)
 			}
+			libraryNote := "the library copy is kept"
+			if processed != nil && strings.TrimSpace(*processed) != "" {
+				libraryNote = "the library copy stays in " + *processed
+			}
+			reason := seedEndReason(ratioReached, timeLimitReached, idleReached)
 			if target, moveErr := MoveToTrash(source, *cfg.TrashPath); moveErr != nil {
-				logging.Error(fmt.Sprintf("❌ Could not move «%s» to the trash after seeding (%s): %v", torrent.Name, source, moveErr), "hash", torrent.Hash)
+				logging.Error(fmt.Sprintf("❌ Could not move the download copy of «%s» to the trash after seeding (%s); %s: %v", torrent.Name, source, libraryNote, moveErr), "hash", torrent.Hash)
 			} else {
-				logging.Info(fmt.Sprintf("🗑️ «%s» finished seeding and its download folder moved to the trash: %s", torrent.Name, target), "hash", torrent.Hash)
+				logging.Info(fmt.Sprintf("🗑️ «%s» has finished seeding (%s): the download copy moved to %s, %s", torrent.Name, reason, target, libraryNote), "hash", torrent.Hash)
 			}
 			continue
 		}
@@ -2201,14 +2207,8 @@ func EnforceSeedPolicy(cfg *Config, torrents TorrentSession, db *Database, postS
 				}
 			} else if value {
 				stopped = true
-				reason := "seed time reached"
-				switch {
-				case ratioReached && timeReached:
-					reason = "ratio and time reached"
-				case ratioReached:
-					reason = "ratio reached"
-				case !timeReached && idleReached:
-					reason = "no upload while seeding"
+				reason := seedEndReason(ratioReached, timeReached, idleReached)
+				if !timeReached && idleReached {
 					policy.markIdleStop(torrent.Hash)
 				}
 				if limits.Rule != "" {

@@ -31,3 +31,25 @@ func TestSeedLimitsForTorrent(t *testing.T) {
 		t.Fatalf("minutes fallback: time=%v", timeLimit)
 	}
 }
+
+// TestSeedEndReason fixes the words used to say why a seed ended, shared by the
+// pause line and the trash line: the end-of-seed message must name the limit
+// that was reached.
+func TestSeedEndReason(t *testing.T) {
+	cases := []struct {
+		name                          string
+		ratio, timeLimit, idleReached bool
+		want                          string
+	}{
+		{"ratio and time", true, true, false, "ratio and time reached"},
+		{"ratio", true, false, false, "ratio reached"},
+		{"time", false, true, false, "seed time reached"},
+		{"idle", false, false, true, "no upload while seeding"},
+		{"time wins over idle", false, true, true, "seed time reached"},
+	}
+	for _, tc := range cases {
+		if got := seedEndReason(tc.ratio, tc.timeLimit, tc.idleReached); got != tc.want {
+			t.Errorf("%s: seedEndReason = %q, want %q", tc.name, got, tc.want)
+		}
+	}
+}

@@ -15,6 +15,8 @@ manual is online: [English](docs/MANUAL.en.md) ·
 
 ## 28 October 2026
 
+- **The log says why a download ends and that the library copy stays.** When an already archived season pack finished seeding and its download copy went to the trash, the log only said that the folder had moved to the trash: it looked as if the whole pack had been thrown away. The line now says which limit ended the seed ("seed time reached", "ratio reached"…) and that the library copy stays, with its path. If the move to the trash fails, the message still says where the good copy is. Nothing to configure.
+
 - **Weekly Packs arrive as soon as they are downloadable.** GetComics publishes a pack's page before its download links, and the comics check runs once a week: the pack waited for the next check, about a week. Now, on every regular cycle, Gextto rechecks only the packs already recorded but not downloaded yet and queues one as soon as its link appears, without redoing the comics check. The pack of the week of 21 October, waiting since the 23rd, is taken at the next cycle.
 
 - **Monitored comics follow the series, not just the chosen issue.** A monitor with an issue number in its title ("Poison Ivy #41", "Spawn #373") was compared with that number only: the automatic check never found the new issues, which appeared only when searching by hand. The periodic check now also downloads the later issues of the same series; earlier issues, issues of other series and collections stay out. The post chosen in *Add comic* is downloaded as it is, and from there the series carries on by itself.

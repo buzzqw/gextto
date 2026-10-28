@@ -16,6 +16,8 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
 
 ## 28 ottobre 2026
 
+- **Il log dice perché un download finisce e che la copia in libreria resta.** Quando un season pack già archiviato finiva il seed e la sua copia di download andava nel cestino, il log scriveva soltanto che la cartella era stata spostata nel cestino: sembrava che fosse stato buttato via tutto il pack. Ora la riga dice quale limite ha chiuso il seed («seed time reached», «ratio reached»…) e che la copia in libreria resta, con il suo percorso. Se lo spostamento nel cestino fallisce, il messaggio dice comunque dove si trova la copia buona. Non c'è nulla da configurare.
+
 - **I Weekly Pack arrivano appena sono scaricabili.** GetComics pubblica la pagina del pack prima dei link di download, e il controllo fumetti gira una volta a settimana: il pack restava in attesa fino al controllo successivo, cioè circa una settimana. Ora a ogni ciclo normale Gextto ricontrolla solo i pack già registrati ma non ancora scaricati e li accoda appena il link compare, senza rifare il controllo dei fumetti. Il pack della settimana del 21 ottobre, fermo dal 23, viene preso al prossimo ciclo.
 
 - **I fumetti monitorati seguono la serie, non solo l'albo scelto.** Un monitor con il numero nel titolo («Poison Ivy #41», «Spawn #373») veniva confrontato solo con quel numero: il giro automatico non trovava mai i numeri nuovi, che comparivano soltanto cercandoli a mano. Ora il controllo periodico scarica anche i numeri successivi della stessa serie; numeri precedenti, albi di altre serie e raccolte restano esclusi. Il post scelto in *Aggiungi fumetto* viene scaricato così com'è, e da lì in avanti la serie prosegue da sola.

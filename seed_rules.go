@@ -283,6 +283,22 @@ func (l seedLimits) timeReached(torrent *models.TorrentView) bool {
 	return l.Seconds != nil && torrent.SeedingSeconds >= *l.Seconds
 }
 
+// seedEndReason names, in the words the log uses, the limit that ended a seed.
+// timeReached is the time limit alone; a seed stopped for inactivity is
+// reported as such only when the time limit was not reached.
+func seedEndReason(ratioReached, timeReached, idleReached bool) string {
+	switch {
+	case ratioReached && timeReached:
+		return "ratio and time reached"
+	case ratioReached:
+		return "ratio reached"
+	case !timeReached && idleReached:
+		return "no upload while seeding"
+	default:
+		return "seed time reached"
+	}
+}
+
 // seedPolicy resolves the limits of the torrents seen in one pass. It reads the
 // origins from the database once, and only when rules exist.
 type seedPolicy struct {

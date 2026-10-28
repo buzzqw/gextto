@@ -1,6 +1,7 @@
 package gextto
 
 import (
+	"bytes"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -9,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/buzzqw/gextto/internal/logging"
 	"github.com/buzzqw/gextto/internal/models"
 )
 
@@ -457,6 +459,103 @@ func TestRemoveSeededCompletedRecognizesArchivedNasCopy(t *testing.T) {
 	}
 	if _, err := os.Stat(processed); err != nil {
 		t.Fatalf("library copy must stay: %v", err)
+	}
+}
+
+// TestRemoveSeededCompletedToTrashExplainsWhy pins the log of an archived pack
+// sent to the trash at the end of the seed: it must say which limit ended the
+// seed and that the library copy stays, so the line cannot read as if the whole
+// release had been thrown away.
+func TestRemoveSeededCompletedToTrashExplainsWhy(t *testing.T) {
+	dir := t.TempDir()
+	db, err := OpenDatabase(filepath.Join(dir, "gextto.db"))
+	if err != nil {
+		t.Fatalf("OpenDatabase: %v", err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+
+	downloads := filepath.Join(dir, "downloads")
+	library := filepath.Join(dir, "library", "Show")
+	trash := filepath.Join(dir, "trash")
+	for _, path := range []string{downloads, library, trash} {
+		if err := os.MkdirAll(path, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	title := "Show"
+	season := int64(1)
+	release := &models.Release{
+		Title:  "Show.S01.1080p",
+		Magnet: "magnet:?xt=urn:btih:" + seedTestHash,
+		Kind:   "series",
+		Series: &title,
+		Season: &season,
+		IsPack: true,
+	}
+	if err := db.RegisterTorrentScored(release, 100); err != nil {
+		t.Fatalf("RegisterTorrentScored: %v", err)
+	}
+
+	source := filepath.Join(downloads, "Show.S01.1080p")
+	if err := os.MkdirAll(source, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(source, "Show.S01E01.mkv"), []byte("video"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(library, "Show - S01E01.mkv"), []byte("video"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.MarkTorrentCompleted(seedTestHash, library, 5); err != nil {
+		t.Fatalf("MarkTorrentCompleted: %v", err)
+	}
+
+	cfg := DefaultConfig()
+	cfg.Transfer.SeedRatio = 0.5
+	cfg.Transfer.SeedTimeDays = 365
+	cfg.Transfer.AutoRemoveCompleted = true
+	cfg.CleanupAction = "move"
+	cfg.TrashPath = &trash
+	cfg.Settings = map[string]string{}
+
+	view := models.TorrentView{
+		Hash:            seedTestHash,
+		Name:            "Show.S01.1080p",
+		SavePath:        downloads,
+		State:           "seeding",
+		Progress:        100,
+		TotalSize:       5,
+		TotalDone:       5,
+		SeedRatio:       -1,
+		SeedDays:        -1,
+		AllTimeDownload: 100,
+		AllTimeUpload:   1000,
+		SeedingSeconds:  60,
+	}
+
+	var captured bytes.Buffer
+	logging.SetOutput(&captured)
+	defer logging.SetOutput(os.Stdout)
+
+	session := &stubTorrentSession{list: []models.TorrentView{view}}
+	RemoveSeededCompleted(&cfg, session, db, map[string]struct{}{})
+	if len(session.removed) != 1 || session.removed[0] != seedTestHash {
+		t.Fatalf("removed = %v, want [%s]", session.removed, seedTestHash)
+	}
+	if _, err := os.Stat(source); !os.IsNotExist(err) {
+		t.Fatalf("download copy must leave the download folder: %v", err)
+	}
+	if _, err := os.Stat(library); err != nil {
+		t.Fatalf("library copy must stay: %v", err)
+	}
+
+	out := captured.String()
+	if !strings.Contains(out, "has finished seeding (ratio reached)") {
+		t.Fatalf("log does not say why the seed ended:\n%s", out)
+	}
+	if !strings.Contains(out, "the library copy stays in "+library) {
+		t.Fatalf("log does not say the library copy is kept:\n%s", out)
 	}
 }
 
