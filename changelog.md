@@ -16,6 +16,8 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
 
 ## 28 ottobre 2026
 
+- **Il log dice «→ aMule» per i download eD2k.** Quando Gextto avviava un file eD2k (per esempio da DDUnlimited tramite indexarr), la riga «📥 Downloading» del log indicava la cartella dei torrent, anche «RAM disk», benché il file andasse ad aMule, che usa le sue cartelle. Ora la riga dice «→ aMule». Il download avveniva già nel posto giusto: cambia solo il messaggio. Non c'è nulla da configurare.
+
 - **Le release eD2k di indexarr si scaricano anche in automatico.** indexarr manda per i link eD2k un numero di seed e peer pari a zero, perché sulla rete eD2k l'indexer non può contarli. Gextto li leggeva come «nessuno condivide il file» e, nella ricerca automatica, rifiutava ogni release eD2k di indexarr come morta: si poteva scaricarla solo a mano. Ora per un link eD2k quei numeri vengono ignorati e le fonti le trova aMule, come per i link che Gextto trova da solo. Non c'è nulla da configurare.
 
 ## 27 ottobre 2026

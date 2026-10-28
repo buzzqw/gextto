@@ -1217,7 +1217,7 @@ func RunCycleDomain(
 					logMessage += " · replacing: " + from
 				}
 			}
-			if destination := downloadDestinationLabel(cfg, preferredPath); destination != "" {
+			if destination := releaseDestinationLabel(cfg, &release, preferredPath); destination != "" {
 				logMessage += " → " + destination
 			}
 			logHash, _ := releaseHash(&release)
@@ -1483,7 +1483,7 @@ func prioritizeArchiveGapDownloads(
 		stats.GapsFilled++
 		started++
 		gapMessage := fmt.Sprintf("📥 Downloading %s — fills a missing episode (%s)", logTarget(&release), friendlyQuality(release.Quality))
-		if destination := downloadDestinationLabel(cfg, preferredPath); destination != "" {
+		if destination := releaseDestinationLabel(cfg, &release, preferredPath); destination != "" {
 			gapMessage += " → " + destination
 		}
 		logging.Info(gapMessage,

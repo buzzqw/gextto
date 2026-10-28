@@ -406,6 +406,16 @@ func downloadDestinationLabel(cfg *Config, preferredPath *string) string {
 	return destination
 }
 
+// releaseDestinationLabel is downloadDestinationLabel for one release: an
+// eD2k file goes to aMule, which keeps its own temp and incoming folders, so
+// the torrent placement (RAM disk, overflow, tag folder) does not apply.
+func releaseDestinationLabel(cfg *Config, release *models.Release, preferredPath *string) string {
+	if release != nil && release.Ed2kLink != "" {
+		return "aMule"
+	}
+	return downloadDestinationLabel(cfg, preferredPath)
+}
+
 // DiagnoseTorrent explains a torrent's situation as a short machine code plus a
 // human reason and hint. It makes extreme cases explicit (no seeders, a
 // leechers-only swarm, missing metadata, dead trackers) in the logs and in the

@@ -408,4 +408,12 @@ func TestDownloadDestinationLabel(t *testing.T) {
 	if got := downloadDestinationLabel(cfg, &other); got != other {
 		t.Fatalf("explicit destination = %q, want %q", got, other)
 	}
+	// An eD2k file goes to aMule even when the torrent path is the RAM disk.
+	ed2k := &models.Release{Ed2kLink: "ed2k://|file|FBI.mkv|1714662998|0123456789abcdef0123456789abcdef|/"}
+	if got := releaseDestinationLabel(cfg, ed2k, &ram); got != "aMule" {
+		t.Fatalf("eD2k destination = %q, want aMule", got)
+	}
+	if got := releaseDestinationLabel(cfg, &models.Release{}, &ram); got != "RAM disk" {
+		t.Fatalf("torrent destination = %q, want RAM disk", got)
+	}
 }
