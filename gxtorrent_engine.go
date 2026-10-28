@@ -168,10 +168,15 @@ type gxTorrentEngine struct {
 	version   string
 	versionAt time.Time
 
-	mu               sync.Mutex
-	syncMu           sync.Mutex
-	cache            map[string]models.TorrentView
-	previous         map[string]models.TorrentView
+	mu       sync.Mutex
+	syncMu   sync.Mutex
+	cache    map[string]models.TorrentView
+	previous map[string]models.TorrentView
+	// sorted is the cache ordered by hash, rebuilt only when cacheVersion moves:
+	// every reader used to copy and sort the whole table.
+	sorted           []models.TorrentView
+	sortedFor        uint64
+	cacheVersion     uint64
 	events           []models.TorrentEvent
 	pendingMoves     map[string]string
 	lastSync         time.Time
@@ -767,6 +772,7 @@ func (e *gxTorrentEngine) sync() error {
 	}
 	e.previous = next
 	e.cache = next
+	e.cacheVersion++
 	var export []string
 	if e.settings.stateDir != "" {
 		export = e.missingTorrentFilesLocked(next, now)
@@ -978,13 +984,33 @@ func sameFileContent(a, b string) bool {
 // List returns the last snapshot, refreshing it first.
 func (e *gxTorrentEngine) List() []models.TorrentView {
 	_ = e.sync()
+	return e.snapshotLocked()
+}
+
+// Snapshot returns the last snapshot without asking the daemon: the UI, the
+// latency guard and the problems panel read the torrents several times per
+// second and must never wait for a poll that is already in flight.
+func (e *gxTorrentEngine) Snapshot() []models.TorrentView {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	result := make([]models.TorrentView, 0, len(e.cache))
-	for _, view := range e.cache {
-		result = append(result, view)
+	return e.snapshotLocked()
+}
+
+// snapshotLocked copies the cached snapshot, already sorted by hash. The order
+// is kept in `sorted` and rebuilt only when the cache changes, so a reader pays
+// the sort once per poll instead of once per call.
+func (e *gxTorrentEngine) snapshotLocked() []models.TorrentView {
+	if e.sorted == nil || e.sortedFor != e.cacheVersion {
+		sorted := make([]models.TorrentView, 0, len(e.cache))
+		for _, view := range e.cache {
+			sorted = append(sorted, view)
+		}
+		sort.Slice(sorted, func(i, j int) bool { return sorted[i].Hash < sorted[j].Hash })
+		e.sorted = sorted
+		e.sortedFor = e.cacheVersion
 	}
-	sort.Slice(result, func(i, j int) bool { return result[i].Hash < result[j].Hash })
+	result := make([]models.TorrentView, len(e.sorted))
+	copy(result, e.sorted)
 	return result
 }
 
@@ -1043,7 +1069,7 @@ func (e *gxTorrentEngine) Stats() map[string]any {
 	stats := map[string]any{
 		"backend":  BackendGxTorrent,
 		"dry_run":  false,
-		"torrents": len(e.List()),
+		"torrents": len(e.Snapshot()),
 	}
 	var daemon map[string]any
 	if err := e.do(http.MethodGet, "/api/v1/stats", nil, "", &daemon); err != nil {

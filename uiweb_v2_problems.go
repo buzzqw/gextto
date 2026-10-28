@@ -104,7 +104,7 @@ func v2ProblemsViewFrom(s *AppState) v2ProblemsView {
 	now := time.Now()
 	cfg := latestConfig(s)
 	session := map[string]models.TorrentView{}
-	for _, torrent := range s.activeEngine().List() {
+	for _, torrent := range SessionSnapshot(s.activeEngine()) {
 		session[strings.ToLower(torrent.Hash)] = torrent
 	}
 	listed := map[string]struct{}{}

@@ -300,7 +300,7 @@ func (g *latencyGuard) ownRates(now time.Time, engine TorrentEngine) (down, up u
 	if engine == nil {
 		return 0, 0
 	}
-	for _, view := range engine.List() {
+	for _, view := range SessionSnapshot(engine) {
 		down += view.DownloadRate
 		up += view.UploadRate
 	}

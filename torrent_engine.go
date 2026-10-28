@@ -453,3 +453,21 @@ func TorrentIdle(torrent models.TorrentView) bool {
 	}
 	return false
 }
+
+// TorrentSnapshotter is implemented by the backends that can answer from their
+// last snapshot without polling the daemon.
+type TorrentSnapshotter interface {
+	Snapshot() []models.TorrentView
+}
+
+// SessionSnapshot reads the torrents for a path that only displays them: it uses
+// the cached snapshot when the backend has one, and falls back to List (which
+// refreshes first) for any other backend. The UI, the latency guard and the
+// problems panel call it several times per second and must not queue behind a
+// poll to the daemon that is already in flight.
+func SessionSnapshot(torrents TorrentSession) []models.TorrentView {
+	if snapshotter, ok := torrents.(TorrentSnapshotter); ok {
+		return snapshotter.Snapshot()
+	}
+	return torrents.List()
+}

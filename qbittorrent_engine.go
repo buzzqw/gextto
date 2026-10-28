@@ -126,10 +126,15 @@ type qbittorrentEngine struct {
 	queueChanged  bool
 	queueOriginal bool
 
-	mu           sync.Mutex
-	syncMu       sync.Mutex
-	cache        map[string]models.TorrentView
-	previous     map[string]models.TorrentView
+	mu       sync.Mutex
+	syncMu   sync.Mutex
+	cache    map[string]models.TorrentView
+	previous map[string]models.TorrentView
+	// sorted is the cache ordered by hash, rebuilt only when cacheVersion
+	// moves: every reader used to copy and sort the whole table.
+	sorted       []models.TorrentView
+	sortedFor    uint64
+	cacheVersion uint64
 	events       []models.TorrentEvent
 	stalled      map[string]struct{}
 	policyPaused map[string]struct{}
@@ -560,6 +565,7 @@ func (e *qbittorrentEngine) sync() error {
 	}
 	e.previous = next
 	e.cache = next
+	e.cacheVersion++
 	// Keep a Gextto-owned .torrent for every torrent whose metadata is known, so
 	// export and backend migration do not depend on qBittorrent retention. Do
 	// not perform the HTTP export while holding e.mu: an old qBittorrent can take
@@ -788,13 +794,31 @@ func (e *qbittorrentEngine) diffLocked(previous, current models.TorrentView) {
 // outage yields the stale cache (or an empty list) instead of an error.
 func (e *qbittorrentEngine) List() []models.TorrentView {
 	_ = e.sync()
+	return e.snapshotLocked()
+}
+
+// Snapshot returns the last snapshot without asking the daemon (see the same
+// method on the gx-torrent adapter).
+func (e *qbittorrentEngine) Snapshot() []models.TorrentView {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	result := make([]models.TorrentView, 0, len(e.cache))
-	for _, view := range e.cache {
-		result = append(result, view)
+	return e.snapshotLocked()
+}
+
+// snapshotLocked copies the cached snapshot, already sorted by hash: the order
+// is rebuilt only when the cache changes.
+func (e *qbittorrentEngine) snapshotLocked() []models.TorrentView {
+	if e.sorted == nil || e.sortedFor != e.cacheVersion {
+		sorted := make([]models.TorrentView, 0, len(e.cache))
+		for _, view := range e.cache {
+			sorted = append(sorted, view)
+		}
+		sort.Slice(sorted, func(i, j int) bool { return sorted[i].Hash < sorted[j].Hash })
+		e.sorted = sorted
+		e.sortedFor = e.cacheVersion
 	}
-	sort.Slice(result, func(i, j int) bool { return result[i].Hash < result[j].Hash })
+	result := make([]models.TorrentView, len(e.sorted))
+	copy(result, e.sorted)
 	return result
 }
 

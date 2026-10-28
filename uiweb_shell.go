@@ -189,7 +189,7 @@ func uiShellChromeFrom(s *AppState) uiShellChrome {
 		parked, _ = s.db.LoadStallWatches()
 	}
 	var activeDl, totalDl int
-	for _, view := range s.activeEngine().List() {
+	for _, view := range SessionSnapshot(s.activeEngine()) {
 		chrome.Torrents++
 		totalDl++
 		if view.Progress < 100 {
@@ -271,7 +271,7 @@ func uiNavCounts(s *AppState, cfg *Config) map[string]string {
 			active++
 		}
 	}
-	for _, view := range s.activeEngine().List() {
+	for _, view := range SessionSnapshot(s.activeEngine()) {
 		total++
 		if view.Progress < 100 {
 			active++

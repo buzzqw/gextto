@@ -375,3 +375,30 @@ func BenchmarkArchiveMovieQualityPerCall(b *testing.B) {
 		}
 	}
 }
+
+// BenchmarkEngineSnapshotTwelveCalls measures the read side of one worker tick:
+// the monitors ask for the torrent list several times in the same tick, and each
+// call used to copy and sort the whole table.
+func BenchmarkEngineSnapshotTwelveCalls(b *testing.B) {
+	const torrents = 2000
+	e := &gxTorrentEngine{cache: make(map[string]models.TorrentView, torrents)}
+	for index := 0; index < torrents; index++ {
+		hash := fmt.Sprintf("%040x", index+1)
+		e.cache[hash] = models.TorrentView{
+			Hash: hash, Name: fmt.Sprintf("Torrent %04d", index), State: "downloading",
+			TotalDone: 1024, TotalSize: 2048, NumPeers: 12, NumSeeds: 30,
+			Collections: []string{"collection"},
+		}
+	}
+	e.settings.PollInterval = time.Hour
+	e.lastAttempt = time.Now() // no daemon round-trip
+	b.ReportAllocs()
+	b.ResetTimer()
+	for range b.N {
+		for call := 0; call < 12; call++ {
+			if views := e.Snapshot(); len(views) != torrents {
+				b.Fatalf("Snapshot() = %d views, want %d", len(views), torrents)
+			}
+		}
+	}
+}

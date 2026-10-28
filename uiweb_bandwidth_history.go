@@ -105,7 +105,7 @@ func (h *rateHistory) len() int {
 // zero for the session panel.
 func v2CurrentRates(s *AppState) (uint64, uint64) {
 	var down, up uint64
-	for _, view := range s.activeEngine().List() {
+	for _, view := range SessionSnapshot(s.activeEngine()) {
 		down += view.DownloadRate
 		up += view.UploadRate
 	}

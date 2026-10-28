@@ -417,7 +417,7 @@ func uiDashboardDataFrom(s *AppState) uiDashboardData {
 	var views []models.TorrentView
 	backend := "-"
 	if engine != nil {
-		views = engine.List()
+		views = SessionSnapshot(engine)
 		backend = uiBackendLabel(engine.Name())
 	}
 	data := uiDashboardData{
@@ -828,7 +828,7 @@ func uiTorrentsDataFrom(s *AppState) uiTorrentsData {
 }
 
 func uiTorrentRows(s *AppState) []uiTorrentRow {
-	views := s.activeEngine().List()
+	views := SessionSnapshot(s.activeEngine())
 	cfg := latestConfig(s)
 	tags := make(map[string]string)
 	if pairs, err := s.db.TorrentTags(); err == nil {

@@ -1378,3 +1378,32 @@ func TestGxAPIErrorNamesTheMovingTorrent(t *testing.T) {
 		t.Fatal("an unrelated rejection matched ErrTorrentMoving")
 	}
 }
+
+// TestGxSnapshotDoesNotPollTheDaemon guards the read-only path: the UI calls it
+// several times per second and must never wait for (or start) a poll.
+func TestGxSnapshotDoesNotPollTheDaemon(t *testing.T) {
+	e := &gxTorrentEngine{
+		cache: map[string]models.TorrentView{
+			"aa": {Hash: "aa", Name: "One"},
+			"bb": {Hash: "bb", Name: "Two"},
+		},
+		settings: gxTorrentSettings{BaseURL: "http://127.0.0.1:1", Timeout: time.Second},
+	}
+	before := e.lastAttempt
+	views := e.Snapshot()
+	if len(views) != 2 {
+		t.Fatalf("Snapshot() = %d views, want 2", len(views))
+	}
+	if !e.lastAttempt.Equal(before) {
+		t.Fatal("Snapshot started a poll: the read-only path must use the cached snapshot")
+	}
+	// The order is by hash and stable across calls.
+	if views[0].Hash != "aa" || views[1].Hash != "bb" {
+		t.Fatalf("Snapshot() order = %q, %q", views[0].Hash, views[1].Hash)
+	}
+	// A caller may modify its copy without touching the cache.
+	views[0].Name = "changed"
+	if got := e.Snapshot()[0].Name; got != "One" {
+		t.Fatalf("the cache was modified through the returned slice: %q", got)
+	}
+}
