@@ -643,6 +643,12 @@ type Release struct {
 	// Ed2kLink is the `ed2k://|file|...` link of an eD2k result. A release has
 	// exactly one transfer identity: Magnet, TorrentURL or Ed2kLink.
 	Ed2kLink string `json:"ed2k_link,omitempty"`
+	// GrabURL is the indexer's HTTP download link when an eD2k result comes
+	// from a feed that proxies the transfer (indexarr's /dl). It is not the
+	// transfer: before queueing Ed2kLink in aMule, Gextto calls it once so the
+	// indexer can record the grab. Empty for a direct ed2k:// link (Jackett,
+	// Prowlarr, a pasted link).
+	GrabURL string `json:"grab_url,omitempty"`
 	// Sources is the eD2k source count (the number of clients sharing the
 	// file). It is deliberately not mapped onto Seeders: a Kad source count is
 	// a different measure and must not feed the torrent score as if it were a

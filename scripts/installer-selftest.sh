@@ -187,15 +187,15 @@ check_package_script() {
 
   capture bash "$ROOT/scripts/release-manifest.sh" --build 12 --commits 2 --output "$TMP/release.json"
   expect "release-manifest.sh: writes the manifest" 0 "manifest:"
-  if grep -q '"app_version": "1.1.12"' "$TMP/release.json" 2>/dev/null && grep -q '"commits": \[' "$TMP/release.json"; then
+  if grep -q '"app_version": "1.2.12"' "$TMP/release.json" 2>/dev/null && grep -q '"commits": \[' "$TMP/release.json"; then
     pass "release-manifest.sh: manifest has version and commits"
   else
     fail "release-manifest.sh: manifest has version and commits"
   fi
-  # The third number is the build; the series stays 1.1 until raised by hand.
+  # The third number is the build; the series changes only when raised by hand.
   capture bash "$ROOT/scripts/release-manifest.sh" --build 2000 --commits 1 --output "$TMP/release-2000.json"
   expect "release-manifest.sh: writes the large-build manifest" 0 "manifest:"
-  if grep -q '"app_version": "1.1.2000"' "$TMP/release-2000.json" 2>/dev/null; then
+  if grep -q '"app_version": "1.2.2000"' "$TMP/release-2000.json" 2>/dev/null; then
     pass "release-manifest.sh: app_version keeps the build"
   else
     fail "release-manifest.sh: app_version keeps the build"

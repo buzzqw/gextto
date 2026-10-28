@@ -608,6 +608,40 @@ func TestParseFeedBodyReadsEd2kLink(t *testing.T) {
 	}
 }
 
+// indexarr now proxies the eD2k link through /dl and keeps the direct link in
+// the ed2k attribute: Gextto must still build an eD2k release and remember the
+// proxy link for the grab note, without turning it into a torrent.
+func TestParseFeedBodyEd2kKeepsTheProxyLinkForTheGrab(t *testing.T) {
+	const link = "ed2k://|file|Rare%20Movie%201974.avi|700000000|0123456789abcdef0123456789abcdef|/"
+	const proxy = "http://indexarr:8788/dl/7.torrent?apikey=secret"
+	body := `<rss xmlns:torznab="http://torznab.com/schemas/2015/feed"><channel>
+		<item>
+			<title>Rare Movie 1974 1080p</title>
+			<guid>0123456789abcdef0123456789abcdef</guid>
+			<link>` + proxy + `</link>
+			<enclosure url="` + proxy + `" length="700000000" type="application/x-ed2k"/>
+			<torznab:attr name="ed2k" value="` + link + `"/>
+		</item>
+	</channel></rss>`
+	releases, err := parse_feed_body(body, "indexarr:DDUnlimited")
+	if err != nil {
+		t.Fatalf("parse_feed_body: %v", err)
+	}
+	if len(releases) != 1 {
+		t.Fatalf("len = %d, want 1", len(releases))
+	}
+	release := releases[0]
+	if release.Ed2kLink != link || release.Network != "ed2k" {
+		t.Fatalf("release = %+v", release)
+	}
+	if release.GrabURL != proxy {
+		t.Fatalf("grab url = %q, want %q", release.GrabURL, proxy)
+	}
+	if release.Magnet != "" || release.TorrentURL != nil {
+		t.Fatalf("eD2k release also has a torrent identity: %+v", release)
+	}
+}
+
 func TestIsEd2kURL(t *testing.T) {
 	if !IsEd2kURL("ed2k://|file|film.mkv|10|0123456789abcdef0123456789abcdef|/") {
 		t.Fatal("valid eD2k link rejected")

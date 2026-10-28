@@ -325,6 +325,13 @@ func parse_feed_body(body, source string) ([]models.Release, error) {
 							// "dead_swarm_empty". The count stays unknown and
 							// aMule finds the sources.
 							release.GUID = guid
+							// indexarr proxies the eD2k link through its /dl
+							// route: keep it so the grab can be reported to the
+							// indexer before aMule gets the file. The transfer
+							// stays the ed2k:// link in Ed2kLink.
+							if torrentURL != "" {
+								release.GrabURL = torrentURL
+							}
 							out = append(out, *release)
 						}
 					} else if release := ParseReleaseSource(title, magnet, torrentPtr, itemSource, discoveredAt); release != nil {

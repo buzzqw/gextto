@@ -352,6 +352,39 @@ func TestEd2kLinkAddAndDownloadActions(t *testing.T) {
 	}
 }
 
+// A feed that proxies the eD2k link (indexarr /dl) keeps that HTTP link as
+// GrabURL: it is not the transfer, only the call that lets the indexer count
+// the download. A direct ed2k:// link has no GrabURL.
+func TestAddEd2kReleaseNotesTheGrabToTheIndexer(t *testing.T) {
+	core, cfg := ed2kTestCore(t, nil)
+	var hits int
+	indexer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hits++
+		w.Header().Set("Location", "ed2k://|file|x.mkv|10|aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa|/")
+		w.WriteHeader(http.StatusFound)
+	}))
+	defer indexer.Close()
+	const link = "ed2k://|file|Rare%20Show%20S03E01.mkv|900000000|bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb|/"
+	release := &models.Release{Ed2kLink: link, GrabURL: indexer.URL + "/dl/7.torrent?apikey=secret"}
+	if added, err := addEd2kRelease(cfg, release); !added || err != nil {
+		t.Fatalf("addEd2kRelease = %v, %v", added, err)
+	}
+	if hits != 1 {
+		t.Fatalf("indexer grab notes = %d, want 1", hits)
+	}
+	if len(core.Downloads()) != 1 {
+		t.Fatalf("aMule queue = %+v", core.Downloads())
+	}
+}
+
+func TestAddEd2kReleaseWithoutGrabURLDoesNotCallAnything(t *testing.T) {
+	_, cfg := ed2kTestCore(t, nil)
+	const link = "ed2k://|file|Direct%20Link.mkv|900000000|cccccccccccccccccccccccccccccccc|/"
+	if added, err := addEd2kRelease(cfg, &models.Release{Ed2kLink: link}); !added || err != nil {
+		t.Fatalf("addEd2kRelease = %v, %v", added, err)
+	}
+}
+
 func TestEd2kSessionReportsCompletion(t *testing.T) {
 	core, cfg := ed2kTestCore(t, nil)
 	incoming := t.TempDir()

@@ -1161,6 +1161,7 @@ func gh3AddParsedRelease(s *AppState, release models.Release) (int, any) {
 			}
 			return status, map[string]any{"ok": false, "error": err.Error(), "link": link.String()}
 		}
+		noteEd2kGrab(release.GrabURL)
 		if !isVideoExtension(link.Name) {
 			// Not a video (a pdf, a program, an archive): it is aMule's
 			// download only, like a torrent added by hand, and stays in the

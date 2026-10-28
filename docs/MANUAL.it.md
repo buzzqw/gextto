@@ -1311,7 +1311,10 @@ passano dal client torrent. La ricerca aggregata li include quando il titolo non
 `indexer_type=ed2k` alla richiesta Torznab. Per dare tempo alla fonte eD2k di
 aprire i topic, Gextto chiede a indexarr un'attesa fino a 45 secondi solo per le
 proprie ricerche (`live_wait=45`); le altre sorgenti e gli altri programmi non
-cambiano.
+cambiano. Prima di accodare in aMule un file preso da indexarr, Gextto apre una
+volta il suo link di download: indexarr registra così il download e la fonte
+che l'ha fornito in *Log → Download*. Il file scaricato resta il link `ed2k://`
+e, se il link di download non risponde, il download parte lo stesso.
 
 Con Jackett e Prowlarr Gextto legge l'elenco degli indexer dal manager
 e ne interroga **uno alla volta** (l'endpoint Torznab del singolo indexer per
