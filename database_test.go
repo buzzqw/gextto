@@ -2585,3 +2585,29 @@ func TestArchiveGapsSkipEpisodesAlreadyDownloading(t *testing.T) {
 	}
 	assertEqual(t, perSeries, [][2]int64{{1, 1}, {1, 3}, {1, 4}})
 }
+
+// eD2k files live in aMule, not in the torrent session: the reconciliation
+// must leave them alone, or PendingEd2kHashes stops watching them and a
+// finished file is never imported. Rows an earlier version marked as missing
+// go back to queued.
+func TestReconcileLeavesEd2kFilesToAMule(t *testing.T) {
+	db := newTestDB(t)
+	for _, hash := range []string{"0123456789abcdef0123456789abcdef", "fedcba9876543210fedcba9876543210"} {
+		if _, err := db.db.Exec("INSERT INTO torrent_meta(hash,network,status,created_at,updated_at) VALUES (?1,'ed2k','queued',datetime('now'),datetime('now'))", hash); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := db.db.Exec("UPDATE torrent_meta SET status='error', error='missing from session' WHERE hash='fedcba9876543210fedcba9876543210'"); err != nil {
+		t.Fatal(err)
+	}
+	removed, err := db.ReconcileMissingTorrents(map[string]struct{}{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertEqual(t, removed, 0)
+	pending, err := db.PendingEd2kHashes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertEqual(t, len(pending), 2)
+}

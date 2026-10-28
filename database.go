@@ -4730,7 +4730,14 @@ func (d *Database) ReconcilePackRelease(hash string, release *models.Release, cf
 // ReconcileMissingTorrents marks orphan active torrents as `error` and removes
 // their not-yet-downloaded placeholders.
 func (d *Database) ReconcileMissingTorrents(liveHashes map[string]struct{}) (int, error) {
-	rows, err := d.db.Query("SELECT hash FROM torrent_meta WHERE status NOT IN ('completed','error','removed')")
+	// eD2k files live in aMule, never in the torrent session: checked against
+	// it, every one of them looked removed, and PendingEd2kHashes stopped
+	// watching them, so a finished file stayed in aMule's incoming folder.
+	// The rows a previous version marked that way go back to queued.
+	if _, err := d.db.Exec("UPDATE torrent_meta SET status='queued', error=NULL, updated_at=?1 WHERE network='ed2k' AND status='error' AND error='missing from session'", nowSQLite()); err != nil {
+		return 0, err
+	}
+	rows, err := d.db.Query("SELECT hash FROM torrent_meta WHERE network<>'ed2k' AND status NOT IN ('completed','error','removed')")
 	if err != nil {
 		return 0, err
 	}
@@ -4767,7 +4774,7 @@ func (d *Database) ReconcileMissingTorrents(liveHashes map[string]struct{}) (int
 		reconciled++
 	}
 	// Download conclusi non più nella sessione: sono stati "puliti".
-	completedRows, err := d.db.Query("SELECT hash FROM torrent_meta WHERE status='completed' AND removed_at IS NULL")
+	completedRows, err := d.db.Query("SELECT hash FROM torrent_meta WHERE network<>'ed2k' AND status='completed' AND removed_at IS NULL")
 	if err != nil {
 		return reconciled, err
 	}

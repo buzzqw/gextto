@@ -196,3 +196,17 @@ func TestRecoverInterruptedAddsSkipsAddsInFlight(t *testing.T) {
 		t.Fatalf("in-flight add was touched: intents=%d removed=%v", intentCount(t, db), engine.removed)
 	}
 }
+
+// A file the engine or aMule already has is a duplicate, not a cycle problem.
+func TestDuplicateAddIsNotACycleProblem(t *testing.T) {
+	stats := &models.CycleStats{}
+	release := models.Release{Title: "FBI - 2x17 - Promesse infrante.mkv", Kind: "series"}
+	logStartFailure(stats, &release, addRejected, "", nil)
+	if stats.Errors != 0 {
+		t.Fatalf("errors = %d (%v), want 0 for a duplicate", stats.Errors, stats.ErrorDetails)
+	}
+	logStartFailure(stats, &release, addFailed, "", errors.New("engine down"))
+	if stats.Errors != 1 {
+		t.Fatalf("errors = %d, want 1 for a failed add", stats.Errors)
+	}
+}

@@ -15,6 +15,7 @@ package gextto
 import (
 	"fmt"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/buzzqw/gextto/internal/logging"
@@ -254,6 +255,13 @@ func applyPackFilePriorities(
 	}
 	ok, err := torrents.SetFilePriorities(hash, priorities)
 	if err != nil {
+		if strings.Contains(err.Error(), "the torrent is being moved") {
+			// The engine moves the data (to the RAM disk or out of it) and
+			// refuses changes meanwhile; the next inspection applies them.
+			// Every 30 s for a ten-minute move it filled the log with warnings.
+			logging.Debug("pack file priorities postponed: the torrent is being moved", "hash", hash)
+			return false
+		}
 		logging.Warn("could not set the pack file priorities", "hash", hash, "error", err.Error())
 		return false
 	}

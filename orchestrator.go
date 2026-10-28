@@ -1677,11 +1677,17 @@ func withdrawAddedTorrent(torrents TorrentEngine, release *models.Release) {
 
 // logStartFailure records why startApprovedRelease did not start a release.
 func logStartFailure(stats *models.CycleStats, release *models.Release, outcome, reason string, err error) {
+	if outcome == addRejected {
+		// The engine (or aMule) already has this file: a duplicate, not a
+		// problem. Counted as an error it showed "33 problems (see the
+		// warnings above)" with no warning to see.
+		logging.Debug("release already in the download engine", "target", logTarget(release))
+		return
+	}
 	stats.Error(outcome)
 	switch outcome {
 	case addFailed:
 		logging.Warn(fmt.Sprintf("⚠️ Could not start the download of %s; moving on", logTarget(release)), "error", err)
-	case addRejected:
 	case addIntentFailed:
 		logging.Warn(fmt.Sprintf("⚠️ %s not started: it could not be recorded in the database", logTarget(release)), "error", err)
 	default:
