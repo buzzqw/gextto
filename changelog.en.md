@@ -15,6 +15,8 @@ manual is online: [English](docs/MANUAL.en.md) ·
 
 ## 28 October 2026
 
+- **The Health page shows only the sources you actually configured.** If you removed an indexer from the integrations, or switched it off, its row stayed in *Health → Provider status* with the last error, as if it were still in use (for example "mircrew indexerr"). The table now lists only the indexers that are present and enabled and the configured feeds, and the row of a removed source is forgotten: adding it again starts without the old backoff. Nothing to configure.
+
 - **«Search missing» no longer holds the series page.** The button on a series page started the search and left the page waiting for minutes, longer the more episodes were missing. It now starts the same background search as the *Missing* tab: the page shows how far it is, you can cancel it and, when it ends, it lists the results with **Download** without leaving the series. A search started by an external program or from the terminal answers within 90 seconds with the episodes it has checked so far (`complete` says whether it finished) instead of staying open, and a cancelled search marks as searched only the episodes it actually looked at: the deep pass does not skip the others for a day.
 
 - **The outside-profile copy now appears in the manual search too.** When a missing episode has no copy within the quality profile, the list of *Search missing* and of the single episode now shows the copy in the requested language with the «🆘 last resort» badge: it is the one Gextto would take by itself, instead of reading «no results» for an episode it then downloaded. The same holds for a copy only the local archive has: the cycle can take it as a last resort, where it used to stay invisible.

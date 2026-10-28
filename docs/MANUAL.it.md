@@ -1373,9 +1373,10 @@ ripetuti e impedisce temporaneamente nuove richieste alla sorgente problematica.
 
 Il ritardo si imposta in *Configurazione → Generale → Ritardo prima di
 scaricare*. Lo stato dei backoff (livello, scadenza e ultimo errore) è in
-*Salute → Stato provider*, che elenca **sempre tutti gli indexer configurati e
-attivi** (quelli senza problemi come «Nessun problema rilevato»), con la colonna
-*Dettaglio tecnico* che riporta l'errore grezzo. Usa **Azzera** per singola sorgente dopo aver corretto la causa; non usarlo per
+*Salute → Stato provider*, che elenca **solo gli indexer configurati e attivi**
+(quelli senza problemi come «Nessun problema rilevato»): una sorgente rimossa o
+disattivata sparisce anche se aveva un errore. La colonna *Dettaglio tecnico*
+riporta l'errore grezzo. Usa **Azzera** per singola sorgente dopo aver corretto la causa; non usarlo per
 mascherare un'API key sbagliata, altrimenti il backoff ricomincerà.
 
 ### Configurare il NAS senza sorprese

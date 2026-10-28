@@ -2139,6 +2139,13 @@ func (d *Database) ResetProviderStatus(provider string) error {
 	return err
 }
 
+// DeleteProviderStatus removes the backoff row of a source that is no longer
+// configured or is switched off, so it cannot outlive the integration.
+func (d *Database) DeleteProviderStatus(kind, provider string) error {
+	_, err := d.db.Exec("DELETE FROM provider_status WHERE provider=?1 AND kind=?2", provider, kind)
+	return err
+}
+
 // SetMediaInfo persists the `ffprobe` result for a release's archived file.
 func (d *Database) SetMediaInfo(release *models.Release, info *MediaInfo) error {
 	serialized, err := json.Marshal(info)

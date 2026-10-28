@@ -43,4 +43,11 @@ func TestGh5MirCrewServiceStatus(t *testing.T) {
 	if gh5_mirCrewServiceStatus(&plain) != nil {
 		t.Fatal("expected no row when the indexer is not configured")
 	}
+
+	// A switched-off indexer is not an active integration either.
+	disabled := DefaultConfig()
+	disabled.Indexers = []IndexerConfig{{Name: "mircrew-indexer", URL: server.URL + "/api", APIKey: "k", Enabled: false}}
+	if gh5_mirCrewServiceStatus(&disabled) != nil {
+		t.Fatal("expected no row when the indexer is disabled")
+	}
 }

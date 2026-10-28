@@ -780,6 +780,21 @@ func ProvidersStatusView(w http.ResponseWriter, r *http.Request, s *AppState) {
 		items = []models.ProviderStatus{}
 	}
 	cfg := latestConfig(s)
+	// A saved backoff row belongs to one source: once the source is removed from
+	// the integrations, or switched off, its row must not stay in the Health
+	// page as if the integration were still there. Drop it and forget the stale
+	// state, so adding the same name again later starts from a clean backoff.
+	if cfg != nil {
+		kept := items[:0]
+		for _, entry := range items {
+			if gh5_activeProvider(cfg, entry.Kind, entry.Provider) {
+				kept = append(kept, entry)
+				continue
+			}
+			_ = s.db.DeleteProviderStatus(entry.Kind, entry.Provider)
+		}
+		items = kept
+	}
 	for index := range items {
 		items[index].UserMessage, items[index].SuggestedAction = gh5_providerGuidance(items[index])
 		if items[index].URL == "" {
@@ -831,6 +846,45 @@ func ProvidersStatusView(w http.ResponseWriter, r *http.Request, s *AppState) {
 		items = append(kept, live...)
 	}
 	jsonResponse(w, map[string]any{"ok": true, "items": items})
+}
+
+// gh5_activeProvider reports whether a saved backoff row still belongs to an
+// integration that is configured and active. An indexer names its row by the
+// configured name or by "<manager> · <indexer>" when the row belongs to one lane
+// behind a manager; a feed is named by feedSourceName, the same name the backoff
+// table stores. Only those two kinds are written by the search, so a row of any
+// other kind is left alone.
+func gh5_activeProvider(cfg *Config, kind, provider string) bool {
+	if cfg == nil {
+		return false
+	}
+	name := strings.ToLower(strings.TrimSpace(provider))
+	if name == "" {
+		return false
+	}
+	switch strings.ToLower(strings.TrimSpace(kind)) {
+	case "indexer":
+		for _, indexer := range cfg.Indexers {
+			if !indexer.Enabled {
+				continue
+			}
+			base := strings.ToLower(strings.TrimSpace(indexer.Name))
+			if base != "" && (name == base || strings.HasPrefix(name, base+" · ")) {
+				return true
+			}
+		}
+		return false
+	case "feed":
+		for _, feed := range cfg.FeedURLs {
+			if strings.EqualFold(strings.TrimSpace(feedSourceName(feed)), strings.TrimSpace(provider)) ||
+				strings.EqualFold(strings.TrimSpace(feed), strings.TrimSpace(provider)) {
+				return true
+			}
+		}
+		return false
+	default:
+		return true
+	}
 }
 
 // gh5_healthyIndexerStatuses returns a row for every enabled configured indexer
@@ -975,6 +1029,9 @@ func gh5_mirCrewIndexer(cfg *Config) *IndexerConfig {
 		return nil
 	}
 	for index := range cfg.Indexers {
+		if !cfg.Indexers[index].Enabled {
+			continue
+		}
 		name := strings.ToLower(cfg.Indexers[index].Name)
 		rawURL := strings.ToLower(cfg.Indexers[index].URL)
 		if strings.Contains(name, "mircrew") || strings.Contains(rawURL, "mircrew") ||
@@ -1028,6 +1085,11 @@ func gh5_mirCrewLoginState(base string) (string, bool) {
 func gh5_mirCrewServiceStatus(cfg *Config) *models.ProviderStatus {
 	indexer := gh5_mirCrewIndexer(cfg)
 	if indexer == nil {
+		// A disabled or removed mircrew indexer must not keep showing the row
+		// cached from when it was active.
+		gh5_mirCrewProbe.Lock()
+		gh5_mirCrewProbe.entry = nil
+		gh5_mirCrewProbe.Unlock()
 		return nil
 	}
 	gh5_mirCrewProbe.Lock()

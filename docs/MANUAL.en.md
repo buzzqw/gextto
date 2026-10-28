@@ -1335,9 +1335,9 @@ problematic source.
 
 The delay is set in *Configuration → General → Delay before downloading*. The
 backoff state (level, deadline and last error) is in *Health → Provider
-status*, which **always lists every configured and enabled indexer** (healthy
-ones as "No problem detected"), with a *Technical detail* column holding the raw
-error. Use **Reset** per source after fixing the cause; do not use it to hide a wrong API
+status*, which **lists only the configured and enabled indexers** (healthy ones
+as "No problem detected"): a removed or switched-off source disappears even if it
+had an error. The *Technical detail* column holds the raw error. Use **Reset** per source after fixing the cause; do not use it to hide a wrong API
 key, or backoff will start again.
 
 ### Configuring a NAS safely
