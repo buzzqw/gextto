@@ -1,6 +1,8 @@
 package gextto
 
 import (
+	"fmt"
+	"strings"
 	"time"
 
 	"testing"
@@ -72,7 +74,7 @@ func TestDeepPassSearchesTheGapsWaitingLongestFirst(t *testing.T) {
 		{candidate: liveCandidate{Series: series("FBI: International"), Season: 3, Episode: 1}},
 		{candidate: liveCandidate{Series: series("New Tricks"), Season: 1, Episode: 1}, last: now.Add(-20 * 24 * time.Hour), searched: true},
 	}
-	orderWaitingGaps(waiting)
+	orderWaitingGaps(waiting, "")
 	got := []string{}
 	for _, entry := range waiting {
 		got = append(got, entry.candidate.Series.Name)
@@ -82,5 +84,25 @@ func TestDeepPassSearchesTheGapsWaitingLongestFirst(t *testing.T) {
 		if got[i] != want[i] {
 			t.Fatalf("order = %v, want %v", got, want)
 		}
+	}
+}
+
+func TestDeepPassRotatesTheNeverSearchedSeries(t *testing.T) {
+	series := func(name string) *SeriesConfig { return &SeriesConfig{Name: name, Enabled: true} }
+	waiting := []waitingGap{
+		{candidate: liveCandidate{Series: series("Agenzia Roman"), Season: 3, Episode: 10}},
+		{candidate: liveCandidate{Series: series("Ahsoka"), Season: 2, Episode: 1}},
+		{candidate: liveCandidate{Series: series("Ahsoka"), Season: 2, Episode: 2}},
+		{candidate: liveCandidate{Series: series("FBI: International"), Season: 3, Episode: 1}},
+		{candidate: liveCandidate{Series: series("New Tricks"), Season: 1, Episode: 1}},
+	}
+	orderWaitingGaps(waiting, "Ahsoka")
+	got := []string{}
+	for _, entry := range waiting {
+		got = append(got, fmt.Sprintf("%s %dx%02d", entry.candidate.Series.Name, entry.candidate.Season, entry.candidate.Episode))
+	}
+	want := []string{"FBI: International 3x01", "New Tricks 1x01", "Agenzia Roman 3x10", "Ahsoka 2x01", "Ahsoka 2x02"}
+	if strings.Join(got, "|") != strings.Join(want, "|") {
+		t.Fatalf("order = %v, want %v", got, want)
 	}
 }

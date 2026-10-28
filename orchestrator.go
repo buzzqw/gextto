@@ -517,7 +517,8 @@ func RunCycleDomain(
 			searched:  searched,
 		})
 	}
-	orderWaitingGaps(waiting)
+	orderWaitingGaps(waiting, cfg.Settings["gap_deep_cursor"])
+	deepCursor := ""
 	for _, entry := range waiting {
 		if len(liveCandidates) >= deepMaxPerCycle {
 			break
@@ -528,6 +529,9 @@ func RunCycleDomain(
 		}
 		livePerSeries[name]++
 		liveCandidates = append(liveCandidates, entry.candidate)
+		if !entry.searched {
+			deepCursor = name
+		}
 	}
 	logging.Debug(fmt.Sprintf(
 		"gap fill: %d found in the archive, %d to look up online",
@@ -630,6 +634,11 @@ func RunCycleDomain(
 	if isDeep && !cycleCancelled(ctx) {
 		if err := SaveSetting(cfg.DataDir, "last_deep_gap_fill_ts", strconv.FormatInt(deepNow, 10)); err != nil {
 			logging.Warn("could not record the deep gap pass time", "error", err)
+		}
+		if deepCursor != "" {
+			if err := SaveSetting(cfg.DataDir, "gap_deep_cursor", deepCursor); err != nil {
+				logging.Warn("could not record the deep gap pass cursor", "error", err)
+			}
 		}
 	}
 	// Anime numbered by absolute episode become season/episode releases
@@ -2378,12 +2387,45 @@ type waitingGap struct {
 // orderWaitingGaps puts first the gaps never searched online, then the ones
 // searched longest ago. Taken in library order, the first series of the
 // alphabet with many unfindable gaps used every slot of the deep pass, and a
-// series further down waited weeks for its turn.
-func orderWaitingGaps(waiting []waitingGap) {
-	sort.SliceStable(waiting, func(i, j int) bool {
-		if waiting[i].searched != waiting[j].searched {
-			return !waiting[i].searched
+// series further down waited weeks for its turn. The never-searched gaps go one
+// series at a time (the first gap of every series, then the second, ...) and
+// the series start after cursor, the last one served by the previous pass, so
+// each pass reaches new series instead of starting again from the letter A.
+func orderWaitingGaps(waiting []waitingGap, cursor string) {
+	rank := make([]int, len(waiting))
+	seen := map[string]int{}
+	for i := range waiting {
+		if waiting[i].searched {
+			continue
 		}
-		return waiting[i].last.Before(waiting[j].last)
+		name := waiting[i].candidate.Series.Name
+		rank[i] = seen[name]
+		seen[name]++
+	}
+	order := make([]int, len(waiting))
+	for i := range order {
+		order[i] = i
+	}
+	sort.SliceStable(order, func(a, b int) bool {
+		x, y := waiting[order[a]], waiting[order[b]]
+		if x.searched != y.searched {
+			return !x.searched
+		}
+		if x.searched {
+			return x.last.Before(y.last)
+		}
+		if rank[order[a]] != rank[order[b]] {
+			return rank[order[a]] < rank[order[b]]
+		}
+		xn, yn := x.candidate.Series.Name, y.candidate.Series.Name
+		if (xn > cursor) != (yn > cursor) {
+			return xn > cursor
+		}
+		return xn < yn
 	})
+	sorted := make([]waitingGap, len(waiting))
+	for i, index := range order {
+		sorted[i] = waiting[index]
+	}
+	copy(waiting, sorted)
 }
