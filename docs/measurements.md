@@ -270,6 +270,27 @@ and ran five queries per series; the log tail ran six regular expressions on eac
 500 lines every 5 s) and the dashboard's seen-release count, a `COUNT(DISTINCT)` over
 64,000 rows now reused for 30 s.
 
+**Memory of a full cycle — 28 October 2026** (Intel N97, build 1.2.2067, live service,
+`GEXTTO_PPROF=127.0.0.1:6062`, `/proc/<pid>/status`, the cgroup's `memory.stat` and a
+`POST /api/run_now` cycle of 31,275 releases): the process itself is small. At rest
+after a start **RSS 65 MB** (42 MB anon, `heap in use` 8.2 MB sampled, 41 goroutines);
+during the cycle **RSS/`VmHWM` 232 MB**, anon 155 MB, `heap in use` 38 MB at the
+peak of the feed pass (`mergeDuplicateReleases` 10 MB, `parse_feed_body` 14 MB
+cumulative), 65 goroutines; after the cycle **`heap in use` 6.8 MB** and 42 goroutines,
+RSS settling in the 100–160 MB band while the nine downloads of that cycle are
+processed (the instance that had been up 1h45m before this measurement was at 89 MB).
+Nothing is retained: the heap in use after the cycle is the same as before it and the
+goroutine count returns to its baseline.
+
+The large figure shown by `systemctl status` (1.7 GB, peak 4.5 GB) is **page cache, not
+the process**: with the service running for 45 minutes, `memory.current` was 2.0 GB
+with `file` 1.9 GB against `anon` 68 MB, and the peak is `file` as well. The daemon
+reads the six databases, the 310 MB release archive and the media folders, and the
+kernel keeps that in the cgroup's page cache until something needs the memory; it is
+reclaimable, it drops by itself during the cycle (302 MB → 69 MB as the heap grew) and
+a restart of the unit recreates the cgroup and takes it back to ~0.3 GB. `MemoryMax` on
+the unit would count it, so a limit, if one is ever set, must leave room for it.
+
 **gx-torrent at rest** (same session): **1.45 % of a core**, of which 41 % syscalls and
 ~50 % `runtime.findRunnable` — uTP state packets and sends, incoming MSE handshakes
 (`mse.keyPair` 4.6 %) and the DHT loop, which is real traffic. The ~330 `nanosleep`/s are
