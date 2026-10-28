@@ -634,12 +634,9 @@ func uiHealthDataFrom(s *AppState) uiHealthData {
 	if cycles, err := s.db.RecentCycleStats(uiHealthCycleRows); err == nil {
 		data.Cycles = uiCycleRowsFrom(cycles, time.Now())
 	}
-	if queue, err := s.db.PendingQueue(time.Now().UTC()); err == nil {
-		data.Queued = uiQueueRowsFrom(queue)
-	}
-	if failed, err := s.db.FailedImportsDaily(uiHealthFailedImportDays); err == nil {
-		data.FailedImports = uiDailyRowsFrom(failed)
-	}
+	queue := uiHealthQueueFrom(s)
+	data.Queued = queue.Queued
+	data.FailedImports = queue.FailedImports
 	return data
 }
 
