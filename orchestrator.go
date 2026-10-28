@@ -830,6 +830,9 @@ func RunCycleDomain(
 	emptyArchiveIndex := &models.ArchiveQualityIndex{}
 	archiveIndexCache := map[string]*models.ArchiveQualityIndex{}
 	movieArchiveCache := map[string]*models.ArchiveQuality{}
+	// One walk of the archive root per cycle, shared by every movie candidate:
+	// walking it once per candidate was the largest filesystem cost of a cycle.
+	var movieArchiveIndex *MovieArchiveIndex
 	// Downloads currently in the libtorrent session: do not propose an existing
 	// hash or episode again, even when the database has not recorded it yet.
 	liveDownloads := &models.LiveDownloads{
@@ -1085,7 +1088,10 @@ func RunCycleDomain(
 			if cached, ok := movieArchiveCache[key]; ok {
 				movieArchive = cached
 			} else {
-				movieArchive = ArchiveMovieQuality(cfg, &release)
+				if movieArchiveIndex == nil {
+					movieArchiveIndex = BuildMovieArchiveIndex(cfg)
+				}
+				movieArchive = movieArchiveIndex.Best(cfg, &release)
 				movieArchiveCache[key] = movieArchive
 			}
 		}

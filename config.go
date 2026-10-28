@@ -2138,13 +2138,6 @@ func healthAdjustment(release *models.Release) int64 {
 // keeps archive scans and post-processing from silently dropping the
 // size/subtitle parts of the score.
 func (c *Config) FileScore(path string, kind string, title string) int64 {
-	fileName := filepath.Base(path)
-	if path == "" {
-		fileName = ""
-	}
-	if strings.TrimSpace(title) == "" {
-		title = fileName
-	}
 	sizeBytes := int64(0)
 	if info, err := os.Stat(path); err == nil {
 		size := info.Size()
@@ -2152,6 +2145,20 @@ func (c *Config) FileScore(path string, kind string, title string) int64 {
 			size = int64(^uint64(0) >> 1)
 		}
 		sizeBytes = size
+	}
+	return c.fileScoreWithSize(path, kind, title, sizeBytes)
+}
+
+// fileScoreWithSize is FileScore for a caller that already knows the size of the
+// file: a walk of the archive stats every file once and then scores the few that
+// match a title, instead of statting them again for every candidate.
+func (c *Config) fileScoreWithSize(path string, kind string, title string, sizeBytes int64) int64 {
+	fileName := filepath.Base(path)
+	if path == "" {
+		fileName = ""
+	}
+	if strings.TrimSpace(title) == "" {
+		title = fileName
 	}
 	release := models.Release{
 		Title:        title,

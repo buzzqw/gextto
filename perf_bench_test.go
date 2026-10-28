@@ -287,3 +287,91 @@ func BenchmarkSyncArchiveFilesScored(b *testing.B) {
 		}
 	}
 }
+
+// benchMovieArchive builds a temp archive tree: `movies` films with three
+// files each (a folder per film, as a real library has) plus some series files,
+// and returns the configuration pointing at it and the release titles.
+func benchMovieArchive(b *testing.B, movies int) (*Config, []models.Release) {
+	b.Helper()
+	root := b.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "Series"), 0o755); err != nil {
+		b.Fatalf("MkdirAll: %v", err)
+	}
+	for index := 0; index < movies; index++ {
+		folder := filepath.Join(root, fmt.Sprintf("Film %04d (2020)", index))
+		if err := os.MkdirAll(folder, 0o755); err != nil {
+			b.Fatalf("MkdirAll: %v", err)
+		}
+		for variant, name := range []string{"1080p", "720p", "2160p"} {
+			path := filepath.Join(folder, fmt.Sprintf("Film %04d (2020) %s.mkv", index, name))
+			if err := os.WriteFile(path, make([]byte, 1024*(variant+1)), 0o644); err != nil {
+				b.Fatalf("WriteFile: %v", err)
+			}
+		}
+		seriesPath := filepath.Join(root, "Series", fmt.Sprintf("Serie %04d S01E01 1080p.mkv", index))
+		if err := os.WriteFile(seriesPath, make([]byte, 4096), 0o644); err != nil {
+			b.Fatalf("WriteFile: %v", err)
+		}
+	}
+	cfg := DefaultConfig()
+	cfg.ArchiveRoot = &root
+	year := int64(2020)
+	releases := make([]models.Release, 0, movies)
+	for index := 0; index < movies; index++ {
+		releases = append(releases, models.Release{
+			Title: fmt.Sprintf("Film %04d", index),
+			Kind:  "movie",
+			Year:  &year,
+		})
+	}
+	return &cfg, releases
+}
+
+// BenchmarkArchiveMovieQualityPerCandidate measures what the cycle paid: the
+// decision for every movie candidate. It walked the whole archive for each
+// candidate; the index walks it once.
+func BenchmarkArchiveMovieQualityPerCandidate(b *testing.B) {
+	cfg, releases := benchMovieArchive(b, 200)
+	b.ReportAllocs()
+	b.ResetTimer()
+	for range b.N {
+		index := BuildMovieArchiveIndex(cfg)
+		for i := range releases {
+			if found := index.Best(cfg, &releases[i]); found == nil {
+				b.Fatalf("no archived copy of %q", releases[i].Title)
+			}
+		}
+	}
+}
+
+// BenchmarkArchiveMovieQualityWalkPerCandidate is the cost as it was paid before
+// the index: one full walk of the archive per candidate.
+func BenchmarkArchiveMovieQualityWalkPerCandidate(b *testing.B) {
+	cfg, releases := benchMovieArchive(b, 200)
+	root := *cfg.ArchiveRoot
+	b.ReportAllocs()
+	b.ResetTimer()
+	for range b.N {
+		for range releases {
+			if _, err := VideoFiles(root); err != nil {
+				b.Fatalf("VideoFiles: %v", err)
+			}
+		}
+	}
+}
+
+// BenchmarkArchiveMovieQualityPerCall calls the single-candidate entry point for
+// every candidate, which is how the cycle used to ask: it walks the archive once
+// per movie.
+func BenchmarkArchiveMovieQualityPerCall(b *testing.B) {
+	cfg, releases := benchMovieArchive(b, 200)
+	b.ReportAllocs()
+	b.ResetTimer()
+	for range b.N {
+		for i := range releases {
+			if found := ArchiveMovieQuality(cfg, &releases[i]); found == nil {
+				b.Fatalf("no archived copy of %q", releases[i].Title)
+			}
+		}
+	}
+}

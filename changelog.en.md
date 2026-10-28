@@ -15,6 +15,8 @@ manual is online: [English](docs/MANUAL.en.md) ·
 
 ## 28 October 2026
 
+- **Looking up films already in the archive reads the folder once.** For every candidate film Gextto re-read the whole archive (with 200 films and 800 files: 17 seconds and 434 MB of memory per cycle). It now reads the archive once per cycle and compares the candidates with that list: 200 films cost 140 ms.
+
 - **Scanning the library no longer writes once per file.** When Gextto rechecks a series folder, every episode it found cost a separate write to disk: on 2,000 files that was about 3.3 seconds spent only saving, and on a network disk far more. The files of one series are now saved in a single write: the same scan drops to about 60 ms of saving on this disk, and stays instant on a RAM disk.
 
 - **Looking for missing episodes costs less.** Gextto compares every release with all the configured series, and it used to re-process every name and alias of the library for every release: with 500 series that was milliseconds per release. That list is now prepared once and refreshed when you change the series, so the comparison drops to a tenth of a millisecond. The missing-episode calculation also reads the episode table once instead of twice.

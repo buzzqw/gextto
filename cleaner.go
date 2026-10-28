@@ -1232,12 +1232,90 @@ func cleanupOldMovie(cfg *Config, movie string, year *int64, newScore int64, new
 // rebuilt database). Without this check the cycle would download it again and
 // only discard it after completion, wasting the whole transfer.
 func ArchiveMovieQuality(cfg *Config, release *models.Release) *models.ArchiveQuality {
-	if cfg == nil || release == nil || release.Kind != "movie" || cfg.ArchiveRoot == nil {
-		return nil
+	return BuildMovieArchiveIndex(cfg).Best(cfg, release)
+}
+
+// MovieArchiveIndex is one walk of the archive root, kept for the whole cycle so
+// that every movie candidate does not walk the tree again. The walk reads each
+// file name once and stats each file once; the score of a matching file is
+// computed per candidate, because the settings can single out a movie by title.
+type MovieArchiveIndex struct {
+	root  bool
+	empty bool
+	files []movieArchiveFile
+}
+
+// movieArchiveFile is one video file of the archive.
+type movieArchiveFile struct {
+	name     string // base name, as shown to the user
+	key      string // NormalizeSeriesName of the whole path
+	year     int64  // 0 when the file name carries no year
+	quality  models.Quality
+	size     int64
+	fileName string
+}
+
+// BuildMovieArchiveIndex walks the archive root once. A nil or missing root
+// gives an empty index, so a caller can always use it.
+func BuildMovieArchiveIndex(cfg *Config) *MovieArchiveIndex {
+	index := &MovieArchiveIndex{}
+	if cfg == nil || cfg.ArchiveRoot == nil {
+		return index
 	}
 	root := strings.TrimSpace(*cfg.ArchiveRoot)
+	if root == "" {
+		return index
+	}
+	files, err := VideoFiles(root)
+	if err != nil {
+		return index
+	}
+	yearPattern, err := utils.CachedRegex(`\b(19\d{2}|20\d{2})\b`)
+	if err != nil {
+		return index
+	}
+	index.root = true
+	index.files = make([]movieArchiveFile, 0, len(files))
+	for _, file := range files {
+		name, ok := cleanerName(file)
+		if !ok {
+			continue
+		}
+		entry := movieArchiveFile{
+			name:     name,
+			key:      NormalizeSeriesName(file),
+			quality:  ParseQuality(file),
+			fileName: file,
+		}
+		if capture := yearPattern.FindStringSubmatch(file); capture != nil && capture[1] != "" {
+			if year, err := strconv.ParseInt(capture[1], 10, 64); err == nil {
+				entry.year = year
+			}
+		}
+		if info, err := os.Stat(file); err == nil {
+			size := info.Size()
+			if size > int64(^uint64(0)>>1) {
+				size = int64(^uint64(0) >> 1)
+			}
+			entry.size = size
+		}
+		index.files = append(index.files, entry)
+	}
+	return index
+}
+
+// Best returns the best archived copy of the release, or nil when the archive
+// has none: the same answer ArchiveMovieQuality gave walking the tree for every
+// candidate.
+func (index *MovieArchiveIndex) Best(cfg *Config, release *models.Release) *models.ArchiveQuality {
+	if index == nil || cfg == nil || release == nil || !index.root {
+		return nil
+	}
+	if release.Kind != "movie" {
+		return nil
+	}
 	title := strings.TrimSpace(release.Title)
-	if root == "" || title == "" {
+	if title == "" {
 		return nil
 	}
 	words := make([]string, 0)
@@ -1249,33 +1327,19 @@ func ArchiveMovieQuality(cfg *Config, release *models.Release) *models.ArchiveQu
 	if len(words) == 0 {
 		return nil
 	}
-	yearPattern, err := utils.CachedRegex(`\b(19\d{2}|20\d{2})\b`)
-	if err != nil {
-		return nil
-	}
-	files, err := VideoFiles(root)
-	if err != nil {
-		return nil
-	}
 	var best *models.ArchiveQuality
-	for _, file := range files {
-		if _, ok := cleanerName(file); !ok || !cleanerContainsAllWords(NormalizeSeriesName(file), words) {
+	for _, file := range index.files {
+		if !cleanerContainsAllWords(file.key, words) {
 			continue
 		}
 		if release.Year != nil {
-			capture := yearPattern.FindStringSubmatch(file)
-			if capture == nil || capture[1] == "" {
-				continue
-			}
-			oldYear, err := strconv.ParseInt(capture[1], 10, 64)
-			if err != nil || absInt64(oldYear-*release.Year) > 1 {
+			if file.year == 0 || absInt64(file.year-*release.Year) > 1 {
 				continue
 			}
 		}
-		quality := ParseQuality(file)
-		score := cfg.FileScore(file, "movie", title)
+		score := cfg.fileScoreWithSize(file.fileName, "movie", title, file.size)
 		if best == nil || score > best.Score {
-			value := models.ArchiveQuality{Quality: quality, Score: score}
+			value := models.ArchiveQuality{Quality: file.quality, Score: score}
 			best = &value
 		}
 	}

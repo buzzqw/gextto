@@ -16,6 +16,8 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
 
 ## 28 ottobre 2026
 
+- **La ricerca dei film già in archivio legge la cartella una volta sola.** Per ogni film candidato Gextto rileggeva tutto l'archivio (con 200 film e 800 file: 17 secondi e 434 MB di memoria per ciclo). Ora legge l'archivio una volta per ciclo e confronta i candidati con quell'elenco: 200 film costano 140 ms.
+
 - **La scansione della libreria non fa più una scrittura per file.** Quando Gextto ricontrolla la cartella di una serie, ogni episodio trovato costava una scrittura su disco separata: su 2.000 file erano circa 3,3 secondi spesi solo a salvare, e su un disco di rete molto di più. Ora i file di una serie si salvano in un'unica scrittura: la stessa scansione scende a circa 60 ms di salvataggio su questo disco, e resta istantanea su un disco in RAM.
 
 - **La ricerca delle puntate mancanti costa meno.** Gextto confronta ogni release con tutte le serie configurate, e prima rielaborava ogni nome e alias della libreria per ogni release: con 500 serie erano millisecondi per release. Ora quell'elenco si prepara una volta sola e si aggiorna quando cambi le serie, quindi il confronto scende a un decimo di millisecondo. Anche il calcolo delle puntate mancanti legge la tabella degli episodi una volta invece di due.
