@@ -79,6 +79,7 @@ with the live service or a standalone instance as stated.
 | Memory under load | RssAnon peak **1105 MB** with 10 torrents and the NFS write cache; **507 MB outside the two caches** | 226 | same load, `pprof` heap at the end |
 | gexttod at rest | **46 CPU ticks/min (~0.7 %)**, 0 directory opens per 20 s, no write probe on the NAS | 1785 | `GEXTTO_PPROF`, `strace`, `/proc` over 60 s |
 | gexttod at rest (2026-10-26) | **0.35 %** of a core over 240 s, 6.8 MB live heap, 73 MB RSS | 2035 | live service, `GEXTTO_PPROF` CPU profile and heap |
+| gexttod and gx-torrent at rest after the 2026-10-28 pass | gexttod **0.42 %** of a core over 120 s, **70.7 MB RSS** (1.26 % and 69.3 MB in the first minute, while start-up work runs); gx-torrent **0.76 %**, **28.4 MB RSS** | 2073 / engine 264 | live service, CPU ticks from `/proc/<pid>/stat`, `VmRSS`; no regression against the 2035 / 260 figures above |
 | gexttod restart: translation merge | **0.85 s CPU, 45 MB, 1.03 M allocs → 3 ms, 2.5 MB, 35 allocs** when the bundled catalogs did not change | 2037 | `BenchmarkSeedDefaultTranslationsReseed` |
 | Web UI CPU per request (live) | Series **112 → 37 ms**, log tail (refreshed every 5 s) **28 → 5 ms**, dashboard **25–36 → 18–19 ms**, archive 39–40 ms, downloads 10 ms | 2038 | `/proc/<pid>/stat` ticks over 30 requests per page, N97, 55 series, 1,863 episodes |
 | gexttod in the first minutes | **0.39 % of a core**, stale-temp sweep 0.21 s, 8 new TLS connections in 300 s | 1790 | profile from start, `strace -e connect` |
