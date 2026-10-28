@@ -25,6 +25,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -444,12 +445,8 @@ func RunCycleDomain(
 	}
 
 	// Phase 1 (every cycle, free): local archive search only.
-	type liveCandidate struct {
-		Series  *SeriesConfig
-		Season  int64
-		Episode int64
-	}
 	var liveCandidates []liveCandidate
+	var waiting []waitingGap
 	livePerSeries := map[string]int{}
 	archiveHits := 0
 	gapTargets := map[gapTarget]struct{}{}
@@ -504,23 +501,33 @@ func RunCycleDomain(
 			continue
 		}
 		// Phase 2 candidate: deep live search only.
-		if !isDeep || len(liveCandidates) >= deepMaxPerCycle {
+		if !isDeep {
 			continue
 		}
-		if gapLimit > 0 && livePerSeries[gap.Series] >= gapLimit {
-			continue
-		}
-		if recentlySearched, err := db.GapRecentlySearched(gap.Series, gap.Season, gap.Episode, gapResearchHours); err != nil {
+		last, searched, err := db.GapLastSearched(gap.Series, gap.Season, gap.Episode)
+		if err != nil {
 			return nil, err
-		} else if recentlySearched {
+		}
+		if searched && int64(time.Now().UTC().Sub(last).Hours()) < gapResearchHours {
 			continue
 		}
-		livePerSeries[gap.Series]++
-		liveCandidates = append(liveCandidates, liveCandidate{
-			Series:  series,
-			Season:  gap.Season,
-			Episode: gap.Episode,
+		waiting = append(waiting, waitingGap{
+			candidate: liveCandidate{Series: series, Season: gap.Season, Episode: gap.Episode},
+			last:      last,
+			searched:  searched,
 		})
+	}
+	orderWaitingGaps(waiting)
+	for _, entry := range waiting {
+		if len(liveCandidates) >= deepMaxPerCycle {
+			break
+		}
+		name := entry.candidate.Series.Name
+		if gapLimit > 0 && livePerSeries[name] >= gapLimit {
+			continue
+		}
+		livePerSeries[name]++
+		liveCandidates = append(liveCandidates, entry.candidate)
 	}
 	logging.Debug(fmt.Sprintf(
 		"gap fill: %d found in the archive, %d to look up online",
@@ -2351,4 +2358,32 @@ func finishCycleWithoutDownloads(db *Database, stats *models.CycleStats) (*model
 // with mirrors. Releases without any identity are kept.
 func dedupeReleasesByHash(releases []models.Release) []models.Release {
 	return mergeDuplicateReleases(releases)
+}
+
+// liveCandidate is a gap chosen for an online search in the deep pass.
+type liveCandidate struct {
+	Series  *SeriesConfig
+	Season  int64
+	Episode int64
+}
+
+// waitingGap is a gap the archive could not fill, waiting for an online
+// search.
+type waitingGap struct {
+	candidate liveCandidate
+	last      time.Time
+	searched  bool
+}
+
+// orderWaitingGaps puts first the gaps never searched online, then the ones
+// searched longest ago. Taken in library order, the first series of the
+// alphabet with many unfindable gaps used every slot of the deep pass, and a
+// series further down waited weeks for its turn.
+func orderWaitingGaps(waiting []waitingGap) {
+	sort.SliceStable(waiting, func(i, j int) bool {
+		if waiting[i].searched != waiting[j].searched {
+			return !waiting[i].searched
+		}
+		return waiting[i].last.Before(waiting[j].last)
+	})
 }

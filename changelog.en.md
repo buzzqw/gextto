@@ -15,6 +15,8 @@ manual is online: [English](docs/MANUAL.en.md) ·
 
 ## 28 October 2026
 
+- **The deep missing-episode search goes round every series.** Each deep pass searches only a few missing episodes online (5 by default). Gextto always took them from the top of the list, so with many unfindable gaps in the first series of the alphabet (9-1-1, Agenzia Roman…) the series further down, such as New Tricks or FBI: International, waited weeks for their turn. Now the episodes never searched come first, then the ones searched longest ago. There is nothing to configure.
+
 - **Last resort for missing episodes.** When the only copy of a missing episode in the right language had a resolution outside the profile, or did not declare one (common with eD2k files), Gextto used to drop it and the gap stayed open. Now it takes that copy as a last resort, only when no copy within the profile exists. Language, subtitles, audio and exclusions always apply. In *Downloads* the download carries the «🆘 last resort» badge, and the log, the download reason and the notification say so too. As soon as a copy within the profile appears, the upgrade replaces it as usual. It is on by default; turn it off in *Settings → Missing episodes → Last resort*.
 
 - **The log says "→ aMule" for eD2k downloads.** When Gextto started an eD2k file (for example from DDUnlimited through indexarr), the "📥 Downloading" log line named the torrent folder, even "RAM disk", although the file goes to aMule, which uses its own folders. The line now says "→ aMule". The download already went to the right place: only the message changes. Nothing to configure.

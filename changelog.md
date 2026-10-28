@@ -16,6 +16,8 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
 
 ## 28 ottobre 2026
 
+- **La ricerca approfondita dei mancanti fa il giro di tutte le serie.** A ogni giro approfondito Gextto cerca online solo pochi episodi mancanti (5 per default). Li prendeva sempre dall'inizio dell'elenco, quindi con molti mancanti introvabili nelle prime serie in ordine alfabetico (9-1-1, Agenzia Roman…) le serie più in basso, come New Tricks o FBI: International, aspettavano settimane il loro turno. Ora vengono prima gli episodi mai cercati, poi quelli cercati da più tempo. Non c'è nulla da configurare.
+
 - **Ultima risorsa per gli episodi mancanti.** Se per un episodio mancante l'unica copia nella lingua giusta ha una risoluzione fuori dal profilo, o non la dichiara (capita spesso con i file eD2k), prima Gextto la scartava e il buco restava aperto. Ora la prende come ultima risorsa, solo quando non c'è nessuna copia nel profilo. Lingua, sottotitoli, audio ed esclusioni valgono sempre. In *Scarico* il download porta il badge «🆘 ultima risorsa»; anche il log, il motivo del download e la notifica lo segnalano. Appena esce una copia nel profilo, l'upgrade la sostituisce come al solito. È attivo per default; si spegne in *Configurazione → Episodi mancanti → Ultima risorsa*.
 
 - **Il log dice «→ aMule» per i download eD2k.** Quando Gextto avviava un file eD2k (per esempio da DDUnlimited tramite indexarr), la riga «📥 Downloading» del log indicava la cartella dei torrent, anche «RAM disk», benché il file andasse ad aMule, che usa le sue cartelle. Ora la riga dice «→ aMule». Il download avveniva già nel posto giusto: cambia solo il messaggio. Non c'è nulla da configurare.

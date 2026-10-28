@@ -1,6 +1,8 @@
 package gextto
 
 import (
+	"time"
+
 	"testing"
 
 	"github.com/buzzqw/gextto/internal/models"
@@ -58,5 +60,27 @@ func TestPromoteTorrentURLMagnetKeepsDirectMagnetAcquisition(t *testing.T) {
 	}
 	if release.TorrentURL != nil || release.Magnet == "" {
 		t.Fatalf("release = %+v, want magnet with no torrent URL", release)
+	}
+}
+
+func TestDeepPassSearchesTheGapsWaitingLongestFirst(t *testing.T) {
+	now := time.Now().UTC()
+	series := func(name string) *SeriesConfig { return &SeriesConfig{Name: name, Enabled: true} }
+	waiting := []waitingGap{
+		{candidate: liveCandidate{Series: series("9-1-1"), Season: 10, Episode: 1}, last: now.Add(-24 * time.Hour), searched: true},
+		{candidate: liveCandidate{Series: series("Agenzia Roman"), Season: 2, Episode: 10}, last: now.Add(-30 * time.Hour), searched: true},
+		{candidate: liveCandidate{Series: series("FBI: International"), Season: 3, Episode: 1}},
+		{candidate: liveCandidate{Series: series("New Tricks"), Season: 1, Episode: 1}, last: now.Add(-20 * 24 * time.Hour), searched: true},
+	}
+	orderWaitingGaps(waiting)
+	got := []string{}
+	for _, entry := range waiting {
+		got = append(got, entry.candidate.Series.Name)
+	}
+	want := []string{"FBI: International", "New Tricks", "Agenzia Roman", "9-1-1"}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("order = %v, want %v", got, want)
+		}
 	}
 }

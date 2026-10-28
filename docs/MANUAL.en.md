@@ -1953,7 +1953,7 @@ them.
 | Search for missing episodes | Enable filling recognised gaps (missing episodes) from available releases. |
 | Missing episodes per series in each cycle | Maximum gaps to search per series in one cycle (0 = unlimited). *(0 = unlimited)* Shown only while «Search for missing episodes» is on. |
 | Deep search interval | How many hours between targeted live indexer searches for gaps. *(Unit: hours)* Shown only while «Search for missing episodes» is on. |
-| Deep searches per cycle | Maximum number of live searches per cycle. Shown only while «Search for missing episodes» is on. |
+| Deep searches per cycle | Maximum number of live searches per cycle. The episodes never searched online come first, then the ones searched longest ago. Shown only while «Search for missing episodes» is on. |
 | Last resort: accept a resolution outside the profile | On by default. When a missing episode has no copy within the quality profile, Gextto takes the one in the requested language even with a resolution outside the profile or unknown. Language, subtitles, audio and exclusions always apply. The download carries the «🆘 last resort» badge in *Downloads*, the log and the notification say so, and the upgrade replaces it as soon as a copy within the profile appears. Shown only while «Search for missing episodes» is on. |
 
 **Delay before downloading**

@@ -4064,6 +4064,24 @@ func (d *Database) GapRecentlySearched(seriesName string, season, episode, hours
 	return int64(time.Now().UTC().Sub(value).Hours()) < hours, nil
 }
 
+// GapLastSearched returns when a gap was last searched online; ok is false for
+// a gap never searched (or with an unreadable time).
+func (d *Database) GapLastSearched(seriesName string, season, episode int64) (time.Time, bool, error) {
+	var found sql.NullString
+	err := d.db.QueryRow("SELECT last_searched_at FROM gap_search_log WHERE series_name=?1 AND season=?2 AND episode=?3", seriesName, season, episode).Scan(&found)
+	if errors.Is(err, sql.ErrNoRows) {
+		return time.Time{}, false, nil
+	}
+	if err != nil {
+		return time.Time{}, false, err
+	}
+	if !found.Valid {
+		return time.Time{}, false, nil
+	}
+	value, ok := utils.ParseTimestamp(found.String)
+	return value, ok, nil
+}
+
 // MarkGapSearched records the last search time of a gap.
 func (d *Database) MarkGapSearched(seriesName string, season, episode int64) error {
 	_, err := d.db.Exec("INSERT INTO gap_search_log(series_name,season,episode,last_searched_at) VALUES (?1,?2,?3,?4) ON CONFLICT(series_name,season,episode) DO UPDATE SET last_searched_at=excluded.last_searched_at", seriesName, season, episode, nowSQLite())
