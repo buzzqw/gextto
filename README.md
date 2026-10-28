@@ -130,9 +130,9 @@ make build                 # gexttod and gx-torrent in bin/
 ```
 
 `make build` advances the **committed** build number shared with CI, so a
-checkout and a release show the same version: `1.1.<n>`, where the third number
-is always the build (`1.1.1961`). The second number is raised **by hand**, in
-`version_series`, only when a new series is started (`1.2.2000`); Gextto does
+checkout and a release show the same version: `1.2.<n>`, where the third number
+is always the build (`1.2.2065`). The second number is raised **by hand**, in
+`version_series`, only when a new series is started (`1.3.<n>`); Gextto does
 not move it automatically. `gx-torrent` has its own counter, advanced only when
 its code changes, and its own `gx_torrent.version_series` file. `make test`
 runs the

@@ -15,6 +15,8 @@ manual is online: [English](docs/MANUAL.en.md) ·
 
 ## 28 October 2026
 
+- **Gextto moves to the 1.2 series.** From this build the version is `1.2.<build>` (the first is 1.2.2065); the build number carries on where it was. gx-torrent keeps its own series. The update check compares commit and build, so a 1.1 install sees 1.2 as a normal update.
+
 - **eD2k downloads no longer end up as errors every cycle.** At the start of each search Gextto compares its downloads with the torrent engine and marks the missing ones as removed. It did that with eD2k files too, which live in aMule, not in the torrent engine: on 28 October 38 FBI episodes still downloading in aMule were marked «missing from session». Gextto stopped watching for their completion (the finished file would have stayed in aMule's incoming folder) and proposed them again as missing every cycle. eD2k files are now left to aMule, and the rows already marked go back to the queue by themselves.
 - **A file the engine or aMule already has no longer counts as a problem.** The cycle summary said «33 problems (see the warnings above)» with no warning above: they were files already queued. A duplicate is no longer a problem.
 - **Fewer repeated pack warnings.** While gx-torrent moves a torrent's data (onto the RAM disk or off it), the pack file priorities cannot change: Gextto wrote a warning every 30 seconds (19 times for a 10-minute move). It now retries quietly.

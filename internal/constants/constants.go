@@ -26,17 +26,17 @@ const AppName = "gexttod"
 // time with `-X gextto/internal/constants.Version=...`. AppVersion is the
 // authoritative formatter; this variable is kept for compatibility with code
 // that reads the compiled-in string.
-var Version = "1.1.1000"
+var Version = "1.2.1000"
 
 // Build is the monotonic build number, overridden at build time with
 // `-X gextto/internal/constants.Build=...`. It identifies the exact binary.
 var Build = "1000"
 
-// VersionSeries is the manually chosen major.minor of Gextto ("1.1"). It is
+// VersionSeries is the manually chosen major.minor of Gextto ("1.2"). It is
 // stamped at build time from the `version_series` file and the third number is
-// always the build: "1.1.1961". The second number is raised only when the
+// always the build: "1.2.2065". The second number is raised only when the
 // project deliberately starts a new series, never by a counter.
-var VersionSeries = "1.1"
+var VersionSeries = "1.2"
 
 // AppVersion is the version shown in the Gextto UI and API:
 // "<major>.<minor>.<build>".

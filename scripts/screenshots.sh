@@ -61,7 +61,7 @@ trap cleanup EXIT
 # Build into the work directory with the committed build numbers, without
 # bumping them (scripts/build-daemon.sh would bump gx-torrent's on a new
 # output directory).
-SERIES="$(tr -d '[:space:]' < "$ROOT/version_series" 2>/dev/null || echo 1.1)"
+SERIES="$(tr -d '[:space:]' < "$ROOT/version_series" 2>/dev/null || echo 1.2)"
 BUILD="$(tr -dc '0-9' < "$ROOT/build_number")"
 VERSION="$SERIES.$BUILD"
 GX_BUILD="$(tr -dc '0-9' < "$ROOT/gx-torrent.build_number")"

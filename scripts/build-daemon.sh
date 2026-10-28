@@ -18,7 +18,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 OUT="${GEXTTO_BINARY:-$ROOT/bin/gexttod}"
 
 SERIES="$(tr -d '[:space:]' < "$ROOT/version_series" 2>/dev/null || true)"
-[[ -n "$SERIES" ]] || SERIES="1.1"
+[[ -n "$SERIES" ]] || SERIES="1.2"
 GX_SERIES="$(tr -d '[:space:]' < "$ROOT/gx_torrent.version_series" 2>/dev/null || true)"
 [[ -n "$GX_SERIES" ]] || GX_SERIES="1.1"
 

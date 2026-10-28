@@ -15,7 +15,7 @@ RUN go mod download
 # The same version stamping as the release build. The compose file passes the
 # values read from build_number / gx-torrent.build_number; the defaults keep a
 # manual `docker build` working.
-ARG GEXTTO_SERIES=1.1
+ARG GEXTTO_SERIES=1.2
 ARG GEXTTO_BUILD=0
 ARG GX_SERIES=1.1
 ARG GX_BUILD=0
