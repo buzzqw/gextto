@@ -18,6 +18,8 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
 
 - **L'interfaccia non aspetta più la lettura dei torrent.** Le pagine, il grafico del traffico e il controllo della latenza chiedevano l'elenco dei torrent al motore, che prima di rispondere poteva avviare un controllo verso gx-torrent (fino a 15 secondi con il daemon lento). Ora leggono l'ultimo elenco disponibile, che si aggiorna da sé; l'elenco è anche ordinato una volta sola invece di essere riordinato a ogni lettura: su 2.000 torrent una lettura passa da 1,42 ms a 0,6 ms.
 
+- **Il motore spreca meno memoria per ogni pacchetto inviato.** uTP creava un timer, una struttura e una copia dei dati per ogni pacchetto: a 100 MB/s sono decine di migliaia di oggetti al secondo. Ora ogni connessione ha un solo timer che serve tutti i pacchetti in attesa, con la stessa ritrasmissione di prima: nel test di trasferimento in locale le allocazioni per blocco da 16 KiB scendono da 99 a 75 e la velocità resta la stessa (151-159 MB/s).
+
 - **La ricerca dei film già in archivio legge la cartella una volta sola.** Per ogni film candidato Gextto rileggeva tutto l'archivio (con 200 film e 800 file: 17 secondi e 434 MB di memoria per ciclo). Ora legge l'archivio una volta per ciclo e confronta i candidati con quell'elenco: 200 film costano 140 ms.
 
 - **La scansione della libreria non fa più una scrittura per file.** Quando Gextto ricontrolla la cartella di una serie, ogni episodio trovato costava una scrittura su disco separata: su 2.000 file erano circa 3,3 secondi spesi solo a salvare, e su un disco di rete molto di più. Ora i file di una serie si salvano in un'unica scrittura: la stessa scansione scende a circa 60 ms di salvataggio su questo disco, e resta istantanea su un disco in RAM.

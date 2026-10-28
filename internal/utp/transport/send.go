@@ -20,8 +20,18 @@ type send struct {
 	conn        *Conn
 
 	acksSkipped int
-	resendTimer *time.Timer
 	numResends  int
+}
+
+// dueAt is when this packet must be sent again: the RTO of the connection
+// scaled by its own backoff. The connection keeps one timer for all of its
+// outstanding packets, so the timer itself is not stored here.
+func (s *send) dueAt() time.Time {
+	multiplier := s.numResends
+	if multiplier < 1 {
+		multiplier = 1
+	}
+	return s.started.Add(s.conn.resendTimeout() * time.Duration(multiplier))
 }
 
 // Ack marks the packet acknowledged. first is true only the first time, when it
@@ -36,10 +46,6 @@ func (s *send) Ack() (latency time.Duration, first bool) {
 		s.payload = nil
 	}
 	s.acked.Set()
-	if s.resendTimer != nil {
-		s.resendTimer.Stop()
-		s.resendTimer = nil
-	}
 	return
 }
 
@@ -49,25 +55,12 @@ func (s *send) timedOut() {
 	s.conn.destroy(errAckTimeout)
 }
 
-// timeoutResend is the RTO timer: retransmit the packet and schedule the next
-// attempt, feeding the loss signal to the socket counters and this connection's
-// adaptive backoff.
-func (s *send) timeoutResend() {
-	mu.Lock()
-	defer mu.Unlock()
-	if time.Since(s.started) >= writeTimeout {
-		s.timedOut()
-		return
-	}
-	if s.acked.IsSet() || s.conn.destroyed.IsSet() {
-		return
-	}
-	rt := s.conn.resendTimeout()
-	s.resend()
+// noteRTOResend feeds the loss signal of one retransmission to the socket
+// counters and the connection's adaptive backoff.
+func (s *send) noteRTOResend() {
 	s.conn.socket.addTimeoutResend()
 	s.conn.noteRTOTimeout()
 	s.numResends++
-	s.resendTimer.Reset(rt * time.Duration(s.numResends))
 }
 
 // resend retransmits the packet unless it was acknowledged meanwhile.

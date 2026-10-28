@@ -119,6 +119,7 @@ when a change is meant to be an optimisation. A single pass is noise.
 | `BenchmarkMergeCandidatesUnrelated` (32 torrents) | ~265 ns/op, 0 allocs | filter paid when nothing is reusable |
 | `BenchmarkNewConnID` (uTP) | 31 ns/op, 0 allocs | the old version built a 64K-entry table per dial (512 KiB, 152,353 ns/op) |
 | `BenchmarkTransferLoopback` (uTP, 16 KiB block) | 131–139 MB/s, 5.6 KB, 99 allocs | connection-id probe, lazy `Event` channels, reusable read window, `netip.AddrPort` key |
+| `BenchmarkTransferLoopback` after the single RTO timer (2026-10-28) | **151–159 MB/s, 4.0 KB, 75 allocs** against 130–161 MB/s, 5.5 KB and 99 allocs of the previous commit, measured alternately on the same host (`-count=3` each) | one `time.AfterFunc` per packet replaced by one timer per connection armed on the oldest outstanding packet; the first version scanned every unacknowledged packet per write and lost 30 % throughput, the front-only read restored it |
 | `BenchmarkUTPConnRemoteAddr` | 113 ns/op, 40 B, 3 allocs | addresses converted once at wrap |
 | `BenchmarkStorageWrite` / `StorageWriteMmap` | ~5.8 / ~7.4 GB/s | the disk is far above any network speed: `O_DIRECT` and io_uring are not justified |
 | `BenchmarkArchiveSaveBatch` (1,000 releases, ~400 B magnets) | 45.2–46.1 ms, 3.09 MB, 50,536 allocs (44.0–44.4 ms before the guid identity); with the magnet ahead of the guid 43.9–45.0 ms against 44.8–46.1 ms, interleaved runs on a busy host | prepared statements per chunk; measured 2026-10-21 on the N97 |

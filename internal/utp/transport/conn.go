@@ -71,6 +71,13 @@ type Conn struct {
 	// recovers is probed at the measured RTT again quickly. See resendTimeout.
 	rtoBackoff uint32
 
+	// resendTimer is the single RTO timer of the connection: it fires for the
+	// earliest outstanding packet. One timer per packet cost an allocation and a
+	// runtime timer heap entry for every segment sent (measured 99 allocs per
+	// 16 KiB block in the loopback benchmark).
+	resendTimer    *time.Timer
+	resendTimerDue time.Time
+
 	// A state packet is owed to the peer, possibly batched by a short timer.
 	pendingSendState                bool
 	sendPendingSendSendStateTimer   *time.Timer
@@ -244,8 +251,8 @@ func (c *Conn) write(_type st, connID uint16, payload []byte, seqNr uint16) (n i
 		seqNr:       seqNr,
 		conn:        c,
 	}
-	s.resendTimer = time.AfterFunc(c.resendTimeout(), s.timeoutResend)
 	c.unackedSends = append(c.unackedSends, s)
+	c.scheduleResendLocked()
 	c.cur_window += s.payloadSize
 	c.updateCanWrite()
 	c.seq_nr++
@@ -323,6 +330,8 @@ func (c *Conn) ack(nr uint16) {
 		c.updateCanWrite()
 		c.lastAck++
 	}
+	// Nothing is outstanding: the timer can stop.
+	c.scheduleResendLocked()
 }
 
 // ackTo acknowledges every packet up to nr.
@@ -409,8 +418,77 @@ func (c *Conn) ackSkipped(seqNr uint16) {
 		s.resend()
 		// GEXTTO: congestion signal for the socket counters.
 		c.socket.addFastResend()
-		s.resendTimer.Reset(c.resendTimeout() * time.Duration(s.numResends))
+		c.scheduleResendLocked()
 	}
+}
+
+// scheduleResendLocked arms the connection's single RTO timer for the oldest
+// outstanding packet, or stops it when nothing is waiting. The caller holds mu.
+//
+// The front of unackedSends is the oldest packet still unacknowledged, so its
+// deadline is the earliest one in the normal case; the timer callback scans the
+// whole list, so a later packet that became due meanwhile is not missed. Reading
+// the front keeps the cost of a write to one timeout computation, as before.
+func (c *Conn) scheduleResendLocked() {
+	if c.destroyed.IsSet() || len(c.unackedSends) == 0 {
+		if c.resendTimer != nil {
+			c.resendTimer.Stop()
+			c.resendTimer = nil
+			c.resendTimerDue = time.Time{}
+		}
+		return
+	}
+	front := c.unackedSends[0]
+	if front == nil || front.acked.IsSet() {
+		return
+	}
+	due := front.dueAt()
+	if c.resendTimer != nil && !c.resendTimerDue.IsZero() && !c.resendTimerDue.After(due) {
+		return // already armed, and not later than this packet
+	}
+	delay := time.Until(due)
+	if delay < 0 {
+		delay = 0
+	}
+	if c.resendTimer != nil {
+		c.resendTimer.Stop()
+	}
+	c.resendTimerDue = due
+	c.resendTimer = time.AfterFunc(delay, c.resendDue)
+}
+
+// resendDue is the RTO timer callback: it retransmits every packet whose time
+// has come, destroys the connection when a packet waited past writeTimeout, and
+// re-arms the timer for the next one.
+func (c *Conn) resendDue() {
+	mu.Lock()
+	defer mu.Unlock()
+	c.resendTimer = nil
+	c.resendTimerDue = time.Time{}
+	if c.destroyed.IsSet() {
+		return
+	}
+	now := time.Now()
+	rto := c.resendTimeout()
+	for _, s := range c.unackedSends {
+		if s == nil || s.acked.IsSet() {
+			continue
+		}
+		if now.Sub(s.started) >= writeTimeout {
+			s.timedOut()
+			return
+		}
+		multiplier := s.numResends
+		if multiplier < 1 {
+			multiplier = 1
+		}
+		if now.Before(s.started.Add(rto * time.Duration(multiplier))) {
+			continue
+		}
+		s.resend()
+		s.noteRTOResend()
+	}
+	c.scheduleResendLocked()
 }
 
 // receivePacket hands one inbound packet to the connection state machine.

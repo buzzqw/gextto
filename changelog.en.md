@@ -17,6 +17,8 @@ manual is online: [English](docs/MANUAL.en.md) ·
 
 - **The interface no longer waits for the torrent list.** Pages, the traffic graph and the latency guard asked the engine for the torrent list, which could start a poll to gx-torrent before answering (up to 15 seconds with a slow daemon). They now read the last available list, which refreshes by itself; the list is also sorted once instead of on every read: with 2,000 torrents a read goes from 1.42 ms to 0.6 ms.
 
+- **The engine wastes less memory for every packet it sends.** uTP created a timer, a structure and a copy of the data for every packet: at 100 MB/s that is tens of thousands of objects per second. Each connection now has a single timer that serves every waiting packet, with the same retransmission as before: in the loopback transfer test the allocations per 16 KiB block drop from 99 to 75 and the speed stays the same (151–159 MB/s).
+
 - **Looking up films already in the archive reads the folder once.** For every candidate film Gextto re-read the whole archive (with 200 films and 800 files: 17 seconds and 434 MB of memory per cycle). It now reads the archive once per cycle and compares the candidates with that list: 200 films cost 140 ms.
 
 - **Scanning the library no longer writes once per file.** When Gextto rechecks a series folder, every episode it found cost a separate write to disk: on 2,000 files that was about 3.3 seconds spent only saving, and on a network disk far more. The files of one series are now saved in a single write: the same scan drops to about 60 ms of saving on this disk, and stays instant on a RAM disk.
