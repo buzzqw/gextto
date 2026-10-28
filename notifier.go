@@ -737,6 +737,8 @@ func formatEvent(event string, data map[string]any) string {
 		reason = messages.Pick("⬆️ Qualità superiore trovata", "⬆️ Better quality found")
 	case "gap_filled", "gap_fill":
 		reason = messages.Pick("🔎 Episodio mancante trovato", "🔎 Missing episode found")
+	case "last_resort":
+		reason = messages.Pick("🆘 Ultima risorsa: episodio mancante fuori profilo (risoluzione)", "🆘 Last resort: missing episode outside the profile (resolution)")
 	case "restored":
 		reason = messages.Pick("♻️ Download ripristinato", "♻️ Download restored")
 	case "approved":

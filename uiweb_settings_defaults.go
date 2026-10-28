@@ -54,6 +54,7 @@ var uiSettingDefaults = map[string]string{
 	"gap_filling":             "yes",
 	"gap_deep_interval_hours": "6",
 	"gap_deep_max_per_cycle":  "5",
+	"gap_last_resort":         "true",
 	"cycle_title_search":      "auto",
 
 	// --- Sorgenti -----------------------------------------------------------

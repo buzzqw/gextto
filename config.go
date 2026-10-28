@@ -1898,6 +1898,30 @@ func (c *Config) SeriesReleaseAllowed(series *SeriesConfig, quality *models.Qual
 	return !titleExcluded(series.Exclude, title)
 }
 
+// SeriesLastResortAllowed reports whether a series release fails only the
+// resolution of the quality profile: language, subtitles, audio and the
+// exclusions still hold. The missing-episode search takes such a release when
+// nothing within the profile exists, rather than leaving the hole open.
+func (c *Config) SeriesLastResortAllowed(series *SeriesConfig, quality *models.Quality, title string) bool {
+	if !gapLastResortEnabled(c) || resolutionAllowed(quality, series.Quality) {
+		return false
+	}
+	if !languageSubtitleAllowed(quality, series.Language, series.Subtitle) ||
+		!AudioAllowed(quality, series.Audio, series.AudioChannels) {
+		return false
+	}
+	return !titleExcluded(series.Exclude, title)
+}
+
+// gapLastResortEnabled reads the gap_last_resort switch (on by default).
+func gapLastResortEnabled(c *Config) bool {
+	if c == nil {
+		return true
+	}
+	value, ok := c.Settings["gap_last_resort"]
+	return !ok || strings.TrimSpace(value) == "" || settingIsTrue(value)
+}
+
 // ReleaseAllowed reports whether a release passes every global filter.
 func (c *Config) ReleaseAllowed(release *models.Release) bool {
 	return c.AllReleaseDeniedReason(release) == ""

@@ -46,8 +46,8 @@ func TestSettingsEveryPreviousOptionIsStillAvailable(t *testing.T) {
 	if got := len(uiSettingsKeysBeforeReorganization); got != 133 {
 		t.Fatalf("frozen list has %d keys, want 133", got)
 	}
-	if got := len(uiSettingsIndex); got != 172 {
-		t.Fatalf("settings index has %d options, want the 149 of before plus the 3 stall-alternative/update options, holepunch, the TVDB PIN, the first/last default, the 4 DLNA media server options, the update check interval, the per-day speed schedule, the adaptive tuning switch, the automatic speed policy and its latency guard (switch, source, target and line maxima), the idle-seed limit, the in-download pack inspection (abort and file priorities), the speed rule choice, the 9 eD2k/Kad (aMule) options, the two gx-torrent client-identity options, the automatic peer cap and the dead-swarm blocklist expiry, minus cleanup_min_score_diff (folded into upgrade_min_score_diff), plus the three audio-cleanup options", got)
+	if got := len(uiSettingsIndex); got != 173 {
+		t.Fatalf("settings index has %d options, want the 149 of before plus the 3 stall-alternative/update options, holepunch, the TVDB PIN, the first/last default, the 4 DLNA media server options, the update check interval, the per-day speed schedule, the adaptive tuning switch, the automatic speed policy and its latency guard (switch, source, target and line maxima), the idle-seed limit, the in-download pack inspection (abort and file priorities), the speed rule choice, the 9 eD2k/Kad (aMule) options, the two gx-torrent client-identity options, the automatic peer cap and the dead-swarm blocklist expiry, minus cleanup_min_score_diff (folded into upgrade_min_score_diff), plus the three audio-cleanup options and the missing-episode last resort", got)
 	}
 	if got := len(uiScoreSettingDefs); got != 27 {
 		t.Fatalf("score weights = %d, want 27", got)
@@ -86,8 +86,8 @@ func TestSettingsEveryPreviousOptionIsStillAvailable(t *testing.T) {
 		}
 		found++
 	}
-	if found != 199 {
-		t.Fatalf("rendered %d options, want 199", found)
+	if found != 200 {
+		t.Fatalf("rendered %d options, want 200", found)
 	}
 
 	// Editors, panels and actions without a single key.

@@ -920,6 +920,7 @@ func ConfigView(w http.ResponseWriter, r *http.Request, s *AppState) {
 		"gap_filling":                          settingsBool(cfg, "gap_filling", true),
 		"gap_deep_interval_hours":              settingsParseInt(cfg, "gap_deep_interval_hours", 6),
 		"gap_deep_max_per_cycle":               settingsParseUint(cfg, "gap_deep_max_per_cycle", 5),
+		"gap_last_resort":                      settingsBool(cfg, "gap_last_resort", true),
 		"torrent_sched_enabled":                settingsOr(cfg, "torrent_sched_enabled", "false"),
 		"torrent_speed_auto":                   settingsOr(cfg, "torrent_speed_auto", "false"),
 		"torrent_speed_mode":                   speedModeOf(cfg),

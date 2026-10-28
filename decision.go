@@ -630,6 +630,8 @@ func decisionReasonText(reason string) string {
 	switch reason {
 	case "approved", "gap_filled", "gap_fill":
 		return "La release supera i controlli di approvazione."
+	case "last_resort":
+		return "Ultima risorsa: l'unica copia nella lingua richiesta per un episodio mancante, fuori dalla risoluzione del profilo. L'upgrade la sostituisce appena esce una copia nel profilo."
 	case "upgrade":
 		return "Upgrade riconosciuto rispetto al file esistente."
 	case "restored":

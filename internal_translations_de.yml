@@ -6089,3 +6089,7 @@ deu:
   "Serie non trovata.": "Serie nicht gefunden."
   "Ferma la ricerca in corso": "Die laufende Suche stoppen"
   "Ricerca in coda…": "Suche in der Warteschlange…"
+  "Ultima risorsa: accetta una risoluzione fuori profilo": "Letzter Ausweg: eine Auflösung außerhalb des Profils akzeptieren"
+  "Quando per un episodio mancante non esiste nessuna copia nel profilo qualità, prende quella nella lingua richiesta anche se la risoluzione è fuori profilo o sconosciuta. Lingua, sottotitoli, audio ed esclusioni valgono sempre. Il download porta il badge «🆘 ultima risorsa» e l'upgrade lo sostituisce appena esce una copia nel profilo.": "Wenn es für eine fehlende Episode keine Kopie im Qualitätsprofil gibt, wird die Kopie in der gewünschten Sprache genommen, auch wenn ihre Auflösung außerhalb des Profils liegt oder unbekannt ist. Sprache, Untertitel, Audio und Ausschlüsse gelten immer. Der Download trägt das Abzeichen «🆘 letzter Ausweg», und das Upgrade ersetzt ihn, sobald eine Kopie im Profil erscheint."
+  "🆘 ultima risorsa": "🆘 letzter Ausweg"
+  "Ultima risorsa: episodio mancante preso fuori dalla risoluzione del profilo perché era l'unica copia nella lingua richiesta. L'upgrade lo sostituisce appena esce una copia nel profilo.": "Letzter Ausweg: fehlende Episode außerhalb der Profilauflösung genommen, weil sie die einzige Kopie in der gewünschten Sprache war. Das Upgrade ersetzt sie, sobald eine Kopie im Profil erscheint."

@@ -2024,6 +2024,7 @@ salvata** finché non li salvi.
 | Episodi mancanti per serie a ogni ciclo | Numero massimo di gap da cercare per serie in un ciclo (0 = illimitato). *(0 = illimitato)* Compare solo con «Cerca gli episodi mancanti» attivo. |
 | Intervallo della ricerca approfondita | Ogni quante ore fare una ricerca live mirata sugli indexer per i gap. *(Unità: ore)* Compare solo con «Cerca gli episodi mancanti» attivo. |
 | Ricerche approfondite per ciclo | Numero massimo di ricerche live per ciclo. Compare solo con «Cerca gli episodi mancanti» attivo. |
+| Ultima risorsa: accetta una risoluzione fuori profilo | Attivo per default. Se per un episodio mancante non esiste nessuna copia nel profilo qualità, Gextto prende quella nella lingua richiesta anche con una risoluzione fuori profilo o sconosciuta. Lingua, sottotitoli, audio ed esclusioni valgono sempre. Il download porta il badge «🆘 ultima risorsa» in *Scarico*, il log e la notifica lo dicono, e l'upgrade lo sostituisce appena esce una copia nel profilo. Compare solo con «Cerca gli episodi mancanti» attivo. |
 
 **Ritardo prima di scaricare**
 

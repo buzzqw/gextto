@@ -530,6 +530,9 @@ func RunCycleDomain(
 
 	if len(liveCandidates) > 0 {
 		foundResults := make([][]models.Release, len(liveCandidates))
+		// Copies in the right language that miss only the resolution of the
+		// profile: taken when nothing else exists for the episode.
+		lastResorts := make([][]models.Release, len(liveCandidates))
 		var gapWG sync.WaitGroup
 		gapSem := make(chan struct{}, 3)
 		for i := range liveCandidates {
@@ -551,12 +554,18 @@ func RunCycleDomain(
 					for i := range found {
 						release := found[i]
 						if !releaseMatchesConfiguredEpisode(&release, candidate.Series, candidate.Season, candidate.Episode) ||
-							cfg.AllReleaseDeniedReason(&release) != "" ||
-							!cfg.SeriesReleaseAllowed(candidate.Series, &release.Quality, release.Title) {
+							cfg.AllReleaseDeniedReason(&release) != "" {
 							continue
 						}
 						canonicalName := candidate.Series.Name
 						release.Series = &canonicalName
+						if !cfg.SeriesReleaseAllowed(candidate.Series, &release.Quality, release.Title) {
+							if cfg.SeriesLastResortAllowed(candidate.Series, &release.Quality, release.Title) {
+								release.LastResort = true
+								lastResorts[index] = append(lastResorts[index], release)
+							}
+							continue
+						}
 						foundResults[index] = append(foundResults[index], release)
 					}
 				}
@@ -581,6 +590,12 @@ func RunCycleDomain(
 						logging.Info(fmt.Sprintf("🔎 eD2k found %s for the missing %s S%02dE%02d",
 							countLabel(found, "candidate", "candidates"), candidate.Series.Name, candidate.Season, candidate.Episode))
 					}
+				}
+				if len(foundResults[index]) == 0 && len(lastResorts[index]) > 0 {
+					foundResults[index] = lastResorts[index]
+					logging.Info(fmt.Sprintf("🆘 Nothing within the quality profile for the missing %s S%02dE%02d: %s in the right language but outside the resolution, taken as a last resort",
+						candidate.Series.Name, candidate.Season, candidate.Episode,
+						countLabel(int64(len(lastResorts[index])), "copy", "copies")))
 				}
 				logging.Debug("gap-fill live search completed",
 					"series", candidate.Series.Name,
@@ -661,7 +676,8 @@ func RunCycleDomain(
 				// Not monitored: never log these, they are pure noise.
 				continue
 			}
-			if !cfg.SeriesReleaseAllowed(series, &release.Quality, release.Title) {
+			if !cfg.SeriesReleaseAllowed(series, &release.Quality, release.Title) &&
+				!(release.LastResort && cfg.SeriesLastResortAllowed(series, &release.Quality, release.Title)) {
 				logCandidateRejected(&release, "excluded by the series quality/language/exclude rules")
 				continue
 			}
@@ -1116,6 +1132,9 @@ func RunCycleDomain(
 		} else if len(gapEpisodes) > 0 {
 			decisionReason = "gap_fill"
 		}
+		if release.LastResort {
+			decisionReason = "last_resort"
+		}
 		// An episode whose download is stuck may now accept an alternative
 		// within the configured tolerance: mark it so the log, the notification
 		// and the torrent's "Motivo" say why this download was started.
@@ -1201,6 +1220,9 @@ func RunCycleDomain(
 				} else {
 					why = "fills a missing episode"
 				}
+			}
+			if release.LastResort {
+				why = "🆘 last resort: the only copy in the right language, outside the quality profile"
 			}
 			if stallApplies {
 				why = "an alternative while the current download is stuck"

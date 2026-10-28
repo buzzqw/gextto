@@ -5426,3 +5426,7 @@ eng:
   "Serie non trovata.": "Series not found."
   "Ferma la ricerca in corso": "Stop the search in progress"
   "Ricerca in coda…": "Search queued…"
+  "Ultima risorsa: accetta una risoluzione fuori profilo": "Last resort: accept a resolution outside the profile"
+  "Quando per un episodio mancante non esiste nessuna copia nel profilo qualità, prende quella nella lingua richiesta anche se la risoluzione è fuori profilo o sconosciuta. Lingua, sottotitoli, audio ed esclusioni valgono sempre. Il download porta il badge «🆘 ultima risorsa» e l'upgrade lo sostituisce appena esce una copia nel profilo.": "When a missing episode has no copy within the quality profile, takes the one in the requested language even if its resolution is outside the profile or unknown. Language, subtitles, audio and exclusions always apply. The download carries the «🆘 last resort» badge and the upgrade replaces it as soon as a copy within the profile appears."
+  "🆘 ultima risorsa": "🆘 last resort"
+  "Ultima risorsa: episodio mancante preso fuori dalla risoluzione del profilo perché era l'unica copia nella lingua richiesta. L'upgrade lo sostituisce appena esce una copia nel profilo.": "Last resort: missing episode taken outside the profile resolution because it was the only copy in the requested language. The upgrade replaces it as soon as a copy within the profile appears."

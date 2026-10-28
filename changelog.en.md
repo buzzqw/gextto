@@ -15,6 +15,8 @@ manual is online: [English](docs/MANUAL.en.md) ·
 
 ## 28 October 2026
 
+- **Last resort for missing episodes.** When the only copy of a missing episode in the right language had a resolution outside the profile, or did not declare one (common with eD2k files), Gextto used to drop it and the gap stayed open. Now it takes that copy as a last resort, only when no copy within the profile exists. Language, subtitles, audio and exclusions always apply. In *Downloads* the download carries the «🆘 last resort» badge, and the log, the download reason and the notification say so too. As soon as a copy within the profile appears, the upgrade replaces it as usual. It is on by default; turn it off in *Settings → Missing episodes → Last resort*.
+
 - **The log says "→ aMule" for eD2k downloads.** When Gextto started an eD2k file (for example from DDUnlimited through indexarr), the "📥 Downloading" log line named the torrent folder, even "RAM disk", although the file goes to aMule, which uses its own folders. The line now says "→ aMule". The download already went to the right place: only the message changes. Nothing to configure.
 
 - **indexarr eD2k releases now download automatically too.** For eD2k links indexarr sends a seed and peer count of zero, because on the eD2k network the indexer cannot count them. Gextto read that as "nobody shares this file" and, in the automatic search, refused every indexarr eD2k release as dead: it could only be downloaded by hand. Now those numbers are ignored for an eD2k link and aMule finds the sources, as with the links Gextto finds by itself. Nothing to configure.

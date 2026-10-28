@@ -674,6 +674,11 @@ type Release struct {
 	// Score is the release score computed by the current configuration, filled
 	// by the search endpoints so the UI can show and sort by it.
 	Score int64 `json:"score,omitempty"`
+	// LastResort marks a missing episode taken outside the series quality
+	// profile because it was the only copy in the requested language. It is
+	// saved with the download so the UI and the notifications can say so, and
+	// the normal upgrade replaces it when a copy within the profile appears.
+	LastResort bool `json:"last_resort,omitempty"`
 }
 
 // TorrentMeta stores the release associated with a torrent hash.

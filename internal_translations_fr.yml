@@ -6082,3 +6082,7 @@ fra:
   "Serie non trovata.": "Série introuvable."
   "Ferma la ricerca in corso": "Arrêter la recherche en cours"
   "Ricerca in coda…": "Recherche en file d'attente…"
+  "Ultima risorsa: accetta una risoluzione fuori profilo": "Dernier recours : accepter une résolution hors profil"
+  "Quando per un episodio mancante non esiste nessuna copia nel profilo qualità, prende quella nella lingua richiesta anche se la risoluzione è fuori profilo o sconosciuta. Lingua, sottotitoli, audio ed esclusioni valgono sempre. Il download porta il badge «🆘 ultima risorsa» e l'upgrade lo sostituisce appena esce una copia nel profilo.": "Quand un épisode manquant n'a aucune copie dans le profil de qualité, prend celle dans la langue demandée même si sa résolution est hors profil ou inconnue. La langue, les sous-titres, l'audio et les exclusions s'appliquent toujours. Le téléchargement porte le badge «🆘 dernier recours» et la mise à niveau le remplace dès qu'une copie dans le profil apparaît."
+  "🆘 ultima risorsa": "🆘 dernier recours"
+  "Ultima risorsa: episodio mancante preso fuori dalla risoluzione del profilo perché era l'unica copia nella lingua richiesta. L'upgrade lo sostituisce appena esce una copia nel profilo.": "Dernier recours : épisode manquant pris hors de la résolution du profil parce que c'était la seule copie dans la langue demandée. La mise à niveau le remplace dès qu'une copie dans le profil apparaît."

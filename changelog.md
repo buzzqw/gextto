@@ -16,6 +16,8 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
 
 ## 28 ottobre 2026
 
+- **Ultima risorsa per gli episodi mancanti.** Se per un episodio mancante l'unica copia nella lingua giusta ha una risoluzione fuori dal profilo, o non la dichiara (capita spesso con i file eD2k), prima Gextto la scartava e il buco restava aperto. Ora la prende come ultima risorsa, solo quando non c'è nessuna copia nel profilo. Lingua, sottotitoli, audio ed esclusioni valgono sempre. In *Scarico* il download porta il badge «🆘 ultima risorsa»; anche il log, il motivo del download e la notifica lo segnalano. Appena esce una copia nel profilo, l'upgrade la sostituisce come al solito. È attivo per default; si spegne in *Configurazione → Episodi mancanti → Ultima risorsa*.
+
 - **Il log dice «→ aMule» per i download eD2k.** Quando Gextto avviava un file eD2k (per esempio da DDUnlimited tramite indexarr), la riga «📥 Downloading» del log indicava la cartella dei torrent, anche «RAM disk», benché il file andasse ad aMule, che usa le sue cartelle. Ora la riga dice «→ aMule». Il download avveniva già nel posto giusto: cambia solo il messaggio. Non c'è nulla da configurare.
 
 - **Le release eD2k di indexarr si scaricano anche in automatico.** indexarr manda per i link eD2k un numero di seed e peer pari a zero, perché sulla rete eD2k l'indexer non può contarli. Gextto li leggeva come «nessuno condivide il file» e, nella ricerca automatica, rifiutava ogni release eD2k di indexarr come morta: si poteva scaricarla solo a mano. Ora per un link eD2k quei numeri vengono ignorati e le fonti le trova aMule, come per i link che Gextto trova da solo. Non c'è nulla da configurare.

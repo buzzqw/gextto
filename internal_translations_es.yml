@@ -6036,3 +6036,7 @@ spa:
   "Serie non trovata.": "Serie no encontrada."
   "Ferma la ricerca in corso": "Detener la búsqueda en curso"
   "Ricerca in coda…": "Búsqueda en cola…"
+  "Ultima risorsa: accetta una risoluzione fuori profilo": "Último recurso: aceptar una resolución fuera del perfil"
+  "Quando per un episodio mancante non esiste nessuna copia nel profilo qualità, prende quella nella lingua richiesta anche se la risoluzione è fuori profilo o sconosciuta. Lingua, sottotitoli, audio ed esclusioni valgono sempre. Il download porta il badge «🆘 ultima risorsa» e l'upgrade lo sostituisce appena esce una copia nel profilo.": "Cuando un episodio que falta no tiene ninguna copia dentro del perfil de calidad, toma la del idioma pedido aunque su resolución esté fuera del perfil o sea desconocida. El idioma, los subtítulos, el audio y las exclusiones se aplican siempre. La descarga lleva la insignia «🆘 último recurso» y la mejora la sustituye en cuanto aparece una copia dentro del perfil."
+  "🆘 ultima risorsa": "🆘 último recurso"
+  "Ultima risorsa: episodio mancante preso fuori dalla risoluzione del profilo perché era l'unica copia nella lingua richiesta. L'upgrade lo sostituisce appena esce una copia nel profilo.": "Último recurso: episodio que faltaba tomado fuera de la resolución del perfil porque era la única copia en el idioma pedido. La mejora lo sustituye en cuanto aparece una copia dentro del perfil."

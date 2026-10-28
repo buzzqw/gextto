@@ -42,6 +42,7 @@ var uiSettingMetaByKey = map[string]uiSettingMeta{
 	"gap_fill_max_per_series": {Zero: "0 = illimitato", DependsOn: "gap_filling"},
 	"gap_deep_interval_hours": {Unit: "ore", DependsOn: "gap_filling"},
 	"gap_deep_max_per_cycle":  {DependsOn: "gap_filling"},
+	"gap_last_resort":         {DependsOn: "gap_filling"},
 	"cycle_title_search": {Kind: "select", Options: []uiFormOption{
 		{Value: "auto", Label: "Automatica (solo se non ci sono feed)"},
 		{Value: "yes", Label: "Sempre"},

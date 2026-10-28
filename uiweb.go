@@ -188,6 +188,9 @@ type uiTorrentRow struct {
 	// BitTorrent. Sources is the eD2k source count.
 	Network string
 	Sources int
+	// LastResort marks a missing episode taken outside the quality profile
+	// (the "🆘 ultima risorsa" badge).
+	LastResort bool
 }
 
 type uiTorrentsData struct {
@@ -221,6 +224,29 @@ type uiEd2kRow struct {
 	Active   int64
 	Paused   bool
 	Complete bool
+	// LastResort: see uiTorrentRow.
+	LastResort bool
+}
+
+// uiEd2kRowsLastResort marks the eD2k rows started as a last resort. The
+// reason is in torrent_meta, keyed by the eD2k file hash.
+func uiEd2kRowsLastResort(db *Database, rows []uiEd2kRow) {
+	if db == nil || len(rows) == 0 {
+		return
+	}
+	hashes := make([]string, 0, len(rows))
+	for _, row := range rows {
+		hashes = append(hashes, row.Hash)
+	}
+	aux, err := db.TorrentAuxBulk(hashes)
+	if err != nil {
+		return
+	}
+	for index := range rows {
+		if values, ok := aux[strings.ToLower(rows[index].Hash)]; ok {
+			rows[index].LastResort = values[2] == "last_resort"
+		}
+	}
 }
 
 // uiEd2kRows turns aMule's queue into Scarico rows.
@@ -776,10 +802,12 @@ func uiLogsDataFrom(s *AppState) uiLogsData {
 func uiTorrentsDataFrom(s *AppState) uiTorrentsData {
 	rows := uiTorrentRows(s)
 	cfg := latestConfig(s)
+	ed2kRows := uiEd2kRows(Ed2kDownloads(cfg))
+	uiEd2kRowsLastResort(s.db, ed2kRows)
 	return uiTorrentsData{
 		Rows:          rows,
 		HTTPDownloads: HTTPDownloads(),
-		Ed2kDownloads: uiEd2kRows(Ed2kDownloads(cfg)),
+		Ed2kDownloads: ed2kRows,
 		Ed2kEnabled:   ed2kEnabled(cfg),
 		Count:         len(rows),
 		UpdatedAt:     uiNowClock(),
@@ -840,6 +868,7 @@ func uiTorrentRows(s *AppState) []uiTorrentRow {
 			row.Archived = strings.TrimSpace(values[0]) != ""
 			row.Source = values[1]
 			row.Reason = values[2]
+			row.LastResort = row.Reason == "last_resort"
 		}
 		// A comic is archived by its own pipeline, which torrent_meta does not
 		// see: its completion lives in comics_torrents.

@@ -131,6 +131,7 @@ var uiSettingsIndex = []uiSettingDef{
 	{Key: "gap_fill_max_per_series", Label: "Episodi mancanti per serie a ogni ciclo", Tab: "daemon", Group: "Episodi mancanti"},
 	{Key: "gap_deep_interval_hours", Label: "Intervallo della ricerca approfondita", Tab: "daemon", Group: "Episodi mancanti"},
 	{Key: "gap_deep_max_per_cycle", Label: "Ricerche approfondite per ciclo", Tab: "daemon", Group: "Episodi mancanti"},
+	{Key: "gap_last_resort", Label: "Ultima risorsa: accetta una risoluzione fuori profilo", Tab: "daemon", Group: "Episodi mancanti"},
 	{Key: "delay_torrent_minutes", Label: "Ritardo per le serie", Tab: "daemon", Group: "Ritardo prima di scaricare"},
 	{Key: "delay_movies_minutes", Label: "Ritardo per i film", Tab: "daemon", Group: "Ritardo prima di scaricare"},
 	{Key: "delay_bypass_score", Label: "Ignora il ritardo da questo punteggio", Tab: "daemon", Group: "Ritardo prima di scaricare"},

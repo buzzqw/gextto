@@ -571,6 +571,7 @@
                     <button class="torrent-open" type="button" hx-get="/downloads/detail?hash={{.Hash}}&tab=general" hx-target="#v2-detail-drawer" hx-swap="innerHTML" title="{{.Name}}"><span class="truncate">{{.Name}}</span></button>
                     {{if .Archived}}<span class="badge ok" title="Copia archiviata presente">NAS</span>{{end}}
         {{if eq .Network "ed2k"}}<span class="badge" title="Rete eD2k/Kad">eD2k</span> <span class="badge" title="Fonti eD2k">{{.Sources}}</span>{{end}}
+                    {{if .LastResort}}<span class="badge warn" title="Ultima risorsa: episodio mancante preso fuori dalla risoluzione del profilo perché era l'unica copia nella lingua richiesta. L'upgrade lo sostituisce appena esce una copia nel profilo.">🆘 ultima risorsa</span>{{end}}
                     {{if .SeedInfinite}}<span class="badge warn" title="Seed senza limiti">seed ∞</span>{{end}}
                     {{if .Pinned}}<span class="badge" title="Forzato fuori coda: si sblocca dalla scheda del torrent">📌 pin</span>{{end}}
                     {{if .Tags}}<span class="tag-chips">{{range .Tags}}<span class="tag-chip">{{.}}</span>{{end}}</span>{{end}}
@@ -628,7 +629,7 @@
               <div class="torrent-card">
                 <div class="torrent-head">
                   <span class="torrent-select"></span>
-                  <span class="torrent-name"><span class="truncate" title="{{.Name}}">{{.Name}}</span> <span class="badge ed2k" title="Rete eD2k/Kad tramite aMule">eD2k</span></span>
+                  <span class="torrent-name"><span class="truncate" title="{{.Name}}">{{.Name}}</span> <span class="badge ed2k" title="Rete eD2k/Kad tramite aMule">eD2k</span> {{if .LastResort}}<span class="badge warn" title="Ultima risorsa: episodio mancante preso fuori dalla risoluzione del profilo perché era l'unica copia nella lingua richiesta. L'upgrade lo sostituisce appena esce una copia nel profilo.">🆘 ultima risorsa</span>{{end}}</span>
                   <span class="torrent-state badge {{.StateClass}}">{{.State}}</span>
                 </div>
                 <div class="torrent-body">

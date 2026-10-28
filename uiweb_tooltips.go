@@ -68,6 +68,7 @@ var uiSettingTooltipText = map[string]string{
 	"gap_fill_max_per_series":              "Numero massimo di gap da cercare per serie in un ciclo (0 = illimitato).",
 	"gap_deep_interval_hours":              "Ogni quante ore fare una ricerca live mirata sugli indexer per i gap.",
 	"gap_deep_max_per_cycle":               "Numero massimo di ricerche live per ciclo.",
+	"gap_last_resort":                      "Quando per un episodio mancante non esiste nessuna copia nel profilo qualità, prende quella nella lingua richiesta anche se la risoluzione è fuori profilo o sconosciuta. Lingua, sottotitoli, audio ed esclusioni valgono sempre. Il download porta il badge «🆘 ultima risorsa» e l'upgrade lo sostituisce appena esce una copia nel profilo.",
 	"cycle_title_search":                   "Cosa Gextto cerca online durante il ciclo. «Automatica»: la ricerca dei titoli sugli indexer parte solo quando non c'è nessun feed RSS configurato. «Sempre»: parte comunque, anche con i feed. «Mai»: usa solo i feed e l'archivio locale, nessuna ricerca online.",
 	"delay_torrent_minutes":                "Ritarda l'avvio dei download delle serie di questo numero di minuti. 0 avvia subito.",
 	"delay_movies_minutes":                 "Ritarda l'avvio dei download dei film di questo numero di minuti. 0 avvia subito.",
