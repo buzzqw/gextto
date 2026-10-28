@@ -575,6 +575,10 @@ type ApprovalContext struct {
 	// stays within StallScoreDrop of the stuck release. This lets the search
 	// try an alternative without removing the stuck torrent.
 	StallAlternatives map[LiveEpisodeKey]int64
+	// Blocklist is the set of blocked hashes (lower case) the caller already
+	// loaded for this decision. Filling it once per cycle saves one query per
+	// candidate; a nil map means "ask the database".
+	Blocklist map[string]struct{}
 	// StallScoreDrop is how many points below the stuck release an alternative
 	// may score (0 disables the tolerance).
 	StallScoreDrop int64

@@ -1160,6 +1160,7 @@ func RunCycleDomain(
 			DryRun:            cfg.DryRun,
 			StallAlternatives: stallAlternatives,
 			StallScoreDrop:    stallScoreDrop,
+			Blocklist:         blocklistedHashes,
 		}
 		// Decide only: the library is not written until the torrent is in the
 		// engine (see startApprovedRelease).
@@ -1518,6 +1519,7 @@ func prioritizeArchiveGapDownloads(
 			GapEpisode:        true,
 			StallAlternatives: stallAlternatives,
 			StallScoreDrop:    stallScoreDrop,
+			Blocklist:         blocklisted,
 		}
 		// candidate.score includes the swarm health, which only picks the best
 		// copy among the hits: the decision and the stored score use the

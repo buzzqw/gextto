@@ -1071,15 +1071,15 @@ func (d *Database) checkSeriesScoredInner(release *models.Release, score, minSco
 	if err != nil {
 		return false, "", err
 	}
-	blocklisted, err := d.IsBlocklisted(hash)
+	if context == nil {
+		context = &models.ApprovalContext{}
+	}
+	blocklisted, err := d.blocklistedWith(context.Blocklist, hash)
 	if err != nil {
 		return false, "", err
 	}
 	if blocklisted {
 		return false, "blocklisted", nil
-	}
-	if context == nil {
-		context = &models.ApprovalContext{}
 	}
 	dryRun := context.DryRun
 	live := context.Live
@@ -2356,6 +2356,16 @@ func (d *Database) purgeExpiredBlocklist(now time.Time) {
 	if removed, raErr := result.RowsAffected(); raErr == nil && removed > 0 {
 		logging.Debug("expired blocklist entries removed; those releases can be chosen again", "count", removed)
 	}
+}
+
+// blocklistedWith answers the blocklist question from a snapshot the caller
+// already has, and falls back to a query when it has none.
+func (d *Database) blocklistedWith(snapshot map[string]struct{}, hash string) (bool, error) {
+	if snapshot != nil {
+		_, found := snapshot[strings.ToLower(hash)]
+		return found, nil
+	}
+	return d.IsBlocklisted(hash)
 }
 
 // IsBlocklisted reports whether a hash is in the blocklist.
