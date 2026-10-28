@@ -1,9 +1,7 @@
 package piecepicker
 
 import (
-	"cmp"
 	"fmt"
-	"slices"
 
 	"github.com/buzzqw/gextto/internal/gxcore/internal/peer"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/piece"
@@ -553,33 +551,38 @@ func (p *PiecePicker) pickAllowedFast(pe *peer.Peer) *myPiece {
 
 // pickRarest takes the least-held unrequested piece the peer has, flipping
 // to endgame when nothing is unrequested anywhere.
+//
+// It scans for the minimum instead of sorting the whole table first: the order
+// was only ever used to read the first eligible piece, and the sort ran on every
+// pick of every peer (the pick is 9 % of the profile under load).
 func (p *PiecePicker) pickRarest(pe *peer.Peer) *myPiece {
-	sortByAvailability(p.piecesByAvailability)
 	var picked *myPiece
 	var hasUnrequested bool
 	for _, mp := range p.piecesByAvailability {
 		if mp.Done || mp.Writing || mp.Skip {
 			continue
 		}
-		if mp.Requested.Len() == 0 && mp.heldBy(pe) {
-			picked = mp
-			break
+		if mp.Requested.Len() != 0 {
+			continue
 		}
-		if mp.Requested.Len() == 0 {
-			hasUnrequested = true
+		hasUnrequested = true
+		// Compare the rarity before asking the peer's bitfield: a piece that
+		// cannot beat the current best is skipped with two field reads.
+		if picked != nil && mp.holders >= picked.holders {
+			continue
+		}
+		if !mp.heldBy(pe) {
+			continue
+		}
+		picked = mp
+		if mp.holders <= 1 {
+			break // nobody can hold a piece fewer times
 		}
 	}
 	if picked == nil && !hasUnrequested {
 		p.endgame = true
 	}
 	return picked
-}
-
-// sortByAvailability orders pieces rarest-first by holder count.
-func sortByAvailability(pieces []*myPiece) {
-	slices.SortFunc(pieces, func(a, b *myPiece) int {
-		return cmp.Compare(a.holders, b.holders)
-	})
 }
 
 // pickFileEdge takes the first edge piece the peer holds that nobody
@@ -617,43 +620,47 @@ func (p *PiecePicker) pickSequential(pe *peer.Peer) *myPiece {
 }
 
 // pickEndgame duplicates the least-requested piece the peer holds and lacks,
-// under the duplicate cap.
+// under the duplicate cap. The minimum is found by scanning, not by sorting:
+// during the endgame this runs for every peer on every pick.
 func (p *PiecePicker) pickEndgame(pe *peer.Peer) *myPiece {
-	sortByRunning(p.piecesByAvailability)
+	var picked *myPiece
+	pickedRunning := 0
 	for _, mp := range p.piecesByAvailability {
 		if mp.Done || mp.Writing || mp.Skip {
 			continue
 		}
-		if mp.Requested.Len() < p.maxDuplicateDownload && mp.heldBy(pe) && !mp.Requested.Has(pe) {
-			return mp
+		running := mp.RunningDownloads()
+		if picked != nil && running >= pickedRunning {
+			continue // cannot beat the current best
 		}
+		if mp.Requested.Len() >= p.maxDuplicateDownload || !mp.heldBy(pe) || mp.Requested.Has(pe) {
+			continue
+		}
+		picked, pickedRunning = mp, running
 	}
-	return nil
-}
-
-// sortByRunning orders pieces by active fetch count.
-func sortByRunning(pieces []*myPiece) {
-	slices.SortFunc(pieces, func(a, b *myPiece) int {
-		return cmp.Compare(a.RunningDownloads(), b.RunningDownloads())
-	})
+	return picked
 }
 
 // pickStalled re-requests a stalled piece's idle copy: running pieces stay,
 // and the least-stalled duplicate under the cap wins.
 func (p *PiecePicker) pickStalled(pe *peer.Peer) *myPiece {
-	slices.SortFunc(p.piecesByStalled, func(a, b *myPiece) int {
-		return cmp.Compare(a.StalledDownloads(), b.StalledDownloads())
-	})
+	var picked *myPiece
+	pickedStalled := 0
 	for _, mp := range p.piecesByStalled {
 		if mp.Done || mp.Writing || mp.Skip {
 			continue
 		}
+		stalled := mp.StalledDownloads()
+		if picked != nil && stalled >= pickedStalled {
+			continue // cannot beat the current best
+		}
 		if mp.RunningDownloads() > 0 {
 			continue
 		}
-		if mp.Requested.Len() < p.maxDuplicateDownload && mp.heldBy(pe) && !mp.Requested.Has(pe) {
-			return mp
+		if mp.Requested.Len() >= p.maxDuplicateDownload || !mp.heldBy(pe) || mp.Requested.Has(pe) {
+			continue
 		}
+		picked, pickedStalled = mp, stalled
 	}
-	return nil
+	return picked
 }

@@ -5569,10 +5569,6 @@ func (d *Database) SyncScoresWithSettings(cfg *Config) (int, error) {
 }
 
 func (d *Database) Rescore(cfg *Config) (int, error) {
-	type metadataRow struct {
-		Hash string
-		JSON string
-	}
 	rows, err := d.db.Query("SELECT hash,metadata_json FROM torrent_meta WHERE metadata_json!=''")
 	if err != nil {
 		return 0, err
@@ -5633,32 +5629,19 @@ func (d *Database) Rescore(cfg *Config) (int, error) {
 	}
 	movieMediaRows.Close()
 
+	// One transaction per chunk instead of one autocommit UPDATE per row: with
+	// synchronous=FULL every autocommit is an fsync, so re-scoring N torrents
+	// used to cost 3N fsyncs.
 	changed := 0
-	for _, row := range metadataRows {
-		var meta models.TorrentMeta
-		if err := json.Unmarshal([]byte(row.JSON), &meta); err != nil {
-			continue
+	for start := 0; start < len(metadataRows); start += rescoreBatchSize {
+		end := start + rescoreBatchSize
+		if end > len(metadataRows) {
+			end = len(metadataRows)
 		}
-		mediaInfo := episodeMediaMap[strings.ToLower(row.Hash)]
-		if mediaInfo == "" {
-			mediaInfo = movieMediaMap[strings.ToLower(row.Hash)]
-		}
-		enrichQualityWithMediaInfo(mediaInfo, &meta.Release.Quality)
-		score := cfg.ReleaseScore(&meta.Release)
-		if result, err := d.db.Exec("UPDATE episodes SET quality_score=?1 WHERE lower(magnet_hash)=lower(?2)", score, row.Hash); err != nil {
+		count, err := d.rescoreMetadataRows(metadataRows[start:end], cfg, episodeMediaMap, movieMediaMap)
+		changed += count
+		if err != nil {
 			return changed, err
-		} else if affected, _ := result.RowsAffected(); affected > 0 {
-			changed += int(affected)
-		}
-		if result, err := d.db.Exec("UPDATE movies SET quality_score=?1 WHERE lower(magnet_hash)=lower(?2)", score, row.Hash); err != nil {
-			return changed, err
-		} else if affected, _ := result.RowsAffected(); affected > 0 {
-			changed += int(affected)
-		}
-		if result, err := d.db.Exec("UPDATE torrent_meta SET quality_score=?1,updated_at=?2 WHERE lower(hash)=lower(?3)", score, nowSQLite(), row.Hash); err != nil {
-			return changed, err
-		} else if affected, _ := result.RowsAffected(); affected > 0 {
-			changed += int(affected)
 		}
 	}
 	// Episodi con un file in libreria, e quelli senza una release tracciata:
@@ -5670,12 +5653,6 @@ func (d *Database) Rescore(cfg *Config) (int, error) {
 	episodeRows, err := d.db.Query("SELECT e.id, COALESCE(e.title,''), COALESCE(e.archive_path,''), COALESCE(e.media_info_json,'') FROM episodes e WHERE COALESCE(e.archive_path,'') <> '' OR e.magnet_hash IS NULL OR NOT EXISTS(SELECT 1 FROM torrent_meta t WHERE lower(t.hash)=lower(e.magnet_hash) AND COALESCE(t.metadata_json,'') != '')")
 	if err != nil {
 		return changed, err
-	}
-	type episodeScoreRow struct {
-		ID        int64
-		Title     string
-		Path      string
-		MediaInfo string
 	}
 	episodeScoreRows := make([]episodeScoreRow, 0)
 	for episodeRows.Next() {
@@ -5691,7 +5668,149 @@ func (d *Database) Rescore(cfg *Config) (int, error) {
 		return changed, err
 	}
 	episodeRows.Close()
-	for _, row := range episodeScoreRows {
+	for start := 0; start < len(episodeScoreRows); start += rescoreBatchSize {
+		end := start + rescoreBatchSize
+		if end > len(episodeScoreRows) {
+			end = len(episodeScoreRows)
+		}
+		count, err := d.rescoreEpisodeRows(episodeScoreRows[start:end], cfg)
+		changed += count
+		if err != nil {
+			return changed, err
+		}
+	}
+	// Film senza una release tracciata.
+	movieRows, err := d.db.Query("SELECT m.id, COALESCE(NULLIF(m.title,''), m.name, ''), m.year, COALESCE(m.media_info_json,'') FROM movies m WHERE m.magnet_hash IS NULL OR NOT EXISTS(SELECT 1 FROM torrent_meta t WHERE lower(t.hash)=lower(m.magnet_hash) AND COALESCE(t.metadata_json,'') != '')")
+	if err != nil {
+		return changed, err
+	}
+	movieScoreRows := make([]movieScoreRow, 0)
+	for movieRows.Next() {
+		var row movieScoreRow
+		if err := movieRows.Scan(&row.ID, &row.Title, &row.Year, &row.MediaInfo); err != nil {
+			movieRows.Close()
+			return changed, err
+		}
+		movieScoreRows = append(movieScoreRows, row)
+	}
+	if err := movieRows.Err(); err != nil {
+		movieRows.Close()
+		return changed, err
+	}
+	movieRows.Close()
+	for start := 0; start < len(movieScoreRows); start += rescoreBatchSize {
+		end := start + rescoreBatchSize
+		if end > len(movieScoreRows) {
+			end = len(movieScoreRows)
+		}
+		count, err := d.rescoreMovieRows(movieScoreRows[start:end], cfg)
+		changed += count
+		if err != nil {
+			return changed, err
+		}
+	}
+	return changed, nil
+}
+
+// metadataRow is one tracked torrent as stored: the hash that links it to the
+// episodes and movies rows, and the release JSON the score comes from.
+type metadataRow struct {
+	Hash string
+	JSON string
+}
+
+// episodeScoreRow is one archived episode whose score must come from the file
+// in the library rather than from a tracked release.
+type episodeScoreRow struct {
+	ID        int64
+	Title     string
+	Path      string
+	MediaInfo string
+}
+
+// movieScoreRow is one movie without a tracked release.
+type movieScoreRow struct {
+	ID        int64
+	Title     string
+	Year      sql.NullInt64
+	MediaInfo string
+}
+
+// rescoreBatchSize is how many rows one re-score transaction carries. It keeps
+// the single SQLite connection busy for a few milliseconds at a time instead of
+// one fsync per row.
+const rescoreBatchSize = 500
+
+// rescoreMetadataRows re-scores the episodes, movies and torrent rows that refer
+// to the given tracked torrents, in one transaction with prepared statements.
+func (d *Database) rescoreMetadataRows(rows []metadataRow, cfg *Config, episodeMediaMap, movieMediaMap map[string]string) (int, error) {
+	tx, err := d.db.Begin()
+	if err != nil {
+		return 0, err
+	}
+	defer func() { _ = tx.Rollback() }()
+	episodeStmt, err := tx.Prepare("UPDATE episodes SET quality_score=?1 WHERE lower(magnet_hash)=lower(?2)")
+	if err != nil {
+		return 0, err
+	}
+	movieStmt, err := tx.Prepare("UPDATE movies SET quality_score=?1 WHERE lower(magnet_hash)=lower(?2)")
+	if err != nil {
+		return 0, err
+	}
+	torrentStmt, err := tx.Prepare("UPDATE torrent_meta SET quality_score=?1,updated_at=?2 WHERE lower(hash)=lower(?3)")
+	if err != nil {
+		return 0, err
+	}
+	now := nowSQLite()
+	changed := 0
+	for _, row := range rows {
+		var meta models.TorrentMeta
+		if err := json.Unmarshal([]byte(row.JSON), &meta); err != nil {
+			continue
+		}
+		hash := strings.ToLower(row.Hash)
+		mediaInfo := episodeMediaMap[hash]
+		if mediaInfo == "" {
+			mediaInfo = movieMediaMap[hash]
+		}
+		enrichQualityWithMediaInfo(mediaInfo, &meta.Release.Quality)
+		score := cfg.ReleaseScore(&meta.Release)
+		if affected, err := execAffected(episodeStmt, score, row.Hash); err != nil {
+			return changed, err
+		} else {
+			changed += affected
+		}
+		if affected, err := execAffected(movieStmt, score, row.Hash); err != nil {
+			return changed, err
+		} else {
+			changed += affected
+		}
+		if affected, err := execAffected(torrentStmt, score, now, row.Hash); err != nil {
+			return changed, err
+		} else {
+			changed += affected
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return changed, err
+	}
+	return changed, nil
+}
+
+// rescoreEpisodeRows re-scores the archived episodes whose score must come from
+// the file in the library, in one transaction.
+func (d *Database) rescoreEpisodeRows(rows []episodeScoreRow, cfg *Config) (int, error) {
+	tx, err := d.db.Begin()
+	if err != nil {
+		return 0, err
+	}
+	defer func() { _ = tx.Rollback() }()
+	stmt, err := tx.Prepare("UPDATE episodes SET quality_score=?1 WHERE id=?2")
+	if err != nil {
+		return 0, err
+	}
+	changed := 0
+	for _, row := range rows {
 		// Prefer the archived file's own name; the stored title is the fallback
 		// for old imports whose path is a folder or carries no quality tokens.
 		quality := models.Quality{}
@@ -5709,51 +5828,61 @@ func (d *Database) Rescore(cfg *Config) (int, error) {
 			continue
 		}
 		release := archivedRelease(row.Title, row.Path, quality, "series", nil)
-		if result, err := d.db.Exec("UPDATE episodes SET quality_score=?1 WHERE id=?2", cfg.ReleaseScore(&release), row.ID); err != nil {
+		if affected, err := execAffected(stmt, cfg.ReleaseScore(&release), row.ID); err != nil {
 			return changed, err
-		} else if affected, _ := result.RowsAffected(); affected > 0 {
-			changed += int(affected)
+		} else {
+			changed += affected
 		}
 	}
-	// Film senza una release tracciata.
-	movieRows, err := d.db.Query("SELECT m.id, COALESCE(NULLIF(m.title,''), m.name, ''), m.year, COALESCE(m.media_info_json,'') FROM movies m WHERE m.magnet_hash IS NULL OR NOT EXISTS(SELECT 1 FROM torrent_meta t WHERE lower(t.hash)=lower(m.magnet_hash) AND COALESCE(t.metadata_json,'') != '')")
+	if err := tx.Commit(); err != nil {
+		return changed, err
+	}
+	return changed, nil
+}
+
+// rescoreMovieRows re-scores the movies without a tracked release, in one
+// transaction.
+func (d *Database) rescoreMovieRows(rows []movieScoreRow, cfg *Config) (int, error) {
+	tx, err := d.db.Begin()
 	if err != nil {
-		return changed, err
+		return 0, err
 	}
-	type movieScoreRow struct {
-		ID        int64
-		Title     string
-		Year      sql.NullInt64
-		MediaInfo string
+	defer func() { _ = tx.Rollback() }()
+	stmt, err := tx.Prepare("UPDATE movies SET quality_score=?1 WHERE id=?2")
+	if err != nil {
+		return 0, err
 	}
-	movieScoreRows := make([]movieScoreRow, 0)
-	for movieRows.Next() {
-		var row movieScoreRow
-		if err := movieRows.Scan(&row.ID, &row.Title, &row.Year, &row.MediaInfo); err != nil {
-			movieRows.Close()
-			return changed, err
-		}
-		movieScoreRows = append(movieScoreRows, row)
-	}
-	if err := movieRows.Err(); err != nil {
-		movieRows.Close()
-		return changed, err
-	}
-	movieRows.Close()
-	for _, row := range movieScoreRows {
+	changed := 0
+	for _, row := range rows {
 		quality, ok := meaningfulQuality(row.Title)
 		if !ok {
 			continue
 		}
 		enrichQualityWithMediaInfo(row.MediaInfo, &quality)
 		release := archivedRelease(row.Title, "", quality, "movie", nullInt64Ptr(row.Year))
-		if result, err := d.db.Exec("UPDATE movies SET quality_score=?1 WHERE id=?2", cfg.ReleaseScore(&release), row.ID); err != nil {
+		if affected, err := execAffected(stmt, cfg.ReleaseScore(&release), row.ID); err != nil {
 			return changed, err
-		} else if affected, _ := result.RowsAffected(); affected > 0 {
-			changed += int(affected)
+		} else {
+			changed += affected
 		}
 	}
+	if err := tx.Commit(); err != nil {
+		return changed, err
+	}
 	return changed, nil
+}
+
+// execAffected runs one prepared statement and reports how many rows it matched.
+func execAffected(stmt *sql.Stmt, args ...any) (int, error) {
+	result, err := stmt.Exec(args...)
+	if err != nil {
+		return 0, err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil || affected <= 0 {
+		return 0, nil
+	}
+	return int(affected), nil
 }
 
 // Cleanup removes old cycle history and stale errored torrents.

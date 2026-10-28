@@ -22,14 +22,34 @@ import (
 type Archive struct {
 	db   *sql.DB
 	path string
+	// readDB is a second handle used by the read paths: search, browse, the
+	// counters and the SQL preview. The write handle keeps a single connection,
+	// so a long scan used to hold it — and the whole daemon — for its whole
+	// duration. WAL lets a reader work while a write or another scan runs. It is
+	// nil when the second handle could not be opened, and every read path then
+	// falls back to db.
+	readDB *sql.DB
 }
 
-// Close closes the underlying SQLite connection (see Database.Close).
+// Close closes the underlying SQLite connections (see Database.Close).
 func (a *Archive) Close() error {
 	if a == nil || a.db == nil {
 		return nil
 	}
+	if a.readDB != nil {
+		_ = a.readDB.Close()
+		a.readDB = nil
+	}
 	return a.db.Close()
+}
+
+// reader returns the handle the read paths must use: the second connection when
+// it is available, the main one otherwise.
+func (a *Archive) reader() *sql.DB {
+	if a.readDB != nil {
+		return a.readDB
+	}
+	return a.db
 }
 
 // RowCount returns the number of rows stored in the archive database.
@@ -319,7 +339,33 @@ func OpenArchive(path string) (*Archive, error) {
 	// Hashes are stored normalized (lowercase hex), so the lookups by hash use
 	// idx_archive_hash: the older expression index only cost write time.
 	_, _ = db.Exec("DROP INDEX IF EXISTS idx_archive_magnet_lower")
-	return &Archive{db: db, path: path}, nil
+	return &Archive{db: db, path: path, readDB: openArchiveReader(path)}, nil
+}
+
+// openArchiveReader opens the second handle for the archive's read paths, or
+// returns nil when it cannot be opened: the archive then keeps reading on the
+// main connection, exactly as before, instead of failing.
+//
+// It is not opened with mode=ro on purpose. A WAL database needs its -shm file,
+// and a read-only handle cannot create it; the connection is opened read-write
+// and immediately restricted with query_only, so it behaves as a reader while
+// SQLite keeps its normal WAL bookkeeping.
+func openArchiveReader(path string) *sql.DB {
+	dsn := "file:" + path + "?_pragma=busy_timeout(10000)&_pragma=query_only(1)&_pragma=cache_size(" + sqliteCacheSizeKiB + ")"
+	reader, err := sql.Open("sqlite", dsn)
+	if err != nil {
+		logging.Debug("the archive will be read on the main connection: the second handle is not available", "error", err)
+		return nil
+	}
+	// Two readers serve the UI and one background job; more would only multiply
+	// the page cache measured in sqlite.go.
+	reader.SetMaxOpenConns(2)
+	if err := reader.Ping(); err != nil {
+		_ = reader.Close()
+		logging.Debug("the archive will be read on the main connection: the second handle is not available", "error", err)
+		return nil
+	}
+	return reader
 }
 
 // archiveInsertSQL and archiveRefreshSQL archive one release: ?1 title, ?2
@@ -539,7 +585,7 @@ func (a *Archive) Search(query string) ([][3]string, error) {
 	if term == "" {
 		return [][3]string{}, nil
 	}
-	rows, err := a.db.Query("SELECT archive.title,archive.magnet,COALESCE(archive.source,'archive') FROM archive JOIN archive_fts ON archive_fts.rowid=archive.id WHERE archive_fts MATCH ?1 ORDER BY archive.added_at DESC,archive.id DESC LIMIT 200", term)
+	rows, err := a.reader().Query("SELECT archive.title,archive.magnet,COALESCE(archive.source,'archive') FROM archive JOIN archive_fts ON archive_fts.rowid=archive.id WHERE archive_fts MATCH ?1 ORDER BY archive.added_at DESC,archive.id DESC LIMIT 200", term)
 	if err != nil {
 		return nil, err
 	}
@@ -560,7 +606,7 @@ func (a *Archive) Search(query string) ([][3]string, error) {
 // of thousands of rows) into memory on every feed-status computation.
 func (a *Archive) RecentEntries(limit int) ([][3]string, error) {
 	limit = clampInt(limit, 1, 500_000)
-	rows, err := a.db.Query(
+	rows, err := a.reader().Query(
 		"SELECT title,magnet,COALESCE(source,'archive') FROM archive ORDER BY added_at DESC LIMIT ?1",
 		limit,
 	)
@@ -598,7 +644,7 @@ func (a *Archive) Checkpoint() error {
 // Count returns the number of archived rows.
 func (a *Archive) Count() (int64, error) {
 	var count int64
-	if err := a.db.QueryRow("SELECT COUNT(*) FROM archive").Scan(&count); err != nil {
+	if err := a.reader().QueryRow("SELECT COUNT(*) FROM archive").Scan(&count); err != nil {
 		return 0, err
 	}
 	return count, nil
@@ -613,13 +659,13 @@ func (a *Archive) Browse(query string, limit int) ([]ArchiveEntry, error) {
 	term := ftsQuery(query)
 	limit = clampInt(limit, 1, 500)
 	if term == "" {
-		rows, err := a.db.Query("SELECT id,title,magnet,COALESCE(source,'archive'),COALESCE(quality_score,0),added_at FROM archive ORDER BY added_at DESC LIMIT ?1", limit)
+		rows, err := a.reader().Query("SELECT id,title,magnet,COALESCE(source,'archive'),COALESCE(quality_score,0),added_at FROM archive ORDER BY added_at DESC LIMIT ?1", limit)
 		if err != nil {
 			return nil, err
 		}
 		return scanArchiveEntries(rows)
 	}
-	rows, err := a.db.Query("SELECT archive.id,archive.title,archive.magnet,COALESCE(archive.source,'archive'),COALESCE(archive.quality_score,0),archive.added_at FROM archive JOIN archive_fts ON archive_fts.rowid=archive.id WHERE archive_fts MATCH ?1 ORDER BY archive.added_at DESC LIMIT ?2", term, limit)
+	rows, err := a.reader().Query("SELECT archive.id,archive.title,archive.magnet,COALESCE(archive.source,'archive'),COALESCE(archive.quality_score,0),archive.added_at FROM archive JOIN archive_fts ON archive_fts.rowid=archive.id WHERE archive_fts MATCH ?1 ORDER BY archive.added_at DESC LIMIT ?2", term, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -649,14 +695,14 @@ func (a *Archive) BrowsePage(query string, page, limit int) (*ArchivePage, error
 	if len(includes) > 0 {
 		term := ftsMatchExpression(includes, excludes)
 		var total int64
-		if err := a.db.QueryRow(
+		if err := a.reader().QueryRow(
 			"SELECT COUNT(*) FROM archive JOIN archive_fts ON archive_fts.rowid=archive.id WHERE archive_fts MATCH ?1",
 			term,
 		).Scan(&total); err != nil {
 			return nil, err
 		}
 		pages, offset := pageOf(total)
-		rows, err := a.db.Query("SELECT archive.id,archive.title,archive.magnet,COALESCE(archive.source,'archive'),COALESCE(archive.quality_score,0),archive.added_at FROM archive JOIN archive_fts ON archive_fts.rowid=archive.id WHERE archive_fts MATCH ?1 ORDER BY archive.added_at DESC LIMIT ?2 OFFSET ?3", term, limit, offset)
+		rows, err := a.reader().Query("SELECT archive.id,archive.title,archive.magnet,COALESCE(archive.source,'archive'),COALESCE(archive.quality_score,0),archive.added_at FROM archive JOIN archive_fts ON archive_fts.rowid=archive.id WHERE archive_fts MATCH ?1 ORDER BY archive.added_at DESC LIMIT ?2 OFFSET ?3", term, limit, offset)
 		if err != nil {
 			return nil, err
 		}
@@ -681,7 +727,7 @@ func (a *Archive) BrowsePage(query string, page, limit int) (*ArchivePage, error
 		whereSQL += fmt.Sprintf("lower(title) NOT LIKE ?%d", len(filterBinds))
 	}
 	var total int64
-	if err := a.db.QueryRow("SELECT COUNT(*) FROM archive"+whereSQL, filterBinds...).Scan(&total); err != nil {
+	if err := a.reader().QueryRow("SELECT COUNT(*) FROM archive"+whereSQL, filterBinds...).Scan(&total); err != nil {
 		return nil, err
 	}
 	pages, offset := pageOf(total)
@@ -691,7 +737,7 @@ func (a *Archive) BrowsePage(query string, page, limit int) (*ArchivePage, error
 		"SELECT id,title,magnet,COALESCE(source,'archive'),COALESCE(quality_score,0),added_at FROM archive%s ORDER BY added_at DESC LIMIT ?%d OFFSET ?%d",
 		whereSQL, count-1, count,
 	)
-	rows, err := a.db.Query(sql, filterBinds...)
+	rows, err := a.reader().Query(sql, filterBinds...)
 	if err != nil {
 		return nil, err
 	}
@@ -795,10 +841,10 @@ func (a *Archive) contentFilterCandidates(query string) (*sql.Rows, error) {
 	includes, excludes := parseArchiveFilter(query)
 	selectSQL := "SELECT archive.id,archive.title FROM archive"
 	if len(includes) > 0 {
-		return a.db.Query(selectSQL+" JOIN archive_fts ON archive_fts.rowid=archive.id WHERE archive_fts MATCH ?1 ORDER BY archive.added_at DESC,archive.id DESC", ftsMatchExpression(includes, excludes))
+		return a.reader().Query(selectSQL+" JOIN archive_fts ON archive_fts.rowid=archive.id WHERE archive_fts MATCH ?1 ORDER BY archive.added_at DESC,archive.id DESC", ftsMatchExpression(includes, excludes))
 	}
 	if len(excludes) == 0 {
-		return a.db.Query(selectSQL + " ORDER BY archive.added_at DESC,archive.id DESC")
+		return a.reader().Query(selectSQL + " ORDER BY archive.added_at DESC,archive.id DESC")
 	}
 	where := make([]string, len(excludes))
 	args := make([]any, len(excludes))
@@ -806,7 +852,7 @@ func (a *Archive) contentFilterCandidates(query string) (*sql.Rows, error) {
 		where[index] = fmt.Sprintf("lower(archive.title) NOT LIKE ?%d", index+1)
 		args[index] = "%" + word + "%"
 	}
-	return a.db.Query(selectSQL+" WHERE "+strings.Join(where, " AND ")+" ORDER BY archive.added_at DESC,archive.id DESC", args...)
+	return a.reader().Query(selectSQL+" WHERE "+strings.Join(where, " AND ")+" ORDER BY archive.added_at DESC,archive.id DESC", args...)
 }
 
 // entriesByIDs loads the full rows of the given archive ids, keeping the order
@@ -822,7 +868,7 @@ func (a *Archive) entriesByIDs(ids []int64) ([]ArchiveEntry, error) {
 		placeholders[index] = "?" + strconv.Itoa(index+1)
 		args[index] = id
 	}
-	rows, err := a.db.Query("SELECT id,title,magnet,COALESCE(source,'archive'),COALESCE(quality_score,0),added_at FROM archive WHERE id IN ("+strings.Join(placeholders, ",")+")", args...)
+	rows, err := a.reader().Query("SELECT id,title,magnet,COALESCE(source,'archive'),COALESCE(quality_score,0),added_at FROM archive WHERE id IN ("+strings.Join(placeholders, ",")+")", args...)
 	if err != nil {
 		return nil, err
 	}

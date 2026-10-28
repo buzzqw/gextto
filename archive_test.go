@@ -666,3 +666,45 @@ func TestArchiveSameGUIDAnotherTorrentKeepsBoth(t *testing.T) {
 		t.Fatalf("rows = %v, want each title with its own torrent", got)
 	}
 }
+
+// TestArchiveCompactionWorksWithTheReadHandle checks that the second handle the
+// read paths use does not stop the maintenance actions: VACUUM needs exclusive
+// access, and an idle connection must not keep it. The archive is compacted
+// from the maintenance page while the UI keeps its connections open.
+func TestArchiveCompactionWorksWithTheReadHandle(t *testing.T) {
+	archive := openTestArchive(t)
+	if archive.readDB == nil {
+		t.Skip("the second read handle is not available in this environment")
+	}
+	year := int64(2026)
+	releases := make([]models.Release, 0, 5)
+	for index := 1; index <= 5; index++ {
+		releases = append(releases, models.Release{
+			Title:        fmt.Sprintf("Compact %d 1080p", index),
+			Magnet:       fmt.Sprintf("magnet:?xt=urn:btih:%040x", index),
+			Source:       "bench",
+			Kind:         "movie",
+			Year:         &year,
+			DiscoveredAt: time.Now().UTC(),
+			Seeders:      -1,
+			Peers:        -1,
+		})
+	}
+	if err := archive.SaveBatch(releases, &Config{}); err != nil {
+		t.Fatalf("SaveBatch: %v", err)
+	}
+	// A read through the second handle, so it has used the database.
+	if _, err := archive.Count(); err != nil {
+		t.Fatalf("Count: %v", err)
+	}
+	if err := archive.Optimize("vacuum"); err != nil {
+		t.Fatalf("vacuum with the read handle open: %v", err)
+	}
+	count, err := archive.Count()
+	if err != nil {
+		t.Fatalf("Count after vacuum: %v", err)
+	}
+	if count != int64(len(releases)) {
+		t.Fatalf("Count after vacuum = %d, want %d", count, len(releases))
+	}
+}

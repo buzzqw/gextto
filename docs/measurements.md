@@ -131,6 +131,31 @@ when a change is meant to be an optimisation. A single pass is noise.
 | `BenchmarkPayloadContentPath` (2,000-file torrent) | Original 207 ns, 64 B, 1 alloc; NoSubfolder 1.65 µs, 0 allocs | the `content_path` every list refresh now computes per torrent (content layout); measured 2026-10-17 on the N97 |
 | `BenchmarkNamingTags` (audio + HDR label for one name) | 16.5 µs/op, 2.08 KB, 33 allocs | once per episode at the 6-hour library check (~21 ms for 1,278 files); keeps the existing spelling so the check does not rename a file back and forth; measured 2026-10-25 on the N97 |
 
+### Second performance pass (2026-10-28, N97)
+
+Figures **before** and **after** each change of the second pass. Same benchmark, same
+machine, three runs each; the picker rows were also measured on the previous commit in
+a separate worktree, so the comparison is not between two machines.
+
+| Benchmark | Before | After | What it measures |
+|---|---|---|---|
+| `BenchmarkFindSeriesMatchUnmatched` (500 series, one alias each) | 3.63–3.71 ms/op, 1.52 MB, 33,500 allocs | not changed yet | resolving a release nobody monitors: the tolerant second pass normalises every configured name and alias for every release |
+| `BenchmarkFindSeriesMatchMatched` (year suffix, last series) | 2.72–2.90 ms/op, 987 KB, 29,473 allocs | not changed yet | same scan when the release is monitored but the exact pass misses |
+| `BenchmarkRescore` (2,000 tracked torrents) | 215–237 ms/op, 6.3 MB, 84,153 allocs | **54–60 ms/op, 6.2 MB, 82,264 allocs** | one full re-score: one transaction per 500 rows with prepared statements, instead of three autocommit `UPDATE`s per torrent (one fsync each with `synchronous=FULL`) |
+| `BenchmarkArchiveGaps` (50 series, 2 seasons, 40 episodes each) | 5.74–6.77 ms/op, 522 KB, 17,580 allocs | not changed yet | one gap calculation, which reads the episode table several times |
+| `BenchmarkSyncArchiveFileScored` (existing episode, file present) | 134–137 µs/op, 2.0 KB, 70 allocs | not changed yet | recording one library file: four statements, each its own transaction, plus the stat of the present copy |
+| `BenchmarkEngineListSnapshot` (2,000 torrents) | 1.42 ms/op, 1.00 MB, 4 allocs | not changed yet | one read of the torrent snapshot (`List`): a copy of every row and a sort by hash |
+| `BenchmarkArchiveReadDuringFullScan` (50,000 releases, one reader scanning while `Count` runs) | **116–122 ms/op, 32.8 MB, 549,784 allocs** | **257–349 µs/op, 618 B, 17 allocs** | a short read while a full scan runs: with one connection the counter waited for the scan; the archive now has a second read handle |
+| `BenchmarkPickerRarestSteady` | 112.7–118.6 µs/op, 0 allocs | **14.6–35.7 ns/op, 0 allocs** | one piece pick when the rarest pieces have one holder: the minimum is found by scanning with an early exit instead of sorting the table |
+| `BenchmarkPickerRarestShuffled` (worst case) | 1.12–1.16 ms/op, 0 allocs | **337–349 µs/op, 0 allocs** | same pick with the availability order fully scrambled, so the sort could not be adaptive |
+| `BenchmarkPickerSequentialNearlyDone` | 106.8–112.9 µs/op | 106.7–113.7 µs/op (unchanged path) | sequential pick, not touched by the change: it fixes the noise floor of the comparison |
+| `BenchmarkPickerRarestManyPeers` (150 peers) | 12.8–13.0 µs/op, 0 allocs | 12.9–13.2 µs/op, 0 allocs | one pick in a dense swarm; the first version of the scan was 20 µs here and was corrected before landing (the rarity is compared before asking the peer's bitfield) |
+
+Reproduce with `go test -run XXX -bench '<name>' -benchmem -count=3`; the picker
+figures come from `internal/gxcore/internal/piecepicker`, the others from the root
+package. The old side of the picker rows was measured in a worktree at commit
+`c52a1a71` so both sides ran on the same host.
+
 ## 4. Investigations and decisions
 
 Each entry states the question, the numbers that answered it and the decision. The
