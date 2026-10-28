@@ -1689,16 +1689,17 @@ func RunComicsCycle(ctx context.Context, db *ComicsDb, client *GetComicsClient, 
 			return downloaded, nil
 		}
 		logging.Debug("comics: checking title", "comic", comic.Title, "tag", comic.TagURL)
-		// A numbered monitor identifies one exact issue: its publication date
-		// may be older than the generic monitoring start date, so that date
-		// must not hide the requested issue.
+		// A numbered monitor starts the series at that issue and follows it:
+		// later issues of the same series are downloaded too. Its publication
+		// date may be older than the generic monitoring start date, so that
+		// date must not hide the requested issue.
 		exactIssue := issueNumber(comic.Title) != nil
 		tagFromDate := ""
 		if !exactIssue {
 			tagFromDate = comic.FromDate
 		}
-		// A result chosen by the search is a precise post: it must not be
-		// replaced by a new generic search of the same name.
+		// A result chosen by the search is a precise post: it is downloaded as
+		// it is, and the name search adds the later issues of its series.
 		var exactPostURL *string
 		if strings.TrimSpace(comic.PostURL) != "" {
 			value := comic.PostURL
@@ -1733,7 +1734,7 @@ func RunComicsCycle(ctx context.Context, db *ComicsDb, client *GetComicsClient, 
 		}
 		clean := cleanSearchTitle(comic.Title)
 		var searchPosts []ComicPost
-		if exactPostURL == nil && clean != "" {
+		if clean != "" {
 			_, found, searchErr := client.SearchPosts(clean)
 			if searchErr != nil {
 				logging.Warn(fmt.Sprintf("Could not search GetComics by name for «%s»: %v", comic.Title, searchErr))
@@ -1747,25 +1748,27 @@ func RunComicsCycle(ctx context.Context, db *ComicsDb, client *GetComicsClient, 
 			logging.Warn(fmt.Sprintf("Could not read the GetComics tag of «%s» and the name search found nothing: %v", comic.Title, *tagError))
 		}
 		merged := map[string]ComicPost{}
-		for _, post := range posts {
-			if !matchesMonitoredIssue(comic.Title, post.Title) {
-				logging.Debug("comics: ignoring post for a different issue or collection", "comic", comic.Title, "post", post.Title)
-				continue
+		keep := func(post ComicPost) {
+			if exactPostURL != nil && post.URL == *exactPostURL {
+				// The chosen post is downloaded as it is, whatever its title:
+				// it is the issue the person selected.
+				merged[post.URL] = post
+				return
+			}
+			if !matchesMonitoredSeries(comic.Title, post.Title) {
+				logging.Debug("comics: ignoring a post from another series, an older issue or a collection", "comic", comic.Title, "post", post.Title)
+				return
 			}
 			if !exactIssue && strings.TrimSpace(comic.FromDate) != "" && post.Date != "" && post.Date < comic.FromDate {
-				continue
+				return
 			}
 			merged[post.URL] = post
 		}
+		for _, post := range posts {
+			keep(post)
+		}
 		for _, post := range searchPosts {
-			if !matchesMonitoredIssue(comic.Title, post.Title) {
-				logging.Debug("comics: ignoring post for a different issue or collection", "comic", comic.Title, "post", post.Title)
-				continue
-			}
-			if !exactIssue && strings.TrimSpace(comic.FromDate) != "" && post.Date != "" && post.Date < comic.FromDate {
-				continue
-			}
-			merged[post.URL] = post
+			keep(post)
 		}
 		keys := make([]string, 0, len(merged))
 		for key := range merged {
@@ -2550,16 +2553,32 @@ func issueNumber(title string) *string {
 	return &digits
 }
 
-func matchesMonitoredIssue(monitoredTitle, postTitle string) bool {
+// matchesMonitoredSeries reports whether a GetComics post belongs to a
+// monitored comic. A monitor without an issue follows the whole series, as
+// before. A monitor with an issue starts the series at that issue: the post
+// must be an issue of the same series and not an older one, so later issues are
+// downloaded automatically. Collections (no issue number) and titles of another
+// series are excluded, even when the search by name returns them.
+func matchesMonitoredSeries(monitoredTitle, postTitle string) bool {
 	monitored := issueNumber(monitoredTitle)
-	post := issueNumber(postTitle)
-	if monitored != nil && post != nil {
-		return *monitored == *post
+	if monitored == nil {
+		// A series monitor takes every post the tag or the name search returns.
+		return true
 	}
-	if monitored != nil && post == nil {
+	base := strings.ToLower(strings.TrimSpace(cleanSearchTitle(monitoredTitle)))
+	if base == "" || strings.ToLower(strings.TrimSpace(cleanSearchTitle(postTitle))) != base {
 		return false
 	}
-	return true
+	post := issueNumber(postTitle)
+	if post == nil {
+		return false
+	}
+	monitoredNumber, monitoredErr := strconv.Atoi(*monitored)
+	postNumber, postErr := strconv.Atoi(*post)
+	if monitoredErr == nil && postErr == nil {
+		return postNumber >= monitoredNumber
+	}
+	return *post == *monitored
 }
 
 // ---------------------------------------------------------------------------

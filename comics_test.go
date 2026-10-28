@@ -133,21 +133,30 @@ func TestClearFinishedHTTPDownloadsSkipsActiveRows(t *testing.T) {
 	removeHTTPDownload(active)
 }
 
-func TestMonitoredIssueDoesNotAcceptNewerIssueOrCollection(t *testing.T) {
+// TestMonitoredSeriesFollowsLaterIssues locks in that a numbered monitor starts
+// the series at that issue: the number itself is not a one-shot, so new issues
+// are found by the periodic check instead of only by a manual search.
+func TestMonitoredSeriesFollowsLaterIssues(t *testing.T) {
 	issue := issueNumber("Poison Ivy #41 (2026)")
 	if issue == nil || *issue != "41" {
 		t.Fatalf("issueNumber = %v, want 41", issue)
 	}
-	if !matchesMonitoredIssue("Poison Ivy #41 (2026)", "Poison Ivy #41 (2026)") {
+	if !matchesMonitoredSeries("Poison Ivy #41 (2026)", "Poison Ivy #41 (2026)") {
 		t.Error("same issue should match")
 	}
-	if matchesMonitoredIssue("Poison Ivy #41 (2026)", "Poison Ivy #47 (2026)") {
-		t.Error("newer issue should not match")
+	if !matchesMonitoredSeries("Poison Ivy #41 (2026)", "Poison Ivy #47 (2026)") {
+		t.Error("a later issue of the same series should match")
 	}
-	if matchesMonitoredIssue("Poison Ivy #41 (2026)", "Poison Ivy Vol. 7 – Amuse-Bouche (TPB) (2026)") {
+	if matchesMonitoredSeries("Poison Ivy #41 (2026)", "Poison Ivy #40 (2026)") {
+		t.Error("an older issue should not match")
+	}
+	if matchesMonitoredSeries("Poison Ivy #41 (2026)", "Poison Ivy Vol. 7 – Amuse-Bouche (TPB) (2026)") {
 		t.Error("collection should not match a numbered issue")
 	}
-	if !matchesMonitoredIssue("Batman (2026)", "Batman Vol. 1 (2026)") {
+	if matchesMonitoredSeries("Poison Ivy #41 (2026)", "Spawn #41 (2026)") {
+		t.Error("an issue of another series should not match")
+	}
+	if !matchesMonitoredSeries("Batman (2026)", "Batman Vol. 1 (2026)") {
 		t.Error("unnumbered monitor should match a collection")
 	}
 }
@@ -574,6 +583,62 @@ func TestComicsCycleLogLinesAreReadable(t *testing.T) {
 	}
 	if !strings.Contains(captured.String()[offset:], "«Test Comic #1 (2026)» is already up to date") {
 		t.Fatalf("missing the already-up-to-date line:\n%s", captured.String()[offset:])
+	}
+}
+
+// TestComicsCycleDownloadsLaterIssuesOfAMonitoredSeries is the user-facing
+// case: a monitor named after one issue used to wait for that issue only, so
+// the periodic check found nothing while a manual search found the new issues.
+func TestComicsCycleDownloadsLaterIssuesOfAMonitoredSeries(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/tag/test-comic/":
+			fmt.Fprint(w, `<html><body>
+<article class="post">
+  <h1 class="post-title"><a href="/test-comic-1/">Test Comic #1 (2026)</a></h1>
+  <time datetime="2026-10-01">2026-10-01</time>
+</article>
+<article class="post">
+  <h1 class="post-title"><a href="/test-comic-2/">Test Comic #2 (2026)</a></h1>
+  <time datetime="2026-10-20">2026-10-20</time>
+</article>
+</body></html>`)
+		case "/test-comic-2/":
+			fmt.Fprint(w, `<html><body><a href="/test-comic-2.cbz">Download</a></body></html>`)
+		case "/test-comic-2.cbz":
+			w.Header().Set("Content-Type", "application/octet-stream")
+			_, _ = w.Write([]byte("comic pages"))
+		default:
+			fmt.Fprint(w, `<html><body></body></html>`)
+		}
+	}))
+	defer server.Close()
+
+	db := openTestComicsDb(t)
+	defer db.Close()
+	id, err := db.AddMonitored("Test Comic #1 (2026)", "/tag/test-comic/", "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The first issue is already downloaded: only the later one is new.
+	if _, err := db.AddHistory(id, server.URL+"/test-comic-1/", "Test Comic #1 (2026)", "", ""); err != nil {
+		t.Fatal(err)
+	}
+	client := &GetComicsClient{client: server.Client(), baseURL: server.URL}
+	downloadDir := t.TempDir()
+	downloaded, err := RunComicsCycle(context.Background(), db, client, NewNotifier(), downloadDir, &mockTorrentEngine{}, nil, &Config{})
+	if err != nil {
+		t.Fatalf("comics cycle: %v", err)
+	}
+	if downloaded != 1 {
+		t.Fatalf("downloaded = %d, want 1 (the later issue)", downloaded)
+	}
+	sent, err := db.AlreadySent(server.URL + "/test-comic-2/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !sent {
+		t.Fatal("the later issue was not recorded in the comics history")
 	}
 }
 

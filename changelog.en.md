@@ -15,6 +15,8 @@ manual is online: [English](docs/MANUAL.en.md) ·
 
 ## 28 October 2026
 
+- **Monitored comics follow the series, not just the chosen issue.** A monitor with an issue number in its title ("Poison Ivy #41", "Spawn #373") was compared with that number only: the automatic check never found the new issues, which appeared only when searching by hand. The periodic check now also downloads the later issues of the same series; earlier issues, issues of other series and collections stay out. The post chosen in *Add comic* is downloaded as it is, and from there the series carries on by itself.
+
 - **The Health page shows only the sources you actually configured.** If you removed an indexer from the integrations, or switched it off, its row stayed in *Health → Provider status* with the last error, as if it were still in use (for example "mircrew indexerr"). The table now lists only the indexers that are present and enabled and the configured feeds, and the row of a removed source is forgotten: adding it again starts without the old backoff. Nothing to configure.
 
 - **«Search missing» no longer holds the series page.** The button on a series page started the search and left the page waiting for minutes, longer the more episodes were missing. It now starts the same background search as the *Missing* tab: the page shows how far it is, you can cancel it and, when it ends, it lists the results with **Download** without leaving the series. A search started by an external program or from the terminal answers within 90 seconds with the episodes it has checked so far (`complete` says whether it finished) instead of staying open, and a cancelled search marks as searched only the episodes it actually looked at: the deep pass does not skip the others for a day.

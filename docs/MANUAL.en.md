@@ -887,7 +887,10 @@ changes nothing: it reloads the table with the filter you typed.
 - **Comics** — in **Add comic**, enter a title and click **Find**; choose the
   exact GetComics result and confirm. Gextto saves the selected post, tag,
   cover and metadata, then uses that post for downloading instead of replacing
-  it with a similarly named issue. The monitored list, post link extraction,
+  it with a similarly named issue. A comic whose title carries an issue number
+  (for example "Poison Ivy #41") follows the series from that issue on: the
+  periodic check also downloads the later issues, while earlier issues, other
+  series and collections are skipped. The monitored list, post link extraction,
   weekly-pack settings and resend/delete/force history are also available. A
   weekly pack is queued only once: before downloading it Gextto looks in its
   own history for an earlier download (and checks whether it is still in the

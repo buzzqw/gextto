@@ -909,7 +909,10 @@ elenco** invece non modifica nulla: rilegge la tabella con il filtro scritto.
 - **Fumetti** — in **Aggiungi fumetto** scrivi il titolo e premi **Trova**; scegli
   il risultato esatto di GetComics e poi conferma. Gextto salva il post scelto,
   il tag, la copertina e i metadati, e usa quel post per il download senza
-  sostituirlo con un albo omonimo. Sono inoltre disponibili lista monitorati,
+  sostituirlo con un albo omonimo. Un fumetto con il numero nel titolo (per
+  esempio «Poison Ivy #41») segue la serie da quel numero in avanti: il controllo
+  periodico scarica anche i numeri successivi, mentre numeri precedenti, altre
+  serie e raccolte vengono esclusi. Sono inoltre disponibili lista monitorati,
   estrazione link da un post, impostazioni weekly pack e storico con
   reinvia/elimina/forza. Un weekly pack viene accodato una volta sola: prima di
   scaricarlo Gextto guarda nel suo storico se lo ha già preso (e controlla se è
