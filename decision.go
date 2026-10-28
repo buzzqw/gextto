@@ -411,7 +411,8 @@ func ExplainWithArchive(
 
 	policyAllowed := false
 	if series != nil {
-		policyAllowed = cfg.SeriesReleaseAllowed(series, &release.Quality, release.Title)
+		policyAllowed = cfg.SeriesReleaseAllowed(series, &release.Quality, release.Title) ||
+			(release.LastResort && cfg.SeriesLastResortAllowed(series, &release.Quality, release.Title))
 	} else if movie != nil {
 		policyAllowed = cfg.MovieReleaseAllowedForTitle(movie, &release.Quality, release.Title)
 	}

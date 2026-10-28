@@ -169,6 +169,11 @@ func releaseLink(release *models.Release) string {
 // unless `other` is a better copy: then `other` takes its place and every
 // former copy becomes a mirror.
 func mergeInto(kept *models.Release, other models.Release) {
+	// The gap pass marks a copy as a last resort after finding nothing else
+	// for the episode; the same file met first in the title search must not
+	// lose the mark, or the filter refuses it for its resolution.
+	lastResort := kept.LastResort || other.LastResort
+	defer func() { kept.LastResort = lastResort }()
 	if preferredCopy(&other, kept) {
 		previous := *kept
 		mirrors := previous.Mirrors

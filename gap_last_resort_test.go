@@ -60,3 +60,20 @@ func TestEd2kRowsCarryTheLastResortBadge(t *testing.T) {
 		t.Fatalf("last resort flags = %v %v %v, want true false false", rows[0].LastResort, rows[1].LastResort, rows[2].LastResort)
 	}
 }
+
+func TestDuplicateCopiesKeepTheLastResortMark(t *testing.T) {
+	title := "FBI.International.3x01.June.ITA.DLMux.x264-UBi.mkv"
+	link := "ed2k://|file|FBI.International.3x01.June.ITA.DLMux.x264-UBi.mkv|462422016|0123456789ABCDEF0123456789ABCDEF|/"
+	fromTitleSearch := models.Release{Title: title, Kind: "series", Magnet: link, SizeBytes: 462422016, Source: "indexarr:DDUnlimited"}
+	fromGapPass := fromTitleSearch
+	fromGapPass.LastResort = true
+	for _, order := range [][]models.Release{{fromTitleSearch, fromGapPass}, {fromGapPass, fromTitleSearch}} {
+		merged := mergeDuplicateReleases(order)
+		if len(merged) != 1 {
+			t.Fatalf("merged = %d releases, want 1", len(merged))
+		}
+		if !merged[0].LastResort {
+			t.Fatalf("merged copy lost the last resort mark: %+v", merged[0])
+		}
+	}
+}
