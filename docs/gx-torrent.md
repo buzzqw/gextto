@@ -636,6 +636,11 @@ session 0, i.e. services and tasks without a logged-in user), `xdg-open` on Unix
 with `gio`/`sensible-browser` fallback (only with `DISPLAY`, `WAYLAND_DISPLAY` or
 `XDG_SESSION_TYPE`). In other cases the log still prints the URL to open.
 
+**In managed mode the qBittorrent-compatible API does not exist here**: Gextto
+answers its own subset of it on the address of its interface (`/api/v2`, see
+[`API.md`](API.md)), so a browser extension or a client pointed at Gextto sends
+torrents into its queue, and the daemon below stays driven by Gextto only.
+
 In standalone the daemon also exposes a **qBittorrent-compatible API**
 (`/api/v2`) for Sonarr, Radarr and mobile apps: `auth/login` and `auth/logout`
 (`SID` cookie, the same login password), `app/version`,
