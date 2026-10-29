@@ -267,6 +267,11 @@ type torrent struct {
 	// connectedPeerIPs prevents duplicate connections per IP.
 	connectedPeerIPs map[string]struct{}
 
+	// seedPeerIPs remembers the peers that answered "both seeds" while
+	// seeding: they have nothing to ask for, so a seeding torrent that dials
+	// candidates to find leechers must not knock on them twice.
+	seedPeerIPs map[string]struct{}
+
 	// bannedPeerIPs holds corrupt-data peers.
 	bannedPeerIPs map[string]struct{}
 
@@ -412,6 +417,7 @@ func newTorrent(
 		verifierProgressC:         make(chan verifier.Progress),
 		verifierResultC:           make(chan *verifier.Verifier),
 		connectedPeerIPs:          make(map[string]struct{}),
+		seedPeerIPs:               make(map[string]struct{}),
 		bannedPeerIPs:             make(map[string]struct{}),
 		holepunchAttempted:        make(map[string]struct{}),
 		announcersStoppedC:        make(chan struct{}, 1),

@@ -182,7 +182,9 @@ func (a *PeriodicalAnnouncer) Run() {
 				cancel()
 				ctx, cancel = context.WithCancel(context.Background())
 			}
-			a.doAnnounce(ctx, tracker.EventCompleted, 0)
+			// Ask for peers as well: the torrent starts seeding now, and a
+			// leecher behind a NAT can only be reached by knocking first.
+			a.doAnnounce(ctx, tracker.EventCompleted, a.numWant)
 			a.completedC = nil // a single completed event per run
 		case req := <-a.statsCommandC:
 			req.Response <- a.stats()

@@ -5443,3 +5443,5 @@ eng:
   "Ricerca non più disponibile: aprila di nuovo dalla puntata.": "Search no longer available: open it again from the episode."
   "Applica i limiti anche ai peer della rete locale": "Apply the limits to peers on the local network too"
   "Rallenta ai limiti di velocità anche i peer della tua rete di casa o d'ufficio. Spento (consigliato), i trasferimenti in rete locale vanno alla massima velocità: i limiti servono per la linea Internet.": "Also slows the peers of your home or office network down to the speed limits. Off (recommended), transfers on the local network run at full speed: the limits are meant for the Internet line."
+  "Sciame: seeder / leecher": "Swarm: seeders / leechers"
+  "Sciame secondo i tracker e il DHT: seeder / leecher, non necessariamente connessi. Con 0 leecher non c'è nessuno a cui caricare.": "Swarm seen by the trackers and the DHT: seeders / leechers, not necessarily connected. With 0 leechers there is nobody to upload to."

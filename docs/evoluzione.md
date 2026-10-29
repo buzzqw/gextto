@@ -805,12 +805,12 @@ asks.
 - **Choking on a real swarm.** The controlled evidence is healthy (§4.6 of
   [`measurements.md`](measurements.md)): a real
   libtorrent leecher is served at full speed on loopback and reciprocation works.
-  What is missing is a
-  swarm where peers download *from* us, which needs a host with a **reachable inbound
-  port** (this one is behind a NAT: the seeding harness finds no peers). Gate: a campaign
+  A completed torrent also dials a few peers (`seedDialBudget`), so a leecher
+  behind a NAT is reached as well: until that change a seed could only serve
+  peers that connected to it. Gate for touching `internal/unchoker`: a campaign
   against libtorrent/qBittorrent on the same public torrent with the same policy and
   metrics (upload efficiency while seeding, reciprocation, first-block time, stall
-  rate). Only a gap would justify touching `internal/unchoker`.
+  rate). Only a gap would justify a change there.
 - **uTP acknowledgements stay one per data packet.** A state packet goes out
   500 µs after a data packet (`pendingSendStateDelay`), so only bursts share one. On a
   saturated line each connection receives a packet every few milliseconds, and the ACK

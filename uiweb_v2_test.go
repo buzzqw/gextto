@@ -710,7 +710,7 @@ func firstEntryName(entries []v2DownloadEntry) string {
 }
 
 func TestV2DownloadsRenderEveryKindInTheChosenOrder(t *testing.T) {
-	torrents := []uiTorrentRow{{Hash: "t1", Name: "Bravo.Torrent"}}
+	torrents := []uiTorrentRow{{Hash: "t1", Name: "Bravo.Torrent", SwarmSeeds: 28, SwarmLeechers: 0}}
 	http := []ComicDownload{{ID: "h1", Title: "Alfa HTTP", Status: "downloading"}}
 	ed2k := []uiEd2kRow{{Hash: "e1", Name: "Charlie eD2k"}}
 	entries := v2DownloadEntries(torrents, http, ed2k)
@@ -735,6 +735,11 @@ func TestV2DownloadsRenderEveryKindInTheChosenOrder(t *testing.T) {
 	}
 	if !strings.Contains(body, "In scarico") {
 		t.Fatal("the HTTP row lost its state label")
+	}
+	// The swarm counts from the tracker are shown next to the connected peers:
+	// a seeder in a swarm with no leechers has nobody to upload to.
+	if !strings.Contains(body, "Sciame: seeder / leecher") || !strings.Contains(body, "> 28 / 0<") {
+		t.Fatal("the torrent row does not show the tracker swarm")
 	}
 }
 

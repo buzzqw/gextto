@@ -6099,3 +6099,5 @@ fra:
   "Ricerca non più disponibile: aprila di nuovo dalla puntata.": "Recherche plus disponible : rouvrez-la depuis l'épisode."
   "Applica i limiti anche ai peer della rete locale": "Appliquer les limites aussi aux pairs du réseau local"
   "Rallenta ai limiti di velocità anche i peer della tua rete di casa o d'ufficio. Spento (consigliato), i trasferimenti in rete locale vanno alla massima velocità: i limiti servono per la linea Internet.": "Ralentit aussi les pairs de votre réseau domestique ou de bureau aux limites de vitesse. Désactivé (recommandé), les transferts sur le réseau local vont à pleine vitesse : les limites sont faites pour la ligne Internet."
+  "Sciame: seeder / leecher": "Essaim : sources / pairs"
+  "Sciame secondo i tracker e il DHT: seeder / leecher, non necessariamente connessi. Con 0 leecher non c'è nessuno a cui caricare.": "Essaim vu par les trackers et le DHT : sources / pairs, pas forcément connectés. Avec 0 pair en téléchargement, il n'y a personne à qui envoyer."

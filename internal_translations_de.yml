@@ -6106,3 +6106,5 @@ deu:
   "Ricerca non più disponibile: aprila di nuovo dalla puntata.": "Suche nicht mehr verfügbar: erneut über die Folge öffnen."
   "Applica i limiti anche ai peer della rete locale": "Limits auch auf Peers im lokalen Netzwerk anwenden"
   "Rallenta ai limiti di velocità anche i peer della tua rete di casa o d'ufficio. Spento (consigliato), i trasferimenti in rete locale vanno alla massima velocità: i limiti servono per la linea Internet.": "Bremst auch die Peers deines Heim- oder Büronetzwerks auf die Geschwindigkeitslimits. Aus (empfohlen) laufen Übertragungen im lokalen Netzwerk mit voller Geschwindigkeit: Die Limits sind für die Internetleitung gedacht."
+  "Sciame: seeder / leecher": "Schwarm: Seeder / Leecher"
+  "Sciame secondo i tracker e il DHT: seeder / leecher, non necessariamente connessi. Con 0 leecher non c'è nessuno a cui caricare.": "Schwarm laut Trackern und DHT: Seeder / Leecher, nicht unbedingt verbunden. Bei 0 Leechern gibt es niemanden, an den hochgeladen werden kann."

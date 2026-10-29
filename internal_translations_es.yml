@@ -6053,3 +6053,5 @@ spa:
   "Ricerca non più disponibile: aprila di nuovo dalla puntata.": "Búsqueda ya no disponible: ábrela de nuevo desde el episodio."
   "Applica i limiti anche ai peer della rete locale": "Aplicar los límites también a los pares de la red local"
   "Rallenta ai limiti di velocità anche i peer della tua rete di casa o d'ufficio. Spento (consigliato), i trasferimenti in rete locale vanno alla massima velocità: i limiti servono per la linea Internet.": "Frena también a los pares de tu red de casa o de oficina a los límites de velocidad. Desactivado (recomendado), las transferencias en la red local van a toda velocidad: los límites son para la línea de Internet."
+  "Sciame: seeder / leecher": "Enjambre: semillas / pares"
+  "Sciame secondo i tracker e il DHT: seeder / leecher, non necessariamente connessi. Con 0 leecher non c'è nessuno a cui caricare.": "Enjambre según los trackers y el DHT: semillas / pares, no necesariamente conectados. Con 0 pares descargando no hay nadie a quien subir."

@@ -442,7 +442,10 @@ away, instead of leaving the episode to the next cycle.
 - **Table columns**: Name, Status, Progress, ↓, ↑, ETA, Peers, Ratio — sorted
   from **Sort by**. The order covers the whole list, torrents, HTTP downloads
   and eD2k files together: without choosing anything it is alphabetical by name,
-  not torrents first and the aMule files below in aMule's own order.
+  not torrents first and the aMule files below in aMule's own order. Every torrent
+  row also shows the **swarm** (🌐 seeders / leechers reported by the trackers and
+  the DHT, not necessarily connected): with **0 leechers** there is nobody to
+  upload to, even when the connected peers are zero.
 - **Row actions**: pause/resume, recheck, remove.
 - **Details**: open by clicking the **torrent name** (or anywhere on the row; on
   the keyboard the name is the button that opens them) as a frame **above the

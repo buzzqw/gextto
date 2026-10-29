@@ -60,19 +60,18 @@ func (t *torrent) resolveAndAddPeer(host string, port int) {
 }
 
 // handleNewPeers absorbs discovered addresses: eagerness off (we have
-// candidates again), unless stopped; unfinished torrents filter bans, queue
-// and dial.
+// candidates again), unless stopped. A seeding torrent dials too: it has
+// nothing to download, but a leecher behind a NAT cannot reach us, so the only
+// way to find someone to upload to is to knock.
 func (t *torrent) handleNewPeers(addrs []*net.TCPAddr, source peersource.Source) {
 	t.log.Debugf("received %d peers from %s", len(addrs), source)
 	t.setNeedMorePeers(false)
 	if status := t.status(); status == Stopped || status == Stopping {
 		return
 	}
-	if !t.completed {
-		addrs = t.filterBannedIPs(addrs)
-		t.addrList.Push(addrs, source)
-		t.dialAddresses()
-	}
+	addrs = t.filterBannedIPs(addrs)
+	t.addrList.Push(addrs, source)
+	t.dialAddresses()
 }
 
 // ipBanned checks the per-torrent ban plus the session-wide time-limited ban
@@ -95,32 +94,45 @@ func (t *torrent) filterBannedIPs(a []*net.TCPAddr) []*net.TCPAddr {
 	return b
 }
 
-// dialAddresses fills the outgoing dial budget from the candidate pool,
-// capped by the per-torrent limit when set. An emptied pool marks the swarm
-// hungry again; already-connected IPs are skipped without consuming budget.
-func (t *torrent) dialAddresses() {
-	if t.completed {
-		return
-	}
-	peersConnected := func() int {
-		return len(t.outgoingPeers) + len(t.outgoingHandshakers)
-	}
+// seedDialBudget is how many outgoing connections a seeding torrent keeps
+// open. A seed has nothing to download: the connections exist only to find
+// leechers to upload to, and each one that turns out to be a seed costs a slot
+// and a handshake, so the budget stays small.
+const seedDialBudget = 10
+
+// dialBudget is how many outgoing connections the torrent may open: the
+// session's MaxPeerDial while downloading, seedDialBudget while seeding.
+func (t *torrent) dialBudget() int {
 	maxDial := t.session.config.MaxPeerDial
+	if t.completed && maxDial > seedDialBudget {
+		maxDial = seedDialBudget
+	}
 	if t.maxConnections > 0 {
 		if allowed := t.maxConnections - len(t.peers) - len(t.incomingHandshakers); allowed < maxDial {
 			maxDial = allowed
 		}
 	}
+	return maxDial
+}
+
+// dialAddresses fills the outgoing dial budget from the candidate pool.
+// An emptied pool marks the swarm hungry again while downloading; a seed stays
+// quiet, because the next regular announce brings a fresh list and an eager one
+// would only repeat the seeds it already knows.
+func (t *torrent) dialAddresses() {
+	peersConnected := func() int {
+		return len(t.outgoingPeers) + len(t.outgoingHandshakers)
+	}
+	maxDial := t.dialBudget()
 	for peersConnected() < maxDial {
-		addr, src := t.addrList.Pop()
+		addr, src := t.nextDialAddress()
 		if addr == nil {
-			t.setNeedMorePeers(true)
+			if !t.completed {
+				t.setNeedMorePeers(true)
+			}
 			return
 		}
 		ip := addr.IP.String()
-		if _, ok := t.connectedPeerIPs[ip]; ok {
-			continue
-		}
 		h := outgoinghandshaker.New(addr, src)
 		t.outgoingHandshakers[h] = struct{}{}
 		t.connectedPeerIPs[ip] = struct{}{}
@@ -134,6 +146,26 @@ func (t *torrent) dialAddresses() {
 			t.session.config.DisableOutgoingEncryption,
 			t.session.config.ForceOutgoingEncryption,
 		)
+	}
+}
+
+// nextDialAddress pops the next candidate worth a dial: the ones we are
+// already connected to and the seeds that already answered "both seeds" are
+// skipped without consuming budget. nil when the pool has nothing left.
+func (t *torrent) nextDialAddress() (*net.TCPAddr, peersource.Source) {
+	for {
+		addr, src := t.addrList.Pop()
+		if addr == nil {
+			return nil, 0
+		}
+		ip := addr.IP.String()
+		if _, ok := t.connectedPeerIPs[ip]; ok {
+			continue
+		}
+		if _, ok := t.seedPeerIPs[ip]; ok {
+			continue
+		}
+		return addr, src
 	}
 }
 

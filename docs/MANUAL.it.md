@@ -448,7 +448,10 @@ invece di lasciare l'episodio al ciclo successivo.
 - **Colonne tabella**: Nome, Stato, Progresso, ↓, ↑, ETA, Peers, Ratio — si ordinano
   da **Ordina per**. L'ordine vale per tutta la lista, torrent, download HTTP e file
   eD2k insieme: senza scegliere niente è alfabetico per nome, non i torrent prima e
-  i file di aMule sotto, nell'ordine in cui li dà aMule.
+  i file di aMule sotto, nell'ordine in cui li dà aMule. Ogni riga di torrent mostra
+  anche lo **sciame** (🌐 seeder / leecher riportati dai tracker e dal DHT, non
+  necessariamente connessi): con **0 leecher** non c'è nessuno a cui caricare, anche
+  quando i peer connessi sono zero.
 - **Azioni riga**: pausa/riprendi, recheck, rimuovi.
 - **Dettagli**: si aprono cliccando il **nome del torrent** (o un punto qualsiasi
   della riga; da tastiera il nome è il pulsante che li apre) come riquadro

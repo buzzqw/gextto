@@ -2015,6 +2015,16 @@ seeding: the clock runs only in the seeding state and restarts with the daemon,
 a torrent set to seed forever is exempt, and the action is the same pause or
 removal as the other limits.
 
+While seeding the engine still opens a few outgoing connections. A leecher
+behind a NAT cannot reach a seed, so the only way to find someone to upload to is
+to knock: a completed torrent keeps the peers a tracker returns and dials up to
+`seedDialBudget` (10) of them, the completed announce asks for peers (`numwant`)
+instead of zero, and an emptied candidate pool does not switch the announce to
+its eager interval. A peer that answers with a full bitfield is closed at once
+(`closeIfBothSeeds`) and remembered in `seedPeerIPs`, so the same seed is not
+dialed twice; a peer that shows interest stays and is served. A downloading
+torrent keeps the session's `MaxPeerDial`.
+
 ## Super-seeding (BEP 16)
 
 On a **completed** torrent super-seeding can be activated: the engine does not

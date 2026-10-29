@@ -595,6 +595,7 @@
                     <span class="torrent-metric" title="↑ Upload"><span class="sr-only">↑ Upload</span><span aria-hidden="true">↑</span> {{rate .UploadRate}}</span>
                     <span class="torrent-metric" title="ETA"><span class="sr-only">ETA</span><span aria-hidden="true">⏱</span> {{.ETA}}</span>
                     <span class="torrent-metric" title="Peer / Seed"><span class="sr-only">Peer / Seed</span><span aria-hidden="true">👥</span> {{.NumPeers}} / {{.NumSeeds}}</span>
+                    <span class="torrent-metric" title="Sciame secondo i tracker e il DHT: seeder / leecher, non necessariamente connessi. Con 0 leecher non c'è nessuno a cui caricare."><span class="sr-only">Sciame: seeder / leecher</span><span aria-hidden="true">🌐</span> {{.SwarmSeeds}} / {{.SwarmLeechers}}</span>
                     <span class="torrent-metric" title="Ratio"><span class="sr-only">Ratio</span><span aria-hidden="true">⇅</span> {{printf "%.2f" .Ratio}}</span>
                   </div>
                 </div>

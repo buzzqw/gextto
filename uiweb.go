@@ -169,6 +169,11 @@ type uiTorrentRow struct {
 	ETASeconds    int64
 	NumPeers      int
 	NumSeeds      int
+	// SwarmSeeds/SwarmLeechers are the seed and leecher counts the trackers
+	// and the DHT report: not necessarily connected, and zero on a swarm
+	// nobody is downloading from.
+	SwarmSeeds    int
+	SwarmLeechers int
 	Ratio         float64
 	TotalSize     int64
 	TotalDone     int64
@@ -873,6 +878,8 @@ func uiTorrentRows(s *AppState) []uiTorrentRow {
 			UploadRate:    view.UploadRate,
 			NumPeers:      view.NumPeers,
 			NumSeeds:      view.NumSeeds,
+			SwarmSeeds:    view.NumComplete,
+			SwarmLeechers: view.NumIncomplete,
 			Ratio:         ratio,
 			TotalSize:     view.TotalSize,
 			TotalDone:     view.TotalDone,
