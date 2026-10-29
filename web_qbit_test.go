@@ -263,9 +263,10 @@ func TestQbitCompatAddRequiresTheSetup(t *testing.T) {
 func TestQbitCompatTorrentsInfoMapsTheStates(t *testing.T) {
 	state, engine := newQbitState(t)
 	engine.listed = []models.TorrentView{
-		{Hash: "AA", Name: "downloading", State: "downloading", Progress: 0.5, TotalSize: 100, TotalDone: 50, DownloadRate: 10, NumSeeds: 3, NumPeers: 4},
-		{Hash: "BB", Name: "seeding", State: "seeding", Progress: 1, IsSeeding: true, TotalSize: 100, TotalDone: 100, UploadRate: 5},
-		{Hash: "CC", Name: "stopped", State: "paused", Progress: 0.25},
+		// Gextto reports the completion in percent; qBittorrent wants 0..1.
+		{Hash: "AA", Name: "downloading", State: "downloading", Progress: 50, TotalSize: 100, TotalDone: 50, DownloadRate: 10, NumSeeds: 3, NumPeers: 4},
+		{Hash: "BB", Name: "seeding", State: "seeding", Progress: 100, IsSeeding: true, TotalSize: 100, TotalDone: 100, UploadRate: 5},
+		{Hash: "CC", Name: "stopped", State: "paused", Progress: 25},
 	}
 	handler := Router(state)
 

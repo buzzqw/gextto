@@ -493,9 +493,26 @@ func qbitFormBool(r *http.Request, key string) bool {
 	return false
 }
 
+// qbitProgress is the completion of a torrent in qBittorrent's 0..1 scale.
+// Gextto reports it in percent (0..100, as both engines do), so the value is
+// normalised here, once, for every answer of this API.
+func qbitProgress(torrent models.TorrentView) float64 {
+	progress := torrent.Progress
+	if progress > 1 {
+		progress /= 100
+	}
+	if progress < 0 {
+		return 0
+	}
+	if progress > 1 {
+		return 1
+	}
+	return progress
+}
+
 // qbitFilterMatches applies the `filter` values a client uses on the list.
 func qbitFilterMatches(filter string, torrent models.TorrentView) bool {
-	complete := torrent.Progress >= 1 || torrent.IsSeeding
+	complete := qbitProgress(torrent) >= 0.9999 || torrent.IsSeeding
 	switch filter {
 	case "", "all":
 		return true
@@ -541,12 +558,13 @@ func qbitTorrentPayload(torrent models.TorrentView) map[string]any {
 	if torrent.AllTimeDownload > 0 {
 		ratio = float64(torrent.AllTimeUpload) / float64(torrent.AllTimeDownload)
 	}
+	progress := qbitProgress(torrent)
 	return map[string]any{
 		"hash":           strings.ToLower(torrent.Hash),
 		"name":           torrent.Name,
 		"size":           torrent.TotalSize,
 		"total_size":     torrent.TotalSize,
-		"progress":       torrent.Progress,
+		"progress":       progress,
 		"dlspeed":        torrent.DownloadRate,
 		"upspeed":        torrent.UploadRate,
 		"state":          qbitState(torrent),
@@ -578,7 +596,7 @@ func qbitTorrentPayload(torrent models.TorrentView) map[string]any {
 
 // qbitState translates Gextto's state into the qBittorrent names clients know.
 func qbitState(torrent models.TorrentView) string {
-	complete := torrent.Progress >= 1 || torrent.IsSeeding
+	complete := qbitProgress(torrent) >= 0.9999 || torrent.IsSeeding
 	switch torrent.State {
 	case "seeding":
 		return "seeding"
