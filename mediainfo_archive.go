@@ -31,6 +31,10 @@ import (
 // cycle, which would wait on a slow archive mount for every candidate.
 const archivedProbeTimeout = 20 * time.Second
 
+// probeArchiveFile is ProbeResult behind a variable, so the test can answer
+// without ffprobe.
+var probeArchiveFile = probeFileWithin
+
 // archivedProbes remembers what one file answered, so a cycle that evaluates
 // many releases for the same episode asks ffprobe once. The key carries the
 // size and modification time: a replaced file is a different file.
@@ -52,11 +56,11 @@ type archivedProbeResult struct {
 // persist receives the probe result to store on the row it came from; it may be
 // nil (dry run, or a row that does not exist yet).
 func archivedQualityTruth(path, stored string, quality models.Quality, persist func(string) error) models.Quality {
-	media := archivedMediaInfo(path, stored)
+	media, probed := archivedMediaInfo(path, stored)
 	if media == "" {
 		return quality
 	}
-	if media != stored && persist != nil {
+	if probed && persist != nil {
 		if err := persist(media); err != nil {
 			logging.Debug("the real quality of the library file could not be recorded",
 				"path", path, "error", err)
@@ -74,15 +78,16 @@ func archivedQualityTruth(path, stored string, quality models.Quality, persist f
 }
 
 // archivedMediaInfo returns the stored MediaInfo or, when it is empty, the one
-// ffprobe reads from the file. Empty means "nothing to compare".
-func archivedMediaInfo(path, stored string) string {
+// ffprobe reads from the file. The second answer reports whether it came from
+// the probe, so the caller stores it once. Empty means "nothing to compare".
+func archivedMediaInfo(path, stored string) (string, bool) {
 	path = strings.TrimSpace(path)
 	if strings.TrimSpace(stored) != "" || path == "" || !probeAvailable() {
-		return stored
+		return stored, false
 	}
 	info, err := os.Stat(path)
 	if err != nil || !info.Mode().IsRegular() {
-		return ""
+		return "", false
 	}
 	key := path + "\x00" + strconv.FormatInt(info.Size(), 10) + "\x00" +
 		info.ModTime().UTC().Format(time.RFC3339Nano)
@@ -90,9 +95,10 @@ func archivedMediaInfo(path, stored string) string {
 	cached, seen := archivedProbes.entries[key]
 	archivedProbes.Unlock()
 	if seen {
-		return cached.media
+		// Already delivered once: the first caller stored it on its row.
+		return cached.media, false
 	}
-	probed, probeErr := probeFileWithin(path, archivedProbeTimeout)
+	probed, probeErr := probeArchiveFile(path, archivedProbeTimeout)
 	result := archivedProbeResult{}
 	if probeErr == nil {
 		if encoded, encodeErr := json.Marshal(probed); encodeErr == nil {
@@ -111,5 +117,5 @@ func archivedMediaInfo(path, stored string) string {
 		logging.Debug("the real quality of the library file could not be read; the decision keeps what the database knows",
 			"path", path)
 	}
-	return result.media
+	return result.media, result.media != ""
 }
