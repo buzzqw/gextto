@@ -207,7 +207,7 @@ func gh5_scanArchivePath(db *Database, series *SeriesConfig, path string, cfg *C
 		// Never register a broken file as the archived copy: a zero-filled or
 		// unrecognised video must not make the episode look present.
 		if invalidErr := validateCompletedFile(file); invalidErr != nil {
-			logging.Warn("archive scan skipped an invalid video file",
+			logging.Warn("⚠️ Archive scan skipped an invalid video file",
 				"path", file, "error", invalidErr.Error())
 			continue
 		}

@@ -305,7 +305,7 @@ func gh4_scanArchivePath(db *Database, series *SeriesConfig, path string, cfg *C
 		}
 		// Never register a broken file as the archived copy.
 		if invalidErr := validateCompletedFile(file); invalidErr != nil {
-			logging.Warn("archive scan skipped an invalid video file",
+			logging.Warn("⚠️ Archive scan skipped an invalid video file",
 				"path", file, "error", invalidErr.Error())
 			continue
 		}
@@ -1183,11 +1183,11 @@ func ScanAllArchives(w http.ResponseWriter, r *http.Request, s *AppState) {
 			updated += count
 		}
 		if len(errorsList) > 0 {
-			logging.Warn("archive scan finished with errors", "updated", updated, "errors", len(errorsList), "job_id", jobID)
+			logging.Warn("⚠️ Archive scan finished with errors", "updated", updated, "errors", len(errorsList), "job_id", jobID)
 			s.jobs.Fail(jobID, fmt.Errorf("archive scan finished with %d error(s); updated=%d", len(errorsList), updated))
 			return
 		}
-		logging.Info("archive scan completed", "updated", updated, "job_id", jobID)
+		logging.Info("🗂️ Archive scan completed", "updated", updated, "job_id", jobID)
 	}); err != nil {
 		jsonError(w, http.StatusInternalServerError, err.Error())
 		return
