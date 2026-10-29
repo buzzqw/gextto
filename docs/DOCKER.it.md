@@ -1,7 +1,7 @@
-# Docker: stack completo con Gextto, Jackett, Prowlarr, FlareSolverr e aMule
+# Docker: stack completo con Gextto, indexarr, Jackett, Prowlarr, FlareSolverr e aMule
 
 Questa guida avvia **tutto** in Docker: Gextto con il suo `gx-torrent` gestito,
-Jackett e Prowlarr per gli indexer Torznab, FlareSolverr per le pagine protette
+indexarr con le sue fonti native, Jackett e Prowlarr per gli indexer Torznab, FlareSolverr per le pagine protette
 da Cloudflare e `amuled` per eD2k/Kad. È pensata per un host Linux con Docker
 Engine e il plugin `docker compose`; non sostituisce l'installazione con
 `install.sh`, che resta quella consigliata su una macchina dedicata.
@@ -17,6 +17,7 @@ docker-full/docker-compose.yml
 - [Avvio rapido](#avvio-rapido)
 - [Cartelle e permessi](#cartelle-e-permessi)
 - [Prima configurazione di Gextto](#prima-configurazione-di-gextto)
+- [indexarr](#indexarr)
 - [Jackett, Prowlarr e FlareSolverr](#jackett-prowlarr-e-flaresolverr)
 - [aMule, eD2k e Kad](#amule-ed2k-e-kad)
 - [gx-torrent e identità del client](#gx-torrent-e-identità-del-client)
@@ -32,14 +33,16 @@ docker-full/docker-compose.yml
 | Servizio | Immagine | Porta | Ruolo |
 |---|---|---|---|
 | `gextto` | compilata da `docker-full/Dockerfile` | 5000 | UI/API, daemon, `gx-torrent` gestito |
+| `indexarr` | compilata dal checkout di indexarr (il suo `Dockerfile`) | 8788 | indexer Torznab/Newznab con fonti native, eD2k compreso |
 | `amuled` | `ngosang/amule` | 4712 EC, 4662 TCP, 4672 UDP | eD2k e Kad |
 | `jackett` | `lscr.io/linuxserver/jackett` | 9117 | indexer Torznab |
 | `prowlarr` | `lscr.io/linuxserver/prowlarr` | 9696 | indexer Torznab |
 | `flaresolverr` | `ghcr.io/flaresolverr/flaresolverr` | 8191 | superamento Cloudflare |
 
-Gextto e `amuled` usano **`network_mode: host`**: aMule ha bisogno della rete
-dell'host per l'UPnP e per le porte eD2k, e Gextto trova Jackett, Prowlarr,
-FlareSolverr e aMule su `127.0.0.1` come in un'installazione normale. Jackett,
+Gextto, indexarr e `amuled` usano **`network_mode: host`**: aMule ha bisogno
+della rete dell'host per l'UPnP e per le porte eD2k, Gextto trova indexarr,
+Jackett, Prowlarr, FlareSolverr e aMule su `127.0.0.1`, e indexarr vi trova
+FlareSolverr e la web API di aMule, come in un'installazione normale. Jackett,
 Prowlarr e FlareSolverr restano su rete bridge e pubblicano le porte solo su
 `127.0.0.1` (vedi [Sicurezza](#sicurezza)).
 
@@ -49,8 +52,13 @@ Prowlarr e FlareSolverr restano su rete bridge e pubblicano le porte solo su
 - Almeno 4 GB di RAM liberi e spazio per i download, la libreria e i database.
 - Le porte **5000** (UI), **6881 TCP/UDP** (gx-torrent), **4662 TCP** e
   **4672 UDP** (aMule), **4712** (EC di aMule) libere sull'host.
+- La porta **8788** (indexarr) libera, oppure un'altra scelta con
+  `INDEXARR_PORT`.
 - Le porte 9117, 9696 e 8191 libere se non usi altri container con gli stessi
   servizi.
+- Il sorgente di **indexarr** accanto a questo repository (l'immagine si compila
+  da lì): `git clone https://github.com/buzzqw/indexarr.git ../indexarr`. Una
+  posizione diversa va in `INDEXARR_SRC` in `docker-full/.env`.
 - Un utente con UID/GID che possiede le cartelle montate. Gli esempi usano
   `1000:1000`: cambia `PUID`/`PGID` in `docker-full/.env` se il tuo utente ha
   un altro ID (`id -u`, `id -g`).
@@ -73,14 +81,15 @@ Prepara le cartelle **prima** di avviare i container, così non vengono create
 come root:
 
 ```bash
-mkdir -p docker-full/data/{gextto,amule,jackett,prowlarr,flaresolverr} \
+mkdir -p docker-full/data/{gextto,indexarr,amule,jackett,prowlarr,flaresolverr} \
          docker-full/media/amule/{incoming,temp} \
          docker-full/library
 sudo chown -R "$(id -u):$(id -g)" docker-full/data docker-full/media docker-full/library
 ```
 
-Compila l'immagine con la versione di questo checkout (legge `build_number`,
-`version_series`, `gx-torrent.build_number` e `gx_torrent.version_series`):
+Compila le immagini con la versione dei checkout (per Gextto legge
+`build_number`, `version_series`, `gx-torrent.build_number` e
+`gx_torrent.version_series`; per indexarr il suo `git describe`):
 
 ```bash
 ./scripts/docker-full-build.sh
@@ -123,6 +132,7 @@ docker compose -f docker-full/docker-compose.yml down
 | `docker-full/media/amule/incoming` | `/amule/incoming` | file completati da aMule, da importare |
 | `docker-full/media/amule/temp` | non montato in Gextto | file temporanei di aMule |
 | `docker-full/data/amule` | non montato in Gextto | configurazione di aMule |
+| `docker-full/data/indexarr` | `/data` in indexarr | database, configurazione, log e chiave del vault di indexarr |
 
 Il percorso di aMule **deve essere lo stesso** dentro `amuled` e dentro Gextto:
 per questo `./media/amule/incoming` è montato come `/amule/incoming` in
@@ -149,6 +159,37 @@ Non impostare `gxtorrent_listen` su un indirizzo pubblico senza token: il
 default `127.0.0.1:8890` è quello giusto per questo stack. La pagina di
 gx-torrent è raggiungibile dall'interno del container; per esporla usa
 `gxtorrent_listen` e `gxtorrent_token` con cautela.
+
+## indexarr
+
+indexarr è un indexer Torznab/Newznab con fonti native proprie: sostituisce
+Jackett e Prowlarr per i siti che copre, e Gextto lo legge come qualsiasi altro
+indexer. Apri la sua UI su `http://IP-HOST:8788` (o sulla `INDEXARR_PORT` che
+hai scelto).
+
+1. **Impostazioni → Sicurezza**: imposta subito utente e password, perché la UI
+   ascolta su tutte le interfacce dell'host (rete host). La stessa pagina mostra
+   la **API key**.
+2. **Impostazioni → Rete**: indirizzo di FlareSolverr `http://127.0.0.1:8191`,
+   poi **Testa FlareSolverr**.
+3. **Indexer → Aggiungi indexer**: aggiungi dal catalogo le fonti che ti
+   servono.
+4. In Gextto: **Configurazione → Sorgenti → Aggiungi indexer**, gestore
+   **indexarr**, URL `http://127.0.0.1:8788`, la API key del punto 1. Salva e
+   verifica.
+
+Per le fonti eD2k indexarr può mandare i link allo stesso `amuled`: in **App →
+Client di download** aggiungi aMule con l'indirizzo della web API
+`http://127.0.0.1:4711` e la password `AMULE_WEBUI_PASSWORD`.
+
+Le guide di indexarr su fonti, impostazioni e API sono solo in inglese:
+[README](https://github.com/buzzqw/indexarr/blob/main/README.md) e
+[guida d'uso](https://github.com/buzzqw/indexarr/blob/main/docs/USAGE.md).
+La sua interfaccia invece è tradotta anche in italiano.
+
+La chiave del vault che cifra password e cookie di indexarr viene creata in
+`docker-full/data/indexarr/.config/indexarr/master.key`. Senza di essa i
+segreti salvati non si possono leggere: tienine una copia separata dai backup.
 
 ## Jackett, Prowlarr e FlareSolverr
 
@@ -290,14 +331,16 @@ qBittorrent, se un giorno lo usi al posto di gx-torrent.
 
 ```bash
 git pull
+git -C ../indexarr pull
 ./scripts/docker-full-build.sh
 docker compose -f docker-full/docker-compose.yml up -d
 ```
 
 `docker compose up -d` ricrea solo i container con un'immagine nuova; i volumi
 in `docker-full/data`, `docker-full/media` e `docker-full/library` restano.
-Non usare l'aggiornamento interno di Gextto (`gexttod --update`) in questo
-stack: l'installer e il servizio systemd non sono attivi nel container.
+Non usare l'aggiornamento interno di Gextto (`gexttod --update`) né
+`scripts/upgrade.sh` di indexarr in questo stack: installer e servizi systemd
+non sono attivi nei container.
 Aggiorna Jackett, Prowlarr, FlareSolverr e aMule con:
 
 ```bash
@@ -315,7 +358,16 @@ cp -a docker-full/data/gextto /percorso/di/backup/gextto-$(date +%F)
 docker compose -f docker-full/docker-compose.yml start gextto
 ```
 
-Per un backup completo copia anche `docker-full/data/amule`,
+Lo stesso per indexarr:
+
+```bash
+docker compose -f docker-full/docker-compose.yml stop indexarr
+cp -a docker-full/data/indexarr /percorso/di/backup/indexarr-$(date +%F)
+docker compose -f docker-full/docker-compose.yml start indexarr
+```
+
+La copia contiene anche la chiave del vault: conservala in un posto sicuro. Per
+un backup completo copia anche `docker-full/data/amule`,
 `docker-full/data/jackett`, `docker-full/data/prowlarr` e, se vuoi,
 `docker-full/library`. I download in `docker-full/media` sono spesso grandi:
 escludili o copiali con uno strumento incrementale.
@@ -325,6 +377,9 @@ escludili o copiali con uno strumento incrementale.
 | Sintomo | Cosa controllare |
 |---|---|
 | La porta 5000 è già in uso | Un'altra istanza di Gextto è attiva sull'host. Fermala (`systemctl --user stop gextto`) oppure cambia `GEXTTO_LISTEN` nel compose e la porta pubblicata. |
+| La porta 8788 è già in uso | indexarr è già installato sull'host. Fermalo (`systemctl --user stop indexarr`) oppure imposta un'altra `INDEXARR_PORT` in `.env` e usa quella porta nell'URL di indexarr in Gextto. |
+| `indexarr checkout not found` durante il build | Clona indexarr accanto a questo repository oppure imposta `INDEXARR_SRC` in `docker-full/.env` (relativo a `docker-full/` o assoluto). |
+| Gextto non vede indexarr | L'URL è `http://127.0.0.1:8788` (rete host), non `http://indexarr:8788`; controlla `docker compose ... logs indexarr`. |
 | `permission denied` su `/data` o `/media` | `PUID`/`PGID` in `.env` devono corrispondere al proprietario delle cartelle; esegui `chown -R` sulle cartelle host. |
 | Gextto non vede Jackett/Prowlarr | Gextto usa la rete host: l'URL è `http://127.0.0.1:9117` / `http://127.0.0.1:9696`, non `http://jackett`. Verifica che le porte siano pubblicate. |
 | FlareSolverr non risponde | Controlla `docker compose ... logs flaresolverr` e apri `http://127.0.0.1:8191` dall'host. |
@@ -340,6 +395,9 @@ escludili o copiali con uno strumento incrementale.
 - Gextto ascolta su `0.0.0.0:5000` (rete host): mettilo dietro un reverse proxy
   con HTTPS o limitane l'accesso con il firewall. Proteggi l'API con la sua
   API key.
+- indexarr ascolta su tutte le interfacce sulla porta 8788 (rete host) e non
+  chiede login finché non lo imposti in **Impostazioni → Sicurezza**: fallo al
+  primo avvio, oppure limita la porta con il firewall.
 - Jackett, Prowlarr e FlareSolverr sono pubblicati solo su `127.0.0.1` per
   default. FlareSolverr non ha autenticazione: non esporlo sulla LAN.
 - Non pubblicare la porta EC 4712 di aMule su Internet.
@@ -356,8 +414,9 @@ escludili o copiali con uno strumento incrementale.
   tuo intervento.
 - L'immagine include `ffprobe`, `ffmpeg` e `mkvmerge`: servono alla pulizia
   opzionale delle tracce audio e non vanno installati a mano.
-- L'immagine compila dal sorgente: il primo build richiede qualche minuto e
-  scarica l'immagine `golang:1.27` e Debian slim.
+- Le immagini compilano dal sorgente: il primo build richiede qualche minuto e
+  scarica `golang:1.27` e Debian slim per Gextto, `golang:1.26-alpine` e Alpine
+  per indexarr.
 
 Per l'integrazione aMule completa (protocollo EC, cartelle, diagnostica) vedi
 anche [eD2k e Kad con aMule](amule.it.md). Per il motore e le identità client

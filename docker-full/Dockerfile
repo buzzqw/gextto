@@ -1,5 +1,6 @@
 # Full Gextto container: gexttod and the managed gx-torrent daemon, for the
-# docker-full stack (Gextto + Jackett + Prowlarr + FlareSolverr + aMule).
+# docker-full stack (Gextto + indexarr + Jackett + Prowlarr + FlareSolverr +
+# aMule). indexarr is built from its own repository and Dockerfile.
 #
 # Build from the repository root; docker-full/docker-compose.yml does it for
 # you. The standalone gx-torrent-only image remains the root Dockerfile.

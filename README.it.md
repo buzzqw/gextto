@@ -103,7 +103,7 @@ Leap 15.6+/Tumbleweed, Arch. Da root:
 curl -fsSL https://raw.githubusercontent.com/buzzqw/gextto/main/install.sh | sudo bash
 ```
 
-Preferisci Docker? Lo [stack completo](docs/DOCKER.it.md) avvia insieme Gextto, `gx-torrent`, Jackett, Prowlarr, FlareSolverr e aMule con `docker compose`.
+Preferisci Docker? Lo [stack completo](docs/DOCKER.it.md) avvia insieme Gextto, `gx-torrent`, indexarr, Jackett, Prowlarr, FlareSolverr e aMule con `docker compose`.
 
 Installa in `/opt/gextto`, tiene i dati in `/var/lib/gextto` e serve la UI
 sulla porta 5000, con `gx-torrent` accanto a `gexttod` — Go puro, nient'altro da

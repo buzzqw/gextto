@@ -15,6 +15,8 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
 [issue su GitHub](https://github.com/buzzqw/gextto/issues).
 
 ## 29 ottobre 2026
+- **Lo stack Docker completo include indexarr.** `docker-full` avvia ora anche indexarr, l'indexer Torznab/Newznab con fonti native, accanto a Jackett, Prowlarr, FlareSolverr e aMule. L'immagine si compila dal sorgente di indexarr messo accanto a quello di Gextto (o dove indica `INDEXARR_SRC` in `docker-full/.env`) e `scripts/docker-full-build.sh` le dà la sua versione. indexarr usa la rete dell'host sulla porta 8788 (`INDEXARR_PORT` per cambiarla): in Gextto si aggiunge come indexer **indexarr** con URL `http://127.0.0.1:8788`. Prima di avviare crea anche `docker-full/data/indexarr` e imposta subito utente e password nella sua UI. La guida Docker spiega configurazione, aggiornamento e backup, compresa la chiave del vault da conservare a parte.
+
 - **I backup non salvano più i download in corso.** Uno ZIP di Gextto non contiene più `gx-ed2k/incoming` (i file eD2k ancora in arrivo) né `gx-torrent/parts` (i pezzi temporanei del motore torrent): sono dati parziali che si riscaricano, e su un download grande potevano pesare quanto il file intero. La configurazione e le cartelle vicine restano nel backup. Vale per i backup automatici, manuali e da riga di comando; i backup già creati non vengono toccati.
 
 - **Un torrent in blocklist non riempie più il log.** Quando Gextto scarta una release perché è in blocklist, la riga «Skipped … it is on the blocklist» passa da INFO a DEBUG: resta visibile alzando la verbosità, ma non compare più a ogni ciclo. Gli altri motivi di scarto restano a INFO.

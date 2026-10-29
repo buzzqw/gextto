@@ -1,14 +1,16 @@
-# Gextto full stack: Gextto (with the managed gx-torrent), Jackett, Prowlarr,
-# FlareSolverr and aMule. Use it on a Linux Docker host.
+# Gextto full stack: Gextto (with the managed gx-torrent), indexarr, Jackett,
+# Prowlarr, FlareSolverr and aMule. Use it on a Linux Docker host.
 #
 #   cp docker-full/env.example docker-full/.env
-#   # edit .env (passwords, PUID/PGID)
+#   # edit .env (passwords, PUID/PGID, INDEXARR_SRC)
 #   scripts/docker-full-build.sh
 #   docker compose -f docker-full/docker-compose.yml up -d
 #
-# Gextto and aMule use host networking: aMule's UPnP needs the host network,
-# and Gextto reaches the published services on 127.0.0.1 exactly as it does in
-# a normal install. Read docs/DOCKER.it.md or docs/DOCKER.en.md before starting.
+# Gextto, indexarr and aMule use host networking: aMule's UPnP needs the host
+# network, and Gextto and indexarr reach the published services on 127.0.0.1
+# exactly as they do in a normal install. indexarr is built from its own
+# checkout, by default next to this repository (../indexarr). Read
+# docs/DOCKER.it.md or docs/DOCKER.en.md before starting.
 name: gextto-full
 
 services:
@@ -38,8 +40,39 @@ services:
       - ./media/amule/incoming:/amule/incoming
     depends_on:
       - amuled
+      - indexarr
       - jackett
       - prowlarr
+      - flaresolverr
+    restart: unless-stopped
+
+  indexarr:
+    # Torznab/Newznab indexer with native sources, built from the indexarr
+    # checkout with its own Dockerfile.
+    build:
+      context: ${INDEXARR_SRC:-../../indexarr}
+      args:
+        VERSION: ${INDEXARR_VERSION:-dev}
+    image: indexarr-full:local
+    container_name: gextto-indexarr
+    # Host network: Gextto reads it on 127.0.0.1, and indexarr reaches
+    # FlareSolverr and aMule's web API on 127.0.0.1 as in a normal install.
+    network_mode: host
+    user: "${PUID:-1000}:${PGID:-1000}"
+    environment:
+      TZ: ${TZ:-Europe/Rome}
+    # The image listens on :8788; INDEXARR_PORT moves it when 8788 is taken.
+    entrypoint: ["indexarr", "-config", "/data/indexarr.json", "-listen", ":${INDEXARR_PORT:-8788}"]
+    volumes:
+      # Database, configuration, logs and the vault key (.config/indexarr).
+      - ./data/indexarr:/data
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:${INDEXARR_PORT:-8788}/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    depends_on:
       - flaresolverr
     restart: unless-stopped
 
