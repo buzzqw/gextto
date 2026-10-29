@@ -578,7 +578,7 @@ func ArchiveAndRemoveTorrent(s *AppState, cfg *Config, hash string) (bool, error
 			Name:     filepath.Base(target),
 			SavePath: destination,
 		}
-		processed, procErr := tev_completeTorrentOptions(cfg, s.db, s.activeEngine(), &processedEvent, release, s.tmdb, false)
+		processed, procErr := tev_completeTorrentOptions(cfg, s.db, s.activeEngine(), &processedEvent, release, s.tmdb, tev_importSource{})
 		if procErr != nil {
 			return false, fmt.Errorf("post-processing failed: %w", procErr)
 		}

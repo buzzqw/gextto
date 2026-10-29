@@ -678,9 +678,10 @@ func mediaInfoMismatchText(name string, recorded, onDisk models.Quality) string 
 }
 
 // mediaInfoBackfillText summarises a MediaInfo backfill run: which library
-// files had their real quality read, and why that matters. Empty when there
-// is nothing worth telling.
-func mediaInfoBackfillText(names []string, failed, missing int) string {
+// files had their real quality read, how many of them told Gextto something the
+// release name did not say (the reading changes those upgrade decisions) and why
+// that matters. Empty when there is nothing worth telling.
+func mediaInfoBackfillText(names []string, failed, missing, newDetails int) string {
 	if len(names) == 0 && failed == 0 && missing == 0 {
 		return ""
 	}
@@ -693,8 +694,14 @@ func mediaInfoBackfillText(names []string, failed, missing int) string {
 			more = fmt.Sprintf(" and %d more", len(listed)-shown)
 			listed = listed[:shown]
 		}
-		text = fmt.Sprintf("🔬 Read the real quality of %s (%s%s): future upgrades will compare with what is actually on disk",
+		text = fmt.Sprintf("🔬 Read the real quality of %s (%s%s)",
 			countLabel(len(names), "library file", "library files"), strings.Join(listed, ", "), more)
+		if newDetails > 0 {
+			text += fmt.Sprintf(": %s carried details the release name did not, so the next upgrades will be decided on the file itself",
+				countLabel(newDetails, "file", "files"))
+		} else {
+			text += ": the release name already said everything, so the next upgrades will be decided on the file itself"
+		}
 	} else {
 		text = "🔬 Library quality check"
 	}

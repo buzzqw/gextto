@@ -2426,7 +2426,6 @@ func tev_completeEpisodeFolderWithArchive(cfg *Config, db *Database, torrents To
 		return false, err
 	}
 	target := filepath.Join(destination, filepath.Base(video))
-	sourceHandled := false
 	sourcePreserved := false
 	linked := false
 	seriesName := ""
@@ -2443,7 +2442,6 @@ func tev_completeEpisodeFolderWithArchive(cfg *Config, db *Database, torrents To
 	resuming := interruptedImportCopy(video, target)
 	if resuming {
 		video = target
-		sourceHandled = true
 		sourcePreserved = true
 	}
 	resolved := false
@@ -2476,41 +2474,42 @@ func tev_completeEpisodeFolderWithArchive(cfg *Config, db *Database, torrents To
 			if err := moveIntoLibrary(video, target); err != nil {
 				return false, err
 			}
-			sourceHandled = true
 		} else {
 			value, err := linkOrCopyFile(cfg, video, target)
 			if err != nil {
 				return false, err
 			}
 			linked = value
-			sourceHandled = true
 			sourcePreserved = true
 		}
 	}
 	processedEvent := *event
 	processedEvent.SavePath = destination
 	processedEvent.Name = filepath.Base(target)
-	processed, err := tev_completeTorrentOptions(cfg, db, torrents, &processedEvent, release, tmdb, sourcePreserved)
+	processed, err := tev_completeTorrentOptions(cfg, db, torrents, &processedEvent, release, tmdb, tev_importSource{
+		preserveSource: sourcePreserved,
+		note:           tev_sourceNote(resuming, moveSource, linked),
+	})
 	if err != nil {
 		return false, err
 	}
-	if processed && sourceHandled {
-		switch {
-		case resuming:
-			logging.Info(fmt.Sprintf("📁 «%s» was already in the library from an interrupted import: finished importing it", event.Name),
-				"library_file", target, "hash", event.Hash)
-		case moveSource:
-			logging.Info(fmt.Sprintf("📁 «%s» moved into the library; the source leaves aMule's incoming folder", event.Name),
-				"library_file", target, "hash", event.Hash)
-		case linked:
-			logging.Info(fmt.Sprintf("📁 «%s» linked into the library (hardlink, no extra space); the download stays to keep sharing it", event.Name),
-				"library_file", target, "hash", event.Hash)
-		default:
-			logging.Info(fmt.Sprintf("📁 «%s» copied to the library; the download stays to keep sharing it", event.Name),
-				"library_file", target, "hash", event.Hash)
-		}
-	}
 	return processed, nil
+}
+
+// tev_sourceNote closes the import line with what happened to the downloaded
+// source. The import itself is already reported by logLibraryImport: saying it
+// again in a second line made one eD2k import look like two events.
+func tev_sourceNote(resuming, moveSource, linked bool) string {
+	switch {
+	case resuming:
+		return "resumed an import that had been interrupted"
+	case moveSource:
+		return "the source leaves aMule's incoming folder"
+	case linked:
+		return "hardlink, no extra space; the download stays to keep sharing it"
+	default:
+		return "the download stays to keep sharing it"
+	}
 }
 
 // tev_rejectUnconfirmedUpgrade discards a completed upgrade that MediaInfo
@@ -2646,31 +2645,18 @@ func tev_completeMovieWithArchive(cfg *Config, db *Database, torrents TorrentSes
 	processedEvent := *event
 	processedEvent.SavePath = destination
 	processedEvent.Name = filepath.Base(target)
-	processed, err := tev_completeTorrentOptions(cfg, db, torrents, &processedEvent, release, tmdb, !moveSource)
+	processed, err := tev_completeTorrentOptions(cfg, db, torrents, &processedEvent, release, tmdb, tev_importSource{
+		preserveSource: !moveSource,
+		note:           tev_sourceNote(resuming, moveSource, linked),
+	})
 	if err != nil {
 		return false, err
-	}
-	if processed {
-		switch {
-		case resuming:
-			logging.Info(fmt.Sprintf("📁 «%s» was already in the library from an interrupted import: finished importing it", event.Name),
-				"library_file", target, "hash", event.Hash)
-		case moveSource:
-			logging.Info(fmt.Sprintf("📁 «%s» moved into the library; the source leaves aMule's incoming folder", event.Name),
-				"library_file", target, "hash", event.Hash)
-		case linked:
-			logging.Info(fmt.Sprintf("📁 «%s» linked into the library (hardlink, no extra space); the download stays to keep sharing it", event.Name),
-				"library_file", target, "hash", event.Hash)
-		default:
-			logging.Info(fmt.Sprintf("📁 «%s» copied to the library; the download stays to keep sharing it", event.Name),
-				"library_file", target, "hash", event.Hash)
-		}
 	}
 	return processed, nil
 }
 
 func tev_completeTorrent(cfg *Config, db *Database, torrents TorrentSession, event *models.TorrentEvent, release *models.Release, tmdb *TmdbClient) (bool, error) {
-	return tev_completeTorrentOptions(cfg, db, torrents, event, release, tmdb, false)
+	return tev_completeTorrentOptions(cfg, db, torrents, event, release, tmdb, tev_importSource{})
 }
 
 // tevSeedingCompletionAlreadyRecorded suppresses duplicate finished alerts for
@@ -2775,17 +2761,31 @@ func tev_markReleaseCompleted(cfg *Config, db *Database, release *models.Release
 	return db.MarkPackCompleted(release, entries, path, size)
 }
 
-// tev_completeTorrentOptions controls whether the original torrent source must
-// remain available for seeding. Single episodes are imported by copying their
-// video to the library, so they use preserveSource=true.
+// tev_importSource says how the completed source is being handled, so the single
+// import line can state it. Without it the caller has to log a second line about
+// the same file, which reads like a duplicate of the import itself.
+type tev_importSource struct {
+	// preserveSource keeps the download in place (copy or hardlink) while it
+	// seeds; false means it was moved into the library.
+	preserveSource bool
+	// note closes the import line with the fate of the source, in the user's
+	// words; empty leaves the line as it is.
+	note string
+}
+
 // logLibraryImport records the archive/import phase of a completed release. When
 // the release superseded existing files it emits a single "updated" line that
 // also names the replaced file(s), instead of the import line plus one
-// "replaced" line per removed file.
-func logLibraryImport(cfg *Config, hash, target string, size int64, path, suffix string, replaced []string) {
+// "replaced" line per removed file. note is appended when the caller has
+// something to add about the source (hardlink, eD2k incoming folder, resume).
+func logLibraryImport(cfg *Config, hash, target string, size int64, path, suffix, note string, replaced []string) {
+	extra := ""
+	if note != "" {
+		extra = " · " + note
+	}
 	if len(replaced) == 0 {
-		logging.Info(fmt.Sprintf("📁 %s added to the library (%s): %s%s",
-			target, logging.HumanBytesI64(size), path, suffix), "hash", hash)
+		logging.Info(fmt.Sprintf("📁 %s added to the library (%s): %s%s%s",
+			target, logging.HumanBytesI64(size), path, suffix, extra), "hash", hash)
 		return
 	}
 	action := "moved to the trash"
@@ -2796,10 +2796,10 @@ func logLibraryImport(cfg *Config, hash, target string, size int64, path, suffix
 	for i, file := range replaced {
 		names[i] = "«" + filepath.Base(file) + "»"
 	}
-	logging.Info(fmt.Sprintf("♻️ %s updated (%s): %s · %s %s %s",
+	logging.Info(fmt.Sprintf("♻️ %s updated (%s): %s · %s %s %s%s",
 		target, logging.HumanBytesI64(size), path,
 		plural(len(replaced), "previous version", "previous versions"),
-		strings.Join(names, ", "), action), "hash", hash)
+		strings.Join(names, ", "), action, extra), "hash", hash)
 }
 
 // tev_skippedVideoError explains a completion whose payload has no importable
@@ -2830,7 +2830,7 @@ func tev_skippedVideoError(torrents TorrentSession, hash string) error {
 	return fmt.Errorf("no video file was downloaded; qBittorrent skipped: %s", message)
 }
 
-func tev_completeTorrentOptions(cfg *Config, db *Database, torrents TorrentSession, event *models.TorrentEvent, release *models.Release, tmdb *TmdbClient, preserveSource bool) (bool, error) {
+func tev_completeTorrentOptions(cfg *Config, db *Database, torrents TorrentSession, event *models.TorrentEvent, release *models.Release, tmdb *TmdbClient, source tev_importSource) (bool, error) {
 	// Record the episode under the configured series, not the raw parsed name.
 	normalizeReleaseSeries(cfg, release)
 	guard := AcquireArchiveImport(release.Series)
@@ -3050,11 +3050,11 @@ func tev_completeTorrentOptions(cfg *Config, db *Database, torrents TorrentSessi
 	// seed period), so the two lifecycle messages retain their real order. When
 	// the release replaced existing files, one combined "updated" line is
 	// emitted instead of the import line plus one line per removed file.
-	logLibraryImport(cfg, event.Hash, logTarget(release), size, processedPath, suffix, replaced)
+	logLibraryImport(cfg, event.Hash, logTarget(release), size, processedPath, suffix, source.note, replaced)
 	// The file is in its final place: queue the optional audio cleanup. It runs
 	// in its own worker and never blocks the torrent event loop.
 	scheduleAudioCleanup(cfg, db, processedPath, event.Hash, release.Series)
-	if !preserveSource && cfg.Transfer.AutoRemoveCompleted && (recoveredExisting || (renamedSet && !SamePath(processedPath, path))) {
+	if !source.preserveSource && cfg.Transfer.AutoRemoveCompleted && (recoveredExisting || (renamedSet && !SamePath(processedPath, path))) {
 		removed, err := torrents.Remove(event.Hash, false)
 		if err != nil {
 			logging.Warn("renamed torrent removal failed",

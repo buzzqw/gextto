@@ -332,6 +332,23 @@ func TestMediaInfoApplyToQualityIsAdditiveOnly(t *testing.T) {
 	}
 }
 
+// TestMediaInfoAddsToQuality says whether the reading told Gextto something the
+// release name did not: that is what the backfill line counts.
+func TestMediaInfoAddsToQuality(t *testing.T) {
+	info := MediaInfo{HDR: "HDR10", VideoCodec: "hevc", AudioCodec: "eac3", AudioChannels: 6, Width: 3840, Height: 2160}
+	named := models.Quality{Resolution: "2160p", Codec: "h265", Audio: "ddp", AudioChannels: "5.1", HDR: "HDR10"}
+	if info.AddsToQuality(named) {
+		t.Fatalf("a complete release name must not be reported as enlarged: %#v", named)
+	}
+	plain := models.Quality{Resolution: "1080p", Codec: "h265", Audio: "aac"}
+	if !info.AddsToQuality(plain) {
+		t.Fatal("HDR, audio channels and the real resolution were added but not reported")
+	}
+	if (MediaInfo{}).AddsToQuality(plain) {
+		t.Fatal("an empty probe adds nothing and must not be reported")
+	}
+}
+
 // TestMediaInfoResolutionBuckets covers the frame-size buckets.
 func TestMediaInfoResolutionBuckets(t *testing.T) {
 	cases := []struct {

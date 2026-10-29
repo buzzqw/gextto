@@ -1,12 +1,14 @@
 package gextto
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/buzzqw/gextto/internal/logging"
 	"github.com/buzzqw/gextto/internal/models"
 )
 
@@ -367,6 +369,32 @@ func TestEd2kMovieCopyModeKeepsIncoming(t *testing.T) {
 	}
 }
 
+// An eD2k import is one log line. It used to be the library line plus a second
+// "moved into the library" line about the same file, which read like two
+// events; the fate of the source now closes the single line.
+func TestEd2kImportIsLoggedOnce(t *testing.T) {
+	var captured bytes.Buffer
+	logging.SetOutput(&captured)
+	defer logging.SetOutput(os.Stdout)
+
+	cfg, db, _, _, event := newEpisodeImportFixture(t, true)
+	session := listedEd2kSession{ed2kSession: ed2kSession{cfg: &cfg}, hash: event.Hash}
+	if _, err := HandleTorrentEvent(&cfg, session, db, map[string]struct{}{}, map[string]struct{}{},
+		map[string]StorageMoveRetry{}, event, NewTmdbClient(nil), NewNotifier()); err != nil {
+		t.Fatalf("HandleTorrentEvent: %v", err)
+	}
+	out := captured.String()
+	if count := strings.Count(out, "added to the library"); count != 1 {
+		t.Fatalf("want one import line, got %d:\n%s", count, out)
+	}
+	if strings.Contains(out, "moved into the library") {
+		t.Fatalf("the same import is still logged twice:\n%s", out)
+	}
+	if !strings.Contains(out, "the source leaves aMule's incoming folder") {
+		t.Fatalf("the import line does not say where the source went:\n%s", out)
+	}
+}
+
 func TestCompletedEd2kDownloadReachesTheHistory(t *testing.T) {
 	f := newMovieImportFixture(t)
 	if _, err := tev_completeMovieWithArchive(&f.cfg, f.db, &movieCopySession{}, &f.event, f.release, f.archive, NewTmdbClient(nil), false); err != nil {
@@ -525,7 +553,7 @@ func TestCompletedTorrentReportsSkippedVideoFiles(t *testing.T) {
 	}
 	session := &skippedMovieSession{names: []string{"Example.Movie.2024.1080p.WEB-DL.mkv"}}
 	processed, err := tev_completeTorrentOptions(
-		&f.cfg, f.db, session, &f.event, f.release, NewTmdbClient(nil), true,
+		&f.cfg, f.db, session, &f.event, f.release, NewTmdbClient(nil), tev_importSource{preserveSource: true},
 	)
 	if processed {
 		t.Fatal("a completion with only skipped files must not be imported")

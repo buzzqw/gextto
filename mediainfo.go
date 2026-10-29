@@ -143,6 +143,22 @@ func (m MediaInfo) ApplyToQuality(quality *models.Quality) {
 	}
 }
 
+// AddsToQuality reports whether the probe found something the given quality does
+// not carry: the fields a later upgrade decision takes from the file instead of
+// the release name. It is the effect ApplyToQuality would have, without changing
+// the caller's value.
+func (m MediaInfo) AddsToQuality(quality models.Quality) bool {
+	enriched := quality
+	m.ApplyToQuality(&enriched)
+	return enriched.HDR != quality.HDR ||
+		enriched.IsDV != quality.IsDV ||
+		enriched.Codec != quality.Codec ||
+		enriched.Audio != quality.Audio ||
+		enriched.Resolution != quality.Resolution ||
+		enriched.AudioChannels != quality.AudioChannels ||
+		len(enriched.Languages) != len(quality.Languages)
+}
+
 // CodecLabel maps an ffprobe codec name to a Gextto quality codec label.
 func CodecLabel(codec string) (string, bool) {
 	switch strings.ToLower(strings.TrimSpace(codec)) {

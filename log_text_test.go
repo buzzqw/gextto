@@ -193,16 +193,22 @@ func TestComicPendingNoticeOncePerPost(t *testing.T) {
 }
 
 func TestMediaInfoBackfillTextNamesTheFiles(t *testing.T) {
-	got := mediaInfoBackfillText([]string{"Wolf Like Me S01E01", "Wolf Like Me S01E02", "Silo S03E04"}, 0, 0)
-	want := "🔬 Read the real quality of 3 library files (Wolf Like Me S01E01, Wolf Like Me S01E02, Silo S03E04): future upgrades will compare with what is actually on disk"
+	got := mediaInfoBackfillText([]string{"Wolf Like Me S01E01", "Wolf Like Me S01E02", "Silo S03E04"}, 0, 0, 2)
+	want := "🔬 Read the real quality of 3 library files (Wolf Like Me S01E01, Wolf Like Me S01E02, Silo S03E04): 2 files carried details the release name did not, so the next upgrades will be decided on the file itself"
 	if got != want {
 		t.Fatalf("got %q", got)
 	}
-	got = mediaInfoBackfillText([]string{"A", "B", "C", "D", "E", "F"}, 1, 2)
-	if !strings.Contains(got, "A, B, C, D and 2 more") || !strings.Contains(got, "1 file could not be read, 2 files are no longer on disk") {
+	// Nothing new read: the line says so instead of repeating the purpose only.
+	got = mediaInfoBackfillText([]string{"Silo S03E04"}, 0, 0, 0)
+	if !strings.Contains(got, "the release name already said everything") {
 		t.Fatalf("got %q", got)
 	}
-	if mediaInfoBackfillText(nil, 0, 0) != "" {
+	got = mediaInfoBackfillText([]string{"A", "B", "C", "D", "E", "F"}, 1, 2, 3)
+	if !strings.Contains(got, "A, B, C, D and 2 more") || !strings.Contains(got, "1 file could not be read, 2 files are no longer on disk") ||
+		!strings.Contains(got, "3 files carried details the release name did not") {
+		t.Fatalf("got %q", got)
+	}
+	if mediaInfoBackfillText(nil, 0, 0, 0) != "" {
 		t.Fatal("an empty run must not log")
 	}
 }

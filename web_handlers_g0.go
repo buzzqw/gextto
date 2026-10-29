@@ -1493,6 +1493,7 @@ func gh0_runMediaInfoBackfill(ctx context.Context, s *AppState, limit int, onPro
 	probed := 0
 	failed := 0
 	skipped := 0
+	newDetails := 0
 	failedItems := []any{}
 	missingItems := []any{}
 	missingFiles := []string{}
@@ -1548,6 +1549,9 @@ func gh0_runMediaInfoBackfill(ctx context.Context, s *AppState, limit int, onPro
 		if updated > 0 {
 			probed++
 			probedNames = append(probedNames, target.displayName())
+			if info.AddsToQuality(ParseQuality(target.Title)) {
+				newDetails++
+			}
 			logging.Debug("MediaInfo analyzed for archived file",
 				"kind", target.Kind, "series", target.Series, "season", target.Season,
 				"episode", target.Episode, "name", target.Name, "resolution", info.Resolution(),
@@ -1567,6 +1571,7 @@ func gh0_runMediaInfoBackfill(ctx context.Context, s *AppState, limit int, onPro
 		"canceled":      ctx != nil && ctx.Err() != nil,
 		"probed":        probed,
 		"analyzed":      probed,
+		"new_details":   newDetails,
 		"failed":        failed,
 		"skipped":       skipped,
 		"failed_items":  failedItems,
