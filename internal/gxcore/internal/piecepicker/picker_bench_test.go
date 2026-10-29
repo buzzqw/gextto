@@ -14,8 +14,8 @@ import (
 //	go test -run '^$' -bench 'BenchmarkPicker' -benchmem \
 //	    github.com/buzzqw/gextto/internal/gxcore/internal/piecepicker
 //
-// The point is to compare a realistic steady state (availability changes
-// slowly, so the availability order is nearly sorted) with a worst case.
+// The scans walk the piece table in index order; the benchmarks size it like a
+// large torrent (27250 pieces) or a busy swarm (150 peers).
 
 func benchPieces(n int) []piece.Piece {
 	pieces := make([]piece.Piece, n)
@@ -55,24 +55,9 @@ func BenchmarkPickerRarestSteady(b *testing.B) {
 	}
 }
 
-// BenchmarkPickerRarestShuffled is the worst case: the availability order is
-// fully scrambled before every pick, so the sort cannot exploit adaptivity.
-func BenchmarkPickerRarestShuffled(b *testing.B) {
-	pp, pe := benchRarest(27250)
-	b.ReportAllocs()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		rand.Shuffle(len(pp.piecesByAvailability), func(x, y int) {
-			pp.piecesByAvailability[x], pp.piecesByAvailability[y] = pp.piecesByAvailability[y], pp.piecesByAvailability[x]
-		})
-		if pp.pickRarest(pe) == nil {
-			b.Fatal("no piece picked")
-		}
-	}
-}
-
 // BenchmarkPickerSequentialNearlyDone marks every piece but the last as done:
-// the sequential scan walks the whole table before finding the frontier.
+// the frontier cursor skips the finished prefix instead of walking it on every
+// pick.
 func BenchmarkPickerSequentialNearlyDone(b *testing.B) {
 	const n = 27250
 	pieces := benchPieces(n)
@@ -161,6 +146,26 @@ func BenchmarkPickerBitfieldManyPeers(b *testing.B) {
 				pp.HandleHave(pe, uint32(j))
 			}
 		}
+		pp.HandleDisconnect(pe)
+	}
+}
+
+// BenchmarkPickerDisconnect is one peer leaving a large torrent (27250 pieces)
+// it half holds, in a swarm of 50: the cost every peer departure pays on the
+// torrent loop. The peer's downloads are already closed, as closePeer does.
+func BenchmarkPickerDisconnect(b *testing.B) {
+	const n = 27250
+	pp, _ := benchSwarm(n, 50)
+	pe := testPeer(n)
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		b.StopTimer()
+		pe = testPeer(n)
+		for j := 0; j < n; j += 2 {
+			pp.HandleHave(pe, uint32(j))
+		}
+		b.StartTimer()
 		pp.HandleDisconnect(pe)
 	}
 }

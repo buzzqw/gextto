@@ -25,11 +25,14 @@ findPiece belongs here.
 type PiecePicker struct {
 	webseedSources       []*webseedsource.WebseedSource
 	pieces               []myPiece
-	piecesByAvailability []*myPiece
-	piecesByStalled      []*myPiece
 	maxDuplicateDownload int
 	maxWebseedPieces     int
 	available            uint32
+
+	// seqFrom is where pickSequential starts: every piece below it is Done.
+	// Done only goes from false to true while a picker lives (stop and a new
+	// allocation build a new picker), so the cursor never has to move back.
+	seqFrom int
 
 	// gapScratch, gapOrder and gapCounts are reused by every peer pick while
 	// a webseed downloads (pickLastPieceOfSmallestGap), which used to allocate
@@ -130,12 +133,6 @@ func New(pieces []piece.Piece, maxDuplicateDownload int, webseedSources []*webse
 	for i := range pieces {
 		ps[i] = myPiece{Piece: &pieces[i]}
 	}
-	byAvailability := make([]*myPiece, len(ps))
-	byStalled := make([]*myPiece, len(ps))
-	for i := range byAvailability {
-		byAvailability[i] = &ps[i]
-		byStalled[i] = &ps[i]
-	}
 	// One HTTP range covers ~5% of the pieces (BEP 19 sizing).
 	maxWebseedPieces := len(pieces) / 20
 	if maxWebseedPieces == 0 {
@@ -146,8 +143,6 @@ func New(pieces []piece.Piece, maxDuplicateDownload int, webseedSources []*webse
 	}
 	picker := &PiecePicker{
 		pieces:               ps,
-		piecesByAvailability: byAvailability,
-		piecesByStalled:      byStalled,
 		maxDuplicateDownload: maxDuplicateDownload,
 		maxWebseedPieces:     maxWebseedPieces,
 		webseedSources:       webseedSources,
@@ -411,17 +406,28 @@ func (p *PiecePicker) HandleCancelDownload(pe *peer.Peer, i uint32) {
 	p.pieces[i].Choked.Remove(pe)
 }
 
-// HandleDisconnect forgets a peer everywhere.
+// HandleDisconnect forgets a peer everywhere. The torrent closes the peer's
+// piece downloads first (closePeer), which already clears its requested,
+// snubbed and choked marks, so only the pieces it holds are visited: a peer
+// leaving a large torrent costs its set bits, not a walk of every piece. A peer
+// still downloading (a caller that skipped the close) gets the full walk.
 func (p *PiecePicker) HandleDisconnect(pe *peer.Peer) {
-	for i := range p.pieces {
-		p.HandleCancelDownload(pe, uint32(i))
-		// Only the pieces it had count it. The bit is cleared with the count,
-		// so the books stay balanced even if a disconnect came twice.
-		if p.pieces[i].heldBy(pe) {
-			pe.Bitfield.Clear(uint32(i))
-			p.removeHolder(i)
+	if pe.Downloading || pe.ConcurrentPieces > 0 {
+		for i := range p.pieces {
+			p.HandleCancelDownload(pe, uint32(i))
 		}
 	}
+	if pe.Bitfield == nil {
+		return
+	}
+	// Only the pieces it had count it. The bits are cleared with the counts,
+	// so the books stay balanced even if a disconnect came twice.
+	pe.Bitfield.ForEachSet(func(i uint32) {
+		if int(i) < len(p.pieces) {
+			p.removeHolder(int(i))
+		}
+	})
+	clear(pe.Bitfield.Bytes())
 }
 
 // addHolder counts a new holder, ticking availability on the first.
@@ -558,7 +564,8 @@ func (p *PiecePicker) pickAllowedFast(pe *peer.Peer) *myPiece {
 func (p *PiecePicker) pickRarest(pe *peer.Peer) *myPiece {
 	var picked *myPiece
 	var hasUnrequested bool
-	for _, mp := range p.piecesByAvailability {
+	for i := range p.pieces {
+		mp := &p.pieces[i]
 		if mp.Done || mp.Writing || mp.Skip {
 			continue
 		}
@@ -600,7 +607,10 @@ func (p *PiecePicker) pickFileEdge(pe *peer.Peer) *myPiece {
 // flipping to endgame when nothing is unrequested anywhere.
 func (p *PiecePicker) pickSequential(pe *peer.Peer) *myPiece {
 	var hasUnrequested bool
-	for i := range p.pieces {
+	for p.seqFrom < len(p.pieces) && p.pieces[p.seqFrom].Done {
+		p.seqFrom++
+	}
+	for i := p.seqFrom; i < len(p.pieces); i++ {
 		mp := &p.pieces[i]
 		if mp.Done || mp.Writing || mp.Skip {
 			continue
@@ -625,7 +635,8 @@ func (p *PiecePicker) pickSequential(pe *peer.Peer) *myPiece {
 func (p *PiecePicker) pickEndgame(pe *peer.Peer) *myPiece {
 	var picked *myPiece
 	pickedRunning := 0
-	for _, mp := range p.piecesByAvailability {
+	for i := range p.pieces {
+		mp := &p.pieces[i]
 		if mp.Done || mp.Writing || mp.Skip {
 			continue
 		}
@@ -646,7 +657,8 @@ func (p *PiecePicker) pickEndgame(pe *peer.Peer) *myPiece {
 func (p *PiecePicker) pickStalled(pe *peer.Peer) *myPiece {
 	var picked *myPiece
 	pickedStalled := 0
-	for _, mp := range p.piecesByStalled {
+	for i := range p.pieces {
+		mp := &p.pieces[i]
 		if mp.Done || mp.Writing || mp.Skip {
 			continue
 		}

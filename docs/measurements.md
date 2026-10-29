@@ -89,7 +89,7 @@ with the live service or a standalone instance as stated.
 | Archive insert | **40.9–41.8 ms per 1,000 releases** (3.00 MB, 50,528 allocs) | 1791 | `BenchmarkArchiveSaveBatch` |
 | Archive search (standalone) | **7.4 ms** on 100,000 releases, 49× faster than before | — | `BenchmarkFeedArchiveSearch` |
 | Archive content-filter page | the candidate scan used to copy the `magnet` text of **all 364,348 rows — 138,090,257 B (~131.7 MiB) — per request**; now it reads `id,title` (28.8 MB of titles) and loads the ≤500 visible rows with one `id IN (…)` query | 2072 | live `gextto_archive.db`: `SELECT count(*), sum(length(magnet)), sum(length(title)) FROM archive` |
-| Piece picker | `RarestManyPeers` **13.8 µs**, bitfield update+disconnect **65–68 µs** | 228 | `go test -bench . ./internal/gxcore/internal/piecepicker` |
+| Piece picker | `RarestManyPeers` **10.5–11.1 µs**, bitfield update+disconnect **35–37 µs**, one departure on 27,250 pieces **95–126 µs** (was 413–440), sequential pick near the end **4.6 ns** (was 110 µs) | 2094 | `go test -bench . ./internal/gxcore/internal/piecepicker` |
 | uTP loopback | **131–139 MB/s**, 5.6 KB and 99 allocs per op | 224 | `BenchmarkTransferLoopback` |
 | Storage | **~5.8 GB/s** buffered, **~7.4 GB/s** mmap; 16 KiB writes on NFS **81 MiB/s** | — | `BenchmarkStorageWrite`, `BenchmarkStorageWriteMmap`, NFS harness |
 | Indexer lanes | 30 titles, 6 at a time: **110 s**, 205/0 requests, 5,935 releases (aggregate: 450 s, 35/25, 2,737) | 1796 | `TestMeasureManagerLanes` |
@@ -177,6 +177,27 @@ runs each, to show they did not move:
 
 Reproduce with
 `CGO_ENABLED=0 go test -run '^$' -bench 'BenchmarkEngineListSnapshot|BenchmarkEngineSnapshotTwelveCalls' -benchmem -count=3 .`
+
+### Piece picker: peer departure and sequential frontier (2026-10-29, N97)
+
+A peer leaving used to walk every piece of the torrent (three set removals and a
+bitfield test per piece); it now visits only the bits the peer holds, since its
+downloads are closed before the departure reaches the picker. The sequential pick
+starts from a cursor past the finished prefix instead of index 0. The two unsorted
+copies of the piece table (16 bytes per piece) are gone, and with them
+`BenchmarkPickerRarestShuffled`, which measured a sort that no longer exists. Same
+machine, six runs each, `GOMAXPROCS=2`, before and after on the same checkout:
+
+| Benchmark | Before | After | What it measures |
+|---|---|---|---|
+| `BenchmarkPickerDisconnect` (27,250 pieces, peer holds half, 50 peers) | 413–440 µs/op, 0 allocs | **95–126 µs/op, 0 allocs** | one peer departure on the torrent loop |
+| `BenchmarkPickerBitfieldManyPeers` (4,000 pieces, 150 peers) | 57.0–62.5 µs/op, 1 alloc | **35.4–37.0 µs/op, 1 alloc** | a new peer's bitfield arriving, then its departure |
+| `BenchmarkPickerSequentialNearlyDone` (27,250 pieces, all but the last done) | 106–115 µs/op | **4.5–4.7 ns/op** | one sequential pick near the end of a download |
+| `BenchmarkPickerRarestManyPeers` (150 peers) | 12.1–12.8 µs/op | 10.5–11.1 µs/op | one rarest pick in a dense swarm (index order without the pointer table) |
+| `BenchmarkPickerRarestSteady` | 8–46 ns/op | 11–35 ns/op | rarest pick with an early exit: unchanged, noise |
+
+Reproduce with
+`go test -run '^$' -bench 'BenchmarkPicker' -benchmem -count=6 ./internal/gxcore/internal/piecepicker/`
 
 ## 4. Investigations and decisions
 

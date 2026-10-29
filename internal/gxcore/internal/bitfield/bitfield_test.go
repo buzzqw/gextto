@@ -2,6 +2,7 @@ package bitfield
 
 import (
 	"math/rand"
+	"slices"
 	"testing"
 )
 
@@ -115,6 +116,32 @@ func TestHasAnyOutside(t *testing.T) {
 		have.Set(last)
 		if peer.HasAnyOutside(have, skip) {
 			t.Fatalf("n=%d: bit we have counted", n)
+		}
+	}
+}
+
+// TestForEachSetMatchesTest walks random bitfields of awkward lengths (partial
+// trailing byte and word) and checks ForEachSet visits exactly the set bits,
+// in order.
+func TestForEachSetMatchesTest(t *testing.T) {
+	rng := rand.New(rand.NewSource(3))
+	for _, n := range []uint32{0, 1, 7, 8, 9, 63, 64, 65, 127, 1000, 27250} {
+		b := New(n)
+		for i := uint32(0); i < n; i++ {
+			if rng.Intn(3) == 0 {
+				b.Set(i)
+			}
+		}
+		var got []uint32
+		b.ForEachSet(func(i uint32) { got = append(got, i) })
+		var want []uint32
+		for i := uint32(0); i < n; i++ {
+			if b.Test(i) {
+				want = append(want, i)
+			}
+		}
+		if !slices.Equal(got, want) {
+			t.Fatalf("length %d: ForEachSet visited %v, want %v", n, got, want)
 		}
 	}
 }

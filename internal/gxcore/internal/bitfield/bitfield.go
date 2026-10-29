@@ -155,6 +155,34 @@ func (b *Bitfield) HasAnyOutside(have, skip *Bitfield) bool {
 	return false
 }
 
+// ForEachSet calls fn with the index of every set bit, in increasing order. It
+// reads a word at a time and skips empty words, so a sparse bitfield costs its
+// set bits, not its length.
+func (b *Bitfield) ForEachSet(fn func(i uint32)) {
+	rest := b.bytes
+	var base uint32
+	for len(rest) > 0 {
+		var w uint64
+		n := min(len(rest), 8)
+		if n == 8 {
+			w = binary.BigEndian.Uint64(rest)
+		} else {
+			for k := 0; k < n; k++ {
+				w |= uint64(rest[k]) << (56 - 8*k)
+			}
+		}
+		for w != 0 {
+			z := uint32(bits.LeadingZeros64(w))
+			if i := base + z; i < b.length {
+				fn(i)
+			}
+			w &^= 1 << (63 - z)
+		}
+		rest = rest[n:]
+		base += 64
+	}
+}
+
 func (b *Bitfield) checkIndex(i uint32) {
 	if i >= b.Len() {
 		panic("index out of bound")
