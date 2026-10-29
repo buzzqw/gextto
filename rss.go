@@ -913,9 +913,9 @@ func sweepStaleFlareSolverrSessions(ctx context.Context, client *http.Client, en
 		for _, item := range pending {
 			domains = append(domains, item.domain)
 		}
-		closed := "an idle browser session"
+		closed := "an idle FlareSolverr browser session"
 		if len(pending) > 1 {
-			closed = fmt.Sprintf("%d idle browser sessions", len(pending))
+			closed = fmt.Sprintf("%d idle FlareSolverr browser sessions", len(pending))
 		}
 		logging.Debug(fmt.Sprintf("🧹 Closed %s after %s: %s",
 			closed, logDuration(fsSessionTTL), strings.Join(domains, ", ")))
@@ -960,9 +960,9 @@ func reconcileFlareSolverrSessions(ctx context.Context, client *http.Client, end
 		}
 	}
 	if destroyed > 0 {
-		closed := "a browser session left open by the previous run"
+		closed := "a FlareSolverr browser session left open by the previous run"
 		if destroyed > 1 {
-			closed = fmt.Sprintf("%d browser sessions left open by the previous run", destroyed)
+			closed = fmt.Sprintf("%d FlareSolverr browser sessions left open by the previous run", destroyed)
 		}
 		logging.Info("🧹 Closed " + closed)
 	}

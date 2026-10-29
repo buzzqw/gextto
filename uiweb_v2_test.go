@@ -3,6 +3,7 @@ package gextto
 // uiweb_v2_test.go covers the isolated SSR+HTMX interface served at the root.
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -661,6 +662,79 @@ func TestV2TorrentColumnsMatchRenderedRowCells(t *testing.T) {
 	}
 	if !v2ValidSort("state") {
 		t.Fatal("state must be a valid torrent sort key")
+	}
+}
+
+func TestV2DownloadsSortCoversEveryKind(t *testing.T) {
+	torrents := []uiTorrentRow{
+		{Hash: "t1", Name: "Bravo.Torrent", DownloadRate: 5, Progress: 10},
+		{Hash: "t2", Name: "Delta.Torrent", DownloadRate: 7, Progress: 90},
+	}
+	http := []ComicDownload{{ID: "h1", Title: "Alfa HTTP", Progress: 50, SpeedBytes: 3}}
+	ed2k := []uiEd2kRow{{Hash: "e1", Name: "Charlie eD2k", Speed: 9, Progress: 20}}
+
+	entries := v2DownloadEntries(torrents, http, ed2k)
+	names := func() []string {
+		out := make([]string, len(entries))
+		for index, entry := range entries {
+			out[index] = entry.name()
+		}
+		return out
+	}
+	// The default order is the whole page, not torrents first: eD2k files and
+	// HTTP downloads used to sit below them in the engine's own order.
+	v2SortDownloadEntries(entries, "name", "asc")
+	if got := strings.Join(names(), "|"); got != "Alfa HTTP|Bravo.Torrent|Charlie eD2k|Delta.Torrent" {
+		t.Fatalf("name asc = %s", got)
+	}
+	v2SortDownloadEntries(entries, "name", "desc")
+	if got := strings.Join(names(), "|"); got != "Delta.Torrent|Charlie eD2k|Bravo.Torrent|Alfa HTTP" {
+		t.Fatalf("name desc = %s", got)
+	}
+	// A numeric key mixes the kinds too: the eD2k speed counts like a torrent's.
+	v2SortDownloadEntries(entries, "dl", "desc")
+	if got := firstEntryName(entries); got != "Charlie eD2k" {
+		t.Fatalf("fastest = %q, want the eD2k file", got)
+	}
+	v2SortDownloadEntries(entries, "progress", "asc")
+	if got := firstEntryName(entries); got != "Bravo.Torrent" {
+		t.Fatalf("least advanced = %q", got)
+	}
+}
+
+func firstEntryName(entries []v2DownloadEntry) string {
+	if len(entries) == 0 {
+		return ""
+	}
+	return entries[0].name()
+}
+
+func TestV2DownloadsRenderEveryKindInTheChosenOrder(t *testing.T) {
+	torrents := []uiTorrentRow{{Hash: "t1", Name: "Bravo.Torrent"}}
+	http := []ComicDownload{{ID: "h1", Title: "Alfa HTTP", Status: "downloading"}}
+	ed2k := []uiEd2kRow{{Hash: "e1", Name: "Charlie eD2k"}}
+	entries := v2DownloadEntries(torrents, http, ed2k)
+	v2SortDownloadEntries(entries, "name", "asc")
+	view := v2TorrentsView{
+		Rows: torrents, HTTPDownloads: http, Ed2kDownloads: ed2k, Entries: entries,
+		Count: 3, Columns: v2TorrentColumns, Sort: "name", Dir: "asc",
+	}
+	var out bytes.Buffer
+	if err := v2Templates.ExecuteTemplate(&out, "v2_torrents_wrap", view); err != nil {
+		t.Fatalf("render: %v", err)
+	}
+	body := out.String()
+	httpAt := strings.Index(body, "v2-http-download-h1")
+	torrentAt := strings.Index(body, "v2-torrent-t1")
+	ed2kAt := strings.Index(body, "v2-ed2k-download-e1")
+	if httpAt < 0 || torrentAt < 0 || ed2kAt < 0 {
+		t.Fatalf("a row is missing (http=%d torrent=%d ed2k=%d)", httpAt, torrentAt, ed2kAt)
+	}
+	if !(httpAt < torrentAt && torrentAt < ed2kAt) {
+		t.Fatalf("rows not in the alphabetical order: http=%d torrent=%d ed2k=%d", httpAt, torrentAt, ed2kAt)
+	}
+	if !strings.Contains(body, "In scarico") {
+		t.Fatal("the HTTP row lost its state label")
 	}
 }
 

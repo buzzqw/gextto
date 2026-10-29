@@ -217,13 +217,15 @@ type uiEd2kRow struct {
 	Uploaded    int64
 	Speed       uint64
 	// Eta is the time left at the current rate, empty when unknown or done;
-	// Ratio is uploaded/downloaded, "—" until something moved.
-	Eta      string
-	Ratio    string
-	Sources  int64
-	Active   int64
-	Paused   bool
-	Complete bool
+	// Ratio is uploaded/downloaded, "—" until something moved, and RatioValue
+	// is the same number for sorting ("∞" sorts above everything).
+	Eta        string
+	Ratio      string
+	RatioValue float64
+	Sources    int64
+	Active     int64
+	Paused     bool
+	Complete   bool
 	// LastResort: see uiTorrentRow.
 	LastResort bool
 }
@@ -270,10 +272,13 @@ func uiEd2kRows(downloads []amule.Download) []uiEd2kRow {
 		progress := download.Progress()
 		uploaded := max(download.Uploaded, 0)
 		ratio := "—"
+		ratioValue := 0.0
 		if download.Done > 0 {
-			ratio = strconv.FormatFloat(float64(uploaded)/float64(download.Done), 'f', 2, 64)
+			ratioValue = float64(uploaded) / float64(download.Done)
+			ratio = strconv.FormatFloat(ratioValue, 'f', 2, 64)
 		} else if uploaded > 0 {
 			ratio = "∞"
+			ratioValue = math.Inf(1)
 		}
 		eta := ""
 		if !download.Complete() && download.Speed > 0 && download.Size > download.Done {
@@ -292,6 +297,7 @@ func uiEd2kRows(downloads []amule.Download) []uiEd2kRow {
 			Speed:       uint64(max(download.Speed, 0)),
 			Eta:         eta,
 			Ratio:       ratio,
+			RatioValue:  ratioValue,
 			Sources:     download.Sources,
 			Active:      download.Active,
 			Paused:      download.Paused(),

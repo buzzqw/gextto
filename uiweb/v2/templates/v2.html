@@ -561,7 +561,16 @@
       <table class="data-table torrent-table">
         <caption class="sr-only">Torrent e download HTTP nella sessione</caption>
         <tbody>
-          {{range .Rows}}
+          {{range .Entries}}{{template "v2_download_row" .}}{{end}}
+        </tbody>
+      </table>
+    </div>
+    {{else}}<p class="muted">Nessun download nella sessione.</p>{{end}}
+  </form>
+</div>
+{{end}}
+
+{{define "v2_download_row"}}{{if eq .Kind "torrent"}}{{with .Torrent}}
           <tr id="v2-torrent-{{.Hash}}" data-hash="{{.Hash}}">
             <td class="torrent-card-cell">
               <div class="torrent-card">
@@ -599,15 +608,14 @@
               </div>
             </td>
           </tr>
-          {{end}}
-          {{range .HTTPDownloads}}
+{{end}}{{else if eq .Kind "http"}}{{with .HTTP}}
           <tr id="v2-http-download-{{.ID}}" data-http-download="{{.ID}}">
             <td class="torrent-card-cell">
               <div class="torrent-card">
                 <div class="torrent-head">
                   <span class="torrent-select"></span>
                   <span class="torrent-name"><span class="truncate" title="{{.Title}}">{{.Title}}</span> <span class="badge">HTTP</span></span>
-                  <span class="torrent-state badge{{if eq .Status "completed"}} ok{{else if eq .Status "error"}} err{{else if eq .Status "paused"}} warn{{end}}">{{if eq .Status "downloading"}}In scarico{{else if eq .Status "completed"}}Completato{{else if eq .Status "paused"}}In pausa{{else}}{{.Status}}{{end}}</span>
+                  <span class="torrent-state badge{{if eq .Status "completed"}} ok{{else if eq .Status "error"}} err{{else if eq .Status "paused"}} warn{{end}}">{{httpState .Status}}</span>
                 </div>
                 <div class="torrent-body">
                   <div class="torrent-progress">{{if ge .Progress 0.0}}<div class="progress"><span style="width:{{printf "%.1f" .Progress}}%"></span></div><small class="muted">{{printf "%.1f" .Progress}}% · {{bytesU .DownloadedBytes}}</small>{{else}}<small class="muted">{{bytesU .DownloadedBytes}}</small>{{end}}</div>
@@ -622,8 +630,7 @@
               </div>
             </td>
           </tr>
-          {{end}}
-          {{range .Ed2kDownloads}}
+{{end}}{{else}}{{with .Ed2k}}
           <tr id="v2-ed2k-download-{{.Hash}}" data-ed2k-download="{{.Hash}}">
             <td class="torrent-card-cell">
               <div class="torrent-card">
@@ -651,14 +658,7 @@
               </div>
             </td>
           </tr>
-          {{end}}
-        </tbody>
-      </table>
-    </div>
-    {{else}}<p class="muted">Nessun download nella sessione.</p>{{end}}
-  </form>
-</div>
-{{end}}
+{{end}}{{end}}{{end}}
 
 {{define "v2_detail_modal"}}
 <div class="torrent-drawer-head">

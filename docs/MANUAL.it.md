@@ -446,7 +446,9 @@ invece di lasciare l'episodio al ciclo successivo.
 - **Pin**: un torrent forzato fuori coda mostra il badge **📌 pin**; si sblocca
   dal pulsante **Sblocca pin** nella sua scheda di dettaglio (dove c'è anche **Pin**).
 - **Colonne tabella**: Nome, Stato, Progresso, ↓, ↑, ETA, Peers, Ratio — si ordinano
-  da **Ordina per**.
+  da **Ordina per**. L'ordine vale per tutta la lista, torrent, download HTTP e file
+  eD2k insieme: senza scegliere niente è alfabetico per nome, non i torrent prima e
+  i file di aMule sotto, nell'ordine in cui li dà aMule.
 - **Azioni riga**: pausa/riprendi, recheck, rimuovi.
 - **Dettagli**: si aprono cliccando il **nome del torrent** (o un punto qualsiasi
   della riga; da tastiera il nome è il pulsante che li apre) come riquadro

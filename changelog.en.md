@@ -14,6 +14,10 @@ manual is online: [English](docs/MANUAL.en.md) ·
 [GitHub issues](https://github.com/buzzqw/gextto/issues).
 
 ## 29 October 2026
+- **In Downloads the order covers the whole list, eD2k included.** The list showed the torrents alphabetically and, below them, the HTTP downloads and aMule's files in aMule's own order, and **Sort by** only reordered the torrents. Torrents, HTTP downloads and eD2k files are now one list: it is alphabetical by name when you open it, and **Sort by** with ↑/↓ orders them all together by status, progress, download and upload speed, estimated time, peers and ratio (what a row does not have stays at zero). Nothing to configure.
+
+- **The log names FlareSolverr when it closes browser sessions.** The line that at start-up reports the browser sessions left open by the previous run only said «Closed 5 browser sessions…»: it now names FlareSolverr, so it is clear what it is about. The DEBUG line about idle sessions says it too.
+
 - **An eD2k import is now a single log line.** When a file taken from eD2k reached the library the log wrote two nearly identical lines — the import with the episode name and the move with the download's raw name — which looked like two events. Now there is one line: it says what entered the library and where, whether it replaced a previous version, and that the file left aMule's incoming folder (or that it stays there in copy mode, or that an interrupted import was resumed). Nothing to configure.
 
 - **The real quality check also says whether it found anything.** The line that now and then summarises the MediaInfo backfill of the library («Read the real quality of …») only said how many files it had read. It now also says for how many of them the reading added something the release name did not — and therefore for how many the next upgrade will be decided on the file instead of the name — or that the names already said everything and no decision changes. Files that could not be read or are no longer on disk stay at the end of the line.

@@ -29,6 +29,7 @@ import (
 	stdhtml "html"
 	"html/template"
 	"io/fs"
+	"math"
 	"net/http"
 	"net/url"
 	"path/filepath"
@@ -58,6 +59,7 @@ var v2Templates = template.Must(template.New("v2").Funcs(template.FuncMap{
 	"rateI":       logging.HumanRate,
 	"arrow":       v2SortArrow,
 	"sourceLabel": uiSourceLabel,
+	"httpState":   v2HTTPStateLabel,
 	"ternary": func(cond bool, whenTrue, whenFalse string) string {
 		if cond {
 			return whenTrue
@@ -1171,16 +1173,19 @@ type v2TorrentsView struct {
 	Rows          []uiTorrentRow
 	HTTPDownloads []ComicDownload
 	Ed2kDownloads []uiEd2kRow
-	Ed2kEnabled   bool
-	Count         int
-	UpdatedAt     string
-	Sort          string
-	Dir           string
-	Filter        string
-	Auto          bool
-	Columns       []v2Column
-	TagOptions    []string
-	TagFilter     string
+	// Entries is the whole list in the chosen order: torrents, HTTP downloads
+	// and eD2k files interleaved by the sort key.
+	Entries     []v2DownloadEntry
+	Ed2kEnabled bool
+	Count       int
+	UpdatedAt   string
+	Sort        string
+	Dir         string
+	Filter      string
+	Auto        bool
+	Columns     []v2Column
+	TagOptions  []string
+	TagFilter   string
 	// Speed is the exception and the rule shown by the bandwidth menu.
 	Speed               uiSpeedState
 	AutoRemoveCompleted bool
@@ -1240,44 +1245,220 @@ func v2ValidSort(key string) bool {
 	return false
 }
 
-func v2SortRows(rows []uiTorrentRow, key, dir string) {
-	less := func(i, j int) bool { return rows[i].Name < rows[j].Name }
-	switch key {
-	case "state":
-		less = func(i, j int) bool {
-			left, right := strings.ToLower(rows[i].State), strings.ToLower(rows[j].State)
-			if left == right {
-				return strings.ToLower(rows[i].Name) < strings.ToLower(rows[j].Name)
-			}
-			return left < right
+// v2HTTPStateLabel is the state shown for an HTTP download in Scarico. It lives
+// here as well as in the template so sorting by state orders the row by the
+// words the user reads, like torrents and eD2k files.
+func v2HTTPStateLabel(status string) string {
+	switch status {
+	case "downloading":
+		return "In scarico"
+	case "completed":
+		return "Completato"
+	case "paused":
+		return "In pausa"
+	}
+	return status
+}
+
+// v2DownloadEntry is one row of Scarico: a torrent, an HTTP download or aMule's
+// eD2k file. The three share one ordered list, so "Ordina per" applies to the
+// whole page and not only to the torrents: eD2k files used to be listed in
+// aMule's order, below the torrents, with no way to sort them.
+type v2DownloadEntry struct {
+	// Kind is "torrent", "http" or "ed2k"; exactly one pointer is set.
+	Kind    string
+	Torrent *uiTorrentRow
+	HTTP    *ComicDownload
+	Ed2k    *uiEd2kRow
+}
+
+func v2DownloadEntries(torrents []uiTorrentRow, http []ComicDownload, ed2k []uiEd2kRow) []v2DownloadEntry {
+	entries := make([]v2DownloadEntry, 0, len(torrents)+len(http)+len(ed2k))
+	for index := range torrents {
+		entries = append(entries, v2DownloadEntry{Kind: "torrent", Torrent: &torrents[index]})
+	}
+	for index := range http {
+		entries = append(entries, v2DownloadEntry{Kind: "http", HTTP: &http[index]})
+	}
+	for index := range ed2k {
+		entries = append(entries, v2DownloadEntry{Kind: "ed2k", Ed2k: &ed2k[index]})
+	}
+	return entries
+}
+
+func (entry v2DownloadEntry) name() string {
+	switch {
+	case entry.Torrent != nil:
+		return entry.Torrent.Name
+	case entry.HTTP != nil:
+		return entry.HTTP.Title
+	case entry.Ed2k != nil:
+		return entry.Ed2k.Name
+	}
+	return ""
+}
+
+func (entry v2DownloadEntry) state() string {
+	switch {
+	case entry.Torrent != nil:
+		return entry.Torrent.State
+	case entry.HTTP != nil:
+		return v2HTTPStateLabel(entry.HTTP.Status)
+	case entry.Ed2k != nil:
+		return entry.Ed2k.State
+	}
+	return ""
+}
+
+func (entry v2DownloadEntry) progress() float64 {
+	switch {
+	case entry.Torrent != nil:
+		return entry.Torrent.Progress
+	case entry.HTTP != nil:
+		return entry.HTTP.Progress
+	case entry.Ed2k != nil:
+		return entry.Ed2k.Progress
+	}
+	return 0
+}
+
+func (entry v2DownloadEntry) downloadRate() uint64 {
+	switch {
+	case entry.Torrent != nil:
+		return entry.Torrent.DownloadRate
+	case entry.HTTP != nil:
+		return entry.HTTP.SpeedBytes
+	case entry.Ed2k != nil:
+		return entry.Ed2k.Speed
+	}
+	return 0
+}
+
+func (entry v2DownloadEntry) uploadRate() uint64 {
+	switch {
+	case entry.Torrent != nil:
+		return entry.Torrent.UploadRate
+	case entry.Ed2k != nil:
+		// aMule reports the bytes uploaded so far, not a rate: sorting by
+		// upload keeps the eD2k files with the most shared data first.
+		if entry.Ed2k.Uploaded < 0 {
+			return 0
 		}
-	case "progress":
-		less = func(i, j int) bool { return rows[i].Progress < rows[j].Progress }
-	case "dl":
-		less = func(i, j int) bool { return rows[i].DownloadRate < rows[j].DownloadRate }
-	case "ul":
-		less = func(i, j int) bool { return rows[i].UploadRate < rows[j].UploadRate }
-	case "eta":
-		less = func(i, j int) bool { return rows[i].ETASeconds < rows[j].ETASeconds }
-	case "peers":
-		less = func(i, j int) bool { return rows[i].NumPeers < rows[j].NumPeers }
-	case "ratio":
-		less = func(i, j int) bool { return rows[i].Ratio < rows[j].Ratio }
-	default:
-		less = func(i, j int) bool {
-			left, right := strings.ToLower(rows[i].Name), strings.ToLower(rows[j].Name)
-			if left == right {
-				return rows[i].Hash < rows[j].Hash
-			}
-			return left < right
+		return uint64(entry.Ed2k.Uploaded)
+	}
+	return 0
+}
+
+func (entry v2DownloadEntry) etaSeconds() int64 {
+	switch {
+	case entry.Torrent != nil:
+		return entry.Torrent.ETASeconds
+	case entry.HTTP != nil:
+		if entry.HTTP.ETASeconds != nil {
+			return int64(*entry.HTTP.ETASeconds)
+		}
+	case entry.Ed2k != nil:
+		row := entry.Ed2k
+		if !row.Complete && row.Speed > 0 && row.Size > row.Done {
+			return (row.Size - row.Done) / int64(row.Speed)
 		}
 	}
-	sort.SliceStable(rows, func(i, j int) bool {
-		if dir == "desc" {
-			return less(j, i)
+	return 0
+}
+
+func (entry v2DownloadEntry) peers() int {
+	switch {
+	case entry.Torrent != nil:
+		return entry.Torrent.NumPeers
+	case entry.Ed2k != nil:
+		switch {
+		case entry.Ed2k.Active <= 0:
+			return 0
+		case entry.Ed2k.Active > math.MaxInt32:
+			return math.MaxInt32
 		}
-		return less(i, j)
+		return int(entry.Ed2k.Active)
+	}
+	return 0
+}
+
+func (entry v2DownloadEntry) ratio() float64 {
+	switch {
+	case entry.Torrent != nil:
+		return entry.Torrent.Ratio
+	case entry.Ed2k != nil:
+		return entry.Ed2k.RatioValue
+	}
+	return 0
+}
+
+// v2SortDownloadEntries orders the whole Scarico list. The chosen key decides,
+// the name breaks the ties (case-insensitive), so the order is the same on
+// every refresh instead of following the engine's own order.
+func v2SortDownloadEntries(entries []v2DownloadEntry, key, dir string) {
+	less := func(a, b v2DownloadEntry) bool {
+		var compare int
+		switch key {
+		case "state":
+			compare = strings.Compare(strings.ToLower(a.state()), strings.ToLower(b.state()))
+		case "progress":
+			compare = compareFloat(a.progress(), b.progress())
+		case "dl":
+			compare = compareUint(a.downloadRate(), b.downloadRate())
+		case "ul":
+			compare = compareUint(a.uploadRate(), b.uploadRate())
+		case "eta":
+			compare = compareInt(a.etaSeconds(), b.etaSeconds())
+		case "peers":
+			compare = compareInt(int64(a.peers()), int64(b.peers()))
+		case "ratio":
+			compare = compareFloat(a.ratio(), b.ratio())
+		}
+		if compare != 0 {
+			return compare < 0
+		}
+		left, right := strings.ToLower(a.name()), strings.ToLower(b.name())
+		if left == right {
+			return a.name() < b.name()
+		}
+		return left < right
+	}
+	sort.SliceStable(entries, func(i, j int) bool {
+		if dir == "desc" {
+			return less(entries[j], entries[i])
+		}
+		return less(entries[i], entries[j])
 	})
+}
+
+func compareFloat(a, b float64) int {
+	switch {
+	case a < b:
+		return -1
+	case a > b:
+		return 1
+	}
+	return 0
+}
+
+func compareUint(a, b uint64) int {
+	switch {
+	case a < b:
+		return -1
+	case a > b:
+		return 1
+	}
+	return 0
+}
+
+func compareInt(a, b int64) int {
+	switch {
+	case a < b:
+		return -1
+	case a > b:
+		return 1
+	}
+	return 0
 }
 
 func v2FilterRows(rows []uiTorrentRow, filter string) []uiTorrentRow {
@@ -1349,7 +1530,6 @@ func v2TorrentsViewFrom(s *AppState, r *http.Request, message string, isErr bool
 		}
 		rows = filtered
 	}
-	v2SortRows(rows, sortKey, dir)
 	// Only the chrome around the table is needed here: the torrent snapshot is
 	// already in `data`, and asking for the whole page would list the engine and
 	// sort again on every poll.
@@ -1361,10 +1541,13 @@ func v2TorrentsViewFrom(s *AppState, r *http.Request, message string, isErr bool
 	// Keep the live download list updating on first entry. The explicit `0`
 	// value from the Auto button is still respected and disables polling.
 	autoEnabled := auto == "" || auto == "1"
+	entries := v2DownloadEntries(rows, data.HTTPDownloads, data.Ed2kDownloads)
+	v2SortDownloadEntries(entries, sortKey, dir)
 	return v2TorrentsView{
 		Rows:                rows,
 		HTTPDownloads:       data.HTTPDownloads,
 		Ed2kDownloads:       data.Ed2kDownloads,
+		Entries:             entries,
 		Ed2kEnabled:         data.Ed2kEnabled,
 		Count:               data.Count,
 		UpdatedAt:           data.UpdatedAt,
