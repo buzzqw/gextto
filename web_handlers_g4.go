@@ -687,8 +687,14 @@ func BatchArchiveDownload(w http.ResponseWriter, r *http.Request, s *AppState) {
 		var status int
 		if strings.TrimSpace(item.Ed2kLink) != "" {
 			// An eD2k result has no magnet: queue its ed2k:// link through the
-			// same path as the search results, so aMule gets it.
-			release := models.Release{Title: item.Title, Source: source, Ed2kLink: strings.TrimSpace(item.Ed2kLink)}
+			// same path as the search results, so aMule gets it. The release is
+			// parsed like a torrent's, so the download keeps its series, season
+			// and episode (the episode search sends only title, link and source).
+			link := strings.TrimSpace(item.Ed2kLink)
+			release := models.Release{Title: item.Title, Source: source, Ed2kLink: link}
+			if parsed := ParseEd2kRelease(item.Title, link, source, 0, 0, time.Now().UTC()); parsed != nil {
+				release = *parsed
+			}
 			status, _ = gh3AddRelease(s, release)
 		} else {
 			release := ParseRelease(item.Title, item.Magnet, source)

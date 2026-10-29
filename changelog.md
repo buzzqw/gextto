@@ -15,6 +15,8 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
 [issue su GitHub](https://github.com/buzzqw/gextto/issues).
 
 ## 30 ottobre 2026
+- **Un episodio scelto a mano da eD2k entra in libreria.** Scegliendo un risultato eD2k dalla ricerca di un episodio (anche dagli episodi mancanti di una serie), il download veniva registrato col solo nome del file, senza serie, stagione ed episodio. Finito il download, Gextto non lo riconosceva come episodio, provava a spostarlo come un torrent (cosa che aMule non permette) e nel log ripeteva ogni dieci minuti «Could not move the completed …». Ora il download mantiene serie ed episodio e a fine scaricamento viene importato come ogni episodio eD2k. Anche i download già bloccati così vengono riconosciuti al prossimo controllo ed entrano in libreria. Un file eD2k che Gextto non sa collocare resta nella cartella incoming di aMule, con una sola riga nel log. Niente da configurare.
+
 - **Lo streaming di un torrent aggiunto con «Salta verifica» legge solo dati controllati.** Con gx-torrent un torrent aggiunto senza verifica controlla ogni pezzo la prima volta che un peer lo chiede, ma il lettore per lo streaming leggeva i file così com'erano. Ora anche lo streaming aspetta il controllo del pezzo che sta per leggere, e lo avvia da solo se nessun peer l'ha ancora chiesto; se il pezzo non corrisponde, gx-torrent ricontrolla tutti i file come per i peer. L'attesa è di pochi millisecondi per pezzo. Niente da configurare.
 
 ## 29 ottobre 2026

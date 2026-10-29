@@ -288,6 +288,16 @@ func TestBatchDownloadQueuesED2KLink(t *testing.T) {
 	if len(downloads) != 1 || downloads[0].Hash != "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" {
 		t.Fatalf("aMule downloads = %+v", downloads)
 	}
+	// The row sends only title, link and source: the download must still be
+	// registered as the episode it is, or its completion cannot import it.
+	meta, err := state.db.TorrentMeta("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+	if err != nil || meta == nil {
+		t.Fatalf("TorrentMeta: %v %+v", err, meta)
+	}
+	got := meta.Release
+	if got.Kind != "series" || got.Season == nil || *got.Season != 2 || got.Episode == nil || *got.Episode != 1 {
+		t.Fatalf("registered release = kind %q season %v episode %v, want series S02E01", got.Kind, got.Season, got.Episode)
+	}
 }
 
 // TestManualEd2kAddIsLogged covers the download the operator starts by hand

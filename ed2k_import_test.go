@@ -562,3 +562,124 @@ func TestCompletedTorrentReportsSkippedVideoFiles(t *testing.T) {
 		t.Fatalf("error = %v, want the skipped-file explanation", err)
 	}
 }
+
+// newUnidentifiedEd2kFixture registers an eD2k download the way a manual
+// queue from a search result did: only the file name, no kind, series, season
+// or episode. The library has one series, "Example Show", in move mode.
+func newUnidentifiedEd2kFixture(t *testing.T, name string) (Config, *Database, string, string, models.TorrentEvent) {
+	t.Helper()
+	root := t.TempDir()
+	incoming := filepath.Join(root, "incoming")
+	archive := filepath.Join(root, "library", "Example Show")
+	for _, dir := range []string{incoming, archive} {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	source := filepath.Join(incoming, name)
+	writeFile(t, source, validMKV(4096))
+	link := "ed2k://|file|" + name + "|4096|a1b2c3d4e5f60718293a4b5c6d7e8f90|/"
+	release := &models.Release{Title: name, Source: "indexarr:example", Network: networkEd2k, Ed2kLink: link}
+	cfg := DefaultConfig()
+	cfg.DataDir = filepath.Join(root, "data")
+	if err := os.MkdirAll(cfg.DataDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	cfg.DownloadDir = incoming
+	cfg.RenameEpisodes = true
+	cfg.DryRun = false
+	cfg.Series = []SeriesConfig{{Name: "Example Show", Seasons: "1+", ArchivePath: archive, Enabled: true}}
+	cfg.Settings["move_episodes"] = "true"
+	cfg.Transfer.SeedRatio, cfg.Transfer.SeedTimeDays = 1, 7
+	db, err := OpenDatabase(filepath.Join(root, "test.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	if err := db.RegisterTorrentScored(release, 0); err != nil {
+		t.Fatalf("RegisterTorrentScored: %v", err)
+	}
+	hash, err := releaseIdentityHash(release)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return cfg, db, archive, source, models.TorrentEvent{Kind: "torrent_finished", Hash: hash, Name: name, SavePath: incoming}
+}
+
+// TestEd2kUnidentifiedEpisodeIsImported: an episode queued by hand from an eD2k
+// result, registered with only its file name, is recognised at completion and
+// imported like any eD2k episode. It used to reach the torrent move, which
+// aMule cannot do, and was retried every ten minutes forever.
+func TestEd2kUnidentifiedEpisodeIsImported(t *testing.T) {
+	cfg, db, archive, source, event := newUnidentifiedEd2kFixture(t, "Example.Show.S01E02.1080p.WEB-DL.mkv")
+	session := listedEd2kSession{ed2kSession: ed2kSession{cfg: &cfg}, hash: event.Hash}
+	retries := map[string]StorageMoveRetry{}
+	processed, err := HandleTorrentEvent(&cfg, session, db, map[string]struct{}{}, map[string]struct{}{},
+		retries, event, NewTmdbClient(nil), NewNotifier())
+	if err != nil || !processed {
+		t.Fatalf("processed=%v err=%v", processed, err)
+	}
+	if got := countVideos(t, archive); got != 1 {
+		t.Fatalf("videos in the library = %d, want 1", got)
+	}
+	if _, statErr := os.Stat(source); !os.IsNotExist(statErr) {
+		t.Fatalf("move mode must take the episode out of aMule's incoming folder, stat err = %v", statErr)
+	}
+	if len(retries) != 0 {
+		t.Fatalf("no storage move may be scheduled for aMule: %v", retries)
+	}
+}
+
+// TestEd2kCompletionNeverSchedulesAMoveForAmule: an eD2k download that is
+// neither an episode nor a film Gextto imports (here a release of another kind)
+// stays in aMule's incoming folder and is closed, with no storage move
+// scheduled: aMule cannot relocate files, so a retried move would loop forever.
+func TestEd2kCompletionNeverSchedulesAMoveForAmule(t *testing.T) {
+	cfg, db, archive, source, event := newUnidentifiedEd2kFixture(t, "Example.Show.S01E02.1080p.WEB-DL.mkv")
+	release := &models.Release{
+		Title: "Example.Show.S01E02.1080p.WEB-DL.mkv", Kind: "other", Source: "indexarr:example", Network: networkEd2k,
+		Ed2kLink: "ed2k://|file|Example.Show.S01E02.1080p.WEB-DL.mkv|4096|a1b2c3d4e5f60718293a4b5c6d7e8f90|/",
+	}
+	if err := db.RegisterTorrentScored(release, 0); err != nil {
+		t.Fatalf("RegisterTorrentScored: %v", err)
+	}
+	session := listedEd2kSession{ed2kSession: ed2kSession{cfg: &cfg}, hash: event.Hash}
+	retries := map[string]StorageMoveRetry{}
+	processed, err := HandleTorrentEvent(&cfg, session, db, map[string]struct{}{}, map[string]struct{}{},
+		retries, event, NewTmdbClient(nil), NewNotifier())
+	if err != nil || !processed {
+		t.Fatalf("processed=%v err=%v", processed, err)
+	}
+	if _, statErr := os.Stat(source); statErr != nil {
+		t.Fatalf("the file must stay in aMule's incoming folder: %v", statErr)
+	}
+	if got := countVideos(t, archive); got != 0 {
+		t.Fatalf("videos in the library = %d, want 0", got)
+	}
+	if len(retries) != 0 {
+		t.Fatalf("no storage move may be scheduled for aMule: %v", retries)
+	}
+}
+
+// TestIdentifyReleaseFillsOnlyAnUnidentifiedRelease: the title of a bare
+// release yields its series, season and episode; a release already identified
+// is left alone.
+func TestIdentifyReleaseFillsOnlyAnUnidentifiedRelease(t *testing.T) {
+	bare := models.Release{
+		Title:    "Star.Trek.Starfleet.Academy.S01E02.Beta.Test.ITA.ENG.2160p.PMTP.WEB-DL.DDP5.1.DV.HDR.H265-UBi.mkv",
+		Ed2kLink: "ed2k://|file|Star.Trek.Starfleet.Academy.S01E02.Beta.Test.ITA.ENG.2160p.PMTP.WEB-DL.DDP5.1.DV.HDR.H265-UBi.mkv|4207255144|177ec8afa6859357cfc9daa0fca66b89|/",
+	}
+	identifyRelease(&bare)
+	if bare.Kind != "series" || bare.Season == nil || *bare.Season != 1 || bare.Episode == nil || *bare.Episode != 2 || bare.Series == nil {
+		t.Fatalf("bare release identified as %+v", bare)
+	}
+	if bare.Quality.Resolution == "" {
+		t.Fatal("the quality must be parsed too")
+	}
+	series := "Kept Name"
+	known := models.Release{Title: "Other.Show.S03E04.mkv", Kind: "series", Series: &series}
+	identifyRelease(&known)
+	if *known.Series != "Kept Name" {
+		t.Fatalf("an identified release was changed: %+v", known)
+	}
+}

@@ -1193,6 +1193,7 @@ func gh3AddParsedRelease(s *AppState, release models.Release) (int, any) {
 		if release.Title == "" {
 			release.Title = link.Name
 		}
+		identifyRelease(&release)
 		score := latestConfig(s).ReleaseScore(&release)
 		if err := s.db.RegisterTorrentScored(&release, score); err != nil {
 			return http.StatusInternalServerError, map[string]any{"ok": false, "error": err.Error()}
@@ -1254,6 +1255,39 @@ func gh3AddParsedRelease(s *AppState, release models.Release) (int, any) {
 		}
 	}()
 	return http.StatusAccepted, map[string]any{"ok": true, "title": title, "queued": true}
+}
+
+// identifyRelease fills the identity of a release that arrives without one (an
+// eD2k search result or a pasted link carries only its file name): kind,
+// series, season, episode, pack and quality are parsed from the title, as for
+// any archive release. Without them the completion cannot tell an episode from
+// a film and has no library folder to import it into. A release already
+// identified is left as it is.
+func identifyRelease(release *models.Release) {
+	if release == nil || release.Kind != "" || strings.TrimSpace(release.Title) == "" {
+		return
+	}
+	// The parser keys a release on a magnet; an eD2k file has none, so its
+	// link's hash stands in for it, as in ParseEd2kRelease.
+	magnet := release.Magnet
+	if magnet == "" && release.Ed2kLink != "" {
+		if link, err := ed2k.ParseFileLink(release.Ed2kLink); err == nil {
+			magnet = "magnet:?xt=urn:btih:" + link.Hash
+		}
+	}
+	parsed := ParseRelease(release.Title, magnet, release.Source)
+	if parsed == nil {
+		return
+	}
+	release.Kind = parsed.Kind
+	release.Series = parsed.Series
+	release.Season = parsed.Season
+	release.Episode = parsed.Episode
+	release.IsPack = parsed.IsPack
+	release.EpisodeRange = parsed.EpisodeRange
+	if release.Quality.Resolution == "" {
+		release.Quality = parsed.Quality
+	}
 }
 
 // gh3IsTorrentURL implements `is_torrent_url`.

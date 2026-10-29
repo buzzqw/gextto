@@ -3267,6 +3267,10 @@ func HandleTorrentEvent(cfg *Config, torrents TorrentSession, db *Database, move
 			return false, nil
 		}
 		release := metadata.Release
+		// A download queued by hand from an eD2k result was registered without
+		// its identity (only the file name): parse it now, or an episode would
+		// miss its series branch and the library import.
+		identifyRelease(&release)
 		source := CompletionPath(&event)
 		corrected := ReconcilePackIdentity(&release, event.Name)
 		if corrected == nil {
@@ -3600,6 +3604,21 @@ func HandleTorrentEvent(cfg *Config, torrents TorrentSession, db *Database, move
 			logging.Info(fmt.Sprintf("🎉 %s downloaded. It stays in the download folder while it is shared, then moves to the library", logTarget(&release)),
 				"folder", source, "hash", event.Hash)
 			return false, nil
+		}
+		// aMule cannot relocate a download: a file that reaches this point (no
+		// series or film Gextto recognises) stays in its incoming folder, still
+		// shared, and the download is closed instead of retrying a move that
+		// can never succeed.
+		if tev_movesCompletedImmediately(torrents) {
+			size, sizeErr := SizeOfPath(source)
+			if sizeErr != nil {
+				return false, sizeErr
+			}
+			if err := db.MarkReleaseCompleted(&release, source, size); err != nil {
+				return false, err
+			}
+			logging.Info(fmt.Sprintf("🎉 «%s» downloaded; Gextto does not recognise it as an episode or a film of your library, so it stays in %s", event.Name, source), "hash", event.Hash)
+			return true, nil
 		}
 		if _, exists := moveRequests[event.Hash]; exists {
 			return false, nil
