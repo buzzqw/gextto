@@ -2301,7 +2301,7 @@ verifica.
 | Impostazione | Cosa fa |
 |---|---|
 | Cifratura | Politica di cifratura: 0 disabilitata, 1 abilitata, 2 forzata. |
-| Applica IP filter | Applica il filtro IP anche ai tracker. |
+| Applica IP filter | Applica il filtro IP anche ai tracker HTTP. È spento per impostazione predefinita: la lista predefinita contiene gli intervalli di Cloudflare, quindi i tracker ospitati lì (molti tracker privati) resterebbero irraggiungibili e nella scheda *Tracker* comparirebbe «tracker IP is blocked». Il filtro sui peer resta sempre attivo. |
 | IP filter (file/URL) | File locale o URL della lista IP da bloccare. Il valore predefinito è la lista eMule Security (`https://upd.emule-security.org/ipfilter.gz`), in formato P2P e aggiornata ogni giorno. |
 
 **Azioni**

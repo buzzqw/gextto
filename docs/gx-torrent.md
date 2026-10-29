@@ -410,7 +410,7 @@ gx-torrent [-listen 0.0.0.0:8890] [-data ~/.local/share/gx-torrent]
            [-encryption 0|1|2] [-no-dht] [-no-pex] [-no-utp] [-no-holepunch]
            [-no-lsd] [-no-upnp] [-no-natpmp] [-dht-bootstrap host:port,...]
            [-dht-read-only] [-web-sources-allow-private]
-           [-ipfilter FILE] [-ipfilter-trackers=true] [-lang it]
+           [-ipfilter FILE] [-ipfilter-trackers] [-lang it]
            [-mode managed|standalone] [-notify-url URL] [-mmap]
            [-log-file FILE] [-insecure] [-debug] [-version]
 ```
@@ -1246,8 +1246,10 @@ RPC server is disabled.
     (`name:start-end`) and eMule `ipfilter.dat`. eMule rules with level
     ≥ 128 allow traffic; IPv6 rules in CIDR form are applied
     (ranges/P2P/eMule remain IPv4 only).
-  - The filter applies to incoming and outgoing peers, and to trackers if
-    `torrent_apply_ip_filter` is active.
+  - The filter applies to incoming and outgoing peers, and to trackers only
+    when `torrent_apply_ip_filter` is on (off by default: the bundled eMule
+    Security list carries the Cloudflare ranges, so trackers hosted there
+    would answer "tracker IP is blocked" and never work).
   - gextto's "Update IP filter" button also works with gx-torrent:
     it downloads the list if it is a URL and reloads it in the daemon.
   - The file is **updated at the startup of the service** and then **once a

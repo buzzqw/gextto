@@ -41,7 +41,7 @@ var uiSettingTooltipText = map[string]string{
 	"torrent_holepunch":                    "Apre una connessione diretta ai peer dietro NAT tramite un peer che fa da relè (BEP 55). Richiede uTP.",
 	"torrent_dht_bootstrap_nodes":          "Nodi DHT iniziali (host:porta separati da virgola).",
 	"torrent_encryption":                   "Politica di cifratura: 0 disabilitata, 1 abilitata, 2 forzata.",
-	"torrent_apply_ip_filter":              "Applica il filtro IP anche ai tracker.",
+	"torrent_apply_ip_filter":              "Applica il filtro IP anche ai tracker HTTP. Spento per impostazione predefinita: la lista predefinita contiene gli intervalli di Cloudflare e i tracker ospitati lì resterebbero irraggiungibili (tracker IP is blocked).",
 	"torrent_ipfilter_url":                 "File locale o URL della lista IP da bloccare.",
 	"torrent_listen_interfaces":            "Indica dove il motore torrent accetta connessioni: 0.0.0.0:6881-6891 per tutte le interfacce, 127.0.0.1:6881 solo in locale, oppure wg0:6881/tun0:6881 per una VPN. Il valore proposto va bene nella maggior parte dei casi.",
 	"torrent_outgoing_interface":           "Killswitch VPN: interfaccia usata per tutto il traffico BitTorrent in uscita.",

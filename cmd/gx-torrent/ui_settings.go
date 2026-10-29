@@ -549,7 +549,7 @@ func (d *Daemon) renderSettings(w http.ResponseWriter, r *http.Request, errKey s
 	repl("{{IPFILTER_REFRESH}}", strconv.Itoa(int(d.ipFilterRefreshEvery()/time.Hour)))
 	repl("{{IPFILTER_STATUS}}", d.ipFilterStatusHTML())
 	repl("{{OPT_STATUS}}", d.optimizationStatusHTML())
-	repl("{{IPFILTER_TRACKERS}}", checkedIf(!strings.EqualFold(strings.TrimSpace(store.Get("ipfilter-trackers", "true")), "false")))
+	repl("{{IPFILTER_TRACKERS}}", checkedIf(!strings.EqualFold(strings.TrimSpace(store.Get("ipfilter-trackers", "false")), "false")))
 	repl("{{ENC_OPTIONS}}", encryptionOptions(store.Get("encryption", "1")))
 	repl("{{LAYOUT_OPTIONS}}", contentLayoutOptions(d.defaultContentLayout()))
 	repl("{{DHT_BOOTSTRAP}}", get("dht-bootstrap"))

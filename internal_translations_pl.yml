@@ -216,7 +216,7 @@ pol:
   Applica i limiti temporanei e ripristina automaticamente alla scadenza: Zastosuj tymczasowe limity i automatycznie zresetuj, gdy
   Applica i limiti temporanei; con durata 0 restano attivi finché non li rimuovi o interviene la programmazione: wygasa Egzekwuj limity tymczasowe;
     z czasem trwania 0 pozostają aktywne do czasu ich usunięcia lub zaprogramowania
-  Applica il filtro IP anche ai tracker.: interweniuje. Zastosuj filtrowanie IP także do trackerów.
+  "Applica il filtro IP anche ai tracker HTTP. Spento per impostazione predefinita: la lista predefinita contiene gli intervalli di Cloudflare e i tracker ospitati lì resterebbero irraggiungibili (tracker IP is blocked).": "Zastosuj filtr IP także do trackerów HTTP. Domyślnie wyłączone: dołączona lista zawiera zakresy Cloudflare, a trackery tam hostowane pozostałyby nieosiągalne (tracker IP is blocked)."
   Applica limiti: Zastosuj limity
   ? 'Applica limiti di velocità diversi in fasce orarie programmabili. Esempio: velocità piena di notte (01:00-08:00), limitata di giorno per
     non intralciare lo streaming e lo smart working.'

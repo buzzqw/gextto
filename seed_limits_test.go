@@ -1,6 +1,11 @@
 package gextto
 
-import "testing"
+import (
+	"strings"
+	"testing"
+
+	"github.com/buzzqw/gextto/internal/models"
+)
 
 // TestSeedLimitsForTorrent fixes the effective seed limits: the torrent's own
 // when positive, the globals when negative (inherit), none when zero
@@ -29,6 +34,22 @@ func TestSeedLimitsForTorrent(t *testing.T) {
 	minutes.Transfer.SeedTimeMinutes = 30
 	if _, timeLimit := seedLimitsForTorrent(minutes, -1, -1); timeLimit == nil || *timeLimit != 1800 {
 		t.Fatalf("minutes fallback: time=%v", timeLimit)
+	}
+}
+
+// TestTorrentRowShowsInfiniteSeedWhileDownloading: the "seed ∞" badge follows
+// the seed limits the torrent is set to, not its current state, so a torrent
+// set to ratio 0 and days 0 shows it while it still downloads.
+func TestTorrentRowShowsInfiniteSeedWhileDownloading(t *testing.T) {
+	state := newTestAppState(t)
+	hash := strings.Repeat("d", 40)
+	state.setActiveEngine(fakeProblemsEngine{list: []models.TorrentView{{
+		Hash: hash, Name: "movie", State: "downloading", Progress: 10,
+		TotalSize: 1000, TotalDone: 100, SeedRatio: 0, SeedDays: 0,
+	}}})
+	rows := uiTorrentRows(state)
+	if len(rows) != 1 || !rows[0].SeedInfinite {
+		t.Fatalf("a torrent with ratio 0 and days 0 must show seed ∞: %+v", rows)
 	}
 }
 

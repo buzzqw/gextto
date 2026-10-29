@@ -1205,7 +1205,7 @@ func (d *Daemon) handleQbitPreferences(w http.ResponseWriter, _ *http.Request) {
 		"anonymous_mode":                    false,
 		"ip_filter_enabled":                 stats.IPFilterRules > 0,
 		"ip_filter_path":                    stats.IPFilterPath,
-		"ip_filter_trackers":                d.settingBool("ipfilter-trackers", true),
+		"ip_filter_trackers":                d.settingBool("ipfilter-trackers", false),
 		"rss_refresh_interval":              d.rssRefreshMinutes(),
 		"export_dir":                        exportDir,
 		"export_dir_fin":                    exportFinDir,

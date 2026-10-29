@@ -2227,7 +2227,7 @@ the download stands. Season packs do not go through this check.
 | Setting | What it does |
 |---|---|
 | Encryption | Encryption policy: 0 disabled, 1 enabled, 2 forced. |
-| Apply IP filter | Apply the IP filter to trackers as well. |
+| Apply IP filter | Apply the IP filter to HTTP trackers as well. It is off by default: the bundled list contains Cloudflare ranges, so trackers hosted there (many private ones) would stay unreachable and the *Trackers* tab would show "tracker IP is blocked". Peer filtering is always on. |
 | IP filter (file/URL) | Local file or URL of the IP blocklist. The default is the eMule Security list (`https://upd.emule-security.org/ipfilter.gz`), in P2P format and updated every day. |
 
 **Actions**

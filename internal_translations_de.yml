@@ -219,7 +219,7 @@ deu:
     her, wenn sie ablaufen
   Applica i limiti temporanei; con durata 0 restano attivi finché non li rimuovi o interviene la programmazione: Vorübergehende Beschränkungen
     durchsetzen; Mit der Dauer 0 bleiben sie aktiv, bis Sie sie entfernen oder die Programmierung eingreift
-  Applica il filtro IP anche ai tracker.: Wenden Sie die IP-Filterung auch auf Tracker an.
+  "Applica il filtro IP anche ai tracker HTTP. Spento per impostazione predefinita: la lista predefinita contiene gli intervalli di Cloudflare e i tracker ospitati lì resterebbero irraggiungibili (tracker IP is blocked).": "IP-Filter auch auf HTTP-Tracker anwenden. Standardmäßig aus: Die mitgelieferte Liste enthält Cloudflare-Bereiche, und dort gehostete Tracker wären nicht erreichbar (tracker IP is blocked)."
   Applica limiti: Limits anwenden
   ? 'Applica limiti di velocità diversi in fasce orarie programmabili. Esempio: velocità piena di notte (01:00-08:00), limitata di giorno per
     non intralciare lo streaming e lo smart working.'

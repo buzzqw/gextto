@@ -216,7 +216,7 @@ spa:
   Applica i limiti temporanei e ripristina automaticamente alla scadenza: Aplicar límites temporales y restablecer automáticamente cuando
   Applica i limiti temporanei; con durata 0 restano attivi finché non li rimuovi o interviene la programmazione: expira Hacer cumplir límites
     temporales; con duración 0 permanecen activos hasta que los elimines o programes
-  Applica il filtro IP anche ai tracker.: interviene Aplicar filtrado de IP a los rastreadores también.
+  "Applica il filtro IP anche ai tracker HTTP. Spento per impostazione predefinita: la lista predefinita contiene gli intervalli di Cloudflare e i tracker ospitati lì resterebbero irraggiungibili (tracker IP is blocked).": "Aplicar el filtro IP también a los trackers HTTP. Desactivado por defecto: la lista incluida contiene los rangos de Cloudflare y los trackers alojados allí seguirían inaccesibles (tracker IP is blocked)."
   Applica limiti: Aplicar límites
   ? 'Applica limiti di velocità diversi in fasce orarie programmabili. Esempio: velocità piena di notte (01:00-08:00), limitata di giorno per
     non intralciare lo streaming e lo smart working.'

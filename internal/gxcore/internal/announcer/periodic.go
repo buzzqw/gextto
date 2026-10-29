@@ -2,6 +2,7 @@ package announcer
 
 import (
 	"context"
+	"errors"
 	"math"
 	"net"
 	"net/url"
@@ -312,22 +313,26 @@ type AnnounceError struct {
 // below are operator-visible (UI/API); keep them stable.
 func (a *PeriodicalAnnouncer) newAnnounceError(err error) (e *AnnounceError) {
 	e = &AnnounceError{Err: err}
-	switch err {
-	case resolver.ErrNotIPv4Address:
+	// The HTTP client wraps what the dialer returns in *url.Error, so the
+	// sentinels of the resolver and of the decoder are matched with errors.Is:
+	// a direct comparison would miss them and report "unknown error in
+	// announce" (a tracker blocked by the IP filter is the common case).
+	switch {
+	case errors.Is(err, resolver.ErrBlocked):
+		e.Message = "tracker IP is blocked"
+		return
+	case errors.Is(err, resolver.ErrNotIPv4Address):
 		parsed, _ := url.Parse(a.Tracker.URL())
 		e.Message = "tracker has no IPv4 address: " + parsed.Hostname()
 		return
-	case resolver.ErrBlocked:
-		e.Message = "tracker IP is blocked"
-		return
-	case resolver.ErrInvalidPort:
+	case errors.Is(err, resolver.ErrInvalidPort):
 		parsed, _ := url.Parse(a.Tracker.URL())
 		e.Message = "invalid port number in tracker address: " + parsed.Host
 		return
-	case tracker.ErrDecode:
+	case errors.Is(err, tracker.ErrDecode):
 		e.Message = "invalid response from tracker"
 		return
-	case tracker.ErrTierExhausted:
+	case errors.Is(err, tracker.ErrTierExhausted):
 		e.Message = "all trackers in the tier asked to not be retried"
 		return
 	}
@@ -367,9 +372,26 @@ func (a *PeriodicalAnnouncer) newAnnounceError(err error) (e *AnnounceError) {
 		e.Message = "announce error: " + err.FailureReason
 		return
 	}
-	e.Message = "unknown error in announce"
+	// Nobody classified this one: say what happened, with the reason the
+	// transport reported. The URL is left out because a private tracker puts
+	// its passkey in the path.
+	e.Message = "announce failed: " + announceReason(err)
 	e.Unknown = true
 	return
+}
+
+// announceReason is the bare reason of an announce failure, without the
+// request URL, capped so the tracker table stays readable.
+func announceReason(err error) string {
+	reason := err.Error()
+	if uerr, ok := err.(*url.Error); ok && uerr.Err != nil {
+		reason = uerr.Err.Error()
+	}
+	reason = strings.TrimSpace(reason)
+	if len(reason) > 120 {
+		reason = reason[:117] + "..."
+	}
+	return reason
 }
 
 // dnsErrorMessage maps resolver failures to messages, or "" when unmatched.
@@ -414,6 +436,14 @@ func urlErrorMessage(trackerURL string, err *url.Error) (string, bool) {
 		return "invalid server response", true
 	case strings.Contains(s, "network is unreachable"):
 		return "network is unreachable: " + parsed.Hostname(), true
+	case strings.Contains(s, "x509:"),
+		strings.Contains(s, "tls: failed to verify certificate"),
+		strings.Contains(s, "certificate is not valid for"):
+		return "TLS certificate rejected: " + parsed.Hostname(), true
+	case strings.Contains(s, "unsupported protocol scheme"):
+		return "invalid tracker address: " + parsed.Scheme, true
+	case strings.Contains(s, "proxyconnect"):
+		return "proxy refused the connection", true
 	}
 	return "", false
 }

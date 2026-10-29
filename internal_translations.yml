@@ -1385,7 +1385,7 @@ eng:
   "Annuncia a tutti i tracker": "Announce to all trackers"
   "Annuncia a tutti i tracker, non solo al primo di ogni tier.": "Announce to all trackers, not just the first of each tier."
   "Applica IP filter": "Apply IP filter"
-  "Applica il filtro IP anche ai tracker.": "Apply the IP filter to trackers as well."
+  "Applica il filtro IP anche ai tracker HTTP. Spento per impostazione predefinita: la lista predefinita contiene gli intervalli di Cloudflare e i tracker ospitati lì resterebbero irraggiungibili (tracker IP is blocked).": "Apply the IP filter to HTTP trackers too. Off by default: the bundled list contains Cloudflare ranges, and trackers hosted there would stay unreachable (tracker IP is blocked)."
   "Apre le porte del router automaticamente con NAT-PMP.": "Opens router ports automatically with NAT-PMP."
   "Apre le porte del router automaticamente con UPnP.": "Opens router ports automatically with UPnP."
   "Archivio": "Archive"

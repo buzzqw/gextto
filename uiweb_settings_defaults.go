@@ -108,7 +108,7 @@ var uiSettingDefaults = map[string]string{
 	"torrent_holepunch":                   "true",
 	"torrent_dht_bootstrap_nodes":         "",
 	"torrent_encryption":                  "1",
-	"torrent_apply_ip_filter":             "true",
+	"torrent_apply_ip_filter":             "false",
 	"torrent_ipfilter_url":                constants.DefaultIPFilterURL,
 	"torrent_listen_interfaces":           "0.0.0.0:6881-6891",
 	"torrent_outgoing_interface":          "",

@@ -178,8 +178,8 @@ type uiTorrentRow struct {
 	Archived bool
 	Reason   string
 	Source   string
-	// SeedInfinite marks a seeding torrent configured to seed without a ratio
-	// or time limit, rendered as the "seed ∞" badge.
+	// SeedInfinite marks a torrent configured to seed without a ratio or time
+	// limit, rendered as the "seed ∞" badge.
 	SeedInfinite bool
 	// Pinned marks the torrent forced out of the queue (the "📌 pin" badge);
 	// it is unpinned from its detail drawer.
@@ -904,11 +904,10 @@ func uiTorrentRows(s *AppState) []uiTorrentRow {
 				row.TotalDone = row.TotalSize
 			}
 		}
-		// An eD2k download follows the configured seed (rules and global
-		// limits): the badge says when it is kept sharing.
-		if view.State == "seeding" || view.State == "finished" {
-			row.SeedInfinite = policy.limitsFor(seedViewForPolicy(view)).none()
-		}
+		// The badge describes the seed policy of the torrent, not its current
+		// state: a torrent set to seed forever shows it from the moment the
+		// limits are saved, while it still downloads too.
+		row.SeedInfinite = policy.limitsFor(seedViewForPolicy(view)).none()
 		rows = append(rows, row)
 	}
 	// Default order in Scarico: alphabetical by name (case-insensitive), with

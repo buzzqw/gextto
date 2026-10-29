@@ -251,7 +251,7 @@ func main() {
 	noNATPMP := flag.Bool("no-natpmp", envBool("GX_TORRENT_NO_NATPMP", false), "do not open the port on the router with NAT-PMP")
 	ipFilter := flag.String("ipfilter", envOr("GX_TORRENT_IPFILTER", ""), "IP filter file (CIDR, ranges, P2P or eMule format)")
 	lang := flag.String("lang", envOr("GX_TORRENT_LANG", ""), "web page language (it, en, de, fr, es, pl; empty = English)")
-	ipFilterTrackers := flag.Bool("ipfilter-trackers", envBool("GX_TORRENT_IPFILTER_TRACKERS", true), "apply the IP filter to trackers too")
+	ipFilterTrackers := flag.Bool("ipfilter-trackers", envBool("GX_TORRENT_IPFILTER_TRACKERS", false), "apply the IP filter to trackers too")
 	dhtBootstrap := flag.String("dht-bootstrap", envOr("GX_TORRENT_DHT_BOOTSTRAP", ""), "comma-separated DHT router addresses (empty = built-in bootstrap nodes)")
 	webSourcesAllowPrivate := flag.Bool("web-sources-allow-private", envBool("GX_TORRENT_WEB_SOURCES_ALLOW_PRIVATE", false), "let web seeds and magnet xs=/as= sources reach private/LAN addresses (off: protects the LAN from URLs in untrusted torrents)")
 	dhtReadOnly := flag.Bool("dht-read-only", envBool("GX_TORRENT_DHT_READ_ONLY", false), "read-only DHT (BEP 43): do not answer queries and ask not to be added to routing tables")
