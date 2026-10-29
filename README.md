@@ -261,6 +261,10 @@ checkout: `git pull --ff-only && ./scripts/update.sh`.
 - **Notifications and media servers**: Telegram, e-mail, webhooks (Discord,
   Slack, ntfy, Gotify, Pushover), Jellyfin and Plex folder refreshes, an iCal
   feed of arrivals and air dates.
+- **From the browser**: magnets and `.torrent` files go straight into the queue,
+  with the `magnet:`/`.torrent` handlers or with any extension written for
+  qBittorrent (Torrent Control for Firefox), through the qBittorrent-compatible
+  `/api/v2` subset served on Gextto's own address.
 - **Traceability**: every download carries an **Acquisition ID** across
   search, selection, transfer, post-processing and archive logs; the dashboard
   **To check** panel keeps each warning while its download is active; a live

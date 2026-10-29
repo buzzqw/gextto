@@ -314,6 +314,8 @@ func Router(s *AppState) *http.ServeMux {
 	handle(s, mux, "GET /api/run_now", RunNow)
 	handle(s, mux, "POST /api/run_now", RunNow)
 	handle(s, mux, "POST /api/run-now", RunNow)
+	// The qBittorrent-compatible subset the browser extensions speak.
+	registerQbitCompatRoutes(s, mux)
 	registerV2Routes(s, mux)
 	return mux
 }

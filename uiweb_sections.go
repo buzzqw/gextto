@@ -547,7 +547,7 @@ func uiIntegrationSections(s *AppState, cfg *Config) []uiPageSection {
 		})),
 		group("Collegamenti", sectionLinks(uiLinksSection{
 			Title: "Handler del browser",
-			Hint:  "Scarica gli script per aprire magnet e file .torrent direttamente in Gextto.",
+			Hint:  "Scarica gli script per aprire magnet e file .torrent in Gextto, oppure punta un'estensione scritta per qBittorrent (Torrent Control) all'indirizzo di Gextto.",
 			Links: []uiLinkItem{
 				{Label: "Gestore magnet", Href: "/api/browser-handlers/download?file=gextto-magnet"},
 				{Label: "Gestore torrent", Href: "/api/browser-handlers/download?file=gextto-torrent"},

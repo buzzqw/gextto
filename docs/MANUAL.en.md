@@ -2714,6 +2714,28 @@ Key") instead of the bare HTTP code.
 | `install.sh` | Downloads the installation script. |
 | Check sources / Refresh | Checks feeds, indexers and web engines; with a query it also measures results, without changing settings. |
 
+### Browser extension (qBittorrent client)
+
+Gextto answers a subset of the qBittorrent API (`/api/v2`) on the address of its
+own interface, so an extension written for qBittorrent — *Torrent Control* for
+Firefox, for example — sends magnets and `.torrent` files to Gextto: the torrent
+enters the queue and the active engine downloads it (gx-core by default), as if
+it had been added from the interface.
+
+In the extension, configure a server with these values:
+
+| Field | Value |
+|---|---|
+| BitTorrent client | qBittorrent (current version) |
+| Server address | `http://<gextto address>:5000/` (the interface port, not the gx-torrent one) |
+| Username / Password | the ones of the protected access, when it is on; otherwise they can stay empty |
+| Download folder | empty to use the configured folder, or a path the engine accepts |
+| Label / Category | empty: categories, tags and a content layout other than *Original* are refused with an explicit error, because in Gextto they would change the queue tags and the folders on disk |
+
+When the protected access is on, the extension logs in with the same credentials
+as the interface and receives a session cookie valid only for `/api/v2`: the rest
+of the interface stays protected.
+
 ## Appendix C. Reference — Maintenance
 
 ### Quick actions

@@ -104,6 +104,11 @@ func (a authSettings) passwordMatches(password string) bool {
 	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)) == nil
 }
 
+// usernameMatches compares the configured user name with the one a client sent.
+func (a authSettings) usernameMatches(username string) bool {
+	return subtle.ConstantTimeCompare([]byte(strings.TrimSpace(username)), []byte(a.username)) == 1
+}
+
 func (a authSettings) apiKeyMatches(key string) bool {
 	key = strings.TrimSpace(key)
 	return a.apiKey != "" && key != "" && subtle.ConstantTimeCompare([]byte(key), []byte(a.apiKey)) == 1
@@ -210,10 +215,12 @@ func authClientAddress(r *http.Request) string {
 }
 
 // authPublicPath lists what the login page itself and an installed app need
-// before logging in.
+// before logging in. The qBittorrent-compatible login is here too: a client
+// written for qBittorrent has no Gextto session yet when it authenticates.
 func authPublicPath(path string) bool {
 	switch path {
-	case "/login", "/logout", "/favicon.ico", "/manifest.webmanifest", "/sw.js":
+	case "/login", "/logout", "/favicon.ico", "/manifest.webmanifest", "/sw.js",
+		"/api/v2/auth/login", "/api/v2/auth/logout":
 		return true
 	}
 	return strings.HasPrefix(path, "/static/")
@@ -256,6 +263,15 @@ func AuthMiddleware(s *AppState, next http.Handler) http.Handler {
 		if auth.apiKeyMatches(r.Header.Get("X-Api-Key")) || auth.apiKeyMatches(r.URL.Query().Get("apikey")) {
 			next.ServeHTTP(w, r)
 			return
+		}
+		// A qBittorrent client keeps only the SID cookie its login received, so
+		// that cookie opens the compatibility API and nothing else: the rest of
+		// the interface still needs Gextto's own session.
+		if strings.HasPrefix(r.URL.Path, "/api/v2/") {
+			if cookie, err := r.Cookie(qbitSIDCookie); err == nil && auth.sessionValid(cookie.Value, time.Now()) {
+				next.ServeHTTP(w, r)
+				return
+			}
 		}
 		if cookie, err := r.Cookie(authCookieName); err == nil && auth.sessionValid(cookie.Value, time.Now()) {
 			next.ServeHTTP(w, r)
@@ -331,7 +347,7 @@ func authLoginHandler(s *AppState, auth authSettings, w http.ResponseWriter, r *
 		return
 	}
 	username := strings.TrimSpace(r.FormValue("username"))
-	if subtle.ConstantTimeCompare([]byte(username), []byte(auth.username)) != 1 || !auth.passwordMatches(r.FormValue("password")) {
+	if !auth.usernameMatches(username) || !auth.passwordMatches(r.FormValue("password")) {
 		authLoginFailed(client, now)
 		logging.Warn(fmt.Sprintf("Failed login to the web interface from %s", client))
 		authRenderLogin(s, w, next, "Utente o password errati.", http.StatusUnauthorized)

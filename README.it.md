@@ -268,6 +268,10 @@ un checkout: `git pull --ff-only && ./scripts/update.sh`.
 - **Notifiche e media server**: Telegram, e-mail, webhook (Discord, Slack,
   ntfy, Gotify, Pushover), aggiornamento delle cartelle di Jellyfin e Plex, un
   feed iCal di arrivi e date di uscita.
+- **Dal browser**: magnet e file `.torrent` entrano dritti nella coda, con gli
+  handler `magnet:`/`.torrent` oppure con un'estensione scritta per qBittorrent
+  (Torrent Control per Firefox), tramite il sottoinsieme `/api/v2` compatibile
+  con qBittorrent servito sull'indirizzo di Gextto.
 - **Tracciabilità**: ogni download porta un **ID di acquisizione** attraverso i
   log di ricerca, scelta, trasferimento, post-elaborazione e archivio; il
   pannello **Da controllare** della dashboard tiene ogni avviso finché il suo

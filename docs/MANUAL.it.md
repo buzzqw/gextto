@@ -2792,6 +2792,28 @@ Key») invece del solo codice HTTP.
 | `install.sh` | Scarica lo script di installazione. |
 | Verifica sorgenti / Aggiorna | Controlla feed, indexer e motori web; con una ricerca misura anche i risultati, senza cambiare le impostazioni. |
 
+### Estensione del browser (client qBittorrent)
+
+Gextto risponde a un sottoinsieme dell'API di qBittorrent (`/api/v2`) proprio
+sull'indirizzo dell'interfaccia, così un'estensione scritta per qBittorrent —
+per esempio *Torrent Control* per Firefox — manda magnet e file `.torrent` a
+Gextto: il torrent entra in coda e lo scarica il motore attivo (gx-core per
+default), come se fosse stato aggiunto dall'interfaccia.
+
+Nell'estensione si configura un server con questi valori:
+
+| Campo | Valore |
+|---|---|
+| Client BitTorrent | qBittorrent (versione corrente) |
+| Indirizzo del server | `http://<indirizzo-di-gextto>:5000/` (la porta dell'interfaccia, non quella di gx-torrent) |
+| Utente / Password | quelli dell'accesso protetto, se è attivo; altrimenti si possono lasciare vuoti |
+| Cartella di scaricamento | vuota per usare la cartella configurata, oppure un percorso accettato dal motore |
+| Etichetta / Categoria | vuota: categorie, tag e layout del contenuto diversi da *Original* sono rifiutati con un errore esplicito, perché in Gextto cambierebbero i tag della coda e le cartelle su disco |
+
+Quando l'accesso protetto è attivo, l'estensione fa il login con le stesse
+credenziali dell'interfaccia e riceve un cookie di sessione valido solo per
+`/api/v2`: il resto dell'interfaccia resta protetto.
+
 ## Appendice C. Riferimento — Manutenzione
 
 ### Azioni rapide

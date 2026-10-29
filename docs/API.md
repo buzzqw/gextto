@@ -5,8 +5,9 @@ surface reference, not a stable integration contract for every payload: before
 automating an action, check the request and the response on the running build.
 
 The document covers two servers: the **Gextto daemon** (`/api/…`, the routes
-below) and the **gx-torrent daemon**, which exposes its own native `/api/v1` and
-a qBittorrent-compatible `/api/v2` (see *gx-torrent daemon routes* at the end).
+below, plus a qBittorrent-compatible subset under `/api/v2`) and the
+**gx-torrent daemon**, which exposes its own native `/api/v1` and a
+qBittorrent-compatible `/api/v2` (see *gx-torrent daemon routes* at the end).
 
 ## Before using the API
 
@@ -348,6 +349,20 @@ state.
 | POST | `/api/update/apply` | apply the update |
 | POST | `/api/update/check` | check for updates |
 | POST | `/api/upload-torrent` | upload a .torrent file |
+| POST | `/api/v2/auth/login` | qBittorrent-compatible login: the credentials of the access control, answered with Ok. or Fails. and the SID cookie |
+| POST | `/api/v2/auth/logout` | qBittorrent-compatible logout: drops the SID cookie |
+| GET | `/api/v2/app/defaultSavePath` | download folder of the configuration |
+| GET | `/api/v2/app/version` | Gextto's version in the qBittorrent format (a v prefix) |
+| GET | `/api/v2/app/webapiVersion` | version of the Web API subset |
+| POST | `/api/v2/torrents/add` | add torrents the way the browser extensions do: the urls field (magnets and http(s) .torrent addresses) or the uploaded .torrent files, with stopped/paused, savepath, sequentialDownload, firstLastPiecePrio and skip_checking |
+| POST | `/api/v2/torrents/delete` | remove torrents (hashes, deleteFiles) |
+| GET | `/api/v2/torrents/info` | torrent list in the qBittorrent shape (hashes and filter honoured) |
+| POST | `/api/v2/torrents/pause` | pause torrents (hashes, empty = all) |
+| POST | `/api/v2/torrents/recheck` | recheck the data (hashes) |
+| POST | `/api/v2/torrents/resume` | resume torrents (hashes, empty = all) |
+| POST | `/api/v2/torrents/start` | resume torrents (qBittorrent 5.x alias of resume) |
+| POST | `/api/v2/torrents/stop` | pause torrents (qBittorrent 5.x alias of pause) |
+| GET | `/api/v2/transfer/info` | global download and upload speeds |
 | GET | `/api/watched-folders` | watched folders |
 | POST | `/api/watched-folders` | save the watched folders |
 | GET | `/favicon.ico` | favicon |
@@ -355,7 +370,7 @@ state.
 | GET | `/feed/calendar.ics` | calendar feed (iCal) |
 | GET | `/magnet` | add from a magnet link |
 
-Total routes: 267
+Total routes: 281
 
 The temporary speed limit (`POST /api/torrents/temp-limits`) is the speed
 exception: it wins over the rule chosen in the settings (fixed limits, Auto or the
@@ -443,6 +458,36 @@ from—never a single title's exclusions. The v3 lookup records report the first
 profile of the saved list as their `qualityProfileId` (the profile the add form
 preselects), and `POST /api/v3/series`/`POST /api/v3/movie` answer 400 for a
 `qualityProfileId` that does not exist while 0 or absent means that default.
+
+### qBittorrent-compatible subset (`/api/v2`)
+
+The `/api/v2` routes of the table are the subset of the qBittorrent Web API a
+browser extension needs (Torrent Control and similar) to send a magnet link or a
+`.torrent` file to Gextto: the torrent enters the queue and the active engine
+downloads it, as if it had been added from the interface. It is a compatibility
+layer on Gextto's own address, not a qBittorrent replacement: RSS, the search
+plugins, categories, tags, the sync API and the file/peer details are not
+implemented, and `POST /api/v2/torrents/add` **refuses** `category`, `tags` and a
+`contentLayout` other than `Original` with 400 instead of ignoring them (in
+Gextto a category is a download tag, and the content layout decides the folders
+on disk, so a silent no-op would put the torrent somewhere else than the client
+asked).
+
+- The answers are qBittorrent's: the plain `Ok.`/`Fails.` texts and `409` when
+  the torrent is already there.
+- `POST /api/v2/auth/login` accepts the credentials of the access control and
+  leaves the `SID` cookie; while the access control is off, or with the local
+  exemption for a client on the LAN, any credentials are accepted. The `SID`
+  cookie opens **only** `/api/v2`: the rest of the interface still needs
+  Gextto's own session.
+- The login and the logout are reachable without a session (that is how a client
+  authenticates); the other routes need it like the rest of the API.
+- `GET /api/v2/torrents/info` honours `hashes` and the common `filter` values and
+  lists everything else; sorting, paging and the category/tag filters are not
+  part of the subset.
+- These routes exist whatever engine is active, because Gextto stays the only
+  master: the transfer is handed to gx-core or to qBittorrent-nox by the engine
+  in use.
 
 ## gx-torrent daemon routes
 

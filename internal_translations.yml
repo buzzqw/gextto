@@ -4146,7 +4146,7 @@ eng:
   "Rimuove solo dati tecnici non più necessari: conserva gli ultimi cicli indicati e cancella le schede dei torrent in errore più vecchie del limite scelto. Non elimina file multimediali, libreria, torrent attivi o impostazioni.": "Removes only technical data that is no longer needed: keeps the last indicated cycles and deletes the records of torrents in error older than the chosen limit. It does not delete media files, library, active torrents or settings."
   "Rinomina tutti i file archiviati secondo il formato configurato.": "Renames all archived files according to the configured format."
   "Risultati": "Results"
-  "Scarica gli script per aprire magnet e file .torrent direttamente in Gextto.": "Download the scripts to open magnet links and .torrent files directly in Gextto."
+  "Scarica gli script per aprire magnet e file .torrent in Gextto, oppure punta un'estensione scritta per qBittorrent (Torrent Control) all'indirizzo di Gextto.": "Download the scripts to open magnet links and .torrent files in Gextto, or point an extension written for qBittorrent (Torrent Control) at Gextto's address."
   "Sciame (seed / peer)": "Swarm (seed / peer)"
   "Situazione": "Situation"
   "Stato assegnato alle serie importate nella watchlist Simkl.": "Status assigned to the series imported into the Simkl watchlist."
