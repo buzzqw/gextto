@@ -206,9 +206,10 @@ Every protocol message used to be its own `Write`: a refill of 250 block request
 takes the run of small messages at the head of its queue in one hand-off and sends it
 with one `Write`; block uploads still go one by one. `BenchmarkPeerWriterRequestsTCP`
 sends 400 refills of 250 requests over loopback TCP; the syscalls were counted with
-`strace -f -c` on the test binary of the previous commit and of this one (the wall
-times under `strace` only show the direction: the machine was loaded, load average
-above 20, so plain timings were noise and are not recorded):
+`strace -f -c` on the test binary of the previous commit and of this one. The wall
+times were taken separately, on 2026-10-30 with the machine quiet (load average
+1.7–2.6), running the two binaries alternately six times each (`GOMAXPROCS=2`): the
+first pass, with the machine loaded above 20, was noise.
 
 | Measure (100,000 requests) | Before | After |
 |---|---|---|
@@ -216,6 +217,7 @@ above 20, so plain timings were noise and are not recorded):
 | all traced syscalls (`write`, `read`, `futex`, …) | 144,329 | **4,842** |
 | writes per message, `BenchmarkPeerWriterRequests` (counting conn, 6 runs) | 1.000 | **0.014–0.021** |
 | heap per refill of 250 | 27.4 KiB, 750 allocs | **15.6–15.9 KiB, 500 allocs** |
+| time per refill of 250 over loopback TCP, `BenchmarkPeerWriterRequestsTCP` | 1.70–2.85 ms | **0.28–0.46 ms** |
 
 Reproduce with `go test -c ./internal/gxcore/internal/peerconn/peerwriter/` and
 `strace -f -c -e trace=write,read,futex ./peerwriter.test -test.run '^$' -test.bench RequestsTCP -test.benchtime=400x`.
