@@ -14,6 +14,8 @@ manual is online: [English](docs/MANUAL.en.md) ·
 [GitHub issues](https://github.com/buzzqw/gextto/issues).
 
 ## 29 October 2026
+- **gx-torrent asks peers for data with far fewer packets.** Block requests to a peer went out one by one, each with its own socket write and its own network packet: 250 requests were 250 packets. Requests and the other short queued messages now leave together in one write, and the system calls for the same number of requests drop about fiftyfold. Less CPU and fewer packets on the network while downloading, especially with many fast peers; sending data to others is unchanged. Nothing to configure.
+
 - **gx-torrent uses less CPU on large torrents.** When a peer disconnects, the engine no longer walks every piece of the torrent, only the ones that peer had: on a 27,000-piece torrent the cost drops about fourfold, which matters in swarms where peers come and go all the time. In sequential download (streaming) the choice of the next piece no longer starts from the beginning of the file, so near the end of a large download it costs nothing. Nothing to configure.
 
 - **Several clients connected to gx-torrent stay incrementally updated.** qBittorrent-compatible web interfaces (VueTorrent and the like) ask gx-torrent only for what changed since their last reply. With two clients open at once — two browser tabs, or a web interface and another app — each made the other lose track, and both received the whole torrent list on every poll. Each client now receives the changes since its own last reply. Nothing to configure.

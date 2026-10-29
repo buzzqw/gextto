@@ -199,6 +199,53 @@ machine, six runs each, `GOMAXPROCS=2`, before and after on the same checkout:
 Reproduce with
 `go test -run '^$' -bench 'BenchmarkPicker' -benchmem -count=6 ./internal/gxcore/internal/piecepicker/`
 
+### Peer writer: small messages batched into one write (2026-10-29, N97)
+
+Every protocol message used to be its own `Write`: a refill of 250 block requests
+(17 bytes each) was 250 syscalls and, with `TCP_NODELAY`, 250 segments. The writer now
+takes the run of small messages at the head of its queue in one hand-off and sends it
+with one `Write`; block uploads still go one by one. `BenchmarkPeerWriterRequestsTCP`
+sends 400 refills of 250 requests over loopback TCP; the syscalls were counted with
+`strace -f -c` on the test binary of the previous commit and of this one (the wall
+times under `strace` only show the direction: the machine was loaded, load average
+above 20, so plain timings were noise and are not recorded):
+
+| Measure (100,000 requests) | Before | After |
+|---|---|---|
+| `write` syscalls | 100,309 | **1,972** |
+| all traced syscalls (`write`, `read`, `futex`, …) | 144,329 | **4,842** |
+| writes per message, `BenchmarkPeerWriterRequests` (counting conn, 6 runs) | 1.000 | **0.014–0.021** |
+| heap per refill of 250 | 27.4 KiB, 750 allocs | **15.6–15.9 KiB, 500 allocs** |
+
+Reproduce with `go test -c ./internal/gxcore/internal/peerconn/peerwriter/` and
+`strace -f -c -e trace=write,read,futex ./peerwriter.test -test.run '^$' -test.bench RequestsTCP -test.benchtime=400x`.
+
+### Seeding dials leechers (2026-10-29, N97)
+
+A completed torrent never opened an outgoing connection: it kept the peers a tracker sent
+only while downloading, so it could serve only peers that connected to it, and a leecher
+behind a NAT never got the data. The change dials up to `seedDialBudget` (10) candidates
+while seeding, asks for peers on the completed announce, and remembers the peers that
+answer with a full bitfield so a seed is not dialed twice. The dial path is cold (a few
+addresses per announce); the harnesses that exercise serving were re-run on the checkout
+that became build `1.2.2096`:
+
+| Harness | Result | What it measures |
+|---|---|---|
+| `make measure-seeding` | 2 MiB, 3 leechers: **3.00× corpus** in 24 ms | the local swarm served by the seed |
+| `make measure-choking` | libtorrent leecher: **50,331,648 bytes (100 % of the file) in 5.587 s** | a real external client served on its incoming connection |
+| `BenchmarkEngineListSnapshot` (2,000 torrents) | **0.76–1.13 ms/op, 1.00 MB, 1 alloc** | one read of the torrent snapshot |
+| `BenchmarkEngineSnapshotTwelveCalls` (2,000 torrents) | **9.0–12.1 ms, 12.3 MB, 12 allocs** | the twelve reads of one tick |
+
+The snapshot benchmark allocates exactly what the 29 October figures in §3 allocated; its
+wall time came out 20–70 % higher, with the daemon stopped just before the run and the
+machine still settling. The patch does not touch that path, so the difference is the host,
+not the change. The real-swarm half of the campaign is still open: what is missing is a
+public torrent with leechers that only a seed's outgoing dial can reach.
+
+Reproduce with `make measure-seeding`, `make measure-choking` and
+`CGO_ENABLED=0 go test -run '^$' -bench 'BenchmarkEngineListSnapshot|BenchmarkEngineSnapshotTwelveCalls' -benchmem -count=3 .`
+
 ## 4. Investigations and decisions
 
 Each entry states the question, the numbers that answered it and the decision. The

@@ -15,6 +15,8 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
 [issue su GitHub](https://github.com/buzzqw/gextto/issues).
 
 ## 29 ottobre 2026
+- **gx-torrent chiede i dati ai peer con molti meno pacchetti.** Le richieste dei blocchi a un peer partivano una per una, ognuna con la sua scrittura sul socket e il suo pacchetto di rete: 250 richieste erano 250 pacchetti. Ora le richieste e gli altri messaggi brevi in coda partono insieme in una sola scrittura, e le chiamate al sistema per la stessa quantità di richieste scendono di circa cinquanta volte. Meno CPU e meno pacchetti sulla rete durante i download, soprattutto con molti peer veloci; l'invio dei dati agli altri resta com'era. Niente da configurare.
+
 - **gx-torrent consuma meno CPU sui torrent grandi.** Quando un peer si disconnette, il motore non ripassa più tutti i pezzi del torrent ma solo quelli che il peer aveva: su un torrent da 27.000 pezzi il costo scende di circa quattro volte, e conta su sciami dove i peer vanno e vengono di continuo. Nel download sequenziale (streaming) la scelta del pezzo successivo non riparte più dall'inizio del file, quindi verso la fine di un download grande non costa più nulla. Niente da configurare.
 
 - **Più client collegati a gx-torrent restano aggiornati in modo incrementale.** Le interfacce web compatibili con qBittorrent (VueTorrent e simili) chiedono a gx-torrent solo cosa è cambiato dall'ultima risposta. Con due client aperti insieme — due schede del browser, o un'interfaccia web e un'altra app — ognuno faceva perdere il filo all'altro e tutti e due ricevevano a ogni giro l'elenco completo dei torrent. Ora ogni client riceve le differenze rispetto alla propria ultima risposta. Niente da configurare.
