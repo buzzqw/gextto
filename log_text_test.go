@@ -383,3 +383,16 @@ func TestGxExitTextIsASentence(t *testing.T) {
 		t.Errorf("third stop = %q, want %q", got, want)
 	}
 }
+
+func TestRoutineSkipReasonKeepsBlocklistedCandidatesQuiet(t *testing.T) {
+	for _, reason := range []string{"duplicate", "active_episode", "blocklisted"} {
+		if !routineSkipReason(reason) {
+			t.Errorf("routineSkipReason(%q) = false, want true", reason)
+		}
+	}
+	for _, reason := range []string{"dead_swarm_empty", "dead_swarm_upgrade", "upgrades_disabled", "smart_episode", ""} {
+		if routineSkipReason(reason) {
+			t.Errorf("routineSkipReason(%q) = true, want false", reason)
+		}
+	}
+}

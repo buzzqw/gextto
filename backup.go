@@ -57,6 +57,42 @@ var excludedEntries = []string{
 // the writable probes and of an interrupted backup's scratch folder.
 var excludedPrefixes = []string{".health-probe-", ".gextto-backup-"}
 
+// excludedRelativePaths are download staging folders inside the data
+// directory. They hold partial content, not configuration: an eD2k file still
+// arriving and the pieces gx-torrent writes before moving a finished file to
+// its destination. Saving them would make every backup carry the same
+// in-progress data and could restore a half-downloaded file.
+var excludedRelativePaths = []string{
+	"gx-ed2k/incoming",
+	"gx-torrent/parts",
+}
+
+// backupExcludedRelative reports whether a data-directory relative path is one
+// of the download staging folders or lives below it.
+func backupExcludedRelative(relative string) bool {
+	relative = filepath.ToSlash(filepath.Clean(relative))
+	for _, excluded := range excludedRelativePaths {
+		if relative == excluded || strings.HasPrefix(relative, excluded+"/") {
+			return true
+		}
+	}
+	return false
+}
+
+// backupExcludedPath applies backupExcludedRelative to an absolute path when
+// it belongs to the data directory. Paths outside it are never excluded by
+// these rules.
+func backupExcludedPath(dataDir, path string) bool {
+	if !backupPathWithin(path, dataDir) {
+		return false
+	}
+	relative, err := filepath.Rel(dataDir, path)
+	if err != nil {
+		return false
+	}
+	return backupExcludedRelative(relative)
+}
+
 // snapshotDatabase produces a consistent copy of a live database with the
 // online backup API. Copying the file while the daemon writes can capture a
 // torn or stale state (commits still only in the -wal); the backup API
@@ -546,15 +582,19 @@ func addExtraPaths(writer *zip.Writer, dataDir string, extras []string) error {
 			logging.Warn("backup extra path is a symlink, skipped", "path", path)
 			continue
 		}
-		if err := addExtraPath(writer, path, info, added); err != nil {
+		if err := addExtraPath(writer, dataDir, path, info, added); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func addExtraPath(writer *zip.Writer, path string, info os.FileInfo, added map[string]bool) error {
+func addExtraPath(writer *zip.Writer, dataDir, path string, info os.FileInfo, added map[string]bool) error {
 	name := extraBackupEntry + "/" + filepath.ToSlash(strings.TrimPrefix(filepath.Clean(path), string(filepath.Separator)))
+	if backupExcludedPath(dataDir, path) {
+		logging.Debug("backup extra path is a download staging folder", "path", path)
+		return nil
+	}
 	if !info.IsDir() {
 		if !info.Mode().IsRegular() {
 			logging.Warn("backup extra path is not a regular file, skipped", "path", path)
@@ -569,6 +609,12 @@ func addExtraPath(writer *zip.Writer, path string, info os.FileInfo, added map[s
 	return filepath.WalkDir(path, func(current string, entry os.DirEntry, err error) error {
 		if err != nil {
 			return err
+		}
+		if backupExcludedPath(dataDir, current) {
+			if entry.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
 		}
 		if entry.Type()&os.ModeSymlink != 0 {
 			if entry.IsDir() {
@@ -623,6 +669,9 @@ func addDirectory(writer *zip.Writer, root, current, backupRoot, skip string) er
 		relative, err := filepath.Rel(root, path)
 		if err != nil {
 			return err
+		}
+		if backupExcludedRelative(relative) {
+			continue
 		}
 		name := filepath.ToSlash(relative)
 		if info.IsDir() {

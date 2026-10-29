@@ -14,6 +14,10 @@ manual is online: [English](docs/MANUAL.en.md) ·
 [GitHub issues](https://github.com/buzzqw/gextto/issues).
 
 ## 29 October 2026
+- **Backups no longer save downloads in progress.** A Gextto ZIP no longer contains `gx-ed2k/incoming` (eD2k files still arriving) or `gx-torrent/parts` (the torrent engine's temporary pieces): they are partial data that is downloaded again, and on a large download they could weigh as much as the whole file. Configuration and the neighbouring folders stay in the backup. It applies to automatic, manual and command-line backups; backups already created are untouched.
+
+- **A blocklisted torrent no longer fills the log.** When Gextto discards a release because it is on the blocklist, the line «Skipped … it is on the blocklist» moves from INFO to DEBUG: it stays visible when you raise the verbosity, but no longer appears on every cycle. The other skip reasons stay at INFO.
+
 
 - **An upgrade is decided on the file you have, not on the release name.** Before downloading a "better" version Gextto compared the release name with the name of the library file: when that file had been renamed without its attributes — the standard name keeps only resolution and codec — any release with «2160p DV» in its name looked better. On 29 October this happened to three files in one day: downloaded, copied into the library and then discarded because the copy already there was equal or better. Now, when the real quality of the library copy has not been read yet, Gextto reads it from the file before deciding: when it is not a real improvement the download never starts, and the reading is kept for the next searches. When the file cannot be read or is not there, the decision stays the one of before.
 

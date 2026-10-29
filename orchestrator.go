@@ -1376,8 +1376,8 @@ func RunCycleDomain(
 			default:
 				skips.Other++
 			}
-			if approvalReason == "duplicate" || approvalReason == "active_episode" {
-				logging.Debug("download skipped (already present or active)",
+			if routineSkipReason(approvalReason) {
+				logging.Debug("download skipped (routine rejection)",
 					"target", releaseTarget(&release),
 					"score", score,
 					"reason", decisionReason,

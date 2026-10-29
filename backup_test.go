@@ -96,6 +96,12 @@ func TestBackupCreateSnapshotIncludesDatabasesAndExcludesContent(t *testing.T) {
 	writeBackupFile(t, filepath.Join(dataDir, "trash", "Show.S01E01.mkv"), "video")
 	writeBackupFile(t, filepath.Join(dataDir, ".health-probe-123-4"), "")
 	writeBackupFile(t, filepath.Join(dataDir, ".gextto-run.json"), "{}")
+	// Download staging folders: never in a backup. Their configuration
+	// siblings stay, so the exclusion is path-based and not a blanket name.
+	writeBackupFile(t, filepath.Join(dataDir, "gx-ed2k", "incoming", "partial.bin"), "partial")
+	writeBackupFile(t, filepath.Join(dataDir, "gx-ed2k", "config.json"), "{}\n")
+	writeBackupFile(t, filepath.Join(dataDir, "gx-torrent", "parts", "chunk.bin"), "chunk")
+	writeBackupFile(t, filepath.Join(dataDir, "gx-torrent", "config.json"), "{}\n")
 
 	archive, err := CreateSnapshot(dataDir, backupRoot, 3)
 	if err != nil {
@@ -115,7 +121,7 @@ func TestBackupCreateSnapshotIncludesDatabasesAndExcludesContent(t *testing.T) {
 	}
 
 	files := readBackupZip(t, archive)
-	for _, required := range []string{"gextto_series.db", "gextto_config.db", "gextto_comics.db", "gextto.json", "custom/extra.txt"} {
+	for _, required := range []string{"gextto_series.db", "gextto_config.db", "gextto_comics.db", "gextto.json", "custom/extra.txt", "gx-ed2k/config.json", "gx-torrent/config.json"} {
 		if _, ok := files[required]; !ok {
 			t.Errorf("archive is missing %q; entries: %v", required, backupZipNames(files))
 		}
@@ -130,6 +136,8 @@ func TestBackupCreateSnapshotIncludesDatabasesAndExcludesContent(t *testing.T) {
 		"trash/Show.S01E01.mkv",
 		".health-probe-123-4",
 		".gextto-run.json",
+		"gx-ed2k/incoming/partial.bin",
+		"gx-torrent/parts/chunk.bin",
 	} {
 		if _, ok := files[excluded]; ok {
 			t.Errorf("archive must not contain %q; entries: %v", excluded, backupZipNames(files))
@@ -513,6 +521,39 @@ func TestBackupConcurrentSnapshotsAreSafe(t *testing.T) {
 	for _, entry := range entries {
 		if strings.HasPrefix(entry.Name(), ".gextto-backup-") {
 			t.Fatalf("leftover scratch folder: %s", entry.Name())
+		}
+	}
+}
+
+// TestBackupExtraParentDoesNotRestoreDownloadStaging covers a backup_extra_paths
+// entry that contains the data directory as a subfolder (for example the home
+// directory). The download staging folders must stay out of the archive even
+// when they are reached through that extra walk, while their configuration
+// siblings remain.
+func TestBackupExtraParentDoesNotRestoreDownloadStaging(t *testing.T) {
+	root := t.TempDir()
+	dataDir := filepath.Join(root, "gextto-data")
+	backupRoot := filepath.Join(root, "backups")
+	writeBackupFile(t, filepath.Join(dataDir, "gextto.json"), "{}\n")
+	writeBackupFile(t, filepath.Join(dataDir, "gx-ed2k", "incoming", "partial.bin"), "partial")
+	writeBackupFile(t, filepath.Join(dataDir, "gx-ed2k", "config.json"), "{}\n")
+	writeBackupFile(t, filepath.Join(dataDir, "gx-torrent", "parts", "chunk.bin"), "chunk")
+	writeBackupFile(t, filepath.Join(dataDir, "gx-torrent", "config.json"), "{}\n")
+
+	archive, err := CreateSnapshotWithExtras(dataDir, backupRoot, 3, []string{root})
+	if err != nil {
+		t.Fatalf("CreateSnapshotWithExtras: %v", err)
+	}
+	files := readBackupZip(t, archive)
+	prefix := "extra/" + strings.TrimPrefix(filepath.ToSlash(root), "/") + "/gextto-data/"
+	for _, excluded := range []string{"gx-ed2k/incoming/partial.bin", "gx-torrent/parts/chunk.bin"} {
+		if _, ok := files[prefix+excluded]; ok {
+			t.Errorf("archive must not contain %q; entries: %v", prefix+excluded, backupZipNames(files))
+		}
+	}
+	for _, required := range []string{"gx-ed2k/config.json", "gx-torrent/config.json"} {
+		if _, ok := files[prefix+required]; !ok {
+			t.Errorf("archive is missing %q; entries: %v", prefix+required, backupZipNames(files))
 		}
 	}
 }

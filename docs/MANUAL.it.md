@@ -1650,9 +1650,11 @@ prima di avviare upgrade e ricerche mancanti.
 Lascia fuori ciò che si riscarica o si ricostruisce: la sessione torrent e i suoi
 dati di ripresa (`gextto_torrents_state`, `gx-torrent/session.db`), il filtro IP,
 le cache degli scraper, i fumetti, i log e il cestino predefinito
-(`<dati>/trash`). Fuori dalla cartella dati non contiene
-`/etc/gextto/gextto.env` (le tue variabili d'ambiente, se ne hai aggiunte):
-conservane una copia tu.
+(`<dati>/trash`). Non contiene nemmeno le cartelle di transito dei download:
+`gx-ed2k/incoming` (file eD2k ancora in arrivo) e `gx-torrent/parts` (pezzi
+temporanei), perché sono dati parziali che si riscaricano. Fuori dalla cartella
+dati non contiene `/etc/gextto/gextto.env` (le tue variabili d'ambiente, se ne
+hai aggiunte): conservane una copia tu.
 
 **Ripristino sulla stessa macchina o su una nuova.**
 

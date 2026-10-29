@@ -371,6 +371,19 @@ func archiveCoversRelease(archive *models.ArchiveQualityIndex, release *models.R
 	return false
 }
 
+// routineSkipReason reports the rejections that are expected during a normal
+// cycle: an item already in the library, an episode already downloading, or a
+// release the operator permanently blocklisted. They stay at debug level so a
+// blocklisted torrent does not fill the readable log on every search.
+func routineSkipReason(approvalReason string) bool {
+	switch approvalReason {
+	case "duplicate", "active_episode", "blocklisted":
+		return true
+	default:
+		return false
+	}
+}
+
 // skipReasonText explains why a candidate was not downloaded.
 func skipReasonText(approvalReason string) string {
 	switch approvalReason {

@@ -1598,9 +1598,11 @@ moved, fix paths or scan the archive before starting upgrades and missing search
 It leaves out what is downloaded or rebuilt: the torrent session and its
 resume data (`gextto_torrents_state`, `gx-torrent/session.db`), the IP filter,
 the scraper caches, the comics, the logs and the default recycle bin
-(`<data>/trash`). Outside the data folder it does not hold
-`/etc/gextto/gextto.env` (your environment overrides, if you added any): keep
-a copy of it yourself.
+(`<data>/trash`). It also leaves out the download staging folders:
+`gx-ed2k/incoming` (eD2k files still arriving) and `gx-torrent/parts`
+(temporary pieces), because they are partial data that is downloaded again.
+Outside the data folder it does not hold `/etc/gextto/gextto.env` (your
+environment overrides, if you added any): keep a copy of it yourself.
 
 **Restoring on the same or a new machine.**
 
