@@ -100,3 +100,14 @@ func TestSessionSetLimitLocalPeersReachesTorrents(t *testing.T) {
 		t.Fatal("SetLimitLocalPeers(false) must lift the LAN limits of every torrent")
 	}
 }
+
+// TestProxiedPeersAreNeverLocal: behind a proxy a connection reports the
+// proxy's address, so a proxy on the LAN must not lift the limits of every peer.
+func TestProxiedPeersAreNeverLocal(t *testing.T) {
+	tr := limitedTorrent(false)
+	tr.session = &Session{config: Config{Proxy: "socks5://192.168.1.2:1080"}}
+	down, up := tr.peerLimiters(&net.TCPAddr{IP: net.ParseIP("192.168.1.2"), Port: 1080})
+	if !throttled(down) || !throttled(up) {
+		t.Fatal("a peer reached through a proxy must keep the torrent limits")
+	}
+}

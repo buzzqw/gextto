@@ -2077,7 +2077,9 @@ per-torrent limits too. Those peers hold a limiter of their own that forwards
 to the torrent limiter only when the option is on, so switching it applies at
 once to the peers already connected. Gextto passes the flag to the managed
 daemon from *Apply the limits to peers on the local network too*. Web seeds
-keep the torrent limits whatever their address.
+keep the torrent limits whatever their address. With a proxy configured no
+peer counts as local: a proxied connection reports the proxy's address, often
+loopback or a LAN host, which would otherwise lift the limits for every peer.
 
 Every torrent also has its own **connection limit** and **upload
 slots** (`POST /api/v1/torrents/{hash}/conn-limits`, fields `max_connections` and

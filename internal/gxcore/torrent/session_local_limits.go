@@ -38,9 +38,12 @@ func (t *torrent) applyLocalPeerLimits(on bool) {
 }
 
 // peerLimiters picks the limiters a new peer holds: the local ones for a peer
-// on the local network, the torrent ones otherwise.
+// on the local network, the torrent ones otherwise. Behind a proxy no peer is
+// local: a proxied connection reports the proxy's address (often 127.0.0.1 or a
+// LAN host), which would lift the limits for every peer.
 func (t *torrent) peerLimiters(addr net.Addr) (download, upload *bandwidth.Limiter) {
-	if isLocalPeerAddr(addr) && t.bucketLocalDownload != nil {
+	proxied := t.session != nil && t.session.config.Proxy != ""
+	if !proxied && isLocalPeerAddr(addr) && t.bucketLocalDownload != nil {
 		return t.bucketLocalDownload, t.bucketLocalUpload
 	}
 	return t.bucketDownload, t.bucketUpload
