@@ -19,6 +19,7 @@ manual is online: [English](docs/MANUAL.en.md) ·
 
 - **The archive scan lines have an icon too.** "Archive scan completed", "Archive scan finished with errors" and the files skipped during a scan now start with an icon like the other log lines, so they no longer look attached to the INFO level.
 
+- **A feed is paused with a `#`.** In *Configuration → Sources → RSS feeds* a line starting with `#` — with or without a space (`# https://…` or `#https://…`) — is no longer read on every cycle, but stays in the list: removing the hash brings the feed back without retyping it.
 
 ## 28 October 2026
 

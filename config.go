@@ -364,6 +364,52 @@ func parseConfigList(value string) []string {
 	return result
 }
 
+// feedLinesFromSetting returns every line stored for the feed list, comments
+// included. The settings editor shows them so the operator can re-enable a
+// feed without retyping its URL.
+func feedLinesFromSetting(value string) []string {
+	raw := strings.TrimSpace(value)
+	if raw == "" {
+		return nil
+	}
+	if strings.HasPrefix(raw, "[") {
+		var lines []string
+		if err := json.Unmarshal([]byte(raw), &lines); err == nil {
+			return lines
+		}
+	}
+	// Older installations stored a single URL, or a newline-separated list,
+	// without the JSON array.
+	return strings.Split(raw, "\n")
+}
+
+// feedSettingLines normalizes what the editor sends: one source per line, with
+// empty lines dropped and comments (a leading '#') kept.
+func feedSettingLines(text string) []string {
+	lines := make([]string, 0)
+	for _, line := range strings.Split(text, "\n") {
+		if trimmed := strings.TrimSpace(line); trimmed != "" {
+			lines = append(lines, trimmed)
+		}
+	}
+	return lines
+}
+
+// activeFeedURLs removes empty and commented lines. A line whose first
+// non-space character is '#' stays in the setting but is never read: it is how
+// the operator disables a source without deleting it.
+func activeFeedURLs(lines []string) []string {
+	feeds := make([]string, 0, len(lines))
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
+			continue
+		}
+		feeds = append(feeds, trimmed)
+	}
+	return feeds
+}
+
 // contentFilterRanges maps a named Unicode-script filter to its code point
 // ranges.
 func contentFilterRanges(filter string) ([][2]int64, bool) {
@@ -2363,16 +2409,7 @@ func (c *Config) loadConfigDB() error {
 		return err
 	}
 	if value, ok := c.Settings["url"]; ok {
-		var feeds []string
-		if strings.HasPrefix(strings.TrimSpace(value), "[") {
-			if err := json.Unmarshal([]byte(value), &feeds); err == nil {
-				c.FeedURLs = feeds
-			} else {
-				c.FeedURLs = []string{value}
-			}
-		} else {
-			c.FeedURLs = []string{value}
-		}
+		c.FeedURLs = activeFeedURLs(feedLinesFromSetting(value))
 	}
 	if value, ok := c.Settings["blacklist"]; ok {
 		c.Blacklist = parseConfigList(value)

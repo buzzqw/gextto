@@ -4169,6 +4169,7 @@ pol:
   "URL dell'interfaccia API di gx-torrent (es. http://127.0.0.1:8890).": "URL API gx-torrent (np. http://127.0.0.1:8890)."
   "URL dell'interfaccia Web di qBittorrent-nox (es. http://127.0.0.1:8080).": "URL interfejsu WWW qBittorrent-nox (np. http://127.0.0.1:8080)."
   "Un URL per riga": "Jeden URL w wierszu"
+  "Un URL per riga. Metti # all'inizio di una riga per escluderla senza cancellarla.": "Jeden URL w wierszu. Umieść # na początku wiersza, aby go wykluczyć bez usuwania."
   "Utente dell'interfaccia Web di qBittorrent-nox.": "Użytkownik interfejsu WWW qBittorrent-nox."
   "Valore base dei download attivi; con la coda dinamica viene adattato a runtime.": "Wartość bazowa aktywnych pobrań; z dynamiczną kolejką jest dostosowywana w trakcie pracy."
   "Valore base dei seed attivi; con la coda dinamica scende a 1 quando ci sono download in coda.": "Wartość bazowa aktywnych seedów; z dynamiczną kolejką spada do 1, gdy pobrania czekają."

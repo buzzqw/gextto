@@ -20,6 +20,7 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
 
 - **Anche le righe della scansione dell'archivio hanno l'icona.** «Archive scan completed», «Archive scan finished with errors» e i file scartati durante la scansione ora iniziano con un'icona come le altre righe del log, quindi non sembrano più attaccate al livello INFO.
 
+- **Un feed si mette in pausa con un `#`.** In *Configurazione → Sorgenti → Feed RSS* una riga che inizia con `#` — con o senza spazio (`# https://…` o `#https://…`) — non viene più letta a ogni ciclo, ma resta nell'elenco: togliendo il cancelletto il feed riparte senza doverlo riscrivere.
 
 ## 28 ottobre 2026
 

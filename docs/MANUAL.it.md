@@ -2065,7 +2065,7 @@ salvata** finché non li salvi.
 
 | Impostazione | Cosa fa |
 |---|---|
-| Feed RSS | Lista dei feed RSS da leggere a ogni ciclo (una riga per URL). |
+| Feed RSS | Lista dei feed RSS da leggere a ogni ciclo (una riga per URL). Metti `#` all'inizio di una riga per escluderla senza cancellarla: `# https://…` o `#https://…`. |
 | Motori web | Motori di ricerca web usati dal gap-filling quando feed e indexer non trovano nulla. |
 | Filtri contenuto esclusi | Le release che contengono queste parole o script (es. [porno]) vengono escluse. |
 | Filtri per sorgente | Parole chiave da accettare o scartare per una singola sorgente, con attivazione per riga. |

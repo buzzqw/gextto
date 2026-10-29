@@ -1134,7 +1134,8 @@
 <div class="card editor-card" id="v2-sources-feeds">
   <h3>Feed RSS</h3>
   <form method="post" action="/settings/feed" hx-post="/settings/feed" hx-swap="none" data-v2-track>
-    <label class="field"><span>Un URL per riga</span><textarea class="input" name="feeds" rows="9">{{.Feeds}}</textarea></label>
+    <label class="field"><span>Un URL per riga</span><textarea class="input" name="feeds" rows="9" title="Un URL per riga. Metti # all'inizio di una riga per escluderla senza cancellarla.">{{.Feeds}}</textarea></label>
+    <div class="hint">Un URL per riga. Metti # all'inizio di una riga per escluderla senza cancellarla.</div>
     <div class="form-actions"><button class="btn sm primary" type="submit">Salva feed</button><span class="setting-badge setting-dirty" data-v2-dirty-badge hidden>non salvata</span></div>
   </form>
 </div>

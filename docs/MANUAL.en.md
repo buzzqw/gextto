@@ -1997,7 +1997,7 @@ them.
 
 | Setting | What it does |
 |---|---|
-| RSS feeds | List of RSS feeds read on every cycle (one URL per line). |
+| RSS feeds | List of RSS feeds read on every cycle (one URL per line). Put `#` at the start of a line to exclude it without deleting it: `# https://…` or `#https://…`. |
 | Web engines | Web search engines used by gap-filling when feeds and indexers find nothing. |
 | Excluded content filters | Releases containing these words or scripts (e.g. [porno]) are excluded. |
 | Source filters | Keywords to accept or reject for a single source, enabled per row. |

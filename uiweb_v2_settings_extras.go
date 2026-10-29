@@ -26,26 +26,21 @@ import (
 
 // --- feeds ------------------------------------------------------------------
 
+// v2FeedsFrom shows every stored line, comments included: a feed disabled with
+// a leading '#' must stay visible so the operator can re-enable it.
 func v2FeedsFrom(s *AppState) string {
-	if raw, status := v2InternalJSON(s, http.MethodGet, "/api/config", nil, nil); status < 400 {
-		var config struct {
-			FeedURLs []string `json:"feed_urls"`
-		}
-		if json.Unmarshal(raw, &config) == nil {
-			return strings.Join(config.FeedURLs, "\n")
-		}
+	cfg := latestConfig(s)
+	if cfg == nil {
+		return ""
 	}
-	return ""
+	return strings.Join(feedLinesFromSetting(cfg.Settings["url"]), "\n")
 }
 
 // V2SettingsFeed saves the RSS feed list as the `url` setting (JSON array).
+// A line starting with '#' is stored as well: it disables the source without
+// deleting it.
 func V2SettingsFeed(w http.ResponseWriter, r *http.Request, s *AppState) {
-	feeds := []string{}
-	for _, line := range strings.Split(r.FormValue("feeds"), "\n") {
-		if trimmed := strings.TrimSpace(line); trimmed != "" {
-			feeds = append(feeds, trimmed)
-		}
-	}
+	feeds := feedSettingLines(r.FormValue("feeds"))
 	encoded, _ := json.Marshal(feeds)
 	if err := saveConfigSetting(s.cfg.DataDir, "url", string(encoded)); err != nil {
 		v2SettingsRedirect(w, r, "sources")

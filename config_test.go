@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -587,6 +588,49 @@ func TestSourceFiltersBlockOnlyTheirOwnSource(t *testing.T) {
 	disabled := release("Film 1080p x265", "ExtTo - MIRCrewRS")
 	if !cfg.ReleaseAllowed(&disabled) {
 		t.Fatal("disabled filter must not block")
+	}
+}
+
+func TestCommentedFeedLinesStayInTheSettingButAreNotProcessed(t *testing.T) {
+	dir := t.TempDir()
+	raw, err := json.Marshal([]string{
+		"https://example.test/active.xml",
+		"# https://example.test/disabled-with-space.xml",
+		"#https://example.test/disabled-without-space.xml",
+		"   # https://example.test/disabled-indented.xml",
+		"https://example.test/second.xml",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := saveConfigSetting(dir, "url", string(raw)); err != nil {
+		t.Fatal(err)
+	}
+	cfg := DefaultConfig()
+	cfg.DataDir = dir
+	if err := cfg.loadConfigDB(); err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"https://example.test/active.xml", "https://example.test/second.xml"}
+	if !reflect.DeepEqual(cfg.FeedURLs, want) {
+		t.Fatalf("active feeds = %#v, want %#v", cfg.FeedURLs, want)
+	}
+	// The editor keeps every stored line, comments included: disabling a feed
+	// must not erase it.
+	all := feedLinesFromSetting(cfg.Settings["url"])
+	if len(all) != 5 || all[1] == "" || !strings.HasPrefix(strings.TrimSpace(all[1]), "#") {
+		t.Fatalf("stored feed lines were not preserved: %#v", all)
+	}
+}
+
+func TestFeedEditorKeepsCommentedLines(t *testing.T) {
+	text := "https://example.test/active.xml\n# https://example.test/one.xml\n#https://example.test/two.xml\n\n"
+	stored := feedSettingLines(text)
+	if len(stored) != 3 {
+		t.Fatalf("stored lines = %#v, want 3", stored)
+	}
+	if !reflect.DeepEqual(activeFeedURLs(stored), []string{"https://example.test/active.xml"}) {
+		t.Fatalf("active feeds = %#v", activeFeedURLs(stored))
 	}
 }
 
