@@ -1597,8 +1597,6 @@ type v2DetailCaps struct {
 	FileNote string
 	// LimitsNote is shown in the limits tab.
 	LimitsNote string
-	// TrackerNote is shown in the trackers tab.
-	TrackerNote string
 }
 
 // v2DetailCapsFor derives the detail-tab capabilities from capabilityLevels
@@ -1629,7 +1627,6 @@ func v2DetailCapsFor(backend string) v2DetailCaps {
 	case BackendGxTorrent:
 		caps.FileNote = "gx-torrent scarica per primi i file ad alta priorità; cambiare la selezione (salta/scarica) riavvia il torrent per un attimo."
 		caps.LimitsNote = "I limiti valgono per questo torrent: -1 usa il limite globale, 0 è illimitato."
-		caps.TrackerNote = "gx-torrent sostituisce l'intera lista dei tracker: le righe cancellate vengono rimosse."
 	case BackendQbittorrent:
 		caps.LimitsNote = "qBittorrent non ha connessioni e slot di upload per singolo torrent: si impostano solo globalmente."
 	}
@@ -1646,6 +1643,39 @@ func v2DetailBackendLabel(backend string) string {
 	default:
 		return backend
 	}
+}
+
+// v2RealTrackers drops the "** [DHT] **"-style meta rows qBittorrent reports
+// next to the real trackers: they are not tracker entries and cannot be
+// edited or removed.
+func v2RealTrackers(trackers []models.TrackerView) []models.TrackerView {
+	out := make([]models.TrackerView, 0, len(trackers))
+	for _, tracker := range trackers {
+		if strings.HasPrefix(strings.TrimSpace(tracker.URL), "**") {
+			continue
+		}
+		out = append(out, tracker)
+	}
+	return out
+}
+
+// v2TrackerInputs turns the engine's tracker list into the payload of the
+// trackers endpoint, keeping each tier and dropping duplicates.
+func v2TrackerInputs(trackers []models.TrackerView) []TrackerEntryInput {
+	entries := make([]TrackerEntryInput, 0, len(trackers))
+	seen := map[string]struct{}{}
+	for _, tracker := range v2RealTrackers(trackers) {
+		value := strings.TrimSpace(tracker.URL)
+		if value == "" {
+			continue
+		}
+		if _, dup := seen[value]; dup {
+			continue
+		}
+		seen[value] = struct{}{}
+		entries = append(entries, TrackerEntryInput{Tier: int32(tracker.Tier), Url: value})
+	}
+	return entries
 }
 
 func v2FindTorrent(s *AppState, hash string) (models.TorrentView, bool) {
@@ -1807,7 +1837,9 @@ func v2DetailViewFrom(s *AppState, hash, tab string) v2DetailView {
 	var tabErr error
 	switch tab {
 	case "trackers":
-		view.Trackers, _, tabErr = s.activeEngine().Trackers(hash)
+		var trackers []models.TrackerView
+		trackers, _, tabErr = s.activeEngine().Trackers(hash)
+		view.Trackers = v2RealTrackers(trackers)
 	case "files":
 		view.Files, _, tabErr = s.activeEngine().Files(hash)
 	case "peers":
@@ -1970,15 +2002,45 @@ func V2DownloadsDetailAction(w http.ResponseWriter, r *http.Request, s *AppState
 		urls := strings.Fields(strings.TrimSpace(r.FormValue("urls")))
 		body, _ = json.Marshal(WebSeedsInput{Urls: urls, Remove: r.FormValue("remove") == "true"})
 	case "trackers":
+		// Adding is additive: the trackers already on the torrent stay, the
+		// rows typed in the editor are appended. The edit form never wipes a
+		// list the user did not touch; removing one entry is its own action
+		// ("trackers-remove").
 		path = "/api/torrents/" + url.PathEscape(hash) + "/trackers"
 		entries := []TrackerEntryInput{}
+		seen := map[string]struct{}{}
+		if current, ok, err := s.activeEngine().Trackers(hash); err == nil && ok {
+			entries = v2TrackerInputs(current)
+			for _, entry := range entries {
+				seen[entry.Url] = struct{}{}
+			}
+		}
 		for _, line := range strings.Split(r.FormValue("trackers"), "\n") {
 			parts := strings.SplitN(strings.TrimSpace(line), "|", 2)
 			if len(parts) != 2 || strings.TrimSpace(parts[1]) == "" {
 				continue
 			}
 			tier, _ := strconv.ParseInt(strings.TrimSpace(parts[0]), 10, 32)
-			entries = append(entries, TrackerEntryInput{Tier: int32(tier), Url: strings.TrimSpace(parts[1])})
+			value := strings.TrimSpace(parts[1])
+			if _, dup := seen[value]; dup {
+				continue
+			}
+			seen[value] = struct{}{}
+			entries = append(entries, TrackerEntryInput{Tier: int32(tier), Url: value})
+		}
+		body, _ = json.Marshal(TrackersInput{Trackers: entries})
+	case "trackers-remove":
+		// One row of the tracker table: only that URL goes away, the others
+		// are sent back unchanged.
+		path = "/api/torrents/" + url.PathEscape(hash) + "/trackers"
+		remove := strings.TrimSpace(r.FormValue("url"))
+		entries := []TrackerEntryInput{}
+		if current, ok, err := s.activeEngine().Trackers(hash); err == nil && ok {
+			for _, entry := range v2TrackerInputs(current) {
+				if !strings.EqualFold(entry.Url, remove) {
+					entries = append(entries, entry)
+				}
+			}
 		}
 		body, _ = json.Marshal(TrackersInput{Trackers: entries})
 	case "files-priority":

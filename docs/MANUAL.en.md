@@ -458,8 +458,9 @@ away, instead of leaving the episode to the next cycle.
   and it deliberately lowers the seed's upload) and web-seed add/remove; with
   gx-torrent the **General** tab also lists the **BEP 38 hints**
   (`collections`/`similar`) with the local torrents that share them, when the
-  torrent carries any; **Tracker** lets you edit the whole
-  list (`tier|url` per line); **Content** sets the **per-file priority**
+  torrent carries any; **Tracker** adds the new
+  trackers (`tier|url` per line) without touching the ones already there, and
+  each row's **Remove** drops only that tracker; **Content** sets the **per-file priority**
   (Skip/Normal/High/Maximum: high-priority files are fetched first). With
   gx-torrent changing **only the level** is immediate, without stopping the
   torrent; excluding or re-including a file restarts it for a moment to move its

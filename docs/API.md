@@ -338,7 +338,7 @@ state.
 | GET | `/api/torrents/{hash}/stream` | stream a file from a torrent |
 | POST | `/api/torrents/{hash}/super-seeding` | super-seeding on or off |
 | GET | `/api/torrents/{hash}/trackers` | trackers of a torrent |
-| POST | `/api/torrents/{hash}/trackers` | set the trackers |
+| POST | `/api/torrents/{hash}/trackers` | replace the tracker list (an empty list removes every tracker); the UI composes it from the add form and the per-row remove |
 | POST | `/api/torrents/{hash}/web-seeds` | set the web seeds |
 | GET | `/api/torrents/{hash}/why` | diagnose a torrent: reason and hint when it is not transferring |
 | GET | `/api/trash` | recycle bin entries |

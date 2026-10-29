@@ -466,7 +466,8 @@ invece di lasciare l'episodio al ciclo successivo.
   con gx-torrent la scheda **Generale** elenca anche gli **hint BEP 38**
   (`collections`/`similar`) con i torrent locali che li condividono, quando il
   torrent ne ha; in
-  **Tracker** puoi modificare l'intera lista (`tier|url` per riga); in
+  **Tracker** aggiungi i tracker nuovi (`tier|url` per riga) senza toccare
+  quelli già presenti, e il **Rimuovi** di ogni riga toglie solo quel tracker; in
   **Contenuto** imposti la **priorità per file** (Salta/Normale/Alta/Massima: i
   file ad alta priorità vengono scaricati per primi). Con gx-torrent cambiare
   **solo il livello** è immediato, senza fermare il torrent; escludere o

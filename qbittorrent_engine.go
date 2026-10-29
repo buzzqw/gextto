@@ -1302,14 +1302,12 @@ func (e *qbittorrentEngine) SetTrackers(hash string, trackers []TrackerEntry) (b
 		seen[url] = struct{}{}
 		urls = append(urls, url)
 	}
-	if len(urls) == 0 {
-		return false, nil
-	}
 	ctx, cancel := e.requestContext()
 	defer cancel()
 	// Replace the list: remove the trackers that are no longer wanted
 	// (qBittorrent's own "** [DHT] **" rows are not trackers) and add the new
-	// ones.
+	// ones. An empty list removes every tracker, so removing the last row of
+	// the editor works like it does with gx-torrent.
 	current, err := e.client.Trackers(ctx, hash)
 	if err != nil {
 		return false, err
