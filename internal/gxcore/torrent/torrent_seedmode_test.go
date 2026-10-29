@@ -107,3 +107,41 @@ func TestSeedModeParkedRequestsAreBounded(t *testing.T) {
 		t.Fatalf("parked %d requests (count %d), want 2", parked, tr.seedParked[pe])
 	}
 }
+
+// TestSeedModeStreamWaitsForTheHash: a player reading a piece claimed in seed
+// mode does not get it before its hash, and asking for it is enough to start
+// that hash (no peer has to request it).
+func TestSeedModeStreamWaitsForTheHash(t *testing.T) {
+	const pieceLength = 32 << 10
+	content := make([]byte, 3*pieceLength)
+	if _, err := rand.Read(content); err != nil {
+		t.Fatal(err)
+	}
+	pieces := seedModePieces(t, content, pieceLength)
+	for i := range pieces {
+		pieces[i].Done = true
+	}
+	tr := &torrent{
+		pieces:       pieces,
+		seedMode:     true,
+		seedVerified: bitfield.New(3),
+		seedPending:  map[uint32][]seedModeRequest{},
+		seedParked:   map[*peer.Peer]int{},
+		seedHashing:  map[uint32]struct{}{},
+		seedHashC:    make(chan seedHashResult, 1),
+		closeC:       make(chan struct{}),
+	}
+	if tr.piecesDone(0, 1) {
+		t.Fatal("an unchecked piece must not be ready for a stream")
+	}
+	if _, ok := tr.seedHashing[0]; !ok {
+		t.Fatal("asking for the piece must start its hash")
+	}
+	tr.handleSeedHashDone(<-tr.seedHashC)
+	if !tr.piecesDone(0, 1) {
+		t.Fatal("a piece whose hash matched must be ready")
+	}
+	if !tr.seedMode || tr.seedVerified.Has(1) {
+		t.Fatal("only the asked piece is checked; seed mode goes on")
+	}
+}

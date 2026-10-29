@@ -60,17 +60,25 @@ func (t *Torrent) FilePieceRange(fileIndex int, offset, length int64) (begin, en
 }
 
 // piecesDone reports whether every piece in [begin, end) is done or skipped. It
-// must run in the torrent goroutine.
+// must run in the torrent goroutine. In seed mode a piece claimed but not yet
+// hashed is not ready: its hash is queued (a player may read a piece no peer
+// asked for), and a later poll sees it once it matches, so a stream never reads
+// unchecked bytes either.
 func (t *torrent) piecesDone(begin, end uint32) bool {
 	if len(t.pieces) == 0 {
 		return false
 	}
+	ready := true
 	for i := begin; i < end && i < uint32(len(t.pieces)); i++ {
 		if !t.pieces[i].Done && !t.pieces[i].Skip {
 			return false
 		}
+		if t.pieces[i].Done && t.seedUnverified(i) {
+			t.wantSeedHash(i)
+			ready = false
+		}
 	}
-	return true
+	return ready
 }
 
 // PiecesDone reports whether every piece in [begin, end) is present, for the

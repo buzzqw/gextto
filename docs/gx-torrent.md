@@ -2062,9 +2062,11 @@ pieces missing so they are downloaded again. Missing files at start end seed mod
 before anything is claimed. The flag is persisted (`seed_mode` in the resume record,
 `SeedMode` in the move-torrent payload); the set of pieces already checked is not,
 so after a restart in seed mode the pieces are checked again as they are served.
-A magnet applies seed mode when its metadata arrives. The streaming reader and the
-swarm merge read the local files as they are (a merged piece is verified against
-the destination's own hashes anyway). `GET /api/v1/torrents` reports `seed_mode`
+A magnet applies seed mode when its metadata arrives. The streaming reader waits
+for the hash too: a piece it needs that no peer asked for yet is queued for its
+check, and it is read only once it matches. The swarm merge reads the local files
+as they are (a merged piece is verified against the destination's own hashes
+anyway). `GET /api/v1/torrents` reports `seed_mode`
 while it lasts.
 
 ## Writes to the state disk

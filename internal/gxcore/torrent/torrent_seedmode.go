@@ -124,6 +124,20 @@ func (t *torrent) queueSeedModeRequest(pe *peer.Peer, msg peerprotocol.RequestMe
 	}
 }
 
+// wantSeedHash queues the hash of piece i with no request waiting on it (a
+// local reader wants it): it starts when a slot is free, like a peer's.
+func (t *torrent) wantSeedHash(i uint32) {
+	if _, ok := t.seedPending[i]; !ok {
+		t.seedPending[i] = nil
+	}
+	if _, ok := t.seedHashing[i]; ok {
+		return
+	}
+	if len(t.seedHashing) < seedModeMaxHashing {
+		t.startSeedHash(i)
+	}
+}
+
 // startSeedHash reads and hashes one piece off the run loop.
 func (t *torrent) startSeedHash(i uint32) {
 	t.seedHashing[i] = struct{}{}

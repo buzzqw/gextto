@@ -1193,6 +1193,7 @@ what is transferring the files is visible at a glance).
   disk without checking them first: it seeds at once, and each piece is checked
   the first time a peer asks for it — a piece that does not match is never sent,
   and the torrent then checks all its files again and downloads what is wrong.
+  Streaming waits for the same check before reading a piece.
   Use it for data you know is complete, such as a copy of what you already
   seeded. A magnet that carries the `so=`
   parameter (BEP 53) downloads only the listed files from the start, `ws=` adds

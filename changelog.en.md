@@ -13,6 +13,9 @@ manual is online: [English](docs/MANUAL.en.md) ·
 [italiano](docs/MANUAL.it.md). For reports:
 [GitHub issues](https://github.com/buzzqw/gextto/issues).
 
+## 30 October 2026
+- **Streaming a torrent added with «Skip check» reads only checked data.** With gx-torrent a torrent added without the check verifies each piece the first time a peer asks for it, but the streaming reader read the files as they were. Streaming now waits for the check of the piece it is about to read too, and starts it by itself if no peer asked for that piece yet; if the piece does not match, gx-torrent checks every file again, as it does for peers. The wait is a few milliseconds per piece. Nothing to configure.
+
 ## 29 October 2026
 - **gx-torrent can add a torrent without checking it first («Skip check»).** When the files are already on disk and you know they are complete — for example a copy of what you were already seeding — the **Skip check** option in the add dialog (or `skip_checking` for programs that speak the qBittorrent API) puts the torrent into seeding at once, without reading every file back. Before, gx-torrent ignored the option. Safety stays: each piece is checked the first time a peer asks for it, and a piece that does not match is never sent; in that case the torrent leaves this mode, checks all its files again and downloads what is wrong. Once every piece has been checked the mode ends by itself, and it stays on across a restart. With qBittorrent the option is now actually passed to the client.
 

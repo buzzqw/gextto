@@ -1225,7 +1225,8 @@ attivo, così si vede a colpo d'occhio cosa sta trasferendo i file).
   qBittorrent) aggiunge un torrent su file già presenti senza verificarli prima:
   va subito in seeding, e ogni pezzo viene verificato la prima volta che un peer
   lo chiede — un pezzo che non corrisponde non viene mai inviato, e il torrent
-  allora riverifica tutti i suoi file e riscarica ciò che non va. Usalo per dati
+  allora riverifica tutti i suoi file e riscarica ciò che non va. Anche lo
+  streaming aspetta lo stesso controllo prima di leggere un pezzo. Usalo per dati
   che sai completi, come una copia di quello che già condividevi. Un magnet con
   il parametro `so=` (BEP 53) scarica da subito solo i file
   indicati; con `ws=` aggiunge web seed e con `dht=` un nodo DHT di bootstrap.

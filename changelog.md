@@ -14,6 +14,9 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
 [changelog.en.md](changelog.en.md). Per segnalazioni:
 [issue su GitHub](https://github.com/buzzqw/gextto/issues).
 
+## 30 ottobre 2026
+- **Lo streaming di un torrent aggiunto con «Salta verifica» legge solo dati controllati.** Con gx-torrent un torrent aggiunto senza verifica controlla ogni pezzo la prima volta che un peer lo chiede, ma il lettore per lo streaming leggeva i file così com'erano. Ora anche lo streaming aspetta il controllo del pezzo che sta per leggere, e lo avvia da solo se nessun peer l'ha ancora chiesto; se il pezzo non corrisponde, gx-torrent ricontrolla tutti i file come per i peer. L'attesa è di pochi millisecondi per pezzo. Niente da configurare.
+
 ## 29 ottobre 2026
 - **gx-torrent può aggiungere un torrent senza verificarlo prima («Salta verifica»).** Quando i file sono già su disco e sai che sono completi — per esempio una copia di quello che già condividevi — l'opzione **Salta verifica** nella finestra di aggiunta (o `skip_checking` per i programmi che parlano l'API di qBittorrent) mette il torrent subito in seeding, senza rileggere tutti i file. Prima con gx-torrent l'opzione veniva ignorata. La sicurezza resta: ogni pezzo viene controllato la prima volta che un peer lo chiede, e un pezzo che non corrisponde non viene mai inviato; in quel caso il torrent esce da questa modalità, riverifica tutti i file e riscarica ciò che non va. Quando tutti i pezzi sono stati controllati la modalità finisce da sola, e resta attiva anche dopo un riavvio. Con qBittorrent l'opzione ora viene passata davvero al client.
 
