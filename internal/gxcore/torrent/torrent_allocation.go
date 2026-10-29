@@ -52,6 +52,10 @@ func (t *torrent) handleAllocationDone(al *allocator.Allocator) {
 		pe.Bitfield = bitfield.New(t.info().NumPieces)
 	}
 
+	// Seed mode claims every piece instead of verifying: it then follows the
+	// resume path below with a full bitfield.
+	t.seedModeAllocated(al)
+
 	if t.bitfield != nil && !al.HasMissing {
 		for i := uint32(0); i < t.bitfield.Len(); i++ {
 			t.pieces[i].Done = t.bitfield.Test(i)

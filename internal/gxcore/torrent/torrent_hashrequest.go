@@ -256,7 +256,7 @@ func (t *torrent) blockLeavesRange(fi, index, length int) ([][merkle.HashSize]by
 	for first := index; first < end; {
 		p := first / blocksPerPiece
 		global := start + p
-		if p >= count || global >= len(t.pieces) || !t.bitfield.Test(uint32(global)) {
+		if p >= count || global >= len(t.pieces) || !t.bitfield.Test(uint32(global)) || t.seedUnverified(uint32(global)) {
 			return nil, false
 		}
 		pc := &t.pieces[global]

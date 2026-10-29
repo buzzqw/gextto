@@ -1829,20 +1829,6 @@ func (e *gxTorrentEngine) resolveSavePath(preferredPath *string, cfg *Config) st
 	return resolveSavePath(preferredPath, use)
 }
 
-// gxWarnUnsupportedOptions notes the add-time options the engine cannot apply, so a
-// caller does not believe they were honored. Of the add-time options only seed
-// mode is missing.
-func gxWarnUnsupportedOptions(options AddOptions) {
-	var unsupported []string
-	if options.SeedMode {
-		unsupported = append(unsupported, "seed_mode")
-	}
-	if len(unsupported) > 0 {
-		logging.Warn("gx-torrent does not support these add options: they will be ignored",
-			"options", strings.Join(unsupported, ","))
-	}
-}
-
 func gxAddForm(savePath string, options AddOptions) url.Values {
 	form := url.Values{}
 	if savePath != "" {
@@ -1866,6 +1852,11 @@ func gxAddForm(savePath string, options AddOptions) url.Values {
 	if options.StopAtMetadata {
 		form.Set("stop_at_metadata", "1")
 	}
+	if options.SeedMode {
+		// Seed mode: gx-torrent trusts the data and checks each piece the
+		// first time it is uploaded.
+		form.Set("seed_mode", "1")
+	}
 	return form
 }
 
@@ -1883,7 +1874,6 @@ func (e *gxTorrentEngine) AddWithOptions(magnet string, cfg *Config, preferredPa
 	if strings.TrimSpace(magnet) == "" {
 		return false, nil
 	}
-	gxWarnUnsupportedOptions(options)
 	options.FirstLast = options.FirstLast || e.firstLastDefault.Load()
 	form := gxAddForm(e.resolveSavePath(preferredPath, cfg), options)
 	form.Set("magnet", magnet)
@@ -1919,7 +1909,6 @@ func (e *gxTorrentEngine) AddTorrentFileWithOptions(torrentPath string, cfg *Con
 	if err != nil {
 		return nil, fmt.Errorf("torrent file not readable: %w", err)
 	}
-	gxWarnUnsupportedOptions(options)
 	options.FirstLast = options.FirstLast || e.firstLastDefault.Load()
 	body := &bytes.Buffer{}
 	writer := multipart.NewWriter(body)

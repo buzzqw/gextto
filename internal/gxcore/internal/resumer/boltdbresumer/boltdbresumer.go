@@ -43,6 +43,7 @@ var Keys = struct {
 	Sequential        []byte
 	FirstLast         []byte
 	SuperSeeding      []byte
+	SeedMode          []byte
 	FilePaths         []byte
 	DisplayName       []byte
 	ContentLayout     []byte
@@ -70,6 +71,7 @@ var Keys = struct {
 	Sequential:        []byte("sequential"),
 	FirstLast:         []byte("first_last"),
 	SuperSeeding:      []byte("super_seeding"),
+	SeedMode:          []byte("seed_mode"),
 	FilePaths:         []byte("file_paths"),
 	DisplayName:       []byte("display_name"),
 	ContentLayout:     []byte("content_layout"),
@@ -146,6 +148,7 @@ func (r *Resumer) Write(torrentID string, spec *Spec) error {
 		_ = b.Put(Keys.Sequential, []byte(strconv.FormatBool(spec.Sequential)))
 		_ = b.Put(Keys.FirstLast, []byte(strconv.FormatBool(spec.FirstLast)))
 		_ = b.Put(Keys.SuperSeeding, []byte(strconv.FormatBool(spec.SuperSeeding)))
+		_ = b.Put(Keys.SeedMode, []byte(strconv.FormatBool(spec.SeedMode)))
 		_ = b.Put(Keys.FilePaths, filePaths)
 		_ = b.Put(Keys.DisplayName, []byte(spec.DisplayName))
 		_ = b.Put(Keys.ContentLayout, []byte(spec.ContentLayout))
@@ -247,6 +250,13 @@ func (r *Resumer) WriteSuperSeeding(torrentID string, value bool) error {
 	})
 }
 
+// WriteSeedMode replaces only the seed-mode flag.
+func (r *Resumer) WriteSeedMode(torrentID string, value bool) error {
+	return r.update(torrentID, func(b *bbolt.Bucket) error {
+		return b.Put(Keys.SeedMode, []byte(strconv.FormatBool(value)))
+	})
+}
+
 // Read loads one torrent's spec. Bolt values die with the transaction, so
 // every byte field is copied out. A storage fault (SIGBUS on a broken
 // mapping) becomes an error instead of a crash.
@@ -336,6 +346,7 @@ func (r *Resumer) Read(torrentID string) (spec *Spec, err error) {
 			{Keys.Sequential, &spec.Sequential},
 			{Keys.FirstLast, &spec.FirstLast},
 			{Keys.SuperSeeding, &spec.SuperSeeding},
+			{Keys.SeedMode, &spec.SeedMode},
 		} {
 			if v := b.Get(flag.key); v != nil {
 				if *flag.dst, err = strconv.ParseBool(string(v)); err != nil {

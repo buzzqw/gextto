@@ -1608,6 +1608,8 @@ func (e *qbittorrentEngine) addOptions(options AddOptions, cfg *Config) qbittorr
 		Paused:     options.Paused,
 		Sequential: options.Sequential,
 		FirstLast:  options.FirstLast || e.firstLastDefault.Load(),
+		// Seed mode is qBittorrent's skip_checking.
+		SkipChecking: options.SeedMode,
 	}
 	// Do not ask qBittorrent to stop an inactivity seed that Gextto itself
 	// considers infinite: the global ratio and time must both be finite. Per

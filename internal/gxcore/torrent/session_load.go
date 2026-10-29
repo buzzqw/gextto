@@ -138,6 +138,7 @@ func (s *Session) loadExistingTorrent(id string) (tt *Torrent, hasStarted bool, 
 	t.filePaths = append([]string(nil), spec.FilePaths...)
 	t.displayName = spec.DisplayName
 	t.contentLayout = spec.ContentLayout
+	t.seedMode = spec.SeedMode
 	go s.checkTorrent(t)
 	delete(s.availablePorts, spec.Port)
 
@@ -211,6 +212,7 @@ func (s *Session) CompactDatabase(output string) error {
 			Sequential:        t.torrent.sequential,
 			FirstLast:         t.torrent.firstLast,
 			SuperSeeding:      t.torrent.superSeeding,
+			SeedMode:          t.torrent.seedMode,
 			FilePaths:         t.torrent.filePaths,
 			ContentLayout:     t.torrent.contentLayout,
 		}

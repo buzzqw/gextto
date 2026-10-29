@@ -252,13 +252,17 @@ func TestAddMagnetSendsFields(t *testing.T) {
 	fake, client := newFakeServer(t)
 	ctx := context.Background()
 	hash, err := client.AddMagnet(ctx, "magnet:?xt=urn:btih:ABCDEF0123456789ABCDEF0123456789ABCDEF01&dn=x", AddOptions{
-		SavePath:   "/data/completed",
-		Category:   "gextto",
-		Paused:     true,
-		Sequential: true,
+		SavePath:     "/data/completed",
+		Category:     "gextto",
+		Paused:       true,
+		Sequential:   true,
+		SkipChecking: true,
 	})
 	if err != nil {
 		t.Fatalf("AddMagnet: %v", err)
+	}
+	if fake.lastAdd.Get("skip_checking") != "true" {
+		t.Fatalf("skip_checking not sent: %v", fake.lastAdd)
 	}
 	if hash != "abcdef0123456789abcdef0123456789abcdef01" {
 		t.Fatalf("hash = %q", hash)

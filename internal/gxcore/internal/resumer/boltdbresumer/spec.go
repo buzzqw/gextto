@@ -34,6 +34,10 @@ type Spec struct {
 	FirstLast         bool
 	// SuperSeeding arms BEP 16 super-seeding.
 	SuperSeeding bool
+	// SeedMode trusts the data without the full check: pieces are hashed
+	// lazily as they are served (libtorrent seed_mode). The pieces already
+	// checked are not recorded, so a restart checks them again.
+	SeedMode bool
 	// FilePaths overrides the on-disk storage paths of info.Files, in order,
 	// when a file or folder was renamed (qBittorrent renameFile/renameFolder).
 	// Nil when no rename happened. The info dict itself is never changed (its
@@ -83,6 +87,8 @@ type jsonSpec struct {
 	// a never-renamed torrent is unchanged.
 	FilePaths   []string `json:",omitempty"`
 	DisplayName string   `json:",omitempty"`
+	// Seed mode, appended last and omitted when off for the same reason.
+	SeedMode bool `json:",omitempty"`
 }
 
 // MarshalJSON implements json.Marshaler.
@@ -113,6 +119,7 @@ func (s Spec) MarshalJSON() ([]byte, error) {
 		SeededFor:   int64(s.SeededFor),
 		FilePaths:   s.FilePaths,
 		DisplayName: s.DisplayName,
+		SeedMode:    s.SeedMode,
 	})
 }
 
@@ -156,5 +163,6 @@ func (s *Spec) UnmarshalJSON(b []byte) error {
 	s.Version = j.Version
 	s.FilePaths = j.FilePaths
 	s.DisplayName = j.DisplayName
+	s.SeedMode = j.SeedMode
 	return nil
 }

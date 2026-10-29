@@ -1188,7 +1188,13 @@ what is transferring the files is visible at a glance).
   in 10 minutes) Gextto falls back to qBittorrent-nox by itself. It supports
   **sequential download** and **first/last piece** priority (set when adding a
   torrent, or for every new torrent in *Configuration → Queues and performance →
-  Download mode*; they apply to new torrents). A magnet that carries the `so=`
+  Download mode*; they apply to new torrents). **Skip check** in the add
+  dialog (qBittorrent's *skip hash check*) adds a torrent over files already on
+  disk without checking them first: it seeds at once, and each piece is checked
+  the first time a peer asks for it — a piece that does not match is never sent,
+  and the torrent then checks all its files again and downloads what is wrong.
+  Use it for data you know is complete, such as a copy of what you already
+  seeded. A magnet that carries the `so=`
   parameter (BEP 53) downloads only the listed files from the start, `ws=` adds
   web seeds and `dht=` adds a DHT bootstrap node. It supports
   **v2-only** torrents (BEP 52), both from a `.torrent` and from a magnet link;

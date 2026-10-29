@@ -2047,6 +2047,26 @@ exchange the data instead of downloading it all from the seed, at the price of a
 
 Gextto reports the capability `super_seeding` for gx-torrent (`full`).
 
+**Seed mode** (libtorrent `seed_mode`, qBittorrent `skip_checking`; `seed_mode=1`
+on `/api/v1/add` and `/api/v1/add-file`, **skip check** in the add dialog,
+`skip_checking` on `/api/v2/torrents/add`, the capability `seed_mode`). The torrent
+skips the initial verification: every piece is advertised and the torrent seeds at
+once, but a piece is read back and hashed the first time a peer asks for it, and
+its blocks leave only after the hash matches (up to 4 pieces hashed at once per
+torrent; the requests wait meanwhile). v2 leaf hashes are not served for a piece
+not yet checked. When every piece has been checked the torrent leaves seed mode by
+itself. A piece that fails — or a read error — ends seed mode for the whole torrent:
+nothing of that piece was sent, the claimed bitfield is dropped from the resume
+record, and the torrent restarts through the full verification, which marks the bad
+pieces missing so they are downloaded again. Missing files at start end seed mode
+before anything is claimed. The flag is persisted (`seed_mode` in the resume record,
+`SeedMode` in the move-torrent payload); the set of pieces already checked is not,
+so after a restart in seed mode the pieces are checked again as they are served.
+A magnet applies seed mode when its metadata arrives. The streaming reader and the
+swarm merge read the local files as they are (a merged piece is verified against
+the destination's own hashes anyway). `GET /api/v1/torrents` reports `seed_mode`
+while it lasts.
+
 ## Writes to the state disk
 
 The daemon's state (`DATA_DIR/gx-torrent`: `session.db`, `state.json`, logs)
@@ -2185,7 +2205,7 @@ describes the payloads of the v1 resources.
 | `GET /api/v1/portcheck` | port test: the peer port is listening and the router forwards it |
 | `GET /api/v1/torrents` | full list (progress %, sizes, speeds, peers, swarm, status, path, seed limits, queue flags). Optional `?limit=`/`?offset=` page the list (the offset may be negative, counted from the end); without them the response is unchanged |
 | `GET /api/v1/torrents/{hash}` | the published view of one torrent (cheap polling). Additive: the list and the `{hash}/{what}` resources are unchanged |
-| `POST /api/v1/add` | form fields: `magnet`, `destination`, `paused`, `top`, `sequential`, `first_last`, `super_seeding`, `stop_at_metadata`, `seed_ratio`, `seed_days`. Responds `{hash, existing}` |
+| `POST /api/v1/add` | form fields: `magnet`, `destination`, `paused`, `top`, `sequential`, `first_last`, `super_seeding`, `seed_mode`, `stop_at_metadata`, `seed_ratio`, `seed_days`. Responds `{hash, existing}` |
 | `POST /api/v1/add-file` | multipart `torrent` plus the same fields |
 | `POST /api/v1/create-torrent` | JSON `path`/`name`/`trackers`/`webseeds`/`private`/`piece_length`/`comment`: creates a `.torrent` from a file or folder of the server and returns it as a download (mktorrent-style). `piece_length` (multiple of 16 KiB, 0 = automatic) is limited to 16 MiB so as not to turn an arbitrary value into a huge allocation |
 | `DELETE /api/v1/torrents/{hash}?delete_files=1` | removal |

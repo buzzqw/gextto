@@ -12,6 +12,7 @@ import (
 	"github.com/buzzqw/gextto/internal/gxcore/internal/peerconn/peerwriter"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/peerprotocol"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/peersource"
+	"github.com/buzzqw/gextto/internal/gxcore/internal/piece"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/piecedownloader"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/piecewriter"
 )
@@ -385,10 +386,21 @@ func (t *torrent) serveRequest(pe *peer.Peer, msg peerprotocol.RequestMessage) {
 	}
 	if pe.ClientChoking {
 		if pe.FastEnabled && pe.SentAllowedFast.Has(pi) {
-			pe.SendPiece(msg, cachedpiece.New(pi, t.session.pieceCache, t.session.config.ReadCacheBlockSize, t.peerID))
+			t.sendPiece(pe, msg, pi)
 		} else if pe.FastEnabled {
 			pe.SendMessage(peerprotocol.RejectMessage{RequestMessage: msg})
 		}
+		return
+	}
+	t.sendPiece(pe, msg, pi)
+}
+
+// sendPiece queues one block upload from the read cache. In seed mode a
+// piece not yet hashed is held back: the request waits for the piece's first
+// hash, so unverified bytes never leave.
+func (t *torrent) sendPiece(pe *peer.Peer, msg peerprotocol.RequestMessage, pi *piece.Piece) {
+	if t.seedUnverified(msg.Index) {
+		t.queueSeedModeRequest(pe, msg)
 		return
 	}
 	pe.SendPiece(msg, cachedpiece.New(pi, t.session.pieceCache, t.session.config.ReadCacheBlockSize, t.peerID))

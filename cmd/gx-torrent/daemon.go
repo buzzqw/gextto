@@ -1414,8 +1414,11 @@ type torrentInfo struct {
 	Sequential       bool  `json:"sequential"`
 	FirstLast        bool  `json:"first_last"`
 	SuperSeeding     bool  `json:"super_seeding"`
-	Pinned           bool  `json:"pinned"`
-	Parked           bool  `json:"parked"`
+	// SeedMode: added without the initial check; pieces are checked as they
+	// are first uploaded (qBittorrent skip_checking).
+	SeedMode bool `json:"seed_mode,omitempty"`
+	Pinned   bool `json:"pinned"`
+	Parked   bool `json:"parked"`
 	// DiskWait: paused by the disk guard until the folder has space again.
 	DiskWait       bool   `json:"disk_wait,omitempty"`
 	Probing        bool   `json:"probing"`
@@ -1537,6 +1540,7 @@ func (d *Daemon) infoLocked(t *torrent.Torrent, stats torrent.Stats, rt *runtime
 		Sequential:       meta.Sequential,
 		FirstLast:        meta.FirstLast,
 		SuperSeeding:     meta.SuperSeeding,
+		SeedMode:         stats.SeedMode,
 		Pinned:           meta.Pinned,
 		Parked:           meta.Parked,
 		DiskWait:         rt != nil && rt.diskWait,
@@ -1690,6 +1694,9 @@ type addRequest struct {
 	FirstLast bool
 	// SuperSeeding enables BEP 16 super-seeding, a seeding strategy.
 	SuperSeeding bool
+	// SeedMode skips the initial check (qBittorrent skip_checking): the data
+	// on disk is trusted and each piece is checked when first uploaded.
+	SeedMode bool
 	// ContentLayout is the qBittorrent content layout (torrent.ContentLayout*);
 	// empty = Original.
 	ContentLayout string
@@ -1775,7 +1782,7 @@ func (d *Daemon) add(req addRequest) (string, bool, error) {
 		_ = os.Remove(d.linkPath(id))
 		return "", false, fmt.Errorf("unknown content layout %q", req.ContentLayout)
 	}
-	opt := &torrent.AddTorrentOptions{ID: id, Stopped: true, Sequential: sequential, FirstLast: req.FirstLast, SuperSeeding: req.SuperSeeding, ContentLayout: layout}
+	opt := &torrent.AddTorrentOptions{ID: id, Stopped: true, Sequential: sequential, FirstLast: req.FirstLast, SuperSeeding: req.SuperSeeding, SeedMode: req.SeedMode, ContentLayout: layout}
 	var t *torrent.Torrent
 	if req.Magnet != "" {
 		t, err = session.AddURI(req.Magnet, opt)

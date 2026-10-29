@@ -1221,7 +1221,13 @@ attivo, così si vede a colpo d'occhio cosa sta trasferendo i file).
   qBittorrent-nox. Supporta il **download sequenziale** e la **prima/ultima parte**
   dei file (si impostano all'aggiunta, o per tutti i nuovi torrent in
   *Configurazione → Code e prestazioni → Modalità di download*; valgono per i torrent
-  nuovi). Un magnet con il parametro `so=` (BEP 53) scarica da subito solo i file
+  nuovi). **Salta verifica** nella finestra di aggiunta (lo *skip hash check* di
+  qBittorrent) aggiunge un torrent su file già presenti senza verificarli prima:
+  va subito in seeding, e ogni pezzo viene verificato la prima volta che un peer
+  lo chiede — un pezzo che non corrisponde non viene mai inviato, e il torrent
+  allora riverifica tutti i suoi file e riscarica ciò che non va. Usalo per dati
+  che sai completi, come una copia di quello che già condividevi. Un magnet con
+  il parametro `so=` (BEP 53) scarica da subito solo i file
   indicati; con `ws=` aggiunge web seed e con `dht=` un nodo DHT di bootstrap.
   Supporta i torrent **solo-v2** (BEP 52),
   sia da `.torrent` sia da

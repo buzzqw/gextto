@@ -620,6 +620,12 @@ func TestGxAddFormCarriesSequential(t *testing.T) {
 	if got := gxAddForm("/dl", AddOptions{FirstLast: true}).Get("first_last"); got != "1" {
 		t.Fatalf("first_last not sent to the daemon, got %q", got)
 	}
+	if got := gxAddForm("/dl", AddOptions{SeedMode: true}).Get("seed_mode"); got != "1" {
+		t.Fatalf("seed_mode not sent to the daemon, got %q", got)
+	}
+	if got := gxAddForm("/dl", AddOptions{}).Get("seed_mode"); got != "" {
+		t.Fatalf("seed_mode must be off by default, got %q", got)
+	}
 }
 
 // TestGxEngineSetSequentialPushesConfig checks that SetSequential reaches the

@@ -118,6 +118,20 @@ type torrent struct {
 	// (content_layout.go); a magnet applies it when its metadata arrives.
 	contentLayout string
 
+	// Seed mode (torrent_seedmode.go): the data is trusted without the full
+	// check and each piece is hashed the first time it is served.
+	// seedVerified holds the pieces already hashed, seedPending the requests
+	// waiting for a hash, seedHashing the hashes in flight; seedGen discards
+	// results from an earlier seed-mode session, and seedRecheck restarts the
+	// torrent through the verification after a failed piece.
+	seedMode     bool
+	seedVerified *bitfield.Bitfield
+	seedPending  map[uint32][]seedModeRequest
+	seedHashing  map[uint32]struct{}
+	seedHashC    chan seedHashResult
+	seedGen      uint64
+	seedRecheck  bool
+
 	// Peer pumps and registries.
 	peerDisconnectedC chan *peer.Peer
 	pieceMessagesC    *suspendchan.Chan[peer.PieceMessage]
@@ -398,6 +412,7 @@ func newTorrent(
 		infoDownloaders:           make(map[*peer.Peer]*infodownloader.InfoDownloader),
 		infoDownloadersSnubbed:    make(map[*peer.Peer]*infodownloader.InfoDownloader),
 		pieceWriterResultC:        make(chan *piecewriter.PieceWriter),
+		seedHashC:                 make(chan seedHashResult),
 		completeC:                 make(chan struct{}),
 		completeMetadataC:         make(chan struct{}),
 		closeC:                    make(chan struct{}),

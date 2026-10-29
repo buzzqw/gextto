@@ -99,6 +99,9 @@ type AddOptions struct {
 	Paused     bool
 	Sequential bool
 	FirstLast  bool
+	// SkipChecking adds the torrent in seed mode (qBittorrent skip_checking):
+	// the data on disk is trusted without the initial check.
+	SkipChecking bool
 	// Share limits applied by qBittorrent as soon as the torrent is added.
 	// Pointers because 0 is a meaningful limit on qBittorrent's scale.
 	RatioLimit               *float64
@@ -462,6 +465,9 @@ func (c *Client) add(ctx context.Context, magnet, torrentPath string, opts AddOp
 	}
 	if opts.FirstLast {
 		field("firstLastPiecePrio", "true")
+	}
+	if opts.SkipChecking {
+		field("skip_checking", "true")
 	}
 	if opts.RatioLimit != nil {
 		field("ratioLimit", strconv.FormatFloat(*opts.RatioLimit, 'f', -1, 64))

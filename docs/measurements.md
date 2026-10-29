@@ -246,6 +246,28 @@ public torrent with leechers that only a seed's outgoing dial can reach.
 Reproduce with `make measure-seeding`, `make measure-choking` and
 `CGO_ENABLED=0 go test -run '^$' -bench 'BenchmarkEngineListSnapshot|BenchmarkEngineSnapshotTwelveCalls' -benchmem -count=3 .`
 
+### Seed mode: cost of the lazy check (2026-10-29, N97)
+
+A torrent added in seed mode hashes a piece the first time a peer asks for it: the
+first block of that piece waits for one read of the whole piece and its SHA-1, then
+the piece is served from the read cache like any other. `BenchmarkSeedModeLazyHash`
+measures that wait with the file in the page cache (the CPU side; a cold read adds
+the disk time of one piece), three runs each, `GOMAXPROCS=2`:
+
+| Piece size | Wait before the first block | Throughput | Heap per check |
+|---|---|---|---|
+| 256 KiB | **0.21 ms** | 1.22–1.25 GB/s | 256 KiB, 3 allocs |
+| 1 MiB | **0.74–0.81 ms** | 1.29–1.42 GB/s | 1 MiB, 3 allocs |
+| 4 MiB | **3.7–3.9 ms** | 1.08–1.14 GB/s | 4 MiB, 3 allocs |
+| 16 MiB | **13.0–13.1 ms** | 1.28–1.29 GB/s | 16 MiB, 3 allocs |
+
+Each piece pays it once per seed-mode session; at most 4 checks run at once per
+torrent, so the transient heap is bounded by 4 pieces. The full check that seed mode
+skips reads and hashes the whole torrent before the first byte is served.
+
+Reproduce with
+`go test -run '^$' -bench BenchmarkSeedModeLazyHash -benchmem -count=3 ./internal/gxcore/torrent/`
+
 ## 4. Investigations and decisions
 
 Each entry states the question, the numbers that answered it and the decision. The

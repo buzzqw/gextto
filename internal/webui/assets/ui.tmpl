@@ -1751,6 +1751,7 @@ window.gxClearFilters=function(){state.filter={status:'all',cat:null,tag:null,tr
           <label class="chk" title="Download pieces in order (streaming); slower overall"><input type="checkbox" name="sequential" value="1"> sequential</label>
           <label class="chk" title="Download the ends of every file first"><input type="checkbox" name="first_last" value="1"> first/last</label>
           <label class="chk" title="BEP 16 super-seeding: advertise one piece at a time so the swarm spreads the data. For initial seeding only; it reduces the seed's upload throughput"><input type="checkbox" name="super_seeding" value="1"> super-seeding</label>
+          <label class="chk" title="Skip the initial check: the files already on disk are trusted as complete and seeding starts at once. Each piece is checked the first time a peer asks for it and is never sent if it does not match; a piece that fails ends this mode and every file is checked again"><input type="checkbox" name="seed_mode" value="1"> skip check</label>
         </div>
         <div class="form-grid" style="margin-top:10px">
           <label title="Download speed limit for the added torrents in KiB/s: 0 = unlimited, empty = follow the global limit">Download limit (KiB/s)<input type="number" min="0" name="download_limit" placeholder="global"></label>

@@ -50,6 +50,8 @@ func (t *torrent) run() {
 			t.handleWebseedPieceResult(res)
 		case src := <-t.webseedRetryC:
 			t.startPieceDownloaderForWebseed(src)
+		case r := <-t.seedHashC:
+			t.handleSeedHashDone(r)
 		case pw := <-t.pieceWriterResultC:
 			t.handlePieceWriteDone(pw)
 			t.maybeStartDeferredMerge()

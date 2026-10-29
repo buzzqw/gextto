@@ -18,6 +18,9 @@ func (t *torrent) handleStopped() {
 	t.errC <- t.lastError
 	t.errC = nil
 	t.portC = nil
+	if t.seedModeRecheckAfterStop() {
+		return
+	}
 	if t.doVerify && t.lastError != nil {
 		t.doVerify = false
 	}

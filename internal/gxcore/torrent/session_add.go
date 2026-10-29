@@ -50,6 +50,12 @@ type AddTorrentOptions struct {
 	// ContentLayout is qBittorrent's content layout (ContentLayoutOriginal,
 	// ContentLayoutSubfolder, ContentLayoutNoSubfolder); empty = Original.
 	ContentLayout string
+	// SeedMode skips the initial check (qBittorrent skip_checking): the data
+	// already on disk is trusted as complete and each piece is hashed the
+	// first time a peer asks for it, before any byte is sent. A piece that
+	// fails ends seed mode and the whole torrent is checked again. A magnet
+	// applies it when its metadata arrives.
+	SeedMode bool
 }
 
 // ValidateTorrentFile reports whether data is a .torrent file the session would
@@ -144,6 +150,7 @@ func (s *Session) addTorrentStopped(r io.Reader, opt *AddTorrentOptions) (*Torre
 	t.pieceLayers = mi.PieceLayers
 	t.filePaths = layoutPaths
 	t.contentLayout = opt.ContentLayout
+	t.seedMode = opt.SeedMode
 	t.setSelectOnly(opt.SelectOnly)
 	layers, _ := metainfo.EncodePieceLayers(mi.PieceLayers)
 	rspec := &boltdbresumer.Spec{
@@ -160,6 +167,7 @@ func (s *Session) addTorrentStopped(r io.Reader, opt *AddTorrentOptions) (*Torre
 		Sequential:        opt.Sequential,
 		FirstLast:         opt.FirstLast,
 		SuperSeeding:      opt.SuperSeeding,
+		SeedMode:          opt.SeedMode,
 		FilePaths:         layoutPaths,
 		ContentLayout:     opt.ContentLayout,
 	}
@@ -280,6 +288,7 @@ func (s *Session) addMagnet(link string, opt *AddTorrentOptions) (*Torrent, erro
 	}
 	t.hasV2Hint = ma.HasV2
 	t.contentLayout = opt.ContentLayout
+	t.seedMode = opt.SeedMode
 	// BEP 53: the magnet "so" is the default selection; an explicit option wins.
 	wanted := opt.SelectOnly
 	if len(wanted) == 0 {
@@ -305,6 +314,7 @@ func (s *Session) addMagnet(link string, opt *AddTorrentOptions) (*Torrent, erro
 		Sequential:        opt.Sequential,
 		FirstLast:         opt.FirstLast,
 		SuperSeeding:      opt.SuperSeeding,
+		SeedMode:          opt.SeedMode,
 		ContentLayout:     opt.ContentLayout,
 	}
 	if err = s.resumer.Write(id, rspec); err != nil {

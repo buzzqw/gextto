@@ -260,6 +260,7 @@ func addRequestFromForm(r *http.Request) addRequest {
 		Sequential:     formBool(r, "sequential"),
 		FirstLast:      formBool(r, "first_last"),
 		SuperSeeding:   formBool(r, "super_seeding"),
+		SeedMode:       formBool(r, "seed_mode"),
 		SeedRatio:      formFloat(r, "seed_ratio", -1),
 		SeedDays:       formInt(r, "seed_days", -1),
 		Category:       strings.TrimSpace(r.FormValue("category")),

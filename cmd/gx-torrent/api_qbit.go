@@ -940,6 +940,9 @@ func (d *Daemon) handleQbitAdd(w http.ResponseWriter, r *http.Request) {
 	paused := formBool(r, "paused") || formBool(r, "stopped")
 	sequential := formBool(r, "sequentialDownload")
 	firstLast := formBool(r, "firstLastPiecePrio")
+	// skip_checking is qBittorrent's seed mode: trust the data, check each
+	// piece when it is first uploaded.
+	skipChecking := formBool(r, "skip_checking")
 	layout := d.qbitContentLayout(r)
 	if _, ok := torrent.ParseContentLayout(layout); !ok {
 		qbitText(w, http.StatusBadRequest, "unknown contentLayout")
@@ -959,7 +962,7 @@ func (d *Daemon) handleQbitAdd(w http.ResponseWriter, r *http.Request) {
 			if readErr != nil || len(data) == 0 {
 				continue
 			}
-			req := addRequest{TorrentData: data, Destination: savePath, Paused: paused, Category: category, Tags: tags, Sequential: sequential, FirstLast: firstLast, AutoTMM: autoTMM, AutoTMMSet: true, ContentLayout: layout}
+			req := addRequest{TorrentData: data, Destination: savePath, Paused: paused, Category: category, Tags: tags, Sequential: sequential, FirstLast: firstLast, SeedMode: skipChecking, AutoTMM: autoTMM, AutoTMMSet: true, ContentLayout: layout}
 			if _, _, err := d.add(req); err != nil {
 				qbitText(w, http.StatusUnsupportedMediaType, qbitInvalidCode)
 				return
@@ -974,7 +977,7 @@ func (d *Daemon) handleQbitAdd(w http.ResponseWriter, r *http.Request) {
 		if line == "" {
 			continue
 		}
-		req := addRequest{Destination: savePath, Paused: paused, Category: category, Tags: tags, Sequential: sequential, FirstLast: firstLast, AutoTMM: autoTMM, AutoTMMSet: true, ContentLayout: layout}
+		req := addRequest{Destination: savePath, Paused: paused, Category: category, Tags: tags, Sequential: sequential, FirstLast: firstLast, SeedMode: skipChecking, AutoTMM: autoTMM, AutoTMMSet: true, ContentLayout: layout}
 		switch {
 		case strings.HasPrefix(strings.ToLower(line), "magnet:"):
 			req.Magnet = line

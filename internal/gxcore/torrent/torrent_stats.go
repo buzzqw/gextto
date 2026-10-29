@@ -101,6 +101,9 @@ type Stats struct {
 	Name string
 	// Private marks private torrents.
 	Private bool
+	// SeedMode reports a torrent added without the initial check whose
+	// pieces are still being checked as they are uploaded.
+	SeedMode bool
 	// FileCount counts the files.
 	FileCount int
 	// PieceLength is the nominal piece size.
@@ -174,6 +177,7 @@ func (t *torrent) stats() Stats {
 			s.Name = n
 		}
 		s.Private = t.info().Private
+		s.SeedMode = t.seedMode
 		s.FileCount = len(t.info().Files)
 		s.PieceLength = t.info().PieceLength
 		s.Pieces.Total = t.info().NumPieces
