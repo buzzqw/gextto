@@ -127,10 +127,12 @@ type torrent struct {
 	seedMode     bool
 	seedVerified *bitfield.Bitfield
 	seedPending  map[uint32][]seedModeRequest
-	seedHashing  map[uint32]struct{}
-	seedHashC    chan seedHashResult
-	seedGen      uint64
-	seedRecheck  bool
+	// seedParked counts the parked requests per peer (bounded by MaxRequestsIn).
+	seedParked  map[*peer.Peer]int
+	seedHashing map[uint32]struct{}
+	seedHashC   chan seedHashResult
+	seedGen     uint64
+	seedRecheck bool
 
 	// Peer pumps and registries.
 	peerDisconnectedC chan *peer.Peer

@@ -7,6 +7,9 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/buzzqw/gextto/internal/gxcore/internal/bitfield"
+	"github.com/buzzqw/gextto/internal/gxcore/internal/peer"
+	"github.com/buzzqw/gextto/internal/gxcore/internal/peerprotocol"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/piece"
 )
 
@@ -73,5 +76,34 @@ func BenchmarkSeedModeLazyHash(b *testing.B) {
 				}
 			}
 		})
+	}
+}
+
+// TestSeedModeParkedRequestsAreBounded: a peer parks at most MaxRequestsIn
+// requests for unchecked pieces; the rest is dropped (refused with the fast
+// extension), so the parked set cannot grow without limit.
+func TestSeedModeParkedRequestsAreBounded(t *testing.T) {
+	tr := &torrent{
+		session:      &Session{config: Config{MaxRequestsIn: 2}},
+		seedMode:     true,
+		seedVerified: bitfield.New(8),
+		seedPending:  map[uint32][]seedModeRequest{},
+		seedParked:   map[*peer.Peer]int{},
+		seedHashing:  map[uint32]struct{}{},
+	}
+	// Every hash slot busy, so no hash starts in the test.
+	for i := uint32(100); i < 100+seedModeMaxHashing; i++ {
+		tr.seedHashing[i] = struct{}{}
+	}
+	pe := &peer.Peer{}
+	for i := uint32(0); i < 5; i++ {
+		tr.queueSeedModeRequest(pe, peerprotocol.RequestMessage{Index: i, Length: 16384})
+	}
+	parked := 0
+	for _, reqs := range tr.seedPending {
+		parked += len(reqs)
+	}
+	if parked != 2 || tr.seedParked[pe] != 2 {
+		t.Fatalf("parked %d requests (count %d), want 2", parked, tr.seedParked[pe])
 	}
 }

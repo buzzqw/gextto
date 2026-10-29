@@ -61,6 +61,7 @@ func (t *torrent) enterSeedMode() {
 	t.mBitfield.Unlock()
 	t.seedVerified = bitfield.New(n)
 	t.seedPending = make(map[uint32][]seedModeRequest)
+	t.seedParked = make(map[*peer.Peer]int)
 	t.seedHashing = make(map[uint32]struct{})
 	t.seedGen++
 	t.log.Info("seed mode: the files are trusted as complete without the initial check; each piece is checked the first time a peer asks for it")
@@ -92,6 +93,7 @@ func (t *torrent) setSeedMode(v bool) {
 	if !v {
 		t.seedVerified = nil
 		t.seedPending = nil
+		t.seedParked = nil
 		t.seedHashing = nil
 		t.seedGen++
 	}
@@ -101,8 +103,18 @@ func (t *torrent) setSeedMode(v bool) {
 }
 
 // queueSeedModeRequest parks a request until its piece is hashed, starting
-// the hash when a slot is free.
+// the hash when a slot is free. A peer parks at most MaxRequestsIn requests,
+// the bound its upload queue has anyway: past it the request is refused (or
+// dropped without the fast extension), so a peer asking for blocks of
+// thousands of unchecked pieces cannot grow the parked set without limit.
 func (t *torrent) queueSeedModeRequest(pe *peer.Peer, msg peerprotocol.RequestMessage) {
+	if t.seedParked[pe] >= t.session.config.MaxRequestsIn {
+		if pe.FastEnabled {
+			pe.SendMessage(peerprotocol.RejectMessage{RequestMessage: msg})
+		}
+		return
+	}
+	t.seedParked[pe]++
 	t.seedPending[msg.Index] = append(t.seedPending[msg.Index], seedModeRequest{pe: pe, msg: msg})
 	if _, ok := t.seedHashing[msg.Index]; ok {
 		return
@@ -159,6 +171,11 @@ func (t *torrent) handleSeedHashDone(r seedHashResult) {
 		}
 		t.failSeedMode(r.index, cause)
 		return
+	}
+	for _, req := range waiting {
+		if t.seedParked[req.pe]--; t.seedParked[req.pe] <= 0 {
+			delete(t.seedParked, req.pe)
+		}
 	}
 	t.seedVerified.Set(r.index)
 	for _, req := range waiting {
