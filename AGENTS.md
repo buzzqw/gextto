@@ -42,9 +42,12 @@ conflict with another, the more specific one wins.
 - **Changelog in both languages.** Every commit adds or updates the entry in
   `changelog.md` and `changelog.en.md` (same sections, same substance). The
   entry speaks to the people who use Gextto: what changes, for whom, what they
-  have to do. No hashes, function names or file lists. A commit that only
-  touches build, tests or internal documentation has no entry of its own: its
-  visible part goes into the entry of the functional commit it accompanies.
+  have to do. No hashes, function names or file lists. **No film or TV series
+  names either**, not even as an example in quotes: the changelog is public and
+  the episode that showed the problem is told without naming its title. A commit
+  that only touches build, tests or internal documentation has no entry of its
+  own: its visible part goes into the entry of the functional commit it
+  accompanies.
 - **Small, verified commits, pushed right away** to `origin/main`.
 - **Do not commit** `bin/` or the data directories (`data/`, `gextto-data/`).
   `build_number` and `gx-torrent.build_number` **are** committed instead: they
