@@ -587,7 +587,13 @@ torrent, and a **disk guard** that pauses and resumes downloads when a folder fa
 below the free-space threshold while seeding continues. Streaming: a reader with seek
 and readahead with graduated piece priority (stream > readahead > rarest). Request
 queue: adaptive depth per delivered block, reset on choke; **two pieces per peer** with
-a shared in-flight budget; a bounded per-torrent write ring buffer. Session: an engine
+a shared in-flight budget; a bounded per-torrent write ring buffer; the short messages
+queued for a peer (requests, haves) leave together in one write. Limits: peers on the
+local network are outside the speed limits unless the operator applies them there too
+(never behind a proxy, where a peer's address is the proxy's). **Seed mode** (add without
+the initial check, qBittorrent's *skip hash check*): every piece is advertised at once
+and hashed the first time a peer asks for it, so no unchecked byte is uploaded; a
+failed piece ends seed mode and rechecks the files. Session: an engine
 event bus (SSE `GET /ui/events`), a global in-flight budget and a deterministic drop of
 the worst connection; `.torrent` creation from a folder (`CreateTorrent`, form and API).
 DHT: our own module (`internal/dht`, BEP 5/32/33/42/43/44/46) with a bucket-less
@@ -680,11 +686,17 @@ merge above. Caveats: the reference `bittorrent-tracker` returns only
 WebRTC peers to a WebSocket client, so a native client gets no TCP peers there — the
 real unlock would be WebRTC, which is not done.
 
-**What is missing.** Feature-wise the engine covers what libtorrent covers for this
-use. What libtorrent has and gx-core does not is **exposure**: twenty years of runs in
-the wild, and that is not a backlog item — it is acquired by running, which is exactly
-what the campaign in [`measurements.md`](measurements.md) §4.6 and the open items in §8 are for. What is left is therefore
-tuning and measurement, not capability: the **choking quality** on a real swarm (the
+**What is missing.** Compared with libtorrent function by function, in the code, the
+engine lacks **peer turnover** (libtorrent periodically closes the slowest peers when a
+torrent sits at its connection cap, to try new addresses; here `prunePeers` frees a slot
+only from a peer that is useless, never from a slow one), the **mixed-mode TCP/uTP
+arbitration** (libtorrent throttles TCP when uTP shares the line; here the latency
+guard and auto-speed act on the caps instead) and `share_mode` (not wanted: it serves
+ratio farming, not a library). Turnover has its gate in §8. Beyond functions, what
+libtorrent has and gx-core does not is **exposure**: twenty years of runs in the wild,
+acquired only by running, which is what the campaign in
+[`measurements.md`](measurements.md) §4.6 and the open items in §8 are for. The rest is
+tuning and measurement: the **choking quality** on a real swarm (the
 deterministic harness is the net, the swarm is the verification), the **pipelining**
 ceiling beyond a local pair (the 10 Gbps target needs hardware that is not here), the
 **disk I/O** (`fdatasync` and opt-in mmap today; `O_DIRECT`/`io_uring` and contiguous
@@ -801,6 +813,11 @@ enable it by default, so a new installation does not contact eD2k unless its ope
 asks.
 
 **Waiting for a measurement or a host.**
+- **Peer turnover.** At its connection cap a torrent keeps a slow but useful peer for
+  as long as it stays, so a better address in the queue never gets a slot. libtorrent
+  closes the slowest few percent every few minutes to try new ones. Gate: a real
+  swarm larger than the cap (this host's NAT limits the swarm to outgoing peers) where
+  the download rate with turnover beats the current one on the same torrent.
 
 - **Choking on a real swarm.** The controlled evidence is healthy (§4.6 of
   [`measurements.md`](measurements.md)): a real
