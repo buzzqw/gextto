@@ -156,7 +156,7 @@ func (d *Daemon) applyPendingRename() {
 		return
 	}
 	if err := torrent.PersistRename(pr.dbPath, pr.id, pr.paths, pr.name); err != nil {
-		logf("rename %s: cannot persist the new paths: %v", pr.id, err)
+		logfError("rename %s: cannot persist the new paths: %v", pr.id, err)
 		return
 	}
 	logf("renamed %s", pr.id)

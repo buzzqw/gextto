@@ -143,6 +143,9 @@ type torrentMeta struct {
 	// the tick does not repeat them.
 	ExportedTorrent bool `json:"exported_torrent,omitempty"`
 	ExportedFin     bool `json:"exported_fin,omitempty"`
+	// SeedLimitNotice is set once a seed limit has been announced, so the
+	// pause is news once instead of a line per tick (and per resume).
+	SeedLimitNotice bool `json:"seed_limit_notice,omitempty"`
 }
 
 type persistedState struct {
@@ -517,7 +520,7 @@ func newDaemon(opts Options) (*Daemon, error) {
 			defer d.mu.Unlock()
 			if err != nil {
 				d.lsdError = err.Error()
-				logf("local peer discovery (LSD) unavailable: %v", err)
+				logfError("local peer discovery (LSD) unavailable: %v", err)
 				return
 			}
 			d.lsd = lsd
@@ -572,18 +575,18 @@ func (d *Daemon) saveLocked() {
 	d.state.BadTrackers = d.trackers.disabledSnapshot()
 	data, err := json.MarshalIndent(d.state, "", "  ")
 	if err != nil {
-		logf("cannot encode state: %v", err)
+		logfError("cannot encode state: %v", err)
 		return
 	}
 	tmp := d.opts.StatePath + ".tmp"
 	if err := os.WriteFile(tmp, data, 0o600); err != nil {
-		logf("cannot write state: %v", err)
+		logfError("cannot write state: %v", err)
 		return
 	}
 	if err := os.Rename(tmp, d.opts.StatePath); err != nil {
 		// Never leave the temporary behind when the replace fails.
 		_ = os.Remove(tmp)
-		logf("cannot replace state: %v", err)
+		logfError("cannot replace state: %v", err)
 		return
 	}
 	d.dirty = false
@@ -619,7 +622,7 @@ func (d *Daemon) applyClientIdentity(cfg *torrent.Config) {
 	cfg.PublicTrackerHTTPUserAgent = identity.UserAgent
 	cfg.TrackerHTTPPrivateUserAgent = identity.UserAgent
 	torrent.SetCreator(identity.Client)
-	logf("client identity: %s %s (peer id %s)", identity.Name, identity.Version, identity.PeerID)
+	logfDebug("client identity: %s %s (peer id %s)", identity.Name, identity.Version, identity.PeerID)
 }
 
 func (d *Daemon) sessionConfig() torrent.Config {
@@ -683,7 +686,7 @@ func (d *Daemon) openSessionLocked() error {
 		// loads the list shortly.
 		if path != "" {
 			if rules, err := d.loadIPFilterLocked(path); err != nil {
-				logf("IP filter %s not loaded: %v", path, err)
+				logfError("IP filter %s not loaded: %v", path, err)
 			} else {
 				logf("IP filter loaded: %d rules from %s", rules, path)
 			}
@@ -718,7 +721,7 @@ func (d *Daemon) restartSessionLocked() {
 	d.closeSessionDoneLocked()
 	if d.session != nil {
 		if err := d.session.Close(); err != nil {
-			logf("session close: %v", err)
+			logfError("cannot close the engine session: %v", err)
 		}
 		d.session = nil
 	}
@@ -726,7 +729,7 @@ func (d *Daemon) restartSessionLocked() {
 	// rolled back on failure and the new paths persisted only when they succeed.
 	d.applyPendingRename()
 	if err := d.openSessionLocked(); err != nil {
-		logf("cannot reopen the session: %v", err)
+		logfError("cannot reopen the session: %v", err)
 		d.restartPending = true
 		return
 	}
@@ -801,13 +804,13 @@ func (d *Daemon) close() {
 	d.closeSessionDoneLocked()
 	if d.session != nil {
 		if err := d.session.Close(); err != nil {
-			logf("session close: %v", err)
+			logfError("cannot close the engine session: %v", err)
 		}
 		d.session = nil
 	}
 	if d.feedArchive != nil {
 		if err := d.feedArchive.close(); err != nil {
-			logf("feed archive close: %v", err)
+			logfError("cannot close the feed archive: %v", err)
 		}
 	}
 }
@@ -1004,7 +1007,7 @@ func (d *Daemon) reportPeerNoise(now time.Time) {
 	d.lastPeerNoiseReport = now
 	d.mu.Unlock()
 	if line := formatPeerNoise(peerNoiseCounters.drain()); line != "" {
-		logf("peer noise: %s", line)
+		logfDebug("peer noise: %s", line)
 	}
 }
 
@@ -1121,17 +1124,25 @@ func (d *Daemon) tick(now time.Time) {
 		d.maybeExport(t, meta, stats, complete)
 		// Global seeding limits: pause (or remove) a seeding torrent that
 		// reached the configured share ratio, seeding time or inactivity.
-		if complete && running {
+		// Only in standalone: in managed mode Gextto owns the whole seed policy
+		// (per-torrent limits, seed rules, archives at end of seed) and a
+		// second enforcer here fought it — a torrent paused by one side was
+		// resumed by the other every few seconds.
+		if complete && running && d.opts.Mode == ModeStandalone {
 			remove, reached := d.seedLimitReached(meta, stats)
 			idle := !reached && d.seedIdleReached(rt, meta, stats, now)
 			if idle {
 				remove, reached = d.settingInt(maxRatioActKey, 0) == 1, true
 			}
 			if reached {
-				if idle {
-					logf("%s uploaded nothing for the inactive seeding time", stats.Name)
-				} else {
-					logf("%s reached the seeding limit", stats.Name)
+				if !meta.SeedLimitNotice {
+					meta.SeedLimitNotice = true
+					d.dirty = true
+					if idle {
+						logf("%s uploaded nothing for the inactive seeding time", stats.Name)
+					} else {
+						logf("%s reached the seeding limit", stats.Name)
+					}
 				}
 				if remove {
 					pendingRemovals = append(pendingRemovals, id)
@@ -1146,7 +1157,7 @@ func (d *Daemon) tick(now time.Time) {
 		if !running && stats.Error != nil && meta.Error == "" && !d.moving[id] {
 			meta.Error = stats.Error.Error()
 			d.dirty = true
-			logf("%s stopped with an error: %s", stats.Name, meta.Error)
+			logfError("%s stopped with an error: %s", stats.Name, meta.Error)
 		}
 		if meta.StopAtMetadata && stats.Status != torrent.DownloadingMetadata && stats.Bytes.Total > 0 {
 			meta.StopAtMetadata = false
@@ -1258,9 +1269,14 @@ func (d *Daemon) tick(now time.Time) {
 		rt := d.runtimeLocked(id)
 		rt.startedAt = now
 		rt.lastActive = time.Time{}
-		if meta, ok := d.state.Torrents[id]; ok && !meta.RotatedAt.IsZero() {
-			meta.RotatedAt = time.Time{}
-			d.dirty = true
+		if meta, ok := d.state.Torrents[id]; ok {
+			if !meta.RotatedAt.IsZero() {
+				meta.RotatedAt = time.Time{}
+				d.dirty = true
+			}
+			// A torrent the queue starts again can reach the limit again: the
+			// pause is news each time, not just the first.
+			meta.SeedLimitNotice = false
 		}
 	}
 	if d.dirty {
@@ -1295,12 +1311,12 @@ func (d *Daemon) tick(now time.Time) {
 	// Phase 3: act on the run loops without holding d.mu.
 	for _, t := range pendingStops {
 		if err := t.Stop(); err != nil {
-			logf("queue stop %s: %v", t.ID(), err)
+			logfError("cannot stop «%s»: %v", t.ID(), err)
 		}
 	}
 	for _, t := range pendingStarts {
 		if err := t.Start(); err != nil {
-			logf("queue start %s: %v", t.ID(), err)
+			logfError("cannot start «%s»: %v", t.ID(), err)
 		}
 	}
 	for _, job := range pendingSelectOnly {
@@ -1308,7 +1324,7 @@ func (d *Daemon) tick(now time.Time) {
 	}
 	for _, id := range pendingRemovals {
 		if err := d.remove(id, false); err != nil {
-			logf("seed limit remove %s: %v", id, err)
+			logfError("cannot remove «%s» after its seed limit: %v", id, err)
 		}
 	}
 	// Watch folders (standalone): scan and add dropped .torrent files.
@@ -1783,7 +1799,7 @@ func (d *Daemon) add(req addRequest) (string, bool, error) {
 	for _, other := range d.session.ListTorrents() {
 		if other.ID() != id && other.InfoHash().String() == hash {
 			if err := d.session.RemoveTorrent(id, false); err != nil {
-				logf("cannot drop duplicate %s: %v", id, err)
+				logfError("cannot drop duplicate %s: %v", id, err)
 			}
 			return hash, true, nil
 		}
@@ -1913,6 +1929,9 @@ func (d *Daemon) resume(key string) error {
 		meta.Parked = false
 		meta.RotatedAt = time.Time{}
 		meta.Error = ""
+		// A new run is news again: if it reaches a seed limit once more, the
+		// log says so once.
+		meta.SeedLimitNotice = false
 		return nil
 	})
 }
@@ -1946,6 +1965,7 @@ func (d *Daemon) restart(key string, window time.Duration) error {
 		meta.UserPaused = false
 		meta.Error = ""
 		meta.RotatedAt = time.Time{}
+		meta.SeedLimitNotice = false
 		meta.ProbeUntil = time.Now().Add(window)
 		if err := t.Start(); err != nil {
 			return err
@@ -1991,6 +2011,7 @@ func (d *Daemon) setPin(key string, pinned bool) error {
 		meta.Pinned = pinned
 		if pinned {
 			meta.UserPaused = false
+			meta.SeedLimitNotice = false
 		}
 		return nil
 	})
@@ -2286,7 +2307,7 @@ func (d *Daemon) finishMove(id string, t *torrent.Torrent, from, dest, name stri
 	}
 	if err != nil {
 		meta.Error = "move failed: " + err.Error()
-		logf("moving «%s» to %s failed: %v", name, dest, err)
+		logfError("moving «%s» to %s failed: %v", name, dest, err)
 	} else {
 		meta.SavePath = dest
 		if empty {
@@ -2296,12 +2317,12 @@ func (d *Daemon) finishMove(id string, t *torrent.Torrent, from, dest, name stri
 		}
 		if associate {
 			if verifyErr := t.Verify(); verifyErr != nil {
-				logf("verify after relocation of «%s»: %v", name, verifyErr)
+				logfError("cannot verify «%s» after moving it: %v", name, verifyErr)
 			}
 		} else if wasRunning {
 			// The queue restarts it if it still deserves a slot.
 			if startErr := t.Start(); startErr != nil {
-				logf("restart after move of «%s»: %v", name, startErr)
+				logfError("cannot restart «%s» after moving it: %v", name, startErr)
 			}
 		}
 	}
@@ -2405,7 +2426,7 @@ func (d *Daemon) applySequentialLocked(sequential bool) {
 	}
 	for _, t := range d.session.ListTorrents() {
 		if err := t.SetSequential(sequential); err != nil {
-			logf("cannot set sequential on %s: %v", t.ID(), err)
+			logfError("cannot set sequential on %s: %v", t.ID(), err)
 			continue
 		}
 		if meta, ok := d.state.Torrents[t.ID()]; ok {
@@ -2710,7 +2731,7 @@ func (d *Daemon) relocateForCategory(key string) {
 		return
 	}
 	if err := d.move(key, dest, false); err != nil {
-		logf("autoTMM %s: cannot move to %s: %v", key, dest, err)
+		logfError("autoTMM %s: cannot move to %s: %v", key, dest, err)
 	}
 }
 

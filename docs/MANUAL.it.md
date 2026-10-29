@@ -1586,7 +1586,8 @@ L'elenco completo delle azioni e dei parametri è nell'[Appendice C](#appendice-
   l'esecuzione; nessun riscaricamento.
 - **Log gx-torrent** — pannello con le ultime righe del log del motore torrent
   (`gx-torrent/gx-torrent.log`), separato dal log di Gextto e conservato tra i
-  riavvii del servizio. Puoi filtrarne il testo, mostrare solo avvisi ed errori e
+  riavvii del servizio. Ogni riga ha data e livello (INFO, WARN, ERROR, DEBUG)
+  come il log di Gextto. Puoi filtrarne il testo, mostrare solo avvisi ed errori e
   scegliere tra il file attivo e le rotazioni (`.1`, `.2`, `.3`). Utile quando un
   download o un trasferimento non si comporta come previsto.
  - **Database**: prune per cicli/età errori, **retention dei "visti dai feed"**

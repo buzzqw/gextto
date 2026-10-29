@@ -107,18 +107,18 @@ func (d *Daemon) scanWatchFolders(folders [][2]string) {
 			}
 			if err := torrent.ValidateTorrentFile(data); err != nil {
 				if rerr := os.Rename(full, full+watchInvalidSuffix); rerr != nil {
-					logf("watch folder %s: %s is not a valid .torrent (%v) and cannot be set aside: %v", folder, entry.Name(), err, rerr)
+					logfError("watch folder %s: %s is not a valid .torrent (%v) and cannot be set aside: %v", folder, entry.Name(), err, rerr)
 				} else {
 					logf("watch folder %s: %s is not a valid .torrent (%v): renamed to %s", folder, entry.Name(), err, entry.Name()+watchInvalidSuffix)
 				}
 				continue
 			}
 			if _, _, err := d.add(addRequest{TorrentData: data, Destination: dest}); err != nil {
-				logf("watch folder %s: cannot add %s: %v", folder, entry.Name(), err)
+				logfError("watch folder %s: cannot add %s: %v", folder, entry.Name(), err)
 				continue
 			}
 			if err := os.Remove(full); err != nil {
-				logf("watch folder %s: added %s but cannot remove it: %v", folder, entry.Name(), err)
+				logfError("watch folder %s: added %s but cannot remove it: %v", folder, entry.Name(), err)
 			} else {
 				logf("watch folder %s: added %s", folder, entry.Name())
 			}

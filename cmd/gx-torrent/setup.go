@@ -142,7 +142,7 @@ func (d *Daemon) handleUISetup(w http.ResponseWriter, r *http.Request) {
 	// the error instead of it being silently logged.
 	if len(limits) > 0 {
 		if _, err := d.setConfig(limits); err != nil {
-			logf("setup: cannot apply the bandwidth limits: %v", err)
+			logfError("setup: cannot apply the bandwidth limits: %v", err)
 			d.renderSetup(w, r, "The bandwidth limits could not be applied; check that the data folder is writable.")
 			return
 		}
@@ -171,7 +171,7 @@ func (d *Daemon) handleUISetup(w http.ResponseWriter, r *http.Request) {
 	if password != "" {
 		hash, err := auth.HashPassword(password)
 		if err != nil {
-			logf("setup: cannot hash the password: %v", err)
+			logfError("setup: cannot hash the password: %v", err)
 			d.renderSetup(w, r, "Setup failed.")
 			return
 		}
@@ -183,7 +183,7 @@ func (d *Daemon) handleUISetup(w http.ResponseWriter, r *http.Request) {
 	}
 	store.Set(setupCompleteKey, "true")
 	if err := store.Save(); err != nil {
-		logf("setup: cannot save settings: %v", err)
+		logfError("setup: cannot save settings: %v", err)
 		d.renderSetup(w, r, "Setup failed.")
 		return
 	}

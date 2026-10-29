@@ -59,14 +59,14 @@ func (d *Daemon) loadLifetime() {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if !errors.Is(err, os.ErrNotExist) {
-			logf("cannot read lifetime totals: %v", err)
+			logfError("cannot read lifetime totals: %v", err)
 		}
 		d.lifetime = lifetimeTotals{Since: time.Now()}
 		return
 	}
 	var loaded lifetimeTotals
 	if err := json.Unmarshal(data, &loaded); err != nil {
-		logf("corrupted lifetime totals %s: %v", path, err)
+		logfError("corrupted lifetime totals %s: %v", path, err)
 		d.lifetime = lifetimeTotals{Since: time.Now()}
 		return
 	}
@@ -117,18 +117,18 @@ func (d *Daemon) saveLifetime() {
 	data, err := json.MarshalIndent(d.lifetime, "", "  ")
 	d.mu.Unlock()
 	if err != nil {
-		logf("cannot encode lifetime totals: %v", err)
+		logfError("cannot encode lifetime totals: %v", err)
 		return
 	}
 	tmp := path + ".tmp"
 	if err := os.WriteFile(tmp, data, 0o600); err != nil {
-		logf("cannot write lifetime totals: %v", err)
+		logfError("cannot write lifetime totals: %v", err)
 		return
 	}
 	if err := os.Rename(tmp, path); err != nil {
 		// Never leave the temporary behind when the replace fails.
 		_ = os.Remove(tmp)
-		logf("cannot replace lifetime totals: %v", err)
+		logfError("cannot replace lifetime totals: %v", err)
 	}
 }
 

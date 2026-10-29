@@ -169,11 +169,39 @@ func engineLogHandler(debug bool) clog.Handler {
 		level = clog.DEBUG
 	}
 	handler := clog.NewWriterHandler(logOutput)
+	// The same shape as the daemon's own lines: date, level, sentence. The
+	// engine tags a record with a logger name that carries the infohash
+	// ("torrent <hash>") and a file:line, neither of which belongs in a log a
+	// person reads.
+	handler.SetFormatter(daemonFormatter{})
 	handler.SetLevel(level)
 	// Let the engine drop records below the handler level before building
 	// them; the handler would filter them out anyway.
 	clog.SetEngineLevel(level)
 	return &swarmNoiseFilter{Handler: handler}
+}
+
+// daemonFormatter renders the engine's records like the daemon's own lines.
+type daemonFormatter struct{}
+
+func (daemonFormatter) Format(rec *clog.Record) string {
+	return fmt.Sprintf("%s %5s %s",
+		rec.Time.Format("2006-01-02 15:04:05"), daemonLevelName(rec.Level), rec.Message)
+}
+
+// daemonLevelName maps the engine's level names onto the ones the daemon and
+// Gextto use.
+func daemonLevelName(level clog.Level) string {
+	switch level {
+	case clog.CRITICAL, clog.ERROR:
+		return "ERROR"
+	case clog.WARNING:
+		return "WARN"
+	case clog.DEBUG:
+		return "DEBUG"
+	default:
+		return "INFO"
+	}
 }
 
 type swarmNoiseFilter struct {

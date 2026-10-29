@@ -31,7 +31,7 @@ func (d *Daemon) indexers() []torznab.Indexer {
 	}
 	var list []torznab.Indexer
 	if err := json.Unmarshal([]byte(raw), &list); err != nil {
-		logf("cannot parse the indexers setting: %v", err)
+		logfError("cannot parse the indexers setting: %v", err)
 		return nil
 	}
 	// With FlareSolverr configured, route the indexer requests through it (direct
@@ -99,7 +99,7 @@ func (d *Daemon) handleUISearch(w http.ResponseWriter, r *http.Request) {
 			items = append(items, rssItemFromTorznab(item))
 		}
 		if _, err := d.archive().record("search:"+strings.ToLower(query), items, time.Now()); err != nil {
-			logf("archive search %q: cannot archive the indexer results: %v", query, err)
+			logfError("archive search %q: cannot archive the indexer results: %v", query, err)
 		}
 	}
 	writeJSON(w, http.StatusOK, results)

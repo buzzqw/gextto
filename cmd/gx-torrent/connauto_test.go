@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/buzzqw/gextto/internal/gxcore/torrent"
+	"github.com/buzzqw/gextto/internal/logging"
 	"github.com/buzzqw/gextto/internal/queue"
 )
 
@@ -289,9 +290,11 @@ func TestAutoConnectionsPassDueOnNewTorrent(t *testing.T) {
 func TestLogAutoConnectionChangesGroups(t *testing.T) {
 	var buf bytes.Buffer
 	previous, flags := log.Writer(), log.Flags()
+	previousLevel := daemonLogLevel
 	log.SetOutput(&buf)
 	log.SetFlags(0)
-	t.Cleanup(func() { log.SetOutput(previous); log.SetFlags(flags) })
+	daemonLogLevel = logging.LevelDebug
+	t.Cleanup(func() { log.SetOutput(previous); log.SetFlags(flags); daemonLogLevel = previousLevel })
 	changes := []connAutoChange{{name: "solo", from: 55, to: 27, reason: "seeding"}}
 	for _, name := range []string{"a", "b", "c", "d", "e"} {
 		changes = append(changes, connAutoChange{name: name, from: 37, to: 33, reason: "machine allowance, shared with 9 running torrents"})

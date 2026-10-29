@@ -214,7 +214,7 @@ func (d *Daemon) checkUpdate(ctx context.Context) error {
 	u.checkedAt = time.Now()
 	if err != nil {
 		u.err = err.Error()
-		logf("update check failed: %v", err)
+		logfError("update check failed: %v", err)
 		return err
 	}
 	u.err, u.manifest = "", m
@@ -274,7 +274,7 @@ func (d *Daemon) startUpdate() error {
 		}
 		u.mu.Unlock()
 		if err != nil {
-			logf("update failed: %v", err)
+			logfError("update failed: %v", err)
 			return
 		}
 		u.restartOnce.Do(func() { close(u.restartC()) })
@@ -530,7 +530,7 @@ func updateBootGuard(dataDir, exe string) string {
 				n.Pending, n.RolledBack = false, true
 				n.Error = "The new version did not start: the previous one was restored."
 				_ = writeUpdateNotes(dataDir, n)
-				logf("update: the new version failed to start %d times, previous version restored", updateBootAttempts)
+				logfError("update: the new version failed to start %d times, previous version restored", updateBootAttempts)
 				return exe
 			}
 		}

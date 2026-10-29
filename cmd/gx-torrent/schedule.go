@@ -218,5 +218,5 @@ func (d *Daemon) logSpeedLimitsLocked(now time.Time, reason string) {
 	}
 	d.loggedDL, d.loggedUL = d.appliedDL, d.appliedUL
 	d.loggedReason, d.loggedAt = reason, now
-	logf("effective speed limits %d/%d KiB/s (%s)", d.appliedDL, d.appliedUL, reason)
+	logfDebug("speed limits applied: %d KiB/s down, %d KiB/s up (%s)", d.appliedDL, d.appliedUL, reason)
 }

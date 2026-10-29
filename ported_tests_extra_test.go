@@ -47,20 +47,38 @@ func TestSeedLimitsReachedMatchesPolicy(t *testing.T) {
 }
 
 func TestInfiniteSeedResumeSkipsQueuePaused(t *testing.T) {
+	cfg := &Config{}
+	cfg.Transfer.SeedRatio = 0
+	cfg.Transfer.SeedTimeDays = 0
+	cfg.Transfer.SeedTimeMinutes = 0
+	policy := newSeedPolicy(cfg, nil)
 	base := models.TorrentView{SeedRatio: 0, Progress: 100, State: "paused", AutoManaged: false}
-	if !tev_needsInfiniteSeedResume(&base) {
+	if !tev_needsInfiniteSeedResume(policy, &base) {
 		t.Fatal("paused complete torrent with infinite seed should resume")
 	}
 	cases := []models.TorrentView{
-		{SeedRatio: 0, Progress: 100, State: "paused", AutoManaged: true},                // still managed
-		{SeedRatio: 0, Progress: 50, State: "paused", AutoManaged: false},                // incomplete
-		{SeedRatio: 1, SeedDays: -1, Progress: 100, State: "paused", AutoManaged: false}, // finite rule
+		{SeedRatio: 0, Progress: 100, State: "paused", AutoManaged: true}, // still managed
+		{SeedRatio: 0, Progress: 50, State: "paused", AutoManaged: false}, // incomplete
 		{SeedRatio: 0, Progress: 100, State: "seeding", AutoManaged: false},
 	}
 	for _, torrent := range cases {
-		if tev_needsInfiniteSeedResume(&torrent) {
+		if tev_needsInfiniteSeedResume(policy, &torrent) {
 			t.Fatalf("unexpected resume for %+v", torrent)
 		}
+	}
+	// The pause and the resume must read the same limits. With both a global
+	// ratio and a global time limit in force, a torrent that inherits them is
+	// finite: the resume loop must leave it paused.
+	global := &Config{}
+	global.Transfer.SeedRatio = 2
+	global.Transfer.SeedTimeMinutes = 60
+	finite := newSeedPolicy(global, nil)
+	inheriting := models.TorrentView{SeedRatio: -1, SeedDays: -1, Progress: 100, State: "paused"}
+	if tev_needsInfiniteSeedResume(finite, &inheriting) {
+		t.Fatal("a global seed limit must keep the torrent paused")
+	}
+	if !tev_needsInfiniteSeedResume(finite, &base) {
+		t.Fatal("a per-torrent ratio of 0 still means unlimited, whatever the global limit says")
 	}
 }
 

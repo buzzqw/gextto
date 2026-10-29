@@ -560,6 +560,12 @@ func Probe(path string) *MediaInfo {
 // ProbeResult runs `ffprobe` on path and returns a human-readable reason on
 // failure, so the caller can log the exact file that could not be analyzed.
 func ProbeResult(path string) (MediaInfo, error) {
+	return probeFileWithin(path, 60*time.Second)
+}
+
+// probeFileWithin runs `ffprobe` on path with a caller-chosen bound: the
+// backfill worker can wait a minute, a decision inside the search cycle cannot.
+func probeFileWithin(path string, timeout time.Duration) (MediaInfo, error) {
 	path = strings.TrimSpace(path)
 	if path == "" {
 		return MediaInfo{}, errors.New("empty path")
@@ -571,7 +577,7 @@ func ProbeResult(path string) (MediaInfo, error) {
 	}
 	// A bounded timeout keeps a hung probe from pinning a worker, and the
 	// protocol whitelist keeps ffprobe from following remote URLs (SSRF).
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	command := exec.CommandContext(
 		ctx,

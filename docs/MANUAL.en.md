@@ -1538,9 +1538,10 @@ The complete list of actions and parameters is in [Appendix C](#appendix-c-refer
   untouched. Preview first, then execute; no re-download is involved.
 - **gx-torrent log** — panel with the latest lines of the torrent engine log
   (`gx-torrent/gx-torrent.log`), separate from Gextto's log and kept across
-  service restarts. You can filter its text, show only warnings and errors, and
-  pick between the active file and the rotations (`.1`, `.2`, `.3`). Useful when
-  a download or a transfer does not behave as expected.
+  service restarts. Every line carries its date and level (INFO, WARN, ERROR,
+  DEBUG) like Gextto's log. You can filter its text, show only warnings and
+  errors, and pick between the active file and the rotations (`.1`, `.2`, `.3`).
+  Useful when a download or a transfer does not behave as expected.
  - **Database**: prune by cycles/error age, **seen-from-feed retention** (days; 0
    keeps everything), keyword prune with a list of the matching rows, and
    **VACUUM / ANALYZE** across all databases.

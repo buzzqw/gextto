@@ -142,7 +142,7 @@ func (d *Daemon) prepareNetwork() error {
 		if _, err := resolveInterface(n.OutgoingInterface); err != nil {
 			// Killswitch: the session still starts, but nothing goes out
 			// until the interface has an address.
-			logf("outgoing interface %s is not available (%v): no traffic until it comes up", n.OutgoingInterface, err)
+			logfError("outgoing interface %s is not available (%v): no traffic until it comes up", n.OutgoingInterface, err)
 		}
 	}
 	return nil

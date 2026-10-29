@@ -168,6 +168,12 @@ type gxTorrentEngine struct {
 	version   string
 	versionAt time.Time
 
+	// startupMu guards startupNote: what the daemon did at start-up (kept
+	// running, replaced), written into the single start line instead of a
+	// separate one just before it.
+	startupMu   sync.Mutex
+	startupNote string
+
 	mu       sync.Mutex
 	syncMu   sync.Mutex
 	cache    map[string]models.TorrentView
@@ -469,7 +475,9 @@ func (e *gxTorrentEngine) adoptOrReplace(cfg *Config, health gxHealth) {
 	}
 	if health.Fingerprint == spec.fingerprint && gxPidAlive(health.Pid) {
 		e.process = adoptGxProcess(health.Pid)
-		logging.Info(fmt.Sprintf("🔗 gx-torrent %s is still running: transfers were not interrupted", health.Version))
+		// The start line says it: a separate line before the divider made a
+		// restart read as three messages.
+		e.setStartupNote(fmt.Sprintf("%s (transfers were not interrupted)", health.Version))
 		if gxEnsureIPFilter(cfg, false) {
 			if path := gxIPFilterPath(cfg); path != "" {
 				if _, err := e.LoadIPFilter(path); err != nil {
@@ -483,12 +491,28 @@ func (e *gxTorrentEngine) adoptOrReplace(cfg *Config, health gxHealth) {
 		// Stopping it now would cut a copy to the library in half: keep the
 		// old daemon until its moves are done, then replace it.
 		e.process = adoptGxProcess(health.Pid)
+		e.setStartupNote(fmt.Sprintf("%s (restarts once its moves in progress finish)", health.Version))
 		logging.Info(fmt.Sprintf("⏳ gx-torrent %s will restart with its new program or settings once %d move(s) in progress finish", health.Version, moving))
 		go e.replaceWhenIdle(health.Pid, health.Version)
 		return
 	}
 	logging.Info(fmt.Sprintf("🔄 Restarting gx-torrent %s: its program or settings changed", health.Version))
 	gxStopPid(health.Pid)
+}
+
+// setStartupNote records what the daemon did at start-up for the start line.
+func (e *gxTorrentEngine) setStartupNote(note string) {
+	e.startupMu.Lock()
+	e.startupNote = note
+	e.startupMu.Unlock()
+}
+
+// StartupNote reports what the daemon did at start-up, for the start line.
+// Empty when this is not the managed gx-torrent engine.
+func (e *gxTorrentEngine) StartupNote() string {
+	e.startupMu.Lock()
+	defer e.startupMu.Unlock()
+	return e.startupNote
 }
 
 // movesInProgress returns how many storage moves the daemon is running.

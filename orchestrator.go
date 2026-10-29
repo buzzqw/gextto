@@ -1262,6 +1262,19 @@ func RunCycleDomain(
 			}
 			why := "new"
 			switch {
+			case release.Kind == "movie" && approvalReason == "upgrade":
+				why = "better version than the one you have"
+			case release.Kind == "movie" && approvalReason == "restored":
+				// The database remembered this film as removed, but its file is
+				// no longer anywhere: this is a new attempt, not an upgrade.
+				why = "the copy in the library is missing"
+			case release.Kind == "movie" && fromArchive:
+				// A film is not an episode: the archive branch below said
+				// "fills a missing episode" for a movie proposed from the
+				// release archive, which read as nonsense in the log.
+				why = "taken from the release archive"
+			case release.Kind == "movie":
+				why = "new"
 			case fromArchive || len(gapEpisodes) > 0:
 				why = "fills a missing episode"
 				if approvalReason == "upgrade" {

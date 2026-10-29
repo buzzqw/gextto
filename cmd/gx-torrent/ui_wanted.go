@@ -462,7 +462,7 @@ func (d *Daemon) handleUIWantedSearch(w http.ResponseWriter, r *http.Request) {
 		// the archive instead of asking the indexer again.
 		if len(found) > 0 {
 			if _, aerr := d.archive().record("search:"+strings.ToLower(query), found, time.Now()); aerr != nil {
-				logf("wanted search %q: cannot archive the indexer results: %v", query, aerr)
+				logfError("wanted search %q: cannot archive the indexer results: %v", query, aerr)
 			}
 		}
 	}

@@ -154,7 +154,7 @@ func (d *Daemon) enableAutoSpeed(uploadKiB int64) {
 	store.Set(autospeedEnabledKey, "true")
 	store.Set(autospeedMinKey, strconv.FormatInt(max(uploadKiB/10, autoSpeedDefaultMinKiB), 10))
 	if err := store.Save(); err != nil {
-		logf("cannot save the auto-speed settings: %v", err)
+		logfError("cannot save the auto-speed settings: %v", err)
 	}
 }
 

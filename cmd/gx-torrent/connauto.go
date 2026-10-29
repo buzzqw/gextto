@@ -228,7 +228,7 @@ func (d *Daemon) applyAutoConnectionsLocked(now time.Time, torrents []*torrent.T
 	base := limits.perTorrent
 	if limits != d.connAutoLimits {
 		d.connAutoLimits = limits
-		logf("automatic peer cap: %d connections per torrent, %d in all (%d cores, %d MiB available)",
+		logfDebug("automatic peer cap: %d connections per torrent, %d in all (%d cores, %d MiB available)",
 			base, limits.budget, connAutoCores(), memoryAvailable()>>20)
 	}
 	budget := limits.budget
@@ -351,7 +351,7 @@ func logAutoConnectionChanges(changes []connAutoChange) {
 		group := groups[key]
 		if len(group) == 1 {
 			c := group[0]
-			logf("peer cap for «%s»: %d → %d (%s)", c.name, c.from, c.to, c.reason)
+			logfDebug("peer cap for «%s»: %d → %d (%s)", c.name, c.from, c.to, c.reason)
 			continue
 		}
 		names := make([]string, 0, 3)
@@ -362,6 +362,6 @@ func logAutoConnectionChanges(changes []connAutoChange) {
 		if len(group) > 3 {
 			more = fmt.Sprintf(" +%d", len(group)-3)
 		}
-		logf("peer cap %d for %d torrents (%s): %s%s", key.to, len(group), key.reason, strings.Join(names, ", "), more)
+		logfDebug("peer cap %d for %d torrents (%s): %s%s", key.to, len(group), key.reason, strings.Join(names, ", "), more)
 	}
 }

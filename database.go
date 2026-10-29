@@ -1211,6 +1211,20 @@ func (d *Database) checkSeriesScoredInner(release *models.Release, score, minSco
 	if dbRowErr != nil && !errors.Is(dbRowErr, sql.ErrNoRows) {
 		return false, "", dbRowErr
 	}
+	// recordLibraryMedia stores the MediaInfo read from a library file on the
+	// episode row. A dry run does not write, and a missing row makes the
+	// update affect nothing: the decision still uses what the probe found.
+	recordLibraryMedia := func(value string) error {
+		if dryRun {
+			return nil
+		}
+		_, err := d.SetEpisodeMediaInfo(seriesName, season, episode, value)
+		return err
+	}
+	diff := context.StallAdjustedMinDiff(minScoreDiff, episodeKey)
+	upgradeStands := func(existing *models.Quality, existingScore int64) bool {
+		return upgradeReasonUntil(&release.Quality, existing, score, existingScore, diff, context.UpgradeUntilScore, context.ScoreSettings) != ""
+	}
 	// Intelligenza archivio (parità col legacy `_best_quality_in_path`).
 	if archive != nil {
 		if disk, ok := archive.BestFor(season, episode); ok {
@@ -1229,8 +1243,30 @@ func (d *Database) checkSeriesScoredInner(release *models.Release, score, minSco
 					comparisonScore = dbScore
 				}
 			}
-			if upgradeReasonUntil(&release.Quality, &comparisonQuality, score, comparisonScore, context.StallAdjustedMinDiff(minScoreDiff, episodeKey), context.UpgradeUntilScore, context.ScoreSettings) == "" {
+			if !upgradeStands(&comparisonQuality, comparisonScore) {
 				return false, "duplicate", nil
+			}
+			// The copy that would be replaced is the truth the completion gate
+			// will use: read its real streams now, before downloading. A name
+			// that lost its quality tags (the standard rename keeps only
+			// resolution and codec) otherwise makes any richer name look
+			// better, and the file is downloaded and discarded for nothing.
+			if path := strings.TrimSpace(disk.Path); path != "" {
+				// The stored MediaInfo belongs to the row's file: use it only
+				// when the index found that same file, or the decision would
+				// judge one copy with the streams of another.
+				stored := ""
+				if dbRow && SamePath(dbArchivePath, path) {
+					stored = dbMediaInfo
+				}
+				probed := archivedQualityTruth(path, stored, comparisonQuality, recordLibraryMedia)
+				comparisonQuality = probed
+				if truth := ScoreQuality(&comparisonQuality, context.ScoreSettings); truth > comparisonScore {
+					comparisonScore = truth
+				}
+				if !upgradeStands(&comparisonQuality, comparisonScore) {
+					return false, "duplicate", nil
+				}
 			}
 		}
 	}
@@ -1266,6 +1302,15 @@ func (d *Database) checkSeriesScoredInner(release *models.Release, score, minSco
 		// candidate was already bounded by StallScoreDrop above).
 		if !manual && !missingArchivedFile && !stallAlternative && upgradeReasonUntil(&release.Quality, &oldQuality, score, dbScore, minScoreDiff, context.UpgradeUntilScore, context.ScoreSettings) == "" {
 			return false, "duplicate", nil
+		}
+		// Same as above when the archive scan found nothing for this episode
+		// (the row still names the file): an upgrade is confirmed against the
+		// real streams of the copy it would replace.
+		if !manual && !missingArchivedFile && !stallAlternative && strings.TrimSpace(dbArchivePath) != "" {
+			oldQuality = archivedQualityTruth(dbArchivePath, dbMediaInfo, oldQuality, recordLibraryMedia)
+			if upgradeReasonUntil(&release.Quality, &oldQuality, score, dbScore, minScoreDiff, context.UpgradeUntilScore, context.ScoreSettings) == "" {
+				return false, "duplicate", nil
+			}
 		}
 		if dryRun {
 			// Upgrade recognised, but do not write the backup/update rows.
@@ -1785,6 +1830,12 @@ func (d *Database) checkMovieScoredWithDisk(release *models.Release, score, minS
 	var removedID int64
 	removedErr := d.db.QueryRow("SELECT id FROM movies WHERE magnet_hash=?1 AND removed_at IS NOT NULL", hash).Scan(&removedID)
 	if removedErr == nil {
+		// The row says "removed" but the file is still on the archive volume
+		// (an old removal, a library reset): the copy is there, and a
+		// re-download would only be discarded after the download and the copy.
+		if disk != nil {
+			return false, "duplicate", nil
+		}
 		if dryRun {
 			return true, "restored", nil
 		}
@@ -1797,11 +1848,12 @@ func (d *Database) checkMovieScoredWithDisk(release *models.Release, score, minS
 		return false, "", removedErr
 	}
 	var id, existingScore int64
-	var dbTitle, metadataJSON, existingMedia string
+	var dbName, dbTitle, metadataJSON, existingMedia, processedPath string
+	var dbYear sql.NullInt64
 	var downloadedAt sql.NullString
 	// Match exact year if null/same, or allow +/- 1 year tolerance to align with disk cleanup logic
-	query := "SELECT COALESCE(m.title,''),m.id,m.quality_score,COALESCE(t.metadata_json,''),m.downloaded_at,COALESCE(m.media_info_json,'') FROM movies m LEFT JOIN torrent_meta t ON lower(t.hash)=lower(m.magnet_hash) WHERE m.removed_at IS NULL AND m.name=?1 AND (m.year IS ?2 OR (?2 IS NOT NULL AND m.year IS NOT NULL AND abs(m.year - ?2) <= 1)) ORDER BY (m.year IS ?2) DESC, m.id DESC LIMIT 1"
-	rowErr := d.db.QueryRow(query, release.Title, release.Year).Scan(&dbTitle, &id, &existingScore, &metadataJSON, &downloadedAt, &existingMedia)
+	query := "SELECT COALESCE(m.name,''),m.year,COALESCE(m.title,''),m.id,m.quality_score,COALESCE(t.metadata_json,''),m.downloaded_at,COALESCE(m.media_info_json,''),COALESCE(t.processed_path,'') FROM movies m LEFT JOIN torrent_meta t ON lower(t.hash)=lower(m.magnet_hash) WHERE m.removed_at IS NULL AND m.name=?1 AND (m.year IS ?2 OR (?2 IS NOT NULL AND m.year IS NOT NULL AND abs(m.year - ?2) <= 1)) ORDER BY (m.year IS ?2) DESC, m.id DESC LIMIT 1"
+	rowErr := d.db.QueryRow(query, release.Title, release.Year).Scan(&dbName, &dbYear, &dbTitle, &id, &existingScore, &metadataJSON, &downloadedAt, &existingMedia, &processedPath)
 	if rowErr != nil && !errors.Is(rowErr, sql.ErrNoRows) {
 		return false, "", rowErr
 	}
@@ -1831,6 +1883,38 @@ func (d *Database) checkMovieScoredWithDisk(release *models.Release, score, minS
 		upgrade := upgradeReasonUntil(&release.Quality, &existingQuality, score, existingScore, minScoreDiff, upgradeUntil, settings) != ""
 		if !upgrade {
 			return false, "duplicate", nil
+		}
+		// Before downloading, confirm the upgrade against the real streams of
+		// the copy it would replace. The database title is often the clean
+		// film name and the archive scan may miss the file (another folder,
+		// a mount that was slow): the recorded path is the last resort, and
+		// without MediaInfo for it the copy looks worse than any release name
+		// that carries its quality tags.
+		if strings.TrimSpace(existingMedia) == "" {
+			probePath := ""
+			switch {
+			case disk != nil && strings.TrimSpace(disk.Path) != "":
+				probePath = disk.Path
+			case strings.TrimSpace(processedPath) != "":
+				probePath = processedPath
+			}
+			if probePath != "" {
+				record := func(value string) error {
+					if dryRun {
+						return nil
+					}
+					_, err := d.SetMovieMediaInfo(dbName, nullInt64Ptr(dbYear), value)
+					return err
+				}
+				probed := archivedQualityTruth(probePath, existingMedia, existingQuality, record)
+				existingQuality = probed
+				if truth := ScoreQuality(&existingQuality, settings); truth > existingScore {
+					existingScore = truth
+				}
+				if upgradeReasonUntil(&release.Quality, &existingQuality, score, existingScore, minScoreDiff, upgradeUntil, settings) == "" {
+					return false, "duplicate", nil
+				}
+			}
 		}
 		if dryRun {
 			return true, "upgrade", nil
@@ -6913,7 +6997,7 @@ func (d *Database) SeriesQualityIndex(seriesName string, season int64, cfg *Conf
 			// file's quality.
 			score = cfg.FileScore(archivePath, "series", seriesName)
 		}
-		index.Best[[2]int64{episodeSeason, episode}] = models.ArchiveQuality{Quality: quality, Score: score}
+		index.Best[[2]int64{episodeSeason, episode}] = models.ArchiveQuality{Quality: quality, Score: score, Path: archivePath}
 	}
 	return index
 }

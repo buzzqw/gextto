@@ -776,7 +776,7 @@ func (d *Daemon) archive() *feedArchive {
 	d.archiveOnce.Do(func() {
 		archive, err := openFeedArchive(filepath.Join(d.opts.DataDir, feedArchiveFile))
 		if err != nil {
-			logf("feed archive unavailable: %v", err)
+			logfError("feed archive unavailable: %v", err)
 			return
 		}
 		d.feedArchive = archive

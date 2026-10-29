@@ -162,17 +162,46 @@ func stopBackgroundWorkers(state *AppState) {
 			return
 		case <-ticker.C:
 		}
-		if names := mediaFileOps.runningNames(); len(names) > 0 {
+		if operations := mediaFileOps.running(); len(operations) > 0 {
 			if time.Since(lastNotice) >= shutdownNoticeInterval {
-				logging.Info(fmt.Sprintf("⏳ Stopping: waiting for %d file %s to finish copying so nothing is left half-copied: %s",
-					len(names), pluralWord(len(names), "copy", "copies"), quotedList(names, 3)))
+				names := make([]string, len(operations))
+				for i, operation := range operations {
+					names[i] = operation.what
+				}
+				// The elapsed time is what tells a stop that is progressing
+				// from one that is stuck: a 10 GB copy over the network is
+				// expected to take a while, and without it the same sentence
+				// repeated every 15 seconds says nothing new.
+				logging.Info(fmt.Sprintf("⏳ Stopping: waiting for %d file %s to finish copying so nothing is left half-copied: %s (started %s ago)",
+					len(names), pluralWord(len(names), "copy", "copies"), quotedList(names, 3),
+					logDuration(time.Since(operations[0].started))))
 				lastNotice = time.Now()
 			}
 			continue
 		}
 		if time.Since(started) >= workerStopTimeout && mediaFileOps.closeIfIdle() {
-			logging.Warn(fmt.Sprintf("⚠️ Some background work was still running after %s; no file is being copied, so Gextto stops anyway",
-				logDuration(workerStopTimeout)))
+			// "No file is being copied" alone contradicted the line just
+			// above it; name the work that is still running, when the jobs
+			// manager knows it.
+			remaining := ""
+			if state.jobs != nil {
+				if running := state.jobs.List("", JobRunning); len(running) > 0 {
+					kinds := make([]string, 0, len(running))
+					for _, job := range running {
+						if kind := strings.TrimSpace(job.Kind); kind != "" {
+							kinds = append(kinds, kind)
+						}
+					}
+					remaining = quotedList(kinds, 3)
+				}
+			}
+			if remaining == "" {
+				logging.Warn(fmt.Sprintf("⚠️ The file copies are finished, but some background work was still running after %s: Gextto stops anyway",
+					logDuration(workerStopTimeout)))
+			} else {
+				logging.Warn(fmt.Sprintf("⚠️ The file copies are finished, but this work was still running after %s: %s. Gextto stops anyway",
+					logDuration(workerStopTimeout), remaining))
+			}
 			return
 		}
 	}
@@ -274,6 +303,13 @@ func Serve(state *AppState) error {
 	engineName := "-"
 	if active := state.activeEngine(); active != nil {
 		engineName = active.Name()
+		// What the engine did at start-up (an adopted daemon keeps its
+		// transfers) belongs to the start line, not to a line of its own.
+		if noter, ok := active.(interface{ StartupNote() string }); ok {
+			if note := strings.TrimSpace(noter.StartupNote()); note != "" {
+				engineName += " " + note
+			}
+		}
 	}
 	prevRun := logStartupBanner(state.cfg.DataDir, startupDetails{WebAddr: webAddr, Mode: mode, Engine: engineName})
 	notifyRestart(state, prevRun)

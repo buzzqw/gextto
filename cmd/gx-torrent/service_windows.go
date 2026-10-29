@@ -34,7 +34,7 @@ func (h *gxServiceHandler) Execute(_ []string, requests <-chan svc.ChangeRequest
 	status <- svc.Status{State: svc.StartPending}
 	run, err := startDaemon(h.opts)
 	if err != nil {
-		logf("service cannot start: %v", err)
+		logfError("service cannot start: %v", err)
 		return false, 1
 	}
 	status <- svc.Status{State: svc.Running, Accepts: svc.AcceptStop | svc.AcceptShutdown}
@@ -51,7 +51,7 @@ func (h *gxServiceHandler) Execute(_ []string, requests <-chan svc.ChangeRequest
 			}
 		case err := <-run.serverErr:
 			if err != nil && !errors.Is(err, http.ErrServerClosed) {
-				logf("service server failed: %v", err)
+				logfError("service server failed: %v", err)
 				run.shutdown()
 				return false, 1
 			}

@@ -94,7 +94,7 @@ func (d *Daemon) feeds() []feedConfig {
 	}
 	var list []feedConfig
 	if err := json.Unmarshal([]byte(raw), &list); err != nil {
-		logf("cannot parse the feeds setting: %v", err)
+		logfError("cannot parse the feeds setting: %v", err)
 		return nil
 	}
 	return list
@@ -290,7 +290,7 @@ func (d *Daemon) pollFeedsOnlyDetailed(only string) feedPollResult {
 		status.Items = len(items)
 		totalItems += len(items)
 		if newItems, err := d.archive().record(name, items, time.Now()); err != nil {
-			logf("feed %s: cannot archive the items: %v", name, err)
+			logfError("feed %s: cannot archive the items: %v", name, err)
 		} else {
 			status.New = newItems
 			totalNew += newItems
@@ -331,7 +331,7 @@ func (d *Daemon) pollFeedsOnlyDetailed(only string) feedPollResult {
 			newlyAdded, err := d.addFeedItem(item, rule.Action)
 			if err != nil {
 				status.LastError = err.Error()
-				logf("feed %s: cannot add %q: %v", name, item.Title, err)
+				logfError("feed %s: cannot add %q: %v", name, item.Title, err)
 				if !wasError && !addErrorNotified {
 					d.notify("feed_error", map[string]any{"feed": name, "title": item.Title, "error": err.Error()})
 					addErrorNotified = true
@@ -373,7 +373,7 @@ func (d *Daemon) pollFeedsOnlyDetailed(only string) feedPollResult {
 	// A host that answered 429 is reported once, with how long it is left alone.
 	for host, skipped := range rateLimitedByHost {
 		errorsList = append(errorsList, fmt.Sprintf("%s: %d feed(s) left for the next check, the site is limiting the requests", host, skipped))
-		logf("rate limited by %s: %d feed(s) left for the next check", host, skipped)
+		logfWarn("rate limited by %s: %d feed(s) left for the next check", host, skipped)
 	}
 	if len(rulesOnce) > 0 {
 		d.disableRules(rulesOnce)
@@ -523,7 +523,7 @@ func (d *Daemon) rules() []rss.Rule {
 	}
 	var list []rss.Rule
 	if err := json.Unmarshal([]byte(raw), &list); err != nil {
-		logf("cannot parse the rules setting: %v", err)
+		logfError("cannot parse the rules setting: %v", err)
 		return nil
 	}
 	return list
@@ -677,7 +677,7 @@ func (d *Daemon) disableRules(names []string) {
 		return
 	}
 	if err := d.saveRules(rules); err != nil {
-		logf("cannot disable once rules %v: %v", disabled, err)
+		logfError("cannot disable once rules %v: %v", disabled, err)
 		return
 	}
 	for _, name := range disabled {

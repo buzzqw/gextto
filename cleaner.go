@@ -100,7 +100,7 @@ func IndexArchive(seriesName, archivePath string, cfg *Config) models.ArchiveQua
 		key := [2]int64{season, episode}
 		existing, found := index.Best[key]
 		if !found || score > existing.Score {
-			index.Best[key] = models.ArchiveQuality{Quality: quality, Score: score}
+			index.Best[key] = models.ArchiveQuality{Quality: quality, Score: score, Path: file}
 		}
 	}
 	return index
@@ -1339,7 +1339,7 @@ func (index *MovieArchiveIndex) Best(cfg *Config, release *models.Release) *mode
 		}
 		score := cfg.fileScoreWithSize(file.fileName, "movie", title, file.size)
 		if best == nil || score > best.Score {
-			value := models.ArchiveQuality{Quality: file.quality, Score: score}
+			value := models.ArchiveQuality{Quality: file.quality, Score: score, Path: file.fileName}
 			best = &value
 		}
 	}

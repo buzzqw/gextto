@@ -10,6 +10,7 @@ package main
 // cooldown.
 
 import (
+	"fmt"
 	"strings"
 	"sync"
 	"time"
@@ -130,9 +131,24 @@ func (d *Daemon) updateTrackerHealth(collected map[string]collectedTorrent, now 
 	}
 	d.trackers.mu.Unlock()
 
-	for _, url := range newly {
-		logf("tracker not working for %s: removed from the session for %s · %s",
-			trackerFailWindow, trackerDisableFor, url)
+	// One sentence for the whole pass: a torrent carries a dozen public
+	// trackers and, when they go down together, a line each buried the rest of
+	// the log (ten identical lines in the same second).
+	if len(newly) > 0 {
+		const shown = 3
+		list := newly
+		more := ""
+		if len(list) > shown {
+			more = fmt.Sprintf(" and %d more", len(list)-shown)
+			list = list[:shown]
+		}
+		if len(newly) == 1 {
+			logf("The tracker %s stopped answering for %s: removed from the session for %s",
+				newly[0], trackerFailWindow, trackerDisableFor)
+		} else {
+			logf("%d trackers stopped answering for %s: removed from the session for %s (%s%s)",
+				len(newly), trackerFailWindow, trackerDisableFor, strings.Join(list, ", "), more)
+		}
 	}
 	if len(disabled) > 0 {
 		d.stripDisabledTrackers(collected, disabled)
@@ -160,7 +176,7 @@ func (d *Daemon) stripDisabledTrackers(collected map[string]collectedTorrent, di
 		}
 		if changed {
 			if err := d.setTrackers(strings.ToLower(hash), remaining); err != nil {
-				logf("cannot drop a failing tracker: %v", err)
+				logfError("cannot drop a failing tracker: %v", err)
 			}
 		}
 	}

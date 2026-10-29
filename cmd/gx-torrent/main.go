@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/buzzqw/gextto/internal/constants"
+	"github.com/buzzqw/gextto/internal/logging"
 	"github.com/buzzqw/gextto/internal/settings"
 )
 
@@ -46,8 +47,48 @@ func displayVersion() string {
 	return constants.GxTorrentVersionLabel()
 }
 
+// daemonLogLevel is the threshold of the daemon's own lines: INFO, or DEBUG
+// with -debug. The engine has its own level, set by engineLogHandler.
+var daemonLogLevel = logging.LevelInfo
+
+// logf writes an informational line; logfWarn, logfError and logfDebug carry
+// the level of their sentence. Lines go through the same shape Gextto uses
+// (ISO date, level, sentence in words), so the two logs read as one: the
+// daemon's own lines used to be plain `log.Printf` lines without a level and
+// with a timestamp in another format.
 func logf(format string, args ...any) {
-	log.Printf(format, args...)
+	daemonLog(logging.LevelInfo, format, args...)
+}
+
+func logfWarn(format string, args ...any) {
+	daemonLog(logging.LevelWarn, format, args...)
+}
+
+func logfError(format string, args ...any) {
+	daemonLog(logging.LevelError, format, args...)
+}
+
+func logfDebug(format string, args ...any) {
+	daemonLog(logging.LevelDebug, format, args...)
+}
+
+func daemonLog(level logging.Level, format string, args ...any) {
+	if level < daemonLogLevel {
+		return
+	}
+	line := time.Now().Format("2006-01-02 15:04:05") + " " +
+		fmt.Sprintf("%5s", level.String()) + " " + fmt.Sprintf(format, args...)
+	// The flag set is empty (see main): the line carries its own date and
+	// level, and the rotating writer and the log ring receive it unchanged.
+	_ = log.Output(2, line)
+}
+
+// daemonFatal writes the line as an ERROR and exits: the startup checks used
+// log.Fatal, which printed without a level and without the date in the shape
+// the rest of the log uses.
+func daemonFatal(format string, args ...any) {
+	logfError(format, args...)
+	os.Exit(1)
 }
 
 func envOr(key, fallback string) string {
@@ -109,7 +150,7 @@ func seedDefaultIPFilter(store *settings.Store, flagValue string) {
 	}
 	store.Set("ipfilter", constants.DefaultIPFilterURL)
 	if err := store.Save(); err != nil {
-		log.Printf("cannot save the default IP filter: %v", err)
+		logfError("cannot save the default IP filter: %v", err)
 	}
 }
 
@@ -277,28 +318,36 @@ func main() {
 	showVersion := flag.Bool("version", false, "print the version and exit")
 	flag.Parse()
 	applyGCDefault()
+	if *debug {
+		// -debug also shows the daemon's own detail lines (peer cap, cache,
+		// swarm noise): they are what a diagnosis needs and cannot go in the
+		// log an operator reads.
+		daemonLogLevel = logging.LevelDebug
+	}
 
 	if *showVersion {
 		fmt.Println(displayVersion())
 		return
 	}
-	log.SetFlags(log.LstdFlags)
-	log.SetPrefix("gx-torrent: ")
+	// No flag and no prefix: daemonLog writes the date and the level itself,
+	// in the same shape as Gextto's log lines.
+	log.SetFlags(0)
+	log.SetPrefix("")
 	setupLogFile(*logFile)
 
 	data, err := filepath.Abs(*dataDir)
 	if err != nil {
-		log.Fatal(err)
+		daemonFatal("%v", err)
 	}
 	modeValue, err := resolveMode(*mode, *fingerprint)
 	if err != nil {
-		log.Fatal(err)
+		daemonFatal("%v", err)
 	}
 	var settingsStore *settings.Store
 	if modeValue == ModeStandalone {
 		store, loadErr := settings.Load(filepath.Join(data, "settings.json"))
 		if loadErr != nil {
-			log.Printf("cannot read settings.json: %v", loadErr)
+			logfError("cannot read the settings file: %v", loadErr)
 		} else {
 			settingsStore = store
 			seedDefaultIPFilter(store, *ipFilter)
@@ -316,18 +365,18 @@ func main() {
 		listenValue = defaultListen(modeValue)
 	}
 	if modeValue != ModeStandalone && !loopback(listenValue) && tokenValue == "" && !*insecure {
-		log.Fatalf("refusing to listen on %s without a token: set -token/GX_TORRENT_TOKEN or use -insecure", listenValue)
+		daemonFatal("refusing to listen on %s without a token: set -token/GX_TORRENT_TOKEN or use -insecure", listenValue)
 	}
 	portBegin, portEnd, err := resolvePortRange(*ports, settingsStore)
 	if err != nil {
-		log.Fatal(err)
+		daemonFatal("%v", err)
 	}
 	downloads := optStr(settingsStore, "download-dir", *downloadDir)
 	if downloads == "" {
 		downloads = filepath.Join(data, "downloads")
 	}
 	if downloads, err = filepath.Abs(downloads); err != nil {
-		log.Fatal(err)
+		daemonFatal("%v", err)
 	}
 	partsDir := optStr(settingsStore, "temp-dir", "")
 	notifyURLValue := optStr(settingsStore, notifyURLSettingKey, *notify)
@@ -355,7 +404,7 @@ func main() {
 	for _, root := range strings.Split(*roots, ",") {
 		if root = strings.TrimSpace(root); root != "" {
 			if !filepath.IsAbs(root) {
-				log.Fatalf("allowed root %q must be absolute", root)
+				daemonFatal("allowed root %q must be absolute", root)
 			}
 			allowed = append(allowed, filepath.Clean(root))
 		}
@@ -414,7 +463,7 @@ func main() {
 	// the service dispatcher instead of the interactive signal loop.
 	if isWindowsService() {
 		if err := runWindowsService(opts); err != nil {
-			logf("service failed: %v", err)
+			logfError("service failed: %v", err)
 			os.Exit(1)
 		}
 		return
@@ -426,7 +475,7 @@ func main() {
 			if exe, err = filepath.EvalSymlinks(exe); err == nil {
 				if target := updateBootGuard(opts.DataDir, exe); target != "" {
 					if err := restartInto(target); err != nil {
-						logf("cannot start the restored version: %v", err)
+						logfError("cannot start the restored version: %v", err)
 					}
 				}
 			}
@@ -434,7 +483,7 @@ func main() {
 	}
 	run, err := startDaemon(opts)
 	if err != nil {
-		log.Fatalf("cannot start: %v", err)
+		daemonFatal("cannot start: %v", err)
 	}
 
 	signals := make(chan os.Signal, 1)
@@ -446,7 +495,7 @@ func main() {
 		logf("received %s, shutting down", sig)
 	case err := <-run.serverErr:
 		if err != nil && !errors.Is(err, http.ErrServerClosed) {
-			logf("API server failed: %v", err)
+			logfError("API server failed: %v", err)
 			exitCode = 1
 		}
 	case <-run.daemon.updater.restartC():
@@ -460,7 +509,7 @@ func main() {
 		}
 		// Exec failed: exit with an error so a supervisor (systemd
 		// Restart=on-failure) starts the new binary.
-		logf("cannot restart in place: %v", err)
+		logfError("cannot restart in place: %v", err)
 		os.Exit(1)
 	}
 	run.shutdown()
@@ -510,10 +559,12 @@ func startDaemon(opts Options) (*daemonRun, error) {
 	server := &http.Server{Handler: daemon.routes(), ReadHeaderTimeout: 10 * time.Second}
 	serverErr := make(chan error, 1)
 	boundHost, boundPort, _ := net.SplitHostPort(listener.Addr().String())
-	logf("version %s listening on %s (data %s, downloads %s)", runtimeVersion(), listener.Addr(), opts.DataDir, opts.DownloadDir)
-	for _, url := range webUIURLs(boundHost, boundPort) {
-		logf("web UI: %s", url)
-	}
+	// One line for the start-up: the address, the folders and the page are
+	// what a person needs; the rest of the session banner (identity, IP filter,
+	// peer cap) follows only when it changes something.
+	logf("gx-core %s is listening on %s · data: %s · downloads: %s · web interface: %s",
+		runtimeVersion(), listener.Addr(), opts.DataDir, opts.DownloadDir,
+		strings.Join(webUIURLs(boundHost, boundPort), " · "))
 	go func() {
 		serverErr <- server.Serve(listener)
 	}()
@@ -527,7 +578,7 @@ func startDaemon(opts Options) (*daemonRun, error) {
 			logf("first run: open %s to configure gx-torrent", url)
 			go func() {
 				if err := openBrowser(url); err != nil {
-					logf("cannot open the browser automatically: %v (open %s by hand)", err, url)
+					logfError("cannot open the browser automatically: %v (open %s by hand)", err, url)
 				}
 			}()
 		}

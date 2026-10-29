@@ -935,6 +935,34 @@ Copy of the live databases (read-only backup), N97, `nice -n 15`.
 | *Impatto sulla libreria*: feed releases replayed through the dry-run decision | **259** releases, **55** series, **1.46 s** |
 | Archived episodes those releases would replace | **2** (1080p WEBRip AAC x265 → 1080p WEB-DL DDP 5.1 H.264, «source» rule) |
 
+### Log volume and upgrade probes — 29 October 2026
+
+The machine running the service (N97, 4 cores), the live logs of the last 24
+hours (2026-10-28 11:48 → 2026-10-29 11:48), read with `awk`/`grep`:
+
+| Measure | Before | After |
+|---|---|---|
+| `gx-torrent.log`, lines in 24 h | **212** | — |
+| of which the applied speed limits (a value that changes every few seconds) | **76** | 0 at INFO (DEBUG with `-debug`) |
+| of which peer caps, peer noise, cache retunes, memory releases | **61** | 0 at INFO (DEBUG with `-debug`) |
+| of which one line per failed tracker (10 in the same second when a public tracker list went down) | **18** | 3 (one sentence per pass, up to 3 names) |
+| of which "reached the seeding limit", one per paused-and-resumed torrent | **12** | 1 per torrent per run |
+| of which the start-up banner | **40** (8 × 5 restarts) | **5** (one line per start) |
+| `gextto.log`, lines in 24 h | **499** | — |
+| of which the restart sequence (`stopped`, `still running`, divider, banner) | **112** (28 restarts) | 84 (the daemon line merged into the banner) |
+
+Cost of reading the real quality of one library file with ffprobe on the same
+machine (local disk, warm cache), the command the upgrade decision runs once per
+file and then remembers in the database:
+
+| File | `ffprobe -v error -print_format json -show_format -show_streams` |
+|---|---|
+| 1080p WEB-DL mkv, 1.9 GB | 274 ms (cold), 81 ms, 80 ms |
+
+The probe runs only for a candidate the decision already judged an upgrade and
+whose library row has no MediaInfo yet; the result is stored in `episodes` or
+`movies`, so the periodic backfill and the next searches do not repeat it.
+
 ### Test suite duration — 22 October 2026
 
 `make test` on the N97 (4 cores, Go build cache warm, service running):

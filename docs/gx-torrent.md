@@ -102,8 +102,11 @@ Code:
    engine:
    - data in `DATA_DIR/gx-torrent`;
    - log in `DATA_DIR/gx-torrent/gx-torrent.log`, written by the daemon itself and
-     rotated at 5 MB keeping 4 files; errors of individual peers (expired
-     handshakes, resets) and of failed announces are at debug level;
+     rotated at 5 MB keeping 4 files. Every line carries date, level (`INFO`,
+     `WARN`, `ERROR`, `DEBUG`) and a sentence in words, in the same shape as
+     Gextto's log. Errors of individual peers (expired handshakes, resets) and
+     of failed announces are at debug level, like the automatic peer caps, the
+     cache retunes and the swarm noise: those detail lines need `-debug`;
    - default download folder equal to Gextto's configured download folder;
    - the daemon is restarted if it exits;
    - **it stays up when Gextto restarts** (for example for an
@@ -1992,6 +1995,10 @@ then move or remove. Gextto resolves each limit from the torrent, then the first
 **seed rule** matching its source (indexer) and category, then the global
 settings, and adds an **inactivity** limit (no upload for N minutes while
 seeding); all of it lives in `seed_rules.go`, so it is the same with either engine.
+
+In managed mode the daemon leaves the whole policy to Gextto: it does not
+enforce any limit of its own, so a torrent paused by Gextto is never resumed by
+the daemon and the two cannot fight over the same seed.
 
 In **standalone** the daemon also enforces the **global** seeding limits
 (Settings, *Seeding limits*): a seeding torrent whose per-torrent limit is

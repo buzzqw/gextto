@@ -77,7 +77,7 @@ func (d *Daemon) wantedList() []wantedEntry {
 	}
 	var list []wantedEntry
 	if err := json.Unmarshal([]byte(raw), &list); err != nil {
-		logf("cannot parse the wanted setting: %v", err)
+		logfError("cannot parse the wanted setting: %v", err)
 		return nil
 	}
 	return list
@@ -394,7 +394,7 @@ func (d *Daemon) pollWantedLocked(ctx context.Context, onlyName string) wantedPo
 				// from the archive (fast) instead of asking the indexer again.
 				if len(found) > 0 {
 					if _, aerr := d.archive().record(wantedFeedName(w.Name), found, now); aerr != nil {
-						logf("wanted %q: cannot archive the indexer results: %v", w.Name, aerr)
+						logfError("wanted %q: cannot archive the indexer results: %v", w.Name, aerr)
 					}
 				}
 			}
@@ -922,7 +922,7 @@ func (d *Daemon) applyWanted(now time.Time, feedName string, items []rss.Item) (
 			action := rss.Action{SavePath: strings.TrimSpace(w.SavePath), Category: strings.TrimSpace(w.Category)}
 			newly, err := d.addFeedItem(item, action)
 			if err != nil {
-				logf("wanted %q: cannot add %q: %v", w.Name, item.Title, err)
+				logfError("wanted %q: cannot add %q: %v", w.Name, item.Title, err)
 				continue
 			}
 			if newly {
@@ -974,7 +974,7 @@ func (d *Daemon) wantedGapSearch(ctx context.Context, now time.Time, w wantedEnt
 		}
 		if len(items) > 0 {
 			if _, aerr := d.archive().record(wantedFeedName(w.Name), items, now); aerr != nil {
-				logf("wanted %q: cannot archive the gap-search results: %v", w.Name, aerr)
+				logfError("wanted %q: cannot archive the gap-search results: %v", w.Name, aerr)
 			}
 		}
 		crit := w.criteria()

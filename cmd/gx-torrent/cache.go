@@ -218,7 +218,7 @@ func (d *Daemon) adaptCacheLocked(now time.Time, activeDownloads, activeSeeds in
 			return
 		}
 		d.applyCacheSizesLocked(read, write, reason, now)
-		logf("cache retuned: read=%dMiB write=%dMiB (%s)", read/mib, write/mib, reason)
+		logfDebug("cache retuned: read=%dMiB write=%dMiB (%s)", read/mib, write/mib, reason)
 		return
 	}
 	if !cacheMoved(d.cacheRead, read) && !cacheMoved(d.cacheWrite, write) {
@@ -229,7 +229,7 @@ func (d *Daemon) adaptCacheLocked(now time.Time, activeDownloads, activeSeeds in
 		return
 	}
 	d.applyCacheSizesLocked(read, write, reason, now)
-	logf("cache retuned: read=%dMiB write=%dMiB (%s)", read/mib, write/mib, reason)
+	logfDebug("cache retuned: read=%dMiB write=%dMiB (%s)", read/mib, write/mib, reason)
 }
 
 // applyCacheSizesLocked resizes the running session's caches.

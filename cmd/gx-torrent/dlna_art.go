@@ -455,7 +455,7 @@ func (s *dlnaServer) libThumb(n int, rel string, p dlnaArtProfile) ([]byte, bool
 	}
 	data, err := dlnaMakeThumb(src, p)
 	if err != nil {
-		logf("DLNA: no thumbnail for %s: %v", rel, err)
+		logfWarn("DLNA: no thumbnail for %s: %v", rel, err)
 		return nil, false
 	}
 	s.art.put(key, info.Size(), info.ModTime(), data)

@@ -518,6 +518,10 @@ type ArchiveQualityIndex struct {
 type ArchiveQuality struct {
 	Quality Quality
 	Score   int64
+	// Path is the file on disk the quality was read from (empty when the
+	// entry comes from the database alone). It lets the upgrade decision read
+	// the real streams of the copy that would be replaced, before downloading.
+	Path string
 }
 
 // BestFor returns the best archived quality for a season/episode.

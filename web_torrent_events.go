@@ -1278,12 +1278,20 @@ func MonitorMetadata(cfg *Config, torrents TorrentSession, db *Database, notifie
 // seed-limit helpers
 // ---------------------------------------------------------------------------
 
-// tev_needsInfiniteSeedResume implements `needs_infinite_seed_resume`.
-func tev_needsInfiniteSeedResume(torrent *models.TorrentView) bool {
-	return (torrent.SeedRatio == 0.0 || torrent.SeedDays == 0) &&
-		torrent.Progress >= 100.0 &&
-		torrent.State == "paused" &&
-		!torrent.AutoManaged
+// tev_needsInfiniteSeedResume implements `needs_infinite_seed_resume`: a
+// completed torrent that must seed without limits, left paused (by a previous
+// seed limit or by hand), is resumed.
+//
+// "Without limits" is answered by the seed policy itself, not by the raw
+// per-torrent values: a seed rule or the global limits can still apply to a
+// torrent whose own ratio/days are zero, and reading only those values here
+// made Gextto resume a torrent its own policy had just paused, every few
+// seconds, for as long as the two disagreed.
+func tev_needsInfiniteSeedResume(policy *seedPolicy, torrent *models.TorrentView) bool {
+	if torrent.Progress < 100.0 || torrent.State != "paused" || torrent.AutoManaged {
+		return false
+	}
+	return policy.limitsFor(seedViewForPolicy(*torrent)).none()
 }
 
 // tev_seedsForever reports whether a torrent's seed policy never ends: an
@@ -1454,8 +1462,11 @@ func RemoveSeededCompleted(cfg *Config, torrents TorrentSession, db *Database, p
 		if _, ok := postSeedMoves[torrent.Hash]; ok {
 			continue
 		}
-		// Explicit infinite seeding: the torrent must remain seeding.
-		if torrent.SeedRatio == 0.0 || torrent.SeedDays == 0 {
+		// Explicit infinite seeding: the torrent must remain seeding. The
+		// answer comes from the seed policy, the same one that decides the
+		// pause: reading the raw values here let a torrent the policy had
+		// stopped be handled as "seeds forever".
+		if policy.limitsFor(seedViewForPolicy(torrent)).none() {
 			continue
 		}
 		// The seed limits come from the session view alone: a torrent that has
@@ -2157,7 +2168,7 @@ func EnforceSeedPolicy(cfg *Config, torrents TorrentSession, db *Database, postS
 	// An infinite-seed override means the torrent must keep seeding: if a
 	// previous seed limit left it paused after completion, resume it.
 	for _, torrent := range torrents.List() {
-		if !tev_needsInfiniteSeedResume(&torrent) {
+		if !tev_needsInfiniteSeedResume(policy, &torrent) {
 			continue
 		}
 		value, err := torrents.Resume(torrent.Hash)
@@ -2884,7 +2895,10 @@ func tev_completeTorrentOptions(cfg *Config, db *Database, torrents TorrentSessi
 	// never written) or unrecognised video file must not replace a good copy.
 	if err := validateCompletedFile(path); err != nil {
 		quarantined := quarantineCorruptFile(path, cfg)
-		logging.Error("completed file failed integrity validation; not archiving",
+		// The caller writes the single ERROR for this acquisition, with the
+		// same reason and the acquisition id: logging it here too made one
+		// failure look like two.
+		logging.Debug("completed file failed integrity validation; not archiving",
 			"name", event.Name, "path", path, "error", err.Error(), "quarantined", quarantined)
 		return false, fmt.Errorf("integrity validation failed: %w", err)
 	}

@@ -127,7 +127,7 @@ func (d *Daemon) publishDHTFeed(name string, hashes []string) (string, int64, er
 		// The feed is already on the DHT; a lost sequence only means the next
 		// publish may reuse this number, so report it in the log, not as a
 		// publish failure.
-		logf("DHT feed: cannot save the sequence: %v", err)
+		logfError("DHT feed: cannot save the sequence: %v", err)
 	}
 	return dhtFeedURL(pub), seq, nil
 }

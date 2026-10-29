@@ -146,7 +146,7 @@ func (d *Daemon) runDLNA(stop <-chan struct{}) {
 		}
 		started, err := d.startDLNA()
 		if err != nil {
-			logf("DLNA: cannot start the media server: %v", err)
+			logfError("DLNA: cannot start the media server: %v", err)
 			return
 		}
 		srv, running = started, want
@@ -263,7 +263,7 @@ func (d *Daemon) startDLNA() (*dlnaServer, error) {
 	// answer M-SEARCH. A failure here is not fatal: the server still works for
 	// clients that find it by URL, so it is logged only.
 	if err := srv.startSSDP(ip); err != nil {
-		logf("DLNA: SSDP unavailable (%v); the server still answers on %s", err, srv.base)
+		logfError("DLNA: SSDP unavailable (%v); the server still answers on %s", err, srv.base)
 	}
 	return srv, nil
 }

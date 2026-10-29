@@ -75,7 +75,7 @@ func (d *Daemon) maybeReleaseMemory(now time.Time, moving bool) {
 	debug.FreeOSMemory()
 	if memoryLogDue(now, d.lastMemoryLogAt) {
 		d.lastMemoryLogAt = now
-		logf("memory released: no active downloads for %s", now.Sub(lastActive).Round(time.Minute))
+		logfDebug("memory released: no active downloads for %s", now.Sub(lastActive).Round(time.Minute))
 	}
 }
 

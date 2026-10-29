@@ -155,7 +155,7 @@ func (m *portMapper) refresh() {
 	m.method = ""
 	m.mu.Unlock()
 	if changed {
-		logf("router port %d not opened automatically (%s): forward it by hand for incoming peers", m.port, message)
+		logfWarn("router port %d not opened automatically (%s): forward it by hand for incoming peers", m.port, message)
 	}
 }
 
