@@ -163,6 +163,21 @@ figures come from `internal/gxcore/internal/piecepicker`, the others from the ro
 package. The old side of the picker rows was measured in a worktree at commit
 `c52a1a71` so both sides ran on the same host.
 
+### Per-torrent limits round (2026-10-29, N97)
+
+The per-torrent limits fix (an omitted field keeps its value, and the cache shows the
+new values at once) touches only cold paths: the limits request itself and the cache
+update that follows it. The read paths were re-measured anyway, build `1.2.2085`, three
+runs each, to show they did not move:
+
+| Benchmark | Result | What it measures |
+|---|---|---|
+| `BenchmarkEngineListSnapshot` (2,000 torrents) | **641–656 µs/op, 1.00 MB, 1 alloc** | one read of the torrent snapshot: unchanged from the 593–610 µs of the second pass, still one allocation |
+| `BenchmarkEngineSnapshotTwelveCalls` (2,000 torrents, the reads of one 750 ms tick) | **6.9–7.6 ms, 12.3 MB, 12 allocs** | the twelve reads of one tick: unchanged |
+
+Reproduce with
+`CGO_ENABLED=0 go test -run '^$' -bench 'BenchmarkEngineListSnapshot|BenchmarkEngineSnapshotTwelveCalls' -benchmem -count=3 .`
+
 ## 4. Investigations and decisions
 
 Each entry states the question, the numbers that answered it and the decision. The

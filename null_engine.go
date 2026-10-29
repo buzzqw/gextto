@@ -90,7 +90,7 @@ func (n nullEngine) SetTrackers(string, []TrackerEntry) (bool, error) {
 func (n nullEngine) WebSeeds(string, string, bool) (bool, error) {
 	return false, n.unsupported("web_seeds")
 }
-func (n nullEngine) SetLimits(string, int64, int64, float64, int64) (bool, error) {
+func (n nullEngine) SetLimits(string, *int64, *int64, *float64, *int64) (bool, error) {
 	return false, n.unsupported("limits")
 }
 func (n nullEngine) SetGlobalSpeedLimits(int64, int64) (bool, error) {

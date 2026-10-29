@@ -396,7 +396,7 @@ func TestQbittorrentEngineAddAndLimits(t *testing.T) {
 	if got := fake.forms["/api/v2/torrents/add"].Get("category"); got != "gextto" {
 		t.Fatalf("category = %q", got)
 	}
-	if _, err := engine.SetLimits("abc", 1024, 512, 1.5, 2); err != nil {
+	if _, err := engine.SetLimits("abc", int64Ptr(1024), int64Ptr(512), floatPtr(1.5), int64Ptr(2)); err != nil {
 		t.Fatalf("SetLimits: %v", err)
 	}
 	if fake.forms["/api/v2/torrents/setDownloadLimit"].Get("limit") != "1024" {
@@ -429,7 +429,7 @@ func TestQbittorrentEngineAddAndLimits(t *testing.T) {
 	if got := fake.forms["/api/v2/torrents/add"].Get("inactiveSeedingTimeLimit"); got != "30" {
 		t.Fatalf("add inactiveSeedingTimeLimit = %q, want 30", got)
 	}
-	if _, err := engine.SetLimits("abc", -1, -1, 1.5, 2); err != nil {
+	if _, err := engine.SetLimits("abc", int64Ptr(-1), int64Ptr(-1), floatPtr(1.5), int64Ptr(2)); err != nil {
 		t.Fatalf("SetLimits with idle: %v", err)
 	}
 	if got := fake.forms["/api/v2/torrents/setShareLimits"].Get("inactiveSeedingTimeLimit"); got != "30" {

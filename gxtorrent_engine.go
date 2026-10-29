@@ -1267,6 +1267,10 @@ func (e *gxTorrentEngine) updateCached(hash string, update func(*models.TorrentV
 	if view, ok := e.cache[hash]; ok {
 		update(&view)
 		e.cache[hash] = view
+		// The sorted copy is rebuilt from cacheVersion: without this bump the
+		// next read (the panel that just saved, the API) would still answer
+		// with the values from before the change.
+		e.cacheVersion++
 	}
 }
 
@@ -1630,25 +1634,40 @@ func (e *gxTorrentEngine) WebSeeds(hash, urls string, remove bool) (bool, error)
 
 // SetLimits stores the per-torrent seed policy and speed limits. The engine's limits
 // are in KiB/s: -1 inherits the global, 0 is unlimited.
-func (e *gxTorrentEngine) SetLimits(hash string, downloadLimit, uploadLimit int64, seedRatio float64, seedDays int64) (bool, error) {
+func (e *gxTorrentEngine) SetLimits(hash string, downloadLimit, uploadLimit *int64, seedRatio *float64, seedDays *int64) (bool, error) {
+	// Only what the caller names travels to the daemon: an omitted field keeps
+	// its stored value instead of falling back to the global one.
 	form := url.Values{}
-	form.Set("download_limit", strconv.FormatInt(bytesToKib(downloadLimit), 10))
-	form.Set("upload_limit", strconv.FormatInt(bytesToKib(uploadLimit), 10))
-	if seedRatio >= -1.0 {
-		form.Set("seed_ratio", strconv.FormatFloat(seedRatio, 'f', -1, 64))
+	if downloadLimit != nil {
+		form.Set("download_limit", strconv.FormatInt(bytesToKib(*downloadLimit), 10))
 	}
-	if seedDays >= -1 {
-		form.Set("seed_days", strconv.FormatInt(seedDays, 10))
+	if uploadLimit != nil {
+		form.Set("upload_limit", strconv.FormatInt(bytesToKib(*uploadLimit), 10))
+	}
+	if seedRatio != nil {
+		form.Set("seed_ratio", strconv.FormatFloat(*seedRatio, 'f', -1, 64))
+	}
+	if seedDays != nil {
+		form.Set("seed_days", strconv.FormatInt(*seedDays, 10))
 	}
 	if err := e.action(hash, "seed-limits", form); err != nil {
 		return false, err
 	}
 	e.updateCached(hash, func(view *models.TorrentView) {
-		view.DownloadLimit = downloadLimit
-		view.UploadLimit = uploadLimit
-		view.SeedRatio = seedRatio
-		view.SeedDays = seedDays
+		if downloadLimit != nil {
+			view.DownloadLimit = *downloadLimit
+		}
+		if uploadLimit != nil {
+			view.UploadLimit = *uploadLimit
+		}
+		if seedRatio != nil {
+			view.SeedRatio = *seedRatio
+		}
+		if seedDays != nil {
+			view.SeedDays = *seedDays
+		}
 	})
+	e.refresh()
 	return true, nil
 }
 

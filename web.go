@@ -1048,10 +1048,11 @@ type DiscoverInput struct {
 
 // TorrentLimits is the input of `set_torrent_limits`.
 type TorrentLimits struct {
-	DownloadLimit int64    `json:"download_limit"`
-	UploadLimit   int64    `json:"upload_limit"`
-	SeedRatio     *float64 `json:"seed_ratio"`
-	SeedDays      *int64   `json:"seed_days"`
+	// Nil leaves the current value alone; -1 = the global value, 0 = no limit.
+	DownloadLimit  *int64   `json:"download_limit"`
+	UploadLimit    *int64   `json:"upload_limit"`
+	SeedRatio      *float64 `json:"seed_ratio"`
+	SeedDays       *int64   `json:"seed_days"`
 	// Per-torrent connection ceilings (nil = leave unchanged, 0 = unlimited).
 	MaxConnections *int64 `json:"max_connections"`
 	MaxUploads     *int64 `json:"max_uploads"`

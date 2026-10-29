@@ -266,13 +266,13 @@ func TestGxEngineOperations(t *testing.T) {
 	if !fake.seen("POST /api/v1/add?destination=%2Fdl&magnet=magnet%3A%3Fnew&top=1") {
 		t.Fatalf("add options not sent: %v", fake.requests)
 	}
-	if ok, err := engine.SetLimits("aa", 1000, -1, 2.0, -1); err != nil || !ok {
+	if ok, err := engine.SetLimits("aa", int64Ptr(1000), int64Ptr(-1), floatPtr(2.0), int64Ptr(-1)); err != nil || !ok {
 		t.Fatalf("per-torrent speed limits: %v %v", ok, err)
 	}
 	if !fake.seen("POST /api/v1/torrents/aa/seed-limits?download_limit=1&") {
 		t.Fatalf("download limit not converted to KiB: %v", fake.requests)
 	}
-	if ok, err := engine.SetLimits("aa", -1, -1, 2.0, 7); err != nil || !ok {
+	if ok, err := engine.SetLimits("aa", int64Ptr(-1), int64Ptr(-1), floatPtr(2.0), int64Ptr(7)); err != nil || !ok {
 		t.Fatalf("seed limits: %v %v", ok, err)
 	}
 	if !fake.seen("POST /api/v1/torrents/aa/seed-limits?download_limit=-1&seed_days=7&seed_ratio=2&upload_limit=-1") {
@@ -292,6 +292,34 @@ func TestGxEngineOperations(t *testing.T) {
 		}
 	}
 	fake.mu.Unlock()
+}
+
+// TestGxEngineSetLimitsSendsOnlyTheNamedFields keeps the daemon's partial
+// update: a nil argument must not travel as "global" (-1) or as "unlimited" (0).
+func TestGxEngineSetLimitsSendsOnlyTheNamedFields(t *testing.T) {
+	engine, fake := newTestGxEngine(t, "")
+	fake.set(gxTorrentItem{Hash: "aa", Name: "Show", State: "seeding", SavePath: "/dl", Progress: 100})
+	_ = engine.List()
+
+	if ok, err := engine.SetLimits("aa", nil, nil, nil, int64Ptr(0)); err != nil || !ok {
+		t.Fatalf("seed days only: ok=%v err=%v", ok, err)
+	}
+	if !fake.seen("POST /api/v1/torrents/aa/seed-limits?seed_days=0") {
+		t.Fatalf("only the seed days must travel: %v", fake.requests)
+	}
+	if view, ok := engine.cachedState("aa"); !ok || view.SeedDays != 0 {
+		t.Fatalf("the cache must show the new value at once: %+v", view)
+	}
+
+	if _, err := engine.SetLimits("aa", nil, nil, floatPtr(2.5), nil); err != nil {
+		t.Fatal(err)
+	}
+	if !fake.seen("POST /api/v1/torrents/aa/seed-limits?seed_ratio=2.5") {
+		t.Fatalf("only the ratio must travel: %v", fake.requests)
+	}
+	if view, ok := engine.cachedState("aa"); !ok || view.SeedRatio != 2.5 || view.SeedDays != 0 {
+		t.Fatalf("the ratio update must not touch the days: %+v", view)
+	}
 }
 
 func TestGxEngineMoveEmitsStorageMoved(t *testing.T) {
@@ -1087,13 +1115,13 @@ func TestGxSetLimitsPostsKibAndMapsThemBack(t *testing.T) {
 		settings: gxTorrentSettings{BaseURL: server.URL, Timeout: time.Second},
 		client:   server.Client(),
 	}
-	if ok, err := e.SetLimits("ABC", 2*1024*1024, 0, 1.5, 7); err != nil || !ok {
+	if ok, err := e.SetLimits("ABC", int64Ptr(2*1024*1024), int64Ptr(0), floatPtr(1.5), int64Ptr(7)); err != nil || !ok {
 		t.Fatalf("SetLimits: ok=%v err=%v", ok, err)
 	}
 	if !strings.HasSuffix(action, "/seed-limits") || download != "2048" || upload != "0" || ratio != "1.5" || days != "7" {
 		t.Fatalf("posted action=%q dl=%q ul=%q ratio=%q days=%q", action, download, upload, ratio, days)
 	}
-	if _, err := e.SetLimits("ABC", -1, 0, -1, -1); err != nil {
+	if _, err := e.SetLimits("ABC", int64Ptr(-1), int64Ptr(0), floatPtr(-1), int64Ptr(-1)); err != nil {
 		t.Fatal(err)
 	}
 	if download != "-1" || upload != "0" {

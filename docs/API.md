@@ -397,6 +397,17 @@ and Cloudflare 1.1.1.1/1.0.0.1 on port 443) and `torrent_line_max_down_kib` /
 controller discovers it). The caps are driven by the latency, not by the
 router; the controller ramps while the ping is good and cuts when it rises.
 
+### Per-torrent limits
+
+`POST /api/torrents/{hash}/limits` changes only the fields it carries:
+`download_limit` and `upload_limit` (bytes/s), `seed_ratio`, `seed_days`,
+`max_connections` and `max_uploads`. A field that is left out keeps its current
+value, so a client that edits one field at a time never resets the others
+(setting the seed days to `0` must not move the ratio to the global value).
+`-1` means «use the global value», `0` «no limit». The historical
+`POST /api/torrents/set_limits` (`dl_kbps`, `ul_kbps`, `seed_ratio`,
+`seed_days`) always carries the two rates and only the seed limits it names.
+
 ### Audio preferences
 
 `POST /api/tmdb/add`, `POST /api/series/{name}` and `POST /api/movies/{id}`

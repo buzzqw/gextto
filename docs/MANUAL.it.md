@@ -454,7 +454,11 @@ invece di lasciare l'episodio al ciclo successivo.
   storico restano visibili mentre imposti i valori.
 - **Dettagli** (tab Generale, Tracker, Contenuto, Peers, Pezzi, Limiti, Storage):
   copia magnet, limiti per torrent/giorni di seed, reannounce, pin, riavvia,
-  segna come fallito, sposta storage. Passando il mouse su un valore del tab
+  segna come fallito, sposta storage. Nella scheda **Limiti** ogni campo vive per
+  conto suo: **-1** usa il valore globale e **0** toglie il limite, e chi cambia
+  solo i giorni di seed (o solo il ratio, o solo la banda) non tocca gli altri.
+  Anche via API e dalla TUI un campo che non viene inviato resta com'è, non
+  torna al valore globale. Passando il mouse su un valore del tab
   **Generale**, sui pulsanti delle azioni o sulle intestazioni delle tabelle
   compare una spiegazione di cosa significa il dato o cosa fa il pulsante. In **Generale** trovi anche **Esporta
   .torrent**, **Super seeding** (con gx-torrent vale solo a torrent completato e

@@ -448,7 +448,11 @@ away, instead of leaving the episode to the next cycle.
   visible while you set the values.
 - **Details** tabs: General, Tracker, Content, Peers, Pieces, Limits, Storage;
   includes copy magnet, per-torrent limits/seed-days, reannounce, pin, restart,
-  mark-failed, move storage. Hovering a value in the **General** tab, an action
+  mark-failed, move storage. In the **Limits** tab every field lives on its own:
+  **-1** uses the global value and **0** removes the limit, and changing only the
+  seed days (or only the ratio, or only the rates) leaves the others alone. Over
+  the API and from the TUI a field the request does not carry keeps its value
+  instead of falling back to the global one. Hovering a value in the **General** tab, an action
   button or a table header shows what the value means or what the button does. **General** also offers **Export .torrent**,
   **Super seeding** (with gx-torrent it only applies once the torrent is complete
   and it deliberately lowers the seed's upload) and web-seed add/remove; with

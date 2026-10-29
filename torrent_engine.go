@@ -126,7 +126,11 @@ type TorrentEngine interface {
 	SetFilePriorities(hash string, priorities []int32) (bool, error)
 	SetTrackers(hash string, trackers []TrackerEntry) (bool, error)
 	WebSeeds(hash, urls string, remove bool) (bool, error)
-	SetLimits(hash string, downloadLimit, uploadLimit int64, seedRatio float64, seedDays int64) (bool, error)
+	// SetLimits changes the per-torrent rates and seed limits. A nil argument
+	// keeps the current value: an update that touches only the seed days must
+	// not reset the ratio (and a rate the caller does not mention must not
+	// become "unlimited"). -1 means "use the global value", 0 "no limit".
+	SetLimits(hash string, downloadLimit, uploadLimit *int64, seedRatio *float64, seedDays *int64) (bool, error)
 	SetGlobalSpeedLimits(downloadKib, uploadKib int64) (bool, error)
 	SetMaxConnections(hash string, value int) (bool, error)
 	SetMaxUploads(hash string, value int) (bool, error)

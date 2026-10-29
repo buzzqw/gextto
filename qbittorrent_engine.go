@@ -1360,45 +1360,69 @@ func (e *qbittorrentEngine) WebSeeds(hash, urls string, remove bool) (bool, erro
 	return false, backendCapabilityError(BackendQbittorrent, "web_seeds")
 }
 
-func (e *qbittorrentEngine) SetLimits(hash string, downloadLimit, uploadLimit int64, seedRatio float64, seedDays int64) (bool, error) {
+func (e *qbittorrentEngine) SetLimits(hash string, downloadLimit, uploadLimit *int64, seedRatio *float64, seedDays *int64) (bool, error) {
 	ctx, cancel := e.requestContext()
 	defer cancel()
 	applied := false
-	if downloadLimit >= 0 {
-		if err := e.client.SetTorrentDownloadLimit(ctx, downloadLimit, hash); err != nil {
+	if downloadLimit != nil {
+		// -1 is "use the global limit" for qBittorrent too; anything else
+		// negative is not a limit it knows.
+		limit := *downloadLimit
+		if limit < 0 {
+			limit = -1
+		}
+		if err := e.client.SetTorrentDownloadLimit(ctx, limit, hash); err != nil {
 			return false, err
 		}
 		applied = true
 	}
-	if uploadLimit >= 0 {
-		if err := e.client.SetTorrentUploadLimit(ctx, uploadLimit, hash); err != nil {
+	if uploadLimit != nil {
+		limit := *uploadLimit
+		if limit < 0 {
+			limit = -1
+		}
+		if err := e.client.SetTorrentUploadLimit(ctx, limit, hash); err != nil {
 			return false, err
 		}
 		applied = true
 	}
-	if seedRatio >= -1.0 || seedDays >= -1 {
-		ratio := -2.0
+	if seedRatio != nil || seedDays != nil {
+		// qBittorrent wants the three share limits in one request, so a value
+		// the caller did not name is read back from the current view and sent
+		// unchanged: touching the days must not reset the ratio.
+		ratio := -1.0
+		days := int64(-1)
+		if current, ok := e.cachedState(hash); ok {
+			ratio, days = current.SeedRatio, current.SeedDays
+		}
+		if seedRatio != nil {
+			ratio = *seedRatio
+		}
+		if seedDays != nil {
+			days = *seedDays
+		}
+		limitRatio := -2.0
 		switch {
-		case seedRatio > 0:
-			ratio = seedRatio
-		case seedRatio == 0:
-			ratio = -1
+		case ratio > 0:
+			limitRatio = ratio
+		case ratio == 0:
+			limitRatio = -1
 		}
 		minutes := int64(-2)
 		switch {
-		case seedDays > 0:
-			minutes = seedDays * 1440
-		case seedDays == 0:
+		case days > 0:
+			minutes = days * 1440
+		case days == 0:
 			minutes = -1
 		}
 		// The inactivity limit travels in the same request: qBittorrent
 		// rejects the call unless all three limits are present. -2 means
 		// "use the global value", which clears a limit Gextto no longer wants.
 		inactive := int64(-2)
-		if idle := e.inactiveSeedMinutes(seedRatio, seedDays); idle > 0 {
+		if idle := e.inactiveSeedMinutes(ratio, days); idle > 0 {
 			inactive = idle
 		}
-		if err := e.client.SetShareLimits(ctx, ratio, minutes, inactive, hash); err != nil {
+		if err := e.client.SetShareLimits(ctx, limitRatio, minutes, inactive, hash); err != nil {
 			return false, err
 		}
 		applied = true

@@ -1813,20 +1813,16 @@ func SetTorrentLimitsLegacy(w http.ResponseWriter, r *http.Request, s *AppState)
 		jsonError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	seedRatio := -1.0
-	if input.SeedRatio != nil {
-		seedRatio = *input.SeedRatio
-	}
-	seedDays := int64(-1)
-	if input.SeedDays != nil {
-		seedDays = *input.SeedDays
-	}
+	// The rates are always part of this legacy payload (0 = unlimited); the
+	// seed limits only when present, so they keep their value otherwise.
+	download := saturatingMulInt64(input.DlKbps, 1024)
+	upload := saturatingMulInt64(input.UlKbps, 1024)
 	ok, err := s.activeEngine().SetLimits(
 		input.Hash,
-		saturatingMulInt64(input.DlKbps, 1024),
-		saturatingMulInt64(input.UlKbps, 1024),
-		seedRatio,
-		seedDays,
+		&download,
+		&upload,
+		input.SeedRatio,
+		input.SeedDays,
 	)
 	status, body := gh0_torrentAction(ok, err)
 	jsonStatus(w, status, body)

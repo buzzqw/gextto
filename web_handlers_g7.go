@@ -1515,15 +1515,10 @@ func SetTorrentLimits(w http.ResponseWriter, r *http.Request, s *AppState) {
 		jsonError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	seedRatio := -1.0
-	if input.SeedRatio != nil {
-		seedRatio = *input.SeedRatio
-	}
-	seedDays := int64(-1)
-	if input.SeedDays != nil {
-		seedDays = *input.SeedDays
-	}
-	result, err := s.activeEngine().SetLimits(hash, input.DownloadLimit, input.UploadLimit, seedRatio, seedDays)
+	// The fields the request does not carry stay as they are: an update of the
+	// seed days must not reset the ratio to the global value (or the rates to
+	// "unlimited"), which is what a client that edits one field at a time sends.
+	result, err := s.activeEngine().SetLimits(hash, input.DownloadLimit, input.UploadLimit, input.SeedRatio, input.SeedDays)
 	if err != nil {
 		gh7_torrent_action(w, result, err)
 		return
