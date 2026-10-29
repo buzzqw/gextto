@@ -711,7 +711,8 @@ Closed with a measurement, so they are not retried without new data:
 | Write-back cache in the engine | the storage keeps up with the download (`write_cache=0` in the live service), so there is nothing to absorb; reopen only with storage slower than the network |
 | Batched uTP datagram I/O (`recvmmsg`/`sendmmsg`) | measured again on a uTP-heavy path (2026-10-21): on the loopback benchmark `Socket.writeTo` is 44 % of the CPU (58 % is `Syscall6`), but in the real-swarm profile it is **8.3 %** of the samples (36 % syscalls, reads and TCP included). Batching would remove at most that share, while adding a copy per datagram and a sender queue; at the live rate it saves well under 1 % of a core. Reopen only on a uTP-only session above 8 MB/s |
 | Contiguous-write coalescing | the page cache already merges adjacent writebacks |
-| Rarity buckets, watermark cursor in `pickSequential`/`pickFileEdge`, `PieceDownloader` bitmask, `FADV_RANDOM`, `saveLocked` outside `d.mu`, `/proc/meminfo` under `d.mu` | no measurement justified the cost |
+| Rarity buckets, watermark cursor in `pickFileEdge`, `FADV_RANDOM`, `saveLocked` outside `d.mu`, `/proc/meminfo` under `d.mu` | no measurement justified the cost (the `pickSequential` cursor did: §3, *Piece picker: peer departure and sequential frontier*) |
+| `PieceDownloader` bitmask instead of its three maps | `BenchmarkPieceDownloaderLifecycle` (one 4 MiB piece, 256 blocks, 2026-10-29, N97): 0.66–1.10 ms/op, **18 KB and 15 allocs per piece**, the time almost all the 4 MiB copy into the piece buffer. At 100 MB/s that is about 450 KB/s of garbage: a bitmask would save nothing measurable |
 | Upsert with two conflict targets (archive) | +17 ms per 1,000 releases against `INSERT OR IGNORE` + refresh |
 | `idx_archive_title`, expression index on `lower(magnet_hash)` | never used by the queries; only write time and space |
 | Multi-path `get_peers` | `peers_confirmed_multi` was 0 in both real runs |
