@@ -15,6 +15,8 @@ manual is online: [English](docs/MANUAL.en.md) ·
 
 ## 29 October 2026
 
+- **An interrupted import no longer throws the download away.** If Gextto stopped — restart, shutdown, update — while copying a big eD2k file into the library, the next attempt compared the download with the copy it had already put in the library, judged it "not better" and moved aMule's file to the trash, leaving a raw release-named file in the library and the episode still marked as not archived. That copy is now recognised as its own (same name, same size): the import resumes from it, the file is renamed and recorded, and the download stays in aMule to keep sharing. It applies to episodes and movies.
+
 - **Trackers behind Cloudflare work again.** With the IP filter applied to trackers too (the default) and the bundled list, which carries the Cloudflare ranges, the trackers hosted there — many private ones — were blocked before being contacted: the *Trackers* tab showed them as not working with "unknown error in announce" and after an hour the tracker was dropped from the session for six hours. Now the IP filter blocks peers and, only if you turn it back on, trackers: *Apply IP filter* in *Settings → Network* is off by default. When a tracker does not answer, the tab states the real reason — "tracker IP is blocked", rejected TLS certificate, proxy refusing the connection — instead of "unknown error in announce".
 
 - **The "seed ∞" badge appears as soon as you set an unlimited seed.** Before it showed only while the torrent was seeding: a torrent still downloading, set to ratio 0 and days 0, did not show it. It now follows the setting (ratio or time 0 = seed without limits) and is visible during the download too.

@@ -149,6 +149,45 @@ func TestEd2kMovieIsImportedByCopy(t *testing.T) {
 	}
 }
 
+// TestEd2kInterruptedImportResumesFromTheLibraryCopy pins the retry of an import
+// stopped after the copy (a restart while a big file was being copied): the
+// library already holds the video under its own name, and the retry must finish
+// that import instead of comparing the download with its own copy — which is
+// never "better" — and moving the source to the trash.
+func TestEd2kInterruptedImportResumesFromTheLibraryCopy(t *testing.T) {
+	f := newMovieImportFixture(t)
+	copied := filepath.Join(f.archive, filepath.Base(f.source))
+	writeFile(t, copied, validMKV(4096)) // same name and size: the copy finished
+
+	session := &movieCopySession{}
+	processed, err := tev_completeMovieWithArchive(&f.cfg, f.db, session, &f.event, f.release, f.archive, NewTmdbClient(nil), false)
+	if err != nil {
+		t.Fatalf("completion: %v", err)
+	}
+	if !processed {
+		t.Fatal("the interrupted import was not completed")
+	}
+	if _, err := os.Stat(f.source); err != nil {
+		t.Fatalf("the download must stay in aMule's incoming folder: %v", err)
+	}
+	entries, err := os.ReadDir(f.trash)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 0 {
+		t.Fatalf("the download was discarded instead of resumed: %v", entries)
+	}
+	if len(session.removed) != 0 {
+		t.Fatalf("a resumed import must not remove the download from aMule: %v", session.removed)
+	}
+	if got := countVideos(t, f.archive); got != 1 {
+		t.Fatalf("videos in the library = %d, want 1", got)
+	}
+	if status, _ := f.db.TorrentStatus(f.hash); status == nil || *status != "completed" {
+		t.Fatalf("status = %v, want completed", status)
+	}
+}
+
 func TestEd2kMovieInferiorIsDiscardedBeforeCopy(t *testing.T) {
 	f := newMovieImportFixture(t)
 	// The library already holds the same release: the incoming copy is not an

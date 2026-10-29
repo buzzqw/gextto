@@ -2425,9 +2425,25 @@ func tev_completeEpisodeFolderWithArchive(cfg *Config, db *Database, torrents To
 	if reason := mediaInfoUpgradeRejection(cfg, db, event.Hash, video, release); reason != "" {
 		return false, tev_rejectUnconfirmedUpgrade(cfg, db, torrents, event, release, reason)
 	}
-	if resolved, resolveErr := ResolveExistingTarget(video, target, cfg.ReleaseScore(release), cfg, "series", seriesName, &release.Quality); resolveErr != nil {
-		return false, resolveErr
-	} else if resolved {
+	// An import stopped by a restart (or a shutdown) leaves the video in the
+	// library under its own name. The next attempt must resume from it: without
+	// this the download was compared with its own copy, judged "not better" and
+	// its source moved to the trash, leaving an untracked file in the library.
+	resuming := interruptedImportCopy(video, target)
+	if resuming {
+		video = target
+		sourceHandled = true
+		sourcePreserved = true
+	}
+	resolved := false
+	if !resuming {
+		value, resolveErr := ResolveExistingTarget(video, target, cfg.ReleaseScore(release), cfg, "series", seriesName, &release.Quality)
+		if resolveErr != nil {
+			return false, resolveErr
+		}
+		resolved = value
+	}
+	if resolved {
 		restored, err := db.RestoreUpgrade(event.Hash)
 		if err != nil {
 			return false, err
@@ -2444,7 +2460,7 @@ func tev_completeEpisodeFolderWithArchive(cfg *Config, db *Database, torrents To
 		logging.Warn(fmt.Sprintf("🗑️ %s discarded: the file is not better than the copy already in the library.",
 			shortTorrentName(event.Name)), "hash", event.Hash)
 		return false, nil
-	} else {
+	} else if !resuming {
 		if moveSource {
 			if err := moveIntoLibrary(video, target); err != nil {
 				return false, err
@@ -2469,6 +2485,9 @@ func tev_completeEpisodeFolderWithArchive(cfg *Config, db *Database, torrents To
 	}
 	if processed && sourceHandled {
 		switch {
+		case resuming:
+			logging.Info(fmt.Sprintf("📁 «%s» was already in the library from an interrupted import: finished importing it", event.Name),
+				"library_file", target, "hash", event.Hash)
 		case moveSource:
 			logging.Info(fmt.Sprintf("📁 «%s» moved into the library; the source leaves aMule's incoming folder", event.Name),
 				"library_file", target, "hash", event.Hash)
@@ -2529,6 +2548,27 @@ func moveIntoLibrary(source, target string) error {
 	return moveAcrossDevices(source, target)
 }
 
+// interruptedImportCopy reports whether the destination already holds this
+// download: the same file name in the library folder, with the same size. It
+// recognises the import stopped by a restart while a big file was being copied
+// (the copy is atomic, so a file carrying the final name is complete): the next
+// attempt must resume from it instead of comparing the download with its own
+// copy, which is never "better", and throwing the source away.
+func interruptedImportCopy(video, target string) bool {
+	if SamePath(video, target) || filepath.Base(video) != filepath.Base(target) {
+		return false
+	}
+	sourceInfo, err := os.Stat(video)
+	if err != nil || sourceInfo.IsDir() || sourceInfo.Size() <= 0 {
+		return false
+	}
+	targetInfo, err := os.Stat(target)
+	if err != nil || targetInfo.IsDir() {
+		return false
+	}
+	return targetInfo.Size() == sourceInfo.Size()
+}
+
 // tev_completeMovieWithArchive imports a completed movie by link/copy or move:
 // the same quality gate as an episode runs before the file reaches the library.
 // With moveSource false the source stays in the backend's folder so it keeps
@@ -2546,9 +2586,21 @@ func tev_completeMovieWithArchive(cfg *Config, db *Database, torrents TorrentSes
 	if reason := mediaInfoUpgradeRejection(cfg, db, event.Hash, video, release); reason != "" {
 		return false, tev_rejectUnconfirmedUpgrade(cfg, db, torrents, event, release, reason)
 	}
-	if resolved, resolveErr := ResolveExistingTarget(video, target, cfg.ReleaseScore(release), cfg, "movie", release.Title, &release.Quality); resolveErr != nil {
-		return false, resolveErr
-	} else if resolved {
+	// Same resume rule as the episode import: a copy left in the library by an
+	// interrupted import is this download, not another version of it.
+	resuming := interruptedImportCopy(video, target)
+	if resuming {
+		video = target
+	}
+	resolved := false
+	if !resuming {
+		value, resolveErr := ResolveExistingTarget(video, target, cfg.ReleaseScore(release), cfg, "movie", release.Title, &release.Quality)
+		if resolveErr != nil {
+			return false, resolveErr
+		}
+		resolved = value
+	}
+	if resolved {
 		restored, err := db.RestoreUpgrade(event.Hash)
 		if err != nil {
 			return false, err
@@ -2567,7 +2619,9 @@ func tev_completeMovieWithArchive(cfg *Config, db *Database, torrents TorrentSes
 		return false, nil
 	}
 	linked := false
-	if moveSource {
+	if resuming {
+		// The library already holds this download: nothing to copy or move.
+	} else if moveSource {
 		if err := moveIntoLibrary(video, target); err != nil {
 			return false, err
 		}
@@ -2587,6 +2641,9 @@ func tev_completeMovieWithArchive(cfg *Config, db *Database, torrents TorrentSes
 	}
 	if processed {
 		switch {
+		case resuming:
+			logging.Info(fmt.Sprintf("📁 «%s» was already in the library from an interrupted import: finished importing it", event.Name),
+				"library_file", target, "hash", event.Hash)
 		case moveSource:
 			logging.Info(fmt.Sprintf("📁 «%s» moved into the library; the source leaves aMule's incoming folder", event.Name),
 				"library_file", target, "hash", event.Hash)
