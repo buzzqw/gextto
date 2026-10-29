@@ -2524,10 +2524,22 @@ func (d *Database) RollbackRelease(release *models.Release) error {
 	} else if backupErr != nil && !errors.Is(backupErr, sql.ErrNoRows) {
 		return backupErr
 	}
-	if _, err := tx.Exec("DELETE FROM episodes WHERE magnet_hash=?1 OR magnet_link=?2", hash, release.Magnet); err != nil {
+	// Only the placeholders this release added are removed: a release that was
+	// refused after its file had already reached the library must not delete the
+	// archived copy. An eD2k release has no magnet link, so matching an empty
+	// `magnet_link` used to match every eD2k placeholder in the library (all of
+	// them carry an empty string in that column).
+	episodeDelete := "DELETE FROM episodes WHERE downloaded_at IS NULL AND COALESCE(archive_path,'')='' AND (magnet_hash=?1"
+	episodeArgs := []any{hash}
+	if strings.TrimSpace(release.Magnet) != "" {
+		episodeDelete += " OR magnet_link=?2"
+		episodeArgs = append(episodeArgs, release.Magnet)
+	}
+	episodeDelete += ")"
+	if _, err := tx.Exec(episodeDelete, episodeArgs...); err != nil {
 		return err
 	}
-	if _, err := tx.Exec("DELETE FROM movies WHERE magnet_hash=?1", hash); err != nil {
+	if _, err := tx.Exec("DELETE FROM movies WHERE magnet_hash=?1 AND downloaded_at IS NULL", hash); err != nil {
 		return err
 	}
 	if err := tx.Commit(); err != nil {
@@ -2554,7 +2566,7 @@ func (d *Database) ForgetRemovedTorrent(hash string) error {
 	if _, err := tx.Exec("UPDATE episodes SET magnet_hash=NULL WHERE lower(COALESCE(magnet_hash,''))=?1 AND (downloaded_at IS NOT NULL OR COALESCE(archive_path,'')<>'')", normalized); err != nil {
 		return err
 	}
-	if _, err := tx.Exec("UPDATE movies SET magnet_hash=NULL WHERE lower(COALESCE(magnet_hash,''))=?1 AND (downloaded_at IS NOT NULL OR COALESCE(archive_path,'')<>'')", normalized); err != nil {
+	if _, err := tx.Exec("UPDATE movies SET magnet_hash=NULL WHERE lower(COALESCE(magnet_hash,''))=?1 AND downloaded_at IS NOT NULL", normalized); err != nil {
 		return err
 	}
 	if _, err := tx.Exec("DELETE FROM episodes WHERE lower(COALESCE(magnet_hash,''))=?1 AND downloaded_at IS NULL AND COALESCE(archive_path,'')=''", normalized); err != nil {
@@ -4729,7 +4741,15 @@ func (d *Database) ReconcilePackRelease(hash string, release *models.Release, cf
 		ID      int64
 		Episode int64
 	}
-	rows, err := tx.Query("SELECT id,episode FROM episodes WHERE (lower(COALESCE(magnet_hash,''))=?1 OR magnet_link=?2) AND downloaded_at IS NULL AND COALESCE(archive_path,'')=''", normalized, oldMagnet)
+	// An eD2k release has no magnet link: matching an empty `magnet_link` would
+	// pick up the placeholders of every other eD2k download.
+	oldMagnetClause := ""
+	oldMagnetArgs := []any{}
+	if strings.TrimSpace(oldMagnet) != "" {
+		oldMagnetClause = " OR magnet_link=?"
+		oldMagnetArgs = append(oldMagnetArgs, oldMagnet)
+	}
+	rows, err := tx.Query("SELECT id,episode FROM episodes WHERE downloaded_at IS NULL AND COALESCE(archive_path,'')='' AND (lower(COALESCE(magnet_hash,''))=?1"+oldMagnetClause+")", append([]any{normalized}, oldMagnetArgs...)...)
 	if err != nil {
 		return err
 	}
@@ -4819,7 +4839,7 @@ func (d *Database) ReconcileMissingTorrents(liveHashes map[string]struct{}) (int
 			return reconciled, err
 		}
 		if release != nil {
-			if err := d.clearPlaceholders(d.db, release.Magnet); err != nil {
+			if err := d.clearPlaceholders(d.db, release); err != nil {
 				return reconciled, err
 			}
 		}
@@ -4878,7 +4898,7 @@ func (d *Database) MarkTorrentRemoved(hash string) error {
 		return err
 	}
 	if release != nil {
-		if err := d.clearPlaceholders(tx, release.Magnet); err != nil {
+		if err := d.clearPlaceholders(tx, release); err != nil {
 			return err
 		}
 	}
@@ -5281,16 +5301,36 @@ func (d *Database) MarkPackCompleted(release *models.Release, episodes []PackEpi
 }
 
 // clearPlaceholders deletes the not-yet-downloaded placeholders of a release.
-func (d *Database) clearPlaceholders(exec sqlExecer, magnet string) error {
-	digest, ok := utils.MagnetHash(magnet)
-	if !ok {
-		// No usable magnet hash: match only by the exact magnet link so an
-		// empty digest cannot delete unrelated rows that legitimately have an
-		// empty magnet_hash.
-		_, err := exec.Exec("DELETE FROM episodes WHERE magnet_link=?1 AND downloaded_at IS NULL AND COALESCE(archive_path,'')=''", magnet)
-		return err
+// The identity is the same one the approval used: the torrent infohash, or the
+// eD2k hash when the release has no magnet. Matching an empty `magnet_link`
+// would remove the placeholders of every eD2k download in the library.
+func (d *Database) clearPlaceholders(exec sqlExecer, release *models.Release) error {
+	if release == nil {
+		return nil
 	}
-	_, err := exec.Exec("DELETE FROM episodes WHERE (lower(magnet_hash)=lower(?1) OR magnet_link=?2) AND downloaded_at IS NULL AND COALESCE(archive_path,'')=''", digest, magnet)
+	digest := ""
+	if hash, err := releaseIdentityHash(release); err == nil {
+		digest = strings.ToLower(hash)
+	}
+	magnet := strings.TrimSpace(release.Magnet)
+	if digest == "" && magnet == "" {
+		return nil
+	}
+	query := "DELETE FROM episodes WHERE downloaded_at IS NULL AND COALESCE(archive_path,'')='' AND ("
+	args := make([]any, 0, 2)
+	if digest != "" {
+		query += "lower(COALESCE(magnet_hash,''))=?"
+		args = append(args, digest)
+	}
+	if magnet != "" {
+		if len(args) > 0 {
+			query += " OR "
+		}
+		query += "magnet_link=?"
+		args = append(args, magnet)
+	}
+	query += ")"
+	_, err := exec.Exec(query, args...)
 	return err
 }
 
@@ -5314,7 +5354,7 @@ func (d *Database) MarkTorrentError(hash, failureError string) error {
 		return err
 	}
 	if release != nil {
-		if err := d.clearPlaceholders(tx, release.Magnet); err != nil {
+		if err := d.clearPlaceholders(tx, release); err != nil {
 			return err
 		}
 	}
@@ -5459,11 +5499,13 @@ func (d *Database) RestoreUpgrade(hash string) (bool, error) {
 	if _, err := tx.Exec("DELETE FROM upgrade_backup WHERE new_hash=?1", normalized); err != nil {
 		return false, err
 	}
-	if _, err := tx.Exec("DELETE FROM episodes WHERE lower(COALESCE(magnet_hash,''))=?1", normalized); err != nil {
+	// Only placeholders are removed: a file the release already placed in the
+	// library keeps its row, even when the release as a whole is later undone.
+	if _, err := tx.Exec("DELETE FROM episodes WHERE lower(COALESCE(magnet_hash,''))=?1 AND downloaded_at IS NULL AND COALESCE(archive_path,'')=''", normalized); err != nil {
 		return false, err
 	}
 	if newMagnet != "" {
-		if _, err := tx.Exec("DELETE FROM episodes WHERE magnet_link=?1", newMagnet); err != nil {
+		if _, err := tx.Exec("DELETE FROM episodes WHERE magnet_link=?1 AND downloaded_at IS NULL AND COALESCE(archive_path,'')=''", newMagnet); err != nil {
 			return false, err
 		}
 	}

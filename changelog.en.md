@@ -13,6 +13,10 @@ manual is online: [English](docs/MANUAL.en.md) ·
 [italiano](docs/MANUAL.it.md). For reports:
 [GitHub issues](https://github.com/buzzqw/gextto/issues).
 
+## 29 October 2026
+
+- **Episodes already in the library no longer disappear when a download is discarded.** When an eD2k file was refused — for example because the library copy was better — Gextto also rolled back the rows of *every* episode that had come from eD2k: the *Missing* tab showed episodes that were on the NAS, and only *Scan archive* put them back. On 29 October this happened to 1,096 episodes, FBI among them. The rollback now touches only the refused download's row, never the copies already archived. Anyone who has already lost the rows gets them back with **Maintenance → Scan archives** (or *Scan archive* on a single series). The completed-torrent cleanup also no longer fails on the movies table: the torrent hash is really cleared from the archived rows, so they can no longer be mistaken for a download to undo.
+
 ## 28 October 2026
 
 - **The interface no longer waits for the torrent list.** Pages, the traffic graph and the latency guard asked the engine for the torrent list, which could start a poll to gx-torrent before answering (up to 15 seconds with a slow daemon). They now read the last available list, which refreshes by itself; the list is also sorted once instead of on every read: with 2,000 torrents a read goes from 1.42 ms to 0.6 ms.

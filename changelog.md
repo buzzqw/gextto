@@ -14,6 +14,10 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
 [changelog.en.md](changelog.en.md). Per segnalazioni:
 [issue su GitHub](https://github.com/buzzqw/gextto/issues).
 
+## 29 ottobre 2026
+
+- **Le puntate già in libreria non spariscono più quando un download viene scartato.** Se un file arrivato da eD2k veniva rifiutato — per esempio perché la copia in libreria era migliore — Gextto annullava anche le righe di *tutte* le puntate arrivate da eD2k: nella scheda *Mancanti* ricomparivano episodi che erano sul NAS, e solo *Scansiona archivio* li riportava a posto. Il 29 ottobre è successo a 1.096 puntate, FBI compresa. Ora l'annullamento tocca soltanto la riga del download rifiutato, mai le copie già archiviate. Chi ha già perso le righe le recupera con **Manutenzione → Scansiona archivi** (o con *Scansiona archivio* sulla singola serie). In più, la pulizia dei torrent completati non fallisce più sulla tabella dei film: il codice del torrent viene tolto davvero dalle righe archiviate, che quindi non possono più essere confuse con un download da annullare.
+
 ## 28 ottobre 2026
 
 - **L'interfaccia non aspetta più la lettura dei torrent.** Le pagine, il grafico del traffico e il controllo della latenza chiedevano l'elenco dei torrent al motore, che prima di rispondere poteva avviare un controllo verso gx-torrent (fino a 15 secondi con il daemon lento). Ora leggono l'ultimo elenco disponibile, che si aggiorna da sé; l'elenco è anche ordinato una volta sola invece di essere riordinato a ogni lettura: su 2.000 torrent una lettura passa da 1,42 ms a 0,6 ms.

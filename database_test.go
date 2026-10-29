@@ -3,9 +3,11 @@ package gextto
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -1157,6 +1159,147 @@ func TestMovieRemuxUpgradeIsAllowedWithSmallScoreDelta(t *testing.T) {
 	}
 	assertEqual(t, approved, true)
 	assertEqual(t, reason, "upgrade")
+}
+
+func TestRollbackReleaseKeepsArchivedCopiesOfOtherED2kEpisodes(t *testing.T) {
+	db := newTestDB(t)
+	dir := t.TempDir()
+	archivedPath := filepath.Join(dir, "Show - S01E01 - Pilot.mkv")
+	if err := os.WriteFile(archivedPath, []byte("video"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.SyncArchiveFileScored("Show", 1, 1, "Show - S01E01 - Pilot", archivedPath, 5, 1200); err != nil {
+		t.Fatal(err)
+	}
+	// Every eD2k placeholder stores an empty magnet link: that is what the old
+	// rollback matched, deleting the whole eD2k part of the library.
+	if _, err := db.db.Exec("UPDATE episodes SET magnet_link='' WHERE series_id=(SELECT id FROM series WHERE name='Show') AND season=1 AND episode=1"); err != nil {
+		t.Fatal(err)
+	}
+
+	release := models.Release{
+		Title:        "Other.Show.S02E03.ITA.mkv",
+		Magnet:       "",
+		Ed2kLink:     "ed2k://|file|Other.Show.S02E03.ITA.mkv|1024|0123456789abcdef0123456789abcdef|/",
+		Source:       "indexarr",
+		Network:      "ed2k",
+		Kind:         "series",
+		Series:       stringPtr("Show"),
+		Season:       int64Ptr(2),
+		Episode:      int64Ptr(3),
+		EpisodeRange: []int64{3},
+		Seeders:      -1,
+		Peers:        -1,
+	}
+	if approved, reason, err := db.CheckSeries(&release); err != nil || !approved {
+		t.Fatalf("approval: approved=%v reason=%q err=%v", approved, reason, err)
+	}
+	if err := db.RollbackRelease(&release); err != nil {
+		t.Fatal(err)
+	}
+
+	var archived int
+	if err := db.db.QueryRow("SELECT COUNT(*) FROM episodes e JOIN series s ON s.id=e.series_id WHERE s.name='Show' AND e.season=1 AND e.episode=1 AND COALESCE(e.archive_path,'')<>''").Scan(&archived); err != nil {
+		t.Fatal(err)
+	}
+	if archived != 1 {
+		t.Fatalf("rollback deleted an archived eD2k episode: %d rows left", archived)
+	}
+	var placeholder int
+	if err := db.db.QueryRow("SELECT COUNT(*) FROM episodes e JOIN series s ON s.id=e.series_id WHERE s.name='Show' AND e.season=2 AND e.episode=3").Scan(&placeholder); err != nil {
+		t.Fatal(err)
+	}
+	if placeholder != 0 {
+		t.Fatalf("rollback left its own placeholder: %d rows", placeholder)
+	}
+}
+
+func TestForgetRemovedTorrentClearsHashOnArchivedRows(t *testing.T) {
+	db := newTestDB(t)
+	dir := t.TempDir()
+	path := filepath.Join(dir, "Example.S01E01.mkv")
+	if err := os.WriteFile(path, []byte("video"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	release := testRelease()
+	if approved, reason, err := db.CheckSeries(&release); err != nil || !approved {
+		t.Fatalf("approval: approved=%v reason=%q err=%v", approved, reason, err)
+	}
+	if _, err := db.db.Exec("UPDATE episodes SET downloaded_at=datetime('now'),archive_path=?1 WHERE magnet_hash=?2", path, mustMagnetHash(t, release.Magnet)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.db.Exec("INSERT INTO movies(name,year,title,magnet_hash,downloaded_at) VALUES ('Example Movie',2024,'Example Movie','fedcba9876543210fedcba9876543210fedcba98',datetime('now'))"); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.ForgetRemovedTorrent(mustMagnetHash(t, release.Magnet)); err != nil {
+		t.Fatalf("ForgetRemovedTorrent: %v", err)
+	}
+	var hash sql.NullString
+	if err := db.db.QueryRow("SELECT magnet_hash FROM episodes WHERE archive_path=?1", path).Scan(&hash); err != nil {
+		t.Fatal(err)
+	}
+	if hash.Valid && hash.String != "" {
+		t.Fatalf("archived episode kept the removed torrent hash: %q", hash.String)
+	}
+}
+
+func TestMarkTorrentErrorClearsOnlyItsOwnED2kPlaceholder(t *testing.T) {
+	db := newTestDB(t)
+	links := []string{
+		"ed2k://|file|Show.S01E01.ITA.mkv|1024|11111111111111111111111111111111|/",
+		"ed2k://|file|Show.S01E02.ITA.mkv|1024|22222222222222222222222222222222|/",
+	}
+	hashes := make([]string, 0, len(links))
+	for index, link := range links {
+		episode := int64(index + 1)
+		release := models.Release{
+			Title:        fmt.Sprintf("Show.S01E%02d.ITA.mkv", episode),
+			Ed2kLink:     link,
+			Source:       "indexarr",
+			Network:      "ed2k",
+			Kind:         "series",
+			Series:       stringPtr("Show"),
+			Season:       int64Ptr(1),
+			Episode:      int64Ptr(episode),
+			EpisodeRange: []int64{episode},
+			Seeders:      -1,
+			Peers:        -1,
+		}
+		if approved, reason, err := db.CheckSeries(&release); err != nil || !approved {
+			t.Fatalf("approval: approved=%v reason=%q err=%v", approved, reason, err)
+		}
+		hash, _ := releaseIdentityHash(&release)
+		hashes = append(hashes, hash)
+		if err := db.RegisterTorrentScored(&release, 100); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := db.MarkTorrentError(hashes[0], "test failure"); err != nil {
+		t.Fatal(err)
+	}
+	var remaining int
+	if err := db.db.QueryRow("SELECT COUNT(*) FROM episodes e JOIN series s ON s.id=e.series_id WHERE s.name='Show' AND e.season=1 AND e.episode=2").Scan(&remaining); err != nil {
+		t.Fatal(err)
+	}
+	if remaining != 1 {
+		t.Fatalf("marking one eD2k download failed removed the placeholder of another: %d rows", remaining)
+	}
+	var cleared int
+	if err := db.db.QueryRow("SELECT COUNT(*) FROM episodes e JOIN series s ON s.id=e.series_id WHERE s.name='Show' AND e.season=1 AND e.episode=1").Scan(&cleared); err != nil {
+		t.Fatal(err)
+	}
+	if cleared != 0 {
+		t.Fatalf("failed placeholder was not cleared: %d rows", cleared)
+	}
+}
+
+func mustMagnetHash(t *testing.T, magnet string) string {
+	t.Helper()
+	hash, ok := utils.MagnetHash(magnet)
+	if !ok {
+		t.Fatalf("invalid magnet: %q", magnet)
+	}
+	return strings.ToLower(hash)
 }
 
 func TestRollbackReleaseRestoresMovieUpgrade(t *testing.T) {
