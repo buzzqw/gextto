@@ -1889,6 +1889,10 @@ func (d *Database) RegisterTorrent(release *models.Release) error {
 }
 
 // RegisterTorrentScored implements `Database::register_torrent_scored`.
+//
+// The same infohash can be downloaded again — the archived copy was deleted, or
+// the release is proposed once more after the last attempt failed — so a row
+// that still says "completed" is cleared first: see beginNewDownloadAttempt.
 func (d *Database) RegisterTorrentScored(release *models.Release, qualityScore int64) error {
 	hash, err := releaseIdentityHash(release)
 	if err != nil {
@@ -1907,7 +1911,46 @@ func (d *Database) RegisterTorrentScored(release *models.Release, qualityScore i
 		"INSERT INTO torrent_meta(hash,kind,title,series_name,season,episode,year,quality_score,source,network,link,metadata_json,status,created_at,updated_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,'queued',?13,?13) ON CONFLICT(hash) DO UPDATE SET kind=excluded.kind,title=excluded.title,series_name=excluded.series_name,season=excluded.season,episode=excluded.episode,year=excluded.year,quality_score=excluded.quality_score,source=excluded.source,network=excluded.network,link=excluded.link,metadata_json=excluded.metadata_json,status=CASE WHEN torrent_meta.status='completed' THEN torrent_meta.status ELSE 'queued' END,error=CASE WHEN torrent_meta.status='completed' THEN torrent_meta.error ELSE NULL END,removed_at=CASE WHEN torrent_meta.status='completed' THEN torrent_meta.removed_at ELSE NULL END,updated_at=excluded.updated_at",
 		hash, release.Kind, release.Title, release.Series, release.Season, release.Episode, release.Year, qualityScore, release.Source, network, release.Ed2kLink, string(metadata), now,
 	)
-	return err
+	if err != nil {
+		return err
+	}
+	return d.beginNewDownloadAttempt(hash, now)
+}
+
+// beginNewDownloadAttempt clears the completion recorded for a release that is
+// being downloaded again.
+//
+// The same infohash comes back when the archived copy has gone (a film deleted
+// from the library, an episode removed by hand) or when a release is proposed
+// again after a failure. Its torrent_meta row still says "completed", and the
+// completion handler trusts that state: the first storage move of the new
+// attempt — the RAM-disk admission, which happens seconds after the metadata
+// arrives, when the payload is still a preallocated file full of zeros — was
+// taken for the end of the download, so Gextto quarantined a 2 GB file that had
+// downloaded nothing at all.
+//
+// A completion whose archived copy is still on disk is kept: that add is a
+// duplicate of something already in the library, and the repeated completion
+// must go on being recognised as such (tevIgnoreRepeatedCompletion).
+func (d *Database) beginNewDownloadAttempt(hash, now string) error {
+	status, err := d.TorrentStatus(hash)
+	if err != nil || status == nil || *status != "completed" {
+		return err
+	}
+	if tevArchivedCopyPresent(d, hash) {
+		logging.Debug("re-downloading a release whose archived copy is still in place: its completion is kept",
+			"hash", hash)
+		return nil
+	}
+	if _, err := d.db.Exec(
+		"UPDATE torrent_meta SET status='queued', completed_at=NULL, processed_path=NULL, removed_at=NULL, reason='', error=NULL, created_at=?2, updated_at=?2 WHERE hash=?1",
+		hash, now,
+	); err != nil {
+		return err
+	}
+	logging.Debug("the archived copy taken by the previous download is gone: the release starts from scratch",
+		"hash", hash)
+	return nil
 }
 
 // releaseIdentityHash returns the 32-hex identity of a release: the torrent

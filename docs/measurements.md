@@ -600,6 +600,24 @@ The SQLite `cache_size` stays at SQLite's default 2 MB: on the real archive DB (
 FTS5) the latency is flat within noise even on a broad `MATCH` (~1.14 s), because the OS
 page cache serves the file — `gexttod` RSS 67.6 MB against 109.7 MB at the same uptime.
 
+**Registering a release again (2026-10-29, N97).** A new download of an infohash
+that was already downloaded clears the completion left by the previous attempt
+(`beginNewDownloadAttempt`): one indexed read on the normal paths, two reads and one
+`UPDATE` when the row still says "completed" and its archived copy is gone.
+`go test -run XXX -bench BenchmarkRegisterTorrentScored -benchmem -count=5` (the same
+checkout with and without the change; `MarkTorrentCompleted`, which the loop needs to put
+the row back into "completed", is outside the timed region):
+
+| Case | Before | After |
+|---|---|---|
+| First add, no row yet | 115–163 µs | 154–199 µs |
+| Re-register on a queued row | 123–145 µs | 149–194 µs |
+| Re-register after a completion whose copy is gone | 167–233 µs | 272–320 µs |
+
+The path runs once per started download, not per cycle or per request, and the figures
+are dominated by SQLite's per-statement cost on this disk: the added work is one read, or
+two reads and one write for a re-download.
+
 ### 4.10 Rejected designs and ideas not added
 
 Closed with a measurement, so they are not retried without new data:
