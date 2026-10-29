@@ -295,11 +295,13 @@ type Daemon struct {
 	// qbitRID is the qBittorrent /sync/maindata response id: it only has to move
 	// forward so third-party WebUIs (VueTorrent, Shift) see a fresh snapshot.
 	qbitRID atomic.Int64
-	// qbitSync carries the state needed to answer sync/maindata incrementally
-	// (the last snapshot and the rid it was sent with).
-	qbitSyncMu   sync.Mutex
-	qbitLastRID  int64
-	qbitSnapshot *qbitSyncState
+	// qbitSync carries the state needed to answer sync/maindata incrementally:
+	// the snapshots recently sent, by rid, so every polling client (two WebUI
+	// tabs, an *arr app) diffs against its own last reply instead of the last
+	// reply sent to anyone.
+	qbitSyncMu      sync.Mutex
+	qbitSyncHistory map[int64]*qbitSyncState
+	qbitSyncOrder   []int64
 	// qbitSearch holds the in-memory qBittorrent search jobs (search/start etc.).
 	qbitSearchMu  sync.Mutex
 	qbitSearchSeq int

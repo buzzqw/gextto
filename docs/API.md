@@ -598,7 +598,7 @@ The `{what}` of `GET /api/v1/torrents/{hash}/{what}` is one of `files`,
 | POST | `/api/v2/search/stop` | stop a search |
 | POST | `/api/v2/search/uninstallPlugin` | uninstall a search plugin |
 | POST | `/api/v2/search/updatePlugins` | update the search plugins |
-| GET | `/api/v2/sync/maindata` | incremental state for the qBittorrent sync |
+| GET | `/api/v2/sync/maindata` | incremental state for the qBittorrent sync: the diff since the reply whose rid the client echoes (the last 16 replies are remembered, so several clients stay incremental), otherwise a full snapshot |
 | GET | `/api/v2/sync/torrentPeers` | peers of one torrent |
 | POST | `/api/v2/torrentcreator/addTask` | start a torrent creation task |
 | POST | `/api/v2/torrentcreator/deleteTask` | delete a creation task |

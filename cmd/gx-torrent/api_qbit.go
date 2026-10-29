@@ -1697,10 +1697,29 @@ func qbitServerState(stats daemonStats) map[string]any {
 	}
 }
 
+// qbitSyncHistorySize bounds the remembered sync/maindata snapshots: enough for
+// a handful of clients polling at once, each echoing its own last rid.
+const qbitSyncHistorySize = 16
+
+// rememberQbitSyncLocked stores the snapshot sent with rid, dropping the oldest
+// past qbitSyncHistorySize. Callers hold qbitSyncMu.
+func (d *Daemon) rememberQbitSyncLocked(rid int64, state *qbitSyncState) {
+	if d.qbitSyncHistory == nil {
+		d.qbitSyncHistory = make(map[int64]*qbitSyncState, qbitSyncHistorySize)
+	}
+	d.qbitSyncHistory[rid] = state
+	d.qbitSyncOrder = append(d.qbitSyncOrder, rid)
+	if len(d.qbitSyncOrder) > qbitSyncHistorySize {
+		delete(d.qbitSyncHistory, d.qbitSyncOrder[0])
+		d.qbitSyncOrder = append(d.qbitSyncOrder[:0], d.qbitSyncOrder[1:]...)
+	}
+}
+
 // handleQbitSync answers /api/v2/sync/maindata. When the client echoes the rid
-// of the previous reply it receives only what changed (torrents, categories,
-// tags and the removed entries); otherwise it receives a full snapshot. rid
-// always advances.
+// of one of the recent replies it receives only what changed since that reply
+// (torrents, categories, tags and the removed entries); otherwise it receives a
+// full snapshot. rid always advances, and each client diffs against its own
+// last reply, so two clients polling together both stay incremental.
 func (d *Daemon) handleQbitSync(w http.ResponseWriter, r *http.Request) {
 	clientRID := int64(0)
 	if raw := strings.TrimSpace(r.URL.Query().Get("rid")); raw != "" {
@@ -1712,11 +1731,10 @@ func (d *Daemon) handleQbitSync(w http.ResponseWriter, r *http.Request) {
 	stats := d.stats()
 
 	d.qbitSyncMu.Lock()
-	prev := d.qbitSnapshot
-	full := prev == nil || clientRID != d.qbitLastRID
+	prev := d.qbitSyncHistory[clientRID]
+	full := prev == nil
 	rid := d.qbitRID.Add(1)
-	d.qbitSnapshot = current
-	d.qbitLastRID = rid
+	d.rememberQbitSyncLocked(rid, current)
 	d.qbitSyncMu.Unlock()
 
 	payload := map[string]any{

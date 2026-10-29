@@ -15,6 +15,8 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
 [issue su GitHub](https://github.com/buzzqw/gextto/issues).
 
 ## 29 ottobre 2026
+- **Più client collegati a gx-torrent restano aggiornati in modo incrementale.** Le interfacce web compatibili con qBittorrent (VueTorrent e simili) chiedono a gx-torrent solo cosa è cambiato dall'ultima risposta. Con due client aperti insieme — due schede del browser, o un'interfaccia web e un'altra app — ognuno faceva perdere il filo all'altro e tutti e due ricevevano a ogni giro l'elenco completo dei torrent. Ora ogni client riceve le differenze rispetto alla propria ultima risposta. Niente da configurare.
+
 - **In Scarico l'ordine vale per tutta la lista, eD2k compreso.** L'elenco mostrava i torrent in ordine alfabetico e sotto i download HTTP e i file di aMule nell'ordine in cui li dà aMule, e **Ordina per** cambiava solo i torrent. Ora torrent, download HTTP e file eD2k stanno in una lista sola: dall'apertura è alfabetica per nome, e **Ordina per** con ↑/↓ li ordina tutti insieme per stato, progresso, velocità di download e upload, tempo stimato, peer e rapporto (quello che una riga non ha resta a zero). Niente da configurare.
 
 - **Il log dice «FlareSolverr» quando chiude le sessioni del browser.** La riga che all'avvio segnala le sessioni di browser lasciate aperte dalla volta precedente diceva solo «Closed 5 browser sessions…»: ora nomina FlareSolverr, così si capisce di cosa si tratta. Anche la riga di DEBUG sulle sessioni inattive lo dice.

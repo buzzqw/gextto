@@ -373,6 +373,35 @@ func TestQbitSyncIncremental(t *testing.T) {
 	}
 }
 
+// TestQbitSyncTwoClientsStayIncremental checks that two clients polling in turn
+// each diff against their own last reply: with one shared snapshot every poll
+// of either client fell back to a full update.
+func TestQbitSyncTwoClientsStayIncremental(t *testing.T) {
+	d := newTestDaemon(t)
+	srv := httptest.NewServer(d.routesQbit())
+	defer srv.Close()
+
+	a := qbitSyncCall(t, srv.URL, "")
+	b := qbitSyncCall(t, srv.URL, "")
+	for round := 0; round < 3; round++ {
+		a = qbitSyncCall(t, srv.URL, strconv.FormatInt(a.RID, 10))
+		if a.FullUpdate {
+			t.Fatalf("round %d: client A got a full update", round)
+		}
+		b = qbitSyncCall(t, srv.URL, strconv.FormatInt(b.RID, 10))
+		if b.FullUpdate {
+			t.Fatalf("round %d: client B got a full update", round)
+		}
+	}
+	// A rid older than the remembered window is a full update.
+	for i := 0; i < qbitSyncHistorySize; i++ {
+		qbitSyncCall(t, srv.URL, "")
+	}
+	if late := qbitSyncCall(t, srv.URL, strconv.FormatInt(a.RID, 10)); !late.FullUpdate {
+		t.Fatalf("a forgotten rid must get a full update")
+	}
+}
+
 // TestQbitTorrentsInfoCategoryTagAndState exercises the filters end to end:
 // category, tag, state filter and the empty-category/empty-tag meaning.
 func TestQbitTorrentsInfoCategoryTagAndState(t *testing.T) {

@@ -14,6 +14,8 @@ manual is online: [English](docs/MANUAL.en.md) ·
 [GitHub issues](https://github.com/buzzqw/gextto/issues).
 
 ## 29 October 2026
+- **Several clients connected to gx-torrent stay incrementally updated.** qBittorrent-compatible web interfaces (VueTorrent and the like) ask gx-torrent only for what changed since their last reply. With two clients open at once — two browser tabs, or a web interface and another app — each made the other lose track, and both received the whole torrent list on every poll. Each client now receives the changes since its own last reply. Nothing to configure.
+
 - **In Downloads the order covers the whole list, eD2k included.** The list showed the torrents alphabetically and, below them, the HTTP downloads and aMule's files in aMule's own order, and **Sort by** only reordered the torrents. Torrents, HTTP downloads and eD2k files are now one list: it is alphabetical by name when you open it, and **Sort by** with ↑/↓ orders them all together by status, progress, download and upload speed, estimated time, peers and ratio (what a row does not have stays at zero). Nothing to configure.
 
 - **The log names FlareSolverr when it closes browser sessions.** The line that at start-up reports the browser sessions left open by the previous run only said «Closed 5 browser sessions…»: it now names FlareSolverr, so it is clear what it is about. The DEBUG line about idle sessions says it too.
