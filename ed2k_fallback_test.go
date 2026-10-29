@@ -3,8 +3,11 @@ package gextto
 import (
 	"context"
 	"encoding/json"
+	"html"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -208,9 +211,10 @@ func TestSeriesSearchMissingFallsBackToED2K(t *testing.T) {
 	}
 }
 
-// TestEpisodeSearchModalShowsED2KDownload checks the interface side: the eD2k
-// row carries its source, its link and a Scarica button that queues it in aMule.
-func TestEpisodeSearchModalShowsED2KDownload(t *testing.T) {
+// TestEpisodeSearchPanelShowsED2KDownload checks the interface side: the panel
+// under the episode follows the online search and its eD2k row carries the
+// source, the link and a Scarica button that queues it in aMule.
+func TestEpisodeSearchPanelShowsED2KDownload(t *testing.T) {
 	core, coreCfg := ed2kTestCore(t, map[string]string{"ed2k_fallback": "true"})
 	core.SetResults([]amuletest.Result{{
 		Hash: "99999999999999999999999999999999", Name: "Scrubs S02E01 720p ITA.mkv", Size: 900000000, Sources: 6,
@@ -220,15 +224,47 @@ func TestEpisodeSearchModalShowsED2KDownload(t *testing.T) {
 	server := httptest.NewServer(Router(state))
 	t.Cleanup(server.Close)
 
-	code, body := v2Request(t, server, http.MethodGet, "/series/episode-search-online?series=Scrubs&season=2&episode=1", nil)
+	code, body := v2Request(t, server, http.MethodPost, "/series/episode-search",
+		url.Values{"series": {"Scrubs"}, "season": {"2"}, "episode": {"1"}})
 	if code != http.StatusOK {
-		t.Fatalf("episode search modal -> %d: %s", code, body)
+		t.Fatalf("episode search panel -> %d: %s", code, body)
 	}
-	for _, want := range []string{"eD2k/Kad", "ed2k://|file|Scrubs", ">Scarica<"} {
+	// The panel is a frame under the episode, not a modal, and it follows the
+	// search with a polled fragment.
+	for _, want := range []string{`data-v2-ep-search-panel`, "Archivio", "Feed e indexer", "Avvio della ricerca online…"} {
 		if !strings.Contains(body, want) {
-			t.Fatalf("episode search modal is missing %q: %s", want, body)
+			t.Fatalf("episode search panel is missing %q: %s", want, body)
 		}
 	}
+	status := v2EpisodeSearchFinalBody(t, server, body)
+	for _, want := range []string{"eD2k/Kad", "ed2k://|file|Scrubs", ">Scarica<"} {
+		if !strings.Contains(status, want) {
+			t.Fatalf("episode search panel is missing %q: %s", want, status)
+		}
+	}
+}
+
+// v2EpisodeSearchFinalBody polls the fragment until the search is over and
+// returns its last rendering, exactly like the panel does in the browser.
+func v2EpisodeSearchFinalBody(t *testing.T, server *httptest.Server, panel string) string {
+	t.Helper()
+	match := regexp.MustCompile(`hx-get="(/series/episode-search-status\?search=[^"]+)"`).FindStringSubmatch(panel)
+	if match == nil {
+		t.Fatalf("episode search panel has no status URL: %s", panel)
+	}
+	deadline := time.Now().Add(10 * time.Second)
+	for time.Now().Before(deadline) {
+		code, body := v2Request(t, server, http.MethodGet, html.UnescapeString(match[1]), nil)
+		if code != http.StatusOK {
+			t.Fatalf("episode search status -> %d: %s", code, body)
+		}
+		if !strings.Contains(body, `hx-trigger="every 1s"`) {
+			return body
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	t.Fatalf("episode search did not finish in time")
+	return ""
 }
 
 // TestBatchDownloadQueuesED2KLink checks the download button of an eD2k row:

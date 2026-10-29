@@ -118,7 +118,6 @@ type v2SourceRow struct {
 type v2SourcesView struct {
 	Label       string
 	Hint        string
-	OnlineURL   string
 	Redirect    string
 	ShowEpisode bool
 	Results     []v2SourceRow
@@ -188,25 +187,17 @@ func v2SourceRowsFrom(entries []map[string]any) []v2SourceRow {
 	return rows
 }
 
-// v2EpisodeResultsView builds the modal view for one episode, either from the
-// sources already collected (live=false) or from a fresh online search
-// (live=true).
-func v2EpisodeResultsView(s *AppState, series, season, episode string, live bool) v2SourcesView {
+// v2EpisodeResultsView builds the view for one episode from the sources already
+// collected (the archive and the feed rows seen so far). It never starts a
+// search: the panel asks for the online releases separately.
+func v2EpisodeResultsView(s *AppState, series, season, episode string) v2SourcesView {
 	view := v2SourcesView{Label: "S" + season + "E" + episode}
 	if series == "" || season == "" || episode == "" {
 		return view
 	}
 	view.Redirect = "/?view=series&series=" + url.QueryEscape(series)
 	base := "/api/episodes/" + url.PathEscape(series) + "/" + url.PathEscape(season) + "/" + url.PathEscape(episode)
-	path := base + "/sources"
-	method := http.MethodGet
-	var body []byte
-	if live {
-		path = base + "/search"
-		method = http.MethodPost
-		body = []byte("{}")
-	}
-	raw, status := v2InternalJSON(s, method, path, nil, body)
+	raw, status := v2InternalJSON(s, http.MethodGet, base+"/sources", nil, nil)
 	if status >= 400 {
 		return view
 	}
@@ -274,7 +265,7 @@ func v2DedupSources(rows []v2SourceRow) []v2SourceRow {
 // archive. It never triggers an online search (MirCrew / RSS feeds); use the
 // search button for that.
 func V2SeriesSources(w http.ResponseWriter, r *http.Request, s *AppState) {
-	all := v2EpisodeResultsView(s, r.FormValue("series"), r.FormValue("season"), r.FormValue("episode"), false)
+	all := v2EpisodeResultsView(s, r.FormValue("series"), r.FormValue("season"), r.FormValue("episode"))
 	view := v2SourcesView{Label: all.Label, Hint: "Nessuna release in archivio per questa puntata. Usa 🔍 per cercare online.", Redirect: all.Redirect}
 	for _, row := range all.Results {
 		if strings.EqualFold(row.Origin, episodeOriginArchive) {
@@ -333,48 +324,4 @@ func V2SeriesHistory(w http.ResponseWriter, r *http.Request, s *AppState) {
 	}
 	dict, eng := v2Dictionaries(s)
 	v2Render(w, http.StatusOK, "v2_series_history", view, dict, eng)
-}
-
-// V2SeriesEpisodeSearch opens the manual episode search modal: the local
-// archive results are shown immediately, then the (slow) feed/indexer results
-// are loaded asynchronously into #v2-sources-online.
-func V2SeriesEpisodeSearch(w http.ResponseWriter, r *http.Request, s *AppState) {
-	series := r.FormValue("series")
-	season := r.FormValue("season")
-	episode := r.FormValue("episode")
-	stored := v2EpisodeResultsView(s, series, season, episode, false)
-	view := v2SourcesView{Label: stored.Label, Redirect: stored.Redirect}
-	for _, row := range stored.Results {
-		if strings.EqualFold(row.Origin, episodeOriginArchive) {
-			view.Results = append(view.Results, row)
-		}
-	}
-	view.Results = v2DedupSources(view.Results)
-	view.OnlineURL = "/series/episode-search-online?series=" + url.QueryEscape(series) +
-		"&season=" + url.QueryEscape(season) + "&episode=" + url.QueryEscape(episode)
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_episode_search_modal", view, dict, eng)
-}
-
-// V2SeriesEpisodeSearchOnline runs the online part of the search (feeds and
-// indexers) and returns just those rows for the async modal section.
-func V2SeriesEpisodeSearchOnline(w http.ResponseWriter, r *http.Request, s *AppState) {
-	all := v2EpisodeResultsView(s, r.FormValue("series"), r.FormValue("season"), r.FormValue("episode"), true)
-	view := v2SourcesView{Label: all.Label, Hint: "Nessun risultato online per questa puntata.", Redirect: all.Redirect}
-	// A release already shown in the archive section must not reappear here.
-	archived := map[string]bool{}
-	for _, row := range all.Results {
-		if strings.EqualFold(row.Origin, episodeOriginArchive) {
-			archived[row.Key] = true
-		}
-	}
-	for _, row := range all.Results {
-		if strings.EqualFold(row.Origin, episodeOriginArchive) || archived[row.Key] {
-			continue
-		}
-		view.Results = append(view.Results, row)
-	}
-	view.Results = v2DedupSources(view.Results)
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_sources_rows", view, dict, eng)
 }

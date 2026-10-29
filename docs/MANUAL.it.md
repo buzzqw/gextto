@@ -666,7 +666,11 @@ mano). «Sottocartelle per stagione» archivia gli episodi in *Stagione 01*,
   quando un file sembra corretto ma non rispetta il template configurato.
 - **Episodi**: accordion per stagione; per ogni episodio puoi cercare, copiare il
   magnet, ignorare/riattivare, forzare, riscaricare o eliminare; la ricerca
-  manuale segnala i risultati già presenti nel feed.
+  manuale (🔍) si apre in un riquadro sotto la puntata, non in una finestra che
+  copre la pagina, e mentre cerca online dice a che punto è: quante sorgenti sta
+  interrogando, quante hanno risposto e quando passa a eD2k/Kad; segnala i
+  risultati già presenti nel feed e, a ricerca finita, quante sorgenti ha
+  interrogato.
 
 ### Aggiungere e configurare una serie
 
@@ -709,7 +713,9 @@ quante sono). Sono raggruppate per serie, ognuna richiudibile, con una riga per
 stagione e le puntate come pulsanti (`S04E03`):
 
 - **un clic su una puntata** la cerca e apre i risultati, prima dall'archivio
-  locale e poi online, ognuno con **Scarica**;
+  locale e poi online, ognuno con **Scarica**, in un riquadro sotto la riga
+  della stagione: la ricerca online dice quante sorgenti ha interrogato e
+  quante hanno risposto mentre è in corso;
 - **Cerca mancanti** cerca tutte le puntate mancanti di quella serie, anche in
   background: la scheda dice a che punto è e puoi annullare; quando finisce
   elenca lì i risultati trovati, ognuno con la puntata e **Scarica**. Non scarica

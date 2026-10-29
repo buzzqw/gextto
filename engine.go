@@ -643,6 +643,33 @@ func (e *Engine) SearchQueryIDs(ctx context.Context, cfg *Config, query string, 
 	return searchOneWithDB(ctx, cfg, query, externalIDs, nil, e.db, false)
 }
 
+// searchProgress is how many sources of one search have answered so far.
+type searchProgress struct {
+	Done  int
+	Total int
+}
+
+// searchProgressContextKey carries the observer of a running search.
+type searchProgressContextKey struct{}
+
+// withSearchProgress attaches an observer to ctx: the search reports one update
+// every time a source (an indexer lane, the group of web engines) answers. The
+// manual episode search uses it to say what it is doing while the fan-out runs,
+// instead of leaving the panel on a generic "search in progress".
+func withSearchProgress(ctx context.Context, report func(searchProgress)) context.Context {
+	if report == nil {
+		return ctx
+	}
+	return context.WithValue(ctx, searchProgressContextKey{}, report)
+}
+
+// searchProgressObserver reads the observer once per search: without one the
+// fan-out only pays a nil check per answered source.
+func searchProgressObserver(ctx context.Context) func(searchProgress) {
+	report, _ := ctx.Value(searchProgressContextKey{}).(func(searchProgress))
+	return report
+}
+
 // SearchSeriesEpisode searches one known episode using its structured TV
 // identity. It is used by gap filling and episode-level manual searches: a
 // broad title search can miss older episodes even when the indexer supports an
@@ -761,6 +788,21 @@ func searchOneWithDBType(
 		}
 		lanes = append(lanes, lane)
 	}
+	// The manual episode search counts the answers while the panel waits: the
+	// observer is attached to the context only by that panel, so the cycle pays
+	// nothing for it.
+	answeredTotal := len(lanes)
+	if includeWeb && len(cfg.WebsearchEngines) > 0 {
+		answeredTotal++
+	}
+	progress := searchProgressObserver(ctx)
+	var answered atomic.Int64
+	noteAnswer := func() {
+		if progress == nil || answeredTotal == 0 {
+			return
+		}
+		progress(searchProgress{Done: int(answered.Add(1)), Total: answeredTotal})
+	}
 	// An interactive search does not queue behind the cycle's: it skips the
 	// lane slots (the manager still serves it in its own order).
 	interactive := webTimeout != nil
@@ -772,7 +814,7 @@ func searchOneWithDBType(
 			defer recoverGoroutine("indexer search")
 			defer indexerWG.Done()
 			result := indexerResult{Name: lane.health, Query: query}
-			defer func() { indexerResults[index] = result }()
+			defer func() { indexerResults[index] = result; noteAnswer() }()
 			if !interactive {
 				release, err := acquireLane(ctx, lane)
 				if errors.Is(err, errLaneBusy) {
@@ -808,6 +850,7 @@ func searchOneWithDBType(
 		go func() {
 			defer recoverGoroutine("web search")
 			defer webWG.Done()
+			defer noteAnswer()
 			webResults = SearchWithTimeout(ctx, cfg, query, webTimeout)
 			logging.Debug("web search completed", "query", query, "results", len(webResults))
 		}()

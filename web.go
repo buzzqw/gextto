@@ -567,6 +567,9 @@ type AppState struct {
 	// after it has persisted for a few seconds (see uiShellChromeFrom).
 	health_status   healthStatusDebouncer
 	rename_progress *RenameProgress
+	// episode_search keeps the manual episode searches the inline panels poll.
+	// It is created on first use (episodeSearches), so a hand-built state works.
+	episode_search atomic.Pointer[v2EpisodeSearchRegistry]
 	// rename_progress_mu guards rename_progress: the rename-all job writes its
 	// progress from a background goroutine while the UI polls it, and two
 	// concurrent rename requests must not both pass the "already running" check.

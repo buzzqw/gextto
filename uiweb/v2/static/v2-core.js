@@ -952,6 +952,40 @@
     if (filter) filter.focus();
   });
 
+  // ------------------------------------------ episode search (inline) --
+  // The 🔍 of an episode fills a frame under the row (on the Missing tab, under
+  // the series block) instead of covering the page with a modal, so the episode
+  // stays in sight while the online search runs. Closing the panel empties the
+  // frame and the focus goes back to the button that opened it.
+  var episodeSearchOpener = null;
+
+  document.addEventListener("click", function (event) {
+    var control = event.target.closest && event.target.closest("[data-v2-ep-search-target]");
+    if (control) episodeSearchOpener = control;
+  });
+
+  document.addEventListener("htmx:afterSwap", function (event) {
+    var target = event.detail && event.detail.target;
+    if (!target || !target.hasAttribute || !target.hasAttribute("data-v2-ep-search-slot")) return;
+    var open = target.innerHTML.trim() !== "";
+    var row = target.closest("[data-v2-ep-search-row]");
+    if (row) row.hidden = !open;
+    var controls = document.querySelectorAll('[data-v2-ep-search-target="' + target.id + '"]');
+    for (var i = 0; i < controls.length; i++) controls[i].setAttribute("aria-expanded", open ? "true" : "false");
+    if (!open) {
+      if (episodeSearchOpener && document.contains(episodeSearchOpener)) {
+        try { episodeSearchOpener.focus(); } catch (error) { /* ignore */ }
+      }
+      episodeSearchOpener = null;
+      return;
+    }
+    var panel = target.querySelector("[data-v2-ep-search-panel]");
+    if (!panel) return;
+    try { panel.focus(); } catch (error) { /* ignore */ }
+    // The frame sits in the page, not over it: bring it into view.
+    try { panel.scrollIntoView({ block: "nearest" }); } catch (error) { /* ignore */ }
+  });
+
   // The torrent list is swapped every few seconds: carry the selection over,
   // including a box ticked while the request was in flight.
   var keptSelection = null;

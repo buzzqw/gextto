@@ -1,7 +1,11 @@
 package gextto
 
 import (
+	"context"
 	"fmt"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"sync"
@@ -401,4 +405,35 @@ func BenchmarkEngineSnapshotTwelveCalls(b *testing.B) {
 			}
 		}
 	}
+}
+
+// BenchmarkSearchProgressFanOut measures what following a manual episode search
+// adds to its fan-out: the panel attaches an observer that counts the answered
+// sources, while the cycle searches without one. The work is one context lookup
+// per search plus an atomic count and a callback per answered source, so the
+// figures should stay inside the noise of the indexer round trip.
+func BenchmarkSearchProgressFanOut(b *testing.B) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.WriteString(w, `<rss><channel><item><title>Example.Show.S01E01.1080p</title><link>magnet:?xt=urn:btih:0123456789012345678901234567890123456789</link></item></channel></rss>`)
+	}))
+	b.Cleanup(server.Close)
+	cfg := DefaultConfig()
+	cfg.WebsearchEngines = nil
+	cfg.Indexers = []IndexerConfig{{Name: "Indexer", URL: server.URL, Enabled: true}}
+	series := &SeriesConfig{Name: "Example Show", Enabled: true}
+	engine := NewEngine()
+
+	b.Run("cycle", func(b *testing.B) {
+		b.ReportAllocs()
+		for range b.N {
+			engine.SearchSeriesEpisode(context.Background(), &cfg, series, 1, 1, true)
+		}
+	})
+	b.Run("panel", func(b *testing.B) {
+		ctx := withSearchProgress(context.Background(), func(searchProgress) {})
+		b.ReportAllocs()
+		for range b.N {
+			engine.SearchSeriesEpisode(ctx, &cfg, series, 1, 1, true)
+		}
+	})
 }

@@ -3012,7 +3012,7 @@
               <td class="numeric">{{.QualityScore}}</td>
               <td class="numeric">{{bytes .SizeBytes}}</td>
               <td class="row-actions">
-                <button class="btn sm icon-action" type="button" hx-post="/series/episode-search?series={{$.PathName}}&amp;season={{.Season}}&amp;episode={{.Episode}}" hx-target="#v2-modal" hx-swap="innerHTML" title="Cerca manualmente questa puntata" aria-label="Cerca S{{.Season}}E{{.Episode}}"><span aria-hidden="true">🔍</span></button>
+                <button class="btn sm icon-action" type="button" hx-post="/series/episode-search?series={{$.PathName}}&amp;season={{.Season}}&amp;episode={{.Episode}}" hx-target="#v2-ep-search-{{.Season}}-{{.Episode}}" hx-swap="innerHTML" hx-disabled-elt="this" data-v2-ep-search-target="v2-ep-search-{{.Season}}-{{.Episode}}" aria-controls="v2-ep-search-{{.Season}}-{{.Episode}}" aria-expanded="false" title="Cerca manualmente questa puntata" aria-label="Cerca S{{.Season}}E{{.Episode}}"><span aria-hidden="true">🔍</span></button>
                 {{template "v2_action_btn" (dict "Redirect" (printf "/?view=series&series=%s" $.PathName) "Path" .ForcePath "Method" "POST" "Body" "{}" "Label" "⚡" "Class" "icon-action" "Title" "Forza il download")}}
                 {{template "v2_action_btn" (dict "Redirect" (printf "/?view=series&series=%s" $.PathName) "Path" .IgnorePath "Method" "POST" "Body" .IgnoreBody "Label" (ternary .Ignored "✓" "🚫") "Class" "icon-action" "Title" "Ignora o riabilita")}}
                 {{template "v2_action_btn" (dict "Redirect" (printf "/?view=series&series=%s" $.PathName) "Path" .Redownload "Method" "POST" "Body" "{}" "Label" "↻" "Class" "icon-action" "Title" "Riscarica: sposta il file nel cestino, azzera la puntata e la riscarica" "Confirm" "Spostare il file nel cestino e riscaricare questa puntata?")}}
@@ -3020,6 +3020,9 @@
                 <button class="btn sm icon-action" type="button" hx-get="/series/history?series={{$.PathName}}&amp;season={{.Season}}&amp;episode={{.Episode}}&amp;modal=1" hx-target="#v2-modal" hx-swap="innerHTML" title="Storia dei download di questa puntata: ricerca, download, spostamenti, errori" aria-label="Storia dei download della puntata">📜</button>
                 {{template "v2_action_btn" (dict "Redirect" (printf "/?view=series&series=%s" $.PathName) "Path" .DeletePath "Method" "DELETE" "Body" "{}" "Label" "🗑️" "Class" "icon-action danger" "Title" "Elimina dall'archivio" "Confirm" "Eliminare questa puntata dall'archivio?")}}
               </td>
+            </tr>
+            <tr class="v2-ep-search-row" data-v2-ep-search-row hidden>
+              <td colspan="7"><div id="v2-ep-search-{{.Season}}-{{.Episode}}" data-v2-ep-search-slot></div></td>
             </tr>
             {{end}}
             </tbody>
@@ -3183,19 +3186,36 @@
 </div>
 {{end}}
 
-{{define "v2_episode_search_modal"}}
-<div class="overlay" style="display:block">
-  <div class="modal v2-sources-modal" role="dialog" aria-modal="true" aria-labelledby="v2-sources-title">
-    <div class="modal-head"><h3 id="v2-sources-title"><span>Cerca</span> {{.Label}}</h3>
-      <button class="btn sm" type="button" hx-get="/empty" hx-target="#v2-modal" hx-swap="innerHTML">Chiudi</button></div>
-    <div class="modal-body">
-      <h4>Archivio</h4>
-      {{if .Results}}{{template "v2_sources_rows" .}}{{else}}<p class="muted">Nessuna release in archivio per questa puntata.</p>{{end}}
-      <h4>Feed e indexer</h4>
-      <div id="v2-sources-online" hx-get="{{.OnlineURL}}" hx-trigger="load" hx-swap="innerHTML"><p class="muted">Ricerca online in corso…</p></div>
-    </div>
+{{define "v2_episode_search_panel"}}
+{{/* The inline search of one episode: the archive releases at once, then the
+     online search, followed here with what it is doing. */}}
+<section class="v2-ep-search" data-v2-ep-search-panel role="region" aria-labelledby="v2-ep-search-title-{{.Slot}}" tabindex="-1">
+  <div class="v2-ep-search-head">
+    <h4 id="v2-ep-search-title-{{.Slot}}"><span>Cerca</span> {{.Label}}</h4>
+    <button class="btn sm" type="button" hx-get="/empty" hx-target="#{{.Slot}}" hx-swap="innerHTML" title="Chiudi i risultati della ricerca">Chiudi</button>
   </div>
+  <div class="v2-ep-search-body">
+    {{if .Error}}<p class="alert">{{.Error}}</p>{{end}}
+    <h5>Archivio</h5>
+    {{template "v2_sources_rows" .Archive}}
+    {{if .Online.ID}}<h5>Feed e indexer</h5>
+    {{template "v2_episode_search_online" .Online}}{{end}}
+  </div>
+</section>
+{{end}}
+
+{{define "v2_episode_search_online"}}
+<div id="v2-ep-online-{{.ID}}" class="v2-ep-online"{{if .Running}} hx-get="{{.URL}}" hx-trigger="every 1s" hx-swap="outerHTML"{{end}} role="status" aria-live="polite">
+  {{if .Running}}{{template "v2_episode_search_progress" .}}{{else if .Error}}<p class="err">{{.Error}}</p>{{else}}{{if gt .Total 0}}<p class="muted v2-ep-total"><span>Sorgenti interrogate:</span> {{.Total}}</p>{{end}}{{template "v2_sources_rows" .Sources}}{{end}}
 </div>
+{{end}}
+
+{{define "v2_episode_search_progress"}}
+<p class="muted v2-ep-progress"><span class="v2-spinner" aria-hidden="true"></span>
+  {{- if eq .Phase "ed2k"}}<span>Nessun risultato dai torrent: controllo eD2k/Kad…</span>
+  {{- else if gt .Total 0}}<span>{{.Done}}/{{.Total}}</span> <span>sorgenti hanno risposto…</span>
+  {{- else if eq .Phase "sources"}}<span>Interrogo indexer e motori di ricerca…</span>
+  {{- else}}<span>Avvio della ricerca online…</span>{{end}}</p>
 {{end}}
 
 {{define "v2_rename_preview"}}

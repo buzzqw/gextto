@@ -12,6 +12,7 @@ package gextto
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	stdhtml "html"
@@ -56,6 +57,13 @@ func v2PublicBase(r *http.Request) string {
 // re-implementing data access. TestInternalJSONPathsAreRegisteredRoutes keeps
 // every literal path a registered route.
 func v2InternalJSON(s *AppState, method, path string, query url.Values, jsonBody []byte) ([]byte, int) {
+	return v2InternalJSONContext(context.Background(), s, method, path, query, jsonBody)
+}
+
+// v2InternalJSONContext is v2InternalJSON with a caller context: a background
+// operation keeps the values (a search observer) and the cancellation of the
+// request it belongs to.
+func v2InternalJSONContext(ctx context.Context, s *AppState, method, path string, query url.Values, jsonBody []byte) ([]byte, int) {
 	mux := s.internalMux.Load()
 	if mux == nil {
 		return []byte(`{"ok":false,"error":"v2 router not registered"}`), http.StatusInternalServerError
@@ -64,7 +72,7 @@ func v2InternalJSON(s *AppState, method, path string, query url.Values, jsonBody
 	if len(jsonBody) > 0 {
 		body = bytes.NewReader(jsonBody)
 	}
-	request, err := http.NewRequest(method, path, body)
+	request, err := http.NewRequestWithContext(ctx, method, path, body)
 	if err != nil {
 		return []byte(`{"ok":false,"error":"bad internal request"}`), http.StatusInternalServerError
 	}

@@ -1323,9 +1323,41 @@ form.htmx-request:not([hx-trigger*="every"]) button[type="submit"],
 .torrent-sort { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 0.82rem; }
 .torrent-sort select { min-width: 0; flex: 0 1 auto; }
 
+/* The search of one episode opens in a frame under its row (on the Missing tab,
+   under the series block) instead of a modal: the episode stays in sight and the
+   results grow in place. */
+.data-table tr.v2-ep-search-row > td { padding: 0 0 10px; border: 0; background: transparent; }
+.v2-ep-search {
+  scroll-margin-top: 84px;
+  padding: 12px 14px 14px;
+  border: 1px solid var(--line, rgba(128, 128, 128, .25));
+  border-radius: var(--v2-radius);
+  background: var(--surface, transparent);
+}
+.v2-ep-search:focus-visible { outline: 2px solid var(--accent, #4ec97a); outline-offset: 2px; }
+.v2-ep-search-head { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+.v2-ep-search-head h4 { margin: 0; flex: 1; min-width: 0; }
+.v2-ep-search-body h5 { margin: 14px 0 6px; font-size: .9rem; }
+.v2-ep-search-body h5:first-of-type { margin-top: 0; }
+.v2-ep-progress { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
+.v2-ep-total { margin: 4px 0 8px; }
+.v2-gap-ep-result { margin: 0 0 10px; }
+.v2-spinner {
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--line, rgba(128, 128, 128, .35));
+  border-top-color: var(--accent, #4ec97a);
+  border-radius: 50%;
+  animation: v2-spin .9s linear infinite;
+}
+@keyframes v2-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .v2-spinner { animation: none; }
+}
+
 /* Wider sources/search modal so the per-release actions stay visible. */
-.overlay .modal.v2-sources-modal { width: min(1500px, 98vw); }
-.v2-sources-modal .data-table { table-layout: fixed; min-width: 0; }
+.overlay .modal.v2-sources-modal { width: min(1500px, 98vw); }.v2-sources-modal .data-table { table-layout: fixed; min-width: 0; }
 .v2-sources-modal .data-table th:nth-child(1),
 .v2-sources-modal .data-table td:nth-child(1) { width: 42%; }
 .v2-sources-modal .data-table th:nth-child(2),

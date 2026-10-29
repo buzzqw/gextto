@@ -649,8 +649,11 @@ episodes in *Season 01*, *Season 02*, … inside the series folder.
   the exact target name from the template and the TMDB/TVDB metadata, useful
   when a file looks correct but does not match the configured template.
 - **Episodes**: per-season accordion; per episode you can search, copy magnet,
-  ignore/reactivate, force, re-download or delete; the manual search marks
-  results already present in the feed.
+  ignore/reactivate, force, re-download or delete. The manual search (🔍) opens
+  in a frame under the episode, not in a window that covers the page, and while
+  it is searching online it says how far it is: how many sources it is asking,
+  how many have answered and when it moves on to eD2k/Kad. It marks the results
+  already present in the feed and, once finished, how many sources it asked.
 
 ### Adding and configuring a series
 
@@ -693,7 +696,9 @@ grouped by series, each one collapsible, with a line per season and the
 episodes as buttons (`S04E03`):
 
 - **a click on an episode** searches it and opens the results, first from the
-  local archive and then online, each with **Download**;
+  local archive and then online, each with **Download**, in a frame under the
+  season line: while the online search runs it says how many sources it asked
+  and how many have answered;
 - **Search missing** searches every missing episode of that series, in the
   background too: the tab shows how far it is and you can cancel it; when it
   ends it lists what it found right there, each with its episode and

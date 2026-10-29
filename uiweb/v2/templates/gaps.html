@@ -45,8 +45,9 @@
         {{range $s.Seasons}}
         <div class="v2-gap-season">
           <span class="v2-gap-season-label"><span>Stagione</span> {{.Season}}</span>
-          <span class="v2-gap-episodes">{{range .Episodes}}<button class="chip v2-gap-ep" type="button" hx-post="/series/episode-search?series={{$s.PathName}}&amp;season={{.Season}}&amp;episode={{.Episode}}" hx-target="#v2-modal" hx-swap="innerHTML" aria-label="Cerca {{$s.Name}} {{.Code}}" title="Cerca {{.Code}}{{if .AirDate}} · uscita il {{.AirDate}}{{end}}">{{.Code}}</button>{{end}}</span>
+          <span class="v2-gap-episodes">{{range .Episodes}}<button class="chip v2-gap-ep" type="button" hx-post="/series/episode-search?series={{$s.PathName}}&amp;season={{.Season}}&amp;episode={{.Episode}}" hx-target="#v2-gap-ep-{{$i}}-{{.Season}}" hx-swap="innerHTML" data-v2-ep-search-target="v2-gap-ep-{{$i}}-{{.Season}}" aria-controls="v2-gap-ep-{{$i}}-{{.Season}}" aria-expanded="false" aria-label="Cerca {{$s.Name}} {{.Code}}" title="Cerca {{.Code}}{{if .AirDate}} · uscita il {{.AirDate}}{{end}}">{{.Code}}</button>{{end}}</span>
         </div>
+        <div class="v2-gap-ep-result" data-v2-ep-search-row hidden><div id="v2-gap-ep-{{$i}}-{{.Season}}" data-v2-ep-search-slot></div></div>
         {{end}}
       </div>
     </details>

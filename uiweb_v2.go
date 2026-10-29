@@ -251,7 +251,7 @@ func registerV2Routes(s *AppState, mux *http.ServeMux) {
 	v2Handle(s, mux, "GET /series/sources", V2SeriesSources)
 	v2Handle(s, mux, "GET /series/history", V2SeriesHistory)
 	v2Handle(s, mux, "POST /series/episode-search", V2SeriesEpisodeSearch)
-	v2Handle(s, mux, "GET /series/episode-search-online", V2SeriesEpisodeSearchOnline)
+	v2Handle(s, mux, "GET /series/episode-search-status", V2SeriesEpisodeSearchStatus)
 	v2Handle(s, mux, "GET /series/rename-preview", V2SeriesRenamePreview)
 	v2Handle(s, mux, "POST /series/rename-execute", V2SeriesRenameExecute)
 

@@ -340,8 +340,29 @@ func gh7_last_resort_episode_results(results []gh7_episode_result, cfg *Config, 
 
 // gh7_search_series_episode_sources searches stored + live sources for an
 // episode, keeping the origin on every result.
+// searchStageContextKey carries the observer of a search's stages.
+type searchStageContextKey struct{}
+
+// withSearchStages attaches an observer of the stages of a manual episode
+// search: "sources" before the indexer fan-out and "ed2k" before the fallback.
+// The inline episode panel uses it to say what the search is doing; the cycle
+// and the other callers carry no observer and pay nothing for it.
+func withSearchStages(ctx context.Context, report func(string)) context.Context {
+	if report == nil {
+		return ctx
+	}
+	return context.WithValue(ctx, searchStageContextKey{}, report)
+}
+
+func reportSearchStage(ctx context.Context, name string) {
+	if report, ok := ctx.Value(searchStageContextKey{}).(func(string)); ok {
+		report(name)
+	}
+}
+
 func gh7_search_series_episode_sources(ctx context.Context, s *AppState, cfg *Config, series SeriesConfig, season, episode int64) []gh7_episode_result {
 	results := gh7_stored_series_episode_sources(s, series, season, episode)
+	reportSearchStage(ctx, "sources")
 	if s.engine != nil {
 		for _, release := range s.engine.SearchSeriesEpisode(ctx, cfg, &series, season, episode, true) {
 			if gh7_release_matches_series_episode(&release, series, season, episode) {
@@ -356,6 +377,7 @@ func gh7_search_series_episode_sources(ctx context.Context, s *AppState, cfg *Co
 	// explicit ed2k_fallback, so a manual search never surprises the operator.
 	final := gh7_finalize_episode_search_results(results, cfg, series)
 	if len(final) == 0 {
+		reportSearchStage(ctx, "ed2k")
 		for _, release := range ed2kManualEpisodeFallback(ctx, s.engine, cfg, &series, season, episode) {
 			results = append(results, gh7_episode_result{Release: release, Origin: episodeOriginED2K})
 		}
