@@ -963,6 +963,14 @@ The probe runs only for a candidate the decision already judged an upgrade and
 whose library row has no MediaInfo yet; the result is stored in `episodes` or
 `movies`, so the periodic backfill and the next searches do not repeat it.
 
+*Impatto sulla libreria* (the dry-run preview, which never stores the probe
+because it does not write), live library, same machine:
+
+| Run | Releases checked | Wall time |
+| --- | --- | --- |
+| First, with the library files not read yet in this process | 63 (55 series) | **5.6 s** |
+| Again, answers still in the process cache | 63 (55 series) | **2.0 s** |
+
 ### Test suite duration — 22 October 2026
 
 `make test` on the N97 (4 cores, Go build cache warm, service running):
