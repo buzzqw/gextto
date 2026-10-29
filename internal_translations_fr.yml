@@ -6097,3 +6097,5 @@ fra:
   "Avvio della ricerca online…": "Démarrage de la recherche en ligne…"
   "Ricerca non avviata: configurazione non disponibile.": "Recherche non démarrée : configuration indisponible."
   "Ricerca non più disponibile: aprila di nuovo dalla puntata.": "Recherche plus disponible : rouvrez-la depuis l'épisode."
+  "Applica i limiti anche ai peer della rete locale": "Appliquer les limites aussi aux pairs du réseau local"
+  "Rallenta ai limiti di velocità anche i peer della tua rete di casa o d'ufficio. Spento (consigliato), i trasferimenti in rete locale vanno alla massima velocità: i limiti servono per la linea Internet.": "Ralentit aussi les pairs de votre réseau domestique ou de bureau aux limites de vitesse. Désactivé (recommandé), les transferts sur le réseau local vont à pleine vitesse : les limites sont faites pour la ligne Internet."

@@ -2277,6 +2277,7 @@ verifica.
 | Auto — host per misurare la latenza | Host (o host:porta) a cui misurare la latenza con una connessione TCP ogni 2 secondi, solo mentre Auto è attivo. Vuoto = Google (8.8.8.8, 8.8.4.4) e Cloudflare (1.1.1.1, 1.0.0.1), porta 443; si usa il tempo più basso, così un server lontano o lento non falsa la misura. |
 | Auto — velocità massima linea, download | Massima velocità reale della linea in download, in KiB/s (es. 9000 per 9 MB/s). 0 = non nota: la scopre Auto. Se la indichi, Auto non sale oltre e trova il punto giusto più in fretta. |
 | Auto — velocità massima linea, upload | Massima velocità reale della linea in upload, in KiB/s (es. 800). 0 = non nota: la scopre Auto. Se la indichi, Auto non sale oltre e trova il punto giusto più in fretta. |
+| Applica i limiti anche ai peer della rete locale | Spento (default, consigliato): i peer della tua rete di casa o d'ufficio (indirizzi privati 10.x, 172.16–31.x, 192.168.x, link-local, loopback e IPv6 locali fc00::/7) scaricano e caricano alla massima velocità, come in qBittorrent e libtorrent: i limiti di velocità servono per la linea Internet. Acceso: anche loro rispettano i limiti globali e del torrent. Solo gx-torrent (qBittorrent ha la sua opzione). Cambiarla riavvia gx-torrent. |
 
 **Porte e interfacce**
 

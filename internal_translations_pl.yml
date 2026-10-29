@@ -6045,3 +6045,5 @@ pol:
   "Avvio della ricerca online…": "Uruchamianie wyszukiwania online…"
   "Ricerca non avviata: configurazione non disponibile.": "Wyszukiwanie nie zostało uruchomione: konfiguracja niedostępna."
   "Ricerca non più disponibile: aprila di nuovo dalla puntata.": "Wyszukiwanie nie jest już dostępne: otwórz je ponownie z odcinka."
+  "Applica i limiti anche ai peer della rete locale": "Stosuj limity także do peerów w sieci lokalnej"
+  "Rallenta ai limiti di velocità anche i peer della tua rete di casa o d'ufficio. Spento (consigliato), i trasferimenti in rete locale vanno alla massima velocità: i limiti servono per la linea Internet.": "Spowalnia do limitów prędkości także peerów w twojej sieci domowej lub biurowej. Wyłączone (zalecane) przesyłanie w sieci lokalnej idzie z pełną prędkością: limity są dla łącza internetowego."

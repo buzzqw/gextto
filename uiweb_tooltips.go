@@ -47,6 +47,7 @@ var uiSettingTooltipText = map[string]string{
 	"torrent_outgoing_interface":           "Killswitch VPN: interfaccia usata per tutto il traffico BitTorrent in uscita.",
 	"torrent_dl_limit":                     "Limite globale di download in KiB/s (0 = illimitato).",
 	"torrent_ul_limit":                     "Limite globale di upload in KiB/s (0 = illimitato).",
+	"torrent_limit_lan_peers":              "Rallenta ai limiti di velocità anche i peer della tua rete di casa o d'ufficio. Spento (consigliato), i trasferimenti in rete locale vanno alla massima velocità: i limiti servono per la linea Internet.",
 	"torrent_auto_latency_guard":           "Con la velocità su Auto misura la latenza verso Google e Cloudflare e alza download e upload finché il ping resta buono; quando sale, taglia il limite. Con «both» i contatori del router restano solo un'informazione; con «ping» il router non viene proprio letto, quindi non può sbagliare.",
 	"torrent_auto_latency_source":          "Cosa guida il limite di Auto: «both» = ping Google/Cloudflare (decide) + router (solo diagnostica); «ping» = solo ping, il router è ignorato; «router» = vecchio comportamento, si cede solo agli altri dispositivi visti dal router.",
 	"torrent_auto_latency_target":          "Host (o host:porta) a cui misurare la latenza con una connessione TCP ogni 2 secondi, solo mentre Auto è attivo. Vuoto = Google (8.8.8.8, 8.8.4.4) e Cloudflare (1.1.1.1, 1.0.0.1); si usa il tempo più basso, così un server lontano o lento non falsa la misura.",

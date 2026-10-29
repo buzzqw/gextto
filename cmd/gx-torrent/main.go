@@ -295,6 +295,7 @@ func main() {
 	ipFilterTrackers := flag.Bool("ipfilter-trackers", envBool("GX_TORRENT_IPFILTER_TRACKERS", false), "apply the IP filter to trackers too")
 	dhtBootstrap := flag.String("dht-bootstrap", envOr("GX_TORRENT_DHT_BOOTSTRAP", ""), "comma-separated DHT router addresses (empty = built-in bootstrap nodes)")
 	webSourcesAllowPrivate := flag.Bool("web-sources-allow-private", envBool("GX_TORRENT_WEB_SOURCES_ALLOW_PRIVATE", false), "let web seeds and magnet xs=/as= sources reach private/LAN addresses (off: protects the LAN from URLs in untrusted torrents)")
+	limitLANPeers := flag.Bool("limit-lan-peers", envBool("GX_TORRENT_LIMIT_LAN_PEERS", false), "apply the speed limits to peers on the local network too (default: LAN peers transfer at full speed)")
 	dhtReadOnly := flag.Bool("dht-read-only", envBool("GX_TORRENT_DHT_READ_ONLY", false), "read-only DHT (BEP 43): do not answer queries and ask not to be added to routing tables")
 	insecure := flag.Bool("insecure", false, "allow a non-loopback listen address without a token")
 	debug := flag.Bool("debug", os.Getenv("GX_TORRENT_DEBUG") == "1", "verbose engine logging")
@@ -397,6 +398,7 @@ func main() {
 	dhtBootstrapValue := optStr(settingsStore, "dht-bootstrap", *dhtBootstrap)
 	dhtReadOnlyValue := optBool(settingsStore, "dht-read-only", *dhtReadOnly)
 	webSourcesAllowPrivateValue := optBool(settingsStore, "web-sources-allow-private", *webSourcesAllowPrivate)
+	limitLANPeersValue := optBool(settingsStore, limitLANPeersKey, *limitLANPeers)
 	dlnaEnabledValue := optBool(settingsStore, dlnaEnabledKey, *dlnaEnabled)
 	dlnaListenValue := optStr(settingsStore, dlnaListenKey, *dlnaListen)
 	dlnaNameValue := optStr(settingsStore, dlnaNameKey, *dlnaName)
@@ -439,6 +441,7 @@ func main() {
 			DHTBootstrap:           parseBootstrapNodes(dhtBootstrapValue),
 			DHTReadOnly:            dhtReadOnlyValue,
 			WebSourcesAllowPrivate: webSourcesAllowPrivateValue,
+			LimitLANPeers:          limitLANPeersValue,
 		},
 		Debug:                 *debug,
 		Mode:                  modeValue,

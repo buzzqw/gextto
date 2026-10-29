@@ -1196,6 +1196,7 @@ var uiSettingGxTorrentOnly = map[string]bool{
 	"torrent_listen_interfaces": true, "torrent_outgoing_interface": true,
 	"torrent_dht": true, "torrent_pex": true, "torrent_lsd": true,
 	"torrent_upnp": true, "torrent_natpmp": true, "torrent_utp": true,
+	"torrent_limit_lan_peers":     true,
 	"torrent_dht_bootstrap_nodes": true, "torrent_encryption": true,
 	"torrent_apply_ip_filter": true, "torrent_ipfilter_url": true,
 	"torrent_dynamic_queue": true, "torrent_dynamic_queue_min": true, "torrent_dynamic_queue_max": true,

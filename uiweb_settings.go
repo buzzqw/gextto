@@ -195,6 +195,7 @@ var uiSettingsIndex = []uiSettingDef{
 	{Key: "torrent_auto_latency_target", Label: "Auto — host per misurare la latenza", Tab: "network", Group: "Limiti di velocità"},
 	{Key: "torrent_line_max_down_kib", Label: "Auto — velocità massima linea, download", Tab: "network", Group: "Limiti di velocità"},
 	{Key: "torrent_line_max_up_kib", Label: "Auto — velocità massima linea, upload", Tab: "network", Group: "Limiti di velocità"},
+	{Key: "torrent_limit_lan_peers", Label: "Applica i limiti anche ai peer della rete locale", Tab: "network", Group: "Limiti di velocità"},
 	{Key: "torrent_port_min", Label: "Porta minima", Tab: "network", Group: "Porte e interfacce"},
 	{Key: "torrent_port_max", Label: "Porta massima", Tab: "network", Group: "Porte e interfacce"},
 	{Key: "torrent_listen_interfaces", Label: "Interfacce listen", Tab: "network", Group: "Porte e interfacce"},

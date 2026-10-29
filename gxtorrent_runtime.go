@@ -795,6 +795,9 @@ func gxNetworkArgs(cfg *Config) []string {
 	if !lt.Holepunch {
 		args = append(args, "-no-holepunch")
 	}
+	if lt.LimitLanPeers {
+		args = append(args, "-limit-lan-peers")
+	}
 	if !lt.Lsd {
 		args = append(args, "-no-lsd")
 	}

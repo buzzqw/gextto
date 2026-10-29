@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -11,6 +12,8 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/buzzqw/gextto/internal/settings"
 )
 
 func trackerURLs(t *testing.T, d *Daemon, hash string) []string {
@@ -436,4 +439,50 @@ func TestQbitAddStoppedFlag(t *testing.T) {
 		_, meta := d.findLocked(hash)
 		return meta != nil && meta.UserPaused
 	})
+}
+
+// TestQbitLimitLANPeers covers qBittorrent's limit_lan_peers: off by default
+// (LAN peers at full speed), set through setPreferences, read back from
+// preferences and switched on the running session at once.
+func TestQbitLimitLANPeers(t *testing.T) {
+	store, err := settings.Load(filepath.Join(t.TempDir(), "settings.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	d := newTestDaemonFull(t, NetworkOptions{PortBegin: 42000, PortEnd: 42100, Encryption: 1, PEX: true}, store)
+	srv := httptest.NewServer(d.routesQbit())
+	defer srv.Close()
+
+	readPref := func() bool {
+		var prefs map[string]any
+		getJSONInto(t, srv.URL+"/api/v2/app/preferences", &prefs)
+		on, ok := prefs["limit_lan_peers"].(bool)
+		if !ok {
+			t.Fatalf("preferences lack a boolean limit_lan_peers: %v", prefs["limit_lan_peers"])
+		}
+		return on
+	}
+	sessionOn := func() bool {
+		d.mu.Lock()
+		defer d.mu.Unlock()
+		return d.session.LimitLocalPeers()
+	}
+	if readPref() || sessionOn() {
+		t.Fatal("LAN peers must be outside the limits by default")
+	}
+	set := func(on bool) {
+		resp, err := http.PostForm(srv.URL+"/api/v2/app/setPreferences", url.Values{"json": {fmt.Sprintf(`{"limit_lan_peers":%t}`, on)}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+	}
+	set(true)
+	if !readPref() || !sessionOn() {
+		t.Fatal("limit_lan_peers=true must be saved and applied to the session")
+	}
+	set(false)
+	if readPref() || sessionOn() {
+		t.Fatal("limit_lan_peers=false must be saved and applied to the session")
+	}
 }

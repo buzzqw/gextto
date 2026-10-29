@@ -72,7 +72,10 @@ type Session struct {
 	// bucketDownload/bucketUpload are retuned live by SetSpeedLimits.
 	bucketDownload *bandwidth.Limiter
 	bucketUpload   *bandwidth.Limiter
-	closeC         chan struct{}
+	// limitLocalPeers mirrors Config.LimitLocalPeers and is switched live by
+	// SetLimitLocalPeers.
+	limitLocalPeers atomic.Bool
+	closeC          chan struct{}
 
 	// bannedIPs quarantines corrupt-data peers session-wide with a TTL
 	// (libtorrent-style smart ban), consulted by every torrent.
@@ -359,6 +362,7 @@ func assembleSession(cfg Config, l logger.Logger, db *bbolt.DB, res *boltdbresum
 	}
 	c.bucketDownload = bandwidth.New(max(cfg.SpeedLimitDownload, 0) * 1024)
 	c.bucketUpload = bandwidth.New(max(cfg.SpeedLimitUpload, 0) * 1024)
+	c.limitLocalPeers.Store(cfg.LimitLocalPeers)
 	if cfg.DHTEnabled {
 		c.dhtPeerRequests = make(map[*torrent]struct{})
 	}

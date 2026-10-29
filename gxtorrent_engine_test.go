@@ -425,6 +425,11 @@ func TestGxNetworkArgs(t *testing.T) {
 	if got := strings.Join(gxNetworkArgs(cfg), " "); !strings.Contains(got, "-no-holepunch") {
 		t.Fatalf("holepunch off not forwarded: %q", got)
 	}
+	// LAN peers stay outside the limits unless asked (no flag above).
+	cfg.Transfer.LimitLanPeers = true
+	if got := strings.Join(gxNetworkArgs(cfg), " "); !strings.Contains(got, "-limit-lan-peers") {
+		t.Fatalf("limits for LAN peers not forwarded: %q", got)
+	}
 	cfg.Transfer.ListenInterfaces = "0.0.0.0:6881-6891"
 	if host, ports := gxListenInterface(cfg.Transfer.ListenInterfaces); host != "" || ports != "6881-6891" {
 		t.Fatalf("all interfaces: %q %q", host, ports)

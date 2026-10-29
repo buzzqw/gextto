@@ -211,11 +211,14 @@ type TransferSettings struct {
 	DontCountSlowTorrents bool `json:"dont_count_slow_torrents"`
 	AutoRemoveCompleted   bool `json:"auto_remove_completed"`
 	// Extended session settings.
-	ConnectionsLimit int64  `json:"connections_limit"`
-	CacheSize        int64  `json:"cache_size"`
-	CacheExpiry      int64  `json:"cache_expiry"`
-	Utp              bool   `json:"utp"`
-	Holepunch        bool   `json:"holepunch"`
+	ConnectionsLimit int64 `json:"connections_limit"`
+	CacheSize        int64 `json:"cache_size"`
+	CacheExpiry      int64 `json:"cache_expiry"`
+	Utp              bool  `json:"utp"`
+	Holepunch        bool  `json:"holepunch"`
+	// LimitLanPeers applies the speed limits to the peers on the local network
+	// too (gx-torrent only); off, they transfer at full speed.
+	LimitLanPeers    bool   `json:"limit_lan_peers"`
 	ApplyIpFilter    bool   `json:"apply_ip_filter"`
 	Encryption       int64  `json:"encryption"`
 	IpFilterPath     string `json:"ip_filter_path"`
@@ -2782,6 +2785,7 @@ func (c *Config) applyTransferSettings() {
 		CacheExpiry:           numberSettingInt(c.Settings, "torrent_cache_expiry", 300),
 		Utp:                   boolSettingOr(c.Settings, "torrent_utp", true),
 		Holepunch:             boolSettingOr(c.Settings, "torrent_holepunch", true),
+		LimitLanPeers:         boolSettingOr(c.Settings, "torrent_limit_lan_peers", false),
 		ApplyIpFilter:         boolSettingOr(c.Settings, "torrent_apply_ip_filter", false),
 		Encryption:            numberSettingInt(c.Settings, "torrent_encryption", 1),
 		IpFilterPath:          settingOrDefault(c.Settings, "torrent_ipfilter_url", constants.DefaultIPFilterURL),

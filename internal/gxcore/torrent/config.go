@@ -149,6 +149,11 @@ type Config struct {
 	SpeedLimitDownload int64 `yaml:"speed-limit-download"`
 	// Global upload speed limit in KB/s.
 	SpeedLimitUpload int64 `yaml:"speed-limit-upload"`
+	// LimitLocalPeers applies the speed limits to peers on the local network
+	// too (loopback, link-local and private addresses, IPv6 ULA included). Off,
+	// the default, LAN peers transfer at full speed, as in libtorrent and
+	// qBittorrent: the limits exist for the internet line.
+	LimitLocalPeers bool `yaml:"limit-local-peers"`
 	// Start torrent automatically if it was running when previous session was closed.
 	ResumeOnStartup bool `yaml:"resume-on-startup"`
 	// Check each torrent loop for aliveness. Helps to detect bugs earlier.

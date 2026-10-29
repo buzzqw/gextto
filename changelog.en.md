@@ -14,6 +14,8 @@ manual is online: [English](docs/MANUAL.en.md) ·
 [GitHub issues](https://github.com/buzzqw/gextto/issues).
 
 ## 29 October 2026
+- **Peers on the local network run at full speed.** With gx-torrent the speed limits also slowed down transfers to the computers at home or in the office, which do not go through the Internet line. Now, as in qBittorrent, peers on the local network are outside them: the limit applies to the Internet only. To limit them too, turn on **Apply the limits to peers on the local network too** (Configuration → Speed and network → Speed limits in Gextto, *Bandwidth* on the gx-torrent page); from the gx-torrent page the choice applies at once to the peers already connected. qBittorrent-compatible interfaces read and change it as «Apply rate limit to peers on LAN».
+
 - **gx-torrent asks peers for data with far fewer packets.** Block requests to a peer went out one by one, each with its own socket write and its own network packet: 250 requests were 250 packets. Requests and the other short queued messages now leave together in one write, and the system calls for the same number of requests drop about fiftyfold. Less CPU and fewer packets on the network while downloading, especially with many fast peers; sending data to others is unchanged. Nothing to configure.
 
 - **gx-torrent uses less CPU on large torrents.** When a peer disconnects, the engine no longer walks every piece of the torrent, only the ones that peer had: on a 27,000-piece torrent the cost drops about fourfold, which matters in swarms where peers come and go all the time. In sequential download (streaming) the choice of the next piece no longer starts from the beginning of the file, so near the end of a large download it costs nothing. Nothing to configure.

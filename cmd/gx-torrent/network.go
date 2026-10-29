@@ -59,6 +59,10 @@ type NetworkOptions struct {
 	// private/LAN addresses (off by default, against SSRF from untrusted
 	// torrents and feeds).
 	WebSourcesAllowPrivate bool
+	// LimitLANPeers applies the speed limits to peers on the local network
+	// too; off (the default) they transfer at full speed. The settings key
+	// limitLANPeersKey changes it at runtime.
+	LimitLANPeers bool
 	// MaxRequestsOut/DefaultRequestsOut size the adaptive per-peer request
 	// queue (pipelining): the depth starts at DefaultRequestsOut and grows by
 	// one per delivered block up to MaxRequestsOut (or the peer's reqq). Zero
@@ -210,6 +214,7 @@ func (d *Daemon) applyNetwork(cfg *torrent.Config) {
 	}
 	cfg.BlocklistEnabledForTrackers = n.IPFilterTrackers
 	cfg.WebSourcesAllowPrivate = n.WebSourcesAllowPrivate
+	cfg.LimitLocalPeers = d.limitLANPeers()
 	cfg.BlocklistEnabledForIncomingConnections = true
 	cfg.BlocklistEnabledForOutgoingConnections = true
 }
@@ -318,4 +323,14 @@ func (d *Daemon) fetchIPFilterURL(rawURL string) (string, error) {
 		return "", err
 	}
 	return path, nil
+}
+
+// limitLANPeersKey is the settings.json key of "apply the speed limits to
+// peers on the local network" (qBittorrent's limit_lan_peers).
+const limitLANPeersKey = "limit-lan-peers"
+
+// limitLANPeers reports whether the speed limits apply to LAN peers: the
+// saved setting, or the start-up flag when nothing is saved.
+func (d *Daemon) limitLANPeers() bool {
+	return d.settingBool(limitLANPeersKey, d.opts.Network.LimitLANPeers)
 }

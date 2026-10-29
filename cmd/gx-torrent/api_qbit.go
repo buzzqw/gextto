@@ -1183,6 +1183,7 @@ func (d *Daemon) handleQbitPreferences(w http.ResponseWriter, _ *http.Request) {
 		"alt_dl_limit":                      altDL,
 		"alt_up_limit":                      altUL,
 		"use_alt_speed_limits":              altManual,
+		"limit_lan_peers":                   d.limitLANPeers(),
 		"max_connec":                        cfg.MaxPeerDial + cfg.MaxPeerAccept,
 		"max_connec_per_torrent":            qbitPrefLimitOut(int64(cfg.MaxConnectionsPerTorrent)),
 		"max_uploads":                       0,
@@ -1484,11 +1485,16 @@ func (d *Daemon) handleQbitSetPreferences(w http.ResponseWriter, r *http.Request
 			d.opts.Settings.Set(m.key, strconv.FormatInt(kib, 10))
 			changed = true
 		}
-		if v, ok := prefs["use_alt_speed_limits"]; ok {
-			var on bool
-			if json.Unmarshal(v, &on) == nil {
-				d.opts.Settings.Set(altSpeedEnabledKey, strconv.FormatBool(on))
-				changed = true
+		for _, b := range []struct{ pref, key string }{
+			{"use_alt_speed_limits", altSpeedEnabledKey},
+			{"limit_lan_peers", limitLANPeersKey},
+		} {
+			if v, ok := prefs[b.pref]; ok {
+				var on bool
+				if json.Unmarshal(v, &on) == nil {
+					d.opts.Settings.Set(b.key, strconv.FormatBool(on))
+					changed = true
+				}
 			}
 		}
 		// scan_dirs (qBittorrent): folder -> 0 (the folder itself), 1 (default

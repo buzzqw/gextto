@@ -121,6 +121,7 @@ var uiSettingDefaults = map[string]string{
 	"torrent_port_max":                    "6891",
 	"torrent_dl_limit":                    "0",
 	"torrent_ul_limit":                    "0",
+	"torrent_limit_lan_peers":             "false",
 	"torrent_speed_auto":                  "false",
 	"torrent_speed_mode":                  "fixed",
 	"torrent_auto_latency_guard":          "true",

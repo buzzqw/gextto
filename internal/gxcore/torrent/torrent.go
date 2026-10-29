@@ -321,6 +321,11 @@ type torrent struct {
 	// land; peers hold these, so changes apply without reconnecting.
 	bucketDownload *bandwidth.Limiter
 	bucketUpload   *bandwidth.Limiter
+	// bucketLocalDownload/bucketLocalUpload are held by the peers on the local
+	// network: unlimited, or forwarding to the torrent limiters when the
+	// session applies the limits to LAN peers (applyLocalPeerLimits).
+	bucketLocalDownload *bandwidth.Limiter
+	bucketLocalUpload   *bandwidth.Limiter
 	// downloadLimitKib/uploadLimitKib are explicit KiB/s caps (-1 inherits).
 	downloadLimitKib int64
 	uploadLimitKib   int64
@@ -452,6 +457,9 @@ func (t *torrent) finishConstruction(s *Session, cfg Config, info *metainfo.Info
 	t.bucketDownload.SetParent(s.bucketDownload)
 	t.bucketUpload = bandwidth.New(0)
 	t.bucketUpload.SetParent(s.bucketUpload)
+	t.bucketLocalDownload = bandwidth.New(0)
+	t.bucketLocalUpload = bandwidth.New(0)
+	t.applyLocalPeerLimits(s.limitLocalPeers.Load())
 	t.downloadLimitKib = -1
 	t.uploadLimitKib = -1
 	if len(t.webseedSources) > s.config.WebseedMaxSources {

@@ -213,6 +213,7 @@ func (d *Daemon) handleUISettings(w http.ResponseWriter, r *http.Request) {
 	if r.Form.Has("alt-speed-limits-on") {
 		store.Set(altSpeedEnabledKey, strconv.FormatBool(formBool(r, "alt-speed-limits-on")))
 	}
+	store.Set(limitLANPeersKey, strconv.FormatBool(formBool(r, limitLANPeersKey)))
 
 	// Folders, network, protocols, language and notifications (settings.json,
 	// read at the next start).
@@ -493,6 +494,7 @@ func (d *Daemon) renderSettings(w http.ResponseWriter, r *http.Request, errKey s
 	repl("{{ALT_SPEED_DL}}", strconv.FormatInt(altDL, 10))
 	repl("{{ALT_SPEED_UL}}", strconv.FormatInt(altUL, 10))
 	repl("{{ALT_SPEED_ON}}", checkedIf(altManual))
+	repl("{{LIMIT_LAN_PEERS}}", checkedIf(d.limitLANPeers()))
 	repl("{{SCHED_ENABLED}}", checkedIf(boolSetting(scheduleEnabledKey)))
 	week, ok := d.scheduleWeek()
 	if !ok {

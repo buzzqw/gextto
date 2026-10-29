@@ -412,7 +412,7 @@ gx-torrent [-listen 0.0.0.0:8890] [-data ~/.local/share/gx-torrent]
            [-outgoing-interface wg0] [-proxy socks5://host:port]
            [-encryption 0|1|2] [-no-dht] [-no-pex] [-no-utp] [-no-holepunch]
            [-no-lsd] [-no-upnp] [-no-natpmp] [-dht-bootstrap host:port,...]
-           [-dht-read-only] [-web-sources-allow-private]
+           [-dht-read-only] [-web-sources-allow-private] [-limit-lan-peers]
            [-ipfilter FILE] [-ipfilter-trackers] [-lang it]
            [-mode managed|standalone] [-notify-url URL] [-mmap]
            [-log-file FILE] [-insecure] [-debug] [-version]
@@ -674,7 +674,8 @@ queue; `torrents/pieceStates` and `torrents/pieceHashes` expose the
 piece diagnostics; `torrents/webseeds` lists the HTTP sources;
 `torrents/downloadLimit`/`uploadLimit` read the per-torrent limits;
 `transfer/speedLimitsMode` reports whether the alternative limits are active
-(the scheduled window or the manual toggle) and `transfer/toggleSpeedLimitsMode`
+(the scheduled window or the manual toggle), `app/preferences` and
+`app/setPreferences` carry `limit_lan_peers` (speed limits for LAN peers) and `transfer/toggleSpeedLimitsMode`
 flips the manual mode (the qBittorrent speed-limit button); `app/networkInterfaceList`/`networkInterfaceAddressList` list the
 interfaces; `log/main` and `log/peers` read the daemon log. `sync/maindata`
 answers **incrementally**: when the client echoes the last `rid` it receives
@@ -2064,6 +2065,19 @@ It is set with `POST /api/v1/torrents/{hash}/seed-limits` (fields
 `download_limit`, `upload_limit`) or from the daemon page; Gextto does it from the
 **Limits** tab of the torrent detail. Gextto keeps the values between one restart
 and the next and the daemon reapplies them to the reloaded session.
+
+**Peers on the local network** are outside the speed limits by default, as in
+libtorrent and qBittorrent: a peer whose address is loopback, link-local or
+private (RFC 1918, IPv6 ULA `fc00::/7`), over TCP or uTP, transfers at full
+speed, because the limits are meant for the Internet line. *Apply the limits
+to peers on the local network* (daemon page, *Bandwidth*; settings key
+`limit-lan-peers`; flag `-limit-lan-peers`, `GX_TORRENT_LIMIT_LAN_PEERS=1`;
+qBittorrent preference `limit_lan_peers`) puts them under the global and
+per-torrent limits too. Those peers hold a limiter of their own that forwards
+to the torrent limiter only when the option is on, so switching it applies at
+once to the peers already connected. Gextto passes the flag to the managed
+daemon from *Apply the limits to peers on the local network too*. Web seeds
+keep the torrent limits whatever their address.
 
 Every torrent also has its own **connection limit** and **upload
 slots** (`POST /api/v1/torrents/{hash}/conn-limits`, fields `max_connections` and
