@@ -1,8 +1,6 @@
 package piecewriter
 
 import (
-	"crypto/sha1"
-
 	"github.com/buzzqw/gextto/internal/gxcore/internal/bufferpool"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/piece"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/semaphore"
@@ -34,10 +32,7 @@ func New(p *piece.Piece, source any, buf bufferpool.Buffer) *PieceWriter {
 // writes it to storage under the write-slot semaphore. Meters and result
 // delivery mirror the surrounding pipeline's accounting.
 func (w *PieceWriter) Run(resultC chan *PieceWriter, closeC chan struct{}, writesPerSecond, writeBytesPerSecond metrics.Meter, sem *semaphore.Semaphore) {
-	w.HashOK = w.Piece.VerifyHash(w.Buffer.Data, sha1.New())
-	if w.Piece.V2 {
-		w.HashOK = w.Piece.VerifyV2(w.Buffer.Data)
-	}
+	w.HashOK = w.Piece.Verify(w.Buffer.Data)
 	if w.HashOK {
 		writesPerSecond.Mark(1)
 		writeBytesPerSecond.Mark(int64(len(w.Buffer.Data)))

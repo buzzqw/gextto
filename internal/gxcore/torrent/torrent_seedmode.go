@@ -1,7 +1,6 @@
 package torrent
 
 import (
-	"crypto/sha1" // nolint: gosec
 	"errors"
 
 	"github.com/buzzqw/gextto/internal/gxcore/internal/allocator"
@@ -162,10 +161,7 @@ func hashStoredPiece(pi *piece.Piece) (bool, error) {
 	if _, err := pi.Data.ReadAt(buf, 0); err != nil {
 		return false, err
 	}
-	ok := pi.VerifyHash(buf, sha1.New()) // nolint: gosec
-	if pi.V2 {
-		ok = pi.VerifyV2(buf)
-	}
+	ok := pi.Verify(buf)
 	return ok, nil
 }
 

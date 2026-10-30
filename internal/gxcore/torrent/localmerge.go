@@ -2,7 +2,6 @@ package torrent
 
 import (
 	"bytes"
-	"crypto/sha1"
 	"sync/atomic"
 
 	"github.com/buzzqw/gextto/internal/gxcore/internal/metainfo"
@@ -816,8 +815,5 @@ func storePartialBlocks(dst *piece.Piece, buf []byte, spans []span) []uint32 {
 // verifyPieceBytes checks a piece's bytes against its hash: the SHA-1 of the
 // piece for v1, the merkle node for v2.
 func verifyPieceBytes(p *piece.Piece, buf []byte) bool {
-	if p.V2 {
-		return p.VerifyV2(buf)
-	}
-	return p.VerifyHash(buf, sha1.New())
+	return p.Verify(buf)
 }

@@ -2,6 +2,7 @@ package piece
 
 import (
 	"bytes"
+	"crypto/sha1"
 	"hash"
 
 	"github.com/buzzqw/gextto/internal/gxcore/internal/allocator"
@@ -169,6 +170,16 @@ func (p *Piece) calculateBlocks(blockSize uint32) []Block {
 	}
 	flushBlock()
 	return blocks
+}
+
+// Verify checks buf against the piece's hash: the SHA-1 piece hash for v1,
+// the merkle node for v2 (BEP 52). It is the entry point for "is this piece
+// good?", so a v2 piece never pays for a digest its layout does not use.
+func (p *Piece) Verify(buf []byte) bool {
+	if p.V2 {
+		return p.VerifyV2(buf)
+	}
+	return p.VerifyHash(buf, sha1.New()) // nolint: gosec
 }
 
 // VerifyHash checks buf against the v1 SHA-1 piece hash. Length mismatch

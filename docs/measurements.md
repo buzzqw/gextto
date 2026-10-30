@@ -123,6 +123,7 @@ when a change is meant to be an optimisation. A single pass is noise.
 | `BenchmarkTransferLoopback` after the single RTO timer (2026-10-28) | **151–159 MB/s, 4.0 KB, 75 allocs** against 130–161 MB/s, 5.5 KB and 99 allocs of the previous commit, measured alternately on the same host (`-count=3` each) | one `time.AfterFunc` per packet replaced by one timer per connection armed on the oldest outstanding packet; the first version scanned every unacknowledged packet per write and lost 30 % throughput, the front-only read restored it |
 | `BenchmarkUTPConnRemoteAddr` | 113 ns/op, 40 B, 3 allocs | addresses converted once at wrap |
 | `BenchmarkStorageWrite` / `StorageWriteMmap` | ~5.8 / ~7.4 GB/s | the disk is far above any network speed: `O_DIRECT` and io_uring are not justified |
+| `BenchmarkPieceWriterRunV2` (4 MiB piece) | **1.93–1.95 ms, 2151–2177 MB/s, 32,832 B, 12 allocs** (3.47–3.55 ms, 1181–1207 MB/s, 14 allocs before) | one hash per piece: verification dispatches on the layout (`Piece.Verify`) instead of running SHA-1 and then the v2 merkle tree; v1 unchanged; measured 2026-10-30 on the N97 (`go test -run XXX -bench BenchmarkPieceWriterRun -benchmem -count=3 ./internal/gxcore/internal/piecewriter/`) |
 | `BenchmarkArchiveSaveBatch` (1,000 releases, ~400 B magnets) | 45.2–46.1 ms, 3.09 MB, 50,536 allocs (44.0–44.4 ms before the guid identity); with the magnet ahead of the guid 43.9–45.0 ms against 44.8–46.1 ms, interleaved runs on a busy host | prepared statements per chunk; measured 2026-10-21 on the N97 |
 | `BenchmarkFeedArchiveSearch` (100,000 releases) | 7.4 ms | compact index on bbolt |
 | `BenchmarkMetricsScrape` (one torrent) | ~0.24 ms, 121 KB, 813 allocs | computed only when scraped |
@@ -269,6 +270,28 @@ skips reads and hashes the whole torrent before the first byte is served.
 
 Reproduce with
 `go test -run '^$' -bench BenchmarkSeedModeLazyHash -benchmem -count=3 ./internal/gxcore/torrent/`
+
+### Verification: one hash per write (2026-10-30, N97)
+
+Every piece write verified the buffer with SHA-1 and, when the piece was BitTorrent
+v2, hashed it a second time as a BEP 52 merkle tree, throwing the first result away.
+The full check and seed mode's lazy check did the same. `Piece.Verify` now dispatches
+on the layout, so a piece pays for one digest only. `BenchmarkPieceWriterRunV1`/`V2`
+hash and write one 4 MiB piece (the write goes to a discarding file, so the figures
+are the CPU of the check plus the pipeline), three runs each:
+
+| Benchmark | Before | After |
+|---|---|---|
+| `BenchmarkPieceWriterRunV2` | 3.47–3.55 ms, 1181–1207 MB/s, 32,968 B, 14 allocs | **1.93–1.95 ms, 2151–2177 MB/s, 32,832 B, 12 allocs** |
+| `BenchmarkPieceWriterRunV1` | 1.55–1.65 ms, 2545–2703 MB/s, 232 B, 3 allocs | 1.54–1.56 ms, 2693–2720 MB/s, 232 B, 3 allocs (unchanged, inside the noise) |
+
+The saving is 1.55 ms per 4 MiB piece: at 100 MB/s of a v2 download (24 pieces per
+second) about 3.9 % of a core, at 1 Gbit/s about 4.9 %. The full check and seed mode
+cost the same per piece, so they save the same share; `BenchmarkSeedModeLazyHash` above
+measures v1 pieces and stays as it is. v1 torrents are untouched.
+
+Reproduce with
+`CGO_ENABLED=0 go test -run XXX -bench 'BenchmarkPieceWriterRun' -benchmem -count=3 ./internal/gxcore/internal/piecewriter/`
 
 ## 4. Investigations and decisions
 

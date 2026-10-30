@@ -113,13 +113,14 @@ func widestPiece(pieces []piece.Piece) int {
 	return maxLen
 }
 
-// checkPiece hashes buf: SHA-1 for v1, Merkle verification for v2 pieces.
+// checkPiece hashes buf: SHA-1 for v1, Merkle verification for v2 pieces. The
+// v1 hasher is reused across pieces, so the branch keeps that allocation out
+// of the loop instead of calling Piece.Verify.
 func (v *Verifier) checkPiece(p *piece.Piece, buf []byte, hash hash.Hash) bool {
-	ok := p.VerifyHash(buf, hash)
 	if p.V2 {
-		ok = p.VerifyV2(buf)
+		return p.VerifyV2(buf)
 	}
-	return ok
+	return p.VerifyHash(buf, hash)
 }
 
 // report publishes one progress step; false means closed meanwhile.
