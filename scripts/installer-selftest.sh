@@ -90,6 +90,27 @@ check_install() {
   capture bash "$INSTALL" --help
   if contains "--media-group"; then pass "$label: --help documents --media-group"; else fail "$label: --help documents --media-group"; fi
   if contains "--listen"; then pass "$label: --help documents --listen"; else fail "$label: --help documents --listen"; fi
+  if contains "--no-media-tools"; then pass "$label: --help documents --no-media-tools"; else fail "$label: --help documents --no-media-tools"; fi
+
+  capture bash "$INSTALL" --dry-run --data-dir "$TMP/data" --install-dir "$TMP/opt"
+  if contains "distribution:" && contains "install system packages:"; then
+    pass "$label: detects the distribution and plans its packages"
+  else
+    fail "$label: detects the distribution and plans its packages"
+  fi
+  if contains "install media tools:"; then
+    pass "$label: plans the media tools"
+  else
+    fail "$label: plans the media tools"
+  fi
+
+  capture bash "$INSTALL" --dry-run --no-media-tools --data-dir "$TMP/data" --install-dir "$TMP/opt"
+  expect "$label: --no-media-tools is honoured" 0
+  if contains "install media tools:"; then
+    fail "$label: --no-media-tools skips the media tools"
+  else
+    pass "$label: --no-media-tools skips the media tools"
+  fi
 
   capture bash "$INSTALL" --dry-run --media-group gextto-selftest-missing-group --data-dir "$TMP/data" --install-dir "$TMP/opt"
   expect "$label: a missing media group is skipped" 0 "does not exist; skipped"

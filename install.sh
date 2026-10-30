@@ -17,8 +17,9 @@
 # Environment overrides (kept for backward compatibility): GEXTTO_DATA_DIR,
 # GEXTTO_PORT, GEXTTO_ENGINE_PORT, GEXTTO_LISTEN, GEXTTO_USER, GEXTTO_GROUP,
 # GEXTTO_INSTALL_DIR, GEXTTO_REPO, GEXTTO_RELEASE, GEXTTO_ARCH,
-# GEXTTO_SKIP_PACKAGES, GEXTTO_LOCAL_ARCHIVE, GEXTTO_NO_START,
-# GEXTTO_HEALTH_TIMEOUT, GEXTTO_HTTP_TIMEOUT, GEXTTO_MEDIA_GROUPS.
+# GEXTTO_SKIP_PACKAGES, GEXTTO_SKIP_MEDIA_TOOLS, GEXTTO_LOCAL_ARCHIVE,
+# GEXTTO_NO_START, GEXTTO_HEALTH_TIMEOUT, GEXTTO_HTTP_TIMEOUT,
+# GEXTTO_MEDIA_GROUPS.
 set -euo pipefail
 
 INSTALL_DIR="${GEXTTO_INSTALL_DIR:-/opt/gextto}"
@@ -42,6 +43,10 @@ NO_START="${GEXTTO_NO_START:-0}"
 # name of the same limit.
 HTTP_TIMEOUT="${GEXTTO_HTTP_TIMEOUT:-${GEXTTO_HEALTH_TIMEOUT:-180}}"
 MEDIA_GROUPS="${GEXTTO_MEDIA_GROUPS:-}"
+# Media tools (ffprobe, MediaInfo, mkvmerge) unlock the quality checks and the
+# audio-track cleanup. They are installed when the distribution ships them;
+# this switch keeps minimal servers free of the extra packages.
+SKIP_MEDIA_TOOLS="${GEXTTO_SKIP_MEDIA_TOOLS:-0}"
 
 # Download hardening: HTTPS only (redirects included), a real TLS floor and
 # timeouts, so a hung or downgrading mirror cannot block or weaken the install.
@@ -121,12 +126,13 @@ Options:
                           comma-separated), e.g. the group that owns the NAS
                           media folders
       --local-archive F   install from a local .tar.gz instead of downloading us
+      --no-media-tools    do not install ffmpeg, mediainfo and mkvtoolnix
 
 Environment overrides: GEXTTO_DATA_DIR, GEXTTO_PORT, GEXTTO_ENGINE_PORT,
 GEXTTO_LISTEN, GEXTTO_USER, GEXTTO_GROUP, GEXTTO_INSTALL_DIR, GEXTTO_REPO,
-GEXTTO_RELEASE, GEXTTO_ARCH, GEXTTO_SKIP_PACKAGES, GEXTTO_LOCAL_ARCHIVE,
-GEXTTO_NO_START, GEXTTO_HEALTH_TIMEOUT, GEXTTO_HTTP_TIMEOUT,
-GEXTTO_MEDIA_GROUPS.
+GEXTTO_RELEASE, GEXTTO_ARCH, GEXTTO_SKIP_PACKAGES, GEXTTO_SKIP_MEDIA_TOOLS,
+GEXTTO_LOCAL_ARCHIVE, GEXTTO_NO_START, GEXTTO_HEALTH_TIMEOUT,
+GEXTTO_HTTP_TIMEOUT, GEXTTO_MEDIA_GROUPS.
 EOF
 }
 
@@ -147,6 +153,7 @@ parse_args() {
       --user) SERVICE_USER="${2:-}"; [[ -n "$SERVICE_USER" ]] || die "--user requires a value"; shift 2 ;;
       --media-group) [[ -n "${2:-}" ]] || die "--media-group requires a value"; MEDIA_GROUPS="${MEDIA_GROUPS:+$MEDIA_GROUPS,}$2"; shift 2 ;;
       --gx-torrent) shift ;;
+      --no-media-tools) SKIP_MEDIA_TOOLS=1; shift ;;
       --local-archive) LOCAL_ARCHIVE="${2:-}"; [[ -n "$LOCAL_ARCHIVE" ]] || die "--local-archive requires a value"; shift 2 ;;
       *) die "unknown option: $1 (use --help)" ;;
     esac
@@ -157,59 +164,164 @@ require_root() {
   [[ "$(id -u)" == "0" ]] || die "run as root (or with sudo)"
 }
 
+# detect_distro reads /etc/os-release and maps the distribution to the package
+# family whose package names we know. The package manager is the fallback for
+# derivatives that do not carry an ID_LIKE we recognise.
+DISTRO_NAME=""
+DISTRO_ID=""
+DISTRO_FAMILY=""
+BASE_PACKAGES=()
+MEDIA_PACKAGES=()
+detect_distro() {
+  local id="" like="" name=""
+  if [[ -r /etc/os-release ]]; then
+    # shellcheck disable=SC1091
+    . /etc/os-release
+    id="${ID:-}"
+    like="${ID_LIKE:-}"
+    name="${PRETTY_NAME:-${NAME:-}}"
+  fi
+  DISTRO_NAME="${name:-unknown distribution}"
+  DISTRO_ID="${id:-unknown}"
+  local key
+  key=" ${id,,} ${like,,} "
+  case "$key" in
+    *" debian "*|*" ubuntu "*|*" linuxmint "*|*" pop "*|*" raspbian "*) DISTRO_FAMILY="debian" ;;
+    *" fedora "*|*" rhel "*|*" centos "*|*" rocky "*|*" alma "*|*" amazon "*) DISTRO_FAMILY="fedora" ;;
+    *" opensuse "*|*" suse "*|*" sles "*) DISTRO_FAMILY="suse" ;;
+    *" arch "*|*" manjaro "*|*" endeavouros "*) DISTRO_FAMILY="arch" ;;
+  esac
+  if [[ -z "$DISTRO_FAMILY" ]]; then
+    if command -v apt-get >/dev/null 2>&1; then
+      DISTRO_FAMILY="debian"
+    elif command -v dnf >/dev/null 2>&1; then
+      DISTRO_FAMILY="fedora"
+    elif command -v zypper >/dev/null 2>&1; then
+      DISTRO_FAMILY="suse"
+    elif command -v pacman >/dev/null 2>&1; then
+      DISTRO_FAMILY="arch"
+    fi
+  fi
+  log "distribution: $DISTRO_NAME ($DISTRO_ID, packages: ${DISTRO_FAMILY:-unknown})"
+}
+
+# base_packages holds what the installer itself needs. Names differ per family
+# for useradd: Debian calls the package passwd, openSUSE and Arch call it shadow,
+# Fedora and its derivatives call it shadow-utils.
+base_packages() {
+  case "$DISTRO_FAMILY" in
+    debian) BASE_PACKAGES=(ca-certificates curl tar gzip coreutils passwd) ;;
+    fedora) BASE_PACKAGES=(ca-certificates curl tar gzip coreutils shadow-utils) ;;
+    suse) BASE_PACKAGES=(ca-certificates curl tar gzip coreutils shadow) ;;
+    arch) BASE_PACKAGES=(ca-certificates curl tar gzip coreutils shadow) ;;
+    *) BASE_PACKAGES=() ;;
+  esac
+}
+
+# media_packages are the optional tools Gextto uses to read the real quality of
+# a file (ffprobe, MediaInfo) and to clean audio tracks (mkvmerge). They are
+# best-effort: their absence only disables those features.
+media_packages() {
+  if [[ "$SKIP_MEDIA_TOOLS" == "1" ]]; then
+    MEDIA_PACKAGES=()
+    return
+  fi
+  case "$DISTRO_FAMILY" in
+    debian|fedora|suse) MEDIA_PACKAGES=(ffmpeg mediainfo mkvtoolnix) ;;
+    arch) MEDIA_PACKAGES=(ffmpeg mediainfo mkvtoolnix-cli) ;;
+    *) MEDIA_PACKAGES=() ;;
+  esac
+}
+
+install_package_list() {
+  case "$DISTRO_FAMILY" in
+    debian) apt-get install -y --no-install-recommends "$@" ;;
+    fedora) dnf install -y "$@" ;;
+    suse) zypper --non-interactive install "$@" ;;
+    arch) pacman -S --needed --noconfirm "$@" ;;
+    *) return 1 ;;
+  esac
+}
+
 preflight() {
   # In --dry-run nothing is executed, so missing tools are a warning, not an
   # error: the plan can be reviewed anywhere.
   local fatal=1
   [[ "$DRY_RUN" == "1" ]] && fatal=0
-  fail_or_warn() {
-    if [[ "$fatal" == "1" ]]; then die "$1"; else warn "$1"; fi
-  }
-
   if ! command -v systemctl >/dev/null 2>&1 || [[ ! -d /run/systemd/system ]]; then
-    fail_or_warn "systemd is required (no running systemd detected)"
+    if [[ "$fatal" == "1" ]]; then
+      die "systemd is required (no running systemd detected)"
+    else
+      warn "systemd is required (no running systemd detected)"
+    fi
   fi
-  # curl, tar and gzip are checked after install_packages, which installs
-  # them: minimal systems (containers, netinstall) often lack them.
-  local cmd
-  for cmd in sha256sum install id useradd realpath; do
-    command -v "$cmd" >/dev/null 2>&1 || fail_or_warn "missing required command: $cmd"
-  done
 }
 
-require_download_tools() {
-  [[ "$DRY_RUN" == "1" ]] && return 0
+# has_command finds tools that live in /usr/sbin or /sbin even when the caller's
+# PATH does not include those directories (a non-root dry-run, for example).
+has_command() {
+  command -v "$1" >/dev/null 2>&1 && return 0
+  local dir
+  for dir in /usr/sbin /sbin /usr/bin /bin; do
+    [[ -x "$dir/$1" ]] && return 0
+  done
+  return 1
+}
+
+# require_commands runs after install_packages: a minimal system may start
+# without curl, tar or useradd, which the distribution packages provide.
+require_commands() {
+  local fatal=1
+  [[ "$DRY_RUN" == "1" ]] && fatal=0
   local cmd
-  for cmd in curl tar gzip; do
-    command -v "$cmd" >/dev/null 2>&1 || die "missing required command: $cmd (install it and run the installer again)"
+  for cmd in sha256sum install id useradd realpath curl tar gzip; do
+    if ! has_command "$cmd"; then
+      if [[ "$fatal" == "1" ]]; then
+        die "missing required command: $cmd (install it and run the installer again)"
+      else
+        warn "missing required command: $cmd"
+      fi
+    fi
   done
 }
 
 # install_packages is best-effort: a single missing optional package must never
-# abort the installation (for example libssl3 does not exist on Debian 11).
+# abort the installation (for example a media tool absent from the configured
+# repositories). The base list and the media list are separate so a missing
+# optional package cannot keep curl or tar from being installed.
 install_packages() {
-  [[ "${GEXTTO_SKIP_PACKAGES:-0}" == "1" ]] && { log "skipping system packages"; return; }
-  if [[ "$DRY_RUN" == "1" ]]; then
-    log "[dry-run] install system packages"
+  detect_distro
+  if [[ "${GEXTTO_SKIP_PACKAGES:-0}" == "1" ]]; then
+    log "skipping system packages"
     return
   fi
-  if command -v apt-get >/dev/null; then
+  base_packages
+  media_packages
+  if [[ -z "$DISTRO_FAMILY" ]]; then
+    warn "unknown distribution: install curl, tar, sha256sum, useradd and a media prober manually"
+    return
+  fi
+  if [[ "$DRY_RUN" == "1" ]]; then
+    log "[dry-run] install system packages: ${BASE_PACKAGES[*]}"
+    if [[ ${#MEDIA_PACKAGES[@]} -gt 0 ]]; then
+      log "[dry-run] install media tools: ${MEDIA_PACKAGES[*]}"
+    fi
+    return
+  fi
+  if [[ "$DISTRO_FAMILY" == "debian" ]]; then
     apt-get update || warn "apt-get update failed; continuing"
-    apt-get install -y ca-certificates curl tar coreutils zlib1g zstd \
-      || warn "some optional packages could not be installed; continuing"
-  elif command -v dnf >/dev/null; then
-    dnf install -y ca-certificates curl tar gzip coreutils zlib zstd \
-      || warn "some optional packages could not be installed; continuing"
-  elif command -v zypper >/dev/null; then
-    zypper --non-interactive install ca-certificates curl tar gzip coreutils zlib zstd \
-      || warn "some optional packages could not be installed; continuing"
-  elif command -v pacman >/dev/null; then
-    # No -y: refreshing the databases without a full upgrade (-Syu) is a
-    # partial upgrade, which Arch does not support.
-    pacman -S --needed --noconfirm ca-certificates curl tar gzip coreutils zlib zstd \
-      || warn "some optional packages could not be installed (run pacman -Syu first?); continuing"
-  else
-    warn "unknown distribution: install curl, tar, sha256sum, OpenSSL and zstd manually"
+  fi
+  log "installing system packages: ${BASE_PACKAGES[*]}"
+  install_package_list "${BASE_PACKAGES[@]}" \
+    || warn "some system packages could not be installed; continuing"
+  if [[ ${#MEDIA_PACKAGES[@]} -gt 0 ]]; then
+    log "installing media tools: ${MEDIA_PACKAGES[*]}"
+    local media_failed=0 pkg
+    for pkg in "${MEDIA_PACKAGES[@]}"; do
+      install_package_list "$pkg" || media_failed=1
+    done
+    [[ "$media_failed" == "0" ]] \
+      || warn "some media tools could not be installed; quality checks and audio cleanup stay limited"
   fi
 }
 
@@ -646,7 +758,7 @@ main() {
   log "service user: $SERVICE_USER (group $SERVICE_GROUP)"
   preflight
   install_packages
-  require_download_tools
+  require_commands
   log "build: gx-torrent (pure Go)"
 
   WORK_DIR="$(mktemp -d)"

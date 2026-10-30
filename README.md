@@ -105,9 +105,14 @@ Prefer Docker? The [full stack](docs/DOCKER.en.md) starts Gextto, `gx-torrent`, 
 
 It installs to `/opt/gextto`, keeps data in `/var/lib/gextto` and serves the UI
 on port 5000, with `gx-torrent` alongside `gexttod` — pure Go, nothing else to
-install for torrents. eD2k and Kad are optional and need an `amuled` you run
-yourself ([aMule integration](docs/amule.md)). The installer runs the program
-once first, so a missing library or an old glibc is reported at once. The
+install for torrents. The installer reads `/etc/os-release` and installs the
+base packages with the right names for Debian, Ubuntu, Fedora, openSUSE and
+Arch; when the repositories provide them it also installs `ffmpeg`,
+`mediainfo` and `mkvtoolnix`, used for the real file quality and audio-track
+cleanup. `--no-media-tools` (or `GEXTTO_SKIP_MEDIA_TOOLS=1`) skips them. eD2k
+and Kad are optional and need an `amuled` you run yourself
+([aMule integration](docs/amule.md)). The installer runs the program once
+first, so a missing library or an old glibc is reported at once. The
 service runs as **the user invoking the installer** by default; `--user gextto`
 uses an isolated system account and `--media-group <group>` grants access to
 someone else's NAS library.

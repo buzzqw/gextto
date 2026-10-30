@@ -107,10 +107,15 @@ Preferisci Docker? Lo [stack completo](docs/DOCKER.it.md) avvia insieme Gextto, 
 
 Installa in `/opt/gextto`, tiene i dati in `/var/lib/gextto` e serve la UI
 sulla porta 5000, con `gx-torrent` accanto a `gexttod` — Go puro, nient'altro da
-installare per i torrent. eD2k e Kad sono facoltativi e richiedono un `amuled`
-che fai girare tu ([integrazione con aMule](docs/amule.it.md)). L'installer esegue
-prima il programma una volta, così una libreria mancante o una glibc vecchia
-vengono segnalate subito. Per default il servizio gira come **l'utente che
+installare per i torrent. L'installer riconosce la distribuzione da
+`/etc/os-release` e installa i pacchetti di base con i nomi giusti per Debian,
+Ubuntu, Fedora, openSUSE e Arch; se i repository li forniscono installa anche
+`ffmpeg`, `mediainfo` e `mkvtoolnix`, che servono per la qualità reale dei file
+e la pulizia delle tracce audio. `--no-media-tools` (o
+`GEXTTO_SKIP_MEDIA_TOOLS=1`) li salta. eD2k e Kad sono facoltativi e richiedono
+un `amuled` che fai girare tu ([integrazione con aMule](docs/amule.it.md)).
+L'installer esegue prima il programma una volta, così una libreria mancante o
+una glibc vecchia vengono segnalate subito. Per default il servizio gira come **l'utente che
 lancia l'installer**; `--user gextto` usa un account di sistema isolato e
 `--media-group <gruppo>` dà accesso alla libreria su un NAS altrui.
 

@@ -229,8 +229,14 @@ checksum SHA-256 e lo installa senza compilare nulla sul server:
 curl -fsSL https://raw.githubusercontent.com/buzzqw/gextto/main/install.sh | sudo bash
 ```
 
-L'installer deve essere eseguito come root e richiede systemd. Usa `GEXTTO_REPO`
-e `GEXTTO_RELEASE` per scegliere un repository o una release diversi. Salva i
+L'installer deve essere eseguito come root e richiede systemd. Riconosce la
+distribuzione da `/etc/os-release` e installa i pacchetti di base con i nomi
+giusti per Debian, Ubuntu, Fedora, openSUSE e Arch; se i repository li
+forniscono installa anche `ffmpeg`, `mediainfo` e `mkvtoolnix`, usati per la
+qualità reale dei file e la pulizia delle tracce audio. `--no-media-tools` (o
+`GEXTTO_SKIP_MEDIA_TOOLS=1`) salta i tre strumenti multimediali. Usa
+`GEXTTO_REPO` e `GEXTTO_RELEASE` per scegliere un repository o una release
+diversi. Salva i
 dati del servizio in `/var/lib/gextto` e il programma in `/opt/gextto`; un file
 opzionale `/etc/gextto/gextto.env`, se presente, viene caricato come variabili
 d'ambiente (il token API non è lì: si imposta in *Configurazione → Accesso e

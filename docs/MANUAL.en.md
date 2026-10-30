@@ -228,8 +228,13 @@ target server:
 curl -fsSL https://raw.githubusercontent.com/buzzqw/gextto/main/install.sh | sudo bash
 ```
 
-The installer must run as root and requires systemd. Use `GEXTTO_REPO` and
-`GEXTTO_RELEASE` to select another repository or release. It stores the service
+The installer must run as root and requires systemd. It reads `/etc/os-release`
+and installs the base packages with the right names for Debian, Ubuntu, Fedora,
+openSUSE and Arch; when the repositories provide them it also installs
+`ffmpeg`, `mediainfo` and `mkvtoolnix`, used for the real file quality and
+audio-track cleanup. `--no-media-tools` (or `GEXTTO_SKIP_MEDIA_TOOLS=1`) skips
+the three media tools. Use `GEXTTO_REPO` and `GEXTTO_RELEASE` to select another
+repository or release. It stores the service
 data in `/var/lib/gextto` and the program in `/opt/gextto`; an optional
 `/etc/gextto/gextto.env` file, if present, is loaded as environment overrides
 (the API token is not stored there: set it in *Configuration → Access and
