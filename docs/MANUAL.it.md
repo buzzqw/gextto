@@ -313,7 +313,10 @@ il pacchetto di release usato dall'installer (README, *Installazione Linux*).
 - **Ricerca manuale globale** — cerca in archivio + indexer + motori web.
 - **Ricerca automatica** — avvia un ciclo completo o di un solo dominio (Serie,
   Film, Fumetti); mostra prossima esecuzione, intervallo ed esito dell'ultimo
-  ciclo; backup immediato.
+  ciclo; backup immediato. Un ciclo di un solo dominio interroga gli indexer
+  solo per i titoli di quel dominio (nome e alias delle serie, `Nome Anno` dei
+  film); i feed si leggono comunque per intero, perché alimentano l'archivio
+  locale condiviso.
 - **In sessione** — un unico riquadro in cima: i torrent in scarico, fermi e in
   seed, la banda degli ultimi 30 giorni e l'accesso diretto a Scarico, con sotto
   il **grafico del traffico degli ultimi 30 minuti** (curve di **download** e

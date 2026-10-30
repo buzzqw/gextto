@@ -280,6 +280,63 @@ func TestScrapeAllSearchesSeriesAliases(t *testing.T) {
 	}
 }
 
+func TestScrapeAllDomainSearchesOnlyTheCycleTitles(t *testing.T) {
+	var mutex sync.Mutex
+	queries := map[string]int{}
+	indexer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		query := r.URL.Query().Get("q")
+		if query != "" {
+			mutex.Lock()
+			queries[query]++
+			mutex.Unlock()
+		}
+		_, _ = io.WriteString(w, `<rss><channel></channel></rss>`)
+	}))
+	defer indexer.Close()
+
+	state := newTestAppState(t)
+	cfg := DefaultConfig()
+	cfg.DataDir = state.cfg.DataDir
+	cfg.Series = []SeriesConfig{{Name: "Canonical Show", Aliases: []string{"Titolo Alternativo"}, Enabled: true}}
+	cfg.Movies = []MovieConfig{{Name: "Example Film", Year: "2026", Enabled: true}}
+	cfg.FeedURLs = nil
+	cfg.Indexers = []IndexerConfig{{Name: "test", URL: indexer.URL, Enabled: true}}
+	cfg.WebsearchEngines = nil
+
+	searched := func(domain *string) map[string]int {
+		mutex.Lock()
+		queries = map[string]int{}
+		mutex.Unlock()
+		if _, _, err := state.engine.ScrapeAllDomain(context.Background(), &cfg, domain); err != nil {
+			t.Fatalf("ScrapeAllDomain(%v): %v", domain, err)
+		}
+		mutex.Lock()
+		defer mutex.Unlock()
+		copied := make(map[string]int, len(queries))
+		for query, count := range queries {
+			copied[query] = count
+		}
+		return copied
+	}
+
+	movies := "movies"
+	got := searched(&movies)
+	if len(got) != 1 || got["Example Film 2026"] != 1 {
+		t.Fatalf("movies-only cycle searched %+v, want only the movie title", got)
+	}
+
+	series := "series"
+	got = searched(&series)
+	if len(got) != 2 || got["Canonical Show"] != 1 || got["Titolo Alternativo"] != 1 {
+		t.Fatalf("series-only cycle searched %+v, want the series and its alias", got)
+	}
+
+	got = searched(nil)
+	if len(got) != 3 {
+		t.Fatalf("full cycle searched %+v, want every title and alias", got)
+	}
+}
+
 func TestCycleCandidatesCountsOnlySurvivingReleases(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = io.WriteString(w, `<rss><channel>

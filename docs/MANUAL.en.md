@@ -309,7 +309,10 @@ release package the installer uses (README, *Install on Linux*).
   opens that row under the first badge (Gextto CPU and RAM).
 - **Manual global search** — searches archive + indexers + web engines.
 - **Automatic search** — run a full cycle or a single domain (Series, Movies,
-  Comics); shows next run, interval and last-cycle outcome; backup now.
+  Comics); shows next run, interval and last-cycle outcome; backup now. A
+  single-domain cycle queries the indexers only for that domain's titles (the
+  name and aliases of the series, `Name Year` for movies); the feeds are still
+  read whole, because they fill the shared local archive.
 - **In session** — one card on top: torrents downloading, stalled and seeding,
   the last-30-days bandwidth and direct access to Downloads, with the **last
   30 minutes traffic chart** below (the **download** and **upload** curves, the

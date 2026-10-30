@@ -156,7 +156,7 @@ func RunCycleDomain(
 		}
 	}
 
-	releases, sources, err := engine.ScrapeAll(ctx, cfg)
+	releases, sources, err := engine.ScrapeAllDomain(ctx, cfg, domain)
 	if err != nil {
 		if cycleCancelled(ctx) {
 			return stats, nil

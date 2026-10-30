@@ -217,6 +217,16 @@ func torrentFetchFailureReason(body io.Reader) string {
 // and movie on the Torznab indexers and web engines, returning the unique
 // releases that survive the global filters.
 func (e *Engine) ScrapeAll(ctx context.Context, cfg *Config) ([]models.Release, []models.CycleSourceStat, error) {
+	return e.ScrapeAllDomain(ctx, cfg, nil)
+}
+
+// ScrapeAllDomain is ScrapeAll with the online title search restricted to one
+// domain (`series` or `movies`); a nil domain means "full". The feeds are still
+// read whole because they fill the shared local archive, but a movies-only
+// cycle must not spend minutes querying the indexers for every enabled series
+// only to discard those releases afterwards: the domain filter runs before the
+// search, not after it.
+func (e *Engine) ScrapeAllDomain(ctx context.Context, cfg *Config, domain *string) ([]models.Release, []models.CycleSourceStat, error) {
 	var all []models.Release
 	maxPages := cfg.FeedMaxPages()
 	maxAgeDays := cfg.MaxReleaseAgeDays
@@ -274,7 +284,7 @@ func (e *Engine) ScrapeAll(ctx context.Context, cfg *Config) ([]models.Release, 
 		var targets []searchTarget
 		seenTargets := map[string]struct{}{}
 		for _, series := range cfg.Series {
-			if !series.Enabled {
+			if domainIs(domain, "movies") || !series.Enabled {
 				continue
 			}
 			// Pass the real external ids to Torznab: `tvdbid` with the TVDB id and
@@ -295,7 +305,7 @@ func (e *Engine) ScrapeAll(ctx context.Context, cfg *Config) ([]models.Release, 
 			}
 		}
 		for _, movie := range cfg.Movies {
-			if !movie.Enabled {
+			if domainIs(domain, "series") || !movie.Enabled {
 				continue
 			}
 			query := fmt.Sprintf("%s %s", movie.Name, movie.Year)
