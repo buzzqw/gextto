@@ -236,6 +236,29 @@ func splitFormList(value string) []string {
 // a magnet link.
 var errNotATorrent = errors.New("the URL contains neither a .torrent file nor a magnet link")
 
+// maxTorrentRedirects bounds the redirect chain of a download link: trackers
+// use two or three hops (a login, a mirror), never ten.
+const maxTorrentRedirects = 10
+
+// magnetIn returns raw when it is a magnet link, "" otherwise. The check is on
+// the scheme only, so the tracker list and the display name survive untouched.
+func magnetIn(raw string) string {
+	if strings.HasPrefix(strings.ToLower(strings.TrimSpace(raw)), "magnet:") {
+		return strings.TrimSpace(raw)
+	}
+	return ""
+}
+
+// urlScheme names the scheme of raw for an error message ("unknown" when it
+// cannot be parsed), so a refused redirect says what it was.
+func urlScheme(raw string) string {
+	parsed, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil || parsed.Scheme == "" {
+		return "unknown"
+	}
+	return parsed.Scheme
+}
+
 // fetchTorrentSource downloads a torrent source from an http(s) URL and says
 // which of the three shapes the indexer handed out: the .torrent bytes, a
 // magnet link as the body, or a redirect to a magnet instead of a file.
@@ -247,27 +270,34 @@ var errNotATorrent = errors.New("the URL contains neither a .torrent file nor a 
 // about which shapes are understood.
 func (d *Daemon) fetchTorrentSource(rawURL string) (data []byte, magnet string, err error) {
 	client := outboundClientWithJar(60*time.Second, d.cookieJar())
-	var atMagnet string
+	var redirectedTo string
 	client.CheckRedirect = func(req *http.Request, via []*http.Request) error {
 		if scheme := strings.ToLower(req.URL.Scheme); scheme != "http" && scheme != "https" {
-			atMagnet = req.URL.String()
+			// Not fetchable over HTTP: stop the chain and look at it below. Only
+			// a magnet is a torrent source; anything else is refused, so a
+			// redirect cannot talk us into treating a file: or ftp: target as
+			// the release.
+			redirectedTo = req.URL.String()
 			return http.ErrUseLastResponse
 		}
-		if len(via) >= 10 {
-			return errors.New("stopped after 10 redirects")
+		if len(via) >= maxTorrentRedirects {
+			return fmt.Errorf("stopped after %d redirects", maxTorrentRedirects)
 		}
 		return nil
 	}
 	resp, err := client.Get(rawURL)
 	if err != nil {
-		if atMagnet != "" {
+		if atMagnet := magnetIn(redirectedTo); atMagnet != "" {
 			return nil, atMagnet, nil
 		}
 		return nil, "", err
 	}
 	defer resp.Body.Close()
-	if atMagnet != "" {
-		return nil, atMagnet, nil
+	if redirectedTo != "" {
+		if atMagnet := magnetIn(redirectedTo); atMagnet != "" {
+			return nil, atMagnet, nil
+		}
+		return nil, "", fmt.Errorf("%w: it redirects to a %s URL", errNotATorrent, urlScheme(redirectedTo))
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return nil, "", fmt.Errorf("torrent URL returned %d", resp.StatusCode)

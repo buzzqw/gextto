@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -124,4 +125,46 @@ func postFormJSON(t *testing.T, rawurl string, form url.Values, out any) int {
 		}
 	}
 	return resp.StatusCode
+}
+
+// TestQbitSearchJobRecordsItsEnd: the job's finish time is what the eviction
+// key reads. Without it a finished job would never be pruned, whatever the
+// prune function does, so the handler must write it on every path that stops a
+// job.
+func TestQbitSearchJobRecordsItsEnd(t *testing.T) {
+	d := standaloneTestDaemon(t, "", true)
+	d.qbitSearch = map[int]*qbitSearchJob{1: {pattern: "x", status: "Running"}}
+
+	// No indexers configured: the search finishes at once with no results.
+	d.qbitRunSearch(context.Background(), 1, "x", nil)
+
+	d.qbitSearchMu.Lock()
+	job := d.qbitSearch[1]
+	d.qbitSearchMu.Unlock()
+	if job == nil {
+		t.Fatal("the job disappeared")
+	}
+	if job.status != "Stopped" {
+		t.Fatalf("status = %q, want Stopped", job.status)
+	}
+	if job.finishedAt.IsZero() {
+		t.Fatal("a finished job has no finish time: it would never be pruned")
+	}
+	if age := time.Since(job.finishedAt); age > time.Minute {
+		t.Fatalf("finish time is %s old, want about now", age)
+	}
+
+	// Past the TTL the next search drops it, and the running one stays.
+	d.qbitSearchMu.Lock()
+	job.finishedAt = time.Now().Add(-qbitSearchJobTTL - time.Minute)
+	d.qbitSearch[2] = &qbitSearchJob{pattern: "y", status: "Running"}
+	d.pruneQbitSearchLocked(time.Now())
+	d.qbitSearchMu.Unlock()
+
+	if _, ok := d.qbitSearch[1]; ok {
+		t.Error("an expired job survived the prune")
+	}
+	if _, ok := d.qbitSearch[2]; !ok {
+		t.Error("a running job was pruned")
+	}
 }

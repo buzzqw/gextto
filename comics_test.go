@@ -930,3 +930,45 @@ func TestMonitoredComicRejectsRemoteTagHost(t *testing.T) {
 		t.Error("remote tag host should be rejected")
 	}
 }
+
+// TestDownloadHTTPResumesToTheRightExtension covers the other finish path: a
+// `.part` file already complete makes the server answer 416, and the file still
+// has to be named for what it holds. This branch and the normal one used to be
+// two copies of the same code.
+func TestDownloadHTTPResumesToTheRightExtension(t *testing.T) {
+	payload := append([]byte("Rar!\x1a\x07\x00"), make([]byte, 4096)...)
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.Header().Set("Content-Type", "application/octet-stream")
+		if request.Header.Get("Range") != "" {
+			writer.WriteHeader(http.StatusRequestedRangeNotSatisfiable)
+			return
+		}
+		_, _ = writer.Write(payload)
+	}))
+	defer server.Close()
+
+	dir := t.TempDir()
+	title := "Batman: The Long Halloween #1 (2024)"
+	destination := filepath.Join(dir, comicDownloadFilename(title))
+	part := filepath.Join(dir, withPartExtension(comicDownloadFilename(title)))
+	if err := os.WriteFile(part, payload, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	path, err := DownloadHTTP(server.Client(), server.URL+"/dls/opaque", dir, title)
+	if err != nil {
+		t.Fatalf("DownloadHTTP: %v", err)
+	}
+	if got := filepath.Ext(path); got != ".cbr" {
+		t.Fatalf("saved as %q, want the .cbr extension", path)
+	}
+	if _, err := os.Stat(part); !os.IsNotExist(err) {
+		t.Error("the .part file was left behind")
+	}
+	if _, err := os.Stat(destination); !os.IsNotExist(err) {
+		t.Errorf("the RAR is still named %q", destination)
+	}
+	if data, readErr := os.ReadFile(path); readErr != nil || !bytes.Equal(data, payload) {
+		t.Fatalf("the resumed file does not hold the payload: %v", readErr)
+	}
+}

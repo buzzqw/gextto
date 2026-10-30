@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/buzzqw/gextto/internal/gxcore/internal/filesection"
+	"github.com/buzzqw/gextto/internal/gxcore/internal/merkle"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/piece"
 )
 
@@ -127,5 +128,79 @@ func TestCloseDuringPrepare(t *testing.T) {
 	v.Close()
 	if fa.reads != 0 {
 		t.Fatalf("piece read %d time(s) after close", fa.reads)
+	}
+}
+
+// makeV2Piece builds a BEP 52 piece whose merkle root matches data.
+func makeV2Piece(index uint32, data []byte) (piece.Piece, *countingFile) {
+	leaves := merkle.LeafHashes(data)
+	root := merkle.Root(leaves)
+	f := &countingFile{data: data}
+	p := piece.Piece{
+		Index:    index,
+		Length:   uint32(len(data)),
+		Hash:     root[:],
+		V2:       true,
+		V2Leaves: len(leaves),
+		Data:     filesection.Piece{{File: f, Offset: 0, Length: int64(len(data))}},
+	}
+	return p, f
+}
+
+// TestVerifierChecksV2PiecesWithTheMerkleTree: the whole-torrent check reads v2
+// pieces too, and it must accept them on their merkle root alone. Checking a v2
+// piece with SHA-1 (the layout it does not have) would reject every v2 file.
+func TestVerifierChecksV2PiecesWithTheMerkleTree(t *testing.T) {
+	good := make([]byte, 2*piece.BlockSize)
+	for i := range good {
+		good[i] = byte(i)
+	}
+	corrupt := append([]byte(nil), good...)
+	corrupt[len(corrupt)-1] ^= 0xff
+
+	pa, _ := makeV2Piece(0, good)
+	// The piece is hashed over the good bytes; the bytes on disk are corrupt,
+	// which is what the verifier has to catch.
+	pb, _ := makeV2Piece(1, good)
+	pb.Data = filesection.Piece{{File: &countingFile{data: corrupt}, Offset: 0, Length: int64(len(corrupt))}}
+
+	v, _ := runVerifier(t, []piece.Piece{pa, pb}, nil)
+	if v.Error != nil {
+		t.Fatalf("verifier error: %v", v.Error)
+	}
+	if !v.Bitfield.Test(0) {
+		t.Error("the valid v2 piece was not marked done")
+	}
+	if v.Bitfield.Test(1) {
+		t.Error("a corrupt v2 piece was marked done")
+	}
+}
+
+// TestCheckPieceDispatchesOnTheLayout pins the branch itself: a v2 piece whose
+// bytes match its merkle root passes even though its SHA-1 is unrelated, and a
+// v1 piece is never asked for a merkle root.
+func TestCheckPieceDispatchesOnTheLayout(t *testing.T) {
+	data := make([]byte, piece.BlockSize)
+	for i := range data {
+		data[i] = byte(i)
+	}
+	v2, _ := makeV2Piece(0, data)
+	v1, _ := makePiece(0, data)
+
+	v := &Verifier{}
+	if !v.checkPiece(&v2, data, sha1.New()) {
+		t.Fatal("a v2 piece did not verify against its merkle root")
+	}
+	if !v.checkPiece(&v1, data, sha1.New()) {
+		t.Fatal("a v1 piece did not verify against its SHA-1")
+	}
+
+	broken := append([]byte(nil), data...)
+	broken[0] ^= 0xff
+	if v.checkPiece(&v2, broken, sha1.New()) {
+		t.Fatal("a corrupt v2 piece verified")
+	}
+	if v.checkPiece(&v1, broken, sha1.New()) {
+		t.Fatal("a corrupt v1 piece verified")
 	}
 }

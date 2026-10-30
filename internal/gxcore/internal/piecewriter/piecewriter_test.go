@@ -1,6 +1,7 @@
 package piecewriter
 
 import (
+	"bytes"
 	"crypto/sha1"
 	"testing"
 
@@ -39,6 +40,22 @@ func v2Piece(buf []byte) piece.Piece {
 	return piece.Piece{Length: uint32(len(buf)), Hash: root[:], V2: true, V2Leaves: len(leaves)}
 }
 
+// corrupt returns a copy of buf with its last byte flipped, so a piece built
+// from the copy cannot verify against the original.
+func corrupt(buf []byte, b byte) []byte {
+	out := bytes.Clone(buf)
+	last := out[len(out)-1]
+	if last == b {
+		b = ^b
+	}
+	out[len(out)-1] = b
+	return out
+}
+
+func v1PieceWith(buf []byte, b byte) piece.Piece { return v1Piece(corrupt(buf, b)) }
+
+func v2PieceWith(buf []byte, b byte) piece.Piece { return v2Piece(corrupt(buf, b)) }
+
 // benchmarkRun hashes and writes one piece per iteration.
 func benchmarkRun(b *testing.B, p *piece.Piece, buf []byte) {
 	b.SetBytes(int64(len(buf)))
@@ -62,6 +79,61 @@ func benchmarkRun(b *testing.B, p *piece.Piece, buf []byte) {
 	}
 	b.StopTimer()
 	borrowed.Release()
+}
+
+// TestRunWritesOnlyVerifiedPieces is the invariant the pipeline rests on: a
+// corrupt block batch never reaches the disk, for either layout, and the buffer
+// is still handed back through the result channel so the caller can release it.
+func TestRunWritesOnlyVerifiedPieces(t *testing.T) {
+	buf := make([]byte, 2*piece.BlockSize)
+	for i := range buf {
+		buf[i] = byte(i)
+	}
+	cases := []struct {
+		name  string
+		piece piece.Piece
+		good  bool
+	}{
+		{name: "v1-good", piece: v1Piece(buf), good: true},
+		{name: "v1-corrupt", piece: v1PieceWith(buf, byte(0xff)), good: false},
+		{name: "v2-good", piece: v2Piece(buf), good: true},
+		{name: "v2-corrupt", piece: v2PieceWith(buf, byte(0xff)), good: false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			file := &discardFile{}
+			p := tc.piece
+			p.Data = filesection.Piece{{File: file, Length: int64(len(buf))}}
+			pool := bufferpool.New(len(buf))
+			borrowed := pool.Get(len(buf))
+			defer borrowed.Release()
+			copy(borrowed.Data, buf)
+
+			resultC := make(chan *PieceWriter, 1)
+			closeC := make(chan struct{})
+			w := New(&p, nil, borrowed)
+			w.Run(resultC, closeC, metrics.NewMeter(), metrics.NewMeter(), semaphore.New(1))
+
+			select {
+			case got := <-resultC:
+				if got != w {
+					t.Fatal("the writer did not report itself")
+				}
+			default:
+				t.Fatal("Run did not report a result")
+			}
+			if w.HashOK != tc.good {
+				t.Fatalf("HashOK = %v, want %v", w.HashOK, tc.good)
+			}
+			if tc.good {
+				if file.written != len(buf) {
+					t.Fatalf("wrote %d bytes, want %d", file.written, len(buf))
+				}
+			} else if file.written != 0 {
+				t.Fatalf("a corrupt piece wrote %d bytes to storage", file.written)
+			}
+		})
+	}
 }
 
 func BenchmarkPieceWriterRunV1(b *testing.B) {
