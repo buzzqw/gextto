@@ -844,6 +844,18 @@ label.field > span, .field > span, .field-label { color: var(--muted); font-size
   .ed2k-shared-table th:nth-child(9), .ed2k-shared-table td:nth-child(9) { width: 68px; }
   .ed2k-shared-table th:nth-child(10), .ed2k-shared-table td:nth-child(10) { width: 87px; }
 }
+/* Wider screens have room for both: the counters keep enough space for their
+   headers and values, and the file name still gets the rest. */
+@media (min-width: 1440px) {
+  .ed2k-shared-table th:nth-child(2), .ed2k-shared-table td:nth-child(2) { width: 116px; }
+  .ed2k-shared-table th:nth-child(3), .ed2k-shared-table td:nth-child(3) { width: 100px; }
+  .ed2k-shared-table th:nth-child(4), .ed2k-shared-table td:nth-child(4) { width: 100px; }
+  .ed2k-shared-table th:nth-child(5), .ed2k-shared-table td:nth-child(5) { width: 105px; }
+  .ed2k-shared-table th:nth-child(6), .ed2k-shared-table td:nth-child(6) { width: 85px; }
+  .ed2k-shared-table th:nth-child(7), .ed2k-shared-table td:nth-child(7) { width: 95px; }
+  .ed2k-shared-table th:nth-child(9), .ed2k-shared-table td:nth-child(9) { width: 110px; }
+  .ed2k-shared-table th:nth-child(10), .ed2k-shared-table td:nth-child(10) { width: 80px; }
+}
 .ed2k-uploads-table { width: 100%; min-width: 0; table-layout: fixed; }
 .ed2k-uploads-table thead th { white-space: normal; }
 .ed2k-uploads-table th:nth-child(1), .ed2k-uploads-table td:nth-child(1) { width: 15%; }
