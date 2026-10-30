@@ -958,7 +958,9 @@ elenco** invece non modifica nulla: rilegge la tabella con il filtro scritto.
   «Poison Ivy #41 (2025)»): Komga, Kavita e i lettori su tablet lo usano per
   raggruppare e ordinare gli albi. Un file che ha già il suo `ComicInfo.xml` non viene
   toccato; i fumetti scaricati via torrent restano identici, perché sono in
-  seed, e i CBR (RAR) non si possono modificare.
+  seed, e i CBR (RAR) non si possono modificare. Il nome del file prende
+  comunque l'estensione del formato che contiene: un albo che arriva come RAR
+  viene salvato `.cbr` e non `.cbz`, così Komga e Kavita lo aprono.
 
 - **eD2k** — la pagina di aMule: vedi la sezione seguente.
 

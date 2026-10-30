@@ -1388,18 +1388,11 @@ func downloadHTTPOnce(client *http.Client, id, rawURL, targetDir, title string, 
 	// The `.part` file was already complete: the server answers 416 and it only
 	// needs to be renamed.
 	if offset > 0 && response.StatusCode == http.StatusRequestedRangeNotSatisfiable {
-		isTorrent, err := comicFileIsTorrent(temporary)
+		path, err := finishComicDownload(temporary, destination)
 		if err != nil {
 			return comicHTTPCompleted, "", err
 		}
-		if isTorrent {
-			_ = os.Remove(temporary)
-			return comicHTTPCompleted, "", errComicDownloadTorrent
-		}
-		if err := os.Rename(temporary, destination); err != nil {
-			return comicHTTPCompleted, "", err
-		}
-		return comicHTTPCompleted, destination, nil
+		return comicHTTPCompleted, path, nil
 	}
 	if response.StatusCode >= 400 {
 		return comicHTTPCompleted, "", fmt.Errorf("HTTP status %d", response.StatusCode)
@@ -1505,18 +1498,57 @@ func downloadHTTPOnce(client *http.Client, id, rawURL, targetDir, title string, 
 	if downloaded == 0 {
 		return comicHTTPCompleted, "", fmt.Errorf("comic download is empty")
 	}
-	isTorrent, err := comicFileIsTorrent(temporary)
+	path, err := finishComicDownload(temporary, destination)
 	if err != nil {
 		return comicHTTPCompleted, "", err
 	}
+	return comicHTTPCompleted, path, nil
+}
+
+// finishComicDownload moves a completed `.part` into its final name and
+// returns the path it ended up at. A body that is not a comic is refused
+// first: GetComics serves metainfo documents from opaque `/dls/` URLs, and one
+// stored as a comic would sit in the library forever as an unreadable file.
+func finishComicDownload(temporary, destination string) (string, error) {
+	isTorrent, err := comicFileIsTorrent(temporary)
+	if err != nil {
+		return "", err
+	}
 	if isTorrent {
 		_ = os.Remove(temporary)
-		return comicHTTPCompleted, "", errComicDownloadTorrent
+		return "", errComicDownloadTorrent
 	}
 	if err := os.Rename(temporary, destination); err != nil {
-		return comicHTTPCompleted, "", err
+		return "", err
 	}
-	return comicHTTPCompleted, destination, nil
+	return comicArchiveNamedForItsBytes(destination), nil
+}
+
+// comicArchiveNamedForItsBytes renames a downloaded comic to the extension of
+// the format it actually holds. The name comes from the post title, which does
+// not say whether the file is a CBZ (a ZIP) or a CBR (a RAR); Komga and Kavita
+// refuse to open a RAR named `.cbz`. Anything that is not a RAR keeps the name
+// it has, so a ZIP (or a file we cannot read) is never renamed.
+func comicArchiveNamedForItsBytes(path string) string {
+	if !strings.HasSuffix(strings.ToLower(path), ".cbz") {
+		return path
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		return path
+	}
+	var magic [7]byte
+	n, _ := io.ReadFull(file, magic[:])
+	_ = file.Close()
+	// RAR 1.5-4.x and RAR 5 both start with "Rar!\x1a\x07".
+	if n < len(magic) || !strings.HasPrefix(string(magic[:n]), "Rar!\x1a\x07") {
+		return path
+	}
+	renamed := strings.TrimSuffix(path, filepath.Ext(path)) + ".cbr"
+	if err := os.Rename(path, renamed); err != nil {
+		return path // the name is cosmetic: keep the file rather than fail
+	}
+	return renamed
 }
 
 func isPermanentComicDownloadError(err error) bool {

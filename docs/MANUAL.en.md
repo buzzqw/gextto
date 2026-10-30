@@ -934,7 +934,9 @@ changes nothing: it reloads the table with the filter you typed.
   “Poison Ivy #41 (2025)”): Komga, Kavita and tablet readers use it to group and
   sort issues. A file that already has its own `ComicInfo.xml` is left alone;
   comics downloaded by torrent stay identical because they are seeding, and CBR
-  (RAR) files cannot be modified.
+  (RAR) files cannot be modified. The file name still takes the extension of the
+  format it holds: an issue that arrives as a RAR is saved as `.cbr` and not
+  `.cbz`, so Komga and Kavita open it.
 
 - **eD2k** — the aMule page: see the next section.
 

@@ -367,6 +367,41 @@ func TestDownloadHTTPRejectsTorrentPayloadWithoutRetrying(t *testing.T) {
 	}
 }
 
+// TestDownloadHTTPNamesTheArchiveAfterItsBytes: the file name comes from the
+// post title, which does not say whether the download is a CBZ (a ZIP) or a
+// CBR (a RAR). A RAR stored as ".cbz" is refused by Komga and Kavita, so the
+// extension follows the magic bytes of what arrived.
+func TestDownloadHTTPNamesTheArchiveAfterItsBytes(t *testing.T) {
+	cases := []struct {
+		name    string
+		payload []byte
+		want    string
+	}{
+		{name: "cbz", payload: append([]byte("PK\x03\x04"), make([]byte, 2048)...), want: ".cbz"},
+		{name: "cbr", payload: append([]byte("Rar!\x1a\x07\x00"), make([]byte, 2048)...), want: ".cbr"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+				writer.Header().Set("Content-Type", "application/octet-stream")
+				_, _ = writer.Write(tc.payload)
+			}))
+			defer server.Close()
+
+			path, err := DownloadHTTP(server.Client(), server.URL+"/dls/opaque", t.TempDir(), "Batman: The Long Halloween #1 (2024)")
+			if err != nil {
+				t.Fatalf("DownloadHTTP: %v", err)
+			}
+			if got := filepath.Ext(path); got != tc.want {
+				t.Fatalf("saved as %q, want the %q extension", path, tc.want)
+			}
+			if _, err := os.Stat(path); err != nil {
+				t.Fatalf("the finished comic is missing: %v", err)
+			}
+		})
+	}
+}
+
 func TestDownloadTorrentFileRejectsNonTorrentPayload(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		writer.Header().Set("Content-Type", "application/octet-stream")

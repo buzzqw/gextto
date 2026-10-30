@@ -14,6 +14,8 @@ manual is online: [English](docs/MANUAL.en.md) ·
 [GitHub issues](https://github.com/buzzqw/gextto/issues).
 
 ## 30 October 2026
+- **A comic downloaded as a CBR arrives with the right extension.** The file name came from the post title, which does not say whether the content is a CBZ (a ZIP) or a CBR (a RAR): every direct download therefore ended in `.cbz`, and Komga and Kavita refused to open the issues that were really RAR archives. Once the download completes the extension now follows the content: a RAR becomes `.cbr`, a ZIP stays `.cbz`. Files already downloaded are left alone. Nothing to configure.
+
 - **A download link that ends on a magnet is no longer lost.** Some indexers do not hand out the `.torrent` file: they answer the download address with a redirect to a `magnet:` link, or they put the magnet in the response body. Gextto and gx-torrent treated that as an error, so the release was lost — from the search, from the feeds and from the add dialog. The address is now followed, recognised and added as a magnet, with the trackers it carries. An address that holds neither a `.torrent` nor a magnet says so with a clear message instead of failing while reading the file. Nothing to configure.
 
 - **Abandoned searches do not stay in memory.** The qBittorrent-compatible search keeps its results until the client deletes them: a client that closes the tab or goes away mid-search left the results in memory for the life of the daemon. A finished search is now forgotten after 15 minutes if nobody deletes it. Anyone who reads the results and then deletes them, like Sonarr, Radarr and Prowlarr, sees no change in their flow.
