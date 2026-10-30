@@ -329,7 +329,11 @@ il pacchetto di release usato dall'installer (README, *Installazione Linux*).
   sotto 1 KB/s valgono 0: è solo rumore di protocollo, e il grafico resta
   piatto invece di tremare. Con eD2k attivo aMule ha **linee proprie
   tratteggiate** e una voce **eD2k ↓ ↑** accanto a quella dei **Torrent**; le
-  velocità nella barra in alto sono invece la somma di torrent e aMule. Si
+  velocità nella barra in alto sono invece la somma di torrent e aMule, e
+  per l'eD2k sono la media dell'ultimo mezzo minuto: aMule dichiara una velocità
+  di un solo secondo, e un client che carica a blocchi la faceva sembrare ferma
+  tra un blocco e l'altro. Le velocità per file e per client nella pagina eD2k
+  restano invece quelle istantanee di aMule. Si
   aggiorna da solo.
 - **Da controllare** — sotto la striscia: i download **fermi** (con il motivo,
   il prossimo tentativo e quando verranno abbandonati; il nome si ferma alla

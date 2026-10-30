@@ -783,7 +783,11 @@ missing** and single-episode search (the series search asks once per season, the
 single search once per episode). Accepted automatic results need an exact
 episode, a recognised quality and enough sources; a manual search shows every
 match. eD2k names are a claim, the MD4 hash is the identity, and MediaInfo
-validation after the download is the second line of defence.
+validation after the download is the second line of defence. The top bar adds
+aMule's traffic to the torrents': aMule reports the speed of a one-second
+window, so the badge uses the eD2k rates averaged over the last half minute
+from its session counters, while the eD2k page keeps aMule's own instant
+figures per file and per client.
 
 eD2k results also arrive from an eD2k source behind indexarr: the feed parser reads
 the `ed2k://` link from `<link>` and from the `ed2k` attribute, ignores the

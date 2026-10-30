@@ -112,17 +112,24 @@ func v2CurrentRates(s *AppState) (uint64, uint64) {
 	return v2RateOrZero(down), v2RateOrZero(up)
 }
 
-// v2Ed2kRates returns aMule's global download and upload rates, from the
-// cached status (it never waits on aMule), floored like the torrent rates.
+// v2Ed2kRates returns aMule's download and upload rates as the top bar shows
+// them, from the cached status (it never waits on aMule), floored like the
+// torrent rates. The figures come from the session counters averaged over the
+// last half minute: aMule's own live speed is a one-second window, and a
+// client that transfers in bursts reads hundreds of KB/s for an instant and
+// zero in between, which made the badge blink between that and no traffic at
+// all.
 func v2Ed2kRates(s *AppState) (uint64, uint64) {
 	if s == nil || !ed2kEnabled(latestConfig(s)) {
 		return 0, 0
 	}
-	status, err := ed2kStatus(latestConfig(s))
-	if err != nil {
+	if _, err := ed2kStatus(latestConfig(s)); err != nil {
 		return 0, 0
 	}
-	return v2RateOrZero(uint64(max(status.DownloadRate, 0))), v2RateOrZero(uint64(max(status.UploadRate, 0)))
+	ed2kState.mu.Lock()
+	down, up := ed2kState.rates.down, ed2kState.rates.up
+	ed2kState.mu.Unlock()
+	return v2RateOrZero(down), v2RateOrZero(up)
 }
 
 // v2RateOrZero treats anything under the noise floor as no traffic, so the

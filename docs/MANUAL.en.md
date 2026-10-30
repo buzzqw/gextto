@@ -325,7 +325,10 @@ release package the installer uses (README, *Install on Linux*).
   just protocol chatter, and the chart stays flat instead of twitching. With
   eD2k on, aMule has its own **dashed lines** and an **eD2k ↓ ↑** entry next to
   the **Torrent** one; the speeds in the top bar are the sum of torrents and
-  aMule. It refreshes on its own.
+  aMule, and for eD2k they are the average of the last half minute: aMule
+  reports a one-second speed, and a client uploading in blocks made it look
+  stopped between one block and the next. The per-file and per-client speeds on
+  the eD2k page remain aMule's own instant figures. It refreshes on its own.
 - **To check** — below the strip: **stuck** downloads (with the reason, the
   next attempt and when they will be abandoned; the name stops at its
   season/episode and the full one appears on hover), **pending moves to the

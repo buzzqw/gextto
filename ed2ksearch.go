@@ -173,6 +173,9 @@ var ed2kState struct {
 	err      string
 	failedAt time.Time
 	incoming string
+	// rates averages the session counters, so the top bar shows the traffic
+	// that really moved instead of aMule's one-second window.
+	rates ed2kRateTracker
 }
 
 // ed2kSearchMu serialises searches: amuled keeps a single result list, so a
@@ -218,6 +221,8 @@ func ed2kClient(cfg *Config) (*amule.Client, error) {
 		ed2kState.checked = time.Time{}
 		ed2kState.failedAt = time.Time{}
 		ed2kState.incoming = ""
+		// Another core: its counters are not the ones the window was built on.
+		ed2kState.rates = ed2kRateTracker{}
 	}
 	return ed2kState.client, nil
 }
@@ -323,6 +328,13 @@ func ed2kStatus(cfg *Config) (amule.Status, error) {
 		ed2kState.err = err.Error()
 	} else {
 		ed2kState.err = ""
+		// A core without a statistics history answers the status but sends no
+		// session totals; there is nothing to average then.
+		if status.SessionSent > 0 || status.SessionRecv > 0 {
+			ed2kState.rates.observe(ed2kState.checked, status.SessionSent, status.SessionRecv, status.DownloadRate, status.UploadRate)
+		} else {
+			ed2kState.rates.live(status.DownloadRate, status.UploadRate)
+		}
 	}
 	ed2kState.mu.Unlock()
 	return status, err
