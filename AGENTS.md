@@ -425,6 +425,18 @@ not. Error strings reachable from a log line are English too.
   seeding, search, daemon, CLI/TUI. If the change concerns gx-torrent, check
   `docs/gx-torrent.md` and its web page too. The manuals are **online**:
   updating them requires neither `make build` nor a restart.
+- **Documentation site** (`mkdocs.yml`, `.github/workflows/pages.yml`): the
+  site <https://buzzqw.github.io/gextto/> is **generated** from `docs/` with
+  MkDocs Material, so a document is written and reviewed once, in `docs/`, in
+  the same commit as the change it describes — there is no second copy to keep
+  aligned. `mkdocs build --strict` runs in CI and fails the build on a broken
+  link, a page missing from the nav or an anchor that does not exist: moving or
+  renaming a document means updating `mkdocs.yml` and the links. The home page
+  is `docs/README.md` (MkDocs maps it to `index.html`), and the in-page anchors
+  follow **GitHub's rule** (`toc.slugify`), so a `#section` link written for the
+  repository works on the site too. Anything outside `docs/` — the changelog,
+  the README, `internal/gxcore/GEXTTO.md` — is not published: link it with an
+  absolute URL.
 - **README** (`README.md` and `README.it.md`, same substance): it is
   documentation in every respect and must be updated on every change that
   affects users, especially when it highlights Gextto or gx-core.

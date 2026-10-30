@@ -1,0 +1,104 @@
+# Gextto documentation site (GitHub Pages, MkDocs Material).
+#
+# The source stays in docs/: the site is generated from those files, so a
+# document is written and reviewed once, in the same commit as the change it
+# describes. `strict: true` makes a broken link or a page missing from the nav
+# fail the build, which is the same guarantee the API tests give to the routes.
+
+site_name: Gextto
+site_description: Media acquisition and archiving daemon, with its own BitTorrent engine (gx-core).
+site_url: https://buzzqw.github.io/gextto/
+repo_url: https://github.com/buzzqw/gextto
+repo_name: buzzqw/gextto
+edit_uri: edit/main/docs/
+docs_dir: docs
+# MANUAL.it.md would otherwise become /MANUAL.it/: the file names keep their
+# dotted suffix everywhere (the UI and the documents link them by path).
+use_directory_urls: false
+strict: true
+
+exclude_docs: |
+  archive/
+
+theme:
+  name: material
+  language: en
+  icon:
+    repo: fontawesome/brands/github
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle:
+        icon: material/weather-night
+        name: Switch to the dark theme
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to the light theme
+  features:
+    - navigation.sections
+    - navigation.top
+    - navigation.footer
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - toc.follow
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - tables
+  # GitHub's own slug rule, so an in-page link written for the repository
+  # (for example `#appendice-a-riferimento--configurazione`, where the em dash
+  # leaves two hyphens) points to the same heading on the site.
+  - toc:
+      permalink: true
+      slugify: !!python/object/apply:pymdownx.slugs.slugify
+        kwds:
+          case: lower
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/buzzqw/gextto
+      name: Gextto on GitHub
+
+nav:
+  - Home: README.md
+  - Italiano:
+      - Manuale: MANUAL.it.md
+      - Visita guidata: TOUR.it.md
+      - Guida avanzata: ADVANCED.it.md
+      - "Docker: stack completo": DOCKER.it.md
+      - Chiavi di accesso: api-keys.it.md
+      - eD2k e aMule: amule.it.md
+      - Changelog: https://github.com/buzzqw/gextto/blob/main/changelog.md
+  - English:
+      - Manual: MANUAL.en.md
+      - Guided tour: TOUR.en.md
+      - Advanced guide: ADVANCED.en.md
+      - "Docker: full stack": DOCKER.en.md
+      - Access keys: api-keys.md
+      - eD2k and aMule: amule.md
+      - Changelog: https://github.com/buzzqw/gextto/blob/main/changelog.en.md
+  - Reference:
+      - HTTP API: API.md
+      - Architecture: ARCHITECTURE.md
+      - State and backlog: evoluzione.md
+      - Measurements: measurements.md
+      - BEP compliance: bep.md
+      - gx-torrent daemon: gx-torrent.md
+      - gx-core engine: gx-core.md
+      - Engine inventory: https://github.com/buzzqw/gextto/blob/main/internal/gxcore/GEXTTO.md
+      - qBittorrent-nox backend: qbittorrent-nox.md
+      - Migration: MIGRATION.md
+      - Security: SECURITY.md
+      - Accessibility: ACCESSIBILITY.md
+      - TUI: tui.md
+      - Developers: DEVELOPERS.md
+      - Build and test times: tempistiche.md

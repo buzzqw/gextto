@@ -19,7 +19,8 @@ dipendenza C, nessuna build Node.js, sei lingue.
 > **English:** [README.md](README.md) · **Manuale:**
 > [italiano](docs/MANUAL.it.md) · [English](docs/MANUAL.en.md) · **Segnalazioni:**
 > [bug e richieste](https://github.com/buzzqw/gextto/issues) ·
-> **Contribuire:** [guida per sviluppatori](docs/DEVELOPERS.md)
+> **Contribuire:** [guida per sviluppatori](docs/DEVELOPERS.md) ·
+> **Sito della documentazione:** <https://buzzqw.github.io/gextto/>
 
 ## Cosa fa
 

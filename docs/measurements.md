@@ -9,7 +9,7 @@ otherwise.
 
 The state of the product and the open items are in [`evoluzione.md`](evoluzione.md);
 the engine is in [`gx-torrent.md`](gx-torrent.md) (inventory
-[`../internal/gxcore/GEXTTO.md`](../internal/gxcore/GEXTTO.md)) and its BEP compliance
+[`../internal/gxcore/GEXTTO.md`](https://github.com/buzzqw/gextto/blob/main/internal/gxcore/GEXTTO.md)) and its BEP compliance
 in [`bep.md`](bep.md).
 
 ## Index

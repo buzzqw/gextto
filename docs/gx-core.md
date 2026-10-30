@@ -6,7 +6,7 @@ and a complete standalone client (web page, search, RSS, categories, settings) w
 is launched on its own. The engine itself is our own code in-tree
 ([`evoluzione.md`](evoluzione.md) §7), the internals of the daemon are in
 [`gx-torrent.md`](gx-torrent.md), the inventory of the engine's areas in
-[`../internal/gxcore/GEXTTO.md`](../internal/gxcore/GEXTTO.md) and the numbers in
+[`../internal/gxcore/GEXTTO.md`](https://github.com/buzzqw/gextto/blob/main/internal/gxcore/GEXTTO.md) and the numbers in
 [`measurements.md`](measurements.md).
 
 ## Index
@@ -250,6 +250,6 @@ third-party work is rewritten rather than copied
 - [`docs/measurements.md`](measurements.md) — the harnesses, the numbers and how they are
   taken.
 - [`docs/bep.md`](bep.md) — BEP status and the BitTorrent v2 rules.
-- [`internal/gxcore/GEXTTO.md`](../internal/gxcore/GEXTTO.md) — inventory of the engine's
+- [`internal/gxcore/GEXTTO.md`](https://github.com/buzzqw/gextto/blob/main/internal/gxcore/GEXTTO.md) — inventory of the engine's
   features.
 - [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) — map of Gextto's code.

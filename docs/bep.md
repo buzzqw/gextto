@@ -5,7 +5,7 @@ Support status for the BitTorrent specifications (BEPs) of the **gx-core** engin
 
 This document is the **single source of truth for BEP status**: the status reflects
 the code, not comparisons with other clients. The per-file detail is in
-[`internal/gxcore/GEXTTO.md`](../internal/gxcore/GEXTTO.md) (engine inventory)
+[`internal/gxcore/GEXTTO.md`](https://github.com/buzzqw/gextto/blob/main/internal/gxcore/GEXTTO.md) (engine inventory)
 and in [`gx-torrent.md`](gx-torrent.md) (daemon); rationale, measurements and
 backlog in [`evoluzione.md`](evoluzione.md).
 
@@ -206,7 +206,7 @@ tables: `bep.md` stays the BEP-only source of truth.
 ## Maintenance
 
 Update this table on every new BEP implemented or excluded, together with the
-linked documents ([`internal/gxcore/GEXTTO.md`](../internal/gxcore/GEXTTO.md),
+linked documents ([`internal/gxcore/GEXTTO.md`](https://github.com/buzzqw/gextto/blob/main/internal/gxcore/GEXTTO.md),
 [`gx-torrent.md`](gx-torrent.md), [`evoluzione.md`](evoluzione.md)); an entry
 given as absent must be closed or reclassified when the code implements it.
 

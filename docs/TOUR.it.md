@@ -1,6 +1,6 @@
 # Gextto — visita guidata
 
-> **English:** [TOUR.en.md](TOUR.en.md) · Torna al [README](../README.it.md)
+> **English:** [TOUR.en.md](TOUR.en.md) · Torna al [README](https://github.com/buzzqw/gextto/blob/main/README.it.md)
 
 Le schermate principali di Gextto e del suo motore, gx-torrent. Ogni immagine
 viene da un'istanza di prova che scarica torrent pubblici e legali (Debian,

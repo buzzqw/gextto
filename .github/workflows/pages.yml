@@ -1,0 +1,53 @@
+name: Pages
+
+# The documentation site is generated from docs/, so the source of truth stays
+# in the repository and is reviewed in the same commit as the change it
+# describes. `mkdocs build --strict` turns a broken link, a page missing from
+# the nav or an unknown anchor into a failed build: the documents get the same
+# guard the API route tables have from their Go test.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/**'
+      - '*.md'
+      - 'mkdocs.yml'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - name: Install MkDocs Material
+        run: pip install 'mkdocs-material==9.8.0'
+      - name: "Build (strict: a broken link fails)"
+        run: mkdocs build --strict
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-24.04
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

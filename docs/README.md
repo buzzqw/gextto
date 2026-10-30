@@ -4,16 +4,26 @@ This folder holds the documentation maintained together with the code. Start
 from the manual in the language you prefer; the other documents cover specific
 needs.
 
+These same files are published as a site at
+<https://buzzqw.github.io/gextto/>: the pages are built from `docs/` at every
+change, so this index and the site are never two different texts.
+
+**Quick links:** [Manuale italiano](MANUAL.it.md) ·
+[English manual](MANUAL.en.md) · [Visita guidata](TOUR.it.md) ·
+[Guided tour](TOUR.en.md) · [HTTP API](API.md) ·
+[Changelog](https://github.com/buzzqw/gextto/blob/main/changelog.md) ·
+[changelog.en.md](https://github.com/buzzqw/gextto/blob/main/changelog.en.md)
+
 | Document | When to use it |
 |---|---|
 | [Manuale italiano](MANUAL.it.md) | Setup and day-to-day use of the web UI. |
 | [English manual](MANUAL.en.md) | English version of the complete user guide. |
 | [Visita guidata](TOUR.it.md) | Screenshots of the main screens, generated with `make screenshots`. |
 | [Guided tour](TOUR.en.md) | English version of the screenshot tour. |
-| [Changelog (italiano)](../changelog.md) | What changed for users, day by day. |
+| [Changelog (italiano)](https://github.com/buzzqw/gextto/blob/main/changelog.md) | What changed for users, day by day. |
 | [Docker: stack completo (Italiano)](DOCKER.it.md) | Gextto, gx-torrent, Jackett, Prowlarr, FlareSolverr e aMule in un solo `docker compose`; avvio, configurazione, aggiornamento e problemi comuni. |
 | [Docker: full stack](DOCKER.en.md) | English version: Gextto, gx-torrent, Jackett, Prowlarr, FlareSolverr and aMule in one `docker compose`; start, configuration, updating and troubleshooting. |
-| [Changelog (English)](../changelog.en.md) | English version of the user-facing changelog. |
+| [Changelog (English)](https://github.com/buzzqw/gextto/blob/main/changelog.en.md) | English version of the user-facing changelog. |
 | [Chiavi di accesso](api-keys.it.md) | The Gextto API key and the gx-torrent token: what they are, how to generate and use them. |
 | [Access keys](api-keys.md) | English version: the Gextto API key and the gx-torrent token. |
 | [Guida avanzata (Italiano)](ADVANCED.it.md) | NAS, permissions, proxy, backup and diagnostics. |
@@ -34,7 +44,7 @@ needs.
 | [eD2k and Kad through aMule](amule.md) | How to install and configure aMule, enable it in Gextto and use eD2k/Kad: search, links, aMule's queue in Downloads, completion, shared limits, troubleshooting, settings and tests. |
 | [BEP compliance](bep.md) | Which BitTorrent specifications (BEPs) the engine supports, which are missing and the roadmap. |
 | [gx-core](gx-core.md) | The standalone torrent client (the `gx-torrent` binary used without Gextto): modes, security, packaging, what is still open. |
-| [SQL maintenance scripts](../scripts/sql/README.md) | Ready-to-run queries and the Maintenance tab for the release archive: old/language-filtered releases, diagnostics and their manual deletion. |
+| [SQL maintenance scripts](https://github.com/buzzqw/gextto/blob/main/scripts/sql/README.md) | Ready-to-run queries and the Maintenance tab for the release archive: old/language-filtered releases, diagnostics and their manual deletion. |
 
 > [!NOTE]
 > The paths, ports and commands here are examples. Always check the service

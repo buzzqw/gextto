@@ -19,7 +19,8 @@ binaries, no C dependencies, no Node.js build, six languages.
 > **Italiano:** [README.it.md](README.it.md) · **Manual:**
 > [English](docs/MANUAL.en.md) · [italiano](docs/MANUAL.it.md) · **Issues:**
 > [bugs and feature requests](https://github.com/buzzqw/gextto/issues) ·
-> **Contribute:** [developer guide](docs/DEVELOPERS.md)
+> **Contribute:** [developer guide](docs/DEVELOPERS.md) ·
+> **Documentation site:** <https://buzzqw.github.io/gextto/>
 
 ## What it does
 

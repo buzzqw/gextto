@@ -6,7 +6,7 @@ exist and the open items with their gate. The numbers behind the choices are in
 
 The technical reference of the engine is [`gx-torrent.md`](gx-torrent.md), its BEP
 compliance [`bep.md`](bep.md), the engine inventory
-[`../internal/gxcore/GEXTTO.md`](../internal/gxcore/GEXTTO.md) and the standalone client
+[`../internal/gxcore/GEXTTO.md`](https://github.com/buzzqw/gextto/blob/main/internal/gxcore/GEXTTO.md) and the standalone client
 [`gx-core.md`](gx-core.md).
 
 ## Index

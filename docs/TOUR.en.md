@@ -1,6 +1,6 @@
 # Gextto — guided tour
 
-> **Italiano:** [TOUR.it.md](TOUR.it.md) · Back to the [README](../README.md)
+> **Italiano:** [TOUR.it.md](TOUR.it.md) · Back to the [README](https://github.com/buzzqw/gextto/blob/main/README.md)
 
 The main screens of Gextto and of its engine, gx-torrent. Every image comes from
 a test instance downloading public, legal torrents (Debian, Ubuntu Server and
