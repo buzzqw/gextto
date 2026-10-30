@@ -828,6 +828,22 @@ label.field > span, .field > span, .field-label { color: var(--muted); font-size
 .ed2k-shared-table .ed2k-file-name { display: block; overflow-wrap: anywhere; word-break: break-word; white-space: normal; }
 .ed2k-shared-table .ed2k-uploaded { display: block; white-space: nowrap; }
 .ed2k-shared-table .ed2k-uploaded + small { display: block; white-space: normal; overflow-wrap: anywhere; }
+/* From this width on, every counter has a fixed width and the file name takes
+   all the remaining space. "Ultimo caricamento" becomes "Ultimo" and
+   "caricamento" on two lines, so its column stops growing with the window. */
+@media (min-width: 1280px) {
+  .ed2k-shared-table th:nth-child(1), .ed2k-shared-table td:nth-child(1) { width: auto; }
+  .ed2k-shared-table th:nth-child(2), .ed2k-shared-table td:nth-child(2) { width: 68px; }
+  .ed2k-shared-table th:nth-child(3), .ed2k-shared-table td:nth-child(3) { width: 97px; }
+  .ed2k-shared-table th:nth-child(4), .ed2k-shared-table td:nth-child(4) { width: 77px; }
+  .ed2k-shared-table th:nth-child(5), .ed2k-shared-table td:nth-child(5) { width: 77px; }
+  .ed2k-shared-table th:nth-child(6), .ed2k-shared-table td:nth-child(6) { width: 58px; }
+  .ed2k-shared-table th:nth-child(7), .ed2k-shared-table td:nth-child(7) { width: 77px; }
+  .ed2k-shared-table th:nth-child(8), .ed2k-shared-table td:nth-child(8) { width: 104px; padding-left: 4px; padding-right: 4px; }
+  .ed2k-shared-table thead th:nth-child(8) { font-size: 0.6rem; letter-spacing: 0.02em; }
+  .ed2k-shared-table th:nth-child(9), .ed2k-shared-table td:nth-child(9) { width: 68px; }
+  .ed2k-shared-table th:nth-child(10), .ed2k-shared-table td:nth-child(10) { width: 87px; }
+}
 .ed2k-uploads-table { width: 100%; min-width: 0; table-layout: fixed; }
 .ed2k-uploads-table thead th { white-space: normal; }
 .ed2k-uploads-table th:nth-child(1), .ed2k-uploads-table td:nth-child(1) { width: 15%; }
