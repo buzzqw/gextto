@@ -152,7 +152,7 @@ Settings (*Torrent engine* tab, *gx-torrent* group):
 | `gxtorrent_auto` | `true` | self-management of gx-torrent: dynamic queue and adaptive cache. Disable it to set slots and cache by hand |
 | `gxtorrent_request_timeout_secs` | `15` | 1–300 |
 | `gxtorrent_poll_interval_ms` | `1500` | minimum interval between two state reads (250–60000) |
-| `gxtorrent_proxy` | empty | proxy for gx-torrent: `socks5://[user:password@]host:port` or `http://host:port`. Peers, HTTP trackers and web seeds go through the proxy; DHT and UDP trackers are turned off. It travels in the daemon's environment, not on the command line |
+| `gxtorrent_proxy` | empty | proxy for gx-torrent: `socks5://[user:password@]host:port` or `http://host:port`. Peers, HTTP trackers, web seeds and the IP filter list download go through the proxy; DHT and UDP trackers are turned off. It travels in the daemon's environment, not on the command line |
 
 The queue and bandwidth settings remain those of the *Speed and network* and
 *Queues and performance* tabs:
@@ -1236,8 +1236,8 @@ RPC server is disabled.
 - **Proxy.**
   - `socks5://[user:password@]host:port` or `http://host:port`
     (CONNECT tunnel).
-  - Peers, HTTP trackers and web seeds go through the proxy; the tracker names
-    are resolved by the proxy.
+  - Peers, HTTP trackers, web seeds and the IP filter list download go through
+    the proxy; the tracker names are resolved by the proxy.
   - DHT and UDP trackers are turned off, because they cannot go through a TCP
     proxy and otherwise would go out.
   - Incoming connections stay direct on the single port.

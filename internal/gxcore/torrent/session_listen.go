@@ -7,18 +7,27 @@ package torrent
 // torrent from the info hash and hands it the ready connection.
 
 import (
-	"github.com/buzzqw/gextto/internal/gxcore/internal/netx"
+	"errors"
 	"net"
 	"time"
 
 	"github.com/buzzqw/gextto/internal/dht"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/btconn"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/handshaker/incominghandshaker"
+	"github.com/buzzqw/gextto/internal/gxcore/internal/netx"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/peersource"
 )
 
 // maxRoutedHandshakes bounds concurrent incoming handshakes on the shared port.
 const maxRoutedHandshakes = 256
+
+const (
+	// acceptRetryInitial is the first pause after a transient Accept failure;
+	// it doubles up to acceptRetryMax so a long descriptor shortage does not
+	// spin the loop.
+	acceptRetryInitial = 5 * time.Millisecond
+	acceptRetryMax     = time.Second
+)
 
 func (s *Session) sharedPort() bool {
 	return s.config.ListenPort > 0
@@ -45,16 +54,16 @@ func (s *Session) startSharedListener() error {
 // acceptUTP routes incoming uTP peers like the TCP ones.
 func (s *Session) acceptUTP() {
 	slots := make(chan struct{}, maxRoutedHandshakes)
+	delay, warned := acceptRetryInitial, false
 	for {
 		raw, err := s.utpSocket.Accept()
 		if err != nil {
-			select {
-			case <-s.closeC:
-			default:
-				s.log.Errorln("uTP listener stopped:", err)
+			if !s.acceptRetry(err, &delay, &warned) {
+				return
 			}
-			return
+			continue
 		}
+		delay, warned = acceptRetryInitial, false
 		conn := netx.TrackUTP(netx.NewUTPConn(raw))
 		netx.IncomingUTP.Add(1)
 		addr, ok := conn.RemoteAddr().(*net.TCPAddr)
@@ -77,16 +86,16 @@ func (s *Session) acceptUTP() {
 
 func (s *Session) acceptShared(listener *net.TCPListener) {
 	slots := make(chan struct{}, maxRoutedHandshakes)
+	delay, warned := acceptRetryInitial, false
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
-			select {
-			case <-s.closeC:
-			default:
-				s.log.Errorln("shared listener stopped:", err)
+			if !s.acceptRetry(err, &delay, &warned) {
+				return
 			}
-			return
+			continue
 		}
+		delay, warned = acceptRetryInitial, false
 		netx.IncomingTCP.Add(1)
 		addr, ok := conn.RemoteAddr().(*net.TCPAddr)
 		if !ok {
@@ -108,6 +117,42 @@ func (s *Session) acceptShared(listener *net.TCPListener) {
 			s.routeIncoming(conn)
 		}()
 	}
+}
+
+// acceptRetry decides what to do after an Accept failure. A transient error
+// (EMFILE/ENFILE when descriptors are briefly exhausted, EINTR, ECONNABORTED)
+// must not kill the listener for the rest of the session: it waits with a
+// growing backoff and lets the loop try again. A permanent error, or a closed
+// session, stops the loop.
+func (s *Session) acceptRetry(err error, delay *time.Duration, warned *bool) bool {
+	select {
+	case <-s.closeC:
+		return false
+	default:
+	}
+	var ne net.Error
+	if !errors.As(err, &ne) || !ne.Temporary() {
+		s.log.Errorln("incoming peer listener stopped:", err)
+		return false
+	}
+	if !*warned {
+		s.log.Warningln("cannot accept an incoming peer connection, retrying:", err)
+		*warned = true
+	} else {
+		s.log.Debugln("cannot accept an incoming peer connection yet:", err)
+	}
+	select {
+	case <-s.closeC:
+		return false
+	case <-time.After(*delay):
+	}
+	if *delay < acceptRetryMax {
+		*delay *= 2
+		if *delay > acceptRetryMax {
+			*delay = acceptRetryMax
+		}
+	}
+	return true
 }
 
 // sharedSKey finds the MSE secret (info hash) among all torrents.

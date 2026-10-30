@@ -1,6 +1,8 @@
 package main
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
@@ -45,6 +47,39 @@ func TestIPFilterRulesCache(t *testing.T) {
 	}
 	if n, err := d.loadIPFilterLocked(path); err != nil || n != 1 {
 		t.Fatalf("reload = %d/%v, want 1 rule", n, err)
+	}
+}
+
+// TestIPFilterDownloadUsesTheProxy: with a proxy configured, fetching the IP
+// filter list must go through it. A direct fetch would reveal the operator's
+// address and bypass the tunnel the proxy exists for.
+func TestIPFilterDownloadUsesTheProxy(t *testing.T) {
+	proxy := startTestProxy(t, "http")
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/filter.dat" {
+			t.Errorf("filter path = %q, want /filter.dat", r.URL.Path)
+		}
+		_, _ = w.Write([]byte("1.2.3.0/24\n5.6.7.0/24\n"))
+	}))
+	defer server.Close()
+
+	d := newTestDaemonWith(t, NetworkOptions{
+		PortBegin: 49000, PortEnd: 49099, Encryption: 1,
+		Proxy: "http://" + proxy.listener.Addr().String(),
+	})
+	path, err := d.fetchIPFilterURL(server.URL + "/filter.dat")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if proxy.tunnels.Load() == 0 {
+		t.Fatal("the IP filter download did not go through the proxy")
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(data) == 0 {
+		t.Fatal("the downloaded filter is empty")
 	}
 }
 

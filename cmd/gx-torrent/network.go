@@ -293,7 +293,10 @@ func (d *Daemon) fetchIPFilterURL(rawURL string) (string, error) {
 		return "", err
 	}
 	req.Header.Set("User-Agent", "gx-torrent")
-	resp, err := http.DefaultClient.Do(req)
+	// The filter list is fetched like every other engine download: through the
+	// configured proxy or VPN interface, never around it.
+	client := &http.Client{Transport: torrent.HTTPTransport()}
+	resp, err := client.Do(req)
 	if err != nil {
 		return "", err
 	}

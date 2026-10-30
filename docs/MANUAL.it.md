@@ -2232,7 +2232,7 @@ verifica.
 | gx-torrent — URL Web API | URL dell'API di gx-torrent (es. http://127.0.0.1:8890). Gextto lo usa per pilotare il demone. |
 | gx-torrent — indirizzo di ascolto (LAN) | Indirizzo di ascolto del demone gestito. Predefinito `127.0.0.1:8890`: pagina web e API restano solo su questo server. Per esporle in LAN usa `0.0.0.0:8890` e imposta `gxtorrent_token` (senza token Gextto avvia il demone in `-insecure`). La porta viene allineata a quella dell'URL. |
 | gx-torrent — gestione automatica (cache e coda) | Attiva l'autogestione di gx-torrent: coda dinamica e cache adattiva (dimensionata su memoria disponibile, download/seed attivi e tipo di storage). Predefinito attivo. Disattivalo per fissare a mano cache e slot. |
-| gx-torrent — proxy (socks5:// o http://) | Proxy per peer, tracker HTTP e web seed; con un proxy DHT e tracker UDP vengono spenti (non visualizzato). |
+| gx-torrent — proxy (socks5:// o http://) | Proxy per peer, tracker HTTP, web seed e scaricamento della lista del filtro IP; con un proxy DHT e tracker UDP vengono spenti (non visualizzato). |
 | gx-torrent — identità del client annunciata | Cosa vedono peer e tracker: `gx-core` con la versione reale (default) oppure un preset qBittorrent, Transmission, Rain o anacrolix/torrent. Cambia solo l'identità annunciata, non il protocollo: alcuni tracker privati accettano solo client in whitelist, controlla le loro regole. |
 | gx-torrent — versione del client annunciata | Versione usata con il preset; vuoto usa quella predefinita del preset. |
 | gx-torrent — timeout richieste | Timeout in secondi delle richieste HTTP verso gx-torrent. *(Unità: secondi)* |

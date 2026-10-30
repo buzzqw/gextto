@@ -14,6 +14,10 @@ manual is online: [English](docs/MANUAL.en.md) ·
 [GitHub issues](https://github.com/buzzqw/gextto/issues).
 
 ## 30 October 2026
+- **The IP filter list is downloaded through the proxy.** With a proxy configured for gx-torrent, updating the IP filter list went straight out to the Internet: your address was visible and the traffic bypassed the tunnel. It now goes through the same proxy (or VPN interface) as peers, trackers and web seeds. Nothing to configure.
+
+- **gx-torrent no longer stops accepting peers because of a passing error.** If the system refused an incoming connection for a moment — for example because too many files were open — the engine treated the listener as closed and accepted no peer until a restart. It now retries by itself, with growing waits, and resumes as soon as the system allows it; one line stays in the log. Nothing to configure.
+
 - **An episode picked by hand from eD2k reaches the library.** Picking an eD2k result from an episode search (the missing episodes of a series included) registered the download with only its file name, without series, season and episode. Once it finished, Gextto did not recognise it as an episode, tried to move it like a torrent (which aMule does not allow) and repeated «Could not move the completed …» in the log every ten minutes. The download now keeps its series and episode and is imported at completion like any eD2k episode. Downloads already stuck this way are recognised at the next check and reach the library. An eD2k file Gextto cannot place stays in aMule's incoming folder, with a single log line. Nothing to configure.
 
 - **Streaming a torrent added with «Skip check» reads only checked data.** With gx-torrent a torrent added without the check verifies each piece the first time a peer asks for it, but the streaming reader read the files as they were. Streaming now waits for the check of the piece it is about to read too, and starts it by itself if no peer asked for that piece yet; if the piece does not match, gx-torrent checks every file again, as it does for peers. The wait is a few milliseconds per piece. Nothing to configure.
