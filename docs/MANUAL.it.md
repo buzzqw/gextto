@@ -1018,12 +1018,13 @@ alto e un Kad non dietro firewall, cioè più fonti.
   esistono (disco di rete smontato, cartella rimossa) la pagina lo segnala con
   **Crea le cartelle**: senza, aMule riempie il log di *Failed to get file
   system statistics* e non importa i file completati.
-- **File condivisi**: quello che aMule condivide, con i byte caricati nella
-  sessione e in totale, richieste e accettate (sessione e dall'inizio), client
-  in coda, velocità di caricamento del file, ultimo caricamento, priorità e il
-  link `ed2k://` da copiare; sotto, i client a cui stai caricando con velocità e
-  posizione in coda. I contatori sono quelli di aMule: la colonna della sessione
-  riparte da zero a ogni riavvio di `amuled`, quella totale resta. **Ricarica
+- **File condivisi**: quello che aMule condivide, con i byte caricati in totale
+  e, sotto, quelli della sessione, richieste e accettate (sessione e
+  dall'inizio), client in coda, velocità di caricamento del file, ultimo
+  caricamento, priorità e il link `ed2k://` da copiare; sotto, i client a cui
+  stai caricando con velocità e posizione in coda. I contatori sono quelli di
+  aMule: il valore della sessione riparte da zero a ogni riavvio di `amuled`,
+  quello totale resta. **Ricarica
   file condivisi** fa rileggere ad aMule le
   cartelle (utile se hai aggiunto o tolto file a mano); le cartelle condivise
   sono elencate in sola lettura.

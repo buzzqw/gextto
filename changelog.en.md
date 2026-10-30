@@ -14,6 +14,8 @@ manual is online: [English](docs/MANUAL.en.md) ·
 [GitHub issues](https://github.com/buzzqw/gextto/issues).
 
 ## 30 October 2026
+- **eD2k shared files no longer widen the page.** On the *Shared files* tab a long name forced you to scroll right and left the last fields off screen. The name now wraps inside its cell and the bytes uploaded in this session sit under the total, in the same column: the table fits the page and shows more data at once. Nothing to configure.
+
 - **Feeds, indexers and .torrent links go through the proxy.** With a proxy configured for gx-torrent, only peers, trackers, web seeds and the IP filter list used it: RSS feeds, Torznab indexers and .torrent files taken from a URL went out directly. They now follow the proxy (or the VPN interface), while services on localhost and on the local network stay direct, because sending them through the proxy would break them. With a proxy configured, FlareSolverr is not used as a fallback: it would fetch on its own outside the tunnel, so it must be placed behind the same proxy. The update check stays as before. Nothing to configure.
 
 - **The IP filter list is downloaded through the proxy.** With a proxy configured for gx-torrent, updating the IP filter list went straight out to the Internet: your address was visible and the traffic bypassed the tunnel. It now goes through the same proxy (or VPN interface) as peers, trackers and web seeds, even with an HTTP proxy that refuses CONNECT tunnels to port 80. Nothing to configure.

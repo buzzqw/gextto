@@ -58,6 +58,51 @@ func TestV2Ed2kPageRenders(t *testing.T) {
 	}
 }
 
+// TestV2Ed2kSharedTableWrapsLongNames keeps the shared-files table inside the
+// page: a long file name must wrap in its cell instead of widening the whole
+// table, and the session upload sits under the total in a single column.
+func TestV2Ed2kSharedTableWrapsLongNames(t *testing.T) {
+	longName := "FBI.International.4x13.La.Taglia.ITA.AMZN.DLMux.x264-WRM.mkv"
+	view := v2Ed2kSharedView{
+		Enabled: true,
+		Files: []v2Ed2kSharedRow{{
+			Name:           longName,
+			Size:           376545824,
+			Transferred:    1024,
+			TransferredAll: 2048,
+			Requests:       3,
+			RequestsAll:    9,
+			Accepts:        2,
+			AcceptsAll:     8,
+			Queued:         1,
+			UploadRate:     100,
+			LastUpload:     "2026-10-30 08:00",
+			Priority:       "Normale",
+			Link:           "ed2k://|file|a.mkv|10|0123456789abcdef0123456789abcdef|/",
+		}},
+	}
+	var buffer bytes.Buffer
+	if err := v2Templates.ExecuteTemplate(&buffer, "v2_ed2k_shared", view); err != nil {
+		t.Fatal(err)
+	}
+	body := buffer.String()
+	for _, want := range []string{
+		`class="data-table ed2k-shared-table"`,
+		`class="ed2k-file-name"`,
+		`class="ed2k-uploaded"`,
+		`<span>Sessione</span>`,
+		"Caricato (totale)",
+		`title="` + longName + `"`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("shared files table is missing %q", want)
+		}
+	}
+	if strings.Contains(body, "Caricato (sessione)") {
+		t.Fatal("the session column must sit under the total, not beside it")
+	}
+}
+
 // TestV2ArchiveShowsScaricaForEd2kResults guards the archive variant of the
 // eD2k results: the block sits under the archive table and must keep the same
 // Scarica button that queues the ed2k link in aMule. It was lost once already.

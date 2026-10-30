@@ -2699,14 +2699,13 @@
 </div>
 <p class="muted"><span>Cartelle condivise</span>: <code>{{.Incoming}}</code> <span>cartella di arrivo</span>{{range .Dirs}} · <code>{{.}}</code>{{end}}</p>
 {{if .Files}}
-<div class="table-wrap"><table class="data-table">
+<div class="table-wrap"><table class="data-table ed2k-shared-table">
   <caption class="sr-only">File condivisi con quanto aMule ha caricato</caption>
-  <thead><tr><th scope="col">File</th><th scope="col" class="numeric">Dimensione</th><th scope="col" class="numeric" title="Byte caricati in questa sessione">Caricato (sessione)</th><th scope="col" class="numeric" title="Byte caricati dall'inizio">Caricato (totale)</th><th scope="col" class="numeric" title="Richieste ricevute: in questa sessione (dall'inizio)">Richieste</th><th scope="col" class="numeric" title="Richieste accettate: in questa sessione (dall'inizio)">Accettate</th><th scope="col" class="numeric">In coda</th><th scope="col" class="numeric" title="Byte al secondo che aMule sta caricando per questo file">Velocità</th><th scope="col" title="Ultimo caricamento di questo file; — se aMule non l'ha mai caricato">Ultimo caricamento</th><th scope="col">Priorità</th><th scope="col">Link</th></tr></thead>
+  <thead><tr><th scope="col">File</th><th scope="col" class="numeric">Dimensione</th><th scope="col" class="numeric" title="Byte caricati dall'inizio">Caricato (totale)</th><th scope="col" class="numeric" title="Richieste ricevute: in questa sessione (dall'inizio)">Richieste</th><th scope="col" class="numeric" title="Richieste accettate: in questa sessione (dall'inizio)">Accettate</th><th scope="col" class="numeric">In coda</th><th scope="col" class="numeric" title="Byte al secondo che aMule sta caricando per questo file">Velocità</th><th scope="col" title="Ultimo caricamento di questo file; — se aMule non l'ha mai caricato">Ultimo caricamento</th><th scope="col">Priorità</th><th scope="col">Link</th></tr></thead>
   <tbody>{{range .Files}}<tr>
-    <td><span class="truncate" title="{{.Name}}">{{.Name}}</span></td>
+    <td><span class="ed2k-file-name" title="{{.Name}}">{{.Name}}</span></td>
     <td class="numeric">{{bytes .Size}}</td>
-    <td class="numeric">{{bytes .Transferred}}</td>
-    <td class="numeric">{{bytes .TransferredAll}}</td>
+    <td class="numeric"><span class="ed2k-uploaded">{{bytes .TransferredAll}}</span><small class="muted" title="Byte caricati in questa sessione"><span>Sessione</span> {{bytes .Transferred}}</small></td>
     <td class="numeric">{{.Requests}} ({{.RequestsAll}})</td>
     <td class="numeric">{{.Accepts}} ({{.AcceptsAll}})</td>
     <td class="numeric">{{.Queued}}</td>
@@ -2719,9 +2718,9 @@
 {{else}}<p class="muted">aMule non sta condividendo file.</p>{{end}}
 {{if .Uploads}}
 <h4>Chi sta scaricando da te</h4>
-<div class="table-wrap"><table class="data-table">
+<div class="table-wrap"><table class="data-table ed2k-uploads-table">
   <thead><tr><th scope="col">Client</th><th scope="col">Software</th><th scope="col">File</th><th scope="col" class="numeric">Velocità</th><th scope="col" class="numeric">Caricato</th><th scope="col" class="numeric">Posizione in coda</th></tr></thead>
-  <tbody>{{range .Uploads}}<tr><td>{{if .Name}}{{.Name}}{{else}}{{.IP}}{{end}}</td><td>{{.Software}}</td><td><span class="truncate" title="{{.FileName}}">{{.FileName}}</span></td><td class="numeric">{{rateI .UpSpeed}}</td><td class="numeric">{{bytes .Uploaded}}</td><td class="numeric">{{.WaitingPosition}}</td></tr>{{end}}</tbody>
+  <tbody>{{range .Uploads}}<tr><td>{{if .Name}}{{.Name}}{{else}}{{.IP}}{{end}}</td><td>{{.Software}}</td><td><span class="ed2k-file-name" title="{{.FileName}}">{{.FileName}}</span></td><td class="numeric">{{rateI .UpSpeed}}</td><td class="numeric">{{bytes .Uploaded}}</td><td class="numeric">{{.WaitingPosition}}</td></tr>{{end}}</tbody>
 </table></div>
 {{else}}<p class="muted">Nessun client in coda di caricamento.</p>{{end}}
 {{end}}

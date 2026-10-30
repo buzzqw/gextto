@@ -995,12 +995,13 @@ which means more sources.
   network disk unmounted, a folder removed) the page says so and **Create the
   folders** makes them; without them aMule fills its log with *Failed to get
   file system statistics* and never imports completed files.
-- **Shared files**: what aMule shares, with the bytes uploaded in this session
-  and over all time, requests and accepted ones (session and since the start),
-  queued clients, the file's upload speed, the last upload, priority and
-  the `ed2k://` link to copy; below it the clients you are uploading to, with
-  speed and queue position. The counters are aMule's: the session column starts
-  from zero every time `amuled` restarts, the total one does not. **Reload
+- **Shared files**: what aMule shares, with the bytes uploaded over all time
+  and, below, those of this session, requests and accepted ones (session and
+  since the start), queued clients, the file's upload speed, the last upload,
+  priority and the `ed2k://` link to copy; below it the clients you are
+  uploading to, with speed and queue position. The counters are aMule's: the
+  session value starts from zero every time `amuled` restarts, the total one
+  does not. **Reload
   shared files** asks aMule to rescan the
   folders (useful after adding or removing files by hand); the shared folders
   are listed read-only.
