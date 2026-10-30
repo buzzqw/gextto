@@ -9,7 +9,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net/http"
 	"sort"
 	"strconv"
 	"strings"
@@ -202,7 +201,7 @@ func (d *Daemon) pollFeedsOnlyDetailed(only string) feedPollResult {
 	// the indexers directly, so a standalone client that only has indexers and
 	// wanted titles is still driven. Do not return early when feeds is empty.
 	feeds := d.feeds()
-	client := &http.Client{Timeout: feedRequestTimeout}
+	client := outboundClient(feedRequestTimeout)
 	var rulesOnce []string
 	onceHit := map[string]bool{}
 	var (

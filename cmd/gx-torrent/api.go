@@ -236,7 +236,7 @@ func splitFormList(value string) []string {
 // API applies to an uploaded file. The RSS auto-download and the compatible API
 // both use it; the cookie jar is the one the settings page manages.
 func (d *Daemon) fetchTorrentURL(rawURL string) ([]byte, error) {
-	client := &http.Client{Timeout: 60 * time.Second, Jar: d.cookieJar()}
+	client := outboundClientWithJar(60*time.Second, d.cookieJar())
 	resp, err := client.Get(rawURL)
 	if err != nil {
 		return nil, err

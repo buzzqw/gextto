@@ -152,7 +152,7 @@ Settings (*Torrent engine* tab, *gx-torrent* group):
 | `gxtorrent_auto` | `true` | self-management of gx-torrent: dynamic queue and adaptive cache. Disable it to set slots and cache by hand |
 | `gxtorrent_request_timeout_secs` | `15` | 1–300 |
 | `gxtorrent_poll_interval_ms` | `1500` | minimum interval between two state reads (250–60000) |
-| `gxtorrent_proxy` | empty | proxy for gx-torrent: `socks5://[user:password@]host:port` or `http://host:port`. Peers, HTTP trackers, web seeds and the IP filter list download go through the proxy; DHT and UDP trackers are turned off. It travels in the daemon's environment, not on the command line |
+| `gxtorrent_proxy` | empty | proxy for gx-torrent: `socks5://[user:password@]host:port` or `http://host:port`. Peers, HTTP trackers, web seeds, the IP filter list, RSS feeds, Torznab indexers and .torrent downloads go through the proxy; localhost and LAN services stay direct. DHT and UDP trackers are turned off. It travels in the daemon's environment, not on the command line |
 
 The queue and bandwidth settings remain those of the *Speed and network* and
 *Queues and performance* tabs:
@@ -1236,8 +1236,16 @@ RPC server is disabled.
 - **Proxy.**
   - `socks5://[user:password@]host:port` or `http://host:port`
     (CONNECT tunnel).
-  - Peers, HTTP trackers, web seeds and the IP filter list download go through
-    the proxy; the tracker names are resolved by the proxy.
+  - Peers, HTTP trackers, web seeds, the IP filter list, RSS feeds, Torznab
+    indexers and .torrent downloads go through the proxy; the tracker names
+    are resolved by the proxy.
+  - Localhost and LAN destinations (loopback, private and link-local
+    addresses, `localhost`, single-label service names and `.local`/`.lan`/
+    `.home`/`.internal`) are reached directly: a Jackett or Prowlarr on the
+    same machine must not be sent to the proxy.
+  - FlareSolverr is not used as a fallback while a proxy is configured: it
+    fetches the page on its own network and would bypass the tunnel. Run it
+    behind the same proxy if the fallback is needed.
   - Plain HTTP requests reach an HTTP proxy in absolute form, while HTTPS uses
     a CONNECT tunnel: a proxy that refuses CONNECT on port 80 does not break
     plain HTTP downloads.

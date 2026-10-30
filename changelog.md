@@ -15,6 +15,8 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
 [issue su GitHub](https://github.com/buzzqw/gextto/issues).
 
 ## 30 ottobre 2026
+- **Feed, indexer e link .torrent passano dal proxy.** Con un proxy configurato per gx-torrent, solo peer, tracker, web seed e lista del filtro IP lo usavano: i feed RSS, gli indexer Torznab e i .torrent presi da un URL uscivano diretti. Ora seguono il proxy (o l'interfaccia VPN), mentre i servizi su localhost e in rete locale restano diretti, perché passare dal proxy li romperebbe. Se il proxy è configurato, FlareSolverr non viene usato come ripiego: scaricherebbe per conto suo fuori dal tunnel, quindi va messo dietro lo stesso proxy. Il controllo degli aggiornamenti resta come prima. Niente da configurare.
+
 - **La lista del filtro IP si scarica attraverso il proxy.** Con un proxy configurato per gx-torrent, l'aggiornamento della lista del filtro IP usciva direttamente da Internet: il tuo indirizzo si vedeva e il traffico aggirava il tunnel. Ora passa dallo stesso proxy (o dall'interfaccia VPN) dei peer, dei tracker e dei web seed, anche con un proxy HTTP che non accetta tunnel CONNECT verso la porta 80. Niente da configurare.
 
 - **gx-torrent non smette più di accettare peer per un errore passeggero.** Se il sistema rifiutava per un attimo una connessione in arrivo — per esempio perché i file aperti erano troppi — il motore considerava chiuso il listener e non accettava più nessun peer fino al riavvio. Ora riprova da solo, con attese crescenti, e riprende appena il sistema lo permette; nel log resta una riga. Niente da configurare.

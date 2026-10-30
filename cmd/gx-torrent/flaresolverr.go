@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/buzzqw/gextto/internal/flaresolverr"
+	"github.com/buzzqw/gextto/internal/gxcore/torrent"
 	"github.com/buzzqw/gextto/internal/rss"
 )
 
@@ -49,7 +50,10 @@ func (d *Daemon) remoteGet(ctx context.Context, rawURL string) ([]byte, error) {
 		original = fmt.Errorf("HTTP %d", status)
 	}
 	ep := d.flareEndpoint()
-	if ep == "" || isLocalURL(rawURL) {
+	// With a proxy configured FlareSolverr would fetch the page on its own
+	// network and bypass the tunnel, so the direct error stands. Run
+	// FlareSolverr behind the same proxy if you need it.
+	if ep == "" || isLocalURL(rawURL) || torrent.ProxyEnabled() {
 		return nil, original
 	}
 	if solved, ferr := flaresolverr.Get(ctx, ep, rawURL); ferr == nil {
@@ -66,7 +70,7 @@ func directGet(ctx context.Context, rawURL string) ([]byte, int, error) {
 	if err != nil {
 		return nil, 0, err
 	}
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := outboundClient(0).Do(req)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -103,7 +107,8 @@ func (d *Daemon) fetchFeedItems(ctx context.Context, client *http.Client, rawURL
 		return items, nil
 	}
 	ep := d.flareEndpoint()
-	if ep == "" || isLocalURL(rawURL) {
+	// As in remoteGet: FlareSolverr would fetch on its own network.
+	if ep == "" || isLocalURL(rawURL) || torrent.ProxyEnabled() {
 		return nil, err
 	}
 	data, ferr := flaresolverr.Get(ctx, ep, rawURL)

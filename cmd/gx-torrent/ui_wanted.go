@@ -517,7 +517,7 @@ func mergeNames(base, extra []string, limit int) []string {
 // feeds, whose results come from the indexers), for the wanted search step.
 func (d *Daemon) wantedRSSItems(ctx context.Context) []rss.Item {
 	var out []rss.Item
-	client := &http.Client{Timeout: feedRequestTimeout}
+	client := outboundClient(feedRequestTimeout)
 	for _, feed := range d.feeds() {
 		if strings.TrimSpace(feed.URL) == "" || feed.Paused {
 			continue

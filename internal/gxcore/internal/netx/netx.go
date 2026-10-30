@@ -14,6 +14,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -198,7 +199,10 @@ func DialDirectContext(ctx context.Context, base net.Dialer, network, addr strin
 	return d.DialContext(ctx, network, addr)
 }
 
-// HTTPTransport is an HTTP transport that honors the outbound rules.
+// HTTPTransport is an HTTP transport that honors the outbound rules. A
+// configured proxy is used for public hosts only: localhost, LAN and
+// single-label service names are reached directly, because a proxy cannot
+// improve a connection to a service on the same machine or network.
 func HTTPTransport() *http.Transport {
 	s := Current()
 	tr := &http.Transport{
@@ -210,9 +214,38 @@ func HTTPTransport() *http.Transport {
 		// http, https and socks5/socks5h are handled by net/http: HTTPS uses
 		// CONNECT, plain HTTP keeps its absolute form, and a SOCKS5 proxy gets
 		// the hostname (the same remote resolution DialContext uses).
-		tr.Proxy = http.ProxyURL(s.Proxy)
+		tr.Proxy = func(req *http.Request) (*url.URL, error) {
+			if IsLocalHost(req.URL.Hostname()) {
+				return nil, nil
+			}
+			return s.Proxy, nil
+		}
 	}
 	return tr
+}
+
+// IsLocalHost reports whether host is a destination a proxy must not see:
+// loopback, a private or link-local IP, "localhost", a single-label service
+// name (a Docker service, for example) or a .local/.lan/.home/.internal name.
+// It never resolves a name: deciding whether to use the proxy must not leak a
+// DNS query for a public host.
+func IsLocalHost(host string) bool {
+	host = strings.ToLower(strings.TrimSuffix(strings.TrimSpace(host), "."))
+	if host == "" {
+		return false
+	}
+	if ip := net.ParseIP(host); ip != nil {
+		return IsPrivateAddress(ip)
+	}
+	if host == "localhost" || strings.HasSuffix(host, ".localhost") {
+		return true
+	}
+	for _, suffix := range []string{".local", ".lan", ".home", ".internal"} {
+		if strings.HasSuffix(host, suffix) {
+			return true
+		}
+	}
+	return !strings.Contains(host, ".")
 }
 
 // utpDial is the uTP dialer of the session (nil = TCP only); utpOnly skips

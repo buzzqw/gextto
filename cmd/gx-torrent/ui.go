@@ -1030,7 +1030,7 @@ func fetchRemoteTorrent(rawURL string) ([]byte, error) {
 		return nil, err
 	}
 	req.Header.Set("User-Agent", "gx-torrent")
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := outboundClient(0).Do(req)
 	if err != nil {
 		return nil, err
 	}

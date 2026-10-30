@@ -11,6 +11,13 @@ import (
 	"github.com/buzzqw/gextto/internal/gxcore/internal/netx"
 )
 
+// ProxyEnabled reports whether an outbound proxy is configured. Callers that
+// would hand a URL to another service (FlareSolverr) use it to avoid a fetch
+// that bypasses the tunnel.
+func ProxyEnabled() bool {
+	return netx.Current().Proxy != nil
+}
+
 // HTTPTransport returns an HTTP transport that honors the configured outgoing
 // interface and proxy. The caller owns it and should close idle connections
 // when done with a short-lived client.

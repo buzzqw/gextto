@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -48,6 +49,55 @@ func TestIPFilterRulesCache(t *testing.T) {
 	}
 	if n, err := d.loadIPFilterLocked(path); err != nil || n != 1 {
 		t.Fatalf("reload = %d/%v, want 1 rule", n, err)
+	}
+}
+
+// TestTorrentAndIndexerDownloadsUseTheProxyOnlyForRemoteHosts: the daemon's
+// own downloads (.torrent URLs, Torznab indexers) follow the configured proxy
+// for public hosts, while a service on localhost stays direct.
+func TestTorrentAndIndexerDownloadsUseTheProxyOnlyForRemoteHosts(t *testing.T) {
+	var hits atomic.Int64
+	proxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hits.Add(1)
+		_, _ = w.Write([]byte("proxied-body"))
+	}))
+	defer proxy.Close()
+	local := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte("local-body"))
+	}))
+	defer local.Close()
+
+	d := newTestDaemonWith(t, NetworkOptions{
+		PortBegin: 49000, PortEnd: 49099, Encryption: 1,
+		Proxy: proxy.URL,
+	})
+
+	// A public host: the proxy answers and the target name never resolves.
+	body, err := d.fetchTorrentURL("http://torrent.invalid/a.torrent")
+	if err != nil || string(body) != "proxied-body" {
+		t.Fatalf("remote .torrent = %q, %v", body, err)
+	}
+	before := hits.Load()
+	if before == 0 {
+		t.Fatal("the remote .torrent did not go through the proxy")
+	}
+
+	// The indexer transport follows the same rule.
+	if body, err = d.remoteGet(context.Background(), "http://indexer.invalid/api"); err != nil || string(body) != "proxied-body" {
+		t.Fatalf("remote indexer = %q, %v", body, err)
+	}
+	if hits.Load() <= before {
+		t.Fatal("the remote indexer did not go through the proxy")
+	}
+
+	// A service on the machine is reached directly and the proxy is not used.
+	before = hits.Load()
+	body, err = d.fetchTorrentURL(local.URL)
+	if err != nil || string(body) != "local-body" {
+		t.Fatalf("local .torrent = %q, %v", body, err)
+	}
+	if hits.Load() != before {
+		t.Fatal("a localhost download went through the proxy")
 	}
 }
 

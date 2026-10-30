@@ -155,7 +155,7 @@ func (d *Daemon) handleUIFeedItems(w http.ResponseWriter, r *http.Request) {
 		feedName = chosen.URL
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), feedRequestTimeout)
-	items, err := d.fetchFeedItems(ctx, &http.Client{Timeout: feedRequestTimeout}, chosen.URL, feedName)
+	items, err := d.fetchFeedItems(ctx, outboundClient(feedRequestTimeout), chosen.URL, feedName)
 	cancel()
 	if err != nil {
 		writeError(w, http.StatusBadGateway, err)
