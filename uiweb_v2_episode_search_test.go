@@ -174,15 +174,28 @@ func TestEpisodeSearchReportsWhatItDoes(t *testing.T) {
 		{Name: "First", URL: indexer.URL, Enabled: true},
 		{Name: "Second", URL: indexer.URL, Enabled: true},
 	}
+	// The progress callback is called from the indexer fan-out goroutines: the
+	// slice and the counter below it are shared, so they need a lock. Without
+	// it `go test -race` flags the test and a lost append makes the assertion
+	// fail on a slow machine.
+	var progressMu sync.Mutex
 	var counts []searchProgress
 	ctx := withSearchProgress(context.Background(), func(progress searchProgress) {
+		progressMu.Lock()
 		counts = append(counts, progress)
+		progressMu.Unlock()
 	})
 	NewEngine().SearchSeriesEpisode(ctx, &cfg, &SeriesConfig{Name: "Example Show", Enabled: true}, 1, 1, true)
-	if len(counts) != 2 {
+	progressMu.Lock()
+	got := len(counts)
+	var last searchProgress
+	if got > 0 {
+		last = counts[got-1]
+	}
+	progressMu.Unlock()
+	if got != 2 {
 		t.Fatalf("progress reports = %+v, want one per source", counts)
 	}
-	last := counts[len(counts)-1]
 	if last.Total != 2 || last.Done != 2 {
 		t.Fatalf("last progress = %+v, want 2 of 2 sources", last)
 	}
@@ -190,10 +203,18 @@ func TestEpisodeSearchReportsWhatItDoes(t *testing.T) {
 	// The stages: the indexer fan-out first, then the eD2k fallback when the
 	// torrent side left nothing.
 	state := newTestAppState(t)
+	var stagesMu sync.Mutex
 	var stages []string
-	stageCtx := withSearchStages(context.Background(), func(name string) { stages = append(stages, name) })
+	stageCtx := withSearchStages(context.Background(), func(name string) {
+		stagesMu.Lock()
+		stages = append(stages, name)
+		stagesMu.Unlock()
+	})
 	gh7_search_series_episode_sources(stageCtx, state, latestConfig(state), SeriesConfig{Name: "Show", Enabled: true}, 1, 1)
-	if strings.Join(stages, ",") != "sources,ed2k" {
+	stagesMu.Lock()
+	joined := strings.Join(stages, ",")
+	stagesMu.Unlock()
+	if joined != "sources,ed2k" {
 		t.Fatalf("stages = %v, want sources then ed2k", stages)
 	}
 }

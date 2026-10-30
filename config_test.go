@@ -932,6 +932,10 @@ func TestConfigUnmarshalKeepsDefaultsForAbsentKeys(t *testing.T) {
 // TestLoadConfigPartialFileKeepsDefaults exercises the real loader: a
 // gextto.json containing only `{}` must behave like the defaults.
 func TestLoadConfigPartialFileKeepsDefaults(t *testing.T) {
+	// The default data_dir is relative ("data"), and the loader opens the
+	// settings database inside it: without this the test creates a data/
+	// directory in the checkout — and fails where the tree is read-only.
+	t.Chdir(t.TempDir())
 	dir := t.TempDir()
 	path := filepath.Join(dir, "gextto.json")
 	if err := os.WriteFile(path, []byte("{}\n"), 0o644); err != nil {

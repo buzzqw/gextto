@@ -259,8 +259,32 @@ func TestV2TrafficViewFromNilState(t *testing.T) {
 	if view.HasData || view.HasLimit {
 		t.Fatal("empty state must not draw a chart")
 	}
+	if view.Auto {
+		t.Fatal("an empty state must not claim the speed is decided by Auto")
+	}
 	if view.CurrentDown == "" || view.CurrentUp == "" {
 		t.Fatal("current rates must be formatted even without history")
+	}
+}
+
+// TestSpeedPolicyWithoutAConfig: with no configuration loaded the policy
+// answers "no limit, no rule". It used to dereference the nil config and panic,
+// which the traffic panel reaches whenever the first load fails (a read-only
+// tree, a broken settings database) — the state a page can still be rendered
+// from.
+func TestSpeedPolicyWithoutAConfig(t *testing.T) {
+	download, upload, source := speedPolicy(nil)
+	if download != 0 || upload != 0 {
+		t.Fatalf("limits = %d/%d, want none", download, upload)
+	}
+	if source != speedSourceBase || speedSourceIsAuto(source) {
+		t.Fatalf("source = %q, want %q and not Auto", source, speedSourceBase)
+	}
+	if _, _, ruleSource := speedRule(nil); ruleSource != speedSourceBase {
+		t.Fatalf("rule source = %q, want %q", ruleSource, speedSourceBase)
+	}
+	if got := gh6_parseSettingInt(nil, "any-key"); got != 0 {
+		t.Fatalf("gh6_parseSettingInt(nil) = %d, want 0", got)
 	}
 }
 

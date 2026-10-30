@@ -131,6 +131,9 @@ func gh6_revokeIntegrationTokens(s *AppState, keys []string) (int, map[string]an
 }
 
 func gh6_parseSettingInt(cfg *Config, key string) int64 {
+	if cfg == nil {
+		return 0
+	}
 	value, ok := cfg.Settings[key]
 	if !ok {
 		return 0
@@ -172,6 +175,13 @@ const (
 // removed, whatever the rule is: Auto, a limit with an expiry or one kept until
 // removed. Then the rule: the schedule window in force, Auto, the fixed limits.
 func speedPolicy(cfg *Config) (download, upload int64, source string) {
+	if cfg == nil {
+		// No configuration available yet (a daemon still starting, or the state
+		// of a page rendered before the first load): no limit and no rule, so
+		// the caller draws no limit line and no badge instead of dereferencing
+		// a nil config.
+		return 0, 0, speedSourceBase
+	}
 	now := time.Now().Unix()
 	tempUntil := gh6_parseSettingInt(cfg, "torrent_temp_limit_until")
 	tempLive := tempUntil == 0 || tempUntil > now
@@ -191,6 +201,9 @@ func speedPolicy(cfg *Config) (download, upload int64, source string) {
 // speedRule is the rule chosen in Configuration, without the exception: the
 // schedule window in force, Auto, or the fixed limits.
 func speedRule(cfg *Config) (download, upload int64, source string) {
+	if cfg == nil {
+		return 0, 0, speedSourceBase
+	}
 	if gh6_truthySetting(cfg.Settings["torrent_sched_enabled"]) {
 		if day, ok := speedScheduleWeek(cfg).AtDay(time.Now()); ok {
 			if day.Auto() {

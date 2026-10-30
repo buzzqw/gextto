@@ -50,6 +50,16 @@ func (s *Session) waitRunLoop(t *torrent) bool {
 		case <-timeout.C:
 			since := t.syncingSince.Load()
 			if since == 0 {
+				// The probe and the timer can become ready in the same
+				// instant: the loop may have woken up to take the command just
+				// as the timer fired. One non-blocking attempt before
+				// declaring it dead, so the select's coin flip can never crash
+				// a loop that was answering.
+				select {
+				case t.commandC <- func() {}:
+					return true
+				default:
+				}
 				crash(t.id, "Torrent (id="+t.id+") does not respond.")
 			}
 			if !warned {

@@ -14,6 +14,8 @@ manual is online: [English](docs/MANUAL.en.md) ·
 [GitHub issues](https://github.com/buzzqw/gextto/issues).
 
 ## 30 October 2026
+- **Pages no longer break when the configuration has not been loaded yet.** When the configuration was unavailable — at startup, or when reading it fails — the traffic panel and the speed-limit badge read an empty configuration and the page came back empty. Neither the limit line nor the badge is drawn in that case now, and the page opens normally. Nothing to configure.
+
 - **The engine's health check no longer declares a torrent dead while it is answering.** The watchdog periodically asks each torrent's loop whether it is alive; when the wait expires while the torrent is writing to disk, it waits instead of reacting. One edge case was left: when the torrent answered in the very instant the wait expired, the random choice could take the "expired" branch, read "no write in progress" and end gx-torrent with an error. Before declaring the torrent dead the watchdog now makes one immediate last attempt: if the loop is listening, the answer arrives and the torrent carries on. Nothing to configure.
 
 - **A comic downloaded as a CBR arrives with the right extension.** The file name came from the post title, which does not say whether the content is a CBZ (a ZIP) or a CBR (a RAR): every direct download therefore ended in `.cbz`, and Komga and Kavita refused to open the issues that were really RAR archives. Once the download completes the extension now follows the content: a RAR becomes `.cbr`, a ZIP stays `.cbz`. Files already downloaded are left alone. Nothing to configure.

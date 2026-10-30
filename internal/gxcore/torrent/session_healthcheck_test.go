@@ -26,9 +26,12 @@ func TestHealthCheckWaitsOutASlowFlush(t *testing.T) {
 	done := make(chan bool, 1)
 	go func() { done <- s.waitRunLoop(tr) }()
 
-	// Several timeouts pass while the flush runs, then the loop answers.
+	// Several timeouts pass while the flush runs, then the loop answers. The
+	// flush marker is never cleared: clearing it opened a window in which the
+	// watchdog could read "no flush" in the instant before the command was
+	// taken and crash a loop that was alive — the test lost that race on a slow
+	// machine. `waitRunLoop` returns on the answer, whatever the marker says.
 	time.Sleep(50 * time.Millisecond)
-	tr.syncingSince.Store(0)
 	(<-tr.commandC)()
 	if !<-done {
 		t.Fatal("waitRunLoop = false, want true once the loop answers")
