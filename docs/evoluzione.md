@@ -606,7 +606,7 @@ that socket (dual-stack `udp`, `udp4`, `udp6`) and serves every torrent's lookup
 scrapes and feeds from one request channel, where an external library expects its own
 socket and a traversal object per torrent; no measurement shows it behind
 ([`measurements.md`](measurements.md) §4.7). Robustness: parser fuzzing in
-CI (`make fuzz-smoke`, 24 targets, seeds in `testdata/fuzz`), a bounded bencode screen
+CI (`make fuzz-smoke`, 25 targets, seeds in `testdata/fuzz`), a bounded bencode screen
 before the decoder on every hand-written path, snub and session ban with TTL, IP
 filter, and hostile hash-request headers (bogus root, bad length, huge proof, overflow)
 refused without a panic. Diagnostics: uTP socket, dial, accept, error, RTO and SYN-drop counters, merge

@@ -95,6 +95,7 @@ fuzz-smoke:
 	  "internal/gxcore/internal/tracker/wstracker:FuzzWSReadMessage" \
 	  "internal/gxcore/internal/btconn:FuzzReadHandshake" \
 	  "internal/gxcore/internal/mse:FuzzHandshakeIncoming" \
+	  "internal/amule:FuzzReadPacket" \
 	  "internal/utp/transport:FuzzHeaderUnmarshal"; do \
 		dir="$${spec%%:*}"; names="$${spec##*:}"; \
 		for t in $$names; do \
