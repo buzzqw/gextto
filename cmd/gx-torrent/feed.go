@@ -501,11 +501,15 @@ func (d *Daemon) addFeedItem(item rss.Item, action rss.Action) (bool, error) {
 	if item.Magnet != "" {
 		req.Magnet = item.Magnet
 	} else {
-		data, err := d.fetchTorrentURL(item.Link)
+		data, magnet, err := d.fetchTorrentSource(item.Link)
 		if err != nil {
 			return false, err
 		}
-		req.TorrentData = data
+		if magnet != "" {
+			req.Magnet = magnet
+		} else {
+			req.TorrentData = data
+		}
 	}
 	_, existing, err := d.add(req)
 	return !existing, err

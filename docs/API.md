@@ -354,7 +354,7 @@ state.
 | GET | `/api/v2/app/defaultSavePath` | download folder of the configuration |
 | GET | `/api/v2/app/version` | Gextto's version in the qBittorrent format (a v prefix) |
 | GET | `/api/v2/app/webapiVersion` | version of the Web API subset |
-| POST | `/api/v2/torrents/add` | add torrents the way the browser extensions do: the urls field (magnets and http(s) .torrent addresses) or the uploaded .torrent files, with stopped/paused, savepath, sequentialDownload, firstLastPiecePrio and skip_checking |
+| POST | `/api/v2/torrents/add` | add torrents the way the browser extensions do: the urls field (magnets and http(s) .torrent addresses, including an address that answers with a magnet, as a redirect or as the body) or the uploaded .torrent files, with stopped/paused, savepath, sequentialDownload, firstLastPiecePrio and skip_checking |
 | POST | `/api/v2/torrents/delete` | remove torrents (hashes, deleteFiles) |
 | GET | `/api/v2/torrents/info` | torrent list in the qBittorrent shape (hashes and filter honoured) |
 | POST | `/api/v2/torrents/pause` | pause torrents (hashes, empty = all) |
@@ -588,7 +588,7 @@ The `{what}` of `GET /api/v1/torrents/{hash}/{what}` is one of `files`,
 | POST | `/api/v2/rss/setFeedRefreshInterval` | set the feed refresh interval |
 | POST | `/api/v2/rss/setFeedURL` | change a feed URL |
 | POST | `/api/v2/rss/setRule` | create or update a download rule |
-| POST | `/api/v2/search/delete` | delete a search |
+| POST | `/api/v2/search/delete` | delete a search (a finished search is also dropped 15 minutes after it stopped, so a client that never deletes it does not pin the results in memory) |
 | POST | `/api/v2/search/enablePlugin` | enable or disable a plugin |
 | POST | `/api/v2/search/installPlugin` | install a search plugin |
 | GET | `/api/v2/search/plugins` | installed search plugins |

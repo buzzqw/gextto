@@ -982,12 +982,16 @@ func (d *Daemon) handleQbitAdd(w http.ResponseWriter, r *http.Request) {
 		case strings.HasPrefix(strings.ToLower(line), "magnet:"):
 			req.Magnet = line
 		case strings.HasPrefix(strings.ToLower(line), "http://"), strings.HasPrefix(strings.ToLower(line), "https://"):
-			data, err := d.fetchTorrentURL(line)
+			data, magnet, err := d.fetchTorrentSource(line)
 			if err != nil {
 				qbitText(w, http.StatusUnsupportedMediaType, qbitInvalidCode)
 				return
 			}
-			req.TorrentData = data
+			if magnet != "" {
+				req.Magnet = magnet
+			} else {
+				req.TorrentData = data
+			}
 		default:
 			continue
 		}

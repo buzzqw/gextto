@@ -17,7 +17,6 @@ package main
 
 import (
 	"bytes"
-	"context"
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/hex"
@@ -848,7 +847,7 @@ func (d *Daemon) handleUIAltSpeed(w http.ResponseWriter, r *http.Request) {
 // uiBuildAddRequest builds one add request from an add form: an uploaded
 // .torrent file wins when present, otherwise a magnet link or an http(s) URL
 // to a .torrent in the source field. The form must already be parsed.
-func uiBuildAddRequest(r *http.Request) (addRequest, error) {
+func uiBuildAddRequest(d *Daemon, r *http.Request) (addRequest, error) {
 	req := addRequestFromForm(r)
 	if file, _, err := r.FormFile("torrent"); err == nil {
 		data, readErr := io.ReadAll(io.LimitReader(file, maxTorrentFile))
@@ -873,18 +872,14 @@ func uiBuildAddRequest(r *http.Request) (addRequest, error) {
 	case strings.HasPrefix(lower, "magnet:"):
 		req.Magnet = source
 	case strings.HasPrefix(lower, "http://"), strings.HasPrefix(lower, "https://"):
-		data, err := fetchRemoteTorrent(source)
+		data, magnet, err := d.fetchTorrentSource(source)
 		if err != nil {
 			return req, fmt.Errorf("download: %w", err)
 		}
-		trimmed := strings.TrimSpace(string(data))
-		switch {
-		case strings.HasPrefix(strings.ToLower(trimmed), "magnet:"):
-			req.Magnet = trimmed
-		case len(data) > 0 && data[0] == 'd':
+		if magnet != "" {
+			req.Magnet = magnet
+		} else {
 			req.TorrentData = data
-		default:
-			return req, fmt.Errorf("the URL does not contain a .torrent file")
 		}
 	default:
 		return req, fmt.Errorf("paste a magnet link, a .torrent URL or choose a .torrent file")
@@ -933,7 +928,7 @@ func (d *Daemon) handleUIAdd(w http.ResponseWriter, r *http.Request) {
 		r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 		_ = r.ParseForm()
 	}
-	req, err := uiBuildAddRequest(r)
+	req, err := uiBuildAddRequest(d, r)
 	d.uiFinishAdd(w, r, req, err)
 }
 
@@ -1019,28 +1014,6 @@ func (d *Daemon) handleUIEvents(w http.ResponseWriter, r *http.Request) {
 	d.streamSessionEvents(w, r, "")
 }
 
-// fetchRemoteTorrent downloads a .torrent from an http(s) URL, bounded in size
-// and time. A magnet link served as plain text is returned as-is so the caller
-// can still add it.
-func fetchRemoteTorrent(rawURL string) ([]byte, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
-	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("User-Agent", "gx-torrent")
-	resp, err := outboundClient(0).Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("HTTP %d", resp.StatusCode)
-	}
-	return io.ReadAll(io.LimitReader(resp.Body, maxTorrentFile))
-}
-
 // handleUIAddFile is the legacy file-only counterpart of /ui/add: it accepts
 // the same request, so old clients keep working while the page shows one form.
 func (d *Daemon) handleUIAddFile(w http.ResponseWriter, r *http.Request) {
@@ -1055,7 +1028,7 @@ func (d *Daemon) handleUIAddFile(w http.ResponseWriter, r *http.Request) {
 		d.uiDone(w, r, "", err)
 		return
 	}
-	req, err := uiBuildAddRequest(r)
+	req, err := uiBuildAddRequest(d, r)
 	d.uiFinishAdd(w, r, req, err)
 }
 

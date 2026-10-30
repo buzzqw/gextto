@@ -232,20 +232,59 @@ func splitFormList(value string) []string {
 	return out
 }
 
-// fetchTorrentURL downloads a .torrent from a URL, with the same size cap the
-// API applies to an uploaded file. The RSS auto-download and the compatible API
-// both use it; the cookie jar is the one the settings page manages.
-func (d *Daemon) fetchTorrentURL(rawURL string) ([]byte, error) {
+// errNotATorrent reports a URL that answered with neither a .torrent file nor
+// a magnet link.
+var errNotATorrent = errors.New("the URL contains neither a .torrent file nor a magnet link")
+
+// fetchTorrentSource downloads a torrent source from an http(s) URL and says
+// which of the three shapes the indexer handed out: the .torrent bytes, a
+// magnet link as the body, or a redirect to a magnet instead of a file.
+//
+// The redirect has to be read here: with the stock redirect policy Go tries to
+// request the magnet as if it were HTTP and fails with `unsupported protocol
+// scheme "magnet"`, losing the release. The RSS auto-download, the compatible
+// API and the page all come through this one function, so they cannot disagree
+// about which shapes are understood.
+func (d *Daemon) fetchTorrentSource(rawURL string) (data []byte, magnet string, err error) {
 	client := outboundClientWithJar(60*time.Second, d.cookieJar())
+	var atMagnet string
+	client.CheckRedirect = func(req *http.Request, via []*http.Request) error {
+		if scheme := strings.ToLower(req.URL.Scheme); scheme != "http" && scheme != "https" {
+			atMagnet = req.URL.String()
+			return http.ErrUseLastResponse
+		}
+		if len(via) >= 10 {
+			return errors.New("stopped after 10 redirects")
+		}
+		return nil
+	}
 	resp, err := client.Get(rawURL)
 	if err != nil {
-		return nil, err
+		if atMagnet != "" {
+			return nil, atMagnet, nil
+		}
+		return nil, "", err
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("torrent URL returned %d", resp.StatusCode)
+	if atMagnet != "" {
+		return nil, atMagnet, nil
 	}
-	return io.ReadAll(io.LimitReader(resp.Body, maxTorrentFile))
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, "", fmt.Errorf("torrent URL returned %d", resp.StatusCode)
+	}
+	data, err = io.ReadAll(io.LimitReader(resp.Body, maxTorrentFile))
+	if err != nil {
+		return nil, "", err
+	}
+	if trimmed := strings.TrimSpace(string(data)); strings.HasPrefix(strings.ToLower(trimmed), "magnet:") {
+		return nil, trimmed, nil
+	}
+	// A .torrent is a bencoded dictionary: it starts with 'd'. Anything else
+	// (an HTML page, a login form, an empty body) is not a torrent.
+	if len(data) == 0 || data[0] != 'd' {
+		return nil, "", errNotATorrent
+	}
+	return data, "", nil
 }
 
 // addRequestFromForm builds the options shared by the add endpoints (API and

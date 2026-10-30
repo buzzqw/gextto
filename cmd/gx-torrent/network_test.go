@@ -59,11 +59,11 @@ func TestTorrentAndIndexerDownloadsUseTheProxyOnlyForRemoteHosts(t *testing.T) {
 	var hits atomic.Int64
 	proxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		hits.Add(1)
-		_, _ = w.Write([]byte("proxied-body"))
+		_, _ = w.Write([]byte("d4:infod4:name5:proxyee"))
 	}))
 	defer proxy.Close()
 	local := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		_, _ = w.Write([]byte("local-body"))
+		_, _ = w.Write([]byte("d4:infod4:name5:localee"))
 	}))
 	defer local.Close()
 
@@ -73,9 +73,9 @@ func TestTorrentAndIndexerDownloadsUseTheProxyOnlyForRemoteHosts(t *testing.T) {
 	})
 
 	// A public host: the proxy answers and the target name never resolves.
-	body, err := d.fetchTorrentURL("http://torrent.invalid/a.torrent")
-	if err != nil || string(body) != "proxied-body" {
-		t.Fatalf("remote .torrent = %q, %v", body, err)
+	body, magnet, err := d.fetchTorrentSource("http://torrent.invalid/a.torrent")
+	if err != nil || magnet != "" || string(body) != "d4:infod4:name5:proxyee" {
+		t.Fatalf("remote .torrent = %q, %q, %v", body, magnet, err)
 	}
 	before := hits.Load()
 	if before == 0 {
@@ -83,7 +83,7 @@ func TestTorrentAndIndexerDownloadsUseTheProxyOnlyForRemoteHosts(t *testing.T) {
 	}
 
 	// The indexer transport follows the same rule.
-	if body, err = d.remoteGet(context.Background(), "http://indexer.invalid/api"); err != nil || string(body) != "proxied-body" {
+	if body, err = d.remoteGet(context.Background(), "http://indexer.invalid/api"); err != nil || string(body) != "d4:infod4:name5:proxyee" {
 		t.Fatalf("remote indexer = %q, %v", body, err)
 	}
 	if hits.Load() <= before {
@@ -92,9 +92,9 @@ func TestTorrentAndIndexerDownloadsUseTheProxyOnlyForRemoteHosts(t *testing.T) {
 
 	// A service on the machine is reached directly and the proxy is not used.
 	before = hits.Load()
-	body, err = d.fetchTorrentURL(local.URL)
-	if err != nil || string(body) != "local-body" {
-		t.Fatalf("local .torrent = %q, %v", body, err)
+	body, magnet, err = d.fetchTorrentSource(local.URL)
+	if err != nil || magnet != "" || string(body) != "d4:infod4:name5:localee" {
+		t.Fatalf("local .torrent = %q, %q, %v", body, magnet, err)
 	}
 	if hits.Load() != before {
 		t.Fatal("a localhost download went through the proxy")

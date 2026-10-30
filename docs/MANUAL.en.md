@@ -1209,7 +1209,9 @@ what is transferring the files is visible at a glance).
   Use it for data you know is complete, such as a copy of what you already
   seeded. A magnet that carries the `so=`
   parameter (BEP 53) downloads only the listed files from the start, `ws=` adds
-  web seeds and `dht=` adds a DHT bootstrap node. It supports
+  web seeds and `dht=` adds a DHT bootstrap node. A download address that
+  answers with a magnet link — either as a redirect or as the body — is added
+  as a magnet instead of failing. It supports
   **v2-only** torrents (BEP 52), both from a `.torrent` and from a magnet link;
   it does not support WebTorrent/WebRTC.
 - **qBittorrent-nox** — Gextto drives an existing qBittorrent-nox through its Web

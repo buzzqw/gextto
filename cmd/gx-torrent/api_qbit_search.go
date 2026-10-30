@@ -38,7 +38,17 @@ type qbitSearchJob struct {
 	status  string
 	results []qbitSearchResult
 	cancel  context.CancelFunc
+	// finishedAt is when the job reached "Stopped": the results stay for the
+	// client to read, but not forever (see qbitSearchJobTTL).
+	finishedAt time.Time
 }
+
+// qbitSearchJobTTL is how long a finished search is kept when the client never
+// calls search/delete. Sonarr, Radarr and Prowlarr delete their jobs after
+// reading them; a client that goes away — a closed tab, a WebUI alternative
+// killed mid-search — must not pin its results in memory for the life of the
+// daemon. The wait is generous: a client reading slowly still finds them.
+const qbitSearchJobTTL = 15 * time.Minute
 
 // qbitSearchTimeout bounds one search job (the indexers are queried in
 // parallel by the caller only by convention; here sequentially with a shared
@@ -54,6 +64,7 @@ func (d *Daemon) handleQbitSearchStart(w http.ResponseWriter, r *http.Request) {
 	if d.qbitSearch == nil {
 		d.qbitSearch = map[int]*qbitSearchJob{}
 	}
+	d.pruneQbitSearchLocked(time.Now())
 	d.qbitSearchSeq++
 	id := d.qbitSearchSeq
 	d.qbitSearch[id] = &qbitSearchJob{pattern: pattern, status: "Running", cancel: cancel}
@@ -61,6 +72,17 @@ func (d *Daemon) handleQbitSearchStart(w http.ResponseWriter, r *http.Request) {
 
 	go d.qbitRunSearch(ctx, id, pattern, plugins)
 	writeJSON(w, http.StatusOK, map[string]any{"id": id})
+}
+
+// pruneQbitSearchLocked drops the finished jobs nobody deleted. It runs when a
+// new search starts (the only moment the map grows), so no timer or background
+// goroutine is needed. Caller holds qbitSearchMu.
+func (d *Daemon) pruneQbitSearchLocked(now time.Time) {
+	for id, job := range d.qbitSearch {
+		if job.status == "Stopped" && !job.finishedAt.IsZero() && now.Sub(job.finishedAt) >= qbitSearchJobTTL {
+			delete(d.qbitSearch, id)
+		}
+	}
 }
 
 // qbitRunSearch queries the selected indexers and stores the results on the job.
@@ -112,6 +134,7 @@ func (d *Daemon) qbitRunSearch(ctx context.Context, id int, pattern string, plug
 		job.results = results
 		job.status = "Stopped"
 		job.cancel = nil
+		job.finishedAt = time.Now()
 	}
 	d.qbitSearchMu.Unlock()
 }
@@ -209,6 +232,7 @@ func (d *Daemon) handleQbitSearchStop(w http.ResponseWriter, r *http.Request) {
 	d.qbitSearchMu.Lock()
 	if job := d.qbitSearch[id]; job != nil {
 		job.status = "Stopped"
+		job.finishedAt = time.Now()
 		if job.cancel != nil {
 			job.cancel()
 		}

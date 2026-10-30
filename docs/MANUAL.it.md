@@ -1244,6 +1244,8 @@ attivo, così si vede a colpo d'occhio cosa sta trasferendo i file).
   che sai completi, come una copia di quello che già condividevi. Un magnet con
   il parametro `so=` (BEP 53) scarica da subito solo i file
   indicati; con `ws=` aggiunge web seed e con `dht=` un nodo DHT di bootstrap.
+  Un indirizzo di scaricamento che risponde con un magnet — come redirect o come
+  corpo della risposta — viene aggiunto come magnet invece di fallire.
   Supporta i torrent **solo-v2** (BEP 52),
   sia da `.torrent` sia da
   magnet; non supporta WebTorrent/WebRTC.
