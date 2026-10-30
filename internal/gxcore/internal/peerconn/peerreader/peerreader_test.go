@@ -1,7 +1,9 @@
 package peerreader
 
 import (
+	"bytes"
 	"encoding/binary"
+	"io"
 	"net"
 	"testing"
 	"time"
@@ -23,7 +25,7 @@ func newTestReader(t *testing.T) (*PeerReader, net.Conn) {
 }
 
 // writeMessage frames one message: length prefix, id, payload.
-func writeMessage(conn net.Conn, id peerprotocol.MessageID, payload []byte) {
+func writeMessage(conn io.Writer, id peerprotocol.MessageID, payload []byte) {
 	header := make([]byte, 5)
 	binary.BigEndian.PutUint32(header[:4], uint32(1+len(payload)))
 	header[4] = byte(id)
@@ -100,4 +102,53 @@ func TestLegalBitfieldIsDelivered(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		t.Fatal("a legal bitfield was not delivered")
 	}
+}
+
+// benchConn is a net.Conn over an in-memory buffer, for the read path only.
+type benchConn struct{ r *bytes.Reader }
+
+func (c *benchConn) Read(p []byte) (int, error)       { return c.r.Read(p) }
+func (c *benchConn) Write(p []byte) (int, error)      { return len(p), nil }
+func (c *benchConn) Close() error                     { return nil }
+func (c *benchConn) LocalAddr() net.Addr              { return benchAddr{} }
+func (c *benchConn) RemoteAddr() net.Addr             { return benchAddr{} }
+func (c *benchConn) SetDeadline(time.Time) error      { return nil }
+func (c *benchConn) SetReadDeadline(time.Time) error  { return nil }
+func (c *benchConn) SetWriteDeadline(time.Time) error { return nil }
+
+type benchAddr struct{}
+
+func (benchAddr) Network() string { return "tcp" }
+func (benchAddr) String() string  { return "127.0.0.1:1" }
+
+// BenchmarkPeerReaderRequests measures the parse-and-hand-off path for the
+// message that dominates an upload-heavy connection: the block requests of a
+// leecher. The per-type size caps added to parseMessage are three integer
+// comparisons on messages that carry none, so the figure must stay in the
+// nanoseconds per message.
+func BenchmarkPeerReaderRequests(b *testing.B) {
+	const count = 4096
+	payload := make([]byte, 12) // index, begin, length
+	var frame bytes.Buffer
+	for i := 0; i < count; i++ {
+		binary.BigEndian.PutUint32(payload[0:4], uint32(i))
+		binary.BigEndian.PutUint32(payload[8:12], 16<<10)
+		writeMessage(&frame, peerprotocol.Request, payload)
+	}
+	data := frame.Bytes()
+	b.SetBytes(int64(len(data)))
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		r := New(&benchConn{r: bytes.NewReader(data)}, logger.New("peerreader-bench"), time.Minute, 30<<20, bandwidth.New(0))
+		done := make(chan struct{})
+		go func() { r.Run(); close(done) }()
+		for j := 0; j < count; j++ {
+			<-r.Messages()
+		}
+		r.Stop()
+		<-done
+	}
+	b.StopTimer()
+	b.ReportMetric(float64(b.Elapsed().Nanoseconds())/float64(b.N*count), "ns/message")
 }

@@ -179,19 +179,23 @@ func (p *PeerReader) Run() {
 	if err = p.dr.arm(readTimeout); err != nil {
 		return
 	}
+	// The fixed-size head is read into stack arrays: binary.Read would allocate
+	// a buffer and go through reflection for every message of every peer.
+	var head [4]byte
+	var idb [1]byte
 	for {
-		var length uint32
-		if err = binary.Read(p.r, binary.BigEndian, &length); err != nil {
+		if err = p.readFull(head[:]); err != nil {
 			return
 		}
+		length := binary.BigEndian.Uint32(head[:])
 		if length == 0 {
 			p.log.Debug("Received message of type \"keep alive\"")
 			continue
 		}
-		var id peerprotocol.MessageID
-		if err = binary.Read(p.r, binary.BigEndian, &id); err != nil {
+		if err = p.readFull(idb[:]); err != nil {
 			return
 		}
+		id := peerprotocol.MessageID(idb[0])
 		length--
 		if int64(length) > int64(p.maxMsgSize) {
 			err = fmt.Errorf("received message larger than allowed (%d > %d)", length, p.maxMsgSize)
@@ -212,6 +216,26 @@ func (p *PeerReader) Run() {
 	}
 }
 
+// readFull fills b without allocating, for the fixed-size message bodies.
+func (p *PeerReader) readFull(b []byte) error {
+	_, err := io.ReadFull(p.r, b)
+	return err
+}
+
+// readRequest decodes index, begin and length, the body shared by request,
+// reject and cancel.
+func (p *PeerReader) readRequest() (peerprotocol.RequestMessage, error) {
+	var b [12]byte
+	if err := p.readFull(b[:]); err != nil {
+		return peerprotocol.RequestMessage{}, err
+	}
+	return peerprotocol.RequestMessage{
+		Index:  binary.BigEndian.Uint32(b[0:4]),
+		Begin:  binary.BigEndian.Uint32(b[4:8]),
+		Length: binary.BigEndian.Uint32(b[8:12]),
+	}, nil
+}
+
 // parseMessage decodes one message body of the given id and remaining
 // length. Unknown ids are discarded inline and reported as (nil, nil).
 func (p *PeerReader) parseMessage(id peerprotocol.MessageID, length uint32) (any, error) {
@@ -230,11 +254,11 @@ func (p *PeerReader) parseMessage(id peerprotocol.MessageID, length uint32) (any
 		p.log.Debug("Received NotInterested")
 		return peerprotocol.NotInterestedMessage{}, nil
 	case peerprotocol.Have:
-		var hm peerprotocol.HaveMessage
-		if err = binary.Read(p.r, binary.BigEndian, &hm); err != nil {
+		var b [4]byte
+		if err = p.readFull(b[:]); err != nil {
 			return nil, err
 		}
-		return hm, nil
+		return peerprotocol.HaveMessage{Index: binary.BigEndian.Uint32(b[:])}, nil
 	case peerprotocol.Bitfield:
 		if length > maxBitfieldMessage {
 			return nil, &blockSizeError{messageID: id, got: length, allowedMax: maxBitfieldMessage}
@@ -246,8 +270,8 @@ func (p *PeerReader) parseMessage(id peerprotocol.MessageID, length uint32) (any
 		}
 		return bm, nil
 	case peerprotocol.Request:
-		var rm peerprotocol.RequestMessage
-		if err = binary.Read(p.r, binary.BigEndian, &rm); err != nil {
+		rm, err := p.readRequest()
+		if err != nil {
 			return nil, err
 		}
 		if rm.Length > MaxBlockSize {
@@ -255,18 +279,18 @@ func (p *PeerReader) parseMessage(id peerprotocol.MessageID, length uint32) (any
 		}
 		return rm, nil
 	case peerprotocol.Reject:
-		var rm peerprotocol.RejectMessage
-		if err = binary.Read(p.r, binary.BigEndian, &rm); err != nil {
+		rm, err := p.readRequest()
+		if err != nil {
 			return nil, err
 		}
 		p.log.Debugf("Received Reject: %+v", rm)
-		return rm, nil
+		return peerprotocol.RejectMessage{RequestMessage: rm}, nil
 	case peerprotocol.Cancel:
-		var cm peerprotocol.CancelMessage
-		if err = binary.Read(p.r, binary.BigEndian, &cm); err != nil {
+		cm, err := p.readRequest()
+		if err != nil {
 			return nil, err
 		}
-		return cm, nil
+		return peerprotocol.CancelMessage{RequestMessage: cm}, nil
 	case peerprotocol.Piece:
 		return p.parsePiece(length)
 	case peerprotocol.HaveAll:
@@ -274,17 +298,17 @@ func (p *PeerReader) parseMessage(id peerprotocol.MessageID, length uint32) (any
 	case peerprotocol.HaveNone:
 		return peerprotocol.HaveNoneMessage{}, nil
 	case peerprotocol.AllowedFast:
-		var am peerprotocol.AllowedFastMessage
-		if err = binary.Read(p.r, binary.BigEndian, &am); err != nil {
+		var b [4]byte
+		if err = p.readFull(b[:]); err != nil {
 			return nil, err
 		}
-		return am, nil
+		return peerprotocol.AllowedFastMessage{HaveMessage: peerprotocol.HaveMessage{Index: binary.BigEndian.Uint32(b[:])}}, nil
 	case peerprotocol.Port:
-		var pm peerprotocol.PortMessage
-		if err = binary.Read(p.r, binary.BigEndian, &pm); err != nil {
+		var b [2]byte
+		if err = p.readFull(b[:]); err != nil {
 			return nil, err
 		}
-		return pm, nil
+		return peerprotocol.PortMessage{Port: binary.BigEndian.Uint16(b[:])}, nil
 	case peerprotocol.Extension:
 		if length > maxExtensionMessage {
 			return nil, &blockSizeError{messageID: id, got: length, allowedMax: maxExtensionMessage}
@@ -322,9 +346,13 @@ func (p *PeerReader) parsePiece(length uint32) (any, error) {
 		// of the next message and leave the stream out of step.
 		return nil, fmt.Errorf("invalid piece message size: %d", length)
 	}
-	var pm peerprotocol.PieceMessage
-	if err := binary.Read(p.r, binary.BigEndian, &pm); err != nil {
+	var head [8]byte
+	if err := p.readFull(head[:]); err != nil {
 		return nil, err
+	}
+	pm := peerprotocol.PieceMessage{
+		Index: binary.BigEndian.Uint32(head[0:4]),
+		Begin: binary.BigEndian.Uint32(head[4:8]),
 	}
 	length -= 8
 	if length > piece.BlockSize {

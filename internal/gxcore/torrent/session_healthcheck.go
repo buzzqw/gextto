@@ -11,10 +11,19 @@ import (
 // silent past the timeout dumps every goroutine stack to a temp file and
 // panics — loud by design, so deadlocks surface in testing instead of
 // masquerading as stalls in production.
+//
+// One goroutine per torrent keeps the probes independent (a torrent busy on a
+// slow share cannot delay the others) and costs about 4 KB each; the interval
+// is a ticker, so a running session allocates no timer per round.
 func (s *Session) checkTorrent(t *torrent) {
+	if s.config.HealthCheckInterval <= 0 {
+		return // disabled: no ticker, no probe
+	}
+	ticker := time.NewTicker(s.config.HealthCheckInterval)
+	defer ticker.Stop()
 	for {
 		select {
-		case <-time.After(s.config.HealthCheckInterval):
+		case <-ticker.C:
 			if !s.waitRunLoop(t) {
 				return
 			}

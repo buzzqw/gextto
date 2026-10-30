@@ -90,3 +90,45 @@ func benchMmapSyncClean(b *testing.B, whole bool) {
 
 func BenchmarkMmapSyncRangedClean(b *testing.B) { benchMmapSyncClean(b, false) }
 func BenchmarkMmapSyncWholeClean(b *testing.B)  { benchMmapSyncClean(b, true) }
+
+// benchPlainSyncClean isolates the cost the resume tick paid on the plain-file
+// path: it used to call fdatasync on every open file of every torrent, whether
+// or not the file had changed. forced=true reproduces the old behaviour,
+// forced=false goes through the dirty flag, which is a no-op on a clean file.
+func benchPlainSyncClean(b *testing.B, forced bool) {
+	s, err := New(b.TempDir(), 0o755)
+	if err != nil {
+		b.Fatal(err)
+	}
+	f, _, err := s.Open("bench.bin", 1<<20)
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer f.Close()
+	of, ok := f.(*osFile)
+	if !ok {
+		b.Fatalf("unexpected file type %T", f)
+	}
+	page := make([]byte, 1<<20)
+	if _, err := f.WriteAt(page, 0); err != nil {
+		b.Fatal(err)
+	}
+	if err := f.Sync(); err != nil {
+		b.Fatal(err)
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if forced {
+			if err := unix.Fdatasync(int(of.Fd())); err != nil {
+				b.Fatal(err)
+			}
+			continue
+		}
+		if err := f.Sync(); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkPlainSyncCleanSkipped(b *testing.B)   { benchPlainSyncClean(b, false) }
+func BenchmarkPlainSyncCleanFdatasync(b *testing.B) { benchPlainSyncClean(b, true) }
