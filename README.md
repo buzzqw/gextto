@@ -15,6 +15,7 @@ binaries, no C dependencies, no Node.js build, six languages.
 ![Platforms](https://img.shields.io/badge/platforms-Linux%20%C2%B7%20Windows%20(gx--torrent)-informational)
 ![BEPs](https://img.shields.io/badge/BitTorrent%20BEPs-34%20implemented-success)
 ![Languages](https://img.shields.io/badge/UI-IT%20%C2%B7%20EN%20%C2%B7%20DE%20%C2%B7%20FR%20%C2%B7%20ES%20%C2%B7%20PL-lightgrey)
+[![Documentation](https://img.shields.io/badge/docs-buzzqw.github.io-blue)](https://buzzqw.github.io/gextto/)
 
 > **Italiano:** [README.it.md](README.it.md) · **Manual:**
 > [English](docs/MANUAL.en.md) · [italiano](docs/MANUAL.it.md) · **Issues:**
