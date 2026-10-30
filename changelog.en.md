@@ -14,7 +14,7 @@ manual is online: [English](docs/MANUAL.en.md) ·
 [GitHub issues](https://github.com/buzzqw/gextto/issues).
 
 ## 30 October 2026
-- **The IP filter list is downloaded through the proxy.** With a proxy configured for gx-torrent, updating the IP filter list went straight out to the Internet: your address was visible and the traffic bypassed the tunnel. It now goes through the same proxy (or VPN interface) as peers, trackers and web seeds. Nothing to configure.
+- **The IP filter list is downloaded through the proxy.** With a proxy configured for gx-torrent, updating the IP filter list went straight out to the Internet: your address was visible and the traffic bypassed the tunnel. It now goes through the same proxy (or VPN interface) as peers, trackers and web seeds, even with an HTTP proxy that refuses CONNECT tunnels to port 80. Nothing to configure.
 
 - **gx-torrent no longer stops accepting peers because of a passing error.** If the system refused an incoming connection for a moment — for example because too many files were open — the engine treated the listener as closed and accepted no peer until a restart. It now retries by itself, with growing waits, and resumes as soon as the system allows it; one line stays in the log. Nothing to configure.
 

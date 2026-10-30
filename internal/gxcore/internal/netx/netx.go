@@ -184,13 +184,35 @@ func UDPLocalAddr() (*net.UDPAddr, error) {
 	return &net.UDPAddr{IP: ip}, nil
 }
 
+// DialDirectContext opens a TCP connection honoring only the outgoing
+// interface, never the proxy. HTTP transports set the proxy themselves
+// (http.Transport.Proxy) so a plain HTTP request reaches an HTTP proxy in its
+// native form instead of a CONNECT tunnel, which many proxies refuse on port
+// 80.
+func DialDirectContext(ctx context.Context, base net.Dialer, network, addr string) (net.Conn, error) {
+	s := Current()
+	d, err := localDialer(base, s)
+	if err != nil {
+		return nil, err
+	}
+	return d.DialContext(ctx, network, addr)
+}
+
 // HTTPTransport is an HTTP transport that honors the outbound rules.
 func HTTPTransport() *http.Transport {
-	return &http.Transport{
+	s := Current()
+	tr := &http.Transport{
 		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-			return DialContext(ctx, net.Dialer{}, network, addr)
+			return DialDirectContext(ctx, net.Dialer{}, network, addr)
 		},
 	}
+	if s.Proxy != nil {
+		// http, https and socks5/socks5h are handled by net/http: HTTPS uses
+		// CONNECT, plain HTTP keeps its absolute form, and a SOCKS5 proxy gets
+		// the hostname (the same remote resolution DialContext uses).
+		tr.Proxy = http.ProxyURL(s.Proxy)
+	}
+	return tr
 }
 
 // utpDial is the uTP dialer of the session (nil = TCP only); utpOnly skips

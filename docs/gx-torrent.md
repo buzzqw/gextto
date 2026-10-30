@@ -1238,6 +1238,9 @@ RPC server is disabled.
     (CONNECT tunnel).
   - Peers, HTTP trackers, web seeds and the IP filter list download go through
     the proxy; the tracker names are resolved by the proxy.
+  - Plain HTTP requests reach an HTTP proxy in absolute form, while HTTPS uses
+    a CONNECT tunnel: a proxy that refuses CONNECT on port 80 does not break
+    plain HTTP downloads.
   - DHT and UDP trackers are turned off, because they cannot go through a TCP
     proxy and otherwise would go out.
   - Incoming connections stay direct on the single port.

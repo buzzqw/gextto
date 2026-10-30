@@ -5,6 +5,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
 
 	"github.com/buzzqw/gextto/internal/gxcore/torrent"
@@ -52,26 +53,28 @@ func TestIPFilterRulesCache(t *testing.T) {
 
 // TestIPFilterDownloadUsesTheProxy: with a proxy configured, fetching the IP
 // filter list must go through it. A direct fetch would reveal the operator's
-// address and bypass the tunnel the proxy exists for.
+// address and bypass the tunnel the proxy exists for. The target host does not
+// resolve on purpose: only the proxy can answer.
 func TestIPFilterDownloadUsesTheProxy(t *testing.T) {
-	proxy := startTestProxy(t, "http")
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	var proxied atomic.Bool
+	proxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		proxied.Store(true)
 		if r.URL.Path != "/filter.dat" {
 			t.Errorf("filter path = %q, want /filter.dat", r.URL.Path)
 		}
 		_, _ = w.Write([]byte("1.2.3.0/24\n5.6.7.0/24\n"))
 	}))
-	defer server.Close()
+	defer proxy.Close()
 
 	d := newTestDaemonWith(t, NetworkOptions{
 		PortBegin: 49000, PortEnd: 49099, Encryption: 1,
-		Proxy: "http://" + proxy.listener.Addr().String(),
+		Proxy: proxy.URL,
 	})
-	path, err := d.fetchIPFilterURL(server.URL + "/filter.dat")
+	path, err := d.fetchIPFilterURL("http://filter.invalid/filter.dat")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if proxy.tunnels.Load() == 0 {
+	if !proxied.Load() {
 		t.Fatal("the IP filter download did not go through the proxy")
 	}
 	data, err := os.ReadFile(path)
