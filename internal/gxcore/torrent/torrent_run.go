@@ -11,9 +11,6 @@ import (
 // state single-threaded. Public API calls arrive as commands carrying their
 // own behavior — torrent_commands.go lists what can come through commandC.
 func (t *torrent) run() {
-	t.seedDurationTicker = time.NewTicker(time.Second)
-	defer t.seedDurationTicker.Stop()
-
 	t.unchokeTicker = time.NewTicker(10 * time.Second)
 	defer t.unchokeTicker.Stop()
 
@@ -57,8 +54,6 @@ func (t *torrent) run() {
 			t.maybeStartDeferredMerge()
 		case <-t.laterMergeC:
 			t.handleLaterMergeRequest()
-		case now := <-t.seedDurationTicker.C:
-			t.updateSeedDuration(now)
 		case pe := <-t.peerSnubbedC:
 			t.handlePeerSnubbed(pe)
 		case <-t.unchokeTicker.C:

@@ -77,7 +77,12 @@ type Peer struct {
 	uploadSpeed   metrics.Meter
 
 	// Messages buffers protocol traffic received before metadata arrived.
-	Messages []any
+	// QueuedBytes and QueueOverflow carry its budget (torrent goroutine only):
+	// a peer that sends more than the allowed share is dropped from the queue
+	// instead of growing the process memory on the peer's say-so.
+	Messages      []any
+	QueuedBytes   int
+	QueueOverflow bool
 
 	ExtensionHandshake *peerprotocol.ExtensionHandshakeMessage
 

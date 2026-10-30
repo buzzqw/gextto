@@ -609,7 +609,13 @@ socket and a traversal object per torrent; no measurement shows it behind
 CI (`make fuzz-smoke`, 25 targets, seeds in `testdata/fuzz`), a bounded bencode screen
 before the decoder on every hand-written path, snub and session ban with TTL, IP
 filter, and hostile hash-request headers (bogus root, bad length, huge proof, overflow)
-refused without a panic. Diagnostics: uTP socket, dial, accept, error, RTO and SYN-drop counters, merge
+refused without a panic. The resource bounds are stated per peer and per message
+instead of per session: a ceiling per variable-length message type (bitfield,
+BEP 10 extension, BEP 52 hashes), a bounded queue for what a peer sends before the
+metadata of a magnet arrives, and hash answers paced by the bytes they read, so a
+peer cannot retain or read on our side more than its share. Metainfo paths are
+checked against the storage root at parse time, again at open time and in the
+daemon's payload handling. Diagnostics: uTP socket, dial, accept, error, RTO and SYN-drop counters, merge
 metrics (`merged_pieces`/`merged_bytes`) and storage errors flow from the engine stats
 to the daemon API into **both UIs**.
 

@@ -203,12 +203,80 @@ func DialDirectContext(ctx context.Context, base net.Dialer, network, addr strin
 // configured proxy is used for public hosts only: localhost, LAN and
 // single-label service names are reached directly, because a proxy cannot
 // improve a connection to a service on the same machine or network.
+//
+// The transport is shared by every caller and rebuilt when Configure changes
+// the rules. It used to be created per fetch, which paid a TCP and TLS
+// handshake on every poll and left each discarded transport's idle connections
+// behind (IdleConnTimeout zero keeps them until the server closes them): the
+// feeds, the indexers, the .torrent downloads and the IP filter list reuse the
+// connections now.
 func HTTPTransport() *http.Transport {
-	s := Current()
+	return cachedTransport(Current(), false)
+}
+
+// PublicHTTPTransport is HTTPTransport restricted to public addresses, for
+// URLs that come from torrent or magnet data rather than from the operator.
+// It shares the cache of the plain transport, keyed like it.
+func PublicHTTPTransport() *http.Transport {
+	return cachedTransport(Current(), true)
+}
+
+// transportSlot caches one transport (plain or public) for a set of rules.
+type transportSlot struct {
+	settings Settings
+	tr       *http.Transport
+	valid    bool
+}
+
+var (
+	transportMu    sync.Mutex
+	transportSlots [2]transportSlot // 0 plain, 1 public
+)
+
+// cachedTransport hands out the transport of its kind for these settings,
+// rebuilding it (and closing the idle connections of the old one) only when the
+// rules change. Plain and public have a slot each, so the daemon's feeds and the
+// engine's untrusted sources do not evict each other's pool.
+func cachedTransport(s Settings, public bool) *http.Transport {
+	i := 0
+	if public {
+		i = 1
+	}
+	transportMu.Lock()
+	defer transportMu.Unlock()
+	slot := &transportSlots[i]
+	if slot.valid && slot.settings.Interface == s.Interface && sameProxy(slot.settings.Proxy, s.Proxy) {
+		return slot.tr
+	}
+	if slot.tr != nil {
+		slot.tr.CloseIdleConnections()
+	}
+	build := buildHTTPTransport
+	if public {
+		build = buildPublicHTTPTransport
+	}
+	slot.tr = build(s)
+	slot.settings = s
+	slot.valid = true
+	return slot.tr
+}
+
+func sameProxy(a, b *url.URL) bool {
+	if a == nil || b == nil {
+		return a == nil && b == nil
+	}
+	return a.String() == b.String()
+}
+
+// buildHTTPTransport builds a fresh transport for the rules.
+func buildHTTPTransport(s Settings) *http.Transport {
 	tr := &http.Transport{
 		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
 			return DialDirectContext(ctx, net.Dialer{}, network, addr)
 		},
+		MaxIdleConns:        32,
+		MaxIdleConnsPerHost: 8,
+		IdleConnTimeout:     90 * time.Second,
 	}
 	if s.Proxy != nil {
 		// http, https and socks5/socks5h are handled by net/http: HTTPS uses

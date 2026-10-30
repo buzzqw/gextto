@@ -203,11 +203,54 @@ func (t *torrent) handlePeerMessage(pm peer.Message) {
 	}
 }
 
+// Torrents added from a magnet know no piece count until the metadata arrives:
+// until then the peer messages that depend on it (have, bitfield, have_all,
+// allowed_fast) are queued and replayed later. The queue is bounded, because
+// their size is chosen by the peer: a bitfield message may declare up to
+// MaxMetadataSize (30 MiB), so an unbounded list would let one peer retain
+// gigabytes. A real peer sends a handful of messages and a few KB here.
+const (
+	maxPreMetadataMessages = 1024
+	maxPreMetadataBytes    = 4 << 20
+)
+
+// queuedMessageSize estimates the memory a queued message retains.
+func queuedMessageSize(msg any) int {
+	switch m := msg.(type) {
+	case peerprotocol.BitfieldMessage:
+		return len(m.Data)
+	case peerprotocol.HaveMessage, peerprotocol.HaveAllMessage, peerprotocol.AllowedFastMessage:
+		return 4
+	}
+	return 16
+}
+
+// preMetadataRoom reports whether a message of size bytes fits in the peer's
+// pre-metadata queue.
+func preMetadataRoom(pe *peer.Peer, size int) bool {
+	return len(pe.Messages) < maxPreMetadataMessages && pe.QueuedBytes+size <= maxPreMetadataBytes
+}
+
+// queuePreMetadata stores a message that arrived before the metadata, within
+// the per-peer budget.
+func (t *torrent) queuePreMetadata(pe *peer.Peer, msg any) {
+	size := queuedMessageSize(msg)
+	if !preMetadataRoom(pe, size) {
+		if !pe.QueueOverflow {
+			pe.QueueOverflow = true
+			pe.Logger().Debugln("dropping the peer messages queued before the metadata: the peer sent too much")
+		}
+		return
+	}
+	pe.QueuedBytes += size
+	pe.Messages = append(pe.Messages, msg)
+}
+
 // noteHave records one announced piece, queueing pre-metadata announcements
 // for replay, and feeds the picker, super-seeding and interest.
 func (t *torrent) noteHave(pe *peer.Peer, msg peerprotocol.HaveMessage) {
 	if t.pieces == nil || t.bitfield == nil {
-		pe.Messages = append(pe.Messages, msg)
+		t.queuePreMetadata(pe, msg)
 		return
 	}
 	if msg.Index >= t.info().NumPieces {
@@ -237,7 +280,7 @@ func (t *torrent) noteHave(pe *peer.Peer, msg peerprotocol.HaveMessage) {
 // seed-side remote tracking super-seeding needs without a picker).
 func (t *torrent) noteBitfield(pe *peer.Peer, msg peerprotocol.BitfieldMessage) {
 	if t.pieces == nil || t.bitfield == nil {
-		pe.Messages = append(pe.Messages, msg)
+		t.queuePreMetadata(pe, msg)
 		return
 	}
 	if len(msg.Data) == 0 {
@@ -253,16 +296,15 @@ func (t *torrent) noteBitfield(pe *peer.Peer, msg peerprotocol.BitfieldMessage) 
 	if log := pe.Logger(); log.DebugEnabled() {
 		log.Debugln("Received bitfield:", bf.Hex())
 	}
-	for i := uint32(0); i < bf.Len(); i++ {
-		if !bf.Test(i) {
-			continue
-		}
+	// A word at a time: a sparse bitfield costs its set pieces, not its
+	// length, and a seed's dense one is no slower than the bit-by-bit loop.
+	bf.ForEachSet(func(i uint32) {
 		if t.piecePicker != nil {
 			t.piecePicker.HandleHave(pe, i)
 		} else if pe.Bitfield != nil {
 			pe.Bitfield.Set(i)
 		}
-	}
+	})
 	if t.closeIfBothSeeds(pe) {
 		return
 	}
@@ -273,7 +315,7 @@ func (t *torrent) noteBitfield(pe *peer.Peer, msg peerprotocol.BitfieldMessage) 
 // noteHaveAll marks every piece present on the peer.
 func (t *torrent) noteHaveAll(pe *peer.Peer, msg peerprotocol.HaveAllMessage) {
 	if t.pieces == nil || t.bitfield == nil {
-		pe.Messages = append(pe.Messages, msg)
+		t.queuePreMetadata(pe, msg)
 		return
 	}
 	if t.piecePicker != nil {
@@ -297,7 +339,7 @@ func (t *torrent) noteHaveAll(pe *peer.Peer, msg peerprotocol.HaveAllMessage) {
 // ones for replay.
 func (t *torrent) noteAllowedFast(pe *peer.Peer, msg peerprotocol.AllowedFastMessage) {
 	if t.pieces == nil || t.bitfield == nil {
-		pe.Messages = append(pe.Messages, msg)
+		t.queuePreMetadata(pe, msg)
 		return
 	}
 	if msg.Index >= t.info().NumPieces {

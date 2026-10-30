@@ -3,6 +3,8 @@
 package filestorage
 
 import (
+	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -36,7 +38,14 @@ var _ storage.Storage = (*FileStorage)(nil)
 // New files are preallocated or sparsely truncated per configuration;
 // existing files of the wrong size are resized. Writes stay un-synced: the
 // engine batches durability into storage.File.Sync at resume-bitfield time.
+//
+// name is torrent-relative and must stay under the root: an absolute path or a
+// ".." component is refused here too, so no caller can write outside the
+// download folder even if it skipped its own validation.
 func (s *FileStorage) Open(name string, size int64) (f storage.File, exists bool, err error) {
+	if !filepath.IsLocal(name) {
+		return nil, false, fmt.Errorf("file path %q escapes the storage root", name)
+	}
 	name = filepath.Join(s.dest, filepath.Clean(name))
 	if err = os.MkdirAll(filepath.Dir(name), os.ModeDir|s.perm); err != nil {
 		return nil, false, err
@@ -66,14 +75,14 @@ func (s *FileStorage) Open(name string, size int64) (f storage.File, exists bool
 func (s *FileStorage) openFile(name string, size int64) (*os.File, bool, error) {
 	mode := s.perm &^ 0111
 	flags := applyNoAtimeFlag(os.O_RDWR)
-	of, err := os.OpenFile(name, flags, mode)
+	of, err := openForWrite(name, flags, mode)
 	if err == nil {
 		return s.adoptExisting(of, size)
 	}
 	if !os.IsNotExist(err) {
 		return nil, false, err
 	}
-	of, err = os.OpenFile(name, flags|os.O_CREATE, mode)
+	of, err = openForWrite(name, flags|os.O_CREATE, mode)
 	if err != nil {
 		return nil, false, err
 	}
@@ -87,6 +96,25 @@ func (s *FileStorage) openFile(name string, size int64) (*os.File, bool, error) 
 		return nil, false, err
 	}
 	return of, false, nil
+}
+
+// openForWrite opens the file read-write, dropping O_NOATIME when the kernel
+// refuses it. O_NOATIME is allowed only to the file's owner or with CAP_FOWNER:
+// torrent data restored from a backup, or written by another account, would
+// otherwise fail with EPERM and the torrent could never start.
+func openForWrite(name string, flags int, mode fs.FileMode) (*os.File, error) {
+	of, err := os.OpenFile(name, flags, mode)
+	if err == nil || !errors.Is(err, fs.ErrPermission) {
+		return of, err
+	}
+	plain, ok := withoutNoAtime(flags)
+	if !ok {
+		return nil, err
+	}
+	if of, plainErr := os.OpenFile(name, plain, mode); plainErr == nil {
+		return of, nil
+	}
+	return nil, err
 }
 
 // adoptExisting resizes an existing file that drifted from the expected size.
@@ -115,7 +143,7 @@ func (s *FileStorage) wrap(of *os.File, size int64) storage.File {
 			return &mmapFile{f: of, data: data}
 		}
 	}
-	return osFile{of}
+	return &osFile{File: of}
 }
 
 func maxInt() int { return int(^uint(0) >> 1) }

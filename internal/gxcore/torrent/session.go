@@ -96,7 +96,7 @@ type Session struct {
 	detachedAnnouncers sync.WaitGroup
 
 	mPeerRequests   sync.Mutex
-	dhtPeerRequests map[*torrent]struct{}
+	dhtPeerRequests map[*torrent]int // torrent -> announced port
 
 	mTorrents          sync.RWMutex
 	torrents           map[string]*Torrent
@@ -364,16 +364,22 @@ func assembleSession(cfg Config, l logger.Logger, db *bbolt.DB, res *boltdbresum
 	c.bucketUpload = bandwidth.New(max(cfg.SpeedLimitUpload, 0) * 1024)
 	c.limitLocalPeers.Store(cfg.LimitLocalPeers)
 	if cfg.DHTEnabled {
-		c.dhtPeerRequests = make(map[*torrent]struct{})
+		c.dhtPeerRequests = make(map[*torrent]int)
 	}
 	return c
 }
 
 // webseedHTTPClient fetches through the session resolver with the SSRF
 // guard (no LAN unless allowed) and the configured timeouts and TLS policy.
+// The idle pool per host follows WebseedMaxDownloads: the ranges of one source
+// are fetched in parallel, and with the net/http default (two idle connections
+// per host) the rest were reopened — a TCP and TLS handshake per range.
 func webseedHTTPClient(cfg Config, bl *blocklist.Blocklist) http.Client {
+	idlePerHost := max(cfg.WebseedMaxDownloads, 2)
 	return http.Client{
 		Transport: &http.Transport{
+			MaxIdleConns:        100,
+			MaxIdleConnsPerHost: idlePerHost,
 			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
 				ip, port, err := resolver.Resolve(ctx, addr, cfg.DNSResolveTimeout, bl)
 				if err != nil {
@@ -622,8 +628,8 @@ func (s *Session) stopAndRemoveData(t *Torrent, keepData bool) error {
 	var dest string
 	if s.config.DataDirIncludesTorrentID {
 		dest = filepath.Join(s.config.DataDir, t.torrent.id)
-	} else if t.torrent.info() != nil {
-		dest = filepath.Join(s.config.DataDir, t.torrent.info().Name)
+	} else if info := t.torrent.info(); info != nil && safeStorageName(info.Name) {
+		dest = filepath.Join(s.config.DataDir, info.Name)
 	}
 	if dest != "" {
 		if err = os.RemoveAll(dest); err != nil {
@@ -631,6 +637,13 @@ func (s *Session) stopAndRemoveData(t *Torrent, keepData bool) error {
 		}
 	}
 	return err
+}
+
+// safeStorageName reports whether an info name is a single path component that
+// stays inside the data dir. The name comes from an untrusted .torrent, so it
+// must pass here before it is joined to a directory and handed to RemoveAll.
+func safeStorageName(name string) bool {
+	return name != "" && !strings.ContainsAny(name, `/\`) && filepath.IsLocal(name)
 }
 
 // StartAll persists the started flag on every torrent, then starts them off

@@ -7,17 +7,48 @@ import (
 	"os"
 	"runtime/debug"
 	"sync"
+	"sync/atomic"
 
 	"github.com/buzzqw/gextto/internal/gxcore/internal/storage"
 )
 
 // osFile wraps the OS file so Sync uses fdatasync (piece data needs no metadata
 // flush) instead of fsync. ReadAt/WriteAt/Close come from the embedded file.
-type osFile struct{ *os.File }
+//
+// dirty records a write since the last Sync: the resume tick syncs every open
+// file of every torrent, and most of them are untouched between two ticks. A
+// clean file needs no fdatasync. With thousands of files per torrent (or a
+// network share) that is the difference between a handful of syscalls and tens
+// of thousands every interval, on the torrent's run loop.
+type osFile struct {
+	*os.File
+	dirty atomic.Bool
+}
 
-var _ storage.File = osFile{}
+var _ storage.File = (*osFile)(nil)
 
-func (f osFile) Sync() error { return dataSync(f.File) }
+// WriteAt records that the file has bytes to flush.
+func (f *osFile) WriteAt(p []byte, off int64) (int, error) {
+	n, err := f.File.WriteAt(p, off)
+	if n > 0 {
+		f.dirty.Store(true)
+	}
+	return n, err
+}
+
+// Sync flushes only when something was written; a failed flush stays dirty so
+// the next tick retries it instead of persisting the bitfield over unflushed
+// data.
+func (f *osFile) Sync() error {
+	if !f.dirty.Swap(false) {
+		return nil
+	}
+	if err := dataSync(f.File); err != nil {
+		f.dirty.Store(true)
+		return err
+	}
+	return nil
+}
 
 // dirtyRange is a half-open byte interval [begin, end) written into the
 // mapping since the last Sync.

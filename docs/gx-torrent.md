@@ -1871,6 +1871,13 @@ The engine saves every torrent in `DataDir/<id>` and at removal always runs
 - removing a torrent deletes only the symlink. Data is deleted only with
   `delete_files=1`, and only the torrent's file or folder, never the
   whole destination or other files;
+- the paths come from the metainfo, which is untrusted: the engine refuses a
+  name or a file path that would leave the storage root (`filepath.IsLocal` in
+  `metainfo.buildFiles`), the storage refuses it again before opening the file
+  (`filestorage.Open`) and the daemon accepts only a single, local component as
+  the top entry (`payloadPath`), so a crafted torrent cannot write, move or
+  delete anything above its own folder. A torrent that tries is refused when it
+  is added;
 - a real folder left in place of the symlink is moved to
   `DATA/orphaned/<id>` before removal, never deleted;
 - destinations must be absolute paths; the flag `-allowed-roots`
@@ -2088,7 +2095,9 @@ suitable for NFS. Writes are contained: the engine saves statistics and bitfield
 every 2 minutes (the daemon raises to 2 minutes the 30 s default of
 `ResumeWriteInterval`), with a fsync of the data before every bitfield
 write: about 100 MB per day at rest; the log rotates at
-5 MB × 4.
+5 MB × 4. Only the files written since the previous flush are synced
+(`osFile`/`mmapFile` track what is dirty), so a torrent that is only seeding
+costs no disk writes.
 
 ## Bandwidth limits
 

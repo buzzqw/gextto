@@ -66,7 +66,9 @@ func (t *clientThrottle) CheckBlock(host string) bool {
 
 // cleanup refills the per-host counters and forgets hosts that have been quiet
 // long enough. It runs faster than the one-minute window to keep the tables
-// small.
+// small. A block expires with the activity entry that produced it (the host
+// must go quiet and refill), so an address that once spammed is not banned for
+// as long as it stays in the table.
 func (t *clientThrottle) cleanup() {
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
@@ -81,6 +83,11 @@ func (t *clientThrottle) cleanup() {
 					continue
 				}
 				t.activity.set(key, v+5)
+			}
+			for _, key := range t.blocked.keys() {
+				if _, ok := t.activity.get(key); !ok {
+					t.blocked.delete(key)
+				}
 			}
 			t.mu.Unlock()
 		case <-t.stop:

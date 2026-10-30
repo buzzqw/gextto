@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"strconv"
+	"time"
 )
 
 // ErrPrivateAddress is returned when a URL taken from torrent or magnet data
@@ -109,12 +110,16 @@ func CheckPublicTCPAddr(ip net.IP, port int) error {
 	return nil
 }
 
-// PublicHTTPTransport is HTTPTransport restricted to public addresses, for
-// URLs that come from torrent or magnet data rather than from the operator.
-func PublicHTTPTransport() *http.Transport {
+// buildPublicHTTPTransport is the plain transport restricted to public
+// addresses: the host is resolved here and the connection goes to the checked
+// IP, so a DNS answer cannot switch to a private address afterwards.
+func buildPublicHTTPTransport(Settings) *http.Transport {
 	return &http.Transport{
 		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
 			return DialPublic(ctx, net.Dialer{}, network, addr)
 		},
+		MaxIdleConns:        16,
+		MaxIdleConnsPerHost: 4,
+		IdleConnTimeout:     90 * time.Second,
 	}
 }

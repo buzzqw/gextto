@@ -105,7 +105,7 @@ func (t *torrent) punishCorruptSource(pw *piecewriter.PieceWriter) {
 	case *peer.Peer:
 		t.log.Debugln("received corrupt piece from peer", src.String())
 		t.closePeer(src)
-		t.bannedPeerIPs[src.IP()] = struct{}{}
+		rememberPeerIP(t.bannedPeerIPs, src.IP())
 		if t.session != nil {
 			t.session.BanIP(src.IP(), sessionBanTTL)
 		}

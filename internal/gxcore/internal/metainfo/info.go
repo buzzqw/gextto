@@ -81,9 +81,18 @@ type File struct {
 // list matches the file count. It returns false otherwise. Used by the resume
 // loader to apply a persisted rename (qBittorrent renameFile/renameFolder):
 // the info dict is untouched, so the info hash stays the original.
+//
+// Every path must stay inside the torrent storage: a list holding an absolute
+// path or ".." (a hand-edited resume, a rename written by an older version) is
+// refused as a whole instead of being applied.
 func (i *Info) SetFilePaths(paths []string) bool {
 	if len(paths) != len(i.Files) {
 		return false
+	}
+	for _, p := range paths {
+		if !localStoragePath(p) {
+			return false
+		}
 	}
 	for j := range i.Files {
 		i.Files[j].Path = paths[j]
@@ -220,10 +229,14 @@ func NewInfo(b []byte, utf8 bool, pad bool) (*Info, error) {
 
 // buildFiles maps the bencoded entries onto cleaned storage paths, rejecting
 // duplicate non-padding paths (pad files legitimately share ".pad/<length>"
-// per BEP 47).
+// per BEP 47) and any path that would leave the torrent storage.
 func (i *Info) buildFiles(entries []file, multiFile, pad bool) error {
 	if !multiFile {
-		i.Files = []File{{Path: cleanName(i.Name), Length: i.Length}}
+		name := cleanName(i.Name)
+		if !localStoragePath(name) {
+			return fmt.Errorf("unsafe torrent name: %q", i.Name)
+		}
+		i.Files = []File{{Path: name, Length: i.Length}}
 		return nil
 	}
 	i.Files = make([]File, len(entries))
@@ -235,6 +248,13 @@ func (i *Info) buildFiles(entries []file, multiFile, pad bool) error {
 			parts = append(parts, cleanName(p))
 		}
 		joinedPath := filepath.Join(parts...)
+		// The name is the first component of every path and is not screened
+		// like the path entries: a torrent whose name is ".." (or, on Windows,
+		// a name or entry carrying "..\\") would otherwise write above the
+		// download folder. IsLocal is the lexical check for every platform.
+		if !localStoragePath(joinedPath) {
+			return fmt.Errorf("unsafe file name: %q", joinedPath)
+		}
 		isPadding := pad && f.isPadding()
 		if !isPadding {
 			if _, ok := uniquePaths[joinedPath]; ok {
@@ -249,6 +269,18 @@ func (i *Info) buildFiles(entries []file, multiFile, pad bool) error {
 		}
 	}
 	return nil
+}
+
+// localStoragePath reports whether a torrent-relative storage path stays
+// inside the download folder: not empty, not ".", not absolute and without a
+// ".." component. On Windows it also refuses the separators, drive-relative
+// and reserved names filepath.IsLocal knows about; elsewhere a backslash is an
+// ordinary character in a file name.
+func localStoragePath(p string) bool {
+	if p == "" || p == "." {
+		return false
+	}
+	return filepath.IsLocal(p)
 }
 
 // cleanName sanitizes one path segment for storage: valid UTF-8, bounded

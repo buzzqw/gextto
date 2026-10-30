@@ -120,7 +120,8 @@ func (t *torrent) matchesInfoHash(b []byte) bool {
 	return [20]byte(sum256[:20]) == t.infoHash
 }
 
-// handleHashRequest serves a BEP 52 hash request from the piece hashes we have.
+// handleHashRequest answers a BEP 52 hash request, or rejects it when we cannot
+// serve it.
 func (t *torrent) handleHashRequest(pe *peer.Peer, msg peerprotocol.HashRequestMessage) {
 	hashes, ok := t.serveHashes(msg.HashRequestHeader)
 	if !ok {
@@ -128,6 +129,25 @@ func (t *torrent) handleHashRequest(pe *peer.Peer, msg peerprotocol.HashRequestM
 		return
 	}
 	pe.SendMessage(peerprotocol.HashesMessage{HashRequestHeader: msg.HashRequestHeader, Hashes: hashes})
+}
+
+// allowServedHashRequest takes the file bytes an answer will read from the
+// torrent's hash-answer budget: a burst, then a steady rate.
+func (t *torrent) allowServedHashRequest(now time.Time, bytes int) bool {
+	if t.hashReqRefill.IsZero() {
+		t.hashReqBudget = hashServeBurstBytes
+		t.hashReqRefill = now
+	}
+	if elapsed := now.Sub(t.hashReqRefill); elapsed >= time.Second {
+		seconds := int(elapsed / time.Second)
+		t.hashReqBudget = min(hashServeBurstBytes, t.hashReqBudget+seconds*hashServePerSecond)
+		t.hashReqRefill = t.hashReqRefill.Add(time.Duration(seconds) * time.Second)
+	}
+	if bytes > t.hashReqBudget {
+		return false
+	}
+	t.hashReqBudget -= bytes
+	return true
 }
 
 func (t *torrent) serveHashes(req peerprotocol.HashRequestHeader) ([][merkle.HashSize]byte, bool) {
@@ -163,6 +183,12 @@ func (t *torrent) serveHashes(req peerprotocol.HashRequestHeader) ([][merkle.Has
 	}
 	// A partly downloaded file can still serve the leaf layer when the request
 	// spans at least one piece, so its proof lives at or above the piece layer.
+	// This path reads the blocks from disk on the run loop: such requests are
+	// paced, so a peer cannot use them to drive the disk. The answers above
+	// come from memory and are not limited.
+	if !t.allowServedHashRequest(time.Now(), int(req.Length)*merkle.BlockSize) {
+		return nil, false
+	}
 	return t.servePartialBlockHashes(fi, level, req)
 }
 
@@ -286,8 +312,26 @@ func (t *torrent) blockLeavesRange(fi, index, length int) ([][merkle.HashSize]by
 // v2BlockCacheBudget bounds the memory the block-layer trees of one torrent may
 // hold. A tree is big (a 40 GB file is a few hundred MB including the padded
 // layers); the budget keeps a large file from pinning that for the whole
-// torrent lifetime while still caching the most recently used one.
+// torrent lifetime while still caching the most recently used one. A build in
+// flight reserves its estimated size, so several requests cannot exceed the
+// budget before the trees exist.
 const v2BlockCacheBudget = 256 << 20
+
+// maxV2BlockBuilds caps the block-tree builds running at the same time for one
+// torrent. Each one reads a whole file from disk: a peer asking for the hashes
+// of every file of a large torrent must not turn into N parallel reads.
+const maxV2BlockBuilds = 1
+
+// Leaf-layer answers are served on the run loop and read the file from disk
+// (up to v2ChunkMax blocks, 8 MiB, for one request). They are paced by the bytes
+// they read, not by the request count: a downloader fetching hashes for a big
+// file pays only what it reads, while a peer that asks for the whole file over
+// and over cannot use the run loop to drive the disk. Piece-layer answers come
+// from memory and are not limited.
+const (
+	hashServeBurstBytes = 32 << 20
+	hashServePerSecond  = 16 << 20
+)
 
 // v2BlockRetryAfter is how long a failed block-tree build is remembered, so a
 // peer asking again does not trigger a rebuild storm.
@@ -329,13 +373,29 @@ func (t *torrent) v2BlockTree(fi int) *merkle.LayerTree {
 		t.v2BlockMu.Unlock()
 		return nil
 	}
+	if t.v2BlockBuilds >= maxV2BlockBuilds {
+		t.v2BlockMu.Unlock()
+		return nil
+	}
 	if t.v2BlockBusy == nil {
 		t.v2BlockBusy = map[string]bool{}
 	}
 	t.v2BlockBusy[key] = true
+	t.v2BlockBuilds++
+	// Reserve the estimated tree size for the duration of the build, so the
+	// in-flight reads count against the cache budget too.
+	reserved := expectedV2BlockTreeBytes(f.Length)
+	t.v2BlockBytes += reserved
 	t.v2BlockMu.Unlock()
-	go t.buildV2BlockTree(fi, key)
+	go t.buildV2BlockTree(fi, key, reserved)
 	return nil
+}
+
+// expectedV2BlockTreeBytes estimates the memory a file's block-layer tree takes:
+// one 32-byte hash per 16 KiB block, doubled for the intermediate layers.
+func expectedV2BlockTreeBytes(length int64) int64 {
+	blocks := (length + merkle.BlockSize - 1) / merkle.BlockSize
+	return blocks * merkle.HashSize * 2
 }
 
 // v2FileComplete reports whether every piece of a v2 file is present.
@@ -359,10 +419,12 @@ func (t *torrent) v2FileComplete(fi int) bool {
 // its block-layer tree, verifies it against the file's pieces root and caches
 // it. On any failure the file is put on a short cooldown so another request
 // does not immediately retry.
-func (t *torrent) buildV2BlockTree(fi int, key string) {
+func (t *torrent) buildV2BlockTree(fi int, key string, reserved int64) {
 	tree := t.buildV2BlockTreeData(fi)
 	t.v2BlockMu.Lock()
 	delete(t.v2BlockBusy, key)
+	t.v2BlockBuilds--
+	t.v2BlockBytes -= reserved
 	if tree == nil {
 		if t.v2BlockFailed == nil {
 			t.v2BlockFailed = map[string]time.Time{}

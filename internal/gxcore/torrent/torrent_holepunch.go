@@ -204,7 +204,7 @@ func (t *torrent) tryHolepunchRendezvous(target *net.TCPAddr) {
 		}
 	}
 	if sent > 0 {
-		t.holepunchAttempted[key] = struct{}{}
+		rememberPeerIP(t.holepunchAttempted, key)
 	}
 	t.log.Debugf("holepunch rendezvous for %s sent to %d peer(s)", target, sent)
 }

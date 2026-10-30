@@ -23,6 +23,21 @@ const (
 	readTimeout = 2 * time.Minute
 	// readBufferSize frames the common fixed head: length + id + request.
 	readBufferSize = 4 + 1 + 12
+
+	// The session cap (maxMsgSize, from MaxMetadataSize) bounds every message
+	// at 30 MiB, which is far too large to allocate on a peer's say-so: a
+	// single variable-length message would hand a remote peer a 30 MiB buffer
+	// and, before the metadata, a place to keep it. Each variable-length type
+	// gets its own ceiling, generous for the protocol and small in memory.
+	//
+	// maxBitfieldMessage is 1 MiB: 8.4 million pieces, beyond any real torrent.
+	maxBitfieldMessage = 1 << 20
+	// maxExtensionMessage is 256 KiB: BEP 10 handshake, a 16 KiB metadata
+	// block and a PEX gossip batch all fit with room to spare.
+	maxExtensionMessage = 256 << 10
+	// maxHashesMessage is 64 KiB: BEP 52 permits 512 hashes of 32 bytes, plus
+	// the header.
+	maxHashesMessage = 64 << 10
 )
 
 // blockPool recycles piece-block buffers across connections.
@@ -221,6 +236,9 @@ func (p *PeerReader) parseMessage(id peerprotocol.MessageID, length uint32) (any
 		}
 		return hm, nil
 	case peerprotocol.Bitfield:
+		if length > maxBitfieldMessage {
+			return nil, &blockSizeError{messageID: id, got: length, allowedMax: maxBitfieldMessage}
+		}
 		var bm peerprotocol.BitfieldMessage
 		bm.Data = make([]byte, length)
 		if _, err = io.ReadFull(p.r, bm.Data); err != nil {
@@ -268,6 +286,9 @@ func (p *PeerReader) parseMessage(id peerprotocol.MessageID, length uint32) (any
 		}
 		return pm, nil
 	case peerprotocol.Extension:
+		if length > maxExtensionMessage {
+			return nil, &blockSizeError{messageID: id, got: length, allowedMax: maxExtensionMessage}
+		}
 		buf := make([]byte, length)
 		if _, err = io.ReadFull(p.r, buf); err != nil {
 			return nil, err
@@ -296,6 +317,11 @@ func (p *PeerReader) parseMessage(id peerprotocol.MessageID, length uint32) (any
 // parsePiece decodes a piece message: 8-byte header plus the block payload,
 // capped at the wire block size and read through the throttle.
 func (p *PeerReader) parsePiece(length uint32) (any, error) {
+	if length < 8 {
+		// Shorter than the index+begin header: reading it would consume bytes
+		// of the next message and leave the stream out of step.
+		return nil, fmt.Errorf("invalid piece message size: %d", length)
+	}
 	var pm peerprotocol.PieceMessage
 	if err := binary.Read(p.r, binary.BigEndian, &pm); err != nil {
 		return nil, err
@@ -343,6 +369,9 @@ func (p *PeerReader) parseHashMessage(length uint32, reject, withHashes bool) (a
 	if length < peerprotocol.HashRequestHeaderSize ||
 		(length-peerprotocol.HashRequestHeaderSize)%peerprotocol.HashSize != 0 {
 		return nil, fmt.Errorf("invalid hashes size: %d", length)
+	}
+	if length > maxHashesMessage {
+		return nil, &blockSizeError{messageID: peerprotocol.Hashes, got: length, allowedMax: maxHashesMessage}
 	}
 	buf := make([]byte, length)
 	if _, err := io.ReadFull(p.r, buf); err != nil {

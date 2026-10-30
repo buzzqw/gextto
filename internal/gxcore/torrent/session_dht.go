@@ -40,13 +40,32 @@ func (s *Session) processDHTResults() {
 	}
 }
 
+// dhtAnnounceBatch is how many queued torrents one one-second tick hands to the
+// DHT. The requests only enqueue a lookup in the node, so a batch keeps a large
+// session announcing on time without flooding it; one per tick would delay the
+// last torrent by one second each.
+const dhtAnnounceBatch = 10
+
+// handleDHTtick hands a batch of pending DHT peer requests to the node. The
+// queue is drained a batch at a time, in random map order, so no torrent is
+// starved and the map lock is never held while talking to the node.
 func (s *Session) handleDHTtick() {
+	type request struct {
+		ih   [20]byte
+		port int
+	}
+	pending := make([]request, 0, dhtAnnounceBatch)
 	s.mPeerRequests.Lock()
-	defer s.mPeerRequests.Unlock()
-	for t := range s.dhtPeerRequests {
-		s.dht.PeersRequestPort(string(t.infoHash[:]), true, t.port)
+	for t, port := range s.dhtPeerRequests {
+		if len(pending) == dhtAnnounceBatch {
+			break
+		}
+		pending = append(pending, request{ih: t.infoHash, port: port})
 		delete(s.dhtPeerRequests, t)
-		return
+	}
+	s.mPeerRequests.Unlock()
+	for _, req := range pending {
+		s.dht.PeersRequestPort(string(req.ih[:]), true, req.port)
 	}
 }
 

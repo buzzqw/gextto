@@ -136,7 +136,7 @@ func (d *URLDownloader) Run(client *http.Client, pieces []piece.Piece, multifile
 			return false
 		}
 		defer resp.Body.Close()
-		if err := checkStatus(resp); err != nil {
+		if err := checkStatus(resp, job.RangeBegin); err != nil {
 			d.sendResult(resultC, &PieceResult{Downloader: d, Error: err})
 			return false
 		}
@@ -191,13 +191,16 @@ func calcReadSize(buf bufferpool.Buffer, bufPos int, job downloadJob, jobPos int
 }
 
 // readFull fills b like io.ReadFull, restarting the stall timer after every
-// read so a slow-but-moving server does not trip the timeout.
+// read that moved bytes, so a slow-but-moving server does not trip the timeout
+// and a server that answers nothing cannot reset it forever.
 func readFull(r io.Reader, b []byte, t *time.Timer, d time.Duration) (o int, err error) {
 	for o < len(b) && err == nil {
 		var nn int
 		nn, err = r.Read(b[o:])
 		o += nn
-		t.Reset(d)
+		if nn > 0 {
+			t.Reset(d)
+		}
 	}
 	if o >= len(b) {
 		err = nil
@@ -247,11 +250,19 @@ func (d *URLDownloader) sendResult(resultC chan *PieceResult, res *PieceResult) 
 	}
 }
 
-// checkStatus accepts full and partial content; anything else fails the job.
-func checkStatus(resp *http.Response) error {
+// checkStatus accepts full and partial content. A server that ignores the
+// Range header answers 200 with the file from byte zero: that is only valid
+// for a job starting at the beginning of the file, otherwise the bytes belong
+// to another offset and the piece would be corrupt (and blamed on the swarm).
+func checkStatus(resp *http.Response, rangeBegin int64) error {
 	switch resp.StatusCode {
-	case 200, 206:
+	case http.StatusPartialContent:
 		return nil
+	case http.StatusOK:
+		if rangeBegin == 0 {
+			return nil
+		}
+		return fmt.Errorf("server ignored the range request (offset %d)", rangeBegin)
 	default:
 		return fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}

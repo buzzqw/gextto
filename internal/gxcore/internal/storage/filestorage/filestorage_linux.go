@@ -19,6 +19,15 @@ func applyNoAtimeFlag(f int) int {
 	return f | syscall.O_NOATIME
 }
 
+// withoutNoAtime drops O_NOATIME (ok is false when the flag is absent): used to
+// retry an open the kernel refused with EPERM on a file we do not own.
+func withoutNoAtime(f int) (int, bool) {
+	if f&syscall.O_NOATIME == 0 {
+		return f, false
+	}
+	return f &^ syscall.O_NOATIME, true
+}
+
 // preallocate reserves the file up front so a nearly-full disk fails fast
 // at add time instead of mid-download. Filesystems without fallocate — and
 // tmpfs, where reserving would pin the whole size in RAM at once even for a

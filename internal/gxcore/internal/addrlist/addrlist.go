@@ -100,6 +100,11 @@ func (d *AddrList) Push(addrs []*net.TCPAddr, source peersource.Source) {
 		}
 		admitted++
 	}
+	if admitted == 0 {
+		// Nothing changed: the two indexes already agree, so the O(n log n)
+		// re-sort below would be pure waste (PEX can push often).
+		return
+	}
 	d.compact()
 	slices.SortFunc(d.peerByTime, func(a, b *peerAddr) int { return a.timestamp.Compare(b.timestamp) })
 	for i, p := range d.peerByTime {

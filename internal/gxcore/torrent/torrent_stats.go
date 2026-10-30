@@ -329,11 +329,15 @@ func (t *torrent) getWebseeds() []Webseed {
 	return webseeds
 }
 
-// updateSeedDuration accrues Seeding-state time; leaving the state clears
-// the baseline.
+// updateSeedDuration accrues Seeding-state time; leaving the state closes the
+// last interval. It is called on the stats sample, on completion and at every
+// resume write, so no per-second ticker is needed to keep the counter exact.
 func (t *torrent) updateSeedDuration(now time.Time) {
 	if t.status() != Seeding {
-		t.seedDurationUpdatedAt = time.Time{}
+		if !t.seedDurationUpdatedAt.IsZero() {
+			t.seededFor.Inc(int64(now.Sub(t.seedDurationUpdatedAt)))
+			t.seedDurationUpdatedAt = time.Time{}
+		}
 		return
 	}
 	if t.seedDurationUpdatedAt.IsZero() {

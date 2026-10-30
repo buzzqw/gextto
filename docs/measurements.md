@@ -82,6 +82,7 @@ with the live service or a standalone instance as stated.
 | gexttod and gx-torrent at rest, first pass | gexttod **0.42 %** of a core over 120 s, **70.7 MB RSS** (1.26 % and 69.3 MB in the first minute, while start-up work runs); gx-torrent **0.76 %**, **28.4 MB RSS** | 2073 / engine 264 | live service, CPU ticks from `/proc/<pid>/stat`, `VmRSS`; no regression against the 2035 / 260 figures above |
 | gexttod and gx-torrent at rest, second pass | gexttod **0.43 %** of a core over 120 s, **72.2 MB RSS** five minutes after start with no cycle yet (83.4 MB after a cycle ran: the Go heap keeps the peak, not a leak); gx-torrent **0.78 %**, **30.5 MB RSS** | 2075 / engine 264 | same measurement; the archive's second read handle costs about 1.5 MB at rest on this archive |
 | gexttod and gx-torrent at rest, end of the second pass | gexttod **0.46 %** of a core over 120 s, **71.1 MB RSS**; gx-torrent **0.78 %**, **30.3 MB RSS** | 2078 / engine 265 | same measurement after the uTP timer change: no regression in either process |
+| gx-torrent at rest, after the timer and I/O cleanup (2026-10-30) | **0.87-0.93 %** of a core over 60 s, **29.3 MB RSS**, 10 threads, 92 descriptors; the 30 s CPU profile puts **~24 % of the samples in the DHT** (loop, `processPacket`, `handleQueryPacket`, `replyFindNode`) while the DHT counters grow by ~5 packets/s: the figure is **network work, not internal timers** | engine 278 | live service, 3 seeds and 0 peers, full IP filter; ticks from `/proc/<pid>/stat` over 60 s + `GX_TORRENT_PPROF=127.0.0.1:6060` profile (`go tool pprof -top`) |
 | gexttod restart: translation merge | **0.85 s CPU, 45 MB, 1.03 M allocs → 3 ms, 2.5 MB, 35 allocs** when the bundled catalogs did not change | 2037 | `BenchmarkSeedDefaultTranslationsReseed` |
 | Web UI CPU per request (live) | Series **112 → 37 ms**, log tail (refreshed every 5 s) **28 → 5 ms**, dashboard **25–36 → 18–19 ms**, archive 39–40 ms, downloads 10 ms | 2038 | `/proc/<pid>/stat` ticks over 30 requests per page, N97, 55 series, 1,863 episodes |
 | gexttod in the first minutes | **0.39 % of a core**, stale-temp sweep 0.21 s, 8 new TLS connections in 300 s | 1790 | profile from start, `strace -e connect` |
@@ -629,6 +630,27 @@ reusable, the candidate filter costs 115 ns and 0 allocations over 32 unrelated 
 torrents.
 
 ### 4.9 Other measurements
+
+**Idle CPU of gx-torrent (2026-10-30, N97, engine 278).** With three seeds and no
+peers the daemon costs 0.87-0.93 % of a core. A CPU profile attributes about a quarter
+of the samples to the DHT answering queries (`dht_packets_in` grew by ~5 per second
+against the public DHT), so the figure measures the node doing its DHT duty, not a busy
+loop of our own. What was removed in the same pass is therefore not visible in the
+total but is visible per unit: one **time.Second ticker per torrent** (only for the
+seeding counter, now derived from a timestamp at the stats sample and at every resume
+write), four `time.Tick` timers in the DHT (kept alive after every session restart) and
+the 10 Hz refill ticker when the rate limit is off. The rest of the idle work is the
+daemon's 3 s queue tick (one sample per torrent) and the DHT traffic itself.
+
+**HTTP transports and the resume flush (2026-10-30).** Two costs were removed by
+construction and are pinned by tests rather than by a benchmark: a transport per fetch
+(`outboundClient`, `netx.HTTPTransport`) opened a TCP and TLS connection for every
+feed poll and .torrent download and left its idle connections behind, since
+`IdleConnTimeout` was zero; the transports are now shared and rebuilt only when the
+egress rules change. `syncPieces` called `fdatasync` on every open file of every torrent
+before each resume write; with the per-file dirty flag a clean file costs no syscall
+(`TestSyncSkipsCleanFile`), which on the 20,000-file case above is 20,000 syscalls saved
+per resume tick.
 
 **Many files in one torrent (file pool, 2026-10-18, N97).** Is a pool of open files
 (an LRU, like libtorrent's) needed? The allocator opens every file of a torrent when it

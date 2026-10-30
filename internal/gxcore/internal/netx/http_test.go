@@ -69,3 +69,43 @@ func TestHTTPTransportProxiesOnlyRemoteHosts(t *testing.T) {
 		}
 	}
 }
+
+// TestHTTPTransportIsSharedAndRebuilt pins the pool lifecycle: the daemon used
+// to build a transport per fetch, so every poll opened a new TCP and TLS
+// connection and the discarded transport's idle ones were never reaped. The
+// transport is shared while the rules hold, rebuilt when they change, and the
+// public and plain kinds keep their own pool.
+func TestHTTPTransportIsSharedAndRebuilt(t *testing.T) {
+	old := Current()
+	t.Cleanup(func() { Configure(old) })
+
+	proxyA, err := url.Parse("http://127.0.0.1:9")
+	if err != nil {
+		t.Fatal(err)
+	}
+	proxyB, err := url.Parse("http://127.0.0.1:10")
+	if err != nil {
+		t.Fatal(err)
+	}
+	Configure(Settings{Proxy: proxyA})
+	first := HTTPTransport()
+	if again := HTTPTransport(); again != first {
+		t.Fatal("the transport was rebuilt with unchanged rules")
+	}
+	if public := PublicHTTPTransport(); public == first {
+		t.Fatal("the public transport reused the plain one")
+	}
+	Configure(Settings{Proxy: proxyB})
+	second := HTTPTransport()
+	if second == first {
+		t.Fatal("the transport was not rebuilt after the proxy changed")
+	}
+	if again := HTTPTransport(); again != second {
+		t.Fatal("the transport was rebuilt twice for the same rules")
+	}
+	// The zero value (no proxy) is a rule change too.
+	Configure(Settings{})
+	if third := HTTPTransport(); third == second {
+		t.Fatal("the transport was not rebuilt after the proxy was removed")
+	}
+}

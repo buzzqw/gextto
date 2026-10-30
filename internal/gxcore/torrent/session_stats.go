@@ -245,6 +245,9 @@ func (s *Session) updateStats() {
 			}
 			t.torrent.mBitfield.RUnlock()
 			t.torrent.syncPieces()
+			// Close the seeding interval here too: without the old one-second
+			// ticker this is the last moment the counter is read for a while.
+			t.torrent.updateSeedDuration(time.Now())
 			return statsSnapshot{
 				id:              []byte(t.torrent.id),
 				bitfield:        bits,

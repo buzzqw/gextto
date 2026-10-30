@@ -108,7 +108,7 @@ func (t *torrent) closeIfBothSeeds(pe *peer.Peer) bool {
 	t.log.Debugf("closing %s: both sides are seeds", pe.Addr().String())
 	// Remember it: a seeding torrent dials a few candidates looking for
 	// leechers, and this one has nothing to ask for.
-	t.seedPeerIPs[pe.IP()] = struct{}{}
+	rememberPeerIP(t.seedPeerIPs, pe.IP())
 	t.closePeer(pe)
 	return true
 }

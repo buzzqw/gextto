@@ -83,6 +83,27 @@ func (t *torrent) ipBanned(ip string) bool {
 	return t.session != nil && t.session.IsBannedIP(ip)
 }
 
+// maxRememberedPeerIPs bounds the per-torrent address sets (banned peers, seeds
+// that answered "both seeds", endpoints already offered a holepunch). A busy
+// swarm can meet thousands of distinct addresses over days; the sets are
+// dropped and start over past the cap instead of growing for the life of the
+// torrent. The session-wide ban (with its TTL) still covers the recent past.
+const maxRememberedPeerIPs = 4096
+
+// rememberPeerIP adds ip to a bounded address set.
+func rememberPeerIP(set map[string]struct{}, ip string) {
+	if ip == "" {
+		return
+	}
+	if _, ok := set[ip]; ok {
+		return
+	}
+	if len(set) >= maxRememberedPeerIPs {
+		clear(set)
+	}
+	set[ip] = struct{}{}
+}
+
 // filterBannedIPs drops banned addresses in place.
 func (t *torrent) filterBannedIPs(a []*net.TCPAddr) []*net.TCPAddr {
 	b := a[:0]
@@ -285,6 +306,7 @@ func (t *torrent) processQueuedMessages() {
 			t.handlePeerMessage(peer.Message{Peer: pe, Message: msg})
 		}
 		pe.Messages = nil
+		pe.QueuedBytes = 0
 	}
 }
 

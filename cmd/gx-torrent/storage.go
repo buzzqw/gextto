@@ -110,9 +110,13 @@ func (d *Daemon) protectLegacyDir(id string) {
 }
 
 // payloadPath is the file or top directory of a torrent inside its save path.
+// The name is one component: both separators are refused on every platform (on
+// Windows "/" is a separator too, and a torrent name may come from an untrusted
+// .torrent), and filepath.IsLocal rejects ".", "..", absolute paths and the
+// Windows reserved names.
 func payloadPath(savePath, name string) (string, error) {
 	name = strings.TrimSpace(name)
-	if name == "" || name == "." || name == ".." || strings.ContainsRune(name, os.PathSeparator) {
+	if name == "" || strings.ContainsAny(name, `/\`) || !filepath.IsLocal(name) {
 		return "", fmt.Errorf("unsafe torrent name %q", name)
 	}
 	return filepath.Join(savePath, name), nil

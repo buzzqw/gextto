@@ -235,6 +235,7 @@ func (t *torrent) partsStorage(skip []bool) storage.Storage {
 
 func (t *torrent) applySkippedPieces() {
 	skip := t.skippedPieces(t.skippedInfoFiles())
+	t.selectionMask, t.selectionMaskSet = skip, true
 	prio := t.piecePriorities()
 	t.skipBits = nil
 	for i := range t.pieces {
@@ -265,12 +266,25 @@ func (t *torrent) peerHasWanted(pe *peer.Peer) bool {
 	return pe.Bitfield.HasAnyOutside(t.bitfield, t.skipBits)
 }
 
+// skipMask returns the pieces belonging to deselected files, cached until the
+// selection changes (applySkippedPieces refreshes it). Rebuilding the mask on
+// every Stats sample — every three seconds per torrent, plus every API detail
+// request — would allocate two NumPieces-wide slices each time.
+func (t *torrent) skipMask() []bool {
+	if t.selectionMaskSet {
+		return t.selectionMask
+	}
+	t.selectionMask = t.skippedPieces(t.skippedInfoFiles())
+	t.selectionMaskSet = true
+	return t.selectionMask
+}
+
 // wantedComplete reports whether every wanted piece is downloaded.
 func (t *torrent) wantedComplete() bool {
 	if t.bitfield == nil {
 		return false
 	}
-	skip := t.skippedPieces(t.skippedInfoFiles())
+	skip := t.skipMask()
 	for i := uint32(0); i < t.bitfield.Len(); i++ {
 		if skip != nil && skip[i] {
 			continue
@@ -303,7 +317,7 @@ func (t *torrent) selectedBytes() (total, done int64) {
 	if t.info() == nil {
 		return 0, 0
 	}
-	skip := t.skippedPieces(t.skippedInfoFiles())
+	skip := t.skipMask()
 	pieceLength := int64(t.info().PieceLength)
 	if n := t.info().NumPieces; skip == nil && n > 0 && (t.bitfield == nil || t.bitfield.Len() == n) {
 		// Every piece wanted: the size of the torrent, and the done pieces

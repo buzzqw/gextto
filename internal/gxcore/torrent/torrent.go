@@ -94,9 +94,14 @@ type torrent struct {
 	v2BlockBytes  int64
 	v2BlockMu     sync.Mutex
 	v2BlockBusy   map[string]bool
+	v2BlockBuilds int
 	v2BlockFailed map[string]time.Time
 	v2Pending     map[*peer.Peer]*v2HashRequest
 	v2NoHashPeers map[*peer.Peer]struct{}
+	// hashReqBudget/hashReqRefill pace the leaf-layer hash answers that read
+	// from disk on the run loop (BEP 52). Run loop only.
+	hashReqBudget int
+	hashReqRefill time.Time
 
 	// Verified pieces, set only after bytes hit storage. mBitfield guards
 	// announcer-side reads against the run loop.
@@ -264,6 +269,10 @@ type torrent struct {
 	// skipBits marks deselected-file pieces (nil when none): interest and
 	// usefulness ignore them. Run loop only.
 	skipBits *bitfield.Bitfield
+	// selectionMask/selectionMaskSet cache skipMask(): the mask of deselected
+	// pieces, refreshed by applySkippedPieces. Run loop only.
+	selectionMask    []bool
+	selectionMaskSet bool
 
 	// pendingWrites bounds the write ring (maxPendingWrites): the network
 	// flows during writes instead of stopping the world. Run loop only.
@@ -278,7 +287,6 @@ type torrent struct {
 	seededFor       metrics.Counter
 
 	seedDurationUpdatedAt time.Time
-	seedDurationTicker    *time.Ticker
 
 	// connectedPeerIPs prevents duplicate connections per IP.
 	connectedPeerIPs map[string]struct{}
@@ -655,7 +663,7 @@ func (f File) Length() int64 {
 // announceDHT registers the torrent for DHT peer duty.
 func (t *torrent) announceDHT() {
 	t.session.mPeerRequests.Lock()
-	t.session.dhtPeerRequests[t] = struct{}{}
+	t.session.dhtPeerRequests[t] = t.port
 	t.session.mPeerRequests.Unlock()
 }
 

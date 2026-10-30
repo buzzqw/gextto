@@ -445,16 +445,23 @@ func (d *DHT) bootstrapRouters() {
 // and listens for incoming DHT requests until d.Stop()
 // is called from another go routine.
 // rateLimiter arms the inbound packet token bucket: disabled below zero,
-// floored at 10 above it (smaller rates quantize badly at 10 Hz refill).
-func (d *DHT) rateLimiter() (<-chan time.Time, int64) {
+// floored at 10 above it (smaller rates quantize badly at 10 Hz refill). The
+// ticker is returned so the loop can stop it: time.Tick would leave a 10 Hz
+// goroutine behind on every session restart. A nil ticker (and a nil channel,
+// which blocks forever in the select) means "not rate limited".
+func (d *DHT) rateLimiter() (<-chan time.Time, *time.Ticker, int64) {
 	if d.config.RateLimit < 0 {
 		d.DebugLogger.Infof("rate limiting disabled")
-		return nil, d.config.RateLimit
+		return nil, nil, d.config.RateLimit
 	}
 	if d.config.RateLimit > 0 && d.config.RateLimit < 10 {
 		d.config.RateLimit = 10
 	}
-	return time.Tick(time.Second / 10), d.config.RateLimit
+	if d.config.RateLimit == 0 {
+		return nil, nil, 0
+	}
+	ticker := time.NewTicker(time.Second / 10)
+	return ticker.C, ticker, d.config.RateLimit
 }
 
 // loop pumps the node until Stop: one reader goroutine feeds datagrams to
@@ -478,15 +485,26 @@ func (d *DHT) loop() {
 
 	d.bootstrap()
 
-	cleanupTicker := time.Tick(d.config.CleanupPeriod)
-	secretRotateTicker := time.Tick(secretRotatePeriod)
+	// Every ticker is created here and stopped on exit: time.Tick leaked one
+	// goroutine per session restart, and the daemon rebuilds the session on
+	// every configuration change.
+	cleanupTicker := time.NewTicker(d.config.CleanupPeriod)
+	defer cleanupTicker.Stop()
+	secretRotateTicker := time.NewTicker(secretRotatePeriod)
+	defer secretRotateTicker.Stop()
 
-	saveTicker := make(<-chan time.Time)
+	var saveTicker *time.Ticker
+	var saveC <-chan time.Time
 	if d.store != nil {
-		saveTicker = time.Tick(d.config.SavePeriod)
+		saveTicker = time.NewTicker(d.config.SavePeriod)
+		defer saveTicker.Stop()
+		saveC = saveTicker.C
 	}
 
-	fillTokenBucket, tokenBucket := d.rateLimiter()
+	fillTokenBucket, refillTicker, tokenBucket := d.rateLimiter()
+	if refillTicker != nil {
+		defer refillTicker.Stop()
+	}
 	d.DebugLogger.Infof("DHT: Starting DHT node %x on port %d.", d.nodeId, d.config.Port)
 
 	for {
@@ -532,15 +550,15 @@ func (d *DHT) loop() {
 			if tokenBucket < d.config.RateLimit {
 				tokenBucket += d.config.RateLimit / 10
 			}
-		case <-cleanupTicker:
+		case <-cleanupTicker.C:
 			d.runCleanupTick()
 		case node := <-d.pingRequest:
 			d.pingNode(node)
-		case <-secretRotateTicker:
+		case <-secretRotateTicker.C:
 			d.tokenSecrets = []string{d.newTokenSecret(), d.tokenSecrets[0]}
 		case d.portRequest <- d.config.Port:
 			continue
-		case <-saveTicker:
+		case <-saveC:
 			d.persistRoutingTable()
 		}
 	}
