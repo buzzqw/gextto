@@ -98,8 +98,10 @@ be chosen with the `/ui/browse-dir` selector.
 **Page and UI.** HTML, CSS and JS live in `internal/webui/assets` with `embed.FS`, live
 updates over SSE (`/ui/live`) as Gextto's UI does; no framework with a Node build, so the
 binary stays compilable with a plain `go build`. From `/ui/settings` one sets folders,
-network and ports, protocols, queue and cache, bandwidth and the scheduler, language and
-notifications.
+network and ports, protocols, queue and cache, bandwidth, the scheduler and the automatic
+speed, language and notifications. The page is split into seven tabs (folders and files,
+network, bandwidth, queue, library, interface, system): each panel shows only its groups,
+the search box at the top filters across all of them and one Save applies the whole form.
 
 **Packaging.** A dedicated archive `gx-torrent-linux-<arch>.tar.gz` (binary, `run.sh`,
 `gx-torrent.service`, `install-service.sh`/`uninstall-service.sh`, `README`, `VERSION`,

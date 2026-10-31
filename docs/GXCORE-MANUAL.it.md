@@ -14,7 +14,30 @@ streaming, DLNA e API compatibile con qBittorrent.
 
 ## 1. Avvio in tre minuti
 
+gx-torrent esce come **archivio autonomo** (`gx-torrent-linux-<arch>.tar.gz`
+nella pagina delle release): dentro ci sono il binario, `run.sh` per avviarlo e
+`install-service.sh` per installarlo come servizio systemd.
+
 ```bash
+tar xzf gx-torrent-linux-x86_64.tar.gz
+cd gx-torrent
+./run.sh                              # avvio diretto, dati in una cartella accanto
+# oppure: sudo ./install-service.sh   # servizio systemd, dati in /var/lib/gx-torrent
+```
+
+Apri `http://IP-DEL-SERVER:8890/`: al primo accesso compare la procedura guidata.
+
+### Con Docker
+
+L’immagine non è pubblicata: il contenitore si **costruisce dai sorgenti**,
+quindi scarica prima il repository (o l’archivio dei sorgenti di una release) e
+lancia i comandi dalla cartella che contiene il `Dockerfile`. Il solo
+`Dockerfile` non basta, perché durante la build il demone viene compilato dal
+codice del repository.
+
+```bash
+git clone https://github.com/buzzqw/gextto.git
+cd gextto
 docker build -t gx-torrent .
 docker run -d --name gx-torrent \
   -p 8080:8080 -p 6881:6881 -p 6881:6881/udp \
@@ -22,7 +45,7 @@ docker run -d --name gx-torrent \
   gx-torrent
 ```
 
-Apri `http://IP-DEL-SERVER:8080/`: al primo accesso compare la procedura guidata.
+Con il contenitore la pagina risponde su `http://IP-DEL-SERVER:8080/`.
 
 ![Procedura guidata](screenshots/gx-core/it/setup.png)
 
@@ -152,7 +175,52 @@ fa funzionare davvero la gestione automatica dei torrent.
 
 ![Categorie](screenshots/gx-core/it/categories.png)
 
-## 7. Dal telefono
+### Velocità automatica (misura la linea)
+
+In **Impostazioni → Banda → Velocità automatica (misura la linea)** lasci che sia
+gx-torrent a trovare la velocità invece di fissarla: sonda la latenza di andata
+e ritorno verso Google e Cloudflare (o un host scelto) e muove **download e
+upload insieme**, abbassandoli quando la linea si mette in coda e rialzandoli
+quando la latenza scende. Un limite manuale resta il tetto, e i massimi reali
+della linea, se li conosci, gli fanno raggiungere prima il punto giusto; con i
+massimi a 0 li scopre da solo. **Ottimizza** nella stessa scheda azzera i due
+limiti e accende la velocità automatica. È spenta per default.
+
+### Notifiche
+
+In **Impostazioni → Interfaccia → Notifiche** il client ti dice cosa succede
+sugli stessi canali di Gextto e indexarr: **Telegram**, un **webhook** generico
+(formato JSON, Discord, Slack, Gotify, ntfy o Pushover), **Discord**, **Slack**,
+**Gotify**, **ntfy**, **Pushover**, un server **Apprise**, l’**e-mail** e uno
+**script personale**. Compila quelli che usi e lascia vuoti gli altri: ogni
+canale compilato riceve ogni evento attivo, e un servizio lento non trattiene
+gli altri. Tre interruttori scelgono gli eventi — *Download completato*, *Feed
+ha aggiunto torrent*, *Errore del feed* — e **Invia prova** prova in una volta
+tutti i canali salvati. Lo script riceve l’evento nelle variabili
+`GX_TORRENT_*` (app, evento, titolo e messaggio), mai sulla riga di comando.
+
+## 7. Quanto costa in CPU e RAM
+
+Motore, coda, pagina, RSS e API compatibile con qBittorrent sono un solo
+processo Go: nessun motore esterno, nessuna libreria C, nessun server di
+database. Questi numeri sono l’intero demone, misurati su un **mini-PC Intel N97**
+(4 core, 16 GB di RAM) il 26–30 ottobre 2026, con DHT attiva e un filtro IP
+completo caricato (172.740 regole):
+
+| Situazione | CPU | Memoria (RSS) |
+| --- | --- | --- |
+| A riposo | **0,6–1,0 %** di un core | **29–39 MB** |
+| In download da sciami pubblici a 8,2–8,8 MB/s con 116–132 peer | **18–37 %** di un core, **2,0–4,3 s di CPU per 100 MB** | — |
+| Trasferimento in loopback (seed e leecher sullo stesso host) | **7,5–8,3 s di CPU per 1,09 GiB** per entrambi i lati | **≈ 100 MB di picco** |
+| Cinque minuti dopo un picco, senza trasferimenti | — | **550 MB → 35–40 MB** |
+
+A riposo il processore fa soprattutto lavoro di rete vero — DHT e handshake dei
+peer in arrivo — non polling interno. Il tetto di connessioni è dimensionato
+sulla macchina (55 peer per torrent e 300 in totale su questo host a 4 core), e
+i buffer dei pezzi tornano dopo un picco invece di restare riservati. Macchina,
+data e comando di ogni numero sono in [`measurements.md`](measurements.md).
+
+## 8. Dal telefono
 
 La pagina è responsive e installabile come app: manifest e service worker
 mettono in cache solo le risorse condivise, mai pagine o risposte autenticate.
@@ -160,7 +228,7 @@ Quando c’è una password compare **Esci**.
 
 ![Mobile](screenshots/gx-core/it/mobile.png)
 
-## 8. Integrazioni
+## 9. Integrazioni
 
 gx-core espone l’**API compatibile con qBittorrent** (`/api/v2`) per Sonarr,
 Radarr, Lidarr, Readarr, Prowlarr e le app mobili. In **Impostazioni → Rete** si
@@ -173,7 +241,7 @@ un client restano: le app che leggono questi dati li trovano pieni. La
 compatibilità è ampia ma non è un clone al 100%: i limiti sono in
 [`gx-core.md`](gx-core.md) §6.
 
-## 9. Sicurezza
+## 10. Sicurezza
 
 - La pagina ascolta su `0.0.0.0:8080` nel container; il login è opzionale ma
   consigliato se la esponi oltre la LAN.
@@ -183,7 +251,7 @@ compatibilità è ampia ma non è un clone al 100%: i limiti sono in
 - I web seed e le sorgenti magnet non raggiungono la rete locale se non lo
   consenti esplicitamente.
 
-## 10. Riprodurre l’ambiente di questo manuale
+## 11. Riprodurre l’ambiente di questo manuale
 
 L’ambiente delle immagini è un container `gx-torrent` con quattro torrent
 pubblici e legali, un paio di categorie e un titolo seguito. I passi sono quelli

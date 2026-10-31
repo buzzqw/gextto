@@ -394,13 +394,17 @@ semplice con tutto ciò che serve a un client autonomo.
   (`/api/v1/events`) per Node-RED, Home Assistant o script
   ([esempi](docs/API.md#integrating-with-other-systems)).
 - **Web UI** disposta come quella di qBittorrent: temi chiaro e scuro; filtri
-  per stato, categoria, tag e tracker; scelta delle colonne (24) con colonne
-  ridimensionabili salvate sul server; menu contestuale completo; pannello di
-  dettaglio ridimensionabile (file raggruppati per cartella, rinomina, peer);
-  anteprima del magnet mentre lo scrivi; annullamento dopo una rimozione;
-  scorciatoie da tastiera, trascinamento, schede adatte al telefono e una
-  pagina **Statistiche** (totali di sessione e di sempre, grafico 1 h/24 h/7 g).
-  Ogni pagina verificata con axe-core.
+  per stato, categoria, tag e tracker; la **lingua** dell'interfaccia in fondo
+  alla barra laterale (sei lingue, salvata come il campo nelle impostazioni);
+  scelta delle colonne (24) con colonne ridimensionabili salvate sul server;
+  menu contestuale completo; pannello di dettaglio ridimensionabile (file
+  raggruppati per cartella, rinomina, peer); anteprima del magnet mentre lo
+  scrivi; annullamento dopo una rimozione; scorciatoie da tastiera,
+  trascinamento, schede adatte al telefono, una pagina **Statistiche** (totali
+  di sessione e di sempre, grafico 1 h/24 h/7 g) e una pagina **Impostazioni**
+  divisa in sette schede — *Cartelle e file*, *Rete*, *Banda*, *Coda*,
+  *Libreria*, *Interfaccia*, *Sistema* — con una ricerca che le attraversa
+  tutte. Ogni pagina verificata con axe-core.
 - **RSS e automazione.** Una pagina **Serie e film** che
   dice per ogni titolo cosa è scaricato, in download o trovato ma non scaricato,
   con filtri per stato, una sola azione principale e il perché ogni release
@@ -425,9 +429,9 @@ semplice con tutto ciò che serve a un client autonomo.
 - **Dal telefono.** La pagina si installa come app (manifest e service worker
   per le sole risorse condivise) e ha l'uscita dalla sessione quando c'è una
   password.
-- **Notifiche** sugli stessi canali di Gextto, più il server Apprise, i canali
-  dedicati Discord, Slack, Gotify, ntfy e Pushover e uno script personalizzato,
-  con un pulsante di prova.
+- **Notifiche** sugli stessi canali di Gextto e indexarr: Telegram, webhook,
+  Discord, Slack, Gotify, ntfy, Pushover, un server Apprise, e-mail e uno script
+  personale, con gli eventi che scegli e un pulsante di prova.
 - **Si aggiorna da solo** dalle build della CI quando cambia il suo codice,
   verificato SHA-256, con ripristino automatico.
 - **Leggero sulla macchina.** Un solo processo in Go puro, senza motore esterno
@@ -438,11 +442,16 @@ semplice con tutto ciò che serve a un client autonomo.
   di picco, e cinque minuti dopo un picco la memoria scende da 550 MB a
   35–40 MB. Numeri, macchina e comandi in
   [`docs/measurements.md`](docs/measurements.md).
-- **Piattaforme.** Linux x86_64/aarch64 (unit systemd, `run.sh`, immagine Docker
-  non privilegiata) e servizio Windows nativo su amd64/arm64.
+- **Piattaforme.** Linux x86_64/aarch64 (unit systemd, `run.sh`, e un
+  `Dockerfile` che costruisce dai sorgenti un'immagine non privilegiata; non
+  esiste un'immagine pubblicata) e servizio Windows nativo su amd64/arm64.
 
-Apri `http://<host>:8890/` per la sua procedura guidata. Riferimento completo:
-il [manuale illustrato](docs/GXCORE-MANUAL.it.md) e il [documento tecnico di gx-torrent](docs/gx-torrent.md).
+Apri `http://<host>:8890/` per la sua procedura guidata. Il `Dockerfile` nella
+radice costruisce il solo demone (`docker build -t gx-torrent .`, poi il
+`docker run` del [manuale](docs/GXCORE-MANUAL.it.md#1-avvio-in-tre-minuti)): non
+esiste un'immagine pubblicata e la build richiede i sorgenti. Riferimento
+completo: il [manuale illustrato](docs/GXCORE-MANUAL.it.md) e il
+[documento tecnico di gx-torrent](docs/gx-torrent.md).
 
 ## Test
 

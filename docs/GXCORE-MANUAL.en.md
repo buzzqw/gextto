@@ -14,7 +14,29 @@ search, statistics, streaming, DLNA and a qBittorrent-compatible API.
 
 ## 1. Start in three minutes
 
+gx-torrent ships as a **standalone archive** (`gx-torrent-linux-<arch>.tar.gz` on
+the releases page): it holds the binary, `run.sh` to start it and
+`install-service.sh` to install it as a systemd service.
+
 ```bash
+tar xzf gx-torrent-linux-x86_64.tar.gz
+cd gx-torrent
+./run.sh                              # direct start, data in a folder beside it
+# or: sudo ./install-service.sh       # systemd service, data in /var/lib/gx-torrent
+```
+
+Open `http://YOUR-SERVER:8890/`: the first visit shows the wizard.
+
+### With Docker
+
+There is no published image: the container is **built from the sources**, so
+download the repository (or the source archive of a release) first and run the
+commands from the folder that holds the `Dockerfile`. The `Dockerfile` alone is
+not enough, because the build compiles the daemon from the checkout.
+
+```bash
+git clone https://github.com/buzzqw/gextto.git
+cd gextto
 docker build -t gx-torrent .
 docker run -d --name gx-torrent \
   -p 8080:8080 -p 6881:6881 -p 6881:6881/udp \
@@ -22,7 +44,7 @@ docker run -d --name gx-torrent \
   gx-torrent
 ```
 
-Open `http://YOUR-SERVER:8080/`: the first visit shows the wizard.
+With the container the page answers on `http://YOUR-SERVER:8080/`.
 
 ![Setup wizard](screenshots/gx-core/en/setup.png)
 
@@ -151,7 +173,52 @@ automatic torrent management really work.
 
 ![Categories](screenshots/gx-core/en/categories.png)
 
-## 7. From the phone
+### Automatic speed (measures the line)
+
+In **Settings → Bandwidth → Automatic speed (measures the line)** you let
+gx-torrent find the speed instead of fixing it: it probes the round-trip latency
+towards Google and Cloudflare (or a host you choose) and moves **download and
+upload together**, lowering them when the line queues and raising them again
+when the latency drops. A manual limit stays the ceiling, and the real maximum
+speeds of the line, if you know them, let it reach the right point sooner; with
+those maxima at 0 it discovers them by itself. **Optimize** in the same tab
+zeros the two limits and turns automatic speed on. It is off by default.
+
+### Notifications
+
+In **Settings → Interface → Notifications** the client tells you what happens on
+the same channels as Gextto and indexarr: **Telegram**, a generic **webhook**
+(JSON, Discord, Slack, Gotify, ntfy or Pushover format), **Discord**, **Slack**,
+**Gotify**, **ntfy**, **Pushover**, an **Apprise** server, **e-mail** and a
+**custom script**. Fill in the ones you use and leave the others empty: every
+filled channel receives every enabled event, and a slow service does not hold up
+the others. Three switches choose the events — *Download complete*, *Feed added
+torrents*, *Feed error* — and **Send test** tries all the saved channels at once.
+The script receives the event in the `GX_TORRENT_*` variables (app, event, title
+and message), never on the command line.
+
+## 7. What it costs in CPU and RAM
+
+Engine, queue, web page, RSS and the qBittorrent-compatible API are one pure-Go
+process: no external engine, no C library, no database server. These figures are
+the whole daemon, measured on an **Intel N97 mini-PC** (4 cores, 16 GB RAM) on
+26–30 October 2026, with DHT on and a full IP filter loaded (172,740 rules):
+
+| Situation | CPU | Memory (RSS) |
+| --- | --- | --- |
+| At rest | **0.6–1.0 %** of one core | **29–39 MB** |
+| Downloading from public swarms at 8.2–8.8 MB/s with 116–132 peers | **18–37 %** of one core, **2.0–4.3 s of CPU per 100 MB** | — |
+| Loopback transfer (seed and leecher on the same host) | **7.5–8.3 s of CPU per 1.09 GiB** for both sides | **≈ 100 MB peak** |
+| Five minutes after a burst, with no transfer | — | **550 MB → 35–40 MB** |
+
+At rest the CPU is mostly real network work — the DHT and incoming peer
+handshakes — not internal polling. The connection cap is sized from the machine
+(55 peers per torrent and 300 in total on this 4-core host), and the buffers of
+the pieces return after a burst instead of staying reserved. Machine, date and
+the command for every figure are in
+[`measurements.md`](measurements.md).
+
+## 8. From the phone
 
 The page is responsive and installable as an app: the manifest and the service
 worker cache only the shared assets, never an authenticated page or an API
@@ -159,7 +226,7 @@ answer. When a password is set, **Sign out** appears.
 
 ![Mobile](screenshots/gx-core/en/mobile.png)
 
-## 8. Integrations
+## 9. Integrations
 
 gx-core exposes the **qBittorrent-compatible API** (`/api/v2`) for Sonarr,
 Radarr, Lidarr, Readarr, Prowlarr and mobile apps. In **Settings → Network** you
@@ -171,7 +238,7 @@ the episodes already taken, and the tags set by a client stay: apps that read
 these fields find them filled. Compatibility is broad but not a 100% clone: the
 limits are in [`gx-core.md`](gx-core.md) §6.
 
-## 9. Security
+## 10. Security
 
 - The page listens on `0.0.0.0:8080` in the container; login is optional but
   recommended if you expose it beyond the LAN.
@@ -181,7 +248,7 @@ limits are in [`gx-core.md`](gx-core.md) §6.
 - Web seeds and magnet sources cannot reach the local network unless you allow
   it.
 
-## 10. Reproducing this manual’s environment
+## 11. Reproducing this manual’s environment
 
 The images come from a `gx-torrent` container with four public, legal torrents,
 a couple of categories and one followed title. The steps are those of chapter

@@ -382,12 +382,16 @@ everything a standalone client needs.
   (`/api/v1/events`) for Node-RED, Home Assistant or scripts
   ([examples](docs/API.md#integrating-with-other-systems)).
 - **Web UI** laid out like qBittorrent's: light and dark themes; status,
-  category, tag and tracker filters; a column chooser (24 columns) with
-  resizable columns kept on the server; a full context menu; a resizable detail
-  panel (files grouped by folder, rename, peers); magnet preview while typing;
-  undo after removal; keyboard shortcuts, drag-and-drop, phone-friendly cards
-  and a **Statistics** page (session and all-time totals, 1 h/24 h/7 d graph).
-  Every page axe-core checked.
+  category, tag and tracker filters; the interface **language** at the bottom of
+  the sidebar (six languages, saved like the field in the settings); a column
+  chooser (24 columns) with resizable columns kept on the server; a full context
+  menu; a resizable detail panel (files grouped by folder, rename, peers);
+  magnet preview while typing; undo after removal; keyboard shortcuts,
+  drag-and-drop, phone-friendly cards, a **Statistics** page (session and
+  all-time totals, 1 h/24 h/7 d graph) and a **Settings** page split into seven
+  tabs — *Folders & files*, *Network*, *Bandwidth*, *Queue*, *Library*,
+  *Interface*, *System* — with one search across all of them. Every page
+  axe-core checked.
 - **RSS and automation.** A **Series & movies** page
   that says per title what is downloaded, downloading or found but not taken,
   with state filters, one primary action and why each release would be taken or
@@ -410,9 +414,9 @@ everything a standalone client needs.
 - **From the phone.** The page installs as an app (manifest and a service
   worker for the shared assets only) and offers a sign-out when a password is
   set.
-- **Notifications** on the same channels as Gextto, plus the Apprise server,
-  the dedicated Discord, Slack, Gotify, ntfy and Pushover channels and a custom
-  script, with a test button.
+- **Notifications** on the same channels as Gextto and indexarr: Telegram, a
+  webhook, Discord, Slack, Gotify, ntfy, Pushover, an Apprise server, e-mail and
+  a custom script, with the events you choose and a test button.
 - **Updates itself** from the CI builds when its own code changed, verified by
   SHA-256, with automatic rollback.
 - **Light on the machine.** One pure-Go process, no external engine and no
@@ -422,10 +426,14 @@ everything a standalone client needs.
   reaches **234–274 MB/s** with about 100 MB peak RSS, and five minutes after a
   burst the memory falls from 550 MB to 35–40 MB. Figures, machine and
   commands in [`docs/measurements.md`](docs/measurements.md).
-- **Platforms.** Linux x86_64/aarch64 (systemd unit, `run.sh`, unprivileged
-  Docker image) and a native Windows service on amd64/arm64.
+- **Platforms.** Linux x86_64/aarch64 (systemd unit, `run.sh`, and a `Dockerfile`
+  that builds an unprivileged image from the sources; no image is published) and
+  a native Windows service on amd64/arm64.
 
-Open `http://<host>:8890/` for its setup wizard. Full reference: the
+Open `http://<host>:8890/` for its setup wizard. The `Dockerfile` in the root
+builds the daemon alone (`docker build -t gx-torrent .`, then the `docker run`
+of the [manual](docs/GXCORE-MANUAL.en.md#1-start-in-three-minutes)): there is no
+published image, and the build needs the sources. Full reference: the
 [illustrated manual](docs/GXCORE-MANUAL.en.md) and the [gx-torrent technical document](docs/gx-torrent.md).
 
 ## Tests
