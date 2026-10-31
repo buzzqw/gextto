@@ -1135,7 +1135,7 @@ func (d *Daemon) wantedGapSearch(ctx context.Context, now time.Time, w wantedEnt
 		crit := w.criteria()
 		crit.EpisodeFilter = fmt.Sprintf("%dx%02d", ep.season, ep.episode)
 		for _, item := range items {
-			if !wantedIncludeMatch(w, item.Title) || !crit.Match(rss.Item{Title: item.Title, Freeleech: item.Freeleech}, now) {
+			if !wantedIncludeMatch(w, item.Title) || !crit.Match(rss.Item{Title: item.Title, Freeleech: item.Freeleech, FreeleechKnown: item.FreeleechKnown}, now) {
 				continue
 			}
 			if d.wantedTaken(w.Name, ep.season, ep.episode) {

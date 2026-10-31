@@ -11,15 +11,17 @@ import (
 // unknown release is not mistaken for a free one.
 func TestTorznabFreeleechFlags(t *testing.T) {
 	for _, test := range []struct {
-		name  string
-		attrs string
-		want  bool
+		name      string
+		attrs     string
+		want      bool
+		wantKnown bool
 	}{
-		{"volume factor zero", `<torznab:attr name="downloadvolumefactor" value="0"/>`, true},
-		{"volume factor paid", `<torznab:attr name="downloadvolumefactor" value="1"/>`, false},
-		{"explicit freeleech", `<torznab:attr name="freeleech" value="1"/><torznab:attr name="freeleechknown" value="1"/>`, true},
-		{"explicit paid", `<torznab:attr name="freeleech" value="0"/><torznab:attr name="freeleechknown" value="1"/>`, false},
-		{"unknown", `<torznab:attr name="downloadvolumefactor" value="0"/><torznab:attr name="freeleechknown" value="0"/>`, false},
+		{"volume factor zero", `<torznab:attr name="downloadvolumefactor" value="0"/>`, true, true},
+		{"volume factor paid", `<torznab:attr name="downloadvolumefactor" value="1"/>`, false, true},
+		{"explicit freeleech", `<torznab:attr name="freeleech" value="1"/><torznab:attr name="freeleechknown" value="1"/>`, true, true},
+		{"explicit paid", `<torznab:attr name="freeleech" value="0"/><torznab:attr name="freeleechknown" value="1"/>`, false, true},
+		{"unknown", `<torznab:attr name="downloadvolumefactor" value="0"/><torznab:attr name="freeleechknown" value="0"/>`, false, false},
+		{"nothing stated", ``, false, false},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			body := `<rss xmlns:torznab="http://torznab.com/schemas/2015/feed"><channel><item>` +
@@ -34,8 +36,9 @@ func TestTorznabFreeleechFlags(t *testing.T) {
 			if len(releases) != 1 {
 				t.Fatalf("releases = %d, want 1", len(releases))
 			}
-			if releases[0].Freeleech != test.want {
-				t.Fatalf("freeleech = %v, want %v", releases[0].Freeleech, test.want)
+			if releases[0].Freeleech != test.want || releases[0].FreeleechKnown != test.wantKnown {
+				t.Fatalf("freeleech = (%v, known %v), want (%v, known %v)",
+					releases[0].Freeleech, releases[0].FreeleechKnown, test.want, test.wantKnown)
 			}
 		})
 	}
@@ -44,18 +47,22 @@ func TestTorznabFreeleechFlags(t *testing.T) {
 // TestProwlarrFreeleechFlags reads the named flags Prowlarr exposes.
 func TestProwlarrFreeleechFlags(t *testing.T) {
 	for _, test := range []struct {
+		name  string
 		flags []any
 		want  bool
+		known bool
 	}{
-		{[]any{"freeleech"}, true},
-		{[]any{"neutralleech"}, true},
-		{[]any{"freeleech", "scene"}, true},
-		{[]any{"scene"}, false},
-		{nil, false},
+		{"freeleech", []any{"freeleech"}, true, true},
+		{"neutralleech", []any{"neutralleech"}, true, true},
+		{"freeleech and scene", []any{"freeleech", "scene"}, true, true},
+		{"scene only is unknown", []any{"scene"}, false, false},
+		{"no flags is unknown", nil, false, false},
 	} {
 		item := map[string]any{"indexerFlags": test.flags}
-		if got := prowlarrFreeleech(item); got != test.want {
-			t.Errorf("prowlarrFreeleech(%v) = %v, want %v", test.flags, got, test.want)
+		got := prowlarrFreeleech(item)
+		if got.Free != test.want || got.Known != test.known {
+			t.Errorf("%s: prowlarrFreeleech(%v) = %+v, want free=%v known=%v",
+				test.name, test.flags, got, test.want, test.known)
 		}
 	}
 }

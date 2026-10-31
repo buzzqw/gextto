@@ -18,18 +18,19 @@ import (
 )
 
 type v2SearchResult struct {
-	Title       string
-	Source      string
-	Network     string
-	Sources     int64
-	Ed2kLink    string
-	Addable     bool
-	Score       int64
-	Seeders     int64
-	Freeleech   bool
-	SizeBytes   int64
-	ReleaseJSON string
-	ExplainJSON string
+	Title          string
+	Source         string
+	Network        string
+	Sources        int64
+	Ed2kLink       string
+	Addable        bool
+	Score          int64
+	Seeders        int64
+	Freeleech      bool
+	FreeleechKnown bool
+	SizeBytes      int64
+	ReleaseJSON    string
+	ExplainJSON    string
 }
 
 type v2SearchView struct {
@@ -112,13 +113,14 @@ func v2SearchViewFrom(s *AppState, query, redirect string, kad bool) v2SearchVie
 						// eD2k files came from aMule, so they can always be queued:
 						// re-checking the integration here used to hide the button
 						// after a search when that check failed for a moment.
-						Addable:     true,
-						Score:       release.Score,
-						Seeders:     release.Seeders,
-						Freeleech:   release.Freeleech,
-						SizeBytes:   release.SizeBytes,
-						ReleaseJSON: string(encoded),
-						ExplainJSON: string(encoded),
+						Addable:        true,
+						Score:          release.Score,
+						Seeders:        release.Seeders,
+						Freeleech:      release.Freeleech,
+						FreeleechKnown: release.FreeleechKnown,
+						SizeBytes:      release.SizeBytes,
+						ReleaseJSON:    string(encoded),
+						ExplainJSON:    string(encoded),
 					})
 				}
 			}

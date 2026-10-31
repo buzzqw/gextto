@@ -79,12 +79,13 @@ func TestMergePrefersAFreeCopyWithTheSameSwarm(t *testing.T) {
 	paid := dedupTorrent(title, "http://indexer/dl/1", 2_000_000_000, 10)
 	free := dedupTorrent(title, "http://mirror/dl/2", 2_000_000_000, 10)
 	free.Freeleech = true
+	free.FreeleechKnown = true
 	merged := mergeDuplicateReleases([]models.Release{paid, free})
 	if len(merged) != 1 {
 		t.Fatalf("got %d releases, want one", len(merged))
 	}
-	if !merged[0].Freeleech {
-		t.Fatal("the free copy did not become the primary")
+	if !merged[0].Freeleech || !merged[0].FreeleechKnown {
+		t.Fatal("the free copy did not become the primary with a known state")
 	}
 	if len(merged[0].Mirrors) != 1 || merged[0].Mirrors[0].Freeleech {
 		t.Fatalf("mirrors = %+v", merged[0].Mirrors)
@@ -102,16 +103,17 @@ func TestSwitchToMirrorPreservesFreeleech(t *testing.T) {
 		TorrentURL: &link,
 		Freeleech:  false,
 		Mirrors: []models.Release{{
-			Title:      "Show S01E02 1080p",
-			TorrentURL: &mirrorLink,
-			Freeleech:  true,
-			Seeders:    5,
+			Title:          "Show S01E02 1080p",
+			TorrentURL:     &mirrorLink,
+			Freeleech:      true,
+			FreeleechKnown: true,
+			Seeders:        5,
 		}},
 	}
 	if !switchToMirror(&release, nil) {
 		t.Fatal("switchToMirror returned false")
 	}
-	if !release.Freeleech {
+	if !release.Freeleech || !release.FreeleechKnown {
 		t.Fatal("the freeleech flag of the mirror was lost")
 	}
 	if release.TorrentURL == nil || *release.TorrentURL != mirrorLink {

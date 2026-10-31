@@ -16,6 +16,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	fl "github.com/buzzqw/gextto/internal/freeleech"
 )
 
 // Indexer is one configured Torznab endpoint.
@@ -48,6 +50,8 @@ type Item struct {
 	// Freeleech is set when the indexer says the download does not count
 	// toward the tracker ratio.
 	Freeleech bool `json:"freeleech,omitempty"`
+	// FreeleechKnown is true when the indexer stated the quota, free or paid.
+	FreeleechKnown bool `json:"freeleech_known,omitempty"`
 }
 
 // Download returns the best way to fetch the item: the magnet when present,
@@ -228,13 +232,15 @@ func ParseProwlarr(r io.Reader, indexerName string) ([]Item, error) {
 		if rel.Protocol != "" && !strings.EqualFold(rel.Protocol, "torrent") {
 			continue
 		}
+		state := prowlarrFreeleech(rel)
 		item := Item{
-			Title:     strings.TrimSpace(rel.Title),
-			Size:      rel.Size,
-			Leechers:  -1,
-			Link:      strings.TrimSpace(rel.DownloadURL),
-			Indexer:   indexerName,
-			Freeleech: prowlarrFreeleech(rel),
+			Title:          strings.TrimSpace(rel.Title),
+			Size:           rel.Size,
+			Leechers:       -1,
+			Link:           strings.TrimSpace(rel.DownloadURL),
+			Indexer:        indexerName,
+			Freeleech:      state.Free,
+			FreeleechKnown: state.Known,
 		}
 		if rel.Seeders != nil {
 			item.Seeders = *rel.Seeders
@@ -262,17 +268,17 @@ func ParseProwlarr(r io.Reader, indexerName string) ([]Item, error) {
 }
 
 // prowlarrFreeleech reads the quota flags of a Prowlarr search result.
-func prowlarrFreeleech(rel prowlarrRelease) bool {
+func prowlarrFreeleech(rel prowlarrRelease) fl.State {
 	for _, flag := range rel.IndexerFlags {
 		switch strings.ToLower(strings.TrimSpace(flag)) {
 		case "freeleech", "neutralleech":
-			return true
+			return fl.State{Free: true, Known: true}
 		}
 	}
 	if rel.DownloadVolumeFactor != nil {
-		return *rel.DownloadVolumeFactor <= 0
+		return fl.Resolve(nil, nil, rel.DownloadVolumeFactor)
 	}
-	return false
+	return fl.State{}
 }
 
 // infoHashMagnet builds a magnet from a v1 (40 hex) or v2 (64 hex) infohash.
@@ -439,16 +445,18 @@ func Parse(r io.Reader, indexerName string) ([]Item, error) {
 					downloadFactor = &parsed
 				}
 			case "freeleech":
-				if parsed, ok := parseBoolish(attr.Value); ok {
+				if parsed, ok := fl.ParseFlag(attr.Value); ok {
 					freeleech = &parsed
 				}
 			case "freeleechknown":
-				if parsed, ok := parseBoolish(attr.Value); ok {
+				if parsed, ok := fl.ParseFlag(attr.Value); ok {
 					freeleechKnown = &parsed
 				}
 			}
 		}
-		item.Freeleech = releaseFreeleech(freeleech, freeleechKnown, downloadFactor)
+		state := fl.Resolve(freeleech, freeleechKnown, downloadFactor)
+		item.Freeleech = state.Free
+		item.FreeleechKnown = state.Known
 		if t, err := parseTorznabTime(raw.PubDate); err == nil {
 			item.Published = t
 		}
@@ -468,34 +476,6 @@ func newLenientDecoder(data []byte) *xml.Decoder {
 	decoder.Strict = false
 	decoder.Entity = xml.HTMLEntity
 	return decoder
-}
-
-// parseBoolish reads the 0/1, true/false and on/off spellings an indexer uses
-// for a flag.
-func parseBoolish(value string) (bool, bool) {
-	switch strings.ToLower(strings.TrimSpace(value)) {
-	case "1", "true", "yes", "on", "free", "freeleech":
-		return true, true
-	case "0", "false", "no", "off", "paid":
-		return false, true
-	}
-	return false, false
-}
-
-// releaseFreeleech resolves what an item said about the download quota. An
-// explicit freeleechknown marker wins, then the freeleech flag, then the
-// standard download volume factor (0 = free).
-func releaseFreeleech(free, known *bool, factor *float64) bool {
-	if known != nil {
-		if !*known {
-			return false
-		}
-		return free != nil && *free
-	}
-	if free != nil {
-		return *free
-	}
-	return factor != nil && *factor <= 0
 }
 
 // parseTorznabTime reads the RFC1123(Z) or RFC3339 dates indexers emit.

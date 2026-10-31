@@ -356,6 +356,7 @@ func switchToMirror(release *models.Release, usable func(*models.Release) bool) 
 		release.Seeders = mirror.Seeders
 		release.Peers = mirror.Peers
 		release.Freeleech = mirror.Freeleech
+		release.FreeleechKnown = mirror.FreeleechKnown
 		return true
 	}
 	return false

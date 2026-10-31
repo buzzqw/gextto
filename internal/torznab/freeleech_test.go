@@ -20,10 +20,19 @@ func TestParseReadsFreeleechAttributes(t *testing.T) {
 	if len(items) != 4 {
 		t.Fatalf("got %d items, want 4", len(items))
 	}
-	want := []bool{true, false, false, true}
+	want := []struct {
+		free  bool
+		known bool
+	}{
+		{true, true},
+		{false, true},
+		{false, false},
+		{true, true},
+	}
 	for i, item := range items {
-		if item.Freeleech != want[i] {
-			t.Errorf("%s: freeleech = %v, want %v", item.Title, item.Freeleech, want[i])
+		if item.Freeleech != want[i].free || item.FreeleechKnown != want[i].known {
+			t.Errorf("%s: freeleech = (%v, known %v), want (%v, known %v)",
+				item.Title, item.Freeleech, item.FreeleechKnown, want[i].free, want[i].known)
 		}
 	}
 }
@@ -41,13 +50,13 @@ func TestParseProwlarrReadsFreeleechFlags(t *testing.T) {
 	if len(items) != 3 {
 		t.Fatalf("got %d items, want 3", len(items))
 	}
-	if !items[0].Freeleech {
-		t.Error("freeleech flag not read")
+	if !items[0].Freeleech || !items[0].FreeleechKnown {
+		t.Error("freeleech flag not read as known free")
 	}
-	if items[1].Freeleech {
-		t.Error("a non-free flag must not set freeleech")
+	if items[1].Freeleech || items[1].FreeleechKnown {
+		t.Error("a scene-only flag must stay unknown, not become paid")
 	}
-	if !items[2].Freeleech {
-		t.Error("downloadVolumeFactor 0 not read")
+	if !items[2].Freeleech || !items[2].FreeleechKnown {
+		t.Error("downloadVolumeFactor 0 not read as known free")
 	}
 }

@@ -934,8 +934,9 @@ all), `fail`, `match` and `action`:
   (no term), `regex`/`not_regex`,
   `min_size`/`max_size` (bytes), `min_seeders`/`max_seeders`, `min_peers`,
   `max_age_days`, `require_episode`, `episode_filter`, `only_freeleech`
-  (accept only releases the indexer marks as freeleech: Torznab
-  `downloadvolumefactor`, Prowlarr's freeleech flag or indexarr's marker) and
+  (accept only releases the indexer marks as known free: Torznab
+  `downloadvolumefactor=0`, `freeleech=1` or Prowlarr's freeleech flag; a
+  release marked paid and one the indexer does not mark are both rejected) and
   `smart_episode`
   (adds an episode of a series only once, keeping track
   of the last one: like qBittorrent's smart episode filter; a **REPACK** or

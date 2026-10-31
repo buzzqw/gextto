@@ -249,10 +249,12 @@ free (`downloadvolumefactor` 0, a Prowlarr freeleech/neutralleech flag, or index
 `freeleech` marker) earns the `score_bonus_freeleech` weight (150 by default) inside
 `AcquisitionScore`, next to swarm health: it breaks a tie between candidates for a
 missing episode and never enters `ReleaseScore`, so it neither triggers an upgrade nor
-changes a stored score. An indexer that says nothing gives no bonus; indexarr's
-`freeleechknown` marker keeps an unknown release from being mistaken for a free one.
-The search result carries the **Freeleech** badge, and the same flag is available to
-the standalone rules as `only_freeleech`.
+changes a stored score. The three states stay distinct: free, explicitly not free, and
+not stated. Only the first gets the bonus; an indexer that says nothing gives no bonus
+and is never treated as paid. The `freeleechknown` marker is what keeps "not stated"
+apart from "not free". The search result carries the **Freeleech**, **Not freeleech**
+or **Not stated** badge, and the same state is available to the standalone rules as
+`only_freeleech` (known free only).
 
 **The blocklist decides before the link is opened.** A result that declares its
 infohash is matched against the blocklist snapshot without touching the link; a

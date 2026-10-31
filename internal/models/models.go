@@ -690,6 +690,10 @@ type Release struct {
 	// freeleech/neutralleech flag, or indexarr's freeleech attribute). It is
 	// only a preference: it never makes a release eligible by itself.
 	Freeleech bool `json:"freeleech,omitempty"`
+	// FreeleechKnown separates "the source says this is paid" from "the
+	// source says nothing": without it, an unmarked release would be
+	// indistinguishable from a paid one.
+	FreeleechKnown bool `json:"freeleech_known,omitempty"`
 	// Score is the release score computed by the current configuration, filled
 	// by the search endpoints so the UI can show and sort by it.
 	Score int64 `json:"score,omitempty"`

@@ -92,15 +92,16 @@ func searchIndexers(ctx context.Context, indexers []torznab.Indexer, query strin
 // "already added" dedup works for search feeds too.
 func rssItemFromTorznab(it torznab.Item) rss.Item {
 	return rss.Item{
-		Title:     it.Title,
-		Magnet:    it.Magnet,
-		Link:      it.Link,
-		Size:      it.Size,
-		Seeders:   it.Seeders,
-		Leechers:  it.Leechers,
-		Published: it.Published,
-		Source:    it.Indexer,
-		GUID:      it.Download(),
-		Freeleech: it.Freeleech,
+		Title:          it.Title,
+		Magnet:         it.Magnet,
+		Link:           it.Link,
+		Size:           it.Size,
+		Seeders:        it.Seeders,
+		Leechers:       it.Leechers,
+		Published:      it.Published,
+		Source:         it.Indexer,
+		GUID:           it.Download(),
+		Freeleech:      it.Freeleech,
+		FreeleechKnown: it.FreeleechKnown,
 	}
 }

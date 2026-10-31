@@ -1113,8 +1113,11 @@ highlighted with a “Save all” bar. The complete per-tab list of every entry 
   of the scoring rules. A release the indexer declares **freeleech** gets a
   separate bonus (**Freeleech bonus**, 150 by default, 0 turns it off) that
   applies only when choosing among candidates for a missing episode: it does
-  not enter the stored score and does not trigger an upgrade. Search shows a
-  **Freeleech** badge; when the indexer says nothing, no bonus is given.
+  not enter the stored score and does not trigger an upgrade. Gextto keeps
+  three states: **freeleech**, **not freeleech** (the indexer says the download
+  counts) and **not stated** (it says nothing). Only the first gets the bonus;
+  an unmarked release is never treated as paid. The search badge says which
+  state it is; when the indexer says nothing, no bonus is given.
   - **Rename** — rename enable, template editor with tokens and live preview,
   TMDB/TVDB keys, language and upgrade thresholds. One file holding several
   contiguous episodes is named with the range (`S01E01-E02`), so media servers

@@ -1145,8 +1145,11 @@ tab, è nell'[Appendice A](#appendice-a-riferimento--configurazione).
   Una release che l'indexer dichiara **freeleech** ha un bonus a parte
   (**Bonus freeleech**, 150 di default, 0 lo spegne) che vale solo nella scelta
   tra candidati per un episodio mancante: non entra nel punteggio salvato e non
-  provoca un upgrade. Nella ricerca release compare il badge **Freeleech**;
-  quando l'indexer non dice nulla, il bonus non viene dato.
+  provoca un upgrade. Gextto distingue tre stati: **freeleech**, **non
+  freeleech** (l'indexer dice che il download conta) e **non marcato** (non
+  dice nulla). Solo il primo riceve il bonus; il non marcato non viene mai
+  trattato come pagamento. Nella ricerca release il badge dice quale dei tre
+  stati è; quando l'indexer non dice nulla, il bonus non viene dato.
   - **Rinomina** — abilita rinomina, editor del template con token e anteprima,
   chiavi TMDB/TVDB, lingua e soglie di upgrade. Un file che copre più episodi
   contigui viene nominato con l'intervallo (`S01E01-E02`), così i media server

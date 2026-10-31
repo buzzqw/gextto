@@ -15,6 +15,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/buzzqw/gextto/internal/freeleech"
 )
 
 // Item is one feed entry reduced to what matters for downloading.
@@ -32,6 +34,8 @@ type Item struct {
 	// Freeleech is set when the indexer says the download does not count
 	// toward the tracker ratio.
 	Freeleech bool `json:"freeleech,omitempty"`
+	// FreeleechKnown is true when the indexer stated the quota, free or paid.
+	FreeleechKnown bool `json:"freeleech_known,omitempty"`
 }
 
 // Download returns the best fetch target: the magnet when present, else the
@@ -97,6 +101,8 @@ func Parse(r io.Reader, source string) ([]Item, error) {
 	var items []Item
 	var current string
 	var item Item
+	var free, known *bool
+	var factor *float64
 	inItem := false
 	for {
 		token, err := decoder.Token()
@@ -117,6 +123,7 @@ func Parse(r io.Reader, source string) ([]Item, error) {
 			if name == "item" || name == "entry" {
 				inItem = true
 				item = Item{Source: source}
+				free, known, factor = nil, nil, nil
 				current = ""
 				continue
 			}
@@ -133,7 +140,7 @@ func Parse(r io.Reader, source string) ([]Item, error) {
 				}
 				rememberLink(&item, attribute2(event, "url", "href"))
 			case "attr":
-				applyTorznabAttr(&item, event)
+				applyTorznabAttr(&item, event, &free, &known, &factor)
 			case "link":
 				rememberLink(&item, attribute2(event, "href", "url"))
 			case "guid":
@@ -177,6 +184,9 @@ func Parse(r io.Reader, source string) ([]Item, error) {
 				if item.GUID == "" {
 					item.GUID = item.Download()
 				}
+				state := freeleech.Resolve(free, known, factor)
+				item.Freeleech = state.Free
+				item.FreeleechKnown = state.Known
 				if item.Title != "" && item.Download() != "" {
 					items = append(items, item)
 				}
@@ -227,7 +237,7 @@ func rememberLink(item *Item, value string) {
 	}
 }
 
-func applyTorznabAttr(item *Item, start xml.StartElement) {
+func applyTorznabAttr(item *Item, start xml.StartElement, free, known **bool, factor **float64) {
 	name, _ := attribute(start, "name")
 	value, _ := attribute(start, "value")
 	switch strings.ToLower(strings.TrimSpace(name)) {
@@ -242,6 +252,18 @@ func applyTorznabAttr(item *Item, start xml.StartElement) {
 	case "magneturl":
 		if magnet := magnetIn(value); magnet != "" {
 			item.Magnet = magnet
+		}
+	case "downloadvolumefactor":
+		if parsed, err := strconv.ParseFloat(strings.TrimSpace(value), 64); err == nil {
+			*factor = &parsed
+		}
+	case "freeleech":
+		if parsed, ok := freeleech.ParseFlag(value); ok {
+			*free = &parsed
+		}
+	case "freeleechknown":
+		if parsed, ok := freeleech.ParseFlag(value); ok {
+			*known = &parsed
 		}
 	}
 }

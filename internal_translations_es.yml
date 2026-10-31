@@ -396,6 +396,10 @@ spa:
   "Punti aggiunti quando si sceglie tra più candidati per un episodio mancante e il tracker segna la release come freeleech: non cambia il punteggio salvato né provoca un upgrade.": "Puntos añadidos al elegir entre varios candidatos para un episodio ausente cuando el tracker marca la versión como freeleech: no cambian la puntuación guardada ni provocan una actualización."
   "Freeleech": Freeleech
   "Il tracker non conta il download (freeleech).": "El tracker no cuenta la descarga (freeleech)."
+  "Il tracker dichiara che il download conta per il rapporto.": "El tracker indica que la descarga cuenta para el ratio."
+  "Il tracker non dice se il download conta per il rapporto.": "El tracker no dice si la descarga cuenta para el ratio."
+  "Non freeleech": "No freeleech"
+  "Non marcato": "No indicado"
   Bonus per le release REPACK (ri-pacchettizzate dallo stesso gruppo).: Bonificación por lanzamientos REPACK (reempaquetados por el mismo grupo).
   Bonus per le release con Dolby Vision.: Bonificación por lanzamientos con Dolby Vision.
   Bonus per le release con HDR (HDR10/HDR10+).: Bonificación por lanzamientos con HDR (HDR10/HDR10+).

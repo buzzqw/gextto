@@ -24,6 +24,7 @@ import (
 
 	"github.com/buzzqw/gextto/internal/cache"
 	"github.com/buzzqw/gextto/internal/ed2k"
+	fl "github.com/buzzqw/gextto/internal/freeleech"
 	"github.com/buzzqw/gextto/internal/logging"
 	"github.com/buzzqw/gextto/internal/models"
 	"github.com/buzzqw/gextto/internal/utils"
@@ -127,43 +128,14 @@ func apply_torznab_attr(
 			*downloadFactor = &parsed
 		}
 	case "freeleech":
-		if parsed, ok := parseBoolish(value); ok {
+		if parsed, ok := fl.ParseFlag(value); ok {
 			*freeleech = &parsed
 		}
 	case "freeleechknown":
-		if parsed, ok := parseBoolish(value); ok {
+		if parsed, ok := fl.ParseFlag(value); ok {
 			*freeleechKnown = &parsed
 		}
 	}
-}
-
-// parseBoolish reads the 0/1, true/false and on/off spellings an indexer uses
-// for a flag.
-func parseBoolish(value string) (bool, bool) {
-	switch strings.ToLower(strings.TrimSpace(value)) {
-	case "1", "true", "yes", "on", "free", "freeleech":
-		return true, true
-	case "0", "false", "no", "off", "paid":
-		return false, true
-	}
-	return false, false
-}
-
-// releaseFreeleech resolves what the item said about the download quota. An
-// explicit freeleechknown marker wins (indexarr sends it so an unknown release
-// is not mistaken for a free one); otherwise the explicit freeleech flag, and
-// finally the standard download volume factor (0 = free).
-func releaseFreeleech(free, known *bool, factor *float64) bool {
-	if known != nil {
-		if !*known {
-			return false
-		}
-		return free != nil && *free
-	}
-	if free != nil {
-		return *free
-	}
-	return factor != nil && *factor <= 0
 }
 
 // parseRSSDate parses the publication-date formats seen in RSS/Atom feeds.
@@ -411,7 +383,9 @@ func parse_feed_body(body, source string) ([]models.Release, error) {
 						} else {
 							release.Peers = -1
 						}
-						release.Freeleech = releaseFreeleech(freeleech, freeleechKnown, downloadFactor)
+						state := fl.Resolve(freeleech, freeleechKnown, downloadFactor)
+						release.Freeleech = state.Free
+						release.FreeleechKnown = state.Known
 						out = append(out, *release)
 					}
 				}
@@ -1932,17 +1906,17 @@ func jsonNumberFloat(value any) *float64 {
 // prowlarrFreeleech reads the quota flags of a Prowlarr search result.
 // Prowlarr exposes the indexer flags by name; downloadVolumeFactor is kept as
 // a fallback for a fork or a proxy that sends the Torznab field in JSON.
-func prowlarrFreeleech(item map[string]any) bool {
+func prowlarrFreeleech(item map[string]any) fl.State {
 	for _, raw := range jsonStringList(item["indexerFlags"]) {
 		switch strings.ToLower(strings.TrimSpace(raw)) {
 		case "freeleech", "neutralleech":
-			return true
+			return fl.State{Free: true, Known: true}
 		}
 	}
 	if factor := jsonNumberFloat(item["downloadVolumeFactor"]); factor != nil {
-		return *factor <= 0
+		return fl.Resolve(nil, nil, factor)
 	}
-	return false
+	return fl.State{}
 }
 
 // jsonStringList reads a JSON array of strings, tolerating a single string.
@@ -2098,7 +2072,9 @@ func parseProwlarrItems(items []map[string]any, source string) []models.Release 
 		} else {
 			release.Peers = -1
 		}
-		release.Freeleech = prowlarrFreeleech(item)
+		state := prowlarrFreeleech(item)
+		release.Freeleech = state.Free
+		release.FreeleechKnown = state.Known
 		out = append(out, *release)
 	}
 	return out
