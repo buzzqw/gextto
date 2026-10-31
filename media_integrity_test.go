@@ -408,8 +408,8 @@ func TestMediaIntegrityDecodeTimeoutGrowsWithTheRuntime(t *testing.T) {
 func TestMediaIntegrityQuickDecodeArgs(t *testing.T) {
 	quick := strings.Join(mediaIntegrityDecodeArgs("/media/movie.mkv", true), " ")
 	full := strings.Join(mediaIntegrityDecodeArgs("/media/movie.mkv", false), " ")
-	if !strings.Contains(quick, "-skip_frame nokey -i /media/movie.mkv") {
-		t.Fatalf("quick args do not skip non-key frames before the input: %s", quick)
+	if !strings.Contains(quick, "-threads 1 -skip_frame nokey -i /media/movie.mkv") {
+		t.Fatalf("quick args do not decode keyframes on one thread before the input: %s", quick)
 	}
 	if strings.Contains(full, "-skip_frame") {
 		t.Fatalf("the full check must decode every frame: %s", full)

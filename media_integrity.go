@@ -1003,7 +1003,11 @@ func mediaIntegrityDecodeArgs(file string, quick bool) []string {
 		"-protocol_whitelist", "file,pipe,data,crypto",
 	}
 	if quick {
-		args = append(args, "-skip_frame", "nokey")
+		// Frame threading and -skip_frame nokey together make the HEVC
+		// decoder report "PPS changed between slices" on healthy files, so the
+		// quick check decodes on one thread. Only keyframes are decoded, so
+		// the cost stays low and the read of the file dominates anyway.
+		args = append(args, "-threads", "1", "-skip_frame", "nokey")
 	}
 	return append(args,
 		"-i", file,
