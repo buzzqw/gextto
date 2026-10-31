@@ -284,10 +284,29 @@ func FromConfig(cfg *Config) *Notifier {
 		Health:      cfg.NotifyEventHealth,
 		Maintenance: cfg.NotifyEventMaintenance,
 	}
-	notifier.cooldownMinutes = int(cfg.NotifyCooldownMinutes)
+	notifier.cooldownMinutes = cooldownMinutesFromSetting(cfg.NotifyCooldownMinutes)
 	notifier.language = cfg.NotifyLanguage
 	notifier.hooks.store(LoadHooks(cfg.Settings))
 	return notifier
+}
+
+// maxCooldownMinutes is the longest anti-spam window the notifier accepts: it is
+// the same upper bound the settings validation enforces (seven days). A bigger
+// number that reached the configuration another way is capped here instead of
+// being taken as it is.
+const maxCooldownMinutes int64 = 7 * 24 * 60
+
+// cooldownMinutesFromSetting turns the configured anti-spam window into the
+// plain minutes the notifier keeps in memory. The value is bounded on both
+// sides, so the conversion can never lose bits whatever the settings contain.
+func cooldownMinutesFromSetting(minutes int64) int {
+	if minutes < 0 {
+		return 0
+	}
+	if minutes > maxCooldownMinutes {
+		return int(maxCooldownMinutes)
+	}
+	return int(minutes)
 }
 
 // stringValue reads an optional configuration string as a plain value.

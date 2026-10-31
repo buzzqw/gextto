@@ -334,3 +334,25 @@ func TestNotifySettingsRoundTrip(t *testing.T) {
 		t.Errorf("the notifier read cooldown/language wrong: %d %q", n.cooldownMinutes, n.notifyLang())
 	}
 }
+
+// TestCooldownMinutesFromSettingIsBounded locks the bounds of the anti-spam
+// window: a negative number means "no cooldown", an unreasonably big one is
+// capped instead of being taken as it is.
+func TestCooldownMinutesFromSettingIsBounded(t *testing.T) {
+	cases := []struct {
+		in   int64
+		want int
+	}{
+		{-1, 0},
+		{0, 0},
+		{30, 30},
+		{int64(maxCooldownMinutes), int(maxCooldownMinutes)},
+		{int64(maxCooldownMinutes) + 1, int(maxCooldownMinutes)},
+		{1 << 62, int(maxCooldownMinutes)},
+	}
+	for _, c := range cases {
+		if got := cooldownMinutesFromSetting(c.in); got != c.want {
+			t.Errorf("cooldownMinutesFromSetting(%d) = %d, want %d", c.in, got, c.want)
+		}
+	}
+}
