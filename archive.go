@@ -380,8 +380,10 @@ func openArchiveReader(path string) *sql.DB {
 // refreshes a listing by that stable key and upgrades a guid-keyed row from
 // its ephemeral URL to the magnet once one is known.
 const (
-	archiveInsertSQL     = "INSERT OR IGNORE INTO archive(title,magnet,magnet_key,magnet_hash,source,quality_score,added_at) VALUES (?1,?2,?6,?3,?4,?5,datetime('now'))"
-	archiveRefreshSQL    = "UPDATE archive SET title=?1, magnet=?2, source=?4, quality_score=?5, added_at=datetime('now') WHERE magnet_hash<>'' AND magnet_hash=?3 AND magnet_key<>?6"
+	archiveInsertSQL = "INSERT OR IGNORE INTO archive(title,magnet,magnet_key,magnet_hash,source,quality_score,added_at) VALUES (?1,?2,?6,?3,?4,?5,datetime('now'))"
+	// A link-only listing of a torrent already archived must not replace its
+	// durable magnet with an ephemeral URL: keep the magnet, refresh the rest.
+	archiveRefreshSQL    = "UPDATE archive SET title=?1, magnet=CASE WHEN ?2 LIKE 'magnet:%' THEN ?2 ELSE magnet END, source=?4, quality_score=?5, added_at=datetime('now') WHERE magnet_hash<>'' AND magnet_hash=?3 AND magnet_key<>?6"
 	archiveRefreshKeySQL = "UPDATE OR IGNORE archive SET title=?1, magnet=CASE WHEN COALESCE(magnet_hash,'')='' THEN ?2 ELSE magnet END, magnet_hash=COALESCE(NULLIF(magnet_hash,''), ?3), source=?4, quality_score=?5, added_at=datetime('now') WHERE magnet_key=?6"
 )
 
@@ -457,6 +459,11 @@ func (a *Archive) saveChunk(releases []models.Release, cfg *Config) error {
 		var hash any
 		if value, ok := archiveInfoHash(source); ok {
 			hash = value
+		} else if declared := canonicalInfoHash(r.InfoHash); declared != "" {
+			// The indexer declared the infohash next to a `.torrent` link: the
+			// link is still needed for the transfer, but the torrent is already
+			// known and must be recognised without downloading it again.
+			hash = normalizeArchiveHash(declared)
 		}
 		identity := archiveIdentity(r)
 		if identity == "" {
@@ -484,11 +491,11 @@ func (a *Archive) saveChunk(releases []models.Release, cfg *Config) error {
 					continue
 				}
 			}
-			// Only a guid-keyed row can need a second pass: it may still hold
-			// the previous ephemeral URL (or no magnet yet). For a release with
-			// a magnet the insert was ignored because that exact row is already
-			// there, and an extra UPDATE would just cost a write.
-			if hash == nil && strings.TrimSpace(r.Magnet) == "" && strings.TrimSpace(r.GUID) != "" {
+			// A link-only listing may still hold the previous ephemeral URL (or
+			// no magnet yet). For a release with a magnet the insert was
+			// ignored because that exact row is already there, and an extra
+			// UPDATE would just cost a write.
+			if strings.TrimSpace(r.Magnet) == "" {
 				if _, err := refreshKey.Exec(args...); err != nil {
 					_ = tx.Rollback()
 					return err
@@ -576,29 +583,55 @@ func (a *Archive) canonicalizeTorrentURL(torrentURL, magnet, source, guid string
 	return tx.Commit()
 }
 
-// Search returns up to 200 newest (title, magnet, source) tuples matching an
-// FTS5 query. Ordering by discovery time ensures recently released episodes are
-// not hidden behind older catalogue entries when a monitored title has more
-// than 200 matches.
-func (a *Archive) Search(query string) ([][3]string, error) {
+// ArchiveListing is one archived listing as returned by SearchEntries.
+// InfoHash is the infohash known for the torrent: the magnet's own, or the one
+// the indexer declared next to a `.torrent`-only listing. The latter is kept
+// even though the transfer still needs the link, so callers can recognise the
+// torrent (blocklist, duplicates) without downloading it again.
+type ArchiveListing struct {
+	Title    string
+	Magnet   string
+	Source   string
+	InfoHash string
+}
+
+// SearchEntries returns up to 200 newest archived listings matching the FTS5
+// query, with the infohash each row already knows. Ordering by discovery time
+// ensures recently released episodes are not hidden behind older catalogue
+// entries when a monitored title has more than 200 matches.
+func (a *Archive) SearchEntries(query string) ([]ArchiveListing, error) {
 	term := ftsQuery(query)
 	if term == "" {
-		return [][3]string{}, nil
+		return []ArchiveListing{}, nil
 	}
-	rows, err := a.reader().Query("SELECT archive.title,archive.magnet,COALESCE(archive.source,'archive') FROM archive JOIN archive_fts ON archive_fts.rowid=archive.id WHERE archive_fts MATCH ?1 ORDER BY archive.added_at DESC,archive.id DESC LIMIT 200", term)
+	rows, err := a.reader().Query("SELECT archive.title,archive.magnet,COALESCE(archive.source,'archive'),COALESCE(archive.magnet_hash,'') FROM archive JOIN archive_fts ON archive_fts.rowid=archive.id WHERE archive_fts MATCH ?1 ORDER BY archive.added_at DESC,archive.id DESC LIMIT 200", term)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	results := [][3]string{}
+	results := []ArchiveListing{}
 	for rows.Next() {
-		var title, magnet, source string
-		if err := rows.Scan(&title, &magnet, &source); err != nil {
+		var entry ArchiveListing
+		if err := rows.Scan(&entry.Title, &entry.Magnet, &entry.Source, &entry.InfoHash); err != nil {
 			continue
 		}
-		results = append(results, [3]string{title, magnet, source})
+		results = append(results, entry)
 	}
 	return results, rows.Err()
+}
+
+// Search returns up to 200 newest (title, magnet, source) tuples matching an
+// FTS5 query. See SearchEntries for the same rows with their infohash.
+func (a *Archive) Search(query string) ([][3]string, error) {
+	entries, err := a.SearchEntries(query)
+	if err != nil {
+		return nil, err
+	}
+	results := make([][3]string, 0, len(entries))
+	for _, entry := range entries {
+		results = append(results, [3]string{entry.Title, entry.Magnet, entry.Source})
+	}
+	return results, nil
 }
 
 // RecentEntries returns the most recent `limit` (title, magnet, source) tuples

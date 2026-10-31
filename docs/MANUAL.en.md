@@ -1367,6 +1367,12 @@ The main checks are independent:
 5. title quality, language, subtitles and exclusions;
 6. comparison with archived files and active downloads.
 
+The blocklist stops the release before Gextto asks the indexer for the torrent:
+when the result only carries the `.torrent` link, Gextto recognises it by title
+and discards it without opening the link. The archive also keeps the torrent
+identifier the indexer declares next to the link, so the same release is not
+requested again or duplicated.
+
 The score helps choose between eligible candidates; it does not make a release
 valid when a blocking filter fails. In **Why not this one?**:
 

@@ -89,6 +89,53 @@ func TestBlocklistUntilExpiresAndComesBack(t *testing.T) {
 	}
 }
 
+// A release with only a `.torrent` link has no infohash until the link is
+// opened: the title snapshot lets the cycle refuse it before asking the
+// indexer, even when the same release is spelled with dots instead of spaces.
+func TestBlocklistedTitlesMatchDifferentSpellings(t *testing.T) {
+	db := newTestDB(t)
+	series := "Example Show"
+	season, episode := int64(1), int64(1)
+	release := models.Release{
+		Title:   "Example Show S01E01 1080p WEB-DL",
+		Magnet:  "magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567",
+		Kind:    "series",
+		Series:  &series,
+		Season:  &season,
+		Episode: &episode,
+	}
+	if err := db.BlocklistUntil(&release, "dead_swarm", time.Now().Add(time.Hour)); err != nil {
+		t.Fatalf("BlocklistUntil: %v", err)
+	}
+	titles, err := db.BlocklistedTitles()
+	if err != nil {
+		t.Fatalf("BlocklistedTitles: %v", err)
+	}
+	if len(titles) != 1 {
+		t.Fatalf("titles = %d, want 1", len(titles))
+	}
+	dotted := models.Release{Title: "Example.Show.S01E01.1080p.WEB-DL"}
+	if !releaseBlockedByTitle(&dotted, titles) {
+		t.Fatal("the dotted spelling of a blocked release must match")
+	}
+	other := models.Release{Title: "Example.Show.S01E02.1080p.WEB-DL"}
+	if releaseBlockedByTitle(&other, titles) {
+		t.Fatal("a different episode must not match the blocklist")
+	}
+
+	// An expired temporary block no longer matches.
+	if err := db.BlocklistUntil(&release, "dead_swarm", time.Now().Add(-time.Minute)); err != nil {
+		t.Fatalf("BlocklistUntil (past): %v", err)
+	}
+	titles, err = db.BlocklistedTitles()
+	if err != nil {
+		t.Fatalf("BlocklistedTitles (expired): %v", err)
+	}
+	if len(titles) != 0 {
+		t.Fatalf("titles after expiry = %d, want 0", len(titles))
+	}
+}
+
 func TestBlocklistWithoutExpiryStaysForever(t *testing.T) {
 	db := newTestDB(t)
 	release := expiryTestRelease()

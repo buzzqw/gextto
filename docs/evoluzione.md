@@ -244,6 +244,14 @@ days by default): when the block expires the release returns among the candidate
 so a better copy whose swarm has revived is still picked up as an upgrade, while
 the operator's own blocklist entries stay forever.
 
+**The blocklist decides before the link is opened.** A result that declares its
+infohash is matched against the blocklist snapshot without touching the link; a
+`.torrent`-only result has no hash until the link is opened, so its title (the same
+normalized key used by duplicate detection) is the fallback that stops it first.
+The archive keeps the infohash an indexer declares next to the link, which gives
+the same listing a real identity on the next cycle and prevents a duplicate row
+of a torrent already stored as a magnet.
+
 **A vanished library volume is not a mass deletion.** Resetting an episode because
 its file is gone (`archiveFileConfirmedMissing`) is bounded: at most
 `archiveResetBurstLimit` rows (20) may be made eligible again within

@@ -1409,6 +1409,12 @@ I controlli principali sono indipendenti:
 5. qualità, lingua, sottotitoli ed esclusioni del titolo;
 6. confronto con file già archiviati e download attivi.
 
+La blocklist ferma la release prima di chiedere il torrent all'indexer: se il
+risultato contiene solo il link al `.torrent`, Gextto la riconosce dal titolo e
+la scarta senza aprire il link. L'archivio conserva anche l'identificativo del
+torrent che l'indexer dichiara accanto al link, così la stessa release non viene
+richiesta di nuovo né duplicata.
+
 Lo score aiuta a scegliere tra candidati ammessi; non rende valida una release
 che fallisce un filtro bloccante. Nel pannello **Perché non questa?**:
 

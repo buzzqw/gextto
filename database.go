@@ -2524,6 +2524,32 @@ func (d *Database) BlocklistedHashes() (map[string]struct{}, error) {
 	return hashes, rows.Err()
 }
 
+// BlocklistedTitles returns the normalized titles of the releases in the
+// blocklist, using the same key as duplicate detection. It is the fallback for
+// a listing that carries only a `.torrent` link: until its link is opened its
+// infohash is unknown, but its title already says which release it is. Without
+// this check every cycle would ask the indexer for the magnet of a release
+// that is blocked, only to reject it immediately afterwards.
+func (d *Database) BlocklistedTitles() (map[string]struct{}, error) {
+	d.purgeExpiredBlocklist(time.Now())
+	rows, err := d.db.Query("SELECT title FROM blocklist WHERE "+blocklistAliveSQL, nowSQLite())
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	titles := make(map[string]struct{})
+	for rows.Next() {
+		var title string
+		if err := rows.Scan(&title); err != nil {
+			return nil, err
+		}
+		if key := duplicateTitleKey(title); key != "" {
+			titles[key] = struct{}{}
+		}
+	}
+	return titles, rows.Err()
+}
+
 // Blocklist adds a release to the blocklist for good.
 func (d *Database) Blocklist(release *models.Release, reason string) error {
 	return d.BlocklistUntil(release, reason, time.Time{})

@@ -92,6 +92,23 @@ func duplicateTitleKey(title string) string {
 	return string(out)
 }
 
+// releaseBlockedByTitle reports whether a release with no torrent identity (a
+// `.torrent` link only, no declared infohash) is already on the blocklist.
+// The title goes through duplicateTitleKey, so different spellings of the same
+// release ("Show.S01E01-GRP" and "Show S01E01 GRP") match. It is only a
+// fallback: when the hash is known the hash decides.
+func releaseBlockedByTitle(release *models.Release, titles map[string]struct{}) bool {
+	if release == nil || len(titles) == 0 {
+		return false
+	}
+	key := duplicateTitleKey(release.Title)
+	if key == "" {
+		return false
+	}
+	_, blocked := titles[key]
+	return blocked
+}
+
 // duplicateSizesMatch reports whether two known sizes are the same file within
 // the rounding indexers apply.
 func duplicateSizesMatch(a, b int64) bool {

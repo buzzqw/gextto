@@ -8,8 +8,10 @@ import (
 	"net/http/httptest"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 
+	"github.com/buzzqw/gextto/internal/models"
 	"github.com/buzzqw/gextto/internal/utils"
 )
 
@@ -157,6 +159,79 @@ func TestRunCycleDomainResolvesTorrentURLRedirectToMagnet(t *testing.T) {
 	}
 	if stats.DownloadsStarted != 1 {
 		t.Fatalf("DownloadsStarted = %d, want 1", stats.DownloadsStarted)
+	}
+}
+
+// A feed listing that carries only a `.torrent` link has no infohash until the
+// link is opened. When the same release is on the blocklist, the title is
+// enough to refuse it: the cycle must not fetch the link, or the indexer counts
+// a download for a release that Gextto is not going to use.
+func TestRunCycleSkipsBlocklistedLinkOnlyReleaseWithoutFetchingTheLink(t *testing.T) {
+	magnetTarget := "magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567&dn=Monitored.Show.S01E01.1080p.WEB-DL&tr=udp%3A%2F%2Ftracker.example.com%3A1337%2Fannounce"
+	var fetches int32
+	var server *httptest.Server
+	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/feed.xml":
+			xml := fmt.Sprintf(`<rss><channel>
+<item>
+<title>Monitored.Show.S01E01.1080p.WEB-DL</title>
+<link>%s/download/item.torrent</link>
+</item>
+</channel></rss>`, server.URL)
+			w.Header().Set("Content-Type", "application/xml")
+			_, _ = w.Write([]byte(xml))
+		case "/download/item.torrent":
+			atomic.AddInt32(&fetches, 1)
+			http.Redirect(w, r, magnetTarget, http.StatusFound)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	state := newCycleState(t)
+	cfg := *state.cfg
+	cfg.Series = []SeriesConfig{{Name: "Monitored Show", Enabled: true}}
+	cfg.FeedURLs = []string{server.URL + "/feed.xml"}
+	cfg.Indexers = nil
+	cfg.WebsearchEngines = nil
+	cfg.DryRun = true
+
+	series := "Monitored Show"
+	season, episode := int64(1), int64(1)
+	blocked := models.Release{
+		Title:   "Monitored Show S01E01 1080p WEB-DL",
+		Magnet:  "magnet:?xt=urn:btih:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		Kind:    "series",
+		Series:  &series,
+		Season:  &season,
+		Episode: &episode,
+	}
+	if err := state.db.Blocklist(&blocked, "manual"); err != nil {
+		t.Fatalf("Blocklist: %v", err)
+	}
+
+	domain := "series"
+	stats, err := RunCycleDomain(
+		context.Background(),
+		&cfg,
+		state.engine,
+		state.db,
+		state.archive,
+		state.comics,
+		state.notifier,
+		state.activeEngine(),
+		&domain,
+	)
+	if err != nil {
+		t.Fatalf("RunCycleDomain: %v", err)
+	}
+	if got := atomic.LoadInt32(&fetches); got != 0 {
+		t.Fatalf("the blocked release was fetched %d times, want 0", got)
+	}
+	if stats == nil || stats.DownloadsStarted != 0 {
+		t.Fatalf("stats = %+v, want no download started", stats)
 	}
 }
 

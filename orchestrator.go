@@ -185,9 +185,17 @@ func RunCycleDomain(
 	if err != nil {
 		return nil, fmt.Errorf("load blocklist: %w", err)
 	}
+	// A `.torrent`-only listing has no infohash yet: its title is the only
+	// identity available before the link is opened, so keep the blocklisted
+	// titles too instead of asking the indexer for a torrent that is already
+	// refused.
+	blocklistedTitles, err := db.BlocklistedTitles()
+	if err != nil {
+		return nil, fmt.Errorf("load blocklist titles: %w", err)
+	}
 	blockedHashes := map[string]struct{}{}
 	for i := range releases {
-		if hash, ok := utils.MagnetHash(releases[i].Magnet); ok {
+		if hash := releaseInfoHash(&releases[i]); hash != "" {
 			if _, blocked := blocklistedHashes[hash]; blocked {
 				blockedHashes[hash] = struct{}{}
 			}
@@ -198,18 +206,24 @@ func RunCycleDomain(
 			return nil, err
 		}
 	}
-	if len(blockedHashes) > 0 {
-		logging.Debug("blocked releases removed from this cycle", "count", len(blockedHashes))
+	if len(blockedHashes) > 0 || len(blocklistedTitles) > 0 {
+		if len(blockedHashes) > 0 {
+			logging.Debug("blocked releases removed from this cycle", "count", len(blockedHashes))
+		}
 		var kept []models.Release
 		for i := range releases {
-			hash, ok := utils.MagnetHash(releases[i].Magnet)
-			if !ok {
-				kept = append(kept, releases[i])
+			if hash := releaseInfoHash(&releases[i]); hash != "" {
+				if _, blocked := blocklistedHashes[hash]; !blocked {
+					kept = append(kept, releases[i])
+				}
 				continue
 			}
-			if _, blocked := blockedHashes[hash]; !blocked {
-				kept = append(kept, releases[i])
+			if releases[i].Ed2kLink == "" && releaseBlockedByTitle(&releases[i], blocklistedTitles) {
+				logging.Debug("release skipped: its title is on the blocklist",
+					"title", releases[i].Title)
+				continue
 			}
+			kept = append(kept, releases[i])
 		}
 		releases = kept
 	}
@@ -261,19 +275,29 @@ func RunCycleDomain(
 	// each release is evaluated (and counted) once.
 	archiveHashes := map[string]struct{}{}
 	for i := range releases {
-		if hash, ok := utils.MagnetHash(releases[i].Magnet); ok {
+		if hash := releaseInfoHash(&releases[i]); hash != "" {
 			archiveHashes[hash] = struct{}{}
 		}
 	}
 	archiveMatches := 0
 	for _, query := range archiveQueries {
-		items, err := archive.Search(query)
+		items, err := archive.SearchEntries(query)
 		if err != nil {
 			return nil, err
 		}
 		for _, item := range items {
-			hash, ok := utils.MagnetHash(item[1])
-			if !ok {
+			release := ParseRelease(item.Title, item.Magnet, "archive:"+item.Source)
+			if release == nil {
+				continue
+			}
+			// The archive may know the infohash an indexer declared next to a
+			// `.torrent`-only listing: use it, so the blocklist and the
+			// duplicate checks do not need to open the link.
+			if release.InfoHash == "" && item.InfoHash != "" {
+				release.InfoHash = canonicalInfoHash(item.InfoHash)
+			}
+			hash := releaseInfoHash(release)
+			if hash == "" {
 				continue
 			}
 			if _, blocked := blocklistedHashes[hash]; blocked {
@@ -283,10 +307,6 @@ func RunCycleDomain(
 				continue
 			}
 			archiveHashes[hash] = struct{}{}
-			release := ParseRelease(item[0], item[1], "archive:"+item[2])
-			if release == nil {
-				continue
-			}
 			if reason := cfg.AllReleaseDeniedReason(release); reason != "" {
 				if cfg.ReleaseIsMonitored(release) {
 					rules.LogRejection(release, reason)
@@ -963,6 +983,16 @@ func RunCycleDomain(
 				provisional = true
 			}
 			release.Magnet = "magnet:?xt=urn:btih:" + deferredHash
+		}
+		// A link with no declared hash cannot be matched by infohash before it
+		// is opened. Its title can: if the same release is on the blocklist,
+		// skip it here instead of asking the indexer for the magnet only to
+		// reject it a moment later.
+		if provisional && releaseBlockedByTitle(&release, blocklistedTitles) {
+			logging.Debug("release skipped: its title is on the blocklist",
+				"target", releaseTarget(&release),
+				"release", release.Title)
+			continue
 		}
 		// resolveDeferred opens the deferred link and replaces the hash-only
 		// magnet with the real one (and the .torrent file when there is one).
