@@ -685,3 +685,49 @@ func TestParseFeedBodyEd2kIgnoresSwarmCounters(t *testing.T) {
 		t.Fatalf("eD2k release blocked by the swarm gate: %s", blocked)
 	}
 }
+
+// TestParseRetryAfter covers both spellings of the Retry-After header and the
+// limits that keep a hostile value from parking a source for days.
+func TestParseRetryAfter(t *testing.T) {
+	now := time.Date(2026, 10, 31, 12, 0, 0, 0, time.UTC)
+	for _, test := range []struct {
+		raw  string
+		want time.Duration
+	}{
+		{"", 0},
+		{"120", 2 * time.Minute},
+		{"0", 0},
+		{"-5", 0},
+		{"999999999", 24 * time.Hour},
+		{"Sat, 31 Oct 2026 12:05:00 GMT", 5 * time.Minute},
+		{"Sat, 31 Oct 2026 11:00:00 GMT", 0},
+		{"not a date", 0},
+	} {
+		if got := parseRetryAfter(test.raw, now); got != test.want {
+			t.Errorf("parseRetryAfter(%q) = %v, want %v", test.raw, got, test.want)
+		}
+	}
+}
+
+// TestTorznabRateLimitCarriesRetryAfter checks that a 429 keeps the pause the
+// indexer asked for instead of becoming a generic HTTP error.
+func TestTorznabRateLimitCarriesRetryAfter(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Retry-After", "120")
+		w.WriteHeader(http.StatusTooManyRequests)
+		_, _ = w.Write([]byte(`<error code="429" description="slow down"/>`))
+	}))
+	defer server.Close()
+	indexer := IndexerConfig{Name: "limited", URL: server.URL, APIKey: "synthetic", Enabled: true}
+	_, err := FetchTorznab(context.Background(), indexer, "query")
+	var limited *indexerRateLimitError
+	if !errors.As(err, &limited) {
+		t.Fatalf("error = %v, want an indexerRateLimitError", err)
+	}
+	if limited.retryAfter != 2*time.Minute {
+		t.Fatalf("retry after = %v, want 2m", limited.retryAfter)
+	}
+	if !strings.Contains(err.Error(), "HTTP 429 Too Many Requests") {
+		t.Fatalf("message = %q", err.Error())
+	}
+}

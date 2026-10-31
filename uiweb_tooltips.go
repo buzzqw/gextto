@@ -215,6 +215,7 @@ var uiSettingTooltipText = map[string]string{
 	"ed2k_min_sources":                     "Numero minimo di sorgenti eD2k perché un risultato venga accettato automaticamente. La ricerca manuale mostra tutto.",
 	"ed2k_search_timeout_secs":             "Per quanti secondi aMule raccoglie i risultati di una ricerca eD2k/Kad prima che Gextto li mostri.",
 	"ed2k_stall_days":                      "Un download eD2k scelto da Gextto che non riceve dati per questi giorni viene annullato in aMule, la release finisce in blocklist e l'episodio torna da cercare. I download aggiunti a mano e quelli in pausa non vengono toccati. 0 = mai.",
+	"score_bonus_freeleech":                "Punti aggiunti quando si sceglie tra più candidati per un episodio mancante e il tracker segna la release come freeleech: non cambia il punteggio salvato né provoca un upgrade.",
 }
 
 // uiSettingTooltip returns the tooltip for a setting key. Score weights without

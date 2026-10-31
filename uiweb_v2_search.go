@@ -26,6 +26,7 @@ type v2SearchResult struct {
 	Addable     bool
 	Score       int64
 	Seeders     int64
+	Freeleech   bool
 	SizeBytes   int64
 	ReleaseJSON string
 	ExplainJSON string
@@ -114,6 +115,7 @@ func v2SearchViewFrom(s *AppState, query, redirect string, kad bool) v2SearchVie
 						Addable:     true,
 						Score:       release.Score,
 						Seeders:     release.Seeders,
+						Freeleech:   release.Freeleech,
 						SizeBytes:   release.SizeBytes,
 						ReleaseJSON: string(encoded),
 						ExplainJSON: string(encoded),

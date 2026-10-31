@@ -40,6 +40,7 @@ var uiScoreSettingDefs = []uiSettingDef{
 	{Key: "score_channels_7.1", Label: "Canali 7.1", Tab: "scores"},
 	{Key: "score_bonus_proper", Label: "PROPER", Tab: "scores"}, {Key: "score_bonus_repack", Label: "REPACK", Tab: "scores"},
 	{Key: "score_bonus_real", Label: "REAL", Tab: "scores"},
+	{Key: "score_bonus_freeleech", Label: "Bonus freeleech", Tab: "scores"},
 }
 
 var uiScoreSettingKeys = func() map[string]bool {

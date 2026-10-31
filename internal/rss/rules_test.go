@@ -26,6 +26,16 @@ func TestFindEpisode(t *testing.T) {
 	}
 }
 
+func TestCriteriaOnlyFreeleech(t *testing.T) {
+	criteria := Criteria{OnlyFreeleech: true}
+	if criteria.Match(Item{Title: "Show S01E01 1080p"}, time.Now()) {
+		t.Fatal("a paid item matched a freeleech-only rule")
+	}
+	if !criteria.Match(Item{Title: "Show S01E01 1080p", Freeleech: true}, time.Now()) {
+		t.Fatal("a freeleech item did not match")
+	}
+}
+
 func TestCriteriaMatch(t *testing.T) {
 	now := time.Now()
 	item := Item{Title: "Show S02E07 1080p", Size: 2 << 30, Seeders: 30, Leechers: 5, Published: now.Add(-2 * time.Hour)}

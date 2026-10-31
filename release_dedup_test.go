@@ -22,6 +22,26 @@ func dedupTorrent(title, link string, size, seeders int64) models.Release {
 	return models.Release{Title: title, TorrentURL: &link, Source: "jackett:" + link, SizeBytes: size, Seeders: seeders}
 }
 
+// TestCanonicalInfoHashDecodesTheDoubleHexForm covers the identity of a
+// release whose indexer hex-encoded the 40-character hash a second time
+// (Jackett issue #17045). The outer value is not a v2 hash: it is the v1 hash,
+// and both the magnet built from it and the dedup key must use the inner one.
+func TestCanonicalInfoHashDecodesTheDoubleHexForm(t *testing.T) {
+	const inner = "234493f324ff4fcbf35c7dfea71f3b962cf5e016"
+	const doubled = "32333434393366333234666634666362663335633764666561373166336239363263663565303136"
+	if got := canonicalInfoHash(doubled); got != inner {
+		t.Fatalf("canonicalInfoHash(double hex) = %q, want %q", got, inner)
+	}
+	if got := prowlarrInfoHashMagnet(doubled, "Some.Release"); !strings.Contains(got, "urn:btih:"+inner) {
+		t.Fatalf("magnet = %q, want the decoded v1 hash", got)
+	}
+	// An 80-character value that does not decode to a hash stays invalid.
+	notAHash := strings.Repeat("ab", 40)
+	if got := canonicalInfoHash(notAHash); got != "" {
+		t.Fatalf("canonicalInfoHash(%q) = %q, want an invalid value", notAHash, got)
+	}
+}
+
 func dedupMagnetRelease(title, hash string, size, seeders int64) models.Release {
 	return models.Release{Title: title, Magnet: dedupMagnet(hash, title), Source: "prowlarr", SizeBytes: size, Seeders: seeders}
 }
@@ -48,6 +68,54 @@ func TestMergeDuplicateReleasesFoldsCopiesOfTheSameTorrent(t *testing.T) {
 	}
 	if releaseInfoHash(&second) != dedupHashB || len(second.Mirrors) != 1 {
 		t.Fatalf("second group = hash %q, %d mirrors", releaseInfoHash(&second), len(second.Mirrors))
+	}
+}
+
+// TestMergePrefersAFreeCopyWithTheSameSwarm: the freeleech flag is a current
+// tracker fact, so when two copies are otherwise equal the free one is kept as
+// the primary and the paid one becomes a mirror.
+func TestMergePrefersAFreeCopyWithTheSameSwarm(t *testing.T) {
+	const title = "Show S01E02 1080p WEB-DL ITA ENG x264-GRP"
+	paid := dedupTorrent(title, "http://indexer/dl/1", 2_000_000_000, 10)
+	free := dedupTorrent(title, "http://mirror/dl/2", 2_000_000_000, 10)
+	free.Freeleech = true
+	merged := mergeDuplicateReleases([]models.Release{paid, free})
+	if len(merged) != 1 {
+		t.Fatalf("got %d releases, want one", len(merged))
+	}
+	if !merged[0].Freeleech {
+		t.Fatal("the free copy did not become the primary")
+	}
+	if len(merged[0].Mirrors) != 1 || merged[0].Mirrors[0].Freeleech {
+		t.Fatalf("mirrors = %+v", merged[0].Mirrors)
+	}
+}
+
+// TestSwitchToMirrorPreservesFreeleech: a fallback copy from a freeleech
+// tracker must carry its flag with the link, or the log and the score would
+// describe the paid copy that failed.
+func TestSwitchToMirrorPreservesFreeleech(t *testing.T) {
+	link := "http://indexer/dl/1"
+	mirrorLink := "http://mirror/dl/2"
+	release := models.Release{
+		Title:      "Show S01E02 1080p",
+		TorrentURL: &link,
+		Freeleech:  false,
+		Mirrors: []models.Release{{
+			Title:      "Show S01E02 1080p",
+			TorrentURL: &mirrorLink,
+			Freeleech:  true,
+			Seeders:    5,
+		}},
+	}
+	if !switchToMirror(&release, nil) {
+		t.Fatal("switchToMirror returned false")
+	}
+	if !release.Freeleech {
+		t.Fatal("the freeleech flag of the mirror was lost")
+	}
+	if release.TorrentURL == nil || *release.TorrentURL != mirrorLink {
+		t.Fatalf("link = %v, want the mirror", release.TorrentURL)
 	}
 }
 

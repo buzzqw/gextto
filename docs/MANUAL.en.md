@@ -1110,7 +1110,11 @@ highlighted with a “Save all” bar. The complete per-tab list of every entry 
   searches, upgrades, post-processing, archive records and rescoring; it also
   includes the size bonus, which on its own is never enough for an upgrade.
   Library scores are recomputed automatically after a change of the weights or
-  of the scoring rules.
+  of the scoring rules. A release the indexer declares **freeleech** gets a
+  separate bonus (**Freeleech bonus**, 150 by default, 0 turns it off) that
+  applies only when choosing among candidates for a missing episode: it does
+  not enter the stored score and does not trigger an upgrade. Search shows a
+  **Freeleech** badge; when the indexer says nothing, no bonus is given.
   - **Rename** — rename enable, template editor with tokens and live preview,
   TMDB/TVDB keys, language and upgrade thresholds. One file holding several
   contiguous episodes is named with the range (`S01E01-E02`), so media servers
@@ -1399,7 +1403,9 @@ The delay is set in *Configuration → General → Delay before downloading*. Th
 backoff state (level, deadline and last error) is in *Health → Provider
 status*, which **lists only the configured and enabled indexers** (healthy ones
 as "No problem detected"): a removed or switched-off source disappears even if it
-had an error. The *Technical detail* column holds the raw error. Use **Reset** per source after fixing the cause; do not use it to hide a wrong API
+had an error. The *Technical detail* column holds the raw error. When an
+indexer answers `429 Too Many Requests` with a `Retry-After`, the deadline
+honours at least the requested time (at most one day). Use **Reset** per source after fixing the cause; do not use it to hide a wrong API
 key, or backoff will start again.
 
 ### Configuring a NAS safely

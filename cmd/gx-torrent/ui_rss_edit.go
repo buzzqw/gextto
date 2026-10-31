@@ -523,6 +523,7 @@ func uiRuleFromForm(r *http.Request) (rss.Rule, error) {
 			MaxAgeDays:     int(formInt(r, "max_age_days", 0)),
 			RequireEpisode: formBool(r, "require_episode"),
 			SmartEpisode:   formBool(r, "smart_episode"),
+			OnlyFreeleech:  formBool(r, "only_freeleech"),
 			EpisodeFilter:  strings.TrimSpace(r.FormValue("episode_filter")),
 		},
 		Action: rss.Action{
@@ -729,6 +730,9 @@ func uiRuleChipsHTML(rule rss.Rule) string {
 	if m.SmartEpisode {
 		flag("Each episode once")
 	}
+	if m.OnlyFreeleech {
+		flag("Freeleech only")
+	}
 	if a.SavePath != "" {
 		add("act", "Save to", a.SavePath)
 	}
@@ -798,6 +802,9 @@ func uiRuleMatchSummary(rule rss.Rule) string {
 	}
 	if m.SmartEpisode {
 		parts = append(parts, "smart_episode")
+	}
+	if m.OnlyFreeleech {
+		parts = append(parts, "only_freeleech")
 	}
 	if rule.IgnoreDays > 0 {
 		parts = append(parts, fmt.Sprintf("ignore_days=%d", rule.IgnoreDays))

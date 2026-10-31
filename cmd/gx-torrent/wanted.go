@@ -1046,7 +1046,7 @@ func (d *Daemon) applyWanted(now time.Time, feedName string, items []rss.Item) (
 				continue
 			}
 			d.recordWantedSeen(w, season, episode)
-			if d.feedSeen(feedName, item.GUID) {
+			if d.feedSeen(feedName, item.GUID) || d.archive().alreadyAdded(feedName, item) {
 				continue
 			}
 			taken := d.wantedTaken(w.Name, season, episode)
@@ -1135,7 +1135,7 @@ func (d *Daemon) wantedGapSearch(ctx context.Context, now time.Time, w wantedEnt
 		crit := w.criteria()
 		crit.EpisodeFilter = fmt.Sprintf("%dx%02d", ep.season, ep.episode)
 		for _, item := range items {
-			if !wantedIncludeMatch(w, item.Title) || !crit.Match(rss.Item{Title: item.Title}, now) {
+			if !wantedIncludeMatch(w, item.Title) || !crit.Match(rss.Item{Title: item.Title, Freeleech: item.Freeleech}, now) {
 				continue
 			}
 			if d.wantedTaken(w.Name, ep.season, ep.episode) {

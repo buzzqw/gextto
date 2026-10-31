@@ -232,6 +232,7 @@ textarea.json{width:100%;font:12.5px/1.45 var(--mono)}
             <div class="checks">
               <label class="chk"><input type="checkbox" name="require_episode" value="1" title="Take only titles with an episode number (S01E02 or 1x02): no movies and no season packs"> Episodes only</label>
               <label class="chk"><input type="checkbox" name="smart_episode" value="1" title="Download each episode only once, even when several releases of it appear"> Each episode once</label>
+              <label class="chk"><input type="checkbox" name="only_freeleech" value="1" title="Take only releases the indexer marks as freeleech: the download does not count toward the tracker ratio"> Freeleech only</label>
             </div>
             <details class="more">
               <summary>Advanced filters</summary>
@@ -454,7 +455,7 @@ function editRule(rule,index){
   function set(n,v){var el=ruleForm.elements[n];if(!el)return;if(el.type==='checkbox')el.checked=!!v;else el.value=(v===undefined||v===null||v===0)?'':v;}
   function mib(b){return b?Math.round(b/1048576):'';}
   set('name',rule.name);$$('input[name=feeds]',ruleForm).forEach(function(cb){cb.checked=(rule.feeds||[]).indexOf(cb.value)>=0;});set('enabled',rule.enabled!==false);
-  set('include',(m.include||[]).join(', '));set('require',(m.require||[]).join(', '));set('exclude',(m.exclude||[]).join(', '));set('episode_filter',m.episode_filter);set('require_episode',m.require_episode);set('smart_episode',m.smart_episode);
+  set('include',(m.include||[]).join(', '));set('require',(m.require||[]).join(', '));set('exclude',(m.exclude||[]).join(', '));set('episode_filter',m.episode_filter);set('require_episode',m.require_episode);set('smart_episode',m.smart_episode);set('only_freeleech',m.only_freeleech);
   set('paused',a.paused);set('sequential',a.sequential);set('first_last',a.first_last);set('top',a.top);set('once',a.once);set('savepath',a.savepath);set('category',a.category);set('tags',(a.tags||[]).join(', '));
   set('regex',m.regex);set('not_regex',m.not_regex);set('min_size',mib(m.min_size));set('max_size',mib(m.max_size));set('min_seeders',m.min_seeders);set('max_seeders',m.max_seeders);set('min_peers',m.min_peers);set('max_age_days',m.max_age_days);set('ignore_days',rule.ignore_days);
   if(m.regex||m.not_regex||m.min_size||m.max_size||m.min_seeders||m.max_seeders||m.min_peers||m.max_age_days||rule.ignore_days)$('details.more',ruleForm).open=true;

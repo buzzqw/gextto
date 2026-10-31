@@ -101,5 +101,6 @@ func rssItemFromTorznab(it torznab.Item) rss.Item {
 		Published: it.Published,
 		Source:    it.Indexer,
 		GUID:      it.Download(),
+		Freeleech: it.Freeleech,
 	}
 }

@@ -43,6 +43,16 @@ func canonicalInfoHash(raw string) string {
 		return value
 	case len(value) == 64 && isHexString(value):
 		return value
+	case len(value) == 80 && isHexString(value):
+		// Some indexers hex-encode the 40-character hash a second time
+		// (Jackett issue #17045). It is not a v2 hash: it is a v1 one wearing
+		// two layers of hex. Decode only when the result is itself a hash, so
+		// an unrelated 80-character value is still refused.
+		decoded, err := hex.DecodeString(value)
+		if err == nil && len(decoded) == 40 && isHexString(string(decoded)) {
+			return string(decoded)
+		}
+		return ""
 	case len(value) == 32:
 		decoded, err := base32.StdEncoding.DecodeString(strings.ToUpper(value))
 		if err != nil || len(decoded) != 20 {
@@ -141,6 +151,9 @@ func preferredCopy(a, b *models.Release) bool {
 	}
 	if a.Seeders != b.Seeders && (a.Seeders > 0 || b.Seeders > 0) {
 		return a.Seeders > b.Seeders
+	}
+	if a.Freeleech != b.Freeleech {
+		return a.Freeleech
 	}
 	aMagnet, bMagnet := strings.TrimSpace(a.Magnet) != "", strings.TrimSpace(b.Magnet) != ""
 	if aHash, bHash := aMagnet || a.InfoHash != "", bMagnet || b.InfoHash != ""; aHash != bHash {
@@ -342,6 +355,7 @@ func switchToMirror(release *models.Release, usable func(*models.Release) bool) 
 		}
 		release.Seeders = mirror.Seeders
 		release.Peers = mirror.Peers
+		release.Freeleech = mirror.Freeleech
 		return true
 	}
 	return false

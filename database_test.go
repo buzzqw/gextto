@@ -2784,3 +2784,31 @@ func TestReconcileLeavesEd2kFilesToAMule(t *testing.T) {
 	}
 	assertEqual(t, len(pending), 2)
 }
+
+// TestProviderFailureUntilHonoursTheStatedPause covers a source that answers
+// 429 with Retry-After: the provider must stay disabled at least that long,
+// even when the normal backoff would allow a retry sooner.
+func TestProviderFailureUntilHonoursTheStatedPause(t *testing.T) {
+	db := newTestDB(t)
+	until := time.Now().UTC().Add(2 * time.Hour)
+	if err := db.ProviderFailureUntil("indexer", "RateLimited", "HTTP 429", until); err != nil {
+		t.Fatal(err)
+	}
+	statuses, err := db.ProviderStatuses()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(statuses) != 1 {
+		t.Fatalf("statuses = %#v", statuses)
+	}
+	got, ok := utils.ParseTimestamp(statuses[0].DisabledTill)
+	if !ok {
+		t.Fatalf("disabled till = %q", statuses[0].DisabledTill)
+	}
+	if got.Before(until.Add(-time.Minute)) {
+		t.Fatalf("disabled till = %v, want at least %v", got, until)
+	}
+	if level := statuses[0].Level; level != 1 {
+		t.Fatalf("level = %d, want the first backoff step", level)
+	}
+}

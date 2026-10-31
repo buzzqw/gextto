@@ -933,7 +933,10 @@ all), `fail`, `match` and `action`:
 - `match`: `require` (every term), `include` (at least one term), `exclude`
   (no term), `regex`/`not_regex`,
   `min_size`/`max_size` (bytes), `min_seeders`/`max_seeders`, `min_peers`,
-  `max_age_days`, `require_episode`, `episode_filter` and `smart_episode`
+  `max_age_days`, `require_episode`, `episode_filter`, `only_freeleech`
+  (accept only releases the indexer marks as freeleech: Torznab
+  `downloadvolumefactor`, Prowlarr's freeleech flag or indexarr's marker) and
+  `smart_episode`
   (adds an episode of a series only once, keeping track
   of the last one: like qBittorrent's smart episode filter; a **REPACK** or
   **PROPER** of an already taken episode is accepted only once);

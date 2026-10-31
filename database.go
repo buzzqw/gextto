@@ -2163,6 +2163,18 @@ func (d *Database) NoRenameTorrents() ([][2]string, error) {
 // ProviderFailure records a failed source attempt and moves it down the
 // escalation schedule.
 func (d *Database) ProviderFailure(kind, provider, failureError string) error {
+	return d.providerFailure(kind, provider, failureError, time.Time{})
+}
+
+// ProviderFailureUntil records a failed source attempt but keeps the source
+// disabled at least until notBefore. It is used when the source itself says
+// when to come back (a `Retry-After` on HTTP 429), so Gextto does not hammer an
+// indexer that has asked for a pause.
+func (d *Database) ProviderFailureUntil(kind, provider, failureError string, notBefore time.Time) error {
+	return d.providerFailure(kind, provider, failureError, notBefore)
+}
+
+func (d *Database) providerFailure(kind, provider, failureError string, notBefore time.Time) error {
 	now := time.Now().UTC()
 	var current int64
 	var lastFailure sql.NullString
@@ -2182,6 +2194,9 @@ func (d *Database) ProviderFailure(kind, provider, failureError string) error {
 	}
 	level := backoff.NextLevel(current, elapsed)
 	disabledTill := now.Add(time.Duration(backoff.PeriodSecs(level)) * time.Second)
+	if notBefore.After(disabledTill) {
+		disabledTill = notBefore.UTC()
+	}
 	_, err = d.db.Exec(
 		"INSERT INTO provider_status(provider,kind,level,initial_failure,most_recent_failure,disabled_till,last_error) VALUES (?1,?2,?3,?4,?4,?5,?6) ON CONFLICT(provider,kind) DO UPDATE SET level=excluded.level, most_recent_failure=excluded.most_recent_failure, disabled_till=excluded.disabled_till, last_error=excluded.last_error",
 		provider, kind, level, sqliteTimestamp(now), sqliteTimestamp(disabledTill), failureError,

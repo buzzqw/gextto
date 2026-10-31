@@ -244,6 +244,16 @@ days by default): when the block expires the release returns among the candidate
 so a better copy whose swarm has revived is still picked up as an upgrade, while
 the operator's own blocklist entries stay forever.
 
+**Freeleech in the choice, not in the quality score.** A release the indexer declares
+free (`downloadvolumefactor` 0, a Prowlarr freeleech/neutralleech flag, or indexarr's
+`freeleech` marker) earns the `score_bonus_freeleech` weight (150 by default) inside
+`AcquisitionScore`, next to swarm health: it breaks a tie between candidates for a
+missing episode and never enters `ReleaseScore`, so it neither triggers an upgrade nor
+changes a stored score. An indexer that says nothing gives no bonus; indexarr's
+`freeleechknown` marker keeps an unknown release from being mistaken for a free one.
+The search result carries the **Freeleech** badge, and the same flag is available to
+the standalone rules as `only_freeleech`.
+
 **The blocklist decides before the link is opened.** A result that declares its
 infohash is matched against the blocklist snapshot without touching the link; a
 `.torrent`-only result has no hash until the link is opened, so its title (the same
@@ -372,7 +382,7 @@ in [`gx-torrent.md`](gx-torrent.md), *Web interface*.
 typed and names the criterion that leaves other archived items out; a feed row says which
 rules decide its downloads; templates and a feed test show a change before it lands.
 Rules are ordered PASS/FAIL with regex, include/exclude, size, seeds, age,
-`require_episode` and smart-episode, and the same separator-insensitive term match
+`require_episode`, smart-episode and freeleech-only, and the same separator-insensitive term match
 (`rss.HasTerm`) across *all of* / *one of* / *none of*. A wanted title lists what is
 downloaded, downloading and seen-but-skipped, with a chip per season that is never
 collapsed; the episode grid (`/ui/wanted-episodes`) is the ledger. Details in
@@ -650,7 +660,9 @@ free for the advanced rules), the RSS panel (per-feed state, synchronous reload,
 enable/disable, configurable interval, ordered PASS/FAIL rules with `once` and a preview
 on the archive), **HTML listings as feeds** (ext.to and TorrentGalaxy pages resolved to
 direct magnets and feed links instead of failing on invalid XML), the **feed archive**
-(bbolt with a compact index), the IP filter with a scheduled refresh, *Optimise*
+(bbolt with a compact index; it is the persistent record of what a feed already gave,
+while the 30-day seen map is only a fast path, so an item that stays in the feed after
+the map expires is not downloaded again), the IP filter with a scheduled refresh, *Optimise*
 (queue, cache, and both bandwidth limits cleared with automatic speed active), the
 **per-day bandwidth scheduler** (`internal/bwschedule`, shared with Gextto: every
 weekday has its own window, with **one choice per day — Off, Limit or Auto** (Auto

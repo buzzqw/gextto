@@ -29,6 +29,9 @@ type Item struct {
 	Seeders     int       `json:"seeders"`
 	Leechers    int       `json:"leechers"`
 	Published   time.Time `json:"published,omitzero"`
+	// Freeleech is set when the indexer says the download does not count
+	// toward the tracker ratio.
+	Freeleech bool `json:"freeleech,omitempty"`
 }
 
 // Download returns the best fetch target: the magnet when present, else the

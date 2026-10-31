@@ -327,6 +327,34 @@ func (a *feedArchive) record(feed string, items []rss.Item, now time.Time) (int,
 	return added, err
 }
 
+// alreadyAdded reports whether this item was already taken from the feed,
+// according to the persistent archive rather than the 30-day seen map. The map
+// is a fast path; the archive is the state, so an item that stays in a feed
+// after the map expires is not downloaded a second time.
+func (a *feedArchive) alreadyAdded(feed string, item rss.Item) bool {
+	if a == nil {
+		return false
+	}
+	id := archiveID(feed, item)
+	if id == nil {
+		return false
+	}
+	added := false
+	_ = a.view(func(tx *bolt.Tx) error {
+		key := tx.Bucket(archiveIDsBucket).Get(id)
+		if key == nil {
+			return nil
+		}
+		var entry archiveEntry
+		raw := tx.Bucket(archiveItemsBucket).Get(key)
+		if raw != nil && json.Unmarshal(raw, &entry) == nil {
+			added = entry.Added
+		}
+		return nil
+	})
+	return added
+}
+
 // markAdded flags the release behind a download target as downloaded.
 func (a *feedArchive) markAdded(feed string, item rss.Item) {
 	if a == nil {

@@ -2218,7 +2218,28 @@ func (c *Config) releaseScoreWithMovie(release *models.Release, movie *MovieConf
 // below DefaultUpgradeMinScoreDiff and the empty-swarm penalty is bounded, so a
 // better resolution always wins and health alone never forces an upgrade.
 func (c *Config) AcquisitionScore(release *models.Release) int64 {
-	return c.ReleaseScore(release) + healthAdjustment(release)
+	return c.ReleaseScore(release) + freeleechBonus(release, c.Settings) + healthAdjustment(release)
+}
+
+// freeleechBonus prefers a free download among the candidates for the same
+// missing episode. It is deliberately outside ReleaseScore: that score is also
+// stored with archived files and drives upgrades, and a freeleech flag is a
+// current tracker fact, not a better quality. A free release therefore wins a
+// tie between candidates but never replaces an episode already in the library.
+func freeleechBonus(release *models.Release, settings map[string]string) int64 {
+	if release == nil || !release.Freeleech {
+		return 0
+	}
+	bonus := int64(150)
+	if raw, ok := settings["score_bonus_freeleech"]; ok {
+		if parsed, err := strconv.ParseInt(strings.TrimSpace(raw), 10, 64); err == nil {
+			bonus = parsed
+		}
+	}
+	if bonus < 0 {
+		return 0
+	}
+	return bonus
 }
 
 // healthAdjustment nudges a candidate score by how alive its swarm looks.

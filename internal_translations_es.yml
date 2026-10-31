@@ -392,6 +392,10 @@ spa:
   Bonus Lingua (ITA): Bonus de Idioma (ITA)
   Bonus per le release PROPER (correzione di una release precedente).: Bonificación por lanzamientos ADECUADOS (corrección de un lanzamiento anterior).
   Bonus per le release REAL (versione autentica, non fake).: Bonificación por lanzamientos REALES (versión auténtica, no falsa).
+  "Bonus freeleech": Bonificación freeleech
+  "Punti aggiunti quando si sceglie tra più candidati per un episodio mancante e il tracker segna la release come freeleech: non cambia il punteggio salvato né provoca un upgrade.": "Puntos añadidos al elegir entre varios candidatos para un episodio ausente cuando el tracker marca la versión como freeleech: no cambian la puntuación guardada ni provocan una actualización."
+  "Freeleech": Freeleech
+  "Il tracker non conta il download (freeleech).": "El tracker no cuenta la descarga (freeleech)."
   Bonus per le release REPACK (ri-pacchettizzate dallo stesso gruppo).: Bonificación por lanzamientos REPACK (reempaquetados por el mismo grupo).
   Bonus per le release con Dolby Vision.: Bonificación por lanzamientos con Dolby Vision.
   Bonus per le release con HDR (HDR10/HDR10+).: Bonificación por lanzamientos con HDR (HDR10/HDR10+).

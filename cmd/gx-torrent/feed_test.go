@@ -165,6 +165,41 @@ func TestPollFeedsAddsAndDedupes(t *testing.T) {
 	}
 }
 
+// TestPollFeedsDoesNotReaddAfterSeenMapExpiry is the regression from the
+// announce-driven clients: the 30-day seen map is a cache, the archive is the
+// state. If an item stays in a feed after the map expires and its torrent was
+// removed from the session, the archive's Added flag must still stop a second
+// download.
+func TestPollFeedsDoesNotReaddAfterSeenMapExpiry(t *testing.T) {
+	feed := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/xml")
+		_, _ = w.Write([]byte(feedBody))
+	}))
+	defer feed.Close()
+
+	d := feedDaemon(t, `[{"name":"f","url":"`+feed.URL+`","include":"1080p"}]`)
+	d.pollFeeds()
+	waitFor(t, "the first download", func() bool { return len(d.snapshotViews()) == 1 })
+
+	// The feed keeps the item, the seen map expires and the torrent is no
+	// longer in the session (it was seeded and removed, or the client restarted
+	// with an empty session).
+	if err := d.remove(d.snapshotViews()[0].Hash, false); err != nil {
+		t.Fatalf("remove torrent: %v", err)
+	}
+	d.mu.Lock()
+	d.state.FeedSeen = nil
+	d.mu.Unlock()
+
+	d.pollFeeds()
+	if views := d.snapshotViews(); len(views) != 0 {
+		t.Fatalf("the expired seen map re-added %d torrent(s)", len(views))
+	}
+	if statuses := d.feedStatusesSnapshot(); len(statuses) != 1 || statuses[0].Added != 0 {
+		t.Fatalf("second poll re-added items: %+v", statuses)
+	}
+}
+
 // TestPollFeedsWithoutFilterArchivesOnly: a feed with no covering rule and no
 // include/exclude grows the archive and downloads nothing; the operator decides
 // what to download with rules, wanted titles or the "take everything" flag.

@@ -685,6 +685,11 @@ type Release struct {
 	SizeBytes    int64     `json:"size_bytes"`
 	Seeders      int64     `json:"seeders"`
 	Peers        int64     `json:"peers"`
+	// Freeleech is set when the indexer says the download does not count
+	// toward the tracker ratio (Torznab downloadvolumefactor=0, Prowlarr's
+	// freeleech/neutralleech flag, or indexarr's freeleech attribute). It is
+	// only a preference: it never makes a release eligible by itself.
+	Freeleech bool `json:"freeleech,omitempty"`
 	// Score is the release score computed by the current configuration, filled
 	// by the search endpoints so the UI can show and sort by it.
 	Score int64 `json:"score,omitempty"`

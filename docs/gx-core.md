@@ -205,7 +205,8 @@ regex, include/exclude filters, size, seeds/peers, age, `require_episode`,
 pause, sequential, first/last, top), a persisted history, a worker, notifications on
 match and error, and feeds also built from search results.
 
-In place: RSS/Atom/Torznab parsing, the ordered rules, the filters above, the actions,
+In place: RSS/Atom/Torznab parsing, the ordered rules (including a freeleech-only
+filter and the per-release download factor), the filters above, the actions,
 the persisted history, the management page `/ui/rss` with the articles matching per rule
 and a manual Add, and the **Wanted** page `/ui/wanted`. Editing is guided: a dropdown of
 indexer types with preset URLs, an essential feed form (name and URL), an editor of the

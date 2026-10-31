@@ -86,6 +86,9 @@ func apply_torznab_attr(
 	magnet *string,
 	infohash *string,
 	ed2kLink *string,
+	freeleech **bool,
+	freeleechKnown **bool,
+	downloadFactor **float64,
 ) {
 	name, _ := attribute(start, "name")
 	name = strings.ToLower(name)
@@ -119,7 +122,48 @@ func apply_torznab_attr(
 		} else {
 			*sizeBytes = nil
 		}
+	case "downloadvolumefactor":
+		if parsed, err := strconv.ParseFloat(strings.TrimSpace(value), 64); err == nil {
+			*downloadFactor = &parsed
+		}
+	case "freeleech":
+		if parsed, ok := parseBoolish(value); ok {
+			*freeleech = &parsed
+		}
+	case "freeleechknown":
+		if parsed, ok := parseBoolish(value); ok {
+			*freeleechKnown = &parsed
+		}
 	}
+}
+
+// parseBoolish reads the 0/1, true/false and on/off spellings an indexer uses
+// for a flag.
+func parseBoolish(value string) (bool, bool) {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "1", "true", "yes", "on", "free", "freeleech":
+		return true, true
+	case "0", "false", "no", "off", "paid":
+		return false, true
+	}
+	return false, false
+}
+
+// releaseFreeleech resolves what the item said about the download quota. An
+// explicit freeleechknown marker wins (indexarr sends it so an unknown release
+// is not mistaken for a free one); otherwise the explicit freeleech flag, and
+// finally the standard download volume factor (0 = free).
+func releaseFreeleech(free, known *bool, factor *float64) bool {
+	if known != nil {
+		if !*known {
+			return false
+		}
+		return free != nil && *free
+	}
+	if free != nil {
+		return *free
+	}
+	return factor != nil && *factor <= 0
 }
 
 // parseRSSDate parses the publication-date formats seen in RSS/Atom feeds.
@@ -150,6 +194,9 @@ func parse_feed_body(body, source string) ([]models.Release, error) {
 	var sizeBytes *float64
 	var seeders *int64
 	var peers *int64
+	var freeleech *bool
+	var freeleechKnown *bool
+	var downloadFactor *float64
 	discoveredAt := time.Now().UTC()
 	var out []models.Release
 	for {
@@ -183,6 +230,9 @@ func parse_feed_body(body, source string) ([]models.Release, error) {
 				sizeBytes = nil
 				seeders = nil
 				peers = nil
+				freeleech = nil
+				freeleechKnown = nil
+				downloadFactor = nil
 				// Items without a date (many listings omit it) are treated as
 				// found now: the age filter must not discard them for a missing
 				// field, and the value is overwritten when a date is parsed.
@@ -213,7 +263,7 @@ func parse_feed_body(body, source string) ([]models.Release, error) {
 							itemSource = fmt.Sprintf("%s:%s", source, strings.TrimSpace(value))
 						}
 					}
-					apply_torznab_attr(event, &sizeBytes, &seeders, &peers, &magnet, &infohash, &ed2kLink)
+					apply_torznab_attr(event, &sizeBytes, &seeders, &peers, &magnet, &infohash, &ed2kLink, &freeleech, &freeleechKnown, &downloadFactor)
 				}
 				value, ok := attribute(event, "href")
 				if !ok {
@@ -361,6 +411,7 @@ func parse_feed_body(body, source string) ([]models.Release, error) {
 						} else {
 							release.Peers = -1
 						}
+						release.Freeleech = releaseFreeleech(freeleech, freeleechKnown, downloadFactor)
 						out = append(out, *release)
 					}
 				}
@@ -395,6 +446,59 @@ func TorznabError(body string) string {
 			return fmt.Sprintf("Torznab %s: %s", code, description)
 		}
 	}
+}
+
+// indexerRateLimitError is an indexer that answered 429. RetryAfter is what
+// the indexer asked to wait, or zero when it did not say: the caller still
+// backs off on the normal schedule, but a stated pause is honoured.
+type indexerRateLimitError struct {
+	status     int
+	retryAfter time.Duration
+	detail     string
+}
+
+func (e *indexerRateLimitError) Error() string {
+	message := fmt.Sprintf("HTTP %d Too Many Requests", e.status)
+	if e.detail != "" {
+		message += ": " + e.detail
+	}
+	if e.retryAfter > 0 {
+		message += " (retry after " + e.retryAfter.Round(time.Second).String() + ")"
+	}
+	return message
+}
+
+// parseRetryAfter reads the Retry-After header in both the seconds and the
+// HTTP-date form. A missing, malformed or absurd value means "no advice".
+func parseRetryAfter(value string, now time.Time) time.Duration {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return 0
+	}
+	if seconds, err := strconv.ParseInt(value, 10, 64); err == nil {
+		if seconds <= 0 {
+			return 0
+		}
+		return capRetryAfter(time.Duration(seconds) * time.Second)
+	}
+	if when, err := http.ParseTime(value); err == nil {
+		wait := when.Sub(now)
+		if wait <= 0 {
+			return 0
+		}
+		return capRetryAfter(wait)
+	}
+	return 0
+}
+
+// capRetryAfter keeps a hostile or mistaken value from parking a source for
+// more than a day.
+func capRetryAfter(wait time.Duration) time.Duration {
+	const maximum = 24 * time.Hour
+	if wait > maximum {
+		return maximum
+	}
+	return wait
 }
 
 func is_cloudflare_challenge(body string) bool {
@@ -1812,6 +1916,54 @@ func jsonNumberInt(value any) *int64 {
 	return nil
 }
 
+// jsonNumberFloat reads a numeric field that may be an integer in the JSON.
+func jsonNumberFloat(value any) *float64 {
+	switch typed := value.(type) {
+	case json.Number:
+		if parsed, err := typed.Float64(); err == nil {
+			return &parsed
+		}
+	case float64:
+		return &typed
+	}
+	return nil
+}
+
+// prowlarrFreeleech reads the quota flags of a Prowlarr search result.
+// Prowlarr exposes the indexer flags by name; downloadVolumeFactor is kept as
+// a fallback for a fork or a proxy that sends the Torznab field in JSON.
+func prowlarrFreeleech(item map[string]any) bool {
+	for _, raw := range jsonStringList(item["indexerFlags"]) {
+		switch strings.ToLower(strings.TrimSpace(raw)) {
+		case "freeleech", "neutralleech":
+			return true
+		}
+	}
+	if factor := jsonNumberFloat(item["downloadVolumeFactor"]); factor != nil {
+		return *factor <= 0
+	}
+	return false
+}
+
+// jsonStringList reads a JSON array of strings, tolerating a single string.
+func jsonStringList(value any) []string {
+	switch typed := value.(type) {
+	case []any:
+		out := make([]string, 0, len(typed))
+		for _, entry := range typed {
+			if text, ok := entry.(string); ok {
+				out = append(out, text)
+			}
+		}
+		return out
+	case []string:
+		return typed
+	case string:
+		return []string{typed}
+	}
+	return nil
+}
+
 // jsonStringValue returns a JSON string value or "".
 func jsonStringValue(value any) string {
 	text, _ := value.(string)
@@ -1835,8 +1987,8 @@ func jsonIdentifierValue(value any) string {
 }
 
 func prowlarrInfoHashMagnet(hash, title string) string {
-	hash = strings.ToLower(strings.TrimSpace(hash))
-	if !isHexString(hash) {
+	hash = canonicalInfoHash(hash)
+	if hash == "" {
 		return ""
 	}
 	var magnet string
@@ -1946,6 +2098,7 @@ func parseProwlarrItems(items []map[string]any, source string) []models.Release 
 		} else {
 			release.Peers = -1
 		}
+		release.Freeleech = prowlarrFreeleech(item)
 		out = append(out, *release)
 	}
 	return out
@@ -2323,6 +2476,16 @@ func fetchTorznabFlareSolverr(ctx context.Context, indexer IndexerConfig, query 
 		}
 		body = fetched
 		contentType = torznabContentType(body)
+	case response.StatusCode == http.StatusTooManyRequests:
+		// The indexer asked for a pause. Keep what it said so the provider
+		// backoff does not bring Gextto back sooner than the site allows.
+		payload, _ := readLimitedBody(response.Body, 64<<10)
+		detail := TorznabError(string(payload))
+		return nil, &indexerRateLimitError{
+			status:     response.StatusCode,
+			retryAfter: parseRetryAfter(response.Header.Get("Retry-After"), time.Now()),
+			detail:     detail,
+		}
 	case response.StatusCode >= 400:
 		if !cloudflare_blocked(response.StatusCode) {
 			// Keep the indexer's own explanation (Jackett: "Torznab 203:

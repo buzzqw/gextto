@@ -311,7 +311,7 @@ func (d *Daemon) pollFeedsOnlyDetailed(only string) feedPollResult {
 			if rule.Action.Once && onceHit[rule.Name] {
 				continue
 			}
-			if d.feedSeen(name, item.GUID) {
+			if d.feedSeen(name, item.GUID) || d.archive().alreadyAdded(name, item) {
 				continue
 			}
 			smartKey := ""

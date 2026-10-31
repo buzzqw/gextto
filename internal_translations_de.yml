@@ -401,6 +401,10 @@ deu:
   Bonus Lingua (ITA): Sprach-Bonus (ITA)
   Bonus per le release PROPER (correzione di una release precedente).: Bonus für RICHTIGE Veröffentlichungen (Korrektur einer früheren Veröffentlichung).
   Bonus per le release REAL (versione autentica, non fake).: Bonus für ECHTE Veröffentlichungen (authentische Version, keine Fälschung).
+  "Bonus freeleech": Freeleech-Bonus
+  "Punti aggiunti quando si sceglie tra più candidati per un episodio mancante e il tracker segna la release come freeleech: non cambia il punteggio salvato né provoca un upgrade.": "Punkte, die bei der Auswahl unter Kandidaten für eine fehlende Episode hinzugefügt werden, wenn der Tracker die Veröffentlichung als Freeleech markiert: Sie ändern weder den gespeicherten Punktestand noch lösen sie ein Upgrade aus."
+  "Freeleech": Freeleech
+  "Il tracker non conta il download (freeleech).": "Der Tracker zählt den Download nicht (Freeleech)."
   Bonus per le release REPACK (ri-pacchettizzate dallo stesso gruppo).: Bonus für REPACK-Veröffentlichungen (neu verpackt von derselben Gruppe).
   Bonus per le release con Dolby Vision.: Bonus für Veröffentlichungen mit Dolby Vision.
   Bonus per le release con HDR (HDR10/HDR10+).: Bonus für Veröffentlichungen mit HDR (HDR10/HDR10+).

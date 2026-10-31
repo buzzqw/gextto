@@ -1142,6 +1142,11 @@ tab, è nell'[Appendice A](#appendice-a-riferimento--configurazione).
   post-processing, archivio e rescore; comprende anche il bonus dimensione, che
   però non basta mai da solo per un upgrade. I punteggi della libreria si
   ricalcolano da soli dopo un cambio dei pesi o delle regole di calcolo.
+  Una release che l'indexer dichiara **freeleech** ha un bonus a parte
+  (**Bonus freeleech**, 150 di default, 0 lo spegne) che vale solo nella scelta
+  tra candidati per un episodio mancante: non entra nel punteggio salvato e non
+  provoca un upgrade. Nella ricerca release compare il badge **Freeleech**;
+  quando l'indexer non dice nulla, il bonus non viene dato.
   - **Rinomina** — abilita rinomina, editor del template con token e anteprima,
   chiavi TMDB/TVDB, lingua e soglie di upgrade. Un file che copre più episodi
   contigui viene nominato con l'intervallo (`S01E01-E02`), così i media server
@@ -1444,7 +1449,9 @@ scaricare*. Lo stato dei backoff (livello, scadenza e ultimo errore) è in
 *Salute → Stato provider*, che elenca **solo gli indexer configurati e attivi**
 (quelli senza problemi come «Nessun problema rilevato»): una sorgente rimossa o
 disattivata sparisce anche se aveva un errore. La colonna *Dettaglio tecnico*
-riporta l'errore grezzo. Usa **Azzera** per singola sorgente dopo aver corretto la causa; non usarlo per
+riporta l'errore grezzo. Se un indexer risponde `429 Too Many Requests` con
+`Retry-After`, la scadenza rispetta almeno il tempo chiesto (al massimo un
+giorno). Usa **Azzera** per singola sorgente dopo aver corretto la causa; non usarlo per
 mascherare un'API key sbagliata, altrimenti il backoff ricomincerà.
 
 ### Configurare il NAS senza sorprese

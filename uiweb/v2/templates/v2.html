@@ -2940,7 +2940,7 @@
   <thead><tr><th scope="col">Titolo</th><th scope="col">Sorgente</th><th scope="col">Punteggio</th><th scope="col">Dimensione</th><th scope="col">Seed</th><th scope="col">Azioni</th></tr></thead>
   <tbody>{{range .Results}}<tr>
     <td class="truncate" title="{{.Title}}">{{.Title}}</td>
-    <td>{{.Source}}{{if eq .Network "ed2k"}} <span class="badge" title="Fonti eD2k">{{.Sources}}</span>{{end}}</td>
+    <td>{{.Source}}{{if .Freeleech}} <span class="badge ok" title="Il tracker non conta il download (freeleech).">Freeleech</span>{{end}}{{if eq .Network "ed2k"}} <span class="badge" title="Fonti eD2k">{{.Sources}}</span>{{end}}</td>
     <td class="numeric">{{.Score}}</td>
     <td class="numeric">{{bytes .SizeBytes}}</td>
     <td class="numeric">{{.Seeders}}</td>

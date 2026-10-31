@@ -897,7 +897,15 @@ func searchOneWithDBType(
 			message := utils.RedactURLSecrets(result.Err.Error())
 			logging.SourceFail("indexer", result.Name, message)
 			if providerDB != nil {
-				_ = providerDB.ProviderFailure("indexer", result.Name, message)
+				var limited *indexerRateLimitError
+				if errors.As(result.Err, &limited) && limited.retryAfter > 0 {
+					// The indexer named its own pause: honour it even when the
+					// normal backoff would allow a retry sooner.
+					until := time.Now().Add(limited.retryAfter)
+					_ = providerDB.ProviderFailureUntil("indexer", result.Name, message, until)
+				} else {
+					_ = providerDB.ProviderFailure("indexer", result.Name, message)
+				}
 			}
 			// SourceStats and the cycle-level provider summary retain the failure
 			// details. Logging every failed title/indexer pair at WARN makes a

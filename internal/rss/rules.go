@@ -30,6 +30,9 @@ type Criteria struct {
 
 	RequireEpisode bool `json:"require_episode,omitempty"`
 	SmartEpisode   bool `json:"smart_episode,omitempty"` // daemon keeps the state
+	// OnlyFreeleech keeps only items the indexer marked as free (download not
+	// counted toward the tracker ratio).
+	OnlyFreeleech bool `json:"only_freeleech,omitempty"`
 	// EpisodeFilter restricts the rule to some episodes (qBittorrent-style
 	// syntax: "1x01", "1x01-05", "1x01-", "1x??"). Empty = every episode.
 	EpisodeFilter string `json:"episode_filter,omitempty"`
@@ -134,6 +137,9 @@ func normalizeSeries(value string) string {
 // Match reports whether the item satisfies the criteria at time now.
 func (c Criteria) Match(item Item, now time.Time) bool {
 	title := item.Title
+	if c.OnlyFreeleech && !item.Freeleech {
+		return false
+	}
 
 	// Terms are found with HasTerm (separators normalized, word starts).
 	if countTerms(c.Include) > 0 && !hasAnyTerm(title, c.Include) {

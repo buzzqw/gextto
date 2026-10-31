@@ -45,6 +45,9 @@ type Item struct {
 	Link      string    `json:"link,omitempty"`
 	Published time.Time `json:"published,omitzero"`
 	Indexer   string    `json:"indexer,omitempty"`
+	// Freeleech is set when the indexer says the download does not count
+	// toward the tracker ratio.
+	Freeleech bool `json:"freeleech,omitempty"`
 }
 
 // Download returns the best way to fetch the item: the magnet when present,
@@ -190,15 +193,17 @@ func (idx Indexer) getBody(ctx context.Context, rawURL string) ([]byte, int, err
 
 // prowlarrRelease is the part of a Prowlarr /api/v1/search result we use.
 type prowlarrRelease struct {
-	Title       string `json:"title"`
-	Size        int64  `json:"size"`
-	Seeders     *int   `json:"seeders"`
-	Leechers    *int   `json:"leechers"`
-	MagnetURL   string `json:"magnetUrl"`
-	DownloadURL string `json:"downloadUrl"`
-	InfoHash    string `json:"infoHash"`
-	PublishDate string `json:"publishDate"`
-	Protocol    string `json:"protocol"`
+	Title                string   `json:"title"`
+	Size                 int64    `json:"size"`
+	Seeders              *int     `json:"seeders"`
+	Leechers             *int     `json:"leechers"`
+	MagnetURL            string   `json:"magnetUrl"`
+	DownloadURL          string   `json:"downloadUrl"`
+	InfoHash             string   `json:"infoHash"`
+	PublishDate          string   `json:"publishDate"`
+	Protocol             string   `json:"protocol"`
+	IndexerFlags         []string `json:"indexerFlags"`
+	DownloadVolumeFactor *float64 `json:"downloadVolumeFactor"`
 }
 
 // ParseProwlarr reads the JSON answer of Prowlarr's aggregate search. Usenet
@@ -224,11 +229,12 @@ func ParseProwlarr(r io.Reader, indexerName string) ([]Item, error) {
 			continue
 		}
 		item := Item{
-			Title:    strings.TrimSpace(rel.Title),
-			Size:     rel.Size,
-			Leechers: -1,
-			Link:     strings.TrimSpace(rel.DownloadURL),
-			Indexer:  indexerName,
+			Title:     strings.TrimSpace(rel.Title),
+			Size:      rel.Size,
+			Leechers:  -1,
+			Link:      strings.TrimSpace(rel.DownloadURL),
+			Indexer:   indexerName,
+			Freeleech: prowlarrFreeleech(rel),
 		}
 		if rel.Seeders != nil {
 			item.Seeders = *rel.Seeders
@@ -253,6 +259,20 @@ func ParseProwlarr(r io.Reader, indexerName string) ([]Item, error) {
 		items = append(items, item)
 	}
 	return items, nil
+}
+
+// prowlarrFreeleech reads the quota flags of a Prowlarr search result.
+func prowlarrFreeleech(rel prowlarrRelease) bool {
+	for _, flag := range rel.IndexerFlags {
+		switch strings.ToLower(strings.TrimSpace(flag)) {
+		case "freeleech", "neutralleech":
+			return true
+		}
+	}
+	if rel.DownloadVolumeFactor != nil {
+		return *rel.DownloadVolumeFactor <= 0
+	}
+	return false
 }
 
 // infoHashMagnet builds a magnet from a v1 (40 hex) or v2 (64 hex) infohash.
@@ -402,6 +422,8 @@ func Parse(r io.Reader, indexerName string) ([]Item, error) {
 			item.Magnet = item.Link
 		}
 		item.Size = raw.Enclosure.Length
+		var freeleech, freeleechKnown *bool
+		var downloadFactor *float64
 		for _, attr := range raw.Attrs {
 			switch strings.ToLower(strings.TrimSpace(attr.Name)) {
 			case "seeders":
@@ -412,8 +434,21 @@ func Parse(r io.Reader, indexerName string) ([]Item, error) {
 				item.Size = atollOr(attr.Value, item.Size)
 			case "magneturl":
 				item.Magnet = strings.TrimSpace(attr.Value)
+			case "downloadvolumefactor":
+				if parsed, err := strconv.ParseFloat(strings.TrimSpace(attr.Value), 64); err == nil {
+					downloadFactor = &parsed
+				}
+			case "freeleech":
+				if parsed, ok := parseBoolish(attr.Value); ok {
+					freeleech = &parsed
+				}
+			case "freeleechknown":
+				if parsed, ok := parseBoolish(attr.Value); ok {
+					freeleechKnown = &parsed
+				}
 			}
 		}
+		item.Freeleech = releaseFreeleech(freeleech, freeleechKnown, downloadFactor)
 		if t, err := parseTorznabTime(raw.PubDate); err == nil {
 			item.Published = t
 		}
@@ -433,6 +468,34 @@ func newLenientDecoder(data []byte) *xml.Decoder {
 	decoder.Strict = false
 	decoder.Entity = xml.HTMLEntity
 	return decoder
+}
+
+// parseBoolish reads the 0/1, true/false and on/off spellings an indexer uses
+// for a flag.
+func parseBoolish(value string) (bool, bool) {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "1", "true", "yes", "on", "free", "freeleech":
+		return true, true
+	case "0", "false", "no", "off", "paid":
+		return false, true
+	}
+	return false, false
+}
+
+// releaseFreeleech resolves what an item said about the download quota. An
+// explicit freeleechknown marker wins, then the freeleech flag, then the
+// standard download volume factor (0 = free).
+func releaseFreeleech(free, known *bool, factor *float64) bool {
+	if known != nil {
+		if !*known {
+			return false
+		}
+		return free != nil && *free
+	}
+	if free != nil {
+		return *free
+	}
+	return factor != nil && *factor <= 0
 }
 
 // parseTorznabTime reads the RFC1123(Z) or RFC3339 dates indexers emit.

@@ -45,6 +45,7 @@ var uiSettingDefaults = map[string]string{
 	"score_bonus_proper":     "75",
 	"score_bonus_repack":     "100",
 	"score_bonus_real":       "100",
+	"score_bonus_freeleech":  "150",
 
 	// --- Daemon -------------------------------------------------------------
 	"active":                  "true",
