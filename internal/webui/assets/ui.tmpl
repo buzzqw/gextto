@@ -13,7 +13,7 @@
 // default width in px (0 = the name column, which takes the remaining space).
 // The style is written before the table is parsed, so a hidden column never
 // flashes on load.
-window.__gxCols=[["name",1,0],["size",1,92],["progress",1,120],["state",1,112],["seeds",1,72],["peers",1,72],["down",1,104],["up",1,104],["eta",1,76],["ratio",1,64],["category",1,104],["tags",0,120],["added",0,132],["completed",0,132],["downloaded",0,94],["uploaded",0,94],["remaining",0,94],["queue",0,52],["tracker",0,150],["path",0,220],["availability",1,80],["active",1,90],["lastactive",1,132],["wasted",1,94]];
+window.__gxCols=[["name",1,0],["size",1,92],["progress",1,120],["state",1,132],["seeds",1,72],["peers",1,72],["down",1,104],["up",1,104],["eta",1,76],["ratio",1,64],["category",1,104],["tags",0,120],["added",0,132],["completed",0,132],["downloaded",0,94],["uploaded",0,94],["remaining",0,94],["queue",0,52],["tracker",0,150],["path",0,220],["availability",1,80],["active",1,90],["lastactive",1,132],["wasted",1,94]];
 window.gxColStyle=function(){
   var saved={};try{saved=JSON.parse(localStorage.getItem('gx-cols')||'{}')||{};}catch(e){}
   var css='',total=34+40+200;
@@ -1976,9 +1976,9 @@ window.gxClearFilters=function(){state.filter={status:'all',cat:null,tag:null,tr
 <div class="dbody">
 <div class="tabs" role="tablist" aria-label="Torrent details">
   <button type="button" role="tab" data-tab="general" aria-selected="{{if eq .Tab "general"}}true{{else}}false{{end}}" title="General torrent information, transfer stats and limits">General</button>
-  <button type="button" role="tab" data-tab="files" aria-selected="{{if eq .Tab "files"}}true{{else}}false{{end}}" title="List of files in the torrent, individual progress and download priority"><span>Files</span> <span class="cnt">{{len .Files}}</span></button>
-  <button type="button" role="tab" data-tab="peers" aria-selected="{{if eq .Tab "peers"}}true{{else}}false{{end}}" title="Connected peers, client software, flags and transfer rates"><span>Peers</span> <span class="cnt">{{len .Peers}}</span></button>
-  <button type="button" role="tab" data-tab="trackers" aria-selected="{{if eq .Tab "trackers"}}true{{else}}false{{end}}" title="Trackers list, announce URLs, tiers and response status"><span>Trackers</span> <span class="cnt">{{len .Trackers}}</span></button>
+  <button type="button" role="tab" data-tab="files" aria-selected="{{if eq .Tab "files"}}true{{else}}false{{end}}" title="List of files in the torrent, individual progress and download priority"><span>Files</span> <span class="cnt">{{.FileCount}}</span></button>
+  <button type="button" role="tab" data-tab="peers" aria-selected="{{if eq .Tab "peers"}}true{{else}}false{{end}}" title="Connected peers, client software, flags and transfer rates"><span>Peers</span> <span class="cnt">{{.PeerCount}}</span></button>
+  <button type="button" role="tab" data-tab="trackers" aria-selected="{{if eq .Tab "trackers"}}true{{else}}false{{end}}" title="Trackers list, announce URLs, tiers and response status"><span>Trackers</span> <span class="cnt">{{.TrackerCount}}</span></button>
   <button type="button" role="tab" data-tab="pieces" aria-selected="{{if eq .Tab "pieces"}}true{{else}}false{{end}}" title="Piece availability map and verified chunks">Pieces</button>
 </div>
 <div role="tabpanel">

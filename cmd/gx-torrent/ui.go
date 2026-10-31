@@ -331,6 +331,12 @@ type uiDetailData struct {
 	PiecesPercent   float64
 	Magnet          string
 
+	// Counts for the tab labels, valid on every tab: the lists themselves are
+	// loaded only for the tab being shown, so a count from the list would read
+	// zero on the others.
+	PeerCount    int
+	TrackerCount int
+
 	Files    []uiFileRow
 	Peers    []uiPeerRow
 	Trackers []uiTrackerRow
@@ -1845,6 +1851,8 @@ func (d *Daemon) uiDetailData(hash, tab string) (uiDetailData, error) {
 	}
 
 	trackers := t.Trackers()
+	data.PeerCount = len(t.Peers())
+	data.TrackerCount = len(trackers)
 	for _, tracker := range trackers {
 		if !tracker.NextAnnounce.IsZero() {
 			if next := int64(time.Until(tracker.NextAnnounce).Seconds()); next >= 0 &&
