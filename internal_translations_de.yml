@@ -6198,3 +6198,4 @@ deu:
   "File per volta.": "Dateien pro Durchlauf."
   "Il controllo automatico è disattivato.": "Die automatische Prüfung ist ausgeschaltet."
   "Attivalo in Configurazione → Manutenzione → Controllo integrità file.": "Aktiviere sie unter Einstellungen → Wartung → Dateiintegritätsprüfung."
+  "Percorso del file state.json di italian_audio_batch: i file già rimappati e verificati pacchetto per pacchetto dal batch vengono considerati controllati e saltati. Lascia vuoto se non usi questo strumento.": "Pfad zur state.json von italian_audio_batch: Dateien, die das Batch bereits neu zusammengefügt und Paket für Paket geprüft hat, gelten als geprüft und werden übersprungen. Leer lassen, wenn du dieses Werkzeug nicht verwendest."

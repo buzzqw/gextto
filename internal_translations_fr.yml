@@ -6191,3 +6191,4 @@ fra:
   "File per volta.": "Fichiers par passage."
   "Il controllo automatico è disattivato.": "La vérification automatique est désactivée."
   "Attivalo in Configurazione → Manutenzione → Controllo integrità file.": "Activez-la dans Configuration → Maintenance → Vérification de l'intégrité des fichiers."
+  "Percorso del file state.json di italian_audio_batch: i file già rimappati e verificati pacchetto per pacchetto dal batch vengono considerati controllati e saltati. Lascia vuoto se non usi questo strumento.": "Chemin du fichier state.json de italian_audio_batch : les fichiers déjà remuxés et vérifiés paquet par paquet par le batch sont considérés comme vérifiés et ignorés. Laissez vide si vous n'utilisez pas cet outil."

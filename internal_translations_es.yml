@@ -6145,3 +6145,4 @@ spa:
   "File per volta.": "Archivos por pasada."
   "Il controllo automatico è disattivato.": "La comprobación automática está desactivada."
   "Attivalo in Configurazione → Manutenzione → Controllo integrità file.": "Actívala en Configuración → Mantenimiento → Comprobación de integridad de archivos."
+  "Percorso del file state.json di italian_audio_batch: i file già rimappati e verificati pacchetto per pacchetto dal batch vengono considerati controllati e saltati. Lascia vuoto se non usi questo strumento.": "Ruta del archivo state.json de italian_audio_batch: los archivos ya remultiplexados y verificados paquete a paquete por el lote se consideran comprobados y se omiten. Déjalo vacío si no usas esta herramienta."

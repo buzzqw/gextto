@@ -2562,7 +2562,7 @@ files. When the memory cannot be read, only the `tmpfs` space counts, as before.
 | Automatic file integrity check | Periodically probes the library files with `ffprobe` and `ffmpeg`, one file at a time, to find the damaged ones. |
 | File integrity check — interval | Minutes between two check passes. Shown only while «Automatic file integrity check» is on. |
 | File integrity check — files per pass | Maximum number of files verified in each pass. |
-| Already verified files | Path to the `state.json` file of `italian_audio_batch`: files already remuxed and verified packet by packet are treated as checked and skipped. |
+| Already verified files | Path to the `state.json` file of `italian_audio_batch`: files already remuxed and verified packet by packet are treated as checked and skipped. Leave it empty if you do not use that tool. |
 
 **Orphaned files**
 

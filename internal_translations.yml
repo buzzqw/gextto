@@ -5535,3 +5535,4 @@ eng:
   "File per volta.": "Files per pass."
   "Il controllo automatico è disattivato.": "The automatic check is off."
   "Attivalo in Configurazione → Manutenzione → Controllo integrità file.": "Enable it in Settings → Maintenance → File integrity check."
+  "Percorso del file state.json di italian_audio_batch: i file già rimappati e verificati pacchetto per pacchetto dal batch vengono considerati controllati e saltati. Lascia vuoto se non usi questo strumento.": "Path to the state.json file of italian_audio_batch: files already remuxed and verified packet by packet by the batch are treated as checked and skipped. Leave it empty if you do not use that tool."

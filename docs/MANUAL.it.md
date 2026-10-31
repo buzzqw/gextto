@@ -2637,7 +2637,7 @@ spazio del `tmpfs`, come prima.
 | Controllo integrità file automatico | Verifica periodicamente con `ffprobe` e `ffmpeg` i file della libreria, un file alla volta, per trovare quelli danneggiati. |
 | Controllo integrità — intervallo | Minuti tra due passaggi del controllo. Compare solo con «Controllo integrità file automatico» attivo. |
 | Controllo integrità — file per volta | Numero massimo di file verificati in ogni passaggio. |
-| File già verificati | Percorso del file `state.json` di `italian_audio_batch`: i file già rimappati e verificati pacchetto per pacchetto vengono considerati controllati e saltati. |
+| File già verificati | Percorso del file `state.json` di `italian_audio_batch`: i file già rimappati e verificati pacchetto per pacchetto vengono considerati controllati e saltati. Lascia vuoto se non usi questo strumento. |
 
 **File orfani**
 

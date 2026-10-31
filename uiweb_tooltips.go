@@ -90,7 +90,7 @@ var uiSettingTooltipText = map[string]string{
 	"media_integrity_enabled":              "Analizza periodicamente con ffprobe e ffmpeg i file della libreria, un file alla volta, per trovare quelli danneggiati.",
 	"media_integrity_interval_minutes":     "Minuti tra due passaggi del controllo integrità.",
 	"media_integrity_batch":                "Numero massimo di file verificati in ogni passaggio del controllo integrità.",
-	"media_integrity_verified_manifest":    "Percorso del file state.json di italian_audio_batch: i file già rimappati e verificati pacchetto per pacchetto dal batch vengono considerati controllati e saltati.",
+	"media_integrity_verified_manifest":    "Percorso del file state.json di italian_audio_batch: i file già rimappati e verificati pacchetto per pacchetto dal batch vengono considerati controllati e saltati. Lascia vuoto se non usi questo strumento.",
 	"notify_telegram":                      "Invia le notifiche su Telegram.",
 	"telegram_bot_token":                   "Token del bot Telegram (da @BotFather).",
 	"telegram_chat_id":                     "ID della chat/canale dove inviare le notifiche.",
