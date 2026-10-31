@@ -2638,7 +2638,7 @@ files. When the memory cannot be read, only the `tmpfs` space counts, as before.
 
 | Setting | What it does |
 |---|---|
-| Anti-spam — minimum interval | Within this many minutes the same event is not sent again. `0` disables the anti-spam window. |
+| Anti-spam — minimum interval | Within this many minutes the same event is not sent again. `0` disables the anti-spam window; the maximum is `10080` (seven days). |
 
 **Message language**
 

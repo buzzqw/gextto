@@ -2718,7 +2718,7 @@ spazio del `tmpfs`, come prima.
 
 | Impostazione | Cosa fa |
 |---|---|
-| Anti-spam — intervallo minimo | Entro questo numero di minuti lo stesso evento non viene inviato di nuovo. `0` disattiva l'anti-spam. |
+| Anti-spam — intervallo minimo | Entro questo numero di minuti lo stesso evento non viene inviato di nuovo. `0` disattiva l'anti-spam; il massimo è `10080` (sette giorni). |
 
 **Lingua dei messaggi**
 
