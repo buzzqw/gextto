@@ -257,13 +257,15 @@ function seasonsHint(){
 function applySeasonsFromValue(value){
   value=(value||'').trim();
   var all=$('#wanted-seasons-all'),from=$('#wanted-season-from'),to=$('#wanted-season-to');
-  var m;
+  var m,complex=false;
   if(!value){all.checked=true;from.value='';to.value='';}
   else if((m=value.match(/^(\d+)\s*-\s*(\d+)$/))){all.checked=false;from.value=m[1];to.value=m[2];}
   else if((m=value.match(/^(\d+)\s*\+$/))){all.checked=false;from.value=m[1];to.value='';}
   else if((m=value.match(/^(\d+)$/))){all.checked=false;from.value=m[1];to.value=m[1];}
-  else{all.checked=false;from.value='';to.value='';}
-  from.disabled=all.checked;to.disabled=all.checked;seasonsHint();
+  else{all.checked=false;from.value='';to.value='';complex=true;}
+  from.disabled=all.checked;to.disabled=all.checked;
+  if(complex){$('#wanted-seasons-hint').textContent=t('Advanced filter');$('#wanted-more').open=true;}
+  else seasonsHint();
 }
 function updateSeasonsText(){
   if($('#wanted-seasons-all').checked)$('#wanted-seasons').value='';
