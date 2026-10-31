@@ -430,6 +430,13 @@ the other hand, apply to both.
   you sign a BEP 46 feed with the selected torrents, or with every torrent of
   the session, and get the `dht://…` address to give to whoever should follow
   it; Gextto keeps the key and bumps the sequence on every publish.
+- **Numbering: back to `1.1.<build>`, the second number is raised by hand.**
+  Gextto no longer moves the second number by itself every 1000 builds: the
+  version is `<series>.<build>`, the third number is always the build
+  (`1.1.1961`) and the series stays `1.1` until it is deliberately changed in
+  `version_series` (for example `1.2.2000`). It also applies to gx-torrent, with
+  its own `gx_torrent.version_series`. The build and the commit stay visible at
+  the bottom of **Maintenance**.
 - **RSS feeds: when IPv6 stalls, Gextto retries over IPv4.** A host reachable
   over IPv6 that never sends data (extto.org behind Cloudflare is one) made the
   feeds time out one after another. After the first failed attempt the next ones
