@@ -176,19 +176,34 @@ func TestDialPeerFallsBackToDelayedLeg(t *testing.T) {
 	defer func() { preferHeadStart = old }()
 	resetDialPrefs()
 
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	// The seeding listener stays up: it collects the real races that earn
+	// TCP the head start.
+	seed, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
-	open := ln.Addr().String()
+	defer seed.Close()
+	seedAddr := seed.Addr().String()
 
-	failUTP := true
+	// The fallback dials a port with nothing behind it. It is a second port
+	// of the same host (the preference is kept per host) so that a uTP leg
+	// of a seeding race landing after DialPeer returned cannot be counted
+	// as the fallback's dial.
+	dead, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	deadAddr := dead.Addr().String()
+	_ = dead.Close()
+
 	var utpDials atomic.Int64
-	SetUTPDialer(func(_ context.Context, _ string) (net.Conn, error) {
-		utpDials.Add(1)
-		if failUTP {
+	SetUTPDialer(func(_ context.Context, addr string) (net.Conn, error) {
+		// uTP is unreachable at the seeding port (so TCP earns the head
+		// start) and works at the fallback port.
+		if addr != deadAddr {
 			return nil, context.DeadlineExceeded
 		}
+		utpDials.Add(1)
 		a, b := net.Pipe()
 		go func() {
 			_ = b.Close()
@@ -201,7 +216,7 @@ func TestDialPeerFallsBackToDelayedLeg(t *testing.T) {
 	defer cancel()
 	// Seed a TCP preference: uTP fails, TCP to the open listener wins.
 	for i := 0; i < preferMinSamples; i++ {
-		c, err := DialPeer(ctx, net.Dialer{}, "tcp", open)
+		c, err := DialPeer(ctx, net.Dialer{}, "tcp", seedAddr)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -211,13 +226,9 @@ func TestDialPeerFallsBackToDelayedLeg(t *testing.T) {
 		t.Fatalf("expected tcp preference, got %q", got)
 	}
 
-	// Now TCP is dead (listener closed) while uTP works: the delayed leg
-	// must still connect.
-	_ = ln.Close()
-	failUTP = false
-	utpDials.Store(0)
+	// Now TCP is dead while uTP works: the delayed leg must still connect.
 	start := time.Now()
-	c, err := DialPeer(ctx, net.Dialer{}, "tcp", open)
+	c, err := DialPeer(ctx, net.Dialer{}, "tcp", deadAddr)
 	if err != nil {
 		t.Fatalf("delayed uTP leg did not fall back: %v", err)
 	}
