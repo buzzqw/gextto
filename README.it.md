@@ -42,12 +42,8 @@ altro.
   rimuove le altre, copiando video e audio senza ricodificare e controllando
   durata e sincronizzazione prima di sostituire il file.
 - Il motore è codice Go nostro: BitTorrent v1, v2 e ibrido, TCP e uTP su una
-  porta, holepunching, DHT IPv6, streaming. Su uno swarm reale di Ubuntu scarica
-  a 9,3–9,4 MB/s dove libtorrent arriva a 6,3–7,1 MB/s, e a riposo occupa
-  60–64 MB. Quei numeri sono stati misurati su una **linea FTTC (100 Mbit/s in
-  download, 15 Mbit/s in upload)**: il limite era la linea, non il motore. Con
-  una FTTH la stessa configurazione non è più limitata dalla linea, quindi
-  9,3–9,4 MB/s non è il tetto del motore. Lo stesso binario è
+  porta, holepunching, DHT IPv6, streaming. È veloce su uno swarm reale e
+  leggero a riposo — le misure sono in [Numeri](#numeri). Lo stesso binario è
   [gx-torrent](https://github.com/buzzqw/gextto/releases), un client autonomo
   per Linux e Windows.
 - Coda, cache e banda seguono la macchina e la linea. Su Auto la linea è tutta
@@ -57,18 +53,13 @@ altro.
 
 | | |
 |---|---|
-| **Velocità** | 9,3–9,4 MB/s su uno swarm reale di Ubuntu su FTTC 100/15, contro 6,3–7,1 MB/s di libtorrent sullo stesso swarm |
-| **Consumi** | 60–64 MB e 1–2 % di un core a riposo; 44–48 % di un core Intel N97 a 8–9 MB/s |
+| **Numeri** | Velocità, consumi, CPU, cicli sugli indexer, scritture su disco: cifre, macchina e linea in [Numeri](#numeri) |
 | **Protocollo** | BitTorrent v1, v2 e ibrido (BEP 52) · 34 BEP implementati e testati ([elenco](docs/bep.md)) |
 | **Rete** | TCP + uTP su una porta · UPnP, NAT-PMP, PCP · holepunching BEP 55 · proxy SOCKS5/HTTP · killswitch VPN |
 | **Automazione** | Serie TV, film, fumetti · Torznab (Jackett, Prowlarr, indexarr) · RSS · ricerca web · sostituzione dei download bloccati |
 | **Integrazioni** | Jellyfin, Plex, Jellyseerr (sottoinsieme API v3), aMule (eD2k e Kad), Telegram, e-mail, Discord/Slack/ntfy/Gotify/Pushover, iCal |
 | **Interfacce** | Web UI (SSR + HTMX, Go puro, PWA installabile) · TUI da terminale via SSH · API JSON |
 | **Build** | Go puro (`CGO_ENABLED=0`) · Linux x86_64/aarch64 · gx-torrent anche su Windows |
-
-Gira su una macchina piccola: tutti i numeri qui vengono da un Intel N97 da 4 core
-e 16 GB. I controlli di salute non scrivono sul NAS, così i suoi dischi possono
-dormire.
 
 ## Uno sguardo
 
@@ -297,15 +288,15 @@ descritte nel [manuale italiano](docs/MANUAL.it.md) e nell'
 ## Numeri
 
 Questi numeri vengono dall'installazione reale e da swarm, indexer e linea
-veri. **Le misure di trasferimento sono su una FTTC 100/15 Mbit/s (100 in
-download, 15 in upload): il limite era la linea, non il motore; con una FTTH la
-stessa configurazione non è più limitata dalla linea.** Ognuno è in
-[`docs/measurements.md`](docs/measurements.md) con la macchina, la data e il
-comando per rifarlo.
+veri, su un Intel N97 da 4 core e 16 GB. **Le misure di trasferimento sono su
+una FTTC 100/15 Mbit/s (100 in download, 15 in upload): il limite era la linea,
+non il motore; con una FTTH la stessa configurazione non è più limitata dalla
+linea.** Ognuno è in [`docs/measurements.md`](docs/measurements.md) con la
+macchina, la data e il comando per rifarlo.
 
 | Area | Risultato |
 |---|---|
-| **Swarm reale** | **9,3–9,4 MB/s** sulla ISO di Ubuntu su FTTC 100/15, contro **6,3–7,1 MB/s** di libtorrent sullo stesso swarm (una campagna di misura) |
+| **Swarm reale** | **9,3–9,4 MB/s** sulla ISO di Ubuntu, contro **6,3–7,1 MB/s** di libtorrent sullo stesso swarm (una campagna di misura) |
 | **Memoria del motore** | **60–64 MB** a riposo. Con 10 torrent in download verso un NAS: **~507 MB** fuori dalle due cache; la cache di scrittura si dimensiona dalla RAM libera |
 | **CPU del motore** | **44–48 % di un core** a 8–9 MB/s con ~110–130 peer: **0,35–0,43 % per peer**, di cui il piece picker occupa il 9 %; 1–2 % a riposo |
 | **Ricerche sugli indexer** | Jackett e Prowlarr interrogati un indexer alla volta: un ciclo di 30 titoli in **110 s**, **205 richieste e nessuna fallita**, **5.935 release** |

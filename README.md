@@ -41,13 +41,10 @@ one.
   video and audio without re-encoding and checking duration and A/V sync before
   replacing the file.
 - The engine is our own Go code: BitTorrent v1, v2 and hybrid, TCP and uTP on
-  one port, holepunching, IPv6 DHT, streaming. On a real Ubuntu swarm it
-  downloads at 9.3–9.4 MB/s where libtorrent gets 6.3–7.1 MB/s, and it idles at
-  60–64 MB. Those figures were measured on an **FTTC line (100 Mbit/s down,
-  15 Mbit/s up)**: the line was the limit, not the engine. On FTTH the line no
-  longer caps the same setup, so 9.3–9.4 MB/s is not an engine ceiling. The same
-  binary is [gx-torrent](https://github.com/buzzqw/gextto/releases), a
-  standalone client for Linux and Windows.
+  one port, holepunching, IPv6 DHT, streaming. It is fast on a real swarm and
+  light at rest — the figures are in [Numbers](#numbers). The same binary is
+  [gx-torrent](https://github.com/buzzqw/gextto/releases), a standalone client
+  for Linux and Windows.
 - Queue, cache and bandwidth follow the machine and the line. On Auto the whole
   line is Gextto's while nobody else needs it, and it gives way when someone
   does.
@@ -56,17 +53,13 @@ one.
 
 | | |
 |---|---|
-| **Speed** | 9.3–9.4 MB/s on a real Ubuntu swarm over FTTC 100/15, against 6.3–7.1 MB/s for libtorrent on the same swarm |
-| **Footprint** | 60–64 MB and 1–2 % of a core idle; 44–48 % of one Intel N97 core at 8–9 MB/s |
+| **Numbers** | Speed, footprint, CPU, indexer cycles, disk writes: figures, machine and line in [Numbers](#numbers) |
 | **Protocol** | BitTorrent v1, v2 and hybrid (BEP 52) · 34 BEPs implemented and tested ([list](docs/bep.md)) |
 | **Network** | TCP + uTP on one port · UPnP, NAT-PMP, PCP · BEP 55 holepunching · SOCKS5/HTTP proxy · VPN killswitch |
 | **Automation** | TV series, movies, comics · Torznab (Jackett, Prowlarr, indexarr) · RSS · web search · stuck-download replacement |
 | **Integrations** | Jellyfin, Plex, Jellyseerr (v3 API subset), aMule (eD2k and Kad), Telegram, e-mail, Discord/Slack/ntfy/Gotify/Pushover, iCal |
 | **Interfaces** | Web UI (SSR + HTMX, pure Go, installable PWA) · terminal TUI over SSH · JSON API |
 | **Build** | Pure Go (`CGO_ENABLED=0`) · Linux x86_64/aarch64 · gx-torrent also on Windows |
-
-It runs on a small machine: every figure here comes from a 4-core Intel N97 with
-16 GB. The health probes do not write to the NAS, so its disks can sleep.
 
 ## A look
 
@@ -288,15 +281,15 @@ by the [English manual](docs/MANUAL.en.md) and the
 ## Numbers
 
 These figures come from the live installation and from real swarms, indexers
-and the home line. **Throughput was measured on an FTTC line (100 Mbit/s down,
-15 Mbit/s up): the line was the limit, not the engine; on FTTH the same setup is
-no longer capped by the line.** Each figure is in
-[`docs/measurements.md`](docs/measurements.md) with the machine, the date and
+and the home line, on a 4-core Intel N97 with 16 GB. **Throughput was measured on
+an FTTC line (100 Mbit/s down, 15 Mbit/s up): the line was the limit, not the
+engine; on FTTH the same setup is no longer capped by the line.** Each figure is
+in [`docs/measurements.md`](docs/measurements.md) with the machine, the date and
 the command to reproduce it.
 
 | Area | Result |
 |---|---|
-| **Real swarm** | **9.3–9.4 MB/s** on the Ubuntu ISO over FTTC 100/15, against **6.3–7.1 MB/s** for libtorrent on the same swarm (one measured campaign) |
+| **Real swarm** | **9.3–9.4 MB/s** on the Ubuntu ISO, against **6.3–7.1 MB/s** for libtorrent on the same swarm (one measured campaign) |
 | **Engine memory** | **60–64 MB** idle. With 10 torrents downloading to a NAS: **~507 MB** outside the two caches; the write cache sizes itself from free RAM |
 | **Engine CPU** | **44–48 % of one core** at 8–9 MB/s with ~110–130 peers: **0.35–0.43 % per peer**, of which the piece picker takes 9 %; 1–2 % at rest |
 | **Indexer searches** | Jackett and Prowlarr searched one indexer at a time: a cycle of 30 titles in **110 s**, **205 requests and none failed**, **5,935 releases** |
