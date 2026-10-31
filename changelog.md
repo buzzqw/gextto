@@ -15,7 +15,7 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
 [issue su GitHub](https://github.com/buzzqw/gextto/issues).
 
 ## 31 ottobre 2026
-- **Le categorie si gestiscono dalla pagina, con la loro cartella.** Una categoria creata dalla finestra del torrent nasceva senza percorso: la gestione automatica la spostava nella cartella di download, quindi l'opzione sembrava non fare nulla. In *Impostazioni → Categorie* ora si aggiunge, si rinomina, si cambia il percorso e si elimina una categoria; cambiando il percorso i torrent gestiti da quella categoria si spostano di conseguenza.
+- **Le categorie si gestiscono dalla pagina, con la loro cartella.** Una categoria creata dalla finestra del torrent nasceva senza percorso: la gestione automatica la spostava nella cartella di download, quindi l'opzione sembrava non fare nulla. In *Impostazioni → Categorie* ora si aggiunge, si cambia il percorso e si elimina una categoria; cambiando il percorso i torrent gestiti da quella categoria si spostano di conseguenza.
 
 - **A fine download gx-torrent può spostare i dati e avviare un programma.** In *Impostazioni → Dopo il download* si sceglie una cartella di completamento (con una sottocartella per categoria, se vuoi) e il torrent continua a seedare dalla nuova posizione. Si può anche indicare un programma da eseguire al completamento: i dettagli del torrent arrivano nelle variabili d'ambiente `GX_HASH`, `GX_NAME`, `GX_PATH`, `GX_CATEGORY` e `GX_SIZE`, mai sulla riga di comando. Entrambe le azioni sono spente per default.
 

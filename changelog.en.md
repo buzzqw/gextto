@@ -14,7 +14,7 @@ manual is online: [English](docs/MANUAL.en.md) ·
 [GitHub issues](https://github.com/buzzqw/gextto/issues).
 
 ## 31 October 2026
-- **Categories are managed from the page, with their folder.** A category created from the torrent dialog started with no path: automatic management moved it to the download folder, so the option looked like it did nothing. In *Settings → Categories* you can now add, rename, change the path of and remove a category; changing the path relocates the managed torrents of that category.
+- **Categories are managed from the page, with their folder.** A category created from the torrent dialog started with no path: automatic management moved it to the download folder, so the option looked like it did nothing. In *Settings → Categories* you can now add, change the path of and remove a category; changing the path relocates the managed torrents of that category.
 
 - **After a download gx-torrent can move the data and run a program.** In *Settings → After download* you choose a completion folder (with one subfolder per category, if you want) and the torrent keeps seeding from the new place. You can also name a program to run on completion: the torrent details arrive in `GX_HASH`, `GX_NAME`, `GX_PATH`, `GX_CATEGORY` and `GX_SIZE`, never on the command line. Both actions are off by default.
 
