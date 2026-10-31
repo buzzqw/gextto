@@ -18,6 +18,8 @@ change, so this index and the site are never two different texts.
 |---|---|
 | [Manuale italiano](MANUAL.it.md) | Setup and day-to-day use of the web UI. |
 | [English manual](MANUAL.en.md) | English version of the complete user guide. |
+| [Manuale gx-core (Italiano)](GXCORE-MANUAL.it.md) | gx-core senza Gextto: avvio Docker, torrent, Serie e film, profili di qualità, RSS, statistiche e integrazioni, con schermate reali. |
+| [gx-core manual](GXCORE-MANUAL.en.md) | English version: gx-core without Gextto, Docker start, torrents, Series & movies, quality profiles, RSS, statistics and integrations, with real screenshots. |
 | [Visita guidata](TOUR.it.md) | Screenshots of the main screens, generated with `make screenshots`. |
 | [Guided tour](TOUR.en.md) | English version of the screenshot tour. |
 | [Changelog (italiano)](https://github.com/buzzqw/gextto/blob/main/changelog.md) | What changed for users, day by day. |

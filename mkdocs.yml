@@ -72,6 +72,7 @@ nav:
   - Home: README.md
   - Italiano:
       - Manuale: MANUAL.it.md
+      - Manuale gx-core: GXCORE-MANUAL.it.md
       - Visita guidata: TOUR.it.md
       - Guida avanzata: ADVANCED.it.md
       - "Docker: stack completo": DOCKER.it.md
@@ -80,6 +81,7 @@ nav:
       - Changelog: https://github.com/buzzqw/gextto/blob/main/changelog.md
   - English:
       - Manual: MANUAL.en.md
+      - gx-core manual: GXCORE-MANUAL.en.md
       - Guided tour: TOUR.en.md
       - Advanced guide: ADVANCED.en.md
       - "Docker: full stack": DOCKER.en.md

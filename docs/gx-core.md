@@ -282,6 +282,7 @@ third-party work is rewritten rather than copied
 
 ## 7. References
 
+- [`GXCORE-MANUAL.it.md`](GXCORE-MANUAL.it.md) / [`GXCORE-MANUAL.en.md`](GXCORE-MANUAL.en.md) — user manual with real screenshots, from the Docker start to Series & movies, profiles and integrations.
 - [`docs/gx-torrent.md`](gx-torrent.md) — technical reference of the daemon and the engine.
 - [`docs/evoluzione.md`](evoluzione.md) — the state of the product and the engine, the
   open items with their gate.

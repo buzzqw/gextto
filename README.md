@@ -413,7 +413,7 @@ everything a standalone client needs.
   Docker image) and a native Windows service on amd64/arm64.
 
 Open `http://<host>:8890/` for its setup wizard. Full reference: the
-[gx-torrent technical document](docs/gx-torrent.md).
+[illustrated manual](docs/GXCORE-MANUAL.en.md) and the [gx-torrent technical document](docs/gx-torrent.md).
 
 ## Tests
 

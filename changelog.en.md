@@ -14,6 +14,7 @@ manual is online: [English](docs/MANUAL.en.md) ·
 [GitHub issues](https://github.com/buzzqw/gextto/issues).
 
 ## 31 October 2026
+- **An illustrated manual for gx-core.** The standalone client now has a user manual with real screenshots, taken from a Docker environment with legal torrents downloading: three-minute start, Torrents page and details, add and create, Series & movies with quality profiles and TVmaze, RSS, statistics, settings, phone and qBittorrent integrations. It is available in Italian and English as *Manuale gx-core* / *gx-core manual*.
 - **The real episode list, optional.** *Settings → Series and movies* can ask TVmaze for the complete episode list of a series: episodes that have already aired become the denominator of the progress bar and count as missing even if no release ever appeared in the feeds. The series title is sent to api.tvmaze.com; the option is off by default and, when a title is not matched, the page keeps using what the feeds and indexers saw. The list is refreshed once a day.
 
 - **Quality profiles and upgrades.** *Settings → Quality profiles* creates a profile with the accepted resolutions and a cutoff; a title can choose it instead of the quality field. With a cutoff, an episode already downloaded at 720p is replaced by a 1080p release when it appears, without deleting the old files: the previous torrent leaves the session, the data stays. Without a profile the behaviour is unchanged.

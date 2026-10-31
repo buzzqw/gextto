@@ -428,7 +428,7 @@ semplice con tutto ciò che serve a un client autonomo.
   non privilegiata) e servizio Windows nativo su amd64/arm64.
 
 Apri `http://<host>:8890/` per la sua procedura guidata. Riferimento completo:
-il [documento tecnico di gx-torrent](docs/gx-torrent.md).
+il [manuale illustrato](docs/GXCORE-MANUAL.it.md) e il [documento tecnico di gx-torrent](docs/gx-torrent.md).
 
 ## Test
 
