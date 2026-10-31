@@ -297,8 +297,8 @@ macchina, la data e il comando per rifarlo.
 | Area | Risultato |
 |---|---|
 | **Swarm reale** | **9,3–9,4 MB/s** sulla ISO di Ubuntu, contro **6,3–7,1 MB/s** di libtorrent sullo stesso swarm (una campagna di misura) |
-| **Memoria del motore** | **60–64 MB** a riposo. Con 10 torrent in download verso un NAS: **~507 MB** fuori dalle due cache; la cache di scrittura si dimensiona dalla RAM libera |
-| **CPU del motore** | **44–48 % di un core** a 8–9 MB/s con ~110–130 peer: **0,35–0,43 % per peer**, di cui il piece picker occupa il 9 %; 1–2 % a riposo |
+| **Memoria del motore** | **29–39 MB di RSS** a riposo, con DHT attiva e un filtro IP completo (172.740 regole). Con 10 torrent in download verso un NAS: **~507 MB** fuori dalle due cache; la cache di scrittura si dimensiona dalla RAM libera |
+| **CPU del motore** | **18–37 % di un core** a 8,2–8,8 MB/s con 116–132 peer, **2,0–4,3 s di CPU per 100 MB**; **0,6–1,0 %** di un core a riposo |
 | **Ricerche sugli indexer** | Jackett e Prowlarr interrogati un indexer alla volta: un ciclo di 30 titoli in **110 s**, **205 richieste e nessuna fallita**, **5.935 release** |
 | **Dividere la linea** | Un download a piena linea aggiunge ~40 ms di latenza a tutta la casa. Da solo sulla linea Gextto la usa tutta (**8,5 MB/s**); con un altro dispositivo che scarica, quel dispositivo ottiene **6,8–7,3 MB/s** dei 9 MB/s della linea FTTC |
 | **Riuso dei dati locali** | Un torrent che condivide file con uno già su disco prende dalla rete solo il **25 %** del file (ISO Debian e Arch), anche dopo un riavvio e in qualunque ordine si aggiungano |
@@ -424,6 +424,14 @@ semplice con tutto ciò che serve a un client autonomo.
 - **Notifiche** sugli stessi canali di Gextto, con un pulsante di prova.
 - **Si aggiorna da solo** dalle build della CI quando cambia il suo codice,
   verificato SHA-256, con ripristino automatico.
+- **Leggero sulla macchina.** Un solo processo in Go puro, senza motore esterno
+  né server di database: **0,6–1,0 % di un core e 29–39 MB di RSS a riposo**,
+  con DHT attiva e un filtro IP completo caricato; **18–37 % di un core** a
+  8,2–8,8 MB/s con 116–132 peer, cioè **2,0–4,3 s di CPU per 100 MB**. Un
+  trasferimento in loopback arriva a **234–274 MB/s** con circa 100 MB di RSS
+  di picco, e cinque minuti dopo un picco la memoria scende da 550 MB a
+  35–40 MB. Numeri, macchina e comandi in
+  [`docs/measurements.md`](docs/measurements.md).
 - **Piattaforme.** Linux x86_64/aarch64 (unit systemd, `run.sh`, immagine Docker
   non privilegiata) e servizio Windows nativo su amd64/arm64.
 

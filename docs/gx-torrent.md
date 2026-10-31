@@ -457,6 +457,23 @@ data folder is **not** read (so the fingerprint stays stable); in standalone
 `download-dir`, `peer-ports`, `auth-user`/`auth-password`, `local-bypass`,
 `indexers` — and an explicit flag still wins.
 
+**Footprint.** The daemon is one pure-Go process (`CGO_ENABLED=0`): engine,
+queue, web page, RSS reader and qBittorrent-compatible API, with no external
+engine, C library or database server. Measured on an Intel N97 (4 cores, 16 GB)
+on 26–30 October 2026; the at-rest and public-swarm figures are with DHT on and
+a full IP filter loaded (172,740 rules): at rest **0.6–1.0 % of one core and
+29–39 MB RSS**; on public swarms at
+8.2–8.8 MB/s with 116–132 peers **18–37 % of one core**, that is
+**2.0–4.3 s of CPU per 100 MB**; a loopback transfer runs at
+**234–274 MB/s** with about **100 MiB peak RSS** and 7.5–8.3 s of CPU per
+1.09 GiB for both sides. Five minutes after a burst with no transfer the RSS
+falls from 550 MB to **35–40 MB** instead of staying reserved. At rest the CPU
+is real network work — the DHT and incoming peer handshakes — not polling, and
+the connection cap is sized from the machine (55 per torrent and 300 in total
+on this 4-core host), so many active torrents do not become an unbounded CPU
+bill. Machine, date and commands are in
+[`measurements.md`](measurements.md).
+
 **Listen address.** With no `listen` in `settings.json` and no `-listen` flag,
 managed listens on `127.0.0.1:8890` and standalone on `0.0.0.0:8890`: standalone
 is a client to drive from another machine (its web UI, *arr apps, mobile apps),

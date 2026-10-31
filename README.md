@@ -290,8 +290,8 @@ the command to reproduce it.
 | Area | Result |
 |---|---|
 | **Real swarm** | **9.3–9.4 MB/s** on the Ubuntu ISO, against **6.3–7.1 MB/s** for libtorrent on the same swarm (one measured campaign) |
-| **Engine memory** | **60–64 MB** idle. With 10 torrents downloading to a NAS: **~507 MB** outside the two caches; the write cache sizes itself from free RAM |
-| **Engine CPU** | **44–48 % of one core** at 8–9 MB/s with ~110–130 peers: **0.35–0.43 % per peer**, of which the piece picker takes 9 %; 1–2 % at rest |
+| **Engine memory** | **29–39 MB RSS** at rest, DHT on and a full IP filter (172,740 rules). With 10 torrents downloading to a NAS: **~507 MB** outside the two caches; the write cache sizes itself from free RAM |
+| **Engine CPU** | **18–37 % of one core** at 8.2–8.8 MB/s with 116–132 peers, **2.0–4.3 s of CPU per 100 MB**; **0.6–1.0 %** of one core at rest |
 | **Indexer searches** | Jackett and Prowlarr searched one indexer at a time: a cycle of 30 titles in **110 s**, **205 requests and none failed**, **5,935 releases** |
 | **Sharing the line** | A saturated download adds ~40 ms of latency to the whole house. Alone on the line Gextto keeps all of it (**8.5 MB/s**); with another device downloading, that device gets **6.8–7.3 MB/s** of the 9 MB/s FTTC line |
 | **Reusing local data** | A torrent sharing files with one already on disk takes only **25 %** of the file from the network (Debian and Arch ISOs), also after a restart and in any adding order |
@@ -409,6 +409,13 @@ everything a standalone client needs.
 - **Notifications** on the same channels as Gextto, with a test button.
 - **Updates itself** from the CI builds when its own code changed, verified by
   SHA-256, with automatic rollback.
+- **Light on the machine.** One pure-Go process, no external engine and no
+  database server: **0.6–1.0 % of one core and 29–39 MB RSS at rest**, with DHT
+  on and a full IP filter loaded; **18–37 % of one core** at 8.2–8.8 MB/s with
+  116–132 peers, that is **2.0–4.3 s of CPU per 100 MB**. A loopback transfer
+  reaches **234–274 MB/s** with about 100 MB peak RSS, and five minutes after a
+  burst the memory falls from 550 MB to 35–40 MB. Figures, machine and
+  commands in [`docs/measurements.md`](docs/measurements.md).
 - **Platforms.** Linux x86_64/aarch64 (systemd unit, `run.sh`, unprivileged
   Docker image) and a native Windows service on amd64/arm64.
 

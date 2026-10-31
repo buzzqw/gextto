@@ -176,6 +176,27 @@ INTERFACES & AUTOMATION
 - Indexer search (Torznab) and RSS notifications, configured in /ui/rss.
 - In-browser streaming: play videos in browser or VLC via HTTP Range streaming.
 
+RESOURCE FOOTPRINT (CPU AND MEMORY)
+-----------------------------------
+gx-torrent is one pure-Go process: no external engine, no C library, no
+database server. Measurements of the whole daemon on an Intel N97 mini-PC
+(4 cores, 16 GB RAM), 26-30 October 2026; at rest and on public swarms with
+DHT on and a full IP filter loaded:
+
+  - At rest: 0.6-1.0 % of one core, 29-39 MB RSS.
+  - Public swarms at 8.2-8.8 MB/s with 116-132 peers: 18-37 % of one core,
+    2.0-4.3 s of CPU per 100 MB downloaded.
+  - Loopback transfer: 234-274 MB/s, 7.5-8.3 s of CPU per 1.09 GiB for both
+    sides, about 100 MB peak RSS.
+  - Five minutes after a burst with no transfer: RSS falls from 550 MB to
+    35-40 MB instead of staying reserved.
+
+The CPU at rest is real network work (DHT and incoming peer handshakes), not
+polling, and the connection cap is sized from the machine, so many active
+torrents do not become an unbounded CPU bill. Every figure, with machine, date and command,
+is in docs/measurements.md in the Gextto repository:
+https://github.com/buzzqw/gextto/blob/main/docs/measurements.md
+
 FLAGS & SETTINGS
 ----------------
 -listen <addr>      Web UI / API bind address (default: 127.0.0.1:8890)

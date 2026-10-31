@@ -172,7 +172,9 @@ RSS rules with smart episode tracking, and direct multi-indexer search.
 It is powered by **gx-core**, an advanced engine supporting BitTorrent v1,
 hybrids, and v2-only (BEP 52 Merkle trees), uTP (BEP 29), NAT holepunching
 (BEP 55), Super-seeding (BEP 16), IPv6 dual-stack DHT (BEP 32/42/44), and
-zero-allocation MSE/PE stream encryption, with a tiny footprint (~25 MB idle).
+zero-allocation MSE/PE stream encryption, with a small footprint (29–39 MB at
+rest). It is one pure-Go process with no external engine, no C library and no
+database server; the figures below are the whole daemon, not a part of it.
 
 ---
 
@@ -208,7 +210,34 @@ Settings are automatically saved to `<data-dir>/settings.json`.
 
 ---
 
-## 2. Production Service Setup (systemd)
+## 2. CPU and Memory Footprint
+
+`gx-torrent` is a single pure-Go process (`CGO_ENABLED=0`): the engine, the
+queue, the web UI, the RSS reader and the qBittorrent-compatible API all live in
+it. There is no libtorrent, no Python and no database server to run alongside.
+
+These are measurements of the whole daemon, on an **Intel N97 mini-PC (4 cores,
+16 GB RAM)**, taken on 26–30 October 2026; the at-rest and public-swarm figures
+are with DHT enabled and a full IP filter loaded (172,740 rules). The machine,
+the date and the command for every figure are in
+[docs/measurements.md](https://github.com/buzzqw/gextto/blob/main/docs/measurements.md).
+
+| Situation | CPU | Memory (RSS) |
+|---|---|---|
+| At rest | **0.6–1.0 %** of one core | **29–39 MB** |
+| Downloading from public swarms at 8.2–8.8 MB/s with 116–132 peers | **18–37 %** of one core, **2.0–4.3 s of CPU per 100 MB** | — |
+| Loopback transfer (seed and leecher on the same host) | **7.5–8.3 s of CPU per 1.09 GiB** for both sides | **≈100 MB peak** |
+| Five minutes after a burst, with no transfer | — | **550 MB → 35–40 MB** |
+
+At rest the CPU is mostly real network work — the DHT and incoming peer
+handshakes — not internal polling. The connection cap is sized from the machine
+(55 peers per torrent and 300 in total on this 4-core host), so a large number
+of active torrents does not turn into an unbounded CPU bill. Memory held by
+piece buffers is returned after a burst instead of staying reserved.
+
+---
+
+## 3. Production Service Setup (systemd)
 
 To run `gx-torrent` as a permanent background service on Linux:
 
@@ -253,7 +282,7 @@ checks and links the new zip; install it by hand.
 
 ---
 
-## 3. Web UI Features & Usage
+## 4. Web UI Features & Usage
 
 Access the dashboard at `http://<server-ip>:8890/`:
 
@@ -285,7 +314,7 @@ Access the dashboard at `http://<server-ip>:8890/`:
 
 ---
 
-## 4. Automation & *arr Integration (Sonarr, Radarr, Lidarr, Mobile Apps)
+## 5. Automation & *arr Integration (Sonarr, Radarr, Lidarr, Mobile Apps)
 
 `gx-torrent` provides native, drop-in compatibility with the **qBittorrent Web API v2** (`/api/v2`). You can connect Sonarr, Radarr, Lidarr, Readarr, and mobile management apps without any proxy or bridge.
 
@@ -299,7 +328,7 @@ In Sonarr / Radarr (*Settings → Download Clients → Add → qBittorrent*):
 
 ---
 
-## 5. Command-Line Reference & Environment Variables
+## 6. Command-Line Reference & Environment Variables
 
 | Flag | Environment Variable | Default | Description |
 |---|---|---|---|
@@ -327,7 +356,7 @@ In Sonarr / Radarr (*Settings → Download Clients → Add → qBittorrent*):
 
 ---
 
-## 6. Docker Container
+## 7. Docker Container
 
 A standalone Docker image can be built from the repository root:
 
@@ -347,7 +376,7 @@ Web UI is exposed on port `8890` (mapped from container port `8080`).
 
 ---
 
-## 7. Configuration File (`settings.json`)
+## 8. Configuration File (`settings.json`)
 
 The daemon maintains its runtime configuration inside `<data-dir>/settings.json`:
 - `standalone_password`: Bcrypt-hashed login password.
@@ -360,7 +389,7 @@ To reset a forgotten password, simply stop the daemon, remove the `standalone_pa
 
 ---
 
-## 8. License
+## 9. License
 
 `gx-torrent` is open source distributed under the [EUPL 1.2](LICENSE) license.
 Third-party component notices and licenses are listed in [THIRD-PARTY-NOTICES](THIRD-PARTY-NOTICES).
