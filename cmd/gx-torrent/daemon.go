@@ -175,6 +175,10 @@ type persistedState struct {
 	// RuleLastMatch records, per rule name, the published time of the last item
 	// a rule accepted (Unix seconds), for the ignore-days window.
 	RuleLastMatch map[string]int64 `json:"rule_last_match,omitempty"`
+	// RuleEpisodes records, per rule with the smart filter, the episodes the rule
+	// already took as qBittorrent's "season x episode" strings ("1x5",
+	// "1x5-REPACK"), exposed as previouslyMatchedEpisodes in the API.
+	RuleEpisodes map[string]smartEpisodes `json:"rule_episodes,omitempty"`
 	// WantedSeen/WantedTaken are the episode ledger of the "wanted" titles: what
 	// appeared in the feeds/indexers and what was downloaded, per title+season.
 	// The difference is what gx-torrent still has to find (gap search).

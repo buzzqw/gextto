@@ -272,7 +272,10 @@ func (d *Daemon) handleUIRssFeed(w http.ResponseWriter, r *http.Request) {
 				d.renderRSS(w, r, "The feed does not exist anymore.")
 				return
 			}
+			old := list[index]
 			list[index] = feed
+			// A changed address keeps the feed's uid, like qBittorrent.
+			d.carryFeedUID(feedIdentity(old), feedIdentity(feed))
 		} else {
 			list = append(list, feed)
 		}

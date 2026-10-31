@@ -567,6 +567,10 @@ client that checks the version can be pointed at a compatible string without a
 rebuild. This is a broad compatibility layer, not a claim that every route,
 field and status code of every qBittorrent release is implemented: the gaps are
 tracked in `gx-core.md` §6 and the fields are covered by the qBittorrent tests.
+In the RSS API a feed's `uid` stays the same when the feed is renamed, moved or
+given a new address, `lastMatch` and `previouslyMatchedEpisodes` are filled from
+the daemon's record, and a rule action is read and written both in the legacy
+flat fields and in the `torrentParams` object (where the tags are).
 
 | Method | Path | Description |
 |---|---|---|

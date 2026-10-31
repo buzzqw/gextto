@@ -754,7 +754,12 @@ onto the daemon's feeds and rules. A rule's `mustContain` keeps its
 qBittorrent meaning: plain words must **all** appear (the rule's `require`),
 `a|b` alternatives are **one of** (`include`); `mustNotContain` maps to
 `exclude`, and the reverse mapping renders `require` as words and `include` as
-`a|b`. The **cookie API**
+`a|b`. A feed's **uid** comes from the feed's address, so renaming or moving a
+feed keeps it and a changed address keeps it too; `lastMatch` and
+`previouslyMatchedEpisodes` are filled from the daemon's own record instead of
+being left empty; the action is read and written both in the deprecated flat
+fields and in the 4.6+ `torrentParams` object, which is where the **tags**
+travel. The **cookie API**
 (`app/cookies`, `app/setCookies`) stores the cookies the daemon sends when it
 fetches `.torrent` files and metadata over HTTP (private trackers): they are
 used by the daemon's URL adds, the magnet `xs=`/`as=` sources and the web

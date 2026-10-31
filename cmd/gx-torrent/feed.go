@@ -315,6 +315,7 @@ func (d *Daemon) pollFeedsOnlyDetailed(only string) feedPollResult {
 				continue
 			}
 			smartKey := ""
+			smartSeason := 0
 			var smartTokens []string
 			if smart {
 				series, season, episode, found := rss.FindEpisode(item.Title)
@@ -322,6 +323,7 @@ func (d *Daemon) pollFeedsOnlyDetailed(only string) feedPollResult {
 					continue
 				}
 				smartKey = fmt.Sprintf("%s\x00%d", series, season)
+				smartSeason = season
 				smartTokens = d.smartEpisodeVerdict(smartKey, item.Title, episode)
 				if len(smartTokens) == 0 {
 					continue
@@ -341,6 +343,7 @@ func (d *Daemon) pollFeedsOnlyDetailed(only string) feedPollResult {
 			d.archive().markAdded(name, item)
 			if smartKey != "" {
 				d.markSmartEpisode(smartKey, smartTokens)
+				d.markRuleEpisodes(rule.Name, smartSeason, smartTokens)
 			}
 			if rule.IgnoreDays > 0 {
 				d.markRuleMatch(rule.Name, time.Now())
@@ -659,6 +662,104 @@ func (d *Daemon) markRuleMatch(name string, at time.Time) {
 	}
 	d.state.RuleLastMatch[name] = at.Unix()
 	d.dirty = true
+}
+
+// markRuleEpisodes records the episodes a smart-filter rule took, in the
+// qBittorrent "season x episode" form ("1x5", "1x5-REPACK") exposed as
+// previouslyMatchedEpisodes by the qBittorrent API.
+func (d *Daemon) markRuleEpisodes(name string, season int, tokens []string) {
+	if strings.TrimSpace(name) == "" || season <= 0 || len(tokens) == 0 {
+		return
+	}
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if d.state.RuleEpisodes == nil {
+		d.state.RuleEpisodes = map[string]smartEpisodes{}
+	}
+	eps := d.state.RuleEpisodes[name]
+	if eps == nil {
+		eps = smartEpisodes{}
+		d.state.RuleEpisodes[name] = eps
+	}
+	now := time.Now()
+	for _, token := range tokens {
+		eps[fmt.Sprintf("%dx%s", season, token)] = now.Unix()
+	}
+	for token, at := range eps {
+		if at > 0 && now.Sub(time.Unix(at, 0)) > feedSeenRetention {
+			delete(eps, token)
+		}
+	}
+	d.dirty = true
+}
+
+// ruleEpisodes returns the episodes a rule took, oldest first, in the form
+// qBittorrent shows in previouslyMatchedEpisodes.
+func (d *Daemon) ruleEpisodes(name string) []string {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	eps := d.state.RuleEpisodes[name]
+	if len(eps) == 0 {
+		return nil
+	}
+	type taken struct {
+		token string
+		at    int64
+	}
+	list := make([]taken, 0, len(eps))
+	for token, at := range eps {
+		list = append(list, taken{token, at})
+	}
+	sort.Slice(list, func(i, j int) bool {
+		if list[i].at != list[j].at {
+			return list[i].at < list[j].at
+		}
+		return list[i].token < list[j].token
+	})
+	out := make([]string, len(list))
+	for i, entry := range list {
+		out[i] = entry.token
+	}
+	return out
+}
+
+// renameRuleState carries the match history of a rule to its new name, so a
+// rename does not lose the last-match time and the episodes already taken.
+func (d *Daemon) renameRuleState(oldName, newName string) {
+	if oldName == "" || newName == "" || oldName == newName {
+		return
+	}
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if at, ok := d.state.RuleLastMatch[oldName]; ok {
+		if d.state.RuleLastMatch == nil {
+			d.state.RuleLastMatch = map[string]int64{}
+		}
+		d.state.RuleLastMatch[newName] = at
+		delete(d.state.RuleLastMatch, oldName)
+	}
+	if eps, ok := d.state.RuleEpisodes[oldName]; ok {
+		if d.state.RuleEpisodes == nil {
+			d.state.RuleEpisodes = map[string]smartEpisodes{}
+		}
+		d.state.RuleEpisodes[newName] = eps
+		delete(d.state.RuleEpisodes, oldName)
+	}
+	d.dirty = true
+	d.saveLocked()
+}
+
+// clearRuleState forgets the match history of a rule that no longer exists.
+func (d *Daemon) clearRuleState(name string) {
+	if name == "" {
+		return
+	}
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	delete(d.state.RuleLastMatch, name)
+	delete(d.state.RuleEpisodes, name)
+	d.dirty = true
+	d.saveLocked()
 }
 
 // disableRules turns off the named rules (Once rules, after they added an item)

@@ -14,6 +14,7 @@ manual is online: [English](docs/MANUAL.en.md) ·
 [GitHub issues](https://github.com/buzzqw/gextto/issues).
 
 ## 31 October 2026
+- **An RSS feed keeps its identity, and rules say what they took.** Renaming, moving or re-addressing a feed no longer changes its identifier: an app or a WebUI that remembers feeds by identifier no longer loses them. Download rules also report when they last took something and which episodes they already took, and the **tags** set by a client are kept instead of disappearing. Nothing to configure: this holds for the gx-torrent page and for the qBittorrent-compatible API.
 - **An illustrated manual for gx-core.** The standalone client now has a user manual with real screenshots, taken from a Docker environment with legal torrents downloading: three-minute start, Torrents page and details, add and create, Series & movies with quality profiles and TVmaze, RSS, statistics, settings, phone and qBittorrent integrations. It is available in Italian and English as *Manuale gx-core* / *gx-core manual*.
 - **The real episode list, optional.** *Settings → Series and movies* can ask TVmaze for the complete episode list of a series: episodes that have already aired become the denominator of the progress bar and count as missing even if no release ever appeared in the feeds. The series title is sent to api.tvmaze.com; the option is off by default and, when a title is not matched, the page keeps using what the feeds and indexers saw. The list is refreshed once a day.
 

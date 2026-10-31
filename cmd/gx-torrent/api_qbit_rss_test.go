@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/buzzqw/gextto/internal/rss"
 )
@@ -172,11 +173,153 @@ func TestQbitMustContainMapsWordsToEveryTerm(t *testing.T) {
 		t.Fatalf("mustNotContain alternatives = %v", got)
 	}
 	rule := rss.Rule{Match: rss.Criteria{Require: []string{"the", "office"}}}
-	if got := gxRuleToQbit(rule, nil)["mustContain"]; got != "the office" {
+	if got := gxRuleToQbit(rule, nil, time.Time{}, nil)["mustContain"]; got != "the office" {
 		t.Fatalf("mustContain rendered as %q", got)
 	}
 	rule = rss.Rule{Match: rss.Criteria{Include: []string{"1080p", "2160p"}}}
-	if got := gxRuleToQbit(rule, nil)["mustContain"]; got != "1080p|2160p" {
+	if got := gxRuleToQbit(rule, nil, time.Time{}, nil)["mustContain"]; got != "1080p|2160p" {
 		t.Fatalf("mustContain rendered as %q", got)
+	}
+}
+
+// TestQbitRssRuleStateAndFeedUID covers the three qBittorrent semantics a
+// client relies on beyond the route names: a feed uid that survives a rename,
+// a move and an address change; the rule last match and the episodes a smart
+// filter already took; and the action carried in torrentParams, tags included.
+func TestQbitRssRuleStateAndFeedUID(t *testing.T) {
+	d := standaloneTestDaemon(t, "", true)
+	srv := httptest.NewServer(d.routesQbit())
+	defer srv.Close()
+
+	post := func(path string, form url.Values) int {
+		t.Helper()
+		resp, err := http.PostForm(srv.URL+path, form)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		return resp.StatusCode
+	}
+	feedUID := func() string {
+		t.Helper()
+		var root map[string]map[string]json.RawMessage
+		getJSONInto(t, srv.URL+"/api/v2/rss/items", &root)
+		for _, folder := range root {
+			raw, ok := folder["Show"]
+			if !ok {
+				continue
+			}
+			var node struct {
+				UID string `json:"uid"`
+			}
+			if err := json.Unmarshal(raw, &node); err != nil {
+				t.Fatal(err)
+			}
+			return node.UID
+		}
+		t.Fatal("feed Show not found in the tree")
+		return ""
+	}
+
+	if code := post("/api/v2/rss/addFeed", url.Values{
+		"url": {"http://feed.example/a"}, "path": {"Serie\\Show"},
+	}); code != http.StatusOK {
+		t.Fatalf("addFeed: %d", code)
+	}
+	uid := feedUID()
+
+	// A rename (move to another folder) keeps the uid, as in qBittorrent.
+	if code := post("/api/v2/rss/moveItem", url.Values{
+		"itemPath": {"Serie\\Show"}, "destPath": {"Film"},
+	}); code != http.StatusOK {
+		t.Fatalf("moveItem: %d", code)
+	}
+	if got := feedUID(); got != uid {
+		t.Fatalf("the uid changed on a move: %q -> %q", uid, got)
+	}
+
+	// A new address keeps the uid too (qBittorrent's uid belongs to the feed,
+	// not to its URL).
+	if code := post("/api/v2/rss/setFeedURL", url.Values{
+		"path": {"Film\\Show"}, "url": {"http://feed.example/b"},
+	}); code != http.StatusOK {
+		t.Fatalf("setFeedURL: %d", code)
+	}
+	if got := feedUID(); got != uid {
+		t.Fatalf("the uid changed on setFeedURL: %q -> %q", uid, got)
+	}
+
+	// A rule set in the 4.6+ form carries its action in torrentParams.
+	ruleDef := `{"enabled":true,"mustContain":"1080p","smartFilter":true,` +
+		`"affectedFeeds":["http://feed.example/b"],` +
+		`"torrentParams":{"save_path":"/srv/tv","category":"tv","tags":["ita"," hd ","ita"],"stopped":true}}`
+	if code := post("/api/v2/rss/setRule", url.Values{"ruleName": {"r1"}, "ruleDef": {ruleDef}}); code != http.StatusOK {
+		t.Fatalf("setRule: %d", code)
+	}
+	var rules map[string]map[string]any
+	getJSONInto(t, srv.URL+"/api/v2/rss/rules", &rules)
+	rule := rules["r1"]
+	if rule == nil {
+		t.Fatalf("rule r1 missing: %v", rules)
+	}
+	if rule["savePath"] != "/srv/tv" || rule["assignedCategory"] != "tv" || rule["addPaused"] != true {
+		t.Fatalf("rule action = %+v", rule)
+	}
+	params, ok := rule["torrentParams"].(map[string]any)
+	if !ok {
+		t.Fatalf("torrentParams missing: %+v", rule)
+	}
+	if params["save_path"] != "/srv/tv" || params["category"] != "tv" || params["stopped"] != true {
+		t.Fatalf("torrentParams = %+v", params)
+	}
+	tags, _ := params["tags"].([]any)
+	if len(tags) != 2 || tags[0] != "ita" || tags[1] != "hd" {
+		t.Fatalf("tags = %+v", params["tags"])
+	}
+	if rule["lastMatch"] != "" {
+		t.Fatalf("a rule that never matched must have an empty lastMatch: %+v", rule["lastMatch"])
+	}
+	if episodes, _ := rule["previouslyMatchedEpisodes"].([]any); len(episodes) != 0 {
+		t.Fatalf("previouslyMatchedEpisodes = %+v", rule["previouslyMatchedEpisodes"])
+	}
+
+	// The daemon's own record fills lastMatch and previouslyMatchedEpisodes.
+	at := time.Date(2026, 10, 31, 6, 53, 23, 0, time.UTC)
+	d.markRuleMatch("r1", at)
+	d.markRuleEpisodes("r1", 2, []string{"7"})
+	getJSONInto(t, srv.URL+"/api/v2/rss/rules", &rules)
+	rule = rules["r1"]
+	matched, _ := rule["lastMatch"].(string)
+	if matched == "" {
+		t.Fatal("lastMatch is empty after a match")
+	}
+	if _, err := time.Parse(time.RFC1123Z, matched); err != nil {
+		t.Fatalf("lastMatch is not an RFC 2822 date: %q (%v)", matched, err)
+	}
+	episodes, _ := rule["previouslyMatchedEpisodes"].([]any)
+	if len(episodes) != 1 || episodes[0] != "2x7" {
+		t.Fatalf("previouslyMatchedEpisodes = %+v", rule["previouslyMatchedEpisodes"])
+	}
+
+	// A rename carries the match history, a removal forgets it.
+	if code := post("/api/v2/rss/renameRule", url.Values{"ruleName": {"r1"}, "newRuleName": {"r2"}}); code != http.StatusOK {
+		t.Fatalf("renameRule: %d", code)
+	}
+	getJSONInto(t, srv.URL+"/api/v2/rss/rules", &rules)
+	renamed := rules["r2"]
+	if renamed == nil {
+		t.Fatalf("rule r2 missing: %v", rules)
+	}
+	if got, _ := renamed["lastMatch"].(string); got == "" {
+		t.Fatal("the rename lost lastMatch")
+	}
+	if eps, _ := renamed["previouslyMatchedEpisodes"].([]any); len(eps) != 1 {
+		t.Fatalf("the rename lost the matched episodes: %+v", renamed["previouslyMatchedEpisodes"])
+	}
+	if code := post("/api/v2/rss/removeRule", url.Values{"ruleName": {"r2"}}); code != http.StatusOK {
+		t.Fatalf("removeRule: %d", code)
+	}
+	if d.ruleEpisodes("r2") != nil {
+		t.Fatal("the removal left the matched episodes behind")
 	}
 }

@@ -252,9 +252,13 @@ is non-destructive: the old torrent leaves the session, its files stay on disk.
 
 - **qBittorrent API completeness**: the layer already speaks the 4.6 level, the
   qBittorrent 5 API key, `app/processInfo` and `torrents/setComment`, and fills
-  the fields the clients read. A 100% clone would still need the full
-  preferences round-trip, the remaining 5.x fields, the exact status codes and
-  every search/RSS corner; the target version must be chosen before claiming it.
+  the fields the clients read. In the RSS corner the feed `uid` follows the feed
+  through a rename, a move and an address change, `lastMatch` and
+  `previouslyMatchedEpisodes` carry the daemon's own record, and a rule action
+  round-trips through `torrentParams` with its tags. A 100% clone would still
+  need the full preferences round-trip, the remaining 5.x fields, the exact
+  status codes, the per-feed refresh interval and the search plugins; the target
+  version must be chosen before claiming it.
 - **Rate-based choking and anti-leech**: to be validated with the deterministic harness
   and the real-swarm campaign before touching the algorithm
   ([`measurements.md`](measurements.md) §4.6).

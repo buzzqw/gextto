@@ -11,8 +11,12 @@ package main
 // separates alternatives. setRule maps the words to the rule's Require list
 // (every term) and single-word alternatives to Include (one of), so a rule
 // set through this API takes what it takes in qBittorrent; the reverse
-// mapping renders Require as words and Include as "a|b". Registered only in
-// standalone.
+// mapping renders Require as words and Include as "a|b". The rule action is
+// read and written both in the legacy flat fields and in the 4.6+
+// "torrentParams" object, which is where the tags travel. The feed uid comes
+// from the feed's address, so a rename or a move keeps it; "lastMatch" and
+// "previouslyMatchedEpisodes" are filled from the daemon's own record instead
+// of being left empty. Registered only in standalone.
 
 import (
 	"crypto/sha1"
@@ -29,6 +33,7 @@ import (
 const (
 	qbitRssPathSep         = `\`
 	rssFoldersSettingKey   = "rss-folders"
+	rssFeedUIDsSettingKey  = "rss-feed-uids"
 	qbitRssArticlesPerFeed = 20
 )
 
@@ -76,15 +81,104 @@ func qbitRssSplit(path string) (folder, name string) {
 	return "", path
 }
 
-// qbitRssUID is a stable UUID (v5-like) derived from the feed path, since
-// gx-core has no per-feed uid.
-func qbitRssUID(path string) string {
-	sum := sha1.Sum([]byte(path))
+// qbitRssUID derives a stable UUID (v5-like) from the feed's identity. The
+// identity is the address, not the path in the tree, so renaming or moving a
+// feed keeps its uid the way qBittorrent does.
+func qbitRssUID(identity string) string {
+	sum := sha1.Sum([]byte(identity))
 	b := sum[:16]
 	b[6] = (b[6] & 0x0f) | 0x50
 	b[8] = (b[8] & 0x3f) | 0x80
 	h := hex.EncodeToString(b)
 	return h[0:8] + "-" + h[8:12] + "-" + h[12:16] + "-" + h[16:20] + "-" + h[20:32]
+}
+
+// feedIdentity is what a feed's uid is derived from: its address, not its name
+// in the tree, so a rename or a move does not change it. A feed that searches
+// the indexers without a URL is identified by its query.
+func feedIdentity(feed feedConfig) string {
+	if url := strings.TrimSpace(feed.URL); url != "" {
+		return "url:" + url
+	}
+	if query := strings.TrimSpace(feed.Search); query != "" {
+		return "search:" + query
+	}
+	return "name:" + qbitRssJoin(feed.Folder, feed.Name)
+}
+
+// rssFeedUIDs returns the uid overrides saved when a feed's address changes.
+func (d *Daemon) rssFeedUIDs() map[string]string {
+	out := map[string]string{}
+	if d.opts.Settings == nil {
+		return out
+	}
+	raw := strings.TrimSpace(d.opts.Settings.Get(rssFeedUIDsSettingKey, ""))
+	if raw == "" {
+		return out
+	}
+	if err := json.Unmarshal([]byte(raw), &out); err != nil {
+		return map[string]string{}
+	}
+	return out
+}
+
+func (d *Daemon) saveRssFeedUIDs(uids map[string]string) error {
+	if d.opts.Settings == nil {
+		return nil
+	}
+	raw, err := json.Marshal(uids)
+	if err != nil {
+		return err
+	}
+	d.opts.Settings.Set(rssFeedUIDsSettingKey, string(raw))
+	return d.opts.Settings.Save()
+}
+
+// feedUIDFor returns the uid recorded for this identity, or the derived one.
+func (d *Daemon) feedUIDFor(identity string) string {
+	if uid := d.rssFeedUIDs()[identity]; uid != "" {
+		return uid
+	}
+	return qbitRssUID(identity)
+}
+
+// feedUID is the uid of a configured feed.
+func (d *Daemon) feedUID(feed feedConfig) string {
+	return d.feedUIDFor(feedIdentity(feed))
+}
+
+// carryFeedUID keeps the uid when a feed's address changes (setFeedURL and the
+// page edit), so a client that knows the feed by uid does not lose it.
+func (d *Daemon) carryFeedUID(oldIdentity, newIdentity string) {
+	if oldIdentity == "" || newIdentity == "" || oldIdentity == newIdentity {
+		return
+	}
+	uids := d.rssFeedUIDs()
+	uids[newIdentity] = d.feedUIDFor(oldIdentity)
+	if err := d.saveRssFeedUIDs(uids); err != nil {
+		logfError("cannot save the feed uid: %v", err)
+	}
+}
+
+// forgetFeedUIDs drops the recorded uid of feeds that were removed.
+func (d *Daemon) forgetFeedUIDs(identities []string) {
+	if len(identities) == 0 {
+		return
+	}
+	uids := d.rssFeedUIDs()
+	changed := false
+	for _, identity := range identities {
+		if _, ok := uids[identity]; ok {
+			delete(uids, identity)
+			changed = true
+		}
+	}
+	if !changed {
+		return
+	}
+	if err := d.saveRssFeedUIDs(uids); err != nil {
+		logfError("cannot save the feed uid: %v", err)
+	}
 }
 
 func (d *Daemon) handleQbitRssItems(w http.ResponseWriter, r *http.Request) {
@@ -122,7 +216,7 @@ func (d *Daemon) handleQbitRssItems(w http.ResponseWriter, r *http.Request) {
 // the rest only with withData.
 func (d *Daemon) qbitRssFeedNode(feed feedConfig, withData bool, status feedStatus) map[string]any {
 	node := map[string]any{
-		"uid": qbitRssUID(qbitRssJoin(feed.Folder, feed.Name)),
+		"uid": d.feedUID(feed),
 		"url": feed.URL,
 	}
 	if withData {
@@ -235,7 +329,9 @@ func (d *Daemon) handleQbitRssSetFeedURL(w http.ResponseWriter, r *http.Request)
 	changed := false
 	for i := range feeds {
 		if qbitRssJoin(feeds[i].Folder, feeds[i].Name) == path {
+			old := feedIdentity(feeds[i])
 			feeds[i].URL = url
+			d.carryFeedUID(old, feedIdentity(feeds[i]))
 			changed = true
 		}
 	}
@@ -263,8 +359,10 @@ func (d *Daemon) handleQbitRssRemoveItem(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	kept := make([]feedConfig, 0, len(d.feeds()))
+	var removed []string
 	for _, feed := range d.feeds() {
 		if qbitRssCovered(qbitRssJoin(feed.Folder, feed.Name), feed.Folder, path) {
+			removed = append(removed, feedIdentity(feed))
 			continue
 		}
 		kept = append(kept, feed)
@@ -273,6 +371,7 @@ func (d *Daemon) handleQbitRssRemoveItem(w http.ResponseWriter, r *http.Request)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	d.forgetFeedUIDs(removed)
 	d.saveRssFolders(qbitRssDropFolders(d.rssFolders(), path))
 	w.WriteHeader(http.StatusOK)
 }
@@ -365,13 +464,15 @@ func (d *Daemon) handleQbitRssRules(w http.ResponseWriter, _ *http.Request) {
 	}
 	out := map[string]any{}
 	for _, rule := range d.rules() {
-		out[rule.Name] = gxRuleToQbit(rule, urlByFeed)
+		out[rule.Name] = gxRuleToQbit(rule, urlByFeed, d.ruleLastMatch(rule.Name), d.ruleEpisodes(rule.Name))
 	}
 	writeJSON(w, http.StatusOK, out)
 }
 
-// gxRuleToQbit renders a gx rule in the qBittorrent rule JSON shape.
-func gxRuleToQbit(rule rss.Rule, urlByFeed map[string]string) map[string]any {
+// gxRuleToQbit renders a gx rule in the qBittorrent rule JSON shape: the match
+// terms, the legacy flat action fields, the rule's last match, the episodes a
+// smart filter already took and the torrentParams object the 4.6+ clients read.
+func gxRuleToQbit(rule rss.Rule, urlByFeed map[string]string, lastMatch time.Time, episodes []string) map[string]any {
 	enabled := true
 	if rule.Enabled != nil {
 		enabled = *rule.Enabled
@@ -403,6 +504,14 @@ func gxRuleToQbit(rule rss.Rule, urlByFeed map[string]string) map[string]any {
 		}
 	}
 	sort.Strings(affected)
+	if episodes == nil {
+		episodes = []string{}
+	}
+	matched := ""
+	if !lastMatch.IsZero() {
+		// qBittorrent serializes the time as an RFC 2822 date.
+		matched = lastMatch.Local().Format(time.RFC1123Z)
+	}
 	return map[string]any{
 		"enabled":                   enabled,
 		"mustContain":               mustContain,
@@ -410,14 +519,35 @@ func gxRuleToQbit(rule rss.Rule, urlByFeed map[string]string) map[string]any {
 		"useRegex":                  useRegex,
 		"episodeFilter":             rule.Match.EpisodeFilter,
 		"smartFilter":               rule.Match.SmartEpisode,
-		"previouslyMatchedEpisodes": []string{},
+		"previouslyMatchedEpisodes": episodes,
 		"affectedFeeds":             affected,
 		"ignoreDays":                rule.IgnoreDays,
-		"lastMatch":                 "",
+		"lastMatch":                 matched,
 		"addPaused":                 rule.Action.Paused,
 		"assignedCategory":          rule.Action.Category,
 		"savePath":                  rule.Action.SavePath,
+		"torrentParams":             qbitTorrentParamsFor(rule.Action),
 	}
+}
+
+// qbitTorrentParamsFor renders the rule's action as the qBittorrent
+// torrentParams object (the 4.6+ form), tags included: they survive a
+// round-trip from a client, where the legacy flat fields had no place for them.
+func qbitTorrentParamsFor(action rss.Action) map[string]any {
+	tags := action.Tags
+	if tags == nil {
+		tags = []string{}
+	}
+	params := map[string]any{
+		"save_path": action.SavePath,
+		"category":  action.Category,
+		"tags":      tags,
+		"stopped":   action.Paused,
+	}
+	if action.Top {
+		params["add_to_top_of_queue"] = true
+	}
+	return params
 }
 
 func (d *Daemon) handleQbitRssMatchingArticles(w http.ResponseWriter, r *http.Request) {
@@ -461,17 +591,28 @@ func (d *Daemon) handleQbitRssMatchingArticles(w http.ResponseWriter, r *http.Re
 
 // qbitRuleDef is the qBittorrent auto-downloading rule definition.
 type qbitRuleDef struct {
-	Enabled          *bool    `json:"enabled"`
-	MustContain      string   `json:"mustContain"`
-	MustNotContain   string   `json:"mustNotContain"`
-	UseRegex         bool     `json:"useRegex"`
-	EpisodeFilter    string   `json:"episodeFilter"`
-	SmartFilter      bool     `json:"smartFilter"`
-	AffectedFeeds    []string `json:"affectedFeeds"`
-	IgnoreDays       int      `json:"ignoreDays"`
-	AddPaused        bool     `json:"addPaused"`
-	AssignedCategory string   `json:"assignedCategory"`
-	SavePath         string   `json:"savePath"`
+	Enabled          *bool                  `json:"enabled"`
+	MustContain      string                 `json:"mustContain"`
+	MustNotContain   string                 `json:"mustNotContain"`
+	UseRegex         bool                   `json:"useRegex"`
+	EpisodeFilter    string                 `json:"episodeFilter"`
+	SmartFilter      bool                   `json:"smartFilter"`
+	AffectedFeeds    []string               `json:"affectedFeeds"`
+	IgnoreDays       int                    `json:"ignoreDays"`
+	AddPaused        bool                   `json:"addPaused"`
+	AssignedCategory string                 `json:"assignedCategory"`
+	SavePath         string                 `json:"savePath"`
+	TorrentParams    *qbitRuleTorrentParams `json:"torrentParams"`
+}
+
+// qbitRuleTorrentParams is the 4.6+ action object of a rule. It is the form
+// that carries the tags, so a rule set by a client keeps them.
+type qbitRuleTorrentParams struct {
+	SavePath string   `json:"save_path"`
+	Category string   `json:"category"`
+	Tags     []string `json:"tags"`
+	Stopped  *bool    `json:"stopped"`
+	QueueTop *bool    `json:"add_to_top_of_queue"`
 }
 
 func (d *Daemon) handleQbitRssSetRule(w http.ResponseWriter, r *http.Request) {
@@ -509,6 +650,19 @@ func (d *Daemon) handleQbitRssSetRule(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	rule.Action = rss.Action{SavePath: strings.TrimSpace(def.SavePath), Category: strings.TrimSpace(def.AssignedCategory), Paused: def.AddPaused}
+	// The 4.6+ clients send the action inside torrentParams (tags included);
+	// when it is there it wins over the deprecated flat fields.
+	if params := def.TorrentParams; params != nil {
+		rule.Action.SavePath = strings.TrimSpace(params.SavePath)
+		rule.Action.Category = strings.TrimSpace(params.Category)
+		rule.Action.Tags = qbitTags(params.Tags)
+		if params.Stopped != nil {
+			rule.Action.Paused = *params.Stopped
+		}
+		if params.QueueTop != nil {
+			rule.Action.Top = *params.QueueTop
+		}
+	}
 
 	rules := d.rules()
 	replaced := false
@@ -559,6 +713,22 @@ func qbitMustNotContain(value string) []string {
 	return out
 }
 
+// qbitTags normalizes the tag list of a rule: trimmed, empty and duplicate
+// entries dropped, the order kept.
+func qbitTags(tags []string) []string {
+	var out []string
+	seen := map[string]bool{}
+	for _, tag := range tags {
+		tag = strings.TrimSpace(tag)
+		if tag == "" || seen[tag] {
+			continue
+		}
+		seen[tag] = true
+		out = append(out, tag)
+	}
+	return out
+}
+
 // qbitTerms splits a qBittorrent mustContain/mustNotContain value into terms.
 func qbitTerms(value string) []string {
 	fields := strings.FieldsFunc(value, func(r rune) bool { return r == ',' || r == ';' || r == '\n' || r == '\r' || r == ' ' })
@@ -588,6 +758,7 @@ func (d *Daemon) handleQbitRssRenameRule(w http.ResponseWriter, r *http.Request)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	d.renameRuleState(oldName, newName)
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -608,5 +779,6 @@ func (d *Daemon) handleQbitRssRemoveRule(w http.ResponseWriter, r *http.Request)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	d.clearRuleState(name)
 	w.WriteHeader(http.StatusOK)
 }

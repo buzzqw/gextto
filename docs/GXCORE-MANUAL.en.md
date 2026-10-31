@@ -153,8 +153,11 @@ gx-core exposes the **qBittorrent-compatible API** (`/api/v2`) for Sonarr,
 Radarr, Lidarr, Readarr, Prowlarr and mobile apps. In **Settings → Network** you
 set the **API key** (`X-Api-Key` or Bearer) and the version reported by
 `app/version` (default `4.6.7`). The native `/api/v1`, Prometheus and SSE remain
-available for scripts and automations. Compatibility is broad but not a 100%
-clone: the limits are in [`gx-core.md`](gx-core.md) §6.
+available for scripts and automations. A feed keeps its identifier when you
+rename it, move it or give it a new address, rules report their last match and
+the episodes already taken, and the tags set by a client stay: apps that read
+these fields find them filled. Compatibility is broad but not a 100% clone: the
+limits are in [`gx-core.md`](gx-core.md) §6.
 
 ## 9. Security
 
