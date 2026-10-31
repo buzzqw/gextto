@@ -212,7 +212,11 @@ rules with move up/down and disable, `episode_filter` and an `ignore_days` coold
 **Wanted** holds the titles to search for (quality dropdown, series/movie type, optional
 folder and category): the series name is suggested from the indexer results and from what
 the feeds and the archive contain (episode names, season packs, "complete" packs), and
-when nothing looks like a series — a movie, a special — the **clean name** of the
+under every name come the **episodes of it already in the archive**, each with
+its resolution and language: choosing one fills the title, the quality and the
+language from that release (the one already taken wins, then the best
+resolution) and everything stays editable. When nothing looks like a series — a
+movie, a special — the **clean name** of the
 matching releases is proposed, cut at year, resolution and source/codec tags, never a raw
 release title. A season pack (`S04`, `Season 4`, `COMPLETE`) counts as its whole
 season and is downloaded when the season is wanted. The engine searches the indexers and the feeds for every title even with

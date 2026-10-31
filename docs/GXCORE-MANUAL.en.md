@@ -89,6 +89,9 @@ list and the denominator becomes the actual series.
 - One primary action per row; everything else is in the **More** menu.
 - **Why not?** opens the releases found and each verdict.
 - **Episodes** opens the per-season grid with the state of every episode.
+- **Search**, in the *Add title* dialog, lists under every name the episodes
+  already in the archive with their resolution and language: picking one fills
+  the title, the quality and the language from that release.
 
 ![Episodes](screenshots/gx-core/en/wanted-episodes.png)
 

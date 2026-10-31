@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -306,5 +307,119 @@ func TestUIWantedSearchKeepsOnlyQueryMatches(t *testing.T) {
 	}
 	if len(result.Names) != 1 || result.Names[0] != "The Mandalorian" {
 		t.Fatalf("names = %v, want [The Mandalorian]", result.Names)
+	}
+}
+
+// TestTitleLanguageTerms pins how a release name is read for the language
+// field: the audio tags become the wanted terms the filter uses, and a tag
+// right after "sub" is a subtitle, not the audio, so it stays out.
+func TestTitleLanguageTerms(t *testing.T) {
+	cases := []struct {
+		title string
+		want  string
+	}{
+		{"The Mandalorian S01E01 1080p ITA WEB-DL", "ita"},
+		{"The.Mandalorian.S01E02.1080p.ITA-ENG", "ita, eng"},
+		{"Show S01E01 2160p MULTI", "multi"},
+		{"Show S01E01 1080p SUB ITA", ""},
+		{"Show S01E01 1080p ITA SUB ITA", "ita"},
+		{"Show S01E01 1080p English", "eng"},
+		{"Show S01E01 1080p", ""},
+	}
+	for _, c := range cases {
+		if got := strings.Join(titleLanguageTerms(c.title), ", "); got != c.want {
+			t.Errorf("%q: language = %q, want %q", c.title, got, c.want)
+		}
+	}
+}
+
+// TestUIWantedSearchListsTheArchiveEpisodes: the search step must show, under
+// each suggested title, the episodes the archive already holds, with the
+// resolution and the language the add dialog copies from the release name.
+func TestUIWantedSearchListsTheArchiveEpisodes(t *testing.T) {
+	d := feedDaemon(t, "")
+	items := []rss.Item{
+		{Title: "The Mandalorian S01E01 720p ENG WEB-DL", Link: "http://t/m1a.torrent"},
+		{Title: "The Mandalorian S01E01 1080p ITA WEB-DL", Link: "http://t/m1b.torrent"},
+		{Title: "The Mandalorian S01E02 2160p MULTI WEB-DL", Link: "http://t/m2.torrent"},
+		{Title: "The Mandalorian S01E03 720p ITA WEB-DL", Link: "http://t/m3a.torrent"},
+		{Title: "The Mandalorian S01E03 2160p ENG WEB-DL", Link: "http://t/m3b.torrent"},
+		{Title: "The Mandalorian S02 1080p ITA", Link: "http://t/mp2.torrent"},
+		{Title: "Arcane S01E01 1080p ITA", Link: "http://t/a1.torrent"},
+	}
+	if _, err := d.archive().record("feedA", items, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	// S01E03 was already taken at 720p: its parameters win over a better
+	// release that was only found.
+	d.archive().markAdded("feedA", items[3])
+	srv := httptest.NewServer(d.routes())
+	defer srv.Close()
+
+	resp, err := http.Get(srv.URL + "/ui/wanted-search?q=mandalorian")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	var result wantedSearchResult
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(result.Series) != 1 || result.Series[0].Name != "The Mandalorian" {
+		t.Fatalf("series = %+v, want only The Mandalorian", result.Series)
+	}
+	series := result.Series[0]
+	if series.Total != 4 || len(series.Episodes) != 4 {
+		t.Fatalf("episodes = %+v (total %d), want 4: S01E01, S01E02, S01E03 and the S02 pack", series.Episodes, series.Total)
+	}
+	want := []wantedSearchEpisode{
+		{Season: 1, Episode: 1, Quality: "1080p", Language: "ita"},
+		{Season: 1, Episode: 2, Quality: "2160p", Language: "multi"},
+		{Season: 1, Episode: 3, Quality: "720p", Language: "ita"},
+		{Season: 2, Episode: 0, Pack: true, Quality: "1080p", Language: "ita"},
+	}
+	for i, w := range want {
+		got := series.Episodes[i]
+		if got.Season != w.Season || got.Episode != w.Episode || got.Pack != w.Pack ||
+			got.Quality != w.Quality || got.Language != w.Language {
+			t.Errorf("episode %d = %+v, want %+v", i, got, w)
+		}
+		if got.Title == "" {
+			t.Errorf("episode %d carries no release title", i)
+		}
+	}
+}
+
+// TestUIWantedSearchCapsTheEpisodesButKeepsTheTotal: a long series must not
+// flood the add dialog; the page says how many others are in the archive.
+func TestUIWantedSearchCapsTheEpisodesButKeepsTheTotal(t *testing.T) {
+	d := feedDaemon(t, "")
+	var items []rss.Item
+	for episode := 1; episode <= 20; episode++ {
+		items = append(items, rss.Item{
+			Title: fmt.Sprintf("The Mandalorian S01E%02d 1080p ITA WEB-DL", episode),
+			Link:  fmt.Sprintf("http://t/m%d.torrent", episode),
+		})
+	}
+	if _, err := d.archive().record("feedA", items, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	srv := httptest.NewServer(d.routes())
+	defer srv.Close()
+
+	resp, err := http.Get(srv.URL + "/ui/wanted-search?q=mandalorian")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	var result wantedSearchResult
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(result.Series) != 1 {
+		t.Fatalf("series = %+v", result.Series)
+	}
+	if result.Series[0].Total != 20 || len(result.Series[0].Episodes) != wantedSearchEpisodesMax {
+		t.Fatalf("total=%d shown=%d, want 20 and %d", result.Series[0].Total, len(result.Series[0].Episodes), wantedSearchEpisodesMax)
 	}
 }

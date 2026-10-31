@@ -22,6 +22,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/buzzqw/gextto/internal/rss"
 	"github.com/buzzqw/gextto/internal/webui/assets"
@@ -30,6 +31,10 @@ import (
 // wantedEpisodeListMax bounds how many episodes the Have/Missing list of a
 // wanted row shows before a trailing "+N".
 const wantedEpisodeListMax = 24
+
+// wantedSearchEpisodesMax bounds the episodes listed under one suggested title;
+// the total count covers all of them.
+const wantedSearchEpisodesMax = 12
 
 // handleUIWanted adds, edits, pauses/resumes or removes one wanted title.
 func (d *Daemon) handleUIWanted(w http.ResponseWriter, r *http.Request) {
@@ -329,12 +334,14 @@ func (d *Daemon) renderWanted(w http.ResponseWriter, r *http.Request, errKey str
 			completeCount++
 		}
 	}
-	page = strings.Replace(page, "{{WANTEDCOUNT}}", strconv.Itoa(len(wanteds)), 1)
-	page = strings.Replace(page, "{{WANTEDMISSING}}", strconv.Itoa(missingCount), 1)
-	page = strings.Replace(page, "{{WANTEDDOWNLOADING}}", strconv.Itoa(downloadingCount), 1)
-	page = strings.Replace(page, "{{WANTEDCOMPLETE}}", strconv.Itoa(completeCount), 1)
-	page = strings.Replace(page, "{{WANTEDPAUSED}}", strconv.Itoa(pausedCount), 1)
-	page = strings.Replace(page, "{{PROFILE_OPTIONS}}", d.wantedProfileOptions(""), 1)
+	// Each count appears both in the summary card and in the filter button, so
+	// every occurrence is replaced, not only the first one.
+	page = strings.ReplaceAll(page, "{{WANTEDCOUNT}}", strconv.Itoa(len(wanteds)))
+	page = strings.ReplaceAll(page, "{{WANTEDMISSING}}", strconv.Itoa(missingCount))
+	page = strings.ReplaceAll(page, "{{WANTEDDOWNLOADING}}", strconv.Itoa(downloadingCount))
+	page = strings.ReplaceAll(page, "{{WANTEDCOMPLETE}}", strconv.Itoa(completeCount))
+	page = strings.ReplaceAll(page, "{{WANTEDPAUSED}}", strconv.Itoa(pausedCount))
+	page = strings.ReplaceAll(page, "{{PROFILE_OPTIONS}}", d.wantedProfileOptions(""))
 	page = strings.Replace(page, "{{WANTEDROWS}}", d.uiWantedRowsHTML(), 1)
 
 	errorHTML := ""
@@ -375,21 +382,67 @@ func (d *Daemon) handleUIWantedPoll(w http.ResponseWriter, r *http.Request) {
 // the indexers were queried (and whether they answered) instead of leaving the
 // operator guessing why only feed names showed up.
 type wantedSearchResult struct {
-	Names        []string `json:"names"`
-	Indexers     int      `json:"indexers"`
-	IndexerHits  int      `json:"indexer_hits"`
-	FeedHits     int      `json:"feed_hits"`
-	ArchiveHits  int      `json:"archive_hits"`
-	IndexerError string   `json:"indexer_error,omitempty"`
+	Names        []string             `json:"names"`
+	Series       []wantedSearchSeries `json:"series,omitempty"`
+	Indexers     int                  `json:"indexers"`
+	IndexerHits  int                  `json:"indexer_hits"`
+	FeedHits     int                  `json:"feed_hits"`
+	ArchiveHits  int                  `json:"archive_hits"`
+	IndexerError string               `json:"indexer_error,omitempty"`
+}
+
+// wantedSearchEpisode is one episode of a suggested title already in the
+// archive, with what the add/edit form copies from its release name when the
+// operator picks it: the title itself, its resolution and its audio language.
+type wantedSearchEpisode struct {
+	Season   int    `json:"season"`
+	Episode  int    `json:"episode"`
+	Pack     bool   `json:"pack,omitempty"`
+	Quality  string `json:"quality,omitempty"`
+	Language string `json:"language,omitempty"`
+	Title    string `json:"title,omitempty"`
+}
+
+// wantedSearchSeries is one suggested title with the episodes of it the archive
+// holds, so the operator can see what already exists and take the quality and
+// the language of a real release instead of typing them.
+type wantedSearchSeries struct {
+	Name     string                `json:"name"`
+	Total    int                   `json:"total"`
+	Episodes []wantedSearchEpisode `json:"episodes,omitempty"`
+}
+
+// wantedEpisodeChoice is the archived release kept for one (season, episode):
+// the one that wins is the one already taken, then the best resolution, then
+// the most seeded.
+type wantedEpisodeChoice struct {
+	Episode wantedSearchEpisode
+	Added   bool
+	Res     int
+	Seeders int
+	Seen    int64
+}
+
+// better reports whether a is a better representative of the episode than b.
+func (a wantedEpisodeChoice) better(b wantedEpisodeChoice) bool {
+	switch {
+	case a.Added != b.Added:
+		return a.Added
+	case a.Res != b.Res:
+		return a.Res > b.Res
+	case a.Seeders != b.Seeders:
+		return a.Seeders > b.Seeders
+	}
+	return a.Seen > b.Seen
 }
 
 // wantedArchiveScan bounds how many archive entries the wanted step reads.
 const wantedArchiveScan = 500
 
-// archiveWantedItems returns the archived releases whose title matches the
-// query, as feed items. The archive is where the feeds keep what they find, so
-// a wanted title searches it too, next to the indexers.
-func (d *Daemon) archiveWantedItems(query string, limit int) []rss.Item {
+// archiveWantedEntries returns the archived entries whose title matches the
+// query, most seeded first. The archive is where the feeds keep what they
+// find, so a wanted title searches it too, next to the indexers.
+func (d *Daemon) archiveWantedEntries(query string, limit int) []archiveEntry {
 	archive := d.archive()
 	if archive == nil || strings.TrimSpace(query) == "" {
 		return nil
@@ -398,11 +451,22 @@ func (d *Daemon) archiveWantedItems(query string, limit int) []rss.Item {
 	if err != nil {
 		return nil
 	}
-	out := make([]rss.Item, 0, len(page.Items))
+	out := make([]archiveEntry, 0, len(page.Items))
 	for _, entry := range page.Items {
 		if len(out) >= limit {
 			break
 		}
+		out = append(out, entry)
+	}
+	return out
+}
+
+// archiveWantedItems returns the archived releases whose title matches the
+// query, as feed items.
+func (d *Daemon) archiveWantedItems(query string, limit int) []rss.Item {
+	entries := d.archiveWantedEntries(query, limit)
+	out := make([]rss.Item, 0, len(entries))
+	for _, entry := range entries {
 		out = append(out, archiveItemToRSS(entry))
 	}
 	return out
@@ -490,8 +554,12 @@ func (d *Daemon) handleUIWantedSearch(w http.ResponseWriter, r *http.Request) {
 			items = append(items, item)
 		}
 	}
-	archiveItems := d.archiveWantedItems(query, wantedArchiveScan)
-	result.ArchiveHits = len(archiveItems)
+	archiveEntries := d.archiveWantedEntries(query, wantedArchiveScan)
+	result.ArchiveHits = len(archiveEntries)
+	archiveItems := make([]rss.Item, 0, len(archiveEntries))
+	for _, entry := range archiveEntries {
+		archiveItems = append(archiveItems, archiveItemToRSS(entry))
+	}
 	items = append(items, archiveItems...)
 	result.Names = filterSuggestions(query, items, langFilters, qualityFilter, 20)
 	// Season packs ("Show S01", "Show Season 2") are series too, without an
@@ -505,7 +573,143 @@ func (d *Daemon) handleUIWantedSearch(w http.ResponseWriter, r *http.Request) {
 			result.Names = result.Names[:20]
 		}
 	}
+	// Every suggested title also carries the episodes the archive already
+	// holds, with the resolution and the language the add dialog can copy.
+	result.Series = wantedSearchSeriesList(result.Names, archiveEntries, terms)
 	writeJSON(w, http.StatusOK, result)
+}
+
+// wantedSearchSeriesList pairs every suggested title with the episodes of it
+// the archive already holds, so the add dialog can show what exists and take
+// the quality and the language of a real release. One entry per episode: the
+// release already taken wins, then the best resolution, then the most seeded.
+func wantedSearchSeriesList(names []string, entries []archiveEntry, terms []string) []wantedSearchSeries {
+	if len(names) == 0 {
+		return nil
+	}
+	wanted := make(map[string]bool, len(names))
+	for _, name := range names {
+		wanted[strings.ToLower(strings.TrimSpace(name))] = true
+	}
+	byTitle := map[string]map[[2]int]wantedEpisodeChoice{}
+	for _, entry := range entries {
+		title := strings.TrimSpace(entry.Title)
+		if title == "" {
+			continue
+		}
+		base, season, episode, ok := wantedArchiveEpisode(title, terms)
+		if !ok {
+			continue
+		}
+		key := strings.ToLower(strings.TrimSpace(base))
+		if !wanted[key] {
+			continue
+		}
+		episodes := byTitle[key]
+		if episodes == nil {
+			episodes = map[[2]int]wantedEpisodeChoice{}
+			byTitle[key] = episodes
+		}
+		choice := wantedEpisodeChoice{
+			Episode: wantedSearchEpisode{
+				Season:   season,
+				Episode:  episode,
+				Pack:     episode == 0,
+				Quality:  titleQuality(title),
+				Language: strings.Join(titleLanguageTerms(title), ", "),
+				Title:    title,
+			},
+			Added:   entry.Added,
+			Res:     extractResolutionNumber(strings.ToLower(title)),
+			Seeders: entry.Seeders,
+			Seen:    entry.LastSeen,
+		}
+		k := [2]int{season, episode}
+		if old, seen := episodes[k]; !seen || choice.better(old) {
+			episodes[k] = choice
+		}
+	}
+	out := make([]wantedSearchSeries, 0, len(names))
+	for _, name := range names {
+		series := wantedSearchSeries{Name: name}
+		episodes := byTitle[strings.ToLower(strings.TrimSpace(name))]
+		keys := make([][2]int, 0, len(episodes))
+		for k := range episodes {
+			keys = append(keys, k)
+		}
+		sort.Slice(keys, func(i, j int) bool {
+			if keys[i][0] != keys[j][0] {
+				return keys[i][0] < keys[j][0]
+			}
+			return keys[i][1] < keys[j][1]
+		})
+		series.Total = len(keys)
+		for _, k := range keys {
+			if len(series.Episodes) >= wantedSearchEpisodesMax {
+				break
+			}
+			series.Episodes = append(series.Episodes, episodes[k].Episode)
+		}
+		out = append(out, series)
+	}
+	return out
+}
+
+// wantedArchiveEpisode reduces an archived release title to its series, its
+// season and its episode; episode 0 marks a season pack, like everywhere else
+// in the wanted engine.
+func wantedArchiveEpisode(title string, terms []string) (base string, season, episode int, ok bool) {
+	if series, s, e, found := rss.FindEpisode(title); found {
+		return series, s, e, true
+	}
+	s, found := rss.FindSeason(title)
+	if !found {
+		return "", 0, 0, false
+	}
+	base, _ = releaseBaseName(title, terms...)
+	if strings.TrimSpace(base) == "" {
+		return "", 0, 0, false
+	}
+	return base, s, 0, true
+}
+
+// titleLanguageTags maps the language words a release name declares to the
+// terms the wanted filter uses, so the form can be filled with them.
+var titleLanguageTags = map[string]string{
+	"ita": "ita", "italian": "ita", "italiano": "ita", "italiana": "ita",
+	"eng": "eng", "english": "eng", "inglese": "eng",
+	"ger": "ger", "deu": "ger", "german": "ger", "tedesco": "ger", "deutsch": "ger",
+	"fra": "fra", "fre": "fra", "french": "fra", "francese": "fra",
+	"spa": "spa", "esp": "spa", "spanish": "spa", "spagnolo": "spa",
+	"pol": "pol", "polish": "pol", "polacco": "pol",
+	"multi": "multi", "multisub": "multi",
+}
+
+// titleLanguageTerms reads the audio languages a release name declares, as the
+// terms the wanted language field uses (ita, eng, multi, ...). A tag right
+// after "sub" is a subtitle, not the audio, and is not reported: the form
+// fills the language field, not the subtitles. A release that declares none
+// reports nothing, so the field keeps what it had.
+func titleLanguageTerms(title string) []string {
+	tokens := strings.FieldsFunc(strings.ToLower(title), func(r rune) bool {
+		return !unicode.IsLetter(r) && !unicode.IsDigit(r)
+	})
+	var out []string
+	seen := map[string]bool{}
+	previous := ""
+	for _, token := range tokens {
+		switch previous {
+		case "sub", "subs", "subtitle", "subtitles", "sottotitoli":
+			previous = token
+			continue
+		}
+		if language, ok := titleLanguageTags[token]; ok && !seen[language] {
+			seen[language] = true
+			out = append(out, language)
+		}
+		previous = token
+	}
+	return out
 }
 
 // mergeNames appends the names of extra that are not in base yet (case

@@ -381,7 +381,9 @@ The standalone pages follow the same structure:
   its torrent**, an episode can be added as missing, and **Force download
   missing** searches the indexers again for what is missing. *Add title* is a guided
   dialog: series or movie, the title with a search that shows how it is named in
-  the archive, feeds and indexers (pick one to use it), then seasons, language
+  the archive, feeds and indexers (pick one to use it) and the episodes of it
+  already in the archive, which fill the quality and the language when picked,
+  then seasons, language
   (with quick picks), subtitles (terms matched on the release name, with quick
   picks like `sub ita`) and quality, and the other options folded away.
 - **Archive** and **Settings** use the same top bar, tables and fieldsets;
@@ -975,7 +977,12 @@ among *Any*, *360p*, *480p*, *576p*, *720p*, *720p+*, *720p-1080p*, *1080p*,
 and path. You add it by hand, or you type a name and press **Search**: it reads
 the **archive** (fast), where the RSS feeds and the periodic indexer polls deposit
 everything they find, and proposes the **names found** (filtered by the
-language/quality already entered and by the searched words). Tick **Search
+language/quality already entered and by the searched words). Under every name it
+lists the **episodes of it already in the archive**, each with its resolution and
+language: choosing one fills the **title, the quality and the language** from
+that release — the release already taken wins, then the best resolution — and
+every field stays editable before saving. The list shows up to twelve episodes
+and says how many others the archive holds. Tick **Search
 indexers too** to also query the configured indexers live — the slow path, for a
 title the archive does not know yet — and its results are archived too, so the
 next search is fast. The **title is required** (regex tolerant of separators,

@@ -91,6 +91,9 @@ vera.
 - Una sola azione principale per riga; tutto il resto è nel menu **Altro**.
 - **Perché no?** apre le release trovate e il verdetto di ciascuna.
 - **Episodi** apre la griglia per stagione, con lo stato di ogni episodio.
+- **Cerca**, nella finestra *Aggiungi titolo*, elenca sotto ogni nome le puntate
+  già in archivio con risoluzione e lingua: sceglierne una compila titolo,
+  qualità e lingua da quella release.
 
 ![Episodi](screenshots/gx-core/it/wanted-episodes.png)
 

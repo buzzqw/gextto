@@ -340,7 +340,7 @@ func (d *Daemon) sessionInfoHashes() map[string]bool {
 // titleQuality extracts the video resolution of a release title.
 func titleQuality(title string) string {
 	lower := strings.ToLower(title)
-	for _, quality := range []string{"2160p", "1080p", "720p", "576p", "480p"} {
+	for _, quality := range []string{"2160p", "1080p", "720p", "576p", "480p", "360p"} {
 		if strings.Contains(lower, quality) {
 			return quality
 		}

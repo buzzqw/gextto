@@ -41,6 +41,13 @@
 .quick{display:flex;gap:6px;flex-wrap:wrap}
 .quick button{height:24px;padding:0 9px;font-size:12px;border-radius:99px}
 .quick button[aria-pressed="true"]{background:var(--accent-soft);color:var(--accent-soft-fg);border-color:transparent}
+.pickgroup{display:flex;flex-direction:column;gap:4px}
+.pickgroup .pickname{width:100%}
+.pickeps{display:flex;flex-wrap:wrap;gap:4px;padding:0 2px}
+.pick .pickeps .epchoice{height:24px;min-height:0;padding:0 8px;font-size:12px;border-radius:99px;margin:0;margin-left:0;font-weight:400}
+.pickeps .epchoice .q{color:var(--subtle);margin-left:5px}
+.pickeps .epchoice .l{color:var(--accent);margin-left:5px}
+.pickeps .pickmore{align-self:center;padding:0 4px;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
 .epgrid{display:flex;flex-direction:column;gap:6px;margin:8px 0}
 .eprow{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
 .eprow .epseason{width:44px;color:var(--muted);font-variant-numeric:tabular-nums}
@@ -381,7 +388,44 @@ $('#wanted-ep-search').addEventListener('click',function(){
 // Typeahead from the archive.
 (function(){var input=$('#wanted-name'),list=$('#series-list'),timer=null;input.addEventListener('input',function(){clearTimeout(timer);var q=input.value.trim();if(q.length<2)return;timer=setTimeout(function(){fetch('/ui/rss-suggest?q='+encodeURIComponent(q),{cache:'no-store'}).then(function(r){return r.ok?r.json():[];}).then(function(names){list.innerHTML='';(names||[]).forEach(function(n){var o=document.createElement('option');o.value=n;list.appendChild(o);});}).catch(function(){});},300);});})();
 
-// Search candidates and pick one.
+// Search candidates and pick one. Every candidate title also lists the
+// episodes of it the archive already holds: choosing one fills the name, the
+// quality and the language from a release that exists, and everything stays
+// editable afterwards.
+function epLabel(ep){return 'S'+String(ep.season).padStart(2,'0')+(ep.pack?'':'E'+String(ep.episode).padStart(2,'0'));}
+function markPicked(box,seriesName){
+  $$('.pickname',box).forEach(function(x){x.setAttribute('aria-pressed',x.getAttribute('data-name')===seriesName?'true':'false');});
+}
+function pickEpisode(box,series,ep){
+  form.elements.name.value=series.name;markPicked(box,series.name);
+  if(ep.quality){var q=$('#wanted-quality');if(!q.querySelector('option[value="'+ep.quality+'"]')){var o=document.createElement('option');o.value=ep.quality;o.textContent=ep.quality;q.appendChild(o);}q.value=ep.quality;}
+  if(ep.language){$('#wanted-language').value=ep.language;syncLang();}
+}
+function renderPicks(box,res,current){
+  box.textContent='';
+  var series=(res.series&&res.series.length)?res.series:(res.names||[]).map(function(n){return {name:n};});
+  series.forEach(function(s){
+    var group=document.createElement('div');group.className='pickgroup';group.setAttribute('role','group');group.setAttribute('aria-label',s.name);
+    var b=document.createElement('button');b.type='button';b.className='pickname';b.setAttribute('data-name',s.name);
+    b.setAttribute('aria-pressed',s.name===current?'true':'false');b.title=s.name;b.textContent=s.name;
+    b.onclick=function(){form.elements.name.value=s.name;markPicked(box,s.name);};group.appendChild(b);
+    if(s.episodes&&s.episodes.length){
+      var eps=document.createElement('div');eps.className='pickeps';
+      s.episodes.forEach(function(ep){
+        var eb=document.createElement('button');eb.type='button';eb.className='epchoice';
+        eb.appendChild(document.createTextNode(epLabel(ep)));
+        if(ep.quality){var q=document.createElement('span');q.className='q';q.textContent=ep.quality;eb.appendChild(q);}
+        if(ep.language){var l=document.createElement('span');l.className='l';l.textContent=ep.language;eb.appendChild(l);}
+        eb.title=(ep.title?ep.title+' · ':'')+t('Use this episode: the name, the quality and the language are filled from it');
+        eb.onclick=function(){pickEpisode(box,s,ep);};eps.appendChild(eb);
+      });
+      var rest=(s.total||0)-s.episodes.length;
+      if(rest>0){var more=document.createElement('span');more.className='pickmore';more.textContent='+'+rest;more.title=rest+' '+t('other episodes in the archive');eps.appendChild(more);}
+      group.appendChild(eps);
+    }
+    box.appendChild(group);
+  });
+}
 function search(){
   var box=$('#wanted-results'),hint=$('#wanted-search-source'),name=form.elements.name.value.trim();
   if(name.length<2){hint.textContent=t('type at least two characters');return;}
@@ -391,8 +435,7 @@ function search(){
     res=res||{};var names=res.names||[];
     var counts=t('Archive')+' '+(res.archive_hits||0)+' · '+t('Feed')+' '+(res.feed_hits||0)+' · '+t('Indexer')+' '+(res.indexer_hits||0);
     hint.textContent=(names.length?names.length+' '+t('titles found')+' · ':t('No results')+' · ')+counts+(res.indexer_error?' · '+t('Error')+': '+res.indexer_error:'')+(!res.indexers?' · '+t('No indexers configured'):'');
-    names.forEach(function(n){var b=document.createElement('button');b.type='button';b.setAttribute('aria-pressed',n===name?'true':'false');b.title=n;var s=document.createElement('span');s.textContent=n;b.appendChild(s);
-      b.onclick=function(){form.elements.name.value=n;$$('button',box).forEach(function(x){x.setAttribute('aria-pressed',x===b?'true':'false');});};box.appendChild(b);});
+    renderPicks(box,res,name);
   }).catch(function(){hint.textContent=t('Error');});
 }
 $('#wanted-search').addEventListener('click',search);
