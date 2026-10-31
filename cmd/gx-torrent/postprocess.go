@@ -49,6 +49,8 @@ func (d *Daemon) runPostProcess(id string) {
 		d.mu.Unlock()
 		return
 	}
+	torrentID := t.ID()
+	infoHash := t.InfoHash().String()
 	stats := t.Stats()
 	name, category, savePath := stats.Name, meta.Category, meta.SavePath
 	total := stats.Bytes.Total
@@ -62,14 +64,14 @@ func (d *Daemon) runPostProcess(id string) {
 		if d.settingBool(postProcessMoveCategoryKey, false) && category != "" {
 			dest = filepath.Join(moveTo, categoryDirName(category))
 		}
-		if err := d.move(id, dest, false); err != nil {
+		if err := d.move(torrentID, dest, false); err != nil {
 			logfError("cannot move «%s» after the download: %v", name, err)
 		} else {
 			// The mover is asynchronous: wait for it before handing the final
 			// path to the command, with a generous ceiling.
 			for i := 0; i < 900; i++ {
 				d.mu.Lock()
-				moving := d.moving[id]
+				moving := d.moving[torrentID]
 				d.mu.Unlock()
 				if !moving {
 					break
@@ -77,7 +79,7 @@ func (d *Daemon) runPostProcess(id string) {
 				time.Sleep(200 * time.Millisecond)
 			}
 			d.mu.Lock()
-			if current := d.state.Torrents[id]; current != nil {
+			if current := d.state.Torrents[torrentID]; current != nil {
 				savePath = current.SavePath
 				if strings.HasPrefix(current.Error, "move failed:") {
 					logfError("«%s» was not moved, the completion command sees the old folder", name)
@@ -91,7 +93,7 @@ func (d *Daemon) runPostProcess(id string) {
 	if command == "" {
 		return
 	}
-	if err := runCompletionCommand(command, id, name, savePath, category, total); err != nil {
+	if err := runCompletionCommand(command, infoHash, name, savePath, category, total); err != nil {
 		logfError("the completion command for «%s» failed: %v", name, err)
 		return
 	}

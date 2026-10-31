@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/buzzqw/gextto/internal/settings"
 )
 
 func TestCategoryDirNameCannotEscape(t *testing.T) {
@@ -63,5 +65,45 @@ func TestCompletionCommandTimesOutNothingLeaks(t *testing.T) {
 	// A command that does not exist is an error, not a silent success.
 	if err := runCompletionCommand("/definitely/not/here", "h", "n", "/p", "", 0); err == nil {
 		t.Fatal("a missing program must return an error")
+	}
+}
+
+// TestRunPostProcessMovesACompletedTorrent checks the completion action end to
+// end: the finished file leaves the download folder, the torrent now points at
+// the completion folder and the data is still there.
+func TestRunPostProcessMovesACompletedTorrent(t *testing.T) {
+	store, err := settings.Load(filepath.Join(t.TempDir(), "settings.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	d := newTestDaemonFull(t, NetworkOptions{PortBegin: 42100, PortEnd: 42200, Encryption: 1, PEX: true}, store)
+	src := t.TempDir()
+	data := makeTorrent(t, src, "movie.bin", 40_000)
+	dest := t.TempDir()
+	store.Set(postProcessMoveKey, dest)
+
+	hash, _, err := d.add(addRequest{TorrentData: data, Destination: src, SeedMode: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "torrent complete", func() bool {
+		d.mu.Lock()
+		defer d.mu.Unlock()
+		tor, _ := d.findLocked(hash)
+		return tor != nil && isComplete(tor.Stats())
+	})
+
+	d.runPostProcess(hash)
+	if _, err := os.Stat(filepath.Join(dest, "movie.bin")); err != nil {
+		t.Fatalf("the file was not moved: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(src, "movie.bin")); !os.IsNotExist(err) {
+		t.Fatalf("the old file is still there: %v", err)
+	}
+	d.mu.Lock()
+	_, meta := d.findLocked(hash)
+	d.mu.Unlock()
+	if meta == nil || filepath.Clean(meta.SavePath) != filepath.Clean(dest) {
+		t.Fatalf("save path = %+v, want %s", meta, dest)
 	}
 }
