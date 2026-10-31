@@ -392,7 +392,9 @@ everything a standalone client needs.
   refused; an **RSS & Indexers** page with
   ordered PASS/FAIL rules, live match previews, rule templates, feed tests,
   pasted feed lists, and a local **archive** of everything the feeds returned.
-- **Operations.** Limits, the per-weekday scheduler, latency auto-speed, one-click
+- **Operations.** Limits, the per-weekday scheduler, **automatic speed** that
+  measures the line and moves download and upload (manual limits stay the
+  ceiling, with optional line maxima), one-click
   optimisation, IP filter with scheduled refresh, categories and tags with a
   category manager and its save path, port test; seeding limits by ratio, time
   and **inactivity**, and qBittorrent's **content layout** (original, create

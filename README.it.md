@@ -406,9 +406,11 @@ semplice con tutto ciò che serve a un client autonomo.
   con regole PASS/FAIL ordinate, anteprima live delle corrispondenze, modelli di
   regole, test dei feed, liste di feed incollate, e un **archivio** locale di
   tutto ciò che i feed hanno restituito.
-- **Gestione.** Limiti, programmazione per giorno, auto-speed sulla latenza,
-  ottimizzazione con un clic, filtro IP con aggiornamento programmato, categorie
-  e tag con una gestione delle categorie e del loro percorso, test della porta;
+- **Gestione.** Limiti, programmazione per giorno, **velocità automatica** che
+  misura la linea e regola download e upload (i limiti manuali restano il tetto,
+  con massimi di linea opzionali), ottimizzazione con un clic, filtro IP con
+  aggiornamento programmato, categorie e tag con una gestione delle categorie e
+  del loro percorso, test della porta;
   limiti di seed per ratio, tempo e **inattività**, e il **content layout** di
   qBittorrent (originale, crea sottocartella, nessuna sottocartella)
   all'aggiunta. I **profili di qualità** con soglia aggiornano un episodio già

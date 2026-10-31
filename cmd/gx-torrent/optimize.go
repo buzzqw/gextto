@@ -15,13 +15,19 @@ import (
 	"strings"
 )
 
-const (
-	// optimizeUploadShare keeps the upload below the measured line capacity:
-	// a saturated upstream delays the ACKs of the downloads and slows them.
-	optimizeUploadShare = 0.8
-	// optimizeMinUploadPeak is the least upload (bytes/s) worth measuring.
-	optimizeMinUploadPeak = 50 * 1024
-)
+// optimizeBandwidth leaves both directions uncapped and turns automatic speed
+// on: the controller measures the line and keeps it responsive.
+func (d *Daemon) optimizeBandwidth() (string, error) {
+	if _, err := d.setConfig(map[string]json.RawMessage{
+		"speed_limit_download": rawJSON(0),
+		"speed_limit_upload":   rawJSON(0),
+	}); err != nil {
+		return "", err
+	}
+	d.enableAutoSpeed()
+	d.applyScheduleNow()
+	return "Bandwidth optimized: download and upload are set by automatic speed, which measures the line; no manual cap.", nil
+}
 
 // handleUIOptimize applies one optimization (queue, cache or bandwidth).
 func (d *Daemon) handleUIOptimize(w http.ResponseWriter, r *http.Request) {
@@ -54,10 +60,8 @@ func (d *Daemon) handleUIOptimize(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, uiSettingsPath+"?msg="+url.QueryEscape(message)+"&ok="+ok+"#optimize", http.StatusSeeOther)
 }
 
-// optimizeAll runs every optimization for the single Optimize button: the queue
-// and the cache always, the bandwidth as far as it can. The upload cap needs
-// some measured traffic, so a not-yet-measured line is reported as a note, not
-// as a failure.
+// optimizeAll runs every optimization for the single Optimize button: the
+// queue, the cache and the automatic speed.
 func (d *Daemon) optimizeAll() (string, error) {
 	var parts []string
 	queueMsg, err := d.optimizeQueue()
@@ -117,49 +121,18 @@ func (d *Daemon) optimizeCache() (string, error) {
 	return "Disk cache optimized: automatic, sized from the RAM and adapted while running.", nil
 }
 
-// optimizeBandwidth sets the limits from the rates measured since start: the
-// download unlimited, the upload at 80% of the highest upload seen, and the
-// latency auto-speed on so the upload backs off when the line gets busy.
-func (d *Daemon) optimizeBandwidth() (string, error) {
-	d.mu.Lock()
-	peakUp := d.peakUp
-	d.mu.Unlock()
-	cfg, _, _ := d.config()
-	if peakUp < optimizeMinUploadPeak {
-		return "", errors.New("Not enough upload measured yet: let some torrents seed for a while, then try again.")
-	}
-	peakKiB := peakUp / 1024
-	if cfg.SpeedLimitUpload > 0 && peakKiB >= cfg.SpeedLimitUpload*9/10 {
-		// The upload ran into the current limit: the line was not measured.
-		// Keep the limit and let the auto-speed protect the line.
-		d.enableAutoSpeed(cfg.SpeedLimitUpload)
-		return "", errors.New("The upload reached the current limit, so the line capacity is unknown: the limit is kept and latency auto-speed is on. Set the upload to 0, let it seed, then optimize again.")
-	}
-	upload := int64(float64(peakKiB) * optimizeUploadShare)
-	if _, err := d.setConfig(map[string]json.RawMessage{
-		"speed_limit_download": rawJSON(0),
-		"speed_limit_upload":   rawJSON(upload),
-	}); err != nil {
-		return "", err
-	}
-	d.enableAutoSpeed(upload)
-	d.applyScheduleNow()
-	return "Bandwidth optimized: download unlimited, upload at 80% of the measured peak, latency auto-speed on.", nil
-}
-
-// enableAutoSpeed turns the latency auto-speed on with a floor of a tenth of
-// the upload limit.
-func (d *Daemon) enableAutoSpeed(uploadKiB int64) {
+// enableAutoSpeed turns automatic speed on without touching its other
+// settings: the floor and the line maxima already configured stay as they are.
+func (d *Daemon) enableAutoSpeed() {
 	store := d.opts.Settings
 	store.Set(autospeedEnabledKey, "true")
-	store.Set(autospeedMinKey, strconv.FormatInt(max(uploadKiB/10, autoSpeedDefaultMinKiB), 10))
 	if err := store.Save(); err != nil {
-		logfError("cannot save the auto-speed settings: %v", err)
+		logfError("cannot save the automatic speed settings: %v", err)
 	}
 }
 
-// optimizationStatusHTML shows the measured peaks the bandwidth optimization
-// starts from.
+// optimizationStatusHTML shows the measured peaks for information: automatic
+// speed no longer derives a cap from them, it measures the line itself.
 func (d *Daemon) optimizationStatusHTML() string {
 	d.mu.Lock()
 	down, up := d.peakDown, d.peakUp

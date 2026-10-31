@@ -163,12 +163,12 @@ func int64FromSetting(value string) int64 {
 	return n
 }
 
-// applyEffectiveSpeedLimitsLocked pushes the effective global limits onto the
-// running session: the scheduled ones inside the window, the configured ones
-// otherwise. It applies only when they changed.
-func (d *Daemon) applyEffectiveSpeedLimitsLocked(now time.Time) {
-	download, upload := d.state.Config.SpeedLimitDownload, d.state.Config.SpeedLimitUpload
-	reason := "limits"
+// configuredSpeedLimits returns the limits in force before automatic speed:
+// the scheduled ones inside the window, the alternative ones when the manual
+// toggle is on, the configured ones otherwise. Callers hold d.mu.
+func (d *Daemon) configuredSpeedLimits(now time.Time) (download, upload int64, reason string) {
+	download, upload = d.state.Config.SpeedLimitDownload, d.state.Config.SpeedLimitUpload
+	reason = "limits"
 	if sd, su, active := d.scheduledSpeedLimits(now); active {
 		download, upload = sd, su
 		reason = "schedule"
@@ -176,15 +176,24 @@ func (d *Daemon) applyEffectiveSpeedLimitsLocked(now time.Time) {
 		download, upload = ad, au
 		reason = "alt-speed"
 	}
-	// Latency auto-speed clamps the upload below the configured (or scheduled)
-	// ceiling; it never raises it above. See autospeed.go.
-	if enabled, _, floor := d.autoSpeedSettings(); enabled {
-		if clamped, acting := d.autoSpeed.clampUpload(now, upload, floor); acting {
-			if clamped != upload {
-				reason = "auto-speed"
-			}
-			upload = clamped
+	return download, upload, reason
+}
+
+// applyEffectiveSpeedLimitsLocked pushes the effective global limits onto the
+// running session: the scheduled ones inside the window, the configured ones
+// otherwise, then the automatic speed caps. It applies only when they changed.
+func (d *Daemon) applyEffectiveSpeedLimitsLocked(now time.Time) {
+	download, upload, reason := d.configuredSpeedLimits(now)
+	// Automatic speed can lower either direction below the configured (or
+	// scheduled) ceiling and never raises it above: 0 from the controller means
+	// "no cap", so the configured value stays.
+	if enabled, _, floor, lineDown, lineUp := d.autoSpeedSettings(); enabled {
+		downCap, upCap := d.autoSpeed.update(now, download, upload, lineDown, lineUp, floor, d.rateDown, d.rateUp)
+		cappedDown, cappedUp := effectiveSpeedLimit(download, downCap), effectiveSpeedLimit(upload, upCap)
+		if cappedDown != download || cappedUp != upload {
+			reason = "auto-speed"
 		}
+		download, upload = cappedDown, cappedUp
 	}
 	if d.session != nil {
 		if lan := d.limitLANPeers(); d.session.LimitLocalPeers() != lan {

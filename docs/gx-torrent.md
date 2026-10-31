@@ -75,7 +75,7 @@ Code:
 - [Super-seeding (BEP 16)](#super-seeding-bep-16)
 - [Writes to the state disk](#writes-to-the-state-disk)
 - [Bandwidth limits](#bandwidth-limits)
-  - [Auto-speed on latency (anti-bufferbloat)](#auto-speed-on-latency-anti-bufferbloat)
+  - [Automatic speed (autotune)](#automatic-speed-autotune)
 - [REST API (v1)](#rest-api-v1)
 - [API availability (snapshot and lock)](#api-availability-snapshot-and-lock)
 - [Known limits (engine)](#known-limits-engine)
@@ -175,7 +175,10 @@ The browser tab shows the daemon icon (a blue download arrow),
 included in the page and also served by `GET /favicon.ico` without a token.
 The page is **translated** (Italian, English, German, French, Spanish,
 Polish): at startup Gextto passes the interface language to the daemon with
-`-lang`, and `?lang=xx` overrides it for the single request.
+`-lang`, and `?lang=xx` overrides it for the single request. The language is
+also chosen from the picker at the bottom of the sidebar of the main page (the
+endonyms, six of them): the choice is written to `settings.json` like the
+settings page's field and the page is reloaded already translated.
 
 The built-in page can be replaced by an **alternative web interface**
 (*Settings → Web interface*): the daemon downloads the latest **VueTorrent**
@@ -388,6 +391,12 @@ The standalone pages follow the same structure:
   picks like `sub ita`) and quality, and the other options folded away.
 - **Archive** and **Settings** use the same top bar, tables and fieldsets;
   Settings keeps its *Save* button visible at the bottom while scrolling.
+- **Settings** is split into seven tabs — *Folders & files*, *Network*,
+  *Bandwidth*, *Queue*, *Library*, *Interface* and *System* — each showing only
+  its own groups, so the page opens short. The filter above searches every tab
+  at once (it hides the tab bar while a text is typed) and *Save* still posts
+  the whole form, hidden tabs included. Arrow keys, Home and End move between
+  the tabs; the selected tab is kept in the URL hash and across a save.
 - **Settings → Categories**: every category with its save path, editable in
   place, plus add and remove. A category created from the torrent dialog starts
   with no folder; this table is where the folder automatic management moves to
@@ -1218,16 +1227,26 @@ peer port, from `/ui/portcheck`), and the download and temporary folders have
 a **Browse…** picker. The DLNA **Library folders** take one folder per line;
 *Add folder…* appends the chosen folder to the list.
 
-**Notifications** use the same channels as Gextto (`internal/notify`):
-**Telegram** (`notify-telegram-token`, `notify-telegram-chat`), a **webhook**
-(`notify-url`, `notify-webhook-format` = `json` — the historical
-`{app, event, time, …}` payload plus `text` —, `discord`, `slack`, `gotify`,
-`ntfy` or `pushover`, with `notify-webhook-token`/`notify-webhook-user`) and
-**e-mail** over SMTP with STARTTLS (`notify-email-smtp`, `-from`, `-to`,
-`-password`). The events are *download complete*, *feed added torrents* and
-*feed error*, each one switchable (`notify-on-complete`, `notify-on-feed-match`,
-`notify-on-feed-error`); **Send test** (`POST /ui/notify-test`) delivers a test
-message with the saved channels.
+**Notifications** use the same channels as Gextto and indexarr
+(`internal/notify`): **Telegram** (`notify-telegram-token`,
+`notify-telegram-chat`), a **webhook** (`notify-url`,
+`notify-webhook-format` = `json` — the historical `{app, event, time, …}`
+payload plus `text` —, `discord`, `slack`, `gotify`, `ntfy` or `pushover`, with
+`notify-webhook-token`/`notify-webhook-user`), the **dedicated channels** that
+live beside it and can be filled together (`notify-discord-url`,
+`notify-slack-url`, `notify-gotify-url`/`-token`, `notify-ntfy-url`/`-topic`/
+`-token`, `notify-pushover-token`/`-user`), an **Apprise API server**
+(`notify-apprise-url`, posted to `/notify`, and the optional `-key` of one
+configuration) and **e-mail** over SMTP with STARTTLS (`notify-email-smtp`,
+`-from`, `-to`, `-password`). A **custom script** (`notify-script`, with the
+optional `notify-script-args`) is run for every event with the event in the
+`GX_TORRENT_*` environment variables (`APP`, `EVENT`, `TITLE`, `MESSAGE`, and
+`TEST=true` for the test), never on the command line. The events are *download
+complete*, *feed added torrents* and *feed error*, each one switchable
+(`notify-on-complete`, `notify-on-feed-match`, `notify-on-feed-error`);
+**Send test** (`POST /ui/notify-test`) delivers a test message with the saved
+channels. Every configured channel is tried at once, so one slow service does
+not hold back the others.
 
 When a check finds a newer release, the status bar at the bottom of the
 Torrents page shows an **Update available** indicator linking to *Settings →
@@ -1239,14 +1258,12 @@ Maintenance*.
 Gextto's base (3
 downloads, 3 seeds, 5 active, dynamic queue between 1 and 10 slots, slow torrents not
 counted, self-management active); **cache** = automatic again (sized
-on RAM and disk type, TTL 300 s); **bandwidth** = unlimited download and upload
-at **80% of the upload peak measured since startup** (a saturated upstream delays
-the download ACKs), with auto-speed on latency active and a minimum of a tenth
-of the limit. If not enough upload has been measured yet (less than 50 KiB/s)
-the action refuses with an explanation; if the upload was already at the current limit the
-line capacity is unknown: the limit stays and only auto-speed is activated.
-The box shows the measured ↓/↑ peaks. The three individual actions stay
-available under *Advanced* (`optimize=queue|cache|bandwidth`).
+on RAM and disk type, TTL 300 s); **bandwidth** = both manual limits cleared
+(`0`) and **automatic speed** on, so the controller measures the line and sets
+download and upload itself. A manual limit, when present, remains the ceiling;
+the action no longer needs a measured upload. The box still shows the measured
+↓/↑ peaks, for information. The three individual actions stay available under
+*Advanced* (`optimize=queue|cache|bandwidth`).
 
 On the **Torrents** page in standalone the *cache r/w* and *I/O
 ops r/w* tiles do not appear (diagnostics useful to Gextto, not to the client's
@@ -2280,29 +2297,54 @@ we hold is closed at once: both sides only upload, so the connection would cost
 a socket, keep-alives and a place in every per-peer loop for nothing
 (libtorrent does the same).
 
-### Auto-speed on latency (anti-bufferbloat)
+### Automatic speed (autotune)
 
-**Standalone** option (settings.json, like the bandwidth scheduler), inspired by
-BiglyBT's *Ping Auto-Speed*. A probe measures every second the **round-trip
-latency** with a TCP connection towards the **gateway** (ports 80, 443,
-53) or towards a configured host; the lowest value of the last 60 s is the
-**resting baseline**. When the latency exceeds `baseline × 1.5` **and**
-`baseline + 20 ms`, the daemon **lowers the upload** by 15% with respect to the limit in
-force (never below the configured minimum); when the line returns to rest it
-raises it again by `limit/20` at a time. Moves are at most one every 3 s
-(`internal/autospeed`, the controller shared with Gextto's latency guard). It reduces **only** the effective upload: the global
-or scheduled limit remains the cap, and an unlimited limit (or the absence of
-measurements) disables the clamp.
+**Standalone** option (settings.json, like the bandwidth scheduler), the
+counterpart of Gextto's *Auto speed*. It measures the line and moves **both
+directions**: the download and the upload are lowered when the line queues and
+raised again while the latency stays at rest.
+
+A probe measures every second the **round-trip latency** with a TCP connection
+to Google and Cloudflare (`8.8.8.8`, `8.8.4.4`, `1.1.1.1`, `1.0.0.1`), taking the
+lowest answer; a configured host replaces them, and the default gateway (ports
+80, 443, 53) is the fallback when the public probes do not answer. The median of
+the last five probes is the current latency, the lowest value of the last
+10 minutes the **resting baseline**.
+
+The controller starts a **trial** when a direction is loading and the latency is
+high or no resting baseline is trusted yet: it backs the loading directions
+off to 60 % for 8 s. If the latency falls, the queue was its own, the new value
+becomes the resting baseline, and control starts; if it does not fall and was
+already high, the line is shared with someone else and the caps stay. Control
+ramps up while the latency is good and cuts by 15 % when it degrades; near the
+**knee** (the cap at which the latency last rose) it climbs by a twentieth of
+the knee and tries to pass it once a minute, so a line that gained room is not
+locked below an old sample. Moves are at most one every 3 s. When neither
+direction transfers more than 16 KiB/s for a tick, the caps are released.
+
+The ceiling of each direction, in order of precedence, is the **manual limit**
+(global, scheduled or alternative; `0` = none), the **line maximum** entered by
+the user, or twice the rate the swarm is delivering. The controller therefore
+never goes above a limit the user set, and with both at `0` it discovers the
+line by itself. The download floor while active is 128 KiB/s; the upload floor
+is `autospeed-min` (default 50 KiB/s). The configured limits and the automatic
+caps reach the engine through the same `applyEffectiveSpeedLimitsLocked` path
+(base → scheduler → automatic speed), which remains the only caller of
+`SetSpeedLimits`; the caps are computed from the session's current rates, not
+from the all-time peaks.
 
 Keys in settings.json: `autospeed-enabled` (default `false`),
-`autospeed-target` (host or `host:port`; empty = gateway), `autospeed-min`
-(KiB/s, default 50). A **positive upload limit** (global or
-scheduled) is needed for auto-speed to act; the page enforces it. The decisions
-appear in the log with reason `auto-speed` (`effective speed limits …`). The
-line is written once a value has stayed put for ten seconds, so the controller's
-three-second steps do not each get a line: a ramp ends with one line carrying
-the cap the session actually runs with. The
-settings page shows the measured latency and the current cap.
+`autospeed-target` (host or `host:port`; empty = Google/Cloudflare, then the
+gateway), `autospeed-min` (KiB/s, default 50), `autospeed-line-down` and
+`autospeed-line-up` (the line maxima in KiB/s; `0` = unknown). A bandwidth
+scheduler window in **Auto** mode leaves the limits at `0`, so automatic speed
+measures the line inside it too. The decisions are logged with reason
+`auto-speed` (`effective speed limits …`), one line after a value has stayed put
+for ten seconds, so a ramp does not write a line per step. The settings page
+shows the current latency and the effective caps (`∞` = no cap). The probe and
+the rate step are `internal/autospeed`, shared with Gextto's latency guard;
+the standalone state machine is in `cmd/gx-torrent/autospeed.go` and, unlike
+Gextto's, has no router counters: only the latency decides.
 
 ## REST API (v1)
 

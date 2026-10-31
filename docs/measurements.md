@@ -130,6 +130,7 @@ when a change is meant to be an optimisation. A single pass is noise.
 | `BenchmarkArchiveSaveBatch` (1,000 releases, ~400 B magnets) | 45.2–46.1 ms, 3.09 MB, 50,536 allocs (44.0–44.4 ms before the guid identity); with the magnet ahead of the guid 43.9–45.0 ms against 44.8–46.1 ms, interleaved runs on a busy host | prepared statements per chunk; measured 2026-10-21 on the N97 |
 | `BenchmarkFeedArchiveSearch` (100,000 releases) | 7.4 ms | compact index on bbolt |
 | `BenchmarkMetricsScrape` (one torrent) | ~0.24 ms, 121 KB, 813 allocs | computed only when scraped |
+| `BenchmarkAutoSpeedUpdate` (automatic speed) | **49–77 ns/op, 0 B, 0 allocs** | one controller step (probe median, latency comparison, cap move), the work of the queue tick every 3 s while the option is on; the TCP probe itself is outside the benchmark. Measured 2026-10-31 on the N97 with `GOMAXPROCS=2` and a loaded host: `GOMAXPROCS=2 go test -run '^$' -bench BenchmarkAutoSpeedUpdate -benchmem -count=5 ./cmd/gx-torrent/` |
 | `BenchmarkCriteriaMatch` (RSS rule, 4 names) | 142 ns/op, 0 B, 0 allocs | scans the title in place |
 | `BenchmarkRateHistoryAdd` / `LifetimeAccumulate` | 42 / 6.4 ns/op, 0 allocs | the statistics page costs nothing on the sampling path |
 | `BenchmarkRateHistorySnapshot1h` / `StatsPageTranslate` | 11.3 µs, 20 KiB, 1 alloc / 255 µs, 89 KiB, 1,919 allocs | one snapshot and one page translation per graph request |

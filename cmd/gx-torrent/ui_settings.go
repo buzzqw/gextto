@@ -157,21 +157,22 @@ func (d *Daemon) handleUISettings(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Latency auto-speed (settings.json, applied at once). It needs a positive
-	// upload ceiling (global or scheduled) to have something to lower.
+	// Automatic speed (settings.json, applied at once): the controller moves
+	// both directions, so no positive upload ceiling is required. A manual
+	// limit, when present, is only a ceiling.
 	autoEnabled := formBool(r, "autospeed-enabled")
 	autoTarget := strings.TrimSpace(r.FormValue("autospeed-target"))
 	autoMin := formInt(r, "autospeed-min", autoSpeedDefaultMinKiB)
 	if autoMin < 1 {
 		autoMin = autoSpeedDefaultMinKiB
 	}
-	if autoEnabled && cfg.SpeedLimitUpload <= 0 && scheduleUL <= 0 {
-		d.renderSettings(w, r, "Latency auto-speed needs a positive upload limit (global or scheduled).", true)
-		return
-	}
+	autoLineDown := max(formInt(r, "autospeed-line-down", 0), 0)
+	autoLineUp := max(formInt(r, "autospeed-line-up", 0), 0)
 	store.Set(autospeedEnabledKey, strconv.FormatBool(autoEnabled))
 	store.Set(autospeedTargetKey, autoTarget)
 	store.Set(autospeedMinKey, strconv.FormatInt(autoMin, 10))
+	store.Set(autospeedLineDownKey, strconv.FormatInt(autoLineDown, 10))
+	store.Set(autospeedLineUpKey, strconv.FormatInt(autoLineUp, 10))
 
 	// Global seeding limits (settings.json, enforced by the queue tick). The
 	// per-torrent limits set through the API always win.
@@ -547,6 +548,10 @@ func (d *Daemon) renderSettings(w http.ResponseWriter, r *http.Request, errKey s
 		autoSpeedMin = autoSpeedDefaultMinKiB
 	}
 	repl("{{AUTOSPEED_MIN}}", strconv.FormatInt(autoSpeedMin, 10))
+	autoLineDown := max(int64FromSetting(store.Get(autospeedLineDownKey, "0")), 0)
+	autoLineUp := max(int64FromSetting(store.Get(autospeedLineUpKey, "0")), 0)
+	repl("{{AUTOSPEED_LINE_DOWN}}", strconv.FormatInt(autoLineDown, 10))
+	repl("{{AUTOSPEED_LINE_UP}}", strconv.FormatInt(autoLineUp, 10))
 	repl("{{AUTOSPEED_STATUS}}", html.EscapeString(d.autoSpeedStatus(time.Now())))
 
 	repl("{{DOWNLOAD_DIR}}", get("download-dir"))

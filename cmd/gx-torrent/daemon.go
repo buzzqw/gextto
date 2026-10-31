@@ -428,9 +428,13 @@ type Daemon struct {
 	// (ipfilter_refresh.go), for the settings page.
 	ipFilterStatus ipFilterState
 	// peakDown/peakUp are the highest total rates (bytes/s) seen since start,
-	// the measure the bandwidth optimization starts from.
+	// shown by the bandwidth optimization.
 	peakDown int64
 	peakUp   int64
+	// rateDown/rateUp are the latest session rates (bytes/s), sampled by the
+	// queue tick for the automatic speed controller (autospeed.go).
+	rateDown int64
+	rateUp   int64
 
 	// Adaptive disk cache (see cache.go). The engine reads the cache sizes when the
 	// session is created, so a retune reopens the session on a coarse cadence.
@@ -1097,6 +1101,9 @@ func (d *Daemon) tick(now time.Time) {
 	}
 	d.peakDown = max(d.peakDown, totalDown)
 	d.peakUp = max(d.peakUp, totalUp)
+	// The controller needs the current rates, not the all-time peaks.
+	d.rateDown = int64(engineStats.SpeedDownload)
+	d.rateUp = int64(engineStats.SpeedUpload)
 	positions := d.queuePositionsLocked(torrents, statsOf)
 
 	handles := make(map[string]*torrent.Torrent, len(torrents))

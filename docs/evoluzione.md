@@ -628,7 +628,7 @@ enable/disable, configurable interval, ordered PASS/FAIL rules with `once` and a
 on the archive), **HTML listings as feeds** (ext.to and TorrentGalaxy pages resolved to
 direct magnets and feed links instead of failing on invalid XML), the **feed archive**
 (bbolt with a compact index), the IP filter with a scheduled refresh, *Optimise*
-(queue, cache, bandwidth at 80% of the measured peak with auto-speed active), the
+(queue, cache, and both bandwidth limits cleared with automatic speed active), the
 **per-day bandwidth scheduler** (`internal/bwschedule`, shared with Gextto: every
 weekday has its own window, with **one choice per day — Off, Limit or Auto** (Auto
 leaves the cap to the auto-tune so the line is measured there), a window past midnight
@@ -672,17 +672,23 @@ hash: for v1 the match is by path and length, because those hashes are not in th
 `.torrent` and would need a private index. The measurements are in §4.8 of
 [`measurements.md`](measurements.md), the cost when nothing is reusable in §3.
 
-**Ping-Based Auto-Speed** (anti-bufferbloat, standalone). A probe measures every second
-the RTT towards the gateway (or the configured target) with a TCP connect, with a
-baseline that is the minimum of the last 60 s; when the latency exceeds the baseline by
-50% **and** 20 ms the upload cap is reduced by 15%, and it is raised by `cap/20` when the
-line is at rest, never below `autospeed-min`, never above the configured or scheduled
-cap. It is a feedback control on **latency**, only on the cap: the data path is
-untouched, and `applyEffectiveSpeedLimitsLocked` (base → scheduler → auto-speed) remains
-the only caller of `SetSpeedLimits`. It needs a positive upload limit, is off by default
-and exists only standalone, like the bandwidth scheduler (in managed mode Gextto governs
-the limits). The probe, the baseline and the cap step are `internal/autospeed`, shared
-with Gextto's latency guard (§3, *Latency guard*), which passes its own window.
+**Automatic speed / autotune** (standalone, off by default). A probe measures every
+second the RTT towards Google/Cloudflare (or a configured target, with the gateway as
+fallback); the median of the last five probes is the current latency and the minimum of
+the last 10 minutes the resting baseline. It controls **both directions**: a trial
+backs the loading directions off to 60% for 8 s, and if the latency falls the queue was
+its own; control then ramps up while the ping is good and cuts by 15% when it degrades,
+climbing just below the knee and trying to pass it once a minute. The ceiling of each
+direction is the manual limit (global, scheduled or alternative), the line maximum
+entered by the user, or twice the rate the line is delivering; the controller never
+exceeds a manual limit, and a limit of 0 lets it discover that direction. It is a
+feedback control on **latency**, only on the caps: the data path is untouched, and
+`applyEffectiveSpeedLimitsLocked` (base → scheduler → automatic speed) remains the only
+caller of `SetSpeedLimits`. `Optimize bandwidth` clears both limits and turns it on; a
+scheduler window in **Auto** mode also leaves the limits uncapped for it. The probe and
+the rate step are `internal/autospeed`, shared with Gextto's latency guard (§3,
+*Latency guard*), which adds its router counters; the standalone state machine has no
+router and decides on the latency alone.
 
 **Extensions outside the BEPs**: a
 **WebSocket tracker** (ws/wss, an original bounded RFC 6455 client plus the

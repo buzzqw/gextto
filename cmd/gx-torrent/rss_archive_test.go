@@ -322,33 +322,25 @@ func TestUIOptimizeQueueCacheBandwidth(t *testing.T) {
 	if cfg.ActiveDownloads != 3 || cfg.ActiveLimit != 5 || !cfg.DynamicQueue || cfg.CacheMB != -1 {
 		t.Fatalf("config after optimize = %+v", cfg)
 	}
-	// No upload measured yet: refused, nothing changed.
-	if loc := post("bandwidth"); !strings.Contains(loc, "ok=0") {
-		t.Fatalf("bandwidth without a measure = %s", loc)
-	}
-	d.mu.Lock()
-	d.peakUp = 1000 * 1024
-	d.mu.Unlock()
+	// Bandwidth optimization clears both limits and turns automatic speed on;
+	// it no longer needs a measured upload.
 	if loc := post("bandwidth"); !strings.Contains(loc, "ok=1") {
 		t.Fatalf("bandwidth redirect = %s", loc)
 	}
 	cfg, _, _ = d.config()
-	if cfg.SpeedLimitUpload != 800 || cfg.SpeedLimitDownload != 0 {
-		t.Fatalf("limits = %d/%d", cfg.SpeedLimitDownload, cfg.SpeedLimitUpload)
+	if cfg.SpeedLimitUpload != 0 || cfg.SpeedLimitDownload != 0 {
+		t.Fatalf("limits = %d/%d, want 0/0", cfg.SpeedLimitDownload, cfg.SpeedLimitUpload)
 	}
 	if d.opts.Settings.Get(autospeedEnabledKey, "") != "true" {
-		t.Fatal("bandwidth optimization must enable the latency auto-speed")
+		t.Fatal("bandwidth optimization must enable automatic speed")
 	}
 
-	// The single Optimize button runs everything: the queue and the cache are
-	// applied even when the upload is not measured yet (the bandwidth part is
-	// then only a note), so a fresh client still gets optimized.
+	// The single Optimize button runs everything: the queue, the cache and
+	// automatic speed.
 	if _, err := d.setConfig(map[string]json.RawMessage{"active_downloads": rawJSON(9), "cache_mb": rawJSON(64)}); err != nil {
 		t.Fatal(err)
 	}
-	d.mu.Lock()
-	d.peakUp = 0
-	d.mu.Unlock()
+	d.opts.Settings.Set(autospeedEnabledKey, "false")
 	if loc := post("all"); !strings.Contains(loc, "ok=1") {
 		t.Fatalf("all optimize = %s", loc)
 	}

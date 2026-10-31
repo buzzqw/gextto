@@ -11,51 +11,92 @@ import (
 	"time"
 )
 
-// TestAutoSpeedClampsAndRecovers checks the controller lowers the upload while
-// the latency is high and raises it again when the line is idle.
-func TestAutoSpeedClampsAndRecovers(t *testing.T) {
+// TestAutoSpeedTrialCapsBothDirections checks that a loading line with no
+// trusted baseline enters the trial and caps download and upload at 60 %.
+func TestAutoSpeedTrialCapsBothDirections(t *testing.T) {
+	a := &autoSpeed{}
+	base := time.Unix(1_700_000_000, 0)
+	a.record(base, 20*time.Millisecond)
+
+	down, up := a.update(base, 0, 0, 0, 0, 50, 1000*1024, 500*1024)
+	if down != 600 || up != 300 {
+		t.Fatalf("trial caps = %d/%d, want 600/300", down, up)
+	}
+	mode, _, _, _, _, have := a.status(base)
+	if mode != autoSpeedModeTrial || !have {
+		t.Fatalf("mode = %v have=%v, want trial true", mode, have)
+	}
+}
+
+// TestAutoSpeedCutsAndRecovers checks the controller lowers both caps when the
+// latency is high and raises them again when it falls back to rest.
+func TestAutoSpeedCutsAndRecovers(t *testing.T) {
 	a := &autoSpeed{}
 	base := time.Unix(1_700_000_000, 0)
 	a.record(base, 20*time.Millisecond)
 	a.record(base.Add(time.Second), 100*time.Millisecond)
 
-	// First decision: from the ceiling 1000 KiB/s, high latency -> x0.85 = 850.
-	if v, acting := a.clampUpload(base.Add(2*time.Second), 1000, 50); !acting || v != 850 {
-		t.Fatalf("first clamp = %d acting=%v, want 850 true", v, acting)
+	// A high latency with no trusted baseline starts a trial at 60 %.
+	down, up := a.update(base.Add(2*time.Second), 0, 0, 0, 0, 50, 1000*1024, 500*1024)
+	if down != 600 || up != 300 {
+		t.Fatalf("trial caps = %d/%d, want 600/300", down, up)
 	}
-	// Still high after the step interval: another x0.85 = 722.
-	a.record(base.Add(5*time.Second), 100*time.Millisecond)
-	if v, _ := a.clampUpload(base.Add(6*time.Second), 1000, 50); v != 722 {
-		t.Fatalf("second clamp = %d, want 722", v)
+	// The trial does not lower the latency: the queue is ours, so control starts.
+	a.record(base.Add(10*time.Second), 100*time.Millisecond)
+	down, up = a.update(base.Add(10*time.Second), 0, 0, 0, 0, 50, 1000*1024, 500*1024)
+	if down == 0 || up == 0 {
+		t.Fatalf("control must cap both directions, got %d/%d", down, up)
 	}
-	// Latency back to idle: the upload rises by ceiling/20 = 50 per step.
-	a.record(base.Add(7*time.Second), 20*time.Millisecond)
-	if v, _ := a.clampUpload(base.Add(9*time.Second), 1000, 50); v != 772 {
-		t.Fatalf("recovery clamp = %d, want 772", v)
+	firstDown, firstUp := down, up
+	// Still high after the settle time: each direction is cut by 15 %.
+	a.record(base.Add(15*time.Second), 100*time.Millisecond)
+	down, up = a.update(base.Add(16*time.Second), 0, 0, 0, 0, 50, 1000*1024, 500*1024)
+	if down >= firstDown || up >= firstUp {
+		t.Fatalf("high latency must cut the caps: %d/%d from %d/%d", down, up, firstDown, firstUp)
+	}
+	cutDown, cutUp := down, up
+	// Back at rest: enough low samples to move the median, then the caps rise.
+	for i := 20; i <= 22; i++ {
+		a.record(base.Add(time.Duration(i)*time.Second), 20*time.Millisecond)
+	}
+	down, up = a.update(base.Add(23*time.Second), 0, 0, 0, 0, 50, 1000*1024, 500*1024)
+	if down <= cutDown || up <= cutUp {
+		t.Fatalf("rest must raise the caps: %d/%d from %d/%d", down, up, cutDown, cutUp)
 	}
 }
 
-// TestAutoSpeedFloorsAtMinimum checks the controller never goes below the floor.
+// TestAutoSpeedFloorsAtMinimum checks the upload floor is respected.
 func TestAutoSpeedFloorsAtMinimum(t *testing.T) {
 	a := &autoSpeed{}
 	base := time.Unix(1_700_000_000, 0)
 	a.record(base, 20*time.Millisecond)
 	a.record(base.Add(time.Second), 500*time.Millisecond)
-	if v, _ := a.clampUpload(base.Add(2*time.Second), 1000, 900); v != 900 {
-		t.Fatalf("clamp = %d, want the floor 900", v)
+	if _, up := a.update(base.Add(2*time.Second), 0, 0, 0, 0, 900, 0, 1000*1024); up != 900 {
+		t.Fatalf("upload cap = %d, want the floor 900", up)
 	}
 }
 
-// TestAutoSpeedNoCeilingOrSamples checks the controller is inactive without a
-// positive ceiling or without any measurement.
-func TestAutoSpeedNoCeilingOrSamples(t *testing.T) {
+// TestAutoSpeedNoSamples checks the controller is inactive without a
+// measurement.
+func TestAutoSpeedNoSamples(t *testing.T) {
 	a := &autoSpeed{}
 	now := time.Unix(1_700_000_000, 0)
-	if v, acting := a.clampUpload(now, 0, 50); v != 0 || acting {
-		t.Fatalf("unlimited ceiling: %d acting=%v, want 0 false", v, acting)
+	if down, up := a.update(now, 0, 0, 0, 0, 50, 1000*1024, 500*1024); down != 0 || up != 0 {
+		t.Fatalf("without samples = %d/%d, want 0/0", down, up)
 	}
-	if v, acting := a.clampUpload(now, 1000, 50); v != 1000 || acting {
-		t.Fatalf("no samples: %d acting=%v, want 1000 false", v, acting)
+}
+
+// TestAutoSpeedIdleReleases checks a finished transfer gives the line back.
+func TestAutoSpeedIdleReleases(t *testing.T) {
+	a := &autoSpeed{}
+	base := time.Unix(1_700_000_000, 0)
+	a.record(base, 20*time.Millisecond)
+	a.record(base.Add(time.Second), 100*time.Millisecond)
+	a.update(base.Add(2*time.Second), 0, 0, 0, 0, 50, 1000*1024, 500*1024)
+	a.record(base.Add(10*time.Second), 100*time.Millisecond)
+	a.update(base.Add(10*time.Second), 0, 0, 0, 0, 50, 1000*1024, 500*1024)
+	if down, up := a.update(base.Add(11*time.Second), 0, 0, 0, 0, 50, 0, 0); down != 0 || up != 0 {
+		t.Fatalf("idle line = %d/%d, want 0/0", down, up)
 	}
 }
 
@@ -64,10 +105,44 @@ func TestAutoSpeedReset(t *testing.T) {
 	a := &autoSpeed{}
 	base := time.Unix(1_700_000_000, 0)
 	a.record(base, 20*time.Millisecond)
-	a.clampUpload(base, 1000, 50)
+	a.update(base, 0, 0, 0, 0, 50, 1000*1024, 500*1024)
 	a.reset()
-	if _, _, _, have := a.snapshot(base); have {
+	if _, _, _, _, _, have := a.status(base); have {
 		t.Fatal("reset must drop the samples")
+	}
+}
+
+// TestAutoSpeedCeiling checks the line maximum and the manual limit combine
+// into the highest value the controller may reach.
+func TestAutoSpeedCeiling(t *testing.T) {
+	cases := []struct{ configured, lineMax, want int64 }{
+		{0, 0, 0},
+		{5000, 0, 5000},
+		{0, 9000, 9000},
+		{5000, 9000, 5000},
+		{9000, 5000, 5000},
+	}
+	for _, c := range cases {
+		if got := autoSpeedCeiling(c.configured, c.lineMax); got != c.want {
+			t.Errorf("autoSpeedCeiling(%d, %d) = %d, want %d", c.configured, c.lineMax, got, c.want)
+		}
+	}
+}
+
+// TestEffectiveSpeedLimit checks a manual limit is a ceiling, never a value
+// automatic speed can raise.
+func TestEffectiveSpeedLimit(t *testing.T) {
+	if got := effectiveSpeedLimit(1000, 800); got != 800 {
+		t.Fatalf("cap below limit = %d, want 800", got)
+	}
+	if got := effectiveSpeedLimit(1000, 1200); got != 1000 {
+		t.Fatalf("cap above limit = %d, want 1000", got)
+	}
+	if got := effectiveSpeedLimit(1000, 0); got != 1000 {
+		t.Fatalf("no cap = %d, want 1000", got)
+	}
+	if got := effectiveSpeedLimit(0, 800); got != 800 {
+		t.Fatalf("unlimited configured = %d, want 800", got)
 	}
 }
 
@@ -112,8 +187,8 @@ func TestLatencyCandidates(t *testing.T) {
 	}
 }
 
-// TestApplyEffectiveSpeedLimitsAutoSpeed checks the controller clamps the
-// effective upload when it is enabled and the latency is high.
+// TestApplyEffectiveSpeedLimitsAutoSpeed checks the controller lowers the
+// effective limits when it is enabled and the latency is high.
 func TestApplyEffectiveSpeedLimitsAutoSpeed(t *testing.T) {
 	d := standaloneTestDaemon(t, "", true)
 	d.autoSpeed = &autoSpeed{}
@@ -122,25 +197,27 @@ func TestApplyEffectiveSpeedLimitsAutoSpeed(t *testing.T) {
 
 	d.mu.Lock()
 	d.state.Config.SpeedLimitUpload = 1000
+	d.rateDown = 1000 * 1024
+	d.rateUp = 500 * 1024
 	base := time.Now()
 	// No measurement yet: the configured limit is applied unchanged.
 	d.applyEffectiveSpeedLimitsLocked(base)
-	if d.appliedUL != 1000 {
+	if d.appliedUL != 1000 || d.appliedDL != 0 {
 		d.mu.Unlock()
-		t.Fatalf("without samples appliedUL = %d, want 1000", d.appliedUL)
+		t.Fatalf("without samples applied = %d/%d, want 0/1000", d.appliedDL, d.appliedUL)
 	}
 	d.autoSpeed.record(base, 20*time.Millisecond)
 	d.autoSpeed.record(base.Add(time.Second), 100*time.Millisecond)
 	d.applyEffectiveSpeedLimitsLocked(base.Add(2 * time.Second))
-	got := d.appliedUL
+	gotDown, gotUp := d.appliedDL, d.appliedUL
 	d.mu.Unlock()
-	if got != 850 {
-		t.Fatalf("with high latency appliedUL = %d, want 850", got)
+	if gotDown != 600 || gotUp != 300 {
+		t.Fatalf("with high latency applied = %d/%d, want 600/300", gotDown, gotUp)
 	}
 }
 
 // TestUISettingsSavesAutoSpeed checks the settings page writes and shows the
-// auto-speed option, and refuses to enable it without an upload ceiling.
+// automatic speed options, including the line maxima, with no upload ceiling.
 func TestUISettingsSavesAutoSpeed(t *testing.T) {
 	d := standaloneTestDaemon(t, "", true)
 	d.opts.Settings.Set(setupCompleteKey, "true")
@@ -153,42 +230,39 @@ func TestUISettingsSavesAutoSpeed(t *testing.T) {
 	}
 	body, _ := io.ReadAll(page.Body)
 	page.Body.Close()
-	if page.StatusCode != http.StatusOK || !strings.Contains(string(body), `name="autospeed-enabled"`) || !strings.Contains(string(body), `name="autospeed-target"`) {
-		t.Fatalf("settings page: status=%d", page.StatusCode)
+	for _, field := range []string{"autospeed-enabled", "autospeed-target", "autospeed-min", "autospeed-line-down", "autospeed-line-up"} {
+		if !strings.Contains(string(body), `name="`+field+`"`) {
+			t.Errorf("settings page is missing %s", field)
+		}
 	}
 	if strings.Contains(string(body), "{{AUTOSPEED_") {
-		t.Fatalf("unreplaced auto-speed placeholder in the page")
+		t.Fatalf("unreplaced automatic speed placeholder in the page")
 	}
 
 	resp, err := http.PostForm(srv.URL+"/ui/settings", url.Values{
-		"speed-upload":      {"512"},
-		"autospeed-enabled": {"1"},
-		"autospeed-target":  {"192.168.1.1:80"},
-		"autospeed-min":     {"100"},
-		"schedule-enabled":  {"0"},
-		"schedule-download": {"0"},
-		"schedule-upload":   {"0"},
+		"speed-upload":        {"0"},
+		"autospeed-enabled":   {"1"},
+		"autospeed-target":    {"192.168.1.1:80"},
+		"autospeed-min":       {"100"},
+		"autospeed-line-down": {"9000"},
+		"autospeed-line-up":   {"800"},
+		"schedule-enabled":    {"0"},
+		"schedule-download":   {"0"},
+		"schedule-upload":     {"0"},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	resp.Body.Close()
 	store := d.opts.Settings
-	if store.Get(autospeedEnabledKey, "") != "true" || store.Get(autospeedTargetKey, "") != "192.168.1.1:80" || store.Get(autospeedMinKey, "") != "100" {
-		t.Fatalf("auto-speed not saved: %q %q %q", store.Get(autospeedEnabledKey, ""), store.Get(autospeedTargetKey, ""), store.Get(autospeedMinKey, ""))
-	}
-
-	// Enabling without any upload ceiling must be refused.
-	bad, err := http.PostForm(srv.URL+"/ui/settings", url.Values{
-		"speed-upload":      {"0"},
-		"autospeed-enabled": {"1"},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	badBody, _ := io.ReadAll(bad.Body)
-	bad.Body.Close()
-	if !strings.Contains(string(badBody), `class="err"`) {
-		t.Fatalf("enabling without a ceiling must be reported: %s", badBody)
+	if store.Get(autospeedEnabledKey, "") != "true" ||
+		store.Get(autospeedTargetKey, "") != "192.168.1.1:80" ||
+		store.Get(autospeedMinKey, "") != "100" ||
+		store.Get(autospeedLineDownKey, "") != "9000" ||
+		store.Get(autospeedLineUpKey, "") != "800" {
+		t.Fatalf("automatic speed not saved: %q %q %q %q %q",
+			store.Get(autospeedEnabledKey, ""), store.Get(autospeedTargetKey, ""),
+			store.Get(autospeedMinKey, ""), store.Get(autospeedLineDownKey, ""),
+			store.Get(autospeedLineUpKey, ""))
 	}
 }
