@@ -57,7 +57,7 @@ one.
 | **Protocol** | BitTorrent v1, v2 and hybrid (BEP 52) · 34 BEPs implemented and tested ([list](docs/bep.md)) |
 | **Network** | TCP + uTP on one port · UPnP, NAT-PMP, PCP · BEP 55 holepunching · SOCKS5/HTTP proxy · VPN killswitch |
 | **Automation** | TV series, movies, comics · Torznab (Jackett, Prowlarr, indexarr) · RSS · web search · stuck-download replacement |
-| **Integrations** | Jellyfin, Plex, Jellyseerr (v3 API subset), aMule (eD2k and Kad), Telegram, e-mail, Discord/Slack/ntfy/Gotify/Pushover, iCal |
+| **Integrations** | Jellyfin, Plex, Jellyseerr (v3 API subset), aMule (eD2k and Kad), Telegram, e-mail, Discord/Slack/ntfy/Gotify/Pushover/Apprise, iCal |
 | **Interfaces** | Web UI (SSR + HTMX, pure Go, installable PWA) · terminal TUI over SSH · JSON API |
 | **Build** | Pure Go (`CGO_ENABLED=0`) · Linux x86_64/aarch64 · gx-torrent also on Windows |
 
@@ -258,8 +258,10 @@ checkout: `git pull --ff-only && ./scripts/update.sh`.
 
 ### Integrations, control and interfaces
 
-- **Notifications and media servers**: Telegram, e-mail, webhooks (Discord,
-  Slack, ntfy, Gotify, Pushover), Jellyfin and Plex folder refreshes, an iCal
+- **Notifications and media servers**: Telegram, e-mail, webhooks and the
+  dedicated Discord, Slack, Gotify, ntfy, Pushover and Apprise channels, a
+  custom program on any event, per-group event switches, an anti-spam window and
+  a message language of its own; Jellyfin and Plex folder refreshes, an iCal
   feed of arrivals and air dates.
 - **From the browser**: magnets and `.torrent` files go straight into the queue,
   with the `magnet:`/`.torrent` handlers or with any extension written for
@@ -408,7 +410,9 @@ everything a standalone client needs.
 - **From the phone.** The page installs as an app (manifest and a service
   worker for the shared assets only) and offers a sign-out when a password is
   set.
-- **Notifications** on the same channels as Gextto, with a test button.
+- **Notifications** on the same channels as Gextto, plus the Apprise server,
+  the dedicated Discord, Slack, Gotify, ntfy and Pushover channels and a custom
+  script, with a test button.
 - **Updates itself** from the CI builds when its own code changed, verified by
   SHA-256, with automatic rollback.
 - **Light on the machine.** One pure-Go process, no external engine and no

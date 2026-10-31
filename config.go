@@ -313,10 +313,31 @@ type Config struct {
 	EmailFrom           *string           `json:"email_from"`
 	EmailTo             *string           `json:"email_to"`
 	EmailPassword       *string           `json:"email_password"`
-	CleanupUpgrades     bool              `json:"cleanup_upgrades"`
-	CleanupMinScoreDiff int64             `json:"cleanup_min_score_diff"`
-	UpgradeMinScoreDiff int64             `json:"upgrade_min_score_diff"`
-	UpgradeUntilScore   int64             `json:"upgrade_until_score"`
+	// Dedicated notification channels, the same ones indexarr and the
+	// gx-torrent daemon offer next to Telegram, the generic webhook and e-mail.
+	NotifyDiscordURL       *string `json:"notify_discord_url"`
+	NotifySlackURL         *string `json:"notify_slack_url"`
+	NotifyGotifyURL        *string `json:"notify_gotify_url"`
+	NotifyGotifyToken      *string `json:"notify_gotify_token"`
+	NotifyNtfyURL          *string `json:"notify_ntfy_url"`
+	NotifyNtfyTopic        *string `json:"notify_ntfy_topic"`
+	NotifyNtfyToken        *string `json:"notify_ntfy_token"`
+	NotifyPushoverToken    *string `json:"notify_pushover_token"`
+	NotifyPushoverUser     *string `json:"notify_pushover_user"`
+	NotifyAppriseURL       *string `json:"notify_apprise_url"`
+	NotifyAppriseKey       *string `json:"notify_apprise_key"`
+	NotifyScriptPath       *string `json:"notify_script_path"`
+	NotifyScriptArgs       *string `json:"notify_script_args"`
+	NotifyEventDownloads   bool    `json:"notify_events_downloads"`
+	NotifyEventErrors      bool    `json:"notify_events_errors"`
+	NotifyEventHealth      bool    `json:"notify_events_health"`
+	NotifyEventMaintenance bool    `json:"notify_events_maintenance"`
+	NotifyCooldownMinutes  int64   `json:"notify_cooldown_minutes"`
+	NotifyLanguage         string  `json:"notify_language"`
+	CleanupUpgrades        bool    `json:"cleanup_upgrades"`
+	CleanupMinScoreDiff    int64   `json:"cleanup_min_score_diff"`
+	UpgradeMinScoreDiff    int64   `json:"upgrade_min_score_diff"`
+	UpgradeUntilScore      int64   `json:"upgrade_until_score"`
 	// StallAlternativeAfterMin/ScoreDrop relax the quality floor for an episode
 	// whose download is stuck: after this many minutes without progress an
 	// alternative scoring up to ScoreDrop points less may be started, while the
@@ -829,6 +850,11 @@ func DefaultConfig() Config {
 		EmailFrom:                 nil,
 		EmailTo:                   nil,
 		EmailPassword:             nil,
+		NotifyEventDownloads:      true,
+		NotifyEventErrors:         true,
+		NotifyEventHealth:         true,
+		NotifyEventMaintenance:    true,
+		NotifyCooldownMinutes:     30,
 		CleanupUpgrades:           true,
 		CleanupMinScoreDiff:       0,
 		UpgradeMinScoreDiff:       200,
@@ -1188,12 +1214,52 @@ func configPathSetting(value *string) *string {
 	return &result
 }
 
+// settingsText returns the stored value of a setting, or "".
+func settingsText(settings map[string]string, key string) string {
+	return settings[key]
+}
+
 // mapValue returns a pointer to the value stored under key, or nil.
 func mapValue(settings map[string]string, key string) *string {
 	if value, ok := settings[key]; ok {
 		return &value
 	}
 	return nil
+}
+
+// configOptionalText returns the trimmed value of a setting, or nil when it is
+// absent or empty: an empty notification channel is off, not an empty string.
+func configOptionalText(settings map[string]string, key string) *string {
+	value := strings.TrimSpace(settings[key])
+	if value == "" {
+		return nil
+	}
+	return &value
+}
+
+// configNotifyLanguage reads the language of the notification messages: empty
+// means "follow the interface", and an unsupported code is ignored rather than
+// silently switched to Italian.
+func configNotifyLanguage(raw string) string {
+	value := strings.ToLower(strings.TrimSpace(raw))
+	switch {
+	case value == "":
+		return ""
+	case strings.HasPrefix(value, "it"), value == "ita":
+		return "it"
+	case strings.HasPrefix(value, "en"), value == "eng":
+		return "en"
+	case strings.HasPrefix(value, "de"), value == "deu":
+		return "de"
+	case strings.HasPrefix(value, "fr"), value == "fra":
+		return "fr"
+	case strings.HasPrefix(value, "es"), value == "spa":
+		return "es"
+	case strings.HasPrefix(value, "pl"), value == "pol":
+		return "pl"
+	default:
+		return ""
+	}
 }
 
 // numberSettingInt parses an integer setting, falling back to default.
@@ -2713,6 +2779,30 @@ func (c *Config) loadConfigDB() error {
 	} else {
 		c.EmailPassword = nil
 	}
+	c.NotifyDiscordURL = configOptionalText(c.Settings, "notify_discord_url")
+	c.NotifySlackURL = configOptionalText(c.Settings, "notify_slack_url")
+	c.NotifyGotifyURL = configOptionalText(c.Settings, "notify_gotify_url")
+	c.NotifyGotifyToken = configOptionalText(c.Settings, "notify_gotify_token")
+	c.NotifyNtfyURL = configOptionalText(c.Settings, "notify_ntfy_url")
+	c.NotifyNtfyTopic = configOptionalText(c.Settings, "notify_ntfy_topic")
+	c.NotifyNtfyToken = configOptionalText(c.Settings, "notify_ntfy_token")
+	c.NotifyPushoverToken = configOptionalText(c.Settings, "notify_pushover_token")
+	c.NotifyPushoverUser = configOptionalText(c.Settings, "notify_pushover_user")
+	c.NotifyAppriseURL = configOptionalText(c.Settings, "notify_apprise_url")
+	c.NotifyAppriseKey = configOptionalText(c.Settings, "notify_apprise_key")
+	c.NotifyScriptPath = configOptionalText(c.Settings, "notify_script_path")
+	c.NotifyScriptArgs = configOptionalText(c.Settings, "notify_script_args")
+	// An installation that predates these switches keeps notifying everything:
+	// only a switch explicitly saved as false turns a group off.
+	c.NotifyEventDownloads = boolSettingOr(c.Settings, "notify_events_downloads", true)
+	c.NotifyEventErrors = boolSettingOr(c.Settings, "notify_events_errors", true)
+	c.NotifyEventHealth = boolSettingOr(c.Settings, "notify_events_health", true)
+	c.NotifyEventMaintenance = boolSettingOr(c.Settings, "notify_events_maintenance", true)
+	c.NotifyCooldownMinutes = numberSettingInt(c.Settings, "notify_cooldown_minutes", 30)
+	if c.NotifyCooldownMinutes < 0 {
+		c.NotifyCooldownMinutes = 0
+	}
+	c.NotifyLanguage = configNotifyLanguage(settingsText(c.Settings, "notify_language"))
 	c.CleanupUpgrades = configBoolSetting(mapValue(c.Settings, "cleanup_upgrades"))
 	c.UpgradeMinScoreDiff = numberSettingInt(c.Settings, "upgrade_min_score_diff", 200)
 	if c.UpgradeMinScoreDiff < 0 {

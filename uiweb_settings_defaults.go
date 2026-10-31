@@ -216,10 +216,16 @@ var uiSettingDefaults = map[string]string{
 	"temp_orphan_min_age_days":             "7",
 
 	// --- Notifiche ----------------------------------------------------------
-	"notify_telegram":       "false",
-	"notify_email":          "false",
-	"email_smtp":            "smtp.gmail.com:587",
-	"notify_webhook_format": "gextto",
+	"notify_telegram":           "false",
+	"notify_email":              "false",
+	"email_smtp":                "smtp.gmail.com:587",
+	"notify_webhook_format":     "gextto",
+	"notify_events_downloads":   "true",
+	"notify_events_errors":      "true",
+	"notify_events_health":      "true",
+	"notify_events_maintenance": "true",
+	"notify_cooldown_minutes":   "30",
+	"notify_language":           "",
 
 	// --- Percorsi -----------------------------------------------------------
 	"cleanup_action": "move",

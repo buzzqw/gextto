@@ -373,7 +373,10 @@ which matters because the LAN bypasses the login.
 
 **Media servers, notifications, calendar.** Jellyfin gets `/Library/Media/Updated`, Plex a
 targeted section refresh, with path mappings for Docker and merged requests; notifications
-are translated and the webhook speaks Discord, Slack, ntfy, Gotify and Pushover. The iCal
+are translated, can be sent in a language of their own, respect an anti-spam window and
+per-group event switches, and reach the dedicated channels of indexarr (Discord, Slack,
+Gotify, ntfy, Pushover, Apprise and a custom script) besides Telegram, e-mail and the
+webhook formats. The iCal
 feed distinguishes arrival in the library, original air date and the Italian release of a
 movie, with a declared fallback to the original date.
 

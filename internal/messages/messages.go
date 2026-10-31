@@ -17,19 +17,7 @@ var (
 // SetLanguage sets the active language from a public code (it, en, de, fr, es,
 // pl, ita, eng, ...).
 func SetLanguage(lang string) {
-	normalized := "it"
-	code := strings.ToLower(strings.TrimSpace(lang))
-	if strings.HasPrefix(code, "en") {
-		normalized = "en"
-	} else if strings.HasPrefix(code, "de") {
-		normalized = "de"
-	} else if strings.HasPrefix(code, "fr") {
-		normalized = "fr"
-	} else if code == "es" || code == "spa" {
-		normalized = "es"
-	} else if code == "pl" || code == "pol" {
-		normalized = "pl"
-	}
+	normalized := Normalize(lang)
 	mu.Lock()
 	language = normalized
 	mu.Unlock()
@@ -51,7 +39,14 @@ func IsEnglish() bool {
 // English come from the arguments; German, French, Spanish and Polish come from
 // catalogIT keyed by the Italian source, with English as the fallback.
 func Pick(italian, english string) string {
-	switch Language() {
+	return PickLang(Language(), italian, english)
+}
+
+// PickLang is Pick in an explicit language, without changing the active one.
+// Notifications may be sent in a language of their own (the «message language»
+// option), different from the interface the daemon is showing.
+func PickLang(lang, italian, english string) string {
+	switch Normalize(lang) {
 	case "en":
 		return english
 	case "de":
@@ -64,6 +59,26 @@ func Pick(italian, english string) string {
 		return pickCatalog(italian, english, 3)
 	default:
 		return italian
+	}
+}
+
+// Normalize maps a public language code (it, en, de, fr, es, pl, ita, eng, …)
+// to the code the catalogs use, with Italian as the fallback.
+func Normalize(lang string) string {
+	code := strings.ToLower(strings.TrimSpace(lang))
+	switch {
+	case strings.HasPrefix(code, "en"):
+		return "en"
+	case strings.HasPrefix(code, "de"):
+		return "de"
+	case strings.HasPrefix(code, "fr"):
+		return "fr"
+	case code == "es" || code == "spa":
+		return "es"
+	case code == "pl" || code == "pol":
+		return "pl"
+	default:
+		return "it"
 	}
 }
 

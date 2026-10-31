@@ -1821,8 +1821,9 @@ accorgerti che qualcosa non va.
 
 ## 11. Notifiche
 
-Configura Telegram, e-mail (SMTP) o un webhook — anche verso Discord, Slack,
-ntfy, Gotify o Pushover — e invia un test. Le notifiche di completamento
+Configura Telegram, e-mail (SMTP), un webhook e i canali dedicati — Discord,
+Slack, Gotify, ntfy, Pushover e Apprise — più, se vuoi, un programma personale,
+e invia un test. Le notifiche di completamento
 includono dimensione, tempo di download e velocità media. Per un season pack
 l'avviso distingue gli episodi **nuovi** da quelli che hanno **sostituito una
 versione inferiore** già in libreria: questi ultimi non vengono contati fra i
@@ -1881,6 +1882,48 @@ Note:
   Slack non ne hanno bisogno;
 - usa il pulsante di **test** nella scheda Notifiche: se l'URL o il token sono
   sbagliati lo dice subito, invece di fallire in silenzio alla prima consegna.
+
+### Canali dedicati
+
+Ogni servizio ha anche i suoi campi, così più canali possono restare accesi
+insieme senza condividere l'URL del webhook. Ogni canale configurato riceve lo
+stesso evento, e uno lento o irraggiungibile non trattiene gli altri.
+
+| Canale | Campi | Note |
+|---|---|---|
+| Discord | **Discord webhook URL** | il webhook del canale |
+| Slack | **Slack webhook URL** | il webhook in ingresso |
+| Gotify | **Gotify URL** e **Gotify token** | le notifiche vengono inviate a `/message` |
+| ntfy | **ntfy URL**, **ntfy topic** e, se l'argomento è protetto, **ntfy token** | le notifiche vengono inviate a `<server>/<argomento>` |
+| Pushover | **Pushover token** e **Pushover user key** | token dell'applicazione e user o group key |
+| Apprise | **Apprise URL** e, se ne usi una, **Apprise key** | le notifiche vengono inviate a `/notify` e Apprise le inoltra ai servizi configurati lì |
+| Programma | **Programma** e **Argomenti del programma** | eseguito su ogni evento, con i dati nelle variabili d'ambiente `GEXTTO_*` (app, evento, titolo, messaggio); l'evento non passa mai dalla riga di comando |
+
+Un campo lasciato vuoto spegne il suo canale. Il programma gira senza shell: le
+virgolette tengono insieme un argomento con spazi e la barra rovesciata protegge
+il carattere successivo. Per un test riceve anche `GEXTTO_TEST=true`.
+
+### Quali eventi, ogni quanto, in quale lingua
+
+Il gruppo **Eventi** decide cosa ricevono i canali:
+
+- **Notifiche dei download** — un download parte, si completa o riempie un
+  episodio mancante;
+- **Notifiche degli errori** — un download fallisce, un torrent o fumetto va in
+  errore, o il servizio si ferma per un errore fatale;
+- **Notifiche di salute e motore** — problemi di salute, del ciclo di ricerca,
+  degli indexer, del login ai provider e del motore torrent, e il loro ritorno
+  alla normalità;
+- **Notifiche di manutenzione** — riavvii, backup completati e pulizia delle
+  tracce audio.
+
+Un semplice messaggio di test non viene mai filtrato. L'opzione **Anti-spam —
+intervallo minimo** non rimanda lo stesso evento (stesso titolo, serie, episodio,
+fonte e motivo) prima che siano passati quei minuti, così un errore ripetuto non
+inonda il canale; `0` lo disattiva. **Lingua dei messaggi** sceglie la lingua
+delle notifiche: vuota segue la lingua dell'interfaccia, e la scelta è
+indipendente da essa. **Invia notifica di test**, in cima alla scheda, usa
+insieme tutti i canali configurati.
 
 ### Procedura di configurazione
 
@@ -2578,7 +2621,7 @@ spazio del `tmpfs`, come prima.
 
 #### Notifiche
 
-*Telegram, email, webhook e programmi da eseguire sugli eventi.*
+*Telegram, email, webhook, Discord, Slack, Gotify, ntfy, Pushover, Apprise e programmi da eseguire sugli eventi. «Invia notifica di test» manda un messaggio su tutti i canali configurati.*
 
 **Telegram**
 
@@ -2607,6 +2650,75 @@ spazio del `tmpfs`, come prima.
 | Formato webhook | Formato del payload inviato all'URL del webhook (Gextto, Discord, Slack, ntfy, Gotify, Pushover). |
 | Webhook token | Credenziale del provider (ntfy, Gotify, Pushover); non visualizzata. Non serve per Gextto, Discord e Slack. |
 | Webhook user (Pushover) | Solo Pushover: la user key. Non serve per gli altri formati. |
+
+**Discord**
+
+| Impostazione | Cosa fa |
+|---|---|
+| Discord webhook URL | URL del webhook del canale Discord. Vuoto non usa Discord. |
+
+**Slack**
+
+| Impostazione | Cosa fa |
+|---|---|
+| Slack webhook URL | URL del webhook in ingresso di Slack. Vuoto non usa Slack. |
+
+**Gotify**
+
+| Impostazione | Cosa fa |
+|---|---|
+| Gotify URL | Indirizzo del server Gotify (es. https://gotify.esempio); le notifiche vengono inviate a `/message`. |
+| Gotify token | Token dell'applicazione Gotify, necessario insieme all'URL. |
+
+**ntfy**
+
+| Impostazione | Cosa fa |
+|---|---|
+| ntfy URL | Indirizzo del server ntfy (es. https://ntfy.sh). |
+| ntfy topic | Argomento su cui pubblicare le notifiche. |
+| ntfy token | Token Bearer, solo se l'argomento è protetto. |
+
+**Pushover**
+
+| Impostazione | Cosa fa |
+|---|---|
+| Pushover token | Token dell'applicazione Pushover. |
+| Pushover user key | User o group key del tuo account Pushover. |
+
+**Apprise**
+
+| Impostazione | Cosa fa |
+|---|---|
+| Apprise URL | Indirizzo di un server Apprise API (es. http://192.168.1.10:8000); le notifiche vengono inviate a `/notify`. |
+| Apprise key | Chiave opzionale di una configurazione Apprise; vuota usa quella predefinita. |
+
+**Programma**
+
+| Impostazione | Cosa fa |
+|---|---|
+| Programma | Eseguibile lanciato su ogni evento, con i dati nelle variabili d'ambiente `GEXTTO_*`. |
+| Argomenti del programma | Argomenti passati al programma, separati da spazi; le virgolette tengono insieme quelli con spazi. |
+
+**Eventi**
+
+| Impostazione | Cosa fa |
+|---|---|
+| Notifiche dei download | Avvisa quando un download parte, si completa o riempie un episodio mancante. |
+| Notifiche degli errori | Avvisa quando un download fallisce o un torrent o fumetto va in errore. |
+| Notifiche di salute e motore | Avvisa dei problemi di salute, del ciclo di ricerca, degli indexer, del login ai provider e del motore torrent. |
+| Notifiche di manutenzione | Avvisa dei riavvii, dei backup completati e della pulizia delle tracce audio. |
+
+**Anti-spam**
+
+| Impostazione | Cosa fa |
+|---|---|
+| Anti-spam — intervallo minimo | Entro questo numero di minuti lo stesso evento non viene inviato di nuovo. `0` disattiva l'anti-spam. |
+
+**Lingua dei messaggi**
+
+| Impostazione | Cosa fa |
+|---|---|
+| Lingua dei messaggi | Lingua delle notifiche; vuota segue la lingua dell'interfaccia. |
 
 **Editor**
 

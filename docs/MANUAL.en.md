@@ -1758,8 +1758,9 @@ opening the log.
 
 ## 11. Notifications
 
-Configure Telegram, e-mail (SMTP) or a webhook — including Discord, Slack,
-ntfy, Gotify or Pushover — and send a test. Completion notifications include
+Configure Telegram, e-mail (SMTP), a webhook and the dedicated channels —
+Discord, Slack, Gotify, ntfy, Pushover and Apprise — plus, if you want, a
+custom script, then send a test. Completion notifications include
 size, download time and average speed. For a season pack the notice separates
 **new** episodes from those that **replaced an inferior version** already in the
 library: the latter are not counted as new, so downloading a single episode and
@@ -1816,6 +1817,47 @@ Notes:
   Discord and Slack do not need one;
 - use the **test** button in the Notifications tab: a wrong URL or token is
   reported at once instead of failing silently on the first delivery.
+
+### Dedicated channels
+
+Each service also has its own fields, so several channels can stay on together
+without sharing the webhook URL. Every configured channel receives the same
+event, and a slow or unreachable one does not hold back the others.
+
+| Channel | Fields | Notes |
+|---|---|---|
+| Discord | **Discord webhook URL** | the webhook of the channel |
+| Slack | **Slack webhook URL** | the incoming webhook |
+| Gotify | **Gotify URL** and **Gotify token** | notifications are posted to `/message` |
+| ntfy | **ntfy URL**, **ntfy topic** and, if the topic is protected, **ntfy token** | notifications are posted to `<server>/<topic>` |
+| Pushover | **Pushover token** and **Pushover user key** | application token and user or group key |
+| Apprise | **Apprise URL** and, if you use one, **Apprise key** | notifications are posted to `/notify` and Apprise forwards them to the services configured there |
+| Script | **Program** and **Program arguments** | run on every event, with the data in the `GEXTTO_*` environment variables (app, event, title, message); the event is never passed on the command line |
+
+A field left empty switches its channel off. The script runs without a shell:
+quotes keep an argument with spaces together and a backslash escapes the next
+character. It receives `GEXTTO_TEST=true` for a test.
+
+### Which events, how often, in which language
+
+The **Events** group decides what the channels receive:
+
+- **Download notifications** — a download starts, completes or fills a missing
+  episode;
+- **Error notifications** — a download fails, a torrent or comic goes into
+  error, or the service stops with a fatal error;
+- **Health and engine notifications** — health, search cycle, indexer, provider
+  login and torrent engine problems, and their recovery;
+- **Maintenance notifications** — restarts, completed backups and audio-track
+  cleanup.
+
+A plain test message is never filtered. The **Anti-spam — minimum interval**
+option suppresses the same event (same title, series, episode, source and
+reason) for that many minutes, so a repeated failure does not flood the
+channel; `0` disables it. **Message language** chooses the language of the
+notifications: empty follows the interface language, and the choice is
+independent of it. **Send test notification** at the top of the tab uses every
+configured channel at once.
 
 ### Configuration procedure
 
@@ -2499,7 +2541,7 @@ files. When the memory cannot be read, only the `tmpfs` space counts, as before.
 
 #### Notifications
 
-*Telegram, email, webhooks and programs to run on events.*
+*Telegram, email, webhooks, Discord, Slack, Gotify, ntfy, Pushover, Apprise and programs to run on events. «Send test notification» sends a message on every configured channel.*
 
 **Telegram**
 
@@ -2528,6 +2570,75 @@ files. When the memory cannot be read, only the `tmpfs` space counts, as before.
 | Webhook format | Format of the payload sent to the webhook URL (Gextto, Discord, Slack, ntfy, Gotify, Pushover). |
 | Webhook token | Provider credential (ntfy, Gotify, Pushover); not shown. Not needed for Gextto, Discord and Slack. |
 | Webhook user (Pushover) | Pushover only: the user key. Not needed for the other formats. |
+
+**Discord**
+
+| Setting | What it does |
+|---|---|
+| Discord webhook URL | Webhook URL of the Discord channel. Empty does not use Discord. |
+
+**Slack**
+
+| Setting | What it does |
+|---|---|
+| Slack webhook URL | Slack incoming webhook URL. Empty does not use Slack. |
+
+**Gotify**
+
+| Setting | What it does |
+|---|---|
+| Gotify URL | Address of the Gotify server (e.g. https://gotify.example); notifications are posted to `/message`. |
+| Gotify token | Application token of Gotify, needed together with the URL. |
+
+**ntfy**
+
+| Setting | What it does |
+|---|---|
+| ntfy URL | Address of the ntfy server (e.g. https://ntfy.sh). |
+| ntfy topic | Topic the notifications are published to. |
+| ntfy token | Bearer token, only when the topic is protected. |
+
+**Pushover**
+
+| Setting | What it does |
+|---|---|
+| Pushover token | Application token of Pushover. |
+| Pushover user key | User or group key of your Pushover account. |
+
+**Apprise**
+
+| Setting | What it does |
+|---|---|
+| Apprise URL | Address of an Apprise API server (e.g. http://192.168.1.10:8000); notifications are posted to `/notify`. |
+| Apprise key | Optional key of one Apprise configuration; empty uses the default one. |
+
+**Program**
+
+| Setting | What it does |
+|---|---|
+| Program | Executable run on every event, with the data in the `GEXTTO_*` environment variables. |
+| Program arguments | Arguments passed to the program, separated by spaces; quotes keep together the ones with spaces. |
+
+**Events**
+
+| Setting | What it does |
+|---|---|
+| Download notifications | Notifies when a download starts, completes or fills a missing episode. |
+| Error notifications | Notifies when a download fails or a torrent or comic goes into error. |
+| Health and engine notifications | Notifies about health, search cycle, indexer, provider login and torrent engine problems. |
+| Maintenance notifications | Notifies about restarts, completed backups and audio-track cleanup. |
+
+**Anti-spam**
+
+| Setting | What it does |
+|---|---|
+| Anti-spam — minimum interval | Within this many minutes the same event is not sent again. `0` disables the anti-spam window. |
+
+**Message language**
+
+| Setting | What it does |
+|---|---|
+| Message language | Language of the notifications; empty follows the interface language. |
 
 **Editors**
 

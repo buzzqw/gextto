@@ -209,6 +209,21 @@ var uiSettingMetaByKey = map[string]uiSettingMeta{
 		{Value: "gotify", Label: "Gotify"},
 		{Value: "pushover", Label: "Pushover"},
 	}},
+	"notify_discord_url":      {Kind: "url"},
+	"notify_slack_url":        {Kind: "url"},
+	"notify_gotify_url":       {Kind: "url"},
+	"notify_ntfy_url":         {Kind: "url"},
+	"notify_apprise_url":      {Kind: "url"},
+	"notify_cooldown_minutes": {Unit: "minuti", Zero: "0 = nessun limite"},
+	"notify_language": {Kind: "select", Options: []uiFormOption{
+		{Value: "", Label: "Automatica (lingua dell'interfaccia)"},
+		{Value: "it", Label: "Italiano"},
+		{Value: "en", Label: "Inglese"},
+		{Value: "de", Label: "Tedesco"},
+		{Value: "fr", Label: "Francese"},
+		{Value: "es", Label: "Spagnolo"},
+		{Value: "pl", Label: "Polacco"},
+	}},
 
 	// Accesso
 	"auth_local_bypass": {DependsOn: "auth_enabled"},

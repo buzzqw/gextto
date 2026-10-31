@@ -193,6 +193,12 @@ func validateSettingValue(key, value string, cfg *Config) error {
 			return err
 		}
 	}
+	if key == "notify_language" {
+		raw := strings.TrimSpace(value)
+		if raw != "" && configNotifyLanguage(raw) == "" {
+			return fmt.Errorf("%s must be it, en, de, fr, es or pl", key)
+		}
+	}
 	if key == audioCleanupPolicySetting {
 		switch strings.ToLower(strings.TrimSpace(value)) {
 		case "", audioCleanupPolicyAll, audioCleanupPolicyBest, audioCleanupPolicyFirst:
@@ -303,6 +309,11 @@ func validateNumericSetting(key, value string) error {
 		parsed, err := strconv.ParseInt(raw, 10, 64)
 		if err != nil || parsed < 5 || parsed > 120 {
 			return fmt.Errorf("%s must be between 5 and 120 seconds", key)
+		}
+	case key == "notify_cooldown_minutes":
+		parsed, err := strconv.ParseInt(raw, 10, 64)
+		if err != nil || parsed < 0 || parsed > 10080 {
+			return fmt.Errorf("%s must be between 0 and 10080 minutes", key)
 		}
 	}
 	return nil

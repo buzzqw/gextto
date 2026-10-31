@@ -805,6 +805,14 @@ func uiSettingsPageFrom(s *AppState, activeTab, mode string) uiSettingsPage {
 				}
 			}
 		}
+	case "notify":
+		page.Actions = &uiActionSection{
+			Label: "Prova le notifiche",
+			Hint:  "Invia un messaggio di prova su tutti i canali configurati e mostra subito l'esito.",
+			Buttons: []uiActionButton{
+				{Label: "Invia notifica di test", Class: "primary", Method: "POST", Path: "/api/test-notification", Body: "{}", Hint: "Un provider lento o irraggiungibile fa fallire il test: controlla URL, token e log."},
+			},
+		}
 	case "performance":
 		page.Actions = &uiActionSection{
 			Label: "Ottimizzazione",

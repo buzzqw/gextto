@@ -1329,6 +1329,10 @@ func TestNotification(w http.ResponseWriter, r *http.Request, s *AppState) {
 		message = *input.Message
 	}
 	notifier := FromConfig(latestConfig(s))
+	if !notifier.Enabled() {
+		jsonStatus(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "no notification channel is configured"})
+		return
+	}
 	if err := notifier.Notify(message); err != nil {
 		logging.Info("notification test", "ok", false, "error", err.Error())
 		jsonStatus(w, http.StatusBadGateway, map[string]any{"ok": false, "error": err.Error()})

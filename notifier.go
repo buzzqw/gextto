@@ -28,6 +28,7 @@ import (
 
 	"github.com/buzzqw/gextto/internal/logging"
 	"github.com/buzzqw/gextto/internal/messages"
+	"github.com/buzzqw/gextto/internal/notify"
 )
 
 // The pacing of the notifications: the retry back-off unit (retries wait 1,
@@ -57,12 +58,139 @@ type Notifier struct {
 	emailTo          *string
 	emailPassword    *string
 	lastTelegram     *telegramThrottle
+	// extra holds the dedicated channels Gextto shares with indexarr and the
+	// gx-torrent daemon — Discord, Slack, Gotify, ntfy, Pushover, Apprise and a
+	// custom script — plus nothing of Telegram, the generic webhook and e-mail,
+	// which stay in the fields above. Leaving a field empty switches that
+	// channel off.
+	extra notify.Config
+	// events says which event groups may reach the channels. An event outside
+	// every group (a plain message, a test) always passes.
+	events notifyEventSwitches
+	// cooldownMinutes is the anti-spam window: the same event is not sent again
+	// within it. 0 disables it.
+	cooldownMinutes int
+	// language is the language of the message bodies ("" follows the interface).
+	language string
 	// External event hooks (see hooks.go). Reloadable at runtime when the user
 	// edits them in the UI.
 	hooks *eventHookStore
 	// async makes NotifyEvent enqueue the delivery instead of performing it
 	// (see Async).
 	async bool
+}
+
+// notifyEventSwitches are the four event groups of the settings page.
+type notifyEventSwitches struct {
+	Downloads   bool
+	Errors      bool
+	Health      bool
+	Maintenance bool
+}
+
+// notifyEventsOn is the default of every switch: a new installation notifies
+// everything, like Gextto always did.
+func notifyEventsOn() notifyEventSwitches {
+	return notifyEventSwitches{Downloads: true, Errors: true, Health: true, Maintenance: true}
+}
+
+// notifyEventGroup returns the switch that governs an event, or "" when the
+// event is not part of a group (a test message, an unknown event) and must
+// always be delivered.
+func notifyEventGroup(event string) string {
+	switch event {
+	case "download_started", "torrent_completed", "season_pack_completed",
+		"comic_queued", "comic_completed", "comic_pending", "gap_filled":
+		return "downloads"
+	case "download_failed", "torrent_error", "comic_error", "daemon_error":
+		return "errors"
+	case "health_degraded", "health_recovered", "cycle_warning", "cycle_recovered",
+		"provider_login_failed", "provider_login_recovered", "indexer_failing",
+		"engine_crashed", "engine_restarted", "engine_fallback", "engine_recovery",
+		"engine_rollback", "engine_unresponsive", "engine_unstable", "engine_error":
+		return "health"
+	case "backup_completed", "audio_cleanup", "daemon_restarted":
+		return "maintenance"
+	}
+	return ""
+}
+
+// notifyCooldown is the anti-spam ledger, shared by every Notifier built from
+// the configuration: the cycle and torrent-event workers rebuild the notifier
+// often, but the window must survive those rebuilds.
+var notifyCooldown = struct {
+	sync.Mutex
+	last map[string]time.Time
+}{last: map[string]time.Time{}}
+
+// resetNotifyCooldown empties the ledger. Tests and configuration reloads use
+// it; the running daemon clears it when the window changes.
+func resetNotifyCooldown() {
+	notifyCooldown.Lock()
+	notifyCooldown.last = map[string]time.Time{}
+	notifyCooldown.Unlock()
+}
+
+// notifyCooldownKey identifies the event for the anti-spam window: the event
+// name plus the fields a person would read as "the same thing". Two different
+// episodes, sources or reasons are not the same event.
+func notifyCooldownKey(event string, data map[string]any) string {
+	key := event
+	for _, field := range []string{"title", "name", "series", "season", "episode", "source", "reason", "error"} {
+		value := strings.TrimSpace(jsonString(mapLookup(data, field)))
+		if value != "" {
+			key += "|" + field + "=" + value
+		}
+	}
+	return key
+}
+
+// notifyCooldownHit reports whether the event was already sent within the
+// configured window.
+func (n *Notifier) notifyCooldownHit(event string, data map[string]any) bool {
+	if n == nil || n.cooldownMinutes <= 0 || event == "message" || event == "test" {
+		return false
+	}
+	key := notifyCooldownKey(event, data)
+	notifyCooldown.Lock()
+	defer notifyCooldown.Unlock()
+	last, ok := notifyCooldown.last[key]
+	return ok && time.Since(last) < time.Duration(n.cooldownMinutes)*time.Minute
+}
+
+// markNotifyCooldown records a successful delivery for the anti-spam window.
+func (n *Notifier) markNotifyCooldown(event string, data map[string]any) {
+	if n == nil || n.cooldownMinutes <= 0 || event == "message" || event == "test" {
+		return
+	}
+	key := notifyCooldownKey(event, data)
+	now := time.Now()
+	window := time.Duration(n.cooldownMinutes) * time.Minute
+	notifyCooldown.Lock()
+	// The ledger must not grow with every distinct event of a long run: drop
+	// the entries that can no longer suppress anything.
+	for seen, at := range notifyCooldown.last {
+		if now.Sub(at) >= window {
+			delete(notifyCooldown.last, seen)
+		}
+	}
+	notifyCooldown.last[key] = now
+	notifyCooldown.Unlock()
+}
+
+// eventEnabled reports whether the event's group is switched on.
+func (n *Notifier) eventEnabled(event string) bool {
+	switch notifyEventGroup(event) {
+	case "downloads":
+		return n.events.Downloads
+	case "errors":
+		return n.events.Errors
+	case "health":
+		return n.events.Health
+	case "maintenance":
+		return n.events.Maintenance
+	}
+	return true
 }
 
 // telegramMessage is the Telegram `sendMessage` JSON body.
@@ -113,6 +241,8 @@ func NewNotifier() *Notifier {
 		emailSMTP:    "smtp.gmail.com:587",
 		lastTelegram: &telegramThrottle{},
 		hooks:        &eventHookStore{},
+		events:       notifyEventsOn(),
+		extra:        notify.Config{App: "Gextto"},
 	}
 }
 
@@ -132,8 +262,40 @@ func FromConfig(cfg *Config) *Notifier {
 	notifier.emailFrom = cfg.EmailFrom
 	notifier.emailTo = cfg.EmailTo
 	notifier.emailPassword = cfg.EmailPassword
+	notifier.extra = notify.Config{
+		App:           "Gextto",
+		DiscordURL:    stringValue(cfg.NotifyDiscordURL),
+		SlackURL:      stringValue(cfg.NotifySlackURL),
+		GotifyURL:     stringValue(cfg.NotifyGotifyURL),
+		GotifyToken:   stringValue(cfg.NotifyGotifyToken),
+		NtfyURL:       stringValue(cfg.NotifyNtfyURL),
+		NtfyTopic:     stringValue(cfg.NotifyNtfyTopic),
+		NtfyToken:     stringValue(cfg.NotifyNtfyToken),
+		PushoverToken: stringValue(cfg.NotifyPushoverToken),
+		PushoverUser:  stringValue(cfg.NotifyPushoverUser),
+		AppriseURL:    stringValue(cfg.NotifyAppriseURL),
+		AppriseKey:    stringValue(cfg.NotifyAppriseKey),
+		Script:        stringValue(cfg.NotifyScriptPath),
+		ScriptArgs:    stringValue(cfg.NotifyScriptArgs),
+	}
+	notifier.events = notifyEventSwitches{
+		Downloads:   cfg.NotifyEventDownloads,
+		Errors:      cfg.NotifyEventErrors,
+		Health:      cfg.NotifyEventHealth,
+		Maintenance: cfg.NotifyEventMaintenance,
+	}
+	notifier.cooldownMinutes = int(cfg.NotifyCooldownMinutes)
+	notifier.language = cfg.NotifyLanguage
 	notifier.hooks.store(LoadHooks(cfg.Settings))
 	return notifier
+}
+
+// stringValue reads an optional configuration string as a plain value.
+func stringValue(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return strings.TrimSpace(*value)
 }
 
 // ReloadHooks replaces the event hooks, e.g. after the settings API saved them.
@@ -156,7 +318,17 @@ func (n *Notifier) EventHooks() []EventHook {
 func (n *Notifier) Enabled() bool {
 	return (n.telegramEnabled && n.telegramBotToken != nil && n.telegramChatID != nil) ||
 		n.webhookURL != nil ||
-		(n.emailEnabled && n.emailFrom != nil && n.emailTo != nil && n.emailPassword != nil)
+		(n.emailEnabled && n.emailFrom != nil && n.emailTo != nil && n.emailPassword != nil) ||
+		n.extra.Enabled()
+}
+
+// notifyLang is the language of the message bodies: the chosen one, or the
+// language of the interface when the option is empty.
+func (n *Notifier) notifyLang() string {
+	if n == nil || strings.TrimSpace(n.language) == "" {
+		return messages.Language()
+	}
+	return messages.Normalize(n.language)
 }
 
 // Notify sends a plain text message (`message` event).
@@ -307,11 +479,16 @@ func (n *Notifier) NotifyEvent(event string, data map[string]any) error {
 // deliverEvent sends one event to every enabled channel, synchronously.
 func (n *Notifier) deliverEvent(event string, data map[string]any) error {
 	// External hooks run on a detached goroutine so they never delay the
-	// notification delivery or the caller.
+	// notification delivery or the caller. They are chosen event by event and
+	// are not affected by the notification switches or by the anti-spam window.
 	hooks := n.EventHooks()
 	if len(hooks) > 0 {
 		Dispatch(hooks, event, data)
 	}
+	if !n.eventEnabled(event) || n.notifyCooldownHit(event, data) {
+		return nil
+	}
+	lang := n.notifyLang()
 	var firstError error
 	if n.telegramEnabled {
 		if n.telegramBotToken != nil && n.telegramChatID != nil {
@@ -320,7 +497,7 @@ func (n *Notifier) deliverEvent(event string, data map[string]any) error {
 			chat := *n.telegramChatID
 			rawURL := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", token)
 			send := func() error {
-				body, err := json.Marshal(telegramMessage{ChatID: chat, Text: formatEvent(event, data)})
+				body, err := json.Marshal(telegramMessage{ChatID: chat, Text: formatEventLang(lang, event, data)})
 				if err != nil {
 					return err
 				}
@@ -342,7 +519,7 @@ func (n *Notifier) deliverEvent(event string, data map[string]any) error {
 	}
 	if n.webhookURL != nil {
 		target := *n.webhookURL
-		body, contentType, headers, err := n.webhookRequest(event, data)
+		body, contentType, headers, err := n.webhookRequest(lang, event, data)
 		if err != nil {
 			return err
 		}
@@ -362,11 +539,31 @@ func (n *Notifier) deliverEvent(event string, data map[string]any) error {
 		}
 	}
 	if n.emailEnabled {
-		if err := n.sendEmail(event, formatEmailSubject(event, data), formatEvent(event, data)); err != nil {
+		if err := n.sendEmail(event, formatEmailSubjectLang(lang, event, data), formatEventLang(lang, event, data)); err != nil {
 			if firstError == nil {
 				firstError = err
 			}
 		}
+	}
+	// The dedicated channels: Discord, Slack, Gotify, ntfy, Pushover, Apprise
+	// and the custom script. They are one block because they share the same
+	// delivery code (internal/notify), which also sends them concurrently: a
+	// slow service never holds back the others.
+	if n.extra.Enabled() {
+		payload := notify.Event{
+			Name:   event,
+			Title:  formatEmailSubjectLang(lang, event, data),
+			Text:   formatEventLang(lang, event, data),
+			Fields: data,
+		}
+		if err := notify.Send(context.Background(), n.extra, payload); err != nil {
+			if firstError == nil {
+				firstError = err
+			}
+		}
+	}
+	if firstError == nil {
+		n.markNotifyCooldown(event, data)
 	}
 	return firstError
 }
@@ -412,30 +609,30 @@ func (n *Notifier) postRaw(rawURL, contentType string, headers map[string]string
 // carries only the endpoint: the provider credential goes in the dedicated
 // "Webhook token" field (ntfy Bearer, gotify X-Gotify-Key, pushover token) and
 // Pushover's user key in "Webhook user".
-func (n *Notifier) webhookRequest(event string, data map[string]any) ([]byte, string, map[string]string, error) {
+func (n *Notifier) webhookRequest(lang, event string, data map[string]any) ([]byte, string, map[string]string, error) {
 	headers := map[string]string{}
 	switch strings.ToLower(strings.TrimSpace(n.webhookFormat)) {
 	case "discord":
-		body, err := json.Marshal(map[string]any{"content": formatEvent(event, data)})
+		body, err := json.Marshal(map[string]any{"content": formatEventLang(lang, event, data)})
 		return body, "application/json", headers, err
 	case "slack":
-		body, err := json.Marshal(map[string]any{"text": formatEvent(event, data)})
+		body, err := json.Marshal(map[string]any{"text": formatEventLang(lang, event, data)})
 		return body, "application/json", headers, err
 	case "gotify":
 		if n.webhookToken != nil {
 			headers["X-Gotify-Key"] = *n.webhookToken
 		}
-		body, err := json.Marshal(map[string]any{"title": "Gextto", "message": formatEvent(event, data)})
+		body, err := json.Marshal(map[string]any{"title": "Gextto", "message": formatEventLang(lang, event, data)})
 		return body, "application/json", headers, err
 	case "ntfy":
 		if n.webhookToken != nil {
 			headers["Authorization"] = "Bearer " + *n.webhookToken
 		}
-		return []byte(formatEvent(event, data)), "text/plain; charset=utf-8", headers, nil
+		return []byte(formatEventLang(lang, event, data)), "text/plain; charset=utf-8", headers, nil
 	case "pushover":
 		form := url.Values{}
 		form.Set("title", "Gextto")
-		form.Set("message", formatEvent(event, data))
+		form.Set("message", formatEventLang(lang, event, data))
 		if n.webhookToken != nil {
 			form.Set("token", *n.webhookToken)
 		}
@@ -603,8 +800,14 @@ func buildEmailMessage(from string, recipients []string, subject, body string) [
 	return []byte(message.String())
 }
 
-// formatEmailSubject builds a clean, readable email subject for an event.
+// formatEmailSubject is the interface-language form of formatEmailSubjectLang.
 func formatEmailSubject(event string, data map[string]any) string {
+	return formatEmailSubjectLang(messages.Language(), event, data)
+}
+
+// formatEmailSubjectLang builds a clean, readable email subject for an event in
+// the requested language.
+func formatEmailSubjectLang(lang, event string, data map[string]any) string {
 	text := func(key string) string {
 		return jsonString(mapLookup(data, key))
 	}
@@ -625,64 +828,64 @@ func formatEmailSubject(event string, data map[string]any) string {
 	switch event {
 	case "download_started":
 		if text("kind") == "movie" {
-			return fmt.Sprintf("Gextto: %s — %s", messages.Pick("Film in download", "Movie download started"), itemLabel)
+			return fmt.Sprintf("Gextto: %s — %s", messages.PickLang(lang, "Film in download", "Movie download started"), itemLabel)
 		}
-		return fmt.Sprintf("Gextto: %s — %s", messages.Pick("Nuovo episodio in download", "Episode download started"), itemLabel)
+		return fmt.Sprintf("Gextto: %s — %s", messages.PickLang(lang, "Nuovo episodio in download", "Episode download started"), itemLabel)
 	case "torrent_completed":
 		if seeding, ok := mapLookup(data, "seeding").(bool); ok && seeding {
-			return fmt.Sprintf("Gextto: %s — %s", messages.Pick("Download completato (in seed)", "Download complete (seeding)"), itemLabel)
+			return fmt.Sprintf("Gextto: %s — %s", messages.PickLang(lang, "Download completato (in seed)", "Download complete (seeding)"), itemLabel)
 		}
-		return fmt.Sprintf("Gextto: %s — %s", messages.Pick("Download completato", "Download complete"), itemLabel)
+		return fmt.Sprintf("Gextto: %s — %s", messages.PickLang(lang, "Download completato", "Download complete"), itemLabel)
 	case "season_pack_completed":
 		if series != "" && hasSeason {
-			return fmt.Sprintf("Gextto: %s — %s S%02d", messages.Pick("Season Pack completato", "Season pack complete"), series, season)
+			return fmt.Sprintf("Gextto: %s — %s S%02d", messages.PickLang(lang, "Season Pack completato", "Season pack complete"), series, season)
 		}
-		return fmt.Sprintf("Gextto: %s — %s", messages.Pick("Season Pack completato", "Season pack complete"), itemLabel)
+		return fmt.Sprintf("Gextto: %s — %s", messages.PickLang(lang, "Season Pack completato", "Season pack complete"), itemLabel)
 	case "backup_completed":
 		if sched, ok := mapLookup(data, "scheduled").(bool); ok && sched {
-			return fmt.Sprintf("Gextto: %s", messages.Pick("Backup programmato completato", "Scheduled backup completed"))
+			return fmt.Sprintf("Gextto: %s", messages.PickLang(lang, "Backup programmato completato", "Scheduled backup completed"))
 		}
-		return fmt.Sprintf("Gextto: %s", messages.Pick("Backup completato", "Backup completed"))
+		return fmt.Sprintf("Gextto: %s", messages.PickLang(lang, "Backup completato", "Backup completed"))
 	case "torrent_error":
 		if itemLabel != "" {
-			return fmt.Sprintf("Gextto: %s — %s", messages.Pick("Errore torrent", "Torrent error"), itemLabel)
+			return fmt.Sprintf("Gextto: %s — %s", messages.PickLang(lang, "Errore torrent", "Torrent error"), itemLabel)
 		}
-		return fmt.Sprintf("Gextto: %s", messages.Pick("Errore torrent", "Torrent error"))
+		return fmt.Sprintf("Gextto: %s", messages.PickLang(lang, "Errore torrent", "Torrent error"))
 	case "download_failed":
 		if itemLabel != "" {
-			return fmt.Sprintf("Gextto: %s — %s", messages.Pick("Download fallito", "Download failed"), itemLabel)
+			return fmt.Sprintf("Gextto: %s — %s", messages.PickLang(lang, "Download fallito", "Download failed"), itemLabel)
 		}
-		return fmt.Sprintf("Gextto: %s", messages.Pick("Download fallito", "Download failed"))
+		return fmt.Sprintf("Gextto: %s", messages.PickLang(lang, "Download fallito", "Download failed"))
 	case "comic_queued":
-		return fmt.Sprintf("Gextto: %s — %s", messages.Pick("Fumetto in download", "Comic download started"), itemLabel)
+		return fmt.Sprintf("Gextto: %s — %s", messages.PickLang(lang, "Fumetto in download", "Comic download started"), itemLabel)
 	case "comic_completed":
-		return fmt.Sprintf("Gextto: %s — %s", messages.Pick("Fumetto scaricato", "Comic downloaded"), itemLabel)
+		return fmt.Sprintf("Gextto: %s — %s", messages.PickLang(lang, "Fumetto scaricato", "Comic downloaded"), itemLabel)
 	case "audio_cleanup":
-		return fmt.Sprintf("Gextto: %s — %s", messages.Pick("Tracce audio rimosse", "Audio tracks removed"), itemLabel)
+		return fmt.Sprintf("Gextto: %s — %s", messages.PickLang(lang, "Tracce audio rimosse", "Audio tracks removed"), itemLabel)
 	case "comic_error":
-		return fmt.Sprintf("Gextto: %s — %s", messages.Pick("Errore fumetto", "Comic error"), itemLabel)
+		return fmt.Sprintf("Gextto: %s — %s", messages.PickLang(lang, "Errore fumetto", "Comic error"), itemLabel)
 	case "comic_pending":
-		return fmt.Sprintf("Gextto: %s — %s", messages.Pick("Fumetto in attesa", "Comic pending"), itemLabel)
+		return fmt.Sprintf("Gextto: %s — %s", messages.PickLang(lang, "Fumetto in attesa", "Comic pending"), itemLabel)
 	case "gap_filled":
-		return fmt.Sprintf("Gextto: %s — %s", messages.Pick("Gap riempito", "Gap filled"), itemLabel)
+		return fmt.Sprintf("Gextto: %s — %s", messages.PickLang(lang, "Gap riempito", "Gap filled"), itemLabel)
 	case "cycle_warning":
-		return fmt.Sprintf("Gextto: %s", messages.Pick("Ricerca da controllare", "Search needs attention"))
+		return fmt.Sprintf("Gextto: %s", messages.PickLang(lang, "Ricerca da controllare", "Search needs attention"))
 	case "cycle_recovered":
-		return fmt.Sprintf("Gextto: %s", messages.Pick("Ricerca di nuovo regolare", "Search healthy again"))
+		return fmt.Sprintf("Gextto: %s", messages.PickLang(lang, "Ricerca di nuovo regolare", "Search healthy again"))
 	case "indexer_failing":
-		label := messages.Pick("Indexer da controllare", "Indexer needs attention")
+		label := messages.PickLang(lang, "Indexer da controllare", "Indexer needs attention")
 		if source := text("source"); source != "" {
 			return fmt.Sprintf("Gextto: %s — %s", label, source)
 		}
 		return fmt.Sprintf("Gextto: %s", label)
 	case "provider_login_failed":
-		label := messages.Pick("Login al provider non riuscito", "Provider login failed")
+		label := messages.PickLang(lang, "Login al provider non riuscito", "Provider login failed")
 		if source := text("source"); source != "" {
 			return fmt.Sprintf("Gextto: %s — %s", label, source)
 		}
 		return fmt.Sprintf("Gextto: %s", label)
 	case "provider_login_recovered":
-		label := messages.Pick("Login al provider di nuovo attivo", "Provider login working again")
+		label := messages.PickLang(lang, "Login al provider di nuovo attivo", "Provider login working again")
 		if source := text("source"); source != "" {
 			return fmt.Sprintf("Gextto: %s — %s", label, source)
 		}
@@ -692,9 +895,14 @@ func formatEmailSubject(event string, data map[string]any) string {
 	}
 }
 
-// formatEvent renders a human notification text for an event, picking the
-// Italian or English wording like the UI.
+// formatEvent is the interface-language form of formatEventLang.
 func formatEvent(event string, data map[string]any) string {
+	return formatEventLang(messages.Language(), event, data)
+}
+
+// formatEventLang renders a human notification text for an event in the
+// requested language, like the UI.
+func formatEventLang(lang, event string, data map[string]any) string {
 	text := func(key string) string {
 		return jsonString(mapLookup(data, key))
 	}
@@ -734,19 +942,19 @@ func formatEvent(event string, data map[string]any) string {
 	var reason string
 	switch reasonCode {
 	case "upgrade":
-		reason = messages.Pick("⬆️ Qualità superiore trovata", "⬆️ Better quality found")
+		reason = messages.PickLang(lang, "⬆️ Qualità superiore trovata", "⬆️ Better quality found")
 	case "gap_filled", "gap_fill":
-		reason = messages.Pick("🔎 Episodio mancante trovato", "🔎 Missing episode found")
+		reason = messages.PickLang(lang, "🔎 Episodio mancante trovato", "🔎 Missing episode found")
 	case "last_resort":
-		reason = messages.Pick("🆘 Ultima risorsa: episodio mancante fuori profilo (risoluzione)", "🆘 Last resort: missing episode outside the profile (resolution)")
+		reason = messages.PickLang(lang, "🆘 Ultima risorsa: episodio mancante fuori profilo (risoluzione)", "🆘 Last resort: missing episode outside the profile (resolution)")
 	case "restored":
-		reason = messages.Pick("♻️ Download ripristinato", "♻️ Download restored")
+		reason = messages.PickLang(lang, "♻️ Download ripristinato", "♻️ Download restored")
 	case "approved":
-		reason = messages.Pick("🆕 Nuovo episodio approvato", "🆕 New episode approved")
+		reason = messages.PickLang(lang, "🆕 Nuovo episodio approvato", "🆕 New episode approved")
 	case "stall_alternative":
-		reason = messages.Pick("⏱️ Download bloccato: provo un'alternativa", "⏱️ Stuck download: trying an alternative")
+		reason = messages.PickLang(lang, "⏱️ Download bloccato: provo un'alternativa", "⏱️ Stuck download: trying an alternative")
 	case "":
-		reason = messages.Pick("✅ Release approvata", "✅ Release approved")
+		reason = messages.PickLang(lang, "✅ Release approvata", "✅ Release approved")
 	default:
 		reason = reasonCode
 	}
@@ -759,32 +967,32 @@ func formatEvent(event string, data map[string]any) string {
 		// only when the release carries it.
 		sourceLine := ""
 		if source := notifySourceText(text("source")); source != "" {
-			sourceLine = "\n📡 " + messages.Pick("Fonte", "Source") + ": " + source
+			sourceLine = "\n📡 " + messages.PickLang(lang, "Fonte", "Source") + ": " + source
 		}
 		if text("kind") == "movie" {
 			return fmt.Sprintf(
 				"%s\n\n🏷️ Release: %s%s\n🏆 %s %d\n⚙️ %s: %s",
-				messages.Pick("🎬 FILM IN DOWNLOAD!", "🎬 MOVIE DOWNLOAD STARTED!"),
+				messages.PickLang(lang, "🎬 FILM IN DOWNLOAD!", "🎬 MOVIE DOWNLOAD STARTED!"),
 				text("title"),
 				sourceLine,
-				messages.Pick("Score Qualità:", "Quality score:"),
+				messages.PickLang(lang, "Score Qualità:", "Quality score:"),
 				qualityScore,
-				messages.Pick("Motivo", "Reason"),
+				messages.PickLang(lang, "Motivo", "Reason"),
 				reason,
 			)
 		}
 		return fmt.Sprintf(
 			"%s\n\n🎬 %s: %s\n▶️ %s: %s\n🏷️ Release: %s%s\n🏆 %s %d\n⚙️ %s: %s",
-			messages.Pick("📺 NUOVO EPISODIO IN DOWNLOAD!", "📺 NEW EPISODE DOWNLOAD STARTED!"),
-			messages.Pick("Serie", "Series"),
+			messages.PickLang(lang, "📺 NUOVO EPISODIO IN DOWNLOAD!", "📺 NEW EPISODE DOWNLOAD STARTED!"),
+			messages.PickLang(lang, "Serie", "Series"),
 			text("series"),
-			messages.Pick("Episodio", "Episode"),
+			messages.PickLang(lang, "Episodio", "Episode"),
 			episodeCode(),
 			text("title"),
 			sourceLine,
-			messages.Pick("Score Qualità:", "Quality score:"),
+			messages.PickLang(lang, "Score Qualità:", "Quality score:"),
 			qualityScore,
-			messages.Pick("Motivo", "Reason"),
+			messages.PickLang(lang, "Motivo", "Reason"),
 			reason,
 		)
 	case "torrent_completed":
@@ -811,12 +1019,12 @@ func formatEvent(event string, data map[string]any) string {
 		if manuallyAdded, _ := mapLookup(data, "manual").(bool); manuallyAdded {
 			return fmt.Sprintf(
 				"%s\n\n📁 %s: %s\n💾 %s: %s\n📂 %s: %s",
-				messages.Pick("✅ DOWNLOAD COMPLETATO (AGGIUNTO MANUALMENTE)", "✅ DOWNLOAD COMPLETE (ADDED MANUALLY)"),
-				messages.Pick("File", "File"),
+				messages.PickLang(lang, "✅ DOWNLOAD COMPLETATO (AGGIUNTO MANUALMENTE)", "✅ DOWNLOAD COMPLETE (ADDED MANUALLY)"),
+				messages.PickLang(lang, "File", "File"),
 				text("title"),
-				messages.Pick("Dimensione", "Size"),
+				messages.PickLang(lang, "Dimensione", "Size"),
 				formatBytes(size),
-				messages.Pick("Percorso", "Path"),
+				messages.PickLang(lang, "Percorso", "Path"),
 				text("path"),
 			)
 		}
@@ -828,27 +1036,27 @@ func formatEvent(event string, data map[string]any) string {
 		if seeding, ok := mapLookup(data, "seeding").(bool); ok && seeding {
 			return fmt.Sprintf(
 				"%s\n\n%s %s\n\n💾 %s%s\n%s",
-				messages.Pick("📥 DOWNLOAD COMPLETATO — IN SEED", "📥 DOWNLOAD COMPLETE — SEEDING"),
+				messages.PickLang(lang, "📥 DOWNLOAD COMPLETATO — IN SEED", "📥 DOWNLOAD COMPLETE — SEEDING"),
 				mediaIcon,
 				seriesEpisode(),
 				formatBytes(size),
 				stats,
-				messages.Pick("⏳ Sarà archiviato a fine seed", "⏳ Will be archived when seeding ends"),
+				messages.PickLang(lang, "⏳ Sarà archiviato a fine seed", "⏳ Will be archived when seeding ends"),
 			)
 		}
 		replacedTitle := text("replaced_title")
 		var upgradeNote string
 		if replacedTitle != "" {
-			upgradeNote = fmt.Sprintf("\n\n♻️ %s: «%s»", messages.Pick("Sostituisce versione inferiore", "Replaces inferior version"), replacedTitle)
+			upgradeNote = fmt.Sprintf("\n\n♻️ %s: «%s»", messages.PickLang(lang, "Sostituisce versione inferiore", "Replaces inferior version"), replacedTitle)
 		}
 		return fmt.Sprintf(
 			"%s\n\n%s %s\n\n💾 %s%s\n%s: %s%s",
-			messages.Pick("✅ DOWNLOAD COMPLETATO", "✅ DOWNLOAD COMPLETE"),
+			messages.PickLang(lang, "✅ DOWNLOAD COMPLETATO", "✅ DOWNLOAD COMPLETE"),
 			mediaIcon,
 			seriesEpisode(),
 			formatBytes(size),
 			stats,
-			messages.Pick("📂 Archiviato in", "📂 Archived to"),
+			messages.PickLang(lang, "📂 Archiviato in", "📂 Archived to"),
 			text("path"),
 			upgradeNote,
 		)
@@ -860,7 +1068,7 @@ func formatEvent(event string, data map[string]any) string {
 		discardedCount, _ := jsonInt(mapLookup(data, "discarded_count"))
 		body := fmt.Sprintf(
 			"%s\n\n🎬 %s S%02d\n\n💾 %s",
-			messages.Pick(
+			messages.PickLang(lang,
 				"✅ DOWNLOAD COMPLETATO — SEASON PACK ARCHIVIATO",
 				"✅ DOWNLOAD COMPLETE — SEASON PACK ARCHIVED",
 			),
@@ -869,18 +1077,18 @@ func formatEvent(event string, data map[string]any) string {
 			formatBytes(size),
 		)
 		if newCount > 0 {
-			body += fmt.Sprintf("\n\n✅ %d %s", newCount, messages.Pick("nuovi", "new"))
+			body += fmt.Sprintf("\n\n✅ %d %s", newCount, messages.PickLang(lang, "nuovi", "new"))
 			if newEpisodes := formatSeasonEpisodes(mapLookup(data, "episodes")); newEpisodes != "" {
 				body += ": " + newEpisodes
 			}
 		}
 		if upgradedCount > 0 {
-			label := messages.Pick(
+			label := messages.PickLang(lang,
 				"sostituisce una versione inferiore",
 				"replaces an inferior version",
 			)
 			if upgradedCount > 1 {
-				label = messages.Pick(
+				label = messages.PickLang(lang,
 					"sostituiscono versioni inferiori",
 					"replace inferior versions",
 				)
@@ -891,7 +1099,7 @@ func formatEvent(event string, data map[string]any) string {
 			}
 		}
 		if discardedCount > 0 {
-			body += fmt.Sprintf("\n🗑️ %d %s", discardedCount, messages.Pick(
+			body += fmt.Sprintf("\n🗑️ %d %s", discardedCount, messages.PickLang(lang,
 				"scartati dal pack (in libreria c'è già una copia migliore)",
 				"discarded from the pack (the library already has a better copy)"))
 			if discarded := formatDiscardedEpisodes(mapLookup(data, "discarded")); discarded != "" {
@@ -906,12 +1114,12 @@ func formatEvent(event string, data map[string]any) string {
 		}
 		var restoredText string
 		if restored, ok := mapLookup(data, "upgrade_restored").(bool); ok && restored {
-			restoredText = messages.Pick(" (versione precedente ripristinata)", " (previous version restored)")
+			restoredText = messages.PickLang(lang, " (versione precedente ripristinata)", " (previous version restored)")
 		}
 		if name != "" {
 			return fmt.Sprintf(
 				"Gextto: %s «%s» — %s%s",
-				messages.Pick("errore torrent", "torrent error"),
+				messages.PickLang(lang, "errore torrent", "torrent error"),
 				name,
 				text("error"),
 				restoredText,
@@ -919,28 +1127,28 @@ func formatEvent(event string, data map[string]any) string {
 		}
 		return fmt.Sprintf(
 			"Gextto: %s — %s%s",
-			messages.Pick("errore torrent", "torrent error"),
+			messages.PickLang(lang, "errore torrent", "torrent error"),
 			text("error"),
 			restoredText,
 		)
 	case "gap_filled":
 		return fmt.Sprintf(
 			"Gextto: %s — %s",
-			messages.Pick("gap riempito", "gap filled"),
+			messages.PickLang(lang, "gap riempito", "gap filled"),
 			seriesEpisode(),
 		)
 	case "series_complete":
 		return fmt.Sprintf(
 			"Gextto: %s — %s",
-			messages.Pick("serie completata", "series complete"),
+			messages.PickLang(lang, "serie completata", "series complete"),
 			text("series"),
 		)
 	case "movie":
 		return fmt.Sprintf(
 			"Gextto: %s «%s» %s",
-			messages.Pick("film", "movie"),
+			messages.PickLang(lang, "film", "movie"),
 			text("title"),
-			messages.Pick("disponibile", "available"),
+			messages.PickLang(lang, "disponibile", "available"),
 		)
 	case "download_failed":
 		title := text("title")
@@ -950,12 +1158,12 @@ func formatEvent(event string, data map[string]any) string {
 		errText := text("error")
 		var restoredText string
 		if restored, ok := mapLookup(data, "upgrade_restored").(bool); ok && restored {
-			restoredText = messages.Pick(" (versione precedente ripristinata)", " (previous version restored)")
+			restoredText = messages.PickLang(lang, " (versione precedente ripristinata)", " (previous version restored)")
 		}
 		if errText != "" && title != "" {
 			return fmt.Sprintf(
 				"Gextto: %s «%s» — %s%s",
-				messages.Pick("download fallito", "download failed"),
+				messages.PickLang(lang, "download fallito", "download failed"),
 				title,
 				errText,
 				restoredText,
@@ -964,39 +1172,39 @@ func formatEvent(event string, data map[string]any) string {
 		if title != "" {
 			return fmt.Sprintf(
 				"Gextto: %s «%s»%s",
-				messages.Pick("download fallito", "download failed"),
+				messages.PickLang(lang, "download fallito", "download failed"),
 				title,
 				restoredText,
 			)
 		}
 		return fmt.Sprintf(
 			"Gextto: %s — %s%s",
-			messages.Pick("download fallito", "download failed"),
+			messages.PickLang(lang, "download fallito", "download failed"),
 			errText,
 			restoredText,
 		)
 	case "comic_queued":
 		return fmt.Sprintf(
 			"%s\n\n🏷️ %s: %s\n⚙️ %s: %s\n✨ %s",
-			messages.Pick("📚 NUOVO FUMETTO IN DOWNLOAD!", "📚 NEW COMIC DOWNLOAD STARTED!"),
-			messages.Pick("Titolo", "Title"),
+			messages.PickLang(lang, "📚 NUOVO FUMETTO IN DOWNLOAD!", "📚 NEW COMIC DOWNLOAD STARTED!"),
+			messages.PickLang(lang, "Titolo", "Title"),
 			text("title"),
-			messages.Pick("Metodo", "Method"),
+			messages.PickLang(lang, "Metodo", "Method"),
 			text("method"),
-			messages.Pick("Download avviato con successo.", "Download started successfully."),
+			messages.PickLang(lang, "Download avviato con successo.", "Download started successfully."),
 		)
 	case "comic_completed":
 		size, _ := jsonInt(mapLookup(data, "size_bytes"))
 		return fmt.Sprintf(
 			"%s\n\n🏷️ %s: %s\n⚙️ %s: %s\n💾 %s: %s\n📂 %s: %s",
-			messages.Pick("✅ FUMETTO SCARICATO!", "✅ COMIC DOWNLOADED!"),
-			messages.Pick("Titolo", "Title"),
+			messages.PickLang(lang, "✅ FUMETTO SCARICATO!", "✅ COMIC DOWNLOADED!"),
+			messages.PickLang(lang, "Titolo", "Title"),
 			text("title"),
-			messages.Pick("Metodo", "Method"),
+			messages.PickLang(lang, "Metodo", "Method"),
 			text("method"),
-			messages.Pick("Dimensione", "Size"),
+			messages.PickLang(lang, "Dimensione", "Size"),
 			formatBytes(size),
-			messages.Pick("File salvato nella cartella fumetti", "File saved in the comics folder"),
+			messages.PickLang(lang, "File salvato nella cartella fumetti", "File saved in the comics folder"),
 			text("path"),
 		)
 	case "audio_cleanup":
@@ -1005,35 +1213,35 @@ func formatEvent(event string, data map[string]any) string {
 		size, _ := jsonInt(mapLookup(data, "size_bytes"))
 		return fmt.Sprintf(
 			"%s\n\n📄 %s: %s\n🔇 %s: %d\n💾 %s: %s\n📦 %s: %s\n⚙️ %s: %s",
-			messages.Pick("🎧 TRACCE AUDIO IN ALTRE LINGUE RIMOSSE", "🎧 AUDIO TRACKS IN OTHER LANGUAGES REMOVED"),
-			messages.Pick("File", "File"),
+			messages.PickLang(lang, "🎧 TRACCE AUDIO IN ALTRE LINGUE RIMOSSE", "🎧 AUDIO TRACKS IN OTHER LANGUAGES REMOVED"),
+			messages.PickLang(lang, "File", "File"),
 			text("file"),
-			messages.Pick("Tracce rimosse", "Tracks removed"),
+			messages.PickLang(lang, "Tracce rimosse", "Tracks removed"),
 			removed,
-			messages.Pick("Spazio risparmiato", "Space saved"),
+			messages.PickLang(lang, "Spazio risparmiato", "Space saved"),
 			formatBytes(saved),
-			messages.Pick("Nuova dimensione", "New size"),
+			messages.PickLang(lang, "Nuova dimensione", "New size"),
 			formatBytes(size),
-			messages.Pick("Motore", "Engine"),
+			messages.PickLang(lang, "Motore", "Engine"),
 			text("backend"),
 		)
 	case "comic_error":
 		return fmt.Sprintf(
 			"Gextto: %s «%s» — %s",
-			messages.Pick("errore fumetto", "comic error"),
+			messages.PickLang(lang, "errore fumetto", "comic error"),
 			text("title"),
 			text("error"),
 		)
 	case "comic_pending":
 		return fmt.Sprintf(
 			"%s\n\n🏷️ %s: %s\n🔗 %s",
-			messages.Pick(
+			messages.PickLang(lang,
 				"⏳ FUMETTO PRESENTE MA NON ANCORA SCARICABILE",
 				"⏳ COMIC FOUND BUT NOT YET DOWNLOADABLE",
 			),
-			messages.Pick("Titolo", "Title"),
+			messages.PickLang(lang, "Titolo", "Title"),
 			text("title"),
-			messages.Pick(
+			messages.PickLang(lang,
 				"GetComics non ha ancora pubblicato un pulsante Download Now o un link torrent. Gextto riproverà al prossimo ciclo.",
 				"GetComics has not published a Download Now button or torrent link yet. Gextto will retry on the next cycle.",
 			),
@@ -1041,7 +1249,7 @@ func formatEvent(event string, data map[string]any) string {
 	case "backup_completed":
 		path := text("path")
 		if path == "" {
-			return messages.Pick("Gextto: backup completato", "Gextto: backup completed")
+			return messages.PickLang(lang, "Gextto: backup completato", "Gextto: backup completed")
 		}
 		size, hasSize := jsonInt(mapLookup(data, "size_bytes"))
 		if !hasSize || size <= 0 {
@@ -1051,23 +1259,23 @@ func formatEvent(event string, data map[string]any) string {
 			}
 		}
 		var lines []string
-		header := messages.Pick("💾 BACKUP COMPLETATO", "💾 BACKUP COMPLETED")
+		header := messages.PickLang(lang, "💾 BACKUP COMPLETATO", "💾 BACKUP COMPLETED")
 		if sched, ok := mapLookup(data, "scheduled").(bool); ok && sched {
-			header = messages.Pick("💾 BACKUP PROGRAMMATO COMPLETATO", "💾 SCHEDULED BACKUP COMPLETED")
+			header = messages.PickLang(lang, "💾 BACKUP PROGRAMMATO COMPLETATO", "💾 SCHEDULED BACKUP COMPLETED")
 		}
 		lines = append(lines, header, "")
-		lines = append(lines, fmt.Sprintf("📦 %s: %s", messages.Pick("File", "File"), path))
+		lines = append(lines, fmt.Sprintf("📦 %s: %s", messages.PickLang(lang, "File", "File"), path))
 		if hasSize && size > 0 {
-			lines = append(lines, fmt.Sprintf("📊 %s: %s", messages.Pick("Dimensione", "Size"), formatBytes(size)))
+			lines = append(lines, fmt.Sprintf("📊 %s: %s", messages.PickLang(lang, "Dimensione", "Size"), formatBytes(size)))
 		}
 
 		cloudCopied, _ := mapLookup(data, "cloud_copied").(bool)
 		cloudDest := text("cloud_destination")
 		cloudErr := text("cloud_error")
 		if cloudCopied && cloudDest != "" {
-			lines = append(lines, fmt.Sprintf("☁️ %s: %s", messages.Pick("Copia cloud", "Cloud copy"), cloudDest))
+			lines = append(lines, fmt.Sprintf("☁️ %s: %s", messages.PickLang(lang, "Copia cloud", "Cloud copy"), cloudDest))
 		} else if cloudErr != "" {
-			lines = append(lines, fmt.Sprintf("⚠️ %s: %s", messages.Pick("Copia cloud non riuscita", "Cloud copy failed"), cloudErr))
+			lines = append(lines, fmt.Sprintf("⚠️ %s: %s", messages.PickLang(lang, "Copia cloud non riuscita", "Cloud copy failed"), cloudErr))
 		}
 
 		ftpUploaded, _ := mapLookup(data, "ftp_uploaded").(bool)
@@ -1083,13 +1291,13 @@ func formatEvent(event string, data map[string]any) string {
 			} else {
 				dest = fmt.Sprintf("%s (%s)", ftpHost, baseName)
 			}
-			lines = append(lines, fmt.Sprintf("🌐 %s: %s", messages.Pick("Caricato via FTP", "Uploaded via FTP"), dest))
+			lines = append(lines, fmt.Sprintf("🌐 %s: %s", messages.PickLang(lang, "Caricato via FTP", "Uploaded via FTP"), dest))
 		} else if ftpErr != "" {
 			dest := ftpHost
 			if dest == "" {
 				dest = "FTP"
 			}
-			lines = append(lines, fmt.Sprintf("⚠️ %s (%s): %s", messages.Pick("Caricamento FTP non riuscito", "FTP upload failed"), dest, ftpErr))
+			lines = append(lines, fmt.Sprintf("⚠️ %s (%s): %s", messages.PickLang(lang, "Caricamento FTP non riuscito", "FTP upload failed"), dest, ftpErr))
 		}
 
 		tgParts, _ := jsonInt(mapLookup(data, "telegram_parts"))
@@ -1097,23 +1305,23 @@ func formatEvent(event string, data map[string]any) string {
 			if tgParts > 1 {
 				baseName := filepath.Base(path)
 				lines = append(lines, fmt.Sprintf("📱 %s %d %s: cat %s.0* > %s",
-					messages.Pick("Inviato su Telegram in", "Sent to Telegram in"), tgParts,
-					messages.Pick("parti; per ricomporlo", "parts; to rebuild it"), baseName, baseName))
+					messages.PickLang(lang, "Inviato su Telegram in", "Sent to Telegram in"), tgParts,
+					messages.PickLang(lang, "parti; per ricomporlo", "parts; to rebuild it"), baseName, baseName))
 			} else {
-				lines = append(lines, fmt.Sprintf("📱 %s", messages.Pick("Inviato anche come allegato Telegram", "Also sent as a Telegram document")))
+				lines = append(lines, fmt.Sprintf("📱 %s", messages.PickLang(lang, "Inviato anche come allegato Telegram", "Also sent as a Telegram document")))
 			}
 		} else if tgErr := text("telegram_error"); tgErr != "" {
 			sent := ""
 			if tgParts > 0 {
-				sent = fmt.Sprintf(" (%s %d)", messages.Pick("parti inviate:", "parts sent:"), tgParts)
+				sent = fmt.Sprintf(" (%s %d)", messages.PickLang(lang, "parti inviate:", "parts sent:"), tgParts)
 			}
-			lines = append(lines, fmt.Sprintf("⚠️ %s%s: %s", messages.Pick("Invio Telegram non riuscito", "Telegram upload failed"), sent, tgErr))
+			lines = append(lines, fmt.Sprintf("⚠️ %s%s: %s", messages.PickLang(lang, "Invio Telegram non riuscito", "Telegram upload failed"), sent, tgErr))
 		}
 
 		return strings.Join(lines, "\n")
 	case "daemon_restarted":
 		run, _ := jsonInt(mapLookup(data, "run"))
-		head := messages.Pick(
+		head := messages.PickLang(lang,
 			fmt.Sprintf("♻️ Gextto riavviato (avvio #%d)", run),
 			fmt.Sprintf("♻️ Gextto restarted (run #%d)", run),
 		)
@@ -1124,46 +1332,46 @@ func formatEvent(event string, data map[string]any) string {
 		unclean, _ := mapLookup(data, "unclean").(bool)
 		switch {
 		case hasDown && down >= 0:
-			head += messages.Pick(" · fermo da ", " · down for ") + formatDuration(down)
+			head += messages.PickLang(lang, " · fermo da ", " · down for ") + formatDuration(down)
 		case unclean:
-			head += messages.Pick(" · dopo un arresto anomalo", " · after an unclean shutdown")
+			head += messages.PickLang(lang, " · dopo un arresto anomalo", " · after an unclean shutdown")
 		}
 		return head
 	case "daemon_error":
 		errText := text("error")
 		if errText == "" {
-			errText = messages.Pick("errore non specificato", "unspecified error")
+			errText = messages.PickLang(lang, "errore non specificato", "unspecified error")
 		}
 		return fmt.Sprintf("Gextto: %s — %s",
-			messages.Pick("🛑 arresto per un errore", "🛑 stopped by an error"), errText)
+			messages.PickLang(lang, "🛑 arresto per un errore", "🛑 stopped by an error"), errText)
 	case "engine_crashed":
 		errText := text("error")
 		if errText == "" {
-			errText = messages.Pick("uscita inattesa", "unexpected exit")
+			errText = messages.PickLang(lang, "uscita inattesa", "unexpected exit")
 		}
 		restarts, _ := jsonInt(mapLookup(data, "restarts_in_window"))
 		return fmt.Sprintf("gx-torrent: %s — %s (%s %d)",
-			messages.Pick("⚠️ uscita inattesa", "⚠️ unexpected exit"),
+			messages.PickLang(lang, "⚠️ uscita inattesa", "⚠️ unexpected exit"),
 			errText,
-			messages.Pick("riavvii recenti:", "recent restarts:"), restarts)
+			messages.PickLang(lang, "riavvii recenti:", "recent restarts:"), restarts)
 	case "engine_restarted":
 		restarts, _ := jsonInt(mapLookup(data, "restarts_in_window"))
 		return fmt.Sprintf("gx-torrent: %s (%s %d)",
-			messages.Pick("🔄 riavviato dopo un'uscita inattesa", "🔄 restarted after an unexpected exit"),
-			messages.Pick("riavvii recenti:", "recent restarts:"), restarts)
+			messages.PickLang(lang, "🔄 riavviato dopo un'uscita inattesa", "🔄 restarted after an unexpected exit"),
+			messages.PickLang(lang, "riavvii recenti:", "recent restarts:"), restarts)
 	case "engine_fallback":
 		target := text("to")
 		if target == "" {
 			target = BackendQbittorrent
 		}
 		return fmt.Sprintf("Gextto: %s %s",
-			messages.Pick(
+			messages.PickLang(lang,
 				"⛔ il motore torrent non riesce a restare attivo; passo al motore",
 				"⛔ the torrent engine cannot stay up; switching to the",
 			), target)
 	case "engine_recovery":
 		reason := text("reason")
-		head := messages.Pick(
+		head := messages.PickLang(lang,
 			"⛔ nessun motore torrent alternativo disponibile: trasferimenti fermi, controlla la configurazione",
 			"⛔ no alternative torrent engine is available: transfers stopped, check the configuration",
 		)
@@ -1173,67 +1381,67 @@ func formatEvent(event string, data map[string]any) string {
 		return "Gextto: " + head
 	case "engine_rollback":
 		return fmt.Sprintf("gx-torrent: %s",
-			messages.Pick(
+			messages.PickLang(lang,
 				"♻️ non riesce a restare attivo; ho ripristinato il binario precedente",
 				"♻️ cannot stay up; the previous binary has been restored",
 			))
 	case "engine_unresponsive":
 		seconds, _ := jsonInt(mapLookup(data, "unresponsive_seconds"))
 		return fmt.Sprintf("gx-torrent: %s (%s %d s)",
-			messages.Pick(
+			messages.PickLang(lang,
 				"⚠️ non risponde più alle API pur essendo attivo; lo riavvio",
 				"⚠️ stopped answering its API while still running; restarting it",
 			),
-			messages.Pick("fermo da", "silent for"), seconds)
+			messages.PickLang(lang, "fermo da", "silent for"), seconds)
 	case "engine_unstable":
 		retry, _ := jsonInt(mapLookup(data, "retry_minutes"))
 		return fmt.Sprintf("gx-torrent: %s (%s %d min)",
-			messages.Pick(
+			messages.PickLang(lang,
 				"⛔ non riesce a restare attivo e nessun motore alternativo è disponibile: trasferimenti fermi, riprovo in modalità sicura",
 				"⛔ cannot stay up and no alternative engine is available: transfers stopped, retrying in safe mode",
 			),
-			messages.Pick("prossimo tentativo tra", "next attempt in"), retry)
+			messages.PickLang(lang, "prossimo tentativo tra", "next attempt in"), retry)
 	case "engine_error":
 		errText := text("error")
 		if errText == "" {
-			errText = messages.Pick("errore non specificato", "unspecified error")
+			errText = messages.PickLang(lang, "errore non specificato", "unspecified error")
 		}
 		return fmt.Sprintf("gx-torrent: %s — %s",
-			messages.Pick("⚠️ problema", "⚠️ problem"), errText)
+			messages.PickLang(lang, "⚠️ problema", "⚠️ problem"), errText)
 	case "health_degraded":
 		return fmt.Sprintf("%s\n\n%s: %s\n%s: %s",
-			messages.Pick("⚠️ GEXTTO HA UN PROBLEMA", "⚠️ GEXTTO HAS A PROBLEM"),
-			messages.Pick("Stato", "Status"), text("status"),
-			messages.Pick("Motivo", "Reason"), text("reason"))
+			messages.PickLang(lang, "⚠️ GEXTTO HA UN PROBLEMA", "⚠️ GEXTTO HAS A PROBLEM"),
+			messages.PickLang(lang, "Stato", "Status"), text("status"),
+			messages.PickLang(lang, "Motivo", "Reason"), text("reason"))
 	case "health_recovered":
-		return messages.Pick("✅ Gextto di nuovo operativo", "✅ Gextto healthy again")
+		return messages.PickLang(lang, "✅ Gextto di nuovo operativo", "✅ Gextto healthy again")
 	case "cycle_warning":
 		return fmt.Sprintf("%s\n\n%s: %s",
-			messages.Pick("⚠️ LA RICERCA AUTOMATICA HA UN PROBLEMA", "⚠️ THE AUTOMATIC SEARCH HAS A PROBLEM"),
-			messages.Pick("Motivo", "Reason"), text("reason"))
+			messages.PickLang(lang, "⚠️ LA RICERCA AUTOMATICA HA UN PROBLEMA", "⚠️ THE AUTOMATIC SEARCH HAS A PROBLEM"),
+			messages.PickLang(lang, "Motivo", "Reason"), text("reason"))
 	case "cycle_recovered":
-		return messages.Pick("✅ La ricerca automatica è di nuovo regolare", "✅ The automatic search is healthy again")
+		return messages.PickLang(lang, "✅ La ricerca automatica è di nuovo regolare", "✅ The automatic search is healthy again")
 	case "provider_login_failed":
 		return fmt.Sprintf("%s\n\n📡 %s: %s\n📝 %s: %s\n\n💡 %s",
-			messages.Pick("⚠️ LOGIN AL PROVIDER NON RIUSCITO", "⚠️ PROVIDER LOGIN FAILED"),
-			messages.Pick("Fonte", "Source"), text("source"),
-			messages.Pick("Motivo", "Reason"), text("error"),
-			messages.Pick(
+			messages.PickLang(lang, "⚠️ LOGIN AL PROVIDER NON RIUSCITO", "⚠️ PROVIDER LOGIN FAILED"),
+			messages.PickLang(lang, "Fonte", "Source"), text("source"),
+			messages.PickLang(lang, "Motivo", "Reason"), text("error"),
+			messages.PickLang(lang,
 				"Controlla utente e password nella web UI del servizio e usa «Rifai login»; finché non funziona, disabilita l'indexer nelle ricerche.",
 				"Check the username and password in the service web UI and use «Rifai login»; until it works, disable the indexer in the searches.",
 			))
 	case "provider_login_recovered":
 		return fmt.Sprintf("%s\n\n📡 %s: %s",
-			messages.Pick("✅ LOGIN AL PROVIDER DI NUOVO ATTIVO", "✅ PROVIDER LOGIN WORKING AGAIN"),
-			messages.Pick("Fonte", "Source"), text("source"))
+			messages.PickLang(lang, "✅ LOGIN AL PROVIDER DI NUOVO ATTIVO", "✅ PROVIDER LOGIN WORKING AGAIN"),
+			messages.PickLang(lang, "Fonte", "Source"), text("source"))
 	case "indexer_failing":
 		failures, _ := jsonInt(mapLookup(data, "failed_links"))
 		return fmt.Sprintf("%s\n\n📡 %s: %s\n🔗 %s: %d\n📝 %s: %s\n\n💡 %s",
-			messages.Pick("⚠️ INDEXER DA CONTROLLARE", "⚠️ INDEXER NEEDS ATTENTION"),
-			messages.Pick("Fonte", "Source"), text("source"),
-			messages.Pick("Link falliti", "Failed links"), failures,
-			messages.Pick("Motivo", "Reason"), text("error"),
-			messages.Pick(
+			messages.PickLang(lang, "⚠️ INDEXER DA CONTROLLARE", "⚠️ INDEXER NEEDS ATTENTION"),
+			messages.PickLang(lang, "Fonte", "Source"), text("source"),
+			messages.PickLang(lang, "Link falliti", "Failed links"), failures,
+			messages.PickLang(lang, "Motivo", "Reason"), text("error"),
+			messages.PickLang(lang,
 				"Rifai il login nell'indexer (o aggiorna le credenziali) e controlla che il servizio risponda; finché non funziona, disabilitalo nelle ricerche.",
 				"Sign in to the indexer again (or update its credentials) and check that the service answers; until it works, disable it in the searches.",
 			))

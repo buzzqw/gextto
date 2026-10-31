@@ -57,7 +57,7 @@ altro.
 | **Protocollo** | BitTorrent v1, v2 e ibrido (BEP 52) · 34 BEP implementati e testati ([elenco](docs/bep.md)) |
 | **Rete** | TCP + uTP su una porta · UPnP, NAT-PMP, PCP · holepunching BEP 55 · proxy SOCKS5/HTTP · killswitch VPN |
 | **Automazione** | Serie TV, film, fumetti · Torznab (Jackett, Prowlarr, indexarr) · RSS · ricerca web · sostituzione dei download bloccati |
-| **Integrazioni** | Jellyfin, Plex, Jellyseerr (sottoinsieme API v3), aMule (eD2k e Kad), Telegram, e-mail, Discord/Slack/ntfy/Gotify/Pushover, iCal |
+| **Integrazioni** | Jellyfin, Plex, Jellyseerr (sottoinsieme API v3), aMule (eD2k e Kad), Telegram, e-mail, Discord/Slack/ntfy/Gotify/Pushover/Apprise, iCal |
 | **Interfacce** | Web UI (SSR + HTMX, Go puro, PWA installabile) · TUI da terminale via SSH · API JSON |
 | **Build** | Go puro (`CGO_ENABLED=0`) · Linux x86_64/aarch64 · gx-torrent anche su Windows |
 
@@ -263,8 +263,10 @@ un checkout: `git pull --ff-only && ./scripts/update.sh`.
 
 ### Integrazioni, controllo e interfacce
 
-- **Notifiche e media server**: Telegram, e-mail, webhook (Discord, Slack,
-  ntfy, Gotify, Pushover), aggiornamento delle cartelle di Jellyfin e Plex, un
+- **Notifiche e media server**: Telegram, e-mail, webhook e i canali dedicati
+  Discord, Slack, Gotify, ntfy, Pushover e Apprise, un programma personale su
+  qualsiasi evento, interruttori per gruppi di eventi, anti-spam e una lingua
+  dei messaggi a scelta; aggiornamento delle cartelle di Jellyfin e Plex, un
   feed iCal di arrivi e date di uscita.
 - **Dal browser**: magnet e file `.torrent` entrano dritti nella coda, con gli
   handler `magnet:`/`.torrent` oppure con un'estensione scritta per qBittorrent
@@ -423,7 +425,9 @@ semplice con tutto ciò che serve a un client autonomo.
 - **Dal telefono.** La pagina si installa come app (manifest e service worker
   per le sole risorse condivise) e ha l'uscita dalla sessione quando c'è una
   password.
-- **Notifiche** sugli stessi canali di Gextto, con un pulsante di prova.
+- **Notifiche** sugli stessi canali di Gextto, più il server Apprise, i canali
+  dedicati Discord, Slack, Gotify, ntfy e Pushover e uno script personalizzato,
+  con un pulsante di prova.
 - **Si aggiorna da solo** dalle build della CI quando cambia il suo codice,
   verificato SHA-256, con ripristino automatico.
 - **Leggero sulla macchina.** Un solo processo in Go puro, senza motore esterno
