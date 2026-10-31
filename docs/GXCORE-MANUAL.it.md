@@ -134,9 +134,10 @@ sempre, disco e cache, rete, coda e torrent più attivi.
 ![Statistiche](screenshots/gx-core/it/stats.png)
 
 **Impostazioni** raccoglie cartelle, watch folder, rete, protocolli, coda,
-bandwidth e scheduler per giorno, limiti di seed, auto-speed sulla latenza,
-DLNA, notifiche, categorie, profili di qualità, azioni a fine download,
-manutenzione e aggiornamento.
+bandwidth e scheduler per giorno, limiti di seed, velocità automatica
+(autotune, che misura la linea e regola download e upload), DLNA, notifiche,
+categorie, profili di qualità, azioni a fine download, manutenzione e
+aggiornamento.
 
 ![Impostazioni](screenshots/gx-core/it/settings.png)
 

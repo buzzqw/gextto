@@ -133,7 +133,8 @@ disk and cache, network, queue and the busiest torrents.
 ![Statistics](screenshots/gx-core/en/stats.png)
 
 **Settings** collects folders, watch folders, network, protocols, queue,
-bandwidth and the per-day scheduler, seeding limits, latency auto-speed, DLNA,
+bandwidth and the per-day scheduler, seeding limits, automatic speed
+(autotune, which measures the line and moves download and upload), DLNA,
 notifications, categories, quality profiles, completion actions, maintenance
 and updates.
 
