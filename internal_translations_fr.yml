@@ -6171,3 +6171,4 @@ fra:
   "Ferma il controllo dopo il file in corso; la posizione resta salvata": "Arrête la vérification après le fichier en cours ; la position reste enregistrée"
   "File danneggiati": "Fichiers endommagés"
   "Riavvia da capo": "Recommencer"
+  "Sposta il file danneggiato nel cestino e cerca una release diversa?": "Déplacer le fichier endommagé vers la corbeille et chercher une autre version ?"

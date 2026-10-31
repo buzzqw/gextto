@@ -355,8 +355,8 @@ decodes them with `ffmpeg`, one file at a time and in the background, to find da
 header-only probe cannot see. The pass keeps its position in `ui_state` and its findings in
 `media_integrity`, so it can be stopped, resumed after a restart and re-run from the
 beginning. A damaged episode can be sent back to the downloads from the report: the old
-release is blocklisted and the gap search asks for a different one. The panel is the same
-in Gextto's UI and reflects the job state; `ffprobe` and `ffmpeg` are required.
+release is blocklisted and the gap search asks for a different one. The panel lives in
+Gextto's UI and reflects the job state; `ffprobe` and `ffmpeg` are required.
 
 **The standalone page** is laid out like qBittorrent's: filters on the left, one line per
 torrent, the detail panel below, a full context menu, per-user columns and widths kept on

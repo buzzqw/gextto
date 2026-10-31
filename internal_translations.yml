@@ -5515,3 +5515,4 @@ eng:
   "Ferma il controllo dopo il file in corso; la posizione resta salvata": "Stops the check after the current file; the position stays saved"
   "File danneggiati": "Damaged files"
   "Riavvia da capo": "Start over"
+  "Sposta il file danneggiato nel cestino e cerca una release diversa?": "Move the damaged file to the trash and search for a different release?"

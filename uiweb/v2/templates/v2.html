@@ -2417,7 +2417,7 @@
         <td class="truncate" title="{{.Path}}">{{.Path}}</td>
         <td>{{if eq .Status "damaged"}}<span class="badge err">Danneggiato</span>{{else}}<span class="badge warn">Illeggibile</span>{{end}}</td>
         <td class="truncate" title="{{.Detail}}">{{.Detail}}</td>
-        <td class="row-actions">{{if .RedownloadPath}}{{template "v2_action_btn" (dict "Redirect" "/?view=maintenance" "Path" .RedownloadPath "Method" "POST" "Body" "{}" "Label" "Riscarica" "Class" "" "Title" "Sposta il file danneggiato nel cestino e cerca una release diversa" "Confirm" "Sposta il file danneggiato nel cestino e cerca una release diversa per questa puntata?")}}{{end}}</td>
+        <td class="row-actions">{{if .RedownloadPath}}{{template "v2_action_btn" (dict "Redirect" "/?view=maintenance" "Path" .RedownloadPath "Method" "POST" "Body" "{}" "Label" "Riscarica" "Class" "" "Title" "Sposta il file danneggiato nel cestino e cerca una release diversa" "Confirm" "Sposta il file danneggiato nel cestino e cerca una release diversa?")}}{{end}}</td>
       </tr>{{end}}</tbody>
     </table></div>
     {{else if .Running}}<p class="muted">Nessun file danneggiato finora.</p>

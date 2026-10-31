@@ -6119,3 +6119,4 @@ pol:
   "Ferma il controllo dopo il file in corso; la posizione resta salvata": "Zatrzymuje sprawdzanie po bieżącym pliku; pozycja pozostaje zapisana"
   "File danneggiati": "Uszkodzone pliki"
   "Riavvia da capo": "Zacznij od nowa"
+  "Sposta il file danneggiato nel cestino e cerca una release diversa?": "Przenieść uszkodzony plik do kosza i wyszukać inną wersję?"
