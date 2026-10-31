@@ -33,10 +33,21 @@ const (
 	// mediaIntegrityProbeTimeout bounds the metadata probe: reading the header
 	// of a file on a slow network share must never pin the worker.
 	mediaIntegrityProbeTimeout = 2 * time.Minute
-	// mediaIntegrityDecodeTimeout bounds the full decode. A two-hour movie on a
-	// slow disk can take a while; beyond this the file is reported as unreadable
-	// with the timeout as the reason, and the scan moves on.
+	// mediaIntegrityDecodeTimeout is the minimum time a full decode may take.
+	// Beyond the bound the file is reported as unreadable with the timeout as
+	// the reason, and the scan moves on.
 	mediaIntegrityDecodeTimeout = 30 * time.Minute
+	// mediaIntegrityDecodeSlowFactor is how much wall time the decode may take
+	// for every second of media. A 4K HEVC file on a low-power CPU decodes at
+	// about real time, so a fixed bound would call it unreadable while it is
+	// only slow.
+	mediaIntegrityDecodeSlowFactor = 3
+	// mediaIntegrityDecodeTimeoutMax caps the adaptive bound, so a stalled read
+	// cannot pin the worker for a whole day.
+	mediaIntegrityDecodeTimeoutMax = 6 * time.Hour
+	// mediaIntegrityUnreadableRetry is how long a file that could not be read
+	// waits before another attempt: a timeout says nothing about the file.
+	mediaIntegrityUnreadableRetry = 24 * time.Hour
 	// mediaIntegrityDetailLimit bounds the ffmpeg message kept for a file.
 	mediaIntegrityDetailLimit = 500
 	// mediaIntegrityStateKey is the ui_state key holding the resumable scan.
@@ -171,7 +182,6 @@ type MediaIntegrityState struct {
 	ManifestFingerprint string `json:"manifest_fingerprint"`
 	Total               int    `json:"total"`
 	Checked             int    `json:"checked"`
-	Damaged             int    `json:"damaged"`
 	Running             bool   `json:"running"`
 	Done                bool   `json:"done"`
 	Current             string `json:"current"`
@@ -190,6 +200,7 @@ type MediaIntegrityStatus struct {
 	Total      int                     `json:"total"`
 	Checked    int                     `json:"checked"`
 	Damaged    int                     `json:"damaged"`
+	Unreadable int                     `json:"unreadable"`
 	Cursor     string                  `json:"cursor"`
 	Current    string                  `json:"current"`
 	StartedAt  string                  `json:"started_at"`
@@ -208,16 +219,31 @@ type mediaIntegrityCandidate struct {
 	storedSize   int64
 	storedMTime  int64
 	storedStatus string
-	hasStored    bool
+	// storedCheckedAt is when the outcome was recorded, used to retry a file
+	// that could not be read after a while.
+	storedCheckedAt string
+	hasStored       bool
 }
 
 // needsCheck reports whether the file has to be probed again: never checked,
-// changed since the last check, or a forced pass.
+// changed since the last check, or a forced pass. A file that timed out is
+// retried once the wait has passed, because a timeout is not proof of damage;
+// a file found damaged is not decoded again by itself, the operator decides.
 func (c mediaIntegrityCandidate) needsCheck(force bool) bool {
 	if force || !c.hasStored {
 		return true
 	}
-	return c.target.SizeBytes != c.storedSize || c.target.ModifiedNS != c.storedMTime
+	if c.target.SizeBytes != c.storedSize || c.target.ModifiedNS != c.storedMTime {
+		return true
+	}
+	if c.storedStatus == "unreadable" {
+		checked, err := time.Parse(time.RFC3339, c.storedCheckedAt)
+		if err != nil {
+			return true
+		}
+		return time.Since(checked) >= mediaIntegrityUnreadableRetry
+	}
+	return false
 }
 
 // mediaIntegrityFileIdentity returns the resolved file, its size and its
@@ -258,11 +284,12 @@ func (d *Database) queryMediaIntegrityCandidates(after string, limit int) ([]med
 	if kind != "movie" {
 		type episodeRow struct {
 			id, season, episode, size, modified int64
-			series, path, status                string
+			series, path, status, checkedAt     string
 		}
 		var rowsData []episodeRow
 		rows, err := d.db.Query(`SELECT e.id, s.name, e.season, e.episode, e.archive_path,
-				COALESCE(mi.size_bytes,0), COALESCE(mi.modified_ns,0), COALESCE(mi.status,'')
+				COALESCE(mi.size_bytes,0), COALESCE(mi.modified_ns,0), COALESCE(mi.status,''),
+				COALESCE(mi.checked_at,'')
 			FROM episodes e
 			JOIN series s ON s.id=e.series_id
 			LEFT JOIN media_integrity mi ON mi.kind='episode' AND mi.series_name=s.name
@@ -275,7 +302,7 @@ func (d *Database) queryMediaIntegrityCandidates(after string, limit int) ([]med
 		for rows.Next() {
 			var row episodeRow
 			if err := rows.Scan(&row.id, &row.series, &row.season, &row.episode, &row.path,
-				&row.size, &row.modified, &row.status); err != nil {
+				&row.size, &row.modified, &row.status, &row.checkedAt); err != nil {
 				rows.Close()
 				return nil, err
 			}
@@ -296,8 +323,9 @@ func (d *Database) queryMediaIntegrityCandidates(after string, limit int) ([]med
 					SizeBytes: size, ModifiedNS: modified, Resolved: resolved,
 				},
 				storedSize: row.size, storedMTime: row.modified,
-				hasStored:    strings.TrimSpace(row.status) != "",
-				storedStatus: row.status,
+				storedCheckedAt: row.checkedAt,
+				hasStored:       strings.TrimSpace(row.status) != "",
+				storedStatus:    row.status,
 			})
 			if len(candidates) >= limit {
 				return candidates, nil
@@ -312,12 +340,13 @@ func (d *Database) queryMediaIntegrityCandidates(after string, limit int) ([]med
 			movieAfter = afterID
 		}
 		type movieRow struct {
-			id, year, size, modified int64
-			name, path, status       string
+			id, year, size, modified      int64
+			name, path, status, checkedAt string
 		}
 		var rowsData []movieRow
 		rows, err := d.db.Query(`SELECT m.id, COALESCE(m.name,''), COALESCE(m.year,0), t.processed_path,
-				COALESCE(mi.size_bytes,0), COALESCE(mi.modified_ns,0), COALESCE(mi.status,'')
+				COALESCE(mi.size_bytes,0), COALESCE(mi.modified_ns,0), COALESCE(mi.status,''),
+				COALESCE(mi.checked_at,'')
 			FROM movies m
 			JOIN torrent_meta t ON lower(t.hash)=lower(m.magnet_hash)
 			LEFT JOIN media_integrity mi ON mi.kind='movie' AND mi.movie_name=COALESCE(m.name,'')
@@ -330,7 +359,7 @@ func (d *Database) queryMediaIntegrityCandidates(after string, limit int) ([]med
 		for rows.Next() {
 			var row movieRow
 			if err := rows.Scan(&row.id, &row.name, &row.year, &row.path,
-				&row.size, &row.modified, &row.status); err != nil {
+				&row.size, &row.modified, &row.status, &row.checkedAt); err != nil {
 				rows.Close()
 				return nil, err
 			}
@@ -351,8 +380,9 @@ func (d *Database) queryMediaIntegrityCandidates(after string, limit int) ([]med
 					Resolved: resolved,
 				},
 				storedSize: row.size, storedMTime: row.modified,
-				hasStored:    strings.TrimSpace(row.status) != "",
-				storedStatus: row.status,
+				storedCheckedAt: row.checkedAt,
+				hasStored:       strings.TrimSpace(row.status) != "",
+				storedStatus:    row.status,
 			})
 		}
 	}
@@ -915,13 +945,39 @@ func mediaIntegrityDetail(raw string) string {
 	return miTruncateRunes(strings.Join(kept, " · "), mediaIntegrityDetailLimit)
 }
 
+// mediaIntegrityDecodeTimeoutFor is the wall time a full decode of a file of
+// runtimeSeconds may take: the base bound for short files, more for long ones
+// on slow hardware, and a cap so a stalled read cannot pin the worker forever.
+func mediaIntegrityDecodeTimeoutFor(runtimeSeconds int64) time.Duration {
+	timeout := mediaIntegrityDecodeTimeout
+	if runtimeSeconds > 0 {
+		// The multiplier is capped before it is applied, so a nonsense
+		// duration from a broken header cannot overflow the multiplication.
+		capSeconds := int64(mediaIntegrityDecodeTimeoutMax / (time.Second * mediaIntegrityDecodeSlowFactor))
+		if runtimeSeconds > capSeconds {
+			return mediaIntegrityDecodeTimeoutMax
+		}
+		if scaled := time.Duration(runtimeSeconds) * time.Second * mediaIntegrityDecodeSlowFactor; scaled > timeout {
+			timeout = scaled
+		}
+	}
+	if timeout > mediaIntegrityDecodeTimeoutMax {
+		return mediaIntegrityDecodeTimeoutMax
+	}
+	return timeout
+}
+
 // mediaIntegrityDecode decodes every stream of the file with ffmpeg without
-// writing anything. It reports "ok", "damaged" or "canceled".
-func mediaIntegrityDecode(parent context.Context, file string) (string, string) {
+// writing anything, within the given bound. It reports "ok", "damaged",
+// "unreadable" or "canceled".
+func mediaIntegrityDecode(parent context.Context, file string, timeout time.Duration) (string, string) {
 	if parent == nil {
 		parent = context.Background()
 	}
-	ctx, cancel := context.WithTimeout(parent, mediaIntegrityDecodeTimeout)
+	if timeout <= 0 {
+		timeout = mediaIntegrityDecodeTimeout
+	}
+	ctx, cancel := context.WithTimeout(parent, timeout)
 	defer cancel()
 	command := exec.CommandContext(ctx, "ffmpeg",
 		"-nostdin",
@@ -943,9 +999,10 @@ func mediaIntegrityDecode(parent context.Context, file string) (string, string) 
 	err := command.Run()
 	detail := mediaIntegrityDetail(stderr.String())
 	if ctx.Err() == context.DeadlineExceeded {
-		// A timeout is not proof of damage: a very large file on a slow disk can
-		// just be slow. It stays a problem to look at, but is not called broken.
-		return "unreadable", fmt.Sprintf("the check did not finish within %s", mediaIntegrityDecodeTimeout)
+		// A timeout is not proof of damage: a large file on slow hardware or a
+		// slow disk can just be slow. It stays a problem to look at and is
+		// retried later, but it is not called broken.
+		return "unreadable", fmt.Sprintf("the check did not finish within %s", logging.HumanDuration(int64(timeout/time.Second)))
 	}
 	if parent.Err() != nil {
 		return "canceled", ""
@@ -969,7 +1026,8 @@ func mediaIntegrityCheckPath(ctx context.Context, path string) (string, string) 
 	if err != nil {
 		return "unreadable", err.Error()
 	}
-	if _, err := probeFileWithinContext(ctx, file, mediaIntegrityProbeTimeout); err != nil {
+	info, err := probeFileWithinContext(ctx, file, mediaIntegrityProbeTimeout)
+	if err != nil {
 		if ctx != nil && ctx.Err() != nil {
 			return "canceled", ""
 		}
@@ -978,7 +1036,7 @@ func mediaIntegrityCheckPath(ctx context.Context, path string) (string, string) 
 	if ctx != nil && ctx.Err() != nil {
 		return "canceled", ""
 	}
-	return mediaIntegrityDecode(ctx, file)
+	return mediaIntegrityDecode(ctx, file, mediaIntegrityDecodeTimeoutFor(info.RuntimeSeconds))
 }
 
 // ---------------------------------------------------------------------------
@@ -995,17 +1053,23 @@ func mediaIntegrityStatusFor(s *AppState) MediaIntegrityStatus {
 		status.Done = state.Done
 		status.Total = state.Total
 		status.Checked = state.Checked
-		status.Damaged = state.Damaged
 		status.Cursor = state.Cursor
 		status.Current = state.Current
 		status.StartedAt = state.StartedAt
 		status.FinishedAt = state.FinishedAt
 		if problems, err := s.db.MediaIntegrityProblems(); err == nil {
 			status.Problems = problems
-			// The panel shows how many files are damaged now, not only the
-			// ones found again in this pass: an unchanged damaged file is
-			// skipped but still listed.
-			status.Damaged = len(problems)
+			// The panel shows how many files are damaged and how many could
+			// not be read now, not only the ones found again in this pass: an
+			// unchanged problem is skipped but still listed.
+			status.Damaged, status.Unreadable = 0, 0
+			for _, problem := range problems {
+				if problem.Status == "damaged" {
+					status.Damaged++
+				} else {
+					status.Unreadable++
+				}
+			}
 		}
 	}
 	if s.jobs != nil {
@@ -1061,7 +1125,6 @@ func beginMediaIntegrityScan(s *AppState, restart bool, limit int) (*Job, bool, 
 		// must stay forced) and start from the beginning.
 		state.Cursor = ""
 		state.Checked = 0
-		state.Damaged = 0
 		state.Done = false
 		state.Current = ""
 		state.FinishedAt = ""
@@ -1167,9 +1230,13 @@ func runMediaIntegrityScan(ctx context.Context, s *AppState, jobID string, limit
 		if err := s.db.SaveMediaIntegrityCheck(check); err != nil {
 			return nil, err
 		}
-		if status != "ok" {
-			state.Damaged++
+		switch status {
+		case "damaged":
 			logging.Warn(fmt.Sprintf("🧪 The file of «%s» looks damaged: %s", target.Label(), detail))
+		case "unreadable":
+			// Not proof of damage: the file was too slow to read within the
+			// bound. It is retried later, and the log does not call it broken.
+			logging.Warn(fmt.Sprintf("🧪 The file of «%s» could not be checked and will be retried later: %s", target.Label(), detail))
 		}
 		state.Checked++
 		checkedThisRun++
@@ -1199,12 +1266,28 @@ func runMediaIntegrityScan(ctx context.Context, s *AppState, jobID string, limit
 	if err := s.db.SaveMediaIntegrityState(state); err != nil {
 		return nil, err
 	}
+	// The summary counts the problems that are in the library now, split by
+	// status, exactly like the panel: a file that timed out is not counted as
+	// damaged, and a file already replaced no longer counts.
+	damaged, unreadable := 0, 0
+	if problems, err := s.db.MediaIntegrityProblems(); err != nil {
+		logging.Debug("media check: the problem list could not be read for the summary", "error", err)
+	} else {
+		for _, problem := range problems {
+			if problem.Status == "damaged" {
+				damaged++
+			} else {
+				unreadable++
+			}
+		}
+	}
 	report := map[string]any{
 		"ok":               true,
 		"checked":          state.Checked,
 		"checked_this_run": checkedThisRun,
 		"total":            state.Total,
-		"damaged":          state.Damaged,
+		"damaged":          damaged,
+		"unreadable":       unreadable,
 		"done":             state.Done,
 		"canceled":         ctx.Err() != nil,
 		"started_at":       state.StartedAt,
@@ -1213,16 +1296,30 @@ func runMediaIntegrityScan(ctx context.Context, s *AppState, jobID string, limit
 	}
 	switch {
 	case ctx.Err() != nil:
-		logging.Info(fmt.Sprintf("🧪 Media integrity check stopped: %s checked, %s found damaged",
-			countLabel(state.Checked, "file", "files"), countLabel(state.Damaged, "file", "files")))
+		logging.Info(fmt.Sprintf("🧪 Media integrity check stopped: %s", mediaIntegritySummary(state.Checked, damaged, unreadable, false)))
 	case state.Done:
-		logging.Info(fmt.Sprintf("🧪 Media integrity check finished: %s checked, %s found damaged",
-			countLabel(state.Checked, "file", "files"), countLabel(state.Damaged, "file", "files")))
+		logging.Info(fmt.Sprintf("🧪 Media integrity check finished: %s", mediaIntegritySummary(state.Checked, damaged, unreadable, false)))
 	case checkedThisRun > 0:
-		logging.Info(fmt.Sprintf("🧪 Media integrity check: %s checked so far, %s found damaged",
-			countLabel(state.Checked, "file", "files"), countLabel(state.Damaged, "file", "files")))
+		logging.Info(fmt.Sprintf("🧪 Media integrity check: %s", mediaIntegritySummary(state.Checked, damaged, unreadable, true)))
 	}
 	return report, nil
+}
+
+// mediaIntegritySummary is the tail of the summary line: how many files were
+// checked, which ones are damaged and which ones could not be read. Only the
+// counts that happened are named, so the line stays one readable sentence.
+func mediaIntegritySummary(checked, damaged, unreadable int, soFar bool) string {
+	checkedLabel := "checked"
+	if soFar {
+		checkedLabel = "checked so far"
+	}
+	summary := fmt.Sprintf("%s %s, %s found damaged",
+		countLabel(checked, "file", "files"), checkedLabel, countLabel(damaged, "file", "files"))
+	if unreadable > 0 {
+		summary += fmt.Sprintf(", %s could not be read",
+			countLabel(unreadable, "file", "files"))
+	}
+	return summary
 }
 
 // sleepMediaIntegrity waits for d, returning false when the job was canceled.

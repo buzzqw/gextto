@@ -2374,6 +2374,7 @@
   <div class="panel-body">
     <p class="hint">Legge ogni file archiviato con ffprobe e poi lo decodifica con ffmpeg, un file alla volta e in secondo piano, per trovare puntate e film danneggiati. Il controllo riparte dal punto salvato anche dopo un riavvio: puoi interromperlo e riprenderlo quando vuoi.</p>
     <p class="hint">I file già controllati e non cambiati vengono saltati; «Riavvia da capo» li ricontrolla tutti.</p>
+    <p class="hint">Un file che non si riesce a leggere entro il tempo previsto non è dato per danneggiato: il controllo lo riprova più tardi.</p>
     {{if not .Available}}<p class="alert" role="alert"><span>Servono ffprobe e ffmpeg: installali e riavvia Gextto per attivare il controllo.</span> <span>Mancano:</span> <code>{{.Missing}}</code></p>
     {{else if .Enabled}}<p class="hint"><span>Controllo automatico attivo.</span> <span>Ogni</span> <strong>{{.IntervalMinutes}}</strong> <span>Minuti,</span> <strong>{{.Batch}}</strong> <span>File per volta.</span></p>
     {{else}}<p class="alert" role="status"><span>Il controllo automatico è disattivato.</span> <a href="/?view=settings&amp;tab=maintenance&amp;highlight=media_integrity_enabled#v2-setting-media_integrity_enabled">Attivalo in Configurazione → Manutenzione → Controllo integrità file.</a></p>{{end}}
@@ -2397,13 +2398,14 @@
     {{if .Started}}<div class="stat-grid" style="margin-top:10px" aria-live="polite">
       <span class="stat"><strong>{{.Checked}}</strong> <span>Controllati</span></span>
       <span class="stat"><strong>{{.Damaged}}</strong> <span>Danneggiati</span></span>
+      {{if .Unreadable}}<span class="stat"><strong>{{.Unreadable}}</strong> <span>Illeggibili</span></span>{{end}}
       {{if .Running}}<span class="stat"><strong>{{.Percent}}%</strong></span>
       {{if .Current}}<span class="stat"><span>In corso:</span> <strong>{{.Current}}</strong></span>{{end}}{{end}}
     </div>{{end}}
     {{if .Message}}<p class="alert{{if not .Error}} ok{{end}}" role="{{if .Error}}alert{{else}}status{{end}}">{{.Message}}</p>{{end}}
     {{if .Problems}}
     <div class="table-wrap" style="margin-top:10px"><table class="data-table">
-      <caption class="sr-only">File danneggiati</caption>
+      <caption class="sr-only">File danneggiati o illeggibili</caption>
       <thead><tr><th scope="col">Elemento</th><th scope="col">File</th><th scope="col">Esito</th><th scope="col">Dettaglio</th><th scope="col">Azioni</th></tr></thead>
       <tbody>{{range .Problems}}<tr>
         <td>{{.Label}}</td>

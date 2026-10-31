@@ -387,6 +387,99 @@ func BenchmarkMediaIntegrityTargets(b *testing.B) {
 	}
 }
 
+func TestMediaIntegrityDecodeTimeoutGrowsWithTheRuntime(t *testing.T) {
+	cases := []struct {
+		runtime int64
+		want    time.Duration
+	}{
+		{0, mediaIntegrityDecodeTimeout},
+		{60, mediaIntegrityDecodeTimeout},
+		{600, mediaIntegrityDecodeTimeout},
+		{3724, 3724 * time.Second * mediaIntegrityDecodeSlowFactor},
+		{1_000_000, mediaIntegrityDecodeTimeoutMax},
+	}
+	for _, test := range cases {
+		if got := mediaIntegrityDecodeTimeoutFor(test.runtime); got != test.want {
+			t.Errorf("timeout for %ds = %s, want %s", test.runtime, got, test.want)
+		}
+	}
+}
+
+func TestMediaIntegrityDecodeReportsATimeoutAsUnreadable(t *testing.T) {
+	miInstallFakeMediaTools(t, "#!/bin/sh\nexec /bin/sleep 5\n")
+	file := filepath.Join(t.TempDir(), "slow.mkv")
+	if err := os.WriteFile(file, []byte("data"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	status, detail := mediaIntegrityDecode(context.Background(), file, 100*time.Millisecond)
+	if status != "unreadable" {
+		t.Fatalf("timeout = %q (%s), want unreadable", status, detail)
+	}
+	if !strings.Contains(detail, "did not finish") {
+		t.Fatalf("detail = %q, want the timeout reason", detail)
+	}
+}
+
+func TestMediaIntegritySummarySeparatesUnreadable(t *testing.T) {
+	if got, want := mediaIntegritySummary(3, 0, 1, false), "3 files checked, 0 files found damaged, 1 file could not be read"; got != want {
+		t.Fatalf("summary = %q, want %q", got, want)
+	}
+	if got, want := mediaIntegritySummary(2, 1, 0, true), "2 files checked so far, 1 file found damaged"; got != want {
+		t.Fatalf("summary = %q, want %q", got, want)
+	}
+}
+
+func TestMediaIntegrityRetriesUnreadableFilesAfterTheWait(t *testing.T) {
+	state := newTestAppState(t)
+	dir := t.TempDir()
+	file := filepath.Join(dir, "episode.mkv")
+	if err := os.WriteFile(file, []byte("data"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := state.db.db.Exec("INSERT INTO series(name) VALUES ('Show')"); err != nil {
+		t.Fatal(err)
+	}
+	var seriesID int64
+	if err := state.db.db.QueryRow("SELECT id FROM series WHERE name='Show'").Scan(&seriesID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := state.db.db.Exec("INSERT INTO episodes(series_id,season,episode,title,archive_path) VALUES (?1,1,1,'Show S01E01',?2)", seriesID, file); err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Stat(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	problem := MediaIntegrityProblem{
+		TargetID: 1, Kind: "episode", Series: "Show", Season: 1, Episode: 1, Path: file,
+		Status: "unreadable", Detail: "the check did not finish",
+		SizeBytes: info.Size(), ModifiedNS: info.ModTime().UnixNano(),
+		CheckedAt: time.Now().Format(time.RFC3339),
+	}
+	if err := state.db.SaveMediaIntegrityCheck(problem); err != nil {
+		t.Fatal(err)
+	}
+	if total, err := state.db.CountMediaIntegrityTargets(false); err != nil || total != 0 {
+		t.Fatalf("a fresh timeout must wait: total = %d (%v)", total, err)
+	}
+	problem.CheckedAt = time.Now().Add(-mediaIntegrityUnreadableRetry - time.Minute).Format(time.RFC3339)
+	if err := state.db.SaveMediaIntegrityCheck(problem); err != nil {
+		t.Fatal(err)
+	}
+	if total, err := state.db.CountMediaIntegrityTargets(false); err != nil || total != 1 {
+		t.Fatalf("an old timeout must be retried: total = %d (%v)", total, err)
+	}
+
+	// A damaged file is not decoded again by itself: only the operator acts.
+	problem.Status = "damaged"
+	if err := state.db.SaveMediaIntegrityCheck(problem); err != nil {
+		t.Fatal(err)
+	}
+	if total, err := state.db.CountMediaIntegrityTargets(false); err != nil || total != 0 {
+		t.Fatalf("a damaged file must not be rechecked by itself: total = %d (%v)", total, err)
+	}
+}
+
 func TestMediaIntegritySkipsCheckedUnchangedFiles(t *testing.T) {
 	state := newTestAppState(t)
 	dir := t.TempDir()

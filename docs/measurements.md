@@ -1154,15 +1154,28 @@ fake core that answers at once (now shortened in the tests: 33 s → 3.5 s).
 
 The file check (*Settings → Maintenance → File integrity check*) walks the library one
 target at a time, so the query between two `ffmpeg` decodes must not add load. With 5,000
-archived episodes, `MediaIntegrityTargets` returns one target in **99.7–100.6 µs/op**
-(1,984 B/op, 44 allocs/op) on the N97, build 1.2.2133. The `ffmpeg` decode dominates the
-run; the periodic worker probes the configured number of files per interval (one by
+archived episodes, `MediaIntegrityTargets` returns one target in **99.3–100.5 µs/op**
+(2,160 B/op, 45 allocs/op) on the N97, build 1.2.2138. The extra column that lets a
+timeout be retried costs 176 B/op and one allocation, not time. The `ffmpeg` decode
+dominates the run; the periodic worker probes the configured number of files per interval (one by
 default) and the manual *Check now* starts a pass, so the load stays off the acquisition
 cycle and the daemon at rest. Later passes skip the files whose size and modification time
 match the stored outcome: the cost is then one `stat` per library file, not a decode.
 
 ```
 CGO_ENABLED=0 go test . -run '^$' -bench '^BenchmarkMediaIntegrityTargets$' -benchmem -count=3
+```
+
+**Decode cost.** The `ffmpeg` decode is the expensive part and runs at about real
+time on the N97. A 60 s slice of a 12.2 GB 4K release (3840×1606 HEVC 10-bit Dolby
+Vision, 24 fps, on the NFS library share) decoded in **50.7 s of wall time** (1 m 49 s
+CPU across the four cores): about **1.18× real time**, so the full 62-minute episode
+needs roughly **73 minutes**. A fixed 30-minute bound therefore reported a healthy
+file as unreadable; the bound now grows with the media duration (3× the runtime,
+minimum 30 minutes, cap 6 hours). Measured on 31 October 2026, build 1.2.2137, with:
+
+```
+ffmpeg -nostdin -hide_banner -nostats -v error -i "<file>" -map '0:v?' -map '0:a?' -t 60 -f null -
 ```
 
 ### Packaging

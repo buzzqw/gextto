@@ -28,6 +28,7 @@ type v2MediaCheckView struct {
 	Checked         int
 	Total           int
 	Damaged         int
+	Unreadable      int
 	Percent         int
 	Current         string
 	StartedAt       string
@@ -62,6 +63,7 @@ func v2MediaCheckViewFrom(s *AppState) v2MediaCheckView {
 		Checked:         status.Checked,
 		Total:           status.Total,
 		Damaged:         status.Damaged,
+		Unreadable:      status.Unreadable,
 		Current:         status.Current,
 		StartedAt:       v2UpdateTimeLabel(status.StartedAt),
 		FinishedAt:      v2UpdateTimeLabel(status.FinishedAt),

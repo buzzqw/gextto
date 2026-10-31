@@ -1543,10 +1543,14 @@ The complete list of actions and parameters is in [Appendix C](#appendix-c-refer
   the middle, such as a truncated or badly downloaded episode. It saves its
   position and the files already checked, so it resumes after a restart and
   skips the unchanged ones; the first pass is the longest, later passes are much
-  faster. In *Maintenance* the panel shows progress and the damaged or
-  unreadable files with the reason reported by `ffmpeg`; **Check now** starts a
-  pass at once and **Start over** rechecks the whole library. Next to every
-  episode there is **Redownload**: it moves the damaged file out of the library,
+  faster. The time allowed for the decode grows with the file duration, so a
+  long 4K on a modest computer is not mistaken for a broken file; a file that
+  still cannot be read is not treated as damaged and is tried again later. In
+  *Maintenance* the panel shows progress and the damaged or unreadable files,
+  with the two counts kept apart and the reason reported by `ffmpeg`; **Check
+  now** starts a pass at once and **Start over** rechecks the whole library.
+  Next to every episode there is **Redownload**: it moves the damaged file out
+  of the library,
   blocklists the release and searches the same episode choosing a different
   release, so the same broken file is not taken again; when the new episode
   enters the library, the log says which release replaced the damaged file.
@@ -2959,7 +2963,7 @@ of the interface stays protected.
 | Check new and changed | Verifies only the files that are new, replaced or never checked. |
 | Stop | Stops the check after the current file; the position stays saved. |
 | Start over | Starts again from the first file, clears the previous results and rechecks the whole library. |
-| Damaged / Unreadable | The file could not be decoded, or it could not be read. |
+| Damaged / Unreadable | The file could not be decoded, or it could not be read within the allotted time: an unreadable file is not treated as broken and is retried automatically after a day. |
 | Redownload | Moves the damaged file out of the library, blocklists the old release and searches the same episode for a different release. |
 
 ### Rename folder content

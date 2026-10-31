@@ -1596,11 +1596,15 @@ L'elenco completo delle azioni e dei parametri è nell'[Appendice C](#appendice-
   decodifica il file per intero per trovare danni nel mezzo, come una puntata
   troncata o scaricata male. Salva la posizione e i file già controllati, quindi
   riprende dopo un riavvio e salta quelli non cambiati; la prima passata è la
-  più lunga, le successive sono molto più rapide. In *Manutenzione* il pannello
-  mostra avanzamento ed elenco dei file danneggiati o illeggibili con il motivo
-  riportato da `ffmpeg`; **Controlla ora** avvia subito un passaggio e
-  **Riavvia da capo** ricontrolla tutta la libreria. Accanto a ogni puntata c'è
-  **Riscarica**: sposta il file danneggiato fuori dalla
+  più lunga, le successive sono molto più rapide. Il tempo concesso alla
+  decodifica cresce con la durata del file, così un 4K lungo su un computer
+  modesto non viene scambiato per un file rotto; un file che non si riesce
+  comunque a leggere non è dato per danneggiato e viene ritentato più tardi. In
+  *Manutenzione* il pannello mostra avanzamento ed elenco dei file danneggiati o
+  illeggibili, con i due conteggi separati e il motivo riportato da `ffmpeg`;
+  **Controlla ora** avvia subito un passaggio e **Riavvia da capo** ricontrolla
+  tutta la libreria. Accanto a ogni puntata c'è **Riscarica**: sposta il file
+  danneggiato fuori dalla
   libreria, mette la release in blocklist e cerca la stessa puntata scegliendo
   una release diversa, così non riprende lo stesso file corrotto; quando la
   nuova puntata entra in libreria, il log dice quale release ha sostituito il
@@ -3039,7 +3043,7 @@ credenziali dell'interfaccia e riceve un cookie di sessione valido solo per
 | Controlla nuovi e cambiati | Verifica solo i file nuovi, sostituiti o mai controllati. |
 | Interrompi | Ferma il controllo dopo il file in corso; la posizione resta salvata. |
 | Riavvia da capo | Ricomincia dal primo file, cancella i risultati precedenti e ricontrolla tutta la libreria. |
-| Danneggiato / Illeggibile | Il file non è stato decodificato, oppure non è stato possibile leggerlo. |
+| Danneggiato / Illeggibile | Il file non è stato decodificato, oppure non è stato possibile leggerlo entro il tempo previsto: un illeggibile non è dato per rotto e viene ritentato automaticamente dopo un giorno. |
 | Riscarica | Sposta il file danneggiato fuori dalla libreria, mette la vecchia release in blocklist e cerca la stessa puntata scegliendo una release diversa. |
 
 ### Rinomina contenuto cartella

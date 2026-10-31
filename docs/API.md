@@ -182,7 +182,7 @@ change. `/ui` is not served. For operational checks use
 | POST | `/api/maintenance/backfill-media-info` | probe the missing media info |
 | POST | `/api/maintenance/media-integrity/start` | start or resume the file integrity check; restart=true forgets the previous outcomes and rechecks everything, batch=0 checks every pending file |
 | POST | `/api/maintenance/media-integrity/stop` | stop the file integrity check after the current file |
-| GET | `/api/maintenance/media-integrity` | progress and damaged files of the integrity check; files already checked and unchanged are skipped |
+| GET | `/api/maintenance/media-integrity` | progress and damaged files of the integrity check; files already checked and unchanged are skipped, a file that timed out is retried after a day, and the answer keeps damaged and unreadable counts apart |
 | POST | `/api/maintenance/clean-duplicates` | remove the duplicate library files |
 | POST | `/api/maintenance/clean-trash` | empty the recycle bin |
 | POST | `/api/maintenance/housekeeping` | run the housekeeping now |
