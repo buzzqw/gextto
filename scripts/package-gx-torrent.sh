@@ -438,7 +438,17 @@ To reset a forgotten password, stop the daemon, remove the password entry from
 
 ---
 
-## 8. License
+## 8. Supporting the project
+
+gx-torrent is free and has no advertising. If it is useful to you, the
+**Donate** button is always in the bottom-right corner of the interface (PayPal,
+in a new tab):
+
+[Donate with PayPal](https://www.paypal.com/cgi-bin/webscr?cmd=_donations&business=azanzani@gmail.com&item_name=Support+gx-torrent+Project)
+
+---
+
+## 9. License
 
 `gx-torrent` is open source distributed under the [EUPL 1.2](LICENSE) license.
 Third-party component notices and licenses are listed in

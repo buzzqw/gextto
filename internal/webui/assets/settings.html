@@ -563,10 +563,29 @@ Array.prototype.forEach.call(document.querySelectorAll('[data-formaction]'), fun
   }
   if (box) box.addEventListener('input', applyFilter);
 
+  // A link or a redirect can land on a section (#categories, #quality-profiles,
+  // #optimize, #maintenance…): open the tab that holds it and bring it into
+  // view, so an action in a sub-tab stays in that sub-tab instead of falling
+  // back to the first one.
+  function tabOfAnchor(id) {
+    var el = document.getElementById(id);
+    if (!el || !el.closest) return null;
+    var panel = el.closest('[role=tabpanel]');
+    if (!panel) return null;
+    var label = panel.getAttribute('aria-labelledby') || '';
+    return label.indexOf('tab-') === 0 ? label.slice(4) : null;
+  }
   var initial = (location.hash || '').slice(1);
+  var anchor = null;
+  if (initial && ORDER.indexOf(initial) < 0) {
+    anchor = document.getElementById(initial);
+    var fromAnchor = anchor ? tabOfAnchor(initial) : null;
+    initial = fromAnchor || '';
+  }
   if (!initial) { try { initial = sessionStorage.getItem('gx-settings-tab') || ''; } catch (e) {} }
   bar.hidden = false;
   showTab(initial);
+  if (anchor) anchor.scrollIntoView({block: 'start'});
 })();
 // "Test port": the reachability of the saved peer port, rendered by
 // /ui/portcheck (coloured dot and explanation) in the live region below.
@@ -646,4 +665,5 @@ document.addEventListener('DOMContentLoaded', function () { ensureTooltips(docum
 ensureTooltips(document);
 syncSchedModes();
 </script>
+<a class="donate" href="https://www.paypal.com/cgi-bin/webscr?cmd=_donations&amp;business=azanzani@gmail.com&amp;item_name=Support+gx-torrent+Project" target="_blank" rel="noopener noreferrer" title="Support gx-torrent with a PayPal donation" aria-label="Support gx-torrent with a PayPal donation"><span class="donate-icon" aria-hidden="true">❤️</span><span class="donate-label">Donate</span></a>
 </body></html>

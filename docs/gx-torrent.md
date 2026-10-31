@@ -385,12 +385,17 @@ The standalone pages follow the same structure:
   missing** searches the indexers again for what is missing. *Add title* is a guided
   dialog: series or movie, the title with a search that shows how it is named in
   the archive, feeds and indexers (pick one to use it) and the episodes of it
-  already in the archive, which fill the quality and the language when picked,
-  then seasons, language
-  (with quick picks), subtitles (terms matched on the release name, with quick
-  picks like `sub ita`) and quality, and the other options folded away.
+  already in the archive, which fill the language when picked, then seasons,
+  language (with quick picks), subtitles (terms matched on the release name,
+  with quick picks like `sub ita`) and the **quality profile** — the only quality
+  control, with a link to create or edit the profiles — and the other options
+  folded away.
 - **Archive** and **Settings** use the same top bar, tables and fieldsets;
   Settings keeps its *Save* button visible at the bottom while scrolling.
+- Every interface page carries the **Donate** link (PayPal, new tab) in the
+  bottom-right corner, above the status bar and the settings save bar; on a
+  phone only the heart remains. Its label and accessible name are in the
+  catalog, so it is translated like the rest of the page.
 - **Settings** is split into seven tabs — *Folders & files*, *Network*,
   *Bandwidth*, *Queue*, *Library*, *Interface* and *System* — each showing only
   its own groups, so the page opens short. The filter above searches every tab
@@ -980,17 +985,16 @@ dedicated to managing the titles the operator wants. The page says *Wanted* in
 the code and in the routes; the visible name is **Series & movies**. Each title
 has type (series/movie),
 seasons (two numbers: from/to, with "all seasons" as the default; the advanced
-field still accepts `1+`, `2-4`, `1`), language, quality (selectable from a drop-down
-among *Any*, *360p*, *480p*, *576p*, *720p*, *720p+*, *720p-1080p*, *1080p*,
-*1080p+*, *2160p 4K*, *2160p+ 4K+*), excluded, episode filter, category
-and path. You add it by hand, or you type a name and press **Search**: it reads
+field still accepts `1+`, `2-4`, `1`), language, quality profile (a drop-down
+with *Any quality* and the profiles defined in the settings), excluded, episode
+filter, category and path. You add it by hand, or you type a name and press **Search**: it reads
 the **archive** (fast), where the RSS feeds and the periodic indexer polls deposit
 everything they find, and proposes the **names found** (filtered by the
 language/quality already entered and by the searched words). Under every name it
 lists the **episodes of it already in the archive**, each with its resolution and
-language: choosing one fills the **title, the quality and the language** from
-that release — the release already taken wins, then the best resolution — and
-every field stays editable before saving. The list shows up to twelve episodes
+language: choosing one fills the **title and the language** from that release —
+the release already taken wins, then the best resolution — and every field stays
+editable before saving. The list shows up to twelve episodes
 and says how many others the archive holds. Tick **Search
 indexers too** to also query the configured indexers live — the slow path, for a
 title the archive does not know yet — and its results are archived too, so the
@@ -1002,10 +1006,11 @@ error: so you can
 immediately tell an absent or unresponsive indexer from the results of the
 feeds alone.
 
-**Quality profiles and upgrades.** Above the plain *Quality* field a title can
-choose a **quality profile** (*Settings → Quality profiles*): a named set of
-accepted resolutions (360p … 2160p) and an optional **cutoff**. The profile
-replaces the quality match; when a batch of releases carries several accepted
+**Quality profiles and upgrades.** A title chooses a **quality profile**
+(*Settings → Library → Quality profiles*): a named set of accepted resolutions
+(360p … 2160p) and an optional **cutoff**. It is the only quality control — the
+dialog has no plain quality field — and a title without a profile accepts any
+quality. The profile decides the match; when a batch of releases carries several accepted
 qualities the best one is taken. With a cutoff, an episode already downloaded at
 a lower quality is upgraded when a better release appears, until the cutoff is
 reached. The upgrade is **non-destructive**: the new torrent is added and the

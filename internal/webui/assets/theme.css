@@ -460,3 +460,23 @@ details.more > .fgrid, details.more > .checks { margin-bottom: 14px; }
 .preview .r { display: flex; gap: 10px; padding: 4px 0; border-bottom: 1px solid var(--border); }
 .preview .r:last-child { border-bottom: 0; }
 .preview .r .t { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+
+/* ---------- donate (standalone pages) ---------- */
+/* The support link, always visible in the bottom-right corner of the page.
+   It clears the status bar of the torrents page and the settings save bar. */
+.donate {
+  position: fixed; right: 16px; bottom: calc(76px + env(safe-area-inset-bottom));
+  z-index: 50; display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 14px; border-radius: 999px; border: 1px solid var(--border);
+  background: var(--surface); color: var(--text);
+  font-size: 12.5px; font-weight: 600; text-decoration: none;
+  box-shadow: var(--shadow);
+}
+.donate:hover, .donate:focus-visible {
+  transform: translateY(-1px); border-color: var(--accent); color: var(--accent);
+}
+.donate-icon { font-size: 1rem; line-height: 1; }
+@media (max-width: 760px) {
+  .donate { right: 12px; bottom: calc(88px + env(safe-area-inset-bottom)); padding: 10px; }
+  .donate-label { display: none; }
+}

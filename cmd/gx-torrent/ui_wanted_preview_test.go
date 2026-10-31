@@ -111,6 +111,47 @@ func TestWantedPreviewGivesEveryReleaseAVerdict(t *testing.T) {
 	}
 }
 
+// TestWantedPreviewUsesTheQualityProfile: the add dialog has one quality
+// control, the profile, so the preview must apply it and not fall back to an
+// absent quality field (which would list everything as acceptable).
+func TestWantedPreviewUsesTheQualityProfile(t *testing.T) {
+	d := feedDaemon(t, "")
+	srv := httptest.NewServer(d.routes())
+	defer srv.Close()
+	archiveItems(t, d, "feedA",
+		"Show Name S01E01 480p ITA WEB",
+		"Show Name S01E02 1080p ITA WEB",
+	)
+	q := url.Values{"name": {"Show Name"}, "kind": {"series"}, "seasons": {"1"}, "language": {"ita"}, "profile": {"HD"}}
+	resp, err := http.Get(srv.URL + "/ui/wanted-preview?" + q.Encode())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	var out struct {
+		Take     int `json:"take"`
+		Releases []struct {
+			Title   string `json:"title"`
+			Verdict string `json:"verdict"`
+		} `json:"releases"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]string{
+		"Show Name S01E01 480p ITA WEB":  verdictQuality,
+		"Show Name S01E02 1080p ITA WEB": verdictTake,
+	}
+	if out.Take != 1 {
+		t.Fatalf("take=%d, want 1 (only the 1080p release is inside the HD profile)", out.Take)
+	}
+	for _, r := range out.Releases {
+		if want[r.Title] != r.Verdict {
+			t.Errorf("%s: verdict %q, want %q", r.Title, r.Verdict, want[r.Title])
+		}
+	}
+}
+
 // TestWantedPreviewLiveSearchesTheIndexers: live=1 asks the indexers for the
 // title and lists what they return with the same verdicts, so a release that is
 // not in the archive yet can be seen and taken by hand (the interactive search).

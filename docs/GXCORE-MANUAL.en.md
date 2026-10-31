@@ -116,15 +116,19 @@ list and the denominator becomes the actual series.
 - **Episodes** opens the per-season grid with the state of every episode.
 - **Search**, in the *Add title* dialog, lists under every name the episodes
   already in the archive with their resolution and language: picking one fills
-  the title, the quality and the language from that release.
+  the title and the language from that release.
+- A title's quality is chosen **only through the profile**: the dialog has a
+  single *Quality profile* field and, below it, a **Create or edit profiles**
+  link that opens the *Library* tab of the settings. Without a profile the title
+  accepts any resolution.
 
 ![Episodes](screenshots/gx-core/en/wanted-episodes.png)
 
 ### Quality profiles and upgrades
 
-In **Settings → Quality profiles** you create a profile with the accepted
-resolutions (360p…2160p) and a **cutoff**. A title can choose the profile
-instead of the quality field. With a cutoff, an episode already downloaded at
+In **Settings → Library → Quality profiles** you create a profile with the
+accepted resolutions (360p…2160p) and a **cutoff**; it is the only way to set a
+title's quality. With a cutoff, an episode already downloaded at
 720p is replaced by a 1080p release when it appears: the new torrent enters, the
 old one leaves the session and **the files stay**.
 
@@ -164,7 +168,10 @@ completion actions, network and protocols, speed limits and the per-day
 scheduler, queue and cache, categories and quality profiles with DLNA, language
 and notifications, maintenance and updates. The search box at the top still
 looks in every tab at once; **Save** stays at the bottom and saves the whole
-page, including the groups of the tabs that are closed.
+page, including the groups of the tabs that are closed. After a save or an
+action inside a tab (adding a category, saving a profile, testing the port,
+sending a test notification) the page stays on that tab and confirms with a
+message in the bottom-right corner, so the button visibly did something.
 
 ![Settings](screenshots/gx-core/en/settings.png)
 
@@ -261,3 +268,10 @@ curl -X POST --data-urlencode \
 ```
 
 No personal data, no private trackers, no copyrighted content.
+
+## 12. Supporting the project
+
+gx-torrent is free and has no advertising. If it is useful to you, the
+**Donate** button is always in the bottom-right corner of the interface pages:
+it opens PayPal in a new tab and the donation goes to development. On a phone
+the button keeps only the heart. The same link is in the README.

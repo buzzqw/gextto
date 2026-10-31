@@ -502,7 +502,7 @@ Albero completo: l'[indice della documentazione](docs/README.md).
 
 Se Gextto ti è utile e vuoi sostenerne lo sviluppo, una donazione PayPal è
 benvenuta — grazie. Un pulsante **Dona** è sempre visibile anche nella UI, in
-basso a destra.
+basso a destra; la pagina di gx-torrent standalone ha lo stesso pulsante.
 
 [![Dona con PayPal](https://img.shields.io/badge/Dona-PayPal-0070BA.svg?logo=paypal)](https://www.paypal.com/cgi-bin/webscr?cmd=_donations&business=azanzani@gmail.com&item_name=Support+Gextto+Project)
 

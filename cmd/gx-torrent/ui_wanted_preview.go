@@ -77,7 +77,7 @@ func wantedVerdict(w wantedEntry, re *regexp.Regexp, title string, now time.Time
 			return verdictSubtitle, ep
 		}
 	}
-	if !wantedQualityMatch(w.Quality, strings.ToLower(title)) {
+	if !w.qualityMatch(title) {
 		return verdictQuality, ep
 	}
 	for _, term := range splitList(w.Exclude) {
@@ -121,6 +121,16 @@ func (d *Daemon) handleUIWantedPreview(w http.ResponseWriter, r *http.Request) {
 		list := d.wantedList()
 		if index, err := parseFormIndex(raw); err == nil && index >= 0 && index < len(list) {
 			entry = list[index]
+		}
+	}
+	// The dialog has one quality control, the profile: resolve it here, or the
+	// preview would ignore it and list releases the save would refuse.
+	if name := strings.TrimSpace(q.Get("profile")); name != "" && entry.Profile == "" {
+		entry.Profile = name
+	}
+	if entry.Profile != "" && entry.profile.Name == "" {
+		if profile, ok := d.qualityProfileByName(entry.Profile); ok {
+			entry.profile = profile
 		}
 	}
 	// live asks the indexers now (the interactive search): the archive is read

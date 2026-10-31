@@ -163,23 +163,13 @@ details.hint summary{cursor:pointer}
           <label class="field">Language<input type="text" name="language" id="wanted-language" placeholder="ita" autocomplete="off" title="Required language terms (e.g. ita, eng)">
             <span class="quick" role="group" aria-label="Common languages"><button type="button" data-lang="ita" aria-pressed="false" title="Italian releases">ita</button><button type="button" data-lang="eng" aria-pressed="false" title="English releases">eng</button><button type="button" data-lang="multi" aria-pressed="false" title="Releases with several audio tracks">multi</button></span>
           </label>
-          <label class="field">Quality<select name="quality" id="wanted-quality" title="Required video quality resolution">
-            <option value="">Any</option>
-            <option value="360p">360p</option>
-            <option value="480p">480p</option>
-            <option value="576p">576p</option>
-            <option value="720p">720p</option>
-            <option value="720p+">720p+</option>
-            <option value="720p-1080p">720p-1080p</option>
-            <option value="1080p">1080p</option>
-            <option value="1080p+">1080p+</option>
-            <option value="2160p">2160p 4K</option>
-            <option value="2160p+">2160p+ 4K+</option>
-          </select></label>
-          <label class="field">Quality profile<select name="profile" id="wanted-profile" title="Quality profile for this title: it decides the accepted qualities and the cutoff; empty uses the quality field">{{PROFILE_OPTIONS}}</select></label>
+          <input type="hidden" name="quality" id="wanted-quality" value="">
+          <label class="field">Quality profile<select name="profile" id="wanted-profile" title="Quality profile for this title: it decides the accepted qualities and the upgrade cutoff">{{PROFILE_OPTIONS}}</select></label>
           <label class="field">Category<input type="text" name="category" placeholder="tv" autocomplete="off" title="Category assigned to added torrents"></label>
           <label class="field">Save path<input type="text" name="savepath" placeholder="/srv/tv" autocomplete="off" title="Folder on disk where files will be saved"></label>
         </div>
+        <p class="hint" id="wanted-quality-note" hidden></p>
+        <p class="hint"><a href="/ui/settings#quality-profiles" target="_blank" rel="noopener">Create or edit profiles</a></p>
         <label class="field">Subtitles (optional)<input type="text" name="subtitles" id="wanted-subtitles" placeholder="sub ita" autocomplete="off" title="Subtitle terms matched on the release name (e.g. sub ita)">
           <span class="quick" role="group" aria-label="Common subtitles"><button type="button" data-sub="sub ita" aria-pressed="false" title="Italian subtitles">sub ita</button><button type="button" data-sub="sub eng" aria-pressed="false" title="English subtitles">sub eng</button></span>
         </label>
@@ -303,9 +293,14 @@ function openEditor(data,index){
   $('#wanted-search-source').textContent=t('Search to see how the title is named in the feeds and pick the right one.');
   if(data){
     form.elements.name.value=data.name||'';$$('input[name=kind]',form).forEach(function(r){r.checked=r.value===(data.kind||'series');});
-    ['seasons','language','subtitles','exclude','category','savepath','profile'].forEach(function(n){form.elements[n].value=data[n]||'';});
+    ['seasons','language','subtitles','exclude','category','savepath','profile','quality'].forEach(function(n){form.elements[n].value=data[n]||'';});
     form.elements.episode_filter.value=data.episode||'';form.elements.paused.checked=data.paused==='true';
-    var q=$('#wanted-quality');if(data.quality&&!q.querySelector('option[value="'+data.quality+'"]')){var o=document.createElement('option');o.value=data.quality;o.textContent=data.quality;q.appendChild(o);}q.value=data.quality||'';
+    var note=$('#wanted-quality-note');
+    if(note){
+      var oldQuality=(data.quality||'').trim();
+      note.hidden=!(oldQuality&&!(data.profile||'').trim());
+      note.textContent=note.hidden?'':t('Old quality kept until you choose a profile')+': '+oldQuality;
+    }
     $('#wanted-more').open=!!(data.exclude||data.episode||data.paused==='true');
   }
   applySeasonsFromValue(form.elements.seasons.value||'');
@@ -398,7 +393,6 @@ function markPicked(box,seriesName){
 }
 function pickEpisode(box,series,ep){
   form.elements.name.value=series.name;markPicked(box,series.name);
-  if(ep.quality){var q=$('#wanted-quality');if(!q.querySelector('option[value="'+ep.quality+'"]')){var o=document.createElement('option');o.value=ep.quality;o.textContent=ep.quality;q.appendChild(o);}q.value=ep.quality;}
   if(ep.language){$('#wanted-language').value=ep.language;syncLang();}
 }
 function renderPicks(box,res,current){
@@ -416,7 +410,7 @@ function renderPicks(box,res,current){
         eb.appendChild(document.createTextNode(epLabel(ep)));
         if(ep.quality){var q=document.createElement('span');q.className='q';q.textContent=ep.quality;eb.appendChild(q);}
         if(ep.language){var l=document.createElement('span');l.className='l';l.textContent=ep.language;eb.appendChild(l);}
-        eb.title=(ep.title?ep.title+' · ':'')+t('Use this episode: the name, the quality and the language are filled from it');
+        eb.title=(ep.title?ep.title+' · ':'')+t('Use this episode: the name and the language are filled from it');
         eb.onclick=function(){pickEpisode(box,s,ep);};eps.appendChild(eb);
       });
       var rest=(s.total||0)-s.episodes.length;
@@ -430,7 +424,7 @@ function search(){
   var box=$('#wanted-results'),hint=$('#wanted-search-source'),name=form.elements.name.value.trim();
   if(name.length<2){hint.textContent=t('type at least two characters');return;}
   box.textContent='';hint.textContent=t('Searching…');
-  var p=new URLSearchParams({q:name,language:form.elements.language.value,quality:form.elements.quality.value});if($('#wanted-live').checked)p.set('live','1');
+  var p=new URLSearchParams({q:name,language:form.elements.language.value});if($('#wanted-live').checked)p.set('live','1');
   fetch('/ui/wanted-search?'+p.toString(),{cache:'no-store'}).then(function(r){return r.ok?r.json():Promise.reject();}).then(function(res){
     res=res||{};var names=res.names||[];
     var counts=t('Archive')+' '+(res.archive_hits||0)+' · '+t('Feed')+' '+(res.feed_hits||0)+' · '+t('Indexer')+' '+(res.indexer_hits||0);
@@ -484,7 +478,7 @@ function renderReleases(res,sum,counts,list,reload){
     list.appendChild(r);
   });
 }
-function previewParams(){var p=new URLSearchParams();['name','kind','seasons','language','subtitles','quality','exclude','episode_filter'].forEach(function(n){var el=form.elements[n];if(!el)return;p.set(n,el.value||'');});if($('#wanted-live')&&$('#wanted-live').checked)p.set('live','1');return p;}
+function previewParams(){var p=new URLSearchParams();['name','kind','seasons','language','subtitles','quality','profile','exclude','episode_filter'].forEach(function(n){var el=form.elements[n];if(!el)return;p.set(n,el.value||'');});if($('#wanted-live')&&$('#wanted-live').checked)p.set('live','1');return p;}
 function previewWanted(){
   var seq=++previewSeq,sum=$('#wanted-preview-sum');
   if((form.elements.name.value||'').trim().length<2){sum.textContent=t('Type a title to see which releases in the archive it would take, and why the others are left out.');$('#wanted-preview-counts').textContent='';$('#wanted-preview-list').textContent='';return;}
@@ -579,4 +573,5 @@ $$('[data-wanted-poll]').forEach(function(btn){btn.addEventListener('click',func
 applyWantedView();
 })();
 </script>
+<a class="donate" href="https://www.paypal.com/cgi-bin/webscr?cmd=_donations&amp;business=azanzani@gmail.com&amp;item_name=Support+gx-torrent+Project" target="_blank" rel="noopener noreferrer" title="Support gx-torrent with a PayPal donation" aria-label="Support gx-torrent with a PayPal donation"><span class="donate-icon" aria-hidden="true">❤️</span><span class="donate-label">Donate</span></a>
 </body></html>

@@ -110,4 +110,5 @@ document.getElementById('archive-delete-results').onclick=function(){if(!confirm
 document.getElementById('archive-prune').onclick=function(){var days=document.getElementById('archive-days').value;if(!confirm(t('Delete the items found more than this many days ago?'))){return;}var f=new URLSearchParams();f.set('days',days);post('/ui/archive/delete',f).then(function(res){document.getElementById('archive-info').textContent=res.removed+' '+t('items deleted');load(1);}).catch(function(e){document.getElementById('archive-info').textContent=t('Error')+': '+e.message;});};
 load(1);
 </script>
+<a class="donate" href="https://www.paypal.com/cgi-bin/webscr?cmd=_donations&amp;business=azanzani@gmail.com&amp;item_name=Support+gx-torrent+Project" target="_blank" rel="noopener noreferrer" title="Support gx-torrent with a PayPal donation" aria-label="Support gx-torrent with a PayPal donation"><span class="donate-icon" aria-hidden="true">❤️</span><span class="donate-label">Donate</span></a>
 </body></html>

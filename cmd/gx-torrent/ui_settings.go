@@ -715,11 +715,14 @@ func (d *Daemon) renderSettings(w http.ResponseWriter, r *http.Request, errKey s
 
 	errorHTML := ""
 	if errKey != "" {
-		class := "muted"
+		// A toast, so the confirmation of an action is visible wherever the
+		// operator is in the page (a sub-tab, scrolled to a section) instead of
+		// only at the top.
+		class := "notice"
 		if isError {
-			class = "err"
+			class = "notice err"
 		}
-		errorHTML = `<p class="` + class + `">` + html.EscapeString(errKey) + `</p>`
+		errorHTML = `<p class="` + class + `" data-toast>` + html.EscapeString(errKey) + `</p>`
 	}
 	repl("<!--ERROR-->", errorHTML)
 

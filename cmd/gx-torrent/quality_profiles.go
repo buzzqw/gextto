@@ -315,13 +315,13 @@ func cutoffLabel(profile qualityProfile) string {
 func (d *Daemon) wantedProfileOptions(selected string) string {
 	selected = strings.TrimSpace(selected)
 	var b strings.Builder
-	b.WriteString(`<option value="">No profile (use quality)</option>`)
+	b.WriteString(`<option value="">Any quality</option>`)
 	for _, profile := range d.qualityProfiles() {
 		mark := ""
 		if strings.EqualFold(profile.Name, selected) {
 			mark = " selected"
 		}
-		b.WriteString(`<option value="` + html.EscapeString(profile.Name) + `"` + mark + `>` + html.EscapeString(profile.Name) + ` (up to ` + html.EscapeString(strings.Join(profile.Qualities, "/")) + `)</option>`)
+		b.WriteString(`<option value="` + html.EscapeString(profile.Name) + `"` + mark + `>` + html.EscapeString(profile.Name) + ` — ` + html.EscapeString(strings.Join(profile.Qualities, "/")) + `</option>`)
 	}
 	return b.String()
 }

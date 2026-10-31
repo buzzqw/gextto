@@ -103,11 +103,13 @@ func (d *Daemon) handleUIWanted(w http.ResponseWriter, r *http.Request) {
 				d.renderWanted(w, r, "The wanted title to edit does not exist anymore.")
 				return
 			}
+			entry = keepLegacyQuality(r, entry, list[index].Quality)
 			list[index] = entry
 		} else {
 			replaced := false
 			for i := range list {
 				if strings.EqualFold(list[i].Name, entry.Name) {
+					entry = keepLegacyQuality(r, entry, list[i].Quality)
 					list[i] = entry
 					replaced = true
 					break
@@ -315,6 +317,22 @@ func (d *Daemon) handleUIWantedEpisodes(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "episodes": d.wantedEpisodeViews(entry)})
+}
+
+// keepLegacyQuality resolves the one quality control the dialog has, the
+// profile. A title saved with a profile drops the plain quality (the profile
+// decides which resolutions are taken); a title saved without one keeps the
+// quality it already had, so editing an older entry (whose quality is no
+// longer a form field) does not silently lose it.
+func keepLegacyQuality(r *http.Request, entry wantedEntry, previous string) wantedEntry {
+	if entry.Profile != "" {
+		entry.Quality = ""
+		return entry
+	}
+	if !r.Form.Has("quality") {
+		entry.Quality = previous
+	}
+	return entry
 }
 
 func (d *Daemon) renderWanted(w http.ResponseWriter, r *http.Request, errKey string) {

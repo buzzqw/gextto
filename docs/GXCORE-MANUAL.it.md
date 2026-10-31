@@ -118,16 +118,20 @@ vera.
 - **Perché no?** apre le release trovate e il verdetto di ciascuna.
 - **Episodi** apre la griglia per stagione, con lo stato di ogni episodio.
 - **Cerca**, nella finestra *Aggiungi titolo*, elenca sotto ogni nome le puntate
-  già in archivio con risoluzione e lingua: sceglierne una compila titolo,
-  qualità e lingua da quella release.
+  già in archivio con risoluzione e lingua: sceglierne una compila titolo e
+  lingua da quella release.
+- La qualità di un titolo si sceglie **solo dal profilo**: la finestra ha un
+  unico campo *Profilo di qualità* e sotto un collegamento **Crea o modifica i
+  profili** che apre la scheda *Libreria* delle impostazioni. Senza profilo il
+  titolo accetta qualsiasi risoluzione.
 
 ![Episodi](screenshots/gx-core/it/wanted-episodes.png)
 
 ### Profili di qualità e aggiornamenti
 
-In **Impostazioni → Profili di qualità** si crea un profilo con le risoluzioni
-accettate (360p…2160p) e una **soglia**. Un titolo può scegliere il profilo al
-posto del campo qualità. Con la soglia, un episodio già scaricato a 720p viene
+In **Impostazioni → Libreria → Profili di qualità** si crea un profilo con le
+risoluzioni accettate (360p…2160p) e una **soglia**; è l'unico modo per fissare
+la qualità di un titolo. Con la soglia, un episodio già scaricato a 720p viene
 sostituito da una release 1080p quando arriva: il nuovo torrent entra, il
 vecchio esce dalla sessione e **i file restano**.
 
@@ -166,7 +170,11 @@ cartelle e azioni a fine download, rete e protocolli, limiti di velocità e
 scheduler per giorno, coda e cache, categorie e profili di qualità con DLNA,
 lingua e notifiche, manutenzione e aggiornamento. La ricerca in alto cerca in
 tutte le schede insieme; il pulsante **Salva** resta in fondo e salva comunque
-tutta la pagina, anche i gruppi delle schede chiuse.
+tutta la pagina, anche i gruppi delle schede chiuse. Dopo un salvataggio o
+un'azione dentro una scheda (aggiungere una categoria, salvare un profilo,
+provare la porta, inviare una notifica di prova) la pagina resta su quella
+scheda e conferma con un messaggio in basso a destra, così si vede che il
+pulsante ha fatto qualcosa.
 
 ![Impostazioni](screenshots/gx-core/it/settings.png)
 
@@ -264,3 +272,10 @@ curl -X POST --data-urlencode \
 ```
 
 Nessun dato personale, nessun tracker privato, nessun contenuto protetto.
+
+## 12. Sostenere il progetto
+
+gx-torrent è libero e non ha pubblicità. Se ti è utile, il pulsante **Dona** è
+sempre in basso a destra nelle pagine dell’interfaccia: apre PayPal in una nuova
+scheda e la donazione va allo sviluppo. Sul telefono resta il cuore, senza
+scritta. Lo stesso collegamento è nel README.
