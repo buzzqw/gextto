@@ -489,6 +489,13 @@ func filterFeedItem(rules []rss.Rule, feed feedConfig, feedName string, item rss
 // .torrent URL downloaded first. It reports whether the torrent was newly added
 // (false when it was already in the session).
 func (d *Daemon) addFeedItem(item rss.Item, action rss.Action) (bool, error) {
+	newly, _, err := d.addFeedItemHash(item, action)
+	return newly, err
+}
+
+// addFeedItemHash is addFeedItem with the torrent hash, so the caller that
+// tracks a wanted episode can remember what covers it.
+func (d *Daemon) addFeedItemHash(item rss.Item, action rss.Action) (bool, string, error) {
 	req := addRequest{
 		Destination: strings.TrimSpace(action.SavePath),
 		Paused:      action.Paused,
@@ -503,7 +510,7 @@ func (d *Daemon) addFeedItem(item rss.Item, action rss.Action) (bool, error) {
 	} else {
 		data, magnet, err := d.fetchTorrentSource(item.Link)
 		if err != nil {
-			return false, err
+			return false, "", err
 		}
 		if magnet != "" {
 			req.Magnet = magnet
@@ -511,8 +518,8 @@ func (d *Daemon) addFeedItem(item rss.Item, action rss.Action) (bool, error) {
 			req.TorrentData = data
 		}
 	}
-	_, existing, err := d.add(req)
-	return !existing, err
+	hash, existing, err := d.add(req)
+	return !existing, hash, err
 }
 
 // rules returns the configured ordered rules (empty when none/invalid).

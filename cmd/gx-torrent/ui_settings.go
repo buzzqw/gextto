@@ -190,6 +190,9 @@ func (d *Daemon) handleUISettings(w http.ResponseWriter, r *http.Request) {
 	store.Set(autoTMMEnabledKey, strconv.FormatBool(formBool(r, "auto-tmm-enabled")))
 	// Completion actions: move the finished data and/or run a program.
 	store.Set(postProcessMoveCategoryKey, strconv.FormatBool(formBool(r, "postprocess-move-category")))
+	if r.FormValue("metadata-form") == "1" {
+		store.Set(metadataEpisodesKey, strconv.FormatBool(formBool(r, "metadata-episodes")))
+	}
 	if layout, ok := torrent.ParseContentLayout(r.FormValue("content-layout")); ok {
 		store.Set(contentLayoutKey, layout)
 	}
@@ -222,7 +225,7 @@ func (d *Daemon) handleUISettings(w http.ResponseWriter, r *http.Request) {
 	// read at the next start).
 	for _, key := range []string{
 		"download-dir", "temp-dir", "listen", "peer-ports", "listen-interface",
-		"outgoing-interface", "proxy", "token", "ipfilter", "dht-bootstrap",
+		"outgoing-interface", "proxy", "token", qbitAPIKey, qbitVersionKey, "ipfilter", "dht-bootstrap",
 		"watch-folders", "export-dir", "export-dir-fin",
 		postProcessMoveKey, postProcessRunKey,
 		"notify-url", "lang", notifyWebhookTokenKey, notifyWebhookUserKey,
@@ -558,6 +561,7 @@ func (d *Daemon) renderSettings(w http.ResponseWriter, r *http.Request, errKey s
 	repl("{{TEMP_DIR}}", get("temp-dir"))
 	repl("{{EXPORT_DIR}}", get("export-dir"))
 	repl("{{EXPORT_FIN_DIR}}", get("export-dir-fin"))
+	repl("{{METADATA_EPISODES_ON}}", checkedIf(d.metadataEpisodesEnabled()))
 	repl("{{POSTPROCESS_MOVE}}", get(postProcessMoveKey))
 	repl("{{POSTPROCESS_MOVE_CATEGORY}}", checkedIf(boolSetting(postProcessMoveCategoryKey)))
 	repl("{{POSTPROCESS_RUN}}", get(postProcessRunKey))
@@ -573,6 +577,7 @@ func (d *Daemon) renderSettings(w http.ResponseWriter, r *http.Request, errKey s
 	repl("{{CLIENT_IDENTITY_VERSION}}", html.EscapeString(clientIdentityVersion(store.Get(clientIdentityVersionKey, ""))))
 	repl("{{WATCH_FOLDERS}}", get("watch-folders"))
 	repl("{{CATEGORIES_ROWS}}", d.categoryRows())
+	repl("{{QUALITY_PROFILE_ROWS}}", d.qualityProfileRows())
 	repl("{{COOKIES}}", html.EscapeString(d.cookiesPretty()))
 	repl("{{ALT_WEBUI_ON}}", checkedIf(d.altWebUIEnabled()))
 	altVersion := d.altWebUIVersion()
@@ -591,6 +596,8 @@ func (d *Daemon) renderSettings(w http.ResponseWriter, r *http.Request, errKey s
 	repl("{{OUT_IFACE}}", get("outgoing-interface"))
 	repl("{{PROXY}}", get("proxy"))
 	repl("{{TOKEN}}", get("token"))
+	repl("{{QBIT_API_KEY}}", get(qbitAPIKey))
+	repl("{{QBIT_VERSION}}", get(qbitVersionKey))
 	repl("{{IPFILTER}}", get("ipfilter"))
 	repl("{{IPFILTER_REFRESH}}", strconv.Itoa(int(d.ipFilterRefreshEvery()/time.Hour)))
 	repl("{{IPFILTER_STATUS}}", d.ipFilterStatusHTML())

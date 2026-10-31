@@ -64,6 +64,12 @@ h3.sub{margin:14px 0 2px;font-size:13px;color:var(--subtle);text-transform:upper
     <label class="chk"><input type="checkbox" name="auto-tmm-enabled" value="1"{{AUTO_TMM_ON}} title="New torrents follow their category's save path by default; assigning a category moves them (qBittorrent automatic torrent management, off by default)"> New torrents follow their category's folder (autoTMM)</label>
   </div>
 </fieldset>
+<fieldset id="series-metadata">
+  <legend>Series and movies</legend>
+  <input type="hidden" name="metadata-form" value="1">
+  <label class="chk"><input type="checkbox" name="metadata-episodes" value="1"{{METADATA_EPISODES_ON}} title="Ask TVmaze for the complete episode list of each series, so missing episodes are known even if no release ever appeared in the feeds. The series title is sent to api.tvmaze.com."> Use TVmaze for the real episode list</label>
+  <p class="muted">The public TVmaze API needs no key. It tells gx-torrent which episodes exist and when they aired, so a series is not limited to what the feeds happened to show. Turn it off to keep the title on this machine only.</p>
+</fieldset>
 <fieldset id="after-download">
   <legend>After download</legend>
   <label>Move completed downloads to<span class="field-row"><input type="text" name="postprocess-move" value="{{POSTPROCESS_MOVE}}" autocomplete="off" placeholder="empty = stay in the download folder" title="Folder where finished torrents are moved; empty disables the move. The torrent keeps seeding from the new folder."><button type="button" class="browse" data-target="postprocess-move" title="Choose an existing folder on the server">Browse…</button></span></label>
@@ -98,6 +104,8 @@ h3.sub{margin:14px 0 2px;font-size:13px;color:var(--subtle);text-transform:upper
     <label>Outgoing interface (VPN killswitch)<input type="text" name="outgoing-interface" value="{{OUT_IFACE}}" autocomplete="off" title="Network interface for outgoing traffic (VPN killswitch)"></label>
     <label>Proxy (socks5:// or http://)<input type="text" name="proxy" value="{{PROXY}}" autocomplete="off" title="SOCKS5 or HTTP proxy URL for peer traffic"></label>
     <label>API token<input type="text" name="token" value="{{TOKEN}}" autocomplete="off" title="Authentication token for API requests"></label>
+    <label>qBittorrent API key<input type="text" name="qbit-api-key" value="{{QBIT_API_KEY}}" autocomplete="off" title="API key accepted by the qBittorrent-compatible API (X-Api-Key or Bearer); empty disables this way of signing in"></label>
+    <label>qBittorrent version reported<input type="text" name="qbit-version" value="{{QBIT_VERSION}}" autocomplete="off" placeholder="4.6.7" title="Version string returned to qBittorrent clients by app/version; keep 4.6.7 unless a client requires another version"></label>
     <label>Client identity<select name="client-identity" title="What peers and trackers see: gx-core with its real version by default, or a compatibility preset. Some private trackers only accept whitelisted clients; check their rules before using a preset.">{{CLIENT_IDENTITY_OPTIONS}}</select></label>
     <label>Client version (empty = preset)<input type="text" name="client-identity-version" value="{{CLIENT_IDENTITY_VERSION}}" autocomplete="off" placeholder="5.2.3" title="Version announced with the preset; empty uses the preset version"></label>
     <label class="chk"><input type="checkbox" name="web-sources-allow-private" value="1"{{WEB_PRIVATE}} title="Web seeds and magnet sources (xs=/as=) come from torrent data: by default they cannot reach the local network, so a torrent from a feed cannot make the client request the router or the NAS"> Allow web seeds and magnet sources on the local network</label>
@@ -292,6 +300,31 @@ h3.sub{margin:14px 0 2px;font-size:13px;color:var(--subtle);text-transform:upper
       <input type="text" name="savepath" autocomplete="off" placeholder="download folder" title="Folder where the torrents of this category are saved (empty = the main download folder)">
     </label>
     <div><button type="submit" class="primary sm" title="Create the category with this save path">Add category</button></div>
+  </form>
+</fieldset>
+<fieldset id="quality-profiles">
+  <legend>Quality profiles</legend>
+  <p class="muted">A profile is a named set of accepted resolutions. A title can choose one instead of the plain quality field; the cutoff is the quality at which upgrades stop (empty = no upgrades).</p>
+  <div class="table-scroll">
+    <table class="cat-manage">
+      <thead><tr><th scope="col">Profile</th><th scope="col">Qualities and cutoff</th><th scope="col">Upgrades</th><th scope="col"><span class="sr-only">Actions</span></th></tr></thead>
+      <tbody>{{QUALITY_PROFILE_ROWS}}</tbody>
+    </table>
+  </div>
+  <form method="post" action="/ui/quality-profile" class="form-grid">
+    <input type="hidden" name="op" value="add">
+    <label>New profile
+      <input type="text" name="name" required autocomplete="off" title="Name of the new quality profile, for example HD or Best">
+    </label>
+    <label>Qualities
+      <input type="text" name="qualities" autocomplete="off" placeholder="720p, 1080p" title="Accepted resolutions, separated by commas (360p, 480p, 576p, 720p, 1080p, 2160p)">
+    </label>
+    <label>Cutoff
+      <select name="cutoff" title="Stop upgrading when this quality is downloaded (empty = no upgrades)">
+        <option value="">No upgrade</option><option value="360p">360p</option><option value="480p">480p</option><option value="576p">576p</option><option value="720p">720p</option><option value="1080p">1080p</option><option value="2160p">2160p</option>
+      </select>
+    </label>
+    <div><button type="submit" class="primary sm" title="Create this quality profile">Add profile</button></div>
   </form>
 </fieldset>
 <!--UPDATE_NOTES-->

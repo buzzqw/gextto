@@ -6,8 +6,10 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func qbitLogin(t *testing.T, base, user, password string) (int, string, []*http.Cookie) {
@@ -337,5 +339,118 @@ func TestQbitStateMapping(t *testing.T) {
 		if got := qbitState(in); got != want {
 			t.Errorf("qbitState(%q) = %q, want %q", in, got, want)
 		}
+	}
+}
+
+// TestQbitAPIKeyAuthentication covers the qBittorrent 5 API key: the standalone
+// setting (or the v1 token) opens /api/v2 without a SID cookie.
+func TestQbitAPIKeyAuthentication(t *testing.T) {
+	d := standaloneTestDaemon(t, "s3cret", false)
+	d.opts.Settings.Set(qbitAPIKey, "key-123")
+	srv := httptest.NewServer(d.routes())
+	defer srv.Close()
+
+	get := func(header, value string) int {
+		req, _ := http.NewRequest(http.MethodGet, srv.URL+"/api/v2/app/version", nil)
+		if header != "" {
+			req.Header.Set(header, value)
+		}
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		return resp.StatusCode
+	}
+	if code := get("", ""); code != http.StatusForbidden {
+		t.Fatalf("without a key: %d, want 403", code)
+	}
+	if code := get("X-Api-Key", "wrong"); code != http.StatusForbidden {
+		t.Fatalf("wrong key: %d, want 403", code)
+	}
+	if code := get("X-Api-Key", "key-123"); code != http.StatusOK {
+		t.Fatalf("X-Api-Key: %d, want 200", code)
+	}
+	if code := get("Authorization", "Bearer key-123"); code != http.StatusOK {
+		t.Fatalf("Bearer: %d, want 200", code)
+	}
+}
+
+func TestQbitViewFillsTheFieldsClientsRead(t *testing.T) {
+	v := torrentInfo{
+		Hash: "ABCDEF", Name: "Show", SavePath: "/srv/tv", LastActive: 123,
+		SeedRatio: -1, SeedDays: -1, QueuePosition: 2, SuperSeeding: true,
+		TrackersCount: 3, Private: true, CompletedAt: 456,
+	}
+	got := qbitView(v)
+	if got.Hash != "abcdef" || got.DownloadPath != "/srv/tv" || got.LastActivity != 123 {
+		t.Fatalf("base fields = %+v", got)
+	}
+	if got.MaxRatio != -2 || got.RatioLimit != -2 || got.MaxSeedingTime != -2 || got.SeedingTimeLimit != -2 {
+		t.Fatalf("seed fields = %+v", got)
+	}
+	if got.Priority != 2 || !got.SuperSeeding || got.TrackersCount != 3 || got.SeenComplete != 456 {
+		t.Fatalf("flags = %+v", got)
+	}
+	if !strings.Contains(got.MagnetURI, "urn:btih:abcdef") {
+		t.Fatalf("magnet = %q", got.MagnetURI)
+	}
+}
+
+func TestQbitApplyAddLimits(t *testing.T) {
+	req := addRequest{SeedRatio: -1, SeedDays: -1}
+	r := httptest.NewRequest(http.MethodPost, "/api/v2/torrents/add", strings.NewReader(url.Values{
+		"dlLimit": {"2048"}, "upLimit": {"1024"}, "ratioLimit": {"1.5"}, "seedingTimeLimit": {"120"},
+	}.Encode()))
+	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	_ = r.ParseForm()
+	qbitApplyAddLimits(r, &req)
+	if req.DownloadLimitKib == nil || *req.DownloadLimitKib != 2 || req.UploadLimitKib == nil || *req.UploadLimitKib != 1 {
+		t.Fatalf("speed limits = %+v", req)
+	}
+	if req.SeedRatio != 1.5 || req.SeedDays != 1 {
+		t.Fatalf("seed limits = %v/%v", req.SeedRatio, req.SeedDays)
+	}
+}
+
+func TestQbitVersionIsConfigurable(t *testing.T) {
+	d := standaloneTestDaemon(t, "", true)
+	if got := d.qbitVersion(); got != "4.6.7" {
+		t.Fatalf("default qbit version = %q", got)
+	}
+	d.opts.Settings.Set(qbitVersionKey, "5.0.0")
+	if got := d.qbitVersion(); got != "5.0.0" {
+		t.Fatalf("configured qbit version = %q", got)
+	}
+}
+
+func TestQbitProcessInfoAndComment(t *testing.T) {
+	d := standaloneTestDaemon(t, "", true)
+	d.startedAt = time.Now()
+	rec := httptest.NewRecorder()
+	d.handleQbitProcessInfo(rec, httptest.NewRequest(http.MethodGet, "/api/v2/app/processInfo", nil))
+	var info map[string]int64
+	if err := json.NewDecoder(rec.Body).Decode(&info); err != nil || info["launch_time"] <= 0 {
+		t.Fatalf("processInfo = %+v err=%v", info, err)
+	}
+
+	daemon := newTestDaemon(t)
+	src := filepath.Join(t.TempDir(), "src")
+	hash, _, err := daemon.add(addRequest{TorrentData: makeTorrent(t, src, "movie.bin", 40_000), Destination: src})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rec = httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/v2/torrents/setComment", strings.NewReader(url.Values{"hash": {hash}, "comment": {"hello"}}.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	daemon.handleQbitSetComment(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("setComment = %d", rec.Code)
+	}
+	daemon.mu.Lock()
+	_, meta := daemon.findLocked(hash)
+	daemon.mu.Unlock()
+	if meta == nil || meta.Comment != "hello" {
+		t.Fatalf("comment = %+v", meta)
 	}
 }

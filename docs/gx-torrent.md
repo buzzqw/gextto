@@ -390,6 +390,11 @@ The standalone pages follow the same structure:
   place, plus add and remove. A category created from the torrent dialog starts
   with no folder; this table is where the folder automatic management moves to
   is set (and changing it relocates the managed torrents of that category).
+- **Settings → Quality profiles** and **Settings → Series and movies**: the
+  named quality profiles (accepted resolutions and cutoff, used for the upgrade)
+  and the opt-in TVmaze episode list. The profile table is editable in place,
+  like the category one; the TVmaze switch says that the series title is sent to
+  `api.tvmaze.com` and is off by default.
 - **Settings → After download**: the completion actions. *Move completed
   downloads to* moves the finished data (optionally into one subfolder per
   category) and the torrent keeps seeding from there; *Run a program on
@@ -958,6 +963,25 @@ so fuzzy results on common words do not enter) and language/quality are in
 error: so you can
 immediately tell an absent or unresponsive indexer from the results of the
 feeds alone.
+
+**Quality profiles and upgrades.** Above the plain *Quality* field a title can
+choose a **quality profile** (*Settings → Quality profiles*): a named set of
+accepted resolutions (360p … 2160p) and an optional **cutoff**. The profile
+replaces the quality match; when a batch of releases carries several accepted
+qualities the best one is taken. With a cutoff, an episode already downloaded at
+a lower quality is upgraded when a better release appears, until the cutoff is
+reached. The upgrade is **non-destructive**: the new torrent is added and the
+old one leaves the session, but its files stay on disk. A title without a
+profile keeps the plain quality field and never upgrades.
+
+**Real episode list (TVmaze, optional).** *Settings → Series and movies* can ask
+the public TVmaze API for the complete episode list of each series. When on, the
+series title is sent to `api.tvmaze.com`; the already-aired episodes become the
+denominator of the progress bar and count as missing even if no release ever
+appeared in a feed. The snapshot is kept in `state.json` and refreshed once a
+day; a title that cannot be matched keeps the feed/indexer ledger alone and the
+row says *TVmaze: not matched*. The option is **off by default**, so a machine
+that must not contact third parties keeps working as before.
 
 A title written between slashes is a **regular expression** (case-insensitive):
 `/ted.?lasso/` takes the releases matching the expression instead of the plain

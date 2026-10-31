@@ -1257,8 +1257,10 @@ attivo, così si vede a colpo d'occhio cosa sta trasferendo i file).
   magnet; non supporta WebTorrent/WebRTC. In **standalone** (senza Gextto) la
   stessa pagina aggiunge la gestione delle categorie, le azioni a fine download
   (sposta i dati completati in una cartella e/o esegui un programma con i
-  dettagli del torrent nell'ambiente), la ricerca parallela sugli indexer con
-  risultati ordinabili, e l'app installabile con l'uscita dalla sessione.
+  dettagli del torrent nell'ambiente), i **profili di qualità** con soglia e
+  aggiornamento a una release migliore, l'**elenco episodi reale** da TVmaze
+  (opzionale), la ricerca parallela sugli indexer con risultati ordinabili, e
+  l'app installabile con l'uscita dalla sessione.
 - **qBittorrent-nox** — Gextto pilota un qBittorrent-nox esistente tramite la sua
   Web API. Imposta URL, utente/password, categoria, tag e intervallo di polling, e
   le **mappature percorsi** `locale=remoto` quando i due processi vedono percorsi

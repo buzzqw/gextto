@@ -144,6 +144,7 @@ func (d *Daemon) routes() http.Handler {
 	root.HandleFunc("POST /ui/pin", d.handleUIPin)
 	root.HandleFunc("POST /ui/category", d.handleUICategory)
 	root.HandleFunc("POST /ui/category-manage", d.handleUICategoryManage)
+	root.HandleFunc("POST /ui/quality-profile", d.handleUIQualityProfile)
 	if d.opts.Mode == ModeStandalone {
 		// The qBittorrent-compatible API lets *arr and the mobile apps drive
 		// the standalone daemon; managed mode is driven by Gextto only.

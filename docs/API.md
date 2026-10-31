@@ -557,6 +557,17 @@ The `{what}` of `GET /api/v1/torrents/{hash}/{what}` is one of `files`,
 
 ### qBittorrent-compatible API (`/api/v2`)
 
+The daemon speaks the qBittorrent Web API at the **4.6 / API 2.9.3 level**, with
+the most-used 5.x additions (`getFreeSpace`, `getDirectoryContent`,
+`processInfo`, `setComment`, the 5.x `stopped` flag). Authentication accepts the
+`SID` login, the page session, or the **API key** configured in *Settings →
+Network* (`X-Api-Key` or `Authorization: Bearer`). `app/version` reports the
+version in *Settings → qBittorrent version reported* (default `4.6.7`), so a
+client that checks the version can be pointed at a compatible string without a
+rebuild. This is a broad compatibility layer, not a claim that every route,
+field and status code of every qBittorrent release is implemented: the gaps are
+tracked in `gx-core.md` §6 and the fields are covered by the qBittorrent tests.
+
 | Method | Path | Description |
 |---|---|---|
 | GET | `/api/v2/app/buildInfo` | version and build info |
@@ -566,6 +577,7 @@ The `{what}` of `GET /api/v1/torrents/{hash}/{what}` is one of `files`,
 | GET | `/api/v2/app/getFreeSpace` | free space of a folder in bytes |
 | GET | `/api/v2/app/networkInterfaceAddressList` | addresses of the interfaces |
 | GET | `/api/v2/app/networkInterfaceList` | network interfaces |
+| GET | `/api/v2/app/processInfo` | process launch time |
 | GET | `/api/v2/app/preferences` | preferences document |
 | POST | `/api/v2/app/setCookies` | set the cookies |
 | POST | `/api/v2/app/setPreferences` | change the preferences |
@@ -646,6 +658,7 @@ The `{what}` of `GET /api/v1/torrents/{hash}/{what}` is one of `files`,
 | POST | `/api/v2/torrents/setAutoManagement` | automatic management on or off |
 | POST | `/api/v2/torrents/setCategory` | set the category |
 | POST | `/api/v2/torrents/setDownloadLimit` | set a torrent download limit |
+| POST | `/api/v2/torrents/setComment` | set the torrent comment |
 | POST | `/api/v2/torrents/setForceStart` | force start on or off |
 | POST | `/api/v2/torrents/setLocation` | move a torrent to another folder |
 | POST | `/api/v2/torrents/setShareLimits` | set the share limits |

@@ -60,7 +60,7 @@ VERSION="$(gextto_version_for_build "$BUILD")"
 # only when its own code changed.
 GX_PATHS=(cmd/gx-torrent internal/auth internal/bwschedule internal/autospeed internal/constants internal/debugpprof internal/dht internal/flaresolverr
   internal/gxcore internal/logging internal/queue internal/rss internal/settings
-  internal/notify internal/torznab internal/updatecheck internal/utp internal/webui go.mod go.sum)
+  internal/notify internal/torznab internal/tvmaze internal/updatecheck internal/utp internal/webui go.mod go.sum)
 declare -A GX_COMMITS=()
 while read -r sha; do
   [[ -n "$sha" ]] && GX_COMMITS[$sha]=1

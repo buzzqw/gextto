@@ -92,7 +92,8 @@ func TestUICategoryManageOnlyStandalone(t *testing.T) {
 	}
 }
 
-func TestCategoryEditorOnlyStandalone(t *testing.T) {	render := func(standalone bool) string {
+func TestCategoryEditorOnlyStandalone(t *testing.T) {
+	render := func(standalone bool) string {
 		d := &Daemon{}
 		rec := httptest.NewRecorder()
 		req := httptest.NewRequest(http.MethodGet, "http://127.0.0.1:8890/ui/detail?tab=general", nil)

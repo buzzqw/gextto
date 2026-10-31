@@ -167,6 +167,7 @@ details.hint summary{cursor:pointer}
             <option value="2160p">2160p 4K</option>
             <option value="2160p+">2160p+ 4K+</option>
           </select></label>
+          <label class="field">Quality profile<select name="profile" id="wanted-profile" title="Quality profile for this title: it decides the accepted qualities and the cutoff; empty uses the quality field">{{PROFILE_OPTIONS}}</select></label>
           <label class="field">Category<input type="text" name="category" placeholder="tv" autocomplete="off" title="Category assigned to added torrents"></label>
           <label class="field">Save path<input type="text" name="savepath" placeholder="/srv/tv" autocomplete="off" title="Folder on disk where files will be saved"></label>
         </div>
@@ -293,7 +294,7 @@ function openEditor(data,index){
   $('#wanted-search-source').textContent=t('Search to see how the title is named in the feeds and pick the right one.');
   if(data){
     form.elements.name.value=data.name||'';$$('input[name=kind]',form).forEach(function(r){r.checked=r.value===(data.kind||'series');});
-    ['seasons','language','subtitles','exclude','category','savepath'].forEach(function(n){form.elements[n].value=data[n]||'';});
+    ['seasons','language','subtitles','exclude','category','savepath','profile'].forEach(function(n){form.elements[n].value=data[n]||'';});
     form.elements.episode_filter.value=data.episode||'';form.elements.paused.checked=data.paused==='true';
     var q=$('#wanted-quality');if(data.quality&&!q.querySelector('option[value="'+data.quality+'"]')){var o=document.createElement('option');o.value=data.quality;o.textContent=data.quality;q.appendChild(o);}q.value=data.quality||'';
     $('#wanted-more').open=!!(data.exclude||data.episode||data.paused==='true');
@@ -308,7 +309,7 @@ function openEditor(data,index){
   syncKind();syncLang();syncSub();openDialog(dlg);form.elements.name.focus();previewWanted();
 }
 $('#add-wanted').addEventListener('click',function(){openEditor(null);});
-$$('[data-wanted-edit]').forEach(function(btn){btn.addEventListener('click',function(){var d={};['name','kind','seasons','language','subtitles','quality','exclude','episode','category','savepath','paused'].forEach(function(k){d[k]=btn.getAttribute('data-'+k)||'';});openEditor(d,btn.getAttribute('data-index'));});});
+$$('[data-wanted-edit]').forEach(function(btn){btn.addEventListener('click',function(){var d={};['name','kind','seasons','language','subtitles','quality','profile','exclude','episode','category','savepath','paused'].forEach(function(k){d[k]=btn.getAttribute('data-'+k)||'';});openEditor(d,btn.getAttribute('data-index'));});});
 
 // Episode grid: what is present, what is downloading, what is missing. The same
 // renderer feeds the edit dialog and the inline grid of each row.

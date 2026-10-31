@@ -6,6 +6,7 @@ package main
 // Gextto is the single master and the API is not exposed.
 
 import (
+	"crypto/subtle"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -15,11 +16,14 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/buzzqw/gextto/internal/gxcore/torrent"
 )
 
 const (
+	qbitAPIKey      = "qbit-api-key"
+	qbitVersionKey  = "qbit-version"
 	qbitSIDCookie   = "SID"
 	qbitWebAPIVer   = "2.9.3"
 	qbitUnknownETA  = int64(8640000)
@@ -38,6 +42,7 @@ func (d *Daemon) routesQbit() http.Handler {
 	mux.HandleFunc("GET /api/v2/app/defaultSavePath", d.handleQbitDefaultSavePath)
 	mux.HandleFunc("GET /api/v2/app/preferences", d.handleQbitPreferences)
 	mux.HandleFunc("GET /api/v2/app/buildInfo", d.handleQbitBuildInfo)
+	mux.HandleFunc("GET /api/v2/app/processInfo", d.handleQbitProcessInfo)
 	mux.HandleFunc("GET /api/v2/app/cookies", d.handleQbitGetCookies)
 	mux.HandleFunc("POST /api/v2/app/setCookies", d.handleQbitSetCookies)
 	mux.HandleFunc("GET /api/v2/transfer/info", d.handleQbitTransferInfo)
@@ -109,6 +114,7 @@ func (d *Daemon) routesQbit() http.Handler {
 	// and a clean shutdown.
 	mux.HandleFunc("POST /api/v2/torrents/addPeers", d.handleQbitAddPeers)
 	mux.HandleFunc("POST /api/v2/torrents/rename", d.handleQbitRename)
+	mux.HandleFunc("POST /api/v2/torrents/setComment", d.handleQbitSetComment)
 	mux.HandleFunc("POST /api/v2/torrents/renameFile", d.handleQbitRenameFile)
 	mux.HandleFunc("POST /api/v2/torrents/renameFolder", d.handleQbitRenameFolder)
 	mux.HandleFunc("POST /api/v2/transfer/banPeers", d.handleQbitBanPeers)
@@ -153,6 +159,32 @@ func (d *Daemon) routesQbit() http.Handler {
 	return d.qbitAuth(mux)
 }
 
+// qbitAPIKeyValid accepts the qBittorrent 5 API key. The key is a setting of
+// the standalone page; the v1 token is accepted too, so an operator who
+// already protects the API can reuse it. A request without a configured key is
+// not authenticated by this path.
+func (d *Daemon) qbitAPIKeyValid(r *http.Request) bool {
+	if d.opts.Settings == nil {
+		return false
+	}
+	given := strings.TrimSpace(r.Header.Get("X-Api-Key"))
+	if given == "" {
+		given = strings.TrimSpace(strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "))
+	}
+	if given == "" {
+		return false
+	}
+	for _, key := range []string{
+		strings.TrimSpace(d.opts.Settings.Get(qbitAPIKey, "")),
+		strings.TrimSpace(d.opts.Token),
+	} {
+		if key != "" && subtle.ConstantTimeCompare([]byte(given), []byte(key)) == 1 {
+			return true
+		}
+	}
+	return false
+}
+
 // qbitAuth guards the qBittorrent API the same way the page and /api/v1 are
 // guarded: no password configured, a LAN source with local-bypass on, or a valid
 // session (the page's gx_session cookie or the qBittorrent SID). A cross-site
@@ -164,7 +196,7 @@ func (d *Daemon) qbitAuth(next http.Handler) http.Handler {
 			http.Error(w, "cross-origin request rejected", http.StatusForbidden)
 			return
 		}
-		if r.URL.Path == "/api/v2/auth/login" || d.standaloneAPIAllowed(r) {
+		if r.URL.Path == "/api/v2/auth/login" || d.qbitAPIKeyValid(r) || d.standaloneAPIAllowed(r) {
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -210,7 +242,19 @@ func (d *Daemon) handleQbitLogout(w http.ResponseWriter, r *http.Request) {
 }
 
 func (d *Daemon) handleQbitVersion(w http.ResponseWriter, _ *http.Request) {
-	qbitText(w, http.StatusOK, "v"+runtimeVersion())
+	qbitText(w, http.StatusOK, "v"+d.qbitVersion())
+}
+
+// qbitVersion is what qBittorrent clients see in app/version. It defaults to
+// the 4.6 API level gx-core implements; an operator can change it when a
+// client insists on another version string.
+func (d *Daemon) qbitVersion() string {
+	if d.opts.Settings != nil {
+		if value := strings.TrimSpace(d.opts.Settings.Get(qbitVersionKey, "")); value != "" {
+			return value
+		}
+	}
+	return "4.6.7"
 }
 
 func (d *Daemon) handleQbitWebAPIVersion(w http.ResponseWriter, _ *http.Request) {
@@ -239,6 +283,7 @@ type qbitTorrent struct {
 	ULRate        int64   `json:"upspeed"`
 	State         string  `json:"state"`
 	SavePath      string  `json:"save_path"`
+	DownloadPath  string  `json:"download_path"`
 	ContentPath   string  `json:"content_path"`
 	Category      string  `json:"category"`
 	Tags          string  `json:"tags"`
@@ -272,6 +317,15 @@ type qbitTorrent struct {
 	ForceStart        bool    `json:"force_start"`
 	AutoTMM           bool    `json:"auto_tmm"`
 	MagnetURI         string  `json:"magnet_uri"`
+	LastActivity      int64   `json:"last_activity"`
+	MaxRatio          float64 `json:"max_ratio"`
+	MaxSeedingTime    int64   `json:"max_seeding_time"`
+	RatioLimit        float64 `json:"ratio_limit"`
+	SeedingTimeLimit  int64   `json:"seeding_time_limit"`
+	InactiveTimeLimit int64   `json:"inactive_seeding_time_limit"`
+	SeenComplete      int64   `json:"seen_complete"`
+	SuperSeeding      bool    `json:"super_seeding"`
+	TrackersCount     int     `json:"trackers_count"`
 }
 
 func (d *Daemon) handleQbitTorrentsInfo(w http.ResponseWriter, r *http.Request) {
@@ -473,6 +527,7 @@ func qbitView(v torrentInfo) qbitTorrent {
 		ULRate:            v.UploadRate,
 		State:             qbitStateFor(v),
 		SavePath:          v.SavePath,
+		DownloadPath:      v.SavePath,
 		ContentPath:       qbitContentPath(v),
 		Category:          v.Category,
 		Tags:              strings.Join(v.Tags, ", "),
@@ -497,12 +552,53 @@ func qbitView(v torrentInfo) qbitTorrent {
 		TimeActive:        v.ActiveSeconds,
 		TotalWasted:       v.Wasted,
 		Availability:      availability,
-		Priority:          0,
+		Priority:          qbitPriority(v.QueuePosition),
 		SeqDL:             v.Sequential,
 		FLPiecePrio:       v.FirstLast,
 		ForceStart:        v.Pinned,
 		AutoTMM:           v.AutoTMM,
+		MagnetURI:         magnetLink(strings.ToLower(v.Hash), v.Name, nil),
+		LastActivity:      v.LastActive,
+		MaxRatio:          qbitRatioLimitOut(v.SeedRatio),
+		MaxSeedingTime:    qbitSeedingTimeOut(v.SeedDays),
+		RatioLimit:        qbitRatioLimitOut(v.SeedRatio),
+		SeedingTimeLimit:  qbitSeedingTimeOut(v.SeedDays),
+		InactiveTimeLimit: -2,
+		SeenComplete:      v.CompletedAt,
+		SuperSeeding:      v.SuperSeeding,
+		TrackersCount:     v.TrackersCount,
 	}
+}
+
+func qbitPriority(position int) int {
+	if position < 0 {
+		return 0
+	}
+	return position
+}
+
+// qbitRatioLimitOut maps the daemon's seed ratio (-1 global, 0 unlimited) to
+// qBittorrent's (-2 global, -1 infinite).
+func qbitRatioLimitOut(value float64) float64 {
+	switch {
+	case value < 0:
+		return -2
+	case value == 0:
+		return -1
+	}
+	return value
+}
+
+// qbitSeedingTimeOut maps the daemon's seed days (-1 global, 0 unlimited) to
+// qBittorrent's minutes (-2 global, -1 infinite).
+func qbitSeedingTimeOut(days int64) int64 {
+	switch {
+	case days < 0:
+		return -2
+	case days == 0:
+		return -1
+	}
+	return days * 24 * 60
 }
 
 // qbitTorrentLimitOut renders a per-torrent limit for torrents/info: bytes per
@@ -919,6 +1015,59 @@ func (d *Daemon) handleQbitDelete(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+// qbitApplyAddLimits maps the optional qBittorrent add fields onto the add
+// request: speeds are bytes/s, the seed limits use qBittorrent's -2 (global),
+// -1 (infinite) and minutes conventions.
+func qbitApplyAddLimits(r *http.Request, req *addRequest) {
+	if raw := strings.TrimSpace(r.FormValue("dlLimit")); raw != "" {
+		if v, err := strconv.ParseInt(raw, 10, 64); err == nil && v >= 0 {
+			kib := (v + 1023) / 1024
+			req.DownloadLimitKib = &kib
+		}
+	}
+	if raw := strings.TrimSpace(r.FormValue("upLimit")); raw != "" {
+		if v, err := strconv.ParseInt(raw, 10, 64); err == nil && v >= 0 {
+			kib := (v + 1023) / 1024
+			req.UploadLimitKib = &kib
+		}
+	}
+	if raw := strings.TrimSpace(r.FormValue("ratioLimit")); raw != "" {
+		if v, err := strconv.ParseFloat(raw, 64); err == nil {
+			switch {
+			case v == -2:
+				req.SeedRatio = -1
+			case v == -1:
+				req.SeedRatio = 0
+			case v >= 0:
+				req.SeedRatio = v
+			}
+		}
+	}
+	if raw := strings.TrimSpace(r.FormValue("seedingTimeLimit")); raw != "" {
+		if v, err := strconv.ParseInt(raw, 10, 64); err == nil {
+			switch {
+			case v == -2:
+				req.SeedDays = -1
+			case v == -1:
+				req.SeedDays = 0
+			case v >= 0:
+				req.SeedDays = (v + 24*60 - 1) / (24 * 60)
+			}
+		}
+	}
+}
+
+// qbitRenameAfterAdd applies qBittorrent's rename field after a successful add.
+func qbitRenameAfterAdd(d *Daemon, hash string, existing bool, name string) {
+	name = strings.TrimSpace(name)
+	if existing || hash == "" || name == "" {
+		return
+	}
+	if err := d.renameTorrent(hash, name); err != nil {
+		logfError("cannot rename the added torrent %s: %v", hash, err)
+	}
+}
+
 // handleQbitAdd accepts "urls" (magnet links and .torrent URLs, one per line)
 // and an uploaded .torrent (multipart field "torrents"), plus savepath, paused,
 // sequentialDownload and firstLastPiecePrio, the way Sonarr and Radarr send
@@ -964,11 +1113,14 @@ func (d *Daemon) handleQbitAdd(w http.ResponseWriter, r *http.Request) {
 			if readErr != nil || len(data) == 0 {
 				continue
 			}
-			req := addRequest{TorrentData: data, Destination: savePath, Paused: paused, Category: category, Tags: tags, Sequential: sequential, FirstLast: firstLast, SeedMode: skipChecking, AutoTMM: autoTMM, AutoTMMSet: true, ContentLayout: layout}
-			if _, _, err := d.add(req); err != nil {
+			req := addRequest{TorrentData: data, Destination: savePath, Paused: paused, Category: category, Tags: tags, Sequential: sequential, FirstLast: firstLast, SeedMode: skipChecking, AutoTMM: autoTMM, AutoTMMSet: true, ContentLayout: layout, SeedRatio: -1, SeedDays: -1}
+			qbitApplyAddLimits(r, &req)
+			hash, existing, err := d.add(req)
+			if err != nil {
 				qbitText(w, http.StatusUnsupportedMediaType, qbitInvalidCode)
 				return
 			}
+			qbitRenameAfterAdd(d, hash, existing, r.FormValue("rename"))
 			added = true
 		}
 	}
@@ -979,7 +1131,8 @@ func (d *Daemon) handleQbitAdd(w http.ResponseWriter, r *http.Request) {
 		if line == "" {
 			continue
 		}
-		req := addRequest{Destination: savePath, Paused: paused, Category: category, Tags: tags, Sequential: sequential, FirstLast: firstLast, SeedMode: skipChecking, AutoTMM: autoTMM, AutoTMMSet: true, ContentLayout: layout}
+		req := addRequest{Destination: savePath, Paused: paused, Category: category, Tags: tags, Sequential: sequential, FirstLast: firstLast, SeedMode: skipChecking, AutoTMM: autoTMM, AutoTMMSet: true, ContentLayout: layout, SeedRatio: -1, SeedDays: -1}
+		qbitApplyAddLimits(r, &req)
 		switch {
 		case strings.HasPrefix(strings.ToLower(line), "magnet:"):
 			req.Magnet = line
@@ -997,10 +1150,12 @@ func (d *Daemon) handleQbitAdd(w http.ResponseWriter, r *http.Request) {
 		default:
 			continue
 		}
-		if _, _, err := d.add(req); err != nil {
+		hash, existing, err := d.add(req)
+		if err != nil {
 			qbitText(w, http.StatusUnsupportedMediaType, qbitInvalidCode)
 			return
 		}
+		qbitRenameAfterAdd(d, hash, existing, r.FormValue("rename"))
 		added = true
 	}
 	if !added {
@@ -1161,67 +1316,126 @@ func (d *Daemon) handleQbitPreferences(w http.ResponseWriter, _ *http.Request) {
 		}
 	}
 	exportDir, exportFinDir := d.exportDirs()
+	sessionTimeout := 0
+	if d.sessions != nil {
+		sessionTimeout = int(d.sessions.TTL().Seconds())
+	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"locale":                            d.opts.Lang,
-		"save_path":                         d.downloadDir(),
-		"temp_path":                         d.opts.PartsDir,
-		"temp_path_enabled":                 d.opts.PartsDir != "",
-		"create_subfolder_enabled":          true,
-		"start_paused_enabled":              false,
-		"preallocate_all":                   cfg.Preallocate,
-		"incomplete_files_ext":              false,
-		"listen_port":                       stats.PeerPort,
-		"random_port":                       false,
-		"dht":                               stats.DHT,
-		"pex":                               !d.settingBool("no-pex", false),
-		"lsd":                               !d.settingBool("no-lsd", false),
-		"upnp":                              !d.settingBool("no-upnp", false),
-		"encryption":                        qbitEncryptionMode(stats.Encryption),
-		"bittorrent_protocol":               qbitProtocol(stats.UTP),
-		"limit_utp_rate":                    true,
-		"queueing_enabled":                  true,
-		"max_active_downloads":              cfg.ActiveDownloads,
-		"max_active_uploads":                cfg.ActiveSeeds,
-		"max_active_torrents":               cfg.ActiveLimit,
-		"dont_count_slow_torrents":          cfg.DontCountSlow,
-		"slow_torrent_dl_rate_threshold":    int(cfg.SlowRate),
-		"slow_torrent_ul_rate_threshold":    int(cfg.SlowRate),
-		"slow_torrent_inactive_timer":       int(cfg.SlowAfterSecs),
-		"dl_limit":                          qbitPrefLimitOut(cfg.SpeedLimitDownload),
-		"up_limit":                          qbitPrefLimitOut(cfg.SpeedLimitUpload),
-		"alt_dl_limit":                      altDL,
-		"alt_up_limit":                      altUL,
-		"use_alt_speed_limits":              altManual,
-		"limit_lan_peers":                   d.limitLANPeers(),
-		"max_connec":                        cfg.MaxPeerDial + cfg.MaxPeerAccept,
-		"max_connec_per_torrent":            qbitPrefLimitOut(int64(cfg.MaxConnectionsPerTorrent)),
-		"max_uploads":                       0,
-		"max_uploads_per_torrent":           0,
-		"max_ratio_enabled":                 d.settingBool(maxRatioEnabledKey, false),
-		"max_ratio":                         d.settingFloat(maxRatioKey, -1),
-		"max_ratio_act":                     d.settingInt(maxRatioActKey, 0),
-		"max_seeding_time_enabled":          d.settingBool(maxSeedingTimeEnabledKey, false),
-		"max_seeding_time":                  d.settingInt(maxSeedingTimeKey, -1),
-		"max_inactive_seeding_time_enabled": d.settingBool(maxInactiveSeedingTimeEnabledKey, false),
-		"max_inactive_seeding_time":         d.settingInt(maxInactiveSeedingTimeKey, -1),
-		"auto_tmm_enabled":                  d.settingBool(autoTMMEnabledKey, false),
-		"torrent_content_layout":            d.defaultContentLayout(),
-		"torrent_changed_tmm_enabled":       true,
-		"category_changed_tmm_enabled":      true,
-		"save_path_changed_tmm_enabled":     true,
-		"use_category_paths_in_manual_mode": false,
-		"scheduler_enabled":                 d.settingBool(scheduleEnabledKey, false),
-		"proxy_type":                        proxyType,
-		"anonymous_mode":                    false,
-		"ip_filter_enabled":                 stats.IPFilterRules > 0,
-		"ip_filter_path":                    stats.IPFilterPath,
-		"ip_filter_trackers":                d.settingBool("ipfilter-trackers", false),
-		"rss_refresh_interval":              d.rssRefreshMinutes(),
-		"export_dir":                        exportDir,
-		"export_dir_fin":                    exportFinDir,
-		"scan_dirs":                         scanDirs,
-		"save_resume_data_interval":         60,
+		"locale":                                 d.opts.Lang,
+		"save_path":                              d.downloadDir(),
+		"temp_path":                              d.opts.PartsDir,
+		"temp_path_enabled":                      d.opts.PartsDir != "",
+		"create_subfolder_enabled":               true,
+		"start_paused_enabled":                   false,
+		"preallocate_all":                        cfg.Preallocate,
+		"incomplete_files_ext":                   false,
+		"listen_port":                            stats.PeerPort,
+		"random_port":                            false,
+		"dht":                                    stats.DHT,
+		"pex":                                    !d.settingBool("no-pex", false),
+		"lsd":                                    !d.settingBool("no-lsd", false),
+		"upnp":                                   !d.settingBool("no-upnp", false),
+		"encryption":                             qbitEncryptionMode(stats.Encryption),
+		"bittorrent_protocol":                    qbitProtocol(stats.UTP),
+		"limit_utp_rate":                         true,
+		"queueing_enabled":                       true,
+		"max_active_downloads":                   cfg.ActiveDownloads,
+		"max_active_uploads":                     cfg.ActiveSeeds,
+		"max_active_torrents":                    cfg.ActiveLimit,
+		"dont_count_slow_torrents":               cfg.DontCountSlow,
+		"slow_torrent_dl_rate_threshold":         int(cfg.SlowRate),
+		"slow_torrent_ul_rate_threshold":         int(cfg.SlowRate),
+		"slow_torrent_inactive_timer":            int(cfg.SlowAfterSecs),
+		"dl_limit":                               qbitPrefLimitOut(cfg.SpeedLimitDownload),
+		"up_limit":                               qbitPrefLimitOut(cfg.SpeedLimitUpload),
+		"alt_dl_limit":                           altDL,
+		"alt_up_limit":                           altUL,
+		"use_alt_speed_limits":                   altManual,
+		"limit_lan_peers":                        d.limitLANPeers(),
+		"max_connec":                             cfg.MaxPeerDial + cfg.MaxPeerAccept,
+		"max_connec_per_torrent":                 qbitPrefLimitOut(int64(cfg.MaxConnectionsPerTorrent)),
+		"max_uploads":                            -1,
+		"max_uploads_per_torrent":                -1,
+		"max_ratio_enabled":                      d.settingBool(maxRatioEnabledKey, false),
+		"max_ratio":                              d.settingFloat(maxRatioKey, -1),
+		"max_ratio_act":                          d.settingInt(maxRatioActKey, 0),
+		"max_seeding_time_enabled":               d.settingBool(maxSeedingTimeEnabledKey, false),
+		"max_seeding_time":                       d.settingInt(maxSeedingTimeKey, -1),
+		"max_inactive_seeding_time_enabled":      d.settingBool(maxInactiveSeedingTimeEnabledKey, false),
+		"max_inactive_seeding_time":              d.settingInt(maxInactiveSeedingTimeKey, -1),
+		"auto_tmm_enabled":                       d.settingBool(autoTMMEnabledKey, false),
+		"torrent_content_layout":                 d.defaultContentLayout(),
+		"torrent_changed_tmm_enabled":            true,
+		"category_changed_tmm_enabled":           true,
+		"save_path_changed_tmm_enabled":          true,
+		"use_category_paths_in_manual_mode":      false,
+		"scheduler_enabled":                      d.settingBool(scheduleEnabledKey, false),
+		"proxy_type":                             proxyType,
+		"anonymous_mode":                         false,
+		"ip_filter_enabled":                      stats.IPFilterRules > 0,
+		"ip_filter_path":                         stats.IPFilterPath,
+		"ip_filter_trackers":                     d.settingBool("ipfilter-trackers", false),
+		"rss_refresh_interval":                   d.rssRefreshMinutes(),
+		"export_dir":                             exportDir,
+		"export_dir_fin":                         exportFinDir,
+		"scan_dirs":                              scanDirs,
+		"save_resume_data_interval":              60,
+		"web_ui_username":                        d.standaloneUser(),
+		"web_ui_address":                         qbitListenHost(d.opts.Listen),
+		"web_ui_port":                            qbitListenPort(d.opts.Listen),
+		"web_ui_upnp":                            false,
+		"web_ui_csrf_protection_enabled":         true,
+		"web_ui_clickjacking_protection_enabled": true,
+		"web_ui_host_header_validation_enabled":  true,
+		"web_ui_secure_cookie_enabled":           true,
+		"web_ui_session_timeout":                 sessionTimeout,
+		"bypass_local_auth":                      d.standaloneLocalBypass(),
+		"alternative_webui_enabled":              d.altWebUIEnabled(),
+		"alternative_webui_path":                 "",
+		"use_https":                              false,
 	})
+}
+
+func (d *Daemon) handleQbitProcessInfo(w http.ResponseWriter, _ *http.Request) {
+	writeJSON(w, http.StatusOK, map[string]any{"launch_time": d.startedAt.Unix()})
+}
+
+func (d *Daemon) handleQbitSetComment(w http.ResponseWriter, r *http.Request) {
+	hash := strings.TrimSpace(r.FormValue("hash"))
+	comment := strings.TrimSpace(r.FormValue("comment"))
+	d.mu.Lock()
+	_, meta := d.findLocked(hash)
+	if meta != nil {
+		meta.Comment = comment
+		d.dirty = true
+	}
+	d.mu.Unlock()
+	if meta == nil {
+		http.Error(w, "Not found", http.StatusNotFound)
+		return
+	}
+	d.poke()
+	qbitText(w, http.StatusOK, qbitOKCode)
+}
+
+func qbitListenHost(listen string) string {
+	host, _, err := net.SplitHostPort(strings.TrimSpace(listen))
+	if err != nil {
+		return "*"
+	}
+	if host == "" || host == "0.0.0.0" || host == "::" {
+		return "*"
+	}
+	return host
+}
+
+func qbitListenPort(listen string) int {
+	_, port, err := net.SplitHostPort(strings.TrimSpace(listen))
+	if err != nil {
+		return 0
+	}
+	value, _ := strconv.Atoi(port)
+	return value
 }
 
 func (d *Daemon) handleQbitBuildInfo(w http.ResponseWriter, _ *http.Request) {
@@ -1246,6 +1460,16 @@ func (d *Daemon) qbitFindView(hash string) (torrentInfo, bool) {
 	return torrentInfo{}, false
 }
 
+func qbitTorrentComment(d *Daemon, hash string) string {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	_, meta := d.findLocked(hash)
+	if meta == nil {
+		return ""
+	}
+	return meta.Comment
+}
+
 func (d *Daemon) handleQbitProperties(w http.ResponseWriter, r *http.Request) {
 	v, ok := d.qbitFindView(r.URL.Query().Get("hash"))
 	if !ok {
@@ -1257,28 +1481,35 @@ func (d *Daemon) handleQbitProperties(w http.ResponseWriter, r *http.Request) {
 		eta = qbitUnknownETA
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"save_path":       v.SavePath,
-		"piece_size":      v.PieceLength,
-		"total_size":      v.TotalSize,
-		"total_done":      v.TotalDone,
-		"pieces_num":      v.PiecesTotal,
-		"pieces_have":     v.PiecesHave,
-		"dl_speed":        v.DownloadRate,
-		"up_speed":        v.UploadRate,
-		"eta":             eta,
-		"seeds":           v.NumSeeds,
-		"peers":           v.NumPeers,
-		"seeds_total":     v.NumComplete,
-		"peers_total":     v.NumIncomplete,
-		"share_ratio":     ratioOf(v),
-		"addition_date":   v.AddedAt,
-		"completion_date": v.CompletedAt,
-		"time_elapsed":    v.ActiveSeconds,
-		"seeding_time":    v.SeedingSeconds,
-		"dl_limit":        -1,
-		"up_limit":        -1,
-		"comment":         "",
-		"created_by":      "",
+		"save_path":            v.SavePath,
+		"piece_size":           v.PieceLength,
+		"total_size":           v.TotalSize,
+		"total_done":           v.TotalDone,
+		"pieces_num":           v.PiecesTotal,
+		"pieces_have":          v.PiecesHave,
+		"dl_speed":             v.DownloadRate,
+		"up_speed":             v.UploadRate,
+		"eta":                  eta,
+		"seeds":                v.NumSeeds,
+		"peers":                v.NumPeers,
+		"seeds_total":          v.NumComplete,
+		"peers_total":          v.NumIncomplete,
+		"share_ratio":          ratioOf(v),
+		"addition_date":        v.AddedAt,
+		"completion_date":      v.CompletedAt,
+		"time_elapsed":         v.ActiveSeconds,
+		"seeding_time":         v.SeedingSeconds,
+		"dl_limit":             qbitTorrentLimitOut(v.DownloadLimitKib),
+		"up_limit":             qbitTorrentLimitOut(v.UploadLimitKib),
+		"is_private":           v.Private,
+		"total_uploaded":       v.Uploaded,
+		"total_downloaded":     v.Downloaded,
+		"last_seen":            v.LastActive,
+		"nb_connections":       v.NumPeers,
+		"nb_connections_limit": 0,
+		"magnet_uri":           magnetLink(strings.ToLower(v.Hash), v.Name, nil),
+		"comment":              qbitTorrentComment(d, v.Hash),
+		"created_by":           "",
 	})
 }
 
@@ -1696,7 +1927,7 @@ func qbitTagsList(set map[string]struct{}) []string {
 
 // qbitServerState is the global transfer snapshot qBittorrent clients read from
 // server_state (both of sync/maindata and transfer/info).
-func qbitServerState(stats daemonStats) map[string]any {
+func (d *Daemon) qbitServerState(stats daemonStats) map[string]any {
 	return map[string]any{
 		"dl_info_speed":          stats.DownloadRate,
 		"up_info_speed":          stats.UploadRate,
@@ -1709,6 +1940,17 @@ func qbitServerState(stats daemonStats) map[string]any {
 		"queueing":               true,
 		"global_ratio":           strconv.FormatFloat(stats.Ratio, 'f', 2, 64),
 		"total_peer_connections": stats.Peers,
+		"alltime_dl":             stats.Lifetime.Downloaded,
+		"alltime_ul":             stats.Lifetime.Uploaded,
+		"average_time_queue":     0,
+		"read_cache_hits":        0,
+		"read_cache_overload":    "0",
+		"write_cache_overload":   "0",
+		"total_buffers_size":     0,
+		"total_queued_size":      0,
+		"total_wasted_session":   0,
+		"use_alt_speed_limits":   d.altSpeedActive(time.Now()),
+		"refresh_interval":       2000,
 	}
 }
 
@@ -1755,7 +1997,7 @@ func (d *Daemon) handleQbitSync(w http.ResponseWriter, r *http.Request) {
 	payload := map[string]any{
 		"rid":          rid,
 		"full_update":  full,
-		"server_state": qbitServerState(stats),
+		"server_state": d.qbitServerState(stats),
 	}
 	if full {
 		payload["torrents"] = current.torrents

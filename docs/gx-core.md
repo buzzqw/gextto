@@ -56,7 +56,12 @@ cap so the auto-speed/peak observer can measure the line), the global seeding li
 the content layout of new torrents (Original, Subfolder, NoSubfolder),
 **completion actions** (move the finished data to a folder, optionally one
 subfolder per category, and run an operator command with the torrent details in
-the environment), the RSS manager with the *Series & movies* page (the *Wanted* route), the Torznab indexer search
+the environment), the RSS manager with the *Series & movies* page (the *Wanted*
+route), the **real episode list** from TVmaze (opt-in: it tells the page which
+episodes exist and when they aired, not only what the feeds happened to show),
+**quality profiles** with allowed resolutions and a cutoff, the **upgrade**
+of an episode already taken when a better release appears (the previous torrent
+is dropped from the session but its files are kept), the Torznab indexer search
 with a parallel fan-out and sortable rich results, the installable page (web app
 manifest and service worker for the shared assets),
 and the **qBittorrent-compatible Web API** (`/api/v2/auth`, `/api/v2/torrents/*`,
@@ -118,7 +123,15 @@ accepts the extra `shareLimitsMode` and `shareLimitAction` fields of 5.2/5.3
 without rejecting older clients. It is verified against Gextto's own
 qBittorrent client (`internal/qbittorrent`), which acts as an automatic test bench, and
 it is what lets existing clients of that protocol use gx-core without patches. In
-managed the whole `/api/v2` is not mounted: Gextto is the single master. On the
+managed the whole `/api/v2` is not mounted: Gextto is the single master. The
+layer advertises the **4.6 / API 2.9.3** level (configurable `app/version`), accepts
+the **qBittorrent 5 API key** (`X-Api-Key` or `Authorization: Bearer`) from
+*Settings → Network*, and fills the fields the WebUI clients read (`download_path`,
+`last_activity`, per-torrent ratio and seeding limits, `super_seeding`,
+`trackers_count`, `magnet_uri`, `is_private`, `total_uploaded`/`total_downloaded`,
+a richer `sync` `server_state`); the 5.x additions are `app/processInfo` and
+`torrents/setComment`. It is a **compatibility layer, not a 100% clone**: the
+remaining gaps are listed in §6. On the
 token-protected v1 side the daemon also serves `GET /api/v1/metrics` (Prometheus) and
 `GET /api/v1/events` (Server-Sent Events), in both modes, beside the frozen resources
 Gextto uses.
@@ -227,8 +240,21 @@ cannot inject arguments. Both actions are off by default. Renaming into a media
 library with metadata (the way Gextto does) remains Gextto's job: the standalone
 offers the generic hook, not a second library manager.
 
+**Episode knowledge and upgrades.** The real episode list is opt-in
+(*Settings → Series and movies*): when on, the series title is sent to the
+public TVmaze API, its already-aired episodes are added to the ledger and an
+episode that never appeared in a feed still counts as missing. Quality profiles
+name the accepted resolutions and a cutoff; with a cutoff, a better release of
+an episode already taken is downloaded until the cutoff is reached. The upgrade
+is non-destructive: the old torrent leaves the session, its files stay on disk.
+
 **Open.**
 
+- **qBittorrent API completeness**: the layer already speaks the 4.6 level, the
+  qBittorrent 5 API key, `app/processInfo` and `torrents/setComment`, and fills
+  the fields the clients read. A 100% clone would still need the full
+  preferences round-trip, the remaining 5.x fields, the exact status codes and
+  every search/RSS corner; the target version must be chosen before claiming it.
 - **Rate-based choking and anti-leech**: to be validated with the deterministic harness
   and the real-swarm campaign before touching the algorithm
   ([`measurements.md`](measurements.md) §4.6).

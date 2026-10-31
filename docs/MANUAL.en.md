@@ -1221,8 +1221,9 @@ what is transferring the files is visible at a glance).
   it does not support WebTorrent/WebRTC. In **standalone** (without Gextto) the
   same page adds the category manager, the completion actions (move the finished
   data to a folder and/or run a program with the torrent details in the
-  environment), the parallel indexer search with sortable results, and the
-  installable app with sign-out.
+  environment), **quality profiles** with a cutoff and the upgrade to a better
+  release, the **real episode list** from TVmaze (optional), the parallel
+  indexer search with sortable results, and the installable app with sign-out.
 - **qBittorrent-nox** — Gextto drives an existing qBittorrent-nox through its Web
   API. Set the URL, user/password, category, tag and poll interval, and the
   `local=remote` **path mappings** whenever the two processes see different

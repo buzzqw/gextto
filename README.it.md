@@ -386,8 +386,8 @@ gx-torrent è anche un client completo senza Gextto, come `qbittorrent-nox` o
 semplice con tutto ciò che serve a un client autonomo.
 
 - **Web API v2 di qBittorrent** (`/api/v2/...`, comprese le chiamate di
-  qBittorrent 5) per Sonarr, Radarr, Lidarr, Readarr e le app mobili; la sua
-  API JSON; **metriche Prometheus**
+  qBittorrent 5, l'API key e i campi letti dalle WebUI) per Sonarr, Radarr,
+  Lidarr, Readarr e le app mobili; la sua API JSON; **metriche Prometheus**
   (`/api/v1/metrics`) per Grafana o Home Assistant, e un **flusso di eventi**
   (`/api/v1/events`) per Node-RED, Home Assistant o script
   ([esempi](docs/API.md#integrating-with-other-systems)).
@@ -411,7 +411,10 @@ semplice con tutto ciò che serve a un client autonomo.
   e tag con una gestione delle categorie e del loro percorso, test della porta;
   limiti di seed per ratio, tempo e **inattività**, e il **content layout** di
   qBittorrent (originale, crea sottocartella, nessuna sottocartella)
-  all'aggiunta.
+  all'aggiunta. I **profili di qualità** con soglia aggiornano un episodio già
+  preso quando arriva una release migliore, senza cancellare i file; l'**elenco
+  episodi reale** da TVmaze (opzionale) dice cosa manca anche quando nessuna
+  release è mai passata dai feed.
 - **Fine del download.** Sposta i dati completati in una cartella (anche una
   sottocartella per categoria) continuando a seedare, oppure esegue un programma
   con i dettagli del torrent nell'ambiente; entrambi spenti per default.

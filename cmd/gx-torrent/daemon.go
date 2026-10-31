@@ -21,6 +21,7 @@ import (
 	"github.com/buzzqw/gextto/internal/gxcore/torrent"
 	"github.com/buzzqw/gextto/internal/queue"
 	"github.com/buzzqw/gextto/internal/settings"
+	"github.com/buzzqw/gextto/internal/tvmaze"
 )
 
 // diskFree returns the free (available to the user) and total bytes of the
@@ -132,6 +133,8 @@ type torrentMeta struct {
 	SelectOnly []int  `json:"select_only,omitempty"`
 	Version    string `json:"version,omitempty"`
 	Error      string `json:"error,omitempty"`
+	// Comment is the qBittorrent torrent comment (setComment).
+	Comment string `json:"comment,omitempty"`
 	// Category and Tags are the qBittorrent-style labels a client assigns
 	// (standalone mode). They do not affect the transfer.
 	Category string   `json:"category,omitempty"`
@@ -175,8 +178,11 @@ type persistedState struct {
 	// WantedSeen/WantedTaken are the episode ledger of the "wanted" titles: what
 	// appeared in the feeds/indexers and what was downloaded, per title+season.
 	// The difference is what gx-torrent still has to find (gap search).
-	WantedSeen  map[string]smartEpisodes `json:"wanted_seen,omitempty"`
-	WantedTaken map[string]smartEpisodes `json:"wanted_taken,omitempty"`
+	WantedSeen         map[string]smartEpisodes     `json:"wanted_seen,omitempty"`
+	WantedTaken        map[string]smartEpisodes     `json:"wanted_taken,omitempty"`
+	WantedTakenQuality map[string]smartEpisodes     `json:"wanted_taken_quality,omitempty"`
+	WantedTakenTorrent map[string]map[string]string `json:"wanted_taken_torrent,omitempty"`
+	WantedMeta         map[string]wantedMetadata    `json:"wanted_meta,omitempty"`
 	// WantedGapLast throttles the missing-episode gap search per wanted title.
 	WantedGapLast map[string]int64 `json:"wanted_gap_last,omitempty"`
 	// WantedSearchLast throttles the per-title indexer search: the archive is fed
@@ -313,6 +319,8 @@ type Daemon struct {
 	qbitCreateMu  sync.Mutex
 	qbitCreateSeq int
 	qbitCreate    map[string]*qbitCreateTask
+	// metadata is the TVmaze client for the real episode list (standalone).
+	metadata *tvmaze.Client
 	// watchLast/watchRunning drive the standalone watch-folders scan (off when
 	// no folder is configured); watchLast is touched only by the serial tick.
 	watchLast    time.Time
@@ -484,6 +492,7 @@ func newDaemon(opts Options) (*Daemon, error) {
 		appliedDL:      -1,
 		appliedUL:      -1,
 		autoSpeed:      &autoSpeed{},
+		metadata:       tvmaze.New(),
 	}
 	if opts.Mode == ModeStandalone {
 		d.sessions = auth.NewSessions(30 * 24 * time.Hour)
@@ -1414,6 +1423,7 @@ type torrentInfo struct {
 	ETASeconds     int64   `json:"eta_seconds"`
 	CurrentTracker string  `json:"current_tracker,omitempty"`
 	QueuePosition  int     `json:"queue_position"`
+	TrackersCount  int     `json:"trackers_count"`
 	NumPeers       int     `json:"num_peers"`
 	NumSeeds       int     `json:"num_seeds"`
 	NumComplete    int     `json:"num_complete"`
@@ -1542,6 +1552,7 @@ func (d *Daemon) infoLocked(t *torrent.Torrent, stats torrent.Stats, rt *runtime
 		NumPeers:         stats.Peers.Total,
 		NumSeeds:         rt.numSeeds,
 		CurrentTracker:   rt.tracker,
+		TrackersCount:    len(t.Trackers()),
 		NumComplete:      meta.SwarmSeeds,
 		NumIncomplete:    meta.SwarmPeers,
 		SeedRatio:        meta.SeedRatio,

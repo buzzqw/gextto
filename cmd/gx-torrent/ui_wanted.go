@@ -72,6 +72,7 @@ func (d *Daemon) handleUIWanted(w http.ResponseWriter, r *http.Request) {
 			Language:      strings.TrimSpace(r.FormValue("language")),
 			Subtitles:     strings.TrimSpace(r.FormValue("subtitles")),
 			Quality:       strings.TrimSpace(r.FormValue("quality")),
+			Profile:       strings.TrimSpace(r.FormValue("profile")),
 			Exclude:       strings.TrimSpace(r.FormValue("exclude")),
 			EpisodeFilter: strings.TrimSpace(r.FormValue("episode_filter")),
 			Category:      strings.TrimSpace(r.FormValue("category")),
@@ -199,6 +200,11 @@ func (d *Daemon) wantedEpisodeViews(w wantedEntry) []wantedEpisodeView {
 		k := [2]int{ep.season, ep.episode}
 		record(k, state)
 		mediaByKey[k] = view
+	}
+	// The real episode list fills the gaps the feeds never showed: an episode
+	// that exists and has aired counts as missing even if no release passed by.
+	for _, ep := range d.wantedMetadataEpisodes(w, time.Now()) {
+		record([2]int{ep.season, ep.episode}, wantedEpisodeMissing)
 	}
 	sort.Slice(keys, func(i, j int) bool {
 		if keys[i][0] != keys[j][0] {
@@ -328,6 +334,7 @@ func (d *Daemon) renderWanted(w http.ResponseWriter, r *http.Request, errKey str
 	page = strings.Replace(page, "{{WANTEDDOWNLOADING}}", strconv.Itoa(downloadingCount), 1)
 	page = strings.Replace(page, "{{WANTEDCOMPLETE}}", strconv.Itoa(completeCount), 1)
 	page = strings.Replace(page, "{{WANTEDPAUSED}}", strconv.Itoa(pausedCount), 1)
+	page = strings.Replace(page, "{{PROFILE_OPTIONS}}", d.wantedProfileOptions(""), 1)
 	page = strings.Replace(page, "{{WANTEDROWS}}", d.uiWantedRowsHTML(), 1)
 
 	errorHTML := ""
@@ -745,6 +752,12 @@ func (d *Daemon) uiWantedRowsHTML() string {
 		if q := strings.TrimSpace(w.Quality); q != "" {
 			chips.WriteString(uiChip("in", "Quality", q))
 		}
+		if profile := strings.TrimSpace(w.Profile); profile != "" {
+			chips.WriteString(uiChip("in", "Profile", profile))
+		}
+		if metaChip := d.wantedMetadataChip(w); metaChip != "" {
+			chips.WriteString(uiChip("in", "Episode list", metaChip))
+		}
 		if strings.TrimSpace(w.Exclude) != "" {
 			chips.WriteString(uiChip("out", "Exclude", w.Exclude))
 		}
@@ -808,6 +821,7 @@ func (d *Daemon) uiWantedRowsHTML() string {
 			` data-language="` + html.EscapeString(w.Language) + `"` +
 			` data-subtitles="` + html.EscapeString(w.Subtitles) + `"` +
 			` data-quality="` + html.EscapeString(w.Quality) + `"` +
+			` data-profile="` + html.EscapeString(w.Profile) + `"` +
 			` data-exclude="` + html.EscapeString(w.Exclude) + `"` +
 			` data-episode="` + html.EscapeString(w.EpisodeFilter) + `"` +
 			` data-category="` + html.EscapeString(w.Category) + `"` +

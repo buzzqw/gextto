@@ -54,11 +54,15 @@ type wantedEntry struct {
 	Language      string `json:"language,omitempty"`
 	Subtitles     string `json:"subtitles,omitempty"`
 	Quality       string `json:"quality,omitempty"`
+	Profile       string `json:"profile,omitempty"`
 	Exclude       string `json:"exclude,omitempty"`
 	EpisodeFilter string `json:"episode_filter,omitempty"`
 	Category      string `json:"category,omitempty"`
 	SavePath      string `json:"savepath,omitempty"`
 	Paused        bool   `json:"paused,omitempty"`
+	// profile is the resolved quality profile (not persisted): wantedList fills
+	// it from the profile name so the match and upgrade rules are pure methods.
+	profile qualityProfile
 }
 
 // wantedEpisode is one missing episode of a wanted series.
@@ -79,6 +83,11 @@ func (d *Daemon) wantedList() []wantedEntry {
 	if err := json.Unmarshal([]byte(raw), &list); err != nil {
 		logfError("cannot parse the wanted setting: %v", err)
 		return nil
+	}
+	for i := range list {
+		if profile, ok := d.qualityProfileByName(list[i].Profile); ok {
+			list[i].profile = profile
+		}
 	}
 	return list
 }
@@ -196,7 +205,6 @@ func (w wantedEntry) criteria() rss.Criteria {
 // wantedIncludeMatch reports whether the title contains every language and
 // subtitle term and satisfies the quality requirement.
 func wantedIncludeMatch(w wantedEntry, title string) bool {
-	lower := strings.ToLower(title)
 	// rss.HasTerm: "sub ita" finds "SUB.ITA", "ita" does not find "Capitan".
 	for _, term := range splitList(w.Language) {
 		if strings.TrimSpace(term) != "" && !rss.HasTerm(title, term) {
@@ -208,10 +216,19 @@ func wantedIncludeMatch(w wantedEntry, title string) bool {
 			return false
 		}
 	}
-	if !wantedQualityMatch(w.Quality, lower) {
+	if !w.qualityMatch(title) {
 		return false
 	}
 	return true
+}
+
+// qualityMatch applies the quality profile when the title has one, otherwise
+// the plain Quality field.
+func (w wantedEntry) qualityMatch(title string) bool {
+	if w.Profile != "" && w.profile.Name != "" {
+		return w.profile.allows(title)
+	}
+	return wantedQualityMatch(w.Quality, strings.ToLower(title))
 }
 
 func (w wantedEntry) kind() string {
@@ -363,10 +380,11 @@ func (d *Daemon) pollWantedLocked(ctx context.Context, onlyName string) wantedPo
 	}
 	now := time.Now()
 	var (
-		checked     int
-		addedCount  int
-		addedTitles []string
-		errorsList  []string
+		checked       int
+		addedCount    int
+		addedTitles   []string
+		errorsList    []string
+		metadataTries int
 	)
 
 	for _, w := range wanteds {
@@ -381,6 +399,9 @@ func (d *Daemon) pollWantedLocked(ctx context.Context, onlyName string) wantedPo
 			break
 		}
 		checked++
+		if metadataTries < metadataPerCycle && d.refreshWantedMetadata(ctx, w, onlyName != "") {
+			metadataTries++
+		}
 		var items []rss.Item
 		// A /regex/ title is searched by its literal words (none with "|").
 		searchText := titleSearchText(w.Name)
@@ -466,6 +487,100 @@ func (d *Daemon) recordWantedTaken(w wantedEntry, season, episode int) {
 	d.dirty = true
 }
 
+// recordWantedTakenQuality stores the resolution of the release actually taken
+// for an episode, so a later better release can be recognized as an upgrade.
+func (d *Daemon) recordWantedTakenQuality(w wantedEntry, season, episode int, title string) {
+	_, rank := rss.QualityRank(title)
+	if rank <= 0 {
+		return
+	}
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if d.state.WantedTakenQuality == nil {
+		d.state.WantedTakenQuality = map[string]smartEpisodes{}
+	}
+	key := wantedKey(w.Name, season)
+	if d.state.WantedTakenQuality[key] == nil {
+		d.state.WantedTakenQuality[key] = smartEpisodes{}
+	}
+	d.state.WantedTakenQuality[key][strconv.Itoa(episode)] = int64(rank)
+	d.dirty = true
+}
+
+// recordWantedTakenTorrent remembers the torrent that covers an episode, so an
+// upgrade can drop the older torrent from the session (its files are kept).
+func (d *Daemon) recordWantedTakenTorrent(w wantedEntry, season, episode int, hash string) {
+	hash = strings.ToLower(strings.TrimSpace(hash))
+	if hash == "" {
+		return
+	}
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if d.state.WantedTakenTorrent == nil {
+		d.state.WantedTakenTorrent = map[string]map[string]string{}
+	}
+	key := wantedKey(w.Name, season)
+	if d.state.WantedTakenTorrent[key] == nil {
+		d.state.WantedTakenTorrent[key] = map[string]string{}
+	}
+	d.state.WantedTakenTorrent[key][strconv.Itoa(episode)] = hash
+	d.dirty = true
+}
+
+func (d *Daemon) wantedTakenRank(w wantedEntry, season, episode int) int {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	eps := d.state.WantedTakenQuality[wantedKey(w.Name, season)]
+	if eps == nil {
+		return 0
+	}
+	return int(eps[strconv.Itoa(episode)])
+}
+
+func (d *Daemon) wantedTakenTorrentHash(w wantedEntry, season, episode int) string {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return d.state.WantedTakenTorrent[wantedKey(w.Name, season)][strconv.Itoa(episode)]
+}
+
+// wantedCanUpgrade reports whether a release is a better copy of an episode
+// already taken: only with a profile that has a cutoff, only above the taken
+// quality and never beyond the cutoff.
+func (d *Daemon) wantedCanUpgrade(w wantedEntry, season, episode int, title string) bool {
+	if w.Profile == "" || w.profile.Name == "" || w.profile.Cutoff == "" {
+		return false
+	}
+	taken := d.wantedTakenRank(w, season, episode)
+	if taken <= 0 {
+		return false
+	}
+	_, candidate := rss.QualityRank(title)
+	if candidate <= taken {
+		return false
+	}
+	if !w.profile.allows(title) {
+		return false
+	}
+	cutoff := w.profile.cutoffRank()
+	if cutoff > 0 && (taken >= cutoff || candidate > cutoff) {
+		return false
+	}
+	return true
+}
+
+// dropUpgradedTorrent removes the previous torrent of an upgraded episode from
+// the session without deleting its files: a failed new download never destroys
+// what was already there.
+func (d *Daemon) dropUpgradedTorrent(w wantedEntry, season, episode int, newHash string) {
+	old := d.wantedTakenTorrentHash(w, season, episode)
+	if old == "" || old == strings.ToLower(newHash) {
+		return
+	}
+	if err := d.remove(old, false); err != nil {
+		logfError("wanted %q: cannot drop the previous torrent %s after the upgrade: %v", w.Name, old, err)
+	}
+}
+
 func (d *Daemon) wantedTaken(name string, season, episode int) bool {
 	d.mu.Lock()
 	defer d.mu.Unlock()
@@ -503,6 +618,8 @@ func (d *Daemon) setWantedTaken(name string, season, episode int, have bool) {
 		d.state.WantedTaken[key][token] = time.Now().Unix()
 	} else {
 		delete(d.state.WantedTaken[key], token)
+		delete(d.state.WantedTakenQuality[key], token)
+		delete(d.state.WantedTakenTorrent[key], token)
 	}
 	d.dirty = true
 }
@@ -856,6 +973,20 @@ func (d *Daemon) wantedMissing(w wantedEntry) []wantedEpisode {
 			missing = append(missing, wantedEpisode{season: season, episode: episode})
 		}
 	}
+	known := make(map[wantedEpisode]bool, len(missing))
+	for _, ep := range missing {
+		known[ep] = true
+	}
+	for _, ep := range d.wantedMetadataEpisodes(w, time.Now()) {
+		if known[ep] || d.wantedTaken(w.Name, ep.season, ep.episode) || inSession[ep] {
+			continue
+		}
+		if _, ok := taken[wantedKey(w.Name, ep.season)]["0"]; ok {
+			continue
+		}
+		known[ep] = true
+		missing = append(missing, ep)
+	}
 	sort.Slice(missing, func(i, j int) bool {
 		if missing[i].season != missing[j].season {
 			return missing[i].season < missing[j].season
@@ -893,6 +1024,13 @@ func (d *Daemon) applyWanted(now time.Time, feedName string, items []rss.Item) (
 	}
 	added := 0
 	var addedTitles []string
+	// Best quality first: a profile with several accepted qualities takes the
+	// best release in the batch, not whichever appeared first.
+	sort.SliceStable(items, func(i, j int) bool {
+		_, ri := rss.QualityRank(items[i].Title)
+		_, rj := rss.QualityRank(items[j].Title)
+		return ri > rj
+	})
 	// What is already in the session, per title, read once for this batch.
 	inSession := map[string]map[wantedEpisode]bool{}
 	for _, item := range items {
@@ -908,29 +1046,46 @@ func (d *Daemon) applyWanted(now time.Time, feedName string, items []rss.Item) (
 				continue
 			}
 			d.recordWantedSeen(w, season, episode)
-			if d.feedSeen(feedName, item.GUID) || d.wantedTaken(w.Name, season, episode) {
+			if d.feedSeen(feedName, item.GUID) {
 				continue
+			}
+			taken := d.wantedTaken(w.Name, season, episode)
+			upgrade := false
+			if taken {
+				if !d.wantedCanUpgrade(w, season, episode, item.Title) {
+					continue
+				}
+				upgrade = true
 			}
 			if _, ok := inSession[w.Name]; !ok {
 				inSession[w.Name] = d.wantedSessionEpisodes(w)
 			}
 			if inSession[w.Name][wantedEpisode{season: season, episode: episode}] {
 				// Already downloaded by something else: had, not taken again.
-				d.recordWantedTaken(w, season, episode)
+				if !taken {
+					d.recordWantedTaken(w, season, episode)
+				}
 				continue
 			}
 			action := rss.Action{SavePath: strings.TrimSpace(w.SavePath), Category: strings.TrimSpace(w.Category)}
-			newly, err := d.addFeedItem(item, action)
+			newly, hash, err := d.addFeedItemHash(item, action)
 			if err != nil {
 				logfError("wanted %q: cannot add %q: %v", w.Name, item.Title, err)
 				continue
 			}
 			if newly {
+				if upgrade {
+					d.dropUpgradedTorrent(w, season, episode, hash)
+				}
 				d.markFeedSeen(feedName, item.GUID)
 				d.recordWantedTaken(w, season, episode)
+				d.recordWantedTakenQuality(w, season, episode, item.Title)
+				d.recordWantedTakenTorrent(w, season, episode, hash)
 				added++
 				addedTitles = append(addedTitles, item.Title)
-				if episode == 0 && season > 0 {
+				if upgrade {
+					logf("wanted %q: upgraded %s S%02dE%02d to a better release", w.Name, item.Title, season, episode)
+				} else if episode == 0 && season > 0 {
 					logf("wanted %q: added %s S%02d pack", w.Name, item.Title, season)
 				} else {
 					logf("wanted %q: added %s S%02dE%02d", w.Name, item.Title, season, episode)
@@ -987,8 +1142,10 @@ func (d *Daemon) wantedGapSearch(ctx context.Context, now time.Time, w wantedEnt
 				break
 			}
 			action := rss.Action{SavePath: strings.TrimSpace(w.SavePath), Category: strings.TrimSpace(w.Category)}
-			if newly, err := d.addFeedItem(item, action); err == nil && newly {
+			if newly, hash, err := d.addFeedItemHash(item, action); err == nil && newly {
 				d.recordWantedTaken(w, ep.season, ep.episode)
+				d.recordWantedTakenQuality(w, ep.season, ep.episode, item.Title)
+				d.recordWantedTakenTorrent(w, ep.season, ep.episode, hash)
 				total++
 				addedTitles = append(addedTitles, item.Title)
 				break

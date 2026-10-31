@@ -372,8 +372,9 @@ gx-torrent is also a complete client without Gextto, like `qbittorrent-nox` or
 `transmission-daemon` — **the same binary** Gextto drives, a simpler Gextto with
 everything a standalone client needs.
 
-- **qBittorrent Web API v2** (`/api/v2/...`, qBittorrent 5 calls included)
-  for Sonarr, Radarr, Lidarr, Readarr and mobile managers; its own JSON API;
+- **qBittorrent Web API v2** (`/api/v2/...`, qBittorrent 5 calls included,
+  with the API key and the fields the WebUIs read) for Sonarr, Radarr, Lidarr,
+  Readarr and mobile managers; its own JSON API;
   **Prometheus metrics**
   (`/api/v1/metrics`) for Grafana or Home Assistant, and an **event stream**
   (`/api/v1/events`) for Node-RED, Home Assistant or scripts
@@ -395,7 +396,10 @@ everything a standalone client needs.
   optimisation, IP filter with scheduled refresh, categories and tags with a
   category manager and its save path, port test; seeding limits by ratio, time
   and **inactivity**, and qBittorrent's **content layout** (original, create
-  subfolder, no subfolder) when adding.
+  subfolder, no subfolder) when adding. **Quality profiles** with a cutoff
+  upgrade an episode already taken when a better release appears, without
+  deleting the files; the optional **real episode list** from TVmaze says what
+  is missing even when no release ever passed through the feeds.
 - **After the download.** Move the finished data to a folder (optionally one
   subfolder per category) while it keeps seeding, or run a program with the
   torrent details in the environment; both off by default.
