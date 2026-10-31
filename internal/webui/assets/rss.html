@@ -290,6 +290,7 @@ textarea.json{width:100%;font:12.5px/1.45 var(--mono)}
       <label class="field">Name<input type="text" name="name" id="indexer-name" placeholder="prowlarr" autocomplete="off" required title="Indexer name"></label>
       <label class="field">URL<input type="text" name="url" id="indexer-url" placeholder="http://127.0.0.1:9696" autocomplete="off" required title="Torznab endpoint URL"></label>
       <label class="field">API key<input type="text" name="apikey" id="indexer-apikey" autocomplete="off" title="API key for authentication with the indexer"></label>
+      <div class="actions" style="margin:0"><button type="button" class="sm" id="indexer-test" title="Check that the indexer answers (Torznab caps)">Test</button><span class="muted" id="indexer-test-status" aria-live="polite"></span></div>
     </div>
     <div class="dlg-foot">
       <button type="button" data-close title="Close without saving">Cancel</button>
@@ -514,6 +515,7 @@ var idxForm=$('#indexer-form'),autoName='';
 $('#indexer-type').addEventListener('change',function(){var o=this.options[this.selectedIndex];if(!o)return;var v=String(o.value||'').toLowerCase(),u=o.getAttribute('data-url')||'';if(u)$('#indexer-url').value=u;var n=$('#indexer-name'),cur=n.value.trim();if(!cur||cur===autoName){n.value=v;autoName=v;}});
 function editIndexer(b){
   idxForm.reset();autoName='';var editing=!!b;$('#indexer-index').value=editing?b.getAttribute('data-index'):'';
+  $('#indexer-test-status').className='muted';$('#indexer-test-status').textContent='';
   if(editing){$('#indexer-name').value=b.getAttribute('data-name')||'';$('#indexer-url').value=b.getAttribute('data-url')||'';$('#indexer-apikey').placeholder=t('leave blank to keep');}
   else{$('#indexer-apikey').placeholder='';$('#indexer-type').dispatchEvent(new Event('change'));}
   $('#dlg-indexer-title').textContent=editing?t('Edit indexer'):t('New indexer');$('#indexer-submit').textContent=editing?t('Save indexer'):t('Add indexer');
@@ -521,6 +523,16 @@ function editIndexer(b){
 }
 $('#new-indexer').addEventListener('click',function(){editIndexer(null);});
 $$('[data-idx-edit]').forEach(function(b){b.addEventListener('click',function(){editIndexer(b);});});
+// Test the indexer typed in the dialog, before saving it.
+$('#indexer-test').addEventListener('click',function(){
+  var span=$('#indexer-test-status'),url=$('#indexer-url').value.trim();
+  span.className='muted';span.textContent=url?t('Checking…'):t('Type an indexer URL first');
+  if(!url)return;
+  var f=new URLSearchParams();
+  f.set('url',url);f.set('name',$('#indexer-name').value.trim());f.set('apikey',$('#indexer-apikey').value);
+  var index=$('#indexer-index').value;if(index!=='')f.set('index',index);
+  fetch('/ui/rss-indexer-test',{method:'POST',body:f,headers:{'Content-Type':'application/x-www-form-urlencoded'}}).then(function(r){return r.json();}).then(function(res){if(res.ok){span.className='ok';span.textContent='✓ '+res.ms+' ms';}else{span.className='err';span.textContent=t('test failed:')+' '+(res.error||'');}}).catch(function(){span.className='err';span.textContent=t('test failed:');});
+});
 $$('[data-idx-test]').forEach(function(btn){btn.addEventListener('click',function(){
   var i=btn.getAttribute('data-index'),span=$('[data-idx-status="'+i+'"]');if(span){span.className='item-status';span.textContent=t('Checking…');}
   var f=new URLSearchParams();f.set('index',i);

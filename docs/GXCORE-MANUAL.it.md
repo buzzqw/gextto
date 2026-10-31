@@ -115,7 +115,8 @@ indexer e lo dice sulla riga.
 ## 5. RSS, archivio e ricerca
 
 **RSS e indexer** gestisce feed, regole ordinate PASS/FAIL, indexer Torznab e
-l’archivio locale. Le regole hanno anteprima live, test dei feed, import/export
+l’archivio locale. Un indexer si può provare con **Prova** già nella finestra in
+cui lo si aggiunge o modifica, prima di salvarlo. Le regole hanno anteprima live, test dei feed, import/export
 e azioni (cartella, categoria, tag, pausa, sequenziale, primo/ultimo, top).
 **Archivio** rende ricercabile tutto ciò che i feed hanno restituito, anche
 quando non è stato scaricato. **Cerca** interroga gli indexer in parallelo e

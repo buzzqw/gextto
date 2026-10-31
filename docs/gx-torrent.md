@@ -1072,7 +1072,9 @@ definitions without cluttering the view with wanted titles. The **Check feeds** 
 runs a complete check and provides immediate visual feedback (`✓ N feeds checked: X new · Y added`
 or error indicators) rather than running silently in the background. Below: lists with
 buttons to add, **edit** (the form is filled with the row's values; an empty API key keeps it)
-**test** (Torznab request `t=caps`, outcome next to the row) and remove **indexers** (drop-down
+**test** (Torznab request `t=caps`, outcome next to the row or, while adding or editing, in the form
+itself: the typed URL and key are probed before saving, not only the stored entry) and remove
+**indexers** (drop-down
 Prowlarr/Jackett/Other, pre-filled URL; the name is a **link to the indexer's web page**, i.e.
 scheme and host of the Torznab URL, opened in a new tab). A **FlareSolverr URL**
 can be set next to the RSS options and tested with **Test FlareSolverr**: feeds
@@ -1101,7 +1103,8 @@ have descriptive, localised tooltips. In the first-startup wizard
 (via `/api/v1/portcheck?port=...`).
 
 The same results are obtained via
-`POST /ui/rss-indexer`, `POST /ui/rss-feed` (op `add` — with `index` it edits in
+`POST /ui/rss-indexer`, `POST /ui/rss-indexer-test` (`index` for a saved entry, or
+`url` with `name`/`apikey` for the values held by the editor), `POST /ui/rss-feed` (op `add` — with `index` it edits in
 place —, `toggle`, `remove`), `POST /ui/rss-rule` (op `add` — with `index` it edits
 —, `toggle`, `remove`, `up`, `down`), `POST /ui/rss-rule-preview` (same fields
 as the form, responds `{matches, total, scanned, titles, skip}`: `titles` groups

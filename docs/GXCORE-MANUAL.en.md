@@ -113,8 +113,10 @@ row.
 ## 5. RSS, archive and search
 
 **RSS & indexers** manages feeds, ordered PASS/FAIL rules, Torznab indexers and
-the local archive. Rules have a live preview, feed tests, import/export and
-actions (folder, category, tags, pause, sequential, first/last, top).
+the local archive. An indexer can be checked with **Test** already in the
+window where you add or edit it, before saving. Rules have a live preview, feed
+tests, import/export and actions (folder, category, tags, pause, sequential,
+first/last, top).
 **Archive** makes everything the feeds returned searchable, even when it was not
 downloaded. **Search** queries the indexers in parallel and shows size, seeds,
 peers, age and indexer; each result is added at once or with the options

@@ -183,8 +183,11 @@ func (d *Daemon) handleUIRssIndexer(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/ui/rss#indexers", http.StatusSeeOther)
 }
 
-// handleUIRssIndexerTest checks one configured indexer with a Torznab `t=caps`
-// request and returns the outcome, so the page can offer a Test button.
+// handleUIRssIndexerTest checks one indexer with a Torznab `t=caps` request and
+// returns the outcome, so the page can offer a Test button. With only `index`
+// it probes the saved entry; with `url` (and optionally `name`/`apikey`) it
+// probes what the editor holds before saving it. A blank `apikey` while editing
+// keeps the stored key, exactly like saving does.
 func (d *Daemon) handleUIRssIndexerTest(w http.ResponseWriter, r *http.Request) {
 	if d.opts.Mode != ModeStandalone || d.opts.Settings == nil {
 		http.NotFound(w, r)
@@ -196,11 +199,30 @@ func (d *Daemon) handleUIRssIndexerTest(w http.ResponseWriter, r *http.Request) 
 	_ = r.ParseForm()
 	list := d.indexers()
 	index, err := parseFormIndex(r.FormValue("index"))
-	if err != nil || index < 0 || index >= len(list) {
+	if err != nil {
+		index = -1
+	}
+	var idx torznab.Indexer
+	switch rawURL := strings.TrimSpace(r.FormValue("url")); {
+	case rawURL != "":
+		if !validIndexerURL(rawURL) {
+			writeJSON(w, http.StatusOK, map[string]any{"ok": false, "error": "The indexer URL must start with http:// or https://."})
+			return
+		}
+		idx = torznab.Indexer{
+			Name:   strings.TrimSpace(r.FormValue("name")),
+			URL:    strings.TrimRight(rawURL, "/"),
+			APIKey: strings.TrimSpace(r.FormValue("apikey")),
+		}
+		if idx.APIKey == "" && index >= 0 && index < len(list) {
+			idx.APIKey = list[index].APIKey
+		}
+	case index >= 0 && index < len(list):
+		idx = list[index]
+	default:
 		writeJSON(w, http.StatusOK, map[string]any{"ok": false, "error": "indexer not found"})
 		return
 	}
-	idx := list[index]
 	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
 	defer cancel()
 	start := time.Now()

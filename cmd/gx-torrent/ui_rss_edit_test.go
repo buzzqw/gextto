@@ -582,6 +582,33 @@ func TestUIRssIndexerTestEndpoint(t *testing.T) {
 		t.Fatal("the indexer was not probed")
 	}
 
+	// The editor tests what it holds before saving: a URL and key that are
+	// not in the settings yet are probed too.
+	before := atomic.LoadInt32(&capsHits)
+	resp, err = http.PostForm(srv.URL+"/ui/rss-indexer-test", url.Values{"url": {indexer.URL}, "apikey": {"k"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, _ = io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if !strings.Contains(string(body), `"ok":true`) {
+		t.Fatalf("unsaved indexer test = %s", body)
+	}
+	if atomic.LoadInt32(&capsHits) == before {
+		t.Fatal("the unsaved indexer was not probed")
+	}
+
+	// An address that is not http(s) is refused before any request.
+	resp, err = http.PostForm(srv.URL+"/ui/rss-indexer-test", url.Values{"url": {"file:///etc/passwd"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, _ = io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if !strings.Contains(string(body), `"ok":false`) || !strings.Contains(string(body), "http://") {
+		t.Fatalf("invalid indexer URL test = %s", body)
+	}
+
 	// A failing endpoint reports ok:false.
 	down := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		http.Error(w, "boom", http.StatusInternalServerError)
