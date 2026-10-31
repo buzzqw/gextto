@@ -5516,3 +5516,7 @@ eng:
   "File danneggiati": "Damaged files"
   "Riavvia da capo": "Start over"
   "Sposta il file danneggiato nel cestino e cerca una release diversa?": "Move the damaged file to the trash and search for a different release?"
+  "I file già controllati e non cambiati vengono saltati; «Riavvia da capo» li ricontrolla tutti.": "Files already checked and unchanged are skipped; «Start over» rechecks every one of them."
+  "Controlla nuovi e cambiati": "Check new and changed"
+  "Controlla solo i file nuovi, cambiati o mai verificati": "Checks only the files that are new, changed or never verified"
+  "Nessun file nuovo o modificato da controllare.": "No new or changed file to check."

@@ -2373,6 +2373,7 @@
   <div class="panel-head"><h3>Controllo integrità file</h3></div>
   <div class="panel-body">
     <p class="hint">Legge ogni file archiviato con ffprobe e poi lo decodifica con ffmpeg, un file alla volta e in secondo piano, per trovare puntate e film danneggiati. Il controllo riparte dal punto salvato anche dopo un riavvio: puoi interromperlo e riprenderlo quando vuoi.</p>
+    <p class="hint">I file già controllati e non cambiati vengono saltati; «Riavvia da capo» li ricontrolla tutti.</p>
     {{if not .Available}}<p class="alert" role="alert"><span>Servono ffprobe e ffmpeg: installali e riavvia Gextto per attivare il controllo.</span> <span>Mancano:</span> <code>{{.Missing}}</code></p>{{end}}
     {{if .Available}}<div class="toolbar">
       {{if .Running}}
@@ -2382,8 +2383,12 @@
       </form>
       {{else if .Done}}
       <form hx-post="/maintenance/media-integrity" hx-target="#v2-media-integrity-panel" hx-swap="outerHTML" style="display:inline">
+        <input type="hidden" name="action" value="start" />
+        <button class="btn sm primary" type="submit" title="Controlla solo i file nuovi, cambiati o mai verificati">Controlla nuovi e cambiati</button>
+      </form>
+      <form hx-post="/maintenance/media-integrity" hx-target="#v2-media-integrity-panel" hx-swap="outerHTML" style="display:inline">
         <input type="hidden" name="action" value="restart" />
-        <button class="btn sm primary" type="submit" hx-confirm="Ricomincia dal primo file e cancella i risultati precedenti?" title="Ricomincia dal primo file e cancella i risultati precedenti">Riavvia da capo</button>
+        <button class="btn sm" type="submit" hx-confirm="Ricomincia dal primo file e cancella i risultati precedenti?" title="Ricomincia dal primo file e cancella i risultati precedenti">Riavvia da capo</button>
       </form>
       {{else if .Started}}
       <form hx-post="/maintenance/media-integrity" hx-target="#v2-media-integrity-panel" hx-swap="outerHTML" style="display:inline">
@@ -2421,6 +2426,7 @@
       </tr>{{end}}</tbody>
     </table></div>
     {{else if .Running}}<p class="muted">Nessun file danneggiato finora.</p>
+    {{else if .NothingToCheck}}<p class="muted">Nessun file nuovo o modificato da controllare.</p>
     {{else if .Done}}<p class="muted">Controllo completato: nessun file danneggiato trovato.</p>
     {{else if .Started}}<p class="muted">Controllo interrotto: riprendilo per continuare.</p>
     {{else}}<p class="muted">Il controllo non è ancora stato eseguito.</p>{{end}}

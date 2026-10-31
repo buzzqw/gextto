@@ -16,21 +16,22 @@ import (
 
 // v2MediaCheckView is the model of the panel.
 type v2MediaCheckView struct {
-	Available  bool
-	Missing    string
-	Running    bool
-	Done       bool
-	Started    bool
-	Checked    int
-	Total      int
-	Damaged    int
-	Percent    int
-	Current    string
-	StartedAt  string
-	FinishedAt string
-	Problems   []v2MediaCheckProblem
-	Message    string
-	Error      bool
+	Available      bool
+	Missing        string
+	Running        bool
+	Done           bool
+	NothingToCheck bool
+	Started        bool
+	Checked        int
+	Total          int
+	Damaged        int
+	Percent        int
+	Current        string
+	StartedAt      string
+	FinishedAt     string
+	Problems       []v2MediaCheckProblem
+	Message        string
+	Error          bool
 }
 
 // v2MediaCheckProblem is one damaged file with the action that re-downloads it.
@@ -47,15 +48,16 @@ type v2MediaCheckProblem struct {
 func v2MediaCheckViewFrom(s *AppState) v2MediaCheckView {
 	status := mediaIntegrityStatusFor(s)
 	view := v2MediaCheckView{
-		Available:  status.Available,
-		Running:    status.Running,
-		Done:       status.Done,
-		Checked:    status.Checked,
-		Total:      status.Total,
-		Damaged:    status.Damaged,
-		Current:    status.Current,
-		StartedAt:  v2UpdateTimeLabel(status.StartedAt),
-		FinishedAt: v2UpdateTimeLabel(status.FinishedAt),
+		Available:      status.Available,
+		Running:        status.Running,
+		Done:           status.Done,
+		NothingToCheck: status.Done && status.Total == 0,
+		Checked:        status.Checked,
+		Total:          status.Total,
+		Damaged:        status.Damaged,
+		Current:        status.Current,
+		StartedAt:      v2UpdateTimeLabel(status.StartedAt),
+		FinishedAt:     v2UpdateTimeLabel(status.FinishedAt),
 	}
 	view.Started = status.Checked > 0 || (strings.TrimSpace(status.Cursor) != "" && status.Cursor != "e:0")
 	if len(status.Missing) > 0 {

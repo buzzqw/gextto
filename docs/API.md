@@ -180,9 +180,9 @@ change. `/ui` is not served. For operational checks use
 | GET | `/api/logs` | recent log lines |
 | GET | `/api/logs/stream` | live log (Server-Sent Events) |
 | POST | `/api/maintenance/backfill-media-info` | probe the missing media info |
-| POST | `/api/maintenance/media-integrity/start` | start or resume the file integrity check |
+| POST | `/api/maintenance/media-integrity/start` | start or resume the file integrity check; restart=true forgets the previous outcomes and rechecks everything |
 | POST | `/api/maintenance/media-integrity/stop` | stop the file integrity check after the current file |
-| GET | `/api/maintenance/media-integrity` | progress and damaged files of the integrity check |
+| GET | `/api/maintenance/media-integrity` | progress and damaged files of the integrity check; files already checked and unchanged are skipped |
 | POST | `/api/maintenance/clean-duplicates` | remove the duplicate library files |
 | POST | `/api/maintenance/clean-trash` | empty the recycle bin |
 | POST | `/api/maintenance/housekeeping` | run the housekeeping now |

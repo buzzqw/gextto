@@ -63,6 +63,8 @@ const databaseMediaIntegritySchema = `CREATE TABLE IF NOT EXISTS media_integrity
                 path TEXT NOT NULL,
                 status TEXT NOT NULL,
                 detail TEXT NOT NULL DEFAULT '',
+                size_bytes INTEGER NOT NULL DEFAULT 0,
+                modified_ns INTEGER NOT NULL DEFAULT 0,
                 checked_at TEXT NOT NULL,
                 UNIQUE(kind, series_name, season, episode, movie_name, movie_year)
             );
@@ -79,6 +81,11 @@ type MediaIntegrityTarget struct {
 	MovieName string
 	MovieYear *int64
 	Path      string
+	// SizeBytes and ModifiedNS are the current file identity, read when the
+	// target is selected. They are stored with the outcome so a later pass can
+	// skip the file while it is unchanged.
+	SizeBytes  int64
+	ModifiedNS int64
 }
 
 // Label names the library item the way the operator sees it.
@@ -105,17 +112,19 @@ func (t MediaIntegrityTarget) cursor() string {
 
 // MediaIntegrityProblem is a damaged or unreadable file stored by the scan.
 type MediaIntegrityProblem struct {
-	TargetID  int64  `json:"target_id"`
-	Kind      string `json:"kind"`
-	Series    string `json:"series"`
-	Season    int64  `json:"season"`
-	Episode   int64  `json:"episode"`
-	MovieName string `json:"movie_name"`
-	MovieYear int64  `json:"movie_year"`
-	Path      string `json:"path"`
-	Status    string `json:"status"`
-	Detail    string `json:"detail"`
-	CheckedAt string `json:"checked_at"`
+	TargetID   int64  `json:"target_id"`
+	Kind       string `json:"kind"`
+	Series     string `json:"series"`
+	Season     int64  `json:"season"`
+	Episode    int64  `json:"episode"`
+	MovieName  string `json:"movie_name"`
+	MovieYear  int64  `json:"movie_year"`
+	Path       string `json:"path"`
+	Status     string `json:"status"`
+	Detail     string `json:"detail"`
+	SizeBytes  int64  `json:"size_bytes"`
+	ModifiedNS int64  `json:"modified_ns"`
+	CheckedAt  string `json:"checked_at"`
 }
 
 // Label names the problem the way the operator sees it.
@@ -135,7 +144,9 @@ func (p MediaIntegrityProblem) Label() string {
 // MediaIntegrityState is the resumable progress of the scan. It is stored as
 // JSON in ui_state so a restart continues where it left off.
 type MediaIntegrityState struct {
-	Cursor     string `json:"cursor"`
+	Cursor string `json:"cursor"`
+	// Force rechecks every file, even the ones already checked and unchanged.
+	Force      bool   `json:"force"`
 	Total      int    `json:"total"`
 	Checked    int    `json:"checked"`
 	Damaged    int    `json:"damaged"`
@@ -168,13 +179,46 @@ type MediaIntegrityStatus struct {
 // Database
 // ---------------------------------------------------------------------------
 
-// MediaIntegrityTargets returns up to limit targets after the given cursor and
-// the cursor to use for the next call. Episodes come first (ordered by their
-// row id), then movies; "done" means the library has been walked completely.
-func (d *Database) MediaIntegrityTargets(after string, limit int) ([]MediaIntegrityTarget, string, error) {
-	limit = clampInt(limit, 1, 100)
+// mediaIntegrityCandidate is one archived file with its current identity and
+// the outcome stored by an earlier pass (when any).
+type mediaIntegrityCandidate struct {
+	target      MediaIntegrityTarget
+	storedSize  int64
+	storedMTime int64
+	hasStored   bool
+}
+
+// needsCheck reports whether the file has to be probed again: never checked,
+// changed since the last check, or a forced pass.
+func (c mediaIntegrityCandidate) needsCheck(force bool) bool {
+	if force || !c.hasStored {
+		return true
+	}
+	return c.target.SizeBytes != c.storedSize || c.target.ModifiedNS != c.storedMTime
+}
+
+// mediaIntegrityFileIdentity returns the size and modification time of the
+// video file behind an archived path. A missing or unreadable path yields
+// zeros, so a file that appears later is always seen as changed.
+func mediaIntegrityFileIdentity(path string) (int64, int64) {
+	file, err := mediaIntegrityResolveFile(path)
+	if err != nil {
+		return 0, 0
+	}
+	info, err := os.Stat(file)
+	if err != nil {
+		return 0, 0
+	}
+	return info.Size(), info.ModTime().UnixNano()
+}
+
+// queryMediaIntegrityCandidates reads up to limit archived items after the
+// cursor, with the outcome of the previous pass when it exists. Episodes come
+// first (ordered by row id), then movies.
+func (d *Database) queryMediaIntegrityCandidates(after string, limit int) ([]mediaIntegrityCandidate, error) {
+	limit = clampInt(limit, 1, 1000)
 	if after == "done" {
-		return nil, "done", nil
+		return nil, nil
 	}
 	kind := ""
 	var afterID int64
@@ -187,120 +231,205 @@ func (d *Database) MediaIntegrityTargets(after string, limit int) ([]MediaIntegr
 		fmt.Sscanf(after[2:], "%d", &afterID)
 	}
 
-	targets := make([]MediaIntegrityTarget, 0, limit)
+	candidates := make([]mediaIntegrityCandidate, 0, limit)
 	if kind != "movie" {
 		type episodeRow struct {
-			id, season, episode int64
-			series, path        string
+			id, season, episode, size, modified int64
+			series, path, status                string
 		}
 		var rowsData []episodeRow
-		rows, err := d.db.Query(`SELECT e.id, s.name, e.season, e.episode, e.archive_path
-			FROM episodes e JOIN series s ON s.id=e.series_id
+		rows, err := d.db.Query(`SELECT e.id, s.name, e.season, e.episode, e.archive_path,
+				COALESCE(mi.size_bytes,0), COALESCE(mi.modified_ns,0), COALESCE(mi.status,'')
+			FROM episodes e
+			JOIN series s ON s.id=e.series_id
+			LEFT JOIN media_integrity mi ON mi.kind='episode' AND mi.series_name=s.name
+				AND mi.season=e.season AND mi.episode=e.episode
 			WHERE e.id > ?1 AND COALESCE(e.archive_path,'') <> ''
 			ORDER BY e.id LIMIT ?2`, afterID, limit)
 		if err != nil {
-			return nil, "", err
+			return nil, err
 		}
 		for rows.Next() {
 			var row episodeRow
-			if err := rows.Scan(&row.id, &row.series, &row.season, &row.episode, &row.path); err != nil {
+			if err := rows.Scan(&row.id, &row.series, &row.season, &row.episode, &row.path,
+				&row.size, &row.modified, &row.status); err != nil {
 				rows.Close()
-				return nil, "", err
+				return nil, err
 			}
 			rowsData = append(rowsData, row)
 		}
 		if err := rows.Err(); err != nil {
 			rows.Close()
-			return nil, "", err
+			return nil, err
 		}
 		rows.Close()
 		for _, row := range rowsData {
 			season, episode := row.season, row.episode
-			targets = append(targets, MediaIntegrityTarget{
-				Kind: "episode", ID: row.id, Series: row.series,
-				Season: &season, Episode: &episode, Path: row.path,
+			size, modified := mediaIntegrityFileIdentity(row.path)
+			candidates = append(candidates, mediaIntegrityCandidate{
+				target: MediaIntegrityTarget{
+					Kind: "episode", ID: row.id, Series: row.series,
+					Season: &season, Episode: &episode, Path: row.path,
+					SizeBytes: size, ModifiedNS: modified,
+				},
+				storedSize: row.size, storedMTime: row.modified,
+				hasStored: strings.TrimSpace(row.status) != "",
 			})
-			if len(targets) >= limit {
-				return targets, targets[len(targets)-1].cursor(), nil
+			if len(candidates) >= limit {
+				return candidates, nil
 			}
 		}
 	}
 
-	remaining := limit - len(targets)
+	remaining := limit - len(candidates)
 	if remaining > 0 {
 		movieAfter := int64(0)
 		if kind == "movie" {
 			movieAfter = afterID
 		}
 		type movieRow struct {
-			id, year int64
-			name     string
-			path     string
+			id, year, size, modified int64
+			name, path, status       string
 		}
 		var rowsData []movieRow
-		rows, err := d.db.Query(`SELECT m.id, COALESCE(m.name,''), COALESCE(m.year,0), t.processed_path
-			FROM movies m JOIN torrent_meta t ON lower(t.hash)=lower(m.magnet_hash)
+		rows, err := d.db.Query(`SELECT m.id, COALESCE(m.name,''), COALESCE(m.year,0), t.processed_path,
+				COALESCE(mi.size_bytes,0), COALESCE(mi.modified_ns,0), COALESCE(mi.status,'')
+			FROM movies m
+			JOIN torrent_meta t ON lower(t.hash)=lower(m.magnet_hash)
+			LEFT JOIN media_integrity mi ON mi.kind='movie' AND mi.movie_name=COALESCE(m.name,'')
+				AND mi.movie_year=COALESCE(m.year,0)
 			WHERE m.id > ?1 AND m.removed_at IS NULL AND COALESCE(t.processed_path,'') <> ''
 			ORDER BY m.id LIMIT ?2`, movieAfter, remaining)
 		if err != nil {
-			return nil, "", err
+			return nil, err
 		}
 		for rows.Next() {
 			var row movieRow
-			if err := rows.Scan(&row.id, &row.name, &row.year, &row.path); err != nil {
+			if err := rows.Scan(&row.id, &row.name, &row.year, &row.path,
+				&row.size, &row.modified, &row.status); err != nil {
 				rows.Close()
-				return nil, "", err
+				return nil, err
 			}
 			rowsData = append(rowsData, row)
 		}
 		if err := rows.Err(); err != nil {
 			rows.Close()
-			return nil, "", err
+			return nil, err
 		}
 		rows.Close()
 		for _, row := range rowsData {
 			year := row.year
-			targets = append(targets, MediaIntegrityTarget{
-				Kind: "movie", ID: row.id, MovieName: row.name,
-				MovieYear: &year, Path: row.path,
+			size, modified := mediaIntegrityFileIdentity(row.path)
+			candidates = append(candidates, mediaIntegrityCandidate{
+				target: MediaIntegrityTarget{
+					Kind: "movie", ID: row.id, MovieName: row.name,
+					MovieYear: &year, Path: row.path, SizeBytes: size, ModifiedNS: modified,
+				},
+				storedSize: row.size, storedMTime: row.modified,
+				hasStored: strings.TrimSpace(row.status) != "",
 			})
 		}
 	}
+	if len(candidates) == 0 {
+		return nil, nil
+	}
+	return candidates, nil
+}
 
-	if len(targets) == 0 {
+// MediaIntegrityTargets returns up to limit files that need a check after the
+// given cursor, and the cursor to use for the next call. Files already checked
+// and unchanged are skipped unless force is set. "done" means the library has
+// been walked completely.
+func (d *Database) MediaIntegrityTargets(after string, limit int, force bool) ([]MediaIntegrityTarget, string, error) {
+	limit = clampInt(limit, 1, 100)
+	if after == "done" {
 		return nil, "done", nil
 	}
-	return targets, targets[len(targets)-1].cursor(), nil
+	// A forced pass reads one file per step. A normal pass reads a wider
+	// window so a long run of already checked files is skipped with few
+	// queries instead of one per file.
+	chunk := limit
+	if !force {
+		chunk = limit * 20
+		if chunk < 200 {
+			chunk = 200
+		}
+		if chunk > 1000 {
+			chunk = 1000
+		}
+	}
+	targets := make([]MediaIntegrityTarget, 0, limit)
+	cursor := after
+	lastExamined := after
+	for len(targets) < limit {
+		candidates, err := d.queryMediaIntegrityCandidates(cursor, chunk)
+		if err != nil {
+			return nil, "", err
+		}
+		if len(candidates) == 0 {
+			if len(targets) == 0 {
+				return nil, "done", nil
+			}
+			return targets, lastExamined, nil
+		}
+		for _, candidate := range candidates {
+			lastExamined = candidate.target.cursor()
+			if !candidate.needsCheck(force) {
+				continue
+			}
+			targets = append(targets, candidate.target)
+			if len(targets) >= limit {
+				return targets, lastExamined, nil
+			}
+		}
+		cursor = lastExamined
+	}
+	return targets, lastExamined, nil
 }
 
-// CountMediaIntegrityTargets counts the archived files the scan will walk.
-func (d *Database) CountMediaIntegrityTargets() (int, error) {
-	var total int
-	err := d.db.QueryRow(`SELECT
-		(SELECT COUNT(*) FROM episodes e WHERE COALESCE(e.archive_path,'') <> '') +
-		(SELECT COUNT(*) FROM movies m JOIN torrent_meta t ON lower(t.hash)=lower(m.magnet_hash)
-			WHERE m.removed_at IS NULL AND COALESCE(t.processed_path,'') <> '')`).Scan(&total)
-	return total, err
+// CountMediaIntegrityTargets counts the files the next pass will check.
+func (d *Database) CountMediaIntegrityTargets(force bool) (int, error) {
+	total := 0
+	cursor := ""
+	for {
+		candidates, err := d.queryMediaIntegrityCandidates(cursor, 500)
+		if err != nil {
+			return 0, err
+		}
+		if len(candidates) == 0 {
+			return total, nil
+		}
+		for _, candidate := range candidates {
+			if candidate.needsCheck(force) {
+				total++
+			}
+		}
+		cursor = candidates[len(candidates)-1].target.cursor()
+	}
 }
 
-// SaveMediaIntegrityProblem stores or updates one damaged file.
-func (d *Database) SaveMediaIntegrityProblem(problem MediaIntegrityProblem) error {
+// SaveMediaIntegrityCheck stores or updates the outcome of one file, including
+// the identity used to skip it while it does not change.
+func (d *Database) SaveMediaIntegrityCheck(check MediaIntegrityProblem) error {
 	_, err := d.db.Exec(`INSERT INTO media_integrity
-		(target_id, kind, series_name, season, episode, movie_name, movie_year, path, status, detail, checked_at)
-		VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11)
+		(target_id, kind, series_name, season, episode, movie_name, movie_year, path, status, detail,
+		 size_bytes, modified_ns, checked_at)
+		VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13)
 		ON CONFLICT(kind, series_name, season, episode, movie_name, movie_year) DO UPDATE SET
 			target_id=excluded.target_id, path=excluded.path, status=excluded.status,
-			detail=excluded.detail, checked_at=excluded.checked_at`,
-		problem.TargetID, problem.Kind, problem.Series, problem.Season, problem.Episode,
-		problem.MovieName, problem.MovieYear, problem.Path, problem.Status, problem.Detail, problem.CheckedAt)
+			detail=excluded.detail, size_bytes=excluded.size_bytes, modified_ns=excluded.modified_ns,
+			checked_at=excluded.checked_at`,
+		check.TargetID, check.Kind, check.Series, check.Season, check.Episode,
+		check.MovieName, check.MovieYear, check.Path, check.Status, check.Detail,
+		check.SizeBytes, check.ModifiedNS, check.CheckedAt)
 	return err
 }
 
-// MediaIntegrityProblems lists the damaged files of the last pass, newest first.
+// MediaIntegrityProblems lists the damaged or unreadable files, newest first.
 func (d *Database) MediaIntegrityProblems() ([]MediaIntegrityProblem, error) {
 	rows, err := d.db.Query(`SELECT target_id, kind, series_name, season, episode, movie_name,
-		movie_year, path, status, detail, checked_at
-		FROM media_integrity ORDER BY checked_at DESC, id DESC`)
+		movie_year, path, status, detail, size_bytes, modified_ns, checked_at
+		FROM media_integrity WHERE status <> 'ok' ORDER BY checked_at DESC, id DESC`)
 	if err != nil {
 		return nil, err
 	}
@@ -310,7 +439,7 @@ func (d *Database) MediaIntegrityProblems() ([]MediaIntegrityProblem, error) {
 		var problem MediaIntegrityProblem
 		if err := rows.Scan(&problem.TargetID, &problem.Kind, &problem.Series, &problem.Season,
 			&problem.Episode, &problem.MovieName, &problem.MovieYear, &problem.Path,
-			&problem.Status, &problem.Detail, &problem.CheckedAt); err != nil {
+			&problem.Status, &problem.Detail, &problem.SizeBytes, &problem.ModifiedNS, &problem.CheckedAt); err != nil {
 			return nil, err
 		}
 		problems = append(problems, problem)
@@ -318,9 +447,24 @@ func (d *Database) MediaIntegrityProblems() ([]MediaIntegrityProblem, error) {
 	return problems, rows.Err()
 }
 
-// ClearMediaIntegrityProblems starts a new pass.
-func (d *Database) ClearMediaIntegrityProblems() error {
+// ClearMediaIntegrityChecks forgets every outcome: the next pass rechecks the
+// whole library.
+func (d *Database) ClearMediaIntegrityChecks() error {
 	_, err := d.db.Exec(`DELETE FROM media_integrity`)
+	return err
+}
+
+// PruneMediaIntegrityChecks removes the outcomes of episodes and movies that
+// left the library, so the panel and the skip list only describe current items.
+func (d *Database) PruneMediaIntegrityChecks() error {
+	_, err := d.db.Exec(`DELETE FROM media_integrity
+		WHERE (kind='episode' AND NOT EXISTS (
+			SELECT 1 FROM episodes e JOIN series s ON s.id=e.series_id
+			WHERE s.name=media_integrity.series_name AND e.season=media_integrity.season
+				AND e.episode=media_integrity.episode))
+		OR (kind='movie' AND NOT EXISTS (
+			SELECT 1 FROM movies m WHERE m.name=media_integrity.movie_name
+				AND COALESCE(m.year,0)=media_integrity.movie_year AND m.removed_at IS NULL))`)
 	return err
 }
 
@@ -547,6 +691,10 @@ func mediaIntegrityStatusFor(s *AppState) MediaIntegrityStatus {
 		status.FinishedAt = state.FinishedAt
 		if problems, err := s.db.MediaIntegrityProblems(); err == nil {
 			status.Problems = problems
+			// The panel shows how many files are damaged now, not only the
+			// ones found again in this pass: an unchanged damaged file is
+			// skipped but still listed.
+			status.Damaged = len(problems)
 		}
 	}
 	if s.jobs != nil {
@@ -568,17 +716,44 @@ func beginMediaIntegrityScan(s *AppState, restart bool) (*Job, bool, error) {
 		return job, false, nil
 	}
 	state := s.db.LoadMediaIntegrityState()
-	if restart || state.Done || state.Total == 0 || strings.TrimSpace(state.Cursor) == "" {
-		total, err := s.db.CountMediaIntegrityTargets()
+	switch {
+	case restart:
+		// Forget every outcome: the next pass probes the whole library.
+		if err := s.db.ClearMediaIntegrityChecks(); err != nil {
+			s.jobs.Fail(job.ID, err)
+			return nil, false, err
+		}
+		state = MediaIntegrityState{Force: true}
+	case state.Done:
+		// A completed pass is over: start a new one that skips the files
+		// already checked and unchanged.
+		if err := s.db.PruneMediaIntegrityChecks(); err != nil {
+			s.jobs.Fail(job.ID, err)
+			return nil, false, err
+		}
+		state = MediaIntegrityState{Force: false}
+	case state.Total == 0:
+		// Fresh state, or an empty library: keep the force flag (a forced pass
+		// must stay forced) and start from the beginning.
+		if err := s.db.PruneMediaIntegrityChecks(); err != nil {
+			s.jobs.Fail(job.ID, err)
+			return nil, false, err
+		}
+		state.Cursor = ""
+		state.Checked = 0
+		state.Damaged = 0
+		state.Done = false
+		state.Current = ""
+		state.FinishedAt = ""
+	}
+	if state.Total == 0 {
+		total, err := s.db.CountMediaIntegrityTargets(state.Force)
 		if err != nil {
 			s.jobs.Fail(job.ID, err)
 			return nil, false, err
 		}
-		if err := s.db.ClearMediaIntegrityProblems(); err != nil {
-			s.jobs.Fail(job.ID, err)
-			return nil, false, err
-		}
-		state = MediaIntegrityState{Total: total, StartedAt: time.Now().Format(time.RFC3339)}
+		state.Total = total
+		state.StartedAt = time.Now().Format(time.RFC3339)
 	}
 	state.Running = true
 	state.Done = false
@@ -621,7 +796,7 @@ func runMediaIntegrityScan(ctx context.Context, s *AppState, jobID string) (map[
 		if ctx.Err() != nil {
 			break
 		}
-		targets, next, err := s.db.MediaIntegrityTargets(state.Cursor, 1)
+		targets, next, err := s.db.MediaIntegrityTargets(state.Cursor, 1, state.Force)
 		if err != nil {
 			return nil, err
 		}
@@ -642,24 +817,26 @@ func runMediaIntegrityScan(ctx context.Context, s *AppState, jobID string) (map[
 		if ctx.Err() != nil || status == "canceled" {
 			break
 		}
+		check := MediaIntegrityProblem{
+			TargetID: target.ID, Kind: target.Kind, Series: target.Series,
+			MovieName: target.MovieName, Path: target.Path,
+			Status: status, Detail: detail,
+			SizeBytes: target.SizeBytes, ModifiedNS: target.ModifiedNS,
+			CheckedAt: time.Now().Format(time.RFC3339),
+		}
+		if target.Season != nil {
+			check.Season = *target.Season
+		}
+		if target.Episode != nil {
+			check.Episode = *target.Episode
+		}
+		if target.MovieYear != nil {
+			check.MovieYear = *target.MovieYear
+		}
+		if err := s.db.SaveMediaIntegrityCheck(check); err != nil {
+			return nil, err
+		}
 		if status != "ok" {
-			problem := MediaIntegrityProblem{
-				TargetID: target.ID, Kind: target.Kind, Series: target.Series,
-				MovieName: target.MovieName, Path: target.Path,
-				Status: status, Detail: detail, CheckedAt: time.Now().Format(time.RFC3339),
-			}
-			if target.Season != nil {
-				problem.Season = *target.Season
-			}
-			if target.Episode != nil {
-				problem.Episode = *target.Episode
-			}
-			if target.MovieYear != nil {
-				problem.MovieYear = *target.MovieYear
-			}
-			if err := s.db.SaveMediaIntegrityProblem(problem); err != nil {
-				return nil, err
-			}
 			state.Damaged++
 			logging.Warn(fmt.Sprintf("🧪 The file of «%s» looks damaged: %s", target.Label(), detail))
 		}

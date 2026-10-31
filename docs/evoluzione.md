@@ -352,9 +352,11 @@ last 30 minutes of bandwidth as a server-rendered SVG from a bounded ring sample
 
 **File integrity check.** Maintenance walks the archived files with `ffprobe` and then
 decodes them with `ffmpeg`, one file at a time and in the background, to find damage that a
-header-only probe cannot see. The pass keeps its position in `ui_state` and its findings in
-`media_integrity`, so it can be stopped, resumed after a restart and re-run from the
-beginning. A damaged episode can be sent back to the downloads from the report: the old
+header-only probe cannot see. The pass keeps its position in `ui_state` and the size and
+modification time of every checked file in `media_integrity`, so it can be stopped,
+resumed after a restart and re-run from the beginning. Files already checked and unchanged
+are skipped; only new, replaced and never-checked files are probed again, unless the
+operator asks for a full pass. A damaged episode can be sent back to the downloads from the report: the old
 release is blocklisted and the gap search asks for a different one. The panel lives in
 Gextto's UI and reflects the job state; `ffprobe` and `ffmpeg` are required.
 

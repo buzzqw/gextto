@@ -946,6 +946,16 @@ func (d *Database) migrate() error {
 	if _, err := d.db.Exec(databaseMediaIntegritySchema); err != nil {
 		return err
 	}
+	// An installation that already ran the first version of the check has no
+	// file identity yet: the next pass rechecks those files once.
+	for _, column := range []struct{ table, name, definition string }{
+		{"media_integrity", "size_bytes", "INTEGER NOT NULL DEFAULT 0"},
+		{"media_integrity", "modified_ns", "INTEGER NOT NULL DEFAULT 0"},
+	} {
+		if err := ensureColumn(d.db, column.table, column.name, column.definition); err != nil {
+			logging.Warn("schema migration: cannot ensure column", "table", column.table, "column", column.name, "error", err)
+		}
+	}
 	// Identità della release bloccata (come il legacy `download_blocklist`):
 	// hash + serie/stagione/episodio o film/anno, per audit e UI.
 	for _, column := range []struct{ table, name, definition string }{

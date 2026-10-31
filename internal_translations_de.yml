@@ -6179,3 +6179,7 @@ deu:
   "File danneggiati": "Beschädigte Dateien"
   "Riavvia da capo": "Von vorne beginnen"
   "Sposta il file danneggiato nel cestino e cerca una release diversa?": "Die beschädigte Datei in den Papierkorb verschieben und eine andere Veröffentlichung suchen?"
+  "I file già controllati e non cambiati vengono saltati; «Riavvia da capo» li ricontrolla tutti.": "Bereits geprüfte und unveränderte Dateien werden übersprungen; «Von vorne beginnen» prüft alle erneut."
+  "Controlla nuovi e cambiati": "Neue und geänderte prüfen"
+  "Controlla solo i file nuovi, cambiati o mai verificati": "Prüft nur die neuen, geänderten oder noch nie geprüften Dateien"
+  "Nessun file nuovo o modificato da controllare.": "Keine neue oder geänderte Datei zu prüfen."

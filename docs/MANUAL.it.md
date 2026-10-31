@@ -1580,6 +1580,10 @@ L'elenco completo delle azioni e dei parametri è nell'[Appendice C](#appendice-
   male. Procede un file alla volta e salva la posizione, quindi puoi
   **interromperlo** e **riprenderlo** anche dopo un riavvio di Gextto. Alla fine
   elenca i file danneggiati o illeggibili con il motivo riportato da `ffmpeg`.
+  I file già controllati e non cambiati vengono saltati: **Controlla nuovi e
+  cambiati** verifica solo quelli nuovi, sostituiti o mai controllati, mentre
+  **Riavvia da capo** ricontrolla tutta la libreria. La prima passata è la più
+  lunga, perché decodifica ogni file; le successive sono molto più rapide.
   Accanto a ogni puntata c'è **Riscarica**: sposta il file danneggiato fuori
   dalla libreria, mette la release in blocklist e cerca la stessa puntata
   scegliendo una release diversa, così non riprende lo stesso file corrotto.
@@ -3011,9 +3015,10 @@ credenziali dell'interfaccia e riceve un cookie di sessione valido solo per
 
 | Voce | Cosa fa |
 |---|---|
-| Avvia controllo / Riprendi controllo | Avvia la passata o la riprende dal primo file non ancora verificato. |
+| Avvia controllo / Riprendi controllo | Avvia la passata o la riprende dal primo file non ancora verificato; i file già controllati e non cambiati vengono saltati. |
+| Controlla nuovi e cambiati | Verifica solo i file nuovi, sostituiti o mai controllati. |
 | Interrompi | Ferma il controllo dopo il file in corso; la posizione resta salvata. |
-| Riavvia da capo | Ricomincia dal primo file e cancella i risultati precedenti. |
+| Riavvia da capo | Ricomincia dal primo file, cancella i risultati precedenti e ricontrolla tutta la libreria. |
 | Danneggiato / Illeggibile | Il file non è stato decodificato, oppure non è stato possibile leggerlo. |
 | Riscarica | Sposta il file danneggiato fuori dalla libreria, mette la vecchia release in blocklist e cerca la stessa puntata scegliendo una release diversa. |
 

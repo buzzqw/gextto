@@ -6172,3 +6172,7 @@ fra:
   "File danneggiati": "Fichiers endommagés"
   "Riavvia da capo": "Recommencer"
   "Sposta il file danneggiato nel cestino e cerca una release diversa?": "Déplacer le fichier endommagé vers la corbeille et chercher une autre version ?"
+  "I file già controllati e non cambiati vengono saltati; «Riavvia da capo» li ricontrolla tutti.": "Les fichiers déjà vérifiés et inchangés sont ignorés ; « Recommencer » les vérifie tous à nouveau."
+  "Controlla nuovi e cambiati": "Vérifier les nouveaux et modifiés"
+  "Controlla solo i file nuovi, cambiati o mai verificati": "Vérifie uniquement les fichiers nouveaux, modifiés ou jamais vérifiés"
+  "Nessun file nuovo o modificato da controllare.": "Aucun fichier nouveau ou modifié à vérifier."

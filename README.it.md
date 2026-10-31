@@ -243,8 +243,10 @@ un checkout: `git pull --ff-only && ./scripts/update.sh`.
 - **Controllo dei file danneggiati**: *Manutenzione → Controllo integrità file*
   analizza e decodifica per intero ogni video archiviato con `ffprobe` e
   `ffmpeg`, un file alla volta e in secondo piano, e conserva la posizione anche
-  dopo un riavvio. Dal rapporto puoi rimandare nei download una puntata
-  danneggiata: la vecchia release va in blocklist e ne viene cercata una diversa.
+  dopo un riavvio. I file già controllati e non cambiati vengono saltati;
+  *Riavvia da capo* ricontrolla tutta la libreria. Dal rapporto puoi rimandare
+  nei download una puntata danneggiata: la vecchia release va in blocklist e ne
+  viene cercata una diversa.
 
 ### Banda e linea condivisa
 

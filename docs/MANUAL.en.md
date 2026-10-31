@@ -1527,7 +1527,11 @@ The complete list of actions and parameters is in [Appendix C](#appendix-c-refer
   the file to find damage in the middle, such as a truncated or badly downloaded
   episode. It goes one file at a time and saves its position, so you can
   **stop** it and **resume** it even after a Gextto restart. At the end it lists
-  the damaged or unreadable files with the reason reported by `ffmpeg`. Next to
+  the damaged or unreadable files with the reason reported by `ffmpeg`. Files
+  already checked and unchanged are skipped: **Check new and changed** verifies
+  only the new, replaced or never-checked ones, while **Start over** rechecks the
+  whole library. The first pass is the longest because it decodes every file;
+  later passes are much faster. Next to
   every episode there is **Redownload**: it moves the damaged file out of the
   library, blocklists the release and searches the same episode choosing a
   different release, so the same broken file is not taken again. `ffprobe` and
@@ -2927,9 +2931,10 @@ of the interface stays protected.
 
 | Item | What it does |
 |---|---|
-| Start check / Resume check | Starts the pass or resumes it from the first file not yet verified. |
+| Start check / Resume check | Starts the pass or resumes it from the first file not yet verified; files already checked and unchanged are skipped. |
+| Check new and changed | Verifies only the files that are new, replaced or never checked. |
 | Stop | Stops the check after the current file; the position stays saved. |
-| Start over | Starts again from the first file and clears the previous results. |
+| Start over | Starts again from the first file, clears the previous results and rechecks the whole library. |
 | Damaged / Unreadable | The file could not be decoded, or it could not be read. |
 | Redownload | Moves the damaged file out of the library, blocklists the old release and searches the same episode for a different release. |
 

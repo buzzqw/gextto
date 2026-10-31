@@ -112,14 +112,14 @@ func TestMediaIntegrityTargetsWalkEpisodesThenMovies(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	total, err := state.db.CountMediaIntegrityTargets()
+	total, err := state.db.CountMediaIntegrityTargets(true)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if total != 2 {
 		t.Fatalf("total = %d, want 2", total)
 	}
-	targets, next, err := state.db.MediaIntegrityTargets("", 10)
+	targets, next, err := state.db.MediaIntegrityTargets("", 10, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -135,7 +135,7 @@ func TestMediaIntegrityTargetsWalkEpisodesThenMovies(t *testing.T) {
 	if next != "m:"+strconv.FormatInt(targets[1].ID, 10) {
 		t.Fatalf("next = %q", next)
 	}
-	more, next, err := state.db.MediaIntegrityTargets(next, 10)
+	more, next, err := state.db.MediaIntegrityTargets(next, 10, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -175,13 +175,25 @@ func TestRunMediaIntegrityScanRecordsAndResumes(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	total, err := state.db.CountMediaIntegrityTargets()
+	total, err := state.db.CountMediaIntegrityTargets(true)
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Simulate a pass interrupted after the first file.
+	// Simulate a pass interrupted after the first file: its outcome is
+	// already stored, so a resumed pass must not check it again.
 	firstID := int64(0)
 	if err := state.db.db.QueryRow("SELECT id FROM episodes ORDER BY id LIMIT 1").Scan(&firstID); err != nil {
+		t.Fatal(err)
+	}
+	firstInfo, err := os.Stat(paths[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := state.db.SaveMediaIntegrityCheck(MediaIntegrityProblem{
+		TargetID: firstID, Kind: "episode", Series: "Show", Season: 1, Episode: 1,
+		Path: paths[0], Status: "ok", SizeBytes: firstInfo.Size(),
+		ModifiedNS: firstInfo.ModTime().UnixNano(), CheckedAt: "2026-01-01T00:00:00Z",
+	}); err != nil {
 		t.Fatal(err)
 	}
 	if err := state.db.SaveMediaIntegrityState(MediaIntegrityState{
@@ -223,11 +235,11 @@ func TestMediaIntegritySaveProblemIsIdempotent(t *testing.T) {
 		TargetID: 7, Kind: "episode", Series: "Show", Season: 1, Episode: 2,
 		Path: "/media/episode.mkv", Status: "damaged", Detail: "first", CheckedAt: "2026-01-01T00:00:00Z",
 	}
-	if err := state.db.SaveMediaIntegrityProblem(problem); err != nil {
+	if err := state.db.SaveMediaIntegrityCheck(problem); err != nil {
 		t.Fatal(err)
 	}
 	problem.Detail = "second"
-	if err := state.db.SaveMediaIntegrityProblem(problem); err != nil {
+	if err := state.db.SaveMediaIntegrityCheck(problem); err != nil {
 		t.Fatal(err)
 	}
 	problems, err := state.db.MediaIntegrityProblems()
@@ -358,8 +370,175 @@ func BenchmarkMediaIntegrityTargets(b *testing.B) {
 	}
 	b.ResetTimer()
 	for index := 0; index < b.N; index++ {
-		if _, _, err := db.MediaIntegrityTargets("", 1); err != nil {
+		if _, _, err := db.MediaIntegrityTargets("", 1, true); err != nil {
 			b.Fatal(err)
 		}
+	}
+}
+
+func TestMediaIntegritySkipsCheckedUnchangedFiles(t *testing.T) {
+	state := newTestAppState(t)
+	dir := t.TempDir()
+	file := filepath.Join(dir, "episode.mkv")
+	if err := os.WriteFile(file, []byte("data"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := state.db.db.Exec("INSERT INTO series(name) VALUES ('Show')"); err != nil {
+		t.Fatal(err)
+	}
+	var seriesID int64
+	if err := state.db.db.QueryRow("SELECT id FROM series WHERE name='Show'").Scan(&seriesID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := state.db.db.Exec("INSERT INTO episodes(series_id,season,episode,title,archive_path) VALUES (?1,1,2,'Show S01E02',?2)", seriesID, file); err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Stat(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := state.db.SaveMediaIntegrityCheck(MediaIntegrityProblem{
+		TargetID: 1, Kind: "episode", Series: "Show", Season: 1, Episode: 2, Path: file,
+		Status: "ok", SizeBytes: info.Size(), ModifiedNS: info.ModTime().UnixNano(),
+		CheckedAt: "2026-01-01T00:00:00Z",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	total, err := state.db.CountMediaIntegrityTargets(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if total != 0 {
+		t.Fatalf("unchanged checked files still count: %d", total)
+	}
+	targets, next, err := state.db.MediaIntegrityTargets("", 10, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(targets) != 0 || next != "done" {
+		t.Fatalf("targets = %d, next = %q, want none/done", len(targets), next)
+	}
+	problems, err := state.db.MediaIntegrityProblems()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(problems) != 0 {
+		t.Fatalf("an OK check must not be listed as a problem: %+v", problems)
+	}
+
+	// A changed file is checked again.
+	if err := os.WriteFile(file, []byte("changed and longer"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	total, err = state.db.CountMediaIntegrityTargets(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if total != 1 {
+		t.Fatalf("changed file not counted: %d", total)
+	}
+	targets, _, err = state.db.MediaIntegrityTargets("", 10, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(targets) != 1 {
+		t.Fatalf("changed file not returned: %d", len(targets))
+	}
+
+	// A forced pass returns it even when unchanged.
+	targets, _, err = state.db.MediaIntegrityTargets("", 10, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(targets) != 1 {
+		t.Fatalf("forced pass did not return the file: %d", len(targets))
+	}
+}
+
+func TestPruneMediaIntegrityChecksDropsRemovedItems(t *testing.T) {
+	state := newTestAppState(t)
+	dir := t.TempDir()
+	file := filepath.Join(dir, "episode.mkv")
+	if err := os.WriteFile(file, []byte("data"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := state.db.db.Exec("INSERT INTO series(name) VALUES ('Show')"); err != nil {
+		t.Fatal(err)
+	}
+	var seriesID int64
+	if err := state.db.db.QueryRow("SELECT id FROM series WHERE name='Show'").Scan(&seriesID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := state.db.db.Exec("INSERT INTO episodes(series_id,season,episode,title,archive_path) VALUES (?1,1,1,'Show S01E01',?2)", seriesID, file); err != nil {
+		t.Fatal(err)
+	}
+	if err := state.db.SaveMediaIntegrityCheck(MediaIntegrityProblem{
+		Kind: "episode", Series: "Show", Season: 1, Episode: 1, Path: file,
+		Status: "damaged", Detail: "broken", CheckedAt: "2026-01-01T00:00:00Z",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := state.db.db.Exec("DELETE FROM episodes WHERE series_id=?1", seriesID); err != nil {
+		t.Fatal(err)
+	}
+	if err := state.db.PruneMediaIntegrityChecks(); err != nil {
+		t.Fatal(err)
+	}
+	problems, err := state.db.MediaIntegrityProblems()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(problems) != 0 {
+		t.Fatalf("the check of a removed episode was not pruned: %+v", problems)
+	}
+}
+
+func TestRunMediaIntegrityScanSkipsUnchangedOnTheNextPass(t *testing.T) {
+	state := newTestAppState(t)
+	miInstallFakeMediaTools(t, "#!/bin/sh\nexit 0\n")
+	oldPause := mediaIntegrityPause
+	mediaIntegrityPause = 0
+	t.Cleanup(func() { mediaIntegrityPause = oldPause })
+
+	dir := t.TempDir()
+	file := filepath.Join(dir, "episode.mkv")
+	if err := os.WriteFile(file, []byte("data"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := state.db.db.Exec("INSERT INTO series(name) VALUES ('Show')"); err != nil {
+		t.Fatal(err)
+	}
+	var seriesID int64
+	if err := state.db.db.QueryRow("SELECT id FROM series WHERE name='Show'").Scan(&seriesID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := state.db.db.Exec("INSERT INTO episodes(series_id,season,episode,title,archive_path) VALUES (?1,1,1,'Show S01E01',?2)", seriesID, file); err != nil {
+		t.Fatal(err)
+	}
+	total, err := state.db.CountMediaIntegrityTargets(false)
+	if err != nil || total != 1 {
+		t.Fatalf("first pass total = %d (%v)", total, err)
+	}
+	if _, err := runMediaIntegrityScan(context.Background(), state, ""); err != nil {
+		t.Fatal(err)
+	}
+	saved := state.db.LoadMediaIntegrityState()
+	if !saved.Done || saved.Checked != 1 {
+		t.Fatalf("first pass state = %+v", saved)
+	}
+	if total, err := state.db.CountMediaIntegrityTargets(false); err != nil || total != 0 {
+		t.Fatalf("next pass total = %d (%v), want 0", total, err)
+	}
+	// beginMediaIntegrityScan starts a new pass after a completed one; here
+	// the fresh state is set directly so the scan can be called synchronously.
+	if err := state.db.SaveMediaIntegrityState(MediaIntegrityState{}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := runMediaIntegrityScan(context.Background(), state, ""); err != nil {
+		t.Fatal(err)
+	}
+	saved = state.db.LoadMediaIntegrityState()
+	if !saved.Done || saved.Checked != 0 {
+		t.Fatalf("next pass state = %+v, want done with nothing checked", saved)
 	}
 }

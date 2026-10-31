@@ -6120,3 +6120,7 @@ pol:
   "File danneggiati": "Uszkodzone pliki"
   "Riavvia da capo": "Zacznij od nowa"
   "Sposta il file danneggiato nel cestino e cerca una release diversa?": "Przenieść uszkodzony plik do kosza i wyszukać inną wersję?"
+  "I file già controllati e non cambiati vengono saltati; «Riavvia da capo» li ricontrolla tutti.": "Pliki już sprawdzone i niezmienione są pomijane; «Zacznij od nowa» sprawdza je wszystkie ponownie."
+  "Controlla nuovi e cambiati": "Sprawdź nowe i zmienione"
+  "Controlla solo i file nuovi, cambiati o mai verificati": "Sprawdza tylko pliki nowe, zmienione lub nigdy niezweryfikowane"
+  "Nessun file nuovo o modificato da controllare.": "Brak nowych lub zmienionych plików do sprawdzenia."
