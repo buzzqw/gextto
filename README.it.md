@@ -399,9 +399,10 @@ semplice con tutto ciò che serve a un client autonomo.
   scorciatoie da tastiera, trascinamento, schede adatte al telefono e una
   pagina **Statistiche** (totali di sessione e di sempre, grafico 1 h/24 h/7 g).
   Ogni pagina verificata con axe-core.
-- **RSS e automazione.** Una pagina **Cercati** che
-  dice per ogni titolo cosa è scaricato, in download o visto ma scartato, e
-  perché ogni release verrebbe presa o rifiutata; una pagina **RSS e indexer**
+- **RSS e automazione.** Una pagina **Serie e film** che
+  dice per ogni titolo cosa è scaricato, in download o trovato ma non scaricato,
+  con filtri per stato, una sola azione principale e il perché ogni release
+  verrebbe presa o rifiutata; una pagina **RSS e indexer**
   con regole PASS/FAIL ordinate, anteprima live delle corrispondenze, modelli di
   regole, test dei feed, liste di feed incollate, e un **archivio** locale di
   tutto ciò che i feed hanno restituito.

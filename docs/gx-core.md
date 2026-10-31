@@ -56,7 +56,7 @@ cap so the auto-speed/peak observer can measure the line), the global seeding li
 the content layout of new torrents (Original, Subfolder, NoSubfolder),
 **completion actions** (move the finished data to a folder, optionally one
 subfolder per category, and run an operator command with the torrent details in
-the environment), the RSS manager with the *Wanted* page, the Torznab indexer search
+the environment), the RSS manager with the *Series & movies* page (the *Wanted* route), the Torznab indexer search
 with a parallel fan-out and sortable rich results, the installable page (web app
 manifest and service worker for the shared assets),
 and the **qBittorrent-compatible Web API** (`/api/v2/auth`, `/api/v2/torrents/*`,

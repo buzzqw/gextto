@@ -385,9 +385,10 @@ everything a standalone client needs.
   undo after removal; keyboard shortcuts, drag-and-drop, phone-friendly cards
   and a **Statistics** page (session and all-time totals, 1 h/24 h/7 d graph).
   Every page axe-core checked.
-- **RSS and automation.** A **Wanted** page
-  that says per title what is downloaded, downloading or seen but skipped, and
-  why each release would be taken or refused; an **RSS & Indexers** page with
+- **RSS and automation.** A **Series & movies** page
+  that says per title what is downloaded, downloading or found but not taken,
+  with state filters, one primary action and why each release would be taken or
+  refused; an **RSS & Indexers** page with
   ordered PASS/FAIL rules, live match previews, rule templates, feed tests,
   pasted feed lists, and a local **archive** of everything the feeds returned.
 - **Operations.** Limits, the per-weekday scheduler, latency auto-speed, one-click

@@ -167,11 +167,20 @@ func TestWantedRowShowsCounts(t *testing.T) {
 	if !strings.Contains(row, "seasonchip") {
 		t.Fatalf("the row must carry a per-season chip: %s", row)
 	}
+	if !strings.Contains(row, `data-wanted-state="uptodate"`) || !strings.Contains(row, "wprogress") {
+		t.Fatalf("the row must carry its state and a progress bar: %s", row)
+	}
+	if !strings.Contains(row, "Why not?") || !strings.Contains(row, `class="row-more"`) {
+		t.Fatalf("the row must keep the secondary actions in the More menu: %s", row)
+	}
 	// A seen-but-not-taken episode shows as such.
 	d.recordWantedSeen(w, 1, 5)
 	row = d.uiWantedRowsHTML()
-	if !strings.Contains(row, "Seen, not downloaded") {
+	if !strings.Contains(row, "Found, not downloaded") {
 		t.Fatalf("a known missing episode must be flagged: %s", row)
+	}
+	if !strings.Contains(row, `data-wanted-state="missing"`) || !strings.Contains(row, "Search missing") {
+		t.Fatalf("a title with a gap must offer Search missing: %s", row)
 	}
 }
 
@@ -454,8 +463,13 @@ func TestUIWantedPageAndPollEndpoints(t *testing.T) {
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("GET /ui/wanted status = %d", resp.StatusCode)
 	}
-	if !strings.Contains(string(raw), "Wanted titles") {
-		t.Fatalf("page missing Wanted titles: %s", string(raw))
+	if !strings.Contains(string(raw), "Series &amp; movies list") {
+		t.Fatalf("page missing the series & movies list: %s", string(raw))
+	}
+	for _, want := range []string{`data-wanted-state="missing"`, `id="wanted-sort"`, "With missing episodes", "Not monitored"} {
+		if !strings.Contains(string(raw), want) {
+			t.Fatalf("page missing %q: %s", want, string(raw))
+		}
 	}
 
 	// POST /ui/wanted toggle-pause

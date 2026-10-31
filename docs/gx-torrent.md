@@ -197,7 +197,7 @@ Every page is checked with axe-core (WCAG 2 A/AA) in both themes.
 
 - **Layout** (familiar to qBittorrent Web UI users, not a copy of it): a top
   bar with search (`/`), live speeds and the theme switch; the standalone
-  navigation holds Torrents, Wanted, RSS & indexers, Archive, Statistics and
+  navigation holds Torrents, Series & movies, RSS & indexers, Archive, Statistics and
   Settings, plus a **More** menu beside Settings with **Log**, **Tools** and
   **Search indexers** (the main-page actions, opened here from every page);
   a **side bar** with
@@ -937,9 +937,12 @@ to titles with a recognisable episode; an invalid filter never matches
 Example:
 `[{"name":"no-cam","fail":true,"match":{"regex":"(?i)cam"}},{"name":"shows","match":{"require_episode":true,"smart_episode":true},"action":{"category":"tv","savepath":"/srv/tv"}}]`.
 
-The **`/ui/wanted`** page (tab *Wanted* in the navigation bar) is dedicated to managing
-the titles the operator wants. Each title has type (series/movie),
-seasons (`1+`, `2-4`, `1`), language, quality (selectable from a drop-down
+The **`/ui/wanted`** page (tab *Series & movies* in the navigation bar) is
+dedicated to managing the titles the operator wants. The page says *Wanted* in
+the code and in the routes; the visible name is **Series & movies**. Each title
+has type (series/movie),
+seasons (two numbers: from/to, with "all seasons" as the default; the advanced
+field still accepts `1+`, `2-4`, `1`), language, quality (selectable from a drop-down
 among *Any*, *360p*, *480p*, *576p*, *720p*, *720p+*, *720p-1080p*, *1080p*,
 *1080p+*, *2160p 4K*, *2160p+ 4K+*), excluded, episode filter, category
 and path. You add it by hand, or you type a name and press **Search**: it reads
@@ -959,14 +962,29 @@ feeds alone.
 A title written between slashes is a **regular expression** (case-insensitive):
 `/ted.?lasso/` takes the releases matching the expression instead of the plain
 words. The indexer and archive searches use its literal words; a pattern with
-alternatives (`|`) is matched only against what the feeds and the archive scan
+alternatives (`|`) matches only against what the feeds and the archive scan
 bring. The form says so under the title field.
 
-At the top of the *Wanted* page, the **Search all wanted** button triggers an immediate
-manual search across indexers, RSS feeds and the archive for all configured titles and
-gap searches missing episodes, displaying real-time feedback with items added and status.
-Each row in the table provides individual **Search**, **Edit**, **Pause/Resume** and
-**Remove** actions, missing episodes ledger and real-time status.
+**Rows and filters.** Each row states in words what the operator has
+(*Downloaded*, *Downloading*, *Found, not downloaded*) and a progress bar over
+the episodes found so far, never a claim about the whole series. The badge is
+one of *Episodes missing*, *Downloading*, *Complete*, *Not monitored* or
+*No episodes yet*; the next search is beside the last one. The row has **one
+primary action** chosen from the state (*Search missing*, *Open*, *Episodes* or
+*Releases*) and a **More** menu with the rest (releases/why not, episodes,
+search now, edit, pause/resume monitoring, remove). Above the list the state
+filters (*All*, *With missing*, *Downloading*, *Complete*, *Not monitored*) and
+the order (name, missing episodes, last search, added) work on the rows already
+on the page; the name filter stays. The legend explains that **found** means
+seen by the feeds or the indexers: gx-torrent does not know the complete
+episode list of a series, and the page says so instead of pretending a partly
+seen season is complete.
+
+At the top of the page, **Search all now** triggers an immediate manual search
+across indexers, RSS feeds and the archive for all configured titles and gap
+searches missing episodes, displaying real-time feedback with items added and
+status. Each row provides its primary action, and the **More** menu with
+**Search now**, **Edit**, **Pause/Resume monitoring** and **Remove**.
 
 **Taking a release by hand (interactive search).** *Releases* on a title opens the
 releases held for it and gives each one a verdict (**Would be taken**, *Taken*,

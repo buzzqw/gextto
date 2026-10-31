@@ -1011,6 +1011,23 @@ func (d *Daemon) wantedGapDue(name string, now time.Time) bool {
 	return now.Sub(time.Unix(last, 0)) >= wantedGapInterval
 }
 
+// wantedNextGap is when the missing-episode search for this title is due. A
+// title never searched is due now, so the page can say "soon" instead of
+// showing a misleading past time.
+func (d *Daemon) wantedNextGap(name string, now time.Time) time.Time {
+	d.mu.Lock()
+	last := d.state.WantedGapLast[strings.TrimSpace(name)]
+	d.mu.Unlock()
+	if last <= 0 {
+		return now
+	}
+	next := time.Unix(last, 0).Add(wantedGapInterval)
+	if next.Before(now) {
+		return now
+	}
+	return next
+}
+
 func (d *Daemon) markWantedGap(name string, now time.Time) {
 	d.mu.Lock()
 	defer d.mu.Unlock()

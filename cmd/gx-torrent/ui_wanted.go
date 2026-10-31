@@ -309,17 +309,24 @@ func (d *Daemon) handleUIWantedEpisodes(w http.ResponseWriter, r *http.Request) 
 func (d *Daemon) renderWanted(w http.ResponseWriter, r *http.Request, errKey string) {
 	page := assets.WantedPage()
 	wanteds := d.wantedList()
-	activeCount := 0
-	pausedCount := 0
+	missingCount, downloadingCount, completeCount, pausedCount := 0, 0, 0, 0
 	for _, w := range wanteds {
-		if w.Paused {
+		stats := d.wantedStatsFor(w)
+		switch wantedTitleState(w, stats) {
+		case "paused":
 			pausedCount++
-		} else {
-			activeCount++
+		case "downloading":
+			downloadingCount++
+		case "missing":
+			missingCount++
+		case "uptodate":
+			completeCount++
 		}
 	}
 	page = strings.Replace(page, "{{WANTEDCOUNT}}", strconv.Itoa(len(wanteds)), 1)
-	page = strings.Replace(page, "{{WANTEDACTIVE}}", strconv.Itoa(activeCount), 1)
+	page = strings.Replace(page, "{{WANTEDMISSING}}", strconv.Itoa(missingCount), 1)
+	page = strings.Replace(page, "{{WANTEDDOWNLOADING}}", strconv.Itoa(downloadingCount), 1)
+	page = strings.Replace(page, "{{WANTEDCOMPLETE}}", strconv.Itoa(completeCount), 1)
 	page = strings.Replace(page, "{{WANTEDPAUSED}}", strconv.Itoa(pausedCount), 1)
 	page = strings.Replace(page, "{{WANTEDROWS}}", d.uiWantedRowsHTML(), 1)
 
@@ -679,7 +686,18 @@ func baseNameSuggestions(query string, items []rss.Item, includeLang []string, q
 	return out
 }
 
-// uiWantedRowsHTML renders the wanted titles as table rows, each with Search,
+// wantedSessionHash returns the torrent of a wanted title currently in the
+// session, when there is one, so the row's primary action can open it.
+func (d *Daemon) wantedSessionHash(w wantedEntry) string {
+	for _, media := range d.wantedSessionMedia(w) {
+		if media.Hash != "" {
+			return media.Hash
+		}
+	}
+	return ""
+}
+
+// uiWantedRowsHTML renders the wanted titles as rows, each with Search,
 // Edit, Pause/Resume and Remove actions, and the missing episodes found so far.
 func (d *Daemon) uiWantedRowsHTML() string {
 	list := d.wantedList()
@@ -687,10 +705,12 @@ func (d *Daemon) uiWantedRowsHTML() string {
 		return `<li class="empty"><svg class="i" style="width:40px;height:40px;color:var(--subtle)"><use href="/assets/icons.svg#i-tv"/></svg><h3>Nothing wanted yet</h3><p>Add a series or a movie: gx-torrent watches the feeds and the indexers for it and downloads what is missing.</p><button type="button" class="primary sm" onclick="document.getElementById('add-wanted').click()" title="Add a series or a movie to the wanted list">Add title</button></li>`
 	}
 	var b strings.Builder
+	now := time.Now()
 	for index, w := range list {
 		idx := strconv.Itoa(index)
 		stats := d.wantedStatsFor(w)
-		badgeClass, badgeLabel := wantedBadge(wantedTitleState(w, stats))
+		state := wantedTitleState(w, stats)
+		badgeClass, badgeLabel := wantedBadge(state)
 		icon, kindLabel := "i-tv", "Series"
 		if w.kind() == "movie" {
 			icon, kindLabel = "i-film", "Movie"
@@ -699,11 +719,17 @@ func (d *Daemon) uiWantedRowsHTML() string {
 		if w.Paused {
 			cls += " off"
 		}
-		pauseText, pauseTitle := "Pause", "Pause monitoring this wanted title"
+		pauseText, pauseTitle := "Pause monitoring", "Pause monitoring this title"
 		if w.Paused {
-			pauseText, pauseTitle = "Resume", "Resume monitoring this wanted title"
+			pauseText, pauseTitle = "Resume monitoring", "Resume monitoring this title"
 		}
-		b.WriteString(`<li class="` + cls + `" data-wanted-row="` + idx + `"><div class="kind-icon" aria-hidden="true"><svg class="i"><use href="/assets/icons.svg#` + icon + `"/></svg></div><div class="item-main">`)
+		lastSearch := time.Time{}
+		if _, last := d.wantedProgress(w); !last.IsZero() {
+			lastSearch = last
+		}
+		nextGap := d.wantedNextGap(w.Name, now)
+		hash := d.wantedSessionHash(w)
+		b.WriteString(`<li class="` + cls + `" data-wanted-row="` + idx + `" data-wanted-state="` + state + `" data-wanted-name="` + html.EscapeString(w.Name) + `" data-wanted-missing="` + strconv.Itoa(stats.Missing) + `" data-wanted-downloading="` + strconv.Itoa(stats.Downloading) + `" data-wanted-last="` + strconv.FormatInt(lastSearch.Unix(), 10) + `" data-wanted-gap="` + strconv.FormatInt(nextGap.Unix(), 10) + `" data-wanted-index="` + idx + `"><div class="kind-icon" aria-hidden="true"><svg class="i"><use href="/assets/icons.svg#` + icon + `"/></svg></div><div class="item-main">`)
 		b.WriteString(`<div class="item-title"><span class="name">` + html.EscapeString(w.Name) + `</span><span class="chip">` + kindLabel + `</span><span class="badge ` + badgeClass + `">` + badgeLabel + `</span></div>`)
 
 		var chips strings.Builder
@@ -736,12 +762,15 @@ func (d *Daemon) uiWantedRowsHTML() string {
 		}
 
 		// What the operator has, honestly: how many episodes are downloaded,
-		// how many are still downloading and how many were seen but not taken.
+		// how many are still downloading and how many were found but not taken.
 		// A season we only partly saw is never claimed complete.
 		b.WriteString(`<div class="item-status">`)
 		b.WriteString(d.uiWantedStatusHTML(w, stats))
-		if _, last := d.wantedProgress(w); !last.IsZero() {
-			b.WriteString(` · <span class="muted" title="When the indexers were last searched for this title"><span>Indexers searched</span> ` + last.Format("02/01 15:04") + `</span>`)
+		if !lastSearch.IsZero() {
+			b.WriteString(` · <span class="muted" title="When the indexers were last searched for this title"><span>Last search</span> ` + lastSearch.Format("02/01 15:04") + `</span>`)
+		}
+		if !w.Paused {
+			b.WriteString(` · <span class="muted" title="When the missing episodes are searched next"><span>Next search</span> ` + uiWantedWait(int64(time.Until(nextGap).Seconds())) + `</span>`)
 		}
 		b.WriteString(`</div>`)
 		if w.kind() != "movie" {
@@ -750,11 +779,28 @@ func (d *Daemon) uiWantedRowsHTML() string {
 		}
 		b.WriteString(`<div class="item-status" data-wanted-status="` + idx + `" aria-live="polite"></div></div><div class="item-actions">`)
 
-		if w.kind() != "movie" {
-			b.WriteString(`<button type="button" class="sm" data-wanted-episodes data-index="` + idx + `" data-name="` + html.EscapeString(w.Name) + `" aria-expanded="false" title="Show or hide the episodes of this title"><svg class="i"><use href="/assets/icons.svg#i-list"/></svg>Episodes</button>`)
+		// One primary action, chosen from the state; everything else is in the
+		// "More" menu so the row never becomes a wall of buttons.
+		episodesButton := `<button type="button" class="sm" data-wanted-episodes data-index="` + idx + `" data-name="` + html.EscapeString(w.Name) + `" aria-expanded="false" title="Show or hide the episodes of this title"><svg class="i"><use href="/assets/icons.svg#i-list"/></svg>Episodes</button>`
+		releasesButton := `<button type="button" class="sm" data-wanted-releases data-index="` + idx + `" data-name="` + html.EscapeString(w.Name) + `" title="See the releases found and why they were not taken">Why not?</button>`
+		searchButton := `<button type="button" class="sm" data-wanted-poll data-index="` + idx + `" data-name="` + html.EscapeString(w.Name) + `" title="Search this title now"><svg class="i"><use href="/assets/icons.svg#i-search"/></svg>Search now</button>`
+		missingButton := `<button type="button" class="sm primary" data-wanted-poll data-index="` + idx + `" data-name="` + html.EscapeString(w.Name) + `" title="Search the missing episodes now"><svg class="i"><use href="/assets/icons.svg#i-search"/></svg>Search missing</button>`
+		switch {
+		case w.Paused:
+			b.WriteString(`<form method="post" action="/ui/wanted"><input type="hidden" name="op" value="toggle-pause"><input type="hidden" name="index" value="` + idx + `"><button type="submit" class="sm primary" title="Resume monitoring this title">Resume monitoring</button></form>`)
+		case stats.Missing > 0:
+			b.WriteString(missingButton)
+		case stats.Downloading > 0 && hash != "":
+			b.WriteString(`<a class="btn sm primary" href="/?open=` + html.EscapeString(hash) + `" title="Open the torrent in the session">Open</a>`)
+		case stats.Downloading > 0:
+			b.WriteString(searchButton)
+		case stats.Downloaded > 0 && w.kind() != "movie":
+			b.WriteString(episodesButton)
+		case stats.Downloaded > 0:
+			b.WriteString(releasesButton)
+		default:
+			b.WriteString(searchButton)
 		}
-		b.WriteString(`<button type="button" class="sm" data-wanted-releases data-index="` + idx + `" data-name="` + html.EscapeString(w.Name) + `" title="The releases of this title in the archive, with what would be taken and why the others are not">Releases</button>`)
-		b.WriteString(`<button type="button" class="sm" data-wanted-poll data-index="` + idx + `" data-name="` + html.EscapeString(w.Name) + `" title="Search this title now"><svg class="i"><use href="/assets/icons.svg#i-search"/></svg>Search</button>`)
 		attrs := `data-wanted-edit data-index="` + idx + `"` +
 			` data-name="` + html.EscapeString(w.Name) + `"` +
 			` data-kind="` + w.kind() + `"` +
@@ -767,27 +813,42 @@ func (d *Daemon) uiWantedRowsHTML() string {
 			` data-category="` + html.EscapeString(w.Category) + `"` +
 			` data-savepath="` + html.EscapeString(w.SavePath) + `"` +
 			` data-paused="` + strconv.FormatBool(w.Paused) + `"`
-		b.WriteString(`<button type="button" class="sm" ` + attrs + ` title="Edit wanted title">Edit</button>`)
+		b.WriteString(`<details class="row-more"><summary class="sm" aria-label="More actions for this title" title="More actions: releases, episodes, edit, pause, remove">More</summary><div class="row-more-menu">`)
+		b.WriteString(releasesButton)
+		if w.kind() != "movie" {
+			b.WriteString(episodesButton)
+		}
+		b.WriteString(searchButton)
+		b.WriteString(`<button type="button" class="sm" ` + attrs + ` title="Edit this title">Edit</button>`)
 		b.WriteString(`<form method="post" action="/ui/wanted"><input type="hidden" name="op" value="toggle-pause"><input type="hidden" name="index" value="` + idx + `"><button type="submit" class="sm ghost" title="` + pauseTitle + `">` + pauseText + `</button></form>`)
-		b.WriteString(`<form method="post" action="/ui/wanted" data-confirm="Stop monitoring this title?"><input type="hidden" name="op" value="remove"><input type="hidden" name="index" value="` + idx + `"><button type="submit" class="ghost icon sm danger" title="Remove this wanted title" aria-label="Remove this wanted title"><svg class="i"><use href="/assets/icons.svg#i-trash"/></svg></button></form>`)
-		b.WriteString(`</div></li>`)
+		b.WriteString(`<form method="post" action="/ui/wanted" data-confirm="Stop monitoring this title?"><input type="hidden" name="op" value="remove"><input type="hidden" name="index" value="` + idx + `"><button type="submit" class="ghost icon sm danger" title="Remove this title from the list" aria-label="Remove this title from the list"><svg class="i"><use href="/assets/icons.svg#i-trash"/></svg></button></form>`)
+		b.WriteString(`</div></details></div></li>`)
 	}
 	return b.String()
+}
+
+// uiWantedWait formats the time until the next search; a title never searched
+// is "soon" rather than "0s".
+func uiWantedWait(seconds int64) string {
+	if seconds <= 0 {
+		return "soon"
+	}
+	return uiDuration(seconds)
 }
 
 // wantedBadge maps a title state to its badge class and label (a catalog key).
 func wantedBadge(state string) (class, label string) {
 	switch state {
 	case "paused":
-		return "b-paused", "Paused"
+		return "b-paused", "Not monitored"
 	case "downloading":
 		return "b-downloading", "Downloading"
 	case "missing":
-		return "b-missing", "To complete"
+		return "b-missing", "Episodes missing"
 	case "uptodate":
-		return "b-seeding", "Up to date"
+		return "b-seeding", "Complete"
 	default:
-		return "b-paused", "Waiting"
+		return "b-paused", "No episodes yet"
 	}
 }
 
@@ -806,12 +867,12 @@ func (d *Daemon) uiWantedStatusHTML(w wantedEntry, stats wantedStats) string {
 		parts = append(parts, `<span class="warn" title="Episodes still downloading">◐</span> <b>`+strconv.Itoa(stats.Downloading)+`</b> <span>Downloading</span>`)
 	}
 	if stats.Missing > 0 {
-		parts = append(parts, `<span class="warn" title="Episodes seen but not downloaded">○</span> <b>`+strconv.Itoa(stats.Missing)+`</b> <span>Seen, not downloaded</span>`)
+		parts = append(parts, `<span class="warn" title="Episodes found in the feeds or indexers and not downloaded yet">○</span> <b>`+strconv.Itoa(stats.Missing)+`</b> <span>Found, not downloaded</span>`)
 	}
 	if len(parts) == 0 {
-		return `<span class="muted">No episodes seen yet</span>`
+		return `<span class="muted">No episodes found yet</span>`
 	}
-	status := strings.Join(parts, ` · `)
+	status := d.uiWantedProgressHTML(stats) + strings.Join(parts, ` · `)
 	if len(stats.Seasons) > 0 {
 		var chips []string
 		for _, season := range stats.Seasons {
@@ -820,6 +881,19 @@ func (d *Daemon) uiWantedStatusHTML(w wantedEntry, stats wantedStats) string {
 		status += `<div class="seasons" title="Episodes per season">` + strings.Join(chips, " ") + `</div>`
 	}
 	return status
+}
+
+// uiWantedProgressHTML is the progress of the episodes known so far: the bar
+// is downloaded / (downloaded + downloading + found but not downloaded). It is
+// deliberately not a claim about the whole series, which gx-torrent does not
+// know: the tooltip says "of the episodes found so far".
+func (d *Daemon) uiWantedProgressHTML(stats wantedStats) string {
+	known := stats.Downloaded + stats.Downloading + stats.Missing
+	if known == 0 {
+		return ""
+	}
+	pct := stats.Downloaded * 100 / known
+	return `<div class="wprogress" role="progressbar" aria-valuenow="` + strconv.Itoa(pct) + `" aria-valuemin="0" aria-valuemax="100" aria-label="Downloaded episodes out of the ones found so far" title="Downloaded episodes out of the ones found so far"><i style="width:` + strconv.Itoa(pct) + `%"></i></div>`
 }
 
 // uiWantedSeasonChip renders one season with its episode counts (only the
@@ -850,9 +924,9 @@ func (d *Daemon) uiWantedMovieStatusHTML(w wantedEntry, stats wantedStats) strin
 		return `<span class="warn">◐</span> <span>Downloading</span> <b>` + fmt.Sprintf("%.0f%%", media.Progress) + `</b> · ` + link
 	}
 	if stats.Downloaded > 0 {
-		return `<span class="ok">✓</span> <span>Downloaded</span> · <span class="muted">Downloaded (no longer in session)</span>`
+		return `<span class="ok">✓</span> <span>Downloaded</span> · <span class="muted">Downloaded earlier, not in the session</span>`
 	}
-	return `<span class="muted">No release seen yet</span>`
+	return `<span class="muted">No release found yet</span>`
 }
 
 // wantedProgress returns how many episodes (or releases) were taken for a
