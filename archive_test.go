@@ -374,6 +374,62 @@ func TestArchiveKeepsDeclaredInfohashForLinkOnlyListings(t *testing.T) {
 	}
 }
 
+// An old link-only row may exist next to a magnet row of the same torrent. When
+// the indexer starts declaring the infohash for that listing, the link-only
+// copy is redundant: it must go, or the archive keeps proposing a row it cannot
+// match to the blocklist by hash.
+func TestArchiveDropsLinkOnlyDuplicateWhenTheMagnetIsAlreadyStored(t *testing.T) {
+	archive := openTestArchive(t)
+	const hash = "0123456789abcdef0123456789abcdef01234567"
+	url := "http://indexarr:8788/dl/16225.torrent?apikey=one"
+	title := "Example Show S01E01 1080p WEB-DL"
+	magnet := "magnet:?xt=urn:btih:" + hash + "&dn=Example+Show"
+	linkOnly := models.Release{
+		Title:        title,
+		TorrentURL:   &url,
+		Source:       "indexarr:ExtTo",
+		GUID:         hash,
+		Kind:         "series",
+		DiscoveredAt: time.Now().UTC(),
+		Seeders:      -1,
+		Peers:        -1,
+	}
+	if err := archive.SaveBatch([]models.Release{linkOnly}, &Config{}); err != nil {
+		t.Fatalf("SaveBatch link-only: %v", err)
+	}
+	magnetCopy := models.Release{
+		Title:        title,
+		Magnet:       magnet,
+		Source:       "indexarr",
+		GUID:         "another-listing",
+		Kind:         "series",
+		DiscoveredAt: time.Now().UTC(),
+		Seeders:      -1,
+		Peers:        -1,
+	}
+	if err := archive.SaveBatch([]models.Release{magnetCopy}, &Config{}); err != nil {
+		t.Fatalf("SaveBatch magnet: %v", err)
+	}
+	if count, err := archive.Count(); err != nil || count != 2 {
+		t.Fatalf("count = %d, %v; want the magnet row and the link-only row", count, err)
+	}
+
+	linkOnly.InfoHash = hash
+	if err := archive.SaveBatch([]models.Release{linkOnly}, &Config{}); err != nil {
+		t.Fatalf("SaveBatch link-only with infohash: %v", err)
+	}
+	if count, err := archive.Count(); err != nil || count != 1 {
+		t.Fatalf("count after the declared infohash = %d, %v; want 1", count, err)
+	}
+	var storedMagnet, storedHash string
+	if err := archive.db.QueryRow("SELECT magnet, COALESCE(magnet_hash,'') FROM archive").Scan(&storedMagnet, &storedHash); err != nil {
+		t.Fatalf("read archived row: %v", err)
+	}
+	if storedMagnet != magnet || storedHash != hash {
+		t.Fatalf("stored = (%q, %q), want the magnet and infohash (%q, %q)", storedMagnet, storedHash, magnet, hash)
+	}
+}
+
 func TestArchiveDeduplicatesEphemeralTorrentURLsByGUID(t *testing.T) {
 	archive := openTestArchive(t)
 	const guid = "https://tracker.example/details/42"

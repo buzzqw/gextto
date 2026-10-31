@@ -385,6 +385,11 @@ const (
 	// durable magnet with an ephemeral URL: keep the magnet, refresh the rest.
 	archiveRefreshSQL    = "UPDATE archive SET title=?1, magnet=CASE WHEN ?2 LIKE 'magnet:%' THEN ?2 ELSE magnet END, source=?4, quality_score=?5, added_at=datetime('now') WHERE magnet_hash<>'' AND magnet_hash=?3 AND magnet_key<>?6"
 	archiveRefreshKeySQL = "UPDATE OR IGNORE archive SET title=?1, magnet=CASE WHEN COALESCE(magnet_hash,'')='' THEN ?2 ELSE magnet END, magnet_hash=COALESCE(NULLIF(magnet_hash,''), ?3), source=?4, quality_score=?5, added_at=datetime('now') WHERE magnet_key=?6"
+	// The same torrent is already archived under another listing: a link-only
+	// copy that has just learned its infohash is redundant and must go, or the
+	// archive keeps a second row without a magnet and the archive pass keeps
+	// proposing the ephemeral link.
+	archiveDeleteLinkSQL = "DELETE FROM archive WHERE magnet_key=?1 AND COALESCE(magnet_hash,'')='' AND EXISTS (SELECT 1 FROM archive AS other WHERE other.magnet_hash=?2 AND other.magnet_key<>?1)"
 )
 
 // SaveBatch archives releases: one row per magnet/listing and per infohash.
@@ -435,6 +440,12 @@ func (a *Archive) saveChunk(releases []models.Release, cfg *Config) error {
 		return err
 	}
 	defer refreshKey.Close()
+	deleteLink, err := tx.Prepare(archiveDeleteLinkSQL)
+	if err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	defer deleteLink.Close()
 	for i := range releases {
 		r := &releases[i]
 		// Content filters are also an archive-ingestion boundary: releases that
@@ -488,6 +499,15 @@ func (a *Archive) saveChunk(releases []models.Release, cfg *Config) error {
 					return err
 				}
 				if affected, _ := refreshed.RowsAffected(); affected > 0 {
+					// This link-only listing duplicates a torrent already
+					// archived under another key: drop the copy instead of
+					// keeping a row the archive pass cannot match by hash.
+					if strings.TrimSpace(r.Magnet) == "" {
+						if _, err := deleteLink.Exec(archiveMagnetKeyString(identity), hash); err != nil {
+							_ = tx.Rollback()
+							return err
+						}
+					}
 					continue
 				}
 			}
