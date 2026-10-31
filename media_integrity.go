@@ -153,15 +153,18 @@ func (p MediaIntegrityProblem) Label() string {
 type MediaIntegrityState struct {
 	Cursor string `json:"cursor"`
 	// Force rechecks every file, even the ones already checked and unchanged.
-	Force      bool   `json:"force"`
-	Total      int    `json:"total"`
-	Checked    int    `json:"checked"`
-	Damaged    int    `json:"damaged"`
-	Running    bool   `json:"running"`
-	Done       bool   `json:"done"`
-	Current    string `json:"current"`
-	StartedAt  string `json:"started_at"`
-	FinishedAt string `json:"finished_at"`
+	Force bool `json:"force"`
+	// ManifestFingerprint identifies the external report last applied. When it
+	// changes, the pass starts again so the new verified files are honoured.
+	ManifestFingerprint string `json:"manifest_fingerprint"`
+	Total               int    `json:"total"`
+	Checked             int    `json:"checked"`
+	Damaged             int    `json:"damaged"`
+	Running             bool   `json:"running"`
+	Done                bool   `json:"done"`
+	Current             string `json:"current"`
+	StartedAt           string `json:"started_at"`
+	FinishedAt          string `json:"finished_at"`
 }
 
 // MediaIntegrityStatus is the answer of the status endpoint and the model of the
@@ -671,6 +674,21 @@ func mediaIntegrityBatchSize(cfg *Config) int {
 	return value
 }
 
+// mediaIntegrityManifestFingerprint identifies the external report: its path,
+// size and modification time. A nightly batch rewrites the file, so a change is
+// a new report and starts a new check pass.
+func mediaIntegrityManifestFingerprint(path string) string {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return ""
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		return "missing|" + path
+	}
+	return fmt.Sprintf("%s|%d|%d", path, info.Size(), info.ModTime().UnixNano())
+}
+
 // mediaIntegrityMissingTools reports which of the two tools is not on PATH.
 func mediaIntegrityMissingTools() []string {
 	missing := make([]string, 0, 2)
@@ -884,6 +902,11 @@ func beginMediaIntegrityScan(s *AppState, restart bool, limit int) (*Job, bool, 
 		return job, false, nil
 	}
 	state := s.db.LoadMediaIntegrityState()
+	manifestPath := ""
+	if cfg := latestConfig(s); cfg != nil {
+		manifestPath = strings.TrimSpace(cfg.Settings[mediaIntegrityVerifiedManifestSetting])
+	}
+	fingerprint := mediaIntegrityManifestFingerprint(manifestPath)
 	switch {
 	case restart:
 		// Forget every outcome: the next pass probes the whole library.
@@ -891,11 +914,23 @@ func beginMediaIntegrityScan(s *AppState, restart bool, limit int) (*Job, bool, 
 			s.jobs.Fail(job.ID, err)
 			return nil, false, err
 		}
-		state = MediaIntegrityState{Force: true}
+		state = MediaIntegrityState{Force: true, ManifestFingerprint: fingerprint}
 	case state.Done:
 		// A completed pass is over: start a new one that skips the files
 		// already checked and unchanged.
-		state = MediaIntegrityState{Force: false}
+		state = MediaIntegrityState{Force: false, ManifestFingerprint: fingerprint}
+	case !state.Force && state.ManifestFingerprint != fingerprint:
+		// A new or updated external report: the next run applies its entries.
+		// A pass already under way keeps its cursor and its checked files; only
+		// its total is recomputed after the new entries are marked.
+		state.ManifestFingerprint = fingerprint
+		state.Total = 0
+		if state.Checked == 0 {
+			state.Cursor = ""
+			state.Done = false
+			state.Current = ""
+			state.FinishedAt = ""
+		}
 	case state.Total == 0:
 		// Fresh state, or an empty library: keep the force flag (a forced pass
 		// must stay forced) and start from the beginning.
@@ -905,6 +940,7 @@ func beginMediaIntegrityScan(s *AppState, restart bool, limit int) (*Job, bool, 
 		state.Done = false
 		state.Current = ""
 		state.FinishedAt = ""
+		state.ManifestFingerprint = fingerprint
 	}
 	state.Running = true
 	state.Done = false
@@ -961,7 +997,9 @@ func runMediaIntegrityScan(ctx context.Context, s *AppState, jobID string, limit
 		if err != nil {
 			return nil, err
 		}
-		state.Total = total
+		// A pass already under way counts the files checked so far as well;
+		// a fresh pass starts from zero.
+		state.Total = state.Checked + total
 		state.StartedAt = time.Now().Format(time.RFC3339)
 	}
 	if state.Total > 0 && state.Checked > state.Total {
