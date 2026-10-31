@@ -213,6 +213,7 @@ var uiSettingDefaults = map[string]string{
 	"media_integrity_enabled":              "false",
 	"media_integrity_interval_minutes":     "60",
 	"media_integrity_batch":                "1",
+	"media_integrity_quick_4k":             "true",
 	"media_integrity_verified_manifest":    "",
 	"media_info_backfill_enabled":          "true",
 	"media_info_backfill_interval_minutes": "60",

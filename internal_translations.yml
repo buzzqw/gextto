@@ -5534,6 +5534,8 @@ eng:
   "Controllo integrità file automatico": "Automatic file integrity check"
   "Controllo integrità — intervallo": "File integrity check — interval"
   "Controllo integrità — file per volta": "File integrity check — files per pass"
+  "Controllo integrità — controllo veloce dei file 4K": "File integrity check — quick check for 4K files"
+  "Per i file 4K legge tutto il file ma decodifica solo i fotogrammi chiave: il controllo è molto più veloce e trova comunque i file troncati o illeggibili, ma può non vedere un piccolo danno tra un fotogramma chiave e l'altro.": "For 4K files it reads the whole file but decodes only the keyframes: the check is much faster and still finds truncated or unreadable files, but it may miss a small defect between one keyframe and the next."
   "File già verificati": "Already verified files"
   "Analizza periodicamente con ffprobe e ffmpeg i file della libreria, un file alla volta, per trovare quelli danneggiati.": "Periodically probes the library files with ffprobe and ffmpeg, one file at a time, to find the damaged ones."
   "Minuti tra due passaggi del controllo integrità.": "Minutes between two integrity check passes."

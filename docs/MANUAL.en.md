@@ -1546,7 +1546,10 @@ The complete list of actions and parameters is in [Appendix C](#appendix-c-refer
   faster. The time allowed for the decode grows with the file duration, so a
   long 4K on a modest computer is not mistaken for a broken file; a file that
   still cannot be read is not treated as damaged and is tried again in a later
-  pass. In
+  pass. 4K files use the quick check: the whole file is read but only the
+  keyframes are decoded, so truncated or unreadable files are still found
+  without taking hours (it can be turned off in *Settings → Maintenance → File
+  integrity check*). In
   *Maintenance* the panel shows progress and the damaged or unreadable files,
   with the two counts kept apart and the reason reported by `ffmpeg`; **Check
   now** starts a pass at once and **Start over** rechecks the whole library.
@@ -2580,6 +2583,7 @@ files. When the memory cannot be read, only the `tmpfs` space counts, as before.
 | Automatic file integrity check | Periodically probes the library files with `ffprobe` and `ffmpeg`, one file at a time, to find the damaged ones. |
 | File integrity check — interval | Minutes between two check passes. Shown only while «Automatic file integrity check» is on. |
 | File integrity check — files per pass | Maximum number of files verified in each pass. |
+| File integrity check — quick check for 4K files | For 4K files it reads the whole file but decodes only the keyframes: the check is much faster and still finds truncated or unreadable files, but it may miss a small defect between one keyframe and the next. It is on by default. |
 
 **Orphaned files**
 

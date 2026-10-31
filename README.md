@@ -242,7 +242,9 @@ checkout: `git pull --ff-only && ./scripts/update.sh`.
   and fully decodes the archived videos with `ffprobe` and `ffmpeg` a little at
   a time in the background, keeping its position across a restart. Files
   already checked and unchanged are skipped; *Start over* rechecks the whole
-  library. A damaged episode can be sent back to the
+  library. 4K files use the quick check (on by default): the whole file is read
+  but only the keyframes are decoded, so a 4K episode takes minutes instead of
+  an hour and truncation and unreadable data are still found. A damaged episode can be sent back to the
   downloads from the report: the old release is blocklisted and a different one
   is searched.
 

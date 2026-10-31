@@ -6144,6 +6144,8 @@ spa:
   "Controllo integrità file automatico": "Comprobación automática de integridad de archivos"
   "Controllo integrità — intervallo": "Comprobación de integridad — intervalo"
   "Controllo integrità — file per volta": "Comprobación de integridad — archivos por pasada"
+  "Controllo integrità — controllo veloce dei file 4K": "Comprobación de integridad — comprobación rápida de archivos 4K"
+  "Per i file 4K legge tutto il file ma decodifica solo i fotogrammi chiave: il controllo è molto più veloce e trova comunque i file troncati o illeggibili, ma può non vedere un piccolo danno tra un fotogramma chiave e l'altro.": "En los archivos 4K lee todo el archivo pero solo decodifica los fotogramas clave: la comprobación es mucho más rápida y sigue encontrando los archivos truncados o ilegibles, pero puede no ver un pequeño defecto entre un fotograma clave y el siguiente."
   "File già verificati": "Archivos ya verificados"
   "Analizza periodicamente con ffprobe e ffmpeg i file della libreria, un file alla volta, per trovare quelli danneggiati.": "Analiza periódicamente los archivos de la biblioteca con ffprobe y ffmpeg, uno a la vez, para encontrar los dañados."
   "Minuti tra due passaggi del controllo integrità.": "Minutos entre dos pasadas de la comprobación de integridad."

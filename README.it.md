@@ -245,7 +245,10 @@ un checkout: `git pull --ff-only && ./scripts/update.sh`.
   volta; Gextto analizza e decodifica per intero i video archiviati con
   `ffprobe` e `ffmpeg` un po' alla volta in background, conservando la posizione
   anche dopo un riavvio. I file già controllati e non cambiati vengono saltati;
-  *Riavvia da capo* ricontrolla tutta la libreria. Dal rapporto puoi rimandare
+  *Riavvia da capo* ricontrolla tutta la libreria. I file 4K usano il controllo
+  veloce (attivo di default): il file viene letto tutto ma si decodificano solo i
+  fotogrammi chiave, così una puntata 4K richiede minuti invece di un'ora e i
+  file troncati o illeggibili vengono comunque trovati. Dal rapporto puoi rimandare
   nei download una puntata
   danneggiata: la vecchia release va in blocklist e ne viene cercata una diversa.
 

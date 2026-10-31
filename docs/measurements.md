@@ -1178,6 +1178,16 @@ minimum 30 minutes, cap 6 hours). Measured on 31 October 2026, build 1.2.2137, w
 ffmpeg -nostdin -hide_banner -nostats -v error -i "<file>" -map '0:v?' -map '0:a?' -t 60 -f null -
 ```
 
+The quick check for 4K files (the default for 2160p) reads the whole file but decodes
+only the keyframes (`-skip_frame nokey`): the same 60 s slice took **4.3 s of wall
+time** (2.5 s CPU), **11.8× faster**, so the full episode needs about **6 minutes**
+instead of 73. Truncation and unreadable data are still found; a small defect between
+two keyframes can be missed. Measured on 31 October 2026, build 1.2.2138, with:
+
+```
+ffmpeg -nostdin -hide_banner -nostats -v error -skip_frame nokey -i "<file>" -map '0:v?' -map '0:a?' -t 60 -f null -
+```
+
 ### Packaging
 
 The release archive root is **0755** (`mktemp -d` made it 0700, which tar applied to the

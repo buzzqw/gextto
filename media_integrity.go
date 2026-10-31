@@ -55,6 +55,8 @@ const (
 	// mediaIntegrityVerifiedManifestSetting points to an external report of
 	// files already verified by another tool (the italian_audio_batch state).
 	mediaIntegrityVerifiedManifestSetting = "media_integrity_verified_manifest"
+	// mediaIntegrityQuick4KSetting switches the quick check for 4K files on.
+	mediaIntegrityQuick4KSetting = "media_integrity_quick_4k"
 )
 
 // mediaIntegrityPause lets the disk (and the rest of Gextto) breathe between
@@ -795,6 +797,21 @@ func mediaIntegrityEnabled(cfg *Config) bool {
 	return cfg != nil && settingTruthy(cfg.Settings["media_integrity_enabled"])
 }
 
+// mediaIntegrityQuick4K reports whether 4K files use the quick check: the whole
+// file is read and demuxed but only keyframes are decoded. It is on unless the
+// operator turns it off, because a full 4K decode on low-power hardware takes
+// longer than the library can wait.
+func mediaIntegrityQuick4K(cfg *Config) bool {
+	if cfg == nil {
+		return true
+	}
+	raw, ok := cfg.Settings[mediaIntegrityQuick4KSetting]
+	if !ok {
+		return true
+	}
+	return settingTruthy(raw)
+}
+
 // mediaIntegrityIntervalMinutes is the wait between two periodic passes.
 func mediaIntegrityIntervalMinutes(cfg *Config) int {
 	value := 60
@@ -967,24 +984,28 @@ func mediaIntegrityDecodeTimeoutFor(runtimeSeconds int64) time.Duration {
 	return timeout
 }
 
-// mediaIntegrityDecode decodes every stream of the file with ffmpeg without
-// writing anything, within the given bound. It reports "ok", "damaged",
-// "unreadable" or "canceled".
-func mediaIntegrityDecode(parent context.Context, file string, timeout time.Duration) (string, string) {
-	if parent == nil {
-		parent = context.Background()
-	}
-	if timeout <= 0 {
-		timeout = mediaIntegrityDecodeTimeout
-	}
-	ctx, cancel := context.WithTimeout(parent, timeout)
-	defer cancel()
-	command := exec.CommandContext(ctx, "ffmpeg",
+// mediaIntegrityUsesQuickDecode reports whether the file is checked without
+// decoding every frame: only 4K/UHD files, and only when the option is on.
+func mediaIntegrityUsesQuickDecode(enabled bool, info MediaInfo) bool {
+	return enabled && info.Resolution() == "2160p"
+}
+
+// mediaIntegrityDecodeArgs is the ffmpeg command line of the check. The quick
+// mode adds -skip_frame nokey before the input: the whole file is still read
+// and demuxed, but only keyframes are decoded, which is an order of magnitude
+// faster on 4K and still finds truncation and unreadable data.
+func mediaIntegrityDecodeArgs(file string, quick bool) []string {
+	args := []string{
 		"-nostdin",
 		"-hide_banner",
 		"-nostats",
 		"-v", "error",
 		"-protocol_whitelist", "file,pipe,data,crypto",
+	}
+	if quick {
+		args = append(args, "-skip_frame", "nokey")
+	}
+	return append(args,
 		"-i", file,
 		// Video and audio are decoded. Subtitle streams are not: the null
 		// muxer has no subtitle encoder, and copying them would read the whole
@@ -994,6 +1015,21 @@ func mediaIntegrityDecode(parent context.Context, file string, timeout time.Dura
 		"-f", "null",
 		"-",
 	)
+}
+
+// mediaIntegrityDecode decodes the file with ffmpeg without writing anything,
+// within the given bound. It reports "ok", "damaged", "unreadable" or
+// "canceled".
+func mediaIntegrityDecode(parent context.Context, file string, timeout time.Duration, quick bool) (string, string) {
+	if parent == nil {
+		parent = context.Background()
+	}
+	if timeout <= 0 {
+		timeout = mediaIntegrityDecodeTimeout
+	}
+	ctx, cancel := context.WithTimeout(parent, timeout)
+	defer cancel()
+	command := exec.CommandContext(ctx, "ffmpeg", mediaIntegrityDecodeArgs(file, quick)...)
 	stderr := &mediaIntegrityLimitedBuffer{limit: 64 * 1024}
 	command.Stderr = stderr
 	err := command.Run()
@@ -1020,8 +1056,9 @@ func mediaIntegrityDecode(parent context.Context, file string, timeout time.Dura
 }
 
 // mediaIntegrityCheckPath validates the container with ffprobe and then decodes
-// the file with ffmpeg.
-func mediaIntegrityCheckPath(ctx context.Context, path string) (string, string) {
+// the file with ffmpeg. When the quick check is on, a 4K file is read end to end
+// but only its keyframes are decoded.
+func mediaIntegrityCheckPath(ctx context.Context, path string, quick4K bool) (string, string) {
 	file, err := mediaIntegrityResolveFile(path)
 	if err != nil {
 		return "unreadable", err.Error()
@@ -1036,7 +1073,8 @@ func mediaIntegrityCheckPath(ctx context.Context, path string) (string, string) 
 	if ctx != nil && ctx.Err() != nil {
 		return "canceled", ""
 	}
-	return mediaIntegrityDecode(ctx, file, mediaIntegrityDecodeTimeoutFor(info.RuntimeSeconds))
+	quick := mediaIntegrityUsesQuickDecode(quick4K, info)
+	return mediaIntegrityDecode(ctx, file, mediaIntegrityDecodeTimeoutFor(info.RuntimeSeconds), quick)
 }
 
 // ---------------------------------------------------------------------------
@@ -1201,6 +1239,7 @@ func runMediaIntegrityScan(ctx context.Context, s *AppState, jobID string, limit
 	}
 	startedAt := time.Now()
 	checkedThisRun := 0
+	quick4K := mediaIntegrityQuick4K(latestConfig(s))
 	for {
 		if ctx.Err() != nil {
 			break
@@ -1222,7 +1261,7 @@ func runMediaIntegrityScan(ctx context.Context, s *AppState, jobID string, limit
 		if jobID != "" && state.Total > 0 {
 			s.jobs.SetProgress(jobID, float64(state.Checked)/float64(state.Total), target.Label())
 		}
-		status, detail := mediaIntegrityCheckPath(ctx, target.Path)
+		status, detail := mediaIntegrityCheckPath(ctx, target.Path, quick4K)
 		if ctx.Err() != nil || status == "canceled" {
 			break
 		}

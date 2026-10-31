@@ -369,7 +369,9 @@ in `ui_state` and the size and modification time of every checked file in
 `media_integrity`, so it resumes after a restart and skips the files already checked and
 unchanged; only new, replaced and never-checked files are probed again, unless the operator
 asks for a full pass. An external report (the `italian_audio_batch` state) can mark files
-already verified packet by packet as checked. A damaged episode can be sent back to the
+already verified packet by packet as checked. 4K files use a quick check by default: the
+whole file is read and demuxed but only the keyframes are decoded, which is an order of
+magnitude faster and still finds truncation and unreadable data. A damaged episode can be sent back to the
 downloads from the report: the old release is blocklisted and the gap search asks for a
 different one. The Maintenance panel shows progress and findings; `ffprobe` and `ffmpeg`
 are required.

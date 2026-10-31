@@ -292,6 +292,7 @@ var uiSettingsIndex = []uiSettingDef{
 	{Key: "media_integrity_enabled", Label: "Controllo integrità file automatico", Tab: "maintenance", Group: "Controllo integrità file"},
 	{Key: "media_integrity_interval_minutes", Label: "Controllo integrità — intervallo", Tab: "maintenance", Group: "Controllo integrità file"},
 	{Key: "media_integrity_batch", Label: "Controllo integrità — file per volta", Tab: "maintenance", Group: "Controllo integrità file"},
+	{Key: "media_integrity_quick_4k", Label: "Controllo integrità — controllo veloce dei file 4K", Tab: "maintenance", Group: "Controllo integrità file"},
 	{Key: "temp_orphan_cleanup_enabled", Label: "Sposta nel cestino i dati orfani della cartella temporanea", Tab: "maintenance", Group: "File orfani"},
 	{Key: "temp_orphan_min_age_days", Label: "Dati orfani — fermi da almeno", Tab: "maintenance", Group: "File orfani"},
 

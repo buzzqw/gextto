@@ -6138,6 +6138,8 @@ pol:
   "Controllo integrità file automatico": "Automatyczne sprawdzanie integralności plików"
   "Controllo integrità — intervallo": "Sprawdzanie integralności — interwał"
   "Controllo integrità — file per volta": "Sprawdzanie integralności — pliki na przebieg"
+  "Controllo integrità — controllo veloce dei file 4K": "Sprawdzanie integralności — szybkie sprawdzanie plików 4K"
+  "Per i file 4K legge tutto il file ma decodifica solo i fotogrammi chiave: il controllo è molto più veloce e trova comunque i file troncati o illeggibili, ma può non vedere un piccolo danno tra un fotogramma chiave e l'altro.": "W plikach 4K odczytuje cały plik, ale dekoduje tylko klatki kluczowe: sprawdzanie jest znacznie szybsze i nadal znajduje obcięte lub nieczytelne pliki, ale może nie zauważyć drobnego uszkodzenia między jedną klatką kluczową a drugą."
   "File già verificati": "Pliki już zweryfikowane"
   "Analizza periodicamente con ffprobe e ffmpeg i file della libreria, un file alla volta, per trovare quelli danneggiati.": "Okresowo analizuje pliki biblioteki za pomocą ffprobe i ffmpeg, po jednym pliku, aby znaleźć uszkodzone."
   "Minuti tra due passaggi del controllo integrità.": "Minuty między dwoma przebiegami sprawdzania integralności."

@@ -51,17 +51,17 @@ func TestMediaIntegrityCheckPath(t *testing.T) {
 		}
 	}
 
-	if status, detail := mediaIntegrityCheckPath(context.Background(), good); status != "ok" {
+	if status, detail := mediaIntegrityCheckPath(context.Background(), good, false); status != "ok" {
 		t.Fatalf("good file = %q (%s), want ok", status, detail)
 	}
-	status, detail := mediaIntegrityCheckPath(context.Background(), bad)
+	status, detail := mediaIntegrityCheckPath(context.Background(), bad, false)
 	if status != "damaged" {
 		t.Fatalf("bad file = %q, want damaged", status)
 	}
 	if !strings.Contains(detail, "Invalid data") {
 		t.Fatalf("detail = %q, want the ffmpeg message", detail)
 	}
-	if status, _ := mediaIntegrityCheckPath(context.Background(), filepath.Join(dir, "missing.mkv")); status != "unreadable" {
+	if status, _ := mediaIntegrityCheckPath(context.Background(), filepath.Join(dir, "missing.mkv"), false); status != "unreadable" {
 		t.Fatalf("missing file = %q, want unreadable", status)
 	}
 }
@@ -405,13 +405,55 @@ func TestMediaIntegrityDecodeTimeoutGrowsWithTheRuntime(t *testing.T) {
 	}
 }
 
+func TestMediaIntegrityQuickDecodeArgs(t *testing.T) {
+	quick := strings.Join(mediaIntegrityDecodeArgs("/media/movie.mkv", true), " ")
+	full := strings.Join(mediaIntegrityDecodeArgs("/media/movie.mkv", false), " ")
+	if !strings.Contains(quick, "-skip_frame nokey -i /media/movie.mkv") {
+		t.Fatalf("quick args do not skip non-key frames before the input: %s", quick)
+	}
+	if strings.Contains(full, "-skip_frame") {
+		t.Fatalf("the full check must decode every frame: %s", full)
+	}
+	if !strings.Contains(full, "-map 0:v? -map 0:a? -f null -") {
+		t.Fatalf("full args changed shape: %s", full)
+	}
+}
+
+func TestMediaIntegrityQuickCheckOnlyFor4K(t *testing.T) {
+	uhd := MediaInfo{Width: 3840, Height: 1606}
+	hd := MediaInfo{Width: 1920, Height: 1080}
+	if !mediaIntegrityUsesQuickDecode(true, uhd) {
+		t.Fatal("a 4K file must use the quick check when the option is on")
+	}
+	if mediaIntegrityUsesQuickDecode(true, hd) {
+		t.Fatal("a 1080p file must keep the full decode")
+	}
+	if mediaIntegrityUsesQuickDecode(false, uhd) {
+		t.Fatal("the quick check must be off when the option is off")
+	}
+}
+
+func TestMediaIntegrityQuick4KIsOnByDefault(t *testing.T) {
+	if !mediaIntegrityQuick4K(nil) {
+		t.Fatal("the quick 4K check must be on by default")
+	}
+	on := &Config{Settings: map[string]string{mediaIntegrityQuick4KSetting: "true"}}
+	if !mediaIntegrityQuick4K(on) {
+		t.Fatal("the quick 4K check must read a saved true")
+	}
+	off := &Config{Settings: map[string]string{mediaIntegrityQuick4KSetting: "false"}}
+	if mediaIntegrityQuick4K(off) {
+		t.Fatal("the quick 4K check must read a saved false")
+	}
+}
+
 func TestMediaIntegrityDecodeReportsATimeoutAsUnreadable(t *testing.T) {
 	miInstallFakeMediaTools(t, "#!/bin/sh\nexec /bin/sleep 5\n")
 	file := filepath.Join(t.TempDir(), "slow.mkv")
 	if err := os.WriteFile(file, []byte("data"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	status, detail := mediaIntegrityDecode(context.Background(), file, 100*time.Millisecond)
+	status, detail := mediaIntegrityDecode(context.Background(), file, 100*time.Millisecond, false)
 	if status != "unreadable" {
 		t.Fatalf("timeout = %q (%s), want unreadable", status, detail)
 	}

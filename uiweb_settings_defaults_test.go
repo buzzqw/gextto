@@ -43,6 +43,7 @@ var uiSettingBackendDefaults = map[string]func(*Config) string{
 	"delay_bypass_score":           func(c *Config) string { return strconv.FormatInt(c.DelayBypassScore(), 10) },
 	"debug_enabled":                func(c *Config) string { return strconv.FormatBool(c.DebugEnabled()) },
 	"max_release_age_days":         func(c *Config) string { return strconv.FormatInt(c.MaxReleaseAgeDays, 10) },
+	"media_integrity_quick_4k":     func(c *Config) string { return strconv.FormatBool(mediaIntegrityQuick4K(c)) },
 }
 
 // TestDefaultTransferSettingsMatchLoader proves the fallbacks loadConfigDB

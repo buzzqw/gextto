@@ -1600,7 +1600,10 @@ L'elenco completo delle azioni e dei parametri è nell'[Appendice C](#appendice-
   decodifica cresce con la durata del file, così un 4K lungo su un computer
   modesto non viene scambiato per un file rotto; un file che non si riesce
   comunque a leggere non è dato per danneggiato e viene ritentato in un
-  passaggio successivo. In
+  passaggio successivo. Per i file 4K il controllo è veloce: legge tutto il file
+  ma decodifica solo i fotogrammi chiave, così trova comunque i file troncati o
+  illeggibili senza impiegare ore (si spegne in *Configurazione → Manutenzione →
+  Controllo integrità file*). In
   *Manutenzione* il pannello mostra avanzamento ed elenco dei file danneggiati o
   illeggibili, con i due conteggi separati e il motivo riportato da `ffmpeg`;
   **Controlla ora** avvia subito un passaggio e **Riavvia da capo** ricontrolla
@@ -2657,6 +2660,7 @@ spazio del `tmpfs`, come prima.
 | Controllo integrità file automatico | Verifica periodicamente con `ffprobe` e `ffmpeg` i file della libreria, un file alla volta, per trovare quelli danneggiati. |
 | Controllo integrità — intervallo | Minuti tra due passaggi del controllo. Compare solo con «Controllo integrità file automatico» attivo. |
 | Controllo integrità — file per volta | Numero massimo di file verificati in ogni passaggio. |
+| Controllo integrità — controllo veloce dei file 4K | Per i file 4K legge tutto il file ma decodifica solo i fotogrammi chiave: il controllo è molto più veloce e trova comunque i file troncati o illeggibili, ma può non vedere un piccolo danno tra un fotogramma chiave e l'altro. È attivo di default. |
 
 **File orfani**
 

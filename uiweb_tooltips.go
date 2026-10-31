@@ -90,6 +90,7 @@ var uiSettingTooltipText = map[string]string{
 	"media_integrity_enabled":              "Analizza periodicamente con ffprobe e ffmpeg i file della libreria, un file alla volta, per trovare quelli danneggiati.",
 	"media_integrity_interval_minutes":     "Minuti tra due passaggi del controllo integrità.",
 	"media_integrity_batch":                "Numero massimo di file verificati in ogni passaggio del controllo integrità.",
+	"media_integrity_quick_4k":             "Per i file 4K legge tutto il file ma decodifica solo i fotogrammi chiave: il controllo è molto più veloce e trova comunque i file troncati o illeggibili, ma può non vedere un piccolo danno tra un fotogramma chiave e l'altro.",
 	"notify_telegram":                      "Invia le notifiche su Telegram.",
 	"telegram_bot_token":                   "Token del bot Telegram (da @BotFather).",
 	"telegram_chat_id":                     "ID della chat/canale dove inviare le notifiche.",
