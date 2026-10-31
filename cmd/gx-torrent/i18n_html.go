@@ -125,6 +125,35 @@ func uiTranslateHTML(raw string, dict map[string]string) string {
 	return out.String()
 }
 
+// uiLanguageNames lists the interface languages with their endonyms, in the
+// order the selectors show them. It is shared by the wizard, the settings page
+// and the sidebar picker, so a new language is added in one place.
+var uiLanguageNames = []struct{ Code, Name string }{
+	{"en", "English"}, {"it", "Italiano"}, {"de", "Deutsch"},
+	{"fr", "Français"}, {"es", "Español"}, {"pl", "Polski"},
+}
+
+// uiLangChoice is one entry of the sidebar's language picker (standalone).
+type uiLangChoice struct {
+	Code     string
+	Name     string
+	Selected bool
+}
+
+// uiLanguageChoices returns the language picker entries for the page, the one
+// in use marked. Empty or unknown means English, like uiLang.
+func uiLanguageChoices(current string) []uiLangChoice {
+	current = strings.ToLower(strings.TrimSpace(current))
+	if !validStandaloneLang(current) {
+		current = "en"
+	}
+	out := make([]uiLangChoice, 0, len(uiLanguageNames))
+	for _, item := range uiLanguageNames {
+		out = append(out, uiLangChoice{Code: item.Code, Name: item.Name, Selected: item.Code == current})
+	}
+	return out
+}
+
 // uiLang is the language for one request: a valid ?lang= wins, otherwise the
 // standalone settings (live, so the wizard applies at once), otherwise the
 // daemon's configured language (empty or unknown means English).

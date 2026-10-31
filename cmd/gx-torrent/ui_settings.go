@@ -28,6 +28,30 @@ import (
 	"github.com/buzzqw/gextto/internal/webui/assets"
 )
 
+// handleUILang saves the interface language chosen from the sidebar picker of
+// the main page (standalone). It writes the same setting as the settings page;
+// the page is translated on every request from the store, so the redirect lands
+// already in the new language.
+func (d *Daemon) handleUILang(w http.ResponseWriter, r *http.Request) {
+	if d.opts.Mode != ModeStandalone || d.opts.Settings == nil {
+		http.NotFound(w, r)
+		return
+	}
+	if !d.uiAuthorized(w, r) || !d.uiSameOrigin(w, r) {
+		return
+	}
+	_ = r.ParseForm()
+	lang := strings.ToLower(strings.TrimSpace(r.FormValue("lang")))
+	var err error
+	if !validStandaloneLang(lang) {
+		err = fmt.Errorf("unknown language: %q", r.FormValue("lang"))
+	} else {
+		d.opts.Settings.Set("lang", lang)
+		err = d.opts.Settings.Save()
+	}
+	d.uiDone(w, r, "Language changed", err)
+}
+
 // uiSettingsPath is the standalone settings page.
 const uiSettingsPath = "/ui/settings"
 
@@ -232,6 +256,11 @@ func (d *Daemon) handleUISettings(w http.ResponseWriter, r *http.Request) {
 		"notify-url", "lang", notifyWebhookTokenKey, notifyWebhookUserKey,
 		notifyTelegramTokenKey, notifyTelegramChatKey, notifyEmailSMTPKey,
 		notifyEmailFromKey, notifyEmailToKey,
+		notifyDiscordURLKey, notifySlackURLKey, notifyGotifyURLKey,
+		notifyGotifyTokenKey, notifyNtfyURLKey, notifyNtfyTopicKey,
+		notifyNtfyTokenKey, notifyPushoverTokenKey, notifyPushoverUserKey,
+		notifyAppriseURLKey, notifyAppriseKeyKey, notifyScriptKey,
+		notifyScriptArgsKey,
 	} {
 		store.Set(key, strings.TrimSpace(r.FormValue(key)))
 	}
@@ -460,17 +489,13 @@ func contentLayoutOptions(selected string) string {
 // languageOptions renders the UI language select with the endonyms.
 func languageOptions(selected string) string {
 	selected = strings.ToLower(strings.TrimSpace(selected))
-	names := []struct{ code, name string }{
-		{"en", "English"}, {"it", "Italiano"}, {"de", "Deutsch"},
-		{"fr", "Français"}, {"es", "Español"}, {"pl", "Polski"},
-	}
 	var b strings.Builder
-	for _, item := range names {
+	for _, item := range uiLanguageNames {
 		mark := ""
-		if item.code == selected || (selected == "" && item.code == "en") {
+		if item.Code == selected || (selected == "" && item.Code == "en") {
 			mark = " selected"
 		}
-		b.WriteString(`<option value="` + item.code + `"` + mark + `>` + item.name + `</option>`)
+		b.WriteString(`<option value="` + item.Code + `"` + mark + `>` + html.EscapeString(item.Name) + `</option>`)
 	}
 	return b.String()
 }
@@ -660,6 +685,19 @@ func (d *Daemon) renderSettings(w http.ResponseWriter, r *http.Request, errKey s
 	repl("{{NOTIFY_FROM}}", get(notifyEmailFromKey))
 	repl("{{NOTIFY_TO}}", get(notifyEmailToKey))
 	repl("{{NOTIFY_PASSWORD}}", get(notifyEmailPasswordKey))
+	repl("{{NOTIFY_DISCORD_URL}}", get(notifyDiscordURLKey))
+	repl("{{NOTIFY_SLACK_URL}}", get(notifySlackURLKey))
+	repl("{{NOTIFY_GOTIFY_URL}}", get(notifyGotifyURLKey))
+	repl("{{NOTIFY_GOTIFY_TOKEN}}", get(notifyGotifyTokenKey))
+	repl("{{NOTIFY_NTFY_URL}}", get(notifyNtfyURLKey))
+	repl("{{NOTIFY_NTFY_TOPIC}}", get(notifyNtfyTopicKey))
+	repl("{{NOTIFY_NTFY_TOKEN}}", get(notifyNtfyTokenKey))
+	repl("{{NOTIFY_PUSHOVER_TOKEN}}", get(notifyPushoverTokenKey))
+	repl("{{NOTIFY_PUSHOVER_USER}}", get(notifyPushoverUserKey))
+	repl("{{NOTIFY_APPRISE_URL}}", get(notifyAppriseURLKey))
+	repl("{{NOTIFY_APPRISE_KEY}}", get(notifyAppriseKeyKey))
+	repl("{{NOTIFY_SCRIPT}}", get(notifyScriptKey))
+	repl("{{NOTIFY_SCRIPT_ARGS}}", get(notifyScriptArgsKey))
 	repl("{{NOTIFY_ON_COMPLETE}}", checkedIf(d.notifyEventOn("download_complete")))
 	repl("{{NOTIFY_ON_MATCH}}", checkedIf(d.notifyEventOn("feed_match")))
 	repl("{{NOTIFY_ON_ERROR}}", checkedIf(d.notifyEventOn("feed_error")))

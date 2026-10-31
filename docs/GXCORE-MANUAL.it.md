@@ -42,7 +42,10 @@ alto mostra il traffico; in basso ci sono i comandi globali.
   tag, pausa, sequenziale, primo/ultimo pezzo, limiti e content layout.
 - **Pausa tutto / Riprendi tutto** fermano o riavviano l’intera sessione.
 - Le colonne si scelgono e si ridimensionano; la scelta resta.
-- Il filtro laterale divide per stato, categoria, tag e tracker.
+- Il filtro laterale divide per stato, categoria, tag e tracker. In fondo alla
+  barra laterale c’è la **lingua** dell’interfaccia (English, Italiano,
+  Deutsch, Français, Español, Polski): si cambia da lì, la pagina si ricarica
+  già tradotta e la scelta resta salvata come quella nelle impostazioni.
 - Il menu contestuale ha coda, limiti, sposta, rinomina, verifica, reannounce,
   super-seeding e rimozione.
 
@@ -133,11 +136,14 @@ sempre, disco e cache, rete, coda e torrent più attivi.
 
 ![Statistiche](screenshots/gx-core/it/stats.png)
 
-**Impostazioni** raccoglie cartelle, watch folder, rete, protocolli, coda,
-bandwidth e scheduler per giorno, limiti di seed, velocità automatica
-(autotune, che misura la linea e regola download e upload), DLNA, notifiche,
-categorie, profili di qualità, azioni a fine download, manutenzione e
-aggiornamento.
+**Impostazioni** è divisa in sette schede — **Cartelle e file**, **Rete**,
+**Banda**, **Coda**, **Libreria**, **Interfaccia** e **Sistema** — così ogni
+gruppo di opzioni si apre da solo invece di scorrere un unico elenco lungo:
+cartelle e azioni a fine download, rete e protocolli, limiti di velocità e
+scheduler per giorno, coda e cache, categorie e profili di qualità con DLNA,
+lingua e notifiche, manutenzione e aggiornamento. La ricerca in alto cerca in
+tutte le schede insieme; il pulsante **Salva** resta in fondo e salva comunque
+tutta la pagina, anche i gruppi delle schede chiuse.
 
 ![Impostazioni](screenshots/gx-core/it/settings.png)
 

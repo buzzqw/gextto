@@ -52,7 +52,18 @@ h3.sub{margin:14px 0 2px;font-size:13px;color:var(--subtle);text-transform:upper
   <input type="search" id="settings-filter" placeholder="Filter settings…" autocomplete="off" aria-label="Filter settings" title="Show only the sections mentioning this text" style="max-width:340px">
   <span class="muted" id="settings-filter-info" aria-live="polite"></span>
 </div>
-<form method="post" action="/ui/settings">
+<!--ERROR-->
+<div class="tabbar settings-tabs" role="tablist" aria-label="Settings sections" hidden>
+  <button type="button" role="tab" id="tab-folders" aria-controls="p-folders" aria-selected="true" tabindex="0" data-tab="folders" title="Download folders, completion actions, watch folders and cookies">Folders &amp; files</button>
+  <button type="button" role="tab" id="tab-network" aria-controls="p-network" aria-selected="false" tabindex="-1" data-tab="network" title="Listen address, ports, proxy, IP filter and protocols">Network</button>
+  <button type="button" role="tab" id="tab-bandwidth" aria-controls="p-bandwidth" aria-selected="false" tabindex="-1" data-tab="bandwidth" title="Speed limits, scheduler, seeding limits and the one-click optimization">Bandwidth</button>
+  <button type="button" role="tab" id="tab-queue" aria-controls="p-queue" aria-selected="false" tabindex="-1" data-tab="queue" title="Active torrents, peer caps, disk cache and the free-space guard">Queue</button>
+  <button type="button" role="tab" id="tab-library" aria-controls="p-library-settings p-library" aria-selected="false" tabindex="-1" data-tab="library" title="Series metadata, categories, quality profiles and the media server">Library</button>
+  <button type="button" role="tab" id="tab-interface" aria-controls="p-interface" aria-selected="false" tabindex="-1" data-tab="interface" title="Language, web interface and notifications">Interface</button>
+  <button type="button" role="tab" id="tab-system" aria-controls="p-system" aria-selected="false" tabindex="-1" data-tab="system" title="Updates and the archive database">System</button>
+</div>
+<form method="post" action="/ui/settings" id="settings-form">
+<section class="tabpanel" id="p-folders" role="tabpanel" aria-labelledby="tab-folders" tabindex="0">
 <fieldset>
   <legend>Folders</legend>
   <div class="grid">
@@ -63,12 +74,6 @@ h3.sub{margin:14px 0 2px;font-size:13px;color:var(--subtle);text-transform:upper
     <label>Content layout<select name="content-layout" title="How the files of a new torrent are placed in its folder: as in the torrent, always inside a folder of their own, or straight in the download folder without the torrent's root folder (qBittorrent content layout)">{{LAYOUT_OPTIONS}}</select></label>
     <label class="chk"><input type="checkbox" name="auto-tmm-enabled" value="1"{{AUTO_TMM_ON}} title="New torrents follow their category's save path by default; assigning a category moves them (qBittorrent automatic torrent management, off by default)"> New torrents follow their category's folder (autoTMM)</label>
   </div>
-</fieldset>
-<fieldset id="series-metadata">
-  <legend>Series and movies</legend>
-  <input type="hidden" name="metadata-form" value="1">
-  <label class="chk"><input type="checkbox" name="metadata-episodes" value="1"{{METADATA_EPISODES_ON}} title="Ask TVmaze for the complete episode list of each series, so missing episodes are known even if no release ever appeared in the feeds. The series title is sent to api.tvmaze.com."> Use TVmaze for the real episode list</label>
-  <p class="muted">The public TVmaze API needs no key. It tells gx-torrent which episodes exist and when they aired, so a series is not limited to what the feeds happened to show. Turn it off to keep the title on this machine only.</p>
 </fieldset>
 <fieldset id="after-download">
   <legend>After download</legend>
@@ -85,16 +90,8 @@ h3.sub{margin:14px 0 2px;font-size:13px;color:var(--subtle);text-transform:upper
   <legend>Cookies</legend>
   <label>Cookies sent when fetching .torrent files and metadata (JSON array)<textarea name="cookies" rows="4" spellcheck="false" autocomplete="off" title="A JSON array of cookie objects, sent when the daemon fetches .torrent files and metadata over HTTP (private trackers); the same shape as the qBittorrent cookie API. Each entry has name, value, domain and path. Empty means no cookies.">{{COOKIES}}</textarea></label>
 </fieldset>
-<fieldset>
-  <legend>Web interface</legend>
-  <label class="chk"><input type="checkbox" name="webui-alternative" value="1"{{ALT_WEBUI_ON}} title="Serve a downloaded VueTorrent at the root address; the standard interface stays available at /ui"> Use the alternative web interface (VueTorrent)</label>
-  <p class="muted" style="margin:0;font-size:12.5px"><span>Installed version</span>: {{ALT_WEBUI_VERSION}}</p>
-  <div class="actions">
-    <button type="button" class="secondary sm" data-formaction="/ui/webui-install" title="Download the latest VueTorrent release and install (or update) it here">Install or update VueTorrent</button>
-  </div>
-  <p class="muted" style="margin:0;font-size:12.5px">The standard interface is always available at <a href="/ui">/ui</a>.</p>
-  {{LOGOUT_FORM}}
-</fieldset>
+</section>
+<section class="tabpanel" id="p-network" role="tabpanel" aria-labelledby="tab-network" tabindex="0">
 <fieldset>
   <legend>Network</legend>
   <div class="grid">
@@ -142,6 +139,8 @@ h3.sub{margin:14px 0 2px;font-size:13px;color:var(--subtle);text-transform:upper
     <label class="chk"><input type="checkbox" name="dht-read-only" value="1"{{DHT_READONLY}} title="Run DHT in read-only mode without answering queries"> DHT read-only (BEP 43)</label>
   </div>
 </fieldset>
+</section>
+<section class="tabpanel" id="p-queue" role="tabpanel" aria-labelledby="tab-queue" tabindex="0">
 <fieldset>
   <legend>Queue and cache</legend>
   <div class="grid">
@@ -156,6 +155,14 @@ h3.sub{margin:14px 0 2px;font-size:13px;color:var(--subtle);text-transform:upper
     <label class="chk"><input type="checkbox" name="sequential" value="1"{{SEQUENTIAL}} title="Download torrent pieces in sequential order for media streaming preview"> Download in sequential order</label>
   </div>
 </fieldset>
+</section>
+<section class="tabpanel" id="p-library-settings" role="tabpanel" aria-labelledby="tab-library" tabindex="0">
+<fieldset id="series-metadata">
+  <legend>Series and movies</legend>
+  <input type="hidden" name="metadata-form" value="1">
+  <label class="chk"><input type="checkbox" name="metadata-episodes" value="1"{{METADATA_EPISODES_ON}} title="Ask TVmaze for the complete episode list of each series, so missing episodes are known even if no release ever appeared in the feeds. The series title is sent to api.tvmaze.com."> Use TVmaze for the real episode list</label>
+  <p class="muted">The public TVmaze API needs no key. It tells gx-torrent which episodes exist and when they aired, so a series is not limited to what the feeds happened to show. Turn it off to keep the title on this machine only.</p>
+</fieldset>
 <fieldset>
   <legend>Media server (DLNA)</legend>
   <div class="grid">
@@ -167,6 +174,8 @@ h3.sub{margin:14px 0 2px;font-size:13px;color:var(--subtle);text-transform:upper
   <p class="muted" id="dlna-folders-help">Any number of folders, one per line: each one appears to the players as a browsable folder beside the torrents. Add folder… appends the chosen folder to the list; Download folder adds the one configured above. To remove one, delete its line.</p>
   <p class="muted" role="status">{{DLNA_STATUS}}</p>
 </fieldset>
+</section>
+<section class="tabpanel" id="p-bandwidth" role="tabpanel" aria-labelledby="tab-bandwidth" tabindex="0">
 <fieldset id="optimize">
   <legend>Optimization</legend>
   <p class="muted">One click puts the queue, the disk cache and the bandwidth on values that work well.</p>
@@ -229,13 +238,25 @@ h3.sub{margin:14px 0 2px;font-size:13px;color:var(--subtle);text-transform:upper
   <p class="muted">When the line queues, the round-trip latency rises: automatic speed lowers download and upload until it is responsive, then raises them again. A manual limit above stays the ceiling; 0 in a maximum lets it discover that direction.</p>
   <p class="muted"><span>Current latency / caps</span>: {{AUTOSPEED_STATUS}}</p>
 </fieldset>
+</section>
+<section class="tabpanel" id="p-interface" role="tabpanel" aria-labelledby="tab-interface" tabindex="0">
+<fieldset>
+  <legend>Web interface</legend>
+  <label class="chk"><input type="checkbox" name="webui-alternative" value="1"{{ALT_WEBUI_ON}} title="Serve a downloaded VueTorrent at the root address; the standard interface stays available at /ui"> Use the alternative web interface (VueTorrent)</label>
+  <p class="muted" style="margin:0;font-size:12.5px"><span>Installed version</span>: {{ALT_WEBUI_VERSION}}</p>
+  <div class="actions">
+    <button type="button" class="secondary sm" data-formaction="/ui/webui-install" title="Download the latest VueTorrent release and install (or update) it here">Install or update VueTorrent</button>
+  </div>
+  <p class="muted" style="margin:0;font-size:12.5px">The standard interface is always available at <a href="/ui">/ui</a>.</p>
+  {{LOGOUT_FORM}}
+</fieldset>
 <fieldset>
   <legend>Interface</legend>
   <label>Language<select name="lang" title="Web interface language">{{LANG_OPTIONS}}</select></label>
 </fieldset>
 <fieldset id="notifications">
   <legend>Notifications</legend>
-  <p class="muted">The same channels as Gextto: fill in the ones you use, leave the others empty. Every filled channel receives every enabled event.</p>
+  <p class="muted">The same channels as Gextto and indexarr: fill in the ones you use, leave the others empty. Every filled channel receives every enabled event.</p>
   <div class="days" role="group" aria-labelledby="notify-events-label">
     <span id="notify-events-label" class="days-label">Events</span>
     <label class="chk"><input type="checkbox" name="notify-on-complete" value="1"{{NOTIFY_ON_COMPLETE}} title="Notify when a download finishes"> Download complete</label>
@@ -254,6 +275,35 @@ h3.sub{margin:14px 0 2px;font-size:13px;color:var(--subtle);text-transform:upper
     <label>Webhook token<input type="password" name="notify-webhook-token" value="{{NOTIFY_WH_TOKEN}}" autocomplete="off" title="Credential of the service: ntfy access token, Gotify application key or Pushover application token"></label>
     <label>Pushover user key<input type="text" name="notify-webhook-user" value="{{NOTIFY_WH_USER}}" autocomplete="off" title="Your Pushover user key (Pushover format only)"></label>
   </div>
+  <h3 class="sub">Discord</h3>
+  <div class="grid">
+    <label>Discord webhook URL<input type="text" name="notify-discord-url" value="{{NOTIFY_DISCORD_URL}}" autocomplete="off" title="Incoming webhook URL of the Discord channel the notifications are posted to"></label>
+  </div>
+  <h3 class="sub">Slack</h3>
+  <div class="grid">
+    <label>Slack webhook URL<input type="text" name="notify-slack-url" value="{{NOTIFY_SLACK_URL}}" autocomplete="off" title="Incoming webhook URL of the Slack channel the notifications are posted to"></label>
+  </div>
+  <h3 class="sub">Gotify</h3>
+  <div class="grid">
+    <label>Gotify server URL<input type="text" name="notify-gotify-url" value="{{NOTIFY_GOTIFY_URL}}" autocomplete="off" title="Address of the Gotify server, for example https://gotify.example.com: notifications are posted to /message"></label>
+    <label>Gotify app token<input type="password" name="notify-gotify-token" value="{{NOTIFY_GOTIFY_TOKEN}}" autocomplete="off" title="Token of the Gotify application that receives the notifications"></label>
+  </div>
+  <h3 class="sub">ntfy</h3>
+  <div class="grid">
+    <label>ntfy server URL<input type="text" name="notify-ntfy-url" value="{{NOTIFY_NTFY_URL}}" autocomplete="off" title="Address of the ntfy server; use https://ntfy.sh for the public one"></label>
+    <label>ntfy topic<input type="text" name="notify-ntfy-topic" value="{{NOTIFY_NTFY_TOPIC}}" autocomplete="off" title="Topic that receives the message: choose a name that is hard to guess when the server is public"></label>
+    <label>ntfy access token<input type="password" name="notify-ntfy-token" value="{{NOTIFY_NTFY_TOKEN}}" autocomplete="off" title="Optional token for a protected topic; leave it empty for a public one"></label>
+  </div>
+  <h3 class="sub">Pushover</h3>
+  <div class="grid">
+    <label>Pushover application token<input type="password" name="notify-pushover-token" value="{{NOTIFY_PUSHOVER_TOKEN}}" autocomplete="off" title="Token of your Pushover application"></label>
+    <label>Pushover user key<input type="text" name="notify-pushover-user" value="{{NOTIFY_PUSHOVER_USER}}" autocomplete="off" title="Your Pushover user or group key"></label>
+  </div>
+  <h3 class="sub">Apprise</h3>
+  <div class="grid">
+    <label>Apprise API URL<input type="text" name="notify-apprise-url" value="{{NOTIFY_APPRISE_URL}}" autocomplete="off" title="Address of an Apprise API server, for example http://192.168.1.10:8000: notifications are posted to /notify and it forwards them to the services configured there"></label>
+    <label>Apprise key<input type="password" name="notify-apprise-key" value="{{NOTIFY_APPRISE_KEY}}" autocomplete="off" title="Optional key of one Apprise configuration; leave it empty to use the default one"></label>
+  </div>
   <h3 class="sub">E-mail</h3>
   <div class="grid">
     <label>SMTP server (host:port)<input type="text" name="notify-email-smtp" value="{{NOTIFY_SMTP}}" autocomplete="off" placeholder="smtp.example.com:587" title="Mail server and port; STARTTLS is used when the server offers it"></label>
@@ -261,9 +311,16 @@ h3.sub{margin:14px 0 2px;font-size:13px;color:var(--subtle);text-transform:upper
     <label>To (comma separated)<input type="text" name="notify-email-to" value="{{NOTIFY_TO}}" autocomplete="off" title="Recipients of the notifications, separated by commas"></label>
     <label>SMTP password<input type="password" name="notify-email-password" value="{{NOTIFY_PASSWORD}}" autocomplete="new-password" title="Password of the sender account on the SMTP server"></label>
   </div>
+  <h3 class="sub">Custom script</h3>
+  <div class="grid">
+    <label>Script path<input type="text" name="notify-script" value="{{NOTIFY_SCRIPT}}" autocomplete="off" placeholder="/usr/local/bin/gx-torrent-notify" title="Executable run on this machine for every event, for example /usr/local/bin/gx-torrent-notify"></label>
+    <label>Script arguments<input type="text" name="notify-script-args" value="{{NOTIFY_SCRIPT_ARGS}}" autocomplete="off" title="Optional arguments separated by spaces; quotes keep a value with spaces together. The event travels in the GX_TORRENT_* variables: app, event, title and message"></label>
+  </div>
   <div class="actions"><button type="button" class="secondary sm" id="notify-test" title="Send a test notification with the saved channels">Send test</button></div>
   <p class="muted" id="notify-test-result" role="status" aria-live="polite"></p>
 </fieldset>
+</section>
+<section class="tabpanel" id="p-system" role="tabpanel" aria-labelledby="tab-system" tabindex="0">
 <fieldset id="maintenance">
   <legend>Maintenance</legend>
   <label class="chk"><input type="checkbox" name="update-check" value="1"{{UPDATE_CHECK}} title="Look for a new version of gx-torrent on a timer; nothing is installed without your click"> Check for updates automatically</label>
@@ -281,9 +338,10 @@ h3.sub{margin:14px 0 2px;font-size:13px;color:var(--subtle);text-transform:upper
   </div>
   <p class="muted" id="archive-maint-result" role="status" aria-live="polite"></p>
 </fieldset>
-<div class="savebar"><button type="submit" class="primary" title="Save settings to settings.json">Save</button></div>
-<!--ERROR-->
+</section>
+<div class="savebar" id="settings-savebar"><button type="submit" class="primary" title="Save settings to settings.json">Save</button></div>
 </form>
+<section class="tabpanel" id="p-library" role="tabpanel" aria-labelledby="tab-library" tabindex="0">
 <fieldset id="categories">
   <legend>Categories</legend>
   <p class="muted">A category can have its own folder. When a torrent is assigned to it with automatic management on, the torrent moves to that folder; with a category created from the torrent dialog the folder starts empty, so set it here.</p>
@@ -329,6 +387,7 @@ h3.sub{margin:14px 0 2px;font-size:13px;color:var(--subtle);text-transform:upper
     <div><button type="submit" class="primary sm" title="Create this quality profile">Add profile</button></div>
   </form>
 </fieldset>
+</section>
 <!--UPDATE_NOTES-->
 </main>
 <dialog id="browse-overlay" class="picker" data-browse-endpoint="/ui/browse-dir" aria-label="Choose an existing folder on the server">
@@ -405,25 +464,109 @@ Array.prototype.forEach.call(document.querySelectorAll('[data-formaction]'), fun
     form.setAttribute('action', originalAction);
   });
 });
-// Section filter: with many sections, typing narrows the page to the ones
-// mentioning the text (legend, labels, help). A section with a match stays
-// whole, so nothing saves half-hidden: the form still posts every field.
+// Settings sections: one tab per group, so the page opens on a short list of
+// choices instead of every field at once. Without JavaScript the tab bar stays
+// hidden and every section is visible, as before. Hidden panels still post
+// their fields, so Save stores the whole page whichever tab is open.
 (function () {
+  var GROUPS = {
+    folders: ['p-folders'],
+    network: ['p-network'],
+    bandwidth: ['p-bandwidth'],
+    queue: ['p-queue'],
+    library: ['p-library-settings', 'p-library'],
+    interface: ['p-interface'],
+    system: ['p-system']
+  };
+  var ORDER = ['folders', 'network', 'bandwidth', 'queue', 'library', 'interface', 'system'];
+  var bar = document.querySelector('.settings-tabs');
+  var form = document.getElementById('settings-form');
+  var savebar = document.getElementById('settings-savebar');
   var box = document.getElementById('settings-filter');
   var info = document.getElementById('settings-filter-info');
-  if (!box) return;
+  if (!bar) return;
   var t = function (s) { return (window.__uiI18n && window.__uiI18n[s]) || s; };
-  function apply() {
+  var active = 'folders';
+  function panel(id) { return document.getElementById(id); }
+  function fieldsets() {
+    return Array.prototype.slice.call(document.querySelectorAll('[role=tabpanel] fieldset'));
+  }
+  function showTab(name, focus) {
+    if (ORDER.indexOf(name) < 0) name = 'folders';
+    active = name;
+    ORDER.forEach(function (n) {
+      var on = n === name;
+      var btn = document.getElementById('tab-' + n);
+      btn.setAttribute('aria-selected', on ? 'true' : 'false');
+      btn.tabIndex = on ? 0 : -1;
+      GROUPS[n].forEach(function (id) { var p = panel(id); if (p) p.hidden = !on; });
+    });
+    // Only the tabs whose fields are in the settings form get the Save bar; the
+    // Library tab also holds the category and profile forms, which save alone.
+    var inForm = GROUPS[name].some(function (id) {
+      var p = panel(id);
+      return p && form && form.contains(p);
+    });
+    if (savebar) savebar.hidden = !inForm;
+    if (focus) document.getElementById('tab-' + name).focus();
+    try { sessionStorage.setItem('gx-settings-tab', name); } catch (e) {}
+    if (location.hash !== '#' + name) history.replaceState(null, '', '#' + name);
+  }
+  function noFilter() {
+    if (box) box.value = '';
+    fieldsets().forEach(function (fs) { fs.hidden = false; });
+    if (info) info.textContent = '';
+    bar.hidden = false;
+    showTab(active);
+  }
+  bar.addEventListener('click', function (e) {
+    var btn = e.target.closest('[role=tab]');
+    if (!btn) return;
+    if (box && box.value.trim()) noFilter();
+    showTab(btn.getAttribute('data-tab'));
+  });
+  bar.addEventListener('keydown', function (e) {
+    var current = document.activeElement && document.activeElement.getAttribute
+      ? document.activeElement.getAttribute('data-tab') : '';
+    var i = ORDER.indexOf(current);
+    if (i < 0) return;
+    var next = null;
+    if (e.key === 'ArrowRight') next = ORDER[(i + 1) % ORDER.length];
+    if (e.key === 'ArrowLeft') next = ORDER[(i - 1 + ORDER.length) % ORDER.length];
+    if (e.key === 'Home') next = ORDER[0];
+    if (e.key === 'End') next = ORDER[ORDER.length - 1];
+    if (next) { e.preventDefault(); showTab(next, true); }
+  });
+  window.addEventListener('hashchange', function () {
+    if (box && box.value.trim()) { applyFilter(); return; }
+    showTab(location.hash.slice(1));
+  });
+
+  // The filter searches every group at once: while it holds a text the tab bar
+  // steps aside and only the sections mentioning it stay visible. A section
+  // with a match stays whole, so nothing saves half-hidden.
+  function applyFilter() {
     var q = box.value.trim().toLowerCase(), shown = 0, total = 0;
-    Array.prototype.forEach.call(document.querySelectorAll('form fieldset'), function (fs) {
+    if (!q) { noFilter(); return; }
+    bar.hidden = true;
+    if (savebar) savebar.hidden = false;
+    ORDER.forEach(function (n) {
+      GROUPS[n].forEach(function (id) { var p = panel(id); if (p) p.hidden = false; });
+    });
+    fieldsets().forEach(function (fs) {
       total++;
-      var hit = !q || (fs.textContent || '').toLowerCase().indexOf(q) >= 0;
+      var hit = (fs.textContent || '').toLowerCase().indexOf(q) >= 0;
       fs.hidden = !hit;
       if (hit) shown++;
     });
-    if (info) info.textContent = q ? (shown + ' / ' + total + ' ' + t('sections')) : '';
+    if (info) info.textContent = shown + ' / ' + total + ' ' + t('sections');
   }
-  box.addEventListener('input', apply);
+  if (box) box.addEventListener('input', applyFilter);
+
+  var initial = (location.hash || '').slice(1);
+  if (!initial) { try { initial = sessionStorage.getItem('gx-settings-tab') || ''; } catch (e) {} }
+  bar.hidden = false;
+  showTab(initial);
 })();
 // "Test port": the reachability of the saved peer port, rendered by
 // /ui/portcheck (coloured dot and explanation) in the live region below.

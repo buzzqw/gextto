@@ -51,7 +51,7 @@ category manager in the settings page, the virtualised torrent table (above 500 
 300 with *Show more* remain the no-JavaScript fallback), the bandwidth
 scheduler with
 alternative limits (**one choice per day — Off, Limit or Auto**, where Auto lifts the
-cap so automatic speed can measure the line), the global seeding limits
+cap so the auto-speed/peak observer can measure the line), the global seeding limits
 (share ratio, seeding time and inactive seeding time, as qBittorrent's preferences),
 the content layout of new torrents (Original, Subfolder, NoSubfolder),
 **completion actions** (move the finished data to a folder, optionally one

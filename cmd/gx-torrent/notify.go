@@ -1,11 +1,12 @@
 package main
 
-// notify.go: optional notifications, on the same channels Gextto offers
-// (internal/notify): Telegram, a webhook (generic JSON, Discord, Slack,
-// Gotify, ntfy, Pushover) and e-mail. The daemon notifies completed downloads,
-// feed matches and feed errors. The webhook URL also comes from the
-// -notify-url flag or GX_TORRENT_NOTIFY_URL; in standalone the rest lives in
-// settings.json and is edited on the settings page.
+// notify.go: optional notifications, on the same channels Gextto and indexarr
+// offer (internal/notify): Telegram, a webhook (generic JSON, Discord, Slack,
+// Gotify, ntfy, Pushover), the dedicated Discord, Slack, Gotify, ntfy and
+// Pushover channels, Apprise, e-mail and a custom script. The daemon notifies
+// completed downloads, feed matches and feed errors. The webhook URL also
+// comes from the -notify-url flag or GX_TORRENT_NOTIFY_URL; in standalone the
+// rest lives in settings.json and is edited on the settings page.
 
 import (
 	"context"
@@ -25,6 +26,21 @@ const (
 	notifyWebhookUserKey   = "notify-webhook-user"
 	notifyTelegramTokenKey = "notify-telegram-token"
 	notifyTelegramChatKey  = "notify-telegram-chat"
+	// Dedicated channels, the same ones indexarr offers: they can be filled
+	// together, so a user reaches several services at once.
+	notifyDiscordURLKey    = "notify-discord-url"
+	notifySlackURLKey      = "notify-slack-url"
+	notifyGotifyURLKey     = "notify-gotify-url"
+	notifyGotifyTokenKey   = "notify-gotify-token"
+	notifyNtfyURLKey       = "notify-ntfy-url"
+	notifyNtfyTopicKey     = "notify-ntfy-topic"
+	notifyNtfyTokenKey     = "notify-ntfy-token"
+	notifyPushoverTokenKey = "notify-pushover-token"
+	notifyPushoverUserKey  = "notify-pushover-user"
+	notifyAppriseURLKey    = "notify-apprise-url"
+	notifyAppriseKeyKey    = "notify-apprise-key"
+	notifyScriptKey        = "notify-script"
+	notifyScriptArgsKey    = "notify-script-args"
 	notifyEmailSMTPKey     = "notify-email-smtp"
 	notifyEmailFromKey     = "notify-email-from"
 	notifyEmailToKey       = "notify-email-to"
@@ -55,6 +71,19 @@ func (d *Daemon) notifyConfig() notify.Config {
 		cfg.WebhookUser = s.Get(notifyWebhookUserKey, "")
 		cfg.TelegramToken = s.Get(notifyTelegramTokenKey, "")
 		cfg.TelegramChat = s.Get(notifyTelegramChatKey, "")
+		cfg.DiscordURL = s.Get(notifyDiscordURLKey, "")
+		cfg.SlackURL = s.Get(notifySlackURLKey, "")
+		cfg.GotifyURL = s.Get(notifyGotifyURLKey, "")
+		cfg.GotifyToken = s.Get(notifyGotifyTokenKey, "")
+		cfg.NtfyURL = s.Get(notifyNtfyURLKey, "")
+		cfg.NtfyTopic = s.Get(notifyNtfyTopicKey, "")
+		cfg.NtfyToken = s.Get(notifyNtfyTokenKey, "")
+		cfg.PushoverToken = s.Get(notifyPushoverTokenKey, "")
+		cfg.PushoverUser = s.Get(notifyPushoverUserKey, "")
+		cfg.AppriseURL = s.Get(notifyAppriseURLKey, "")
+		cfg.AppriseKey = s.Get(notifyAppriseKeyKey, "")
+		cfg.Script = s.Get(notifyScriptKey, "")
+		cfg.ScriptArgs = s.Get(notifyScriptArgsKey, "")
 		cfg.SMTP = s.Get(notifyEmailSMTPKey, "")
 		cfg.From = s.Get(notifyEmailFromKey, "")
 		cfg.To = s.Get(notifyEmailToKey, "")
@@ -105,6 +134,22 @@ func notifyText(event string, fields map[string]any) string {
 	return event
 }
 
+// notifyTitle is the short subject some channels show on their own (the
+// Apprise title) and the custom script receives.
+func notifyTitle(event string, fields map[string]any) string {
+	switch event {
+	case "download_complete":
+		return fmt.Sprintf("Download complete: %v", fields["name"])
+	case "feed_match":
+		return fmt.Sprintf("Feed %v: %v torrent(s) added", fields["feed"], fields["added"])
+	case "feed_error":
+		return fmt.Sprintf("Feed %v: error", fields["feed"])
+	case "test":
+		return "gx-torrent: test notification"
+	}
+	return "gx-torrent"
+}
+
 // notify sends an event to the configured channels, best effort and without
 // blocking the caller.
 func (d *Daemon) notify(event string, fields map[string]any) {
@@ -113,7 +158,8 @@ func (d *Daemon) notify(event string, fields map[string]any) {
 		return
 	}
 	go func() {
-		if err := notify.Send(context.Background(), cfg, notify.Event{Name: event, Text: notifyText(event, fields), Fields: fields}); err != nil {
+		payload := notify.Event{Name: event, Title: notifyTitle(event, fields), Text: notifyText(event, fields), Fields: fields}
+		if err := notify.Send(context.Background(), cfg, payload); err != nil {
 			logf("notify %s: %v", event, err)
 		}
 	}()
@@ -135,7 +181,7 @@ func (d *Daemon) handleUINotifyTest(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 60*time.Second)
 	defer cancel()
-	if err := notify.Send(ctx, cfg, notify.Event{Name: "test", Text: notifyText("test", nil)}); err != nil {
+	if err := notify.Send(ctx, cfg, notify.Event{Name: "test", Title: notifyTitle("test", nil), Text: notifyText("test", nil)}); err != nil {
 		w.WriteHeader(http.StatusBadGateway)
 		_, _ = w.Write([]byte(uiTranslateText("Not delivered:", lang) + " " + err.Error()))
 		return

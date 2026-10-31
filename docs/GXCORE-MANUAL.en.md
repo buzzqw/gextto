@@ -42,7 +42,10 @@ status bar has the global controls.
   tags, pause, sequential, first/last piece, limits and content layout.
 - **Pause all / Resume all** stop or restart the whole session.
 - Columns can be chosen and resized; the choice is remembered.
-- The sidebar filters by state, category, tag and tracker.
+- The sidebar filters by state, category, tag and tracker. At the bottom of the
+  sidebar is the interface **language** (English, Italiano, Deutsch, Français,
+  Español, Polski): you change it from there, the page reloads already
+  translated and the choice stays saved like the field in the settings.
 - The context menu has queue, limits, move, rename, verify, reannounce,
   super-seeding and remove.
 
@@ -132,11 +135,14 @@ disk and cache, network, queue and the busiest torrents.
 
 ![Statistics](screenshots/gx-core/en/stats.png)
 
-**Settings** collects folders, watch folders, network, protocols, queue,
-bandwidth and the per-day scheduler, seeding limits, automatic speed
-(autotune, which measures the line and moves download and upload), DLNA,
-notifications, categories, quality profiles, completion actions, maintenance
-and updates.
+**Settings** is split into seven tabs — **Folders & files**, **Network**,
+**Bandwidth**, **Queue**, **Library**, **Interface** and **System** — so each
+group of options opens on its own instead of a single long scroll: folders and
+completion actions, network and protocols, speed limits and the per-day
+scheduler, queue and cache, categories and quality profiles with DLNA, language
+and notifications, maintenance and updates. The search box at the top still
+looks in every tab at once; **Save** stays at the bottom and saves the whole
+page, including the groups of the tabs that are closed.
 
 ![Settings](screenshots/gx-core/en/settings.png)
 

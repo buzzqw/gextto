@@ -268,3 +268,93 @@ func TestUISettingsSavesClientOptions(t *testing.T) {
 		}
 	}
 }
+
+// TestUISettingsSavesNotificationChannels checks the channels added beside the
+// webhook — the same indexarr offers — are written to settings.json and shown
+// again on the page.
+func TestUISettingsSavesNotificationChannels(t *testing.T) {
+	d := standaloneTestDaemon(t, "", true)
+	d.opts.Settings.Set(setupCompleteKey, "true")
+	srv := httptest.NewServer(d.routes())
+	defer srv.Close()
+
+	resp, err := http.PostForm(srv.URL+"/ui/settings", url.Values{
+		"notify-discord-url":    {"https://discord.example/hook"},
+		"notify-slack-url":      {"https://slack.example/hook"},
+		"notify-gotify-url":     {"https://gotify.example"},
+		"notify-gotify-token":   {"g-app"},
+		"notify-ntfy-url":       {"https://ntfy.example"},
+		"notify-ntfy-topic":     {"gxt"},
+		"notify-ntfy-token":     {"n-token"},
+		"notify-pushover-token": {"p-app"},
+		"notify-pushover-user":  {"p-user"},
+		"notify-apprise-url":    {"https://apprise.example"},
+		"notify-apprise-key":    {"config"},
+		"notify-script":         {"/usr/local/bin/notify"},
+		"notify-script-args":    {"--quiet"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+
+	store := d.opts.Settings
+	want := map[string]string{
+		"notify-discord-url":    "https://discord.example/hook",
+		"notify-slack-url":      "https://slack.example/hook",
+		"notify-gotify-url":     "https://gotify.example",
+		"notify-gotify-token":   "g-app",
+		"notify-ntfy-url":       "https://ntfy.example",
+		"notify-ntfy-topic":     "gxt",
+		"notify-ntfy-token":     "n-token",
+		"notify-pushover-token": "p-app",
+		"notify-pushover-user":  "p-user",
+		"notify-apprise-url":    "https://apprise.example",
+		"notify-apprise-key":    "config",
+		"notify-script":         "/usr/local/bin/notify",
+		"notify-script-args":    "--quiet",
+	}
+	for key, value := range want {
+		if got := store.Get(key, ""); got != value {
+			t.Errorf("setting %q = %q, want %q", key, got, value)
+		}
+	}
+
+	page, err := http.Get(srv.URL + "/ui/settings")
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, _ := io.ReadAll(page.Body)
+	page.Body.Close()
+	for _, fragment := range []string{
+		`name="notify-apprise-url" value="https://apprise.example"`,
+		`name="notify-script" value="/usr/local/bin/notify"`,
+		`name="notify-ntfy-topic" value="gxt"`,
+	} {
+		if !strings.Contains(string(body), fragment) {
+			t.Fatalf("settings page missing %q", fragment)
+		}
+	}
+}
+
+// TestUISettingsNotificationChannelsAreTranslated checks the new channels are
+// translated in the interface language, like every other field of the page.
+func TestUISettingsNotificationChannelsAreTranslated(t *testing.T) {
+	d := standaloneTestDaemon(t, "", true)
+	d.opts.Settings.Set(setupCompleteKey, "true")
+	d.opts.Settings.Set("lang", "it")
+	srv := httptest.NewServer(d.routes())
+	defer srv.Close()
+
+	page, err := http.Get(srv.URL + "/ui/settings")
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, _ := io.ReadAll(page.Body)
+	page.Body.Close()
+	for _, want := range []string{"URL API Apprise", "Script personalizzato", "Argomenti dello script", "Token di accesso ntfy"} {
+		if !strings.Contains(string(body), want) {
+			t.Errorf("Italian settings page is missing %q", want)
+		}
+	}
+}

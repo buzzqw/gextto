@@ -142,6 +142,10 @@ type uiPageData struct {
 	// LoginEnabled shows the sign-out control: it is useless (and absent)
 	// when the page has no password.
 	LoginEnabled bool
+	// LangOptions feeds the sidebar's language picker (standalone): the
+	// interface languages with the endonym, the current one marked. It is not
+	// part of the JSON the table refresh reads.
+	LangOptions []uiLangChoice `json:"-"`
 
 	Rows []uiTorrentRow
 }
@@ -442,6 +446,9 @@ func (d *Daemon) handleUI(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
+	}
+	if page.Standalone {
+		page.LangOptions = uiLanguageChoices(d.uiLang(r))
 	}
 	if msg := strings.TrimSpace(r.URL.Query().Get("msg")); msg != "" {
 		page.Notice = msg
