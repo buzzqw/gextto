@@ -686,10 +686,12 @@ func RedownloadEpisode(w http.ResponseWriter, r *http.Request, s *AppState) {
 	keepFiles := strings.EqualFold(strings.TrimSpace(r.URL.Query().Get("keep_files")), "1")
 	avoidPrevious := strings.EqualFold(strings.TrimSpace(r.URL.Query().Get("avoid_previous")), "1")
 	blockedTitle := ""
+	oldTitle := ""
 	if avoidPrevious {
 		if release, found, err := s.db.EpisodeCurrentRelease(series, season, episode); err != nil {
 			logging.Warn("could not read the release to blocklist before the re-download", "series", series, "season", season, "episode", episode, "error", err)
 		} else if found {
+			oldTitle = release.Title
 			if err := s.db.Blocklist(&release, "corrupt_file"); err != nil {
 				logging.Warn("could not blocklist the damaged release; the search may pick it again", "series", series, "season", season, "episode", episode, "error", err)
 			} else {
@@ -697,6 +699,10 @@ func RedownloadEpisode(w http.ResponseWriter, r *http.Request, s *AppState) {
 				logging.Info(fmt.Sprintf("🚫 «%s» S%02dE%02d: the damaged release was blocklisted, a different one will be searched", series, season, episode))
 			}
 		}
+	}
+	oldPath := ""
+	if avoidPrevious {
+		oldPath, _ = s.db.ArchivedEpisodePath(series, season, episode)
 	}
 	moved := ""
 	if !keepFiles {
@@ -716,6 +722,11 @@ func RedownloadEpisode(w http.ResponseWriter, r *http.Request, s *AppState) {
 				}
 			}
 		}
+	}
+	if avoidPrevious {
+		_ = s.db.MarkMediaIntegrityReplacement(MediaIntegrityProblem{
+			Kind: "episode", Series: series, Season: season, Episode: episode, Path: oldPath,
+		}, oldTitle)
 	}
 	if err := s.db.ResetEpisode(series, season, episode, true); err != nil {
 		jsonError(w, http.StatusInternalServerError, err.Error())

@@ -11,6 +11,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/buzzqw/gextto/internal/models"
 )
 
 // miInstallFakeMediaTools puts a working ffprobe and a configurable ffmpeg in a
@@ -289,6 +291,13 @@ func TestRedownloadEpisodeAvoidsThePreviousRelease(t *testing.T) {
 	}
 	if _, err := os.Stat(file); !os.IsNotExist(err) {
 		t.Fatalf("the damaged file must leave the library, stat err = %v", err)
+	}
+	oldTitle, oldPath, found, err := state.db.TakeMediaIntegrityReplacement("episode", "Example", 1, 1, "", 0)
+	if err != nil || !found {
+		t.Fatalf("replacement marker: found=%v err=%v", found, err)
+	}
+	if oldTitle != "Example S01E01" || oldPath != file {
+		t.Fatalf("replacement marker = %q, %q; want the old release and file", oldTitle, oldPath)
 	}
 }
 
@@ -627,5 +636,54 @@ func TestApplyMediaIntegrityManifestMarksMatchingFiles(t *testing.T) {
 	problems, err := state.db.MediaIntegrityProblems()
 	if err != nil || len(problems) != 0 {
 		t.Fatalf("manifest row must not be a problem: %+v (%v)", problems, err)
+	}
+}
+
+func TestMediaIntegrityReplacementMarkerRoundTrip(t *testing.T) {
+	state := newTestAppState(t)
+	problem := MediaIntegrityProblem{Kind: "episode", Series: "Show", Season: 1, Episode: 2, Path: "/media/old.mkv"}
+	if err := state.db.MarkMediaIntegrityReplacement(problem, "Old.Release.S01E02"); err != nil {
+		t.Fatal(err)
+	}
+	title, path, found, err := state.db.TakeMediaIntegrityReplacement("episode", "Show", 1, 2, "", 0)
+	if err != nil || !found {
+		t.Fatalf("take: found=%v err=%v", found, err)
+	}
+	if title != "Old.Release.S01E02" || path != "/media/old.mkv" {
+		t.Fatalf("marker = %q, %q", title, path)
+	}
+	if _, _, found, err := state.db.TakeMediaIntegrityReplacement("episode", "Show", 1, 2, "", 0); err != nil || found {
+		t.Fatalf("second take: found=%v err=%v, want consumed", found, err)
+	}
+}
+
+func TestMovieIdentityForRelease(t *testing.T) {
+	state := newTestAppState(t)
+	if _, err := state.db.db.Exec("INSERT INTO movies(name,year,title,downloaded_at) VALUES ('Film','2024','Film.2024.1080p.WEB-DL','2026-01-01')"); err != nil {
+		t.Fatal(err)
+	}
+	year := int64(2024)
+	name, movieYear, found, err := state.db.MovieIdentityForRelease("Film.2024.1080p.WEB-DL", &year)
+	if err != nil || !found {
+		t.Fatalf("lookup: found=%v err=%v", found, err)
+	}
+	if name != "Film" || movieYear != 2024 {
+		t.Fatalf("identity = %q, %d", name, movieYear)
+	}
+}
+
+func TestLogMediaIntegrityReplacementConsumesTheMarker(t *testing.T) {
+	state := newTestAppState(t)
+	season, episode := int64(1), int64(2)
+	series := "Show"
+	if err := state.db.MarkMediaIntegrityReplacement(MediaIntegrityProblem{
+		Kind: "episode", Series: series, Season: season, Episode: episode, Path: "/media/old.mkv",
+	}, "Old.Release.S01E02"); err != nil {
+		t.Fatal(err)
+	}
+	release := models.Release{Kind: "series", Title: "New.Release.S01E02", Series: &series, Season: &season, Episode: &episode}
+	logMediaIntegrityReplacementAfterRelease(state.db, "hash", &release, "/media/new.mkv")
+	if _, _, found, err := state.db.TakeMediaIntegrityReplacement("episode", series, season, episode, "", 0); err != nil || found {
+		t.Fatalf("the marker must be consumed: found=%v err=%v", found, err)
 	}
 }

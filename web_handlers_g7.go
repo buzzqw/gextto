@@ -765,6 +765,9 @@ var settingWritableAPIOnly = map[string]bool{
 	"content_filters": true, "dry_run": true, "flaresolverr_url": true,
 	"indexers": true, "rename_format": true, "rename_template": true,
 	"url": true, "websearch_engines": true,
+	// Developer-only import of an external verified-file report; it has no
+	// row in the settings page.
+	"media_integrity_verified_manifest": true,
 }
 
 var settingWritablePrefixes = []string{

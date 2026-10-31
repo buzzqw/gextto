@@ -1532,13 +1532,13 @@ The complete list of actions and parameters is in [Appendix C](#appendix-c-refer
   skips the unchanged ones; the first pass is the longest, later passes are much
   faster. In *Maintenance* the panel shows progress and the damaged or
   unreadable files with the reason reported by `ffmpeg`; **Check now** starts a
-  pass at once and **Start over** rechecks the whole library. If the Italian
-  audio batch already verified files, point *Already verified files* at its
-  `state.json`: those files are treated as checked and skipped. Next to every
+  pass at once and **Start over** rechecks the whole library. Next to every
   episode there is **Redownload**: it moves the damaged file out of the library,
   blocklists the release and searches the same episode choosing a different
-  release, so the same broken file is not taken again. `ffprobe` and `ffmpeg`
-  are required; without them the panel says so and the check stays off.
+  release, so the same broken file is not taken again; when the new episode
+  enters the library, the log says which release replaced the damaged file.
+  `ffprobe` and `ffmpeg` are required; without them the panel says so and the
+  check stays off.
 - **Rename folder contents** — enter a folder and press **Browse** to select it
   on the server. Gextto recursively scans video files, detects series and movies
   from their names, compares titles with TMDB/TVDB and shows a rename proposal
@@ -2562,7 +2562,6 @@ files. When the memory cannot be read, only the `tmpfs` space counts, as before.
 | Automatic file integrity check | Periodically probes the library files with `ffprobe` and `ffmpeg`, one file at a time, to find the damaged ones. |
 | File integrity check — interval | Minutes between two check passes. Shown only while «Automatic file integrity check» is on. |
 | File integrity check — files per pass | Maximum number of files verified in each pass. |
-| Already verified files | Path to the `state.json` file of `italian_audio_batch`: files already remuxed and verified packet by packet are treated as checked and skipped. Leave it empty if you do not use that tool. |
 
 **Orphaned files**
 

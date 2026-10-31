@@ -245,9 +245,8 @@ un checkout: `git pull --ff-only && ./scripts/update.sh`.
   volta; Gextto analizza e decodifica per intero i video archiviati con
   `ffprobe` e `ffmpeg` un po' alla volta in background, conservando la posizione
   anche dopo un riavvio. I file già controllati e non cambiati vengono saltati;
-  *Riavvia da capo* ricontrolla tutta la libreria. Il rapporto di un altro
-  strumento (lo `state.json` del batch audio italiano) può segnare i suoi file
-  come già verificati. Dal rapporto puoi rimandare nei download una puntata
+  *Riavvia da capo* ricontrolla tutta la libreria. Dal rapporto puoi rimandare
+  nei download una puntata
   danneggiata: la vecchia release va in blocklist e ne viene cercata una diversa.
 
 ### Banda e linea condivisa

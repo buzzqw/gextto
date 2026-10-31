@@ -3051,6 +3051,9 @@ func tev_completeTorrentOptions(cfg *Config, db *Database, torrents TorrentSessi
 	// the release replaced existing files, one combined "updated" line is
 	// emitted instead of the import line plus one line per removed file.
 	logLibraryImport(cfg, event.Hash, logTarget(release), size, processedPath, suffix, source.note, replaced)
+	// If this release answers a "Riscarica" from the file integrity check, say
+	// which damaged copy it replaced.
+	logMediaIntegrityReplacementAfterRelease(db, event.Hash, release, processedPath)
 	// The file is in its final place: queue the optional audio cleanup. It runs
 	// in its own worker and never blocks the torrent event loop.
 	scheduleAudioCleanup(cfg, db, processedPath, event.Hash, release.Series)
@@ -3482,6 +3485,14 @@ func HandleTorrentEvent(cfg *Config, torrents TorrentSession, db *Database, move
 			}
 			logging.Info(fmt.Sprintf("🎉 %s complete: %s (%s) added to the library in %s",
 				logTarget(&release), countLabel(len(entries), "episode", "episodes"), logging.HumanBytesI64(size), destination), "hash", event.Hash)
+			if release.Series != nil && release.Season != nil {
+				for _, item := range processed {
+					if item.Discarded {
+						continue
+					}
+					logMediaIntegrityReplacement(db, event.Hash, "episode", *release.Series, *release.Season, item.Episode, "", 0, release.Title, item.Path)
+				}
+			}
 			// Detail per file: which episodes were kept and which were discarded.
 			// The Python original logged this per file; the Rust port only kept
 			// the counts, which made a rejected episode impossible to trace.

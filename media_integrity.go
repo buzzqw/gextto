@@ -72,7 +72,19 @@ const databaseMediaIntegritySchema = `CREATE TABLE IF NOT EXISTS media_integrity
                 checked_at TEXT NOT NULL,
                 UNIQUE(kind, series_name, season, episode, movie_name, movie_year)
             );
-            CREATE INDEX IF NOT EXISTS idx_media_integrity_checked ON media_integrity(checked_at);`
+            CREATE INDEX IF NOT EXISTS idx_media_integrity_checked ON media_integrity(checked_at);
+            CREATE TABLE IF NOT EXISTS media_integrity_replacements (
+                kind TEXT NOT NULL,
+                series_name TEXT NOT NULL DEFAULT '',
+                season INTEGER NOT NULL DEFAULT 0,
+                episode INTEGER NOT NULL DEFAULT 0,
+                movie_name TEXT NOT NULL DEFAULT '',
+                movie_year INTEGER NOT NULL DEFAULT 0,
+                old_title TEXT NOT NULL DEFAULT '',
+                old_path TEXT NOT NULL DEFAULT '',
+                requested_at TEXT NOT NULL,
+                PRIMARY KEY(kind, series_name, season, episode, movie_name, movie_year)
+            );`
 
 // MediaIntegrityTarget is one archived file the scan has to check.
 type MediaIntegrityTarget struct {
@@ -585,6 +597,119 @@ func (d *Database) ApplyMediaIntegrityManifest(entries map[string]mediaIntegrity
 		}
 		cursor = candidates[len(candidates)-1].target.cursor()
 	}
+}
+
+// MarkMediaIntegrityReplacement records that a damaged item was sent back to
+// the downloads. The completion handler reads it to log which release replaced
+// the damaged copy.
+func (d *Database) MarkMediaIntegrityReplacement(problem MediaIntegrityProblem, oldTitle string) error {
+	_, err := d.db.Exec(`INSERT INTO media_integrity_replacements
+		(kind, series_name, season, episode, movie_name, movie_year, old_title, old_path, requested_at)
+		VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9)
+		ON CONFLICT(kind, series_name, season, episode, movie_name, movie_year) DO UPDATE SET
+			old_title=excluded.old_title, old_path=excluded.old_path, requested_at=excluded.requested_at`,
+		problem.Kind, problem.Series, problem.Season, problem.Episode, problem.MovieName,
+		problem.MovieYear, oldTitle, problem.Path, time.Now().Format(time.RFC3339))
+	return err
+}
+
+// TakeMediaIntegrityReplacement returns and clears the pending replacement of
+// one item, if any.
+func (d *Database) TakeMediaIntegrityReplacement(kind, series string, season, episode int64, movieName string, movieYear int64) (string, string, bool, error) {
+	tx, err := d.db.Begin()
+	if err != nil {
+		return "", "", false, err
+	}
+	committed := false
+	defer func() {
+		if !committed {
+			_ = tx.Rollback()
+		}
+	}()
+	var oldTitle, oldPath string
+	err = tx.QueryRow(`SELECT old_title, old_path FROM media_integrity_replacements
+		WHERE kind=?1 AND series_name=?2 AND season=?3 AND episode=?4 AND movie_name=?5 AND movie_year=?6`,
+		kind, series, season, episode, movieName, movieYear).Scan(&oldTitle, &oldPath)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", "", false, nil
+	}
+	if err != nil {
+		return "", "", false, err
+	}
+	if _, err := tx.Exec(`DELETE FROM media_integrity_replacements
+		WHERE kind=?1 AND series_name=?2 AND season=?3 AND episode=?4 AND movie_name=?5 AND movie_year=?6`,
+		kind, series, season, episode, movieName, movieYear); err != nil {
+		return "", "", false, err
+	}
+	if err := tx.Commit(); err != nil {
+		return "", "", false, err
+	}
+	committed = true
+	return oldTitle, oldPath, true, nil
+}
+
+// MovieIdentityForRelease finds the configured movie name of a release, so a
+// replacement recorded by movie name can be matched at completion.
+func (d *Database) MovieIdentityForRelease(title string, year *int64) (string, int64, bool, error) {
+	var name string
+	var movieYear int64
+	err := d.db.QueryRow(`SELECT name, COALESCE(year,0) FROM movies
+		WHERE lower(title)=lower(?1) AND (?2 IS NULL OR year IS ?2) AND removed_at IS NULL
+		ORDER BY (year IS ?2) DESC, id DESC LIMIT 1`, title, year).Scan(&name, &movieYear)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", 0, false, nil
+	}
+	if err != nil {
+		return "", 0, false, err
+	}
+	return name, movieYear, true, nil
+}
+
+// logMediaIntegrityReplacementAfterRelease logs the new release for a single
+// episode or a movie when it replaces a copy the media check had found damaged.
+func logMediaIntegrityReplacementAfterRelease(db *Database, hash string, release *models.Release, newPath string) {
+	if db == nil || release == nil {
+		return
+	}
+	switch {
+	case release.Kind == "movie":
+		name, year, found, err := db.MovieIdentityForRelease(release.Title, release.Year)
+		if err == nil && found {
+			logMediaIntegrityReplacement(db, hash, "movie", "", 0, 0, name, year, release.Title, newPath)
+		}
+	case release.Kind == "series" && release.Series != nil && release.Season != nil && release.Episode != nil:
+		logMediaIntegrityReplacement(db, hash, "episode", *release.Series, *release.Season, *release.Episode, "", 0, release.Title, newPath)
+	}
+}
+
+// logMediaIntegrityReplacement logs the new release that replaced a damaged item.
+func logMediaIntegrityReplacement(db *Database, hash, kind, series string, season, episode int64, movieName string, movieYear int64, newTitle, newPath string) {
+	if db == nil {
+		return
+	}
+	oldTitle, oldPath, found, err := db.TakeMediaIntegrityReplacement(kind, series, season, episode, movieName, movieYear)
+	if err != nil {
+		logging.Warn("media check: could not read the pending replacement", "error", err)
+		return
+	}
+	if !found {
+		return
+	}
+	oldName := filepath.Base(oldPath)
+	if oldName == "." || oldName == "/" || oldName == "" {
+		oldName = oldTitle
+	}
+	if oldName == "" {
+		oldName = "previous copy"
+	}
+	target := movieName
+	if kind == "episode" {
+		target = fmt.Sprintf("%s S%02dE%02d", series, season, episode)
+	} else if movieYear > 0 {
+		target = fmt.Sprintf("%s (%d)", movieName, movieYear)
+	}
+	logging.Info(fmt.Sprintf("🧪 %s: the damaged copy «%s» was replaced by «%s»", target, oldName, newTitle),
+		"hash", hash, "path", newPath)
 }
 
 // mediaIntegrityCheckFromTarget carries the identity of a target into the row

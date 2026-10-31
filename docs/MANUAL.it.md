@@ -1584,13 +1584,13 @@ L'elenco completo delle azioni e dei parametri è nell'[Appendice C](#appendice-
   più lunga, le successive sono molto più rapide. In *Manutenzione* il pannello
   mostra avanzamento ed elenco dei file danneggiati o illeggibili con il motivo
   riportato da `ffmpeg`; **Controlla ora** avvia subito un passaggio e
-  **Riavvia da capo** ricontrolla tutta la libreria. Se il batch audio italiano
-  ha già verificato dei file, indica il suo `state.json` in *File già
-  verificati*: quei file vengono considerati controllati e saltati. Accanto a
-  ogni puntata c'è **Riscarica**: sposta il file danneggiato fuori dalla
+  **Riavvia da capo** ricontrolla tutta la libreria. Accanto a ogni puntata c'è
+  **Riscarica**: sposta il file danneggiato fuori dalla
   libreria, mette la release in blocklist e cerca la stessa puntata scegliendo
-  una release diversa, così non riprende lo stesso file corrotto. Servono
-  `ffprobe` e `ffmpeg`; senza, il pannello lo dice e il controllo resta spento.
+  una release diversa, così non riprende lo stesso file corrotto; quando la
+  nuova puntata entra in libreria, il log dice quale release ha sostituito il
+  file danneggiato. Servono `ffprobe` e `ffmpeg`; senza, il pannello lo dice e
+  il controllo resta spento.
 - **Rinomina contenuto cartella** — inserisci una cartella e premi **Sfoglia** per
   sceglierla dal server. Gextto analizza ricorsivamente i file video, riconosce
   serie e film dal nome, confronta i titoli con TMDB/TVDB e mostra una proposta
@@ -2637,7 +2637,6 @@ spazio del `tmpfs`, come prima.
 | Controllo integrità file automatico | Verifica periodicamente con `ffprobe` e `ffmpeg` i file della libreria, un file alla volta, per trovare quelli danneggiati. |
 | Controllo integrità — intervallo | Minuti tra due passaggi del controllo. Compare solo con «Controllo integrità file automatico» attivo. |
 | Controllo integrità — file per volta | Numero massimo di file verificati in ogni passaggio. |
-| File già verificati | Percorso del file `state.json` di `italian_audio_batch`: i file già rimappati e verificati pacchetto per pacchetto vengono considerati controllati e saltati. Lascia vuoto se non usi questo strumento. |
 
 **File orfani**
 

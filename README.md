@@ -242,8 +242,7 @@ checkout: `git pull --ff-only && ./scripts/update.sh`.
   and fully decodes the archived videos with `ffprobe` and `ffmpeg` a little at
   a time in the background, keeping its position across a restart. Files
   already checked and unchanged are skipped; *Start over* rechecks the whole
-  library. A report from another tool (the Italian audio batch `state.json`) can
-  mark its files as already verified. A damaged episode can be sent back to the
+  library. A damaged episode can be sent back to the
   downloads from the report: the old release is blocklisted and a different one
   is searched.
 
