@@ -1150,6 +1150,19 @@ The root package holds 1,284 tests; run serially they spent half their time wait
 were 64 s of the 89 s total; the eD2k tests waited a full aMule search window against a
 fake core that answers at once (now shortened in the tests: 33 s → 3.5 s).
 
+### Media integrity scan — 31 October 2026
+
+The file check (*Maintenance → File integrity check*) walks the library one target at a
+time, so the query between two `ffmpeg` decodes must not add load. With 5,000 archived
+episodes, `MediaIntegrityTargets` returns one target in **62.2–62.5 µs/op** (1,080 B/op,
+34 allocs/op) on the N97, build 1.2.2127. The `ffmpeg` decode dominates the run; the
+scan is on demand, one file at a time, and adds no work to the acquisition cycle or to
+the daemon at rest.
+
+```
+CGO_ENABLED=0 go test . -run '^$' -bench '^BenchmarkMediaIntegrityTargets$' -benchmem -count=3
+```
+
 ### Packaging
 
 The release archive root is **0755** (`mktemp -d` made it 0700, which tar applied to the

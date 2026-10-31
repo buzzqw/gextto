@@ -240,6 +240,11 @@ un checkout: `git pull --ff-only && ./scripts/update.sh`.
   upgrade su più titoli insieme; *Manutenzione → Importa file* legge un video
   già sul disco (o una cartella), propone serie/stagione/episodio o film/anno e
   lo archivia con la rinomina e i controlli MediaInfo normali.
+- **Controllo dei file danneggiati**: *Manutenzione → Controllo integrità file*
+  analizza e decodifica per intero ogni video archiviato con `ffprobe` e
+  `ffmpeg`, un file alla volta e in secondo piano, e conserva la posizione anche
+  dopo un riavvio. Dal rapporto puoi rimandare nei download una puntata
+  danneggiata: la vecchia release va in blocklist e ne viene cercata una diversa.
 
 ### Banda e linea condivisa
 

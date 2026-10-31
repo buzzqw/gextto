@@ -484,10 +484,12 @@ func RedownloadMovie(w http.ResponseWriter, r *http.Request, s *AppState) {
 		return
 	}
 	var name string
+	var movieYear int64
 	found := false
 	for i := range cfg.Movies {
 		if cfg.Movies[i].ID == id {
 			name = cfg.Movies[i].Name
+			movieYear, _ = strconv.ParseInt(strings.TrimSpace(cfg.Movies[i].Year), 10, 64)
 			found = true
 			break
 		}
@@ -496,15 +498,49 @@ func RedownloadMovie(w http.ResponseWriter, r *http.Request, s *AppState) {
 		jsonError(w, http.StatusNotFound, "movie not found")
 		return
 	}
+	avoidPrevious := strings.EqualFold(strings.TrimSpace(r.URL.Query().Get("avoid_previous")), "1")
+	blockedTitle := ""
+	if avoidPrevious {
+		if release, found, err := s.db.MovieCurrentRelease(id); err != nil {
+			logging.Warn("could not read the release to blocklist before the re-download", "movie", name, "error", err)
+		} else if found {
+			if err := s.db.Blocklist(&release, "corrupt_file"); err != nil {
+				logging.Warn("could not blocklist the damaged release; the search may pick it again", "movie", name, "error", err)
+			} else {
+				blockedTitle = release.Title
+				logging.Info(fmt.Sprintf("🚫 «%s»: the damaged release was blocklisted, a different one will be searched", name))
+			}
+		}
+		if archived, err := s.db.MovieProcessedPath(id); err == nil && strings.TrimSpace(archived) != "" {
+			if quarantineCorruptFile(archived, cfg) == "" {
+				logging.Warn("redownload: could not move the damaged movie file out of the library", "path", archived)
+			}
+		}
+	}
 	reset, err := s.db.ResetMovieByName(name)
 	if err != nil {
 		jsonStatus(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": err.Error()})
 		return
 	}
+	if avoidPrevious {
+		_ = s.db.ClearMediaIntegrityProblem(MediaIntegrityProblem{Kind: "movie", MovieName: name, MovieYear: movieYear})
+	}
+	message := "film rimesso in coda al prossimo ciclo"
+	if avoidPrevious {
+		// The damaged copy is gone and blocklisted: search now instead of
+		// waiting for the next scheduled cycle.
+		clone := r.Clone(r.Context())
+		query := clone.URL.Query()
+		query.Set("domain", "movies")
+		clone.URL.RawQuery = query.Encode()
+		RunNow(&v2DiscardWriter{}, clone, s)
+		message = "film rimesso in coda: ricerca avviata"
+	}
 	jsonStatus(w, http.StatusOK, map[string]any{
-		"ok":      true,
-		"reset":   reset,
-		"message": "film rimesso in coda al prossimo ciclo",
+		"ok":            true,
+		"reset":         reset,
+		"blocked_title": blockedTitle,
+		"message":       message,
 	})
 }
 

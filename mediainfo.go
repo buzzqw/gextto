@@ -582,6 +582,12 @@ func ProbeResult(path string) (MediaInfo, error) {
 // probeFileWithin runs `ffprobe` on path with a caller-chosen bound: the
 // backfill worker can wait a minute, a decision inside the search cycle cannot.
 func probeFileWithin(path string, timeout time.Duration) (MediaInfo, error) {
+	return probeFileWithinContext(context.Background(), path, timeout)
+}
+
+// probeFileWithinContext is probeFileWithin with a parent context, so a
+// canceled background job (the media integrity check) stops the probe too.
+func probeFileWithinContext(parent context.Context, path string, timeout time.Duration) (MediaInfo, error) {
 	path = strings.TrimSpace(path)
 	if path == "" {
 		return MediaInfo{}, errors.New("empty path")
@@ -591,9 +597,12 @@ func probeFileWithin(path string, timeout time.Duration) (MediaInfo, error) {
 	if strings.HasPrefix(path, "-") {
 		return MediaInfo{}, errors.New("invalid path")
 	}
+	if parent == nil {
+		parent = context.Background()
+	}
 	// A bounded timeout keeps a hung probe from pinning a worker, and the
 	// protocol whitelist keeps ffprobe from following remote URLs (SSRF).
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	ctx, cancel := context.WithTimeout(parent, timeout)
 	defer cancel()
 	command := exec.CommandContext(
 		ctx,

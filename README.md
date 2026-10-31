@@ -237,6 +237,11 @@ checkout: `git pull --ff-only && ./scripts/update.sh`.
   at once; *Maintenance → Import file* reads a video already on disk (or a
   folder), proposes series/season/episode or movie/year and archives it with the
   normal rename and MediaInfo checks.
+- **Damaged-file check**: *Maintenance → File integrity check* probes and fully
+  decodes every archived video with `ffprobe` and `ffmpeg`, one file at a time
+  and in the background, and keeps its position across a restart. A damaged
+  episode can be sent back to the downloads from the report: the old release is
+  blocklisted and a different one is searched.
 
 ### Bandwidth and the shared line
 

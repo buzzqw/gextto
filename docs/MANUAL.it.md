@@ -1574,6 +1574,17 @@ L'elenco completo delle azioni e dei parametri è nell'[Appendice C](#appendice-
 - Le operazioni lunghe (**Scansiona archivi**, **Aggiorna MediaInfo**, **Rinomina
   tutto**) girano in background: la pagina non resta bloccata, puoi continuare a
   usare Gextto, annullarle dal messaggio e vederne l'esito quando finiscono.
+- **Controllo integrità file** — analizza tutti i video della libreria con
+  `ffprobe` e `ffmpeg`: prima legge formato e tracce, poi decodifica il file per
+  intero per trovare danni nel mezzo, come una puntata troncata o scaricata
+  male. Procede un file alla volta e salva la posizione, quindi puoi
+  **interromperlo** e **riprenderlo** anche dopo un riavvio di Gextto. Alla fine
+  elenca i file danneggiati o illeggibili con il motivo riportato da `ffmpeg`.
+  Accanto a ogni puntata c'è **Riscarica**: sposta il file danneggiato fuori
+  dalla libreria, mette la release in blocklist e cerca la stessa puntata
+  scegliendo una release diversa, così non riprende lo stesso file corrotto.
+  Servono `ffprobe` e `ffmpeg`; senza, il pannello lo dice e il controllo resta
+  spento.
 - **Rinomina contenuto cartella** — inserisci una cartella e premi **Sfoglia** per
   sceglierla dal server. Gextto analizza ricorsivamente i file video, riconosce
   serie e film dal nome, confronta i titoli con TMDB/TVDB e mostra una proposta
@@ -2995,6 +3006,16 @@ credenziali dell'interfaccia e riceve un cookie di sessione valido solo per
 | Rinomina tutto | Rinomina tutti i file archiviati secondo il formato configurato. |
 | Housekeeping | Pulizia dei dati tecnici e dello storico, senza toccare la libreria. |
 | Riavvia servizio | Riavvia il daemon Gextto. |
+
+### Controllo integrità file
+
+| Voce | Cosa fa |
+|---|---|
+| Avvia controllo / Riprendi controllo | Avvia la passata o la riprende dal primo file non ancora verificato. |
+| Interrompi | Ferma il controllo dopo il file in corso; la posizione resta salvata. |
+| Riavvia da capo | Ricomincia dal primo file e cancella i risultati precedenti. |
+| Danneggiato / Illeggibile | Il file non è stato decodificato, oppure non è stato possibile leggerlo. |
+| Riscarica | Sposta il file danneggiato fuori dalla libreria, mette la vecchia release in blocklist e cerca la stessa puntata scegliendo una release diversa. |
 
 ### Rinomina contenuto cartella
 

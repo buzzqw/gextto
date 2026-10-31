@@ -59,6 +59,7 @@ type v2Section struct {
 	// Dedicated maintenance widgets.
 	Duplicates   *v2DuplicatesView
 	DB           *v2DBView
+	MediaCheck   *v2MediaCheckView
 	Ramdisk      *v2RamdiskView
 	FolderRename *v2FolderRenameView
 	Progress     *v2ProgressView
@@ -158,6 +159,10 @@ func v2ConvertSection(s *AppState, r *http.Request, view string, section uiPageS
 		widget := v2DBViewFrom(s, r)
 		item.DB = &widget
 		item.Title = "Ottimizzazione database"
+	case "media_integrity":
+		widget := v2MediaCheckViewFrom(s)
+		item.MediaCheck = &widget
+		item.Title = "Controllo integrità file"
 	case "ramdisk":
 		widget := v2RamdiskViewFrom(s, r)
 		item.Ramdisk = &widget
@@ -277,6 +282,20 @@ func v2ActionFlash(path string, raw []byte, status int) (string, bool) {
 	}
 	if path == "/api/backup" {
 		return "Backup creato", false
+	}
+	basePath := path
+	if index := strings.Index(basePath, "?"); index >= 0 {
+		basePath = basePath[:index]
+	}
+	if strings.HasSuffix(basePath, "/redownload") {
+		var payload struct {
+			Message      string `json:"message"`
+			BlockedTitle string `json:"blocked_title"`
+			MovedTo      string `json:"moved_to"`
+		}
+		if json.Unmarshal(raw, &payload) == nil && payload.Message != "" {
+			return payload.Message, false
+		}
 	}
 	if path == "/api/maintenance/clean-trash" {
 		var payload struct {

@@ -684,10 +684,31 @@ func RedownloadEpisode(w http.ResponseWriter, r *http.Request, s *AppState) {
 	}
 	cfg := latestConfig(s)
 	keepFiles := strings.EqualFold(strings.TrimSpace(r.URL.Query().Get("keep_files")), "1")
+	avoidPrevious := strings.EqualFold(strings.TrimSpace(r.URL.Query().Get("avoid_previous")), "1")
+	blockedTitle := ""
+	if avoidPrevious {
+		if release, found, err := s.db.EpisodeCurrentRelease(series, season, episode); err != nil {
+			logging.Warn("could not read the release to blocklist before the re-download", "series", series, "season", season, "episode", episode, "error", err)
+		} else if found {
+			if err := s.db.Blocklist(&release, "corrupt_file"); err != nil {
+				logging.Warn("could not blocklist the damaged release; the search may pick it again", "series", series, "season", season, "episode", episode, "error", err)
+			} else {
+				blockedTitle = release.Title
+				logging.Info(fmt.Sprintf("🚫 «%s» S%02dE%02d: the damaged release was blocklisted, a different one will be searched", series, season, episode))
+			}
+		}
+	}
 	moved := ""
 	if !keepFiles {
 		if archived, err := s.db.ArchivedEpisodePath(series, season, episode); err == nil && archived != "" {
-			if trash := trashRoot(cfg); trash != "" {
+			if avoidPrevious {
+				// A damaged file must leave the library even when no trash
+				// folder is configured: quarantineCorruptFile renames it in
+				// place as a last resort.
+				if destination := quarantineCorruptFile(archived, cfg); destination != "" {
+					moved = destination
+				}
+			} else if trash := trashRoot(cfg); trash != "" {
 				if destination, err := MoveToTrash(archived, trash); err != nil {
 					logging.Warn("redownload: could not move the file to the trash", "path", archived, "error", err.Error())
 				} else {
@@ -704,6 +725,9 @@ func RedownloadEpisode(w http.ResponseWriter, r *http.Request, s *AppState) {
 		jsonError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	if avoidPrevious {
+		_ = s.db.ClearMediaIntegrityProblem(MediaIntegrityProblem{Kind: "episode", Series: series, Season: season, Episode: episode})
+	}
 	// Kick off a series search right away so the episode is re-queued without
 	// waiting for the next scheduled cycle.
 	clone := r.Clone(r.Context())
@@ -718,10 +742,11 @@ func RedownloadEpisode(w http.ResponseWriter, r *http.Request, s *AppState) {
 		return " (file moved to the trash)"
 	}()))
 	jsonStatus(w, http.StatusOK, map[string]any{
-		"ok":         true,
-		"redownload": true,
-		"moved_to":   moved,
-		"message":    "episodio reso nuovamente scaricabile: ricerca serie avviata",
+		"ok":            true,
+		"redownload":    true,
+		"moved_to":      moved,
+		"blocked_title": blockedTitle,
+		"message":       "episodio reso nuovamente scaricabile: ricerca serie avviata",
 	})
 }
 

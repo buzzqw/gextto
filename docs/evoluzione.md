@@ -350,6 +350,14 @@ the settings search follows the level. Default is Esperto, the wizard sets Facil
 last 30 minutes of bandwidth as a server-rendered SVG from a bounded ring sampled every
 10 s, refreshed by the chrome SSE stream.
 
+**File integrity check.** Maintenance walks the archived files with `ffprobe` and then
+decodes them with `ffmpeg`, one file at a time and in the background, to find damage that a
+header-only probe cannot see. The pass keeps its position in `ui_state` and its findings in
+`media_integrity`, so it can be stopped, resumed after a restart and re-run from the
+beginning. A damaged episode can be sent back to the downloads from the report: the old
+release is blocklisted and the gap search asks for a different one. The panel is the same
+in Gextto's UI and reflects the job state; `ffprobe` and `ffmpeg` are required.
+
 **The standalone page** is laid out like qBittorrent's: filters on the left, one line per
 torrent, the detail panel below, a full context menu, per-user columns and widths kept on
 the server, controls usable from the keyboard, an 8-second undo after a remove, and the

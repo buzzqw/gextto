@@ -1522,6 +1522,16 @@ The complete list of actions and parameters is in [Appendix C](#appendix-c-refer
 - Long operations (**Scan archives**, **Refresh MediaInfo**, **Rename all**) run
   in the background: the page is not blocked, you can keep using Gextto, cancel
   them from the message and see the outcome when they finish.
+- **File integrity check** — probes every video in the library with `ffprobe`
+  and `ffmpeg`: it first reads the container and the tracks, then fully decodes
+  the file to find damage in the middle, such as a truncated or badly downloaded
+  episode. It goes one file at a time and saves its position, so you can
+  **stop** it and **resume** it even after a Gextto restart. At the end it lists
+  the damaged or unreadable files with the reason reported by `ffmpeg`. Next to
+  every episode there is **Redownload**: it moves the damaged file out of the
+  library, blocklists the release and searches the same episode choosing a
+  different release, so the same broken file is not taken again. `ffprobe` and
+  `ffmpeg` are required; without them the panel says so and the check stays off.
 - **Rename folder contents** — enter a folder and press **Browse** to select it
   on the server. Gextto recursively scans video files, detects series and movies
   from their names, compares titles with TMDB/TVDB and shows a rename proposal
@@ -2912,6 +2922,16 @@ of the interface stays protected.
 | Rename all | Renames every archived file using the configured format. |
 | Housekeeping | Cleans technical data and history without touching the library. |
 | Restart service | Restarts the Gextto daemon. |
+
+### File integrity check
+
+| Item | What it does |
+|---|---|
+| Start check / Resume check | Starts the pass or resumes it from the first file not yet verified. |
+| Stop | Stops the check after the current file; the position stays saved. |
+| Start over | Starts again from the first file and clears the previous results. |
+| Damaged / Unreadable | The file could not be decoded, or it could not be read. |
+| Redownload | Moves the damaged file out of the library, blocklists the old release and searches the same episode for a different release. |
 
 ### Rename folder content
 

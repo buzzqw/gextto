@@ -942,6 +942,10 @@ func (d *Database) migrate() error {
 	if _, err := d.db.Exec(databaseUIStateSchema); err != nil {
 		return err
 	}
+	// Damaged archived files found by the Media check (media_integrity.go).
+	if _, err := d.db.Exec(databaseMediaIntegritySchema); err != nil {
+		return err
+	}
 	// Identità della release bloccata (come il legacy `download_blocklist`):
 	// hash + serie/stagione/episodio o film/anno, per audit e UI.
 	for _, column := range []struct{ table, name, definition string }{

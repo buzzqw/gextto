@@ -270,6 +270,8 @@ func registerV2Routes(s *AppState, mux *http.ServeMux) {
 	// Manutenzione: widget dedicati (duplicati, database, RAM disk, rinomina).
 	v2Handle(s, mux, "POST /maintenance/duplicates", V2Duplicates)
 	v2Handle(s, mux, "POST /maintenance/db", V2DBMaintenance)
+	v2Handle(s, mux, "GET /maintenance/media-integrity", V2MediaIntegrityPanel)
+	v2Handle(s, mux, "POST /maintenance/media-integrity", V2MediaIntegrityAction)
 	v2Handle(s, mux, "POST /maintenance/ramdisk", V2Ramdisk)
 	v2Handle(s, mux, "GET /maintenance/update", V2Update)
 	v2Handle(s, mux, "POST /setup/auth", V2SetupAuth)
