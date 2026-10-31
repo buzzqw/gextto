@@ -288,6 +288,10 @@ var uiSettingsIndex = []uiSettingDef{
 	{Key: "media_info_backfill_enabled", Label: "Backfill MediaInfo automatico", Tab: "maintenance", Group: "Analisi MediaInfo"},
 	{Key: "media_info_backfill_interval_minutes", Label: "Backfill MediaInfo — intervallo", Tab: "maintenance", Group: "Analisi MediaInfo"},
 	{Key: "media_info_backfill_batch", Label: "Backfill MediaInfo — file per volta", Tab: "maintenance", Group: "Analisi MediaInfo"},
+	{Key: "media_integrity_enabled", Label: "Controllo integrità file automatico", Tab: "maintenance", Group: "Controllo integrità file"},
+	{Key: "media_integrity_interval_minutes", Label: "Controllo integrità — intervallo", Tab: "maintenance", Group: "Controllo integrità file"},
+	{Key: "media_integrity_batch", Label: "Controllo integrità — file per volta", Tab: "maintenance", Group: "Controllo integrità file"},
+	{Key: "media_integrity_verified_manifest", Label: "File già verificati", Tab: "maintenance", Group: "Controllo integrità file"},
 	{Key: "temp_orphan_cleanup_enabled", Label: "Sposta nel cestino i dati orfani della cartella temporanea", Tab: "maintenance", Group: "File orfani"},
 	{Key: "temp_orphan_min_age_days", Label: "Dati orfani — fermi da almeno", Tab: "maintenance", Group: "File orfani"},
 

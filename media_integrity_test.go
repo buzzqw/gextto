@@ -2,6 +2,7 @@ package gextto
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -9,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 )
 
 // miInstallFakeMediaTools puts a working ffprobe and a configurable ffmpeg in a
@@ -203,7 +205,7 @@ func TestRunMediaIntegrityScanRecordsAndResumes(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	report, err := runMediaIntegrityScan(context.Background(), state, "")
+	report, err := runMediaIntegrityScan(context.Background(), state, "", 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -519,7 +521,7 @@ func TestRunMediaIntegrityScanSkipsUnchangedOnTheNextPass(t *testing.T) {
 	if err != nil || total != 1 {
 		t.Fatalf("first pass total = %d (%v)", total, err)
 	}
-	if _, err := runMediaIntegrityScan(context.Background(), state, ""); err != nil {
+	if _, err := runMediaIntegrityScan(context.Background(), state, "", 0); err != nil {
 		t.Fatal(err)
 	}
 	saved := state.db.LoadMediaIntegrityState()
@@ -534,11 +536,96 @@ func TestRunMediaIntegrityScanSkipsUnchangedOnTheNextPass(t *testing.T) {
 	if err := state.db.SaveMediaIntegrityState(MediaIntegrityState{}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := runMediaIntegrityScan(context.Background(), state, ""); err != nil {
+	if _, err := runMediaIntegrityScan(context.Background(), state, "", 0); err != nil {
 		t.Fatal(err)
 	}
 	saved = state.db.LoadMediaIntegrityState()
 	if !saved.Done || saved.Checked != 0 {
 		t.Fatalf("next pass state = %+v, want done with nothing checked", saved)
+	}
+}
+
+func TestLoadMediaIntegrityVerifiedManifestTrustsOnlyVerifiedFiles(t *testing.T) {
+	dir := t.TempDir()
+	manifest := filepath.Join(dir, "state.json")
+	payload := map[string]any{
+		"folders": map[string]any{
+			"Show": map[string]any{
+				"path": dir,
+				"files": map[string]any{
+					"remuxed.mkv": map[string]any{"status": "remuxed", "size": 100, "mtime": 11, "size_after": 90, "deep": false},
+					"skipped.mkv": map[string]any{"status": "skipped", "size": 50, "mtime": 12, "size_after": 50, "deep": false},
+					"deep.mkv":    map[string]any{"status": "skipped", "size": 60, "mtime": 13, "size_after": 60, "deep": true},
+					"error.mkv":   map[string]any{"status": "error", "size": 70, "mtime": 14, "size_after": 0, "deep": true},
+				},
+			},
+		},
+	}
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(manifest, raw, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	entries, err := loadMediaIntegrityVerifiedManifest(manifest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 2 {
+		t.Fatalf("trusted entries = %d, want 2 (remuxed and deep skipped)", len(entries))
+	}
+	if entry, ok := entries[filepath.Join(dir, "remuxed.mkv")]; !ok || entry.size != 90 || entry.mtime != 11 {
+		t.Fatalf("remuxed entry = %+v, ok=%v", entry, ok)
+	}
+	if _, ok := entries[filepath.Join(dir, "skipped.mkv")]; ok {
+		t.Fatalf("a skipped file that was not fully decoded must not be trusted")
+	}
+	if _, ok := entries[filepath.Join(dir, "error.mkv")]; ok {
+		t.Fatalf("an error must never be trusted")
+	}
+}
+
+func TestApplyMediaIntegrityManifestMarksMatchingFiles(t *testing.T) {
+	state := newTestAppState(t)
+	dir := t.TempDir()
+	file := filepath.Join(dir, "episode.mkv")
+	if err := os.WriteFile(file, make([]byte, 90), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	mtime := time.Unix(1700000000, 0)
+	if err := os.Chtimes(file, mtime, mtime); err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Stat(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := state.db.db.Exec("INSERT INTO series(name) VALUES ('Show')"); err != nil {
+		t.Fatal(err)
+	}
+	var seriesID int64
+	if err := state.db.db.QueryRow("SELECT id FROM series WHERE name='Show'").Scan(&seriesID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := state.db.db.Exec("INSERT INTO episodes(series_id,season,episode,title,archive_path) VALUES (?1,1,1,'Show S01E01',?2)", seriesID, file); err != nil {
+		t.Fatal(err)
+	}
+	entries := map[string]mediaIntegrityManifestEntry{
+		filepath.Clean(file): {size: info.Size(), mtime: info.ModTime().UnixNano()},
+	}
+	marked, err := state.db.ApplyMediaIntegrityManifest(entries)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if marked != 1 {
+		t.Fatalf("marked = %d, want 1", marked)
+	}
+	if total, err := state.db.CountMediaIntegrityTargets(false); err != nil || total != 0 {
+		t.Fatalf("after the manifest total = %d (%v), want 0", total, err)
+	}
+	problems, err := state.db.MediaIntegrityProblems()
+	if err != nil || len(problems) != 0 {
+		t.Fatalf("manifest row must not be a problem: %+v (%v)", problems, err)
 	}
 }

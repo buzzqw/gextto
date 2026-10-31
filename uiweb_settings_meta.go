@@ -191,6 +191,9 @@ var uiSettingMetaByKey = map[string]uiSettingMeta{
 	"archive_keep_min":                     {DependsOn: "archive_cleanup_enabled"},
 	"media_info_backfill_interval_minutes": {Unit: "minuti", DependsOn: "media_info_backfill_enabled"},
 	"media_info_backfill_batch":            {DependsOn: "media_info_backfill_enabled"},
+	"media_integrity_interval_minutes":     {Unit: "minuti", DependsOn: "media_integrity_enabled"},
+	"media_integrity_batch":                {DependsOn: "media_integrity_enabled"},
+	"media_integrity_verified_manifest":    {DependsOn: "media_integrity_enabled"},
 	"temp_orphan_min_age_days":             {Unit: "giorni", DependsOn: "temp_orphan_cleanup_enabled"},
 
 	// Notifiche

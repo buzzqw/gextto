@@ -240,13 +240,15 @@ un checkout: `git pull --ff-only && ./scripts/update.sh`.
   upgrade su più titoli insieme; *Manutenzione → Importa file* legge un video
   già sul disco (o una cartella), propone serie/stagione/episodio o film/anno e
   lo archivia con la rinomina e i controlli MediaInfo normali.
-- **Controllo dei file danneggiati**: *Manutenzione → Controllo integrità file*
-  analizza e decodifica per intero ogni video archiviato con `ffprobe` e
-  `ffmpeg`, un file alla volta e in secondo piano, e conserva la posizione anche
-  dopo un riavvio. I file già controllati e non cambiati vengono saltati;
-  *Riavvia da capo* ricontrolla tutta la libreria. Dal rapporto puoi rimandare
-  nei download una puntata danneggiata: la vecchia release va in blocklist e ne
-  viene cercata una diversa.
+- **Controllo dei file danneggiati**: si attiva in *Configurazione →
+  Manutenzione → Controllo integrità file*, scegliendo intervallo e file per
+  volta; Gextto analizza e decodifica per intero i video archiviati con
+  `ffprobe` e `ffmpeg` un po' alla volta in background, conservando la posizione
+  anche dopo un riavvio. I file già controllati e non cambiati vengono saltati;
+  *Riavvia da capo* ricontrolla tutta la libreria. Il rapporto di un altro
+  strumento (lo `state.json` del batch audio italiano) può segnare i suoi file
+  come già verificati. Dal rapporto puoi rimandare nei download una puntata
+  danneggiata: la vecchia release va in blocklist e ne viene cercata una diversa.
 
 ### Banda e linea condivisa
 

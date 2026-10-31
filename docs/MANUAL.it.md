@@ -1574,21 +1574,23 @@ L'elenco completo delle azioni e dei parametri è nell'[Appendice C](#appendice-
 - Le operazioni lunghe (**Scansiona archivi**, **Aggiorna MediaInfo**, **Rinomina
   tutto**) girano in background: la pagina non resta bloccata, puoi continuare a
   usare Gextto, annullarle dal messaggio e vederne l'esito quando finiscono.
-- **Controllo integrità file** — analizza tutti i video della libreria con
-  `ffprobe` e `ffmpeg`: prima legge formato e tracce, poi decodifica il file per
-  intero per trovare danni nel mezzo, come una puntata troncata o scaricata
-  male. Procede un file alla volta e salva la posizione, quindi puoi
-  **interromperlo** e **riprenderlo** anche dopo un riavvio di Gextto. Alla fine
-  elenca i file danneggiati o illeggibili con il motivo riportato da `ffmpeg`.
-  I file già controllati e non cambiati vengono saltati: **Controlla nuovi e
-  cambiati** verifica solo quelli nuovi, sostituiti o mai controllati, mentre
-  **Riavvia da capo** ricontrolla tutta la libreria. La prima passata è la più
-  lunga, perché decodifica ogni file; le successive sono molto più rapide.
-  Accanto a ogni puntata c'è **Riscarica**: sposta il file danneggiato fuori
-  dalla libreria, mette la release in blocklist e cerca la stessa puntata
-  scegliendo una release diversa, così non riprende lo stesso file corrotto.
-  Servono `ffprobe` e `ffmpeg`; senza, il pannello lo dice e il controllo resta
-  spento.
+- **Controllo integrità file** — si attiva in *Configurazione → Manutenzione →
+  Controllo integrità file*: scegli ogni quanti minuti e quanti file per volta,
+  e Gextto verifica la libreria un po' alla volta in background, senza tenere
+  aperta la pagina. Usa `ffprobe` e `ffmpeg`: prima legge formato e tracce, poi
+  decodifica il file per intero per trovare danni nel mezzo, come una puntata
+  troncata o scaricata male. Salva la posizione e i file già controllati, quindi
+  riprende dopo un riavvio e salta quelli non cambiati; la prima passata è la
+  più lunga, le successive sono molto più rapide. In *Manutenzione* il pannello
+  mostra avanzamento ed elenco dei file danneggiati o illeggibili con il motivo
+  riportato da `ffmpeg`; **Controlla ora** avvia subito un passaggio e
+  **Riavvia da capo** ricontrolla tutta la libreria. Se il batch audio italiano
+  ha già verificato dei file, indica il suo `state.json` in *File già
+  verificati*: quei file vengono considerati controllati e saltati. Accanto a
+  ogni puntata c'è **Riscarica**: sposta il file danneggiato fuori dalla
+  libreria, mette la release in blocklist e cerca la stessa puntata scegliendo
+  una release diversa, così non riprende lo stesso file corrotto. Servono
+  `ffprobe` e `ffmpeg`; senza, il pannello lo dice e il controllo resta spento.
 - **Rinomina contenuto cartella** — inserisci una cartella e premi **Sfoglia** per
   sceglierla dal server. Gextto analizza ricorsivamente i file video, riconosce
   serie e film dal nome, confronta i titoli con TMDB/TVDB e mostra una proposta
@@ -2632,6 +2634,10 @@ spazio del `tmpfs`, come prima.
 | Backfill MediaInfo automatico | Analizza periodicamente con ffprobe i file già presenti che non hanno ancora MediaInfo. |
 | Backfill MediaInfo — intervallo | Minuti tra due passaggi del backfill MediaInfo. *(Unità: minuti)* Compare solo con «Backfill MediaInfo automatico» attivo. |
 | Backfill MediaInfo — file per volta | Numero massimo di file analizzati in ogni passaggio MediaInfo. Compare solo con «Backfill MediaInfo automatico» attivo. |
+| Controllo integrità file automatico | Verifica periodicamente con `ffprobe` e `ffmpeg` i file della libreria, un file alla volta, per trovare quelli danneggiati. |
+| Controllo integrità — intervallo | Minuti tra due passaggi del controllo. Compare solo con «Controllo integrità file automatico» attivo. |
+| Controllo integrità — file per volta | Numero massimo di file verificati in ogni passaggio. |
+| File già verificati | Percorso del file `state.json` di `italian_audio_batch`: i file già rimappati e verificati pacchetto per pacchetto vengono considerati controllati e saltati. |
 
 **File orfani**
 

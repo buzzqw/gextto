@@ -350,15 +350,17 @@ the settings search follows the level. Default is Esperto, the wizard sets Facil
 last 30 minutes of bandwidth as a server-rendered SVG from a bounded ring sampled every
 10 s, refreshed by the chrome SSE stream.
 
-**File integrity check.** Maintenance walks the archived files with `ffprobe` and then
-decodes them with `ffmpeg`, one file at a time and in the background, to find damage that a
-header-only probe cannot see. The pass keeps its position in `ui_state` and the size and
-modification time of every checked file in `media_integrity`, so it can be stopped,
-resumed after a restart and re-run from the beginning. Files already checked and unchanged
-are skipped; only new, replaced and never-checked files are probed again, unless the
-operator asks for a full pass. A damaged episode can be sent back to the downloads from the report: the old
-release is blocklisted and the gap search asks for a different one. The panel lives in
-Gextto's UI and reflects the job state; `ffprobe` and `ffmpeg` are required.
+**File integrity check.** A setting turns on a periodic pass that walks the archived files
+with `ffprobe` and then decodes them with `ffmpeg`, a few files per interval and in the
+background, to find damage that a header-only probe cannot see. The pass keeps its position
+in `ui_state` and the size and modification time of every checked file in
+`media_integrity`, so it resumes after a restart and skips the files already checked and
+unchanged; only new, replaced and never-checked files are probed again, unless the operator
+asks for a full pass. An external report (the `italian_audio_batch` state) can mark files
+already verified packet by packet as checked. A damaged episode can be sent back to the
+downloads from the report: the old release is blocklisted and the gap search asks for a
+different one. The Maintenance panel shows progress and findings; `ffprobe` and `ffmpeg`
+are required.
 
 **The standalone page** is laid out like qBittorrent's: filters on the left, one line per
 torrent, the detail panel below, a full context menu, per-user columns and widths kept on

@@ -1522,20 +1522,23 @@ The complete list of actions and parameters is in [Appendix C](#appendix-c-refer
 - Long operations (**Scan archives**, **Refresh MediaInfo**, **Rename all**) run
   in the background: the page is not blocked, you can keep using Gextto, cancel
   them from the message and see the outcome when they finish.
-- **File integrity check** — probes every video in the library with `ffprobe`
-  and `ffmpeg`: it first reads the container and the tracks, then fully decodes
-  the file to find damage in the middle, such as a truncated or badly downloaded
-  episode. It goes one file at a time and saves its position, so you can
-  **stop** it and **resume** it even after a Gextto restart. At the end it lists
-  the damaged or unreadable files with the reason reported by `ffmpeg`. Files
-  already checked and unchanged are skipped: **Check new and changed** verifies
-  only the new, replaced or never-checked ones, while **Start over** rechecks the
-  whole library. The first pass is the longest because it decodes every file;
-  later passes are much faster. Next to
-  every episode there is **Redownload**: it moves the damaged file out of the
-  library, blocklists the release and searches the same episode choosing a
-  different release, so the same broken file is not taken again. `ffprobe` and
-  `ffmpeg` are required; without them the panel says so and the check stays off.
+- **File integrity check** — switch it on in *Settings → Maintenance → File
+  integrity check*: choose how many minutes apart and how many files per pass,
+  and Gextto verifies the library a little at a time in the background, without
+  the page having to stay open. It uses `ffprobe` and `ffmpeg`: it first reads
+  the container and the tracks, then fully decodes the file to find damage in
+  the middle, such as a truncated or badly downloaded episode. It saves its
+  position and the files already checked, so it resumes after a restart and
+  skips the unchanged ones; the first pass is the longest, later passes are much
+  faster. In *Maintenance* the panel shows progress and the damaged or
+  unreadable files with the reason reported by `ffmpeg`; **Check now** starts a
+  pass at once and **Start over** rechecks the whole library. If the Italian
+  audio batch already verified files, point *Already verified files* at its
+  `state.json`: those files are treated as checked and skipped. Next to every
+  episode there is **Redownload**: it moves the damaged file out of the library,
+  blocklists the release and searches the same episode choosing a different
+  release, so the same broken file is not taken again. `ffprobe` and `ffmpeg`
+  are required; without them the panel says so and the check stays off.
 - **Rename folder contents** — enter a folder and press **Browse** to select it
   on the server. Gextto recursively scans video files, detects series and movies
   from their names, compares titles with TMDB/TVDB and shows a rename proposal
@@ -2551,6 +2554,15 @@ files. When the memory cannot be read, only the `tmpfs` space counts, as before.
 | Automatic MediaInfo backfill | Periodically analyses with ffprobe the files already present that have no MediaInfo yet. |
 | MediaInfo backfill — interval | Minutes between two MediaInfo backfill passes. *(Unit: minutes)* Shown only while «Automatic MediaInfo backfill» is on. |
 | MediaInfo backfill — files per run | Maximum number of files analysed in each MediaInfo pass. Shown only while «Automatic MediaInfo backfill» is on. |
+
+**File integrity check**
+
+| Setting | What it does |
+|---|---|
+| Automatic file integrity check | Periodically probes the library files with `ffprobe` and `ffmpeg`, one file at a time, to find the damaged ones. |
+| File integrity check — interval | Minutes between two check passes. Shown only while «Automatic file integrity check» is on. |
+| File integrity check — files per pass | Maximum number of files verified in each pass. |
+| Already verified files | Path to the `state.json` file of `italian_audio_batch`: files already remuxed and verified packet by packet are treated as checked and skipped. |
 
 **Orphaned files**
 

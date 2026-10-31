@@ -16,22 +16,25 @@ import (
 
 // v2MediaCheckView is the model of the panel.
 type v2MediaCheckView struct {
-	Available      bool
-	Missing        string
-	Running        bool
-	Done           bool
-	NothingToCheck bool
-	Started        bool
-	Checked        int
-	Total          int
-	Damaged        int
-	Percent        int
-	Current        string
-	StartedAt      string
-	FinishedAt     string
-	Problems       []v2MediaCheckProblem
-	Message        string
-	Error          bool
+	Available       bool
+	Missing         string
+	Enabled         bool
+	IntervalMinutes int
+	Batch           int
+	Running         bool
+	Done            bool
+	NothingToCheck  bool
+	Started         bool
+	Checked         int
+	Total           int
+	Damaged         int
+	Percent         int
+	Current         string
+	StartedAt       string
+	FinishedAt      string
+	Problems        []v2MediaCheckProblem
+	Message         string
+	Error           bool
 }
 
 // v2MediaCheckProblem is one damaged file with the action that re-downloads it.
@@ -47,17 +50,21 @@ type v2MediaCheckProblem struct {
 // v2MediaCheckViewFrom reads the persisted scan state and the live job state.
 func v2MediaCheckViewFrom(s *AppState) v2MediaCheckView {
 	status := mediaIntegrityStatusFor(s)
+	cfg := latestConfig(s)
 	view := v2MediaCheckView{
-		Available:      status.Available,
-		Running:        status.Running,
-		Done:           status.Done,
-		NothingToCheck: status.Done && status.Total == 0,
-		Checked:        status.Checked,
-		Total:          status.Total,
-		Damaged:        status.Damaged,
-		Current:        status.Current,
-		StartedAt:      v2UpdateTimeLabel(status.StartedAt),
-		FinishedAt:     v2UpdateTimeLabel(status.FinishedAt),
+		Available:       status.Available,
+		Enabled:         mediaIntegrityEnabled(cfg),
+		IntervalMinutes: mediaIntegrityIntervalMinutes(cfg),
+		Batch:           mediaIntegrityBatchSize(cfg),
+		Running:         status.Running,
+		Done:            status.Done,
+		NothingToCheck:  status.Done && status.Total == 0,
+		Checked:         status.Checked,
+		Total:           status.Total,
+		Damaged:         status.Damaged,
+		Current:         status.Current,
+		StartedAt:       v2UpdateTimeLabel(status.StartedAt),
+		FinishedAt:      v2UpdateTimeLabel(status.FinishedAt),
 	}
 	view.Started = status.Checked > 0 || (strings.TrimSpace(status.Cursor) != "" && status.Cursor != "e:0")
 	if len(status.Missing) > 0 {
@@ -66,7 +73,6 @@ func v2MediaCheckViewFrom(s *AppState) v2MediaCheckView {
 	if status.Total > 0 {
 		view.Percent = int(clampFloat(float64(status.Checked)/float64(status.Total), 0, 1) * 100)
 	}
-	cfg := latestConfig(s)
 	for _, problem := range status.Problems {
 		item := v2MediaCheckProblem{
 			Label:     problem.Label(),
@@ -124,7 +130,12 @@ func V2MediaIntegrityAction(w http.ResponseWriter, r *http.Request, s *AppState)
 	message, isErr := "", false
 	switch action {
 	case "start", "restart":
-		body, _ := json.Marshal(map[string]bool{"restart": action == "restart"})
+		batch := mediaIntegrityBatchSize(latestConfig(s))
+		if action == "restart" {
+			// A forced full pass rechecks everything, not just one batch.
+			batch = 0
+		}
+		body, _ := json.Marshal(map[string]any{"restart": action == "restart", "batch": batch})
 		raw, status := v2InternalJSON(s, http.MethodPost, "/api/maintenance/media-integrity/start", nil, body)
 		if status >= http.StatusBadRequest {
 			if status == http.StatusConflict {

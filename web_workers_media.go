@@ -116,6 +116,43 @@ func mediaInfoBackfillWorker(state *AppState) {
 	}
 }
 
+// mediaIntegrityWorker runs the periodic file check: when the option is on, it
+// probes a few files at every interval instead of decoding the whole library in
+// one go. The pass keeps its position, so the next interval continues.
+func mediaIntegrityWorker(state *AppState) {
+	if !state.SleepBackground(30 * time.Second) {
+		return
+	}
+	warnedUnavailable := false
+	for {
+		cfg := latestConfig(state)
+		enabled := mediaIntegrityEnabled(cfg)
+		interval := mediaIntegrityIntervalMinutes(cfg)
+		batch := mediaIntegrityBatchSize(cfg)
+		if enabled {
+			if len(mediaIntegrityMissingTools()) == 0 {
+				warnedUnavailable = false
+				if _, created, err := beginMediaIntegrityScan(state, false, batch); err != nil {
+					logging.Warn("media integrity check run failed", "error", err)
+				} else if !created {
+					logging.Debug("media integrity check already running; this interval is skipped")
+				}
+			} else if !warnedUnavailable {
+				warnedUnavailable = true
+				logging.Warn("ffprobe or ffmpeg is not available: the media integrity check is paused until they are installed")
+			}
+		}
+		wait := time.Duration(interval) * time.Minute
+		if !enabled {
+			// Wake up sooner so switching the option on takes effect quickly.
+			wait = time.Minute
+		}
+		if !state.SleepBackground(wait) {
+			return
+		}
+	}
+}
+
 // calendarWarmupWorker implements `calendar_warmup_worker` (the web module:6639):
 // precomputes the calendar at startup and refreshes it when the cache expires,
 // so the endpoint answers immediately.

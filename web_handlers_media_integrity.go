@@ -15,6 +15,9 @@ type MediaIntegrityStartInput struct {
 	// Restart starts a fresh pass from the first file even when the previous
 	// one was interrupted or completed.
 	Restart bool `json:"restart"`
+	// Batch is the number of files this run checks before stopping; 0 means
+	// every pending file (the manual full pass).
+	Batch int `json:"batch"`
 }
 
 // MediaIntegrityStart begins (or resumes) the check. It answers 202 at once:
@@ -34,7 +37,7 @@ func MediaIntegrityStart(w http.ResponseWriter, r *http.Request, s *AppState) {
 		})
 		return
 	}
-	job, created, err := beginMediaIntegrityScan(s, input.Restart)
+	job, created, err := beginMediaIntegrityScan(s, input.Restart, input.Batch)
 	if err != nil {
 		jsonError(w, http.StatusInternalServerError, err.Error())
 		return

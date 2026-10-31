@@ -17,6 +17,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -40,6 +41,9 @@ const (
 	mediaIntegrityDetailLimit = 500
 	// mediaIntegrityStateKey is the ui_state key holding the resumable scan.
 	mediaIntegrityStateKey = "media_integrity_state"
+	// mediaIntegrityVerifiedManifestSetting points to an external report of
+	// files already verified by another tool (the italian_audio_batch state).
+	mediaIntegrityVerifiedManifestSetting = "media_integrity_verified_manifest"
 )
 
 // mediaIntegrityPause lets the disk (and the rest of Gextto) breathe between
@@ -86,6 +90,9 @@ type MediaIntegrityTarget struct {
 	// skip the file while it is unchanged.
 	SizeBytes  int64
 	ModifiedNS int64
+	// Resolved is the video file actually probed: an archived folder is
+	// resolved to its largest video file.
+	Resolved string
 }
 
 // Label names the library item the way the operator sees it.
@@ -182,10 +189,11 @@ type MediaIntegrityStatus struct {
 // mediaIntegrityCandidate is one archived file with its current identity and
 // the outcome stored by an earlier pass (when any).
 type mediaIntegrityCandidate struct {
-	target      MediaIntegrityTarget
-	storedSize  int64
-	storedMTime int64
-	hasStored   bool
+	target       MediaIntegrityTarget
+	storedSize   int64
+	storedMTime  int64
+	storedStatus string
+	hasStored    bool
 }
 
 // needsCheck reports whether the file has to be probed again: never checked,
@@ -197,19 +205,19 @@ func (c mediaIntegrityCandidate) needsCheck(force bool) bool {
 	return c.target.SizeBytes != c.storedSize || c.target.ModifiedNS != c.storedMTime
 }
 
-// mediaIntegrityFileIdentity returns the size and modification time of the
-// video file behind an archived path. A missing or unreadable path yields
-// zeros, so a file that appears later is always seen as changed.
-func mediaIntegrityFileIdentity(path string) (int64, int64) {
+// mediaIntegrityFileIdentity returns the resolved file, its size and its
+// modification time. A missing or unreadable path yields empty/zeros, so a file
+// that appears later is always seen as changed.
+func mediaIntegrityFileIdentity(path string) (string, int64, int64) {
 	file, err := mediaIntegrityResolveFile(path)
 	if err != nil {
-		return 0, 0
+		return "", 0, 0
 	}
 	info, err := os.Stat(file)
 	if err != nil {
-		return 0, 0
+		return "", 0, 0
 	}
-	return info.Size(), info.ModTime().UnixNano()
+	return file, info.Size(), info.ModTime().UnixNano()
 }
 
 // queryMediaIntegrityCandidates reads up to limit archived items after the
@@ -265,15 +273,16 @@ func (d *Database) queryMediaIntegrityCandidates(after string, limit int) ([]med
 		rows.Close()
 		for _, row := range rowsData {
 			season, episode := row.season, row.episode
-			size, modified := mediaIntegrityFileIdentity(row.path)
+			resolved, size, modified := mediaIntegrityFileIdentity(row.path)
 			candidates = append(candidates, mediaIntegrityCandidate{
 				target: MediaIntegrityTarget{
 					Kind: "episode", ID: row.id, Series: row.series,
 					Season: &season, Episode: &episode, Path: row.path,
-					SizeBytes: size, ModifiedNS: modified,
+					SizeBytes: size, ModifiedNS: modified, Resolved: resolved,
 				},
 				storedSize: row.size, storedMTime: row.modified,
-				hasStored: strings.TrimSpace(row.status) != "",
+				hasStored:    strings.TrimSpace(row.status) != "",
+				storedStatus: row.status,
 			})
 			if len(candidates) >= limit {
 				return candidates, nil
@@ -319,14 +328,16 @@ func (d *Database) queryMediaIntegrityCandidates(after string, limit int) ([]med
 		rows.Close()
 		for _, row := range rowsData {
 			year := row.year
-			size, modified := mediaIntegrityFileIdentity(row.path)
+			resolved, size, modified := mediaIntegrityFileIdentity(row.path)
 			candidates = append(candidates, mediaIntegrityCandidate{
 				target: MediaIntegrityTarget{
 					Kind: "movie", ID: row.id, MovieName: row.name,
 					MovieYear: &year, Path: row.path, SizeBytes: size, ModifiedNS: modified,
+					Resolved: resolved,
 				},
 				storedSize: row.size, storedMTime: row.modified,
-				hasStored: strings.TrimSpace(row.status) != "",
+				hasStored:    strings.TrimSpace(row.status) != "",
+				storedStatus: row.status,
 			})
 		}
 	}
@@ -477,6 +488,124 @@ func (d *Database) ClearMediaIntegrityProblem(problem MediaIntegrityProblem) err
 	return err
 }
 
+// mediaIntegrityManifestEntry is one file an external tool already verified:
+// the size and modification time are the identity it must still have.
+type mediaIntegrityManifestEntry struct {
+	size  int64
+	mtime int64
+}
+
+// loadMediaIntegrityVerifiedManifest reads the state.json of the
+// italian_audio_batch tool. A "remuxed" file was compared packet by packet
+// against the source (the batch runs --verify-packets on every file); a
+// "skipped" file counts only when it was also fully decoded (deep). The
+// identity is the post-remux size and the original modification time, which the
+// batch preserves.
+func loadMediaIntegrityVerifiedManifest(path string) (map[string]mediaIntegrityManifestEntry, error) {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	var root struct {
+		Folders map[string]struct {
+			Path  string `json:"path"`
+			Files map[string]struct {
+				Status    string `json:"status"`
+				Size      int64  `json:"size"`
+				MTime     int64  `json:"mtime"`
+				SizeAfter int64  `json:"size_after"`
+				Deep      bool   `json:"deep"`
+			} `json:"files"`
+		} `json:"folders"`
+	}
+	if err := json.Unmarshal(raw, &root); err != nil {
+		return nil, err
+	}
+	verified := map[string]mediaIntegrityManifestEntry{}
+	for _, folder := range root.Folders {
+		folderPath := strings.TrimSpace(folder.Path)
+		if folderPath == "" {
+			continue
+		}
+		for name, file := range folder.Files {
+			if file.Status != "remuxed" && !(file.Status == "skipped" && file.Deep) {
+				continue
+			}
+			size := file.SizeAfter
+			if size <= 0 {
+				size = file.Size
+			}
+			full := filepath.Clean(filepath.Join(folderPath, name))
+			verified[full] = mediaIntegrityManifestEntry{size: size, mtime: file.MTime}
+		}
+	}
+	return verified, nil
+}
+
+// ApplyMediaIntegrityManifest marks the archived files the external tool already
+// verified as checked, so the pass does not decode them again. It only trusts an
+// entry when the file on disk still has the size and modification time the
+// report recorded.
+func (d *Database) ApplyMediaIntegrityManifest(entries map[string]mediaIntegrityManifestEntry) (int, error) {
+	if len(entries) == 0 {
+		return 0, nil
+	}
+	marked := 0
+	cursor := ""
+	now := time.Now().Format(time.RFC3339)
+	for {
+		candidates, err := d.queryMediaIntegrityCandidates(cursor, 500)
+		if err != nil {
+			return marked, err
+		}
+		if len(candidates) == 0 {
+			return marked, nil
+		}
+		for _, candidate := range candidates {
+			if candidate.target.Resolved == "" {
+				continue
+			}
+			entry, ok := entries[filepath.Clean(candidate.target.Resolved)]
+			if !ok || candidate.target.SizeBytes != entry.size || candidate.target.ModifiedNS != entry.mtime {
+				continue
+			}
+			if candidate.hasStored && candidate.storedSize == entry.size &&
+				candidate.storedMTime == entry.mtime && candidate.storedStatus == "ok" {
+				continue
+			}
+			check := mediaIntegrityCheckFromTarget(candidate.target, "ok", "verified by the external batch")
+			check.CheckedAt = now
+			if err := d.SaveMediaIntegrityCheck(check); err != nil {
+				return marked, err
+			}
+			marked++
+		}
+		cursor = candidates[len(candidates)-1].target.cursor()
+	}
+}
+
+// mediaIntegrityCheckFromTarget carries the identity of a target into the row
+// saved for an outcome.
+func mediaIntegrityCheckFromTarget(target MediaIntegrityTarget, status, detail string) MediaIntegrityProblem {
+	check := MediaIntegrityProblem{
+		TargetID: target.ID, Kind: target.Kind, Series: target.Series,
+		MovieName: target.MovieName, Path: target.Path,
+		Status: status, Detail: detail,
+		SizeBytes: target.SizeBytes, ModifiedNS: target.ModifiedNS,
+		CheckedAt: time.Now().Format(time.RFC3339),
+	}
+	if target.Season != nil {
+		check.Season = *target.Season
+	}
+	if target.Episode != nil {
+		check.Episode = *target.Episode
+	}
+	if target.MovieYear != nil {
+		check.MovieYear = *target.MovieYear
+	}
+	return check
+}
+
 // LoadMediaIntegrityState reads the resumable scan state.
 func (d *Database) LoadMediaIntegrityState() MediaIntegrityState {
 	raw, ok := d.uiStateValue(mediaIntegrityStateKey)
@@ -502,6 +631,45 @@ func (d *Database) SaveMediaIntegrityState(state MediaIntegrityState) error {
 // ---------------------------------------------------------------------------
 // Tools and file check
 // ---------------------------------------------------------------------------
+
+// mediaIntegrityEnabled reports whether the periodic check is switched on.
+func mediaIntegrityEnabled(cfg *Config) bool {
+	return cfg != nil && settingTruthy(cfg.Settings["media_integrity_enabled"])
+}
+
+// mediaIntegrityIntervalMinutes is the wait between two periodic passes.
+func mediaIntegrityIntervalMinutes(cfg *Config) int {
+	value := 60
+	if cfg != nil {
+		if parsed, err := strconv.Atoi(strings.TrimSpace(cfg.Settings["media_integrity_interval_minutes"])); err == nil {
+			value = parsed
+		}
+	}
+	if value < 5 {
+		value = 5
+	}
+	if value > 24*60 {
+		value = 24 * 60
+	}
+	return value
+}
+
+// mediaIntegrityBatchSize is how many files one periodic pass checks.
+func mediaIntegrityBatchSize(cfg *Config) int {
+	value := 1
+	if cfg != nil {
+		if parsed, err := strconv.Atoi(strings.TrimSpace(cfg.Settings["media_integrity_batch"])); err == nil {
+			value = parsed
+		}
+	}
+	if value < 1 {
+		value = 1
+	}
+	if value > 50 {
+		value = 50
+	}
+	return value
+}
 
 // mediaIntegrityMissingTools reports which of the two tools is not on PATH.
 func mediaIntegrityMissingTools() []string {
@@ -710,7 +878,7 @@ func mediaIntegrityStatusFor(s *AppState) MediaIntegrityStatus {
 
 // beginMediaIntegrityScan initialises (or resumes) the run and starts the job.
 // It returns the existing job when one is already running.
-func beginMediaIntegrityScan(s *AppState, restart bool) (*Job, bool, error) {
+func beginMediaIntegrityScan(s *AppState, restart bool, limit int) (*Job, bool, error) {
 	job, created := s.jobs.Create(mediaIntegrityJobKind, mediaIntegrityJobKind)
 	if !created {
 		return job, false, nil
@@ -727,33 +895,16 @@ func beginMediaIntegrityScan(s *AppState, restart bool) (*Job, bool, error) {
 	case state.Done:
 		// A completed pass is over: start a new one that skips the files
 		// already checked and unchanged.
-		if err := s.db.PruneMediaIntegrityChecks(); err != nil {
-			s.jobs.Fail(job.ID, err)
-			return nil, false, err
-		}
 		state = MediaIntegrityState{Force: false}
 	case state.Total == 0:
 		// Fresh state, or an empty library: keep the force flag (a forced pass
 		// must stay forced) and start from the beginning.
-		if err := s.db.PruneMediaIntegrityChecks(); err != nil {
-			s.jobs.Fail(job.ID, err)
-			return nil, false, err
-		}
 		state.Cursor = ""
 		state.Checked = 0
 		state.Damaged = 0
 		state.Done = false
 		state.Current = ""
 		state.FinishedAt = ""
-	}
-	if state.Total == 0 {
-		total, err := s.db.CountMediaIntegrityTargets(state.Force)
-		if err != nil {
-			s.jobs.Fail(job.ID, err)
-			return nil, false, err
-		}
-		state.Total = total
-		state.StartedAt = time.Now().Format(time.RFC3339)
 	}
 	state.Running = true
 	state.Done = false
@@ -764,7 +915,7 @@ func beginMediaIntegrityScan(s *AppState, restart bool) (*Job, bool, error) {
 		return nil, false, err
 	}
 	if err := s.jobs.Start(job.ID, func(ctx context.Context, jobID string) {
-		report, err := runMediaIntegrityScan(ctx, s, jobID)
+		report, err := runMediaIntegrityScan(ctx, s, jobID, limit)
 		if err != nil {
 			s.jobs.Fail(jobID, err)
 			return
@@ -779,19 +930,51 @@ func beginMediaIntegrityScan(s *AppState, restart bool) (*Job, bool, error) {
 
 // runMediaIntegrityScan walks the library one file at a time, saving its
 // position after every file.
-func runMediaIntegrityScan(ctx context.Context, s *AppState, jobID string) (map[string]any, error) {
+func runMediaIntegrityScan(ctx context.Context, s *AppState, jobID string, limit int) (map[string]any, error) {
 	state := s.db.LoadMediaIntegrityState()
 	state.Running = true
 	state.Done = false
 	state.FinishedAt = ""
+	if state.Total == 0 {
+		// A new pass prepares its queue here, not in the HTTP request: reading
+		// the external report and counting the files touches the disk and can
+		// be slow on a network library.
+		if err := s.db.PruneMediaIntegrityChecks(); err != nil {
+			return nil, err
+		}
+		if !state.Force {
+			if cfg := latestConfig(s); cfg != nil {
+				manifestPath := strings.TrimSpace(cfg.Settings[mediaIntegrityVerifiedManifestSetting])
+				if manifestPath != "" {
+					entries, err := loadMediaIntegrityVerifiedManifest(manifestPath)
+					if err != nil {
+						logging.Warn("🧪 The external verified-file report could not be read", "path", manifestPath, "error", err)
+					} else if marked, err := s.db.ApplyMediaIntegrityManifest(entries); err != nil {
+						logging.Warn("🧪 The external verified-file report could not be applied", "path", manifestPath, "error", err)
+					} else if marked > 0 {
+						logging.Info(fmt.Sprintf("🧪 %s already verified outside Gextto were marked as checked", countLabel(marked, "file", "files")))
+					}
+				}
+			}
+		}
+		total, err := s.db.CountMediaIntegrityTargets(state.Force)
+		if err != nil {
+			return nil, err
+		}
+		state.Total = total
+		state.StartedAt = time.Now().Format(time.RFC3339)
+	}
 	if state.Total > 0 && state.Checked > state.Total {
 		state.Total = state.Checked
 	}
 	if err := s.db.SaveMediaIntegrityState(state); err != nil {
 		return nil, err
 	}
-	logging.Info("🧪 Media integrity check started: the library is verified one file at a time")
+	if state.Checked == 0 {
+		logging.Info("🧪 Media integrity check started: the library is verified one file at a time")
+	}
 	startedAt := time.Now()
+	checkedThisRun := 0
 	for {
 		if ctx.Err() != nil {
 			break
@@ -817,22 +1000,7 @@ func runMediaIntegrityScan(ctx context.Context, s *AppState, jobID string) (map[
 		if ctx.Err() != nil || status == "canceled" {
 			break
 		}
-		check := MediaIntegrityProblem{
-			TargetID: target.ID, Kind: target.Kind, Series: target.Series,
-			MovieName: target.MovieName, Path: target.Path,
-			Status: status, Detail: detail,
-			SizeBytes: target.SizeBytes, ModifiedNS: target.ModifiedNS,
-			CheckedAt: time.Now().Format(time.RFC3339),
-		}
-		if target.Season != nil {
-			check.Season = *target.Season
-		}
-		if target.Episode != nil {
-			check.Episode = *target.Episode
-		}
-		if target.MovieYear != nil {
-			check.MovieYear = *target.MovieYear
-		}
+		check := mediaIntegrityCheckFromTarget(target, status, detail)
 		if err := s.db.SaveMediaIntegrityCheck(check); err != nil {
 			return nil, err
 		}
@@ -841,6 +1009,7 @@ func runMediaIntegrityScan(ctx context.Context, s *AppState, jobID string) (map[
 			logging.Warn(fmt.Sprintf("🧪 The file of «%s» looks damaged: %s", target.Label(), detail))
 		}
 		state.Checked++
+		checkedThisRun++
 		state.Cursor = next
 		if err := s.db.SaveMediaIntegrityState(state); err != nil {
 			return nil, err
@@ -850,6 +1019,11 @@ func runMediaIntegrityScan(ctx context.Context, s *AppState, jobID string) (map[
 		}
 		if next == "done" {
 			state.Done = true
+			break
+		}
+		if limit > 0 && checkedThisRun >= limit {
+			// A periodic pass checks a few files and leaves the rest to the
+			// next interval.
 			break
 		}
 		if !sleepMediaIntegrity(ctx, mediaIntegrityPause) {
@@ -863,15 +1037,16 @@ func runMediaIntegrityScan(ctx context.Context, s *AppState, jobID string) (map[
 		return nil, err
 	}
 	report := map[string]any{
-		"ok":            true,
-		"checked":       state.Checked,
-		"total":         state.Total,
-		"damaged":       state.Damaged,
-		"done":          state.Done,
-		"canceled":      ctx.Err() != nil,
-		"started_at":    state.StartedAt,
-		"finished_at":   state.FinishedAt,
-		"duration_secs": int64(time.Since(startedAt).Seconds()),
+		"ok":               true,
+		"checked":          state.Checked,
+		"checked_this_run": checkedThisRun,
+		"total":            state.Total,
+		"damaged":          state.Damaged,
+		"done":             state.Done,
+		"canceled":         ctx.Err() != nil,
+		"started_at":       state.StartedAt,
+		"finished_at":      state.FinishedAt,
+		"duration_secs":    int64(time.Since(startedAt).Seconds()),
 	}
 	switch {
 	case ctx.Err() != nil:
@@ -879,6 +1054,9 @@ func runMediaIntegrityScan(ctx context.Context, s *AppState, jobID string) (map[
 			countLabel(state.Checked, "file", "files"), countLabel(state.Damaged, "file", "files")))
 	case state.Done:
 		logging.Info(fmt.Sprintf("🧪 Media integrity check finished: %s checked, %s found damaged",
+			countLabel(state.Checked, "file", "files"), countLabel(state.Damaged, "file", "files")))
+	case checkedThisRun > 0:
+		logging.Info(fmt.Sprintf("🧪 Media integrity check: %s checked so far, %s found damaged",
 			countLabel(state.Checked, "file", "files"), countLabel(state.Damaged, "file", "files")))
 	}
 	return report, nil

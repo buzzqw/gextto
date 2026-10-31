@@ -1152,13 +1152,14 @@ fake core that answers at once (now shortened in the tests: 33 s → 3.5 s).
 
 ### Media integrity scan — 31 October 2026
 
-The file check (*Maintenance → File integrity check*) walks the library one target at a
-time, so the query between two `ffmpeg` decodes must not add load. With 5,000 archived
-episodes, `MediaIntegrityTargets` returns one target in **99.7–100.6 µs/op** (1,984 B/op,
-44 allocs/op) on the N97, build 1.2.2131. The `ffmpeg` decode dominates the run; the
-scan is on demand, one file at a time, and adds no work to the acquisition cycle or to
-the daemon at rest. Later passes skip the files whose size and modification time match
-the stored outcome: the cost is then one `stat` per library file, not a decode.
+The file check (*Settings → Maintenance → File integrity check*) walks the library one
+target at a time, so the query between two `ffmpeg` decodes must not add load. With 5,000
+archived episodes, `MediaIntegrityTargets` returns one target in **99.7–100.6 µs/op**
+(1,984 B/op, 44 allocs/op) on the N97, build 1.2.2132. The `ffmpeg` decode dominates the
+run; the periodic worker probes the configured number of files per interval (one by
+default) and the manual *Check now* starts a pass, so the load stays off the acquisition
+cycle and the daemon at rest. Later passes skip the files whose size and modification time
+match the stored outcome: the cost is then one `stat` per library file, not a decode.
 
 ```
 CGO_ENABLED=0 go test . -run '^$' -bench '^BenchmarkMediaIntegrityTargets$' -benchmem -count=3
