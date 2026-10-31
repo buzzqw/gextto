@@ -98,6 +98,20 @@ func runDaemon(dryRun bool, configOption *string) error {
 		filter = env
 	}
 	logging.SetLevel(filter)
+	// The data-folder lock comes before the databases: a second instance must
+	// stop here, not after opening SQLite, the archive and the acquisition
+	// recorder. The interface port is checked at the same point: a process
+	// that does not hold the lock can still be sitting on the address.
+	releaseLock, err := gextto.AcquireInstanceLock(cfg.DataDir)
+	if err != nil {
+		logging.Error("Cannot start: the data folder is already in use by another Gextto. Stop that instance and try again.", "data folder", cfg.DataDir)
+		return err
+	}
+	defer releaseLock()
+	if conflicts := gextto.ListenConflicts(&cfg); len(conflicts) > 0 {
+		logging.Error("Cannot start: the interface address is already in use. Stop the other instance and try again.", "address", strings.Join(conflicts, ", "))
+		return fmt.Errorf("the address %s is already in use: stop the other instance before starting", strings.Join(conflicts, ", "))
+	}
 	gextto.WarnIfAudioCleanupUnavailable(&cfg)
 	for _, warning := range dirWarnings {
 		logging.Warn("a configured folder is not available; Gextto starts anyway, fix the path in Configuration", "folder", warning)
@@ -169,11 +183,6 @@ func runDaemon(dryRun bool, configOption *string) error {
 		default:
 			logging.Error("Database damaged: "+check.name+" failed its integrity check. Restore it from a backup (Maintenance → Backup)", "detail", joinRows(rows))
 		}
-	}
-
-	if conflicts := gextto.ListenConflicts(&cfg); len(conflicts) > 0 {
-		logging.Warn(fmt.Sprintf("⚠️ The address %s is already in use: stop the other instance (legacy extto/rextto or a previous Gextto) before starting",
-			strings.Join(conflicts, ", ")))
 	}
 
 	if engine := gextto.ApplyEngineOverride(&cfg); engine != "" {

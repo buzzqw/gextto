@@ -153,6 +153,11 @@ Gextto gira come un unico servizio. Apri la UI all'indirizzo `http://<host>:5000
   TVDB: vedi *Configurazione → Metadati: TMDB o TVDB*.
 - Il pulsante **Dona** (PayPal) è sempre visibile in basso a destra: se Gextto ti
   è utile puoi sostenere lo sviluppo; l'indirizzo è anche nel README.
+- **Una sola istanza per cartella dati.** Se un altro Gextto sta già usando la
+  stessa cartella dati, o se la porta dell'interfaccia è già occupata, il nuovo
+  processo si ferma subito e lo scrive nel log, senza aprire i database: ferma
+  l'istanza precedente e riavvia. Per una prova su un'altra cartella dati non
+  c'è nulla da configurare.
 
 ### Procedura consigliata per il primo ciclo
 

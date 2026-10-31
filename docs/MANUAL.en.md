@@ -151,6 +151,10 @@ Gextto runs as a single service. Open the web UI at `http://<host>:5000`.
 - The **Donate** button (PayPal) is always visible at the bottom right: if
   Gextto is useful to you, you can support development; the address is also in
   the README.
+- **One instance per data folder.** If another Gextto is already using the same
+  data folder, or the interface port is already taken, the new process stops at
+  once and says so in the log, before opening the databases: stop the previous
+  instance and start again. A test on another data folder needs nothing.
 
 ### Recommended first cycle
 

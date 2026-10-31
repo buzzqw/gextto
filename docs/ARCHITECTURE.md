@@ -87,6 +87,7 @@ qBittorrent-nox.
 | `indexer_failure.go` | repeated `.torrent` failures from one source (an expired login, a dead proxy): a warning in the log and, at most every 12 hours, a notification naming the source and the action (sign in again, disable it in the searches); a resolved link re-arms it. |
 | `torrent_add_intent.go` | starting an approved release (add → approval → `torrent_meta`) and recovery of adds interrupted by a crash. |
 | `web_serve.go` | startup of the web server and background workers. |
+| `instance_lock.go` | `flock` on the data folder so a second Gextto stops before opening the databases; the interface address is checked at the same point. |
 | `service_restart.go` | scheduled systemd actions (e.g. service restart). |
 | `update.go` | self-update of the binary. |
 | `safety.go` | controlled restart of workers after a panic. |
