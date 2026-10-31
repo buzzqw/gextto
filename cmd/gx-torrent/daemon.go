@@ -146,6 +146,9 @@ type torrentMeta struct {
 	// SeedLimitNotice is set once a seed limit has been announced, so the
 	// pause is news once instead of a line per tick (and per resume).
 	SeedLimitNotice bool `json:"seed_limit_notice,omitempty"`
+	// PostProcessed is set when the completion action (move and/or command) has
+	// been launched, so a restart does not run it twice.
+	PostProcessed bool `json:"post_processed,omitempty"`
 }
 
 type persistedState struct {
@@ -1091,6 +1094,7 @@ func (d *Daemon) tick(now time.Time) {
 	var pendingStops []*torrent.Torrent
 	var pendingSelectOnly []selectOnlyJob
 	var pendingRemovals []string
+	var pendingPostProcess []string
 	for _, t := range torrents {
 		id := t.ID()
 		stats, ok := statsOf[id]
@@ -1119,6 +1123,11 @@ func (d *Daemon) tick(now time.Time) {
 			// over files already on disk completes at its first check.
 			if stats.Bytes.Downloaded > 0 {
 				d.notify("download_complete", map[string]any{"name": stats.Name, "hash": id})
+			}
+			if !meta.PostProcessed && d.postProcessEnabled() {
+				meta.PostProcessed = true
+				d.dirty = true
+				pendingPostProcess = append(pendingPostProcess, id)
 			}
 		}
 		// export_dir / export_dir_fin: copy the .torrent once the metadata is
@@ -1328,6 +1337,11 @@ func (d *Daemon) tick(now time.Time) {
 		if err := d.remove(id, false); err != nil {
 			logfError("cannot remove «%s» after its seed limit: %v", id, err)
 		}
+	}
+	// Completion actions run outside d.mu: the move stops the torrent and the
+	// command may take minutes.
+	for _, id := range pendingPostProcess {
+		go d.runPostProcess(id)
 	}
 	// Watch folders (standalone): scan and add dropped .torrent files.
 	d.maybeScanWatchFolders(now)

@@ -1,0 +1,18 @@
+{
+  "name": "gx-torrent",
+  "short_name": "gx-torrent",
+  "description": "Torrent client with RSS feeds, wanted titles, search and a media server",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#111318",
+  "theme_color": "#111318",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

@@ -139,6 +139,9 @@ type uiPageData struct {
 	FeedCount    int
 	// Standalone shows the standalone navigation (torrents, RSS & indexers).
 	Standalone bool
+	// LoginEnabled shows the sign-out control: it is useless (and absent)
+	// when the page has no password.
+	LoginEnabled bool
 
 	Rows []uiTorrentRow
 }
@@ -973,7 +976,27 @@ func (d *Daemon) handleUICreateTorrent(w http.ResponseWriter, r *http.Request) {
 			trackers = append(trackers, line)
 		}
 	}
-	data, err := torrent.CreateTorrent(path, torrent.CreateOptions{Name: name, Trackers: trackers})
+	var webseeds []string
+	for _, line := range strings.Split(r.FormValue("webseeds"), "\n") {
+		if line = strings.TrimSpace(line); line != "" {
+			webseeds = append(webseeds, line)
+		}
+	}
+	// The piece size is chosen in KiB; 0 lets the engine pick one from the
+	// total size. Anything below 16 KiB or not a multiple of it is ignored,
+	// because the BitTorrent piece layout cannot use it.
+	var pieceLength uint32
+	if kib := formInt(r, "piece_size", 0); kib >= 16 && kib <= 16384 && kib%16 == 0 {
+		pieceLength = uint32(kib) * 1024
+	}
+	data, err := torrent.CreateTorrent(path, torrent.CreateOptions{
+		Name:        name,
+		Trackers:    trackers,
+		Webseeds:    webseeds,
+		Private:     formBool(r, "private"),
+		PieceLength: pieceLength,
+		Comment:     strings.TrimSpace(r.FormValue("comment")),
+	})
 	if err != nil {
 		d.uiDone(w, r, "", err)
 		return
@@ -1459,6 +1482,8 @@ func (d *Daemon) uiPageData(limit int) (uiPageData, error) {
 		stats.Session["utp_syn_drops"])
 	page.CPUPercent, page.ProcRSS = d.processUsage(time.Now())
 	if d.opts.Mode == ModeStandalone {
+		page.Standalone = true
+		page.LoginEnabled = d.loginEnabled()
 		update := d.updateStatus()
 		page.UpdateAvailable, page.UpdateDate = update.Available && !update.Applying, update.LatestDate
 		page.AltSpeed = d.altSpeedActive(time.Now())

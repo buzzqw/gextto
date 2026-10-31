@@ -181,3 +181,45 @@ func TestUIRssSuggest(t *testing.T) {
 		t.Fatalf("a one-character query must return no suggestions, got %v", names)
 	}
 }
+
+// TestUISearchQueriesIndexersInParallel checks that several indexers are
+// queried together: with a sequential round the page waits for the sum of
+// their times, and a slow indexer makes the search look stuck.
+func TestUISearchQueriesIndexersInParallel(t *testing.T) {
+	feed := func(w http.ResponseWriter, _ *http.Request) {
+		time.Sleep(300 * time.Millisecond)
+		w.Header().Set("Content-Type", "application/xml")
+		_, _ = w.Write([]byte(searchFeed))
+	}
+	a := httptest.NewServer(http.HandlerFunc(feed))
+	defer a.Close()
+	b := httptest.NewServer(http.HandlerFunc(feed))
+	defer b.Close()
+
+	d := standaloneTestDaemon(t, "", true)
+	d.opts.Settings.Set(setupCompleteKey, "true")
+	d.opts.Settings.Set(indexersSettingKey, `[{"name":"a","url":"`+a.URL+`","apikey":"k"},{"name":"b","url":"`+b.URL+`","apikey":"k"}]`)
+	srv := httptest.NewServer(d.routes())
+	defer srv.Close()
+
+	start := time.Now()
+	resp, err := http.Get(srv.URL + "/ui/search?q=movie")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	elapsed := time.Since(start)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d", resp.StatusCode)
+	}
+	var items []torznab.Item
+	if err := json.NewDecoder(resp.Body).Decode(&items); err != nil {
+		t.Fatal(err)
+	}
+	if len(items) != 4 {
+		t.Fatalf("items = %d, want 4", len(items))
+	}
+	if elapsed > 550*time.Millisecond {
+		t.Fatalf("search took %v: the indexers were queried sequentially", elapsed)
+	}
+}

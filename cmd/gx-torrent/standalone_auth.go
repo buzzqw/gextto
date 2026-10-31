@@ -250,6 +250,45 @@ func (d *Daemon) loginMatches(user, password string) bool {
 	return auth.VerifyPassword(stored, password)
 }
 
+// handleUILogout signs the browser out: it drops the page session and the
+// qBittorrent SID of the same browser, clears both cookies and returns to the
+// sign-in page. The request is a POST, so a link on another site cannot log the
+// operator out.
+func (d *Daemon) handleUILogout(w http.ResponseWriter, r *http.Request) {
+	if d.opts.Mode != ModeStandalone {
+		http.NotFound(w, r)
+		return
+	}
+	if r.Method != http.MethodPost {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+	if !d.uiSameOrigin(w, r) {
+		return
+	}
+	if d.sessions != nil {
+		for _, name := range []string{uiSessionCookie, qbitSIDCookie} {
+			if cookie, err := r.Cookie(name); err == nil {
+				d.sessions.Drop(cookie.Value)
+			}
+		}
+	}
+	for _, name := range []string{uiSessionCookie, qbitSIDCookie} {
+		http.SetCookie(w, &http.Cookie{
+			Name: name, Value: "", Path: "/", MaxAge: -1,
+			HttpOnly: true, Secure: secureRequest(r), SameSite: http.SameSiteStrictMode,
+		})
+	}
+	http.Redirect(w, r, "/ui/login", http.StatusSeeOther)
+}
+
+// loginEnabled reports whether the page has a password, so a sign-out control
+// is shown only when it can do something.
+func (d *Daemon) loginEnabled() bool {
+	return d.opts.Mode == ModeStandalone && d.opts.Settings != nil &&
+		strings.TrimSpace(d.opts.Settings.Get(standalonePasswordKey, "")) != ""
+}
+
 // handleUILogin renders the sign-in form (GET) and processes it (POST).
 func (d *Daemon) handleUILogin(w http.ResponseWriter, r *http.Request) {
 	if d.opts.Mode != ModeStandalone {

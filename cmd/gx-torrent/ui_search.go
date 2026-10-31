@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/buzzqw/gextto/internal/rss"
@@ -71,19 +72,41 @@ func (d *Daemon) handleUISearch(w http.ResponseWriter, r *http.Request) {
 	// same rule the local archive section applies, so the two agree.
 	filter := parseArchiveQuery(query, "", false)
 	results := make([]torznab.Item, 0, 64)
+	// Query the indexers in parallel, with a small ceiling: with several
+	// indexers a sequential round waits for the sum of their times, and the
+	// page looks stuck. Each one gets its own timeout, so a single slow indexer
+	// cannot consume the whole request; the others still answer.
+	var (
+		mu  sync.Mutex
+		wg  sync.WaitGroup
+		sem = make(chan struct{}, 4)
+	)
 	for _, indexer := range indexers {
-		items, err := indexer.Search(ctx, query)
-		if err != nil {
-			logf("indexer %s: %v", indexer.Name, err)
-			continue
-		}
-		for _, item := range items {
-			if !filter.matchTitle(item.Title) {
-				continue
+		indexer := indexer
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+			searchCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
+			defer cancel()
+			items, err := indexer.Search(searchCtx, query)
+			if err != nil {
+				logf("indexer %s: %v", indexer.Name, err)
+				return
 			}
-			results = append(results, item)
-		}
+			kept := make([]torznab.Item, 0, len(items))
+			for _, item := range items {
+				if filter.matchTitle(item.Title) {
+					kept = append(kept, item)
+				}
+			}
+			mu.Lock()
+			results = append(results, kept...)
+			mu.Unlock()
+		}()
 	}
+	wg.Wait()
 	sort.SliceStable(results, func(i, j int) bool {
 		if results[i].Seeders != results[j].Seeders {
 			return results[i].Seeders > results[j].Seeders

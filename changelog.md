@@ -14,6 +14,17 @@ aggiornato è online: [italiano](docs/MANUAL.it.md) ·
 [changelog.en.md](changelog.en.md). Per segnalazioni:
 [issue su GitHub](https://github.com/buzzqw/gextto/issues).
 
+## 31 ottobre 2026
+- **Le categorie si gestiscono dalla pagina, con la loro cartella.** Una categoria creata dalla finestra del torrent nasceva senza percorso: la gestione automatica la spostava nella cartella di download, quindi l'opzione sembrava non fare nulla. In *Impostazioni → Categorie* ora si aggiunge, si rinomina, si cambia il percorso e si elimina una categoria; cambiando il percorso i torrent gestiti da quella categoria si spostano di conseguenza.
+
+- **A fine download gx-torrent può spostare i dati e avviare un programma.** In *Impostazioni → Dopo il download* si sceglie una cartella di completamento (con una sottocartella per categoria, se vuoi) e il torrent continua a seedare dalla nuova posizione. Si può anche indicare un programma da eseguire al completamento: i dettagli del torrent arrivano nelle variabili d'ambiente `GX_HASH`, `GX_NAME`, `GX_PATH`, `GX_CATEGORY` e `GX_SIZE`, mai sulla riga di comando. Entrambe le azioni sono spente per default.
+
+- **La ricerca sugli indexer risponde prima e mostra di più.** Gli indexer vengono interrogati in parallelo, quindi con più indexer non si aspetta la somma dei loro tempi. Ogni risultato mostra dimensione, seed, peer, età e indexer; la lista si ordina per seed, dimensione, data o nome; *Opzioni* apre la finestra di aggiunta già compilata per scegliere destinazione, categoria e tag.
+
+- **La pagina si installa come app e si può chiudere la sessione.** Da telefono o dal browser la pagina di gx-torrent si aggiunge alla schermata home (manifest e service worker per le sole risorse condivise, mai per pagine o risposte autenticate) e, quando c'è una password, compare *Esci*.
+
+- **Più comodo aggiungere e creare.** La finestra di aggiunta accetta anche i tag e i limiti di seed (ratio e giorni); la barra ha *Pausa tutto* e *Riprendi tutto*; la creazione di un `.torrent` espone dimensione dei pezzi, torrent privato, commento e web seed. L'API compatibile con qBittorrent serve anche lo spazio libero e il contenuto di una cartella, così VueTorrent e le app mobili scelgono il percorso senza errori.
+
 ## 30 ottobre 2026
 - **La velocità eD2k nella barra in alto non resta più a zero mentre aMule carica.** aMule dichiara la propria velocità su una finestra di un solo secondo: un client che scaricava da te a blocchi faceva comparire la sua velocità per un istante e zero nel resto del tempo, e la somma con i torrent scendeva a `0 B/s` anche con centinaia di KB/s in uscita (sulla pagina eD2k gli stessi client sembravano fermi tra un blocco e l'altro). Ora la barra in alto usa i byte che aMule ha davvero inviato e ricevuto nell'ultimo mezzo minuto: la velocità resta quella reale e non balla più. Le velocità per file e per client nella pagina eD2k restano quelle istantanee di aMule. Niente da configurare.
 

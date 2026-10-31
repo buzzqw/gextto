@@ -101,6 +101,8 @@ func (d *Daemon) routesQbit() http.Handler {
 	mux.HandleFunc("POST /api/v2/transfer/toggleSpeedLimitsMode", d.handleQbitToggleSpeedLimitsMode)
 	mux.HandleFunc("GET /api/v2/app/networkInterfaceList", d.handleQbitNetworkInterfaceList)
 	mux.HandleFunc("GET /api/v2/app/networkInterfaceAddressList", d.handleQbitNetworkInterfaceAddressList)
+	mux.HandleFunc("GET /api/v2/app/getFreeSpace", d.handleQbitGetFreeSpace)
+	mux.HandleFunc("GET /api/v2/app/getDirectoryContent", d.handleQbitGetDirectoryContent)
 	mux.HandleFunc("GET /api/v2/log/main", d.handleQbitLogMain)
 	mux.HandleFunc("GET /api/v2/log/peers", d.handleQbitLogPeers)
 	// Write endpoints: peers, category editing, piece priority, queue priority

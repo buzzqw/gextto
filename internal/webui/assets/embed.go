@@ -9,7 +9,7 @@ package assets
 
 import "embed"
 
-//go:embed ui.tmpl token.html login.html setup.html rss.html wanted.html settings.html archive.html stats.html favicon.svg theme.css common.js icons.svg
+//go:embed ui.tmpl token.html login.html setup.html rss.html wanted.html settings.html archive.html stats.html favicon.svg theme.css common.js icons.svg manifest.webmanifest sw.js
 var files embed.FS
 
 // UITemplate is the html/template source of the daemon page: the page body plus
@@ -53,6 +53,13 @@ func IconsSVG() string { return mustRead("icons.svg") }
 
 // FaviconSVG is the site icon, inlined in the pages and served at /favicon.ico.
 func FaviconSVG() string { return mustRead("favicon.svg") }
+
+// Manifest is the web app manifest: it lets a phone or a desktop browser
+// install the standalone page as an app.
+func Manifest() string { return mustRead("manifest.webmanifest") }
+
+// ServiceWorker caches the shared assets; authenticated pages stay online-only.
+func ServiceWorker() string { return mustRead("sw.js") }
 
 func mustRead(name string) string {
 	data, err := files.ReadFile(name)

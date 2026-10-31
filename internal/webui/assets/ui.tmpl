@@ -6,6 +6,7 @@
 <meta name="color-scheme" content="light dark">
 <title>gx-torrent</title>
 <link rel="icon" type="image/svg+xml" href="/favicon.ico">
+<link rel="manifest" href="/manifest.webmanifest">
 <script>try{var m=localStorage.getItem('gx-theme');if(m==='light'||m==='dark')document.documentElement.setAttribute('data-theme',m);}catch(e){}</script>
 <script>
 // The torrent table's columns (the column chooser): key, shown by default,
@@ -36,6 +37,7 @@ body{display:flex;flex-direction:column;overflow:hidden}
 .topbar .search input{width:100%;padding-left:32px;height:32px;background:var(--surface-2);border-color:transparent}
 .topbar .search input:focus{background:var(--sunken);border-color:var(--accent)}
 .topbar .search kbd{position:absolute;right:8px;font:11px var(--mono);color:var(--subtle);border:1px solid var(--border);border-radius:4px;padding:0 4px;background:var(--surface)}
+.topbar .logout-form{display:flex;margin:0}
 .speeds{display:flex;gap:12px;font-variant-numeric:tabular-nums;font-size:13px;white-space:nowrap}
 .speeds span{display:inline-flex;align-items:center;gap:4px}
 .speeds .d{color:var(--info)}.speeds .u{color:var(--ok)}
@@ -191,6 +193,7 @@ body{display:flex;flex-direction:column;overflow:hidden}
 .results{display:flex;flex-direction:column;gap:6px;max-height:50vh;overflow:auto}
 .results .r{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--border);border-radius:var(--radius)}
 .results .r .t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.results .r .m{color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:42%}
 .logpane{flex:1;min-height:0;display:flex;flex-direction:column}
 .logbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:8px 14px;border-bottom:1px solid var(--border);background:var(--surface)}
 .logview{flex:1;margin:0;overflow:auto;padding:10px 14px;background:var(--sunken);font:12.5px/1.45 var(--mono);white-space:pre-wrap;overflow-wrap:anywhere}
@@ -315,6 +318,7 @@ body{display:flex;flex-direction:column;overflow:hidden}
     <button type="button" class="ghost icon" data-theme-switch data-label-auto="Theme: automatic (follows the system)" data-label-light="Theme: light" data-label-dark="Theme: dark" aria-label="Theme: automatic (follows the system)" title="Switch theme (automatic, light, dark)">
       <svg class="i" data-theme-icon="auto"><use href="#i-auto"/></svg><svg class="i" data-theme-icon="light" hidden><use href="#i-sun"/></svg><svg class="i" data-theme-icon="dark" hidden><use href="#i-moon"/></svg>
     </button>
+    {{if .LoginEnabled}}<form method="post" action="/ui/logout" class="logout-form"><button type="submit" class="ghost icon" aria-label="Sign out" title="Sign out of the web interface"><svg class="i"><use href="#i-exit"/></svg></button></form>{{end}}
   </div>
 </header>
 
@@ -335,6 +339,9 @@ body{display:flex;flex-direction:column;overflow:hidden}
   <main class="work" id="main">
     <div class="toolbar" role="toolbar" aria-label="Torrent actions" id="toolbar">
       <button type="button" class="primary" id="btn-add" title="Add torrents: magnet links, .torrent URLs or files (shortcut N)"><svg class="i"><use href="#i-plus"/></svg><span class="lbl">Add</span></button>
+      <span class="sep" aria-hidden="true"></span>
+      <button type="button" class="ghost" id="btn-resume-all" title="Resume every torrent in the session"><svg class="i"><use href="#i-play"/></svg><span class="lbl">Resume all</span></button>
+      <button type="button" class="ghost" id="btn-pause-all" title="Pause every torrent in the session"><svg class="i"><use href="#i-pause"/></svg><span class="lbl">Pause all</span></button>
       <span class="sep" aria-hidden="true"></span>
       <button type="button" class="ghost" data-bulk="resume" title="Start the selected torrents (Resume; qBittorrent Start)"><svg class="i"><use href="#i-play"/></svg><span class="lbl">Resume</span></button>
       <button type="button" class="ghost" data-bulk="pause" title="Stop the selected torrents (Pause; qBittorrent Stop) (P)"><svg class="i"><use href="#i-pause"/></svg><span class="lbl">Pause</span></button>
@@ -515,6 +522,9 @@ body{display:flex;flex-direction:column;overflow:hidden}
       <label class="field">Category
         <input type="text" name="category" list="catlist-all" autocomplete="off" title="Category assigned to the added torrents for organization and filtering">
       </label>
+      <label class="field">Tags
+        <input type="text" name="tags" placeholder="tag, tag" autocomplete="off" title="Tags assigned to the added torrents, separated by commas">
+      </label>
       <label class="chk" title="Let the category decide the save path: assigning a category moves the torrent to its folder (qBittorrent automatic torrent management)"><input type="checkbox" name="auto_tmm" value="1"> Save path managed by the category</label>
       {{end}}
       {{template "addopts"}}
@@ -672,11 +682,17 @@ body{display:flex;flex-direction:column;overflow:hidden}
     <div class="dlg-body">
       <label class="field">Folder or file on the server<input type="text" name="path" placeholder="/srv/share/folder" autocomplete="off" title="Path to folder or file on the server to package into .torrent"></label>
       <label class="field">Name (optional)<input type="text" name="name" autocomplete="off" title="Display name for the torrent (optional, defaults to filename or folder name)"></label>
+      <div class="form-grid">
+        <label>Piece size<select name="piece_size" title="Size of each piece in the .torrent: Auto picks one from the total size, a fixed size is useful to match an existing torrent"><option value="0">Auto</option><option value="32">32 KiB</option><option value="64">64 KiB</option><option value="128">128 KiB</option><option value="256">256 KiB</option><option value="512">512 KiB</option><option value="1024">1 MiB</option><option value="2048">2 MiB</option><option value="4096">4 MiB</option><option value="8192">8 MiB</option><option value="16384">16 MiB</option></select></label>
+        <label class="chk" title="Mark the torrent private (BEP 27): DHT, PEX and local discovery are disabled and only the trackers are used"><input type="checkbox" name="private" value="1"> Private</label>
+      </div>
+      <label class="field">Comment (optional)<input type="text" name="comment" autocomplete="off" title="Comment stored in the .torrent, for example the source or the release group"></label>
       <label class="field">Trackers, one per line<textarea name="trackers" rows="3" autocomplete="off" title="Tracker announce URLs, one per line (optional, for swarm discovery)"></textarea></label>
+      <label class="field">Web seeds, one per line<textarea name="webseeds" rows="2" autocomplete="off" placeholder="https://example/file" title="HTTP/HTTPS web seeds stored in the .torrent, one per line (optional, BEP 19)"></textarea></label>
     </div>
     <div class="dlg-foot">
       <button type="button" data-close title="Close without creating">Cancel</button>
-      <button type="submit" class="primary" title="Create .torrent file from the specified path and start seeding">Create .torrent</button>
+      <button type="submit" class="primary" title="Create and download the .torrent file">Create .torrent</button>
     </div>
   </form>
 </dialog>
@@ -686,8 +702,14 @@ body{display:flex;flex-direction:column;overflow:hidden}
   <form method="dialog" id="form-search">
     <div class="dlg-head"><h2 id="dlg-search-title">Search indexers</h2><button type="button" class="ghost icon" data-close aria-label="Close" title="Close"><svg class="i"><use href="#i-x"/></svg></button></div>
     <div class="dlg-body">
-      <div style="display:flex;gap:8px">
-        <input type="search" id="searchbox" style="flex:1" placeholder="Search indexers…" autocomplete="off" aria-label="Search indexers…" title="Search configured Torznab indexers for releases">
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <input type="search" id="searchbox" style="flex:1;min-width:220px" placeholder="Search indexers…" autocomplete="off" aria-label="Search indexers…" title="Search configured Torznab indexers for releases">
+        <select id="search-sort" aria-label="Sort results" title="Order of the search results: most seeders, largest, newest or name">
+          <option value="seeders">Seeds</option>
+          <option value="size">Size</option>
+          <option value="date">Newest</option>
+          <option value="name">Name</option>
+        </select>
         <button type="submit" class="primary" title="Execute search query across configured indexers">Search</button>
       </div>
       <p class="muted" id="searchinfo" style="margin:0" aria-live="polite"></p>
@@ -1582,8 +1604,11 @@ document.addEventListener('click',function(e){
   var more=el.closest('#torrents td.more button');if(more){var r=rowOf(more),rc=more.getBoundingClientRect();rowMenu(r,rc.right-230,rc.bottom+4,more);return;}
   var tab=el.closest('#drawer [data-tab]');if(tab&&state.drawer){openDetail(state.drawer.hash,tab.dataset.tab);return;}
   var da=el.closest('#drawer [data-dact]');if(da&&state.drawer){var h=state.drawer.hash;if(da.dataset.dact==='magnet')copyMagnet(h);else if(da.dataset.dact==='dht'){toast(t('DHT swarm')+'…',false);fetch('/ui/dhtscrape?hash='+encodeURIComponent(h),{cache:'no-store'}).then(function(r){return r.ok?r.json():Promise.reject();}).then(function(d){toast(t('DHT swarm (seeders / peers):')+' ~'+d.seeders+' / ~'+d.peers,false);}).catch(function(){toast(t('DHT swarm')+': '+t('Copy failed'),true);});}else act(da.dataset.dact,[h]);return;}
-  var res=el.closest('#searchresults [data-add]');if(res){var p=new URLSearchParams();p.set('source',res.dataset.add);res.disabled=true;post('/ui/add',p).then(function(x){report(x);refresh();});return;}
+  var res=el.closest('#searchresults [data-add]');if(res){var p=new URLSearchParams();p.set('source',res.dataset.add);res.disabled=true;post('/ui/add',p).then(function(x){report(x);refresh();res.disabled=false;});return;}
+  var resopt=el.closest('#searchresults [data-add-options]');if(resopt){var dlg=$('#dlg-add');if(dlg){openDialog(dlg);$('#add-source').value=resopt.dataset.addOptions||'';updateAddPreview();}return;}
   if(el.closest('#btn-add')){cookieDomains=null;openDialog($('#dlg-add'));updateAddPreview();return;}
+  if(el.closest('#btn-pause-all')){post('/ui/action',{op:'pause-all'}).then(function(r){report(r);refresh();});return;}
+  if(el.closest('#btn-resume-all')){post('/ui/action',{op:'resume-all'}).then(function(r){report(r);refresh();});return;}
   if(el.closest('#undo-btn')){doUndo();return;}
   if(el.closest('#btn-search')){openDialog($('#dlg-search'));return;}
   if(el.closest('#btn-log')){showLog($('#btn-log').getAttribute('aria-pressed')!=='true');return;}
@@ -1613,6 +1638,7 @@ document.addEventListener('change',function(e){
   if(e.target.id==='files-all'){$$('#drawer .filesel').forEach(function(c){c.checked=e.target.checked;});return;}
   if(e.target.id==='files-tree'){try{localStorage.setItem('gx-files-tree',e.target.checked?'1':'0');}catch(_){}groupFiles();return;}
   if(e.target.id==='add-files'){updateFilePick();return;}
+  if(e.target.id==='search-sort'){renderSearchResults();return;}
   if(e.target.id==='log-debug'||e.target.id==='log-info'||e.target.id==='log-warn'||e.target.id==='log-error'||e.target.id==='log-lines'){if(e.target.id==='log-lines')loadLog();else renderLog();return;}
   var f=e.target.closest('#drawer form');if(f)f.classList.add('dirty');
 });
@@ -1712,13 +1738,48 @@ function tool(name){
   else if(name==='feeds'){toast(t('Checking…'),false);fetch('/ui/feeds/poll',{method:'POST',headers:{'X-GX-Fetch':'1'}}).then(function(r){if(!r.ok)throw new Error(r.status);return r.json();}).then(function(res){if(res.errors&&res.errors.length)toast(res.errors.join(' · '),true);else toast(res.feeds+' '+t('feeds checked')+': '+res.new+' '+t('new')+' · '+res.added+' '+t('added'),false);refresh();}).catch(function(e){toast(t('Error')+': '+(e.message||''),true);});}
   else if(name==='ports'){toast(t('checking…'),false);fetch('/ui/portcheck',{cache:'no-store'}).then(function(r){return r.text();}).then(function(h){var d=document.createElement('div');d.innerHTML=h;toast(d.textContent.trim()||t('Done'),/not|non|nicht|pas|nie|no /i.test(d.textContent)&&false);}).catch(function(e){toast(t('test failed:')+' '+e.message,true);});}
 }
+var lastSearchResults=[];
+function searchAge(iso){
+  if(!iso)return '';
+  var t=Date.parse(iso);if(isNaN(t))return '';
+  var s=Math.max(0,(Date.now()-t)/1000);
+  if(s<3600)return Math.max(1,Math.round(s/60))+'m';
+  if(s<86400)return Math.round(s/3600)+'h';
+  return Math.round(s/86400)+'d';
+}
+function renderSearchResults(){
+  var box=$('#searchresults'),info=$('#searchinfo');if(!box)return;
+  box.textContent='';
+  var sort=($('#search-sort')&&$('#search-sort').value)||'seeders';
+  var list=lastSearchResults.slice();
+  list.sort(function(a,b){
+    if(sort==='size')return (b.size||0)-(a.size||0);
+    if(sort==='name')return String(a.title||'').localeCompare(String(b.title||''));
+    if(sort==='date')return Date.parse(b.published||0)-Date.parse(a.published||0);
+    return (b.seeders||0)-(a.seeders||0);
+  });
+  info.textContent=list.length?list.length+' '+t('results'):t('No results');
+  list.forEach(function(it){
+    var row=document.createElement('div');row.className='r';
+    var name=document.createElement('span');name.className='t';name.textContent=it.title;name.title=it.title;
+    var meta=document.createElement('span');meta.className='m';
+    var parts=[fmtBytes(it.size),'S '+it.seeders,'P '+it.leechers];
+    var age=searchAge(it.published);if(age)parts.push(age);
+    if(it.indexer)parts.push(it.indexer);
+    meta.textContent=parts.join(' · ');meta.title=meta.textContent;
+    var add=document.createElement('button');add.type='button';add.className='primary sm';add.textContent=t('Add');add.dataset.add=it.magnet||it.link||'';
+    var opt=document.createElement('button');opt.type='button';opt.className='ghost sm';opt.textContent=t('Options');opt.title=t('Add with destination, category and tags');opt.dataset.addOptions=it.magnet||it.link||'';
+    row.appendChild(name);row.appendChild(meta);row.appendChild(add);row.appendChild(opt);
+    box.appendChild(row);
+  });
+}
 function runSearch(){
-  var q=($('#searchbox').value||'').trim(),box=$('#searchresults'),info=$('#searchinfo');box.textContent='';if(!q){info.textContent='';return;}
+  var q=($('#searchbox').value||'').trim(),box=$('#searchresults'),info=$('#searchinfo');if(!box)return;box.textContent='';if(!q){info.textContent='';return;}
   info.textContent=t('Searching…');
   fetch('/ui/search?q='+encodeURIComponent(q),{cache:'no-store'}).then(function(r){return r.ok?r.json():[];}).then(function(list){
-    info.textContent=list.length?list.length+' '+t('results'):t('No results');
-    list.forEach(function(it){var row=document.createElement('div');row.className='r';var name=document.createElement('span');name.className='t';name.textContent=it.title;name.title=it.title;var meta=document.createElement('span');meta.className='muted';meta.textContent=fmtBytes(it.size)+' · '+t('Seeds')+' '+it.seeders;var b=document.createElement('button');b.type='button';b.className='primary sm';b.textContent=t('Add');b.dataset.add=it.magnet||it.link;row.appendChild(name);row.appendChild(meta);row.appendChild(b);box.appendChild(row);});
-  }).catch(function(){info.textContent=t('No results');});
+    lastSearchResults=Array.isArray(list)?list:[];
+    renderSearchResults();
+  }).catch(function(){lastSearchResults=[];renderSearchResults();});
 }
 function fmtBytes(n){if(!n||n<0)return '';var u=['B','KiB','MiB','GiB','TiB'],i=0;while(n>=1024&&i<u.length-1){n/=1024;i++;}return (i?n.toFixed(1):n)+' '+u[i];}
 
@@ -1756,6 +1817,8 @@ window.gxClearFilters=function(){state.filter={status:'all',cat:null,tag:null,tr
         <div class="form-grid" style="margin-top:10px">
           <label title="Download speed limit for the added torrents in KiB/s: 0 = unlimited, empty = follow the global limit">Download limit (KiB/s)<input type="number" min="0" name="download_limit" placeholder="global"></label>
           <label title="Upload speed limit for the added torrents in KiB/s: 0 = unlimited, empty = follow the global limit">Upload limit (KiB/s)<input type="number" min="0" name="upload_limit" placeholder="global"></label>
+          {{if .Standalone}}<label title="Seed ratio limit for the added torrents: 0 = unlimited, empty = follow the global limit">Seed ratio<input type="number" min="0" step="any" name="seed_ratio" placeholder="global"></label>
+          <label title="Maximum seeding time for the added torrents in days: 0 = unlimited, empty = follow the global limit">Seed days<input type="number" min="0" name="seed_days" placeholder="global"></label>{{end}}
           <label title="How the files are placed in the save folder: as in the torrent, always inside a folder of their own, or without the torrent's root folder. Default follows the settings">Content layout<select name="content_layout"><option value="">Default</option><option value="Original">Original</option><option value="Subfolder">Create subfolder</option><option value="NoSubfolder">Don't create subfolder</option></select></label>
         </div>
       </details>

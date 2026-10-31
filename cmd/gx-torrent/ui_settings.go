@@ -15,6 +15,7 @@ import (
 	"net/http"
 	"net/url"
 	"slices"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -187,6 +188,8 @@ func (d *Daemon) handleUISettings(w http.ResponseWriter, r *http.Request) {
 	// Global autoTMM default (off unless enabled): new torrents follow their
 	// category's save path.
 	store.Set(autoTMMEnabledKey, strconv.FormatBool(formBool(r, "auto-tmm-enabled")))
+	// Completion actions: move the finished data and/or run a program.
+	store.Set(postProcessMoveCategoryKey, strconv.FormatBool(formBool(r, "postprocess-move-category")))
 	if layout, ok := torrent.ParseContentLayout(r.FormValue("content-layout")); ok {
 		store.Set(contentLayoutKey, layout)
 	}
@@ -221,6 +224,7 @@ func (d *Daemon) handleUISettings(w http.ResponseWriter, r *http.Request) {
 		"download-dir", "temp-dir", "listen", "peer-ports", "listen-interface",
 		"outgoing-interface", "proxy", "token", "ipfilter", "dht-bootstrap",
 		"watch-folders", "export-dir", "export-dir-fin",
+		postProcessMoveKey, postProcessRunKey,
 		"notify-url", "lang", notifyWebhookTokenKey, notifyWebhookUserKey,
 		notifyTelegramTokenKey, notifyTelegramChatKey, notifyEmailSMTPKey,
 		notifyEmailFromKey, notifyEmailToKey,
@@ -467,6 +471,37 @@ func languageOptions(selected string) string {
 	return b.String()
 }
 
+// categoryRows renders the category manager table: one row per category, with
+// its save path editable in place and a remove button. The page creates the
+// category automatically when a torrent is assigned a new name; this table is
+// where the path that automatic torrent management moves to is set.
+func (d *Daemon) categoryRows() string {
+	categories := d.categoriesSnapshot()
+	names := make([]string, 0, len(categories))
+	for name := range categories {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	if len(names) == 0 {
+		return `<tr><td colspan="3" class="muted">No categories yet. Add one below: torrents can then be assigned to it and moved to its folder.</td></tr>`
+	}
+	var b strings.Builder
+	for _, name := range names {
+		escaped := html.EscapeString(name)
+		fmt.Fprintf(&b, `<tr><td><strong>%s</strong></td><td>`+
+			`<form method="post" action="/ui/category-manage" class="cat-edit">`+
+			`<input type="hidden" name="op" value="edit"><input type="hidden" name="name" value="%s">`+
+			`<input type="text" name="savepath" value="%s" placeholder="download folder" autocomplete="off" aria-label="Save path of %s" title="Folder where the torrents of this category are saved (empty = the main download folder)">`+
+			`<button type="submit" class="sm" title="Save the save path of this category">Save</button>`+
+			`</form></td><td>`+
+			`<form method="post" action="/ui/category-manage" data-confirm="Remove this category? Its torrents keep their files and lose the category.">`+
+			`<input type="hidden" name="op" value="remove"><input type="hidden" name="name" value="%s">`+
+			`<button type="submit" class="sm danger" title="Remove this category; its torrents keep their files and lose the category">Remove</button>`+
+			`</form></td></tr>`, escaped, escaped, html.EscapeString(categories[name]), escaped, escaped)
+	}
+	return b.String()
+}
+
 // renderSettings writes the settings page, localized like the daemon page.
 func (d *Daemon) renderSettings(w http.ResponseWriter, r *http.Request, errKey string, isError bool) {
 	cfg, _, _ := d.config()
@@ -523,6 +558,9 @@ func (d *Daemon) renderSettings(w http.ResponseWriter, r *http.Request, errKey s
 	repl("{{TEMP_DIR}}", get("temp-dir"))
 	repl("{{EXPORT_DIR}}", get("export-dir"))
 	repl("{{EXPORT_FIN_DIR}}", get("export-dir-fin"))
+	repl("{{POSTPROCESS_MOVE}}", get(postProcessMoveKey))
+	repl("{{POSTPROCESS_MOVE_CATEGORY}}", checkedIf(boolSetting(postProcessMoveCategoryKey)))
+	repl("{{POSTPROCESS_RUN}}", get(postProcessRunKey))
 	repl("{{AUTO_TMM_ON}}", checkedIf(boolSetting(autoTMMEnabledKey)))
 	repl("{{MAX_RATIO_ON}}", checkedIf(boolSetting(maxRatioEnabledKey)))
 	repl("{{MAX_RATIO}}", strconv.FormatFloat(d.settingFloat(maxRatioKey, -1), 'f', -1, 64))
@@ -534,6 +572,7 @@ func (d *Daemon) renderSettings(w http.ResponseWriter, r *http.Request, errKey s
 	repl("{{CLIENT_IDENTITY_OPTIONS}}", clientIdentityOptions(store.Get(clientIdentityKey, defaultClientIdentity)))
 	repl("{{CLIENT_IDENTITY_VERSION}}", html.EscapeString(clientIdentityVersion(store.Get(clientIdentityVersionKey, ""))))
 	repl("{{WATCH_FOLDERS}}", get("watch-folders"))
+	repl("{{CATEGORIES_ROWS}}", d.categoryRows())
 	repl("{{COOKIES}}", html.EscapeString(d.cookiesPretty()))
 	repl("{{ALT_WEBUI_ON}}", checkedIf(d.altWebUIEnabled()))
 	altVersion := d.altWebUIVersion()
@@ -541,6 +580,11 @@ func (d *Daemon) renderSettings(w http.ResponseWriter, r *http.Request, errKey s
 		altVersion = "not installed"
 	}
 	repl("{{ALT_WEBUI_VERSION}}", html.EscapeString(altVersion))
+	logoutForm := ""
+	if d.loginEnabled() {
+		logoutForm = `<button type="submit" formaction="/ui/logout" formmethod="post" class="secondary sm" title="Sign out of the web interface">Sign out</button>`
+	}
+	repl("{{LOGOUT_FORM}}", logoutForm)
 	repl("{{LISTEN}}", get("listen"))
 	repl("{{PEER_PORTS}}", get("peer-ports"))
 	repl("{{LISTEN_IFACE}}", get("listen-interface"))

@@ -640,7 +640,14 @@ standalone pages' usability (Browse… on the folders, the port test, the multi-
 DLNA library, Gextto's blocklist as the default IP filter, export/import of the RSS
 setup, `/regex/` wanted titles, the *Update available* indicator in the status bar, the
 **Statistics** page with this session and all-time totals — kept across restarts —,
-disk and cache, the network, the queue and a speed graph over 1 h/24 h/7 d).
+disk and cache, the network, the queue and a speed graph over 1 h/24 h/7 d), the
+**category manager** with its save path (what automatic torrent management
+needs to move anything), the **completion actions** (move the finished data to
+a folder — optionally one subfolder per category — and/or run an operator
+command with the torrent in the environment, both off by default), the
+**parallel indexer search** with sortable results and an add dialog pre-filled
+from a result, and the **installable page** (manifest and service worker for the
+shared assets only) with a sign-out when a password is set.
 The standalone **self-update** is described in §3.
 
 **Swarm Merging** (file sharing between torrents). Different swarms holding **the same

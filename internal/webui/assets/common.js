@@ -226,6 +226,13 @@
   });
   function init() {
     apply(read());
+    // The daemon page is installable as an app: the service worker caches only
+    // the shared assets, never an authenticated page or an API answer.
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", function () {
+        navigator.serviceWorker.register("/sw.js").catch(function () { /* plain HTTP or a proxy: the page still works */ });
+      });
+    }
     // A server notice (redirect after a classic form post) becomes a toast.
     var n = document.querySelector(".notice[data-toast]");
     if (n) { toast(n.textContent.trim(), n.classList.contains("err")); n.remove(); }

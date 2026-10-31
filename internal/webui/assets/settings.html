@@ -6,6 +6,7 @@
 <title>gx-torrent</title>
 <meta name="color-scheme" content="light dark">
 <link rel="icon" type="image/svg+xml" href="/favicon.ico">
+<link rel="manifest" href="/manifest.webmanifest">
 <script>try{var m=localStorage.getItem('gx-theme');if(m==='light'||m==='dark')document.documentElement.setAttribute('data-theme',m);}catch(e){}</script>
 <link rel="stylesheet" href="/assets/theme.css">
 <style>
@@ -29,6 +30,12 @@ h3.sub{margin:14px 0 2px;font-size:13px;color:var(--subtle);text-transform:upper
 .sched-week thead th{color:var(--subtle);font-weight:600}
 .sched-week input[type=time]{min-width:7.5em}
 .sched-week input[type=number]{min-width:6em}
+.cat-manage{width:100%;border-collapse:collapse;font-size:13px;margin:8px 0}
+.cat-manage th,.cat-manage td{padding:6px;border-bottom:1px solid var(--border);text-align:left;vertical-align:middle}
+.cat-manage th{color:var(--subtle);font-weight:600}
+.cat-manage .cat-edit{display:flex;gap:6px;align-items:center;margin:0}
+.cat-manage .cat-edit input[type=text]{flex:1;min-width:12em}
+.cat-manage form{margin:0}
 .savebar{position:sticky;bottom:0;margin:18px -16px 0;padding:12px 16px;display:flex;justify-content:flex-end;gap:10px;background:var(--surface);border-top:1px solid var(--border);box-shadow:0 -6px 20px rgba(0,0,0,.08)}
 </style></head>
 <body>
@@ -57,6 +64,13 @@ h3.sub{margin:14px 0 2px;font-size:13px;color:var(--subtle);text-transform:upper
     <label class="chk"><input type="checkbox" name="auto-tmm-enabled" value="1"{{AUTO_TMM_ON}} title="New torrents follow their category's save path by default; assigning a category moves them (qBittorrent automatic torrent management, off by default)"> New torrents follow their category's folder (autoTMM)</label>
   </div>
 </fieldset>
+<fieldset id="after-download">
+  <legend>After download</legend>
+  <label>Move completed downloads to<span class="field-row"><input type="text" name="postprocess-move" value="{{POSTPROCESS_MOVE}}" autocomplete="off" placeholder="empty = stay in the download folder" title="Folder where finished torrents are moved; empty disables the move. The torrent keeps seeding from the new folder."><button type="button" class="browse" data-target="postprocess-move" title="Choose an existing folder on the server">Browse…</button></span></label>
+  <label class="chk"><input type="checkbox" name="postprocess-move-category" value="1"{{POSTPROCESS_MOVE_CATEGORY}} title="Put each finished torrent in a subfolder named after its category, inside the completion folder"> Put each torrent in a subfolder named after its category</label>
+  <label>Run a program on completion<input type="text" name="postprocess-run" value="{{POSTPROCESS_RUN}}" autocomplete="off" placeholder="empty = no program" title="Program and arguments separated by spaces; empty disables it. The torrent is not passed on the command line: its details arrive in GX_HASH, GX_NAME, GX_PATH, GX_CATEGORY and GX_SIZE."></label>
+  <p class="muted">The command runs only when a download completes, with the torrent details in the environment. The move runs first: the command finds the final folder in GX_PATH. A torrent that cannot be moved keeps its old folder and the command is told so.</p>
+</fieldset>
 <fieldset>
   <legend>Watch folders</legend>
   <label>Folders to watch for .torrent files (one per line)<textarea name="watch-folders" rows="3" spellcheck="false" autocomplete="off" title="Folders whose .torrent files are downloaded and added automatically: each file is read and its content added to the session; each line is a folder, or folder=destination to choose where its torrents are saved. The .torrent is removed after a successful add; a file that is not a valid .torrent is renamed to .invalid. Empty disables the feature.">{{WATCH_FOLDERS}}</textarea></label>
@@ -73,6 +87,7 @@ h3.sub{margin:14px 0 2px;font-size:13px;color:var(--subtle);text-transform:upper
     <button type="button" class="secondary sm" data-formaction="/ui/webui-install" title="Download the latest VueTorrent release and install (or update) it here">Install or update VueTorrent</button>
   </div>
   <p class="muted" style="margin:0;font-size:12.5px">The standard interface is always available at <a href="/ui">/ui</a>.</p>
+  {{LOGOUT_FORM}}
 </fieldset>
 <fieldset>
   <legend>Network</legend>
@@ -259,6 +274,26 @@ h3.sub{margin:14px 0 2px;font-size:13px;color:var(--subtle);text-transform:upper
 <div class="savebar"><button type="submit" class="primary" title="Save settings to settings.json">Save</button></div>
 <!--ERROR-->
 </form>
+<fieldset id="categories">
+  <legend>Categories</legend>
+  <p class="muted">A category can have its own folder. When a torrent is assigned to it with automatic management on, the torrent moves to that folder; with a category created from the torrent dialog the folder starts empty, so set it here.</p>
+  <div class="table-scroll">
+    <table class="cat-manage">
+      <thead><tr><th scope="col">Category</th><th scope="col">Save path</th><th scope="col"><span class="sr-only">Actions</span></th></tr></thead>
+      <tbody>{{CATEGORIES_ROWS}}</tbody>
+    </table>
+  </div>
+  <form method="post" action="/ui/category-manage" class="form-grid">
+    <input type="hidden" name="op" value="add">
+    <label>New category
+      <input type="text" name="name" required autocomplete="off" title="Name of the new category, for example Movies or TV">
+    </label>
+    <label>Save path
+      <input type="text" name="savepath" autocomplete="off" placeholder="download folder" title="Folder where the torrents of this category are saved (empty = the main download folder)">
+    </label>
+    <div><button type="submit" class="primary sm" title="Create the category with this save path">Add category</button></div>
+  </form>
+</fieldset>
 <!--UPDATE_NOTES-->
 </main>
 <dialog id="browse-overlay" class="picker" data-browse-endpoint="/ui/browse-dir" aria-label="Choose an existing folder on the server">
@@ -289,6 +324,10 @@ function ensureTooltips(root) {
     if (text) { node.setAttribute('title', text); }
   }
 }
+document.addEventListener('submit', function (e) {
+  var q = e.target && e.target.getAttribute && e.target.getAttribute('data-confirm');
+  if (q && !window.confirm((window.__uiI18n && window.__uiI18n[q]) || q)) e.preventDefault();
+});
 // The per-day bandwidth scheduler: only a "Limit" day uses its two speed
 // numbers; "Off" and "Auto" (the auto-speed measures) get them out of the way.
 function syncSchedModes() {

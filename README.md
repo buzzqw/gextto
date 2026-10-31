@@ -391,9 +391,16 @@ everything a standalone client needs.
   ordered PASS/FAIL rules, live match previews, rule templates, feed tests,
   pasted feed lists, and a local **archive** of everything the feeds returned.
 - **Operations.** Limits, the per-weekday scheduler, latency auto-speed, one-click
-  optimisation, IP filter with scheduled refresh, categories and tags, port test;
-  seeding limits by ratio, time and **inactivity**, and qBittorrent's **content
-  layout** (original, create subfolder, no subfolder) when adding.
+  optimisation, IP filter with scheduled refresh, categories and tags with a
+  category manager and its save path, port test; seeding limits by ratio, time
+  and **inactivity**, and qBittorrent's **content layout** (original, create
+  subfolder, no subfolder) when adding.
+- **After the download.** Move the finished data to a folder (optionally one
+  subfolder per category) while it keeps seeding, or run a program with the
+  torrent details in the environment; both off by default.
+- **From the phone.** The page installs as an app (manifest and a service
+  worker for the shared assets only) and offers a sign-out when a password is
+  set.
 - **Notifications** on the same channels as Gextto, with a test button.
 - **Updates itself** from the CI builds when its own code changed, verified by
   SHA-256, with automatic rollback.

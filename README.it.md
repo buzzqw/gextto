@@ -407,9 +407,16 @@ semplice con tutto ciò che serve a un client autonomo.
   tutto ciò che i feed hanno restituito.
 - **Gestione.** Limiti, programmazione per giorno, auto-speed sulla latenza,
   ottimizzazione con un clic, filtro IP con aggiornamento programmato, categorie
-  e tag, test della porta; limiti di seed per ratio, tempo e **inattività**, e il
-  **content layout** di qBittorrent (originale, crea sottocartella, nessuna
-  sottocartella) all'aggiunta.
+  e tag con una gestione delle categorie e del loro percorso, test della porta;
+  limiti di seed per ratio, tempo e **inattività**, e il **content layout** di
+  qBittorrent (originale, crea sottocartella, nessuna sottocartella)
+  all'aggiunta.
+- **Fine del download.** Sposta i dati completati in una cartella (anche una
+  sottocartella per categoria) continuando a seedare, oppure esegue un programma
+  con i dettagli del torrent nell'ambiente; entrambi spenti per default.
+- **Dal telefono.** La pagina si installa come app (manifest e service worker
+  per le sole risorse condivise) e ha l'uscita dalla sessione quando c'è una
+  password.
 - **Notifiche** sugli stessi canali di Gextto, con un pulsante di prova.
 - **Si aggiorna da solo** dalle build della CI quando cambia il suo codice,
   verificato SHA-256, con ripristino automatico.

@@ -230,3 +230,32 @@ func TestManagedDoesNotUseStandaloneAuth(t *testing.T) {
 		t.Fatal("managed mode must not require the standalone login")
 	}
 }
+
+// TestUILogoutDropsTheSession checks that signing out invalidates the page
+// session and clears both cookies (the page one and the qBittorrent SID).
+func TestUILogoutDropsTheSession(t *testing.T) {
+	d := standaloneTestDaemon(t, "s3cret", true)
+	token := d.sessions.Create()
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "http://127.0.0.1:8890/ui/logout", nil)
+	req.AddCookie(&http.Cookie{Name: uiSessionCookie, Value: token})
+	d.handleUILogout(rec, req)
+	if rec.Code != http.StatusSeeOther || rec.Header().Get("Location") != "/ui/login" {
+		t.Fatalf("logout = %d %q", rec.Code, rec.Header().Get("Location"))
+	}
+	if d.sessions.Valid(token) {
+		t.Fatal("the session must be invalid after sign-out")
+	}
+	cleared := false
+	for _, cookie := range rec.Result().Cookies() {
+		if cookie.Name == uiSessionCookie && cookie.MaxAge < 0 {
+			cleared = true
+		}
+	}
+	if !cleared {
+		t.Fatal("the page cookie was not cleared")
+	}
+	if !d.loginEnabled() {
+		t.Fatal("a configured password must enable the sign-out control")
+	}
+}

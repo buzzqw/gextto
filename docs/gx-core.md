@@ -46,14 +46,19 @@ Gextto would end up with the worse of the two engines.
 v1 API used by Gextto is only *added to*, never changed: persistent settings from the
 page (`settings.json`), the first-run wizard, login and sessions, categories and tags
 with the announced client identity (gx-core with the real version by default, or
-a qBittorrent/Transmission/Rain/anacrolix preset), a path per category, the virtualised torrent table (above 500 rows; the first
+a qBittorrent/Transmission/Rain/anacrolix preset), a path per category with a
+category manager in the settings page, the virtualised torrent table (above 500 rows; the first
 300 with *Show more* remain the no-JavaScript fallback), the bandwidth
 scheduler with
 alternative limits (**one choice per day — Off, Limit or Auto**, where Auto lifts the
 cap so the auto-speed/peak observer can measure the line), the global seeding limits
 (share ratio, seeding time and inactive seeding time, as qBittorrent's preferences),
 the content layout of new torrents (Original, Subfolder, NoSubfolder),
-the RSS manager with the *Wanted* page, the Torznab indexer search,
+**completion actions** (move the finished data to a folder, optionally one
+subfolder per category, and run an operator command with the torrent details in
+the environment), the RSS manager with the *Wanted* page, the Torznab indexer search
+with a parallel fan-out and sortable rich results, the installable page (web app
+manifest and service worker for the shared assets),
 and the **qBittorrent-compatible Web API** (`/api/v2/auth`, `/api/v2/torrents/*`,
 `/api/v2/app/*`) that clients speaking that protocol can use.
 
@@ -212,11 +217,18 @@ the state vocabulary is explained by a legend on the page.
 
 ## 6. What is missing and what is decided
 
+**Completion actions.** The standalone closes the acquisition loop without
+Gextto: when a download completes it can **move the data to a completion
+folder** (optionally one subfolder per category) and **run an operator
+command** with `GX_HASH`, `GX_NAME`, `GX_PATH`, `GX_CATEGORY` and `GX_SIZE` in
+the environment. The move happens first and the torrent keeps seeding from the
+new folder; the command is not built from the torrent name, so a hostile title
+cannot inject arguments. Both actions are off by default. Renaming into a media
+library with metadata (the way Gextto does) remains Gextto's job: the standalone
+offers the generic hook, not a second library manager.
+
 **Open.**
 
-- **Post-processing on completion**: notifications are complete (webhook, Telegram,
-  e-mail; events `download_complete`, `feed_match`, `feed_error`); Gextto's completion
-  post-processing — rename and move into the library — is not part of the standalone.
 - **Rate-based choking and anti-leech**: to be validated with the deterministic harness
   and the real-swarm campaign before touching the algorithm
   ([`measurements.md`](measurements.md) §4.6).

@@ -211,7 +211,8 @@ Every page is checked with axe-core (WCAG 2 A/AA) in both themes.
   the same predicates as the page filter (`uiPageData`, `matchStatus`). A
   **toolbar** acts on the selection (resume, pause, remove, queue top/up/
   down/bottom) next to *Columns*, *Log* and *Tools* (IP filter, create
-  `.torrent`, check feeds, test ports). The **status bar** keeps what matters
+  `.torrent`, check feeds, test ports); two more buttons pause or resume
+  **every** torrent in the session, with no selection needed. The **status bar** keeps what matters
   at a glance — port reachability, DHT nodes, free space, the
   **alternative-limits toggle** (standalone), the update notice, and the
   **download/upload speeds with the global limits**: a click opens *Global
@@ -254,9 +255,9 @@ Every page is checked with axe-core (WCAG 2 A/AA) in both themes.
   and several files at once, destination (suggested from the existing save
   paths, with a *Browse* folder picker in standalone: `GET /ui/browse-dir` lists
   the daemon machine's directories so the path is chosen instead of typed),
-  category (standalone) and the options (paused, top, sequential,
-  first/last, super-seeding, per-torrent download/upload limits, automatic
-  management). What is typed is previewed at once (magnet name and info hash,
+  category and tags (standalone) and the options (paused, top, sequential,
+  first/last, super-seeding, per-torrent download/upload limits, seed ratio and
+  seed days, automatic management). What is typed is previewed at once (magnet name and info hash,
   ignored lines); a `.torrent` dropped anywhere on the page or a
   magnet pasted outside a field opens it pre-filled.
 - **Remove** asks in a dialog whether to delete the files too.
@@ -286,6 +287,13 @@ Every page is checked with axe-core (WCAG 2 A/AA) in both themes.
   of the daemon's recent lines, so it works whether the log goes to stderr or to
   the rotating file already open in a terminal. In managed, when the daemon is
   launched next to Gextto, the same button shows *gextto.log*.
+- **Search indexers** (*More → Search indexers*, or the toolbar button when
+  indexers are configured): the query is sent to every Torznab indexer **in
+  parallel** (four at a time, a per-indexer timeout), so several indexers do not
+  add their waits one after the other. Each result shows size, seeders, peers,
+  age and the indexer, the list is sortable by seeders, size, age or name, and
+  *Add* downloads at once while *Options* opens the add dialog with the release
+  already filled in, to choose destination, category, tags and pause.
 - **Large lists** (standalone only): on the desktop layout, above 500 torrents
   the table is **virtualised client-side**. `/ui/rows?rows=all` carries the
   whole session, filtering and sorting work on that data, and only the rows
@@ -378,6 +386,24 @@ The standalone pages follow the same structure:
   picks like `sub ita`) and quality, and the other options folded away.
 - **Archive** and **Settings** use the same top bar, tables and fieldsets;
   Settings keeps its *Save* button visible at the bottom while scrolling.
+- **Settings → Categories**: every category with its save path, editable in
+  place, plus add and remove. A category created from the torrent dialog starts
+  with no folder; this table is where the folder automatic management moves to
+  is set (and changing it relocates the managed torrents of that category).
+- **Settings → After download**: the completion actions. *Move completed
+  downloads to* moves the finished data (optionally into one subfolder per
+  category) and the torrent keeps seeding from there; *Run a program on
+  completion* runs an operator command with `GX_HASH`, `GX_NAME`, `GX_PATH`,
+  `GX_CATEGORY` and `GX_SIZE` in the environment, after the move. Both are off
+  by default and the command is never built from the torrent name.
+- **Settings → Web interface** also carries *Sign out* (only when a password is
+  configured), and the page is **installable as an app**: `GET
+  /manifest.webmanifest` and `GET /sw.js` serve the manifest and a service
+  worker that caches only the shared assets, never an authenticated page or an
+  API answer.
+- **Create `.torrent`** (*Tools*) exposes the engine's options: piece size,
+  private flag, comment, trackers and web seeds; the file is downloaded, not
+  added to the session.
 - **Archive database maintenance** (`Settings → Archive database`): *Delete old
   items* prunes the entries older than the given days (the same prune the Archive
   page does), and *Optimize archive* rewrites the bbolt file compactly, because

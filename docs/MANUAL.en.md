@@ -1218,7 +1218,11 @@ what is transferring the files is visible at a glance).
   answers with a magnet link — either as a redirect or as the body — is added
   as a magnet instead of failing. It supports
   **v2-only** torrents (BEP 52), both from a `.torrent` and from a magnet link;
-  it does not support WebTorrent/WebRTC.
+  it does not support WebTorrent/WebRTC. In **standalone** (without Gextto) the
+  same page adds the category manager, the completion actions (move the finished
+  data to a folder and/or run a program with the torrent details in the
+  environment), the parallel indexer search with sortable results, and the
+  installable app with sign-out.
 - **qBittorrent-nox** — Gextto drives an existing qBittorrent-nox through its Web
   API. Set the URL, user/password, category, tag and poll interval, and the
   `local=remote` **path mappings** whenever the two processes see different

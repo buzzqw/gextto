@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -34,6 +35,34 @@ func TestHandleCreateTorrent(t *testing.T) {
 	out := rec.Body.String()
 	if !strings.HasPrefix(out, "d") || !strings.Contains(out, "mytorrent") {
 		t.Errorf("body does not look like the created torrent: %q", out)
+	}
+}
+
+func TestHandleUICreateTorrentOptions(t *testing.T) {
+	d := standaloneTestDaemon(t, "", true)
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "a.bin"), []byte("payload"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest("POST", "/ui/create-torrent", strings.NewReader(url.Values{
+		"path":       {dir},
+		"piece_size": {"64"},
+		"private":    {"1"},
+		"comment":    {"hello"},
+		"trackers":   {"http://tracker.example/announce"},
+		"webseeds":   {"https://seed.example/a.bin"},
+	}.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	d.handleUICreateTorrent(rec, req)
+	if rec.Code != 200 {
+		t.Fatalf("status = %d: %s", rec.Code, rec.Body.String())
+	}
+	out := rec.Body.String()
+	for _, want := range []string{"piece lengthi65536e", "7:privatei1e", "7:comment5:hello", "8:url-list"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("created torrent lacks %q: %s", want, out)
+		}
 	}
 }
 

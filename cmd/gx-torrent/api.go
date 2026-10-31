@@ -62,6 +62,8 @@ func (d *Daemon) routes() http.Handler {
 	root.HandleFunc("GET /assets/theme.css", handleStaticAsset("text/css; charset=utf-8", assets.ThemeCSS))
 	root.HandleFunc("GET /assets/common.js", handleStaticAsset("text/javascript; charset=utf-8", assets.CommonJS))
 	root.HandleFunc("GET /assets/icons.svg", handleStaticAsset("image/svg+xml", assets.IconsSVG))
+	root.HandleFunc("GET /manifest.webmanifest", handleStaticAsset("application/manifest+json", assets.Manifest))
+	root.HandleFunc("GET /sw.js", handleStaticAsset("text/javascript; charset=utf-8", assets.ServiceWorker))
 	root.HandleFunc("GET /ui", d.handleUI)
 	root.HandleFunc("GET /ui/live", d.handleUILive)
 	root.HandleFunc("GET /ui/rows", d.handleUIRows)
@@ -105,6 +107,7 @@ func (d *Daemon) routes() http.Handler {
 	root.HandleFunc("GET /ui/magnet", d.handleUIMagnet)
 	root.HandleFunc("GET /ui/login", d.handleUILogin)
 	root.HandleFunc("POST /ui/login", d.handleUILogin)
+	root.HandleFunc("POST /ui/logout", d.handleUILogout)
 	root.HandleFunc("GET /ui/setup", d.handleUISetup)
 	root.HandleFunc("POST /ui/setup", d.handleUISetup)
 	root.HandleFunc("GET "+uiBrowsePath, d.handleUIBrowseDir)
@@ -140,6 +143,7 @@ func (d *Daemon) routes() http.Handler {
 	root.HandleFunc("POST /ui/move", d.handleUIMove)
 	root.HandleFunc("POST /ui/pin", d.handleUIPin)
 	root.HandleFunc("POST /ui/category", d.handleUICategory)
+	root.HandleFunc("POST /ui/category-manage", d.handleUICategoryManage)
 	if d.opts.Mode == ModeStandalone {
 		// The qBittorrent-compatible API lets *arr and the mobile apps drive
 		// the standalone daemon; managed mode is driven by Gextto only.
@@ -333,6 +337,7 @@ func addRequestFromForm(r *http.Request) addRequest {
 		SeedRatio:      formFloat(r, "seed_ratio", -1),
 		SeedDays:       formInt(r, "seed_days", -1),
 		Category:       strings.TrimSpace(r.FormValue("category")),
+		Tags:           splitFormList(r.FormValue("tags")),
 		// content_layout: Original, Subfolder or NoSubfolder (qBittorrent);
 		// empty = Original through the API, the settings default from the page.
 		ContentLayout: strings.TrimSpace(r.FormValue("content_layout")),

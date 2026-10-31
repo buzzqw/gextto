@@ -13,6 +13,17 @@ manual is online: [English](docs/MANUAL.en.md) ·
 [italiano](docs/MANUAL.it.md). For reports:
 [GitHub issues](https://github.com/buzzqw/gextto/issues).
 
+## 31 October 2026
+- **Categories are managed from the page, with their folder.** A category created from the torrent dialog started with no path: automatic management moved it to the download folder, so the option looked like it did nothing. In *Settings → Categories* you can now add, rename, change the path of and remove a category; changing the path relocates the managed torrents of that category.
+
+- **After a download gx-torrent can move the data and run a program.** In *Settings → After download* you choose a completion folder (with one subfolder per category, if you want) and the torrent keeps seeding from the new place. You can also name a program to run on completion: the torrent details arrive in `GX_HASH`, `GX_NAME`, `GX_PATH`, `GX_CATEGORY` and `GX_SIZE`, never on the command line. Both actions are off by default.
+
+- **The indexer search answers sooner and shows more.** The indexers are queried in parallel, so with several indexers you no longer wait for the sum of their times. Each result shows size, seeders, peers, age and indexer; the list sorts by seeders, size, date or name; *Options* opens the add dialog already filled in, to choose destination, category and tags.
+
+- **The page installs as an app and the session can be closed.** From a phone or a browser the gx-torrent page can be added to the home screen (a manifest and a service worker for the shared assets only, never for authenticated pages or API answers) and, when a password is set, *Sign out* appears.
+
+- **Easier to add and create.** The add dialog also takes tags and seed limits (ratio and days); the toolbar has *Pause all* and *Resume all*; creating a `.torrent` exposes the piece size, the private flag, a comment and web seeds. The qBittorrent-compatible API also serves the free space and the content of a folder, so VueTorrent and the mobile apps choose a path without errors.
+
 ## 30 October 2026
 - **The eD2k speed in the top bar no longer stays at zero while aMule is uploading.** aMule reports its own speed over a one-second window: a client downloading from you in blocks made its speed appear for an instant and zero the rest of the time, and the sum with the torrents dropped to `0 B/s` even with hundreds of KB/s going out (on the eD2k page the same clients looked stopped between one block and the next). The top bar now uses the bytes aMule really sent and received in the last half minute: the speed stays the real one and no longer flickers. The per-file and per-client speeds on the eD2k page remain aMule's instant figures. Nothing to configure.
 

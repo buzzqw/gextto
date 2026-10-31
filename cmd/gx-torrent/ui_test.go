@@ -765,3 +765,53 @@ func TestUIUTPSocketSummary(t *testing.T) {
 		t.Fatalf("summary = %q, %v", s, ok)
 	}
 }
+
+// TestAddFormReadsTagsAndSeedLimits locks the add dialog's optional fields:
+// tags are split like everywhere else, and the per-torrent seed limits reach
+// the add request instead of being dropped.
+func TestAddFormReadsTagsAndSeedLimits(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "/ui/add", strings.NewReader(url.Values{
+		"tags":       {"hd, ita"},
+		"seed_ratio": {"1.5"},
+		"seed_days":  {"7"},
+	}.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	if err := req.ParseForm(); err != nil {
+		t.Fatal(err)
+	}
+	got := addRequestFromForm(req)
+	if len(got.Tags) != 2 || got.Tags[0] != "hd" || got.Tags[1] != "ita" {
+		t.Fatalf("tags = %v", got.Tags)
+	}
+	if got.SeedRatio != 1.5 || got.SeedDays != 7 {
+		t.Fatalf("seed limits = %v/%v", got.SeedRatio, got.SeedDays)
+	}
+}
+
+// TestStandalonePWAEndpoints checks the manifest and the service worker are
+// served, and that the page declares the manifest so a phone can install it.
+func TestStandalonePWAEndpoints(t *testing.T) {
+	d := standaloneTestDaemon(t, "", true)
+	srv := httptest.NewServer(d.routes())
+	defer srv.Close()
+	for _, path := range []string{"/manifest.webmanifest", "/sw.js"} {
+		resp, err := http.Get(srv.URL + path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		body, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusOK || len(body) == 0 {
+			t.Fatalf("%s -> %d (%d bytes)", path, resp.StatusCode, len(body))
+		}
+	}
+	resp, err := http.Get(srv.URL + "/ui")
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if !strings.Contains(string(body), `rel="manifest"`) {
+		t.Fatal("the page does not declare the web app manifest")
+	}
+}

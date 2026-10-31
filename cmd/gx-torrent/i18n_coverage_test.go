@@ -34,6 +34,13 @@ var uiI18nAllowlist = map[string]bool{
 	// Example values used as placeholders on the settings page.
 	"smtp.example.com:587": true, "gx-torrent@example.com": true,
 	"/srv/media/Movies\n/srv/media/TV": true,
+	// Piece sizes offered by the torrent creator: unit labels, identical in
+	// every language.
+	"32 KiB": true, "64 KiB": true, "128 KiB": true, "256 KiB": true,
+	"512 KiB": true, "1 MiB": true, "2 MiB": true, "4 MiB": true,
+	"8 MiB": true, "16 MiB": true,
+	// Placeholder values that describe the empty state of a field.
+	"empty = no program": true, "empty = stay in the download folder": true,
 }
 
 // uiI18nWorth reports whether a string is user-facing prose worth translating.

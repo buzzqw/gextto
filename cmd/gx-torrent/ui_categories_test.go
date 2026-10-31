@@ -40,8 +40,59 @@ func TestUICategoryRefusedInManaged(t *testing.T) {
 	}
 }
 
-func TestCategoryEditorOnlyStandalone(t *testing.T) {
-	render := func(standalone bool) string {
+func TestUICategoryManageAddEditRemove(t *testing.T) {
+	d := standaloneTestDaemon(t, "", true)
+	d.opts.Settings.Set(setupCompleteKey, "true")
+	post := func(values url.Values) *httptest.ResponseRecorder {
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodPost, "http://127.0.0.1:8890/ui/category-manage", strings.NewReader(values.Encode()))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		d.handleUICategoryManage(rec, req)
+		return rec
+	}
+	if rec := post(url.Values{"op": {"add"}, "name": {"Movies"}, "savepath": {"/srv/media/movies"}}); rec.Code != http.StatusSeeOther {
+		t.Fatalf("add status = %d", rec.Code)
+	}
+	if got := d.categoriesSnapshot()["Movies"]; got != "/srv/media/movies" {
+		t.Fatalf("added category path = %q", got)
+	}
+	if rec := post(url.Values{"op": {"edit"}, "name": {"Movies"}, "savepath": {"/srv/media/films"}}); rec.Code != http.StatusSeeOther {
+		t.Fatalf("edit status = %d", rec.Code)
+	}
+	if got := d.categoriesSnapshot()["Movies"]; got != "/srv/media/films" {
+		t.Fatalf("edited category path = %q", got)
+	}
+	// The settings page shows the category and its path in an editable row.
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "http://127.0.0.1:8890/ui/settings", nil)
+	d.renderSettings(rec, req, "", false)
+	if body := rec.Body.String(); !strings.Contains(body, `value="Movies"`) || !strings.Contains(body, `value="/srv/media/films"`) {
+		t.Fatalf("settings page does not show the category: %s", body)
+	}
+	if rec := post(url.Values{"op": {"remove"}, "name": {"Movies"}}); rec.Code != http.StatusSeeOther {
+		t.Fatalf("remove status = %d", rec.Code)
+	}
+	if _, ok := d.categoriesSnapshot()["Movies"]; ok {
+		t.Fatal("category not removed")
+	}
+	// A blank name is refused instead of creating an unnamed category.
+	if rec := post(url.Values{"op": {"add"}, "name": {"  "}}); !strings.Contains(rec.Header().Get("Location"), "ok=0") {
+		t.Fatalf("blank name must be refused: %q", rec.Header().Get("Location"))
+	}
+}
+
+func TestUICategoryManageOnlyStandalone(t *testing.T) {
+	d := &Daemon{opts: Options{Mode: ModeManaged}}
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "http://127.0.0.1:8890/ui/category-manage", strings.NewReader("op=add&name=Movies"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	d.handleUICategoryManage(rec, req)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("managed status = %d, want 404", rec.Code)
+	}
+}
+
+func TestCategoryEditorOnlyStandalone(t *testing.T) {	render := func(standalone bool) string {
 		d := &Daemon{}
 		rec := httptest.NewRecorder()
 		req := httptest.NewRequest(http.MethodGet, "http://127.0.0.1:8890/ui/detail?tab=general", nil)

@@ -562,6 +562,8 @@ The `{what}` of `GET /api/v1/torrents/{hash}/{what}` is one of `files`,
 | GET | `/api/v2/app/buildInfo` | version and build info |
 | GET | `/api/v2/app/cookies` | cookies used for the .torrent fetches |
 | GET | `/api/v2/app/defaultSavePath` | default save path |
+| GET | `/api/v2/app/getDirectoryContent` | list a folder for the path pickers (name, is_dir, size) |
+| GET | `/api/v2/app/getFreeSpace` | free space of a folder in bytes |
 | GET | `/api/v2/app/networkInterfaceAddressList` | addresses of the interfaces |
 | GET | `/api/v2/app/networkInterfaceList` | network interfaces |
 | GET | `/api/v2/app/preferences` | preferences document |
