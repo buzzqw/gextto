@@ -31,6 +31,23 @@ func TestAssetsAreEmbedded(t *testing.T) {
 	}
 }
 
+// TestWantedRowMenuIsNotClipped guards the wanted rows' "More" menu: it opens
+// over the card, so the list must not clip its children (the remove action sits
+// at the bottom of the menu and was cut off by the card's edge), and the menu
+// must be able to flip upwards when there is no room below.
+func TestWantedRowMenuIsNotClipped(t *testing.T) {
+	for _, line := range strings.Split(ThemeCSS(), "\n") {
+		if strings.HasPrefix(strings.TrimSpace(line), "ul.items {") && strings.Contains(line, "overflow: hidden") {
+			t.Errorf("the item list clips the row menu: %s", line)
+		}
+	}
+	for _, marker := range []string{".row-more-menu.up{", "classList.add('up')"} {
+		if !strings.Contains(WantedPage(), marker) {
+			t.Errorf("the wanted page is missing %q", marker)
+		}
+	}
+}
+
 // TestArchivePageHasLiveIndexerSearch checks the archive page keeps the
 // "search the indexers too" option wired to the live search endpoint.
 func TestArchivePageHasLiveIndexerSearch(t *testing.T) {

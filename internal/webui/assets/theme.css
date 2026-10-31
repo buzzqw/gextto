@@ -395,8 +395,12 @@ main.page { max-width: 980px; margin: 0 auto; padding: 20px 16px 40px; }
 .panel-head h2 { margin: 0; font-size: 15px; flex: 1; }
 .panel-head .hint { flex-basis: 100%; margin: 0; color: var(--muted); font-size: 13px; }
 
-ul.items { list-style: none; margin: 0; padding: 0; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; }
+/* The list does not clip its children: a row menu has to be able to open past
+   the card's edge. The first and the last row carry the corners instead. */
+ul.items { list-style: none; margin: 0; padding: 0; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); }
 .items > li { display: flex; gap: 14px; align-items: flex-start; padding: 14px 16px; border-bottom: 1px solid var(--border); }
+.items > li:first-child { border-top-left-radius: calc(var(--radius-lg) - 1px); border-top-right-radius: calc(var(--radius-lg) - 1px); }
+.items > li:last-child { border-bottom-left-radius: calc(var(--radius-lg) - 1px); border-bottom-right-radius: calc(var(--radius-lg) - 1px); }
 .items > li:last-child { border-bottom: 0; }
 .items > li.off .item-title .name, .items > li.off .item-title .name a { color: var(--muted); }
 .items > li.off { background: var(--sunken); }

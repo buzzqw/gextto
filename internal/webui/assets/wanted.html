@@ -31,6 +31,8 @@
 .item-actions .row-more>summary::-webkit-details-marker{display:none}
 .item-actions .row-more[open]>summary{background:var(--surface-2)}
 .row-more-menu{position:absolute;right:0;top:calc(100% + 4px);z-index:8;display:flex;flex-direction:column;align-items:stretch;gap:4px;min-width:180px;padding:6px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow)}
+/* Not enough room below: the menu opens upwards instead of running off screen. */
+.row-more-menu.up{top:auto;bottom:calc(100% + 4px)}
 .row-more-menu form{margin:0}
 .row-more-menu button,.row-more-menu a{justify-content:flex-start;width:100%}
 @media (max-width:760px){.row-more-menu{position:static;min-width:0;margin-top:4px;box-shadow:none}}
@@ -504,8 +506,16 @@ $$('button[data-wanted-state]').forEach(function(btn){btn.addEventListener('clic
   applyWantedView();
 });});
 // The row's "More" menu is a native <details>: close the others when one opens
-// and when a click lands outside.
-$$('.row-more').forEach(function(d){d.addEventListener('toggle',function(){if(d.open)$$('.row-more[open]').forEach(function(o){if(o!==d)o.open=false;});});});
+// and when a click lands outside. It also flips upwards when it would fall off
+// the bottom of the window (the list no longer clips it).
+$$('.row-more').forEach(function(d){d.addEventListener('toggle',function(){
+  if(!d.open)return;
+  $$('.row-more[open]').forEach(function(o){if(o!==d)o.open=false;});
+  var m=d.querySelector('.row-more-menu');if(!m)return;
+  m.classList.remove('up');
+  var r=m.getBoundingClientRect(),s=d.getBoundingClientRect();
+  if(r.bottom>window.innerHeight-8&&s.top>r.height+8)m.classList.add('up');
+});});
 document.addEventListener('click',function(e){if(!e.target.closest('.row-more'))$$('.row-more[open]').forEach(function(d){d.open=false;});
 if(e.target.closest('.row-more-menu')){var rd=e.target.closest('.row-more');if(rd)setTimeout(function(){rd.open=false;},0);}});
 
