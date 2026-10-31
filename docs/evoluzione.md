@@ -506,7 +506,10 @@ costs less than abandoning; 45 s for Jackett and a direct indexer) and its own h
 the backoff and the cycle warning name "prowlarr · TorrentLeech", not the whole
 manager. When a lane's queue, at its average time per search, would outlast what is
 left of a title's budget, that title skips the lane at once; this is not a failure,
-and a slow tracker serves the titles it can without holding the cycle. A tracker
+and a slow tracker serves the titles it can without holding the cycle. An indexer
+that answers `429 Too Many Requests` with a `Retry-After` sets the lane's backoff
+deadline at least to the requested time (one day at most): the pause the site asked
+for is never shortened by Gextto's own schedule. A tracker
 listed by both Jackett and Prowlarr (for example LimeTorrents) is searched **once**,
 through the lane that answers faster. A lane never measured is tried first, so each is
 tried once. The indexers Prowlarr reports as failing are skipped, the capabilities are
