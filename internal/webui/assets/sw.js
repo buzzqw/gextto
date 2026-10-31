@@ -21,5 +21,14 @@ self.addEventListener('fetch', (event) => {
   if (url.origin !== location.origin) return;
   const shared = url.pathname.startsWith('/assets/') || url.pathname === '/favicon.ico';
   if (!shared) return;
-  event.respondWith(caches.match(request).then((cached) => cached || fetch(request)));
+  // Network first: a new release updates the style and script at once when the
+  // browser is online; the cached copy is only the offline fallback.
+  event.respondWith(
+    fetch(request)
+      .then((response) => {
+        if (response.ok) caches.open(CACHE).then((cache) => cache.put(request, response.clone()));
+        return response;
+      })
+      .catch(() => caches.match(request))
+  );
 });

@@ -1176,6 +1176,17 @@ func (d *Daemon) handleUITrackers(w http.ResponseWriter, r *http.Request) {
 		d.uiDoneDetail(w, r, hash, "trackers", "Tracker removed", err)
 		return
 	}
+	if r.FormValue("op") == "edit" {
+		oldURL := strings.TrimSpace(r.FormValue("old"))
+		newURL := strings.TrimSpace(r.FormValue("new"))
+		if newURL == "" {
+			d.uiDoneDetail(w, r, hash, "trackers", "", fmt.Errorf("the tracker URL is required"))
+			return
+		}
+		err := d.editTracker(hash, oldURL, newURL)
+		d.uiDoneDetail(w, r, hash, "trackers", "Tracker updated", err)
+		return
+	}
 	var urls []string
 	for _, line := range strings.Split(r.FormValue("urls"), "\n") {
 		if line = strings.TrimSpace(line); line != "" {

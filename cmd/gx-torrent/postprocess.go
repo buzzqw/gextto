@@ -29,7 +29,7 @@ const (
 
 // postProcessEnabled reports whether any completion action is configured.
 func (d *Daemon) postProcessEnabled() bool {
-	if d.opts.Settings == nil {
+	if d.opts.Mode != ModeStandalone || d.opts.Settings == nil {
 		return false
 	}
 	return strings.TrimSpace(d.opts.Settings.Get(postProcessMoveKey, "")) != "" ||

@@ -194,6 +194,8 @@ body{display:flex;flex-direction:column;overflow:hidden}
 .results .r{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--border);border-radius:var(--radius)}
 .results .r .t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .results .r .m{color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:42%}
+.trk-edit{display:flex;gap:4px;align-items:center;margin:0}
+.trk-edit input[type=text]{min-width:16em;flex:1}
 .logpane{flex:1;min-height:0;display:flex;flex-direction:column}
 .logbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:8px 14px;border-bottom:1px solid var(--border);background:var(--surface)}
 .logview{flex:1;margin:0;overflow:auto;padding:10px 14px;background:var(--sunken);font:12.5px/1.45 var(--mono);white-space:pre-wrap;overflow-wrap:anywhere}
@@ -2125,7 +2127,11 @@ window.gxClearFilters=function(){state.filter={status:'all',cat:null,tag:null,tr
     <thead><tr><th scope="col">URL</th><th scope="col">State</th><th scope="col" class="num">Seeds</th><th scope="col" class="num">Peers</th><th scope="col" class="num">Next</th><th scope="col"><span class="sr-only">Actions</span></th></tr></thead>
     <tbody>
     {{range .Trackers}}
-      <tr><td style="word-break:break-all" title="{{.Message}}">{{.URL}}</td><td>{{.Status}}</td>
+      <tr><td style="word-break:break-all" title="{{.Message}}"><form method="post" action="/ui/trackers" class="trk-edit">
+        <input type="hidden" name="hash" value="{{$.Hash}}"><input type="hidden" name="tab" value="trackers"><input type="hidden" name="op" value="edit"><input type="hidden" name="old" value="{{.URL}}">
+        <input type="text" name="new" value="{{.URL}}" aria-label="Tracker URL" title="Change this tracker URL; the torrent keeps its data">
+        <button type="submit" class="sm" title="Save the tracker URL">Save</button>
+      </form></td><td>{{.Status}}</td>
       <td class="num">{{.Seeders}}</td><td class="num">{{.Leechers}}</td>
       <td class="num">{{if gt .Next 0}}{{dur .Next}}{{else}}—{{end}}</td>
       <td><form method="post" action="/ui/trackers"><input type="hidden" name="hash" value="{{$.Hash}}"><input type="hidden" name="tab" value="trackers"><input type="hidden" name="op" value="remove"><input type="hidden" name="url" value="{{.URL}}"><button type="submit" class="ghost icon sm" aria-label="Remove this tracker" title="Remove this tracker"><svg class="i"><use href="#i-trash"/></svg></button></form></td></tr>

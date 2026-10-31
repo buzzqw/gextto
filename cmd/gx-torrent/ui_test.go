@@ -815,3 +815,34 @@ func TestStandalonePWAEndpoints(t *testing.T) {
 		t.Fatal("the page does not declare the web app manifest")
 	}
 }
+
+// TestUITrackerEdit checks the tracker row's inline editor replaces the URL
+// without removing and re-adding the tracker (the engine keeps the tier).
+func TestUITrackerEdit(t *testing.T) {
+	d := newTestDaemon(t)
+	src := filepath.Join(t.TempDir(), "src")
+	hash, _, err := d.add(addRequest{TorrentData: makeTorrent(t, src, "movie.bin", 80_000), Destination: src})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := d.addTrackers(hash, []string{"http://a/announce"}); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "tracker added", func() bool {
+		got := trackerURLs(t, d, hash)
+		return len(got) == 1 && got[0] == "http://a/announce"
+	})
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/ui/trackers", strings.NewReader(url.Values{
+		"hash": {hash}, "tab": {"trackers"}, "op": {"edit"}, "old": {"http://a/announce"}, "new": {"http://b/announce"},
+	}.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	d.handleUITrackers(rec, req)
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("edit -> %d", rec.Code)
+	}
+	waitFor(t, "tracker edited", func() bool {
+		got := trackerURLs(t, d, hash)
+		return len(got) == 1 && got[0] == "http://b/announce"
+	})
+}

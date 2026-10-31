@@ -272,7 +272,7 @@ Every page is checked with axe-core (WCAG 2 A/AA) in both themes.
   streaming** with a labelled *Stream* button), *Peers*
   (connection flags, transport, encryption; **add peers** by `ip:port` and
   **ban** a peer's IP for 30 minutes, `POST /ui/peers`), *Trackers* (status,
-  swarm, add and **remove**), *Pieces* (coloured map). Peers, trackers and pieces refresh while
+  swarm, add, **edit the URL** and remove), *Pieces* (coloured map). Peers, trackers and pieces refresh while
   the panel is open; the forms save in place, without reloading the page.
 - **IP filter** from a URL or file (*Tools*); the field is pre-filled with the
   filter configured in Gextto.
