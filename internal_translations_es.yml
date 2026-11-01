@@ -5180,6 +5180,8 @@ spa:
   "Ultimi 30 minuti": "Últimos 30 minutos"
   "Picco di download nel periodo": "Pico de descarga en el periodo"
   "Picco di upload nel periodo": "Pico de subida en el periodo"
+  "Picco download": "Pico de descarga"
+  "Picco upload": "Pico de subida"
   "Limite di banda attivo": "Límite de ancho de banda activo"
   "Nessun limite di banda attivo": "Sin límite de ancho de banda activo"
   "Nessun limite": "Sin límite"

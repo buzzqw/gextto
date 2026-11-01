@@ -283,10 +283,32 @@ func TestV2LiveTrafficTemplateRendersChart(t *testing.T) {
 		`traffic-line down`,
 		`traffic-line up`,
 		`traffic-limit`,
+		// The peaks of the window name themselves: next to the current rates
+		// an unlabelled 380.6 KB/s read as a second, contradictory upload
+		// speed.
+		`class="muted traffic-peak"`,
+		`Picco download`,
+		`Picco upload`,
+		`2.0 MB/s`,
+		`1.0 MB/s`,
 	} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("traffic fragment missing %q in:\n%s", want, out)
 		}
+	}
+	if strings.Contains(out, `title="Picco di download nel periodo">↓`) {
+		t.Fatalf("the download peak is back to an unlabelled arrow:\n%s", out)
+	}
+
+	// Without history there is no peak to label: collecting-data note only.
+	empty := view
+	empty.HasData = false
+	buffer.Reset()
+	if err := v2Templates.ExecuteTemplate(&buffer, "v2_live_traffic", empty); err != nil {
+		t.Fatalf("render v2_live_traffic without data: %v", err)
+	}
+	if strings.Contains(buffer.String(), "Picco download") {
+		t.Fatalf("a chart without samples must not show a peak:\n%s", buffer.String())
 	}
 }
 

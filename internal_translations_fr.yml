@@ -5226,6 +5226,8 @@ fra:
   "Ultimi 30 minuti": "30 dernières minutes"
   "Picco di download nel periodo": "Pic de téléchargement sur la période"
   "Picco di upload nel periodo": "Pic d'envoi sur la période"
+  "Picco download": "Pic de téléchargement"
+  "Picco upload": "Pic d'envoi"
   "Limite di banda attivo": "Limite de bande passante active"
   "Nessun limite di banda attivo": "Aucune limite de bande passante active"
   "Nessun limite": "Aucune limite"

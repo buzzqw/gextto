@@ -5174,6 +5174,8 @@ pol:
   "Ultimi 30 minuti": "Ostatnie 30 minut"
   "Picco di download nel periodo": "Szczyt pobierania w okresie"
   "Picco di upload nel periodo": "Szczyt wysyłania w okresie"
+  "Picco download": "Szczyt pobierania"
+  "Picco upload": "Szczyt wysyłania"
   "Limite di banda attivo": "Aktywny limit przepustowości"
   "Nessun limite di banda attivo": "Brak aktywnego limitu przepustowości"
   "Nessun limite": "Bez limitu"

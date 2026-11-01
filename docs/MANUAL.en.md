@@ -321,7 +321,9 @@ release package the installer uses (README, *Install on Linux*).
   the last-30-days bandwidth and direct access to Downloads, with the **last
   30 minutes traffic chart** below: two **solid lines in different colours**
   for the **download** and the **upload** of the whole traffic — torrents and
-  aMule — with the peak, the current speed and the line of
+  aMule — with the current speed, the **peak** of the period — labelled
+  **Picco download** and **Picco upload** so it is never mistaken for the
+  speed of the moment — and the line of
   the **active bandwidth limit** (base, schedule or exception; it is not drawn
   when the speed is *Auto*, i.e. when Gextto measures the line and adapts, and
   in that case the card shows the **Auto** badge, while the measured ping

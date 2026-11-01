@@ -4571,6 +4571,8 @@ eng:
   "Ultimi 30 minuti": "Last 30 minutes"
   "Picco di download nel periodo": "Download peak in the period"
   "Picco di upload nel periodo": "Upload peak in the period"
+  "Picco download": "Download peak"
+  "Picco upload": "Upload peak"
   "Limite di banda attivo": "Active bandwidth limit"
   "Nessun limite di banda attivo": "No active bandwidth limit"
   "Nessun limite": "No limit"

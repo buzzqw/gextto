@@ -326,7 +326,9 @@ il pacchetto di release usato dall'installer (README, *Installazione Linux*).
   seed, la banda degli ultimi 30 giorni e l'accesso diretto a Scarico, con sotto
   il **grafico del traffico degli ultimi 30 minuti**: due **linee continue di
   colore diverso** per il **download** e l'**upload** di tutto il traffico —
-  torrent e aMule —, con il picco, la velocità attuale e la
+  torrent e aMule —, con la velocità attuale, il **picco** del periodo —
+  etichettato **Picco download** e **Picco upload**, così non si confonde con
+  la velocità di adesso — e la
   linea del **limite di banda in vigore** (limiti fissi, programmazione o
   eccezione; non compare quando la velocità è *Auto*, cioè quando Gextto misura
   la linea e si adatta; in quel caso il riquadro mostra il badge **Auto**, e il

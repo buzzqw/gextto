@@ -2252,6 +2252,24 @@ html.settings-only-modified .settings-panel:not(:has(.setting-modified-row)):not
 .dashboard-traffic-panel .traffic-line.ed2k-up { stroke: var(--chart-up); stroke-dasharray: 6 4; opacity: 0.7; }
 .dashboard-traffic-panel .traffic-breakdown { font-size: 0.85em; }
 .dashboard-traffic-panel .traffic-breakdown-sep { margin: 0 2px; opacity: 0.6; }
+/* The highest value of the window sits next to the current rates, so each
+   figure names itself: without the words it read as a second, contradictory
+   upload speed. The two figures are nowrap and wrap as whole units on a
+   phone, with the separator travelling with the second one. */
+.dashboard-traffic-panel .traffic-peak {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 8px;
+  font-size: 0.85em;
+}
+.dashboard-traffic-panel .traffic-peak-figure { white-space: nowrap; }
+.dashboard-traffic-panel .traffic-peak-label { font-weight: 600; }
+.dashboard-traffic-panel .traffic-peak-figure + .traffic-peak-figure::before {
+  content: "·";
+  margin-right: 8px;
+  opacity: 0.6;
+}
 .dashboard-traffic-panel .traffic-limit { stroke: var(--warn); stroke-width: 1; stroke-dasharray: 5 4; vector-effect: non-scaling-stroke; }
 .dashboard-traffic-panel .traffic-axis {
   display: flex;
