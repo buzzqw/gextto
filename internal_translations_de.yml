@@ -6233,7 +6233,7 @@ deu:
   "1 giorno": "1 Tag"
   "Riga disabilitata con #": "Zeile mit # deaktiviert"
   "Tentativi/successi/fallimenti/presi": "Versuche/Erfolge/Fehler/übernommen"
-  "T = tentativi, S = successi, F = fallimenti, P = release prese. I conteggi coprono gli ultimi 1, 7 e 30 giorni; «Ultimi risultati» è l'ultima lettura riuscita.": "T = Versuche, S = Erfolge, F = Fehler, P = übernommene Releases. Die Zahlen decken die letzten 1, 7 und 30 Tage ab; „Letzte Ergebnisse“ ist der letzte erfolgreiche Abruf."
+  "Nelle colonne «1 giorno», «7 giorni» e «30 giorni» ogni valore è nell'ordine tentativi/successi/fallimenti/prese. «Ultimi risultati» è l'ultima lettura riuscita.": "In den Spalten „1 Tag“, „7 Tage“ und „30 Tage“ steht jeder Wert in der Reihenfolge Versuche/Erfolge/Fehler/übernommene Releases. „Letzte Ergebnisse“ ist der letzte erfolgreiche Abruf."
   "Dopo quanti giorni senza un successo il feed viene disabilitato automaticamente con un # davanti alla riga. Scatta solo se un altro feed ha funzionato nello stesso giorno, così un guasto di rete non spegne tutta la lista. 0 disattiva la regola. Il feed resta visibile nel pannello e si riattiva togliendo il #.": "Nach wie vielen Tagen ohne erfolgreiche Anfrage der Feed automatisch mit einem # vor der Zeile deaktiviert wird. Die Regel greift nur, wenn am selben Tag ein anderer Feed funktioniert hat, damit ein Netzausfall nicht die ganze Liste abschaltet. 0 deaktiviert die Regel. Der Feed bleibt im Panel sichtbar und wird durch Entfernen des # wieder aktiviert."
 
   "disabilitati": "deaktiviert"

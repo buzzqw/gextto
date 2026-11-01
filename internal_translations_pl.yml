@@ -6174,7 +6174,7 @@ pol:
   "1 giorno": "1 dzień"
   "Riga disabilitata con #": "Wiersz wyłączony znakiem #"
   "Tentativi/successi/fallimenti/presi": "Próby/sukcesy/błędy/pobrane"
-  "T = tentativi, S = successi, F = fallimenti, P = release prese. I conteggi coprono gli ultimi 1, 7 e 30 giorni; «Ultimi risultati» è l'ultima lettura riuscita.": "T = próby, S = sukcesy, F = błędy, P = pobrane wydania. Liczby obejmują ostatnie 1, 7 i 30 dni; „Ostatnie wyniki” to ostatni udany odczyt."
+  "Nelle colonne «1 giorno», «7 giorni» e «30 giorni» ogni valore è nell'ordine tentativi/successi/fallimenti/prese. «Ultimi risultati» è l'ultima lettura riuscita.": "W kolumnach „1 dzień”, „7 dni” i „30 dni” każda wartość jest w kolejności próby/sukcesy/błędy/pobrane wydania. „Ostatnie wyniki” to ostatni udany odczyt."
   "Dopo quanti giorni senza un successo il feed viene disabilitato automaticamente con un # davanti alla riga. Scatta solo se un altro feed ha funzionato nello stesso giorno, così un guasto di rete non spegne tutta la lista. 0 disattiva la regola. Il feed resta visibile nel pannello e si riattiva togliendo il #.": "Po ilu dniach bez udanego żądania kanał jest automatycznie wyłączany znakiem # przed wierszem. Reguła działa tylko wtedy, gdy inny kanał działał tego samego dnia, aby awaria sieci nie wyłączyła całej listy. 0 wyłącza regułę. Kanał pozostaje widoczny w panelu i włącza się po usunięciu #."
 
   "disabilitati": "wyłączone"

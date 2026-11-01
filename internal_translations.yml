@@ -5571,7 +5571,7 @@ eng:
   "1 giorno": "1 day"
   "Riga disabilitata con #": "Line disabled with #"
   "Tentativi/successi/fallimenti/presi": "Attempts/successes/failures/taken"
-  "T = tentativi, S = successi, F = fallimenti, P = release prese. I conteggi coprono gli ultimi 1, 7 e 30 giorni; «Ultimi risultati» è l'ultima lettura riuscita.": "T = attempts, S = successes, F = failures, P = releases taken. The counts cover the last 1, 7 and 30 days; “Last results” is the last successful read."
+  "Nelle colonne «1 giorno», «7 giorni» e «30 giorni» ogni valore è nell'ordine tentativi/successi/fallimenti/prese. «Ultimi risultati» è l'ultima lettura riuscita.": "In the “1 day”, “7 days” and “30 days” columns each value is in the order attempts/successes/failures/taken. “Last results” is the last successful read."
 
   "disabilitati": "disabled"
   "tentativi": "attempts"

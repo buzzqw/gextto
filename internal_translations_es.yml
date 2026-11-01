@@ -6180,7 +6180,7 @@ spa:
   "1 giorno": "1 día"
   "Riga disabilitata con #": "Línea desactivada con #"
   "Tentativi/successi/fallimenti/presi": "Intentos/éxitos/fallos/adquiridos"
-  "T = tentativi, S = successi, F = fallimenti, P = release prese. I conteggi coprono gli ultimi 1, 7 e 30 giorni; «Ultimi risultati» è l'ultima lettura riuscita.": "T = intentos, S = éxitos, F = fallos, P = releases adquiridas. Los recuentos cubren los últimos 1, 7 y 30 días; «Últimos resultados» es la última lectura correcta."
+  "Nelle colonne «1 giorno», «7 giorni» e «30 giorni» ogni valore è nell'ordine tentativi/successi/fallimenti/prese. «Ultimi risultati» è l'ultima lettura riuscita.": "En las columnas «1 día», «7 días» y «30 días» cada valor sigue el orden intentos/éxitos/fallos/releases adquiridas. «Últimos resultados» es la última lectura correcta."
   "Dopo quanti giorni senza un successo il feed viene disabilitato automaticamente con un # davanti alla riga. Scatta solo se un altro feed ha funzionato nello stesso giorno, così un guasto di rete non spegne tutta la lista. 0 disattiva la regola. Il feed resta visibile nel pannello e si riattiva togliendo il #.": "Tras cuántos días sin una petición correcta el feed se desactiva automáticamente con un # delante de su línea. Solo se activa si otro feed ha funcionado el mismo día, para que un fallo de red no apague toda la lista. 0 desactiva la regla. El feed sigue visible en el panel y se reactiva quitando el #."
 
   "disabilitati": "desactivados"

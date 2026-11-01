@@ -890,6 +890,11 @@ label.field > span, .field > span, .field-label { color: var(--muted); font-size
 .download-history-table .source-label { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .backup-table { min-width: 760px; }
 .backup-table th:first-child, .backup-table td:first-child { min-width: 460px; white-space: nowrap; }
+/* Salute → Stato provider: "Disabilitato fino a" goes on two lines, so the
+   provider name stays whole and Situazione, which matters more, keeps the
+   room. */
+.provider-status-table thead th:nth-child(4) { width: 1%; white-space: normal; }
+.provider-status-table tbody td:first-child { white-space: nowrap; }
 .row-actions { display: flex; flex-wrap: nowrap; gap: 6px; white-space: nowrap; min-width: max-content; }
 .row-actions .btn { flex: none; }
 

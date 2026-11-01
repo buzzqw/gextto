@@ -6226,7 +6226,7 @@ fra:
   "1 giorno": "1 jour"
   "Riga disabilitata con #": "Ligne désactivée avec #"
   "Tentativi/successi/fallimenti/presi": "Tentatives/succès/échecs/pris"
-  "T = tentativi, S = successi, F = fallimenti, P = release prese. I conteggi coprono gli ultimi 1, 7 e 30 giorni; «Ultimi risultati» è l'ultima lettura riuscita.": "T = tentatives, S = succès, F = échecs, P = releases prises. Les chiffres couvrent les 1, 7 et 30 derniers jours ; « Derniers résultats » est la dernière lecture réussie."
+  "Nelle colonne «1 giorno», «7 giorni» e «30 giorni» ogni valore è nell'ordine tentativi/successi/fallimenti/prese. «Ultimi risultati» è l'ultima lettura riuscita.": "Dans les colonnes « 1 jour », « 7 jours » et « 30 jours », chaque valeur suit l'ordre tentatives/succès/échecs/releases prises. « Derniers résultats » est la dernière lecture réussie."
   "Dopo quanti giorni senza un successo il feed viene disabilitato automaticamente con un # davanti alla riga. Scatta solo se un altro feed ha funzionato nello stesso giorno, così un guasto di rete non spegne tutta la lista. 0 disattiva la regola. Il feed resta visibile nel pannello e si riattiva togliendo il #.": "Après combien de jours sans requête réussie le flux est désactivé automatiquement avec un # devant sa ligne. La règle ne s'applique que si un autre flux a fonctionné le même jour, pour qu'une panne réseau n'éteigne pas toute la liste. 0 désactive la règle. Le flux reste visible dans le panneau et se réactive en retirant le #."
 
   "disabilitati": "désactivés"

@@ -620,6 +620,7 @@ func uiHealthDataFrom(s *AppState) uiHealthData {
 			}),
 			sectionTable(uiTableSpec{
 				Title:    "Stato provider",
+				Class:    "provider-status-table",
 				Endpoint: "/api/providers/status",
 				ItemsKey: "items",
 				ColumnsJSON: uiJSON([]uiColumn{
