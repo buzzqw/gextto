@@ -50,6 +50,34 @@ func newCycleState(t *testing.T) *AppState {
 	return state
 }
 
+// countingAddEngine accepts every add like fakeAddEngine, but records that it
+// was asked: the dry-run tests need to know whether a release reached the
+// session, not only whether the database was left alone.
+type countingAddEngine struct {
+	fakeAddEngine
+	adds atomic.Int32
+}
+
+func (e *countingAddEngine) Add(string, *Config) (bool, error) {
+	e.adds.Add(1)
+	return true, nil
+}
+
+func (e *countingAddEngine) AddWithPath(string, *Config, *string) (bool, error) {
+	e.adds.Add(1)
+	return true, nil
+}
+
+func (e *countingAddEngine) AddWithOptions(string, *Config, *string, AddOptions) (bool, error) {
+	e.adds.Add(1)
+	return true, nil
+}
+
+func (e *countingAddEngine) AddFileWithPath(string, *Config, *string) (bool, error) {
+	e.adds.Add(1)
+	return true, nil
+}
+
 // TestCycleFullNoSourcesIsNoOp runs a full cycle with an empty configuration.
 // With no feeds, indexers, series, movies or monitored comics every network
 // phase is a no-op, so the cycle must complete cleanly and report zero work.
@@ -431,6 +459,51 @@ func TestDryRunCycleIsInnocuous(t *testing.T) {
 		if count != 0 {
 			t.Fatalf("dry-run persisted state: %s = %d, want 0", query, count)
 		}
+	}
+}
+
+// TestDryRunCycleNeverAddsToTheEngine pins what the manual promises: a dry-run
+// cycle collects the candidates, logs "would download" and leaves the session
+// exactly as it found it. The approved release used to be handed to the engine
+// even then, so the download really started while the log said it would not.
+func TestDryRunCycleNeverAddsToTheEngine(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.WriteString(w, `<rss><channel>
+<item><title>Monitored.Show.S01E01.1080p.WEB-DL</title><link>magnet:?xt=urn:btih:0123456789012345678901234567890123456789</link></item>
+</channel></rss>`)
+	}))
+	defer server.Close()
+
+	state := newCycleState(t)
+	torrents := &countingAddEngine{}
+	state.setActiveEngine(torrents)
+	cfg := *state.cfg
+	cfg.Series = []SeriesConfig{{Name: "Monitored Show", Enabled: true}}
+	cfg.FeedURLs = []string{server.URL}
+	cfg.Indexers = nil
+	cfg.WebsearchEngines = nil
+	cfg.DryRun = true
+
+	domain := "series"
+	stats, err := RunCycleDomain(
+		context.Background(),
+		&cfg,
+		state.engine,
+		state.db,
+		state.archive,
+		state.comics,
+		state.notifier,
+		torrents,
+		&domain,
+	)
+	if err != nil {
+		t.Fatalf("RunCycleDomain: %v", err)
+	}
+	if stats.DownloadsStarted != 1 {
+		t.Fatalf("the dry run did not reach the download decision: %+v", stats)
+	}
+	if got := torrents.adds.Load(); got != 0 {
+		t.Fatalf("the dry run handed %d release(s) to the engine, want 0", got)
 	}
 }
 

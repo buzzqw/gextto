@@ -123,21 +123,28 @@ const (
 // A failure after the Add withdraws the torrent (and, after the commit, rolls
 // the placeholder back), so the release stays eligible for a later cycle. A
 // crash anywhere leaves the intent, which recoverInterruptedAdds resolves. In
-// dry-run nothing is written: only the Add runs, against the dry-run engine.
+// dry-run nothing is written and nothing reaches the engine: add() calls the
+// real session, so running it would start the download the log says it would
+// only have started. The release identity is still checked, the one thing an
+// add can refuse before it touches the engine.
 //
 // It returns "" when the torrent was started, otherwise one of the add*
 // outcome keys; reason is the commit's approval reason ("upgrade", …).
 func startApprovedRelease(db *Database, torrents TorrentEngine, release *models.Release, score int64, dryRun bool,
 	add func() (bool, error), commit func() (bool, string, error)) (outcome, reason string, err error) {
-	if !dryRun {
-		if err := db.BeginTorrentAdd(release, score); err != nil {
-			return addIntentFailed, "", err
+	if dryRun {
+		// A release the engine could not even identify could never be added,
+		// registered or withdrawn: a dry run reports the same refusal instead of
+		// promising a download that a real cycle would not have started.
+		if _, err := releaseIdentityHash(release); err != nil {
+			return addFailed, "", err
 		}
+		return "", "", nil
+	}
+	if err := db.BeginTorrentAdd(release, score); err != nil {
+		return addIntentFailed, "", err
 	}
 	end := func() {
-		if dryRun {
-			return
-		}
 		if err := db.EndTorrentAdd(release); err != nil {
 			logging.Warn("could not clear the torrent add intent", "error", err)
 		}
@@ -150,9 +157,6 @@ func startApprovedRelease(db *Database, torrents TorrentEngine, release *models.
 	if !added {
 		end()
 		return addRejected, "", nil
-	}
-	if dryRun {
-		return "", "", nil
 	}
 	committed, reason, err := commit()
 	if err != nil || !committed {

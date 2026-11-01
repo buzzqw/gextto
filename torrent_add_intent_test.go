@@ -97,17 +97,43 @@ func TestStartApprovedReleaseRefusesReleaseWithoutHash(t *testing.T) {
 	}
 }
 
-// Dry-run writes nothing, not even the intent.
+// Dry-run writes nothing and never reaches the engine: the caller's add() is a
+// closure over the real session, so running it would start the download.
 func TestStartApprovedReleaseDryRunWritesNothing(t *testing.T) {
 	db := newTestDB(t)
 	release := testRelease()
 	before := approvalRowCounts(t, db)
-	outcome, _, _ := startApprovedRelease(db, &mockTorrentEngine{}, &release, 0, true,
-		func() (bool, error) { return true, nil }, commitTestRelease(db, &release))
+	engine := &mockTorrentEngine{}
+	called := false
+	outcome, _, _ := startApprovedRelease(db, engine, &release, 0, true,
+		func() (bool, error) { called = true; return true, nil }, commitTestRelease(db, &release))
 	if outcome != "" || intentCount(t, db) != 0 {
 		t.Fatalf("dry-run outcome=%q intents=%d", outcome, intentCount(t, db))
 	}
+	if called {
+		t.Fatal("the dry run called add(): the download would really have started")
+	}
+	if len(engine.removed) != 0 {
+		t.Fatalf("the dry run touched the engine: %v", engine.removed)
+	}
 	assertSameCounts(t, "dry-run", before, approvalRowCounts(t, db))
+}
+
+// A release without an identity could not be added even outside a dry run:
+// saying "would download" about it would be a promise the real cycle breaks.
+func TestStartApprovedReleaseDryRunRefusesReleaseWithoutHash(t *testing.T) {
+	db := newTestDB(t)
+	release := testRelease()
+	release.Magnet = "https://example.invalid/file.torrent"
+	called := false
+	outcome, _, err := startApprovedRelease(db, &mockTorrentEngine{}, &release, 0, true,
+		func() (bool, error) { called = true; return true, nil }, commitTestRelease(db, &release))
+	if outcome != addFailed || err == nil {
+		t.Fatalf("outcome=%q err=%v, want the add refusal", outcome, err)
+	}
+	if called {
+		t.Fatal("the dry run called add()")
+	}
 }
 
 // A process that died in the middle of an add leaves its intent; the next
