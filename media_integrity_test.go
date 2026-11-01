@@ -91,6 +91,14 @@ done
 exit 0
 `
 
+// miFakeFfmpegUnknownMuxerMessage is a complaint from the null muxer that the
+// check does not know by heart. It describes the sink the check writes to, not
+// the file, so it must not mark the file as damaged.
+const miFakeFfmpegUnknownMuxerMessage = `#!/bin/sh
+echo "[null @ 0x55bd8d99e680] Some new complaint about the sink" >&2
+exit 0
+`
+
 // miFakeFfmpegDecodeError is a real problem in the file: a stream that cannot be
 // decoded. ffmpeg keeps going and exits zero, so the message itself is the only
 // evidence.
@@ -122,6 +130,21 @@ func TestMediaIntegrityIgnoresOutputTimestampWarnings(t *testing.T) {
 // must not be read as a decode error.
 func TestMediaIntegrityIgnoresTruncatedOutputTimestampWarnings(t *testing.T) {
 	miInstallFakeMediaTools(t, miFakeFfmpegFloodedTimestamps)
+	file := filepath.Join(t.TempDir(), "episode.mkv")
+	if err := os.WriteFile(file, []byte("data"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	status, detail := mediaIntegrityCheckPath(context.Background(), file, false)
+	if status != "ok" {
+		t.Fatalf("status = %q (%s), want ok", status, detail)
+	}
+}
+
+// TestMediaIntegrityIgnoresUnknownNullMuxerMessages pins the rule by source:
+// whatever the sink says is about the output the check asked for, even when the
+// wording is new.
+func TestMediaIntegrityIgnoresUnknownNullMuxerMessages(t *testing.T) {
+	miInstallFakeMediaTools(t, miFakeFfmpegUnknownMuxerMessage)
 	file := filepath.Join(t.TempDir(), "episode.mkv")
 	if err := os.WriteFile(file, []byte("data"), 0o644); err != nil {
 		t.Fatal(err)
@@ -575,16 +598,19 @@ func TestMediaIntegrityDecodeTimeoutGrowsWithTheRuntime(t *testing.T) {
 }
 
 func TestMediaIntegrityQuickDecodeArgs(t *testing.T) {
-	quick := strings.Join(mediaIntegrityDecodeArgs("/media/movie.mkv", true), " ")
-	full := strings.Join(mediaIntegrityDecodeArgs("/media/movie.mkv", false), " ")
+	quick := strings.Join(mediaIntegrityDecodeArgs("/media/movie.mkv", true, "-fps_mode"), " ")
+	full := strings.Join(mediaIntegrityDecodeArgs("/media/movie.mkv", false, "-fps_mode"), " ")
 	if !strings.Contains(quick, "-threads 1 -skip_frame nokey -i /media/movie.mkv") {
 		t.Fatalf("quick args do not decode keyframes on one thread before the input: %s", quick)
 	}
 	if strings.Contains(full, "-skip_frame") {
 		t.Fatalf("the full check must decode every frame: %s", full)
 	}
-	if !strings.Contains(full, "-map 0:v? -map 0:a? -f null -") {
+	if !strings.Contains(full, "-map 0:v? -map 0:a? -fps_mode vfr -f null -") {
 		t.Fatalf("full args changed shape: %s", full)
+	}
+	if !strings.Contains(quick, "-fps_mode vfr -f null -") {
+		t.Fatalf("the quick check must pass the timestamps through too: %s", quick)
 	}
 }
 

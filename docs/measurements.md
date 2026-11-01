@@ -1195,11 +1195,11 @@ ffmpeg -nostdin -hide_banner -nostats -v error -threads 1 -skip_frame nokey -i "
 on stderr, so with a source whose frames are out of order the same line arrives
 thousands of times (a full 54-minute episode produced 22,998, all the null
 muxer's timestamp complaint, with exit code 0). Building the readable detail from
-a 64 KiB buffer of those lines takes **396–417 µs/op** (63 kB/op, 403 allocs/op)
-on the N97, build 1.2.2178 — three orders of magnitude below the decode that
-produced them. Dropping the line cut in the middle by the buffer limit costs
-nothing measurable: it runs once per file, not once per line. Measured on
-1 November 2026 with:
+a 64 KiB buffer of those lines takes **167–176 µs/op** (63 kB/op, 403 allocs/op)
+on the N97, build 1.2.2179, measured on an otherwise idle machine. Dropping the
+line cut in the middle by the buffer limit and ignoring the sink's own lines
+cost nothing measurable: the first runs once per file, the second is one prefix
+check per line. Measured on 1 November 2026 with:
 
 ```
 CGO_ENABLED=0 go test . -run '^$' -bench '^BenchmarkMediaIntegrityDetail$' -benchmem -count=3

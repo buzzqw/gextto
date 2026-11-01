@@ -1621,8 +1621,11 @@ L'elenco completo delle azioni e dei parametri è nell'[Appendice C](#appendice-
   comunque a leggere non è dato per danneggiato e viene ritentato in un
   passaggio successivo. Un messaggio di `ffmpeg` che riguarda solo i timestamp
   dell'output del controllo — succede con release sane di certi encoder — non
-  basta a dare il file per danneggiato: conta un problema di lettura o di
-  decodifica del file stesso. Per i file 4K il controllo è veloce: legge tutto il file
+  basta a dare il file per danneggiato: la decodifica conserva i timestamp
+  originali, così il controllo non produce da sé quell'avviso, e le righe che
+  `ffmpeg` scrive sul proprio output (`[null @ …]`) sono ignorate perché
+  descrivono il controllo, non il file. Conta un problema di
+  lettura o di decodifica del file stesso. Per i file 4K il controllo è veloce: legge tutto il file
   ma decodifica solo i fotogrammi chiave, così trova comunque i file troncati o
   illeggibili senza impiegare ore (si spegne nella stessa pagina). Nello stesso
   gruppo, sotto le opzioni, il pannello **Stato del controllo** mostra

@@ -1565,8 +1565,11 @@ The complete list of actions and parameters is in [Appendix C](#appendix-c-refer
   still cannot be read is not treated as damaged and is tried again in a later
   pass. An `ffmpeg` message about the timestamps of the check's own output only
   — it happens with healthy releases from some encoders — is not enough to call
-  the file damaged: a problem reading or decoding the file itself is what
-  counts. 4K files use the quick check: the whole file is read but only the
+  the file damaged: the decode keeps the original timestamps, so the check no
+  longer produces that warning itself, and the lines `ffmpeg` writes about its
+  own output (`[null @ …]`) are ignored because they describe the check, not
+  the file. A problem reading or decoding the file itself is
+  what counts. 4K files use the quick check: the whole file is read but only the
   keyframes are decoded, so truncated or unreadable files are still found
   without taking hours (it can be turned off on the same page). In the same
   group, under the options, the **Check status** panel shows progress and the

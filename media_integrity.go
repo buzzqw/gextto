@@ -1043,15 +1043,19 @@ func (b *mediaIntegrityLimitedBuffer) String() string {
 	return content
 }
 
-// mediaIntegrityBenignOutput reports whether an ffmpeg line only complains
-// about the timestamps of the *output* of the check, not about the file being
-// read. The null muxer writes nothing and its stream is just a sink: a source
-// whose frames repeat or go back in presentation order plays correctly in every
-// player, but makes ffmpeg print these lines at error level. They are not
-// evidence of damage, and treating them as such sent whole healthy seasons (the
-// same WEBRip encoder, the same repeated timestamps) to the re-download.
+// mediaIntegrityBenignOutput reports whether an ffmpeg line says nothing about
+// the file being read. Two cases: the line comes from the null muxer, the sink
+// the check itself writes to, whose messages describe the output it builds and
+// never the source; or it only complains about the timestamps of that output,
+// which the check now asks the muxer to pass through, but older ffmpeg may
+// still report. The source is what matters, not the wording: a new complaint of
+// the sink must not be read as damage to a healthy file.
 func mediaIntegrityBenignOutput(line string) bool {
-	lower := strings.ToLower(line)
+	trimmed := strings.TrimSpace(line)
+	lower := strings.ToLower(trimmed)
+	if strings.HasPrefix(lower, "[null @") {
+		return true
+	}
 	return strings.Contains(lower, "non monotonically increasing dts to muxer") ||
 		strings.Contains(lower, "non-monotonous dts in output stream")
 }
@@ -1106,11 +1110,25 @@ func mediaIntegrityUsesQuickDecode(enabled bool, info MediaInfo) bool {
 	return enabled && info.Resolution() == "2160p"
 }
 
+// mediaIntegrityFrameMode is the option that keeps the null muxer from
+// complaining about the timestamps it is handed. With a variable frame rate the
+// muxer passes the decoded timestamps through instead of rebuilding them, so a
+// healthy source with repeated or out-of-order timestamps stays silent; the
+// file is still decoded frame by frame. -fps_mode is the current spelling,
+// ffmpeg 4.x (the one on Ubuntu 22.04) only knows -vsync.
+var mediaIntegrityFrameMode = sync.OnceValue(func() string {
+	command := exec.Command("ffmpeg", "-hide_banner", "-nostdin", "-fps_mode", "vfr", "-version")
+	if err := command.Run(); err == nil {
+		return "-fps_mode"
+	}
+	return "-vsync"
+})
+
 // mediaIntegrityDecodeArgs is the ffmpeg command line of the check. The quick
 // mode adds -skip_frame nokey before the input: the whole file is still read
 // and demuxed, but only keyframes are decoded, which is an order of magnitude
 // faster on 4K and still finds truncation and unreadable data.
-func mediaIntegrityDecodeArgs(file string, quick bool) []string {
+func mediaIntegrityDecodeArgs(file string, quick bool, frameMode string) []string {
 	args := []string{
 		"-nostdin",
 		"-hide_banner",
@@ -1132,6 +1150,12 @@ func mediaIntegrityDecodeArgs(file string, quick bool) []string {
 		// file a second time. ffprobe already validates their presence.
 		"-map", "0:v?",
 		"-map", "0:a?",
+		// The sink is told to pass the decoded timestamps through: without
+		// this, it rebuilds them and reports every repetition to stderr, which
+		// says nothing about the file. A healthy episode with out-of-order
+		// frames wrote thousands of those lines, enough to hide a real decode
+		// error behind them.
+		frameMode, "vfr",
 		"-f", "null",
 		"-",
 	)
@@ -1151,7 +1175,7 @@ func mediaIntegrityDecode(parent context.Context, file string, timeout time.Dura
 	}
 	ctx, cancel := context.WithTimeout(parent, timeout)
 	defer cancel()
-	command := exec.CommandContext(ctx, "ffmpeg", mediaIntegrityDecodeArgs(file, quick)...)
+	command := exec.CommandContext(ctx, "ffmpeg", mediaIntegrityDecodeArgs(file, quick, mediaIntegrityFrameMode())...)
 	stderr := &mediaIntegrityLimitedBuffer{limit: 64 * 1024}
 	command.Stderr = stderr
 	err := command.Run()
