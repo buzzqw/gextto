@@ -5590,3 +5590,5 @@ eng:
   "su questa macchina": "on this machine"
   "in un container, su questa macchina": "in a container, on this machine"
   "su un'altra macchina": "on another machine"
+
+  "aMule è un programma separato, avviato fuori da Gextto: Gextto non lo avvia, non lo ferma e non lo aggiorna.": "aMule is a separate program, started outside Gextto: Gextto does not start it, stop it or update it."

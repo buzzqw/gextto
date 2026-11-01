@@ -6200,3 +6200,5 @@ spa:
   "su questa macchina": "en este equipo"
   "in un container, su questa macchina": "en un contenedor, en este equipo"
   "su un'altra macchina": "en otro equipo"
+
+  "aMule è un programma separato, avviato fuori da Gextto: Gextto non lo avvia, non lo ferma e non lo aggiorna.": "aMule es un programa aparte, iniciado fuera de Gextto: Gextto no lo inicia, no lo detiene ni lo actualiza."

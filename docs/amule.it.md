@@ -87,6 +87,36 @@ Con l'immagine `ngosang/amule` (o qualunque container con aMule):
 - pubblica la porta EC (4712) e imposta `ECAddress=0.0.0.0` se Gextto è fuori
   dal container.
 
+Un `compose.yaml` minimo che segue queste regole (percorsi da adattare):
+
+```yaml
+services:
+  amule:
+    image: ngosang/amule:latest
+    container_name: amule
+    network_mode: host
+    restart: unless-stopped
+    environment:
+      TZ: Europe/Rome
+      PUID: "1000"
+      PGID: "1000"
+      UMASK: "0002"
+      GUI_PWD: "<password EC in chiaro>"
+      INCOMING_DIR: /srv/downloads/amule
+      TEMP_DIR: /srv/downloads/amule-temp
+    volumes:
+      - ./amule-config:/home/amule/.aMule
+      - /srv/downloads:/srv/downloads
+```
+
+Con `network_mode: host` aMule ascolta sulla porta 4712 dell'host e Gextto si
+collega all'indirizzo della macchina (anche `127.0.0.1`). Il container è tuo:
+Gextto **non lo crea, non lo avvia e non lo aggiorna**; per aggiornarlo usa
+`docker compose pull` e `docker compose up -d`. Anche le cartelle delle
+**categorie** di aMule devono stare in un volume montato e avere un percorso che
+esiste: un `Incoming=/incoming` rimasto da un'altra immagine non è creabile nel
+container e riempie il log di errori.
+
 Con aMule in un container, Gextto controlla le cartelle di arrivo e temporanea
 **dentro il container** (tramite `/proc/<pid>/root`): una cartella mancante lì
 viene segnalata nella pagina eD2k ma non viene mai creata da fuori. Se la
