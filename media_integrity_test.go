@@ -67,6 +67,60 @@ func TestMediaIntegrityCheckPath(t *testing.T) {
 	}
 }
 
+// miFakeFfmpegRepeatedOutputTimestamps reproduces what ffmpeg writes at error
+// level when the source repeats or reorders the decode timestamps: the null
+// muxer cannot honour them, while the file plays fine. A whole healthy season
+// from the same encoder produced exactly these lines, and reading them as
+// damage sent every episode to the re-download.
+const miFakeFfmpegRepeatedOutputTimestamps = `#!/bin/sh
+echo "[null @ 0x55bd8d99e680] Application provided invalid, non monotonically increasing dts to muxer in stream 0: 2 >= 2" >&2
+echo "[null @ 0x55bd8d99e680] Application provided invalid, non monotonically increasing dts to muxer in stream 0: 6 >= 6" >&2
+exit 0
+`
+
+// miFakeFfmpegDecodeError is a real problem in the file: a stream that cannot be
+// decoded. ffmpeg keeps going and exits zero, so the message itself is the only
+// evidence.
+const miFakeFfmpegDecodeError = `#!/bin/sh
+echo "[h264 @ 0x1234] Error while decoding stream #0:0: Invalid data found when processing input" >&2
+exit 0
+`
+
+// TestMediaIntegrityIgnoresOutputTimestampWarnings pins that only a complaint
+// about the file counts: a warning about the timestamps of the output, which
+// the check itself creates, is not damage.
+func TestMediaIntegrityIgnoresOutputTimestampWarnings(t *testing.T) {
+	miInstallFakeMediaTools(t, miFakeFfmpegRepeatedOutputTimestamps)
+	file := filepath.Join(t.TempDir(), "episode.mkv")
+	if err := os.WriteFile(file, []byte("data"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	status, detail := mediaIntegrityCheckPath(context.Background(), file, false)
+	if status != "ok" {
+		t.Fatalf("status = %q (%s), want ok", status, detail)
+	}
+	if detail != "" {
+		t.Fatalf("detail = %q, want no problem reported", detail)
+	}
+}
+
+// TestMediaIntegrityDecodeErrorIsStillDamaged keeps the other side of the rule:
+// a message about the file is still damage, even when ffmpeg exits zero.
+func TestMediaIntegrityDecodeErrorIsStillDamaged(t *testing.T) {
+	miInstallFakeMediaTools(t, miFakeFfmpegDecodeError)
+	file := filepath.Join(t.TempDir(), "episode.mkv")
+	if err := os.WriteFile(file, []byte("data"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	status, detail := mediaIntegrityCheckPath(context.Background(), file, false)
+	if status != "damaged" {
+		t.Fatalf("status = %q (%s), want damaged", status, detail)
+	}
+	if !strings.Contains(detail, "Error while decoding") {
+		t.Fatalf("detail = %q, want the decode error", detail)
+	}
+}
+
 func TestMediaIntegrityResolveFilePicksLargestVideo(t *testing.T) {
 	dir := t.TempDir()
 	small := filepath.Join(dir, "small.mkv")

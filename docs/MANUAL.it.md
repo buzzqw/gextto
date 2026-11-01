@@ -1613,7 +1613,10 @@ L'elenco completo delle azioni e dei parametri è nell'[Appendice C](#appendice-
   decodifica cresce con la durata del file, così un 4K lungo su un computer
   modesto non viene scambiato per un file rotto; un file che non si riesce
   comunque a leggere non è dato per danneggiato e viene ritentato in un
-  passaggio successivo. Per i file 4K il controllo è veloce: legge tutto il file
+  passaggio successivo. Un messaggio di `ffmpeg` che riguarda solo i timestamp
+  dell'output del controllo — succede con release sane di certi encoder — non
+  basta a dare il file per danneggiato: conta un problema di lettura o di
+  decodifica del file stesso. Per i file 4K il controllo è veloce: legge tutto il file
   ma decodifica solo i fotogrammi chiave, così trova comunque i file troncati o
   illeggibili senza impiegare ore (si spegne nella stessa pagina). Nello stesso
   gruppo, sotto le opzioni, il pannello **Stato del controllo** mostra

@@ -1557,7 +1557,10 @@ The complete list of actions and parameters is in [Appendix C](#appendix-c-refer
   faster. The time allowed for the decode grows with the file duration, so a
   long 4K on a modest computer is not mistaken for a broken file; a file that
   still cannot be read is not treated as damaged and is tried again in a later
-  pass. 4K files use the quick check: the whole file is read but only the
+  pass. An `ffmpeg` message about the timestamps of the check's own output only
+  — it happens with healthy releases from some encoders — is not enough to call
+  the file damaged: a problem reading or decoding the file itself is what
+  counts. 4K files use the quick check: the whole file is read but only the
   keyframes are decoded, so truncated or unreadable files are still found
   without taking hours (it can be turned off on the same page). In the same
   group, under the options, the **Check status** panel shows progress and the

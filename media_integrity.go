@@ -1025,13 +1025,28 @@ func (b *mediaIntegrityLimitedBuffer) String() string {
 	return b.buf.String()
 }
 
-// mediaIntegrityDetail turns ffmpeg's multi-line stderr into one readable line.
+// mediaIntegrityBenignOutput reports whether an ffmpeg line only complains
+// about the timestamps of the *output* of the check, not about the file being
+// read. The null muxer writes nothing and its stream is just a sink: a source
+// whose frames repeat or go back in presentation order plays correctly in every
+// player, but makes ffmpeg print these lines at error level. They are not
+// evidence of damage, and treating them as such sent whole healthy seasons (the
+// same WEBRip encoder, the same repeated timestamps) to the re-download.
+func mediaIntegrityBenignOutput(line string) bool {
+	lower := strings.ToLower(line)
+	return strings.Contains(lower, "non monotonically increasing dts to muxer") ||
+		strings.Contains(lower, "non-monotonous dts in output stream")
+}
+
+// mediaIntegrityDetail turns ffmpeg's multi-line stderr into one readable line,
+// leaving out the warnings about the output timestamps that say nothing about
+// the file itself. An empty result means ffmpeg found no problem worth naming.
 func mediaIntegrityDetail(raw string) string {
 	lines := strings.Split(strings.TrimSpace(raw), "\n")
 	kept := make([]string, 0, len(lines))
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
-		if line == "" {
+		if line == "" || mediaIntegrityBenignOutput(line) {
 			continue
 		}
 		kept = append(kept, line)
@@ -1106,7 +1121,9 @@ func mediaIntegrityDecodeArgs(file string, quick bool) []string {
 
 // mediaIntegrityDecode decodes the file with ffmpeg without writing anything,
 // within the given bound. It reports "ok", "damaged", "unreadable", "canceled"
-// or "interrupted".
+// or "interrupted". Only a message about the file itself counts as damage: the
+// complaints about the timestamps of the output are dropped by
+// mediaIntegrityDetail.
 func mediaIntegrityDecode(parent context.Context, file string, timeout time.Duration, quick bool) (string, string) {
 	if parent == nil {
 		parent = context.Background()
