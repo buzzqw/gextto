@@ -13,6 +13,7 @@ import (
 func TestMain(m *testing.M) {
 	feedRetryUnit = 5 * time.Millisecond
 	feedRateLimitPenalty = 20 * time.Millisecond
+	feedHostMaxPenalty = 200 * time.Millisecond
 	hostMinInterval = 5 * time.Millisecond
 	notifierRetryUnit = 5 * time.Millisecond
 	telegramMinGap = 5 * time.Millisecond

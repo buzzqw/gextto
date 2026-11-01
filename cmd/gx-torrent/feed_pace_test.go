@@ -69,3 +69,50 @@ func TestFeedHostKey(t *testing.T) {
 		}
 	}
 }
+
+// TestFeedPacerGrowsTheCooldownWhileTheSiteKeepsAnswering429 covers the
+// escalation: one 429 costs the base cooldown, the next one twice as much, and
+// so on, instead of probing a site that is blocking us every ten minutes for
+// ever.
+func TestFeedPacerGrowsTheCooldownWhileTheSiteKeepsAnswering429(t *testing.T) {
+	pacer := newFeedPacer(time.Millisecond, 20*time.Millisecond)
+	pacer.done("busy.example", errors.New("HTTP 429"))
+	first := pacer.wait(context.Background(), "busy.example")
+	if first <= 0 {
+		t.Fatal("the first 429 must put the host on cooldown")
+	}
+	// After the first cooldown the site answers 429 again: the second one is
+	// twice as long.
+	pacer.done("busy.example", errors.New("HTTP 429"))
+	second := pacer.wait(context.Background(), "busy.example")
+	if second <= first {
+		t.Fatalf("cooldown after the second 429 = %v, want more than the first (%v)", second, first)
+	}
+}
+
+// TestFeedPacerStretchesTheGapAndRecovers covers the other half: the spacing
+// between scheduled requests grows after a 429 and comes back after a run of
+// good answers.
+func TestFeedPacerStretchesTheGapAndRecovers(t *testing.T) {
+	pacer := newFeedPacer(10*time.Millisecond, 5*time.Millisecond)
+	pacer.done("busy.example", errors.New("HTTP 429"))
+	pacer.mu.Lock()
+	grown := pacer.host("busy.example").gap
+	pacer.mu.Unlock()
+	if grown <= 10*time.Millisecond {
+		t.Fatalf("gap after a 429 = %v, want more than the base 10ms", grown)
+	}
+	for i := 0; i < feedHostRecoverAfter; i++ {
+		pacer.done("busy.example", nil)
+	}
+	pacer.mu.Lock()
+	state := pacer.host("busy.example")
+	recoveredGap, strikes := state.gap, state.strikes
+	pacer.mu.Unlock()
+	if recoveredGap >= grown {
+		t.Fatalf("gap after %d good answers = %v, want less than %v", feedHostRecoverAfter, recoveredGap, grown)
+	}
+	if strikes != 0 {
+		t.Fatalf("strikes after recovery = %d, want 0", strikes)
+	}
+}

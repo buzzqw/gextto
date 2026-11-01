@@ -591,6 +591,14 @@ func (e *Engine) scrapeFeed(ctx context.Context, cfg *Config, rawURL string, max
 			return nil
 		}
 	}
+	// A site that answered 429 is left alone until its cooldown ends. The other
+	// feeds of that host wait for the next cycle too: asking them one after the
+	// other is what turns a single rate limit into a dozen failing feeds.
+	if wait, cooling := host_cooling(rawURL); cooling {
+		logging.Debug("feed skipped while the site cools down after a rate limit",
+			"feed", feed, "retry_in_seconds", int(wait.Seconds()))
+		return nil
+	}
 	fetchCtx, cancel := context.WithTimeout(ctx, feedFetchBudget)
 	defer cancel()
 	items, err := FetchFeed(fetchCtx, rawURL, cfg.FlaresolverrURL, maxPages, maxAgeDays, oldRatio)
@@ -608,6 +616,12 @@ func (e *Engine) scrapeFeed(ctx context.Context, cfg *Config, rawURL string, max
 	// backoff or emit a warning, as searchOneWithDB does for indexers.
 	if ctx.Err() != nil {
 		logging.Debug("feed fetch stopped with the cycle context", "feed", feed, "reason", err)
+		return nil
+	}
+	if errors.Is(err, errHostCooling) {
+		// The site asked to slow down while this feed was running: the feed is
+		// not broken, it simply waits for the next cycle.
+		logging.Debug("feed interrupted while the site cools down after a rate limit", "feed", feed)
 		return nil
 	}
 	message := utils.RedactURLSecrets(err.Error())

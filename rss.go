@@ -32,6 +32,10 @@ import (
 	"golang.org/x/net/html"
 )
 
+// errHostCooling marks a feed left for the next cycle because its site is
+// inside the cooldown earned with an HTTP 429. It is not a failure of the feed.
+var errHostCooling = errors.New("the site asked to slow down (HTTP 429)")
+
 // local_name returns the lowercased local part of a possibly namespaced XML
 // name (`torznab:attr` -> `attr`), mirroring the helper.
 func local_name(value string) string {
@@ -639,26 +643,64 @@ func host_semaphore(rawURL string) chan struct{} {
 // (250 ms); the tests shorten it.
 var hostMinInterval = 250 * time.Millisecond
 
+// hostPaceState is what the process learnt about one site: the next free start
+// (the short spacing), and the cooldown a site earns when it answers 429.
+type hostPaceState struct {
+	// next is the earliest start of the next request.
+	next time.Time
+	// cooling is the end of the 429 cooldown; zero means "not cooling".
+	cooling time.Time
+	// strikes counts the consecutive rate-limit answers; it grows the cooldown.
+	strikes int
+	// good counts the answers since the last rate limit; enough of them step
+	// the strikes back down.
+	good int
+}
+
 var (
 	hostLastRequestMu sync.Mutex
-	hostLastRequest   = map[string]time.Time{}
+	hostLastRequest   = map[string]*hostPaceState{}
 )
+
+// host_pace_key is the key of the per-site pace. It keeps the port: on a
+// developer machine two services on 127.0.0.1 are different sites, and a
+// cooldown earned by one must not silence the other. Public sites have no port
+// in the URL, so they keep one shared pace.
+func host_pace_key(rawURL string) string {
+	parsed, err := url.Parse(strings.TrimSpace(rawURL))
+	if err != nil {
+		return ""
+	}
+	return strings.ToLower(parsed.Host)
+}
+
+// host_pace returns the state of one site. It must be called with
+// hostLastRequestMu held.
+func host_pace(domain string) *hostPaceState {
+	state := hostLastRequest[domain]
+	if state == nil {
+		state = &hostPaceState{}
+		hostLastRequest[domain] = state
+	}
+	return state
+}
 
 // throttle_host waits until the per-host start interval has elapsed, then
 // claims the slot.
 func throttle_host(ctx context.Context, rawURL string) {
-	domain := domain_of(rawURL)
+	domain := host_pace_key(rawURL)
 	if domain == "" {
 		return
 	}
 	for {
 		var wait time.Duration
 		hostLastRequestMu.Lock()
+		state := host_pace(domain)
 		now := time.Now()
-		if previous, ok := hostLastRequest[domain]; ok && previous.Add(hostMinInterval).After(now) {
-			wait = previous.Add(hostMinInterval).Sub(now)
+		if state.next.After(now) {
+			wait = state.next.Sub(now)
 		} else {
-			hostLastRequest[domain] = now
+			state.next = now.Add(hostMinInterval)
 		}
 		hostLastRequestMu.Unlock()
 		if wait <= 0 {
@@ -673,15 +715,70 @@ func throttle_host(ctx context.Context, rawURL string) {
 }
 
 // penalize_host pauses a host after a `429` so the next requests do not extend
-// the penalty.
+// the penalty. The first answer costs the base penalty; a host that answers
+// again after that cooldown doubles it each time, up to feedHostMaxPenalty, so
+// a site that is blocking us is not probed every few minutes for ever.
 func penalize_host(rawURL string, penalty time.Duration) {
-	domain := domain_of(rawURL)
+	domain := host_pace_key(rawURL)
 	if domain == "" {
 		return
 	}
 	hostLastRequestMu.Lock()
-	hostLastRequest[domain] = time.Now().Add(penalty)
-	hostLastRequestMu.Unlock()
+	defer hostLastRequestMu.Unlock()
+	state := host_pace(domain)
+	state.strikes++
+	state.good = 0
+	wait := penalty
+	for i := 1; i < state.strikes && wait < feedHostMaxPenalty; i++ {
+		wait *= 2
+	}
+	if wait > feedHostMaxPenalty {
+		wait = feedHostMaxPenalty
+	}
+	state.cooling = time.Now().Add(wait)
+}
+
+// host_cooling reports the remaining cooldown of a site that answered 429, so
+// the feeds of that site are left for the next cycle instead of being asked
+// one after the other (which only extends the block).
+func host_cooling(rawURL string) (time.Duration, bool) {
+	domain := host_pace_key(rawURL)
+	if domain == "" {
+		return 0, false
+	}
+	hostLastRequestMu.Lock()
+	defer hostLastRequestMu.Unlock()
+	state := host_pace(domain)
+	if state.cooling.IsZero() {
+		return 0, false
+	}
+	now := time.Now()
+	if !now.Before(state.cooling) {
+		state.cooling = time.Time{}
+		return 0, false
+	}
+	return state.cooling.Sub(now), true
+}
+
+// host_succeeded records a good answer from a site. Enough of them step the
+// strike count down, so a site that was busy returns to the normal pace.
+func host_succeeded(rawURL string) {
+	domain := host_pace_key(rawURL)
+	if domain == "" {
+		return
+	}
+	hostLastRequestMu.Lock()
+	defer hostLastRequestMu.Unlock()
+	state := host_pace(domain)
+	if state.strikes == 0 {
+		return
+	}
+	state.good++
+	if state.good < feedHostRecoverAfter {
+		return
+	}
+	state.good = 0
+	state.strikes--
 }
 
 func session_for(rawURL string) (cfSession, bool) {
@@ -1151,10 +1248,14 @@ func flaresolverr_or(ctx context.Context, client *http.Client, flaresolverr, raw
 const FEED_FETCH_ATTEMPTS = 3
 
 // The pacing of feed fetches: the retry back-off unit (1, then 2 units) and
-// the pause imposed on a site that answered 429. The tests shorten them.
+// the pause imposed on a site that answered 429. The pause is the base of a
+// growing cooldown: a site that answers again after it doubles the wait, up to
+// feedHostMaxPenalty. The tests shorten them.
 var (
 	feedRetryUnit        = time.Second
-	feedRateLimitPenalty = 2 * time.Second
+	feedRateLimitPenalty = 10 * time.Minute
+	feedHostMaxPenalty   = 6 * time.Hour
+	feedHostRecoverAfter = 20
 )
 
 // Timeout del singolo tentativo.
@@ -1173,6 +1274,10 @@ const (
 	fetchAttemptCloudflare
 	fetchAttemptTransient
 	fetchAttemptFatal
+	// fetchAttemptCooling is a site inside the cooldown it earned with a 429:
+	// the request is not attempted and the caller leaves the feed for the next
+	// cycle instead of counting it as a failure.
+	fetchAttemptCooling
 )
 
 type fetchAttempt struct {
@@ -1181,6 +1286,11 @@ type fetchAttempt struct {
 }
 
 func fetch_body_direct(ctx context.Context, client *http.Client, rawURL string, timeout time.Duration) fetchAttempt {
+	// A site that answered 429 is left alone until its cooldown ends: asking it
+	// once per feed of the list only extends the block.
+	if wait, cooling := host_cooling(rawURL); cooling {
+		return fetchAttempt{kind: fetchAttemptCooling, value: wait.Round(time.Second).String()}
+	}
 	requestCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	headers := map[string]string{}
@@ -1228,6 +1338,8 @@ func fetch_body_direct(ctx context.Context, client *http.Client, rawURL string, 
 		if is_cloudflare_challenge(body) {
 			return fetchAttempt{kind: fetchAttemptCloudflare, value: "cloudflare challenge body"}
 		}
+		// The site is answering: count it towards recovery from a past 429.
+		host_succeeded(rawURL)
 		return fetchAttempt{kind: fetchAttemptBody, value: body}
 	}
 	if cloudflare_blocked(status) {
@@ -1328,6 +1440,10 @@ func fetch_body(ctx context.Context, client *http.Client, rawURL string, flareso
 			return flaresolverr_or(ctx, client, *flaresolverr, rawURL, result.value, false)
 		case fetchAttemptFatal:
 			return "", fmt.Errorf("%s", result.value)
+		case fetchAttemptCooling:
+			// The site answered 429 and is inside its cooldown: this feed is
+			// not a failure, it simply waits for the next cycle.
+			return "", fmt.Errorf("%w: retry in %s", errHostCooling, result.value)
 		case fetchAttemptTransient:
 			lastTransient = result.value
 			if attempt < FEED_FETCH_ATTEMPTS {

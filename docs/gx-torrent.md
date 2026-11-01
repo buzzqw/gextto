@@ -912,7 +912,11 @@ same host are at least `feedHostGap` (2 s) apart, and a host that answers **429*
 is left alone for `feedHostCooldown` (10 min) — its remaining feeds are skipped
 for the cycle with a *HTTP 429: the site is limiting the requests* status and
 retried at the next check, instead of failing one after the other. The round
-reports it once per host. `cmd/gx-torrent/feed_pace.go`.
+reports it once per host. The judgement grows with the site's answer: a host
+that answers 429 again doubles the pause each time, up to
+`feedHostMaxCooldown` (6 h), and its spacing grows up to `feedHostMaxGap` (30 s);
+after `feedHostRecoverAfter` (20) good answers the pacing steps back down, so a
+site that was merely busy returns to the normal pace. `cmd/gx-torrent/feed_pace.go`.
 
 A feed can also be a **search**: instead of `url` a `search` (a
 query) is used and the worker queries the configured Torznab **indexers**, treating the

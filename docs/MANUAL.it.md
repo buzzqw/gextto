@@ -2241,6 +2241,8 @@ salvata** finché non li salvi.
 
 Sotto l'editor c'è il riquadro **Feed disabilitati**: elenca le righe con `#` e dice se sono state disabilitate a mano o automaticamente, con la data e i giorni di errore. L'andamento completo — stato, ultimo successo, ultimo errore, ultimi risultati e tentativi/successi/fallimenti/release prese su 1, 7 e 30 giorni — è nella pagina **Salute → Attività dei feed**, con il riepilogo delle ultime 24 ore. Il pannello distingue i feed che condividono host e percorso tramite i parametri (per esempio `filter=u=…` di ext.to), maschera le credenziali e, finché non c'è ancora un tentativo, dice «in attesa del primo ciclo». Per riattivare un feed basta togliere il `#` e salvare.
 
+Più feed possono puntare allo stesso sito (le liste degli uploader di ext.to o TorrentGalaxy). Gextto li legge distanziati, non tutti insieme, e quando il sito risponde «troppe richieste» lo lascia in pace: la pausa parte da dieci minuti e cresce ogni volta che succede di nuovo, fino a sei ore, mentre gli altri feed dello stesso sito aspettano un ciclo successivo. La pausa finisce da sola; non serve disabilitare i feed.
+
 #### eD2k e Kad
 
 *Collegamento ad aMule, ricerca su Kad e sui server eD2k, ripiego automatico e download fermi.*

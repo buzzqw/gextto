@@ -2165,6 +2165,8 @@ them.
 
 Below the editor there is the **Disabled feeds** frame: it lists the lines with `#` and says whether they were disabled by hand or automatically, with the date and the days of failure. The full activity — state, last success, last error, last results and attempts/successes/failures/releases taken over 1, 7 and 30 days — is on the **Health → Feed activity** page, with the last-24-hours summary. The panel tells feeds that share host and path apart through their parameters (for example ext.to's `filter=u=…`), masks credentials and, until a first attempt, says “waiting for the first cycle”. Removing the `#` and saving enables a feed again.
 
+Many feeds can point at the same site (the uploader listings of ext.to or TorrentGalaxy). Gextto reads them spaced apart, not all together, and when the site answers “too many requests” it leaves that site alone: the pause starts at ten minutes and grows each time it happens again, up to six hours, while the other feeds of the same site wait for a later cycle. The pause clears by itself; you do not have to disable the feeds.
+
 #### eD2k and Kad
 
 *Connection to aMule, search on Kad and the eD2k servers, automatic fallback and stalled downloads.*
