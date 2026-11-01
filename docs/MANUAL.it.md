@@ -1596,10 +1596,12 @@ L'elenco completo delle azioni e dei parametri è nell'[Appendice C](#appendice-
 - Le operazioni lunghe (**Scansiona archivi**, **Aggiorna MediaInfo**, **Rinomina
   tutto**) girano in background: la pagina non resta bloccata, puoi continuare a
   usare Gextto, annullarle dal messaggio e vederne l'esito quando finiscono.
-- **Controllo integrità file** — si attiva in *Configurazione → Manutenzione →
-  Controllo integrità file*: scegli ogni quanti minuti e quanti file per volta,
-  e Gextto verifica la libreria un po' alla volta in background, senza tenere
-  aperta la pagina. Usa `ffprobe` e `ffmpeg`: prima legge formato e tracce, poi
+- **Controllo integrità file** — non ha un pannello in questa pagina: si attiva
+  e si gestisce in *Configurazione →
+  Manutenzione → Controllo integrità file*. Scegli se il controllo gira da solo,
+  ogni quanti minuti e quanti file per volta, e Gextto verifica la libreria un
+  po' alla volta in background, senza tenere aperta la pagina. Usa `ffprobe` e
+  `ffmpeg`: prima legge formato e tracce, poi
   decodifica il file per intero per trovare danni nel mezzo, come una puntata
   troncata o scaricata male. Salva la posizione e i file già controllati, quindi
   riprende dopo un riavvio e salta quelli non cambiati; la prima passata è la
@@ -1609,17 +1611,12 @@ L'elenco completo delle azioni e dei parametri è nell'[Appendice C](#appendice-
   comunque a leggere non è dato per danneggiato e viene ritentato in un
   passaggio successivo. Per i file 4K il controllo è veloce: legge tutto il file
   ma decodifica solo i fotogrammi chiave, così trova comunque i file troncati o
-  illeggibili senza impiegare ore (si spegne in *Configurazione → Manutenzione →
-  Controllo integrità file*). In
-  *Manutenzione* il pannello mostra avanzamento ed elenco dei file danneggiati o
-  illeggibili, con i due conteggi separati e il motivo riportato da `ffmpeg`;
-  **Controlla ora** avvia subito un passaggio e **Riavvia da capo** ricontrolla
-  tutta la libreria: le due azioni funzionano anche con il controllo automatico
-  spento. Le opzioni del controllo automatico stanno invece in *Configurazione →
-  Manutenzione → Controllo integrità file*, e dal pannello ci si arriva con
-  **Impostazioni del controllo** (e dalla pagina delle impostazioni il testo
-  del gruppo riporta a *Manutenzione*).
-  Accanto a ogni puntata c'è **Riscarica**: sposta il file
+  illeggibili senza impiegare ore (si spegne nella stessa pagina). Nello stesso
+  gruppo, sotto le opzioni, il pannello **Stato del controllo** mostra
+  avanzamento ed elenco dei file danneggiati o illeggibili, con i due conteggi
+  separati e il motivo riportato da `ffmpeg`; **Controlla ora** avvia subito un
+  passaggio e **Riavvia da capo** ricontrolla tutta la libreria, anche con il
+  controllo automatico spento. Accanto a ogni puntata c'è **Riscarica**: sposta il file
   danneggiato fuori dalla
   libreria, mette la release in blocklist e cerca la stessa puntata scegliendo
   una release diversa, così non riprende lo stesso file corrotto; quando la
@@ -1885,8 +1882,10 @@ non c'è niente da configurare.
 Con eD2k attivo la pagina **Salute** ha anche una scheda **eD2k e Kad (aMule)**
 con lo stato della connessione, le velocità, i byte scambiati nella sessione, le
 cartelle di aMule mancanti e le ultime righe di problema dal log di aMule
-(disconnessioni, server non validi, errori), così non devi aprire il log per
-accorgerti che qualcosa non va.
+(disconnessioni, server non validi, errori), una volta per messaggio e senza i
+tentativi che aMule riprova e completa da solo (per esempio il database IP→paese
+all'inizio del mese), così non devi aprire il log per accorgerti che qualcosa non
+va.
 
 ## 11. Notifiche
 
@@ -2689,6 +2688,18 @@ spazio del `tmpfs`, come prima.
 | Controllo integrità — controllo veloce dei file 4K | Per i file 4K legge tutto il file ma decodifica solo i fotogrammi chiave: il controllo è molto più veloce e trova comunque i file troncati o illeggibili, ma può non vedere un piccolo danno tra un fotogramma chiave e l'altro. È attivo di default. |
 | Controllo integrità — riscarica i file danneggiati | Appena il controllo trova un file danneggiato mette la release in blocklist, sposta il file fuori dalla libreria e cerca subito una release diversa per la stessa puntata o lo stesso film. È spento di default: senza, la sostituzione resta manuale, con **Riscarica**. |
 
+**Controllo integrità file — pannello**
+
+Sotto le opzioni, nello stesso gruppo, il pannello mostra lo stato e i file trovati.
+
+| Voce | Cosa fa |
+|---|---|
+| Avvia controllo / Riprendi controllo | Avvia la passata o la riprende dal primo file non ancora verificato; i file già controllati e non cambiati vengono saltati. Funziona anche con il controllo automatico spento. |
+| Interrompi | Ferma il controllo dopo il file in corso; la posizione resta salvata. |
+| Riavvia da capo | Ricomincia dal primo file, cancella i risultati precedenti e ricontrolla tutta la libreria. |
+| Danneggiato / Illeggibile | Il file non è stato decodificato, oppure non è stato possibile leggerlo entro il tempo previsto: un illeggibile non è dato per rotto e viene ritentato automaticamente in un passaggio successivo. |
+| Riscarica | Sposta il file danneggiato fuori dalla libreria, mette la vecchia release in blocklist e cerca la stessa puntata scegliendo una release diversa. Con **Controllo integrità — riscarica i file danneggiati** attivo lo fa Gextto da solo, appena il file è dato per danneggiato. |
+
 **File orfani**
 
 | Impostazione | Cosa fa |
@@ -3066,18 +3077,6 @@ credenziali dell'interfaccia e riceve un cookie di sessione valido solo per
 | Rinomina tutto | Rinomina tutti i file archiviati secondo il formato configurato. |
 | Housekeeping | Pulizia dei dati tecnici e dello storico, senza toccare la libreria. |
 | Riavvia servizio | Riavvia il daemon Gextto. |
-
-### Controllo integrità file
-
-| Voce | Cosa fa |
-|---|---|
-| Avvia controllo / Riprendi controllo | Avvia la passata o la riprende dal primo file non ancora verificato; i file già controllati e non cambiati vengono saltati. |
-| Controlla nuovi e cambiati | Verifica solo i file nuovi, sostituiti o mai controllati. |
-| Interrompi | Ferma il controllo dopo il file in corso; la posizione resta salvata. |
-| Riavvia da capo | Ricomincia dal primo file, cancella i risultati precedenti e ricontrolla tutta la libreria. |
-| Danneggiato / Illeggibile | Il file non è stato decodificato, oppure non è stato possibile leggerlo entro il tempo previsto: un illeggibile non è dato per rotto e viene ritentato automaticamente in un passaggio successivo. |
-| Riscarica | Sposta il file danneggiato fuori dalla libreria, mette la vecchia release in blocklist e cerca la stessa puntata scegliendo una release diversa. Con **Controllo integrità — riscarica i file danneggiati** attivo lo fa Gextto da solo, appena il file è dato per danneggiato. |
-| Impostazioni del controllo | Apre *Configurazione → Manutenzione* sulle opzioni del controllo automatico: intervallo, file per volta, controllo veloce 4K e riscarica automatica. |
 
 ### Rinomina contenuto cartella
 

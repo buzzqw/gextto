@@ -1541,8 +1541,9 @@ The complete list of actions and parameters is in [Appendix C](#appendix-c-refer
 - Long operations (**Scan archives**, **Refresh MediaInfo**, **Rename all**) run
   in the background: the page is not blocked, you can keep using Gextto, cancel
   them from the message and see the outcome when they finish.
-- **File integrity check** — switch it on in *Settings → Maintenance → File
-  integrity check*: choose how many minutes apart and how many files per pass,
+- **File integrity check** — it has no panel on this page: everything lives in
+  *Settings → Maintenance → File integrity check*. Switch the check on and
+  choose how many minutes apart and how many files per pass,
   and Gextto verifies the library a little at a time in the background, without
   the page having to stay open. It uses `ffprobe` and `ffmpeg`: it first reads
   the container and the tracks, then fully decodes the file to find damage in
@@ -1554,15 +1555,12 @@ The complete list of actions and parameters is in [Appendix C](#appendix-c-refer
   still cannot be read is not treated as damaged and is tried again in a later
   pass. 4K files use the quick check: the whole file is read but only the
   keyframes are decoded, so truncated or unreadable files are still found
-  without taking hours (it can be turned off in *Settings → Maintenance → File
-  integrity check*). In
-  *Maintenance* the panel shows progress and the damaged or unreadable files,
+  without taking hours (it can be turned off on the same page). In the same
+  group, under the options, the **Check status** panel shows progress and the
+  damaged or unreadable files,
   with the two counts kept apart and the reason reported by `ffmpeg`; **Check
-  now** starts a pass at once and **Start over** rechecks the whole library:
-  both work even with the automatic pass off. The options of the automatic pass
-  live in *Settings → Maintenance → File integrity check*, and **Check
-  settings** takes you there from the panel (the text of the settings group
-  points back to *Maintenance*).
+  now** starts a pass at once and **Start over** rechecks the whole library,
+  even with the automatic pass off.
   Next to every episode there is **Redownload**: it moves the damaged file out
   of the library,
   blocklists the release and searches the same episode choosing a different
@@ -1819,8 +1817,10 @@ configure.
 With eD2k on, the **Health** page also has an **eD2k and Kad (aMule)** card with
 the connection state, the speeds, the bytes exchanged in this session, the
 missing aMule folders and the latest problem lines from aMule's log
-(disconnections, no valid servers, errors), so a problem is visible without
-opening the log.
+(disconnections, no valid servers, errors) once per message and without the
+attempts aMule retries and completes by itself (for example the IP-to-country
+database at the start of a month), so a problem is visible without opening the
+log.
 
 ## 11. Notifications
 
@@ -2611,6 +2611,18 @@ files. When the memory cannot be read, only the `tmpfs` space counts, as before.
 | File integrity check — quick check for 4K files | For 4K files it reads the whole file but decodes only the keyframes: the check is much faster and still finds truncated or unreadable files, but it may miss a small defect between one keyframe and the next. It is on by default. |
 | File integrity check — re-download damaged files | As soon as the check finds a damaged file it blocklists the release, moves the file out of the library and searches at once for a different release of the same episode or movie. It is off by default: without it the replacement stays manual, with **Redownload**. |
 
+**File integrity check — panel**
+
+Under the options, in the same group, the panel shows the state and the files it found.
+
+| Item | What it does |
+|---|---|
+| Start check / Resume check | Starts the pass or resumes it from the first file not yet verified; files already checked and unchanged are skipped. It works with the automatic pass off too. |
+| Stop | Stops the check after the current file; the position stays saved. |
+| Start over | Starts again from the first file, clears the previous results and rechecks the whole library. |
+| Damaged / Unreadable | The file could not be decoded, or it could not be read within the allotted time: an unreadable file is not treated as broken and is retried automatically in a later pass. |
+| Redownload | Moves the damaged file out of the library, blocklists the old release and searches the same episode for a different release. With **File integrity check — re-download damaged files** on, Gextto does it by itself as soon as a file is reported as damaged. |
+
 **Orphaned files**
 
 | Setting | What it does |
@@ -2985,18 +2997,6 @@ of the interface stays protected.
 | Rename all | Renames every archived file using the configured format. |
 | Housekeeping | Cleans technical data and history without touching the library. |
 | Restart service | Restarts the Gextto daemon. |
-
-### File integrity check
-
-| Item | What it does |
-|---|---|
-| Start check / Resume check | Starts the pass or resumes it from the first file not yet verified; files already checked and unchanged are skipped. |
-| Check new and changed | Verifies only the files that are new, replaced or never checked. |
-| Stop | Stops the check after the current file; the position stays saved. |
-| Start over | Starts again from the first file, clears the previous results and rechecks the whole library. |
-| Damaged / Unreadable | The file could not be decoded, or it could not be read within the allotted time: an unreadable file is not treated as broken and is retried automatically in a later pass. |
-| Redownload | Moves the damaged file out of the library, blocklists the old release and searches the same episode for a different release. With **File integrity check — re-download damaged files** on, Gextto does it by itself as soon as a file is reported as damaged. |
-| Check settings | Opens *Settings → Maintenance* on the options of the automatic check: interval, files per pass, quick 4K check and automatic re-download. |
 
 ### Rename folder content
 

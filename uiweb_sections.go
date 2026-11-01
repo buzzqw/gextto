@@ -434,7 +434,6 @@ func uiMaintenanceSections(s *AppState, cfg *Config) []uiPageSection {
 		sectionProgress("Progresso rinomina", "/api/rename-progress"),
 		group("Libreria", uiPageSection{Kind: "duplicates"}),
 		group("Libreria", uiPageSection{Kind: "db_optimize"}),
-		group("Libreria", uiPageSection{Kind: "media_integrity"}),
 		uiPageSection{Kind: "ramdisk"},
 		group("Pulizie", uiPageSection{Kind: "trash_panel"}),
 		group("Pulizie", sectionForm(uiFormSection{

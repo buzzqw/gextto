@@ -270,8 +270,8 @@ func registerV2Routes(s *AppState, mux *http.ServeMux) {
 	// Manutenzione: widget dedicati (duplicati, database, RAM disk, rinomina).
 	v2Handle(s, mux, "POST /maintenance/duplicates", V2Duplicates)
 	v2Handle(s, mux, "POST /maintenance/db", V2DBMaintenance)
-	v2Handle(s, mux, "GET /maintenance/media-integrity", V2MediaIntegrityPanel)
-	v2Handle(s, mux, "POST /maintenance/media-integrity", V2MediaIntegrityAction)
+	v2Handle(s, mux, "GET /settings/media-integrity", V2MediaIntegrityPanel)
+	v2Handle(s, mux, "POST /settings/media-integrity", V2MediaIntegrityAction)
 	v2Handle(s, mux, "POST /maintenance/ramdisk", V2Ramdisk)
 	v2Handle(s, mux, "GET /maintenance/update", V2Update)
 	v2Handle(s, mux, "POST /setup/auth", V2SetupAuth)
@@ -2580,6 +2580,10 @@ type v2SettingsView struct {
 	// Ed2k is the aMule panel of the eD2k tab (preallocation is aMule's own
 	// setting, applied through the EC protocol).
 	Ed2k *v2SettingsEd2k
+	// MediaCheck is the manual side of the file integrity check: progress,
+	// actions and the damaged files, rendered under the settings group of the
+	// Maintenance tab where the check is configured.
+	MediaCheck *v2MediaCheckView
 	// Flash carries a one-shot feedback message after an action.
 	Flash    string
 	FlashErr bool
@@ -2661,6 +2665,12 @@ func v2SettingsViewFrom(s *AppState, tab, highlight, mode string) v2SettingsView
 	}
 	if page.ActiveID == "ed2k" {
 		view.Ed2k = v2SettingsEd2kFrom(s)
+	}
+	if page.ActiveID == "maintenance" {
+		// The check is configured and driven from one place: the panel with its
+		// progress and manual actions sits right under the settings group.
+		check := v2MediaCheckViewFrom(s)
+		view.MediaCheck = &check
 	}
 	if page.Actions != nil {
 		view.Actions = &v2SettingsActions{Title: page.Actions.Label, Hint: page.Actions.Hint, Buttons: buttons(page.Actions.Buttons)}

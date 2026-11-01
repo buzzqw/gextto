@@ -3,6 +3,7 @@ package gextto
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -301,40 +302,69 @@ func TestRedownloadEpisodeAvoidsThePreviousRelease(t *testing.T) {
 	}
 }
 
-func TestV2MaintenanceRendersTheMediaIntegrityPanel(t *testing.T) {
-	state := newTestAppState(t)
-	server := httptest.NewServer(Router(state))
-	t.Cleanup(server.Close)
-	_, body := v2Request(t, server, http.MethodGet, "/?view=maintenance", nil)
-	if !strings.Contains(body, "Controllo integrità file") {
-		t.Fatalf("maintenance page does not render the media integrity panel")
-	}
-}
-
-// TestMediaIntegrityPanelLinksTheSettings reconciles the two faces of the
-// check: the manual actions live in Maintenance, the periodic behaviour in the
-// settings. The panel must always offer the way to those settings, and the
-// manual buttons must work whether the automatic pass is on or off.
-func TestMediaIntegrityPanelLinksTheSettings(t *testing.T) {
+// TestV2SettingsMaintenanceHoldsTheMediaIntegrityPanel checks the check lives in
+// one place only: the Maintenance tab of the settings, right after the group
+// that configures it, and no longer as a separate panel of the Maintenance page.
+func TestV2SettingsMaintenanceHoldsTheMediaIntegrityPanel(t *testing.T) {
 	state := newTestAppState(t)
 	miInstallFakeMediaTools(t, miFakeFfmpegDetectsBadFile)
 	server := httptest.NewServer(Router(state))
 	t.Cleanup(server.Close)
-	_, body := v2Request(t, server, http.MethodGet, "/?view=maintenance", nil)
-	link := `href="/?view=settings&amp;tab=maintenance&amp;highlight=media_integrity_enabled#v2-setting-media_integrity_enabled"`
-	if !strings.Contains(body, link) {
-		t.Fatalf("the panel does not link the check settings")
-	}
-	if !strings.Contains(body, "Impostazioni del controllo") {
-		t.Fatalf("the link to the settings has no visible label")
-	}
-	if !strings.Contains(body, "Controlla ora") {
-		t.Fatalf("the manual check must be usable with the automatic pass off")
-	}
 
 	_, settings := v2Request(t, server, http.MethodGet, "/?view=settings&tab=maintenance", nil)
-	if !strings.Contains(settings, "Il controllo si avvia, si ferma e si riavvia da Manutenzione") {
-		t.Fatalf("the settings group does not point back at the Maintenance panel")
+	if !strings.Contains(settings, `id="v2-media-integrity-panel"`) {
+		t.Fatalf("the Maintenance settings tab does not render the media integrity panel")
+	}
+	if !strings.Contains(settings, "Controlla ora") {
+		t.Fatalf("the manual check must be usable with the automatic pass off")
+	}
+	if !strings.Contains(settings, "Riavvia da capo") {
+		t.Fatalf("the panel must offer the full pass")
+	}
+	if !strings.Contains(settings, "Stato del controllo") {
+		t.Fatalf("the panel has no title of its own")
+	}
+	// The panel follows the group of its options.
+	group := strings.Index(settings, `id="v2-setting-media_integrity_enabled"`)
+	panel := strings.Index(settings, `id="v2-media-integrity-panel"`)
+	if group < 0 || panel < 0 || panel < group {
+		t.Fatalf("the panel must sit under its settings (group at %d, panel at %d)", group, panel)
+	}
+
+	_, maintenance := v2Request(t, server, http.MethodGet, "/?view=maintenance", nil)
+	if strings.Contains(maintenance, `id="v2-media-integrity-panel"`) {
+		t.Fatalf("the maintenance page must not render the check a second time")
+	}
+}
+
+// TestMediaIntegrityPanelActionsRunInPlace keeps the partial endpoint of the
+// panel working where the panel now lives.
+func TestMediaIntegrityPanelActionsRunInPlace(t *testing.T) {
+	state := newTestAppState(t)
+	miInstallFakeMediaTools(t, miFakeFfmpegDetectsBadFile)
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+
+	request, err := http.NewRequest(http.MethodGet, server.URL+"/settings/media-integrity", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	request.Header.Set("HX-Request", "true")
+	response, err := http.DefaultClient.Do(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer response.Body.Close()
+	raw, err := io.ReadAll(response.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := string(raw)
+	if response.StatusCode != http.StatusOK || !strings.Contains(body, `id="v2-media-integrity-panel"`) {
+		t.Fatalf("panel partial -> %d", response.StatusCode)
+	}
+	if !strings.Contains(body, `hx-post="/settings/media-integrity"`) {
+		t.Fatalf("the partial does not post its actions back to itself")
 	}
 }
 

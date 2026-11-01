@@ -907,7 +907,7 @@
     </div>
     {{end}}
     {{if .EditorsFirst}}{{template "v2_settings_editors" .}}{{end}}
-    {{range .Groups}}{{template "v2_setting_group" .}}{{end}}
+    {{range .Groups}}{{template "v2_setting_group" .}}{{if and (eq $.ActiveID "maintenance") (eq .Title "Controllo integrità file")}}{{with $.MediaCheck}}{{template "v2_media_integrity_panel" .}}{{end}}{{end}}{{end}}
     {{if .Rename}}{{template "v2_rename_editor" .Rename}}{{end}}
     {{if and (not .EditorsFirst) (ne .ActiveID "scores")}}{{template "v2_settings_editors" .}}{{end}}
     {{if .I18n}}{{template "v2_i18n_editor" .I18n}}{{end}}
@@ -2265,7 +2265,6 @@
 {{else if eq .Kind "oauth"}}{{template "v2_oauth_section" .}}
 {{else if eq .Kind "duplicates"}}{{with .Duplicates}}{{template "v2_duplicates_panel" .}}{{end}}
 {{else if eq .Kind "db_optimize"}}{{with .DB}}{{template "v2_db_panel" .}}{{end}}
-{{else if eq .Kind "media_integrity"}}{{with .MediaCheck}}{{template "v2_media_integrity_panel" .}}{{end}}
 {{else if eq .Kind "ramdisk"}}{{with .Ramdisk}}{{template "v2_ramdisk_panel" .}}{{end}}
 {{else if eq .Kind "folder_rename"}}{{with .FolderRename}}{{template "v2_folder_rename_panel" .}}{{end}}
 {{else if eq .Kind "progress"}}{{with .Progress}}{{template "v2_rename_progress_panel" .}}{{end}}
@@ -2417,32 +2416,31 @@
 {{end}}
 
 {{define "v2_media_integrity_panel"}}
-<div class="panel" id="v2-media-integrity-panel"{{if .Running}} hx-get="/maintenance/media-integrity" hx-trigger="every 4s" hx-swap="outerHTML" aria-busy="true"{{end}}>
-  <div class="panel-head"><h3>Controllo integrità file</h3></div>
+<div class="panel" id="v2-media-integrity-panel"{{if .Running}} hx-get="/settings/media-integrity" hx-trigger="every 4s" hx-swap="outerHTML" aria-busy="true"{{end}}>
+  <div class="panel-head"><h3>Stato del controllo</h3></div>
   <div class="panel-body">
     <p class="hint">Legge ogni file archiviato con ffprobe e poi lo decodifica con ffmpeg, un file alla volta e in secondo piano, per trovare puntate e film danneggiati. Il controllo riparte dal punto salvato anche dopo un riavvio: puoi interromperlo e riprenderlo quando vuoi.</p>
     <p class="hint">I file già controllati e non cambiati vengono saltati; «Riavvia da capo» li ricontrolla tutti.</p>
     <p class="hint">Un file che non si riesce a leggere entro il tempo previsto non è dato per danneggiato: il controllo lo riprova più tardi.</p>
     {{if not .Available}}<p class="alert" role="alert"><span>Servono ffprobe e ffmpeg: installali e riavvia Gextto per attivare il controllo.</span> <span>Mancano:</span> <code>{{.Missing}}</code></p>
     {{else if .Enabled}}<p class="hint"><span>Controllo automatico attivo.</span> <span>Ogni</span> <strong>{{.IntervalMinutes}}</strong> <span>Minuti,</span> <strong>{{.Batch}}</strong> <span>File per volta.</span></p>
-    {{else}}<p class="alert" role="status">Il controllo automatico è disattivato: puoi avviare un controllo a mano qui sotto, oppure attivarlo nelle impostazioni del controllo.</p>{{end}}
+    {{else}}<p class="alert" role="status">Il controllo automatico è disattivato: puoi avviare un controllo a mano qui sotto, oppure attivarlo con l'opzione qui sopra.</p>{{end}}
     {{if .Available}}<div class="toolbar">
       {{if .Running}}
-      <form hx-post="/maintenance/media-integrity" hx-target="#v2-media-integrity-panel" hx-swap="outerHTML" style="display:inline">
+      <form hx-post="/settings/media-integrity" hx-target="#v2-media-integrity-panel" hx-swap="outerHTML" style="display:inline">
         <input type="hidden" name="action" value="stop" />
         <button class="btn sm danger" type="submit" title="Ferma il controllo dopo il file in corso; la posizione resta salvata">Interrompi</button>
       </form>
       {{else}}
-      <form hx-post="/maintenance/media-integrity" hx-target="#v2-media-integrity-panel" hx-swap="outerHTML" style="display:inline">
+      <form hx-post="/settings/media-integrity" hx-target="#v2-media-integrity-panel" hx-swap="outerHTML" style="display:inline">
         <input type="hidden" name="action" value="start" />
         <button class="btn sm primary" type="submit" title="Avvia subito un passaggio del controllo sui file non ancora verificati">Controlla ora</button>
       </form>
-      <form hx-post="/maintenance/media-integrity" hx-target="#v2-media-integrity-panel" hx-swap="outerHTML" style="display:inline">
+      <form hx-post="/settings/media-integrity" hx-target="#v2-media-integrity-panel" hx-swap="outerHTML" style="display:inline">
         <input type="hidden" name="action" value="restart" />
         <button class="btn sm" type="submit" hx-confirm="Ricomincia dal primo file e cancella i risultati precedenti?" title="Ricomincia dal primo file e cancella i risultati precedenti">Riavvia da capo</button>
       </form>
       {{end}}
-      <a class="btn sm" href="/?view=settings&amp;tab=maintenance&amp;highlight=media_integrity_enabled#v2-setting-media_integrity_enabled" title="Porta alle impostazioni del controllo automatico: intervallo, file per volta, controllo veloce 4K e riscarica automatica">Impostazioni del controllo</a>
     </div>{{end}}
     {{if .Started}}<div class="stat-grid" style="margin-top:10px" aria-live="polite">
       <span class="stat"><strong>{{.Checked}}</strong> <span>Controllati</span></span>
@@ -2461,7 +2459,7 @@
         <td class="truncate" title="{{.Path}}">{{.Path}}</td>
         <td>{{if eq .Status "damaged"}}<span class="badge err">Danneggiato</span>{{else}}<span class="badge warn">Illeggibile</span>{{end}}</td>
         <td class="truncate" title="{{.Detail}}">{{.Detail}}</td>
-        <td class="row-actions">{{if .RedownloadPath}}{{template "v2_action_btn" (dict "Redirect" "/?view=maintenance" "Path" .RedownloadPath "Method" "POST" "Body" "{}" "Label" "Riscarica" "Class" "" "Title" "Sposta il file danneggiato nel cestino e cerca una release diversa" "Confirm" "Sposta il file danneggiato nel cestino e cerca una release diversa?")}}{{end}}</td>
+        <td class="row-actions">{{if .RedownloadPath}}{{template "v2_action_btn" (dict "Redirect" "/?view=settings&tab=maintenance#v2-media-integrity-panel" "Path" .RedownloadPath "Method" "POST" "Body" "{}" "Label" "Riscarica" "Class" "" "Title" "Sposta il file danneggiato nel cestino e cerca una release diversa" "Confirm" "Sposta il file danneggiato nel cestino e cerca una release diversa?")}}{{end}}</td>
       </tr>{{end}}</tbody>
     </table></div>
     {{else if .Running}}<p class="muted">Nessun file danneggiato finora.</p>

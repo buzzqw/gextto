@@ -59,7 +59,6 @@ type v2Section struct {
 	// Dedicated maintenance widgets.
 	Duplicates   *v2DuplicatesView
 	DB           *v2DBView
-	MediaCheck   *v2MediaCheckView
 	Ramdisk      *v2RamdiskView
 	FolderRename *v2FolderRenameView
 	Progress     *v2ProgressView
@@ -159,10 +158,6 @@ func v2ConvertSection(s *AppState, r *http.Request, view string, section uiPageS
 		widget := v2DBViewFrom(s, r)
 		item.DB = &widget
 		item.Title = "Ottimizzazione database"
-	case "media_integrity":
-		widget := v2MediaCheckViewFrom(s)
-		item.MediaCheck = &widget
-		item.Title = "Controllo integrità file"
 	case "ramdisk":
 		widget := v2RamdiskViewFrom(s, r)
 		item.Ramdisk = &widget

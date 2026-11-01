@@ -114,7 +114,7 @@ func v2MovieIDExists(cfg *Config, id int64) bool {
 // it while a check is running.
 func V2MediaIntegrityPanel(w http.ResponseWriter, r *http.Request, s *AppState) {
 	if r.Header.Get("HX-Request") == "" {
-		http.Redirect(w, r, "/?view=maintenance", http.StatusSeeOther)
+		http.Redirect(w, r, "/?view=settings&tab=maintenance#v2-media-integrity-panel", http.StatusSeeOther)
 		return
 	}
 	dict, eng := v2Dictionaries(s)
@@ -125,7 +125,7 @@ func V2MediaIntegrityPanel(w http.ResponseWriter, r *http.Request, s *AppState) 
 // panel with the new state.
 func V2MediaIntegrityAction(w http.ResponseWriter, r *http.Request, s *AppState) {
 	if r.Header.Get("HX-Request") == "" {
-		http.Redirect(w, r, "/?view=maintenance", http.StatusSeeOther)
+		http.Redirect(w, r, "/?view=settings&tab=maintenance#v2-media-integrity-panel", http.StatusSeeOther)
 		return
 	}
 	action := strings.TrimSpace(r.FormValue("action"))

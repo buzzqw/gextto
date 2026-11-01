@@ -822,12 +822,12 @@ func uiSettingsPageFrom(s *AppState, activeTab, mode string) uiSettingsPage {
 			},
 		}
 	case "maintenance":
-		// The check has two faces: the manual actions live in Manutenzione, the
-		// periodic behaviour here. Each one points at the other so the two do
-		// not look like two unrelated features.
+		// The check is configured and driven in the same place: the options
+		// here and, right below them, the panel with progress, actions and the
+		// damaged files.
 		for index := range page.Groups {
 			if page.Groups[index].Title == "Controllo integrità file" {
-				page.Groups[index].Hint = "Il controllo si avvia, si ferma e si riavvia da Manutenzione → Controllo integrità file; qui decidi cosa fa da solo."
+				page.Groups[index].Hint = "Il controllo gira in secondo piano, un file alla volta. Sotto le opzioni trovi l'avanzamento, i file danneggiati con Riscarica e i pulsanti per avviarlo, interromperlo o ricominciare da capo a mano."
 			}
 		}
 	}

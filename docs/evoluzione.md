@@ -389,10 +389,9 @@ different one. An option, off by default, does the same by itself as soon as a f
 found damaged and starts the search at the end of the current run, so a broken season pack
 becomes one search instead of one per episode. A decode stopped from outside (a restart of
 the daemon stops its children) is not an outcome: it is not recorded and the file is
-checked again later. The Maintenance panel shows progress and findings; it starts, stops and
-restarts the pass by hand (independently of the periodic switch) and offers the
-way to the options of the periodic pass, which live in the settings, where the
-group text points back at the panel; `ffprobe` and `ffmpeg` are required.
+checked again later. The panel of the Maintenance tab of the settings shows progress and
+findings and starts, stops and restarts the pass by hand, independently of the periodic
+switch, right under the options that configure it; `ffprobe` and `ffmpeg` are required.
 
 **The standalone page** is laid out like qBittorrent's: filters on the left, one line per
 torrent, the detail panel below, a full context menu, per-user columns and widths kept on
