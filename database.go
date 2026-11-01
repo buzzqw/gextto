@@ -988,6 +988,16 @@ func (d *Database) migrate() error {
 			logging.Warn("schema migration: cannot ensure column", "table", column.table, "column", column.name, "error", err)
 		}
 	}
+	// A decode stopped by a signal was recorded as damage before the check
+	// learned to tell the two apart. The decoder writes nothing when it is
+	// terminated, so the reason is the bare exit status of the signal or of the
+	// process that died on it: those rows are not evidence of a broken file and
+	// are forgotten, so the panel does not offer to re-download a healthy episode.
+	if _, err := d.db.Exec(`DELETE FROM media_integrity
+		WHERE status='damaged'
+			AND (detail='exit status 255' OR detail LIKE 'signal: %')`); err != nil {
+		logging.Warn("schema migration: cannot forget the interrupted media checks", "error", err)
+	}
 	// Identità della release bloccata (come il legacy `download_blocklist`):
 	// hash + serie/stagione/episodio o film/anno, per audit e UI.
 	for _, column := range []struct{ table, name, definition string }{

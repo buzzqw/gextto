@@ -822,3 +822,275 @@ func TestLogMediaIntegrityReplacementConsumesTheMarker(t *testing.T) {
 		t.Fatalf("the marker must be consumed: found=%v err=%v", found, err)
 	}
 }
+
+// miFakeFfmpegStoppedBySignal reproduces what ffmpeg does when a restart of
+// Gextto reaches it: the signal handler ends the process with status 255 and
+// nothing on stderr.
+const miFakeFfmpegStoppedBySignal = `#!/bin/sh
+exit 255
+`
+
+// miFakeFfmpegKilledWithoutHandler is the other shape of an interrupted decode:
+// the process dies on the signal itself, so it has no exit code at all.
+const miFakeFfmpegKilledWithoutHandler = `#!/bin/sh
+kill -TERM $$
+exit 0
+`
+
+// TestMediaIntegrityStoppedProcessIsNotDamaged pins the cause of the false
+// "damaged" verdicts: an ffmpeg stopped by a signal (which is what a restart of
+// the daemon does to its children) never finished the decode, so the file was
+// not read and nothing can be said about it. Recording it as damaged would send
+// a healthy file to the re-download.
+func TestMediaIntegrityStoppedProcessIsNotDamaged(t *testing.T) {
+	for name, script := range map[string]string{
+		"exit 255":   miFakeFfmpegStoppedBySignal,
+		"no handler": miFakeFfmpegKilledWithoutHandler,
+	} {
+		t.Run(name, func(t *testing.T) {
+			miInstallFakeMediaTools(t, script)
+			file := filepath.Join(t.TempDir(), "episode.mkv")
+			if err := os.WriteFile(file, []byte("data"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			status, detail := mediaIntegrityCheckPath(context.Background(), file, false)
+			if status != "interrupted" {
+				t.Fatalf("status = %q (%s), want interrupted", status, detail)
+			}
+			if !strings.Contains(detail, "stopped") {
+				t.Fatalf("detail = %q, want the interruption reason", detail)
+			}
+		})
+	}
+}
+
+// TestRunMediaIntegrityScanRecordsNothingForAnInterruptedFile checks the scan
+// leaves no outcome at all: the file keeps its position and is checked again in
+// a later pass, exactly like a pass stopped at shutdown.
+func TestRunMediaIntegrityScanRecordsNothingForAnInterruptedFile(t *testing.T) {
+	state := newTestAppState(t)
+	miInstallFakeMediaTools(t, miFakeFfmpegStoppedBySignal)
+	oldPause := mediaIntegrityPause
+	mediaIntegrityPause = 0
+	t.Cleanup(func() { mediaIntegrityPause = oldPause })
+
+	dir := t.TempDir()
+	file := filepath.Join(dir, "episode.mkv")
+	if err := os.WriteFile(file, []byte("data"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := state.db.db.Exec("INSERT INTO series(name) VALUES ('Show')"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := state.db.db.Exec("INSERT INTO episodes(series_id,season,episode,title,archive_path) VALUES ((SELECT id FROM series WHERE name='Show'),1,1,'Show S01E01',?1)", file); err != nil {
+		t.Fatal(err)
+	}
+
+	report, err := runMediaIntegrityScan(context.Background(), state, "", 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := report["damaged"]; got != 0 {
+		t.Fatalf("damaged = %v, want 0", got)
+	}
+	if got := report["checked"]; got != 0 {
+		t.Fatalf("checked = %v, want 0: an interrupted file was not checked", got)
+	}
+	problems, err := state.db.MediaIntegrityProblems()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(problems) != 0 {
+		t.Fatalf("problems = %+v, want none", problems)
+	}
+	if state.db.LoadMediaIntegrityState().Cursor == "done" {
+		t.Fatal("the interrupted file must keep its position for the next pass")
+	}
+}
+
+// TestMediaIntegrityRedownloadIsOffByDefault keeps the automatic replacement an
+// explicit choice: the check alone never removes a file from the library.
+func TestMediaIntegrityRedownloadIsOffByDefault(t *testing.T) {
+	if mediaIntegrityRedownloadEnabled(nil) {
+		t.Fatal("the automatic re-download must be off without a configuration")
+	}
+	cfg := &Config{Settings: map[string]string{}}
+	if mediaIntegrityRedownloadEnabled(cfg) {
+		t.Fatal("the automatic re-download must be off when nothing is saved")
+	}
+	cfg.Settings[mediaIntegrityRedownloadSetting] = "true"
+	if !mediaIntegrityRedownloadEnabled(cfg) {
+		t.Fatal("the automatic re-download must read a saved true")
+	}
+}
+
+// TestRunMediaIntegrityScanRedownloadsADamagedFileWithTheOptionOn is the whole
+// automatic path: the damaged episode is blocklisted, the file leaves the
+// library, the episode is eligible again and the search starts as soon as the
+// run ends.
+func TestRunMediaIntegrityScanRedownloadsADamagedFileWithTheOptionOn(t *testing.T) {
+	state := newTestAppState(t)
+	miInstallFakeMediaTools(t, miFakeFfmpegDetectsBadFile)
+	oldPause := mediaIntegrityPause
+	mediaIntegrityPause = 0
+	t.Cleanup(func() { mediaIntegrityPause = oldPause })
+	oldSearch := mediaIntegrityStartSearch
+	var searched []string
+	mediaIntegrityStartSearch = func(s *AppState, domain *string) (bool, bool, error) {
+		if domain == nil {
+			searched = append(searched, "full")
+		} else {
+			searched = append(searched, *domain)
+		}
+		return true, false, nil
+	}
+	t.Cleanup(func() { mediaIntegrityStartSearch = oldSearch })
+	if err := SaveSetting(state.cfg.DataDir, mediaIntegrityRedownloadSetting, "true"); err != nil {
+		t.Fatal(err)
+	}
+
+	dir := t.TempDir()
+	file := filepath.Join(dir, "bad episode.mkv")
+	if err := os.WriteFile(file, []byte("data"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := state.db.db.Exec("INSERT INTO series(name) VALUES ('Show')"); err != nil {
+		t.Fatal(err)
+	}
+	hash := strings.Repeat("b", 40)
+	magnet := "magnet:?xt=urn:btih:" + hash
+	if _, err := state.db.db.Exec(`INSERT INTO episodes(series_id,season,episode,title,magnet_hash,magnet_link,downloaded_at,archive_path)
+		VALUES ((SELECT id FROM series WHERE name='Show'),1,1,'Show S01E01',?1,?2,'2026-01-01 00:00:00',?3)`, hash, magnet, file); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := runMediaIntegrityScan(context.Background(), state, "", 0); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := os.Stat(file); !os.IsNotExist(err) {
+		t.Fatalf("the damaged file must leave the library, stat err = %v", err)
+	}
+	var episodes int
+	if err := state.db.db.QueryRow("SELECT COUNT(*) FROM episodes").Scan(&episodes); err != nil {
+		t.Fatal(err)
+	}
+	if episodes != 0 {
+		t.Fatalf("episode rows = %d, want 0: the episode must be eligible again", episodes)
+	}
+	var blocked int
+	if err := state.db.db.QueryRow("SELECT COUNT(*) FROM blocklist WHERE lower(magnet_hash)=?1 AND reason='corrupt_file'", hash).Scan(&blocked); err != nil {
+		t.Fatal(err)
+	}
+	if blocked != 1 {
+		t.Fatalf("blocklisted rows = %d, want 1", blocked)
+	}
+	var gaps int
+	if err := state.db.db.QueryRow("SELECT COUNT(*) FROM forced_gaps WHERE lower(series_name)='show' AND season=1 AND episode=1").Scan(&gaps); err != nil {
+		t.Fatal(err)
+	}
+	if gaps != 1 {
+		t.Fatalf("forced gaps = %d, want 1", gaps)
+	}
+	if _, _, found, err := state.db.TakeMediaIntegrityReplacement("episode", "Show", 1, 1, "", 0); err != nil || !found {
+		t.Fatalf("replacement marker: found=%v err=%v", found, err)
+	}
+	if problems, err := state.db.MediaIntegrityProblems(); err != nil {
+		t.Fatal(err)
+	} else if len(problems) != 0 {
+		t.Fatalf("problems = %+v, want none after the re-download", problems)
+	}
+	if len(searched) != 1 || searched[0] != "series" {
+		t.Fatalf("searches = %v, want one series search as soon as the run ends", searched)
+	}
+}
+
+// TestRunMediaIntegrityScanLeavesADamagedFileAloneWhenTheOptionIsOff pins the
+// default: without the option the file and the episode row stay as they are and
+// no search starts.
+func TestRunMediaIntegrityScanLeavesADamagedFileAloneWhenTheOptionIsOff(t *testing.T) {
+	state := newTestAppState(t)
+	miInstallFakeMediaTools(t, miFakeFfmpegDetectsBadFile)
+	oldPause := mediaIntegrityPause
+	mediaIntegrityPause = 0
+	t.Cleanup(func() { mediaIntegrityPause = oldPause })
+	oldSearch := mediaIntegrityStartSearch
+	searches := 0
+	mediaIntegrityStartSearch = func(s *AppState, domain *string) (bool, bool, error) {
+		searches++
+		return true, false, nil
+	}
+	t.Cleanup(func() { mediaIntegrityStartSearch = oldSearch })
+
+	dir := t.TempDir()
+	file := filepath.Join(dir, "bad episode.mkv")
+	if err := os.WriteFile(file, []byte("data"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := state.db.db.Exec("INSERT INTO series(name) VALUES ('Show')"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := state.db.db.Exec("INSERT INTO episodes(series_id,season,episode,title,archive_path) VALUES ((SELECT id FROM series WHERE name='Show'),1,1,'Show S01E01',?1)", file); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := runMediaIntegrityScan(context.Background(), state, "", 0); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(file); err != nil {
+		t.Fatalf("the damaged file must stay where it is: %v", err)
+	}
+	problems, err := state.db.MediaIntegrityProblems()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(problems) != 1 || problems[0].Status != "damaged" {
+		t.Fatalf("problems = %+v, want the damaged file listed", problems)
+	}
+	if searches != 0 {
+		t.Fatalf("searches = %d, want none with the option off", searches)
+	}
+}
+
+// TestOpenDatabaseForgetsTheInterruptedDamage clears the rows the old version
+// stored for a decode stopped by a signal: they were never evidence of damage
+// and would offer a healthy episode for re-download.
+func TestOpenDatabaseForgetsTheInterruptedDamage(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "gextto.db")
+	db, err := OpenDatabase(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, problem := range []MediaIntegrityProblem{
+		{Kind: "episode", Series: "Show", Season: 1, Episode: 1, Path: "/media/a.mkv", Status: "damaged", Detail: "exit status 255", CheckedAt: "2026-11-01T00:00:00Z"},
+		{Kind: "episode", Series: "Show", Season: 1, Episode: 2, Path: "/media/b.mkv", Status: "damaged", Detail: "signal: terminated", CheckedAt: "2026-11-01T00:00:00Z"},
+		{Kind: "episode", Series: "Show", Season: 1, Episode: 3, Path: "/media/c.mkv", Status: "damaged", Detail: "Invalid data found when processing input", CheckedAt: "2026-11-01T00:00:00Z"},
+		{Kind: "episode", Series: "Show", Season: 1, Episode: 4, Path: "/media/d.mkv", Status: "unreadable", Detail: "the check did not finish within 30 minutes", CheckedAt: "2026-11-01T00:00:00Z"},
+	} {
+		if err := db.SaveMediaIntegrityCheck(problem); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	reopened, err := OpenDatabase(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { reopened.Close() })
+	problems, err := reopened.MediaIntegrityProblems()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(problems) != 2 {
+		t.Fatalf("problems = %+v, want only the real damage and the unreadable file", problems)
+	}
+	for _, problem := range problems {
+		if problem.Episode == 1 || problem.Episode == 2 {
+			t.Fatalf("the interrupted check of S01E%02d was kept: %+v", problem.Episode, problem)
+		}
+	}
+}

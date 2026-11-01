@@ -685,67 +685,20 @@ func RedownloadEpisode(w http.ResponseWriter, r *http.Request, s *AppState) {
 	cfg := latestConfig(s)
 	keepFiles := strings.EqualFold(strings.TrimSpace(r.URL.Query().Get("keep_files")), "1")
 	avoidPrevious := strings.EqualFold(strings.TrimSpace(r.URL.Query().Get("avoid_previous")), "1")
-	blockedTitle := ""
-	oldTitle := ""
-	if avoidPrevious {
-		if release, found, err := s.db.EpisodeCurrentRelease(series, season, episode); err != nil {
-			logging.Warn("could not read the release to blocklist before the re-download", "series", series, "season", season, "episode", episode, "error", err)
-		} else if found {
-			oldTitle = release.Title
-			if err := s.db.Blocklist(&release, "corrupt_file"); err != nil {
-				logging.Warn("could not blocklist the damaged release; the search may pick it again", "series", series, "season", season, "episode", episode, "error", err)
-			} else {
-				blockedTitle = release.Title
-				logging.Info(fmt.Sprintf("🚫 «%s» S%02dE%02d: the damaged release was blocklisted, a different one will be searched", series, season, episode))
-			}
-		}
-	}
-	oldPath := ""
-	if avoidPrevious {
-		oldPath, _ = s.db.ArchivedEpisodePath(series, season, episode)
-	}
-	moved := ""
-	if !keepFiles {
-		if archived, err := s.db.ArchivedEpisodePath(series, season, episode); err == nil && archived != "" {
-			if avoidPrevious {
-				// A damaged file must leave the library even when no trash
-				// folder is configured: quarantineCorruptFile renames it in
-				// place as a last resort.
-				if destination := quarantineCorruptFile(archived, cfg); destination != "" {
-					moved = destination
-				}
-			} else if trash := trashRoot(cfg); trash != "" {
-				if destination, err := MoveToTrash(archived, trash); err != nil {
-					logging.Warn("redownload: could not move the file to the trash", "path", archived, "error", err.Error())
-				} else {
-					moved = destination
-				}
-			}
-		}
-	}
-	if avoidPrevious {
-		_ = s.db.MarkMediaIntegrityReplacement(MediaIntegrityProblem{
-			Kind: "episode", Series: series, Season: season, Episode: episode, Path: oldPath,
-		}, oldTitle)
-	}
-	if err := s.db.ResetEpisode(series, season, episode, true); err != nil {
-		jsonError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	if err := s.db.AddForcedGap(series, season, episode); err != nil {
+	blockedTitle, moved, err := redownloadEpisode(s, cfg, series, season, episode, keepFiles, avoidPrevious)
+	if err != nil {
 		jsonError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 	if avoidPrevious {
-		_ = s.db.ClearMediaIntegrityProblem(MediaIntegrityProblem{Kind: "episode", Series: series, Season: season, Episode: episode})
+		// Kick off a series search right away so the episode is re-queued without
+		// waiting for the next scheduled cycle.
+		clone := r.Clone(r.Context())
+		query := clone.URL.Query()
+		query.Set("domain", "series")
+		clone.URL.RawQuery = query.Encode()
+		RunNow(&v2DiscardWriter{}, clone, s)
 	}
-	// Kick off a series search right away so the episode is re-queued without
-	// waiting for the next scheduled cycle.
-	clone := r.Clone(r.Context())
-	query := clone.URL.Query()
-	query.Set("domain", "series")
-	clone.URL.RawQuery = query.Encode()
-	RunNow(&v2DiscardWriter{}, clone, s)
 	logging.Info(fmt.Sprintf("🔁 «%s» S%02dE%02d marked for re-download%s", series, season, episode, func() string {
 		if moved == "" {
 			return ""

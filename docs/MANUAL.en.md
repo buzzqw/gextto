@@ -1564,8 +1564,13 @@ The complete list of actions and parameters is in [Appendix C](#appendix-c-refer
   blocklists the release and searches the same episode choosing a different
   release, so the same broken file is not taken again; when the new episode
   enters the library, the log says which release replaced the damaged file.
-  `ffprobe` and `ffmpeg` are required; without them the panel says so and the
-  check stays off.
+  With **File integrity check — re-download damaged files** (off by default) it
+  does so on its own: as soon as a file is really damaged the release is
+  blocklisted, the file leaves the library and the search starts at once,
+  without waiting for the end of the pass and without your help; a file whose
+  check was interrupted by a restart is not treated as damaged and is checked
+  again. `ffprobe` and `ffmpeg` are required; without them the panel says so and
+  the check stays off.
 - **Rename folder contents** — enter a folder and press **Browse** to select it
   on the server. Gextto recursively scans video files, detects series and movies
   from their names, compares titles with TMDB/TVDB and shows a rename proposal
@@ -2593,6 +2598,7 @@ files. When the memory cannot be read, only the `tmpfs` space counts, as before.
 | File integrity check — interval | Minutes between two check passes. Shown only while «Automatic file integrity check» is on. |
 | File integrity check — files per pass | Maximum number of files verified in each pass. |
 | File integrity check — quick check for 4K files | For 4K files it reads the whole file but decodes only the keyframes: the check is much faster and still finds truncated or unreadable files, but it may miss a small defect between one keyframe and the next. It is on by default. |
+| File integrity check — re-download damaged files | As soon as the check finds a damaged file it blocklists the release, moves the file out of the library and searches at once for a different release of the same episode or movie. It is off by default: without it the replacement stays manual, with **Redownload**. |
 
 **Orphaned files**
 
@@ -2978,7 +2984,7 @@ of the interface stays protected.
 | Stop | Stops the check after the current file; the position stays saved. |
 | Start over | Starts again from the first file, clears the previous results and rechecks the whole library. |
 | Damaged / Unreadable | The file could not be decoded, or it could not be read within the allotted time: an unreadable file is not treated as broken and is retried automatically in a later pass. |
-| Redownload | Moves the damaged file out of the library, blocklists the old release and searches the same episode for a different release. |
+| Redownload | Moves the damaged file out of the library, blocklists the old release and searches the same episode for a different release. With **File integrity check — re-download damaged files** on, Gextto does it by itself as soon as a file is reported as damaged. |
 
 ### Rename folder content
 

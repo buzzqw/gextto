@@ -499,38 +499,10 @@ func RedownloadMovie(w http.ResponseWriter, r *http.Request, s *AppState) {
 		return
 	}
 	avoidPrevious := strings.EqualFold(strings.TrimSpace(r.URL.Query().Get("avoid_previous")), "1")
-	blockedTitle := ""
-	oldTitle := ""
-	oldPath := ""
-	if avoidPrevious {
-		if release, found, err := s.db.MovieCurrentRelease(id); err != nil {
-			logging.Warn("could not read the release to blocklist before the re-download", "movie", name, "error", err)
-		} else if found {
-			oldTitle = release.Title
-			if err := s.db.Blocklist(&release, "corrupt_file"); err != nil {
-				logging.Warn("could not blocklist the damaged release; the search may pick it again", "movie", name, "error", err)
-			} else {
-				blockedTitle = release.Title
-				logging.Info(fmt.Sprintf("🚫 «%s»: the damaged release was blocklisted, a different one will be searched", name))
-			}
-		}
-		if archived, err := s.db.MovieProcessedPath(id); err == nil {
-			oldPath = archived
-			if strings.TrimSpace(archived) != "" && quarantineCorruptFile(archived, cfg) == "" {
-				logging.Warn("redownload: could not move the damaged movie file out of the library", "path", archived)
-			}
-		}
-		_ = s.db.MarkMediaIntegrityReplacement(MediaIntegrityProblem{
-			Kind: "movie", MovieName: name, MovieYear: movieYear, Path: oldPath,
-		}, oldTitle)
-	}
-	reset, err := s.db.ResetMovieByName(name)
+	blockedTitle, reset, err := redownloadMovie(s, cfg, id, name, movieYear, avoidPrevious)
 	if err != nil {
 		jsonStatus(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": err.Error()})
 		return
-	}
-	if avoidPrevious {
-		_ = s.db.ClearMediaIntegrityProblem(MediaIntegrityProblem{Kind: "movie", MovieName: name, MovieYear: movieYear})
 	}
 	message := "film rimesso in coda al prossimo ciclo"
 	if avoidPrevious {

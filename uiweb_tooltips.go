@@ -91,6 +91,7 @@ var uiSettingTooltipText = map[string]string{
 	"media_integrity_interval_minutes":     "Minuti tra due passaggi del controllo integrità.",
 	"media_integrity_batch":                "Numero massimo di file verificati in ogni passaggio del controllo integrità.",
 	"media_integrity_quick_4k":             "Per i file 4K legge tutto il file ma decodifica solo i fotogrammi chiave: il controllo è molto più veloce e trova comunque i file troncati o illeggibili, ma può non vedere un piccolo danno tra un fotogramma chiave e l'altro.",
+	"media_integrity_redownload":           "Quando il controllo trova un file danneggiato mette la release in blocklist, sposta il file fuori dalla libreria e cerca subito una release diversa per la stessa puntata o lo stesso film. Il file spostato resta nel cestino, se lo hai configurato. Spento, il file danneggiato resta al suo posto e la sostituzione è solo manuale, con Riscarica.",
 	"notify_telegram":                      "Invia le notifiche su Telegram.",
 	"telegram_bot_token":                   "Token del bot Telegram (da @BotFather).",
 	"telegram_chat_id":                     "ID della chat/canale dove inviare le notifiche.",

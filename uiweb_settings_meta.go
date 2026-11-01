@@ -195,6 +195,7 @@ var uiSettingMetaByKey = map[string]uiSettingMeta{
 	"media_integrity_interval_minutes":     {Unit: "minuti", DependsOn: "media_integrity_enabled"},
 	"media_integrity_batch":                {DependsOn: "media_integrity_enabled"},
 	"media_integrity_quick_4k":             {DependsOn: "media_integrity_enabled"},
+	"media_integrity_redownload":           {DependsOn: "media_integrity_enabled"},
 	"temp_orphan_min_age_days":             {Unit: "giorni", DependsOn: "temp_orphan_cleanup_enabled"},
 
 	// Notifiche

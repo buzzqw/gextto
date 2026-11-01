@@ -57,6 +57,9 @@ const (
 	mediaIntegrityVerifiedManifestSetting = "media_integrity_verified_manifest"
 	// mediaIntegrityQuick4KSetting switches the quick check for 4K files on.
 	mediaIntegrityQuick4KSetting = "media_integrity_quick_4k"
+	// mediaIntegrityRedownloadSetting switches the automatic re-download of the
+	// files found damaged on.
+	mediaIntegrityRedownloadSetting = "media_integrity_redownload"
 )
 
 // mediaIntegrityPause lets the disk (and the rest of Gextto) breathe between
@@ -846,6 +849,86 @@ func mediaIntegrityBatchSize(cfg *Config) int {
 	return value
 }
 
+// mediaIntegrityRedownload reports whether a file found damaged sends its
+// episode or movie back to the downloads by itself. It is off unless the
+// operator turns it on: removing a file from the library and searching again is
+// his choice, and the check only reports by default.
+func mediaIntegrityRedownloadEnabled(cfg *Config) bool {
+	return cfg != nil && settingTruthy(cfg.Settings[mediaIntegrityRedownloadSetting])
+}
+
+// mediaIntegrityRedownload puts a file the check has just found damaged back in
+// the downloads: the release that produced it is blocklisted, the file leaves
+// the library, the episode or the movie is eligible again and the replacement
+// is recorded for the completion log. It returns the domain whose search brings
+// the new copy back, or "" when there is nothing to search.
+func mediaIntegrityRedownload(s *AppState, target MediaIntegrityTarget) string {
+	if s == nil || s.db == nil {
+		return ""
+	}
+	cfg := latestConfig(s)
+	if !mediaIntegrityRedownloadEnabled(cfg) {
+		return ""
+	}
+	switch target.Kind {
+	case "episode":
+		if target.Season == nil || target.Episode == nil {
+			return ""
+		}
+		if _, _, err := redownloadEpisode(s, cfg, target.Series, *target.Season, *target.Episode, false, true); err != nil {
+			logging.Warn(fmt.Sprintf("🧪 «%s» could not be put back in the downloads: %s", target.Label(), err))
+			return ""
+		}
+		return "series"
+	case "movie":
+		movieYear := int64(0)
+		if target.MovieYear != nil {
+			movieYear = *target.MovieYear
+		}
+		if _, _, err := redownloadMovie(s, cfg, target.ID, target.MovieName, movieYear, true); err != nil {
+			logging.Warn(fmt.Sprintf("🧪 «%s» could not be put back in the downloads: %s", target.Label(), err))
+			return ""
+		}
+		return "movies"
+	}
+	return ""
+}
+
+// mediaIntegrityStartSearch asks for the cycle that searches the releases of
+// the damaged files put back in the downloads. It is a variable so the tests can
+// observe the request without starting a real cycle.
+var mediaIntegrityStartSearch = func(s *AppState, domain *string) (bool, bool, error) {
+	return requestCycle(s, domain, "Searching for a replacement of the damaged files")
+}
+
+// mediaIntegrityRequestSearches starts the search as soon as a run of the check
+// ends. A run checks a few files, so the search starts right after the damaged
+// file was found instead of waiting for the whole library; one cycle covers
+// every file of the same domain found in the run, because a broken season pack
+// must not start one search per episode.
+func mediaIntegrityRequestSearches(s *AppState, domains map[string]struct{}) {
+	if s == nil || len(domains) == 0 || s.stopping() {
+		return
+	}
+	var domain *string
+	if len(domains) == 1 {
+		for name := range domains {
+			value := name
+			domain = &value
+		}
+	}
+	_, _, err := mediaIntegrityStartSearch(s, domain)
+	switch {
+	case errors.Is(err, errSetupIncomplete), errors.Is(err, errDaemonInactive):
+		// The operator turned the daemon off: the damage stays in the panel and
+		// the search starts with the next cycle, which picks the item up from
+		// the forced gap.
+		logging.Debug("media check: the search for a replacement waits for the daemon to be active", "error", err)
+	case err != nil:
+		logging.Warn("media check: the search for a replacement could not be started", "error", err)
+	}
+}
+
 // mediaIntegrityManifestFingerprint identifies the external report: its path,
 // size and modification time. A nightly batch rewrites the file, so a change is
 // a new report and starts a new check pass.
@@ -1022,8 +1105,8 @@ func mediaIntegrityDecodeArgs(file string, quick bool) []string {
 }
 
 // mediaIntegrityDecode decodes the file with ffmpeg without writing anything,
-// within the given bound. It reports "ok", "damaged", "unreadable" or
-// "canceled".
+// within the given bound. It reports "ok", "damaged", "unreadable", "canceled"
+// or "interrupted".
 func mediaIntegrityDecode(parent context.Context, file string, timeout time.Duration, quick bool) (string, string) {
 	if parent == nil {
 		parent = context.Background()
@@ -1048,6 +1131,12 @@ func mediaIntegrityDecode(parent context.Context, file string, timeout time.Dura
 		return "canceled", ""
 	}
 	if err != nil {
+		if mediaIntegrityStoppedBySignal(err) {
+			// A decoder stopped by a signal did not finish its work, so the
+			// file was not read: nothing can be said about its health. It is
+			// not recorded and the file is checked again in a later pass.
+			return "interrupted", "the check was stopped before it could finish"
+		}
 		if detail == "" {
 			detail = err.Error()
 		}
@@ -1057,6 +1146,21 @@ func mediaIntegrityDecode(parent context.Context, file string, timeout time.Dura
 		return "damaged", detail
 	}
 	return "ok", ""
+}
+
+// mediaIntegrityStoppedBySignal reports whether the decoder was stopped from
+// outside instead of failing on the file. ffmpeg exits with 255 and writes
+// nothing when it receives SIGTERM or SIGINT, which is what happens when the
+// daemon is restarted: systemd signals every process of the service and the
+// child gets the signal together with Gextto. A process killed without a
+// handler reports no exit code at all. Neither case is proof of damage.
+func mediaIntegrityStoppedBySignal(err error) bool {
+	var exit *exec.ExitError
+	if !errors.As(err, &exit) {
+		return false
+	}
+	code := exit.ExitCode()
+	return code == -1 || code == 255
 }
 
 // mediaIntegrityCheckPath validates the container with ffprobe and then decodes
@@ -1244,6 +1348,10 @@ func runMediaIntegrityScan(ctx context.Context, s *AppState, jobID string, limit
 	startedAt := time.Now()
 	checkedThisRun := 0
 	quick4K := mediaIntegrityQuick4K(latestConfig(s))
+	// The domains of the damaged files sent back to the downloads: the search
+	// starts as soon as this run ends, so a file found damaged does not wait
+	// for the whole library to be checked.
+	searchDomains := map[string]struct{}{}
 	for {
 		if ctx.Err() != nil {
 			break
@@ -1266,7 +1374,9 @@ func runMediaIntegrityScan(ctx context.Context, s *AppState, jobID string, limit
 			s.jobs.SetProgress(jobID, float64(state.Checked)/float64(state.Total), target.Label())
 		}
 		status, detail := mediaIntegrityCheckPath(ctx, target.Path, quick4K)
-		if ctx.Err() != nil || status == "canceled" {
+		if ctx.Err() != nil || status == "canceled" || status == "interrupted" {
+			// Nothing was learned about the file: it keeps its position so the
+			// next pass checks it again, and no outcome is recorded.
 			break
 		}
 		check := mediaIntegrityCheckFromTarget(target, status, detail)
@@ -1276,6 +1386,9 @@ func runMediaIntegrityScan(ctx context.Context, s *AppState, jobID string, limit
 		switch status {
 		case "damaged":
 			logging.Warn(fmt.Sprintf("🧪 The file of «%s» looks damaged: %s", target.Label(), detail))
+			if domain := mediaIntegrityRedownload(s, target); domain != "" {
+				searchDomains[domain] = struct{}{}
+			}
 		case "unreadable":
 			// Not proof of damage: the file was too slow to read within the
 			// bound. It is retried later, and the log does not call it broken.
@@ -1303,6 +1416,8 @@ func runMediaIntegrityScan(ctx context.Context, s *AppState, jobID string, limit
 			break
 		}
 	}
+	// The search for the damaged files starts now, as soon as this run ends.
+	mediaIntegrityRequestSearches(s, searchDomains)
 	state.Running = false
 	state.Current = ""
 	state.FinishedAt = time.Now().Format(time.RFC3339)

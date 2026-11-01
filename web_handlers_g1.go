@@ -10,6 +10,7 @@ package gextto
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -683,35 +684,21 @@ func RemoveTorrentWithOptions(w http.ResponseWriter, r *http.Request, s *AppStat
 }
 
 func RunNow(w http.ResponseWriter, r *http.Request, s *AppState) {
-	cfg, err := LoadConfig(s.config_path)
-	if err != nil {
-		jsonError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	if s.cfg.DryRun {
-		cfg.DryRun = true
-	}
-	if !SetupComplete(&cfg) {
-		jsonError(w, http.StatusConflict, "complete the initial setup first")
-		return
-	}
-	if !cfg.Active {
-		jsonError(w, http.StatusConflict, "daemon inactive")
-		return
-	}
 	var domain *string
 	switch queryParam(r, "domain") {
 	case "series", "movies", "comics":
 		value := queryParam(r, "domain")
 		domain = &value
 	}
-	running := true
-	if s.cycle_lock.TryLock() {
-		s.cycle_lock.Unlock()
-		running = false
-	}
-	if !s.manualCyclePending.CompareAndSwap(false, true) {
-		logging.Info(fmt.Sprintf("A %s cycle is already waiting to start: this request joins it", gh1_domainLabel(domain)))
+	running, queued, err := requestCycle(s, domain, "Search requested from the interface")
+	switch {
+	case errors.Is(err, errSetupIncomplete), errors.Is(err, errDaemonInactive):
+		jsonError(w, http.StatusConflict, err.Error())
+		return
+	case err != nil:
+		jsonError(w, http.StatusInternalServerError, err.Error())
+		return
+	case queued:
 		jsonStatus(w, http.StatusAccepted, map[string]any{
 			"ok":      true,
 			"started": false,
@@ -720,7 +707,53 @@ func RunNow(w http.ResponseWriter, r *http.Request, s *AppState) {
 		})
 		return
 	}
-	logging.Info(fmt.Sprintf("▶️ Search requested from the interface (%s)", cycleModeLabel(gh1_domainLabel(domain))))
+	message := "Ciclo avviato"
+	if running {
+		message = "Ciclo già in corso: richiesta accodata"
+	}
+	jsonStatus(w, http.StatusAccepted, map[string]any{
+		"ok":      true,
+		"started": !running,
+		"queued":  running,
+		"message": message,
+	})
+}
+
+var (
+	errSetupIncomplete = errors.New("complete the initial setup first")
+	errDaemonInactive  = errors.New("daemon inactive")
+)
+
+// requestCycle starts the search cycle of one domain, or joins the request
+// already waiting. It is shared by the manual request from the interface and by
+// the file integrity check, which asks for a search as soon as it finds a
+// damaged file. origin says who asked, for the log line. It reports whether the
+// cycle was already running (so the request was queued) and whether the request
+// joined one already pending.
+func requestCycle(s *AppState, domain *string, origin string) (running, queued bool, err error) {
+	cfg, err := LoadConfig(s.config_path)
+	if err != nil {
+		return false, false, err
+	}
+	if s.cfg.DryRun {
+		cfg.DryRun = true
+	}
+	if !SetupComplete(&cfg) {
+		return false, false, errSetupIncomplete
+	}
+	if !cfg.Active {
+		return false, false, errDaemonInactive
+	}
+	running = true
+	if s.cycle_lock.TryLock() {
+		s.cycle_lock.Unlock()
+		running = false
+	}
+	if !s.manualCyclePending.CompareAndSwap(false, true) {
+		logging.Info(fmt.Sprintf("A %s cycle is already waiting to start: this request joins it", gh1_domainLabel(domain)))
+		return running, true, nil
+	}
+	logging.Info(fmt.Sprintf("▶️ %s (%s)", origin, cycleModeLabel(gh1_domainLabel(domain))))
 	taskDomain := domain
 	// Cancelled on shutdown so a manual cycle releases the torrent engine
 	// before the native session is destroyed.
@@ -733,7 +766,7 @@ func RunNow(w http.ResponseWriter, r *http.Request, s *AppState) {
 		defer s.manualCyclePending.Store(false)
 		s.cycle_lock.Lock()
 		defer s.cycle_lock.Unlock()
-		logging.Debug("manual cycle started", "domain", gh1_domainLabel(taskDomain))
+		logging.Debug("search cycle started", "domain", gh1_domainLabel(taskDomain))
 		now := time.Now().UTC()
 		s.last_cycle.Set(models.CycleStats{LastStartedAt: &now, ErrorDetails: map[string]int{}})
 		notifier := FromConfig(&cfg).Async()
@@ -749,7 +782,7 @@ func RunNow(w http.ResponseWriter, r *http.Request, s *AppState) {
 			taskDomain,
 		)
 		if runErr != nil {
-			logging.Error("manual monitoring failed", "domain", gh1_domainLabel(taskDomain), "error", runErr.Error())
+			logging.Error("search cycle failed", "domain", gh1_domainLabel(taskDomain), "error", runErr.Error())
 			return
 		}
 		// The cycle has already reported its outcome in the log with the
@@ -759,16 +792,7 @@ func RunNow(w http.ResponseWriter, r *http.Request, s *AppState) {
 			s.last_cycle.Set(*stats)
 		}
 	}()
-	message := "Ciclo avviato"
-	if running {
-		message = "Ciclo già in corso: richiesta accodata"
-	}
-	jsonStatus(w, http.StatusAccepted, map[string]any{
-		"ok":      true,
-		"started": !running,
-		"queued":  running,
-		"message": message,
-	})
+	return running, false, nil
 }
 
 // gh1_domainLabel mirrors the `unwrap_or("full")` label used in logs.

@@ -1619,8 +1619,12 @@ L'elenco completo delle azioni e dei parametri è nell'[Appendice C](#appendice-
   libreria, mette la release in blocklist e cerca la stessa puntata scegliendo
   una release diversa, così non riprende lo stesso file corrotto; quando la
   nuova puntata entra in libreria, il log dice quale release ha sostituito il
-  file danneggiato. Servono `ffprobe` e `ffmpeg`; senza, il pannello lo dice e
-  il controllo resta spento.
+  file danneggiato. Con **Controllo integrità — riscarica i file danneggiati**
+  (spento di default) lo fa da solo: appena un file è davvero danneggiato la
+  release va in blocklist, il file esce dalla libreria e la ricerca parte subito,
+  senza aspettare la fine del giro e senza il tuo intervento; un file interrotto
+  da un riavvio non è dato per danneggiato e viene ricontrollato. Servono
+  `ffprobe` e `ffmpeg`; senza, il pannello lo dice e il controllo resta spento.
 - **Rinomina contenuto cartella** — inserisci una cartella e premi **Sfoglia** per
   sceglierla dal server. Gextto analizza ricorsivamente i file video, riconosce
   serie e film dal nome, confronta i titoli con TMDB/TVDB e mostra una proposta
@@ -2671,6 +2675,7 @@ spazio del `tmpfs`, come prima.
 | Controllo integrità — intervallo | Minuti tra due passaggi del controllo. Compare solo con «Controllo integrità file automatico» attivo. |
 | Controllo integrità — file per volta | Numero massimo di file verificati in ogni passaggio. |
 | Controllo integrità — controllo veloce dei file 4K | Per i file 4K legge tutto il file ma decodifica solo i fotogrammi chiave: il controllo è molto più veloce e trova comunque i file troncati o illeggibili, ma può non vedere un piccolo danno tra un fotogramma chiave e l'altro. È attivo di default. |
+| Controllo integrità — riscarica i file danneggiati | Appena il controllo trova un file danneggiato mette la release in blocklist, sposta il file fuori dalla libreria e cerca subito una release diversa per la stessa puntata o lo stesso film. È spento di default: senza, la sostituzione resta manuale, con **Riscarica**. |
 
 **File orfani**
 
@@ -3059,7 +3064,7 @@ credenziali dell'interfaccia e riceve un cookie di sessione valido solo per
 | Interrompi | Ferma il controllo dopo il file in corso; la posizione resta salvata. |
 | Riavvia da capo | Ricomincia dal primo file, cancella i risultati precedenti e ricontrolla tutta la libreria. |
 | Danneggiato / Illeggibile | Il file non è stato decodificato, oppure non è stato possibile leggerlo entro il tempo previsto: un illeggibile non è dato per rotto e viene ritentato automaticamente in un passaggio successivo. |
-| Riscarica | Sposta il file danneggiato fuori dalla libreria, mette la vecchia release in blocklist e cerca la stessa puntata scegliendo una release diversa. |
+| Riscarica | Sposta il file danneggiato fuori dalla libreria, mette la vecchia release in blocklist e cerca la stessa puntata scegliendo una release diversa. Con **Controllo integrità — riscarica i file danneggiati** attivo lo fa Gextto da solo, appena il file è dato per danneggiato. |
 
 ### Rinomina contenuto cartella
 

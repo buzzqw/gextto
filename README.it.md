@@ -254,6 +254,8 @@ un checkout: `git pull --ff-only && ./scripts/update.sh`.
   file troncati o illeggibili vengono comunque trovati. Dal rapporto puoi rimandare
   nei download una puntata
   danneggiata: la vecchia release va in blocklist e ne viene cercata una diversa.
+  Un'opzione, spenta di default, lo fa da solo appena un file è danneggiato e
+  avvia subito la ricerca, così la sostituzione non aspetta la fine del giro.
 
 ### Banda e linea condivisa
 

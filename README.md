@@ -249,7 +249,9 @@ checkout: `git pull --ff-only && ./scripts/update.sh`.
   but only the keyframes are decoded, so a 4K episode takes minutes instead of
   an hour and truncation and unreadable data are still found. A damaged episode can be sent back to the
   downloads from the report: the old release is blocklisted and a different one
-  is searched.
+  is searched. An option, off by default, does it by itself as soon as a file is
+  found damaged and starts the search right away, so the replacement does not
+  wait for the end of the pass.
 
 ### Bandwidth and the shared line
 

@@ -384,8 +384,12 @@ already verified packet by packet as checked. 4K files use a quick check by defa
 whole file is read and demuxed but only the keyframes are decoded, which is an order of
 magnitude faster and still finds truncation and unreadable data. A damaged episode can be sent back to the
 downloads from the report: the old release is blocklisted and the gap search asks for a
-different one. The Maintenance panel shows progress and findings; `ffprobe` and `ffmpeg`
-are required.
+different one. An option, off by default, does the same by itself as soon as a file is
+found damaged and starts the search at the end of the current run, so a broken season pack
+becomes one search instead of one per episode. A decode stopped from outside (a restart of
+the daemon stops its children) is not an outcome: it is not recorded and the file is
+checked again later. The Maintenance panel shows progress and findings; `ffprobe` and
+`ffmpeg` are required.
 
 **The standalone page** is laid out like qBittorrent's: filters on the left, one line per
 torrent, the detail panel below, a full context menu, per-user columns and widths kept on
