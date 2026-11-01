@@ -6154,7 +6154,7 @@ spa:
   "Minuti tra due passaggi del controllo integrità.": "Minutos entre dos pasadas de la comprobación de integridad."
   "Numero massimo di file verificati in ogni passaggio del controllo integrità.": "Número máximo de archivos verificados en cada pasada."
   "Percorso del file state.json di italian_audio_batch: i file già rimappati e verificati pacchetto per pacchetto dal batch vengono considerati controllati e saltati.": "Ruta del archivo state.json de italian_audio_batch: los archivos ya remultiplexados y verificados paquete a paquete por el lote se consideran comprobados y se omiten."
-  "Avvia subito un passaggio del controllo; poi continua da solo all'intervallo impostato": "Inicia ahora una pasada; después continúa solo al intervalo configurado"
+  "Avvia subito un passaggio del controllo sui file non ancora verificati": "Inicia ahora una pasada por los archivos aún no comprobados"
   "Controllo automatico attivo.": "Comprobación automática activa."
   "Ogni": "Cada"
   "Minuti,": "Minutos,"

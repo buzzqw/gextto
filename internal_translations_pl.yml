@@ -6148,7 +6148,7 @@ pol:
   "Minuti tra due passaggi del controllo integrità.": "Minuty między dwoma przebiegami sprawdzania integralności."
   "Numero massimo di file verificati in ogni passaggio del controllo integrità.": "Maksymalna liczba plików sprawdzanych w każdym przebiegu."
   "Percorso del file state.json di italian_audio_batch: i file già rimappati e verificati pacchetto per pacchetto dal batch vengono considerati controllati e saltati.": "Ścieżka do state.json narzędzia italian_audio_batch: pliki już przemultipleksowane i zweryfikowane pakiet po pakiecie przez wsad są uznawane za sprawdzone i pomijane."
-  "Avvia subito un passaggio del controllo; poi continua da solo all'intervallo impostato": "Natychmiast rozpoczyna przebieg; potem kontynuuje sam w skonfigurowanym interwale"
+  "Avvia subito un passaggio del controllo sui file non ancora verificati": "Natychmiast rozpoczyna przebieg plików jeszcze nie sprawdzonych"
   "Controllo automatico attivo.": "Automatyczne sprawdzanie włączone."
   "Ogni": "Co"
   "Minuti,": "Minut,"

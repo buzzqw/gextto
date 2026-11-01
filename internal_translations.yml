@@ -5545,7 +5545,7 @@ eng:
   "Minuti tra due passaggi del controllo integrità.": "Minutes between two integrity check passes."
   "Numero massimo di file verificati in ogni passaggio del controllo integrità.": "Maximum number of files verified in each integrity check pass."
   "Percorso del file state.json di italian_audio_batch: i file già rimappati e verificati pacchetto per pacchetto dal batch vengono considerati controllati e saltati.": "Path to the state.json file of italian_audio_batch: files already remuxed and verified packet by packet by the batch are treated as checked and skipped."
-  "Avvia subito un passaggio del controllo; poi continua da solo all'intervallo impostato": "Starts a check pass now; it then continues by itself at the configured interval"
+  "Avvia subito un passaggio del controllo sui file non ancora verificati": "Starts a check pass now on the files not checked yet"
   "Controllo automatico attivo.": "Automatic check on."
   "Ogni": "Every"
   "Minuti,": "Minutes,"

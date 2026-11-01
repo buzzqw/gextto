@@ -311,6 +311,33 @@ func TestV2MaintenanceRendersTheMediaIntegrityPanel(t *testing.T) {
 	}
 }
 
+// TestMediaIntegrityPanelLinksTheSettings reconciles the two faces of the
+// check: the manual actions live in Maintenance, the periodic behaviour in the
+// settings. The panel must always offer the way to those settings, and the
+// manual buttons must work whether the automatic pass is on or off.
+func TestMediaIntegrityPanelLinksTheSettings(t *testing.T) {
+	state := newTestAppState(t)
+	miInstallFakeMediaTools(t, miFakeFfmpegDetectsBadFile)
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+	_, body := v2Request(t, server, http.MethodGet, "/?view=maintenance", nil)
+	link := `href="/?view=settings&amp;tab=maintenance&amp;highlight=media_integrity_enabled#v2-setting-media_integrity_enabled"`
+	if !strings.Contains(body, link) {
+		t.Fatalf("the panel does not link the check settings")
+	}
+	if !strings.Contains(body, "Impostazioni del controllo") {
+		t.Fatalf("the link to the settings has no visible label")
+	}
+	if !strings.Contains(body, "Controlla ora") {
+		t.Fatalf("the manual check must be usable with the automatic pass off")
+	}
+
+	_, settings := v2Request(t, server, http.MethodGet, "/?view=settings&tab=maintenance", nil)
+	if !strings.Contains(settings, "Il controllo si avvia, si ferma e si riavvia da Manutenzione") {
+		t.Fatalf("the settings group does not point back at the Maintenance panel")
+	}
+}
+
 func TestMediaIntegrityAPIRefusesWhenToolsAreMissing(t *testing.T) {
 	state := newTestAppState(t)
 	miUsePath(t, t.TempDir())

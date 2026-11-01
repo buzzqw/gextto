@@ -251,7 +251,8 @@ checkout: `git pull --ff-only && ./scripts/update.sh`.
   downloads from the report: the old release is blocklisted and a different one
   is searched. An option, off by default, does it by itself as soon as a file is
   found damaged and starts the search right away, so the replacement does not
-  wait for the end of the pass.
+  wait for the end of the pass. The panel in *Maintenance* also starts and
+  stops a pass by hand and opens the check settings with **Check settings**.
 
 ### Bandwidth and the shared line
 

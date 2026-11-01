@@ -256,6 +256,8 @@ un checkout: `git pull --ff-only && ./scripts/update.sh`.
   danneggiata: la vecchia release va in blocklist e ne viene cercata una diversa.
   Un'opzione, spenta di default, lo fa da solo appena un file è danneggiato e
   avvia subito la ricerca, così la sostituzione non aspetta la fine del giro.
+  Il pannello in *Manutenzione* avvia e ferma un controllo a mano e apre le
+  impostazioni del controllo con **Impostazioni del controllo**.
 
 ### Banda e linea condivisa
 

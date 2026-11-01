@@ -1614,7 +1614,12 @@ L'elenco completo delle azioni e dei parametri è nell'[Appendice C](#appendice-
   *Manutenzione* il pannello mostra avanzamento ed elenco dei file danneggiati o
   illeggibili, con i due conteggi separati e il motivo riportato da `ffmpeg`;
   **Controlla ora** avvia subito un passaggio e **Riavvia da capo** ricontrolla
-  tutta la libreria. Accanto a ogni puntata c'è **Riscarica**: sposta il file
+  tutta la libreria: le due azioni funzionano anche con il controllo automatico
+  spento. Le opzioni del controllo automatico stanno invece in *Configurazione →
+  Manutenzione → Controllo integrità file*, e dal pannello ci si arriva con
+  **Impostazioni del controllo** (e dalla pagina delle impostazioni il testo
+  del gruppo riporta a *Manutenzione*).
+  Accanto a ogni puntata c'è **Riscarica**: sposta il file
   danneggiato fuori dalla
   libreria, mette la release in blocklist e cerca la stessa puntata scegliendo
   una release diversa, così non riprende lo stesso file corrotto; quando la
@@ -3065,6 +3070,7 @@ credenziali dell'interfaccia e riceve un cookie di sessione valido solo per
 | Riavvia da capo | Ricomincia dal primo file, cancella i risultati precedenti e ricontrolla tutta la libreria. |
 | Danneggiato / Illeggibile | Il file non è stato decodificato, oppure non è stato possibile leggerlo entro il tempo previsto: un illeggibile non è dato per rotto e viene ritentato automaticamente in un passaggio successivo. |
 | Riscarica | Sposta il file danneggiato fuori dalla libreria, mette la vecchia release in blocklist e cerca la stessa puntata scegliendo una release diversa. Con **Controllo integrità — riscarica i file danneggiati** attivo lo fa Gextto da solo, appena il file è dato per danneggiato. |
+| Impostazioni del controllo | Apre *Configurazione → Manutenzione* sulle opzioni del controllo automatico: intervallo, file per volta, controllo veloce 4K e riscarica automatica. |
 
 ### Rinomina contenuto cartella
 

@@ -1558,7 +1558,11 @@ The complete list of actions and parameters is in [Appendix C](#appendix-c-refer
   integrity check*). In
   *Maintenance* the panel shows progress and the damaged or unreadable files,
   with the two counts kept apart and the reason reported by `ffmpeg`; **Check
-  now** starts a pass at once and **Start over** rechecks the whole library.
+  now** starts a pass at once and **Start over** rechecks the whole library:
+  both work even with the automatic pass off. The options of the automatic pass
+  live in *Settings → Maintenance → File integrity check*, and **Check
+  settings** takes you there from the panel (the text of the settings group
+  points back to *Maintenance*).
   Next to every episode there is **Redownload**: it moves the damaged file out
   of the library,
   blocklists the release and searches the same episode choosing a different
@@ -2985,6 +2989,7 @@ of the interface stays protected.
 | Start over | Starts again from the first file, clears the previous results and rechecks the whole library. |
 | Damaged / Unreadable | The file could not be decoded, or it could not be read within the allotted time: an unreadable file is not treated as broken and is retried automatically in a later pass. |
 | Redownload | Moves the damaged file out of the library, blocklists the old release and searches the same episode for a different release. With **File integrity check — re-download damaged files** on, Gextto does it by itself as soon as a file is reported as damaged. |
+| Check settings | Opens *Settings → Maintenance* on the options of the automatic check: interval, files per pass, quick 4K check and automatic re-download. |
 
 ### Rename folder content
 
