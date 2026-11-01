@@ -154,7 +154,11 @@ fi
 SERVICE_GROUP="$(id -gn "$SERVICE_USER" 2>/dev/null || echo "$SERVICE_USER")"
 
 install -d -o "$SERVICE_USER" -g "$SERVICE_GROUP" /opt/gextto /var/lib/gextto
-cp -a "$DIR/." /opt/gextto/
+# Unpacking the archive straight into /opt/gextto is a common way to do it:
+# copying the folder onto itself makes cp fail.
+if [[ "$(readlink -f "$DIR")" != "$(readlink -f /opt/gextto)" ]]; then
+  cp -a "$DIR/." /opt/gextto/
+fi
 chown -R "$SERVICE_USER:$SERVICE_GROUP" /opt/gextto
 chmod +x /opt/gextto/gexttod /opt/gextto/gx-torrent /opt/gextto/run.sh 2>/dev/null || true
 

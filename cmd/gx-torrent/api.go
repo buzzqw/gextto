@@ -478,13 +478,35 @@ func pageSlice[T any](list []T, limitRaw, offsetRaw string) []T {
 }
 
 func (d *Daemon) handleAdd(w http.ResponseWriter, r *http.Request) {
-	magnet := strings.TrimSpace(r.FormValue("magnet"))
-	if magnet == "" {
+	source := strings.TrimSpace(r.FormValue("magnet"))
+	if source == "" {
 		writeError(w, http.StatusBadRequest, errors.New("missing magnet"))
 		return
 	}
 	req := addRequestFromForm(r)
-	req.Magnet = magnet
+	// A .torrent URL that redirects to a magnet goes through the same reader as
+	// the page and the qBittorrent-compatible API: indexarr and Jackett answer
+	// `302 Location: magnet:…` for a source that only has a magnet, and the
+	// engine would follow it with a plain HTTP client and fail with
+	// `unsupported protocol scheme "magnet"`.
+	switch lower := strings.ToLower(source); {
+	case strings.HasPrefix(lower, "magnet:"):
+		req.Magnet = source
+	case strings.HasPrefix(lower, "http://"), strings.HasPrefix(lower, "https://"):
+		data, magnet, err := d.fetchTorrentSource(source)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, err)
+			return
+		}
+		if magnet != "" {
+			req.Magnet = magnet
+		} else {
+			req.TorrentData = data
+		}
+	default:
+		writeError(w, http.StatusBadRequest, fmt.Errorf("not a magnet link or a .torrent URL: %q", source))
+		return
+	}
 	hash, existing, err := d.add(req)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err)

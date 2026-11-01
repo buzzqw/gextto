@@ -139,8 +139,14 @@ if ! id -u gx-torrent >/dev/null 2>&1; then
 fi
 
 install -d -o gx-torrent -g gx-torrent /opt/gx-torrent /var/lib/gx-torrent
-install -m 0755 -o gx-torrent -g gx-torrent "$DIR/gx-torrent" /opt/gx-torrent/gx-torrent
-install -m 0755 -o gx-torrent -g gx-torrent "$DIR/run.sh" /opt/gx-torrent/run.sh
+# Unpacking the archive straight into /opt/gx-torrent is a common way to do it:
+# the files are already where they belong, and `install` refuses to copy a file
+# onto itself.
+if [[ "$(readlink -f "$DIR")" != "$(readlink -f /opt/gx-torrent)" ]]; then
+  install -m 0755 -o gx-torrent -g gx-torrent "$DIR/gx-torrent" /opt/gx-torrent/gx-torrent
+  install -m 0755 -o gx-torrent -g gx-torrent "$DIR/run.sh" /opt/gx-torrent/run.sh
+fi
+chmod 0755 /opt/gx-torrent/gx-torrent /opt/gx-torrent/run.sh
 install -m 0644 "$DIR/gx-torrent.service" /etc/systemd/system/gx-torrent.service
 systemctl daemon-reload
 systemctl enable --now gx-torrent

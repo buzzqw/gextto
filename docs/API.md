@@ -527,7 +527,7 @@ server-rendered UI under `/ui`; those HTML routes are not part of this table.
 
 | Method | Path | Description |
 |---|---|---|
-| POST | `/api/v1/add` | add a torrent (magnet, URL or JSON body); content_layout = Original, Subfolder or NoSubfolder (empty = Original); seed_mode=1 skips the initial check (each piece is checked when first uploaded) |
+| POST | `/api/v1/add` | add a torrent (magnet, URL or JSON body); content_layout = Original, Subfolder or NoSubfolder (empty = Original); seed_mode=1 skips the initial check (each piece is checked when first uploaded). A URL that answers with a redirect to a magnet: link — indexarr and Jackett do this for a source that has no .torrent file to serve — is followed and added as that magnet |
 | POST | `/api/v1/add-file` | add a .torrent file upload (same content_layout and seed_mode) |
 | GET | `/api/v1/config` | daemon configuration |
 | POST | `/api/v1/config` | change the daemon configuration |
