@@ -2146,6 +2146,7 @@ deu:
   Pagina: Seite
   Pagina {} / {}: Seite {} / {}
   Pagine feed da leggere: Feed-Seiten zum Lesen
+  Disabilita i feed dopo giorni di errori: Feeds nach Tagen mit Fehlern deaktivieren
   Pannello di controllo: Systemsteuerung
   Panoramica: Überblick
   Parametri operativi applicati dal motore. 0 disattiva il controllo corrispondente.: Vom Motor angewendete Betriebsparameter. 0 deaktiviert das
@@ -6212,3 +6213,17 @@ deu:
   "Il controllo automatico è disattivato.": "Die automatische Prüfung ist ausgeschaltet."
   "Attivalo in Configurazione → Manutenzione → Controllo integrità file.": "Aktiviere sie unter Einstellungen → Wartung → Dateiintegritätsprüfung."
   "Percorso del file state.json di italian_audio_batch: i file già rimappati e verificati pacchetto per pacchetto dal batch vengono considerati controllati e saltati. Lascia vuoto se non usi questo strumento.": "Pfad zur state.json von italian_audio_batch: Dateien, die das Batch bereits neu zusammengefügt und Paket für Paket geprüft hat, gelten als geprüft und werden übersprungen. Leer lassen, wenn du dieses Werkzeug nicht verwendest."
+
+  "Feed disabilitati": "Deaktivierte Feeds"
+  "Questi feed non vengono letti. Togli il # davanti alla riga qui sotto e salva per riattivarli.": "Diese Feeds werden nicht gelesen. Entferne das # vor der Zeile unten und speichere, um sie wieder zu aktivieren."
+  "Disabilitato automaticamente": "Automatisch deaktiviert"
+  "Disabilitato manualmente": "Manuell deaktiviert"
+  "giorni senza successi": "Tage ohne Erfolg"
+  "Attività dei feed": "Feed-Aktivität"
+  "Ultimo successo": "Letzter Erfolg"
+  "Ultimi risultati": "Letzte Ergebnisse"
+  "1 giorno": "1 Tag"
+  "Riga disabilitata con #": "Zeile mit # deaktiviert"
+  "Tentativi/successi/fallimenti/presi": "Versuche/Erfolge/Fehler/übernommen"
+  "T = tentativi, S = successi, F = fallimenti, P = release prese. I conteggi coprono gli ultimi 1, 7 e 30 giorni; «Ultimi risultati» è l'ultima lettura riuscita.": "T = Versuche, S = Erfolge, F = Fehler, P = übernommene Releases. Die Zahlen decken die letzten 1, 7 und 30 Tage ab; „Letzte Ergebnisse“ ist der letzte erfolgreiche Abruf."
+  "Dopo quanti giorni senza un successo il feed viene disabilitato automaticamente con un # davanti alla riga. Scatta solo se un altro feed ha funzionato nello stesso giorno, così un guasto di rete non spegne tutta la lista. 0 disattiva la regola. Il feed resta visibile nel pannello e si riattiva togliendo il #.": "Nach wie vielen Tagen ohne erfolgreiche Anfrage der Feed automatisch mit einem # vor der Zeile deaktiviert wird. Die Regel greift nur, wenn am selben Tag ein anderer Feed funktioniert hat, damit ein Netzausfall nicht die ganze Liste abschaltet. 0 deaktiviert die Regel. Der Feed bleibt im Panel sichtbar und wird durch Entfernen des # wieder aktiviert."

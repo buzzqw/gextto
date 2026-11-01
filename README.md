@@ -203,7 +203,10 @@ checkout: `git pull --ff-only && ./scripts/update.sh`.
   Torznab indexers and the Jackett/Prowlarr/indexarr managers, web search, optional
   FlareSolverr. The managers are searched **one indexer at a time**, each at the
   pace it really serves, a tracker present in more than one only once, a slow tracker
-  costing only its own results.
+  costing only its own results. Each feed has its own **activity panel** (last success,
+  last error, attempts/successes/failures/taken over 1, 7 and 30 days) and is disabled
+  automatically after a configurable run of days without a success, with a warning frame
+  listing the disabled ones.
 - **eD2k and Kad through aMule, when torrents find nothing.** Optional and off by
   default: Gextto drives an `amuled` you run (External Connections protocol,
   our own Go client). Search Kad or the eD2k servers, paste `ed2k://` links,

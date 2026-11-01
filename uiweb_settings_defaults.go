@@ -186,6 +186,7 @@ var uiSettingDefaults = map[string]string{
 	"archive_max_age_days":       "0",
 	"archive_keep_min":           "0",
 	"stop_on_old_page_threshold": "3",
+	"feed_auto_disable_days":     "7",
 	"rename_verify_interval":     "6",
 	"move_episodes":              "false",
 	"auth_enabled":               "false",

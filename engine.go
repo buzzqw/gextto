@@ -11,11 +11,13 @@ package gextto
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -581,6 +583,7 @@ func (e *Engine) scrapeFeed(ctx context.Context, cfg *Config, rawURL string, max
 	if e.db != nil {
 		if blocked, err := e.db.ProviderBlocked("feed", source); err == nil && blocked {
 			logging.Debug("feed skipped (backoff)", "feed", feed)
+			e.maybeAutoDisableFeed(cfg, rawURL, source)
 			return nil
 		}
 	}
@@ -591,6 +594,7 @@ func (e *Engine) scrapeFeed(ctx context.Context, cfg *Config, rawURL string, max
 		logging.SourceOK("feed", source, len(items))
 		logging.Debug("RSS feed analyzed", "feed", feed, "items", len(items))
 		if e.db != nil {
+			_ = e.db.RecordSourceAttempt("feed", source, true, len(items), "")
 			_ = e.db.ProviderSuccess("feed", source)
 		}
 		return items
@@ -613,9 +617,112 @@ func (e *Engine) scrapeFeed(ctx context.Context, cfg *Config, rawURL string, max
 	logging.SourceFail("feed", source, message)
 	logging.Warn(fmt.Sprintf("⚠️ RSS feed unavailable — %s: %s", feed, message))
 	if e.db != nil {
+		_ = e.db.RecordSourceAttempt("feed", source, false, 0, message)
 		_ = e.db.ProviderFailure("feed", source, message)
+		e.maybeAutoDisableFeed(cfg, rawURL, source)
 	}
 	return nil
+}
+
+// feedAutoDisableDays is how many days without a successful request make a
+// feed eligible for automatic disabling. 0 turns the rule off.
+func feedAutoDisableDays(cfg *Config) int {
+	const fallback = 7
+	if cfg == nil {
+		return fallback
+	}
+	raw := strings.TrimSpace(cfg.Settings["feed_auto_disable_days"])
+	if raw == "" {
+		return fallback
+	}
+	days, err := strconv.Atoi(raw)
+	if err != nil {
+		return fallback
+	}
+	if days < 0 {
+		return 0
+	}
+	return days
+}
+
+// maybeAutoDisableFeed disables a feed that has not succeeded for the configured
+// number of days. It only acts when another feed succeeded today: when every
+// feed fails, the cause is probably the network, DNS or FlareSolverr, and
+// disabling the whole list would make the outage worse.
+func (e *Engine) maybeAutoDisableFeed(cfg *Config, rawURL, source string) {
+	days := feedAutoDisableDays(cfg)
+	if e.db == nil || cfg == nil || days <= 0 {
+		return
+	}
+	health, err := e.db.SourceHealth("feed", source)
+	if err != nil || health.FirstAttemptAt == "" {
+		return
+	}
+	first, ok := utils.ParseTimestamp(health.FirstAttemptAt)
+	if !ok {
+		return
+	}
+	now := time.Now().UTC()
+	if now.Sub(first) < time.Duration(days)*24*time.Hour {
+		return
+	}
+	if health.LastSuccessAt != "" {
+		if last, ok := utils.ParseTimestamp(health.LastSuccessAt); ok && now.Sub(last) < time.Duration(days)*24*time.Hour {
+			return
+		}
+	}
+	otherSucceeded, err := e.db.AnySourceSuccessToday("feed", source)
+	if err != nil || !otherSucceeded {
+		logging.Debug("feed not disabled automatically: no other feed succeeded today", "feed", feedLabel(rawURL))
+		return
+	}
+	disabled, err := disableFeedInConfig(cfg, rawURL)
+	if err != nil {
+		logging.Warn(fmt.Sprintf("⚠️ Could not disable the RSS feed %s automatically: %v", feedLabel(rawURL), err))
+		return
+	}
+	if !disabled {
+		return
+	}
+	reason := strconv.Itoa(days)
+	_ = e.db.MarkSourceAutoDisabled("feed", source, reason, now)
+	logging.Warn(fmt.Sprintf("⚠️ The RSS feed %s has not worked for %d days: it has been disabled with a # in Settings → Sources. Fix its address, or remove the # to try it again.", feedLabel(rawURL), days))
+}
+
+// disableFeedInConfig prepends '#' to the one feed line that matches rawURL,
+// preserving every other line and comment. It reports whether the line was
+// changed; an already commented line is left alone.
+func disableFeedInConfig(cfg *Config, rawURL string) (bool, error) {
+	if cfg == nil {
+		return false, nil
+	}
+	rawSetting := cfg.Settings["url"]
+	if saved, err := loadConfigSetting(cfg.DataDir, "url"); err == nil && saved != "" {
+		rawSetting = saved
+	}
+	lines := feedLinesFromSetting(rawSetting)
+	target := strings.TrimSpace(rawURL)
+	changed := false
+	for index, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "#") || trimmed != target {
+			continue
+		}
+		lines[index] = "# " + line
+		changed = true
+		break
+	}
+	if !changed {
+		return false, nil
+	}
+	encoded, err := json.Marshal(lines)
+	if err != nil {
+		return false, err
+	}
+	if err := saveConfigSetting(cfg.DataDir, "url", string(encoded)); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 // SearchQuery is the gap-fill title search: the whole fan-out is bounded by the
@@ -1074,7 +1181,46 @@ func feedSourceName(rawURL string) string {
 	return feedLabel(rawURL)
 }
 
-// feedLabel is the short human label (host + path) shown in the feed log lines.
+// feedProviderForSource maps a release source back to the configured feed it
+// came from. Generic feeds use the raw URL as Source, the special parsers use a
+// label; both resolve to the stable provider name the stats table stores.
+func feedProviderForSource(cfg *Config, source string) (string, bool) {
+	source = strings.TrimSpace(source)
+	if cfg == nil || source == "" {
+		return "", false
+	}
+	for _, raw := range cfg.FeedURLs {
+		provider := feedSourceName(raw)
+		if provider == "" {
+			continue
+		}
+		if strings.EqualFold(source, provider) || strings.EqualFold(source, raw) ||
+			strings.EqualFold(source, feedLabel(raw)) {
+			return provider, true
+		}
+		lower := strings.ToLower(source)
+		if strings.HasPrefix(lower, strings.ToLower(provider)) && len(source) > len(provider) {
+			rest := source[len(provider):]
+			if strings.HasPrefix(rest, " ") || strings.HasPrefix(rest, "-") ||
+				strings.HasPrefix(rest, "—") || strings.HasPrefix(rest, ":") ||
+				strings.HasPrefix(rest, "/") {
+				return provider, true
+			}
+		}
+	}
+	return "", false
+}
+
+// recordFeedAccepted counts one release taken from a feed. It is deliberately
+// silent: a missing feed match (an indexer, an archive release) is normal.
+func recordFeedAccepted(db *Database, cfg *Config, release *models.Release) {
+	if db == nil || release == nil {
+		return
+	}
+	if provider, ok := feedProviderForSource(cfg, release.Source); ok {
+		_ = db.RecordSourceAccepted("feed", provider)
+	}
+}
 func feedLabel(rawURL string) string {
 	parsed, err := url.Parse(rawURL)
 	if err != nil {

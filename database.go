@@ -744,6 +744,33 @@ const databaseProviderSchema = `CREATE TABLE IF NOT EXISTS provider_status (
                 PRIMARY KEY(provider, kind)
             );`
 
+// databaseSourceStatsSchema keeps the per-source history the feed panel reads:
+// one row per day for the 1/7/30-day windows, and one row per source for the
+// first and last success (used by the prolonged-failure rule).
+const databaseSourceStatsSchema = `CREATE TABLE IF NOT EXISTS source_daily (
+                kind TEXT NOT NULL,
+                provider TEXT NOT NULL,
+                day TEXT NOT NULL,
+                attempts INTEGER NOT NULL DEFAULT 0,
+                successes INTEGER NOT NULL DEFAULT 0,
+                failures INTEGER NOT NULL DEFAULT 0,
+                results INTEGER NOT NULL DEFAULT 0,
+                accepted INTEGER NOT NULL DEFAULT 0,
+                last_error TEXT NOT NULL DEFAULT '',
+                PRIMARY KEY(kind, provider, day)
+            );
+            CREATE TABLE IF NOT EXISTS source_health (
+                kind TEXT NOT NULL,
+                provider TEXT NOT NULL,
+                first_attempt_at TEXT,
+                last_attempt_at TEXT,
+                last_success_at TEXT,
+                last_results INTEGER NOT NULL DEFAULT 0,
+                disabled_at TEXT,
+                disabled_reason TEXT NOT NULL DEFAULT '',
+                PRIMARY KEY(kind, provider)
+            );`
+
 // databaseStallWatchSchema persists the retry and notification schedule for a
 // stalled download. Keeping it outside torrent_meta preserves a user's normal
 // paused state: only torrents explicitly parked by the stall monitor appear
@@ -920,6 +947,11 @@ func (d *Database) migrate() error {
 	}
 	// Escalating provider backoff (feeds, indexers).
 	if _, err := d.db.Exec(databaseProviderSchema); err != nil {
+		return err
+	}
+	// Per-source daily history and health for the feed panel and the
+	// prolonged-failure rule.
+	if _, err := d.db.Exec(databaseSourceStatsSchema); err != nil {
 		return err
 	}
 	if _, err := d.db.Exec(databaseStallWatchSchema); err != nil {
@@ -2299,6 +2331,194 @@ func (d *Database) ResetProviderStatus(provider string) error {
 		"UPDATE provider_status SET level=0, disabled_till=NULL, most_recent_failure=NULL, last_error='' WHERE provider=?1",
 		provider)
 	return err
+}
+
+// RecordSourceAttempt appends one request outcome to the daily history and
+// refreshes the source's first/last success. A success also clears a previous
+// automatic-disable marker: the operator has re-enabled the feed and it works.
+func (d *Database) RecordSourceAttempt(kind, provider string, ok bool, results int, errText string) error {
+	kind = strings.TrimSpace(kind)
+	provider = strings.TrimSpace(provider)
+	if kind == "" || provider == "" {
+		return nil
+	}
+	now := time.Now().UTC()
+	day := now.Format("2006-01-02")
+	successes, failures := 0, 1
+	resultsValue := 0
+	if ok {
+		successes, failures = 1, 0
+		resultsValue = results
+		errText = ""
+	}
+	if resultsValue < 0 {
+		resultsValue = 0
+	}
+	_, err := d.db.Exec(`
+		INSERT INTO source_daily(kind, provider, day, attempts, successes, failures, results, last_error)
+		VALUES (?1, ?2, ?3, 1, ?4, ?5, ?6, ?7)
+		ON CONFLICT(kind, provider, day) DO UPDATE SET
+			attempts = source_daily.attempts + 1,
+			successes = source_daily.successes + excluded.successes,
+			failures = source_daily.failures + excluded.failures,
+			results = source_daily.results + excluded.results,
+			last_error = CASE WHEN excluded.last_error <> '' THEN excluded.last_error ELSE source_daily.last_error END`,
+		kind, provider, day, successes, failures, resultsValue, errText)
+	if err != nil {
+		return fmt.Errorf("record source attempt: %w", err)
+	}
+	lastSuccess := ""
+	lastResults := int64(-1)
+	if ok {
+		lastSuccess = sqliteTimestamp(now)
+		lastResults = int64(resultsValue)
+	}
+	_, err = d.db.Exec(`
+		INSERT INTO source_health(kind, provider, first_attempt_at, last_attempt_at, last_success_at, last_results)
+		VALUES (?1, ?2, ?3, ?3, ?4, ?5)
+		ON CONFLICT(kind, provider) DO UPDATE SET
+			first_attempt_at = CASE WHEN source_health.first_attempt_at IS NULL OR source_health.first_attempt_at = ''
+				THEN excluded.first_attempt_at ELSE source_health.first_attempt_at END,
+			last_attempt_at = excluded.last_attempt_at,
+			last_success_at = CASE WHEN excluded.last_success_at <> '' THEN excluded.last_success_at ELSE source_health.last_success_at END,
+			last_results = CASE WHEN excluded.last_results >= 0 THEN excluded.last_results ELSE source_health.last_results END,
+			disabled_at = CASE WHEN excluded.last_success_at <> '' THEN NULL ELSE source_health.disabled_at END,
+			disabled_reason = CASE WHEN excluded.last_success_at <> '' THEN '' ELSE source_health.disabled_reason END`,
+		kind, provider, sqliteTimestamp(now), lastSuccess, lastResults)
+	if err != nil {
+		return fmt.Errorf("record source health: %w", err)
+	}
+	return nil
+}
+
+// RecordSourceAccepted counts a release the source returned and Gextto took.
+func (d *Database) RecordSourceAccepted(kind, provider string) error {
+	kind = strings.TrimSpace(kind)
+	provider = strings.TrimSpace(provider)
+	if kind == "" || provider == "" {
+		return nil
+	}
+	day := time.Now().UTC().Format("2006-01-02")
+	_, err := d.db.Exec(`
+		INSERT INTO source_daily(kind, provider, day, accepted)
+		VALUES (?1, ?2, ?3, 1)
+		ON CONFLICT(kind, provider, day) DO UPDATE SET
+			accepted = source_daily.accepted + 1`, kind, provider, day)
+	if err != nil {
+		return fmt.Errorf("record source acceptance: %w", err)
+	}
+	return nil
+}
+
+// MarkSourceAutoDisabled records why a source was disabled automatically. The
+// daily history stays: the panel still shows what the feed did before.
+func (d *Database) MarkSourceAutoDisabled(kind, provider, reason string, at time.Time) error {
+	_, err := d.db.Exec(`
+		INSERT INTO source_health(kind, provider, disabled_at, disabled_reason)
+		VALUES (?1, ?2, ?3, ?4)
+		ON CONFLICT(kind, provider) DO UPDATE SET
+			disabled_at = excluded.disabled_at,
+			disabled_reason = excluded.disabled_reason`,
+		strings.TrimSpace(kind), strings.TrimSpace(provider), sqliteTimestamp(at), strings.TrimSpace(reason))
+	if err != nil {
+		return fmt.Errorf("mark source disabled: %w", err)
+	}
+	return nil
+}
+
+// SourceHealth returns the first/last attempt, last success and disable marker
+// of one source.
+func (d *Database) SourceHealth(kind, provider string) (models.SourceStat, error) {
+	var out models.SourceStat
+	var first, last, success, disabled, reason sql.NullString
+	err := d.db.QueryRow(`
+		SELECT first_attempt_at, last_attempt_at, last_success_at, last_results,
+			disabled_at, disabled_reason
+		FROM source_health WHERE kind=?1 AND provider=?2`, kind, provider).
+		Scan(&first, &last, &success, &out.LastResults, &disabled, &reason)
+	if errors.Is(err, sql.ErrNoRows) {
+		return out, nil
+	}
+	if err != nil {
+		return out, err
+	}
+	out.Kind = kind
+	out.Provider = provider
+	out.FirstAttemptAt = first.String
+	out.LastAttemptAt = last.String
+	out.LastSuccessAt = success.String
+	out.DisabledAt = disabled.String
+	out.DisabledReason = reason.String
+	return out, nil
+}
+
+// SourceStats returns the 1, 7 and 30 day history of every source of one kind.
+func (d *Database) SourceStats(kind string) ([]models.SourceStat, error) {
+	now := time.Now().UTC()
+	day1 := now.Format("2006-01-02")
+	day7 := now.AddDate(0, 0, -6).Format("2006-01-02")
+	day30 := now.AddDate(0, 0, -29).Format("2006-01-02")
+	rows, err := d.db.Query(`
+		SELECT s.provider,
+			COALESCE(SUM(CASE WHEN s.day >= ?1 THEN s.attempts ELSE 0 END), 0),
+			COALESCE(SUM(CASE WHEN s.day >= ?1 THEN s.successes ELSE 0 END), 0),
+			COALESCE(SUM(CASE WHEN s.day >= ?1 THEN s.failures ELSE 0 END), 0),
+			COALESCE(SUM(CASE WHEN s.day >= ?1 THEN s.results ELSE 0 END), 0),
+			COALESCE(SUM(CASE WHEN s.day >= ?1 THEN s.accepted ELSE 0 END), 0),
+			COALESCE(SUM(CASE WHEN s.day >= ?2 THEN s.attempts ELSE 0 END), 0),
+			COALESCE(SUM(CASE WHEN s.day >= ?2 THEN s.successes ELSE 0 END), 0),
+			COALESCE(SUM(CASE WHEN s.day >= ?2 THEN s.failures ELSE 0 END), 0),
+			COALESCE(SUM(CASE WHEN s.day >= ?2 THEN s.results ELSE 0 END), 0),
+			COALESCE(SUM(CASE WHEN s.day >= ?2 THEN s.accepted ELSE 0 END), 0),
+			COALESCE(SUM(CASE WHEN s.day >= ?3 THEN s.attempts ELSE 0 END), 0),
+			COALESCE(SUM(CASE WHEN s.day >= ?3 THEN s.successes ELSE 0 END), 0),
+			COALESCE(SUM(CASE WHEN s.day >= ?3 THEN s.failures ELSE 0 END), 0),
+			COALESCE(SUM(CASE WHEN s.day >= ?3 THEN s.results ELSE 0 END), 0),
+			COALESCE(SUM(CASE WHEN s.day >= ?3 THEN s.accepted ELSE 0 END), 0),
+			MAX(h.first_attempt_at), MAX(h.last_attempt_at), MAX(h.last_success_at),
+			COALESCE(MAX(h.last_results), 0), MAX(h.disabled_at), MAX(h.disabled_reason)
+		FROM source_daily s
+		LEFT JOIN source_health h ON h.kind = s.kind AND h.provider = s.provider
+		WHERE s.kind = ?4 AND s.day >= ?3
+		GROUP BY s.provider
+		ORDER BY s.provider`, day1, day7, day30, kind)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make([]models.SourceStat, 0)
+	for rows.Next() {
+		var item models.SourceStat
+		var first, last, success, disabled, reason sql.NullString
+		if err := rows.Scan(&item.Provider,
+			&item.Attempts1, &item.Successes1, &item.Failures1, &item.Results1, &item.Accepted1,
+			&item.Attempts7, &item.Successes7, &item.Failures7, &item.Results7, &item.Accepted7,
+			&item.Attempts30, &item.Successes30, &item.Failures30, &item.Results30, &item.Accepted30,
+			&first, &last, &success, &item.LastResults, &disabled, &reason); err != nil {
+			return nil, err
+		}
+		item.Kind = kind
+		item.FirstAttemptAt = first.String
+		item.LastAttemptAt = last.String
+		item.LastSuccessAt = success.String
+		item.DisabledAt = disabled.String
+		item.DisabledReason = reason.String
+		out = append(out, item)
+	}
+	return out, rows.Err()
+}
+
+// AnySourceSuccessToday reports whether a source of the same kind other than
+// exclude succeeded today. The automatic-disable rule uses it to tell a broken
+// feed from a network/DNS outage that affects every feed at once.
+func (d *Database) AnySourceSuccessToday(kind, exclude string) (bool, error) {
+	day := time.Now().UTC().Format("2006-01-02")
+	var found int
+	err := d.db.QueryRow(`
+		SELECT EXISTS(SELECT 1 FROM source_daily
+			WHERE kind=?1 AND day=?2 AND successes > 0 AND provider <> ?3)`,
+		kind, day, exclude).Scan(&found)
+	return found != 0, err
 }
 
 // DeleteProviderStatus removes the backoff row of a source that is no longer
@@ -6231,6 +6451,11 @@ func (d *Database) Housekeeping(params HousekeepingParams) (HousekeepingReport, 
 	}
 	if affected, err := result.RowsAffected(); err == nil {
 		report.StaleProvidersRemoved = int(affected)
+	}
+	// The feed panel reads 1/7/30 days; keep a little more than 30 for the
+	// boundary and drop the rest.
+	if _, err := d.db.Exec("DELETE FROM source_daily WHERE day < date('now', '-35 day')"); err != nil {
+		return report, err
 	}
 	return report, nil
 }

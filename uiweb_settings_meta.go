@@ -43,6 +43,7 @@ var uiSettingMetaByKey = map[string]uiSettingMeta{
 	"gap_deep_interval_hours": {Unit: "ore", DependsOn: "gap_filling"},
 	"gap_deep_max_per_cycle":  {DependsOn: "gap_filling"},
 	"gap_last_resort":         {DependsOn: "gap_filling"},
+	"feed_auto_disable_days":  {Unit: "giorni", Zero: "0 = mai"},
 	"cycle_title_search": {Kind: "select", Options: []uiFormOption{
 		{Value: "auto", Label: "Automatica (solo se non ci sono feed)"},
 		{Value: "yes", Label: "Sempre"},

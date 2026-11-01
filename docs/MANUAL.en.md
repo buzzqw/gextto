@@ -2133,6 +2133,7 @@ them.
 |---|---|
 | Blacklist (one word per line) | Forbidden words, one per line: releases containing them are discarded. |
 | Feed pages to read | How many listing pages to read per feed (3 is a good compromise). |
+| Disable feeds after days of errors | After how many days without a success the feed is disabled automatically with a `#` in front of its line. It only fires when another feed worked on the same day; `0` turns the rule off. |
 
 **Editors**
 
@@ -2143,6 +2144,8 @@ them.
 | Excluded content filters | Releases containing these words or scripts (e.g. [porno]) are excluded. |
 | Source filters | Keywords to accept or reject for a single source, enabled per row. |
 | Watched folders | The .torrent and .magnet files found in the given folders are **downloaded** and added to the session automatically (recursive, delete after). |
+
+Below the editor there is **Feed activity**: for every feed it shows the state, the last success, the last error, the last results and the counts of attempts/successes/failures/releases taken over the last 1, 7 and 30 days. If a line is disabled with `#`, a **Disabled feeds** frame lists it above the table and says whether it was disabled by hand or automatically, with the date and the days of failure. Removing the `#` and saving enables it again.
 
 #### eD2k and Kad
 

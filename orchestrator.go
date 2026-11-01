@@ -1361,6 +1361,9 @@ func RunCycleDomain(
 				}
 			}
 			stats.DownloadsStarted++
+			if !cfg.DryRun {
+				recordFeedAccepted(db, cfg, &release)
+			}
 			if approvalReason == "upgrade" {
 				upgrades++
 			} else {
@@ -1601,6 +1604,7 @@ func prioritizeArchiveGapDownloads(
 		stats.DownloadsStarted++
 		stats.GapsFilled++
 		started++
+		recordFeedAccepted(db, cfg, &release)
 		gapMessage := fmt.Sprintf("📥 Downloading %s — fills a missing episode (%s)", logTarget(&release), friendlyQuality(release.Quality))
 		if destination := releaseDestinationLabel(cfg, &release, preferredPath); destination != "" {
 			gapMessage += " → " + destination

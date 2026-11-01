@@ -2146,6 +2146,7 @@ fra:
   Pagina: Page
   Pagina {} / {}: Page {} / {}
   Pagine feed da leggere: Pages de flux à lire
+  Disabilita i feed dopo giorni di errori: Désactiver les flux après des jours d'erreurs
   Pannello di controllo: Panneau de contrôle
   Panoramica: Aperçu
   Parametri operativi applicati dal motore. 0 disattiva il controllo corrispondente.: Paramètres de fonctionnement appliqués par le moteur. 0
@@ -6205,3 +6206,17 @@ fra:
   "Il controllo automatico è disattivato.": "La vérification automatique est désactivée."
   "Attivalo in Configurazione → Manutenzione → Controllo integrità file.": "Activez-la dans Configuration → Maintenance → Vérification de l'intégrité des fichiers."
   "Percorso del file state.json di italian_audio_batch: i file già rimappati e verificati pacchetto per pacchetto dal batch vengono considerati controllati e saltati. Lascia vuoto se non usi questo strumento.": "Chemin du fichier state.json de italian_audio_batch : les fichiers déjà remuxés et vérifiés paquet par paquet par le batch sont considérés comme vérifiés et ignorés. Laissez vide si vous n'utilisez pas cet outil."
+
+  "Feed disabilitati": "Flux désactivés"
+  "Questi feed non vengono letti. Togli il # davanti alla riga qui sotto e salva per riattivarli.": "Ces flux ne sont pas lus. Retirez le # devant la ligne ci-dessous et enregistrez pour les réactiver."
+  "Disabilitato automaticamente": "Désactivé automatiquement"
+  "Disabilitato manualmente": "Désactivé manuellement"
+  "giorni senza successi": "jours sans succès"
+  "Attività dei feed": "Activité des flux"
+  "Ultimo successo": "Dernier succès"
+  "Ultimi risultati": "Derniers résultats"
+  "1 giorno": "1 jour"
+  "Riga disabilitata con #": "Ligne désactivée avec #"
+  "Tentativi/successi/fallimenti/presi": "Tentatives/succès/échecs/pris"
+  "T = tentativi, S = successi, F = fallimenti, P = release prese. I conteggi coprono gli ultimi 1, 7 e 30 giorni; «Ultimi risultati» è l'ultima lettura riuscita.": "T = tentatives, S = succès, F = échecs, P = releases prises. Les chiffres couvrent les 1, 7 et 30 derniers jours ; « Derniers résultats » est la dernière lecture réussie."
+  "Dopo quanti giorni senza un successo il feed viene disabilitato automaticamente con un # davanti alla riga. Scatta solo se un altro feed ha funzionato nello stesso giorno, così un guasto di rete non spegne tutta la lista. 0 disattiva la regola. Il feed resta visibile nel pannello e si riattiva togliendo il #.": "Après combien de jours sans requête réussie le flux est désactivé automatiquement avec un # devant sa ligne. La règle ne s'applique que si un autre flux a fonctionné le même jour, pour qu'une panne réseau n'éteigne pas toute la liste. 0 désactive la règle. Le flux reste visible dans le panneau et se réactive en retirant le #."

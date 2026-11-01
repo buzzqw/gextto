@@ -305,6 +305,11 @@ func validateNumericSetting(key, value string) error {
 		if err != nil || parsed < 0 || parsed > 365 {
 			return fmt.Errorf("%s must be between 0 and 365 days", key)
 		}
+	case key == "feed_auto_disable_days":
+		parsed, err := strconv.ParseInt(raw, 10, 64)
+		if err != nil || parsed < 0 || parsed > 365 {
+			return fmt.Errorf("%s must be between 0 and 365 days", key)
+		}
 	case key == "ed2k_search_timeout_secs":
 		parsed, err := strconv.ParseInt(raw, 10, 64)
 		if err != nil || parsed < 5 || parsed > 120 {

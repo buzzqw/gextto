@@ -157,6 +157,7 @@ var uiSettingTooltipText = map[string]string{
 	"tvdb_pin":                             "PIN dell'abbonamento TheTVDB: serve solo con le chiavi di tipo «user-supported», che lo richiedono al login.",
 	"tvdb_language":                        "Lingua preferita per i metadati TVDB (es. ita, eng).",
 	"stop_on_old_page_threshold":           "Quante pagine di elenco leggere per ogni feed (3 è un buon compromesso).",
+	"feed_auto_disable_days":               "Dopo quanti giorni senza un successo il feed viene disabilitato automaticamente con un # davanti alla riga. Scatta solo se un altro feed ha funzionato nello stesso giorno, così un guasto di rete non spegne tutta la lista. 0 disattiva la regola. Il feed resta visibile nel pannello e si riattiva togliendo il #.",
 	"rename_verify_interval":               "Ogni quante ore verificare che i file archiviati/rinominati siano ancora presenti.",
 	"move_episodes":                        "Attivo: la sorgente scaricata viene spostata in libreria e rimossa dalla cartella download (per i torrent al termine del seed; per eD2k al completamento, perché il seeding è gestito da aMule). Spento: la sorgente viene copiata o collegata e mantenuta per la condivisione.",
 	"hardlink_seeding":                     "Attivo: un file che resta in seed entra in libreria come hardlink, cioè un secondo nome per gli stessi dati, senza occupare spazio due volte. Cancellare uno dei due nomi non tocca l'altro. Funziona solo se download e libreria sono sullo stesso filesystem; altrimenti gextto copia come prima.",

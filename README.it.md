@@ -205,7 +205,10 @@ un checkout: `git pull --ff-only && ./scripts/update.sh`.
   indexer Torznab e i gestori Jackett/Prowlarr/indexarr, ricerca web, FlareSolverr
   opzionale. I gestori vengono interrogati **un indexer alla volta**, ognuno al
   ritmo che regge davvero, un tracker presente in più gestori una volta sola, e un
-  tracker lento perde solo i propri risultati.
+  tracker lento perde solo i propri risultati. Ogni feed ha il suo **pannello di
+  attività** (ultimo successo, ultimo errore, tentativi/successi/fallimenti/prese su
+  1, 7 e 30 giorni) e viene disabilitato automaticamente dopo una serie configurabile
+  di giorni senza successi, con un riquadro che elenca quelli spenti.
 - **eD2k e Kad tramite aMule, quando i torrent non trovano nulla.** Opzionale e
   spento di default: Gextto pilota un `amuled` che fai girare tu (protocollo
   External Connections, client nostro in Go). Cerchi su Kad o sui server eD2k,

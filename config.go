@@ -753,6 +753,25 @@ func OpenConfigDB(path string) (*sql.DB, error) {
 	return OpenSQLite(path)
 }
 
+// loadConfigSetting reads one value from gextto_config.db. A missing key is an
+// empty value, not an error: the caller may be reading a setting that has never
+// been saved.
+func loadConfigSetting(dataDir, key string) (string, error) {
+	conn, err := OpenConfigDB(filepath.Join(dataDir, "gextto_config.db"))
+	if err != nil {
+		return "", err
+	}
+	defer conn.Close()
+	var value string
+	if err := conn.QueryRow("SELECT value FROM settings WHERE key=?1", key).Scan(&value); err != nil {
+		if err == sql.ErrNoRows {
+			return "", nil
+		}
+		return "", err
+	}
+	return value, nil
+}
+
 // CleanupMovieRequirements is a one-time cleanup of legacy/imported dirty movie
 // requirement rows. It also folds the legacy «Lingue richieste» into the
 // movie's single «Lingua»: when present the requirement decided alone, so the

@@ -2210,6 +2210,7 @@ salvata** finché non li salvi.
 |---|---|
 | Blacklist (una parola per riga) | Parole vietate, una per riga: le release che le contengono vengono scartate. |
 | Pagine feed da leggere | Quante pagine di elenco leggere per ogni feed (3 è un buon compromesso). |
+| Disabilita i feed dopo giorni di errori | Dopo quanti giorni senza un successo il feed viene disabilitato automaticamente con un `#` davanti alla riga. Scatta solo se un altro feed ha funzionato nello stesso giorno; `0` disattiva la regola. |
 
 **Editor**
 
@@ -2220,6 +2221,8 @@ salvata** finché non li salvi.
 | Filtri contenuto esclusi | Le release che contengono queste parole o script (es. [porno]) vengono escluse. |
 | Filtri per sorgente | Parole chiave da accettare o scartare per una singola sorgente, con attivazione per riga. |
 | Cartelle osservate | I .torrent e i .magnet trovati nelle cartelle indicate vengono **scaricati** e aggiunti automaticamente alla sessione (ricorsiva, elimina dopo). |
+
+Sotto l'editor c'è **Attività dei feed**: per ogni feed mostra lo stato, l'ultimo successo, l'ultimo errore, gli ultimi risultati e i conteggi di tentativi/successi/fallimenti/release prese sugli ultimi 1, 7 e 30 giorni. Se una riga è disabilitata con `#`, un riquadro **Feed disabilitati** la elenca sopra la tabella e dice se è stata disabilitata a mano o automaticamente, con la data e i giorni di errore. Per riattivarla basta togliere il `#` e salvare.
 
 #### eD2k e Kad
 

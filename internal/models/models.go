@@ -847,6 +847,40 @@ type ProviderStatus struct {
 	SuggestedAction string `json:"suggested_action,omitempty"`
 }
 
+// SourceStat is one source's history in the 1, 7 and 30 day windows, plus the
+// last success and the automatic-disable marker. Attempts and successes are
+// requests, Results is how many releases the source returned and Accepted is
+// how many of them Gextto took.
+type SourceStat struct {
+	Provider string `json:"provider"`
+	Kind     string `json:"kind"`
+
+	Attempts1  int64 `json:"attempts_1d"`
+	Successes1 int64 `json:"successes_1d"`
+	Failures1  int64 `json:"failures_1d"`
+	Results1   int64 `json:"results_1d"`
+	Accepted1  int64 `json:"accepted_1d"`
+
+	Attempts7  int64 `json:"attempts_7d"`
+	Successes7 int64 `json:"successes_7d"`
+	Failures7  int64 `json:"failures_7d"`
+	Results7   int64 `json:"results_7d"`
+	Accepted7  int64 `json:"accepted_7d"`
+
+	Attempts30  int64 `json:"attempts_30d"`
+	Successes30 int64 `json:"successes_30d"`
+	Failures30  int64 `json:"failures_30d"`
+	Results30   int64 `json:"results_30d"`
+	Accepted30  int64 `json:"accepted_30d"`
+
+	FirstAttemptAt string `json:"first_attempt_at,omitempty"`
+	LastAttemptAt  string `json:"last_attempt_at,omitempty"`
+	LastSuccessAt  string `json:"last_success_at,omitempty"`
+	LastResults    int64  `json:"last_results"`
+	DisabledAt     string `json:"disabled_at,omitempty"`
+	DisabledReason string `json:"disabled_reason,omitempty"`
+}
+
 // TorrentEvent is a lifecycle event emitted by the torrent session.
 type TorrentEvent struct {
 	Kind     string `json:"kind"`

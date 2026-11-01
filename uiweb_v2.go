@@ -2579,6 +2579,8 @@ type v2SettingsView struct {
 	EditorsFirst   bool
 	ShowFeeds      bool
 	Feeds          string
+	FeedStats      []v2FeedStat
+	DisabledFeeds  []v2DisabledFeed
 	CheckboxGroups []v2CheckboxGroup
 	ListEditors    []v2ListEditorView
 	Rename         *v2RenameView
@@ -2722,6 +2724,7 @@ func v2SettingsViewFrom(s *AppState, tab, highlight, mode string) v2SettingsView
 	if page.ShowSources {
 		view.ShowFeeds = true
 		view.Feeds = v2FeedsFrom(s)
+		view.FeedStats, view.DisabledFeeds = v2FeedStatsFrom(s)
 		view.CheckboxGroups = v2CheckboxGroupsFrom(page.CheckboxGroups)
 	}
 	for _, editor := range page.ListEditors {

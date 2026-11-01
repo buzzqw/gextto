@@ -140,6 +140,7 @@ var uiSettingsIndex = []uiSettingDef{
 	// --- Sorgenti -----------------------------------------------------------
 	{Key: "blacklist", Label: "Blacklist (una parola per riga)", Tab: "sources", Group: "Feed e blacklist"},
 	{Key: "stop_on_old_page_threshold", Label: "Pagine feed da leggere", Tab: "sources", Group: "Feed e blacklist"},
+	{Key: "feed_auto_disable_days", Label: "Disabilita i feed dopo giorni di errori", Tab: "sources", Group: "Feed e blacklist"},
 	{Key: "ed2k_enabled", Label: "eD2k e Kad tramite aMule", Tab: "ed2k", Group: "eD2k e Kad"},
 	{Key: "amule_host", Label: "aMule — indirizzo", Tab: "ed2k", Group: "eD2k e Kad"},
 	{Key: "amule_port", Label: "aMule — porta connessioni esterne (EC)", Tab: "ed2k", Group: "eD2k e Kad"},

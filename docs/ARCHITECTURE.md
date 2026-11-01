@@ -219,7 +219,7 @@ qBittorrent-nox.
 | `uiweb_v2.go` | v2 shell (HTMX), fragment routing and rendering. |
 | `uiweb_v2_dashboard.go`, `uiweb_v2_downloads.go`, `uiweb_v2_detail.go`, `uiweb_v2_search.go`, `uiweb_v2_comics.go`, `uiweb_v2_maintenance.go`, `uiweb_v2_archive_sql.go` | dedicated v2 pages. |
 | `uiweb_v2_gaps.go`, `uiweb_v2_import.go`, `uiweb_v2_library_layout.go`, `uiweb_v2_ports.go` | *Missing* tab grouped by series and season, manual-import page, poster view of the library, peer-port panel. |
-| `uiweb_v2_settings_insights.go`, `uiweb_v2_settings_mode.go`, `uiweb_v2_tuning.go` | Configuration: read-only insights next to the controls, the Facilitata/Esperto switch, the *Gestione automatica* card. |
+| `uiweb_v2_settings_insights.go`, `uiweb_v2_settings_mode.go`, `uiweb_v2_feed_stats.go`, `uiweb_v2_tuning.go` | Configuration: read-only insights next to the controls, the per-feed activity panel, the Facilitata/Esperto switch and the *Gestione automatica* card. |
 | `uiweb_v2_theme.go`, `uiweb_bandwidth_history.go` | theme picker (saved themes on the server, the active one per browser) and the bandwidth chart of the dashboard. |
 | `uiweb_v2_sections.go` | pages composed of sections (Maintenance, Integrations). |
 | `uiweb_v2_settings_extras.go` | structured editors of the v2 Configuration. |

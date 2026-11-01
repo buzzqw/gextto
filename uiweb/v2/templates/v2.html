@@ -1137,6 +1137,33 @@
     <div class="hint">Un URL per riga. Metti # all'inizio di una riga per escluderla senza cancellarla.</div>
     <div class="form-actions"><button class="btn sm primary" type="submit">Salva feed</button><span class="setting-badge setting-dirty" data-v2-dirty-badge hidden>non salvata</span></div>
   </form>
+  {{if .DisabledFeeds}}
+  <div class="alert" role="status">
+    <strong>Feed disabilitati</strong>
+    <p>Questi feed non vengono letti. Togli il # davanti alla riga qui sotto e salva per riattivarli.</p>
+    <ul>
+      {{range .DisabledFeeds}}<li><strong>{{.Label}}</strong> — <span>{{if .AutoDisabled}}Disabilitato automaticamente{{else}}Disabilitato manualmente{{end}}</span>{{if .AutoDisabled}} <span>{{.DisabledAt}}</span>{{if .Reason}} <span class="muted">(<span>{{.Reason}}</span> <span>giorni senza successi</span>)</span>{{end}}{{end}}</li>{{end}}
+    </ul>
+  </div>
+  {{end}}
+  {{if .FeedStats}}
+  <h4>Attività dei feed</h4>
+  <p class="hint">T = tentativi, S = successi, F = fallimenti, P = release prese. I conteggi coprono gli ultimi 1, 7 e 30 giorni; «Ultimi risultati» è l'ultima lettura riuscita.</p>
+  <div class="table-wrap"><table class="data-table">
+    <caption class="sr-only">Attività dei feed</caption>
+    <thead><tr><th scope="col">Feed</th><th scope="col">Stato</th><th scope="col">Ultimo successo</th><th scope="col">Ultimo errore</th><th scope="col">Ultimi risultati</th><th scope="col">1 giorno</th><th scope="col">7 giorni</th><th scope="col">30 giorni</th></tr></thead>
+    <tbody>{{range .FeedStats}}<tr>
+      <td class="truncate" title="{{.Provider}}">{{.Label}}{{if .Disabled}} <span class="badge warn" title="Riga disabilitata con #">#</span>{{end}}</td>
+      <td><span class="badge {{.StateClass}}">{{.State}}</span></td>
+      <td class="nowrap">{{if .LastSuccess}}{{.LastSuccess}}{{else}}—{{end}}</td>
+      <td class="truncate" title="{{.LastError}}">{{if .LastError}}{{.LastError}}{{else}}—{{end}}</td>
+      <td class="numeric">{{.LastResults}}</td>
+      <td class="numeric" title="Tentativi/successi/fallimenti/presi">{{.OneDay}}</td>
+      <td class="numeric" title="Tentativi/successi/fallimenti/presi">{{.SevenDays}}</td>
+      <td class="numeric" title="Tentativi/successi/fallimenti/presi">{{.ThirtyDays}}</td>
+    </tr>{{end}}</tbody>
+  </table></div>
+  {{end}}
 </div>
 {{end}}
 {{range .CheckboxGroups}}
