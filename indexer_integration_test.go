@@ -296,7 +296,7 @@ func TestIndexarrManagerHealthUsesTheSameEndpoints(t *testing.T) {
 			  {"id":5,"name":"ExtTo","enable":true}
 			]`)
 		case "/api/v1/indexerstatus":
-			_, _ = io.WriteString(w, `[{"indexerId":3,"disabledTill":"2026-11-01T12:30:00Z","mostRecentFailure":"paused after repeated failures"}]`)
+			_, _ = io.WriteString(w, `[{"indexerId":3,"disabledTill":"2026-11-01T12:30:00Z","message":"paused after repeated failures"}]`)
 		default:
 			w.WriteHeader(http.StatusNotFound)
 		}
@@ -319,7 +319,9 @@ func TestIndexarrManagerHealthUsesTheSameEndpoints(t *testing.T) {
 	for _, item := range items {
 		byName[item["name"].(string)] = item
 	}
-	if item := byName["DDUnlimited"]; item["ok"] != false || !strings.Contains(item["error"].(string), "disabilitato fino a") {
+	if item := byName["DDUnlimited"]; item["ok"] != false ||
+		!strings.Contains(item["error"].(string), "paused after repeated failures") ||
+		!strings.Contains(item["error"].(string), "disabilitato fino a") {
 		t.Fatalf("DDUnlimited health = %+v", item)
 	}
 	if item := byName["ExtTo"]; item["ok"] != true {

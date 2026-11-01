@@ -58,11 +58,20 @@ func ManagerIndexerHealth(ctx context.Context, baseURL, apiKey, kind string) ([]
 				if id == "" {
 					continue
 				}
-				if disabledTill := strings.TrimSpace(managerScalar(status["disabledTill"])); disabledTill != "" {
-					failures[id] = "in errore, disabilitato fino a " + disabledTill
-				} else {
-					failures[id] = "in errore"
+				// indexarr adds the reason in "message"; Prowlarr keeps it only
+				// in its log, so a Prowlarr row falls back to the state alone.
+				reason := strings.TrimSpace(managerScalar(status["message"]))
+				if len(reason) > 200 {
+					reason = strings.TrimSpace(reason[:200]) + "…"
 				}
+				detail := "in errore"
+				if reason != "" {
+					detail += ": " + reason
+				}
+				if disabledTill := strings.TrimSpace(managerScalar(status["disabledTill"])); disabledTill != "" {
+					detail += ", disabilitato fino a " + disabledTill
+				}
+				failures[id] = detail
 			}
 		}
 	}
