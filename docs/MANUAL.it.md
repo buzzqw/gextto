@@ -1530,7 +1530,7 @@ L'elenco completo dei campi e delle azioni è nell'[Appendice B](#appendice-b-ri
   d'ambiente `GEXTTO_*`. I programmi sono eseguiti senza shell e con timeout di
   default pari a 60 secondi (massimo 24 ore; anche `0` usa il default). Ogni
   segnaposto diventa un solo argomento anche se il valore contiene spazi: un
-  titolo come `The Office` arriva intero, non spezzato in due. Allo scadere del
+  titolo come `Titolo Con Spazi` arriva intero, non spezzato in due. Allo scadere del
   timeout viene terminato anche ogni processo figlio lanciato dal programma; al
   massimo 4 hook girano contemporaneamente, gli altri attendono il proprio turno.
 

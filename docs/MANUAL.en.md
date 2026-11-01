@@ -1478,7 +1478,7 @@ The complete list of fields and actions is in [Appendix B](#appendix-b-reference
   environment variables. Programs run without a shell and use a 60-second
   default timeout (maximum 24 hours; `0` also means the default). Each
   placeholder becomes a single argument even when its value contains spaces: a
-  title such as `The Office` arrives whole, not split in two. When the timeout
+  title such as `Title With Spaces` arrives whole, not split in two. When the timeout
   expires, every child process started by the program is stopped too; at most 4
   hooks run at the same time, the others wait their turn.
 

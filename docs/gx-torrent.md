@@ -981,7 +981,7 @@ all), `fail`, `match` and `action`:
 a wanted title's languages) are found the same way everywhere
 (`rss.HasTerm`): case-insensitive, with the separators of release names — dots,
 underscores, dashes, brackets — counting as spaces on both sides, and from the
-start of a word. So `the office` finds `The.Office.US.S03E01`, `sub ita` finds
+start of a word. So `my show` finds `My.Show.US.S03E01`, `sub ita` finds
 `SUB.ITA`, `ita` finds `ITA` and `Italian` but not `Capitan`, `1080` finds
 `1080p`.
 

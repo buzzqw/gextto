@@ -43,8 +43,8 @@ conflict with another, the more specific one wins.
   `changelog.md` and `changelog.en.md` (same sections, same substance). The
   entry speaks to the people who use Gextto: what changes, for whom, what they
   have to do. No hashes, function names or file lists. **No film or TV series
-  names either**, not even as an example in quotes: the changelog is public and
-  the episode that showed the problem is told without naming its title. A commit
+  names either**: the rule for every document is in
+  [Documentation and manuals](#documentation-and-manuals). A commit
   that only touches build, tests or internal documentation has no entry of its
   own: its visible part goes into the entry of the functional commit it
   accompanies.
@@ -435,6 +435,15 @@ not. Error strings reachable from a log line are English too.
   sentence fails the tests.
 
 ### Documentation and manuals
+- **Never write the name of a TV series, an episode or a film in a document.**
+  No exception: not in the changelog (either language), the manuals, the
+  README, `docs/`, this file, examples, log lines or sample file names, and not
+  even in quotes or as "just an example". The documents are public and are
+  published on the site. A concrete case is told by describing it — *a series
+  with 37 gaps across two seasons*, `Serie.2x05.Il.Titolo.Della.Puntata.ITA.DLMux.x264-GRUPPO.mkv`,
+  `Series A S06E13` — never by naming the title. In `docs/measurements.md` the
+  samples keep the numbers and lose the names: replace them with explicit
+  placeholders (`Series A`, `<series>`, `example movie 1999`).
 - **Manuals** (`docs/MANUAL.it.md` and `docs/MANUAL.en.md`): they are updated
   in the same commit when anything visible or operational changes — templates,
   JS/CSS, routes, labels, settings, but also acquisition, queue, archive,

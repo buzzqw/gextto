@@ -853,7 +853,8 @@ throw-away `--config-dir`, ports not forwarded (Low ID, Kad firewalled),
   (`GEXTTO_AMULE_EC=… go test ./internal/amule/ -run Live`, 0.05 s);
 - after `Connect`, Kad and the eD2k server (eMule Sunrise, ~47 600 users) were
   up within ~15 s;
-- `FBI S06E13`: **14** Kad results and **12** global server results, each
+- `Series A S06E13` (titles in this document are replaced with placeholders):
+  **14** Kad results and **12** global server results, each
   collected over a 40 s window, with the episode (WEB, HDTV, 1080p variants) at
   1–2 sources on a firewalled client.
 
@@ -899,7 +900,7 @@ One live run from the N97 (`bin/gx-ed2k`, standalone, UPnP on, `nodes.dat` from
   `peer_packets=0` — UPnP succeeded but no Kad peer answered, which is exactly
   the "port open, outbound UDP blocked" case it is meant to flag.
 - **eD2k servers**: login and HighID (`server_id=809248847`, `low_id=false`),
-  `server.met` parsed (16 servers), search `the matrix 1999` returned **14
+  `server.met` parsed (16 servers), search `example movie 1999` returned **14
   results** (name, size, MD4, sources), including Italian releases; the query
   took **10.5 s** with five servers in parallel and a short idle window after
   the first result. Packed server results (`0xD4` + zlib) and tagged
@@ -913,7 +914,7 @@ One live run from the N97 (`bin/gx-ed2k`, standalone, UPnP on, `nodes.dat` from
   chunks; the client read them big-endian, so it sent probes to reversed
   addresses. The fix and the new live numbers are below.
 - **Gextto integration**: with `ed2k_enabled` on, the managed daemon started
-  (fingerprint/scope), `/api/search` with `{"query":"the matrix 1999","kad":true}`
+  (fingerprint/scope), `/api/search` with `{"query":"example movie 1999","kad":true}`
   returned **248 results (234 torrent + 14 eD2k)** in **25.7 s**; without `kad`
   only the 226 torrent ones. `POST /api/search/add` on an eD2k result answers
   **501** with the link and the reason, and queues nothing.
@@ -926,11 +927,11 @@ cached by aMule (`~/.aMule/nodes.dat`) and then the rebuilt daemon
 
 - **Packet probe**: 200 valid contacts; 22/32 bootstrap requests answered with
   a well-formed `BOOTSTRAP_RES` (20 contacts each); 293/318 `PING`s answered;
-  430 `SEARCH_RES` datagrams for `matrix` (mostly `0xE5` zlib-packed, which the
+  430 `SEARCH_RES` datagrams for `movie` (mostly `0xE5` zlib-packed, which the
   client now inflates).
 - **Daemon**: 421 nodes in the routing table, `peer_packets=142`,
   `reachability=open` ("Kad peers answered"), UPnP mapping accepted.
-- **Search**: `the matrix 1999` returned 253 results through Gextto with
+- **Search**: `example movie 1999` returned 253 results through Gextto with
   `kad:true`: 19 eD2k (4 `kad`, 7 `kad+server`, 8 `server`) plus torrents.
   The `kad+server` entries match by MD4, which confirms that Kad file hashes
   and eD2k server hashes are decoded in the same order.
@@ -968,7 +969,7 @@ smaller.
 Caveats: the result set is capped at 500, the match is a regex on the name
 (no download validation), localized series titles were used as-is, and the
 sample is a single run. The even spread also put nine episodes of the same
-series (`I misteri di Murdoch`) in the 30, so the next run should stratify by
+series (one of them, a localized title) in the 30, so the next run should stratify by
 series (one episode per show). Most of the 27 "Kad hits" were unrelated files
 that shared the longest token (for example every show with `S04E01`).
 
@@ -981,16 +982,16 @@ this change, so it measures the pre-retry behaviour.
 
 ### Search precision — plain keyword vs restrictive tree
 
-A/B on the same routing table (`gx-ed2k` 1.1.12, `fbi`/`elsbeth` targets):
+A/B on the same routing table (`gx-ed2k` 1.1.12, two series targets):
 
 | Query | Plain keyword | Restrictive AND tree |
 |---|---|---|
-| `FBI S06E13` | 500 results, no exact match in the first page | 35 results, includes `FBI.S06E13...` |
-| `Elsbeth S04E02` | 500 results, mostly other Elsbeth episodes | 42 results, `S04E02` variants with 6–8 sources |
+| `Series A S06E13` | 500 results, no exact match in the first page | 35 results, includes `Series.A.S06E13...` |
+| `Series B S04E02` | 500 results, mostly other episodes of the same series | 42 results, `S04E02` variants with 6–8 sources |
 
 The tree target is the first real title word; episode markers, years and
 quality tags are skipped for the target but kept in the AND filter, and stop
-words are dropped so `The.Matrix.1999.mkv` still matches.
+words are dropped so `Example.Movie.1999.mkv` still matches.
 
 ### Phase 0 stratified sample — 30 series, 19 October 2026
 
@@ -1006,10 +1007,9 @@ One already-aired gap per series (30 series in the gap list), query
 | Same, with at least 2 sources | 5/30 (17%) |
 | Same, with at least 3 sources (default fallback floor) | 4/30 (13%) |
 
-The four series that clear the real floor are `9-1-1`, `CIA`, `Elsbeth` and
-`Scrubs`; `Surrealestate` (Agenzia Roman) and `FBI S03E12` have an exact,
-qualified result but only 1–2 sources. `Strike S04E01` has an exact name but no
-recognisable quality in the name. The other 23 series returned no exact Kad
+Four series clear the real floor; two more have an exact, qualified result but
+only 1–2 sources, and one has an exact name but no recognisable quality in the
+name. The other 23 series returned no exact Kad
 result; many of those queries still returned 500 eD2k **server** results with
 unrelated names, which confirms that the restrictive tree filtered the Kad
 bucket rather than filling it with noise.
@@ -1029,10 +1029,10 @@ retry and the episode-variant filter:
 | Exact episode + recognisable quality + plausible size | 3/30 (10%) |
 | Same, with at least 3 sources (default fallback floor) | **2/30 (7%)** |
 
-`CIA S02E02` (3 results with ≥3 sources) and `The Pitt S02E14` (1) clear the
-floor; `Surrealestate S02E04` has one exact result but a single source. The
-broad retry does recover individual cases (`Tracker S04E01` went from 0 to 5
-Kad results in a spot check), but it does not change the aggregate.
+Two series clear the floor (one with 3 results with ≥3 sources, one with 1);
+another has an exact result but a single source. The broad retry does recover
+individual cases (one series went from 0 to 5 Kad results in a spot check), but
+it does not change the aggregate.
 
 **Gate conclusion.** Two independent 30-series samples put the real-fallback
 coverage at **7–13%** (2/30 and 4/30 with ≥3 sources). That is below the level
@@ -1046,15 +1046,15 @@ Kad. Two spot checks against the same routing table:
 
 | Localized query | Kad hits | Original/alias query | Kad hits |
 |---|---|---|---|
-| `I misteri di Murdoch S13E12` | 0 | `Murdoch Mysteries S13E12` | 1 (`...Fox.Hunt.DVDRip...`, 2 sources) |
-| `Agenzia Roman S03E01` | 0 | `Surrealestate S03E01` | 1 (`...Buckaroo.Web.h264-Rbb...`, 1 source) |
+| `Serie locale A S13E12` | 0 | `Original Title A S13E12` | 1 (`...Fox.Hunt.DVDRip...`, 2 sources) |
+| `Serie locale B S03E01` | 0 | `Original Title B S03E01` | 1 (`...Buckaroo.Web.h264-Rbb...`, 1 source) |
 
 The automatic gap filler now queries the configured name and its aliases in
 parallel, so the gate sample must use the same alias-aware query to be fair.
 
 **Throttling.** A second 30-query batch run a few minutes later returned almost
 no Kad results from the same endpoint, while `PING` still answered and a fresh
-client on another UDP port found 35 `FBI S06E13` results. Peers appear to
+client on another UDP port found 35 results for the same query. Peers appear to
 throttle rapid searches. The gate run must space queries (roughly one every
 1–2 minutes) and be repeated cleanly before its numbers are final.
 
@@ -1206,8 +1206,8 @@ CGO_ENABLED=0 go test . -run '^$' -bench '^BenchmarkMediaIntegrityDetail$' -benc
 ### Gap fill on eD2k — 1 November 2026
 
 aMule runs one search at a time and answers in about a minute on this library, so
-the unit of cost is the query, not the episode. A series with 37 gaps (Walker,
-seasons 2 and 3) was answered by **2 season queries, about 1 minute each**, which
+the unit of cost is the query, not the episode. A series with 37 gaps across two
+seasons was answered by **2 season queries, about 1 minute each**, which
 returned 35 usable copies; one query per episode would have been 37 waits, spread
 over the deep pass at five gaps per cycle (`gap_deep_max_per_cycle`) and shared
 with every other series with gaps, so days of calendar time for the same result.
@@ -1215,8 +1215,8 @@ Measured on the N97 (debminis) on 1 November 2026, build 1.2.2175, from the log 
 the manual missing search:
 
 ```
-🔎 eD2k search for Walker season 2: 128 candidates in 1 minute
-🔎 eD2k search for Walker season 3: 93 candidates in 1 minute
+🔎 eD2k search for <series> season 2: 128 candidates in 1 minute
+🔎 eD2k search for <series> season 3: 93 candidates in 1 minute
 ```
 
 The automatic pass now makes the same query (`ed2kSeasonFallback`) for the season
