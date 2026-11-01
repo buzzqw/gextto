@@ -15,6 +15,11 @@
   --muted: #93a4c3;
   --accent: #4fd6a1;
   --accent-2: #6cb8ff;
+  /* The two curves of the dashboard traffic chart need two hues that stay
+     distinct in every theme, so they do not follow --accent-2 (which the
+     custom theme derives from --accent). */
+  --chart-down: #6cb8ff;
+  --chart-up: #4fd6a1;
   --ok: #4fd6a1;
   --warn: #f2c14e;
   --err: #ff7b93;
@@ -45,6 +50,8 @@
      --accent-action remains brighter because it is used as a button fill. */
   --accent: #08704f;
   --accent-2: #125ea8;
+  --chart-down: #125ea8;
+  --chart-up: #08704f;
   --ok: #08704f;
   --warn: #8a5a00;
   --err: #b4235a;
@@ -74,6 +81,8 @@
   --muted: #6a5c44;
   --accent: #1f6b47;
   --accent-2: #155a86;
+  --chart-down: #155a86;
+  --chart-up: #1f6b47;
   --ok: #1f6b47;
   --warn: #8a5a00;
   --err: #ab2f5a;
@@ -103,6 +112,10 @@
   --line-soft: color-mix(in srgb, var(--surface) 86%, var(--text) 14%);
   --muted: color-mix(in srgb, var(--text) 75%, var(--bg));
   --accent-2: color-mix(in srgb, var(--accent) 72%, var(--text));
+  /* Fixed hues: a chart drawn with --accent and its own tint would show two
+     shades of the same colour when the chosen accent is blue. */
+  --chart-down: #6cb8ff;
+  --chart-up: #4fd6a1;
   --ok: var(--accent);
   --warn: #e0a63a;
   --err: #ef6f88;
@@ -119,6 +132,8 @@
 [data-theme="custom"][data-tone="light"] {
   --warn: #8a5a00;
   --err: #b4235a;
+  --chart-down: #125ea8;
+  --chart-up: #08704f;
   --shadow: 0 12px 30px rgba(31, 45, 71, 0.12);
   color-scheme: light;
 }

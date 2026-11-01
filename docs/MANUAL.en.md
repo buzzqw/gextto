@@ -319,16 +319,18 @@ release package the installer uses (README, *Install on Linux*).
   read whole, because they fill the shared local archive.
 - **In session** — one card on top: torrents downloading, stalled and seeding,
   the last-30-days bandwidth and direct access to Downloads, with the **last
-  30 minutes traffic chart** below (the **download** and **upload** curves, the
-  peak, the current speed and the line of the **active bandwidth limit**: base,
-  schedule or exception; it is not drawn when the speed is *Auto*, i.e. when
-  Gextto measures the line and adapts, and in that case the card shows the
-  **Auto** badge, while the measured ping appears next to the **↓ Download**
-  speed in the top bar, not "No limit"). Speeds
-  under 1 KB/s count as zero: that is
+  30 minutes traffic chart** below: two **solid lines in different colours**
+  for the **download** and the **upload** of the whole traffic — torrents and
+  aMule — with the peak, the current speed and the line of
+  the **active bandwidth limit** (base, schedule or exception; it is not drawn
+  when the speed is *Auto*, i.e. when Gextto measures the line and adapts, and
+  in that case the card shows the **Auto** badge, while the measured ping
+  appears next to the **↓ Download** speed in the top bar, not "No limit").
+  Speeds under 1 KB/s count as zero: that is
   just protocol chatter, and the chart stays flat instead of twitching. With
-  eD2k on, aMule has its own **dashed lines** and an **eD2k ↓ ↑** entry next to
-  the **Torrent** one; the speeds in the top bar are the sum of torrents and
+  eD2k on, aMule has **dashed lines** in the same two colours, and the legend
+  breaks the total down into **Torrent** and **eD2k**; the speeds in the top
+  bar are the sum of torrents and
   aMule, and for eD2k they are the average of the last half minute: aMule
   reports a one-second speed, and a client uploading in blocks made it look
   stopped between one block and the next. The per-file and per-client speeds on

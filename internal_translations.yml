@@ -4576,6 +4576,10 @@ eng:
   "Nessun limite": "No limit"
   "Raccolta dati in corso…": "Collecting data…"
   "Grafico della banda di rete, ultimi 30 minuti": "Network bandwidth chart, last 30 minutes"
+  "Grafico del traffico totale di download e upload, ultimi 30 minuti": "Chart of the total download and upload traffic, last 30 minutes"
+  "Velocità di download totale: torrent e aMule": "Total download speed: torrents and aMule"
+  "Velocità di upload totale: torrent e aMule": "Total upload speed: torrents and aMule"
+  "Ripartizione della velocità totale": "Breakdown of the total speed"
 
   # Dashboard — "Da controllare" warnings (no 24h expiry)
   "Avvisi": "Warnings"

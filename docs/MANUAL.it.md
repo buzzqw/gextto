@@ -324,17 +324,19 @@ il pacchetto di release usato dall'installer (README, *Installazione Linux*).
   locale condiviso.
 - **In sessione** — un unico riquadro in cima: i torrent in scarico, fermi e in
   seed, la banda degli ultimi 30 giorni e l'accesso diretto a Scarico, con sotto
-  il **grafico del traffico degli ultimi 30 minuti** (curve di **download** e
-  **upload**, il picco, la velocità attuale e la linea del **limite di banda in
-  vigore**: limiti fissi, programmazione o eccezione; non compare quando la
-  velocità è *Auto*, cioè quando Gextto misura la linea e si adatta; in quel
-  caso il riquadro mostra il badge **Auto**, e il ping misurato compare accanto
-  alla velocità **↓ Download** nella barra in alto, non
-  «Nessun limite»). Le velocità
+  il **grafico del traffico degli ultimi 30 minuti**: due **linee continue di
+  colore diverso** per il **download** e l'**upload** di tutto il traffico —
+  torrent e aMule —, con il picco, la velocità attuale e la
+  linea del **limite di banda in vigore** (limiti fissi, programmazione o
+  eccezione; non compare quando la velocità è *Auto*, cioè quando Gextto misura
+  la linea e si adatta; in quel caso il riquadro mostra il badge **Auto**, e il
+  ping misurato compare accanto alla velocità **↓ Download** nella barra in
+  alto, non «Nessun limite»). Le velocità
   sotto 1 KB/s valgono 0: è solo rumore di protocollo, e il grafico resta
-  piatto invece di tremare. Con eD2k attivo aMule ha **linee proprie
-  tratteggiate** e una voce **eD2k ↓ ↑** accanto a quella dei **Torrent**; le
-  velocità nella barra in alto sono invece la somma di torrent e aMule, e
+  piatto invece di tremare. Con eD2k attivo aMule ha **linee tratteggiate**
+  degli stessi due colori, e la legenda riporta la ripartizione tra **Torrent**
+  ed **eD2k**; le velocità nella barra in alto sono la somma di torrent e
+  aMule, e
   per l'eD2k sono la media dell'ultimo mezzo minuto: aMule dichiara una velocità
   di un solo secondo, e un client che carica a blocchi la faceva sembrare ferma
   tra un blocco e l'altro. Le velocità per file e per client nella pagina eD2k

@@ -5179,6 +5179,10 @@ pol:
   "Nessun limite": "Bez limitu"
   "Raccolta dati in corso…": "Zbieranie danych…"
   "Grafico della banda di rete, ultimi 30 minuti": "Wykres przepustowości sieci, ostatnie 30 minut"
+  "Grafico del traffico totale di download e upload, ultimi 30 minuti": "Wykres całkowitego ruchu pobierania i wysyłania, ostatnie 30 minut"
+  "Velocità di download totale: torrent e aMule": "Całkowita prędkość pobierania: torrenty i aMule"
+  "Velocità di upload totale: torrent e aMule": "Całkowita prędkość wysyłania: torrenty i aMule"
+  "Ripartizione della velocità totale": "Podział całkowitej prędkości"
 
   # Dashboard — "Da controllare" warnings (no 24h expiry)
   "Avvisi": "Ostrzeżenia"

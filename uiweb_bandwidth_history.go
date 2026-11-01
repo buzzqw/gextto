@@ -101,8 +101,9 @@ func (h *rateHistory) len() int {
 }
 
 // v2CurrentRates sums the download and upload rates of every torrent in the
-// active session, like the top bar does, with sub-kilobyte chatter floored to
-// zero for the session panel.
+// active session, with sub-kilobyte chatter floored to zero for the session
+// panel. aMule's rates are separate (v2Ed2kRates): the chart adds them to
+// reach the total.
 func v2CurrentRates(s *AppState) (uint64, uint64) {
 	var down, up uint64
 	for _, view := range SessionSnapshot(s.activeEngine()) {
@@ -142,6 +143,17 @@ func v2RateOrZero(rate uint64) uint64 {
 	return rate
 }
 
+// v2SampleDown and v2SampleUp are the total rates of one history point: the
+// torrent rate Gextto sampled plus aMule's. Each part is floored on its own,
+// so the protocol chatter of one side never lifts the total curve.
+func v2SampleDown(sample rateSample) uint64 {
+	return v2RateOrZero(sample.Down) + v2RateOrZero(sample.Ed2kDown)
+}
+
+func v2SampleUp(sample rateSample) uint64 {
+	return v2RateOrZero(sample.Up) + v2RateOrZero(sample.Ed2kUp)
+}
+
 // v2TrafficView is the data the bandwidth chart template needs. Points and
 // areas are precomputed as SVG coordinate strings; the numbers are already
 // formatted so the template stays free of arithmetic.
@@ -161,8 +173,12 @@ type v2TrafficView struct {
 	PeakDown    string
 	PeakUp      string
 	ScaleLabel  string
-	// eD2k (aMule) has its own lines and legend, next to the torrents'.
-	HasEd2k         bool
+	// The two solid curves are the whole traffic: torrents and aMule. The
+	// per-source figures below feed the breakdown.
+	TorrentDown string
+	TorrentUp   string
+	HasEd2k     bool
+	// eD2k (aMule) keeps its own dashed lines and figures under the total.
 	Ed2kDownPoints  string
 	Ed2kUpPoints    string
 	CurrentEd2kDown string
@@ -177,12 +193,17 @@ func v2TrafficViewFrom(s *AppState) v2TrafficView {
 		Width:  trafficChartWidth,
 		Height: trafficChartHeight,
 	}
+	// The headline figures and the two solid curves are the whole traffic:
+	// torrents plus aMule. The per-source numbers stay beside them, so aMule's
+	// share is still readable.
 	down, up := v2CurrentRates(s)
-	view.CurrentDown = logging.HumanRate(saturatingInt64(down))
-	view.CurrentUp = logging.HumanRate(saturatingInt64(up))
+	ed2kDown, ed2kUp := v2Ed2kRates(s)
 	view.HasEd2k = s != nil && ed2kEnabled(latestConfig(s))
+	view.TorrentDown = logging.HumanRate(saturatingInt64(down))
+	view.TorrentUp = logging.HumanRate(saturatingInt64(up))
+	view.CurrentDown = logging.HumanRate(saturatingInt64(down + ed2kDown))
+	view.CurrentUp = logging.HumanRate(saturatingInt64(up + ed2kUp))
 	if view.HasEd2k {
-		ed2kDown, ed2kUp := v2Ed2kRates(s)
 		view.CurrentEd2kDown = logging.HumanRate(saturatingInt64(ed2kDown))
 		view.CurrentEd2kUp = logging.HumanRate(saturatingInt64(ed2kUp))
 	}
@@ -213,17 +234,11 @@ func v2TrafficViewFrom(s *AppState) v2TrafficView {
 
 	var peakDown, peakUp uint64
 	for _, sample := range samples {
-		if down := v2RateOrZero(sample.Down); down > peakDown {
+		if down := v2SampleDown(sample); down > peakDown {
 			peakDown = down
 		}
-		if up := v2RateOrZero(sample.Up); up > peakUp {
+		if up := v2SampleUp(sample); up > peakUp {
 			peakUp = up
-		}
-		if sample.Ed2kDown > peakDown {
-			peakDown = sample.Ed2kDown
-		}
-		if sample.Ed2kUp > peakUp {
-			peakUp = sample.Ed2kUp
 		}
 	}
 
@@ -269,10 +284,10 @@ func v2TrafficViewFrom(s *AppState) v2TrafficView {
 		}
 		x := xOf(sample.At)
 		lastX = x
-		downPoints.WriteString(svgPoint(x, yOf(v2RateOrZero(sample.Down))))
-		upPoints.WriteString(svgPoint(x, yOf(v2RateOrZero(sample.Up))))
-		ed2kDownPoints.WriteString(svgPoint(x, yOf(sample.Ed2kDown)))
-		ed2kUpPoints.WriteString(svgPoint(x, yOf(sample.Ed2kUp)))
+		downPoints.WriteString(svgPoint(x, yOf(v2SampleDown(sample))))
+		upPoints.WriteString(svgPoint(x, yOf(v2SampleUp(sample))))
+		ed2kDownPoints.WriteString(svgPoint(x, yOf(v2RateOrZero(sample.Ed2kDown))))
+		ed2kUpPoints.WriteString(svgPoint(x, yOf(v2RateOrZero(sample.Ed2kUp))))
 	}
 	view.DownPoints = downPoints.String()
 	view.UpPoints = upPoints.String()

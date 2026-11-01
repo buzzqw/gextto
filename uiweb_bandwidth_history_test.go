@@ -213,6 +213,44 @@ func TestV2TrafficViewTreatsSubKibRatesAsZero(t *testing.T) {
 	}
 }
 
+// TestV2TrafficViewCurvesAreTheWholeTraffic: the two solid curves and the
+// peaks add aMule to the torrents, so a transfer that only aMule is doing
+// still reaches the chart instead of leaving it flat.
+func TestV2TrafficViewCurvesAreTheWholeTraffic(t *testing.T) {
+	cfg := DefaultConfig()
+	if cfg.Settings == nil {
+		cfg.Settings = map[string]string{}
+	}
+	state := trafficTestState(&cfg)
+	now := time.Now()
+	for i := 0; i < 6; i++ {
+		state.rate_history.add(rateSample{
+			At:       now.Add(time.Duration(i-6) * 10 * time.Second),
+			Down:     1 << 20,
+			Up:       512 << 10,
+			Ed2kDown: 1 << 20,
+			Ed2kUp:   512 << 10,
+		})
+	}
+	view := v2TrafficViewFrom(state)
+	if view.PeakDown != "2.0 MB/s" || view.PeakUp != "1.0 MB/s" {
+		t.Fatalf("peaks = %q/%q, want the totals 2.0 MB/s and 1.0 MB/s", view.PeakDown, view.PeakUp)
+	}
+	if view.ScaleLabel != "2.0 MB/s" {
+		t.Fatalf("scale = %q, want the download peak", view.ScaleLabel)
+	}
+	// The last point sits above the baseline proportionally to the total.
+	points := strings.Fields(view.DownPoints)
+	last := points[len(points)-1]
+	y, err := strconv.ParseFloat(strings.SplitN(last, ",", 2)[1], 64)
+	if err != nil || y >= trafficChartHeight {
+		t.Fatalf("last download point = %q (%v), want it lifted off the baseline", last, err)
+	}
+	if view.CurrentEd2kDown != "" || view.CurrentEd2kUp != "" {
+		t.Fatalf("eD2k breakdown = %q/%q, want none while eD2k is off", view.CurrentEd2kDown, view.CurrentEd2kUp)
+	}
+}
+
 // TestV2LiveTrafficTemplateRendersChart renders the fragment the SSE stream
 // pushes and checks the accessible SVG plus the limit line are present.
 func TestV2LiveTrafficTemplateRendersChart(t *testing.T) {
@@ -241,7 +279,7 @@ func TestV2LiveTrafficTemplateRendersChart(t *testing.T) {
 		`id="v2-live-traffic"`,
 		`class="traffic-chart"`,
 		`role="img"`,
-		`aria-label="Grafico della banda di rete, ultimi 30 minuti"`,
+		`aria-label="Grafico del traffico totale di download e upload, ultimi 30 minuti"`,
 		`traffic-line down`,
 		`traffic-line up`,
 		`traffic-limit`,

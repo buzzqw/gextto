@@ -363,18 +363,15 @@
 {{define "v2_live_traffic"}}
 <div id="v2-live-traffic" class="traffic">
   <div class="traffic-legend">
-    {{if .HasEd2k}}<span class="muted">Torrent</span>{{end}}
-    <span class="traffic-stat down" title="Velocità di download"><span aria-hidden="true">↓</span> {{.CurrentDown}}</span>
-    <span class="traffic-stat up" title="Velocità di upload"><span aria-hidden="true">↑</span> {{.CurrentUp}}</span>
-    {{if .HasEd2k}}<span class="muted">eD2k</span>
-    <span class="traffic-stat ed2k-down" title="Velocità di download di aMule (linea tratteggiata)"><span aria-hidden="true">↓</span> {{.CurrentEd2kDown}}</span>
-    <span class="traffic-stat ed2k-up" title="Velocità di upload di aMule (linea tratteggiata)"><span aria-hidden="true">↑</span> {{.CurrentEd2kUp}}</span>{{end}}
+    <span class="traffic-stat down" title="Velocità di download totale: torrent e aMule"><span aria-hidden="true">↓</span> {{.CurrentDown}}</span>
+    <span class="traffic-stat up" title="Velocità di upload totale: torrent e aMule"><span aria-hidden="true">↑</span> {{.CurrentUp}}</span>
+    {{if .HasEd2k}}<span class="muted traffic-breakdown" title="Ripartizione della velocità totale"><span>Torrent</span> ↓ {{.TorrentDown}} ↑ {{.TorrentUp}} <span class="traffic-breakdown-sep" aria-hidden="true">·</span> <span>eD2k</span> <span class="traffic-ed2k-figure">↓ {{.CurrentEd2kDown}} ↑ {{.CurrentEd2kUp}}</span></span>{{end}}
     {{if .HasData}}<span class="muted" title="Picco di download nel periodo">↓ {{.PeakDown}}</span>
     <span class="muted" title="Picco di upload nel periodo">↑ {{.PeakUp}}</span>{{end}}
     {{if .HasLimit}}<span class="badge warn" title="Limite di banda attivo">Limite <strong>{{.LimitLabel}}</strong></span>{{else if .Auto}}<span class="badge" title="Auto attivo: Gextto misura la linea e adatta la velocità, senza un tetto fisso">Auto</span>{{else}}<span class="badge" title="Nessun limite di banda attivo">Nessun limite</span>{{end}}
   </div>
   {{if .HasData}}
-  <svg class="traffic-chart" viewBox="0 0 {{.Width}} {{.Height}}" preserveAspectRatio="none" role="img" aria-label="Grafico della banda di rete, ultimi 30 minuti">
+  <svg class="traffic-chart" viewBox="0 0 {{.Width}} {{.Height}}" preserveAspectRatio="none" role="img" aria-label="Grafico del traffico totale di download e upload, ultimi 30 minuti">
     <polygon class="traffic-area down" points="{{.DownArea}}" />
     {{if .HasLimit}}<line class="traffic-limit" x1="0" y1="{{.LimitY}}" x2="{{.Width}}" y2="{{.LimitY}}" />{{end}}
     <polyline class="traffic-line up" points="{{.UpPoints}}" />

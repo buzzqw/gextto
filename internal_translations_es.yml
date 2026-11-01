@@ -5185,6 +5185,10 @@ spa:
   "Nessun limite": "Sin límite"
   "Raccolta dati in corso…": "Recopilando datos…"
   "Grafico della banda di rete, ultimi 30 minuti": "Gráfico de ancho de banda de red, últimos 30 minutos"
+  "Grafico del traffico totale di download e upload, ultimi 30 minuti": "Gráfico del tráfico total de descarga y subida, últimos 30 minutos"
+  "Velocità di download totale: torrent e aMule": "Velocidad total de descarga: torrents y aMule"
+  "Velocità di upload totale: torrent e aMule": "Velocidad total de subida: torrents y aMule"
+  "Ripartizione della velocità totale": "Desglose de la velocidad total"
 
   # Dashboard — "Da controllare" warnings (no 24h expiry)
   "Avvisi": "Avisos"

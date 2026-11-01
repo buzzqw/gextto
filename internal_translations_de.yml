@@ -5238,6 +5238,10 @@ deu:
   "Nessun limite": "Kein Limit"
   "Raccolta dati in corso…": "Daten werden gesammelt…"
   "Grafico della banda di rete, ultimi 30 minuti": "Netzwerk-Bandbreitendiagramm, letzte 30 Minuten"
+  "Grafico del traffico totale di download e upload, ultimi 30 minuti": "Diagramm des gesamten Download- und Upload-Verkehrs, letzte 30 Minuten"
+  "Velocità di download totale: torrent e aMule": "Gesamte Download-Geschwindigkeit: Torrents und aMule"
+  "Velocità di upload totale: torrent e aMule": "Gesamte Upload-Geschwindigkeit: Torrents und aMule"
+  "Ripartizione della velocità totale": "Aufteilung der Gesamtgeschwindigkeit"
 
   # Dashboard — "Da controllare" warnings (no 24h expiry)
   "Avvisi": "Warnungen"
