@@ -56,6 +56,12 @@ const (
 	// laneLatencyWeight is the weight of a new sample in a lane's moving
 	// average (which of two duplicate lanes is faster).
 	laneLatencyWeight = 0.3
+	// laneFailureWindow is how long a failure the manager reports keeps a lane
+	// closed. The manager just failed on that indexer, so the first attempt of
+	// this cycle would almost surely be another wasted slot; a stale failure
+	// (older than the window) is still tried, because the site may be back and
+	// dropping it would cost results.
+	laneFailureWindow = 30 * time.Minute
 )
 
 // searchLane is one source of a title search: a plain indexer, or one
@@ -156,12 +162,18 @@ func readManagerIndexers(ctx context.Context, indexer IndexerConfig) ([]managerI
 		failing := map[int64]bool{}
 		if statusBody, err := get(base + "/api/v1/indexerstatus?apikey=" + key); err == nil {
 			var statuses []struct {
-				IndexerID    int64     `json:"indexerId"`
-				DisabledTill time.Time `json:"disabledTill"`
+				IndexerID         int64     `json:"indexerId"`
+				DisabledTill      time.Time `json:"disabledTill"`
+				MostRecentFailure time.Time `json:"mostRecentFailure"`
 			}
 			if json.Unmarshal(statusBody, &statuses) == nil {
+				now := time.Now()
 				for _, status := range statuses {
-					if status.DisabledTill.After(time.Now()) {
+					// A paused indexer is skipped until the manager's own
+					// deadline; a recent failure is skipped for the window,
+					// because the manager just proved the site was failing.
+					if status.DisabledTill.After(now) ||
+						(!status.MostRecentFailure.IsZero() && now.Sub(status.MostRecentFailure) < laneFailureWindow) {
 						failing[status.IndexerID] = true
 					}
 				}

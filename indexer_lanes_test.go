@@ -341,3 +341,52 @@ func TestLaneSkippedWhenItsQueueOutlastsTheSearch(t *testing.T) {
 	}
 	got()
 }
+
+// TestManagerFailureWindowSkipsRecentlyFailedLanes pins the rule that the
+// manager's own failure report reaches the search: a recent failure is skipped
+// for the window, an old one is still tried, and a paused one keeps the
+// manager's deadline.
+func TestManagerFailureWindowSkipsRecentlyFailedLanes(t *testing.T) {
+	now := time.Now().UTC()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/v1/indexer":
+			_ = json.NewEncoder(w).Encode([]map[string]any{
+				{"id": 1, "name": "Recent", "enable": true, "protocol": "torrent", "definitionName": "recent"},
+				{"id": 2, "name": "Old", "enable": true, "protocol": "torrent", "definitionName": "old"},
+				{"id": 3, "name": "Paused", "enable": true, "protocol": "torrent", "definitionName": "paused"},
+				{"id": 4, "name": "Fine", "enable": true, "protocol": "torrent", "definitionName": "fine"},
+			})
+		case "/api/v1/indexerstatus":
+			_ = json.NewEncoder(w).Encode([]map[string]any{
+				{"indexerId": 1, "mostRecentFailure": now.Add(-5 * time.Minute).Format(time.RFC3339)},
+				{"indexerId": 2, "mostRecentFailure": now.Add(-3 * time.Hour).Format(time.RFC3339)},
+				{"indexerId": 3, "disabledTill": now.Add(time.Hour).Format(time.RFC3339)},
+			})
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+	resetLaneState()
+
+	lanes, err := readManagerIndexers(context.Background(), IndexerConfig{
+		Name: "Prowlarr", URL: server.URL, Enabled: true, Manager: ManagerProwlarr,
+	})
+	if err != nil {
+		t.Fatalf("readManagerIndexers: %v", err)
+	}
+	got := map[string]bool{}
+	for _, lane := range lanes {
+		got[lane.title] = true
+	}
+	if got["Recent"] {
+		t.Error("a lane that failed 5 minutes ago was searched again")
+	}
+	if got["Paused"] {
+		t.Error("a lane the manager paused was searched")
+	}
+	if !got["Old"] || !got["Fine"] {
+		t.Fatalf("lanes = %v, want Old and Fine", got)
+	}
+}
