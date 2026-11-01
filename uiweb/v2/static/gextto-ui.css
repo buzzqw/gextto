@@ -895,6 +895,9 @@ label.field > span, .field > span, .field-label { color: var(--muted); font-size
    room. */
 .provider-status-table thead th:nth-child(4) { width: 1%; white-space: normal; }
 .provider-status-table tbody td:first-child { white-space: nowrap; }
+/* Situazione is the column that matters: it gets the room freed above, and it
+   is not cut at the generic 360px cap of every truncated cell. */
+.provider-status-table tbody td:nth-child(5) .cell-truncate { max-width: 30rem; }
 .row-actions { display: flex; flex-wrap: nowrap; gap: 6px; white-space: nowrap; min-width: max-content; }
 .row-actions .btn { flex: none; }
 
