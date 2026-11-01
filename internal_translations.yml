@@ -5569,3 +5569,16 @@ eng:
   "Riga disabilitata con #": "Line disabled with #"
   "Tentativi/successi/fallimenti/presi": "Attempts/successes/failures/taken"
   "T = tentativi, S = successi, F = fallimenti, P = release prese. I conteggi coprono gli ultimi 1, 7 e 30 giorni; «Ultimi risultati» è l'ultima lettura riuscita.": "T = attempts, S = successes, F = failures, P = releases taken. The counts cover the last 1, 7 and 30 days; “Last results” is the last successful read."
+
+  "disabilitati": "disabled"
+  "tentativi": "attempts"
+  "successi": "successes"
+  "fallimenti": "failures"
+  "presi": "taken"
+  "24 ore:": "24 hours:"
+  "Nessun feed configurato.": "No feeds configured."
+  "Migliore negli ultimi 30 giorni:": "Best in the last 30 days:"
+  "L'andamento di ogni feed è in": "Each feed's activity is in"
+  "Salute → Attività dei feed": "Health → Feed activity"
+
+  "Questi feed non vengono letti. Togli il # davanti alla riga e salva per riattivarli.": "These feeds are not read. Remove the # in front of the line and save to enable them again."

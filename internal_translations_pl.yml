@@ -6173,3 +6173,16 @@ pol:
   "Tentativi/successi/fallimenti/presi": "Próby/sukcesy/błędy/pobrane"
   "T = tentativi, S = successi, F = fallimenti, P = release prese. I conteggi coprono gli ultimi 1, 7 e 30 giorni; «Ultimi risultati» è l'ultima lettura riuscita.": "T = próby, S = sukcesy, F = błędy, P = pobrane wydania. Liczby obejmują ostatnie 1, 7 i 30 dni; „Ostatnie wyniki” to ostatni udany odczyt."
   "Dopo quanti giorni senza un successo il feed viene disabilitato automaticamente con un # davanti alla riga. Scatta solo se un altro feed ha funzionato nello stesso giorno, così un guasto di rete non spegne tutta la lista. 0 disattiva la regola. Il feed resta visibile nel pannello e si riattiva togliendo il #.": "Po ilu dniach bez udanego żądania kanał jest automatycznie wyłączany znakiem # przed wierszem. Reguła działa tylko wtedy, gdy inny kanał działał tego samego dnia, aby awaria sieci nie wyłączyła całej listy. 0 wyłącza regułę. Kanał pozostaje widoczny w panelu i włącza się po usunięciu #."
+
+  "disabilitati": "wyłączone"
+  "tentativi": "próby"
+  "successi": "sukcesy"
+  "fallimenti": "błędy"
+  "presi": "pobrane"
+  "24 ore:": "24 godziny:"
+  "Nessun feed configurato.": "Brak skonfigurowanych kanałów."
+  "Migliore negli ultimi 30 giorni:": "Najlepszy w ostatnich 30 dniach:"
+  "L'andamento di ogni feed è in": "Aktywność każdego kanału jest w"
+  "Salute → Attività dei feed": "Kondycja → Aktywność kanałów"
+
+  "Questi feed non vengono letti. Togli il # davanti alla riga e salva per riattivarli.": "Te kanały nie są czytane. Usuń # przed wierszem i zapisz, aby je włączyć."

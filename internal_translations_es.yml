@@ -6179,3 +6179,16 @@ spa:
   "Tentativi/successi/fallimenti/presi": "Intentos/éxitos/fallos/adquiridos"
   "T = tentativi, S = successi, F = fallimenti, P = release prese. I conteggi coprono gli ultimi 1, 7 e 30 giorni; «Ultimi risultati» è l'ultima lettura riuscita.": "T = intentos, S = éxitos, F = fallos, P = releases adquiridas. Los recuentos cubren los últimos 1, 7 y 30 días; «Últimos resultados» es la última lectura correcta."
   "Dopo quanti giorni senza un successo il feed viene disabilitato automaticamente con un # davanti alla riga. Scatta solo se un altro feed ha funzionato nello stesso giorno, così un guasto di rete non spegne tutta la lista. 0 disattiva la regola. Il feed resta visibile nel pannello e si riattiva togliendo il #.": "Tras cuántos días sin una petición correcta el feed se desactiva automáticamente con un # delante de su línea. Solo se activa si otro feed ha funcionado el mismo día, para que un fallo de red no apague toda la lista. 0 desactiva la regla. El feed sigue visible en el panel y se reactiva quitando el #."
+
+  "disabilitati": "desactivados"
+  "tentativi": "intentos"
+  "successi": "éxitos"
+  "fallimenti": "fallos"
+  "presi": "adquiridos"
+  "24 ore:": "24 horas:"
+  "Nessun feed configurato.": "Ningún feed configurado."
+  "Migliore negli ultimi 30 giorni:": "Mejor en los últimos 30 días:"
+  "L'andamento di ogni feed è in": "La actividad de cada feed está en"
+  "Salute → Attività dei feed": "Salud → Actividad de los feeds"
+
+  "Questi feed non vengono letti. Togli il # davanti alla riga e salva per riattivarli.": "Estos feeds no se leen. Quita el # delante de la línea y guarda para reactivarlos."

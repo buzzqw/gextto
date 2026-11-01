@@ -512,6 +512,11 @@ type v2HealthView struct {
 	Engine      uiEngineStats
 	// Ed2k is the aMule card: state, session totals and recent log warnings.
 	Ed2k *v2Ed2kHealth
+	// Feeds is the per-feed activity table and its summary; DisabledFeeds is
+	// the warning frame shared with the Sources editor.
+	Feeds         []v2FeedStat
+	DisabledFeeds []v2DisabledFeed
+	FeedSummary   v2FeedSummary
 }
 
 type v2DownloadsView struct {
@@ -557,11 +562,15 @@ func v2DashboardViewFrom(s *AppState, r *http.Request) v2DashboardView {
 
 func v2HealthViewFrom(s *AppState, r *http.Request) v2HealthView {
 	base := uiHealthDataFrom(s)
+	feeds, disabled, summary := v2FeedStatsFrom(s)
 	return v2HealthView{
-		uiHealthData: base,
-		PanelTables:  v2SectionTables(s, r, base.Panels, []string{"health-sources", "health-providers"}),
-		Engine:       uiEngineStatsFrom(s),
-		Ed2k:         v2Ed2kHealthFrom(s),
+		uiHealthData:  base,
+		PanelTables:   v2SectionTables(s, r, base.Panels, []string{"health-sources", "health-providers"}),
+		Engine:        uiEngineStatsFrom(s),
+		Ed2k:          v2Ed2kHealthFrom(s),
+		Feeds:         feeds,
+		DisabledFeeds: disabled,
+		FeedSummary:   summary,
 	}
 }
 
@@ -2579,7 +2588,6 @@ type v2SettingsView struct {
 	EditorsFirst   bool
 	ShowFeeds      bool
 	Feeds          string
-	FeedStats      []v2FeedStat
 	DisabledFeeds  []v2DisabledFeed
 	CheckboxGroups []v2CheckboxGroup
 	ListEditors    []v2ListEditorView
@@ -2724,7 +2732,7 @@ func v2SettingsViewFrom(s *AppState, tab, highlight, mode string) v2SettingsView
 	if page.ShowSources {
 		view.ShowFeeds = true
 		view.Feeds = v2FeedsFrom(s)
-		view.FeedStats, view.DisabledFeeds = v2FeedStatsFrom(s)
+		_, view.DisabledFeeds, _ = v2FeedStatsFrom(s)
 		view.CheckboxGroups = v2CheckboxGroupsFrom(page.CheckboxGroups)
 	}
 	for _, editor := range page.ListEditors {

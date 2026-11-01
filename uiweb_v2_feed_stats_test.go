@@ -40,13 +40,29 @@ func TestFeedStatsPanelShowsActivityAndDisabledFrame(t *testing.T) {
 		"Questi feed non vengono letti",
 		"Disabilitato automaticamente",
 		"two.example",
+		"L'andamento di ogni feed è in",
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("sources panel missing %q:\n%s", want, body)
+		}
+	}
+	if strings.Contains(body, "Ultimo successo") {
+		t.Error("the activity table is still on the Sources tab")
+	}
+
+	code, body = v2Request(t, server, http.MethodGet, "/?view=health", nil)
+	if code != http.StatusOK {
+		t.Fatalf("health page = %d: %s", code, body)
+	}
+	for _, want := range []string{
 		"Attività dei feed",
 		"Ultimo successo",
 		"one.example",
 		"1/1/0/1",
+		"Feed disabilitati",
 	} {
 		if !strings.Contains(body, want) {
-			t.Errorf("feed panel missing %q:\n%s", want, body)
+			t.Errorf("health feed panel missing %q:\n%s", want, body)
 		}
 	}
 }

@@ -343,16 +343,17 @@ the library copy and reports the impact of the current rules on the library; the
 cards follow, closed. Settings search also reaches the indexer editor by concept
 ("Prowlarr").
 
-**Feed activity and the prolonged-failure rule.** The Sorgenti tab keeps one
+**Feed activity and the prolonged-failure rule.** The Salute page keeps one
 `source_daily` row per feed per day and one `source_health` row per feed, and
-shows them under the feed editor: last success, last error, last results and
-attempts/successes/failures/releases taken over 1, 7 and 30 days. A feed line
-disabled with `#` is listed in a warning frame with its date and reason. A feed
-that has not succeeded for `feed_auto_disable_days` (seven by default, `0` turns
-the rule off) is disabled automatically by prepending `#`, with one sentence in
-the log; the rule only fires when another feed succeeded on the same day, so a
-network, DNS or FlareSolverr outage does not switch off the whole list. A success
-clears the marker.
+shows them as a panel: last success, last error, last results and
+attempts/successes/failures/releases taken over 1, 7 and 30 days, plus a
+last-24-hours summary and the best feed of the last 30 days. The Sorgenti editor
+keeps only the warning frame for lines disabled with `#`. A feed that has not
+succeeded for `feed_auto_disable_days` (seven by default, `0` turns the rule off)
+is disabled automatically by prepending `#`, with one sentence in the log; the
+rule only fires when another feed succeeded on the same day, so a network, DNS
+or FlareSolverr outage does not switch off the whole list. A success clears the
+marker.
 
 **Guided tuning.** The performance tab proposes values from RAM, CPU, volumes and storage
 class (`tuning.go`, `system_probe.go`, `sysinfo.go`): current → proposed, with the reason.

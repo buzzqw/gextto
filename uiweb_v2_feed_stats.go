@@ -26,6 +26,26 @@ type v2FeedStat struct {
 	ThirtyDays   string
 	Disabled     bool
 	AutoDisabled bool
+
+	Attempts1  int64
+	Successes1 int64
+	Failures1  int64
+	Accepted1  int64
+	Accepted30 int64
+}
+
+// v2FeedSummary is the one-line picture shown above the feed table: how many
+// feeds are active, how many are off, and what the last 24 hours did.
+type v2FeedSummary struct {
+	Total       int
+	Active      int
+	Disabled    int
+	Attempts1   int64
+	Successes1  int64
+	Failures1   int64
+	Accepted1   int64
+	TopLabel    string
+	TopAccepted int64
 }
 
 type v2DisabledFeed struct {
@@ -38,17 +58,17 @@ type v2DisabledFeed struct {
 
 // v2FeedStatsFrom reads the configured lines and the stored history. Disabled
 // lines stay in the table and are also listed in the frame above it.
-func v2FeedStatsFrom(s *AppState) ([]v2FeedStat, []v2DisabledFeed) {
+func v2FeedStatsFrom(s *AppState) ([]v2FeedStat, []v2DisabledFeed, v2FeedSummary) {
 	if s == nil {
-		return nil, nil
+		return nil, nil, v2FeedSummary{}
 	}
 	cfg := latestConfig(s)
 	if cfg == nil {
-		return nil, nil
+		return nil, nil, v2FeedSummary{}
 	}
 	lines := feedLinesFromSetting(cfg.Settings["url"])
 	if len(lines) == 0 {
-		return nil, nil
+		return nil, nil, v2FeedSummary{}
 	}
 	stats := map[string]v2StatRow{}
 	if s.db != nil {
@@ -60,6 +80,11 @@ func v2FeedStatsFrom(s *AppState) ([]v2FeedStat, []v2DisabledFeed) {
 					oneDay:      fmt.Sprintf("%d/%d/%d/%d", row.Attempts1, row.Successes1, row.Failures1, row.Accepted1),
 					sevenDays:   fmt.Sprintf("%d/%d/%d/%d", row.Attempts7, row.Successes7, row.Failures7, row.Accepted7),
 					thirtyDays:  fmt.Sprintf("%d/%d/%d/%d", row.Attempts30, row.Successes30, row.Failures30, row.Accepted30),
+					attempts1:   row.Attempts1,
+					successes1:  row.Successes1,
+					failures1:   row.Failures1,
+					accepted1:   row.Accepted1,
+					accepted30:  row.Accepted30,
 					disabledAt:  row.DisabledAt,
 					reason:      row.DisabledReason,
 				}
@@ -134,9 +159,26 @@ func v2FeedStatsFrom(s *AppState) ([]v2FeedStat, []v2DisabledFeed) {
 			ThirtyDays:   thirtyDays,
 			Disabled:     isDisabled,
 			AutoDisabled: isDisabled && row.disabledAt != "",
+			Attempts1:    row.attempts1,
+			Successes1:   row.successes1,
+			Failures1:    row.failures1,
+			Accepted1:    row.accepted1,
+			Accepted30:   row.accepted30,
 		})
 	}
-	return table, disabled
+	summary := v2FeedSummary{Total: len(table), Disabled: len(disabled)}
+	summary.Active = summary.Total - summary.Disabled
+	for _, item := range table {
+		summary.Attempts1 += item.Attempts1
+		summary.Successes1 += item.Successes1
+		summary.Failures1 += item.Failures1
+		summary.Accepted1 += item.Accepted1
+		if item.Accepted30 > summary.TopAccepted {
+			summary.TopLabel = item.Label
+			summary.TopAccepted = item.Accepted30
+		}
+	}
+	return table, disabled, summary
 }
 
 type v2StatRow struct {
@@ -145,6 +187,11 @@ type v2StatRow struct {
 	oneDay      string
 	sevenDays   string
 	thirtyDays  string
+	attempts1   int64
+	successes1  int64
+	failures1   int64
+	accepted1   int64
+	accepted30  int64
 	disabledAt  string
 	reason      string
 }
