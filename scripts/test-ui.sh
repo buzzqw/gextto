@@ -39,7 +39,7 @@ trap cleanup EXIT
 # suite runs on does not take many more.
 groups=(
     "settings|tests/settings.spec.ts tests/i18n.spec.ts tests/example.spec.ts tests/security.spec.ts tests/jobs.spec.ts|15003|18892|18893"
-    "pages|tests/pages.spec.ts|15013|18902|18903"
+    "pages|tests/pages.spec.ts tests/mobile.spec.ts|15013|18902|18903"
     "a11y|tests/accessibility.spec.ts|15033|18922|18923"
 )
 

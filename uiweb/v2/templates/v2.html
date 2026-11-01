@@ -1447,7 +1447,7 @@
   <div class="grid-2">
     <div class="panel">
       <div class="panel-head"><h3>Percorsi</h3></div>
-      <div class="panel-body">{{range .Health.Paths}}<div class="row"><span>{{if eq .Label "Data"}}Cartella dati{{else if eq .Label "Trash"}}Cestino{{else}}{{.Label}}{{end}}</span><span class="muted truncate" title="{{.Path}}">{{.Path}} · <span>{{if .Exists}}presente{{else}}assente{{end}}</span> · <span>{{if .Writable}}scrivibile{{else}}non scrivibile{{end}}</span></span></div>{{end}}</div>
+      <div class="panel-body">{{range .Health.Paths}}<div class="row v2-path-row"><span>{{if eq .Label "Data"}}Cartella dati{{else if eq .Label "Trash"}}Cestino{{else}}{{.Label}}{{end}}</span><span class="muted truncate" title="{{.Path}}">{{.Path}} · <span>{{if .Exists}}presente{{else}}assente{{end}}</span> · <span>{{if .Writable}}scrivibile{{else}}non scrivibile{{end}}</span></span></div>{{end}}</div>
     </div>
     <div class="panel">
       <div class="panel-head"><h3>Dischi</h3></div>

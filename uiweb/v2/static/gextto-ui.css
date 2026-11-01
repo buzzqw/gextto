@@ -451,6 +451,9 @@ button:focus-visible, a:focus-visible { outline: 3px solid color-mix(in srgb, va
 .row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--line-soft); }
 .row:last-child { border-bottom: 0; }
 .hl-err { color: var(--err); }
+/* An error line with a long path or hash has no space to wrap on: let it break
+   anywhere instead of running past the panel and being clipped. */
+.row > .hl-err { min-width: 0; overflow-wrap: anywhere; }
 .hl-warn { color: var(--warn); }
 .hl-ok { color: var(--ok); }
 .hl-src { color: var(--accent-2); }
@@ -1509,35 +1512,48 @@ pre.log-view { margin: 0; }
   .dashboard-feed-panel,
   .dashboard-consumption-panel { display: none; }
 
-  /* Library lists keep the title, the useful status and the row actions in
-     view. Secondary metadata remains available on the detail page instead of
-     forcing a wide horizontal table on a phone. */
+  /* Library lists keep the selection, the title, the useful status and the row
+     actions in view. Secondary metadata remains available on the detail page
+     instead of forcing a wide horizontal table on a phone. The column offsets
+     include the select checkbox that the bulk editor adds as the first cell. */
   .data-table.series-table,
   .data-table.movie-table { min-width: 0; table-layout: fixed; }
-  .data-table.series-table th:nth-child(2),
-  .data-table.series-table td:nth-child(2),
   .data-table.series-table th:nth-child(3),
   .data-table.series-table td:nth-child(3),
   .data-table.series-table th:nth-child(4),
   .data-table.series-table td:nth-child(4),
+  .data-table.series-table th:nth-child(5),
+  .data-table.series-table td:nth-child(5),
   .data-table.series-table th:nth-child(6),
   .data-table.series-table td:nth-child(6),
   .data-table.series-table th:nth-child(7),
   .data-table.series-table td:nth-child(7),
+  .data-table.series-table th:nth-child(8),
+  .data-table.series-table td:nth-child(8),
   .data-table.movie-table th:nth-child(3),
   .data-table.movie-table td:nth-child(3),
   .data-table.movie-table th:nth-child(4),
-  .data-table.movie-table td:nth-child(4) { display: none; }
-  .data-table.series-table th:first-child,
-  .data-table.series-table td:first-child,
-  .data-table.movie-table th:first-child,
-  .data-table.movie-table td:first-child { width: 48%; }
+  .data-table.movie-table td:nth-child(4),
+  .data-table.movie-table th:nth-child(5),
+  .data-table.movie-table td:nth-child(5) { display: none; }
+  .data-table.series-table .select-col,
+  .data-table.movie-table .select-col { width: 34px; }
+  .data-table.series-table th:nth-child(2),
+  .data-table.series-table td:nth-child(2),
+  .data-table.movie-table th:nth-child(2),
+  .data-table.movie-table td:nth-child(2) { width: calc(100% - 34px - 11rem); }
+  .data-table.series-table th:nth-last-child(2),
+  .data-table.series-table td:nth-last-child(2),
+  .data-table.movie-table th:nth-last-child(2),
+  .data-table.movie-table td:nth-last-child(2) { width: 5.5rem; }
   .data-table.series-table th:last-child,
   .data-table.series-table td:last-child,
   .data-table.movie-table th:last-child,
-  .data-table.movie-table td:last-child { width: 24%; }
+  .data-table.movie-table td:last-child { width: 5.5rem; }
+  /* The two row buttons stack inside the narrow action column instead of
+     overflowing it (the base rule keeps them on one line). */
   .data-table.series-table .row-actions,
-  .data-table.movie-table .row-actions { white-space: normal; }
+  .data-table.movie-table .row-actions { flex-wrap: wrap; min-width: 0; white-space: normal; }
 
   /* Keep the download controls readable instead of producing a long row of
      tiny buttons. */

@@ -40,6 +40,15 @@ html, body {
 .settings-search-row .settings-results > * {
   margin: 0;
 }
+/* Before anything is typed the result area holds only the hint: without this
+   it keeps the card border and looks like a second search field under the
+   first one (very visible on a phone). */
+.settings-search-row .settings-results:has(> p.muted:only-child) {
+  background: none;
+  border: 0;
+  box-shadow: none;
+  padding: 2px 0;
+}
 .setting-control-browse {
   display: flex;
   align-items: center;
@@ -151,6 +160,21 @@ html, body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+/* On a phone the six columns squeeze "Serie" to "s…" and the date to nothing:
+   keep the name, the state and the date, and let the name wrap on two lines. */
+@media (max-width: 700px) {
+  .dashboard-recent-table th:nth-child(2), .dashboard-recent-table td:nth-child(2),
+  .dashboard-recent-table th:nth-child(3), .dashboard-recent-table td:nth-child(3),
+  .dashboard-recent-table th:nth-child(5), .dashboard-recent-table td:nth-child(5) { display: none; }
+  /* The generic table asks for 560px: with three columns left the date stayed
+     off screen behind a sideways scroll. */
+  .dashboard-recent-table { min-width: 0; }
+  .dashboard-recent-table th:nth-child(1) { width: 52%; }
+  .dashboard-recent-table th:nth-child(4) { width: 12%; }
+  .dashboard-recent-table th:nth-child(6) { width: 36%; }
+  .dashboard-recent-table td { white-space: normal; }
+  .dashboard-recent-table td.truncate { overflow: hidden; text-overflow: clip; }
 }
 .dashboard-recent-table .dashboard-complete-cell {
   color: var(--ok);
@@ -1470,6 +1494,13 @@ details.add-torrent-panel > summary::-webkit-details-marker { display: none; }
   #app-sidebar .nav-more-indicator { display: none; }
   /* "Dashboard" is the longest label: a touch smaller so it fits its column. */
   #app-sidebar .nav-item[data-nav="dashboard"] { font-size: 0.64rem; letter-spacing: -0.02em; }
+  /* On a 320px phone six columns leave ~53px each: the labels used to run past
+     their column and the first and last were cut by the screen edge. */
+  @media (max-width: 360px) {
+    #app-sidebar .nav-item,
+    #app-sidebar .nav-more { font-size: 0.62rem; letter-spacing: -0.03em; padding: 4px 1px; }
+    #app-sidebar .nav-item[data-nav="dashboard"] { font-size: 0.53rem; }
+  }
   #app-sidebar .nav-item.has-news { position: relative; }
   /* Downloads in progress: a small counter on the Scarico icon. */
   #app-sidebar .nav-item[data-nav="downloads"] { position: relative; }
@@ -1559,7 +1590,11 @@ details.add-torrent-panel > summary::-webkit-details-marker { display: none; }
   details.dashboard-search-panel:not([open]) > summary { border-bottom: 0; }
   .add-torrent-plus { display: inline; color: var(--accent); }
   .session-panel .panel-head { display: flex; align-items: center; gap: 8px; }
-.session-panel .panel-head h3 { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* The title carries the live count ("Torrent: 3 · HTTP: 0 · eD2k: 4 ·
+     aggiornato 05:30"): on a phone it wraps on a second line instead of being
+     cut mid-word by the ellipsis. */
+  .session-panel .panel-head h3 { min-width: 0; white-space: normal; overflow: visible; text-overflow: clip; }
+  .session-panel .panel-head .session-count { white-space: normal; }
   .session-panel .session-panel-note { display: none; }
   .downloads-view.has-selection .download-bulk-toolbar {
     position: sticky;
@@ -1620,6 +1655,12 @@ details.add-torrent-panel > summary::-webkit-details-marker { display: none; }
 .settings-view .settings-head { position: static; }
 .settings-view .settings-title-row { align-items: center; flex-wrap: wrap; }
 .settings-view .settings-save-hint { margin: 0; max-width: 70ch; }
+/* On a phone the row is a column: this rule wins over the one in
+   gextto-ui.css that switches it to flex-start, and centering the column left
+   the two checkboxes floating in the middle of the page. */
+@media (max-width: 700px) {
+  .settings-view .settings-title-row { align-items: flex-start; }
+}
 .settings-keys-toggle { font-size: 0.82rem; color: var(--muted); }
 
 /* Configurazione focuses on its own sections: the main navigation is hidden on
@@ -2153,6 +2194,37 @@ html.settings-only-modified .settings-panel:not(:has(.setting-modified-row)):not
    and a long source ends with an ellipsis instead of running over the score. */
 .archive-table th:last-child, .archive-table td:last-child { width: 12.5rem; }
 .archive-table td:nth-child(2) { overflow: hidden; text-overflow: ellipsis; }
+/* On a phone the archive table is wider than the screen: with its fixed layout
+   and no minimum width the title column collapsed to one character per line
+   (a single row grew to a page). Keep the columns readable and let the wrap
+   scroll sideways, as the other tables already do. */
+@media (max-width: 700px) {
+  .data-table.archive-table { min-width: 40rem; }
+  .archive-table th:last-child, .archive-table td:last-child { width: 9rem; }
+  /* Same for the aMule table of shared files: ten fixed columns squeezed into
+     the screen put every header and value on top of the next. */
+  .data-table.ed2k-shared-table { min-width: 44rem; }
+  [data-ed2k-results] .data-table { min-width: 34rem; }
+}
+
+/* Health → Percorsi: the path and its state are the point of the panel, so on
+   a phone they go on two lines and wrap instead of ending in an ellipsis. */
+@media (max-width: 700px) {
+  .v2-path-row { flex-direction: column; align-items: flex-start; gap: 2px; }
+  .v2-path-row > .truncate { overflow: visible; white-space: normal; text-overflow: clip; overflow-wrap: anywhere; }
+}
+
+/* Phone: pages where the desktop order buried the main action.
+   - Serie TV / Film: the list first, the "add" form below it.
+   - Esplora: the two search forms first, calendar and trending after. */
+@media (max-width: 700px) {
+  #v2-page[data-view="series"] .view > div:not(.panel):not(:has([id^="v2-table-panel-"])),
+  #v2-page[data-view="movies"] .view > div:not(.panel):not(:has([id^="v2-table-panel-"])) { order: 1; }
+  #v2-page[data-view="search"] .view > .panel:nth-child(3) { order: 1; }
+  #v2-page[data-view="search"] .view > .panel:nth-child(4) { order: 2; }
+  #v2-page[data-view="search"] .view > .panel:nth-child(1) { order: 3; }
+  #v2-page[data-view="search"] .view > .panel:nth-child(2) { order: 4; }
+}
 
 /* Dashboard "Traffico di rete": a server-rendered SVG sparkline of the last
    half hour. No charting library: the two curves are coloured through the
@@ -2192,6 +2264,19 @@ html.settings-only-modified .settings-panel:not(:has(.setting-modified-row)):not
 /* A search row keeps its button label on one line: the field takes the
    remaining width instead of squeezing “Apri link eD2k” onto two. */
 .search-row textarea { flex: 1 1 auto; min-width: 0; }
+/* On a phone the field needs the whole line: sharing it with the eD2k check
+   and the button left it a few characters wide. */
+@media (max-width: 560px) {
+  .search-row { flex-wrap: wrap; }
+  .search-row > input,
+  .search-row > textarea { flex: 1 1 100%; }
+}
+/* Import: same for the path field, which shared its line with Sfoglia and
+   Analizza and ended up a few characters wide. */
+@media (max-width: 560px) {
+  .v2-import .field-row { flex-wrap: wrap; }
+  .v2-import .field-row > .input { flex: 1 1 100%; }
+}
 .search-row .btn,
 .search-row .chk { flex: 0 0 auto; white-space: nowrap; }
 /* The button of a multi-line search field keeps its own height instead of
@@ -2223,6 +2308,11 @@ html.settings-only-modified .settings-panel:not(:has(.setting-modified-row)):not
 
 /* Maintenance tabs: general panels vs the archive SQL engine. */
 .maintenance-tabs { margin-bottom: 14px; }
+
+/* Import: the panel holds the form directly, without the .panel-body wrapper
+   every other panel uses, so it needs the same inner padding (otherwise the
+   title and the text touch the border). */
+.v2-import, .import-row { padding: 14px 16px; }
 
 /* Archive SQL maintenance: curated operations, preview first, then delete. */
 .v2-warning {
