@@ -1001,9 +1001,10 @@ func mediaIntegrityResolveFile(path string) (string, error) {
 
 // mediaIntegrityLimitedBuffer keeps at most limit bytes of the tool output.
 type mediaIntegrityLimitedBuffer struct {
-	mu    sync.Mutex
-	buf   bytes.Buffer
-	limit int
+	mu        sync.Mutex
+	buf       bytes.Buffer
+	limit     int
+	truncated bool
 }
 
 func (b *mediaIntegrityLimitedBuffer) Write(p []byte) (int, error) {
@@ -1012,9 +1013,12 @@ func (b *mediaIntegrityLimitedBuffer) Write(p []byte) (int, error) {
 	if room := b.limit - b.buf.Len(); room > 0 {
 		if len(p) > room {
 			_, _ = b.buf.Write(p[:room])
+			b.truncated = true
 		} else {
 			_, _ = b.buf.Write(p)
 		}
+	} else {
+		b.truncated = true
 	}
 	return len(p), nil
 }
@@ -1022,7 +1026,21 @@ func (b *mediaIntegrityLimitedBuffer) Write(p []byte) (int, error) {
 func (b *mediaIntegrityLimitedBuffer) String() string {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	return b.buf.String()
+	content := b.buf.String()
+	if b.truncated {
+		// Only the beginning of the output is kept, so the last line is cut in
+		// the middle. A truncated line matches no known message: a harmless
+		// timestamp warning cut after "invalid, non" looked like a decode
+		// error and sent a healthy episode to the recycle bin and to the
+		// re-download. The incomplete line is not evidence either way, so it
+		// is dropped and the complete lines before it are judged as usual.
+		if last := strings.LastIndexByte(content, '\n'); last >= 0 {
+			content = content[:last]
+		} else {
+			content = ""
+		}
+	}
+	return content
 }
 
 // mediaIntegrityBenignOutput reports whether an ffmpeg line only complains

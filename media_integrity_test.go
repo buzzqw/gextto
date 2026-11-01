@@ -78,6 +78,19 @@ echo "[null @ 0x55bd8d99e680] Application provided invalid, non monotonically in
 exit 0
 `
 
+// miFakeFfmpegFloodedTimestamps reproduces a long healthy file: ffmpeg writes
+// the output timestamp warning thousands of times, far past the amount of
+// stderr the check keeps. The kept text then ends in the middle of one of
+// those lines, and the cut line must stay harmless too.
+const miFakeFfmpegFloodedTimestamps = `#!/bin/sh
+i=0
+while [ $i -lt 3000 ]; do
+  echo "[null @ 0x55bd8d99e680] Application provided invalid, non monotonically increasing dts to muxer in stream 0: $i >= $i" >&2
+  i=$((i+1))
+done
+exit 0
+`
+
 // miFakeFfmpegDecodeError is a real problem in the file: a stream that cannot be
 // decoded. ffmpeg keeps going and exits zero, so the message itself is the only
 // evidence.
@@ -101,6 +114,33 @@ func TestMediaIntegrityIgnoresOutputTimestampWarnings(t *testing.T) {
 	}
 	if detail != "" {
 		t.Fatalf("detail = %q, want no problem reported", detail)
+	}
+}
+
+// TestMediaIntegrityIgnoresTruncatedOutputTimestampWarnings covers the long
+// file: the kept stderr ends inside one of the benign lines, and the cut piece
+// must not be read as a decode error.
+func TestMediaIntegrityIgnoresTruncatedOutputTimestampWarnings(t *testing.T) {
+	miInstallFakeMediaTools(t, miFakeFfmpegFloodedTimestamps)
+	file := filepath.Join(t.TempDir(), "episode.mkv")
+	if err := os.WriteFile(file, []byte("data"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	status, detail := mediaIntegrityCheckPath(context.Background(), file, false)
+	if status != "ok" {
+		t.Fatalf("status = %q (%s), want ok", status, detail)
+	}
+}
+
+// TestMediaIntegrityLimitedBufferDropsCutLine pins the rule behind the case
+// above: a line cut by the size limit is not a message and is left out.
+func TestMediaIntegrityLimitedBufferDropsCutLine(t *testing.T) {
+	buffer := &mediaIntegrityLimitedBuffer{limit: 32}
+	if _, err := buffer.Write([]byte("ok line\n" + strings.Repeat("x", 40))); err != nil {
+		t.Fatal(err)
+	}
+	if got := buffer.String(); got != "ok line" {
+		t.Fatalf("String() = %q, want only the complete line", got)
 	}
 }
 
