@@ -771,6 +771,12 @@ l'unica copia nella lingua richiesta con il badge **🆘 ultima risorsa**: è qu
 che Gextto prenderebbe da solo, e l'upgrade la sostituisce appena esce una copia
 nel profilo. Vale anche per una copia che si trova solo nell'archivio locale.
 
+Gextto cerca le puntate mancanti anche da solo, nei cicli automatici: prima
+nell'archivio locale, poi online, e quando i torrent non danno nulla chiede a
+eD2k una volta per stagione, così una stagione con molti buchi si riempie in un
+giro invece di una puntata per ciclo. **Cerca mancanti** serve a non aspettare il
+prossimo ciclo.
+
 Il vecchio indirizzo della pagina *Mancanti* porta a questa scheda.
 
 Da **Cerca mancanti** o dalla scheda episodio:
@@ -2213,7 +2219,7 @@ salvata** finché non li salvi.
 | Cerca gli episodi mancanti | Attiva il riempimento dei buchi (episodi mancanti) dalle release disponibili. |
 | Episodi mancanti per serie a ogni ciclo | Numero massimo di gap da cercare per serie in un ciclo (0 = illimitato). *(0 = illimitato)* Compare solo con «Cerca gli episodi mancanti» attivo. |
 | Intervallo della ricerca approfondita | Ogni quante ore fare una ricerca live mirata sugli indexer per i gap. *(Unità: ore)* Compare solo con «Cerca gli episodi mancanti» attivo. |
-| Ricerche approfondite per ciclo | Numero massimo di ricerche live per ciclo. Vengono prima gli episodi mai cercati online, un episodio per serie a rotazione (ogni giro riparte dalla serie dopo l'ultima servita), poi quelli cercati da più tempo. Compare solo con «Cerca gli episodi mancanti» attivo. |
+| Ricerche approfondite per ciclo | Numero massimo di ricerche live per ciclo. Vengono prima gli episodi mai cercati online, un episodio per serie a rotazione (ogni giro riparte dalla serie dopo l'ultima servita), poi quelli cercati da più tempo. Quando i torrent non danno nulla, aMule risponde una volta per stagione: una sola ricerca riempie tutte le puntate mancanti di quella stagione, come fa **Cerca mancanti**. Compare solo con «Cerca gli episodi mancanti» attivo. |
 | Ultima risorsa: accetta una risoluzione fuori profilo | Attivo per default. Se per un episodio mancante non esiste nessuna copia nel profilo qualità, Gextto prende quella nella lingua richiesta anche con una risoluzione fuori profilo o sconosciuta. Lingua, sottotitoli, audio ed esclusioni valgono sempre. Il download porta il badge «🆘 ultima risorsa» in *Scarico*, il log e la notifica lo dicono, e l'upgrade lo sostituisce appena esce una copia nel profilo. Compare solo con «Cerca gli episodi mancanti» attivo. |
 
 **Ritardo prima di scaricare**

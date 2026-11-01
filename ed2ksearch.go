@@ -682,21 +682,13 @@ func (e *Engine) SearchSeriesED2K(ctx context.Context, cfg *Config, series *Seri
 	if manual {
 		return candidates
 	}
-	minSources := ed2kMinSources(cfg)
 	accepted := make([]models.Release, 0, len(candidates))
 	for index := range candidates {
 		release := candidates[index]
 		if !releaseMatchesConfiguredEpisode(&release, series, season, episode) {
 			continue
 		}
-		if link, err := ed2k.ParseFileLink(release.Ed2kLink); err != nil || !isVideoExtension(link.Name) {
-			// An archive or a sample in another format cannot be imported.
-			continue
-		}
-		if release.Quality.Resolution == "" || strings.EqualFold(release.Quality.Resolution, "unknown") {
-			continue
-		}
-		if release.Sources < minSources {
+		if !ed2kAcceptAutomatic(cfg, release) {
 			continue
 		}
 		canonicalName := series.Name
@@ -792,6 +784,24 @@ func releaseMatchesConfiguredSeason(release *models.Release, series *SeriesConfi
 // for the series missing search: one query per season, then the caller
 // distributes the results to the gaps. It is gated by the same explicit switch.
 func ed2kManualSeasonFallback(ctx context.Context, engine *Engine, cfg *Config, series *SeriesConfig, season int64) []models.Release {
+	return ed2kSeasonFallback(ctx, engine, cfg, series, season, false)
+}
+
+// ed2kAutomaticSeasonFallback is the same query for the deep gap pass: one
+// search answers for every missing episode of the season instead of one search
+// per episode, which is what kept a season with many holes trickling in at the
+// pace of the pass. It keeps the acceptance of the per-episode automatic
+// fallback.
+func ed2kAutomaticSeasonFallback(ctx context.Context, engine *Engine, cfg *Config, series *SeriesConfig, season int64) []models.Release {
+	return ed2kSeasonFallback(ctx, engine, cfg, series, season, true)
+}
+
+// ed2kSeasonFallback looks up a whole season with one query ("Name Sxx") and
+// keeps the copies that belong to it. automatic applies the acceptance of the
+// automatic fallback (a video file, a known resolution, enough sources); the
+// manual search keeps everything it found, because the interface shows the
+// copies the profile would refuse too.
+func ed2kSeasonFallback(ctx context.Context, engine *Engine, cfg *Config, series *SeriesConfig, season int64, automatic bool) []models.Release {
 	if engine == nil || series == nil || !ed2kFallbackEligible(cfg) {
 		return nil
 	}
@@ -803,6 +813,9 @@ func ed2kManualSeasonFallback(ctx context.Context, engine *Engine, cfg *Config, 
 		if !releaseMatchesConfiguredSeason(&release, series, season) {
 			continue
 		}
+		if automatic && !ed2kAcceptAutomatic(cfg, release) {
+			continue
+		}
 		name := series.Name
 		release.Series = &name
 		accepted = append(accepted, release)
@@ -812,4 +825,18 @@ func ed2kManualSeasonFallback(ctx context.Context, engine *Engine, cfg *Config, 
 			series.Name, season, countLabel(len(accepted), "candidate", "candidates"), logDuration(time.Since(started))))
 	}
 	return accepted
+}
+
+// ed2kAcceptAutomatic reports whether a copy the automatic fallback found may
+// be used: a video file with a known resolution and at least the configured
+// number of sources. An archive or a sample in another format cannot be
+// imported, and an unknown resolution cannot be compared with the profile.
+func ed2kAcceptAutomatic(cfg *Config, release models.Release) bool {
+	if link, err := ed2k.ParseFileLink(release.Ed2kLink); err != nil || !isVideoExtension(link.Name) {
+		return false
+	}
+	if release.Quality.Resolution == "" || strings.EqualFold(release.Quality.Resolution, "unknown") {
+		return false
+	}
+	return release.Sources >= ed2kMinSources(cfg)
 }

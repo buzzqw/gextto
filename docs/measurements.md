@@ -1203,6 +1203,26 @@ produced them. Measured on 1 November 2026 with:
 CGO_ENABLED=0 go test . -run '^$' -bench '^BenchmarkMediaIntegrityDetail$' -benchmem -count=3
 ```
 
+### Gap fill on eD2k — 1 November 2026
+
+aMule runs one search at a time and answers in about a minute on this library, so
+the unit of cost is the query, not the episode. A series with 37 gaps (Walker,
+seasons 2 and 3) was answered by **2 season queries, about 1 minute each**, which
+returned 35 usable copies; one query per episode would have been 37 waits, spread
+over the deep pass at five gaps per cycle (`gap_deep_max_per_cycle`) and shared
+with every other series with gaps, so days of calendar time for the same result.
+Measured on the N97 (debminis) on 1 November 2026, build 1.2.2175, from the log of
+the manual missing search:
+
+```
+🔎 eD2k search for Walker season 2: 128 candidates in 1 minute
+🔎 eD2k search for Walker season 3: 93 candidates in 1 minute
+```
+
+The automatic pass now makes the same query (`ed2kSeasonFallback`) for the season
+of the gaps it picked and distributes the copies to every gap of it; the per-query
+time is aMule's, unchanged by the number of episodes the answer covers.
+
 ### Packaging
 
 The release archive root is **0755** (`mktemp -d` made it 0700, which tar applied to the

@@ -476,6 +476,11 @@ func RunCycleDomain(
 	// them as a last resort, but only after the online search for the same gap
 	// found nothing better, like the live ones.
 	archiveLastResorts := map[gapTarget][]models.Release{}
+	// Gaps the archive does not hold, grouped by series and season: eD2k is
+	// asked once for the whole season, then the candidates go to every gap of
+	// it instead of one search per episode.
+	seasonGaps := map[seriesSeason][]int64{}
+	seasonSeries := map[seriesSeason]*SeriesConfig{}
 	// One query for the search times of every gap: a point query per gap made
 	// the deep pass cost grow with the library.
 	searchTimes, err := db.GapSearchedTimes()
@@ -537,6 +542,9 @@ func RunCycleDomain(
 			archiveHits++
 			continue
 		}
+		seasonKey := seriesSeason{Series: series.Name, Season: gap.Season}
+		seasonGaps[seasonKey] = append(seasonGaps[seasonKey], gap.Episode)
+		seasonSeries[seasonKey] = series
 		// Phase 2 candidate: deep live search only.
 		if !isDeep {
 			continue
@@ -626,37 +634,9 @@ func RunCycleDomain(
 						"query", seasonQuery)
 					appendValid(engine.SearchSeriesSeason(ctx, cfg, candidate.Series, candidate.Season, false))
 				}
-				// Last resort, and only when the operator explicitly enabled the
-				// automatic eD2k fallback and aMule is reachable.
-				if len(foundResults[index]) == 0 && ed2kFallbackEligible(cfg) {
-					before := len(foundResults[index])
-					appendValid(engine.SearchSeriesED2K(ctx, cfg, candidate.Series, candidate.Season, candidate.Episode, false))
-					// Logged only when it found something: a gap with nothing on
-					// eD2k either would repeat the same line every cycle.
-					if found := len(foundResults[index]) - before; found > 0 {
-						logging.Info(fmt.Sprintf("🔎 eD2k found %s for the missing %s S%02dE%02d",
-							countLabel(found, "candidate", "candidates"), candidate.Series.Name, candidate.Season, candidate.Episode))
-					}
-				}
-				if len(foundResults[index]) == 0 && len(lastResorts[index]) > 0 {
-					foundResults[index] = lastResorts[index]
-					logging.Info(fmt.Sprintf("🆘 Nothing within the quality profile for the missing %s S%02dE%02d: %s in the right language but outside the resolution, taken as a last resort",
-						candidate.Series.Name, candidate.Season, candidate.Episode,
-						countLabel(int64(len(lastResorts[index])), "copy", "copies")))
-				}
-				// The archive may hold the only copy, outside the profile: the
-				// live search does not look there, so the pass adds it now that
-				// every online source has answered.
-				if len(foundResults[index]) == 0 {
-					key := gapTarget{Series: candidate.Series.Name, Season: candidate.Season, Episode: candidate.Episode}
-					if archived := archiveLastResorts[key]; len(archived) > 0 {
-						foundResults[index] = archived
-						logging.Info(fmt.Sprintf("🆘 Nothing within the quality profile for the missing %s S%02dE%02d: %s from the release archive, taken as a last resort",
-							candidate.Series.Name, candidate.Season, candidate.Episode,
-							countLabel(int64(len(archived)), "copy", "copies")))
-					}
-				}
-				logging.Debug("gap-fill live search completed",
+				// eD2k is asked once for the whole season after every budget
+				// gap has been searched: see the phase after gapWG.Wait().
+				logging.Debug("gap-fill torrent search completed",
 					"series", candidate.Series.Name,
 					"season", candidate.Season,
 					"episode", candidate.Episode,
@@ -669,6 +649,86 @@ func RunCycleDomain(
 		// A cancelled cycle returns empty searches: do not record those gaps as
 		// searched, or they would be skipped for the next 23 hours.
 		searchesValid := !cycleCancelled(ctx)
+
+		// eD2k answers one query per season and aMule serialises its searches,
+		// so asking a single episode at a time left a season with many holes as
+		// slow as the pacing of the deep pass — a missing episode per day where
+		// the missing search finds a whole season in two minutes. Ask eD2k for
+		// the whole season once, the same query the series missing search makes
+		// on demand, and hand the candidates to every gap of it. Only the
+		// seasons this pass picked are asked, so the pacing still holds.
+		if searchesValid && ed2kFallbackEligible(cfg) {
+			candidateIndex := make(map[gapTarget]int, len(liveCandidates))
+			for i := range liveCandidates {
+				candidateIndex[gapTarget{
+					Series:  liveCandidates[i].Series.Name,
+					Season:  liveCandidates[i].Season,
+					Episode: liveCandidates[i].Episode,
+				}] = i
+			}
+			askedSeasons := map[seriesSeason]bool{}
+			for i := range liveCandidates {
+				candidate := liveCandidates[i]
+				if len(foundResults[i]) > 0 {
+					continue
+				}
+				key := seriesSeason{Series: candidate.Series.Name, Season: candidate.Season}
+				if askedSeasons[key] {
+					continue
+				}
+				askedSeasons[key] = true
+				series := seasonSeries[key]
+				if series == nil {
+					series = candidate.Series
+				}
+				episodes := seasonGaps[key]
+				if len(episodes) == 0 {
+					episodes = []int64{candidate.Episode}
+				}
+				var found []models.Release
+				if len(episodes) > 1 {
+					found = ed2kAutomaticSeasonFallback(ctx, engine, cfg, series, key.Season)
+				} else {
+					// One gap only: the episode query is narrower and can find a
+					// file the season query does not list.
+					found = engine.SearchSeriesED2K(ctx, cfg, series, key.Season, episodes[0], false)
+				}
+				extra, accepted := distributeSeasonED2K(cfg, series, key.Season, episodes, found, candidateIndex, foundResults, lastResorts)
+				releases = append(releases, extra...)
+				if accepted > 0 {
+					logging.Info(fmt.Sprintf("🔎 eD2k answered for %s season %d: %s for its missing episodes",
+						series.Name, key.Season, countLabel(accepted, "copy", "copies")))
+				}
+				for _, episode := range episodes {
+					_ = db.MarkGapSearched(series.Name, key.Season, episode)
+				}
+			}
+		}
+
+		// Nothing else for a gap this pass looked up: take the copies in the
+		// right language that miss only the resolution, then the ones the
+		// release archive holds.
+		for i := range liveCandidates {
+			candidate := liveCandidates[i]
+			if len(foundResults[i]) == 0 && len(lastResorts[i]) > 0 {
+				foundResults[i] = lastResorts[i]
+				logging.Info(fmt.Sprintf("🆘 Nothing within the quality profile for the missing %s S%02dE%02d: %s in the right language but outside the resolution, taken as a last resort",
+					candidate.Series.Name, candidate.Season, candidate.Episode,
+					countLabel(int64(len(lastResorts[i])), "copy", "copies")))
+			}
+			// The archive may hold the only copy, outside the profile: the
+			// live search does not look there, so the pass adds it now that
+			// every online source has answered.
+			if len(foundResults[i]) == 0 {
+				key := gapTarget{Series: candidate.Series.Name, Season: candidate.Season, Episode: candidate.Episode}
+				if archived := archiveLastResorts[key]; len(archived) > 0 {
+					foundResults[i] = archived
+					logging.Info(fmt.Sprintf("🆘 Nothing within the quality profile for the missing %s S%02dE%02d: %s from the release archive, taken as a last resort",
+						candidate.Series.Name, candidate.Season, candidate.Episode,
+						countLabel(int64(len(archived)), "copy", "copies")))
+				}
+			}
+		}
 		for i := range liveCandidates {
 			releases = append(releases, foundResults[i]...)
 			if searchesValid {
@@ -1449,6 +1509,54 @@ func cycleElapsedSeconds(stats *models.CycleStats) int64 {
 		return 0
 	}
 	return elapsed
+}
+
+// distributeSeasonED2K hands the candidates of one eD2k season search to the
+// gaps of that season. A copy within the profile goes to the results; one that
+// misses only the resolution becomes the last resort of its gap, but only when
+// that gap is one of the candidates the pass picked, because the others are not
+// started this cycle. extra holds the copies for episodes the pass did not pick:
+// they are downloaded anyway — the query already paid for them — and keep the
+// season from needing a search per episode.
+func distributeSeasonED2K(cfg *Config, series *SeriesConfig, season int64, episodes []int64, found []models.Release,
+	candidateIndex map[gapTarget]int, foundResults, lastResorts [][]models.Release) (extra []models.Release, accepted int) {
+	if cfg == nil || series == nil || len(episodes) == 0 {
+		return nil, 0
+	}
+	wanted := make(map[int64]struct{}, len(episodes))
+	for _, episode := range episodes {
+		wanted[episode] = struct{}{}
+	}
+	for i := range found {
+		release := found[i]
+		if release.Episode == nil || release.Season == nil || *release.Season != season {
+			continue
+		}
+		if _, isGap := wanted[*release.Episode]; !isGap {
+			continue
+		}
+		if cfg.AllReleaseDeniedReason(&release) != "" {
+			continue
+		}
+		canonicalName := series.Name
+		release.Series = &canonicalName
+		target := gapTarget{Series: series.Name, Season: season, Episode: *release.Episode}
+		index, isCandidate := candidateIndex[target]
+		if !cfg.SeriesReleaseAllowed(series, &release.Quality, release.Title) {
+			if isCandidate && cfg.SeriesLastResortAllowed(series, &release.Quality, release.Title) {
+				release.LastResort = true
+				lastResorts[index] = append(lastResorts[index], release)
+			}
+			continue
+		}
+		if isCandidate {
+			foundResults[index] = append(foundResults[index], release)
+		} else {
+			extra = append(extra, release)
+		}
+		accepted++
+	}
+	return extra, accepted
 }
 
 // prioritizeArchiveGapDownloads starts archive-backed missing episodes before

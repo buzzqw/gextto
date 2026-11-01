@@ -258,6 +258,8 @@ func TestEd2kWrongPasswordIsReported(t *testing.T) {
 	}
 }
 
+// TestSearchSeriesED2KFiltersAutomaticCandidates tests the per-episode
+// automatic fallback: the same acceptance now shared with the season query.
 func TestSearchSeriesED2KFiltersAutomaticCandidates(t *testing.T) {
 	core, cfg := ed2kTestCore(t, map[string]string{"ed2k_min_sources": "3"})
 	core.SetResults([]amuletest.Result{
@@ -281,6 +283,84 @@ func TestSearchSeriesED2KFiltersAutomaticCandidates(t *testing.T) {
 	// The automatic fallback asks Kad and the eD2k servers.
 	if searches := core.Searches(); len(searches) != 2 {
 		t.Fatalf("automatic searches = %v, want one per network", searches)
+	}
+}
+
+// TestEd2kAutomaticSeasonFallbackAnswersAWholeSeasonWithOneQuery pins the fix
+// for a season with many holes: one search for "Show Sxx" instead of one per
+// episode, and every copy it returns is kept for its episode.
+func TestEd2kAutomaticSeasonFallbackAnswersAWholeSeasonWithOneQuery(t *testing.T) {
+	core, cfg := ed2kTestCore(t, map[string]string{"ed2k_fallback": "true"})
+	core.SetResults([]amuletest.Result{
+		{Hash: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", Name: "Rare Show S02E05 1080p.mkv", Size: 5000000000, Sources: 4},
+		{Hash: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", Name: "Rare Show S02E06 720p.mkv", Size: 900000000, Sources: 5},
+		{Hash: "cccccccccccccccccccccccccccccccc", Name: "Rare Show S02E07 480p.mkv", Size: 400000000, Sources: 6},
+	}, "")
+	series := &SeriesConfig{Name: "Rare Show"}
+	engine := &Engine{}
+
+	got := ed2kAutomaticSeasonFallback(context.Background(), engine, cfg, series, 2)
+	if len(got) != 3 {
+		t.Fatalf("accepted %d candidates, want the 3 episodes of the season: %+v", len(got), got)
+	}
+	episodes := map[int64]bool{}
+	for _, release := range got {
+		if release.Season == nil || release.Episode == nil || *release.Season != 2 {
+			t.Fatalf("candidate outside season 2: %+v", release)
+		}
+		if *release.Series != "Rare Show" {
+			t.Fatalf("series = %q, want the canonical name", *release.Series)
+		}
+		episodes[*release.Episode] = true
+	}
+	if !episodes[5] || !episodes[6] || !episodes[7] {
+		t.Fatalf("episodes = %v, want 5, 6 and 7", episodes)
+	}
+	// One query for the whole season, not one per episode.
+	if searches := core.Searches(); len(searches) != 1 || searches[0] != "Rare Show S02" {
+		t.Fatalf("searches = %v, want a single season query", searches)
+	}
+}
+
+// TestEd2kAutomaticSeasonFallbackKeepsTheAutomaticAcceptance: the season query
+// is broader, but a copy with an unknown resolution, a non-video file or too few
+// sources is still refused, as the per-episode fallback does.
+func TestEd2kAutomaticSeasonFallbackKeepsTheAutomaticAcceptance(t *testing.T) {
+	for name, result := range map[string]amuletest.Result{
+		"unknown resolution": {Hash: "dddddddddddddddddddddddddddddddd", Name: "Rare Show S02E05.mkv", Size: 900000000, Sources: 9},
+		"archive file":       {Hash: "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", Name: "Rare Show S02E05 1080p.rar", Size: 900000000, Sources: 9},
+		"too few sources":    {Hash: "ffffffffffffffffffffffffffffffff", Name: "Rare Show S02E05 1080p.mkv", Size: 900000000, Sources: 1},
+	} {
+		t.Run(name, func(t *testing.T) {
+			core, cfg := ed2kTestCore(t, map[string]string{"ed2k_min_sources": "3", "ed2k_fallback": "true"})
+			core.SetResults([]amuletest.Result{result}, "")
+			series := &SeriesConfig{Name: "Rare Show"}
+			engine := &Engine{}
+			if got := ed2kAutomaticSeasonFallback(context.Background(), engine, cfg, series, 2); len(got) != 0 {
+				t.Fatalf("accepted %+v, want nothing", got)
+			}
+		})
+	}
+}
+
+// TestEd2kManualSeasonFallbackSeesTheLastResortCopies: the manual search must
+// show what the automatic one would refuse, or the interface would hide the only
+// copy of an episode.
+func TestEd2kManualSeasonFallbackSeesTheLastResortCopies(t *testing.T) {
+	core, cfg := ed2kTestCore(t, map[string]string{"ed2k_fallback": "true"})
+	core.SetResults([]amuletest.Result{
+		{Hash: "77777777777777777777777777777777", Name: "Rare Show S02E05 480p.mkv", Size: 400000000, Sources: 4},
+	}, "")
+	series := &SeriesConfig{Name: "Rare Show"}
+	engine := &Engine{}
+
+	automatic := ed2kAutomaticSeasonFallback(context.Background(), engine, cfg, series, 2)
+	manual := ed2kManualSeasonFallback(context.Background(), engine, cfg, series, 2)
+	if len(automatic) != 1 || len(manual) != 1 {
+		t.Fatalf("automatic = %d manual = %d, want the 480p copy in both", len(automatic), len(manual))
+	}
+	if got := manual[0].Quality.Resolution; got != "480p" {
+		t.Fatalf("manual resolution = %q", got)
 	}
 }
 

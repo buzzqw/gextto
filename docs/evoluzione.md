@@ -286,7 +286,12 @@ first and one series at a time starting after the series served last
 (`gap_deep_cursor`), then the ones searched longest ago (`gap_search_log`). A gap
 searched online is left alone for `gap_research_hours`. An announced episode is not
 a gap: a series with a pre-release status and no aired episode, and an episode with
-a future air date, stay out of the tab and out of the cycle.
+a future air date, stay out of the tab and out of the cycle. When the torrent plane
+leaves a season of the deep pass empty and the eD2k fallback is on
+(`ed2k_fallback`), the season is looked up with one query (`ed2kSeasonFallback`,
+the same call *Search missing* makes) and its candidates go to every gap of that
+season, not only to the episodes the pass picked: aMule runs one search at a time,
+so a season with many holes fills in one pass instead of one episode per pass.
 
 **A copy outside the profile, as the last resort** (`gap_last_resort`, on by
 default). When an episode has no copy within the series profile, the cycle takes the
