@@ -454,10 +454,15 @@ func Ed2kSharedReloadAPI(w http.ResponseWriter, r *http.Request, s *AppState) {
 
 // v2Ed2kHealth is the aMule card on the Health page.
 type v2Ed2kHealth struct {
-	Enabled      bool
-	Reachable    bool
-	Error        string
-	Version      string
+	Enabled   bool
+	Reachable bool
+	Error     string
+	Version   string
+	// Address is the EC endpoint Gextto uses, and Runtime says in words where
+	// aMule runs (this machine, in a container, or another host): the eD2k
+	// card has to make it clear that aMule is the client in use.
+	Address      string
+	Runtime      string
 	Connected    bool
 	Server       string
 	HighID       bool
@@ -480,6 +485,10 @@ func v2Ed2kHealthFrom(s *AppState) *v2Ed2kHealth {
 	if !card.Enabled {
 		return card
 	}
+	if settings, settingsErr := ed2kSettingsFromConfig(cfg); settingsErr == nil {
+		card.Address = settings.Address
+	}
+	card.Runtime = amuleRuntimeLabel(cfg)
 	status, err := ed2kStatus(cfg)
 	if err != nil {
 		card.Error = err.Error()
@@ -517,6 +526,22 @@ func v2Ed2kHealthFrom(s *AppState) *v2Ed2kHealth {
 		card.Warnings = ed2kLogWarnings(lines, 5)
 	}
 	return card
+}
+
+// amuleRuntimeLabel says in words where the aMule Gextto talks to runs: on
+// this machine, on this machine inside a container, or on another host. It is
+// shown next to the aMule version so the eD2k client in use is unambiguous.
+func amuleRuntimeLabel(cfg *Config) string {
+	if cfg == nil {
+		return ""
+	}
+	if !hostIsLocal(uiSettingString(cfg, "amule_host")) {
+		return "su un'altra macchina"
+	}
+	if pids := amuleProcessPIDs(); len(pids) > 0 && processRunsInContainer(pids[0]) {
+		return "in un container, su questa macchina"
+	}
+	return "su questa macchina"
 }
 
 // ed2kLogWarnings keeps the most recent aMule log lines that look like a

@@ -1820,7 +1820,9 @@ missing aMule folders and the latest problem lines from aMule's log
 (disconnections, no valid servers, errors) once per message and without the
 attempts aMule retries and completes by itself (for example the IP-to-country
 database at the start of a month), so a problem is visible without opening the
-log.
+log. The card also says that the eD2k client in use is **aMule**, with its
+version, the EC address and **Where it runs**: on this machine, in a container
+on the same machine, or on another machine.
 
 ## 11. Notifications
 

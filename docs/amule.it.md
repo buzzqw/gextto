@@ -129,6 +129,13 @@ aMule: è un'impostazione di aMule, non una salvata in Gextto. La pagina **Salut
 una scheda eD2k con lo stesso stato, i totali di sessione e le ultime righe di
 problema dal log di aMule.
 
+La scheda **aMule** di **Configurazione → eD2k e Kad** e la scheda eD2k di
+**Salute** dicono esplicitamente che il client in uso è **aMule**, con la
+versione, l'indirizzo EC e **Dove gira**: *su questa macchina*, *in un container,
+su questa macchina* oppure *su un'altra macchina*. Così un aMule in Docker sulla
+stessa macchina non si confonde con uno installato sul sistema né con uno su un
+altro host.
+
 Quando `amuled` gira sulla macchina di Gextto, la barra in alto mostra il badge
 **aMule** con CPU e RAM del demone, aggiornato insieme agli altri valori. Con
 aMule su un altro host il badge non c'è: quei dati non sono disponibili tramite

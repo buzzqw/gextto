@@ -102,6 +102,9 @@ func TestEd2kStatusPanelShowsSessionAndPreallocation(t *testing.T) {
 }
 
 func TestHealthPageShowsTheAmuleCard(t *testing.T) {
+	previous := amuleProcessPIDs
+	amuleProcessPIDs = func() []int { return nil }
+	t.Cleanup(func() { amuleProcessPIDs = previous })
 	core, handler := ed2kTestRouter(t)
 	core.SetLog([]string{"Connected to Kad", "Error: connection lost to server"})
 
@@ -109,10 +112,25 @@ func TestHealthPageShowsTheAmuleCard(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	handler.ServeHTTP(recorder, request)
 	body := recorder.Body.String()
-	for _, want := range []string{"eD2k e Kad (aMule)", "Avvisi recenti dal log di aMule", "connection lost to server", "Sessione"} {
+	for _, want := range []string{"eD2k e Kad (aMule)", "in uso", "Client eD2k", "Dove gira", "su questa macchina", "Avvisi recenti dal log di aMule", "connection lost to server", "Sessione"} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("health card is missing %q", want)
 		}
+	}
+}
+
+func TestAmuleRuntimeLabel(t *testing.T) {
+	if got := amuleRuntimeLabel(nil); got != "" {
+		t.Fatalf("runtime with no config = %q", got)
+	}
+	if got := amuleRuntimeLabel(&Config{Settings: map[string]string{"amule_host": "192.0.2.10"}}); got != "su un'altra macchina" {
+		t.Fatalf("remote runtime = %q", got)
+	}
+	previous := amuleProcessPIDs
+	amuleProcessPIDs = func() []int { return nil }
+	t.Cleanup(func() { amuleProcessPIDs = previous })
+	if got := amuleRuntimeLabel(&Config{Settings: map[string]string{"amule_host": "127.0.0.1"}}); got != "su questa macchina" {
+		t.Fatalf("local runtime = %q", got)
 	}
 }
 

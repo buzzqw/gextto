@@ -128,6 +128,13 @@ aMule at once: it is aMule's setting, not one stored in Gextto. The
 **Health** page has an eD2k card with the same state, the session and all-time
 totals and the latest problem lines from aMule's log.
 
+The **aMule** panel of **Settings → eD2k and Kad** and the eD2k card of
+**Health** say explicitly that the client in use is **aMule**, with its version,
+the EC address and **Where it runs**: *on this machine*, *in a container, on
+this machine* or *on another machine*. That way an aMule in Docker on the same
+machine is not confused with one installed on the system or with one on another
+host.
+
 When `amuled` runs on Gextto's machine, the header shows an **aMule** badge with
 the daemon's CPU and RAM, updated with the other metrics. With aMule on another
 host the badge is absent: those figures are not available through the EC

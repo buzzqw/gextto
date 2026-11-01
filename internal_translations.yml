@@ -5584,3 +5584,9 @@ eng:
 
   "in attesa del primo ciclo": "waiting for the first cycle"
   "mai letto": "never read"
+
+  "Client eD2k": "eD2k client"
+  "Dove gira": "Where it runs"
+  "su questa macchina": "on this machine"
+  "in un container, su questa macchina": "in a container, on this machine"
+  "su un'altra macchina": "on another machine"

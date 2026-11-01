@@ -6194,3 +6194,9 @@ spa:
 
   "in attesa del primo ciclo": "en espera del primer ciclo"
   "mai letto": "nunca leído"
+
+  "Client eD2k": "Cliente eD2k"
+  "Dove gira": "Dónde se ejecuta"
+  "su questa macchina": "en este equipo"
+  "in un container, su questa macchina": "en un contenedor, en este equipo"
+  "su un'altra macchina": "en otro equipo"

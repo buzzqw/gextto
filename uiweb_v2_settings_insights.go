@@ -231,7 +231,7 @@ func v2SourcesIndexFrom(s *AppState, cfg *Config) *v2SourcesIndex {
 				Status: fmt.Sprintf(tr("%d motori attivi"), engines),
 			},
 			{
-				Label:  tr("eD2k e Kad"),
+				Label:  tr("eD2k e Kad (aMule)"),
 				Href:   "/?view=settings&tab=ed2k#v2-setting-ed2k_enabled",
 				Hint:   tr("Ricerca Kad/eD2k e stato della connessione."),
 				Status: ed2kLabel,
@@ -243,9 +243,14 @@ func v2SourcesIndexFrom(s *AppState, cfg *Config) *v2SourcesIndex {
 
 // v2SettingsEd2k is the aMule panel of the eD2k settings tab.
 type v2SettingsEd2k struct {
-	Enabled      bool
-	Reachable    bool
-	Error        string
+	Enabled   bool
+	Reachable bool
+	Error     string
+	// Address and Version identify the aMule in use; Runtime says where it
+	// runs. The panel has to make clear that aMule is the eD2k client.
+	Address      string
+	Version      string
+	Runtime      string
 	AllocateFull bool
 	// IncomingDir and TempDir are aMule's folders, shown read-only: they belong
 	// to aMule and Gextto only reads them (the import uses the incoming one).
@@ -257,6 +262,10 @@ type v2SettingsEd2k struct {
 func v2SettingsEd2kFrom(s *AppState) *v2SettingsEd2k {
 	cfg := latestConfig(s)
 	panel := &v2SettingsEd2k{Enabled: ed2kEnabled(cfg)}
+	if settings, err := ed2kSettingsFromConfig(cfg); err == nil {
+		panel.Address = settings.Address
+	}
+	panel.Runtime = amuleRuntimeLabel(cfg)
 	if !panel.Enabled {
 		return panel
 	}
@@ -266,6 +275,9 @@ func v2SettingsEd2kFrom(s *AppState) *v2SettingsEd2k {
 		return panel
 	}
 	panel.Reachable = true
+	if status, statusErr := ed2kStatus(cfg); statusErr == nil {
+		panel.Version = status.Version
+	}
 	panel.AllocateFull = prefs.AllocateFull
 	panel.IncomingDir = prefs.IncomingDir
 	panel.TempDir = prefs.TempDir

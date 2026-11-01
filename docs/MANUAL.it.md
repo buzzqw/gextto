@@ -1885,7 +1885,9 @@ cartelle di aMule mancanti e le ultime righe di problema dal log di aMule
 (disconnessioni, server non validi, errori), una volta per messaggio e senza i
 tentativi che aMule riprova e completa da solo (per esempio il database IP→paese
 all'inizio del mese), così non devi aprire il log per accorgerti che qualcosa non
-va.
+va. La scheda dice anche che il client eD2k in uso è **aMule**, con la versione,
+l'indirizzo EC e **Dove gira**: su questa macchina, in un container sulla stessa
+macchina oppure su un'altra macchina.
 
 ## 11. Notifiche
 

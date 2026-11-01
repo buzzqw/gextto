@@ -988,13 +988,15 @@
 
 {{define "v2_settings_ed2k"}}
 <div class="panel settings-panel" id="v2-settings-ed2k">
-  <div class="panel-head"><h3>aMule</h3></div>
+  <div class="panel-head"><h3>aMule</h3><small class="muted">{{if .Reachable}}<span>in uso</span>{{if .Version}} · {{.Version}}{{end}}{{if .Address}} · {{.Address}}{{end}}{{else}}non raggiungibile{{end}}</small></div>
   <div class="panel-body">
   {{if not .Enabled}}
     <p class="muted">L'integrazione con aMule è spenta.</p>
   {{else if .Error}}
     <p class="alert" role="alert"><span>aMule non raggiungibile:</span> {{.Error}}</p>
   {{else}}
+    <div class="row"><span>Client eD2k</span><strong>aMule <span>{{.Version}}</span></strong></div>
+    <div class="row"><span>Dove gira</span><strong>{{.Runtime}}</strong></div>
     <p class="hint" title="Queste cartelle appartengono ad aMule: Gextto le legge soltanto. Si cambiano da aMule/amuled; dopo la modifica riavvia Gextto (oppure riapri questa pagina) perché usi il nuovo percorso.">Queste cartelle appartengono ad aMule: Gextto le legge soltanto. Si cambiano da aMule/amuled.</p>
     <div class="row" title="Cartella in cui aMule salva i file completati. Si cambia da aMule/amuled; dopo la modifica riavvia Gextto."><span>Cartella download</span><strong class="truncate" title="{{if .IncomingDir}}{{.IncomingDir}}{{else}}—{{end}}">{{if .IncomingDir}}{{.IncomingDir}}{{else}}—{{end}}</strong></div>
     <div class="row" title="Cartella in cui aMule tiene i file incompleti. Si cambia da aMule/amuled; dopo la modifica riavvia Gextto."><span>Cartella temporanea</span><strong class="truncate" title="{{if .TempDir}}{{.TempDir}}{{else}}—{{end}}">{{if .TempDir}}{{.TempDir}}{{else}}—{{end}}</strong></div>
@@ -1545,12 +1547,14 @@
      tutti i riquadri sono resi freschi dal render completo. */}}
 {{define "v2_health_ed2k"}}
 <div class="panel">
-  <div class="panel-head"><h3>eD2k e Kad (aMule)</h3><small class="muted">{{if .Reachable}}{{if .Version}}{{.Version}}{{end}}{{else}}non raggiungibile{{end}}</small></div>
+  <div class="panel-head"><h3>eD2k e Kad (aMule)</h3><small class="muted">{{if .Reachable}}<span>in uso</span>{{if .Version}} · {{.Version}}{{end}}{{if .Address}} · {{.Address}}{{end}}{{else}}non raggiungibile{{end}}</small></div>
   <div class="panel-body">
   {{if .Error}}
     <p class="alert" role="alert"><span>aMule non raggiungibile:</span> {{.Error}}</p>
   {{else}}
     <div class="stat-grid">
+      <div class="row"><span>Client eD2k</span><strong>aMule <span>{{.Version}}</span></strong></div>
+      <div class="row"><span>Dove gira</span><strong>{{.Runtime}}</strong></div>
       <div class="row"><span>eD2k</span><strong>{{if .Connected}}<span>Connesso a</span> {{.Server}} · {{if .HighID}}<span class="badge ok">ID alto</span>{{else}}<span class="badge warn">ID basso</span>{{end}}{{else}}<span>Non connesso</span>{{end}}</strong></div>
       <div class="row"><span>Kad</span><strong>{{if eq .Kad "connected"}}<span class="badge ok">Connesso</span>{{else if eq .Kad "firewalled"}}<span class="badge warn">Connesso, dietro firewall</span>{{else if eq .Kad "connecting"}}<span>In connessione…</span>{{else}}<span>Fermo</span>{{end}}</strong></div>
       <div class="row"><span>Velocità</span><strong>↓ {{rateI .DownloadRate}} · ↑ {{rateI .UploadRate}}</strong></div>
@@ -1911,6 +1915,7 @@
   {{else}}
     <div class="stat-grid">
       <div class="row"><span>Versione di aMule</span><strong>{{.Status.Version}}</strong></div>
+      <div class="row"><span>Dove gira</span><strong>{{.Runtime}}</strong></div>
       <div class="row"><span>eD2k</span><strong>{{if .Status.Ed2kConnected}}<span>Connesso a</span> {{if .Status.ServerName}}{{.Status.ServerName}}{{else}}{{.Status.ServerAddress}}{{end}} · {{if .Status.HighID}}<span class="badge ok" title="Gli altri client possono contattarti direttamente">ID alto</span>{{else}}<span class="badge warn" title="Porta TCP non raggiungibile da fuori: meno fonti. Apri la porta TCP di aMule sul router">ID basso</span>{{end}}{{else if .Status.Ed2kConnecting}}<span>In connessione…</span>{{else}}<span>Non connesso</span>{{end}}</strong></div>
       <div class="row"><span>Kad</span><strong>{{if .Status.KadConnected}}{{if .Status.KadFirewalled}}<span class="badge warn" title="Porta UDP non raggiungibile da fuori: Kad funziona ma con meno fonti. Apri la porta UDP di aMule sul router">Connesso, dietro firewall</span>{{else}}<span class="badge ok">Connesso</span>{{end}}{{else if .Status.KadRunning}}<span>In connessione…</span>{{else}}<span>Fermo</span>{{end}}</strong></div>
       <div class="row"><span>Velocità</span><strong>↓ {{rateI .Status.DownloadRate}} · ↑ {{rateI .Status.UploadRate}}</strong></div>

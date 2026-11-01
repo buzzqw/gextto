@@ -22,12 +22,14 @@ import (
 // v2Ed2kView is the eD2k page.
 type v2Ed2kView struct {
 	// Tab selects the eD2k sub-page: "status" (default), "shared" or "log".
-	Tab        string
-	Enabled    bool
-	Error      string
-	Status     amule.Status
-	Servers    []amule.Server
-	Address    string
+	Tab     string
+	Enabled bool
+	Error   string
+	Status  amule.Status
+	Servers []amule.Server
+	Address string
+	// Runtime says where aMule runs (this machine, in a container, elsewhere).
+	Runtime    string
 	Network    string
 	Message    string
 	Detail     string
@@ -108,6 +110,7 @@ func v2Ed2kViewFrom(s *AppState, message, detail string, isErr bool, tab string)
 		return view
 	}
 	view.Address = settings.Address
+	view.Runtime = amuleRuntimeLabel(cfg)
 	view.Network = v2Ed2kNetworkName(settings.Network)
 	view.Search.Network = view.Network
 	if !view.Enabled {
