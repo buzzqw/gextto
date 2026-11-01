@@ -121,6 +121,24 @@ func TestMediaIntegrityDecodeErrorIsStillDamaged(t *testing.T) {
 	}
 }
 
+// BenchmarkMediaIntegrityDetail measures the work done on ffmpeg's stderr: a
+// healthy file from an encoder with out-of-order frames writes this line
+// thousands of times, and every line is read before the file is judged.
+func BenchmarkMediaIntegrityDetail(b *testing.B) {
+	var raw strings.Builder
+	for i := 0; i < 400; i++ {
+		raw.WriteString("[null @ 0x55bd8d99e680] Application provided invalid, non monotonically increasing dts to muxer in stream 0: 2 >= 2\n")
+	}
+	raw.WriteString("[h264 @ 0x1234] Error while decoding stream #0:0: Invalid data found when processing input\n")
+	input := raw.String()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		if mediaIntegrityDetail(input) == "" {
+			b.Fatal("the real decode error must survive the filter")
+		}
+	}
+}
+
 func TestMediaIntegrityResolveFilePicksLargestVideo(t *testing.T) {
 	dir := t.TempDir()
 	small := filepath.Join(dir, "small.mkv")

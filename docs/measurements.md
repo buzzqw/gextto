@@ -1191,6 +1191,18 @@ build 1.2.2140, with:
 ffmpeg -nostdin -hide_banner -nostats -v error -threads 1 -skip_frame nokey -i "<file>" -map '0:v?' -map '0:a?' -f null -
 ```
 
+**Reading ffmpeg's error output.** The check judges a file by what `ffmpeg` writes
+on stderr, so with a source whose frames are out of order the same line arrives
+thousands of times (a full 54-minute episode produced 22,998, all the null
+muxer's timestamp complaint, with exit code 0). Building the readable detail from
+a 64 KiB buffer of those lines takes **0.34–0.39 ms/op** (64 kB/op, 403 allocs/op)
+on the N97, build 1.2.2174 — three orders of magnitude below the decode that
+produced them. Measured on 1 November 2026 with:
+
+```
+CGO_ENABLED=0 go test . -run '^$' -bench '^BenchmarkMediaIntegrityDetail$' -benchmem -count=3
+```
+
 ### Packaging
 
 The release archive root is **0755** (`mktemp -d` made it 0700, which tar applied to the
