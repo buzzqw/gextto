@@ -244,6 +244,22 @@ not to break.
   must not write state (`saveLocked` returns immediately): without the guard it
   would create a `.tmp` in the working directory and leave it there because the
   rename to the empty path fails.
+- **Logs of test and build runs stay out of the home and the checkout.** The
+  output of `make test`, `make test-ui`, a sharded `go test` or a build goes
+  to a scratch directory created for the cycle and deleted when the cycle ends
+  (at the latest before the final report):
+
+  ```bash
+  scratch="$(mktemp -d "${TMPDIR:-/tmp}/gextto-check.XXXXXX")"
+  make test >"$scratch/test.log" 2>&1 || { tail -n 40 "$scratch/test.log"; exit 1; }
+  tail -n 5 "$scratch/test.log"
+  rm -rf "$scratch"
+  ```
+
+  Files such as `~/gextto-test-<id>.log`, `~/gextto-build-<id>.log` or a
+  `*.log` at the root of the checkout are forbidden: they pile up in the home
+  and no test cleans them. A log that must survive the cycle stays in
+  `gextto-data/` with a fixed name, so the next run overwrites it.
 - **Gextto's TUI must always keep working.** After every change cycle run
   `go test ./internal/tui/` and the integration test
   `go test . -run TestTUILibraryClientAgainstTheRouter` (it drives the TUI
