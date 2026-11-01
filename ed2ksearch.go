@@ -643,9 +643,10 @@ func Ed2kStatus(w http.ResponseWriter, r *http.Request, s *AppState) {
 
 // SearchSeriesED2K is the gap-filling entry point. It builds the same
 // `Name SxxExx` query as SearchSeriesEpisode, then keeps only the results that
-// match the episode, the configured quality and the source floor. The caller
-// (the deep gap pass) has already established that the torrent plane found
-// nothing.
+// match the episode and pass the automatic acceptance (a video file, the source
+// floor). The profile is applied later, by the caller: a copy it refuses may
+// still be taken as a last resort. The caller (the deep gap pass) has already
+// established that the torrent plane found nothing.
 func (e *Engine) SearchSeriesED2K(ctx context.Context, cfg *Config, series *SeriesConfig, season, episode int64, manual bool) []models.Release {
 	if series == nil || season < 1 || episode < 1 || !ed2kEnabled(cfg) {
 		return nil
@@ -828,14 +829,14 @@ func ed2kSeasonFallback(ctx context.Context, engine *Engine, cfg *Config, series
 }
 
 // ed2kAcceptAutomatic reports whether a copy the automatic fallback found may
-// be used: a video file with a known resolution and at least the configured
-// number of sources. An archive or a sample in another format cannot be
-// imported, and an unknown resolution cannot be compared with the profile.
+// be used: a video file with at least the configured number of sources. The
+// resolution is deliberately not required — eD2k releases are often named only
+// "ITA DLMux x264", and the profile decides: within the profile the copy is a
+// normal candidate, outside it or with an unknown resolution it becomes a last
+// resort, the same rule the torrent plane follows. An archive or a sample in
+// another format still cannot be imported.
 func ed2kAcceptAutomatic(cfg *Config, release models.Release) bool {
 	if link, err := ed2k.ParseFileLink(release.Ed2kLink); err != nil || !isVideoExtension(link.Name) {
-		return false
-	}
-	if release.Quality.Resolution == "" || strings.EqualFold(release.Quality.Resolution, "unknown") {
 		return false
 	}
 	return release.Sources >= ed2kMinSources(cfg)

@@ -104,3 +104,26 @@ func TestDistributeSeasonED2KIgnoresOtherEpisodes(t *testing.T) {
 		t.Fatalf("accepted = %d extra = %+v, want nothing outside season 2", accepted, extra)
 	}
 }
+
+// TestDistributeSeasonED2KTakesACopyWithoutAResolutionAsLastResort is the
+// Walker case: the only copy of an episode is named "ITA DLMux x264" with no
+// resolution at all, so it reaches the profile decision and is kept as a last
+// resort instead of being discarded for not declaring its quality.
+func TestDistributeSeasonED2KTakesACopyWithoutAResolutionAsLastResort(t *testing.T) {
+	cfg := DefaultConfig()
+	series := &SeriesConfig{Name: "Walker", Quality: "720p-1080p", Language: "ita"}
+	candidate := gapTarget{Series: "Walker", Season: 2, Episode: 5}
+	candidateIndex := map[gapTarget]int{candidate: 0}
+	foundResults := make([][]models.Release, 1)
+	lastResorts := make([][]models.Release, 1)
+
+	found := []models.Release{seasonED2KRelease(5, "")}
+	_, accepted := distributeSeasonED2K(&cfg, series, 2, []int64{5}, found, candidateIndex, foundResults, lastResorts)
+
+	if accepted != 0 {
+		t.Fatalf("accepted = %d, want 0 (it is outside the profile)", accepted)
+	}
+	if len(lastResorts[0]) != 1 || !lastResorts[0][0].LastResort {
+		t.Fatalf("last resorts = %+v, want the copy without a resolution", lastResorts[0])
+	}
+}

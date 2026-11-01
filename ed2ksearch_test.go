@@ -323,13 +323,13 @@ func TestEd2kAutomaticSeasonFallbackAnswersAWholeSeasonWithOneQuery(t *testing.T
 }
 
 // TestEd2kAutomaticSeasonFallbackKeepsTheAutomaticAcceptance: the season query
-// is broader, but a copy with an unknown resolution, a non-video file or too few
-// sources is still refused, as the per-episode fallback does.
+// is broader, but a non-video file or too few sources is still refused, as the
+// per-episode fallback does. The resolution is not required: eD2k names often
+// carry none, and the profile decides later.
 func TestEd2kAutomaticSeasonFallbackKeepsTheAutomaticAcceptance(t *testing.T) {
 	for name, result := range map[string]amuletest.Result{
-		"unknown resolution": {Hash: "dddddddddddddddddddddddddddddddd", Name: "Rare Show S02E05.mkv", Size: 900000000, Sources: 9},
-		"archive file":       {Hash: "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", Name: "Rare Show S02E05 1080p.rar", Size: 900000000, Sources: 9},
-		"too few sources":    {Hash: "ffffffffffffffffffffffffffffffff", Name: "Rare Show S02E05 1080p.mkv", Size: 900000000, Sources: 1},
+		"archive file":    {Hash: "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", Name: "Rare Show S02E05 1080p.rar", Size: 900000000, Sources: 9},
+		"too few sources": {Hash: "ffffffffffffffffffffffffffffffff", Name: "Rare Show S02E05 1080p.mkv", Size: 900000000, Sources: 1},
 	} {
 		t.Run(name, func(t *testing.T) {
 			core, cfg := ed2kTestCore(t, map[string]string{"ed2k_min_sources": "3", "ed2k_fallback": "true"})
@@ -340,6 +340,27 @@ func TestEd2kAutomaticSeasonFallbackKeepsTheAutomaticAcceptance(t *testing.T) {
 				t.Fatalf("accepted %+v, want nothing", got)
 			}
 		})
+	}
+}
+
+// TestEd2kAutomaticSeasonFallbackKeepsCopiesWithoutAResolution: a file named
+// only "ITA DLMux x264" is exactly what a whole season has on eD2k. It must
+// reach the profile decision, where it becomes a last resort, instead of being
+// thrown away.
+func TestEd2kAutomaticSeasonFallbackKeepsCopiesWithoutAResolution(t *testing.T) {
+	core, cfg := ed2kTestCore(t, map[string]string{"ed2k_fallback": "true"})
+	core.SetResults([]amuletest.Result{
+		{Hash: "99999999999999999999999999999999", Name: "Walker.2x05.Il.Terzo.Incomodo.ITA.DLMux.x264-WRM.mkv", Size: 350000000, Sources: 4},
+	}, "")
+	series := &SeriesConfig{Name: "Walker", Quality: "720p-1080p", Language: "ita"}
+	engine := &Engine{}
+
+	got := ed2kAutomaticSeasonFallback(context.Background(), engine, cfg, series, 2)
+	if len(got) != 1 {
+		t.Fatalf("accepted %d copies, want the one without a resolution: %+v", len(got), got)
+	}
+	if !cfg.SeriesLastResortAllowed(series, &got[0].Quality, got[0].Title) {
+		t.Fatalf("the copy without a resolution must be a last resort: %+v", got[0])
 	}
 }
 
