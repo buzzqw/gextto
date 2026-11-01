@@ -2681,15 +2681,15 @@
   <div class="panel-head"><h3>Operazioni in background</h3><small class="muted">{{.Active}} <span>in corso</span> · {{len .Jobs}} <span>recenti</span></small></div>
   <div class="panel-body">
     {{if .Jobs}}
-    <div class="table-wrap"><table class="data-table">
+    <div class="table-wrap"><table class="data-table jobs-table">
       <caption class="sr-only">Operazioni in background</caption>
-      <thead><tr><th scope="col">Operazione</th><th scope="col">Stato</th><th scope="col">Avanzamento</th><th scope="col">Messaggio</th><th scope="col"></th></tr></thead>
+      <thead><tr><th scope="col">Operazione</th><th scope="col">Stato</th><th scope="col">Avanzamento</th><th scope="col">Messaggio</th><th scope="col"><span class="sr-only">Azioni</span></th></tr></thead>
       <tbody>{{range .Jobs}}<tr>
-        <td>{{.Kind}}</td>
-        <td><span class="badge {{.StateClass}}">{{.StateLabel}}</span></td>
-        <td style="min-width:140px"><div class="progress"><span style="width:{{.Progress}}%"></span></div><small class="muted">{{.Progress}}%{{if .Started}} · {{.Started}}{{end}}</small></td>
-        <td class="truncate">{{if .Error}}{{.Error}}{{else}}{{.Message}}{{end}}</td>
-        <td class="row-actions">{{if not .Done}}<form hx-post="/jobs/cancel" hx-target="#v2-jobs-panel" hx-swap="outerHTML" style="display:inline"><input type="hidden" name="id" value="{{.ID}}" /><button class="btn sm danger" type="submit" hx-confirm="Annullare l'operazione?">Annulla</button></form>{{end}}</td>
+        <td class="job-kind">{{.Kind}}</td>
+        <td class="job-state"><span class="badge {{.StateClass}}">{{.StateLabel}}</span></td>
+        <td class="job-progress-cell"><div class="progress" role="progressbar" aria-label="Avanzamento di {{.Kind}}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{.Progress}}"><span style="width:{{.Progress}}%"></span></div><small class="muted">{{.Progress}}%{{if .Started}} · {{.Started}}{{end}}</small></td>
+        <td class="job-message truncate">{{if .Error}}{{.Error}}{{else}}{{.Message}}{{end}}</td>
+        <td class="row-actions job-actions">{{if not .Done}}<form hx-post="/jobs/cancel" hx-target="#v2-jobs-panel" hx-swap="outerHTML" style="display:inline"><input type="hidden" name="id" value="{{.ID}}" /><button class="btn sm danger" type="submit" hx-confirm="Annullare l'operazione?">Annulla</button></form>{{end}}</td>
       </tr>{{end}}</tbody>
     </table></div>
     {{else}}<p class="muted">Nessuna operazione in background.</p>{{end}}

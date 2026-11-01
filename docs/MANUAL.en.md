@@ -348,6 +348,12 @@ release package the installer uses (README, *Install on Linux*).
 - **Stat cards** — library (series/movies), free space, archive magnets
   and engine.
 - **Network and active downloads** — CPU/RAM plus a live network sparkline.
+- **Background operations** — appears when a long operation is running or has
+  just finished: rename, archive scan, MediaInfo refresh, file integrity check,
+  missing-episode search, orphan cleanup. Each line shows the state, the
+  **percentage** with its progress bar, the message (for example the file being
+  checked) and **Cancel** while the operation is running. On a phone each
+  operation becomes a card, with no sideways scrolling.
 - **Upcoming releases**, **last downloads**, **recent activity** and
   **latest finds from sources**.
 

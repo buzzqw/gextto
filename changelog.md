@@ -24,6 +24,9 @@ creazione, app sul telefono — valgono **soltanto per la versione standalone** 
 non cambiano l'interfaccia di Gextto, dove quelle pagine non esistono. Le
 correzioni al motore valgono invece per entrambi.
 
+## 1 novembre 2026
+- **Le operazioni in background mostrano la percentuale vera e si leggono sul telefono.** Nella dashboard e in *Manutenzione* la barra di un'operazione completata segnava **1%** invece di 100%: ora la percentuale è quella reale, e accanto alla barra c'è anche per i lettori di schermo. Sul telefono ogni operazione diventa una scheda — nome e stato sulla prima riga, barra di avanzamento, messaggio e pulsante **Annulla** sotto — invece di una tabella larga che scorreva di lato e lasciava fuori messaggio e pulsante. Il messaggio generico («done», «running») non viene più ripetuto accanto allo stato: resta solo quando dice qualcosa di più, per esempio il file in corso di controllo.
+
 ## 31 ottobre 2026
 - **Un indexer che dice «aspetta» viene ascoltato.** Se un indexer risponde `429 Too Many Requests` con l'indicazione `Retry-After`, Gextto mette la sorgente in pausa almeno per il tempo chiesto invece di riprovare secondo il proprio calendario; il limite di sicurezza è un giorno. Niente da configurare: lo stato e la scadenza compaiono in *Sorgenti in backoff*.
 - **L'hash dichiarato due volte non confonde più l'identità.** Alcuni indexer codificano in esadecimale una seconda volta l'infohash a 40 caratteri. Gextto ora riconosce quella forma e usa l'hash interno per il magnete e per la deduplica, invece di scartare il valore e trattare la stessa release come nuova.

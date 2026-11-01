@@ -743,9 +743,27 @@ func v2JobsViewFrom(s *AppState) v2JobsView {
 		return view
 	}
 	for _, job := range payload.Jobs {
+		// The job manager reports progress as a 0..1 fraction (1 = done); the
+		// page shows a percentage, so it must be scaled here. Rendering the
+		// fraction as it was printed "1%" for every finished job.
+		percent := int(job.Progress*100 + 0.5)
+		if percent < 0 {
+			percent = 0
+		}
+		if percent > 100 {
+			percent = 100
+		}
 		entry := v2Job{
 			ID: job.ID, Kind: job.Kind, State: job.State, Message: job.Message, Error: job.Error,
-			Progress: int(job.Progress + 0.5), Done: job.State == "succeeded" || job.State == "failed" || job.State == "canceled",
+			Progress: percent, Done: job.State == "succeeded" || job.State == "failed" || job.State == "canceled",
+		}
+		// The generic lifecycle words repeat what the state badge already says
+		// (and they are internal English names on a translated page): keep the
+		// message only when the job reported something more specific, such as
+		// the file or the series it is working on.
+		switch entry.Message {
+		case "queued", "running", "done", "canceled", "canceling":
+			entry.Message = ""
 		}
 		switch job.State {
 		case "queued":

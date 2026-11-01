@@ -357,6 +357,13 @@ il pacchetto di release usato dall'installer (README, *Installazione Linux*).
 - **Card statistiche** — libreria (serie/film), spazio libero, magnet in
   archivio e motore.
 - **Rete e download attivi** — CPU/RAM e sparkline di rete in tempo reale.
+- **Operazioni in background** — compare quando un'operazione lunga è in corso
+  o si è appena conclusa: rinomina, scansione archivi, aggiornamento MediaInfo,
+  controllo integrità dei file, ricerca delle puntate mancanti, pulizia degli
+  orfani. Ogni riga mostra lo stato, la **percentuale** con la barra di
+  avanzamento, il messaggio (per esempio il file in controllo) e **Annulla**
+  finché l'operazione è in corso. Sul telefono ogni operazione diventa una
+  scheda, senza dover scorrere di lato.
 - **Prossime uscite**, **ultimi download**, **attività recente** e **ultimi
   trovati nelle sorgenti**.
 

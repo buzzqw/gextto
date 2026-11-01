@@ -118,6 +118,35 @@ func TestV2MaintenanceWidgetEndpoints(t *testing.T) {
 	}
 }
 
+// TestV2JobsRenderProgressAsPercentage locks the fraction-to-percentage
+// conversion: the job manager reports 0..1, and a finished job used to be
+// printed as "1%" instead of "100%".
+func TestV2JobsRenderProgressAsPercentage(t *testing.T) {
+	state := newTestAppState(t)
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+
+	job, created := state.jobs.Create("media-integrity", "")
+	if !created {
+		t.Fatal("job not created")
+	}
+	state.jobs.SetProgress(job.ID, 0.25, "checking 2 of 8 files")
+	code, body := v2Request(t, server, http.MethodGet, "/partial/jobs", nil)
+	if code != http.StatusOK {
+		t.Fatalf("jobs partial -> %d", code)
+	}
+	for _, want := range []string{`width:25%`, `aria-valuenow="25"`, "25%"} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("running job missing %q in %s", want, body)
+		}
+	}
+
+	state.jobs.SetProgress(job.ID, 1, "")
+	if code, body := v2Request(t, server, http.MethodGet, "/partial/jobs", nil); code != http.StatusOK || !strings.Contains(body, `width:100%`) || !strings.Contains(body, `aria-valuenow="100"`) {
+		t.Fatalf("finished job is not shown at 100%% -> %d: %s", code, body)
+	}
+}
+
 func TestV2OAuthAndTranslationKey(t *testing.T) {
 	state := newTestAppState(t)
 	server := httptest.NewServer(Router(state))

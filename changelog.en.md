@@ -23,6 +23,9 @@ create, the app on the phone — apply **only to the standalone version** and do
 not change Gextto's interface, where those pages do not exist. Engine fixes, on
 the other hand, apply to both.
 
+## 1 November 2026
+- **Background operations show the real percentage and read well on a phone.** On the dashboard and in *Maintenance* the bar of a finished operation said **1%** instead of 100%: the percentage is now the real one, and screen readers get it too. On a phone each operation becomes a card — name and state on the first line, progress bar, message and **Cancel** button below — instead of a wide table that scrolled sideways and left the message and the button off screen. The generic message (“done”, “running”) is no longer repeated next to the state: it stays only when it says something more, such as the file being checked.
+
 ## 31 October 2026
 - **An indexer that says “wait” is heard.** When an indexer answers `429 Too Many Requests` with a `Retry-After`, Gextto disables the source at least for the requested time instead of retrying on its own schedule; the safety cap is one day. Nothing to configure: the state and the deadline appear in *Sources in backoff*.
 - **A hash declared twice no longer confuses the identity.** Some indexers hex-encode the 40-character infohash a second time. Gextto now recognises that form and uses the inner hash for the magnet and for deduplication, instead of discarding the value and treating the same release as new.
