@@ -6154,7 +6154,10 @@ pol:
   "Minuti,": "Minut,"
   "File per volta.": "Plików na przebieg."
   "Il controllo automatico è disattivato.": "Automatyczne sprawdzanie jest wyłączone."
-  "Attivalo in Configurazione → Manutenzione → Controllo integrità file.": "Włącz je w Konfiguracja → Konserwacja → Sprawdzanie integralności plików."
+  "Il controllo automatico è disattivato: puoi avviare un controllo a mano qui sotto, oppure attivarlo nelle impostazioni del controllo.": "Automatyczne sprawdzanie jest wyłączone: możesz uruchomić sprawdzanie ręcznie poniżej albo włączyć je w ustawieniach sprawdzania."
+  "Impostazioni del controllo": "Ustawienia sprawdzania"
+  "Porta alle impostazioni del controllo automatico: intervallo, file per volta, controllo veloce 4K e riscarica automatica": "Otwiera ustawienia automatycznego sprawdzania: interwał, pliki na przebieg, szybkie sprawdzanie 4K i automatyczne ponowne pobieranie"
+  "Il controllo si avvia, si ferma e si riavvia da Manutenzione → Controllo integrità file; qui decidi cosa fa da solo.": "Sprawdzanie uruchamia się, zatrzymuje i restartuje w Konserwacja → Sprawdzanie integralności plików; tutaj decydujesz, co robi samo."
   "Percorso del file state.json di italian_audio_batch: i file già rimappati e verificati pacchetto per pacchetto dal batch vengono considerati controllati e saltati. Lascia vuoto se non usi questo strumento.": "Ścieżka do state.json narzędzia italian_audio_batch: pliki już przemultipleksowane i zweryfikowane pakiet po pakiecie przez wsad są uznawane za sprawdzone i pomijane. Pozostaw puste, jeśli nie używasz tego narzędzia."
 
   "Feed disabilitati": "Wyłączone kanały"

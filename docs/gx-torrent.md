@@ -392,6 +392,16 @@ The standalone pages follow the same structure:
   folded away.
 - **Archive** and **Settings** use the same top bar, tables and fieldsets;
   Settings keeps its *Save* button visible at the bottom while scrolling.
+- On a phone the archive is a **card per item** — title and flags, size and
+  seeds with their own label (the table header is not shown), the actions on
+  their own line — instead of a table whose title column collapsed to a few
+  pixels; the wanted legend keeps each icon with its label when it wraps; the
+  files list in the detail panel keeps the path readable and scrolls sideways;
+  the feed row's explanation of what decides its downloads wraps instead of
+  ending in an ellipsis. The section bar and the tab bars scroll sideways, so
+  they bring the page you are on into view. The toolbar keeps one play and one
+  pause (the *all* ones): without their labels the selection pair is
+  indistinguishable, and the per-torrent ones stay in the row menu.
 - Every interface page carries the **Donate** link (PayPal, new tab) in the
   bottom-right corner, above the status bar and the settings save bar; on a
   phone only the heart remains. Its label and accessible name are in the

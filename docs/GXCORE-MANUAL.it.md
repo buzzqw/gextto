@@ -234,6 +234,12 @@ La pagina è responsive e installabile come app: manifest e service worker
 mettono in cache solo le risorse condivise, mai pagine o risposte autenticate.
 Quando c’è una password compare **Esci**.
 
+Sul telefono ogni torrent è una scheda (nome, barra, stato e velocità) e
+l’archivio è una scheda per voce, con titolo, dimensione, seed e i pulsanti
+**Add**, **Copy magnet** ed eliminazione; la barra delle sezioni scorre di lato
+e porta al centro la pagina in cui sei. Nel dettaglio i nomi dei file restano
+leggibili e la tabella scorre di lato.
+
 ![Mobile](screenshots/gx-core/it/mobile.png)
 
 ## 9. Integrazioni

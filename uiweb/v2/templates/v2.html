@@ -2404,8 +2404,8 @@
     <p class="hint">Un file che non si riesce a leggere entro il tempo previsto non è dato per danneggiato: il controllo lo riprova più tardi.</p>
     {{if not .Available}}<p class="alert" role="alert"><span>Servono ffprobe e ffmpeg: installali e riavvia Gextto per attivare il controllo.</span> <span>Mancano:</span> <code>{{.Missing}}</code></p>
     {{else if .Enabled}}<p class="hint"><span>Controllo automatico attivo.</span> <span>Ogni</span> <strong>{{.IntervalMinutes}}</strong> <span>Minuti,</span> <strong>{{.Batch}}</strong> <span>File per volta.</span></p>
-    {{else}}<p class="alert" role="status"><span>Il controllo automatico è disattivato.</span> <a href="/?view=settings&amp;tab=maintenance&amp;highlight=media_integrity_enabled#v2-setting-media_integrity_enabled">Attivalo in Configurazione → Manutenzione → Controllo integrità file.</a></p>{{end}}
-    {{if and .Available .Enabled}}<div class="toolbar">
+    {{else}}<p class="alert" role="status">Il controllo automatico è disattivato: puoi avviare un controllo a mano qui sotto, oppure attivarlo nelle impostazioni del controllo.</p>{{end}}
+    {{if .Available}}<div class="toolbar">
       {{if .Running}}
       <form hx-post="/maintenance/media-integrity" hx-target="#v2-media-integrity-panel" hx-swap="outerHTML" style="display:inline">
         <input type="hidden" name="action" value="stop" />
@@ -2421,6 +2421,7 @@
         <button class="btn sm" type="submit" hx-confirm="Ricomincia dal primo file e cancella i risultati precedenti?" title="Ricomincia dal primo file e cancella i risultati precedenti">Riavvia da capo</button>
       </form>
       {{end}}
+      <a class="btn sm" href="/?view=settings&amp;tab=maintenance&amp;highlight=media_integrity_enabled#v2-setting-media_integrity_enabled" title="Porta alle impostazioni del controllo automatico: intervallo, file per volta, controllo veloce 4K e riscarica automatica">Impostazioni del controllo</a>
     </div>{{end}}
     {{if .Started}}<div class="stat-grid" style="margin-top:10px" aria-live="polite">
       <span class="stat"><strong>{{.Checked}}</strong> <span>Controllati</span></span>

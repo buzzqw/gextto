@@ -241,6 +241,10 @@ body{display:flex;flex-direction:column;overflow:hidden}
   .tbl.t td.more{display:block;grid-area:more}
   .tbl.t td.c-progress{display:block;grid-area:prog}
   .tbl.t td.meta-m{display:flex;grid-area:meta;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+  /* The file list in the detail drawer: the path broke to one word per line
+     because the other columns left it a few pixels. Give it a real width and
+     let the drawer scroll sideways. */
+  .tbl.files .fname{min-width:11rem}
   .toolbar .lbl{display:none}
   .toolbar{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
   .toolbar .selinfo,.toolbar .hide-m{display:none}
@@ -367,8 +371,11 @@ body{display:flex;flex-direction:column;overflow:hidden}
       <button type="button" class="ghost" id="btn-resume-all" title="Resume every torrent in the session"><svg class="i"><use href="#i-play"/></svg><span class="lbl">Resume all</span></button>
       <button type="button" class="ghost" id="btn-pause-all" title="Pause every torrent in the session"><svg class="i"><use href="#i-pause"/></svg><span class="lbl">Pause all</span></button>
       <span class="sep" aria-hidden="true"></span>
-      <button type="button" class="ghost" data-bulk="resume" title="Start the selected torrents (Resume; qBittorrent Start)"><svg class="i"><use href="#i-play"/></svg><span class="lbl">Resume</span></button>
-      <button type="button" class="ghost" data-bulk="pause" title="Stop the selected torrents (Pause; qBittorrent Stop) (P)"><svg class="i"><use href="#i-pause"/></svg><span class="lbl">Pause</span></button>
+      <!-- Without their label the two "selected" buttons look exactly like
+           "Resume all" and "Pause all": on a phone only the all ones stay, the
+           per-torrent actions are in the row menu. -->
+      <button type="button" class="ghost hide-m" data-bulk="resume" title="Start the selected torrents (Resume; qBittorrent Start)"><svg class="i"><use href="#i-play"/></svg><span class="lbl">Resume</span></button>
+      <button type="button" class="ghost hide-m" data-bulk="pause" title="Stop the selected torrents (Pause; qBittorrent Stop) (P)"><svg class="i"><use href="#i-pause"/></svg><span class="lbl">Pause</span></button>
       <button type="button" class="ghost hide-m" data-bulk="force-start" aria-label="Force start the selected torrents" title="Force start: run now, outside the queue limits"><svg class="i"><use href="#i-bolt"/></svg></button>
       <button type="button" class="ghost danger" data-bulk="remove-ask" title="Remove the selected torrents (Delete)"><svg class="i"><use href="#i-trash"/></svg><span class="lbl">Remove</span></button>
       <span class="sep hide-m" aria-hidden="true"></span>

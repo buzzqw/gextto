@@ -821,6 +821,15 @@ func uiSettingsPageFrom(s *AppState, activeTab, mode string) uiSettingsPage {
 				{Label: "Ottimizza", Class: "primary", Method: "POST", Path: "/api/torrents/optimize_settings", Body: "{}", Hint: "Applica una base sicura e suggerisce cache e buffer in base alla RAM."},
 			},
 		}
+	case "maintenance":
+		// The check has two faces: the manual actions live in Manutenzione, the
+		// periodic behaviour here. Each one points at the other so the two do
+		// not look like two unrelated features.
+		for index := range page.Groups {
+			if page.Groups[index].Title == "Controllo integrità file" {
+				page.Groups[index].Hint = "Il controllo si avvia, si ferma e si riavvia da Manutenzione → Controllo integrità file; qui decidi cosa fa da solo."
+			}
+		}
 	}
 
 	entries := make([]uiSearchEntry, 0, len(cfg.Settings))

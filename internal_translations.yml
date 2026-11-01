@@ -5551,7 +5551,10 @@ eng:
   "Minuti,": "Minutes,"
   "File per volta.": "Files per pass."
   "Il controllo automatico è disattivato.": "The automatic check is off."
-  "Attivalo in Configurazione → Manutenzione → Controllo integrità file.": "Enable it in Settings → Maintenance → File integrity check."
+  "Il controllo automatico è disattivato: puoi avviare un controllo a mano qui sotto, oppure attivarlo nelle impostazioni del controllo.": "The automatic check is off: you can start a check by hand below, or switch it on in the check settings."
+  "Impostazioni del controllo": "Check settings"
+  "Porta alle impostazioni del controllo automatico: intervallo, file per volta, controllo veloce 4K e riscarica automatica": "Opens the settings of the automatic check: interval, files per pass, quick 4K check and automatic re-download"
+  "Il controllo si avvia, si ferma e si riavvia da Manutenzione → Controllo integrità file; qui decidi cosa fa da solo.": "The check is started, stopped and restarted from Maintenance → File integrity check; here you decide what it does by itself."
   "Percorso del file state.json di italian_audio_batch: i file già rimappati e verificati pacchetto per pacchetto dal batch vengono considerati controllati e saltati. Lascia vuoto se non usi questo strumento.": "Path to the state.json file of italian_audio_batch: files already remuxed and verified packet by packet by the batch are treated as checked and skipped. Leave it empty if you do not use that tool."
 
   "Feed disabilitati": "Disabled feeds"

@@ -24,7 +24,10 @@
 textarea.json{width:100%;font:12.5px/1.45 var(--mono)}
 #rule-preview-warn .hint{color:var(--subtle)}
 #feed-fallback.unused .fgrid,#feed-fallback.unused .checks{border-left:3px solid var(--warn);padding-left:10px}
-.item-sub.governs{color:var(--muted)}
+/* A sentence, not a one-line label: it wraps as text instead of ending in an
+   ellipsis (and the icon stays on the first line). */
+.item-sub.governs{color:var(--muted);display:block;white-space:normal;overflow:visible;text-overflow:clip}
+.item-sub.governs>svg.i{margin-right:4px}
 .item-sub.governs b{color:var(--text);font-weight:600}
 .linklike{background:none;border:0;padding:0;color:var(--accent);cursor:pointer;font:inherit}
 .linklike:hover{text-decoration:underline}

@@ -6213,7 +6213,10 @@ deu:
   "Minuti,": "Minuten,"
   "File per volta.": "Dateien pro Durchlauf."
   "Il controllo automatico è disattivato.": "Die automatische Prüfung ist ausgeschaltet."
-  "Attivalo in Configurazione → Manutenzione → Controllo integrità file.": "Aktiviere sie unter Einstellungen → Wartung → Dateiintegritätsprüfung."
+  "Il controllo automatico è disattivato: puoi avviare un controllo a mano qui sotto, oppure attivarlo nelle impostazioni del controllo.": "Die automatische Prüfung ist aus: Du kannst unten eine Prüfung von Hand starten oder sie in den Einstellungen der Prüfung einschalten."
+  "Impostazioni del controllo": "Einstellungen der Prüfung"
+  "Porta alle impostazioni del controllo automatico: intervallo, file per volta, controllo veloce 4K e riscarica automatica": "Öffnet die Einstellungen der automatischen Prüfung: Intervall, Dateien pro Durchlauf, Schnellprüfung für 4K und automatisches erneutes Laden"
+  "Il controllo si avvia, si ferma e si riavvia da Manutenzione → Controllo integrità file; qui decidi cosa fa da solo.": "Die Prüfung wird unter Wartung → Dateiintegritätsprüfung gestartet, gestoppt und neu gestartet; hier legst du fest, was sie von selbst tut."
   "Percorso del file state.json di italian_audio_batch: i file già rimappati e verificati pacchetto per pacchetto dal batch vengono considerati controllati e saltati. Lascia vuoto se non usi questo strumento.": "Pfad zur state.json von italian_audio_batch: Dateien, die das Batch bereits neu zusammengefügt und Paket für Paket geprüft hat, gelten als geprüft und werden übersprungen. Leer lassen, wenn du dieses Werkzeug nicht verwendest."
 
   "Feed disabilitati": "Deaktivierte Feeds"

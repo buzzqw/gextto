@@ -224,8 +224,27 @@
     var b = document.querySelector(".navmenu > button");
     if (b) { b.setAttribute("aria-expanded", "false"); b.focus(); }
   });
+  // The section nav and the tab bars scroll sideways on a phone (no visible
+  // scrollbar): bring the current item into the middle, so the section you are
+  // on is never the one cut off at the edge.
+  function revealActive() {
+    document.querySelectorAll(".nav, .tabbar").forEach(function (bar) {
+      var active = bar.querySelector('[aria-current="page"], [aria-selected="true"]');
+      if (!active || bar.scrollWidth <= bar.clientWidth) return;
+      // Measured against the bar itself: offsetLeft is relative to the offset
+      // parent, which is not necessarily the scrolling container.
+      var barBox = bar.getBoundingClientRect(), box = active.getBoundingClientRect();
+      var delta = box.left - barBox.left - (bar.clientWidth - box.width) / 2;
+      bar.scrollLeft = Math.max(0, Math.min(bar.scrollLeft + delta, bar.scrollWidth - bar.clientWidth));
+    });
+  }
+  window.gx.revealActive = revealActive;
+
   function init() {
     apply(read());
+    // The settings tab bar is shown by its own script while the page parses,
+    // before this runs.
+    revealActive();
     // The daemon page is installable as an app: the service worker caches only
     // the shared assets, never an authenticated page or an API answer.
     if ("serviceWorker" in navigator) {

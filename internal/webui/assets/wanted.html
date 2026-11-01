@@ -60,6 +60,7 @@
 .seasonchip{font-variant-numeric:tabular-nums}
 .seasonchip .ok,.seasonchip .warn{font-weight:650;margin-left:4px}
 .legend{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;font-size:12.5px;color:var(--muted);margin:0 0 10px}
+.legend .lgitem{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
 .legend .epchip{pointer-events:none}
 .epadd{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin:8px 0}
 .epadd .field{width:96px}
@@ -117,9 +118,9 @@ details.hint summary{cursor:pointer}
 </div>
 
 <p class="legend">
-  <span class="epchip have">✓</span> <span>Downloaded</span>
-  <span class="epchip dl">◐</span> <span>Downloading</span>
-  <span class="epchip miss">○</span> <span>Found, not downloaded</span>
+  <span class="lgitem"><span class="epchip have">✓</span> <span>Downloaded</span></span>
+  <span class="lgitem"><span class="epchip dl">◐</span> <span>Downloading</span></span>
+  <span class="lgitem"><span class="epchip miss">○</span> <span>Found, not downloaded</span></span>
   <span class="hint">“Found” means the feeds or the indexers have seen it; gx-torrent does not know the complete episode list of a series.</span>
 </p>
 <h2 class="sr-only" id="wanted-list-title">Series &amp; movies list</h2>

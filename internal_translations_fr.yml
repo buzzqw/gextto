@@ -6206,7 +6206,10 @@ fra:
   "Minuti,": "Minutes,"
   "File per volta.": "Fichiers par passage."
   "Il controllo automatico è disattivato.": "La vérification automatique est désactivée."
-  "Attivalo in Configurazione → Manutenzione → Controllo integrità file.": "Activez-la dans Configuration → Maintenance → Vérification de l'intégrité des fichiers."
+  "Il controllo automatico è disattivato: puoi avviare un controllo a mano qui sotto, oppure attivarlo nelle impostazioni del controllo.": "La vérification automatique est désactivée : vous pouvez lancer une vérification manuelle ci-dessous ou l'activer dans les réglages de la vérification."
+  "Impostazioni del controllo": "Réglages de la vérification"
+  "Porta alle impostazioni del controllo automatico: intervallo, file per volta, controllo veloce 4K e riscarica automatica": "Ouvre les réglages de la vérification automatique : intervalle, fichiers par passage, contrôle rapide 4K et retéléchargement automatique"
+  "Il controllo si avvia, si ferma e si riavvia da Manutenzione → Controllo integrità file; qui decidi cosa fa da solo.": "La vérification se lance, s'arrête et redémarre depuis Maintenance → Vérification de l'intégrité des fichiers ; ici vous décidez ce qu'elle fait toute seule."
   "Percorso del file state.json di italian_audio_batch: i file già rimappati e verificati pacchetto per pacchetto dal batch vengono considerati controllati e saltati. Lascia vuoto se non usi questo strumento.": "Chemin du fichier state.json de italian_audio_batch : les fichiers déjà remuxés et vérifiés paquet par paquet par le batch sont considérés comme vérifiés et ignorés. Laissez vide si vous n'utilisez pas cet outil."
 
   "Feed disabilitati": "Flux désactivés"

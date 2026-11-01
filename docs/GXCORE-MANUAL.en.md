@@ -231,6 +231,12 @@ The page is responsive and installable as an app: the manifest and the service
 worker cache only the shared assets, never an authenticated page or an API
 answer. When a password is set, **Sign out** appears.
 
+On a phone every torrent is a card (name, bar, state and speeds) and the archive
+is a card per item, with the title, the size, the seeds and the **Add**, **Copy
+magnet** and delete buttons; the section bar scrolls sideways and brings the
+page you are on into view. In the detail the file names stay readable and the
+table scrolls sideways.
+
 ![Mobile](screenshots/gx-core/en/mobile.png)
 
 ## 9. Integrations
