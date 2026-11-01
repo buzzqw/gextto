@@ -11,12 +11,15 @@ package gextto
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -578,12 +581,13 @@ func (e *Engine) scrapeFeed(ctx context.Context, cfg *Config, rawURL string, max
 	}
 	feed := feedLabel(rawURL)
 	source := feedSourceName(rawURL)
+	statKey := feedStatKey(rawURL)
 	// Skip sources inside their backoff window instead of hammering them once
 	// more every cycle.
 	if e.db != nil {
 		if blocked, err := e.db.ProviderBlocked("feed", source); err == nil && blocked {
 			logging.Debug("feed skipped (backoff)", "feed", feed)
-			e.maybeAutoDisableFeed(cfg, rawURL, source)
+			e.maybeAutoDisableFeed(cfg, rawURL, statKey)
 			return nil
 		}
 	}
@@ -594,7 +598,7 @@ func (e *Engine) scrapeFeed(ctx context.Context, cfg *Config, rawURL string, max
 		logging.SourceOK("feed", source, len(items))
 		logging.Debug("RSS feed analyzed", "feed", feed, "items", len(items))
 		if e.db != nil {
-			_ = e.db.RecordSourceAttempt("feed", source, true, len(items), "")
+			_ = e.db.RecordSourceAttempt("feed", statKey, true, len(items), "")
 			_ = e.db.ProviderSuccess("feed", source)
 		}
 		return items
@@ -617,9 +621,9 @@ func (e *Engine) scrapeFeed(ctx context.Context, cfg *Config, rawURL string, max
 	logging.SourceFail("feed", source, message)
 	logging.Warn(fmt.Sprintf("⚠️ RSS feed unavailable — %s: %s", feed, message))
 	if e.db != nil {
-		_ = e.db.RecordSourceAttempt("feed", source, false, 0, message)
+		_ = e.db.RecordSourceAttempt("feed", statKey, false, 0, message)
 		_ = e.db.ProviderFailure("feed", source, message)
-		e.maybeAutoDisableFeed(cfg, rawURL, source)
+		e.maybeAutoDisableFeed(cfg, rawURL, statKey)
 	}
 	return nil
 }
@@ -649,12 +653,12 @@ func feedAutoDisableDays(cfg *Config) int {
 // number of days. It only acts when another feed succeeded today: when every
 // feed fails, the cause is probably the network, DNS or FlareSolverr, and
 // disabling the whole list would make the outage worse.
-func (e *Engine) maybeAutoDisableFeed(cfg *Config, rawURL, source string) {
+func (e *Engine) maybeAutoDisableFeed(cfg *Config, rawURL, statKey string) {
 	days := feedAutoDisableDays(cfg)
 	if e.db == nil || cfg == nil || days <= 0 {
 		return
 	}
-	health, err := e.db.SourceHealth("feed", source)
+	health, err := e.db.SourceHealth("feed", statKey)
 	if err != nil || health.FirstAttemptAt == "" {
 		return
 	}
@@ -671,7 +675,7 @@ func (e *Engine) maybeAutoDisableFeed(cfg *Config, rawURL, source string) {
 			return
 		}
 	}
-	otherSucceeded, err := e.db.AnySourceSuccessToday("feed", source)
+	otherSucceeded, err := e.db.AnySourceSuccessToday("feed", statKey)
 	if err != nil || !otherSucceeded {
 		logging.Debug("feed not disabled automatically: no other feed succeeded today", "feed", feedLabel(rawURL))
 		return
@@ -685,7 +689,7 @@ func (e *Engine) maybeAutoDisableFeed(cfg *Config, rawURL, source string) {
 		return
 	}
 	reason := strconv.Itoa(days)
-	_ = e.db.MarkSourceAutoDisabled("feed", source, reason, now)
+	_ = e.db.MarkSourceAutoDisabled("feed", statKey, reason, now)
 	logging.Warn(fmt.Sprintf("⚠️ The RSS feed %s has not worked for %d days: it has been disabled with a # in Settings → Sources. Fix its address, or remove the # to try it again.", feedLabel(rawURL), days))
 }
 
@@ -1194,9 +1198,10 @@ func feedProviderForSource(cfg *Config, source string) (string, bool) {
 		if provider == "" {
 			continue
 		}
+		key := feedStatKey(raw)
 		if strings.EqualFold(source, provider) || strings.EqualFold(source, raw) ||
 			strings.EqualFold(source, feedLabel(raw)) {
-			return provider, true
+			return key, true
 		}
 		lower := strings.ToLower(source)
 		if strings.HasPrefix(lower, strings.ToLower(provider)) && len(source) > len(provider) {
@@ -1204,7 +1209,7 @@ func feedProviderForSource(cfg *Config, source string) (string, bool) {
 			if strings.HasPrefix(rest, " ") || strings.HasPrefix(rest, "-") ||
 				strings.HasPrefix(rest, "—") || strings.HasPrefix(rest, ":") ||
 				strings.HasPrefix(rest, "/") {
-				return provider, true
+				return key, true
 			}
 		}
 	}
@@ -1221,6 +1226,11 @@ func recordFeedAccepted(db *Database, cfg *Config, release *models.Release) {
 		_ = db.RecordSourceAccepted("feed", provider)
 	}
 }
+
+// feedLabel is the short human label (host + path + a readable query) shown in
+// the feed log lines and the activity table. The query is what distinguishes
+// several uploader or category feeds on the same path (ext.to/browse?filter=…);
+// values that look like credentials are masked.
 func feedLabel(rawURL string) string {
 	parsed, err := url.Parse(rawURL)
 	if err != nil {
@@ -1234,10 +1244,72 @@ func feedLabel(rawURL string) string {
 		host = "feed"
 	}
 	path := strings.TrimRight(parsed.Path, "/")
-	if path == "" {
-		return host
+	label := host + path
+	if query := safeFeedQuery(parsed.RawQuery); query != "" {
+		label += "?" + query
 	}
-	return host + path
+	return label
+}
+
+// feedStatKey is the stable identity of one configured feed in the activity
+// history. Two feeds can share host and path (uploader and category listings);
+// the short hash of the full URL keeps their statistics apart.
+func feedStatKey(rawURL string) string {
+	sum := sha256.Sum256([]byte(strings.TrimSpace(rawURL)))
+	return feedLabel(rawURL) + "#" + hex.EncodeToString(sum[:4])
+}
+
+// safeFeedQuery renders a query string for a label: it keeps the readable
+// parameters, masks values whose name looks like a credential and bounds the
+// result. It is a label, never a URL to fetch.
+func safeFeedQuery(raw string) string {
+	if strings.TrimSpace(raw) == "" {
+		return ""
+	}
+	values, err := url.ParseQuery(raw)
+	if err != nil {
+		return ""
+	}
+	keys := make([]string, 0, len(values))
+	for key := range values {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	parts := make([]string, 0, len(keys))
+	for _, key := range keys {
+		lower := strings.ToLower(key)
+		secret := strings.Contains(lower, "key") || strings.Contains(lower, "token") ||
+			strings.Contains(lower, "pass") || strings.Contains(lower, "secret") ||
+			strings.Contains(lower, "auth")
+		for _, value := range values[key] {
+			if secret {
+				parts = append(parts, safeQueryPart(key)+"=***")
+				continue
+			}
+			if len(value) > 40 {
+				value = value[:40] + "…"
+			}
+			parts = append(parts, safeQueryPart(key)+"="+safeQueryPart(value))
+		}
+	}
+	out := strings.Join(parts, "&")
+	if len(out) > 80 {
+		out = out[:80] + "…"
+	}
+	return out
+}
+
+// safeQueryPart leaves a readable value alone when it only contains characters
+// that are unambiguous in a label; anything else is percent-encoded.
+func safeQueryPart(value string) string {
+	for _, character := range value {
+		if (character >= 'a' && character <= 'z') || (character >= 'A' && character <= 'Z') ||
+			(character >= '0' && character <= '9') || strings.ContainsRune("._~-=", character) {
+			continue
+		}
+		return url.QueryEscape(value)
+	}
+	return value
 }
 
 // Cross-module calls reconciled with the shared ports:

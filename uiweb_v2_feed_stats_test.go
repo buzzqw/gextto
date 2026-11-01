@@ -19,13 +19,13 @@ func TestFeedStatsPanelShowsActivityAndDisabledFrame(t *testing.T) {
 	if err := saveConfigSetting(state.cfg.DataDir, "url", string(encoded)); err != nil {
 		t.Fatalf("save feed setting: %v", err)
 	}
-	if err := state.db.RecordSourceAttempt("feed", "one.example", true, 4, ""); err != nil {
+	if err := state.db.RecordSourceAttempt("feed", feedStatKey("https://one.example/feed.xml"), true, 4, ""); err != nil {
 		t.Fatalf("record attempt: %v", err)
 	}
-	if err := state.db.RecordSourceAccepted("feed", "one.example"); err != nil {
+	if err := state.db.RecordSourceAccepted("feed", feedStatKey("https://one.example/feed.xml")); err != nil {
 		t.Fatalf("record accepted: %v", err)
 	}
-	if err := state.db.MarkSourceAutoDisabled("feed", "two.example", "7", time.Now().UTC()); err != nil {
+	if err := state.db.MarkSourceAutoDisabled("feed", feedStatKey("https://two.example/feed.xml"), "7", time.Now().UTC()); err != nil {
 		t.Fatalf("mark disabled: %v", err)
 	}
 

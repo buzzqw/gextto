@@ -85,6 +85,7 @@ func v2FeedStatsFrom(s *AppState) ([]v2FeedStat, []v2DisabledFeed, v2FeedSummary
 					failures1:   row.Failures1,
 					accepted1:   row.Accepted1,
 					accepted30:  row.Accepted30,
+					hasData:     row.Attempts30 > 0 || row.Accepted30 > 0,
 					disabledAt:  row.DisabledAt,
 					reason:      row.DisabledReason,
 				}
@@ -114,14 +115,15 @@ func v2FeedStatsFrom(s *AppState) ([]v2FeedStat, []v2DisabledFeed, v2FeedSummary
 		if rawURL == "" {
 			continue
 		}
-		provider := feedSourceName(rawURL)
+		source := feedSourceName(rawURL)
+		statKey := feedStatKey(rawURL)
 		label := feedLabel(rawURL)
-		row := stats[provider]
+		row := stats[statKey]
 		if isDisabled && s.db != nil {
 			// A manually disabled feed may have no daily row at all, and an
 			// auto-disabled one may have only the health marker: read it so the
 			// frame can still say when and why.
-			if health, err := s.db.SourceHealth("feed", provider); err == nil {
+			if health, err := s.db.SourceHealth("feed", statKey); err == nil {
 				if row.disabledAt == "" {
 					row.disabledAt = health.DisabledAt
 					row.reason = health.DisabledReason
@@ -140,8 +142,10 @@ func v2FeedStatsFrom(s *AppState) ([]v2FeedStat, []v2DisabledFeed, v2FeedSummary
 				DisabledAt:   v2FeedTime(row.disabledAt),
 				Reason:       row.reason,
 			})
-		} else if statuses[provider] != "" {
+		} else if statuses[source] != "" {
 			state, class = "errori recenti", "warn"
+		} else if !row.hasData {
+			state, class = "in attesa del primo ciclo", ""
 		} else if row.lastSuccess == "" {
 			state, class = "mai letto", "warn"
 		}
@@ -150,9 +154,9 @@ func v2FeedStatsFrom(s *AppState) ([]v2FeedStat, []v2DisabledFeed, v2FeedSummary
 			oneDay, sevenDays, thirtyDays = "0/0/0/0", "0/0/0/0", "0/0/0/0"
 		}
 		table = append(table, v2FeedStat{
-			Label: label, Provider: provider, State: state, StateClass: class,
+			Label: label, Provider: statKey, State: state, StateClass: class,
 			LastSuccess:  v2FeedTime(row.lastSuccess),
-			LastError:    statuses[provider],
+			LastError:    statuses[source],
 			LastResults:  row.lastResults,
 			OneDay:       oneDay,
 			SevenDays:    sevenDays,
@@ -192,6 +196,7 @@ type v2StatRow struct {
 	failures1   int64
 	accepted1   int64
 	accepted30  int64
+	hasData     bool
 	disabledAt  string
 	reason      string
 }

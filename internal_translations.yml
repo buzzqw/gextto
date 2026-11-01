@@ -5582,3 +5582,6 @@ eng:
   "Salute → Attività dei feed": "Health → Feed activity"
 
   "Questi feed non vengono letti. Togli il # davanti alla riga e salva per riattivarli.": "These feeds are not read. Remove the # in front of the line and save to enable them again."
+
+  "in attesa del primo ciclo": "waiting for the first cycle"
+  "mai letto": "never read"

@@ -2161,7 +2161,7 @@ them.
 | Source filters | Keywords to accept or reject for a single source, enabled per row. |
 | Watched folders | The .torrent and .magnet files found in the given folders are **downloaded** and added to the session automatically (recursive, delete after). |
 
-Below the editor there is the **Disabled feeds** frame: it lists the lines with `#` and says whether they were disabled by hand or automatically, with the date and the days of failure. The full activity — state, last success, last error, last results and attempts/successes/failures/releases taken over 1, 7 and 30 days — is on the **Health → Feed activity** page, with the last-24-hours summary. Removing the `#` and saving enables a feed again.
+Below the editor there is the **Disabled feeds** frame: it lists the lines with `#` and says whether they were disabled by hand or automatically, with the date and the days of failure. The full activity — state, last success, last error, last results and attempts/successes/failures/releases taken over 1, 7 and 30 days — is on the **Health → Feed activity** page, with the last-24-hours summary. The panel tells feeds that share host and path apart through their parameters (for example ext.to's `filter=u=…`), masks credentials and, until a first attempt, says “waiting for the first cycle”. Removing the `#` and saving enables a feed again.
 
 #### eD2k and Kad
 

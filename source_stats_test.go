@@ -100,14 +100,16 @@ func TestFeedProviderForSourceAndAcceptedCount(t *testing.T) {
 		"https://one.example/feed.xml",
 		"https://torrentgalaxy.example/get-posts/user:someone/",
 	}}
+	oneKey := feedStatKey("https://one.example/feed.xml")
+	tgxKey := feedStatKey("https://torrentgalaxy.example/get-posts/user:someone/")
 	for _, test := range []struct {
 		source string
 		want   string
 		ok     bool
 	}{
-		{"https://one.example/feed.xml", "one.example", true},
-		{"one.example", "one.example", true},
-		{"TGx — someone", "TGx", true},
+		{"https://one.example/feed.xml", oneKey, true},
+		{"one.example", oneKey, true},
+		{"TGx — someone", tgxKey, true},
 		{"a regular indexer", "", false},
 	} {
 		got, ok := feedProviderForSource(cfg, test.source)
@@ -183,7 +185,7 @@ func TestMaybeAutoDisableFeedNeedsAnotherSuccess(t *testing.T) {
 	db := newTestDB(t)
 	dir := t.TempDir()
 	rawURL := "https://one.example/feed.xml"
-	provider := feedSourceName(rawURL)
+	provider := feedStatKey(rawURL)
 	encoded, _ := json.Marshal([]string{rawURL, "https://two.example/feed.xml"})
 	cfg := &Config{DataDir: dir, Settings: map[string]string{
 		"url":                    string(encoded),

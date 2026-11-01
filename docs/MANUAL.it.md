@@ -2238,7 +2238,7 @@ salvata** finché non li salvi.
 | Filtri per sorgente | Parole chiave da accettare o scartare per una singola sorgente, con attivazione per riga. |
 | Cartelle osservate | I .torrent e i .magnet trovati nelle cartelle indicate vengono **scaricati** e aggiunti automaticamente alla sessione (ricorsiva, elimina dopo). |
 
-Sotto l'editor c'è il riquadro **Feed disabilitati**: elenca le righe con `#` e dice se sono state disabilitate a mano o automaticamente, con la data e i giorni di errore. L'andamento completo — stato, ultimo successo, ultimo errore, ultimi risultati e tentativi/successi/fallimenti/release prese su 1, 7 e 30 giorni — è nella pagina **Salute → Attività dei feed**, con il riepilogo delle ultime 24 ore. Per riattivare un feed basta togliere il `#` e salvare.
+Sotto l'editor c'è il riquadro **Feed disabilitati**: elenca le righe con `#` e dice se sono state disabilitate a mano o automaticamente, con la data e i giorni di errore. L'andamento completo — stato, ultimo successo, ultimo errore, ultimi risultati e tentativi/successi/fallimenti/release prese su 1, 7 e 30 giorni — è nella pagina **Salute → Attività dei feed**, con il riepilogo delle ultime 24 ore. Il pannello distingue i feed che condividono host e percorso tramite i parametri (per esempio `filter=u=…` di ext.to), maschera le credenziali e, finché non c'è ancora un tentativo, dice «in attesa del primo ciclo». Per riattivare un feed basta togliere il `#` e salvare.
 
 #### eD2k e Kad
 
