@@ -278,6 +278,77 @@ func TestProwlarrIndexerHealth(t *testing.T) {
 	if item, ok := byName["LimeTorrents"]; !ok || item["ok"] != true {
 		t.Fatalf("LimeTorrents health = %+v", byName["LimeTorrents"])
 	}
+	if got := byName["LimeTorrents"]["kind"]; got != ManagerProwlarr {
+		t.Errorf("kind = %v, want %s", got, ManagerProwlarr)
+	}
+}
+
+// TestIndexarrManagerHealthUsesTheSameEndpoints proves the Sources view probes
+// an indexarr instance like a Prowlarr one: indexarr answers the same read-only
+// /api/v1/indexer and /api/v1/indexerstatus documents, so a paused or failing
+// indexarr indexer is listed instead of showing up as missing results.
+func TestIndexarrManagerHealthUsesTheSameEndpoints(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/v1/indexer":
+			_, _ = io.WriteString(w, `[
+			  {"id":3,"name":"DDUnlimited","enable":true},
+			  {"id":5,"name":"ExtTo","enable":true}
+			]`)
+		case "/api/v1/indexerstatus":
+			_, _ = io.WriteString(w, `[{"indexerId":3,"disabledTill":"2026-11-01T12:30:00Z","mostRecentFailure":"paused after repeated failures"}]`)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	items, err := ManagerIndexerHealth(context.Background(), server.URL, "secret", ManagerIndexarr)
+	if err != nil {
+		t.Fatalf("ManagerIndexerHealth: %v", err)
+	}
+	if len(items) != 2 {
+		t.Fatalf("items = %+v", items)
+	}
+	for _, item := range items {
+		if item["kind"] != ManagerIndexarr {
+			t.Errorf("%v: kind = %v, want %s", item["name"], item["kind"], ManagerIndexarr)
+		}
+	}
+	byName := map[string]map[string]any{}
+	for _, item := range items {
+		byName[item["name"].(string)] = item
+	}
+	if item := byName["DDUnlimited"]; item["ok"] != false || !strings.Contains(item["error"].(string), "disabilitato fino a") {
+		t.Fatalf("DDUnlimited health = %+v", item)
+	}
+	if item := byName["ExtTo"]; item["ok"] != true {
+		t.Fatalf("ExtTo health = %+v", item)
+	}
+}
+
+// TestManagerHealthSourcesIncludesBothManagers covers the selection rule: only
+// enabled managers are probed, and the page filter never mixes the two kinds.
+func TestManagerHealthSourcesIncludesBothManagers(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Indexers = []IndexerConfig{
+		{Name: "Prowlarr", URL: "http://prowlarr:9696", Enabled: true, Manager: ManagerProwlarr},
+		{Name: "indexarr", URL: "http://indexarr:8788", Enabled: true, Manager: ManagerIndexarr},
+		{Name: "off", URL: "http://off:8788", Enabled: false, Manager: ManagerIndexarr},
+		{Name: "direct", URL: "http://direct:9117", Enabled: true},
+	}
+	all := managerHealthSources(&cfg, "")
+	if len(all) != 2 {
+		t.Fatalf("managers = %+v, want Prowlarr and indexarr", all)
+	}
+	onlyIndexarr := managerHealthSources(&cfg, ManagerIndexarr)
+	if len(onlyIndexarr) != 1 || onlyIndexarr[0].Name != "indexarr" {
+		t.Fatalf("indexarr filter = %+v", onlyIndexarr)
+	}
+	onlyProwlarr := managerHealthSources(&cfg, ManagerProwlarr)
+	if len(onlyProwlarr) != 1 || onlyProwlarr[0].Name != "Prowlarr" {
+		t.Fatalf("prowlarr filter = %+v", onlyProwlarr)
+	}
 }
 
 func TestSlowIndexerDoesNotBlockTheSearch(t *testing.T) {

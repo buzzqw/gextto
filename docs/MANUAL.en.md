@@ -1809,6 +1809,13 @@ For each indexer the table distinguishes:
 This distinction matters: restarting Gextto does not fix a wrong API key, while a
 network problem may require checking DNS, containers, ports or the firewall.
 
+Behind a manager the table also lists the manager's own indexers, one row each,
+so a failed or paused tracker is visible even though the manager itself answers:
+this works for Prowlarr and for indexarr, which exposes the same read-only list
+and status documents. When indexarr has paused a source the row says so and, if
+the manager knows it, shows the moment the next attempt is allowed; nothing to
+configure.
+
 With eD2k on, the **Health** page also has an **eD2k and Kad (aMule)** card with
 the connection state, the speeds, the bytes exchanged in this session, the
 missing aMule folders and the latest problem lines from aMule's log

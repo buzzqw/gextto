@@ -11,13 +11,27 @@ import (
 )
 
 // ProwlarrIndexerHealth reads the indexer list and the failure status of a
-// Prowlarr instance and returns one ready-to-render item per indexer, so the
-// Sources view shows which indexers the manager currently considers failing
-// instead of leaving an empty result unexplained.
+// Prowlarr instance. It is the historical entry point; the indexarr manager
+// speaks the same read-only endpoints, so both go through
+// ManagerIndexerHealth.
 func ProwlarrIndexerHealth(ctx context.Context, baseURL, apiKey string) ([]map[string]any, error) {
+	return ManagerIndexerHealth(ctx, baseURL, apiKey, ManagerProwlarr)
+}
+
+// ManagerIndexerHealth reads the indexer list and the failure status of a
+// manager and returns one ready-to-render item per indexer, so the Sources
+// view shows which indexers the manager currently considers failing instead of
+// leaving an empty result unexplained. Prowlarr and indexarr answer the same
+// /api/v1/indexer and /api/v1/indexerstatus documents; the kind only labels
+// the row.
+func ManagerIndexerHealth(ctx context.Context, baseURL, apiKey, kind string) ([]map[string]any, error) {
 	base := strings.TrimRight(strings.TrimSpace(baseURL), "/")
 	if base == "" {
-		return nil, fmt.Errorf("prowlarr: url is required")
+		return nil, fmt.Errorf("manager: url is required")
+	}
+	kind = strings.ToLower(strings.TrimSpace(kind))
+	if kind == "" {
+		kind = ManagerProwlarr
 	}
 	headers := map[string]string{}
 	if key := strings.TrimSpace(apiKey); key != "" {
@@ -30,7 +44,7 @@ func ProwlarrIndexerHealth(ctx context.Context, baseURL, apiKey string) ([]map[s
 	}
 	var raw []map[string]any
 	if err := json.Unmarshal([]byte(listBody), &raw); err != nil {
-		return nil, fmt.Errorf("prowlarr: invalid indexer list: %w", err)
+		return nil, fmt.Errorf("manager: invalid indexer list: %w", err)
 	}
 
 	// The status endpoint only lists indexers with a failure entry; a fetch
@@ -65,7 +79,7 @@ func ProwlarrIndexerHealth(ctx context.Context, baseURL, apiKey string) ([]map[s
 			enabled = value
 		}
 		item := map[string]any{
-			"kind":    "prowlarr",
+			"kind":    kind,
 			"name":    name,
 			"results": nil,
 			"ok":      enabled,

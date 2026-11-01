@@ -1875,6 +1875,13 @@ Questa distinzione è importante: riavviare Gextto non risolve un errore API key
 mentre un problema di rete può richiedere di controllare DNS, container, porta o
 firewall.
 
+Dietro un manager la tabella elenca anche gli indexer del manager, una riga per
+ciascuno, così un tracker in errore o in pausa si vede anche se il manager
+risponde: vale per Prowlarr e per indexarr, che espone gli stessi documenti di
+sola lettura (elenco e stato). Quando indexarr ha messo una sorgente in pausa la
+riga lo dice e, se il manager lo sa, mostra il momento in cui sarà riprovata;
+non c'è niente da configurare.
+
 Con eD2k attivo la pagina **Salute** ha anche una scheda **eD2k e Kad (aMule)**
 con lo stato della connessione, le velocità, i byte scambiati nella sessione, le
 cartelle di aMule mancanti e le ultime righe di problema dal log di aMule

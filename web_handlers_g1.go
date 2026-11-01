@@ -933,7 +933,7 @@ func SourcesHealth(w http.ResponseWriter, r *http.Request, s *AppState) {
 	// Health probes are request-bound: a client that navigates away stops them.
 	ctx := r.Context()
 
-	tasks := []func() map[string]any{}
+	tasks := []func() []map[string]any{}
 	if term != nil {
 		feedMaxPages := cfg.FeedMaxPages()
 		maxAgeDays := cfg.MaxReleaseAgeDays
@@ -941,12 +941,12 @@ func SourcesHealth(w http.ResponseWriter, r *http.Request, s *AppState) {
 		if includeKind("feed") {
 			for _, feed := range cfg.FeedURLs {
 				feed := feed
-				tasks = append(tasks, func() map[string]any {
+				tasks = append(tasks, func() []map[string]any {
 					items, err := FetchFeed(ctx, feed, cfg.FlaresolverrURL, feedMaxPages, maxAgeDays, oldRatio)
 					if err != nil {
-						return map[string]any{"kind": "feed", "name": feed, "ok": false, "results": int64(0), "error": err.Error()}
+						return []map[string]any{map[string]any{"kind": "feed", "name": feed, "ok": false, "results": int64(0), "error": err.Error()}}
 					}
-					return map[string]any{"kind": "feed", "name": feed, "ok": true, "results": int64(len(items)), "error": nil}
+					return []map[string]any{map[string]any{"kind": "feed", "name": feed, "ok": true, "results": int64(len(items)), "error": nil}}
 				})
 			}
 		}
@@ -956,24 +956,24 @@ func SourcesHealth(w http.ResponseWriter, r *http.Request, s *AppState) {
 					continue
 				}
 				indexer := indexer
-				tasks = append(tasks, func() map[string]any {
+				tasks = append(tasks, func() []map[string]any {
 					items, err := FetchTorznabFlareSolverr(ctx, indexer, *term, nil, cfg.FlaresolverrURL)
 					if err != nil {
-						return map[string]any{"kind": "indexer", "name": indexer.Name, "ok": false, "results": int64(0), "error": err.Error()}
+						return []map[string]any{map[string]any{"kind": "indexer", "name": indexer.Name, "ok": false, "results": int64(0), "error": err.Error()}}
 					}
-					return map[string]any{"kind": "indexer", "name": indexer.Name, "ok": true, "results": int64(len(items)), "error": nil}
+					return []map[string]any{map[string]any{"kind": "indexer", "name": indexer.Name, "ok": true, "results": int64(len(items)), "error": nil}}
 				})
 			}
 		}
 		if includeKind("engine") {
 			for _, engine := range cfg.WebsearchEngines {
 				engine := engine
-				tasks = append(tasks, func() map[string]any {
+				tasks = append(tasks, func() []map[string]any {
 					items, err := runWebEngine(ctx, engine, *term, cfg.FlaresolverrURL)
 					if err != nil {
-						return map[string]any{"kind": "engine", "name": engine, "ok": false, "results": int64(0), "error": err.Error()}
+						return []map[string]any{map[string]any{"kind": "engine", "name": engine, "ok": false, "results": int64(0), "error": err.Error()}}
 					}
-					return map[string]any{"kind": "engine", "name": engine, "ok": true, "results": int64(len(items)), "error": nil}
+					return []map[string]any{map[string]any{"kind": "engine", "name": engine, "ok": true, "results": int64(len(items)), "error": nil}}
 				})
 			}
 		}
@@ -981,18 +981,18 @@ func SourcesHealth(w http.ResponseWriter, r *http.Request, s *AppState) {
 		if includeKind("feed") {
 			for _, feed := range cfg.FeedURLs {
 				feed := feed
-				tasks = append(tasks, func() map[string]any {
+				tasks = append(tasks, func() []map[string]any {
 					request, err := http.NewRequestWithContext(ctx, http.MethodGet, feed, nil)
 					if err != nil {
-						return map[string]any{"kind": "feed", "name": feed, "url": feed, "ok": false, "status": int64(0), "error": err.Error()}
+						return []map[string]any{map[string]any{"kind": "feed", "name": feed, "url": feed, "ok": false, "status": int64(0), "error": err.Error()}}
 					}
 					response, err := client.Do(request)
 					if err != nil {
-						return map[string]any{"kind": "feed", "name": feed, "url": feed, "ok": false, "status": int64(0), "error": err.Error()}
+						return []map[string]any{map[string]any{"kind": "feed", "name": feed, "url": feed, "ok": false, "status": int64(0), "error": err.Error()}}
 					}
 					_ = response.Body.Close()
 					ok := response.StatusCode >= 200 && response.StatusCode < 300
-					return map[string]any{"kind": "feed", "name": feed, "url": feed, "ok": ok, "status": int64(response.StatusCode), "error": nil}
+					return []map[string]any{map[string]any{"kind": "feed", "name": feed, "url": feed, "ok": ok, "status": int64(response.StatusCode), "error": nil}}
 				})
 			}
 		}
@@ -1002,51 +1002,44 @@ func SourcesHealth(w http.ResponseWriter, r *http.Request, s *AppState) {
 					continue
 				}
 				indexer := indexer
-				tasks = append(tasks, func() map[string]any {
+				tasks = append(tasks, func() []map[string]any {
 					items, err := FetchTorznabFlareSolverr(ctx, indexer, "ita", nil, cfg.FlaresolverrURL)
 					if err != nil {
-						return map[string]any{"kind": "indexer", "name": indexer.Name, "url": indexer.URL, "ok": false, "results": int64(0), "error": err.Error()}
+						return []map[string]any{map[string]any{"kind": "indexer", "name": indexer.Name, "url": indexer.URL, "ok": false, "results": int64(0), "error": err.Error()}}
 					}
-					return map[string]any{"kind": "indexer", "name": indexer.Name, "url": indexer.URL, "ok": true, "results": int64(len(items)), "error": nil}
+					return []map[string]any{map[string]any{"kind": "indexer", "name": indexer.Name, "url": indexer.URL, "ok": true, "results": int64(len(items)), "error": nil}}
 				})
 			}
 		}
 		if includeKind("engine") {
 			for _, engine := range cfg.WebsearchEngines {
 				engine := engine
-				tasks = append(tasks, func() map[string]any {
+				tasks = append(tasks, func() []map[string]any {
 					items, err := runWebEngine(ctx, engine, "ita", cfg.FlaresolverrURL)
 					if err != nil {
-						return map[string]any{"kind": "engine", "name": engine, "ok": false, "results": int64(0), "error": err.Error()}
+						return []map[string]any{map[string]any{"kind": "engine", "name": engine, "ok": false, "results": int64(0), "error": err.Error()}}
 					}
-					return map[string]any{"kind": "engine", "name": engine, "ok": true, "results": int64(len(items)), "error": nil}
+					return []map[string]any{map[string]any{"kind": "engine", "name": engine, "ok": true, "results": int64(len(items)), "error": nil}}
 				})
 			}
 		}
 	}
 
 	// Manager-side indexer health: one row per indexer configured in a Prowlarr
-	// instance, so a failing or disabled indexer is visible in the Sources table
-	// instead of showing up only as missing results.
-	if kindFilter == "" || kindFilter == "prowlarr" {
-		for _, indexer := range cfg.Indexers {
-			if !indexer.Enabled || managerKind(indexer) != ManagerProwlarr {
-				continue
+	// or indexarr instance, so a failing or disabled indexer is visible in the
+	// Sources table instead of showing up only as missing results. Both
+	// managers expose the same read-only /api/v1/indexer and
+	// /api/v1/indexerstatus documents.
+	for _, indexer := range managerHealthSources(cfg, kindFilter) {
+		indexer := indexer
+		manager := managerKind(indexer)
+		tasks = append(tasks, func() []map[string]any {
+			health, err := ManagerIndexerHealth(ctx, indexer.URL, indexer.APIKey, manager)
+			if err != nil {
+				return []map[string]any{{"kind": manager, "name": indexer.Name, "ok": false, "results": nil, "error": err.Error()}}
 			}
-			health, healthErr := ProwlarrIndexerHealth(ctx, indexer.URL, indexer.APIKey)
-			if healthErr != nil {
-				name := indexer.Name
-				message := healthErr.Error()
-				tasks = append(tasks, func() map[string]any {
-					return map[string]any{"kind": "prowlarr", "name": name, "ok": false, "results": nil, "error": message}
-				})
-				continue
-			}
-			for _, item := range health {
-				item := item
-				tasks = append(tasks, func() map[string]any { return item })
-			}
-		}
+			return health
+		})
 	}
 
 	// Keep health probes bounded: each task may need one or more browser
@@ -1056,8 +1049,8 @@ func SourcesHealth(w http.ResponseWriter, r *http.Request, s *AppState) {
 	if len(tasks) < workerCount {
 		workerCount = len(tasks)
 	}
-	jobs := make(chan func() map[string]any, len(tasks))
-	results := make(chan map[string]any, len(tasks))
+	jobs := make(chan func() []map[string]any, len(tasks))
+	results := make(chan []map[string]any, len(tasks))
 	var wait sync.WaitGroup
 	for i := 0; i < workerCount; i++ {
 		wait.Add(1)
@@ -1076,8 +1069,8 @@ func SourcesHealth(w http.ResponseWriter, r *http.Request, s *AppState) {
 	wait.Wait()
 	close(results)
 	items := make([]map[string]any, 0, len(tasks))
-	for item := range results {
-		items = append(items, item)
+	for batch := range results {
+		items = append(items, batch...)
 	}
 
 	var query any
@@ -1132,4 +1125,26 @@ func UnpinTorrent(w http.ResponseWriter, r *http.Request, s *AppState) {
 	}
 	status, value := gh1_torrentAction(ok, err)
 	jsonStatus(w, status, value)
+}
+
+// managerHealthSources selects the managers whose indexers the Sources view
+// probes: every enabled Prowlarr or indexarr instance, optionally narrowed by
+// the kind filter of the page. Both expose the same read-only
+// /api/v1/indexer and /api/v1/indexerstatus documents.
+func managerHealthSources(cfg *Config, kindFilter string) []IndexerConfig {
+	if cfg == nil {
+		return nil
+	}
+	out := make([]IndexerConfig, 0, len(cfg.Indexers))
+	for _, indexer := range cfg.Indexers {
+		manager := managerKind(indexer)
+		if !indexer.Enabled || (manager != ManagerProwlarr && manager != ManagerIndexarr) {
+			continue
+		}
+		if kindFilter != "" && kindFilter != manager {
+			continue
+		}
+		out = append(out, indexer)
+	}
+	return out
 }
