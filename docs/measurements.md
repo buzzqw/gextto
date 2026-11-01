@@ -1209,6 +1209,25 @@ The release archive root is **0755** (`mktemp -d` made it 0700, which tar applie
 extracted folder) and `build-release.sh` checks it; `install.sh` keeps `gexttod.prev`
 **and** `gx-torrent.prev`, as `gexttod --update` does.
 
+### 5.1 Gextto on a Synology DS420j (trial, not a supported target)
+
+Machine: DS420j, Realtek RTD1296 (4 × Cortex-A53), 987 MB RAM, DSM 7.4.1, kernel 4.4,
+ext4 on HDD RAID, Surveillance Station running. 2026-11-01, Gextto 1.2.2174, gx-torrent
+1.1.294, cross-compiled `linux/arm64`, run as a plain user with `nice -n 10` and
+`GOMEMLIMIT=250MiB`, no `systemd-run`, sampled every 10 s from `/proc`. Before the trial:
+~370 MB available, 297 MB of swap in use.
+
+| Phase | gexttod RSS | gx-torrent RSS | Min. MemAvailable | Swap | CPU busy | iowait |
+| --- | --- | --- | --- | --- | --- | --- |
+| Idle, IP filter loaded (162,155 rules) | 37–66 MB | 20–21 MB | 318 MB | 302 MB | 3–7 % | 0–7 % |
+| Search cycle: 4 titles, 1,703 releases, 49 s, remote indexer | 66 MB peak (whole phase) | 129 MB | 240 MB | 306 MB | 20 % peak | 22 % peak |
+| Download: 6 large torrents, ~2 min | 37 MB | 209 MB | 160 MB | 316 MB | 19 % peak | 48 % peak |
+| Download: 4 torrents, 8 min, 8–9 MB/s total, 16 MB/s disk peak | 38 MB | 90 MB | 290 MB | 319 MB | 14 % avg, 19 % peak | 6 % avg, 28 % peak |
+
+One pass on public swarms: the 9 MB/s is what those swarms and this line gave, not a
+ceiling of the NAS. Not measured: seeding, post-processing of completed files, operation
+over several days. `ffprobe` is missing on DSM, so the MediaInfo backfill stays paused.
+
 ## 6. Adding a measurement
 
 - Next to each figure: the machine, the date, the build and the command that produced
