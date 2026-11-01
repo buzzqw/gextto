@@ -521,26 +521,77 @@ func v2Ed2kHealthFrom(s *AppState) *v2Ed2kHealth {
 
 // ed2kLogWarnings keeps the most recent aMule log lines that look like a
 // problem. It is deliberately conservative: only clear markers are reported,
-// and the last `limit` lines are kept.
+// the same message is reported once even when aMule writes it again with a new
+// timestamp, and a retry aMule completes by itself is not a problem at all.
 func ed2kLogWarnings(lines []string, limit int) []string {
 	if limit <= 0 {
 		return nil
 	}
 	markers := []string{"error", "failed", "failure", "cannot", "can't", "lost", "disconnect", "no valid server", "refused"}
-	out := make([]string, 0, len(lines))
-	for _, line := range lines {
-		lower := strings.ToLower(line)
+	kept := make([]string, 0, len(lines))
+	keys := make([]string, 0, len(lines))
+	for _, raw := range lines {
+		line := strings.TrimSpace(raw)
+		if line == "" {
+			continue
+		}
+		message := ed2kLogMessage(line)
+		if ed2kLogMessageIsBenign(message) {
+			continue
+		}
+		lower := strings.ToLower(message)
+		problem := false
 		for _, marker := range markers {
 			if strings.Contains(lower, marker) {
-				out = append(out, strings.TrimSpace(line))
+				problem = true
 				break
 			}
+		}
+		if !problem {
+			continue
+		}
+		kept = append(kept, line)
+		keys = append(keys, message)
+	}
+	// A message repeated over the log (aMule reprints it with a new timestamp)
+	// is shown once, at its most recent position.
+	last := make(map[string]int, len(keys))
+	for index, key := range keys {
+		last[key] = index
+	}
+	out := make([]string, 0, len(kept))
+	for index, line := range kept {
+		if last[keys[index]] == index {
+			out = append(out, line)
 		}
 	}
 	if len(out) > limit {
 		out = out[len(out)-limit:]
 	}
 	return out
+}
+
+// ed2kLogMessage strips the leading `!` and the timestamp aMule puts in front
+// of every line, so two copies of the same message compare equal.
+func ed2kLogMessage(line string) string {
+	line = strings.TrimPrefix(strings.TrimSpace(line), "!")
+	const stamp = "2006-01-02 15:04:05"
+	if len(line) > len(stamp)+2 && strings.HasPrefix(line[len(stamp):], ": ") {
+		if _, err := time.Parse(stamp, line[:len(stamp)]); err == nil {
+			return strings.TrimSpace(line[len(stamp)+2:])
+		}
+	}
+	return line
+}
+
+// ed2kLogMessageIsBenign reports the lines that describe a retry aMule
+// completes by itself, so they must not be shown as problems. At the start of
+// every month db-ip.com has not published the new IP-to-country database yet:
+// aMule gets a 404, retries the previous month's file and keeps the one it has.
+func ed2kLogMessageIsBenign(message string) bool {
+	lower := strings.ToLower(message)
+	return strings.Contains(lower, "download.db-ip.com") ||
+		(strings.Contains(lower, "db-ip download failed") && strings.Contains(lower, "previous month"))
 }
 
 // amuleDirIssue is one aMule folder that cannot be used, with the scope that

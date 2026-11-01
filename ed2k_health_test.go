@@ -34,6 +34,37 @@ func TestEd2kLogWarnings(t *testing.T) {
 	}
 }
 
+func TestEd2kLogWarningsDropsRepeatsAndSelfHealingLines(t *testing.T) {
+	incoming := " 2026-11-01 06:00:05: 06:00:05: Error: Directory '/incoming' couldn't be created (error 13: Permission denied)"
+	firstStat := " 2026-11-01 06:00:08: Error: Failed to get file system statistics: No such file or directory"
+	lastStat := " 2026-11-01 06:01:00: Error: Failed to get file system statistics: No such file or directory"
+	lines := []string{
+		incoming,
+		incoming,
+		firstStat,
+		" 2026-11-01 06:00:12: HTTP download failed for https://download.db-ip.com: Error:  (404)",
+		" 2026-11-01 06:00:12: DB-IP download failed for the current month - retrying with the previous month's URL.",
+		lastStat,
+		" 2026-11-01 06:02:00: Connected to Kad",
+	}
+
+	got := ed2kLogWarnings(lines, 5)
+	want := []string{strings.TrimSpace(incoming), strings.TrimSpace(lastStat)}
+	if len(got) != len(want) {
+		t.Fatalf("warnings = %v, want %v", got, want)
+	}
+	for index := range want {
+		if got[index] != want[index] {
+			t.Fatalf("warnings = %v, want %v", got, want)
+		}
+	}
+
+	// The limit applies after the repeats are collapsed.
+	if got := ed2kLogWarnings(lines, 1); len(got) != 1 || got[0] != strings.TrimSpace(lastStat) {
+		t.Fatalf("warnings with limit 1 = %v, want the newest line only", got)
+	}
+}
+
 func TestEd2kSettingsTabIsSeparateFromSources(t *testing.T) {
 	core, handler := ed2kTestRouter(t)
 	core.SetAllocateFull(true)
