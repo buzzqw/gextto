@@ -22,8 +22,12 @@ the releases page): it holds the binary, `run.sh` to start it and
 tar xzf gx-torrent-linux-x86_64.tar.gz
 cd gx-torrent
 ./run.sh                              # direct start, data in a folder beside it
-# or: sudo ./install-service.sh       # systemd service, data in /var/lib/gx-torrent
+./run.sh 2                            # or: systemd service, data in /var/lib/gx-torrent
+# or: sudo ./install-service.sh       # the same, without going through run.sh
 ```
+
+`./run.sh --help` lists the two choices; with no argument, in a terminal, the
+script asks which one you want.
 
 Open `http://YOUR-SERVER:8890/`: the first visit shows the wizard.
 

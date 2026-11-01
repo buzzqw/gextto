@@ -22,8 +22,12 @@ nella pagina delle release): dentro ci sono il binario, `run.sh` per avviarlo e
 tar xzf gx-torrent-linux-x86_64.tar.gz
 cd gx-torrent
 ./run.sh                              # avvio diretto, dati in una cartella accanto
-# oppure: sudo ./install-service.sh   # servizio systemd, dati in /var/lib/gx-torrent
+./run.sh 2                            # oppure: servizio systemd, dati in /var/lib/gx-torrent
+# oppure: sudo ./install-service.sh   # lo stesso, senza passare da run.sh
 ```
+
+`./run.sh --help` elenca le due scelte; senza argomento, in un terminale,
+lo script le chiede.
 
 Apri `http://IP-DEL-SERVER:8890/`: al primo accesso compare la procedura guidata.
 

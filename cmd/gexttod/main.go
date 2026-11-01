@@ -109,8 +109,8 @@ func runDaemon(dryRun bool, configOption *string) error {
 	}
 	defer releaseLock()
 	if conflicts := gextto.ListenConflicts(&cfg); len(conflicts) > 0 {
-		logging.Error("Cannot start: the interface address is already in use. Stop the other instance and try again.", "address", strings.Join(conflicts, ", "))
-		return fmt.Errorf("the address %s is already in use: stop the other instance before starting", strings.Join(conflicts, ", "))
+		logging.Error("Cannot start: another Gextto is already listening on the interface address. Stop it, or start this copy on other ports.", "address", strings.Join(conflicts, ", "))
+		return fmt.Errorf("another Gextto is already listening on %s: stop it first (systemctl --user stop gextto, or systemctl stop gextto when it is the system service), or start this copy on other ports with GEXTTO_LISTEN and GEXTTO_ENGINE_LISTEN", strings.Join(conflicts, ", "))
 	}
 	gextto.WarnIfAudioCleanupUnavailable(&cfg)
 	for _, warning := range dirWarnings {

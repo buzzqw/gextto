@@ -66,26 +66,62 @@ fi
 cat > "$STAGE/run.sh" <<'RUN'
 #!/usr/bin/env bash
 # Launch gextto from an extracted archive or install it as a system service.
+# The systemd unit runs this script too: with no terminal and no argument it
+# goes straight to the daemon.
 set -euo pipefail
 DIR="$(cd "$(dirname "$0")" && pwd)"
 export GEXTTO_DATA_DIR="${GEXTTO_DATA_DIR:-$DIR/data}"
 
-if [[ -t 0 && $# -eq 0 ]]; then
+usage() {
+  echo "uso / usage: ./run.sh [1|2]"
+  echo "  1  avvia Gextto direttamente / start Gextto directly (default)"
+  echo "  2  installa il servizio systemd (gextto.service) / install the systemd service"
+  echo "Senza argomento, in un terminale, lo script chiede quale vuoi."
+  echo "With no argument, in a terminal, the script asks which one you want."
+}
+
+install_service() {
+  if [[ ! -x "$DIR/install-service.sh" ]]; then
+    echo "errore / error: install-service.sh is not next to this script" >&2
+    exit 1
+  fi
+  if [[ "$(id -u)" != "0" ]]; then
+    exec sudo "$DIR/install-service.sh"
+  fi
+  exec "$DIR/install-service.sh"
+}
+
+# The choice arrives as an argument (./run.sh 2) or from the prompt below, and
+# it must never travel on to the daemon: the daemon ignores an argument it does
+# not know, so `./run.sh 1` used to look like it had picked the menu entry while
+# it was simply starting.
+chosen=""
+if [[ $# -gt 0 ]]; then
+  case "$1" in
+    1) chosen="1"; shift ;;
+    2) shift; install_service ;;
+    -h|--help) usage; exit 0 ;;
+    [0-9]*) echo "errore / error: unknown choice '$1'" >&2; usage >&2; exit 2 ;;
+  esac
+fi
+
+if [[ -z "$chosen" && $# -eq 0 && -t 0 ]]; then
   echo "================================================="
   echo " Gextto — Media Acquisition & Archiving"
   echo "================================================="
   echo "1) Avvia Gextto direttamente / Start Gextto directly"
   echo "2) Installa il servizio systemd / Install systemd service (gextto.service)"
-  read -r -p "Scelta / Choice [1/2] (default 1): " choice
-  if [[ "$choice" == "2" ]]; then
-    if [[ -x "$DIR/install-service.sh" ]]; then
-      if [[ "$(id -u)" != "0" ]]; then
-        exec sudo "$DIR/install-service.sh"
-      else
-        exec "$DIR/install-service.sh"
-      fi
+  while :; do
+    if ! read -r -p "Scelta / Choice [1/2] (default 1): " answer; then
+      echo
+      break
     fi
-  fi
+    case "$answer" in
+      ""|1) break ;;
+      2) install_service ;;
+      *) echo "Scegli 1 o 2 / Choose 1 or 2" ;;
+    esac
+  done
 fi
 
 exec "$DIR/gexttod" "$@"

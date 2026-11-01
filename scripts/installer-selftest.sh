@@ -228,12 +228,53 @@ check_package_script() {
   expect "holepunch-netns-test.sh: --help exits 0" 0 "Usage:"
 }
 
+# check_launcher <label> <package script> <binary name>: builds the real archive
+# from a stand-in binary (the packaging script only checks that it is
+# executable) and drives the run.sh inside it. The launcher must take the menu
+# choice as an argument: `./run.sh 1` used to hand the "1" to the daemon, which
+# ignores an argument it does not know, so the choice looked ignored.
+check_launcher() {
+  local label="$1" script="$2" binary="$3"
+  local src="$TMP/launcher-$label" out="$TMP/launcher-$label.tar.gz" dir="$TMP/launcher-$label.d"
+  mkdir -p "$src" "$dir"
+  printf '#!/bin/sh\necho "daemon started with: $*"\n' > "$src/$binary"
+  chmod +x "$src/$binary"
+  # package-linux.sh ships gx-torrent beside gexttod and refuses to package
+  # without it.
+  [[ "$binary" == "gexttod" ]] && cp "$src/$binary" "$src/gx-torrent"
+
+  capture bash "$script" --binary "$src/$binary" --output "$out" --arch test
+  expect "$label: archive built" 0 "archive:"
+  tar xzf "$out" -C "$dir"
+
+  capture bash "$dir/run.sh" --help
+  expect "$label run.sh: --help exits 0" 0 "usage:"
+
+  capture bash "$dir/run.sh" 9
+  expect "$label run.sh: an unknown choice is rejected" 2 "unknown choice"
+
+  capture bash "$dir/run.sh" 1
+  expect "$label run.sh: option 1 starts the daemon" 0 "daemon started with:"
+
+  # No argument and no terminal is how the systemd unit runs it.
+  capture bash "$dir/run.sh"
+  expect "$label run.sh: without a terminal it starts the daemon" 0 "daemon started with:"
+
+  # Asking for the service when the installer is not in the archive must say so
+  # instead of quietly starting the daemon.
+  rm -f "$dir/install-service.sh"
+  capture bash "$dir/run.sh" 2
+  expect "$label run.sh: option 2 without the installer fails" 1 "not next to this script"
+}
+
 printf 'installer self-test\n'
 check_common "install.sh" "$INSTALL"
 check_common "install-user-service.sh" "$USER_INSTALL"
 check_install
 check_user_install
 check_package_script
+check_launcher "gextto" "$ROOT/scripts/package-linux.sh" "gexttod"
+check_launcher "gx-torrent" "$ROOT/scripts/package-gx-torrent.sh" "gx-torrent"
 
 if (( failures > 0 )); then
   printf '\n%d check(s) failed\n' "$failures" >&2
