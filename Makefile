@@ -3,7 +3,7 @@ BINARY := gexttod
 CMD := ./cmd/gexttod
 OUT := bin/$(BINARY)
 
-.PHONY: all build fast gx-torrent test test-serial test-race test-engine test-dht test-ui screenshots fuzz-smoke container vet fmt check-ui check-scripts installer-test tidy package clean run measure-seeding measure-pipeline measure-realswarm measure-choking measure-dht measure-merge3 cache-refresh
+.PHONY: all build fast gx-torrent test test-serial test-race test-engine test-dht test-ui screenshots fuzz-smoke container vet fmt check-ui check-scripts installer-test tidy package clean run measure-seeding measure-pipeline measure-realswarm measure-choking measure-dht measure-merge3 bench-all bench-all-docker cache-refresh
 
 all: build
 
@@ -170,6 +170,17 @@ measure-merge3:
 # GX_MEASURE_DHT=5m sets the duration; GX_MEASURE_DHT_INTERVAL=10s the sampling.
 measure-dht:
 	cd internal/dht && GX_MEASURE_DHT=$${GX_MEASURE_DHT:-3m} go test -run MeasureDHT -v -count=1 -timeout 30m
+
+# The whole Go benchmark suite in one reproducible pass (not part of CI). Run it
+# on an idle machine: the numbers replace the ones in docs/measurements.md.
+# GX_BENCH_COUNT (default 6) and GX_BENCH_PROCS (default 2) tune the run; the
+# output goes to gextto-data/bench/ as a raw log plus a benchstat table.
+bench-all:
+	scripts/bench-all.sh
+
+# Same pass in a pinned golang image, with the CPUs restricted to the container.
+bench-all-docker:
+	scripts/bench-all.sh --docker
 
 vet:
 	CGO_ENABLED=0 go vet ./...
