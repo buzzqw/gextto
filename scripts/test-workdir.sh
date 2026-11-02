@@ -8,11 +8,15 @@
 #   scripts/test-workdir.sh root          # print the root (created if missing)
 #   scripts/test-workdir.sh new <name>    # create and print <root>/<name>
 #   scripts/test-workdir.sh clean         # remove what no process is using
-#   scripts/test-workdir.sh clean --all   # remove everything (stop the runs first)
+#   scripts/test-workdir.sh clean --all   # remove everything, long-lived too
 #
 # Root: $GEXTTO_TEST_ROOT, default ${XDG_CACHE_HOME:-$HOME/.cache}/gextto-tests.
 # It sits on a real disk on purpose: /tmp is often tmpfs, too small for torrent
 # payloads and gone after a reboot.
+#
+# `clean` keeps the folders of a running instance (a live pid file) and the
+# long-lived gx-core test instance, which is a tool rather than a cycle's
+# residue; `--all` removes those too (stop the instance first).
 set -euo pipefail
 
 ROOT="${GEXTTO_TEST_ROOT:-${XDG_CACHE_HOME:-$HOME/.cache}/gextto-tests}"
@@ -50,13 +54,21 @@ cmd_new() {
 }
 
 cmd_clean() {
-	local all=0 entry pidfile pid
+	local all=0 entry pidfile pid name
+	# The gx-core test instance is a long-lived tool (its own state, session
+	# database and downloads), not the residue of a cycle: it survives `clean`.
+	local keep="gx-core-test"
 	[[ ${1:-} == --all ]] && all=1
 	[[ -d "$ROOT" ]] || return 0
 	for entry in "$ROOT"/*; do
 		[[ -e "$entry" ]] || continue
+		name=$(basename "$entry")
 		pid=""
 		if ((!all)); then
+			if [[ "$name" == "$keep" ]]; then
+				echo "keep   $entry (long-lived test instance; --all removes it)"
+				continue
+			fi
 			for pidfile in "$entry"/*.pid; do
 				[[ -f "$pidfile" ]] || continue
 				if alive "$pidfile"; then
@@ -79,7 +91,7 @@ case "${1:-root}" in
 root) cmd_root ;;
 new) cmd_new "${2:-}" ;;
 clean) cmd_clean "${2:-}" ;;
--h | --help | help) sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//' ;;
+-h | --help | help) awk 'NR > 1 { if ($0 !~ /^#/) exit; sub(/^# ?/, ""); print }' "$0" ;;
 *)
 	echo "test-workdir: unknown command: $1" >&2
 	exit 2

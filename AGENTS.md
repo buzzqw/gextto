@@ -274,7 +274,8 @@ not to break.
   - **Cleanup is part of the work**: `scripts/gx-core-test.sh clean` (stops the
     test daemon and removes it), `scripts/compare/run.py clean` (payloads and
     containers of a round), `scripts/test-workdir.sh clean` (everything no
-    process is using). Before the final report the work area holds nothing left
+    process is using; the long-lived gx-core test instance stays, `--all`
+    removes it too). Before the final report the work area holds nothing left
     over and `$HOME` has no new entry.
   - The only artifacts that stay are the raw benchmark results in
     `gextto-data/bench/`, with fixed names so the next run overwrites them; the
