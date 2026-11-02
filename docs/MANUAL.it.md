@@ -1413,6 +1413,12 @@ link di download, senza far aspettare il download: indexarr registra così il
 download e la fonte che l'ha fornito in *Log → Download*. Il file scaricato resta il link `ed2k://`
 e, se il link di download non risponde, il download parte lo stesso.
 
+Quando un torrent o un file eD2k si completa, Gextto comunica a indexarr che il
+file è davvero arrivato, usando lo stesso indirizzo e la stessa API key delle
+ricerche. Nella pagina Download di indexarr quella riga diventa **scaricato**;
+quella solo consegnata resta **solo consegnato**. La comunicazione avviene in
+sottofondo e non rallenta mai il download; non c'è niente da configurare.
+
 Con Jackett e Prowlarr Gextto legge l'elenco degli indexer dal manager
 e ne interroga **uno alla volta** (l'endpoint Torznab del singolo indexer per
 Jackett, la ricerca per `indexerIds` per Prowlarr): ogni tracker ha

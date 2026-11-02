@@ -207,6 +207,10 @@ checkout: `git pull --ff-only && ./scripts/update.sh`.
   last error, attempts/successes/failures/taken over 1, 7 and 30 days) and is disabled
   automatically after a configurable run of days without a success, with a warning frame
   listing the disabled ones.
+- **Download confirmation.** At the end of a torrent or eD2k download, Gextto
+  tells the indexarr managers already configured which file arrived, so
+  indexarr's Download page can mark it as downloaded instead of only delivered.
+  The report runs in the background and never delays the download.
 - **eD2k and Kad through aMule, when torrents find nothing.** Optional and off by
   default: Gextto drives an `amuled` you run (External Connections protocol,
   our own Go client). Search Kad or the eD2k servers, paste `ed2k://` links,

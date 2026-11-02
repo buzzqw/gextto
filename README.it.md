@@ -209,6 +209,11 @@ un checkout: `git pull --ff-only && ./scripts/update.sh`.
   attività** (ultimo successo, ultimo errore, tentativi/successi/fallimenti/prese su
   1, 7 e 30 giorni) e viene disabilitato automaticamente dopo una serie configurabile
   di giorni senza successi, con un riquadro che elenca quelli spenti.
+- **Conferma dei download.** Alla fine di un download torrent o eD2k, Gextto
+  comunica ai gestori indexarr già configurati quale file è arrivato, così la
+  pagina Download di indexarr lo segna come scaricato invece che solo
+  consegnato. La comunicazione avviene in sottofondo e non rallenta mai il
+  download.
 - **eD2k e Kad tramite aMule, quando i torrent non trovano nulla.** Opzionale e
   spento di default: Gextto pilota un `amuled` che fai girare tu (protocollo
   External Connections, client nostro in Go). Cerchi su Kad o sui server eD2k,

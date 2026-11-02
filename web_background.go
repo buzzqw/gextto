@@ -1458,6 +1458,17 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 						}
 					}
 				}
+				// The file is complete: tell every configured indexarr which
+				// release arrived, so its Download tab can tell this grab from
+				// one that was only handed over. Off the request path and
+				// idempotent on both sides.
+				network := ""
+				title := event.Name
+				if completionMeta != nil {
+					network = completionMeta.Release.Network
+					title = completionMeta.Release.Title
+				}
+				notifyIndexarrCompletion(cfg, event.Hash, indexarrProtocol(network, event.Hash), title, 0, time.Now())
 			}
 			eventLog.Push(publicEvent)
 		}
