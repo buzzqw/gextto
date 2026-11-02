@@ -171,6 +171,12 @@ measure-merge3:
 measure-dht:
 	cd internal/dht && GX_MEASURE_DHT=$${GX_MEASURE_DHT:-3m} go test -run MeasureDHT -v -count=1 -timeout 30m
 
+# gx-torrent against qBittorrent, Transmission and Deluge in Docker, the one way
+# to compare clients (AGENTS.md, The benchmark rule). Long: about two hours.
+measure-compare:
+	python3 scripts/compare/run.py run
+	python3 scripts/compare/run.py report
+
 # The whole Go benchmark suite in one reproducible pass (not part of CI). Run it
 # on an idle machine: the numbers replace the ones in docs/measurements.md.
 # GX_BENCH_COUNT (default 6) and GX_BENCH_PROCS (default 2) tune the run; the

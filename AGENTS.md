@@ -265,6 +265,25 @@ not to break.
   `go test . -run TestTUILibraryClientAgainstTheRouter` (it drives the TUI
   client against the real API), plus the `gexttod tui` smoke test against the
   daemon. Always include the TUI verification in the final control round.
+- **The benchmark rule: one way to compare clients.** A comparison with
+  qBittorrent, Transmission or Deluge comes only from `make measure-compare`
+  (`scripts/compare/run.py`), so every round is the same experiment:
+  - *Same torrents*: the payloads are generated from a fixed formula and their
+    info hashes are pinned in `OFFICIAL_HASHES`; a different payload is refused.
+  - *Same images*: pinned Debian base and client versions in
+    `scripts/compare/Dockerfile`, gx-torrent built from the checkout.
+  - *Same limits*: client under test on CPUs 2-3 with 4 GiB, reference peers on
+    CPUs 0-1 with 1.5 GiB each, data in `~/.cache/gextto-compare` on the ext4
+    NVMe (never tmpfs), isolated Docker network, same scenarios and settings.
+  - *Quiet host*: before a round set `media_integrity_enabled` to `false`
+    (ffmpeg must not run, the harness refuses to go on otherwise) and put it
+    back afterwards; do not start with load above 1. A run whose
+    `background_cores` is above 1 is run again, not reported.
+  - *Same reading*: three interleaved rounds, the median with its range, every
+    downloaded file compared byte by byte.
+  - Changing any of these (machine, version, limit, payload) starts a new
+    baseline: re-run **every** client and replace the whole table. Never compare
+    with numbers from another setup. Results go in `docs/measurements.md`.
 - **Performance (CPU and RAM).** After every cycle of engine or daemon changes,
   do a **thorough performance check**: CPU, RAM (RSS and allocations) and
   transfer latency/throughput. Every replacement or optimisation must be **at
