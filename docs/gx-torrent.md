@@ -1468,7 +1468,9 @@ RPC server is disabled.
     `utp_dial_errors`, `utp_accept_errors` in `GET /api/v1/stats`); the
     retransmission counters (`utp_resends_timeout`, `utp_resends_fast`) and the
     dropped-SYN counter (`utp_syn_drops`) are shown in the Salute «uTP» row and
-    in the daemon status bar.
+    in the daemon status bar. If the TCP leg is accepted and then reset before
+    the BitTorrent handshake — what a uTP-only peer does — the dial is retried
+    once over uTP alone, so the peer is not lost until the next announce.
   - The retransmission timeout adapts to the loss signal: a **minimum RTT of
     5 ms** keeps a fast path (loopback/LAN, RTT of tens of microseconds) from
     collapsing the RTO to sub-milliseconds and resending in a storm, and a

@@ -3,7 +3,10 @@ package btconn
 import (
 	"bytes"
 	"context"
+	"errors"
+	"io"
 	"net"
+	"syscall"
 	"time"
 
 	"github.com/buzzqw/gextto/internal/gxcore/internal/ctxutil"
@@ -17,6 +20,10 @@ import (
 // plaintext unless forced), with one plaintext redial when the encrypted
 // attempt fails and encryption is optional. The returned conn is ready for
 // peer messages; on error the socket is already closed.
+//
+// If the race picked TCP and the peer reset it before the handshake (a
+// uTP-only peer accepts the TCP leg and resets it), Dial retries once over
+// uTP alone instead of losing the peer until the next announce.
 func Dial(
 	addr net.Addr,
 	dialTimeout, handshakeTimeout time.Duration,
@@ -28,11 +35,45 @@ func Dial(
 	stopC chan struct{}) (
 	conn net.Conn, cipher mse.CryptoMethod, peerExtensions [8]byte, peerID [20]byte, err error) {
 	log := logger.New("conn -> " + addr.String())
-	done := make(chan struct{})
-	defer close(done)
-
 	ctx, cancel := ctxutil.FromChan(stopC)
 	defer cancel()
+	dialer := net.Dialer{Timeout: dialTimeout}
+
+	conn, cipher, peerExtensions, peerID, usedUTP, err := dialAttempt(
+		ctx, &dialer, addr, handshakeTimeout, enableEncryption, forceEncryption,
+		ourExtensions, ih, ourID, stopC, log, false)
+	if err == nil || stopped(stopC) || usedUTP || !retryableDialError(err) || !netx.UTPAvailable() {
+		return
+	}
+	log.Debugln("TCP connection failed before the handshake, retrying over uTP:", err)
+	firstErr := err
+	conn, cipher, peerExtensions, peerID, _, err = dialAttempt(
+		ctx, &dialer, addr, handshakeTimeout, enableEncryption, forceEncryption,
+		ourExtensions, ih, ourID, stopC, log, true)
+	if err != nil {
+		err = firstErr
+	}
+	return
+}
+
+// dialAttempt is one full connection attempt: dial, optional encryption, and
+// the BitTorrent handshake. usedUTP reports which transport the dial picked,
+// so Dial can decide whether a uTP retry makes sense after a failure.
+func dialAttempt(
+	ctx context.Context,
+	dialer *net.Dialer,
+	addr net.Addr,
+	handshakeTimeout time.Duration,
+	enableEncryption, forceEncryption bool,
+	ourExtensions [8]byte,
+	ih [20]byte,
+	ourID [20]byte,
+	stopC chan struct{},
+	log logger.Logger,
+	forceUTP bool) (
+	conn net.Conn, cipher mse.CryptoMethod, peerExtensions [8]byte, peerID [20]byte, usedUTP bool, err error) {
+	done := make(chan struct{})
+	defer close(done)
 
 	// The handshake bytes are buffered up front: the encrypted and the plain
 	// path send the same 68 bytes.
@@ -41,11 +82,11 @@ func Dial(
 		return
 	}
 
-	dialer := net.Dialer{Timeout: dialTimeout}
-	conn, err = dialGuarded(ctx, &dialer, addr, handshakeTimeout, stopC, done, log)
+	conn, err = dialGuarded(ctx, dialer, addr, handshakeTimeout, stopC, done, log, forceUTP)
 	if err != nil {
 		return
 	}
+	usedUTP = netx.IsUTP(conn)
 	// Every error below closes the current conn; a redial closes the old one
 	// explicitly before replacing it (a failed redial leaves conn nil, which
 	// the guard must not close).
@@ -69,9 +110,10 @@ func Dial(
 			}
 			conn.Close()
 			log.Debug("Connecting again without encryption...")
-			if conn, err = dialGuarded(ctx, &dialer, addr, handshakeTimeout, stopC, done, log); err != nil {
+			if conn, err = dialGuarded(ctx, dialer, addr, handshakeTimeout, stopC, done, log, forceUTP); err != nil {
 				return
 			}
+			usedUTP = netx.IsUTP(conn)
 			if _, err = conn.Write(out.Bytes()); err != nil {
 				return
 			}
@@ -101,11 +143,38 @@ func Dial(
 	return
 }
 
+// retryableDialError reports whether a failed attempt may succeed over uTP.
+// Only a connection that the peer accepted and then dropped before the
+// handshake is retried: a protocol mismatch or a timeout means the race
+// already tried uTP, so another dial would only repeat the wait.
+func retryableDialError(err error) bool {
+	if errors.Is(err, errOwnConnection) ||
+		errors.Is(err, errInvalidInfoHash) ||
+		errors.Is(err, errInvalidProtocol) ||
+		errors.Is(err, errNotEncrypted) {
+		return false
+	}
+	return errors.Is(err, io.EOF) ||
+		errors.Is(err, io.ErrUnexpectedEOF) ||
+		errors.Is(err, syscall.ECONNRESET) ||
+		errors.Is(err, syscall.EPIPE) ||
+		errors.Is(err, syscall.ECONNABORTED)
+}
+
 // dialGuarded dials, arms the handshake deadline, and ties the socket's
-// lifetime to stopC (closed on abort) versus done (normal return).
-func dialGuarded(ctx context.Context, dialer *net.Dialer, addr net.Addr, handshakeTimeout time.Duration, stopC, done chan struct{}, log logger.Logger) (net.Conn, error) {
+// lifetime to stopC (closed on abort) versus done (normal return). With
+// forceUTP the dial uses uTP alone instead of racing TCP.
+func dialGuarded(ctx context.Context, dialer *net.Dialer, addr net.Addr, handshakeTimeout time.Duration, stopC, done chan struct{}, log logger.Logger, forceUTP bool) (net.Conn, error) {
 	log.Debug("Connecting to peer...")
-	conn, err := netx.DialPeer(ctx, *dialer, addr.Network(), addr.String())
+	var (
+		conn net.Conn
+		err  error
+	)
+	if forceUTP {
+		conn, err = netx.DialPeerUTP(ctx, *dialer, addr.String())
+	} else {
+		conn, err = netx.DialPeer(ctx, *dialer, addr.Network(), addr.String())
+	}
 	if err != nil {
 		return nil, err
 	}

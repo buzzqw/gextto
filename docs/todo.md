@@ -24,14 +24,6 @@ here.
   public torrent, with the same policy and metrics (upload efficiency while seeding,
   reciprocation, first-block time, stall rate). Gate: a host with a reachable inbound
   port; only a gap justifies touching `internal/unchoker`.
-- **uTP-only peer dropped by a TCP reset** — with the reference peer in uTP-only
-  mode, our dial race still opens the TCP leg; the peer accepts it and resets it. TCP
-  wins the race, the uTP leg is cancelled, and the reset leaves no connection: the peer
-  is lost until the next announce. The race (`netx.DialPeer`) must not cancel the uTP
-  leg on a TCP winner that resets before the BitTorrent handshake; keep the uTP leg as
-  the fallback, or do not dial TCP when the peer is known uTP-only. Regression test: a
-  peer that accepts TCP and resets it while the uTP leg is up. No gate: the defect is
-  reproduced.
 - **Mixed-mode TCP/uTP arbitration** — throttle TCP when uTP shares the line, as
   libtorrent does; today only the transfer caps react. Gate: a mixed swarm where the
   current caps lose throughput or latency.

@@ -466,6 +466,41 @@ func noteDialWinner(host, winner string, latency time.Duration) {
 	}
 }
 
+// ErrUTPUnavailable reports that a uTP-only dial was requested while uTP is
+// not enabled (no dialer, or a proxy is configured).
+var ErrUTPUnavailable = errors.New("uTP is not available")
+
+// UTPAvailable reports whether DialPeerUTP can open a connection.
+func UTPAvailable() bool {
+	mu.RLock()
+	defer mu.RUnlock()
+	return utpDial != nil && current.Proxy == nil
+}
+
+// DialPeerUTP connects over uTP alone, with the same dial timeout as
+// DialPeer. It is the fallback when the TCP leg of a race is reset before the
+// BitTorrent handshake.
+func DialPeerUTP(ctx context.Context, base net.Dialer, addr string) (net.Conn, error) {
+	mu.RLock()
+	dial := utpDial
+	proxied := current.Proxy != nil
+	mu.RUnlock()
+	if dial == nil || proxied {
+		return nil, ErrUTPUnavailable
+	}
+	if base.Timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, base.Timeout)
+		defer cancel()
+	}
+	conn, err := dial(ctx, addr)
+	if err != nil {
+		return nil, err
+	}
+	OutgoingUTP.Add(1)
+	return TrackUTP(NewUTPConn(conn)), nil
+}
+
 // DialPeer connects to a peer. With uTP enabled (and no proxy) uTP and TCP
 // are tried at the same time and the first connection wins, so peers that
 // speak only one of the two are reached without waiting for a timeout.
