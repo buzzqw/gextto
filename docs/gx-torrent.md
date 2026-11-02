@@ -600,9 +600,8 @@ letter. On Unix the atomic symlink remains. Migration between volumes also recog
 error `ERROR_NOT_SAME_DEVICE`, so the copy fallback works as on Unix; without
 the symlink privilege, a symlink of the payload pointing to a file is copied
 as a file instead of making the move fail (on Unix it remains a symlink).
-Only two I/O **optimisations** remain without a native equivalent — the
-readahead (`fadvise`) and preallocation with `fallocate` — which use the
-fallback (`Truncate`): they work, without the optimisation.
+Only one I/O **optimisation** remains without a native equivalent: preallocation with
+`fallocate`, which uses the fallback (`Truncate`): it works, without the optimisation.
 
 **Installation on Windows.** The daemon recognises that it is started by the
 Service Control Manager (`svc.IsWindowsService`, `service_windows.go`) and runs
@@ -2217,7 +2216,8 @@ not yet checked. When every piece has been checked the torrent leaves seed mode 
 itself. A piece that fails — or a read error — ends seed mode for the whole torrent:
 nothing of that piece was sent, the claimed bitfield is dropped from the resume
 record, and the torrent restarts through the full verification, which marks the bad
-pieces missing so they are downloaded again. Missing files at start end seed mode
+pieces missing so they are downloaded again. A recheck asked by hand ends seed mode too, and
+reads the data. Missing files at start end seed mode
 before anything is claimed. The flag is persisted (`seed_mode` in the resume record,
 `SeedMode` in the move-torrent payload); the set of pieces already checked is not,
 so after a restart in seed mode the pieces are checked again as they are served.

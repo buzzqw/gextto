@@ -445,7 +445,7 @@ func (t *torrent) sendPiece(pe *peer.Peer, msg peerprotocol.RequestMessage, pi *
 		t.queueSeedModeRequest(pe, msg)
 		return
 	}
-	pe.SendPiece(msg, cachedpiece.New(pi, t.session.pieceCache, t.session.config.ReadCacheBlockSize, t.peerID))
+	pe.SendPiece(msg, cachedpiece.New(pi, t.session.pieceCache, t.session.config.ReadCacheBlockSize, t.peerID, !t.session.config.Mmap))
 }
 
 // noteReject requeues one refused block; unknown or malformed rejects drop

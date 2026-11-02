@@ -16,18 +16,9 @@ here.
 
 ## Engine (gx-core, gx-torrent)
 
-- **Peer addresses lost on equal priority** — `AddrList` orders candidates by BEP 40
-  priority alone, so addresses with the same priority overwrite each other and those peers
-  wait for the next announce. Break the tie on IP and port in `peerAddr.Less`, with a
-  regression test. No gate: reproduced by `make measure-compare`, line scenarios, and a
-  throwaway build with the tie-break reached the libtorrent clients. Then re-run the whole
-  comparison and replace its tables.
-- **Recheck on a torrent added in seed mode** — a recheck after an add with `skip_checking`
-  does no hashing. No gate: reproduced by the comparison harness (0.09 s of CPU on 4 GiB).
-- **uTP CPU, upload rate and recheck time** — the comparison shows about 1.5 times the
-  CPU per GiB of the libtorrent clients on uTP, about half their upload rate and the
-  slowest recheck. Gate: a profile on the same harness that names a cost the engine can
-  remove.
+- **uTP CPU** — uTP still costs more CPU per GiB than the libtorrent clients, mostly syscalls
+  and goroutine wake-ups per datagram. Gate: a profile on `make measure-compare`, line-utp
+  scenario, that names a cost the engine can remove.
 - **Peer turnover** — at the connection cap, close the slowest peers periodically and
   try new addresses (`prunePeers` frees only a useless peer today). Gate: a real swarm
   larger than the cap where turnover beats the current download rate on the same
@@ -39,8 +30,8 @@ here.
 - **Mixed-mode TCP/uTP arbitration** — throttle TCP when uTP shares the line, as
   libtorrent does; today only the transfer caps react. Gate: a mixed swarm where the
   current caps lose throughput or latency.
-- **uTP acknowledgements and datagrams** — coalescing ACKs needs a delay of 20 ms or
-  more, which inflates the RTT the RTO is built on; the alternative is batched datagram
+- **uTP acknowledgements and datagrams** — coalescing ACKs beyond the current short delay
+  needs 20 ms or more, which inflates the RTT the RTO is built on; the alternative is batched datagram
   I/O (`recvmmsg`/`sendmmsg`). Gate: a uTP-heavy session with an inbound port where
   `recvfrom`/`sendto` is a real share of the syscall time.
 - **Graduated file priority (0–7)** with mixed-priority files. Gate: a torrent with

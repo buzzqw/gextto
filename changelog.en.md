@@ -24,6 +24,9 @@ not change Gextto's interface, where those pages do not exist. Engine fixes, on
 the other hand, apply to both.
 
 ## 2 November 2026
+- **Torrents connect to all their peers from the start.** Two peers that looked alike to the engine overwrote each other in its address list, and one of them stayed out until the next tracker answer, about a minute or more later. In a small swarm this cost a lot: on a 100 Mbit/s line with four peers a download went from 6.9 to 11.2 MB/s. Nothing to do.
+- **Upload and file checks are faster.** The engine told the system not to read ahead on torrent files, which slowed every read from disk: sending to a fast peer goes from about 120 MB/s to 180–240 MB/s, and rechecking a 4 GB file from 8.8 to about 4 seconds on a mini PC with NVMe. A torrent also goes back to seeding as soon as its check ends, and a queued torrent starts as soon as another one stops, with no wait of up to 3 seconds. On µTP the engine uses 10% less CPU.
+- **A recheck on a torrent added with "skip check" really reads the files.** It ended at once without reading anything, so damaged data stayed hidden. Now it checks everything, and the torrent leaves that mode.
 - **A peer that speaks only µTP no longer disappears when it refuses the TCP attempt.** With a peer configured for µTP only, the TCP attempt is still accepted and immediately reset. The engine took it as the winner, cancelled the µTP attempt and lost the peer until the next announce. Now, if the TCP connection is reset before the initial handshake with the peer, the engine retries once over µTP alone: the peer stays reachable and the download does not stall. It applies to Gextto and gx-torrent. Nothing to configure.
 
 ## 1 November 2026

@@ -935,6 +935,8 @@ func (d *Daemon) run(stop <-chan struct{}) {
 	go d.runIPFilterRefresh(stop)
 	// The DLNA media server follows its settings (off by default).
 	go d.runDLNA(stop)
+	// A torrent that stops is a queue decision to take now, not at the next tick.
+	go d.runStopWatch(stop)
 	ticker := time.NewTicker(d.opts.Tick)
 	defer ticker.Stop()
 	for {
@@ -948,6 +950,47 @@ func (d *Daemon) run(stop <-chan struct{}) {
 		case <-d.wake:
 		}
 		d.tick(time.Now())
+	}
+}
+
+// runStopWatch asks for a queue round whenever a torrent stops. A recheck ends
+// stopped and the queue restarts it: waiting for the tick left a checked torrent
+// idle for up to Tick, and kept a freed slot empty just as long. A dropped event
+// only falls back to the tick.
+func (d *Daemon) runStopWatch(stop <-chan struct{}) {
+	for {
+		d.mu.Lock()
+		session, done := d.session, d.sessionDone
+		d.mu.Unlock()
+		if session == nil {
+			return
+		}
+		events, cancel := session.Subscribe()
+		replaced := d.pokeOnStops(events, done, stop)
+		cancel()
+		if !replaced {
+			return
+		}
+	}
+}
+
+// pokeOnStops serves one session's events; true means the session was replaced
+// and the watch moves on to the new one.
+func (d *Daemon) pokeOnStops(events <-chan torrent.Event, done, stop <-chan struct{}) bool {
+	for {
+		select {
+		case <-stop:
+			return false
+		case <-done:
+			return true
+		case ev, ok := <-events:
+			if !ok {
+				return false
+			}
+			if ev.Type == torrent.EventTorrentStopped || ev.Type == torrent.EventTorrentError {
+				d.poke()
+			}
+		}
 	}
 }
 

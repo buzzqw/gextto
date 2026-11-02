@@ -25,6 +25,9 @@ non cambiano l'interfaccia di Gextto, dove quelle pagine non esistono. Le
 correzioni al motore valgono invece per entrambi.
 
 ## 2 novembre 2026
+- **I torrent si collegano a tutti i peer da subito.** Due peer che per il motore si somigliavano si sovrascrivevano nell'elenco degli indirizzi, e uno dei due restava fuori fino alla risposta successiva del tracker, circa un minuto o più dopo. In uno swarm piccolo pesava molto: su una linea da 100 Mbit/s con quattro peer un download è passato da 6,9 a 11,2 MB/s. Non devi fare nulla.
+- **Upload e controllo dei file sono più veloci.** Il motore diceva al sistema di non leggere in anticipo i file dei torrent, e questo rallentava ogni lettura dal disco: l'invio a un peer veloce passa da circa 120 MB/s a 180–240 MB/s, e il ricontrollo di un file da 4 GB da 8,8 a circa 4 secondi su un mini PC con NVMe. Inoltre un torrent torna in seeding appena finisce il controllo, e uno in coda parte appena un altro si ferma, senza aspettare fino a 3 secondi. Su µTP il motore usa il 10% di CPU in meno.
+- **Il ricontrollo di un torrent aggiunto con "salta il controllo" legge davvero i file.** Finiva subito senza leggere nulla, quindi eventuali dati danneggiati restavano nascosti. Ora controlla tutto, e il torrent esce da quella modalità.
 - **Un peer che parla solo µTP non sparisce più quando rifiuta il tentativo TCP.** Con un peer configurato per il solo µTP, il tentativo TCP viene comunque accettato e subito resettato. Il motore lo considerava il vincitore, annullava il tentativo µTP e perdeva il peer fino all'annuncio successivo. Ora, se la connessione TCP viene resettata prima dello scambio iniziale con il peer, il motore riprova una volta in solo µTP: il peer resta raggiungibile e il download non si blocca. Vale per Gextto e per gx-torrent. Niente da configurare.
 
 ## 1 novembre 2026

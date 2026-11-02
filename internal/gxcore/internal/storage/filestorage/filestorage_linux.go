@@ -7,12 +7,6 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-// disableReadAhead hints random access so the page cache does not prefetch
-// sequentially across multi-gigabyte torrent files.
-func disableReadAhead(f *os.File) error {
-	return unix.Fadvise(int(f.Fd()), 0, 0, unix.FADV_RANDOM)
-}
-
 // applyNoAtimeFlag opens without atime updates: torrent workloads rewrite
 // metadata otherwise, pointlessly dirtying inodes on every read.
 func applyNoAtimeFlag(f int) int {

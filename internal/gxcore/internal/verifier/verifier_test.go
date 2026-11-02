@@ -2,6 +2,7 @@ package verifier
 
 import (
 	"crypto/sha1"
+	"errors"
 	"testing"
 
 	"github.com/buzzqw/gextto/internal/gxcore/internal/filesection"
@@ -202,5 +203,91 @@ func TestCheckPieceDispatchesOnTheLayout(t *testing.T) {
 	}
 	if v.checkPiece(&v1, broken, sha1.New()) {
 		t.Fatal("a corrupt v1 piece verified")
+	}
+}
+
+// failingFile reads like a broken disk.
+type failingFile struct{ countingFile }
+
+var errBrokenDisk = errors.New("broken disk")
+
+func (f *failingFile) ReadAt([]byte, int64) (int, error) { return 0, errBrokenDisk }
+
+// TestPipelineReportsPiecesInOrder: reading and hashing run apart, yet progress
+// stays in piece order and a damaged piece is the only bit left unset.
+func TestPipelineReportsPiecesInOrder(t *testing.T) {
+	var pieces []piece.Piece
+	for i := range uint32(40) {
+		data := make([]byte, 1024+int(i)) // varying lengths, as v2 tails do
+		data[0] = byte(i)
+		p, _ := makePiece(i, data)
+		pieces = append(pieces, p)
+	}
+	pieces[17].Hash = make([]byte, 20)
+
+	v := New()
+	progressC := make(chan Progress, len(pieces)+1)
+	resultC := make(chan *Verifier, 1)
+	v.Run(pieces, progressC, resultC)
+	close(progressC)
+	next := uint32(1)
+	for step := range progressC {
+		if step.Checked != next {
+			t.Fatalf("progress %d, want %d", step.Checked, next)
+		}
+		next++
+	}
+	if next != 41 {
+		t.Fatalf("%d progress steps, want 40", next-1)
+	}
+	got := <-resultC
+	if got.Error != nil {
+		t.Fatal(got.Error)
+	}
+	for i := range uint32(40) {
+		if got.Bitfield.Test(i) == (i == 17) {
+			t.Fatalf("piece %d: bit %v", i, got.Bitfield.Test(i))
+		}
+	}
+}
+
+// TestPipelineStopsOnReadError: a read failure ends the check and reaches the
+// caller, with no goroutine left behind waiting for a buffer.
+func TestPipelineStopsOnReadError(t *testing.T) {
+	good, _ := makePiece(0, []byte("good piece"))
+	bad, _ := makePiece(1, []byte("bad piece!"))
+	bad.Data = filesection.Piece{{File: &failingFile{}, Offset: 0, Length: int64(bad.Length)}}
+	after, f := makePiece(2, []byte("never read"))
+
+	got, steps := runVerifier(t, []piece.Piece{good, bad, after}, nil)
+	if !errors.Is(got.Error, errBrokenDisk) {
+		t.Fatalf("error %v", got.Error)
+	}
+	if f.reads != 0 {
+		t.Fatal("a piece past the failure was read")
+	}
+	if steps != 1 {
+		t.Fatalf("%d progress steps, want 1", steps)
+	}
+}
+
+// BenchmarkVerifierPipeline is one check over pieces already in memory: the cost
+// of the reader, the hasher and the hand-off between them.
+func BenchmarkVerifierPipeline(b *testing.B) {
+	data := make([]byte, 1<<20)
+	var pieces []piece.Piece
+	for i := range uint32(32) {
+		p, _ := makePiece(i, data)
+		pieces = append(pieces, p)
+	}
+	b.SetBytes(int64(len(pieces) * len(data)))
+	for b.Loop() {
+		v := New()
+		progressC := make(chan Progress, len(pieces)+1)
+		resultC := make(chan *Verifier, 1)
+		v.Run(pieces, progressC, resultC)
+		if got := <-resultC; got.Error != nil {
+			b.Fatal(got.Error)
+		}
 	}
 }

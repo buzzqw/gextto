@@ -316,7 +316,7 @@ macchina, la data e il comando per rifarlo.
 
 | Area | Risultato |
 |---|---|
-| **Confronto con altri client** | Stessi limiti in Docker, N97: **290 MB/s** alla massima velocità contro 56–250 MB/s di Transmission, qBittorrent e Deluge, con **27 MiB** di memoria propria. Più lento in upload (**125** contro 131–238 MB/s) e nel ricontrollo, e **6,9 MB/s** su una linea simulata da 100 Mbit/s contro 9,5–10,7, per un bug noto (da correggere). [Tabelle complete](docs/measurements.md#compared-with-qbittorrent-transmission-and-deluge) |
+| **Confronto con altri client** | Stessi limiti in Docker, N97: **290 MB/s** alla massima velocità contro 56–250 MB/s di Transmission, qBittorrent e Deluge, con **27 MiB** di memoria propria. Più lento in upload (**125** contro 131–238 MB/s) e nel ricontrollo, e **6,9 MB/s** su una linea simulata da 100 Mbit/s contro 9,5–10,7: tutto migliorato in seguito (**180–240 MB/s**, **3,8 s**, **11,2 MB/s**), gli altri client non ancora rimisurati. [Tabelle complete](docs/measurements.md#compared-with-qbittorrent-transmission-and-deluge) |
 | **Swarm reale** | **9,3–9,4 MB/s** sulla ISO di Ubuntu, contro **6,3–7,1 MB/s** di libtorrent sullo stesso swarm (una campagna di misura) |
 | **Memoria del motore** | **29–39 MB di RSS** a riposo, con DHT attiva e un filtro IP completo (172.740 regole). Con 10 torrent in download verso un NAS: **~507 MB** fuori dalle due cache; la cache di scrittura si dimensiona dalla RAM libera |
 | **CPU del motore** | **18–37 % di un core** a 8,2–8,8 MB/s con 116–132 peer, **2,0–4,3 s di CPU per 100 MB**; **0,6–1,0 %** di un core a riposo |

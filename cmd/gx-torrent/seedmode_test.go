@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/buzzqw/gextto/internal/gxcore/torrent"
 )
 
 // seedModeWasted reads the wasted bytes (blocks that failed their hash) of a
@@ -229,5 +231,66 @@ func TestQbitAddSkipCheckingIsSeedMode(t *testing.T) {
 			}
 		}
 		return false
+	})
+}
+
+// TestSeedModeRecheckReadsTheData: a recheck asked on a torrent still in seed
+// mode really reads the files. Seed mode must not claim every piece again on the
+// restart, or the damaged piece stays hidden behind a recheck that hashed nothing.
+func TestSeedModeRecheckReadsTheData(t *testing.T) {
+	src := filepath.Join(t.TempDir(), "src")
+	torrentData := makeTorrent(t, src, "movie.bin", 300_000)
+	payload := filepath.Join(src, "movie.bin")
+	raw, err := os.ReadFile(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw[5*16384+100] ^= 0xff // damage piece 5
+	if err := os.WriteFile(payload, raw, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	d := newTestDaemonWith(t, NetworkOptions{PortBegin: 47650, PortEnd: 47699, Encryption: 1})
+	hash, _, err := d.add(addRequest{TorrentData: torrentData, Destination: src, SeedMode: true, SeedRatio: -1, SeedDays: -1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "seed mode claiming the damaged data", func() bool {
+		info, _ := findInfo(d, hash)
+		return info.State == "seeding" && info.SeedMode && info.Progress == 100
+	})
+	if err := d.verify(hash); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "the recheck to find the damaged piece", func() bool {
+		info, _ := findInfo(d, hash)
+		return !info.SeedMode && info.Progress < 100 && info.State != "checking"
+	})
+}
+
+// TestRecheckRestartsWithoutWaitingForTheTick: a recheck ends stopped and the queue
+// restarts the torrent. With a tick far away it still comes back at once, because
+// the stop itself asks for a queue round.
+func TestRecheckRestartsWithoutWaitingForTheTick(t *testing.T) {
+	t.Setenv("GX_TEST_TICK", "10m")
+	src := filepath.Join(t.TempDir(), "src")
+	torrentData := makeTorrent(t, src, "movie.bin", 300_000)
+	d := newTestDaemonWith(t, NetworkOptions{PortBegin: 47600, PortEnd: 47649, Encryption: 1})
+	hash, _, err := d.add(addRequest{TorrentData: torrentData, Destination: src, SeedRatio: -1, SeedDays: -1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "the first check", func() bool {
+		info, _ := findInfo(d, hash)
+		return info.State == "seeding"
+	})
+	d.mu.Lock()
+	handle, _ := d.findLocked(hash)
+	d.mu.Unlock()
+	if err := d.verify(hash); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "the recheck to stop the torrent", func() bool { return !isRunning(handle.Stats().Status) || handle.Stats().Status == torrent.Verifying })
+	waitFor(t, "the torrent to run again after the recheck", func() bool {
+		return handle.Stats().Status == torrent.Seeding
 	})
 }

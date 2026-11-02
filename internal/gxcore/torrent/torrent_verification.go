@@ -13,6 +13,11 @@ import (
 func (t *torrent) handleVerifyCommand() {
 	t.log.Info("verifying")
 	t.doVerify = true
+	// A recheck is asked to read the data: seed mode would claim every piece
+	// again on the restart and hash nothing.
+	if t.seedMode {
+		t.setSeedMode(false)
+	}
 	if t.status() == Stopped {
 		t.mBitfield.Lock()
 		t.bitfield = nil

@@ -12,17 +12,17 @@ torrents and limits for every client.
 | Question | Best | gx-torrent | Why it matters |
 |---|---|---|---|
 | Fastest download with nothing in the way | **gx-torrent, 290 MB/s** | first; the others 56–250 MB/s | a fast disk and a fast peer |
-| Download on a 100 Mbit/s line, 4 peers | Deluge and qBittorrent, about 10.6 MB/s | **last, 6.9 MB/s: a bug, 11.2 MB/s with the fix** ([details](#a-bug-found-by-this-comparison)) | the common case at home |
+| Download on a 100 Mbit/s line, 4 peers | Deluge and qBittorrent, about 10.6 MB/s | **last, 6.9 MB/s: a bug, now fixed, 11.2 MB/s** ([details](#what-the-comparison-changed)) | the common case at home |
 | Least own memory at full speed | Transmission, 12 MiB | **27 MiB**, qBittorrent 24, Deluge 57; on the 100 Mbit/s line 36 against 10–39 | what the client cannot give back to the system |
-| Fastest upload | Deluge and qBittorrent, about 230 MB/s | **125 MB/s**, close to Transmission | only matters above a gigabit link |
-| Fastest recheck of 4 GiB | Transmission, 3.9 s | **last, 8.8 s** | after a move or a crash |
+| Fastest upload | Deluge and qBittorrent, about 230 MB/s | **125 MB/s**, now [180–240 MB/s](#what-the-comparison-changed) | only matters above a gigabit link |
+| Fastest recheck of 4 GiB | Transmission, 3.9 s | **last, 8.8 s**, now [3.8 s](#what-the-comparison-changed) | after a move or a crash |
 | Lowest CPU at rest | gx-torrent and qBittorrent, 0.05–0.06 % | among the best | a machine that is always on |
 | Lightest with 100 torrents | Transmission, 19 MB | **second, 29 MB** (qBittorrent 119 MB) | a long seeding list |
 
 In short: gx-torrent is the fastest downloader when the network is not the limit and stays
-small while doing it. It uploads and rechecks more slowly than the libtorrent clients, it
-spends more CPU on uTP than any of them, and the comparison exposed a real bug in how it
-keeps peer addresses.
+small while doing it, and it still spends more CPU on uTP than the others. The tables are the
+round of 2026-11-02. The defects that round exposed are fixed since, and their effect is
+measured [below](#what-the-comparison-changed); the tables are replaced at the next full round.
 
 ## Compared with qBittorrent, Transmission and Deluge
 
@@ -89,7 +89,6 @@ before protocol overhead.
 | qBittorrent | 10.57 MB/s | 50.8 s | 26 % | 26.9 s | 9.5 MiB | 543 MiB |
 | Transmission | 9.52 MB/s | 56.4 s | 14 % | 16.3 s | 9.6 MiB | 24 MiB |
 | gx-torrent | **6.90 MB/s** | 77.8 s | 15 % | 22.7 s | 36 MiB | 50 MiB |
-| *gx-torrent with the fix below* | *11.16 MB/s* | *48.1 s* | *19 %* | *18.2 s* | *40 MiB* | *56 MiB* |
 
 ### The same line, uTP only
 
@@ -101,24 +100,9 @@ The same four peers with TCP blocked at the peer.
 | qBittorrent | 11.59 MB/s | 46.3 s | 40 % | 37.0 s | 9.7 MiB | 543 MiB |
 | Transmission | 9.60 MB/s | 55.9 s | 23 % | 25.4 s | 9.2 MiB | 24 MiB |
 | gx-torrent | **6.88 MB/s** | 78.1 s | 45 % | 69.3 s | 44 MiB | 59 MiB |
-| *gx-torrent with the fix below* | *11.14 MB/s* | *48.2 s* | *59 %* | *56.6 s* | *49 MiB* | *64 MiB* |
 
-uTP is where gx-torrent spends the most: about 1.5 times the CPU per GiB of the libtorrent
-clients even with the fix, and 1.7–1.9 times without it.
-
-### A bug found by this comparison
-
-During the line runs gx-torrent is connected to only two of the four peers for the first
-60 s; the other two appear at the next tracker announce. The address list is ordered by
-BEP 40 priority alone, so two addresses with the same priority overwrite each other. While the
-client does not know its own IP, the BEP 40 mask makes `.20` and `.22` identical, and `.21` and
-`.23`: exactly the two peers that go missing.
-
-A throwaway build that breaks the tie on the address gave **11.14–11.19 MB/s** over TCP and
-**11.13–11.22 MB/s** over uTP (three rounds each, same setup). Those rows are in italics
-because that build is not the code in the repository: the fix is an open item in
-[`todo.md`](todo.md). The loss on a public swarm was not measured. It should be smaller there,
-because few addresses collide and a large swarm has other peers to take over.
+uTP is where gx-torrent spends the most: 1.7–1.9 times the CPU per GiB of the libtorrent
+clients in this round.
 
 ### Recheck and upload
 
@@ -132,8 +116,8 @@ then an upload to one unshaped reference peer.
 | qBittorrent | 5.6 s (765 MB/s) | 3.4 s | 223 MB/s (192–262) | 2.58 s | 13 MiB | 4,103 MiB |
 | gx-torrent | 8.8 s (488 MB/s) | 4.0 s | 125 MB/s (115–125) | 4.79 s | 58 MiB | 73 MiB |
 
-gx-torrent's API reports a state change 1–3 s late, which inflates its recheck time; the CPU
-column shows it is still the most expensive, but by less than the wall time suggests.
+In this round a finished recheck waited for the 3 s queue tick before seeding again, so about
+3 s of gx-torrent's time is that wait; it is gone since.
 
 ### 100 torrents
 
@@ -150,6 +134,27 @@ until all are seeding, then 60 s at rest and the time to come back after a resta
 One gx-torrent round took 24 s to reach seeding where the other two took 3 s; its cause was
 not investigated. Transmission reaches seeding at once because it trusts existing files
 until asked to recheck.
+
+### What the comparison changed
+
+The round exposed defects in gx-torrent, all fixed since. Same setup, gx-torrent only, the old and
+new code alternating on one binary, 2026-11-02. This is not a new ranking: the other clients were
+not run again.
+
+| Measure | Before | After | Cause |
+|---|---|---|---|
+| 100 Mbit/s line, TCP | 6.9 MB/s | **11.2 MB/s** | addresses with the same BEP 40 priority overwrote each other, so 2 of the 4 peers waited for the next announce |
+| 100 Mbit/s line, uTP | 6.9 MB/s | **11.2 MB/s** | same cause |
+| uTP CPU per GiB | 54 s | **48 s** | state packets batched over 2 ms instead of 0.5 ms |
+| Recheck of 4 GiB | 8.8 s | **3.8–4.0 s** | read-ahead back on, a queue round when the check ends, reading and hashing side by side (0.8 s more CPU) |
+| Upload | 110–125 MB/s | **180–240 MB/s** | read-ahead back on (most of the gain), next block read in the background (about 10 %) |
+| Upload CPU per GiB | 4.9 s | **3.2 s** | same causes |
+| Recheck after an add in seed mode | hashed nothing | **reads the data** | seed mode claimed every piece again on the restart |
+| Download at full speed | 284 MB/s | 290 MB/s | no regression |
+
+The public-swarm effect of the address fix was not measured. It should be smaller, because few
+addresses collide and a large swarm has other peers to take over. The upload range is wide
+because repeated 4 GiB writes by the receiving peer slow this disk over a session.
 
 ### What these numbers do not say
 
@@ -221,7 +226,7 @@ CPU** than a fixed 55 per torrent, for 4 % fewer bytes, inside the ±10 % spread
 | Local swarm, 3 leechers | 3.00× the file uploaded; with leechers meshed the seed drops to 1.84× | `make measure-seeding` |
 | Indexers, 30 titles | 110 s, 205 requests, 0 failed, 5,935 releases; the old aggregate took 450 s, 35 answered, 25 failed, 2,737 releases | `TestMeasureManagerLanes` |
 
-The real-swarm figure comes from one campaign and predates the [address bug](#a-bug-found-by-this-comparison).
+The real-swarm figure comes from one campaign and predates the [address fix](#what-the-comparison-changed).
 
 ### Reusing local data
 
@@ -341,7 +346,7 @@ Closed with a measurement, so they are not retried without new data.
 | Write-back cache in the engine | the storage keeps up with the download | storage slower than the network |
 | Batched uTP datagrams (`recvmmsg`/`sendmmsg`) | 8.3 % of samples on real swarms; saves under 1 % of a core at the live rate | a uTP-only session above 8 MB/s |
 | Coalescing contiguous writes | the page cache already merges them | |
-| Rarity buckets, `pickFileEdge` cursor, `FADV_RANDOM` | no measurement justified the cost | |
+| Rarity buckets, `pickFileEdge` cursor | no measurement justified the cost | |
 | `PieceDownloader` bitmask | 18 KB and 15 allocations per piece: about 450 KB/s of garbage at 100 MB/s | |
 | Async `state.json` | 4 ms every few minutes at 1,000 torrents, 0.003 % of a core | thousands of torrents with frequent changes, or a visible UI stall |
 | Lock-free read cache | the lock costs about 0.2 % of a core at 100 MB/s of upload | |

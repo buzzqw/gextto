@@ -150,6 +150,22 @@ func (c *Cache) Get(key string, loader Loader) ([]byte, error) {
 	return c.getValue(c.claim(key), loader)
 }
 
+// Prefetch loads key in the background unless it is resident or already loading.
+// It does not count as a request, so the hit ratio stays the one peers see, and it
+// waits for the read semaphore like any load. A failed load is simply dropped: the
+// request that really needs the block reports the error.
+func (c *Cache) Prefetch(key string, loader Loader) {
+	c.m.Lock()
+	if _, ok := c.items[key]; ok {
+		c.m.Unlock()
+		return
+	}
+	i := &item{key: key, index: -1}
+	c.items[key] = i
+	c.m.Unlock()
+	go func() { _, _ = c.getValue(i, loader) }()
+}
+
 // claim returns the resident item (counting the hit), or registers a fresh
 // loading placeholder. Expired residents are dropped so the caller reloads;
 // loading placeholders (index -1) survive.

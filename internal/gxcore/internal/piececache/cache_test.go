@@ -1,6 +1,7 @@
 package piececache
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 	"sync/atomic"
@@ -109,5 +110,44 @@ func TestCacheSetMaxSizeEvicts(t *testing.T) {
 	c.SetMaxSize(2) // only two single-byte items fit
 	if c.Size() > 2 {
 		t.Fatalf("size after SetMaxSize = %d, want <= 2", c.Size())
+	}
+}
+
+// TestPrefetchIsNotARequest: a background load fills the cache without moving the
+// hit ratio, a failed one leaves nothing behind, and a key already resident is not
+// loaded twice.
+func TestPrefetchIsNotARequest(t *testing.T) {
+	c := New(1<<20, time.Minute, 1)
+	defer c.Close()
+	loads := make(chan struct{}, 4)
+	c.Prefetch("a", func() ([]byte, error) { loads <- struct{}{}; return []byte("value"), nil })
+	<-loads
+	deadline := time.Now().Add(5 * time.Second)
+	for c.Size() == 0 {
+		if time.Now().After(deadline) {
+			t.Fatal("the prefetched value never landed")
+		}
+		time.Sleep(time.Millisecond)
+	}
+	if n := c.NumTotal.Count(); n != 0 {
+		t.Fatalf("%d requests counted for a prefetch", n)
+	}
+	c.Prefetch("a", func() ([]byte, error) { t.Error("a resident key was loaded again"); return nil, nil })
+	got, err := c.Get("a", func() ([]byte, error) { t.Error("a hit ran the loader"); return nil, nil })
+	if err != nil || string(got) != "value" {
+		t.Fatalf("got %q, %v", got, err)
+	}
+
+	c.Prefetch("bad", func() ([]byte, error) { loads <- struct{}{}; return nil, errors.New("read failed") })
+	<-loads
+	for c.Len() != 1 {
+		if time.Now().After(deadline) {
+			t.Fatalf("the failed load stayed: %d items", c.Len())
+		}
+		time.Sleep(time.Millisecond)
+	}
+	got, err = c.Get("bad", func() ([]byte, error) { return []byte("second try"), nil })
+	if err != nil || string(got) != "second try" {
+		t.Fatalf("after a failed prefetch: %q, %v", got, err)
 	}
 }

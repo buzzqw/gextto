@@ -176,8 +176,8 @@ not to break.
     APIs; the library link is a **junction** (no symlink privilege) and the
     cross-volume move recognises `ERROR_NOT_SAME_DEVICE`.
   - Since Go 1.23 `os.Lstat` reports a junction as `ModeIrregular`, not
-    `ModeSymlink`: to recognise a link always use `isDirLink`. Only `fadvise`
-    and `fallocate` have no native equivalent (`Truncate` fallback).
+    `ModeSymlink`: to recognise a link always use `isDirLink`. Only `fallocate` has no native
+    equivalent (`Truncate` fallback).
   - The daemon runs as a **native Windows service**
     (`svc.IsWindowsService` → `svc.Run`, `service_windows.go`/
     `service_other.go`), started by `startDaemon` (extracted and shared with the
@@ -284,6 +284,11 @@ not to break.
   - Changing any of these (machine, version, limit, payload) starts a new
     baseline: re-run **every** client and replace the whole table. Never compare
     with numbers from another setup. Results go in `docs/measurements.md`.
+  - *Findings are fixed, not filed*: a gap, defect or improvement a benchmark exposes
+    is applied in the same cycle, with its test and its before-and-after number, and
+    Gextto and the daemon are rebuilt and restarted as needed without asking. Only what
+    needs a real decision, or has no cost to remove yet, goes to `docs/todo.md`. Run
+    alternated, rotated A/B: a fixed order mistook the position for the change.
 - **Performance (CPU and RAM).** After every cycle of engine or daemon changes,
   do a **thorough performance check**: CPU, RAM (RSS and allocations) and
   transfer latency/throughput. Every replacement or optimisation must be **at

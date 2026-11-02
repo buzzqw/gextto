@@ -70,36 +70,95 @@ func (v *Verifier) Run(pieces []piece.Piece, progressC chan Progress, resultC ch
 		default:
 		}
 	}
-	// One buffer sized to the widest piece: v2 pieces vary (per-file
-	// tails), so the first piece is not necessarily the largest.
-	buf := make([]byte, widestPiece(pieces))
+	v.check(pieces, progressC)
+}
+
+// readPiece is one piece on its way from the reader to the hasher: its data in
+// buf, or skip for a piece already known to be good.
+type readPiece struct {
+	piece *piece.Piece
+	buf   []byte
+	skip  bool
+}
+
+// check reads the pieces on one goroutine and hashes them on this one, so the
+// disk and the CPU work at the same time: a cold check takes as long as the slower
+// of the two instead of their sum. Reading stays strictly in order, one piece at a
+// time, which is what a hard disk wants, and two buffers are enough: the one being
+// read and the one being hashed.
+func (v *Verifier) check(pieces []piece.Piece, progressC chan Progress) {
+	readC := make(chan readPiece)
+	freeC := make(chan []byte, 2)
+	// Sized to the widest piece: v2 pieces vary (per-file tails), so the first
+	// piece is not necessarily the largest.
+	width := widestPiece(pieces)
+	freeC <- make([]byte, width)
+	freeC <- make([]byte, width)
+	stopC := make(chan struct{})
+	var readErr error
+	go func() {
+		defer close(readC)
+		readErr = v.readPieces(pieces, readC, freeC, stopC)
+	}()
+	defer func() {
+		close(stopC)
+		for range readC { // the reader exits on stopC; wait for it
+		}
+		if v.Error == nil {
+			v.Error = readErr
+		}
+	}()
+
 	hash := sha1.New()
-	var numOK uint32
-	for _, p := range pieces {
+	for r := range readC {
+		if r.skip {
+			v.Bitfield.Set(r.piece.Index)
+		} else {
+			if v.checkPiece(r.piece, r.buf, hash) {
+				v.Bitfield.Set(r.piece.Index)
+			}
+			hash.Reset()
+			freeC <- r.buf[:cap(r.buf)]
+		}
+		if !v.report(progressC, r.piece.Index+1) {
+			return
+		}
+	}
+}
+
+// readPieces feeds the hasher in piece order until the pieces end, a read fails
+// or the check stops. A read error ends the check, as it always did.
+func (v *Verifier) readPieces(pieces []piece.Piece, readC chan<- readPiece, freeC <-chan []byte, stopC <-chan struct{}) error {
+	for i := range pieces {
+		p := &pieces[i]
 		if v.Only != nil && !v.Only(p.Index) {
 			continue
 		}
+		next := readPiece{piece: p}
 		if v.Skip != nil && v.Skip(p.Index) {
-			v.Bitfield.Set(p.Index)
-			numOK++
-			if !v.report(progressC, p.Index+1) {
-				return
+			next.skip = true
+		} else {
+			select {
+			case next.buf = <-freeC:
+			case <-stopC:
+				return nil
+			case <-v.closeC:
+				return nil
 			}
-			continue
+			next.buf = next.buf[:p.Length]
+			if _, err := p.Data.ReadAt(next.buf, 0); err != nil {
+				return err
+			}
 		}
-		buf = buf[:p.Length]
-		if _, v.Error = p.Data.ReadAt(buf, 0); v.Error != nil {
-			return
+		select {
+		case readC <- next:
+		case <-stopC:
+			return nil
+		case <-v.closeC:
+			return nil
 		}
-		if ok := v.checkPiece(&p, buf, hash); ok {
-			v.Bitfield.Set(p.Index)
-			numOK++
-		}
-		if !v.report(progressC, p.Index+1) {
-			return
-		}
-		hash.Reset()
 	}
+	return nil
 }
 
 // widestPiece returns the largest piece length for the shared read buffer.

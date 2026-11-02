@@ -60,12 +60,6 @@ func (s *FileStorage) Open(name string, size int64) (f storage.File, exists bool
 			f = nil
 			return
 		}
-		if rerr := disableReadAhead(of); rerr != nil {
-			_ = of.Close()
-			err = rerr
-			f = nil
-			return
-		}
 		f = s.wrap(of, size)
 	}()
 	return nil, opened, nil
