@@ -11,18 +11,19 @@ torrents and limits for every client.
 
 | Question | Best | gx-torrent | Why it matters |
 |---|---|---|---|
-| Fastest download with nothing in the way | **gx-torrent, 290 MB/s** | first; the others 56–250 MB/s | a fast disk and a fast peer |
-| Download on a 100 Mbit/s line, 4 peers | Deluge and qBittorrent, about 10.6 MB/s | **last, 6.9 MB/s: a bug, now fixed, 11.2 MB/s** ([details](#what-the-comparison-changed)) | the common case at home |
-| Least own memory at full speed | Transmission, 12 MiB | **27 MiB**, qBittorrent 24, Deluge 57; on the 100 Mbit/s line 36 against 10–39 | what the client cannot give back to the system |
-| Fastest upload | Deluge and qBittorrent, about 230 MB/s | **125 MB/s**, now [180–240 MB/s](#what-the-comparison-changed) | only matters above a gigabit link |
-| Fastest recheck of 4 GiB | Transmission, 3.9 s | **last, 8.8 s**, now [3.8 s](#what-the-comparison-changed) | after a move or a crash |
-| Lowest CPU at rest | gx-torrent and qBittorrent, 0.05–0.06 % | among the best | a machine that is always on |
-| Lightest with 100 torrents | Transmission, 19 MB | **second, 29 MB** (qBittorrent 119 MB) | a long seeding list |
+| Fastest download with nothing in the way | **gx-torrent, 289 MB/s** | first; the others 56–250 MB/s | a fast disk and a fast peer |
+| Download on a 100 Mbit/s line, 4 peers, TCP | **gx-torrent, 11.2 MB/s** | first; the others 9.5–10.7 MB/s | the common case at home |
+| The same line, uTP only | Deluge and qBittorrent, about 11.6 MB/s | **third, 11.2 MB/s**, with the CPU of the libtorrent clients | peers that prefer uTP |
+| Least own memory at full speed | Transmission, 11 MiB | **28 MiB**, qBittorrent 26, Deluge 55; on the 100 Mbit/s line 40 against 10–39 | what the client cannot give back to the system |
+| Fastest upload | qBittorrent and gx-torrent, about 260 MB/s | **258 MB/s**, ranges overlap with Deluge's 241 | only matters above a gigabit link |
+| Fastest recheck of 4 GiB | **gx-torrent, 3.8 s** | first; Transmission 4.0 s, qBittorrent 5.7 s | after a move or a crash |
+| Lowest CPU at rest | gx-torrent and qBittorrent, 0.05 % | among the best | a machine that is always on |
+| Lightest with 100 torrents | Transmission, 19 MB | **second, 28 MB** (qBittorrent 118 MB) | a long seeding list |
 
-In short: gx-torrent is the fastest downloader when the network is not the limit and stays
-small while doing it, and it still spends more CPU on uTP than the others. The tables are the
-round of 2026-11-02. The defects that round exposed are fixed since, and their effect is
-measured [below](#what-the-comparison-changed); the tables are replaced at the next full round.
+In short: gx-torrent is the fastest downloader over TCP and the fastest at a recheck, and it
+uploads as fast as the libtorrent clients. It holds the most own memory on the 100 Mbit/s line
+and while uploading, and Transmission spends less CPU on every download, at a lower speed. The
+tables are the round of 2026-11-02 on commit `e9ca59c9`.
 
 ## Compared with qBittorrent, Transmission and Deluge
 
@@ -35,7 +36,7 @@ byte with the original.
 
 | Client | Version | Engine |
 |---|---|---|
-| gx-torrent | commit `13bad664` | gx-core, pure Go |
+| gx-torrent | commit `e9ca59c9` | gx-core, pure Go |
 | qBittorrent | 5.1.0 (Debian 13) | libtorrent |
 | Transmission | 4.1.0 beta 2 (Debian 13) | its own |
 | Deluge | 2.2.0 (Debian 13) | libtorrent 2.0.11 |
@@ -59,10 +60,10 @@ One client, no torrents, 60 s after a 15 s settle.
 
 | Client | CPU (% of a core) | Own memory | RSS |
 |---|---|---|---|
-| gx-torrent | 0.06 | 7.6 MiB | 22 MiB |
-| qBittorrent | 0.05 | 7.1 MiB | 35 MiB |
-| Transmission | 0.30 | 2.4 MiB | 17 MiB |
-| Deluge | 0.30 | 38 MiB | 63 MiB |
+| gx-torrent | 0.05 | 7.6 MiB | 22 MiB |
+| qBittorrent | 0.05 | 7.1 MiB | 34 MiB |
+| Transmission | 0.29 | 2.4 MiB | 17 MiB |
+| Deluge | 0.28 | 38 MiB | 62 MiB |
 
 ### Download at full speed
 
@@ -71,10 +72,10 @@ ceiling of each client on this machine.
 
 | Client | Speed | Time | CPU per GiB | Peak own memory | Peak RSS |
 |---|---|---|---|---|---|
-| **gx-torrent** | **290 MB/s** (288–291) | 14.8 s | 3.05 s | 27 MiB | 39 MiB |
-| Deluge | 250 MB/s (247–250) | 17.2 s | 2.92 s | 57 MiB | 3,979 MiB |
-| qBittorrent | 242 MB/s (240–245) | 17.7 s | 2.70 s | 24 MiB | 3,972 MiB |
-| Transmission | 56 MB/s (56–56) | 77.0 s | 2.18 s | 12 MiB | 26 MiB |
+| **gx-torrent** | **289 MB/s** (285–290) | 14.8 s | 3.20 s | 28 MiB | 42 MiB |
+| Deluge | 250 MB/s (246–250) | 17.2 s | 2.90 s | 55 MiB | 3,980 MiB |
+| qBittorrent | 239 MB/s (225–240) | 18.0 s | 2.75 s | 26 MiB | 3,982 MiB |
+| Transmission | 56 MB/s (56–56) | 77.2 s | 2.23 s | 11 MiB | 26 MiB |
 
 Transmission's 56 MB/s repeats in every round; its cause was not investigated.
 
@@ -85,10 +86,10 @@ before protocol overhead.
 
 | Client | Speed | Time | CPU (% of a core) | CPU per GiB | Peak own memory | Peak RSS |
 |---|---|---|---|---|---|---|
-| Deluge | 10.68 MB/s | 50.3 s | 30 % | 30.2 s | 39 MiB | 575 MiB |
-| qBittorrent | 10.57 MB/s | 50.8 s | 26 % | 26.9 s | 9.5 MiB | 543 MiB |
-| Transmission | 9.52 MB/s | 56.4 s | 14 % | 16.3 s | 9.6 MiB | 24 MiB |
-| gx-torrent | **6.90 MB/s** | 77.8 s | 15 % | 22.7 s | 36 MiB | 50 MiB |
+| **gx-torrent** | **11.19 MB/s** | 48.0 s | 20 % | 19.6 s | 40 MiB | 54 MiB |
+| Deluge | 10.68 MB/s | 50.3 s | 30 % | 30.0 s | 39 MiB | 574 MiB |
+| qBittorrent | 10.52 MB/s | 51.0 s | 25 % | 26.0 s | 9.5 MiB | 543 MiB |
+| Transmission | 9.50 MB/s | 56.5 s | 15 % | 17.0 s | 9.7 MiB | 24 MiB |
 
 ### The same line, uTP only
 
@@ -96,13 +97,13 @@ The same four peers with TCP blocked at the peer.
 
 | Client | Speed | Time | CPU (% of a core) | CPU per GiB | Peak own memory | Peak RSS |
 |---|---|---|---|---|---|---|
-| Deluge | 11.66 MB/s | 46.1 s | 43 % | 39.7 s | 39 MiB | 575 MiB |
-| qBittorrent | 11.59 MB/s | 46.3 s | 40 % | 37.0 s | 9.7 MiB | 543 MiB |
-| Transmission | 9.60 MB/s | 55.9 s | 23 % | 25.4 s | 9.2 MiB | 24 MiB |
-| gx-torrent | **6.88 MB/s** | 78.1 s | 45 % | 69.3 s | 44 MiB | 59 MiB |
+| Deluge | 11.66 MB/s | 46.1 s | 43 % | 39.3 s | 39 MiB | 575 MiB |
+| qBittorrent | 11.56 MB/s | 46.4 s | 39 % | 36.1 s | 9.7 MiB | 544 MiB |
+| gx-torrent | 11.18 MB/s | 48.0 s | 37 % | 35.5 s (35–39) | 47 MiB | 61 MiB |
+| Transmission | 9.58 MB/s | 56.0 s | 23 % | 25.3 s | 9.1 MiB | 24 MiB |
 
-uTP is where gx-torrent spends the most: 1.7–1.9 times the CPU per GiB of the libtorrent
-clients in this round.
+On uTP gx-torrent now spends about what the libtorrent clients spend and is about 4 % slower
+than them.
 
 ### Recheck and upload
 
@@ -111,13 +112,14 @@ then an upload to one unshaped reference peer.
 
 | Client | Recheck | CPU | Upload speed | CPU per GiB | Peak own memory | Peak RSS |
 |---|---|---|---|---|---|---|
-| Transmission | **3.9 s** (1,098 MB/s) | 2.6 s | 131 MB/s (130–144) | 2.87 s | 35 MiB | 50 MiB |
-| Deluge | 4.6 s (940 MB/s) | 3.3 s | **238 MB/s** (237–292) | 2.48 s | 44 MiB | 4,101 MiB |
-| qBittorrent | 5.6 s (765 MB/s) | 3.4 s | 223 MB/s (192–262) | 2.58 s | 13 MiB | 4,103 MiB |
-| gx-torrent | 8.8 s (488 MB/s) | 4.0 s | 125 MB/s (115–125) | 4.79 s | 58 MiB | 73 MiB |
+| **gx-torrent** | **3.8 s** (1,135 MB/s) | 4.0 s | 258 MB/s (242–323) | 2.52 s | 60 MiB | 75 MiB |
+| Transmission | 4.0 s (1,080 MB/s) | 2.5 s | 125 MB/s (103–132) | 2.63 s | 36 MiB | 51 MiB |
+| Deluge | 4.3 s (995 MB/s) | 3.4 s | 241 MB/s (208–265) | 2.66 s | 44 MiB | 4,098 MiB |
+| qBittorrent | 5.7 s (748 MB/s) | 3.7 s | **263 MB/s** (223–289) | 2.58 s | 13 MiB | 4,106 MiB |
 
-In this round a finished recheck waited for the 3 s queue tick before seeding again, so about
-3 s of gx-torrent's time is that wait; it is gone since.
+The upload ranges overlap and are wide for every client, because repeated 4 GiB writes by the
+receiving peer slow this disk over a session: gx-torrent, qBittorrent and Deluge are not
+separated here.
 
 ### 100 torrents
 
@@ -126,20 +128,18 @@ until all are seeding, then 60 s at rest and the time to come back after a resta
 
 | Client | Add | All seeding | Restart | CPU at rest | Own memory | RSS |
 |---|---|---|---|---|---|---|
-| Transmission | 0.9 s | **0.9 s** | **0.2 s** | 0.29 % | 4.2 MiB | 19 MiB |
-| gx-torrent | 1.5 s | 3.4 s (3–24) | 0.5 s | 0.67 % | 14 MiB | 29 MiB |
-| Deluge | 3.4 s | 3.4 s | 1.0 s | 0.33 % | 42 MiB | 68 MiB |
-| qBittorrent | 0.9 s | 100.5 s | 0.5 s | **0.06 %** | 90 MiB | 119 MiB |
+| Transmission | 0.9 s | **0.9 s** | **0.2 s** | 0.31 % | 4.2 MiB | 19 MiB |
+| gx-torrent | 2.1 s | 2.7 s (2–6) | 0.5 s | 0.67 % | 12 MiB | 28 MiB |
+| Deluge | 2.6 s | 2.7 s | 1.0 s | 0.35 % | 42 MiB | 68 MiB |
+| qBittorrent | 0.9 s | 100.5 s | 0.5 s | **0.07 %** | 89 MiB | 118 MiB |
 
-One gx-torrent round took 24 s to reach seeding where the other two took 3 s; its cause was
-not investigated. Transmission reaches seeding at once because it trusts existing files
-until asked to recheck.
+Transmission reaches seeding at once because it trusts existing files until asked to recheck.
 
 ### What the comparison changed
 
-The round exposed defects in gx-torrent, all fixed since. Same setup, gx-torrent only, the old and
-new code alternating on one binary, 2026-11-02. This is not a new ranking: the other clients were
-not run again.
+An earlier round on the same day exposed defects in gx-torrent. All are fixed, and the tables above
+measure the fixed code. The figures below are gx-torrent only, the old and new code taking turns in
+the same setup, so they can differ a little from the tables, which come from another session.
 
 | Measure | Before | After | Cause |
 |---|---|---|---|
@@ -153,8 +153,7 @@ not run again.
 | Download at full speed | 284 MB/s | 290 MB/s | no regression |
 
 The public-swarm effect of the address fix was not measured. It should be smaller, because few
-addresses collide and a large swarm has other peers to take over. The upload range is wide
-because repeated 4 GiB writes by the receiving peer slow this disk over a session.
+addresses collide and a large swarm has other peers to take over.
 
 ### What these numbers do not say
 
@@ -166,8 +165,7 @@ because repeated 4 GiB writes by the receiving peer slow this disk over a sessio
 - **Transmission is a beta**, the version Debian 13 ships.
 - **Small differences are not results.** A gap inside the ranges above means nothing.
 - **Deluge's web front end** runs in a separate container, so its CPU and memory are not
-  counted. Two Deluge runs failed on a harness error (the web front end was not yet connected
-  to the daemon); they were repeated after the fix, with the same image.
+  counted.
 
 ## How to repeat the comparison
 
