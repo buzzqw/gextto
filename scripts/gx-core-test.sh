@@ -5,13 +5,16 @@
 #   scripts/gx-core-test.sh build      # compile this checkout into the test dir
 #   scripts/gx-core-test.sh start      # start it (rebuilds if the code changed)
 #   scripts/gx-core-test.sh restart    # stop + start (rebuilds if changed)
-#   scripts/gx-core-test.sh stop | status | log
+#   scripts/gx-core-test.sh stop | status | log | clean
 #
 # Extra daemon options go after "--", e.g. `start -- -debug -no-dht`. `--build`
 # on start/restart forces a rebuild even when the sources did not change.
 #
 # It never touches what Gextto uses: its own directory (state, session DB,
-# downloads, log), its own API port and its own peer ports. The build goes to
+# downloads, log), its own API port and its own peer ports. The directory keeps
+# out of $HOME and the checkout: it lives in the test work area
+# (scripts/test-workdir.sh, default ~/.cache/gextto-tests), and `clean` removes
+# it when the try-out is over. The build goes to
 # the test directory, not to bin/, and does not bump the committed build
 # numbers, so Gextto's managed gx-torrent is never replaced. It is a local
 # build without a release channel: it never updates itself.
@@ -29,7 +32,8 @@
 # page password is still detected, its API answering 401 until a session exists.
 #
 # Settings (environment):
-#   GX_TEST_DIR         test directory           (default ~/gx-core-test)
+#   GX_TEST_DIR         test directory           (default
+#                       ~/.cache/gextto-tests/gx-core-test)
 #   GX_TEST_LISTEN      web page / API address   (default 0.0.0.0:8899)
 #   GX_TEST_PEER_PORTS  peer port range          (default 51500-51510)
 #   GX_TEST_TOKEN       X-Gx-Token required by the API; without it a
@@ -45,7 +49,7 @@ SCRIPT="$(readlink -f "$0")"
 ROOT="$(cd "$(dirname "$SCRIPT")/.." && pwd)"
 # shellcheck source=scripts/version.sh
 . "$ROOT/scripts/version.sh"
-DIR="${GX_TEST_DIR:-$HOME/gx-core-test}"
+DIR="${GX_TEST_DIR:-${GEXTTO_TEST_ROOT:-${XDG_CACHE_HOME:-$HOME/.cache}/gextto-tests}/gx-core-test}"
 LISTEN="${GX_TEST_LISTEN:-0.0.0.0:8899}"
 PEER_PORTS="${GX_TEST_PEER_PORTS:-51500-51510}"
 TOKEN="${GX_TEST_TOKEN:-}"
@@ -149,6 +153,10 @@ daemon_answers() {
 # (GX_TEST_BIN) and by status, which must not build.
 warn_if_stale() {
   local built want
+  if [[ ! -x "$BIN" ]]; then
+    echo "note: no test binary at $BIN yet: run '$0 build'" >&2
+    return 0
+  fi
   built="$("$BIN" -version 2>/dev/null | head -1 | tr -d '[:space:]')"
   want="$(gx_version_label_for_build "$(tr -d '[:space:]' < "$ROOT/gx-torrent.build_number" 2>/dev/null)")"
   if [[ -n "$built" && -n "$want" && "$built" != "$want" ]]; then
@@ -344,6 +352,20 @@ status() {
   fi
 }
 
+# clean stops the test daemon and removes its directory: the try-out is over and
+# the test work area must not fill up.
+clean() {
+  case "$DIR" in
+    "" | / | "$HOME" | "$HOME/" | /home | /home/"$(id -un)" | /tmp | /var | /usr | /etc)
+      echo "refusing to remove '$DIR'" >&2
+      exit 1
+      ;;
+  esac
+  stop
+  rm -rf "$DIR"
+  echo "removed the test directory $DIR"
+}
+
 [[ $# -ge 1 ]] || usage
 COMMAND="$1"
 shift
@@ -365,5 +387,6 @@ case "$COMMAND" in
   stop) stop ;;
   status) status ;;
   log) exec tail -n 50 -F "$LOG_FILE" ;;
+  clean) clean ;;
   *) usage ;;
 esac

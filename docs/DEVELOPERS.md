@@ -84,13 +84,14 @@ scripts/gx-core-test.sh start --build   # force a rebuild even if nothing change
 scripts/gx-core-test.sh start -- -debug # extra daemon options after "--"
 ```
 
-It keeps everything apart from Gextto: its own directory (`~/gx-core-test`:
-binary, state, session database, downloads, log), its own web page/API address
+It keeps everything apart from Gextto: its own directory (the test work area,
+`~/.cache/gextto-tests/gx-core-test`: binary, state, session database,
+downloads, log), its own web page/API address
 (`0.0.0.0:8899`, open on the whole LAN like the packaged standalone daemon) and
 peer ports (`51500-51510`), no UPnP/NAT-PMP mapping. `start` and `status` print
 the address another device on the network opens (the machine's LAN address); its
 page stays open until a password is set in its own `settings.json` (standalone's
-LAN bypass). The build goes to `~/gx-core-test/bin`, not to `bin/`, and does not
+LAN bypass). The build goes to that directory's `bin`, not to `bin/`, and does not
 bump `gx-torrent.build_number`: Gextto's managed gx-torrent is never replaced.
 The binary carries the commit (`-dirty` when the engine or daemon sources have
 uncommitted changes) and no release channel, so it never updates itself.
@@ -238,7 +239,7 @@ make screenshots          # docs/screenshots/<lang>/<name>.png
 ```
 
 `scripts/screenshots.sh` compiles `gexttod` and `gx-torrent` into
-`~/.cache/gextto-screenshots` (no change to `bin/` or to the build numbers),
+`~/.cache/gextto-tests/screenshots` (no change to `bin/` or to the build numbers),
 starts a real instance there — dry-run cannot add torrents — with automation
 off, its own ports and a 2000 KiB/s cap, adds the legal torrents (Debian,
 Ubuntu Server, the Blender open movies) and a small public-domain library, lets
@@ -309,6 +310,33 @@ idle — its transcript `~/.claude/projects/<project>/<session>.jsonl` and its
 own content untouched for 12 h (`--claude-idle HOURS`) — and nothing in it is
 open or is a process's working directory, so a running session keeps its
 scratchpad. The loose files beside the sessions age like build residue (6 h).
+
+## Test and benchmark work area
+
+Tests, measurements and screenshots never write into `$HOME` at its top level or
+into the checkout: each run gets a folder under one root, and the folder is
+removed when the cycle ends.
+
+```bash
+scripts/test-workdir.sh root            # ~/.cache/gextto-tests
+scripts/test-workdir.sh new cycle-42    # the folder of this cycle
+scripts/test-workdir.sh clean           # remove what no process is using
+```
+
+The root is `$GEXTTO_TEST_ROOT`, default
+`${XDG_CACHE_HOME:-$HOME/.cache}/gextto-tests`; it is on a real disk because
+`/tmp` is tmpfs (too small for torrent payloads). The tools already default
+inside it: `scripts/gx-core-test.sh` (`GX_TEST_DIR`),
+`scripts/phase3-env.sh` and `make measure-merge3` (`GX_PHASE3_DIR`),
+`scripts/compare/run.py` (`GX_COMPARE_DIR`), `scripts/screenshots.sh`
+(`GEXTTO_SHOTS_WORK`), `scripts/bench-all.sh` (`GX_BENCH_OUT`). Logs of a single
+command go in a `mktemp -d` scratch folder, deleted at the end.
+
+Cleanup has a command for each thing: `scripts/gx-core-test.sh clean` stops the
+test daemon and removes its directory, `scripts/compare/run.py clean` removes
+the payloads and the containers of a round, `scripts/test-workdir.sh clean` the
+rest. The only files that stay are the raw benchmark results in
+`gextto-data/bench/`, which the next run overwrites.
 
 ## Build cache
 

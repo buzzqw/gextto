@@ -13,11 +13,11 @@
 #    every 1 MiB destination piece then straddles verified and unverified
 #    source pieces, the exact case Phase 3 reuses at 16 KiB block level.
 #
-# Usage: scripts/phase3-env.sh [dir]   (default ~/gx-phase3)
+# Usage: scripts/phase3-env.sh [dir]   (default ~/.cache/gextto-tests/phase3)
 # Then:  GX_MEASURE_MERGE3=<dir>/debian go test ./cmd/gx-torrent/ -run MeasureMergePhase3 -v
 set -euo pipefail
 
-DIR=${1:-$HOME/gx-phase3}
+DIR=${1:-${GEXTTO_TEST_ROOT:-${XDG_CACHE_HOME:-$HOME/.cache}/gextto-tests}/phase3}
 SRC_PIECE=${SRC_PIECE:-262144}
 DST_PIECE=${DST_PIECE:-1048576}
 CORRUPT_EVERY=${CORRUPT_EVERY:-4}

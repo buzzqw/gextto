@@ -162,8 +162,9 @@ measure-choking:
 # network. GX_PHASE3_DIR sets the folder, GX_PHASE3_SET picks debian or arch.
 # See docs/measurements.md.
 measure-merge3:
-	scripts/phase3-env.sh $${GX_PHASE3_DIR:-$$HOME/gx-phase3}
-	GX_MEASURE_MERGE3=$${GX_PHASE3_DIR:-$$HOME/gx-phase3}/$${GX_PHASE3_SET:-debian} go test ./cmd/gx-torrent/ -run MeasureMergePhase3 -v -count=1 -timeout 40m
+	@merge3_dir=$${GX_PHASE3_DIR:-$$(scripts/test-workdir.sh new phase3)}; \
+	  scripts/phase3-env.sh "$$merge3_dir" && \
+	  GX_MEASURE_MERGE3="$$merge3_dir/$${GX_PHASE3_SET:-debian}" go test ./cmd/gx-torrent/ -run MeasureMergePhase3 -v -count=1 -timeout 40m
 
 # DHT real-swarm measurement (opt-in, outside CI): routing-table fill and query
 # success over time, the numbers behind the anti-Sybil/multi-path decisions.

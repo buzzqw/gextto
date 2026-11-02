@@ -9,9 +9,11 @@ method and keeps the results; `make measure-compare` is the usual entry point.
   scripts/compare/run.py build                 build the images
   scripts/compare/run.py run [--rounds N] ...  run the scenarios, append results
   scripts/compare/run.py report                print the tables of the results
+  scripts/compare/run.py clean                 remove the payloads and containers
 
-Standard library only. The data lives in ~/.cache/gextto-compare (a real disk:
-/tmp is often tmpfs), the results in gextto-data/bench/compare.jsonl.
+Standard library only. The data lives in the test work area
+($GEXTTO_TEST_ROOT, default ~/.cache/gextto-tests/compare — a real disk: /tmp is
+often tmpfs), the results in gextto-data/bench/compare.jsonl.
 """
 import argparse
 import base64
@@ -33,7 +35,13 @@ import uuid
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-WORK = Path(os.environ.get("GX_COMPARE_DIR", Path.home() / ".cache" / "gextto-compare"))
+TEST_ROOT = Path(
+    os.environ.get(
+        "GEXTTO_TEST_ROOT",
+        Path(os.environ.get("XDG_CACHE_HOME") or Path.home() / ".cache") / "gextto-tests",
+    )
+)
+WORK = Path(os.environ.get("GX_COMPARE_DIR", TEST_ROOT / "compare"))
 RESULTS = Path(os.environ.get("GX_COMPARE_OUT", ROOT / "gextto-data" / "bench" / "compare.jsonl"))
 
 CLIENTS = ["gx-torrent", "qbittorrent", "transmission", "deluge"]
@@ -871,6 +879,14 @@ def command_build(args):
         )
 
 
+def command_clean(args):
+    """Drop the payloads and the containers of a finished round: a round leaves
+    several GiB behind and the harness regenerates them from the fixed formula."""
+    cleanup()
+    shutil.rmtree(WORK, ignore_errors=True)
+    print(f"removed {WORK}")
+
+
 def describe_host():
     """What a future round has to match, written next to the results."""
     cpu = next((line.split(":", 1)[1].strip() for line in Path("/proc/cpuinfo").read_text().splitlines()
@@ -1016,8 +1032,15 @@ def main():
     run.add_argument("--tag", default="")
     report = sub.add_parser("report")
     report.add_argument("--tag", default="")
+    sub.add_parser("clean")
     args = parser.parse_args()
-    return {"build": command_build, "run": command_run, "report": command_report}[args.command](args) or 0
+    commands = {
+        "build": command_build,
+        "run": command_run,
+        "report": command_report,
+        "clean": command_clean,
+    }
+    return commands[args.command](args) or 0
 
 
 if __name__ == "__main__":

@@ -17,7 +17,7 @@
 # work directory, which lives under ~/.cache (not /tmp, often a tmpfs in RAM).
 #
 # Settings (environment):
-#   GEXTTO_SHOTS_WORK     work directory     (default ~/.cache/gextto-screenshots)
+#   GEXTTO_SHOTS_WORK     work directory     (default ~/.cache/gextto-tests/screenshots)
 #   GEXTTO_SHOTS_SETTLE   seconds of download before the shots (default 150)
 #   GEXTTO_SHOTS_DL       download cap in KiB/s (default 2000)
 #   GEXTTO_SHOTS_LANGS    languages with every shot (default en,it)
@@ -26,7 +26,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-WORK="${GEXTTO_SHOTS_WORK:-${XDG_CACHE_HOME:-$HOME/.cache}/gextto-screenshots}"
+WORK="${GEXTTO_SHOTS_WORK:-${GEXTTO_TEST_ROOT:-${XDG_CACHE_HOME:-$HOME/.cache}/gextto-tests}/screenshots}"
 SETTLE="${GEXTTO_SHOTS_SETTLE:-150}"
 DL_LIMIT="${GEXTTO_SHOTS_DL:-2000}"
 UI_PORT=15023

@@ -32,7 +32,8 @@ conflict with another, the more specific one wins.
    idea — yours or the operator's.
 4. **Tests green locally**: `make test`, `make vet` and, if you touched the UI,
    `make test-ui`; plus the TUI, performance and invariants described in *Build
-   and test*.
+   and test*. The test and benchmark work area is left empty (see *Build and
+   test*), not scattered in `$HOME`.
 5. **Commit** with author `buzzqw <azanzani@gmail.com>`, then push to
    `origin/main`.
 6. **Report** commit, push, build and restart in your message, with the short
@@ -244,22 +245,44 @@ not to break.
   must not write state (`saveLocked` returns immediately): without the guard it
   would create a `.tmp` in the working directory and leave it there because the
   rename to the empty path fails.
-- **Logs of test and build runs stay out of the home and the checkout.** The
-  output of `make test`, `make test-ui`, a sharded `go test` or a build goes
-  to a scratch directory created for the cycle and deleted when the cycle ends
-  (at the latest before the final report):
+- **Test, benchmark and build work has one home, and it is not yours.** Nothing
+  a cycle produces — logs, profiles, payloads, screenshots, a test daemon's
+  data — is written into `$HOME` (not even at its top level), into the checkout
+  or into the current directory. Everything goes under **one work area** and is
+  removed when the cycle ends, at the latest before the final report.
+  - Work area: `${GEXTTO_TEST_ROOT:-${XDG_CACHE_HOME:-$HOME/.cache}/gextto-tests}`,
+    on a real disk (`/tmp` is often tmpfs: too small for torrent payloads and
+    gone at the next reboot). `scripts/test-workdir.sh root` prints it and
+    `scripts/test-workdir.sh new <name>` creates the folder of the cycle.
+  - Small and disposable output (`make test`, `make test-ui`, `go test`) uses a
+    scratch directory of the cycle:
 
-  ```bash
-  scratch="$(mktemp -d "${TMPDIR:-/tmp}/gextto-check.XXXXXX")"
-  make test >"$scratch/test.log" 2>&1 || { tail -n 40 "$scratch/test.log"; exit 1; }
-  tail -n 5 "$scratch/test.log"
-  rm -rf "$scratch"
-  ```
+    ```bash
+    scratch="$(mktemp -d "${TMPDIR:-/tmp}/gextto-check.XXXXXX")"
+    make test >"$scratch/test.log" 2>&1 || { tail -n 40 "$scratch/test.log"; exit 1; }
+    tail -n 5 "$scratch/test.log"
+    rm -rf "$scratch"
+    ```
 
-  Files such as `~/gextto-test-<id>.log`, `~/gextto-build-<id>.log` or a
-  `*.log` at the root of the checkout are forbidden: they pile up in the home
-  and no test cleans them. A log that must survive the cycle stays in
-  `gextto-data/` with a fixed name, so the next run overwrites it.
+  - Anything that outlives the single command (payloads, `pprof` profiles, a
+    test daemon, screenshots) goes in the cycle folder, and the tool is pointed
+    at it: `GX_TEST_DIR` (`scripts/gx-core-test.sh`), `GX_PHASE3_DIR`
+    (`make measure-merge3`), `GX_COMPARE_DIR` (`scripts/compare/run.py`),
+    `GEXTTO_SHOTS_WORK` (`scripts/screenshots.sh`), `GX_BENCH_OUT`
+    (`scripts/bench-all.sh`). The defaults of those scripts already point
+    inside the work area.
+  - **Cleanup is part of the work**: `scripts/gx-core-test.sh clean` (stops the
+    test daemon and removes it), `scripts/compare/run.py clean` (payloads and
+    containers of a round), `scripts/test-workdir.sh clean` (everything no
+    process is using). Before the final report the work area holds nothing left
+    over and `$HOME` has no new entry.
+  - The only artifacts that stay are the raw benchmark results in
+    `gextto-data/bench/`, with fixed names so the next run overwrites them; the
+    figures a reader can decide something from go to `docs/measurements.md`.
+  - Forbidden, always: `~/gextto-test-<id>.log`, `~/gextto-build-<id>.log`,
+    `~/gx-phase3*`, `~/gx-core-test` at the top level, in short any new folder or
+    file in `$HOME`, and a `*.log` or a scratch folder at the root of the
+    checkout.
 - **Gextto's TUI must always keep working.** After every change cycle run
   `go test ./internal/tui/` and the integration test
   `go test . -run TestTUILibraryClientAgainstTheRouter` (it drives the TUI
@@ -273,8 +296,9 @@ not to break.
   - *Same images*: pinned Debian base and client versions in
     `scripts/compare/Dockerfile`, gx-torrent built from the checkout.
   - *Same limits*: client under test on CPUs 2-3 with 4 GiB, reference peers on
-    CPUs 0-1 with 1.5 GiB each, data in `~/.cache/gextto-compare` on the ext4
-    NVMe (never tmpfs), isolated Docker network, same scenarios and settings.
+    CPUs 0-1 with 1.5 GiB each, data in `~/.cache/gextto-tests/compare` on the
+    ext4 NVMe (never tmpfs), isolated Docker network, same scenarios and
+    settings.
   - *Quiet host*: before a round set `media_integrity_enabled` to `false`
     (ffmpeg must not run, the harness refuses to go on otherwise) and put it
     back afterwards; do not start with load above 1. A run whose
