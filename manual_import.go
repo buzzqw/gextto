@@ -4,7 +4,7 @@ package gextto
 // on disk: it parses the name, matches a configured series or movie, proposes
 // the archive destination and, when confirmed, renames and moves the file,
 // replacing an inferior copy only when the operator asks for it. It is the
-// missing Sonarr/Radarr operation described in docs/evoluzione.md §8.
+// missing Sonarr/Radarr operation described in docs/todo.md.
 
 import (
 	"context"

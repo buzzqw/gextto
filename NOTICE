@@ -12,6 +12,5 @@ and is shown on the Licence page of the web interface.
 
 Provenance: gx-core (internal/gxcore) and the DHT (internal/dht) were
 historically developed from permissively licensed bases and have since been
-rewritten file by file in this tree (see docs/evoluzione.md, section 7);
-only protocol-mandated formats (BEP wire layouts, API shapes) coincide. The
-full history is in git.
+rewritten file by file in this tree; only protocol-mandated formats
+(BEP wire layouts, API shapes) coincide. The full history is in git.

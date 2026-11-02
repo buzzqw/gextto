@@ -23,7 +23,7 @@ Everything is measured on the reference machine below, unless a row says otherwi
 | Go | 1.27.3 |
 | Docker | 29.9.2 |
 
-The state of the product and the open items are in [`evoluzione.md`](evoluzione.md);
+The open items are in [`todo.md`](todo.md);
 the engine is in [`gx-torrent.md`](gx-torrent.md) (inventory
 [`../internal/gxcore/GEXTTO.md`](https://github.com/buzzqw/gextto/blob/main/internal/gxcore/GEXTTO.md))
 and its BEP compliance in [`bep.md`](bep.md).
@@ -794,11 +794,11 @@ Closed with a measurement, so they are not retried without new data:
 considered and not done — the internal one shares a UDP socket with uTP, chooses that
 socket's family and serves every torrent from a single request channel, where an external
 library expects its own socket and a traversal per torrent. The state is in
-[`evoluzione.md`](evoluzione.md) §6.
+[`gx-torrent.md`](gx-torrent.md).
 
 **Postponed, with a reason:** qBittorrent's `renameFile`/`renameFolder` (needs rename
 support in the engine: a feature of its own); graduated file priority with mixed-priority
-files (open item in [`evoluzione.md`](evoluzione.md) §8); qBittorrent's
+files (open item in [`todo.md`](todo.md)); qBittorrent's
 `setAutoManagement` tuning.
 
 ## 6. Verification
@@ -864,8 +864,7 @@ unchanged by the number of episodes the answer covers.
 
 ### Dead torrent links
 
-The quarantine of `.torrent` links that keep failing (see [`evoluzione.md`](evoluzione.md)
-§2) costs **one query per cycle**, not one per release: the whole set is read once and
+The quarantine of `.torrent` links that keep failing costs **one query per cycle**, not one per release: the whole set is read once and
 checked in memory. With 300 quarantined rows it measures about 0.35–0.36 ms and 88 KB
 allocated per cycle (§4), against a cycle of minutes.
 `RecordTorrentLinkFailure` runs only for the links that actually fail (tens per cycle at

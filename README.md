@@ -482,7 +482,7 @@ assistive-technology testing is still required
 | Operate the service | [English manual](docs/MANUAL.en.md) · [Manuale italiano](docs/MANUAL.it.md) |
 | What changed | [Changelog](changelog.en.md) |
 | Measurements and method | [Measurements](docs/measurements.md) |
-| State, decisions and what is next | [Evolution](docs/evoluzione.md) |
+| Open work | [TODO](docs/todo.md) |
 | Architecture and design | [Architecture](docs/ARCHITECTURE.md) |
 | BitTorrent specifications (BEPs) | [BEP compliance](docs/bep.md) |
 | NAS, reverse proxy, recovery | [Advanced guide](docs/ADVANCED.en.md) |

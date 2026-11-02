@@ -3,9 +3,8 @@
 gx-core is Gextto's torrent engine **and** a torrent client that runs on its own. It is
 **one binary**, `gx-torrent`, with two modes: it is the engine when Gextto launches it,
 and a complete standalone client (web page, search, RSS, categories, settings) when it
-is launched on its own. The engine itself is our own code in-tree
-([`evoluzione.md`](evoluzione.md) §7), the internals of the daemon are in
-[`gx-torrent.md`](gx-torrent.md), the inventory of the engine's areas in
+is launched on its own. The engine itself is our own code in-tree, the internals of the
+daemon are in [`gx-torrent.md`](gx-torrent.md), the inventory of the engine's areas in
 [`../internal/gxcore/GEXTTO.md`](https://github.com/buzzqw/gextto/blob/main/internal/gxcore/GEXTTO.md) and the numbers in
 [`measurements.md`](measurements.md).
 
@@ -193,8 +192,8 @@ decided at startup and never changed. The **shared modules** — `internal/queue
 `internal/webui`, `internal/rss`, `internal/torznab` — are shared by the two uses: they
 cannot live in Gextto's root package, which the daemon cannot import without dragging
 all of Gextto along. The
-**engine** is our own code and stays so
-([`evoluzione.md`](evoluzione.md) §7): what it still needs is written here, not copied.
+**engine** is our own code and stays so: what it still needs is written here, not
+copied.
 
 ## 5. The RSS manager and Wanted
 
@@ -279,8 +278,7 @@ is non-destructive: the old torrent leaves the session, its files stay on disk.
   own.
 - **i18n**: the six languages of the page are assumed to be enough for the standalone
   product; extending the catalogue is not decided.
-- **WebTorrent/WebRTC** and **share mode**: not needed for now
-  ([`evoluzione.md`](evoluzione.md) §6).
+- **WebTorrent/WebRTC** and **share mode**: not planned (see [`todo.md`](todo.md)).
 
 **Risks and countermeasures.** A regression on Gextto's path is prevented by the v1
 contract tests, by a `fingerprint` independent of `settings.json` and by switching the
@@ -288,15 +286,13 @@ standalone functions off in managed; two masters of the same queue are prevented
 mode decided at startup; the LAN without password is protected as in §3; the UI is kept
 out of Go strings by `embed.FS` and Playwright tests; a costly porting from another
 engine is done one algorithm at a time, with before/after measurement; and future
-third-party work is rewritten rather than copied
-([`evoluzione.md`](evoluzione.md) §7).
+third-party work is rewritten rather than copied.
 
 ## 7. References
 
 - [`GXCORE-MANUAL.it.md`](GXCORE-MANUAL.it.md) / [`GXCORE-MANUAL.en.md`](GXCORE-MANUAL.en.md) — user manual with real screenshots, from the Docker start to Series & movies, profiles and integrations.
 - [`docs/gx-torrent.md`](gx-torrent.md) — technical reference of the daemon and the engine.
-- [`docs/evoluzione.md`](evoluzione.md) — the state of the product and the engine, the
-  open items with their gate.
+- [`docs/todo.md`](todo.md) — the open items and the gate that unblocks each.
 - [`docs/measurements.md`](measurements.md) — the harnesses, the numbers and how they are
   taken.
 - [`docs/bep.md`](bep.md) — BEP status and the BitTorrent v2 rules.

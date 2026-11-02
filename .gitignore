@@ -19,8 +19,8 @@ coverage.xml
 *.pid
 
 # Local-only project notes and superseded planning documents.
-# The improvement/evolution docs were consolidated into docs/evoluzione.md;
-# the originals remain as untracked local copies in docs/archive/.
+# The current open work is in docs/todo.md; the originals remain as
+# untracked local copies in docs/archive/.
 docs/internal/
 docs/archive/
 

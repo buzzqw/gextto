@@ -16,7 +16,7 @@ conflict with another, the more specific one wins.
 7. [Code scanning](#code-scanning-codeql)
 8. [Service running on this machine](#service-running-on-this-machine)
 9. [Change conventions](#change-conventions)
-10. [`docs/evoluzione.md`](#docsevoluzionemd)
+10. [`docs/todo.md`](#docstodomd)
 11. [Interface accessibility and i18n](#interface-accessibility-and-i18n)
 12. [Where things live](#where-things-live) — index of the documents
 
@@ -116,9 +116,8 @@ conflict with another, the more specific one wins.
   They are not a gap to close: they must not be enabled in managed mode. Anyone
   who wants feeds/rules/searches runs a standalone gx-torrent (or the test
   instance of `scripts/gx-core-test.sh`). Details: `docs/gx-core.md`.
-- Gap analysis against libtorrent and qBittorrent and improvement plan:
-  **`docs/evoluzione.md`** (§6–§7); evolution towards a standalone client
-  (gx-core): **`docs/gx-core.md`**.
+- Open items and the gate that unblocks each: **`docs/todo.md`**; the engine and its
+  standalone use: **`docs/gx-core.md`**.
 
 ## Build and test
 
@@ -230,7 +229,7 @@ not to break.
   RSS, MSE, IP filter, aMule EC packets), `FUZZ_TIME` seconds per target (default 30s, e.g. `FUZZ_TIME=2m`
   for a serious pass). It is not part of `make test`; crashes found must be
   fixed and their inputs committed as seeds in `testdata/fuzz`. See
-  `docs/evoluzione.md` §6.
+  `docs/todo.md`.
 - Targeted tests: `go test ./cmd/gx-torrent/` and `go test -run GxEngine .`.
 - Engine tests (`internal/gxcore`): `make test-engine` (`go test` from the root
   on the engine packages). It is part of the module, so `go test ./...` already
@@ -478,16 +477,15 @@ not. Error strings reachable from a log line are English too.
   `docs/DEVELOPERS.md`, *Web UI and API changes*.
 - When you add or move documents, update the `docs/README.md` index.
 
-## `docs/evoluzione.md`
+## `docs/todo.md`
 
-Only two contents: the **current state** (what exists and why) and the **future
-improvements** with their gate. It is not a changelog or a manual: no bugs,
-fixes, implementation chronicles, dates, build numbers, commit hashes, usage
-instructions or measurements. Write in the present tense and describe _what
-exists_, not what was done: a sentence that would be false in six months
-because it tells the story of a transition must be cut. When a feature lands,
-the state is updated and the open point removed; decisions stay with their
-rationale, the numbers in `measurements.md`.
+The maintained list of open work. One line per item: what to do and the gate that
+unblocks it. It is not a changelog, a design document or a manual: no history, no
+positioning, no implementation chronicles, no dates, build numbers, commit hashes or
+measurements. When an item lands, delete it; when a new one is accepted, add it. The
+state of the product is in `gx-torrent.md`, `gx-core.md` and the manuals; the numbers
+are in `measurements.md`; the rejected designs and the measurement that closed each one
+are in `measurements.md` §5.9.
 
 ## Interface accessibility and i18n
 - The pages of the gx-torrent daemon (`internal/webui/assets`) use the **shared
@@ -537,8 +535,8 @@ Index of the documents: `docs/README.md`.
 | Interface usage, visible behaviour | `docs/MANUAL.it.md`, `docs/MANUAL.en.md` |
 | Project presentation, quick build | `README.md`, `README.it.md` |
 | Architecture and file map | `docs/ARCHITECTURE.md` |
-| Current state and future engine improvements | `docs/evoluzione.md` |
-| CPU/RAM/latency measurements (numbers only, with machine and date) | `docs/measurements.md` |
+| Open items and the gate that unblocks each | `docs/todo.md` |
+| Benchmarks, CPU/RAM/latency and build/test/CI times (numbers only, with machine and date) | `docs/measurements.md` |
 | gx-torrent daemon and gx-core engine | `docs/gx-torrent.md`, `docs/gx-core.md`, `internal/gxcore/GEXTTO.md` |
 | Engine BEP compliance | `docs/bep.md` |
 | HTTP routes of Gextto and the daemon | `docs/API.md` |

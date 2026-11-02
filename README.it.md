@@ -501,7 +501,7 @@ manuali con screen reader e tecnologie assistive
 | Usare il servizio | [Manuale italiano](docs/MANUAL.it.md) · [English manual](docs/MANUAL.en.md) |
 | Cosa è cambiato | [Changelog](changelog.md) · [English](changelog.en.md) |
 | Misure e metodo | [Misure](docs/measurements.md) |
-| Stato, decisioni e prossimi passi | [Evoluzione](docs/evoluzione.md) |
+| Lavori aperti | [TODO](docs/todo.md) |
 | Architettura e progetto | [Architettura](docs/ARCHITECTURE.md) |
 | Specifiche BitTorrent (BEP) | [Conformità BEP](docs/bep.md) |
 | NAS, reverse proxy, recupero | [Guida avanzata](docs/ADVANCED.en.md) |

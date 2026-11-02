@@ -66,7 +66,7 @@ test-dht:
 # seed corpus; this actually fuzzes, so a panic on hostile input surfaces before
 # a release (the pass of 2026-10-13 found a .torrent scanner panic in minutes).
 # Not part of `make test`; run it by hand or in a nightly job. Override the
-# per-target time with FUZZ_TIME=2m. See docs/evoluzione.md §6.
+# per-target time with FUZZ_TIME=2m.
 FUZZ_TIME ?= 30s
 # Each target runs once and, if it fails, once more. The Go fuzzing engine
 # occasionally ends a target with a spurious "context deadline exceeded" when
@@ -129,14 +129,14 @@ screenshots:
 # Seeding/choking measurements. The deterministic unchoker harness
 # runs with `make test-engine`; this runs the opt-in local-swarm harness. Add
 # GX_MEASURE_SUPERSEED=1 to compare against super-seeding, GX_MEASURE_LEECHERS=N
-# for the swarm size. See docs/evoluzione.md (section 6).
+# for the swarm size. See docs/measurements.md.
 measure-seeding:
 	GX_MEASURE=1 go test ./cmd/gx-torrent/ -run MeasureSeeding -v -count=1
 
 # Pipelining (adaptive request queue) harness: runs the local swarm at a shallow
 # and at deeper queue depths. On loopback the RTT is ~0, so the depth barely
 # matters: it is a regression/sanity harness, not a WAN demonstration. Add
-# GX_MEASURE_LEECHERS=N. See docs/evoluzione.md (section 6).
+# GX_MEASURE_LEECHERS=N. See docs/measurements.md.
 measure-pipeline:
 	GX_MEASURE_PIPELINE=1 go test ./cmd/gx-torrent/ -run MeasurePipelining -v -count=1
 
@@ -144,7 +144,7 @@ measure-pipeline:
 # with the DHT, the trackers and uTP enabled, sampling the uTP socket counters
 # while peers connect (healthy control paths must keep the resend counters low).
 # GX_MEASURE_REAL=<torrent file> is required; GX_MEASURE_REAL_SECONDS sets the
-# window (default 120). See docs/evoluzione.md (section 6).
+# window (default 120). See docs/measurements.md.
 measure-realswarm:
 	GX_MEASURE_REAL=$${GX_MEASURE_REAL:?set GX_MEASURE_REAL=<public torrent file>} \
 	  GX_MEASURE_REAL_SECONDS=$${GX_MEASURE_REAL_SECONDS:-120} \
@@ -160,7 +160,7 @@ measure-choking:
 # over BitTorrent and two v2 torrents of each with different piece lengths
 # (scripts/phase3-env.sh), then the bytes the destination takes from the
 # network. GX_PHASE3_DIR sets the folder, GX_PHASE3_SET picks debian or arch.
-# See docs/evoluzione.md §6.
+# See docs/measurements.md.
 measure-merge3:
 	scripts/phase3-env.sh $${GX_PHASE3_DIR:-$$HOME/gx-phase3}
 	GX_MEASURE_MERGE3=$${GX_PHASE3_DIR:-$$HOME/gx-phase3}/$${GX_PHASE3_SET:-debian} go test ./cmd/gx-torrent/ -run MeasureMergePhase3 -v -count=1 -timeout 40m

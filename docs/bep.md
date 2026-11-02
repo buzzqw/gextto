@@ -7,7 +7,7 @@ This document is the **single source of truth for BEP status**: the status refle
 the code, not comparisons with other clients. The per-file detail is in
 [`internal/gxcore/GEXTTO.md`](https://github.com/buzzqw/gextto/blob/main/internal/gxcore/GEXTTO.md) (engine inventory)
 and in [`gx-torrent.md`](gx-torrent.md) (daemon); rationale, measurements and
-backlog in [`evoluzione.md`](evoluzione.md).
+backlog in [`todo.md`](todo.md).
 
 Status legend: **yes** = implemented and tested; **partial** = only a part;
 **no** = absent; **excluded** = out of scope by choice.
@@ -46,7 +46,8 @@ stay narrow and the tables remain readable.
 > **Swarm Merging**, which is *not* driven by the hints but by the structure
 > (an identical piece layout, or an equal v2 per-file Merkle root): matching on
 > the identity of the bytes is what makes the reuse safe. Phases 1–3 are done
-> (`evoluzione.md` §6 and `measurements.md` §4.8), including block-granularity reuse, the
+> (the Swarm Merging section in [`gx-torrent.md`](gx-torrent.md) and
+> [`measurements.md`](measurements.md) §5.8), including block-granularity reuse, the
 > resume path and the re-trigger when a sibling appears after the allocation.
 > The daemon's BEP 38 view is `GET /api/v1/torrents/{hash}/collections`.
 >
@@ -196,7 +197,7 @@ stay narrow and the tables remain readable.
 
 **BEP 38 is complete** (hints, block reuse at allocation/resume/later trigger):
 the detail is in the note above, in [`gx-torrent.md`](gx-torrent.md)
-(*Local data reuse*) and in [`evoluzione.md`](evoluzione.md) §6 and [`measurements.md`](measurements.md) §4.8.
+(*Local data reuse*) and in [`measurements.md`](measurements.md) §5.8.
 
 **Beyond the BEPs.** Extensions that are *not* part of the BEP catalogue — the
 WebSocket tracker (`ws://`/`wss://`), WebTorrent/WebRTC peers, the v1
@@ -207,8 +208,7 @@ tables: `bep.md` stays the BEP-only source of truth.
 
 Update this table on every new BEP implemented or excluded, together with the
 linked documents ([`internal/gxcore/GEXTTO.md`](https://github.com/buzzqw/gextto/blob/main/internal/gxcore/GEXTTO.md),
-[`gx-torrent.md`](gx-torrent.md), [`evoluzione.md`](evoluzione.md)); an entry
-given as absent must be closed or reclassified when the code implements it.
+[`gx-torrent.md`](gx-torrent.md), [`todo.md`](todo.md)); an entrygiven as absent must be closed or reclassified when the code implements it.
 
 ## Comparison with other clients
 

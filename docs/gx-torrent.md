@@ -1187,7 +1187,7 @@ keep, so it costs almost nothing. The database has a **compact index** (title
 already normalised, feed, size, seed, flags) next to the JSON of the items:
 the search scans only the index and decodes the JSON of only the rows of the
 page — on 100,000 items **~7 ms and ~44 KB per search** (see
-`docs/evoluzione.md`). The index rebuilds itself on opening if missing.
+`docs/measurements.md`). The index rebuilds itself on opening if missing.
 
 Endpoints: `GET /ui/archive/items?q=&feed=&added=1&sort=new|old|seeds|size|title&page=N`
 (JSON with `items`, `total`, `page`, `pages`, `entries`, `size_bytes`),
@@ -1684,8 +1684,7 @@ The merge matches by structure, in four ways:
   two torrents use a **different piece length**: the destination piece's bytes
   are reassembled from the source's verified pieces and **each destination piece
   is verified against its own hash** before it is written. There is no content
-  hash to match v1 files: the v1 cross-layout case is matched by path and length
-  (§6 of [`evoluzione.md`](evoluzione.md)).
+  hash to match v1 files: the v1 cross-layout case is matched by path and length.
 - **v2, 16 KiB blocks.** When the source has verified only part of
   the source pieces a destination piece spans, the verified blocks are written
   and only the missing blocks are requested from peers; the piece is verified
@@ -2028,8 +2027,8 @@ pieces in buffered mode and flushes in batch with `storage.File.Sync()` before
 persisting the bitfield (order snapshot → fsync → write; `updateStats` in
 two phases). A bit that survives a crash therefore always refers to data already
 on disk, and at most the pieces of the last few minutes are re-downloaded. On HDD and NFS
-this removes one fsync per piece write (measurements in `evoluzione.md`
-§5).
+this removes one fsync per piece write (measurements in
+[`measurements.md`](measurements.md) §3).
 
 **Move**:
 

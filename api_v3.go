@@ -3,7 +3,7 @@ package gextto
 // api_v3.go implements the small Sonarr/Radarr v3 subset Jellyseerr needs:
 // system status, the generated quality/language profiles, the root folders and
 // tags, series/movie lookup and add, and the queue. It is deliberately a
-// subset: full *arr compatibility is not a goal (docs/evoluzione.md §8), but
+// subset: full *arr compatibility is not a goal (docs/todo.md), but
 // the operations a request manager uses are real, not stubs.
 
 import (
