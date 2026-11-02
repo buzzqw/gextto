@@ -4163,7 +4163,7 @@ pol:
   "Spazio libero minimo (GB) sulla cartella download: sotto questa soglia il ciclo non avvia download e gx-torrent mette in pausa quelli in corso, che ripartono da soli quando lo spazio torna (0 = nessun controllo del ciclo; gx-torrent usa il suo valore predefinito di 1 GiB).": "Minimalne wolne miejsce (GB) w folderze pobierania: poniżej tego progu cykl nie startuje pobrań, a gx-torrent wstrzymuje trwające, które wznawiają się same, gdy miejsce wróci (0 = brak kontroli cyklu; gx-torrent zachowuje domyślne 1 GiB)."
   "Spazio minimo libero in byte richiesto per usare il RAM disk. 0 = usa il margine configurato.": "Minimalne wolne miejsce w bajtach wymagane do użycia dysku RAM. 0 = użyj ustawionego marginesu."
   "Stallo con zero seeder (dead swarm): rimosso dopo questo periodo, più breve, e la puntata viene ricercata di nuovo subito. Imposta 0 per usare la soglia generale.": "Blokada bez seederów (dead swarm): usuwany po tym krótszym czasie, a odcinek jest od razu szukany ponownie. Ustaw 0, aby użyć progu ogólnego."
-  "Una release abbandonata perché lo swarm non aveva seeder resta in blocklist per questo periodo: quando scade torna fra i candidati, così un 4K che nel frattempo ha trovato seeder può essere scaricato come upgrade. 0 la tiene bloccata per sempre.": "Wydanie porzucone, bo jego swarm nie miał seederów, pozostaje zablokowane przez ten okres: po jego upływie wraca do kandydatów, więc 4K, który w międzyczasie znalazł seedery, można pobrać jako aktualizację. 0 blokuje je na zawsze."
+  "Una release con lo swarm vuoto — abbandonata durante il download o rifiutata prima di partire perché nessuno la condivideva — resta in blocklist per questo periodo: quando scade torna fra i candidati, così un 4K che nel frattempo ha trovato seeder può essere scaricato come upgrade. 0 la tiene bloccata per sempre.": "Wydanie z pustym swarmem — porzucone podczas pobierania albo odrzucone przed startem, bo nikt go nie udostępniał — pozostaje zablokowane przez ten okres: po jego upływie wraca do kandydatów, więc 4K, który w międzyczasie znalazł seedery, można pobrać jako aktualizację. 0 blokuje je na zawsze."
   "Stato qBittorrent-nox": "Stan qBittorrent-nox"
   "Tag applicato ai torrent aggiunti a qBittorrent-nox.": "Tag nadawany torrentom dodanym do qBittorrent-nox."
   "Tedesco": "Niemiecki"
@@ -5000,6 +5000,8 @@ pol:
   "Import falliti per giorno": "Nieudane importy dziennie"
   "Giorno": "Dzień"
   "Nessun import fallito negli ultimi 7 giorni.": "Brak nieudanych importów w ciągu ostatnich 7 dni."
+  "Titoli trattenuti da un profilo di attesa: da quanto aspettano e quando saranno valutati di nuovo.": "Tytuły wstrzymane przez profil opóźnienia: jak długo czekają i kiedy zostaną ponownie ocenione."
+  "Import in libreria falliti giorno per giorno negli ultimi 7 giorni: la gestione del completamento non è riuscita oppure il controllo di integrità ha rifiutato il file.": "Nieudane importy do biblioteki, dzień po dniu, w ciągu ostatnich 7 dni: obsługa zakończenia się nie powiodła albo kontrola integralności odrzuciła plik."
   "Collezioni BEP 38": "Kolekcje BEP 38"
   "Torrent simili BEP 38": "Podobne torrenty BEP 38"
 

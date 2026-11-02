@@ -20,6 +20,13 @@ import (
 const (
 	portLease   = time.Hour
 	portRefresh = 20 * time.Minute
+	// portRenewBefore is how much lease must be left for a refresh to renew
+	// the mapping. One refresh interval of margin: the Add updates the lease of
+	// an existing mapping, so the port never disappears while the daemon runs.
+	// Waiting for the mapping to expire (what the presence check used to do)
+	// closed the port until the next refresh and made the router announce a
+	// removal and an addition every hour.
+	portRenewBefore = uint32(portRefresh / time.Second)
 )
 
 // upnpClient is the subset shared by the IGD service clients.
@@ -182,9 +189,9 @@ func (m *portMapper) mapUPnP() error {
 		return fmt.Errorf("cannot determine the local address towards the router")
 	}
 	for _, proto := range []string{"TCP", "UDP"} {
-		// Verify before (re)adding: a mapping that is already there does not
-		// need to be reopened every refresh.
-		if m.upnpMappingPresent(ctx, client, proto) {
+		// A mapping that is already there still has a lease: renew it before
+		// the router drops it, instead of waiting for it to expire.
+		if present, lease := m.upnpMappingLease(ctx, client, proto); present && (lease == 0 || lease > portRenewBefore) {
 			continue
 		}
 		if err := client.AddPortMappingCtx(ctx, "", uint16(m.port), proto, uint16(m.port), local.String(), true,
@@ -201,21 +208,29 @@ func (m *portMapper) mapUPnP() error {
 }
 
 func upnpMappingPresentForPort(ctx context.Context, client upnpClient, proto string, port int) bool {
-	internalPort, internalClient, enabled, _, _, err := client.GetSpecificPortMappingEntryCtx(ctx, "", uint16(port), proto)
+	present, _ := upnpMappingLeaseForPort(ctx, client, proto, port)
+	return present
+}
+
+// upnpMappingLeaseForPort reports whether the router already forwards the port
+// to this host for the given protocol, and how many seconds of lease are left
+// (0 means a permanent mapping).
+func upnpMappingLeaseForPort(ctx context.Context, client upnpClient, proto string, port int) (bool, uint32) {
+	internalPort, internalClient, enabled, _, lease, err := client.GetSpecificPortMappingEntryCtx(ctx, "", uint16(port), proto)
 	if err != nil || !enabled || int(internalPort) != port {
-		return false
+		return false, 0
 	}
 	local := client.LocalAddr()
 	if local != nil && strings.TrimSpace(internalClient) != "" && internalClient != local.String() {
-		return false
+		return false, 0
 	}
-	return true
+	return true, lease
 }
 
-// upnpMappingPresent reports whether the router already forwards the peer port
-// to this host for the given protocol.
-func (m *portMapper) upnpMappingPresent(ctx context.Context, client upnpClient, proto string) bool {
-	return upnpMappingPresentForPort(ctx, client, proto, m.port)
+// upnpMappingLease reports whether the router already forwards the peer port
+// to this host for the given protocol, and its remaining lease.
+func (m *portMapper) upnpMappingLease(ctx context.Context, client upnpClient, proto string) (bool, uint32) {
+	return upnpMappingLeaseForPort(ctx, client, proto, m.port)
 }
 
 // portCheck is the result of the "Test porte" action: whether the daemon is
@@ -321,8 +336,8 @@ func (m *portMapper) checkPort(port int) portCheck {
 		case method == "upnp" && upnp != nil:
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
-			tcp := m.upnpMappingPresent(ctx, upnp, "TCP")
-			udp := m.upnpMappingPresent(ctx, upnp, "UDP")
+			tcp, _ := m.upnpMappingLease(ctx, upnp, "TCP")
+			udp, _ := m.upnpMappingLease(ctx, upnp, "UDP")
 			out.Mapped = tcp && udp
 			if out.Mapped {
 				out.Detail = "mapping UPnP presente (TCP+UDP)"

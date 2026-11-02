@@ -72,7 +72,15 @@ here.
 Ideas proposed but not decided yet. An accepted proposal moves to the matching area with
 its gate; a rejected one moves to *Not planned*.
 
-_None at the moment._
+- **Escalating dead-swarm block** — a release that comes back after its block expires and
+  is refused again for an empty swarm would stay away longer the next time (a week, then
+  a month) instead of a week every time. It needs a strike count that survives the
+  expiry, while today the expired rows are purged as soon as they are read, by design.
+  Gate: a decision on the second period and on how much history to keep for the count.
+- **Portable folder names for existing series** — the add dialog now drops the characters
+  Windows, exFAT and SMB shares refuse, but a series added earlier keeps its folder and
+  the path stored in the library. A check in Maintenance could report them and rename the
+  folder with its files. Gate: a decision on moving files automatically or only reporting.
 
 ## Not planned
 

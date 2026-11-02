@@ -97,8 +97,10 @@ export default defineConfig({
   webServer: {
     // GEXTTO_GXTORRENT_LISTEN gives the suite its own gx-torrent: without it a
     // daemon already listening on the default 8890 (a live installation) would
-    // be adopted and reconfigured by the test instance.
-    command: `GEXTTO_DATA_DIR=${testDataDir} GEXTTO_LISTEN=127.0.0.1:${port} GEXTTO_ENGINE_LISTEN=127.0.0.1:${enginePort} GEXTTO_GXTORRENT_LISTEN=127.0.0.1:${gxtorrentPort} bin/gexttod --dry-run`,
+    // be adopted and reconfigured by the test instance. UPnP and NAT-PMP are
+    // off: a test run must not add port mappings to the real router (gx-torrent
+    // would inherit the environment and open them with the peer port).
+    command: `GX_TORRENT_NO_UPNP=1 GX_TORRENT_NO_NATPMP=1 GEXTTO_DATA_DIR=${testDataDir} GEXTTO_LISTEN=127.0.0.1:${port} GEXTTO_ENGINE_LISTEN=127.0.0.1:${enginePort} GEXTTO_GXTORRENT_LISTEN=127.0.0.1:${gxtorrentPort} bin/gexttod --dry-run`,
     cwd: "../..",
     port,
     reuseExistingServer: process.env.GEXTTO_TEST_REUSE !== "0" && !process.env.CI,

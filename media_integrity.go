@@ -188,10 +188,13 @@ type MediaIntegrityState struct {
 	Total               int    `json:"total"`
 	Checked             int    `json:"checked"`
 	Running             bool   `json:"running"`
-	Done                bool   `json:"done"`
-	Current             string `json:"current"`
-	StartedAt           string `json:"started_at"`
-	FinishedAt          string `json:"finished_at"`
+	// Stopped records that the last run ended because the operator stopped it,
+	// so the next run says in the log that the check resumes from here.
+	Stopped    bool   `json:"stopped"`
+	Done       bool   `json:"done"`
+	Current    string `json:"current"`
+	StartedAt  string `json:"started_at"`
+	FinishedAt string `json:"finished_at"`
 }
 
 // MediaIntegrityStatus is the answer of the status endpoint and the model of the
@@ -1401,8 +1404,21 @@ func runMediaIntegrityScan(ctx context.Context, s *AppState, jobID string, limit
 	if err := s.db.SaveMediaIntegrityState(state); err != nil {
 		return nil, err
 	}
-	if state.Checked == 0 {
+	// The start of a pass is written once, when the pass begins; a run that
+	// picks it up again after a stop says so, so the "stopped" line always has
+	// a matching line when the check comes back. The periodic runs in between
+	// are reported by their own summary line, not by one more start line.
+	resumedAfterStop := state.Stopped
+	state.Stopped = false
+	switch {
+	case state.Checked == 0:
 		logging.Info("🧪 Media integrity check started: the library is verified one file at a time")
+	case resumedAfterStop:
+		position := countLabel(state.Checked, "file", "files")
+		if state.Total > 0 {
+			position += " of " + countLabel(state.Total, "file", "files")
+		}
+		logging.Info(fmt.Sprintf("🧪 Media integrity check resumed: %s already checked", position))
 	}
 	startedAt := time.Now()
 	checkedThisRun := 0
@@ -1480,6 +1496,9 @@ func runMediaIntegrityScan(ctx context.Context, s *AppState, jobID string, limit
 	state.Running = false
 	state.Current = ""
 	state.FinishedAt = time.Now().Format(time.RFC3339)
+	// A run canceled from the panel leaves the pass where it is and says so on
+	// the next start; the periodic end of a run is not a stop.
+	state.Stopped = ctx.Err() != nil
 	if err := s.db.SaveMediaIntegrityState(state); err != nil {
 		return nil, err
 	}

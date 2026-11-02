@@ -652,6 +652,65 @@ func indexerTestText(kind, name, host string, reachable, ok bool, status int, to
 	}
 }
 
+// joinWithAnd joins a short list the way a sentence does: "a", "a and b",
+// "a, b and c".
+func joinWithAnd(parts []string) string {
+	switch len(parts) {
+	case 0:
+		return ""
+	case 1:
+		return parts[0]
+	case 2:
+		return parts[0] + " and " + parts[1]
+	default:
+		return strings.Join(parts[:len(parts)-1], ", ") + " and " + parts[len(parts)-1]
+	}
+}
+
+// housekeepingOlderThan names the age that kept a row, e.g. "older than 30
+// days"; empty when the setting disables that cleanup.
+func housekeepingOlderThan(days int64) string {
+	if days <= 0 {
+		return ""
+	}
+	return "older than " + countLabel(days, "day", "days")
+}
+
+// housekeepingSummary says what a routine cleanup removed, in the words of the
+// Maintenance page: a total and the categories that actually lost rows, each
+// with the age that kept it. Categories with nothing removed are not named, so
+// the line stays one sentence, and no row, title or hash is listed.
+func housekeepingSummary(report *HousekeepingReport, params HousekeepingParams) string {
+	if report == nil {
+		return ""
+	}
+	parts := make([]string, 0, 7)
+	add := func(count int, singular, pluralForm, tail string) {
+		if count <= 0 {
+			return
+		}
+		part := countLabel(count, singular, pluralForm)
+		if tail != "" {
+			part += " " + tail
+		}
+		parts = append(parts, part)
+	}
+	add(report.OldCyclesRemoved, "old search cycle", "old search cycles", "")
+	add(report.StaleTorrentsRemoved, "failed torrent", "failed torrents", housekeepingOlderThan(maxInt64(params.ErrorAgeDays, 1)))
+	add(report.SeenRemoved, "feed entry already seen", "feed entries already seen", housekeepingOlderThan(params.SeenDays))
+	add(report.GapLogsRemoved, "missing-episode search", "missing-episode searches", housekeepingOlderThan(params.GapLogDays))
+	add(report.UpgradeBackupsRemoved, "upgrade backup", "upgrade backups", housekeepingOlderThan(params.UpgradeBackupDays))
+	add(report.OldHistoryRemoved, "download history entry", "download history entries", housekeepingOlderThan(params.HistoryDays))
+	add(report.StaleProvidersRemoved, "indexer cooldown", "indexer cooldowns", "expired more than a week ago")
+	if len(parts) == 0 {
+		return ""
+	}
+	total := report.OldCyclesRemoved + report.StaleTorrentsRemoved + report.SeenRemoved +
+		report.GapLogsRemoved + report.UpgradeBackupsRemoved + report.OldHistoryRemoved +
+		report.StaleProvidersRemoved
+	return countLabel(total, "old entry", "old entries") + ": " + joinWithAnd(parts)
+}
+
 // mediaInfoMismatchText explains a file whose real quality differs from the
 // release title stored in the database. It is the line that makes a stale
 // upgrade row visible: "the file says 480p h264, the recorded release says

@@ -1466,6 +1466,11 @@ func RunCycleDomain(
 				skips.InLibrary++
 			case "active_episode", "active_pack":
 				skips.Downloading++
+			case "dead_swarm_empty", "dead_swarm_upgrade":
+				// Nobody is sharing it: the release waits on the blocklist for the
+				// configured period instead of coming back at every search.
+				skips.Other++
+				blockDeadSwarmRelease(db, cfg, &release)
 			default:
 				skips.Other++
 			}
@@ -1684,6 +1689,9 @@ func prioritizeArchiveGapDownloads(
 			return err
 		}
 		if !approved {
+			if reason == "dead_swarm_empty" || reason == "dead_swarm_upgrade" {
+				blockDeadSwarmRelease(db, cfg, &release)
+			}
 			logging.Debug("priority gap skipped", "target", releaseTarget(&release), "reason", reason)
 			continue
 		}
@@ -2307,6 +2315,27 @@ func swarmBlockReason(release *models.Release, approvalReason string) string {
 		return "dead_swarm_upgrade"
 	}
 	return ""
+}
+
+// blockDeadSwarmRelease keeps a release the swarm gate refused for an empty
+// swarm out of the next searches: evaluating it again at every cycle only
+// repeats the same line in the log. The block expires after
+// `torrent_dead_swarm_blocklist_days`, so a swarm that revives is seen again;
+// zero keeps the release blocked forever, like the operator's own entries.
+func blockDeadSwarmRelease(db *Database, cfg *Config, release *models.Release) {
+	if db == nil || cfg == nil || cfg.DryRun || release == nil {
+		return
+	}
+	ttl := tev_deadSwarmBlocklistTTL(cfg)
+	var err error
+	if ttl <= 0 {
+		err = db.Blocklist(release, "dead_swarm")
+	} else {
+		err = db.BlocklistUntil(release, "dead_swarm", time.Now().Add(ttl))
+	}
+	if err != nil {
+		logging.Debug("could not blocklist a release nobody is sharing", "target", releaseTarget(release), "error", err)
+	}
 }
 
 // releaseStrictlyBetter reports whether a must replace b: a higher score, or at

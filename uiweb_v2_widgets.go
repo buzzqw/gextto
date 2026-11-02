@@ -1380,13 +1380,25 @@ func v2ProposedArchivePath(s *AppState, name string) string {
 	return proposedArchivePath(latestConfig(s), name)
 }
 
+// folderNameForTitle turns a series title into a folder name that exists on
+// every filesystem Gextto may write to. Windows, exFAT, FAT sticks and many SMB
+// shares refuse \ / : * ? " < > | (on NTFS a colon is also the alternate data
+// stream separator), and a trailing dot or space is illegal on Windows too.
+// The episode file names already drop the same characters, so the folder and
+// the files inside keep the same spelling. Empty when nothing usable is left,
+// so the caller proposes no folder rather than an unusable one.
+func folderNameForTitle(name string) string {
+	name = sanitizeInvalid(strings.TrimSpace(name))
+	return strings.TrimRight(name, ". ")
+}
+
 // proposedArchivePath is the default folder the add modal offers for a new
 // series: <series library root>/<name>. The series root is inferred from the
 // already-configured series (the most common parent of their archive paths), so
 // it matches where the library actually stores series; when there are none it
 // falls back to the global archive_root. Empty when neither is available.
 func proposedArchivePath(cfg *Config, name string) string {
-	name = strings.TrimSpace(name)
+	name = folderNameForTitle(name)
 	if name == "" || cfg == nil {
 		return ""
 	}

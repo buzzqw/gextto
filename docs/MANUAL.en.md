@@ -662,8 +662,12 @@ is removed from the torrent session).
 Add a series via TMDB search or manually (title, quality, languages, seasons,
 aliases, exclusions, NAS path, subtitles, timeframe). The NAS path is pre-filled
 with *library folder + title*: keep “Create folder” on to create it when adding
-(clear the check to edit the path by hand). “Subfolders per season” stores
-episodes in *Season 01*, *Season 02*, … inside the series folder.
+(clear the check to edit the path by hand). In the folder name the characters
+Windows, exFAT and SMB shares refuse (`\ / : * ? " < > |`) and a trailing dot or
+space are dropped — “Title: Subtitle” becomes “Title Subtitle” — so the library
+stays readable from another computer; the episode file names follow the same
+rule. “Subfolders per season” stores episodes in *Season 01*, *Season 02*, …
+inside the series folder.
 
 - The list shows Name, Seasons, Quality, Language, Episodes (downloaded/total),
   Completeness, Last download; filter it with the search box.
@@ -2525,7 +2529,7 @@ files. When the memory cannot be read, only the `tmpfs` space counts, as before.
 | Retry stalled torrents every | Interval between reannounce attempts for stalled torrents. *(Unit: minutes)* |
 | Remove stalled torrents after | After this period without progress, the torrent is removed automatically. Set 0 to completely disable automatic removal due to stalling. *(Unit: minutes; 0 = never)* |
 | Remove torrents without seeders after | Stall with zero seeders (dead swarm): removed after this shorter period, and the episode is searched again right away. Set 0 to use the general threshold. *(Unit: minutes; 0 = use the general threshold)* |
-| Let a release without seeders back in after | A release abandoned because its swarm had no seeders stays blocklisted for this period, then it is back among the candidates: a 4K that has found seeders in the meantime can be downloaded as an upgrade. The copy already in the library stays meanwhile. Set 0 to keep it blocked forever. *(Unit: days; 0 = forever)* |
+| Let a release without seeders back in after | A release with an empty swarm — abandoned during the download or refused before starting because nobody was sharing it — stays blocklisted for this period, then it is back among the candidates: a 4K that has found seeders in the meantime can be downloaded as an upgrade, and the log stops repeating the same line at every search. The copy already in the library stays meanwhile. Set 0 to keep it blocked forever. *(Unit: days; 0 = forever)* |
 
 ### Where to store
 

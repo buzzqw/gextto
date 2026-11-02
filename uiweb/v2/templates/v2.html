@@ -1413,7 +1413,7 @@
 <div id="v2-health-queue" hx-get="/partial/health/queue" hx-trigger="every 60s" hx-swap="outerHTML">
   <div class="grid-2">
     <div class="panel">
-      <div class="panel-head"><h3>Coda titoli</h3></div>
+      <div class="panel-head"><h3 title="Titoli trattenuti da un profilo di attesa: da quanto aspettano e quando saranno valutati di nuovo.">Coda titoli</h3></div>
       <div class="panel-body">
         {{if .Queued}}
         <div class="table-wrap"><table class="data-table">
@@ -1431,7 +1431,7 @@
       </div>
     </div>
     <div class="panel">
-      <div class="panel-head"><h3>Import falliti</h3></div>
+      <div class="panel-head"><h3 title="Import in libreria falliti giorno per giorno negli ultimi 7 giorni: la gestione del completamento non è riuscita oppure il controllo di integrità ha rifiutato il file.">Import falliti</h3></div>
       <div class="panel-body">
         {{if .FailedImports}}
         <div class="table-wrap"><table class="data-table">

@@ -4222,7 +4222,7 @@ deu:
   "Spazio libero minimo (GB) sulla cartella download: sotto questa soglia il ciclo non avvia download e gx-torrent mette in pausa quelli in corso, che ripartono da soli quando lo spazio torna (0 = nessun controllo del ciclo; gx-torrent usa il suo valore predefinito di 1 GiB).": "Minimaler freier Speicher (GB) im Download-Ordner: darunter startet der Zyklus keine Downloads und gx-torrent pausiert die laufenden, die von selbst weiterlaufen, sobald wieder Platz da ist (0 = keine Prüfung im Zyklus; gx-torrent behält seinen Standard von 1 GiB)."
   "Spazio minimo libero in byte richiesto per usare il RAM disk. 0 = usa il margine configurato.": "Minimaler freier Platz in Byte für die RAM-Disk. 0 = konfigurierte Reserve verwenden."
   "Stallo con zero seeder (dead swarm): rimosso dopo questo periodo, più breve, e la puntata viene ricercata di nuovo subito. Imposta 0 per usare la soglia generale.": "Blockade ohne Seeder (dead swarm): nach dieser kürzeren Zeit entfernt, die Episode wird sofort neu gesucht. 0 verwendet den allgemeinen Schwellenwert."
-  "Una release abbandonata perché lo swarm non aveva seeder resta in blocklist per questo periodo: quando scade torna fra i candidati, così un 4K che nel frattempo ha trovato seeder può essere scaricato come upgrade. 0 la tiene bloccata per sempre.": "Eine Release, die aufgegeben wurde, weil ihr Swarm keine Seeder hatte, bleibt für diesen Zeitraum gesperrt: Danach ist sie wieder unter den Kandidaten, sodass ein 4K, der inzwischen Seeder gefunden hat, als Upgrade geladen werden kann. 0 sperrt sie dauerhaft."
+  "Una release con lo swarm vuoto — abbandonata durante il download o rifiutata prima di partire perché nessuno la condivideva — resta in blocklist per questo periodo: quando scade torna fra i candidati, così un 4K che nel frattempo ha trovato seeder può essere scaricato come upgrade. 0 la tiene bloccata per sempre.": "Eine Release mit leerem Swarm — während des Downloads aufgegeben oder vor dem Start abgelehnt, weil niemand sie teilte — bleibt für diesen Zeitraum gesperrt: Danach ist sie wieder unter den Kandidaten, sodass ein 4K, der inzwischen Seeder gefunden hat, als Upgrade geladen werden kann. 0 sperrt sie dauerhaft."
   "Stato qBittorrent-nox": "qBittorrent-nox-Status"
   "Tag applicato ai torrent aggiunti a qBittorrent-nox.": "Tag für die zu qBittorrent-nox hinzugefügten Torrents."
   "Tedesco": "Deutsch"
@@ -5059,6 +5059,8 @@ deu:
   "Import falliti per giorno": "Fehlgeschlagene Importe pro Tag"
   "Giorno": "Tag"
   "Nessun import fallito negli ultimi 7 giorni.": "Keine fehlgeschlagenen Importe in den letzten 7 Tagen."
+  "Titoli trattenuti da un profilo di attesa: da quanto aspettano e quando saranno valutati di nuovo.": "Titel, die ein Verzögerungsprofil zurückhält: wie lange sie schon warten und wann sie erneut bewertet werden."
+  "Import in libreria falliti giorno per giorno negli ultimi 7 giorni: la gestione del completamento non è riuscita oppure il controllo di integrità ha rifiutato il file.": "Fehlgeschlagene Importe in die Bibliothek, Tag für Tag, in den letzten 7 Tagen: die Abschlussverarbeitung ist fehlgeschlagen oder die Integritätsprüfung hat die Datei abgelehnt."
   "Collezioni BEP 38": "BEP 38 Sammlungen"
   "Torrent simili BEP 38": "BEP 38 ähnliche Torrents"
 

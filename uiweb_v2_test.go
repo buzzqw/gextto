@@ -537,6 +537,18 @@ func TestProposedArchivePath(t *testing.T) {
 	if got := proposedArchivePath(&Config{ArchiveRoot: &root}, ""); got != "" {
 		t.Fatalf("no name -> %q, want empty", got)
 	}
+	// A title with a colon (or any other character a Windows, exFAT or SMB
+	// destination refuses) becomes a folder name that exists everywhere, the
+	// same spelling the episode files already use.
+	if got := proposedArchivePath(cfg, "Example: Show"); got != "/media/serie/Example Show" {
+		t.Fatalf("colon = %q, want the colon dropped", got)
+	}
+	if got := proposedArchivePath(cfg, "Example: Show. "); got != "/media/serie/Example Show" {
+		t.Fatalf("trailing dot and space = %q, want them dropped", got)
+	}
+	if got := proposedArchivePath(cfg, "::"); got != "" {
+		t.Fatalf("a name with nothing usable left -> %q, want empty", got)
+	}
 }
 
 // TestV2AddTorrentIsOpenedFromTheTopBar: the add-torrent button is in the

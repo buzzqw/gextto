@@ -254,6 +254,28 @@ func TestBackupLogSummaryMentionsOnlyConfiguredSteps(t *testing.T) {
 	}
 }
 
+func TestHousekeepingSummaryNamesWhatWasRemoved(t *testing.T) {
+	params := DefaultHousekeepingParams()
+	report := HousekeepingReport{
+		OldCyclesRemoved:      3,
+		StaleTorrentsRemoved:  8,
+		SeenRemoved:           2,
+		StaleProvidersRemoved: 1,
+	}
+	want := "14 old entries: 3 old search cycles, 8 failed torrents older than 7 days, " +
+		"2 feed entries already seen older than 30 days and 1 indexer cooldown expired more than a week ago"
+	if got := housekeepingSummary(&report, params); got != want {
+		t.Fatalf("summary =\n %q\nwant\n %q", got, want)
+	}
+	single := HousekeepingReport{StaleTorrentsRemoved: 1}
+	if got, want := housekeepingSummary(&single, params), "1 old entry: 1 failed torrent older than 7 days"; got != want {
+		t.Fatalf("single summary = %q, want %q", got, want)
+	}
+	if got := housekeepingSummary(&HousekeepingReport{}, params); got != "" {
+		t.Fatalf("summary of a cleanup that removed nothing = %q, want empty", got)
+	}
+}
+
 func TestTorznabShortReasonDropsTheURL(t *testing.T) {
 	err := &url.Error{Op: "Get", URL: "http://192.168.1.161:9118/api?t=tvsearch&apikey=secret", Err: io.EOF}
 	if got := torznabShortReason(err); got != "connection closed by the indexer (EOF)" {

@@ -681,7 +681,11 @@ Aggiungi una serie via ricerca TMDB o manualmente (titolo, qualità, lingue,
 stagioni, alias, esclusioni, percorso NAS, sottotitoli, timeframe). Il percorso
 NAS è precompilato con *cartella libreria + titolo*: lascia attivo «Crea
 cartella» per crearlo all'aggiunta (togli la spunta per modificare il percorso a
-mano). «Sottocartelle per stagione» archivia gli episodi in *Stagione 01*,
+mano). Nel nome della cartella i caratteri che Windows, exFAT e le condivisioni
+SMB rifiutano (`\ / : * ? " < > |`) e il punto o lo spazio finale vengono
+togliati — «Titolo: Sottotitolo» diventa «Titolo Sottotitolo» — così la libreria
+resta leggibile anche da un altro computer; i file delle puntate usano la stessa
+regola. «Sottocartelle per stagione» archivia gli episodi in *Stagione 01*,
 *Stagione 02*, … dentro la cartella della serie.
 
 - La lista mostra Nome, Stagioni, Qualità, Lingua, Episodi (scaricati/totali),
@@ -2607,7 +2611,7 @@ spazio del `tmpfs`, come prima.
 | Riprova i torrent bloccati ogni | Intervallo tra i tentativi di reannounce dei torrent stalled. *(Unità: minuti)* |
 | Rimuovi i torrent bloccati dopo | Dopo questo periodo senza progresso il torrent viene rimosso automaticamente. Imposta 0 per disattivare completamente la rimozione automatica per stallo. *(Unità: minuti; 0 = mai)* |
 | Rimuovi i torrent senza seeder dopo | Stallo con zero seeder (dead swarm): rimosso dopo questo periodo, più breve, e la puntata viene ricercata di nuovo subito. Imposta 0 per usare la soglia generale. *(Unità: minuti; 0 = usa la soglia generale)* |
-| Riammetti una release senza seeder dopo | Una release abbandonata perché lo swarm non aveva seeder resta in blocklist per questo periodo, poi torna fra i candidati: così un 4K che nel frattempo ha trovato seeder può essere scaricato come upgrade. La copia già in libreria resta nel frattempo. Imposta 0 per tenerla bloccata per sempre. *(Unità: giorni; 0 = per sempre)* |
+| Riammetti una release senza seeder dopo | Una release con lo swarm vuoto — abbandonata durante il download o rifiutata prima di partire perché nessuno la condivideva — resta in blocklist per questo periodo, poi torna fra i candidati: così un 4K che nel frattempo ha trovato seeder può essere scaricato come upgrade, e il log non ripete la stessa riga a ogni ricerca. La copia già in libreria resta nel frattempo. Imposta 0 per tenerla bloccata per sempre. *(Unità: giorni; 0 = per sempre)* |
 
 ### Dove salvare
 

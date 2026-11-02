@@ -1360,8 +1360,12 @@ RPC server is disabled.
   preset (see [the Docker guide](DOCKER.en.md)).
 - **Opening on the router.**
   - UPnP (IGD v1 and v2), then **PCP** (RFC 6887, on the default gateway) and finally
-    NAT-PMP, tried in this order; mappings are renewed every 20 minutes and
-    removed at shutdown. PCP is a minimal MAP client, without external
+    NAT-PMP, tried in this order. A UPnP mapping is renewed before its lease runs
+    out (the refresh checks the remaining lease, and renews when one refresh
+    interval is left), so the port is never closed while the daemon runs: waiting
+    for the expiry would leave the port shut until the next refresh and make the
+    router announce a removal and an addition every hour. Mappings are removed at
+    shutdown. PCP is a minimal MAP client, without external
     dependencies; on a router that does not speak it the request expires and it moves to
     NAT-PMP.
   - Outcome and external address are in `GET /api/v1/stats` (`port_mapping`).

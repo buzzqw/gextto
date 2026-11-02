@@ -3,6 +3,7 @@ package gextto
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -13,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/buzzqw/gextto/internal/logging"
 	"github.com/buzzqw/gextto/internal/models"
 )
 
@@ -881,6 +883,66 @@ func TestRunMediaIntegrityScanSkipsUnchangedOnTheNextPass(t *testing.T) {
 	saved = state.db.LoadMediaIntegrityState()
 	if !saved.Done || saved.Checked != 0 {
 		t.Fatalf("next pass state = %+v, want done with nothing checked", saved)
+	}
+}
+
+// A stop from the panel leaves the log with a "stopped" line; the run that
+// picks the pass up again says in the log that the check is back, so the two
+// lines always come in pairs.
+func TestRunMediaIntegrityScanLogsTheResumeAfterAStop(t *testing.T) {
+	state := newTestAppState(t)
+	miInstallFakeMediaTools(t, "#!/bin/sh\nexit 0\n")
+	oldPause := mediaIntegrityPause
+	mediaIntegrityPause = 0
+	t.Cleanup(func() { mediaIntegrityPause = oldPause })
+
+	dir := t.TempDir()
+	if _, err := state.db.db.Exec("INSERT INTO series(name) VALUES ('Show')"); err != nil {
+		t.Fatal(err)
+	}
+	var seriesID int64
+	if err := state.db.db.QueryRow("SELECT id FROM series WHERE name='Show'").Scan(&seriesID); err != nil {
+		t.Fatal(err)
+	}
+	for episode := 1; episode <= 2; episode++ {
+		file := filepath.Join(dir, fmt.Sprintf("episode%d.mkv", episode))
+		if err := os.WriteFile(file, []byte("data"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := state.db.db.Exec("INSERT INTO episodes(series_id,season,episode,title,archive_path) VALUES (?1,1,?2,?3,?4)",
+			seriesID, episode, fmt.Sprintf("Show S01E0%d", episode), file); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := runMediaIntegrityScan(context.Background(), state, "", 1); err != nil {
+		t.Fatal(err)
+	}
+	saved := state.db.LoadMediaIntegrityState()
+	if saved.Checked != 1 || saved.Stopped {
+		t.Fatalf("first run state = %+v, want one file checked and no stop", saved)
+	}
+	// Stopping cancels the job context: the run learns nothing about the file
+	// it had not reached and the pass waits for the next start.
+	canceled, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, err := runMediaIntegrityScan(canceled, state, "", 1); err != nil {
+		t.Fatal(err)
+	}
+	saved = state.db.LoadMediaIntegrityState()
+	if !saved.Stopped || saved.Checked != 1 {
+		t.Fatalf("stopped state = %+v, want the pass kept at one checked file", saved)
+	}
+	var captured strings.Builder
+	logging.SetOutput(&captured)
+	defer logging.SetOutput(os.Stdout)
+	if _, err := runMediaIntegrityScan(context.Background(), state, "", 0); err != nil {
+		t.Fatal(err)
+	}
+	if got := captured.String(); !strings.Contains(got, "Media integrity check resumed: 1 file of 2 files already checked") {
+		t.Fatalf("the resume after a stop is missing from the log:\n%s", got)
+	}
+	if saved = state.db.LoadMediaIntegrityState(); saved.Stopped || saved.Checked != 2 || !saved.Done {
+		t.Fatalf("resumed state = %+v, want the pass complete", saved)
 	}
 }
 

@@ -2212,10 +2212,8 @@ func housekeepingWorker(state *AppState) {
 		}
 		if enabled {
 			if report, ok := gh0_runHousekeeping(state); ok && report != nil {
-				removed := report.OldCyclesRemoved + report.StaleTorrentsRemoved + report.SeenRemoved +
-					report.GapLogsRemoved + report.StaleProvidersRemoved
-				if removed > 0 {
-					logging.Info(fmt.Sprintf("🧹 Routine cleanup: removed %s", countLabel(removed, "old record", "old records")))
+				if summary := housekeepingSummary(report, HousekeepingParams{}.FromSettings(cfg.Settings)); summary != "" {
+					logging.Info("🧹 Routine cleanup removed " + summary)
 				}
 				logging.Debug("housekeeping completed",
 					"cycles", report.OldCyclesRemoved,

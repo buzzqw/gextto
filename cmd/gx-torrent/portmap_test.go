@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"net"
 	"strings"
 	"testing"
@@ -61,6 +63,70 @@ func TestPortMapperCheckRecentMapping(t *testing.T) {
 	}
 	if got.Method != "natpmp" || got.ExternalIP != "1.2.3.4" {
 		t.Fatalf("status not copied: %+v", got)
+	}
+}
+
+// fakeIGD is one router's WANIPConnection service: it reports a single mapping
+// and records the Add calls mapUPnP makes.
+type fakeIGD struct {
+	local     net.IP
+	present   bool
+	lease     uint32
+	added     []string
+	addFailed bool
+}
+
+func (f *fakeIGD) LocalAddr() net.IP { return f.local }
+
+func (f *fakeIGD) GetExternalIPAddressCtx(context.Context) (string, error) { return "1.2.3.4", nil }
+
+func (f *fakeIGD) GetSpecificPortMappingEntryCtx(_ context.Context, _ string, externalPort uint16, protocol string) (uint16, string, bool, string, uint32, error) {
+	if !f.present {
+		return 0, "", false, "", 0, errNoMapping
+	}
+	return externalPort, f.local.String(), true, "gx-torrent", f.lease, nil
+}
+
+func (f *fakeIGD) AddPortMappingCtx(_ context.Context, _ string, _ uint16, protocol string, _ uint16, _ string, _ bool, _ string, _ uint32) error {
+	if f.addFailed {
+		return errNoMapping
+	}
+	f.added = append(f.added, protocol)
+	return nil
+}
+
+func (f *fakeIGD) DeletePortMappingCtx(context.Context, string, uint16, string) error { return nil }
+
+var errNoMapping = errors.New("no such entry")
+
+// A mapping that still has enough lease is left alone; one that is about to
+// expire is renewed with the same Add that created it, so the router never
+// drops the port and announces the removal and the addition every hour.
+func TestPortMapperRenewsTheLeaseBeforeItExpires(t *testing.T) {
+	port := 6881
+	cases := []struct {
+		name    string
+		present bool
+		lease   uint32
+		want    []string
+	}{
+		{"fresh lease: no renewal", true, uint32(portLease.Seconds()), nil},
+		{"lease about to expire: renew both protocols", true, portRenewBefore - 1, []string{"TCP", "UDP"}},
+		{"permanent mapping: no renewal", true, 0, nil},
+		{"missing mapping: add both protocols", false, 0, []string{"TCP", "UDP"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			router := &fakeIGD{local: net.ParseIP("192.168.1.161"), present: tc.present, lease: tc.lease}
+			mapper := newPortMapper(port, true, false)
+			mapper.upnpClient = router
+			if err := mapper.mapUPnP(); err != nil {
+				t.Fatalf("mapUPnP: %v", err)
+			}
+			if strings.Join(router.added, ",") != strings.Join(tc.want, ",") {
+				t.Fatalf("added = %v, want %v", router.added, tc.want)
+			}
+		})
 	}
 }
 

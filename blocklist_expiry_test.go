@@ -136,6 +136,68 @@ func TestBlocklistedTitlesMatchDifferentSpellings(t *testing.T) {
 	}
 }
 
+// A release refused before starting because its swarm is empty goes on the
+// same temporary blocklist as one abandoned mid-download: the next cycles do
+// not evaluate it again (and do not repeat the same line in the log), and it
+// comes back once the block expires in case the swarm has revived.
+func TestEmptySwarmSkipBlocklistsTheRelease(t *testing.T) {
+	db := newTestDB(t)
+	release := expiryTestRelease()
+	hash := "0123456789abcdef0123456789abcdef01234567"
+	cfg := &Config{Settings: map[string]string{}}
+
+	blockDeadSwarmRelease(db, cfg, &release)
+	blocked, err := db.IsBlocklisted(hash)
+	if err != nil || !blocked {
+		t.Fatalf("the release nobody is sharing was not blocklisted: blocked=%v err=%v", blocked, err)
+	}
+	entries, err := db.BlocklistEntries(10)
+	if err != nil {
+		t.Fatalf("BlocklistEntries: %v", err)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("entries = %d, want 1", len(entries))
+	}
+	entry, _ := entries[0].(map[string]any)
+	if entry["expires_at"] == "" {
+		t.Fatal("the block must expire, so a revived swarm can be chosen again")
+	}
+
+	// Dry-run is a no-op: the log says what it would do, the database stays.
+	drySkipped := expiryTestRelease()
+	drySkipped.Magnet = "magnet:?xt=urn:btih:fedcba9876543210fedcba9876543210fedcba98"
+	blockDeadSwarmRelease(db, &Config{DryRun: true, Settings: map[string]string{}}, &drySkipped)
+	if blocked, err := db.IsBlocklisted("fedcba9876543210fedcba9876543210fedcba98"); err != nil || blocked {
+		t.Fatalf("dry-run blocklisted a release: blocked=%v err=%v", blocked, err)
+	}
+
+	// Zero days means forever, like the existing dead-swarm option.
+	forever := &Config{Settings: map[string]string{"torrent_dead_swarm_blocklist_days": "0"}}
+	permanent := expiryTestRelease()
+	permanent.Magnet = "magnet:?xt=urn:btih:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	blockDeadSwarmRelease(db, forever, &permanent)
+	if blocked, err := db.IsBlocklisted("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"); err != nil || !blocked {
+		t.Fatalf("a dead swarm with zero days must block forever: blocked=%v err=%v", blocked, err)
+	}
+	entries, err = db.BlocklistEntries(10)
+	if err != nil {
+		t.Fatalf("BlocklistEntries (forever): %v", err)
+	}
+	found := false
+	for _, raw := range entries {
+		entry, _ := raw.(map[string]any)
+		if entry["hash"] == "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" {
+			found = true
+			if entry["expires_at"] != "" {
+				t.Fatalf("a zero-day block must have no expiry, got %q", entry["expires_at"])
+			}
+		}
+	}
+	if !found {
+		t.Fatal("the forever block is missing from the blocklist page")
+	}
+}
+
 func TestBlocklistWithoutExpiryStaysForever(t *testing.T) {
 	db := newTestDB(t)
 	release := expiryTestRelease()
