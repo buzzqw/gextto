@@ -39,7 +39,7 @@ change, so this index and the site are never two different texts.
 | [Developers](DEVELOPERS.md) | Build, tests and contributor conventions. |
 | [Architecture](ARCHITECTURE.md) | Map of the code folders and files. |
 | [Open items](todo.md) | The maintained TODO list: what is not done and the gate that unblocks it. |
-| [Measurements and benchmarks](measurements.md) | Comparative results first, then current footprint, speed, build, test and CI times: harnesses, benchmarks, swarm, DHT, merge on real data, accessibility verification. |
+| [Measurements and benchmarks](measurements.md) | gx-torrent compared with qBittorrent, Transmission and Deluge, how to repeat the comparison, then Gextto's own footprint, build and test times, and the designs closed by a measurement. |
 | [gx-torrent engine](gx-torrent.md) | Technical document of the pure-Go torrent engine (gx-core, daemon, adapter). |
 | [eD2k e Kad con aMule (Italiano)](amule.it.md) | Italian version: install and configure aMule, enable it in Gextto, use eD2k/Kad, troubleshooting and settings. |
 | [eD2k and Kad through aMule](amule.md) | How to install and configure aMule, enable it in Gextto and use eD2k/Kad: search, links, aMule's queue in Downloads, completion, shared limits, troubleshooting, settings and tests. |

@@ -289,12 +289,14 @@ not to break.
   transfer latency/throughput. Every replacement or optimisation must be **at
   least equivalent** to the previous one, if not better: measure before and
   after (`go test -bench … -benchmem`, `pprof` CPU/heap profiles, footprint of
-  the daemon and of `gx-torrent`, `make measure-seeding`) and record the numbers
-  in `docs/measurements.md`.
-- **Every time you run benchmarks, update `docs/measurements.md`.** This applies
-  to any measurement (Go benchmarks, `make measure-*`, profiles, RSS): the
-  document is where the numbers stay, with machine and date — if a measurement
-  is not there, it was not done.
+  the daemon and of `gx-torrent`, `make measure-seeding`) and keep the result in
+  `gextto-data/bench/`; a number a reader can decide something from goes in
+  `docs/measurements.md`.
+- **`docs/measurements.md` is for people, and it stays short.** Comparison tables
+  and results first, plain sentences, at most 35 KB. A new figure replaces the row
+  it measures, with machine and date. No before-and-after log of every change, no
+  list of every Go benchmark: raw results stay in `gextto-data/bench/`, and a
+  figure enters the document only if a reader can decide something from it.
 
 ## Release, installer and updates
 
@@ -508,7 +510,7 @@ document or a manual: no history, no positioning, no implementation chronicles, 
 build numbers, commit hashes or measurements. When an item lands, delete it; when a new
 one is accepted, add it. The state of the product is in `gx-torrent.md`, `gx-core.md` and
 the manuals; the numbers are in `measurements.md`; the rejected designs and the
-measurement that closed each one are in `measurements.md` §5.9.
+measurement that closed each one are in `measurements.md`, *Closed designs*.
 
 ## Interface accessibility and i18n
 - The pages of the gx-torrent daemon (`internal/webui/assets`) use the **shared

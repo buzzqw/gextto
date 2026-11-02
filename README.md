@@ -307,6 +307,7 @@ the command to reproduce it.
 
 | Area | Result |
 |---|---|
+| **Compared with other clients** | Same limits in Docker, N97: **290 MB/s** at full speed against 56–250 MB/s for Transmission, qBittorrent and Deluge, with **27 MiB** of own memory. Slower on upload (**125** against 131–238 MB/s) and recheck, and **6.9 MB/s** on a shaped 100 Mbit/s line against 9.5–10.7, a known bug (open item). [Full tables](docs/measurements.md#compared-with-qbittorrent-transmission-and-deluge) |
 | **Real swarm** | **9.3–9.4 MB/s** on the Ubuntu ISO, against **6.3–7.1 MB/s** for libtorrent on the same swarm (one measured campaign) |
 | **Engine memory** | **29–39 MB RSS** at rest, DHT on and a full IP filter (172,740 rules). With 10 torrents downloading to a NAS: **~507 MB** outside the two caches; the write cache sizes itself from free RAM |
 | **Engine CPU** | **18–37 % of one core** at 8.2–8.8 MB/s with 116–132 peers, **2.0–4.3 s of CPU per 100 MB**; **0.6–1.0 %** of one core at rest |

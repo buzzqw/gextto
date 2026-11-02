@@ -1477,8 +1477,8 @@ RPC server is disabled.
     **per-connection backoff** doubles the RTO on each timeout (up to 4×) and
     halves it on each delivered packet, so a silent or congested peer is
     retried with growing patience while a link that delivers again returns to
-    the measured RTT. On the silent-peer harness the backoff halves the resends
-    ([`measurements.md`](measurements.md) §4.1). A healthy connection never timeout-resends, so its RTO is
+    the measured RTT. On the silent-peer harness the backoff halves the resends.
+    A healthy connection never timeout-resends, so its RTO is
     unchanged.
   - Incoming, the handshake is routed as for TCP.
   - The peer list indicates which ones are connected over uTP.
@@ -1693,7 +1693,7 @@ The merge matches by structure, in four ways:
   whole once complete. If that check fails, the local blocks are dropped and
   the piece is downloaded whole (the peer is not banned for it). Measured on
   the Debian and Arch ISOs with a source 75% complete: 25% of the file from the
-  network instead of 100% ([`measurements.md`](measurements.md) §4.8, harness
+  network instead of 100% ([`measurements.md`](measurements.md#reusing-local-data), harness
   `scripts/phase3-env.sh` + `TestMeasureMergePhase3`).
 - **v1, a different piece length.** Two **v1** torrents matched by
   file **path and length** share **whole** pieces even when their piece grids
@@ -1946,7 +1946,7 @@ using fixed values.
   **shared memory mapping** instead of with `read`/`write`. Piece writes
   become copies into the page cache (asynchronous kernel writeback) and
   reads avoid the syscall (on tmpfs the benchmark is ~7.0 GB/s against
-  ~5.9 GB/s for `pwrite`, [`measurements.md`](measurements.md) §4.9). It is **opt-in** (also `GX_TORRENT_MMAP=1`) because it maps
+  ~5.9 GB/s for `pwrite`, [`measurements.md`](measurements.md#the-numbers-behind-engine-decisions)). It is **opt-in** (also `GX_TORRENT_MMAP=1`) because it maps
   every open file: with torrents of thousands of files it approaches the
   `vm.max_map_count` limit. Outside Linux it is ignored (normal files are used).
   A page the disk cannot back (disk full on a sparse file, file truncated by
@@ -1966,7 +1966,7 @@ using fixed values.
   next transfer. The line is written when the idle period starts and then at
   most every 6 hours, so a daemon that stays idle for a day does not fill the
   log with the same sentence. On the N97 the RSS went from 550 MB to 35–40 MB
-  ([`measurements.md`](measurements.md) §4.1).
+  ([`measurements.md`](measurements.md#footprint)).
 - The Health panel and `GET /api/v1/stats` show the effective cache, the
   chosen target (`cache_read_mb`, `cache_write_mb`), the **reason**
   (`cache_reason`), the storage class (`cache_storage`) and the available
@@ -2030,7 +2030,7 @@ persisting the bitfield (order snapshot → fsync → write; `updateStats` in
 two phases). A bit that survives a crash therefore always refers to data already
 on disk, and at most the pieces of the last few minutes are re-downloaded. On HDD and NFS
 this removes one fsync per piece write (measurements in
-[`measurements.md`](measurements.md) §3).
+[`measurements.md`](measurements.md#the-numbers-behind-engine-decisions)).
 
 **Move**:
 
@@ -2311,7 +2311,7 @@ re-announce) and logs each new allowance and each change (`peer cap for «…»:
 `peer cap 33 for 9 torrents (machine allowance, shared with 9 running torrents): …`).
 `max_connections_per_torrent` stays the ceiling when above zero, a torrent's
 own limit always wins, and the peers of such a torrent are taken out of the
-budget first. The reason is in [`measurements.md`](measurements.md) §4.1: CPU
+budget first. The reason is in [`measurements.md`](measurements.md#peer-cap): CPU
 grows with the number of established peers (about 0.1 % of a core each) and
 hardly with the bytes when the line is the limit.
 
@@ -2584,7 +2584,7 @@ the resident memory. Measurements in `docs/measurements.md`.
   - loading of the IP filter.
   - (opt-in, `GX_MEASURE=1` / `make measure-seeding`) the seeding/choking measurement
     on a local swarm, with bytes and times per peer: method and metrics in
-    `docs/measurements.md` (§4.6).
+    `docs/measurements.md`.
 - `go test ./internal/blocklist` in `internal/gxcore` covers the formats of the
   IP filter.
 - `make test-engine` also covers the deterministic choking harness

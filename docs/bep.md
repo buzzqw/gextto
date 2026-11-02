@@ -47,7 +47,7 @@ stay narrow and the tables remain readable.
 > (an identical piece layout, or an equal v2 per-file Merkle root): matching on
 > the identity of the bytes is what makes the reuse safe. Phases 1–3 are done
 > (the Swarm Merging section in [`gx-torrent.md`](gx-torrent.md) and
-> [`measurements.md`](measurements.md) §5.8), including block-granularity reuse, the
+> [`measurements.md`](measurements.md#reusing-local-data)), including block-granularity reuse, the
 > resume path and the re-trigger when a sibling appears after the allocation.
 > The daemon's BEP 38 view is `GET /api/v1/torrents/{hash}/collections`.
 >
@@ -197,7 +197,7 @@ stay narrow and the tables remain readable.
 
 **BEP 38 is complete** (hints, block reuse at allocation/resume/later trigger):
 the detail is in the note above, in [`gx-torrent.md`](gx-torrent.md)
-(*Local data reuse*) and in [`measurements.md`](measurements.md) §5.8.
+(*Local data reuse*) and in [`measurements.md`](measurements.md#reusing-local-data).
 
 **Beyond the BEPs.** Extensions that are *not* part of the BEP catalogue — the
 WebSocket tracker (`ws://`/`wss://`), WebTorrent/WebRTC peers, the v1

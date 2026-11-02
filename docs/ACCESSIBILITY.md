@@ -124,4 +124,4 @@ A UI change without this check is not finished.
 - The TUI relies on plain text, a stable order and the terminal's own screen-reader
   support; it has no graphical semantics of its own.
 - The accessibility results of each round, with the machine and the date, are in
-  [`measurements.md`](measurements.md) §5.
+  [`measurements.md`](measurements.md#verified-without-a-benchmark).

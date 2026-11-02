@@ -9,7 +9,7 @@ package unchoker
 // for how long. This harness pins that down repeatably. Throughput on a real
 // swarm depends on many more factors, so cross-client comparisons
 // (libtorrent/qBittorrent) still need a real swarm; see
-// docs/measurements.md (section 3).
+// docs/measurements.md.
 
 import (
 	"fmt"

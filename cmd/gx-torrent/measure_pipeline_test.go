@@ -8,7 +8,7 @@ package main
 // On loopback the RTT is close to zero, so the depth barely matters by
 // construction: this harness is a regression and sanity check of the queue
 // plumbing, not a WAN demonstration. A real-swarm campaign needs latency (see
-// docs/measurements.md section 3).
+// docs/measurements.md).
 //
 // Run it with:
 //

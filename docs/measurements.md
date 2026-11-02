@@ -1,957 +1,376 @@
-# Measurements, benchmarks and verification of Gextto, gx-torrent and gx-core
+# Measurements
 
-The numbers we use to decide, with the machine they were taken on and the command to
-repeat them. The document is a **snapshot**: it keeps the latest figure of each item,
-never a history. A new round replaces the row it measures.
+How gx-torrent compares with qBittorrent, Transmission and Deluge, what Gextto costs on a
+small machine, and how to repeat every number. The figures are the latest ones, not a
+history: a new round replaces the row it measures.
 
-- **§2 Comparative benchmarks** come first: the before → after of every change that still
-  shapes the current code. This is what a change is judged by.
-- **§3 Current baselines** are the static figures of the system and of the build:
-  footprint, speed, build, tests and CI.
-- **§4 Benchmark reference** is the unit cost of each measured path.
-- **§5 Investigations and decisions** explains why the current design is what it is.
-- **§6 Verification** is what was verified without being a benchmark.
+## Short answer
 
-Everything is measured on the reference machine below, unless a row says otherwise:
+Measured on 2026-11-02 on a low-power mini PC (Intel N97), in Docker, with the same
+torrents and limits for every client.
+
+| Question | Best | gx-torrent | Why it matters |
+|---|---|---|---|
+| Fastest download with nothing in the way | **gx-torrent, 290 MB/s** | first; the others 56–250 MB/s | a fast disk and a fast peer |
+| Download on a 100 Mbit/s line, 4 peers | Deluge and qBittorrent, about 10.6 MB/s | **last, 6.9 MB/s: a bug, 11.2 MB/s with the fix** ([details](#a-bug-found-by-this-comparison)) | the common case at home |
+| Least own memory at full speed | Transmission, 12 MiB | **27 MiB**, qBittorrent 24, Deluge 57; on the 100 Mbit/s line 36 against 10–39 | what the client cannot give back to the system |
+| Fastest upload | Deluge and qBittorrent, about 230 MB/s | **125 MB/s**, close to Transmission | only matters above a gigabit link |
+| Fastest recheck of 4 GiB | Transmission, 3.9 s | **last, 8.8 s** | after a move or a crash |
+| Lowest CPU at rest | gx-torrent and qBittorrent, 0.05–0.06 % | among the best | a machine that is always on |
+| Lightest with 100 torrents | Transmission, 19 MB | **second, 29 MB** (qBittorrent 119 MB) | a long seeding list |
+
+In short: gx-torrent is the fastest downloader when the network is not the limit and stays
+small while doing it. It uploads and rechecks more slowly than the libtorrent clients, it
+spends more CPU on uTP than any of them, and the comparison exposed a real bug in how it
+keeps peer addresses.
+
+## Compared with qBittorrent, Transmission and Deluge
+
+### What was run
+
+Every client runs in its own container with the same limits, against the same reference
+peers, on an isolated network. Each table is the **median of three interleaved rounds**,
+with the range in brackets where it matters. Every downloaded file was compared byte by
+byte with the original.
+
+| Client | Version | Engine |
+|---|---|---|
+| gx-torrent | commit `13bad664` | gx-core, pure Go |
+| qBittorrent | 5.1.0 (Debian 13) | libtorrent |
+| Transmission | 4.1.0 beta 2 (Debian 13) | its own |
+| Deluge | 2.2.0 (Debian 13) | libtorrent 2.0.11 |
 
 | Item | Value |
 |---|---|
-| System | Debian GNU/Linux 13 (trixie), kernel 7.1.13, x86_64 |
-| CPU | Intel N97, 4 cores / 4 threads (low-power mini PC) |
-| RAM | 15 GiB (no swap) |
-| Disk | NVMe Lexar NM620 256 GB (ext4) |
-| Go | 1.27.3 |
-| Docker | 29.9.2 |
+| Machine | Intel N97 (4 cores), 15 GiB RAM, Lexar NM620 NVMe, ext4, Debian 13, kernel 7.1.13, Docker 29.9.2 |
+| Client under test | CPUs 2–3, 4 GiB of memory limit |
+| Reference peers | qBittorrent on CPUs 0–1, 1.5 GiB each, plaintext |
+| Network | Docker bridge with no outside access; a private tracker; no DHT, PEX, LSD, UPnP or NAT-PMP |
+| Host | ffmpeg stopped; a run with more than 1 core busy outside the test is thrown away and repeated |
 
-The open items are in [`todo.md`](todo.md);
-the engine is in [`gx-torrent.md`](gx-torrent.md) (inventory
-[`../internal/gxcore/GEXTTO.md`](https://github.com/buzzqw/gextto/blob/main/internal/gxcore/GEXTTO.md))
-and its BEP compliance in [`bep.md`](bep.md).
+Two kinds of memory appear below. **Own memory** (anonymous) is what the client really
+holds. **RSS** also counts file pages mapped from disk, which the system takes back whenever
+it needs them; that is why libtorrent clients show about 4 GB on a 4 GiB file without any
+memory pressure.
 
-## Index
+### At rest
 
-1. [How to measure](#1-how-to-measure)
-2. [Comparative benchmarks](#2-comparative-benchmarks)
-3. [Current baselines](#3-current-baselines)
-4. [Benchmark reference](#4-benchmark-reference)
-5. [Investigations and decisions](#5-investigations-and-decisions)
-6. [Verification](#6-verification)
-7. [Adding a measurement](#7-adding-a-measurement)
+One client, no torrents, 60 s after a 15 s settle.
 
----
-
-## 1. How to measure
-
-Two rules apply everywhere: measure the system **as it really runs** (queue and slots,
-seed policy, scheduler and auto-management on — never "with the queues off", which would
-be a laboratory and not production), and compare two clients only with the same swarm,
-the same role, the same policies and the same metrics.
-
-A number is usable only with four things written next to it: the **machine**, the
-**date**, the **build**, and the **command** (or harness) that produced it. A single pass
-on a public swarm cannot rank a parameter: peers are luck. Parameters are compared with
-the controlled local swarm or with repeated, interleaved runs (`-count`, `benchstat`);
-a public swarm says whether the feature works, not which value is better.
-
-**An idle host.** A benchmark round runs with the machine at rest: the service stopped,
-containers and browsers idle, load average below 1. A busy host is not a measurement, and
-a difference smaller than the spread of the same binary on the same host is not a result.
-
-**Profilers.** The engine and the daemon have an opt-in loopback pprof endpoint:
-`GX_TORRENT_PPROF=127.0.0.1:6061` on gx-torrent, `GEXTTO_PPROF=127.0.0.1:6062` on
-Gextto. Both are off unless the variable is set, so a profile never costs anything in
-normal use.
-
-### A reproducible round
-
-`scripts/bench-all.sh` runs the whole Go benchmark suite in one pass: the root package,
-`cmd/gx-torrent`, `internal/gxcore/...`, `internal/utp/...` and the separate
-`internal/dht` module, with `-benchmem` and `-count` runs, `GOMAXPROCS=2`. It writes the
-raw log and the `benchstat` table to `gextto-data/bench/` and keeps `latest.txt` for the
-next comparison.
-
-```bash
-make bench-all              # on this host
-make bench-all-docker       # in a pinned golang image, CPUs restricted to the container
-scripts/bench-all.sh --compare old-raw.txt new-raw.txt
-```
-
-`GX_BENCH_COUNT` (default 6), `GX_BENCH_PROCS` (default 2), `GX_BENCH_OUT`,
-`GX_BENCH_CPUSET` and `GX_BENCH_IMAGE` tune the round. The container pins the Go
-toolchain, not the host: the CPU model and the load still belong in the record.
-
-### Harnesses
-
-Cheap probes and opt-in tests, all outside CI:
-
-| Harness | What it measures |
-|---|---|
-| `make bench-all` | every Go benchmark of Gextto, gx-torrent and gx-core, raw log plus `benchstat` table |
-| `scripts/bench-engines.sh [--size MiB] [--dir DIR] [--leechers N]` | RAM and throughput of gx-core: loopback swarm throughput with peak RSS, and disk write throughput of a directory (`--dir` on the NFS mount to compare) |
-| `make measure-seeding` | local swarm, seeder plus 3 leechers by default, distinct `127.0.0.x` addresses. `GX_MEASURE_SUPERSEED=1` compares super-seeding, `GX_MEASURE_MESH=1` connects the leechers to each other, `GX_MEASURE_LEECHERS=N` sets the size |
-| `make measure-choking` | the choking campaign: a real **libtorrent** leecher on loopback (`scripts/libtorrent-leech.py`, needs `python3-libtorrent`), plus a real-swarm half that needs an inbound port |
-| `make measure-pipeline` | the adaptive request queue at shallow (4/4), default (50/250) and deep (200/500) depth; the knobs travel in `NetworkOptions` (`MaxRequestsOut`/`DefaultRequestsOut`) |
-| `make measure-realswarm GX_MEASURE_REAL=<public.torrent>` | a public torrent with DHT, trackers and uTP (`GX_MEASURE_REAL_SECONDS`, default 120 s): peers, uTP split, socket counters. A comma-separated list runs all the torrents together, all active, and adds the CPU of the process and the CPU per 100 MB. A run that sees no peer fails, so it cannot pass hollow. The test daemons tick every 50 ms; `GX_TEST_TICK=3s` gives them the production tick |
-| `make measure-merge3` | Swarm Merging Phase 3 on real ISOs (§5.8) |
-| `make measure-dht` | the public DHT: routing-table fill and query success (`GX_MEASURE_DHT=5m`, `GX_MEASURE_DHT_INFOHASH=<40 hex>`) |
-| `TestMeasureLatencyGuard` | the latency guard against a second instance and a competing download on the real line (`GX_MEASURE_LATENCY_GUARD`, `GX_MEASURE_COMPETITOR_URL`) |
-| `TestMeasureManagerLanes` | Jackett/Prowlarr lanes against the aggregate on the live managers (`GX_MEASURE_LANES=<data dir>`) |
-| `TestMeasureManyFiles` | descriptors, peak RSS and check time of one torrent with many files already on disk (`GX_MEASURE_FILES=500,2000,5000`; run it niced and memory-capped, §3.5) |
-| `TestMeasureManyFilesDownload` | a torrent of many files downloaded at full speed from a second daemon over loopback (`GX_MEASURE_DL=files:avgsize`), data under `GX_MEASURE_DIR` on a real disk (§3.5) |
-| `TestMeasureMergePhase3` | block-granularity merge on real ISOs (`GX_MEASURE_MERGE3=<dir>`, `GX_MEASURE_MERGE3_PEER` for a libtorrent seeder) |
-| unchoker simulation (`internal/gxcore/internal/unchoker/sim_test.go`) | the real `Unchoker` driven by synthetic peers: fast downloaders in download, fast uploaders in seed, immediate fast unchoke, optimistic unchoke that does not steal a slot and rotates, budget respected, fairness |
-| `TestMeasurePipeliningLatency` | an in-process latency proxy before the seed (no `tc`/`netem`, no root): every chunk released at arrival plus latency, in order and without limiting bandwidth |
-| `scripts/holepunch-netns-test.sh` | BEP 55 end to end between two clients behind a stateful firewall, with a public relay (`sudo`, network namespaces, `--keep` to debug) |
-
-## 2. Comparative benchmarks
-
-Before and after the change that produced the current code, on the same host and with
-the same command: interleaved runs or `-count` plus `benchstat`. This is the first
-section because a change is judged by the delta it produces. The steady-state figure of
-the same benchmark is in §4.
-
-### 2.1 Engine, picker and merge
-
-| Change | Before | After | Measured |
+| Client | CPU (% of a core) | Own memory | RSS |
 |---|---|---|---|
-| Log level checked before formatting (`BenchmarkEngineLoggerFiltered`) | 151–175 ns/op, 3 allocs | **36–38 ns/op, 40 B, 1 alloc** | 2026-10-28 |
-| IP filter parsed on the bytes of the line (`BenchmarkLoad`, 172,000 rules) | 56.5–58.6 ms, 39.7 MB, 882,032 allocs | **32.6–33.1 ms, 6.6 MB, 32 allocs** | 2026-10-26 |
-| Log page highlighting: one word scan instead of six regexps (`BenchmarkV2HighlightLogLine`) | 58.6–67.3 µs, 2.3 KB, 18 allocs per line | **0.91–0.95 µs, 576 B, 2 allocs** | 2026-10-26 |
-| Restart with unchanged translation catalogs (`BenchmarkSeedDefaultTranslationsReseed`) | 841–1,025 ms, 45.3 MB, 1,027,628 allocs | **3.1–3.7 ms, 2.5 MB, 35 allocs** | 2026-10-26 |
-| Series names and aliases indexed once per list (`BenchmarkFindSeriesMatchUnmatched`, 500 series) | 3.63–3.71 ms, 1.52 MB, 33,500 allocs | **120–121 µs, 8.9 KB, 518 allocs** | 2026-10-28 |
-| Same scan when the release is monitored but the exact pass misses (`BenchmarkFindSeriesMatchMatched`) | 2.72–2.90 ms, 987 KB, 29,473 allocs | **128–132 µs, 8.5 KB, 515 allocs** | 2026-10-28 |
-| One transaction per 500 rows instead of three autocommit `UPDATE`s per torrent (`BenchmarkRescore`, 2,000 torrents) | 215–237 ms, 6.3 MB, 84,153 allocs | **54–60 ms, 6.2 MB, 82,264 allocs** | 2026-10-28 |
-| Gap calculation in one pass instead of two scans (`BenchmarkArchiveGaps`, 50 series) | 5.74–6.77 ms, 522 KB, 17,580 allocs | **4.36–4.57 ms, 515 KB, 17,164 allocs** | 2026-10-28 |
-| Library rescan batched in one transaction per series (`BenchmarkSyncArchiveFilesScored`, 500 files) | 135 µs/file on the RAM disk, 1.63–1.70 ms/file on the NVMe | **20 µs/file on the RAM disk, 25–39 µs/file on the NVMe** | 2026-10-28 |
-| Torrent snapshot read: sort kept with the cache (`BenchmarkEngineListSnapshot`, 2,000 torrents) | 1.42 ms, 1.00 MB, 4 allocs | **593–610 µs, 1.00 MB, 1 alloc** | 2026-10-28 |
-| The twelve reads of one 750 ms tick (`BenchmarkEngineSnapshotTwelveCalls`, 2,000 torrents) | 12 copies and 12 sorts of the whole table | **7.1–7.4 ms, 12.3 MB, 12 allocs** | 2026-10-28 |
-| Archive volume walked once per cycle, not once per movie (`BenchmarkArchiveMovieQualityPerCandidate`, 200 candidates) | 17.4–18.2 s, 434 MB, 5.47 M allocs | **139–146 ms, 3.1 MB, 45,900 allocs** | 2026-10-28 |
-| Second read handle on the archive (`BenchmarkArchiveReadDuringFullScan`, 50,000 releases) | 116–122 ms, 32.8 MB, 549,784 allocs | **257–349 µs, 618 B, 17 allocs** | 2026-10-28 |
-| Piece picker, rarest with early exit (`BenchmarkPickerRarestSteady`) | 112.7–118.6 µs/op, 0 allocs | **11–35 ns/op, 0 allocs** | 2026-10-28 |
-| Piece picker, peer departure visits only the bits the peer held (`BenchmarkPickerDisconnect`, 27,250 pieces) | 413–440 µs/op, 0 allocs | **95–126 µs/op, 0 allocs** | 2026-10-29 |
-| Piece picker, new peer bitfield then departure (`BenchmarkPickerBitfieldManyPeers`, 4,000 pieces, 150 peers) | 57.0–62.5 µs/op, 1 alloc | **35.4–37.0 µs/op, 1 alloc** | 2026-10-29 |
-| Piece picker, sequential pick starts past the finished prefix (`BenchmarkPickerSequentialNearlyDone`, 27,250 pieces) | 106–115 µs/op | **4.5–4.7 ns/op** | 2026-10-29 |
-| Piece picker, rarest in a dense swarm (`BenchmarkPickerRarestManyPeers`, 150 peers) | 12.1–12.8 µs/op | **10.5–11.1 µs/op** | 2026-10-29 |
-| Webseed gap list into reused buffers (`BenchmarkPickerSmallestGapWebseeds`, 15,000 pieces) | 238–246 µs, 64 KB, 1 alloc per pick | **79–81 µs, 0 allocs per pick** | 2026-10-26 |
-| Fixed-size peer message bodies read into stack arrays (`BenchmarkPeerReaderRequests`, 4,096 messages) | 531–572 ns and 4 allocs per message | **407–451 ns and 2 allocs per message** | 2026-10-30 |
-| One timer per connection armed on the oldest outstanding packet (`BenchmarkTransferLoopback`, 16 KiB block) | 130–161 MB/s, 5.5 KB, 99 allocs | **151–159 MB/s, 4.0 KB, 75 allocs** | 2026-10-28 |
-| Connection id without a 64K-entry table per dial (`BenchmarkNewConnID`) | 152,353 ns/op, 512 KiB per dial | **31 ns/op, 0 allocs** | — |
-| One hash per piece: verification dispatches on the layout (`BenchmarkPieceWriterRunV2`, 4 MiB piece) | 3.47–3.55 ms, 1181–1207 MB/s, 14 allocs | **1.93–1.95 ms, 2151–2177 MB/s, 12 allocs**; v1 unchanged at 1.54–1.56 ms | 2026-10-30 |
-| Release identity: name and size match once per release (`BenchmarkMergeDuplicateReleases`, 24,000 releases) | 45–52 ms, 37.7 MB, 120,002 allocs | 48–54 ms, 48.2 MB, 192,198 allocs (deliberate trade: about +10 MB of short-lived memory) | 2026-10-24 |
-| Archive identity declared for a `.torrent`-only listing (`BenchmarkArchiveSaveBatch`, 1,000 releases) | 45.2–46.1 ms, 3.09 MB, 50,536 allocs | **40.1–40.4 ms, 3.18 MB, 50,538 allocs** | 2026-10-31 · build 2124 |
+| gx-torrent | 0.06 | 7.6 MiB | 22 MiB |
+| qBittorrent | 0.05 | 7.1 MiB | 35 MiB |
+| Transmission | 0.30 | 2.4 MiB | 17 MiB |
+| Deluge | 0.30 | 38 MiB | 63 MiB |
 
-### 2.2 Storage and archive
+### Download at full speed
 
-| Change | Before | After | Measured |
-|---|---|---|---|
-| Resume flush: a clean file costs no syscall (`BenchmarkPlainSyncCleanSkipped` vs `…Fdatasync`) | 337–361 ns (`fdatasync` on a clean file) | **9.5–12.5 ns** (dirty flag clear, no syscall) | 2026-10-30 |
-| Feed archive dedup on the infohash (live database) | 480 MB, 610,254 rows | **258 MB, 307,477 rows** | 2026-10-21 |
-| Archive content-filter page: `id,title` instead of the whole `magnet` text | 364,348 rows, 138,090,257 B (~131.7 MiB) copied per request | **28.8 MB of titles and one `id IN (…)` query** for the visible rows | build 2072 |
-| Durability without `O_SYNC`, batched by `syncPieces()` | 35 MiB/s for 16 KiB writes on NFS | **81 MiB/s (2.3×)**, up to ~118× at small blocks on NVMe | — |
+A 4 GiB file from one reference peer over TCP, with no rate limit and a cold disk cache: the
+ceiling of each client on this machine.
 
-### 2.3 Daemon and web UI
+| Client | Speed | Time | CPU per GiB | Peak own memory | Peak RSS |
+|---|---|---|---|---|---|
+| **gx-torrent** | **290 MB/s** (288–291) | 14.8 s | 3.05 s | 27 MiB | 39 MiB |
+| Deluge | 250 MB/s (247–250) | 17.2 s | 2.92 s | 57 MiB | 3,979 MiB |
+| qBittorrent | 242 MB/s (240–245) | 17.7 s | 2.70 s | 24 MiB | 3,972 MiB |
+| Transmission | 56 MB/s (56–56) | 77.0 s | 2.18 s | 12 MiB | 26 MiB |
 
-| Change | Before | After | Measured |
-|---|---|---|---|
-| Series page: names and aliases indexed once, five queries per series removed | 112 ms of CPU per request | **37 ms** | build 2038 |
-| Log tail: one word scan instead of six regexps on 500 lines every 5 s | 28 ms per refresh | **5 ms** | build 2038 |
-| Dashboard seen-release count reused for 30 s | 25–36 ms per request | **18–19 ms** | build 2038 |
-| Web UI transfer, gzipped | dashboard 33.3 KB, downloads 70.7 KB, archive 473.2 KB, maintenance 118.7 KB | **8.0 / 12.3 / 38.8 / 17.2 KB** | build 1945 |
-| CSS and JS served compressed and cached immutable | 285.2 KB | **75.3 KB**, repeat request `304, 0 bytes` | build 1945 |
-| eD2k grab note off the request path | up to 40 s on a batch of ten results | **0.31–0.54 ms** for the add, the note runs in its own goroutine | build 2067 |
-| Log volume in 24 h, `gx-torrent.log` | 212 lines, 76 speed-limit changes, 61 peer/cache/memory lines, 18 tracker lines, 12 seeding-limit lines, 40 banner lines | **0 speed and peer lines at INFO** (DEBUG with `-debug`), **3 tracker lines**, **1 seeding line per torrent per run**, **5 banner lines** | 2026-10-29 |
-| Log volume in 24 h, `gextto.log` | 499 lines, 112 restart-sequence lines | **84 restart-sequence lines** (the daemon line merged into the banner) | 2026-10-29 |
+Transmission's 56 MB/s repeats in every round; its cause was not investigated.
 
-### 2.4 Peer writer: small messages batched into one write
+### Download on a 100 Mbit/s line
 
-Every protocol message used to be its own `Write`: a refill of 250 block requests
-(17 bytes each) was 250 syscalls and, with `TCP_NODELAY`, 250 segments. The writer now
-takes the run of small messages at the head of its queue in one hand-off and sends it
-with one `Write`; block uploads still go one by one.
+A 512 MiB file from four peers, each shaped to 25 Mbit/s and 40 ms: a line of 12.5 MB/s
+before protocol overhead.
 
-| Measure (100,000 requests) | Before | After |
-|---|---|---|
-| `write` syscalls | 100,309 | **1,972** |
-| all traced syscalls (`write`, `read`, `futex`, …) | 144,329 | **4,842** |
-| writes per message, `BenchmarkPeerWriterRequests` (counting conn) | 1.000 | **0.014–0.021** |
-| heap per refill of 250 | 27.4 KiB, 750 allocs | **15.6–15.9 KiB, 500 allocs** |
-| time per refill of 250 over loopback TCP, `BenchmarkPeerWriterRequestsTCP` | 1.70–2.85 ms | **0.28–0.46 ms** |
-
-Reproduce with `go test -c ./internal/gxcore/internal/peerconn/peerwriter/` and
-`strace -f -c -e trace=write,read,futex ./peerwriter.test -test.run '^$' -test.bench RequestsTCP -test.benchtime=400x`.
-
-### 2.5 Registering a release again
-
-A new download of an infohash that was already downloaded clears the completion left by
-the previous attempt (`beginNewDownloadAttempt`): one indexed read on the normal paths,
-two reads and one `UPDATE` when the row still says "completed" and its archived copy is
-gone. The path runs once per started download, not per cycle. `MarkTorrentCompleted`,
-which the loop needs to put the row back into "completed", is outside the timed region.
-
-| Case | Before | After |
-|---|---|---|
-| First add, no row yet | 115–163 µs | **154–199 µs** |
-| Re-register on a queued row | 123–145 µs | **149–194 µs** |
-| Re-register after a completion whose copy is gone | 167–233 µs | **272–320 µs** |
-
-Reproduce with
-`go test -run XXX -bench BenchmarkRegisterTorrentScored -benchmem -count=5`.
-
-### 2.6 Build and test suite
-
-| Change | Before | After |
-|---|---|---|
-| `make test-serial` (plain `go test ./...`, root package serial) | 65 s, root package 59.7 s | **34 s** with the test waits shortened |
-| `make test` (root package in 4 processes, `scripts/go-test-sharded.sh`) | 65 s serial | **22–24 s** (35 s with the test binary rebuilt, 15 s warm) |
-| `make test-ui` (Playwright, Chromium) | about 75 s | **63–72 s** |
-
-The waits that only pace real servers are package variables that `TestMain` shortens in
-the root package (feed retries and per-host gap, rate-limit penalty, notifier retries and
-Telegram gap, TMDB and comic retries, adopted gx-torrent poll) and in `cmd/gx-torrent`
-(`feedHostGap`). `internal/gxcore/torrent` dropped from 18 s to 0.9 s once the IPv6 DHT
-test stopped waiting the 15 s re-query period; `cmd/gx-torrent` stays in one process
-because its tests share fixed port ranges.
-
-## 3. Current baselines
-
-### 3.1 gx-torrent
-
-| | Current figure | Build · date | Reproduce with |
-|---|---|---|---|
-| At rest | **0.93–0.98 %** of a core over 60 s, **29–32 MB RSS**, 10 threads, 92 descriptors; ~24 % of the 30 s CPU profile in the DHT | 1.2.278–279 · 2026-10-30 | live service, 3 seeds, no peers, full IP filter; `/proc/<pid>/stat`, `GX_TORRENT_PPROF=127.0.0.1:6060` |
-| Under load, public ISOs | **2.0–4.3 s of CPU per 100 MB**, 18–37 % of a core at 8.2–8.8 MB/s, 116–132 peers | 261 · 2026-10-26 | 5 public ISOs for 180 s, automatic peer cap, `GX_TEST_TICK=3s`, data under `~/.cache` |
-| Loopback transfer | **234–274 MB/s**, 7.5–8.3 s of CPU per 1.09 GiB for seeder and leecher together, 100 MiB peak RSS | 261 · 2026-10-26 | `GX_MEASURE_DL=8:134217728`, `GOMAXPROCS=2`, `CPUQuota=200%`, interleaved rounds |
-| Automatic peer cap | **55 per torrent, 300 in all** on this 4-core/16 GiB host; with 9 active torrents **−36 % peers and −12 % CPU** against a fixed 55 per torrent, throughput within the swarm noise (−4 %) | 1934 · engine 245 | `GX_MEASURE_AUTO=1` / `GX_MEASURE_MAXCONN`, 9 public ISOs, 150 s, two interleaved rounds |
-| uTP loopback | **178–188 MB/s**, 4.0 KB and 75 allocs per op | 2026-11-02 | `BenchmarkTransferLoopback` |
-| Storage | **5.52–5.61 GB/s** buffered, **7.03–7.20 GB/s** mmap; 16 KiB writes on NFS **81 MiB/s** | 2026-11-02 | `BenchmarkStorageWrite`, `BenchmarkStorageWriteMmap`, NFS harness |
-| Read cache | **338.9–353.5 ns** and 0 allocs per hit; parallel form 724.4–860.3 ns/op | 2026-11-02 | `BenchmarkCacheGetHit`, `-benchtime 200000x -count=6` |
-| `state.json` save | **0.465–0.504 ms** at 100 torrents (133–135 KB allocated), **4.27–4.96 ms** at 1,000, **19.81–24.87 ms** at 5,000, **16.10–16.61 ms** with 1,000 torrents and 20,000 feed entries | 2026-11-02 | `BenchmarkSaveStateLocked` |
-
-### 3.2 gexttod
-
-| | Current figure | Build · date | Reproduce with |
-|---|---|---|---|
-| At rest | **0.46 %** of a core over 120 s, **71.1 MB RSS** | 2078 | live service, CPU ticks from `/proc/<pid>/stat`, `VmRSS` |
-| First minutes after a start | **0.39 %** of a core, stale-temp sweep 0.21 s, 8 new TLS connections in 300 s | 1790 | profile from start, `strace -e connect` |
-| Directory opens at rest | **0** per 20 s; no write probe on the NAS | 1785 | `strace`, `/proc` over 60 s |
-| Metadata calls | ~5,000 a day for 55 series | — | live service |
-| Add intent (crash-safe add) | **76–79 µs, 3.2 kB, 44 allocs** per started download | — | written before every engine add; negligible next to the engine add |
-| Memory of a full cycle | at rest after a start **65 MB RSS** (42 MB anon, 8.2 MB `heap in use`, 41 goroutines); during the cycle **232 MB RSS**, 155 MB anon, 38 MB heap, 65 goroutines; after the cycle **6.8 MB heap**, 42 goroutines | 2067 · 2026-10-28 | live service, `GEXTTO_PPROF`, `/proc/<pid>/status`, cgroup `memory.stat`, `POST /api/run_now` of 31,275 releases |
-| Page cache of the service | `memory.current` 2.0 GB with `file` 1.9 GB against `anon` 68 MB; peak 4.5 GB, all `file` | 2067 · 2026-10-28 | cgroup `memory.stat`; the pid's own RSS is the figure above |
-
-The large number shown by `systemctl status` is **page cache, not the process**. It is
-reclaimable, it drops by itself during a cycle (302 MB → 69 MB as the heap grew) and a
-restart of the unit recreates the cgroup and takes it back to ~0.3 GB. `MemoryMax` on the
-unit would count it, so a limit, if one is ever set, must leave room for it.
-
-### 3.3 Web UI and feed archive
-
-| | Current figure | Build · date |
-|---|---|---|
-| CPU per request | Series **37 ms**, log tail **5 ms**, dashboard **18–19 ms**, archive **39–40 ms**, downloads **10 ms** | 2038 |
-| Transfer, gzipped | dashboard **8.0 KB**, downloads **12.3 KB**, archive **38.8 KB**, maintenance **17.2 KB**; CSS and JS **75.3 KB**, cached immutable | 1945 |
-| Rows refresh (gx-torrent page) | **9,831 B per tick** (3,432 B JSON + 6,399 B notable), about 1.7 KB per row | — |
-| Feed archive | **258 MB**, **307,477 rows**, one row per torrent (infohash) | 2026-10-21 |
-| Archive insert | **42.72–44.06 ms per 1,000 releases** (3.19 MB, 50,534–50,538 allocs) | 2026-11-02 |
-| Archive search (standalone) | **7.86–8.06 ms** on 100,000 releases | 2026-11-02 |
-| Archive API page (100 rows) | **7–23 ms** | — |
-| Prometheus scrape | **193.7–204.2 µs, 121 KB, 813 allocs**, computed only when scraped | 2026-11-02 |
-| Media integrity targets (5,000 episodes) | **112.3–115.2 µs/op** (2.2 KB, 45 allocs) | 2026-11-02 |
-| Media integrity detail (64 KiB of ffmpeg lines) | **149.8–153.0 µs/op** (64.4 kB, 403 allocs) | 2026-11-02 |
-
-### 3.4 Network and swarm
-
-| | Current figure | Reproduce with |
-|---|---|---|
-| Real swarm throughput | **9.3–9.4 MiB/s** on the Ubuntu ISO over an FTTC 100/15 line, against 6.3–7.1 MiB/s of libtorrent on the same swarm | `make measure-realswarm` |
-| Real-swarm sessions | 276 MB in 90 s (75 peers), 793 MB in 180 s (80 peers), 1.08 GB in 180 s (85 peers), `utp_syn_drops` 0 | `make measure-realswarm` |
-| DHT (5-minute run) | **389 nodes**, 5,128 queries, 1,798 replies (**35.1 %**), 2,091 dropped, 1,331 reflected, `subnet_share_max` 5, `nodes_insecure_id` ~32 %; `peers_confirmed_multi` 0, the infohash lookup returned 0 peers in this run | `GX_MEASURE_DHT=5m make measure-dht` |
-| Merge on real data | **25.0 % from the network** (Debian and Arch ISOs), also after a restart and in any add order | `TestMeasureMergePhase3` |
-| Indexer lanes | 30 titles, 6 at a time: **110 s**, 205/0 requests, 5,935 releases (aggregate: 450 s, 35/25, 2,737) | `TestMeasureManagerLanes` |
-| Latency guard | alone **8,503 KiB/s kept**; with a competing download the other device gets **+55 %** (router counters) or **+66 %** (trials only) | `TestMeasureLatencyGuard` |
-| Local swarm | **3.00× corpus** in 11 ms, 2 MiB and 3 leechers | `make measure-seeding` |
-| Choking, real libtorrent leecher | **50,331,648 bytes (100 % of the file) in 4.832 s** | `make measure-choking` |
-| Pipelining at RTT 50 ms, 256 KiB pieces | **303 KiB/s** with one block in flight, **6,743 KiB/s** with the default queue; on loopback **162–163 MiB/s** at shallow, default and deep depth | `make measure-pipeline` |
-
-### 3.5 Many files in one torrent
-
-`TestMeasureManyFiles` opens a torrent of 4 KiB files already on disk, under
-`systemd-run --user --scope -p MemoryMax=6G -p CPUQuota=200%`, niced and ioniced,
-`GOMAXPROCS=2`:
-
-| Files | Descriptors while running | After a stop | Check of the data on disk |
-|---|---|---|---|
-| 500 | +500 | back to the base | 94 ms |
-| 2,000 | +2,000 | back to the base | 150 ms |
-| 5,000 | +5,000 | back to the base | 137 ms |
-| 12,000 | +12,000 | back to the base | 361 ms |
-| 20,000 | +20,000 | back to the base | 406 ms |
-
-`TestMeasureManyFilesDownload` serves a torrent of many files from a second daemon over
-loopback (sizes spread ±50 % around the average, 512 KiB pieces spanning several files),
-nothing throttled; CPU and RSS are the two daemons together:
-
-| Files | Size | Seeder check | Download | Average | CPU | Peak RSS | Peak descriptors | Host load (max) |
-|---|---|---|---|---|---|---|---|---|
-| 1,000 | 0.15 GiB | 1.4 s | 1.9 s | 85 MB/s | 0.65 core | 100 MiB | 2,013 | 0.6 |
-| 6,000 | 0.92 GiB | 5.8 s | 7.9 s | 125 MB/s (peak 140) | 0.88 core | 114 MiB | 12,015 | 1.5 |
-| 6,500 | 3.72 GiB | 10.2 s | 23.8 s | 168 MB/s | 1.37 cores | 121 MiB | 13,015 | 1.7 |
-
-The host stayed responsive throughout: available memory never moved from ~11.2 GiB and
-the load stayed under 2. Thousands of files cost neither memory nor speed: the rate is
-the loopback single-pair ceiling of §3.1.
-
-### 3.6 Gextto on a Synology DS420j (trial, not a supported target)
-
-Machine: DS420j, Realtek RTD1296 (4 × Cortex-A53), 987 MB RAM, DSM 7.4.1, kernel 4.4,
-ext4 on HDD RAID, Surveillance Station running. 2026-11-01, Gextto 1.2.2174, gx-torrent
-1.1.294, cross-compiled `linux/arm64`, run as a plain user with `nice -n 10` and
-`GOMEMLIMIT=250MiB`, no `systemd-run`, sampled every 10 s from `/proc`. Before the trial:
-~370 MB available, 297 MB of swap in use.
-
-| Phase | gexttod RSS | gx-torrent RSS | Min. MemAvailable | Swap | CPU busy | iowait |
+| Client | Speed | Time | CPU (% of a core) | CPU per GiB | Peak own memory | Peak RSS |
 |---|---|---|---|---|---|---|
-| Idle, IP filter loaded (162,155 rules) | 37–66 MB | 20–21 MB | 318 MB | 302 MB | 3–7 % | 0–7 % |
-| Search cycle: 4 titles, 1,703 releases, 49 s, remote indexer | 66 MB peak (whole phase) | 129 MB | 240 MB | 306 MB | 20 % peak | 22 % peak |
-| Download: 6 large torrents, ~2 min | 37 MB | 209 MB | 160 MB | 316 MB | 19 % peak | 48 % peak |
-| Download: 4 torrents, 8 min, 8–9 MB/s total, 16 MB/s disk peak | 38 MB | 90 MB | 290 MB | 319 MB | 14 % avg, 19 % peak | 6 % avg, 28 % peak |
+| Deluge | 10.68 MB/s | 50.3 s | 30 % | 30.2 s | 39 MiB | 575 MiB |
+| qBittorrent | 10.57 MB/s | 50.8 s | 26 % | 26.9 s | 9.5 MiB | 543 MiB |
+| Transmission | 9.52 MB/s | 56.4 s | 14 % | 16.3 s | 9.6 MiB | 24 MiB |
+| gx-torrent | **6.90 MB/s** | 77.8 s | 15 % | 22.7 s | 36 MiB | 50 MiB |
+| *gx-torrent with the fix below* | *11.16 MB/s* | *48.1 s* | *19 %* | *18.2 s* | *40 MiB* | *56 MiB* |
 
-One pass on public swarms: the 9 MB/s is what those swarms and this line gave, not a
-ceiling of the NAS. Not measured: seeding, post-processing of completed files, operation
-over several days. `ffprobe` is missing on DSM, so the MediaInfo backfill stays paused.
+### The same line, uTP only
 
-### 3.7 Build, tests and CI
+The same four peers with TCP blocked at the peer.
 
-Build and test costs on the reference machine of §1. The build figures were measured on
-2026-10-17, the test-suite figures on 2026-10-22 and the counts on 2026-11-02: the
-hardware changes them, and a GitHub runner has fewer cores than this machine.
+| Client | Speed | Time | CPU (% of a core) | CPU per GiB | Peak own memory | Peak RSS |
+|---|---|---|---|---|---|---|
+| Deluge | 11.66 MB/s | 46.1 s | 43 % | 39.7 s | 39 MiB | 575 MiB |
+| qBittorrent | 11.59 MB/s | 46.3 s | 40 % | 37.0 s | 9.7 MiB | 543 MiB |
+| Transmission | 9.60 MB/s | 55.9 s | 23 % | 25.4 s | 9.2 MiB | 24 MiB |
+| gx-torrent | **6.88 MB/s** | 78.1 s | 45 % | 69.3 s | 44 MiB | 59 MiB |
+| *gx-torrent with the fix below* | *11.14 MB/s* | *48.2 s* | *59 %* | *56.6 s* | *49 MiB* | *64 MiB* |
 
-**Build.**
+uTP is where gx-torrent spends the most: about 1.5 times the CPU per GiB of the libtorrent
+clients even with the fix, and 1.7–1.9 times without it.
 
-| Operation | Command | Time |
-|---|---|---|
-| Everything from scratch (cold Go cache; `gexttod` + `gx-torrent` probe) | `go clean -cache && make build` | **42.5 s** |
-| One package changed, plus the link | `make fast` | **7.1 s** |
-| Nothing to do (warm cache) | `make fast` | **1.1 s** |
-| Only the gx-torrent daemon | `make gx-torrent` | **0.5 s** |
+### A bug found by this comparison
 
-`make build` is pure Go (`CGO_ENABLED=0`). It increments Gextto's `build_number` and,
-when the engine's code changed, also `gx-torrent.build_number`; it replaces
-`bin/gx-torrent` only when its code changed (hash comparison,
-`bin/gx-torrent.code-sha256`). `make gx-torrent` builds only the daemon and bumps only
-its own number. The cold figure is dominated by compiling the engine and the daemon; the
-incremental one is the changed package plus the link.
+During the line runs gx-torrent is connected to only two of the four peers for the first
+60 s; the other two appear at the next tracker announce. The address list is ordered by
+BEP 40 priority alone, so two addresses with the same priority overwrite each other. While the
+client does not know its own IP, the BEP 40 mask makes `.20` and `.22` identical, and `.21` and
+`.23`: exactly the two peers that go missing.
 
-**Test suite.** What there is to run:
+A throwaway build that breaks the tie on the address gave **11.14–11.19 MB/s** over TCP and
+**11.13–11.22 MB/s** over uTP (three rounds each, same setup). Those rows are in italics
+because that build is not the code in the repository: the fix is an open item in
+[`todo.md`](todo.md). The loss on a public swarm was not measured. It should be smaller there,
+because few addresses collide and a large swarm has other peers to take over.
 
-| | |
-|---|---|
-| Go test functions | **2,866** |
-| Go benchmarks | **83** |
-| `_test.go` files | **548** |
-| Go packages | **93**, of which **69 with tests** |
-| Separate module `internal/dht` | tested by `make test-dht`, outside `go test ./...` |
-| Playwright end2end tests (`uiweb/end2end`) | **80** |
+### Recheck and upload
 
-“Cold build cache” means `go clean -cache` first, so the whole suite is recompiled;
-`-count=1` disables the test result cache, so every test runs. The shortening of the
-waits that only pace real servers is in §2.6.
+Both start from the same 4 GiB file with the disk cache dropped: first an explicit recheck,
+then an upload to one unshaped reference peer.
 
-| Round | Command | Time |
-|---|---|---|
-| Go tests, cold build cache, every test run | `go clean -cache && CGO_ENABLED=0 go test -count=1 ./...` | **117.0 s** |
-| Everything, one process | `make test-serial` | **34 s** |
-| Everything, root package in 4 processes | `make test` | **22–24 s** (35 s with the test binary rebuilt) |
-| Full guard round, warm test cache | `make test` | **15 s** |
-| Browser suite | `make test-ui` | **63–72 s** |
+| Client | Recheck | CPU | Upload speed | CPU per GiB | Peak own memory | Peak RSS |
+|---|---|---|---|---|---|---|
+| Transmission | **3.9 s** (1,098 MB/s) | 2.6 s | 131 MB/s (130–144) | 2.87 s | 35 MiB | 50 MiB |
+| Deluge | 4.6 s (940 MB/s) | 3.3 s | **238 MB/s** (237–292) | 2.48 s | 44 MiB | 4,101 MiB |
+| qBittorrent | 5.6 s (765 MB/s) | 3.4 s | 223 MB/s (192–262) | 2.58 s | 13 MiB | 4,103 MiB |
+| gx-torrent | 8.8 s (488 MB/s) | 4.0 s | 125 MB/s (115–125) | 4.79 s | 58 MiB | 73 MiB |
 
-`make test` is `check-ui` (`scripts/check-ui-settings-index.sh`) + `check-scripts`
-(`bash -n`, plus `shellcheck` when installed) + `installer-test`
-(`scripts/installer-selftest.sh`) + `test-dht` + `go test ./...` through
-`scripts/go-test-sharded.sh`. The scripts cost a few seconds together; the rest is the
-Go suite. `make test-ui` builds the daemon, starts it in dry-run and drives the real UI
-in Chromium; the first-start wizard is completed by the harness
-(`uiweb/end2end/global-setup.ts`), so an empty data dir works.
+gx-torrent's API reports a state change 1–3 s late, which inflates its recheck time; the CPU
+column shows it is still the most expensive, but by less than the wall time suggests.
 
-**CI (GitHub Actions).** Whole-run wall times and per-job durations of the reference
-runs on `main` of 2026-10-17; the jobs run in parallel, so the wall time is shorter than
-the sum. The runners are `ubuntu-24.04` (x86_64) and `windows-latest`, with **2 vCPUs**
-each; Linux releases are built in the `ubuntu:22.04` container (glibc 2.35) and, for
-aarch64, on `ubuntu-24.04-arm`.
+### 100 torrents
 
-| Workflow | When | Wall | Jobs |
-|---|---|---|---|
-| `ci.yml` | push and PR | **411 s** | *vet and test (x86_64)* 264 s · *UI end2end (Playwright)* 114 s · *gx-torrent platform tests (Windows)* 74 s · *gx-torrent service install (Windows)* 86 s (non-blocking) · *container image (x86_64)* 45 s · *race detector (x86_64)* 391 s (non-blocking) |
-| `continuous.yml` | push to `main` | **278 s** | *test* 160 s · *package (x86_64)* 100 s · *package (aarch64)* 81 s · *publish continuous* 11 s |
-| `codeql.yml` | push, PR and weekly | **210 s** | *analyze (go)* 207 s |
-| `release.yml` | tag | — | no run in the period; *test* + matrix *package* in the `ubuntu:22.04` container, with the Windows packages alongside |
+A hundred torrents of 2 MiB each, with their files already in place: time to add them, time
+until all are seeding, then 60 s at rest and the time to come back after a restart.
 
-`continuous.yml` and `release.yml` publish **6 packages** plus `release.json`:
+| Client | Add | All seeding | Restart | CPU at rest | Own memory | RSS |
+|---|---|---|---|---|---|---|
+| Transmission | 0.9 s | **0.9 s** | **0.2 s** | 0.29 % | 4.2 MiB | 19 MiB |
+| gx-torrent | 1.5 s | 3.4 s (3–24) | 0.5 s | 0.67 % | 14 MiB | 29 MiB |
+| Deluge | 3.4 s | 3.4 s | 1.0 s | 0.33 % | 42 MiB | 68 MiB |
+| qBittorrent | 0.9 s | 100.5 s | 0.5 s | **0.06 %** | 90 MiB | 119 MiB |
 
-- `gextto-linux-x86_64.tar.gz`;
-- `gextto-linux-aarch64.tar.gz`;
-- `gx-torrent-linux-x86_64.tar.gz`, `gx-torrent-linux-aarch64.tar.gz`;
-- `gx-torrent-windows-amd64.zip`, `gx-torrent-windows-arm64.zip`.
+One gx-torrent round took 24 s to reach seeding where the other two took 3 s; its cause was
+not investigated. Transmission reaches seeding at once because it trusts existing files
+until asked to recheck.
 
-**How these were measured.**
+### What these numbers do not say
 
-- Build: `go clean -cache` before the cold measurement, `time make …` for the others;
-  the incremental figure changes one statement in a non-test package and restores it.
-- Tests: `time` around `go test -count=1 ./...` (no test result cache), with
-  `CGO_ENABLED=0`; the cold figure also runs `go clean -cache` first. `make test` is
-  measured with the test cache valid and again after a change that invalidates it.
-- CI: `gh run view <id> --json createdAt,updatedAt,jobs`, with the wall time as
-  `updatedAt - createdAt` and each job as `completedAt - startedAt`; the reference runs
-  are CI 39048101228, continuous 39049025870 and CodeQL 39049025808.
+- **No ranking on a real swarm.** These runs use few peers, no encryption from the peers and
+  no discovery. Behaviour among hundreds of peers, choking included, is not measured here.
+- **Settings are defaults**, with three exceptions the setup needs: discovery off everywhere,
+  a fixed peer port, and Transmission's uTP off in the TCP scenarios (it otherwise waits on
+  uTP against a TCP-only peer).
+- **Transmission is a beta**, the version Debian 13 ships.
+- **Small differences are not results.** A gap inside the ranges above means nothing.
+- **Deluge's web front end** runs in a separate container, so its CPU and memory are not
+  counted. Two Deluge runs failed on a harness error (the web front end was not yet connected
+  to the daemon); they were repeated after the fix, with the same image.
 
-To reproduce:
+## How to repeat the comparison
 
 ```bash
-go clean -cache && time make build            # pure build from scratch
-time make fast                                # one change + link (warm cache)
-time (CGO_ENABLED=0 go test -count=1 ./...)   # every test, warm build cache
-time make test                                # guard round
-time make test-ui                             # browser suite
+make measure-compare     # about two hours; the machine must be otherwise idle
+python3 scripts/compare/run.py report --tag <tag>
 ```
 
-## 4. Benchmark reference
+The rule is in [`AGENTS.md`](https://github.com/buzzqw/gextto/blob/main/AGENTS.md), *Build
+and test*: same torrents (generated from a fixed formula, info hashes pinned in
+`scripts/compare/run.py`), same pinned images (`scripts/compare/Dockerfile`), same limits,
+quiet host, three interleaved rounds. Results are written to
+`gextto-data/bench/compare.jsonl`. Changing the machine, a version, a limit or a payload
+starts a new baseline: run every client again and replace every table above.
 
-Micro-benchmarks with `-benchmem`. **Round of 2026-11-02**: the machine of §1, commit
-`0d324ab5`, `GOMAXPROCS=2`, six runs per benchmark (`make bench-all`), host at rest with
-the automatic file-integrity check off. The figure is the median, the range is the six
-runs. The raw log and the `benchstat` table are in `gextto-data/bench/`
-(`latest.txt` and `latest-benchstat.txt`).
+## Gextto and gx-torrent on their own
 
-| Benchmark | Current figure | Note |
+Same N97 machine, outside Docker unless stated. Dates are in the text only when they differ
+from the most recent round (October–November 2026).
+
+### Footprint
+
+| What | At rest | Under load |
 |---|---|---|
-| `BenchmarkEngineLoggerFiltered` vs `Forwarded` | **27.9–28.3 ns/op, 40 B, 1 alloc** vs 621.8–667.1 ns/op, 424 B, 6 allocs | the level methods check the threshold before `fmt.Sprint`/`Sprintf`; the remaining alloc is the variadic slice of the call |
-| `BenchmarkBlocked` (IP filter) | 19.5–21.0 ns/op, 0 allocs | sorted merged intervals with binary search |
-| `BenchmarkLoad` (IP filter, 172,000 rules) | **30.03–35.62 ms, 6.62 MB, 32 allocs** | ranges parsed on the bytes of the line; `FuzzParseCIDRMatchesReference` holds it to the old parser |
-| `BenchmarkV2HighlightLogLine` vs `…Regexp` | **739.8–794.5 ns, 576 B, 2 allocs** vs 60.9–63.0 µs, 2.3 KB, 18 allocs per line | output identical on the live log and a 45 s fuzz |
-| `BenchmarkSeedDefaultTranslationsReseed` | **2.52–2.65 ms, 2.61 MB, 34 allocs** | a restart with unchanged catalogs only hashes them |
-| `BenchmarkPickerRarestSteady` | 13.8–60.6 ns/op, 0 allocs | rarest pick with an early exit |
-| `BenchmarkPickerRarestManyPeers` (150 peers) | 9.8–11.8 µs/op, 0 allocs | one rarest pick in a dense swarm |
-| `BenchmarkPickerDisconnect` (27,250 pieces) | 94.4–104.7 µs/op, 0 allocs | one peer departure on the torrent loop |
-| `BenchmarkPickerBitfieldManyPeers` (4,000 pieces, 150 peers) | 32.7–36.5 µs/op, 512 B, 1 alloc | a new peer's bitfield arriving, then its departure |
-| `BenchmarkPickerSequentialNearlyDone` | 4.5–5.5 ns/op | one sequential pick near the end of a download |
-| `BenchmarkPickerFileEdgeFullScan` | 39.9–59.2 µs/op, 0 allocs | a full scan for the next file edge |
-| `BenchmarkPickerSmallestGapWebseeds` (15,000 pieces) | 86.8–88.7 µs, 0 allocs per pick | gaps into reused buffers, pieces read in place, counting sort on the gap length |
-| `BenchmarkTickUnchokeSeeding` | 919.8–985.1 ns/op, 896 B, 1 alloc | unchoker tick with 50 synthetic peers |
-| `BenchmarkPrefillFromUnrelatedV2` (16 candidates) | 1.6 µs/op, 224 B, 18 allocs | one-shot cost of the Phase 2 merge scan |
-| `BenchmarkMergeCandidatesUnrelated` (32 torrents) | 283.4–300.3 ns/op, 0 allocs | filter paid when nothing is reusable |
-| `BenchmarkNewConnID` (uTP) | 26.5–28.1 ns/op, 0 allocs | no 64K-entry table per dial |
-| `BenchmarkTransferLoopback` (uTP, 16 KiB block) | **178–188 MB/s**, 4.0 KB, 75 allocs | connection-id probe, lazy `Event` channels, reusable read window, `netip.AddrPort` key, one RTO timer per connection |
-| `BenchmarkUTPConnRemoteAddr` | 102.1–105.5 ns/op, 40 B, 3 allocs | addresses converted once at wrap |
-| `BenchmarkPeerReaderRequests` | **400–420 ns and 2 allocs per message** | 4,096 messages per op (1.64–1.72 ms); the fixed-size bodies are read into stack arrays |
-| `BenchmarkPeerWriterRequests` / `…RequestsTCP` (250 requests) | 643.5–667.9 µs / **248.0–256.1 µs** per refill, 16.0 KB, 500 allocs | small messages batched into one `Write` |
-| `BenchmarkRequestRelease` | 1.7–1.8 µs/op, 112 B, 1 alloc | one request/release of the resource manager |
-| `BenchmarkUpdateInterestNothingWanted` | 2.9–3.0 µs/op, 0 allocs | one interest update with nothing wanted |
-| `BenchmarkValidBencode` (DHT) | 129.4–133.5 ns/op, 0 allocs | valid input accepted by the bencode screen |
-| `BenchmarkV1FilesMatchNoMatch` | 8.2–8.7 ns (1 file), 286.5–345.6 ns (8), 3.0–3.1 µs (64), 96.8–107.4 µs (2,000) | merge file match; the 2,000-file case allocates 109 KB and 9 allocs |
-| `BenchmarkPlainSyncCleanSkipped` vs `…Fdatasync` | **7.1–7.3 ns** vs 215.1–223.9 ns | the dirty flag is clear: no syscall on a clean file |
-| `BenchmarkStorageWrite` / `StorageWriteMmap` | **5.52–5.61 / 7.03–7.20 GB/s** | far above any network speed: `O_DIRECT` and io_uring are not justified |
-| `BenchmarkMmapSyncRanged` / `…Whole` | 9.4–9.7 / 9.4–9.8 µs, 27.1–27.8 / 26.8–27.8 GB/s | ranged and whole mapping sync through the page cache |
-| `BenchmarkMmapSyncRangedClean` / `…WholeClean` | 14.1–15.7 ns / 263.8–271.4 ns | a clean mapping costs no writeback |
-| `BenchmarkPieceWriterRunV2` (4 MiB piece) | **1.97–2.06 ms, 2039–2124 MB/s, 32.8 KB, 12 allocs** | one hash per piece; `BenchmarkPieceWriterRunV1` 1.60–1.64 ms, 2557–2627 MB/s, 232 B, 3 allocs |
-| `BenchmarkCacheGetHit` / `…HitParallel` | **338.9–353.5 ns, 0 alloc, 0 B**; parallel 724.4–860.3 ns/op | the read path of every uploaded block |
-| `BenchmarkSaveStateLocked` (torrents=…) | **0.465–0.504 ms** at 100, **4.27–4.96 ms** at 1,000, **19.81–24.87 ms** at 5,000, **16.10–16.61 ms** at 1,000 with 20,000 feed entries | one `state.json` save, the work done while holding `d.mu` |
-| `BenchmarkPieceDownloaderLifecycle` (4 MiB piece, 256 blocks) | 211.7–217.2 µs/op, **18.1 KB and 15 allocs per piece** | the time is almost all the 4 MiB copy into the piece buffer |
-| `BenchmarkArchiveSaveBatch` (1,000 releases) | **42.72–44.06 ms, 3.19 MB, 50,534–50,538 allocs** | prepared statements per chunk |
-| `BenchmarkFeedArchiveSearch` (100,000 releases) | 7.86–8.06 ms | compact index on bbolt |
-| `BenchmarkMetricsScrape` (one torrent) | **193.7–204.2 µs, 121 KB, 813 allocs** | computed only when scraped |
-| `BenchmarkMediaIntegrityTargets` (5,000 archived episodes) | **112.3–115.2 µs/op, 2.2 KB, 45 allocs** | one target per call; the `ffmpeg` decode dominates the run |
-| `BenchmarkMediaIntegrityDetail` (64 KiB of ffmpeg lines) | **149.8–153.0 µs/op, 64.4 kB, 403 allocs** | building the readable detail from the stderr buffer |
-| `BenchmarkRescore` (2,000 torrents) | **54.87–56.93 ms/op, 6.16 MB, 82,226–82,229 allocs** | one full re-score |
-| `BenchmarkFindSeriesMatchUnmatched` / `…Matched` | **121.8–126.3 / 132.9–138.4 µs/op** | 500 series, one alias each |
-| `BenchmarkEngineListSnapshot` (2,000 torrents) | **516.0–543.9 µs/op, 1.02 MB, 1 alloc** | one read of the torrent snapshot |
-| `BenchmarkEngineSnapshotTwelveCalls` (2,000 torrents) | **4.63–4.95 ms, 12.29 MB, 12 allocs** | the twelve reads of one tick |
-| `BenchmarkArchiveGaps` (50 series, 2 seasons, 40 episodes each) | **4.54–4.73 ms/op, 514.7 KB, 17,164 allocs** | one gap calculation |
-| `BenchmarkSyncArchiveFileScored` (existing episode, file present) | 141.2–146.2 µs/op, 3.7 KB, 103 allocs | single-record path, one commit on purpose |
-| `BenchmarkSyncArchiveFilesScored` (500 files of one series) | **9.86–10.14 ms = 19.7–20.3 µs/file** | one transaction per series |
-| `BenchmarkArchiveMovieQualityPerCall` / `…WalkPerCandidate` / `…PerCandidate` (200 candidates) | 16.76–17.44 s, 426–433 MB / 335.93–350.56 ms, 78.6–79.9 MB / **136.01–142.51 ms, 2.86–2.94 MB** | the old per-call walk, then one walk per candidate, then one walk per cycle; the last is the current code |
-| `BenchmarkArchiveReadDuringFullScan` (50,000 releases) | **54.7–58.1 µs/op, 14.1–14.8 KB, 243–254 allocs** | a short read while a full scan runs |
-| `BenchmarkRegisterTorrentScoredFirstAdd` / `…RepeatQueued` / `…AfterCompletion` | **119.2–123.9 / 120.9–126.1 / 258.2–265.6 µs** | dominated by SQLite's per-statement cost on this disk |
-| `BenchmarkQuarantinedTorrentLinks` (300 rows) | 349.3–361.5 µs/op, 88.3 KB, 2,732 allocs | one query per cycle, not one per release |
-| `BenchmarkSeedPolicyPass` (10 seed rules, 100 torrents) | 40.2–46.0 µs/op, 5.2 KB, 128 allocs per pass | plus one `torrent_meta` query only when rules exist |
-| `BenchmarkMergeDuplicateReleases` (24,000 releases, 8,000 copies) | 40.52–42.15 ms/op, 50.21 MB, 192,198 allocs | one pass per cycle and per search |
-| `BenchmarkNamingTags` (audio + HDR label) | 11.0–11.6 µs/op, 2.1 KB, 33 allocs | once per episode at the 6-hour library check |
-| `BenchmarkParseQuality` | 748.4–792.9 µs/op, 24.9 KB, 399 allocs | the quality parser on one release name |
-| `BenchmarkSearchProgressFanOut` (one indexer) | 187.8–193.7 µs/op (cycle) and 189.6–196.5 µs/op (panel), 19.3 KB, 293 allocs | what following a manual episode search adds to its fan-out |
-| `BenchmarkReleaseScore` / `AcquisitionScore` | 829.1–860.5 / 850.2–874.7 ns/op, 288 B, 4 allocs | one score for the acquisition decision |
-| `BenchmarkPayloadContentPath` / `…NoSubfolder` | 165.7–173.5 ns, 64 B, 1 alloc / 1.8 µs, 0 allocs | the `content_path` every list refresh computes per torrent |
-| `BenchmarkAutoSpeedUpdate` | **41.6–43.2 ns/op, 0 B, 0 allocs** | one controller step, the work of the queue tick every 3 s; the TCP probe is outside |
-| `BenchmarkCriteriaMatch` (RSS rule, 4 names) | 144.6–149.7 ns/op, 0 B, 0 allocs | scans the title in place |
-| `BenchmarkRateHistoryAdd` / `LifetimeAccumulate` | 35.2–36.9 ns/op, 20 B / 6.9–7.3 ns/op, 0 allocs | the statistics page costs nothing on the sampling path |
-| `BenchmarkRateHistorySnapshot1h` / `StatsPageTranslate` | 11.2–12.9 µs, 20.5 KB, 1 alloc / 264.8–275.8 µs, 97 KB, 2,124 allocs | one snapshot and one page translation per graph request |
-| `BenchmarkV2TranslateHTML` | 363.6–369.5 µs/op, 128.6 KB, 4,249 allocs | one page translation |
-| `BenchmarkV2FormatCell` | 2.1–2.2 µs/op, 928 B, 18 allocs | one table cell |
-| `BenchmarkV2RenderTableFragment` | 1.13–1.23 ms/op, 181.0 KB, 5,798 allocs | one table fragment |
-| `BenchmarkV2RenderShell` | 481.5–501.0 µs/op, 162.2 KB, 3,724 allocs | one page shell |
-| `BenchmarkDLNAArtThumb` | 36.90–38.20 ms/op, 4.12 MB, 24 allocs | one thumbnail; the image work dominates |
-| `BenchmarkHasAnyNotIn` (bitfield) | 3.3–3.5 ns/op, 0 allocs | one check against the peer's bitfield |
+| gx-torrent, live (DHT on, 172,740 IP filter rules, 3 seeds) | 0.93–0.98 % of a core, 29–32 MB RSS | 18–37 % of a core at 8.2–8.8 MB/s with 116–132 peers, 2.0–4.3 s of CPU per 100 MB |
+| gx-torrent, 10 torrents to a NAS | | about 507 MB outside the two caches, 1.1 GB peak with the NFS write cache |
+| gexttod | 0.46 % of a core, 71 MB RSS | 232 MB RSS during a cycle of 31,275 releases, back to 65 MB after it |
 
-### 4.1 Seed mode: cost of the lazy check
+- **After a burst** the daemon returns its piece buffers: with 7 torrents and no transfer the
+  RSS falls from 550 MB to 35–40 MB.
+- **`systemctl status` shows a large number** (2.0 GB, peak 4.5 GB) that is page cache, not
+  the process; `anon` is 68 MB. A `MemoryMax` on the unit would count it, so it must leave
+  room for it.
+- **At rest gexttod** opens no directory and writes nothing to the NAS, so its disks can spin
+  down.
+- **Where the CPU goes under load** (five public ISOs): about 50 % syscalls and scheduler
+  wake-ups, 9–10 % MSE encryption, 5–7 % piece hashing, 2–3 % TLS of web seeds, 9 % the piece
+  picker with about 200 peers.
 
-A torrent added in seed mode hashes a piece the first time a peer asks for it: the first
-block of that piece waits for one read of the whole piece and its SHA-1, then the piece
-is served from the read cache like any other. The table measures that wait with the file
-in the page cache (the CPU side; a cold read adds the disk time of one piece),
-`GOMAXPROCS=2`:
+### Peer cap
 
-| Piece size | Wait before the first block | Throughput | Heap per check |
-|---|---|---|---|
-| 256 KiB | **188.6–208.9 µs** | 1.26–1.39 GB/s | 262.3 KB, 3 allocs |
-| 1 MiB | **677.7–692.9 µs** | 1.51–1.55 GB/s | 1.05 MB, 3 allocs |
-| 4 MiB | **3.34–3.43 ms** | 1.22–1.26 GB/s | 4.19 MB, 3 allocs |
-| 16 MiB | **12.77–12.88 ms** | 1.30–1.31 GB/s | 16.78 MB, 3 allocs |
+CPU follows established peers (about 0.1 % of a core each) far more than bytes, when the line
+is the limit. The daemon sizes the cap from the machine: **55 per torrent and 300 in all** on
+this host. With nine public torrents, two interleaved rounds: **36 % fewer peers and 12 % less
+CPU** than a fixed 55 per torrent, for 4 % fewer bytes, inside the ±10 % spread between rounds.
 
-Each piece pays it once per seed-mode session; at most 4 checks run at once per torrent,
-so the transient heap is bounded by 4 pieces. The full check that seed mode skips reads
-and hashes the whole torrent before the first byte is served.
+### Real swarms and the home line
 
-Reproduce with
-`go test -run '^$' -bench BenchmarkSeedModeLazyHash -benchmem -count=6 ./internal/gxcore/torrent/`.
+| What | Result | Command |
+|---|---|---|
+| Ubuntu ISO on an FTTC 100/15 line | **9.3–9.4 MiB/s**, libtorrent 6.3–7.1 MiB/s on the same swarm; one campaign, so not a ranking | `make measure-realswarm` |
+| Sharing the line (latency guard) | alone 8,503 KiB/s kept; another device downloading gets 55–66 % more | `TestMeasureLatencyGuard` |
+| Public DHT, 5 minutes | 389 nodes, 35.1 % of queries answered, no concentrated subnet | `make measure-dht` |
+| Real libtorrent leecher, loopback | the whole 50 MiB file in 4.8 s | `make measure-choking` |
+| Request queue at 50 ms RTT | 303 KiB/s with one block in flight, 6,743 KiB/s with the default queue | `make measure-pipeline` |
+| Local swarm, 3 leechers | 3.00× the file uploaded; with leechers meshed the seed drops to 1.84× | `make measure-seeding` |
+| Indexers, 30 titles | 110 s, 205 requests, 0 failed, 5,935 releases; the old aggregate took 450 s, 35 answered, 25 failed, 2,737 releases | `TestMeasureManagerLanes` |
 
-## 5. Investigations and decisions
+The real-swarm figure comes from one campaign and predates the [address bug](#a-bug-found-by-this-comparison).
 
-Each entry states the question, the numbers that answered it and the decision. The
-figures are the latest; the benchmark and the command are in §3 and §4.
+### Reusing local data
 
-### 5.1 Engine CPU and memory
+A torrent sharing files with one already on disk fetches only what is missing. Real Debian
+(756 MiB) and Arch (1.5 GiB) ISOs, source 75 % complete, one source piece in four corrupted:
+**25.0 % from the network**, every piece verified, in 1.31 s and 2.71 s. The result is the
+same after a restart, when the sibling is added later, and with a real libtorrent seeder. With
+nothing to reuse the filter costs 265 ns over 32 torrents. `make measure-merge3`.
 
-**Current figures** (load test, 9–10 releases, Auto speed, a collector every 5 s and a
-CPU profile at ≥ 8 MB/s): at rest 29–32 MB RSS and under 1 % of a core (§3.1); under
-load 44–48 % of a core at 8–9 MB/s with ~110–130 peers; **5.3 % of a core per MB/s and
-0.35–0.43 per peer**; memory under load RssAnon peak ~1.1 GB with 10 torrents and the
-NFS write cache, ~507 MB outside the two caches; the piece picker is 9 % of the profile.
+### Many files in one torrent
 
-**Choices behind these figures.** The read path uses a progress-based deadline, so a dead
-uTP connection fails at once instead of looping; the socket handles each datagram in the
-receive buffer and copies only what stays queued; `waitEvents` is a plain select. The IP
-filter keeps the parsed rules instead of the file, `GOGC=50` trims the heap headroom, and
-the buffers of a finished burst are released. The collector costs 0.5 %
-(`gcBgMarkWorker`) and 2.2 % (`mallocgc`) of the profile. After 5 minutes with the total
-transfer rate below the queue's slow rate the daemon calls `debug.FreeOSMemory` (at most
-every 10 minutes) to return the 1 MB piece buffers that the per-torrent `sync.Pool`s
-would otherwise keep reachable until the next collection: the RSS goes from 550 MB to
-35–40 MB with 7 torrents and no active transfer.
+Over loopback from a second daemon (`TestMeasureManyFilesDownload`), CPU and memory of both
+daemons together:
 
-**Where the CPU goes** (five public ISOs together, 180 s, production tick): syscalls and
-the Go scheduler's wake-ups about 50 % (one goroutine per connection, every segment that
-arrives), RC4 of the MSE stream 9–10 %, SHA-1 piece checks 5–7 % (with SHA-NI), TLS of
-the HTTPS webseeds 2–3 %: costs of the protocol and of the traffic itself. What was the
-engine's own: zeroing every pool buffer before use (1.9 %), now skipped where the buffer
-is overwritten whole — a block read with `io.ReadFull`, a piece whose blocks cover it
-(pieces with BEP 47 padding are still zeroed, `TestPaddedTorrentTransfer`); and the
-webseed pick, which allocated and sorted the gap list for every peer pick (2.4 %, 3×
-cheaper now). The statistics the tick reads sum the done bytes with a popcount of the
-bitfield when no file is skipped, instead of a test per piece. The public runs of the
-same binary spread from 2.0 to 4.3 s per 100 MB with the peers and uTP share they get, so
-the gain is stated by the profile share and the micro-benchmarks, not by a throughput
-figure.
+| Files | Size | Download | Average | CPU | Peak RSS |
+|---|---|---|---|---|---|
+| 1,000 | 0.15 GiB | 1.9 s | 85 MB/s | 0.65 core | 100 MiB |
+| 6,000 | 0.92 GiB | 7.9 s | 125 MB/s | 0.88 core | 114 MiB |
+| 6,500 | 3.72 GiB | 23.8 s | 168 MB/s | 1.37 cores | 121 MiB |
 
-Kept as they are: the per-peer read cache allocates its 128 KiB blocks per upload (it
-follows the upload rate, 1–2 MB/s on this line), and RC4 is chosen whenever the peer
-offers it, as libtorrent does; plaintext would save that share at the price of the
-obfuscation, which is the user's choice (`-encryption`).
+Each file costs one descriptor while the torrent runs, none after a stop. Checking 20,000
+small files on disk takes 406 ms.
 
-**Piece picker.** With ~200 peers it reads the peer bitfield (O(1)), keeps a count per
-piece and a counter of high-priority pieces, and touches only the pieces a disconnecting
-peer had. On three public ISOs at 9.4 MB/s it is 9 % of the CPU. Pinned by
-`TestHoldersMatchAReferenceModel` (20,000 random have/don't-have/disconnect steps).
+### Synology DS420j (a trial, not a supported target)
 
-**Automatic peer cap.** The daemon sizes the per-torrent cap from the machine — ten
-connections per core plus fifteen, bounded to 15–200, halved below 4 GiB of RAM and under
-768 MiB available — and trims a torrent that keeps at least ten peers with no progress
-for two minutes to half. It is applied live with `SetMaxConnections` (no session restart)
-every 30 s; the configured value stays the ceiling and a per-torrent limit wins
-(`cmd/gx-torrent/connauto.go`). Same public swarm (Ubuntu ISO, 90 s window, two
-interleaved rounds, `GX_MEASURE_AUTO=1` / `GX_MEASURE_MAXCONN`), three policies:
+Realtek RTD1296 (4 × Cortex-A53), 987 MB RAM, HDD RAID, about 370 MB available before the
+trial, `GOMEMLIMIT=250MiB`.
 
-| Policy | Peak peers | Downloaded | CPU per 100 MB |
-|---|---|---|---|
-| automatic (55 on this host) | 25 / 37 | 221 / 604 MB | 4.7 / 3.7 s |
-| fixed 200 | 78 / 89 | 314 / 625 MB | 4.5 / 3.9 s |
-| fixed 25 | 25 / 25 | 497 / 548 MB | 4.5 / 5.7 s |
-
-A cap in this range costs no throughput — the spread is swarm luck, and one public pass
-cannot rank a parameter (§1) — while the established peers, and with them the absolute
-CPU (about 0.1 % of a core per peer), stay bounded. The automatic cap did not bind in
-these runs (peers stayed below 55), so the table shows that 25–55 per torrent is safe,
-not the trimming path: that is covered by `TestDaemonAutoConnectionsFollowProgress`.
-
-**Session budget with many torrents.** The cap of one torrent does not bound the CPU when
-many run: the session also has a budget of 75 connections per core (300 here) shared by
-weight among the running torrents, and a seed closes seed-to-seed connections at once.
-Nine public torrents together, all active, 150 s window, two interleaved rounds per
-policy, CPU from `getrusage` of the test process (`GX_MEASURE_REAL=<list>`):
-
-| Policy | Peak peers | Downloaded | CPU (share of a core) | CPU per 100 MB |
+| Phase | gexttod RSS | gx-torrent RSS | Lowest available memory | Peak iowait |
 |---|---|---|---|---|
-| budget (33 per torrent with 9) | 145 / 184 | 1028 / 1234 MB | 26.9 / 41.6 % | 3.9 / 5.1 s |
-| fixed 55 per torrent | 243 / 272 | 1235 / 1114 MB | 36.3 / 41.3 % | 4.4 / 5.6 s |
+| Idle, IP filter loaded | 37–66 MB | 20–21 MB | 318 MB | 7 % |
+| Search of 4 titles, 1,703 releases | 66 MB | 129 MB | 240 MB | 22 % |
+| 6 large torrents, 2 minutes | 37 MB | 209 MB | 160 MB | 48 % |
+| 4 torrents, 8 minutes, 8–9 MB/s | 38 MB | 90 MB | 290 MB | 28 % |
 
-On average the budget holds 36 % fewer peers (165 against 258) and spends 12 % less CPU
-(34 % against 39 % of a core, 4.5 against 5.0 s per 100 MB) for 4 % fewer bytes, inside
-the round-to-round spread of the same policy (±10 %). A torrent just added runs without a
-cap for up to 30 s, so the first runs of a campaign can show the automatic policy peaking
-higher than the fixed one.
+Seeding, post-processing and several days of operation were not measured.
 
-**uTP retransmission.** A 5 ms minimum-RTT floor keeps a fast path from collapsing the
-RTO; a per-connection backoff doubles on timeout and halves on delivery; a healthy
-connection never timeout-resends. The listen socket keeps a 50-SYN backlog bound that
-never binds on the real swarms tested (`utp_syn_drops` 0).
+### The numbers behind engine decisions
 
-### 5.2 Daemon at rest
+A selection of the Go benchmarks: `make bench-all` runs all of them (six runs,
+`GOMAXPROCS=2`) and writes the raw log and a `benchstat` table to `gextto-data/bench/`. Round
+of 2026-11-02.
 
-**Current figures** (live service; `GEXTTO_PPROF`, `strace` and `/proc`): idle CPU
-**0.46 %** of a core over 120 s with **71.1 MB RSS**, 0 directory opens per 20 s and no
-write probe; `torrentEventWorker` 90 ms per 60 s; the first minutes after a start 0.39 %
-of a core, stale-temp sweep 0.21 s; ~5,000 metadata calls a day for 55 series.
-
-**Choices behind these figures.** The `.torrent` copies are trusted for 5 minutes (or
-until the name or the copy folder changes) instead of being stat'ed at every 1.5 s poll.
-The Salute tile and the health check share a 30 s cache and use `access(W_OK)` on network
-shares instead of writing, so the NAS disks can spin down. A consistent pack-identity
-verdict is reused for 60 s. The stale-temp sweep uses `WalkDir` and stats only temporary
-names. One TMDB transport is shared and the calendar is bounded to 8 lookups with a
-15 min cache. The HTTP transports are shared and rebuilt only when the egress rules
-change: a transport per fetch opened a TCP and TLS connection for every feed poll and
-`.torrent` download and, with `IdleConnTimeout` at zero, left its idle connections
-behind (`outboundClient`, `netx.HTTPTransport`). `RemoveSeededCompleted`,
-`DetachCompletedArchivedSingles` and
-`DetachErrorTorrents` query only what the session view does not already rule out. The
-recovery pass remembers a "not to detach" verdict for 30 s instead of querying the
-database and stat-ing the archive for every seeding torrent at every 750 ms tick.
-
-### 5.3 Feed archive
-
-**Current figures** (live `gextto_archive.db`): 258 MB, 307,477 rows, one row per
-torrent (infohash); insert 42.72–44.06 ms per 1,000 releases; Archive page 7–23 ms;
-standalone feed search 7.4 ms on 100,000 releases.
-
-**Choices behind these figures.** Uniqueness is on `magnet_key`, the first 16 bytes of
-the SHA-256 of the exact magnet: the dedup is unchanged without a 400-byte index. Rows
-with the same infohash are the same content, so the newest is kept, base32 hashes are
-stored as hex and a partial UNIQUE index enforces it; a known torrent under another
-magnet refreshes its row. A `.torrent`-only listing is keyed by the indexer guid (when
-present), because Jackett regenerates its `/dl/?path=...` URL at every request; URL rows
-with no guid still never merge. Inserts are prepared per chunk (`INSERT OR IGNORE` plus a
-conditional refresh), faster than a two-conflict upsert. The plain title index is gone:
-titles match through FTS or `lower(title) LIKE`. SQLite's `cache_size` stays at the
-default 2 MB: on the real archive DB the latency is flat within noise even on a broad
-`MATCH` (~1.14 s), because the OS page cache serves the file.
-
-### 5.4 Indexer managers
-
-**Current figures** (`TestMeasureManagerLanes`, the live Prowlarr and Jackett, 30
-titles, 6 at a time): cycle 110 s (per title p50 2.1 s, max 100 s), 205 requests answered
-and 0 failed, 5,935 releases.
-
-**Why one indexer at a time** (same library, same host): an aggregate with a broken
-indexer enabled waits for the timeout (60 s) and returns nothing; a healthy indexer
-called directly answers in 0.25–2.4 s with 40–100 releases; the aggregate, with the
-broken indexer disabled in the manager, answers in 2–4 s with 156–240. Six concurrent
-aggregates with timeouts snowball until even a single search waits 120 s, recovered once
-the backlog drained.
-
-**Why one aggregate through indexarr.** Expanded into one lane per indexarr source, every
-title became 46 requests and a 104-title search took 3 min 40 s, held back by the two
-slots of its slowest source; through indexarr's own `/api` the same title is answered in
-2.6 s, the indexer phase goes from 3 min 40 s to 1 min 23 s and the whole cycle from 12
-to 5 minutes.
-
-**Choices behind these figures.** Each manager indexer is a lane, read from the manager
-at run time (10 min cache, never copied into the configuration): Prowlarr
-`/api/v1/search?indexerIds=`, Jackett the indexer's Torznab endpoint. Prowlarr serves one
-search per indexer, so a lane has one slot (Jackett two), its own timeout (90 s behind
-Prowlarr, 45 s direct) and its own health; a title skips a lane whose queue would outlast
-its 100 s budget. A tracker present in both managers is searched once, through the faster
-lane; Prowlarr's failing indexers are skipped; the aggregate is the fallback when the
-list cannot be read.
-
-### 5.5 The home line and the latency guard
-
-**Current figures** (`TestMeasureLatencyGuard`, a second instance downloading three
-public ISOs, 90 s phases; the other device is an HTTP download read and discarded):
-alone on the line **8,503 KiB/s kept**, the trial at 8 %; with a competing download the
-other device gets **6,769 KiB/s (+55 %)** by router counters, or **7,253 KiB/s (+66 %)**
-by trials only.
-
-**Choices behind these figures.** The guard reads the engine's cumulative `peer_wire_*`
-counters, because the reported rate is averaged over tens of seconds, and probes a public
-host every 2 s while Auto is in force. It learns the idle reference by trial: a latency
-that falls after Gextto backs off means the queue was its own; one that stays high means
-someone else is on the line. The router's UPnP WAN counters decide first when they answer.
-The lowest reference is kept for 6 h, so one disturbed trial cannot blind the guard.
-
-**Controller on a model line** (`TestLatencyGuardSitsBelowTheKnee`,
-`GX_LOG_GUARD_KNEE=1`; 2026-10-26, build 2039). The line answers 20 ms up to its capacity
-and 60 ms above it or uncapped; ten minutes (300 probes) after a one-minute warm-up:
-
-| Line | Ping high, before | Ping high, after | Line used, before → after |
-|---|---|---|---|
-| 800 KiB/s | 228 of 300 | 66 of 300 | 96 % → 94 % |
-| 4,000 KiB/s | 174 of 300 | 29 of 300 | 95 % → 96 % |
-| 20,000 KiB/s | 172 of 300 | 6 of 300 | 95 % → 95 % |
-
-The current controller probes Google/Cloudflare, ramps while the ping is good, cuts when
-it rises, accepts an optional user line maximum (`torrent_line_max_*_kib`) and remembers
-the knee, sitting at 90 % of it and probing once a minute. The extra cost is a few
-comparisons per 2 s probe: no measurable CPU or memory.
-
-### 5.6 Swarm: seeding, choking, pipelining
-
-**Current figures.** The unchoker holds its properties on the synthetic harness (fast
-downloaders in download, fast uploaders in seed, immediate fast unchoke, optimistic
-unchoke that does not steal a slot and rotates, budget, fairness); the tick with 50 peers
-costs ~1.1 µs, 896 B, 1 alloc. Local swarm (2 MiB, 3 leechers): **3.00× corpus** in
-~11 ms; with mesh the leechers exchange 2.52 MB and the seed drops to **1.84×**.
-Super-seeding is opt-in: it does not reduce the upload on a measurable swarm and costs
-~24 % locally. Pipelining at RTT 50 ms, 256 KiB pieces: **303 KiB/s** with one block in
-flight and **6,743 KiB/s** with the default queue; on loopback the pair runs at
-162–163 MiB/s at every depth, so the local run does not rank the queue.
-
-**Choices behind these figures.** Choking stays the standard rate-based one: a real
-libtorrent leecher is served at full speed on loopback, and the real-swarm half needs an
-inbound port this host does not have. Super-seeding stays opt-in. Multi-piece per peer
-shares one in-flight budget, and the write ring buffer keeps the disk from becoming the
-bottleneck.
-
-**Seeding dials leechers.** A completed torrent kept the peers a tracker sent only while
-downloading, so it could serve only peers that connected to it, and a leecher behind a
-NAT never got the data. While seeding the engine now dials up to `seedDialBudget` (10)
-candidates, asks for peers on the completed announce and remembers the peers that answer
-with a full bitfield, so a seed is not dialed twice. The dial path is cold (a few
-addresses per announce); the local swarm served by the seed is **3.00× corpus in 11 ms**
-and the real libtorrent leecher gets the whole file in 4.832 s. The real-swarm half of
-the campaign stays open: it needs a public torrent with leechers that only a seed's
-outgoing dial can reach.
-
-### 5.7 DHT
-
-**Current figures** (`GX_MEASURE_DHT=5m GX_MEASURE_DHT_INFOHASH=<Ubuntu 24.04.3
-desktop>`): a fresh node settles at **389 nodes** after five minutes, with 5,128
-`get_peers`, 1,798 replies (**35.1 %**), 2,091 dropped and 1,331 reflected observations;
-`subnet_share_max` 5, `nodes_insecure_id` ~32 %, `capped` 0, `peers_confirmed_multi` 0.
-The peer lookup for the Ubuntu infohash returned **0** in this run: the table fills and
-the queries are answered, but a peer answers only if it announced that infohash to the
-DHT.
-
-**Choices behind these figures.** The routing table is not concentrated
-(`subnet_share_max` 5), so the anti-Sybil cap stays a hint, off by default. Multi-path
-`get_peers` is closed: the instrumentation exists, but `peers_confirmed_multi` is 0 in
-the real runs. A torrent resolves its metadata in ~49 s with 12 peers in the real-swarm
-downloads; the rest is the routing-table fill (~30 s cold), not the lookup.
-
-### 5.8 Merge on real data
-
-**Current behaviour.** Phase 3 reuses at **16 KiB block** granularity: the verified spans
-of a partly covered destination piece are written and read back, and only the missing
-blocks are requested; the piece is verified whole. Safe because BEP 52 leaves are blocks
-of the file, not of the piece.
-
-**Current figures** (real Debian and Arch ISOs, source 75 % complete, one source piece in
-four corrupted):
-
-| Run | From the network | Time |
+| Path | Cost | What it means |
 |---|---|---|
-| Debian 756 MiB | 198,180,864 B (25.0 %) | 1.31 s |
-| Arch 1.5 GiB | 410,255,360 B (25.0 %) | 2.71 s |
-| Debian with a libtorrent 2.0.11 seeder | 25.0 %, complete | — |
-| resume after a restart | 25.0 % | 1.00 s |
-| sibling added later | 25.0 % | 0.91 s |
+| Disk write, buffered / mmap (`BenchmarkStorageWrite…`) | 5.5–5.6 / 7.0–7.2 GB/s | far above any network speed; mmap is opt-in |
+| 16 KiB writes on NFS, batched durability | 81 MiB/s (35 without) | one fsync per piece removed |
+| Piece check, v1 / v2, 4 MiB | 2.6 / 2.1 GB/s | one hash per piece |
+| uTP over loopback (`BenchmarkTransferLoopback`) | 178–188 MB/s | single connection |
+| Picker, rarest pick with 150 peers | 10–12 µs | one pick in a dense swarm |
+| Peer departure, 27,250 pieces | 94–105 µs | touches only the pieces the peer held |
+| Refill of 250 requests over TCP | 248–256 µs, about 5 writes instead of 250 | small messages batched |
+| Read cache hit | 339–354 ns, no allocation | every uploaded block |
+| `state.json` save, 100 / 1,000 / 5,000 torrents | 0.5 / 4.3–5.0 / 20–25 ms | held under the daemon lock |
+| IP filter load, 172,000 rules | 30–36 ms, 6.6 MB | at start |
+| Blocked-IP lookup | 20 ns | every incoming address |
+| Archive insert, 1,000 releases | 43–44 ms | per feed batch |
+| Archive search, 100,000 releases | 7.9–8.1 ms | standalone search |
+| Re-score of 2,000 torrents | 55–57 ms | one transaction per 500 rows |
+| Series match, 500 series | 122–138 µs | one release against the list |
+| Prometheus scrape | 194–204 µs | only when scraped |
 
-All destination pieces were reused at block level and passed their hash. With nothing
-reusable, the candidate filter costs 265 ns and 0 allocations over 32 unrelated session
-torrents.
+**Seed mode.** A torrent added in seed mode hashes a piece when a peer first asks for it. The
+first block waits 0.19 ms at 256 KiB, 0.68 ms at 1 MiB, 3.4 ms at 4 MiB and 12.8 ms at 16 MiB
+per piece (file in page cache; a cold read adds one piece of disk time). At most four checks
+run at once per torrent.
 
-### 5.9 Rejected designs and ideas not added
+## Build, tests and CI
 
-Closed with a measurement, so they are not retried without new data:
-
-| Idea | Why it was closed |
+| What | Time |
 |---|---|
-| `io_uring` / AIO | the disk is at 5.8–7.4 GB/s, far above any network speed; Go exposes it only with a dependency or cgo, and the mmap path is already asynchronous |
-| Write-back cache in the engine | the storage keeps up with the download (`write_cache=0` in the live service), so there is nothing to absorb; reopen only with storage slower than the network |
-| Batched uTP datagram I/O (`recvmmsg`/`sendmmsg`) | on the loopback benchmark `Socket.writeTo` is 44 % of the CPU (58 % is `Syscall6`), but in the real-swarm profile it is **8.3 %** of the samples (36 % syscalls, reads and TCP included). Batching would remove at most that share, while adding a copy per datagram and a sender queue; at the live rate it saves well under 1 % of a core. Reopen only on a uTP-only session above 8 MB/s |
-| Contiguous-write coalescing | the page cache already merges adjacent writebacks |
-| Rarity buckets, watermark cursor in `pickFileEdge`, `FADV_RANDOM`, `/proc/meminfo` under `d.mu` | no measurement justified the cost (the `pickSequential` cursor did: §2.1) |
-| `PieceDownloader` bitmask instead of its three maps | `BenchmarkPieceDownloaderLifecycle`: 211.7–217.2 µs/op, **18.1 KB and 15 allocs per piece**, the time almost all the 4 MiB copy into the piece buffer. At 100 MB/s that is about 450 KB/s of garbage: a bitmask would save nothing measurable |
-| Upsert with two conflict targets (archive) | +17 ms per 1,000 releases against `INSERT OR IGNORE` + refresh |
-| `idx_archive_title`, expression index on `lower(magnet_hash)` | never used by the queries; only write time and space |
-| Async `state.json` (snapshot under the lock, marshal and write on a writer goroutine) | `BenchmarkSaveStateLocked`: 0.465–0.504 ms at 100 torrents, 4.27–4.96 ms at 1,000, 19.81–24.87 ms at 5,000, and the idle service rewrote the file once in two minutes. At 1,000 torrents the exclusive hold is 4 ms every few minutes (0.003 % of a core): a snapshot plus writer goroutine would have to get the ordering of concurrent saves right for less than that. Reopen only with thousands of torrents *and* frequent changes, or when a save shows up as a UI stall |
-| Lock-free / sharded read cache | `BenchmarkCacheGetHit`: 338.9–353.5 ns and zero allocations per hit; the parallel form with four goroutines is 724.4–860.3 ns/op. The lock costs ~0.2 % of a core at 100 MB/s of upload, which is the whole budget such a rewrite could win |
-| One PEX loop per torrent instead of one goroutine per peer | a goroutine with a ticker costs ~4.3 KB and ~3 µs of CPU per wake on this machine; at the 60 s PEX period that is 0.0025 % of a core and 2–3 MB at 500 peers, against the kernel socket buffers of the same peers. The staged list is already bounded |
-| Multi-path `get_peers` | `peers_confirmed_multi` is 0 in the real runs |
-| Anti-Sybil cap on by default | the routing table is not concentrated and legitimate CGNAT/mobile subnets would be capped |
-| Choking changes | reciprocation works locally and against libtorrent |
-| Super-seeding by default | no upload reduction on the measurable swarms, and ~24 % slower locally |
-| Ordering the merge candidates by reusable bytes | superseded by the dedup, no measurable gain |
-| Latency guard: fixed 100 MB/s ceiling, current-rate ceiling, 64 KiB/s floor, low-peak anchor | the cap either locked to a slow sample or was an arbitrary number; the current controller ramps on the Google/Cloudflare ping, uses the user's line maximum (or 2× the delivered rate) and cuts only on a real latency rise |
+| `make build` from a cold Go cache | 42.5 s |
+| `make fast`, one package changed / nothing changed | 7.1 s / 1.1 s |
+| `make gx-torrent` | 0.5 s |
+| `make test`, root package in 4 processes | 22–24 s (35 s with the test binary rebuilt, 15 s warm) |
+| `make test-serial` | 34 s |
+| `go test -count=1 ./...` from a cold cache | 117 s |
+| `make test-ui` (Playwright, Chromium) | 63–72 s |
+| CI (`ci.yml` / `continuous.yml` / `codeql.yml`), 2 vCPU runners | 411 s / 278 s / 210 s |
 
-**Not a measurement but a model:** replacing `internal/dht` with a third-party library was
-considered and not done — the internal one shares a UDP socket with uTP, chooses that
-socket's family and serves every torrent from a single request channel, where an external
-library expects its own socket and a traversal per torrent. The state is in
-[`gx-torrent.md`](gx-torrent.md).
+The suite has 2,866 Go tests in 69 packages, 80 Playwright tests and 83 Go benchmarks (count
+of 2026-11-02; build times of 2026-10-17, test times of 2026-10-22, CI of 2026-10-17).
 
-**Postponed, with a reason:** qBittorrent's `renameFile`/`renameFolder` (needs rename
-support in the engine: a feature of its own); graduated file priority with mixed-priority
-files (open item in [`todo.md`](todo.md)); qBittorrent's
-`setAutoManagement` tuning.
+## Verified without a benchmark
 
-## 6. Verification
+- **Accessibility.** 14 axe-core tests pass and the gx-torrent pages had 0 violations in light
+  and dark themes. Method in [`ACCESSIBILITY.md`](ACCESSIBILITY.md).
+- **Backup and restore.** Round trip on a copy of the live data: all 40 tables of the four
+  databases identical, integrity ok. A missing download or temp folder after a restore is a
+  warning you can fix from the interface.
+- **eD2k.** The EC client passes against a real `amuled` 2.3.3, and aMule 3.1.0 in Docker
+  completed a download started from the page. Two samples of 30 series put real fallback
+  coverage at **7–13 %** with at least 3 sources, too low to justify an own transfer engine:
+  Kad stays a manual search, `ed2k_fallback` stays off. Reopen on a much larger sample or a
+  material change in metadata.
+- **Gap fill on eD2k.** A series with 37 gaps across two seasons needed 2 season queries of
+  about a minute each, returning 35 usable copies; one query per episode would have been 37
+  waits.
+- **Upgrade decisions on the live library.** 0 of 1,861 archived episodes differ from a rescore
+  or would re-download themselves. 259 feed releases replayed in a dry run took 1.46 s and
+  would replace 2 episodes. `ffprobe` on a 1.9 GB file takes 274 ms cold, 81 ms warm.
+- **Media integrity.** The full decode runs near real time (62 minutes of 4K in about 73
+  minutes); the quick 4K check reads the file and decodes only keyframes, 4 m 09 s for a
+  62.5-minute 5 GB episode, no false errors, and it can miss a small defect between two
+  keyframes. A later pass costs one `stat` per unchanged file.
+- **Robustness.** Lenient Torznab decoding costs nothing measurable, a short uTP header is
+  refused instead of panicking, and the mmap fault guard turns a fault into an I/O error at
+  the same write cost.
 
-### Accessibility
+## Closed designs
 
-The automated baseline passes: **14 axe-core/Playwright tests**, and the gx-torrent pages
-had **0 violations** in the audit (light and dark theme, sample torrents, feeds, rules
-and wanted titles). The method, the manual checklist, the acceptance criteria and the
-known limits are in [`ACCESSIBILITY.md`](ACCESSIBILITY.md).
+Closed with a measurement, so they are not retried without new data.
 
-### Backup and restore
+| Idea | Why it was closed | Reopen when |
+|---|---|---|
+| `io_uring` / AIO | the disk does 5.5–7.2 GB/s, far above any network; needs cgo or a dependency | storage slower than the network |
+| Write-back cache in the engine | the storage keeps up with the download | storage slower than the network |
+| Batched uTP datagrams (`recvmmsg`/`sendmmsg`) | 8.3 % of samples on real swarms; saves under 1 % of a core at the live rate | a uTP-only session above 8 MB/s |
+| Coalescing contiguous writes | the page cache already merges them | |
+| Rarity buckets, `pickFileEdge` cursor, `FADV_RANDOM` | no measurement justified the cost | |
+| `PieceDownloader` bitmask | 18 KB and 15 allocations per piece: about 450 KB/s of garbage at 100 MB/s | |
+| Async `state.json` | 4 ms every few minutes at 1,000 torrents, 0.003 % of a core | thousands of torrents with frequent changes, or a visible UI stall |
+| Lock-free read cache | the lock costs about 0.2 % of a core at 100 MB/s of upload | |
+| One PEX loop per torrent | 0.0025 % of a core and 2–3 MB at 500 peers | |
+| Multi-path `get_peers` | `peers_confirmed_multi` is 0 in real runs | |
+| Anti-Sybil cap on by default | the table is not concentrated, and CGNAT subnets would be capped | |
+| Choking changes | reciprocation works locally and against libtorrent | a gap on a real swarm |
+| Super-seeding by default | no upload saved on measurable swarms, about 24 % slower locally | |
+| Merge candidates ordered by reusable bytes | superseded by the dedup | |
+| Upsert with two conflict targets (archive) | 17 ms more per 1,000 releases | |
+| `idx_archive_title`, index on `lower(magnet_hash)` | never used by the queries | |
+| Latency guard with a fixed ceiling or floor | locked to a slow sample or an arbitrary number | |
+| A third-party DHT library | not a measurement but a model: ours shares the UDP socket with uTP and serves every torrent from one channel | |
 
-Round trip on a copy of the live data: **all 40 tables of the four databases identical**
-and integrity ok, with the default recycle bin, the probe leftovers and the run marker
-excluded. A restore on another machine starts with only the data and state folders; an
-unavailable download, temp or trash folder is a **warning** and is fixable from the
-interface. Verified in a systemd container (install, upgrade, restore offline in
-dry-run).
+Postponed: qBittorrent's `renameFile`/`renameFolder` (needs rename support in the engine) and
+its `setAutoManagement` tuning.
 
-### eD2k and Kad through aMule
+## Adding a measurement
 
-eD2k goes through aMule. EC client against a real `amuled` 2.3.3 (Debian trixie
-package) on the N97, throw-away `--config-dir`, ports not forwarded (Low ID, Kad
-firewalled), `nodes.dat` and `server.met` copied from an existing aMule profile:
+- **Compare clients only** with `make measure-compare`, and replace all the tables.
+- **Compare two versions of our code** with `-count` and `benchstat`, or interleaved runs. A
+  single pass on a public swarm says a feature works, not which value is better.
+- **Measure the system as it really runs**, on a quiet host, with queues and auto-management
+  on.
+- **Write the machine, date and command next to a number**, and replace the old row.
+- **Keep this page readable.** A number goes here only if a reader can decide something from
+  it; the rest stays in `gextto-data/bench/` and in the command that produces it. A rejected
+  idea goes under [Closed designs](#closed-designs).
 
-- login, status, preferences, server list, add / pause / resume / delete of a link,
-  bandwidth limits, log and the refusal of a wrong password all pass
-  (`GEXTTO_AMULE_EC=… go test ./internal/amule/ -run Live`, 0.05 s);
-- after `Connect`, Kad and the eD2k server (eMule Sunrise, ~47,600 users) were up within
-  ~15 s;
-- `Series A S06E13` (placeholders): **14** Kad results and **12** global server results,
-  each collected over a 40 s window, with the episode (WEB, HDTV, 1080p variants) at
-  1–2 sources on a firewalled client.
-
-**End to end with the service.** aMule 3.1.0 in Docker (`ngosang/amule`, bridge network,
-High ID, Kad firewalled), driven by the running Gextto: a global server search for
-`eMule0.70b Installer` returned 5 results in the eD2k page (the installer with 74
-sources); `eMule0.70b-Installer.exe` (4.27 MB) added from the page completed in
-**~3.5 minutes** into the incoming folder. aMule 3.x removed it from the download queue
-at once and only shared it, which is why completions are looked up among the shared
-files.
-
-**The fallback gate.** Two independent 30-series samples put the real-fallback coverage
-at **7–13 %** (2/30 and 4/30 with at least 3 sources, the default floor). That is below
-the level that justifies a 6.5–10-month transfer engine: Kad stays an optional **manual**
-search provider, `ed2k_fallback` stays off, and the T0/T1 spikes stay isolated from the
-daemon. The question is reopened only by a material change in metadata/aliases or by a
-much larger sample showing a different picture. Localized and original titles differ
-(0 Kad hits for a localized name against 1 for the original in two spot checks), so the
-automatic gap filler queries the configured name and its aliases in parallel.
-
-### Gap fill on eD2k
-
-aMule runs one search at a time and answers in about a minute on this library, so the
-unit of cost is the query, not the episode. A series with 37 gaps across two seasons was
-answered by **2 season queries, about 1 minute each**, which returned 35 usable copies;
-one query per episode would have been 37 waits, spread over the deep pass at five gaps
-per cycle (`gap_deep_max_per_cycle`) and shared with every other series with gaps. The
-automatic pass makes the same query (`ed2kSeasonFallback`) for the season of the gaps it
-picked and distributes the copies to every gap of it; the per-query time is aMule's,
-unchanged by the number of episodes the answer covers.
-
-### Dead torrent links
-
-The quarantine of `.torrent` links that keep failing costs **one query per cycle**, not one per release: the whole set is read once and
-checked in memory. With 300 quarantined rows it measures about 0.35–0.36 ms and 88 KB
-allocated per cycle (§4), against a cycle of minutes.
-`RecordTorrentLinkFailure` runs only for the links that actually fail (tens per cycle at
-most) and `ClearTorrentLinkFailure` only for the ones that are downloaded.
-
-### Upgrade decisions on the live library
-
-Copy of the live databases (read-only backup), N97, `nice -n 15`.
-
-| Check | Result |
-|---|---|
-| Archived episodes whose stored score differs from a rescore with the current code | **0 / 1861** |
-| Archived episodes that their own release title or file name would re-download | **0 / 1861** |
-| Custom groups with capitals that never received their bonus | **4 / 6** |
-| Feed releases replayed through the dry-run decision | **259** releases, **55** series, **1.46 s** |
-| Archived episodes those releases would replace | **2** (1080p WEBRip AAC x265 → 1080p WEB-DL DDP 5.1 H.264, «source» rule) |
-
-The upgrade decision reads the real quality of a library file with `ffprobe` once per
-file and remembers it: `ffprobe -v error -print_format json -show_format -show_streams`
-on a 1080p WEB-DL mkv of 1.9 GB takes **274 ms cold, 81 ms warm**. The probe runs only
-for a candidate the decision already judged an upgrade and whose library row has no
-MediaInfo yet; the result is stored in `episodes` or `movies`, so the periodic backfill
-and the next searches do not repeat it. *Impatto sulla libreria* (the dry-run preview,
-which never stores the probe because it does not write): 63 releases over 55 series in
-**5.6 s** cold and **2.0 s** with the answers in the process cache.
-
-### Media integrity scan
-
-The file check (*Settings → Maintenance → File integrity check*) walks the library one
-target at a time, so the query between two `ffmpeg` decodes must not add load: with 5,000
-archived episodes, `MediaIntegrityTargets` returns one target in 112.3–115.2 µs/op. The
-`ffmpeg` decode dominates the run; the periodic worker probes the configured number of
-files per interval (one by default) and the manual *Check now* starts a pass, so the load
-stays off the acquisition cycle and the daemon at rest. Later passes skip the files whose
-size and modification time match the stored outcome: the cost is then one `stat` per
-library file, not a decode.
-
-The decode runs at about real time on the N97. A 60 s slice of a 12.2 GB 4K release
-(3840×1606 HEVC 10-bit Dolby Vision, 24 fps, on the NFS library share) decoded in
-**50.7 s of wall time** (1 m 49 s CPU across the four cores): about **1.18× real time**,
-so the full 62-minute episode needs roughly **73 minutes**. The bound therefore grows
-with the media duration (3× the runtime, minimum 30 minutes, cap 6 hours). The quick
-check for 4K files (the default for 2160p) reads the whole file but decodes only the
-keyframes, on one thread: frame threading together with `-skip_frame nokey` makes the
-HEVC decoder report `PPS changed between slices` on healthy files. The same 60 s slice
-took **2.5 s of wall time** (2.6 s CPU), and a whole 62.5-minute 5 GB 4K episode took
-**4 m 09 s** with **no error output**, against roughly 74 minutes for the full decode.
-Truncation and unreadable data are still found; a small defect between two keyframes can
-be missed.
-
-```
-ffmpeg -nostdin -hide_banner -nostats -v error -threads 1 -skip_frame nokey -i "<file>" -map '0:v?' -map '0:a?' -f null -
-```
-
-The check judges a file by what `ffmpeg` writes on stderr, so with a source whose frames
-are out of order the same line arrives thousands of times (a full 54-minute episode
-produced 22,998, all the null muxer's timestamp complaint, with exit code 0). Building
-the readable detail from a 64 KiB buffer of those lines takes 149.8–153.0 µs/op. Dropping
-the line cut in the middle by the buffer limit and ignoring the sink's own lines cost
-nothing measurable: the first runs once per file, the second is one prefix check per
-line.
-
-### Robustness
-
-Torznab answers are decoded leniently (a raw `&` or an HTML entity in a title):
-**2.22–2.32 ms** against **2.24–2.32 ms** strict on a 100-item answer, with identical
-allocations. The uTP header refuses inputs shorter than 20 bytes instead of panicking,
-the bencode screen bounds lengths and depth before the decoder, and the mmap fault guard
-turns a fault into an I/O error with the same write cost (**35.9–37.5 µs, 0 alloc**).
-
-### Packaging
-
-The release archive root is **0755** (`mktemp -d` made it 0700, which tar applied to the
-extracted folder) and `build-release.sh` checks it; `install.sh` keeps `gexttod.prev`
-**and** `gx-torrent.prev`, as `gexttod --update` does.
-
-## 7. Adding a measurement
-
-- Next to each figure: the machine, the date, the build and the command that produced
-  it, so the measurement can be repeated and compared.
-- A new round **replaces** the row it measures: update §2 for a comparison, §3 for a
-  baseline and §4 for a benchmark. Do not keep an older pass next to the new one; if a
-  number is gone from the document, the command that produced it is still there.
-- If a measurement decides something, add it to §5 and, when rejected, to §5.9.
-- Compare before and after with `-count`/`benchstat` or an interleaved A/B. One pass on a
-  public swarm cannot rank a parameter.
-- `make bench-all` runs the whole Go suite in one reproducible pass, on the host or in a
-  pinned container; `scripts/measure-baseline.sh` runs the cheap harnesses and the
-  network ones when their environment is set. A round that changes nothing still re-runs
-  them, so a regression shows up as a difference from the previous run.
+The other harnesses are in the `Makefile` (`measure-*`, `bench-all`, `bench-all-docker`) and in
+`scripts/measure-baseline.sh`. Profilers are opt-in on loopback: `GX_TORRENT_PPROF=127.0.0.1:6061`
+and `GEXTTO_PPROF=127.0.0.1:6062`.

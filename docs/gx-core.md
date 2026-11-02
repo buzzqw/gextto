@@ -267,7 +267,7 @@ is non-destructive: the old torrent leaves the session, its files stay on disk.
   version must be chosen before claiming it.
 - **Rate-based choking and anti-leech**: to be validated with the deterministic harness
   and the real-swarm campaign before touching the algorithm
-  ([`measurements.md`](measurements.md) §4.6).
+  ([`measurements.md`](measurements.md#real-swarms-and-the-home-line)).
 - **Container image**: the `Dockerfile` is built and smoke-tested in CI (job
   `container image`); publishing it to a registry is not done.
 - **Distribution targets**: Linux (amd64/arm64) and Windows are covered; macOS is not

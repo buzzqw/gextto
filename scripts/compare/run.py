@@ -479,6 +479,8 @@ class Deluge(Client):
         answer = json.loads(http(f"http://{self.ip}:8112/json", body, {"Content-Type": "application/json"},
                                  timeout=60, opener=self.jar))
         if answer.get("error"):
+            # web.connect returned before the daemon's methods were listed: connect again.
+            self.connected = False
             raise RuntimeError(f"deluge {method}: {answer['error']}")
         return answer["result"]
 

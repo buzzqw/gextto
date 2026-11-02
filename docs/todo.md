@@ -16,6 +16,18 @@ here.
 
 ## Engine (gx-core, gx-torrent)
 
+- **Peer addresses lost on equal priority** — `AddrList` orders candidates by BEP 40
+  priority alone, so addresses with the same priority overwrite each other and those peers
+  wait for the next announce. Break the tie on IP and port in `peerAddr.Less`, with a
+  regression test. No gate: reproduced by `make measure-compare`, line scenarios, and a
+  throwaway build with the tie-break reached the libtorrent clients. Then re-run the whole
+  comparison and replace its tables.
+- **Recheck on a torrent added in seed mode** — a recheck after an add with `skip_checking`
+  does no hashing. No gate: reproduced by the comparison harness (0.09 s of CPU on 4 GiB).
+- **uTP CPU, upload rate and recheck time** — the comparison shows about 1.5 times the
+  CPU per GiB of the libtorrent clients on uTP, about half their upload rate and the
+  slowest recheck. Gate: a profile on the same harness that names a cost the engine can
+  remove.
 - **Peer turnover** — at the connection cap, close the slowest peers periodically and
   try new addresses (`prunePeers` frees only a useless peer today). Gate: a real swarm
   larger than the cap where turnover beats the current download rate on the same
@@ -87,5 +99,5 @@ Closed by choice, not waiting for a measurement:
 Engine designs rejected on a measurement — `io_uring`/AIO, contiguous-write coalescing,
 multi-path `get_peers`, the anti-Sybil cap on by default, super-seeding by default,
 async `state.json`, a lock-free read cache — are in
-[`measurements.md`](measurements.md) §5.9 with the number that closed each one. Do not
+[`measurements.md`](measurements.md#closed-designs) with the number that closed each one. Do not
 reopen one without new data.
