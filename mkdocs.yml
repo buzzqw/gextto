@@ -92,7 +92,7 @@ nav:
       - HTTP API: API.md
       - Architecture: ARCHITECTURE.md
       - State and backlog: evoluzione.md
-      - Measurements: measurements.md
+      - Measurements and benchmarks: measurements.md
       - BEP compliance: bep.md
       - gx-torrent daemon: gx-torrent.md
       - gx-core engine: gx-core.md
