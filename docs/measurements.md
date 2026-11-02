@@ -146,6 +146,7 @@ the same setup, so they can differ a little from the tables, which come from ano
 | 100 Mbit/s line, TCP | 6.9 MB/s | **11.2 MB/s** | addresses with the same BEP 40 priority overwrote each other, so 2 of the 4 peers waited for the next announce |
 | 100 Mbit/s line, uTP | 6.9 MB/s | **11.2 MB/s** | same cause |
 | uTP CPU per GiB | 51 s | **39 s** | the reader wakes once per block instead of once per datagram; same speed, peak own memory 49 MiB against 51 |
+| uTP CPU per GiB, peers forcing encryption | 51 s (50–54) | **40 s** (38–42) | the same wake-up now also crosses the encryption layer; 11.1 MB/s both ways, four rounds each, peak own memory 48 MiB against 46, inside the range |
 | Recheck of 4 GiB | 8.8 s | **3.8–4.0 s** | read-ahead back on, a queue round when the check ends, reading and hashing side by side (0.8 s more CPU) |
 | Upload | 230 MB/s (205–242) | **262 MB/s** (223–290) | up to 8 blocks in one socket write instead of one each; six rounds each, old and new taking turns |
 | Upload CPU per GiB | 3.3 s | **2.5 s** | same cause |

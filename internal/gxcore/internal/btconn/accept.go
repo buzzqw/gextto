@@ -93,7 +93,7 @@ func AcceptRouted(
 // upgradeToMSE replays the buffered bytes into an MSE handshake and returns
 // the encrypted connection with the negotiated cipher.
 func upgradeToMSE(conn net.Conn, seen *bytes.Buffer, getSKey func([20]byte) []byte, forceEncryption bool, log logger.Logger) (net.Conn, mse.CryptoMethod, bool, error) {
-	replayed := &rwConn{readWriter{io.MultiReader(seen, conn), conn}, conn}
+	replayed := &rwConn{readWriter{io.MultiReader(seen, conn), conn}, conn, seen}
 	mseConn := mse.WrapConn(replayed)
 	var cipher mse.CryptoMethod
 	encrypted := false

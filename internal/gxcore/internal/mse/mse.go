@@ -85,6 +85,9 @@ type Stream struct {
 	r   *cipher.StreamReader
 	w   *inPlaceStreamWriter
 	r2  io.Reader
+	// ia holds what is left of the initial payload the initiator sent inside the
+	// handshake: it is read before the socket (see r2).
+	ia *bytes.Buffer
 }
 
 // NewStream wraps rw. Complete HandshakeIncoming or HandshakeOutgoing before
@@ -93,6 +96,21 @@ func NewStream(rw io.ReadWriter) *Stream { return &Stream{raw: rw} }
 
 // Read decrypts into p.
 func (s *Stream) Read(p []byte) (n int, err error) { return s.r2.Read(p) }
+
+// HintRead forwards a reader's hint to the socket (see transport.Conn.HintRead).
+// The bytes still held from the initial payload will not come from the socket, so
+// they do not count: asking it for them would wait for data the peer never sends.
+func (s *Stream) HintRead(n int) {
+	if s.ia != nil {
+		n -= s.ia.Len()
+	}
+	if n <= 0 {
+		return
+	}
+	if h, ok := s.raw.(interface{ HintRead(int) }); ok {
+		h.HintRead(n)
+	}
+}
 
 // Write encrypts p onto the wire.
 func (s *Stream) Write(p []byte) (n int, err error) { return s.w.Write(p) }
@@ -357,6 +375,7 @@ func answerCryptoSelect(s *Stream, writeBuf *bytes.Buffer, cryptoSelect func(Cry
 	}
 
 	s.updateCipher(selected)
+	s.ia = IA
 	s.r2 = io.MultiReader(IA, s.r)
 	debugln("--- in: done")
 	debugln("--- in: end handshake")

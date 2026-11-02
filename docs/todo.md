@@ -16,9 +16,6 @@ here.
 
 ## Engine (gx-core, gx-torrent)
 
-- **uTP read hint on encrypted connections** — an encrypted peer still wakes the reader per
-  datagram, because the MSE layer can hold bytes left over from the handshake. Gate: a profile
-  with encrypted uTP peers where those wake-ups are a real share of the CPU.
 - **Reused read-cache buffers** — each block read for an upload allocates and clears a new
   buffer, about a tenth of the CPU with the collector. Gate: a way to recycle a buffer that a
   cache eviction cannot pull from under a block being copied.
