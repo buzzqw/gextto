@@ -6,13 +6,22 @@ never a history. A new round replaces the row it measures.
 
 - **§2 Comparative benchmarks** come first: the before → after of every change that still
   shapes the current code. This is what a change is judged by.
-- **§3 Current baselines** are the static figures of the system as it runs today.
+- **§3 Current baselines** are the static figures of the system and of the build:
+  footprint, speed, build, tests and CI.
 - **§4 Benchmark reference** is the unit cost of each measured path.
 - **§5 Investigations and decisions** explains why the current design is what it is.
 - **§6 Verification** is what was verified without being a benchmark.
 
-Everything is measured on an Intel N97 mini-PC — 4 cores, 16 GB of RAM, Debian 13
-(trixie), Go 1.27.3 — unless a row says otherwise.
+Everything is measured on the reference machine below, unless a row says otherwise:
+
+| Item | Value |
+|---|---|
+| System | Debian GNU/Linux 13 (trixie), kernel 7.1.13, x86_64 |
+| CPU | Intel N97, 4 cores / 4 threads (low-power mini PC) |
+| RAM | 15 GiB (no swap) |
+| Disk | NVMe Lexar NM620 256 GB (ext4) |
+| Go | 1.27.3 |
+| Docker | 29.9.2 |
 
 The state of the product and the open items are in [`evoluzione.md`](evoluzione.md);
 the engine is in [`gx-torrent.md`](gx-torrent.md) (inventory
@@ -311,6 +320,100 @@ ext4 on HDD RAID, Surveillance Station running. 2026-11-01, Gextto 1.2.2174, gx-
 One pass on public swarms: the 9 MB/s is what those swarms and this line gave, not a
 ceiling of the NAS. Not measured: seeding, post-processing of completed files, operation
 over several days. `ffprobe` is missing on DSM, so the MediaInfo backfill stays paused.
+
+### 3.7 Build, tests and CI
+
+Build and test costs on the reference machine of §1. The build figures were measured on
+2026-10-17, the test-suite figures on 2026-10-22 and the counts on 2026-11-02: the
+hardware changes them, and a GitHub runner has fewer cores than this machine.
+
+**Build.**
+
+| Operation | Command | Time |
+|---|---|---|
+| Everything from scratch (cold Go cache; `gexttod` + `gx-torrent` probe) | `go clean -cache && make build` | **42.5 s** |
+| One package changed, plus the link | `make fast` | **7.1 s** |
+| Nothing to do (warm cache) | `make fast` | **1.1 s** |
+| Only the gx-torrent daemon | `make gx-torrent` | **0.5 s** |
+
+`make build` is pure Go (`CGO_ENABLED=0`). It increments Gextto's `build_number` and,
+when the engine's code changed, also `gx-torrent.build_number`; it replaces
+`bin/gx-torrent` only when its code changed (hash comparison,
+`bin/gx-torrent.code-sha256`). `make gx-torrent` builds only the daemon and bumps only
+its own number. The cold figure is dominated by compiling the engine and the daemon; the
+incremental one is the changed package plus the link.
+
+**Test suite.** What there is to run:
+
+| | |
+|---|---|
+| Go test functions | **2,866** |
+| Go benchmarks | **83** |
+| `_test.go` files | **548** |
+| Go packages | **93**, of which **69 with tests** |
+| Separate module `internal/dht` | tested by `make test-dht`, outside `go test ./...` |
+| Playwright end2end tests (`uiweb/end2end`) | **80** |
+
+“Cold build cache” means `go clean -cache` first, so the whole suite is recompiled;
+`-count=1` disables the test result cache, so every test runs. The shortening of the
+waits that only pace real servers is in §2.6.
+
+| Round | Command | Time |
+|---|---|---|
+| Go tests, cold build cache, every test run | `go clean -cache && CGO_ENABLED=0 go test -count=1 ./...` | **117.0 s** |
+| Everything, one process | `make test-serial` | **34 s** |
+| Everything, root package in 4 processes | `make test` | **22–24 s** (35 s with the test binary rebuilt) |
+| Full guard round, warm test cache | `make test` | **15 s** |
+| Browser suite | `make test-ui` | **63–72 s** |
+
+`make test` is `check-ui` (`scripts/check-ui-settings-index.sh`) + `check-scripts`
+(`bash -n`, plus `shellcheck` when installed) + `installer-test`
+(`scripts/installer-selftest.sh`) + `test-dht` + `go test ./...` through
+`scripts/go-test-sharded.sh`. The scripts cost a few seconds together; the rest is the
+Go suite. `make test-ui` builds the daemon, starts it in dry-run and drives the real UI
+in Chromium; the first-start wizard is completed by the harness
+(`uiweb/end2end/global-setup.ts`), so an empty data dir works.
+
+**CI (GitHub Actions).** Whole-run wall times and per-job durations of the reference
+runs on `main` of 2026-10-17; the jobs run in parallel, so the wall time is shorter than
+the sum. The runners are `ubuntu-24.04` (x86_64) and `windows-latest`, with **2 vCPUs**
+each; Linux releases are built in the `ubuntu:22.04` container (glibc 2.35) and, for
+aarch64, on `ubuntu-24.04-arm`.
+
+| Workflow | When | Wall | Jobs |
+|---|---|---|---|
+| `ci.yml` | push and PR | **411 s** | *vet and test (x86_64)* 264 s · *UI end2end (Playwright)* 114 s · *gx-torrent platform tests (Windows)* 74 s · *gx-torrent service install (Windows)* 86 s (non-blocking) · *container image (x86_64)* 45 s · *race detector (x86_64)* 391 s (non-blocking) |
+| `continuous.yml` | push to `main` | **278 s** | *test* 160 s · *package (x86_64)* 100 s · *package (aarch64)* 81 s · *publish continuous* 11 s |
+| `codeql.yml` | push, PR and weekly | **210 s** | *analyze (go)* 207 s |
+| `release.yml` | tag | — | no run in the period; *test* + matrix *package* in the `ubuntu:22.04` container, with the Windows packages alongside |
+
+`continuous.yml` and `release.yml` publish **6 packages** plus `release.json`:
+
+- `gextto-linux-x86_64.tar.gz`;
+- `gextto-linux-aarch64.tar.gz`;
+- `gx-torrent-linux-x86_64.tar.gz`, `gx-torrent-linux-aarch64.tar.gz`;
+- `gx-torrent-windows-amd64.zip`, `gx-torrent-windows-arm64.zip`.
+
+**How these were measured.**
+
+- Build: `go clean -cache` before the cold measurement, `time make …` for the others;
+  the incremental figure changes one statement in a non-test package and restores it.
+- Tests: `time` around `go test -count=1 ./...` (no test result cache), with
+  `CGO_ENABLED=0`; the cold figure also runs `go clean -cache` first. `make test` is
+  measured with the test cache valid and again after a change that invalidates it.
+- CI: `gh run view <id> --json createdAt,updatedAt,jobs`, with the wall time as
+  `updatedAt - createdAt` and each job as `completedAt - startedAt`; the reference runs
+  are CI 39048101228, continuous 39049025870 and CodeQL 39049025808.
+
+To reproduce:
+
+```bash
+go clean -cache && time make build            # pure build from scratch
+time make fast                                # one change + link (warm cache)
+time (CGO_ENABLED=0 go test -count=1 ./...)   # every test, warm build cache
+time make test                                # guard round
+time make test-ui                             # browser suite
+```
 
 ## 4. Benchmark reference
 

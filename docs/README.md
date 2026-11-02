@@ -37,10 +37,9 @@ change, so this index and the site are never two different texts.
 | [Accessibility](ACCESSIBILITY.md) | Keyboard, screen reader, automated axe tests and the manual checklist for the web UI, the gx-torrent page and the TUI. |
 | [TUI](tui.md) | Terminal client and keyboard shortcuts. |
 | [Developers](DEVELOPERS.md) | Build, tests and contributor conventions. |
-| [Build and test times](tempistiche.md) | What builds and the test suite cost on a real machine, and how long CI takes. |
 | [Architecture](ARCHITECTURE.md) | Map of the code folders and files. |
 | [State and backlog](evoluzione.md) | What Gextto and the gx-torrent / gx-core engine have today and what is planned next (positioning, capabilities, engine, open items). |
-| [Measurements and verification](measurements.md) | The comparative results first, then the current footprint and speed: harnesses, benchmarks, swarm, DHT, merge on real data, accessibility verification. |
+| [Measurements and benchmarks](measurements.md) | Comparative results first, then current footprint, speed, build, test and CI times: harnesses, benchmarks, swarm, DHT, merge on real data, accessibility verification. |
 | [gx-torrent engine](gx-torrent.md) | Technical document of the pure-Go torrent engine (gx-core, daemon, adapter). |
 | [eD2k e Kad con aMule (Italiano)](amule.it.md) | Italian version: install and configure aMule, enable it in Gextto, use eD2k/Kad, troubleshooting and settings. |
 | [eD2k and Kad through aMule](amule.md) | How to install and configure aMule, enable it in Gextto and use eD2k/Kad: search, links, aMule's queue in Downloads, completion, shared limits, troubleshooting, settings and tests. |
