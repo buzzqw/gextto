@@ -192,9 +192,14 @@ from the most recent round (October–November 2026).
 
 | What | At rest | Under load |
 |---|---|---|
-| gx-torrent, live (DHT on, 172,740 IP filter rules, 3 seeds) | 0.93–0.98 % of a core, 29–32 MB RSS | 18–37 % of a core at 8.2–8.8 MB/s with 116–132 peers, 2.0–4.3 s of CPU per 100 MB |
+| gx-torrent 1.1.296, live (DHT on, full IP filter, 3 seeds) | 0.28 % of a core, 29–31 MB RSS, 15 MB own memory | 18–37 % of a core at 8.2–8.8 MB/s with 116–132 peers, 2.0–4.3 s of CPU per 100 MB |
 | gx-torrent, 10 torrents to a NAS | | about 507 MB outside the two caches, 1.1 GB peak with the NFS write cache |
-| gexttod | 0.46 % of a core, 71 MB RSS | 232 MB RSS during a cycle of 31,275 releases, back to 65 MB after it |
+| gexttod 1.2.2181 | 0.43 % of a core, 71 MB RSS, 48 MB own memory | 232 MB RSS during a cycle of 31,275 releases, back to 65 MB after it |
+
+At-rest figures: 120 s on 2026-11-02, starting about 6 minutes after a restart, with the integrity
+check off. A daemon that has run for days has more DHT and peer traffic: an earlier sample of
+gx-torrent read 0.93–0.98 %. The under-load figures are from October, before the fixes
+[above](#what-the-comparison-changed), and were not measured again.
 
 - **After a burst** the daemon returns its piece buffers: with 7 torrents and no transfer the
   RSS falls from 550 MB to 35–40 MB.
@@ -274,6 +279,9 @@ of 2026-11-02.
 |---|---|---|
 | Disk write, buffered / mmap (`BenchmarkStorageWrite…`) | 5.5–5.6 / 7.0–7.2 GB/s | far above any network speed; mmap is opt-in |
 | 16 KiB writes on NFS, batched durability | 81 MiB/s (35 without) | one fsync per piece removed |
+| Recheck of 4 GiB, cold, gx-torrent 1.1.296 | 3.8–4.0 s, about 4 s of CPU | reading and hashing side by side, read-ahead on |
+| Upload to one peer, cold, gx-torrent 1.1.296 | 180–240 MB/s, 3.2 s of CPU per GiB | read-ahead on, next block loaded in the background |
+| uTP download on a 100 Mbit/s line, gx-torrent 1.1.296 | 11.2 MB/s, 48 s of CPU per GiB | state packets batched over 2 ms |
 | Piece check, v1 / v2, 4 MiB | 2.6 / 2.1 GB/s | one hash per piece |
 | uTP over loopback (`BenchmarkTransferLoopback`) | 178–188 MB/s | single connection |
 | Picker, rarest pick with 150 peers | 10–12 µs | one pick in a dense swarm |
@@ -307,7 +315,7 @@ run at once per torrent.
 | `make test-ui` (Playwright, Chromium) | 63–72 s |
 | CI (`ci.yml` / `continuous.yml` / `codeql.yml`), 2 vCPU runners | 411 s / 278 s / 210 s |
 
-The suite has 2,866 Go tests in 69 packages, 80 Playwright tests and 83 Go benchmarks (count
+The suite has 2,879 Go tests in 72 packages, 79 Playwright tests and 84 Go benchmarks (count
 of 2026-11-02; build times of 2026-10-17, test times of 2026-10-22, CI of 2026-10-17).
 
 ## Verified without a benchmark
