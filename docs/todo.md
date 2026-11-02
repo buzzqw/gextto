@@ -7,8 +7,12 @@ added here. There is no history and no design essay: the state of the product is
 in [`measurements.md`](measurements.md).
 
 **Rule.** No speculative work: an item starts only when its gate is met. An item with no
-gate is ready to pick up. Do not add a diary: a sentence that would still be true after
-the item lands does not belong here.
+gate is ready to pick up. Every idea proposed by the operator or by the assistant in a
+working session is written here in the same cycle: under the matching area once accepted,
+under [Proposals](#proposals) while it is still a decision, and under
+[Not planned](#not-planned) when rejected. An idea must not stay only in the chat. Do not
+add a diary: a sentence that would still be true after the item lands does not belong
+here.
 
 ## Engine (gx-core, gx-torrent)
 
@@ -59,6 +63,13 @@ the item lands does not belong here.
   latency (a call, a game) fills no queue, so a ping alone cannot see them; in
   `both`/`router` the WAN counters do. Gate: a real call or game next to a saturated
   download, measured in `both` and in `ping`.
+
+## Proposals
+
+Ideas proposed but not decided yet. An accepted proposal moves to the matching area with
+its gate; a rejected one moves to *Not planned*.
+
+_None at the moment._
 
 ## Not planned
 
