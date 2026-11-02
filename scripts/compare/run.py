@@ -9,7 +9,7 @@ method and keeps the results; `make measure-compare` is the usual entry point.
   scripts/compare/run.py build                 build the images
   scripts/compare/run.py run [--rounds N] ...  run the scenarios, append results
   scripts/compare/run.py report                print the tables of the results
-  scripts/compare/run.py clean                 remove the payloads and containers
+  scripts/compare/run.py clean [--images]      remove payloads, containers, images
 
 Standard library only. The data lives in the test work area
 ($GEXTTO_TEST_ROOT, default ~/.cache/gextto-tests/compare — a real disk: /tmp is
@@ -880,11 +880,16 @@ def command_build(args):
 
 
 def command_clean(args):
-    """Drop the payloads and the containers of a finished round: a round leaves
-    several GiB behind and the harness regenerates them from the fixed formula."""
+    """Drop what a finished round leaves behind: containers, network and payloads
+    (several GiB, regenerated from the fixed formula). The images stay unless
+    --images is given, because the next round would rebuild them from scratch."""
     cleanup()
+    sh("docker", "network", "rm", NET, check=False)
+    if args.images:
+        for target in CLIENTS + ["tracker"]:
+            sh("docker", "image", "rm", "-f", f"gxc-{target}", check=False)
     shutil.rmtree(WORK, ignore_errors=True)
-    print(f"removed {WORK}")
+    print(f"removed {WORK}" + (" and the gxc-* images" if args.images else ""))
 
 
 def describe_host():
@@ -1032,7 +1037,8 @@ def main():
     run.add_argument("--tag", default="")
     report = sub.add_parser("report")
     report.add_argument("--tag", default="")
-    sub.add_parser("clean")
+    clean = sub.add_parser("clean")
+    clean.add_argument("--images", action="store_true", help="also remove the gxc-* images")
     args = parser.parse_args()
     commands = {
         "build": command_build,

@@ -334,10 +334,13 @@ command go in a `mktemp -d` scratch folder, deleted at the end.
 
 Cleanup has a command for each thing: `scripts/gx-core-test.sh clean` stops the
 test daemon and removes its directory, `scripts/compare/run.py clean` removes
-the payloads and the containers of a round, `scripts/test-workdir.sh clean` the
-throwaway folders (it keeps a running instance and the long-lived gx-core test
-instance; `--all` removes those too). The only files that stay are the raw
-benchmark results in `gextto-data/bench/`, which the next run overwrites.
+the payloads, the containers and the network of a round (`--images` removes the
+`gxc-*` images too), `scripts/test-workdir.sh clean` the throwaway folders (it
+keeps a running instance and the long-lived gx-core test instance; `--all`
+removes those too). The only files that stay are the raw benchmark results in
+`gextto-data/bench/`, which the next run overwrites. Docker's build cache is not
+part of the work area: `docker builder prune` after a round that rebuilt the
+images.
 
 ## Build cache
 

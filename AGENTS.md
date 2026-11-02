@@ -272,11 +272,14 @@ not to break.
     (`scripts/bench-all.sh`). The defaults of those scripts already point
     inside the work area.
   - **Cleanup is part of the work**: `scripts/gx-core-test.sh clean` (stops the
-    test daemon and removes it), `scripts/compare/run.py clean` (payloads and
-    containers of a round), `scripts/test-workdir.sh clean` (everything no
-    process is using; the long-lived gx-core test instance stays, `--all`
-    removes it too). Before the final report the work area holds nothing left
-    over and `$HOME` has no new entry.
+    test daemon and removes it), `scripts/compare/run.py clean` (payloads,
+    containers and network of a round; `--images` removes the `gxc-*` images
+    too, about 700 MB), `scripts/test-workdir.sh clean` (everything no process
+    is using; the long-lived gx-core test instance stays, `--all` removes it
+    too). Docker's build cache is outside the work area: prune it with
+    `docker builder prune` when `docker system df` shows a large reclaimable
+    part. Before the final report the work area holds nothing left over and
+    `$HOME` has no new entry.
   - The only artifacts that stay are the raw benchmark results in
     `gextto-data/bench/`, with fixed names so the next run overwrites them; the
     figures a reader can decide something from go to `docs/measurements.md`.
