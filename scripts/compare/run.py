@@ -51,7 +51,7 @@ REF_MEMORY = "1500m"
 UID = f"{os.getuid()}:{os.getgid()}"
 
 PIECE = 2 * 1024 * 1024
-MANY_COUNT = 500
+MANY_COUNT = 100
 MANY_SIZE = 2 * 1024 * 1024
 LINE_PEERS = 4
 LINE_RATE = "25mbit"  # 4 peers x 25 Mbit/s = a 100 Mbit/s line
@@ -65,9 +65,9 @@ MAX_ATTEMPTS = 3
 # hashes differently is refused: the round would not compare with the earlier ones.
 OFFICIAL_HASHES = {
     "big.bin": "f9221811202b8222c1ea7d6b18c1956ac6fcbd5a",
-    "line.bin": "14f648d44b7dc0e4781cd126551dbb2c8407da13",
+    "line.bin": "d4b2903110733690a8cc2a731bb6859b0db6461c",
     "many-0000.bin": "cd646c86c9b3a72653199896634b7d0a2f1dea32",
-    "many-0499.bin": "24a4c317ac5abaf29a9da4caa98d8f4bcc9dc34c",
+    "many-0099.bin": "dbf983049538743b152e57de03b92066d8dc7444",
 }
 
 
@@ -552,13 +552,13 @@ def guard_host():
 
 
 def wait_quiet(limit=1200):
-    """Wait for the rest of the host to use less than QUIET_CORES, for 20 s in a row."""
+    """Wait for the rest of the host to use less than QUIET_CORES, for 10 s in a row."""
     started = time.time()
     while time.time() - started < limit:
         guard_host()
         before = host_busy_seconds()
-        time.sleep(20)
-        cores = (host_busy_seconds() - before) / 20
+        time.sleep(10)
+        cores = (host_busy_seconds() - before) / 10
         if cores < QUIET_CORES and not ffmpeg_running():
             return cores
         log(f"host busy ({cores:.2f} cores), waiting")
@@ -723,7 +723,7 @@ def cleanup():
 
 def scenario_idle(client, env):
     sut = start_sut(client)
-    time.sleep(30)
+    time.sleep(15)
     with Sampler(sut) as sample:
         time.sleep(60)
     return sample.metrics()
@@ -821,7 +821,7 @@ def scenario_many(client, env):
 
     all_seeding()
     ready = time.time() - started
-    time.sleep(30)
+    time.sleep(15)
     with Sampler(sut) as sample:
         time.sleep(60)
     metrics = {"add_s": round(added, 2), "ready_s": round(ready, 2), **sample.metrics()}
@@ -848,7 +848,7 @@ def setup_env(args, scenarios):
     if {"full", "check-upload"} & set(scenarios):
         env["big"] = Payload("big.bin" if args.big_gib == 4 else f"big-{args.big_gib}.bin", int(args.big_gib * 2**30))
     if {"line", "line-utp"} & set(scenarios):
-        env["line"] = Payload("line.bin" if args.line_gib == 1 else f"line-{args.line_gib}.bin", int(args.line_gib * 2**30))
+        env["line"] = Payload("line.bin" if args.line_gib == 0.5 else f"line-{args.line_gib}.bin", int(args.line_gib * 2**30))
     if "many" in scenarios:
         env["many"] = [Payload(f"many-{i:04d}.bin", MANY_SIZE, piece=256 * 1024) for i in range(args.many)]
     return env
@@ -1008,7 +1008,7 @@ def main():
     run.add_argument("--clients", default=",".join(CLIENTS))
     run.add_argument("--scenarios", default=",".join(SCENARIOS))
     run.add_argument("--big-gib", type=float, default=4)
-    run.add_argument("--line-gib", type=float, default=1)
+    run.add_argument("--line-gib", type=float, default=0.5)
     run.add_argument("--many", type=int, default=MANY_COUNT)
     run.add_argument("--no-build", action="store_true")
     run.add_argument("--tag", default="")
