@@ -37,6 +37,13 @@ func (c *countingConn) Read(p []byte) (int, error) {
 	return n, err
 }
 
+// HintRead forwards the reader's hint to a socket that can use it (uTP).
+func (c *countingConn) HintRead(n int) {
+	if h, ok := c.Conn.(interface{ HintRead(int) }); ok {
+		h.HintRead(n)
+	}
+}
+
 func (c *countingConn) Write(p []byte) (int, error) {
 	n, err := c.Conn.Write(p)
 	if c.stats != nil {

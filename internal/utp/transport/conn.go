@@ -41,6 +41,9 @@ type Conn struct {
 	readBuf         []byte
 	readPos         int
 	readBufNotEmpty Event
+	// readWant, when set, holds the next Read back until this many bytes are
+	// buffered (see HintRead). It is consumed by that Read.
+	readWant int
 
 	socket           *Socket
 	remoteSocketAddr net.Addr
@@ -617,15 +620,36 @@ func (c *Conn) assertHeader(h header) {
 }
 
 func (c *Conn) updateReadBufNotEmpty() {
-	c.readBufNotEmpty.SetBool(c.bufferedInbound() != 0)
+	c.readBufNotEmpty.SetBool(c.bufferedInbound() >= max(c.readWant, 1))
 }
 
-// appendReadBuf appends received bytes to the read window. When the backing
-// array is full and some of it is already consumed, it first moves the unread
-// tail to the front, so the append reuses the capacity instead of reallocating
-// the whole window.
+// HintRead says the next Read is of no use below n bytes, because the reader
+// knows the peer owes it that much (a block in flight). A block spans a dozen
+// datagrams, and waking the reader for each one was the largest cost of a uTP
+// download after the socket calls. Only that one Read waits, and it returns what
+// is buffered as soon as the peer closes, the connection dies or the read
+// deadline passes, so a peer that stalls is noticed exactly as before. n is
+// capped below the window we offer: the peer can always send what we wait for.
+func (c *Conn) HintRead(n int) {
+	mu.Lock()
+	defer mu.Unlock()
+	c.readWant = min(n, readBufferLen/2)
+	c.updateReadBufNotEmpty()
+}
+
+// readHeldBack reports whether Read must keep waiting for its HintRead amount.
+func (c *Conn) readHeldBack() bool {
+	return c.bufferedInbound() < c.readWant &&
+		!c.gotFin.IsSet() && !c.closed.IsSet() && !c.destroyed.IsSet() && !c.connDeadlines.read.passed.IsSet()
+}
+
+// appendReadBuf appends received bytes to the read window. When they would not fit
+// after the end and some of the array is already consumed, it first moves the
+// unread tail to the front, so the append reuses the capacity instead of
+// reallocating the whole window. A datagram rarely lands exactly on the end, so
+// waiting for a full array would grow it whenever the reader leaves bytes behind.
 func (c *Conn) appendReadBuf(p []byte) {
-	if c.readPos > 0 && len(c.readBuf) == cap(c.readBuf) {
+	if c.readPos > 0 && len(c.readBuf)+len(p) > cap(c.readBuf) {
 		n := copy(c.readBuf, c.readBuf[c.readPos:])
 		c.readBuf = c.readBuf[:n]
 		c.readPos = 0
@@ -721,6 +745,10 @@ func (c *Conn) Read(b []byte) (n int, err error) {
 	mu.Lock()
 	defer mu.Unlock()
 	for {
+		for c.readHeldBack() {
+			c.waitRead()
+		}
+		c.readWant = 0
 		n = copy(b, c.readBuf[c.readPos:])
 		c.readPos += n
 		if c.readPos == len(c.readBuf) {
@@ -751,13 +779,18 @@ func (c *Conn) Read(b []byte) (n int, err error) {
 		case c.connDeadlines.read.passed.IsSet():
 			return 0, errTimeout
 		}
-		waitEvents(&mu,
-			&c.gotFin,
-			&c.closed,
-			&c.destroyed,
-			&c.connDeadlines.read.passed,
-			&c.readBufNotEmpty)
+		c.waitRead()
 	}
+}
+
+// waitRead blocks until a Read has something new to look at. Callers hold mu.
+func (c *Conn) waitRead() {
+	waitEvents(&mu,
+		&c.gotFin,
+		&c.closed,
+		&c.destroyed,
+		&c.connDeadlines.read.passed,
+		&c.readBufNotEmpty)
 }
 
 func (c *Conn) RemoteAddr() net.Addr { return addr{c.remoteSocketAddr} }

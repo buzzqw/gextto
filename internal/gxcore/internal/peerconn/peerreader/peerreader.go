@@ -47,7 +47,7 @@ var blockPool = bufferpool.New(piece.BlockSize)
 // before allocating and throttling block intake through the read limiter.
 type PeerReader struct {
 	conn         net.Conn
-	r            io.Reader
+	r            *bufio.Reader
 	log          logger.Logger
 	pieceTimeout time.Duration
 	maxMsgSize   int
@@ -115,6 +115,14 @@ func (d *deadlineReader) arm(window time.Duration) error {
 	d.deadline = t
 	d.progressed = false
 	return nil
+}
+
+// hintRead tells a socket that can use it (uTP) how much the next read is
+// waiting for, so it wakes this goroutine once per block instead of per datagram.
+func (d *deadlineReader) hintRead(n int) {
+	if h, ok := d.conn.(interface{ HintRead(int) }); ok {
+		h.HintRead(n)
+	}
 }
 
 func (d *deadlineReader) Read(b []byte) (int, error) {
@@ -450,6 +458,9 @@ func (p *PeerReader) readPiece(length uint32) (buf bufferpool.Buffer, err error)
 		}
 	}
 	p.dr.window = p.pieceTimeout
+	if missing := int(length) - p.r.Buffered(); missing > 0 {
+		p.dr.hintRead(missing)
+	}
 	_, err = io.ReadFull(p.r, buf.Data)
 	p.dr.window = readTimeout
 	if err == nil {

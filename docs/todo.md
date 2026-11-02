@@ -16,9 +16,12 @@ here.
 
 ## Engine (gx-core, gx-torrent)
 
-- **uTP CPU** — uTP still costs more CPU per GiB than the libtorrent clients, mostly syscalls
-  and goroutine wake-ups per datagram. Gate: a profile on `make measure-compare`, line-utp
-  scenario, that names a cost the engine can remove.
+- **uTP read hint on encrypted connections** — an encrypted peer still wakes the reader per
+  datagram, because the MSE layer can hold bytes left over from the handshake. Gate: a profile
+  with encrypted uTP peers where those wake-ups are a real share of the CPU.
+- **Reused read-cache buffers** — each block read for an upload allocates and clears a new
+  buffer, about a tenth of the CPU with the collector. Gate: a way to recycle a buffer that a
+  cache eviction cannot pull from under a block being copied.
 - **Peer turnover** — at the connection cap, close the slowest peers periodically and
   try new addresses (`prunePeers` frees only a useless peer today). Gate: a real swarm
   larger than the cap where turnover beats the current download rate on the same

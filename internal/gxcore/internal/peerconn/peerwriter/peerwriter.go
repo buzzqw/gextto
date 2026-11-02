@@ -7,6 +7,7 @@ import (
 	"errors"
 	"io"
 	"net"
+	"sync"
 	"time"
 
 	"github.com/buzzqw/gextto/internal/gxcore/internal/bandwidth"
@@ -21,6 +22,18 @@ const keepAlivePeriod = 2 * time.Minute
 // maxBatch caps the small messages handed to the writer in one go (the
 // in-flight request cap is 250 by default, so one refill fits).
 const maxBatch = 256
+
+// maxPieceBatch caps the blocks written to the socket in one call when the queue
+// holds several. One write per 16 KiB block was the largest cost of an upload at
+// full speed. It stays small because a block handed over can no longer be
+// cancelled, and because the buffer is memory held per uploading peer while it runs.
+const maxPieceBatch = 8
+
+// pieceBatchBufs holds the buffers of the batched writes, shared by every peer so
+// a connection that uploads nothing costs nothing.
+var pieceBatchBufs = sync.Pool{New: func() any {
+	return bytes.NewBuffer(make([]byte, 0, maxPieceBatch*(5+8+peerreader.MaxBlockSize)+bytes.MinRead))
+}}
 
 // servedWindowSize caps the remembered served blocks: an unbounded set grew
 // forever and rejected legitimate re-requests (e.g. after a corrupt
@@ -177,10 +190,11 @@ func (p *PeerWriter) Run() {
 	}
 }
 
-// takeBatch removes the head of the queue for the writer: a block upload on
-// its own, or the run of small messages up to the next upload (at most
-// maxBatch). Small messages are never cancelled or purged, so handing them
-// over together changes nothing but the number of writes.
+// takeBatch removes the head of the queue for the writer: a run of block uploads
+// (at most maxPieceBatch, one when a rate limit paces them), or the run of small
+// messages up to the next upload (at most maxBatch). Small messages are never
+// cancelled or purged, so handing them over together changes nothing but the
+// number of writes.
 func (p *PeerWriter) takeBatch() []peerprotocol.Message {
 	batch := p.batches[p.nextBatch][:0]
 	for e := p.writeQueue.Front(); e != nil && len(batch) < maxBatch; e = p.writeQueue.Front() {
@@ -189,16 +203,36 @@ func (p *PeerWriter) takeBatch() []peerprotocol.Message {
 			if len(batch) > 0 {
 				break
 			}
-			p.writeQueue.Remove(e)
-			p.currentQueuedRequests--
-			batch = append(batch, msg)
-			break
+			return p.finishBatch(p.takePieces(batch))
 		}
 		p.writeQueue.Remove(e)
 		batch = append(batch, msg)
 	}
+	return p.finishBatch(batch)
+}
+
+// finishBatch keeps the slice for reuse and flips to the other one.
+func (p *PeerWriter) finishBatch(batch []peerprotocol.Message) []peerprotocol.Message {
 	p.batches[p.nextBatch] = batch
 	p.nextBatch ^= 1
+	return batch
+}
+
+// takePieces moves the run of block uploads at the head of the queue into batch.
+func (p *PeerWriter) takePieces(batch []peerprotocol.Message) []peerprotocol.Message {
+	limit := maxPieceBatch
+	if p.bucket.Rate() > 0 {
+		limit = 1
+	}
+	for e := p.writeQueue.Front(); e != nil && len(batch) < limit; e = p.writeQueue.Front() {
+		msg := e.Value.(peerprotocol.Message)
+		if _, ok := msg.(Piece); !ok {
+			break
+		}
+		p.writeQueue.Remove(e)
+		p.currentQueuedRequests--
+		batch = append(batch, msg)
+	}
 	return batch
 }
 
@@ -271,12 +305,8 @@ func (p *PeerWriter) messageWriter() {
 		select {
 		case p.readyC <- struct{}{}:
 			batch := <-p.batchC
-			if pi, ok := batch[0].(Piece); ok {
-				var msg peerprotocol.Message = pi
-				if p.servedRequests.seen(pi.RequestMessage) {
-					msg = peerprotocol.RejectMessage{RequestMessage: pi.RequestMessage}
-				}
-				if !p.sendFramed(msg) {
+			if _, ok := batch[0].(Piece); ok {
+				if !p.sendPieces(batch) {
 					return
 				}
 				continue
@@ -372,6 +402,75 @@ func (p *PeerWriter) writeOK(err error, msg peerprotocol.Message) bool {
 	return false
 }
 
+// answerTo is the frame to send for a queued upload: the block, or a reject when
+// the peer already asked for and received it.
+func (p *PeerWriter) answerTo(pi Piece) peerprotocol.Message {
+	if p.servedRequests.seen(pi.RequestMessage) {
+		return peerprotocol.RejectMessage{RequestMessage: pi.RequestMessage}
+	}
+	return pi
+}
+
+// sendPieces writes a run of queued uploads, in one call when there are several.
+// False means the writer loop must exit.
+func (p *PeerWriter) sendPieces(batch []peerprotocol.Message) bool {
+	if len(batch) == 1 {
+		return p.sendFramed(p.answerTo(batch[0].(Piece)))
+	}
+	buf := pieceBatchBufs.Get().(*bytes.Buffer)
+	defer pieceBatchBufs.Put(buf)
+	buf.Reset()
+	var blocks, payload int
+	for _, queued := range batch {
+		pi := queued.(Piece)
+		msg := p.answerTo(pi)
+		if buf.Len() > 0 && buf.Available() < 5+8+int(pi.Length)+bytes.MinRead {
+			if !p.flushPieces(buf, blocks, payload, msg) {
+				return false
+			}
+			blocks, payload = 0, 0
+		}
+		if !p.appendFrame(buf, msg) {
+			return false
+		}
+		if _, ok := msg.(Piece); ok {
+			blocks++
+			payload += int(pi.Length)
+		}
+	}
+	return p.flushPieces(buf, blocks, payload, batch[len(batch)-1])
+}
+
+// flushPieces waits out the upload throttle, writes the framed blocks and reports
+// their payload. A write that failed halfway reports the bytes it can vouch for.
+func (p *PeerWriter) flushPieces(buf *bytes.Buffer, blocks, payload int, msg peerprotocol.Message) bool {
+	if blocks > 0 && !p.waitBucket(int64(buf.Len())) {
+		return false
+	}
+	n, err := p.conn.Write(buf.Bytes())
+	buf.Reset()
+	if err != nil {
+		payload = min(payload, n-13*blocks)
+	}
+	p.countUploadBytes(payload)
+	return p.writeOK(err, msg)
+}
+
+// waitBucket waits for the upload throttle to allow n bytes. False means the
+// writer was stopped meanwhile.
+func (p *PeerWriter) waitBucket(n int64) bool {
+	d := p.bucket.Take(n)
+	if d <= 0 {
+		return true
+	}
+	select {
+	case <-time.After(d):
+		return true
+	case <-p.stopC:
+		return false
+	}
+}
+
 // sendFramed serializes one message into scratch and writes it, honoring
 // the upload throttle for pieces and reporting payload bytes. False means
 // the writer loop must exit.
@@ -381,18 +480,13 @@ func (p *PeerWriter) sendFramed(msg peerprotocol.Message) bool {
 		return false
 	}
 
-	if _, ok := msg.(Piece); ok {
-		if d := p.bucket.Take(int64(buf.Len())); d > 0 {
-			select {
-			case <-time.After(d):
-			case <-p.stopC:
-				return false
-			}
-		}
+	_, isPiece := msg.(Piece)
+	if isPiece && !p.waitBucket(int64(buf.Len())) {
+		return false
 	}
 	n, err := p.conn.Write(buf.Bytes())
-	if _, ok := msg.(Piece); ok {
-		p.countUploadBytes(n)
+	if isPiece {
+		p.countUploadBytes(n - 13) // message + piece header
 	}
 	return p.writeOK(err, msg)
 }
@@ -412,17 +506,13 @@ func (p *PeerWriter) sendKeepAlive() bool {
 	return false
 }
 
-// countUploadBytes reports the payload bytes of a written piece (frame and
-// header excluded, never negative).
+// countUploadBytes reports payload bytes written to the peer, if any.
 func (p *PeerWriter) countUploadBytes(n int) {
-	n -= 13 // message + piece header
-	if n < 0 {
-		n = 0
+	if n <= 0 {
+		return
 	}
-	if uploaded := uint32(n); uploaded > 0 {
-		select {
-		case p.messages <- BlockUploaded{Length: uploaded}:
-		case <-p.stopC:
-		}
+	select {
+	case p.messages <- BlockUploaded{Length: uint32(n)}:
+	case <-p.stopC:
 	}
 }

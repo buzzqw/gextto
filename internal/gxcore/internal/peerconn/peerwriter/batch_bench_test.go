@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/buzzqw/gextto/internal/gxcore/internal/bandwidth"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/logger"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/peerprotocol"
 )
@@ -194,4 +195,128 @@ func BenchmarkPeerWriterRequestsTCP(b *testing.B) {
 			runtime.Gosched()
 		}
 	}
+}
+
+// runWriter starts w and collects the payload it reports as uploaded.
+func runWriter(t *testing.T, w *PeerWriter) *atomic.Int64 {
+	t.Helper()
+	var uploaded atomic.Int64
+	go w.Run()
+	t.Cleanup(w.Stop)
+	go func() {
+		for {
+			select {
+			case m := <-w.Messages():
+				if u, ok := m.(BlockUploaded); ok {
+					uploaded.Add(int64(u.Length))
+				}
+			case <-w.Done():
+				return
+			}
+		}
+	}()
+	return &uploaded
+}
+
+func waitBytes(t *testing.T, conn *countingConn, uploaded *atomic.Int64, wantBytes, wantPayload int64) {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for conn.bytes.Load() < wantBytes || uploaded.Load() < wantPayload {
+		if time.Now().After(deadline) {
+			t.Fatalf("wrote %d of %d bytes, reported %d of %d", conn.bytes.Load(), wantBytes, uploaded.Load(), wantPayload)
+		}
+		time.Sleep(time.Millisecond)
+	}
+}
+
+// Queued blocks go out in fewer writes, intact and in order, with a second request
+// for a served block answered by a reject inside the same run, and only the blocks
+// counted as uploaded.
+func TestPeerWriterBatchesBlocks(t *testing.T) {
+	const blocks = 40
+	conn := &countingConn{keep: true}
+	w := New(conn, logger.New("test"), 250, true, nil)
+	data := make([]byte, blocks*16384)
+	for i := range data {
+		data[i] = byte(i * 31)
+	}
+	source := bytes.NewReader(data)
+	go func() {
+		for j := uint32(0); j < blocks; j++ {
+			w.SendPiece(peerprotocol.RequestMessage{Index: 0, Begin: j * 16384, Length: 16384}, source)
+		}
+		w.SendPiece(peerprotocol.RequestMessage{Index: 0, Begin: 0, Length: 16384}, source) // already served
+	}()
+	uploaded := runWriter(t, w)
+	waitBytes(t, conn, uploaded, blocks*(13+16384)+17, blocks*16384)
+
+	conn.mu.Lock()
+	got := append([]byte(nil), conn.got...)
+	conn.mu.Unlock()
+	for j := uint32(0); j < blocks; j++ {
+		if n := binary.BigEndian.Uint32(got); n != 9+16384 || peerprotocol.MessageID(got[4]) != peerprotocol.Piece {
+			t.Fatalf("block %d: frame length %d, id %d", j, n, got[4])
+		}
+		if begin := binary.BigEndian.Uint32(got[9:]); begin != j*16384 {
+			t.Fatalf("block %d carries begin %d", j, begin)
+		}
+		if !bytes.Equal(got[13:13+16384], data[j*16384:(j+1)*16384]) {
+			t.Fatalf("block %d is not intact", j)
+		}
+		got = got[13+16384:]
+	}
+	if len(got) != 17 || peerprotocol.MessageID(got[4]) != peerprotocol.Reject {
+		t.Fatalf("after the blocks: %d bytes, want the 17 of a reject", len(got))
+	}
+	if n := uploaded.Load(); n != blocks*16384 {
+		t.Fatalf("reported %d bytes uploaded, want %d", n, blocks*16384)
+	}
+}
+
+// A rate limit paces single blocks: a batch would turn it into bursts.
+func TestPeerWriterDoesNotBatchUnderARateLimit(t *testing.T) {
+	const blocks = 6
+	conn := &countingConn{}
+	w := New(conn, logger.New("test"), 250, true, bandwidth.New(1<<30))
+	data := make([]byte, blocks*16384)
+	source := bytes.NewReader(data)
+	go func() {
+		for j := uint32(0); j < blocks; j++ {
+			w.SendPiece(peerprotocol.RequestMessage{Index: 0, Begin: j * 16384, Length: 16384}, source)
+		}
+	}()
+	uploaded := runWriter(t, w)
+	waitBytes(t, conn, uploaded, blocks*(13+16384), blocks*16384)
+	if n := conn.writes.Load(); n != blocks {
+		t.Fatalf("%d writes for %d blocks under a rate limit, want one each", n, blocks)
+	}
+}
+
+// BenchmarkPeerWriterBlocks is the upload path: blocks queued faster than they go.
+func BenchmarkPeerWriterBlocks(b *testing.B) {
+	conn := &countingConn{}
+	w := New(conn, logger.New("bench"), 1<<30, true, nil)
+	go w.Run()
+	defer w.Stop()
+	go func() {
+		for {
+			select {
+			case <-w.Messages():
+			case <-w.Done():
+				return
+			}
+		}
+	}()
+	source := bytes.NewReader(make([]byte, 1<<24))
+	b.SetBytes(16384)
+	b.ReportAllocs()
+	var want int64
+	for i := 0; b.Loop(); i++ {
+		w.SendPiece(peerprotocol.RequestMessage{Index: uint32(i >> 10), Begin: uint32(i%1024) * 16384, Length: 16384}, source)
+		want += 13 + 16384
+	}
+	for conn.bytes.Load() < want {
+		runtime.Gosched()
+	}
+	b.ReportMetric(float64(conn.writes.Load())/float64(b.N), "writes/block")
 }

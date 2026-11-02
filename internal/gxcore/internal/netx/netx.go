@@ -635,6 +635,13 @@ func tcpAddrOf(addr net.Addr) net.Addr {
 	return addr
 }
 
+// HintRead forwards the reader's hint to the uTP connection underneath.
+func (c *UTPConn) HintRead(n int) {
+	if h, ok := c.Conn.(interface{ HintRead(int) }); ok {
+		h.HintRead(n)
+	}
+}
+
 // RemoteAddr returns the peer address as *net.TCPAddr (snapshotted).
 func (c *UTPConn) RemoteAddr() net.Addr { return c.remote }
 

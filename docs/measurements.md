@@ -145,10 +145,10 @@ not run again.
 |---|---|---|---|
 | 100 Mbit/s line, TCP | 6.9 MB/s | **11.2 MB/s** | addresses with the same BEP 40 priority overwrote each other, so 2 of the 4 peers waited for the next announce |
 | 100 Mbit/s line, uTP | 6.9 MB/s | **11.2 MB/s** | same cause |
-| uTP CPU per GiB | 54 s | **48 s** | state packets batched over 2 ms instead of 0.5 ms |
+| uTP CPU per GiB | 51 s | **39 s** | the reader wakes once per block instead of once per datagram; same speed, peak own memory 49 MiB against 51 |
 | Recheck of 4 GiB | 8.8 s | **3.8–4.0 s** | read-ahead back on, a queue round when the check ends, reading and hashing side by side (0.8 s more CPU) |
-| Upload | 110–125 MB/s | **180–240 MB/s** | read-ahead back on (most of the gain), next block read in the background (about 10 %) |
-| Upload CPU per GiB | 4.9 s | **3.2 s** | same causes |
+| Upload | 230 MB/s (205–242) | **262 MB/s** (223–290) | up to 8 blocks in one socket write instead of one each; six rounds each, old and new taking turns |
+| Upload CPU per GiB | 3.3 s | **2.5 s** | same cause |
 | Recheck after an add in seed mode | hashed nothing | **reads the data** | seed mode claimed every piece again on the restart |
 | Download at full speed | 284 MB/s | 290 MB/s | no regression |
 
