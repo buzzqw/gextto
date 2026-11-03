@@ -1250,6 +1250,16 @@ func (d *Database) checkSeriesScoredInner(release *models.Release, score, minSco
 	if sameHashIsArchived {
 		return false, "duplicate", nil
 	}
+	// The same release already imported for this episode, whose library file
+	// is still there, is the copy we have even when the episode row no longer
+	// carries its hash (a row reset or recreated from disk). The library name
+	// drops markers such as REPACK, so judged by the file alone the release
+	// looks like an upgrade of itself and would be downloaded again.
+	if imported, err := d.releaseAlreadyImported(hash, seriesName, season, episode); err != nil {
+		return false, "", err
+	} else if imported {
+		return false, "duplicate", nil
+	}
 	var dbID, dbScore int64
 	var dbTitle, dbArchivePath, dbMediaInfo string
 	var dbDownloaded sql.NullString
@@ -5638,6 +5648,18 @@ func (d *Database) MarkReleaseCompleted(release *models.Release, path string, si
 						return err
 					}
 				}
+				// A single episode's row now describes the file this release put
+				// in the library: record the release on it. The row may have lost
+				// its placeholder (reset, or recreated by a library scan from the
+				// old file) and kept the name and no hash of the replaced copy;
+				// the next decision would then take this very release — a REPACK
+				// whose marker the library name drops — for an upgrade of itself
+				// and download it again. The score is never lowered.
+				if !release.IsPack && len(episodes) == 1 && hash != "" {
+					if err := recordEpisodeRelease(tx, seriesID, season, episodes[0], release, hash); err != nil {
+						return err
+					}
+				}
 			}
 		}
 	} else {
@@ -5653,6 +5675,49 @@ func (d *Database) MarkReleaseCompleted(release *models.Release, path string, si
 	}
 	committed = true
 	return nil
+}
+
+// releaseAlreadyImported reports whether this hash already completed for the
+// episode and the file it put in the library still exists. A file the user
+// deleted on purpose does not count: the release may be downloaded again.
+func (d *Database) releaseAlreadyImported(hash, seriesName string, season, episode int64) (bool, error) {
+	hash = strings.ToLower(strings.TrimSpace(hash))
+	if hash == "" {
+		return false, nil
+	}
+	var processed string
+	err := d.db.QueryRow("SELECT COALESCE(processed_path,'') FROM torrent_meta WHERE hash=?1 AND status='completed' AND lower(series_name)=lower(?2) AND season=?3 AND episode=?4", hash, seriesName, season, episode).Scan(&processed)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	processed = strings.TrimSpace(processed)
+	if processed == "" || !localPath(processed) {
+		return false, nil
+	}
+	info, statErr := os.Stat(processed)
+	return statErr == nil && !info.IsDir(), nil
+}
+
+// recordEpisodeRelease writes the identity of a completed single-episode
+// release on its episode row: the hash (unless another row already holds it,
+// the column is unique) and the release name, which keeps the markers the
+// library file name drops, such as REPACK.
+func recordEpisodeRelease(tx *sql.Tx, seriesID, season, episode int64, release *models.Release, hash string) error {
+	hash = strings.ToLower(strings.TrimSpace(hash))
+	var takenElsewhere bool
+	if err := tx.QueryRow("SELECT EXISTS(SELECT 1 FROM episodes WHERE lower(COALESCE(magnet_hash,''))=?1 AND NOT (series_id=?2 AND season=?3 AND episode=?4))", hash, seriesID, season, episode).Scan(&takenElsewhere); err != nil {
+		return err
+	}
+	if takenElsewhere {
+		return nil
+	}
+	title := strings.TrimSpace(release.Title)
+	_, err := tx.Exec("UPDATE episodes SET magnet_hash=?1, magnet_link=CASE WHEN ?2<>'' THEN ?2 ELSE magnet_link END, title=CASE WHEN ?3<>'' THEN ?3 ELSE title END WHERE series_id=?4 AND season=?5 AND episode=?6",
+		hash, strings.TrimSpace(release.Magnet), title, seriesID, season, episode)
+	return err
 }
 
 // MarkPackCompleted marks a season pack as completed for each archived episode.
