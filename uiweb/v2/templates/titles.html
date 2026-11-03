@@ -1,0 +1,346 @@
+{{define "v2_series_detail"}}
+<div class="view">
+  <div class="toolbar">
+    <a class="btn sm" href="/?view=series" title="Torna all'elenco delle serie">← Serie TV</a>
+    <form class="toolbar" hx-post="/series/gaps/search" hx-target="#v2-gap-result-series" hx-swap="innerHTML" hx-disabled-elt="find button[type=submit]" hx-indicator="#v2-series-gap-busy">
+      <input type="hidden" name="series" value="{{.Name}}" />
+      <input type="hidden" name="slot" value="series" />
+      <button class="btn sm primary" type="submit" title="Cerca in background le puntate mancanti di questa serie sulle sorgenti configurate: la scheda mostra l'avanzamento e i risultati">Cerca mancanti</button>
+      <span id="v2-series-gap-busy" class="htmx-indicator muted">Avvio della ricerca…</span>
+    </form>
+    {{template "v2_action_btn" (dict "Redirect" (printf "/?view=series&series=%s" .PathName) "Path" (printf "/api/series/%s/scan-archive" .PathName) "Method" "POST" "Body" "{}" "Label" "Scansiona archivio" "Class" "" "Title" "Scansiona l'archivio per questa serie")}}
+    {{template "v2_action_btn" (dict "Redirect" (printf "/?view=series&series=%s" .PathName) "Path" (printf "/api/series/%s/metadata" .PathName) "Method" "POST" "Body" "{}" "Label" "Aggiorna da TMDB" "Class" "" "Title" "Aggiorna i metadati TMDB")}}
+    <button class="btn sm" type="button" hx-get="/series/rename-preview?series={{.PathName | urlquery}}" hx-target="#v2-rename-preview" hx-swap="innerHTML" title="Mostra le rinomine proposte senza toccare i file">Anteprima rinomina</button>
+  </div>
+  <div id="v2-gap-result-series" class="v2-gap-result" role="status" aria-live="polite"></div>
+  <div id="v2-rename-preview"></div>
+
+  <div class="panel">
+    <div class="panel-body series-hero">
+      <div class="series-hero-main">
+        {{if .Poster}}<img class="series-poster" loading="lazy" src="{{.Poster}}" alt="{{.Name}}" />{{else}}<div class="series-poster placeholder">N/D</div>{{end}}
+      <div class="series-hero-body">
+         <div class="series-hero-top">
+           <h2>{{.Name}}</h2>
+           {{if .ArchivePath}}<p class="muted series-archive"><small>Archivio: <code title="{{.ArchivePath}}">{{.ArchivePath}}</code></small></p>{{end}}
+         </div>
+        <div class="series-links">{{if .TmdbURL}}<a class="btn sm" href="{{.TmdbURL}}" target="_blank" rel="noopener">TMDB</a>{{end}}{{if .TvdbURL}}<a class="btn sm" href="{{.TvdbURL}}" target="_blank" rel="noopener">TVDB</a>{{end}}</div>
+        <div class="series-badges">
+          {{if .Quality}}<span class="badge"><span>Qualità</span> {{.Quality}}</span>{{end}}
+          {{if .Language}}<span class="badge"><span>Lingua</span> {{.Language}}</span>{{end}}
+          <span class="badge"><span>stagioni</span> {{.Seasons}}</span>
+          <span class="badge">{{.DownloadedCount}}/{{.EpisodeCount}} <span>episodi</span></span>
+          {{if .Gaps}}<span class="badge warn">{{.Gaps}} <span>mancanti</span></span>{{end}}
+           <span class="badge {{if .Enabled}}ok{{else}}warn{{end}}">{{if .Enabled}}attiva{{else}}in pausa{{end}}</span>
+           <span class="badge">{{.StatusLabel}}</span>
+           {{if .Year}}<span class="badge">{{.Year}}</span>{{end}}{{if .Network}}<span class="badge">{{.Network}}</span>{{end}}{{if .Country}}<span class="badge">{{.Country}}</span>{{end}}{{if .Vote}}<span class="badge">★ {{.Vote}}</span>{{end}}{{if .LastAirDate}}<span class="badge"><span>ultima</span> {{.LastAirDate}}</span>{{end}}{{if .NextEpisode}}<span class="badge"><span>Prossima:</span> {{.NextEpisode}}</span>{{end}}
+         </div>
+        {{if .Genres}}<div class="series-genres">{{range .Genres}}<span class="badge">{{.}}</span>{{end}}</div>{{end}}
+        {{if .Overview}}<p class="series-overview">{{.Overview}}</p>{{end}}
+         {{if or .Cast .SeasonButtons}}
+         <div class="series-cast-season">
+           {{if .Cast}}<p class="muted series-cast"><small><span>Cast:</span> {{range $index, $person := .Cast}}{{if $index}}, {{end}}{{if $person.URL}}<a href="{{$person.URL}}" target="_blank" rel="noopener">{{$person.Name}}</a>{{else}}{{$person.Name}}{{end}}{{if $person.Character}} ({{$person.Character}}){{end}}{{end}}</small></p>{{end}}
+           {{if .SeasonButtons}}
+           <div class="season-toggles">
+             <span class="muted"><small>Stagioni (clicca per attivare/disattivare):</small></span>
+             {{range .SeasonButtons}}
+             <form method="post" action="/section/action" hx-post="/section/action" hx-swap="none" style="display:inline">
+               <input type="hidden" name="redirect" value="/?view=series&amp;series={{$.PathName}}" />
+               <input type="hidden" name="path" value="/api/series/{{$.PathName}}/toggle-season" />
+               <input type="hidden" name="method" value="POST" />
+               <input type="hidden" name="body" value='{"season":{{.Season}},"ignored":{{if .Ignored}}false{{else}}true{{end}}}' />
+               <button class="btn sm {{if .Ignored}}warn{{else}}primary{{end}}" type="submit" title="Attiva o disattiva la stagione {{.Season}}">S{{.Season}}</button>
+             </form>
+             {{end}}
+           </div>
+           {{end}}
+         </div>
+         {{end}}
+      </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>Episodi</h3><small class="muted">{{.DownloadedCount}}/{{.EpisodeCount}} · {{.Gaps}} <span>mancanti</span></small></div>
+    <div class="panel-body">
+      {{if .SeasonGroups}}
+      <div class="season-list">
+        {{range .SeasonGroups}}
+        <details class="season-block" open>
+          <summary><strong><span>Stagione</span> {{.Season}}</strong> <small class="muted">{{.Owned}}/{{.Total}} <span>archiviati</span></small></summary>
+          <div class="table-wrap"><table class="data-table series-episodes">
+            <caption class="sr-only"><span>Episodi della stagione</span> {{.Season}}</caption>
+            <thead><tr><th scope="col">S</th><th scope="col">E</th><th scope="col">Titolo</th><th scope="col">Stato</th><th scope="col">Qualità</th><th scope="col">Dimensione</th><th scope="col">Azioni</th></tr></thead>
+            <tbody>
+            {{range .Rows}}
+            <tr>
+              <td class="numeric">{{.Season}}</td><td class="numeric">{{.Episode}}</td>
+              <td class="truncate" title="{{.Title}}">{{.Title}}</td>
+              <td>{{.Status}}{{if .Ignored}} <span class="badge warn">ignorato</span>{{end}}</td>
+              <td class="numeric">{{.QualityScore}}</td>
+              <td class="numeric">{{bytes .SizeBytes}}</td>
+              <td class="row-actions">
+                <button class="btn sm icon-action" type="button" hx-post="/series/episode-search?series={{$.PathName}}&amp;season={{.Season}}&amp;episode={{.Episode}}" hx-target="#v2-ep-search-{{.Season}}-{{.Episode}}" hx-swap="innerHTML" hx-disabled-elt="this" data-v2-ep-search-target="v2-ep-search-{{.Season}}-{{.Episode}}" aria-controls="v2-ep-search-{{.Season}}-{{.Episode}}" aria-expanded="false" title="Cerca manualmente questa puntata" aria-label="Cerca S{{.Season}}E{{.Episode}}"><span aria-hidden="true">🔍</span></button>
+                {{template "v2_action_btn" (dict "Redirect" (printf "/?view=series&series=%s" $.PathName) "Path" .ForcePath "Method" "POST" "Body" "{}" "Label" "⚡" "Class" "icon-action" "Title" "Forza il download")}}
+                {{template "v2_action_btn" (dict "Redirect" (printf "/?view=series&series=%s" $.PathName) "Path" .IgnorePath "Method" "POST" "Body" .IgnoreBody "Label" (ternary .Ignored "✓" "🚫") "Class" "icon-action" "Title" "Ignora o riabilita")}}
+                {{template "v2_action_btn" (dict "Redirect" (printf "/?view=series&series=%s" $.PathName) "Path" .Redownload "Method" "POST" "Body" "{}" "Label" "↻" "Class" "icon-action" "Title" "Riscarica: sposta il file nel cestino, azzera la puntata e la riscarica" "Confirm" "Spostare il file nel cestino e riscaricare questa puntata?")}}
+                <button class="btn sm icon-action" type="button" hx-get="/series/sources?series={{$.PathName}}&amp;season={{.Season}}&amp;episode={{.Episode}}" hx-target="#v2-modal" hx-swap="innerHTML" title="Sorgenti in archivio locale (nessuna ricerca online)" aria-label="Sorgenti in archivio S{{.Season}}E{{.Episode}}"><span aria-hidden="true">ⓘ</span></button>
+                <button class="btn sm icon-action" type="button" hx-get="/series/history?series={{$.PathName}}&amp;season={{.Season}}&amp;episode={{.Episode}}&amp;modal=1" hx-target="#v2-modal" hx-swap="innerHTML" title="Storia dei download di questa puntata: ricerca, download, spostamenti, errori" aria-label="Storia dei download della puntata">📜</button>
+                {{template "v2_action_btn" (dict "Redirect" (printf "/?view=series&series=%s" $.PathName) "Path" .DeletePath "Method" "DELETE" "Body" "{}" "Label" "🗑️" "Class" "icon-action danger" "Title" "Elimina dall'archivio" "Confirm" "Eliminare questa puntata dall'archivio?")}}
+              </td>
+            </tr>
+            <tr class="v2-ep-search-row" data-v2-ep-search-row hidden>
+              <td colspan="7"><div id="v2-ep-search-{{.Season}}-{{.Episode}}" data-v2-ep-search-slot></div></td>
+            </tr>
+            {{end}}
+            </tbody>
+          </table></div>
+        </details>
+        {{end}}
+      </div>
+      {{else}}<p class="muted">Nessun episodio noto.</p>{{end}}
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>Storia dei download</h3><small class="muted">Ultimi 50 eventi; 📜 su una puntata mostra la sua storia completa.</small></div>
+    <div class="panel-body" hx-get="/series/history?series={{.PathName}}" hx-trigger="load" hx-swap="innerHTML"><p class="muted">Caricamento…</p></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>Modifica serie</h3></div>
+    <div class="panel-body">
+      <form class="form-grid" method="post" action="/series/save" hx-post="/series/save" hx-swap="none">
+        <input type="hidden" name="name" value="{{.Name}}" />
+        <label class="field"><span>Stagioni</span><input class="input" name="seasons" value="{{.Seasons}}" placeholder="* oppure 1-5" /></label>
+        {{template "v2_title_profile" .Profiles}}
+        <label class="field" title="ID TMDB della serie (per titoli episodi e poster)"><span>TMDB ID</span><input class="input" name="tmdb_id" value="{{.TmdbID}}" /></label>
+        <label class="field" title="ID TheTVDB della serie (usato per i metadati quando TMDB non è configurato)"><span>TVDB ID</span><input class="input" name="tvdb_id" value="{{.TvdbID}}" /></label>
+        <label class="field span-full"><span>Alias</span><input class="input" name="aliases" value="{{.Aliases}}" placeholder="nomi alternativi separati da virgola" /></label>
+         <label class="field span-full"><span>Percorso archivio (NAS)</span><span class="field-row"><input class="input" name="archive_path" value="{{.ArchivePath}}" data-v2-browse-input /><button class="btn sm" type="button" data-v2-browse-for="archive_path" title="Sfoglia le cartelle disponibili sul server">Sfoglia</button></span></label>
+        <label class="field span-full"><span>Escludi</span><input class="input" name="exclude" value="{{.Exclude}}" /></label>
+        <input type="hidden" name="flags" value="1" />
+        <label class="field" title="Le release degli anime numerano gli episodi dall'inizio senza stagioni («Titolo - 1071»): Gextto converte il numero in stagione ed episodio con i dati TMDB e cerca anche il numero assoluto."><span>Anime (numerazione assoluta)</span><select class="input" name="anime"><option value="false"{{if not .Anime}} selected{{end}}>No</option><option value="true"{{if .Anime}} selected{{end}}>Sì</option></select></label>
+        <div class="form-actions"><button class="btn primary" type="submit">Salva serie</button></div>
+      </form>
+    </div>
+  </div>
+</div>
+{{end}}
+
+{{define "v2_action_btn"}}
+<form method="post" action="/section/action" hx-post="/section/action" hx-swap="none" style="display:inline">
+  <input type="hidden" name="redirect" value="{{.Redirect}}" />
+  <input type="hidden" name="path" value="{{.Path}}" />
+  <input type="hidden" name="method" value="{{.Method}}" />
+  <input type="hidden" name="body" value="{{.Body}}" />
+  <button class="btn sm {{.Class}}" type="submit"{{if .Confirm}} hx-confirm="{{.Confirm}}"{{end}}{{if .Title}} title="{{.Title}}"{{end}}>{{.Label}}</button>
+</form>
+{{end}}
+
+{{define "v2_movie_detail"}}
+<div class="view">
+  <div class="toolbar">
+    <a class="btn sm" href="/?view=movies" title="Torna all'elenco dei film">← Film</a>
+        {{template "v2_action_btn" (dict "Redirect" (printf "/?view=movies&movie=%d" .ID) "Path" (printf "/api/movies/%d/search" .ID) "Method" "POST" "Body" "{}" "Label" "Cerca" "Class" "primary" "Title" "Cerca release per questo film")}}
+    {{template "v2_action_btn" (dict "Redirect" (printf "/?view=movies&movie=%d" .ID) "Path" (printf "/api/movies/%d/redownload" .ID) "Method" "POST" "Body" "{}" "Label" "Riscarica" "Class" "" "Title" "Rendi di nuovo scaricabile")}}
+    {{template "v2_action_btn" (dict "Redirect" (printf "/?view=movies&movie=%d" .ID) "Path" (printf "/api/movies/%d/metadata" .ID) "Method" "POST" "Body" "{\"source\":\"tmdb\"}" "Label" "Aggiorna TMDB" "Class" "" "Title" "Applica i metadati TMDB")}}
+    {{template "v2_action_btn" (dict "Redirect" "/?view=movies" "Path" (printf "/api/movies/%d" .ID) "Method" "DELETE" "Body" "{}" "Label" "Elimina" "Class" "danger" "Title" "Elimina questo film" "Confirm" "Eliminare questo film?")}}
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>{{.Name}} {{.Year}}</h3><small class="muted">{{.Quality}} · {{.Language}}</small></div>
+    <div class="panel-body">
+      {{if .Poster}}<img class="detail-poster" loading="lazy" src="{{.Poster}}" alt="{{.Name}}" />{{end}}{{if .Overview}}<p>{{.Overview}}</p>{{end}}
+      <div class="toolbar detail-links">{{if .TmdbURL}}<a class="btn sm" href="{{.TmdbURL}}" target="_blank" rel="noopener">TMDB</a>{{end}}{{if .TvdbURL}}<a class="btn sm" href="{{.TvdbURL}}" target="_blank" rel="noopener">TVDB</a>{{end}}{{if .ReleaseDate}}<span class="badge"><span>uscita</span> {{.ReleaseDate}}</span>{{end}}</div>
+      {{if .Cast}}<p class="muted"><small><span>Cast:</span> {{range $index, $person := .Cast}}{{if $index}}, {{end}}{{if $person.URL}}<a href="{{$person.URL}}" target="_blank" rel="noopener">{{$person.Name}}</a>{{else}}{{$person.Name}}{{end}}{{if $person.Character}} ({{$person.Character}}){{end}}{{end}}</small></p>{{end}}
+      <form class="form-grid" method="post" action="/section/form" hx-post="/section/form" hx-swap="none">
+        <input type="hidden" name="view" value="movies" />
+        <input type="hidden" name="redirect" value="/?view=movies&amp;movie={{.ID}}" />
+        <input type="hidden" name="path" value="/api/movies/{{.ID}}" />
+        <label class="field"><span>Nome</span><input class="input" name="name" value="{{.Name}}" /></label>
+        <label class="field"><span>Anno</span><input class="input" name="year" value="{{.Year}}" /></label>
+        {{template "v2_title_profile" .Profiles}}
+        <input type="hidden" name="_v2_kind_quality_profile_id" value="number" />
+        <input type="hidden" name="quality" value="{{.Quality}}" /><input type="hidden" name="language" value="{{.Language}}" /><input type="hidden" name="subtitle" value="{{.Subtitle}}" />
+        <label class="field" title="Sì: una release senza questi sottotitoli viene scartata. No: i sottotitoli sono solo preferiti."><span>Sottotitoli obbligatori</span><select class="input" name="subtitle_required"><option value="false"{{if not .SubtitleRequired}} selected{{end}}>No</option><option value="true"{{if .SubtitleRequired}} selected{{end}}>Sì</option></select></label>
+        <input type="hidden" name="_v2_kind_subtitle_required" value="select" />
+        <label class="field span-full"><span>Escludi</span><input class="input" name="exclude" value="{{.Exclude}}" placeholder="es. un altro titolo con lo stesso nome" /></label>
+        <input type="hidden" name="tmdb_id" value="{{.TmdbID}}" />
+        <input type="hidden" name="tvdb_id" value="{{.TvdbID}}" />
+        <div class="form-actions"><button class="btn primary" type="submit">Salva</button></div>
+      </form>
+    </div>
+  </div>
+
+  {{if .Matches}}
+  <div class="panel">
+    <div class="panel-head"><h3>Corrispondenze archivio</h3></div>
+    <div class="panel-body"><div class="table-wrap"><table class="data-table">
+      <caption class="sr-only">Corrispondenze archivio</caption>
+      <thead><tr><th scope="col">Titolo</th><th scope="col">Sorgente</th><th scope="col">Azioni</th></tr></thead>
+      <tbody>{{range .Matches}}<tr>
+        <td class="truncate" title="{{.Title}}">{{.Title}}</td>
+        <td title="{{.Source}}">{{sourceLabel .Source}}</td>
+        <td class="row-actions">
+           {{template "v2_action_btn" (dict "Redirect" (printf "/?view=movies&movie=%d" $.ID) "Path" "/api/archive/batch-download" "Method" "POST" "Body" .Body "Label" "Scarica" "Class" "primary" "Title" "Aggiungi questa release ai download")}}
+           <form method="post" action="/search/explain" hx-post="/search/explain" hx-target="#v2-modal" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="release" value="{{.ExplainBody}}" /><button class="btn sm" type="submit">Perché non questo?</button></form>
+           {{if .Magnet}}<a class="btn sm" href="{{.Magnet}}" title="Apri il link magnet">Magnet</a>{{end}}
+        </td>
+      </tr>{{end}}</tbody>
+    </table></div></div>
+  </div>
+  {{end}}
+
+  {{if .History}}
+  <div class="panel">
+    <div class="panel-head"><h3>Storico</h3></div>
+    <div class="panel-body"><div class="table-wrap"><table class="data-table">
+      <caption class="sr-only">Storico download</caption>
+      <thead><tr><th scope="col">Titolo</th><th scope="col">Qualità</th><th scope="col">Dimensione</th></tr></thead>
+      <tbody>{{range .History}}<tr><td class="truncate">{{.Title}}</td><td class="numeric">{{.QualityScore}}</td><td class="numeric">{{bytes .SizeBytes}}</td></tr>{{end}}</tbody>
+    </table></div></div>
+  </div>
+  {{end}}
+</div>
+{{end}}
+
+{{define "v2_sources_rows"}}
+{{if .Results}}
+<div class="table-wrap"><table class="data-table">
+  <thead><tr>{{if .ShowEpisode}}<th scope="col">Puntata</th>{{end}}<th scope="col">Titolo</th><th scope="col">Sorgente</th><th scope="col">Punteggio</th><th scope="col">Dimensione</th><th scope="col">Azioni</th></tr></thead>
+  <tbody>{{range .Results}}<tr>{{if $.ShowEpisode}}<td class="nowrap">{{.Episode}}</td>{{end}}
+    <td class="truncate" title="{{.Title}}">{{.Title}}{{if .LastResort}} <span class="badge warn" title="Ultima risorsa: episodio mancante preso fuori dalla risoluzione del profilo perché era l'unica copia nella lingua richiesta. L'upgrade lo sostituisce appena esce una copia nel profilo.">🆘 ultima risorsa</span>{{end}}</td>
+    <td>{{.Source}}</td><td class="numeric">{{.Score}}</td><td class="numeric">{{if .SizeBytes}}{{bytes .SizeBytes}}{{else}}—{{end}}</td>
+    <td class="row-actions">{{if .Magnet}}<button class="btn sm" type="button" data-v2-copy="{{.Magnet}}" title="Copia il link magnet negli appunti">Copia magnet</button>{{end}}{{if .Body}}{{template "v2_action_btn" (dict "Redirect" $.Redirect "Path" "/api/archive/batch-download" "Method" "POST" "Body" .Body "Label" "Scarica" "Class" "primary" "Title" "Aggiungi questa release ai download")}}{{end}}</td>
+  </tr>{{end}}</tbody>
+</table></div>
+{{else}}<p class="muted">{{if .Hint}}{{.Hint}}{{else}}Nessuna sorgente disponibile per questa puntata.{{end}}</p>{{end}}
+{{end}}
+
+{{define "v2_dashboard_problems"}}
+{{if .Error}}<p class="alert">{{.Error}}</p>{{end}}
+{{if .Empty}}<p class="muted"><span class="badge ok">ok</span> <span>Niente da controllare: nessun download fermo, nessuno spostamento in sospeso e nessun avviso.</span></p>{{end}}
+{{if .Stalled}}<h4>Fermi</h4>
+<div class="table-wrap"><table class="data-table dashboard-problems-table"><caption class="sr-only">Download fermi</caption><thead><tr><th scope="col">Download</th><th scope="col">Progresso</th><th scope="col">Fermo dalle</th><th scope="col" class="problems-reason">Motivo</th><th scope="col" title="Quando Gextto lo abbandona e cerca un'altra versione">Abbandono previsto</th><th scope="col">Prossimo tentativo</th><th scope="col">Azioni</th></tr></thead>
+<tbody>{{range .Stalled}}<tr><td class="problems-name" title="{{.Name}}">{{.ShortName}}</td><td class="numeric">{{.Progress}}</td><td class="nowrap">{{.Since}}</td><td class="problems-reason">{{.Reason}}</td><td class="nowrap">{{.GiveUpAt}}</td><td class="nowrap">{{.NextRetry}}</td><td class="row-actions"><button class="btn sm" type="button" hx-get="/series/history?hash={{.Hash}}&amp;modal=1" hx-target="#v2-modal" hx-swap="innerHTML" title="Storia di questo download">Storia</button></td></tr>{{end}}</tbody></table></div>{{end}}
+{{if .Moves}}<h4>Spostamenti in sospeso</h4>
+<div class="table-wrap"><table class="data-table dashboard-problems-table"><caption class="sr-only">Spostamenti in libreria in sospeso</caption><thead><tr><th scope="col">Download</th><th scope="col">Destinazione</th><th scope="col">Tentativi</th><th scope="col">Azioni</th></tr></thead>
+<tbody>{{range .Moves}}<tr><td class="problems-name" title="{{.Name}}">{{.ShortName}}</td><td class="truncate" title="{{.Destination}}"><code>{{.Destination}}</code></td><td class="numeric">{{.Attempts}}</td><td class="row-actions"><button class="btn sm" type="button" hx-get="/series/history?hash={{.Hash}}&amp;modal=1" hx-target="#v2-modal" hx-swap="innerHTML" title="Storia di questo download">Storia</button></td></tr>{{end}}</tbody></table></div>{{end}}
+{{if .Recent}}<div class="problems-section-head"><h4>Avvisi</h4><button class="btn sm" type="button" hx-post="/dashboard/problems/ack" hx-target="#v2-dashboard-problems" hx-swap="innerHTML" hx-disabled-elt="this" title="Segna come letti gli avvisi mostrati; ricompaiono solo se il download ne produce di nuovi">Pulisci</button></div>
+<div class="table-wrap"><table class="data-table dashboard-problems-table acquisition-events"><caption class="sr-only">Avvisi dei download non risolti</caption><thead><tr><th scope="col">Quando</th><th scope="col">Download</th><th scope="col">Evento</th><th scope="col">Azioni</th></tr></thead>
+<tbody>{{range .Recent}}<tr class="acq-{{.LevelClass}}"><td class="nowrap">{{.At}}{{if gt .Repeat 1}} <span class="badge" title="Avvisi di questo download">×{{.Repeat}}</span>{{end}}</td><td class="truncate" title="{{.Title}}">{{if .SeriesName}}{{.SeriesName}} {{.EpisodeLabel}}{{else}}{{.Title}}{{end}}</td><td>{{if eq .Level "WARN"}}<span class="badge warn">avviso</span> {{else if eq .Level "ERROR"}}<span class="badge err">errore</span> {{end}}{{.Message}}</td><td class="row-actions"><button class="btn sm" type="button" hx-get="/series/history?hash={{.Hash}}&amp;modal=1" hx-target="#v2-modal" hx-swap="innerHTML" title="Storia di questo download">Storia</button></td></tr>{{end}}</tbody></table></div>{{end}}
+{{end}}
+
+{{define "v2_series_history"}}
+{{if .Modal}}<div class="overlay" style="display:block">
+  <div class="modal v2-history-modal" role="dialog" aria-modal="true" aria-labelledby="v2-history-title">
+    <div class="modal-head"><h3 id="v2-history-title"><span>Storia</span> {{.Label}}</h3>
+      <button class="btn sm" type="button" hx-get="/empty" hx-target="#v2-modal" hx-swap="innerHTML">Chiudi</button></div>
+    <div class="modal-body">{{end}}
+{{if .Error}}<p class="alert">{{.Error}}</p>{{else}}{{template "v2_acquisition_events" (dict "Events" .Events "AcqID" "" "ShowTitle" true)}}{{end}}
+{{if .Modal}}</div>
+  </div>
+</div>{{end}}
+{{end}}
+
+{{define "v2_sources_modal"}}
+<div class="overlay" style="display:block">
+  <div class="modal v2-sources-modal" role="dialog" aria-modal="true" aria-labelledby="v2-sources-title">
+    <div class="modal-head"><h3 id="v2-sources-title"><span>Sorgenti</span> {{.Label}}</h3>
+      <button class="btn sm" type="button" hx-get="/empty" hx-target="#v2-modal" hx-swap="innerHTML">Chiudi</button></div>
+    <div class="modal-body">{{template "v2_sources_rows" .}}</div>
+  </div>
+</div>
+{{end}}
+
+{{define "v2_episode_search_panel"}}
+{{/* The inline search of one episode: the archive releases at once, then the
+     online search, followed here with what it is doing. */}}
+<section class="v2-ep-search" data-v2-ep-search-panel role="region" aria-labelledby="v2-ep-search-title-{{.Slot}}" tabindex="-1">
+  <div class="v2-ep-search-head">
+    <h4 id="v2-ep-search-title-{{.Slot}}"><span>Cerca</span> {{.Label}}</h4>
+    <button class="btn sm" type="button" hx-get="/empty" hx-target="#{{.Slot}}" hx-swap="innerHTML" title="Chiudi i risultati della ricerca">Chiudi</button>
+  </div>
+  <div class="v2-ep-search-body">
+    {{if .Error}}<p class="alert">{{.Error}}</p>{{end}}
+    <h5>Archivio</h5>
+    {{template "v2_sources_rows" .Archive}}
+    {{if .Online.ID}}<h5>Feed e indexer</h5>
+    {{template "v2_episode_search_online" .Online}}{{end}}
+  </div>
+</section>
+{{end}}
+
+{{define "v2_episode_search_online"}}
+<div id="v2-ep-online-{{.ID}}" class="v2-ep-online"{{if .Running}} hx-get="{{.URL}}" hx-trigger="every 1s" hx-swap="outerHTML"{{end}} role="status" aria-live="polite">
+  {{if .Running}}{{template "v2_episode_search_progress" .}}{{else if .Error}}<p class="err">{{.Error}}</p>{{else}}{{if gt .Total 0}}<p class="muted v2-ep-total"><span>Sorgenti interrogate:</span> {{.Total}}</p>{{end}}{{template "v2_sources_rows" .Sources}}{{end}}
+</div>
+{{end}}
+
+{{define "v2_episode_search_progress"}}
+<p class="muted v2-ep-progress"><span class="v2-spinner" aria-hidden="true"></span>
+  {{- if eq .Phase "ed2k"}}<span>Nessun risultato dai torrent: controllo eD2k/Kad…</span>
+  {{- else if gt .Total 0}}<span>{{.Done}}/{{.Total}}</span> <span>sorgenti hanno risposto…</span>
+  {{- else if eq .Phase "sources"}}<span>Interrogo indexer e motori di ricerca…</span>
+  {{- else}}<span>Avvio della ricerca online…</span>{{end}}</p>
+{{end}}
+
+{{define "v2_rename_preview"}}
+<div class="panel" id="v2-rename-preview-panel">
+  <div class="panel-head"><h3><span>Anteprima rinomina</span> · {{.Series}}</h3>{{if .Executed}}<span class="badge ok">eseguita</span>{{end}}</div>
+  <div class="panel-body">
+    {{if .Message}}<p class="{{if .Error}}alert{{else}}muted{{end}}">{{.Message}}</p>{{end}}
+    {{if .Items}}
+    <div class="table-wrap"><table class="data-table">
+      <caption class="sr-only">Anteprima rinomina</caption>
+      <thead><tr><th scope="col">Ep.</th><th scope="col">Vecchio nome</th><th scope="col">Nuovo nome / esito</th></tr></thead>
+      <tbody>{{range .Items}}<tr>
+        <td class="numeric">S{{.Season}}E{{.Episode}}</td>
+        <td class="truncate" title="{{.From}}">{{.From}}</td>
+        <td class="truncate" title="{{.To}}">{{if .Error}}<span class="badge err">errore</span> {{.Error}}{{else if .Discarded}}<span class="badge warn">scartato</span>{{else}}{{.To}}{{end}}</td>
+      </tr>{{end}}</tbody>
+    </table></div>
+    {{end}}
+    <div class="toolbar" style="margin-top:10px">
+      <form hx-post="/series/rename-execute" hx-target="#v2-rename-preview" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="series" value="{{.Series}}" /><button class="btn sm primary" type="submit" {{if not .Items}}disabled{{end}}>Esegui rinomina</button></form>
+      <form hx-post="/series/rename-execute" hx-target="#v2-rename-preview" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="series" value="{{.Series}}" /><input type="hidden" name="force" value="1" /><button class="btn sm danger" type="submit" hx-confirm="Forzare la rinomina? Verranno toccati anche i file già corretti.">Forza rinomina</button></form>
+      <button class="btn sm" type="button" hx-get="/empty" hx-target="#v2-rename-preview" hx-swap="innerHTML">Chiudi</button>
+    </div>
+  </div>
+</div>
+{{end}}
+
+{{define "v2_trash_list"}}
+{{if .Items}}
+<div class="table-wrap"><table class="data-table">
+  <caption class="sr-only">Elementi nel cestino</caption>
+  <thead><tr><th scope="col">Nome</th><th scope="col">Dimensione</th><th scope="col">Tipo</th><th scope="col"></th></tr></thead>
+  <tbody>{{range .Items}}<tr>
+    <td class="truncate" title="{{.Path}}">{{.Name}}</td>
+    <td class="numeric">{{bytes .SizeBytes}}</td>
+    <td>{{if .IsDir}}cartella{{else}}file{{end}}</td>
+    <td class="row-actions">
+      <form method="post" action="/trash/delete" hx-post="/trash/delete" hx-swap="none" style="display:inline">
+        <input type="hidden" name="name" value="{{.Name}}" />
+        <button class="btn sm danger" type="submit" hx-confirm="Eliminare questo elemento dal cestino?">Elimina</button>
+      </form>
+    </td>
+  </tr>{{end}}</tbody>
+</table></div>
+{{else}}<p class="muted">Cestino vuoto.</p>{{end}}
+{{end}}
+
+{{define "v2_form_field"}}
+{{if eq .Kind "hidden"}}<input type="hidden" name="{{.Name}}" value="{{.Value}}" />
+{{else}}<label class="field{{if eq .Kind "area"}} span-full{{end}}" title="{{if .Hint}}{{.Hint}}{{else}}{{.Label}}{{end}}">
+  <input type="hidden" name="_v2_kind_{{.Name}}" value="{{.Kind}}" />
+  <span>{{.Label}}</span>
+  {{if eq .Kind "select"}}<select class="input" name="{{.Name}}">{{range .Options}}<option value="{{.Value}}"{{if .Selected}} selected{{end}}>{{.Label}}</option>{{end}}</select>
+  {{else if eq .Kind "area"}}<textarea class="input" name="{{.Name}}" rows="3" placeholder="{{.Placeholder}}">{{.Value}}</textarea>
+  {{else if eq .Kind "number"}}<input class="input" type="number" name="{{.Name}}" value="{{.Value}}" placeholder="{{.Placeholder}}" />
+  {{else if eq .Kind "password"}}<input class="input" type="password" name="{{.Name}}" value="" placeholder="non visualizzata" autocomplete="new-password" />
+  {{else}}<input class="input" name="{{.Name}}" value="{{.Value}}" placeholder="{{.Placeholder}}" />{{end}}
+</label>{{end}}
+{{end}}

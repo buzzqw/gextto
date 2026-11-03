@@ -158,7 +158,7 @@ func TestGapSearchRowsCarryTheLastResortMark(t *testing.T) {
 // more: with a series full of gaps it held the request open for minutes. It
 // must use the same background job as the Missing tab.
 func TestSeriesDetailStartsTheBackgroundSearch(t *testing.T) {
-	raw, err := os.ReadFile("uiweb/v2/templates/v2.html")
+	raw, err := os.ReadFile("uiweb/v2/templates/titles.html")
 	if err != nil {
 		t.Fatal(err)
 	}

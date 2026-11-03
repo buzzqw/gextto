@@ -1,0 +1,156 @@
+{{define "v2_detail_modal"}}
+<div class="torrent-drawer-head">
+  <h3 id="v2-detail-title">{{.Name}}</h3>
+  <button class="btn sm" type="button" data-v2-detail-close title="Chiudi i dettagli del torrent">Chiudi</button>
+</div>
+<div class="torrent-drawer-body">
+  <div class="toolbar detail-tabs" role="tablist" aria-label="Sezioni dettagli torrent">
+    {{range .Tabs}}<button class="btn sm{{if .Active}} primary{{end}}" type="button" role="tab" aria-selected="{{if .Active}}true{{else}}false{{end}}" data-v2-detail-tab="{{.ID}}" hx-get="/downloads/detail/panel?hash={{$.Hash}}&tab={{.ID}}" hx-target="#v2-detail-panel" hx-swap="innerHTML" title="Mostra la sezione {{.Label}} del dettaglio torrent">{{.Label}}</button>{{end}}
+  </div>
+  <div id="v2-detail-panel" role="tabpanel">{{template "v2_detail_panel" .}}</div>
+</div>
+{{end}}
+
+{{define "v2_detail_panel"}}
+{{if .Error}}<p class="muted">{{.Error}}</p>{{else}}
+<div>
+{{if eq .Tab "general"}}
+  <div class="panel"><div class="panel-body"><div class="stat-grid">{{range .General}}<div class="row"{{if .Hint}} title="{{.Hint}}"{{end}}><span>{{.Label}}</span><strong class="truncate" title="{{if .Hint}}{{.Hint}} — {{end}}{{.Value}}">{{.Value}}</strong></div>{{end}}</div>
+    <div class="toolbar detail-actions">
+      {{template "v2_detail_action" (dict "Hash" .Hash "Tab" "general" "Op" "no_rename" "Body" (printf `{"value":%t}` (not .NoRename)) "Label" (ternary .NoRename "Rinomina abilitata" "Non rinominare") "Title" "Attiva o disattiva la rinomina dei file di questo torrent quando vengono archiviati in libreria.")}}
+      {{template "v2_detail_action" (dict "Hash" .Hash "Tab" "general" "Op" "reannounce" "Body" "{}" "Label" "Annuncia" "Title" "Invia subito un annuncio ai tracker per cercare nuovi peer.")}}
+      {{template "v2_detail_action" (dict "Hash" .Hash "Tab" "general" "Op" "restart" "Body" "{}" "Label" "Riavvia" "Title" "Ferma e riavvia il torrent nella sessione senza perdere i dati già scaricati.")}}
+      {{if .Caps.SuperSeeding}}{{template "v2_detail_action" (dict "Hash" .Hash "Tab" "general" "Op" "super-seeding" "Body" (printf `{"enabled":%t}` (not .Torrent.SuperSeeding)) "Label" (ternary .Torrent.SuperSeeding "Disattiva super seeding" "Super seeding") "Title" "Modalità super seeding: distribuisce i pezzi in modo che i peer si scambino tra loro. Non aumenta il rapporto.")}}{{end}}
+      {{if .Torrent.Pinned}}{{template "v2_detail_action" (dict "Hash" .Hash "Tab" "general" "Op" "unpin" "Body" "{}" "Label" "Sblocca pin" "Title" "Rimette il torrent nella gestione automatica della coda.")}}{{else}}{{template "v2_detail_action" (dict "Hash" .Hash "Tab" "general" "Op" "pin" "Body" "{}" "Label" "Pin" "Title" "Tiene il torrent fuori dalla rotazione automatica della coda e lo lascia attivo.")}}{{end}}
+      {{template "v2_detail_action" (dict "Hash" .Hash "Tab" "general" "Op" "mark_failed" "Body" "{}" "Label" "Segna come fallito" "Class" "danger" "Confirm" "Segnare questo torrent come fallito?" "Title" "Blocklista la release e rimuove il torrent dalla sessione; i file restano e puoi scegliere se eliminarli.")}}
+      <button class="btn sm" type="button" hx-get="/downloads/remove?hash={{.Hash}}" hx-target="#v2-modal" hx-swap="innerHTML" title="Rimuove il torrent dalla sessione e chiede se eliminare anche i file.">Rimuovi</button>
+    </div>
+    <div class="toolbar detail-links">
+      <a class="btn sm" href="/api/torrents/{{.Hash}}/magnet" target="_blank" rel="noopener" title="Apri il link magnet del torrent">Magnet</a>
+      <button class="btn sm" type="button" data-v2-copy="{{.Magnet}}"{{if not .Magnet}} disabled{{end}} title="Copia il link magnet negli appunti">Copia magnet</button>
+      <a class="btn sm" href="/api/torrents/{{.Hash}}/export.torrent" download title="Scarica il file .torrent">Esporta .torrent</a>
+    </div>
+    <form class="toolbar detail-tag-form" hx-post="/downloads/detail/action" hx-target="#v2-detail-panel" hx-swap="innerHTML">
+      <input type="hidden" name="hash" value="{{.Hash}}" /><input type="hidden" name="tab" value="general" /><input type="hidden" name="op" value="tag" />
+      <input class="input" name="tag" placeholder="tag del torrent" aria-label="Tag del torrent" title="Etichetta libera per raggruppare e filtrare i torrent. Salvala con Salva tag; un campo vuoto rimuove il tag." /><button class="btn sm" type="submit" title="Salva il tag del torrent; un campo vuoto lo rimuove.">Salva tag</button>
+    </form>
+    {{if .Caps.WebSeeds}}<form class="form-grid detail-web-seeds" hx-post="/downloads/detail/action" hx-target="#v2-detail-panel" hx-swap="innerHTML">
+      <input type="hidden" name="hash" value="{{.Hash}}" /><input type="hidden" name="tab" value="general" /><input type="hidden" name="op" value="web-seeds" />
+      <label class="field span-full"><span>Web seed (URL separati da spazio)</span><input class="input" name="urls" placeholder="https://example/file.zip" title="Uno o più URL HTTP da cui scaricare i pezzi oltre ai peer, separati da spazi." /></label>
+      <div class="form-actions"><button class="btn sm" type="submit" name="remove" value="false" title="Aggiunge gli URL indicati ai web seed del torrent">Aggiungi</button><button class="btn sm danger" type="submit" name="remove" value="true" title="Rimuove gli URL indicati dai web seed del torrent">Rimuovi</button></div>
+    </form>{{end}}
+  </div></div>
+{{else if eq .Tab "trackers"}}
+  {{if .TabError}}<p class="alert">{{.TabError}}</p>{{end}}
+  {{if .Trackers}}<div class="table-wrap"><table class="data-table"><thead><tr><th scope="col">URL</th><th scope="col" title="Priorità del tracker: il client prova prima il tier più basso; più tracker nello stesso tier vengono provati insieme.">Tier</th><th scope="col" title="Ultimo esito dell'annuncio: verificato, non verificato o il messaggio di errore.">Stato</th><th scope="col" title="Numero di annunci falliti consecutivi per questo tracker.">Errori</th><th scope="col" title="Seed e peer riportati dallo scrape del tracker; — se il tracker non li fornisce.">Seed/Peer</th><th scope="col">Azioni</th></tr></thead><tbody>{{range .Trackers}}<tr><td class="truncate" title="{{.URL}}">{{.URL}}</td><td>{{.Tier}}</td><td>{{if .Message}}{{.Message}}{{else if .Verified}}verificato{{else}}non verificato{{end}}</td><td>{{.Fails}}</td><td>{{.ScrapeComplete}}/{{.ScrapeIncomplete}}</td><td><form hx-post="/downloads/detail/action" hx-target="#v2-detail-panel" hx-swap="innerHTML"><input type="hidden" name="hash" value="{{$.Hash}}" /><input type="hidden" name="tab" value="trackers" /><input type="hidden" name="op" value="trackers-remove" /><input type="hidden" name="url" value="{{.URL}}" /><button class="btn sm danger" type="submit" title="Rimuove solo questo tracker: gli altri restano">Rimuovi</button></form></td></tr>{{end}}</tbody></table></div>{{else}}<p class="muted">Nessun tracker.</p>{{end}}
+  <form class="form-grid" hx-post="/downloads/detail/action" hx-target="#v2-detail-panel" hx-swap="innerHTML">
+    <input type="hidden" name="hash" value="{{.Hash}}" /><input type="hidden" name="tab" value="trackers" /><input type="hidden" name="op" value="trackers" />
+     <label class="field span-full"><span>Aggiungi tracker (tier|URL per riga)</span><textarea class="input" name="trackers" rows="4" placeholder="0|https://tracker.example/announce" title="Un tracker per riga nel formato tier|URL; il tier è normalmente 0"></textarea></label>
+     <div class="form-actions"><button class="btn sm primary" type="submit" title="Aggiunge i tracker indicati lasciando quelli già presenti">Aggiungi</button></div>
+  </form>
+{{else if eq .Tab "files"}}
+   {{if .TabError}}<p class="alert">{{.TabError}}</p>{{end}}
+   {{if .Caps.FileNote}}<p class="hint">{{.Caps.FileNote}}</p>{{end}}
+   {{if .Files}}<div class="table-wrap"><table class="data-table"><thead><tr><th scope="col">File</th><th scope="col">Dimensione</th><th scope="col">Scaricato</th><th scope="col" title="Priorità di download del file: Salta non lo scarica, Alta e Massima lo scaricano prima degli altri.">Priorità</th><th scope="col" title="Avvia lo streaming del file: i pezzi della finestra vengono scaricati per primi.">Riproduci</th></tr></thead><tbody>{{range $index, $file := .Files}}<tr><td class="truncate" title="{{$file.Path}}">{{$file.Path}}</td><td>{{bytes $file.Size}}</td><td>{{bytes $file.Downloaded}}</td><td><form hx-post="/downloads/detail/action" hx-target="#v2-detail-panel" hx-swap="innerHTML"><input type="hidden" name="hash" value="{{$.Hash}}" /><input type="hidden" name="tab" value="files" /><input type="hidden" name="op" value="files-priority" /><input type="hidden" name="index" value="{{$index}}" /><select class="input compact" name="priority" hx-trigger="change" onchange="this.form.requestSubmit()" aria-label="Priorità di {{$file.Path}}" title="Cambia la priorità di {{$file.Path}}; il salvataggio avviene subito"><option value="0"{{if eq $file.Priority 0}} selected{{end}}>Salta</option>{{if $.Caps.FileLevels}}<option value="1"{{if eq $file.Priority 1}} selected{{end}}>Normale</option><option value="4"{{if eq $file.Priority 4}} selected{{end}}>Predefinita</option><option value="6"{{if eq $file.Priority 6}} selected{{end}}>Alta</option><option value="7"{{if eq $file.Priority 7}} selected{{end}}>Massima</option>{{else}}<option value="4"{{if ne $file.Priority 0}} selected{{end}}>Scarica</option>{{end}}</select></form></td>{{if eq $.Caps.Backend "gx-torrent"}}<td><a class="btn sm" href="/api/torrents/{{$.Hash}}/stream?file={{$index}}" target="_blank" rel="noopener" title="Riproduci questo file in streaming; i pezzi della finestra vengono scaricati per primi">▶</a></td>{{end}}</tr>{{end}}</tbody></table></div>
+  {{else}}<p class="muted">Nessun file.</p>{{end}}
+{{else if eq .Tab "peers"}}
+  {{if .TabError}}<p class="alert">{{.TabError}}</p>{{end}}
+  {{if .Peers}}<div class="table-wrap"><table class="data-table"><thead><tr><th scope="col">Peer</th><th scope="col">Client</th><th scope="col" title="Velocità di download da questo peer.">↓</th><th scope="col" title="Velocità di upload verso questo peer.">↑</th><th scope="col" title="Percentuale del torrent che questo peer dichiara di avere.">Progresso</th><th scope="col" title="Il peer ha già tutti i pezzi del torrent.">Seed</th><th scope="col" title="Protocollo, cifratura e direzione della connessione">Connessione</th></tr></thead><tbody>{{range .Peers}}<tr><td>{{.Address}}</td><td class="truncate">{{if .Client}}{{.Client}}{{else}}—{{end}}</td><td>{{rate .DownloadRate}}</td><td>{{rate .UploadRate}}</td><td>{{printf "%.1f" .Progress}}%</td><td>{{if .Seed}}sì{{else}}no{{end}}</td><td>{{if .Utp}}uTP{{else}}TCP{{end}}{{if .Encrypted}}<span> · cifrata</span>{{end}}<span>{{if .Incoming}} · in entrata{{else}} · in uscita{{end}}</span></td></tr>{{end}}</tbody></table></div>
+  {{else}}<p class="muted">Nessun peer connesso.</p>{{end}}
+{{else if eq .Tab "pieces"}}
+  {{if .TabError}}<p class="alert">{{.TabError}}</p>{{end}}
+  {{if .PiecesReady}}
+    <p class="hint">{{.PiecesDone}}/{{.PieceCount}} <span>pezzi scaricati.</span> <span>Verde: scaricato, giallo: in corso, grigio: mancante, spento: saltato; passa il mouse su una cella per l'intervallo.</span></p>
+    <div class="piece-map" role="img" aria-label="Mappa dei pezzi: {{.PiecesDone}} su {{.PieceCount}} scaricati">
+      {{range .Pieces}}<span class="piece-run piece-{{if eq .State "have"}}have{{else if eq .State "downloading"}}down{{else if eq .State "skipped"}}skip{{else}}missing{{end}}" style="width:{{.Pct}}%" title="{{if eq .State "have"}}scaricato{{else if eq .State "downloading"}}in corso{{else if eq .State "skipped"}}saltato{{else}}mancante{{end}} · pezzi {{.Begin}}–{{.End}}"></span>{{end}}
+    </div>
+  {{else}}<p class="muted">Mappa dei pezzi non disponibile: metadata non ancora presenti.</p>{{end}}
+{{else if eq .Tab "history"}}
+  {{if .TabError}}<p class="alert">{{.TabError}}</p>{{end}}
+  {{template "v2_acquisition_events" (dict "Events" .History "AcqID" .AcqID "ShowTitle" false)}}
+{{else if eq .Tab "limits"}}
+  <form class="form-grid" hx-post="/downloads/detail/action" hx-target="#v2-detail-panel" hx-swap="innerHTML">
+    <input type="hidden" name="hash" value="{{.Hash}}" /><input type="hidden" name="tab" value="limits" /><input type="hidden" name="op" value="limits" />
+    {{if .Caps.LimitsNote}}<p class="hint span-full">{{.Caps.LimitsNote}}</p>{{end}}
+    {{if .Caps.RateLimits}}<label class="field"><span>Download (KiB/s)</span><input class="input" type="number" name="download_limit" value="{{kib .Torrent.DownloadLimit}}" title="Limite di download per questo torrent in KiB/s: -1 usa il limite globale, 0 è illimitato." /></label>
+    <label class="field"><span>Upload (KiB/s)</span><input class="input" type="number" name="upload_limit" value="{{kib .Torrent.UploadLimit}}" title="Limite di upload per questo torrent in KiB/s: -1 usa il limite globale, 0 è illimitato." /></label>{{end}}
+    <label class="field"><span>Ratio seed</span><input class="input" type="number" step="0.01" name="seed_ratio" value="{{.Torrent.SeedRatio}}" title="Rapporto di seed da raggiungere prima di fermare il torrent: -1 usa il valore globale, 0 è illimitato." /></label>
+    <label class="field"><span>Giorni seed</span><input class="input" type="number" name="seed_days" value="{{.Torrent.SeedDays}}" title="Giorni di seed prima di fermare il torrent: -1 usa il valore globale, 0 è illimitato." /></label>
+     {{if .Caps.Connections}}<label class="field"><span>Connessioni massime</span><input class="input" type="number" name="max_connections" value="-1" title="Numero massimo di connessioni per questo torrent; -1 usa il valore globale" /></label>
+     <label class="field"><span>Upload massimi</span><input class="input" type="number" name="max_uploads" value="-1" title="Numero massimo di slot upload per questo torrent; -1 usa il valore globale" /></label>{{end}}
+     <div class="form-actions"><button class="btn sm primary" type="submit" title="Salva i limiti specifici di questo torrent">Salva limiti</button></div>
+  </form>
+{{else if eq .Tab "storage"}}
+  <form class="form-grid" hx-post="/downloads/detail/action" hx-target="#v2-detail-panel" hx-swap="innerHTML">
+    <input type="hidden" name="hash" value="{{.Hash}}" /><input type="hidden" name="tab" value="storage" /><input type="hidden" name="op" value="storage" />
+     <label class="field span-full"><span>Nuovo percorso di storage</span><input class="input" name="path" value="{{.Torrent.SavePath}}" required title="Cartella di destinazione: il client sposta qui i file già scaricati del torrent." /></label>
+     <div class="form-actions"><button class="btn sm primary" type="submit" title="Sposta i dati del torrent nel nuovo percorso; l'operazione può richiedere tempo.">Sposta storage</button></div>
+  </form>
+{{else}}
+  <p class="muted">Scheda non disponibile.</p>
+  <div class="panel"><div class="panel-body">{{range .General}}<div class="row"><span>{{.Label}}</span><strong>{{.Value}}</strong></div>{{end}}</div></div>
+{{end}}
+</div>
+{{end}}
+
+{{end}}
+
+{{define "v2_acquisition_events"}}
+{{if .AcqID}}<p class="hint"><span>ID acquisizione:</span> <code>{{.AcqID}}</code> · <a href="/?view=logs&amp;filter={{printf "acq: %s" .AcqID | urlquery}}" title="Apri il log filtrato su questo download">Mostra nel log</a></p>
+<p class="hint">Ogni riga del log di questo download contiene questo ID.</p>{{end}}
+{{if .Events}}<div class="table-wrap"><table class="data-table acquisition-events"><caption class="sr-only">Storia del download</caption><thead><tr><th scope="col">Quando</th>{{if .ShowTitle}}<th scope="col">Download</th>{{end}}<th scope="col">Evento</th><th scope="col">Dettagli</th></tr></thead><tbody>{{range .Events}}<tr class="acq-{{.LevelClass}}"><td class="nowrap">{{.At}}{{if gt .Repeat 1}} <span class="badge" title="Ripetuto più volte: l'ora è quella dell'ultima">×{{.Repeat}}</span><br /><small class="muted"><span>dal</span> {{.FirstAt}}</small>{{end}}</td>{{if $.ShowTitle}}<td class="truncate" title="{{.Title}}"><code>{{.AcqID}}</code> {{.EpisodeLabel}}</td>{{end}}<td>{{if eq .Level "WARN"}}<span class="badge warn">avviso</span> {{else if eq .Level "ERROR"}}<span class="badge err">errore</span> {{end}}{{.Message}}</td><td class="truncate" title="{{.Fields}}">{{if .Fields}}{{.Fields}}{{else}}—{{end}}</td></tr>{{end}}</tbody></table></div>
+{{else}}<p class="muted">Nessun evento registrato per questo download. La storia si costruisce dalle righe di log scritte da questa versione in poi.</p>{{end}}
+{{end}}
+
+{{define "v2_detail_action"}}
+<form method="post" action="/downloads/detail/action" hx-post="/downloads/detail/action" hx-target="#v2-detail-panel" hx-swap="innerHTML" style="display:inline">
+  <input type="hidden" name="hash" value="{{.Hash}}" /><input type="hidden" name="tab" value="{{.Tab}}" /><input type="hidden" name="op" value="{{.Op}}" /><input type="hidden" name="body" value="{{.Body}}" />
+  <button class="btn sm {{.Class}}" type="submit" title="{{if .Title}}{{.Title}}{{else}}{{.Label}}{{end}}"{{if .Confirm}} hx-confirm="{{.Confirm}}"{{end}}>{{.Label}}</button>
+</form>
+{{end}}
+
+{{define "v2_orphans_modal"}}
+<div class="overlay" style="display:block">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="v2-orphans-title">
+    <div class="modal-head"><h3 id="v2-orphans-title">File orfani</h3>
+      <button class="btn sm" type="button" hx-get="/empty" hx-target="#v2-modal" hx-swap="innerHTML" title="Chiudi la finestra dei file orfani">Chiudi</button></div>
+    <div class="modal-body">
+      {{if .Message}}<p class="htx-status {{if .Error}}err{{else}}ok{{end}}">{{.Message}}</p>{{end}}
+      <p class="muted">Voci nella cartella download non più gestite da un torrent. Vengono spostate nel cestino solo se ogni episodio ha una copia in libreria di qualità uguale o migliore.</p>
+      {{if .Items}}
+      <div class="table-wrap"><table class="data-table">
+        <caption class="sr-only">File orfani nella cartella download</caption>
+        <thead><tr><th scope="col">Elemento</th><th scope="col">Dimensione</th><th scope="col">Episodi</th><th scope="col">Esito</th></tr></thead>
+        <tbody>{{range .Items}}<tr><td class="truncate" title="{{.Path}}">{{.Name}}</td><td class="numeric">{{bytes .SizeBytes}}</td><td>{{if .Episodes}}{{.Episodes}}{{else}}—{{end}}</td><td>{{if .Safe}}<span class="badge ok">sicuro</span>{{else}}<span class="badge warn">saltato</span> <small class="muted">{{.Reason}}</small>{{end}}</td></tr>{{end}}</tbody>
+      </table></div>
+      <p class="muted"><span>Totale sicuro:</span> {{bytes .SafeBytes}} / {{bytes .TotalBytes}}</p>
+      {{if gt .SafeBytes 0}}<button class="btn danger" hx-post="/downloads/orphans/clean" hx-target="#v2-modal" hx-swap="innerHTML" hx-disabled-elt="this" hx-confirm="Spostare nel cestino i file orfani sicuri? Le copie in libreria restano." title="Sposta nel cestino le voci sicure">Sposta nel cestino <small class="muted">— {{bytes .SafeBytes}}</small></button>{{end}}
+      {{else}}<p class="muted">Nessun file orfano trovato.</p>{{end}}
+    </div>
+  </div>
+</div>
+{{end}}
+
+{{define "v2_remove_modal"}}
+<div class="overlay" style="display:block">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="v2-remove-title">
+    <div class="modal-head"><h3 id="v2-remove-title">Rimuovi torrent</h3>
+      <button class="btn sm" type="button" hx-get="/empty" hx-target="#v2-modal" hx-swap="innerHTML" title="Chiudi la finestra di rimozione">Chiudi</button></div>
+     <div class="modal-body">
+       <p class="muted">{{.Name}}</p>
+       {{if .OnRamdisk}}<p class="muted">I file nel RAM disk verrebbero rimossi automaticamente se il torrent diventasse orfano.</p>{{end}}
+       <div class="remove-options">
+         {{if .OnRamdisk}}
+         <button class="btn" hx-post="/downloads/remove" hx-vals='{"hash":"{{.Hash}}","mode":"archive"}' hx-target="#v2-torrents-wrap" hx-swap="outerHTML" hx-disabled-elt="this" hx-on::before-request="document.getElementById('v2-torrent-{{.Hash}}')?.remove();this.closest('.overlay')?.remove()" title="Toglie il torrent dal seed, applica rinomina e controlli di qualità, e sposta i file nella cartella NAS o cartella di download predefinita" data-v2-toast-title="Archiviazione" data-v2-toast-message="Archiviazione e spostamento su NAS in corso...">Sposta su NAS / Archivia <small class="muted">— togli dal seed, rinomina e sposta</small></button>
+         {{else}}
+         <button class="btn" hx-post="/downloads/remove" hx-vals='{"hash":"{{.Hash}}","mode":"session"}' hx-target="#v2-torrents-wrap" hx-swap="outerHTML" hx-disabled-elt="this" hx-on::before-request="document.getElementById('v2-torrent-{{.Hash}}')?.remove();this.closest('.overlay')?.remove()" title="Rimuove il torrent dalla sessione ma mantiene tutti i file">Solo torrent <small class="muted">— mantieni i file</small></button>
+         <button class="btn" hx-post="/downloads/remove" hx-vals='{"hash":"{{.Hash}}","mode":"archive"}' hx-target="#v2-torrents-wrap" hx-swap="outerHTML" hx-disabled-elt="this" hx-on::before-request="document.getElementById('v2-torrent-{{.Hash}}')?.remove();this.closest('.overlay')?.remove()" title="Toglie il torrent dal seed, applica rinomina e controlli di qualità, e sposta i file nella cartella NAS o cartella di download predefinita" data-v2-toast-title="Archiviazione" data-v2-toast-message="Archiviazione e spostamento su NAS in corso...">Sposta su NAS / Archivia <small class="muted">— togli dal seed, rinomina e sposta</small></button>
+         {{end}}
+         <button class="btn danger" hx-post="/downloads/remove" hx-vals='{"hash":"{{.Hash}}","mode":"files"}' hx-target="#v2-torrents-wrap" hx-swap="outerHTML" hx-disabled-elt="this" hx-on::before-request="document.getElementById('v2-torrent-{{.Hash}}')?.remove();this.closest('.overlay')?.remove()" title="Rimuove il torrent dalla sessione ed elimina i file">Torrent + dati <small class="muted">— elimina i file</small></button>
+        <button class="btn" hx-post="/downloads/remove" hx-vals='{"hash":"{{.Hash}}","mode":"blocklist"}' hx-target="#v2-torrents-wrap" hx-swap="outerHTML" hx-disabled-elt="this" hx-on::before-request="document.getElementById('v2-torrent-{{.Hash}}')?.remove();this.closest('.overlay')?.remove()" title="Rimuove il torrent, mantiene i file e lo aggiunge alla blocklist">Torrent + blocklist</button>
+        <button class="btn danger" hx-post="/downloads/remove" hx-vals='{"hash":"{{.Hash}}","mode":"files_blocklist"}' hx-target="#v2-torrents-wrap" hx-swap="outerHTML" hx-disabled-elt="this" hx-on::before-request="document.getElementById('v2-torrent-{{.Hash}}')?.remove();this.closest('.overlay')?.remove()" title="Rimuove il torrent, elimina i file e lo aggiunge alla blocklist">Torrent + file + blocklist</button>
+      </div>
+    </div>
+  </div>
+</div>
+{{end}}

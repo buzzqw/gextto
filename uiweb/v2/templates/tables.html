@@ -1,0 +1,88 @@
+{{define "v2_table_panel"}}
+<div class="view">
+  <div class="panel" id="v2-table-panel-{{.View}}">
+    <div class="panel-head"><h3>{{.Title}}</h3>{{if .Layout}}
+      <div class="layout-switch" role="group" aria-label="Come mostrare l'elenco">
+        <a class="btn sm{{if eq .Layout "list"}} active{{end}}" href="{{.LayoutListURL}}" title="Mostra l'elenco come tabella"{{if eq .Layout "list"}} aria-current="true"{{end}}>Elenco</a>
+        <a class="btn sm{{if eq .Layout "cards"}} active{{end}}" href="{{.LayoutCardsURL}}" title="Mostra l'elenco come locandine"{{if eq .Layout "cards"}} aria-current="true"{{end}}>Locandine</a>
+      </div>{{end}}<small class="muted">{{.Total}} <span>voci</span></small></div>
+    <div class="panel-body">
+      {{if .Note}}<p class="hint">{{.Note}}</p>{{end}}
+      {{if or .Search .Filter .Refresh}}<form class="toolbar" hx-get="/table?view={{.View}}" hx-target="#v2-table-body-{{.View}}" hx-swap="outerHTML" hx-trigger="{{if eq .BaseView "archive"}}submit, input[window.gexttoArchiveLiveAllowed && window.gexttoArchiveLiveAllowed(this, event)] changed delay:300ms{{else}}submit, input changed delay:300ms{{end}}" hx-indicator="#v2-table-panel-{{.View}} .archive-indicator">
+        {{if .Manual}}<input type="hidden" name="load" value="1" />{{end}}
+        <input type="hidden" name="sort" value="{{.Sort}}" />
+        <input type="hidden" name="dir" value="{{.Dir}}" />
+        {{if .Search}}<input class="input{{if eq .BaseView "archive"}} archive-search-input{{end}}" type="search" name="q" value="{{.Query}}" placeholder="{{if eq .BaseView "archive"}}Cerca in archivio, almeno 3 caratteri{{else}}Cerca…{{end}}" aria-label="Cerca"{{if eq .BaseView "archive"}} title="La ricerca nell'archivio parte da sola da 3 caratteri. Per termini più corti (es. IT) premi Invio o Cerca. Con «Cerca anche nel web» o «Cerca anche su eD2k» la ricerca online parte solo da Cerca."{{end}} />{{end}}
+        {{if .Filter}}<input class="input" type="search" name="f" value="{{.FilterQuery}}" placeholder="Filtra l'elenco…" aria-label="Filtra l'elenco" />{{end}}
+        {{if .DayFilter}}<label class="check" title="Mostra solo i download conclusi oggi"><input type="checkbox" name="today" value="1"{{if .Today}} checked{{end}} /> <span>Oggi</span></label>{{end}}
+        {{if eq .BaseView "archive"}}
+        <label class="check archive-web-check" title="Cerca anche nei motori web e indexer online"><input type="checkbox" name="web" value="1"{{if .WebSearch}} checked{{end}} /> <span>Cerca anche nel web</span></label>
+        {{if .Ed2kAvailable}}<label class="check archive-web-check" title="Cerca anche su eD2k e Kad tramite aMule (sulla rete scelta in Configurazione); i risultati compaiono sotto l'archivio"><input type="checkbox" name="ed2k" value="1"{{if .Ed2kSearch}} checked{{end}} /> <span>Cerca anche su eD2k</span></label>{{end}}
+        <button class="btn sm primary" type="submit">Cerca</button>
+        <span class="htmx-indicator muted archive-indicator">Ricerca online in corso…</span>
+        {{else}}
+        {{if and .Bulk (ne .Layout "cards")}}<button class="btn sm" type="button" data-v2-bulk-toggle="v2-bulk-panel-{{.View}}" aria-expanded="false" aria-controls="v2-bulk-panel-{{.View}}" title="Apre i campi per cambiare gli stessi valori su tutte le righe spuntate nella tabella">Modifica selezionati</button>{{end}}
+        {{if .Refresh}}<button class="btn sm" type="submit" title="Ricarica l'elenco qui sotto con il filtro attuale: non modifica nulla">{{if .Bulk}}Aggiorna elenco{{else}}Aggiorna{{end}}</button>{{end}}
+        {{end}}
+      </form>{{end}}
+       {{if and .Bulk (ne .Layout "cards")}}{{template "v2_bulk_panel" .Bulk}}{{end}}
+       {{if eq .Layout "cards"}}{{template "v2_library_cards" .}}{{else}}{{template "v2_table_body" .}}{{end}}
+       {{if or .FooterForm .FooterActions}}
+       <div class="table-panel-footer">
+         {{if .FooterForm}}{{template "v2_table_footer_form" .}}{{end}}
+         {{if .FooterActions}}<div class="form-actions">{{range .FooterActions}}{{template "v2_button" (dict "View" $.FooterView "Path" .Path "Method" .Method "Body" .Body "Label" .Label "Class" .Class "Confirm" .Confirm "Hint" .Hint "ToastTitle" .ToastTitle "ToastMessage" .ToastMessage)}}{{end}}</div>{{end}}
+       </div>
+       {{end}}
+    </div>
+  </div>
+</div>
+{{end}}
+
+{{define "v2_table_footer_form"}}
+<form class="form-grid table-footer-form" method="post" action="/section/form" hx-post="/section/form" hx-swap="none">
+  <input type="hidden" name="view" value="{{.FooterView}}" />
+  <input type="hidden" name="path" value="{{.FooterForm.Path}}" />
+  <input type="hidden" name="wrap" value="{{.FooterForm.Wrap}}" />
+  {{range .FooterForm.Fields}}{{template "v2_form_field" .}}{{end}}
+  <div class="form-actions"><button class="btn sm primary" type="submit">{{if .FooterForm.Submit}}{{.FooterForm.Submit}}{{else}}Salva{{end}}</button></div>
+</form>
+{{end}}
+
+{{define "v2_library_cards"}}
+<div class="tmdb-grid library-cards" id="v2-table-body-{{.View}}">
+  {{if not .Cards}}<p class="hint">{{.Empty}}</p>{{end}}
+  {{range .Cards}}
+  <article class="tmdb-card">
+    <a class="tmdb-poster{{if not .Poster}} placeholder{{end}}" href="{{.Link}}" title="Apri il dettaglio" aria-hidden="{{if .Poster}}false{{else}}true{{end}}">{{if .Poster}}<img src="{{.Poster}}" alt="" loading="lazy" />{{else}}<span>▤</span>{{end}}</a>
+    <div class="tmdb-card-body">
+      <strong><a href="{{.Link}}">{{.Name}}</a></strong>
+      <div class="card-meta">{{range $i, $m := .Meta}}{{if $i}}<span class="card-meta-sep" aria-hidden="true">·</span>{{end}}<span class="card-meta-item"{{if $m.Label}} title="{{$m.Label}}"{{end}}>{{$m.Value}}</span>{{end}}</div>
+    </div>
+  </article>
+  {{end}}
+</div>
+{{end}}
+
+{{define "v2_table_body"}}
+<div id="v2-table-body-{{.View}}">
+  <div class="table-wrap" tabindex="0" role="region" aria-label="{{.Title}}">
+    <table class="data-table {{.Class}}">
+      <caption class="sr-only">{{.Title}}</caption>
+      <thead><tr>{{if .SelectName}}<th scope="col" class="select-col"><input type="checkbox" data-v2-check-all="{{.View}}" aria-label="Seleziona tutte le righe" title="Seleziona o deseleziona tutte le righe visibili"></th>{{end}}{{range .Columns}}<th scope="col"{{if .Sortable}} class="th-sort"{{end}}>{{if .Sortable}}<button class="table-sort-button" type="button" hx-get="/table?view={{$.View}}&amp;sort={{.Key}}&amp;dir={{if and (eq $.Sort .Key) (eq $.Dir "asc")}}desc{{else}}asc{{end}}{{if $.Query}}&amp;q={{$.Query}}{{end}}{{if $.FilterQuery}}&amp;f={{$.FilterQuery}}{{end}}{{if $.WebSearch}}&amp;web=1{{end}}{{if $.Ed2kSearch}}&amp;ed2k=1{{end}}" hx-target="#v2-table-body-{{$.View}}" hx-swap="outerHTML"><span>{{.Label}}</span>{{arrow $.Sort $.Dir .Key}}</button>{{else}}{{.Label}}{{end}}</th>{{end}}{{if .HasActions}}<th scope="col">Azioni</th>{{end}}</tr></thead>
+      <tbody>
+        {{if .Rows}}{{range .Rows}}<tr>{{if $.SelectName}}<td class="select-col"><input type="checkbox" name="{{$.SelectName}}" value="{{.Select}}" form="v2-bulk-form-{{$.View}}" data-v2-check-member="{{$.View}}" aria-label="Seleziona la riga"></td>{{end}}{{range .Cells}}<td>{{.HTML}}</td>{{end}}{{if $.HasActions}}<td class="row-actions">{{.Actions}}</td>{{end}}</tr>{{end}}
+        {{else}}<tr><td class="muted" colspan="{{.Colspan}}">{{.Empty}}</td></tr>{{end}}
+      </tbody>
+    </table>
+  </div>
+  {{if gt .Pages 1}}
+  <div class="table-pagination">
+    <button class="btn sm" type="button"{{if le .Page 1}} disabled{{end}} hx-get="/table?view={{.View}}&amp;page={{.Prev}}&amp;q={{.Query}}&amp;f={{.FilterQuery}}&amp;sort={{.Sort}}&amp;dir={{.Dir}}{{if .WebSearch}}&amp;web=1{{end}}" hx-target="#v2-table-body-{{.View}}" hx-swap="outerHTML">‹ Precedente</button>
+    <span class="page-label"><span>Pagina</span> {{.Page}}/{{.Pages}} · {{.Total}} <span>voci</span></span>
+    <button class="btn sm" type="button"{{if ge .Page .Pages}} disabled{{end}} hx-get="/table?view={{.View}}&amp;page={{.Next}}&amp;q={{.Query}}&amp;f={{.FilterQuery}}&amp;sort={{.Sort}}&amp;dir={{.Dir}}{{if .WebSearch}}&amp;web=1{{end}}" hx-target="#v2-table-body-{{.View}}" hx-swap="outerHTML">Successiva ›</button>
+  </div>
+  {{end}}
+  {{if .Ed2k}}<div class="archive-ed2k-results"><h4>eD2k e Kad (aMule)</h4>{{template "v2_ed2k_results" .Ed2k}}</div>{{end}}
+</div>
+{{if .Notice}}<div id="v2-toast-region" hx-swap-oob="innerHTML">{{template "v2_action_notice" .Notice}}</div>{{end}}
+{{end}}

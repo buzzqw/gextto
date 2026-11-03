@@ -1,0 +1,423 @@
+{{/* ------------------------------------------------------------------ */}}
+{{/* Salute                                                              */}}
+{{/* ------------------------------------------------------------------ */}}
+
+{{define "v2_health_queue"}}
+<div id="v2-health-queue" hx-get="/partial/health/queue" hx-trigger="every 60s" hx-swap="outerHTML">
+  <div class="grid-2">
+    <div class="panel">
+      <div class="panel-head"><h3 title="Titoli trattenuti da un profilo di attesa: da quanto aspettano e quando saranno valutati di nuovo.">Coda titoli</h3></div>
+      <div class="panel-body">
+        {{if .Queued}}
+        <div class="table-wrap"><table class="data-table">
+          <caption class="sr-only">Titoli in attesa nella coda</caption>
+          <thead><tr><th scope="col">Titolo</th><th scope="col">Attesa</th><th scope="col">Dovuto</th></tr></thead>
+          <tbody>{{range .Queued}}<tr>
+            <td>{{.Title}} <small class="muted">{{.Label}}</small></td>
+            <td class="nowrap">{{.Waiting}}</td>
+            <td class="nowrap">{{.Due}}</td>
+          </tr>{{end}}</tbody>
+        </table></div>
+        {{else}}
+        <p class="muted">Nessun titolo in attesa.</p>
+        {{end}}
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3 title="Import in libreria falliti giorno per giorno negli ultimi 7 giorni: la gestione del completamento non è riuscita oppure il controllo di integrità ha rifiutato il file.">Import falliti</h3></div>
+      <div class="panel-body">
+        {{if .FailedImports}}
+        <div class="table-wrap"><table class="data-table">
+          <caption class="sr-only">Import falliti per giorno</caption>
+          <thead><tr><th scope="col">Giorno</th><th scope="col">Errori</th></tr></thead>
+          <tbody>{{range .FailedImports}}<tr>
+            <td class="nowrap">{{.Day}}</td>
+            <td class="numeric">{{.Count}}</td>
+          </tr>{{end}}</tbody>
+        </table></div>
+        {{else}}
+        <p class="muted">Nessun import fallito negli ultimi 7 giorni.</p>
+        {{end}}
+      </div>
+    </div>
+  </div>
+</div>
+{{end}}
+
+{{define "v2_health"}}
+<div class="view">
+  <div class="grid-4">
+    {{template "v2_health_tile_status" .}}
+    {{template "v2_health_tile_memory" .}}
+    {{template "v2_health_tile_disk" .}}
+    {{template "v2_health_tile_uptime" .}}
+  </div>
+  <div class="grid-2">
+    <div class="panel">
+      <div class="panel-head"><h3>Percorsi</h3></div>
+      <div class="panel-body">{{range .Health.Paths}}<div class="row v2-path-row"><span>{{if eq .Label "Data"}}Cartella dati{{else if eq .Label "Trash"}}Cestino{{else}}{{.Label}}{{end}}</span><span class="muted truncate" title="{{.Path}}">{{.Path}} · <span>{{if .Exists}}presente{{else}}assente{{end}}</span> · <span>{{if .Writable}}scrivibile{{else}}non scrivibile{{end}}</span></span></div>{{end}}</div>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>Dischi</h3></div>
+      <div class="panel-body">{{range .Health.Disks}}<div class="row"><span>{{.Mount}} <small class="muted">{{.Filesystem}}</small></span><span class="muted">{{bytesU .FreeBytes}} / {{bytesU .TotalBytes}}</span></div>{{end}}</div>
+    </div>
+  </div>
+  {{if gt (len .PanelTables) 1}}
+  <div class="grid-2">
+    {{template "v2_health_engine" .Engine}}
+    {{template "v2_table_panel" (index .PanelTables 1)}}
+  </div>
+  {{else}}
+  {{template "v2_health_engine" .Engine}}
+  {{end}}
+  {{if gt (len .PanelTables) 0}}{{template "v2_table_panel" (index .PanelTables 0)}}{{end}}
+  {{if and .Ed2k .Ed2k.Enabled}}{{template "v2_health_ed2k" .Ed2k}}{{end}}
+  <div class="panel">
+    <div class="panel-head"><h3>Ricerche</h3></div>
+    <div class="panel-body">
+      {{if .Cycles}}
+      <div class="table-wrap"><table class="data-table">
+        <caption class="sr-only">Storico delle ricerche</caption>
+        <thead><tr><th scope="col">Quando</th><th scope="col">Durata</th><th scope="col">Release</th><th scope="col">Download</th><th scope="col">Errori</th><th scope="col">Sorgenti</th></tr></thead>
+        <tbody>{{range .Cycles}}<tr>
+          <td class="nowrap">{{.When}}</td>
+          <td class="nowrap">{{.Duration}}</td>
+          <td class="numeric">{{.Scraped}}</td>
+          <td class="numeric">{{.Downloads}}</td>
+          <td class="numeric">{{if .Errors}}<span class="hl-err">{{.Errors}}</span>{{else}}0{{end}}</td>
+          <td>{{if .FailedCount}}<span class="hl-err" title="{{.SourceDetail}}">{{.FailedCount}}</span>{{else}}<span class="muted">ok</span>{{end}}</td>
+        </tr>{{end}}</tbody>
+      </table></div>
+      {{else}}
+      <p class="muted">Nessuna ricerca registrata.</p>
+      {{end}}
+    </div>
+  </div>
+  {{template "v2_health_feeds" .}}
+  {{template "v2_health_queue" .}}
+  {{if .Health.LastErrors}}
+  <div class="panel"><div class="panel-head"><h3>Ultimi errori</h3></div><div class="panel-body">{{range .Health.LastErrors}}<div class="row"><span class="hl-err">{{.}}</span></div>{{end}}</div></div>
+  {{end}}
+</div>
+{{end}}
+
+{{define "v2_health_feeds"}}
+<div class="panel" id="v2-health-feeds">
+  <div class="panel-head"><h3>Attività dei feed</h3></div>
+  <div class="panel-body">
+    <div class="toolbar">
+      <span class="badge ok"><span>{{.FeedSummary.Active}}</span>/<span>{{.FeedSummary.Total}}</span> <span>attivi</span></span>
+      {{if .FeedSummary.Disabled}}<span class="badge warn"><span>{{.FeedSummary.Disabled}}</span> <span>disabilitati</span></span>{{end}}
+      <span class="badge"><span>24 ore:</span> <span>{{.FeedSummary.Attempts1}}</span> <span>tentativi</span> · <span>{{.FeedSummary.Successes1}}</span> <span>successi</span> · <span>{{.FeedSummary.Failures1}}</span> <span>fallimenti</span> · <span>{{.FeedSummary.Accepted1}}</span> <span>presi</span></span>
+      {{if .FeedSummary.TopLabel}}<span class="badge"><span>Migliore negli ultimi 30 giorni:</span> {{.FeedSummary.TopLabel}} ({{.FeedSummary.TopAccepted}} <span>presi</span>)</span>{{end}}
+    </div>
+    {{template "v2_feed_disabled_notice" .DisabledFeeds}}
+    {{if .Feeds}}
+    <p class="hint">Nelle colonne «1 giorno», «7 giorni» e «30 giorni» ogni valore è nell'ordine tentativi/successi/fallimenti/prese. «Ultimi risultati» è l'ultima lettura riuscita.</p>
+    <div class="table-wrap"><table class="data-table">
+      <caption class="sr-only">Attività dei feed</caption>
+      <thead><tr><th scope="col">Feed</th><th scope="col">Stato</th><th scope="col">Ultimo successo</th><th scope="col">Ultimo errore</th><th scope="col">Ultimi risultati</th><th scope="col">1 giorno</th><th scope="col">7 giorni</th><th scope="col">30 giorni</th></tr></thead>
+      <tbody>{{range .Feeds}}<tr>
+        <td class="truncate" title="{{.Provider}}">{{.Label}}{{if .Disabled}} <span class="badge warn" title="Riga disabilitata con #">#</span>{{end}}</td>
+        <td><span class="badge {{.StateClass}}">{{.State}}</span></td>
+        <td class="nowrap">{{if .LastSuccess}}{{.LastSuccess}}{{else}}—{{end}}</td>
+        <td class="truncate" title="{{.LastError}}">{{if .LastError}}{{.LastError}}{{else}}—{{end}}</td>
+        <td class="numeric">{{.LastResults}}</td>
+        <td class="numeric" title="Tentativi/successi/fallimenti/presi">{{.OneDay}}</td>
+        <td class="numeric" title="Tentativi/successi/fallimenti/presi">{{.SevenDays}}</td>
+        <td class="numeric" title="Tentativi/successi/fallimenti/presi">{{.ThirtyDays}}</td>
+      </tr>{{end}}</tbody>
+    </table></div>
+    {{else}}<p class="muted">Nessun feed configurato.</p>{{end}}
+  </div>
+</div>
+{{end}}
+
+{{/* Riquadri della Salute: Stato, Memoria e Uptime si aggiornano ogni 5s
+     mentre la pagina e' aperta; Disco dati ogni ora. All'ingresso nella pagina
+     tutti i riquadri sono resi freschi dal render completo. */}}
+{{define "v2_health_ed2k"}}
+<div class="panel">
+  <div class="panel-head"><h3>eD2k e Kad (aMule)</h3><small class="muted">{{if .Reachable}}<span>in uso</span>{{if .Version}} · {{.Version}}{{end}}{{if .Address}} · {{.Address}}{{end}}{{else}}non raggiungibile{{end}}</small></div>
+  <div class="panel-body">
+  {{if .Error}}
+    <p class="alert" role="alert"><span>aMule non raggiungibile:</span> {{.Error}}</p>
+  {{else}}
+    <div class="stat-grid">
+      <div class="row"><span>Client eD2k</span><strong>aMule <span>{{.Version}}</span></strong></div>
+      <div class="row"><span>Dove gira</span><strong>{{.Runtime}}</strong></div>
+      <div class="row"><span>eD2k</span><strong>{{if .Connected}}<span>Connesso a</span> {{.Server}} · {{if .HighID}}<span class="badge ok">ID alto</span>{{else}}<span class="badge warn">ID basso</span>{{end}}{{else}}<span>Non connesso</span>{{end}}</strong></div>
+      <div class="row"><span>Kad</span><strong>{{if eq .Kad "connected"}}<span class="badge ok">Connesso</span>{{else if eq .Kad "firewalled"}}<span class="badge warn">Connesso, dietro firewall</span>{{else if eq .Kad "connecting"}}<span>In connessione…</span>{{else}}<span>Fermo</span>{{end}}</strong></div>
+      <div class="row"><span>Velocità</span><strong>↓ {{rateI .DownloadRate}} · ↑ {{rateI .UploadRate}}</strong></div>
+      <div class="row"><span>Sessione</span><strong title="Byte scambiati da aMule da quando è stato avviato">↓ {{bytes .SessionDown}} · ↑ {{bytes .SessionUp}}</strong></div>
+      <div class="row"><span>Totale</span><strong title="Byte scambiati da aMule dall'inizio, somma di tutte le sessioni">↓ {{bytes .TotalDown}} · ↑ {{bytes .TotalUp}}</strong></div>
+      <div class="row"><span>Coda di upload</span><strong>{{.UploadQueue}}</strong></div>
+    </div>
+    {{if .DirIssues}}<p class="alert" role="alert"><span>Cartelle di aMule non utilizzabili:</span> {{range .DirIssues}}<code title="{{.Path}}">{{.Path}}</code> {{end}}<a href="/?view=ed2k">apri la pagina eD2k</a>.</p>{{end}}
+    <h4>Avvisi recenti dal log di aMule</h4>
+    {{if .Warnings}}
+    <ul class="plain-list">{{range .Warnings}}<li class="truncate" title="{{.}}">{{.}}</li>{{end}}</ul>
+    {{else}}<p class="muted">Nessun avviso recente.</p>{{end}}
+  {{end}}
+  </div>
+</div>
+{{end}}
+
+{{define "v2_health_tile_status"}}
+<div class="metric{{if ne .Health.Status "ok"}} amber{{end}}" id="v2-health-tile-status" hx-get="/partial/health/tile?name=status" hx-trigger="every 5s" hx-swap="outerHTML"><span class="metric-sub">Stato</span><strong>{{.Health.Status}}</strong>{{if .StatusReason}}<small class="muted">{{.StatusReason}}</small>{{end}}</div>
+{{end}}
+
+{{define "v2_health_tile_memory"}}
+<div class="metric" id="v2-health-tile-memory" hx-get="/partial/health/tile?name=memory" hx-trigger="every 5s" hx-swap="outerHTML"><span class="metric-sub">Memoria processo</span><strong>{{bytesU .Health.ResidentBytes}}</strong><small class="muted"><span>su</span> {{bytesU .Health.MemoryTotalBytes}}</small></div>
+{{end}}
+
+{{define "v2_health_tile_disk"}}
+<div class="metric" id="v2-health-tile-disk" hx-get="/partial/health/tile?name=disk" hx-trigger="every 3600s" hx-swap="outerHTML"><span class="metric-sub">Disco dati</span><strong>{{.DiskUsedPct}} <span>usato</span></strong><small class="muted">{{bytesU .Health.DiskFreeBytes}} <span>liberi</span></small></div>
+{{end}}
+
+{{/* Motore torrent: stato del motore attivo, aggiornato ogni 15 s. */}}
+{{define "v2_health_engine"}}
+<div class="panel" id="v2-health-engine" hx-get="/partial/health/tile?name=engine" hx-trigger="every 15s" hx-swap="outerHTML">
+  <div class="panel-head"><h3>Motore torrent</h3>{{if .Backend}}<small class="muted">{{.Backend}}</small>{{end}}</div>
+  <div class="panel-body">
+    {{if .Error}}<div class="row"><span class="hl-err">{{.Error}}</span></div>{{end}}
+    {{range .Rows}}<div class="row"><span>{{.Label}}</span><span class="{{if .Warn}}hl-err{{else}}muted{{end}}"{{if .Detail}} title="{{.Detail}}"{{end}}>{{if .Parts}}{{range .Parts}}<span>{{.}}</span>{{end}}{{else}}{{.Value}}{{end}}</span></div>{{end}}
+  </div>
+</div>
+{{end}}
+
+{{define "v2_health_tile_uptime"}}
+<div class="metric" id="v2-health-tile-uptime" hx-get="/partial/health/tile?name=uptime" hx-trigger="every 5s" hx-swap="outerHTML"><span class="metric-sub">Uptime Gextto</span><strong>{{.ProcessUptime}}</strong><small class="muted"><span>sistema</span> {{.Uptime}}</small></div>
+{{end}}
+
+{{/* ------------------------------------------------------------------ */}}
+{{/* Log                                                                 */}}
+{{/* ------------------------------------------------------------------ */}}
+
+{{define "v2_logs"}}
+<div class="view">
+  <div class="panel">
+    <div class="panel-head"><h3>Log daemon</h3><small class="muted"><span id="v2-logs-count">{{.Count}}</span> righe · auto ogni 5 s</small></div>
+    <div class="panel-body">
+      <form class="toolbar logs-toolbar" hx-get="/partial/logs" hx-target="#v2-logs-view" hx-swap="outerHTML"
+            hx-trigger="submit, input changed delay:300ms from:#v2-log-filter, change, every 5s [window.gexttoCanPollLogs && window.gexttoCanPollLogs()]">
+         <input id="v2-log-filter" class="input" type="search" name="filter" value="{{.Filter}}" aria-label="Filtra le righe del log" placeholder="Filtra le righe…" title="Filtra il testo delle righe del log" />
+         <button class="btn sm primary" type="submit" title="Filtra le righe del log">🔍 Filtra</button>
+         <select class="input compact logs-level" name="level" aria-label="Livello" title="Mostra tutte le righe o solo avvisi ed errori">
+          <option value="">Tutte le righe</option>
+          <option value="problems"{{if .ProblemsOnly}} selected{{end}}>Solo avvisi ed errori</option>
+         </select>
+         <select class="input compact" name="lines" aria-label="Numero di righe" title="Numero massimo di righe da visualizzare">
+          <option value="200"{{if eq .LinesNum 200}} selected{{end}}>200</option>
+          <option value="500"{{if eq .LinesNum 500}} selected{{end}}>500</option>
+          <option value="1000"{{if eq .LinesNum 1000}} selected{{end}}>1000</option>
+          <option value="2000"{{if eq .LinesNum 2000}} selected{{end}}>2000</option>
+         </select>
+         <button class="btn sm primary" type="button" data-v2-logs-follow title="Ferma o riattiva lo scorrimento automatico del log">⏸ Ferma scorrimento</button>
+         <button class="btn sm primary" type="submit" title="Aggiorna le righe del log">Aggiorna</button>
+         <button class="btn sm" type="button" data-v2-logs-copy title="Copia le righe di log visibili o la selezione negli appunti">📋 Copia</button>
+         <select class="input" name="log" aria-label="File di log" title="Scegli quale file di log leggere; il primo è quello attivo">
+          {{range .LogFiles}}<option value="{{.}}"{{if eq . $.Log}} selected{{end}}>{{.}}{{if eq . $.ActiveLog}} (<span>attivo</span>){{end}}</option>{{end}}
+         </select>
+      </form>
+      {{template "v2_logs_view" .}}
+    </div>
+  </div>
+</div>
+{{end}}
+
+{{define "v2_logs_view"}}
+<pre class="log-view" id="v2-logs-view" tabindex="0" role="region" aria-label="File di log" data-v2-logs-lines>{{range .Lines}}<span class="log-line">{{.}}</span>{{end}}</pre>
+{{end}}
+
+{{define "v2_gx_log_panel"}}
+<div class="panel">
+  <div class="panel-head"><h3>Log gx-torrent</h3><small class="muted"><span id="v2-gx-logs-count">{{.Count}}</span> righe</small></div>
+  <div class="panel-body">
+    <p class="hint">Ultime righe del log del motore torrent gx-torrent (<code>gx-torrent/gx-torrent.log</code>), separato dal log di Gextto e conservato tra i riavvii del servizio. Utile quando un download o un trasferimento non si comporta come previsto.</p>
+    <form class="toolbar logs-toolbar" hx-get="/maintenance/gx-torrent/log" hx-target="#v2-gx-log-view" hx-swap="outerHTML" hx-trigger="submit, change">
+      <input class="input" type="search" name="filter" value="{{.Filter}}" aria-label="Filtra le righe del log gx-torrent" placeholder="Filtra le righe…" title="Filtra il testo delle righe del log" />
+      <button class="btn sm primary" type="submit" title="Filtra le righe del log">🔍 Filtra</button>
+      <select class="input compact" name="level" aria-label="Livello" title="Mostra tutte le righe o solo avvisi ed errori">
+        <option value="">Tutte le righe</option>
+        <option value="problems"{{if .ProblemsOnly}} selected{{end}}>Solo avvisi ed errori</option>
+      </select>
+      <select class="input compact" name="lines" aria-label="Numero di righe" title="Numero massimo di righe da visualizzare">
+        <option value="200"{{if eq .LinesNum 200}} selected{{end}}>200</option>
+        <option value="500"{{if eq .LinesNum 500}} selected{{end}}>500</option>
+        <option value="1000"{{if eq .LinesNum 1000}} selected{{end}}>1000</option>
+        <option value="2000"{{if eq .LinesNum 2000}} selected{{end}}>2000</option>
+      </select>
+      <button class="btn sm primary" type="submit" title="Aggiorna le righe del log">Aggiorna</button>
+      <select class="input" name="log" aria-label="File di log gx-torrent" title="Scegli quale file di log leggere; il primo è quello attivo">
+        {{range .LogFiles}}<option value="{{.}}"{{if eq . $.Log}} selected{{end}}>{{.}}{{if eq . $.ActiveLog}} (<span>attivo</span>){{end}}</option>{{end}}
+      </select>
+    </form>
+    {{template "v2_gx_log_view" .}}
+  </div>
+</div>
+{{end}}
+
+{{define "v2_gx_log_view"}}
+{{if .Lines}}<pre class="log-view" id="v2-gx-log-view" tabindex="0" role="region" aria-label="File di log gx-torrent">{{range .Lines}}<span class="log-line">{{.}}</span>{{end}}</pre>{{else}}<pre class="log-view" id="v2-gx-log-view" tabindex="0" role="region" aria-label="File di log gx-torrent"><span class="muted">Nessuna riga da mostrare: gx-torrent potrebbe non essere il motore attivo o il log non è ancora stato creato.</span></pre>{{end}}
+{{end}}
+
+{{define "v2_archive_sql_panel"}}
+<div class="panel" id="v2-archive-sql-panel">
+  <div class="panel-head"><h3>Manutenzione SQL dell'archivio</h3></div>
+  <div class="panel-body">
+    <p class="hint">Gli script inclusi lavorano solo sull'Archivio release. Non toccano la libreria, i torrent attivi o le impostazioni.</p>
+    <p class="v2-warning" role="note">Operazioni potenti e irreversibili. Esegui sempre l'anteprima e controlla le righe prima di eliminare.</p>
+    {{if .DryRun}}<p class="hint" role="status">La modalità prova è attiva: l'eliminazione è disabilitata.</p>{{end}}
+    {{if .Error}}<p class="hint" role="alert">{{.Error}}</p>{{end}}
+    <form class="toolbar v2-archive-sql-language" method="get" action="/">
+      <input type="hidden" name="view" value="maintenance" />
+      <input type="hidden" name="tab" value="archive-sql" />
+      <label for="v2-archive-sql-language">Lingua per le operazioni</label>
+      <select class="input compact" id="v2-archive-sql-language" name="language">
+        {{range .Languages}}<option value="{{.Code}}"{{if .Selected}} selected{{end}}>{{.Label}}</option>{{end}}
+      </select>
+      <button class="btn sm" type="submit">Applica</button>
+    </form>
+    {{if .Categories}}
+    <div class="v2-archive-sql-groups">
+      {{range .Categories}}
+      <section class="v2-archive-sql-group">
+        <h4>{{.Title}}</h4>
+        <ul class="v2-archive-sql-list">
+          {{range .Operations}}
+          <li class="v2-archive-sql-op">
+            <div class="v2-archive-sql-op-text">
+              <strong>{{.Title}}</strong>
+              <p class="hint">{{.Description}}</p>
+              <code class="v2-archive-sql-id">{{.ID}}</code>
+            </div>
+            <div class="v2-archive-sql-op-actions">
+              <form hx-post="/maintenance/archive-sql/preview" hx-target="#v2-archive-sql-output" hx-swap="innerHTML show:#v2-archive-sql-output:top" hx-indicator="#v2-archive-sql-working" hx-disabled-elt="find button"{{if .NeedsLanguage}} hx-include="#v2-archive-sql-language"{{end}}>
+                <input type="hidden" name="op" value="{{.ID}}" />
+                {{if .Destructive}}<button class="btn sm" type="submit">Anteprima</button>{{else}}<button class="btn sm" type="submit">Esegui</button>{{end}}
+              </form>
+              {{if .NeedsLanguage}}<span class="badge">Lingua</span>{{end}}
+              {{if .Destructive}}<span class="badge err">Eliminazione</span>{{else}}<span class="badge">Solo lettura</span>{{end}}
+            </div>
+          </li>
+          {{end}}
+        </ul>
+      </section>
+      {{end}}
+    </div>
+    {{else}}<p class="muted">Nessuna operazione disponibile.</p>{{end}}
+    <div id="v2-archive-sql-working" class="htmx-indicator v2-archive-sql-working" role="status" aria-live="polite">
+      <span class="v2-archive-sql-working-text">
+        <strong>Query in corso…</strong>
+        <small>Attendi: l'archivio può richiedere qualche secondo.</small>
+      </span>
+    </div>
+    <div id="v2-archive-sql-output" class="v2-archive-sql-output" aria-live="polite"></div>
+  </div>
+</div>
+{{end}}
+
+{{define "v2_archive_sql_result"}}
+<div class="panel v2-archive-sql-result">
+  {{if .Title}}<div class="panel-head"><h3>{{.Title}}</h3></div>{{end}}
+  <div class="panel-body">
+    {{if .Description}}<p class="hint">{{.Description}}</p>{{end}}
+    {{if .NeedsLanguage}}<p class="hint"><span>Lingua</span>: <strong>{{.LanguageLabel}}</strong></p>{{end}}
+    {{if and .DryRun .Destructive}}<p class="hint" role="status">La modalità prova è attiva: l'eliminazione è disabilitata.</p>{{end}}
+    {{if .DeletedOK}}<p class="v2-archive-sql-deleted" role="status"><strong>{{.Deleted}}</strong> <span>righe eliminate</span></p>{{end}}
+    {{if .Error}}<p class="hint" role="alert">{{.Error}}</p>{{else}}
+      <p class="hint"><strong>{{.Total}}</strong> <span>righe corrispondenti</span>{{if .Limited}} <span>·</span> <span>mostrate le prime</span> <strong>{{.Shown}}</strong>{{end}}</p>
+      {{if .Shown}}
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr>{{range .Columns}}<th scope="col">{{.}}</th>{{end}}</tr></thead>
+          <tbody>{{range .Rows}}<tr>{{range .}}<td>{{.}}</td>{{end}}</tr>{{end}}</tbody>
+        </table>
+      </div>
+      {{else}}<p class="muted">Nessuna riga.</p>{{end}}
+      {{if .CanDelete}}
+      <form class="v2-archive-sql-delete" hx-post="/maintenance/archive-sql/delete" hx-target="#v2-archive-sql-output" hx-swap="innerHTML show:#v2-archive-sql-output:top" hx-indicator="#v2-archive-sql-working" hx-disabled-elt="find button" hx-confirm="Eliminare definitivamente le righe corrispondenti? L'operazione non è reversibile.">
+        <input type="hidden" name="op" value="{{.ID}}" />
+        {{if .NeedsLanguage}}<input type="hidden" name="language" value="{{.LanguageCode}}" />{{end}}
+        <input type="hidden" name="confirm" value="1" />
+        <button class="btn danger" type="submit">Elimina definitivamente</button>
+      </form>
+      {{end}}
+    {{end}}
+    {{if .SQL}}
+    <details class="v2-archive-sql-query">
+      <summary>Query SQL</summary>
+      <pre>{{.SQL}}</pre>
+    </details>
+    {{end}}
+    {{if .DeleteSQL}}
+    <details class="v2-archive-sql-query">
+      <summary>Query di eliminazione</summary>
+      <pre>{{.DeleteSQL}}</pre>
+    </details>
+    {{end}}
+  </div>
+</div>
+{{end}}
+
+{{/* ------------------------------------------------------------------ */}}
+{{/* Manuale / Licenza                                                   */}}
+{{/* ------------------------------------------------------------------ */}}
+
+{{define "v2_license"}}
+<div class="view">
+  <div class="panel">
+    <div class="panel-head"><h3 id="v2-license-heading">Licenza</h3></div>
+    <div class="panel-body"><pre class="log-view" tabindex="0" role="region" aria-labelledby="v2-license-heading">{{.Text}}</pre></div>
+  </div>
+  {{if .ThirdParty}}
+  <div class="panel">
+    <div class="panel-head"><h3 id="v2-thirdparty-heading">Componenti di terze parti</h3></div>
+    <div class="panel-body"><pre class="log-view" tabindex="0" role="region" aria-labelledby="v2-thirdparty-heading">{{.ThirdParty}}</pre></div>
+  </div>
+  {{end}}
+</div>
+{{end}}
+
+{{define "v2_theme_card"}}<label class="theme-card">
+  <input type="radio" name="v2-theme" value="{{.ID}}" data-theme-mode="{{.Mode}}" data-bg="{{.Bg}}" data-surface="{{.Surface}}" data-text="{{.Text}}" data-accent="{{.Accent}}">
+  <span class="theme-swatch" aria-hidden="true" style="background:{{.Bg}}"><span class="theme-swatch-panel" style="background:{{.Surface}};color:{{.Text}}">Aa<span class="theme-swatch-accent" style="background:{{.Accent}}"></span></span></span>
+  <span class="theme-name">{{.Name}}</span>
+</label>{{end}}
+
+{{define "v2_theme_modal"}}
+<div class="overlay" style="display:block">
+  <div class="modal theme-modal" role="dialog" aria-modal="true" aria-labelledby="v2-theme-title" data-theme-selected="{{.Selected}}">
+    <div class="modal-head"><h3 id="v2-theme-title">Tema</h3>
+      <button class="btn sm" type="button" hx-get="/empty" hx-target="#v2-modal" hx-swap="innerHTML" title="Chiudi la scelta del tema">Chiudi</button></div>
+    <div class="modal-body">
+      {{if .Error}}<p class="hint theme-error" role="alert">{{.Error}}</p>{{end}}
+      <fieldset class="theme-group" title="Scegli un tema: si applica subito e vale per questo browser">
+        <legend>Temi</legend>
+        <div class="theme-grid">{{range .Builtin}}{{template "v2_theme_card" .}}{{end}}{{range .Presets}}{{template "v2_theme_card" .}}{{end}}</div>
+      </fieldset>
+      <fieldset class="theme-group" title="Temi salvati con un nome, disponibili su ogni dispositivo">
+        <legend>I tuoi temi</legend>
+        {{if .Saved}}<div class="theme-grid">{{range .Saved}}<div class="theme-saved">{{template "v2_theme_card" .}}<form class="theme-delete" hx-post="/theme/delete" hx-target="#v2-modal" hx-swap="innerHTML" hx-confirm="Eliminare questo tema salvato?"><input type="hidden" name="name" value="{{.Name}}"><button class="btn sm danger" type="submit" title="Elimina questo tema salvato" aria-label="Elimina questo tema salvato">✕</button></form></div>{{end}}</div>
+        {{else}}<p class="hint">Nessun tema salvato: personalizzane uno qui sotto e dagli un nome.</p>{{end}}
+      </fieldset>
+      <form class="theme-editor" id="v2-theme-form" hx-post="/theme/save" hx-target="#v2-modal" hx-swap="innerHTML">
+        <h4>Personalizza</h4>
+        <p class="hint">Parti dal tema scelto e cambia sfondo, pannelli, testo e accento: gli altri toni vengono calcolati da questi. Le modifiche si vedono subito.</p>
+        <div class="form-grid">
+          <label class="field"><span>Sfondo</span><input class="input" type="color" id="v2-color-bg" name="bg" value="#0b1120" title="Colore di sfondo della pagina"></label>
+          <label class="field"><span>Pannelli</span><input class="input" type="color" id="v2-color-surface" name="surface" value="#131c2e" title="Colore dei pannelli, delle schede e delle tabelle"></label>
+          <label class="field"><span>Testo</span><input class="input" type="color" id="v2-color-text" name="text" value="#e9f0fb" title="Colore del testo"></label>
+          <label class="field"><span>Accento</span><input class="input" type="color" id="v2-color-accent" name="accent" value="#4fd6a1" title="Colore di accento di pulsanti e link"></label>
+        </div>
+        <p class="hint theme-contrast" id="v2-theme-contrast" role="status" aria-live="polite"></p>
+        <div class="form-actions">
+          <label class="field theme-name-field"><span>Nome del tema</span><input class="input" type="text" name="name" id="v2-theme-name" maxlength="40" required placeholder="es. Il mio tema" title="Nome con cui salvare il tema: un nome già usato viene sovrascritto"></label>
+          <button class="btn primary" type="submit" title="Salva il tema con questo nome, disponibile su ogni dispositivo">Salva tema</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{{end}}

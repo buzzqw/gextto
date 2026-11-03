@@ -1,0 +1,107 @@
+{{define "v2_search"}}
+<div class="view">
+  <div class="panel">
+    <div class="panel-head"><h3>Calendario TMDB</h3><small class="muted">Prossime uscite</small></div>
+    <div class="panel-body" hx-get="/tmdb/calendar" hx-trigger="load" hx-swap="innerHTML"><p class="muted">Caricamento…</p></div>
+  </div>
+  <div class="panel">
+    <div class="panel-head"><h3>Di tendenza su TMDB</h3><small class="muted">Serie TV e film</small></div>
+    <div class="panel-body">
+      <div class="toolbar"><strong class="muted">Tipo</strong>
+         <form hx-post="/tmdb/discover" hx-target="#v2-tmdb-results" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="kind" value="series" data-v2-discover-kind-input /><input type="hidden" name="mode" value="trending" /><input type="hidden" name="window" value="week" /><button class="btn sm primary" data-v2-discover-kind="series" type="submit">Serie TV</button></form>
+         <form hx-post="/tmdb/discover" hx-target="#v2-tmdb-results" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="kind" value="movie" data-v2-discover-kind-input /><input type="hidden" name="mode" value="trending" /><input type="hidden" name="window" value="week" /><button class="btn sm" data-v2-discover-kind="movie" type="submit">Film</button></form>
+      </div>
+      <div class="toolbar" style="margin-top:8px"><strong class="muted">Elenco</strong>
+          <form class="v2-discover-choice" data-v2-discover-choice="trending:week" hx-post="/tmdb/discover" hx-target="#v2-tmdb-results" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="kind" value="series" data-v2-discover-kind-input /><input type="hidden" name="window" value="week" /><button class="btn sm active" type="submit" name="mode" value="trending" aria-pressed="true">Tendenza settimana</button></form>
+         <form class="v2-discover-choice" data-v2-discover-choice="trending:day" hx-post="/tmdb/discover" hx-target="#v2-tmdb-results" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="kind" value="series" data-v2-discover-kind-input /><input type="hidden" name="window" value="day" /><button class="btn sm" type="submit" name="mode" value="trending">Tendenza oggi</button></form>
+         <form class="v2-discover-choice" data-v2-discover-choice="popular:week" hx-post="/tmdb/discover" hx-target="#v2-tmdb-results" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="kind" value="series" data-v2-discover-kind-input /><input type="hidden" name="window" value="week" /><button class="btn sm" type="submit" name="mode" value="popular">Popolari</button></form>
+         <form class="v2-discover-choice" data-v2-discover-choice="top_rated:week" hx-post="/tmdb/discover" hx-target="#v2-tmdb-results" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="kind" value="series" data-v2-discover-kind-input /><input type="hidden" name="window" value="week" /><button class="btn sm" type="submit" name="mode" value="top_rated">Più votati</button></form>
+         <form class="v2-discover-choice" data-v2-discover-choice="now_playing:week" hx-post="/tmdb/discover" hx-target="#v2-tmdb-results" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="kind" value="series" data-v2-discover-kind-input /><input type="hidden" name="window" value="week" /><button class="btn sm" type="submit" name="mode" value="now_playing">In programmazione</button></form>
+         <form class="v2-discover-choice" data-v2-discover-choice="upcoming:week" hx-post="/tmdb/discover" hx-target="#v2-tmdb-results" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="kind" value="series" data-v2-discover-kind-input /><input type="hidden" name="window" value="week" /><button class="btn sm" type="submit" name="mode" value="upcoming">Prossime uscite</button></form>
+      </div>
+      <div id="v2-tmdb-results" class="tmdb-results" aria-live="polite" hx-post="/tmdb/discover" hx-vals='{"kind":"series","mode":"trending","window":"week"}' hx-trigger="load" hx-swap="innerHTML"><p class="muted">Caricamento…</p></div>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="panel-head"><h3>Esplora TMDB (ricerca)</h3></div>
+    <div class="panel-body">
+      <form class="toolbar" hx-post="/tmdb/search" hx-target="#v2-tmdb-results" hx-swap="innerHTML">
+         <select class="input" name="kind" data-v2-discover-select aria-label="Tipo di contenuto"><option value="series">Serie TV</option><option value="movie">Film</option></select>
+        <input class="input" type="search" name="query" aria-label="Titolo da cercare su TMDB" placeholder="Titolo da cercare su TMDB" />
+        <button class="btn primary" type="submit">Cerca su TMDB</button>
+      </form>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="panel-head"><h3>Ricerca release</h3><small class="muted">Feed, indexer e motori web (fino a 90 s)</small></div>
+    <div class="panel-body">
+      <form class="search-row" method="post" action="/search" hx-post="/search" hx-target="#v2-search-results" hx-swap="innerHTML">
+        <input type="search" name="q" value="{{.Query}}" aria-label="Cerca una release" placeholder="Cerca una release…" />
+        <label class="chk"><input type="checkbox" name="kad" value="1" title="Cerca anche su eD2k (Kad, server o entrambi, secondo Configurazione → eD2k e Kad), se l'integrazione è attiva">eD2k</label>
+        <button class="btn primary" type="submit">Cerca</button>
+      </form>
+      <form class="search-row" method="post" action="/search/link" hx-post="/search/link" hx-target="#v2-search-results" hx-swap="innerHTML">
+        <textarea class="input" name="ed2k_link" rows="2" aria-label="Link eD2k, uno per riga" placeholder="ed2k://|file|…" title="Incolla uno o più link eD2k, uno per riga (o separati da spazi)."></textarea>
+        <button class="btn" type="submit" title="Controlla i link eD2k e mostrali come risultati">Apri link eD2k</button>
+      </form>
+       <div id="v2-search-results">{{template "v2_search_results" .}}</div>
+    </div>
+  </div>
+  </div>
+{{end}}
+
+{{define "v2_search_results"}}
+{{if .Error}}<p class="alert">{{.Error}}</p>
+{{else if .Results}}
+{{if .Notice}}<p class="muted">{{.Notice}}</p>{{end}}
+{{if .Links}}<form method="post" action="/search/add-all" hx-post="/search/add-all" hx-swap="none" style="display:inline">
+  <textarea hidden name="ed2k_links">{{.Links}}</textarea>
+  <input type="hidden" name="redirect" value="{{$.Redirect}}" />
+  <button class="btn primary sm" type="submit" title="Accoda tutti i link eD2k elencati"><span>Aggiungi tutti</span> ({{len .Results}})</button>
+</form>{{end}}
+<div class="table-wrap"><table class="data-table">
+  <thead><tr><th scope="col">Titolo</th><th scope="col">Sorgente</th><th scope="col">Punteggio</th><th scope="col">Dimensione</th><th scope="col">Seed</th><th scope="col">Azioni</th></tr></thead>
+  <tbody>{{range .Results}}<tr>
+    <td class="truncate" title="{{.Title}}">{{.Title}}</td>
+    <td>{{.Source}}{{if .Freeleech}} <span class="badge ok" title="Il tracker non conta il download (freeleech).">Freeleech</span>{{else if .FreeleechKnown}} <span class="badge" title="Il tracker dichiara che il download conta per il rapporto.">Non freeleech</span>{{else}} <span class="badge" title="Il tracker non dice se il download conta per il rapporto.">Non marcato</span>{{end}}{{if eq .Network "ed2k"}} <span class="badge" title="Fonti eD2k">{{.Sources}}</span>{{end}}</td>
+    <td class="numeric">{{.Score}}</td>
+    <td class="numeric">{{bytes .SizeBytes}}</td>
+    <td class="numeric">{{.Seeders}}</td>
+    <td class="row-actions">
+      {{if .Addable}}
+      <form method="post" action="/search/add" hx-post="/search/add" hx-swap="none" style="display:inline">
+        <input type="hidden" name="release" value="{{.ReleaseJSON}}" />
+        <input type="hidden" name="redirect" value="{{$.Redirect}}" />
+        <button class="btn sm primary" type="submit">{{if eq .Network "ed2k"}}Scarica{{else}}Aggiungi{{end}}</button>
+      </form>
+      {{else}}
+      <span class="badge" title="aMule non è attivo o non è raggiungibile.">Solo ricerca</span>
+      {{end}}
+      <form method="post" action="/search/explain" hx-post="/search/explain" hx-target="#v2-modal" hx-swap="innerHTML" style="display:inline">
+        <input type="hidden" name="release" value="{{.ExplainJSON}}" />
+        <button class="btn sm" type="submit">Perché non questo?</button>
+      </form>
+    </td>
+  </tr>{{end}}</tbody>
+</table></div>
+{{else if .Searched}}<p class="muted"><span>Nessun risultato per</span> «{{.Query}}».</p>
+{{else}}<p class="muted">Inserisci una ricerca.</p>{{end}}
+{{end}}
+
+{{define "v2_explain_modal"}}
+<div class="overlay" style="display:block">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="v2-explain-title">
+    <div class="modal-head"><h3 id="v2-explain-title">Perché non questo?</h3>
+      <button class="btn sm" type="button" hx-get="/empty" hx-target="#v2-modal" hx-swap="innerHTML">Chiudi</button></div>
+    <div class="modal-body">
+      {{if .Error}}<p class="alert">{{.Error}}</p>{{else}}
+      <p><span class="badge {{if or (eq .Trace.Decision "approved") (eq .Trace.Decision "accept")}}ok{{else if eq .Trace.Decision "rejected"}}err{{else}}warn{{end}}">{{.Trace.Decision}}</span></p>
+      {{if .Trace.Candidate}}<h4>{{.Trace.Candidate}}</h4>{{end}}
+      {{if .Trace.Reason}}<p class="muted"><span>Motivo:</span> {{.Trace.Reason}}</p>{{end}}
+      <div class="stat-grid"><div class="row"><span>Punteggio</span><strong>{{.Trace.Score}}</strong></div><div class="row"><span>Obiettivo</span><strong>{{.Trace.Target}}</strong></div></div>
+      {{if .Trace.Steps}}<table class="data-table"><thead><tr><th>Regola</th><th>Esito</th><th>Dettaglio</th></tr></thead><tbody>{{range .Trace.Steps}}<tr><td>{{.Rule}}</td><td>{{.Result}}</td><td>{{.Detail}}</td></tr>{{end}}</tbody></table>{{end}}
+      {{end}}
+    </div>
+  </div>
+</div>
+{{end}}

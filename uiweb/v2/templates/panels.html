@@ -1,0 +1,654 @@
+{{/* ------------------------------------------------------------------ */}}
+{{/* Pagine a pannelli (Manutenzione, Integrazioni)                     */}}
+{{/* ------------------------------------------------------------------ */}}
+
+{{define "v2_panels_page"}}
+<div class="view">
+  {{if .Tabs}}
+  <nav class="toolbar maintenance-tabs" role="tablist" aria-label="Sezioni manutenzione">
+    {{range .Tabs}}<a class="chip{{if .Active}} active{{end}}" role="tab" aria-selected="{{if .Active}}true{{else}}false{{end}}" href="{{.Href}}">{{.Label}}</a>{{end}}
+  </nav>
+  {{end}}
+  {{if .ArchiveSQL}}
+    {{with .ArchiveSQL}}{{template "v2_archive_sql_panel" .}}{{end}}
+  {{else if .Import}}
+    {{template "v2_import" .Import}}
+  {{else}}
+    {{range .Groups}}
+      <section class="section-group">
+        {{if .Title}}<div class="section-group-label">{{.Title}}</div>{{end}}
+        <div class="{{if $.Stack}}v2-section-stack{{else if gt (len .Sections) 1}}grid-2{{end}}">
+          {{range .Sections}}{{template "v2_section" .}}{{end}}
+        </div>
+      </section>
+    {{end}}
+    {{if .Jobs}}{{template "v2_jobs" .Jobs}}{{end}}
+  {{end}}
+  {{with .Build}}{{template "v2_build_info" .}}{{end}}
+  </div>
+{{end}}
+
+{{/* Exact build identity at the bottom of Maintenance: the version, the full
+     build and the commit it was compiled from. */}}
+{{define "v2_build_info"}}
+<p class="v2-build-info">
+  <span>Versione</span> <strong>{{.Version}}</strong><span aria-hidden="true"> · </span><span>build</span> <strong>{{.Build}}</strong><span aria-hidden="true"> · </span><span>commit</span> <code title="{{.CommitFull}}">{{.Commit}}</code>
+</p>
+{{end}}
+
+{{define "v2_movies"}}
+<div class="view">
+  <nav class="toolbar" role="tablist" aria-label="Sezioni film">
+    <a class="chip{{if eq .Tab "monitored"}} active{{end}}" role="tab" aria-selected="{{if eq .Tab "monitored"}}true{{else}}false{{end}}" href="/?view=movies">Film monitorati</a>
+    <a class="chip{{if eq .Tab "downloaded"}} active{{end}}" role="tab" aria-selected="{{if eq .Tab "downloaded"}}true{{else}}false{{end}}" href="/?view=movies&amp;tab=downloaded">Film scaricati</a>
+  </nav>
+  {{if eq .Tab "downloaded"}}
+    {{template "v2_table_panel" .History}}
+  {{else}}
+    {{range .Monitored.Groups}}
+      {{if .Title}}<div class="section-group-label">{{.Title}}</div>{{end}}
+      <div class="{{if $.Monitored.Stack}}v2-section-stack{{else if gt (len .Sections) 1}}grid-2{{end}}">
+        {{range .Sections}}{{template "v2_section" .}}{{end}}
+      </div>
+    {{end}}
+  {{end}}
+  </div>
+{{end}}
+
+{{define "v2_section"}}
+{{if eq .Kind "table"}}{{if .Table}}{{template "v2_table_panel" .Table}}{{end}}
+{{else if eq .Kind "actions"}}
+<div class="panel">
+  <div class="panel-head"><h3>{{.Title}}</h3></div>
+  <div class="panel-body">
+    {{if .Hint}}<p class="hint">{{.Hint}}</p>{{end}}
+    <div class="toolbar">{{range .Buttons}}{{template "v2_button" .}}{{end}}</div>
+  </div>
+</div>
+{{else if eq .Kind "form"}}
+<div class="panel">
+  <div class="panel-head"><h3>{{.Title}}</h3></div>
+  <div class="panel-body">
+    {{if .Hint}}<p class="hint">{{.Hint}}</p>{{end}}
+    <form class="form-grid" method="post" action="/section/form" hx-post="/section/form" {{if .FormRender}}hx-target="#v2-form-output-{{.View}}-{{.FormRender}}" hx-swap="innerHTML"{{else}}hx-swap="none"{{end}}>
+      <input type="hidden" name="view" value="{{.View}}">
+      <input type="hidden" name="path" value="{{.FormPath}}">
+      <input type="hidden" name="wrap" value="{{.FormWrap}}">
+      {{if .FormRender}}<input type="hidden" name="render" value="{{.FormRender}}">{{end}}
+      {{range .Fields}}{{template "v2_form_field" .}}{{end}}
+      <div class="form-actions">{{if .FormSubmit}}<button class="btn primary" type="submit">{{.FormSubmit}}</button>{{end}}{{if .TestFTP}}<button class="btn" type="button" hx-post="/section/test-ftp" hx-include="closest form" hx-target="#v2-ftp-test-result" hx-swap="innerHTML">Test FTP</button><small id="v2-ftp-test-result" class="muted" aria-live="polite"></small>{{end}}{{if .ManualAdd}}<button class="btn" type="button" hx-get="/tmdb/manual?kind={{.ManualAdd}}&amp;redirect=/?view={{if eq .ManualAdd "movie"}}movies{{else}}series{{end}}" hx-include="closest form" hx-target="#v2-modal" hx-swap="innerHTML">Aggiungi manualmente</button>{{end}}</div>
+    </form>
+    {{if .FormRender}}<div id="v2-form-output-{{.View}}-{{.FormRender}}" class="form-output" aria-live="polite"></div>{{end}}
+  </div>
+</div>
+{{else if eq .Kind "settings"}}
+<div class="panel settings-panel">
+  <div class="panel-head"><h3>{{.Title}}</h3></div>
+  <div class="panel-body">
+    {{if .Hint}}<p class="hint">{{.Hint}}</p>{{end}}
+    <div class="settings-rows">{{range .SettingFields}}{{template "v2_setting_field" .}}{{end}}</div>
+    {{if .Buttons}}<div class="toolbar" style="margin-top:12px">{{range .Buttons}}{{template "v2_button" .}}{{end}}</div>{{end}}
+  </div>
+</div>
+{{else if eq .Kind "links"}}
+<div class="panel">
+  <div class="panel-head"><h3>{{.Title}}</h3></div>
+  <div class="panel-body">
+    {{if .Hint}}<p class="hint">{{.Hint}}</p>{{end}}
+    <div class="toolbar">{{range .Links}}<a class="btn sm" href="{{.Href}}"{{if .Hint}} title="{{.Hint}}"{{end}}>{{.Label}}</a>{{end}}</div>
+  </div>
+</div>
+{{else if eq .Kind "comics_links"}}
+<div class="panel comics-links-panel">
+  <div class="panel-head"><h3>{{.Title}}</h3></div>
+  <div class="panel-body">
+    {{if .Hint}}<p class="hint">{{.Hint}}</p>{{end}}
+    <form class="toolbar" hx-post="/comics/links" hx-target="#v2-comics-links-output" hx-swap="innerHTML">
+      <input class="input" type="url" name="url" placeholder="https://getcomics.org/..." aria-label="URL del post GetComics" required />
+      <button class="btn sm primary" type="submit">Trova link</button>
+    </form>
+    <div id="v2-comics-links-output" aria-live="polite"><p class="muted">Nessun link ancora cercato.</p></div>
+  </div>
+</div>
+{{else if eq .Kind "integration"}}{{template "v2_integration_card" .}}
+{{else if eq .Kind "oauth"}}{{template "v2_oauth_section" .}}
+{{else if eq .Kind "duplicates"}}{{with .Duplicates}}{{template "v2_duplicates_panel" .}}{{end}}
+{{else if eq .Kind "db_optimize"}}{{with .DB}}{{template "v2_db_panel" .}}{{end}}
+{{else if eq .Kind "ramdisk"}}{{with .Ramdisk}}{{template "v2_ramdisk_panel" .}}{{end}}
+{{else if eq .Kind "folder_rename"}}{{with .FolderRename}}{{template "v2_folder_rename_panel" .}}{{end}}
+{{else if eq .Kind "progress"}}{{with .Progress}}{{template "v2_rename_progress_panel" .}}{{end}}
+{{else if eq .Kind "update"}}{{with .Update}}{{template "v2_update_panel" .}}{{end}}
+{{else if eq .Kind "gx_log"}}{{with .GxLog}}{{template "v2_gx_log_panel" .}}{{end}}
+{{else if eq .Kind "list_editor"}}{{if .ListEditor}}{{template "v2_list_editor" .ListEditor}}{{end}}
+{{else if eq .Kind "sources_check"}}
+<div class="panel">
+  <div class="panel-head"><h3>Verifica sorgenti</h3></div>
+  <div class="panel-body">
+    <form class="toolbar" hx-get="/partial/sources-check" hx-target="#v2-sources-check-output" hx-swap="innerHTML">
+      <input class="input" type="search" name="q" placeholder="Termine di prova (es. ita 1080p)" aria-label="Termine di prova" />
+      <button class="btn sm primary" type="submit">Verifica indexer e sorgenti</button>
+    </form>
+    <div id="v2-sources-check-output" aria-live="polite"><p class="muted">Premi Verifica per controllare feed, indexer e motori web.</p></div>
+  </div>
+</div>
+{{else if eq .Kind "trash_panel"}}
+<div class="panel">
+  <div class="panel-head"><h3>Cestino</h3></div>
+  <div class="panel-body">
+    <p class="hint">Gli elementi nel cestino non occupano la libreria; eliminali singolarmente o svuota tutto.</p>
+    <div class="toolbar">
+      <button class="btn sm primary" type="button" hx-get="/partial/trash" hx-target="#v2-trash-output" hx-swap="innerHTML">Apri cestino</button>
+      <form method="post" action="/trash/delete" hx-post="/trash/delete" hx-swap="none" style="display:inline">
+        <input type="hidden" name="all" value="1" />
+        <button class="btn sm danger" type="submit" hx-confirm="Eliminare tutti gli elementi del cestino?">Svuota cestino</button>
+      </form>
+    </div>
+    <div id="v2-trash-output" aria-live="polite"></div>
+  </div>
+</div>
+{{else}}
+<div class="panel">
+  <div class="panel-head"><h3>{{if .Title}}{{.Title}}{{else}}{{.Kind}}{{end}}</h3></div>
+  <div class="panel-body">
+    {{if .Hint}}<p class="hint">{{.Hint}}</p>{{end}}
+    <p class="muted">Questo widget non è ancora migrato nella UI v2.</p>
+    {{if .OAuth.Name}}
+    <div class="toolbar">{{range .Buttons}}{{template "v2_button" .}}{{end}}</div>
+    {{end}}
+  </div>
+</div>
+{{end}}
+{{end}}
+
+{{define "v2_section_title"}}{{if eq .Kind "table"}}{{with .Table}}{{.Title}}{{end}}{{else if eq .Kind "oauth"}}{{.Title}}{{else}}{{.Title}}{{end}}{{end}}
+
+{{define "v2_integration_card"}}
+<div class="panel integration-card">
+  <div class="panel-head"><h3>{{.Title}}</h3>{{if .Status}}<span class="badge {{.StatusClass}}">{{.Status}}</span>{{end}}</div>
+  <div class="panel-body integration-body">
+    {{range .Children}}
+    <section class="integration-block">
+      <h4 class="integration-subtitle">{{template "v2_section_title" .}}</h4>
+      {{template "v2_section" .}}
+    </section>
+    {{end}}
+  </div>
+</div>
+{{end}}
+
+{{define "v2_oauth_section"}}
+<div class="panel">
+  <div class="panel-head"><h3>{{.Title}}</h3></div>
+  <div class="panel-body">
+    <div class="toolbar">
+      <form hx-post="/oauth/start" hx-target="#v2-oauth-output-simkl" hx-swap="innerHTML" style="display:inline">
+        <input type="hidden" name="path" value="{{.OAuth.StartPath}}" />
+        <button class="btn sm primary" type="submit" title="Avvia il collegamento con il provider e mostra il codice da confermare">Avvia accesso</button>
+      </form>
+      <form class="oauth-poll-form" hx-post="/oauth/poll" hx-target="#v2-oauth-output-simkl" hx-swap="innerHTML">
+        <input type="hidden" name="path" value="{{.OAuth.PollPath}}" />
+        <input class="input" name="code" aria-label="Codice o PIN di accesso" placeholder="codice" />
+        <button class="btn sm" type="submit" title="Conferma il codice/PIN inserito">Conferma</button>
+      </form>
+      {{range .Buttons}}{{template "v2_button" .}}{{end}}
+    </div>
+    <div class="output" id="v2-oauth-output-simkl" aria-live="polite"></div>
+  </div>
+</div>
+{{end}}
+
+{{define "v2_oauth_output"}}{{.Text}}{{end}}
+
+{{define "v2_duplicates_panel"}}
+{{if .Notify}}<div id="v2-toast-region" hx-swap-oob="innerHTML"><div class="v2-toast{{if .NotifyError}} error{{end}}" role="status"><strong>Duplicati video</strong><span>{{.NotifyMessage}}</span></div></div>{{end}}
+<div class="panel" id="v2-duplicates-panel">
+  <div class="panel-head"><h3>Duplicati video in libreria</h3></div>
+  <div class="panel-body">
+    <p class="hint">Confronta le risoluzioni archiviate: l'anteprima non elimina nulla, la pulizia sposta le copie inferiori nel cestino.</p>
+    <div class="toolbar">
+      <form hx-post="/maintenance/duplicates" hx-target="#v2-duplicates-panel" hx-swap="outerHTML" style="display:inline">
+        <input type="hidden" name="execute" value="0" />
+        <button class="btn sm" type="submit" data-v2-toast-title="Duplicati video" data-v2-toast-message="Analisi avviata: i risultati arriveranno qui tra poco.">Anteprima duplicati</button>
+      </form>
+      <form hx-post="/maintenance/duplicates" hx-target="#v2-duplicates-panel" hx-swap="outerHTML" style="display:inline">
+        <input type="hidden" name="execute" value="1" />
+        <button class="btn sm danger" type="submit" hx-confirm="Spostare nel cestino le copie inferiori?" data-v2-toast-title="Duplicati video" data-v2-toast-message="Pulizia avviata: i risultati arriveranno qui tra poco.">Pulisci duplicati</button>
+      </form>
+      {{if .Message}}<small class="htx-status {{if .Error}}err{{else}}ok{{end}}">{{.Message}}</small>{{end}}
+    </div>
+    {{if .Executed}}{{if not .Error}}<p class="muted"><span>Rimossi</span> {{.Removed}} <span>file.</span></p>{{end}}
+    {{else if .Items}}
+    <div class="table-wrap"><table class="data-table">
+      <caption class="sr-only">Duplicati video</caption>
+      <thead><tr><th scope="col">Serie</th><th scope="col">Stagione</th><th scope="col">Episodio</th><th scope="col">File</th><th scope="col">Risoluzione</th></tr></thead>
+      <tbody>{{range .Items}}<tr><td>{{.Series}}</td><td class="numeric">{{.Season}}</td><td class="numeric">{{.Episode}}</td><td class="truncate" title="{{.Path}}">{{.Path}}</td><td>{{.ResolutionRank}} (<span>migliore</span> {{.BestRank}})</td></tr>{{end}}</tbody>
+    </table></div>
+    {{else if .Scanned}}<p class="muted">Nessun duplicato inferiore trovato.</p>
+    {{else}}<p class="muted">Premi Anteprima per cercare i duplicati.</p>{{end}}
+  </div>
+</div>
+{{end}}
+
+{{define "v2_db_panel"}}
+{{if .Notify}}<div id="v2-toast-region" hx-swap-oob="innerHTML"><div class="v2-toast{{if .NotifyError}} error{{end}}" role="status"><strong>Manutenzione database</strong><span>{{.NotifyMessage}}</span></div></div>{{end}}
+<div class="panel" id="v2-db-panel">
+  <div class="panel-head"><h3>Ottimizzazione database</h3>{{if .TotalBytes}}<small class="muted"><span>totale:</span> {{bytes .TotalBytes}}</small>{{end}}{{if .Message}}<small class="muted">{{.Message}}</small>{{end}}</div>
+  <div class="panel-body">
+    <p class="hint">Le operazioni coinvolgono tutti i database SQLite (serie, archivio, configurazione e fumetti): VACUUM compatta i file, ANALYZE aggiorna le statistiche e Verifica controlla integrità, chiavi esterne e indici (compreso FTS dell’archivio), senza modificare dati.</p>
+    <div class="table-wrap"><table class="data-table">
+      <caption class="sr-only">File database</caption>
+      <thead><tr><th scope="col">File</th><th scope="col">Dimensione</th><th scope="col">Stato</th></tr></thead>
+      <tbody>{{range .Files}}<tr><td class="truncate" title="{{.Path}}">{{.Name}}</td><td class="numeric">{{bytes .SizeBytes}}</td><td>{{if .Exists}}<span class="badge ok">presente</span>{{else}}<span class="badge">assente</span>{{end}}</td></tr>{{end}}</tbody>
+    </table></div>
+    <div class="toolbar" style="margin-top:10px">
+      <form hx-post="/maintenance/db" hx-target="#v2-db-panel" hx-swap="outerHTML" style="display:inline" data-v2-toast-title="Ottimizzazione database" data-v2-toast-message="VACUUM avviato: compattazione di tutti i database in corso...">
+        <input type="hidden" name="action" value="vacuum" />
+        <button class="btn sm" type="submit" title="Compatta tutti i database e libera spazio" data-v2-toast-title="Ottimizzazione database" data-v2-toast-message="VACUUM avviato: compattazione di tutti i database in corso...">VACUUM</button>
+      </form>
+      <form hx-post="/maintenance/db" hx-target="#v2-db-panel" hx-swap="outerHTML" style="display:inline" data-v2-toast-title="Ottimizzazione database" data-v2-toast-message="ANALYZE avviato: ottimizzazione delle statistiche SQLite su tutti i database in corso...">
+        <input type="hidden" name="action" value="analyze" />
+        <button class="btn sm" type="submit" title="Aggiorna le statistiche del query planner su tutti i database" data-v2-toast-title="Ottimizzazione database" data-v2-toast-message="ANALYZE avviato: ottimizzazione delle statistiche SQLite su tutti i database in corso...">ANALYZE</button>
+      </form>
+      <form hx-post="/maintenance/db" hx-target="#v2-db-panel" hx-swap="outerHTML" style="display:inline" data-v2-toast-title="Ottimizzazione database" data-v2-toast-message="Aggiornamento dimensioni di tutti i database in corso...">
+        <input type="hidden" name="action" value="refresh" />
+        <button class="btn sm" type="submit" data-v2-toast-title="Ottimizzazione database" data-v2-toast-message="Aggiornamento dimensioni di tutti i database in corso...">Aggiorna dimensioni</button>
+      </form>
+      <form hx-post="/maintenance/db" hx-target="#v2-db-panel" hx-swap="outerHTML" style="display:inline" data-v2-toast-title="Manutenzione database" data-v2-toast-message="Verifica di integrità e indici in corso...">
+        <input type="hidden" name="action" value="check" />
+        <button class="btn sm" type="submit" title="Controlla integrità, chiavi esterne e indici di tutti i database" data-v2-toast-title="Manutenzione database" data-v2-toast-message="Verifica di integrità e indici in corso...">Verifica integrità e indici</button>
+      </form>
+    </div>
+    {{if and (or (eq .Action "vacuum") (eq .Action "analyze")) (not .Error)}}<div class="stat-grid" style="margin-top:10px"><span class="stat"><strong>{{bytes .BeforeSize}}</strong> prima</span><span class="stat"><strong>{{bytes .AfterSize}}</strong> dopo</span></div>{{end}}
+    {{if .Checks}}<div class="table-wrap" style="margin-top:10px"><table class="data-table"><caption class="sr-only">Esito verifica database</caption><thead><tr><th scope="col">Database</th><th scope="col">Esito</th><th scope="col">Dettaglio</th></tr></thead><tbody>{{range .Checks}}<tr><td>{{.Name}}</td><td>{{if .OK}}<span class="badge ok">valido</span>{{else}}<span class="badge err">problema</span>{{end}}</td><td>{{.Detail}}</td></tr>{{end}}</tbody></table></div>{{end}}
+  </div>
+</div>
+{{end}}
+
+{{define "v2_media_integrity_panel"}}
+<div class="panel" id="v2-media-integrity-panel"{{if .Running}} hx-get="/settings/media-integrity" hx-trigger="every 4s" hx-swap="outerHTML" aria-busy="true"{{end}}>
+  <div class="panel-head"><h3>Stato del controllo</h3></div>
+  <div class="panel-body">
+    <p class="hint">Legge ogni file archiviato con ffprobe e poi lo decodifica con ffmpeg, un file alla volta e in secondo piano, per trovare puntate e film danneggiati. Il controllo riparte dal punto salvato anche dopo un riavvio: puoi interromperlo e riprenderlo quando vuoi.</p>
+    <p class="hint">I file già controllati e non cambiati vengono saltati; «Riavvia da capo» li ricontrolla tutti.</p>
+    <p class="hint">Un file che non si riesce a leggere entro il tempo previsto non è dato per danneggiato: il controllo lo riprova più tardi.</p>
+    {{if not .Available}}<p class="alert" role="alert"><span>Servono ffprobe e ffmpeg: installali e riavvia Gextto per attivare il controllo.</span> <span>Mancano:</span> <code>{{.Missing}}</code></p>
+    {{else if .Enabled}}<p class="hint"><span>Controllo automatico attivo.</span> <span>Ogni</span> <strong>{{.IntervalMinutes}}</strong> <span>Minuti,</span> <strong>{{.Batch}}</strong> <span>File per volta.</span></p>
+    {{else}}<p class="alert" role="status">Il controllo automatico è disattivato: puoi avviare un controllo a mano qui sotto, oppure attivarlo con l'opzione qui sopra.</p>{{end}}
+    {{if .Available}}<div class="toolbar">
+      {{if .Running}}
+      <form hx-post="/settings/media-integrity" hx-target="#v2-media-integrity-panel" hx-swap="outerHTML" style="display:inline">
+        <input type="hidden" name="action" value="stop" />
+        <button class="btn sm danger" type="submit" title="Ferma il controllo dopo il file in corso; la posizione resta salvata">Interrompi</button>
+      </form>
+      {{else}}
+      <form hx-post="/settings/media-integrity" hx-target="#v2-media-integrity-panel" hx-swap="outerHTML" style="display:inline">
+        <input type="hidden" name="action" value="start" />
+        <button class="btn sm primary" type="submit" title="Avvia subito un passaggio del controllo sui file non ancora verificati">Controlla ora</button>
+      </form>
+      <form hx-post="/settings/media-integrity" hx-target="#v2-media-integrity-panel" hx-swap="outerHTML" style="display:inline">
+        <input type="hidden" name="action" value="restart" />
+        <button class="btn sm" type="submit" hx-confirm="Ricomincia dal primo file e cancella i risultati precedenti?" title="Ricomincia dal primo file e cancella i risultati precedenti">Riavvia da capo</button>
+      </form>
+      {{end}}
+    </div>{{end}}
+    {{if .Started}}<div class="stat-grid" style="margin-top:10px" aria-live="polite">
+      <span class="stat"><strong>{{.Checked}}</strong> <span>Controllati</span></span>
+      <span class="stat"><strong>{{.Damaged}}</strong> <span>Danneggiati</span></span>
+      {{if .Unreadable}}<span class="stat"><strong>{{.Unreadable}}</strong> <span>Illeggibili</span></span>{{end}}
+      {{if .Running}}<span class="stat"><strong>{{.Percent}}%</strong></span>
+      {{if .Current}}<span class="stat"><span>In corso:</span> <strong>{{.Current}}</strong></span>{{end}}{{end}}
+    </div>{{end}}
+    {{if .Message}}<p class="alert{{if not .Error}} ok{{end}}" role="{{if .Error}}alert{{else}}status{{end}}">{{.Message}}</p>{{end}}
+    {{if .Problems}}
+    <div class="table-wrap" style="margin-top:10px"><table class="data-table">
+      <caption class="sr-only">File danneggiati o illeggibili</caption>
+      <thead><tr><th scope="col">Elemento</th><th scope="col">File</th><th scope="col">Esito</th><th scope="col">Dettaglio</th><th scope="col">Azioni</th></tr></thead>
+      <tbody>{{range .Problems}}<tr>
+        <td>{{.Label}}</td>
+        <td class="truncate" title="{{.Path}}">{{.Path}}</td>
+        <td>{{if eq .Status "damaged"}}<span class="badge err">Danneggiato</span>{{else}}<span class="badge warn">Illeggibile</span>{{end}}</td>
+        <td class="truncate" title="{{.Detail}}">{{.Detail}}</td>
+        <td class="row-actions">{{if .RedownloadPath}}{{template "v2_action_btn" (dict "Redirect" "/?view=settings&tab=maintenance#v2-media-integrity-panel" "Path" .RedownloadPath "Method" "POST" "Body" "{}" "Label" "Riscarica" "Class" "" "Title" "Sposta il file danneggiato nel cestino e cerca una release diversa" "Confirm" "Sposta il file danneggiato nel cestino e cerca una release diversa?")}}{{end}}</td>
+      </tr>{{end}}</tbody>
+    </table></div>
+    {{else if .Running}}<p class="muted">Nessun file danneggiato finora.</p>
+    {{else if .NothingToCheck}}<p class="muted">Nessun file nuovo o modificato da controllare.</p>
+    {{else if .Done}}<p class="muted">Controllo completato: nessun file danneggiato trovato.</p>
+    {{else if .Started}}<p class="muted">Controllo interrotto: riprendilo per continuare.</p>
+    {{else}}<p class="muted">Il controllo non è ancora stato eseguito.</p>{{end}}
+    {{if .FinishedAt}}<p class="muted"><span>Ultimo controllo:</span> <span>{{.FinishedAt}}</span></p>{{end}}
+  </div>
+</div>
+{{end}}
+
+{{define "v2_night_maintenance_panel"}}
+<div class="panel" id="v2-night-maintenance-panel"{{if .Activity}} hx-get="/settings/night-maintenance" hx-trigger="every 10s" hx-swap="outerHTML" aria-busy="true"{{end}}>
+  <div class="panel-head"><h3>Stato della manutenzione notturna</h3></div>
+  <div class="panel-body">
+    <p class="hint">Nella finestra notturna Gextto ottimizza i database, controlla la libreria e, se attivato, pulisce l'audio dei file già archiviati: un lavoro alla volta, solo quando nessun download sta trasferendo, nessun download viene archiviato e il sistema non è sotto carico.</p>
+    <p class="hint"><span>Finestra:</span> <strong>{{.Window}}</strong>{{if .HeavyWindow}} <span>— anche il controllo integrità e l'analisi MediaInfo aspettano la finestra.</span>{{end}}</p>
+    <p aria-live="polite">{{if .Activity}}<span class="badge ok">In corso</span> <strong>{{.Activity}}</strong>{{else if .Waiting}}<span class="badge warn">In attesa</span> <span>{{.Waiting}}</span>{{else if .Open}}<span class="badge">Finestra aperta</span> <span>Niente da fare in questo momento.</span>{{else}}<span class="badge">Finestra chiusa</span> <span>Prossima apertura alle</span> <strong>{{.NextOpening}}</strong>{{end}}</p>
+    <div class="toolbar">
+      <form hx-post="/settings/night-maintenance" hx-target="#v2-night-maintenance-panel" hx-swap="outerHTML" style="display:inline">
+        <input type="hidden" name="action" value="run" />
+        <button class="btn sm primary" type="submit" title="Esegue subito un passaggio della manutenzione, anche fuori dalla finestra; aspetta comunque che nessun download stia trasferendo">Esegui ora</button>
+      </form>
+    </div>
+    {{if .Message}}<p class="alert{{if not .Error}} ok{{end}}" role="{{if .Error}}alert{{else}}status{{end}}">{{.Message}}</p>{{end}}
+
+    <h4>Database</h4>
+    {{if not .DatabaseOn}}<p class="muted">La manutenzione del database è disattivata.</p>
+    {{else if .DBAt}}<p><span>Ultima ottimizzazione:</span> <strong>{{.DBAt}}</strong>{{if .DBSize}} <span>— dimensione totale</span> <strong>{{.DBSize}}</strong>{{end}}{{if .DBFreed}} <span>— spazio recuperato</span> <strong>{{.DBFreed}}</strong>{{end}}</p>
+    {{if .DBCompacted}}<p class="muted"><span>Compattati:</span> <span>{{.DBCompacted}}</span></p>{{end}}
+    {{if .DBCheckedAt}}<p><span>Ultimo controllo di integrità:</span> <strong>{{.DBCheckedAt}}</strong> {{if .DBProblems}}<span class="badge err">Problemi trovati</span>{{else}}<span class="badge ok">Nessun problema</span>{{end}}</p>{{end}}
+    {{if .DBProblems}}<ul class="alert" role="alert">{{range .DBProblems}}<li><code>{{.}}</code></li>{{end}}</ul>{{end}}
+    {{if .DBError}}<p class="alert" role="alert"><span>L'ultima manutenzione non è stata completata:</span> <code>{{.DBError}}</code></p>{{end}}
+    {{else}}<p class="muted">La manutenzione del database non è ancora stata eseguita.</p>{{end}}
+
+    <h4>Pulizia audio della libreria</h4>
+    {{if not .AudioOn}}<p class="muted">Spenta: si attiva con «Pulisci l'audio dei file già in libreria», insieme a «Rimuovi le tracce audio in altre lingue».</p>
+    {{else if .AudioTotal}}<div class="stat-grid" aria-live="polite">
+      <span class="stat"><strong>{{.AudioChecked}}</strong> <span>di</span> <strong>{{.AudioTotal}}</strong> <span>Controllati</span></span>
+      <span class="stat"><strong>{{.AudioPercent}}%</strong></span>
+      <span class="stat"><strong>{{.AudioCleaned}}</strong> <span>Puliti</span></span>
+      <span class="stat"><strong>{{.AudioSaved}}</strong> <span>Risparmiati</span></span>
+      {{if .AudioFailed}}<span class="stat"><strong>{{.AudioFailed}}</strong> <span>Lasciati com'erano</span></span>{{end}}
+    </div>
+    {{if .AudioLast}}<p class="muted"><span>Ultimo controllo non superato:</span> <span class="truncate" title="{{.AudioLast}}">{{.AudioLast}}</span></p>{{end}}
+    <p class="muted">I file ancora in seed con un hardlink aspettano la fine del seed.</p>
+    {{else}}<p class="muted">La pulizia della libreria non è ancora partita: comincia alla prossima finestra.</p>{{end}}
+
+    <h4>Libreria</h4>
+    {{if .CheckAt}}<p><span>Ultimo controllo della libreria:</span> <strong>{{.CheckAt}}</strong> <span>—</span> <strong>{{.CheckSeries}}</strong> <span>Serie,</span> <strong>{{.CheckCorrect}}</strong> <span>File corretti,</span> <strong>{{.CheckRenamed}}</strong> <span>Rinominati,</span> <strong>{{.CheckRemoved}}</strong> <span>Doppioni nel cestino,</span> <strong>{{.CheckErrors}}</strong> <span>Errori</span></p>{{end}}
+    {{if .ReportAt}}<p><span>Ultimo rapporto:</span> <strong>{{.ReportAt}}</strong> <span>—</span> <strong>{{.ReportFiles}}</strong> <span>File in archivio</span></p>
+    {{if .Unreachable}}<p class="alert" role="status"><span>Cartelle che non si potevano leggere (non contate come mancanti):</span> <span>{{.Unreachable}}</span></p>{{end}}
+    {{if .Missing}}<div class="table-wrap" style="margin-top:10px"><table class="data-table">
+      <caption class="sr-only">File della libreria spariti dal disco</caption>
+      <thead><tr><th scope="col">Elemento</th><th scope="col">File</th><th scope="col">Azioni</th></tr></thead>
+      <tbody>{{range .Missing}}<tr>
+        <td>{{.Label}}</td>
+        <td class="truncate" title="{{.Path}}">{{.Path}}</td>
+        <td class="row-actions"><form hx-post="/settings/night-maintenance" hx-target="#v2-night-maintenance-panel" hx-swap="outerHTML" style="display:inline">
+          <input type="hidden" name="action" value="forget" /><input type="hidden" name="series" value="{{.Series}}" /><input type="hidden" name="season" value="{{.Season}}" /><input type="hidden" name="episode" value="{{.Episode}}" />
+          <button class="btn sm" type="submit" title="Segna la puntata come mancante: la ricerca la scaricherà di nuovo" aria-label="Segna come mancante: {{.Label}}">Segna come mancante</button>
+        </form></td>
+      </tr>{{end}}</tbody>
+    </table></div>
+    {{if .MissingMore}}<p class="muted">Sono mostrati i primi 100 file.</p>{{end}}
+    {{else}}<p class="muted">Nessun file della libreria manca dal disco.</p>{{end}}
+    {{else}}<p class="muted">Il rapporto della libreria non è ancora stato eseguito.</p>{{end}}
+  </div>
+</div>
+{{end}}
+
+{{define "v2_setup"}}
+<section class="v2-setup" aria-labelledby="v2-setup-title">
+  <div class="panel">
+    <div class="panel-head"><h2 id="v2-setup-title">Configurazione iniziale</h2><small class="muted">{{.Step}} / 5</small></div>
+    <div class="panel-body">
+      <ol class="v2-setup-steps">{{range .Steps}}<li class="{{if .Current}}current{{else if .Done}}done{{end}}"{{if .Current}} aria-current="step"{{end}}><a href="/?view=setup&amp;step={{.Number}}"><span class="v2-setup-num">{{.Number}}</span> <span>{{.Title}}</span></a></li>{{end}}</ol>
+      {{if .Message}}<p class="alert{{if not .Error}} ok{{end}}" role="{{if .Error}}alert{{else}}status{{end}}">{{.Message}}</p>{{end}}
+
+      {{if eq .Step 1}}
+      <form method="post" action="/language" class="v2-setup-form">
+        <fieldset class="v2-setup-fields"><legend>Lingua dell'interfaccia</legend>
+          <span class="field-row"><select class="input" name="lang" aria-label="Lingua dell'interfaccia" onchange="this.form.submit()">
+            <option value="it"{{if eq .Language "it"}} selected{{end}}>Italiano</option><option value="en"{{if eq .Language "en"}} selected{{end}}>English</option><option value="de"{{if eq .Language "de"}} selected{{end}}>Deutsch</option><option value="fr"{{if eq .Language "fr"}} selected{{end}}>Français</option><option value="es"{{if eq .Language "es"}} selected{{end}}>Español</option><option value="pl"{{if eq .Language "pl"}} selected{{end}}>Polski</option>
+          </select></span>
+        </fieldset>
+      </form>
+      <h3>Chi può usare Gextto?</h3>
+      <p class="hint">L'interfaccia ascolta su tutta la rete. Una password impedisce a chiunque altro di cambiare la configurazione o avviare download. Dalla rete locale puoi lasciare l'accesso libero.</p>
+      <form method="post" action="/setup/auth" class="v2-setup-form">
+        <label class="check"><input type="checkbox" name="auth" value="on"{{if or .AuthEnabled (not .AuthHasPass)}} checked{{end}} data-v2-setup-toggle="v2-setup-auth" /> <span>Proteggi l'accesso con una password</span></label>
+        <div id="v2-setup-auth" class="v2-setup-fields">
+          <label><span>Utente</span><input class="input" name="username" value="{{if .AuthUser}}{{.AuthUser}}{{else}}admin{{end}}" autocomplete="username" /></label>
+          <label><span>Password</span><input class="input" type="password" name="password" autocomplete="new-password" minlength="8" placeholder="{{if .AuthHasPass}}impostata — lascia vuoto per non cambiarla{{else}}almeno 8 caratteri{{end}}" /></label>
+          <label><span>Ripeti la password</span><input class="input" type="password" name="password2" autocomplete="new-password" /></label>
+          <label class="check"><input type="checkbox" name="local_bypass" value="on"{{if .AuthBypass}} checked{{end}} /> <span>Nessun login dalla rete locale</span></label>
+        </div>
+        <div class="toolbar"><button class="btn primary" type="submit">Salva e continua</button></div>
+      </form>
+
+      {{else if eq .Step 2}}
+      <h3>Dove salvare i file</h3>
+      <p class="hint">Verifica controlla ogni cartella con l'utente del servizio: se esiste, se è scrivibile, il tipo di disco e lo spazio libero. Download e temporanei sullo stesso disco della libreria permettono spostamenti istantanei.</p>
+      {{if .ServiceUser}}<p class="hint"><span>Utente del servizio:</span> <code>{{.ServiceUser}}</code></p>{{end}}
+      {{if .Mounts}}<p class="hint"><span>Cartelle di rete e dischi montati trovati:</span> {{range .Mounts}}<button class="btn sm" type="button" data-v2-setup-fill="archive_root" data-value="{{.}}">{{.}}</button> {{end}}</p>{{end}}
+      <form method="post" action="/setup/paths" class="v2-setup-form">
+        {{range .Paths}}
+        <div class="v2-setup-path">
+          <label><span>{{.Label}}</span><span class="field-row"><input class="input" name="{{.Key}}" id="v2-setup-{{.Key}}" value="{{.Value}}" placeholder="{{.Placeholder}}" spellcheck="false" data-v2-browse-input /><button class="btn sm" type="button" data-v2-browse-for="{{.Key}}" title="Sfoglia le cartelle disponibili sul server">Sfoglia</button></span></label>
+          <small class="hint">{{.Hint}}</small>
+          {{if .Checked}}<div class="v2-setup-check">
+            {{if .Problem}}<span class="badge err">Problema</span> <span>{{.Problem}}</span>
+            {{else if .Value}}<span class="badge ok">OK</span>{{if .WillCreate}} <span>Verrà creata.</span>{{end}}{{else}}<span class="muted">Valore predefinito.</span>{{end}}
+            {{if .Filesystem}} <small class="muted">{{.Filesystem}}{{if .FreeBytes}} · {{bytesU .FreeBytes}}{{end}}</small>{{end}}
+            {{if .Network}} <span class="badge">NAS</span>{{end}}
+            {{if .SameAsLib}} <span class="badge ok">stesso disco della libreria</span>{{end}}
+          </div>{{end}}
+          {{if and .Checked (not .Writable) .Exists}}<p class="hint">Dai i permessi di scrittura al gruppo che possiede la cartella e reinstalla con <code>--media-group &lt;gruppo&gt;</code>, oppure, per NFS/SMB, controlla le opzioni di montaggio (uid/gid, all_squash).</p>{{end}}
+        </div>
+        {{end}}
+        <div class="toolbar">
+          <button class="btn" type="submit" name="action" value="check">Verifica</button>
+          <button class="btn primary" type="submit" name="action" value="save">Salva e continua</button>
+          <a class="btn" href="/?view=setup&amp;step=1">Indietro</a>
+        </div>
+      </form>
+
+      {{else if eq .Step 3}}
+      <h3>Da dove cercare</h3>
+      <p class="hint">Gextto cerca le release negli indexer di Prowlarr, Jackett o indexarr e prende titoli, stagioni, episodi, locandine e calendario da TMDB (consigliato) oppure da TVDB. Basta una delle due chiavi: se ci sono entrambe vince TMDB. Puoi aggiungere altro dopo, in Impostazioni.</p>
+      {{if .Indexers}}<p><span class="badge ok">Indexer configurati</span> {{range .Indexers}}<code>{{.Name}}</code> {{end}}</p>{{end}}
+      <form method="post" action="/setup/sources" class="v2-setup-form">
+        <fieldset class="v2-setup-fields"><legend>Aggiungi un indexer</legend>
+          <label><span>Tipo</span><select class="input" name="indexer_manager"><option value="prowlarr">Prowlarr</option><option value="jackett">Jackett</option><option value="indexarr">indexarr</option></select></label>
+          <label><span>Nome</span><input class="input" name="indexer_name" placeholder="prowlarr" /></label>
+          <label><span>URL base</span><input class="input" name="indexer_url" placeholder="http://127.0.0.1:9696" inputmode="url" spellcheck="false" /></label>
+          <label><span>API key</span><input class="input" type="password" name="indexer_api_key" autocomplete="off" /></label>
+        </fieldset>
+        <fieldset class="v2-setup-fields"><legend>TMDB (consigliato)</legend>
+          <label><span>TMDB API key</span><input class="input" type="password" name="tmdb_api_key" autocomplete="off" placeholder="{{if .TmdbSet}}impostata — lascia vuoto per non cambiarla{{else}}non impostata{{end}}" /></label>
+          <small class="hint">Gratuita su themoviedb.org → Impostazioni → API. È la fonte consigliata.</small>
+        </fieldset>
+        <fieldset class="v2-setup-fields"><legend>TVDB (alternativa)</legend>
+          <label><span>TVDB API key</span><input class="input" type="password" name="tvdb_api_key" autocomplete="off" placeholder="{{if .TvdbSet}}impostata — lascia vuoto per non cambiarla{{else}}non impostata{{end}}" /></label>
+          <label><span>PIN abbonato</span><input class="input" type="password" name="tvdb_pin" autocomplete="off" placeholder="solo se la chiave lo richiede" /></label>
+          <small class="hint">Usata al posto di TMDB quando manca la chiave TMDB. Chiave v4 da thetvdb.com → Dashboard → API keys. Le chiavi «user-supported» richiedono un abbonamento TVDB e il suo PIN. Con TVDB manca solo la sezione Scopri.</small>
+        </fieldset>
+        <div class="toolbar">
+          <button class="btn primary" type="submit">Salva e continua</button>
+          <a class="btn" href="/?view=setup&amp;step=2">Indietro</a>
+          <a class="btn" href="/?view=setup&amp;step=4">Salta</a>
+        </div>
+      </form>
+
+      {{else if eq .Step 4}}
+      <h3>La tua prima serie o il tuo primo film</h3>
+      <p class="hint"><span>Cerca un titolo su</span> {{if .TmdbSet}}TMDB{{else}}TVDB{{end}} <span>e aggiungilo: Gextto lo cercherà e lo scaricherà al prossimo ciclo.</span></p>
+      {{if or .SeriesCount .MoviesCount}}<p><span class="badge ok">In libreria</span> <span>Serie TV</span> <strong>{{.SeriesCount}}</strong> · <span>Film</span> <strong>{{.MoviesCount}}</strong></p>{{end}}
+      {{if or .TmdbSet .TvdbSet}}
+      {{$source := "TVDB"}}{{if .TmdbSet}}{{$source = "TMDB"}}{{end}}
+      <form class="toolbar" hx-post="/tmdb/search" hx-target="#v2-tmdb-results" hx-swap="innerHTML">
+        <select class="input" name="kind" aria-label="Tipo di contenuto"><option value="series">Serie TV</option><option value="movie">Film</option></select>
+        <input class="input" type="search" name="query" aria-label="Titolo da cercare su {{$source}}" placeholder="Titolo da cercare su {{$source}}" />
+        <button class="btn primary" type="submit"><span>Cerca su</span> {{$source}}</button>
+      </form>
+      <div id="v2-tmdb-results" aria-live="polite"></div>
+      {{else}}
+      <p class="alert">Senza una API key TMDB o TVDB la ricerca dei titoli non è disponibile: aggiungila al passo precedente, oppure aggiungi i titoli dopo da Serie TV e Film.</p>
+      {{end}}
+      <div class="toolbar">
+        <a class="btn primary" href="/?view=setup&amp;step=5">Continua</a>
+        <a class="btn" href="/?view=setup&amp;step=3">Indietro</a>
+      </div>
+
+      {{else}}
+      <h3>Pronto a partire</h3>
+      <ul class="v2-setup-summary">
+        <li>{{if .ArchiveSet}}<span class="badge ok">OK</span>{{else}}<span class="badge warn">Manca</span>{{end}} <span>Cartella della libreria</span></li>
+        <li>{{if .HasIndexer}}<span class="badge ok">OK</span>{{else}}<span class="badge warn">Manca</span>{{end}} <span>Almeno un indexer</span></li>
+        <li>{{if .TmdbSet}}<span class="badge ok">OK</span> <span>TMDB API key</span>{{else if .TvdbSet}}<span class="badge ok">OK</span> <span>TVDB API key (TMDB è consigliata; senza TMDB manca la sezione Scopri)</span>{{else}}<span class="badge warn">Manca</span> <span>TMDB o TVDB API key</span>{{end}}</li>
+        <li>{{if or .SeriesCount .MoviesCount}}<span class="badge ok">OK</span>{{else}}<span class="badge warn">Manca</span>{{end}} <span>Almeno un titolo in libreria</span></li>
+      </ul>
+      <form method="post" action="/setup/finish" class="v2-setup-form">
+        <label class="check"><input type="checkbox" name="active" value="on" checked /> <span>Avvia la ricerca automatica (ciclo ogni 6 ore)</span></label>
+        <label class="check"><input type="checkbox" name="real_downloads" value="on"{{if not .DryRun}} checked{{end}} /> <span>Scarica davvero (disattiva la modalità prova)</span></label>
+        <p class="hint">In modalità prova Gextto cerca e mostra cosa scaricherebbe, senza scaricare nulla: utile per verificare filtri e qualità.</p>
+        <div class="toolbar">
+          <button class="btn primary" type="submit">Completa</button>
+          <a class="btn" href="/?view=setup&amp;step=4">Indietro</a>
+        </div>
+      </form>
+      {{end}}
+
+      {{if not .Completed}}
+      <form method="post" action="/setup/finish" class="v2-setup-skip"><input type="hidden" name="action" value="skip" /><button class="btn sm" type="submit">Salta la configurazione guidata</button></form>
+      {{end}}
+    </div>
+  </div>
+</section>
+{{end}}
+
+{{define "v2_update_panel"}}
+<div class="panel" id="v2-update-panel"{{if .Requested}} hx-get="/maintenance/update?from={{.Version}}" hx-trigger="every 5s" hx-swap="outerHTML"{{end}}>
+  <div class="panel-head"><h3>Aggiornamenti</h3><small class="muted">{{.Version}} · {{.Channel}}</small></div>
+  <div class="panel-body">
+    {{if .Message}}<p class="alert{{if not .Error}} ok{{end}}" role="status">{{.Message}}</p>{{end}}
+    {{if not .Managed}}
+    <p class="hint">Installazione da sorgenti: aggiorna con git pull e make build.</p>
+    {{else}}
+    {{if .Requested}}
+    <p class="alert ok" role="status"><span>Aggiornamento in corso: Gextto attende la fine delle copie verso la libreria, poi si riavvia. Questo pannello si aggiorna da solo.</span></p>
+    {{else if .Available}}
+    <p><span class="badge warn">Nuova versione</span> <strong>{{.LatestVersion}}</strong> <small class="muted">{{.LatestBuiltLabel}}</small></p>
+    {{if .Changes}}
+    <p class="hint">Novità rispetto alla versione installata:</p>
+    <ul class="v2-update-changes">{{range .Changes}}<li><a href="{{.URL}}" target="_blank" rel="noopener noreferrer"><code>{{.Short}}</code></a> <small class="muted">{{.Day}}</small> {{.Subject}}</li>{{end}}</ul>
+    {{if not .ChangesComplete}}<p class="hint">Elenco parziale: la versione installata è più vecchia delle modifiche mostrate.</p>{{end}}
+    {{end}}
+    {{if .Updater}}
+    <p class="hint">Prima di aggiornare viene creato un backup dei database. Se la nuova versione non parte, torna automaticamente quella precedente.</p>
+    {{else}}
+    <p class="alert">Aggiornamento dalla UI non configurato: riesegui l'installer (install.sh) per abilitarlo, oppure usa sudo gexttod --update.</p>
+    {{end}}
+    {{else if .CheckedAt}}
+    <p><span class="badge ok">Aggiornato</span> <span>Gextto è all'ultima versione disponibile.</span></p>
+    {{end}}
+    {{if .Error}}<p class="alert" role="alert"><span>Controllo aggiornamenti non riuscito:</span> {{.Error}}</p>{{end}}
+    {{if not .CheckEnabled}}<p class="hint">Controllo automatico disattivato (Impostazioni → Sistema → Aggiornamenti).</p>{{else}}<p class="hint"><span>Controllo automatico ogni</span> {{.CheckHours}} <span>ore</span> <small class="muted">(Impostazioni → Sistema → Aggiornamenti)</small></p>{{end}}
+    <div class="toolbar">
+      {{if .CanApply}}<form hx-post="/maintenance/update" hx-target="#v2-update-panel" hx-swap="outerHTML" hx-confirm="Aggiornare Gextto ora? Il servizio si riavvia al termine." style="display:inline"><input type="hidden" name="action" value="apply" /><button class="btn sm primary" type="submit" title="Scarica l'ultima build, la installa e riavvia Gextto">Aggiorna</button></form>
+      <form hx-post="/maintenance/update" hx-target="#v2-update-panel" hx-swap="outerHTML" style="display:inline"><input type="hidden" name="action" value="check" /><button class="btn sm" type="submit" title="Cerca subito una versione più recente">Ricontrolla</button></form>
+      {{else}}<form hx-post="/maintenance/update" hx-target="#v2-update-panel" hx-swap="outerHTML" style="display:inline"><input type="hidden" name="action" value="check" /><button class="btn sm primary" type="submit" title="Cerca subito una versione più recente">Verifica aggiornamenti</button></form>{{end}}
+      {{if .CheckedAt}}<small class="muted"><span>Ultimo controllo:</span> {{.CheckedLabel}}</small>{{end}}
+    </div>
+    {{if .LastLog}}<details><summary id="v2-update-lastlog-heading">Log dell'ultimo aggiornamento</summary><pre class="log-view" tabindex="0" role="region" aria-labelledby="v2-update-lastlog-heading">{{.LastLog}}</pre></details>{{end}}
+    {{end}}
+  </div>
+</div>
+{{end}}
+
+{{define "v2_ramdisk_panel"}}
+<div class="panel" id="v2-ramdisk-panel">
+  <div class="panel-head"><h3>RAM disk</h3><small class="muted">{{if .Configured}}<span>in uso:</span> {{.Configured}}{{else}}non configurato{{end}}</small></div>
+  <div class="panel-body">
+    {{if .Problem}}<p class="alert">{{.Problem}}</p>{{end}}
+    <p class="hint">Scegli una destinazione temporanea tmpfs/ramfs scrivibile: Gextto la configura con soglia e margine consigliati. /dev/shm viene perso al riavvio.</p>
+    <div class="toolbar">
+      <form hx-post="/maintenance/ramdisk" hx-target="#v2-ramdisk-panel" hx-swap="outerHTML" style="display:inline"><button class="btn sm" type="submit">Aggiorna</button></form>
+      {{if .Message}}<small class="htx-status {{if .Error}}err{{else}}ok{{end}}">{{.Message}}</small>{{end}}
+    </div>
+    {{if .Paths}}
+    <div class="table-wrap"><table class="data-table">
+      <caption class="sr-only">Percorsi RAM disk</caption>
+      <thead><tr><th scope="col">Percorso</th><th scope="col">Filesystem</th><th scope="col">Liberi</th><th scope="col">Totali</th><th scope="col"></th></tr></thead>
+      <tbody>{{range .Paths}}<tr>
+        <td class="truncate" title="{{.Path}}">{{.Path}}</td><td>{{.Filesystem}}</td>
+        <td class="numeric">{{bytes .FreeBytes}}</td><td class="numeric">{{bytes .TotalBytes}}</td>
+        <td class="row-actions">
+          {{if .Configured}}<span class="badge ok">in uso</span>
+          {{else if .Writable}}
+          <form hx-post="/maintenance/ramdisk" hx-target="#v2-ramdisk-panel" hx-swap="outerHTML" style="display:inline">
+            <input type="hidden" name="action" value="select" /><input type="hidden" name="path" value="{{.Path}}" />
+            <button class="btn sm primary" type="submit">Usa questo percorso</button>
+          </form>
+          {{else}}<span class="muted">non scrivibile</span>{{end}}
+        </td>
+      </tr>{{end}}</tbody>
+    </table></div>
+    {{else}}<p class="muted">Nessun tmpfs/ramfs scrivibile trovato.</p>{{end}}
+    {{if .CreateAvail}}<form class="toolbar" style="margin-top:10px" hx-post="/maintenance/ramdisk" hx-target="#v2-ramdisk-panel" hx-swap="outerHTML"><input type="hidden" name="action" value="create" /><input type="hidden" name="path" value="{{.CreatePath}}" /><button class="btn sm" type="submit" title="Crea una sottocartella dedicata"><span>Crea</span> {{.CreatePath}}</button></form>{{end}}
+    {{if .Warning}}<p class="muted"><small>{{.Warning}}</small></p>{{end}}
+  </div>
+</div>
+{{end}}
+
+{{define "v2_folder_rename_panel"}}
+<div class="panel" id="v2-folder-rename-panel">
+  <div class="panel-head"><h3>Rinomina contenuto cartella</h3>{{if .Message}}<small class="muted">{{.Message}}</small>{{end}}</div>
+  <div class="panel-body">
+    <p class="hint">Scansiona una cartella di serie o film: Gextto confronta i nomi con TMDB/TVDB e propone le rinomine. La scansione non modifica nulla; vengono applicate solo le righe accettate.</p>
+    <form class="toolbar" hx-post="/maintenance/folder-rename/scan" hx-target="#v2-folder-rename-panel" hx-swap="outerHTML">
+      <input class="input" type="text" name="path" value="{{.Path}}" placeholder="/percorso/alla/cartella" autocomplete="off" aria-label="Cartella" data-v2-browse-input />
+      <button class="btn sm" type="button" data-v2-browse-for="path" title="Sfoglia le cartelle disponibili sul server">Sfoglia</button>
+      <button class="btn sm primary" type="submit">Scansiona e proponi</button>
+    </form>
+    {{if .Error}}<p class="alert">{{.Message}}</p>{{end}}
+    {{if .Scanned}}{{if .Items}}
+    <form hx-post="/maintenance/folder-rename/apply" hx-target="#v2-folder-rename-panel" hx-swap="outerHTML">
+      <input type="hidden" name="path" value="{{.Path}}" />
+      <input type="hidden" name="scan" value="{{.ScanJSON}}" />
+      <div class="table-wrap"><table class="data-table folder-rename-table">
+        <caption class="sr-only">Anteprima rinomina file</caption>
+        <thead><tr><th scope="col">Accetta</th><th scope="col">File</th><th scope="col">Tipo</th><th scope="col">Rilevato</th><th scope="col">Confronto TMDB/TVDB</th><th scope="col">Nuovo nome</th><th scope="col">Stato</th></tr></thead>
+        <tbody>{{range .Items}}<tr>
+          <td><input type="checkbox" name="accept__{{.Index}}" value="1" {{if and .Target (not .Conflict)}}checked{{end}} {{if or (not .Target) .Conflict}}disabled{{end}} aria-label="Accetta proposta" /></td>
+          <td class="truncate" title="{{.Source}}">{{.Relative}}</td>
+          <td>{{if eq .Kind "series"}}Serie{{else if eq .Kind "movie"}}Film{{else}}—{{end}}</td>
+          <td>{{.Detected}}</td>
+          <td>{{if .Candidates}}<select class="input compact" name="cand__{{.Index}}">{{range $i, $c := .Candidates}}<option value="{{$i}}">{{$c.Provider}} · {{$c.Title}}{{if $c.Year}} ({{$c.Year}}){{end}}</option>{{end}}</select>{{else}}{{.Reason}}{{end}}</td>
+          <td class="truncate" title="{{.Target}}">{{.Target}}</td>
+          <td>{{if .Conflict}}Conflitto{{else if eq .Status "unmatched"}}Non identificato{{else if eq .Status "proposta"}}Proposta forte{{else}}Da verificare{{end}}</td>
+        </tr>{{end}}</tbody>
+      </table></div>
+      <div class="toolbar" style="margin-top:10px"><button class="btn sm primary" type="submit">Applica selezionate</button></div>
+    </form>
+    {{else}}<p class="muted">Nessun file video trovato o nessuna proposta.</p>{{end}}{{end}}
+  </div>
+</div>
+{{end}}
+
+{{define "v2_rename_progress_panel"}}
+<div class="panel">
+  <div class="panel-head"><h3>Progresso rinomina</h3></div>
+  <div class="panel-body" hx-get="/partial/rename-progress" hx-trigger="load, every 2s" hx-swap="innerHTML">{{template "v2_rename_progress" .}}</div>
+</div>
+{{end}}
+
+{{define "v2_rename_progress"}}
+<div class="progress" role="progressbar" aria-label="Avanzamento rinomina" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{.Percent}}"><span style="width:{{.Percent}}%"></span></div>
+<p class="muted">{{if .Running}}<span>In corso:</span> {{.Current}}/{{.Total}}{{if .Series}} · {{.Series}}{{end}}{{if .Message}} · {{.Message}}{{end}}{{else}}<span>Nessuna rinomina in corso.</span>{{end}}{{if .Errors}} · {{.Errors}} <span>errori</span>{{end}}</p>
+{{end}}
+
+{{define "v2_jobs"}}
+<div class="panel" id="v2-jobs-panel" hx-get="/partial/jobs" hx-trigger="every 3s" hx-target="this" hx-swap="outerHTML"{{if not .Jobs}} style="display:none"{{end}}>
+  <div class="panel-head"><h3>Operazioni in background</h3><small class="muted">{{.Active}} <span>in corso</span> · {{len .Jobs}} <span>recenti</span></small></div>
+  <div class="panel-body">
+    {{if .Jobs}}
+    <div class="table-wrap"><table class="data-table jobs-table">
+      <caption class="sr-only">Operazioni in background</caption>
+      <thead><tr><th scope="col">Operazione</th><th scope="col">Stato</th><th scope="col">Avanzamento</th><th scope="col">Messaggio</th><th scope="col"><span class="sr-only">Azioni</span></th></tr></thead>
+      <tbody>{{range .Jobs}}<tr>
+        <td class="job-kind">{{.Kind}}</td>
+        <td class="job-state"><span class="badge {{.StateClass}}">{{.StateLabel}}</span></td>
+        <td class="job-progress-cell"><div class="progress" role="progressbar" aria-label="Avanzamento di {{.Kind}}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{.Progress}}"><span style="width:{{.Progress}}%"></span></div><small class="muted">{{.Progress}}%{{if .Started}} · {{.Started}}{{end}}</small></td>
+        <td class="job-message truncate">{{if .Error}}{{.Error}}{{else}}{{.Message}}{{end}}</td>
+        <td class="row-actions job-actions">{{if not .Done}}<form hx-post="/jobs/cancel" hx-target="#v2-jobs-panel" hx-swap="outerHTML" style="display:inline"><input type="hidden" name="id" value="{{.ID}}" /><button class="btn sm danger" type="submit" hx-confirm="Annullare l'operazione?">Annulla</button></form>{{end}}</td>
+      </tr>{{end}}</tbody>
+    </table></div>
+    {{else}}<p class="muted">Nessuna operazione in background.</p>{{end}}
+  </div>
+</div>
+{{end}}

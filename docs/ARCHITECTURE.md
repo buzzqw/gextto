@@ -343,7 +343,7 @@ the old `/?view=manual` page redirects to the online manual.
 | I want to... | Files to touch |
 |---|---|
 | Add/modify an API endpoint | `web_router.go` + a `web_handlers_*.go` (+ optional struct in `web_inputs_extra.go`) |
-| Add a page or a UI widget | `uiweb_v2*.go` + `uiweb/v2/templates/v2.html` (+ CSS/JS in `uiweb/v2/static/`) |
+| Add a page or a UI widget | `uiweb_v2*.go` + the template file of its subject in `uiweb/v2/templates/` (`shell.html`, `dashboard.html`, `downloads.html`, `detail.html`, `settings.html`, `health.html`, `ed2k.html`, `comics.html`, `tables.html`, `panels.html`, `misc.html`, `search.html`, `titles.html`, …) (+ CSS/JS in `uiweb/v2/static/`) |
 | Add a background worker | `web_serve.go` (registration) + `web_background.go` or `web_workers_media.go` |
 | Change the database schema | `database.go` (+ tests) and, if needed, `migrate.go` |
 | Add a setting | `config.go` + `uiweb_settings.go` (section and `Group`) + `uiweb_settings_meta.go` (unit, special value, dependency) + `uiweb_settings_defaults.go` + `uiweb_tooltips.go` + `internal_translations*.yml` catalogues |
