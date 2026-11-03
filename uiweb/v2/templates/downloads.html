@@ -195,7 +195,7 @@
                     {{if .SeedInfinite}}<span class="badge warn" {{trTitle "Seed senza limiti"}}>{{tr "seed ∞"}}</span>{{end}}
                     {{if .Pinned}}<span class="badge" {{trTitle "Forzato fuori coda: si sblocca dalla scheda del torrent"}}>{{tr "📌 pin"}}</span>{{end}}
                     {{if .Tags}}<span class="tag-chips">{{range .Tags}}<span class="tag-chip">{{tr .}}</span>{{end}}</span>{{end}}
-                    {{if or .Reason .Source}}<small class="origin muted"><span>{{tr "Perché:"}}</span> {{if .Reason}}{{tr .Reason}}{{else}}—{{end}} · <span>{{tr "Fonte:"}}</span> {{if .Source}}{{tr .Source}}{{else}}—{{end}}</small>{{end}}
+                    {{if or .Reason .Source}}<small class="origin muted"><span>{{tr "Perché:"}}</span> {{if .Reason}}{{tr (reasonLabel .Reason)}}{{else}}—{{end}} · <span>{{tr "Fonte:"}}</span> {{if .Source}}{{tr .Source}}{{else}}—{{end}}</small>{{end}}
                   </span>
                   <span class="torrent-state badge {{.StateClass}}">{{tr .State}}</span>
                 </div>

@@ -254,6 +254,41 @@ func TestNotifierFormatEventItalian(t *testing.T) {
 	}
 }
 
+// TestNotifierMovieReasonIsNotAnEpisode checks that a movie download never
+// talks about episodes, whatever the reason code of the decision.
+func TestNotifierMovieReasonIsNotAnEpisode(t *testing.T) {
+	previous := messages.Language()
+	t.Cleanup(func() { messages.SetLanguage(previous) })
+
+	episodeWords := []string{"episod", "episode", "puntat", "folge", "odcinek", "épisode"}
+	for _, lang := range []string{"it", "en", "de", "fr", "es", "pl"} {
+		messages.SetLanguage(lang)
+		for _, reason := range []string{"", "approved", "upgrade", "gap_fill", "gap_filled", "last_resort", "restored", "stall_alternative"} {
+			got := formatEvent("download_started", map[string]any{
+				"kind": "movie", "title": "Example Movie 1999", "reason": reason,
+			})
+			for _, word := range episodeWords {
+				if strings.Contains(strings.ToLower(got), word) {
+					t.Fatalf("[%s] movie reason %q talks about episodes: %q", lang, reason, got)
+				}
+			}
+		}
+	}
+
+	messages.SetLanguage("it")
+	if got := formatEvent("download_started", map[string]any{
+		"kind": "movie", "title": "Example Movie 1999", "reason": "approved",
+	}); !strings.Contains(got, "🆕 Nuovo film approvato") {
+		t.Fatalf("movie approved reason = %q", got)
+	}
+	// An episode keeps its own wording.
+	if got := formatEvent("download_started", map[string]any{
+		"series": "Series A", "season": 2, "episode": 5, "reason": "approved",
+	}); !strings.Contains(got, "🆕 Nuovo episodio approvato") {
+		t.Fatalf("episode approved reason = %q", got)
+	}
+}
+
 // TestNotifierFormatEventReasonCodes checks that the raw reason codes used in
 // download_started payloads are always rendered as labels, never leaked.
 func TestNotifierFormatEventReasonCodes(t *testing.T) {

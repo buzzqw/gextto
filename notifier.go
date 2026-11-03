@@ -924,6 +924,43 @@ func formatEvent(event string, data map[string]any) string {
 	return formatEventLang(messages.Language(), event, data)
 }
 
+// downloadReasonText turns the reason code of a started download into a
+// readable sentence. The same code is worded for an episode or for a movie: a
+// movie is not an episode, so its notification never talks about episodes.
+func downloadReasonText(lang, reasonCode, kind string) string {
+	movie := kind == "movie"
+	switch reasonCode {
+	case "upgrade":
+		return messages.PickLang(lang, "⬆️ Qualità superiore trovata", "⬆️ Better quality found")
+	case "gap_filled", "gap_fill":
+		if movie {
+			return messages.PickLang(lang, "🔎 Film mancante trovato", "🔎 Missing movie found")
+		}
+		return messages.PickLang(lang, "🔎 Episodio mancante trovato", "🔎 Missing episode found")
+	case "last_resort":
+		if movie {
+			return messages.PickLang(lang, "🆘 Ultima risorsa: film fuori profilo (risoluzione)", "🆘 Last resort: movie outside the profile (resolution)")
+		}
+		return messages.PickLang(lang, "🆘 Ultima risorsa: episodio mancante fuori profilo (risoluzione)", "🆘 Last resort: missing episode outside the profile (resolution)")
+	case "restored":
+		return messages.PickLang(lang, "♻️ Download ripristinato", "♻️ Download restored")
+	case "approved":
+		if movie {
+			return messages.PickLang(lang, "🆕 Nuovo film approvato", "🆕 New movie approved")
+		}
+		return messages.PickLang(lang, "🆕 Nuovo episodio approvato", "🆕 New episode approved")
+	case "stall_alternative":
+		return messages.PickLang(lang, "⏱️ Download bloccato: provo un'alternativa", "⏱️ Stuck download: trying an alternative")
+	case "":
+		if movie {
+			return messages.PickLang(lang, "✅ Film approvato", "✅ Movie approved")
+		}
+		return messages.PickLang(lang, "✅ Release approvata", "✅ Release approved")
+	default:
+		return reasonCode
+	}
+}
+
 // formatEventLang renders a human notification text for an event in the
 // requested language, like the UI.
 func formatEventLang(lang, event string, data map[string]any) string {
@@ -962,26 +999,7 @@ func formatEventLang(lang, event string, data map[string]any) string {
 		}
 		return "-"
 	}
-	reasonCode := text("reason")
-	var reason string
-	switch reasonCode {
-	case "upgrade":
-		reason = messages.PickLang(lang, "⬆️ Qualità superiore trovata", "⬆️ Better quality found")
-	case "gap_filled", "gap_fill":
-		reason = messages.PickLang(lang, "🔎 Episodio mancante trovato", "🔎 Missing episode found")
-	case "last_resort":
-		reason = messages.PickLang(lang, "🆘 Ultima risorsa: episodio mancante fuori profilo (risoluzione)", "🆘 Last resort: missing episode outside the profile (resolution)")
-	case "restored":
-		reason = messages.PickLang(lang, "♻️ Download ripristinato", "♻️ Download restored")
-	case "approved":
-		reason = messages.PickLang(lang, "🆕 Nuovo episodio approvato", "🆕 New episode approved")
-	case "stall_alternative":
-		reason = messages.PickLang(lang, "⏱️ Download bloccato: provo un'alternativa", "⏱️ Stuck download: trying an alternative")
-	case "":
-		reason = messages.PickLang(lang, "✅ Release approvata", "✅ Release approved")
-	default:
-		reason = reasonCode
-	}
+	reason := downloadReasonText(lang, text("reason"), text("kind"))
 	switch event {
 	case "message":
 		return text("text")

@@ -2834,3 +2834,51 @@ func TestV2QualityProfileDuplicateNameIsReported(t *testing.T) {
 		t.Fatalf("profiles = %+v", profiles)
 	}
 }
+
+// TestV2ReasonLabelNeverShowsRawCodes: the "Perché:" line of Scarico shows the
+// human label of the reason saved with the download, and every label is a
+// catalog key so it is translated in all six languages.
+func TestV2ReasonLabelNeverShowsRawCodes(t *testing.T) {
+	keys := i18nCatalogKeys(t)
+	for _, code := range []string{
+		"approved", "upgrade", "gap_fill", "gap_filled",
+		"last_resort", "restored", "stall_alternative", "manual",
+		" APPROVED ", "Manual",
+	} {
+		label := v2ReasonLabel(code)
+		if label == "" || strings.Contains(label, "_") {
+			t.Fatalf("reason %q = %q, want a readable label", code, label)
+		}
+		if !keys[label] {
+			t.Fatalf("reason %q = %q is not a catalog key, so it stays Italian", code, label)
+		}
+	}
+	// A code nobody knows is left as it is: better than hiding it.
+	if got := v2ReasonLabel("sconosciuto"); got != "sconosciuto" {
+		t.Fatalf("unknown reason = %q", got)
+	}
+}
+
+// TestV2DownloadsRowShowsTheReasonInPlainWords renders the real row template:
+// the origin line must carry the human reason, never the saved code.
+func TestV2DownloadsRowShowsTheReasonInPlainWords(t *testing.T) {
+	set := v2TemplatesFor(nil)
+	entry := v2DownloadEntry{
+		Kind: "torrent",
+		Torrent: &uiTorrentRow{
+			Hash: "abc123", Name: "Example Movie 1999", Reason: "approved",
+			State: "In download", ProgressPct: "0.0",
+		},
+	}
+	var out bytes.Buffer
+	if err := set.ExecuteTemplate(&out, "v2_download_row", entry); err != nil {
+		t.Fatalf("render the downloads row: %v", err)
+	}
+	rendered := out.String()
+	if !strings.Contains(rendered, "✅ approvato") {
+		t.Fatalf("the row does not show the reason in plain words: %s", rendered)
+	}
+	if strings.Contains(rendered, "approved") {
+		t.Fatalf("the row still shows the raw reason code: %s", rendered)
+	}
+}

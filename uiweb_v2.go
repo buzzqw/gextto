@@ -63,6 +63,7 @@ func v2TemplateFuncMap() template.FuncMap {
 		"arrow":       v2SortArrow,
 		"sourceLabel": uiSourceLabel,
 		"httpState":   v2HTTPStateLabel,
+		"reasonLabel": v2ReasonLabel,
 		"ternary": func(cond bool, whenTrue, whenFalse string) string {
 			if cond {
 				return whenTrue
@@ -1273,6 +1274,29 @@ func v2HTTPStateLabel(status string) string {
 		return "In pausa"
 	}
 	return status
+}
+
+// v2ReasonLabels turns the reason code saved with a download ("approved",
+// "gap_filled", "manual", …) into a readable Italian label, which the template
+// translates with `tr`. Without it the "Perché:" line of Scarico showed the raw
+// code.
+var v2ReasonLabels = map[string]string{
+	"approved":          "✅ approvato",
+	"upgrade":           "⬆️ qualità superiore",
+	"gap_fill":          "🔎 lacuna riempita",
+	"gap_filled":        "🔎 lacuna riempita",
+	"last_resort":       "🆘 ultima risorsa",
+	"restored":          "♻️ ripristinato",
+	"stall_alternative": "⏱️ download bloccato",
+	"manual":            "✋ aggiunto a mano",
+}
+
+func v2ReasonLabel(reason string) string {
+	code := strings.ToLower(strings.TrimSpace(reason))
+	if label, ok := v2ReasonLabels[code]; ok {
+		return label
+	}
+	return reason
 }
 
 // v2DownloadEntry is one row of Scarico: a torrent, an HTTP download or aMule's
