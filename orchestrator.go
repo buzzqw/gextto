@@ -18,7 +18,6 @@ import (
 	"context"
 	"crypto/sha1"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"math"
 	"net/url"
@@ -376,378 +375,9 @@ func RunCycleDomain(
 		refreshSeriesMetadata(ctx, cfg, db)
 	}
 
-	gapFilling := true
-	if value, ok := cfg.Settings["gap_filling"]; ok {
-		gapFilling = settingTruthy(value)
-	}
-	var archiveGaps []SeriesGap
-	if domainIs(domain, "movies") || !gapFilling {
-		archiveGaps = nil
-	} else {
-		gaps, err := db.ArchiveGaps()
-		if err != nil {
-			return nil, err
-		}
-		// Respect the current configuration: only existing, enabled series and
-		// monitored seasons (neither disabled nor outside `seasons`).
-		for i := range gaps {
-			season := gaps[i].Season
-			if cfg.FindSeriesMatch(gaps[i].Series, &season) != nil {
-				archiveGaps = append(archiveGaps, gaps[i])
-			}
-		}
-	}
-
-	type seriesSeason struct {
-		Series string
-		Season int64
-	}
-	gapSummary := map[seriesSeason][]int64{}
-	for i := range archiveGaps {
-		key := seriesSeason{Series: archiveGaps[i].Series, Season: archiveGaps[i].Season}
-		gapSummary[key] = append(gapSummary[key], archiveGaps[i].Episode)
-	}
-	for key, episodes := range gapSummary {
-		slices.Sort(episodes)
-		// Only at debug: the full list of open gaps is noisy. The log reports a
-		// gap when it is actually filled.
-		if logging.Enabled(logging.LevelDebug) {
-			logging.Debug(fmt.Sprintf("→ %s S%02d gap: %s", key.Series, key.Season, episodesLabel(episodes)))
-		}
-	}
-
-	gapLimit := 0
-	if value, ok := cfg.Settings["gap_fill_max_per_series"]; ok {
-		if parsed, err := strconv.Atoi(strings.TrimSpace(value)); err == nil && parsed >= 0 {
-			gapLimit = parsed
-		}
-	}
-	deepIntervalHours := int64(6)
-	if value, ok := cfg.Settings["gap_deep_interval_hours"]; ok {
-		if parsed, err := strconv.ParseInt(strings.TrimSpace(value), 10, 64); err == nil {
-			deepIntervalHours = parsed
-		}
-	}
-	if deepIntervalHours < 1 {
-		deepIntervalHours = 1
-	}
-	deepMaxPerCycle := 5
-	if value, ok := cfg.Settings["gap_deep_max_per_cycle"]; ok {
-		if parsed, err := strconv.Atoi(strings.TrimSpace(value)); err == nil && parsed >= 0 {
-			deepMaxPerCycle = parsed
-		}
-	}
-	// How long a gap searched online is left alone (`gap_research_hours`,
-	// default 23). Never shorter than the deep interval, or every deep pass
-	// would search the same gaps again.
-	gapResearchHours := int64(23)
-	if value, ok := cfg.Settings["gap_research_hours"]; ok {
-		if parsed, err := strconv.ParseInt(strings.TrimSpace(value), 10, 64); err == nil && parsed > 0 {
-			gapResearchHours = parsed
-		}
-	}
-	if gapResearchHours < deepIntervalHours {
-		gapResearchHours = deepIntervalHours
-	}
-	deepNow := time.Now().UTC().Unix()
-	lastDeep := int64(0)
-	if value, ok := cfg.Settings["last_deep_gap_fill_ts"]; ok {
-		if parsed, err := strconv.ParseInt(strings.TrimSpace(value), 10, 64); err == nil {
-			lastDeep = parsed
-		}
-	}
-	isDeep := saturatingSub(deepNow, lastDeep) >= saturatingMul(deepIntervalHours, 3600)
-	deepLabel := "in the local release archive"
-	if isDeep {
-		deepLabel = fmt.Sprintf("in the local release archive, plus up to %d online searches", deepMaxPerCycle)
-	}
-	if len(archiveGaps) > 0 {
-		logging.Info(fmt.Sprintf("🧩 Looking for %s %s",
-			countLabel(int64(len(archiveGaps)), "missing episode", "missing episodes"), deepLabel))
-	}
-
-	// Phase 1 (every cycle, free): local archive search only.
-	var liveCandidates []liveCandidate
-	var waiting []waitingGap
-	livePerSeries := map[string]int{}
-	archiveHits := 0
-	gapTargets := map[gapTarget]struct{}{}
-	// Copies the archive holds only outside the profile: the cycle may take
-	// them as a last resort, but only after the online search for the same gap
-	// found nothing better, like the live ones.
-	archiveLastResorts := map[gapTarget][]models.Release{}
-	// Gaps the archive does not hold, grouped by series and season: eD2k is
-	// asked once for the whole season, then the candidates go to every gap of
-	// it instead of one search per episode.
-	seasonGaps := map[seriesSeason][]int64{}
-	seasonSeries := map[seriesSeason]*SeriesConfig{}
-	// One query for the search times of every gap: a point query per gap made
-	// the deep pass cost grow with the library.
-	searchTimes, err := db.GapSearchedTimes()
+	releases, gapTargets, err := collectGapReleases(ctx, cfg, engine, db, archive, domain, blocklistedHashes, releases)
 	if err != nil {
 		return nil, err
-	}
-	for i := range archiveGaps {
-		gapTargets[gapTarget{Series: archiveGaps[i].Series, Season: archiveGaps[i].Season, Episode: archiveGaps[i].Episode}] = struct{}{}
-	}
-	for i := range archiveGaps {
-		gap := archiveGaps[i]
-		season := gap.Season
-		series := cfg.FindSeriesMatch(gap.Series, &season)
-		if series == nil {
-			continue
-		}
-		query := fmt.Sprintf("%s S%02dE%02d", gap.Series, gap.Season, gap.Episode)
-		found := false
-		if items, err := searchArchiveForEpisode(ctx, cfg, archive, series, query, gap.Season, gap.Episode); err == nil {
-			for _, item := range items {
-				hash, ok := utils.MagnetHash(item[1])
-				if !ok {
-					continue
-				}
-				if _, blocked := blocklistedHashes[hash]; blocked {
-					continue
-				}
-				release := parseArchiveRelease(ctx, cfg, series, item)
-				if !releaseMatchesConfiguredEpisode(release, series, gap.Season, gap.Episode) {
-					continue
-				}
-				if reason := cfg.AllReleaseDeniedReason(release); reason != "" {
-					if cfg.ReleaseIsMonitored(release) {
-						rules.LogRejection(release, reason)
-					}
-					continue
-				}
-				canonicalName := series.Name
-				release.Series = &canonicalName
-				if !cfg.SeriesReleaseAllowed(series, &release.Quality, release.Title) {
-					if cfg.SeriesLastResortAllowed(series, &release.Quality, release.Title) {
-						release.LastResort = true
-						key := gapTarget{Series: canonicalName, Season: gap.Season, Episode: gap.Episode}
-						archiveLastResorts[key] = append(archiveLastResorts[key], *release)
-					}
-					continue
-				}
-				logging.Debug("archive release found",
-					"series", gap.Series,
-					"season", gap.Season,
-					"episode", gap.Episode,
-					"title", release.Title,
-					"source", release.Source)
-				releases = append(releases, *release)
-				found = true
-			}
-		}
-		if found {
-			archiveHits++
-			continue
-		}
-		seasonKey := seriesSeason{Series: series.Name, Season: gap.Season}
-		seasonGaps[seasonKey] = append(seasonGaps[seasonKey], gap.Episode)
-		seasonSeries[seasonKey] = series
-		// Phase 2 candidate: deep live search only.
-		if !isDeep {
-			continue
-		}
-		// The log is keyed by the configured name, which may differ from the
-		// archive title when the gap came in through an alias.
-		last, searched := searchTimes[gapTarget{Series: series.Name, Season: gap.Season, Episode: gap.Episode}]
-		if searched && int64(time.Now().UTC().Sub(last).Hours()) < gapResearchHours {
-			continue
-		}
-		waiting = append(waiting, waitingGap{
-			candidate: liveCandidate{Series: series, Season: gap.Season, Episode: gap.Episode},
-			last:      last,
-			searched:  searched,
-		})
-	}
-	orderWaitingGaps(waiting, cfg.Settings["gap_deep_cursor"])
-	deepCursor := ""
-	for _, entry := range waiting {
-		if len(liveCandidates) >= deepMaxPerCycle {
-			break
-		}
-		name := entry.candidate.Series.Name
-		if gapLimit > 0 && livePerSeries[name] >= gapLimit {
-			continue
-		}
-		livePerSeries[name]++
-		liveCandidates = append(liveCandidates, entry.candidate)
-		if !entry.searched {
-			deepCursor = name
-		}
-	}
-	logging.Debug(fmt.Sprintf(
-		"gap fill: %d found in the archive, %d to look up online",
-		archiveHits,
-		len(liveCandidates),
-	))
-
-	if len(liveCandidates) > 0 {
-		foundResults := make([][]models.Release, len(liveCandidates))
-		// Copies in the right language that miss only the resolution of the
-		// profile: taken when nothing else exists for the episode.
-		lastResorts := make([][]models.Release, len(liveCandidates))
-		var gapWG sync.WaitGroup
-		gapSem := make(chan struct{}, 3)
-		for i := range liveCandidates {
-			candidate := liveCandidates[i]
-			gapWG.Add(1)
-			gapSem <- struct{}{}
-			go func(index int, candidate liveCandidate) {
-				defer recoverGoroutine("gap-fill live search")
-				defer gapWG.Done()
-				defer func() { <-gapSem }()
-				query := fmt.Sprintf("%s S%02dE%02d", candidate.Series.Name, candidate.Season, candidate.Episode)
-				logging.Debug("gap-fill live search started",
-					"series", candidate.Series.Name,
-					"season", candidate.Season,
-					"episode", candidate.Episode,
-					"query", query)
-				started := time.Now()
-				appendValid := func(found []models.Release) {
-					for i := range found {
-						release := found[i]
-						if !releaseMatchesConfiguredEpisode(&release, candidate.Series, candidate.Season, candidate.Episode) ||
-							cfg.AllReleaseDeniedReason(&release) != "" {
-							continue
-						}
-						canonicalName := candidate.Series.Name
-						release.Series = &canonicalName
-						if !cfg.SeriesReleaseAllowed(candidate.Series, &release.Quality, release.Title) {
-							if cfg.SeriesLastResortAllowed(candidate.Series, &release.Quality, release.Title) {
-								release.LastResort = true
-								lastResorts[index] = append(lastResorts[index], release)
-							}
-							continue
-						}
-						foundResults[index] = append(foundResults[index], release)
-					}
-				}
-				appendValid(engine.SearchSeriesEpisode(ctx, cfg, candidate.Series, candidate.Season, candidate.Episode, false))
-				if len(foundResults[index]) == 0 {
-					seasonQuery := fmt.Sprintf("%s S%02d", candidate.Series.Name, candidate.Season)
-					logging.Debug("gap-fill season fallback started",
-						"series", candidate.Series.Name,
-						"season", candidate.Season,
-						"episode", candidate.Episode,
-						"query", seasonQuery)
-					appendValid(engine.SearchSeriesSeason(ctx, cfg, candidate.Series, candidate.Season, false))
-				}
-				// eD2k is asked once for the whole season after every budget
-				// gap has been searched: see the phase after gapWG.Wait().
-				logging.Debug("gap-fill torrent search completed",
-					"series", candidate.Series.Name,
-					"season", candidate.Season,
-					"episode", candidate.Episode,
-					"query", query,
-					"elapsed_ms", time.Since(started).Milliseconds(),
-					"results", len(foundResults[index]))
-			}(i, candidate)
-		}
-		gapWG.Wait()
-		// A cancelled cycle returns empty searches: do not record those gaps as
-		// searched, or they would be skipped for the next 23 hours.
-		searchesValid := !cycleCancelled(ctx)
-
-		// eD2k answers one query per season and aMule serialises its searches,
-		// so asking a single episode at a time left a season with many holes as
-		// slow as the pacing of the deep pass — a missing episode per day where
-		// the missing search finds a whole season in two minutes. Ask eD2k for
-		// the whole season once, the same query the series missing search makes
-		// on demand, and hand the candidates to every gap of it. Only the
-		// seasons this pass picked are asked, so the pacing still holds.
-		if searchesValid && ed2kFallbackEligible(cfg) {
-			candidateIndex := make(map[gapTarget]int, len(liveCandidates))
-			for i := range liveCandidates {
-				candidateIndex[gapTarget{
-					Series:  liveCandidates[i].Series.Name,
-					Season:  liveCandidates[i].Season,
-					Episode: liveCandidates[i].Episode,
-				}] = i
-			}
-			askedSeasons := map[seriesSeason]bool{}
-			for i := range liveCandidates {
-				candidate := liveCandidates[i]
-				if len(foundResults[i]) > 0 {
-					continue
-				}
-				key := seriesSeason{Series: candidate.Series.Name, Season: candidate.Season}
-				if askedSeasons[key] {
-					continue
-				}
-				askedSeasons[key] = true
-				series := seasonSeries[key]
-				if series == nil {
-					series = candidate.Series
-				}
-				episodes := seasonGaps[key]
-				if len(episodes) == 0 {
-					episodes = []int64{candidate.Episode}
-				}
-				var found []models.Release
-				if len(episodes) > 1 {
-					found = ed2kAutomaticSeasonFallback(ctx, engine, cfg, series, key.Season)
-				} else {
-					// One gap only: the episode query is narrower and can find a
-					// file the season query does not list.
-					found = engine.SearchSeriesED2K(ctx, cfg, series, key.Season, episodes[0], false)
-				}
-				extra, accepted := distributeSeasonED2K(cfg, series, key.Season, episodes, found, candidateIndex, foundResults, lastResorts)
-				releases = append(releases, extra...)
-				if accepted > 0 {
-					logging.Info(fmt.Sprintf("🔎 eD2k answered for %s season %d: %s for its missing episodes",
-						series.Name, key.Season, countLabel(accepted, "copy", "copies")))
-				}
-				for _, episode := range episodes {
-					_ = db.MarkGapSearched(series.Name, key.Season, episode)
-				}
-			}
-		}
-
-		// Nothing else for a gap this pass looked up: take the copies in the
-		// right language that miss only the resolution, then the ones the
-		// release archive holds.
-		for i := range liveCandidates {
-			candidate := liveCandidates[i]
-			if len(foundResults[i]) == 0 && len(lastResorts[i]) > 0 {
-				foundResults[i] = lastResorts[i]
-				logging.Info(fmt.Sprintf("🆘 Nothing within the quality profile for the missing %s S%02dE%02d: %s in the right language but outside the resolution, taken as a last resort",
-					candidate.Series.Name, candidate.Season, candidate.Episode,
-					countLabel(int64(len(lastResorts[i])), "copy", "copies")))
-			}
-			// The archive may hold the only copy, outside the profile: the
-			// live search does not look there, so the pass adds it now that
-			// every online source has answered.
-			if len(foundResults[i]) == 0 {
-				key := gapTarget{Series: candidate.Series.Name, Season: candidate.Season, Episode: candidate.Episode}
-				if archived := archiveLastResorts[key]; len(archived) > 0 {
-					foundResults[i] = archived
-					logging.Info(fmt.Sprintf("🆘 Nothing within the quality profile for the missing %s S%02dE%02d: %s from the release archive, taken as a last resort",
-						candidate.Series.Name, candidate.Season, candidate.Episode,
-						countLabel(int64(len(archived)), "copy", "copies")))
-				}
-			}
-		}
-		for i := range liveCandidates {
-			releases = append(releases, foundResults[i]...)
-			if searchesValid {
-				_ = db.MarkGapSearched(liveCandidates[i].Series.Name, liveCandidates[i].Season, liveCandidates[i].Episode)
-			}
-		}
-	}
-	// Record the deep pass only once it actually ran: saving the timestamp
-	// before the searches lost the pass for gap_deep_interval_hours whenever the
-	// cycle was cancelled or failed in between.
-	if isDeep && !cycleCancelled(ctx) {
-		if err := SaveSetting(cfg.DataDir, "last_deep_gap_fill_ts", strconv.FormatInt(deepNow, 10)); err != nil {
-			logging.Warn("could not record the deep gap pass time", "error", err)
-		}
-		if deepCursor != "" {
-			if err := SaveSetting(cfg.DataDir, "gap_deep_cursor", deepCursor); err != nil {
-				logging.Warn("could not record the deep gap pass cursor", "error", err)
-			}
-		}
 	}
 	// Anime numbered by absolute episode become season/episode releases
 	// before anything is filtered by kind.
@@ -929,9 +559,6 @@ func RunCycleDomain(
 	// alternative within a few points, without removing the stuck torrent.
 	stallAlternatives, stallScoreDrop := stalledAlternativeContext(cfg, db, torrents)
 
-	upgrades := 0
-	var skips cycleSkipCounts
-	newItems := 0
 	// Distinct `.torrent` links that failed per source in this cycle. Two of
 	// them mean the source is broken (an expired login, a dead proxy), not the
 	// single torrent.
@@ -939,560 +566,34 @@ func RunCycleDomain(
 	if cycleCancelled(ctx) {
 		return stats, nil
 	}
+	pass := &candidatePass{
+		cfg: cfg, engine: engine, db: db, archive: archive, notifier: notifier, torrents: torrents,
+		stats:             stats,
+		blocklistedHashes: blocklistedHashes,
+		blocklistedTitles: blocklistedTitles,
+		gapTargets:        gapTargets,
+		quarantinedLinks:  quarantinedLinks,
+		readyPending:      readyPending,
+		liveDownloads:     liveDownloads,
+		stallAlternatives: stallAlternatives,
+		stallScoreDrop:    stallScoreDrop,
+		minFreeBytes:      minFreeBytes,
+		emptyArchiveIndex: emptyArchiveIndex,
+		archiveIndexCache: archiveIndexCache,
+		movieArchiveCache: movieArchiveCache,
+		movieArchiveIndex: movieArchiveIndex,
+		linkFailures:      linkFailures,
+	}
 	for i := range best {
-		// Stop before starting another download when the daemon is shutting
-		// down: the native session is destroyed right after the workers stop.
-		if cycleCancelled(ctx) {
-			return stats, nil
-		}
-		release := best[i]
-		// Older persisted entries and a few third-party feeds can store a valid
-		// magnet in TorrentURL. Recover it before deciding that a torrent file
-		// must be fetched over HTTP; a magnet is already directly usable by the
-		// torrent engine and must never be passed to HTTPGetBytes.
-		promoteTorrentURLMagnet(&release)
-		// Feeds that expose only a `.torrent` link (for example TorrentLeech)
-		// have no magnet: download the file, derive its infohash, and retain the
-		// file for adding it (private trackers require it for announcing).
-		var torrentFile *string
-		// A mirror is another copy of the same torrent from another source
-		// (release_dedup.go): when this link fails, the next copy is tried in
-		// the same cycle instead of leaving the episode for the next one.
-		mirrorUsable := mirrorNotQuarantined(quarantinedLinks)
-		linkResolved := true
-		resolveLink := func() {
-			for strings.TrimSpace(release.Magnet) == "" && release.TorrentURL != nil {
-				magnet, path, err := resolveTorrentURL(ctx, engine, cfg, *release.TorrentURL, &release.Title)
-				if err != nil {
-					failedSource := release.Source
-					if errors.Is(err, errTorrentNotAvailable) {
-						// The indexer knows the release but cannot serve it yet
-						// (mircrew: "no magnet for this request" until the topic
-						// is thanked, or a login that needs renewing). It is not
-						// a dead link: keep it eligible, no cycle error and no
-						// strike. The next cycle retries it. It still counts for
-						// the "indexer keeps failing" notice.
-						logging.Debug("torrent link not available yet",
-							"target", releaseTarget(&release),
-							"source", release.Source,
-							"error", err)
-						noteTorrentLinkFailure(linkFailures, release.Source, *release.TorrentURL, err, notifier)
-					} else {
-						// Two failures in different cycles mean the link is dead:
-						// quarantine it so the archive stops proposing it (and the
-						// cycle stops counting it as an error) until the retry.
-						if failures, qerr := db.RecordTorrentLinkFailure(*release.TorrentURL, err.Error(), time.Now()); qerr != nil {
-							logging.Debug("could not record the failed torrent link", "error", qerr)
-						} else if failures == torrentLinkFailureLimit {
-							logging.Info(fmt.Sprintf("🚫 The .torrent link of %s from %s failed again: it is set aside for %s",
-								releaseTarget(&release), release.Source, logDuration(torrentLinkQuarantine(failures))))
-						}
-						stats.Error("torrent_link")
-						logging.Warn(fmt.Sprintf("⚠️ Could not fetch the .torrent of %s from %s", releaseTarget(&release), release.Source), "error", err)
-						if source := strings.TrimSpace(release.Source); source != "" {
-							noteTorrentLinkFailure(linkFailures, source, *release.TorrentURL, err, notifier)
-						}
-					}
-					if switchToMirror(&release, mirrorUsable) {
-						logging.Info(fmt.Sprintf("🔁 %s: the link from %s did not work, trying the same release from %s",
-							logTarget(&release), failedSource, release.Source))
-						continue
-					}
-					linkResolved = false
-					break
-				}
-				// The link works: forget any previous failure so it is eligible
-				// again if the indexer breaks later.
-				_ = db.ClearTorrentLinkFailure(*release.TorrentURL)
-				clearIndexerFailureNotice(release.Source)
-				release.Magnet = magnet
-				// The feed was persisted before selection. Replace its
-				// short-lived Jackett URL with the stable magnet so a later
-				// archive search can use it without re-downloading an already
-				// expired link. Skipped in dry-run: it rewrites the archive DB.
-				if !cfg.DryRun {
-					if err := archive.CanonicalizeRelease(&release, release.Magnet); err != nil {
-						logging.Warn("could not canonicalize archived torrent URL", "error", err)
-					}
-				}
-				if path != "" {
-					torrentFile = &path
-				}
-			}
-		}
-		// A link whose infohash the indexer declared (indexarr, Jackett and
-		// Prowlarr with "extended") is opened only for the release that is
-		// actually downloaded. The decision needs only the hash: opening the
-		// link of every candidate cost minutes per cycle, and an aggregator that
-		// counts downloads (indexarr) counted each candidate as one. An
-		// in-progress pack is checked against its file list after the link is
-		// opened (staleInProgressPack).
-		//
-		// A link without a declared hash (a MirCrew topic whose magnet indexarr
-		// fetches on demand) gets a provisional identity derived from the link:
-		// the candidate is judged on its title and quality first, and the link
-		// is opened only when that judgement would download it. The decision
-		// is then made again with the real hash (blocklist, live downloads).
-		deferredHash := ""
-		provisional := false
-		if strings.TrimSpace(release.Magnet) == "" && release.TorrentURL != nil && IsTorrentURL(*release.TorrentURL) {
-			if hash := canonicalInfoHash(release.InfoHash); len(hash) == 40 {
-				deferredHash = hash
-			} else {
-				deferredHash = provisionalLinkHash(*release.TorrentURL)
-				provisional = true
-			}
-			release.Magnet = "magnet:?xt=urn:btih:" + deferredHash
-		}
-		// A link with no declared hash cannot be matched by infohash before it
-		// is opened. Its title can: if the same release is on the blocklist,
-		// skip it here instead of asking the indexer for the magnet only to
-		// reject it a moment later.
-		if provisional && releaseBlockedByTitle(&release, blocklistedTitles) {
-			logging.Debug("release skipped: its title is on the blocklist",
-				"target", releaseTarget(&release),
-				"release", release.Title)
-			continue
-		}
-		// resolveDeferred opens the deferred link and replaces the hash-only
-		// magnet with the real one (and the .torrent file when there is one).
-		resolveDeferred := func() bool {
-			release.Magnet = ""
-			resolveLink()
-			if !linkResolved {
-				return false
-			}
-			if hash, ok := utils.MagnetHash(release.Magnet); ok && hash != deferredHash && !provisional {
-				logging.Debug("the downloaded torrent has another infohash than the one declared",
-					"target", releaseTarget(&release), "declared", deferredHash, "real", hash)
-			}
-			reconcilePackIdentityFromMagnet(&release)
-			deferredHash = ""
-			provisional = false
-			return true
-		}
-		if deferredHash == "" {
-			resolveLink()
-		}
-		if !linkResolved {
-			continue
-		}
-		reconcilePackIdentityFromMagnet(&release)
-		isReadyPending := false
-		if hash, ok := releaseHash(&release); ok {
-			if _, ok := readyPending[hash]; ok {
-				isReadyPending = true
-			}
-		}
-		// AcquisitionScore chooses between candidates; the approval and the
-		// stored score must use ReleaseScore, so a swarm-health bonus can never
-		// masquerade as an upgrade of a file already in the library.
-		releaseScore := cfg.ReleaseScore(&release)
-		// A candidate that fills a known archive gap, or that scores above the
-		// bypass threshold, is never held by a delay profile.
-		gapEpisodes := gapEpisodesForRelease(&release, gapTargets)
-		isGap := len(gapEpisodes) > 0
-		bypassDelay := isGap || (cfg.DelayBypassScore() > 0 && releaseScore >= cfg.DelayBypassScore())
-		if release.Kind == "series" && !isReadyPending {
-			seriesName := ""
-			if release.Series != nil {
-				seriesName = *release.Series
-			}
-			if series := cfg.FindSeriesMatch(seriesName, release.Season); series != nil {
-				// Per-series `timeframe` (hours) wins over the global setting.
-				delayMinutes := cfg.DelayMinutes("series")
-				if series.Timeframe > 0 {
-					delayMinutes = saturatingMul(series.Timeframe, 60)
-				}
-				if delayMinutes > 0 && !bypassDelay {
-					logging.Info(fmt.Sprintf("⏳ %s: waiting %s before downloading, in case a better version appears",
-						logTarget(&release), logDuration(time.Duration(delayMinutes)*time.Minute)))
-					// The queue keeps only the magnet: a provisional identity must
-					// become the real one first.
-					if provisional {
-						if !resolveDeferred() {
-							continue
-						}
-					}
-					if err := db.QueuePendingScored(&release, delayMinutes, releaseScore); err != nil {
-						return nil, err
-					}
-					skips.Waiting++
-					continue
-				}
-			}
-		}
-		if release.Kind == "movie" && !isReadyPending {
-			delayMinutes := cfg.DelayMinutes("movie")
-			if delayMinutes > 0 && !bypassDelay {
-				logging.Info(fmt.Sprintf("⏳ %s: waiting %s before downloading, in case a better version appears",
-					logTarget(&release), logDuration(time.Duration(delayMinutes)*time.Minute)))
-				// The queue keeps only the magnet: a provisional identity must
-				// become the real one first.
-				if provisional {
-					if !resolveDeferred() {
-						continue
-					}
-				}
-				if err := db.QueuePendingMovieScored(&release, delayMinutes, releaseScore); err != nil {
-					return nil, err
-				}
-				skips.Waiting++
-				continue
-			}
-		}
-
-		// Archive index (per series, computed once per cycle): decisions also
-		// consider real files on disk, not only database rows.
-		archiveIndex := emptyArchiveIndex
-		if release.Kind == "series" {
-			key := ""
-			if release.Series != nil {
-				key = *release.Series
-			}
-			if cached, ok := archiveIndexCache[key]; ok {
-				archiveIndex = cached
-			} else {
-				computed := &models.ArchiveQualityIndex{}
-				if series := cfg.FindSeriesMatch(key, release.Season); series != nil {
-					archivePath := ""
-					if resolved := cfg.ResolveArchivePath(series); resolved != nil {
-						archivePath = *resolved
-					}
-					indexed := IndexArchive(series.Name, archivePath, cfg)
-					computed = &indexed
-				}
-				archiveIndexCache[key] = computed
-				archiveIndex = computed
-			}
-		}
-		// A movie file already on the archive volume is authoritative even when
-		// its database row is missing. Scan once per cycle for the same title
-		// and year: a full archive walk for every candidate would be wasteful.
-		var movieArchive *models.ArchiveQuality
-		if release.Kind == "movie" {
-			key := strings.ToLower(release.Title) + "\x00"
-			if release.Year != nil {
-				key += strconv.FormatInt(*release.Year, 10)
-			}
-			if cached, ok := movieArchiveCache[key]; ok {
-				movieArchive = cached
-			} else {
-				if movieArchiveIndex == nil {
-					movieArchiveIndex = BuildMovieArchiveIndex(cfg)
-				}
-				movieArchive = movieArchiveIndex.Best(cfg, &release)
-				movieArchiveCache[key] = movieArchive
-			}
-		}
-		// Per-title "allow upgrades" toggle (default on). The gap flag feeds the
-		// always-on "no orphan older episode" best practice.
-		forbidUpgrade := false
-		if release.Kind == "series" {
-			seriesName := ""
-			if release.Series != nil {
-				seriesName = *release.Series
-			}
-			if series := cfg.FindSeriesMatch(seriesName, release.Season); series != nil {
-				forbidUpgrade = series.DisableUpgrades
-			}
-		} else {
-			if movie := cfg.FindMovieMatchForRelease(&release, false); movie != nil {
-				forbidUpgrade = movie.DisableUpgrades
-			}
-		}
-		// An "in progress" pack declares how many episodes it holds long before
-		// the .torrent is updated. The file list is already here: keep the pack
-		// when it holds at least one episode we need (a gap or a real upgrade),
-		// and skip it only when everything inside is already better on disk.
-		// staleInProgressPack reads the file list of an in-progress pack and
-		// skips it when everything inside is already better on disk. It can
-		// only refuse, so a deferred link is checked once it is opened for a
-		// release that would be downloaded.
-		staleInProgressPack := func() bool {
-			if torrentFile != nil && release.IsPack && release.InProgressEpisodes > 0 {
-				reason, checkErr := incompletePackReason(
-					*torrentFile, &release, gapEpisodes, archiveIndex,
-					releaseScore, cfg.UpgradeMinScoreDiff, cfg.UpgradeUntilScore, forbidUpgrade, cfg.Settings,
-				)
-				if checkErr != nil {
-					logging.Debug("could not read the pack torrent contents",
-						"target", releaseTarget(&release), "error", checkErr)
-				} else if reason != "" {
-					logging.Warn(fmt.Sprintf("⏭️ Season pack skipped — «%s» · %s", release.Title, reason),
-						"target", releaseTarget(&release))
-					if !cfg.DryRun {
-						if release.TorrentURL != nil {
-							if qerr := db.QuarantineTorrentLink(*release.TorrentURL, reason, time.Now(), 7*24*time.Hour); qerr != nil {
-								logging.Debug("could not quarantine the stale pack link", "error", qerr)
-							}
-						}
-						if berr := db.Blocklist(&release, "in_progress_pack_incomplete"); berr != nil {
-							logging.Debug("could not blocklist the stale pack", "error", berr)
-						}
-					}
-					return true
-				}
-			}
-			return false
-		}
-		if staleInProgressPack() {
-			continue
-		}
-		approvalContext := &models.ApprovalContext{
-			Archive:           archiveIndex,
-			MovieArchive:      movieArchive,
-			Live:              liveDownloads,
-			ForbidUpgrade:     forbidUpgrade,
-			UpgradeUntilScore: cfg.UpgradeUntilScore,
-			ScoreSettings:     cfg.Settings,
-			GapEpisode:        isGap,
-			DryRun:            cfg.DryRun,
-			StallAlternatives: stallAlternatives,
-			StallScoreDrop:    stallScoreDrop,
-			Blocklist:         blocklistedHashes,
-		}
-		// Decide only: the library is not written until the torrent is in the
-		// engine (see startApprovedRelease).
-		approved, approvalReason, err := evaluateReleaseApproval(db, &release, releaseScore, cfg.UpgradeMinScoreDiff, approvalContext, forbidUpgrade, true)
+		stop, err := pass.try(ctx, best[i])
 		if err != nil {
 			return nil, err
 		}
-		if approved && provisional {
-			if !resolveDeferred() {
-				continue
-			}
-			approved, approvalReason, err = evaluateReleaseApproval(db, &release, releaseScore, cfg.UpgradeMinScoreDiff, approvalContext, forbidUpgrade, true)
-			if err != nil {
-				return nil, err
-			}
-		}
-		score := releaseScore
-		fromArchive := strings.HasPrefix(release.Source, "archive:")
-		decisionReason := approvalReason
-		if fromArchive {
-			decisionReason = "gap_filled"
-		} else if len(gapEpisodes) > 0 {
-			decisionReason = "gap_fill"
-		}
-		if release.LastResort {
-			decisionReason = "last_resort"
-		}
-		// An episode whose download is stuck may now accept an alternative
-		// within the configured tolerance: mark it so the log, the notification
-		// and the torrent's "Motivo" say why this download was started.
-		stallStuckScore := int64(0)
-		stallApplies := false
-		if stuckScore, has := releaseStallScore(&release, stallAlternatives); has && stallScoreDrop > 0 {
-			stallStuckScore = stuckScore
-			stallApplies = true
-			decisionReason = "stall_alternative"
-		}
-		if approved {
-			// The explicit path (or nil, to let the engine choose) is decided by
-			// the engine-independent RAM-disk policy: a known-too-big or
-			// unknown-size release is staged off the tmpfs, and the RAM disk is
-			// used only for backends that support it.
-			preferredPath := automaticDownloadPath(&release, cfg, engineSupportsRamdisk(torrents))
-			// The global guard measures the default download volume; a tag rule,
-			// the RAM-disk overflow or the RAM disk itself can redirect the
-			// download to another filesystem, so verify the chosen path too.
-			// When no explicit path is forced, mirror the engine fallback so the
-			// volume actually used is the one being checked.
-			checkPath := ""
-			if preferredPath != nil {
-				checkPath = *preferredPath
-			} else {
-				checkPath = preferredDownloadPath(cfg)
-			}
-			if floor := downloadPathFreeSpaceFloor(cfg, checkPath, minFreeBytes); floor != nil && checkPath != "" {
-				free := FreeSpaceBytes(checkPath)
-				if free == nil {
-					stats.Error("min_free_space_unavailable")
-					logging.Warn(fmt.Sprintf("⚠️ %s not downloaded: cannot read the free space of its download folder", logTarget(&release)), "folder", checkPath)
-					continue
-				}
-				if *free < *floor {
-					stats.Error("min_free_space")
-					logging.Warn("cycle: free space below minimum for chosen download path, download skipped",
-						"path", checkPath, "free", logging.HumanBytes(*free), "minimum", logging.HumanBytes(*floor))
-					continue
-				}
-			}
-			if deferredHash != "" && !resolveDeferred() {
-				continue
-			}
-			if staleInProgressPack() {
-				continue
-			}
-			add := func() (bool, error) {
-				if release.Ed2kLink != "" {
-					return addEd2kRelease(cfg, &release)
-				}
-				if torrentFile != nil && *torrentFile != "" {
-					return torrents.AddFileWithPath(*torrentFile, cfg, preferredPath)
-				}
-				return torrents.AddWithPath(release.Magnet, cfg, preferredPath)
-			}
-			commit := func() (bool, string, error) {
-				return commitReleaseApproval(db, &release, releaseScore, cfg.UpgradeMinScoreDiff, approvalContext, forbidUpgrade)
-			}
-			outcome, commitReason, err := startApprovedRelease(db, torrents, &release, score, cfg.DryRun, add, commit)
-			if outcome != "" {
-				// A single release that cannot be started must not abort the whole
-				// cycle: record the failure and continue with the other candidates.
-				logStartFailure(stats, &release, outcome, commitReason, err)
-				continue
-			}
-			if !cfg.DryRun {
-				approvalReason = commitReason
-				if hash, ok := releaseHash(&release); ok {
-					_ = db.SetTorrentReason(hash, decisionReason)
-				}
-			}
-			why := "new"
-			switch {
-			case release.Kind == "movie" && approvalReason == "upgrade":
-				why = "better version than the one you have"
-			case release.Kind == "movie" && approvalReason == "restored":
-				// The database remembered this film as removed, but its file is
-				// no longer anywhere: this is a new attempt, not an upgrade.
-				why = "the copy in the library is missing"
-			case release.Kind == "movie" && fromArchive:
-				// A film is not an episode: the archive branch below said
-				// "fills a missing episode" for a movie proposed from the
-				// release archive, which read as nonsense in the log.
-				why = "taken from the release archive"
-			case release.Kind == "movie":
-				why = "new"
-			case fromArchive || len(gapEpisodes) > 0:
-				why = "fills a missing episode"
-				if approvalReason == "upgrade" {
-					why = "fills a missing episode, better quality"
-				}
-			case approvalReason == "upgrade":
-				if archiveCoversRelease(approvalContext.Archive, &release) {
-					why = "better version than the one you have"
-				} else {
-					why = "fills a missing episode"
-				}
-			}
-			if release.LastResort {
-				why = "🆘 last resort: the only copy in the right language, outside the quality profile"
-			}
-			if stallApplies {
-				why = "an alternative while the current download is stuck"
-				logging.Info(fmt.Sprintf("⏱️ %s: current download stuck for over %s, starting an alternative within %d points",
-					logTarget(&release), logDuration(time.Duration(cfg.StallAlternativeAfterMin)*time.Minute), stallScoreDrop),
-					"stuck_score", stallStuckScore, "candidate_score", releaseScore)
-			}
-			logMessage := fmt.Sprintf("📥 Downloading %s — %s (%s)", logTarget(&release), why, friendlyQuality(release.Quality))
-			if cfg.DryRun {
-				logMessage = fmt.Sprintf("🧪 Test mode: would download %s — %s (%s)", logTarget(&release), why, friendlyQuality(release.Quality))
-			}
-			if approvalReason == "upgrade" {
-				if from := upgradeSourceText(approvalContext.Archive, &release); from != "" {
-					logMessage += " · replacing: " + from
-				}
-			}
-			if destination := releaseDestinationLabel(cfg, &release, preferredPath); destination != "" {
-				logMessage += " → " + destination
-			}
-			logHash, _ := releaseHash(&release)
-			logging.Info(logMessage, "release", shortTorrentName(release.Title), "from", release.Source, "hash", logHash)
-			logging.Debug("download decision",
-				"target", releaseTarget(&release),
-				"quality", releaseQualityLabel(&release),
-				"score", score,
-				"reason", decisionReason,
-				"approval_reason", approvalReason,
-				"gap_episodes", episodesLabel(gapEpisodes))
-			if isReadyPending && !cfg.DryRun {
-				// The download is registered: a stale pending row is harmless (the
-				// active hash blocks a second start), so never abort the cycle here.
-				if release.Series != nil && release.Season != nil && release.Episode != nil {
-					if err := db.RemovePending(*release.Series, *release.Season, *release.Episode); err != nil {
-						logging.Warn("could not clear the delayed release", "target", releaseTarget(&release), "error", err)
-					}
-				} else if release.Kind == "movie" {
-					if err := db.RemovePendingMovie(release.Title, release.Year); err != nil {
-						logging.Warn("could not clear the delayed movie", "target", releaseTarget(&release), "error", err)
-					}
-				}
-			}
-			stats.DownloadsStarted++
-			if !cfg.DryRun {
-				recordFeedAccepted(db, cfg, &release)
-			}
-			if approvalReason == "upgrade" {
-				upgrades++
-			} else {
-				newItems++
-			}
-			if fromArchive || len(gapEpisodes) > 0 {
-				stats.GapsFilled++
-			}
-			var magnetHashValue any
-			if hash, ok := releaseHash(&release); ok {
-				magnetHashValue = hash
-			}
-			payload := map[string]any{
-				"title":           release.Title,
-				"kind":            release.Kind,
-				"series":          release.Series,
-				"season":          release.Season,
-				"episode":         release.Episode,
-				"source":          release.Source,
-				"magnet_hash":     magnetHashValue,
-				"quality_score":   score,
-				"reason":          decisionReason,
-				"approval_reason": approvalReason,
-				"gap_episodes":    gapEpisodes,
-				"resolution":      release.Quality.Resolution,
-				"video_codec":     release.Quality.Codec,
-				"audio":           release.Quality.Audio,
-				"hdr":             release.Quality.HDR,
-				"language":        release.Quality.Language,
-			}
-			if err := notifier.NotifyEvent("download_started", payload); err != nil {
-				logging.Warn("download notification failed", "error", err)
-			}
-		} else {
-			// "Already present / already active" rejections (duplicate or episode
-			// active in the session) are routine, so keep them at debug level to
-			// keep the cycle log readable.
-			switch approvalReason {
-			case "duplicate":
-				skips.InLibrary++
-			case "active_episode", "active_pack":
-				skips.Downloading++
-			case "dead_swarm_empty", "dead_swarm_upgrade":
-				// Nobody is sharing it: the release waits on the blocklist for the
-				// configured period instead of coming back at every search.
-				skips.Other++
-				blockDeadSwarmRelease(db, cfg, &release)
-			default:
-				skips.Other++
-			}
-			if routineSkipReason(approvalReason) {
-				logging.Debug("download skipped (routine rejection)",
-					"target", releaseTarget(&release),
-					"score", score,
-					"reason", decisionReason,
-					"approval_reason", approvalReason)
-			} else {
-				logging.Info(fmt.Sprintf("⏭️ Skipped %s: %s", logTarget(&release), skipReasonText(approvalReason)),
-					"release", release.Title)
-				logging.Debug("download skipped",
-					"target", releaseTarget(&release),
-					"source", release.Source,
-					"score", score,
-					"reason", decisionReason,
-					"approval_reason", approvalReason,
-					"gap_episodes", episodesLabel(gapEpisodes))
-			}
+		if stop {
+			return stats, nil
 		}
 	}
+	upgrades, newItems, skips := pass.upgrades, pass.newItems, pass.skips
 	elapsed := cycleElapsedSeconds(stats)
 	stats.DurationSeconds = int(elapsed)
 	if err := db.SaveCycle(stats); err != nil {
@@ -1504,6 +605,415 @@ func RunCycleDomain(
 
 // cycleElapsedSeconds is how long the cycle has been running, from its recorded
 // start time, rounded down.
+
+// collectGapReleases adds to releases the candidates for the missing episodes
+// of the followed series (gap filling). Every cycle looks in the local
+// archive; a deep pass, at most every gap_deep_interval_hours, also searches
+// online for the gaps the archive does not hold, a bounded number per cycle
+// and per series, resuming from where the previous deep pass stopped. eD2k is
+// asked once per season instead of once per episode.
+//
+// It returns the releases with the gap candidates appended and the set of
+// gaps they answer, which the candidate pass uses to prefer them.
+func collectGapReleases(ctx context.Context, cfg *Config, engine *Engine, db *Database, archive *Archive,
+	domain *string, blocklistedHashes map[string]struct{}, releases []models.Release) ([]models.Release, map[gapTarget]struct{}, error) {
+	gapFilling := true
+	if value, ok := cfg.Settings["gap_filling"]; ok {
+		gapFilling = settingTruthy(value)
+	}
+	var archiveGaps []SeriesGap
+	if domainIs(domain, "movies") || !gapFilling {
+		archiveGaps = nil
+	} else {
+		gaps, err := db.ArchiveGaps()
+		if err != nil {
+			return nil, nil, err
+		}
+		// Respect the current configuration: only existing, enabled series and
+		// monitored seasons (neither disabled nor outside `seasons`).
+		for i := range gaps {
+			season := gaps[i].Season
+			if cfg.FindSeriesMatch(gaps[i].Series, &season) != nil {
+				archiveGaps = append(archiveGaps, gaps[i])
+			}
+		}
+	}
+
+	type seriesSeason struct {
+		Series string
+		Season int64
+	}
+	gapSummary := map[seriesSeason][]int64{}
+	for i := range archiveGaps {
+		key := seriesSeason{Series: archiveGaps[i].Series, Season: archiveGaps[i].Season}
+		gapSummary[key] = append(gapSummary[key], archiveGaps[i].Episode)
+	}
+	for key, episodes := range gapSummary {
+		slices.Sort(episodes)
+		// Only at debug: the full list of open gaps is noisy. The log reports a
+		// gap when it is actually filled.
+		if logging.Enabled(logging.LevelDebug) {
+			logging.Debug(fmt.Sprintf("→ %s S%02d gap: %s", key.Series, key.Season, episodesLabel(episodes)))
+		}
+	}
+
+	policy := readGapFillPolicy(cfg, time.Now())
+	deepLabel := "in the local release archive"
+	if policy.deep {
+		deepLabel = fmt.Sprintf("in the local release archive, plus up to %d online searches", policy.deepMaxPerCycle)
+	}
+	if len(archiveGaps) > 0 {
+		logging.Info(fmt.Sprintf("🧩 Looking for %s %s",
+			countLabel(int64(len(archiveGaps)), "missing episode", "missing episodes"), deepLabel))
+	}
+
+	// Phase 1 (every cycle, free): local archive search only.
+	var liveCandidates []liveCandidate
+	var waiting []waitingGap
+	livePerSeries := map[string]int{}
+	archiveHits := 0
+	gapTargets := map[gapTarget]struct{}{}
+	// Copies the archive holds only outside the profile: the cycle may take
+	// them as a last resort, but only after the online search for the same gap
+	// found nothing better, like the live ones.
+	archiveLastResorts := map[gapTarget][]models.Release{}
+	// Gaps the archive does not hold, grouped by series and season: eD2k is
+	// asked once for the whole season, then the candidates go to every gap of
+	// it instead of one search per episode.
+	seasonGaps := map[seriesSeason][]int64{}
+	seasonSeries := map[seriesSeason]*SeriesConfig{}
+	// One query for the search times of every gap: a point query per gap made
+	// the deep pass cost grow with the library.
+	searchTimes, err := db.GapSearchedTimes()
+	if err != nil {
+		return nil, nil, err
+	}
+	for i := range archiveGaps {
+		gapTargets[gapTarget{Series: archiveGaps[i].Series, Season: archiveGaps[i].Season, Episode: archiveGaps[i].Episode}] = struct{}{}
+	}
+	for i := range archiveGaps {
+		gap := archiveGaps[i]
+		season := gap.Season
+		series := cfg.FindSeriesMatch(gap.Series, &season)
+		if series == nil {
+			continue
+		}
+		query := fmt.Sprintf("%s S%02dE%02d", gap.Series, gap.Season, gap.Episode)
+		found := false
+		if items, err := searchArchiveForEpisode(ctx, cfg, archive, series, query, gap.Season, gap.Episode); err == nil {
+			for _, item := range items {
+				hash, ok := utils.MagnetHash(item[1])
+				if !ok {
+					continue
+				}
+				if _, blocked := blocklistedHashes[hash]; blocked {
+					continue
+				}
+				release := parseArchiveRelease(ctx, cfg, series, item)
+				if !releaseMatchesConfiguredEpisode(release, series, gap.Season, gap.Episode) {
+					continue
+				}
+				if reason := cfg.AllReleaseDeniedReason(release); reason != "" {
+					if cfg.ReleaseIsMonitored(release) {
+						rules.LogRejection(release, reason)
+					}
+					continue
+				}
+				canonicalName := series.Name
+				release.Series = &canonicalName
+				if !cfg.SeriesReleaseAllowed(series, &release.Quality, release.Title) {
+					if cfg.SeriesLastResortAllowed(series, &release.Quality, release.Title) {
+						release.LastResort = true
+						key := gapTarget{Series: canonicalName, Season: gap.Season, Episode: gap.Episode}
+						archiveLastResorts[key] = append(archiveLastResorts[key], *release)
+					}
+					continue
+				}
+				logging.Debug("archive release found",
+					"series", gap.Series,
+					"season", gap.Season,
+					"episode", gap.Episode,
+					"title", release.Title,
+					"source", release.Source)
+				releases = append(releases, *release)
+				found = true
+			}
+		}
+		if found {
+			archiveHits++
+			continue
+		}
+		seasonKey := seriesSeason{Series: series.Name, Season: gap.Season}
+		seasonGaps[seasonKey] = append(seasonGaps[seasonKey], gap.Episode)
+		seasonSeries[seasonKey] = series
+		// Phase 2 candidate: deep live search only.
+		if !policy.deep {
+			continue
+		}
+		// The log is keyed by the configured name, which may differ from the
+		// archive title when the gap came in through an alias.
+		last, searched := searchTimes[gapTarget{Series: series.Name, Season: gap.Season, Episode: gap.Episode}]
+		if searched && int64(time.Now().UTC().Sub(last).Hours()) < policy.researchHours {
+			continue
+		}
+		waiting = append(waiting, waitingGap{
+			candidate: liveCandidate{Series: series, Season: gap.Season, Episode: gap.Episode},
+			last:      last,
+			searched:  searched,
+		})
+	}
+	orderWaitingGaps(waiting, cfg.Settings["gap_deep_cursor"])
+	deepCursor := ""
+	for _, entry := range waiting {
+		if len(liveCandidates) >= policy.deepMaxPerCycle {
+			break
+		}
+		name := entry.candidate.Series.Name
+		if policy.perSeries > 0 && livePerSeries[name] >= policy.perSeries {
+			continue
+		}
+		livePerSeries[name]++
+		liveCandidates = append(liveCandidates, entry.candidate)
+		if !entry.searched {
+			deepCursor = name
+		}
+	}
+	logging.Debug(fmt.Sprintf(
+		"gap fill: %d found in the archive, %d to look up online",
+		archiveHits,
+		len(liveCandidates),
+	))
+
+	if len(liveCandidates) > 0 {
+		foundResults := make([][]models.Release, len(liveCandidates))
+		// Copies in the right language that miss only the resolution of the
+		// profile: taken when nothing else exists for the episode.
+		lastResorts := make([][]models.Release, len(liveCandidates))
+		var gapWG sync.WaitGroup
+		gapSem := make(chan struct{}, 3)
+		for i := range liveCandidates {
+			candidate := liveCandidates[i]
+			gapWG.Add(1)
+			gapSem <- struct{}{}
+			go func(index int, candidate liveCandidate) {
+				defer recoverGoroutine("gap-fill live search")
+				defer gapWG.Done()
+				defer func() { <-gapSem }()
+				query := fmt.Sprintf("%s S%02dE%02d", candidate.Series.Name, candidate.Season, candidate.Episode)
+				logging.Debug("gap-fill live search started",
+					"series", candidate.Series.Name,
+					"season", candidate.Season,
+					"episode", candidate.Episode,
+					"query", query)
+				started := time.Now()
+				appendValid := func(found []models.Release) {
+					for i := range found {
+						release := found[i]
+						if !releaseMatchesConfiguredEpisode(&release, candidate.Series, candidate.Season, candidate.Episode) ||
+							cfg.AllReleaseDeniedReason(&release) != "" {
+							continue
+						}
+						canonicalName := candidate.Series.Name
+						release.Series = &canonicalName
+						if !cfg.SeriesReleaseAllowed(candidate.Series, &release.Quality, release.Title) {
+							if cfg.SeriesLastResortAllowed(candidate.Series, &release.Quality, release.Title) {
+								release.LastResort = true
+								lastResorts[index] = append(lastResorts[index], release)
+							}
+							continue
+						}
+						foundResults[index] = append(foundResults[index], release)
+					}
+				}
+				appendValid(engine.SearchSeriesEpisode(ctx, cfg, candidate.Series, candidate.Season, candidate.Episode, false))
+				if len(foundResults[index]) == 0 {
+					seasonQuery := fmt.Sprintf("%s S%02d", candidate.Series.Name, candidate.Season)
+					logging.Debug("gap-fill season fallback started",
+						"series", candidate.Series.Name,
+						"season", candidate.Season,
+						"episode", candidate.Episode,
+						"query", seasonQuery)
+					appendValid(engine.SearchSeriesSeason(ctx, cfg, candidate.Series, candidate.Season, false))
+				}
+				// eD2k is asked once for the whole season after every budget
+				// gap has been searched: see the phase after gapWG.Wait().
+				logging.Debug("gap-fill torrent search completed",
+					"series", candidate.Series.Name,
+					"season", candidate.Season,
+					"episode", candidate.Episode,
+					"query", query,
+					"elapsed_ms", time.Since(started).Milliseconds(),
+					"results", len(foundResults[index]))
+			}(i, candidate)
+		}
+		gapWG.Wait()
+		// A cancelled cycle returns empty searches: do not record those gaps as
+		// searched, or they would be skipped for the next 23 hours.
+		searchesValid := !cycleCancelled(ctx)
+
+		// eD2k answers one query per season and aMule serialises its searches,
+		// so asking a single episode at a time left a season with many holes as
+		// slow as the pacing of the deep pass — a missing episode per day where
+		// the missing search finds a whole season in two minutes. Ask eD2k for
+		// the whole season once, the same query the series missing search makes
+		// on demand, and hand the candidates to every gap of it. Only the
+		// seasons this pass picked are asked, so the pacing still holds.
+		if searchesValid && ed2kFallbackEligible(cfg) {
+			candidateIndex := make(map[gapTarget]int, len(liveCandidates))
+			for i := range liveCandidates {
+				candidateIndex[gapTarget{
+					Series:  liveCandidates[i].Series.Name,
+					Season:  liveCandidates[i].Season,
+					Episode: liveCandidates[i].Episode,
+				}] = i
+			}
+			askedSeasons := map[seriesSeason]bool{}
+			for i := range liveCandidates {
+				candidate := liveCandidates[i]
+				if len(foundResults[i]) > 0 {
+					continue
+				}
+				key := seriesSeason{Series: candidate.Series.Name, Season: candidate.Season}
+				if askedSeasons[key] {
+					continue
+				}
+				askedSeasons[key] = true
+				series := seasonSeries[key]
+				if series == nil {
+					series = candidate.Series
+				}
+				episodes := seasonGaps[key]
+				if len(episodes) == 0 {
+					episodes = []int64{candidate.Episode}
+				}
+				var found []models.Release
+				if len(episodes) > 1 {
+					found = ed2kAutomaticSeasonFallback(ctx, engine, cfg, series, key.Season)
+				} else {
+					// One gap only: the episode query is narrower and can find a
+					// file the season query does not list.
+					found = engine.SearchSeriesED2K(ctx, cfg, series, key.Season, episodes[0], false)
+				}
+				extra, accepted := distributeSeasonED2K(cfg, series, key.Season, episodes, found, candidateIndex, foundResults, lastResorts)
+				releases = append(releases, extra...)
+				if accepted > 0 {
+					logging.Info(fmt.Sprintf("🔎 eD2k answered for %s season %d: %s for its missing episodes",
+						series.Name, key.Season, countLabel(accepted, "copy", "copies")))
+				}
+				for _, episode := range episodes {
+					_ = db.MarkGapSearched(series.Name, key.Season, episode)
+				}
+			}
+		}
+
+		// Nothing else for a gap this pass looked up: take the copies in the
+		// right language that miss only the resolution, then the ones the
+		// release archive holds.
+		for i := range liveCandidates {
+			candidate := liveCandidates[i]
+			if len(foundResults[i]) == 0 && len(lastResorts[i]) > 0 {
+				foundResults[i] = lastResorts[i]
+				logging.Info(fmt.Sprintf("🆘 Nothing within the quality profile for the missing %s S%02dE%02d: %s in the right language but outside the resolution, taken as a last resort",
+					candidate.Series.Name, candidate.Season, candidate.Episode,
+					countLabel(int64(len(lastResorts[i])), "copy", "copies")))
+			}
+			// The archive may hold the only copy, outside the profile: the
+			// live search does not look there, so the pass adds it now that
+			// every online source has answered.
+			if len(foundResults[i]) == 0 {
+				key := gapTarget{Series: candidate.Series.Name, Season: candidate.Season, Episode: candidate.Episode}
+				if archived := archiveLastResorts[key]; len(archived) > 0 {
+					foundResults[i] = archived
+					logging.Info(fmt.Sprintf("🆘 Nothing within the quality profile for the missing %s S%02dE%02d: %s from the release archive, taken as a last resort",
+						candidate.Series.Name, candidate.Season, candidate.Episode,
+						countLabel(int64(len(archived)), "copy", "copies")))
+				}
+			}
+		}
+		for i := range liveCandidates {
+			releases = append(releases, foundResults[i]...)
+			if searchesValid {
+				_ = db.MarkGapSearched(liveCandidates[i].Series.Name, liveCandidates[i].Season, liveCandidates[i].Episode)
+			}
+		}
+	}
+	// Record the deep pass only once it actually ran: saving the timestamp
+	// before the searches lost the pass for gap_deep_interval_hours whenever the
+	// cycle was cancelled or failed in between.
+	if policy.deep && !cycleCancelled(ctx) {
+		if err := SaveSetting(cfg.DataDir, "last_deep_gap_fill_ts", strconv.FormatInt(policy.now, 10)); err != nil {
+			logging.Warn("could not record the deep gap pass time", "error", err)
+		}
+		if deepCursor != "" {
+			if err := SaveSetting(cfg.DataDir, "gap_deep_cursor", deepCursor); err != nil {
+				logging.Warn("could not record the deep gap pass cursor", "error", err)
+			}
+		}
+	}
+	return releases, gapTargets, nil
+}
+
+// gapFillPolicy is how far one cycle goes looking for missing episodes, read
+// from the settings of the "Missing episodes" panel.
+type gapFillPolicy struct {
+	// perSeries caps the gaps searched per series in one cycle; 0 is no cap
+	// (gap_fill_max_per_series).
+	perSeries int
+	// deepIntervalHours is the minimum time between two deep passes, at
+	// least one hour (gap_deep_interval_hours, default 6).
+	deepIntervalHours int64
+	// deepMaxPerCycle caps the online searches of a deep pass
+	// (gap_deep_max_per_cycle, default 5).
+	deepMaxPerCycle int
+	// researchHours is how long a gap searched online is left alone
+	// (gap_research_hours, default 23), never shorter than the deep
+	// interval, or every deep pass would search the same gaps again.
+	researchHours int64
+	// now is the time of this cycle, in Unix seconds.
+	now int64
+	// deep is true when the previous deep pass (last_deep_gap_fill_ts) is at
+	// least deepIntervalHours old: this cycle also searches online.
+	deep bool
+}
+
+func readGapFillPolicy(cfg *Config, now time.Time) gapFillPolicy {
+	policy := gapFillPolicy{deepIntervalHours: 6, deepMaxPerCycle: 5, researchHours: 23, now: now.UTC().Unix()}
+	if value, ok := cfg.Settings["gap_fill_max_per_series"]; ok {
+		if parsed, err := strconv.Atoi(strings.TrimSpace(value)); err == nil && parsed >= 0 {
+			policy.perSeries = parsed
+		}
+	}
+	if value, ok := cfg.Settings["gap_deep_interval_hours"]; ok {
+		if parsed, err := strconv.ParseInt(strings.TrimSpace(value), 10, 64); err == nil {
+			policy.deepIntervalHours = parsed
+		}
+	}
+	if policy.deepIntervalHours < 1 {
+		policy.deepIntervalHours = 1
+	}
+	if value, ok := cfg.Settings["gap_deep_max_per_cycle"]; ok {
+		if parsed, err := strconv.Atoi(strings.TrimSpace(value)); err == nil && parsed >= 0 {
+			policy.deepMaxPerCycle = parsed
+		}
+	}
+	if value, ok := cfg.Settings["gap_research_hours"]; ok {
+		if parsed, err := strconv.ParseInt(strings.TrimSpace(value), 10, 64); err == nil && parsed > 0 {
+			policy.researchHours = parsed
+		}
+	}
+	if policy.researchHours < policy.deepIntervalHours {
+		policy.researchHours = policy.deepIntervalHours
+	}
+	lastDeep := int64(0)
+	if value, ok := cfg.Settings["last_deep_gap_fill_ts"]; ok {
+		if parsed, err := strconv.ParseInt(strings.TrimSpace(value), 10, 64); err == nil {
+			lastDeep = parsed
+		}
+	}
+	policy.deep = saturatingSub(policy.now, lastDeep) >= saturatingMul(policy.deepIntervalHours, 3600)
+	return policy
+}
+
 func cycleElapsedSeconds(stats *models.CycleStats) int64 {
 	started := time.Now().UTC()
 	if stats != nil && stats.LastStartedAt != nil {

@@ -66,6 +66,13 @@ here.
   latency (a call, a game) fills no queue, so a ping alone cannot see them; in
   `both`/`router` the WAN counters do. Gate: a real call or game next to a saturated
   download, measured in `both` and in `ping`.
+- **Functions too long to review** — `torrentEventWorker`, `HandleTorrentEvent`,
+  `formatEventLang`, `seriesRenameApply`, `loadConfigDB` and the candidate pass
+  (`candidatePass.try`) are each several hundred lines with state shared across the
+  whole body: split them by phase, as the acquisition cycle was split into
+  `collectGapReleases`, `readGapFillPolicy` and `candidatePass`. Gate: a behaviour test
+  of the event worker (completion, storage move, retry after a restart) that pins what
+  the split must keep.
 
 ## Proposals
 

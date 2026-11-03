@@ -58,11 +58,11 @@ func TestMeasureLatencyGuard(t *testing.T) {
 	}
 
 	type result struct {
-		latencies           []time.Duration
-		own, other          float64
-		samples, capped, ok int
-		othersSeen          float64
-		modes               map[string]int
+		latencies       []time.Duration
+		own, other      float64
+		samples, capped int
+		othersSeen      float64
+		modes           map[string]int
 	}
 	run := func(name string, guardOn, router, withCompetitor bool, competitorFor, length time.Duration) result {
 		cfg.Settings[latencyGuardKey] = map[bool]string{true: "true", false: "false"}[guardOn]

@@ -45,12 +45,6 @@ func (r *notificationRecorder) snapshot() []recordedNotification {
 	return append([]recordedNotification(nil), r.requests...)
 }
 
-func (r *notificationRecorder) reset() {
-	r.mu.Lock()
-	r.requests = nil
-	r.mu.Unlock()
-}
-
 // TestNotifierDedicatedChannels sends one event through every channel that
 // Gextto shares with indexarr: Discord, Slack, Gotify, ntfy, Pushover, Apprise
 // and the custom script. Each one must receive its own payload.

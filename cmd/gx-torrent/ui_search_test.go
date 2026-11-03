@@ -131,14 +131,6 @@ func TestUISearchDisabledInManaged(t *testing.T) {
 	}
 }
 
-const suggestFeed = `<?xml version="1.0"?>
-<rss version="2.0" xmlns:torznab="http://torznab.com/schemas/2015/feed"><channel>
-<item><title>The.Last.of.Us.S01E01.1080p</title><enclosure url="http://t/1.torrent" length="10"/></item>
-<item><title>The.Last.of.Us.S01E02.1080p</title><enclosure url="http://t/2.torrent" length="10"/></item>
-<item><title>Breaking.Bad.S05E14.720p</title><enclosure url="http://t/3.torrent" length="10"/></item>
-<item><title>Some.Movie.2024.1080p</title><enclosure url="http://t/4.torrent" length="10"/></item>
-</channel></rss>`
-
 // TestUIRssSuggest checks the wanted-title typeahead: it reads the archive (fast)
 // and reduces release titles to unique series names, most frequent first,
 // title-cased. The indexers are not contacted while typing.

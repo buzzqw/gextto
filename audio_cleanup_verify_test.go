@@ -62,7 +62,6 @@ func makeRichAudioCleanupFixture(t *testing.T, path string, fixture richFixture)
 		}
 		args = append(args, "-i", ass)
 		assInput = inputs
-		inputs++
 	}
 	args = append(args, "-map", "0:v")
 	for index := range fixture.audio {
