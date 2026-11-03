@@ -27,6 +27,11 @@ const (
 	// closed the port until the next refresh and made the router announce a
 	// removal and an addition every hour.
 	portRenewBefore = uint32(portRefresh / time.Second)
+	// upnpGenericScanMax bounds the scan of the router's port-mapping table
+	// when the specific lookup cannot answer. The table holds a handful of
+	// entries on a home router; the bound keeps one silent router from turning
+	// a refresh into a long SOAP session.
+	upnpGenericScanMax = 64
 )
 
 // upnpClient is the subset shared by the IGD service clients.
@@ -35,6 +40,7 @@ type upnpClient interface {
 	DeletePortMappingCtx(ctx context.Context, remoteHost string, externalPort uint16, protocol string) error
 	GetExternalIPAddressCtx(ctx context.Context) (string, error)
 	GetSpecificPortMappingEntryCtx(ctx context.Context, remoteHost string, externalPort uint16, protocol string) (internalPort uint16, internalClient string, enabled bool, description string, lease uint32, err error)
+	GetGenericPortMappingEntryCtx(ctx context.Context, index uint16) (remoteHost string, externalPort uint16, protocol string, internalPort uint16, internalClient string, enabled bool, description string, lease uint32, err error)
 	LocalAddr() net.IP
 }
 
@@ -215,16 +221,52 @@ func upnpMappingPresentForPort(ctx context.Context, client upnpClient, proto str
 // upnpMappingLeaseForPort reports whether the router already forwards the port
 // to this host for the given protocol, and how many seconds of lease are left
 // (0 means a permanent mapping).
+//
+// The specific lookup is what the protocol offers, but some IGDs answer it with
+// 714 NoSuchEntryInArray even when the entry exists (observed on a live
+// router). The generic list is then the answer: without it the mapper believes
+// the port is not forwarded and sends an AddPortMapping every refresh, and
+// every Add changes the router's SystemUpdateID, which the router sends to
+// every UPnP subscriber — aMule prints a five-line event block each time and
+// its log fills with them.
 func upnpMappingLeaseForPort(ctx context.Context, client upnpClient, proto string, port int) (bool, uint32) {
 	internalPort, internalClient, enabled, _, lease, err := client.GetSpecificPortMappingEntryCtx(ctx, "", uint16(port), proto)
-	if err != nil || !enabled || int(internalPort) != port {
-		return false, 0
+	if err == nil && enabled && int(internalPort) == port && upnpMappingIsOurs(client, internalClient) {
+		return true, lease
 	}
+	if internalPort, internalClient, enabled, lease, found := upnpGenericMapping(ctx, client, proto, port); found {
+		if enabled && int(internalPort) == port && upnpMappingIsOurs(client, internalClient) {
+			return true, lease
+		}
+	}
+	return false, 0
+}
+
+// upnpGenericMapping scans the router's port-mapping table for the entry of one
+// external port and protocol. The table has no fixed size and routers rarely
+// hold more than a few dozen entries; the scan stops at the first entry the
+// router refuses to list.
+func upnpGenericMapping(ctx context.Context, client upnpClient, proto string, port int) (internalPort uint16, internalClient string, enabled bool, lease uint32, found bool) {
+	for index := uint16(0); index < upnpGenericScanMax; index++ {
+		_, externalPort, protocol, internalPort, internalClient, enabled, _, lease, err := client.GetGenericPortMappingEntryCtx(ctx, index)
+		if err != nil {
+			return 0, "", false, 0, false
+		}
+		if int(externalPort) == port && strings.EqualFold(strings.TrimSpace(protocol), proto) {
+			return internalPort, internalClient, enabled, lease, true
+		}
+	}
+	return 0, "", false, 0, false
+}
+
+// upnpMappingIsOurs reports whether the router forwards the port to this host;
+// an empty client name (some routers omit it) is accepted.
+func upnpMappingIsOurs(client upnpClient, internalClient string) bool {
 	local := client.LocalAddr()
-	if local != nil && strings.TrimSpace(internalClient) != "" && internalClient != local.String() {
-		return false, 0
+	if local == nil || strings.TrimSpace(internalClient) == "" {
+		return true
 	}
-	return true, lease
+	return internalClient == local.String()
 }
 
 // upnpMappingLease reports whether the router already forwards the peer port

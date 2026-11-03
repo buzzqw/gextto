@@ -67,13 +67,16 @@ func TestPortMapperCheckRecentMapping(t *testing.T) {
 }
 
 // fakeIGD is one router's WANIPConnection service: it reports a single mapping
-// and records the Add calls mapUPnP makes.
+// and records the Add calls mapUPnP makes. With specificBroken it answers the
+// specific lookup the way the router in the field does — 714 NoSuchEntryInArray
+// for an entry that the generic list still shows.
 type fakeIGD struct {
-	local     net.IP
-	present   bool
-	lease     uint32
-	added     []string
-	addFailed bool
+	local          net.IP
+	present        bool
+	lease          uint32
+	added          []string
+	addFailed      bool
+	specificBroken bool
 }
 
 func (f *fakeIGD) LocalAddr() net.IP { return f.local }
@@ -81,10 +84,21 @@ func (f *fakeIGD) LocalAddr() net.IP { return f.local }
 func (f *fakeIGD) GetExternalIPAddressCtx(context.Context) (string, error) { return "1.2.3.4", nil }
 
 func (f *fakeIGD) GetSpecificPortMappingEntryCtx(_ context.Context, _ string, externalPort uint16, protocol string) (uint16, string, bool, string, uint32, error) {
-	if !f.present {
+	if !f.present || f.specificBroken {
 		return 0, "", false, "", 0, errNoMapping
 	}
 	return externalPort, f.local.String(), true, "gx-torrent", f.lease, nil
+}
+
+func (f *fakeIGD) GetGenericPortMappingEntryCtx(_ context.Context, index uint16) (string, uint16, string, uint16, string, bool, string, uint32, error) {
+	if !f.present || index > 1 {
+		return "", 0, "", 0, "", false, "", 0, errNoMapping
+	}
+	proto := "TCP"
+	if index == 1 {
+		proto = "UDP"
+	}
+	return "", 6881, proto, 6881, f.local.String(), true, "gx-torrent", f.lease, nil
 }
 
 func (f *fakeIGD) AddPortMappingCtx(_ context.Context, _ string, _ uint16, protocol string, _ uint16, _ string, _ bool, _ string, _ uint32) error {
@@ -127,6 +141,32 @@ func TestPortMapperRenewsTheLeaseBeforeItExpires(t *testing.T) {
 				t.Fatalf("added = %v, want %v", router.added, tc.want)
 			}
 		})
+	}
+}
+
+// TestPortMapperFindsTheMappingWhenTheSpecificLookupLies covers a router that
+// answers GetSpecificPortMappingEntry with 714 for a mapping it lists in the
+// generic table (seen on a live router). The port is forwarded: the mapper must
+// not send an Add, because every Add changes the router's SystemUpdateID and
+// the router notifies every UPnP subscriber — aMule prints a five-line event
+// block each time and its log fills with them.
+func TestPortMapperFindsTheMappingWhenTheSpecificLookupLies(t *testing.T) {
+	router := &fakeIGD{
+		local:          net.ParseIP("192.168.1.161"),
+		present:        true,
+		lease:          uint32(portLease.Seconds()),
+		specificBroken: true,
+	}
+	mapper := newPortMapper(6881, true, false)
+	mapper.upnpClient = router
+	if err := mapper.mapUPnP(); err != nil {
+		t.Fatalf("mapUPnP: %v", err)
+	}
+	if len(router.added) != 0 {
+		t.Fatalf("added %v, want no Add when the generic table shows the mapping", router.added)
+	}
+	if present, lease := upnpMappingLeaseForPort(context.Background(), router, "TCP", 6881); !present || lease == 0 {
+		t.Fatalf("mapping = %v lease %d, want present with its lease", present, lease)
 	}
 }
 

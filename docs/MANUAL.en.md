@@ -1027,7 +1027,9 @@ which means more sources.
   returned, so it does not start a new search.
 - **Paste eD2k links**: one or more `ed2k://` links, even mixed with text;
   **Download with aMule** adds them all.
-- **aMule log**: **Load the log** shows the last lines of amuled's log.
+- **aMule log**: **Load the log** shows the last lines of amuled's log. The
+  blocks of the router's UPnP notifications (`UPNP_EVENT_RECEIVED`) are hidden:
+  they arrive on every change of the forwarding rules and would fill the tab.
 - **aMule folders**: when the incoming or the temporary folder is missing (a
   network disk unmounted, a folder removed) the page says so and **Create the
   folders** makes them; without them aMule fills its log with *Failed to get

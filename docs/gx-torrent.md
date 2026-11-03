@@ -1368,6 +1368,14 @@ RPC server is disabled.
     shutdown. PCP is a minimal MAP client, without external
     dependencies; on a router that does not speak it the request expires and it moves to
     NAT-PMP.
+  - The presence check asks for the single mapping and, when the router does not
+    answer it (`714 NoSuchEntryInArray` on an entry it lists anyway: some IGDs do
+    this), reads the port-mapping table instead. Without the fallback the daemon
+    would believe the port is not forwarded and send an `AddPortMapping` at every
+    refresh; each Add changes the router's `SystemUpdateID`, and the router sends
+    it to every UPnP subscriber — which fills the log of the other clients on the
+    network (aMule prints a five-line event block per change). The same check
+    backs **Test porte**, so the page reports the mapping that is really there.
   - Outcome and external address are in `GET /api/v1/stats` (`port_mapping`).
   - If none of the three works, the log says to open the port by hand.
 - **Listening interface**: `-listen-interface` accepts an IP or an interface

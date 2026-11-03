@@ -201,7 +201,79 @@ func Ed2kLogLines(cfg *Config) ([]string, error) {
 		lines, callErr = client.LogLines(ctx)
 		return callErr
 	})
-	return lines, err
+	return ed2kLogWithoutRouterEvents(lines), err
+}
+
+// ed2kLogWithoutRouterEvents drops the router's UPnP event notifications from
+// aMule's log. aMule stays subscribed to the router's event service and prints
+// a five-line block for every change of the port-mapping table; a port mapping
+// that is added or renewed (by gx-torrent or by another device) is enough, so
+// the tail of the log ends up made of these blocks only and the lines a person
+// needs are pushed out. Nothing in the block is about aMule: the other UPnP
+// lines (a mapping that failed, an error) stay.
+func ed2kLogWithoutRouterEvents(lines []string) []string {
+	if len(lines) == 0 {
+		return lines
+	}
+	out := make([]string, 0, len(lines))
+	inEvent := false
+	for _, line := range lines {
+		body := ed2kLogBody(line)
+		switch {
+		case strings.Contains(body, "UPNP_EVENT_RECEIVED"):
+			inEvent = true
+			continue
+		case inEvent && ed2kRouterEventDetail(body):
+			continue
+		}
+		inEvent = false
+		out = append(out, line)
+	}
+	return out
+}
+
+// ed2kRouterEventDetail reports whether the line is one of the details aMule
+// prints after UPNP_EVENT_RECEIVED: the subscription id, the event key and the
+// service variables the router sent.
+func ed2kRouterEventDetail(body string) bool {
+	switch {
+	case strings.HasPrefix(body, "SID: "),
+		strings.HasPrefix(body, "Key: "),
+		strings.HasPrefix(body, "Property list:"):
+		return true
+	}
+	return ed2kRouterProperty(body)
+}
+
+// ed2kRouterProperty reports whether the line is a service variable as aMule
+// prints it, "Name='value'": SystemUpdateID, PortMappingNumberOfEntries,
+// ExternalIPAddress, ConnectionStatus. They describe the router, not aMule.
+func ed2kRouterProperty(body string) bool {
+	equal := strings.Index(body, "=")
+	if equal <= 0 || !strings.HasSuffix(body, "'") {
+		return false
+	}
+	for i, r := range body[:equal] {
+		switch {
+		case r == '_', r >= 'A' && r <= 'Z', r >= 'a' && r <= 'z':
+		case i > 0 && r >= '0' && r <= '9':
+		default:
+			return false
+		}
+	}
+	return true
+}
+
+// ed2kLogBody strips aMule's own marker from a log line: a "!" and the
+// "YYYY-MM-DD HH:MM:SS: " timestamp, both present on the lines the aMule log
+// carries. A line without them is returned as it is.
+func ed2kLogBody(line string) string {
+	body := strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(line), "!"))
+	if len(body) > 21 && body[4] == '-' && body[7] == '-' && body[10] == ' ' &&
+		body[13] == ':' && body[16] == ':' && body[19] == ':' {
+		body = strings.TrimSpace(body[21:])
+	}
+	return body
 }
 
 // Ed2kLogAPI implements `GET /api/ed2k/log`.

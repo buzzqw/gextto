@@ -292,7 +292,12 @@ reload button of its GUI: files you added or removed by hand show up or
 disappear. Gextto never changes aMule's sharing configuration.
 
 The **aMule log** tab shows the last lines of `amuled`'s own log, with **Refresh**
-to read them again.
+to read them again. The blocks aMule prints for the router's UPnP event
+notifications (`UPNP_EVENT_RECEIVED` with its `SID`, `Key`, `Property list` and
+`SystemUpdateID` lines) are left out: the router sends one every time a port
+mapping changes, on any device, and they would fill the tab and push out the
+lines that matter. Every other aMule line, the other UPnP ones included, is
+shown.
 
 ## Troubleshooting
 

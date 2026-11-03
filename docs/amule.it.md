@@ -294,7 +294,12 @@ compaiono o spariscono. Gextto non modifica mai la configurazione di
 condivisione di aMule.
 
 La scheda **Log di aMule** mostra le ultime righe del log di `amuled`, con
-**Aggiorna** per rileggerle.
+**Aggiorna** per rileggerle. I blocchi che aMule stampa per le notifiche degli
+eventi UPnP del router (`UPNP_EVENT_RECEIVED` con le righe `SID`, `Key`,
+`Property list` e `SystemUpdateID`) restano fuori: il router ne manda uno a ogni
+cambio delle regole di inoltro, da qualunque dispositivo, e riempirebbero la
+scheda scacciando le righe che servono. Ogni altra riga di aMule, comprese le
+altre righe UPnP, resta visibile.
 
 ## Problemi comuni
 

@@ -1055,6 +1055,9 @@ alto e un Kad non dietro firewall, cioè più fonti.
 - **Incolla link eD2k**: uno o più link `ed2k://`, anche mescolati a testo;
   **Scarica con aMule** li aggiunge tutti.
 - **Log di aMule**: **Carica il log** mostra le ultime righe del log di amuled.
+  I blocchi delle notifiche UPnP del router (`UPNP_EVENT_RECEIVED`) sono
+  nascosti: arrivano a ogni cambio delle regole di inoltro e riempirebbero la
+  scheda.
 - **Cartelle di aMule**: se la cartella di arrivo o quella temporanea non
   esistono (disco di rete smontato, cartella rimossa) la pagina lo segnala con
   **Crea le cartelle**: senza, aMule riempie il log di *Failed to get file
