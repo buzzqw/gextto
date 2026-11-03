@@ -205,6 +205,18 @@ func (t *torrent) startPeer(
 	addr := conn.RemoteAddr().(*net.TCPAddr)
 	t.pexAddPeer(addr)
 	if _, ok := t.peerIDs[peerID]; ok {
+		if old := t.silentPeer(func(pe *peer.Peer) bool { return pe.ID == peerID }); old != nil {
+			// Same peer, new socket, old one silent: keep the live one.
+			t.log.Debugf("replacing silent connection of the same peer id. addr: %s", addr)
+			oldIP := old.IP()
+			t.closePeer(old)
+			if oldIP == addr.IP.String() {
+				// closePeer released the address this connection holds.
+				t.connectedPeerIPs[oldIP] = struct{}{}
+			}
+		}
+	}
+	if _, ok := t.peerIDs[peerID]; ok {
 		t.log.Debugf("peer with same id already connected. addr: %s id: %s", addr, peerID)
 		conn.Close()
 		delete(t.connectedPeerIPs, addr.IP.String())

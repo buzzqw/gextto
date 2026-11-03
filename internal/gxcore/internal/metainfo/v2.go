@@ -128,6 +128,9 @@ func NewV2Info(b []byte) (*Info, error) {
 	if ib.MetaVersion == 2 && ib.PieceLength == 0 {
 		return nil, errZeroPieceLength
 	}
+	if ib.PieceLength > maxParsedPieceLength {
+		return nil, errParsedPieceTooBig
+	}
 	i := &Info{
 		PieceLength: ib.PieceLength,
 		Name:        ib.Name,

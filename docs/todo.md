@@ -56,20 +56,6 @@ here.
 - **Hybrid torrents from the v2 swarm** — hybrids are downloaded as v1 only; when the
   swarm of a hybrid has peers in the v2 one and none in the v1 one, the download waits
   without needing to. Gate: a hybrid torrent where the v2 swarm is the only one with peers.
-- **Transient EIO through a new open** — a read that fails with EIO stops the torrent,
-  which is right for a damaged file but not for a NAS, SMB or FUSE mount that can serve the
-  same file through a fresh open (libtorrent PR 9033 reopens and retries over about a
-  second). Gate: a mount where a transient EIO stops a torrent, or a FUSE/fanotify harness
-  like the one of that PR.
-- **One connection per peer id** — the duplicate gate is keyed on the address, so the same
-  peer reached over IPv4 and IPv6, or again after a holepunch, holds two slots and receives
-  the same requests twice; libtorrent keeps `allow_multiple_connections_per_peer_id` off
-  by default (PR 8372). Gate: a dual-stack or holepunch session where one peer id shows two
-  connections.
-- **BEP 44 put conformance** — a `put` that carries `sig` but no `k` is stored as an
-  immutable item at `sha1(value)` and the signature is never checked, while a mutable put
-  is expected (libtorrent rejects it with 203, PR 8698). Gate: the test of the put path
-  (sig without k, k without sig or seq).
 
 ## Gextto, acquisition and UI
 
@@ -88,6 +74,10 @@ here.
   latency (a call, a game) fills no queue, so a ping alone cannot see them; in
   `both`/`router` the WAN counters do. Gate: a real call or game next to a saturated
   download, measured in `both` and in `ping`.
+- **Portable folder names for existing series** — a series added before the add dialog
+  dropped the characters Windows, exFAT and SMB shares refuse keeps its folder; a check
+  in Maintenance reports those folders and never moves files by itself. Gate: an
+  installation with at least one such folder (none here).
 - **Functions too long to review** — `torrentEventWorker`, `HandleTorrentEvent`,
   `formatEventLang`, `seriesRenameApply`, `loadConfigDB` and the candidate pass
   (`candidatePass.try`) are each several hundred lines with state shared across the
@@ -116,10 +106,6 @@ its gate; a rejected one moves to *Not planned*.
   downloads and the library are on the same filesystem (here they are not: the library
   is on the NAS, the downloads on the local disk) and a byte-for-byte comparison before
   linking.
-- **Portable folder names for existing series** — the add dialog now drops the characters
-  Windows, exFAT and SMB shares refuse, but a series added earlier keeps its folder and
-  the path stored in the library. A check in Maintenance could report them and rename the
-  folder with its files. Gate: a decision on moving files automatically or only reporting.
 - **Packages for the root** — 114k non-test lines share `package gextto`, so helpers are
   told apart by prefixes (`gh0_`…`gh7_`, `tev_`, `bg_`) instead of by package. Gate: a
   decision on the first boundary (HTTP handlers, acquisition, storage) and one area
@@ -143,20 +129,6 @@ its gate; a rejected one moves to *Not planned*.
 - **Error wrapping and log wording** — 280 log calls build their sentence with `Sprintf`
   although the logger takes structured fields, and 490 `fmt.Errorf` calls drop the cause
   because they do not use `%w`. Mechanical, area by area, tests green.
-- **Reconnect over a stale connection** — the per-address duplicate gate refuses a new
-  incoming connection while the old one is still open, and a peer that vanished without a
-  FIN holds its slot for the whole two-minute read window, so it cannot reconnect until
-  then (the symptom of libtorrent issue 8367). The handshake happens after the gate, so
-  the peer id cannot be compared yet. Gate: a decision on the heuristic — prefer the new
-  connection when the old one has been silent for N seconds, or accept both when the peer
-  id differs — and on the threshold.
-- **Ceiling on the piece length of a parsed torrent** — `NewInfo` checks neither a power
-  of two nor a maximum, and the piece pool is sized from that number
-  (`bufferpool.New(int(PieceLength))`): a hostile `.torrent` or magnet can ask for a
-  multi-gigabyte buffer, while libtorrent refuses even 2 GiB (issue 8139). The ceiling has
-  to leave room for the 128 MiB pieces of libtorrent's new automatic sizing (PR 8015);
-  our creation stops at 16 MiB with about 2000 pieces, so a multi-terabyte torrent gets
-  hundreds of thousands of pieces. Gate: the ceiling to adopt and its error message.
 - **TLS origination to the proxy** — the proxy is reached in plain text (HTTP CONNECT or
   SOCKS5); an `https://` proxy that terminates TLS itself is not supported, as in
   libtorrent before PR 9039. Gate: an operator who runs an HTTPS proxy.
@@ -185,6 +157,8 @@ Closed by choice, not waiting for a measurement:
   speaks it.
 - HTTP/2 for announces: an announce is one small request per interval and the shared
   HTTP/1.1 transport already reuses the connection (libtorrent PR 8025).
+- Pieces above 16 MiB when creating a torrent: older clients refuse them, and a torrent of
+  several terabytes still works with more pieces.
 - Alternative storages (blob, bolt, SQLite).
 - `share_mode`: it serves ratio farming, not a library.
 - Full `*arr` v3 compatibility, multi-user authentication, Usenet, write-back cache,

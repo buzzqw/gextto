@@ -50,7 +50,8 @@ func (s *FileStorage) Open(name string, size int64) (f storage.File, exists bool
 	if err = os.MkdirAll(filepath.Dir(name), os.ModeDir|s.perm); err != nil {
 		return nil, false, err
 	}
-	of, opened, err := s.openFile(name, size)
+	flags := applyNoAtimeFlag(os.O_RDWR)
+	of, opened, err := s.openFile(name, size, flags)
 	if err != nil {
 		return nil, false, err
 	}
@@ -60,15 +61,14 @@ func (s *FileStorage) Open(name string, size int64) (f storage.File, exists bool
 			f = nil
 			return
 		}
-		f = s.wrap(of, size)
+		f = s.wrap(of, size, flags)
 	}()
 	return nil, opened, nil
 }
 
 // openFile opens the OS file, creating and sizing it on first sight.
-func (s *FileStorage) openFile(name string, size int64) (*os.File, bool, error) {
+func (s *FileStorage) openFile(name string, size int64, flags int) (*os.File, bool, error) {
 	mode := s.perm &^ 0111
-	flags := applyNoAtimeFlag(os.O_RDWR)
 	of, err := openForWrite(name, flags, mode)
 	if err == nil {
 		return s.adoptExisting(of, size)
@@ -130,14 +130,15 @@ func (s *FileStorage) RootDir() string {
 }
 
 // wrap backs an opened file with a memory mapping when configured (Linux,
-// sized mappings only), else with a plain fdatasync file.
-func (s *FileStorage) wrap(of *os.File, size int64) storage.File {
+// sized mappings only), else with a plain fdatasync file. flags are the open
+// flags, reused when a transient read error makes the plain file reopen itself.
+func (s *FileStorage) wrap(of *os.File, size int64, flags int) storage.File {
 	if s.Mmap && size > 0 && size <= int64(maxInt()) {
 		if data, err := mapFile(of, int(size)); err == nil {
 			return &mmapFile{f: of, data: data}
 		}
 	}
-	return &osFile{File: of}
+	return newOSFile(of, flags)
 }
 
 func maxInt() int { return int(^uint(0) >> 1) }

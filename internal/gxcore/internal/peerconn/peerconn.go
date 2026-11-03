@@ -23,16 +23,22 @@ type WireStats struct {
 	Written atomic.Int64
 }
 
-// countingConn wraps a peer socket with wire accounting into stats.
+// countingConn wraps a peer socket with wire accounting into stats, and
+// remembers when the peer last sent a byte.
 type countingConn struct {
 	net.Conn
 	stats *WireStats
+	// lastRead is the UnixNano time of the last read that returned bytes.
+	lastRead atomic.Int64
 }
 
 func (c *countingConn) Read(p []byte) (int, error) {
 	n, err := c.Conn.Read(p)
-	if c.stats != nil {
-		c.stats.Read.Add(int64(n))
+	if n > 0 {
+		c.lastRead.Store(time.Now().UnixNano())
+		if c.stats != nil {
+			c.stats.Read.Add(int64(n))
+		}
 	}
 	return n, err
 }
@@ -56,6 +62,7 @@ func (c *countingConn) Write(p []byte) (int, error) {
 // message streams into one channel for the owning peer.
 type Conn struct {
 	conn     net.Conn
+	counting *countingConn
 	reader   *peerreader.PeerReader
 	writer   *peerwriter.PeerWriter
 	messages chan any
@@ -67,9 +74,12 @@ type Conn struct {
 // New wraps conn with rate-limited reading and writing. Wire bytes are
 // accumulated into stats (nil disables the accounting).
 func New(conn net.Conn, stats *WireStats, l logger.Logger, pieceTimeout time.Duration, maxRequestsIn, maxMsgSize int, fastEnabled bool, br, bw *bandwidth.Limiter) *Conn {
-	conn = &countingConn{Conn: conn, stats: stats}
+	counting := &countingConn{Conn: conn, stats: stats}
+	counting.lastRead.Store(time.Now().UnixNano())
+	conn = counting
 	return &Conn{
 		conn:     conn,
+		counting: counting,
 		reader:   peerreader.New(conn, l, pieceTimeout, maxMsgSize, br),
 		writer:   peerwriter.New(conn, l, maxRequestsIn, fastEnabled, bw),
 		messages: make(chan any),
@@ -87,6 +97,12 @@ func (p *Conn) Addr() *net.TCPAddr {
 // IP returns the peer's IP in string form.
 func (p *Conn) IP() string {
 	return p.conn.RemoteAddr().(*net.TCPAddr).IP.String()
+}
+
+// SilentFor returns how long the peer has sent nothing (since the connection
+// was adopted when it never sent a byte).
+func (p *Conn) SilentFor() time.Duration {
+	return time.Since(time.Unix(0, p.counting.lastRead.Load()))
 }
 
 // String returns the peer's remote address.

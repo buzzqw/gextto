@@ -20,7 +20,7 @@ func TestMappedFaultIsAnError(t *testing.T) {
 	if err := of.Truncate(size); err != nil {
 		t.Fatal(err)
 	}
-	f, ok := (&FileStorage{Mmap: true}).wrap(of, size).(*mmapFile)
+	f, ok := (&FileStorage{Mmap: true}).wrap(of, size, os.O_RDWR).(*mmapFile)
 	if !ok {
 		t.Skip("mmap not available")
 	}

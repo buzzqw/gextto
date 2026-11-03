@@ -119,7 +119,7 @@ func benchPlainSyncClean(b *testing.B, forced bool) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		if forced {
-			if err := unix.Fdatasync(int(of.Fd())); err != nil {
+			if err := unix.Fdatasync(int(of.file.Fd())); err != nil {
 				b.Fatal(err)
 			}
 			continue

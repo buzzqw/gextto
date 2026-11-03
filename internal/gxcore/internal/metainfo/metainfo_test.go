@@ -2,7 +2,10 @@ package metainfo
 
 import (
 	"bytes"
+	"errors"
 	"testing"
+
+	"github.com/zeebo/bencode"
 )
 
 // TestNewRejectsDeclaredLengthBeyondInput pins the fix for the fuzzer's
@@ -36,5 +39,34 @@ func TestNewRejectsDeclaredLengthBeyondInput(t *testing.T) {
 	}
 	if _, err := DecodePieceLayers([]byte("d12000000000:1:xe")); err == nil {
 		t.Error("DecodePieceLayers accepted a huge declared length")
+	}
+}
+
+// TestParsedPieceLengthCeiling refuses an info dictionary whose piece length
+// would make every piece buffer gigabytes large, and keeps accepting the
+// 128 MiB pieces of the largest torrents real clients create.
+func TestParsedPieceLengthCeiling(t *testing.T) {
+	info := func(pieceLength int64) []byte {
+		b, err := bencode.EncodeBytes(map[string]interface{}{
+			"name":         "a",
+			"length":       int64(1),
+			"piece length": pieceLength,
+			"pieces":       string(make([]byte, 20)),
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return b
+	}
+	if _, err := NewInfo(info(128<<20), true, true); err != nil {
+		t.Fatalf("128 MiB pieces refused: %v", err)
+	}
+	for _, size := range []int64{maxParsedPieceLength + 16<<10, 2 << 30, 4<<30 - 16<<10} {
+		if _, err := NewInfo(info(size), true, true); !errors.Is(err, errParsedPieceTooBig) {
+			t.Errorf("NewInfo(piece length %d) = %v, want errParsedPieceTooBig", size, err)
+		}
+		if _, err := ParseInfo(info(size), true, true, nil); !errors.Is(err, errParsedPieceTooBig) {
+			t.Errorf("ParseInfo(piece length %d) = %v, want errParsedPieceTooBig", size, err)
+		}
 	}
 }

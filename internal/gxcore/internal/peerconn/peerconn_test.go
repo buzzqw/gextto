@@ -44,3 +44,23 @@ func TestCountingConnTracksRawBytes(t *testing.T) {
 		t.Fatalf("wire read = %d, want 4", got)
 	}
 }
+
+// TestSilentForTracksTheLastReceivedByte: SilentFor restarts when the peer
+// sends a byte, and grows while it sends nothing.
+func TestSilentForTracksTheLastReceivedByte(t *testing.T) {
+	client, server := net.Pipe()
+	defer client.Close()
+	defer server.Close()
+	c := New(client, nil, logger.New("test"), time.Second, 1, 1<<20, false, nil, nil)
+	c.counting.lastRead.Store(time.Now().Add(-time.Hour).UnixNano())
+	if got := c.SilentFor(); got < 59*time.Minute {
+		t.Fatalf("SilentFor = %v, want about an hour", got)
+	}
+	go func() { _, _ = server.Write([]byte("x")) }()
+	if _, err := io.ReadFull(c.conn, make([]byte, 1)); err != nil {
+		t.Fatal(err)
+	}
+	if got := c.SilentFor(); got > time.Minute {
+		t.Fatalf("SilentFor after a byte = %v, want close to zero", got)
+	}
+}

@@ -1572,6 +1572,13 @@ IP (`connectedPeerIPs`); two daemons on the same IP would be seen as a single
 peer. Both must be started with `-outgoing-interface` equal to the listen IP,
 otherwise they announce to the tracker their "default" IP (wrong).
 
+The engine keeps one connection per address and one per peer id. A peer that
+reconnects while its old connection is still open is refused, unless the old
+one has received nothing for a minute: then the old socket is taken as dead
+(a NAT reset or a computer back from sleep, closed without a FIN) and the new
+connection replaces it, instead of the peer waiting out the two-minute read
+window.
+
 ## File selection and priorities
 
 You can download only some files of a torrent and give priority to the
@@ -1963,6 +1970,11 @@ using fixed values.
   A page the disk cannot back (disk full on a sparse file, file truncated by
   another process) raises `SIGBUS`: the access is guarded and comes back as an
   I/O error on that torrent instead of crashing the daemon.
+- **Network and FUSE mounts**: a read that fails with an I/O error (`EIO`, or a
+  stale NFS handle) reopens the file and tries again for about a second before
+  the torrent is stopped. A NAS, an SMB share or a FUSE mount often serves the same
+  bytes through a fresh open, so a hiccup of the share no longer stops a torrent
+  that is seeding from it; a file that keeps failing still stops it.
 - **"Optimise settings"**: with gx-torrent it resets the cache to automatic and
   applies it immediately.
 - The cache size changes on the fly; cache expiry and

@@ -258,8 +258,24 @@ func (d *DHT) replyPut(addr net.UDPAddr, raw []byte) {
 	}
 
 	item := &StoredItem{Value: v}
-	if k := mapString(req.A, "k"); k != "" {
-		pub := []byte(k)
+	// Any of the mutable-only arguments makes the put a mutable one, which then
+	// needs all three of k, sig and seq: a put carrying sig without k (or k
+	// without seq) is refused instead of being stored, unsigned, as an
+	// immutable item at sha1(v).
+	_, hasK := req.A["k"]
+	_, hasSig := req.A["sig"]
+	_, hasSeq := req.A["seq"]
+	_, hasCas := req.A["cas"]
+	if hasK || hasSig || hasSeq || hasCas {
+		if !hasK || !hasSig || !hasSeq {
+			d.replyError(addr, req.T, 203, "mutable put needs k, sig and seq")
+			return
+		}
+		if _, ok := req.A["seq"].(int64); !ok {
+			d.replyError(addr, req.T, 203, "invalid sequence number")
+			return
+		}
+		pub := []byte(mapString(req.A, "k"))
 		sig := []byte(mapString(req.A, "sig"))
 		seq := mapInt(req.A, "seq")
 		if seq < 0 {
@@ -273,7 +289,7 @@ func (d *DHT) replyPut(addr net.UDPAddr, raw []byte) {
 		item.PublicKey, item.Signature, item.Seq = pub, sig, seq
 		item.Target = MutableTarget(pub, salt)
 		if cur := d.items.get(item.Target); cur != nil && cur.Mutable() {
-			if _, hasCas := req.A["cas"]; hasCas && mapInt(req.A, "cas") != cur.Seq {
+			if hasCas && mapInt(req.A, "cas") != cur.Seq {
 				d.replyError(addr, req.T, 301, "cas mismatch")
 				return
 			}

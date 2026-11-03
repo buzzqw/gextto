@@ -24,6 +24,10 @@ var (
 	errZeroPieces       = errors.New("torrent has zero pieces")
 	errPieceLength      = errors.New("piece length must be multiple of 16K")
 	errPieceLengthBig   = errors.New("piece length is too large")
+	// errParsedPieceTooBig refuses a torrent whose pieces are larger than any
+	// real client creates: the piece buffers are sized from this number, so a
+	// hostile .torrent or magnet could otherwise ask for gigabytes of memory.
+	errParsedPieceTooBig = fmt.Errorf("piece length is larger than %d MiB", maxParsedPieceLength>>20)
 	// ErrV2Only marks a v2-only torrent (BEP 52): meta version 2 with a file
 	// tree but no v1 pieces.
 	ErrV2Only = errors.New("torrent is BitTorrent v2 only")
@@ -35,6 +39,12 @@ var (
 // 16 MiB and the calculator never exceeds it, so a crafted create-torrent
 // request cannot force a giant hash buffer.
 const maxPieceLength = 16 << 20
+
+// maxParsedPieceLength caps the piece size of a torrent read from a file, a
+// magnet or the resume data. It is above the 128 MiB pieces libtorrent's
+// automatic sizing makes for multi-terabyte torrents, and far below the size
+// at which a piece buffer alone would exhaust the memory of a small host.
+const maxParsedPieceLength = 256 << 20
 
 // Info is the decoded info dictionary: piece layout, files, hashes and the
 // v2/BEP 38 extensions.
@@ -167,6 +177,9 @@ func NewInfo(b []byte, utf8 bool, pad bool) (*Info, error) {
 	}
 	if ib.PieceLength == 0 {
 		return nil, errZeroPieceLength
+	}
+	if ib.PieceLength > maxParsedPieceLength {
+		return nil, errParsedPieceTooBig
 	}
 	if len(ib.Pieces)%sha1.Size != 0 {
 		return nil, errInvalidPieceData

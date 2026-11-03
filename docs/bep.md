@@ -113,7 +113,10 @@ stay narrow and the tables remain readable.
 >
 > **BEP 44** offers a local store, a `get`/`put` responder and an **outgoing
 > iterative client** (bounded) to read and publish items; the `put` goes to the
-> **8 closest nodes** to the target among those that provided a token.
+> **8 closest nodes** to the target among those that provided a token. The
+> responder treats a `put` with any of `k`, `sig`, `seq` or `cas` as mutable and refuses
+> it (203) unless `k`, `sig` and `seq` are all present, so an unsigned value is never
+> stored as immutable by mistake.
 >
 > **BEP 46** is reached through the magnet parameter `xs=urn:btpk:`, resolved by
 > the BEP 44 client on add.

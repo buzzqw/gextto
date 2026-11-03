@@ -2,8 +2,10 @@ package torrent
 
 import (
 	"net"
+	"time"
 
 	"github.com/buzzqw/gextto/internal/gxcore/internal/handshaker/incominghandshaker"
+	"github.com/buzzqw/gextto/internal/gxcore/internal/peer"
 )
 
 // handleNewConnection vets an accepted socket through the admission gates —
@@ -26,9 +28,20 @@ func (t *torrent) handleNewConnection(conn net.Conn) {
 		return
 	}
 	if _, ok := t.connectedPeerIPs[ipstr]; ok {
-		t.log.Debugln("received duplicate connection from same IP: ", ipstr)
-		conn.Close()
-		return
+		old := t.silentPeer(func(pe *peer.Peer) bool { return pe.IP() == ipstr })
+		if old == nil {
+			t.log.Debugln("received duplicate connection from same IP: ", ipstr)
+			conn.Close()
+			return
+		}
+		// The peer is reconnecting over a connection that died without a FIN:
+		// the new one wins instead of waiting out the old read window.
+		t.log.Debugln("replacing silent connection from same IP: ", ipstr)
+		t.closePeer(old)
+		if _, still := t.connectedPeerIPs[ipstr]; still {
+			conn.Close()
+			return
+		}
 	}
 	if t.ipBanned(ipstr) {
 		t.log.Debugln("connection attempt from banned IP: ", ipstr)
@@ -47,4 +60,22 @@ func (t *torrent) handleNewConnection(conn net.Conn) {
 		t.ourExtensions(),
 		t.session.config.ForceIncomingEncryption,
 	)
+}
+
+// staleConnectionAfter is how long an established peer must have sent nothing
+// before a new connection from the same address or peer id replaces it. A
+// healthy peer sends a keepalive at least every two minutes and seldom
+// reconnects while its connection works, so a reconnect over a silent one
+// means the old socket died without a FIN (a NAT reset, a sleeping laptop).
+var staleConnectionAfter = time.Minute
+
+// silentPeer returns the established peer matching match that has been silent
+// for staleConnectionAfter, or nil.
+func (t *torrent) silentPeer(match func(*peer.Peer) bool) *peer.Peer {
+	for pe := range t.peers {
+		if match(pe) && pe.SilentFor() >= staleConnectionAfter {
+			return pe
+		}
+	}
+	return nil
 }

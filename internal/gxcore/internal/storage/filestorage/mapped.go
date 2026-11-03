@@ -8,28 +8,94 @@ import (
 	"runtime/debug"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/buzzqw/gextto/internal/gxcore/internal/storage"
 )
 
 // osFile wraps the OS file so Sync uses fdatasync (piece data needs no metadata
-// flush) instead of fsync. ReadAt/WriteAt/Close come from the embedded file.
+// flush) instead of fsync.
 //
 // dirty records a write since the last Sync: the resume tick syncs every open
 // file of every torrent, and most of them are untouched between two ticks. A
 // clean file needs no fdatasync. With thousands of files per torrent (or a
 // network share) that is the difference between a handful of syscalls and tens
 // of thousands every interval, on the torrent's run loop.
+//
+// A read that fails with a transient I/O error (EIO, or a stale handle on NFS)
+// reopens the file and tries again for about a second before giving up: a NAS,
+// SMB or FUSE mount often serves the same bytes through a fresh open, and the
+// error would otherwise stop the torrent as if the file were damaged.
 type osFile struct {
-	*os.File
+	// mu guards file: reads and writes share it, a reopen swaps it.
+	mu    sync.RWMutex
+	file  *os.File
+	name  string
+	flags int
 	dirty atomic.Bool
 }
 
 var _ storage.File = (*osFile)(nil)
 
+// readRetryDelays are the waits before each reopen-and-retry of a read that
+// failed with a transient error: about a second in all.
+var readRetryDelays = []time.Duration{100 * time.Millisecond, 300 * time.Millisecond, 600 * time.Millisecond}
+
+func newOSFile(of *os.File, flags int) *osFile {
+	return &osFile{file: of, name: of.Name(), flags: flags}
+}
+
+// ReadAt reads from the file, reopening it after a transient error.
+func (f *osFile) ReadAt(p []byte, off int64) (int, error) {
+	n, err := f.readAt(p, off)
+	if err == nil || !isTransientReadError(err) || f.name == "" {
+		return n, err
+	}
+	for _, delay := range readRetryDelays {
+		time.Sleep(delay)
+		if reopenErr := f.reopen(); reopenErr != nil {
+			continue
+		}
+		if n, err = f.readAt(p, off); err == nil || !isTransientReadError(err) {
+			return n, err
+		}
+	}
+	return n, err
+}
+
+func (f *osFile) readAt(p []byte, off int64) (int, error) {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
+	return readFileAt(f.file, p, off)
+}
+
+// readFileAt is the plain positional read; tests replace it to inject errors.
+var readFileAt = func(file *os.File, p []byte, off int64) (int, error) {
+	return file.ReadAt(p, off)
+}
+
+// reopen replaces the handle with a fresh open of the same path. Unflushed
+// writes are flushed first, so swapping the handle loses nothing.
+func (f *osFile) reopen() error {
+	fresh, err := openForWrite(f.name, f.flags, 0)
+	if err != nil {
+		return err
+	}
+	f.mu.Lock()
+	old := f.file
+	if f.dirty.Load() {
+		_ = dataSync(old)
+	}
+	f.file = fresh
+	f.mu.Unlock()
+	return old.Close()
+}
+
 // WriteAt records that the file has bytes to flush.
 func (f *osFile) WriteAt(p []byte, off int64) (int, error) {
-	n, err := f.File.WriteAt(p, off)
+	f.mu.RLock()
+	n, err := f.file.WriteAt(p, off)
+	f.mu.RUnlock()
 	if n > 0 {
 		f.dirty.Store(true)
 	}
@@ -43,11 +109,21 @@ func (f *osFile) Sync() error {
 	if !f.dirty.Swap(false) {
 		return nil
 	}
-	if err := dataSync(f.File); err != nil {
+	f.mu.RLock()
+	err := dataSync(f.file)
+	f.mu.RUnlock()
+	if err != nil {
 		f.dirty.Store(true)
 		return err
 	}
 	return nil
+}
+
+// Close closes the current handle.
+func (f *osFile) Close() error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.file.Close()
 }
 
 // dirtyRange is a half-open byte interval [begin, end) written into the

@@ -1,6 +1,7 @@
 package filestorage
 
 import (
+	"errors"
 	"os"
 	"syscall"
 
@@ -38,4 +39,10 @@ func preallocate(f *os.File, size int64) error {
 		return nil
 	}
 	return f.Truncate(size)
+}
+
+// isTransientReadError reports a read error a fresh open may cure: EIO from a
+// network or FUSE mount, or a stale NFS handle.
+func isTransientReadError(err error) bool {
+	return errors.Is(err, syscall.EIO) || errors.Is(err, syscall.ESTALE)
 }
