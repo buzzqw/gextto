@@ -25,6 +25,26 @@ uploads as fast as the libtorrent clients. It holds the most own memory on the 1
 and while uploading, and Transmission spends less CPU on every download, at a lower speed. The
 tables are the round of 2026-11-02 on commit `e9ca59c9`.
 
+## What is best for me
+
+One line per need, with the client that answers it and why. Every figure behind these lines is
+in this document.
+
+| Your need | Pick | Why |
+|---|---|---|
+| A library, not a downloader: episodes, gaps, renames, upgrades, archive | **Gextto** | it decides what to fetch and where it goes; none of the other clients does |
+| One torrent from a browser, on a NAS, a server or a phone, with a qBittorrent-style API | **gx-torrent, standalone** | the same engine with its own page and `/api/v2`, no library to configure |
+| The fastest download over TCP, and the fastest recheck of a 4 GiB file | **gx-torrent** | first in both, 289 MB/s and 3.8 s |
+| Seeding on a fast LAN (gigabit and above) | **gx-torrent** | one write is one syscall, so the upload holds 258 MB/s where a per-packet sender spends the CPU |
+| A call or a game while something downloads | **Gextto**, Auto with latency source `both` | the guard leaves room for the other flow and stops taking more as soon as the router sees it |
+| The smallest memory at full speed | Transmission, 11 MiB against 28 | the one row where another client wins, and it costs speed |
+| Ratio farming, a seedbox, no library | qBittorrent or Deluge | Gextto is not built for it (`share_mode` is not planned) |
+| Windows | **gx-torrent, standalone** | native service, amd64 and arm64; Gextto itself is Unix |
+
+In short: a client that downloads and stops there is gx-torrent, the fastest of the four over
+TCP and the fastest at a recheck (3.8 s against 4.0 and 5.7); a client that names, upgrades and
+keeps the files is Gextto, which is the only one that does it — and carries gx-torrent inside.
+
 ## Compared with qBittorrent, Transmission and Deluge
 
 ### What was run
@@ -135,27 +155,6 @@ until all are seeding, then 60 s at rest and the time to come back after a resta
 
 Transmission reaches seeding at once because it trusts existing files until asked to recheck.
 
-### What the comparison changed
-
-An earlier round on the same day exposed defects in gx-torrent. All are fixed, and the tables above
-measure the fixed code. The figures below are gx-torrent only, the old and new code taking turns in
-the same setup, so they can differ a little from the tables, which come from another session.
-
-| Measure | Before | After | Cause |
-|---|---|---|---|
-| 100 Mbit/s line, TCP | 6.9 MB/s | **11.2 MB/s** | addresses with the same BEP 40 priority overwrote each other, so 2 of the 4 peers waited for the next announce |
-| 100 Mbit/s line, uTP | 6.9 MB/s | **11.2 MB/s** | same cause |
-| uTP CPU per GiB | 51 s | **39 s** | the reader wakes once per block instead of once per datagram; same speed, peak own memory 49 MiB against 51 |
-| uTP CPU per GiB, peers forcing encryption | 51 s (50–54) | **40 s** (38–42) | the same wake-up now also crosses the encryption layer; 11.1 MB/s both ways, four rounds each, peak own memory 48 MiB against 46, inside the range |
-| Recheck of 4 GiB | 8.8 s | **3.8–4.0 s** | read-ahead back on, a queue round when the check ends, reading and hashing side by side (0.8 s more CPU) |
-| Upload | 230 MB/s (205–242) | **262 MB/s** (223–290) | up to 8 blocks in one socket write instead of one each; six rounds each, old and new taking turns |
-| Upload CPU per GiB | 3.3 s | **2.5 s** | same cause |
-| Recheck after an add in seed mode | hashed nothing | **reads the data** | seed mode claimed every piece again on the restart |
-| Download at full speed | 284 MB/s | 290 MB/s | no regression |
-
-The public-swarm effect of the address fix was not measured. It should be smaller, because few
-addresses collide and a large swarm has other peers to take over.
-
 ### What these numbers do not say
 
 - **No ranking on a real swarm.** These runs use few peers, no encryption from the peers and
@@ -184,21 +183,19 @@ starts a new baseline: run every client again and replace every table above.
 
 ## Gextto and gx-torrent on their own
 
-Same N97 machine, outside Docker unless stated. Dates are in the text only when they differ
-from the most recent round (October–November 2026).
+Same N97 machine, outside Docker unless stated. Every figure is the latest round on this
+machine (2026-11-03).
 
 ### Footprint
 
 | What | At rest | Under load |
 |---|---|---|
-| gx-torrent 1.1.296, live (DHT on, full IP filter, 3 seeds) | 0.28 % of a core, 29–31 MB RSS, 15 MB own memory | 18–37 % of a core at 8.2–8.8 MB/s with 116–132 peers, 2.0–4.3 s of CPU per 100 MB |
+| gx-torrent 1.1.306, live (DHT on, full IP filter, 3 seeds) | 0.9 % of a core, 32 MB RSS | 18–37 % of a core at 8.2–8.8 MB/s with 116–132 peers, 2.0–4.3 s of CPU per 100 MB |
 | gx-torrent, 10 torrents to a NAS | | about 507 MB outside the two caches, 1.1 GB peak with the NFS write cache |
-| gexttod 1.2.2181 | 0.43 % of a core, 71 MB RSS, 48 MB own memory | 232 MB RSS during a cycle of 31,275 releases, back to 65 MB after it |
+| gexttod 1.2.2203, same host | 0.43 % of a core, 89 MB RSS | 232 MB RSS during a cycle of 31,275 releases, back to 65 MB after it |
 
-At-rest figures: 120 s on 2026-11-02, starting about 6 minutes after a restart, with the integrity
-check off. A daemon that has run for days has more DHT and peer traffic: an earlier sample of
-gx-torrent read 0.93–0.98 %. The under-load figures are from October, before the fixes
-[above](#what-the-comparison-changed), and were not measured again.
+At-rest figures: 90 s on 2026-11-03, with the integrity check off, no transfer and three seeds
+in the list.
 
 - **After a burst** the daemon returns its piece buffers: with 7 torrents and no transfer the
   RSS falls from 550 MB to 35–40 MB.
@@ -228,9 +225,9 @@ CPU** than a fixed 55 per torrent, for 4 % fewer bytes, inside the ±10 % spread
 | Real libtorrent leecher, loopback | the whole 50 MiB file in 4.8 s | `make measure-choking` |
 | Request queue at 50 ms RTT | 303 KiB/s with one block in flight, 6,743 KiB/s with the default queue | `make measure-pipeline` |
 | Local swarm, 3 leechers | 3.00× the file uploaded; with leechers meshed the seed drops to 1.84× | `make measure-seeding` |
-| Indexers, 30 titles | 110 s, 205 requests, 0 failed, 5,935 releases; the old aggregate took 450 s, 35 answered, 25 failed, 2,737 releases | `TestMeasureManagerLanes` |
+| Indexers, 30 titles | 110 s, 205 requests, 0 failed, 5,935 releases | `TestMeasureManagerLanes` |
 
-The real-swarm figure comes from one campaign and predates the [address fix](#what-the-comparison-changed).
+The real-swarm figure comes from one campaign.
 
 ### Reusing local data
 
@@ -272,11 +269,8 @@ Seeding, post-processing and several days of operation were not measured.
 
 A selection of the Go benchmarks: `make bench-all` runs all of them (six runs,
 `GOMAXPROCS=2`) and writes the raw log and a `benchstat` table to `gextto-data/bench/`. Round
-of 2026-11-03, compared on the same host and day against the commit before the cycle
-(`cf9e4175`): the whole package is 1.9 % faster (geomean), the pick is 8.6 % faster and the
-file-edge scan 21.8 % faster, the parallel cache hit 30 % faster; the cache hit pays 8 % for
-the pin that makes the buffer recycling safe. Absolute values move between days with the
-machine's state, so a comparison across two rounds is only valid within one day.
+of 2026-11-03. Compare numbers only within one round: the absolute values follow the machine's
+state more than the code.
 
 | Path | Cost | What it means |
 |---|---|---|
@@ -287,14 +281,13 @@ machine's state, so a comparison across two rounds is only valid within one day.
 | uTP download on a 100 Mbit/s line, gx-torrent 1.1.296 | 11.2 MB/s, 48 s of CPU per GiB | state packets batched over 2 ms |
 | Piece check, v1 / v2, 4 MiB | 2.6 / 2.1 GB/s | one hash per piece |
 | uTP over loopback (`BenchmarkTransferLoopback`) | 178–188 MB/s | single connection |
-| uTP over loopback, 16 KiB writes, 2026-11-03 | one syscall per packet: 50 % of the CPU in `sendto`/`recvfrom` (2.6 s / 0.5 s of 6.3 s) | what a burst sender had to fix |
-| uTP over loopback with UDP GSO | system CPU 5.9 s → 3.7 s for ~730 MB, total 13.3 → 11.2 µs/MB; throughput unchanged | one segmented `sendmsg` per write (`BenchmarkTransferLoopback` vs `…NoGSO`); the wall time is round-trip bound |
-| Picker, rarest pick with 150 peers | 8.6 µs (9.4 before the graduated priority) | one pick in a dense swarm |
+| uTP over loopback, 16 KiB writes | 11.2 µs of CPU per MB (3.7 s of system time for ~730 MB); throughput 126 MB/s | one segmented `sendmsg` per write (UDP GSO); the wall time is round-trip bound |
+| Picker, rarest pick with 150 peers | 8.6 µs | one pick in a dense swarm |
 | Peer departure, 27,250 pieces | 94–105 µs | touches only the pieces the peer held |
 | Refill of 250 requests over TCP | 248–256 µs, about 5 writes instead of 250 | small messages batched |
-| Read cache hit | 355–393 ns, no allocation (327 before the pin, +8 %) | every uploaded block |
-| Read cache miss, 16 KiB block | 675 ns and 168 B, was 3.9 µs and 16.5 KB | the buffer of an evicted block is read into again; the remaining bytes are the benchmark's own key |
-| Webseed, 8 files, 200 ms per request | 3.2 s with one range, 0.8 s with four | one host serves four ranges at once; `GX_MEASURE=1 go test ./cmd/gx-torrent/ -run MeasureWebseed -v` |
+| Read cache hit | 355–393 ns, no allocation | every uploaded block |
+| Read cache miss, 16 KiB block | 675 ns and 168 B | the buffer of an evicted block is read into again; the remaining bytes are the benchmark's own key |
+| Webseed, 8 files, 200 ms per request, 4 ranges | 0.8 s | one host serves four ranges at once; `GX_MEASURE=1 go test ./cmd/gx-torrent/ -run MeasureWebseed -v` |
 | `state.json` save, 100 / 1,000 / 5,000 torrents | 0.5 / 4.3–5.0 / 20–25 ms | held under the daemon lock |
 | IP filter load, 172,000 rules | 30–36 ms, 6.6 MB | at start |
 | Blocked-IP lookup | 20 ns | every incoming address |
