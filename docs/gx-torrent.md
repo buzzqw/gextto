@@ -1587,7 +1587,9 @@ window.
 
 You can download only some files of a torrent and give priority to the
 others. The scale is that of libtorrent/qBittorrent: **0 = excluded**, **1..4 =
-normal**, **5..7 = high** (high-priority files are downloaded first).
+normal**, **5..7 = high**. It is graduated: a level is fetched before every
+lower one (7 before 6, 6 before 5, and all of them before the normal files),
+and inside the same level or the same rarity the higher priority wins.
 It is set from gextto's files tab or with
 `POST /api/v1/torrents/{hash}/file-priorities` (`priorities=4,0,7`); the
 qBittorrent-compatible API uses its 0/1/6/7 scale.
@@ -1602,9 +1604,11 @@ qBittorrent-compatible API uses its 0/1/6/7 scale.
   the priority levels** (in the same downloaded files) is instead applied to the
   torrent in progress, without stopping it or moving files.
 - The engine computes the priority of each piece as the **maximum** between the files it
-  touches: a piece spanning a normal and a high-priority file is high; the
-  picker requests it right after the streaming/readahead window and before
-  file-edge, allowed-fast and rarest.
+  touches: a piece spanning a normal and a high-priority file is high. The
+  picker requests the highest level still to fetch right after the
+  streaming/readahead window and before file-edge, allowed-fast and rarest;
+  at equal rarity the higher priority breaks the tie, so a mixed selection is
+  followed even inside the normal band (a file at 4 before one at 1).
 - If the **magnet link** carries the `so=` parameter (BEP 53, *Select Only*, e.g.
   `so=0,2,4-7`), the engine immediately downloads only those files and as soon as the
   metadata arrives the daemon records the choice as normal priorities: the files tab

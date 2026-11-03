@@ -493,7 +493,8 @@ away, instead of leaving the episode to the next cycle.
   torrent carries any; **Tracker** adds the new
   trackers (`tier|url` per line) without touching the ones already there, and
   each row's **Remove** drops only that tracker; **Content** sets the **per-file priority**
-  (Skip/Normal/High/Maximum: high-priority files are fetched first). With
+  (Skip/Normal/High/Maximum: high-priority files are fetched first, every
+  level before the lower ones — Maximum before High). With
   gx-torrent changing **only the level** is immediate, without stopping the
   torrent; excluding or re-including a file restarts it for a moment to move its
   data. **Pieces** shows the piece map (green have, yellow

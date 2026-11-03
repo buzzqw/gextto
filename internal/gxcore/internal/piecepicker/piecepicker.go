@@ -42,9 +42,14 @@ type PiecePicker struct {
 	gapCounts  []int
 	endgame    bool
 
-	// highPriority counts the high-priority pieces (RefreshPriorities), so
-	// pickHigh skips its full scan when there are none, the usual case.
-	highPriority int
+	// priorityPieces counts the pieces still to fetch per file priority
+	// (RefreshPriorities): a pick starts from the highest level with work, so
+	// a file at 7 is fetched before one at 6, and both before the normal
+	// ones. The usual torrent has nothing above normal and pays no scan.
+	priorityPieces [8]int
+	// priorityLevels counts the distinct levels in use: with one level — the
+	// default, every file normal — the rarest-first pass keeps its early exit.
+	priorityLevels int
 
 	// sequential picks index order over rarest-first.
 	sequential bool
@@ -247,15 +252,28 @@ func firstPickable(pieces []myPiece, begin, end uint32, pe *peer.Peer) *myPiece 
 	return nil
 }
 
-// pickHigh takes the rarest high-priority piece the peer can take.
-func (p *PiecePicker) pickHigh(pe *peer.Peer) *myPiece {
-	if p.highPriority == 0 {
-		return nil
+// pickHighest takes the rarest piece of the highest file priority the peer can
+// take: 7 before 6, 6 before 5, and every level above normal before the
+// normal pieces the rarest-first pass would pick. With no file above normal —
+// the default — nothing is scanned and the cost is the same as before.
+func (p *PiecePicker) pickHighest(pe *peer.Peer) *myPiece {
+	for level := 7; level > piece.PriorityNormal; level-- {
+		if p.priorityPieces[level] == 0 {
+			continue
+		}
+		if picked := p.pickAtLevel(pe, level); picked != nil {
+			return picked
+		}
 	}
+	return nil
+}
+
+// pickAtLevel returns the rarest piece at exactly one priority level.
+func (p *PiecePicker) pickAtLevel(pe *peer.Peer, level int) *myPiece {
 	var picked *myPiece
 	for i := range p.pieces {
 		mp := &p.pieces[i]
-		if !mp.HighPriority() || !mp.PickableBy(pe) {
+		if int(mp.Priority) != level || !mp.PickableBy(pe) {
 			continue
 		}
 		if picked == nil || mp.holders < picked.holders {
@@ -364,13 +382,28 @@ func (p *PiecePicker) HandleDontHave(pe *peer.Peer, i uint32) {
 	p.removeHolder(int(i))
 }
 
-// RefreshPriorities recounts the high-priority pieces after the file
+// RefreshPriorities recounts the pieces per priority level after the file
 // priorities or the skipped files change.
 func (p *PiecePicker) RefreshPriorities() {
-	p.highPriority = 0
+	p.priorityPieces = [8]int{}
 	for i := range p.pieces {
-		if p.pieces[i].HighPriority() {
-			p.highPriority++
+		mp := &p.pieces[i]
+		if mp.Skip {
+			continue
+		}
+		level := int(mp.Priority)
+		if level < 1 {
+			level = piece.PriorityNormal
+		}
+		if level > 7 {
+			level = 7
+		}
+		p.priorityPieces[level]++
+	}
+	p.priorityLevels = 0
+	for _, count := range p.priorityPieces {
+		if count > 0 {
+			p.priorityLevels++
 		}
 	}
 }
@@ -476,7 +509,7 @@ func (p *PiecePicker) findPiece(pe *peer.Peer) (mp *myPiece, allowedFast bool) {
 		if mp = p.pickReadahead(pe); mp != nil {
 			return mp, pe.ReceivedAllowedFast.Has(mp.Piece)
 		}
-		if mp = p.pickHigh(pe); mp != nil {
+		if mp = p.pickHighest(pe); mp != nil {
 			return mp, pe.ReceivedAllowedFast.Has(mp.Piece)
 		}
 	}
@@ -574,15 +607,22 @@ func (p *PiecePicker) pickRarest(pe *peer.Peer) *myPiece {
 		}
 		hasUnrequested = true
 		// Compare the rarity before asking the peer's bitfield: a piece that
-		// cannot beat the current best is skipped with two field reads.
-		if picked != nil && mp.holders >= picked.holders {
-			continue
+		// cannot beat the current best is skipped with two field reads. At
+		// equal rarity the higher file priority wins, so a graduated selection
+		// (1..7) is followed instead of falling back to the piece index.
+		if picked != nil {
+			if mp.holders > picked.holders {
+				continue
+			}
+			if mp.holders == picked.holders && mp.Priority <= picked.Priority {
+				continue
+			}
 		}
 		if !mp.heldBy(pe) {
 			continue
 		}
 		picked = mp
-		if mp.holders <= 1 {
+		if mp.holders <= 1 && p.priorityLevels <= 1 {
 			break // nobody can hold a piece fewer times
 		}
 	}

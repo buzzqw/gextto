@@ -1198,3 +1198,57 @@ func TestFlattenMovieFolderRenamesLeftoverFolder(t *testing.T) {
 		t.Fatalf("unknown companion should survive in the renamed folder: %v", err)
 	}
 }
+
+// A season pack is matched and placed from the probe done on the download,
+// before anything reaches the library: a file that does not spell its own
+// season and episode is mapped by the probe, and the name it gets in the
+// library carries the identity, so nothing has to be compared by name after
+// the placement.
+func TestPackProbeHappensBeforeTheRename(t *testing.T) {
+	source := t.TempDir()
+	for _, name := range []string{"01.mkv", "Episode 02.mkv", "Show.S01E03.1080p.WEB-DL.mkv"} {
+		if err := os.WriteFile(filepath.Join(source, name), []byte("\x1a\x45\xdf\xa3 matroska "+name), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	season, episode := int64(1), int64(1)
+	release := &models.Release{
+		Title:        "Show.S01.1080p.WEB-DL",
+		Kind:         "series",
+		Series:       stringPtr("Show"),
+		Season:       &season,
+		Episode:      &episode,
+		IsPack:       true,
+		EpisodeRange: []int64{1, 2, 3},
+	}
+	matching, err := MatchingPackFiles(source, release)
+	if err != nil {
+		t.Fatalf("MatchingPackFiles: %v", err)
+	}
+	if len(matching) != 3 {
+		t.Fatalf("the probe matched %d files, want 3", len(matching))
+	}
+	byEpisode := map[int64]PackSourceFile{}
+	for _, file := range matching {
+		byEpisode[file.Episode] = file
+	}
+	for _, want := range []int64{1, 2, 3} {
+		if _, ok := byEpisode[want]; !ok {
+			t.Fatalf("episode %d is missing from the probe: %+v", want, matching)
+		}
+	}
+
+	// The placement uses the probe: a file without its own identity lands
+	// with a name that carries it.
+	destination := t.TempDir()
+	cfg := DefaultConfig()
+	file := byEpisode[2]
+	placed, ok, err := StagePackFile(&file, source, destination, nil, &cfg, models.Quality{Resolution: "1080p", Source: "webdl"})
+	if err != nil || !ok {
+		t.Fatalf("StagePackFile: ok=%v err=%v", ok, err)
+	}
+	base := filepath.Base(placed)
+	if !strings.HasPrefix(base, ".gextto-pack-S01E02-") {
+		t.Fatalf("placed file %q does not carry the identity the probe found", base)
+	}
+}

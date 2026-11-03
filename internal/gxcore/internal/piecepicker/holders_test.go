@@ -78,17 +78,17 @@ func TestPickHighFollowsRefreshPriorities(t *testing.T) {
 	for i := uint32(0); i < 8; i++ {
 		pp.HandleHave(pe, i)
 	}
-	if pp.highPriority != 0 || pp.pickHigh(pe) != nil {
+	if pp.pickHighest(pe) != nil {
 		t.Fatal("no piece is high priority yet")
 	}
 	pieces[5].Priority = piece.PriorityHigh
 	pp.RefreshPriorities()
-	if mp := pp.pickHigh(pe); mp == nil || mp.Index != 5 {
-		t.Fatalf("pickHigh = %v, want piece 5", mp)
+	if mp := pp.pickHighest(pe); mp == nil || mp.Index != 5 {
+		t.Fatalf("pickHighest = %v, want piece 5", mp)
 	}
 	pieces[5].Skip = true
 	pp.RefreshPriorities()
-	if pp.highPriority != 0 {
+	if pp.priorityPieces[piece.PriorityHigh] != 0 {
 		t.Fatal("a skipped piece is not high priority")
 	}
 }

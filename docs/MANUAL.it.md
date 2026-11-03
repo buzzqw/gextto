@@ -505,7 +505,8 @@ invece di lasciare l'episodio al ciclo successivo.
   **Tracker** aggiungi i tracker nuovi (`tier|url` per riga) senza toccare
   quelli già presenti, e il **Rimuovi** di ogni riga toglie solo quel tracker; in
   **Contenuto** imposti la **priorità per file** (Salta/Normale/Alta/Massima: i
-  file ad alta priorità vengono scaricati per primi). Con gx-torrent cambiare
+  file ad alta priorità vengono scaricati per primi, e ogni livello viene prima
+  di quelli più bassi, Massima prima di Alta). Con gx-torrent cambiare
   **solo il livello** è immediato, senza fermare il torrent; escludere o
   reincludere un file lo riavvia per un attimo per spostarne i dati.
   In **Pezzi** c'è la mappa dei pezzi (verde scaricato, giallo in corso, grigio
