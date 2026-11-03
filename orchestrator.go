@@ -988,7 +988,7 @@ func RunCycleDomain(
 								releaseTarget(&release), release.Source, logDuration(torrentLinkQuarantine(failures))))
 						}
 						stats.Error("torrent_link")
-						logging.Warn(fmt.Sprintf("⚠️ Could not fetch the .torrent of %s from %s: %v", releaseTarget(&release), release.Source, err))
+						logging.Warn(fmt.Sprintf("⚠️ Could not fetch the .torrent of %s from %s", releaseTarget(&release), release.Source), "error", err)
 						if source := strings.TrimSpace(release.Source); source != "" {
 							noteTorrentLinkFailure(linkFailures, source, *release.TorrentURL, err, notifier)
 						}
@@ -2538,7 +2538,7 @@ func runComicsIfDue(ctx context.Context, cfg *Config, db *Database, comics *Comi
 	}
 	comicsInterval := int64(604800)
 	if value, err := comics.Setting("comics_check_interval", "604800"); err != nil {
-		logging.Warn(fmt.Sprintf("Could not read the comics settings, so the comics check is skipped: %v", err))
+		logging.Warn("Could not read the comics settings, so the comics check is skipped", "error", err)
 		stats.Error("comics")
 		return
 	} else if parsed, parseErr := strconv.ParseInt(strings.TrimSpace(value), 10, 64); parseErr == nil {
@@ -2549,7 +2549,7 @@ func runComicsIfDue(ctx context.Context, cfg *Config, db *Database, comics *Comi
 	}
 	lastComicsCheck := int64(0)
 	if value, err := comics.Setting("last_comics_check_ts", "0"); err != nil {
-		logging.Warn(fmt.Sprintf("Could not read when the comics check last ran, so it is skipped: %v", err))
+		logging.Warn("Could not read when the comics check last ran, so it is skipped", "error", err)
 		stats.Error("comics")
 		return
 	} else if parsed, parseErr := strconv.ParseInt(strings.TrimSpace(value), 10, 64); parseErr == nil {
@@ -2576,14 +2576,14 @@ func runComicsIfDue(ctx context.Context, cfg *Config, db *Database, comics *Comi
 			retryTs = saturatingSub(nowTs, comicsInterval-comicsFailureRetrySecs)
 		}
 		if err := comics.SetSetting("last_comics_check_ts", strconv.FormatInt(retryTs, 10)); err != nil {
-			logging.Warn(fmt.Sprintf("Could not save when the next comics check is due: %v", err))
+			logging.Warn("Could not save when the next comics check is due", "error", err)
 		}
-		logging.Warn(fmt.Sprintf("⚠️ The comics check failed and will be tried again in about an hour: %v", runErr))
+		logging.Warn("⚠️ The comics check failed and will be tried again in about an hour", "error", runErr)
 		return
 	}
 	logging.Info(fmt.Sprintf("📚 Comics checked: %s downloaded", countLabel(int64(downloaded), "comic", "comics")))
 	if err := comics.SetSetting("last_comics_check_ts", strconv.FormatInt(nowTs, 10)); err != nil {
-		logging.Warn(fmt.Sprintf("Could not save when the comics check ran: %v", err))
+		logging.Warn("Could not save when the comics check ran", "error", err)
 	}
 }
 

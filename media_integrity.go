@@ -879,7 +879,7 @@ func mediaIntegrityRedownload(s *AppState, target MediaIntegrityTarget) string {
 			return ""
 		}
 		if _, _, err := redownloadEpisode(s, cfg, target.Series, *target.Season, *target.Episode, false, true); err != nil {
-			logging.Warn(fmt.Sprintf("🧪 «%s» could not be put back in the downloads: %s", target.Label(), err))
+			logging.Warn(fmt.Sprintf("🧪 «%s» could not be put back in the downloads", target.Label()), "error", err)
 			return ""
 		}
 		return "series"
@@ -889,7 +889,7 @@ func mediaIntegrityRedownload(s *AppState, target MediaIntegrityTarget) string {
 			movieYear = *target.MovieYear
 		}
 		if _, _, err := redownloadMovie(s, cfg, target.ID, target.MovieName, movieYear, true); err != nil {
-			logging.Warn(fmt.Sprintf("🧪 «%s» could not be put back in the downloads: %s", target.Label(), err))
+			logging.Warn(fmt.Sprintf("🧪 «%s» could not be put back in the downloads", target.Label()), "error", err)
 			return ""
 		}
 		return "movies"

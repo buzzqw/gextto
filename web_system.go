@@ -832,7 +832,7 @@ func CleanupDatabase(w http.ResponseWriter, r *http.Request, s *AppState) {
 	cfg := latestConfig(s)
 	archiveRemoved, archiveErr := applyArchiveRetention(cfg, s.archive)
 	if archiveErr != nil {
-		logging.Warn(fmt.Sprintf("⚠️ The release archive cleanup failed: %v", archiveErr))
+		logging.Warn("⚠️ The release archive cleanup failed", "error", archiveErr)
 	}
 	report, err := s.db.Cleanup(1000, 30)
 	if err != nil {

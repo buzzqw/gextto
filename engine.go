@@ -696,7 +696,7 @@ func (e *Engine) maybeAutoDisableFeed(cfg *Config, rawURL, statKey string) {
 	}
 	disabled, err := disableFeedInConfig(cfg, rawURL)
 	if err != nil {
-		logging.Warn(fmt.Sprintf("⚠️ Could not disable the RSS feed %s automatically: %v", feedLabel(rawURL), err))
+		logging.Warn(fmt.Sprintf("⚠️ Could not disable the RSS feed %s automatically", feedLabel(rawURL)), "error", err)
 		return
 	}
 	if !disabled {

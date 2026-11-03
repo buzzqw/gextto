@@ -519,7 +519,7 @@ func RetryStorageMoves(torrents TorrentSession, moveRequests map[string]struct{}
 			logging.Debug("storage move already running in the engine; waiting for it", "name", torrent.Name, "destination", destination)
 		} else if err != nil {
 			delete(moveRequests, hash)
-			logging.Warn(fmt.Sprintf("⚠️ Could not move «%s» to %s (%v): it will be retried", torrent.Name, destination, err), "hash", hash)
+			logging.Warn(fmt.Sprintf("⚠️ Could not move «%s» to %s: it will be retried", torrent.Name, destination), "hash", hash, "error", err)
 			tevScheduleStorageMoveRetry(retries, hash, destination, postSeed, now)
 		} else if moved {
 			if entry, ok := retries[hash]; ok {
@@ -1533,7 +1533,7 @@ func RemoveSeededCompleted(cfg *Config, torrents TorrentSession, db *Database, p
 			}
 			reason := seedRemovalReason(ratioReached, timeLimitReached, idleReached)
 			if target, moveErr := MoveToTrash(source, *cfg.TrashPath); moveErr != nil {
-				logging.Error(fmt.Sprintf("❌ Could not move the download copy of «%s» to the trash after seeding (%s); %s: %v", torrent.Name, source, libraryNote, moveErr), "hash", torrent.Hash)
+				logging.Error(fmt.Sprintf("❌ Could not move the download copy of «%s» to the trash after seeding (%s); %s", torrent.Name, source, libraryNote), "hash", torrent.Hash, "error", moveErr)
 			} else {
 				logging.Info(fmt.Sprintf("🗑️ «%s» has finished seeding (%s): the download copy moved to %s, %s", torrent.Name, reason, target, libraryNote), "hash", torrent.Hash)
 			}
@@ -2102,7 +2102,7 @@ func tevCleanupOrphanedRamdisk(ramdisk string, torrents TorrentSession) {
 			result = os.Remove(path)
 		}
 		if result != nil {
-			logging.Warn(fmt.Sprintf("⚠️ Could not remove %s from the RAM disk, which no download uses any more: %v", path, result))
+			logging.Warn(fmt.Sprintf("⚠️ Could not remove %s from the RAM disk, which no download uses any more", path), "error", result)
 		} else {
 			logging.Info(fmt.Sprintf("🧹 Removed %s from the RAM disk: no download uses it any more", path))
 		}
@@ -2339,7 +2339,7 @@ func tevDiscardCompletedSource(cfg *Config, db *Database, torrents TorrentSessio
 	if cfg.TrashPath != nil && cfg.CleanupAction != "delete" {
 		target, err := MoveToTrash(source, *cfg.TrashPath)
 		if err != nil {
-			logging.Error(fmt.Sprintf("❌ Could not move the rejected download «%s» to the trash (%s): %v", event.Name, source, err), "hash", event.Hash)
+			logging.Error(fmt.Sprintf("❌ Could not move the rejected download «%s» to the trash (%s)", event.Name, source), "hash", event.Hash, "error", err)
 		} else {
 			logging.Debug(fmt.Sprintf("rejected completed download moved to trash — «%s» · %s → %s", event.Name, source, target), "hash", event.Hash)
 		}
@@ -3653,7 +3653,7 @@ func HandleTorrentEvent(cfg *Config, torrents TorrentSession, db *Database, move
 				fallbackDestination = alternative
 			}
 			tevScheduleStorageMoveRetry(retries, event.Hash, fallbackDestination, false, time.Now())
-			logging.Warn(fmt.Sprintf("⚠️ Could not move the completed «%s» (%v): it will be retried", event.Name, err), "hash", event.Hash)
+			logging.Warn(fmt.Sprintf("⚠️ Could not move the completed «%s»: it will be retried", event.Name), "hash", event.Hash, "error", err)
 		} else if moved {
 			retries[strings.ToLower(event.Hash)] = StorageMoveRetry{
 				destination: destination,

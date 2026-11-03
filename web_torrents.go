@@ -1083,7 +1083,7 @@ func RemoveCompletedTorrents(w http.ResponseWriter, r *http.Request, s *AppState
 			logging.Debug("completed download still needs archiving; finalizing it before cleanup",
 				"hash", torrent.Hash, "name", torrent.Name)
 			if ok, err := ArchiveAndRemoveTorrent(s, cfg, torrent.Hash); err != nil {
-				logging.Warn(fmt.Sprintf("⚠️ «%s» could not be moved to the library before the cleanup: %v", torrent.Name, err), "hash", torrent.Hash)
+				logging.Warn(fmt.Sprintf("⚠️ «%s» could not be moved to the library before the cleanup", torrent.Name), "hash", torrent.Hash, "error", err)
 				skipped++
 				failed = append(failed, label+" (not moved to the library: "+err.Error()+")")
 				continue
@@ -1105,7 +1105,7 @@ func RemoveCompletedTorrents(w http.ResponseWriter, r *http.Request, s *AppState
 		if deleteFiles && cfg.TrashPath != nil && strings.TrimSpace(*cfg.TrashPath) != "" && cfg.CleanupAction != "delete" {
 			if _, statErr := os.Stat(source); statErr == nil {
 				if target, moveErr := MoveToTrash(source, *cfg.TrashPath); moveErr != nil {
-					logging.Error(fmt.Sprintf("❌ Could not move «%s» to the trash (%s): %v", torrent.Name, source, moveErr), "hash", torrent.Hash)
+					logging.Error(fmt.Sprintf("❌ Could not move «%s» to the trash (%s)", torrent.Name, source), "hash", torrent.Hash, "error", moveErr)
 				} else {
 					logging.Info(fmt.Sprintf("🗑️ «%s» moved to the trash: %s", torrent.Name, target), "hash", torrent.Hash)
 				}
@@ -1114,7 +1114,7 @@ func RemoveCompletedTorrents(w http.ResponseWriter, r *http.Request, s *AppState
 		}
 		ok, err := s.activeEngine().Remove(torrent.Hash, deleteFiles)
 		if err != nil {
-			logging.Warn(fmt.Sprintf("⚠️ Could not remove the completed «%s»: %v", torrent.Name, err), "hash", torrent.Hash)
+			logging.Warn(fmt.Sprintf("⚠️ Could not remove the completed «%s»", torrent.Name), "hash", torrent.Hash, "error", err)
 			skipped++
 			failed = append(failed, label+" (removal failed: "+err.Error()+")")
 			continue
@@ -1728,7 +1728,7 @@ func AddParsedRelease(s *AppState, release models.Release) (int, any) {
 		added, err := s.activeEngine().Add(source, cfg)
 		switch {
 		case err != nil:
-			logging.Error(fmt.Sprintf("❌ Could not add «%s» to the downloads: %v", title, err), "hash", logHash)
+			logging.Error(fmt.Sprintf("❌ Could not add «%s» to the downloads", title), "hash", logHash, "error", err)
 		case added:
 			logging.Info(fmt.Sprintf("📥 «%s» added to the downloads by hand (score %v)", title, score), "hash", logHash)
 		default:

@@ -167,7 +167,7 @@ func v2ArchiveSQLPreviewResult(ctx context.Context, s *AppState, operation Archi
 	defer cancel()
 	preview, err := s.archive.PreviewArchiveSQL(previewCtx, operation, language)
 	if err != nil {
-		logging.Error(fmt.Sprintf("❌ Could not preview the archive maintenance «%s»: %v", operation.ID, err))
+		logging.Error(fmt.Sprintf("❌ Could not preview the archive maintenance «%s»", operation.ID), "error", err)
 		result.Error = "Anteprima non riuscita."
 		return result
 	}

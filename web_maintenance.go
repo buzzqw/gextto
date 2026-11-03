@@ -183,7 +183,7 @@ func runDbAction(s *AppState, action string) (dbActionResult, error) {
 		return result, err
 	}
 	if err := s.comics.Optimize(action); err != nil {
-		logging.Error(fmt.Sprintf("Could not optimise the comics database: %v", err))
+		logging.Error("Could not optimise the comics database", "error", err)
 		return result, err
 	}
 	if conn, err := OpenConfigDB(configPath); err == nil {
@@ -298,7 +298,7 @@ func gh0AddParsedRelease(ctx context.Context, s *AppState, release models.Releas
 		defer recoverGoroutine("g0 background")
 		added, err := engine.Add(source, cfg)
 		if err != nil {
-			logging.Error(fmt.Sprintf("❌ Could not add «%s» to the downloads: %v", title, err))
+			logging.Error(fmt.Sprintf("❌ Could not add «%s» to the downloads", title), "error", err)
 		} else if added {
 			logging.Info(fmt.Sprintf("📥 «%s» added to the downloads by hand", title))
 		} else {
@@ -501,7 +501,7 @@ func RunHousekeepingNow(w http.ResponseWriter, r *http.Request, s *AppState) {
 	// torrents.
 	archiveRemoved, err := applyArchiveRetention(latestConfig(s), s.archive)
 	if err != nil {
-		logging.Warn(fmt.Sprintf("⚠️ The release archive cleanup failed: %v", err))
+		logging.Warn("⚠️ The release archive cleanup failed", "error", err)
 	}
 	jsonStatus(w, http.StatusOK, map[string]any{"ok": true, "report": report, "archive_removed": archiveRemoved})
 }
@@ -981,7 +981,7 @@ func addParsedRelease(s *AppState, release models.Release) (int, any) {
 		added, err := s.activeEngine().Add(source, cfg)
 		switch {
 		case err != nil:
-			logging.Error(fmt.Sprintf("❌ Could not add «%s» to the downloads: %v", title, err), "hash", logHash)
+			logging.Error(fmt.Sprintf("❌ Could not add «%s» to the downloads", title), "hash", logHash, "error", err)
 		case added:
 			logging.Info(fmt.Sprintf("📥 «%s» added to the downloads by hand (score %v)", title, score), "hash", logHash)
 		default:

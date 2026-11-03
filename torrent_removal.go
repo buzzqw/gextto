@@ -53,7 +53,7 @@ func logManualTorrentRemoval(hash, files, name, state string, hasMetadata bool) 
 func moveRemovedToTrash(hash, source, trash string) (string, error) {
 	target, err := MoveToTrash(source, trash)
 	if err != nil {
-		logging.Error(fmt.Sprintf("❌ Could not move %s to the trash after removing its torrent: %v", source, err), "hash", hash)
+		logging.Error(fmt.Sprintf("❌ Could not move %s to the trash after removing its torrent", source), "hash", hash, "error", err)
 		return "", err
 	}
 	logging.Debug("removed torrent source moved to trash", "hash", hash, "source", source, "trash", target)

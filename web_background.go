@@ -1307,7 +1307,7 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 							"title": comic.Title,
 							"error": err.Error(),
 						})
-						logging.Error(fmt.Sprintf("Could not save the completed comic «%s»: %v", comic.Title, err))
+						logging.Error(fmt.Sprintf("Could not save the completed comic «%s»", comic.Title), "error", err)
 					} else {
 						comicSize, _ := SizeOfPath(CompletionPath(&event))
 						if err := notifier.NotifyEvent("comic_completed", map[string]any{
@@ -1318,7 +1318,7 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 							"size_bytes": comicSize,
 							"method":     "torrent",
 						}); err != nil {
-							logging.Warn(fmt.Sprintf("Could not send the notification for the comic «%s»: %v", comic.Title, err))
+							logging.Warn(fmt.Sprintf("Could not send the notification for the comic «%s»", comic.Title), "error", err)
 						} else {
 							logging.Debug("completion notification sent", "hash", hash, "title", comic.Title)
 						}
@@ -1384,7 +1384,7 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 					"error":            handleErr.Error(),
 					"upgrade_restored": restored,
 				})
-				logging.Error(fmt.Sprintf("❌ «%s» finished downloading but could not be processed: %v", event.Name, handleErr), "hash", hash)
+				logging.Error(fmt.Sprintf("❌ «%s» finished downloading but could not be processed", event.Name), "hash", hash, "error", handleErr)
 				processed = false
 			}
 			if processed && (event.Kind == "torrent_finished" || event.Kind == "storage_moved") {
@@ -2223,7 +2223,7 @@ func housekeepingWorker(state *AppState) {
 		// even when that switch is off. It never touches downloaded files, the
 		// library or the download history: only the searchable catalogue rows.
 		if _, err := applyArchiveRetention(cfg, state.archive); err != nil {
-			logging.Warn(fmt.Sprintf("⚠️ The release archive cleanup failed: %v", err))
+			logging.Warn("⚠️ The release archive cleanup failed", "error", err)
 		}
 		if !state.SleepBackground(housekeepingInterval(cfg)) {
 			return

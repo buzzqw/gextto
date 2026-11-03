@@ -410,8 +410,8 @@ func runLibraryAudioCleanupFile(ctx context.Context, state *AppState, candidate 
 	report, err := RunAudioCleanup(fileCtx, candidate.Path, opts)
 	switch {
 	case err != nil:
-		logging.Warn(fmt.Sprintf("🎧 «%s»: audio cleanup failed, the file was left untouched: %v",
-			filepath.Base(candidate.Path), err), "path", candidate.Path)
+		logging.Warn(fmt.Sprintf("🎧 «%s»: audio cleanup failed, the file was left untouched",
+			filepath.Base(candidate.Path)), "path", candidate.Path, "error", err)
 		return "failed: " + err.Error(), report
 	case report.Applied:
 		if err := state.db.UpdateArchivedSizeAfterCleanup("", candidate.Path, report.NewSize); err != nil {

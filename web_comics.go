@@ -87,7 +87,7 @@ func ComicDownloadHandler(w http.ResponseWriter, r *http.Request, s *AppState) {
 				return
 			}
 			if _, historyErr := s.comics.AddHistory(0, historyURL, strings.TrimSpace(input.Title), "", ""); historyErr != nil {
-				logging.Warn(fmt.Sprintf("Could not record the manual download of «%s» in the comics history: %v", input.Title, historyErr))
+				logging.Warn(fmt.Sprintf("Could not record the manual download of «%s» in the comics history", input.Title), "error", historyErr)
 			}
 		})
 		if err != nil {
@@ -159,7 +159,7 @@ func ComicDownloadHandler(w http.ResponseWriter, r *http.Request, s *AppState) {
 		}
 		if historyURL != "" {
 			if _, err := s.comics.AddHistory(0, historyURL, strings.TrimSpace(input.Title), "", ""); err != nil {
-				logging.Warn(fmt.Sprintf("Could not record the manual download of «%s» in the comics history: %v", input.Title, err))
+				logging.Warn(fmt.Sprintf("Could not record the manual download of «%s» in the comics history", input.Title), "error", err)
 			}
 		}
 	}
