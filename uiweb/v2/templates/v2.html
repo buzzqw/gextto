@@ -904,7 +904,7 @@
     </div>
     {{end}}
     {{if .EditorsFirst}}{{template "v2_settings_editors" .}}{{end}}
-    {{range .Groups}}{{template "v2_setting_group" .}}{{if and (eq $.ActiveID "maintenance") (eq .Title "Controllo integrità file")}}{{with $.MediaCheck}}{{template "v2_media_integrity_panel" .}}{{end}}{{end}}{{end}}
+    {{range .Groups}}{{template "v2_setting_group" .}}{{if and (eq $.ActiveID "maintenance") (eq .Title "Controllo integrità file")}}{{with $.MediaCheck}}{{template "v2_media_integrity_panel" .}}{{end}}{{end}}{{if and (eq $.ActiveID "maintenance") (eq .Title "Manutenzione notturna")}}{{with $.Night}}{{template "v2_night_maintenance_panel" .}}{{end}}{{end}}{{end}}
     {{if .Rename}}{{template "v2_rename_editor" .Rename}}{{end}}
     {{if and (not .EditorsFirst) (ne .ActiveID "scores")}}{{template "v2_settings_editors" .}}{{end}}
     {{if .I18n}}{{template "v2_i18n_editor" .I18n}}{{end}}
@@ -2471,6 +2471,66 @@
     {{else if .Started}}<p class="muted">Controllo interrotto: riprendilo per continuare.</p>
     {{else}}<p class="muted">Il controllo non è ancora stato eseguito.</p>{{end}}
     {{if .FinishedAt}}<p class="muted"><span>Ultimo controllo:</span> <span>{{.FinishedAt}}</span></p>{{end}}
+  </div>
+</div>
+{{end}}
+
+{{define "v2_night_maintenance_panel"}}
+<div class="panel" id="v2-night-maintenance-panel"{{if .Activity}} hx-get="/settings/night-maintenance" hx-trigger="every 10s" hx-swap="outerHTML" aria-busy="true"{{end}}>
+  <div class="panel-head"><h3>Stato della manutenzione notturna</h3></div>
+  <div class="panel-body">
+    <p class="hint">Nella finestra notturna Gextto ottimizza i database, controlla la libreria e, se attivato, pulisce l'audio dei file già archiviati: un lavoro alla volta, solo quando nessun download sta trasferendo, nessun download viene archiviato e il sistema non è sotto carico.</p>
+    <p class="hint"><span>Finestra:</span> <strong>{{.Window}}</strong>{{if .HeavyWindow}} <span>— anche il controllo integrità e l'analisi MediaInfo aspettano la finestra.</span>{{end}}</p>
+    <p aria-live="polite">{{if .Activity}}<span class="badge ok">In corso</span> <strong>{{.Activity}}</strong>{{else if .Waiting}}<span class="badge warn">In attesa</span> <span>{{.Waiting}}</span>{{else if .Open}}<span class="badge">Finestra aperta</span> <span>Niente da fare in questo momento.</span>{{else}}<span class="badge">Finestra chiusa</span> <span>Prossima apertura alle</span> <strong>{{.NextOpening}}</strong>{{end}}</p>
+    <div class="toolbar">
+      <form hx-post="/settings/night-maintenance" hx-target="#v2-night-maintenance-panel" hx-swap="outerHTML" style="display:inline">
+        <input type="hidden" name="action" value="run" />
+        <button class="btn sm primary" type="submit" title="Esegue subito un passaggio della manutenzione, anche fuori dalla finestra; aspetta comunque che nessun download stia trasferendo">Esegui ora</button>
+      </form>
+    </div>
+    {{if .Message}}<p class="alert{{if not .Error}} ok{{end}}" role="{{if .Error}}alert{{else}}status{{end}}">{{.Message}}</p>{{end}}
+
+    <h4>Database</h4>
+    {{if not .DatabaseOn}}<p class="muted">La manutenzione del database è disattivata.</p>
+    {{else if .DBAt}}<p><span>Ultima ottimizzazione:</span> <strong>{{.DBAt}}</strong>{{if .DBSize}} <span>— dimensione totale</span> <strong>{{.DBSize}}</strong>{{end}}{{if .DBFreed}} <span>— spazio recuperato</span> <strong>{{.DBFreed}}</strong>{{end}}</p>
+    {{if .DBCompacted}}<p class="muted"><span>Compattati:</span> <span>{{.DBCompacted}}</span></p>{{end}}
+    {{if .DBCheckedAt}}<p><span>Ultimo controllo di integrità:</span> <strong>{{.DBCheckedAt}}</strong> {{if .DBProblems}}<span class="badge err">Problemi trovati</span>{{else}}<span class="badge ok">Nessun problema</span>{{end}}</p>{{end}}
+    {{if .DBProblems}}<ul class="alert" role="alert">{{range .DBProblems}}<li><code>{{.}}</code></li>{{end}}</ul>{{end}}
+    {{if .DBError}}<p class="alert" role="alert"><span>L'ultima manutenzione non è stata completata:</span> <code>{{.DBError}}</code></p>{{end}}
+    {{else}}<p class="muted">La manutenzione del database non è ancora stata eseguita.</p>{{end}}
+
+    <h4>Pulizia audio della libreria</h4>
+    {{if not .AudioOn}}<p class="muted">Spenta: si attiva con «Pulisci l'audio dei file già in libreria», insieme a «Rimuovi le tracce audio in altre lingue».</p>
+    {{else if .AudioTotal}}<div class="stat-grid" aria-live="polite">
+      <span class="stat"><strong>{{.AudioChecked}}</strong> <span>di</span> <strong>{{.AudioTotal}}</strong> <span>Controllati</span></span>
+      <span class="stat"><strong>{{.AudioPercent}}%</strong></span>
+      <span class="stat"><strong>{{.AudioCleaned}}</strong> <span>Puliti</span></span>
+      <span class="stat"><strong>{{.AudioSaved}}</strong> <span>Risparmiati</span></span>
+      {{if .AudioFailed}}<span class="stat"><strong>{{.AudioFailed}}</strong> <span>Lasciati com'erano</span></span>{{end}}
+    </div>
+    {{if .AudioLast}}<p class="muted"><span>Ultimo controllo non superato:</span> <span class="truncate" title="{{.AudioLast}}">{{.AudioLast}}</span></p>{{end}}
+    <p class="muted">I file ancora in seed con un hardlink aspettano la fine del seed.</p>
+    {{else}}<p class="muted">La pulizia della libreria non è ancora partita: comincia alla prossima finestra.</p>{{end}}
+
+    <h4>Libreria</h4>
+    {{if .CheckAt}}<p><span>Ultimo controllo della libreria:</span> <strong>{{.CheckAt}}</strong> <span>—</span> <strong>{{.CheckSeries}}</strong> <span>Serie,</span> <strong>{{.CheckCorrect}}</strong> <span>File corretti,</span> <strong>{{.CheckRenamed}}</strong> <span>Rinominati,</span> <strong>{{.CheckRemoved}}</strong> <span>Doppioni nel cestino,</span> <strong>{{.CheckErrors}}</strong> <span>Errori</span></p>{{end}}
+    {{if .ReportAt}}<p><span>Ultimo rapporto:</span> <strong>{{.ReportAt}}</strong> <span>—</span> <strong>{{.ReportFiles}}</strong> <span>File in archivio</span></p>
+    {{if .Unreachable}}<p class="alert" role="status"><span>Cartelle che non si potevano leggere (non contate come mancanti):</span> <span>{{.Unreachable}}</span></p>{{end}}
+    {{if .Missing}}<div class="table-wrap" style="margin-top:10px"><table class="data-table">
+      <caption class="sr-only">File della libreria spariti dal disco</caption>
+      <thead><tr><th scope="col">Elemento</th><th scope="col">File</th><th scope="col">Azioni</th></tr></thead>
+      <tbody>{{range .Missing}}<tr>
+        <td>{{.Label}}</td>
+        <td class="truncate" title="{{.Path}}">{{.Path}}</td>
+        <td class="row-actions"><form hx-post="/settings/night-maintenance" hx-target="#v2-night-maintenance-panel" hx-swap="outerHTML" style="display:inline">
+          <input type="hidden" name="action" value="forget" /><input type="hidden" name="series" value="{{.Series}}" /><input type="hidden" name="season" value="{{.Season}}" /><input type="hidden" name="episode" value="{{.Episode}}" />
+          <button class="btn sm" type="submit" title="Segna la puntata come mancante: la ricerca la scaricherà di nuovo" aria-label="Segna come mancante: {{.Label}}">Segna come mancante</button>
+        </form></td>
+      </tr>{{end}}</tbody>
+    </table></div>
+    {{if .MissingMore}}<p class="muted">Sono mostrati i primi 100 file.</p>{{end}}
+    {{else}}<p class="muted">Nessun file della libreria manca dal disco.</p>{{end}}
+    {{else}}<p class="muted">Il rapporto della libreria non è ancora stato eseguito.</p>{{end}}
   </div>
 </div>
 {{end}}

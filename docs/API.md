@@ -182,6 +182,9 @@ change. `/ui` is not served. For operational checks use
 | POST | `/api/maintenance/backfill-media-info` | probe the missing media info |
 | POST | `/api/maintenance/media-integrity/start` | start or resume the file integrity check; restart=true forgets the previous outcomes and rechecks everything, batch=0 checks every pending file |
 | POST | `/api/maintenance/media-integrity/stop` | stop the file integrity check after the current file |
+| GET | `/api/maintenance/night` | night maintenance: the window, whether it is open, why it waits (a download transferring, an import, a high load), the last database maintenance and integrity check, the audio cleanup of the library, the last library check and the library files gone from the disk |
+| POST | `/api/maintenance/night/run` | one night maintenance pass now, outside the window; it still waits until Gextto is idle (202) |
+| POST | `/api/maintenance/night/forget` | body with series, season and episode: clear the archive row of an episode whose file is confirmed gone, so the search downloads it again; 409 when the file is back or its folder cannot be read |
 | GET | `/api/maintenance/media-integrity` | progress and damaged files of the integrity check; files already checked and unchanged are skipped, a file that timed out is retried after a day, and the answer keeps damaged and unreadable counts apart |
 | POST | `/api/maintenance/clean-duplicates` | remove the duplicate library files |
 | POST | `/api/maintenance/clean-trash` | empty the recycle bin |

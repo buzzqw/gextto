@@ -80,10 +80,23 @@ func mediaInfoBackfillWorker(state *AppState) {
 		if batch > 200 {
 			batch = 200
 		}
+		if enabled && !maintenanceAllowedNow(state, cfg, time.Now()) {
+			// Heavy work waits for the night maintenance window and an idle
+			// Gextto; look again in a few minutes so the window is used.
+			if !state.SleepBackground(maintenanceWaitFor(intervalMinutes)) {
+				return
+			}
+			continue
+		}
 		if enabled {
 			if Available() {
 				warnedUnavailable = false
+				release := acquireMaintenanceHeavy(state.bgContext)
+				if release == nil {
+					return
+				}
 				report, err := gh0_runMediaInfoBackfill(state.bgContext, state, batch, nil)
+				release()
 				if err != nil {
 					logging.Warn("MediaInfo backfill run failed", "error", err)
 				} else {
@@ -129,6 +142,14 @@ func mediaIntegrityWorker(state *AppState) {
 		enabled := mediaIntegrityEnabled(cfg)
 		interval := mediaIntegrityIntervalMinutes(cfg)
 		batch := mediaIntegrityBatchSize(cfg)
+		if enabled && (!maintenanceAllowedNow(state, cfg, time.Now()) || maintenanceHeavyBusy()) {
+			// Heavy work waits for the night maintenance window, an idle Gextto
+			// and the end of the other heavy job.
+			if !state.SleepBackground(maintenanceWaitFor(int64(interval))) {
+				return
+			}
+			continue
+		}
 		if enabled {
 			if len(mediaIntegrityMissingTools()) == 0 {
 				warnedUnavailable = false

@@ -77,33 +77,11 @@ its gate; a rejected one moves to *Not planned*.
   a month) instead of a week every time. It needs a strike count that survives the
   expiry, while today the expired rows are purged as soon as they are read, by design.
   Gate: a decision on the second period and on how much history to keep for the count.
-- **Audio cleanup of the existing library** — today only files imported with the option
-  on are cleaned; an action in Maintenance (or per series/folder) could queue the files
-  already in the library, at low priority and in a night window, like the operator's own
-  nightly batch does. Gate: a decision on the window and on how to show the progress.
-- **Audio cleanup after the seed ends** — a hardlinked library file that is cleaned
-  while its torrent seeds becomes a second copy, so the space is used twice until the
-  seed ends. Waiting for the end of the seed would keep one copy. Gate: a decision on
-  whether the delay is worth the saved space.
-- **Night maintenance window** — one window (for example 01:00–07:00) where the heavy
-  background jobs (integrity check, MediaInfo backfill, audio cleanup of the library, the
-  database maintenance below) run only when nothing is downloading or importing and the
-  load is low, niced, one at a time. Gate: a decision on the default window and on what
-  counts as idle.
-- **Automatic database maintenance** — in the window: `PRAGMA optimize`, a `VACUUM` when
-  the free pages pass a threshold, a weekly `integrity_check` with a notification on
-  failure. Gate: the window above.
-- **Library consistency audit** — rows pointing to missing files, library files no row
-  knows, two copies of the same episode, names that no longer follow the template;
-  reported in Maintenance with a fix for each. Gate: a decision on which fixes run
-  without asking.
-- **Metadata refresh of the library** — re-read TMDB/TVDB for the series: episode titles
-  that were placeholders when the file was renamed get the real title (and the file its
-  name), ended or renamed series are updated. Gate: a decision on renaming files
-  automatically.
 - **Relink duplicated copies** — a library file identical to a seeding download but not
-  hardlinked to it (copied across a restart or by hand) is linked again to save the
-  space. Gate: same filesystem and a byte-for-byte comparison before linking.
+  hardlinked to it is linked again to save the space. Gate: an installation where the
+  downloads and the library are on the same filesystem (here they are not: the library
+  is on the NAS, the downloads on the local disk) and a byte-for-byte comparison before
+  linking.
 - **Portable folder names for existing series** — the add dialog now drops the characters
   Windows, exFAT and SMB shares refuse, but a series added earlier keeps its folder and
   the path stored in the library. A check in Maintenance could report them and rename the
@@ -112,6 +90,10 @@ its gate; a rejected one moves to *Not planned*.
 ## Not planned
 
 Closed by choice, not waiting for a measurement:
+
+- A night refresh of the episode titles: the periodic library check already retries the
+  "Episodio N" names and falls back to the English title; the files that keep the
+  placeholder have no title at the provider in any language.
 
 - WebTorrent/WebRTC peers: niche, and the reference WebSocket tracker serves only
   WebRTC peers to a WebSocket client.

@@ -41,6 +41,10 @@ one.
   video and audio without re-encoding and comparing every packet with the
   original, plus duration, flags and A/V sync, before replacing the file.
   Untagged tracks are kept unless you choose otherwise.
+- A night maintenance window runs the heavy work while Gextto is idle, one job
+  at a time: database optimisation and a weekly integrity check, a report of
+  the library files gone from the disk, the audio cleanup of the existing
+  library, the file integrity check and the MediaInfo analysis.
 - The engine is our own Go code: BitTorrent v1, v2 and hybrid, TCP and uTP on
   one port, holepunching, IPv6 DHT, streaming. It is fast on a real swarm and
   light at rest — the figures are in [Numbers](#numbers). The same binary is

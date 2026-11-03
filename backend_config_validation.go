@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/buzzqw/gextto/internal/bwschedule"
 )
 
 // validateBackendSetting provides immediate, field-specific feedback from the
@@ -204,6 +206,13 @@ func validateSettingValue(key, value string, cfg *Config) error {
 		case "", audioCleanupPolicyAll, audioCleanupPolicyBest, audioCleanupPolicyFirst:
 		default:
 			return fmt.Errorf("%s must be all, best or first", key)
+		}
+	}
+	if key == maintenanceWindowStartSetting || key == maintenanceWindowEndSetting {
+		if raw := strings.TrimSpace(value); raw != "" {
+			if _, ok := bwschedule.ParseClock(raw); !ok {
+				return fmt.Errorf("%s must be a time of day such as 01:00", key)
+			}
 		}
 	}
 	if key == audioCleanupUntaggedSetting {

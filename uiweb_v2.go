@@ -272,6 +272,8 @@ func registerV2Routes(s *AppState, mux *http.ServeMux) {
 	v2Handle(s, mux, "POST /maintenance/db", V2DBMaintenance)
 	v2Handle(s, mux, "GET /settings/media-integrity", V2MediaIntegrityPanel)
 	v2Handle(s, mux, "POST /settings/media-integrity", V2MediaIntegrityAction)
+	v2Handle(s, mux, "GET /settings/night-maintenance", V2NightMaintenancePanel)
+	v2Handle(s, mux, "POST /settings/night-maintenance", V2NightMaintenanceAction)
 	v2Handle(s, mux, "POST /maintenance/ramdisk", V2Ramdisk)
 	v2Handle(s, mux, "GET /maintenance/update", V2Update)
 	v2Handle(s, mux, "POST /setup/auth", V2SetupAuth)
@@ -2584,6 +2586,8 @@ type v2SettingsView struct {
 	// actions and the damaged files, rendered under the settings group of the
 	// Maintenance tab where the check is configured.
 	MediaCheck *v2MediaCheckView
+	// Night is the night maintenance panel, under its settings group.
+	Night *v2NightMaintenanceView
 	// Flash carries a one-shot feedback message after an action.
 	Flash    string
 	FlashErr bool
@@ -2671,6 +2675,8 @@ func v2SettingsViewFrom(s *AppState, tab, highlight, mode string) v2SettingsView
 		// progress and manual actions sits right under the settings group.
 		check := v2MediaCheckViewFrom(s)
 		view.MediaCheck = &check
+		night := v2NightMaintenanceViewFrom(s)
+		view.Night = &night
 	}
 	if page.Actions != nil {
 		view.Actions = &v2SettingsActions{Title: page.Actions.Label, Hint: page.Actions.Hint, Buttons: buttons(page.Actions.Buttons)}

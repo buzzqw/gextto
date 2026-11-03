@@ -1619,6 +1619,17 @@ L'elenco completo delle azioni e dei parametri è nell'[Appendice C](#appendice-
 - Le operazioni lunghe (**Scansiona archivi**, **Aggiorna MediaInfo**, **Rinomina
   tutto**) girano in background: la pagina non resta bloccata, puoi continuare a
   usare Gextto, annullarle dal messaggio e vederne l'esito quando finiscono.
+- **Manutenzione notturna** — in *Configurazione → Manutenzione → Manutenzione
+  notturna* scegli una finestra (01:00–07:00 di default) in cui Gextto fa i
+  lavori pesanti: ottimizza e, una volta alla settimana, controlla i database;
+  prepara il rapporto della libreria con i file spariti dal disco; se lo
+  attivi, pulisce dalle altre lingue audio anche i file già in libreria. Con
+  l'opzione predefinita anche il controllo integrità e l'analisi MediaInfo
+  aspettano la finestra. Ogni lavoro parte solo quando Gextto è inattivo (nessun
+  download che trasferisce, nessuna importazione in corso, carico basso), uno
+  alla volta. Il pannello sotto le opzioni mostra cosa sta girando o perché
+  aspetta, e **Esegui ora** fa partire subito un passaggio. Il dettaglio è
+  nell'[Appendice A](#manutenzione-automatica).
 - **Controllo integrità file** — non ha un pannello in questa pagina: si attiva
   e si gestisce in *Configurazione →
   Manutenzione → Controllo integrità file*. Scegli se il controllo gira da solo,
@@ -2708,6 +2719,30 @@ spazio del `tmpfs`, come prima.
 | Pulizia automatica archivio | Abilita la pulizia automatica dell'archivio a ogni housekeeping: elimina solo le righe del catalogo release più vecchie dell'età massima. File scaricati, libreria, storico download e torrent attivi non vengono toccati. |
 | Archivio — età massima | Età massima delle release in archivio, in giorni (0 = nessun limite). *(Unità: giorni; 0 = nessun limite)* Compare solo con «Pulizia automatica archivio» attivo. |
 | Archivio — mantieni almeno N voci | Numero minimo di release recenti da conservare sempre, anche se più vecchie dell'età massima. Compare solo con «Pulizia automatica archivio» attivo. |
+
+**Manutenzione notturna**
+
+| Impostazione | Cosa fa |
+|---|---|
+| Finestra notturna — inizio | Ora di inizio (HH:MM, predefinita 01:00) della finestra in cui girano i lavori pesanti: un lavoro alla volta e solo quando Gextto è inattivo, cioè nessun download trasferisce più di 100 KB/s, nessun download viene archiviato, il controllo della libreria e il controllo integrità sono fermi e il carico del sistema è basso. Il seed non conta: continua tutta la notte. |
+| Finestra notturna — fine | Ora di fine (HH:MM, predefinita 07:00). Dopo non parte nessun lavoro nuovo; quello in corso viene completato. Se la fine è prima dell'inizio la finestra passa la mezzanotte; inizio e fine uguali vogliono dire tutto il giorno. |
+| Controllo integrità e analisi MediaInfo solo nella finestra | Sì (predefinito): il controllo integrità e l'analisi MediaInfo girano al loro intervallo ma solo dentro la finestra e con Gextto inattivo. No: girano al loro intervallo a qualsiasi ora, come prima. I comandi manuali (**Controlla ora**, **Aggiorna MediaInfo**) partono sempre subito. |
+| Manutenzione del database ogni notte | Sì (predefinito): una volta per notte i database vengono ottimizzati (`PRAGMA optimize`) e compattati quando hanno almeno il 20% o 64 MB di spazio libero; una volta alla settimana un controllo completo (`integrity_check`) legge ogni pagina e ogni indice, e se trova un problema arriva subito una notifica, senza aspettare il riepilogo. |
+| Pulisci l'audio dei file già in libreria | Applica **Rimuovi le tracce audio in altre lingue**, con la stessa lingua e le stesse scelte, ai file già archiviati: uno alla volta, nella finestra, con gli stessi controlli della pulizia dopo l'importazione. Ogni file viene esaminato una sola volta (Gextto ne ricorda dimensione e data); un file ancora in seed tramite hardlink aspetta la fine del seed, così la copia pulita non occupa spazio due volte, e un file scritto nell'ultima ora aspetta la notte dopo. Un file che non supera il controllo resta com'è e viene riprovato dopo una settimana. Spento di default; si attiva solo con la pulizia audio accesa. |
+
+**Manutenzione notturna — pannello**
+
+Sotto le opzioni, nello stesso gruppo, il pannello **Stato della manutenzione notturna** mostra la finestra, cosa sta girando o perché aspetta, e l'esito di ogni lavoro.
+
+| Voce | Cosa fa |
+|---|---|
+| Esegui ora | Esegue subito un passaggio della manutenzione, anche fuori dalla finestra; aspetta comunque che Gextto sia inattivo. |
+| Database | Ultima ottimizzazione, dimensione totale dei database e spazio recuperato, ultimo controllo di integrità e i problemi trovati. |
+| Pulizia audio della libreria | File controllati sul totale, file puliti, spazio risparmiato, file lasciati com'erano e l'ultimo controllo non superato. |
+| Libreria | L'ultimo passaggio del controllo della libreria (file corretti, rinominati, doppioni nel cestino, errori: il controllo gira da solo ogni *Verifica dei file rinominati ogni* ore) e il rapporto notturno dei file che il database conosce ma che non sono più sul disco. Una cartella che non si legge, per esempio un NAS non montato, è indicata a parte e non conta come file mancanti. |
+| Segna come mancante | Toglie dall'archivio la puntata il cui file non c'è più, così la ricerca la scarica di nuovo. Non fa niente se il file è tornato o se la cartella non si legge. |
+
+Quando la finestra si chiude, il log riassume la notte in una riga; arriva anche una notifica sui canali configurati, del gruppo manutenzione, se la notte ha trovato problemi nei database, file mancanti, file puliti o file lasciati com'erano, oppure ha recuperato almeno 64 MB.
 
 **Analisi MediaInfo**
 

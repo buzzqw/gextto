@@ -2562,6 +2562,8 @@ func cycleWorker(state *AppState) {
 							// Deferred so a panic cannot leave the repair marked as
 							// running forever.
 							defer renameRepairRunning.Store(false)
+							libraryCheckRunning.Store(true)
+							defer libraryCheckRunning.Store(false)
 							var renamed, discarded, duplicates, errs, correct int64
 							for _, name := range names {
 								_, value := seriesRenameApply(state, name, true, false, false)
@@ -2575,6 +2577,7 @@ func cycleWorker(state *AppState) {
 								errs += bg_countKey(values, "error_count")
 								correct += bg_countKey(values, "already_ok_count")
 							}
+							recordLibraryCheck(len(names), correct, renamed, discarded, duplicates, errs)
 							if renamed+discarded+duplicates+errs > 0 {
 								logging.Info(renameRepairReportText(len(names), correct, renamed, discarded, duplicates, errs))
 								lastRenameAllGood.Store(0)

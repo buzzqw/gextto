@@ -43,6 +43,11 @@ altro.
   ogni pacchetto con l'originale, oltre a durata, flag e sincronizzazione,
   prima di sostituire il file. Le tracce senza lingua restano, salvo scelta
   diversa.
+- Una finestra di manutenzione notturna fa i lavori pesanti quando Gextto è
+  fermo, uno alla volta: ottimizzazione dei database e controllo di integrità
+  settimanale, rapporto dei file della libreria spariti dal disco, pulizia
+  audio della libreria esistente, controllo integrità dei file e analisi
+  MediaInfo.
 - Il motore è codice Go nostro: BitTorrent v1, v2 e ibrido, TCP e uTP su una
   porta, holepunching, DHT IPv6, streaming. È veloce su uno swarm reale e
   leggero a riposo — le misure sono in [Numeri](#numeri). Lo stesso binario è

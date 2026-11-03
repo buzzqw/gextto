@@ -109,7 +109,7 @@ func notifyEventGroup(event string) string {
 		"engine_crashed", "engine_restarted", "engine_fallback", "engine_recovery",
 		"engine_rollback", "engine_unresponsive", "engine_unstable", "engine_error":
 		return "health"
-	case "backup_completed", "audio_cleanup", "daemon_restarted":
+	case "backup_completed", "audio_cleanup", "daemon_restarted", "maintenance_report":
 		return "maintenance"
 	}
 	return ""
@@ -881,6 +881,11 @@ func formatEmailSubjectLang(lang, event string, data map[string]any) string {
 		return fmt.Sprintf("Gextto: %s — %s", messages.PickLang(lang, "Fumetto scaricato", "Comic downloaded"), itemLabel)
 	case "audio_cleanup":
 		return fmt.Sprintf("Gextto: %s — %s", messages.PickLang(lang, "Tracce audio rimosse", "Audio tracks removed"), itemLabel)
+	case "maintenance_report":
+		if problems, _ := jsonInt(mapLookup(data, "db_problems")); problems > 0 {
+			return fmt.Sprintf("Gextto: %s", messages.PickLang(lang, "Database da controllare", "Database needs attention"))
+		}
+		return fmt.Sprintf("Gextto: %s", messages.PickLang(lang, "Manutenzione notturna", "Night maintenance"))
 	case "comic_error":
 		return fmt.Sprintf("Gextto: %s — %s", messages.PickLang(lang, "Errore fumetto", "Comic error"), itemLabel)
 	case "comic_pending":
@@ -1244,6 +1249,8 @@ func formatEventLang(lang, event string, data map[string]any) string {
 			messages.PickLang(lang, "Motore", "Engine"),
 			text("backend"),
 		)
+	case "maintenance_report":
+		return maintenanceReportNotificationBody(lang, data)
 	case "comic_error":
 		return fmt.Sprintf(
 			"Gextto: %s «%s» — %s",
@@ -1717,4 +1724,37 @@ func notifySourceText(raw string) string {
 		return uiSourceLabel(value)
 	}
 	return value
+}
+
+// maintenanceReportNotificationBody is the night maintenance summary, or the
+// warning about a damaged database.
+func maintenanceReportNotificationBody(lang string, data map[string]any) string {
+	number := func(key string) int64 {
+		value, _ := jsonInt(mapLookup(data, key))
+		return value
+	}
+	lines := []string{messages.PickLang(lang, "🌙 MANUTENZIONE NOTTURNA", "🌙 NIGHT MAINTENANCE"), ""}
+	if problems := number("db_problems"); problems > 0 {
+		lines = append(lines, fmt.Sprintf("🗄 %s: %d", messages.PickLang(lang,
+			"Problemi trovati nel database", "Problems found in the database"), problems))
+		if detail := jsonString(mapLookup(data, "detail")); detail != "" {
+			lines = append(lines, detail)
+		}
+		lines = append(lines, messages.PickLang(lang,
+			"Fai un backup e controlla la pagina Manutenzione.",
+			"Take a backup and look at the Maintenance page."))
+	}
+	if freed := number("db_freed"); freed > 0 {
+		lines = append(lines, fmt.Sprintf("🗄 %s: %s", messages.PickLang(lang, "Spazio recuperato nei database", "Space freed in the databases"), formatBytes(freed)))
+	}
+	if missing := number("missing"); missing > 0 {
+		lines = append(lines, fmt.Sprintf("📚 %s: %d", messages.PickLang(lang, "File della libreria spariti dal disco", "Library files gone from the disk"), missing))
+	}
+	if cleaned := number("audio_cleaned"); cleaned > 0 {
+		lines = append(lines, fmt.Sprintf("🎧 %s: %d (%s)", messages.PickLang(lang, "File puliti dalle altre lingue audio", "Files cleaned of other audio languages"), cleaned, formatBytes(number("audio_saved"))))
+	}
+	if failed := number("audio_failed"); failed > 0 {
+		lines = append(lines, fmt.Sprintf("⚠️ %s: %d", messages.PickLang(lang, "File lasciati com'erano dopo un controllo fallito", "Files left as they were after a failed check"), failed))
+	}
+	return strings.Join(lines, "\n")
 }

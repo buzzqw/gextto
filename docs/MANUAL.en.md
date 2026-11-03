@@ -1563,6 +1563,16 @@ The complete list of actions and parameters is in [Appendix C](#appendix-c-refer
 - Long operations (**Scan archives**, **Refresh MediaInfo**, **Rename all**) run
   in the background: the page is not blocked, you can keep using Gextto, cancel
   them from the message and see the outcome when they finish.
+- **Night maintenance** — in *Settings → Maintenance → Night maintenance* you
+  choose a window (01:00–07:00 by default) in which Gextto does the heavy work:
+  it optimises and, once a week, checks the databases; it prepares the library
+  report with the files gone from the disk; when you switch it on, it cleans the
+  other audio languages from the files already in the library too. With the
+  default option the integrity check and the MediaInfo analysis wait for the
+  window as well. Every job starts only while Gextto is idle (no download
+  transferring, no import in progress, low load), one at a time. The panel under
+  the options shows what is running or why it waits, and **Run now** starts a
+  pass at once. The details are in [Appendix A](#automatic-maintenance).
 - **File integrity check** — it has no panel on this page: everything lives in
   *Settings → Maintenance → File integrity check*. Switch the check on and
   choose how many minutes apart and how many files per pass,
@@ -2625,6 +2635,30 @@ files. When the memory cannot be read, only the `tmpfs` space counts, as before.
 | Automatic archive cleanup | Enables automatic archive cleanup on every housekeeping pass: it removes only release-catalogue rows older than the maximum age. Downloaded files, the library, download history and active torrents are untouched. |
 | Archive — maximum age | Maximum age of archive releases, in days (0 = no limit). *(Unit: days; 0 = no limit)* Shown only while «Automatic archive cleanup» is on. |
 | Archive — keep at least N entries | Minimum number of recent releases to always keep, even when older than the maximum age. Shown only while «Automatic archive cleanup» is on. |
+
+**Night maintenance**
+
+| Setting | What it does |
+|---|---|
+| Night window — start | Start time (HH:MM, 01:00 by default) of the window in which the heavy jobs run: one job at a time and only while Gextto is idle, that is no download transfers more than 100 KB/s, no download is being archived, the library check and the integrity check are not running and the system load is low. Seeding does not count: it goes on all night. |
+| Night window — end | End time (HH:MM, 07:00 by default). After it no new job starts; the one in progress is completed. An end before the start makes the window cross midnight; the same start and end mean the whole day. |
+| Integrity check and MediaInfo analysis only in the window | Yes (default): the integrity check and the MediaInfo analysis run at their interval but only inside the window and while Gextto is idle. No: they run at their interval at any hour, as before. The manual commands (**Check now**, **Refresh MediaInfo**) always start at once. |
+| Database maintenance every night | Yes (default): once a night the databases are optimised (`PRAGMA optimize`) and compacted when at least 20% or 64 MB of them is free space; once a week a full check (`integrity_check`) reads every page and every index, and a problem sends a notification at once, without waiting for the summary. |
+| Clean the audio of files already in the library | Applies **Remove audio tracks in other languages**, with the same language and choices, to the files already archived: one at a time, in the window, with the same checks as the cleanup after an import. Every file is examined once (Gextto remembers its size and date); a file still seeding through a hardlink waits for the end of the seed, so the cleaned copy does not use the space twice, and a file written in the last hour waits for the next night. A file that fails the check stays as it is and is tried again after a week. Off by default; it works only with the audio cleanup on. |
+
+**Night maintenance — panel**
+
+Under the options, in the same group, the **Night maintenance status** panel shows the window, what is running or why it waits, and the outcome of each job.
+
+| Item | What it does |
+|---|---|
+| Run now | Runs a maintenance pass at once, even outside the window; it still waits until Gextto is idle. |
+| Database | Last optimisation, total size of the databases and space freed, last integrity check and the problems found. |
+| Audio cleanup of the library | Files checked out of the total, files cleaned, space saved, files left as they were and the last check not passed. |
+| Library | The last pass of the library check (correct files, renamed, duplicates in the trash, errors: the check runs by itself every *Check renamed files every* hours) and the night report of the files the database knows but the disk no longer has. A folder that cannot be read, for example a NAS that is not mounted, is listed apart and does not count as missing files. |
+| Mark as missing | Removes from the archive the episode whose file is gone, so the search downloads it again. It does nothing when the file is back or its folder cannot be read. |
+
+When the window closes, the log sums up the night in one line; a notification on the configured channels, in the maintenance group, also arrives when the night found database problems, missing files, cleaned files or files left as they were, or freed at least 64 MB.
 
 **MediaInfo analysis**
 
