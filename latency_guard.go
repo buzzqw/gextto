@@ -747,7 +747,7 @@ func (g *latencyGuard) tick(now time.Time, cfg *Config, engine TorrentEngine) {
 	if started {
 		st := g.status()
 		logging.Info("🎚️ Autotune: starting with " + speedPairText(downCap, upCap) +
-			bg_speedDetailSuffix(bg_speedMaxText(cfg), bg_pingText(st)))
+			bgSpeedDetailSuffix(bgSpeedMaxText(cfg), bgPingText(st)))
 	}
 	if !changed || engine == nil {
 		return

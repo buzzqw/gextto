@@ -176,7 +176,7 @@ func TestRamdiskAdmissionMovesFittingTorrentOntoTheRamdisk(t *testing.T) {
 		Hash: hash, Name: "fits", SavePath: disk, TotalSize: 1 << 30,
 	}}}
 	event := &models.TorrentEvent{Kind: "metadata_received", Hash: hash, Name: "fits", SavePath: disk}
-	tev_admitToRamdisk(&cfg, torrents, event)
+	tevAdmitToRamdisk(&cfg, torrents, event)
 	if torrents.moved[hash] != ramdisk {
 		t.Fatalf("fitting torrent not admitted to the RAM disk: %v", torrents.moved)
 	}
@@ -202,8 +202,8 @@ func TestRamdiskAdmissionRejectsOversizedOrStartedTorrent(t *testing.T) {
 		{Hash: oversized, Name: "big", SavePath: disk, TotalSize: 8 << 30},
 		{Hash: started, Name: "running", SavePath: disk, TotalSize: 1 << 30, TotalDone: 1 << 30, Progress: 50},
 	}}
-	tev_admitToRamdisk(&cfg, torrents, &models.TorrentEvent{Kind: "metadata_received", Hash: oversized, Name: "big", SavePath: disk})
-	tev_admitToRamdisk(&cfg, torrents, &models.TorrentEvent{Kind: "metadata_received", Hash: started, Name: "running", SavePath: disk})
+	tevAdmitToRamdisk(&cfg, torrents, &models.TorrentEvent{Kind: "metadata_received", Hash: oversized, Name: "big", SavePath: disk})
+	tevAdmitToRamdisk(&cfg, torrents, &models.TorrentEvent{Kind: "metadata_received", Hash: started, Name: "running", SavePath: disk})
 	if len(torrents.moved) != 0 {
 		t.Fatalf("oversized or started torrents must not be admitted: %v", torrents.moved)
 	}
@@ -230,7 +230,7 @@ func TestRamdiskAdmissionDisabledForBackendsWithoutRamdisk(t *testing.T) {
 			Hash: hash, Name: "fits", SavePath: disk, TotalSize: 1 << 30,
 		}}},
 	}
-	tev_admitToRamdisk(&cfg, torrents, &models.TorrentEvent{Kind: "metadata_received", Hash: hash, Name: "fits", SavePath: disk})
+	tevAdmitToRamdisk(&cfg, torrents, &models.TorrentEvent{Kind: "metadata_received", Hash: hash, Name: "fits", SavePath: disk})
 	if len(torrents.moved) != 0 {
 		t.Fatalf("a backend without ramdisk support must not admit to the RAM disk: %v", torrents.moved)
 	}
@@ -332,13 +332,13 @@ func TestRamdiskAdmissionChecksHostMemory(t *testing.T) {
 	event := &models.TorrentEvent{Kind: "metadata_received", Hash: hash, Name: "fits", SavePath: disk}
 
 	withHostMemory(t, 1<<30, true)
-	tev_admitToRamdisk(&cfg, torrents, event)
+	tevAdmitToRamdisk(&cfg, torrents, event)
 	if len(torrents.moved) != 0 {
 		t.Fatalf("a tight host must not admit the torrent: %v", torrents.moved)
 	}
 
 	withHostMemory(t, 4<<30, true)
-	tev_admitToRamdisk(&cfg, torrents, event)
+	tevAdmitToRamdisk(&cfg, torrents, event)
 	if torrents.moved[hash] != ramdisk {
 		t.Fatalf("a well-provided host must admit the torrent: %v", torrents.moved)
 	}

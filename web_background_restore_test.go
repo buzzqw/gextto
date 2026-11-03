@@ -14,7 +14,7 @@ func TestRestoredTorrentNames(t *testing.T) {
 		{Hash: "AAAA", Name: "Zeta"},
 		{Hash: "bbbb", Name: "Alfa"},
 	}}
-	names := bg_restoredTorrentNames(session, nil, []string{"aaaa", "bbbb", "cccc"})
+	names := bgRestoredTorrentNames(session, nil, []string{"aaaa", "bbbb", "cccc"})
 	want := []string{"Alfa", "Zeta", "cccc"}
 	if strings.Join(names, "|") != strings.Join(want, "|") {
 		t.Fatalf("names = %v, want %v", names, want)
@@ -23,13 +23,13 @@ func TestRestoredTorrentNames(t *testing.T) {
 
 // A large restore keeps the log line bounded.
 func TestRestoredTorrentNamesLineIsCapped(t *testing.T) {
-	if got := bg_restoredTorrentNamesLine([]string{"a", "b", "c"}, 2); got != "a, b (+1)" {
+	if got := bgRestoredTorrentNamesLine([]string{"a", "b", "c"}, 2); got != "a, b (+1)" {
 		t.Fatalf("capped line = %q", got)
 	}
-	if got := bg_restoredTorrentNamesLine([]string{"a", "b"}, 2); got != "a, b" {
+	if got := bgRestoredTorrentNamesLine([]string{"a", "b"}, 2); got != "a, b" {
 		t.Fatalf("uncapped line = %q", got)
 	}
-	if got := bg_restoredTorrentNamesLine(nil, 2); got != "" {
+	if got := bgRestoredTorrentNamesLine(nil, 2); got != "" {
 		t.Fatalf("empty line = %q", got)
 	}
 }

@@ -50,7 +50,7 @@ type SystemFacts struct {
 // leaves the field at zero.
 func ProbeSystem(cfg *Config) SystemFacts {
 	facts := SystemFacts{NumCPU: runtime.NumCPU()}
-	facts.MemTotal, facts.MemAvailable = memory_info()
+	facts.MemTotal, facts.MemAvailable = memoryInfo()
 
 	archiveRoot := ""
 	if cfg != nil {

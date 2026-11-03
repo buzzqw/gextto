@@ -594,7 +594,7 @@ func (e *Engine) scrapeFeed(ctx context.Context, cfg *Config, rawURL string, max
 	// A site that answered 429 is left alone until its cooldown ends. The other
 	// feeds of that host wait for the next cycle too: asking them one after the
 	// other is what turns a single rate limit into a dozen failing feeds.
-	if wait, cooling := host_cooling(rawURL); cooling {
+	if wait, cooling := hostCooling(rawURL); cooling {
 		logging.Debug("feed skipped while the site cools down after a rate limit",
 			"feed", feed, "retry_in_seconds", int(wait.Seconds()))
 		return nil

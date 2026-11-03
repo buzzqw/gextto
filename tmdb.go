@@ -63,7 +63,7 @@ type TmdbItem struct {
 // gh_tmdbItemInLibrary reports whether a TMDB discovery/search result already
 // exists in the monitored library. It matches first by external id, then by
 // name (with the year for movies) so a card never offers a duplicate insert.
-func gh_tmdbItemInLibrary(cfg *Config, kind string, item TmdbItem) bool {
+func ghTmdbItemInLibrary(cfg *Config, kind string, item TmdbItem) bool {
 	if cfg == nil {
 		return false
 	}

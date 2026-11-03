@@ -29,7 +29,7 @@ func TestTorznabFreeleechFlags(t *testing.T) {
 				`<guid>some-show-s01e01</guid>` +
 				`<enclosure url="magnet:?xt=urn:btih:0123456789012345678901234567890123456789" length="900000000" type="application/x-bittorrent"/>` +
 				test.attrs + `</item></channel></rss>`
-			releases, err := parse_feed_body(body, "test")
+			releases, err := parseFeedBody(body, "test")
 			if err != nil {
 				t.Fatalf("parse_feed_body: %v", err)
 			}

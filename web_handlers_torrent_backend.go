@@ -317,7 +317,7 @@ func TorrentBackendTest(w http.ResponseWriter, r *http.Request, s *AppState) {
 	}
 	client, err := qbittorrent.New(clientCfg)
 	if err != nil {
-		logging.Info("torrent backend test", "backend", TorrentBackendName(cfg), "host", domain_of(clientCfg.BaseURL), "ok", false, "error", err.Error())
+		logging.Info("torrent backend test", "backend", TorrentBackendName(cfg), "host", domainOf(clientCfg.BaseURL), "ok", false, "error", err.Error())
 		jsonStatus(w, http.StatusBadRequest, map[string]any{"ok": false, "error": err.Error()})
 		return
 	}
@@ -326,7 +326,7 @@ func TorrentBackendTest(w http.ResponseWriter, r *http.Request, s *AppState) {
 
 	appVersion, err := client.AppVersion(ctx)
 	if err != nil {
-		logging.Info("torrent backend test", "backend", TorrentBackendName(cfg), "host", domain_of(clientCfg.BaseURL), "ok", false, "error", err.Error())
+		logging.Info("torrent backend test", "backend", TorrentBackendName(cfg), "host", domainOf(clientCfg.BaseURL), "ok", false, "error", err.Error())
 		jsonStatus(w, http.StatusBadGateway, map[string]any{"ok": false, "error": err.Error()})
 		return
 	}
@@ -339,7 +339,7 @@ func TorrentBackendTest(w http.ResponseWriter, r *http.Request, s *AppState) {
 	if torrents, err := client.Torrents(ctx); err == nil {
 		result["torrents"] = len(torrents)
 	}
-	logging.Info("torrent backend test", "backend", TorrentBackendName(cfg), "host", domain_of(clientCfg.BaseURL), "ok", true, "app_version", appVersion)
+	logging.Info("torrent backend test", "backend", TorrentBackendName(cfg), "host", domainOf(clientCfg.BaseURL), "ok", true, "app_version", appVersion)
 	jsonResponse(w, result)
 }
 

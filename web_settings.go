@@ -457,7 +457,7 @@ func RenameProgressView(w http.ResponseWriter, r *http.Request, s *AppState) {
 
 // Removes the DB state of the series and movies that are no longer part of the
 // saved library.
-func gh4_purgeRemovedLibrary(db *Database, previousSeries []SeriesConfig, previousMovies []MovieConfig, series []SeriesConfig, movies []MovieConfig) {
+func gh4PurgeRemovedLibrary(db *Database, previousSeries []SeriesConfig, previousMovies []MovieConfig, series []SeriesConfig, movies []MovieConfig) {
 	for _, old := range previousSeries {
 		present := false
 		for _, item := range series {
@@ -533,7 +533,7 @@ func SaveLibraryHandler(w http.ResponseWriter, r *http.Request, s *AppState) {
 		jsonError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	gh4_purgeRemovedLibrary(s.db, previous.Series, previous.Movies, input.Series, input.Movies)
+	gh4PurgeRemovedLibrary(s.db, previous.Series, previous.Movies, input.Series, input.Movies)
 	jsonStatus(w, http.StatusOK, map[string]any{
 		"ok":               true,
 		"restart_required": true,
@@ -544,7 +544,7 @@ func SaveLibraryHandler(w http.ResponseWriter, r *http.Request, s *AppState) {
 
 // Removes the DB state of series/movies that are no longer part of the saved
 // library.
-func gh5_purgeRemovedLibrary(db *Database, previousSeries []SeriesConfig, previousMovies []MovieConfig, series []SeriesConfig, movies []MovieConfig) {
+func gh5PurgeRemovedLibrary(db *Database, previousSeries []SeriesConfig, previousMovies []MovieConfig, series []SeriesConfig, movies []MovieConfig) {
 	for _, old := range previousSeries {
 		present := false
 		for _, item := range series {
@@ -603,7 +603,7 @@ func SaveMoviesConfig(w http.ResponseWriter, r *http.Request, s *AppState) {
 		jsonError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	gh5_purgeRemovedLibrary(s.db, cfg.Series, cfg.Movies, cfg.Series, movies)
+	gh5PurgeRemovedLibrary(s.db, cfg.Series, cfg.Movies, cfg.Series, movies)
 	jsonResponse(w, map[string]any{"ok": true, "movies": len(movies)})
 }
 
@@ -623,7 +623,7 @@ func SaveSeriesConfig(w http.ResponseWriter, r *http.Request, s *AppState) {
 		jsonError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	gh6_purgeRemovedLibrary(s.db, cfg.Series, cfg.Movies, series, cfg.Movies)
+	gh6PurgeRemovedLibrary(s.db, cfg.Series, cfg.Movies, series, cfg.Movies)
 	jsonResponse(w, map[string]any{"ok": true, "series": len(series)})
 }
 

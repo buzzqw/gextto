@@ -143,7 +143,7 @@ func AddAllFromArchive(w http.ResponseWriter, r *http.Request, s *AppState) {
 // returns the libtorrent session values sized for it (disk cache, queued disk
 // bytes, send buffer and peer list).
 func LtMemSuggest(w http.ResponseWriter, r *http.Request, s *AppState) {
-	totalBytes, _ := memory_info()
+	totalBytes, _ := memoryInfo()
 	totalMB := int64(totalBytes / (1024 * 1024))
 
 	var cacheSize, queueMB, sendKB, peerList int64

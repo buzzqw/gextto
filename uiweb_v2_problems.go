@@ -129,7 +129,7 @@ func v2ProblemsViewFrom(s *AppState) v2ProblemsView {
 			GiveUpAt:  "mai",
 			NextRetry: v2ProblemTime(entry.nextRetryAt, now),
 		}
-		if window, _, ok := tev_stallGiveupWindow(cfg, &torrent); ok {
+		if window, _, ok := tevStallGiveupWindow(cfg, &torrent); ok {
 			row.GiveUpAt = v2ProblemTime(entry.stalledSince.Add(window), now)
 		}
 		view.Stalled = append(view.Stalled, row)

@@ -213,15 +213,15 @@ func TestBlocklistWithoutExpiryStaysForever(t *testing.T) {
 
 func TestDeadSwarmBlocklistTTLFollowsTheSetting(t *testing.T) {
 	cfg := &Config{Settings: map[string]string{}}
-	if got := tev_deadSwarmBlocklistTTL(cfg); got != 7*24*time.Hour {
+	if got := tevDeadSwarmBlocklistTTL(cfg); got != 7*24*time.Hour {
 		t.Fatalf("default TTL = %s, want 7 days", got)
 	}
 	cfg.Settings["torrent_dead_swarm_blocklist_days"] = "0"
-	if got := tev_deadSwarmBlocklistTTL(cfg); got != 0 {
+	if got := tevDeadSwarmBlocklistTTL(cfg); got != 0 {
 		t.Fatalf("zero must keep the release blocked forever, got %s", got)
 	}
 	cfg.Settings["torrent_dead_swarm_blocklist_days"] = "30"
-	if got := tev_deadSwarmBlocklistTTL(cfg); got != 30*24*time.Hour {
+	if got := tevDeadSwarmBlocklistTTL(cfg); got != 30*24*time.Hour {
 		t.Fatalf("configured TTL = %s, want 30 days", got)
 	}
 }

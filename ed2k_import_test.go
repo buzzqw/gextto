@@ -130,7 +130,7 @@ func TestEd2kMovieIsImportedByCopy(t *testing.T) {
 	f := newMovieImportFixture(t)
 	session := &movieCopySession{}
 
-	processed, err := tev_completeMovieWithArchive(&f.cfg, f.db, session, &f.event, f.release, f.archive, NewTmdbClient(nil), false)
+	processed, err := tevCompleteMovieWithArchive(&f.cfg, f.db, session, &f.event, f.release, f.archive, NewTmdbClient(nil), false)
 	if err != nil {
 		t.Fatalf("completion: %v", err)
 	}
@@ -162,7 +162,7 @@ func TestEd2kInterruptedImportResumesFromTheLibraryCopy(t *testing.T) {
 	writeFile(t, copied, validMKV(4096)) // same name and size: the copy finished
 
 	session := &movieCopySession{}
-	processed, err := tev_completeMovieWithArchive(&f.cfg, f.db, session, &f.event, f.release, f.archive, NewTmdbClient(nil), false)
+	processed, err := tevCompleteMovieWithArchive(&f.cfg, f.db, session, &f.event, f.release, f.archive, NewTmdbClient(nil), false)
 	if err != nil {
 		t.Fatalf("completion: %v", err)
 	}
@@ -202,7 +202,7 @@ func TestEd2kMovieInferiorIsDiscardedBeforeCopy(t *testing.T) {
 	}
 
 	session := &movieCopySession{}
-	processed, err := tev_completeMovieWithArchive(&f.cfg, f.db, session, &f.event, f.release, f.archive, NewTmdbClient(nil), false)
+	processed, err := tevCompleteMovieWithArchive(&f.cfg, f.db, session, &f.event, f.release, f.archive, NewTmdbClient(nil), false)
 	if err != nil {
 		t.Fatalf("completion: %v", err)
 	}
@@ -397,7 +397,7 @@ func TestEd2kImportIsLoggedOnce(t *testing.T) {
 
 func TestCompletedEd2kDownloadReachesTheHistory(t *testing.T) {
 	f := newMovieImportFixture(t)
-	if _, err := tev_completeMovieWithArchive(&f.cfg, f.db, &movieCopySession{}, &f.event, f.release, f.archive, NewTmdbClient(nil), false); err != nil {
+	if _, err := tevCompleteMovieWithArchive(&f.cfg, f.db, &movieCopySession{}, &f.event, f.release, f.archive, NewTmdbClient(nil), false); err != nil {
 		t.Fatalf("completion: %v", err)
 	}
 	// The entry point of the event worker: without this the row keeps
@@ -552,8 +552,8 @@ func TestCompletedTorrentReportsSkippedVideoFiles(t *testing.T) {
 		t.Fatal(err)
 	}
 	session := &skippedMovieSession{names: []string{"Example.Movie.2024.1080p.WEB-DL.mkv"}}
-	processed, err := tev_completeTorrentOptions(
-		&f.cfg, f.db, session, &f.event, f.release, NewTmdbClient(nil), tev_importSource{preserveSource: true},
+	processed, err := tevCompleteTorrentOptions(
+		&f.cfg, f.db, session, &f.event, f.release, NewTmdbClient(nil), tevImportSource{preserveSource: true},
 	)
 	if processed {
 		t.Fatal("a completion with only skipped files must not be imported")

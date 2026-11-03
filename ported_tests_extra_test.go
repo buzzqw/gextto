@@ -26,7 +26,7 @@ func TestSeedLimitsReachedMatchesPolicy(t *testing.T) {
 		AllTimeDownload: 1000,
 		AllTimeUpload:   600,
 	}
-	ratio, timeReached := tev_seedLimitsReached(&cfg, torrent)
+	ratio, timeReached := tevSeedLimitsReached(&cfg, torrent)
 	if !ratio || timeReached {
 		t.Fatalf("ratio=%v time=%v, want ratio reached only", ratio, timeReached)
 	}
@@ -34,14 +34,14 @@ func TestSeedLimitsReachedMatchesPolicy(t *testing.T) {
 	// Per-torrent infinite seeding (ratio 0) is never "reached".
 	infinite := torrent
 	infinite.SeedRatio = 0
-	if ratio, _ := tev_seedLimitsReached(&cfg, infinite); ratio {
+	if ratio, _ := tevSeedLimitsReached(&cfg, infinite); ratio {
 		t.Fatal("per-torrent infinite seed must not count as ratio reached")
 	}
 
 	// Seed time reached.
 	timed := torrent
 	timed.SeedingSeconds = 90_000
-	if _, timeReached := tev_seedLimitsReached(&cfg, timed); !timeReached {
+	if _, timeReached := tevSeedLimitsReached(&cfg, timed); !timeReached {
 		t.Fatal("seed time should be reached after one day")
 	}
 }
@@ -53,7 +53,7 @@ func TestInfiniteSeedResumeSkipsQueuePaused(t *testing.T) {
 	cfg.Transfer.SeedTimeMinutes = 0
 	policy := newSeedPolicy(cfg, nil)
 	base := models.TorrentView{SeedRatio: 0, Progress: 100, State: "paused", AutoManaged: false}
-	if !tev_needsInfiniteSeedResume(policy, &base) {
+	if !tevNeedsInfiniteSeedResume(policy, &base) {
 		t.Fatal("paused complete torrent with infinite seed should resume")
 	}
 	cases := []models.TorrentView{
@@ -62,7 +62,7 @@ func TestInfiniteSeedResumeSkipsQueuePaused(t *testing.T) {
 		{SeedRatio: 0, Progress: 100, State: "seeding", AutoManaged: false},
 	}
 	for _, torrent := range cases {
-		if tev_needsInfiniteSeedResume(policy, &torrent) {
+		if tevNeedsInfiniteSeedResume(policy, &torrent) {
 			t.Fatalf("unexpected resume for %+v", torrent)
 		}
 	}
@@ -74,32 +74,32 @@ func TestInfiniteSeedResumeSkipsQueuePaused(t *testing.T) {
 	global.Transfer.SeedTimeMinutes = 60
 	finite := newSeedPolicy(global, nil)
 	inheriting := models.TorrentView{SeedRatio: -1, SeedDays: -1, Progress: 100, State: "paused"}
-	if tev_needsInfiniteSeedResume(finite, &inheriting) {
+	if tevNeedsInfiniteSeedResume(finite, &inheriting) {
 		t.Fatal("a global seed limit must keep the torrent paused")
 	}
-	if !tev_needsInfiniteSeedResume(finite, &base) {
+	if !tevNeedsInfiniteSeedResume(finite, &base) {
 		t.Fatal("a per-torrent ratio of 0 still means unlimited, whatever the global limit says")
 	}
 }
 
 func TestStorageMoveBackoffBounded(t *testing.T) {
-	previous := tev_storageMoveBackoff(1)
+	previous := tevStorageMoveBackoff(1)
 	for attempt := uint8(2); attempt <= 6; attempt++ {
-		current := tev_storageMoveBackoff(attempt)
+		current := tevStorageMoveBackoff(attempt)
 		if current < previous {
 			t.Fatalf("backoff decreased at attempt %d: %s < %s", attempt, current, previous)
 		}
 		previous = current
 	}
-	if tev_storageMoveBackoff(200) != 3600*time.Second {
-		t.Fatalf("backoff not capped: %s", tev_storageMoveBackoff(200))
+	if tevStorageMoveBackoff(200) != 3600*time.Second {
+		t.Fatalf("backoff not capped: %s", tevStorageMoveBackoff(200))
 	}
 }
 
 func TestStorageMoveRetryScheduleKeepsPostSeedIntent(t *testing.T) {
 	retries := map[string]StorageMoveRetry{}
 	now := time.Now()
-	tev_scheduleStorageMoveRetry(retries, "ABC123", "/dest", true, now)
+	tevScheduleStorageMoveRetry(retries, "ABC123", "/dest", true, now)
 	entry, ok := retries["abc123"]
 	if !ok {
 		t.Fatal("retry not recorded under the lowercase hash")
@@ -118,7 +118,7 @@ func TestClearEmptyDestinationRemovesOnlyEmptyDirs(t *testing.T) {
 	if err := os.MkdirAll(empty, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	tev_clearEmptyDestination(destination, "Show")
+	tevClearEmptyDestination(destination, "Show")
 	if _, err := os.Stat(empty); err == nil {
 		t.Fatal("empty destination directory was not removed")
 	}
@@ -128,7 +128,7 @@ func TestClearEmptyDestinationRemovesOnlyEmptyDirs(t *testing.T) {
 		t.Fatal(err)
 	}
 	writeFile(t, filepath.Join(full, "file.mkv"), validMKV(16))
-	tev_clearEmptyDestination(destination, "Full")
+	tevClearEmptyDestination(destination, "Full")
 	if _, err := os.Stat(full); err != nil {
 		t.Fatal("non-empty destination directory was removed")
 	}
@@ -140,13 +140,13 @@ func TestStallTimerRequiresRealProgress(t *testing.T) {
 	lastDone := int64(100)
 
 	// No progress for longer than the timeout: stalled.
-	if !tev_stallExpired(&last, &lastDone, now, 100, 5*time.Minute) {
+	if !tevStallExpired(&last, &lastDone, now, 100, 5*time.Minute) {
 		t.Fatal("stalled download not detected")
 	}
 	// Progress resets the timer.
 	last = now.Add(-10 * time.Minute)
 	lastDone = 100
-	if tev_stallExpired(&last, &lastDone, now, 200, 5*time.Minute) {
+	if tevStallExpired(&last, &lastDone, now, 200, 5*time.Minute) {
 		t.Fatal("progress should reset the stall timer")
 	}
 }
@@ -156,7 +156,7 @@ func TestStallRetryBackoff(t *testing.T) {
 	entry := StallWatch{}
 	want := []time.Duration{time.Hour, 3 * time.Hour, 6 * time.Hour, 12 * time.Hour, 24 * time.Hour, 24 * time.Hour}
 	for index, delay := range want {
-		if got := tev_scheduleStallRetry(&entry, now, time.Hour); got != delay {
+		if got := tevScheduleStallRetry(&entry, now, time.Hour); got != delay {
 			t.Fatalf("retry %d delay = %s, want %s", index, got, delay)
 		}
 		if entry.nextRetryAt.Sub(now) != delay {
@@ -165,26 +165,26 @@ func TestStallRetryBackoff(t *testing.T) {
 		now = entry.nextRetryAt
 	}
 	// A longer configured interval is the floor of every step.
-	if got := tev_stallRetryDelay(1, 4*time.Hour); got != 4*time.Hour {
+	if got := tevStallRetryDelay(1, 4*time.Hour); got != 4*time.Hour {
 		t.Fatalf("delay with 4h setting = %s, want 4h", got)
 	}
-	if got := tev_stallRetryDelay(0, 20*time.Minute); got != 20*time.Minute {
+	if got := tevStallRetryDelay(0, 20*time.Minute); got != 20*time.Minute {
 		t.Fatalf("first delay must honour the setting, got %s", got)
 	}
 }
 
 func TestMetadataRetryWarningIsRateLimited(t *testing.T) {
 	now := time.Now()
-	if !tev_metadataRetryWarningDue(time.Time{}, now) {
+	if !tevMetadataRetryWarningDue(time.Time{}, now) {
 		t.Fatal("first metadata retry must be reported")
 	}
-	if tev_metadataRetryWarningDue(now.Add(-30*time.Minute), now) {
+	if tevMetadataRetryWarningDue(now.Add(-30*time.Minute), now) {
 		t.Fatal("metadata retry warning should be rate limited")
 	}
-	if tev_metadataRetryWarningDue(now.Add(-time.Hour), now) {
+	if tevMetadataRetryWarningDue(now.Add(-time.Hour), now) {
 		t.Fatal("one hour is still inside the six-hour window")
 	}
-	if !tev_metadataRetryWarningDue(now.Add(-6*time.Hour), now) {
+	if !tevMetadataRetryWarningDue(now.Add(-6*time.Hour), now) {
 		t.Fatal("metadata retry warning should reappear after six hours")
 	}
 }
@@ -202,7 +202,7 @@ func TestParseSeasonEpisodeFromArchiveFilenames(t *testing.T) {
 		{"Show.mkv", 0, 0, false},
 	}
 	for _, tc := range cases {
-		season, episode, ok := gh5_parseSeasonEpisode(tc.name)
+		season, episode, ok := gh5ParseSeasonEpisode(tc.name)
 		if ok != tc.ok || (ok && (season != tc.season || episode != tc.episode)) {
 			t.Errorf("parse(%q) = %d,%d,%v want %d,%d,%v", tc.name, season, episode, ok, tc.season, tc.episode, tc.ok)
 		}
@@ -234,24 +234,24 @@ func TestBackupDueIntervalAndDailyTime(t *testing.T) {
 
 	cfg := DefaultConfig()
 	cfg.Settings = map[string]string{"backup_schedule_hours": "24"}
-	if !bwm_backupDueAt(&cfg, nil, now) {
+	if !bwmBackupDueAt(&cfg, nil, now) {
 		t.Fatal("no previous backup should be due")
 	}
 	recent := now.Add(-time.Hour)
-	if bwm_backupDueAt(&cfg, &recent, now) {
+	if bwmBackupDueAt(&cfg, &recent, now) {
 		t.Fatal("backup within the interval must not be due")
 	}
 	old := now.Add(-25 * time.Hour)
-	if !bwm_backupDueAt(&cfg, &old, now) {
+	if !bwmBackupDueAt(&cfg, &old, now) {
 		t.Fatal("backup past the interval should be due")
 	}
 
 	// A daily time already reached is due once per day.
 	cfg.Settings = map[string]string{"backup_schedule_at": "10:28"}
-	if !bwm_backupDueAt(&cfg, nil, now) {
+	if !bwmBackupDueAt(&cfg, nil, now) {
 		t.Fatal("daily schedule in the past should be due")
 	}
-	if bwm_backupDueAt(&cfg, &now, now) {
+	if bwmBackupDueAt(&cfg, &now, now) {
 		t.Fatal("daily schedule already run today must not be due again")
 	}
 
@@ -260,11 +260,11 @@ func TestBackupDueIntervalAndDailyTime(t *testing.T) {
 	// now-2 minutes, which crossed back to the previous day.
 	midnight := time.Date(2026, time.March, 15, 0, 1, 0, 0, time.Local)
 	cfg.Settings = map[string]string{"backup_schedule_at": "23:59"}
-	if bwm_backupDueAt(&cfg, nil, midnight) {
+	if bwmBackupDueAt(&cfg, nil, midnight) {
 		t.Fatal("daily schedule later in the day must not be due yet")
 	}
 	cfg.Settings = map[string]string{"backup_schedule_at": "00:00"}
-	if !bwm_backupDueAt(&cfg, nil, midnight) {
+	if !bwmBackupDueAt(&cfg, nil, midnight) {
 		t.Fatal("daily schedule already passed after midnight should be due")
 	}
 }

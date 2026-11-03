@@ -2332,7 +2332,7 @@ func blockDeadSwarmRelease(db *Database, cfg *Config, release *models.Release) {
 	if db == nil || cfg == nil || cfg.DryRun || release == nil {
 		return
 	}
-	ttl := tev_deadSwarmBlocklistTTL(cfg)
+	ttl := tevDeadSwarmBlocklistTTL(cfg)
 	var err error
 	if ttl <= 0 {
 		err = db.Blocklist(release, "dead_swarm")

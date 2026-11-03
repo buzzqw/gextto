@@ -174,7 +174,7 @@ func TmdbDiscover(w http.ResponseWriter, r *http.Request, s *AppState) {
 		return
 	}
 	var input DiscoverInput
-	if err := gh6_decodeOptionalJSON(r, &input); err != nil {
+	if err := gh6DecodeOptionalJSON(r, &input); err != nil {
 		jsonError(w, http.StatusBadRequest, err.Error())
 		return
 	}
@@ -211,7 +211,7 @@ func TmdbDiscover(w http.ResponseWriter, r *http.Request, s *AppState) {
 		return
 	}
 	for index := range items {
-		items[index].InLibrary = gh_tmdbItemInLibrary(cfg, kind, items[index])
+		items[index].InLibrary = ghTmdbItemInLibrary(cfg, kind, items[index])
 	}
 	jsonResponse(w, map[string]any{"ok": true, "kind": kind, "items": items})
 }
@@ -285,7 +285,7 @@ func TmdbSearch(w http.ResponseWriter, r *http.Request, s *AppState) {
 	if !tmdbFailed && len(items) > 0 {
 		values := make([]any, 0, len(items))
 		for _, item := range items {
-			item.InLibrary = gh_tmdbItemInLibrary(cfg, input.Kind, item)
+			item.InLibrary = ghTmdbItemInLibrary(cfg, input.Kind, item)
 			encoded, _ := json.Marshal(item)
 			var mapped map[string]any
 			_ = json.Unmarshal(encoded, &mapped)

@@ -178,7 +178,7 @@ func healthClampPercent(value float64) float64 {
 func healthFloatPtr(value float64) *float64 { return &value }
 
 // cpu_snapshot reads `(total, idle)` from `/proc/stat`.
-func cpu_snapshot() (uint64, uint64, bool) {
+func cpuSnapshot() (uint64, uint64, bool) {
 	contents, err := os.ReadFile("/proc/stat")
 	if err != nil {
 		return 0, 0, false
@@ -216,8 +216,8 @@ func cpu_snapshot() (uint64, uint64, bool) {
 // system_cpu_percent is the system CPU usage percent computed from the delta of
 // two consecutive /proc/stat readings. Close calls reuse the previous value; the
 // very first call performs a short measurement so it never returns nil.
-func system_cpu_percent() *float64 {
-	total, idle, ok := cpu_snapshot()
+func systemCpuPercent() *float64 {
+	total, idle, ok := cpuSnapshot()
 	if !ok {
 		return nil
 	}
@@ -240,7 +240,7 @@ func system_cpu_percent() *float64 {
 	cpuSampleMu.Unlock()
 	// First sample: measure over a short window so a value is available at once.
 	time.Sleep(150 * time.Millisecond)
-	totalLater, idleLater, ok := cpu_snapshot()
+	totalLater, idleLater, ok := cpuSnapshot()
 	if !ok {
 		return nil
 	}
@@ -264,7 +264,7 @@ func system_cpu_percent() *float64 {
 // process_cpu_percent is the CPU percent of the current process, computed from
 // its utime+stime ticks. The value refers to a single core (it can exceed 100%
 // with multiple threads).
-func process_cpu_percent() *float64 {
+func processCpuPercent() *float64 {
 	contents, err := os.ReadFile("/proc/self/stat")
 	if err != nil {
 		return nil
@@ -319,7 +319,7 @@ func process_cpu_percent() *float64 {
 
 // process_uptime_seconds returns seconds since the current process started,
 // using procfs start ticks.
-func process_uptime_seconds() uint64 {
+func processUptimeSeconds() uint64 {
 	data, err := os.ReadFile("/proc/self/stat")
 	if err != nil {
 		return 0
@@ -387,7 +387,7 @@ func ProcessMetrics() ProcessMetricsSnapshot {
 	runtime.ReadMemStats(&memory)
 	return ProcessMetricsSnapshot{
 		ResidentBytes:     resident,
-		ProcessCPUPercent: process_cpu_percent(),
+		ProcessCPUPercent: processCpuPercent(),
 		GoHeapBytes:       memory.HeapAlloc,
 		GoHeapInuseBytes:  memory.HeapInuse,
 		GoGoroutines:      runtime.NumGoroutine(),
@@ -417,12 +417,12 @@ func CheckWithPaths(paths *HealthPaths) Health {
 	trashPath := paths.TrashPath
 	downloadPath := paths.DownloadPath
 	writable := dataDirWritable(dataDir)
-	diskTotalBytes, diskFreeBytes := disk_space(downloadPath)
+	diskTotalBytes, diskFreeBytes := diskSpace(downloadPath)
 	resident := healthResidentBytes()
 	uptimeSeconds := healthUptimeSeconds()
 	loadAverage := healthLoadAverage()
-	trashFileCount, trashBytes := tree_stats(trashPath)
-	memoryTotalBytes, memoryAvailableBytes := memory_info()
+	trashFileCount, trashBytes := treeStats(trashPath)
+	memoryTotalBytes, memoryAvailableBytes := memoryInfo()
 
 	status := "degraded"
 	if writable {
@@ -431,7 +431,7 @@ func CheckWithPaths(paths *HealthPaths) Health {
 	var ramdisk *RamDiskInfo
 	if paths.RamdiskPath != "" {
 		if healthIsDir(paths.RamdiskPath) {
-			totalBytes, freeBytes := disk_space(paths.RamdiskPath)
+			totalBytes, freeBytes := diskSpace(paths.RamdiskPath)
 			ramdisk = &RamDiskInfo{
 				Path:       paths.RamdiskPath,
 				TotalBytes: totalBytes,
@@ -450,16 +450,16 @@ func CheckWithPaths(paths *HealthPaths) Health {
 		DiskTotalBytes:       diskTotalBytes,
 		DiskFreeBytes:        diskFreeBytes,
 		UptimeSeconds:        uptimeSeconds,
-		ProcessUptimeSeconds: process_uptime_seconds(),
+		ProcessUptimeSeconds: processUptimeSeconds(),
 		LoadAverage:          loadAverage,
-		CPUPercent:           system_cpu_percent(),
-		ProcessCPUPercent:    process_cpu_percent(),
+		CPUPercent:           systemCpuPercent(),
+		ProcessCPUPercent:    processCpuPercent(),
 		TrashFileCount:       trashFileCount,
 		TrashBytes:           trashBytes,
 		Disks:                disks(),
-		Paths:                path_checks(paths),
+		Paths:                pathChecks(paths),
 		Ramdisk:              ramdisk,
-		LastErrors:           recent_errors(filepath.Join(dataDir, "gextto.log"), 10),
+		LastErrors:           recentErrors(filepath.Join(dataDir, "gextto.log"), 10),
 	}
 }
 
@@ -503,7 +503,7 @@ func healthIsDir(path string) bool {
 // path_checks verifies existence and writability of the operational paths. The
 // probe is cached (dataDirWritable) and, on a network share, asks the server
 // for write permission instead of writing, so NAS disks are not woken up.
-func path_checks(paths *HealthPaths) []PathCheck {
+func pathChecks(paths *HealthPaths) []PathCheck {
 	checks := []PathCheck{}
 	add := func(label, path string, probe bool) {
 		exists := healthIsDir(path)
@@ -533,7 +533,7 @@ func path_checks(paths *HealthPaths) []PathCheck {
 const recentErrorsTailBytes = 256 * 1024
 
 // recent_errors returns the last `limit` ERROR log lines, most recent last.
-func recent_errors(logPath string, limit int) []string {
+func recentErrors(logPath string, limit int) []string {
 	contents, err := readFileTail(logPath, recentErrorsTailBytes)
 	if err != nil {
 		return []string{}
@@ -628,7 +628,7 @@ func disks() []DiskInfo {
 			continue
 		}
 		mount = strings.ReplaceAll(mount, `\040`, " ")
-		totalBytes, freeBytes := disk_space(mount)
+		totalBytes, freeBytes := diskSpace(mount)
 		if totalBytes == 0 {
 			continue
 		}
@@ -655,7 +655,7 @@ func healthContains(values []string, needle string) bool {
 	return false
 }
 
-func memory_info() (uint64, uint64) {
+func memoryInfo() (uint64, uint64) {
 	contents, err := os.ReadFile("/proc/meminfo")
 	if err != nil {
 		return 0, 0
@@ -680,7 +680,7 @@ func memory_info() (uint64, uint64) {
 	return field("MemTotal:"), field("MemAvailable:")
 }
 
-func tree_stats(path string) (uint64, uint64) {
+func treeStats(path string) (uint64, uint64) {
 	entries, err := os.ReadDir(path)
 	if err != nil {
 		return 0, 0
@@ -690,7 +690,7 @@ func tree_stats(path string) (uint64, uint64) {
 	for _, entry := range entries {
 		entryPath := filepath.Join(path, entry.Name())
 		if healthIsDir(entryPath) {
-			nestedFiles, nestedBytes := tree_stats(entryPath)
+			nestedFiles, nestedBytes := treeStats(entryPath)
 			files = healthSatAdd(files, nestedFiles)
 			bytes = healthSatAdd(bytes, nestedBytes)
 			continue
@@ -722,10 +722,10 @@ func probeWritable(path string) bool {
 	if networkFilesystem(path) {
 		return syscall.Access(path, 0x2) == nil // W_OK
 	}
-	return write_probe(path)
+	return writeProbe(path)
 }
 
-func write_probe(dataDir string) bool {
+func writeProbe(dataDir string) bool {
 	path := filepath.Join(dataDir, fmt.Sprintf(".health-probe-%d-%d", os.Getpid(), healthProbeSeq.Add(1)))
 	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o666)
 	if err != nil {
@@ -739,7 +739,7 @@ func write_probe(dataDir string) bool {
 	return os.Remove(path) == nil
 }
 
-func disk_space(path string) (uint64, uint64) {
+func diskSpace(path string) (uint64, uint64) {
 	var stats syscall.Statfs_t
 	if err := syscall.Statfs(path, &stats); err != nil {
 		return 0, 0

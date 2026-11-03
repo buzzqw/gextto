@@ -184,7 +184,7 @@ func ComicWeeklyLinks(w http.ResponseWriter, r *http.Request, s *AppState) {
 	jsonStatus(w, http.StatusOK, map[string]any{"ok": true, "post_url": url, "links": links, "date": input.Date})
 }
 
-type gh1_ComicWeeklySettings struct {
+type gh1ComicWeeklySettings struct {
 	Enabled      *bool   `json:"enabled"`
 	FromDate     *string `json:"from_date"`
 	HistoryLimit *int64  `json:"history_limit"`
@@ -231,7 +231,7 @@ func ComicDownloadPause(w http.ResponseWriter, r *http.Request, s *AppState) {
 }
 
 func ComicWeeklySettings(w http.ResponseWriter, r *http.Request, s *AppState) {
-	var input gh1_ComicWeeklySettings
+	var input gh1ComicWeeklySettings
 	if err := decodeJSON(r, &input); err != nil {
 		jsonError(w, http.StatusBadRequest, err.Error())
 		return

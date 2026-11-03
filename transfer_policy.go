@@ -184,7 +184,7 @@ func preferredDownloadPath(cfg *Config) string {
 // (MemAvailable) in bytes; ok is false when it cannot be determined. It is a
 // variable so tests can pin it; the default reads /proc/meminfo.
 var ramdiskHostMemoryAvailable = func() (uint64, bool) {
-	_, available := memory_info()
+	_, available := memoryInfo()
 	return available, available > 0
 }
 

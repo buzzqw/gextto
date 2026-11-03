@@ -20,7 +20,7 @@ import (
 // minute so the daily time is accurate, and persists the last backup time so it
 // is not repeated on every restart.
 func backupWorker(state *AppState) {
-	last := bwm_loadLastBackup(state.cfg.DataDir)
+	last := bwmLoadLastBackup(state.cfg.DataDir)
 	for {
 		cfg, err := LoadConfig(state.config_path)
 		if err != nil {
@@ -30,14 +30,14 @@ func backupWorker(state *AppState) {
 			}
 			continue
 		}
-		if cfg.Active && bwm_backupDue(&cfg, last) {
+		if cfg.Active && bwmBackupDue(&cfg, last) {
 			notifier := FromConfig(&cfg)
-			if err := bwm_executeScheduledBackup(&cfg, notifier); err != nil {
+			if err := bwmExecuteScheduledBackup(&cfg, notifier); err != nil {
 				logging.Error("scheduled backup failed", "error", err)
 			} else {
 				now := time.Now()
 				last = &now
-				bwm_saveLastBackup(cfg.DataDir, now)
+				bwmSaveLastBackup(cfg.DataDir, now)
 			}
 		}
 		if !state.SleepBackground(60 * time.Second) {
@@ -58,7 +58,7 @@ func mediaInfoBackfillWorker(state *AppState) {
 		cfg := latestConfig(state)
 		enabled := true
 		if value, ok := cfg.Settings["media_info_backfill_enabled"]; ok {
-			enabled = bwm_truthy(value)
+			enabled = bwmTruthy(value)
 		}
 		intervalMinutes := int64(60)
 		if parsed, err := strconv.ParseInt(strings.TrimSpace(cfg.Settings["media_info_backfill_interval_minutes"]), 10, 64); err == nil {
@@ -100,20 +100,20 @@ func mediaInfoBackfillWorker(state *AppState) {
 				if err != nil {
 					logging.Warn("MediaInfo backfill run failed", "error", err)
 				} else {
-					candidates := bwm_reportCount(report, "candidates")
+					candidates := bwmReportCount(report, "candidates")
 					if candidates > 0 {
 						missingFiles, _ := report["missing_files"].([]string)
 						probedNames, _ := report["probed_names"].([]string)
-						if text := mediaInfoBackfillText(probedNames, int(bwm_reportCount(report, "failed")), int(bwm_reportCount(report, "skipped")), int(bwm_reportCount(report, "new_details"))); text != "" {
+						if text := mediaInfoBackfillText(probedNames, int(bwmReportCount(report, "failed")), int(bwmReportCount(report, "skipped")), int(bwmReportCount(report, "new_details"))); text != "" {
 							logging.Info(text)
 						}
 						logging.Debug(
 							"MediaInfo backfill report",
 							"candidates", candidates,
-							"analyzed", bwm_reportCount(report, "probed"),
-							"new_details", bwm_reportCount(report, "new_details"),
-							"failed", bwm_reportCount(report, "failed"),
-							"skipped_missing", bwm_reportCount(report, "skipped"),
+							"analyzed", bwmReportCount(report, "probed"),
+							"new_details", bwmReportCount(report, "new_details"),
+							"failed", bwmReportCount(report, "failed"),
+							"skipped_missing", bwmReportCount(report, "skipped"),
 							"missing_files", strings.Join(missingFiles, " | "),
 						)
 					}
@@ -231,18 +231,18 @@ func flareSolverrSweeperWorker(state *AppState) {
 // ---------------------------------------------------------------------------
 
 // bwm_truthy ports the `matches!(value, "yes" | "true" | "1")` setting check.
-func bwm_truthy(value string) bool {
+func bwmTruthy(value string) bool {
 	return settingTruthy(value)
 }
 
 // bwm_backupStatePath is the file holding the last automatic backup time.
-func bwm_backupStatePath(dataDir string) string {
+func bwmBackupStatePath(dataDir string) string {
 	return filepath.Join(dataDir, ".gextto-backup-last")
 }
 
 // bwm_loadLastBackup mirrors the web module `load_last_backup`.
-func bwm_loadLastBackup(dataDir string) *time.Time {
-	text, err := os.ReadFile(bwm_backupStatePath(dataDir))
+func bwmLoadLastBackup(dataDir string) *time.Time {
+	text, err := os.ReadFile(bwmBackupStatePath(dataDir))
 	if err != nil {
 		return nil
 	}
@@ -255,20 +255,20 @@ func bwm_loadLastBackup(dataDir string) *time.Time {
 }
 
 // bwm_saveLastBackup mirrors the web module `save_last_backup`.
-func bwm_saveLastBackup(dataDir string, when time.Time) {
-	_ = os.WriteFile(bwm_backupStatePath(dataDir), []byte(when.Format(time.RFC3339)), 0o644)
+func bwmSaveLastBackup(dataDir string, when time.Time) {
+	_ = os.WriteFile(bwmBackupStatePath(dataDir), []byte(when.Format(time.RFC3339)), 0o644)
 }
 
 // bwm_backupDue mirrors the web module `backup_due`: `backup_schedule_at` (HH:MM) takes
 // precedence (daily at that local time, at most once a day), otherwise the
 // `backup_schedule_hours` interval is measured from the last backup.
-func bwm_backupDue(cfg *Config, last *time.Time) bool {
-	return bwm_backupDueAt(cfg, last, time.Now())
+func bwmBackupDue(cfg *Config, last *time.Time) bool {
+	return bwmBackupDueAt(cfg, last, time.Now())
 }
 
 // bwm_backupDueAt is bwm_backupDue with an explicit "now", so the schedule can
 // be checked at a fixed instant (tests) without depending on the wall clock.
-func bwm_backupDueAt(cfg *Config, last *time.Time, now time.Time) bool {
+func bwmBackupDueAt(cfg *Config, last *time.Time, now time.Time) bool {
 	now = now.Local()
 	if at := strings.TrimSpace(cfg.Settings["backup_schedule_at"]); at != "" {
 		if parsed, err := time.Parse("15:04", at); err == nil {
@@ -297,13 +297,13 @@ func bwm_backupDueAt(cfg *Config, last *time.Time, now time.Time) bool {
 
 // bwm_executeScheduledBackup mirrors the web module `execute_scheduled_backup`: local
 // snapshot, FTP, cloud copy and notifications.
-func bwm_executeScheduledBackup(cfg *Config, notifier *Notifier) error {
+func bwmExecuteScheduledBackup(cfg *Config, notifier *Notifier) error {
 	dataDir := cfg.DataDir
 	root := filepath.Join(dataDir, "backups")
 	retain := backupRetention(cfg)
 	ftp := backupFtpConfig(cfg)
 	cloudDir := backupCloudDir(cfg)
-	sendTelegram := bwm_truthy(cfg.Settings["backup_send_telegram"])
+	sendTelegram := bwmTruthy(cfg.Settings["backup_send_telegram"])
 
 	steps, err := runBackupSteps(dataDir, root, retain, ftp, cloudDir, BackupExtraPaths(cfg.Settings["backup_extra_paths"]))
 	if err != nil {
@@ -333,10 +333,10 @@ func bwm_executeScheduledBackup(cfg *Config, notifier *Notifier) error {
 		"ftp_uploaded":      steps.ftpUploaded,
 		"ftp_host":          steps.ftpHost,
 		"ftp_remote":        steps.ftpRemote,
-		"ftp_error":         bg_derefStr(steps.ftpError),
+		"ftp_error":         bgDerefStr(steps.ftpError),
 		"cloud_copied":      steps.cloudCopied,
 		"cloud_destination": steps.cloudDestination,
-		"cloud_error":       bg_derefStr(steps.cloudError),
+		"cloud_error":       bgDerefStr(steps.cloudError),
 		"telegram_uploaded": telegramUploaded,
 		"telegram_parts":    telegramParts,
 		"telegram_error":    telegramError,
@@ -346,7 +346,7 @@ func bwm_executeScheduledBackup(cfg *Config, notifier *Notifier) error {
 
 // bwm_reportCount reads a numeric counter from a backfill report the way
 // `as_u64().unwrap_or(0)` does.
-func bwm_reportCount(report map[string]any, key string) uint64 {
+func bwmReportCount(report map[string]any, key string) uint64 {
 	switch value := report[key].(type) {
 	case int:
 		if value < 0 {

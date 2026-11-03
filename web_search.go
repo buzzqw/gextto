@@ -125,7 +125,7 @@ func IndexerTest(w http.ResponseWriter, r *http.Request, s *AppState) {
 	if isManagerSource(input) {
 		kind = managerKind(input)
 	}
-	text := indexerTestText(kind, input.Name, domain_of(rawURL), reachable, ok, status, torznabError)
+	text := indexerTestText(kind, input.Name, domainOf(rawURL), reachable, ok, status, torznabError)
 	if ok {
 		logging.Info(text)
 	} else {
@@ -342,7 +342,7 @@ func trashRoot(cfg *Config) string {
 // at its deadline and gets the partial answer, while the background job goes on
 // to the end.
 type missingSearchOutcome struct {
-	Results       []gh2_episodeResult
+	Results       []gh2EpisodeResult
 	Gaps          [][2]int64
 	TotalMissing  int
 	Searched      int
@@ -431,13 +431,13 @@ func searchMissingEpisodes(ctx context.Context, s *AppState, cfg *Config, series
 		wg.Wait()
 	}
 	cancelled := ctx.Err() != nil
-	results := []gh2_episodeResult{}
+	results := []gh2EpisodeResult{}
 	perGap := make([][]episodeSource, len(gaps))
 	for index, gap := range gaps {
 		season, episode := gap[0], gap[1]
-		episodeResults := gh2_storedSeriesEpisodeSources(s, series, season, episode)
+		episodeResults := gh2StoredSeriesEpisodeSources(s, series, season, episode)
 		for releaseIndex := range liveReleases[index] {
-			if gh2_releaseMatchesSeriesEpisode(&liveReleases[index][releaseIndex], series, season, episode) {
+			if gh2ReleaseMatchesSeriesEpisode(&liveReleases[index][releaseIndex], series, season, episode) {
 				episodeResults = append(episodeResults, episodeSource{Release: liveReleases[index][releaseIndex], Origin: episodeOriginIndexer})
 			}
 		}
@@ -488,7 +488,7 @@ func searchMissingEpisodes(ctx context.Context, s *AppState, cfg *Config, series
 					continue
 				}
 				for _, release := range candidates {
-					if gh2_releaseMatchesSeriesEpisode(&release, series, season, candidateGap[1]) {
+					if gh2ReleaseMatchesSeriesEpisode(&release, series, season, candidateGap[1]) {
 						perGap[index] = append(perGap[index], episodeSource{Release: release, Origin: episodeOriginED2K})
 					}
 				}
@@ -506,7 +506,7 @@ func searchMissingEpisodes(ctx context.Context, s *AppState, cfg *Config, series
 			listed = lastResortEpisodeSources(perGap[index], cfg, series)
 		}
 		for _, result := range listed {
-			results = append(results, gh2_episodeResult{
+			results = append(results, gh2EpisodeResult{
 				Release: result.Release,
 				Origin:  result.Origin,
 				Season:  season,
@@ -515,7 +515,7 @@ func searchMissingEpisodes(ctx context.Context, s *AppState, cfg *Config, series
 		}
 	}
 	seen := map[string]struct{}{}
-	deduped := make([]gh2_episodeResult, 0, len(results))
+	deduped := make([]gh2EpisodeResult, 0, len(results))
 	for _, result := range results {
 		key, ok := releaseDedupKey(&result.Release)
 		if !ok {
@@ -603,7 +603,7 @@ func DecodeOptionalJSON(w http.ResponseWriter, r *http.Request, target any) bool
 	return true
 }
 
-func gh6_decodeOptionalJSON(r *http.Request, target any) error {
+func gh6DecodeOptionalJSON(r *http.Request, target any) error {
 	if r.ContentLength == 0 {
 		return nil
 	}

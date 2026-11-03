@@ -67,21 +67,21 @@ func TestArchivedPackSourceDisposableRequiresCopy(t *testing.T) {
 	}
 
 	// Not completed yet: the source must never be removed.
-	if tev_archivedPackSourceDisposable(db, hash, "/tmp/torrents") {
+	if tevArchivedPackSourceDisposable(db, hash, "/tmp/torrents") {
 		t.Fatal("incomplete pack marked disposable")
 	}
 	if err := db.MarkPackCompleted(release, nil, "/nas/Show", 1); err != nil {
 		t.Fatalf("mark pack completed: %v", err)
 	}
 	// Archived outside the torrent storage: the source is disposable.
-	if !tev_archivedPackSourceDisposable(db, hash, "/tmp/torrents") {
+	if !tevArchivedPackSourceDisposable(db, hash, "/tmp/torrents") {
 		t.Fatal("archived pack not marked disposable")
 	}
 	// A processed path inside the torrent storage is not a copy.
 	if _, err := db.db.Exec("UPDATE torrent_meta SET processed_path=?1 WHERE hash=?2", "/tmp/torrents/Show S01", hash); err != nil {
 		t.Fatalf("update processed path: %v", err)
 	}
-	if tev_archivedPackSourceDisposable(db, hash, "/tmp/torrents") {
+	if tevArchivedPackSourceDisposable(db, hash, "/tmp/torrents") {
 		t.Fatal("processed path inside the torrent storage must not be disposable")
 	}
 }
@@ -94,13 +94,13 @@ func TestEpisodeSearchMatchesPartialAndCompleteSeasonPacks(t *testing.T) {
 	if partial == nil || complete == nil {
 		t.Fatal("releases not parsed")
 	}
-	if !gh7_release_matches_series_episode(partial, series, 1, 5) {
+	if !gh7ReleaseMatchesSeriesEpisode(partial, series, 1, 5) {
 		t.Fatal("partial pack should match episode 5")
 	}
-	if !gh7_release_matches_series_episode(complete, series, 1, 5) {
+	if !gh7ReleaseMatchesSeriesEpisode(complete, series, 1, 5) {
 		t.Fatal("complete pack should match episode 5")
 	}
-	if gh7_release_matches_series_episode(partial, series, 1, 9) {
+	if gh7ReleaseMatchesSeriesEpisode(partial, series, 1, 9) {
 		t.Fatal("partial pack must not match episode 9")
 	}
 }

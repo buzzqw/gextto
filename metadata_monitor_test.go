@@ -64,7 +64,7 @@ func TestMetadataProbeGivesUpWhenNobodyAnswers(t *testing.T) {
 	session := &stubTorrentSession{list: []models.TorrentView{{
 		Hash: metadataTestHash, Name: "Dead.Magnet", State: "downloading_metadata",
 	}}}
-	started := time.Now().Add(-tev_metadataProbeWindow - time.Minute)
+	started := time.Now().Add(-tevMetadataProbeWindow - time.Minute)
 	MonitorMetadata(&cfg, session, db, FromConfig(&cfg),
 		map[string]time.Time{metadataTestHash: started}, map[string]time.Time{metadataTestHash: started}, map[string]time.Time{})
 	if len(session.removed) != 1 {

@@ -432,12 +432,12 @@ func ArchiveAndRemoveTorrent(s *AppState, cfg *Config, hash string) (bool, error
 			}
 			processed = append(processed, partial...)
 		}
-		allDiscarded := tev_allPackFilesDiscarded(processed)
+		allDiscarded := tevAllPackFilesDiscarded(processed)
 		if allDiscarded {
 			if s.db != nil {
 				_ = s.db.MarkTorrentError(hash, "season pack inferior to existing files")
 			}
-			tev_discardCompletedSource(cfg, s.db, s.activeEngine(), &models.TorrentEvent{
+			tevDiscardCompletedSource(cfg, s.db, s.activeEngine(), &models.TorrentEvent{
 				Hash:     hash,
 				Name:     targetTorrent.Name,
 				SavePath: targetTorrent.SavePath,
@@ -544,7 +544,7 @@ func ArchiveAndRemoveTorrent(s *AppState, cfg *Config, hash string) (bool, error
 			}
 			video = v
 		} else {
-			v, err := tev_resolveEpisodeCompletedFile(source, release)
+			v, err := tevResolveEpisodeCompletedFile(source, release)
 			if err != nil {
 				return false, err
 			}
@@ -578,7 +578,7 @@ func ArchiveAndRemoveTorrent(s *AppState, cfg *Config, hash string) (bool, error
 			Name:     filepath.Base(target),
 			SavePath: destination,
 		}
-		processed, procErr := tev_completeTorrentOptions(cfg, s.db, s.activeEngine(), &processedEvent, release, s.tmdb, tev_importSource{})
+		processed, procErr := tevCompleteTorrentOptions(cfg, s.db, s.activeEngine(), &processedEvent, release, s.tmdb, tevImportSource{})
 		if procErr != nil {
 			return false, fmt.Errorf("post-processing failed: %w", procErr)
 		}

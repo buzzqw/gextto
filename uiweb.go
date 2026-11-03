@@ -769,14 +769,14 @@ func uiHealthStatusTileFrom(s *AppState) uiHealthData {
 	health := Health{
 		Status:          status,
 		DataDirWritable: writable,
-		Paths:           path_checks(paths),
+		Paths:           pathChecks(paths),
 	}
 	return uiHealthData{Health: health, StatusReason: healthStatusReasonIn(health, func(text string) string { return uiText(s, text) })}
 }
 
 // uiHealthMemoryTileFrom builds the Memoria processo tile.
 func uiHealthMemoryTileFrom(s *AppState) uiHealthData {
-	memoryTotalBytes, _ := memory_info()
+	memoryTotalBytes, _ := memoryInfo()
 	return uiHealthData{Health: Health{
 		ResidentBytes:    healthResidentBytes(),
 		MemoryTotalBytes: memoryTotalBytes,
@@ -785,7 +785,7 @@ func uiHealthMemoryTileFrom(s *AppState) uiHealthData {
 
 // uiHealthUptimeTileFrom builds the Uptime tile.
 func uiHealthUptimeTileFrom(s *AppState) uiHealthData {
-	processUptime := process_uptime_seconds()
+	processUptime := processUptimeSeconds()
 	uptime := healthUptimeSeconds()
 	return uiHealthData{
 		Health:        Health{ProcessUptimeSeconds: processUptime, UptimeSeconds: uptime},
@@ -797,7 +797,7 @@ func uiHealthUptimeTileFrom(s *AppState) uiHealthData {
 // uiHealthDiskTileFrom builds the Disco dati tile on its own so it can refresh
 // hourly without re-running the rest of the health check.
 func uiHealthDiskTileFrom(s *AppState) uiHealthData {
-	totalBytes, freeBytes := disk_space(uiHealthPathsFrom(s).DownloadPath)
+	totalBytes, freeBytes := diskSpace(uiHealthPathsFrom(s).DownloadPath)
 	usedPct := "n/d"
 	if totalBytes > 0 {
 		used := totalBytes - freeBytes

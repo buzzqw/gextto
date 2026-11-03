@@ -26,7 +26,7 @@ func TestBGSpeedJumpedUsesTenPercent(t *testing.T) {
 		{0, 0, false},
 	}
 	for _, tc := range cases {
-		if got := bg_speedJumped(tc.prev, tc.next); got != tc.want {
+		if got := bgSpeedJumped(tc.prev, tc.next); got != tc.want {
 			t.Errorf("bg_speedJumped(%d, %d) = %v, want %v", tc.prev, tc.next, got, tc.want)
 		}
 	}
@@ -50,7 +50,7 @@ func TestBGSpeedWorthLoggingConsidersTheTrend(t *testing.T) {
 		{"large reversal", 1000, 800, 1000, true},
 	}
 	for _, tc := range cases {
-		if got := bg_speedWorthLogging(tc.prevLogged, tc.current, tc.prevApplied); got != tc.want {
+		if got := bgSpeedWorthLogging(tc.prevLogged, tc.current, tc.prevApplied); got != tc.want {
 			t.Errorf("%s: bg_speedWorthLogging(%d, %d, %d) = %v, want %v", tc.name, tc.prevLogged, tc.current, tc.prevApplied, got, tc.want)
 		}
 	}
@@ -62,18 +62,18 @@ func TestBGSpeedWorthLoggingConsidersTheTrend(t *testing.T) {
 // seconds later.
 func TestBGAdoptsTheGuardsFirstCapLine(t *testing.T) {
 	last := time.Unix(1_800_000_000, 0)
-	if at, ok := bg_adoptFirstCap(last, time.Time{}); ok || !at.Equal(last) {
+	if at, ok := bgAdoptFirstCap(last, time.Time{}); ok || !at.Equal(last) {
 		t.Fatalf("no guard line: adopted=%v at=%v", ok, at)
 	}
-	if _, ok := bg_adoptFirstCap(last, last); ok {
+	if _, ok := bgAdoptFirstCap(last, last); ok {
 		t.Fatal("adopted the line the logger already printed")
 	}
 	guardAt := last.Add(14 * time.Second)
-	at, ok := bg_adoptFirstCap(last, guardAt)
+	at, ok := bgAdoptFirstCap(last, guardAt)
 	if !ok || !at.Equal(guardAt) {
 		t.Fatalf("guard line after the last one: adopted=%v at=%v", ok, at)
 	}
-	if _, ok := bg_adoptFirstCap(guardAt.Add(time.Second), guardAt); ok {
+	if _, ok := bgAdoptFirstCap(guardAt.Add(time.Second), guardAt); ok {
 		t.Fatal("adopted an older guard line")
 	}
 }
@@ -90,7 +90,7 @@ func TestBGSpeedDeltaText(t *testing.T) {
 		{1000, 0, "to unlimited"},
 		{1000, 1000, "="},
 	} {
-		if got := bg_speedDeltaText(tc.prev, tc.next); got != tc.want {
+		if got := bgSpeedDeltaText(tc.prev, tc.next); got != tc.want {
 			t.Errorf("bg_speedDeltaText(%d, %d) = %q, want %q", tc.prev, tc.next, got, tc.want)
 		}
 	}
@@ -101,23 +101,23 @@ func TestBGSpeedDeltaText(t *testing.T) {
 func TestBGSpeedMaxTextShowsTheConfiguredCeiling(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.Settings = map[string]string{"torrent_speed_auto": "1"}
-	if got := bg_speedMaxText(&cfg); got != "no line max" {
+	if got := bgSpeedMaxText(&cfg); got != "no line max" {
 		t.Fatalf("auto max text = %q, want no line max", got)
 	}
 	cfg.Settings["torrent_line_max_down_kib"] = "20000"
 	cfg.Settings["torrent_line_max_up_kib"] = "2000"
-	if got := bg_speedMaxText(&cfg); got != "line max 19.5 MB/s down, 2.0 MB/s up" {
+	if got := bgSpeedMaxText(&cfg); got != "line max 19.5 MB/s down, 2.0 MB/s up" {
 		t.Fatalf("line max text = %q", got)
 	}
 	cfg.Settings = map[string]string{}
 	cfg.Transfer.DownloadLimitKib, cfg.Transfer.UploadLimitKib = 8000, 1000
-	if got := bg_speedMaxText(&cfg); got != "" {
+	if got := bgSpeedMaxText(&cfg); got != "" {
 		t.Fatalf("fixed limits should not repeat the maximum, got %q", got)
 	}
 }
 
 func TestAutotuneDigestAllUnlimited(t *testing.T) {
-	var g bg_autotuneDigest
+	var g bgAutotuneDigest
 	start := time.Date(2026, 10, 23, 10, 0, 0, 0, time.UTC)
 	if !g.add(start, 0, 0, "free") {
 		t.Fatal("the first step was not logged")
@@ -134,25 +134,25 @@ func TestAutotuneDigestAllUnlimited(t *testing.T) {
 }
 
 func TestAutotuneStepTextDoesNotRepeatUnlimited(t *testing.T) {
-	if got := bg_autotuneStepText(0, 0, []string{"upload to unlimited"}, "", ""); got != "🎚️ Autotune: no speed limit" {
+	if got := bgAutotuneStepText(0, 0, []string{"upload to unlimited"}, "", ""); got != "🎚️ Autotune: no speed limit" {
 		t.Fatalf("both unlimited = %q", got)
 	}
-	if got := bg_autotuneStepText(128, 0, []string{"download -78%"}, "", ""); got != "🎚️ Autotune: download 128 KB/s, upload unlimited · download -78%" {
+	if got := bgAutotuneStepText(128, 0, []string{"download -78%"}, "", ""); got != "🎚️ Autotune: download 128 KB/s, upload unlimited · download -78%" {
 		t.Fatalf("download step = %q", got)
 	}
-	if got := bg_autotuneStepText(0, 71, []string{"upload from unlimited"}, "", ""); got != "🎚️ Autotune: download unlimited, upload 71 KB/s · upload from unlimited" {
+	if got := bgAutotuneStepText(0, 71, []string{"upload from unlimited"}, "", ""); got != "🎚️ Autotune: download unlimited, upload 71 KB/s · upload from unlimited" {
 		t.Fatalf("upload step = %q", got)
 	}
 }
 
 func TestSpeedStatusTextSpeaksPlainly(t *testing.T) {
-	if got := bg_speedStatusText(0, 0, "Auto", "no line max", ""); got != "🚦 Speed: no speed limit (Auto)" {
+	if got := bgSpeedStatusText(0, 0, "Auto", "no line max", ""); got != "🚦 Speed: no speed limit (Auto)" {
 		t.Fatalf("unlimited speed line = %q", got)
 	}
-	if got := bg_speedStatusText(19170, 214, "Auto", "", "ping 15 ms (baseline 13 ms)"); got != "🚦 Speed: download 18.7 MB/s, upload 214 KB/s (Auto) · ping 15 ms (baseline 13 ms)" {
+	if got := bgSpeedStatusText(19170, 214, "Auto", "", "ping 15 ms (baseline 13 ms)"); got != "🚦 Speed: download 18.7 MB/s, upload 214 KB/s (Auto) · ping 15 ms (baseline 13 ms)" {
 		t.Fatalf("capped speed line = %q", got)
 	}
-	if got := bg_speedStatusText(500, 0, "scheduled limit", "line max 19.5 MB/s down, 2.0 MB/s up", ""); got != "🚦 Speed: download 500 KB/s, upload unlimited (scheduled limit) · line max 19.5 MB/s down, 2.0 MB/s up" {
+	if got := bgSpeedStatusText(500, 0, "scheduled limit", "line max 19.5 MB/s down, 2.0 MB/s up", ""); got != "🚦 Speed: download 500 KB/s, upload unlimited (scheduled limit) · line max 19.5 MB/s down, 2.0 MB/s up" {
 		t.Fatalf("scheduled speed line = %q", got)
 	}
 }
@@ -160,10 +160,10 @@ func TestSpeedStatusTextSpeaksPlainly(t *testing.T) {
 // TestBGPingTextRendersLatency: the speed line carries the guard's latency and
 // its idle reference.
 func TestBGPingTextRendersLatency(t *testing.T) {
-	if got := bg_pingText(latencyGuardStatus{LatencyMs: 23, BaselineMs: 14}); got != "ping 23 ms (baseline 14 ms)" {
+	if got := bgPingText(latencyGuardStatus{LatencyMs: 23, BaselineMs: 14}); got != "ping 23 ms (baseline 14 ms)" {
 		t.Fatalf("ping text = %q", got)
 	}
-	if got := bg_pingText(latencyGuardStatus{}); got != "" {
+	if got := bgPingText(latencyGuardStatus{}); got != "" {
 		t.Fatalf("missing ping text = %q, want no detail", got)
 	}
 }
@@ -248,7 +248,7 @@ func TestSpeedPolicyAutotuneWindowIsUnlimited(t *testing.T) {
 // steps are gathered and summed up once per window, with unlimited as the top
 // of the range.
 func TestAutotuneDigest(t *testing.T) {
-	var g bg_autotuneDigest
+	var g bgAutotuneDigest
 	start := time.Date(2026, 10, 21, 10, 0, 0, 0, time.UTC)
 	if !g.add(start, 400, 0, "control") {
 		t.Fatal("the first step was not logged")

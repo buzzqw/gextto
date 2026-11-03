@@ -30,7 +30,7 @@ func TestShouldLogQueueCounts(t *testing.T) {
 
 func TestCompletedArchivePresentAcceptsPersistedFullPayload(t *testing.T) {
 	db, _, view, _, processed := seedTestSetup(t)
-	path, present := bg_completedArchivePresent(db, view.Hash, view.TotalSize)
+	path, present := bgCompletedArchivePresent(db, view.Hash, view.TotalSize)
 	if !present || path != processed {
 		t.Fatalf("archive payload = %q, %v; want %q, true", path, present, processed)
 	}
@@ -38,7 +38,7 @@ func TestCompletedArchivePresentAcceptsPersistedFullPayload(t *testing.T) {
 
 func TestCompletedArchivePresentRejectsInsufficientPayload(t *testing.T) {
 	db, _, view, _, _ := seedTestSetup(t)
-	if _, present := bg_completedArchivePresent(db, view.Hash, view.TotalSize+1); present {
+	if _, present := bgCompletedArchivePresent(db, view.Hash, view.TotalSize+1); present {
 		t.Fatal("undersized archive payload was accepted")
 	}
 }
@@ -141,7 +141,7 @@ func TestSeriesRenameApplyDoesNotProcessARenamedFileTwice(t *testing.T) {
 	if !ok {
 		t.Fatalf("result = %#v", value)
 	}
-	if got := bg_countKey(result, "renamed_count"); got != 1 {
+	if got := bgCountKey(result, "renamed_count"); got != 1 {
 		t.Fatalf("renamed_count = %d, want 1 (the same file was processed twice)", got)
 	}
 	items, _ := result["items"].([]any)
@@ -153,7 +153,7 @@ func TestSeriesRenameApplyDoesNotProcessARenamedFileTwice(t *testing.T) {
 	// kept and no probe can move the file again.
 	_, value = seriesRenameApply(s, seriesName, true, false, false)
 	result, _ = value.(map[string]any)
-	if got := bg_countKey(result, "renamed_count"); got != 0 {
+	if got := bgCountKey(result, "renamed_count"); got != 0 {
 		t.Fatalf("second pass renamed_count = %d, want 0", got)
 	}
 	if items, _ := result["items"].([]any); len(items) != 0 {

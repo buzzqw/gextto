@@ -38,7 +38,7 @@ var errHostCooling = errors.New("the site asked to slow down (HTTP 429)")
 
 // local_name returns the lowercased local part of a possibly namespaced XML
 // name (`torznab:attr` -> `attr`), mirroring the helper.
-func local_name(value string) string {
+func localName(value string) string {
 	if index := strings.LastIndexByte(value, ':'); index >= 0 {
 		value = value[index+1:]
 	}
@@ -47,7 +47,7 @@ func local_name(value string) string {
 
 // magnet_in extracts the first `magnet:?` candidate from arbitrary text,
 // stopping at whitespace or a delimiter. Returns "" when none is found.
-func magnet_in(value string) string {
+func magnetIn(value string) string {
 	start := strings.Index(value, "magnet:?")
 	if start < 0 {
 		return ""
@@ -73,7 +73,7 @@ func magnet_in(value string) string {
 // attribute returns the value of an XML attribute matched by local name.
 func attribute(start xml.StartElement, name string) (string, bool) {
 	for _, attr := range start.Attr {
-		if local_name(attr.Name.Local) == name {
+		if localName(attr.Name.Local) == name {
 			return attr.Value, true
 		}
 	}
@@ -83,7 +83,7 @@ func attribute(start xml.StartElement, name string) (string, bool) {
 // apply_torznab_attr reads a Torznab `<...:attr name="seeders" value="5"/>`
 // element into the per-item facts. Unknown or non-numeric values reset the
 // current value to None.
-func apply_torznab_attr(
+func applyTorznabAttr(
 	start xml.StartElement,
 	sizeBytes **float64,
 	seeders **int64,
@@ -100,7 +100,7 @@ func apply_torznab_attr(
 	value, _ := attribute(start, "value")
 	switch name {
 	case "magneturl":
-		if found := magnet_in(value); found != "" {
+		if found := magnetIn(value); found != "" {
 			*magnet = found
 		}
 	case "infohash":
@@ -155,7 +155,7 @@ func parseRSSDate(value string) (time.Time, bool) {
 // parse_feed_body parses an RSS/Atom body with `encoding/xml` ( used
 // `quick-xml`). Text and CDATA are both delivered as `xml.CharData`, so the two
 // branches collapse into one.
-func parse_feed_body(body, source string) ([]models.Release, error) {
+func parseFeedBody(body, source string) ([]models.Release, error) {
 	decoder := xml.NewDecoder(strings.NewReader(body))
 	current := ""
 	inItem := false
@@ -192,7 +192,7 @@ func parse_feed_body(body, source string) ([]models.Release, error) {
 		}
 		switch event := token.(type) {
 		case xml.StartElement:
-			name := local_name(event.Name.Local)
+			name := localName(event.Name.Local)
 			if name == "item" || name == "entry" {
 				inItem = true
 				title = ""
@@ -239,14 +239,14 @@ func parse_feed_body(body, source string) ([]models.Release, error) {
 							itemSource = fmt.Sprintf("%s:%s", source, strings.TrimSpace(value))
 						}
 					}
-					apply_torznab_attr(event, &sizeBytes, &seeders, &peers, &magnet, &infohash, &ed2kLink, &freeleech, &freeleechKnown, &downloadFactor)
+					applyTorznabAttr(event, &sizeBytes, &seeders, &peers, &magnet, &infohash, &ed2kLink, &freeleech, &freeleechKnown, &downloadFactor)
 				}
 				value, ok := attribute(event, "href")
 				if !ok {
 					value, ok = attribute(event, "url")
 				}
 				if ok {
-					if found := magnet_in(value); found != "" {
+					if found := magnetIn(value); found != "" {
 						magnet = found
 					} else if IsEd2kURL(value) {
 						ed2kLink = strings.TrimSpace(value)
@@ -299,7 +299,7 @@ func parse_feed_body(body, source string) ([]models.Release, error) {
 						discoveredAt = parsed
 					}
 				}
-				if found := magnet_in(value); found != "" {
+				if found := magnetIn(value); found != "" {
 					magnet = found
 				}
 				if current == "link" && IsEd2kURL(value) {
@@ -310,7 +310,7 @@ func parse_feed_body(body, source string) ([]models.Release, error) {
 				}
 			}
 		case xml.EndElement:
-			name := local_name(event.Name.Local)
+			name := localName(event.Name.Local)
 			if inItem && (name == "item" || name == "entry") {
 				// size sanity (legacy `_sanity_check`): drop samples/NFO.
 				var sizeMB *float64
@@ -412,7 +412,7 @@ func TorznabError(body string) string {
 		if err != nil {
 			return ""
 		}
-		if start, ok := token.(xml.StartElement); ok && local_name(start.Name.Local) == "error" {
+		if start, ok := token.(xml.StartElement); ok && localName(start.Name.Local) == "error" {
 			code, ok := attribute(start, "code")
 			if !ok {
 				code = "?"
@@ -479,7 +479,7 @@ func capRetryAfter(wait time.Duration) time.Duration {
 	return wait
 }
 
-func is_cloudflare_challenge(body string) bool {
+func isCloudflareChallenge(body string) bool {
 	lower := strings.ToLower(body)
 	return strings.Contains(lower, "just a moment") ||
 		strings.Contains(lower, "cf-challenge") ||
@@ -553,7 +553,7 @@ func ConfigureCloudflareState(dataDir string) {
 }
 
 func cfDomainNeedsFlareSolverr(rawURL string) bool {
-	domain := domain_of(rawURL)
+	domain := domainOf(rawURL)
 	if domain == "" {
 		return false
 	}
@@ -571,7 +571,7 @@ func cfDomainNeedsFlareSolverr(rawURL string) bool {
 }
 
 func rememberCFDomain(rawURL string) {
-	domain := domain_of(rawURL)
+	domain := domainOf(rawURL)
 	if domain == "" {
 		return
 	}
@@ -606,14 +606,14 @@ func rememberCFDomain(rawURL string) {
 // without a shared cap a host starts answering `429 Too Many Requests`. 8
 // concurrent requests per host is well within what torrentgalaxy/ext.to
 // tolerate in testing.
-const HOST_MAX_CONCURRENCY = 8
+const HOSTMAXCONCURRENCY = 8
 
 var (
 	hostLimitsMu sync.Mutex
 	hostLimits   = map[string]chan struct{}{}
 )
 
-func domain_of(rawURL string) string {
+func domainOf(rawURL string) string {
 	parsed, err := url.Parse(rawURL)
 	if err != nil {
 		return ""
@@ -621,8 +621,8 @@ func domain_of(rawURL string) string {
 	return parsed.Hostname()
 }
 
-func host_semaphore(rawURL string) chan struct{} {
-	domain := domain_of(rawURL)
+func hostSemaphore(rawURL string) chan struct{} {
+	domain := domainOf(rawURL)
 	if domain == "" {
 		return nil
 	}
@@ -630,7 +630,7 @@ func host_semaphore(rawURL string) chan struct{} {
 	defer hostLimitsMu.Unlock()
 	semaphore, ok := hostLimits[domain]
 	if !ok {
-		semaphore = make(chan struct{}, HOST_MAX_CONCURRENCY)
+		semaphore = make(chan struct{}, HOSTMAXCONCURRENCY)
 		hostLimits[domain] = semaphore
 	}
 	return semaphore
@@ -666,7 +666,7 @@ var (
 // developer machine two services on 127.0.0.1 are different sites, and a
 // cooldown earned by one must not silence the other. Public sites have no port
 // in the URL, so they keep one shared pace.
-func host_pace_key(rawURL string) string {
+func hostPaceKey(rawURL string) string {
 	parsed, err := url.Parse(strings.TrimSpace(rawURL))
 	if err != nil {
 		return ""
@@ -676,7 +676,7 @@ func host_pace_key(rawURL string) string {
 
 // host_pace returns the state of one site. It must be called with
 // hostLastRequestMu held.
-func host_pace(domain string) *hostPaceState {
+func hostPace(domain string) *hostPaceState {
 	state := hostLastRequest[domain]
 	if state == nil {
 		state = &hostPaceState{}
@@ -687,15 +687,15 @@ func host_pace(domain string) *hostPaceState {
 
 // throttle_host waits until the per-host start interval has elapsed, then
 // claims the slot.
-func throttle_host(ctx context.Context, rawURL string) {
-	domain := host_pace_key(rawURL)
+func throttleHost(ctx context.Context, rawURL string) {
+	domain := hostPaceKey(rawURL)
 	if domain == "" {
 		return
 	}
 	for {
 		var wait time.Duration
 		hostLastRequestMu.Lock()
-		state := host_pace(domain)
+		state := hostPace(domain)
 		now := time.Now()
 		if state.next.After(now) {
 			wait = state.next.Sub(now)
@@ -718,14 +718,14 @@ func throttle_host(ctx context.Context, rawURL string) {
 // the penalty. The first answer costs the base penalty; a host that answers
 // again after that cooldown doubles it each time, up to feedHostMaxPenalty, so
 // a site that is blocking us is not probed every few minutes for ever.
-func penalize_host(rawURL string, penalty time.Duration) {
-	domain := host_pace_key(rawURL)
+func penalizeHost(rawURL string, penalty time.Duration) {
+	domain := hostPaceKey(rawURL)
 	if domain == "" {
 		return
 	}
 	hostLastRequestMu.Lock()
 	defer hostLastRequestMu.Unlock()
-	state := host_pace(domain)
+	state := hostPace(domain)
 	state.strikes++
 	state.good = 0
 	wait := penalty
@@ -741,14 +741,14 @@ func penalize_host(rawURL string, penalty time.Duration) {
 // host_cooling reports the remaining cooldown of a site that answered 429, so
 // the feeds of that site are left for the next cycle instead of being asked
 // one after the other (which only extends the block).
-func host_cooling(rawURL string) (time.Duration, bool) {
-	domain := host_pace_key(rawURL)
+func hostCooling(rawURL string) (time.Duration, bool) {
+	domain := hostPaceKey(rawURL)
 	if domain == "" {
 		return 0, false
 	}
 	hostLastRequestMu.Lock()
 	defer hostLastRequestMu.Unlock()
-	state := host_pace(domain)
+	state := hostPace(domain)
 	if state.cooling.IsZero() {
 		return 0, false
 	}
@@ -762,14 +762,14 @@ func host_cooling(rawURL string) (time.Duration, bool) {
 
 // host_succeeded records a good answer from a site. Enough of them step the
 // strike count down, so a site that was busy returns to the normal pace.
-func host_succeeded(rawURL string) {
-	domain := host_pace_key(rawURL)
+func hostSucceeded(rawURL string) {
+	domain := hostPaceKey(rawURL)
 	if domain == "" {
 		return
 	}
 	hostLastRequestMu.Lock()
 	defer hostLastRequestMu.Unlock()
-	state := host_pace(domain)
+	state := hostPace(domain)
 	if state.strikes == 0 {
 		return
 	}
@@ -781,8 +781,8 @@ func host_succeeded(rawURL string) {
 	state.strikes--
 }
 
-func session_for(rawURL string) (cfSession, bool) {
-	domain := domain_of(rawURL)
+func sessionFor(rawURL string) (cfSession, bool) {
+	domain := domainOf(rawURL)
 	if domain == "" {
 		return cfSession{}, false
 	}
@@ -792,8 +792,8 @@ func session_for(rawURL string) (cfSession, bool) {
 	return session, ok
 }
 
-func remember_session(rawURL, userAgent string, cookies []cloudflareCookie) {
-	domain := domain_of(rawURL)
+func rememberSession(rawURL, userAgent string, cookies []cloudflareCookie) {
+	domain := domainOf(rawURL)
 	if domain == "" {
 		return
 	}
@@ -914,7 +914,7 @@ const fsSessionPrefix = "gextto-"
 // instance and target domain. A session id created by one instance is not valid
 // on another instance after the configured endpoint changes.
 func flareSolverrSessionKey(endpoint, rawURL string) (string, string) {
-	domain := strings.ToLower(domain_of(rawURL))
+	domain := strings.ToLower(domainOf(rawURL))
 	if domain == "" {
 		return "", ""
 	}
@@ -1144,7 +1144,7 @@ func reconcileFlareSolverrSessions(ctx context.Context, client *http.Client, end
 	return destroyed
 }
 
-func fetch_with_flaresolverr(ctx context.Context, client *http.Client, flaresolverr, rawURL string) (string, error) {
+func fetchWithFlaresolverr(ctx context.Context, client *http.Client, flaresolverr, rawURL string) (string, error) {
 	if err := utils.AcquireFlareSolverrContext(ctx); err != nil {
 		return "", err
 	}
@@ -1168,7 +1168,7 @@ func fetch_with_flaresolverr(ctx context.Context, client *http.Client, flaresolv
 		if value.Status != "" && value.Status != "ok" {
 			return "", fmt.Errorf("FlareSolverr returned status %q", value.Status)
 		}
-		remember_session(rawURL, value.Solution.UserAgent, value.Solution.Cookies)
+		rememberSession(rawURL, value.Solution.UserAgent, value.Solution.Cookies)
 		if value.Solution.Response == "" {
 			return "", fmt.Errorf("flaresolverr returned an empty response")
 		}
@@ -1200,24 +1200,24 @@ func fetch_with_flaresolverr(ctx context.Context, client *http.Client, flaresolv
 // cloudflare_blocked reports HTTP statuses that mean "Cloudflare is in front of
 // the origin", where a real browser (FlareSolverr) can succeed. Random statuses
 // such as 404 or 429 must NOT trigger FlareSolverr.
-func cloudflare_blocked(status int) bool {
+func cloudflareBlocked(status int) bool {
 	return status == 403 || status == 503 || (status >= 520 && status <= 530)
 }
 
-func flaresolverr_error_message(err error) string {
+func flaresolverrErrorMessage(err error) string {
 	if errors.Is(err, context.DeadlineExceeded) {
 		return "FlareSolverr did not respond in time"
 	}
 	return "feed URL could not be retrieved via FlareSolverr"
 }
 
-func flaresolverr_or(ctx context.Context, client *http.Client, flaresolverr, rawURL, reason string, retryDirectOnFailure bool) (string, error) {
+func flaresolverrOr(ctx context.Context, client *http.Client, flaresolverr, rawURL, reason string, retryDirectOnFailure bool) (string, error) {
 	// This is an implementation detail of the fetch path. Keep it at debug
 	// level so a successful request produces only the useful summary below;
 	// failures are still reported at warning level.
 	logging.Debug("trying FlareSolverr to retrieve the feed; success will continue with feed parsing",
 		"feed_url", rawURL, "flaresolverr", flaresolverr, "reason", reason)
-	body, err := fetch_with_flaresolverr(ctx, client, flaresolverr, rawURL)
+	body, err := fetchWithFlaresolverr(ctx, client, flaresolverr, rawURL)
 	if err != nil {
 		nextStep := "the feed will be marked as failed"
 		if retryDirectOnFailure {
@@ -1226,7 +1226,7 @@ func flaresolverr_or(ctx context.Context, client *http.Client, flaresolverr, raw
 		logMessage := "FlareSolverr failed; " + nextStep
 		logFields := []any{
 			"feed_url", rawURL, "flaresolverr", flaresolverr,
-			"reason", reason, "error", flaresolverr_error_message(err),
+			"reason", reason, "error", flaresolverrErrorMessage(err),
 		}
 		if retryDirectOnFailure {
 			// This is not yet a failed feed: the direct fallback is still running.
@@ -1245,7 +1245,7 @@ func flaresolverr_or(ctx context.Context, client *http.Client, flaresolverr, raw
 // Tentativi per scaricare il corpo di un feed: Cloudflare a volte chiude lo
 // stream a metà. I feed sono testi piccoli, quindi in caso di errore transitorio
 // si può riscaricare.
-const FEED_FETCH_ATTEMPTS = 3
+const FEEDFETCHATTEMPTS = 3
 
 // The pacing of feed fetches: the retry back-off unit (1, then 2 units) and
 // the pause imposed on a site that answered 429. The pause is the base of a
@@ -1259,12 +1259,12 @@ var (
 )
 
 // Timeout del singolo tentativo.
-const FEED_FETCH_TIMEOUT = 20 * time.Second
+const FEEDFETCHTIMEOUT = 20 * time.Second
 
 // Knaben keeps streaming a very large RSS response instead of closing it
 // promptly. Stop after one normal listing page.
-const KNABEN_STREAM_ITEM_LIMIT = 50
-const KNABEN_STREAM_BODY_LIMIT = 512 * 1024
+const KNABENSTREAMITEMLIMIT = 50
+const KNABENSTREAMBODYLIMIT = 512 * 1024
 
 // fetchAttemptKind is the outcome classification of a single direct fetch.
 type fetchAttemptKind int
@@ -1285,16 +1285,16 @@ type fetchAttempt struct {
 	value string
 }
 
-func fetch_body_direct(ctx context.Context, client *http.Client, rawURL string, timeout time.Duration) fetchAttempt {
+func fetchBodyDirect(ctx context.Context, client *http.Client, rawURL string, timeout time.Duration) fetchAttempt {
 	// A site that answered 429 is left alone until its cooldown ends: asking it
 	// once per feed of the list only extends the block.
-	if wait, cooling := host_cooling(rawURL); cooling {
+	if wait, cooling := hostCooling(rawURL); cooling {
 		return fetchAttempt{kind: fetchAttemptCooling, value: wait.Round(time.Second).String()}
 	}
 	requestCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	headers := map[string]string{}
-	if session, ok := session_for(rawURL); ok {
+	if session, ok := sessionFor(rawURL); ok {
 		if session.userAgent != "" {
 			headers["User-Agent"] = session.userAgent
 		}
@@ -1304,7 +1304,7 @@ func fetch_body_direct(ctx context.Context, client *http.Client, rawURL string, 
 	}
 	// Cap aggregate concurrency per host; the permit is released before a retry
 	// or a FlareSolverr call (which talks to another host).
-	semaphore := host_semaphore(rawURL)
+	semaphore := hostSemaphore(rawURL)
 	if semaphore != nil {
 		select {
 		case semaphore <- struct{}{}:
@@ -1312,7 +1312,7 @@ func fetch_body_direct(ctx context.Context, client *http.Client, rawURL string, 
 			return fetchAttempt{kind: fetchAttemptFatal, value: "host request limiter closed"}
 		}
 	}
-	throttle_host(requestCtx, rawURL)
+	throttleHost(requestCtx, rawURL)
 	response, err := httpDo(requestCtx, client, http.MethodGet, rawURL, headers, nil, "")
 	if semaphore != nil {
 		<-semaphore
@@ -1324,8 +1324,8 @@ func fetch_body_direct(ctx context.Context, client *http.Client, rawURL string, 
 	status := response.StatusCode
 	if status >= 200 && status < 300 {
 		var body string
-		if strings.HasSuffix(domain_of(rawURL), "knaben.org") {
-			body, err = read_knaben_stream(response)
+		if strings.HasSuffix(domainOf(rawURL), "knaben.org") {
+			body, err = readKnabenStream(response)
 		} else {
 			var payload []byte
 			payload, err = readLimitedBody(response.Body, maxFeedResponseBytes)
@@ -1335,18 +1335,18 @@ func fetch_body_direct(ctx context.Context, client *http.Client, rawURL string, 
 			// Stream chiuso a metà: errore transitorio, si ritenta.
 			return fetchAttempt{kind: fetchAttemptTransient, value: err.Error()}
 		}
-		if is_cloudflare_challenge(body) {
+		if isCloudflareChallenge(body) {
 			return fetchAttempt{kind: fetchAttemptCloudflare, value: "cloudflare challenge body"}
 		}
 		// The site is answering: count it towards recovery from a past 429.
-		host_succeeded(rawURL)
+		hostSucceeded(rawURL)
 		return fetchAttempt{kind: fetchAttemptBody, value: body}
 	}
-	if cloudflare_blocked(status) {
+	if cloudflareBlocked(status) {
 		return fetchAttempt{kind: fetchAttemptCloudflare, value: fmt.Sprintf("direct status %d", status)}
 	}
 	if status == 429 {
-		penalize_host(rawURL, feedRateLimitPenalty)
+		penalizeHost(rawURL, feedRateLimitPenalty)
 		logging.Warn("⚠️ A feed site asked to slow down (too many requests); it will be read again later", "feed_url", rawURL)
 		return fetchAttempt{kind: fetchAttemptTransient, value: fmt.Sprintf("HTTP %d", status)}
 	}
@@ -1359,7 +1359,7 @@ func fetch_body_direct(ctx context.Context, client *http.Client, rawURL string, 
 // read_knaben_stream reads the useful prefix of Knaben's streaming RSS
 // response: its endpoint can keep producing items without sending the closing
 // `</rss>`.
-func read_knaben_stream(response *http.Response) (string, error) {
+func readKnabenStream(response *http.Response) (string, error) {
 	var body []byte
 	buffer := make([]byte, 32*1024)
 	for {
@@ -1368,7 +1368,7 @@ func read_knaben_stream(response *http.Response) (string, error) {
 			body = append(body, buffer[:read]...)
 		}
 		itemCount := bytes.Count(body, []byte("</item>"))
-		if itemCount >= KNABEN_STREAM_ITEM_LIMIT || len(body) >= KNABEN_STREAM_BODY_LIMIT {
+		if itemCount >= KNABENSTREAMITEMLIMIT || len(body) >= KNABENSTREAMBODYLIMIT {
 			break
 		}
 		if err != nil {
@@ -1403,28 +1403,28 @@ func newFeedIPv4Client() *http.Client {
 // fetch_body downloads a feed body with a few attempts on transient errors.
 // Cloudflare is the last resort, after the direct retries, so it is not
 // hammered on every micro-error.
-func fetch_body(ctx context.Context, client *http.Client, rawURL string, flaresolverr *string) (string, error) {
+func fetchBody(ctx context.Context, client *http.Client, rawURL string, flaresolverr *string) (string, error) {
 	flareTried := false
 	// Once a domain has required a browser challenge, prefer the browser when
 	// there is no usable in-memory session yet. A successful solution populates
 	// the session cache, so subsequent listing/detail requests can go direct.
 	if flaresolverr != nil && strings.TrimSpace(*flaresolverr) != "" &&
 		cfDomainNeedsFlareSolverr(rawURL) {
-		_, hasSession := session_for(rawURL)
+		_, hasSession := sessionFor(rawURL)
 		if !hasSession {
 			flareTried = true
-			if body, err := flaresolverr_or(ctx, client, *flaresolverr, rawURL, "domain remembered as Cloudflare-protected", true); err == nil {
+			if body, err := flaresolverrOr(ctx, client, *flaresolverr, rawURL, "domain remembered as Cloudflare-protected", true); err == nil {
 				return body, nil
 			}
 		}
 	}
 	lastTransient := ""
-	for attempt := 1; attempt <= FEED_FETCH_ATTEMPTS; attempt++ {
+	for attempt := 1; attempt <= FEEDFETCHATTEMPTS; attempt++ {
 		attemptClient := client
 		if attempt > 1 {
 			attemptClient = feedHTTPClientIPv4
 		}
-		result := fetch_body_direct(ctx, attemptClient, rawURL, FEED_FETCH_TIMEOUT)
+		result := fetchBodyDirect(ctx, attemptClient, rawURL, FEEDFETCHTIMEOUT)
 		switch result.kind {
 		case fetchAttemptBody:
 			return result.value, nil
@@ -1437,7 +1437,7 @@ func fetch_body(ctx context.Context, client *http.Client, rawURL string, flareso
 				return "", fmt.Errorf("%s", result.value)
 			}
 			flareTried = true
-			return flaresolverr_or(ctx, client, *flaresolverr, rawURL, result.value, false)
+			return flaresolverrOr(ctx, client, *flaresolverr, rawURL, result.value, false)
 		case fetchAttemptFatal:
 			return "", fmt.Errorf("%s", result.value)
 		case fetchAttemptCooling:
@@ -1446,11 +1446,11 @@ func fetch_body(ctx context.Context, client *http.Client, rawURL string, flareso
 			return "", fmt.Errorf("%w: retry in %s", errHostCooling, result.value)
 		case fetchAttemptTransient:
 			lastTransient = result.value
-			if attempt < FEED_FETCH_ATTEMPTS {
+			if attempt < FEEDFETCHATTEMPTS {
 				logging.Debug(
 					"feed fetch attempt failed; retrying",
 					"attempt", attempt,
-					"attempts", FEED_FETCH_ATTEMPTS,
+					"attempts", FEEDFETCHATTEMPTS,
 					"error", lastTransient,
 				)
 				select {
@@ -1476,21 +1476,21 @@ func FetchFeed(ctx context.Context, rawURL string, flaresolverr *string, maxPage
 	case strings.Contains(lower, "torrentgalaxy"):
 		kind = "TorrentGalaxy"
 	default:
-		body, err := fetch_body(ctx, defaultHTTPClient, rawURL, flaresolverr)
+		body, err := fetchBody(ctx, defaultHTTPClient, rawURL, flaresolverr)
 		if err != nil {
 			return nil, err
 		}
-		return parse_feed_body(body, rawURL)
+		return parseFeedBody(body, rawURL)
 	}
-	body, err := fetch_body(ctx, defaultHTTPClient, rawURL, flaresolverr)
+	body, err := fetchBody(ctx, defaultHTTPClient, rawURL, flaresolverr)
 	if err != nil {
 		return nil, err
 	}
-	label := source_label(kind, rawURL)
+	label := uploaderSourceLabel(kind, rawURL)
 	// TorrentGalaxy uploader listings link to `/post-detail/...` pages instead
 	// of carrying magnets, so they need the dedicated parser (legacy `_tgx_user`).
 	if kind == "TorrentGalaxy" {
-		return fetch_tgx_listing(ctx, defaultHTTPClient, body, rawURL, label, flaresolverr)
+		return fetchTgxListing(ctx, defaultHTTPClient, body, rawURL, label, flaresolverr)
 	}
 	// Age filter + early-stop (legacy `max_age_days` / `stop_on_old_page_threshold`).
 	var cutoff *time.Time
@@ -1522,7 +1522,7 @@ func FetchFeed(ctx context.Context, rawURL string, flaresolverr *string, maxPage
 		if page == 0 {
 			pageBody = body
 		} else {
-			fetched, err := fetch_body(ctx, defaultHTTPClient, pageURL, flaresolverr)
+			fetched, err := fetchBody(ctx, defaultHTTPClient, pageURL, flaresolverr)
 			if err != nil {
 				logging.Debug("listing page unavailable; keeping the pages already read",
 					"feed_url", utils.RedactURLSecrets(rawURL), "page", page,
@@ -1531,7 +1531,7 @@ func FetchFeed(ctx context.Context, rawURL string, flaresolverr *string, maxPage
 			}
 			pageBody = fetched
 		}
-		items, old, total, err := fetch_traditional_listing(ctx, defaultHTTPClient, pageURL, pageBody, kind, label, flaresolverr, cutoff)
+		items, old, total, err := fetchTraditionalListing(ctx, defaultHTTPClient, pageURL, pageBody, kind, label, flaresolverr, cutoff)
 		if err != nil {
 			if page == 0 {
 				return nil, err
@@ -1589,7 +1589,7 @@ func FetchFeed(ctx context.Context, rawURL string, flaresolverr *string, maxPage
 	return all, nil
 }
 
-func fetch_traditional_listing(ctx context.Context, client *http.Client, rawURL, body, kind, label string, flaresolverr *string, cutoff *time.Time) ([]models.Release, int, int, error) {
+func fetchTraditionalListing(ctx context.Context, client *http.Client, rawURL, body, kind, label string, flaresolverr *string, cutoff *time.Time) ([]models.Release, int, int, error) {
 	selector := "a[href*='/torrent/'], a[href*='/torrents/'], a[href^='magnet:']"
 	if kind == "ExtTo" {
 		selector = "a.torrent-title-link, a[href^='magnet:']"
@@ -1618,9 +1618,9 @@ func fetch_traditional_listing(ctx context.Context, client *http.Client, rawURL,
 			// ext.to download buttons have no text: recover the title from the
 			// magnet `dn=` parameter, exactly like legacy's listing fallback.
 			if title == "" {
-				title = title_from_magnet(href)
+				title = titleFromMagnet(href)
 			}
-			push_release(&output, title, href, label)
+			pushRelease(&output, title, href, label)
 			continue
 		}
 		if title == "" {
@@ -1630,7 +1630,7 @@ func fetch_traditional_listing(ctx context.Context, client *http.Client, rawURL,
 			pending = append(pending, rssDetailLink{title: title, url: detail})
 		}
 	}
-	old := fetch_detail_magnets(ctx, client, pending, label, flaresolverr, &output, cutoff)
+	old := fetchDetailMagnets(ctx, client, pending, label, flaresolverr, &output, cutoff)
 	return output, old, pageTotal, nil
 }
 
@@ -1642,7 +1642,7 @@ type rssDetailLink struct {
 
 // tgx_detail_links parses TorrentGalaxy `div.tgxtablerow` rows into
 // `(title, detail_url)` pairs.
-func tgx_detail_links(body string, base *url.URL) []rssDetailLink {
+func tgxDetailLinks(body string, base *url.URL) []rssDetailLink {
 	document, err := html.Parse(strings.NewReader(body))
 	if err != nil {
 		return nil
@@ -1672,18 +1672,18 @@ func tgx_detail_links(body string, base *url.URL) []rssDetailLink {
 
 // fetch_tgx_listing resolves TorrentGalaxy uploader pages (`/get-posts/user:NAME/`)
 // to magnets. Ports legacy's `_tgx_user` parser (no age filter).
-func fetch_tgx_listing(ctx context.Context, client *http.Client, body, rawURL, label string, flaresolverr *string) ([]models.Release, error) {
+func fetchTgxListing(ctx context.Context, client *http.Client, body, rawURL, label string, flaresolverr *string) ([]models.Release, error) {
 	base, err := url.Parse(rawURL)
 	if err != nil {
 		return nil, err
 	}
-	pending := tgx_detail_links(body, base)
+	pending := tgxDetailLinks(body, base)
 	if len(pending) == 0 {
 		logging.Warn("torrentgalaxy listing returned no post-detail rows", "feed_url", rawURL)
 		return []models.Release{}, nil
 	}
 	var output []models.Release
-	fetch_detail_magnets(ctx, client, pending, label, flaresolverr, &output, nil)
+	fetchDetailMagnets(ctx, client, pending, label, flaresolverr, &output, nil)
 	logging.Debug("torrentgalaxy listing parsed", "feed_url", rawURL, "label", label, "items", len(output))
 	return output, nil
 }
@@ -1691,16 +1691,16 @@ func fetch_tgx_listing(ctx context.Context, client *http.Client, body, rawURL, l
 // fetch_detail_magnets resolves detail pages to magnets, reusing the persistent
 // cache by title so already-seen releases cost no HTTP request. Returns how many
 // fetched details were older than `cutoff` (age filter).
-func fetch_detail_magnets(ctx context.Context, client *http.Client, pending []rssDetailLink, label string, flaresolverr *string, output *[]models.Release, cutoff *time.Time) int {
+func fetchDetailMagnets(ctx context.Context, client *http.Client, pending []rssDetailLink, label string, flaresolverr *string, output *[]models.Release, cutoff *time.Time) int {
 	old := 0
 	var misses []rssDetailLink
 	for _, item := range pending {
 		// Keyed by the detail page, not the title: two releases with the same
 		// title (another uploader, a repack, another site) must never share a
 		// magnet.
-		if magnet, ok := cache.Get(detailCacheKey(item)); ok && !is_placeholder_magnet(magnet) {
+		if magnet, ok := cache.Get(detailCacheKey(item)); ok && !isPlaceholderMagnet(magnet) {
 			// Una civetta in cache non vale: la si risolve di nuovo dal dettaglio.
-			push_release(output, item.title, magnet, label)
+			pushRelease(output, item.title, magnet, label)
 		} else {
 			misses = append(misses, item)
 		}
@@ -1727,7 +1727,7 @@ func fetch_detail_magnets(ctx context.Context, client *http.Client, pending []rs
 				defer recoverGoroutine("detail fetch")
 				defer wait.Done()
 				defer func() { <-semaphore }()
-				body, err := fetch_body(ctx, client, item.url.String(), flaresolverr)
+				body, err := fetchBody(ctx, client, item.url.String(), flaresolverr)
 				if err != nil {
 					results <- fetchedDetail{title: item.title, key: detailCacheKey(item)}
 					return
@@ -1742,7 +1742,7 @@ func fetch_detail_magnets(ctx context.Context, client *http.Client, pending []rs
 		if !result.ok {
 			continue
 		}
-		magnet := extract_magnet(result.body)
+		magnet := extractMagnet(result.body)
 		if magnet == "" {
 			continue
 		}
@@ -1754,22 +1754,22 @@ func fetch_detail_magnets(ctx context.Context, client *http.Client, pending []rs
 			old++
 		} else {
 			cache.Set(result.key, magnet)
-			push_release_at(output, result.title, magnet, label, discoveredAt)
+			pushReleaseAt(output, result.title, magnet, label, discoveredAt)
 		}
 	}
 	return old
 }
 
-func push_release(output *[]models.Release, title, magnet, label string) {
-	push_release_at(output, title, magnet, label, time.Now().UTC())
+func pushRelease(output *[]models.Release, title, magnet, label string) {
+	pushReleaseAt(output, title, magnet, label, time.Now().UTC())
 }
 
-func push_release_at(output *[]models.Release, title, magnet, label string, discoveredAt time.Time) {
+func pushReleaseAt(output *[]models.Release, title, magnet, label string, discoveredAt time.Time) {
 	// La civetta anti-bot di ext.to non è un magnet reale: non archiviarla.
-	if is_placeholder_magnet(magnet) {
+	if isPlaceholderMagnet(magnet) {
 		return
 	}
-	tagged := with_source_tag(title, label)
+	tagged := withSourceTag(title, label)
 	if release := ParseReleaseAt(tagged, magnet, label, discoveredAt); release != nil {
 		*output = append(*output, *release)
 	}
@@ -1777,7 +1777,7 @@ func push_release_at(output *[]models.Release, title, magnet, label string, disc
 
 // with_source_tag is legacy `t_display`: append the source tag to the title so
 // the uploader survives into the archive and the generated magnet feed.
-func with_source_tag(title, label string) string {
+func withSourceTag(title, label string) string {
 	if label == "" || strings.Contains(title, "["+label+"]") {
 		return title
 	}
@@ -1785,7 +1785,7 @@ func with_source_tag(title, label string) string {
 }
 
 // title_from_magnet recovers a readable title from the magnet `dn=` parameter.
-func title_from_magnet(magnet string) string {
+func titleFromMagnet(magnet string) string {
 	parsed, err := url.Parse(magnet)
 	if err != nil {
 		return ""
@@ -1801,9 +1801,9 @@ func title_from_magnet(magnet string) string {
 	return value
 }
 
-// source_label builds the per-uploader source label, matching legacy
+// uploaderSourceLabel builds the per-uploader source label, matching legacy
 // (`ExtTo - user`, `TGx - user`).
-func source_label(kind, rawURL string) string {
+func uploaderSourceLabel(kind, rawURL string) string {
 	extract := func(pattern string) (string, bool) {
 		regex, err := utils.CachedRegex(pattern)
 		if err != nil {
@@ -1813,7 +1813,7 @@ func source_label(kind, rawURL string) string {
 		if captures == nil {
 			return "", false
 		}
-		return decode_component(captures[1]), true
+		return decodeComponent(captures[1]), true
 	}
 	switch kind {
 	case "ExtTo":
@@ -1836,7 +1836,7 @@ func source_label(kind, rawURL string) string {
 	}
 }
 
-func decode_component(value string) string {
+func decodeComponent(value string) string {
 	var out strings.Builder
 	for _, part := range strings.Split(value, "&") {
 		key := part
@@ -1855,11 +1855,11 @@ func decode_component(value string) string {
 // is_placeholder_magnet reports ext.to's anti-bot magnet, which must be ignored
 // because `extract_magnet` would otherwise mistake its base32-looking hash for a
 // real infohash.
-func is_placeholder_magnet(magnet string) bool {
+func isPlaceholderMagnet(magnet string) bool {
 	return strings.Contains(strings.ToLower(magnet), "btih:aremousemovesmostlystraightlined")
 }
 
-func extract_magnet(body string) string {
+func extractMagnet(body string) string {
 	direct := ""
 	if regex, err := utils.CachedRegex(`magnet:\?xt=urn:bt(?:ih|mh):[0-9A-Za-z]{32,68}[^\s"'<>]*`); err == nil {
 		direct = regex.FindString(body)
@@ -1871,7 +1871,7 @@ func extract_magnet(body string) string {
 			}
 		}
 	}
-	if is_placeholder_magnet(direct) {
+	if isPlaceholderMagnet(direct) {
 		return ""
 	}
 	return direct
@@ -1969,7 +1969,7 @@ func isManagerSource(indexer IndexerConfig) bool {
 // aggregate path; anything else is a direct Torznab service (for example the
 // MirCrew indexer), whose endpoint is simply <base>/api — the same rule the
 // standalone gx-torrent uses, so the address to type is identical everywhere.
-func torznab_endpoint(indexer IndexerConfig) string {
+func torznabEndpoint(indexer IndexerConfig) string {
 	base := strings.TrimRight(strings.TrimSpace(indexer.URL), "/")
 	if strings.Contains(base, "/api") || strings.Contains(base, "torznab") {
 		return base
@@ -2275,7 +2275,7 @@ func resolveProwlarrMagnets(ctx context.Context, items []map[string]any) {
 	workersWG.Wait()
 }
 
-func parse_prowlarr_json(body, source string) ([]models.Release, error) {
+func parseProwlarrJson(body, source string) ([]models.Release, error) {
 	decoder := json.NewDecoder(strings.NewReader(body))
 	decoder.UseNumber()
 	var items []map[string]any
@@ -2427,7 +2427,7 @@ func torznabRequestURL(indexer IndexerConfig, query string, externalIDs [][2]str
 }
 
 func torznabRequestURLForType(indexer IndexerConfig, query string, externalIDs [][2]string, requestedType string) string {
-	endpoint := torznab_endpoint(indexer)
+	endpoint := torznabEndpoint(indexer)
 	isProwlarrJSON := strings.Contains(endpoint, "/api/v1/search")
 	searchType := normalizeSearchType(requestedType, query)
 	// Send only what the indexer declares (see torznab_caps.go); unknown caps
@@ -2526,7 +2526,7 @@ func fetchTorznabFlareSolverr(ctx context.Context, indexer IndexerConfig, query 
 	}
 	sentIDs := len(externalIDs) > 0 && fullURL != torznabRequestURLForType(indexer, query, nil, searchType)
 	headers := map[string]string{}
-	if session, ok := session_for(fullURL); ok {
+	if session, ok := sessionFor(fullURL); ok {
 		if session.userAgent != "" {
 			headers["User-Agent"] = session.userAgent
 		}
@@ -2579,7 +2579,7 @@ func fetchTorznabFlareSolverr(ctx context.Context, indexer IndexerConfig, query 
 			detail:     detail,
 		}
 	case response.StatusCode >= 400:
-		if !cloudflare_blocked(response.StatusCode) {
+		if !cloudflareBlocked(response.StatusCode) {
 			// Keep the indexer's own explanation (Jackett: "Torznab 203:
 			// tmdbid is not supported…") instead of a bare status code.
 			payload, _ := readLimitedBody(response.Body, 64<<10)
@@ -2607,7 +2607,7 @@ func fetchTorznabFlareSolverr(ctx context.Context, indexer IndexerConfig, query 
 			return nil, readErr
 		}
 		body = string(payload)
-		if is_cloudflare_challenge(body) {
+		if isCloudflareChallenge(body) {
 			if flaresolverr == nil || strings.TrimSpace(*flaresolverr) == "" {
 				return nil, fmt.Errorf("Cloudflare challenge")
 			}
@@ -2636,7 +2636,7 @@ func fetchTorznabFlareSolverr(ctx context.Context, indexer IndexerConfig, query 
 		}
 		return items, err
 	}
-	items, err := parse_feed_body(body, indexer.Name)
+	items, err := parseFeedBody(body, indexer.Name)
 	if err == nil && managerKind(indexer) == ManagerIndexarr {
 		items = append(items, fetchIndexarrMorePages(ctx, fullURL, headers, body, indexer.Name)...)
 	}
@@ -2687,7 +2687,7 @@ func fetchIndexarrMorePages(ctx context.Context, firstURL string, headers map[st
 			return out
 		}
 		page := string(payload)
-		items, err := parse_feed_body(page, source)
+		items, err := parseFeedBody(page, source)
 		if err != nil {
 			return out
 		}
@@ -2727,7 +2727,7 @@ func torznabViaFlareSolverr(ctx context.Context, indexer IndexerConfig, flaresol
 	logging.Debug("torznab request failed; retrying via FlareSolverr",
 		"indexer", indexer.Name, "reason", errorText, "url", utils.RedactURLSecrets(fullURL))
 	started := time.Now()
-	body, err := fetch_with_flaresolverr(ctx, defaultHTTPClient, flaresolverr, fullURL)
+	body, err := fetchWithFlaresolverr(ctx, defaultHTTPClient, flaresolverr, fullURL)
 	elapsed := time.Since(started).Round(100 * time.Millisecond)
 	if err != nil {
 		if ctx.Err() == nil {
@@ -2753,7 +2753,7 @@ func torznabContentType(body string) string {
 // native status endpoint validates the key and the service (the Torznab `caps`
 // endpoint is not reliable on aggregate search).
 func HealthProbeURL(indexer IndexerConfig) string {
-	endpoint := torznab_endpoint(indexer)
+	endpoint := torznabEndpoint(indexer)
 	if strings.HasSuffix(endpoint, "/api/v1/search") {
 		base := strings.TrimSuffix(endpoint, "/api/v1/search")
 		return base + "/api/v1/system/status?apikey=" + url.QueryEscape(indexer.APIKey)

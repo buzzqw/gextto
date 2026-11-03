@@ -128,7 +128,7 @@ func TestCompletedED2KDownloadSendsCompletionNotification(t *testing.T) {
 		t.Fatalf("TorrentMeta: %v %v", meta, err)
 	}
 	announced := map[string]struct{}{}
-	path := bg_announceCompletion(f.db, notifier, f.event, meta, false, announced)
+	path := bgAnnounceCompletion(f.db, notifier, f.event, meta, false, announced)
 	if !strings.HasPrefix(path, f.archive) {
 		t.Fatalf("announced path = %q, want the library copy under %q", path, f.archive)
 	}
@@ -144,7 +144,7 @@ func TestCompletedED2KDownloadSendsCompletionNotification(t *testing.T) {
 	}
 
 	// A repeated completion event must not notify a second time.
-	bg_announceCompletion(f.db, notifier, f.event, meta, true, announced)
+	bgAnnounceCompletion(f.db, notifier, f.event, meta, true, announced)
 	count := 0
 	for _, event := range events() {
 		if event.Event == "torrent_completed" {

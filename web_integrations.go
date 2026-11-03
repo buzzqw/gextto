@@ -64,7 +64,7 @@ func saveProviderSettings(s *AppState, input SettingsPatch, allowed []string) (i
 	saved := []string{}
 	for _, key := range keys {
 		value := input.Values[key]
-		if value == nil || !gh0_containsString(allowed, key) {
+		if value == nil || !gh0ContainsString(allowed, key) {
 			continue
 		}
 		encoded, ok := settingsValue(value)
@@ -146,7 +146,7 @@ func JellyfinTest(w http.ResponseWriter, r *http.Request, s *AppState) {
 	request.Header.Set("X-Emby-Token", key)
 	response, err := client.Do(request)
 	if err != nil {
-		logging.Info("jellyfin test", "host", domain_of(url), "ok", false, "error", err.Error())
+		logging.Info("jellyfin test", "host", domainOf(url), "ok", false, "error", err.Error())
 		jsonStatus(w, http.StatusBadGateway, map[string]any{"ok": false, "error": err.Error()})
 		return
 	}
@@ -156,12 +156,12 @@ func JellyfinTest(w http.ResponseWriter, r *http.Request, s *AppState) {
 		_ = json.NewDecoder(response.Body).Decode(&info)
 		server, _ := info["ServerName"].(string)
 		version, _ := info["Version"].(string)
-		logging.Info("jellyfin test", "host", domain_of(url), "ok", true, "status", response.StatusCode, "server", server)
+		logging.Info("jellyfin test", "host", domainOf(url), "ok", true, "status", response.StatusCode, "server", server)
 		jsonStatus(w, http.StatusOK, map[string]any{"ok": true, "server": server, "version": version})
 		return
 	}
 	mediaError := mediaTestError("Jellyfin", response.StatusCode)
-	logging.Info("jellyfin test", "host", domain_of(url), "ok", false, "status", response.StatusCode, "error", mediaError)
+	logging.Info("jellyfin test", "host", domainOf(url), "ok", false, "status", response.StatusCode, "error", mediaError)
 	jsonStatus(w, http.StatusBadGateway, map[string]any{
 		"ok":    false,
 		"error": mediaError,
@@ -196,7 +196,7 @@ func FlaresolverrTest(w http.ResponseWriter, r *http.Request, s *AppState) {
 		return
 	}
 	endpoint := flareSolverrEndpoint(configured)
-	host := domain_of(configured)
+	host := domainOf(configured)
 	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
 	defer cancel()
 	body, statusCode, err := HTTPPostJSON(ctx, endpoint, nil, []byte(`{"cmd": "sessions.list"}`))

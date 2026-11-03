@@ -599,7 +599,7 @@ func seenGrouped(w http.ResponseWriter, r *http.Request, s *AppState, kind strin
 // gh6ExternalSearchTimeout bounds the metadata lookup of the apply action.
 const gh6ExternalSearchTimeout = 12 * time.Second
 
-func gh6_jsonString(value any) string {
+func gh6JsonString(value any) string {
 	switch typed := value.(type) {
 	case string:
 		return typed
@@ -611,7 +611,7 @@ func gh6_jsonString(value any) string {
 	return ""
 }
 
-func gh6_seenEntries(w http.ResponseWriter, r *http.Request, s *AppState, kind string) {
+func gh6SeenEntries(w http.ResponseWriter, r *http.Request, s *AppState, kind string) {
 	group := queryParam(r, "key")
 	if group == "" {
 		group = queryParam(r, "group")
@@ -720,11 +720,11 @@ func ApplyMovieMetadata(w http.ResponseWriter, r *http.Request, s *AppState) {
 		jsonError(w, http.StatusBadRequest, "unsupported metadata source")
 		return
 	}
-	title := strings.TrimSpace(gh6_jsonString(details["title"]))
+	title := strings.TrimSpace(gh6JsonString(details["title"]))
 	if title == "" {
 		title = current.Name
 	}
-	date := gh6_jsonString(details["release_date"])
+	date := gh6JsonString(details["release_date"])
 	metadataYear := ""
 	if len(date) >= 4 {
 		candidate := date[:4]
@@ -761,9 +761,9 @@ func ApplyMovieMetadata(w http.ResponseWriter, r *http.Request, s *AppState) {
 	movie := &updated.Movies[index]
 	movie.Name = title
 	movie.Year = year
-	movie.OriginalTitle = gh6_jsonString(details["original_title"])
-	movie.Overview = gh6_jsonString(details["overview"])
-	movie.PosterPath = gh6_jsonString(details["poster_path"])
+	movie.OriginalTitle = gh6JsonString(details["original_title"])
+	movie.Overview = gh6JsonString(details["overview"])
+	movie.PosterPath = gh6JsonString(details["poster_path"])
 	if source == "tmdb" {
 		movie.TmdbID = externalID
 		movie.TvdbID = ""
@@ -784,5 +784,5 @@ func ApplyMovieMetadata(w http.ResponseWriter, r *http.Request, s *AppState) {
 }
 
 func MoviesSeenView(w http.ResponseWriter, r *http.Request, s *AppState) {
-	gh6_seenEntries(w, r, s, "movie")
+	gh6SeenEntries(w, r, s, "movie")
 }

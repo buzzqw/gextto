@@ -4820,8 +4820,8 @@ func (d *Database) LoadTorrentMoves() (map[string]TorrentMoveState, error) {
 			if attempts < 0 {
 				attempts = 0
 			}
-			if attempts > int64(tev_maxStorageMoveRetries) {
-				attempts = int64(tev_maxStorageMoveRetries)
+			if attempts > int64(tevMaxStorageMoveRetries) {
+				attempts = int64(tevMaxStorageMoveRetries)
 			}
 			state.Retry = &StorageMoveRetry{destination: destination, postSeed: retryPostSeed, attempts: uint8(attempts)}
 		}

@@ -11,21 +11,21 @@ import (
 )
 
 func TestPackFileNames(t *testing.T) {
-	if got := tev_packFileNames(nil); got != "none" {
+	if got := tevPackFileNames(nil); got != "none" {
 		t.Fatalf("empty = %q, want none", got)
 	}
 	items := []PackFileResult{
 		{Path: "/nas/Show/S01E01.mkv"},
 		{Path: "/nas/Show/S01E02.mkv"},
 	}
-	if got := tev_packFileNames(items); got != "S01E01.mkv, S01E02.mkv" {
+	if got := tevPackFileNames(items); got != "S01E01.mkv, S01E02.mkv" {
 		t.Fatalf("names = %q", got)
 	}
 	many := make([]PackFileResult, 10)
 	for index := range many {
 		many[index] = PackFileResult{Path: fmt.Sprintf("/nas/Show/S01E%02d.mkv", index+1)}
 	}
-	got := tev_packFileNames(many)
+	got := tevPackFileNames(many)
 	if !strings.Contains(got, "… and 2 more") {
 		t.Fatalf("truncated list = %q, want '… and 2 more'", got)
 	}
@@ -52,7 +52,7 @@ func TestBgTorrentNeedsArchiveImportValidatesPayload(t *testing.T) {
 	}
 	torrent := &models.TorrentView{Hash: hash, Name: "Example.2020.mkv", SavePath: root, HasMetadata: true, TotalSize: 1024}
 
-	if bg_torrentNeedsArchiveImport(cfg, db, torrent) {
+	if bgTorrentNeedsArchiveImport(cfg, db, torrent) {
 		t.Fatal("missing file should not need archive import")
 	}
 
@@ -60,13 +60,13 @@ func TestBgTorrentNeedsArchiveImportValidatesPayload(t *testing.T) {
 	if err := os.WriteFile(target, nil, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if bg_torrentNeedsArchiveImport(cfg, db, torrent) {
+	if bgTorrentNeedsArchiveImport(cfg, db, torrent) {
 		t.Fatal("empty file should not need archive import")
 	}
 	if err := os.WriteFile(target, []byte("video"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if !bg_torrentNeedsArchiveImport(cfg, db, torrent) {
+	if !bgTorrentNeedsArchiveImport(cfg, db, torrent) {
 		t.Fatal("non-empty file should need archive import")
 	}
 
@@ -78,7 +78,7 @@ func TestBgTorrentNeedsArchiveImportValidatesPayload(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(folder, "Stagione 01", "S01E01.mkv"), []byte("video"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if !bg_torrentNeedsArchiveImport(cfg, db, folderTorrent) {
+	if !bgTorrentNeedsArchiveImport(cfg, db, folderTorrent) {
 		t.Fatal("directory with a regular file should need archive import")
 	}
 
@@ -87,7 +87,7 @@ func TestBgTorrentNeedsArchiveImportValidatesPayload(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(root, "Example.Empty", "Stagione 01"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if bg_torrentNeedsArchiveImport(cfg, db, emptyFolderTorrent) {
+	if bgTorrentNeedsArchiveImport(cfg, db, emptyFolderTorrent) {
 		t.Fatal("directory without regular files should not need archive import")
 	}
 }

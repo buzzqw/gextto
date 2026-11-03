@@ -43,7 +43,7 @@ func ToggleSeason(w http.ResponseWriter, r *http.Request, s *AppState) {
 	copy(seriesList, cfg.Series)
 	index := -1
 	for i := range seriesList {
-		if seriesList[i].Name == name || gh0_containsString(seriesList[i].Aliases, name) {
+		if seriesList[i].Name == name || gh0ContainsString(seriesList[i].Aliases, name) {
 			index = i
 			break
 		}
@@ -137,14 +137,14 @@ type episodeSource struct {
 }
 
 // gh2_episodeResult is the search result surfaced by the missing-episode search.
-type gh2_episodeResult struct {
+type gh2EpisodeResult struct {
 	Release models.Release `json:"release"`
 	Origin  string         `json:"origin"`
 	Season  int64          `json:"season"`
 	Episode int64          `json:"episode"`
 }
 
-func gh2_releaseMatchesSeriesEpisode(release *models.Release, series *SeriesConfig, season, episode int64) bool {
+func gh2ReleaseMatchesSeriesEpisode(release *models.Release, series *SeriesConfig, season, episode int64) bool {
 	if release.Kind != "series" {
 		return false
 	}
@@ -173,7 +173,7 @@ func gh2_releaseMatchesSeriesEpisode(release *models.Release, series *SeriesConf
 	return false
 }
 
-func gh2_storedSeriesEpisodeSources(s *AppState, series *SeriesConfig, season, episode int64) []episodeSource {
+func gh2StoredSeriesEpisodeSources(s *AppState, series *SeriesConfig, season, episode int64) []episodeSource {
 	query := fmt.Sprintf("%s S%02dE%02d", series.Name, season, episode)
 	results := []episodeSource{}
 	if rows, err := s.db.SeriesFeedForEpisode(season, episode, 200); err == nil {
@@ -182,7 +182,7 @@ func gh2_storedSeriesEpisodeSources(s *AppState, series *SeriesConfig, season, e
 			if release == nil {
 				continue
 			}
-			if gh2_releaseMatchesSeriesEpisode(release, series, season, episode) {
+			if gh2ReleaseMatchesSeriesEpisode(release, series, season, episode) {
 				results = append(results, episodeSource{Release: *release, Origin: episodeOriginFeed})
 			}
 		}
@@ -193,7 +193,7 @@ func gh2_storedSeriesEpisodeSources(s *AppState, series *SeriesConfig, season, e
 			if release == nil {
 				continue
 			}
-			if gh2_releaseMatchesSeriesEpisode(release, series, season, episode) {
+			if gh2ReleaseMatchesSeriesEpisode(release, series, season, episode) {
 				results = append(results, episodeSource{Release: *release, Origin: episodeOriginArchive})
 			}
 		}
@@ -574,15 +574,15 @@ func asInt64(value any) (int64, bool) {
 	return 0, false
 }
 
-var gh5_seasonEpisodePatterns = []*regexp.Regexp{
+var gh5SeasonEpisodePatterns = []*regexp.Regexp{
 	regexp.MustCompile(`(?i)\bs(?:tagione)?\s*(\d{1,2})\s*e(?:p(?:isodio)?)?\.?\s*(\d{1,4})`),
 	regexp.MustCompile(`(?i)\b(\d{1,2})\s*x\s*(\d{1,4})`),
 	regexp.MustCompile(`(?i)stagione\s*(\d{1,2}).*?episodio\s*(\d{1,4})`),
 }
 
 // gh5_parseSeasonEpisode reads the first season and episode pair of a file name.
-func gh5_parseSeasonEpisode(name string) (int64, int64, bool) {
-	for _, pattern := range gh5_seasonEpisodePatterns {
+func gh5ParseSeasonEpisode(name string) (int64, int64, bool) {
+	for _, pattern := range gh5SeasonEpisodePatterns {
 		match := pattern.FindStringSubmatch(name)
 		if match == nil {
 			continue
@@ -607,7 +607,7 @@ func parseSeasonEpisodes(name string) (int64, []int64, bool) {
 		}
 		return season, episodes, true
 	}
-	season, episode, ok := gh5_parseSeasonEpisode(name)
+	season, episode, ok := gh5ParseSeasonEpisode(name)
 	if !ok {
 		return 0, nil, false
 	}
@@ -924,7 +924,7 @@ func SeriesList(w http.ResponseWriter, r *http.Request, s *AppState) {
 }
 
 // gh7_episode_result is one episode search result with its origin and score.
-type gh7_episode_result struct {
+type gh7EpisodeResult struct {
 	Release models.Release `json:"release"`
 	Origin  string         `json:"origin"`
 	Score   int64          `json:"score"`
@@ -933,7 +933,7 @@ type gh7_episode_result struct {
 // gh7_release_matches_series_episode tells whether a release is the episode
 // asked for: a targeted search must also surface packs that contain the
 // episode (S01E01-08) and whole-season packs (S01).
-func gh7_release_matches_series_episode(release *models.Release, series SeriesConfig, season, episode int64) bool {
+func gh7ReleaseMatchesSeriesEpisode(release *models.Release, series SeriesConfig, season, episode int64) bool {
 	if release.Kind != "series" || release.Season == nil || *release.Season != season {
 		return false
 	}
@@ -960,16 +960,16 @@ func gh7_release_matches_series_episode(release *models.Release, series SeriesCo
 
 // storedSeriesEpisodeSources collects the results already stored locally
 // (feed rows and archive) without any network traffic.
-func storedSeriesEpisodeSources(s *AppState, series SeriesConfig, season, episode int64) []gh7_episode_result {
+func storedSeriesEpisodeSources(s *AppState, series SeriesConfig, season, episode int64) []gh7EpisodeResult {
 	query := fmt.Sprintf("%s S%02dE%02d", series.Name, season, episode)
-	results := []gh7_episode_result{}
+	results := []gh7EpisodeResult{}
 
 	if s.db != nil {
 		if rows, err := s.db.SeriesFeedForEpisode(season, episode, 200); err == nil {
 			for _, row := range rows {
 				if release := ParseRelease(row[0], row[1], row[2]); release != nil {
-					if gh7_release_matches_series_episode(release, series, season, episode) {
-						results = append(results, gh7_episode_result{Release: *release, Origin: episodeOriginFeed})
+					if gh7ReleaseMatchesSeriesEpisode(release, series, season, episode) {
+						results = append(results, gh7EpisodeResult{Release: *release, Origin: episodeOriginFeed})
 					}
 				}
 			}
@@ -980,8 +980,8 @@ func storedSeriesEpisodeSources(s *AppState, series SeriesConfig, season, episod
 		if rows, err := s.archive.Search(query); err == nil {
 			for _, row := range rows {
 				if release := ParseRelease(row[0], row[1], row[2]); release != nil {
-					if gh7_release_matches_series_episode(release, series, season, episode) {
-						results = append(results, gh7_episode_result{Release: *release, Origin: episodeOriginArchive})
+					if gh7ReleaseMatchesSeriesEpisode(release, series, season, episode) {
+						results = append(results, gh7EpisodeResult{Release: *release, Origin: episodeOriginArchive})
 					}
 				}
 			}
@@ -992,8 +992,8 @@ func storedSeriesEpisodeSources(s *AppState, series SeriesConfig, season, episod
 
 // gh7_finalize_episode_search_results applies the same filters as the "Accoda"
 // click, deduplicates by magnet hash + origin and sorts by release score.
-func gh7_finalize_episode_search_results(results []gh7_episode_result, cfg *Config, series SeriesConfig) []gh7_episode_result {
-	allowed := make([]gh7_episode_result, 0, len(results))
+func gh7FinalizeEpisodeSearchResults(results []gh7EpisodeResult, cfg *Config, series SeriesConfig) []gh7EpisodeResult {
+	allowed := make([]gh7EpisodeResult, 0, len(results))
 	for _, result := range results {
 		if cfg.ReleaseAllowed(&result.Release) && cfg.SeriesReleaseAllowed(&series, &result.Release.Quality, result.Release.Title) {
 			result.Score = cfg.ReleaseScore(&result.Release)
@@ -1001,7 +1001,7 @@ func gh7_finalize_episode_search_results(results []gh7_episode_result, cfg *Conf
 		}
 	}
 	seen := map[string]struct{}{}
-	deduped := make([]gh7_episode_result, 0, len(allowed))
+	deduped := make([]gh7EpisodeResult, 0, len(allowed))
 	for _, result := range allowed {
 		key, ok := releaseDedupKey(&result.Release)
 		if !ok {
@@ -1024,8 +1024,8 @@ func gh7_finalize_episode_search_results(results []gh7_episode_result, cfg *Conf
 // resolution of the profile, marked as the last resort: the caller uses them
 // only when the episode has nothing within the profile, exactly as the
 // automatic gap pass does.
-func lastResortEpisodeResults(results []gh7_episode_result, cfg *Config, series SeriesConfig) []gh7_episode_result {
-	kept := make([]gh7_episode_result, 0, len(results))
+func lastResortEpisodeResults(results []gh7EpisodeResult, cfg *Config, series SeriesConfig) []gh7EpisodeResult {
+	kept := make([]gh7EpisodeResult, 0, len(results))
 	for _, result := range results {
 		if !cfg.ReleaseAllowed(&result.Release) {
 			continue
@@ -1050,13 +1050,13 @@ func reportSearchStage(ctx context.Context, name string) {
 	}
 }
 
-func searchSeriesEpisodeSources(ctx context.Context, s *AppState, cfg *Config, series SeriesConfig, season, episode int64) []gh7_episode_result {
+func searchSeriesEpisodeSources(ctx context.Context, s *AppState, cfg *Config, series SeriesConfig, season, episode int64) []gh7EpisodeResult {
 	results := storedSeriesEpisodeSources(s, series, season, episode)
 	reportSearchStage(ctx, "sources")
 	if s.engine != nil {
 		for _, release := range s.engine.SearchSeriesEpisode(ctx, cfg, &series, season, episode, true) {
-			if gh7_release_matches_series_episode(&release, series, season, episode) {
-				results = append(results, gh7_episode_result{Release: release, Origin: episodeOriginIndexer})
+			if gh7ReleaseMatchesSeriesEpisode(&release, series, season, episode) {
+				results = append(results, gh7EpisodeResult{Release: release, Origin: episodeOriginIndexer})
 			}
 		}
 	}
@@ -1065,13 +1065,13 @@ func searchSeriesEpisodeSources(ctx context.Context, s *AppState, cfg *Config, s
 	// runs after the usual filters, so a stored release rejected by quality or
 	// language does not hide the episode from the fallback. The switch is the
 	// explicit ed2k_fallback, so a manual search never surprises the operator.
-	final := gh7_finalize_episode_search_results(results, cfg, series)
+	final := gh7FinalizeEpisodeSearchResults(results, cfg, series)
 	if len(final) == 0 {
 		reportSearchStage(ctx, "ed2k")
 		for _, release := range ed2kManualEpisodeFallback(ctx, s.engine, cfg, &series, season, episode) {
-			results = append(results, gh7_episode_result{Release: release, Origin: episodeOriginED2K})
+			results = append(results, gh7EpisodeResult{Release: release, Origin: episodeOriginED2K})
 		}
-		final = gh7_finalize_episode_search_results(results, cfg, series)
+		final = gh7FinalizeEpisodeSearchResults(results, cfg, series)
 	}
 	if len(final) == 0 {
 		// The cycle takes such a copy as a last resort; the manual search must
@@ -1081,7 +1081,7 @@ func searchSeriesEpisodeSources(ctx context.Context, s *AppState, cfg *Config, s
 	return final
 }
 
-func gh7_json_string(value map[string]any, key string) string {
+func gh7JsonString(value map[string]any, key string) string {
 	if value == nil {
 		return ""
 	}
@@ -1105,7 +1105,7 @@ func SearchEpisode(w http.ResponseWriter, r *http.Request, s *AppState) {
 		return
 	}
 	cfg := latestConfig(s)
-	series, ok := gh7_find_series(cfg, seriesName)
+	series, ok := gh7FindSeries(cfg, seriesName)
 	if !ok {
 		jsonError(w, http.StatusNotFound, "series not found")
 		return
@@ -1164,7 +1164,7 @@ func EpisodeSources(w http.ResponseWriter, r *http.Request, s *AppState) {
 		return
 	}
 	cfg := latestConfig(s)
-	series, ok := gh7_find_series(cfg, seriesName)
+	series, ok := gh7FindSeries(cfg, seriesName)
 	if !ok {
 		jsonError(w, http.StatusNotFound, "series not found")
 		return
@@ -1221,7 +1221,7 @@ func SeriesMetadataRefresh(w http.ResponseWriter, r *http.Request, s *AppState) 
 	cfg.Series = append([]SeriesConfig(nil), live.Series...)
 	cfg.Movies = append([]MovieConfig(nil), live.Movies...)
 
-	series, ok := gh7_find_series(&cfg, name)
+	series, ok := gh7FindSeries(&cfg, name)
 	if !ok {
 		jsonError(w, http.StatusNotFound, "series not found")
 		return
@@ -1291,7 +1291,7 @@ func SeriesMetadataRefresh(w http.ResponseWriter, r *http.Request, s *AppState) 
 		return
 	}
 	if info, err := meta.SeriesInfo(ctx, series.Name, &resolved); err == nil && info != nil {
-		if err := s.db.SaveSeriesStatus(series.Name, gh7_json_string(info, "status"), gh7_json_string(info, "last_air_date")); err != nil {
+		if err := s.db.SaveSeriesStatus(series.Name, gh7JsonString(info, "status"), gh7JsonString(info, "last_air_date")); err != nil {
 			logging.Warn("series status save failed", "series", series.Name, "error", err.Error())
 		}
 	}

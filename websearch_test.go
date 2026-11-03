@@ -22,21 +22,21 @@ func TestEngineCooldownBlocksAfterAFailure(t *testing.T) {
 	clearCooldown()
 	t.Cleanup(clearCooldown)
 
-	if engine_in_cooldown("test-cooldown-engine") {
+	if engineInCooldown("test-cooldown-engine") {
 		t.Fatal("engine should not start in cooldown")
 	}
-	set_engine_cooldown("test-cooldown-engine", "HTTP 429 Too Many Requests")
-	if !engine_in_cooldown("test-cooldown-engine") {
+	setEngineCooldown("test-cooldown-engine", "HTTP 429 Too Many Requests")
+	if !engineInCooldown("test-cooldown-engine") {
 		t.Fatal("engine should be in cooldown after a 429")
 	}
 	// Un motore diverso non è toccato.
-	if engine_in_cooldown("test-cooldown-other") {
+	if engineInCooldown("test-cooldown-other") {
 		t.Fatal("unrelated engine must not be in cooldown")
 	}
 }
 
 func TestBuildsSanitizedMagnetWithTrackers(t *testing.T) {
-	magnet := build_magnet("0123456789012345678901234567890123456789", "Example Show")
+	magnet := buildMagnet("0123456789012345678901234567890123456789", "Example Show")
 	if magnet == "" {
 		t.Fatal("build_magnet returned no magnet")
 	}
@@ -53,7 +53,7 @@ func TestBuildsSanitizedMagnetWithTrackers(t *testing.T) {
 
 func TestExtractsAndSanitizesHTMLMagnet(t *testing.T) {
 	body := `<a href="magnet:?xt=urn:btih:0123456789012345678901234567890123456789&dn=Example%20Show&x=bad space">download</a>`
-	magnet := first_magnet(body)
+	magnet := firstMagnet(body)
 	if !strings.HasPrefix(magnet, "magnet:?xt=urn:btih:") {
 		t.Fatalf("magnet = %q", magnet)
 	}
@@ -114,11 +114,11 @@ func TestWebHTMLReusesFlareSolverrSession(t *testing.T) {
 	}))
 	defer flare.Close()
 
-	body, err := fetch_html(context.Background(), target.URL, &flare.URL)
+	body, err := fetchHtml(context.Background(), target.URL, &flare.URL)
 	if err != nil || !strings.Contains(body, "solved by browser") {
 		t.Fatalf("first fetch = %q, %v", body, err)
 	}
-	body, err = fetch_html(context.Background(), target.URL, &flare.URL)
+	body, err = fetchHtml(context.Background(), target.URL, &flare.URL)
 	if err != nil || !strings.Contains(body, "solved target page") {
 		t.Fatalf("second fetch = %q, %v", body, err)
 	}
@@ -168,7 +168,7 @@ func TestFlareSolverrReusesPersistentBrowserSession(t *testing.T) {
 	defer flare.Close()
 
 	for i := 0; i < 2; i++ {
-		if _, err := fetch_html(context.Background(), target.URL, &flare.URL); err != nil {
+		if _, err := fetchHtml(context.Background(), target.URL, &flare.URL); err != nil {
 			t.Fatalf("fetch %d: %v", i, err)
 		}
 	}
@@ -202,7 +202,7 @@ func TestWebHTMLDoesNotUseFlareSolverrForNonCloudflareStatuses(t *testing.T) {
 			}))
 			defer flare.Close()
 
-			_, err := fetch_html(context.Background(), target.URL, &flare.URL)
+			_, err := fetchHtml(context.Background(), target.URL, &flare.URL)
 			if err == nil || !strings.Contains(err.Error(), http.StatusText(status)) && !strings.Contains(err.Error(), "HTTP ") {
 				t.Fatalf("fetch error = %v", err)
 			}

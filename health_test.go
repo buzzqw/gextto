@@ -125,18 +125,18 @@ func TestHealthRecentErrorsKeepsTheLastLines(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "gextto.log")
 	mustWriteFile(t, path, "INFO ok\nERROR first\nWARN ignore\nERROR second\n")
 
-	errors := recent_errors(path, 10)
+	errors := recentErrors(path, 10)
 	if len(errors) != 2 {
 		t.Fatalf("recent_errors = %#v, want 2 entries", errors)
 	}
 	if !strings.Contains(errors[0], "first") || !strings.Contains(errors[1], "second") {
 		t.Fatalf("recent_errors order = %#v", errors)
 	}
-	last := recent_errors(path, 1)
+	last := recentErrors(path, 1)
 	if len(last) != 1 || !strings.Contains(last[0], "second") {
 		t.Fatalf("recent_errors(1) = %#v", last)
 	}
-	if got := recent_errors(filepath.Join(t.TempDir(), "missing.log"), 10); len(got) != 0 {
+	if got := recentErrors(filepath.Join(t.TempDir(), "missing.log"), 10); len(got) != 0 {
 		t.Fatalf("missing log = %#v, want empty", got)
 	}
 }
@@ -213,7 +213,7 @@ func TestHealthCPUSnapshot(t *testing.T) {
 	if runtime.GOOS != "linux" {
 		t.Skip("procfs is Linux-only")
 	}
-	total, idle, ok := cpu_snapshot()
+	total, idle, ok := cpuSnapshot()
 	if !ok {
 		t.Skip("/proc/stat unavailable")
 	}
@@ -235,14 +235,14 @@ func TestHealthTreeStats(t *testing.T) {
 	mustWriteFile(t, filepath.Join(root, "a.bin"), "12345")
 	mustWriteFile(t, filepath.Join(nested, "b.bin"), "123")
 
-	files, bytes := tree_stats(root)
+	files, bytes := treeStats(root)
 	if files != 2 {
 		t.Fatalf("files = %d, want 2", files)
 	}
 	if bytes != 8 {
 		t.Fatalf("bytes = %d, want 8", bytes)
 	}
-	if files, bytes := tree_stats(filepath.Join(root, "missing")); files != 0 || bytes != 0 {
+	if files, bytes := treeStats(filepath.Join(root, "missing")); files != 0 || bytes != 0 {
 		t.Fatalf("missing tree = (%d,%d), want (0,0)", files, bytes)
 	}
 }
@@ -267,7 +267,7 @@ func TestReadFileTailAndRecentErrorsOnLargeLog(t *testing.T) {
 	if int64(len(tail)) > recentErrorsTailBytes {
 		t.Fatalf("tail = %d bytes, want <= %d", len(tail), recentErrorsTailBytes)
 	}
-	got := recent_errors(path, 10)
+	got := recentErrors(path, 10)
 	if len(got) != 2 || !strings.Contains(got[1], "boom two") {
 		t.Fatalf("recent_errors on a large log = %#v", got)
 	}

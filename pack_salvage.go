@@ -28,7 +28,7 @@ type torrentFileLister interface {
 // torrent and returns how many reached the library, and whether previous
 // library copies of the other episodes were restored from the upgrade backup.
 // Any failure leaves the usual give-up path untouched (nothing is salvaged).
-func tev_salvagePackEpisodes(cfg *Config, torrents TorrentSession, db *Database, torrent models.TorrentView, meta *models.TorrentMeta) (int, bool) {
+func tevSalvagePackEpisodes(cfg *Config, torrents TorrentSession, db *Database, torrent models.TorrentView, meta *models.TorrentMeta) (int, bool) {
 	if meta == nil {
 		return 0, false
 	}

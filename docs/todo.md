@@ -106,10 +106,9 @@ its gate; a rejected one moves to *Not planned*.
   "pack in progress" without a count) is returned as a movie without trying the remaining
   matchers. Gate: a decision that the failed guard should fall through, and a corpus run
   that shows which titles change kind.
-- **Naming and error wrapping** — 407 identifiers are `snake_case`, 280 log calls build
-  their sentence with `Sprintf` although the logger takes structured fields, and 490
-  `fmt.Errorf` calls drop the cause because they do not use `%w`. Mechanical, area by
-  area, tests green.
+- **Error wrapping and log wording** — 280 log calls build their sentence with `Sprintf`
+  although the logger takes structured fields, and 490 `fmt.Errorf` calls drop the cause
+  because they do not use `%w`. Mechanical, area by area, tests green.
 
 ## Not planned
 

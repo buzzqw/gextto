@@ -17,22 +17,22 @@ func TestExplicitManagerOverridesHeuristic(t *testing.T) {
 	// A Prowlarr instance on a non-standard port with an arbitrary name: the
 	// explicit manager must win over the URL/port/name heuristic.
 	prowlarr := IndexerConfig{Name: "custom", URL: "http://host:5001", Enabled: true, Manager: "prowlarr"}
-	if got := torznab_endpoint(prowlarr); got != "http://host:5001/api/v1/search" {
+	if got := torznabEndpoint(prowlarr); got != "http://host:5001/api/v1/search" {
 		t.Fatalf("explicit prowlarr endpoint = %q", got)
 	}
 	jackett := IndexerConfig{Name: "custom", URL: "http://host:5001", Enabled: true, Manager: "jackett"}
-	if got := torznab_endpoint(jackett); got != "http://host:5001/api/v2.0/indexers/all/results/torznab/api" {
+	if got := torznabEndpoint(jackett); got != "http://host:5001/api/v2.0/indexers/all/results/torznab/api" {
 		t.Fatalf("explicit jackett endpoint = %q", got)
 	}
 	// indexarr keeps its own native Torznab endpoint for the aggregate search;
 	// its indexer list and per-indexer lanes use the Jackett-compatible paths.
 	indexarr := IndexerConfig{Name: "custom", URL: "http://host:5001", Enabled: true, Manager: ManagerIndexarr}
-	if got := torznab_endpoint(indexarr); got != "http://host:5001/api" {
+	if got := torznabEndpoint(indexarr); got != "http://host:5001/api" {
 		t.Fatalf("explicit indexarr endpoint = %q", got)
 	}
 	// Without a manager, the historical heuristic still applies.
 	legacy := IndexerConfig{Name: "my-indexer", URL: "http://host:9696", Enabled: true}
-	if got := torznab_endpoint(legacy); got != "http://host:9696/api/v1/search" {
+	if got := torznabEndpoint(legacy); got != "http://host:9696/api/v1/search" {
 		t.Fatalf("heuristic endpoint = %q", got)
 	}
 	heuristicIndexarr := IndexerConfig{Name: "indexarr", URL: "http://host:8484", Enabled: true}

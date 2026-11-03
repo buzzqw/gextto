@@ -781,7 +781,7 @@ func parseSeasonEpisode(name string) (int64, int64, bool) {
 
 // Scans one archive folder and registers every recognised video file, returning
 // the number of files found and the number of files updated.
-func gh4_scanArchivePath(db *Database, series *SeriesConfig, path string, cfg *Config) (int, int, error) {
+func gh4ScanArchivePath(db *Database, series *SeriesConfig, path string, cfg *Config) (int, int, error) {
 	info, err := os.Stat(path)
 	if err != nil || !info.IsDir() {
 		return 0, 0, fmt.Errorf("archive path is not a directory: %s", path)
@@ -869,7 +869,7 @@ func PlexTest(w http.ResponseWriter, r *http.Request, s *AppState) {
 	}
 	response, err := get("/identity")
 	if err != nil {
-		logging.Info("plex test", "host", domain_of(base), "ok", false, "error", err.Error())
+		logging.Info("plex test", "host", domainOf(base), "ok", false, "error", err.Error())
 		jsonStatus(w, http.StatusBadGateway, map[string]any{"ok": false, "error": err.Error()})
 		return
 	}
@@ -885,12 +885,12 @@ func PlexTest(w http.ResponseWriter, r *http.Request, s *AppState) {
 				server = derefString(xmlAttribute(string(body), "friendlyName"))
 			}
 		}
-		logging.Info("plex test", "host", domain_of(base), "ok", true, "status", response.StatusCode, "server", server)
+		logging.Info("plex test", "host", domainOf(base), "ok", true, "status", response.StatusCode, "server", server)
 		jsonStatus(w, http.StatusOK, map[string]any{"ok": true, "server": server, "version": "", "machine": machine})
 		return
 	}
 	mediaError := mediaTestError("Plex", response.StatusCode)
-	logging.Info("plex test", "host", domain_of(base), "ok", false, "status", response.StatusCode, "error", mediaError)
+	logging.Info("plex test", "host", domainOf(base), "ok", false, "status", response.StatusCode, "error", mediaError)
 	jsonStatus(w, http.StatusBadGateway, map[string]any{
 		"ok":    false,
 		"error": mediaError,
@@ -969,7 +969,7 @@ func ScanAllArchives(w http.ResponseWriter, r *http.Request, s *AppState) {
 			if series == nil {
 				continue
 			}
-			_, count, err := gh4_scanArchivePath(s.db, series, target.path, cfg)
+			_, count, err := gh4ScanArchivePath(s.db, series, target.path, cfg)
 			if err != nil {
 				errorsList = append(errorsList, map[string]any{"series": target.name, "error": err.Error()})
 				continue

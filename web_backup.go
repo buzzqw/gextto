@@ -53,7 +53,7 @@ func BackupSendTelegram(w http.ResponseWriter, r *http.Request, s *AppState) {
 
 // Converts a JSON-decoded setting value (string, bool, number or raw JSON) to
 // the string stored in the settings file; ok is false for any other type.
-func gh2_settingsValue(value any) (string, bool) {
+func gh2SettingsValue(value any) (string, bool) {
 	switch typed := value.(type) {
 	case string:
 		return typed, true
@@ -71,7 +71,7 @@ func gh2_settingsValue(value any) (string, bool) {
 		if err := json.Unmarshal(typed, &decoded); err != nil {
 			return "", false
 		}
-		return gh2_settingsValue(decoded)
+		return gh2SettingsValue(decoded)
 	default:
 		return "", false
 	}
@@ -148,7 +148,7 @@ func SaveBackupSettings(w http.ResponseWriter, r *http.Request, s *AppState) {
 		if _, ok := allowed[key]; !ok || isJSONNull(raw) {
 			continue
 		}
-		value, ok := gh2_settingsValue(raw)
+		value, ok := gh2SettingsValue(raw)
 		if !ok {
 			jsonError(w, http.StatusBadRequest, "invalid backup setting value")
 			return
@@ -330,10 +330,10 @@ func CreateBackup(w http.ResponseWriter, r *http.Request, s *AppState) {
 		"ftp_uploaded":      steps.ftpUploaded,
 		"ftp_host":          steps.ftpHost,
 		"ftp_remote":        steps.ftpRemote,
-		"ftp_error":         bg_derefStr(steps.ftpError),
+		"ftp_error":         bgDerefStr(steps.ftpError),
 		"cloud_copied":      steps.cloudCopied,
 		"cloud_destination": steps.cloudDestination,
-		"cloud_error":       bg_derefStr(steps.cloudError),
+		"cloud_error":       bgDerefStr(steps.cloudError),
 		"telegram_uploaded": telegramUploaded,
 		"telegram_parts":    telegramParts,
 		"telegram_error":    telegramError,

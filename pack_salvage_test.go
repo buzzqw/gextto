@@ -197,7 +197,7 @@ func TestSalvageSkipsWithoutLibraryFolder(t *testing.T) {
 	release := ParseRelease("Show.S01.1080p.WEB-DL.ITA", "magnet:?xt=urn:btih:"+salvageTestHash, "test")
 	session := &salvageSession{files: []models.FileView{{Path: "Show.S01.1080p.WEB-DL.ITA/Show.S01E01.1080p.WEB-DL.ITA.mkv", Size: 80, Downloaded: 80}}}
 	torrent := models.TorrentView{Hash: salvageTestHash, Name: "Show.S01.1080p.WEB-DL.ITA", SavePath: downloads}
-	if count, restored := tev_salvagePackEpisodes(&cfg, session, db, torrent, &models.TorrentMeta{Release: *release}); count != 0 || restored {
+	if count, restored := tevSalvagePackEpisodes(&cfg, session, db, torrent, &models.TorrentMeta{Release: *release}); count != 0 || restored {
 		t.Fatalf("salvaged %d without a library folder", count)
 	}
 }

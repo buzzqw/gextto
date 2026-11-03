@@ -84,16 +84,16 @@ func TestMissingArchiveWarningIsNotRepeated(t *testing.T) {
 }
 
 func TestMetadataWaitTextIsReadable(t *testing.T) {
-	got := tev_metadataWaitText("Star Trek: Starfleet Academy S01E09", 13*time.Hour, 0, 0)
+	got := tevMetadataWaitText("Star Trek: Starfleet Academy S01E09", 13*time.Hour, 0, 0)
 	want := "⏳ Star Trek: Starfleet Academy S01E09 — still no file list after 13 hours (no peer has answered yet); retrying."
 	if got != want {
 		t.Fatalf("metadata wait = %q, want %q", got, want)
 	}
-	got = tev_metadataWaitText("Silo S01E01", 2*time.Hour, 3, 0)
+	got = tevMetadataWaitText("Silo S01E01", 2*time.Hour, 3, 0)
 	if !strings.Contains(got, "3 peers connected, nothing received yet") {
 		t.Fatalf("metadata wait with peers = %q", got)
 	}
-	got = tev_metadataWaitText("Silo S01E01", 90*time.Minute, 1, 2048)
+	got = tevMetadataWaitText("Silo S01E01", 90*time.Minute, 1, 2048)
 	if !strings.Contains(got, "1 peer connected, 2.0 KB received so far") {
 		t.Fatalf("metadata wait with data = %q", got)
 	}

@@ -216,7 +216,7 @@ func AddArchiveEntry(w http.ResponseWriter, r *http.Request, s *AppState) {
 	}
 	release := ParseRelease(input.Title, input.Magnet, source)
 	if release == nil {
-		status, body := gh0_addRawMagnet(r.Context(), s, input.Magnet)
+		status, body := gh0AddRawMagnet(r.Context(), s, input.Magnet)
 		jsonStatus(w, status, body)
 		return
 	}
@@ -224,7 +224,7 @@ func AddArchiveEntry(w http.ResponseWriter, r *http.Request, s *AppState) {
 	jsonStatus(w, status, body)
 }
 
-func gh0_downloadAndAdd(ctx context.Context, s *AppState, url string) (*string, string) {
+func gh0DownloadAndAdd(ctx context.Context, s *AppState, url string) (*string, string) {
 	cfg := latestConfig(s)
 	url = strings.TrimSpace(url)
 	addMagnet := func(m string) (*string, string) {
@@ -265,10 +265,10 @@ func gh0_downloadAndAdd(ctx context.Context, s *AppState, url string) (*string, 
 	return result, ""
 }
 
-func gh0_addParsedRelease(ctx context.Context, s *AppState, release models.Release) (int, map[string]any) {
+func gh0AddParsedRelease(ctx context.Context, s *AppState, release models.Release) (int, map[string]any) {
 	source := strings.TrimSpace(release.Magnet)
 	if isHTTPURL(source) {
-		hash, errMessage := gh0_downloadAndAdd(ctx, s, source)
+		hash, errMessage := gh0DownloadAndAdd(ctx, s, source)
 		if errMessage != "" {
 			return http.StatusBadRequest, map[string]any{"ok": false, "error": errMessage}
 		}
@@ -313,10 +313,10 @@ func addRelease(ctx context.Context, s *AppState, release models.Release) (int, 
 		return http.StatusConflict, map[string]any{"ok": false, "error": "complete the initial setup first"}
 	}
 	isURL := isHTTPURL(release.Magnet)
-	status, body := gh0_addParsedRelease(ctx, s, release)
+	status, body := gh0AddParsedRelease(ctx, s, release)
 	if isURL && status == http.StatusBadRequest {
 		if found := resolveBySearch(ctx, s, release.Title); found != nil {
-			retryStatus, retryBody := gh0_addParsedRelease(ctx, s, *found)
+			retryStatus, retryBody := gh0AddParsedRelease(ctx, s, *found)
 			if retryStatus != http.StatusBadRequest {
 				return retryStatus, retryBody
 			}
@@ -325,13 +325,13 @@ func addRelease(ctx context.Context, s *AppState, release models.Release) (int, 
 	return status, body
 }
 
-func gh0_addRawMagnet(ctx context.Context, s *AppState, source string) (int, map[string]any) {
+func gh0AddRawMagnet(ctx context.Context, s *AppState, source string) (int, map[string]any) {
 	if !SetupComplete(s.cfg) {
 		return http.StatusConflict, map[string]any{"ok": false, "error": "complete the initial setup first"}
 	}
 	trimmed := strings.TrimSpace(source)
 	if isHTTPURL(trimmed) {
-		hash, errMessage := gh0_downloadAndAdd(ctx, s, trimmed)
+		hash, errMessage := gh0DownloadAndAdd(ctx, s, trimmed)
 		if errMessage != "" {
 			return http.StatusBadRequest, map[string]any{"ok": false, "error": errMessage}
 		}
@@ -351,21 +351,21 @@ func gh0_addRawMagnet(ctx context.Context, s *AppState, source string) (int, map
 }
 
 func resolveBySearch(ctx context.Context, s *AppState, title string) *models.Release {
-	query := gh0_searchQueryFromTitle(title)
-	normalizedQuery := gh0_normalizeSearch(query)
+	query := gh0SearchQueryFromTitle(title)
+	normalizedQuery := gh0NormalizeSearch(query)
 	if normalizedQuery == "" {
 		return nil
 	}
 	results := s.engine.SearchQueryManual(ctx, latestConfig(s), query)
 	for i := range results {
-		if sourceIsUsable(results[i].Magnet) && strings.HasPrefix(gh0_normalizeSearch(results[i].Title), normalizedQuery) {
+		if sourceIsUsable(results[i].Magnet) && strings.HasPrefix(gh0NormalizeSearch(results[i].Title), normalizedQuery) {
 			return &results[i]
 		}
 	}
 	return nil
 }
 
-func gh0_searchQueryFromTitle(title string) string {
+func gh0SearchQueryFromTitle(title string) string {
 	cleaned := []rune{}
 	beforeBracket := strings.SplitN(title, "[", 2)[0]
 	for _, character := range beforeBracket {
@@ -413,7 +413,7 @@ func isQualityMarker(lower string) bool {
 	return false
 }
 
-func gh0_normalizeSearch(value string) string {
+func gh0NormalizeSearch(value string) string {
 	beforeBracket := strings.ToLower(strings.SplitN(value, "[", 2)[0])
 	cleaned := []rune{}
 	for _, character := range beforeBracket {
@@ -929,14 +929,14 @@ func RemoveTrashContents(root string, olderThanDays int64) (int, uint64, error) 
 
 // gh4_addRelease queues a release for download, falling back to a search of its
 // title when the URL cannot be fetched.
-func gh4_addRelease(s *AppState, release models.Release) (int, any) {
+func gh4AddRelease(s *AppState, release models.Release) (int, any) {
 	if !SetupComplete(s.cfg) {
 		return http.StatusConflict, map[string]any{"ok": false, "error": "complete the initial setup first"}
 	}
 	isURL := isHTTPURL(release.Magnet)
 	status, value := addParsedRelease(s, release)
 	if isURL && status == http.StatusBadRequest {
-		if found := gh4_resolveBySearch(s, release.Title); found != nil {
+		if found := gh4ResolveBySearch(s, release.Title); found != nil {
 			retryStatus, retryValue := addParsedRelease(s, *found)
 			if retryStatus != http.StatusBadRequest {
 				return retryStatus, retryValue
@@ -1032,7 +1032,7 @@ func downloadAndAdd(s *AppState, rawURL string, options AddOptions) (*string, er
 
 // gh4_resolveBySearch searches for a release whose title starts with the one
 // given and whose source can be used.
-func gh4_resolveBySearch(s *AppState, title string) *models.Release {
+func gh4ResolveBySearch(s *AppState, title string) *models.Release {
 	query := searchQueryFromTitle(title)
 	normalized := normalizeSearch(query)
 	if normalized == "" {
@@ -1169,7 +1169,7 @@ func BatchArchiveDownload(w http.ResponseWriter, r *http.Request, s *AppState) {
 			if release == nil {
 				status, _ = addRawMagnet(s, item.Magnet)
 			} else {
-				status, _ = gh4_addRelease(s, *release)
+				status, _ = gh4AddRelease(s, *release)
 			}
 		}
 		if (status >= 200 && status < 300) || status == http.StatusAccepted {
@@ -1352,7 +1352,7 @@ func DeleteArchiveEntry(w http.ResponseWriter, r *http.Request, s *AppState) {
 // episodes: it lists the renames, or applies them when execute is set.
 func RestoreSource(w http.ResponseWriter, r *http.Request, s *AppState) {
 	var input RestoreSourceInput
-	if err := gh6_decodeOptionalJSON(r, &input); err != nil {
+	if err := gh6DecodeOptionalJSON(r, &input); err != nil {
 		jsonError(w, http.StatusBadRequest, err.Error())
 		return
 	}

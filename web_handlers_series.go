@@ -147,6 +147,6 @@ func DeleteSeries(w http.ResponseWriter, r *http.Request, s *AppState) {
 		jsonError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	gh6_purgeRemovedLibrary(s.db, cfg.Series, cfg.Movies, list, cfg.Movies)
+	gh6PurgeRemovedLibrary(s.db, cfg.Series, cfg.Movies, list, cfg.Movies)
 	jsonResponse(w, map[string]any{"ok": true, "removed": cfg.Series[index].Name})
 }

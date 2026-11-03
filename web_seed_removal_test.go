@@ -210,14 +210,14 @@ func TestBgTorrentNeedsArchiveImport(t *testing.T) {
 	view.TotalSize = int64(len(data))
 	view.TotalDone = int64(len(data))
 
-	if !bg_torrentNeedsArchiveImport(cfg, db, &view) {
+	if !bgTorrentNeedsArchiveImport(cfg, db, &view) {
 		t.Fatal("a completed single moved to the archive must still need its import")
 	}
 	// Once a processed path is recorded the import has run and must not repeat.
 	if err := db.MarkTorrentCompleted(seedTestHash, moved, int64(len(data))); err != nil {
 		t.Fatal(err)
 	}
-	if bg_torrentNeedsArchiveImport(cfg, db, &view) {
+	if bgTorrentNeedsArchiveImport(cfg, db, &view) {
 		t.Fatal("a recorded archive copy must not be re-imported")
 	}
 }
@@ -562,29 +562,29 @@ func TestRemoveSeededCompletedToTrashExplainsWhy(t *testing.T) {
 func TestTeVeSeedsForever(t *testing.T) {
 	session := &stubTorrentSession{list: []models.TorrentView{{Hash: seedTestHash, SeedRatio: 0.0, SeedDays: -1}}}
 	cfg := DefaultConfig()
-	if !tev_seedsForever(&cfg, session, seedTestHash) {
+	if !tevSeedsForever(&cfg, session, seedTestHash) {
 		t.Fatal("per-torrent ratio 0 must mean infinite seed")
 	}
 	session.list[0].SeedRatio = 2.0
-	if !tev_seedsForever(&cfg, session, seedTestHash) {
+	if !tevSeedsForever(&cfg, session, seedTestHash) {
 		t.Fatal("a finite ratio with the time inherited infinite must still seed forever")
 	}
 	session.list[0].SeedDays = 5
-	if tev_seedsForever(&cfg, session, seedTestHash) {
+	if tevSeedsForever(&cfg, session, seedTestHash) {
 		t.Fatal("a finite per-torrent ratio and time must not be infinite")
 	}
 	session.list[0].SeedDays = -1
 	session.list[0].SeedRatio = -1.0
 	session.list[0].SeedDays = -1
-	if !tev_seedsForever(&cfg, session, seedTestHash) {
+	if !tevSeedsForever(&cfg, session, seedTestHash) {
 		t.Fatal("no per-torrent and no global limit must mean infinite seed")
 	}
 	cfg.Transfer.SeedRatio = 1.5
-	if !tev_seedsForever(&cfg, session, seedTestHash) {
+	if !tevSeedsForever(&cfg, session, seedTestHash) {
 		t.Fatal("a global ratio with the time left infinite must still seed forever")
 	}
 	cfg.Transfer.SeedTimeMinutes = 60
-	if tev_seedsForever(&cfg, session, seedTestHash) {
+	if tevSeedsForever(&cfg, session, seedTestHash) {
 		t.Fatal("a finite global ratio and time must make the policy finite")
 	}
 }

@@ -96,7 +96,7 @@ func TestParseProwlarrJSONRebuildsMagnetFromInfoHash(t *testing.T) {
 	  {"title":"Usenet Item","magnetUrl":"magnet:?xt=urn:btih:` + strings.Repeat("a", 40) + `","size":1500000000,"protocol":"usenet"},
 	  {"title":"Sample Only","magnetUrl":"magnet:?xt=urn:btih:` + strings.Repeat("b", 40) + `","size":10000000,"protocol":"torrent"}
 	]`
-	releases, err := parse_prowlarr_json(body, "Prowlarr")
+	releases, err := parseProwlarrJson(body, "Prowlarr")
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}
@@ -121,7 +121,7 @@ func TestParseProwlarrJSONRebuildsMagnetFromInfoHash(t *testing.T) {
 func TestProwlarrKeepsTheTorrentLinkNextToAnInfoHash(t *testing.T) {
 	link := "http://prowlarr:9696/3/download?apikey=k&link=abc&file=Show"
 	body := `[{"title":"Show S01E02 1080p WEB-DL","infoHash":"0123456789abcdef0123456789abcdef01234567","downloadUrl":"` + link + `","size":1500000000,"protocol":"torrent","indexer":"PrivateHD"}]`
-	releases, err := parse_prowlarr_json(body, "Prowlarr")
+	releases, err := parseProwlarrJson(body, "Prowlarr")
 	if err != nil || len(releases) != 1 {
 		t.Fatalf("parse = %+v, %v", releases, err)
 	}
@@ -133,7 +133,7 @@ func TestProwlarrKeepsTheTorrentLinkNextToAnInfoHash(t *testing.T) {
 func TestProwlarrPreservesPublishDateAndV2InfoHash(t *testing.T) {
 	hash := strings.Repeat("a", 64)
 	body := `[{"title":"Show S01E02 1080p WEB-DL","infoHash":"` + hash + `","size":1500000000,"protocol":"torrent","publishDate":"2026-09-01T12:00:00Z"}]`
-	releases, err := parse_prowlarr_json(body, "Prowlarr")
+	releases, err := parseProwlarrJson(body, "Prowlarr")
 	if err != nil || len(releases) != 1 {
 		t.Fatalf("parse = %+v, %v", releases, err)
 	}
@@ -147,7 +147,7 @@ func TestProwlarrPreservesPublishDateAndV2InfoHash(t *testing.T) {
 
 func TestProwlarrPreservesTMDBID(t *testing.T) {
 	body := `[{"title":"Example Film 1080p WEB-DL","infoHash":"` + strings.Repeat("e", 40) + `","tmdbId":987,"size":1500000000,"protocol":"torrent"}]`
-	releases, err := parse_prowlarr_json(body, "Prowlarr")
+	releases, err := parseProwlarrJson(body, "Prowlarr")
 	if err != nil || len(releases) != 1 {
 		t.Fatalf("parse = %+v, %v", releases, err)
 	}

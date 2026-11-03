@@ -11,13 +11,13 @@ import (
 )
 
 func TestAllPackFilesDiscardedIncludesEmptyProcessingResult(t *testing.T) {
-	if !tev_allPackFilesDiscarded(nil) {
+	if !tevAllPackFilesDiscarded(nil) {
 		t.Fatal("empty pack processing must be discarded, not marked completed")
 	}
-	if !tev_allPackFilesDiscarded([]PackFileResult{{Discarded: true}}) {
+	if !tevAllPackFilesDiscarded([]PackFileResult{{Discarded: true}}) {
 		t.Fatal("fully discarded pack must be rejected")
 	}
-	if tev_allPackFilesDiscarded([]PackFileResult{{Discarded: true}, {Discarded: false}}) {
+	if tevAllPackFilesDiscarded([]PackFileResult{{Discarded: true}, {Discarded: false}}) {
 		t.Fatal("pack with a retained file must be accepted")
 	}
 }

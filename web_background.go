@@ -40,16 +40,16 @@ import (
 
 // bg_archiveEpisodePattern is the series-archive episode matcher copied verbatim
 // from `series_rename_apply`.
-var bg_archiveEpisodePattern = regexp.MustCompile(`(?i)^(?P<name>.+?)[ ._-]+(?:s(?P<s>\d{1,2})e|(?P<ns>\d{1,2})x)(?P<e>\d{1,4})`)
+var bgArchiveEpisodePattern = regexp.MustCompile(`(?i)^(?P<name>.+?)[ ._-]+(?:s(?P<s>\d{1,2})e|(?P<ns>\d{1,2})x)(?P<e>\d{1,4})`)
 
-func bg_derefStr(value *string) string {
+func bgDerefStr(value *string) string {
 	if value == nil {
 		return ""
 	}
 	return *value
 }
 
-func bg_copyStrPtr(value *string) *string {
+func bgCopyStrPtr(value *string) *string {
 	if value == nil {
 		return nil
 	}
@@ -57,14 +57,14 @@ func bg_copyStrPtr(value *string) *string {
 	return &copied
 }
 
-func bg_strPtrEqual(left, right *string) bool {
+func bgStrPtrEqual(left, right *string) bool {
 	if left == nil || right == nil {
 		return left == nil && right == nil
 	}
 	return *left == *right
 }
 
-func bg_jsonString(value any) string {
+func bgJsonString(value any) string {
 	data, err := json.Marshal(value)
 	if err != nil {
 		return ""
@@ -72,7 +72,7 @@ func bg_jsonString(value any) string {
 	return string(data)
 }
 
-func bg_countKey(values map[string]any, key string) int64 {
+func bgCountKey(values map[string]any, key string) int64 {
 	switch typed := values[key].(type) {
 	case int:
 		return int64(typed)
@@ -84,11 +84,11 @@ func bg_countKey(values map[string]any, key string) int64 {
 	return 0
 }
 
-func bg_archiveImportBusyContains(name string) bool {
+func bgArchiveImportBusyContains(name string) bool {
 	return ArchiveImportBusyContains(name)
 }
 
-func bg_linkArchiveFile(db *Database, series string, season, episode int64, cfg *Config, path string) {
+func bgLinkArchiveFile(db *Database, series string, season, episode int64, cfg *Config, path string) {
 	base := filepath.Base(path)
 	title := strings.TrimSuffix(base, filepath.Ext(base))
 	if strings.TrimSpace(title) == "" {
@@ -104,7 +104,7 @@ func bg_linkArchiveFile(db *Database, series string, season, episode int64, cfg 
 	}
 }
 
-func bg_protectedTorrentPaths(torrents TorrentEngine) map[string]struct{} {
+func bgProtectedTorrentPaths(torrents TorrentEngine) map[string]struct{} {
 	protected := map[string]struct{}{}
 	if torrents == nil {
 		return protected
@@ -154,7 +154,7 @@ func seriesRenameApply(s *AppState, name string, execute, force, sourceOnly bool
 			}
 		}
 		defer release()
-	} else if bg_archiveImportBusyContains(series.Name) {
+	} else if bgArchiveImportBusyContains(series.Name) {
 		logging.Debug("rename skipped: archive import in progress", "series", series.Name)
 		return 200, map[string]any{
 			"ok":      true,
@@ -236,9 +236,9 @@ func seriesRenameApply(s *AppState, name string, execute, force, sourceOnly bool
 			Source:       "archive",
 			Quality:      fallbackQuality,
 			Kind:         "series",
-			Series:       bg_copyStrPtr(&series.Name),
-			Season:       bg_i64PtrValue(episode.Season),
-			Episode:      bg_i64PtrValue(episode.Episode),
+			Series:       bgCopyStrPtr(&series.Name),
+			Season:       bgI64PtrValue(episode.Season),
+			Episode:      bgI64PtrValue(episode.Episode),
 			IsPack:       false,
 			EpisodeRange: []int64{episode.Episode},
 			SizeBytes:    0,
@@ -347,16 +347,16 @@ func seriesRenameApply(s *AppState, name string, execute, force, sourceOnly bool
 	if sourceOnly {
 		// no archive scan
 	} else if files, err := VideoFiles(resolvedArchive); err == nil {
-		nameIndex := bg_archiveEpisodePattern.SubexpIndex("name")
-		seasonIndex := bg_archiveEpisodePattern.SubexpIndex("s")
-		nsIndex := bg_archiveEpisodePattern.SubexpIndex("ns")
-		episodeIndex := bg_archiveEpisodePattern.SubexpIndex("e")
+		nameIndex := bgArchiveEpisodePattern.SubexpIndex("name")
+		seasonIndex := bgArchiveEpisodePattern.SubexpIndex("s")
+		nsIndex := bgArchiveEpisodePattern.SubexpIndex("ns")
+		episodeIndex := bgArchiveEpisodePattern.SubexpIndex("e")
 		for _, file := range files {
 			if trackedPaths[filepath.Clean(file)] {
 				continue
 			}
 			base := filepath.Base(file)
-			captures := bg_archiveEpisodePattern.FindStringSubmatch(base)
+			captures := bgArchiveEpisodePattern.FindStringSubmatch(base)
 			if captures == nil {
 				continue
 			}
@@ -394,9 +394,9 @@ func seriesRenameApply(s *AppState, name string, execute, force, sourceOnly bool
 				Source:       "archive-scan",
 				Quality:      ParseQuality(base),
 				Kind:         "series",
-				Series:       bg_copyStrPtr(&series.Name),
-				Season:       bg_i64PtrValue(season),
-				Episode:      bg_i64PtrValue(episodeNumber),
+				Series:       bgCopyStrPtr(&series.Name),
+				Season:       bgI64PtrValue(season),
+				Episode:      bgI64PtrValue(episodeNumber),
 				IsPack:       false,
 				EpisodeRange: []int64{episodeNumber},
 				SizeBytes:    0,
@@ -408,7 +408,7 @@ func seriesRenameApply(s *AppState, name string, execute, force, sourceOnly bool
 				// Already conforming but untracked: link the file to the DB so
 				// the next cycle knows the episode exists.
 				if execute {
-					bg_linkArchiveFile(s.db, series.Name, season, episodeNumber, cfg, file)
+					bgLinkArchiveFile(s.db, series.Name, season, episodeNumber, cfg, file)
 				}
 				continue
 			}
@@ -470,11 +470,11 @@ func seriesRenameApply(s *AppState, name string, execute, force, sourceOnly bool
 				// returns the target even when the name already matches (it
 				// still applies the sidecars), so without this guard the scan
 				// logged and counted a no-op rename every cycle.
-				bg_linkArchiveFile(s.db, series.Name, season, episodeNumber, cfg, file)
+				bgLinkArchiveFile(s.db, series.Name, season, episodeNumber, cfg, file)
 				continue
 			}
 			_, _ = CleanupOldEpisodeWithQuality(cfg, series.Name, season, episodeNumber, score, target, filepath.Dir(target), release.Quality)
-			bg_linkArchiveFile(s.db, series.Name, season, episodeNumber, cfg, target)
+			bgLinkArchiveFile(s.db, series.Name, season, episodeNumber, cfg, target)
 			items = append(items, map[string]any{
 				"season":   season,
 				"episode":  episodeNumber,
@@ -490,7 +490,7 @@ func seriesRenameApply(s *AppState, name string, execute, force, sourceOnly bool
 	// the 1080p. Execute only.
 	duplicatesRemoved := 0
 	if execute && cfg.CleanupUpgrades && !sourceOnly {
-		protected := bg_protectedTorrentPaths(s.activeEngine())
+		protected := bgProtectedTorrentPaths(s.activeEngine())
 		if removed, err := CleanupInferiorDuplicatesInDir(cfg, series.Name, resolvedArchive, protected); err == nil {
 			duplicatesRemoved = removed
 		} else {
@@ -573,7 +573,7 @@ func seriesRenameApply(s *AppState, name string, execute, force, sourceOnly bool
 	}
 }
 
-func bg_i64PtrValue(value int64) *int64 {
+func bgI64PtrValue(value int64) *int64 {
 	return &value
 }
 
@@ -581,7 +581,7 @@ func bg_i64PtrValue(value int64) *int64 {
 // libtorrent's transient paused/zero-progress state immediately after a
 // storage relocation. The database path and on-disk size are the authoritative
 // evidence that the archived payload is already present.
-func bg_completedArchivePresent(db *Database, hash string, totalSize int64) (string, bool) {
+func bgCompletedArchivePresent(db *Database, hash string, totalSize int64) (string, bool) {
 	if db == nil || totalSize <= 0 {
 		return "", false
 	}
@@ -612,7 +612,7 @@ func shouldLogQueueCounts(tick int, counts, last string) bool {
 // saved state was restored at start, so the startup line says which torrents
 // are involved instead of only how many. The live engine name wins, then the
 // release title recorded in the database, then the hash.
-func bg_restoredTorrentNames(torrents TorrentSession, db *Database, hashes []string) []string {
+func bgRestoredTorrentNames(torrents TorrentSession, db *Database, hashes []string) []string {
 	live := map[string]string{}
 	if torrents != nil {
 		for _, view := range torrents.List() {
@@ -644,7 +644,7 @@ func bg_restoredTorrentNames(torrents TorrentSession, db *Database, hashes []str
 }
 
 // bg_torrentHashes lists the keys of a persisted state map.
-func bg_torrentHashes[T any](states map[string]T) []string {
+func bgTorrentHashes[T any](states map[string]T) []string {
 	hashes := make([]string, 0, len(states))
 	for hash := range states {
 		hashes = append(hashes, hash)
@@ -654,7 +654,7 @@ func bg_torrentHashes[T any](states map[string]T) []string {
 
 // bg_restoredTorrentNamesLine formats the names for one log field, capping the
 // list so a large restore does not flood the line.
-func bg_restoredTorrentNamesLine(names []string, limit int) string {
+func bgRestoredTorrentNamesLine(names []string, limit int) string {
 	if limit <= 0 || len(names) <= limit {
 		return strings.Join(names, ", ")
 	}
@@ -711,18 +711,18 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 		logging.Warn("Could not restore the downloads waiting for their file list", "error", err)
 	} else if len(restored) > 0 {
 		metadataFirstSeen = restored
-		names := bg_restoredTorrentNames(torrents, db, bg_torrentHashes(restored))
+		names := bgRestoredTorrentNames(torrents, db, bgTorrentHashes(restored))
 		logging.Info(fmt.Sprintf("♻️ Restored the wait for the file list of %s: %s",
-			countLabel(len(restored), "download", "downloads"), bg_restoredTorrentNamesLine(names, 8)))
+			countLabel(len(restored), "download", "downloads"), bgRestoredTorrentNamesLine(names, 8)))
 	}
 	stallWaitStart := map[string]StallWatch{}
 	if restored, err := db.LoadStallWatches(); err != nil {
 		logging.Warn("Could not restore the state of the stalled downloads", "error", err)
 	} else if len(restored) > 0 {
 		stallWaitStart = restored
-		names := bg_restoredTorrentNames(torrents, db, bg_torrentHashes(restored))
+		names := bgRestoredTorrentNames(torrents, db, bgTorrentHashes(restored))
 		logging.Info(fmt.Sprintf("♻️ Restored the retry state of %s: %s",
-			countLabel(len(restored), "stalled download", "stalled downloads"), bg_restoredTorrentNamesLine(names, 8)))
+			countLabel(len(restored), "stalled download", "stalled downloads"), bgRestoredTorrentNamesLine(names, 8)))
 	}
 	// Periodic RAM-disk reconciliation: the metadata event fires once, so a
 	// missed event (restart/race) used to leave an oversized torrent on the
@@ -737,14 +737,14 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 	// an unsynced snapshot and its counts are transient, so its log is skipped.
 	queueTicks := 0
 	lastSpeedPolicy := time.Now().Add(-60 * time.Second)
-	var lastSpeed *bg_speedPair
+	var lastSpeed *bgSpeedPair
 	// The autotune line is throttled: at most once a minute, and only when the
 	// cap moved by more than 10 % since the last line. The small 3-second steps
 	// of the controller stay in gx-torrent's debug log, not in the main log.
 	lastAutotuneLog := time.Time{}
 	lastAutotuneDown, lastAutotuneUp := int64(0), int64(0)
 	haveAutotuneLog := false
-	var autotuneDigest bg_autotuneDigest
+	var autotuneDigest bgAutotuneDigest
 	lastDebugLog := time.Now().Add(-300 * time.Second)
 	var lastPin *string
 	var lastSequential *bool
@@ -868,9 +868,9 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 				// Rebuild the notifier/TMDB client only when the relevant config
 				// changed: they used to be rebuilt (with new HTTP clients) every 5s.
 				fingerprint := fmt.Sprintf("%s|%s|%s",
-					bg_derefStr(cfg.TmdbAPIKey),
+					bgDerefStr(cfg.TmdbAPIKey),
 					cfg.TmdbLanguage(),
-					bg_jsonString(cfg.Settings),
+					bgJsonString(cfg.Settings),
 				)
 				if fingerprint != lastFingerprint {
 					notifier = FromConfig(cfg).Async()
@@ -882,7 +882,7 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 		}
 		if now.Sub(lastDynamicAdjustment) >= 90*time.Second {
 			queueTicks++
-			effectiveDownloadKib, _ := bg_currentSpeedLimits(cfg)
+			effectiveDownloadKib, _ := bgCurrentSpeedLimits(cfg)
 			torrents.AdjustQueue(cfg, effectiveDownloadKib)
 			// Queue visibility: log when the counts shown in the line change, not
 			// on every tick. Comparing the engine "downloading" state instead
@@ -977,8 +977,8 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 				logging.Debug("speed policy apply failed", "error", err)
 			} else {
 				st := state.latency_guard.status()
-				ping := bg_pingText(st)
-				maxText := bg_speedMaxText(cfg)
+				ping := bgPingText(st)
+				maxText := bgSpeedMaxText(cfg)
 				if sourceChanged || !haveAutotuneLog {
 					label := map[string]string{
 						speedSourceTemp:         "exception, with expiry",
@@ -1007,13 +1007,13 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 							label += " · latency guard"
 						}
 					}
-					logging.Info(bg_speedStatusText(downloadKib, uploadKib, label, maxText, ping))
+					logging.Info(bgSpeedStatusText(downloadKib, uploadKib, label, maxText, ping))
 					lastAutotuneLog = now
 					lastAutotuneDown, lastAutotuneUp = downloadKib, uploadKib
 					haveAutotuneLog = true
 				} else if now.Sub(lastAutotuneLog) >= 60*time.Second {
 					guardAt, guardDown, guardUp := state.latency_guard.firstCapLog()
-					if at, ok := bg_adoptFirstCap(lastAutotuneLog, guardAt); ok {
+					if at, ok := bgAdoptFirstCap(lastAutotuneLog, guardAt); ok {
 						// The guard printed this cap itself, at once: adopt
 						// that line as the last one logged instead of
 						// repeating the same numbers (and "from unlimited")
@@ -1025,18 +1025,18 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 						if lastSpeed != nil {
 							prevDown, prevUp = lastSpeed.download, lastSpeed.upload
 						}
-						if bg_speedWorthLogging(lastAutotuneDown, downloadKib, prevDown) || bg_speedWorthLogging(lastAutotuneUp, uploadKib, prevUp) {
+						if bgSpeedWorthLogging(lastAutotuneDown, downloadKib, prevDown) || bgSpeedWorthLogging(lastAutotuneUp, uploadKib, prevUp) {
 							changes := make([]string, 0, 2)
 							if downloadKib != lastAutotuneDown {
-								changes = append(changes, "download "+bg_speedDeltaText(lastAutotuneDown, downloadKib))
+								changes = append(changes, "download "+bgSpeedDeltaText(lastAutotuneDown, downloadKib))
 							}
 							if uploadKib != lastAutotuneUp {
-								changes = append(changes, "upload "+bg_speedDeltaText(lastAutotuneUp, uploadKib))
+								changes = append(changes, "upload "+bgSpeedDeltaText(lastAutotuneUp, uploadKib))
 							}
 							// The control loop moves the cap every minute: each
 							// step goes to the debug log, the info log gets the
 							// first step of a mode and a digest every 15 minutes.
-							step := bg_autotuneStepText(downloadKib, uploadKib, changes, maxText, ping)
+							step := bgAutotuneStepText(downloadKib, uploadKib, changes, maxText, ping)
 							if autotuneDigest.add(now, downloadKib, uploadKib, st.Mode) {
 								logging.Info(step)
 							} else {
@@ -1050,14 +1050,14 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 				if line, ok := autotuneDigest.summary(now, downloadKib, uploadKib); ok {
 					logging.Info(line)
 				}
-				lastSpeed = &bg_speedPair{download: downloadKib, upload: uploadKib, source: source}
+				lastSpeed = &bgSpeedPair{download: downloadKib, upload: uploadKib, source: source}
 			}
 			lastSpeedPolicy = now
 		}
 		// `debug_enabled`: periodic diagnostics for crashes/RAM/loops.
 		if cfg.DebugEnabled() && now.Sub(lastDebugLog) >= 300*time.Second {
 			lastDebugLog = now
-			logging.Debug("debug diagnostics", "resident_kb", bg_residentKB(), "torrents", len(torrents.List()))
+			logging.Debug("debug diagnostics", "resident_kb", bgResidentKB(), "torrents", len(torrents.List()))
 		}
 		var pinned *string
 		if value, ok := cfg.Settings["torrent_pinned_hash"]; ok {
@@ -1066,7 +1066,7 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 				pinned = &trimmed
 			}
 		}
-		if !bg_strPtrEqual(lastPin, pinned) {
+		if !bgStrPtrEqual(lastPin, pinned) {
 			applied := false
 			if pinned != nil {
 				if _, err := torrents.SetPin(*pinned, true); err != nil {
@@ -1082,7 +1082,7 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 				}
 			}
 			if applied {
-				lastPin = bg_copyStrPtr(pinned)
+				lastPin = bgCopyStrPtr(pinned)
 			}
 		}
 		sequential := false
@@ -1181,7 +1181,7 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 				// restart) is finalized through the normal storage_moved path. Marking
 				// the raw archive path complete here would skip the rename, the
 				// MediaInfo probe and the completion notification.
-				if bg_torrentNeedsArchiveImport(cfg, db, &torrent) {
+				if bgTorrentNeedsArchiveImport(cfg, db, &torrent) {
 					status, _ := db.TorrentStatus(hash)
 					isCompletedDB := status != nil && *status == "completed"
 					if !isCompletedDB && torrent.Progress < 99.99 {
@@ -1271,7 +1271,7 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 					discrepancy := strings.TrimSpace(found.Error) != ""
 					if status, statusErr := db.TorrentStatus(event.Hash); statusErr == nil && status != nil &&
 						*status == "completed" && found.Progress < 99.99 {
-						if archivePath, present := bg_completedArchivePresent(db, event.Hash, found.TotalSize); present && strings.TrimSpace(found.Error) == "" {
+						if archivePath, present := bgCompletedArchivePresent(db, event.Hash, found.TotalSize); present && strings.TrimSpace(found.Error) == "" {
 							// After MoveStorage, libtorrent may emit torrent_checked while
 							// its resumed session still reports paused/0%. The verified
 							// archived payload is present, so this is not corruption.
@@ -1433,7 +1433,7 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 				completionMeta, _ := db.TorrentMeta(event.Hash)
 				isPack := completionMeta != nil && completionMeta.Release.IsPack
 				if !isPack {
-					processed := bg_announceCompletion(db, notifier, event, completionMeta, alreadyAnnounced, completionNotified)
+					processed := bgAnnounceCompletion(db, notifier, event, completionMeta, alreadyAnnounced, completionNotified)
 					// Ground-truth media inspection of the placed file. A missing
 					// ffprobe just leaves the filename-derived quality in place.
 					if completionMeta != nil {
@@ -1509,7 +1509,7 @@ type persistedMove struct {
 // finished single episode or movie, torrent or eD2k alike, and returns the
 // path the file was placed at. A completion already announced is not sent
 // again.
-func bg_announceCompletion(db *Database, notifier *Notifier, event models.TorrentEvent, completionMeta *models.TorrentMeta, alreadyAnnounced bool, completionNotified map[string]struct{}) string {
+func bgAnnounceCompletion(db *Database, notifier *Notifier, event models.TorrentEvent, completionMeta *models.TorrentMeta, alreadyAnnounced bool, completionNotified map[string]struct{}) string {
 	processedPath, err := db.TorrentProcessed(event.Hash)
 	processed := event.SavePath
 	if err == nil && processedPath != nil {
@@ -1633,9 +1633,9 @@ func restoreTorrentMoves(torrents TorrentSession, db *Database, retries map[stri
 		}
 	}
 	if len(saved) > 0 {
-		names := bg_restoredTorrentNames(torrents, db, bg_torrentHashes(saved))
+		names := bgRestoredTorrentNames(torrents, db, bgTorrentHashes(saved))
 		logging.Info(fmt.Sprintf("📦 %s still to be moved after the restart: %s",
-			countLabel(len(saved), "download is", "downloads are"), bg_restoredTorrentNamesLine(names, 8)))
+			countLabel(len(saved), "download is", "downloads are"), bgRestoredTorrentNamesLine(names, 8)))
 	}
 	return persisted
 }
@@ -1692,20 +1692,20 @@ func syncTorrentMoves(db *Database, persisted map[string]persistedMove, retries 
 // speed-limit policy helpers (current_speed_limits / scheduled_speed_limits)
 // ---------------------------------------------------------------------------
 
-type bg_speedPair struct {
+type bgSpeedPair struct {
 	download int64
 	upload   int64
 	source   string
 }
 
-func bg_currentSpeedLimits(cfg *Config) (int64, int64) {
+func bgCurrentSpeedLimits(cfg *Config) (int64, int64) {
 	return currentSpeedLimits(cfg)
 }
 
 // bg_speedJumped reports a change of at least 10 % of the previous value. A
 // move from or to "unlimited" (0) is always worth a line: it is a policy
 // change, not a small step of the controller.
-func bg_speedJumped(prev, next int64) bool {
+func bgSpeedJumped(prev, next int64) bool {
 	if prev == next {
 		return false
 	}
@@ -1720,7 +1720,7 @@ func bg_speedJumped(prev, next int64) bool {
 }
 
 // bg_speedPct is the absolute change in percent, rounded down.
-func bg_speedPct(prev, next int64) int64 {
+func bgSpeedPct(prev, next int64) int64 {
 	if prev <= 0 {
 		return 100
 	}
@@ -1736,7 +1736,7 @@ func bg_speedPct(prev, next int64) int64 {
 // the last line avoids printing the same numbers twice: the guard logs the cap
 // at once, with the ping, and the periodic line used to repeat it (reading
 // "from unlimited") at its next tick.
-func bg_adoptFirstCap(lastLog, guardLog time.Time) (time.Time, bool) {
+func bgAdoptFirstCap(lastLog, guardLog time.Time) (time.Time, bool) {
 	if guardLog.IsZero() || !guardLog.After(lastLog) {
 		return lastLog, false
 	}
@@ -1747,8 +1747,8 @@ func bg_adoptFirstCap(lastLog, guardLog time.Time) (time.Time, bool) {
 // logged when it continues the previous direction, but a reversal is logged
 // only if it is large (20 %). Otherwise a controller oscillating around a
 // value would print a line every minute.
-func bg_speedWorthLogging(prevLogged, current, prevApplied int64) bool {
-	if !bg_speedJumped(prevLogged, current) {
+func bgSpeedWorthLogging(prevLogged, current, prevApplied int64) bool {
+	if !bgSpeedJumped(prevLogged, current) {
 		return false
 	}
 	if prevLogged <= 0 || current <= 0 || prevApplied <= 0 {
@@ -1769,17 +1769,17 @@ func bg_speedWorthLogging(prevLogged, current, prevApplied int64) bool {
 	if currentDir == 0 || previousDir == 0 || currentDir == previousDir {
 		return true
 	}
-	return bg_speedPct(prevLogged, current) >= 20
+	return bgSpeedPct(prevLogged, current) >= 20
 }
 
 // bg_autotuneDigestEvery is how often the Autotune steps are summed up in the
 // info log.
-const bg_autotuneDigestEvery = 15 * time.Minute
+const bgAutotuneDigestEvery = 15 * time.Minute
 
 // bg_autotuneDigest gathers the Autotune steps between two info lines: the
 // range of the caps and how many steps there were. A mode change is reported at
 // once, the rest as one line every bg_autotuneDigestEvery.
-type bg_autotuneDigest struct {
+type bgAutotuneDigest struct {
 	mode             string
 	since            time.Time
 	steps            int
@@ -1789,7 +1789,7 @@ type bg_autotuneDigest struct {
 
 // add records one step and reports whether it must be logged at info level
 // (the first step, or a new mode).
-func (g *bg_autotuneDigest) add(now time.Time, down, up int64, mode string) bool {
+func (g *bgAutotuneDigest) add(now time.Time, down, up int64, mode string) bool {
 	if g.since.IsZero() || mode != g.mode {
 		g.mode = mode
 		g.since, g.steps = now, 0
@@ -1800,15 +1800,15 @@ func (g *bg_autotuneDigest) add(now time.Time, down, up int64, mode string) bool
 		g.minDown, g.maxDown, g.minUp, g.maxUp = down, down, up, up
 	}
 	g.steps++
-	g.minDown, g.maxDown = bg_limitMin(g.minDown, down), bg_limitMax(g.maxDown, down)
-	g.minUp, g.maxUp = bg_limitMin(g.minUp, up), bg_limitMax(g.maxUp, up)
+	g.minDown, g.maxDown = bgLimitMin(g.minDown, down), bgLimitMax(g.maxDown, down)
+	g.minUp, g.maxUp = bgLimitMin(g.minUp, up), bgLimitMax(g.maxUp, up)
 	return false
 }
 
 // summary returns the digest line when it is due and there were steps since
 // the last one, and starts a new window.
-func (g *bg_autotuneDigest) summary(now time.Time, down, up int64) (string, bool) {
-	if g.steps == 0 || now.Sub(g.since) < bg_autotuneDigestEvery {
+func (g *bgAutotuneDigest) summary(now time.Time, down, up int64) (string, bool) {
+	if g.steps == 0 || now.Sub(g.since) < bgAutotuneDigestEvery {
 		return "", false
 	}
 	elapsed := logging.HumanDuration(int64(now.Sub(g.since).Seconds()))
@@ -1820,13 +1820,13 @@ func (g *bg_autotuneDigest) summary(now time.Time, down, up int64) (string, bool
 	}
 	return fmt.Sprintf("🎚️ Autotune (last %s): %s. Download %s, upload %s; now %s.",
 		elapsed, countLabel(steps, "adjustment", "adjustments"),
-		bg_limitRange(g.minDown, g.maxDown), bg_limitRange(g.minUp, g.maxUp),
+		bgLimitRange(g.minDown, g.maxDown), bgLimitRange(g.minUp, g.maxUp),
 		speedPairText(down, up)), true
 }
 
 // bg_limitMin/bg_limitMax order speed limits where 0 (or less) is unlimited,
 // the highest.
-func bg_limitMin(a, b int64) int64 {
+func bgLimitMin(a, b int64) int64 {
 	if a <= 0 {
 		return b
 	}
@@ -1836,7 +1836,7 @@ func bg_limitMin(a, b int64) int64 {
 	return b
 }
 
-func bg_limitMax(a, b int64) int64 {
+func bgLimitMax(a, b int64) int64 {
 	if a <= 0 || b <= 0 {
 		return 0
 	}
@@ -1848,7 +1848,7 @@ func bg_limitMax(a, b int64) int64 {
 
 // bg_limitRange renders "128 KB/s–1.0 MB/s", "up to unlimited" or a single
 // value, in the unit a person reads.
-func bg_limitRange(lo, hi int64) string {
+func bgLimitRange(lo, hi int64) string {
 	if lo == hi {
 		return speedLimitText(lo)
 	}
@@ -1862,7 +1862,7 @@ func bg_limitRange(lo, hi int64) string {
 }
 
 // bg_speedDeltaText renders the change against the previously logged value.
-func bg_speedDeltaText(prev, next int64) string {
+func bgSpeedDeltaText(prev, next int64) string {
 	switch {
 	case prev == next:
 		return "="
@@ -1871,9 +1871,9 @@ func bg_speedDeltaText(prev, next int64) string {
 	case next <= 0:
 		return "to unlimited"
 	case next > prev:
-		return fmt.Sprintf("+%d%%", bg_speedPct(prev, next))
+		return fmt.Sprintf("+%d%%", bgSpeedPct(prev, next))
 	default:
-		return fmt.Sprintf("-%d%%", bg_speedPct(prev, next))
+		return fmt.Sprintf("-%d%%", bgSpeedPct(prev, next))
 	}
 }
 
@@ -1882,7 +1882,7 @@ func bg_speedDeltaText(prev, next int64) string {
 // controller is the cap; its internal ceiling is 100 MB/s), and an unlimited
 // policy has none either: both say "no line max". Showing the inactive
 // schedule's 8000 next to a 14166 KiB/s cap would be a contradiction.
-func bg_speedMaxText(cfg *Config) string {
+func bgSpeedMaxText(cfg *Config) string {
 	_, _, source := speedPolicy(cfg)
 	if !speedSourceIsAuto(source) {
 		// The line already names the limits in force; repeating them as a
@@ -1890,13 +1890,13 @@ func bg_speedMaxText(cfg *Config) string {
 		return ""
 	}
 	if ld, lu := latencyGuardLineMaxKib(cfg); ld > 0 || lu > 0 {
-		return "line max " + bg_speedPairText(ld, lu)
+		return "line max " + bgSpeedPairText(ld, lu)
 	}
 	return "no line max"
 }
 
 // bg_speedPairText renders a download/upload pair in the unit a person reads.
-func bg_speedPairText(down, up int64) string {
+func bgSpeedPairText(down, up int64) string {
 	switch {
 	case down > 0 && up > 0:
 		return speedLimitText(down) + " down, " + speedLimitText(up) + " up"
@@ -1909,7 +1909,7 @@ func bg_speedPairText(down, up int64) string {
 
 // bg_pingText renders the latency measured by the guard next to the speed, or
 // nothing when the probe has not measured it yet.
-func bg_pingText(st latencyGuardStatus) string {
+func bgPingText(st latencyGuardStatus) string {
 	if st.LatencyMs <= 0 {
 		return ""
 	}
@@ -1921,17 +1921,17 @@ func bg_pingText(st latencyGuardStatus) string {
 
 // bg_speedStatusText is the one line that says which limits are in force and
 // why. The internal mode names stay out of it.
-func bg_speedStatusText(down, up int64, label, maxText, ping string) string {
+func bgSpeedStatusText(down, up int64, label, maxText, ping string) string {
 	line := "🚦 Speed: " + speedPairText(down, up)
 	if label != "" {
 		line += " (" + label + ")"
 	}
-	return line + bg_speedDetailSuffix(maxText, ping)
+	return line + bgSpeedDetailSuffix(maxText, ping)
 }
 
 // bg_autotuneStepText is one Autotune adjustment: the limits now in force and
 // the change, without repeating "unlimited" twice.
-func bg_autotuneStepText(down, up int64, changes []string, maxText, ping string) string {
+func bgAutotuneStepText(down, up int64, changes []string, maxText, ping string) string {
 	step := "🎚️ Autotune: " + speedPairText(down, up)
 	// "no limit" is already the new state: a "to unlimited" change would say
 	// it again, and when both sides are unlimited there is nothing to add.
@@ -1946,12 +1946,12 @@ func bg_autotuneStepText(down, up int64, changes []string, maxText, ping string)
 			step += " · " + strings.Join(kept, ", ")
 		}
 	}
-	return step + bg_speedDetailSuffix(maxText, ping)
+	return step + bgSpeedDetailSuffix(maxText, ping)
 }
 
 // bg_speedDetailSuffix adds the line maximum and the measured ping, omitting
 // the ones that carry no information ("no line max", no measurement).
-func bg_speedDetailSuffix(maxText, ping string) string {
+func bgSpeedDetailSuffix(maxText, ping string) string {
 	details := make([]string, 0, 2)
 	if maxText != "" && maxText != "no line max" {
 		details = append(details, maxText)
@@ -1965,7 +1965,7 @@ func bg_speedDetailSuffix(maxText, ping string) string {
 	return " · " + strings.Join(details, " · ")
 }
 
-func bg_residentKB() uint64 {
+func bgResidentKB() uint64 {
 	data, err := os.ReadFile("/proc/self/statm")
 	if err != nil {
 		return 0
@@ -2083,7 +2083,7 @@ func dbCheckpointWorker(state *AppState) {
 
 // bg_dirHasFiles reports whether the directory contains at least one file (also
 // in subdirectories).
-func bg_dirHasFiles(dir string) bool {
+func bgDirHasFiles(dir string) bool {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return true
@@ -2091,7 +2091,7 @@ func bg_dirHasFiles(dir string) bool {
 	for _, entry := range entries {
 		path := filepath.Join(dir, entry.Name())
 		if entry.IsDir() {
-			if bg_dirHasFiles(path) {
+			if bgDirHasFiles(path) {
 				return true
 			}
 		} else {
@@ -2105,7 +2105,7 @@ func bg_dirHasFiles(dir string) bool {
 // `libtorrent_temp_dir` (leftovers of completed or removed downloads). It skips
 // active torrent directories and too-recent ones, so a just-started download is
 // not disturbed.
-func bg_cleanupEmptyTempDirs(cfg *Config, torrents TorrentSession) {
+func bgCleanupEmptyTempDirs(cfg *Config, torrents TorrentSession) {
 	if cfg.DownloadTempDir == nil {
 		return
 	}
@@ -2141,7 +2141,7 @@ func bg_cleanupEmptyTempDirs(cfg *Config, torrents TorrentSession) {
 		if activeChild {
 			continue
 		}
-		if bg_dirHasFiles(path) {
+		if bgDirHasFiles(path) {
 			continue
 		}
 		// Only if it has been there for at least an hour: avoid removing the
@@ -2166,7 +2166,7 @@ func tempCleanupWorker(state *AppState) {
 		return
 	}
 	cfg := latestConfig(state)
-	bg_cleanupEmptyTempDirs(cfg, state.activeEngine())
+	bgCleanupEmptyTempDirs(cfg, state.activeEngine())
 	SweepStaleTempFiles(cfg)
 	trashOrphanedTempData(cfg, state.activeEngine(), state.db, time.Now())
 
@@ -2175,7 +2175,7 @@ func tempCleanupWorker(state *AppState) {
 			return
 		}
 		cfg := latestConfig(state)
-		bg_cleanupEmptyTempDirs(cfg, state.activeEngine())
+		bgCleanupEmptyTempDirs(cfg, state.activeEngine())
 		SweepStaleTempFiles(cfg)
 		trashOrphanedTempData(cfg, state.activeEngine(), state.db, time.Now())
 	}
@@ -2264,21 +2264,21 @@ func housekeepingFirstDelay(cfg *Config, now time.Time) time.Duration {
 // watched_folders_worker
 // ---------------------------------------------------------------------------
 
-type bg_watchedSignature struct {
+type bgWatchedSignature struct {
 	length   uint64
 	modified uint64
 }
 
-type bg_watchedKey struct {
+type bgWatchedKey struct {
 	path     string
 	length   uint64
 	modified uint64
 }
 
-type bg_watchedFailure struct {
+type bgWatchedFailure struct {
 	attempts  int
 	nextRetry time.Time
-	signature bg_watchedSignature
+	signature bgWatchedSignature
 }
 
 // watchedFoldersWorker polls the configured watched folders and adds dropped
@@ -2287,10 +2287,10 @@ type bg_watchedFailure struct {
 // backoff.
 func watchedFoldersWorker(state *AppState) {
 	const period = 15 * time.Second
-	processed := map[bg_watchedKey]struct{}{}
+	processed := map[bgWatchedKey]struct{}{}
 	oversizedWatched := map[string]struct{}{}
-	observed := map[string]bg_watchedSignature{}
-	failures := map[string]bg_watchedFailure{}
+	observed := map[string]bgWatchedSignature{}
+	failures := map[string]bgWatchedFailure{}
 	for {
 		if !state.SleepBackground(period) {
 			return
@@ -2326,7 +2326,7 @@ func watchedFoldersWorker(state *AppState) {
 				if nanos := info.ModTime().UnixNano(); nanos > 0 {
 					modified = uint64(nanos)
 				}
-				signature := bg_watchedSignature{length: length, modified: modified}
+				signature := bgWatchedSignature{length: length, modified: modified}
 				// A producer may copy a .torrent/.magnet directly into the watched
 				// directory. Require two identical observations so we never parse a
 				// half-written file.
@@ -2341,7 +2341,7 @@ func watchedFoldersWorker(state *AppState) {
 						continue
 					}
 				}
-				key := bg_watchedKey{path: pathKey, length: length, modified: modified}
+				key := bgWatchedKey{path: pathKey, length: length, modified: modified}
 				if _, ok := processed[key]; ok {
 					continue
 				}
@@ -2373,7 +2373,7 @@ func watchedFoldersWorker(state *AppState) {
 					if backoff > 30*time.Minute {
 						backoff = 30 * time.Minute
 					}
-					failures[pathKey] = bg_watchedFailure{
+					failures[pathKey] = bgWatchedFailure{
 						attempts:  attempts,
 						nextRetry: now.Add(backoff),
 						signature: signature,
@@ -2399,13 +2399,13 @@ func watchedFoldersWorker(state *AppState) {
 			}
 		}
 		if len(processed) > 4096 {
-			processed = map[bg_watchedKey]struct{}{}
+			processed = map[bgWatchedKey]struct{}{}
 		}
 		if len(failures) > 4096 {
-			failures = map[string]bg_watchedFailure{}
+			failures = map[string]bgWatchedFailure{}
 		}
 		if len(observed) > 4096 {
-			observed = map[string]bg_watchedSignature{}
+			observed = map[string]bgWatchedSignature{}
 		}
 	}
 }
@@ -2554,11 +2554,11 @@ func cycleWorker(state *AppState) {
 								if !ok {
 									continue
 								}
-								renamed += bg_countKey(values, "renamed_count")
-								discarded += bg_countKey(values, "discarded_count")
-								duplicates += bg_countKey(values, "duplicates_removed")
-								errs += bg_countKey(values, "error_count")
-								correct += bg_countKey(values, "already_ok_count")
+								renamed += bgCountKey(values, "renamed_count")
+								discarded += bgCountKey(values, "discarded_count")
+								duplicates += bgCountKey(values, "duplicates_removed")
+								errs += bgCountKey(values, "error_count")
+								correct += bgCountKey(values, "already_ok_count")
 							}
 							recordLibraryCheck(len(names), correct, renamed, discarded, duplicates, errs)
 							if renamed+discarded+duplicates+errs > 0 {

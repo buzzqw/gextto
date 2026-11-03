@@ -33,11 +33,11 @@ func TestTraditionalListingResolvesEveryVisibleDetailLink(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	body, err := fetch_html(context.Background(), base.String(), nil)
+	body, err := fetchHtml(context.Background(), base.String(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	items, _, _, err := fetch_traditional_listing(context.Background(), defaultHTTPClient, base.String(), body, "Corsaro", "test", nil, nil)
+	items, _, _, err := fetchTraditionalListing(context.Background(), defaultHTTPClient, base.String(), body, "Corsaro", "test", nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -47,51 +47,51 @@ func TestTraditionalListingResolvesEveryVisibleDetailLink(t *testing.T) {
 }
 
 func TestFlareSolverrErrorMessageIsUserFriendly(t *testing.T) {
-	if got := flaresolverr_error_message(context.DeadlineExceeded); got != "FlareSolverr did not respond in time" {
+	if got := flaresolverrErrorMessage(context.DeadlineExceeded); got != "FlareSolverr did not respond in time" {
 		t.Fatalf("timeout message = %q", got)
 	}
-	if got := flaresolverr_error_message(errors.New("context deadline exceeded")); got != "feed URL could not be retrieved via FlareSolverr" {
+	if got := flaresolverrErrorMessage(errors.New("context deadline exceeded")); got != "feed URL could not be retrieved via FlareSolverr" {
 		t.Fatalf("generic message = %q", got)
 	}
 }
 
 func TestBuildsTorznabEndpointsForJackettAndProwlarr(t *testing.T) {
 	jackett := IndexerConfig{Name: "jackett", URL: "http://host:9117", APIKey: "k", Enabled: true}
-	if got := torznab_endpoint(jackett); got != "http://host:9117/api/v2.0/indexers/all/results/torznab/api" {
+	if got := torznabEndpoint(jackett); got != "http://host:9117/api/v2.0/indexers/all/results/torznab/api" {
 		t.Fatalf("jackett endpoint = %q", got)
 	}
 	prowlarr := IndexerConfig{Name: "prowlarr", URL: "http://host:9696", APIKey: "k", Enabled: true}
-	if got := torznab_endpoint(prowlarr); got != "http://host:9696/api/v1/search" {
+	if got := torznabEndpoint(prowlarr); got != "http://host:9696/api/v1/search" {
 		t.Fatalf("prowlarr endpoint = %q", got)
 	}
 	explicit := IndexerConfig{Name: "custom", URL: "http://host:9696/12/api", APIKey: "k", Enabled: true}
-	if got := torznab_endpoint(explicit); got != "http://host:9696/12/api" {
+	if got := torznabEndpoint(explicit); got != "http://host:9696/12/api" {
 		t.Fatalf("explicit endpoint = %q", got)
 	}
 	// The kind is detected from the port even when the name is arbitrary.
 	renamed := IndexerConfig{Name: "my-indexer", URL: "http://host:9696", APIKey: "k", Enabled: true}
-	if got := torznab_endpoint(renamed); got != "http://host:9696/api/v1/search" {
+	if got := torznabEndpoint(renamed); got != "http://host:9696/api/v1/search" {
 		t.Fatalf("renamed prowlarr endpoint = %q", got)
 	}
 	jackettRenamed := IndexerConfig{Name: "feed", URL: "http://host:9117", APIKey: "k", Enabled: true}
-	if got := torznab_endpoint(jackettRenamed); got != "http://host:9117/api/v2.0/indexers/all/results/torznab/api" {
+	if got := torznabEndpoint(jackettRenamed); got != "http://host:9117/api/v2.0/indexers/all/results/torznab/api" {
 		t.Fatalf("renamed jackett endpoint = %q", got)
 	}
 	// A direct Torznab service (the MirCrew indexer) accepts the bare base
 	// address, like the standalone gx-torrent: the endpoint is <base>/api.
 	direct := IndexerConfig{Name: "mircrew", URL: "http://192.168.1.161:9118", APIKey: "k", Enabled: true}
-	if got := torznab_endpoint(direct); got != "http://192.168.1.161:9118/api" {
+	if got := torznabEndpoint(direct); got != "http://192.168.1.161:9118/api" {
 		t.Fatalf("direct torznab endpoint = %q", got)
 	}
 	directWithAPI := IndexerConfig{Name: "mircrew", URL: "http://192.168.1.161:9118/api", APIKey: "k", Enabled: true}
-	if got := torznab_endpoint(directWithAPI); got != "http://192.168.1.161:9118/api" {
+	if got := torznabEndpoint(directWithAPI); got != "http://192.168.1.161:9118/api" {
 		t.Fatalf("direct torznab endpoint with /api = %q", got)
 	}
 }
 
 func TestParsesProwlarrJSONResults(t *testing.T) {
 	body := `[{"title":"Example S01E01 1080p","magnetUrl":"magnet:?xt=urn:btih:0123456789012345678901234567890123456789","indexer":"Knaben"}]`
-	releases, err := parse_prowlarr_json(body, "prowlarr")
+	releases, err := parseProwlarrJson(body, "prowlarr")
 	if err != nil {
 		t.Fatalf("parse_prowlarr_json: %v", err)
 	}
@@ -116,7 +116,7 @@ func TestKeepsJackettTrackerIdentityInReleaseSource(t *testing.T) {
             <attr name="jackettindexer" value="Tracker One" />
             <link>magnet:?xt=urn:btih:0123456789012345678901234567890123456789</link>
         </item></channel></rss>`
-	releases, err := parse_feed_body(body, "jackett")
+	releases, err := parseFeedBody(body, "jackett")
 	if err != nil {
 		t.Fatalf("parse_feed_body: %v", err)
 	}
@@ -154,7 +154,7 @@ func TestParseFeedBodyKeepsGUIDAndTorznabTorrentIdentity(t *testing.T) {
 			<torznab:attr name="infohash" value="` + hash + `"/>
 		</item>
 	</channel></rss>`
-	releases, err := parse_feed_body(body, "jackett")
+	releases, err := parseFeedBody(body, "jackett")
 	if err != nil {
 		t.Fatalf("parse_feed_body: %v", err)
 	}
@@ -200,7 +200,7 @@ func TestJackettHealthProbeValidatesAPIKey(t *testing.T) {
 
 func TestExtractsMagnetFromNamespacedRSSAttributesAndDescription(t *testing.T) {
 	xml := `<rss><channel><item><title>Example.S01E01.1080p</title><description><![CDATA[<a href="magnet:?xt=urn:btih:0123456789012345678901234567890123456789">download</a>]]></description></item></channel></rss>`
-	releases, err := parse_feed_body(xml, "test")
+	releases, err := parseFeedBody(xml, "test")
 	if err != nil {
 		t.Fatalf("parse_feed_body: %v", err)
 	}
@@ -210,7 +210,7 @@ func TestExtractsMagnetFromNamespacedRSSAttributesAndDescription(t *testing.T) {
 	if !strings.Contains(releases[0].Magnet, "xt=urn:btih:0123456789012345678901234567890123456789") {
 		t.Fatalf("magnet = %q", releases[0].Magnet)
 	}
-	got := magnet_in("prefix magnet:?xt=urn:btih:0123456789012345678901234567890123456789 suffix")
+	got := magnetIn("prefix magnet:?xt=urn:btih:0123456789012345678901234567890123456789 suffix")
 	if got != "magnet:?xt=urn:btih:0123456789012345678901234567890123456789" {
 		t.Fatalf("magnet_in = %q", got)
 	}
@@ -218,7 +218,7 @@ func TestExtractsMagnetFromNamespacedRSSAttributesAndDescription(t *testing.T) {
 
 func TestParsesCDATATitlesBeforeATruncatedItem(t *testing.T) {
 	xml := "<rss><channel>\n            <item><title><![CDATA[Example.S01E01.1080p.ITA]]></title><link><![CDATA[magnet:?xt=urn:btih:0123456789012345678901234567890123456789]]></link></item>\n            <item><title><![CDATA[Truncated.S01E02]]></title><description><![CDATA[unfinished\n        </channel></rss>"
-	releases, err := parse_feed_body(xml, "test")
+	releases, err := parseFeedBody(xml, "test")
 	if err != nil {
 		t.Fatalf("parse_feed_body: %v", err)
 	}
@@ -232,7 +232,7 @@ func TestParsesCDATATitlesBeforeATruncatedItem(t *testing.T) {
 
 func TestPreservesRSSPublicationDateForReleaseAgeFilters(t *testing.T) {
 	xml := `<rss><channel><item><title>Example.S01E01.1080p.ITA</title><pubDate>Tue, 01 Sep 2026 12:00:00 +0000</pubDate><link>magnet:?xt=urn:btih:0123456789012345678901234567890123456789</link></item></channel></rss>`
-	releases, err := parse_feed_body(xml, "test")
+	releases, err := parseFeedBody(xml, "test")
 	if err != nil {
 		t.Fatalf("parse_feed_body: %v", err)
 	}
@@ -249,7 +249,7 @@ func TestMalformedRSSIsReportedAsError(t *testing.T) {
 	// Malformed XML must surface an error (the caller then falls back to the
 	// listing parser or skips the feed).
 	xml := "<rss><channel><item><title>Broken</title></link></head>"
-	if _, err := parse_feed_body(xml, "test"); err == nil {
+	if _, err := parseFeedBody(xml, "test"); err == nil {
 		t.Fatal("expected an error for malformed RSS")
 	}
 }
@@ -260,7 +260,7 @@ func TestFeedSizeSanityDropsTinyItems(t *testing.T) {
           <item><title>Real.S01E02.1080p.ITA</title><link>magnet:?xt=urn:btih:abcdefabcdefabcdefabcdefabcdefabcdefabcd</link><enclosure length="2147483648" type="application/x-bittorrent"/></item>
           <item><title>Tiny.From.Description.2024</title><link>magnet:?xt=urn:btih:1111111111111111111111111111111111111111</link><description>Size: 20 MB</description></item>
         </channel></rss>`
-	releases, err := parse_feed_body(xml, "test")
+	releases, err := parseFeedBody(xml, "test")
 	if err != nil {
 		t.Fatalf("parse_feed_body: %v", err)
 	}
@@ -273,35 +273,35 @@ func TestFeedSizeSanityDropsTinyItems(t *testing.T) {
 }
 
 func TestBuildsPerUploaderSourceLabelsLikeExtTo(t *testing.T) {
-	if got := source_label("ExtTo", "https://extto.org/browse/?filter=u=CorsaroNero"); got != "ExtTo - CorsaroNero" {
+	if got := uploaderSourceLabel("ExtTo", "https://extto.org/browse/?filter=u=CorsaroNero"); got != "ExtTo - CorsaroNero" {
 		t.Fatalf("ExtTo label = %q", got)
 	}
-	if got := source_label("TorrentGalaxy", "https://torrentgalaxy.one/get-posts/user:MIRCrewRS/"); got != "TGx - MIRCrewRS" {
+	if got := uploaderSourceLabel("TorrentGalaxy", "https://torrentgalaxy.one/get-posts/user:MIRCrewRS/"); got != "TGx - MIRCrewRS" {
 		t.Fatalf("TorrentGalaxy label = %q", got)
 	}
-	if got := source_label("ExtTo", "https://extto.org/browse/?filter=c=Movies&filter=tg=Italian"); got != "ExtTo" {
+	if got := uploaderSourceLabel("ExtTo", "https://extto.org/browse/?filter=c=Movies&filter=tg=Italian"); got != "ExtTo" {
 		t.Fatalf("plain ExtTo label = %q", got)
 	}
 }
 
 func TestRecoversTitleFromMagnetDisplayName(t *testing.T) {
 	magnet := "magnet:?xt=urn:btih:0123456789012345678901234567890123456789&dn=The%20Black%20Hole%201979%20ITA&tr=udp%3A%2F%2Ft.example"
-	if got := title_from_magnet(magnet); got != "The Black Hole 1979 ITA" {
+	if got := titleFromMagnet(magnet); got != "The Black Hole 1979 ITA" {
 		t.Fatalf("title_from_magnet = %q", got)
 	}
-	if got := title_from_magnet("magnet:?xt=urn:btih:0123456789012345678901234567890123456789"); got != "" {
+	if got := titleFromMagnet("magnet:?xt=urn:btih:0123456789012345678901234567890123456789"); got != "" {
 		t.Fatalf("title_from_magnet without dn = %q", got)
 	}
 }
 
 func TestAppendsSourceTagOnce(t *testing.T) {
-	if got := with_source_tag("Movie 2024", "ExtTo - X"); got != "Movie 2024 [ExtTo - X]" {
+	if got := withSourceTag("Movie 2024", "ExtTo - X"); got != "Movie 2024 [ExtTo - X]" {
 		t.Fatalf("with_source_tag = %q", got)
 	}
-	if got := with_source_tag("Movie 2024 [ExtTo - X]", "ExtTo - X"); got != "Movie 2024 [ExtTo - X]" {
+	if got := withSourceTag("Movie 2024 [ExtTo - X]", "ExtTo - X"); got != "Movie 2024 [ExtTo - X]" {
 		t.Fatalf("with_source_tag (already tagged) = %q", got)
 	}
-	if got := with_source_tag("Movie 2024", ""); got != "Movie 2024" {
+	if got := withSourceTag("Movie 2024", ""); got != "Movie 2024" {
 		t.Fatalf("with_source_tag (no label) = %q", got)
 	}
 }
@@ -317,7 +317,7 @@ func TestParsesTorrentgalaxyRowsToDetailLinks(t *testing.T) {
 	if err != nil {
 		t.Fatalf("url.Parse: %v", err)
 	}
-	links := tgx_detail_links(body, base)
+	links := tgxDetailLinks(body, base)
 	if len(links) != 1 {
 		t.Fatalf("len = %d, want 1", len(links))
 	}
@@ -331,12 +331,12 @@ func TestParsesTorrentgalaxyRowsToDetailLinks(t *testing.T) {
 
 func TestOnlyCloudflareStatusesTriggerFlareSolverr(t *testing.T) {
 	for _, status := range []int{403, 503, 520, 521, 524, 530} {
-		if !cloudflare_blocked(status) {
+		if !cloudflareBlocked(status) {
 			t.Fatalf("%d should be CF-like", status)
 		}
 	}
 	for _, status := range []int{200, 301, 404, 429, 500, 502} {
-		if cloudflare_blocked(status) {
+		if cloudflareBlocked(status) {
 			t.Fatalf("%d must not be CF-like", status)
 		}
 	}
@@ -355,7 +355,7 @@ func TestRSSRateLimitDoesNotFallbackToFlareSolverr(t *testing.T) {
 	}))
 	defer flare.Close()
 
-	_, err := fetch_body(context.Background(), target.Client(), target.URL, &flare.URL)
+	_, err := fetchBody(context.Background(), target.Client(), target.URL, &flare.URL)
 	if err == nil || !strings.Contains(err.Error(), "HTTP 429") {
 		t.Fatalf("fetch error = %v, want HTTP 429", err)
 	}
@@ -365,9 +365,9 @@ func TestRSSRateLimitDoesNotFallbackToFlareSolverr(t *testing.T) {
 }
 
 func TestHostLimiterIsSharedPerDomain(t *testing.T) {
-	a := host_semaphore("https://torrentgalaxy.one/get-posts/user:X/")
-	b := host_semaphore("https://torrentgalaxy.one/post-detail/1/")
-	c := host_semaphore("https://other.example/x")
+	a := hostSemaphore("https://torrentgalaxy.one/get-posts/user:X/")
+	b := hostSemaphore("https://torrentgalaxy.one/post-detail/1/")
+	c := hostSemaphore("https://other.example/x")
 	if a == nil || b == nil || c == nil {
 		t.Fatal("host_semaphore returned nil")
 	}
@@ -384,8 +384,8 @@ func TestRemembersCloudflareSessionFromFlareSolverrSolution(t *testing.T) {
 		{Name: "cf_clearance", Value: "abc"},
 		{Name: "PHPSESSID", Value: "xyz"},
 	}
-	remember_session("https://ext-to-test.example/browse/", "BrowserUA/1.0", cookies)
-	session, ok := session_for("https://ext-to-test.example/post-detail/1/")
+	rememberSession("https://ext-to-test.example/browse/", "BrowserUA/1.0", cookies)
+	session, ok := sessionFor("https://ext-to-test.example/post-detail/1/")
 	if !ok {
 		t.Fatal("expected a remembered session")
 	}
@@ -395,7 +395,7 @@ func TestRemembersCloudflareSessionFromFlareSolverrSolution(t *testing.T) {
 	if !strings.Contains(session.cookie, "cf_clearance=abc") || !strings.Contains(session.cookie, "PHPSESSID=xyz") {
 		t.Fatalf("cookie = %q", session.cookie)
 	}
-	if _, ok := session_for("https://never-visited.example/"); ok {
+	if _, ok := sessionFor("https://never-visited.example/"); ok {
 		t.Fatal("unexpected session for never-visited host")
 	}
 }
@@ -409,7 +409,7 @@ func TestDetailCacheAvoidsNetworkFetch(t *testing.T) {
 	// The cache is keyed by the detail page, not by the title.
 	cache.Set(detailCacheKey(pending[0]), "magnet:?xt=urn:btih:0123456789012345678901234567890123456789")
 	var output []models.Release
-	old := fetch_detail_magnets(context.Background(), defaultHTTPClient, pending, "ExtTo - X", nil, &output, nil)
+	old := fetchDetailMagnets(context.Background(), defaultHTTPClient, pending, "ExtTo - X", nil, &output, nil)
 	if old != 0 {
 		t.Fatalf("old = %d, want 0", old)
 	}
@@ -427,7 +427,7 @@ func TestDetailCacheAvoidsNetworkFetch(t *testing.T) {
 func TestListingUsesMagnetDnWhenAnchorHasNoText(t *testing.T) {
 	// ext.to serves `<a href="magnet:...&dn=...">` with no inner text.
 	body := `<html><body><a class="dwn-btn torrent-dwn" rel="nofollow" href="magnet:?xt=urn:btih:0123456789012345678901234567890123456789&amp;dn=The%20Black%20Hole%201979%20ITA%201080p&amp;tr=udp%3A%2F%2Ft.example"> </a></body></html>`
-	releases, old, total, err := fetch_traditional_listing(
+	releases, old, total, err := fetchTraditionalListing(
 		context.Background(),
 		defaultHTTPClient,
 		"https://extto.org/browse/?filter=u=CorsaroNero",
@@ -560,7 +560,7 @@ func TestFeedRetryUsesIPv4AfterATransientFailure(t *testing.T) {
 	t.Cleanup(func() { feedHTTPClientIPv4 = previous })
 
 	failing := &http.Client{Transport: failingRoundTripper{}}
-	body, err := fetch_body(context.Background(), failing, server.URL, nil)
+	body, err := fetchBody(context.Background(), failing, server.URL, nil)
 	if err != nil {
 		t.Fatalf("fetch_body: %v", err)
 	}
@@ -583,7 +583,7 @@ func TestParseFeedBodyReadsEd2kLink(t *testing.T) {
 			<torznab:attr name="ed2k" value="` + link + `"/>
 		</item>
 	</channel></rss>`
-	releases, err := parse_feed_body(body, "indexarr:DDUnlimited")
+	releases, err := parseFeedBody(body, "indexarr:DDUnlimited")
 	if err != nil {
 		t.Fatalf("parse_feed_body: %v", err)
 	}
@@ -623,7 +623,7 @@ func TestParseFeedBodyEd2kKeepsTheProxyLinkForTheGrab(t *testing.T) {
 			<torznab:attr name="ed2k" value="` + link + `"/>
 		</item>
 	</channel></rss>`
-	releases, err := parse_feed_body(body, "indexarr:DDUnlimited")
+	releases, err := parseFeedBody(body, "indexarr:DDUnlimited")
 	if err != nil {
 		t.Fatalf("parse_feed_body: %v", err)
 	}
@@ -670,7 +670,7 @@ func TestParseFeedBodyEd2kIgnoresSwarmCounters(t *testing.T) {
 			<torznab:attr name="ed2k" value="` + link + `"/>
 		</item>
 	</channel></rss>`
-	releases, err := parse_feed_body(body, "indexarr:DDUnlimited")
+	releases, err := parseFeedBody(body, "indexarr:DDUnlimited")
 	if err != nil {
 		t.Fatalf("parse_feed_body: %v", err)
 	}

@@ -88,7 +88,7 @@ func v2MediaCheckViewFrom(s *AppState) v2MediaCheckView {
 				item.RedownloadPath = fmt.Sprintf("/api/movies/%d/redownload?avoid_previous=1", problem.TargetID)
 			}
 		} else if cfg != nil && problem.Series != "" {
-			if _, ok := gh7_find_series(cfg, problem.Series); ok {
+			if _, ok := gh7FindSeries(cfg, problem.Series); ok {
 				item.RedownloadPath = "/api/episodes/" + url.PathEscape(problem.Series) + "/" +
 					strconv.FormatInt(problem.Season, 10) + "/" + strconv.FormatInt(problem.Episode, 10) +
 					"/redownload?avoid_previous=1"

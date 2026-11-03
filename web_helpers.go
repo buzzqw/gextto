@@ -173,7 +173,7 @@ func archiveReleasesForQuery(s *AppState, cfg *Config, query string) []models.Re
 	return results
 }
 
-func gh0_containsString(values []string, needle string) bool {
+func gh0ContainsString(values []string, needle string) bool {
 	for _, value := range values {
 		if value == needle {
 			return true
@@ -322,7 +322,7 @@ func readOptionalBody(r *http.Request) ([]byte, error) {
 	return io.ReadAll(r.Body)
 }
 
-func gh6_purgeRemovedLibrary(
+func gh6PurgeRemovedLibrary(
 	db *Database,
 	previousSeries []SeriesConfig,
 	previousMovies []MovieConfig,
@@ -393,7 +393,7 @@ const (
 
 // gh7_find_series returns a copy of the configured series whose name or alias
 // matches name, and false when there is none.
-func gh7_find_series(cfg *Config, name string) (SeriesConfig, bool) {
+func gh7FindSeries(cfg *Config, name string) (SeriesConfig, bool) {
 	for _, series := range cfg.Series {
 		if series.Name == name {
 			return series, true

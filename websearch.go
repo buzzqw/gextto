@@ -63,7 +63,7 @@ var (
 	engineCooldown   = map[string]time.Time{}
 )
 
-func engine_in_cooldown(engine string) bool {
+func engineInCooldown(engine string) bool {
 	now := time.Now()
 	engineCooldownMu.Lock()
 	defer engineCooldownMu.Unlock()
@@ -78,7 +78,7 @@ func engine_in_cooldown(engine string) bool {
 	return false
 }
 
-func set_engine_cooldown(engine, errorText string) {
+func setEngineCooldown(engine, errorText string) {
 	// Rate-limit: pausa più lunga. Altri errori (parsing/timeout): pausa breve.
 	duration := 15 * time.Minute
 	if strings.Contains(errorText, "429") {
@@ -149,7 +149,7 @@ func searchWithTimeoutRaw(ctx context.Context, cfg *Config, query string, timeou
 		}
 		// Motore in raffreddamento dopo errori recenti: salta per non ripetere
 		// la stessa richiesta a vuoto ad ogni query.
-		if engine_in_cooldown(engine) {
+		if engineInCooldown(engine) {
 			continue
 		}
 		active++
@@ -191,7 +191,7 @@ func searchWithTimeoutRaw(ctx context.Context, cfg *Config, query string, timeou
 				// A cancelled or expired parent context is not the engine's
 				// fault: never put a healthy engine in cooldown for it.
 				if ctx.Err() == nil {
-					set_engine_cooldown(engine, redacted)
+					setEngineCooldown(engine, redacted)
 				}
 				logging.Debug("web engine search failed", "engine", engine, "query", query, "error", redacted)
 				resultsChannel <- outcome{failure: engine}
@@ -239,27 +239,27 @@ collect:
 func runWebEngine(ctx context.Context, engine, query string, flaresolverr *string) ([]webResult, error) {
 	switch engine {
 	case "bitsearch":
-		return search_bitsearch(ctx, query)
+		return searchBitsearch(ctx, query)
 	case "tpb", "thepiratebay":
-		return search_tpb(ctx, query)
+		return searchTpb(ctx, query)
 	case "knaben":
-		return search_knaben(ctx, query)
+		return searchKnaben(ctx, query)
 	case "nyaa":
-		return search_nyaa(ctx, query, flaresolverr)
+		return searchNyaa(ctx, query, flaresolverr)
 	case "eztv":
-		return search_eztv(ctx, query)
+		return searchEztv(ctx, query)
 	case "btdig":
-		return search_btdig(ctx, query, flaresolverr)
+		return searchBtdig(ctx, query, flaresolverr)
 	case "torrentscsv":
-		return search_torrentscsv(ctx, query)
+		return searchTorrentscsv(ctx, query)
 	case "limetorrents":
-		return search_limetorrents(ctx, query, flaresolverr)
+		return searchLimetorrents(ctx, query, flaresolverr)
 	case "torrentz2":
-		return search_torrentz2(ctx, query, flaresolverr)
+		return searchTorrentz2(ctx, query, flaresolverr)
 	case "bt4g":
-		return search_bt4g(ctx, query, flaresolverr)
+		return searchBt4g(ctx, query, flaresolverr)
 	case "1337x", "1337":
-		return search_1337x(ctx, query, flaresolverr)
+		return search1337x(ctx, query, flaresolverr)
 	default:
 		return nil, nil
 	}
@@ -331,7 +331,7 @@ func webContainsInt64(values []int64, needle int64) bool {
 	return false
 }
 
-func search_bitsearch(ctx context.Context, query string) ([]webResult, error) {
+func searchBitsearch(ctx context.Context, query string) ([]webResult, error) {
 	rawURL := "https://bitsearch.to/api/v1/search?" + encodeQueryPairs([][2]string{
 		{"q", query}, {"fuv", "yes"}, {"limit", "20"},
 	})
@@ -347,14 +347,14 @@ func search_bitsearch(ctx context.Context, query string) ([]webResult, error) {
 		if title == "" || len(hash) != 40 {
 			continue
 		}
-		if magnet := build_magnet(hash, title); magnet != "" {
+		if magnet := buildMagnet(hash, title); magnet != "" {
 			results = append(results, webResult{title: title, magnet: magnet, source: "BitSearch"})
 		}
 	}
 	return results, nil
 }
 
-func search_tpb(ctx context.Context, query string) ([]webResult, error) {
+func searchTpb(ctx context.Context, query string) ([]webResult, error) {
 	rawURL := "https://apibay.org/q.php?" + encodeQueryPairs([][2]string{
 		{"q", query}, {"cat", "0"},
 	})
@@ -370,7 +370,7 @@ func search_tpb(ctx context.Context, query string) ([]webResult, error) {
 		if title == "" || len(hash) != 40 || allZeros(hash) {
 			continue
 		}
-		if magnet := build_magnet(hash, title); magnet != "" {
+		if magnet := buildMagnet(hash, title); magnet != "" {
 			results = append(results, webResult{title: title, magnet: magnet, source: "ThePirateBay"})
 		}
 	}
@@ -386,7 +386,7 @@ func allZeros(value string) bool {
 	return true
 }
 
-func search_knaben(ctx context.Context, query string) ([]webResult, error) {
+func searchKnaben(ctx context.Context, query string) ([]webResult, error) {
 	payload, err := json.Marshal(map[string]any{
 		"query":          query,
 		"from":           0,
@@ -417,7 +417,7 @@ func search_knaben(ctx context.Context, query string) ([]webResult, error) {
 	return results, nil
 }
 
-func search_nyaa(ctx context.Context, query string, flaresolverr *string) ([]webResult, error) {
+func searchNyaa(ctx context.Context, query string, flaresolverr *string) ([]webResult, error) {
 	rawURL := "https://nyaa.si/?page=rss&q=" + url.QueryEscape(query)
 	releases, err := FetchFeed(ctx, rawURL, flaresolverr, 3, 0, 0.8)
 	if err != nil {
@@ -430,7 +430,7 @@ func search_nyaa(ctx context.Context, query string, flaresolverr *string) ([]web
 	return results, nil
 }
 
-func search_eztv(ctx context.Context, query string) ([]webResult, error) {
+func searchEztv(ctx context.Context, query string) ([]webResult, error) {
 	regex := utils.MustCachedRegex(`(?i)^(.+?)\s+s(\d{1,2})e(\d{1,3})\b`)
 	captures := regex.FindStringSubmatch(query)
 	if captures == nil {
@@ -462,7 +462,7 @@ func search_eztv(ctx context.Context, query string) ([]webResult, error) {
 		hash := strings.TrimSpace(jsonStringValue(item["hash"]))
 		magnet := strings.TrimSpace(jsonStringValue(item["magnet_url"]))
 		if magnet == "" && len(hash) == 40 {
-			magnet = build_magnet(hash, title)
+			magnet = buildMagnet(hash, title)
 		}
 		if title != "" {
 			if magnet == "" {
@@ -486,9 +486,9 @@ func search_eztv(ctx context.Context, query string) ([]webResult, error) {
 	return output, nil
 }
 
-func search_btdig(ctx context.Context, query string, flaresolverr *string) ([]webResult, error) {
+func searchBtdig(ctx context.Context, query string, flaresolverr *string) ([]webResult, error) {
 	rawURL := "https://btdig.com/search?q=" + url.QueryEscape(query) + "&order=0&p=0"
-	body, err := fetch_html(ctx, rawURL, flaresolverr)
+	body, err := fetchHtml(ctx, rawURL, flaresolverr)
 	if err != nil {
 		return nil, err
 	}
@@ -517,14 +517,14 @@ func search_btdig(ctx context.Context, query string, flaresolverr *string) ([]we
 	return output, nil
 }
 
-func fetch_html(ctx context.Context, rawURL string, flaresolverr *string) (string, error) {
+func fetchHtml(ctx context.Context, rawURL string, flaresolverr *string) (string, error) {
 	useFlareSolverr := flaresolverr != nil && strings.TrimSpace(*flaresolverr) != ""
 	flareTried := false
 	if useFlareSolverr && cfDomainNeedsFlareSolverr(rawURL) {
-		_, hasSession := session_for(rawURL)
+		_, hasSession := sessionFor(rawURL)
 		if !hasSession {
 			flareTried = true
-			if body, err := fetch_with_flaresolverr(ctx, defaultHTTPClient, *flaresolverr, rawURL); err == nil {
+			if body, err := fetchWithFlaresolverr(ctx, defaultHTTPClient, *flaresolverr, rawURL); err == nil {
 				return body, nil
 			}
 		}
@@ -532,7 +532,7 @@ func fetch_html(ctx context.Context, rawURL string, flaresolverr *string) (strin
 
 	requestCtx, cancel := context.WithTimeout(ctx, 8*time.Second)
 	headers := map[string]string{}
-	if session, ok := session_for(rawURL); ok {
+	if session, ok := sessionFor(rawURL); ok {
 		if session.userAgent != "" {
 			headers["User-Agent"] = session.userAgent
 		}
@@ -545,7 +545,7 @@ func fetch_html(ctx context.Context, rawURL string, flaresolverr *string) (strin
 		cancel()
 		if useFlareSolverr && !flareTried {
 			flareTried = true
-			if body, flareErr := fetch_with_flaresolverr(ctx, defaultHTTPClient, *flaresolverr, rawURL); flareErr == nil {
+			if body, flareErr := fetchWithFlaresolverr(ctx, defaultHTTPClient, *flaresolverr, rawURL); flareErr == nil {
 				return body, nil
 			}
 		}
@@ -559,32 +559,32 @@ func fetch_html(ctx context.Context, rawURL string, flaresolverr *string) (strin
 	if readErr != nil {
 		if useFlareSolverr && !flareTried {
 			flareTried = true
-			if body, flareErr := fetch_with_flaresolverr(ctx, defaultHTTPClient, *flaresolverr, rawURL); flareErr == nil {
+			if body, flareErr := fetchWithFlaresolverr(ctx, defaultHTTPClient, *flaresolverr, rawURL); flareErr == nil {
 				return body, nil
 			}
 		}
 		return "", readErr
 	}
 	body := string(payload)
-	if status >= 200 && status < 300 && !is_cloudflare_challenge(body) {
+	if status >= 200 && status < 300 && !isCloudflareChallenge(body) {
 		return body, nil
 	}
 
 	directErr := fmt.Errorf("HTTP %d", status)
-	cloudflare := cloudflare_blocked(status) || is_cloudflare_challenge(body)
+	cloudflare := cloudflareBlocked(status) || isCloudflareChallenge(body)
 	if !cloudflare {
 		return "", directErr
 	}
 	if !useFlareSolverr || flareTried {
-		if is_cloudflare_challenge(body) && status >= 200 && status < 300 {
+		if isCloudflareChallenge(body) && status >= 200 && status < 300 {
 			return "", fmt.Errorf("Cloudflare challenge")
 		}
 		return "", directErr
 	}
-	return fetch_with_flaresolverr(ctx, defaultHTTPClient, *flaresolverr, rawURL)
+	return fetchWithFlaresolverr(ctx, defaultHTTPClient, *flaresolverr, rawURL)
 }
 
-func search_torrentscsv(ctx context.Context, query string) ([]webResult, error) {
+func searchTorrentscsv(ctx context.Context, query string) ([]webResult, error) {
 	rawURL := "https://torrents-csv.com/service/search?" + encodeQueryPairs([][2]string{
 		{"q", query}, {"size", "20"},
 	})
@@ -600,7 +600,7 @@ func search_torrentscsv(ctx context.Context, query string) ([]webResult, error) 
 		if title == "" || len(hash) != 40 {
 			continue
 		}
-		if magnet := build_magnet(hash, title); magnet != "" {
+		if magnet := buildMagnet(hash, title); magnet != "" {
 			output = append(output, webResult{title: title, magnet: magnet, source: "TorrentsCSV"})
 		}
 	}
@@ -616,26 +616,26 @@ type searchDetailLink struct {
 // magnetFromDetail fetches a detail page and returns its raw magnet match.
 // LimeTorrents/Torrentz2 push the raw match, matching the behaviour.
 func magnetFromDetail(ctx context.Context, rawURL string, flaresolverr *string) (string, error) {
-	body, err := fetch_html(ctx, rawURL, flaresolverr)
+	body, err := fetchHtml(ctx, rawURL, flaresolverr)
 	if err != nil {
 		return "", err
 	}
-	return raw_magnet(body), nil
+	return rawMagnet(body), nil
 }
 
 // sanitizedMagnetFromDetail fetches and sanitizes the first magnet (BT4G/1337x).
 func sanitizedMagnetFromDetail(ctx context.Context, rawURL string, flaresolverr *string) (string, error) {
-	body, err := fetch_html(ctx, rawURL, flaresolverr)
+	body, err := fetchHtml(ctx, rawURL, flaresolverr)
 	if err != nil {
 		return "", err
 	}
-	return first_magnet(body), nil
+	return firstMagnet(body), nil
 }
 
-func search_limetorrents(ctx context.Context, query string, flaresolverr *string) ([]webResult, error) {
+func searchLimetorrents(ctx context.Context, query string, flaresolverr *string) ([]webResult, error) {
 	slug := strings.ReplaceAll(query, " ", "-")
 	rawURL := fmt.Sprintf("https://limetorrent.net/search/all/%s/seeds/1/", slug)
-	body, err := fetch_html(ctx, rawURL, flaresolverr)
+	body, err := fetchHtml(ctx, rawURL, flaresolverr)
 	if err != nil {
 		return nil, err
 	}
@@ -675,9 +675,9 @@ func search_limetorrents(ctx context.Context, query string, flaresolverr *string
 	return output, nil
 }
 
-func search_torrentz2(ctx context.Context, query string, flaresolverr *string) ([]webResult, error) {
+func searchTorrentz2(ctx context.Context, query string, flaresolverr *string) ([]webResult, error) {
 	rawURL := "https://torrentz2.nz/search?q=" + url.QueryEscape(query)
-	body, err := fetch_html(ctx, rawURL, flaresolverr)
+	body, err := fetchHtml(ctx, rawURL, flaresolverr)
 	if err != nil {
 		return nil, err
 	}
@@ -717,7 +717,7 @@ func search_torrentz2(ctx context.Context, query string, flaresolverr *string) (
 	return output, nil
 }
 
-func search_bt4g(ctx context.Context, query string, flaresolverr *string) ([]webResult, error) {
+func searchBt4g(ctx context.Context, query string, flaresolverr *string) ([]webResult, error) {
 	encoded := url.QueryEscape(query)
 	candidates := []string{
 		"https://bt4gprx.com/search?q=" + encoded,
@@ -727,7 +727,7 @@ func search_bt4g(ctx context.Context, query string, flaresolverr *string) ([]web
 	var body string
 	var lastErr error
 	for _, candidate := range candidates {
-		if value, err := fetch_html(ctx, candidate, flaresolverr); err == nil {
+		if value, err := fetchHtml(ctx, candidate, flaresolverr); err == nil {
 			selected = candidate
 			body = value
 			break
@@ -785,10 +785,10 @@ func search_bt4g(ctx context.Context, query string, flaresolverr *string) ([]web
 	return output, nil
 }
 
-func search_1337x(ctx context.Context, query string, flaresolverr *string) ([]webResult, error) {
+func search1337x(ctx context.Context, query string, flaresolverr *string) ([]webResult, error) {
 	slug := strings.Join(strings.Fields(query), "-")
 	rawURL := fmt.Sprintf("https://1337x.to/search/%s/1/", slug)
-	body, err := fetch_html(ctx, rawURL, flaresolverr)
+	body, err := fetchHtml(ctx, rawURL, flaresolverr)
 	if err != nil {
 		return nil, err
 	}
@@ -833,7 +833,7 @@ func search_1337x(ctx context.Context, query string, flaresolverr *string) ([]we
 	return output, nil
 }
 
-func raw_magnet(body string) string {
+func rawMagnet(body string) string {
 	regex, err := utils.CachedRegex(`magnet:\?xt=urn:bt(?:ih|mh):[0-9A-Za-z]{32,68}[^\s"'<>]*`)
 	if err != nil {
 		return ""
@@ -841,8 +841,8 @@ func raw_magnet(body string) string {
 	return regex.FindString(body)
 }
 
-func first_magnet(body string) string {
-	magnet := raw_magnet(body)
+func firstMagnet(body string) string {
+	magnet := rawMagnet(body)
 	if magnet == "" {
 		return ""
 	}
@@ -853,7 +853,7 @@ func first_magnet(body string) string {
 	return sanitized
 }
 
-func build_magnet(hash, title string) string {
+func buildMagnet(hash, title string) string {
 	magnet := "magnet:?xt=urn:btih:" + strings.ToLower(hash) + "&dn=" + url.QueryEscape(title)
 	sanitized, ok := utils.SanitizeMagnet(magnet, &title)
 	if !ok {

@@ -171,7 +171,7 @@ func parseProwlarrCaps(body string) *searchCaps {
 
 // searchCapsURL is where the capabilities of an indexer are read.
 func searchCapsURL(indexer IndexerConfig) (string, bool) {
-	endpoint := torznab_endpoint(indexer)
+	endpoint := torznabEndpoint(indexer)
 	if strings.HasSuffix(endpoint, "/api/v1/search") {
 		return strings.TrimSuffix(endpoint, "/api/v1/search") + "/api/v1/indexer?apikey=" + url.QueryEscape(indexer.APIKey), true
 	}

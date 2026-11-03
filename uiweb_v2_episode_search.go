@@ -269,7 +269,7 @@ func V2SeriesEpisodeSearch(w http.ResponseWriter, r *http.Request, s *AppState) 
 		v2Render(w, http.StatusOK, "v2_episode_search_panel", view, dict, eng)
 		return
 	}
-	ser, found := gh7_find_series(cfg, series)
+	ser, found := gh7FindSeries(cfg, series)
 	if !found {
 		view.Error = "Serie non trovata."
 		v2Render(w, http.StatusOK, "v2_episode_search_panel", view, dict, eng)

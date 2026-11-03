@@ -37,7 +37,7 @@ func TestMarkReleaseCompletedRecordsPackFilesNotFolder(t *testing.T) {
 		}
 	}
 
-	if err := tev_markReleaseCompleted(cfg, db, release, folder, 10); err != nil {
+	if err := tevMarkReleaseCompleted(cfg, db, release, folder, 10); err != nil {
 		t.Fatalf("mark completed: %v", err)
 	}
 	for episode, want := range map[int]string{

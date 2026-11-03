@@ -244,13 +244,13 @@ func resolveSeedLimits(cfg *Config, rule *SeedRule, seedRatio float64, seedDays 
 	var seconds int64
 	switch {
 	case seedDays >= 0:
-		seconds = tev_saturatingMulInt64(seedDays, 86_400)
+		seconds = tevSaturatingMulInt64(seedDays, 86_400)
 	case rule != nil && rule.SeedDays != nil:
 		seconds = int64(math.Round(*rule.SeedDays * 86_400))
 	case cfg != nil && cfg.Transfer.SeedTimeDays > 0:
-		seconds = tev_saturatingMulInt64(cfg.Transfer.SeedTimeDays, 86_400)
+		seconds = tevSaturatingMulInt64(cfg.Transfer.SeedTimeDays, 86_400)
 	case cfg != nil:
-		seconds = tev_saturatingMulInt64(cfg.Transfer.SeedTimeMinutes, 60)
+		seconds = tevSaturatingMulInt64(cfg.Transfer.SeedTimeMinutes, 60)
 	}
 	if ratio <= 0 || seconds <= 0 {
 		return seedLimits{Rule: limits.Rule}
@@ -264,7 +264,7 @@ func resolveSeedLimits(cfg *Config, rule *SeedRule, seedRatio float64, seedDays 
 			limits.IdleSeconds = positiveSeconds(int64(math.Round(*rule.IdleMinutes * 60)))
 		}
 	case cfg != nil && cfg.Transfer.SeedIdleMinutes > 0:
-		limits.IdleSeconds = positiveSeconds(tev_saturatingMulInt64(cfg.Transfer.SeedIdleMinutes, 60))
+		limits.IdleSeconds = positiveSeconds(tevSaturatingMulInt64(cfg.Transfer.SeedIdleMinutes, 60))
 	}
 	return limits
 }
@@ -274,7 +274,7 @@ func (l seedLimits) ratioReached(torrent *models.TorrentView) bool {
 	if l.Ratio == nil {
 		return false
 	}
-	download := tev_effectiveDownloadForRatio(torrent)
+	download := tevEffectiveDownloadForRatio(torrent)
 	return download > 0 && float64(torrent.AllTimeUpload)/download >= *l.Ratio
 }
 

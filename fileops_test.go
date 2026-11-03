@@ -100,7 +100,7 @@ func TestRetryStorageMovesHonoursBackoffAfterFailure(t *testing.T) {
 	moveRequests := map[string]struct{}{}
 	postSeed := map[string]struct{}{}
 	// A move just failed: it is scheduled with a backoff.
-	tev_scheduleStorageMoveRetry(retries, seedTestHash, destination, true, time.Now())
+	tevScheduleStorageMoveRetry(retries, seedTestHash, destination, true, time.Now())
 	for tick := 0; tick < 20; tick++ {
 		RetryStorageMoves(session, moveRequests, postSeed, retries)
 	}

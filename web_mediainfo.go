@@ -116,7 +116,7 @@ func runMediaInfoBackfill(ctx context.Context, s *AppState, limit int, onProgres
 // memoryMBFor returns the detected physical memory in MiB (0 when unknown).
 // Used to size the qBittorrent disk cache proportionally to the RAM.
 func memoryMBFor(*Config) uint64 {
-	total, _ := memory_info()
+	total, _ := memoryInfo()
 	return total / (1024 * 1024)
 }
 

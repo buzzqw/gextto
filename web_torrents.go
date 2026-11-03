@@ -147,7 +147,7 @@ func SetTorrentLimitsLegacy(w http.ResponseWriter, r *http.Request, s *AppState)
 
 // gh1_torrentDisplayName returns the display name of a torrent, falling back to
 // "unnamed torrent".
-func gh1_torrentDisplayName(torrents TorrentSession, hash string) string {
+func gh1TorrentDisplayName(torrents TorrentSession, hash string) string {
 	for _, torrent := range torrents.List() {
 		if strings.EqualFold(torrent.Hash, hash) {
 			if strings.TrimSpace(torrent.Name) != "" {
@@ -170,7 +170,7 @@ func mismatchedPackRelease(torrents TorrentSession, db *Database, hash string) *
 	if release.Kind != "series" || !release.IsPack {
 		return nil
 	}
-	name := gh1_torrentDisplayName(torrents, hash)
+	name := gh1TorrentDisplayName(torrents, hash)
 	corrected := ReconcilePackIdentity(&release, name)
 	if corrected == nil {
 		return nil
@@ -574,7 +574,7 @@ func ClampFloat(value, low, high float64) float64 {
 // removeFailedTorrent uses the same removal path as the automatic cleanup, so a
 // manual failure and an automatic one read the same in the log.
 func removeFailedTorrent(torrents TorrentSession, hash string) bool {
-	return tev_removeFailedTorrent(torrents, hash)
+	return tevRemoveFailedTorrent(torrents, hash)
 }
 
 // AddTorrentHandler adds a torrent with the options carried by the request:
@@ -1323,7 +1323,7 @@ func torrentDisplayName(torrents TorrentSession, hash string) string {
 
 // gh7_mismatched_pack_release returns the configured release when the torrent's
 // real name identifies a different season.
-func gh7_mismatched_pack_release(torrents TorrentSession, db *Database, hash string) *models.Release {
+func gh7MismatchedPackRelease(torrents TorrentSession, db *Database, hash string) *models.Release {
 	if db == nil {
 		return nil
 	}
@@ -1348,8 +1348,8 @@ func gh7_mismatched_pack_release(torrents TorrentSession, db *Database, hash str
 
 // gh7_blocklist_mismatched_pack permanently blocklists a mismatched season
 // pack so gap filling cannot pick it again.
-func gh7_blocklist_mismatched_pack(torrents TorrentSession, db *Database, hash string) bool {
-	release := gh7_mismatched_pack_release(torrents, db, hash)
+func gh7BlocklistMismatchedPack(torrents TorrentSession, db *Database, hash string) bool {
+	release := gh7MismatchedPackRelease(torrents, db, hash)
 	if release == nil {
 		return false
 	}
@@ -1388,7 +1388,7 @@ func formUrlencode(value string) string {
 
 // Reports whether path is root itself or lies inside it, comparing whole
 // components so that /media and /media2 do not match.
-func gh7_path_starts_with(path, root string) bool {
+func gh7PathStartsWith(path, root string) bool {
 	if strings.TrimSpace(root) == "" {
 		return false
 	}
@@ -1451,9 +1451,9 @@ func MoveTorrentStorage(w http.ResponseWriter, r *http.Request, s *AppState) {
 	}
 	cfg := latestConfig(s)
 	destination := strings.TrimSpace(input.Path)
-	allowed := gh7_path_starts_with(destination, cfg.DownloadDir) ||
-		(cfg.DownloadTempDir != nil && gh7_path_starts_with(destination, *cfg.DownloadTempDir)) ||
-		(cfg.ArchiveRoot != nil && gh7_path_starts_with(destination, *cfg.ArchiveRoot)) ||
+	allowed := gh7PathStartsWith(destination, cfg.DownloadDir) ||
+		(cfg.DownloadTempDir != nil && gh7PathStartsWith(destination, *cfg.DownloadTempDir)) ||
+		(cfg.ArchiveRoot != nil && gh7PathStartsWith(destination, *cfg.ArchiveRoot)) ||
 		isConfiguredArchive(cfg, s.db, hash, destination)
 	if !allowed {
 		jsonError(w, http.StatusForbidden, "storage path must be inside a configured Gextto directory")
@@ -1514,7 +1514,7 @@ func MoveTorrentStorage(w http.ResponseWriter, r *http.Request, s *AppState) {
 // archive). Post-seed moves go there, so a manual move must be allowed too.
 func isConfiguredArchive(cfg *Config, db *Database, hash, destination string) bool {
 	for index := range cfg.Series {
-		if archive := strings.TrimSpace(cfg.Series[index].ArchivePath); archive != "" && gh7_path_starts_with(destination, archive) {
+		if archive := strings.TrimSpace(cfg.Series[index].ArchivePath); archive != "" && gh7PathStartsWith(destination, archive) {
 			return true
 		}
 	}
@@ -1526,7 +1526,7 @@ func isConfiguredArchive(cfg *Config, db *Database, hash, destination string) bo
 		return false
 	}
 	configured, ok := ConfiguredDestinationFor(&meta.Release, cfg)
-	return ok && strings.TrimSpace(configured) != "" && gh7_path_starts_with(destination, configured)
+	return ok && strings.TrimSpace(configured) != "" && gh7PathStartsWith(destination, configured)
 }
 
 // ReannounceTorrent handles POST /api/torrents/{hash}/reannounce.
@@ -1539,7 +1539,7 @@ func ReannounceTorrent(w http.ResponseWriter, r *http.Request, s *AppState) {
 // RemoveTorrent handles DELETE /api/torrents/{hash}.
 func RemoveTorrent(w http.ResponseWriter, r *http.Request, s *AppState) {
 	hash := pathParam(r, "hash")
-	gh7_blocklist_mismatched_pack(s.activeEngine(), s.db, hash)
+	gh7BlocklistMismatchedPack(s.activeEngine(), s.db, hash)
 	deleteFiles := r.URL.Query().Get("delete_files") == "1" || r.URL.Query().Get("delete_files") == "true"
 	cfg := latestConfig(s)
 	removed, err := SafeRemoveTorrent(s, cfg, hash, deleteFiles)
