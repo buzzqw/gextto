@@ -875,13 +875,9 @@ func tevAbandonTorrent(cfg *Config, db *Database, torrents TorrentSession, notif
 	restored, _ := db.RestoreUpgrade(torrent.Hash)
 	restored = restored || salvageRestored
 	_ = db.MarkTorrentError(torrent.Hash, code)
-	ttl := tevDeadSwarmBlocklistTTL(cfg)
+	var period time.Duration
 	if metadata != nil {
-		if ttl > 0 {
-			_ = db.BlocklistUntil(&metadata.Release, "dead_swarm", time.Now().Add(ttl))
-		} else {
-			_ = db.Blocklist(&metadata.Release, "dead_swarm")
-		}
+		period, _ = db.BlocklistDeadSwarm(&metadata.Release, tevDeadSwarmBlocklistTTL(cfg))
 	}
 	nextStep := "the next search will look for another version"
 	if hasLibraryCopy {
@@ -891,8 +887,8 @@ func tevAbandonTorrent(cfg *Config, db *Database, torrents TorrentSession, notif
 		nextStep = "the next search will look for the episodes still missing"
 	}
 	revival := ""
-	if ttl > 0 {
-		revival = fmt.Sprintf(" It can be tried again in %s.", countLabel(int64(ttl/(24*time.Hour)), "day", "days"))
+	if period > 0 {
+		revival = fmt.Sprintf(" It can be tried again in %s.", countLabel(int64(period/(24*time.Hour)), "day", "days"))
 	}
 	logging.Warn(fmt.Sprintf("❌ Gave up on %s: %s. It is removed; %s.%s",
 		tevUserLabel(db, torrent), why, nextStep, revival), "hash", torrent.Hash)

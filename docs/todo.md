@@ -16,9 +16,6 @@ here.
 
 ## Engine (gx-core, gx-torrent)
 
-- **Reused read-cache buffers** — each block read for an upload allocates and clears a new
-  buffer, about a tenth of the CPU with the collector. Gate: a way to recycle a buffer that a
-  cache eviction cannot pull from under a block being copied.
 - **Peer turnover** — at the connection cap, close the slowest peers periodically and
   try new addresses (`prunePeers` frees only a useless peer today). Gate: a real swarm
   larger than the cap where turnover beats the current download rate on the same
@@ -91,11 +88,6 @@ here.
 Ideas proposed but not decided yet. An accepted proposal moves to the matching area with
 its gate; a rejected one moves to *Not planned*.
 
-- **Escalating dead-swarm block** — a release that comes back after its block expires and
-  is refused again for an empty swarm would stay away longer the next time (a week, then
-  a month) instead of a week every time. It needs a strike count that survives the
-  expiry, while today the expired rows are purged as soon as they are read, by design.
-  Gate: a decision on the second period and on how much history to keep for the count.
 - **Relink duplicated copies** — a library file identical to a seeding download but not
   hardlinked to it is linked again to save the space. Gate: an installation where the
   downloads and the library are on the same filesystem (here they are not: the library
@@ -116,21 +108,12 @@ its gate; a rejected one moves to *Not planned*.
 - **`*Database` split** — 233 methods cover series, movies, torrents, providers,
   blocklist, queues, cycles and maintenance. Gate: `internal/quality` extracted first (the
   moved methods call the root package's scoring).
-- **Title parsing: one matcher table** — `ParseReleaseSource` is a ten-branch `else if`
-  chain: a title that matches a pattern but fails its sanity guard (a season above 40, a
-  "pack in progress" without a count) is returned as a movie without trying the remaining
-  matchers. Gate: a decision that the failed guard should fall through, and a corpus run
-  that shows which titles change kind.
 - **Error wrapping and log wording** — 280 log calls build their sentence with `Sprintf`
   although the logger takes structured fields, and 490 `fmt.Errorf` calls drop the cause
   because they do not use `%w`. Mechanical, area by area, tests green.
 - **TLS origination to the proxy** — the proxy is reached in plain text (HTTP CONNECT or
   SOCKS5); an `https://` proxy that terminates TLS itself is not supported, as in
   libtorrent before PR 9039. Gate: an operator who runs an HTTPS proxy.
-- **DHT scrape keeps the peers** — a `get_peers` with `scrape=1` answers with the bloom
-  filters *instead of* `values`, while BEP 33 says the filters are added to the normal
-  reply (the question of libtorrent issue 8005); our own scrape client does not need it.
-  Gate: a decision on the extra bytes in the reply (BEP 32 warns about the 512-byte size).
 - **Duplicate connections per IPv6 subnet** — the duplicate-IP gate compares the full
   address, so one host with rotating privacy addresses can hold several slots; libtorrent
   issue 8934 asks for one host per /64, but a /64 is a subnet and may hold many real users.

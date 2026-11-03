@@ -1833,27 +1833,6 @@ func swarmBlockReason(release *models.Release, approvalReason string) string {
 	return ""
 }
 
-// blockDeadSwarmRelease keeps a release the swarm gate refused for an empty
-// swarm out of the next searches: evaluating it again at every cycle only
-// repeats the same line in the log. The block expires after
-// `torrent_dead_swarm_blocklist_days`, so a swarm that revives is seen again;
-// zero keeps the release blocked forever, like the operator's own entries.
-func blockDeadSwarmRelease(db *Database, cfg *Config, release *models.Release) {
-	if db == nil || cfg == nil || cfg.DryRun || release == nil {
-		return
-	}
-	ttl := tevDeadSwarmBlocklistTTL(cfg)
-	var err error
-	if ttl <= 0 {
-		err = db.Blocklist(release, "dead_swarm")
-	} else {
-		err = db.BlocklistUntil(release, "dead_swarm", time.Now().Add(ttl))
-	}
-	if err != nil {
-		logging.Debug("could not blocklist a release nobody is sharing", "target", releaseTarget(release), "error", err)
-	}
-}
-
 // releaseStrictlyBetter reports whether a must replace b: a higher score, or at
 // equal score a REMUX against a non-REMUX, or a known-healthier swarm. It is the
 // negation of incumbentWins.

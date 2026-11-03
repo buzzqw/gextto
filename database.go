@@ -931,6 +931,13 @@ func (d *Database) migrate() error {
 	if _, err := d.db.Exec("CREATE TABLE IF NOT EXISTS blocklist (magnet_hash TEXT PRIMARY KEY, title TEXT DEFAULT '', reason TEXT DEFAULT '', created_at TEXT NOT NULL);"); err != nil {
 		return err
 	}
+	// How many times a release has been refused for an empty swarm. The count
+	// lives apart from the blocklist row because that row is deleted when the
+	// block expires: a second refusal must last longer than the first, so the
+	// count has to outlive the block.
+	if _, err := d.db.Exec("CREATE TABLE IF NOT EXISTS dead_swarm_strikes (magnet_hash TEXT PRIMARY KEY, strikes INTEGER NOT NULL DEFAULT 0, last_at TEXT NOT NULL);"); err != nil {
+		return err
+	}
 	// Movies held back by a delay profile (the series equivalent lives in
 	// `pending_downloads`, extended below with a precise `due_at`).
 	if _, err := d.db.Exec(databasePendingMoviesSchema); err != nil {
@@ -2743,6 +2750,7 @@ func (d *Database) purgeExpiredBlocklist(now time.Time) {
 	if removed, raErr := result.RowsAffected(); raErr == nil && removed > 0 {
 		logging.Debug("expired blocklist entries removed; those releases can be chosen again", "count", removed)
 	}
+	d.purgeDeadSwarmStrikes(now)
 }
 
 // blocklistedWith answers the blocklist question from a snapshot the caller
@@ -2813,6 +2821,61 @@ func (d *Database) BlocklistedTitles() (map[string]struct{}, error) {
 // Blocklist adds a release to the blocklist for good.
 func (d *Database) Blocklist(release *models.Release, reason string) error {
 	return d.BlocklistUntil(release, reason, time.Time{})
+}
+
+// BlocklistDeadSwarm blocks a release refused for an empty swarm for the
+// period it has earned, and returns that period (zero means forever). The
+// first refusal lasts the configured base period, the second four times as
+// long and the third twelve times, capped at three months: a release whose
+// swarm never revives stops coming back at every cycle, while a swarm that
+// revives is still seen again. A zero base keeps the release blocked forever,
+// as the setting says.
+func (d *Database) BlocklistDeadSwarm(release *models.Release, base time.Duration) (time.Duration, error) {
+	hash, err := releaseIdentityHash(release)
+	if err != nil {
+		return 0, err
+	}
+	strikes, err := d.noteDeadSwarmStrike(hash)
+	if err != nil {
+		return 0, err
+	}
+	period := deadSwarmBlockPeriod(base, strikes)
+	if period <= 0 {
+		return 0, d.BlocklistUntil(release, "dead_swarm", time.Time{})
+	}
+	return period, d.BlocklistUntil(release, "dead_swarm", time.Now().Add(period))
+}
+
+// noteDeadSwarmStrike counts one more refusal for the release and returns how
+// many times it has been refused, this one included.
+func (d *Database) noteDeadSwarmStrike(hash string) (int, error) {
+	if _, err := d.db.Exec(
+		`INSERT INTO dead_swarm_strikes(magnet_hash, strikes, last_at) VALUES (?1, 1, ?2)
+		 ON CONFLICT(magnet_hash) DO UPDATE SET strikes = strikes + 1, last_at = excluded.last_at`,
+		strings.ToLower(hash), nowSQLite()); err != nil {
+		return 0, err
+	}
+	return d.DeadSwarmStrikes(hash)
+}
+
+// DeadSwarmStrikes reports how many times a release was refused for an empty
+// swarm, counting the refusals whose block has already expired.
+func (d *Database) DeadSwarmStrikes(hash string) (int, error) {
+	var strikes int
+	err := d.db.QueryRow("SELECT strikes FROM dead_swarm_strikes WHERE magnet_hash = ?1", strings.ToLower(hash)).Scan(&strikes)
+	if err == sql.ErrNoRows {
+		return 0, nil
+	}
+	return strikes, err
+}
+
+// purgeDeadSwarmStrikes forgets the refusals older than the retention: the
+// count is a memory of recent trouble, not a permanent sentence.
+func (d *Database) purgeDeadSwarmStrikes(now time.Time) {
+	cutoff := sqliteTimestamp(now.Add(-deadSwarmStrikeRetention))
+	if _, err := d.db.Exec("DELETE FROM dead_swarm_strikes WHERE last_at <= ?1", cutoff); err != nil {
+		logging.Debug("could not forget the old dead-swarm refusals", "error", err)
+	}
 }
 
 // BlocklistUntil adds a release to the blocklist until `until`; after that the
@@ -5590,6 +5653,11 @@ func (d *Database) MarkReleaseCompleted(release *models.Release, path string, si
 		return err
 	}
 	now := nowSQLite()
+	// A release that reached the library is not a dead swarm any more: the
+	// next refusal of the same release starts from the first period again.
+	if _, err := tx.Exec("DELETE FROM dead_swarm_strikes WHERE magnet_hash=?1", strings.ToLower(hash)); err != nil {
+		return err
+	}
 	if release.Kind == "series" {
 		if release.Series != nil && release.Season != nil {
 			series := *release.Series

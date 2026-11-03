@@ -831,236 +831,24 @@ func ParseReleaseSource(title, magnet string, torrentURL *string, source string,
 	} else if normalizedURL == nil {
 		return nil
 	}
-	// Ordine di riconoscimento come legacy: range, multi-episodio concatenato,
-	// SxxExx singolo, NxNN, data (YYYY-MM-DD), stagione completa.
-	rangeRe := utils.MustCachedRegex(`(?i)^(.+?)[ ._-]+s(\d{1,4})e(\d{1,4})[-–]e?(\d{1,4})(?:[ ._-]|$)`)
-	multiRe := utils.MustCachedRegex(`(?i)^(.+?)[ ._-]+s(\d{1,4})((?:e\d{1,4}){2,})(?:[ ._-]|$)`)
-	// Season and episode markers may be separated by a dot or a space
-	// ("S01.E01", "S01 E01"), not only glued ("S01E01").
-	standardRe := utils.MustCachedRegex(`(?i)^(.+?)[ ._-]+s(\d{1,4})[ ._-]?e(\d{1,4})(?:[ ._-]|$)`)
-	nxRe := utils.MustCachedRegex(`(?i)^(.+?)[ ._-]+(\d{1,2})x(\d{1,4})(?:[ ._-]|$)`)
-	nxRangeRe := utils.MustCachedRegex(`(?i)^(.+?)[ ._-]+(\d{1,2})x(\d{1,4})[-–](?:\d{1,2}x|x)?(\d{1,4})(?:[ ._-]|$)`)
-	itaRe := utils.MustCachedRegex(`(?i)^(.+?)[ ._-]+stagione[ ._-]*(\d{1,2})[ ._-]+(?:episodio|puntata|ep\.?)[ ._-]*(\d{1,4})(?:[ ._-]|$)`)
-	englishRe := utils.MustCachedRegex(`(?i)^(.+?)[ ._-]+season[ ._-]*(\d{1,2})[ ._-]+(?:episode|ep)[ ._-]*(\d{1,4})(?:[ ._-]|$)`)
-	dateRe := utils.MustCachedRegex(`(?i)^(.+?)[ ._-]+(\d{4})[-.](\d{1,2})[-.](\d{1,2})(?:[ ._-]|$)`)
-	seasonPackRe := utils.MustCachedRegex(`(?i)^(.+?)[ ._-]+(?:stagione[ ._-]*|season[ ._-]?|s)(\d{1,2})(?:[ ._-]+(?:complete|completa))?(?:[ ._-]|$)`)
-	// A pack marked "IN CORSO n/m" ("in progress", as Italian sites label an
-	// airing season) only holds the first n episodes, not the whole season: the
-	// pack range stops there, so it fills a gap only if one of those n is really
-	// missing. Reading it as a complete season would invent gaps up to the TMDB
-	// count and download the pack for nothing.
-	// The count may be glued to the label ("[IN CORSO 02/18]") or sit in its
-	// own brackets ("[IN CORSO][02/08]", "[IN CORSO] [05/06]"): Italian sites
-	// use both. The total may be unknown ("02/??").
-	inProgressPackRe := utils.MustCachedRegex(`(?i)^(.+?)[ ._-]+(?:stagione[ ._-]*|season[ ._-]?|s)(\d{1,2})\b.*?\b(?:in[ ._-]*(?:corso|progress)|incomplete)\b\W{0,6}0?(\d{1,3})[ ._-]*(?:/|di|of)[ ._-]*(?:0?\d{1,3}|\?{1,3})`)
-	seriesName := func(capture []string) *string {
-		if capture == nil || capture[1] == "" {
-			return nil
-		}
-		value := strings.TrimSpace(strings.ReplaceAll(capture[1], ".", " "))
-		// A resolution tag placed before SxxExx ("Show.2160p.S02E10") is not part
-		// of the series name.
-		value = trailingResolutionRe.ReplaceAllString(value, "")
-		value = strings.TrimSpace(value)
-		if value == "" {
-			return nil
-		}
-		return &value
-	}
-	episodeTokenRe := utils.MustCachedRegex(`(?i)e(\d{1,4})`)
-
-	var (
-		series       *string
-		season       *int64
-		episode      *int64
-		episodeRange = []int64{}
-		seasonPack   bool
-		// inProgressAvailable is how many episodes an "in progress" pack
-		// declares it already holds (0 for every other release). The .torrent
-		// can lag behind that claim; the acquisition loop checks it.
-		inProgressAvailable int64
-	)
-	if capture := rangeRe.FindStringSubmatch(title); capture != nil {
-		seasonValue, err := strconv.ParseInt(capture[2], 10, 64)
-		if err != nil {
-			return nil
-		}
-		episodeValue, err := strconv.ParseInt(capture[3], 10, 64)
-		if err != nil {
-			return nil
-		}
-		end := episodeValue
-		if capture[4] != "" {
-			if parsed, err := strconv.ParseInt(capture[4], 10, 64); err == nil && parsed >= episodeValue {
-				end = parsed
-			}
-		}
-		series = seriesName(capture)
-		season = &seasonValue
-		episode = &episodeValue
-		for value := episodeValue; value <= end; value++ {
-			episodeRange = append(episodeRange, value)
-		}
-	} else if capture := multiRe.FindStringSubmatch(title); capture != nil {
-		seasonValue, err := strconv.ParseInt(capture[2], 10, 64)
-		if err != nil {
-			return nil
-		}
-		joined := capture[3]
-		var episodes []int64
-		for _, match := range episodeTokenRe.FindAllStringSubmatch(joined, -1) {
-			if value, err := strconv.ParseInt(match[1], 10, 64); err == nil && value > 0 {
-				episodes = append(episodes, value)
-			}
-		}
-		if len(episodes) >= 2 {
-			series = seriesName(capture)
-			season = &seasonValue
-			first := episodes[0]
-			episode = &first
-			episodeRange = episodes
-		}
-	} else if capture := standardRe.FindStringSubmatch(title); capture != nil {
-		seasonValue, err := strconv.ParseInt(capture[2], 10, 64)
-		if err != nil {
-			return nil
-		}
-		episodeValue, err := strconv.ParseInt(capture[3], 10, 64)
-		if err != nil {
-			return nil
-		}
-		series = seriesName(capture)
-		season = &seasonValue
-		episode = &episodeValue
-		episodeRange = []int64{episodeValue}
-	} else if capture := nxRangeRe.FindStringSubmatch(title); capture != nil {
-		seasonValue, err := strconv.ParseInt(capture[2], 10, 64)
-		if err != nil {
-			return nil
-		}
-		first, err := strconv.ParseInt(capture[3], 10, 64)
-		if err != nil {
-			return nil
-		}
-		end := first
-		if parsed, err := strconv.ParseInt(capture[4], 10, 64); err == nil && parsed >= first {
-			end = parsed
-		}
-		if seasonValue >= 1 && seasonValue <= 40 && first <= 99 {
-			series = seriesName(capture)
-			season = &seasonValue
-			episode = &first
-			for value := first; value <= end; value++ {
-				episodeRange = append(episodeRange, value)
-			}
-		}
-	} else if capture := nxRe.FindStringSubmatch(title); capture != nil {
-		seasonValue, err := strconv.ParseInt(capture[2], 10, 64)
-		if err != nil {
-			return nil
-		}
-		if seasonValue >= 1 && seasonValue <= 40 {
-			episodeValue, err := strconv.ParseInt(capture[3], 10, 64)
-			if err != nil {
-				return nil
-			}
-			if episodeValue <= 99 {
-				series = seriesName(capture)
-				season = &seasonValue
-				episode = &episodeValue
-				episodeRange = []int64{episodeValue}
-			}
-		}
-	} else if capture := itaRe.FindStringSubmatch(title); capture != nil {
-		seasonValue, err := strconv.ParseInt(capture[2], 10, 64)
-		if err != nil {
-			return nil
-		}
-		episodeValue, err := strconv.ParseInt(capture[3], 10, 64)
-		if err != nil {
-			return nil
-		}
-		series = seriesName(capture)
-		season = &seasonValue
-		episode = &episodeValue
-		episodeRange = []int64{episodeValue}
-	} else if capture := englishRe.FindStringSubmatch(title); capture != nil {
-		seasonValue, err := strconv.ParseInt(capture[2], 10, 64)
-		if err != nil {
-			return nil
-		}
-		episodeValue, err := strconv.ParseInt(capture[3], 10, 64)
-		if err != nil {
-			return nil
-		}
-		series = seriesName(capture)
-		season = &seasonValue
-		episode = &episodeValue
-		episodeRange = []int64{episodeValue}
-	} else if capture := dateRe.FindStringSubmatch(title); capture != nil {
-		year, err := strconv.ParseInt(capture[2], 10, 32)
-		if err != nil {
-			return nil
-		}
-		month, err := strconv.ParseInt(capture[3], 10, 32)
-		if err != nil {
-			return nil
-		}
-		day, err := strconv.ParseInt(capture[4], 10, 32)
-		if err != nil {
-			return nil
-		}
-		date := time.Date(int(year), time.Month(month), int(day), 0, 0, 0, 0, time.UTC)
-		if date.Year() == int(year) && int(date.Month()) == int(month) && date.Day() == int(day) {
-			ordinal := int64(date.YearDay())
-			series = seriesName(capture)
-			season = &year
-			episode = &ordinal
-			episodeRange = []int64{ordinal}
-		}
-	} else if capture := inProgressPackRe.FindStringSubmatch(title); capture != nil {
-		seasonValue, err := strconv.ParseInt(capture[2], 10, 64)
-		if err != nil {
-			return nil
-		}
-		available, err := strconv.ParseInt(capture[3], 10, 64)
-		if err != nil || available < 1 || available > 999 {
-			return nil
-		}
-		first := int64(1)
-		series = seriesName(capture)
-		season = &seasonValue
-		episode = &first
-		inProgressAvailable = available
-		episodeRange = make([]int64, 0, available)
-		for value := int64(1); value <= available; value++ {
-			episodeRange = append(episodeRange, value)
-		}
-	} else if capture := seasonPackRe.FindStringSubmatch(title); capture != nil {
-		seasonValue, err := strconv.ParseInt(capture[2], 10, 64)
-		if err != nil {
-			return nil
-		}
-		zero := int64(0)
-		series = seriesName(capture)
-		season = &seasonValue
-		episode = &zero
-		episodeRange = []int64{0}
-		seasonPack = true
+	parsed := parseReleaseTitle(title)
+	if parsed.dropped {
+		return nil
 	}
 	kind := "movie"
-	if season != nil {
+	if parsed.season != nil {
 		kind = "series"
 	}
 	var absoluteSeries *string
 	var absoluteEpisode *int64
-	if season == nil {
+	if parsed.season == nil {
 		absoluteSeries, absoluteEpisode = parseAbsoluteEpisode(title)
 	}
 	year := releaseYear(title)
-	// E00 is a real special/recap episode, not a complete-season pack. Only
-	// titles matched by seasonPackRe use the {0} range as a pack sentinel.
-	isPack := len(episodeRange) > 1 || seasonPack
+	// E00 is a real special/recap episode, not a complete-season pack. Only a
+	// title read by the season-pack pattern uses the {0} range as a pack
+	// sentinel.
+	isPack := len(parsed.episodeRange) > 1 || parsed.seasonPack
 	return &models.Release{
 		Title:              title,
 		Magnet:             sanitizedMagnet,
@@ -1068,12 +856,12 @@ func ParseReleaseSource(title, magnet string, torrentURL *string, source string,
 		Source:             source,
 		Quality:            ParseQuality(title),
 		Kind:               kind,
-		Series:             series,
-		Season:             season,
-		Episode:            episode,
+		Series:             parsed.series,
+		Season:             parsed.season,
+		Episode:            parsed.episode,
 		IsPack:             isPack,
-		EpisodeRange:       episodeRange,
-		InProgressEpisodes: inProgressAvailable,
+		EpisodeRange:       parsed.episodeRange,
+		InProgressEpisodes: parsed.inProgress,
 		AbsoluteEpisode:    absoluteEpisode,
 		AbsoluteSeries:     absoluteSeries,
 		Year:               year,
@@ -1082,6 +870,284 @@ func ParseReleaseSource(title, magnet string, torrentURL *string, source string,
 		Seeders:            -1,
 		Peers:              -1,
 	}
+}
+
+// A release title spells season and episode in more than one way, and a
+// pattern can match a title whose values it then refuses to read: a season
+// number above 40, a date that does not exist. The matchers below are tried
+// in the order the parser has always used, and the first one that both
+// matches and reads its values wins. A pattern that matches and refuses lets
+// the next one try the same title, so a title is never read as a movie only
+// because the first pattern it happened to match was the wrong one.
+type releaseMatch struct {
+	series       *string
+	season       *int64
+	episode      *int64
+	episodeRange []int64
+	seasonPack   bool
+	// inProgress is how many episodes a pack labelled "in progress" declares
+	// it already holds (0 for every other release). The .torrent can lag
+	// behind that claim; the acquisition loop checks it.
+	inProgress int64
+	// dropped marks a title that claims a shape the parser cannot read
+	// safely: ParseReleaseSource returns nil for it.
+	dropped bool
+}
+
+type matchVerdict int
+
+const (
+	// matchRefused: the pattern matched but its values are unusable, so the
+	// next pattern may still read the title.
+	matchRefused matchVerdict = iota
+	// matchRead: the title is this kind of release.
+	matchRead
+	// matchDropped: the title is a release of this shape, but this parser
+	// cannot read the shape safely and must not guess another one.
+	matchDropped
+)
+
+type releaseMatcher struct {
+	pattern *regexp.Regexp
+	read    func(capture []string) (releaseMatch, matchVerdict)
+}
+
+var releaseMatchers = []releaseMatcher{
+	{utils.MustCachedRegex(`(?i)^(.+?)[ ._-]+s(\d{1,4})e(\d{1,4})[-–]e?(\d{1,4})(?:[ ._-]|$)`), readEpisodeRange},
+	{utils.MustCachedRegex(`(?i)^(.+?)[ ._-]+s(\d{1,4})((?:e\d{1,4}){2,})(?:[ ._-]|$)`), readJoinedEpisodes},
+	// Season and episode markers may be separated by a dot or a space
+	// ("S01.E01", "S01 E01"), not only glued ("S01E01").
+	{utils.MustCachedRegex(`(?i)^(.+?)[ ._-]+s(\d{1,4})[ ._-]?e(\d{1,4})(?:[ ._-]|$)`), readSeasonEpisode},
+	{utils.MustCachedRegex(`(?i)^(.+?)[ ._-]+(\d{1,2})x(\d{1,4})[-–](?:\d{1,2}x|x)?(\d{1,4})(?:[ ._-]|$)`), readNXRange},
+	{utils.MustCachedRegex(`(?i)^(.+?)[ ._-]+(\d{1,2})x(\d{1,4})(?:[ ._-]|$)`), readNX},
+	{utils.MustCachedRegex(`(?i)^(.+?)[ ._-]+stagione[ ._-]*(\d{1,2})[ ._-]+(?:episodio|puntata|ep\.?)[ ._-]*(\d{1,4})(?:[ ._-]|$)`), readSeasonEpisode},
+	{utils.MustCachedRegex(`(?i)^(.+?)[ ._-]+season[ ._-]*(\d{1,2})[ ._-]+(?:episode|ep)[ ._-]*(\d{1,4})(?:[ ._-]|$)`), readSeasonEpisode},
+	{utils.MustCachedRegex(`(?i)^(.+?)[ ._-]+(\d{4})[-.](\d{1,2})[-.](\d{1,2})(?:[ ._-]|$)`), readDate},
+	// A pack marked "IN CORSO n/m" ("in progress", as Italian sites label an
+	// airing season) only holds the first n episodes, not the whole season:
+	// the pack range stops there, so it fills a gap only if one of those n is
+	// really missing. Reading it as a complete season would invent gaps up to
+	// the TMDB count and download the pack for nothing.
+	// The count may be glued to the label ("[IN CORSO 02/18]") or sit in its
+	// own brackets ("[IN CORSO][02/08]", "[IN CORSO] [05/06]"): Italian sites
+	// use both. The total may be unknown ("02/??").
+	{utils.MustCachedRegex(`(?i)^(.+?)[ ._-]+(?:stagione[ ._-]*|season[ ._-]?|s)(\d{1,2})\b.*?\b(?:in[ ._-]*(?:corso|progress)|incomplete)\b\W{0,6}0?(\d{1,3})[ ._-]*(?:/|di|of)[ ._-]*(?:0?\d{1,3}|\?{1,3})`), readInProgressPack},
+	{utils.MustCachedRegex(`(?i)^(.+?)[ ._-]+(?:stagione[ ._-]*|season[ ._-]?|s)(\d{1,2})(?:[ ._-]+(?:complete|completa))?(?:[ ._-]|$)`), readSeasonPack},
+}
+
+// parseReleaseTitle tries every matcher in order and returns what the title
+// says about season and episode. A title no matcher reads is a movie.
+func parseReleaseTitle(title string) releaseMatch {
+	for _, matcher := range releaseMatchers {
+		capture := matcher.pattern.FindStringSubmatch(title)
+		if capture == nil {
+			continue
+		}
+		parsed, verdict := matcher.read(capture)
+		switch verdict {
+		case matchRead:
+			if parsed.episodeRange == nil {
+				parsed.episodeRange = []int64{}
+			}
+			return parsed
+		case matchDropped:
+			return releaseMatch{episodeRange: []int64{}, dropped: true}
+		}
+	}
+	return releaseMatch{episodeRange: []int64{}}
+}
+
+// seriesName reads the series name out of a matcher's first capture.
+func seriesName(capture []string) *string {
+	if capture == nil || capture[1] == "" {
+		return nil
+	}
+	value := strings.TrimSpace(strings.ReplaceAll(capture[1], ".", " "))
+	// A resolution tag placed before SxxExx ("Show.2160p.S02E10") is not part
+	// of the series name.
+	value = trailingResolutionRe.ReplaceAllString(value, "")
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return nil
+	}
+	return &value
+}
+
+// captureInt reads one numeric capture; ok is false when the group is absent
+// or is not a number.
+func captureInt(value string) (int64, bool) {
+	if value == "" {
+		return 0, false
+	}
+	parsed, err := strconv.ParseInt(value, 10, 64)
+	if err != nil {
+		return 0, false
+	}
+	return parsed, true
+}
+
+var episodeTokenRe = utils.MustCachedRegex(`(?i)e(\d{1,4})`)
+
+// readEpisodeRange reads "S01E01-E03" and "S01E01-03".
+func readEpisodeRange(capture []string) (releaseMatch, matchVerdict) {
+	season, ok := captureInt(capture[2])
+	if !ok {
+		return releaseMatch{}, matchRefused
+	}
+	first, ok := captureInt(capture[3])
+	if !ok {
+		return releaseMatch{}, matchRefused
+	}
+	last := first
+	if parsed, ok := captureInt(capture[4]); ok && parsed >= first {
+		last = parsed
+	}
+	episodes := make([]int64, 0, last-first+1)
+	for value := first; value <= last; value++ {
+		episodes = append(episodes, value)
+	}
+	return releaseMatch{series: seriesName(capture), season: &season, episode: &first, episodeRange: episodes}, matchRead
+}
+
+// readJoinedEpisodes reads "S01E01E02E03".
+func readJoinedEpisodes(capture []string) (releaseMatch, matchVerdict) {
+	season, ok := captureInt(capture[2])
+	if !ok {
+		return releaseMatch{}, matchRefused
+	}
+	episodes := make([]int64, 0, 2)
+	for _, token := range episodeTokenRe.FindAllStringSubmatch(capture[3], -1) {
+		if value, ok := captureInt(token[1]); ok && value > 0 {
+			episodes = append(episodes, value)
+		}
+	}
+	if len(episodes) < 2 {
+		return releaseMatch{}, matchRefused
+	}
+	first := episodes[0]
+	return releaseMatch{series: seriesName(capture), season: &season, episode: &first, episodeRange: episodes}, matchRead
+}
+
+// readSeasonEpisode reads the ordinary "S01E01", "Season 1 Episode 2" and
+// "Stagione 1 Puntata 2".
+func readSeasonEpisode(capture []string) (releaseMatch, matchVerdict) {
+	season, ok := captureInt(capture[2])
+	if !ok {
+		return releaseMatch{}, matchRefused
+	}
+	episode, ok := captureInt(capture[3])
+	if !ok {
+		return releaseMatch{}, matchRefused
+	}
+	return releaseMatch{series: seriesName(capture), season: &season, episode: &episode, episodeRange: []int64{episode}}, matchRead
+}
+
+// readNXRange reads "1x01-1x03" and "1x01-03".
+func readNXRange(capture []string) (releaseMatch, matchVerdict) {
+	season, ok := captureInt(capture[2])
+	if !ok {
+		return releaseMatch{}, matchRefused
+	}
+	first, ok := captureInt(capture[3])
+	if !ok {
+		return releaseMatch{}, matchRefused
+	}
+	if season < 1 || season > 40 || first > 99 {
+		return releaseMatch{}, matchRefused
+	}
+	last := first
+	if parsed, ok := captureInt(capture[4]); ok && parsed >= first {
+		last = parsed
+	}
+	episodes := make([]int64, 0, last-first+1)
+	for value := first; value <= last; value++ {
+		episodes = append(episodes, value)
+	}
+	return releaseMatch{series: seriesName(capture), season: &season, episode: &first, episodeRange: episodes}, matchRead
+}
+
+// readNX reads "1x01".
+func readNX(capture []string) (releaseMatch, matchVerdict) {
+	season, ok := captureInt(capture[2])
+	if !ok {
+		return releaseMatch{}, matchRefused
+	}
+	if season < 1 || season > 40 {
+		return releaseMatch{}, matchRefused
+	}
+	episode, ok := captureInt(capture[3])
+	if !ok {
+		return releaseMatch{}, matchRefused
+	}
+	if episode > 99 {
+		return releaseMatch{}, matchRefused
+	}
+	return releaseMatch{series: seriesName(capture), season: &season, episode: &episode, episodeRange: []int64{episode}}, matchRead
+}
+
+// readDate reads a daily release "2024-05-12" as the season's day of year.
+func readDate(capture []string) (releaseMatch, matchVerdict) {
+	year, ok := captureInt(capture[2])
+	if !ok {
+		return releaseMatch{}, matchRefused
+	}
+	month, ok := captureInt(capture[3])
+	if !ok {
+		return releaseMatch{}, matchRefused
+	}
+	day, ok := captureInt(capture[4])
+	if !ok {
+		return releaseMatch{}, matchRefused
+	}
+	date := time.Date(int(year), time.Month(month), int(day), 0, 0, 0, 0, time.UTC)
+	if date.Year() != int(year) || int(date.Month()) != int(month) || date.Day() != int(day) {
+		return releaseMatch{}, matchRefused
+	}
+	ordinal := int64(date.YearDay())
+	return releaseMatch{series: seriesName(capture), season: &year, episode: &ordinal, episodeRange: []int64{ordinal}}, matchRead
+}
+
+// readInProgressPack reads a pack that only holds the first episodes of an
+// airing season. A label with no usable count is dropped rather than read as
+// a complete season: a complete season here would invent gaps up to the TMDB
+// count and download the pack for nothing.
+func readInProgressPack(capture []string) (releaseMatch, matchVerdict) {
+	season, ok := captureInt(capture[2])
+	if !ok {
+		return releaseMatch{}, matchDropped
+	}
+	available, ok := captureInt(capture[3])
+	if !ok || available < 1 || available > 999 {
+		return releaseMatch{}, matchDropped
+	}
+	first := int64(1)
+	episodes := make([]int64, 0, available)
+	for value := int64(1); value <= available; value++ {
+		episodes = append(episodes, value)
+	}
+	return releaseMatch{
+		series:       seriesName(capture),
+		season:       &season,
+		episode:      &first,
+		episodeRange: episodes,
+		inProgress:   available,
+	}, matchRead
+}
+
+// readSeasonPack reads "S01" and "Season 1 Complete": a whole season.
+func readSeasonPack(capture []string) (releaseMatch, matchVerdict) {
+	season, ok := captureInt(capture[2])
+	if !ok {
+		return releaseMatch{}, matchRefused
+	}
+	zero := int64(0)
+	return releaseMatch{
+		series:       seriesName(capture),
+		season:       &season,
+		episode:      &zero,
+		episodeRange: []int64{0},
+		seasonPack:   true,
+	}, matchRead
 }
 
 // ParseEd2kRelease turns a Kad/eD2k result into a Release. eD2k names are
