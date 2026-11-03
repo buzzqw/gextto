@@ -159,10 +159,10 @@ func TestRetryStorageMovesWaitsWhileLibtorrentIsStillCopying(t *testing.T) {
 
 func TestManualMoveAllowsConfiguredSeriesArchive(t *testing.T) {
 	cfg := &Config{Series: []SeriesConfig{{Name: "Wolf Like Me", ArchivePath: "/nas/SerieTV/Wolf.Like.Me"}}}
-	if !gh7_isConfiguredArchive(cfg, nil, seedTestHash, "/nas/SerieTV/Wolf.Like.Me") {
+	if !isConfiguredArchive(cfg, nil, seedTestHash, "/nas/SerieTV/Wolf.Like.Me") {
 		t.Fatal("the archive of a configured series should be an allowed destination")
 	}
-	if gh7_isConfiguredArchive(cfg, nil, seedTestHash, "/etc") {
+	if isConfiguredArchive(cfg, nil, seedTestHash, "/etc") {
 		t.Fatal("an unrelated folder must not be allowed")
 	}
 }

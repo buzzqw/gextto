@@ -317,7 +317,7 @@ func TestManualEd2kAddIsLogged(t *testing.T) {
 		t.Fatal(err)
 	}
 	release := ParseEd2kRelease(file.Name, link, "ed2k:link", file.Size, 0, time.Now().UTC())
-	if status, value := gh3AddParsedRelease(state, *release); status != http.StatusAccepted {
+	if status, value := AddParsedRelease(state, *release); status != http.StatusAccepted {
 		t.Fatalf("add -> %d %+v", status, value)
 	}
 	for _, event := range events {

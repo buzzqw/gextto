@@ -316,7 +316,7 @@ func V2Ed2kAdd(w http.ResponseWriter, r *http.Request, s *AppState) {
 			failed = append(failed, file.Name)
 			continue
 		}
-		status, value := gh3AddParsedRelease(s, *release)
+		status, value := AddParsedRelease(s, *release)
 		if status == http.StatusAccepted {
 			added++
 			continue

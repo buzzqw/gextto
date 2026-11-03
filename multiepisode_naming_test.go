@@ -160,7 +160,7 @@ func TestArchiveScanRegistersEveryEpisodeOfARangeFile(t *testing.T) {
 	file := filepath.Join(dir, "TestShow - S01E01-E02 - Episodio 1 [1080p][h265].mkv")
 	writeFile(t, file, validMKV(4096))
 
-	found, updated, err := gh5_scanArchivePath(db, &series, dir, &cfg)
+	found, updated, err := scanArchivePath(db, &series, dir, &cfg)
 	if err != nil {
 		t.Fatalf("gh5_scanArchivePath: %v", err)
 	}

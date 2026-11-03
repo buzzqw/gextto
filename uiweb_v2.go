@@ -2957,7 +2957,7 @@ func V2SettingsSave(w http.ResponseWriter, r *http.Request, s *AppState) {
 		v2Render(w, http.StatusOK, "v2_setting_field", v2Field{uiSettingField: field, Status: status, Error: isErr}, dict, eng)
 	}
 
-	if !gh7_setting_key_allowed(key) || key == "" || len(key) > 128 {
+	if !settingKeyAllowed(key) || key == "" || len(key) > 128 {
 		render("chiave non modificabile", true)
 		return
 	}

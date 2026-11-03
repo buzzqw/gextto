@@ -514,7 +514,7 @@ func TestWebApiBackupVerify(t *testing.T) {
 }
 
 func TestProviderGuidanceIsActionable(t *testing.T) {
-	message, action := gh5_providerGuidance(models.ProviderStatus{LastError: "HTTP 401 unauthorized"})
+	message, action := providerGuidance(models.ProviderStatus{LastError: "HTTP 401 unauthorized"})
 	if message != "Il provider ha rifiutato l’accesso." {
 		t.Fatalf("message = %q", message)
 	}

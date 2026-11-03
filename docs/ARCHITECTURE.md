@@ -186,7 +186,9 @@ qBittorrent-nox.
 | `web_router.go` | construction of the HTTP mux and route table. |
 | `auth.go` | optional access: middleware in front of all routes, local network exemption, login, API key. |
 | `web_handlers_core.go` | core handlers, log streaming, middleware. |
-| `web_handlers_g0.go` … `web_handlers_g7.go` | groups of handlers ported from the reference project. |
+| `web_system.go`, `web_maintenance.go`, `web_torrents.go`, `web_series.go`, `web_movies.go`, `web_comics.go` | HTTP handlers grouped by subject: daemon status/jobs/setup, archive and database maintenance, torrents, series, movies, comics. |
+| `web_settings.go`, `web_search.go`, `web_backup.go`, `web_integrations.go`, `web_metadata.go`, `web_calendar.go`, `web_media`… | the remaining subjects: settings, searches, backup, third-party integrations, metadata providers, calendar. |
+| `web_helpers.go`, `web_speed.go`, `web_ipfilter.go` | helpers shared by the handler files, and the speed and IP-filter machinery they use. |
 | `web_handlers_compat.go` | compatibility/diagnostics endpoints. |
 | `web_handlers_jobs.go`, `web_handlers_torrent_backend.go`, `web_handlers_torrent_diag.go` | specific handlers (jobs, backend, diagnostics). |
 | `web_handlers_series.go`, `web_handlers_torrent_stream.go` | series handlers (`/api/series/{name}`) and redirect to the streaming of the gx-torrent daemon, with the token added server-side. |
@@ -239,9 +241,9 @@ qBittorrent-nox.
 
 ## 4. File naming conventions
 
-- `web_handlers_g0.go` … `web_handlers_g7.go`: groups of handlers ported from the
-  reference project. The number does **not** indicate a priority: it only serves
-  to split the huge handler table into manageable files.
+- `web_<subject>.go`: the HTTP handlers of one subject (`web_torrents.go`,
+  `web_series.go`, …); `web_helpers.go` holds what several subjects use.
+  A new handler goes in the file of its subject, not in a numbered bucket.
 - `uiweb_v2_*.go`: everything related to **UI v2** (SSR + HTMX). `uiweb_*.go`
   without `_v2` is the shared layer (view-model and formatters) used by UI v2.
 - `gxtorrent_*`, `qbittorrent_*`: the torrent backends.

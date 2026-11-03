@@ -25,7 +25,7 @@ type MediaIntegrityStartInput struct {
 // GET /api/maintenance/media-integrity.
 func MediaIntegrityStart(w http.ResponseWriter, r *http.Request, s *AppState) {
 	var input MediaIntegrityStartInput
-	if _, err := gh0_decodeOptional(r, &input); err != nil {
+	if _, err := decodeOptional(r, &input); err != nil {
 		jsonError(w, http.StatusBadRequest, err.Error())
 		return
 	}

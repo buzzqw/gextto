@@ -53,7 +53,7 @@ type selectiveInput struct {
 func TorrentSelective(w http.ResponseWriter, r *http.Request, s *AppState) {
 	hash := pathParam(r, "hash")
 	var input selectiveInput
-	if !gh3DecodeOptionalJSON(w, r, &input) {
+	if !DecodeOptionalJSON(w, r, &input) {
 		return
 	}
 	profile := strings.ToLower(strings.TrimSpace(input.Profile))

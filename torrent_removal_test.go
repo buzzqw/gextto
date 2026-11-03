@@ -337,7 +337,7 @@ func TestArchiveAndRemoveTorrentFinalizesUnrenamedArchivedCopy(t *testing.T) {
 	cfg.RenameEpisodes = true
 	cfg.Series = append(cfg.Series, SeriesConfig{Name: "TestShow", Enabled: true, ArchivePath: archiveDir})
 
-	if finalized := gh6_archivedCopyFinalized(s.db, torrentName, hash); finalized {
+	if finalized := archivedCopyFinalized(s.db, torrentName, hash); finalized {
 		t.Fatal("an un-renamed archived copy must not be considered finalized")
 	}
 

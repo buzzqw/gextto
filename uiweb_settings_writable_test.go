@@ -13,12 +13,12 @@ import (
 // as editable fields whose save always answered «chiave non modificabile».
 func TestSettingsIndexIsWritable(t *testing.T) {
 	for _, def := range uiSettingsIndex {
-		if !gh7_setting_key_allowed(def.Key) {
+		if !settingKeyAllowed(def.Key) {
 			t.Errorf("%s is shown in the settings page but is not writable", def.Key)
 		}
 	}
 	for _, def := range uiScoreSettingDefs {
-		if !gh7_setting_key_allowed(def.Key) {
+		if !settingKeyAllowed(def.Key) {
 			t.Errorf("score weight %s is shown but is not writable", def.Key)
 		}
 	}
@@ -26,7 +26,7 @@ func TestSettingsIndexIsWritable(t *testing.T) {
 		if uiSettingIndexed[key] {
 			t.Errorf("%s is both shown in the settings page and never writable", key)
 		}
-		if gh7_setting_key_allowed(key) {
+		if settingKeyAllowed(key) {
 			t.Errorf("%s must stay unwritable", key)
 		}
 	}
@@ -47,7 +47,7 @@ func TestSettingWritableAPIOnlyKeysAreNotRedundant(t *testing.T) {
 		}
 	}
 	for _, key := range []string{"", "unknown_key", "constants", "data_dir"} {
-		if gh7_setting_key_allowed(key) {
+		if settingKeyAllowed(key) {
 			t.Errorf("%q must not be writable", key)
 		}
 	}

@@ -95,7 +95,7 @@ func mediaInfoBackfillWorker(state *AppState) {
 				if release == nil {
 					return
 				}
-				report, err := gh0_runMediaInfoBackfill(state.bgContext, state, batch, nil)
+				report, err := runMediaInfoBackfill(state.bgContext, state, batch, nil)
 				release()
 				if err != nil {
 					logging.Warn("MediaInfo backfill run failed", "error", err)
@@ -186,7 +186,7 @@ func calendarWarmupWorker(state *AppState) {
 		if metadataConfigured(cfg) {
 			key := calendarCacheKey(cfg)
 			if _, ok := cacheGet(key, calendarCacheTTL); !ok {
-				response := gh0_buildCalendar(context.Background(), cfg)
+				response := buildCalendar(context.Background(), cfg)
 				cachePut(key, response)
 			}
 		}
@@ -300,12 +300,12 @@ func bwm_backupDueAt(cfg *Config, last *time.Time, now time.Time) bool {
 func bwm_executeScheduledBackup(cfg *Config, notifier *Notifier) error {
 	dataDir := cfg.DataDir
 	root := filepath.Join(dataDir, "backups")
-	retain := gh5_backupRetention(cfg)
-	ftp := gh5_backupFtpConfig(cfg)
-	cloudDir := gh5_backupCloudDir(cfg)
+	retain := backupRetention(cfg)
+	ftp := backupFtpConfig(cfg)
+	cloudDir := backupCloudDir(cfg)
 	sendTelegram := bwm_truthy(cfg.Settings["backup_send_telegram"])
 
-	steps, err := gh5_runBackupSteps(dataDir, root, retain, ftp, cloudDir, BackupExtraPaths(cfg.Settings["backup_extra_paths"]))
+	steps, err := runBackupSteps(dataDir, root, retain, ftp, cloudDir, BackupExtraPaths(cfg.Settings["backup_extra_paths"]))
 	if err != nil {
 		return err
 	}
@@ -323,7 +323,7 @@ func bwm_executeScheduledBackup(cfg *Config, notifier *Notifier) error {
 			telegramUploaded = parts > 0
 		}
 	}
-	logging.Info(gh5_backupLogSummary(steps, true, telegramParts, telegramError))
+	logging.Info(backupLogSummary(steps, true, telegramParts, telegramError))
 	// The notification gets an empty error for a step that was not configured
 	// (nil): the "none" placeholder would read as a failure.
 	_ = notifier.NotifyEvent("backup_completed", map[string]any{

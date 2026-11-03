@@ -934,7 +934,7 @@ func (e *qbittorrentEngine) Stats() map[string]any {
 func (e *qbittorrentEngine) ApplyOptimization(cfg *Config) (map[string]any, error) {
 	memoryMB := uint64(0)
 	if cfg != nil {
-		memoryMB = gh0_memoryMBFor(cfg)
+		memoryMB = memoryMBFor(cfg)
 	}
 	cacheMB := int64(512)
 	switch {

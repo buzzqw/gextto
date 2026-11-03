@@ -763,7 +763,7 @@ func TestRemoveTrashContentsRemovesSymlinks(t *testing.T) {
 	if err := os.Symlink(kept, link); err != nil {
 		t.Skipf("symlink unsupported: %v", err)
 	}
-	files, _, err := gh3RemoveTrashContents(trash, 0)
+	files, _, err := RemoveTrashContents(trash, 0)
 	if err != nil {
 		t.Fatal(err)
 	}

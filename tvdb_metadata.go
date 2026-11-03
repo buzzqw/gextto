@@ -445,10 +445,10 @@ func (c *TvdbClient) SeriesInfo(ctx context.Context, name string, tvdbID *string
 		info["number_of_episodes"] = total
 		now := time.Now()
 		if last := tvdbLastEpisode(episodes, now); last != nil {
-			info["last_episode_to_air"] = gh0_toMap(last)
+			info["last_episode_to_air"] = toMap(last)
 		}
 		if next := tvdbNextEpisode(episodes, now); next != nil {
-			info["next_episode_to_air"] = gh0_toMap(next)
+			info["next_episode_to_air"] = toMap(next)
 		}
 	}
 	return info, nil

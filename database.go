@@ -526,15 +526,6 @@ func qualityIsKnown(quality models.Quality) bool {
 		quality.Score() > 0
 }
 
-func containsInt64Value(values []int64, needle int64) bool {
-	for _, value := range values {
-		if value == needle {
-			return true
-		}
-	}
-	return false
-}
-
 func seenLikePattern(query string) string {
 	trimmed := strings.TrimSpace(query)
 	if trimmed == "" {
@@ -1507,7 +1498,7 @@ func (d *Database) checkSeriesPack(release *models.Release, hash string, score, 
 			explicit = append(explicit, episode)
 		}
 	}
-	complete := containsInt64Value(release.EpisodeRange, 0) || len(explicit) == 0
+	complete := containsInt64(release.EpisodeRange, 0) || len(explicit) == 0
 	if context == nil {
 		context = &models.ApprovalContext{}
 	}
@@ -3929,7 +3920,7 @@ func (d *Database) UnarchivedEpisodesForSeries(seriesName string, ignoredSeasons
 	sort.Slice(seasons, func(i, j int) bool { return seasons[i] < seasons[j] })
 	missing := make([][2]int64, 0)
 	for _, season := range seasons {
-		if containsInt64Value(ignoredSeasons, season) {
+		if containsInt64(ignoredSeasons, season) {
 			continue
 		}
 		for episode := int64(1); episode <= targets[season]; episode++ {
@@ -5610,13 +5601,13 @@ func (d *Database) MarkReleaseCompleted(release *models.Release, path string, si
 					_, err := tx.Exec("INSERT INTO episodes(series_id,season,episode,title,quality_score,downloaded_at,archive_path,size_bytes) VALUES (?1,?2,?3,'',0,?4,?5,?6) ON CONFLICT(series_id,season,episode) DO UPDATE SET downloaded_at=excluded.downloaded_at, archive_path=excluded.archive_path, size_bytes=excluded.size_bytes", seriesID, season, episode, now, path, sizeBytes)
 					return err
 				}
-				if release.IsPack && containsInt64Value(release.EpisodeRange, 0) {
+				if release.IsPack && containsInt64(release.EpisodeRange, 0) {
 					if err := upsertEpisode(0); err != nil {
 						return err
 					}
 				}
 				var episodes []int64
-				if release.IsPack && (len(release.EpisodeRange) == 0 || containsInt64Value(release.EpisodeRange, 0)) {
+				if release.IsPack && (len(release.EpisodeRange) == 0 || containsInt64(release.EpisodeRange, 0)) {
 					var count sql.NullInt64
 					countErr := tx.QueryRow("SELECT MAX(episode_count) FROM series_metadata WHERE series_name=?1 AND season=?2", series, season).Scan(&count)
 					if countErr != nil && !errors.Is(countErr, sql.ErrNoRows) {
@@ -5690,7 +5681,7 @@ func (d *Database) MarkPackCompleted(release *models.Release, episodes []PackEpi
 			return seriesErr
 		}
 		if seriesErr == nil {
-			if containsInt64Value(release.EpisodeRange, 0) {
+			if containsInt64(release.EpisodeRange, 0) {
 				if _, err := tx.Exec("UPDATE episodes SET downloaded_at=?1,archive_path=?2,size_bytes=?3 WHERE series_id=?4 AND season=?5 AND episode=0", now, path, sizeBytes, seriesID, season); err != nil {
 					return err
 				}

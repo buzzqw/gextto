@@ -54,7 +54,7 @@ type NightMaintenanceForgetInput struct {
 // episode is marked missing, so the search downloads it again.
 func NightMaintenanceForgetAPI(w http.ResponseWriter, r *http.Request, s *AppState) {
 	var input NightMaintenanceForgetInput
-	if _, err := gh0_decodeOptional(r, &input); err != nil {
+	if _, err := decodeOptional(r, &input); err != nil {
 		jsonError(w, http.StatusBadRequest, err.Error())
 		return
 	}

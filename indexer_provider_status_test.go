@@ -16,7 +16,7 @@ func TestHealthyIndexerStatusesAlwaysListed(t *testing.T) {
 		{Name: "disabled-one", URL: "http://host:9118", Enabled: false},
 	}}
 	known := map[string]struct{}{"prowlarr": {}}
-	rows := gh5_healthyIndexerStatuses(cfg, known)
+	rows := healthyIndexerStatuses(cfg, known)
 	if len(rows) != 1 || rows[0].Provider != "Jackett" || rows[0].Kind != "indexer" {
 		t.Fatalf("rows = %+v, want one Jackett indexer row", rows)
 	}
@@ -30,17 +30,17 @@ func TestHealthyIndexerStatusesAlwaysListed(t *testing.T) {
 	// A name already present (a Prowlarr manager, a saved failure, ...) is not
 	// duplicated.
 	known = map[string]struct{}{"jackett": {}}
-	if rows := gh5_healthyIndexerStatuses(cfg, known); len(rows) != 0 {
+	if rows := healthyIndexerStatuses(cfg, known); len(rows) != 0 {
 		t.Fatalf("known name duplicated: %+v", rows)
 	}
 }
 
 // TestProviderStatusMessagesAreTranslated guards the "Stato provider" table:
-// every fixed message and suggested action of web_handlers_g5.go is a catalog
+// every fixed message and suggested action of web_services.go is a catalog
 // key in every language, so the rows never stay in Italian in another
 // interface language (the table cells are translated by exact match).
 func TestProviderStatusMessagesAreTranslated(t *testing.T) {
-	source, err := os.ReadFile("web_handlers_g5.go")
+	source, err := os.ReadFile("web_services.go")
 	if err != nil {
 		t.Fatal(err)
 	}

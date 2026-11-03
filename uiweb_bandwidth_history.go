@@ -212,7 +212,7 @@ func v2TrafficViewFrom(s *AppState) v2TrafficView {
 	// engine: Auto/schedule-Auto means no cap, so no line. The badge still has
 	// to say that Auto is what is deciding the speed, not that nothing is set.
 	cfg := latestConfig(s)
-	limitKib, _ := gh6_currentSpeedLimits(cfg)
+	limitKib, _ := currentSpeedLimits(cfg)
 	limitBytes := limitKib * 1024
 	if _, _, source := speedPolicy(cfg); speedSourceIsAuto(source) {
 		view.Auto = true

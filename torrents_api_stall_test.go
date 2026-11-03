@@ -15,7 +15,7 @@ func TestDecoratedTorrentsCarryStallState(t *testing.T) {
 		t.Fatal(err)
 	}
 	s := &AppState{db: db}
-	items := gh3DecorateTorrents(s, []models.TorrentView{{Hash: "abc", Name: "stuck"}, {Hash: "def", Name: "fine"}})
+	items := DecorateTorrents(s, []models.TorrentView{{Hash: "abc", Name: "stuck"}, {Hash: "def", Name: "fine"}})
 	if items[0]["stalled_since"] != since.Format(time.RFC3339) || items[0]["next_retry_at"] != next.Format(time.RFC3339) {
 		t.Fatalf("stalled torrent = %v", items[0])
 	}

@@ -98,17 +98,17 @@ func TestManualSearchListsTheLastResortCopy(t *testing.T) {
 		Magnet:  "magnet:?xt=urn:btih:" + strings.Repeat("c", 40),
 		Quality: models.Quality{Resolution: "1080p", Language: "ita", Languages: []string{"ita"}},
 	}
-	sources := []gh2_episodeSource{
+	sources := []episodeSource{
 		{Release: sd, Origin: episodeOriginIndexer},
 		{Release: hd, Origin: episodeOriginIndexer},
 	}
-	if got := gh2_lastResortEpisodeSources(sources, &cfg, &series); len(got) != 1 || !got[0].Release.LastResort {
+	if got := lastResortEpisodeSources(sources, &cfg, &series); len(got) != 1 || !got[0].Release.LastResort {
 		t.Fatalf("last resorts = %+v, want the 480p copy marked", got)
 	}
 	// A copy within the profile is never labelled: the table would say last
 	// resort for a normal download.
 	cfg.Settings["gap_last_resort"] = "false"
-	if got := gh2_lastResortEpisodeSources([]gh2_episodeSource{{Release: sd, Origin: episodeOriginIndexer}}, &cfg, &series); len(got) != 0 {
+	if got := lastResortEpisodeSources([]episodeSource{{Release: sd, Origin: episodeOriginIndexer}}, &cfg, &series); len(got) != 0 {
 		t.Fatalf("the switch must turn the listing off: %+v", got)
 	}
 }

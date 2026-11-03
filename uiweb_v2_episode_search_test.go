@@ -210,7 +210,7 @@ func TestEpisodeSearchReportsWhatItDoes(t *testing.T) {
 		stages = append(stages, name)
 		stagesMu.Unlock()
 	})
-	gh7_search_series_episode_sources(stageCtx, state, latestConfig(state), SeriesConfig{Name: "Show", Enabled: true}, 1, 1)
+	searchSeriesEpisodeSources(stageCtx, state, latestConfig(state), SeriesConfig{Name: "Show", Enabled: true}, 1, 1)
 	stagesMu.Lock()
 	joined := strings.Join(stages, ",")
 	stagesMu.Unlock()

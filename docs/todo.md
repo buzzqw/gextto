@@ -90,11 +90,6 @@ its gate; a rejected one moves to *Not planned*.
   told apart by prefixes (`gh0_`…`gh7_`, `tev_`, `bg_`) instead of by package. Gate: a
   decision on the first boundary (HTTP handlers, acquisition, storage) and one area
   migrated with the suite green.
-- **Handlers split by domain** — `web_handlers_g0..g7.go` are eight buckets of about 1.5k
-  lines split by size, and the split has already produced duplicated helpers (three
-  copies of the same webseed/free-check predicate). The route table in `web_router.go`
-  already groups by domain: `web_comics.go`, `web_series.go`, `web_torrents.go`, … Gate:
-  one domain moved, its `ghN_` prefix dropped.
 - **Settings as typed keys** — 110+ keys are read as `cfg.Settings["literal"]` with no Go
   constant, so a typo compiles and returns the default. Gate: constants generated from
   the settings index and one family of accessors migrated.

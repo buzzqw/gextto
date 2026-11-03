@@ -90,19 +90,19 @@ func TestGh5MirCrewServiceStatusReportsForumLogin(t *testing.T) {
 	cfg.Indexers = []IndexerConfig{{Name: "mircrew indexerr", URL: server.URL + "/api", APIKey: "k", Enabled: true}}
 
 	reset := func() {
-		gh5_mirCrewProbe.Lock()
-		gh5_mirCrewProbe.entry = nil
-		gh5_mirCrewProbe.Unlock()
+		mirCrewProbe.Lock()
+		mirCrewProbe.entry = nil
+		mirCrewProbe.Unlock()
 	}
 	reset()
-	status := gh5_mirCrewServiceStatus(&cfg)
+	status := mirCrewServiceStatus(&cfg)
 	if status == nil || !strings.Contains(status.UserMessage, "login al forum MirCrew non è riuscito.") || status.LastError != "wrong password" || !strings.Contains(status.SuggestedAction, "Rifai login") {
 		t.Fatalf("failed forum login not reported: %#v", status)
 	}
 
 	loggedIn.Store(true)
 	reset()
-	if status = gh5_mirCrewServiceStatus(&cfg); status == nil || status.UserMessage != "Servizio mircrew-indexer attivo e raggiungibile." {
+	if status = mirCrewServiceStatus(&cfg); status == nil || status.UserMessage != "Servizio mircrew-indexer attivo e raggiungibile." {
 		t.Fatalf("healthy service misreported: %#v", status)
 	}
 
@@ -111,19 +111,19 @@ func TestGh5MirCrewServiceStatusReportsForumLogin(t *testing.T) {
 		_, _ = w.Write([]byte(`{"ok": true, "logged_in": false, "login_error": "", "last_run": ""}`))
 	}))
 	defer starting.Close()
-	if _, failed := gh5_mirCrewLoginState(starting.URL); failed {
+	if _, failed := mirCrewLoginState(starting.URL); failed {
 		t.Fatal("a service still logging in must not be reported as failed")
 	}
 	lost := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte(`{"ok": true, "logged_in": false, "login_error": "", "last_run": "2026-10-08T11:17:51Z"}`))
 	}))
 	defer lost.Close()
-	if _, failed := gh5_mirCrewLoginState(lost.URL); !failed {
+	if _, failed := mirCrewLoginState(lost.URL); !failed {
 		t.Fatal("a login lost after a completed pass must be reported")
 	}
 
 	// An older service without /status is simply reachable.
-	if _, failed := gh5_mirCrewLoginState(server.URL + "/missing"); failed {
+	if _, failed := mirCrewLoginState(server.URL + "/missing"); failed {
 		t.Fatal("a service without /status must not be reported as failed")
 	}
 }

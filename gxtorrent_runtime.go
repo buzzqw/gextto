@@ -858,7 +858,7 @@ func gxEnsureIPFilter(cfg *Config, force bool) bool {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
-	data, errMessage := gh7_fetch_ipfilter(ctx, target)
+	data, errMessage := fetchIpfilter(ctx, target)
 	if errMessage != "" {
 		logging.Warn(fmt.Sprintf("⚠️ Could not download the IP filter from %s (%s): keeping the previous list", target, errMessage))
 		return false

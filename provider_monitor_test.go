@@ -88,7 +88,7 @@ func TestMirCrewLoginProbeReportsReachability(t *testing.T) {
 	}))
 	defer server.Close()
 
-	reason, failed, reachable := gh5_mirCrewLoginProbe(server.URL)
+	reason, failed, reachable := mirCrewLoginProbe(server.URL)
 	if !reachable || failed || reason != "" {
 		t.Fatalf("healthy = (%q,%v,%v), want (\"\",false,true)", reason, failed, reachable)
 	}
@@ -97,7 +97,7 @@ func TestMirCrewLoginProbeReportsReachability(t *testing.T) {
 		_, _ = w.Write([]byte(`{"ok":true,"logged_in":false,"login_error":"credenziali rifiutate o verifica richiesta","last_run":"2026-10-20T16:00:00Z"}`))
 	}))
 	defer broken.Close()
-	reason, failed, reachable = gh5_mirCrewLoginProbe(broken.URL)
+	reason, failed, reachable = mirCrewLoginProbe(broken.URL)
 	if !reachable || !failed || reason == "" {
 		t.Fatalf("broken = (%q,%v,%v), want a reason, failed, reachable", reason, failed, reachable)
 	}
@@ -107,7 +107,7 @@ func TestMirCrewLoginProbeReportsReachability(t *testing.T) {
 		http.NotFound(w, r)
 	}))
 	defer missing.Close()
-	if reason, failed, reachable = gh5_mirCrewLoginProbe(missing.URL); reachable || failed || reason != "" {
+	if reason, failed, reachable = mirCrewLoginProbe(missing.URL); reachable || failed || reason != "" {
 		t.Fatalf("missing /status = (%q,%v,%v), want (\"\",false,false)", reason, failed, reachable)
 	}
 }

@@ -214,7 +214,7 @@ func TestSortCalendarItemsByAirDate(t *testing.T) {
 		return map[string]any{"episode": map[string]any{"air_date": date}}
 	}
 	items := []any{item("2026-02-01"), item(""), item("2026-01-15"), item("2026-03-10")}
-	gh0_sortCalendarItems(items)
+	sortCalendarItems(items)
 	dates := make([]string, len(items))
 	for index, value := range items {
 		dates[index] = value.(map[string]any)["episode"].(map[string]any)["air_date"].(string)
@@ -339,7 +339,7 @@ func TestMagnetFeedBuildsRSSWithEscapedMagnets(t *testing.T) {
 		"magnet:?xt=urn:btih:abc&dn=x&tr=udp://tracker:80",
 		"src",
 	}}
-	feed := gh7_build_magnet_feed(entries)
+	feed := buildMagnetFeed(entries)
 	if !strings.Contains(feed, "<rss version=\"2.0\">") {
 		t.Fatalf("not an RSS feed: %s", feed)
 	}

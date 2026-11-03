@@ -105,11 +105,11 @@ func providerLoginWorker(state *AppState) {
 	var loginState providerLoginState
 	for {
 		cfg := latestConfig(state)
-		if indexer := gh5_mirCrewIndexer(cfg); indexer == nil {
+		if indexer := mirCrewIndexer(cfg); indexer == nil {
 			// No service to watch: drop any pending failure, silently.
 			loginState.reset()
 		} else {
-			reason, failed, reachable := gh5_mirCrewLoginProbe(gh5_providerURL(cfg, indexer.Name))
+			reason, failed, reachable := mirCrewLoginProbe(providerURL(cfg, indexer.Name))
 			if reachable {
 				if reason == "" && failed {
 					reason = "sessione non autenticata"

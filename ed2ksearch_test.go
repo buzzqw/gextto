@@ -661,7 +661,7 @@ func TestAddNonVideoEd2kLinkIsNotRegistered(t *testing.T) {
 	}
 	link := "ed2k://|file|eMule0.70b-Installer.exe|4266968|df0064f8199c5d4aff7359ca0ede089c|/"
 	release := ParseEd2kRelease("eMule0.70b-Installer.exe", link, "ed2k:link", 4266968, 0, time.Now().UTC())
-	status, value := gh3AddParsedRelease(state, *release)
+	status, value := AddParsedRelease(state, *release)
 	payload, _ := value.(map[string]any)
 	if status != 202 || payload["registered"] != false {
 		t.Fatalf("status %d, payload %+v", status, payload)

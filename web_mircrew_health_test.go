@@ -11,9 +11,9 @@ import (
 // the mircrew-indexer service: it probes the configured Torznab indexer and
 // reports reachability without touching the provider backoff table.
 func TestGh5MirCrewServiceStatus(t *testing.T) {
-	gh5_mirCrewProbe.Lock()
-	gh5_mirCrewProbe.entry = nil
-	gh5_mirCrewProbe.Unlock()
+	mirCrewProbe.Lock()
+	mirCrewProbe.entry = nil
+	mirCrewProbe.Unlock()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Query().Get("t") != "caps" {
@@ -27,7 +27,7 @@ func TestGh5MirCrewServiceStatus(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.Indexers = []IndexerConfig{{Name: "mircrew-indexer", URL: server.URL + "/api", APIKey: "k", Enabled: true}}
 
-	status := gh5_mirCrewServiceStatus(&cfg)
+	status := mirCrewServiceStatus(&cfg)
 	if status == nil {
 		t.Fatal("expected a synthetic provider row for the configured mircrew indexer")
 	}
@@ -40,14 +40,14 @@ func TestGh5MirCrewServiceStatus(t *testing.T) {
 
 	// A config without the indexer yields no row.
 	plain := DefaultConfig()
-	if gh5_mirCrewServiceStatus(&plain) != nil {
+	if mirCrewServiceStatus(&plain) != nil {
 		t.Fatal("expected no row when the indexer is not configured")
 	}
 
 	// A switched-off indexer is not an active integration either.
 	disabled := DefaultConfig()
 	disabled.Indexers = []IndexerConfig{{Name: "mircrew-indexer", URL: server.URL + "/api", APIKey: "k", Enabled: false}}
-	if gh5_mirCrewServiceStatus(&disabled) != nil {
+	if mirCrewServiceStatus(&disabled) != nil {
 		t.Fatal("expected no row when the indexer is disabled")
 	}
 }

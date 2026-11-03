@@ -499,7 +499,7 @@ func uiDashboardDataFrom(s *AppState) uiDashboardData {
 				completedAt = item.UpdatedAt
 			}
 			data.Recent = append(data.Recent, uiRecentDownload{
-				Name:         gh4_historyDisplayName(item.Name, item.Source),
+				Name:         historyDisplayName(item.Name, item.Source),
 				Kind:         item.Kind,
 				Status:       item.Status,
 				Destination:  uiRecentDestination(item.ProcessedPath),

@@ -1,15 +1,15 @@
 package gextto
 
-// web_helpers.go holds the small helpers the HTTP handler files share.
-//
-// The handlers live in eight files split by size (web_handlers_g0..g7.go), and
-// before this file existed each of them carried its own prefixed copy of the
-// same helper (`gh0_`, `gh1_`, …) so the copies could not collide. The copies
-// are merged here: one implementation, one name, no prefix.
+// web_helpers.go holds the small helpers that several HTTP handler files share:
+// JSON body decoding, the common torrent-action answers, release and series
+// matching, the speed-policy sources and the episode origin labels. A helper
+// lives here once, so every handler file uses the same implementation and name.
 
 import (
+	"bytes"
 	"crypto/rand"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -17,6 +17,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/buzzqw/gextto/internal/logging"
 	"github.com/buzzqw/gextto/internal/models"
 	"github.com/buzzqw/gextto/internal/rules"
 )
@@ -170,4 +171,238 @@ func archiveReleasesForQuery(s *AppState, cfg *Config, query string) []models.Re
 		results = append(results, *release)
 	}
 	return results
+}
+
+func gh0_containsString(values []string, needle string) bool {
+	for _, value := range values {
+		if value == needle {
+			return true
+		}
+	}
+	return false
+}
+
+// toMap converts a JSON-marshalable value into a map, returning an empty map
+// when the conversion fails.
+func toMap(value any) map[string]any {
+	data, err := json.Marshal(value)
+	if err != nil {
+		return map[string]any{}
+	}
+	var out map[string]any
+	if err := json.Unmarshal(data, &out); err != nil {
+		return map[string]any{}
+	}
+	return out
+}
+
+// decodeOptional decodes a request body that may be absent: it reports whether
+// there was a body to decode, and leaves the target untouched when there was not.
+func decodeOptional(r *http.Request, target any) (bool, error) {
+	if r.Body == nil {
+		return false, nil
+	}
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		return false, err
+	}
+	trimmed := bytes.TrimSpace(body)
+	if len(trimmed) == 0 {
+		return false, nil
+	}
+	if err := json.Unmarshal(trimmed, target); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+func releaseMatchesSeriesEpisode(release models.Release, series *SeriesConfig, season, episode int64) bool {
+	if release.Kind != "series" {
+		return false
+	}
+	if release.Season == nil || *release.Season != season {
+		return false
+	}
+	if len(release.EpisodeRange) == 0 {
+		if release.Episode == nil || *release.Episode != episode {
+			return false
+		}
+	} else {
+		found := false
+		for _, value := range release.EpisodeRange {
+			if value == episode || value == 0 {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+	if release.Series == nil {
+		return false
+	}
+	name := *release.Series
+	if SeriesNamesMatch(series.Name, name) {
+		return true
+	}
+	for _, alias := range series.Aliases {
+		if SeriesNamesMatch(alias, name) {
+			return true
+		}
+	}
+	return false
+}
+
+func runHousekeeping(s *AppState) (*HousekeepingReport, bool) {
+	cfg := latestConfig(s)
+	params := HousekeepingParams{}.FromSettings(cfg.Settings)
+	report, err := s.db.Housekeeping(params)
+	if err != nil {
+		logging.Warn("housekeeping failed", "error", err)
+		return nil, false
+	}
+	if _, err := runDbAction(s, "compact"); err != nil {
+		logging.Warn("housekeeping failed", "error", err)
+		return nil, false
+	}
+	return &report, true
+}
+
+var (
+	errSetupIncomplete = errors.New("complete the initial setup first")
+	errDaemonInactive  = errors.New("daemon inactive")
+)
+
+// historyDisplayName keeps provider suffixes out of the history title when
+// the same provider is already exposed in the dedicated source column.
+func historyDisplayName(name, source string) string {
+	name = strings.TrimSpace(name)
+	source = strings.TrimSpace(source)
+	if name == "" || source == "" {
+		return name
+	}
+	labels := []string{source}
+	if parts := strings.Split(source, ":"); len(parts) > 1 {
+		labels = append(labels, parts[len(parts)-1])
+	}
+	labels = append(labels, strings.Split(source, " - ")...)
+	for _, label := range labels {
+		label = strings.TrimSpace(label)
+		if label == "" || strings.EqualFold(label, "archive") || strings.EqualFold(label, "unknown") {
+			continue
+		}
+		bracketed := "[" + label + "]"
+		if len(name) > len(bracketed) && strings.EqualFold(name[len(name)-len(bracketed):], bracketed) {
+			trimmed := strings.TrimRight(strings.TrimSpace(name[:len(name)-len(bracketed)]), " -_.")
+			if trimmed != "" {
+				return trimmed
+			}
+		}
+		if len(name) <= len(label) || !strings.EqualFold(name[len(name)-len(label):], label) {
+			continue
+		}
+		start := len(name) - len(label)
+		if !strings.ContainsRune("-_.", rune(name[start-1])) {
+			continue
+		}
+		trimmed := strings.TrimRight(name[:start], " -_.")
+		if trimmed != "" {
+			return trimmed
+		}
+	}
+	return name
+}
+
+// readOptionalBody returns the raw request body, tolerating an absent one.
+func readOptionalBody(r *http.Request) ([]byte, error) {
+	if r.Body == nil {
+		return nil, nil
+	}
+	return io.ReadAll(r.Body)
+}
+
+func gh6_purgeRemovedLibrary(
+	db *Database,
+	previousSeries []SeriesConfig,
+	previousMovies []MovieConfig,
+	series []SeriesConfig,
+	movies []MovieConfig,
+) {
+	for _, old := range previousSeries {
+		present := false
+		for _, item := range series {
+			if strings.EqualFold(strings.TrimSpace(item.Name), strings.TrimSpace(old.Name)) {
+				present = true
+				break
+			}
+		}
+		if !present {
+			if _, err := db.PurgeSeries(old.Name); err != nil {
+				logging.Warn("cannot remove the state of the deleted series", "error", err, "series", old.Name)
+			}
+		}
+	}
+	for _, old := range previousMovies {
+		stillPresent := false
+		if old.ID > 0 {
+			for _, item := range movies {
+				if item.ID == old.ID {
+					stillPresent = true
+					break
+				}
+			}
+		} else {
+			for _, item := range movies {
+				if strings.EqualFold(strings.TrimSpace(item.Name), strings.TrimSpace(old.Name)) &&
+					strings.TrimSpace(item.Year) == strings.TrimSpace(old.Year) {
+					stillPresent = true
+					break
+				}
+			}
+		}
+		if !stillPresent {
+			if _, err := db.PurgeMovie(old.Name); err != nil {
+				logging.Warn("cannot remove the state of the deleted movie", "error", err, "movie", old.Name)
+			}
+		}
+	}
+}
+
+// Speed policy sources. The exception set in Downloads ("temp*") comes first;
+// then the rule chosen in Configuration (see speed_mode.go): a schedule window,
+// Auto, or the fixed limits.
+const (
+	speedSourceTemp         = "temp"          // exception: a limit with an expiry
+	speedSourceTempKeep     = "temp_keep"     // exception: a limit kept until removed
+	speedSourceTempAuto     = "temp_auto"     // exception: Auto, the whole line to the tuning
+	speedSourceSchedule     = "schedule"      // rule: schedule window with limits
+	speedSourceScheduleAuto = "schedule_auto" // rule: schedule window on Auto
+	speedSourceAuto         = "auto"          // rule: Auto (or Auto outside the windows)
+	speedSourceBase         = "base"          // rule: the fixed limits
+)
+
+// Episode source origins. They are shown in the UI and returned by the API, and
+// the code also compares them, so every use goes through these constants.
+const (
+	episodeOriginFeed    = "Feed RSS"
+	episodeOriginArchive = "Archivio"
+	episodeOriginIndexer = "Indexer / web"
+	episodeOriginED2K    = "eD2k"
+)
+
+// gh7_find_series returns a copy of the configured series whose name or alias
+// matches name, and false when there is none.
+func gh7_find_series(cfg *Config, name string) (SeriesConfig, bool) {
+	for _, series := range cfg.Series {
+		if series.Name == name {
+			return series, true
+		}
+		for _, alias := range series.Aliases {
+			if alias == name {
+				return series, true
+			}
+		}
+	}
+	return SeriesConfig{}, false
 }

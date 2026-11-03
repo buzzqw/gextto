@@ -343,7 +343,7 @@ func TestSpeedPolicyWithoutAConfig(t *testing.T) {
 	if _, _, ruleSource := speedRule(nil); ruleSource != speedSourceBase {
 		t.Fatalf("rule source = %q, want %q", ruleSource, speedSourceBase)
 	}
-	if got := gh6_parseSettingInt(nil, "any-key"); got != 0 {
+	if got := parseSettingInt(nil, "any-key"); got != 0 {
 		t.Fatalf("gh6_parseSettingInt(nil) = %d, want 0", got)
 	}
 }

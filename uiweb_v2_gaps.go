@@ -146,7 +146,7 @@ func v2GapSearchRedirect(filter string) string {
 	return redirect
 }
 
-func v2GapSearchResultFromOutcome(outcome gh2_missingSearchOutcome, redirect string) v2GapSearchResult {
+func v2GapSearchResultFromOutcome(outcome missingSearchOutcome, redirect string) v2GapSearchResult {
 	view := v2GapSearchResult{
 		Episodes: outcome.Searched,
 		Total:    outcome.TotalMissing,
@@ -194,7 +194,7 @@ func V2SeriesGapsSearch(w http.ResponseWriter, r *http.Request, s *AppState) {
 			view.Error = "Ricerca non avviata."
 		} else if created {
 			if err := s.jobs.Start(job.ID, func(ctx context.Context, jobID string) {
-				outcome := gh2_searchMissingEpisodes(ctx, s, cfg, series, func(done, total int, phase string) {
+				outcome := searchMissingEpisodes(ctx, s, cfg, series, func(done, total int, phase string) {
 					progress := 0.0
 					if phase == "ed2k" {
 						progress = 0.99

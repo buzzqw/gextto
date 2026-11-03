@@ -31,7 +31,7 @@ func speedScheduleWeek(cfg *Config) bwschedule.Week {
 		}
 	}
 	return bwschedule.Uniform(days, clock("torrent_sched_start", 23*60), clock("torrent_sched_end", 8*60),
-		gh6_parseSettingInt(cfg, "torrent_sched_dl_limit"), gh6_parseSettingInt(cfg, "torrent_sched_ul_limit"))
+		parseSettingInt(cfg, "torrent_sched_dl_limit"), parseSettingInt(cfg, "torrent_sched_ul_limit"))
 }
 
 // scheduledSpeedLimitsAt returns the scheduled limits in force at now and

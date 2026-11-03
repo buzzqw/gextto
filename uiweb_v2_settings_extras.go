@@ -151,7 +151,7 @@ func V2SettingsCheckbox(w http.ResponseWriter, r *http.Request, s *AppState) {
 	if custom := strings.TrimSpace(r.FormValue("custom")); custom != "" {
 		values = append(values, custom)
 	}
-	if key != "" && gh7_setting_key_allowed(key) {
+	if key != "" && settingKeyAllowed(key) {
 		encoded, _ := json.Marshal(values)
 		_ = saveConfigSetting(s.cfg.DataDir, key, string(encoded))
 	}

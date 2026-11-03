@@ -1699,7 +1699,7 @@ type bg_speedPair struct {
 }
 
 func bg_currentSpeedLimits(cfg *Config) (int64, int64) {
-	return gh6_currentSpeedLimits(cfg)
+	return currentSpeedLimits(cfg)
 }
 
 // bg_speedJumped reports a change of at least 10 % of the previous value. A
@@ -2205,7 +2205,7 @@ func housekeepingWorker(state *AppState) {
 			enabled = settingTruthy(value)
 		}
 		if enabled {
-			if report, ok := gh0_runHousekeeping(state); ok && report != nil {
+			if report, ok := runHousekeeping(state); ok && report != nil {
 				if summary := housekeepingSummary(report, HousekeepingParams{}.FromSettings(cfg.Settings)); summary != "" {
 					logging.Info("🧹 Routine cleanup removed " + summary)
 				}

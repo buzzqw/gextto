@@ -359,7 +359,7 @@ func v2SetupRedirect(w http.ResponseWriter, r *http.Request, step int, message s
 
 // v2SetupSave stores one setting with the same checks as the settings API.
 func v2SetupSave(s *AppState, key, value string) error {
-	if !gh7_setting_key_allowed(key) {
+	if !settingKeyAllowed(key) {
 		return fmt.Errorf("%s is not writable", key)
 	}
 	if err := validateSettingValue(key, value, latestConfig(s)); err != nil {

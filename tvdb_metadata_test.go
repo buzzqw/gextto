@@ -241,7 +241,7 @@ func TestTvdbOnlyCalendar(t *testing.T) {
 	newTvdbFake(t)
 	cfg := tvdbOnlyConfig()
 	cfg.Series = []SeriesConfig{{Name: "Example Show", Enabled: true}}
-	response := gh0_buildCalendar(context.Background(), &cfg)
+	response := buildCalendar(context.Background(), &cfg)
 	items, _ := response["items"].([]any)
 	if len(items) != 1 {
 		t.Fatalf("calendar = %+v", response)

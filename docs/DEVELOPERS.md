@@ -144,7 +144,7 @@ every literal method and path of those calls, and the `Endpoint`/`GetPath`/
 router.
 
 Settings: a key in the settings index (`uiweb_settings.go`) is writable by
-construction; `settingWritableAPIOnly` (`web_handlers_g7.go`) lists only the
+construction; `settingWritableAPIOnly` (`web_settings.go`) lists only the
 keys with no row on the page. Every write path (the JSON API, the settings page,
 the setup wizard) validates the value through `validateSettingValue`
 (`backend_config_validation.go`), so a rule added there applies everywhere.
