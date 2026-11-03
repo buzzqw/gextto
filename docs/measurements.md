@@ -272,7 +272,11 @@ Seeding, post-processing and several days of operation were not measured.
 
 A selection of the Go benchmarks: `make bench-all` runs all of them (six runs,
 `GOMAXPROCS=2`) and writes the raw log and a `benchstat` table to `gextto-data/bench/`. Round
-of 2026-11-02.
+of 2026-11-03, compared on the same host and day against the commit before the cycle
+(`cf9e4175`): the whole package is 1.9 % faster (geomean), the pick is 8.6 % faster and the
+file-edge scan 21.8 % faster, the parallel cache hit 30 % faster; the cache hit pays 8 % for
+the pin that makes the buffer recycling safe. Absolute values move between days with the
+machine's state, so a comparison across two rounds is only valid within one day.
 
 | Path | Cost | What it means |
 |---|---|---|
@@ -285,11 +289,11 @@ of 2026-11-02.
 | uTP over loopback (`BenchmarkTransferLoopback`) | 178–188 MB/s | single connection |
 | uTP over loopback, 16 KiB writes, 2026-11-03 | one syscall per packet: 50 % of the CPU in `sendto`/`recvfrom` (2.6 s / 0.5 s of 6.3 s) | what a burst sender had to fix |
 | uTP over loopback with UDP GSO | system CPU 5.9 s → 3.7 s for ~730 MB, total 13.3 → 11.2 µs/MB; throughput unchanged | one segmented `sendmsg` per write (`BenchmarkTransferLoopback` vs `…NoGSO`); the wall time is round-trip bound |
-| Picker, rarest pick with 150 peers | 10–12 µs | one pick in a dense swarm |
+| Picker, rarest pick with 150 peers | 8.6 µs (9.4 before the graduated priority) | one pick in a dense swarm |
 | Peer departure, 27,250 pieces | 94–105 µs | touches only the pieces the peer held |
 | Refill of 250 requests over TCP | 248–256 µs, about 5 writes instead of 250 | small messages batched |
-| Read cache hit | 366–372 ns, no allocation | every uploaded block |
-| Read cache miss, 16 KiB block | 732–768 ns and 192 B, was 3.9 µs and 16.5 KB | the buffer of an evicted block is read into again; the remaining bytes are the benchmark's own key |
+| Read cache hit | 355–393 ns, no allocation (327 before the pin, +8 %) | every uploaded block |
+| Read cache miss, 16 KiB block | 675 ns and 168 B, was 3.9 µs and 16.5 KB | the buffer of an evicted block is read into again; the remaining bytes are the benchmark's own key |
 | Webseed, 8 files, 200 ms per request | 3.2 s with one range, 0.8 s with four | one host serves four ranges at once; `GX_MEASURE=1 go test ./cmd/gx-torrent/ -run MeasureWebseed -v` |
 | `state.json` save, 100 / 1,000 / 5,000 torrents | 0.5 / 4.3–5.0 / 20–25 ms | held under the daemon lock |
 | IP filter load, 172,000 rules | 30–36 ms, 6.6 MB | at start |

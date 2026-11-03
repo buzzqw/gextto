@@ -157,12 +157,14 @@ func (c *Cache) TakeBuffer(size int) []byte {
 	return c.buffers.get(size)
 }
 
-// Get serves key from the cache, loading and storing on a miss.
+// Get serves key from the cache, loading and storing on a miss. The block is
+// unpinned before returning: this is the hit path of every uploaded block, so
+// it takes the pin and the unpin directly instead of going through the
+// release closure GetPinned hands out (a closure allocation per block).
 func (c *Cache) Get(key string, loader Loader) ([]byte, error) {
-	value, release, err := c.GetPinned(key, loader)
-	if release != nil {
-		release()
-	}
+	i := c.claim(key)
+	value, err := c.getValue(i, loader)
+	i.unpin(c.buffers)
 	return value, err
 }
 
