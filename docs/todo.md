@@ -72,6 +72,11 @@ here.
 Ideas proposed but not decided yet. An accepted proposal moves to the matching area with
 its gate; a rejected one moves to *Not planned*.
 
+- **Remove the translation editor** — the Settings page that edits, imports, exports and
+  deletes single translations (and its `/api/i18n` write routes) is hardly used: the
+  bundled catalogs are the source of truth and an edit made there is lost from version
+  control. The language picker stays. Gate: the operator's decision; then the editor, its
+  routes, the TUI call and the manual section go in one change.
 - **Escalating dead-swarm block** — a release that comes back after its block expires and
   is refused again for an empty swarm would stay away longer the next time (a week, then
   a month) instead of a week every time. It needs a strike count that survives the
@@ -93,11 +98,11 @@ its gate; a rejected one moves to *Not planned*.
 - **Settings as typed keys** — 110+ keys are read as `cfg.Settings["literal"]` with no Go
   constant, so a typo compiles and returns the default. Gate: constants generated from
   the settings index and one family of accessors migrated.
-- **Translation by key, not by rendered HTML** — the UI is written in Italian and the
-  finished page is re-tokenised and translated per request (`v2TranslateHTML`, the same
-  in `cmd/gx-torrent/i18n_html.go`), so a sentence built with `Sprintf` or a value inside
-  a phrase stays Italian in every language. Gate: a decision on stable keys and one page
-  migrated.
+- **gx-torrent page: translation by key** — the daemon page is still translated after it
+  renders (`cmd/gx-torrent/i18n_html.go` re-tokenises the finished HTML), so a value
+  inside a phrase stays in English. Gextto's pages already translate while they render
+  (`tr`). Gate: the same `tr` helper on the daemon templates and a guard like
+  `TestTemplatesTranslateEveryText`.
 - **`*Database` split** — 233 methods cover series, movies, torrents, providers,
   blocklist, queues, cycles and maintenance. Gate: `internal/quality` extracted first (the
   moved methods call the root package's scoring).

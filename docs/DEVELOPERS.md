@@ -168,11 +168,17 @@ entry in `authPublicPath`.
 
 ### Interface texts and translations
 
-Templates and Go code write interface texts in Italian; the rendered HTML is
-translated with the bundled catalogs `internal_translations.yml` (English),
-`_de`, `_fr`, `_es` and `_pl`, whose keys are the Italian strings. Every new
-text needs an entry in all five catalogs (a test checks that they share the
-same keys). Texts built outside the templates use `uiText(s, "…")`. The catalogs are
+Templates and Go code write interface texts in Italian, translated with the
+bundled catalogs `internal_translations.yml` (English), `_de`, `_fr`, `_es` and
+`_pl`, whose keys are the Italian strings. Every new text needs an entry in all
+five catalogs (a test checks that they share the same keys). In a template every
+text and translatable attribute goes through `{{tr "…"}}` while the page renders;
+a sentence with values keeps them as printf verbs (`{{tr "Apri %s su TMDB" .Name}}`),
+and a whole `title` attribute is written `{{trTitle "…"}}`, which also marks it as
+translated for the client. `TestTemplatesTranslateEveryText` fails on any text
+left outside `tr`. Texts built outside the templates use `uiText(s, "…")` or
+`uiTextf(s, "… %d …", n)`; markup Go assembles itself (table cells, row actions)
+goes through `v2TranslateFragment`. The catalogs are
 merged into the translation database at startup only when they changed: a hash of
 them is kept in the `translation_seed` table, and deleting a language clears it, so
 that language's bundled rows come back at the next start. The TUI has

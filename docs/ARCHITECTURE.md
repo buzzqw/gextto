@@ -225,6 +225,7 @@ qBittorrent-nox.
 | `uiweb_shell.go` | UI "chrome": top bar, sidebar, status. |
 | `uiweb_settings.go`, `uiweb_settings_meta.go`, `uiweb_settings_defaults.go`, `uiweb_tooltips.go` | Configuration page: areas, sections and index with the panel (`Group`) of each setting; units, special values, control type and the toggle it depends on; defaults; descriptions. |
 | `uiweb_v2.go` | v2 shell (HTMX), fragment routing and rendering. |
+| `uiweb_v2_tr.go` | render-time translation: one parsed template set per language with `tr`/`trTitle` bound to its dictionary, and `v2TranslateFragment` for markup Go assembles. |
 | `uiweb_v2_dashboard.go`, `uiweb_v2_downloads.go`, `uiweb_v2_detail.go`, `uiweb_v2_search.go`, `uiweb_v2_comics.go`, `uiweb_v2_maintenance.go`, `uiweb_v2_archive_sql.go` | dedicated v2 pages. |
 | `uiweb_v2_gaps.go`, `uiweb_v2_import.go`, `uiweb_v2_library_layout.go`, `uiweb_v2_ports.go` | *Missing* tab grouped by series and season, manual-import page, poster view of the library, peer-port panel. |
 | `uiweb_v2_settings_insights.go`, `uiweb_v2_settings_mode.go`, `uiweb_v2_feed_stats.go`, `uiweb_v2_tuning.go` | Configuration: read-only insights next to the controls, the per-feed activity panel, the Facilitata/Esperto switch and the *Gestione automatica* card. |

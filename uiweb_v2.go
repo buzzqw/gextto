@@ -96,9 +96,15 @@ func v2TemplateFuncMap() template.FuncMap {
 			return fmt.Sprintf(" · %d min", minutes)
 		},
 		"div": func(a, b int64) int64 { return a / b },
+		// tr and trTitle are bound to a dictionary by v2TemplatesFor; these
+		// Italian-only versions let the package-level set parse.
+		"tr":      v2TranslateFunc(nil, nil),
+		"trTitle": v2TitleFunc(nil, nil),
 	}
 }
 
+// v2Templates is the Italian set, parsed once: the pages use v2TemplatesFor,
+// which binds `tr` to the active language.
 var v2Templates = template.Must(template.New("v2").Funcs(v2TemplateFuncMap()).ParseFS(v2TemplatesFS, "uiweb/v2/templates/*.html"))
 
 // v2Dict builds a map from key/value pairs, used to pass several arguments to a
@@ -364,11 +370,9 @@ func v2Render(w http.ResponseWriter, status int, name string, data any, s *AppSt
 		http.Error(w, "template error", http.StatusInternalServerError)
 		return
 	}
-	dict, eng := v2Dictionaries(s)
-	body := v2TranslateHTML(buffer.String(), dict, eng)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(status)
-	_, _ = w.Write([]byte(body))
+	_, _ = w.Write(buffer.Bytes())
 }
 
 // v2PageLabel returns the navigation label for a view, falling back to the view
@@ -863,25 +867,25 @@ func V2ChromeSSE(w http.ResponseWriter, r *http.Request, s *AppState) {
 			return
 		case <-tick.C:
 			chrome := uiShellChromeFrom(s)
-			// The live chrome goes through the same translation as the page;
-			// otherwise every update would put the Italian labels back.
-			dict, eng := v2Dictionaries(s)
+			// The live chrome renders with the same translated templates as the
+			// page, so an update never puts the Italian labels back.
+			templates := v2TemplatesFor(s)
 
 			var topBuf bytes.Buffer
-			v2TemplatesFor(s).ExecuteTemplate(&topBuf, "v2_live_top_metrics", chrome)
-			fmt.Fprintf(w, "event: chrome-top\ndata: %s\n\n", strings.ReplaceAll(v2TranslateHTML(topBuf.String(), dict, eng), "\n", ""))
+			templates.ExecuteTemplate(&topBuf, "v2_live_top_metrics", chrome)
+			fmt.Fprintf(w, "event: chrome-top\ndata: %s\n\n", strings.ReplaceAll(topBuf.String(), "\n", ""))
 
 			var mobBuf bytes.Buffer
-			v2TemplatesFor(s).ExecuteTemplate(&mobBuf, "v2_live_mobile_metrics", chrome)
-			fmt.Fprintf(w, "event: chrome-mobile\ndata: %s\n\n", strings.ReplaceAll(v2TranslateHTML(mobBuf.String(), dict, eng), "\n", ""))
+			templates.ExecuteTemplate(&mobBuf, "v2_live_mobile_metrics", chrome)
+			fmt.Fprintf(w, "event: chrome-mobile\ndata: %s\n\n", strings.ReplaceAll(mobBuf.String(), "\n", ""))
 
 			var statBuf bytes.Buffer
-			v2TemplatesFor(s).ExecuteTemplate(&statBuf, "v2_live_status", chrome)
-			fmt.Fprintf(w, "event: chrome-status\ndata: %s\n\n", strings.ReplaceAll(v2TranslateHTML(statBuf.String(), dict, eng), "\n", ""))
+			templates.ExecuteTemplate(&statBuf, "v2_live_status", chrome)
+			fmt.Fprintf(w, "event: chrome-status\ndata: %s\n\n", strings.ReplaceAll(statBuf.String(), "\n", ""))
 
 			var trafficBuf bytes.Buffer
-			v2TemplatesFor(s).ExecuteTemplate(&trafficBuf, "v2_live_traffic", v2TrafficViewFrom(s))
-			fmt.Fprintf(w, "event: chrome-traffic\ndata: %s\n\n", strings.ReplaceAll(v2TranslateHTML(trafficBuf.String(), dict, eng), "\n", ""))
+			templates.ExecuteTemplate(&trafficBuf, "v2_live_traffic", v2TrafficViewFrom(s))
+			fmt.Fprintf(w, "event: chrome-traffic\ndata: %s\n\n", strings.ReplaceAll(trafficBuf.String(), "\n", ""))
 
 			flusher.Flush()
 		}
@@ -1094,9 +1098,10 @@ func v2TranslatableAttr(name string) bool {
 	return false
 }
 
-// v2TranslateHTML walks the rendered HTML and translates text nodes and the
-// translatable attributes. It never touches <script>/<style> content, so the
-// inline theme bootstrap stays byte-for-byte identical.
+// v2TranslateHTML walks a piece of HTML and translates text nodes and the
+// translatable attributes. The pages translate while they render (`tr`); this
+// walk is only for the markup Go assembles itself (v2TranslateFragment). It
+// never touches <script>/<style> content.
 func v2TranslateHTML(raw string, dict, eng map[string]string) string {
 	if len(dict) == 0 {
 		return raw
@@ -2389,7 +2394,6 @@ func V2DownloadsRemove(w http.ResponseWriter, r *http.Request, s *AppState) {
 		}
 	}
 
-	dict, eng := v2Dictionaries(s)
 	var buffer bytes.Buffer
 	view := v2TorrentsViewFrom(s, r, message, isErr)
 	view.Partial = true
@@ -2397,7 +2401,7 @@ func V2DownloadsRemove(w http.ResponseWriter, r *http.Request, s *AppState) {
 		http.Error(w, "template error", http.StatusInternalServerError)
 		return
 	}
-	body := v2TranslateHTML(buffer.String(), dict, eng)
+	body := buffer.String()
 	body += `<div id="v2-modal" hx-swap-oob="true"></div>`
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
@@ -3174,13 +3178,12 @@ func v2FillLogLines(view *v2LogsView, raw []string) {
 func V2LogsPartial(w http.ResponseWriter, r *http.Request, s *AppState) {
 	linesNum, _ := strconv.Atoi(r.FormValue("lines"))
 	view := v2LogsViewFrom(s, r.FormValue("filter"), linesNum, r.FormValue("log"), r.FormValue("level") == "problems")
-	dict, eng := v2Dictionaries(s)
 	var buffer bytes.Buffer
 	if err := v2TemplatesFor(s).ExecuteTemplate(&buffer, "v2_logs_view", view); err != nil {
 		http.Error(w, "template error", http.StatusInternalServerError)
 		return
 	}
-	body := v2TranslateHTML(buffer.String(), dict, eng)
+	body := buffer.String()
 	body += fmt.Sprintf(`<span id="v2-logs-count" hx-swap-oob="true">%d</span>`, view.Count)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
@@ -3193,13 +3196,12 @@ func V2LogsPartial(w http.ResponseWriter, r *http.Request, s *AppState) {
 func V2GxLogsPartial(w http.ResponseWriter, r *http.Request, s *AppState) {
 	linesNum, _ := strconv.Atoi(r.FormValue("lines"))
 	view := v2GxLogsViewFrom(s, r.FormValue("filter"), linesNum, r.FormValue("log"), r.FormValue("level") == "problems")
-	dict, eng := v2Dictionaries(s)
 	var buffer bytes.Buffer
 	if err := v2TemplatesFor(s).ExecuteTemplate(&buffer, "v2_gx_log_view", view); err != nil {
 		http.Error(w, "template error", http.StatusInternalServerError)
 		return
 	}
-	body := v2TranslateHTML(buffer.String(), dict, eng)
+	body := buffer.String()
 	body += fmt.Sprintf(`<span id="v2-gx-logs-count" hx-swap-oob="true">%d</span>`, view.Count)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(http.StatusOK)

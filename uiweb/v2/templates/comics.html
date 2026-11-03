@@ -1,65 +1,65 @@
 {{define "v2_comics"}}
 <div class="view">
   {{range .Groups}}
-    {{if .Title}}<div class="section-group-label">{{.Title}}</div>{{end}}
+    {{if .Title}}<div class="section-group-label">{{tr .Title}}</div>{{end}}
     <div class="v2-section-stack">{{range .Sections}}{{template "v2_section" .}}{{end}}</div>
   {{end}}
-  <div class="section-group-label">Download</div>
+  <div class="section-group-label">{{tr "Download"}}</div>
   {{template "v2_table_panel" .Downloads}}
   </div>
 {{end}}
 
 {{define "v2_comics_links_result"}}
-{{if .Error}}<p class="alert">{{.Error}}</p>
+{{if .Error}}<p class="alert">{{tr .Error}}</p>
 {{else}}
   {{$has := false}}
-  {{range .Groups}}{{if .Items}}{{$has = true}}<div class="field comic-link-group"><span>{{.Label}}</span><div class="toolbar">
+  {{range .Groups}}{{if .Items}}{{$has = true}}<div class="field comic-link-group"><span>{{tr .Label}}</span><div class="toolbar">
     {{range $i, $item := .Items}}
     <form hx-post="/comics/download" hx-target="this" hx-swap="outerHTML" style="display:inline">
       <input type="hidden" name="url" value="{{$item}}" />
       <input type="hidden" name="method" value="{{.Method}}" />
       <input type="hidden" name="title" value="Comic {{.Label}} {{$i | addOne}}" />
       <input type="hidden" name="post_url" value="{{$.PostURL}}" />
-      <button class="btn sm" type="submit" title="{{$item}}">Scarica</button>
+      <button class="btn sm" type="submit" {{trTitle $item}}>{{tr "Scarica"}}</button>
     </form>
     {{end}}
   </div></div>{{end}}{{end}}
-{{if not $has}}<p class="muted">Nessun link trovato.</p>{{end}}
+{{if not $has}}<p class="muted">{{tr "Nessun link trovato."}}</p>{{end}}
 {{end}}
 {{end}}
 
 {{define "v2_comics_explore_results"}}
-{{if .Error}}<p class="alert">{{.Error}}</p>
-{{else if .Items}}<div class="table-wrap"><table class="data-table"><thead><tr><th>Risultato GetComics</th><th>Data</th><th>Azioni</th></tr></thead><tbody>{{range .Items}}<tr><td>{{if .URL}}<a href="{{.URL}}" target="_blank" rel="noopener">{{.Title}}</a>{{else}}{{.Title}}{{end}}</td><td>{{.Date}}</td><td class="row-actions"><form hx-post="/comics/explore/download" hx-target="this" hx-swap="outerHTML" style="display:inline"><input type="hidden" name="url" value="{{.URL}}"><input type="hidden" name="title" value="{{.Title}}"><button class="btn sm primary" type="submit">Scarica</button></form><button class="btn sm" type="button" hx-get="/comics/explore/select?title={{.Title | urlquery}}&amp;url={{.URL | urlquery}}&amp;tag_url={{.TagURL | urlquery}}&amp;cover_url={{.CoverURL | urlquery}}&amp;publisher={{.Publisher | urlquery}}&amp;description={{.Description | urlquery}}&amp;date={{.Date | urlquery}}" hx-target="#v2-form-output-comics-comics" hx-swap="afterend">Seleziona</button></td></tr>{{end}}</tbody></table></div>
-{{else}}<p class="muted">Nessun risultato su GetComics.</p>{{end}}
+{{if .Error}}<p class="alert">{{tr .Error}}</p>
+{{else if .Items}}<div class="table-wrap"><table class="data-table"><thead><tr><th>{{tr "Risultato GetComics"}}</th><th>{{tr "Data"}}</th><th>{{tr "Azioni"}}</th></tr></thead><tbody>{{range .Items}}<tr><td>{{if .URL}}<a href="{{.URL}}" target="_blank" rel="noopener">{{tr .Title}}</a>{{else}}{{tr .Title}}{{end}}</td><td>{{tr .Date}}</td><td class="row-actions"><form hx-post="/comics/explore/download" hx-target="this" hx-swap="outerHTML" style="display:inline"><input type="hidden" name="url" value="{{.URL}}"><input type="hidden" name="title" value="{{.Title}}"><button class="btn sm primary" type="submit">{{tr "Scarica"}}</button></form><button class="btn sm" type="button" hx-get="/comics/explore/select?title={{.Title | urlquery}}&amp;url={{.URL | urlquery}}&amp;tag_url={{.TagURL | urlquery}}&amp;cover_url={{.CoverURL | urlquery}}&amp;publisher={{.Publisher | urlquery}}&amp;description={{.Description | urlquery}}&amp;date={{.Date | urlquery}}" hx-target="#v2-form-output-comics-comics" hx-swap="afterend">{{tr "Seleziona"}}</button></td></tr>{{end}}</tbody></table></div>
+{{else}}<p class="muted">{{tr "Nessun risultato su GetComics."}}</p>{{end}}
 {{end}}
 
 {{define "v2_comics_explore_select"}}
-<div class="card editor-card" id="v2-comics-explore-selection"><h3>Fumetto selezionato</h3><p class="muted">{{.Title}}</p><form class="form-grid" hx-post="/comics/explore/add" hx-target="this" hx-swap="outerHTML"><input type="hidden" name="title" value="{{.Title}}"><input type="hidden" name="tag_url" value="{{.TagURL}}"><input type="hidden" name="post_url" value="{{.URL}}"><input type="hidden" name="cover_url" value="{{.CoverURL}}"><input type="hidden" name="publisher" value="{{.Publisher}}"><input type="hidden" name="description" value="{{.Description}}"><input type="hidden" name="from_date" value="{{.Date}}"><label class="field span-full"><span>Percorso archivio (opzionale)</span><input class="input" name="save_path" placeholder="cartella fumetti predefinita"></label><div class="form-actions"><button class="btn sm primary" type="submit">Aggiungi fumetto selezionato</button><button class="btn sm" type="button" hx-get="/empty" hx-target="#v2-comics-explore-selection" hx-swap="outerHTML">Annulla</button></div></form></div>
+<div class="card editor-card" id="v2-comics-explore-selection"><h3>{{tr "Fumetto selezionato"}}</h3><p class="muted">{{tr .Title}}</p><form class="form-grid" hx-post="/comics/explore/add" hx-target="this" hx-swap="outerHTML"><input type="hidden" name="title" value="{{.Title}}"><input type="hidden" name="tag_url" value="{{.TagURL}}"><input type="hidden" name="post_url" value="{{.URL}}"><input type="hidden" name="cover_url" value="{{.CoverURL}}"><input type="hidden" name="publisher" value="{{.Publisher}}"><input type="hidden" name="description" value="{{.Description}}"><input type="hidden" name="from_date" value="{{.Date}}"><label class="field span-full"><span>{{tr "Percorso archivio (opzionale)"}}</span><input class="input" name="save_path" placeholder="{{tr "cartella fumetti predefinita"}}"></label><div class="form-actions"><button class="btn sm primary" type="submit">{{tr "Aggiungi fumetto selezionato"}}</button><button class="btn sm" type="button" hx-get="/empty" hx-target="#v2-comics-explore-selection" hx-swap="outerHTML">{{tr "Annulla"}}</button></div></form></div>
 {{end}}
 
-{{define "v2_comics_explore_action"}}{{if .Error}}<span class="badge err">{{.Message}}</span>{{else}}<span class="badge ok">{{.Message}}</span>{{end}}{{end}}
+{{define "v2_comics_explore_action"}}{{if .Error}}<span class="badge err">{{tr .Message}}</span>{{else}}<span class="badge ok">{{tr .Message}}</span>{{end}}{{end}}
 
-{{define "v2_comics_download_result"}}{{if .Error}}<span class="badge err">{{.Message}}</span>{{else}}<span class="badge ok">{{.Message}}</span>{{end}}{{end}}
+{{define "v2_comics_download_result"}}{{if .Error}}<span class="badge err">{{tr .Message}}</span>{{else}}<span class="badge ok">{{tr .Message}}</span>{{end}}{{end}}
 
 {{define "v2_comic_edit_modal"}}
 <div class="overlay" style="display:block">
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="v2-comic-edit-title">
-    <div class="modal-head"><h3 id="v2-comic-edit-title">Modifica fumetto monitorato</h3>
-      <button class="btn sm" type="button" hx-get="/empty" hx-target="#v2-modal" hx-swap="innerHTML">Chiudi</button></div>
+    <div class="modal-head"><h3 id="v2-comic-edit-title">{{tr "Modifica fumetto monitorato"}}</h3>
+      <button class="btn sm" type="button" hx-get="/empty" hx-target="#v2-modal" hx-swap="innerHTML">{{tr "Chiudi"}}</button></div>
     <div class="modal-body">
       <form class="form-grid" method="post" action="/comics/save" hx-post="/comics/save" hx-swap="none">
-        <label class="field"><span>Titolo</span><input class="input" name="title" value="{{.Title}}" readonly /></label>
-        <label class="field"><span>Data inizio</span><input class="input" type="date" name="from_date" value="{{.FromDate}}" /></label>
-        <label class="field span-full"><span>Percorso archivio</span><input class="input" name="save_path" value="{{.SavePath}}" placeholder="cartella fumetti predefinita" /></label>
+        <label class="field"><span>{{tr "Titolo"}}</span><input class="input" name="title" value="{{.Title}}" readonly /></label>
+        <label class="field"><span>{{tr "Data inizio"}}</span><input class="input" type="date" name="from_date" value="{{.FromDate}}" /></label>
+        <label class="field span-full"><span>{{tr "Percorso archivio"}}</span><input class="input" name="save_path" value="{{.SavePath}}" placeholder="{{tr "cartella fumetti predefinita"}}" /></label>
         <input type="hidden" name="tag_url" value="{{.TagURL}}" /><input type="hidden" name="post_url" value="{{.PostURL}}" />
         <input type="hidden" name="cover_url" value="{{.CoverURL}}" /><input type="hidden" name="publisher" value="{{.Publisher}}" />
         <input type="hidden" name="description" value="{{.Description}}" />
-        <div class="form-actions"><button class="btn primary" type="submit">Salva</button></div>
+        <div class="form-actions"><button class="btn primary" type="submit">{{tr "Salva"}}</button></div>
       </form>
     </div>
   </div>
 </div>
 {{end}}
 
-{{define "v2_comics_save_result"}}{{if .Error}}<p class="alert">{{.Message}}</p>{{else}}<p class="muted">Salvato.</p>{{end}}{{end}}
+{{define "v2_comics_save_result"}}{{if .Error}}<p class="alert">{{tr .Message}}</p>{{else}}<p class="muted">{{tr "Salvato."}}</p>{{end}}{{end}}

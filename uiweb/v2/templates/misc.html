@@ -1,164 +1,164 @@
-{{define "v2_torrent_add_result"}}{{if .Error}}<p class="alert">{{.Message}}</p>{{else}}<p class="muted">{{.Message}}</p>{{end}}{{end}}
+{{define "v2_torrent_add_result"}}{{if .Error}}<p class="alert">{{tr .Message}}</p>{{else}}<p class="muted">{{tr .Message}}</p>{{end}}{{end}}
 
 {{define "v2_http_download_detail"}}
 <div class="overlay" style="display:block"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="v2-http-title">
-   <div class="modal-head"><h3 id="v2-http-title">{{.Title}}</h3><button class="btn sm" type="button" hx-get="/empty" hx-target="#v2-modal" hx-swap="innerHTML" title="Chiudi i dettagli del download HTTP">Chiudi</button></div>
-  <div class="modal-body"><div class="stat-grid"><div class="row"><span>Metodo</span><strong>{{.Method}}</strong></div><div class="row"><span>Stato</span><strong>{{.Status}}</strong></div><div class="row"><span>Progresso</span><strong>{{printf "%.1f" .Progress}}%</strong></div><div class="row"><span>Scaricato</span><strong>{{bytesU .DownloadedBytes}}</strong></div><div class="row"><span>Velocità</span><strong>{{rate .SpeedBytes}}</strong></div><div class="row"><span>ETA</span><strong>{{if .ETASeconds}}{{.ETASeconds}} s{{else}}—{{end}}</strong></div></div>
-    {{if .URL}}<p class="muted"><strong>URL:</strong> <code>{{.URL}}</code></p>{{end}}{{if .Destination}}<p class="muted"><strong>Destinazione:</strong> <code>{{.Destination}}</code></p>{{end}}{{if .Temporary}}<p class="muted"><strong>Temporaneo:</strong> <code>{{.Temporary}}</code></p>{{end}}{{if .Error}}<p class="alert">{{.Error}}</p>{{end}}
+   <div class="modal-head"><h3 id="v2-http-title">{{tr .Title}}</h3><button class="btn sm" type="button" hx-get="/empty" hx-target="#v2-modal" hx-swap="innerHTML" {{trTitle "Chiudi i dettagli del download HTTP"}}>{{tr "Chiudi"}}</button></div>
+  <div class="modal-body"><div class="stat-grid"><div class="row"><span>{{tr "Metodo"}}</span><strong>{{tr .Method}}</strong></div><div class="row"><span>{{tr "Stato"}}</span><strong>{{tr .Status}}</strong></div><div class="row"><span>{{tr "Progresso"}}</span><strong>{{printf "%.1f" .Progress}}%</strong></div><div class="row"><span>{{tr "Scaricato"}}</span><strong>{{bytesU .DownloadedBytes}}</strong></div><div class="row"><span>{{tr "Velocità"}}</span><strong>{{rate .SpeedBytes}}</strong></div><div class="row"><span>{{tr "ETA"}}</span><strong>{{if .ETASeconds}}{{.ETASeconds}} s{{else}}—{{end}}</strong></div></div>
+    {{if .URL}}<p class="muted"><strong>{{tr "URL:"}}</strong> <code>{{tr .URL}}</code></p>{{end}}{{if .Destination}}<p class="muted"><strong>{{tr "Destinazione:"}}</strong> <code>{{tr .Destination}}</code></p>{{end}}{{if .Temporary}}<p class="muted"><strong>{{tr "Temporaneo:"}}</strong> <code>{{tr .Temporary}}</code></p>{{end}}{{if .Error}}<p class="alert">{{tr .Error}}</p>{{end}}
   </div>
 </div></div>
 {{end}}
 
 {{define "v2_ed2k_detail"}}
 <div class="overlay" style="display:block"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="v2-ed2k-detail-title">
-  <div class="modal-head"><h3 id="v2-ed2k-detail-title" class="truncate" title="{{.Name}}">{{.Name}}</h3><button class="btn sm" type="button" hx-get="/empty" hx-target="#v2-modal" hx-swap="innerHTML" title="Chiudi i dettagli del download eD2k">Chiudi</button></div>
+  <div class="modal-head"><h3 id="v2-ed2k-detail-title" class="truncate" {{trTitle .Name}}>{{tr .Name}}</h3><button class="btn sm" type="button" hx-get="/empty" hx-target="#v2-modal" hx-swap="innerHTML" {{trTitle "Chiudi i dettagli del download eD2k"}}>{{tr "Chiudi"}}</button></div>
   <div class="modal-body" id="v2-ed2k-detail-body">{{template "v2_ed2k_detail_body" .}}</div>
 </div></div>
 {{end}}
 
 {{define "v2_ed2k_detail_body"}}
-{{if .Message}}<p class="{{if .Error}}alert{{else}}muted{{end}}" role="{{if .Error}}alert{{else}}status{{end}}"><span>{{.Message}}</span>{{if .Detail}} {{.Detail}}{{end}}</p>{{end}}
+{{if .Message}}<p class="{{if .Error}}alert{{else}}muted{{end}}" role="{{if .Error}}alert{{else}}status{{end}}"><span>{{tr .Message}}</span>{{if .Detail}} {{tr .Detail}}{{end}}</p>{{end}}
 {{if .Found}}
 <div class="stat-grid">
-  <div class="row"><span>Stato</span><strong>{{.State}}</strong></div>
-  <div class="row"><span>Progresso</span><strong>{{.ProgressPct}}% · {{bytes .Done}} / {{bytes .Size}}</strong></div>
-  <div class="row"><span>Velocità</span><strong>{{rateI .Speed}}</strong></div>
-  <div class="row"><span>Fonti eD2k: in trasferimento / totali</span><strong>{{.Active}} / {{.Sources}}</strong></div>
-  <div class="row"><span>Ultimo dato ricevuto</span><strong>{{if .LastReceived}}{{.LastReceived}}{{else}}<span>mai</span>{{end}}</strong></div>
-  <div class="row"><span>Hash MD4</span><strong><code>{{.Hash}}</code></strong></div>
+  <div class="row"><span>{{tr "Stato"}}</span><strong>{{tr .State}}</strong></div>
+  <div class="row"><span>{{tr "Progresso"}}</span><strong>{{.ProgressPct}}% · {{bytes .Done}} / {{bytes .Size}}</strong></div>
+  <div class="row"><span>{{tr "Velocità"}}</span><strong>{{rateI .Speed}}</strong></div>
+  <div class="row"><span>{{tr "Fonti eD2k: in trasferimento / totali"}}</span><strong>{{.Active}} / {{.Sources}}</strong></div>
+  <div class="row"><span>{{tr "Ultimo dato ricevuto"}}</span><strong>{{if .LastReceived}}{{tr .LastReceived}}{{else}}<span>{{tr "mai"}}</span>{{end}}</strong></div>
+  <div class="row"><span>{{tr "Hash MD4"}}</span><strong><code>{{tr .Hash}}</code></strong></div>
 </div>
 <form class="form-grid" method="post" action="/downloads/ed2k-priority" hx-post="/downloads/ed2k-priority" hx-target="#v2-ed2k-detail-body" hx-swap="innerHTML">
   <input type="hidden" name="hash" value="{{.Hash}}">
-  <label class="field"><span>Priorità in aMule</span><select class="input" name="priority" title="Priorità con cui aMule chiede le parti di questo file rispetto agli altri download">
-    <option value="low"{{if eq .Priority "low"}} selected{{end}}>Bassa</option>
-    <option value="normal"{{if eq .Priority "normal"}} selected{{end}}>Normale</option>
-    <option value="high"{{if eq .Priority "high"}} selected{{end}}>Alta</option>
-    <option value="auto"{{if eq .Priority "auto"}} selected{{end}}>Automatica</option>
+  <label class="field"><span>{{tr "Priorità in aMule"}}</span><select class="input" name="priority" {{trTitle "Priorità con cui aMule chiede le parti di questo file rispetto agli altri download"}}>
+    <option value="low"{{if eq .Priority "low"}} selected{{end}}>{{tr "Bassa"}}</option>
+    <option value="normal"{{if eq .Priority "normal"}} selected{{end}}>{{tr "Normale"}}</option>
+    <option value="high"{{if eq .Priority "high"}} selected{{end}}>{{tr "Alta"}}</option>
+    <option value="auto"{{if eq .Priority "auto"}} selected{{end}}>{{tr "Automatica"}}</option>
   </select></label>
-  <div class="form-actions"><button class="btn sm primary" type="submit">Salva la priorità</button></div>
+  <div class="form-actions"><button class="btn sm primary" type="submit">{{tr "Salva la priorità"}}</button></div>
 </form>
-<p class="muted"><span>Link eD2k</span>: <code class="truncate" title="{{.Link}}">{{.Link}}</code> <button class="btn sm" type="button" data-v2-copy="{{.Link}}" title="Copia il link eD2k negli appunti">Copia</button></p>
-{{else}}<p class="muted">Il file non è più nella coda di aMule: se è completato lo trovi nella cartella di arrivo.</p>{{end}}
+<p class="muted"><span>{{tr "Link eD2k"}}</span>: <code class="truncate" {{trTitle .Link}}>{{tr .Link}}</code> <button class="btn sm" type="button" data-v2-copy="{{.Link}}" {{trTitle "Copia il link eD2k negli appunti"}}>{{tr "Copia"}}</button></p>
+{{else}}<p class="muted">{{tr "Il file non è più nella coda di aMule: se è completato lo trovi nella cartella di arrivo."}}</p>{{end}}
 {{end}}
 
 {{define "v2_ed2k_shared"}}
-{{if not .Enabled}}<p class="muted">L'integrazione con aMule è spenta.</p>
-{{else if .Error}}<p class="alert" role="alert"><span>File condivisi non disponibili:</span> {{.Error}}</p>
+{{if not .Enabled}}<p class="muted">{{tr "L'integrazione con aMule è spenta."}}</p>
+{{else if .Error}}<p class="alert" role="alert"><span>{{tr "File condivisi non disponibili:"}}</span> {{tr .Error}}</p>
 {{else}}
 <div class="toolbar">
   <form method="post" action="/ed2k/shared/reload" style="display:inline">
-    <button class="btn sm" type="submit" title="Chiede ad aMule di rileggere le cartelle condivise: i file aggiunti o tolti compaiono qui">Ricarica file condivisi</button>
+    <button class="btn sm" type="submit" {{trTitle "Chiede ad aMule di rileggere le cartelle condivise: i file aggiunti o tolti compaiono qui"}}>{{tr "Ricarica file condivisi"}}</button>
   </form>
 </div>
-{{if .Message}}<p class="{{if .MessageErr}}alert{{else}}muted{{end}}" role="{{if .MessageErr}}alert{{else}}status{{end}}"><span>{{.Message}}</span>{{if .Detail}} {{.Detail}}{{end}}</p>{{end}}
+{{if .Message}}<p class="{{if .MessageErr}}alert{{else}}muted{{end}}" role="{{if .MessageErr}}alert{{else}}status{{end}}"><span>{{tr .Message}}</span>{{if .Detail}} {{tr .Detail}}{{end}}</p>{{end}}
 <div class="stat-grid">
-  <div class="row"><span>File condivisi</span><strong>{{len .Files}}</strong></div>
-  <div class="row"><span>Velocità</span><strong>↑ {{rateI .UploadRate}}</strong></div>
-  <div class="row"><span>Coda di upload</span><strong>{{.UploadQueue}}</strong></div>
+  <div class="row"><span>{{tr "File condivisi"}}</span><strong>{{len .Files}}</strong></div>
+  <div class="row"><span>{{tr "Velocità"}}</span><strong>↑ {{rateI .UploadRate}}</strong></div>
+  <div class="row"><span>{{tr "Coda di upload"}}</span><strong>{{tr .UploadQueue}}</strong></div>
 </div>
-<p class="muted"><span>Cartelle condivise</span>: <code>{{.Incoming}}</code> <span>cartella di arrivo</span>{{range .Dirs}} · <code>{{.}}</code>{{end}}</p>
+<p class="muted"><span>{{tr "Cartelle condivise"}}</span>: <code>{{tr .Incoming}}</code> <span>{{tr "cartella di arrivo"}}</span>{{range .Dirs}} · <code>{{tr .}}</code>{{end}}</p>
 {{if .Files}}
 <div class="table-wrap"><table class="data-table ed2k-shared-table">
-  <caption class="sr-only">File condivisi con quanto aMule ha caricato</caption>
-  <thead><tr><th scope="col">File</th><th scope="col" class="numeric">Dimensione</th><th scope="col" class="numeric" title="Byte caricati dall'inizio">Caricato (totale)</th><th scope="col" class="numeric" title="Richieste ricevute: in questa sessione (dall'inizio)">Richieste</th><th scope="col" class="numeric" title="Richieste accettate: in questa sessione (dall'inizio)">Accettate</th><th scope="col" class="numeric">In coda</th><th scope="col" class="numeric" title="Byte al secondo che aMule sta caricando per questo file">Velocità</th><th scope="col" title="Ultimo caricamento di questo file; — se aMule non l'ha mai caricato">Ultimo caricamento</th><th scope="col">Priorità</th><th scope="col">Link</th></tr></thead>
+  <caption class="sr-only">{{tr "File condivisi con quanto aMule ha caricato"}}</caption>
+  <thead><tr><th scope="col">{{tr "File"}}</th><th scope="col" class="numeric">{{tr "Dimensione"}}</th><th scope="col" class="numeric" {{trTitle "Byte caricati dall'inizio"}}>{{tr "Caricato (totale)"}}</th><th scope="col" class="numeric" {{trTitle "Richieste ricevute: in questa sessione (dall'inizio)"}}>{{tr "Richieste"}}</th><th scope="col" class="numeric" {{trTitle "Richieste accettate: in questa sessione (dall'inizio)"}}>{{tr "Accettate"}}</th><th scope="col" class="numeric">{{tr "In coda"}}</th><th scope="col" class="numeric" {{trTitle "Byte al secondo che aMule sta caricando per questo file"}}>{{tr "Velocità"}}</th><th scope="col" {{trTitle "Ultimo caricamento di questo file; — se aMule non l'ha mai caricato"}}>{{tr "Ultimo caricamento"}}</th><th scope="col">{{tr "Priorità"}}</th><th scope="col">{{tr "Link"}}</th></tr></thead>
   <tbody>{{range .Files}}<tr>
-    <td><span class="ed2k-file-name" title="{{.Name}}">{{.Name}}</span></td>
+    <td><span class="ed2k-file-name" {{trTitle .Name}}>{{tr .Name}}</span></td>
     <td class="numeric">{{bytes .Size}}</td>
-    <td class="numeric"><span class="ed2k-uploaded">{{bytes .TransferredAll}}</span><small class="muted" title="Byte caricati in questa sessione"><span>Sessione</span> {{bytes .Transferred}}</small></td>
+    <td class="numeric"><span class="ed2k-uploaded">{{bytes .TransferredAll}}</span><small class="muted" {{trTitle "Byte caricati in questa sessione"}}><span>{{tr "Sessione"}}</span> {{bytes .Transferred}}</small></td>
     <td class="numeric">{{.Requests}} ({{.RequestsAll}})</td>
     <td class="numeric">{{.Accepts}} ({{.AcceptsAll}})</td>
-    <td class="numeric">{{.Queued}}</td>
+    <td class="numeric">{{tr .Queued}}</td>
     <td class="numeric">{{rateI .UploadRate}}</td>
-    <td class="numeric">{{if .LastUpload}}{{.LastUpload}}{{else}}—{{end}}</td>
-    <td>{{.Priority}}</td>
-    <td><button class="btn sm" type="button" data-v2-copy="{{.Link}}" title="Copia il link eD2k negli appunti">Copia</button></td>
+    <td class="numeric">{{if .LastUpload}}{{tr .LastUpload}}{{else}}—{{end}}</td>
+    <td>{{tr .Priority}}</td>
+    <td><button class="btn sm" type="button" data-v2-copy="{{.Link}}" {{trTitle "Copia il link eD2k negli appunti"}}>{{tr "Copia"}}</button></td>
   </tr>{{end}}</tbody>
 </table></div>
-{{else}}<p class="muted">aMule non sta condividendo file.</p>{{end}}
+{{else}}<p class="muted">{{tr "aMule non sta condividendo file."}}</p>{{end}}
 {{if .Uploads}}
-<h4>Chi sta scaricando da te</h4>
+<h4>{{tr "Chi sta scaricando da te"}}</h4>
 <div class="table-wrap"><table class="data-table ed2k-uploads-table">
-  <thead><tr><th scope="col">Client</th><th scope="col">Software</th><th scope="col">File</th><th scope="col" class="numeric">Velocità</th><th scope="col" class="numeric">Caricato</th><th scope="col" class="numeric">Posizione in coda</th></tr></thead>
-  <tbody>{{range .Uploads}}<tr><td>{{if .Name}}{{.Name}}{{else}}{{.IP}}{{end}}</td><td>{{.Software}}</td><td><span class="ed2k-file-name" title="{{.FileName}}">{{.FileName}}</span></td><td class="numeric">{{rateI .UpSpeed}}</td><td class="numeric">{{bytes .Uploaded}}</td><td class="numeric">{{.WaitingPosition}}</td></tr>{{end}}</tbody>
+  <thead><tr><th scope="col">{{tr "Client"}}</th><th scope="col">{{tr "Software"}}</th><th scope="col">{{tr "File"}}</th><th scope="col" class="numeric">{{tr "Velocità"}}</th><th scope="col" class="numeric">{{tr "Caricato"}}</th><th scope="col" class="numeric">{{tr "Posizione in coda"}}</th></tr></thead>
+  <tbody>{{range .Uploads}}<tr><td>{{if .Name}}{{tr .Name}}{{else}}{{tr .IP}}{{end}}</td><td>{{tr .Software}}</td><td><span class="ed2k-file-name" {{trTitle .FileName}}>{{tr .FileName}}</span></td><td class="numeric">{{rateI .UpSpeed}}</td><td class="numeric">{{bytes .Uploaded}}</td><td class="numeric">{{tr .WaitingPosition}}</td></tr>{{end}}</tbody>
 </table></div>
-{{else}}<p class="muted">Nessun client in coda di caricamento.</p>{{end}}
+{{else}}<p class="muted">{{tr "Nessun client in coda di caricamento."}}</p>{{end}}
 {{end}}
 {{end}}
 
 {{define "v2_ed2k_log"}}
-{{if .Error}}<p class="alert" role="alert"><span>Log di aMule non disponibile:</span> {{.Error}}</p>
-{{else if .Lines}}<pre class="log-view" tabindex="0" role="region" aria-label="Log di aMule">{{range .Lines}}<span class="log-line">{{.}}</span>{{end}}</pre>
-{{else}}<p class="muted">Il log di aMule è vuoto.</p>{{end}}
+{{if .Error}}<p class="alert" role="alert"><span>{{tr "Log di aMule non disponibile:"}}</span> {{tr .Error}}</p>
+{{else if .Lines}}<pre class="log-view" tabindex="0" role="region" aria-label="{{tr "Log di aMule"}}">{{range .Lines}}<span class="log-line">{{tr .}}</span>{{end}}</pre>
+{{else}}<p class="muted">{{tr "Il log di aMule è vuoto."}}</p>{{end}}
 {{end}}
 
 {{define "v2_tmdb_calendar"}}
-{{if .Error}}<p class="alert">{{.Error}}</p>
+{{if .Error}}<p class="alert">{{tr .Error}}</p>
 {{else if .Items}}
 <div class="calendar-grid">
   {{range .Items}}
   <div class="list-item">
-    {{if .Poster}}<img class="list-poster" loading="lazy" src="{{.Poster}}" alt="{{.Series}}" />{{else}}<div class="list-poster placeholder">N/D</div>{{end}}
+    {{if .Poster}}<img class="list-poster" loading="lazy" src="{{.Poster}}" alt="{{.Series}}" />{{else}}<div class="list-poster placeholder">{{tr "N/D"}}</div>{{end}}
      <div class="calendar-item-copy">
-       <strong class="calendar-title">{{if .TmdbURL}}<a href="{{.TmdbURL}}" target="_blank" rel="noopener" title="Apri {{.Series}} su TMDB">{{.Series}}</a>{{else}}{{.Series}}{{end}}</strong>
-       <small>S{{.Season}}E{{.Episode}} · {{if .AirDate}}{{.AirDate}}{{else}}—{{end}}{{if .TvdbURL}} · <a href="{{.TvdbURL}}" target="_blank" rel="noopener">TVDB</a>{{end}}</small>
+       <strong class="calendar-title">{{if .TmdbURL}}<a href="{{.TmdbURL}}" target="_blank" rel="noopener" {{trTitle "Apri %s su TMDB" .Series}}>{{tr .Series}}</a>{{else}}{{tr .Series}}{{end}}</strong>
+       <small>S{{.Season}}E{{.Episode}} · {{if .AirDate}}{{tr .AirDate}}{{else}}—{{end}}{{if .TvdbURL}} · <a href="{{.TvdbURL}}" target="_blank" rel="noopener">{{tr "TVDB"}}</a>{{end}}</small>
      </div>
   </div>
   {{end}}
 </div>
-{{else}}<p class="muted">Nessuna uscita in programma.</p>{{end}}
+{{else}}<p class="muted">{{tr "Nessuna uscita in programma."}}</p>{{end}}
 {{end}}
 
 {{define "v2_tmdb_results"}}
-{{if .Error}}<p class="alert">{{.Error}}</p>
+{{if .Error}}<p class="alert">{{tr .Error}}</p>
 {{else if .Items}}
 <div class="tmdb-grid">
   {{range .Items}}
   <div class="tmdb-card">
-    <div class="tmdb-poster{{if not .Poster}} placeholder{{end}}">{{if .Poster}}<img loading="lazy" src="{{.Poster}}" alt="{{.Name}}" />{{else}}N/D{{end}}</div>
+    <div class="tmdb-poster{{if not .Poster}} placeholder{{end}}">{{if .Poster}}<img loading="lazy" src="{{.Poster}}" alt="{{.Name}}" />{{else}}{{tr "N/D"}}{{end}}</div>
     <div class="tmdb-card-body">
-       {{if .TmdbURL}}<a class="tmdb-result-title truncate" href="{{.TmdbURL}}" target="_blank" rel="noopener" title="Apri {{.Name}} su TMDB">{{.Name}}</a>{{else if .TvdbURL}}<a class="tmdb-result-title truncate" href="{{.TvdbURL}}" target="_blank" rel="noopener" title="Apri {{.Name}} su TVDB">{{.Name}}</a>{{else}}<strong class="truncate" title="{{.Name}}">{{.Name}}</strong>{{end}}
-       <small>{{if .TmdbID}}TMDB {{.TmdbID}}{{else if .TvdbID}}TVDB {{.TvdbID}}{{end}}{{if .Year}} · {{.Year}}{{end}}{{if gt .Vote 0.0}} · ★ {{printf "%.1f" .Vote}}{{end}}{{if and .TmdbID .TvdbURL}} · <a href="{{.TvdbURL}}" target="_blank" rel="noopener">TVDB</a>{{end}}</small>
-      {{if .Overview}}<p class="tmdb-overview">{{.Overview}}</p>{{end}}
-      {{if .InLibrary}}<span class="badge ok tmdb-in-library" title="Già presente nella libreria">Già in lista</span>
+       {{if .TmdbURL}}<a class="tmdb-result-title truncate" href="{{.TmdbURL}}" target="_blank" rel="noopener" {{trTitle "Apri %s su TMDB" .Name}}>{{tr .Name}}</a>{{else if .TvdbURL}}<a class="tmdb-result-title truncate" href="{{.TvdbURL}}" target="_blank" rel="noopener" {{trTitle "Apri %s su TVDB" .Name}}>{{tr .Name}}</a>{{else}}<strong class="truncate" {{trTitle .Name}}>{{tr .Name}}</strong>{{end}}
+       <small>{{if .TmdbID}}TMDB {{.TmdbID}}{{else if .TvdbID}}TVDB {{.TvdbID}}{{end}}{{if .Year}} · {{.Year}}{{end}}{{if gt .Vote 0.0}} · ★ {{printf "%.1f" .Vote}}{{end}}{{if and .TmdbID .TvdbURL}} · <a href="{{.TvdbURL}}" target="_blank" rel="noopener">{{tr "TVDB"}}</a>{{end}}</small>
+      {{if .Overview}}<p class="tmdb-overview">{{tr .Overview}}</p>{{end}}
+      {{if .InLibrary}}<span class="badge ok tmdb-in-library" {{trTitle "Già presente nella libreria"}}>{{tr "Già in lista"}}</span>
        {{else}}<form hx-get="/tmdb/manual?kind={{.Kind}}&amp;name={{.Name | urlquery}}&amp;year={{.Year | urlquery}}&amp;tmdb_id={{.TmdbID | urlquery}}&amp;tvdb_id={{.TvdbID | urlquery}}&amp;redirect=/?view={{if eq .Kind "movie"}}movies{{else}}series{{end}}" hx-target="#v2-modal" hx-swap="innerHTML">
-         <button class="btn sm primary" type="submit">Aggiungi alla libreria</button>
+         <button class="btn sm primary" type="submit">{{tr "Aggiungi alla libreria"}}</button>
        </form>{{end}}
     </div>
   </div>
   {{end}}
 </div>
-{{else}}<p class="muted">{{if .Empty}}{{.Empty}}{{else}}Nessun risultato.{{end}}</p>{{end}}
+{{else}}<p class="muted">{{if .Empty}}{{tr .Empty}}{{else}}{{tr "Nessun risultato."}}{{end}}</p>{{end}}
 {{end}}
 
-{{define "v2_tmdb_add_result"}}{{if .Error}}<span class="badge err">{{.Message}}</span>{{else}}<span class="badge ok">aggiunto</span>{{end}}{{end}}
+{{define "v2_tmdb_add_result"}}{{if .Error}}<span class="badge err">{{tr .Message}}</span>{{else}}<span class="badge ok">{{tr "aggiunto"}}</span>{{end}}{{end}}
 
 {{define "v2_audio_options"}}
-<option value=""{{if eq . ""}} selected{{end}}>Qualsiasi</option>
-<option value="compressed-5.1"{{if eq . "compressed-5.1"}} selected{{end}}>AAC / Opus 5.1+</option>
-<option value="standard-5.1"{{if eq . "standard-5.1"}} selected{{end}}>AC3 / 5.1</option>
-<option value="standard-7.1"{{if eq . "standard-7.1"}} selected{{end}}>AC3 7.1</option>
-<option value="high-5.1"{{if eq . "high-5.1"}} selected{{end}}>DTS / DD+ 5.1+</option>
-<option value="high-7.1"{{if eq . "high-7.1"}} selected{{end}}>DTS / DD+ 7.1</option>
-<option value="lossless-5.1"{{if eq . "lossless-5.1"}} selected{{end}}>Lossless 5.1+ (TrueHD / DTS-HD)</option>
-<option value="lossless-7.1"{{if eq . "lossless-7.1"}} selected{{end}}>Lossless 7.1 (TrueHD / DTS-HD)</option>
-{{if and . (not (or (eq . "") (eq . "lossless-5.1") (eq . "lossless-7.1") (eq . "high-5.1") (eq . "high-7.1") (eq . "standard-5.1") (eq . "standard-7.1") (eq . "compressed-5.1")))}}<option value="{{.}}" selected>{{.}}</option>{{end}}
+<option value=""{{if eq . ""}} selected{{end}}>{{tr "Qualsiasi"}}</option>
+<option value="compressed-5.1"{{if eq . "compressed-5.1"}} selected{{end}}>{{tr "AAC / Opus 5.1+"}}</option>
+<option value="standard-5.1"{{if eq . "standard-5.1"}} selected{{end}}>{{tr "AC3 / 5.1"}}</option>
+<option value="standard-7.1"{{if eq . "standard-7.1"}} selected{{end}}>{{tr "AC3 7.1"}}</option>
+<option value="high-5.1"{{if eq . "high-5.1"}} selected{{end}}>{{tr "DTS / DD+ 5.1+"}}</option>
+<option value="high-7.1"{{if eq . "high-7.1"}} selected{{end}}>{{tr "DTS / DD+ 7.1"}}</option>
+<option value="lossless-5.1"{{if eq . "lossless-5.1"}} selected{{end}}>{{tr "Lossless 5.1+ (TrueHD / DTS-HD)"}}</option>
+<option value="lossless-7.1"{{if eq . "lossless-7.1"}} selected{{end}}>{{tr "Lossless 7.1 (TrueHD / DTS-HD)"}}</option>
+{{if and . (not (or (eq . "") (eq . "lossless-5.1") (eq . "lossless-7.1") (eq . "high-5.1") (eq . "high-7.1") (eq . "standard-5.1") (eq . "standard-7.1") (eq . "compressed-5.1")))}}<option value="{{.}}" selected>{{tr .}}</option>{{end}}
 {{end}}
 
 {{define "v2_title_profile"}}
-<label class="field span-full"><span>Profilo di qualità</span><select class="input" name="quality_profile_id" data-v2-profile-summary="v2-title-profile-summary" aria-describedby="v2-title-profile-summary" title="Scegliendo un profilo e salvando, qualità, audio minimo, lingua, sottotitoli e permetti upgrade del profilo vengono copiati in questo titolo">{{if not .Matched}}<option value="0" data-summary="{{.CurrentSummary}}" selected>Valori attuali</option>{{end}}{{range .Choices}}<option value="{{.ID}}" data-summary="{{.Summary}}"{{if .Selected}} selected{{end}}>{{.Name}}</option>{{end}}</select><small class="hint" id="v2-title-profile-summary" aria-live="polite">{{if .Matched}}{{range .Choices}}{{if .Selected}}{{.Summary}}{{end}}{{end}}{{else}}{{.CurrentSummary}}{{end}}</small><small class="hint">Scegliendo un profilo e salvando, i suoi valori vengono copiati in questo titolo; le esclusioni qui sotto si sommano alle sue.</small></label>
+<label class="field span-full"><span>{{tr "Profilo di qualità"}}</span><select class="input" name="quality_profile_id" data-v2-profile-summary="v2-title-profile-summary" aria-describedby="v2-title-profile-summary" {{trTitle "Scegliendo un profilo e salvando, qualità, audio minimo, lingua, sottotitoli e permetti upgrade del profilo vengono copiati in questo titolo"}}>{{if not .Matched}}<option value="0" data-summary="{{.CurrentSummary}}" selected>{{tr "Valori attuali"}}</option>{{end}}{{range .Choices}}<option value="{{.ID}}" data-summary="{{.Summary}}"{{if .Selected}} selected{{end}}>{{tr .Name}}</option>{{end}}</select><small class="hint" id="v2-title-profile-summary" aria-live="polite">{{if .Matched}}{{range .Choices}}{{if .Selected}}{{tr .Summary}}{{end}}{{end}}{{else}}{{tr .CurrentSummary}}{{end}}</small><small class="hint">{{tr "Scegliendo un profilo e salvando, i suoi valori vengono copiati in questo titolo; le esclusioni qui sotto si sommano alle sue."}}</small></label>
 {{end}}
 
 {{define "v2_tmdb_manual"}}
 <div class="overlay" style="display:block"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="v2-manual-add-title">
-  <div class="modal-head"><h3 id="v2-manual-add-title">{{if eq .Kind "movie"}}Aggiungi film{{else}}Aggiungi serie{{end}}</h3><button class="btn sm" type="button" hx-get="/empty" hx-target="#v2-modal" hx-swap="innerHTML">Chiudi</button></div>
+  <div class="modal-head"><h3 id="v2-manual-add-title">{{if eq .Kind "movie"}}{{tr "Aggiungi film"}}{{else}}{{tr "Aggiungi serie"}}{{end}}</h3><button class="btn sm" type="button" hx-get="/empty" hx-target="#v2-modal" hx-swap="innerHTML">{{tr "Chiudi"}}</button></div>
   <div class="modal-body"><form class="form-grid" method="post" action="/tmdb/add" hx-post="/tmdb/add" hx-target="#v2-tmdb-add-result" hx-swap="innerHTML">
     <input type="hidden" name="kind" value="{{.Kind}}"><input type="hidden" name="source" value="discover"><input type="hidden" name="redirect" value="{{.Redirect}}">
-    <label class="field"><span>Titolo</span><input class="input" name="name" value="{{.Name}}" required></label><label class="field"><span>Anno</span><input class="input" name="year" value="{{.Year}}"></label>
-    <label class="field"><span>TMDB ID</span><input class="input" name="tmdb_id" value="{{.TmdbID}}" required></label><label class="field"><span>TVDB ID</span><input class="input" name="tvdb_id" value="{{.TvdbID}}"></label>
-    <label class="field span-full"><span>Profilo di qualità</span><select class="input" name="quality_profile_id" required data-v2-profile-summary="v2-profile-summary" aria-describedby="v2-profile-summary" title="Qualità, audio minimo, lingua, sottotitoli, esclusioni e upgrade del nuovo titolo vengono da questo profilo">{{range .Profiles}}<option value="{{.ID}}" data-summary="{{.Summary}}"{{if .Selected}} selected{{end}}>{{.Name}}</option>{{end}}</select><small class="hint" id="v2-profile-summary" aria-live="polite">{{range .Profiles}}{{if .Selected}}{{.Summary}}{{end}}{{end}}</small><small class="hint"><span>Qualità, audio, lingua, sottotitoli, esclusioni e upgrade vengono dal profilo; dopo l'aggiunta si possono cambiare nella scheda del titolo.</span> <a href="/?view=settings&amp;tab=scores#v2-editor-quality_profiles">Gestisci i profili</a></small></label>
-    {{if eq .Kind "series"}}<label class="field"><span>Stagioni</span><input class="input" name="seasons" value="{{.Seasons}}"></label><label class="field"><span>Alias</span><input class="input" name="aliases"></label><label class="field span-full"><span>Percorso NAS</span><span class="field-row"><input class="input" name="archive_path" data-v2-browse-input value="{{.ArchivePath}}"{{if .ArchivePath}} readonly{{end}}><button class="btn sm" type="button" data-v2-browse-for="archive_path" title="Sfoglia le cartelle disponibili sul server">Sfoglia</button></span></label><label class="check"><input type="checkbox" name="create_folder" value="1" data-v2-create-folder{{if .ArchivePath}} checked{{end}} /> <span>Crea cartella</span></label><label class="check" title="Archivia gli episodi in una cartella Stagione 01, Stagione 02, … dentro la cartella archivio della serie"><input type="checkbox" name="season_subfolders" value="1" /> <span>Sottocartelle per stagione</span></label>{{end}}
-    <label class="field span-full"><span>Esclusioni in più (solo per questo titolo)</span><input class="input" name="exclude" value="{{.Exclude}}" placeholder="es. un altro titolo con lo stesso nome" title="Parole che scartano una release di questo titolo, aggiunte a quelle del profilo"></label>
-    <div class="form-actions"><button class="btn primary" type="submit">Conferma</button><small id="v2-tmdb-add-result" class="muted" role="alert" aria-live="assertive"></small></div>
+    <label class="field"><span>{{tr "Titolo"}}</span><input class="input" name="name" value="{{.Name}}" required></label><label class="field"><span>{{tr "Anno"}}</span><input class="input" name="year" value="{{.Year}}"></label>
+    <label class="field"><span>{{tr "TMDB ID"}}</span><input class="input" name="tmdb_id" value="{{.TmdbID}}" required></label><label class="field"><span>{{tr "TVDB ID"}}</span><input class="input" name="tvdb_id" value="{{.TvdbID}}"></label>
+    <label class="field span-full"><span>{{tr "Profilo di qualità"}}</span><select class="input" name="quality_profile_id" required data-v2-profile-summary="v2-profile-summary" aria-describedby="v2-profile-summary" {{trTitle "Qualità, audio minimo, lingua, sottotitoli, esclusioni e upgrade del nuovo titolo vengono da questo profilo"}}>{{range .Profiles}}<option value="{{.ID}}" data-summary="{{.Summary}}"{{if .Selected}} selected{{end}}>{{tr .Name}}</option>{{end}}</select><small class="hint" id="v2-profile-summary" aria-live="polite">{{range .Profiles}}{{if .Selected}}{{tr .Summary}}{{end}}{{end}}</small><small class="hint"><span>{{tr "Qualità, audio, lingua, sottotitoli, esclusioni e upgrade vengono dal profilo; dopo l'aggiunta si possono cambiare nella scheda del titolo."}}</span> <a href="/?view=settings&amp;tab=scores#v2-editor-quality_profiles">{{tr "Gestisci i profili"}}</a></small></label>
+    {{if eq .Kind "series"}}<label class="field"><span>{{tr "Stagioni"}}</span><input class="input" name="seasons" value="{{.Seasons}}"></label><label class="field"><span>{{tr "Alias"}}</span><input class="input" name="aliases"></label><label class="field span-full"><span>{{tr "Percorso NAS"}}</span><span class="field-row"><input class="input" name="archive_path" data-v2-browse-input value="{{.ArchivePath}}"{{if .ArchivePath}} readonly{{end}}><button class="btn sm" type="button" data-v2-browse-for="archive_path" {{trTitle "Sfoglia le cartelle disponibili sul server"}}>{{tr "Sfoglia"}}</button></span></label><label class="check"><input type="checkbox" name="create_folder" value="1" data-v2-create-folder{{if .ArchivePath}} checked{{end}} /> <span>{{tr "Crea cartella"}}</span></label><label class="check" {{trTitle "Archivia gli episodi in una cartella Stagione 01, Stagione 02, … dentro la cartella archivio della serie"}}><input type="checkbox" name="season_subfolders" value="1" /> <span>{{tr "Sottocartelle per stagione"}}</span></label>{{end}}
+    <label class="field span-full"><span>{{tr "Esclusioni in più (solo per questo titolo)"}}</span><input class="input" name="exclude" value="{{.Exclude}}" placeholder="{{tr "es. un altro titolo con lo stesso nome"}}" {{trTitle "Parole che scartano una release di questo titolo, aggiunte a quelle del profilo"}}></label>
+    <div class="form-actions"><button class="btn primary" type="submit">{{tr "Conferma"}}</button><small id="v2-tmdb-add-result" class="muted" role="alert" aria-live="assertive"></small></div>
   </form></div>
 </div></div>
 {{end}}
@@ -170,10 +170,10 @@
   <input type="hidden" name="path" value="{{.Path}}">
   <input type="hidden" name="method" value="{{.Method}}">
   <input type="hidden" name="body" value="{{.Body}}">
-  <button class="btn sm {{.Class}}" type="submit" title="{{if .Hint}}{{.Hint}}{{else}}{{.Label}}{{end}}"{{if .Confirm}} hx-confirm="{{.Confirm}}"{{end}}{{if .ToastMessage}} data-v2-toast-title="{{if .ToastTitle}}{{.ToastTitle}}{{else}}Operazione{{end}}" data-v2-toast-message="{{.ToastMessage}}"{{end}} hx-disabled-elt="this">{{.Label}}</button>
+  <button class="btn sm {{.Class}}" type="submit" {{if .Hint}}{{trTitle .Hint}}{{else}}{{trTitle .Label}}{{end}}{{if .Confirm}} hx-confirm="{{tr .Confirm}}"{{end}}{{if .ToastMessage}} data-v2-toast-title="{{if .ToastTitle}}{{tr .ToastTitle}}{{else}}{{tr "Operazione"}}{{end}}" data-v2-toast-message="{{tr .ToastMessage}}"{{end}} hx-disabled-elt="this">{{tr .Label}}</button>
 </form>
 {{end}}
 
-{{define "v2_ftp_test_result"}}<span class="{{if .OK}}htx-status ok{{else}}htx-status err{{end}}">{{.Message}}</span>{{end}}
-{{define "v2_source_test_result"}}{{if .Items}}<span class="htx-status">{{len .Items}} <span>sorgenti verificate</span></span>{{else}}<span class="htx-status err">Nessun risultato</span>{{end}}{{end}}
-{{define "v2_list_test_result"}}<span class="htx-status {{if .OK}}ok{{else}}err{{end}}">{{.Message}}</span>{{end}}
+{{define "v2_ftp_test_result"}}<span class="{{if .OK}}htx-status ok{{else}}htx-status err{{end}}">{{tr .Message}}</span>{{end}}
+{{define "v2_source_test_result"}}{{if .Items}}<span class="htx-status">{{len .Items}} <span>{{tr "sorgenti verificate"}}</span></span>{{else}}<span class="htx-status err">{{tr "Nessun risultato"}}</span>{{end}}{{end}}
+{{define "v2_list_test_result"}}<span class="htx-status {{if .OK}}ok{{else}}err{{end}}">{{tr .Message}}</span>{{end}}

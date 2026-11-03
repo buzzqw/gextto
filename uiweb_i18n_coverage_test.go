@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -135,6 +136,7 @@ func TestUIIsTranslatable(t *testing.T) {
 	// default text is checked as a branch body.
 	valueOnlyBranch := regexp.MustCompile(`(\{\{-?\s*(?:if|else)[^}]*\}\})\{\{[^}]*\}\}(\{\{-?\s*(?:else|end)[^}]*\}\})`)
 	mixed := map[string]string{}
+	templateTrPhrase := regexp.MustCompile("\\b(?:tr|trTitle)\\s+(\"(?:[^\"\\\\]|\\\\.)*\"|`[^`]*`)")
 	// uiText localizes a string at runtime; its argument must be a catalog key
 	// too, otherwise the localized message would stay Italian.
 	// Assignments (data.Empty = "...") and the field helpers that take the
@@ -166,6 +168,21 @@ func TestUIIsTranslatable(t *testing.T) {
 			t.Fatalf("read %s: %v", path, err)
 		}
 		text := string(raw)
+		// The phrases passed to tr/trTitle are the catalog keys of the page.
+		for _, m := range templateTrPhrase.FindAllStringSubmatch(text, -1) {
+			phrase, err := strconv.Unquote(m[1])
+			if err != nil {
+				t.Fatalf("%s: unquote %s: %v", path, m[1], err)
+			}
+			if strings.Contains(phrase, "%") {
+				// A format string is a key as it is: the verbs stay in it.
+				if !keys[phrase] {
+					missing[phrase] = filepath.Base(path)
+				}
+				continue
+			}
+			record(filepath.Base(path), phrase)
+		}
 		for _, m := range templateText.FindAllStringSubmatch(text, -1) {
 			record(filepath.Base(path), m[1])
 		}

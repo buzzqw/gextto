@@ -14,6 +14,7 @@ package gextto
 import (
 	"fmt"
 	"html/template"
+	"reflect"
 	"sync"
 )
 
@@ -41,7 +42,7 @@ func v2TemplatesFor(s *AppState) *template.Template {
 	if s != nil {
 		db = s.i18n
 		lang = v2Language(s)
-		generation = db.generation()
+		generation = db.TranslationsGeneration()
 	}
 	key := v2TemplateSetKey{i18n: db, lang: lang}
 	if cached, ok := v2TemplateSets.Load(key); ok {
@@ -52,6 +53,7 @@ func v2TemplatesFor(s *AppState) *template.Template {
 	dict, eng := v2Dictionaries(s)
 	funcs := v2TemplateFuncMap()
 	funcs["tr"] = v2TranslateFunc(dict, eng)
+	funcs["trTitle"] = v2TitleFunc(dict, eng)
 	set, err := template.New("v2").Funcs(funcs).ParseFS(v2TemplatesFS, "uiweb/v2/templates/*.html")
 	if err != nil {
 		// The templates are embedded, so a parse error is a build-time defect:
@@ -62,25 +64,75 @@ func v2TemplatesFor(s *AppState) *template.Template {
 	return set
 }
 
+// v2TranslateFragment translates markup that Go assembles itself (table cells
+// and row actions, the OAuth hint) instead of a template: its texts and
+// tooltips cannot go through `tr`, so the fragment is translated on its own
+// before it is handed to the template as template.HTML.
+func v2TranslateFragment(s *AppState, fragment template.HTML) template.HTML {
+	dict, eng := v2Dictionaries(s)
+	return template.HTML(v2TranslateHTML(string(fragment), dict, eng))
+}
+
 // v2TranslateFunc builds the `tr` helper for one dictionary pair. The first
 // argument is the Italian phrase, which is the catalog key; the optional
 // arguments fill its printf verbs after the translation, so a translator can
 // move the values inside the sentence.
-func v2TranslateFunc(dict, eng map[string]string) func(phrase string, args ...any) string {
-	lookup := func(phrase string) string {
-		if text, ok := dict[phrase]; ok && text != "" {
-			return text
+//
+// The lookup trims the surrounding whitespace and keeps it, exactly like the
+// whole-text lookup of a rendered node. A value that is not plain text (a
+// number, or markup already typed as template.HTML) is returned unchanged, so
+// `tr` can wrap any printed value without altering how it is escaped.
+func v2TranslateFunc(dict, eng map[string]string) func(value any, args ...any) any {
+	return func(value any, args ...any) any {
+		phrase, ok := v2TranslatableString(value)
+		if !ok {
+			return value
 		}
-		if text, ok := eng[phrase]; ok && text != "" {
-			return text
-		}
-		return phrase
-	}
-	return func(phrase string, args ...any) string {
-		text := lookup(phrase)
+		text := v2TranslateText(phrase, dict, eng)
 		if len(args) == 0 {
 			return text
 		}
 		return fmt.Sprintf(text, args...)
 	}
+}
+
+// v2TitleFunc builds `trTitle`, which renders a whole title attribute. When the
+// catalog translated it, the attribute carries data-v2-title-translated: the
+// client keeps such a tooltip and replaces an untranslated Italian one in the
+// other languages.
+func v2TitleFunc(dict, eng map[string]string) func(value any, args ...any) template.HTMLAttr {
+	return func(value any, args ...any) template.HTMLAttr {
+		phrase, _ := v2TranslatableString(value)
+		if phrase == "" && value != nil {
+			phrase = fmt.Sprint(value)
+		}
+		text := v2TranslateText(phrase, dict, eng)
+		translated := text != phrase
+		if len(args) > 0 {
+			text = fmt.Sprintf(text, args...)
+		}
+		attr := `title="` + template.HTMLEscapeString(text) + `"`
+		if translated {
+			attr += ` data-v2-title-translated="true"`
+		}
+		return template.HTMLAttr(attr)
+	}
+}
+
+// v2TranslatableString reports the text of a value `tr` may look up: a string
+// or a named string type, never a typed safe-content value.
+func v2TranslatableString(value any) (string, bool) {
+	switch v := value.(type) {
+	case string:
+		return v, true
+	case template.HTML, template.HTMLAttr, template.JS, template.JSStr, template.CSS, template.URL, template.Srcset:
+		return "", false
+	case fmt.Stringer:
+		return "", false
+	}
+	rv := reflect.ValueOf(value)
+	if rv.IsValid() && rv.Kind() == reflect.String {
+		return rv.String(), true
+	}
+	return "", false
 }

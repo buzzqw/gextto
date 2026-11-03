@@ -40,7 +40,7 @@ func TestFeedStatsPanelShowsActivityAndDisabledFrame(t *testing.T) {
 		"Questi feed non vengono letti",
 		"Disabilitato automaticamente",
 		"two.example",
-		"L'andamento di ogni feed è in",
+		"L&#39;andamento di ogni feed è in",
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("sources panel missing %q:\n%s", want, body)

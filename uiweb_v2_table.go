@@ -383,10 +383,10 @@ func v2TableDataFrom(s *AppState, r *http.Request, view string, spec uiTableSpec
 			row.Select = v2SelectValue(item[spec.SelectKey])
 		}
 		for _, column := range columns {
-			row.Cells = append(row.Cells, v2Cell{HTML: v2FormatCell(item, column)})
+			row.Cells = append(row.Cells, v2Cell{HTML: v2TranslateFragment(s, v2FormatCell(item, column))})
 		}
 		if data.HasActions {
-			row.Actions = v2RenderActions(view, item, actions, spec)
+			row.Actions = v2TranslateFragment(s, v2RenderActions(view, item, actions, spec))
 		}
 		data.Rows = append(data.Rows, row)
 	}

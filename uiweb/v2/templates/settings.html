@@ -5,72 +5,72 @@
 {{define "v2_settings"}}
 <div class="view settings-view" data-v2-settings>
   <div class="settings-head">
-    <div class="settings-mode" role="group" aria-label="Livello di configurazione">
-      <a class="settings-mode-btn{{if .Brief}} active{{end}}" href="{{.BriefURL}}" title="Poche impostazioni: il resto lo gestisce il sistema."{{if .Brief}} aria-current="true"{{end}}>Facilitata</a>
-      <a class="settings-mode-btn{{if not .Brief}} active{{end}}" href="{{.ExpertURL}}" title="Tutti i valori, quelli interni compresi."{{if not .Brief}} aria-current="true"{{end}}>Esperto</a>
+    <div class="settings-mode" role="group" aria-label="{{tr "Livello di configurazione"}}">
+      <a class="settings-mode-btn{{if .Brief}} active{{end}}" href="{{.BriefURL}}" {{trTitle "Poche impostazioni: il resto lo gestisce il sistema."}}{{if .Brief}} aria-current="true"{{end}}>{{tr "Facilitata"}}</a>
+      <a class="settings-mode-btn{{if not .Brief}} active{{end}}" href="{{.ExpertURL}}" {{trTitle "Tutti i valori, quelli interni compresi."}}{{if not .Brief}} aria-current="true"{{end}}>{{tr "Esperto"}}</a>
     </div>
     <div class="settings-title-row">
-      <p class="settings-save-hint">Ogni impostazione si salva con il suo pulsante «Salva»; le modifiche in sospeso si salvano tutte insieme dalla barra in basso.</p>
-      <label class="check settings-keys-toggle"><input type="checkbox" data-v2-show-keys /> <span>Mostra chiavi tecniche</span></label>
-      <label class="check settings-modified-toggle" title="Nasconde le impostazioni rimaste al valore predefinito; restano visibili quelle modificate e quelle non ancora salvate"><input type="checkbox" data-v2-only-modified /> <span>Solo modificate</span></label>
+      <p class="settings-save-hint">{{tr "Ogni impostazione si salva con il suo pulsante «Salva»; le modifiche in sospeso si salvano tutte insieme dalla barra in basso."}}</p>
+      <label class="check settings-keys-toggle"><input type="checkbox" data-v2-show-keys /> <span>{{tr "Mostra chiavi tecniche"}}</span></label>
+      <label class="check settings-modified-toggle" {{trTitle "Nasconde le impostazioni rimaste al valore predefinito; restano visibili quelle modificate e quelle non ancora salvate"}}><input type="checkbox" data-v2-only-modified /> <span>{{tr "Solo modificate"}}</span></label>
     </div>
     <div class="settings-search-row">
       <label class="settings-search-wrap">
         <span class="settings-search-icon" aria-hidden="true">⌕</span>
-        <span class="sr-only">Cerca impostazioni</span>
-        <input type="search" class="input settings-search" name="q" aria-label="Cerca nelle impostazioni" placeholder="Cerca per nome o chiave…" autocomplete="off"
+        <span class="sr-only">{{tr "Cerca impostazioni"}}</span>
+        <input type="search" class="input settings-search" name="q" aria-label="{{tr "Cerca nelle impostazioni"}}" placeholder="{{tr "Cerca per nome o chiave…"}}" autocomplete="off"
                hx-get="/settings/search" hx-target="#v2-settings-search" hx-swap="innerHTML" hx-trigger="input changed delay:250ms" />
       </label>
-      <div id="v2-settings-search" class="card settings-results" aria-live="polite"><p class="muted">Cerca una impostazione per nome o chiave.</p></div>
+      <div id="v2-settings-search" class="card settings-results" aria-live="polite"><p class="muted">{{tr "Cerca una impostazione per nome o chiave."}}</p></div>
     </div>
     <div id="v2-settings-live" class="sr-only" role="status" aria-live="polite"></div>
-    <span hidden data-v2-leave-message>Ci sono modifiche non salvate. Uscire comunque?</span>
-    <span hidden data-v2-saved-all-message>Impostazioni salvate:</span>
-    <span hidden data-v2-errors-message>Impostazioni non salvate per un errore:</span>
+    <span hidden data-v2-leave-message>{{tr "Ci sono modifiche non salvate. Uscire comunque?"}}</span>
+    <span hidden data-v2-saved-all-message>{{tr "Impostazioni salvate:"}}</span>
+    <span hidden data-v2-errors-message>{{tr "Impostazioni non salvate per un errore:"}}</span>
   </div>
   {{template "v2_settings_body" .}}
-  <div class="settings-savebar" data-v2-savebar role="region" aria-label="Modifiche non salvate" hidden>
-    <span class="settings-savebar-text"><span>Modifiche non salvate:</span> <strong data-v2-dirty-count>0</strong></span>
-    <button class="btn sm" type="button" data-v2-discard>Annulla modifiche</button>
-    <button class="btn sm primary" type="button" data-v2-save-all>Salva tutto</button>
+  <div class="settings-savebar" data-v2-savebar role="region" aria-label="{{tr "Modifiche non salvate"}}" hidden>
+    <span class="settings-savebar-text"><span>{{tr "Modifiche non salvate:"}}</span> <strong data-v2-dirty-count>0</strong></span>
+    <button class="btn sm" type="button" data-v2-discard>{{tr "Annulla modifiche"}}</button>
+    <button class="btn sm primary" type="button" data-v2-save-all>{{tr "Salva tutto"}}</button>
   </div>
 </div>
 {{end}}
 
 {{define "v2_settings_body"}}
 <div id="v2-settings-body" class="settings-layout" data-active-tab="{{.ActiveID}}"{{if .Highlight}} data-highlight="{{.Highlight}}"{{end}}>
-  <nav class="settings-nav" aria-label="Sezioni della configurazione">
+  <nav class="settings-nav" aria-label="{{tr "Sezioni della configurazione"}}">
     <form class="settings-nav-select" method="get" action="/">
       <input type="hidden" name="view" value="settings" />
-      <label class="field"><span>Sezione</span>
+      <label class="field"><span>{{tr "Sezione"}}</span>
         <select class="input" name="tab" hx-get="/settings/body" hx-trigger="change" hx-target="#v2-settings-body" hx-swap="outerHTML">
-          {{range .Areas}}<optgroup label="{{.Label}}">{{range .Tabs}}<option value="{{.ID}}"{{if .Active}} selected{{end}}>{{.Label}}</option>{{end}}</optgroup>{{end}}
+          {{range .Areas}}<optgroup label="{{tr .Label}}">{{range .Tabs}}<option value="{{.ID}}"{{if .Active}} selected{{end}}>{{tr .Label}}</option>{{end}}</optgroup>{{end}}
         </select>
       </label>
-      <noscript><button class="btn sm" type="submit">Apri</button></noscript>
+      <noscript><button class="btn sm" type="submit">{{tr "Apri"}}</button></noscript>
     </form>
     <div class="settings-nav-list">
       {{range .Areas}}
-      <p class="settings-nav-area" id="v2-settings-area-{{.Name}}">{{.Label}}</p>
+      <p class="settings-nav-area" id="v2-settings-area-{{.Name}}">{{tr .Label}}</p>
       <ul aria-labelledby="v2-settings-area-{{.Name}}">
-        {{if eq .Name "search"}}<li><a class="settings-nav-link settings-nav-back" href="/" aria-label="Torna al menu"><span aria-hidden="true">←</span> <span>Torna al menu</span></a></li>{{end}}
-        {{range .Tabs}}<li><a class="settings-nav-link{{if .Active}} active{{end}}" href="/?view=settings&amp;tab={{.ID}}" hx-get="/settings/body?tab={{.ID}}" hx-target="#v2-settings-body" hx-swap="outerHTML"{{if .Active}} aria-current="page"{{end}}><span>{{.Label}}</span>{{if .Count}}<span class="settings-nav-count" aria-hidden="true">{{.Count}}</span>{{end}}</a></li>{{end}}
+        {{if eq .Name "search"}}<li><a class="settings-nav-link settings-nav-back" href="/" aria-label="{{tr "Torna al menu"}}"><span aria-hidden="true">←</span> <span>{{tr "Torna al menu"}}</span></a></li>{{end}}
+        {{range .Tabs}}<li><a class="settings-nav-link{{if .Active}} active{{end}}" href="/?view=settings&amp;tab={{.ID}}" hx-get="/settings/body?tab={{.ID}}" hx-target="#v2-settings-body" hx-swap="outerHTML"{{if .Active}} aria-current="page"{{end}}><span>{{tr .Label}}</span>{{if .Count}}<span class="settings-nav-count" aria-hidden="true">{{tr .Count}}</span>{{end}}</a></li>{{end}}
       </ul>
       {{end}}
     </div>
   </nav>
   <div class="settings-main">
     <div class="settings-section-head">
-      <span class="eyebrow">Configurazione</span>
-      <h2 id="v2-settings-heading" tabindex="-1">{{.ActiveLabel}}</h2>
-      {{if .Intro}}<p class="settings-intro">{{.Intro}}</p>{{end}}
-      {{if .Flash}}<p class="{{if .FlashErr}}alert{{else}}muted{{end}}" role="{{if .FlashErr}}alert{{else}}status{{end}}"><span>{{.Flash}}</span></p>{{end}}
+      <span class="eyebrow">{{tr "Configurazione"}}</span>
+      <h2 id="v2-settings-heading" tabindex="-1">{{tr .ActiveLabel}}</h2>
+      {{if .Intro}}<p class="settings-intro">{{tr .Intro}}</p>{{end}}
+      {{if .Flash}}<p class="{{if .FlashErr}}alert{{else}}muted{{end}}" role="{{if .FlashErr}}alert{{else}}status{{end}}"><span>{{tr .Flash}}</span></p>{{end}}
     </div>
-    {{if or (gt (len .Groups) 1) .LeadGroups}}<nav class="settings-group-index" aria-label="Gruppi di questa sezione">
-      <span class="settings-group-index-label">In questa sezione</span>
-      <ul>{{range .LeadGroups}}<li><a class="settings-group-chip" href="#{{.ID}}">{{.Title}}</a></li>{{end}}{{if eq .ActiveID "scores"}}<li><a class="settings-group-chip" href="#v2-score-test">Prova una release</a></li>{{end}}{{range .Groups}}{{if not .Collapsed}}<li><a class="settings-group-chip" href="#{{.ID}}">{{.Title}}</a></li>{{end}}{{end}}</ul>
+    {{if or (gt (len .Groups) 1) .LeadGroups}}<nav class="settings-group-index" aria-label="{{tr "Gruppi di questa sezione"}}">
+      <span class="settings-group-index-label">{{tr "In questa sezione"}}</span>
+      <ul>{{range .LeadGroups}}<li><a class="settings-group-chip" href="#{{.ID}}">{{tr .Title}}</a></li>{{end}}{{if eq .ActiveID "scores"}}<li><a class="settings-group-chip" href="#v2-score-test">{{tr "Prova una release"}}</a></li>{{end}}{{range .Groups}}{{if not .Collapsed}}<li><a class="settings-group-chip" href="#{{.ID}}">{{tr .Title}}</a></li>{{end}}{{end}}</ul>
     </nav>{{end}}
-    {{if .Note}}<p class="hint">{{.Note}}</p>{{end}}
+    {{if .Note}}<p class="hint">{{tr .Note}}</p>{{end}}
     {{if .Sources}}{{template "v2_sources_index" .Sources}}{{end}}
     {{if .Ed2k}}{{template "v2_settings_ed2k" .Ed2k}}{{end}}
     {{range .LeadGroups}}{{template "v2_setting_group" .}}{{end}}
@@ -79,9 +79,9 @@
     {{if .Tuning}}{{template "v2_tuning_panel" .Tuning}}{{end}}
     {{if .Actions}}
     <div class="panel settings-panel settings-actions-panel">
-      <div class="panel-head"><h3>{{.Actions.Title}}</h3></div>
+      <div class="panel-head"><h3>{{tr .Actions.Title}}</h3></div>
       <div class="panel-body">
-        {{if .Actions.Hint}}<p class="hint">{{.Actions.Hint}}</p>{{end}}
+        {{if .Actions.Hint}}<p class="hint">{{tr .Actions.Hint}}</p>{{end}}
         <div class="toolbar">{{range .Actions.Buttons}}{{template "v2_button" .}}{{end}}</div>
       </div>
     </div>
@@ -91,7 +91,7 @@
     {{if .Rename}}{{template "v2_rename_editor" .Rename}}{{end}}
     {{if and (not .EditorsFirst) (ne .ActiveID "scores")}}{{template "v2_settings_editors" .}}{{end}}
     {{if .I18n}}{{template "v2_i18n_editor" .I18n}}{{end}}
-    {{if and (not .Groups) (not .I18n) (not .ShowFeeds) (not .Tuning) (not .Sources) (not .ScoreExamples) .Empty}}<p class="muted">{{.Empty}}</p>{{end}}
+    {{if and (not .Groups) (not .I18n) (not .ShowFeeds) (not .Tuning) (not .Sources) (not .ScoreExamples) .Empty}}<p class="muted">{{tr .Empty}}</p>{{end}}
     {{if eq .ActiveID "scores"}}{{template "v2_score_groups" .}}{{end}}
     {{if eq .ActiveID "network"}}{{template "v2_ipfilter_action" .}}{{end}}
   </div>
@@ -102,20 +102,20 @@
 {{define "v2_setting_group"}}
 {{if .Collapsed}}
 <details id="{{.ID}}" class="panel settings-panel settings-collapsible{{if .Inactive}} settings-inactive{{end}}">
-  <summary class="panel-head"><h3>{{.Title}}</h3><small class="muted">{{len .Fields}} <span>impostazioni</span></small></summary>
+  <summary class="panel-head"><h3>{{tr .Title}}</h3><small class="muted">{{len .Fields}} <span>{{tr "impostazioni"}}</span></small></summary>
 {{else}}
 <div id="{{.ID}}" class="panel settings-panel">
-  <div class="panel-head"><h3>{{.Title}}</h3><small class="muted">{{len .Fields}} <span>impostazioni</span></small></div>
+  <div class="panel-head"><h3>{{tr .Title}}</h3><small class="muted">{{len .Fields}} <span>{{tr "impostazioni"}}</span></small></div>
 {{end}}
   <div class="panel-body">
-    {{if .Hint}}<p class="hint">{{.Hint}}</p>{{end}}
-    {{if .Summary}}<p class="settings-summary{{if .SummaryWarn}} warn{{end}}" role="note">{{.Summary}}</p>{{end}}
-    {{if .Links}}<div class="toolbar settings-group-links">{{range .Links}}<a class="btn sm" href="{{.Href}}" target="_blank" rel="noopener noreferrer"{{if .Hint}} title="{{.Hint}}"{{end}}>{{.Label}}</a>{{end}}</div>{{end}}
+    {{if .Hint}}<p class="hint">{{tr .Hint}}</p>{{end}}
+    {{if .Summary}}<p class="settings-summary{{if .SummaryWarn}} warn{{end}}" role="note">{{tr .Summary}}</p>{{end}}
+    {{if .Links}}<div class="toolbar settings-group-links">{{range .Links}}<a class="btn sm" href="{{.Href}}" target="_blank" rel="noopener noreferrer"{{if .Hint}} {{trTitle .Hint}}{{end}}>{{tr .Label}}</a>{{end}}</div>{{end}}
     {{if .Subgroups}}
       {{range .Subgroups}}
       <section class="settings-subgroup">
-        <h4 class="settings-subgroup-title">{{.Title}}</h4>
-        {{if .Hint}}<p class="hint">{{.Hint}}</p>{{end}}
+        <h4 class="settings-subgroup-title">{{tr .Title}}</h4>
+        {{if .Hint}}<p class="hint">{{tr .Hint}}</p>{{end}}
         <div class="{{if .Grid}}form-grid{{else}}settings-rows{{end}}">
           {{range .Fields}}{{template "v2_setting_field" .}}{{end}}
         </div>
@@ -133,15 +133,15 @@
 
 {{define "v2_tuning_panel"}}
 <div class="panel settings-panel" id="v2-tuning-panel">
-  <div class="panel-head"><h3>{{.Title}}</h3><small class="muted">{{.Hint}}</small></div>
+  <div class="panel-head"><h3>{{tr .Title}}</h3><small class="muted">{{tr .Hint}}</small></div>
   <div class="panel-body">
-    {{if .DryRun}}<p class="hint">{{.DryRunNote}}</p>{{end}}
-    {{if .Notice}}<p class="{{if .Error}}error{{else}}muted{{end}}" role="status">{{.Notice}}</p>{{end}}
+    {{if .DryRun}}<p class="hint">{{tr .DryRunNote}}</p>{{end}}
+    {{if .Notice}}<p class="{{if .Error}}error{{else}}muted{{end}}" role="status">{{tr .Notice}}</p>{{end}}
     {{if .Rows}}
     {{if .Brief}}
-    <p class="settings-summary" role="note">{{.Summary}}</p>
+    <p class="settings-summary" role="note">{{tr .Summary}}</p>
     <form method="post" hx-post="/settings/tuning/apply" hx-target="#v2-tuning-panel" hx-swap="outerHTML">
-      <div class="form-actions"><button class="btn sm primary" type="submit" hx-disabled-elt="this"{{if .DryRun}} disabled{{end}}>{{.ApplyLabel}}</button></div>
+      <div class="form-actions"><button class="btn sm primary" type="submit" hx-disabled-elt="this"{{if .DryRun}} disabled{{end}}>{{tr .ApplyLabel}}</button></div>
     </form>
     {{else}}
     <form method="post" hx-post="/settings/tuning/apply" hx-target="#v2-tuning-panel" hx-swap="outerHTML">
@@ -149,44 +149,44 @@
         {{range .Rows}}
         <div class="setting-row">
           <div class="setting-info">
-            <span class="setting-label" id="v2-tune-{{.Key}}">{{.Label}}</span>
-            <code class="setting-key">{{.Key}}</code>
-            <p class="setting-hint">{{.Why}}</p>
+            <span class="setting-label" id="v2-tune-{{.Key}}">{{tr .Label}}</span>
+            <code class="setting-key">{{tr .Key}}</code>
+            <p class="setting-hint">{{tr .Why}}</p>
           </div>
-          <div class="setting-control"><span class="muted">{{if .Current}}{{.Current}}{{else}}—{{end}}</span> <span aria-hidden="true">→</span> <strong>{{.Proposed}}</strong></div>
-          <div class="setting-actions"><input type="checkbox" id="v2-tune-check-{{.Key}}" name="key" value="{{.Key}}" checked aria-label="{{.CheckLabel}}" /></div>
+          <div class="setting-control"><span class="muted">{{if .Current}}{{tr .Current}}{{else}}—{{end}}</span> <span aria-hidden="true">→</span> <strong>{{tr .Proposed}}</strong></div>
+          <div class="setting-actions"><input type="checkbox" id="v2-tune-check-{{.Key}}" name="key" value="{{.Key}}" checked aria-label="{{tr .CheckLabel}}" /></div>
         </div>
         {{end}}
       </div>
-      <div class="form-actions"><button class="btn sm primary" type="submit" hx-disabled-elt="this"{{if .DryRun}} disabled{{end}}>{{.ApplyLabel}}</button></div>
+      <div class="form-actions"><button class="btn sm primary" type="submit" hx-disabled-elt="this"{{if .DryRun}} disabled{{end}}>{{tr .ApplyLabel}}</button></div>
     </form>
     {{end}}
-    {{else}}<p class="muted">{{.Empty}}</p>{{end}}
+    {{else}}<p class="muted">{{tr .Empty}}</p>{{end}}
   </div>
 </div>
 {{end}}
 
 {{define "v2_settings_ed2k"}}
 <div class="panel settings-panel" id="v2-settings-ed2k">
-  <div class="panel-head"><h3>aMule</h3><small class="muted">{{if .Reachable}}<span>in uso</span>{{if .Version}} · {{.Version}}{{end}}{{if .Address}} · {{.Address}}{{end}}{{else}}non raggiungibile{{end}}</small></div>
+  <div class="panel-head"><h3>{{tr "aMule"}}</h3><small class="muted">{{if .Reachable}}<span>{{tr "in uso"}}</span>{{if .Version}} · {{.Version}}{{end}}{{if .Address}} · {{.Address}}{{end}}{{else}}{{tr "non raggiungibile"}}{{end}}</small></div>
   <div class="panel-body">
   {{if not .Enabled}}
-    <p class="muted">L'integrazione con aMule è spenta.</p>
+    <p class="muted">{{tr "L'integrazione con aMule è spenta."}}</p>
   {{else if .Error}}
-    <p class="alert" role="alert"><span>aMule non raggiungibile:</span> {{.Error}}</p>
+    <p class="alert" role="alert"><span>{{tr "aMule non raggiungibile:"}}</span> {{tr .Error}}</p>
   {{else}}
-    <div class="row"><span>Client eD2k</span><strong>aMule <span>{{.Version}}</span></strong></div>
-    <div class="row"><span>Dove gira</span><strong>{{.Runtime}}</strong></div>
-    <p class="hint">aMule è un programma separato, avviato fuori da Gextto: Gextto non lo avvia, non lo ferma e non lo aggiorna.</p>
-    <p class="hint" title="Queste cartelle appartengono ad aMule: Gextto le legge soltanto. Si cambiano da aMule/amuled; dopo la modifica riavvia Gextto (oppure riapri questa pagina) perché usi il nuovo percorso.">Queste cartelle appartengono ad aMule: Gextto le legge soltanto. Si cambiano da aMule/amuled.</p>
-    <div class="row" title="Cartella in cui aMule salva i file completati. Si cambia da aMule/amuled; dopo la modifica riavvia Gextto."><span>Cartella download</span><strong class="truncate" title="{{if .IncomingDir}}{{.IncomingDir}}{{else}}—{{end}}">{{if .IncomingDir}}{{.IncomingDir}}{{else}}—{{end}}</strong></div>
-    <div class="row" title="Cartella in cui aMule tiene i file incompleti. Si cambia da aMule/amuled; dopo la modifica riavvia Gextto."><span>Cartella temporanea</span><strong class="truncate" title="{{if .TempDir}}{{.TempDir}}{{else}}—{{end}}">{{if .TempDir}}{{.TempDir}}{{else}}—{{end}}</strong></div>
-    <p class="hint">La preallocazione completa riserva subito l'intero file: su un disco di rete può bloccare amuled per decine di secondi. Spenta è il comportamento consigliato.</p>
-    <div class="row"><span>Preallocazione file</span><strong>{{if .AllocateFull}}<span class="badge warn">attiva</span>{{else}}<span class="badge ok">spenta</span>{{end}}</strong></div>
+    <div class="row"><span>{{tr "Client eD2k"}}</span><strong>{{tr "aMule"}} <span>{{tr .Version}}</span></strong></div>
+    <div class="row"><span>{{tr "Dove gira"}}</span><strong>{{tr .Runtime}}</strong></div>
+    <p class="hint">{{tr "aMule è un programma separato, avviato fuori da Gextto: Gextto non lo avvia, non lo ferma e non lo aggiorna."}}</p>
+    <p class="hint" {{trTitle "Queste cartelle appartengono ad aMule: Gextto le legge soltanto. Si cambiano da aMule/amuled; dopo la modifica riavvia Gextto (oppure riapri questa pagina) perché usi il nuovo percorso."}}>{{tr "Queste cartelle appartengono ad aMule: Gextto le legge soltanto. Si cambiano da aMule/amuled."}}</p>
+    <div class="row" {{trTitle "Cartella in cui aMule salva i file completati. Si cambia da aMule/amuled; dopo la modifica riavvia Gextto."}}><span>{{tr "Cartella download"}}</span><strong class="truncate" title="{{if .IncomingDir}}{{tr .IncomingDir}}{{else}}—{{end}}">{{if .IncomingDir}}{{tr .IncomingDir}}{{else}}—{{end}}</strong></div>
+    <div class="row" {{trTitle "Cartella in cui aMule tiene i file incompleti. Si cambia da aMule/amuled; dopo la modifica riavvia Gextto."}}><span>{{tr "Cartella temporanea"}}</span><strong class="truncate" title="{{if .TempDir}}{{tr .TempDir}}{{else}}—{{end}}">{{if .TempDir}}{{tr .TempDir}}{{else}}—{{end}}</strong></div>
+    <p class="hint">{{tr "La preallocazione completa riserva subito l'intero file: su un disco di rete può bloccare amuled per decine di secondi. Spenta è il comportamento consigliato."}}</p>
+    <div class="row"><span>{{tr "Preallocazione file"}}</span><strong>{{if .AllocateFull}}<span class="badge warn">{{tr "attiva"}}</span>{{else}}<span class="badge ok">{{tr "spenta"}}</span>{{end}}</strong></div>
     <form method="post" action="/settings/ed2k/preallocation" class="form-grid">
-      <label class="check" title="Attiva o disattiva la preallocazione completa dei file in aMule; il salvataggio avviene subito"><input type="checkbox" name="allocate" value="1"{{if .AllocateFull}} checked{{end}} /> <span>Prealloca l'intero file in aMule</span></label>
+      <label class="check" {{trTitle "Attiva o disattiva la preallocazione completa dei file in aMule; il salvataggio avviene subito"}}><input type="checkbox" name="allocate" value="1"{{if .AllocateFull}} checked{{end}} /> <span>{{tr "Prealloca l'intero file in aMule"}}</span></label>
       <div class="form-actions">
-        <button class="btn primary" type="submit" title="Applica subito la preallocazione scelta ad aMule">Salva la preallocazione</button>
+        <button class="btn primary" type="submit" {{trTitle "Applica subito la preallocazione scelta ad aMule"}}>{{tr "Salva la preallocazione"}}</button>
       </div>
     </form>
   {{end}}
@@ -196,15 +196,15 @@
 
 {{define "v2_sources_index"}}
 <div class="panel settings-panel" id="v2-sources-index">
-  <div class="panel-head"><h3>{{.Title}}</h3></div>
+  <div class="panel-head"><h3>{{tr .Title}}</h3></div>
   <div class="panel-body">
-    {{if .Hint}}<p class="hint">{{.Hint}}</p>{{end}}
+    {{if .Hint}}<p class="hint">{{tr .Hint}}</p>{{end}}
     <ul class="sources-index-list">
       {{range .Links}}
       <li class="sources-index-item">
-        <a class="btn sm" href="{{.Href}}"{{if .Hint}} title="{{.Hint}}"{{end}}>{{.Label}}</a>
-        <span class="sources-index-hint muted">{{.Hint}}</span>
-        {{if .Status}}<span class="sources-index-status htx-status{{if .Alert}} err{{end}}">{{.Status}}</span>{{end}}
+        <a class="btn sm" href="{{.Href}}"{{if .Hint}} {{trTitle .Hint}}{{end}}>{{tr .Label}}</a>
+        <span class="sources-index-hint muted">{{tr .Hint}}</span>
+        {{if .Status}}<span class="sources-index-status htx-status{{if .Alert}} err{{end}}">{{tr .Status}}</span>{{end}}
       </li>
       {{end}}
     </ul>
@@ -214,20 +214,20 @@
 
 {{define "v2_score_examples"}}
 <div class="panel settings-panel" id="v2-score-examples">
-  <div class="panel-head"><h3>Esempi con i pesi attuali</h3><small class="muted">Ricalcolati dai pesi correnti</small></div>
+  <div class="panel-head"><h3>{{tr "Esempi con i pesi attuali"}}</h3><small class="muted">{{tr "Ricalcolati dai pesi correnti"}}</small></div>
   <div class="panel-body">
-    <ul class="score-examples">{{range .}}<li>{{.}}</li>{{end}}</ul>
+    <ul class="score-examples">{{range .}}<li>{{tr .}}</li>{{end}}</ul>
   </div>
 </div>
 {{end}}
 
 {{define "v2_upgrade_impact"}}
 <div class="panel settings-panel" id="v2-upgrade-impact">
-  <div class="panel-head"><h3>Impatto sulla libreria</h3><small class="muted">Non scarica nulla</small></div>
+  <div class="panel-head"><h3>{{tr "Impatto sulla libreria"}}</h3><small class="muted">{{tr "Non scarica nulla"}}</small></div>
   <div class="panel-body">
-    <p class="hint">Ripassa le release già viste nei feed con le regole e i pesi attuali e conta quanti episodi archiviati verrebbero sostituiti. Usala dopo aver cambiato i pesi o le soglie: se il numero è alto, i prossimi cicli riscaricherebbero molto.</p>
+    <p class="hint">{{tr "Ripassa le release già viste nei feed con le regole e i pesi attuali e conta quanti episodi archiviati verrebbero sostituiti. Usala dopo aver cambiato i pesi o le soglie: se il numero è alto, i prossimi cicli riscaricherebbero molto."}}</p>
     <form class="form-actions" method="post" action="/settings/upgrade-impact" hx-post="/settings/upgrade-impact" hx-target="#v2-upgrade-impact-result" hx-swap="innerHTML">
-      <button class="btn sm primary" type="submit" hx-disabled-elt="this">Verifica ora</button>
+      <button class="btn sm primary" type="submit" hx-disabled-elt="this">{{tr "Verifica ora"}}</button>
     </form>
     <div id="v2-upgrade-impact-result" aria-live="polite"></div>
   </div>
@@ -235,21 +235,21 @@
 {{end}}
 
 {{define "v2_upgrade_impact_result"}}
-{{if .Error}}<p class="alert" role="alert">{{.Error}}</p>{{else}}
-<p class="settings-summary{{if .Warn}} warn{{end}}" role="note">{{.Summary}}</p>
-{{if .Items}}<ul class="score-examples">{{range .Items}}<li><strong>{{.Target}}</strong> ← {{.Candidate}} ({{.Score}})</li>{{end}}</ul>
-<p class="hint">Per capire il motivo di una sostituzione incolla il nome della release in «Prova una release».</p>{{end}}
+{{if .Error}}<p class="alert" role="alert">{{tr .Error}}</p>{{else}}
+<p class="settings-summary{{if .Warn}} warn{{end}}" role="note">{{tr .Summary}}</p>
+{{if .Items}}<ul class="score-examples">{{range .Items}}<li><strong>{{tr .Target}}</strong> ← {{.Candidate}} ({{.Score}})</li>{{end}}</ul>
+<p class="hint">{{tr "Per capire il motivo di una sostituzione incolla il nome della release in «Prova una release»."}}</p>{{end}}
 {{end}}
 {{end}}
 
 {{define "v2_score_test"}}
 <div class="panel settings-panel" id="v2-score-test">
-  <div class="panel-head"><h3>Prova una release</h3><small class="muted">Non scarica nulla</small></div>
+  <div class="panel-head"><h3>{{tr "Prova una release"}}</h3><small class="muted">{{tr "Non scarica nulla"}}</small></div>
   <div class="panel-body">
-    <p class="hint">Incolla il nome di una release: Gextto mostra il punteggio voce per voce con i pesi attuali e se sostituirebbe la copia già in libreria.</p>
+    <p class="hint">{{tr "Incolla il nome di una release: Gextto mostra il punteggio voce per voce con i pesi attuali e se sostituirebbe la copia già in libreria."}}</p>
     <form class="form-actions" method="post" action="/settings/score-test" hx-post="/settings/score-test" hx-target="#v2-score-test-result" hx-swap="innerHTML">
-      <label class="field span-full"><span>Nome della release</span><input class="input" name="title" required maxlength="512" placeholder="es. Serie.S01E01.1080p.WEB-DL.DDP5.1.H.264-GRUPPO" autocomplete="off" /></label>
-      <button class="btn sm primary" type="submit" hx-disabled-elt="this">Prova</button>
+      <label class="field span-full"><span>{{tr "Nome della release"}}</span><input class="input" name="title" required maxlength="512" placeholder="{{tr "es. Serie.S01E01.1080p.WEB-DL.DDP5.1.H.264-GRUPPO"}}" autocomplete="off" /></label>
+      <button class="btn sm primary" type="submit" hx-disabled-elt="this">{{tr "Prova"}}</button>
     </form>
     <div id="v2-score-test-result" aria-live="polite"></div>
   </div>
@@ -257,55 +257,55 @@
 {{end}}
 
 {{define "v2_score_test_result"}}
-{{if .Error}}<p class="alert" role="alert">{{.Error}}</p>{{else}}
+{{if .Error}}<p class="alert" role="alert">{{tr .Error}}</p>{{else}}
 <div class="stat-grid">
-  <div class="row"><span>Punteggio qualità</span><strong>{{.QualityScore}}</strong></div>
-  <div class="row"><span>Punteggio release</span><strong>{{.ReleaseScore}}</strong></div>
-  {{if .Target}}<div class="row"><span>Obiettivo</span><strong>{{.Target}}</strong></div>{{end}}
+  <div class="row"><span>{{tr "Punteggio qualità"}}</span><strong>{{tr .QualityScore}}</strong></div>
+  <div class="row"><span>{{tr "Punteggio release"}}</span><strong>{{tr .ReleaseScore}}</strong></div>
+  {{if .Target}}<div class="row"><span>{{tr "Obiettivo"}}</span><strong>{{tr .Target}}</strong></div>{{end}}
 </div>
 <ul class="score-examples">{{range .Breakdown}}{{if ne .Value 0}}<li>{{.Label}}: {{.Value}}</li>{{end}}{{end}}</ul>
 {{if .HasLibrary}}
-<p><span>In libreria:</span> <strong>{{if .Library}}{{.Library}}{{else}}—{{end}}</strong> · <span>punteggio</span> {{.LibraryScore}}</p>
-<p><span class="badge {{if .Replace}}ok{{else}}warn{{end}}">{{if .Replace}}upgrade{{else}}nessun upgrade{{end}}</span> {{.Upgrade}}</p>
-{{else}}<p class="muted">Nessuna copia in libreria per questa release.</p>{{end}}
-{{if .Decision}}<p class="muted"><span>Decisione automatica:</span> <span class="badge {{if or (eq .Decision "approved") (eq .Decision "accept")}}ok{{else}}warn{{end}}">{{.Decision}}</span>{{if .Reason}} — {{.Reason}}{{end}}</p>{{end}}
+<p><span>{{tr "In libreria:"}}</span> <strong>{{if .Library}}{{tr .Library}}{{else}}—{{end}}</strong> · <span>{{tr "punteggio"}}</span> {{tr .LibraryScore}}</p>
+<p><span class="badge {{if .Replace}}ok{{else}}warn{{end}}">{{if .Replace}}{{tr "upgrade"}}{{else}}{{tr "nessun upgrade"}}{{end}}</span> {{tr .Upgrade}}</p>
+{{else}}<p class="muted">{{tr "Nessuna copia in libreria per questa release."}}</p>{{end}}
+{{if .Decision}}<p class="muted"><span>{{tr "Decisione automatica:"}}</span> <span class="badge {{if or (eq .Decision "approved") (eq .Decision "accept")}}ok{{else}}warn{{end}}">{{tr .Decision}}</span>{{if .Reason}} — {{.Reason}}{{end}}</p>{{end}}
 {{end}}
 {{end}}
 
 {{define "v2_ipfilter_action"}}
 <div class="panel settings-panel" id="v2-ipfilter-panel">
-  <div class="panel-head"><h3>Filtro IP</h3><small class="muted">scarica e applica subito</small></div>
+  <div class="panel-head"><h3>{{tr "Filtro IP"}}</h3><small class="muted">{{tr "scarica e applica subito"}}</small></div>
   <div class="panel-body">
     <div class="toolbar">
       <span id="v2-ipfilter-status" class="muted" hx-get="/settings/ipfilter" hx-trigger="load" hx-swap="innerHTML">…</span>
-      <button class="btn sm primary" type="button" hx-post="/settings/ipfilter" hx-target="#v2-ipfilter-status" hx-swap="innerHTML" hx-disabled-elt="this" title="Scarica dall'URL configurato (o usa il file locale) e applica subito il filtro IP al motore attivo">Carica / aggiorna ora</button>
+      <button class="btn sm primary" type="button" hx-post="/settings/ipfilter" hx-target="#v2-ipfilter-status" hx-swap="innerHTML" hx-disabled-elt="this" {{trTitle "Scarica dall'URL configurato (o usa il file locale) e applica subito il filtro IP al motore attivo"}}>{{tr "Carica / aggiorna ora"}}</button>
     </div>
-    <p class="hint">L'URL o il file si impostano nei campi «IP filter» qui nella scheda; con un URL Gextto lo scarica e lo applica. Funziona anche con gx-torrent.</p>
+    <p class="hint">{{tr "L'URL o il file si impostano nei campi «IP filter» qui nella scheda; con un URL Gextto lo scarica e lo applica. Funziona anche con gx-torrent."}}</p>
   </div>
 </div>
 {{end}}
 
 {{define "v2_score_groups"}}
 <div class="panel settings-panel" id="v2-score-groups">
-  <div class="panel-head"><h3>Gruppi custom</h3><small class="muted">Bonus o penalità per release group</small></div>
+  <div class="panel-head"><h3>{{tr "Gruppi custom"}}</h3><small class="muted">{{tr "Bonus o penalità per release group"}}</small></div>
   <div class="panel-body">
-    <p class="hint">Il nome deve corrispondere al tag finale della release (es. TBK). Il punteggio viene sommato allo score tecnico; sono ammessi anche valori negativi.</p>
-    {{if .ScoreNotice}}<p class="{{if .ScoreError}}error{{else}}muted{{end}}" role="status">{{.ScoreNotice}}</p>{{end}}
+    <p class="hint">{{tr "Il nome deve corrispondere al tag finale della release (es. TBK). Il punteggio viene sommato allo score tecnico; sono ammessi anche valori negativi."}}</p>
+    {{if .ScoreNotice}}<p class="{{if .ScoreError}}error{{else}}muted{{end}}" role="status">{{tr .ScoreNotice}}</p>{{end}}
     <div class="settings-rows">
       {{range .ScoreGroups}}
       <form class="setting-row v2-score-group-row" method="post" action="/settings/score-groups" hx-post="/settings/score-groups" hx-target="#v2-score-groups" hx-swap="outerHTML">
         <input type="hidden" name="name" value="{{.Name}}" />
-        <div class="setting-info"><strong class="setting-label" id="v2-score-group-{{.Name}}">{{.Name}}</strong><code class="setting-key">score_group_{{.Name}}</code></div>
+        <div class="setting-info"><strong class="setting-label" id="v2-score-group-{{.Name}}">{{tr .Name}}</strong><code class="setting-key">score_group_{{.Name}}</code></div>
         <div class="setting-control"><input class="input" type="number" name="score" value="{{.Score}}" aria-labelledby="v2-score-group-{{.Name}}" /></div>
-        <div class="setting-actions"><button class="btn sm primary" type="submit" id="v2-score-group-save-{{.Name}}" aria-labelledby="v2-score-group-save-{{.Name}} v2-score-group-{{.Name}}">Salva</button><button class="btn sm danger" type="submit" name="op" value="delete" id="v2-score-group-delete-{{.Name}}" aria-labelledby="v2-score-group-delete-{{.Name}} v2-score-group-{{.Name}}" hx-confirm="Rimuovere il gruppo {{.Name}}?">Rimuovi</button></div>
+        <div class="setting-actions"><button class="btn sm primary" type="submit" id="v2-score-group-save-{{.Name}}" aria-labelledby="v2-score-group-save-{{.Name}} v2-score-group-{{.Name}}">{{tr "Salva"}}</button><button class="btn sm danger" type="submit" name="op" value="delete" id="v2-score-group-delete-{{.Name}}" aria-labelledby="v2-score-group-delete-{{.Name}} v2-score-group-{{.Name}}" hx-confirm="{{tr "Rimuovere il gruppo %s?" .Name}}">{{tr "Rimuovi"}}</button></div>
       </form>
-      {{else}}<p class="muted">Nessun gruppo personalizzato configurato.</p>{{end}}
+      {{else}}<p class="muted">{{tr "Nessun gruppo personalizzato configurato."}}</p>{{end}}
     </div>
     <form class="form-actions v2-score-group-add" method="post" action="/settings/score-groups" hx-post="/settings/score-groups" hx-target="#v2-score-groups" hx-swap="outerHTML">
       <input type="hidden" name="op" value="add" />
-      <label class="field"><span>Nuovo gruppo</span><input class="input" name="name" placeholder="es. TBK" required maxlength="64" pattern="[A-Za-z0-9]+" /></label>
-      <label class="field"><span>Punteggio</span><input class="input" type="number" name="score" value="0" required /></label>
-      <button class="btn sm primary" type="submit">Aggiungi gruppo</button>
+      <label class="field"><span>{{tr "Nuovo gruppo"}}</span><input class="input" name="name" placeholder="{{tr "es. TBK"}}" required maxlength="64" pattern="[A-Za-z0-9]+" /></label>
+      <label class="field"><span>{{tr "Punteggio"}}</span><input class="input" type="number" name="score" value="0" required /></label>
+      <button class="btn sm primary" type="submit">{{tr "Aggiungi gruppo"}}</button>
     </form>
   </div>
 </div>
@@ -314,15 +314,15 @@
 {{define "v2_settings_editors"}}
 {{if .ShowFeeds}}
 <div class="card editor-card" id="v2-sources-feeds">
-  <h3>Feed RSS</h3>
+  <h3>{{tr "Feed RSS"}}</h3>
   <form method="post" action="/settings/feed" hx-post="/settings/feed" hx-swap="none" data-v2-track>
-    <label class="field"><span>Un URL per riga</span><textarea class="input" name="feeds" rows="9" title="Un URL per riga. Metti # all'inizio di una riga per escluderla senza cancellarla.">{{.Feeds}}</textarea></label>
-    <div class="hint">Un URL per riga. Metti # all'inizio di una riga per escluderla senza cancellarla.</div>
-    <div class="form-actions"><button class="btn sm primary" type="submit">Salva feed</button><span class="setting-badge setting-dirty" data-v2-dirty-badge hidden>non salvata</span></div>
+    <label class="field"><span>{{tr "Un URL per riga"}}</span><textarea class="input" name="feeds" rows="9" {{trTitle "Un URL per riga. Metti # all'inizio di una riga per escluderla senza cancellarla."}}>{{.Feeds}}</textarea></label>
+    <div class="hint">{{tr "Un URL per riga. Metti # all'inizio di una riga per escluderla senza cancellarla."}}</div>
+    <div class="form-actions"><button class="btn sm primary" type="submit">{{tr "Salva feed"}}</button><span class="setting-badge setting-dirty" data-v2-dirty-badge hidden>{{tr "non salvata"}}</span></div>
   </form>
   {{template "v2_feed_disabled_notice" .DisabledFeeds}}
-  <p class="hint"><span>L'andamento di ogni feed è in</span></p>
-  <p><a class="btn sm" href="/?view=health#v2-health-feeds">Salute → Attività dei feed</a></p>
+  <p class="hint"><span>{{tr "L'andamento di ogni feed è in"}}</span></p>
+  <p><a class="btn sm" href="/?view=health#v2-health-feeds">{{tr "Salute → Attività dei feed"}}</a></p>
 </div>
 {{end}}
 {{range .CheckboxGroups}}
@@ -334,10 +334,10 @@
 {{define "v2_feed_disabled_notice"}}
 {{if .}}
 <div class="alert" role="status">
-  <strong>Feed disabilitati</strong>
-  <p>Questi feed non vengono letti. Togli il # davanti alla riga e salva per riattivarli.</p>
+  <strong>{{tr "Feed disabilitati"}}</strong>
+  <p>{{tr "Questi feed non vengono letti. Togli il # davanti alla riga e salva per riattivarli."}}</p>
   <ul>
-    {{range .}}<li><strong>{{.Label}}</strong> — <span>{{if .AutoDisabled}}Disabilitato automaticamente{{else}}Disabilitato manualmente{{end}}</span>{{if .AutoDisabled}} <span>{{.DisabledAt}}</span>{{if .Reason}} <span class="muted">(<span>{{.Reason}}</span> <span>giorni senza successi</span>)</span>{{end}}{{end}}</li>{{end}}
+    {{range .}}<li><strong>{{tr .Label}}</strong> — <span>{{if .AutoDisabled}}{{tr "Disabilitato automaticamente"}}{{else}}{{tr "Disabilitato manualmente"}}{{end}}</span>{{if .AutoDisabled}} <span>{{tr .DisabledAt}}</span>{{if .Reason}} <span class="muted">(<span>{{tr .Reason}}</span> <span>{{tr "giorni senza successi"}}</span>)</span>{{end}}{{end}}</li>{{end}}
   </ul>
 </div>
 {{end}}
@@ -345,7 +345,7 @@
 
 {{define "v2_content_filter_tools"}}
 <div class="panel settings-panel v2-content-filter-tools">
-  <div class="panel-head"><h3>Filtra e Cancella</h3><small class="muted">Esclusioni future e pulizia dei risultati già archiviati</small></div>
+  <div class="panel-head"><h3>{{tr "Filtra e Cancella"}}</h3><small class="muted">{{tr "Esclusioni future e pulizia dei risultati già archiviati"}}</small></div>
   <div class="panel-body">
     <div class="v2-content-filter-tools-grid">
       {{template "v2_content_filter_section" .}}
@@ -357,29 +357,29 @@
 
 {{define "v2_content_filter_section"}}
 <section class="v2-content-filter-section" id="v2-content-filter-section">
-  <div class="v2-content-tools-heading"><h4>Filtri contenuto esclusi</h4>{{if .Status}}<span class="htx-status ok">{{.Status}}</span>{{end}}</div>
-  {{if .Hint}}<p class="hint">{{.Hint}}</p>{{end}}
+  <div class="v2-content-tools-heading"><h4>{{tr "Filtri contenuto esclusi"}}</h4>{{if .Status}}<span class="htx-status ok">{{tr .Status}}</span>{{end}}</div>
+  {{if .Hint}}<p class="hint">{{tr .Hint}}</p>{{end}}
   <form id="v2-content-filter-form" method="post" action="/settings/checkbox" hx-post="/settings/checkbox" hx-target="#v2-content-filter-section" hx-swap="outerHTML" data-v2-track>
     <input type="hidden" name="key" value="{{.Key}}" />
     <div class="toolbar checkbox-row">
-      {{range .Options}}<label class="check" title="{{.Label}}"><input type="checkbox" name="value" value="{{.Value}}"{{if .Selected}} checked{{end}} /> <span>{{.Label}}</span></label>{{end}}
+      {{range .Options}}<label class="check" {{trTitle .Label}}><input type="checkbox" name="value" value="{{.Value}}"{{if .Selected}} checked{{end}} /> <span>{{tr .Label}}</span></label>{{end}}
     </div>
-    {{if .Custom}}<div class="form-actions v2-checkbox-custom-actions"><input class="input" name="custom" placeholder="{{.CustomPlaceholder}}" /><button class="btn sm primary" type="submit">Salva</button></div>{{else}}<div class="form-actions"><button class="btn sm primary" type="submit">Salva</button></div>{{end}}
+    {{if .Custom}}<div class="form-actions v2-checkbox-custom-actions"><input class="input" name="custom" placeholder="{{tr .CustomPlaceholder}}" /><button class="btn sm primary" type="submit">{{tr "Salva"}}</button></div>{{else}}<div class="form-actions"><button class="btn sm primary" type="submit">{{tr "Salva"}}</button></div>{{end}}
   </form>
 </section>
 {{end}}
 
 {{define "v2_checkbox_group"}}
 <div class="panel settings-panel v2-checkbox-panel-{{.Key}}">
-  <div class="panel-head"><h3>{{.Title}}</h3><small class="muted">{{if .Status}}<span class="htx-status ok">{{.Status}}</span>{{end}}</small></div>
+  <div class="panel-head"><h3>{{tr .Title}}</h3><small class="muted">{{if .Status}}<span class="htx-status ok">{{tr .Status}}</span>{{end}}</small></div>
   <div class="panel-body">
-    {{if .Hint}}<p class="hint">{{.Hint}}</p>{{end}}
+    {{if .Hint}}<p class="hint">{{tr .Hint}}</p>{{end}}
     <form method="post" action="/settings/checkbox" hx-post="/settings/checkbox" hx-target="closest .panel" hx-swap="outerHTML" data-v2-track>
       <input type="hidden" name="key" value="{{.Key}}" />
       <div class="toolbar checkbox-row">
-         {{range .Options}}<label class="check" title="{{.Label}}"><input type="checkbox" name="value" value="{{.Value}}"{{if .Selected}} checked{{end}} /> <span>{{.Label}}</span></label>{{end}}
+         {{range .Options}}<label class="check" {{trTitle .Label}}><input type="checkbox" name="value" value="{{.Value}}"{{if .Selected}} checked{{end}} /> <span>{{tr .Label}}</span></label>{{end}}
       </div>
-      {{if .Custom}}<div class="form-actions v2-checkbox-custom-actions"><input class="input" name="custom" placeholder="{{.CustomPlaceholder}}" /><button class="btn sm primary" type="submit">Salva</button></div>{{else}}<div class="form-actions">{{if .TestKind}}<input class="input" id="v2-test-query-{{.Key}}" name="q" value="{{.TestQuery}}" placeholder="Termine di prova" /><button class="btn sm" type="button" hx-get="/settings/source-test" hx-include="#v2-test-query-{{.Key}}" hx-vals='{"kind":"{{.TestKind}}"}' hx-target="#v2-source-test-{{.Key}}" hx-swap="innerHTML">{{if .TestLabel}}{{.TestLabel}}{{else}}Testa selezionati{{end}}</button><span id="v2-source-test-{{.Key}}" class="muted" aria-live="polite"></span>{{end}}<button class="btn sm primary" type="submit">Salva</button></div>{{end}}
+      {{if .Custom}}<div class="form-actions v2-checkbox-custom-actions"><input class="input" name="custom" placeholder="{{tr .CustomPlaceholder}}" /><button class="btn sm primary" type="submit">{{tr "Salva"}}</button></div>{{else}}<div class="form-actions">{{if .TestKind}}<input class="input" id="v2-test-query-{{.Key}}" name="q" value="{{.TestQuery}}" placeholder="{{tr "Termine di prova"}}" /><button class="btn sm" type="button" hx-get="/settings/source-test" hx-include="#v2-test-query-{{.Key}}" hx-vals='{"kind":"{{.TestKind}}"}' hx-target="#v2-source-test-{{.Key}}" hx-swap="innerHTML">{{if .TestLabel}}{{tr .TestLabel}}{{else}}{{tr "Testa selezionati"}}{{end}}</button><span id="v2-source-test-{{.Key}}" class="muted" aria-live="polite"></span>{{end}}<button class="btn sm primary" type="submit">{{tr "Salva"}}</button></div>{{end}}
     </form>
   </div>
 </div>
@@ -387,13 +387,13 @@
 
 {{define "v2_content_archive_cleanup"}}
 <section class="v2-content-archive-cleanup">
-  <div class="v2-content-tools-heading"><h4>Pulisci i risultati già archiviati</h4><small class="muted">Ricerca nel catalogo</small></div>
-    <p class="hint">I filtri selezionati sopra impediscono di archiviare nuove release corrispondenti. Non cancellano retroattivamente le voci esistenti: qui puoi trovarle e rimuoverle singolarmente, selezionate o tutte insieme. La ricerca usa gli stessi filtri attivi; modificali e salvali sopra per cambiare i contenuti da trovare.</p>
+  <div class="v2-content-tools-heading"><h4>{{tr "Pulisci i risultati già archiviati"}}</h4><small class="muted">{{tr "Ricerca nel catalogo"}}</small></div>
+    <p class="hint">{{tr "I filtri selezionati sopra impediscono di archiviare nuove release corrispondenti. Non cancellano retroattivamente le voci esistenti: qui puoi trovarle e rimuoverle singolarmente, selezionate o tutte insieme. La ricerca usa gli stessi filtri attivi; modificali e salvali sopra per cambiare i contenuti da trovare."}}</p>
      <form method="get" action="/settings/content-archive" hx-get="/settings/content-archive" hx-target="#v2-content-archive-results" hx-swap="innerHTML">
        {{range .Options}}{{if .Selected}}<input type="hidden" name="filter" value="{{.Value}}" />{{end}}{{end}}
        <div class="toolbar">
-         <input class="input" type="search" name="q" placeholder="Parole nel titolo, es. adult o xxx" />
-         <button class="btn sm primary" type="submit">Cerca nell’Archivio</button>
+         <input class="input" type="search" name="q" placeholder="{{tr "Parole nel titolo, es. adult o xxx"}}" />
+         <button class="btn sm primary" type="submit">{{tr "Cerca nell’Archivio"}}</button>
        </div>
      </form>
     <div id="v2-content-archive-results" aria-live="polite"></div>
@@ -402,41 +402,41 @@
 
 {{define "v2_content_archive_results"}}
   {{if .Notice}}<div id="v2-toast-region" hx-swap-oob="innerHTML">{{template "v2_action_notice" (dict "Title" "Archivio" "Message" .Notice "Error" .Error)}}</div>{{end}}
-  {{if .Notice}}<p class="{{if .Error}}error{{else}}muted{{end}}" role="status">{{.Notice}}</p>{{end}}
+  {{if .Notice}}<p class="{{if .Error}}error{{else}}muted{{end}}" role="status">{{tr .Notice}}</p>{{end}}
   {{if or .Query .Filters}}
     {{if .Total}}
-    <p class="muted">{{.Total}} <span>risultati</span>{{if .Query}} <span>per la ricerca</span> “{{.Query}}”{{end}}{{if .Filters}} <span>corrispondenti ai pre-filtri selezionati</span>{{end}}. <span>Mostro i primi</span> {{len .Items}}.</p>
+    <p class="muted">{{tr .Total}} <span>{{tr "risultati"}}</span>{{if .Query}} <span>{{tr "per la ricerca"}}</span> “{{.Query}}”{{end}}{{if .Filters}} <span>{{tr "corrispondenti ai pre-filtri selezionati"}}</span>{{end}}. <span>{{tr "Mostro i primi"}}</span> {{len .Items}}.</p>
     <form method="post" action="/settings/content-archive/delete" hx-post="/settings/content-archive/delete" hx-target="#v2-content-archive-results" hx-swap="innerHTML">
       <input type="hidden" name="q" value="{{.Query}}" />
       {{range .Filters}}<input type="hidden" name="filter" value="{{.}}" />{{end}}
       <div class="table-wrap"><table class="table">
-        <thead><tr><th></th><th>Titolo</th><th>Fonte</th><th>Azioni</th></tr></thead>
+        <thead><tr><th></th><th>{{tr "Titolo"}}</th><th>{{tr "Fonte"}}</th><th>{{tr "Azioni"}}</th></tr></thead>
         <tbody>
           {{range .Items}}
           <tr>
-            <td><input type="checkbox" name="id" value="{{.ID}}" aria-label="Seleziona {{.Title}}" /></td>
-            <td class="truncate" title="{{.Title}}">{{.Title}}</td>
-            <td>{{.Source}}</td>
-            <td class="row-actions"><button class="btn sm danger" type="submit" name="delete_id" value="{{.ID}}" hx-confirm="Eliminare solo questa voce dall’Archivio?" data-v2-toast-title="Archivio" data-v2-toast-message="Avvio eliminazione della voce selezionata.">Elimina</button></td>
+            <td><input type="checkbox" name="id" value="{{.ID}}" aria-label="{{tr "Seleziona %s" .Title}}" /></td>
+            <td class="truncate" {{trTitle .Title}}>{{tr .Title}}</td>
+            <td>{{tr .Source}}</td>
+            <td class="row-actions"><button class="btn sm danger" type="submit" name="delete_id" value="{{.ID}}" hx-confirm="{{tr "Eliminare solo questa voce dall’Archivio?"}}" data-v2-toast-title="{{tr "Archivio"}}" data-v2-toast-message="{{tr "Avvio eliminazione della voce selezionata."}}">{{tr "Elimina"}}</button></td>
           </tr>
           {{end}}
         </tbody>
       </table></div>
       <div class="form-actions">
-        <button class="btn sm danger" type="submit" hx-confirm="Eliminare le voci selezionate dall’Archivio?" data-v2-toast-title="Archivio" data-v2-toast-message="Avvio eliminazione dei risultati selezionati.">Elimina selezionati</button>
-        <button class="btn sm danger" type="submit" name="delete_all" value="1" hx-confirm="Eliminare tutte le {{.Total}} voci corrispondenti alla ricerca e ai pre-filtri selezionati?" data-v2-toast-title="Archivio" data-v2-toast-message="Avvio eliminazione di tutti i {{.Total}} risultati corrispondenti.">Elimina tutti i risultati</button>
+        <button class="btn sm danger" type="submit" hx-confirm="{{tr "Eliminare le voci selezionate dall’Archivio?"}}" data-v2-toast-title="{{tr "Archivio"}}" data-v2-toast-message="{{tr "Avvio eliminazione dei risultati selezionati."}}">{{tr "Elimina selezionati"}}</button>
+        <button class="btn sm danger" type="submit" name="delete_all" value="1" hx-confirm="{{tr "Eliminare tutte le %d voci corrispondenti alla ricerca e ai pre-filtri selezionati?" .Total}}" data-v2-toast-title="{{tr "Archivio"}}" data-v2-toast-message="{{tr "Avvio eliminazione di tutti i %d risultati corrispondenti." .Total}}">{{tr "Elimina tutti i risultati"}}</button>
       </div>
     </form>
     {{else}}
-    <p class="muted"><span>Nessun risultato</span>{{if .Query}} <span>per la ricerca</span> “{{.Query}}”{{end}}{{if .Filters}} <span>con i pre-filtri selezionati</span>{{end}}.</p>
+    <p class="muted"><span>{{tr "Nessun risultato"}}</span>{{if .Query}} <span>{{tr "per la ricerca"}}</span> “{{.Query}}”{{end}}{{if .Filters}} <span>{{tr "con i pre-filtri selezionati"}}</span>{{end}}.</p>
     {{end}}
   {{end}}
 {{end}}
 
 {{define "v2_list_editor"}}
 <div class="card editor-card" id="v2-editor-{{.Key}}">
-  <h3>{{.Title}}</h3>
-  {{if .Hint}}<p class="hint">{{.Hint}}</p>{{end}}
+  <h3>{{tr .Title}}</h3>
+  {{if .Hint}}<p class="hint">{{tr .Hint}}</p>{{end}}
   <form method="post" action="/settings/editor-save" hx-post="/settings/editor-save" hx-swap="none" data-v2-track>
     <input type="hidden" name="editor" value="{{.Key}}" />
     <input type="hidden" name="redirect" value="{{.Redirect}}" />
@@ -444,9 +444,9 @@
       {{range .Rows}}{{template "v2_list_row" (dict "Editor" $ "Row" .)}}{{end}}
     </div>
     <div class="form-actions">
-       <button class="btn sm" type="button" id="v2-editor-{{.Key}}-add" hx-get="/settings/editor-row?editor={{.Key}}&amp;index={{.NextIndex}}&amp;view={{.View}}&amp;tab={{.Tab}}" hx-target="#v2-editor-{{.Key}}-rows" hx-swap="beforeend" data-v2-marks-dirty title="Aggiungi una nuova riga">Aggiungi riga</button>
-       <button class="btn sm primary" type="submit" title="Salva le righe di questa sezione">Salva</button>
-       <span class="setting-badge setting-dirty" data-v2-dirty-badge hidden>non salvata</span>
+       <button class="btn sm" type="button" id="v2-editor-{{.Key}}-add" hx-get="/settings/editor-row?editor={{.Key}}&amp;index={{.NextIndex}}&amp;view={{.View}}&amp;tab={{.Tab}}" hx-target="#v2-editor-{{.Key}}-rows" hx-swap="beforeend" data-v2-marks-dirty {{trTitle "Aggiungi una nuova riga"}}>{{tr "Aggiungi riga"}}</button>
+       <button class="btn sm primary" type="submit" {{trTitle "Salva le righe di questa sezione"}}>{{tr "Salva"}}</button>
+       <span class="setting-badge setting-dirty" data-v2-dirty-badge hidden>{{tr "non salvata"}}</span>
     </div>
   </form>
 </div>
@@ -457,64 +457,64 @@
   {{range .Row.Fields}}
   {{$value := .Value}}{{$name := .Name}}{{$index := $.Row.Index}}
    {{if eq .Kind "id"}}<input type="hidden" name="{{$name}}__{{$index}}" value="{{$value}}" />{{else}}
-   <label class="field{{if .Wide}} wide{{end}}" title="{{.Label}}"><span>{{.Label}}</span>
-    {{if eq .Kind "bool"}}<select class="input" name="{{$name}}__{{$index}}"><option value="true"{{if eq $value "true"}} selected{{end}}>Sì</option><option value="false"{{if eq $value "false"}} selected{{end}}>No</option></select>
+   <label class="field{{if .Wide}} wide{{end}}" {{trTitle .Label}}><span>{{tr .Label}}</span>
+    {{if eq .Kind "bool"}}<select class="input" name="{{$name}}__{{$index}}"><option value="true"{{if eq $value "true"}} selected{{end}}>{{tr "Sì"}}</option><option value="false"{{if eq $value "false"}} selected{{end}}>{{tr "No"}}</option></select>
     {{else if eq .Kind "number"}}<input class="input" type="number" name="{{$name}}__{{$index}}" value="{{$value}}" />
-    {{else if eq .Kind "select"}}<select class="input" name="{{$name}}__{{$index}}">{{range .Options}}<option value="{{.Value}}"{{if eq $value .Value}} selected{{end}}>{{.Label}}</option>{{end}}</select>
-    {{else if eq .Kind "combo"}}<input class="input" name="{{$name}}__{{$index}}" value="{{$value}}" placeholder="{{.Placeholder}}" list="v2-combo-{{$name}}-{{$index}}" autocomplete="off" /><datalist id="v2-combo-{{$name}}-{{$index}}">{{range .Options}}<option value="{{.Value}}">{{.Label}}</option>{{end}}</datalist>
-    {{else}}<span class="field-row"><input class="input" name="{{$name}}__{{$index}}" value="{{$value}}" placeholder="{{.Placeholder}}"{{if .Browse}} data-v2-browse-input{{end}} />{{if .Browse}}<button class="btn sm" type="button" data-v2-browse-for="{{$name}}__{{$index}}" title="Sfoglia le cartelle disponibili sul server">Sfoglia</button>{{end}}</span>{{end}}
+    {{else if eq .Kind "select"}}<select class="input" name="{{$name}}__{{$index}}">{{range .Options}}<option value="{{.Value}}"{{if eq $value .Value}} selected{{end}}>{{tr .Label}}</option>{{end}}</select>
+    {{else if eq .Kind "combo"}}<input class="input" name="{{$name}}__{{$index}}" value="{{$value}}" placeholder="{{tr .Placeholder}}" list="v2-combo-{{$name}}-{{$index}}" autocomplete="off" /><datalist id="v2-combo-{{$name}}-{{$index}}">{{range .Options}}<option value="{{.Value}}">{{tr .Label}}</option>{{end}}</datalist>
+    {{else}}<span class="field-row"><input class="input" name="{{$name}}__{{$index}}" value="{{$value}}" placeholder="{{tr .Placeholder}}"{{if .Browse}} data-v2-browse-input{{end}} />{{if .Browse}}<button class="btn sm" type="button" data-v2-browse-for="{{$name}}__{{$index}}" {{trTitle "Sfoglia le cartelle disponibili sul server"}}>{{tr "Sfoglia"}}</button>{{end}}</span>{{end}}
   </label>{{end}}
   {{end}}
-  <div class="form-actions">{{if .Editor.HasTest}}<button class="btn sm" type="button" hx-post="/settings/editor-test" hx-include="closest .list-row" hx-vals='{"editor":"{{.Editor.Key}}","index":"{{.Row.Index}}"}' hx-target="#v2-list-test-{{.Editor.Key}}-{{.Row.Index}}" hx-swap="innerHTML" title="Testa questa riga">Testa</button><span id="v2-list-test-{{.Editor.Key}}-{{.Row.Index}}" class="muted" aria-live="polite"></span>{{end}}<button class="btn sm danger" type="button" hx-get="/empty" hx-target="closest .list-row" hx-swap="outerHTML" data-v2-marks-dirty title="Rimuovi questa riga (da salvare)">Rimuovi</button></div>
+  <div class="form-actions">{{if .Editor.HasTest}}<button class="btn sm" type="button" hx-post="/settings/editor-test" hx-include="closest .list-row" hx-vals='{"editor":"{{.Editor.Key}}","index":"{{.Row.Index}}"}' hx-target="#v2-list-test-{{.Editor.Key}}-{{.Row.Index}}" hx-swap="innerHTML" {{trTitle "Testa questa riga"}}>{{tr "Testa"}}</button><span id="v2-list-test-{{.Editor.Key}}-{{.Row.Index}}" class="muted" aria-live="polite"></span>{{end}}<button class="btn sm danger" type="button" hx-get="/empty" hx-target="closest .list-row" hx-swap="outerHTML" data-v2-marks-dirty {{trTitle "Rimuovi questa riga (da salvare)"}}>{{tr "Rimuovi"}}</button></div>
 </div>
 {{end}}
 
 {{define "v2_rename_editor"}}
 <div class="panel settings-panel" id="v2-rename-editor">
-  <div class="panel-head"><h3>Composizione del nome</h3>{{if .Status}}<small class="muted">{{.Status}}</small>{{end}}</div>
+  <div class="panel-head"><h3>{{tr "Composizione del nome"}}</h3>{{if .Status}}<small class="muted">{{tr .Status}}</small>{{end}}</div>
   <div class="panel-body">
     <form method="post" action="/settings/rename-save" hx-post="/settings/rename-save" hx-swap="none" class="form-grid v2-rename-form" data-v2-track>
-      <label class="field" title="Scegli il formato predefinito per il nome"><span>Formato</span><select class="input" name="format" hx-post="/settings/rename-preview" hx-include="#v2-rename-editor" hx-target="#v2-rename-preview-code" hx-swap="outerHTML" hx-trigger="change">{{range .Formats}}<option value="{{.Value}}"{{if .Selected}} selected{{end}}>{{.Label}}</option>{{end}}</select></label>
-      <label class="field" title="Template usato per comporre il nome personalizzato"><span>Template personalizzato</span><input class="input" name="template" value="{{.Template}}" placeholder="{Serie} - {Stagione}{Episodio} - {Titolo} [{Risoluzione}][{Lingue}]" hx-post="/settings/rename-preview" hx-include="#v2-rename-editor" hx-target="#v2-rename-preview-code" hx-swap="outerHTML" hx-trigger="input changed delay:300ms" /></label>
-      <div class="form-actions"><button class="btn sm primary" type="submit" title="Salva la composizione del nome">Salva rinomina</button></div>
+      <label class="field" {{trTitle "Scegli il formato predefinito per il nome"}}><span>{{tr "Formato"}}</span><select class="input" name="format" hx-post="/settings/rename-preview" hx-include="#v2-rename-editor" hx-target="#v2-rename-preview-code" hx-swap="outerHTML" hx-trigger="change">{{range .Formats}}<option value="{{.Value}}"{{if .Selected}} selected{{end}}>{{tr .Label}}</option>{{end}}</select></label>
+      <label class="field" {{trTitle "Template usato per comporre il nome personalizzato"}}><span>{{tr "Template personalizzato"}}</span><input class="input" name="template" value="{{.Template}}" placeholder="{{tr "{Serie} - {Stagione}{Episodio} - {Titolo} [{Risoluzione}][{Lingue}]"}}" hx-post="/settings/rename-preview" hx-include="#v2-rename-editor" hx-target="#v2-rename-preview-code" hx-swap="outerHTML" hx-trigger="input changed delay:300ms" /></label>
+      <div class="form-actions"><button class="btn sm primary" type="submit" {{trTitle "Salva la composizione del nome"}}>{{tr "Salva rinomina"}}</button></div>
     </form>
-    <div class="field" style="margin-top:12px"><span>Pezzi del nome (clicca per aggiungere)</span>
-      <div class="toolbar">{{range .Tokens}}<button class="btn sm" type="button" hx-post="/settings/rename-token" hx-vals='{"token":"{{.Token}}"}' hx-include="#v2-rename-editor" hx-target="#v2-rename-editor" hx-swap="outerHTML" data-v2-marks-dirty="#v2-rename-editor form" title="Aggiungi questo pezzo al template">{{.Label}}</button>{{end}}</div>
+    <div class="field" style="margin-top:12px"><span>{{tr "Pezzi del nome (clicca per aggiungere)"}}</span>
+      <div class="toolbar">{{range .Tokens}}<button class="btn sm" type="button" hx-post="/settings/rename-token" hx-vals='{"token":"{{.Token}}"}' hx-include="#v2-rename-editor" hx-target="#v2-rename-editor" hx-swap="outerHTML" data-v2-marks-dirty="#v2-rename-editor form" {{trTitle "Aggiungi questo pezzo al template"}}>{{tr .Label}}</button>{{end}}</div>
     </div>
-    <div class="field" style="margin-top:12px"><span>Anteprima</span>{{template "v2_rename_preview_code" .}}</div>
+    <div class="field" style="margin-top:12px"><span>{{tr "Anteprima"}}</span>{{template "v2_rename_preview_code" .}}</div>
   </div>
 </div>
 {{end}}
 
-{{define "v2_rename_preview_code"}}<code class="rename-preview" id="v2-rename-preview-code">{{.Preview}}</code>{{end}}
+{{define "v2_rename_preview_code"}}<code class="rename-preview" id="v2-rename-preview-code">{{tr .Preview}}</code>{{end}}
 
 {{define "v2_i18n_editor"}}
 <div class="card editor-card">
-  <h3>Traduzioni</h3>
+  <h3>{{tr "Traduzioni"}}</h3>
   <div class="toolbar">
-    <select class="input" name="lang" aria-label="Lingua delle traduzioni" hx-get="/settings/i18n" hx-target="#v2-i18n-table" hx-swap="outerHTML">
-      {{range .Languages}}<option value="{{.}}"{{if eq . $.Language}} selected{{end}}>{{.}}</option>{{end}}
+    <select class="input" name="lang" aria-label="{{tr "Lingua delle traduzioni"}}" hx-get="/settings/i18n" hx-target="#v2-i18n-table" hx-swap="outerHTML">
+      {{range .Languages}}<option value="{{.}}"{{if eq . $.Language}} selected{{end}}>{{tr .}}</option>{{end}}
     </select>
-    <a class="btn sm" href="/api/i18n/export/{{.Language}}" target="_blank" rel="noopener" title="Scarica le traduzioni in YAML">Esporta YAML</a>
+    <a class="btn sm" href="/api/i18n/export/{{.Language}}" target="_blank" rel="noopener" {{trTitle "Scarica le traduzioni in YAML"}}>{{tr "Esporta YAML"}}</a>
     <form method="post" action="/settings/i18n/delete" hx-post="/settings/i18n/delete" hx-swap="none" style="display:inline">
       <input type="hidden" name="lang" value="{{.Language}}" />
-      <button class="btn sm danger" type="submit" hx-confirm="Eliminare tutte le traduzioni di questa lingua?">Elimina lingua</button>
+      <button class="btn sm danger" type="submit" hx-confirm="{{tr "Eliminare tutte le traduzioni di questa lingua?"}}">{{tr "Elimina lingua"}}</button>
     </form>
   </div>
   {{template "v2_i18n_table" .}}
   <form method="post" action="/settings/i18n/import" hx-post="/settings/i18n/import" hx-swap="none">
     <input type="hidden" name="lang" value="{{.Language}}" />
-    <label class="field"><span>Importa YAML</span><textarea class="input" name="yaml" rows="4"></textarea></label>
-    <div class="form-actions"><button class="btn sm primary" type="submit">Importa</button></div>
+    <label class="field"><span>{{tr "Importa YAML"}}</span><textarea class="input" name="yaml" rows="4"></textarea></label>
+    <div class="form-actions"><button class="btn sm primary" type="submit">{{tr "Importa"}}</button></div>
   </form>
 </div>
 {{end}}
 
 {{define "v2_i18n_table"}}
 <div id="v2-i18n-table" class="table-wrap"><table class="data-table i18n-table">
-  <caption class="sr-only">Traduzioni configurate</caption>
+  <caption class="sr-only">{{tr "Traduzioni configurate"}}</caption>
   <colgroup><col class="i18n-key-col" /><col class="i18n-value-col" /></colgroup>
-  <thead><tr><th scope="col">Chiave</th><th scope="col">Valore</th></tr></thead>
+  <thead><tr><th scope="col">{{tr "Chiave"}}</th><th scope="col">{{tr "Valore"}}</th></tr></thead>
   <tbody>{{range $i, $row := .Rows}}<tr>
     <td class="i18n-key"><code id="v2-i18n-key-{{$i}}">{{$row.Key}}</code></td>
     <td class="i18n-value">
@@ -522,7 +522,7 @@
         <input type="hidden" name="lang" value="{{$.Language}}" />
         <input type="hidden" name="key" value="{{$row.Key}}" />
         <input class="input" name="value" value="{{$row.Value}}" aria-labelledby="v2-i18n-key-{{$i}}" />
-        <button class="btn sm" type="submit" id="v2-i18n-save-{{$i}}" aria-labelledby="v2-i18n-save-{{$i}} v2-i18n-key-{{$i}}">Salva</button>
+        <button class="btn sm" type="submit" id="v2-i18n-save-{{$i}}" aria-labelledby="v2-i18n-save-{{$i}} v2-i18n-key-{{$i}}">{{tr "Salva"}}</button>
       </form>
     </td>
   </tr>{{end}}</tbody>
@@ -535,55 +535,55 @@
   <input type="hidden" name="key" value="{{.Key}}">
   <div class="setting-info">
     <div class="setting-title">
-      {{if or (eq .Kind "days") (eq .Kind "week")}}<span class="setting-label" id="label-{{.Key}}">{{.Label}}</span>{{else}}<label class="setting-label" id="label-{{.Key}}" for="input-{{.Key}}">{{.Label}}</label>{{end}}
-      {{if .Modified}}<span class="setting-badge">modificato</span>{{end}}
-      {{if .OriginLabel}}<span class="setting-badge setting-origin" title="{{.OriginTitle}}">{{.OriginLabel}}</span>{{end}}
-      <span class="setting-badge setting-dirty" data-v2-dirty-badge hidden>non salvata</span>
+      {{if or (eq .Kind "days") (eq .Kind "week")}}<span class="setting-label" id="label-{{.Key}}">{{tr .Label}}</span>{{else}}<label class="setting-label" id="label-{{.Key}}" for="input-{{.Key}}">{{tr .Label}}</label>{{end}}
+      {{if .Modified}}<span class="setting-badge">{{tr "modificato"}}</span>{{end}}
+      {{if .OriginLabel}}<span class="setting-badge setting-origin" {{trTitle .OriginTitle}}>{{tr .OriginLabel}}</span>{{end}}
+      <span class="setting-badge setting-dirty" data-v2-dirty-badge hidden>{{tr "non salvata"}}</span>
     </div>
-    {{if .Hint}}<p class="setting-hint" id="hint-{{.Key}}">{{.Hint}}</p>{{end}}
+    {{if .Hint}}<p class="setting-hint" id="hint-{{.Key}}">{{tr .Hint}}</p>{{end}}
     <div class="setting-meta">
-      {{if .DefaultInline}}<span class="setting-default"><span>Predefinito:</span> <code>{{.Default}}</code></span>{{end}}
-      <code class="setting-key">{{.Key}}</code>
+      {{if .DefaultInline}}<span class="setting-default"><span>{{tr "Predefinito:"}}</span> <code>{{tr .Default}}</code></span>{{end}}
+      <code class="setting-key">{{tr .Key}}</code>
     </div>
   </div>
   <div class="setting-control{{if .Browse}} setting-control-browse{{end}}">
     <div class="setting-input">
-    {{if .Blocked}}{{if eq .Kind "bool"}}<span class="switch"><input type="checkbox" role="switch" id="input-{{.Key}}" disabled{{if .BoolValue}} checked{{end}} /><span class="switch-text" aria-hidden="true"><span class="switch-on">Sì</span><span class="switch-off">No</span></span></span>{{else}}<input class="input" id="input-{{.Key}}" value="{{.Value}}" disabled aria-describedby="status-{{.Key}}" />{{end}}
+    {{if .Blocked}}{{if eq .Kind "bool"}}<span class="switch"><input type="checkbox" role="switch" id="input-{{.Key}}" disabled{{if .BoolValue}} checked{{end}} /><span class="switch-text" aria-hidden="true"><span class="switch-on">{{tr "Sì"}}</span><span class="switch-off">{{tr "No"}}</span></span></span>{{else}}<input class="input" id="input-{{.Key}}" value="{{.Value}}" disabled aria-describedby="status-{{.Key}}" />{{end}}
     {{else if .Disabled}}<input class="input" id="input-{{.Key}}" value="{{.Value}}" disabled aria-describedby="status-{{.Key}}" />
-    {{else if .Managed}}<input class="input" id="input-{{.Key}}" value="Auto" disabled title="Gestito dall'ottimizzazione automatica" />
-    {{else if eq .Kind "structured"}}<p class="hint">Valore strutturato: si modifica dalla sezione dedicata.</p>
-    {{else if eq .Kind "bool"}}<span class="switch"><input type="checkbox" role="switch" name="value" id="input-{{.Key}}" value="{{.TrueValue}}"{{if .BoolValue}} checked{{end}}{{if .DescribedBy}} aria-describedby="{{.DescribedBy}}"{{end}}{{if .Error}} aria-invalid="true"{{end}} /><input type="hidden" name="value" value="{{.FalseValue}}" /><span class="switch-text" aria-hidden="true"><span class="switch-on">Sì</span><span class="switch-off">No</span></span></span>
-    {{else if eq .Kind "select"}}<select class="input" name="value" id="input-{{.Key}}"{{if .DescribedBy}} aria-describedby="{{.DescribedBy}}"{{end}}{{if .Error}} aria-invalid="true"{{end}}>{{range .Options}}<option value="{{.Value}}" {{if .Selected}}selected{{end}}>{{.Label}}</option>{{end}}</select>
-    {{else if eq .Kind "langcombo"}}<select class="input" id="input-{{.Key}}"{{if not .Custom}} name="value"{{end}} data-v2-lang-combo{{if .DescribedBy}} aria-describedby="{{.DescribedBy}}"{{end}}>{{range .Options}}<option value="{{.Value}}"{{if .Selected}} selected{{end}}>{{if eq .Value "__custom__"}}{{.Label}}{{else}}{{.Label}} ({{.Value}}){{end}}</option>{{end}}</select><input class="input" type="text" data-v2-lang-custom value="{{if .Custom}}{{.Value}}{{end}}" placeholder="ita" aria-labelledby="label-{{.Key}}"{{if .Custom}} name="value"{{else}} hidden{{end}} />
-    {{else if eq .Kind "days"}}<div class="setting-days" role="group" aria-labelledby="label-{{.Key}}"{{if .DescribedBy}} aria-describedby="{{.DescribedBy}}"{{end}}>{{$key := .Key}}{{range $i, $day := .Options}}<label class="check"><input type="checkbox" name="value" value="{{$day.Value}}"{{if eq $i 0}} id="input-{{$key}}"{{end}}{{if $day.Selected}} checked{{end}} /> <span>{{$day.Label}}</span></label>{{end}}</div>
-    {{else if eq .Kind "week"}}<div class="setting-week table-wrap"><input type="hidden" name="week-reset" value="" />{{$key := .Key}}<table class="data-table" aria-labelledby="label-{{.Key}}"{{if .DescribedBy}} aria-describedby="{{.DescribedBy}}"{{end}}><thead><tr><th scope="col">Giorno</th><th scope="col" id="{{$key}}-col-mode" title="Modalità del giorno: «Non attiva» nessuna fascia, «Limite» la fascia con i tuoi valori, «Auto» la fascia in cui Gextto misura la linea e si adatta.">Modalità</th><th scope="col" id="{{$key}}-col-start">Inizio</th><th scope="col" id="{{$key}}-col-end">Fine</th><th scope="col" id="{{$key}}-col-dl">Download (KiB/s)</th><th scope="col" id="{{$key}}-col-ul">Upload (KiB/s)</th></tr></thead><tbody>{{range $i, $day := .Week}}<tr><th scope="row" id="{{$key}}-row-{{$day.Key}}">{{$day.Label}}</th><td><select class="input" name="day-{{$day.Key}}-mode"{{if eq $i 0}} id="input-{{$key}}"{{end}} aria-labelledby="{{$key}}-row-{{$day.Key}} {{$key}}-col-mode"><option value="off"{{if eq $day.Mode "off"}} selected{{end}}>Non attiva</option><option value="limit"{{if eq $day.Mode "limit"}} selected{{end}}>Limite</option><option value="auto"{{if eq $day.Mode "auto"}} selected{{end}}>Auto</option></select></td><td><input class="input" type="time" name="day-{{$day.Key}}-start" value="{{$day.Start}}" aria-labelledby="{{$key}}-row-{{$day.Key}} {{$key}}-col-start" /></td><td><input class="input" type="time" name="day-{{$day.Key}}-end" value="{{$day.End}}" aria-labelledby="{{$key}}-row-{{$day.Key}} {{$key}}-col-end" /></td><td><input class="input" type="number" min="0" step="1" name="day-{{$day.Key}}-dl" value="{{if eq $day.Mode "limit"}}{{$day.Download}}{{else}}0{{end}}"{{if ne $day.Mode "limit"}} disabled{{end}} aria-labelledby="{{$key}}-row-{{$day.Key}} {{$key}}-col-dl" /></td><td><input class="input" type="number" min="0" step="1" name="day-{{$day.Key}}-ul" value="{{if eq $day.Mode "limit"}}{{$day.Upload}}{{else}}0{{end}}"{{if ne $day.Mode "limit"}} disabled{{end}} aria-labelledby="{{$key}}-row-{{$day.Key}} {{$key}}-col-ul" /></td></tr>{{end}}</tbody></table></div>
-    {{else if eq .Kind "tags"}}<textarea class="input" name="value" id="input-{{.Key}}" rows="3" placeholder="{{if .Placeholder}}{{.Placeholder}}{{else}}un valore per riga{{end}}"{{if .DescribedBy}} aria-describedby="{{.DescribedBy}}"{{end}}{{if .Error}} aria-invalid="true"{{end}}>{{.Value}}</textarea>
-    {{else if eq .Kind "area"}}<textarea class="input" name="value" id="input-{{.Key}}" rows="3" placeholder="{{.Placeholder}}"{{if .DescribedBy}} aria-describedby="{{.DescribedBy}}"{{end}}{{if .Error}} aria-invalid="true"{{end}}>{{.Value}}</textarea>
-    {{else if eq .Kind "secret"}}<input class="input" type="password" name="value" id="input-{{.Key}}" value="" placeholder="{{if .Value}}impostato — lascia vuoto per non cambiarlo{{else}}non impostato{{end}}" autocomplete="new-password"{{if .DescribedBy}} aria-describedby="{{.DescribedBy}}"{{end}}{{if .Error}} aria-invalid="true"{{end}} />
-    {{else if eq .Kind "number"}}<input class="input" type="number" step="{{if .Step}}{{.Step}}{{else}}1{{end}}" name="value" id="input-{{.Key}}" value="{{.Value}}" placeholder="{{.Placeholder}}"{{if .DescribedBy}} aria-describedby="{{.DescribedBy}}"{{end}}{{if .Error}} aria-invalid="true"{{end}} />
+    {{else if .Managed}}<input class="input" id="input-{{.Key}}" value="Auto" disabled {{trTitle "Gestito dall'ottimizzazione automatica"}} />
+    {{else if eq .Kind "structured"}}<p class="hint">{{tr "Valore strutturato: si modifica dalla sezione dedicata."}}</p>
+    {{else if eq .Kind "bool"}}<span class="switch"><input type="checkbox" role="switch" name="value" id="input-{{.Key}}" value="{{.TrueValue}}"{{if .BoolValue}} checked{{end}}{{if .DescribedBy}} aria-describedby="{{.DescribedBy}}"{{end}}{{if .Error}} aria-invalid="true"{{end}} /><input type="hidden" name="value" value="{{.FalseValue}}" /><span class="switch-text" aria-hidden="true"><span class="switch-on">{{tr "Sì"}}</span><span class="switch-off">{{tr "No"}}</span></span></span>
+    {{else if eq .Kind "select"}}<select class="input" name="value" id="input-{{.Key}}"{{if .DescribedBy}} aria-describedby="{{.DescribedBy}}"{{end}}{{if .Error}} aria-invalid="true"{{end}}>{{range .Options}}<option value="{{.Value}}" {{if .Selected}}selected{{end}}>{{tr .Label}}</option>{{end}}</select>
+    {{else if eq .Kind "langcombo"}}<select class="input" id="input-{{.Key}}"{{if not .Custom}} name="value"{{end}} data-v2-lang-combo{{if .DescribedBy}} aria-describedby="{{.DescribedBy}}"{{end}}>{{range .Options}}<option value="{{.Value}}"{{if .Selected}} selected{{end}}>{{if eq .Value "__custom__"}}{{tr .Label}}{{else}}{{.Label}} ({{.Value}}){{end}}</option>{{end}}</select><input class="input" type="text" data-v2-lang-custom value="{{if .Custom}}{{.Value}}{{end}}" placeholder="{{tr "ita"}}" aria-labelledby="label-{{.Key}}"{{if .Custom}} name="value"{{else}} hidden{{end}} />
+    {{else if eq .Kind "days"}}<div class="setting-days" role="group" aria-labelledby="label-{{.Key}}"{{if .DescribedBy}} aria-describedby="{{.DescribedBy}}"{{end}}>{{$key := .Key}}{{range $i, $day := .Options}}<label class="check"><input type="checkbox" name="value" value="{{$day.Value}}"{{if eq $i 0}} id="input-{{$key}}"{{end}}{{if $day.Selected}} checked{{end}} /> <span>{{tr $day.Label}}</span></label>{{end}}</div>
+    {{else if eq .Kind "week"}}<div class="setting-week table-wrap"><input type="hidden" name="week-reset" value="" />{{$key := .Key}}<table class="data-table" aria-labelledby="label-{{.Key}}"{{if .DescribedBy}} aria-describedby="{{.DescribedBy}}"{{end}}><thead><tr><th scope="col">{{tr "Giorno"}}</th><th scope="col" id="{{$key}}-col-mode" {{trTitle "Modalità del giorno: «Non attiva» nessuna fascia, «Limite» la fascia con i tuoi valori, «Auto» la fascia in cui Gextto misura la linea e si adatta."}}>{{tr "Modalità"}}</th><th scope="col" id="{{$key}}-col-start">{{tr "Inizio"}}</th><th scope="col" id="{{$key}}-col-end">{{tr "Fine"}}</th><th scope="col" id="{{$key}}-col-dl">{{tr "Download (KiB/s)"}}</th><th scope="col" id="{{$key}}-col-ul">{{tr "Upload (KiB/s)"}}</th></tr></thead><tbody>{{range $i, $day := .Week}}<tr><th scope="row" id="{{$key}}-row-{{$day.Key}}">{{tr $day.Label}}</th><td><select class="input" name="day-{{$day.Key}}-mode"{{if eq $i 0}} id="input-{{$key}}"{{end}} aria-labelledby="{{$key}}-row-{{$day.Key}} {{$key}}-col-mode"><option value="off"{{if eq $day.Mode "off"}} selected{{end}}>{{tr "Non attiva"}}</option><option value="limit"{{if eq $day.Mode "limit"}} selected{{end}}>{{tr "Limite"}}</option><option value="auto"{{if eq $day.Mode "auto"}} selected{{end}}>{{tr "Auto"}}</option></select></td><td><input class="input" type="time" name="day-{{$day.Key}}-start" value="{{$day.Start}}" aria-labelledby="{{$key}}-row-{{$day.Key}} {{$key}}-col-start" /></td><td><input class="input" type="time" name="day-{{$day.Key}}-end" value="{{$day.End}}" aria-labelledby="{{$key}}-row-{{$day.Key}} {{$key}}-col-end" /></td><td><input class="input" type="number" min="0" step="1" name="day-{{$day.Key}}-dl" value="{{if eq $day.Mode "limit"}}{{$day.Download}}{{else}}0{{end}}"{{if ne $day.Mode "limit"}} disabled{{end}} aria-labelledby="{{$key}}-row-{{$day.Key}} {{$key}}-col-dl" /></td><td><input class="input" type="number" min="0" step="1" name="day-{{$day.Key}}-ul" value="{{if eq $day.Mode "limit"}}{{$day.Upload}}{{else}}0{{end}}"{{if ne $day.Mode "limit"}} disabled{{end}} aria-labelledby="{{$key}}-row-{{$day.Key}} {{$key}}-col-ul" /></td></tr>{{end}}</tbody></table></div>
+    {{else if eq .Kind "tags"}}<textarea class="input" name="value" id="input-{{.Key}}" rows="3" placeholder="{{if .Placeholder}}{{tr .Placeholder}}{{else}}{{tr "un valore per riga"}}{{end}}"{{if .DescribedBy}} aria-describedby="{{.DescribedBy}}"{{end}}{{if .Error}} aria-invalid="true"{{end}}>{{.Value}}</textarea>
+    {{else if eq .Kind "area"}}<textarea class="input" name="value" id="input-{{.Key}}" rows="3" placeholder="{{tr .Placeholder}}"{{if .DescribedBy}} aria-describedby="{{.DescribedBy}}"{{end}}{{if .Error}} aria-invalid="true"{{end}}>{{.Value}}</textarea>
+    {{else if eq .Kind "secret"}}<input class="input" type="password" name="value" id="input-{{.Key}}" value="" placeholder="{{if .Value}}{{tr "impostato — lascia vuoto per non cambiarlo"}}{{else}}{{tr "non impostato"}}{{end}}" autocomplete="new-password"{{if .DescribedBy}} aria-describedby="{{.DescribedBy}}"{{end}}{{if .Error}} aria-invalid="true"{{end}} />
+    {{else if eq .Kind "number"}}<input class="input" type="number" step="{{if .Step}}{{.Step}}{{else}}1{{end}}" name="value" id="input-{{.Key}}" value="{{.Value}}" placeholder="{{tr .Placeholder}}"{{if .DescribedBy}} aria-describedby="{{.DescribedBy}}"{{end}}{{if .Error}} aria-invalid="true"{{end}} />
     {{else if eq .Kind "time"}}<input class="input" type="time" name="value" id="input-{{.Key}}" value="{{.Value}}"{{if .DescribedBy}} aria-describedby="{{.DescribedBy}}"{{end}}{{if .Error}} aria-invalid="true"{{end}} />
-    {{else if eq .Kind "url"}}<input class="input" type="url" name="value" id="input-{{.Key}}" value="{{.Value}}" placeholder="{{.Placeholder}}" inputmode="url"{{if .DescribedBy}} aria-describedby="{{.DescribedBy}}"{{end}}{{if .Error}} aria-invalid="true"{{end}} />
-    {{else}}<input class="input" name="value" id="input-{{.Key}}" value="{{.Value}}" placeholder="{{.Placeholder}}"{{if .DescribedBy}} aria-describedby="{{.DescribedBy}}"{{end}}{{if .Error}} aria-invalid="true"{{end}} />{{end}}
-    {{if .Unit}}<span class="setting-unit" id="unit-{{.Key}}">{{.Unit}}</span>{{end}}
-    {{if .Browse}}<button class="btn sm" type="button" data-v2-browse-for="{{.Key}}" title="Sfoglia le cartelle disponibili sul server">Sfoglia</button>{{end}}
-    {{if .Generatable}}<button class="btn sm" type="button" data-v2-generate="{{.Key}}" aria-describedby="hint-{{.Key}}" title="Genera una chiave casuale e la salva">Genera</button>
-    <button class="btn sm" type="button" data-v2-copy-field="{{.Key}}" aria-describedby="hint-{{.Key}}" title="Copia la chiave negli appunti">Copia</button>{{end}}
+    {{else if eq .Kind "url"}}<input class="input" type="url" name="value" id="input-{{.Key}}" value="{{.Value}}" placeholder="{{tr .Placeholder}}" inputmode="url"{{if .DescribedBy}} aria-describedby="{{.DescribedBy}}"{{end}}{{if .Error}} aria-invalid="true"{{end}} />
+    {{else}}<input class="input" name="value" id="input-{{.Key}}" value="{{.Value}}" placeholder="{{tr .Placeholder}}"{{if .DescribedBy}} aria-describedby="{{.DescribedBy}}"{{end}}{{if .Error}} aria-invalid="true"{{end}} />{{end}}
+    {{if .Unit}}<span class="setting-unit" id="unit-{{.Key}}">{{tr .Unit}}</span>{{end}}
+    {{if .Browse}}<button class="btn sm" type="button" data-v2-browse-for="{{.Key}}" {{trTitle "Sfoglia le cartelle disponibili sul server"}}>{{tr "Sfoglia"}}</button>{{end}}
+    {{if .Generatable}}<button class="btn sm" type="button" data-v2-generate="{{.Key}}" aria-describedby="hint-{{.Key}}" {{trTitle "Genera una chiave casuale e la salva"}}>{{tr "Genera"}}</button>
+    <button class="btn sm" type="button" data-v2-copy-field="{{.Key}}" aria-describedby="hint-{{.Key}}" {{trTitle "Copia la chiave negli appunti"}}>{{tr "Copia"}}</button>{{end}}
     </div>
-    {{if .Zero}}<small class="setting-zero" id="zero-{{.Key}}">{{.Zero}}</small>{{end}}
+    {{if .Zero}}<small class="setting-zero" id="zero-{{.Key}}">{{tr .Zero}}</small>{{end}}
   </div>
   <div class="setting-actions">
-    <small class="setting-status" id="status-{{.Key}}">{{if .Status}}<span class="htx-status {{if .Error}}err{{else}}ok{{end}}">{{.Status}}</span>{{else if .Blocked}}{{.BlockedNote}}{{else if .Disabled}}{{if .DisabledEngine}}<span>Non attivo con il motore</span> «{{.DisabledEngine}}»{{else}}{{.DisabledNote}}{{end}}{{end}}</small>
+    <small class="setting-status" id="status-{{.Key}}">{{if .Status}}<span class="htx-status {{if .Error}}err{{else}}ok{{end}}">{{tr .Status}}</span>{{else if .Blocked}}{{tr .BlockedNote}}{{else if .Disabled}}{{if .DisabledEngine}}<span>{{tr "Non attivo con il motore"}}</span> «{{.DisabledEngine}}»{{else}}{{tr .DisabledNote}}{{end}}{{end}}</small>
     {{if .Generatable}}<small class="setting-status" id="gen-status-{{.Key}}" role="status" aria-live="polite"></small>{{end}}
-    {{if .Resettable}}<button class="btn sm ghost setting-reset" type="button" id="reset-{{.Key}}" data-v2-reset="{{.Default}}" aria-labelledby="reset-{{.Key}} label-{{.Key}}" title="Ripristina il valore predefinito (da salvare)"><span aria-hidden="true">↺</span> <span>Predefinito</span></button>{{end}}
-    {{if .Proposable}}<button class="btn sm" type="button" hx-post="/settings/qbittorrent-mappings" hx-target="#v2-setting-{{.Key}}" hx-swap="outerHTML" hx-disabled-elt="this" title="Legge da qBittorrent le sue cartelle e propone la mappatura dei percorsi">Proponi</button>{{end}}
-    {{if and (ne .Kind "structured") (not .Managed) (not .Disabled) (not .Blocked)}}<button class="btn sm primary setting-save" type="submit" id="save-{{.Key}}" aria-labelledby="save-{{.Key}} label-{{.Key}}">Salva</button>{{end}}
+    {{if .Resettable}}<button class="btn sm ghost setting-reset" type="button" id="reset-{{.Key}}" data-v2-reset="{{.Default}}" aria-labelledby="reset-{{.Key}} label-{{.Key}}" {{trTitle "Ripristina il valore predefinito (da salvare)"}}><span aria-hidden="true">↺</span> <span>{{tr "Predefinito"}}</span></button>{{end}}
+    {{if .Proposable}}<button class="btn sm" type="button" hx-post="/settings/qbittorrent-mappings" hx-target="#v2-setting-{{.Key}}" hx-swap="outerHTML" hx-disabled-elt="this" {{trTitle "Legge da qBittorrent le sue cartelle e propone la mappatura dei percorsi"}}>{{tr "Proponi"}}</button>{{end}}
+    {{if and (ne .Kind "structured") (not .Managed) (not .Disabled) (not .Blocked)}}<button class="btn sm primary setting-save" type="submit" id="save-{{.Key}}" aria-labelledby="save-{{.Key}} label-{{.Key}}">{{tr "Salva"}}</button>{{end}}
   </div>
 </form>
 {{end}}
 
 {{define "v2_settings_search"}}
 {{if .Matches}}
-<table class="data-table"><caption class="sr-only">Risultati della ricerca impostazioni</caption><thead><tr><th scope="col">Impostazione</th><th scope="col">Chiave</th><th scope="col">Sezione</th></tr></thead>
-<tbody>{{range .Matches}}<tr><td><a href="/?view=settings&amp;tab={{.Tab}}{{if .Key}}&amp;highlight={{.Key}}#v2-setting-{{.Key}}{{end}}" hx-get="/settings/body?tab={{.Tab}}{{if .Key}}&amp;highlight={{.Key}}{{end}}" hx-target="#v2-settings-body" hx-swap="outerHTML">{{.Label}}</a></td><td>{{if .Key}}<code>{{.Key}}</code>{{end}}</td><td>{{.TabLabel}}</td></tr>{{end}}</tbody></table>
-{{else}}<p class="muted"><span>Nessuna impostazione corrisponde a</span> «{{.Query}}».</p>{{end}}
+<table class="data-table"><caption class="sr-only">{{tr "Risultati della ricerca impostazioni"}}</caption><thead><tr><th scope="col">{{tr "Impostazione"}}</th><th scope="col">{{tr "Chiave"}}</th><th scope="col">{{tr "Sezione"}}</th></tr></thead>
+<tbody>{{range .Matches}}<tr><td><a href="/?view=settings&amp;tab={{.Tab}}{{if .Key}}&amp;highlight={{.Key}}#v2-setting-{{.Key}}{{end}}" hx-get="/settings/body?tab={{.Tab}}{{if .Key}}&amp;highlight={{.Key}}{{end}}" hx-target="#v2-settings-body" hx-swap="outerHTML">{{tr .Label}}</a></td><td>{{if .Key}}<code>{{tr .Key}}</code>{{end}}</td><td>{{tr .TabLabel}}</td></tr>{{end}}</tbody></table>
+{{else}}<p class="muted"><span>{{tr "Nessuna impostazione corrisponde a"}}</span> «{{.Query}}».</p>{{end}}
 {{end}}

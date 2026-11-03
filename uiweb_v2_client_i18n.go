@@ -1,8 +1,8 @@
 package gextto
 
 // uiweb_v2_client_i18n.go feeds the small dictionary the client script needs.
-// The server-rendered HTML is translated by v2TranslateHTML, but the strings the
-// browser sets at runtime (selection counter, copy feedback, folder browser,
+// The server-rendered HTML is translated while it renders (`tr` in the
+// templates), but the strings the browser sets at runtime (selection counter, copy feedback, folder browser,
 // toasts, pull-to-refresh) never pass through it: they are looked up here and
 // injected as window.__v2i18n, then read back by v2-core.js through t().
 
@@ -111,7 +111,7 @@ func resetV2ClientI18nMemo() {
 }
 
 // v2ClientI18nJSON renders window.__v2i18n for the active language. Unknown keys
-// fall back to the Italian source, exactly like v2TranslateHTML. The result is
+// fall back to the Italian source, exactly like `tr`. The result is
 // cached per language and invalidated when a translation changes.
 func v2ClientI18nJSON(s *AppState) template.JS {
 	if s == nil || s.i18n == nil {

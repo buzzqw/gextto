@@ -6,85 +6,85 @@
 <div class="view dashboard-view">
   <div class="dashboard-intro">
     <div>
-      <span class="eyebrow">Panoramica</span>
-      <h2>Controllo libreria e download</h2>
-      <p class="muted">Monitora il servizio, avvia una ricerca o raggiungi la sezione che ti serve.</p>
+      <span class="eyebrow">{{tr "Panoramica"}}</span>
+      <h2>{{tr "Controllo libreria e download"}}</h2>
+      <p class="muted">{{tr "Monitora il servizio, avvia una ricerca o raggiungi la sezione che ti serve."}}</p>
     </div>
-    <span class="mode-badge{{if .DryRun}} dry{{else}} active{{end}}" title="{{if .DryRun}}Modalità prova: non scarica e non importa nulla{{else}}Gextto è attivo: scarica e importa davvero. Il badge «ok» in alto è lo stato di salute.{{end}}">{{if .DryRun}}DRY-RUN{{else}}ATTIVO{{end}}</span>
+    <span class="mode-badge{{if .DryRun}} dry{{else}} active{{end}}" {{if .DryRun}}{{trTitle "Modalità prova: non scarica e non importa nulla"}}{{else}}{{trTitle "Gextto è attivo: scarica e importa davvero. Il badge «ok» in alto è lo stato di salute."}}{{end}}>{{if .DryRun}}{{tr "DRY-RUN"}}{{else}}{{tr "ATTIVO"}}{{end}}</span>
   </div>
   <div class="panel session-strip-panel dashboard-traffic-panel">
-    <div class="panel-head"><h3>In sessione</h3><small class="muted">Ultimi 30 minuti</small></div>
+    <div class="panel-head"><h3>{{tr "In sessione"}}</h3><small class="muted">{{tr "Ultimi 30 minuti"}}</small></div>
     <div class="panel-body">
       <div class="session-strip">
-        <span>{{.Downloading}} <span>in scarico</span> · {{.Idle}} <span>fermi a 0 B/s</span> · {{.Seeding}} <span>in seed</span>{{if or .Paused .Errors}} · {{.Paused}} <span>in pausa</span> · {{.Errors}} <span>in errore</span>{{end}}</span>
-        <span class="muted"><span>Banda 30 giorni</span> {{bytes .Consumption.Last30}}</span>
-        <a class="btn sm" href="/?view=downloads">Vai a Scarico</a>
+        <span>{{tr .Downloading}} <span>{{tr "in scarico"}}</span> · {{.Idle}} <span>{{tr "fermi a 0 B/s"}}</span> · {{.Seeding}} <span>{{tr "in seed"}}</span>{{if or .Paused .Errors}} · {{.Paused}} <span>{{tr "in pausa"}}</span> · {{.Errors}} <span>{{tr "in errore"}}</span>{{end}}</span>
+        <span class="muted"><span>{{tr "Banda 30 giorni"}}</span> {{bytes .Consumption.Last30}}</span>
+        <a class="btn sm" href="/?view=downloads">{{tr "Vai a Scarico"}}</a>
       </div>
       {{template "v2_live_traffic" .Traffic}}
     </div>
   </div>
     <div class="panel dashboard-problems-panel">
-    <div class="panel-head"><h3>Da controllare</h3><small class="muted">Download fermi, spostamenti in sospeso e avvisi</small></div>
-    <div class="panel-body" id="v2-dashboard-problems" hx-get="/dashboard/problems" hx-trigger="load, every 60s" hx-swap="innerHTML"><p class="muted">Caricamento…</p></div>
+    <div class="panel-head"><h3>{{tr "Da controllare"}}</h3><small class="muted">{{tr "Download fermi, spostamenti in sospeso e avvisi"}}</small></div>
+    <div class="panel-body" id="v2-dashboard-problems" hx-get="/dashboard/problems" hx-trigger="load, every 60s" hx-swap="innerHTML"><p class="muted">{{tr "Caricamento…"}}</p></div>
   </div>
   <div class="panel dashboard-cycle-panel">
-    <div class="panel-head"><h3>Ricerca automatica</h3><small class="muted">Serie TV, film e fumetti · riempimento gap</small></div>
+    <div class="panel-head"><h3>{{tr "Ricerca automatica"}}</h3><small class="muted">{{tr "Serie TV, film e fumetti · riempimento gap"}}</small></div>
     <div class="panel-body">
       <div class="toolbar dashboard-quick-actions">
-        <button class="btn primary" hx-post="/run-cycle" hx-vals='{"domain":"full"}' hx-target="#v2-toast-region" hx-swap="innerHTML" hx-disabled-elt="this">Avvia ciclo (tutto)</button>
-        <button class="btn" hx-post="/run-cycle" hx-vals='{"domain":"series"}' hx-target="#v2-toast-region" hx-swap="innerHTML" hx-disabled-elt="this">Serie TV</button>
-        <button class="btn" hx-post="/run-cycle" hx-vals='{"domain":"movies"}' hx-target="#v2-toast-region" hx-swap="innerHTML" hx-disabled-elt="this">Film</button>
-        <button class="btn" hx-post="/run-cycle" hx-vals='{"domain":"comics"}' hx-target="#v2-toast-region" hx-swap="innerHTML" hx-disabled-elt="this">Fumetti</button>
+        <button class="btn primary" hx-post="/run-cycle" hx-vals='{"domain":"full"}' hx-target="#v2-toast-region" hx-swap="innerHTML" hx-disabled-elt="this">{{tr "Avvia ciclo (tutto)"}}</button>
+        <button class="btn" hx-post="/run-cycle" hx-vals='{"domain":"series"}' hx-target="#v2-toast-region" hx-swap="innerHTML" hx-disabled-elt="this">{{tr "Serie TV"}}</button>
+        <button class="btn" hx-post="/run-cycle" hx-vals='{"domain":"movies"}' hx-target="#v2-toast-region" hx-swap="innerHTML" hx-disabled-elt="this">{{tr "Film"}}</button>
+        <button class="btn" hx-post="/run-cycle" hx-vals='{"domain":"comics"}' hx-target="#v2-toast-region" hx-swap="innerHTML" hx-disabled-elt="this">{{tr "Fumetti"}}</button>
       </div>
-      <div class="row"><span>Prossima esecuzione</span><strong>{{if .NextCycle}}{{.NextCycle}}{{else}}non programmata{{end}}</strong></div>
-      <div class="row"><span>Intervallo</span><strong>{{if .CycleInterval}}{{.CycleInterval}}{{else}}—{{end}}</strong></div>
-      <div class="row"><span>Ultimo ciclo</span><strong>{{.CycleStarted}} <span>avviati</span> · {{.CycleErrors}} <span>errori</span> · {{.CycleGaps}} <span>gap</span></strong></div>
+      <div class="row"><span>{{tr "Prossima esecuzione"}}</span><strong>{{if .NextCycle}}{{tr .NextCycle}}{{else}}{{tr "non programmata"}}{{end}}</strong></div>
+      <div class="row"><span>{{tr "Intervallo"}}</span><strong>{{if .CycleInterval}}{{tr .CycleInterval}}{{else}}—{{end}}</strong></div>
+      <div class="row"><span>{{tr "Ultimo ciclo"}}</span><strong>{{tr .CycleStarted}} <span>{{tr "avviati"}}</span> · {{.CycleErrors}} <span>{{tr "errori"}}</span> · {{.CycleGaps}} <span>{{tr "gap"}}</span></strong></div>
       <div class="toolbar dashboard-cycle-foot">
-        <form method="post" action="/dashboard/backup" hx-post="/dashboard/backup" hx-target="#v2-toast-region" hx-swap="innerHTML" style="display:inline"><button class="btn sm" type="submit" title="Crea uno snapshot di backup dei database">Backup</button></form>
-        <a class="btn sm" href="/?view=settings">Configurazione</a>
+        <form method="post" action="/dashboard/backup" hx-post="/dashboard/backup" hx-target="#v2-toast-region" hx-swap="innerHTML" style="display:inline"><button class="btn sm" type="submit" {{trTitle "Crea uno snapshot di backup dei database"}}>{{tr "Backup"}}</button></form>
+        <a class="btn sm" href="/?view=settings">{{tr "Configurazione"}}</a>
       </div>
     </div>
   </div>
   <details class="panel dashboard-search-panel" data-mobile-collapse open>
-    <summary class="panel-head"><h3>Cerca</h3><small class="muted">Archivio, indexer e motori web</small></summary>
+    <summary class="panel-head"><h3>{{tr "Cerca"}}</h3><small class="muted">{{tr "Archivio, indexer e motori web"}}</small></summary>
     <div class="panel-body">
       <form class="search-row" data-v2-dashboard-search>
-        <input type="search" name="q" aria-label="Cerca in archivio, indexer e motori web" placeholder="Cerca in archivio, indexer e motori web…" />
-        <label class="chk"><input type="checkbox" name="kad" value="1" data-v2-dashboard-search-kad title="Cerca anche su eD2k (Kad, server o entrambi, secondo Configurazione → eD2k e Kad), se l'integrazione è attiva">eD2k</label>
-        <button class="btn primary" type="submit">Cerca</button>
+        <input type="search" name="q" aria-label="{{tr "Cerca in archivio, indexer e motori web"}}" placeholder="{{tr "Cerca in archivio, indexer e motori web…"}}" />
+        <label class="chk"><input type="checkbox" name="kad" value="1" data-v2-dashboard-search-kad {{trTitle "Cerca anche su eD2k (Kad, server o entrambi, secondo Configurazione → eD2k e Kad), se l'integrazione è attiva"}}>{{tr "eD2k"}}</label>
+        <button class="btn primary" type="submit">{{tr "Cerca"}}</button>
       </form>
       <div class="toolbar dashboard-search-results-toolbar">
-        <input class="input" type="search" data-v2-dashboard-search-filter aria-label="Filtra i risultati già caricati" placeholder="Filtra i risultati già caricati… ( -parola esclude )" disabled />
+        <input class="input" type="search" data-v2-dashboard-search-filter aria-label="{{tr "Filtra i risultati già caricati"}}" placeholder="{{tr "Filtra i risultati già caricati… ( -parola esclude )"}}" disabled />
         <small class="muted" data-v2-search-status aria-live="polite"></small>
         <small class="muted" data-v2-search-count aria-live="polite"></small>
       </div>
       <div class="table-wrap dashboard-search-results-table" tabindex="0">
-        <table class="data-table"><caption class="sr-only">Risultati ricerca</caption>
-          <thead><tr><th scope="col">Release</th><th scope="col">Sorgente</th><th scope="col">Punteggio</th><th scope="col">Azioni</th></tr></thead>
-          <tbody data-v2-search-body><tr><td class="muted" colspan="4">Inserisci una ricerca.</td></tr></tbody>
+        <table class="data-table"><caption class="sr-only">{{tr "Risultati ricerca"}}</caption>
+          <thead><tr><th scope="col">{{tr "Release"}}</th><th scope="col">{{tr "Sorgente"}}</th><th scope="col">{{tr "Punteggio"}}</th><th scope="col">{{tr "Azioni"}}</th></tr></thead>
+          <tbody data-v2-search-body><tr><td class="muted" colspan="4">{{tr "Inserisci una ricerca."}}</td></tr></tbody>
         </table>
       </div>
     </div>
   </details>
 
   <div class="panel">
-    <div class="panel-head"><h3>Ultimi download</h3><small class="muted">Libreria</small></div>
+    <div class="panel-head"><h3>{{tr "Ultimi download"}}</h3><small class="muted">{{tr "Libreria"}}</small></div>
     <div class="panel-body">
       {{if .Recent}}
-      <div class="table-wrap"><table class="data-table dashboard-recent-table"><thead><tr><th scope="col">Nome</th><th scope="col">Tipo</th><th scope="col">Punteggio</th><th scope="col">Stato</th><th scope="col">Destinazione</th><th scope="col">Concluso</th></tr></thead>
-      <tbody>{{range .Recent}}<tr><td class="truncate" title="{{.Name}}">{{.Name}}</td><td>{{.Kind}}</td><td>{{.QualityScore}}</td><td class="dashboard-complete-cell" title="{{if eq .Status "completed"}}Completato{{else}}{{.Status}}{{end}}">{{if eq .Status "completed"}}<span aria-hidden="true">✓</span><span class="sr-only">Completato</span>{{else}}{{.Status}}{{end}}</td><td class="truncate" title="{{.Destination}}">{{if .Destination}}{{.Destination}}{{else}}—{{end}}</td><td title="{{.DownloadedAt}}">{{.DownloadedAt}}</td></tr>{{end}}</tbody></table></div>
-      {{else}}<p class="muted">Nessun download recente.</p>{{end}}
+      <div class="table-wrap"><table class="data-table dashboard-recent-table"><thead><tr><th scope="col">{{tr "Nome"}}</th><th scope="col">{{tr "Tipo"}}</th><th scope="col">{{tr "Punteggio"}}</th><th scope="col">{{tr "Stato"}}</th><th scope="col">{{tr "Destinazione"}}</th><th scope="col">{{tr "Concluso"}}</th></tr></thead>
+      <tbody>{{range .Recent}}<tr><td class="truncate" {{trTitle .Name}}>{{tr .Name}}</td><td>{{tr .Kind}}</td><td>{{tr .QualityScore}}</td><td class="dashboard-complete-cell" {{if eq .Status "completed"}}{{trTitle "Completato"}}{{else}}{{trTitle .Status}}{{end}}>{{if eq .Status "completed"}}<span aria-hidden="true">✓</span><span class="sr-only">{{tr "Completato"}}</span>{{else}}{{tr .Status}}{{end}}</td><td class="truncate" {{trTitle .Destination}}>{{if .Destination}}{{tr .Destination}}{{else}}—{{end}}</td><td {{trTitle .DownloadedAt}}>{{tr .DownloadedAt}}</td></tr>{{end}}</tbody></table></div>
+      {{else}}<p class="muted">{{tr "Nessun download recente."}}</p>{{end}}
     </div>
   </div>
   <div class="panel dashboard-explore-panel">
-    <div class="panel-head"><h3>Esplora</h3><small class="muted">Accesso rapido alla libreria</small></div>
+    <div class="panel-head"><h3>{{tr "Esplora"}}</h3><small class="muted">{{tr "Accesso rapido alla libreria"}}</small></div>
     <div class="panel-body"><div class="toolbar dashboard-explore-actions">
-       <a class="btn" href="/?view=series">📺 Serie TV</a><a class="btn" href="/?view=movies">🎬 Film</a><a class="btn" href="/?view=search">🔎 Esplora release</a><a class="btn" href="/?view=gaps">⚠ Mancanti</a><a class="btn" href="/?view=comics">📚 Fumetti</a><a class="btn" href="/?view=archive">📦 Archivio</a><a class="btn" href="/?view=maintenance">🛠 Manutenzione</a>
+       <a class="btn" href="/?view=series">{{tr "📺 Serie TV"}}</a><a class="btn" href="/?view=movies">{{tr "🎬 Film"}}</a><a class="btn" href="/?view=search">{{tr "🔎 Esplora release"}}</a><a class="btn" href="/?view=gaps">{{tr "⚠ Mancanti"}}</a><a class="btn" href="/?view=comics">{{tr "📚 Fumetti"}}</a><a class="btn" href="/?view=archive">{{tr "📦 Archivio"}}</a><a class="btn" href="/?view=maintenance">{{tr "🛠 Manutenzione"}}</a>
     </div></div>
   </div>
   <div class="panel dashboard-feed-panel">
-    <div class="panel-head"><h3>Ultimi trovati nelle sorgenti</h3><small class="muted">Caricamento su richiesta</small></div>
-    <div class="panel-body"><div class="toolbar"><button class="btn sm" type="button" hx-get="/dashboard/feed" hx-target="#v2-dashboard-feed" hx-swap="innerHTML">Carica risultati</button></div><div id="v2-dashboard-feed" class="table-wrap" aria-live="polite"><p class="muted">Premi "Carica risultati" per leggere i feed.</p></div></div>
+    <div class="panel-head"><h3>{{tr "Ultimi trovati nelle sorgenti"}}</h3><small class="muted">{{tr "Caricamento su richiesta"}}</small></div>
+    <div class="panel-body"><div class="toolbar"><button class="btn sm" type="button" hx-get="/dashboard/feed" hx-target="#v2-dashboard-feed" hx-swap="innerHTML">{{tr "Carica risultati"}}</button></div><div id="v2-dashboard-feed" class="table-wrap" aria-live="polite"><p class="muted">{{tr "Premi \"Carica risultati\" per leggere i feed."}}</p></div></div>
   </div>
   {{template "v2_dashboard_calendar" .Calendar}}
   {{if .Jobs}}{{template "v2_jobs" .Jobs}}{{end}}
@@ -93,7 +93,7 @@
 
 {{define "v2_action_notice"}}
 <div class="v2-toast{{if .Error}} error{{end}}" role="status">
-  <strong>{{.Title}}</strong><span>{{.Message}}</span>
+  <strong>{{tr .Title}}</strong><span>{{tr .Message}}</span>
 </div>
 {{end}}
 
@@ -107,13 +107,13 @@
 {{define "v2_dashboard_calendar"}}
 <div class="view">
   <div class="panel dashboard-calendar-panel">
-    <div class="panel-head"><h3>Prossime uscite</h3><small class="muted" title="Data della prima messa in onda originale (TMDB): la versione italiana può arrivare molto più tardi.">Serie TV · messa in onda originale</small></div>
+    <div class="panel-head"><h3>{{tr "Prossime uscite"}}</h3><small class="muted" {{trTitle "Data della prima messa in onda originale (TMDB): la versione italiana può arrivare molto più tardi."}}>{{tr "Serie TV · messa in onda originale"}}</small></div>
     <div class="panel-body">
       <div class="dashboard-list">
         {{if .}}{{range .}}<div class="list-item">
-          {{if .Poster}}<img class="list-poster" loading="lazy" src="{{.Poster}}" alt="{{.Series}}" />{{else}}<div class="list-poster placeholder">N/D</div>{{end}}
-          <div><strong>{{if .TvdbURL}}<a href="{{.TvdbURL}}" target="_blank" rel="noopener" title="Apri la serie su TVDB">{{.Series}}</a>{{else if .TmdbURL}}<a href="{{.TmdbURL}}" target="_blank" rel="noopener" title="Apri la serie su TMDB">{{.Series}}</a>{{else}}{{.Series}}{{end}}</strong><small>S{{.Season}}E{{.Episode}} · {{if .AirDate}}{{.AirDate}}{{else}}data non disponibile{{end}}</small></div>
-        </div>{{end}}{{else}}<p class="muted">Nessuna uscita in programma.</p>{{end}}
+          {{if .Poster}}<img class="list-poster" loading="lazy" src="{{.Poster}}" alt="{{.Series}}" />{{else}}<div class="list-poster placeholder">{{tr "N/D"}}</div>{{end}}
+          <div><strong>{{if .TvdbURL}}<a href="{{.TvdbURL}}" target="_blank" rel="noopener" {{trTitle "Apri la serie su TVDB"}}>{{tr .Series}}</a>{{else if .TmdbURL}}<a href="{{.TmdbURL}}" target="_blank" rel="noopener" {{trTitle "Apri la serie su TMDB"}}>{{tr .Series}}</a>{{else}}{{tr .Series}}{{end}}</strong><small>S{{.Season}}E{{.Episode}} · {{if .AirDate}}{{tr .AirDate}}{{else}}{{tr "data non disponibile"}}{{end}}</small></div>
+        </div>{{end}}{{else}}<p class="muted">{{tr "Nessuna uscita in programma."}}</p>{{end}}
       </div>
     </div>
   </div>
@@ -121,24 +121,24 @@
 {{end}}
 
 {{define "v2_dashboard_feed"}}
-{{if .Error}}<p class="alert">{{.Error}}</p>
-{{else if .Rows}}<table class="data-table"><thead><tr><th>Monitorato</th><th>Tipo</th><th>Release</th><th>Fonte</th><th>Azioni</th></tr></thead><tbody>{{range .Rows}}<tr><td>{{.Name}}</td><td>{{if eq .Kind "movie"}}Film{{else}}Serie TV{{end}}</td><td class="truncate" title="{{.Title}}">{{.Title}}</td><td>{{.Source}}</td><td><form hx-post="/dashboard/feed/add" hx-target="this" hx-swap="outerHTML" style="display:inline"><input type="hidden" name="title" value="{{.Title}}"><input type="hidden" name="magnet" value="{{.Magnet}}"><input type="hidden" name="source" value="{{.Source}}"><button class="btn sm primary" type="submit">Accoda</button></form></td></tr>{{end}}</tbody></table>
-{{else}}<p class="muted">Nessuna release trovata.</p>{{end}}
+{{if .Error}}<p class="alert">{{tr .Error}}</p>
+{{else if .Rows}}<table class="data-table"><thead><tr><th>{{tr "Monitorato"}}</th><th>{{tr "Tipo"}}</th><th>{{tr "Release"}}</th><th>{{tr "Fonte"}}</th><th>{{tr "Azioni"}}</th></tr></thead><tbody>{{range .Rows}}<tr><td>{{tr .Name}}</td><td>{{if eq .Kind "movie"}}{{tr "Film"}}{{else}}{{tr "Serie TV"}}{{end}}</td><td class="truncate" {{trTitle .Title}}>{{tr .Title}}</td><td>{{tr .Source}}</td><td><form hx-post="/dashboard/feed/add" hx-target="this" hx-swap="outerHTML" style="display:inline"><input type="hidden" name="title" value="{{.Title}}"><input type="hidden" name="magnet" value="{{.Magnet}}"><input type="hidden" name="source" value="{{.Source}}"><button class="btn sm primary" type="submit">{{tr "Accoda"}}</button></form></td></tr>{{end}}</tbody></table>
+{{else}}<p class="muted">{{tr "Nessuna release trovata."}}</p>{{end}}
 {{end}}
-{{define "v2_dashboard_feed_result"}}{{if .Error}}<span class="badge err">{{.Message}}</span>{{else}}<span class="badge ok">{{.Message}}</span>{{end}}{{end}}
+{{define "v2_dashboard_feed_result"}}{{if .Error}}<span class="badge err">{{tr .Message}}</span>{{else}}<span class="badge ok">{{tr .Message}}</span>{{end}}{{end}}
 
 {{define "v2_live_traffic"}}
 <div id="v2-live-traffic" class="traffic">
   <div class="traffic-legend">
-    <span class="traffic-stat down" title="Velocità di download totale: torrent e aMule"><span aria-hidden="true">↓</span> {{.CurrentDown}}</span>
-    <span class="traffic-stat up" title="Velocità di upload totale: torrent e aMule"><span aria-hidden="true">↑</span> {{.CurrentUp}}</span>
-    {{if .HasEd2k}}<span class="muted traffic-breakdown" title="Ripartizione della velocità totale"><span>Torrent</span> ↓ {{.TorrentDown}} ↑ {{.TorrentUp}} <span class="traffic-breakdown-sep" aria-hidden="true">·</span> <span>eD2k</span> <span class="traffic-ed2k-figure">↓ {{.CurrentEd2kDown}} ↑ {{.CurrentEd2kUp}}</span></span>{{end}}
-    {{if .HasData}}<span class="muted traffic-peak"><span class="traffic-peak-figure" title="Picco di download nel periodo"><span class="traffic-peak-label">Picco download</span> {{.PeakDown}}</span>
-    <span class="traffic-peak-figure" title="Picco di upload nel periodo"><span class="traffic-peak-label">Picco upload</span> {{.PeakUp}}</span></span>{{end}}
-    {{if .HasLimit}}<span class="badge warn" title="Limite di banda attivo">Limite <strong>{{.LimitLabel}}</strong></span>{{else if .Auto}}<span class="badge" title="Auto attivo: Gextto misura la linea e adatta la velocità, senza un tetto fisso">Auto</span>{{else}}<span class="badge" title="Nessun limite di banda attivo">Nessun limite</span>{{end}}
+    <span class="traffic-stat down" {{trTitle "Velocità di download totale: torrent e aMule"}}><span aria-hidden="true">↓</span> {{tr .CurrentDown}}</span>
+    <span class="traffic-stat up" {{trTitle "Velocità di upload totale: torrent e aMule"}}><span aria-hidden="true">↑</span> {{tr .CurrentUp}}</span>
+    {{if .HasEd2k}}<span class="muted traffic-breakdown" {{trTitle "Ripartizione della velocità totale"}}><span>{{tr "Torrent"}}</span> ↓ {{.TorrentDown}} ↑ {{.TorrentUp}} <span class="traffic-breakdown-sep" aria-hidden="true">·</span> <span>{{tr "eD2k"}}</span> <span class="traffic-ed2k-figure">↓ {{.CurrentEd2kDown}} ↑ {{.CurrentEd2kUp}}</span></span>{{end}}
+    {{if .HasData}}<span class="muted traffic-peak"><span class="traffic-peak-figure" {{trTitle "Picco di download nel periodo"}}><span class="traffic-peak-label">{{tr "Picco download"}}</span> {{tr .PeakDown}}</span>
+    <span class="traffic-peak-figure" {{trTitle "Picco di upload nel periodo"}}><span class="traffic-peak-label">{{tr "Picco upload"}}</span> {{tr .PeakUp}}</span></span>{{end}}
+    {{if .HasLimit}}<span class="badge warn" {{trTitle "Limite di banda attivo"}}>{{tr "Limite"}} <strong>{{tr .LimitLabel}}</strong></span>{{else if .Auto}}<span class="badge" {{trTitle "Auto attivo: Gextto misura la linea e adatta la velocità, senza un tetto fisso"}}>{{tr "Auto"}}</span>{{else}}<span class="badge" {{trTitle "Nessun limite di banda attivo"}}>{{tr "Nessun limite"}}</span>{{end}}
   </div>
   {{if .HasData}}
-  <svg class="traffic-chart" viewBox="0 0 {{.Width}} {{.Height}}" preserveAspectRatio="none" role="img" aria-label="Grafico del traffico totale di download e upload, ultimi 30 minuti">
+  <svg class="traffic-chart" viewBox="0 0 {{.Width}} {{.Height}}" preserveAspectRatio="none" role="img" aria-label="{{tr "Grafico del traffico totale di download e upload, ultimi 30 minuti"}}">
     <polygon class="traffic-area down" points="{{.DownArea}}" />
     {{if .HasLimit}}<line class="traffic-limit" x1="0" y1="{{.LimitY}}" x2="{{.Width}}" y2="{{.LimitY}}" />{{end}}
     <polyline class="traffic-line up" points="{{.UpPoints}}" />
@@ -146,7 +146,7 @@
     {{if .Ed2kDownPoints}}<polyline class="traffic-line ed2k-up" points="{{.Ed2kUpPoints}}" />
     <polyline class="traffic-line ed2k-down" points="{{.Ed2kDownPoints}}" />{{end}}
   </svg>
-  <div class="traffic-axis"><span>0</span><span>{{.ScaleLabel}}</span></div>
-  {{else}}<p class="muted">Raccolta dati in corso…</p>{{end}}
+  <div class="traffic-axis"><span>0</span><span>{{tr .ScaleLabel}}</span></div>
+  {{else}}<p class="muted">{{tr "Raccolta dati in corso…"}}</p>{{end}}
 </div>
 {{end}}

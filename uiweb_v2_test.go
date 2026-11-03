@@ -356,7 +356,7 @@ func TestV2DashboardAndDownloadControlsMatchClassic(t *testing.T) {
 	if code != http.StatusOK {
 		t.Fatalf("downloads -> %d", code)
 	}
-	for _, marker := range []string{"Pulisci completati", "Strumenti", "Aggiorna ogni 5 s", "Rimozione a fine seed", "Eccezione per adesso", "Nuovo tag", "Prealloca spazio", `title="Incolla un link magnet`, `title="Avvia il download subito`, `title="Ricarica l'elenco dei torrent`, `title="Applica l'eccezione con questi valori`, `title="Metti in pausa i torrent selezionati`, "Cerca una release", `name="kad"`, `id="v2-downloads-search-results"`, `name="view" value="downloads"`} {
+	for _, marker := range []string{"Pulisci completati", "Strumenti", "Aggiorna ogni 5 s", "Rimozione a fine seed", "Eccezione per adesso", "Nuovo tag", "Prealloca spazio", `title="Incolla un link magnet`, `title="Avvia il download subito`, `title="Ricarica l&#39;elenco dei torrent`, `title="Applica l&#39;eccezione con questi valori`, `title="Metti in pausa i torrent selezionati`, "Cerca una release", `name="kad"`, `id="v2-downloads-search-results"`, `name="view" value="downloads"`} {
 		if !strings.Contains(body, marker) {
 			t.Fatalf("downloads missing %q", marker)
 		}
@@ -2369,7 +2369,7 @@ func TestV2DownloadsSpeedMenuFollowsTheSettings(t *testing.T) {
 	}
 
 	body := downloads()
-	if !strings.Contains(body, "<span>Limiti fissi</span>") || strings.Count(body, `id="v2-speed-panel"`) != 1 || strings.Contains(body, "Togli l'eccezione") {
+	if !strings.Contains(body, "<span>Limiti fissi</span>") || strings.Count(body, `id="v2-speed-panel"`) != 1 || strings.Contains(body, "Togli l&#39;eccezione") {
 		t.Fatal("by default the menu must show the fixed limits as the rule, once, with no exception")
 	}
 	set(speedModeSetting, speedModeAuto)
@@ -2379,7 +2379,7 @@ func TestV2DownloadsSpeedMenuFollowsTheSettings(t *testing.T) {
 	}
 	set("torrent_temp_auto", "1")
 	body = downloads()
-	if !strings.Contains(body, `aria-pressed="true" data-speed-choice="auto"`) || !strings.Contains(body, "Togli l'eccezione") || !strings.Contains(body, "Poi torna la regola") {
+	if !strings.Contains(body, `aria-pressed="true" data-speed-choice="auto"`) || !strings.Contains(body, "Togli l&#39;eccezione") || !strings.Contains(body, "Poi torna la regola") {
 		t.Fatal("the Auto exception must be marked, with a way back to the rule")
 	}
 }

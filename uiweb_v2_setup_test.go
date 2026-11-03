@@ -183,7 +183,7 @@ func TestV2SetupAsksLanguage(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, body = v2Request(t, server, http.MethodGet, "/?view=setup&step=1", nil)
-	if !strings.Contains(body, `<option value="en" selected="">English</option>`) || !strings.Contains(body, "Who can use Gextto?") {
+	if !strings.Contains(body, `<option value="en" selected>English</option>`) || !strings.Contains(body, "Who can use Gextto?") {
 		t.Fatal("step 1 in English: language not selected or page not translated")
 	}
 }

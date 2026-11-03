@@ -159,7 +159,7 @@ func v2LibraryCardsFrom(ctx context.Context, s *AppState, base string, items []m
 		for _, field := range v2CardMetaFields(base) {
 			if column, ok := v2CardColumn(columns, field); ok {
 				if html := v2FormatCell(item, column); strings.TrimSpace(string(html)) != "" && string(html) != "—" {
-					card.Meta = append(card.Meta, v2CardMeta{Value: html, Label: column.Label})
+					card.Meta = append(card.Meta, v2CardMeta{Value: v2TranslateFragment(s, html), Label: column.Label})
 				}
 			}
 		}

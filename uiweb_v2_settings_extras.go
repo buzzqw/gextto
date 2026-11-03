@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"html"
+	"html/template"
 	"net/http"
 	"net/url"
 	"os"
@@ -381,7 +382,6 @@ func V2SettingsEditorRow(w http.ResponseWriter, r *http.Request, s *AppState) {
 		HasTest:   editor.TestEndpoint != "",
 	}
 	row := v2ListRowFrom(editor.Fields, map[string]any{}, index)
-	dict, eng := v2Dictionaries(s)
 	var buffer bytes.Buffer
 	if err := v2TemplatesFor(s).ExecuteTemplate(&buffer, "v2_list_row", map[string]any{"Editor": view, "Row": row}); err != nil {
 		http.Error(w, "template error", http.StatusInternalServerError)
@@ -389,8 +389,9 @@ func V2SettingsEditorRow(w http.ResponseWriter, r *http.Request, s *AppState) {
 	}
 	addButton := fmt.Sprintf(`<button class="btn sm" type="button" id="v2-editor-%s-add" hx-swap-oob="true" hx-get="/settings/editor-row?editor=%s&amp;index=%d&amp;view=%s&amp;tab=%s" hx-target="#v2-editor-%s-rows" hx-swap="beforeend" data-v2-marks-dirty title="Aggiungi una nuova riga">Aggiungi riga</button>`,
 		canonicalKey, canonicalKey, index+1, viewName, tabName, canonicalKey)
-	// The out-of-band add button is translated with the row.
-	body := v2TranslateHTML(buffer.String()+addButton, dict, eng)
+	// The out-of-band add button is built here, not by a template, so it is
+	// translated on its own.
+	body := buffer.String() + string(v2TranslateFragment(s, template.HTML(addButton)))
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte(body))

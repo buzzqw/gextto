@@ -1,14 +1,14 @@
 {{define "v2_series_page"}}
 <div class="view">
-  <nav class="toolbar" role="tablist" aria-label="Sezioni serie TV">
-    <a class="chip{{if eq .Tab "monitored"}} active{{end}}" role="tab" aria-selected="{{if eq .Tab "monitored"}}true{{else}}false{{end}}" href="/?view=series">Serie monitorate</a>
-    <a class="chip{{if eq .Tab "gaps"}} active{{end}}" role="tab" aria-selected="{{if eq .Tab "gaps"}}true{{else}}false{{end}}" href="/?view=series&amp;tab=gaps" title="Puntate già uscite che non sono ancora in libreria"><span>Mancanti</span>{{if .GapCount}} <span class="badge">{{.GapCount}}</span>{{end}}</a>
+  <nav class="toolbar" role="tablist" aria-label="{{tr "Sezioni serie TV"}}">
+    <a class="chip{{if eq .Tab "monitored"}} active{{end}}" role="tab" aria-selected="{{if eq .Tab "monitored"}}true{{else}}false{{end}}" href="/?view=series">{{tr "Serie monitorate"}}</a>
+    <a class="chip{{if eq .Tab "gaps"}} active{{end}}" role="tab" aria-selected="{{if eq .Tab "gaps"}}true{{else}}false{{end}}" href="/?view=series&amp;tab=gaps" {{trTitle "Puntate già uscite che non sono ancora in libreria"}}><span>{{tr "Mancanti"}}</span>{{if .GapCount}} <span class="badge">{{tr .GapCount}}</span>{{end}}</a>
   </nav>
   {{if eq .Tab "gaps"}}
     {{template "v2_series_gaps" .Gaps}}
   {{else}}
     {{range .Monitored.Groups}}
-      {{if .Title}}<div class="section-group-label">{{.Title}}</div>{{end}}
+      {{if .Title}}<div class="section-group-label">{{tr .Title}}</div>{{end}}
       <div class="{{if $.Monitored.Stack}}v2-section-stack{{else if gt (len .Sections) 1}}grid-2{{end}}">
         {{range .Sections}}{{template "v2_section" .}}{{end}}
       </div>
@@ -19,33 +19,33 @@
 
 {{define "v2_series_gaps"}}
 <section class="panel v2-gaps">
-  <div class="panel-head"><h3>Puntate mancanti</h3><small class="muted">{{.Total}} <span>puntate in</span> {{.SeriesCount}} <span>serie</span></small></div>
+  <div class="panel-head"><h3>{{tr "Puntate mancanti"}}</h3><small class="muted">{{tr .Total}} <span>{{tr "puntate in"}}</span> {{tr .SeriesCount}} <span>{{tr "serie"}}</span></small></div>
   <div class="panel-body">
-    <p class="hint">Un clic su una puntata la cerca e mostra i risultati, ognuno con «Scarica». «Cerca mancanti» cerca tutte le puntate mancanti della serie e mostra qui i risultati: non scarica nulla da solo.</p>
+    <p class="hint">{{tr "Un clic su una puntata la cerca e mostra i risultati, ognuno con «Scarica». «Cerca mancanti» cerca tutte le puntate mancanti della serie e mostra qui i risultati: non scarica nulla da solo."}}</p>
     <form class="toolbar" method="get" action="/">
       <input type="hidden" name="view" value="series" />
       <input type="hidden" name="tab" value="gaps" />
-      <input class="input" type="search" name="f" value="{{.Filter}}" placeholder="Filtra per serie…" aria-label="Filtra per serie" />
-      <button class="btn sm" type="submit" title="Mostra solo le serie il cui nome contiene il testo scritto">Filtra</button>
+      <input class="input" type="search" name="f" value="{{.Filter}}" placeholder="{{tr "Filtra per serie…"}}" aria-label="{{tr "Filtra per serie"}}" />
+      <button class="btn sm" type="submit" {{trTitle "Mostra solo le serie il cui nome contiene il testo scritto"}}>{{tr "Filtra"}}</button>
     </form>
-    {{if not .Series}}<p class="muted">{{if .Filter}}Nessuna serie con puntate mancanti corrisponde al filtro.{{else}}Nessuna puntata mancante.{{end}}</p>{{end}}
+    {{if not .Series}}<p class="muted">{{if .Filter}}{{tr "Nessuna serie con puntate mancanti corrisponde al filtro."}}{{else}}{{tr "Nessuna puntata mancante."}}{{end}}</p>{{end}}
     {{range $i, $s := .Series}}
     <details class="v2-gap-series"{{if $.Open}} open{{end}}>
-      <summary><strong>{{$s.Name}}</strong> <span class="badge">{{$s.Count}}</span>{{if $s.Latest}} <small class="muted"><span>ultima uscita</span> {{$s.Latest}}</small>{{end}}</summary>
+      <summary><strong>{{tr $s.Name}}</strong> <span class="badge">{{tr $s.Count}}</span>{{if $s.Latest}} <small class="muted"><span>{{tr "ultima uscita"}}</span> {{tr $s.Latest}}</small>{{end}}</summary>
       <div class="v2-gap-body">
         <form class="toolbar" hx-post="/series/gaps/search" hx-target="#v2-gap-result-{{$i}}" hx-swap="innerHTML" hx-disabled-elt="find button[type=submit]" hx-indicator="#v2-gap-busy-{{$i}}">
           <input type="hidden" name="series" value="{{$s.Name}}" />
           <input type="hidden" name="filter" value="{{$.Filter}}" />
           <input type="hidden" name="slot" value="{{$i}}" />
-          <button class="btn sm primary" type="submit" title="Cerca tutte le puntate mancanti di questa serie sulle sorgenti configurate">Cerca mancanti</button>
-          <a class="btn sm" href="/?view=series&amp;series={{$s.PathName}}" title="Apri la scheda della serie">Apri la serie</a>
-          <span id="v2-gap-busy-{{$i}}" class="htmx-indicator muted">Avvio della ricerca…</span>
+          <button class="btn sm primary" type="submit" {{trTitle "Cerca tutte le puntate mancanti di questa serie sulle sorgenti configurate"}}>{{tr "Cerca mancanti"}}</button>
+          <a class="btn sm" href="/?view=series&amp;series={{$s.PathName}}" {{trTitle "Apri la scheda della serie"}}>{{tr "Apri la serie"}}</a>
+          <span id="v2-gap-busy-{{$i}}" class="htmx-indicator muted">{{tr "Avvio della ricerca…"}}</span>
         </form>
         <div id="v2-gap-result-{{$i}}" class="v2-gap-result" role="status" aria-live="polite"></div>
         {{range $s.Seasons}}
         <div class="v2-gap-season">
-          <span class="v2-gap-season-label"><span>Stagione</span> {{.Season}}</span>
-          <span class="v2-gap-episodes">{{range .Episodes}}<button class="chip v2-gap-ep" type="button" hx-post="/series/episode-search?series={{$s.PathName}}&amp;season={{.Season}}&amp;episode={{.Episode}}" hx-target="#v2-gap-ep-{{$i}}-{{.Season}}" hx-swap="innerHTML" data-v2-ep-search-target="v2-gap-ep-{{$i}}-{{.Season}}" aria-controls="v2-gap-ep-{{$i}}-{{.Season}}" aria-expanded="false" aria-label="Cerca {{$s.Name}} {{.Code}}" title="Cerca {{.Code}}{{if .AirDate}} · uscita il {{.AirDate}}{{end}}">{{.Code}}</button>{{end}}</span>
+          <span class="v2-gap-season-label"><span>{{tr "Stagione"}}</span> {{tr .Season}}</span>
+          <span class="v2-gap-episodes">{{range .Episodes}}<button class="chip v2-gap-ep" type="button" hx-post="/series/episode-search?series={{$s.PathName}}&amp;season={{.Season}}&amp;episode={{.Episode}}" hx-target="#v2-gap-ep-{{$i}}-{{.Season}}" hx-swap="innerHTML" data-v2-ep-search-target="v2-gap-ep-{{$i}}-{{.Season}}" aria-controls="v2-gap-ep-{{$i}}-{{.Season}}" aria-expanded="false" aria-label="{{tr "Cerca %s %s" $s.Name .Code}}" {{if .AirDate}}{{trTitle "Cerca %s · uscita il %s" .Code .AirDate}}{{else}}{{trTitle "Cerca %s" .Code}}{{end}}>{{tr .Code}}</button>{{end}}</span>
         </div>
         <div class="v2-gap-ep-result" data-v2-ep-search-row hidden><div id="v2-gap-ep-{{$i}}-{{.Season}}" data-v2-ep-search-slot></div></div>
         {{end}}
@@ -59,20 +59,20 @@
 {{define "v2_gap_search_result"}}
 {{if .Running}}
 <div hx-get="/series/gaps/search/status?job={{.JobID}}&amp;filter={{.Filter | urlquery}}&amp;slot={{.Slot}}" hx-trigger="every 2s" hx-swap="outerHTML">
-  <p class="muted" role="status" aria-live="polite">{{if .Queued}}<span>Ricerca in coda…</span>{{else if eq .Progress.Phase "ed2k"}}<span>Ricerca in corso: controllo eD2k/Kad delle stagioni…</span>{{else}}<span>Ricerca in corso:</span> {{.Progress.Done}}/{{.Progress.Total}} <span>puntate…</span>{{end}}</p>
+  <p class="muted" role="status" aria-live="polite">{{if .Queued}}<span>{{tr "Ricerca in coda…"}}</span>{{else if eq .Progress.Phase "ed2k"}}<span>{{tr "Ricerca in corso: controllo eD2k/Kad delle stagioni…"}}</span>{{else}}<span>{{tr "Ricerca in corso:"}}</span> {{.Progress.Done}}/{{.Progress.Total}} <span>{{tr "puntate…"}}</span>{{end}}</p>
   {{/* Kept across the two-second refresh: replacing it would take the keyboard
        focus away from «Annulla» while the search runs. */}}
   <form id="v2-gap-cancel-{{.JobID}}" hx-preserve="true" hx-post="/series/gaps/search/cancel" hx-target="#v2-gap-result-{{.Slot}}" hx-swap="innerHTML">
     <input type="hidden" name="job" value="{{.JobID}}" />
     <input type="hidden" name="filter" value="{{.Filter}}" />
     <input type="hidden" name="slot" value="{{.Slot}}" />
-    <button class="btn sm" type="submit" title="Ferma la ricerca in corso">Annulla</button>
+    <button class="btn sm" type="submit" {{trTitle "Ferma la ricerca in corso"}}>{{tr "Annulla"}}</button>
   </form>
 </div>
-{{else if .Error}}<p class="err">{{.Error}}</p>{{else if not .Episodes}}<p class="ok">Nessuna puntata mancante da cercare.</p>{{else}}
-<p class="ok"><span>Risultati:</span> {{.Results}} · <span>Puntate cercate:</span> {{.Episodes}}.</p>
+{{else if .Error}}<p class="err">{{tr .Error}}</p>{{else if not .Episodes}}<p class="ok">{{tr "Nessuna puntata mancante da cercare."}}</p>{{else}}
+<p class="ok"><span>{{tr "Risultati:"}}</span> {{.Results}} · <span>{{tr "Puntate cercate:"}}</span> {{.Episodes}}.</p>
 {{if .Sources.Results}}{{template "v2_sources_rows" .Sources}}
-<p class="hint"><span>Nessun download automatico: scegli un risultato e premi «Scarica».</span></p>
-{{else}}<p class="muted">Nessun risultato trovato.</p>{{end}}
+<p class="hint"><span>{{tr "Nessun download automatico: scegli un risultato e premi «Scarica»."}}</span></p>
+{{else}}<p class="muted">{{tr "Nessun risultato trovato."}}</p>{{end}}
 {{end}}
 {{end}}

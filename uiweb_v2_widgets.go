@@ -675,7 +675,9 @@ func V2OAuthStart(w http.ResponseWriter, r *http.Request, s *AppState) {
 	if strings.HasPrefix(path, "/api/") {
 		raw, _ = v2InternalJSON(s, http.MethodPost, path, nil, []byte("{}"))
 	}
-	v2Render(w, http.StatusOK, "v2_oauth_output", v2OutputFromJSON(raw), s)
+	output := v2OutputFromJSON(raw)
+	output.Text = v2TranslateFragment(s, output.Text)
+	v2Render(w, http.StatusOK, "v2_oauth_output", output, s)
 }
 
 // V2OAuthPoll confirms the code/PIN entered by the user.
@@ -687,7 +689,9 @@ func V2OAuthPoll(w http.ResponseWriter, r *http.Request, s *AppState) {
 		body, _ := json.Marshal(map[string]string{"code": code})
 		raw, _ = v2InternalJSON(s, http.MethodPost, path, nil, body)
 	}
-	v2Render(w, http.StatusOK, "v2_oauth_output", v2OutputFromJSON(raw), s)
+	output := v2OutputFromJSON(raw)
+	output.Text = v2TranslateFragment(s, output.Text)
+	v2Render(w, http.StatusOK, "v2_oauth_output", output, s)
 }
 
 // ---------------------------------------------------------------------------

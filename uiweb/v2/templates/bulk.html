@@ -1,27 +1,27 @@
 {{define "v2_bulk_panel"}}
 <div class="v2-bulk-panel" id="v2-bulk-panel-{{.View}}" hidden>
   <form id="v2-bulk-form-{{.View}}" class="v2-bulk-form" hx-post="/library/bulk" hx-target="#v2-bulk-result-{{.View}}" hx-swap="innerHTML" hx-disabled-elt="find button[type=submit]">
-    <p class="muted">Spunta le righe nella tabella, poi i valori da cambiare. I valori che non spunti restano come sono in ogni titolo.</p>
+    <p class="muted">{{tr "Spunta le righe nella tabella, poi i valori da cambiare. I valori che non spunti restano come sono in ogni titolo."}}</p>
     {{if .Profiles}}
-    <label class="field"><span>Parti da un profilo</span>
-      <select class="input" name="profile" hx-get="/library/bulk/profile?view={{.View}}" hx-target="#v2-bulk-values-{{.View}}" hx-swap="innerHTML" hx-trigger="change" title="Copia nei campi i valori di un profilo: è un modello, i titoli restano modificabili uno per uno">
-        <option value="">— nessuno —</option>
-        {{range .Profiles}}<option value="{{.ID}}">{{.Name}}</option>{{end}}
+    <label class="field"><span>{{tr "Parti da un profilo"}}</span>
+      <select class="input" name="profile" hx-get="/library/bulk/profile?view={{.View}}" hx-target="#v2-bulk-values-{{.View}}" hx-swap="innerHTML" hx-trigger="change" {{trTitle "Copia nei campi i valori di un profilo: è un modello, i titoli restano modificabili uno per uno"}}>
+        <option value="">{{tr "— nessuno —"}}</option>
+        {{range .Profiles}}<option value="{{.ID}}">{{tr .Name}}</option>{{end}}
       </select>
     </label>
     {{end}}
     <div id="v2-bulk-values-{{.View}}">{{template "v2_bulk_values" .}}</div>
     <div class="form-grid">
-      <label class="field"><span>Stato</span>
-        <select class="input" name="state" title="Attiva o metti in pausa la ricerca dei titoli selezionati">
-          <option value="">Lascia com'è</option>
-          <option value="active">Attivo</option>
-          <option value="paused">In pausa</option>
+      <label class="field"><span>{{tr "Stato"}}</span>
+        <select class="input" name="state" {{trTitle "Attiva o metti in pausa la ricerca dei titoli selezionati"}}>
+          <option value="">{{tr "Lascia com'è"}}</option>
+          <option value="active">{{tr "Attivo"}}</option>
+          <option value="paused">{{tr "In pausa"}}</option>
         </select>
       </label>
     </div>
     <div class="toolbar">
-      <button class="btn sm primary" type="submit" title="Scrive i valori spuntati in tutti i titoli selezionati">Applica ai titoli selezionati</button>
+      <button class="btn sm primary" type="submit" {{trTitle "Scrive i valori spuntati in tutti i titoli selezionati"}}>{{tr "Applica ai titoli selezionati"}}</button>
       <span id="v2-bulk-result-{{.View}}" aria-live="polite"></span>
     </div>
   </form>
@@ -29,24 +29,24 @@
 {{end}}
 
 {{define "v2_bulk_values"}}
-{{if .Error}}<p class="err" role="alert">{{.Error}}</p>{{end}}
-{{if .Marked}}<p class="hint"><span>Da un profilo le esclusioni non vengono applicate: restano quelle di ogni titolo (spunta il campo per sostituirle).</span></p>{{end}}
+{{if .Error}}<p class="err" role="alert">{{tr .Error}}</p>{{end}}
+{{if .Marked}}<p class="hint"><span>{{tr "Da un profilo le esclusioni non vengono applicate: restano quelle di ogni titolo (spunta il campo per sostituirle)."}}</span></p>{{end}}
 <div class="form-grid">
-  <div class="field"><label class="check" title="Spunta per scrivere la qualità nei titoli selezionati (vuoto = nessun requisito)"><input type="checkbox" name="set_quality" value="1"{{if .Marked}} checked{{end}}> Cambia la qualità</label><input class="input" name="quality" value="{{.Values.Quality}}" aria-label="Qualità" placeholder="es. 1080p" title="Risoluzione richiesta: 1080p, un intervallo 720p-1080p o un massimo &lt;1080p"></div>
-  <div class="field"><label class="check" title="Spunta per scrivere l'audio minimo nei titoli selezionati"><input type="checkbox" name="set_audio" value="1"{{if .Marked}} checked{{end}}> Cambia l'audio minimo</label><select class="input" name="audio" aria-label="Audio minimo" title="Audio minimo accettato, con i canali già compresi nel preset. Qualsiasi non impone nulla.">{{template "v2_audio_options" .Values.Audio}}</select></div>
-  <div class="field"><label class="check" title="Spunta per scrivere la lingua nei titoli selezionati"><input type="checkbox" name="set_language" value="1"{{if .Marked}} checked{{end}}> Cambia la lingua</label><input class="input" name="language" value="{{.Values.Language}}" aria-label="Lingua" placeholder="es. ita" title="Lingua dell'audio richiesta, ad esempio ita o ita,eng"></div>
-  <div class="field"><label class="check" title="Spunta per scrivere i sottotitoli nei titoli selezionati"><input type="checkbox" name="set_subtitle" value="1"{{if .Marked}} checked{{end}}> Cambia i sottotitoli</label><input class="input" name="subtitle" value="{{.Values.Subtitle}}" aria-label="Sottotitoli" title="Sottotitoli preferiti, ad esempio ita"></div>
-  <div class="field"><label class="check" title="Spunta per scrivere le esclusioni nei titoli selezionati"><input type="checkbox" name="set_exclude" value="1"{{if .MarkExclude}} checked{{end}}> Cambia le esclusioni</label><input class="input" name="exclude" value="{{.Values.Exclude}}" aria-label="Esclusioni" title="Parole che scartano una release, separate da virgola"></div>
-  <label class="field"><span>Permetti upgrade</span>
-    <select class="input" name="upgrades" title="Sì: una release migliore sostituisce il file archiviato. No: il file archiviato resta. «Lascia com'è» non cambia nulla.">
-      <option value=""{{if not .Marked}} selected{{end}}>Lascia com'è</option>
-      <option value="allow"{{if and .Marked (not .Values.DisableUpgrades)}} selected{{end}}>Sì</option>
-      <option value="deny"{{if and .Marked .Values.DisableUpgrades}} selected{{end}}>No</option>
+  <div class="field"><label class="check" {{trTitle "Spunta per scrivere la qualità nei titoli selezionati (vuoto = nessun requisito)"}}><input type="checkbox" name="set_quality" value="1"{{if .Marked}} checked{{end}}> {{tr "Cambia la qualità"}}</label><input class="input" name="quality" value="{{.Values.Quality}}" aria-label="{{tr "Qualità"}}" placeholder="{{tr "es. 1080p"}}" {{trTitle "Risoluzione richiesta: 1080p, un intervallo 720p-1080p o un massimo <1080p"}}></div>
+  <div class="field"><label class="check" {{trTitle "Spunta per scrivere l'audio minimo nei titoli selezionati"}}><input type="checkbox" name="set_audio" value="1"{{if .Marked}} checked{{end}}> {{tr "Cambia l'audio minimo"}}</label><select class="input" name="audio" aria-label="{{tr "Audio minimo"}}" {{trTitle "Audio minimo accettato, con i canali già compresi nel preset. Qualsiasi non impone nulla."}}>{{template "v2_audio_options" .Values.Audio}}</select></div>
+  <div class="field"><label class="check" {{trTitle "Spunta per scrivere la lingua nei titoli selezionati"}}><input type="checkbox" name="set_language" value="1"{{if .Marked}} checked{{end}}> {{tr "Cambia la lingua"}}</label><input class="input" name="language" value="{{.Values.Language}}" aria-label="{{tr "Lingua"}}" placeholder="{{tr "es. ita"}}" {{trTitle "Lingua dell'audio richiesta, ad esempio ita o ita,eng"}}></div>
+  <div class="field"><label class="check" {{trTitle "Spunta per scrivere i sottotitoli nei titoli selezionati"}}><input type="checkbox" name="set_subtitle" value="1"{{if .Marked}} checked{{end}}> {{tr "Cambia i sottotitoli"}}</label><input class="input" name="subtitle" value="{{.Values.Subtitle}}" aria-label="{{tr "Sottotitoli"}}" {{trTitle "Sottotitoli preferiti, ad esempio ita"}}></div>
+  <div class="field"><label class="check" {{trTitle "Spunta per scrivere le esclusioni nei titoli selezionati"}}><input type="checkbox" name="set_exclude" value="1"{{if .MarkExclude}} checked{{end}}> {{tr "Cambia le esclusioni"}}</label><input class="input" name="exclude" value="{{.Values.Exclude}}" aria-label="{{tr "Esclusioni"}}" {{trTitle "Parole che scartano una release, separate da virgola"}}></div>
+  <label class="field"><span>{{tr "Permetti upgrade"}}</span>
+    <select class="input" name="upgrades" {{trTitle "Sì: una release migliore sostituisce il file archiviato. No: il file archiviato resta. «Lascia com'è» non cambia nulla."}}>
+      <option value=""{{if not .Marked}} selected{{end}}>{{tr "Lascia com'è"}}</option>
+      <option value="allow"{{if and .Marked (not .Values.DisableUpgrades)}} selected{{end}}>{{tr "Sì"}}</option>
+      <option value="deny"{{if and .Marked .Values.DisableUpgrades}} selected{{end}}>{{tr "No"}}</option>
     </select>
   </label>
 </div>
 {{end}}
 
 {{define "v2_bulk_done"}}
-{{if .Error}}<span class="err" role="alert">{{.Error}}</span>{{else}}<span class="ok" role="status"><span>Titoli modificati</span>: {{.Message}}</span>{{end}}
+{{if .Error}}<span class="err" role="alert">{{tr .Error}}</span>{{else}}<span class="ok" role="status"><span>{{tr "Titoli modificati"}}</span>: {{.Message}}</span>{{end}}
 {{end}}
