@@ -71,6 +71,16 @@ func (d *I18nDb) invalidateCache() {
 	d.mu.Unlock()
 }
 
+// generation reports the dictionary generation. A render that captures the
+// dictionary uses it to notice that a translation changed and the cached
+// template set it built from that dictionary is stale.
+func (d *I18nDb) generation() uint64 {
+	if d == nil {
+		return 0
+	}
+	return d.gen.Load()
+}
+
 // Dictionary returns the {key: value} map for a language, building and caching
 // it on first use. The returned map is shared and must not be modified.
 func (d *I18nDb) Dictionary(lang string) (map[string]string, error) {

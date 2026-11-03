@@ -130,8 +130,7 @@ func V2Duplicates(w http.ResponseWriter, r *http.Request, s *AppState) {
 		http.Redirect(w, r, "/?view=maintenance", http.StatusSeeOther)
 		return
 	}
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_duplicates_panel", v2DuplicatesViewFrom(s, r), dict, eng)
+	v2Render(w, http.StatusOK, "v2_duplicates_panel", v2DuplicatesViewFrom(s, r), s)
 }
 
 // ---------------------------------------------------------------------------
@@ -275,8 +274,7 @@ func V2DBMaintenance(w http.ResponseWriter, r *http.Request, s *AppState) {
 		http.Redirect(w, r, "/?view=maintenance", http.StatusSeeOther)
 		return
 	}
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_db_panel", v2DBViewFrom(s, r), dict, eng)
+	v2Render(w, http.StatusOK, "v2_db_panel", v2DBViewFrom(s, r), s)
 }
 
 // ---------------------------------------------------------------------------
@@ -375,8 +373,7 @@ func V2Ramdisk(w http.ResponseWriter, r *http.Request, s *AppState) {
 		http.Redirect(w, r, "/?view=maintenance", http.StatusSeeOther)
 		return
 	}
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_ramdisk_panel", v2RamdiskViewFrom(s, r), dict, eng)
+	v2Render(w, http.StatusOK, "v2_ramdisk_panel", v2RamdiskViewFrom(s, r), s)
 }
 
 // ---------------------------------------------------------------------------
@@ -559,8 +556,7 @@ func V2FolderRenameScan(w http.ResponseWriter, r *http.Request, s *AppState) {
 		// Keep the typed path visible even when the scan fails.
 		view.Path = strings.TrimSpace(r.FormValue("path"))
 	}
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_folder_rename_panel", view, dict, eng)
+	v2Render(w, http.StatusOK, "v2_folder_rename_panel", view, s)
 }
 
 // V2FolderRenameApply applies the accepted proposals and re-renders.
@@ -571,8 +567,7 @@ func V2FolderRenameApply(w http.ResponseWriter, r *http.Request, s *AppState) {
 	// run a fresh scan instead of pretending the preview is still valid.
 	view.Scanned = false
 	view.Items = nil
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_folder_rename_panel", view, dict, eng)
+	v2Render(w, http.StatusOK, "v2_folder_rename_panel", view, s)
 }
 
 // ---------------------------------------------------------------------------
@@ -615,8 +610,7 @@ func v2ProgressViewFrom(s *AppState, section uiProgressSection) v2ProgressView {
 
 // V2RenameProgress renders the progress fragment used by the polling panel.
 func V2RenameProgress(w http.ResponseWriter, r *http.Request, s *AppState) {
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_rename_progress", v2ProgressViewFrom(s, uiProgressSection{}), dict, eng)
+	v2Render(w, http.StatusOK, "v2_rename_progress", v2ProgressViewFrom(s, uiProgressSection{}), s)
 }
 
 // ---------------------------------------------------------------------------
@@ -681,8 +675,7 @@ func V2OAuthStart(w http.ResponseWriter, r *http.Request, s *AppState) {
 	if strings.HasPrefix(path, "/api/") {
 		raw, _ = v2InternalJSON(s, http.MethodPost, path, nil, []byte("{}"))
 	}
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_oauth_output", v2OutputFromJSON(raw), dict, eng)
+	v2Render(w, http.StatusOK, "v2_oauth_output", v2OutputFromJSON(raw), s)
 }
 
 // V2OAuthPoll confirms the code/PIN entered by the user.
@@ -694,8 +687,7 @@ func V2OAuthPoll(w http.ResponseWriter, r *http.Request, s *AppState) {
 		body, _ := json.Marshal(map[string]string{"code": code})
 		raw, _ = v2InternalJSON(s, http.MethodPost, path, nil, body)
 	}
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_oauth_output", v2OutputFromJSON(raw), dict, eng)
+	v2Render(w, http.StatusOK, "v2_oauth_output", v2OutputFromJSON(raw), s)
 }
 
 // ---------------------------------------------------------------------------
@@ -801,8 +793,7 @@ func v2JobsViewFrom(s *AppState) v2JobsView {
 
 // V2JobsPartial renders the background-job list (polled by HTMX).
 func V2JobsPartial(w http.ResponseWriter, r *http.Request, s *AppState) {
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_jobs", v2JobsViewFrom(s), dict, eng)
+	v2Render(w, http.StatusOK, "v2_jobs", v2JobsViewFrom(s), s)
 }
 
 // V2JobCancel cancels a queued/running job and refreshes the list.
@@ -814,8 +805,7 @@ func V2JobCancel(w http.ResponseWriter, r *http.Request, s *AppState) {
 		http.Redirect(w, r, "/?view=maintenance", http.StatusSeeOther)
 		return
 	}
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_jobs", v2JobsViewFrom(s), dict, eng)
+	v2Render(w, http.StatusOK, "v2_jobs", v2JobsViewFrom(s), s)
 }
 
 // ---------------------------------------------------------------------------
@@ -911,8 +901,7 @@ func V2DownloadsAdd(w http.ResponseWriter, r *http.Request, s *AppState) {
 		http.Redirect(w, r, "/?"+query.Encode(), http.StatusSeeOther)
 		return
 	}
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_torrent_add_result", map[string]any{"Message": message, "Error": isErr}, dict, eng)
+	v2Render(w, http.StatusOK, "v2_torrent_add_result", map[string]any{"Message": message, "Error": isErr}, s)
 }
 
 // ---------------------------------------------------------------------------
@@ -928,8 +917,7 @@ func V2SettingsI18nSet(w http.ResponseWriter, r *http.Request, s *AppState) {
 		body, _ := json.Marshal(map[string]string{"lang": language, "key": key, "value": value})
 		v2InternalJSON(s, http.MethodPost, "/api/i18n", nil, body)
 	}
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_i18n_table", v2I18nViewFrom(s, language), dict, eng)
+	v2Render(w, http.StatusOK, "v2_i18n_table", v2I18nViewFrom(s, language), s)
 }
 
 // ---------------------------------------------------------------------------
@@ -1025,8 +1013,7 @@ func V2SeriesRenamePreview(w http.ResponseWriter, r *http.Request, s *AppState) 
 		http.Error(w, "serie mancante", http.StatusBadRequest)
 		return
 	}
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_rename_preview", v2RenamePreviewFrom(s, name, false, false), dict, eng)
+	v2Render(w, http.StatusOK, "v2_rename_preview", v2RenamePreviewFrom(s, name, false, false), s)
 }
 
 // V2SeriesRenameExecute runs the rename and re-renders the panel with the result.
@@ -1038,8 +1025,7 @@ func V2SeriesRenameExecute(w http.ResponseWriter, r *http.Request, s *AppState) 
 	}
 	execute := r.FormValue("preview") != "1"
 	force := r.FormValue("force") == "1"
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_rename_preview", v2RenamePreviewFrom(s, name, execute, force), dict, eng)
+	v2Render(w, http.StatusOK, "v2_rename_preview", v2RenamePreviewFrom(s, name, execute, force), s)
 }
 
 // ---------------------------------------------------------------------------
@@ -1144,8 +1130,7 @@ func V2TmdbCalendar(w http.ResponseWriter, r *http.Request, s *AppState) {
 			}
 		}
 	}
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_tmdb_calendar", view, dict, eng)
+	v2Render(w, http.StatusOK, "v2_tmdb_calendar", view, s)
 }
 
 // V2TmdbDiscover renders a trending/popular/category list.
@@ -1175,8 +1160,7 @@ func V2TmdbSearch(w http.ResponseWriter, r *http.Request, s *AppState) {
 	}
 	query := strings.TrimSpace(r.FormValue("query"))
 	if query == "" {
-		dict, eng := v2Dictionaries(s)
-		v2Render(w, http.StatusOK, "v2_tmdb_results", map[string]any{"Empty": "Inserisci un titolo da cercare."}, dict, eng)
+		v2Render(w, http.StatusOK, "v2_tmdb_results", map[string]any{"Empty": "Inserisci un titolo da cercare."}, s)
 		return
 	}
 	input := map[string]string{"kind": kind, "query": query}
@@ -1207,8 +1191,7 @@ func v2TmdbRenderResults(w http.ResponseWriter, s *AppState, kind string, body [
 			}
 		}
 	}
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_tmdb_results", view, dict, eng)
+	v2Render(w, http.StatusOK, "v2_tmdb_results", view, s)
 }
 
 // V2TmdbAdd adds a TMDB result to the library.
@@ -1265,8 +1248,7 @@ func V2TmdbAdd(w http.ResponseWriter, r *http.Request, s *AppState) {
 			return
 		}
 	}
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_tmdb_add_result", result, dict, eng)
+	v2Render(w, http.StatusOK, "v2_tmdb_add_result", result, s)
 }
 
 func V2TmdbManual(w http.ResponseWriter, r *http.Request, s *AppState) {
@@ -1290,8 +1272,7 @@ func V2TmdbManual(w http.ResponseWriter, r *http.Request, s *AppState) {
 		view["Redirect"] = "/?view=search"
 	}
 	view["Profiles"] = v2ProfileChoices(s, ensureQualityProfiles(s))
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_tmdb_manual", view, dict, eng)
+	v2Render(w, http.StatusOK, "v2_tmdb_manual", view, s)
 }
 
 // v2ProfileChoice is one quality profile offered by the add form, with a

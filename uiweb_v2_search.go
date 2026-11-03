@@ -87,8 +87,7 @@ func V2Search(w http.ResponseWriter, r *http.Request, s *AppState) {
 		redirect = "/?view=dashboard"
 	}
 	view := v2SearchViewFrom(s, query, redirect, kad)
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_search_results", view, dict, eng)
+	v2Render(w, http.StatusOK, "v2_search_results", view, s)
 }
 
 func v2SearchViewFrom(s *AppState, query, redirect string, kad bool) v2SearchView {
@@ -154,8 +153,7 @@ func V2SearchLink(w http.ResponseWriter, r *http.Request, s *AppState) {
 	links := extractEd2kLinks(raw)
 	if len(links) == 0 {
 		view.Error = "Nessun link eD2k valido trovato nel testo incollato."
-		dict, eng := v2Dictionaries(s)
-		v2Render(w, http.StatusOK, "v2_search_results", view, dict, eng)
+		v2Render(w, http.StatusOK, "v2_search_results", view, s)
 		return
 	}
 	cfg := latestConfig(s)
@@ -190,8 +188,7 @@ func V2SearchLink(w http.ResponseWriter, r *http.Request, s *AppState) {
 	if len(view.Results) == 0 {
 		view.Error = "Nessun link eD2k valido trovato nel testo incollato."
 	}
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_search_results", view, dict, eng)
+	v2Render(w, http.StatusOK, "v2_search_results", view, s)
 }
 
 // V2SearchAddAll queues every ed2k link in the pasted block, reusing the same
@@ -268,6 +265,5 @@ func V2SearchExplain(w http.ResponseWriter, r *http.Request, s *AppState) {
 			}
 		}
 	}
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_explain_modal", view, dict, eng)
+	v2Render(w, http.StatusOK, "v2_explain_modal", view, s)
 }

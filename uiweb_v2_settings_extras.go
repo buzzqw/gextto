@@ -140,8 +140,7 @@ func V2SettingsSourceTest(w http.ResponseWriter, r *http.Request, s *AppState) {
 			view.Items = payload.Items
 		}
 	}
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_source_test_result", view, dict, eng)
+	v2Render(w, http.StatusOK, "v2_source_test_result", view, s)
 }
 
 // V2SettingsCheckbox saves a checkbox group immediately.
@@ -168,12 +167,11 @@ func V2SettingsCheckbox(w http.ResponseWriter, r *http.Request, s *AppState) {
 			break
 		}
 	}
-	dict, eng := v2Dictionaries(s)
 	templateName := "v2_checkbox_group"
 	if key == "content_filters" {
 		templateName = "v2_content_filter_section"
 	}
-	v2Render(w, http.StatusOK, templateName, group, dict, eng)
+	v2Render(w, http.StatusOK, templateName, group, s)
 }
 
 // --- list editors -----------------------------------------------------------
@@ -385,7 +383,7 @@ func V2SettingsEditorRow(w http.ResponseWriter, r *http.Request, s *AppState) {
 	row := v2ListRowFrom(editor.Fields, map[string]any{}, index)
 	dict, eng := v2Dictionaries(s)
 	var buffer bytes.Buffer
-	if err := v2Templates.ExecuteTemplate(&buffer, "v2_list_row", map[string]any{"Editor": view, "Row": row}); err != nil {
+	if err := v2TemplatesFor(s).ExecuteTemplate(&buffer, "v2_list_row", map[string]any{"Editor": view, "Row": row}); err != nil {
 		http.Error(w, "template error", http.StatusInternalServerError)
 		return
 	}
@@ -433,8 +431,7 @@ func V2SettingsEditorTest(w http.ResponseWriter, r *http.Request, s *AppState) {
 	} else {
 		message += ": " + v2JSONError(raw)
 	}
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_list_test_result", map[string]any{"OK": okResult, "Message": message}, dict, eng)
+	v2Render(w, http.StatusOK, "v2_list_test_result", map[string]any{"OK": okResult, "Message": message}, s)
 }
 
 // V2SettingsEditorSave saves a structured list editor.
@@ -592,8 +589,7 @@ func V2SettingsRenamePreview(w http.ResponseWriter, r *http.Request, s *AppState
 		Template: r.FormValue("template"),
 	}
 	view.Preview = v2RenameCompose(view.Format, view.Template)
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_rename_preview_code", view, dict, eng)
+	v2Render(w, http.StatusOK, "v2_rename_preview_code", view, s)
 }
 
 // v2RenameCompose builds the sample file name exactly like the classic client.
@@ -636,8 +632,7 @@ func V2SettingsRenameToken(w http.ResponseWriter, r *http.Request, s *AppState) 
 	}
 	view := v2RenameView{Format: selected, Template: template, Formats: formats, Tokens: editor.Tokens}
 	view.Preview = v2RenameCompose(view.Format, view.Template)
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_rename_editor", view, dict, eng)
+	v2Render(w, http.StatusOK, "v2_rename_editor", view, s)
 }
 
 // V2SettingsRenameSave saves the rename format and template.
@@ -677,8 +672,7 @@ func v2I18nViewFrom(s *AppState, language string) v2I18nView {
 
 // V2SettingsI18nTable returns the translations table for a language.
 func V2SettingsI18nTable(w http.ResponseWriter, r *http.Request, s *AppState) {
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_i18n_table", v2I18nViewFrom(s, r.FormValue("lang")), dict, eng)
+	v2Render(w, http.StatusOK, "v2_i18n_table", v2I18nViewFrom(s, r.FormValue("lang")), s)
 }
 
 // V2SettingsI18nImport imports a YAML dictionary for a language.
@@ -764,8 +758,7 @@ func V2SettingsContentArchiveSearch(w http.ResponseWriter, r *http.Request, s *A
 	}
 	query := strings.TrimSpace(r.FormValue("q"))
 	filters := v2ContentArchiveFilters(r)
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_content_archive_results", v2ContentArchiveResultsFrom(s, query, filters, "", false), dict, eng)
+	v2Render(w, http.StatusOK, "v2_content_archive_results", v2ContentArchiveResultsFrom(s, query, filters, "", false), s)
 }
 
 // V2SettingsContentArchiveDelete deletes one row, selected rows, or all archive
@@ -821,8 +814,7 @@ func V2SettingsContentArchiveDelete(w http.ResponseWriter, r *http.Request, s *A
 	} else {
 		logging.Info("archive content deletion completed", "action", action, "deleted", removed, "query", query)
 	}
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_content_archive_results", v2ContentArchiveResultsFrom(s, query, filters, notice, err != nil), dict, eng)
+	v2Render(w, http.StatusOK, "v2_content_archive_results", v2ContentArchiveResultsFrom(s, query, filters, notice, err != nil), s)
 }
 
 // V2SettingsIPFilterApply loads the configured IP filter (downloading the URL if

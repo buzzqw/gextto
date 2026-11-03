@@ -117,8 +117,7 @@ func V2MediaIntegrityPanel(w http.ResponseWriter, r *http.Request, s *AppState) 
 		http.Redirect(w, r, "/?view=settings&tab=maintenance#v2-media-integrity-panel", http.StatusSeeOther)
 		return
 	}
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_media_integrity_panel", v2MediaCheckViewFrom(s), dict, eng)
+	v2Render(w, http.StatusOK, "v2_media_integrity_panel", v2MediaCheckViewFrom(s), s)
 }
 
 // V2MediaIntegrityAction starts, restarts or stops the check and re-renders the
@@ -155,6 +154,5 @@ func V2MediaIntegrityAction(w http.ResponseWriter, r *http.Request, s *AppState)
 	}
 	view := v2MediaCheckViewFrom(s)
 	view.Message, view.Error = message, isErr
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_media_integrity_panel", view, dict, eng)
+	v2Render(w, http.StatusOK, "v2_media_integrity_panel", view, s)
 }

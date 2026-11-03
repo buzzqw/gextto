@@ -182,8 +182,7 @@ func V2Ed2kCreateDirs(w http.ResponseWriter, r *http.Request, s *AppState) {
 		http.Redirect(w, r, "/?view=ed2k", http.StatusSeeOther)
 		return
 	}
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_ed2k_state", v2Ed2kViewFrom(s, message, detail, isErr, "status"), dict, eng)
+	v2Render(w, http.StatusOK, "v2_ed2k_state", v2Ed2kViewFrom(s, message, detail, isErr, "status"), s)
 }
 
 // V2Ed2kAction runs a connection command and re-renders the state panel.
@@ -195,8 +194,7 @@ func V2Ed2kAction(w http.ResponseWriter, r *http.Request, s *AppState) {
 		http.Redirect(w, r, "/?view=ed2k", http.StatusSeeOther)
 		return
 	}
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_ed2k_state", v2Ed2kViewFrom(s, message, detail, isErr, "status"), dict, eng)
+	v2Render(w, http.StatusOK, "v2_ed2k_state", v2Ed2kViewFrom(s, message, detail, isErr, "status"), s)
 }
 
 // v2Ed2kCommand returns a fixed (translatable) message, an optional detail
@@ -258,8 +256,7 @@ func v2HTTPURL(value string) bool {
 func V2Ed2kSearch(w http.ResponseWriter, r *http.Request, s *AppState) {
 	network := ed2kSearchNetwork(r.FormValue("network"))
 	view := v2Ed2kSearchFor(r.Context(), latestConfig(s), strings.TrimSpace(r.FormValue("query")), &network)
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_ed2k_results", view, dict, eng)
+	v2Render(w, http.StatusOK, "v2_ed2k_results", view, s)
 }
 
 // v2Ed2kSearchFor runs one search for the eD2k page or the archive; a nil
@@ -338,8 +335,7 @@ func V2Ed2kAdd(w http.ResponseWriter, r *http.Request, s *AppState) {
 	default:
 		message, detail, isErr = "Alcuni link non sono stati aggiunti ad aMule:", strings.Join(failed, "; "), true
 	}
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_ed2k_message", map[string]any{"Message": message, "Detail": detail, "Error": isErr}, dict, eng)
+	v2Render(w, http.StatusOK, "v2_ed2k_message", map[string]any{"Message": message, "Detail": detail, "Error": isErr}, s)
 }
 
 // v2Ed2kDetailView is the detail dialog of one aMule download.
@@ -390,8 +386,7 @@ func v2Ed2kDetailFor(cfg *Config, hash string) v2Ed2kDetailView {
 
 // V2Ed2kDetail renders the detail dialog of an aMule download.
 func V2Ed2kDetail(w http.ResponseWriter, r *http.Request, s *AppState) {
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_ed2k_detail", v2Ed2kDetailFor(latestConfig(s), r.FormValue("hash")), dict, eng)
+	v2Render(w, http.StatusOK, "v2_ed2k_detail", v2Ed2kDetailFor(latestConfig(s), r.FormValue("hash")), s)
 }
 
 // V2Ed2kPriority changes the priority of an aMule download from the detail
@@ -406,8 +401,7 @@ func V2Ed2kPriority(w http.ResponseWriter, r *http.Request, s *AppState) {
 	} else {
 		view.Message = "Priorità salvata."
 	}
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_ed2k_detail_body", view, dict, eng)
+	v2Render(w, http.StatusOK, "v2_ed2k_detail_body", view, s)
 }
 
 // V2Ed2kLog renders aMule's log on the eD2k page.
@@ -422,8 +416,7 @@ func V2Ed2kLog(w http.ResponseWriter, r *http.Request, s *AppState) {
 		}
 		view["Lines"] = lines
 	}
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_ed2k_log", view, dict, eng)
+	v2Render(w, http.StatusOK, "v2_ed2k_log", view, s)
 }
 
 // v2Ed2kSharedRow is one shared file on the eD2k page.
@@ -566,8 +559,7 @@ func V2Ed2kSharedReload(w http.ResponseWriter, r *http.Request, s *AppState) {
 		// Rendered straight into this response, the error itself can be shown.
 		view.Message, view.Detail = "Comando non riuscito:", detail
 	}
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_ed2k_shared", view, dict, eng)
+	v2Render(w, http.StatusOK, "v2_ed2k_shared", view, s)
 }
 
 // V2SettingsEd2kPreallocation applies aMule's full-file preallocation from the

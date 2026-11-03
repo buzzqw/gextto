@@ -203,8 +203,7 @@ func V2SectionTestFTP(w http.ResponseWriter, r *http.Request, s *AppState) {
 			message = "FTP non riuscito: " + payload.Error
 		}
 	}
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_ftp_test_result", map[string]any{"OK": ok, "Message": message}, dict, eng)
+	v2Render(w, http.StatusOK, "v2_ftp_test_result", map[string]any{"OK": ok, "Message": message}, s)
 }
 
 func v2StringPointer(value string) *string {
@@ -395,19 +394,18 @@ func V2SectionForm(w http.ResponseWriter, r *http.Request, s *AppState) {
 			http.Redirect(w, r, "/?view="+url.QueryEscape(view), http.StatusSeeOther)
 			return
 		}
-		dict, eng := v2Dictionaries(s)
 		switch render {
 		case "tmdb":
 			result := v2SectionTMDBResult(r.FormValue("kind"), raw, status)
-			v2Render(w, http.StatusOK, "v2_tmdb_results", result, dict, eng)
+			v2Render(w, http.StatusOK, "v2_tmdb_results", result, s)
 			return
 		case "releases":
 			result := v2SectionReleaseResult(raw, status)
-			v2Render(w, http.StatusOK, "v2_search_results", result, dict, eng)
+			v2Render(w, http.StatusOK, "v2_search_results", result, s)
 			return
 		case "comics":
 			result := v2SectionComicsResult(raw, status)
-			v2Render(w, http.StatusOK, "v2_comics_explore_results", result, dict, eng)
+			v2Render(w, http.StatusOK, "v2_comics_explore_results", result, s)
 			return
 		}
 	}

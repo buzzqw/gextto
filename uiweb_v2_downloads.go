@@ -123,7 +123,6 @@ func V2DownloadsSettings(w http.ResponseWriter, r *http.Request, s *AppState) {
 		http.Redirect(w, r, "/?"+query.Encode(), http.StatusSeeOther)
 		return
 	}
-	dict, eng := v2Dictionaries(s)
 	view := v2TorrentsViewFrom(s, r, message, status >= 400)
 	view.Partial = true
 	if op == "clear_completed" && len(clearReply.Items) > 0 {
@@ -148,10 +147,10 @@ func V2DownloadsSettings(w http.ResponseWriter, r *http.Request, s *AppState) {
 		v2Render(w, http.StatusOK, "v2_downloads_settings_result", map[string]any{
 			"View":   view,
 			"Notice": map[string]any{"Title": title, "Message": message, "Error": status >= 400},
-		}, dict, eng)
+		}, s)
 		return
 	}
-	v2Render(w, http.StatusOK, "v2_torrents_wrap", view, dict, eng)
+	v2Render(w, http.StatusOK, "v2_torrents_wrap", view, s)
 }
 
 // v2ExceptionMessage confirms the exception now in force.
@@ -183,8 +182,7 @@ func V2HTTPDownloadDetail(w http.ResponseWriter, r *http.Request, s *AppState) {
 		http.Error(w, "download HTTP non trovato", http.StatusNotFound)
 		return
 	}
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_http_download_detail", found, dict, eng)
+	v2Render(w, http.StatusOK, "v2_http_download_detail", found, s)
 }
 
 // v2OrphansView is the data of the guided orphan-cleanup modal.
@@ -214,8 +212,7 @@ func v2OrphansViewFrom(s *AppState) v2OrphansView {
 // V2DownloadsOrphansModal lists the download-folder leftovers that no live
 // torrent owns, with the verdict of the library check.
 func V2DownloadsOrphansModal(w http.ResponseWriter, r *http.Request, s *AppState) {
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_orphans_modal", v2OrphansViewFrom(s), dict, eng)
+	v2Render(w, http.StatusOK, "v2_orphans_modal", v2OrphansViewFrom(s), s)
 }
 
 // V2DownloadsOrphansClean moves the safe leftovers to the trash in a
@@ -243,6 +240,5 @@ func V2DownloadsOrphansClean(w http.ResponseWriter, r *http.Request, s *AppState
 	} else {
 		view.Message = "Pulizia avviata: lo spostamento nel cestino può richiedere qualche minuto, controlla Operazioni"
 	}
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_orphans_modal", view, dict, eng)
+	v2Render(w, http.StatusOK, "v2_orphans_modal", view, s)
 }

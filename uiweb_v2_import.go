@@ -64,8 +64,7 @@ func V2ImportPreview(w http.ResponseWriter, r *http.Request, s *AppState) {
 			view.ResultAt = view.Path
 		}
 	}
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_import_candidates", view, dict, eng)
+	v2Render(w, http.StatusOK, "v2_import_candidates", view, s)
 }
 
 // V2ImportApply performs one confirmed candidate (POST /import/apply).
@@ -89,8 +88,7 @@ func V2ImportApply(w http.ResponseWriter, r *http.Request, s *AppState) {
 	} else {
 		view.Message = final
 	}
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_import_done", view, dict, eng)
+	v2Render(w, http.StatusOK, "v2_import_done", view, s)
 }
 
 // ManualImportPreviewAPI is GET /api/import/preview?path=…

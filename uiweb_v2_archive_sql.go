@@ -186,47 +186,45 @@ func v2ArchiveSQLPreviewResult(ctx context.Context, s *AppState, operation Archi
 // result table. It never modifies the archive.
 func V2ArchiveSQLPreview(w http.ResponseWriter, r *http.Request, s *AppState) {
 	operation, ok := v2ArchiveSQLOperationByID(strings.TrimSpace(r.FormValue("op")))
-	dict, eng := v2Dictionaries(s)
 	if !ok {
 		result := v2ArchiveSQLResult{Error: "Operazione non valida."}
-		v2Render(w, http.StatusOK, "v2_archive_sql_result", result, dict, eng)
+		v2Render(w, http.StatusOK, "v2_archive_sql_result", result, s)
 		return
 	}
 	language := v2ArchiveSQLSelectedLanguage(r)
-	v2Render(w, http.StatusOK, "v2_archive_sql_result", v2ArchiveSQLPreviewResult(r.Context(), s, operation, language), dict, eng)
+	v2Render(w, http.StatusOK, "v2_archive_sql_result", v2ArchiveSQLPreviewResult(r.Context(), s, operation, language), s)
 }
 
 // V2ArchiveSQLDelete deletes the rows of a destructive operation after the
 // preview. The confirmation field is required, so a bare link or a stray form
 // submission cannot trigger the deletion.
 func V2ArchiveSQLDelete(w http.ResponseWriter, r *http.Request, s *AppState) {
-	dict, eng := v2Dictionaries(s)
 	operation, ok := v2ArchiveSQLOperationByID(strings.TrimSpace(r.FormValue("op")))
 	if !ok {
 		result := v2ArchiveSQLResult{Error: "Operazione non valida."}
-		v2Render(w, http.StatusOK, "v2_archive_sql_result", result, dict, eng)
+		v2Render(w, http.StatusOK, "v2_archive_sql_result", result, s)
 		return
 	}
 	language := v2ArchiveSQLSelectedLanguage(r)
 	result := v2ArchiveSQLResultFor(operation, language)
 	if s == nil || s.cfg == nil || s.dryRun() {
 		result.Error = "La modalità prova è attiva: l'eliminazione è disabilitata."
-		v2Render(w, http.StatusOK, "v2_archive_sql_result", result, dict, eng)
+		v2Render(w, http.StatusOK, "v2_archive_sql_result", result, s)
 		return
 	}
 	if !operation.Destructive {
 		result.Error = "Questa operazione è di sola lettura."
-		v2Render(w, http.StatusOK, "v2_archive_sql_result", result, dict, eng)
+		v2Render(w, http.StatusOK, "v2_archive_sql_result", result, s)
 		return
 	}
 	if r.FormValue("confirm") != "1" {
 		result.Error = "Conferma richiesta per eliminare."
-		v2Render(w, http.StatusOK, "v2_archive_sql_result", result, dict, eng)
+		v2Render(w, http.StatusOK, "v2_archive_sql_result", result, s)
 		return
 	}
 	if s.archive == nil {
 		result.Error = "Archivio non disponibile."
-		v2Render(w, http.StatusOK, "v2_archive_sql_result", result, dict, eng)
+		v2Render(w, http.StatusOK, "v2_archive_sql_result", result, s)
 		return
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), archiveSQLTimeout)
@@ -235,7 +233,7 @@ func V2ArchiveSQLDelete(w http.ResponseWriter, r *http.Request, s *AppState) {
 	if err != nil {
 		logging.Error("archive sql deletion failed", "operation", operation.ID, "language", language, "error", err)
 		result.Error = "Eliminazione non riuscita."
-		v2Render(w, http.StatusOK, "v2_archive_sql_result", result, dict, eng)
+		v2Render(w, http.StatusOK, "v2_archive_sql_result", result, s)
 		return
 	}
 	// Show the archive after the deletion: usually the same rows are gone, and
@@ -243,5 +241,5 @@ func V2ArchiveSQLDelete(w http.ResponseWriter, r *http.Request, s *AppState) {
 	result = v2ArchiveSQLPreviewResult(r.Context(), s, operation, language)
 	result.Deleted = removed
 	result.DeletedOK = true
-	v2Render(w, http.StatusOK, "v2_archive_sql_result", result, dict, eng)
+	v2Render(w, http.StatusOK, "v2_archive_sql_result", result, s)
 }

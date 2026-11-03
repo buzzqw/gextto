@@ -155,8 +155,7 @@ func V2ThemeDelete(w http.ResponseWriter, r *http.Request, s *AppState) {
 
 func v2RenderThemeModal(w http.ResponseWriter, s *AppState, selected, message string) {
 	view := v2ThemeView{Builtin: v2BuiltinThemes, Presets: v2PresetThemes, Saved: v2SavedThemes(s), Selected: selected, Error: message}
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_theme_modal", view, dict, eng)
+	v2Render(w, http.StatusOK, "v2_theme_modal", view, s)
 }
 
 func v2SavedThemeID(name string) string { return "saved:" + name }

@@ -1320,8 +1320,7 @@ func TestV2TorrentDetailGeneralRowsExplainThemselves(t *testing.T) {
 		}
 	}
 	rec := httptest.NewRecorder()
-	dict, eng := v2Dictionaries(state)
-	v2Render(rec, http.StatusOK, "v2_detail_panel", view, dict, eng)
+	v2Render(rec, http.StatusOK, "v2_detail_panel", view, state)
 	body := rec.Body.String()
 	for _, want := range []string{
 		"Stato del torrent nella sessione: in download",

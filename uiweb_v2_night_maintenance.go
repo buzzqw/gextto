@@ -143,8 +143,7 @@ func V2NightMaintenancePanel(w http.ResponseWriter, r *http.Request, s *AppState
 		http.Redirect(w, r, "/?view=settings&tab=maintenance#v2-night-maintenance-panel", http.StatusSeeOther)
 		return
 	}
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_night_maintenance_panel", v2NightMaintenanceViewFrom(s), dict, eng)
+	v2Render(w, http.StatusOK, "v2_night_maintenance_panel", v2NightMaintenanceViewFrom(s), s)
 }
 
 // V2NightMaintenanceAction runs a pass now or marks a missing episode, then
@@ -181,6 +180,5 @@ func V2NightMaintenanceAction(w http.ResponseWriter, r *http.Request, s *AppStat
 	}
 	view := v2NightMaintenanceViewFrom(s)
 	view.Message, view.Error = message, isErr
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_night_maintenance_panel", view, dict, eng)
+	v2Render(w, http.StatusOK, "v2_night_maintenance_panel", view, s)
 }

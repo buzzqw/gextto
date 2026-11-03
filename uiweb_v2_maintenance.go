@@ -52,8 +52,7 @@ func v2TrashViewFrom(s *AppState) v2TrashView {
 
 // V2TrashList renders the trash entries on demand.
 func V2TrashList(w http.ResponseWriter, r *http.Request, s *AppState) {
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_trash_list", v2TrashViewFrom(s), dict, eng)
+	v2Render(w, http.StatusOK, "v2_trash_list", v2TrashViewFrom(s), s)
 }
 
 // V2TrashDelete deletes one entry or empties the trash. It reports back, as a
@@ -146,8 +145,7 @@ func V2SourcesCheck(w http.ResponseWriter, r *http.Request, s *AppState) {
 	query := request.URL.Query()
 	query.Set("load", "1")
 	request.URL.RawQuery = query.Encode()
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_table_body", v2TableDataFrom(s, request, "health-sources", spec), dict, eng)
+	v2Render(w, http.StatusOK, "v2_table_body", v2TableDataFrom(s, request, "health-sources", spec), s)
 }
 
 // v2UpdateView is the "Aggiornamenti" maintenance panel.
@@ -202,8 +200,7 @@ func V2Update(w http.ResponseWriter, r *http.Request, s *AppState) {
 			view.Message, view.Error = "L'aggiornamento non è stato installato: controlla il log qui sotto.", true
 		}
 	}
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_update_panel", view, dict, eng)
+	v2Render(w, http.StatusOK, "v2_update_panel", view, s)
 }
 
 // V2UpdateNotesDismiss closes the "updated" popup for good.

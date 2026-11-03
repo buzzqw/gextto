@@ -191,8 +191,7 @@ func v2ProblemsViewFrom(s *AppState) v2ProblemsView {
 // V2DashboardProblems renders the "Da controllare" panel body; the dashboard
 // loads it on its own and refreshes it every minute.
 func V2DashboardProblems(w http.ResponseWriter, r *http.Request, s *AppState) {
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_dashboard_problems", v2ProblemsViewFrom(s), dict, eng)
+	v2Render(w, http.StatusOK, "v2_dashboard_problems", v2ProblemsViewFrom(s), s)
 }
 
 // V2DashboardProblemsAck marks the shown warnings as read (the "Pulisci"

@@ -156,8 +156,7 @@ func V2LibraryBulkProfile(w http.ResponseWriter, r *http.Request, s *AppState) {
 			view.Error = uiText(s, "Profilo di qualità non trovato.")
 		}
 	}
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_bulk_values", view, dict, eng)
+	v2Render(w, http.StatusOK, "v2_bulk_values", view, s)
 }
 
 // V2LibraryBulkApply is POST /library/bulk: it applies the marked values to
@@ -209,6 +208,5 @@ func V2LibraryBulkApply(w http.ResponseWriter, r *http.Request, s *AppState) {
 		// columns are visible at once.
 		w.Header().Set("HX-Refresh", "true")
 	}
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_bulk_done", view, dict, eng)
+	v2Render(w, http.StatusOK, "v2_bulk_done", view, s)
 }

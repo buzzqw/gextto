@@ -127,6 +127,5 @@ func V2SettingsTuningApply(w http.ResponseWriter, r *http.Request, s *AppState) 
 		}
 	}
 
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_tuning_panel", panel, dict, eng)
+	v2Render(w, http.StatusOK, "v2_tuning_panel", panel, s)
 }

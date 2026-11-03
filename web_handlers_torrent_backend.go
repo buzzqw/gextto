@@ -198,8 +198,7 @@ func V2SettingsQbittorrentMappings(w http.ResponseWriter, r *http.Request, s *Ap
 		status = "Mappatura proposta da qBittorrent: controlla e premi Salva."
 	}
 	field := uiSettingFieldFor(key, v2SettingLabelFor(key), value)
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_setting_field", v2Field{uiSettingField: field, Status: status, Error: isErr}, dict, eng)
+	v2Render(w, http.StatusOK, "v2_setting_field", v2Field{uiSettingField: field, Status: status, Error: isErr}, s)
 }
 
 // proposeQbittorrentMappings translates Gextto's download folders into the

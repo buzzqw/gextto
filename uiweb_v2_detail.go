@@ -273,8 +273,7 @@ func V2SeriesSources(w http.ResponseWriter, r *http.Request, s *AppState) {
 		}
 	}
 	view.Results = v2DedupSources(view.Results)
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_sources_modal", view, dict, eng)
+	v2Render(w, http.StatusOK, "v2_sources_modal", view, s)
 }
 
 // v2SeriesHistoryView is the download story of a series or of one episode.
@@ -322,6 +321,5 @@ func V2SeriesHistory(w http.ResponseWriter, r *http.Request, s *AppState) {
 		}
 		view.Events = events
 	}
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_series_history", view, dict, eng)
+	v2Render(w, http.StatusOK, "v2_series_history", view, s)
 }

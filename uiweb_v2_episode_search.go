@@ -243,12 +243,11 @@ func V2SeriesEpisodeSearch(w http.ResponseWriter, r *http.Request, s *AppState) 
 	season, seasonErr := strconv.ParseInt(strings.TrimSpace(r.FormValue("season")), 10, 64)
 	episode, episodeErr := strconv.ParseInt(strings.TrimSpace(r.FormValue("episode")), 10, 64)
 	view := v2EpisodeSearchView{Label: strings.TrimSpace(r.FormValue("season")) + "E" + strings.TrimSpace(r.FormValue("episode"))}
-	dict, eng := v2Dictionaries(s)
 	// An episode outside the page (a stale tab, a hand-written URL) still gets
 	// an answer in its own frame instead of a blank page.
 	if series == "" || seasonErr != nil || episodeErr != nil || season < 1 || episode < 1 {
 		view.Error = "Stagione o episodio non validi."
-		v2Render(w, http.StatusOK, "v2_episode_search_panel", view, dict, eng)
+		v2Render(w, http.StatusOK, "v2_episode_search_panel", view, s)
 		return
 	}
 	view.Slot = v2EpisodeSearchSlotID(season, episode)
@@ -266,13 +265,13 @@ func V2SeriesEpisodeSearch(w http.ResponseWriter, r *http.Request, s *AppState) 
 	cfg := latestConfig(s)
 	if cfg == nil {
 		view.Error = "Ricerca non avviata: configurazione non disponibile."
-		v2Render(w, http.StatusOK, "v2_episode_search_panel", view, dict, eng)
+		v2Render(w, http.StatusOK, "v2_episode_search_panel", view, s)
 		return
 	}
 	ser, found := gh7FindSeries(cfg, series)
 	if !found {
 		view.Error = "Serie non trovata."
-		v2Render(w, http.StatusOK, "v2_episode_search_panel", view, dict, eng)
+		v2Render(w, http.StatusOK, "v2_episode_search_panel", view, s)
 		return
 	}
 	parent := s.bgContext
@@ -288,7 +287,7 @@ func V2SeriesEpisodeSearch(w http.ResponseWriter, r *http.Request, s *AppState) 
 		v2RunEpisodeSearch(ctx, s, id, ser, season, episode)
 	})
 	view.Online = v2EpisodeOnlineViewFrom(state, redirect)
-	v2Render(w, http.StatusOK, "v2_episode_search_panel", view, dict, eng)
+	v2Render(w, http.StatusOK, "v2_episode_search_panel", view, s)
 }
 
 // V2SeriesEpisodeSearchStatus renders the polled part of the panel: the live
@@ -300,8 +299,7 @@ func V2SeriesEpisodeSearchStatus(w http.ResponseWriter, r *http.Request, s *AppS
 			view = v2EpisodeOnlineViewFrom(state, "/?view=series&series="+url.QueryEscape(state.Series))
 		}
 	}
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_episode_search_online", view, dict, eng)
+	v2Render(w, http.StatusOK, "v2_episode_search_online", view, s)
 }
 
 // v2RunEpisodeSearch follows one episode search and publishes what it is doing.

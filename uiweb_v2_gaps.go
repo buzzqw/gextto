@@ -230,8 +230,7 @@ func V2SeriesGapsSearch(w http.ResponseWriter, r *http.Request, s *AppState) {
 			}
 		}
 	}
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_gap_search_result", view, dict, eng)
+	v2Render(w, http.StatusOK, "v2_gap_search_result", view, s)
 }
 
 // V2SeriesGapsSearchStatus is GET /series/gaps/search/status: it renders the
@@ -277,8 +276,7 @@ func V2SeriesGapsSearchStatus(w http.ResponseWriter, r *http.Request, s *AppStat
 			view.Error = "Ricerca annullata."
 		}
 	}
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_gap_search_result", view, dict, eng)
+	v2Render(w, http.StatusOK, "v2_gap_search_result", view, s)
 }
 
 // V2SeriesGapsSearchCancel is POST /series/gaps/search/cancel: it asks the job

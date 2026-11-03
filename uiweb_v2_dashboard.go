@@ -23,8 +23,7 @@ type v2DashboardFeedView struct {
 
 func V2DashboardSearch(w http.ResponseWriter, r *http.Request, s *AppState) {
 	view := v2SearchViewFrom(s, strings.TrimSpace(r.FormValue("q")), "/?view=dashboard", r.FormValue("kad") != "")
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_dashboard_search_results", view, dict, eng)
+	v2Render(w, http.StatusOK, "v2_dashboard_search_results", view, s)
 }
 
 func V2DashboardFeed(w http.ResponseWriter, r *http.Request, s *AppState) {
@@ -63,8 +62,7 @@ func V2DashboardFeed(w http.ResponseWriter, r *http.Request, s *AppState) {
 			}
 		}
 	}
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_dashboard_feed", view, dict, eng)
+	v2Render(w, http.StatusOK, "v2_dashboard_feed", view, s)
 }
 
 func V2DashboardFeedAdd(w http.ResponseWriter, r *http.Request, s *AppState) {
@@ -80,6 +78,5 @@ func V2DashboardFeedAdd(w http.ResponseWriter, r *http.Request, s *AppState) {
 	} else {
 		result["Message"] = "Accodato"
 	}
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_dashboard_feed_result", result, dict, eng)
+	v2Render(w, http.StatusOK, "v2_dashboard_feed_result", result, s)
 }

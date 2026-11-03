@@ -443,12 +443,11 @@ func v2SelectValue(value any) string {
 // v2RenderTableBody writes a table body as an HTMX fragment: the poster cards
 // when the library list is being read that way, the table otherwise.
 func v2RenderTableBody(w http.ResponseWriter, r *http.Request, s *AppState, data v2TableData) {
-	dict, eng := v2Dictionaries(s)
 	if data.Layout == "cards" {
-		v2Render(w, http.StatusOK, "v2_library_cards", data, dict, eng)
+		v2Render(w, http.StatusOK, "v2_library_cards", data, s)
 		return
 	}
-	v2Render(w, http.StatusOK, "v2_table_body", data, dict, eng)
+	v2Render(w, http.StatusOK, "v2_table_body", data, s)
 }
 
 // v2TableItems extracts the row slice from the endpoint payload.

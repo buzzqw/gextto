@@ -52,48 +52,54 @@ var v2TemplatesFS embed.FS
 //go:embed uiweb/v2/static/*
 var v2StaticFS embed.FS
 
-var v2Templates = template.Must(template.New("v2").Funcs(template.FuncMap{
-	"bytes":       logging.HumanBytesI64,
-	"bytesU":      func(value uint64) string { return logging.HumanBytesI64(saturatingInt64(value)) },
-	"rate":        func(value uint64) string { return logging.HumanRate(saturatingInt64(value)) },
-	"rateI":       logging.HumanRate,
-	"arrow":       v2SortArrow,
-	"sourceLabel": uiSourceLabel,
-	"httpState":   v2HTTPStateLabel,
-	"ternary": func(cond bool, whenTrue, whenFalse string) string {
-		if cond {
-			return whenTrue
-		}
-		return whenFalse
-	},
-	"addOne": func(value int) int { return value + 1 },
-	"kib": func(value int64) int64 {
-		if value < 0 {
-			return value
-		}
-		return value / 1024
-	},
-	"dict":    v2Dict,
-	"kibRate": v2KibRate,
-	// badgeLimits and minutesLeft print the badge values with no words to
-	// translate: "↓ 1 MB/s ↑ ∞" and " · 42 min".
-	"badgeLimits": func(download, upload int64) string {
-		short := func(kib int64) string {
-			if kib <= 0 {
-				return "∞"
+// v2TemplateFuncMap is the helper set every parsed template set carries. The
+// `tr` function is added per language by v2TemplatesFor.
+func v2TemplateFuncMap() template.FuncMap {
+	return template.FuncMap{
+		"bytes":       logging.HumanBytesI64,
+		"bytesU":      func(value uint64) string { return logging.HumanBytesI64(saturatingInt64(value)) },
+		"rate":        func(value uint64) string { return logging.HumanRate(saturatingInt64(value)) },
+		"rateI":       logging.HumanRate,
+		"arrow":       v2SortArrow,
+		"sourceLabel": uiSourceLabel,
+		"httpState":   v2HTTPStateLabel,
+		"ternary": func(cond bool, whenTrue, whenFalse string) string {
+			if cond {
+				return whenTrue
 			}
-			return v2KibRate(kib)
-		}
-		return "↓ " + short(download) + " ↑ " + short(upload)
-	},
-	"minutesLeft": func(minutes int64) string {
-		if minutes <= 0 {
-			return ""
-		}
-		return fmt.Sprintf(" · %d min", minutes)
-	},
-	"div": func(a, b int64) int64 { return a / b },
-}).ParseFS(v2TemplatesFS, "uiweb/v2/templates/*.html"))
+			return whenFalse
+		},
+		"addOne": func(value int) int { return value + 1 },
+		"kib": func(value int64) int64 {
+			if value < 0 {
+				return value
+			}
+			return value / 1024
+		},
+		"dict":    v2Dict,
+		"kibRate": v2KibRate,
+		// badgeLimits and minutesLeft print the badge values with no words to
+		// translate: "↓ 1 MB/s ↑ ∞" and " · 42 min".
+		"badgeLimits": func(download, upload int64) string {
+			short := func(kib int64) string {
+				if kib <= 0 {
+					return "∞"
+				}
+				return v2KibRate(kib)
+			}
+			return "↓ " + short(download) + " ↑ " + short(upload)
+		},
+		"minutesLeft": func(minutes int64) string {
+			if minutes <= 0 {
+				return ""
+			}
+			return fmt.Sprintf(" · %d min", minutes)
+		},
+		"div": func(a, b int64) int64 { return a / b },
+	}
+}
+
+var v2Templates = template.Must(template.New("v2").Funcs(v2TemplateFuncMap()).ParseFS(v2TemplatesFS, "uiweb/v2/templates/*.html"))
 
 // v2Dict builds a map from key/value pairs, used to pass several arguments to a
 // shared sub-template (the classic Go templates have no struct literal).
@@ -351,13 +357,14 @@ type v2ShellData struct {
 	Dashboard *v2DashboardView
 }
 
-func v2Render(w http.ResponseWriter, status int, name string, data any, dict, eng map[string]string) {
+func v2Render(w http.ResponseWriter, status int, name string, data any, s *AppState) {
 	var buffer bytes.Buffer
-	if err := v2Templates.ExecuteTemplate(&buffer, name, data); err != nil {
+	if err := v2TemplatesFor(s).ExecuteTemplate(&buffer, name, data); err != nil {
 		logging.Error("v2 template render failed", "template", name, "error", err)
 		http.Error(w, "template error", http.StatusInternalServerError)
 		return
 	}
+	dict, eng := v2Dictionaries(s)
 	body := v2TranslateHTML(buffer.String(), dict, eng)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(status)
@@ -815,14 +822,13 @@ func V2Page(w http.ResponseWriter, r *http.Request, s *AppState) {
 	if notes, ok := PendingUpdateNotes(cfg); ok {
 		page.UpdateNotes = notes
 	}
-	dict, eng := v2Dictionaries(s)
 	// The list/card choice is kept in a cookie so the pages reached later (their
 	// links do not carry the parameter) read the library the same way.
 	v2RememberLayout(w, r)
 	// The Facilitata/Esperto choice is kept in a cookie too, so the tabs reached
 	// later keep it.
 	v2RememberSettingsMode(w, r)
-	v2Render(w, http.StatusOK, "v2_shell", page, dict, eng)
+	v2Render(w, http.StatusOK, "v2_shell", page, s)
 }
 
 // V2ChromePartial refreshes the live performance metrics without reloading the
@@ -834,8 +840,7 @@ func V2ChromePartial(w http.ResponseWriter, r *http.Request, s *AppState) {
 	} else if r.URL.Query().Get("mobile") == "1" {
 		templateName = "v2_live_mobile_metrics"
 	}
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, templateName, uiShellChromeFrom(s), dict, eng)
+	v2Render(w, http.StatusOK, templateName, uiShellChromeFrom(s), s)
 }
 
 func V2ChromeSSE(w http.ResponseWriter, r *http.Request, s *AppState) {
@@ -863,19 +868,19 @@ func V2ChromeSSE(w http.ResponseWriter, r *http.Request, s *AppState) {
 			dict, eng := v2Dictionaries(s)
 
 			var topBuf bytes.Buffer
-			v2Templates.ExecuteTemplate(&topBuf, "v2_live_top_metrics", chrome)
+			v2TemplatesFor(s).ExecuteTemplate(&topBuf, "v2_live_top_metrics", chrome)
 			fmt.Fprintf(w, "event: chrome-top\ndata: %s\n\n", strings.ReplaceAll(v2TranslateHTML(topBuf.String(), dict, eng), "\n", ""))
 
 			var mobBuf bytes.Buffer
-			v2Templates.ExecuteTemplate(&mobBuf, "v2_live_mobile_metrics", chrome)
+			v2TemplatesFor(s).ExecuteTemplate(&mobBuf, "v2_live_mobile_metrics", chrome)
 			fmt.Fprintf(w, "event: chrome-mobile\ndata: %s\n\n", strings.ReplaceAll(v2TranslateHTML(mobBuf.String(), dict, eng), "\n", ""))
 
 			var statBuf bytes.Buffer
-			v2Templates.ExecuteTemplate(&statBuf, "v2_live_status", chrome)
+			v2TemplatesFor(s).ExecuteTemplate(&statBuf, "v2_live_status", chrome)
 			fmt.Fprintf(w, "event: chrome-status\ndata: %s\n\n", strings.ReplaceAll(v2TranslateHTML(statBuf.String(), dict, eng), "\n", ""))
 
 			var trafficBuf bytes.Buffer
-			v2Templates.ExecuteTemplate(&trafficBuf, "v2_live_traffic", v2TrafficViewFrom(s))
+			v2TemplatesFor(s).ExecuteTemplate(&trafficBuf, "v2_live_traffic", v2TrafficViewFrom(s))
 			fmt.Fprintf(w, "event: chrome-traffic\ndata: %s\n\n", strings.ReplaceAll(v2TranslateHTML(trafficBuf.String(), dict, eng), "\n", ""))
 
 			flusher.Flush()
@@ -911,16 +916,14 @@ func V2HealthTilePartial(w http.ResponseWriter, r *http.Request, s *AppState) {
 		http.NotFound(w, r)
 		return
 	}
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, templateName, data, dict, eng)
+	v2Render(w, http.StatusOK, templateName, data, s)
 }
 
 // V2HealthQueuePartial refreshes the "Coda titoli" and "Import falliti" panels
 // without reloading the page. The fragment shows only those two lists: it reads
 // them from the database instead of paying the whole health check every minute.
 func V2HealthQueuePartial(w http.ResponseWriter, r *http.Request, s *AppState) {
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_health_queue", uiHealthQueueFrom(s), dict, eng)
+	v2Render(w, http.StatusOK, "v2_health_queue", uiHealthQueueFrom(s), s)
 }
 
 // V2Empty clears a modal container.
@@ -992,8 +995,7 @@ func V2RunCycle(w http.ResponseWriter, r *http.Request, s *AppState) {
 			notice["Message"] = response.Error
 		}
 	}
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_action_notice", notice, dict, eng)
+	v2Render(w, http.StatusOK, "v2_action_notice", notice, s)
 }
 
 // V2DashboardBackup creates a backup and reports its result in the same
@@ -1008,8 +1010,7 @@ func V2DashboardBackup(w http.ResponseWriter, r *http.Request, s *AppState) {
 	if status >= http.StatusBadRequest {
 		notice["Message"] = v2JSONError(raw)
 	}
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_action_notice", notice, dict, eng)
+	v2Render(w, http.StatusOK, "v2_action_notice", notice, s)
 }
 
 // --- i18n: translate the rendered HTML exactly like the classic client did ---
@@ -1596,10 +1597,9 @@ func V2DownloadsTable(w http.ResponseWriter, r *http.Request, s *AppState) {
 		http.Redirect(w, r, "/?view=downloads", http.StatusSeeOther)
 		return
 	}
-	dict, eng := v2Dictionaries(s)
 	view := v2TorrentsViewFrom(s, r, message, isErr)
 	view.Partial = true
-	v2Render(w, http.StatusOK, "v2_torrents_wrap", view, dict, eng)
+	v2Render(w, http.StatusOK, "v2_torrents_wrap", view, s)
 }
 
 func v2TorrentRowAction(s *AppState, value string) (string, bool) {
@@ -2133,8 +2133,7 @@ func V2DownloadsDetail(w http.ResponseWriter, r *http.Request, s *AppState) {
 	if tab == "" {
 		tab = "general"
 	}
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_detail_modal", v2DetailViewFrom(s, r.FormValue("hash"), tab), dict, eng)
+	v2Render(w, http.StatusOK, "v2_detail_modal", v2DetailViewFrom(s, r.FormValue("hash"), tab), s)
 }
 
 // V2DownloadsDetailPanel renders only the tab panel.
@@ -2143,8 +2142,7 @@ func V2DownloadsDetailPanel(w http.ResponseWriter, r *http.Request, s *AppState)
 	if tab == "" {
 		tab = "general"
 	}
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_detail_panel", v2DetailViewFrom(s, r.FormValue("hash"), tab), dict, eng)
+	v2Render(w, http.StatusOK, "v2_detail_panel", v2DetailViewFrom(s, r.FormValue("hash"), tab), s)
 }
 
 // V2DownloadsDetailAction keeps all torrent-detail mutations inside the v2
@@ -2271,12 +2269,10 @@ func V2DownloadsDetailAction(w http.ResponseWriter, r *http.Request, s *AppState
 	if status >= 400 {
 		view := v2DetailViewFrom(s, hash, tab)
 		view.Error = v2JSONError(raw)
-		dict, eng := v2Dictionaries(s)
-		v2Render(w, http.StatusOK, "v2_detail_panel", view, dict, eng)
+		v2Render(w, http.StatusOK, "v2_detail_panel", view, s)
 		return
 	}
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_detail_panel", v2DetailViewFrom(s, hash, tab), dict, eng)
+	v2Render(w, http.StatusOK, "v2_detail_panel", v2DetailViewFrom(s, hash, tab), s)
 }
 
 func v2ParseInt32(value string, fallback int32) int32 {
@@ -2336,8 +2332,7 @@ func V2DownloadsRemoveModal(w http.ResponseWriter, r *http.Request, s *AppState)
 		name = torrent.Name
 		onRamdisk = v2TorrentOnRamdisk(torrent.SavePath, latestConfig(s))
 	}
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_remove_modal", map[string]any{"Hash": hash, "Name": name, "OnRamdisk": onRamdisk}, dict, eng)
+	v2Render(w, http.StatusOK, "v2_remove_modal", map[string]any{"Hash": hash, "Name": name, "OnRamdisk": onRamdisk}, s)
 }
 
 // v2TorrentOnRamdisk reports whether a torrent's payload resides in the
@@ -2398,7 +2393,7 @@ func V2DownloadsRemove(w http.ResponseWriter, r *http.Request, s *AppState) {
 	var buffer bytes.Buffer
 	view := v2TorrentsViewFrom(s, r, message, isErr)
 	view.Partial = true
-	if err := v2Templates.ExecuteTemplate(&buffer, "v2_torrents_wrap", view); err != nil {
+	if err := v2TemplatesFor(s).ExecuteTemplate(&buffer, "v2_torrents_wrap", view); err != nil {
 		http.Error(w, "template error", http.StatusInternalServerError)
 		return
 	}
@@ -2850,8 +2845,7 @@ func V2SettingsScoreGroup(w http.ResponseWriter, r *http.Request, s *AppState) {
 		ScoreNotice string
 		ScoreError  bool
 	}{ScoreGroups: v2ScoreGroupsFrom(s), ScoreNotice: notice, ScoreError: isError}
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_score_groups", data, dict, eng)
+	v2Render(w, http.StatusOK, "v2_score_groups", data, s)
 }
 
 // v2ListEditorKey maps a list editor to the stable key the row/save endpoints use.
@@ -2878,12 +2872,11 @@ func v2ListEditorKey(editor uiListEditor) (string, bool) {
 // V2SettingsBody swaps the settings navigation and section (tab navigation,
 // search results). The address bar follows the section actually shown.
 func V2SettingsBody(w http.ResponseWriter, r *http.Request, s *AppState) {
-	dict, eng := v2Dictionaries(s)
 	view := v2SettingsViewFrom(s, r.FormValue("tab"), r.FormValue("highlight"), v2SettingsMode(r))
 	if r.Header.Get("HX-Request") != "" {
 		w.Header().Set("HX-Push-Url", "/?view=settings&tab="+view.ActiveID)
 	}
-	v2Render(w, http.StatusOK, "v2_settings_body", view, dict, eng)
+	v2Render(w, http.StatusOK, "v2_settings_body", view, s)
 }
 
 type v2SettingMatch struct {
@@ -2910,9 +2903,8 @@ func V2SettingsSearch(w http.ResponseWriter, r *http.Request, s *AppState) {
 		Query   string
 		Matches []v2SettingMatch
 	}{Query: r.FormValue("q")}
-	dict, eng := v2Dictionaries(s)
 	if query == "" {
-		v2Render(w, http.StatusOK, "v2_settings_search", out, dict, eng)
+		v2Render(w, http.StatusOK, "v2_settings_search", out, s)
 		return
 	}
 	seen := map[string]bool{}
@@ -2939,7 +2931,7 @@ func V2SettingsSearch(w http.ResponseWriter, r *http.Request, s *AppState) {
 			out.Matches = append(out.Matches, v2SettingMatch{Label: entry.Label, Tab: entry.Tab, TabLabel: labels[entry.Tab]})
 		}
 	}
-	v2Render(w, http.StatusOK, "v2_settings_search", out, dict, eng)
+	v2Render(w, http.StatusOK, "v2_settings_search", out, s)
 }
 
 // V2SettingsSave saves one setting and re-renders its field with the result.
@@ -2947,14 +2939,13 @@ func V2SettingsSave(w http.ResponseWriter, r *http.Request, s *AppState) {
 	key := strings.TrimSpace(r.FormValue("key"))
 	value := r.FormValue("value")
 	field := uiSettingFieldFor(key, v2SettingLabelFor(key), value)
-	dict, eng := v2Dictionaries(s)
 
 	render := func(status string, isErr bool) {
 		if r.Header.Get("HX-Request") == "" {
 			http.Redirect(w, r, "/?view=settings", http.StatusSeeOther)
 			return
 		}
-		v2Render(w, http.StatusOK, "v2_setting_field", v2Field{uiSettingField: field, Status: status, Error: isErr}, dict, eng)
+		v2Render(w, http.StatusOK, "v2_setting_field", v2Field{uiSettingField: field, Status: status, Error: isErr}, s)
 	}
 
 	if !settingKeyAllowed(key) || key == "" || len(key) > 128 {
@@ -3185,7 +3176,7 @@ func V2LogsPartial(w http.ResponseWriter, r *http.Request, s *AppState) {
 	view := v2LogsViewFrom(s, r.FormValue("filter"), linesNum, r.FormValue("log"), r.FormValue("level") == "problems")
 	dict, eng := v2Dictionaries(s)
 	var buffer bytes.Buffer
-	if err := v2Templates.ExecuteTemplate(&buffer, "v2_logs_view", view); err != nil {
+	if err := v2TemplatesFor(s).ExecuteTemplate(&buffer, "v2_logs_view", view); err != nil {
 		http.Error(w, "template error", http.StatusInternalServerError)
 		return
 	}
@@ -3204,7 +3195,7 @@ func V2GxLogsPartial(w http.ResponseWriter, r *http.Request, s *AppState) {
 	view := v2GxLogsViewFrom(s, r.FormValue("filter"), linesNum, r.FormValue("log"), r.FormValue("level") == "problems")
 	dict, eng := v2Dictionaries(s)
 	var buffer bytes.Buffer
-	if err := v2Templates.ExecuteTemplate(&buffer, "v2_gx_log_view", view); err != nil {
+	if err := v2TemplatesFor(s).ExecuteTemplate(&buffer, "v2_gx_log_view", view); err != nil {
 		http.Error(w, "template error", http.StatusInternalServerError)
 		return
 	}

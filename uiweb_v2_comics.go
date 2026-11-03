@@ -74,17 +74,15 @@ func V2ComicsExploreDownload(w http.ResponseWriter, r *http.Request, s *AppState
 			}
 		}
 	}
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_comics_explore_action", map[string]any{"Error": status >= 400, "Message": message}, dict, eng)
+	v2Render(w, http.StatusOK, "v2_comics_explore_action", map[string]any{"Error": status >= 400, "Message": message}, s)
 }
 
 func V2ComicsExploreSelect(w http.ResponseWriter, r *http.Request, s *AppState) {
-	dict, eng := v2Dictionaries(s)
 	v2Render(w, http.StatusOK, "v2_comics_explore_select", v2ComicExploreItem{
 		Title: r.FormValue("title"), URL: r.FormValue("url"), TagURL: r.FormValue("tag_url"),
 		CoverURL: r.FormValue("cover_url"), Publisher: r.FormValue("publisher"),
 		Description: r.FormValue("description"), Date: r.FormValue("date"),
-	}, dict, eng)
+	}, s)
 }
 
 func V2ComicsExploreAdd(w http.ResponseWriter, r *http.Request, s *AppState) {
@@ -96,8 +94,7 @@ func V2ComicsExploreAdd(w http.ResponseWriter, r *http.Request, s *AppState) {
 	if status >= 400 {
 		message = v2JSONError(raw)
 	}
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_comics_explore_action", map[string]any{"Error": status >= 400, "Message": message}, dict, eng)
+	v2Render(w, http.StatusOK, "v2_comics_explore_action", map[string]any{"Error": status >= 400, "Message": message}, s)
 }
 
 func mustJSON(value any) []byte {
@@ -160,8 +157,7 @@ func V2ComicsLinks(w http.ResponseWriter, r *http.Request, s *AppState) {
 			}
 		}
 	}
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_comics_links_result", view, dict, eng)
+	v2Render(w, http.StatusOK, "v2_comics_links_result", view, s)
 }
 
 func V2ComicsDownload(w http.ResponseWriter, r *http.Request, s *AppState) {
@@ -177,8 +173,7 @@ func V2ComicsDownload(w http.ResponseWriter, r *http.Request, s *AppState) {
 	} else {
 		result["Message"] = "avviato"
 	}
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_comics_download_result", result, dict, eng)
+	v2Render(w, http.StatusOK, "v2_comics_download_result", result, s)
 }
 
 // V2ComicsWeeklyForce queues a Weekly Pack from its recorded magnet or torrent
@@ -216,8 +211,7 @@ func V2ComicsWeeklyForce(w http.ResponseWriter, r *http.Request, s *AppState) {
 			result["Message"] = "Weekly Pack " + date + " accodato via " + method
 		}
 	}
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_action_notice", result, dict, eng)
+	v2Render(w, http.StatusOK, "v2_action_notice", result, s)
 }
 
 type v2ComicEditView struct {
@@ -262,8 +256,7 @@ func V2ComicsEdit(w http.ResponseWriter, r *http.Request, s *AppState) {
 		http.Error(w, "fumetto non trovato", http.StatusNotFound)
 		return
 	}
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_comic_edit_modal", view, dict, eng)
+	v2Render(w, http.StatusOK, "v2_comic_edit_modal", view, s)
 }
 
 func V2ComicsSave(w http.ResponseWriter, r *http.Request, s *AppState) {
@@ -274,8 +267,7 @@ func V2ComicsSave(w http.ResponseWriter, r *http.Request, s *AppState) {
 	raw, status := v2InternalJSON(s, http.MethodPost, "/api/comics", nil, body)
 	if r.Header.Get("HX-Request") != "" {
 		if status >= 400 {
-			dict, eng := v2Dictionaries(s)
-			v2Render(w, http.StatusOK, "v2_comics_save_result", map[string]any{"Error": true, "Message": v2JSONError(raw)}, dict, eng)
+			v2Render(w, http.StatusOK, "v2_comics_save_result", map[string]any{"Error": true, "Message": v2JSONError(raw)}, s)
 			return
 		}
 		w.Header().Set("HX-Redirect", "/?view=comics")

@@ -339,8 +339,7 @@ func V2SettingsScoreTest(w http.ResponseWriter, r *http.Request, s *AppState) {
 	} else {
 		v2ScoreTestFill(s, &view)
 	}
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_score_test_result", view, dict, eng)
+	v2Render(w, http.StatusOK, "v2_score_test_result", view, s)
 }
 
 func v2ScoreTestFill(s *AppState, view *v2ScoreTestView) {
@@ -443,6 +442,5 @@ func V2SettingsUpgradeImpact(w http.ResponseWriter, r *http.Request, s *AppState
 		}
 		view.Warn = archived > 0 && float64(report.Episodes) > upgradeImpactWarnShare*float64(archived)
 	}
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_upgrade_impact_result", view, dict, eng)
+	v2Render(w, http.StatusOK, "v2_upgrade_impact_result", view, s)
 }
