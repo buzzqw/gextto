@@ -122,7 +122,7 @@ func V2SettingsTuningApply(w http.ResponseWriter, r *http.Request, s *AppState) 
 			if applied == 1 {
 				panel.Notice = uiText(s, "Un'impostazione applicata.")
 			} else {
-				panel.Notice = fmt.Sprintf(uiText(s, "%d impostazioni applicate."), applied)
+				panel.Notice = uiTextf(s, "%d impostazioni applicate.", applied)
 			}
 		}
 	}

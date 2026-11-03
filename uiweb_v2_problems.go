@@ -111,7 +111,7 @@ func v2ProblemsViewFrom(s *AppState) v2ProblemsView {
 
 	watches, err := s.db.LoadStallWatches()
 	if err != nil {
-		view.Error = "Stato dei download fermi non disponibile: " + err.Error()
+		view.Error = uiTextf(s, "Stato dei download fermi non disponibile: %s", err.Error())
 	}
 	for hash, entry := range watches {
 		torrent, ok := session[strings.ToLower(hash)]
@@ -139,7 +139,7 @@ func v2ProblemsViewFrom(s *AppState) v2ProblemsView {
 
 	moves, err := s.db.LoadTorrentMoves()
 	if err != nil && view.Error == "" {
-		view.Error = "Stato degli spostamenti non disponibile: " + err.Error()
+		view.Error = uiTextf(s, "Stato degli spostamenti non disponibile: %s", err.Error())
 	}
 	for hash, state := range moves {
 		if state.Retry == nil {
@@ -166,7 +166,7 @@ func v2ProblemsViewFrom(s *AppState) v2ProblemsView {
 	// hide the ones still worth checking.
 	recent, err := s.db.AcquisitionProblems(ackID, v2ProblemsScan)
 	if err != nil && view.Error == "" {
-		view.Error = "Storia dei download non disponibile: " + err.Error()
+		view.Error = uiTextf(s, "Storia dei download non disponibile: %s", err.Error())
 	}
 	for _, event := range recent {
 		// Already listed above with its live state.

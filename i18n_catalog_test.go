@@ -1,6 +1,7 @@
 package gextto
 
 import (
+	"regexp"
 	"sort"
 	"strings"
 	"testing"
@@ -139,4 +140,50 @@ func keysOnlyIn(a, b map[string]string) []string {
 	}
 	sort.Strings(only)
 	return only
+}
+
+// placeholderPattern matches one printf verb: the flags, the optional width and
+// precision, then the conversion letter. A percent sign followed by a space is
+// prose ("100% from"), not a verb, so it cannot match.
+var placeholderPattern = regexp.MustCompile(`%(?:\[[0-9]+\])?[+#0\-]*[0-9]*(?:\.[0-9]+)?[vTtbcdoOqxXUeEfFgGsqp]`)
+
+// placeholders returns how many times each verb appears in a string.
+func placeholders(text string) map[string]int {
+	counts := map[string]int{}
+	for _, verb := range placeholderPattern.FindAllString(strings.ReplaceAll(text, "%%", ""), -1) {
+		counts[verb]++
+	}
+	return counts
+}
+
+// TestCatalogTranslationsKeepThePlaceholders locks the rule that a translated
+// message keeps the verbs of its Italian format string: uiTextf fills them with
+// fmt.Sprintf, so a missing %d becomes "%!d(MISSING)" in the interface. Only
+// entries whose key carries at least one verb are compared: a bare "100%" in
+// prose is not a placeholder.
+func TestCatalogTranslationsKeepThePlaceholders(t *testing.T) {
+	checked := 0
+	for _, file := range bundledCatalogs() {
+		_, entries := parseCatalog(t, file)
+		for key, value := range entries {
+			want := placeholders(key)
+			if len(want) == 0 {
+				continue
+			}
+			checked++
+			got := placeholders(value)
+			if len(got) != len(want) {
+				t.Errorf("%s: %q keeps %v, translation %q has %v", file.name, key, want, value, got)
+				continue
+			}
+			for verb, n := range want {
+				if got[verb] != n {
+					t.Errorf("%s: %q keeps %d×%q, translation %q has %d", file.name, key, n, verb, value, got[verb])
+				}
+			}
+		}
+	}
+	if checked < 50 {
+		t.Fatalf("only %d formatted entries checked: the guard is not reading the catalogs", checked)
+	}
 }

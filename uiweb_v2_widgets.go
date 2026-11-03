@@ -87,7 +87,7 @@ func v2DuplicatesViewFrom(s *AppState, r *http.Request) v2DuplicatesView {
 			view.NotifyMessage = "Pulizia completata: 1 file spostato nel cestino."
 		} else if view.Removed > 1 {
 			view.Notify = true
-			view.NotifyMessage = fmt.Sprintf("Pulizia completata: %d file spostati nel cestino.", view.Removed)
+			view.NotifyMessage = uiTextf(s, "Pulizia completata: %d file spostati nel cestino.", view.Removed)
 		}
 		return view
 	}
@@ -178,7 +178,7 @@ func v2DBViewFrom(s *AppState, r *http.Request) v2DBView {
 			view.Error = true
 			view.NotifyError = true
 			view.Message = v2JSONError(raw)
-			view.NotifyMessage = "Verifica integrità non riuscita: " + view.Message
+			view.NotifyMessage = uiTextf(s, "Verifica integrità non riuscita: %s", view.Message)
 		} else {
 			var payload struct {
 				OK     bool        `json:"ok"`
@@ -194,7 +194,7 @@ func v2DBViewFrom(s *AppState, r *http.Request) v2DBView {
 				view.Error = !payload.OK
 				view.NotifyError = !payload.OK
 				if payload.OK {
-					view.NotifyMessage = fmt.Sprintf("Verifica completata: integrità e indici validi in tutti i %d database.", len(payload.Checks))
+					view.NotifyMessage = uiTextf(s, "Verifica completata: integrità e indici validi in tutti i %d database.", len(payload.Checks))
 				} else {
 					view.NotifyMessage = "Verifica completata: sono stati rilevati problemi; consulta il dettaglio qui sotto."
 				}
@@ -208,7 +208,7 @@ func v2DBViewFrom(s *AppState, r *http.Request) v2DBView {
 			view.Message = v2JSONError(raw)
 			view.Notify = true
 			view.NotifyError = true
-			view.NotifyMessage = fmt.Sprintf("Operazione %s non riuscita: %s", strings.ToUpper(action), view.Message)
+			view.NotifyMessage = uiTextf(s, "Operazione %s non riuscita: %s", strings.ToUpper(action), view.Message)
 		} else {
 			var payload struct {
 				Before struct {
@@ -230,12 +230,12 @@ func v2DBViewFrom(s *AppState, r *http.Request) v2DBView {
 			if action == "vacuum" {
 				saved := view.BeforeSize - view.AfterSize
 				if saved > 0 {
-					view.NotifyMessage = fmt.Sprintf("VACUUM completato con successo su tutti i database: liberati %s (prima %s, ora %s).", formatBytes(saved), formatBytes(view.BeforeSize), formatBytes(view.AfterSize))
+					view.NotifyMessage = uiTextf(s, "VACUUM completato con successo su tutti i database: liberati %s (prima %s, ora %s).", formatBytes(saved), formatBytes(view.BeforeSize), formatBytes(view.AfterSize))
 				} else {
-					view.NotifyMessage = fmt.Sprintf("VACUUM completato con successo su tutti i database: compattati e ottimizzati (%s totali).", formatBytes(view.AfterSize))
+					view.NotifyMessage = uiTextf(s, "VACUUM completato con successo su tutti i database: compattati e ottimizzati (%s totali).", formatBytes(view.AfterSize))
 				}
 			} else {
-				view.NotifyMessage = fmt.Sprintf("ANALYZE completato con successo su tutti i database: statistiche del query planner aggiornate (%d righe).", view.AfterRows)
+				view.NotifyMessage = uiTextf(s, "ANALYZE completato con successo su tutti i database: statistiche del query planner aggiornate (%d righe).", view.AfterRows)
 			}
 		}
 	} else {
@@ -255,7 +255,7 @@ func v2DBViewFrom(s *AppState, r *http.Request) v2DBView {
 			}
 		}
 		if action == "refresh" && view.Notify {
-			view.NotifyMessage = fmt.Sprintf("Dimensioni aggiornate: totale %s su tutti i %d database.", formatBytes(view.TotalBytes), len(view.Files))
+			view.NotifyMessage = uiTextf(s, "Dimensioni aggiornate: totale %s su tutti i %d database.", formatBytes(view.TotalBytes), len(view.Files))
 		}
 	} else if view.Message == "" {
 		view.Error = true
@@ -263,7 +263,7 @@ func v2DBViewFrom(s *AppState, r *http.Request) v2DBView {
 		if action == "refresh" {
 			view.Notify = true
 			view.NotifyError = true
-			view.NotifyMessage = "Aggiornamento dimensioni non riuscito: " + view.Message
+			view.NotifyMessage = uiTextf(s, "Aggiornamento dimensioni non riuscito: %s", view.Message)
 		}
 	}
 	return view
@@ -321,7 +321,7 @@ func v2RamdiskViewFrom(s *AppState, r *http.Request) v2RamdiskView {
 			view.Message = v2JSONError(raw)
 		} else {
 			view = v2RamdiskState(s)
-			view.Message = uiText(s, "RAM disk selezionato:") + " " + path
+			view.Message = uiTextf(s, "RAM disk selezionato: %s", path)
 		}
 	}
 	return view
@@ -549,7 +549,7 @@ func v2FolderRenameApply(s *AppState, r *http.Request, view *v2FolderRenameView)
 	}
 	_ = json.Unmarshal(raw, &payload)
 	view.Renamed = payload.Renamed
-	view.Message = fmt.Sprintf("Rinominati %d file.", payload.Renamed)
+	view.Message = uiTextf(s, "Rinominati %d file.", payload.Renamed)
 }
 
 // V2FolderRenameScan scans a folder and re-renders the review panel.
@@ -1011,9 +1011,9 @@ func v2RenamePreviewFrom(s *AppState, name string, execute, force bool) v2Rename
 		})
 	}
 	if execute {
-		view.Message = fmt.Sprintf("Rinomina completata: %d rinominati, %d scartati, %d errori.", view.Renamed, view.Discarded, view.ErrorCount)
+		view.Message = uiTextf(s, "Rinomina completata: %d rinominati, %d scartati, %d errori.", view.Renamed, view.Discarded, view.ErrorCount)
 	} else if len(view.Items) == 0 {
-		view.Message = fmt.Sprintf("Nessun file da rinominare (%d già corretti su %d).", view.AlreadyOK, view.WithPath)
+		view.Message = uiTextf(s, "Nessun file da rinominare (%d già corretti su %d).", view.AlreadyOK, view.WithPath)
 	}
 	return view
 }

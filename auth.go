@@ -382,6 +382,14 @@ func uiText(s *AppState, italian string) string {
 	return v2TranslateText(italian, dict, eng)
 }
 
+// uiTextf translates a message and then fills its placeholders. The catalog key
+// is the Italian format string, so a translator decides where the values go
+// inside the sentence; that is why a sentence built with values must never be
+// assembled before the lookup (the finished text can never match a key).
+func uiTextf(s *AppState, format string, args ...any) string {
+	return fmt.Sprintf(uiText(s, format), args...)
+}
+
 func authRenderLogin(s *AppState, w http.ResponseWriter, next, message string, status int) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")

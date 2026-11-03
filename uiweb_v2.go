@@ -2043,7 +2043,7 @@ func v2DetailViewFrom(s *AppState, hash, tab string) v2DetailView {
 	case "history":
 		var historyErr error
 		if view.History, historyErr = s.db.AcquisitionEvents(hash); historyErr != nil {
-			view.TabError = "Storia non disponibile: " + historyErr.Error()
+			view.TabError = uiTextf(s, "Storia non disponibile: %s", historyErr.Error())
 		}
 	case "pieces":
 		if inspector, ok := s.activeEngine().(TorrentPieceInspector); ok {
@@ -2069,7 +2069,7 @@ func v2DetailViewFrom(s *AppState, hash, tab string) v2DetailView {
 		}
 	}
 	if tabErr != nil {
-		view.TabError = "Il motore non ha risposto: " + tabErr.Error()
+		view.TabError = uiTextf(s, "Il motore non ha risposto: %s", tabErr.Error())
 	}
 	return view
 }

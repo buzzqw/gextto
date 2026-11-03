@@ -302,7 +302,7 @@ func V2SeriesHistory(w http.ResponseWriter, r *http.Request, s *AppState) {
 		// One download, oldest first: opened from the dashboard problems.
 		events, err := s.db.AcquisitionEvents(hash)
 		if err != nil {
-			view.Error = "Storia non disponibile: " + err.Error()
+			view.Error = uiTextf(s, "Storia non disponibile: %s", err.Error())
 		}
 		view.Events = events
 		view.Label = logging.AcqID(hash)
@@ -318,7 +318,7 @@ func V2SeriesHistory(w http.ResponseWriter, r *http.Request, s *AppState) {
 		}
 		events, err := s.db.AcquisitionEventsForTitle(series, season, episode, limit)
 		if err != nil {
-			view.Error = "Storia non disponibile: " + err.Error()
+			view.Error = uiTextf(s, "Storia non disponibile: %s", err.Error())
 		}
 		view.Events = events
 	}

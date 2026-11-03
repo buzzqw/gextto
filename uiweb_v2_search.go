@@ -183,9 +183,9 @@ func V2SearchLink(w http.ResponseWriter, r *http.Request, s *AppState) {
 	view.Links = strings.Join(valid, "\n")
 	view.Query = fmt.Sprintf("%d link eD2k", len(view.Results))
 	if download {
-		view.Notice = fmt.Sprintf("%d link eD2k validi: puoi aggiungerli singolarmente o tutti insieme.", len(view.Results))
+		view.Notice = uiTextf(s, "%d link eD2k validi: puoi aggiungerli singolarmente o tutti insieme.", len(view.Results))
 	} else {
-		view.Notice = fmt.Sprintf("%d link eD2k validi, ma aMule non è attivo o non è raggiungibile: controlla la pagina eD2k.", len(view.Results))
+		view.Notice = uiTextf(s, "%d link eD2k validi, ma aMule non è attivo o non è raggiungibile: controlla la pagina eD2k.", len(view.Results))
 	}
 	if len(view.Results) == 0 {
 		view.Error = "Nessun link eD2k valido trovato nel testo incollato."

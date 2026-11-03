@@ -153,7 +153,7 @@ func uiEngineStatsFrom(s *AppState) uiEngineStats {
 	engine := s.activeEngine()
 	switch engine.Name() {
 	case BackendQbittorrent:
-		return uiQbitEngineStats(engine)
+		return uiQbitEngineStats(s, engine)
 	default:
 		return uiGxEngineStats(engine)
 	}
@@ -286,11 +286,11 @@ func uiUTPSocketRow(session map[string]any) ([]string, bool, bool) {
 	return row, true, dialErrs > 0 && accepts == 0
 }
 
-func uiQbitEngineStats(engine TorrentEngine) uiEngineStats {
+func uiQbitEngineStats(s *AppState, engine TorrentEngine) uiEngineStats {
 	stats := engine.Stats()
 	out := uiEngineStats{Backend: "qBittorrent-nox"}
 	if errText := engineString(stats, "error"); errText != "" {
-		out.Error = "qBittorrent non risponde: " + errText
+		out.Error = uiTextf(s, "qBittorrent non risponde: %s", errText)
 		return out
 	}
 	keys := make([]string, 0, len(stats))

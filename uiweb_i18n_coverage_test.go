@@ -121,7 +121,7 @@ func TestUIIsTranslatable(t *testing.T) {
 
 	templateText := regexp.MustCompile(`>([^<>{}]+)<`)
 	templateAttr := regexp.MustCompile(`(?:title|placeholder|aria-label|label|hx-confirm|data-v2-toast-title|data-v2-toast-message)="([^"{}]+)"`)
-	goField := regexp.MustCompile(`(?:Label|Value|Title|Hint|Note|Empty|Placeholder|SearchHint|Description|Caption|Subtitle|Message|Flash|Confirm|Intro|Submit|TestLabel|RefreshHint|CustomPlaceholder|Initial):\s*"([^"\\\n]{3,})"`)
+	goField := regexp.MustCompile(`(?:Label|Value|Title|Hint|Note|Empty|Placeholder|SearchHint|Description|Caption|Subtitle|Message|Flash|Confirm|Intro|Submit|TestLabel|RefreshHint|CustomPlaceholder|Initial|Error|TabError|Notice|NotifyMessage|DisabledNote|Warning):\s*"([^"\\\n]{3,})"`)
 	// A text node at runtime is everything between two tags. Template actions
 	// do not split it: a printed value ({{.X}}) or a word sitting next to an
 	// {{if}} block ends up in the same node as the surrounding words, so that
@@ -139,9 +139,12 @@ func TestUIIsTranslatable(t *testing.T) {
 	// too, otherwise the localized message would stay Italian.
 	// Assignments (data.Empty = "...") and the field helpers that take the
 	// label and hint as arguments.
-	goAssign := regexp.MustCompile(`\.(?:Empty|Message|Hint|Title|Label|Note|Initial)\s*=\s*"([^"\\\n]{3,})"`)
+	goAssign := regexp.MustCompile(`\.(?:Empty|Message|Hint|Title|Label|Note|Initial|Error|TabError|Notice|NotifyMessage|DisabledNote|Warning)\s*=\s*"([^"\\\n]{3,})"`)
 	goHelper := regexp.MustCompile(`(?:boolField|boolFieldHint|sectionSettingsActions)\(\s*"[^"]*",\s*"([^"\\\n]{3,})"(?:,\s*"([^"\\\n]{3,})")?`)
 	goUIText := regexp.MustCompile(`uiText\([^,]+,\s*"([^"\\\n]{3,})"\)`)
+	// A message assembled with values must translate its format string, not the
+	// finished sentence: uiTextf(s, "… %d …", n) keeps the key translatable.
+	goUITextf := regexp.MustCompile(`uiTextf\([^,]+,\s*"([^"\\\n]{3,})"`)
 	// Save outcomes rendered next to a setting (render("salvata", false),
 	// Status: "salvato"): they are text nodes of the page like any label.
 	goStatus := regexp.MustCompile(`(?:\brender\(|\bStatus:\s*)"([^"\\\n]{3,})"`)
@@ -227,6 +230,9 @@ func TestUIIsTranslatable(t *testing.T) {
 			record(path, m[1])
 		}
 		for _, m := range goUIText.FindAllStringSubmatch(string(raw), -1) {
+			record(path, m[1])
+		}
+		for _, m := range goUITextf.FindAllStringSubmatch(string(raw), -1) {
 			record(path, m[1])
 		}
 		for _, m := range goStatus.FindAllStringSubmatch(string(raw), -1) {

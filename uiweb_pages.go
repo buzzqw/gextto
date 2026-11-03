@@ -580,7 +580,7 @@ func uiSettingsPageFrom(s *AppState, activeTab, mode string) uiSettingsPage {
 		}
 		if !uiBackendAllows(uiSettingAllowedBackends(def.Key), activeBackend) {
 			field.Disabled = true
-			field.DisabledNote = "Non attivo con il motore «" + uiBackendLabel(activeBackend) + "»."
+			field.DisabledNote = uiTextf(s, "Non attivo con il motore «%s».", uiBackendLabel(activeBackend))
 			field.DisabledEngine = uiBackendLabel(activeBackend)
 		}
 		// With gx-torrent self-management on, the daemon owns the cache and the
