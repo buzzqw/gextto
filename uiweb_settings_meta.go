@@ -175,6 +175,11 @@ var uiSettingMetaByKey = map[string]uiSettingMeta{
 		{Value: "best", Label: "Solo la migliore"},
 		{Value: "first", Label: "Solo la prima"},
 	}},
+	"audio_cleanup_untagged": {Kind: "select", DependsOn: "audio_cleanup", Options: []uiFormOption{
+		{Value: "keep", Label: "Tienile"},
+		{Value: "remove", Label: "Toglile"},
+		{Value: "skip", Label: "Non toccare il file"},
+	}},
 
 	// Archivio e spazio
 	"trash_retention_days": {Unit: "giorni", Zero: "0 = svuota tutto"},

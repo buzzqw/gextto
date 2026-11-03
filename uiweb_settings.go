@@ -261,6 +261,7 @@ var uiSettingsIndex = []uiSettingDef{
 	{Key: "audio_cleanup", Label: "Rimuovi le tracce audio in altre lingue", Tab: "rename", Group: "Rinomina"},
 	{Key: "audio_cleanup_language", Label: "Lingua audio da tenere", Tab: "rename", Group: "Rinomina"},
 	{Key: "audio_cleanup_policy", Label: "Se ci sono più tracce nella lingua scelta", Tab: "rename", Group: "Rinomina"},
+	{Key: "audio_cleanup_untagged", Label: "Tracce audio senza lingua", Tab: "rename", Group: "Rinomina"},
 	{Key: "default_language", Label: "Lingua predefinita", Tab: "rename", Group: "Lingue dei metadati"},
 	{Key: "tvdb_language", Label: "Lingua TVDB", Tab: "rename", Group: "Lingue dei metadati"},
 	{Key: "tmdb_language", Label: "Lingua TMDB", Tab: "rename", Group: "Lingue dei metadati"},

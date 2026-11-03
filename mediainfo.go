@@ -53,6 +53,12 @@ type StreamInfo struct {
 	Codec     string  `json:"codec"`
 	StartTime float64 `json:"start_time,omitempty"`
 	HasStart  bool    `json:"-"`
+	// Language is the stream's language tag as written (lower case).
+	Language string `json:"language,omitempty"`
+	// Disposition lists the flags set on the stream (default, forced,
+	// hearing_impaired, …), sorted, so a remux can be proven not to have
+	// switched a subtitle or an audio track on or off.
+	Disposition []string `json:"disposition,omitempty"`
 }
 
 // MediaInfo is the parsed result of probing a media file.
@@ -400,6 +406,19 @@ func ParseFfprobe(root map[string]any) MediaInfo {
 				entry.StartTime = seconds
 				entry.HasStart = true
 			}
+		}
+		if tags, ok := stream["tags"].(map[string]any); ok {
+			if language, ok := miText(tags["language"]); ok {
+				entry.Language = strings.ToLower(language)
+			}
+		}
+		if disposition, ok := stream["disposition"].(map[string]any); ok {
+			for flag, value := range disposition {
+				if miAsI64(value) != 0 {
+					entry.Disposition = append(entry.Disposition, flag)
+				}
+			}
+			slices.Sort(entry.Disposition)
 		}
 		info.Streams = append(info.Streams, entry)
 	}

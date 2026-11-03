@@ -38,8 +38,9 @@ one.
   an unmounted share from deleted files, and a recycle bin.
 - Foreign audio can be dropped on import: an optional setting keeps only the
   tracks in your language (Italian by default) and removes the rest, copying
-  video and audio without re-encoding and checking duration and A/V sync before
-  replacing the file.
+  video and audio without re-encoding and comparing every packet with the
+  original, plus duration, flags and A/V sync, before replacing the file.
+  Untagged tracks are kept unless you choose otherwise.
 - The engine is our own Go code: BitTorrent v1, v2 and hybrid, TCP and uTP on
   one port, holepunching, IPv6 DHT, streaming. It is fast on a real swarm and
   light at rest — the figures are in [Numbers](#numbers). The same binary is

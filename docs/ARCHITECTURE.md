@@ -130,7 +130,9 @@ qBittorrent-nox.
 | `mediainfo.go` | actual inspection of files via `ffprobe`. |
 | `comics.go` | comics: scraper, DB, HTTP download, dedicated cycle. |
 | `comicinfo.go` | writing of `ComicInfo.xml` into directly downloaded CBZ files. |
-| `audio_cleanup.go` | audio tracks in other languages removed after the import: video and the kept audio copied packet by packet, no re-encoding (mkvmerge for Matroska, ffmpeg otherwise), a re-probe of tracks, duration and A/V offsets before the library file is replaced. |
+| `audio_cleanup.go` | audio tracks in other languages removed after the import: video and the kept audio copied packet by packet, no re-encoding (mkvmerge first for Matroska, ffmpeg as the second chance and for the other containers), untagged tracks kept/removed/left alone by setting, a re-probe of the streams per type (codec, language, flags), duration and A/V offsets before the library file is replaced; no chmod on network shares. |
+| `audio_cleanup_packets.go` | the packet check of the audio cleanup: every packet of every kept stream compared with the source (MD5 of the payload, time relative to the stream start, distance from the first video packet). |
+| `audio_cleanup_queue.go` | the audio cleanup queue: one worker, no size limit, saved to `audio_cleanup_queue.json` in the data folder and resumed at startup. |
 | `mediainfo_gate.go` | an upgrade is confirmed by probing both files with ffprobe: an attribute the streams do not show (resolution, video codec, audio family and channels, HDR10/HLG) discards the release, blocklists it and restores the archived row. |
 | `manual_import.go` | manual import of a file already on disk: parse the name, match a configured series or movie, propose the archive destination, replace an existing copy only on request. |
 | `upgrade_impact.go` | "what would the next cycles replace?": the archived releases replayed through the series decision in dry-run. |

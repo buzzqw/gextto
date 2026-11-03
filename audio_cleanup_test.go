@@ -60,12 +60,14 @@ func TestPlanAudioCleanup(t *testing.T) {
 		Streams:   []StreamInfo{video},
 	}
 	cases := []struct {
-		name    string
-		tracks  []AudioTrackInfo
-		policy  string
-		keep    []int
-		drop    []int
-		skipped bool
+		name     string
+		tracks   []AudioTrackInfo
+		language string
+		policy   string
+		untagged string
+		keep     []int
+		drop     []int
+		skipped  bool
 	}{
 		{name: "single track", tracks: []AudioTrackInfo{audioTrack(1, "ita", "aac", 2, 0, false)}, skipped: true},
 		{name: "no italian", tracks: []AudioTrackInfo{audioTrack(1, "eng", "aac", 2, 0, false), audioTrack(2, "fra", "aac", 2, 0, false)}, skipped: true},
@@ -79,13 +81,55 @@ func TestPlanAudioCleanup(t *testing.T) {
 			policy: audioCleanupPolicyAll, keep: []int{0}, drop: []int{1},
 		},
 		{
-			name: "untagged removed when italian exists",
+			name: "untagged kept by default",
 			tracks: []AudioTrackInfo{
 				audioTrack(1, "ita", "aac", 2, 0, false),
 				audioTrack(2, "eng", "aac", 2, 0, false),
 				audioTrack(3, "", "aac", 2, 0, false),
 			},
-			policy: audioCleanupPolicyAll, keep: []int{0}, drop: []int{1, 2},
+			policy: audioCleanupPolicyAll, keep: []int{0, 2}, drop: []int{1},
+		},
+		{
+			name: "untagged removed when asked",
+			tracks: []AudioTrackInfo{
+				audioTrack(1, "ita", "aac", 2, 0, false),
+				audioTrack(2, "eng", "aac", 2, 0, false),
+				audioTrack(3, "und", "aac", 2, 0, false),
+			},
+			policy: audioCleanupPolicyAll, untagged: audioCleanupUntaggedRemove, keep: []int{0}, drop: []int{1, 2},
+		},
+		{
+			name: "untagged makes the file untouchable when asked",
+			tracks: []AudioTrackInfo{
+				audioTrack(1, "ita", "aac", 2, 0, false),
+				audioTrack(2, "eng", "aac", 2, 0, false),
+				audioTrack(3, "", "aac", 2, 0, false),
+			},
+			policy: audioCleanupPolicyAll, untagged: audioCleanupUntaggedSkip, skipped: true,
+		},
+		{
+			name: "only italian and untagged is left alone",
+			tracks: []AudioTrackInfo{
+				audioTrack(1, "ita", "aac", 2, 0, false),
+				audioTrack(2, "", "aac", 2, 0, false),
+			},
+			policy: audioCleanupPolicyAll, skipped: true,
+		},
+		{
+			name: "quoted tags are read",
+			tracks: []AudioTrackInfo{
+				audioTrack(1, "'eng'", "aac", 2, 0, false),
+				audioTrack(2, "'ita'", "aac", 2, 0, false),
+			},
+			policy: audioCleanupPolicyAll, keep: []int{1}, drop: []int{0},
+		},
+		{
+			name: "polish codes are equivalent",
+			tracks: []AudioTrackInfo{
+				audioTrack(1, "pl", "aac", 2, 0, false),
+				audioTrack(2, "eng", "aac", 2, 0, false),
+			},
+			language: "pol", policy: audioCleanupPolicyAll, keep: []int{0}, drop: []int{1},
 		},
 		{
 			name: "best prefers channels over commentary",
@@ -122,7 +166,11 @@ func TestPlanAudioCleanup(t *testing.T) {
 			for _, track := range testCase.tracks {
 				info.Streams = append(info.Streams, StreamInfo{Index: track.Index, Type: "audio", Codec: track.Codec})
 			}
-			plan := PlanAudioCleanup(info, AudioCleanupOptions{Language: "ita", Policy: testCase.policy})
+			language := testCase.language
+			if language == "" {
+				language = "ita"
+			}
+			plan := PlanAudioCleanup(info, AudioCleanupOptions{Language: language, Policy: testCase.policy, Untagged: testCase.untagged})
 			if plan.Skipped() != testCase.skipped {
 				t.Fatalf("skipped = %v (%s), want %v", plan.Skipped(), plan.SkipReason, testCase.skipped)
 			}
@@ -151,31 +199,6 @@ func TestPlanAudioCleanupNeedsTwoTracks(t *testing.T) {
 }
 
 // --- command construction --------------------------------------------------
-
-func TestAudioCleanupFFmpegCommandCopiesAndDropsByPosition(t *testing.T) {
-	plan := AudioCleanupPlan{
-		Info: MediaInfo{AudioTracks: []AudioTrackInfo{
-			audioTrack(1, "ita", "eac3", 6, 0, false),
-			audioTrack(2, "eng", "eac3", 6, 0, false),
-			audioTrack(3, "eng", "ac3", 6, 0, false),
-		}},
-		KeepPositions: []int{0},
-		DropPositions: []int{1, 2},
-	}
-	argv, err := audioCleanupCommand("ffmpeg", "in.mkv", "out.mkv", plan)
-	if err != nil {
-		t.Fatal(err)
-	}
-	joined := strings.Join(argv, " ")
-	for _, required := range []string{"-c copy", "-map -0:a:1", "-map -0:a:2", "-map 0:v?", "-map 0:t?"} {
-		if !strings.Contains(joined, required) {
-			t.Errorf("command misses %q: %s", required, joined)
-		}
-	}
-	if strings.Contains(joined, "-map 0:a:2") {
-		t.Errorf("command maps a dropped track: %s", joined)
-	}
-}
 
 // --- scores ----------------------------------------------------------------
 
@@ -548,7 +571,7 @@ func TestAudioCleanupFFmpegBackendVerifiesOutput(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := verifyAudioCleanupOutput(info, output, plan, "ita", true); err != nil {
+	if err := verifyAudioCleanupOutput(info, output, plan, AudioCleanupOptions{Language: "ita"}, true); err != nil {
 		t.Fatalf("verification failed: %v", err)
 	}
 	if len(output.AudioTracks) != 1 || output.AudioTracks[0].Language != "ita" {
@@ -585,7 +608,7 @@ func TestAudioCleanupMkvmergeBackendUsesContainerIDs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := verifyAudioCleanupOutput(info, output, plan, "ita", true); err != nil {
+	if err := verifyAudioCleanupOutput(info, output, plan, AudioCleanupOptions{Language: "ita"}, true); err != nil {
 		t.Fatalf("verification failed: %v", err)
 	}
 	if len(output.AudioTracks) != 1 || output.AudioTracks[0].Language != "ita" {

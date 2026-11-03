@@ -2,21 +2,32 @@
 // language other than the configured one, right after a file enters the
 // library. It never re-encodes: the video and the kept audio are copied packet
 // by packet, so quality, HDR metadata and the A/V timing are exactly the same
-// as the source. mkvmerge is preferred for MKV because it copies the Matroska
-// structure as it is; ffmpeg is the fallback for the other containers.
+// as the source. mkvmerge is tried first for MKV because it keeps the Matroska
+// structure; when its copy does not pass the checks, ffmpeg tries again, and it
+// is the only tool for the other containers.
 //
 // Safety, in order:
 //   - every file is probed with ffprobe: one audio track, no track tagged in
 //     the wanted language, or nothing to remove means the file is left alone;
-//   - the remux writes a hidden temporary in the same directory; the result is
-//     re-probed (stream list, duration, A/V offsets) and only then renamed over
-//     the library file, atomically;
+//     untagged tracks are kept, removed or make the file untouchable, as the
+//     operator chose;
+//   - the remux writes a hidden temporary in the same directory, only when the
+//     filesystem has room for it;
+//   - the result is re-probed: the same streams per type, in the same order,
+//     with the same codecs, languages and flags (a subtitle cannot switch itself
+//     on), the same duration and A/V offsets;
+//   - then every packet of every kept stream is compared with the source: the
+//     same MD5 of the payload and the same relative timestamps, so the copy is
+//     byte-for-byte the source minus the removed tracks. Only then the file is
+//     renamed over the library file, atomically;
 //   - the rename swaps the directory entry, not the inode: a hardlink shared
 //     with a seeding torrent keeps the old file alive, so seeding is not
 //     disturbed and the download's data is never written to;
 //   - the job runs in one background worker, never in the torrent event loop;
 //     the source is re-stat'ed just before the rename so a concurrent upgrade
-//     makes the job give up instead of overwriting it.
+//     makes the job give up instead of overwriting it;
+//   - on a network share the permissions are left to the share (a chmod would
+//     strip the ACLs of a NAS): the new file inherits them from the folder.
 //
 // Scores: the file name is not touched, and most of the quality score is
 // parsed from the name, so the archive score does not move. Two components can
@@ -35,6 +46,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"math"
 	"os"
 	"os/exec"
@@ -42,7 +54,6 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/buzzqw/gextto/internal/logging"
@@ -52,29 +63,38 @@ const (
 	audioCleanupSetting         = "audio_cleanup"
 	audioCleanupLanguageSetting = "audio_cleanup_language"
 	audioCleanupPolicySetting   = "audio_cleanup_policy"
+	audioCleanupUntaggedSetting = "audio_cleanup_untagged"
 
 	audioCleanupPolicyAll   = "all"
 	audioCleanupPolicyBest  = "best"
 	audioCleanupPolicyFirst = "first"
 
+	// What to do with an audio track that declares no language.
+	audioCleanupUntaggedKeep   = "keep"
+	audioCleanupUntaggedRemove = "remove"
+	audioCleanupUntaggedSkip   = "skip"
+
 	audioCleanupDefaultLanguage = "ita"
-	audioCleanupQueueSize       = 64
-	// audioCleanupTimeout bounds one remux: a 4K film on a slow share can take
-	// a long time, but a hung tool must not pin the worker forever.
+	// audioCleanupTimeout bounds one file, remux and checks included: a 4K film
+	// on a slow share can take a long time, but a hung tool must not pin the
+	// worker forever.
 	audioCleanupTimeout = 6 * time.Hour
 	// audioCleanupOffsetTolerance is the maximum A/V offset change accepted
 	// between the source and the result. Container rounding is milliseconds;
 	// 250ms is already a visible desync, so anything above it is refused.
 	audioCleanupOffsetTolerance   = 0.25
 	audioCleanupDurationTolerance = 2
+	// audioCleanupSpaceMargin is kept free on top of the temporary copy.
+	audioCleanupSpaceMargin = 256 << 20
 )
 
 // AudioCleanupOptions is the resolved configuration of one job. It is copied
 // when the job is queued so a later settings change cannot alter work already
 // scheduled.
 type AudioCleanupOptions struct {
-	Language string
-	Policy   string
+	Language string `json:"language"`
+	Policy   string `json:"policy"`
+	Untagged string `json:"untagged"`
 }
 
 // AudioCleanupPlan is the decision taken from the container alone.
@@ -82,9 +102,12 @@ type AudioCleanupPlan struct {
 	Info          MediaInfo
 	Keep          []AudioTrackInfo
 	Drop          []AudioTrackInfo
-	KeepPositions []int // positions inside Info.AudioTracks
-	DropPositions []int // positions inside Info.AudioTracks
-	SkipReason    string
+	KeepPositions []int // positions inside Info.AudioTracks, in file order
+	DropPositions []int // positions inside Info.AudioTracks, in file order
+	// DefaultPosition is the kept track that becomes the default one because
+	// the default track was removed; -1 when the flags stay as they are.
+	DefaultPosition int
+	SkipReason      string
 }
 
 // Skipped reports a file that must not be touched.
@@ -119,23 +142,78 @@ func audioCleanupSettings(cfg *Config) (AudioCleanupOptions, bool) {
 	default:
 		policy = audioCleanupPolicyAll
 	}
-	return AudioCleanupOptions{Language: language, Policy: policy}, true
+	return AudioCleanupOptions{
+		Language: language,
+		Policy:   policy,
+		Untagged: normalizeAudioCleanupUntagged(cfg.Settings[audioCleanupUntaggedSetting]),
+	}, true
+}
+
+// normalizeAudioCleanupUntagged maps the setting to one of the three modes;
+// anything unknown keeps the tracks, the choice that never loses audio.
+func normalizeAudioCleanupUntagged(value string) string {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case audioCleanupUntaggedRemove:
+		return audioCleanupUntaggedRemove
+	case audioCleanupUntaggedSkip:
+		return audioCleanupUntaggedSkip
+	default:
+		return audioCleanupUntaggedKeep
+	}
 }
 
 // audioLanguageAliases maps the spellings found in real containers to one
-// canonical code. Only the languages a release commonly declares are listed;
-// everything else is compared after normalisation.
-var audioLanguageAliases = map[string]string{
-	"it": "it", "ita": "it", "ital": "it", "italian": "it", "italiano": "it",
-	"en": "en", "eng": "en", "english": "en",
-	"fr": "fr", "fra": "fr", "fre": "fr", "french": "fr", "francais": "fr", "français": "fr",
-	"de": "de", "deu": "de", "ger": "de", "german": "de", "deutsch": "de",
-	"es": "es", "spa": "es", "spanish": "es", "espanol": "es", "español": "es",
+// canonical code: ISO 639-1, ISO 639-2/B and 639-2/T, and the English and
+// native names releases write. It covers every language of the settings list;
+// anything else is compared after normalisation.
+var audioLanguageAliases = func() map[string]string {
+	groups := map[string][]string{
+		"it": {"ita", "ital", "italian", "italiano"},
+		"en": {"eng", "english"},
+		"fr": {"fra", "fre", "french", "francais", "français"},
+		"de": {"deu", "ger", "german", "deutsch"},
+		"es": {"spa", "spanish", "espanol", "español", "castellano"},
+		"pt": {"por", "portuguese", "portugues", "português"},
+		"nl": {"nld", "dut", "dutch", "nederlands"},
+		"pl": {"pol", "polish", "polski"},
+		"sv": {"swe", "swedish", "svenska"},
+		"no": {"nor", "nob", "nno", "nb", "nn", "norwegian", "norsk"},
+		"da": {"dan", "danish", "dansk"},
+		"fi": {"fin", "finnish", "suomi"},
+		"cs": {"ces", "cze", "czech", "čeština", "cestina"},
+		"hu": {"hun", "hungarian", "magyar"},
+		"ro": {"ron", "rum", "romanian", "română", "romana"},
+		"el": {"ell", "gre", "greek"},
+		"tr": {"tur", "turkish", "türkçe", "turkce"},
+		"ru": {"rus", "russian"},
+		"uk": {"ukr", "ukrainian"},
+		"ar": {"ara", "arabic"},
+		"he": {"heb", "hebrew", "iw"},
+		"hi": {"hin", "hindi"},
+		"ja": {"jpn", "japanese"},
+		"ko": {"kor", "korean"},
+		"zh": {"zho", "chi", "chinese"},
+	}
+	aliases := make(map[string]string)
+	for canonical, spellings := range groups {
+		aliases[canonical] = canonical
+		for _, spelling := range spellings {
+			aliases[spelling] = canonical
+		}
+	}
+	return aliases
+}()
+
+// audioUntaggedLanguages are the values that declare no real language.
+var audioUntaggedLanguages = map[string]bool{
+	"": true, "und": true, "unk": true, "unknown": true, "zxx": true,
+	"mul": true, "mis": true, "none": true, "n/a": true, "nan": true,
 }
 
 // canonicalAudioLanguage reduces "it-IT", "ITA", "ital" and "Italiano" to "it".
 func canonicalAudioLanguage(value string) string {
-	code := strings.ToLower(strings.TrimSpace(value))
+	// Some muxing tools write the tag with quotes around it ('ita').
+	code := strings.ToLower(strings.Trim(strings.TrimSpace(value), `'"`+"`"+` `))
 	code = strings.ReplaceAll(code, "_", "-")
 	if index := strings.IndexByte(code, '-'); index > 0 {
 		code = code[:index]
@@ -146,21 +224,25 @@ func canonicalAudioLanguage(value string) string {
 	return code
 }
 
+// audioLanguageUntagged reports a language value that names no language.
+func audioLanguageUntagged(value string) bool {
+	return audioUntaggedLanguages[canonicalAudioLanguage(value)]
+}
+
 // audioTrackMatchesLanguage reports a track explicitly tagged in the wanted
-// language. An untagged track ("und", empty) never matches: the caller wants to
-// leave such files alone rather than guess.
+// language. An untagged track ("und", empty) never matches: what happens to it
+// is the operator's choice (AudioCleanupOptions.Untagged), never a guess.
 func audioTrackMatchesLanguage(track AudioTrackInfo, wanted string) bool {
-	code := canonicalAudioLanguage(track.Language)
-	if code == "" || code == "und" || code == "unk" || code == "unknown" {
+	if audioLanguageUntagged(track.Language) {
 		return false
 	}
-	return code == canonicalAudioLanguage(wanted)
+	return canonicalAudioLanguage(track.Language) == canonicalAudioLanguage(wanted)
 }
 
 // PlanAudioCleanup decides what to keep from the probed container. No file
 // name, release tag or external metadata is consulted.
 func PlanAudioCleanup(info MediaInfo, opts AudioCleanupOptions) AudioCleanupPlan {
-	plan := AudioCleanupPlan{Info: info}
+	plan := AudioCleanupPlan{Info: info, DefaultPosition: -1}
 	if len(info.Streams) == 0 && len(info.AudioTracks) == 0 {
 		plan.SkipReason = "the file could not be analysed"
 		return plan
@@ -188,29 +270,56 @@ func PlanAudioCleanup(info MediaInfo, opts AudioCleanupOptions) AudioCleanupPlan
 		return plan
 	}
 
+	var chosen []int
 	switch opts.Policy {
 	case audioCleanupPolicyFirst:
-		plan.KeepPositions = []int{candidates[0]}
+		chosen = []int{candidates[0]}
 	case audioCleanupPolicyBest:
-		plan.KeepPositions = []int{bestAudioCleanupTrack(info.AudioTracks, candidates)}
+		chosen = []int{bestAudioCleanupTrack(info.AudioTracks, candidates)}
 	default:
-		plan.KeepPositions = append([]int(nil), candidates...)
+		chosen = append([]int(nil), candidates...)
 	}
 
-	kept := make(map[int]bool, len(plan.KeepPositions))
-	for _, position := range plan.KeepPositions {
+	kept := make(map[int]bool, len(info.AudioTracks))
+	for _, position := range chosen {
 		kept[position] = true
-		plan.Keep = append(plan.Keep, info.AudioTracks[position])
 	}
+	untaggedMode := normalizeAudioCleanupUntagged(opts.Untagged)
+	untagged := 0
+	for position, track := range info.AudioTracks {
+		if kept[position] || !audioLanguageUntagged(track.Language) {
+			continue
+		}
+		untagged++
+		if untaggedMode == audioCleanupUntaggedKeep {
+			kept[position] = true
+		}
+	}
+	if untagged > 0 && untaggedMode == audioCleanupUntaggedSkip {
+		plan.SkipReason = fmt.Sprintf("%d audio track(s) declare no language", untagged)
+		return plan
+	}
+
+	keptDefault, droppedDefault := false, false
 	for position, track := range info.AudioTracks {
 		if kept[position] {
+			plan.Keep = append(plan.Keep, track)
+			plan.KeepPositions = append(plan.KeepPositions, position)
+			keptDefault = keptDefault || track.Default
 			continue
 		}
 		plan.Drop = append(plan.Drop, track)
 		plan.DropPositions = append(plan.DropPositions, position)
+		droppedDefault = droppedDefault || track.Default
 	}
 	if len(plan.Drop) == 0 {
-		plan.SkipReason = "every audio track is already in the wanted language"
+		plan.SkipReason = "there is no audio track to remove"
+		return plan
+	}
+	// The default track was removed: the chosen language track takes its place,
+	// so a player that follows the flag does not start on no track at all.
+	if droppedDefault && !keptDefault {
+		plan.DefaultPosition = chosen[0]
 	}
 	return plan
 }
@@ -271,14 +380,20 @@ func audioCleanupCodecRank(codec string) int {
 	}
 }
 
-// RunAudioCleanup probes path, decides, remuxes and publishes the result.
-// A skipped file returns no error: skipping is a normal outcome.
+// RunAudioCleanup probes path, decides, remuxes, checks and publishes the
+// result. A skipped file returns no error: skipping is a normal outcome. On any
+// error the library file is exactly as it was.
 func RunAudioCleanup(ctx context.Context, path string, opts AudioCleanupOptions) (report AudioCleanupReport, err error) {
 	report.Path = path
 	started := time.Now()
 	defer func() { report.Elapsed = time.Since(started) }()
 
 	fileInfo, err := os.Stat(path)
+	if errors.Is(err, fs.ErrNotExist) {
+		// Upgraded, renamed or deleted while it waited in the queue.
+		report.SkipReason = "the file is no longer there"
+		return report, nil
+	}
 	if err != nil {
 		return report, err
 	}
@@ -291,7 +406,7 @@ func RunAudioCleanup(ctx context.Context, path string, opts AudioCleanupOptions)
 		return report, nil
 	}
 
-	media, err := ProbeResult(path)
+	media, err := probeFileWithinContext(ctx, path, 5*time.Minute)
 	if err != nil {
 		return report, fmt.Errorf("cannot analyse the file: %w", err)
 	}
@@ -303,11 +418,40 @@ func RunAudioCleanup(ctx context.Context, path string, opts AudioCleanupOptions)
 		return report, nil
 	}
 
-	extension := filepath.Ext(path)
-	temporary := filepath.Join(
-		filepath.Dir(path),
-		fmt.Sprintf(".%s.gxt-audio-%s%s", strings.TrimSuffix(filepath.Base(path), extension), randomToken(), extension),
-	)
+	// A crash or a restart in the middle of an earlier attempt leaves its
+	// hidden copy behind: only this worker writes them, so it is safe to go.
+	removeAudioCleanupLeftovers(path)
+	if err := audioCleanupCheckSpace(path, fileInfo.Size(), plan); err != nil {
+		return report, err
+	}
+
+	backends := audioCleanupBackends(path)
+	if len(backends) == 0 {
+		return report, errors.New("neither mkvmerge nor ffmpeg is installed")
+	}
+	temporary := ""
+	failures := make([]string, 0, len(backends))
+	for attempt, backend := range backends {
+		candidate := audioCleanupTemporaryPath(path)
+		attemptErr := audioCleanupAttempt(ctx, backend, path, candidate, media, plan, opts)
+		if attemptErr == nil {
+			temporary = candidate
+			report.Backend = backend
+			break
+		}
+		_ = os.Remove(candidate)
+		if ctx.Err() != nil {
+			return report, fmt.Errorf("%s: %w", backend, attemptErr)
+		}
+		failures = append(failures, fmt.Sprintf("%s: %v", backend, attemptErr))
+		if attempt+1 < len(backends) {
+			logging.Debug("the remuxed copy did not pass the checks, trying the next tool",
+				"path", path, "tool", backend, "error", attemptErr.Error())
+		}
+	}
+	if temporary == "" {
+		return report, errors.New(strings.Join(failures, "; "))
+	}
 	published := false
 	defer func() {
 		if !published {
@@ -315,43 +459,10 @@ func RunAudioCleanup(ctx context.Context, path string, opts AudioCleanupOptions)
 		}
 	}()
 
-	backend, err := audioCleanupBackend(temporary)
-	if err != nil {
-		return report, err
-	}
-	report.Backend = backend
-
-	argv, err := audioCleanupCommand(backend, path, temporary, plan)
-	if err != nil && backend == "mkvmerge" {
-		// The Matroska ids could not be read: ffmpeg can still do the same copy
-		// without touching the track order.
-		logging.Debug("mkvmerge cannot be used for this file, falling back to ffmpeg", "path", path, "error", err.Error())
-		backend = "ffmpeg"
-		report.Backend = backend
-		argv, err = audioCleanupCommand(backend, path, temporary, plan)
-	}
-	if err != nil {
-		return report, err
-	}
-	if err := runAudioCleanupCommand(ctx, argv, media.RuntimeSeconds, filepath.Base(path)); err != nil {
-		return report, err
-	}
 	temporaryInfo, err := os.Stat(temporary)
 	if err != nil {
 		return report, err
 	}
-	if temporaryInfo.Size() == 0 {
-		return report, errors.New("the remux produced an empty file")
-	}
-
-	output, err := ProbeResult(temporary)
-	if err != nil {
-		return report, fmt.Errorf("cannot analyse the remuxed file: %w", err)
-	}
-	if err := verifyAudioCleanupOutput(media, output, plan, opts.Language, isMatroskaPath(temporary)); err != nil {
-		return report, err
-	}
-
 	after, err := os.Stat(path)
 	if err != nil {
 		return report, err
@@ -359,9 +470,7 @@ func RunAudioCleanup(ctx context.Context, path string, opts AudioCleanupOptions)
 	if !os.SameFile(fileInfo, after) || fileInfo.Size() != after.Size() || !fileInfo.ModTime().Equal(after.ModTime()) {
 		return report, errors.New("the file changed while it was being cleaned")
 	}
-	if err := os.Chmod(temporary, fileInfo.Mode().Perm()); err != nil {
-		return report, err
-	}
+	audioCleanupCopyPermissions(path, temporary, fileInfo, temporaryInfo)
 	if err := os.Rename(temporary, path); err != nil {
 		return report, err
 	}
@@ -375,18 +484,48 @@ func RunAudioCleanup(ctx context.Context, path string, opts AudioCleanupOptions)
 	return report, nil
 }
 
-// audioCleanupBackend chooses mkvmerge only when the output is Matroska and
-// the binary exists: there it copies the container structure exactly.
-func audioCleanupBackend(temporary string) (string, error) {
-	if isMatroskaPath(temporary) {
+// audioCleanupAttempt writes the cleaned copy with one tool and proves it is
+// the source minus the dropped tracks. Any error means the copy is not used.
+func audioCleanupAttempt(ctx context.Context, backend, source, temporary string, media MediaInfo, plan AudioCleanupPlan, opts AudioCleanupOptions) error {
+	argv, err := audioCleanupCommand(backend, source, temporary, plan)
+	if err != nil {
+		return err
+	}
+	if err := runAudioCleanupCommand(ctx, argv, media.RuntimeSeconds, filepath.Base(source)); err != nil {
+		return err
+	}
+	temporaryInfo, err := os.Stat(temporary)
+	if err != nil {
+		return err
+	}
+	if temporaryInfo.Size() == 0 {
+		return errors.New("the remux produced an empty file")
+	}
+	output, err := probeFileWithinContext(ctx, temporary, 5*time.Minute)
+	if err != nil {
+		return fmt.Errorf("cannot analyse the remuxed file: %w", err)
+	}
+	if err := verifyAudioCleanupOutput(media, output, plan, opts, isMatroskaPath(temporary)); err != nil {
+		return err
+	}
+	return verifyAudioCleanupPackets(ctx, source, temporary, media, output, plan, isMatroskaPath(temporary))
+}
+
+// audioCleanupBackends lists the tools to try, in order. For Matroska
+// mkvmerge comes first and ffmpeg is the second chance: mkvmerge rewrites some
+// codec headers and subtitle packets, which the packet check refuses, while
+// ffmpeg copies the bytes as they are.
+func audioCleanupBackends(path string) []string {
+	backends := make([]string, 0, 2)
+	if isMatroskaPath(path) {
 		if _, err := exec.LookPath("mkvmerge"); err == nil {
-			return "mkvmerge", nil
+			backends = append(backends, "mkvmerge")
 		}
 	}
 	if _, err := exec.LookPath("ffmpeg"); err == nil {
-		return "ffmpeg", nil
+		backends = append(backends, "ffmpeg")
 	}
-	return "", errors.New("neither mkvmerge nor ffmpeg is installed")
+	return backends
 }
 
 func isMatroskaPath(path string) bool {
@@ -395,6 +534,90 @@ func isMatroskaPath(path string) bool {
 		return true
 	}
 	return false
+}
+
+// audioCleanupTemporaryMarker names the hidden copies, so a leftover of a
+// crashed attempt can be recognised and removed.
+const audioCleanupTemporaryMarker = ".gxt-audio-"
+
+func audioCleanupTemporaryPath(path string) string {
+	extension := filepath.Ext(path)
+	stem := strings.TrimSuffix(filepath.Base(path), extension)
+	return filepath.Join(filepath.Dir(path), "."+stem+audioCleanupTemporaryMarker+randomToken()+extension)
+}
+
+// removeAudioCleanupLeftovers deletes the hidden copies an interrupted attempt
+// left next to path. The match is literal (no glob): release names are full of
+// brackets.
+func removeAudioCleanupLeftovers(path string) {
+	directory := filepath.Dir(path)
+	extension := filepath.Ext(path)
+	prefix := "." + strings.TrimSuffix(filepath.Base(path), extension) + audioCleanupTemporaryMarker
+	entries, err := os.ReadDir(directory)
+	if err != nil {
+		return
+	}
+	for _, entry := range entries {
+		name := entry.Name()
+		if entry.IsDir() || !strings.HasPrefix(name, prefix) || !strings.HasSuffix(name, extension) {
+			continue
+		}
+		leftover := filepath.Join(directory, name)
+		if err := os.Remove(leftover); err == nil {
+			logging.Info(fmt.Sprintf("🎧 «%s»: removed the unfinished copy left by an interrupted audio cleanup",
+				filepath.Base(path)), "path", leftover)
+		}
+	}
+}
+
+// audioCleanupCheckSpace refuses to start when the folder cannot hold the
+// temporary copy plus a margin: a full disk would stop downloads and imports.
+func audioCleanupCheckSpace(path string, size int64, plan AudioCleanupPlan) error {
+	free := FreeSpaceBytes(filepath.Dir(path))
+	if free == nil {
+		return nil
+	}
+	need := audioCleanupEstimatedSize(size, plan)
+	if *free < uint64(need)+audioCleanupSpaceMargin {
+		return fmt.Errorf("not enough free space for the cleaned copy: about %s needed, %s free",
+			logging.HumanBytesI64(need+audioCleanupSpaceMargin), logging.HumanBytesI64(clampFreeBytes(*free)))
+	}
+	return nil
+}
+
+func clampFreeBytes(value uint64) int64 {
+	if value > math.MaxInt64 {
+		return math.MaxInt64
+	}
+	return int64(value)
+}
+
+// audioCleanupEstimatedSize is the size of the cleaned copy: the file minus
+// the bitrate of the removed tracks when the container declares it.
+func audioCleanupEstimatedSize(size int64, plan AudioCleanupPlan) int64 {
+	removed := int64(0)
+	if plan.Info.RuntimeSeconds > 0 {
+		for _, track := range plan.Drop {
+			removed += track.Bitrate / 8 * plan.Info.RuntimeSeconds
+		}
+	}
+	if removed <= 0 || removed >= size {
+		return size
+	}
+	return size - removed
+}
+
+// audioCleanupCopyPermissions gives the cleaned copy the source's mode on a
+// local disk. On a network share it does nothing: the server decides, and on a
+// NAS with ACLs a chmod would replace them. A failure is not fatal either: the
+// copy keeps the mode the folder gives new files.
+func audioCleanupCopyPermissions(path, temporary string, source, copied os.FileInfo) {
+	if source.Mode().Perm() == copied.Mode().Perm() || networkFilesystem(filepath.Dir(path)) {
+		return
+	}
+	if err := os.Chmod(temporary, source.Mode().Perm()); err != nil {
+		logging.Debug("the cleaned copy keeps the permissions of the folder", "path", path, "error", err.Error())
+	}
 }
 
 // audioCleanupCommand builds the remux command. In both cases the video, the
@@ -413,41 +636,90 @@ func audioCleanupCommand(backend, source, target string, plan AudioCleanupPlan) 
 			}
 			keep = append(keep, strconv.Itoa(ids[position]))
 		}
-		return []string{
+		argv := []string{
 			"mkvmerge", "--gui-mode", "--output", target,
 			"--audio-tracks", strings.Join(keep, ","),
-			source,
-		}, nil
+		}
+		if plan.DefaultPosition >= 0 && plan.DefaultPosition < len(ids) {
+			argv = append(argv, "--default-track-flag", fmt.Sprintf("%d:1", ids[plan.DefaultPosition]))
+		}
+		return append(argv, source), nil
 	}
 
+	matroska := isMatroskaPath(target)
 	argv := []string{
 		"ffmpeg", "-hide_banner", "-nostdin", "-y", "-loglevel", "error",
 		"-progress", "pipe:1", "-nostats",
 		"-i", source,
-		"-map", "0:v?", "-map", "0:a",
 	}
-	// Negative mappings are relative to the audio streams of the input, which
-	// is exactly the position ffprobe reported.
-	for _, position := range plan.DropPositions {
-		argv = append(argv, "-map", fmt.Sprintf("-0:a:%d", position))
-	}
-	argv = append(argv, "-map", "0:s?")
-	if isMatroskaPath(target) {
-		argv = append(argv, "-map", "0:t?")
+	// Every kept stream is mapped by its index, so the copy keeps the order of
+	// the source. Data streams (timecodes, teletext) and, outside Matroska,
+	// attachments have no place in the output container.
+	mapped := audioCleanupMappedStreams(plan, matroska)
+	for _, stream := range mapped {
+		argv = append(argv, "-map", fmt.Sprintf("0:%d", stream.Index))
 	}
 	argv = append(argv,
 		"-map_metadata", "0", "-map_chapters", "0",
 		"-c", "copy", "-max_muxing_queue_size", "9999",
 	)
-	if isMatroskaPath(target) {
+	if matroska {
 		// Matroska accepts negative timestamps: forcing a shift could alter the
 		// per-track offsets.
-		argv = append(argv, "-avoid_negative_ts", "disabled")
+		argv = append(argv, "-avoid_negative_ts", "disabled", "-default_mode", "passthrough")
+		// Explicit flags for every stream: without them ffmpeg marks the first
+		// track of a type as default when none is, and a subtitle would switch
+		// itself on in the player.
+		promoted := -1
+		if plan.DefaultPosition >= 0 && plan.DefaultPosition < len(plan.Info.AudioTracks) {
+			promoted = plan.Info.AudioTracks[plan.DefaultPosition].Index
+		}
+		for output, stream := range mapped {
+			if stream.Type == "attachment" {
+				continue
+			}
+			flags := slices.Clone(stream.Disposition)
+			if stream.Index == promoted && !slices.Contains(flags, "default") {
+				flags = append(flags, "default")
+				slices.Sort(flags)
+			}
+			value := strings.Join(flags, "+")
+			if value == "" {
+				value = "0"
+			}
+			argv = append(argv, fmt.Sprintf("-disposition:%d", output), value)
+		}
 	} else {
 		argv = append(argv, "-avoid_negative_ts", "make_zero")
 	}
 	argv = append(argv, target)
 	return argv, nil
+}
+
+// audioCleanupMappedStreams lists the source streams that must reach the
+// output, in file order.
+func audioCleanupMappedStreams(plan AudioCleanupPlan, matroska bool) []StreamInfo {
+	dropped := make(map[int]bool, len(plan.Drop))
+	for _, track := range plan.Drop {
+		dropped[track.Index] = true
+	}
+	streams := make([]StreamInfo, 0, len(plan.Info.Streams))
+	for _, stream := range plan.Info.Streams {
+		switch stream.Type {
+		case "video", "audio", "subtitle":
+		case "attachment":
+			if !matroska {
+				continue
+			}
+		default:
+			continue
+		}
+		if stream.Type == "audio" && dropped[stream.Index] {
+			continue
+		}
+		streams = append(streams, stream)
+	}
+	return streams
 }
 
 // mkvmergeAudioTrackIDs reads the real mkvmerge track IDs (0-based). They are
@@ -511,7 +783,8 @@ func runAudioCleanupCommand(ctx context.Context, argv []string, duration int64, 
 		return nil
 	}
 	var exitError *exec.ExitError
-	// mkvmerge returns 1 for "finished with warnings", which is not a failure.
+	// mkvmerge returns 1 for "finished with warnings", which is not a failure:
+	// the checks that follow decide whether the copy is good.
 	if errors.As(waitErr, &exitError) && argv[0] == "mkvmerge" && exitError.ExitCode() == 1 {
 		return nil
 	}
@@ -554,57 +827,74 @@ func parseClockSeconds(value string) (float64, bool) {
 	return float64(hours*3600+minutes*60) + seconds, true
 }
 
-// verifyAudioCleanupOutput proves that the remux kept every stream it had to
-// keep and that the A/V offsets did not move.
-func verifyAudioCleanupOutput(source, output MediaInfo, plan AudioCleanupPlan, wanted string, matroska bool) error {
-	dropped := make(map[int]bool, len(plan.Drop))
-	for _, track := range plan.Drop {
-		dropped[track.Index] = true
-	}
-
-	expected := make([]string, 0, len(source.Streams))
-	for _, stream := range source.Streams {
+// audioCleanupStreamsByType groups the streams the cleanup compares, in file
+// order. Data streams are not compared: they are not copied.
+func audioCleanupStreamsByType(streams []StreamInfo, matroska bool) map[string][]StreamInfo {
+	grouped := make(map[string][]StreamInfo, 4)
+	for _, stream := range streams {
 		switch stream.Type {
-		case "video", "audio", "subtitle", "attachment":
+		case "video", "audio", "subtitle":
+		case "attachment":
+			if !matroska {
+				continue
+			}
 		default:
 			continue
 		}
-		if stream.Type == "audio" && dropped[stream.Index] {
-			continue
-		}
-		if !matroska && stream.Type == "attachment" {
-			continue
-		}
-		expected = append(expected, audioCleanupStreamSignature(stream))
+		grouped[stream.Type] = append(grouped[stream.Type], stream)
 	}
-	actual := make([]string, 0, len(output.Streams))
-	for _, stream := range output.Streams {
-		if stream.Type == "data" {
+	return grouped
+}
+
+// verifyAudioCleanupOutput proves, from the container headers, that the remux
+// kept every stream it had to keep, unchanged, and that the A/V offsets did
+// not move. The packet comparison follows it.
+func verifyAudioCleanupOutput(source, output MediaInfo, plan AudioCleanupPlan, opts AudioCleanupOptions, matroska bool) error {
+	expected := audioCleanupStreamsByType(audioCleanupMappedStreams(plan, matroska), matroska)
+	actual := audioCleanupStreamsByType(output.Streams, matroska)
+	promoted := -1
+	if plan.DefaultPosition >= 0 && plan.DefaultPosition < len(plan.Info.AudioTracks) {
+		promoted = plan.Info.AudioTracks[plan.DefaultPosition].Index
+	}
+	for _, kind := range []string{"video", "audio", "subtitle", "attachment"} {
+		want, got := expected[kind], actual[kind]
+		if len(want) != len(got) {
+			return fmt.Errorf("the remux kept %d %s stream(s) instead of %d", len(got), kind, len(want))
+		}
+		if kind == "attachment" {
 			continue
 		}
-		actual = append(actual, audioCleanupStreamSignature(stream))
-	}
-	// The stream order can differ between muxers and container families; the
-	// set is what matters, the audio offset check below covers the timing.
-	slices.Sort(expected)
-	slices.Sort(actual)
-	if !slices.Equal(expected, actual) {
-		return fmt.Errorf("the remux changed the stream set (expected %v, got %v)", expected, actual)
+		for position := range want {
+			if want[position].Codec != got[position].Codec {
+				return fmt.Errorf("%s stream %d changed codec from %s to %s", kind, position+1, want[position].Codec, got[position].Codec)
+			}
+			if kind != "video" && !audioCleanupSameLanguage(want[position].Language, got[position].Language) {
+				return fmt.Errorf("%s stream %d changed language from %q to %q", kind, position+1, want[position].Language, got[position].Language)
+			}
+			if !matroska {
+				continue
+			}
+			flags := want[position].Disposition
+			if want[position].Index == promoted && !slices.Contains(flags, "default") {
+				flags = append(slices.Clone(flags), "default")
+				slices.Sort(flags)
+			}
+			if !slices.Equal(flags, got[position].Disposition) {
+				return fmt.Errorf("%s stream %d changed flags from [%s] to [%s]", kind, position+1,
+					strings.Join(flags, " "), strings.Join(got[position].Disposition, " "))
+			}
+		}
 	}
 
-	outputAudio := make([]StreamInfo, 0, len(plan.Keep))
-	for _, stream := range output.Streams {
-		if stream.Type == "audio" {
-			outputAudio = append(outputAudio, stream)
-		}
-	}
-	if len(outputAudio) != len(plan.Keep) {
-		return fmt.Errorf("the remux kept %d audio tracks instead of %d", len(outputAudio), len(plan.Keep))
-	}
+	untaggedMode := normalizeAudioCleanupUntagged(opts.Untagged)
 	for _, track := range output.AudioTracks {
-		if !audioTrackMatchesLanguage(track, wanted) {
-			return fmt.Errorf("audio track %d is still not tagged %q", track.Index, wanted)
+		if audioTrackMatchesLanguage(track, opts.Language) {
+			continue
 		}
+		if untaggedMode == audioCleanupUntaggedKeep && audioLanguageUntagged(track.Language) {
+			continue
+		}
+		return fmt.Errorf("audio track %d is still not tagged %q", track.Index, opts.Language)
 	}
 	if source.RuntimeSeconds > 0 && output.RuntimeSeconds > 0 {
 		delta := math.Abs(float64(source.RuntimeSeconds - output.RuntimeSeconds))
@@ -613,9 +903,10 @@ func verifyAudioCleanupOutput(source, output MediaInfo, plan AudioCleanupPlan, w
 		}
 	}
 
+	outputAudio := actual["audio"]
 	sourceVideo, sourceVideoOK := audioCleanupFirstVideo(source.Streams)
 	outputVideo, outputVideoOK := audioCleanupFirstVideo(output.Streams)
-	if sourceVideoOK && outputVideoOK {
+	if sourceVideoOK && outputVideoOK && sourceVideo.HasStart && outputVideo.HasStart {
 		for position, track := range plan.Keep {
 			if position >= len(outputAudio) || !track.HasStart || !outputAudio[position].HasStart {
 				continue
@@ -630,6 +921,15 @@ func verifyAudioCleanupOutput(source, output MediaInfo, plan AudioCleanupPlan, w
 	return nil
 }
 
+// audioCleanupSameLanguage compares two language tags as written, treating
+// the spellings of "no language" as one value.
+func audioCleanupSameLanguage(left, right string) bool {
+	if audioLanguageUntagged(left) && audioLanguageUntagged(right) {
+		return true
+	}
+	return strings.EqualFold(strings.TrimSpace(left), strings.TrimSpace(right))
+}
+
 // audioCleanupFirstVideo returns the first video stream, whose start time is
 // the reference every audio offset is measured against.
 func audioCleanupFirstVideo(streams []StreamInfo) (StreamInfo, bool) {
@@ -641,15 +941,6 @@ func audioCleanupFirstVideo(streams []StreamInfo) (StreamInfo, bool) {
 	return StreamInfo{}, false
 }
 
-func audioCleanupStreamSignature(stream StreamInfo) string {
-	switch stream.Type {
-	case "video", "audio":
-		return stream.Type + ":" + stream.Codec
-	default:
-		return stream.Type
-	}
-}
-
 func audioCleanupLastLine(value string) string {
 	lines := strings.Split(strings.TrimSpace(value), "\n")
 	for index := len(lines) - 1; index >= 0; index-- {
@@ -658,20 +949,6 @@ func audioCleanupLastLine(value string) string {
 		}
 	}
 	return ""
-}
-
-// ---------------------------------------------------------------------------
-// Background queue
-// ---------------------------------------------------------------------------
-
-type audioCleanupJob struct {
-	path     string
-	key      string
-	opts     AudioCleanupOptions
-	series   *string
-	db       *Database
-	hash     string
-	notifier *Notifier
 }
 
 // audioCleanupNotificationData is the payload of the per-file notification.
@@ -701,13 +978,6 @@ func notifyAudioCleanup(notifier *Notifier, path string, report AudioCleanupRepo
 	}
 }
 
-var (
-	audioCleanupWorkerOnce sync.Once
-	audioCleanupQueue      = make(chan audioCleanupJob, audioCleanupQueueSize)
-	audioCleanupQueued     sync.Map
-	audioCleanupToolWarn   sync.Once
-)
-
 // audioCleanupUnavailableNote is shown (and translated) when the option cannot
 // be enabled because one of the external tools is missing.
 const audioCleanupUnavailableNote = "Servono ffprobe, ffmpeg e mkvmerge: installali e riavvia Gextto per attivare la pulizia."
@@ -716,8 +986,8 @@ const audioCleanupUnavailableNote = "Servono ffprobe, ffmpeg e mkvmerge: install
 var audioCleanupLookPath = exec.LookPath
 
 // AudioCleanupMissingTools lists the external binaries the feature needs and
-// that are not on PATH. All three are required: ffprobe decides, ffmpeg is the
-// fallback remuxer, mkvmerge is the preferred one for Matroska.
+// that are not on PATH. All three are required: ffprobe decides and checks,
+// ffmpeg is the second remuxer, mkvmerge is the first one for Matroska.
 func AudioCleanupMissingTools() []string {
 	missing := make([]string, 0, 3)
 	for _, tool := range []string{"ffprobe", "ffmpeg", "mkvmerge"} {
@@ -742,89 +1012,5 @@ func WarnIfAudioCleanupUnavailable(cfg *Config) {
 	if missing := AudioCleanupMissingTools(); len(missing) > 0 {
 		logging.Warn(fmt.Sprintf("audio cleanup is enabled but %s is missing, so no file will be cleaned until it is installed and Gextto restarted",
 			strings.Join(missing, ", ")))
-	}
-}
-
-// scheduleAudioCleanup queues the files of an imported release. It is a no-op
-// unless the feature is enabled in the settings, and it never blocks the
-// caller: a slow remux must not stall the torrent event loop.
-func scheduleAudioCleanup(cfg *Config, db *Database, path, hash string, series *string) {
-	opts, enabled := audioCleanupSettings(cfg)
-	if !enabled || strings.TrimSpace(path) == "" {
-		return
-	}
-	if !AudioCleanupAvailable() {
-		audioCleanupToolWarn.Do(func() {
-			logging.Warn(fmt.Sprintf("audio cleanup is enabled but %s is missing, so no file will be cleaned",
-				strings.Join(AudioCleanupMissingTools(), ", ")))
-		})
-		return
-	}
-
-	files := []string{}
-	if info, err := os.Stat(path); err == nil {
-		if info.IsDir() {
-			listed, listErr := VideoFiles(path)
-			if listErr != nil {
-				logging.Warn("audio cleanup could not list the folder", "path", path, "error", listErr.Error())
-				return
-			}
-			files = listed
-		} else if info.Mode().IsRegular() {
-			files = []string{path}
-		}
-	}
-
-	audioCleanupWorkerOnce.Do(func() { go audioCleanupWorker() })
-	notifier := FromConfig(cfg)
-	for _, file := range files {
-		key, err := filepath.Abs(file)
-		if err != nil {
-			key = file
-		}
-		if _, already := audioCleanupQueued.LoadOrStore(key, struct{}{}); already {
-			continue
-		}
-		job := audioCleanupJob{path: file, key: key, opts: opts, series: series, db: db, hash: hash, notifier: notifier}
-		select {
-		case audioCleanupQueue <- job:
-		default:
-			audioCleanupQueued.Delete(key)
-			logging.Warn("audio cleanup queue is full; this file was not cleaned", "path", file)
-		}
-	}
-}
-
-func audioCleanupWorker() {
-	for job := range audioCleanupQueue {
-		audioCleanupProcess(job)
-	}
-}
-
-func audioCleanupProcess(job audioCleanupJob) {
-	defer audioCleanupQueued.Delete(job.key)
-	guard := AcquireArchiveImport(job.series)
-	defer guard.Release()
-
-	ctx, cancel := context.WithTimeout(context.Background(), audioCleanupTimeout)
-	defer cancel()
-	report, err := RunAudioCleanup(ctx, job.path, job.opts)
-	switch {
-	case err != nil:
-		logging.Warn(fmt.Sprintf("🎧 «%s»: audio cleanup failed, the file was left untouched: %v",
-			filepath.Base(job.path), err), "path", job.path)
-	case report.Applied:
-		if job.db != nil {
-			if err := job.db.UpdateArchivedSizeAfterCleanup(job.hash, job.path, report.NewSize); err != nil {
-				logging.Warn("audio cleanup removed the tracks but the archived size was not updated",
-					"path", job.path, "error", err.Error())
-			}
-		}
-		notifyAudioCleanup(job.notifier, job.path, report)
-		logging.Info(fmt.Sprintf("🎧 «%s»: %d audio track(s) in another language removed, %s saved",
-			filepath.Base(job.path), len(report.Dropped), logging.HumanBytesI64(report.SavedBytes)),
-			"path", job.path, "backend", report.Backend)
-	default:
-		logging.Debug("audio cleanup skipped", "path", job.path, "reason", report.SkipReason)
 	}
 }

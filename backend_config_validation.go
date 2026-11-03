@@ -206,6 +206,13 @@ func validateSettingValue(key, value string, cfg *Config) error {
 			return fmt.Errorf("%s must be all, best or first", key)
 		}
 	}
+	if key == audioCleanupUntaggedSetting {
+		switch strings.ToLower(strings.TrimSpace(value)) {
+		case "", audioCleanupUntaggedKeep, audioCleanupUntaggedRemove, audioCleanupUntaggedSkip:
+		default:
+			return fmt.Errorf("%s must be keep, remove or skip", key)
+		}
+	}
 	return validatePathSetting(key, value, cfg)
 }
 

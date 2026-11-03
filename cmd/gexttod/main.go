@@ -188,6 +188,9 @@ func runDaemon(dryRun bool, configOption *string) error {
 	if engine := gextto.ApplyEngineOverride(&cfg); engine != "" {
 		logging.Info("torrent engine forced by the environment for this run", "engine", engine, "env", gextto.EngineOverrideEnv)
 	}
+	// Files whose audio cleanup the previous run did not finish are queued
+	// again; the worker starts only when there is something to clean.
+	gextto.ResumeAudioCleanup(&cfg, db)
 	state := gextto.NewAppState(
 		&cfg,
 		configPath,

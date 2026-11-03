@@ -77,6 +77,14 @@ its gate; a rejected one moves to *Not planned*.
   a month) instead of a week every time. It needs a strike count that survives the
   expiry, while today the expired rows are purged as soon as they are read, by design.
   Gate: a decision on the second period and on how much history to keep for the count.
+- **Audio cleanup of the existing library** — today only files imported with the option
+  on are cleaned; an action in Maintenance (or per series/folder) could queue the files
+  already in the library, at low priority and in a night window, like the operator's own
+  nightly batch does. Gate: a decision on the window and on how to show the progress.
+- **Audio cleanup after the seed ends** — a hardlinked library file that is cleaned
+  while its torrent seeds becomes a second copy, so the space is used twice until the
+  seed ends. Waiting for the end of the seed would keep one copy. Gate: a decision on
+  whether the delay is worth the saved space.
 - **Portable folder names for existing series** — the add dialog now drops the characters
   Windows, exFAT and SMB shares refuse, but a series added earlier keeps its folder and
   the path stored in the library. A check in Maintenance could report them and rename the
