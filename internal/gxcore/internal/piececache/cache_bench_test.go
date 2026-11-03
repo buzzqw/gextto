@@ -44,3 +44,27 @@ func benchCacheHit(b *testing.B, maxSize int64, parallel bool) {
 
 func BenchmarkCacheGetHit(b *testing.B)         { benchCacheHit(b, 64<<20, false) }
 func BenchmarkCacheGetHitParallel(b *testing.B) { benchCacheHit(b, 64<<20, true) }
+
+// BenchmarkCacheGetMissRecycled measures the other half of the upload path: a
+// block that is not in the cache, read into a buffer the cache recycled. The
+// loader takes the buffer from the pool exactly as the piece reader does, so
+// the allocation and the clearing of a fresh block are what this number shows
+// (or does not show).
+func BenchmarkCacheGetMissRecycled(b *testing.B) {
+	c := New(16<<10, time.Minute, 16)
+	defer c.Close()
+	const blockSize = 16 << 10
+	var n int
+	b.SetBytes(blockSize)
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		key := fmt.Sprintf("block-%d", n)
+		n++
+		if _, err := c.Get(key, func() ([]byte, error) {
+			return c.TakeBuffer(blockSize), nil
+		}); err != nil {
+			b.Fatal(err)
+		}
+	}
+}

@@ -21,6 +21,7 @@ type Cache struct {
 	m             sync.RWMutex
 	sem           *semaphore.Semaphore
 	stopC         chan struct{} // stops the expiry sweeper
+	buffers       *bufferPool   // recycles block buffers between reads
 
 	NumCached      metrics.Meter
 	NumTotal       metrics.Meter
@@ -53,6 +54,7 @@ func New(maxSize int64, ttl time.Duration, parallelReads uint) *Cache {
 		items:          make(map[string]*item),
 		sem:            semaphore.New(int(parallelReads)),
 		stopC:          make(chan struct{}),
+		buffers:        newBufferPool(int(parallelReads) * 2),
 		NumCached:      metrics.NewMeter(),
 		NumTotal:       metrics.NewMeter(),
 		NumLoad:        metrics.NewMeter(),
@@ -106,6 +108,9 @@ func (c *Cache) Close() {
 // Clear drops all items at once.
 func (c *Cache) Clear() {
 	c.m.Lock()
+	for _, i := range c.items {
+		i.retire(c.buffers)
+	}
 	c.items = make(map[string]*item)
 	c.accessList = nil
 	c.size = 0
@@ -145,9 +150,34 @@ func (c *Cache) Utilization() int {
 	return int((100 * c.NumCached.Rate1()) / total)
 }
 
+// TakeBuffer returns a buffer of exactly size bytes for a loader to read
+// into, a recycled one when the pool has one: a block read for an upload then
+// costs neither the allocation nor the clearing of fresh memory.
+func (c *Cache) TakeBuffer(size int) []byte {
+	return c.buffers.get(size)
+}
+
 // Get serves key from the cache, loading and storing on a miss.
 func (c *Cache) Get(key string, loader Loader) ([]byte, error) {
-	return c.getValue(c.claim(key), loader)
+	value, release, err := c.GetPinned(key, loader)
+	if release != nil {
+		release()
+	}
+	return value, err
+}
+
+// GetPinned serves key like Get and keeps the block out of the buffer pool
+// until release is called. A reader that copies out of the block after Get
+// returned must use this form: the item can leave the cache meanwhile, and
+// only the pin says the copy is still reading it.
+func (c *Cache) GetPinned(key string, loader Loader) ([]byte, func(), error) {
+	i := c.claim(key)
+	value, err := c.getValue(i, loader)
+	if err != nil {
+		i.unpin(c.buffers)
+		return nil, nil, err
+	}
+	return value, func() { i.unpin(c.buffers) }, nil
 }
 
 // Prefetch loads key in the background unless it is resident or already loading.
@@ -161,9 +191,13 @@ func (c *Cache) Prefetch(key string, loader Loader) {
 		return
 	}
 	i := &item{key: key, index: -1}
+	i.pin()
 	c.items[key] = i
 	c.m.Unlock()
-	go func() { _, _ = c.getValue(i, loader) }()
+	go func() {
+		_, _ = c.getValue(i, loader)
+		i.unpin(c.buffers)
+	}()
 }
 
 // claim returns the resident item (counting the hit), or registers a fresh
@@ -176,11 +210,13 @@ func (c *Cache) claim(key string) *item {
 	if i, ok := c.items[key]; ok {
 		if i.index == -1 || !time.Now().After(i.expireAt) {
 			c.NumCached.Mark(1)
+			i.pin()
 			return i
 		}
 		c.removeItem(i)
 	}
 	i := &item{key: key, index: -1}
+	i.pin()
 	c.items[key] = i
 	return i
 }
@@ -217,13 +253,16 @@ func (c *Cache) storeNew(i *item) ([]byte, error) {
 		if c.items[i.key] == i {
 			delete(c.items, i.key)
 		}
+		i.retire(c.buffers)
 		return nil, i.err
 	}
 	if c.items[i.key] != i {
+		i.retire(c.buffers)
 		return i.value, nil
 	}
 	if int64(len(i.value)) > c.maxSize {
 		delete(c.items, i.key)
+		i.retire(c.buffers)
 		return i.value, nil
 	}
 	c.makeRoom(i)
@@ -263,6 +302,7 @@ func (c *Cache) removeItem(i *item) {
 	delete(c.items, i.key)
 	heap.Remove(&c.accessList, i.index)
 	c.size -= int64(len(i.value))
+	i.retire(c.buffers)
 }
 
 // SetMaxSize retunes the capacity live, evicting the LRU overflow.

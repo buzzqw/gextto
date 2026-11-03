@@ -1442,7 +1442,11 @@ RPC server is disabled.
     resolves the info hash from the mutable item at addition.
   - **BEP 33** (DHT scrape): a `get_peers` with `scrape=1` receives the Bloom
     filters (`BFpe`/`BFsd`) and estimates seed/peer of the swarm from them; the client queries
-    the closest nodes and aggregates. In the UI: **DHT swarm** button in the General
+    the closest nodes and aggregates. The filters are added to the normal answer, as
+    the BEP asks: the same reply carries the peers (`values`) or the closest
+    nodes, so a scrape costs no extra round trip. A plain `get_peers`
+    reply carries up to eight contacts, and consecutive replies continue
+    where the previous one stopped. In the UI: **DHT swarm** button in the General
     tab (`GET /ui/dhtscrape`), besides `GET /api/v1/torrents/{hash}/dhtscrape`.
   - **BEP 43** (read-only): a node can not respond to queries and ask not
     to be entered into the routing tables (`ro`); it is activated with
@@ -1945,6 +1949,14 @@ using fixed values.
 - **`torrent_cache_size` > 0**: **manual override**; the indicated size
   (16 KiB blocks) applies to reading and writing and the adaptive policy is silent.
 - **`torrent_cache_expiry`**: after how long a block in the cache expires.
+- **Reading a block**: a hit is served from memory with no copy and no
+  allocation. A miss reads the block into a buffer the cache **recycles** from
+  a block it evicted (one buffer per size, at most two per parallel read): the
+  upload path then allocates nothing and clears nothing, and a buffer goes
+  back only when the item left the cache *and* no upload is copying out of
+  it. On a 16 KiB block a miss costs 0.73–0.77 µs against 3.9 µs and 16.5 KB
+  allocated before
+  ([`measurements.md`](measurements.md#the-numbers-behind-engine-decisions)).
 - **`torrent_preallocate`**: new files are reserved in full with
   `fallocate`; files excluded from the selection remain sparse, and on tmpfs (RAM
   disk) they always remain sparse: reserving them would immediately take their whole

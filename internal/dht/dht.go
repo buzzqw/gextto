@@ -1036,9 +1036,10 @@ func (d *DHT) replyAnnouncePeer(addr net.UDPAddr, node *remoteNode, r responseTy
 	sendMsg(d.conn, addr, reply, d.DebugLogger)
 }
 
-// replyGetPeers answers with a token plus, exclusively: scrape blooms for
-// scrape asks (BEP 33), peers for known swarms (seeds filtered on noseed),
-// else the closest nodes split by family (BEP 32).
+// replyGetPeers answers with a token plus the BEP 33 scrape filters for a
+// scrape ask, and the usual reply either way: the peers of a known swarm
+// (seeds filtered on noseed), else the closest nodes split by family (BEP
+// 32). BEP 33 adds the filters to the normal answer, it does not replace it.
 func (d *DHT) replyGetPeers(addr net.UDPAddr, r responseType) {
 	totalRecvGetPeers.Add(1)
 	d.DebugLogger.Debugf("DHT get_peers. Host: %v , nodeID: %x , InfoHash: %x , distance to me: %x",
@@ -1048,6 +1049,15 @@ func (d *DHT) replyGetPeers(addr net.UDPAddr, r responseType) {
 		d.Logger.GetPeers(addr, r.A.Id, r.A.InfoHash)
 	}
 
+	sendMsg(d.conn, addr, d.buildGetPeersReply(addr, r), d.DebugLogger)
+}
+
+// buildGetPeersReply builds the reply of one get_peers query, apart from the
+// socket so a test can read exactly what the peer will see. A scrape answer
+// carries its filters *and* the values (or closest nodes) of a normal answer:
+// BEP 33 adds the filters, it does not replace the reply, and eight contacts
+// cost 48 bytes next to the 512 of the filters.
+func (d *DHT) buildGetPeersReply(addr net.UDPAddr, r responseType) replyMessage {
 	ih := r.A.InfoHash
 	r0 := map[string]interface{}{"id": d.nodeId, "token": d.hostToken(addr, []byte(ih), d.tokenSecrets[0])}
 	reply := replyMessage{
@@ -1066,7 +1076,8 @@ func (d *DHT) replyGetPeers(addr net.UDPAddr, r responseType) {
 				reply.R["BFsd"] = string(sd[:])
 			}
 		}
-	} else if peerContacts := d.peersForInfoHash(ih, r.A.NoSeed == 1); len(peerContacts) > 0 {
+	}
+	if peerContacts := d.peersForInfoHash(ih, r.A.NoSeed == 1); len(peerContacts) > 0 {
 		reply.R["values"] = peerContacts
 	}
 	if _, hasValues := reply.R["values"]; !hasValues {
@@ -1078,7 +1089,7 @@ func (d *DHT) replyGetPeers(addr net.UDPAddr, r responseType) {
 			reply.R["nodes6"] = n6
 		}
 	}
-	sendMsg(d.conn, addr, reply, d.DebugLogger)
+	return reply
 }
 
 // nodesForInfoHash returns the closest nodes for ih split by address family:

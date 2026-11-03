@@ -32,33 +32,37 @@ func (p *peerContactsSet) markIP(peerContact string, seed bool) {
 // next returns up to 8 contacts, rotating so consecutive calls spread.
 // Live contacts come first; a short second pass fills from the rest.
 func (p *peerContactsSet) next() []string {
+	if p.ring == nil || len(p.set) == 0 {
+		return nil
+	}
 	count := kNodes
 	if count > len(p.set) {
 		count = len(p.set)
 	}
-	xx := make(map[string]bool)
-	for range p.set {
-		nid := p.ring.Move(1).Value.(string)
-		if _, ok := xx[nid]; p.set[nid] && !ok {
-			xx[nid] = true
+	xx := make(map[string]bool, count)
+	// Walk the ring from where the previous reply stopped. container/ring's
+	// Move returns a new pointer without advancing the ring: keeping the
+	// cursor is what makes one reply carry up to eight contacts instead of
+	// reading the same one at every step.
+	cursor := p.ring
+	for i := 0; i < p.ring.Len() && len(xx) < count; i++ {
+		cursor = cursor.Move(1)
+		nid := cursor.Value.(string)
+		if !p.set[nid] {
+			continue
 		}
-		if len(xx) >= count {
-			break
-		}
+		xx[nid] = true
 	}
-	if len(xx) < count {
-		for range p.set {
-			nid := p.ring.Move(1).Value.(string)
-			if _, ok := xx[nid]; ok {
-				continue
-			}
-			xx[nid] = true
-			if len(xx) >= count {
-				break
-			}
+	for i := 0; i < p.ring.Len() && len(xx) < count; i++ {
+		cursor = cursor.Move(1)
+		nid := cursor.Value.(string)
+		if _, ok := xx[nid]; ok {
+			continue
 		}
+		xx[nid] = true
 	}
-	x := make([]string, 0, count)
+	p.ring = cursor
+	x := make([]string, 0, len(xx))
 	for id := range xx {
 		x = append(x, id)
 	}
@@ -84,20 +88,38 @@ func (p *peerContactsSet) put(peerContact string) bool {
 	return true
 }
 
+// remove unlinks one ring element and forgets the contact, keeping the ring
+// position inside the ring (nil when nothing is left).
+func (p *peerContactsSet) remove(element *ring.Ring) string {
+	removed := element.Prev().Unlink(1).Value.(string)
+	delete(p.set, removed)
+	if p.ring == element {
+		if next := element.Next(); next != element {
+			p.ring = next
+		} else {
+			p.ring = nil
+		}
+	}
+	return removed
+}
+
 // drop removes one contact: the named one when given, else a dead one
 // first, else the ring head. It returns what left.
 func (p *peerContactsSet) drop(peerContact string) string {
+	if p.ring == nil {
+		return ""
+	}
 	if peerContact == "" {
 		if c := p.dropDead(); c != "" {
 			return c
 		}
 		return p.drop(p.ring.Next().Value.(string))
 	}
-	for i := 0; i < p.ring.Len()+1; i++ {
-		if p.ring.Move(1).Value.(string) == peerContact {
-			dn := p.ring.Unlink(1).Value.(string)
-			delete(p.set, dn)
-			return dn
+	cursor := p.ring
+	for i := 0; i < p.ring.Len(); i++ {
+		cursor = cursor.Move(1)
+		if cursor.Value.(string) == peerContact {
+			return p.remove(cursor)
 		}
 	}
 	return ""
@@ -105,11 +127,14 @@ func (p *peerContactsSet) drop(peerContact string) string {
 
 // dropDead unlinks the first dead contact it cycles past.
 func (p *peerContactsSet) dropDead() string {
-	for i := 0; i < p.ring.Len()+1; i++ {
-		if !p.set[p.ring.Move(1).Value.(string)] {
-			dn := p.ring.Unlink(1).Value.(string)
-			delete(p.set, dn)
-			return dn
+	if p.ring == nil {
+		return ""
+	}
+	cursor := p.ring
+	for i := 0; i < p.ring.Len(); i++ {
+		cursor = cursor.Move(1)
+		if !p.set[cursor.Value.(string)] {
+			return p.remove(cursor)
 		}
 	}
 	return ""

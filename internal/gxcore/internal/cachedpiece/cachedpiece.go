@@ -43,16 +43,20 @@ func (c *CachedPiece) ReadAt(p []byte, off int64) (n int, err error) {
 	block := uint32(off / c.readSize)
 	blockBegin := int64(block) * c.readSize
 
-	buf, err := c.cache.Get(c.cacheKey(block), c.loader(block))
+	buf, release, err := c.cache.GetPinned(c.cacheKey(block), c.loader(block))
 	if err != nil {
 		return 0, err
 	}
+	// The block stays out of the buffer pool until the copy is done: another
+	// request can evict the item meanwhile.
+	n = copy(p, buf[off-blockBegin:])
+	release()
 	if c.prefetch && off == blockBegin {
 		if next := blockBegin + c.readSize; next < int64(c.pi.Length) {
 			c.cache.Prefetch(c.cacheKey(block+1), c.loader(block+1))
 		}
 	}
-	return copy(p, buf[off-blockBegin:]), nil
+	return n, nil
 }
 
 // loader reads one block of the piece from storage.
@@ -60,7 +64,7 @@ func (c *CachedPiece) loader(block uint32) piececache.Loader {
 	return func() ([]byte, error) {
 		begin := int64(block) * c.readSize
 		end := min(begin+c.readSize, int64(c.pi.Length))
-		b := make([]byte, end-begin)
+		b := c.cache.TakeBuffer(int(end - begin))
 		_, err := c.pi.Data.ReadAt(b, begin)
 		return b, err
 	}

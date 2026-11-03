@@ -286,7 +286,8 @@ of 2026-11-02.
 | Picker, rarest pick with 150 peers | 10–12 µs | one pick in a dense swarm |
 | Peer departure, 27,250 pieces | 94–105 µs | touches only the pieces the peer held |
 | Refill of 250 requests over TCP | 248–256 µs, about 5 writes instead of 250 | small messages batched |
-| Read cache hit | 339–354 ns, no allocation | every uploaded block |
+| Read cache hit | 366–372 ns, no allocation | every uploaded block |
+| Read cache miss, 16 KiB block | 732–768 ns and 192 B, was 3.9 µs and 16.5 KB | the buffer of an evicted block is read into again; the remaining bytes are the benchmark's own key |
 | `state.json` save, 100 / 1,000 / 5,000 torrents | 0.5 / 4.3–5.0 / 20–25 ms | held under the daemon lock |
 | IP filter load, 172,000 rules | 30–36 ms, 6.6 MB | at start |
 | Blocked-IP lookup | 20 ns | every incoming address |
