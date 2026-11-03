@@ -39,12 +39,12 @@ func stallPolicySummary(s *AppState, cfg *Config) string {
 	}
 	template := tr("Sequenza: bloccato dopo %s; riprovo ogni %s; provo un'alternativa dopo %s (fino a %d punti in meno); senza seeder rimuovo dopo %s; comunque rimuovo dopo %s.")
 	return fmt.Sprintf(template,
-		window(numberSettingInt(cfg.Settings, "torrent_stall_after_min", 60)),
-		window(numberSettingInt(cfg.Settings, "torrent_stall_retry_min", 60)),
+		window(numberSettingInt(cfg.Settings, settingTorrentStallAfterMin, 60)),
+		window(numberSettingInt(cfg.Settings, settingTorrentStallRetryMin, 60)),
 		window(cfg.StallAlternativeAfterMin),
 		cfg.StallAlternativeScoreDrop,
-		window(numberSettingInt(cfg.Settings, "torrent_dead_swarm_giveup_min", 30)),
-		window(numberSettingInt(cfg.Settings, "torrent_stall_giveup_min", 20160)),
+		window(numberSettingInt(cfg.Settings, settingTorrentDeadSwarmGiveupMin, 30)),
+		window(numberSettingInt(cfg.Settings, settingTorrentStallGiveupMin, 20160)),
 	)
 }
 

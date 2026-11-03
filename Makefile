@@ -3,7 +3,7 @@ BINARY := gexttod
 CMD := ./cmd/gexttod
 OUT := bin/$(BINARY)
 
-.PHONY: all build fast gx-torrent test test-serial test-race test-engine test-dht test-ui screenshots fuzz-smoke container vet fmt check-ui check-scripts installer-test tidy package clean run measure-seeding measure-pipeline measure-realswarm measure-choking measure-dht measure-merge3 bench-all bench-all-docker cache-refresh
+.PHONY: all build fast gx-torrent test test-serial test-race test-engine test-dht test-ui screenshots fuzz-smoke container vet fmt settings-keys check-ui check-scripts installer-test tidy package clean run measure-seeding measure-pipeline measure-realswarm measure-choking measure-dht measure-merge3 bench-all bench-all-docker cache-refresh
 
 all: build
 
@@ -194,6 +194,11 @@ vet:
 
 fmt:
 	gofmt -w .
+
+# Regenerate the settings constants (settings_keys_gen.go) from the settings
+# index. A new row without this step fails TestSettingsKeyConstantsMatchTheIndex.
+settings-keys:
+	go run scripts/gen-settings-keys.go
 
 # Validate the server-rendered UI settings index.
 check-ui:

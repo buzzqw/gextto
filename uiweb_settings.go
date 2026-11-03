@@ -454,3 +454,19 @@ var uiSettingSearchTerms = map[string]string{
 	"torrent_dl_limit":              "velocità download",
 	"torrent_ul_limit":              "velocità upload",
 }
+
+// SettingsIndexKeys lists the keys of the settings page, in the order the
+// index declares them: the settings index first, then the score weights. The
+// generated constants (settings_keys_gen.go) and the guard that keeps them in
+// step with the index are built from it, so a new row cannot exist without a
+// name.
+func SettingsIndexKeys() []string {
+	keys := make([]string, 0, len(uiSettingsIndex)+len(uiScoreSettingDefs))
+	for _, def := range uiSettingsIndex {
+		keys = append(keys, def.Key)
+	}
+	for _, def := range uiScoreSettingDefs {
+		keys = append(keys, def.Key)
+	}
+	return keys
+}

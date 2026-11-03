@@ -145,7 +145,14 @@ router.
 
 Settings: a key in the settings index (`uiweb_settings.go`) is writable by
 construction; `settingWritableAPIOnly` (`web_settings.go`) lists only the
-keys with no row on the page. Every write path (the JSON API, the settings page,
+keys with no row on the page. A key in the index gets a constant in
+`settings_keys_gen.go`, generated from the index with `make settings-keys`
+(`scripts/gen-settings-keys.go`): code reads `settingTorrent…` and a typo
+cannot compile. `TestSettingsKeyConstantsMatchTheIndex` fails when a row is
+added without regenerating the file, and `TestSettingsLiteralsAreKnownKeys`
+scans the package for a key read or saved through a literal and fails on one
+Gextto does not know (index, API-only list, writable prefix, or the explicit
+legacy/internal/panel lists in `settings_keys_test.go`). Every write path (the JSON API, the settings page,
 the setup wizard) validates the value through `validateSettingValue`
 (`backend_config_validation.go`), so a rule added there applies everywhere.
 The starting value the page shows (`uiSettingDefaults`,

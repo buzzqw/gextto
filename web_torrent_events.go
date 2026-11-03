@@ -679,7 +679,7 @@ func DetachCompletedArchivedSingles(cfg *Config, torrents TorrentSession, db *Da
 
 // tev_configuredStallGiveupMinutes implements `configured_stall_giveup_minutes`.
 func tevConfiguredStallGiveupMinutes(cfg *Config) float64 {
-	if value, ok := cfg.Settings["torrent_stall_giveup_min"]; ok {
+	if value, ok := cfg.Settings[settingTorrentStallGiveupMin]; ok {
 		if parsed, err := strconv.ParseFloat(strings.TrimSpace(value), 64); err == nil {
 			return parsed
 		}
@@ -770,7 +770,7 @@ func tevScheduleStallRetry(entry *StallWatch, now time.Time, base time.Duration)
 // expires the gap is retried immediately.
 func tevStallGiveupWindow(cfg *Config, torrent *models.TorrentView) (time.Duration, float64, bool) {
 	minutes := tevConfiguredStallGiveupMinutes(cfg)
-	if deadSwarm := tevSettingFloatOr(cfg, "torrent_dead_swarm_giveup_min", 30.0); deadSwarm > 0 {
+	if deadSwarm := tevSettingFloatOr(cfg, settingTorrentDeadSwarmGiveupMin, 30.0); deadSwarm > 0 {
 		if tevIsDeadSwarm(torrent) {
 			minutes = deadSwarm
 		}
@@ -850,7 +850,7 @@ func tevUpgradeHasLibraryCopy(db *Database, hash string) bool {
 // candidates after this window and can still be picked up as an upgrade; zero
 // keeps it blocked forever.
 func tevDeadSwarmBlocklistTTL(cfg *Config) time.Duration {
-	days := numberSettingInt(cfg.Settings, "torrent_dead_swarm_blocklist_days", 7)
+	days := numberSettingInt(cfg.Settings, settingTorrentDeadSwarmBlocklistDays, 7)
 	if days <= 0 {
 		return 0
 	}
@@ -922,8 +922,8 @@ func tevAbandonTorrent(cfg *Config, db *Database, torrents TorrentSession, notif
 
 // MonitorStalled implements `monitor_stalled`.
 func MonitorStalled(cfg *Config, torrents TorrentSession, db *Database, notifier *Notifier, watch map[string]StallWatch) {
-	stallAfterMinutes := tevSettingFloatOr(cfg, "torrent_stall_after_min", 60.0)
-	retryMinutes := tevSettingFloatOr(cfg, "torrent_stall_retry_min", 60.0)
+	stallAfterMinutes := tevSettingFloatOr(cfg, settingTorrentStallAfterMin, 60.0)
+	retryMinutes := tevSettingFloatOr(cfg, settingTorrentStallRetryMin, 60.0)
 	if stallAfterMinutes <= 0 {
 		clear(watch)
 		return
