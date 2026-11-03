@@ -56,6 +56,20 @@ here.
 - **Hybrid torrents from the v2 swarm** — hybrids are downloaded as v1 only; when the
   swarm of a hybrid has peers in the v2 one and none in the v1 one, the download waits
   without needing to. Gate: a hybrid torrent where the v2 swarm is the only one with peers.
+- **Transient EIO through a new open** — a read that fails with EIO stops the torrent,
+  which is right for a damaged file but not for a NAS, SMB or FUSE mount that can serve the
+  same file through a fresh open (libtorrent PR 9033 reopens and retries over about a
+  second). Gate: a mount where a transient EIO stops a torrent, or a FUSE/fanotify harness
+  like the one of that PR.
+- **One connection per peer id** — the duplicate gate is keyed on the address, so the same
+  peer reached over IPv4 and IPv6, or again after a holepunch, holds two slots and receives
+  the same requests twice; libtorrent keeps `allow_multiple_connections_per_peer_id` off
+  by default (PR 8372). Gate: a dual-stack or holepunch session where one peer id shows two
+  connections.
+- **BEP 44 put conformance** — a `put` that carries `sig` but no `k` is stored as an
+  immutable item at `sha1(value)` and the signature is never checked, while a mutable put
+  is expected (libtorrent rejects it with 203, PR 8698). Gate: the test of the put path
+  (sig without k, k without sig or seq).
 
 ## Gextto, acquisition and UI
 
@@ -139,8 +153,13 @@ its gate; a rejected one moves to *Not planned*.
 - **Ceiling on the piece length of a parsed torrent** — `NewInfo` checks neither a power
   of two nor a maximum, and the piece pool is sized from that number
   (`bufferpool.New(int(PieceLength))`): a hostile `.torrent` or magnet can ask for a
-  multi-gigabyte buffer, while libtorrent refuses even 2 GiB (issue 8139). Gate: the
-  ceiling to adopt and its error message.
+  multi-gigabyte buffer, while libtorrent refuses even 2 GiB (issue 8139). The ceiling has
+  to leave room for the 128 MiB pieces of libtorrent's new automatic sizing (PR 8015);
+  our creation stops at 16 MiB with about 2000 pieces, so a multi-terabyte torrent gets
+  hundreds of thousands of pieces. Gate: the ceiling to adopt and its error message.
+- **TLS origination to the proxy** — the proxy is reached in plain text (HTTP CONNECT or
+  SOCKS5); an `https://` proxy that terminates TLS itself is not supported, as in
+  libtorrent before PR 9039. Gate: an operator who runs an HTTPS proxy.
 - **DHT scrape keeps the peers** — a `get_peers` with `scrape=1` answers with the bloom
   filters *instead of* `values`, while BEP 33 says the filters are added to the normal
   reply (the question of libtorrent issue 8005); our own scrape client does not need it.
@@ -161,6 +180,11 @@ Closed by choice, not waiting for a measurement:
 - WebTorrent/WebRTC peers: niche, and the reference WebSocket tracker serves only
   WebRTC peers to a WebSocket client.
 - Native I2P: reachable through a SOCKS5/HTTP proxy.
+- Alternative MSE stream ciphers (the AES-128-CTR of libtorrent PR 8585): the cipher is
+  negotiated between the two ends, so it is worth nothing on a swarm where no other client
+  speaks it.
+- HTTP/2 for announces: an announce is one small request per interval and the shared
+  HTTP/1.1 transport already reuses the connection (libtorrent PR 8025).
 - Alternative storages (blob, bolt, SQLite).
 - `share_mode`: it serves ratio farming, not a library.
 - Full `*arr` v3 compatibility, multi-user authentication, Usenet, write-back cache,
