@@ -380,12 +380,17 @@ func recordLibraryCheck(series int, correct, renamed, discarded, duplicates, err
 // Worker
 // ---------------------------------------------------------------------------
 
-// maintenanceRunNow asks the worker for one pass now, outside the window.
+// maintenanceRunNow wakes the worker for a pass outside the window.
 var maintenanceRunNow = make(chan struct{}, 1)
 
-// requestMaintenanceRun wakes the worker for a pass that ignores the window
-// (the load and the downloads still count).
+// maintenanceForcedPending keeps a "Run now" request until a pass really runs:
+// a busy Gextto delays it, it never drops it.
+var maintenanceForcedPending atomic.Bool
+
+// requestMaintenanceRun asks for a pass that ignores the window (the load and
+// the downloads still count).
 func requestMaintenanceRun() {
+	maintenanceForcedPending.Store(true)
 	select {
 	case maintenanceRunNow <- struct{}{}:
 	default:
@@ -400,28 +405,30 @@ func nightMaintenanceWorker(state *AppState) {
 	timer := time.NewTimer(time.Minute)
 	defer timer.Stop()
 	for {
-		forced := false
 		select {
 		case <-ctx.Done():
 			return
 		case <-timer.C:
 		case <-maintenanceRunNow:
-			forced = true
 		}
-		nightMaintenancePass(ctx, state, time.Now(), forced)
+		forced := maintenanceForcedPending.Load()
+		if nightMaintenancePass(ctx, state, time.Now(), forced) && forced {
+			maintenanceForcedPending.Store(false)
+		}
 		timer.Reset(maintenancePoll)
 	}
 }
 
 // nightMaintenancePass is one look at the window: it runs what is due, or
-// sends the night summary when the window has just closed.
-func nightMaintenancePass(ctx context.Context, state *AppState, now time.Time, forced bool) {
+// sends the night summary when the window has just closed. It reports whether
+// the jobs ran (Gextto was idle).
+func nightMaintenancePass(ctx context.Context, state *AppState, now time.Time, forced bool) bool {
 	cfg := latestConfig(state)
 	window := maintenanceWindowFrom(cfg)
 	if !forced && !window.Contains(now) {
 		maintenanceSetLive("", "")
 		maintenanceNotifyNight(cfg)
-		return
+		return false
 	}
 	night := window.Night(now)
 	maintenanceStatusUpdate(func(status *maintenanceStatus) {
@@ -438,7 +445,7 @@ func nightMaintenancePass(ctx context.Context, state *AppState, now time.Time, f
 		return reason == ""
 	}
 	if !idle() {
-		return
+		return false
 	}
 	defer maintenanceSetLive("", "")
 
@@ -456,6 +463,7 @@ func nightMaintenancePass(ctx context.Context, state *AppState, now time.Time, f
 	if maintenanceAudioLibraryEnabled(cfg) {
 		runLibraryAudioCleanup(ctx, state, func() bool { return inWindow() && idle() })
 	}
+	return true
 }
 
 // runMaintenanceStep runs one job holding the heavy slot.

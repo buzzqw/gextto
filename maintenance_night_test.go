@@ -354,6 +354,36 @@ func TestNightMaintenancePassRunsOnlyInTheWindow(t *testing.T) {
 	}
 }
 
+func TestNightMaintenanceRunNowWaitsForIdleAndIsNotLost(t *testing.T) {
+	original := maintenanceLoadAverage
+	defer func() { maintenanceLoadAverage = original }()
+	busy := 1000.0
+	maintenanceLoadAverage = func() *float64 { return &busy }
+
+	state := newTestAppState(t)
+	resetMaintenanceStatus(t, state.cfg.DataDir)
+	requestMaintenanceRun()
+	defer maintenanceForcedPending.Store(false)
+	<-maintenanceRunNow
+	if ran := nightMaintenancePass(context.Background(), state, clockAt(15, 0), maintenanceForcedPending.Load()); ran {
+		t.Fatal("the pass ran on a busy machine")
+	}
+	if !maintenanceForcedPending.Load() {
+		t.Fatal("the request was dropped while Gextto was busy")
+	}
+	if status := maintenanceStatusSnapshot(); !strings.Contains(status.Waiting, "carico") {
+		t.Fatalf("the panel does not say why it waits: %q", status.Waiting)
+	}
+	idle := 0.0
+	maintenanceLoadAverage = func() *float64 { return &idle }
+	if ran := nightMaintenancePass(context.Background(), state, clockAt(15, 2), maintenanceForcedPending.Load()); !ran {
+		t.Fatal("the pending request did not run once idle")
+	}
+	if !maintenanceStatusSnapshot().Night.DBDone {
+		t.Fatal("the database job did not run")
+	}
+}
+
 func TestNightMaintenancePanelRenders(t *testing.T) {
 	state := newTestAppState(t)
 	resetMaintenanceStatus(t, state.cfg.DataDir)
