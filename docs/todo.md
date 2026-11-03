@@ -33,10 +33,6 @@ here.
   `recvfrom`/`sendto` is a real share of the syscall time.
 - **Graduated file priority (0–7)** with mixed-priority files. Gate: a torrent with
   mixed priorities where the current order is wrong.
-- **Parallel requests per web seed** — one range download runs per web seed at a time;
-  a source that answers each file in seconds (archive.org) is bound by that latency.
-  Gate: a torrent served mostly by web seeds where parallel requests beat the current
-  version on the same source.
 - **DHT feeds** — the resolver and the publisher exist; what is missing is a real
   multi-client audience. Gate: at least two independent clients consuming a published
   feed.

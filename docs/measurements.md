@@ -288,6 +288,7 @@ of 2026-11-02.
 | Refill of 250 requests over TCP | 248–256 µs, about 5 writes instead of 250 | small messages batched |
 | Read cache hit | 366–372 ns, no allocation | every uploaded block |
 | Read cache miss, 16 KiB block | 732–768 ns and 192 B, was 3.9 µs and 16.5 KB | the buffer of an evicted block is read into again; the remaining bytes are the benchmark's own key |
+| Webseed, 8 files, 200 ms per request | 3.2 s with one range, 0.8 s with four | one host serves four ranges at once; `GX_MEASURE=1 go test ./cmd/gx-torrent/ -run MeasureWebseed -v` |
 | `state.json` save, 100 / 1,000 / 5,000 torrents | 0.5 / 4.3–5.0 / 20–25 ms | held under the daemon lock |
 | IP filter load, 172,000 rules | 30–36 ms, 6.6 MB | at start |
 | Blocked-IP lookup | 20 ns | every incoming address |

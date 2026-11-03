@@ -316,15 +316,30 @@ func (t *torrent) getPeers() []Peer {
 	return peers
 }
 
-// getWebseeds snapshots the webseed sources.
+// getWebseeds snapshots the webseed sources, one entry per URL: the copies
+// opened so a host can serve several ranges at once fold their speed and
+// error into it.
 func (t *torrent) getWebseeds() []Webseed {
 	webseeds := make([]Webseed, 0, len(t.webseedSources))
 	for _, src := range t.webseedSources {
-		webseeds = append(webseeds, Webseed{
-			URL:           src.URL,
-			Error:         src.LastError,
-			DownloadSpeed: int(src.DownloadSpeed.Rate1()),
-		})
+		if !src.Replica {
+			webseeds = append(webseeds, Webseed{
+				URL:           src.URL,
+				Error:         src.LastError,
+				DownloadSpeed: int(src.DownloadSpeed.Rate1()),
+			})
+			continue
+		}
+		for i := range webseeds {
+			if webseeds[i].URL != src.URL {
+				continue
+			}
+			webseeds[i].DownloadSpeed += int(src.DownloadSpeed.Rate1())
+			if webseeds[i].Error == nil {
+				webseeds[i].Error = src.LastError
+			}
+			break
+		}
 	}
 	return webseeds
 }

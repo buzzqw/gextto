@@ -1903,6 +1903,22 @@ same map in the **Pieces** tab of the torrent detail. gx-torrent is the first
 Gextto engine to expose piece diagnostics (libtorrent responds "not
 available").
 
+## Web seeds (BEP 19)
+
+An HTTP source (the `url-list` of a `.torrent`, a magnet `ws=`, or one added
+at runtime) is fetched with range requests. A source opens up to
+`webseed-max-downloads` ranges at once (4 by default), and each range is
+fetched with one request per contiguous file span: a host that answers each
+file in seconds — an archive.org item — is then no longer bound by that
+latency, because four files travel at the same time instead of one after the
+other. An idle range takes half of a busy one, so the ranges stay even. The
+number of sources a torrent may carry is still capped by
+`webseed-max-sources` (10).
+
+The copies are an implementation detail: the daemon page, the stats and the
+`.torrent` export show **one entry per URL**, with the speed of all its ranges
+summed and the first error it hit.
+
 ## HTTP streaming (HTTP Range)
 
 Besides sequential download, the daemon can serve a file to a player while

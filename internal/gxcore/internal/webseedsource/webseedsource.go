@@ -13,6 +13,12 @@ type WebseedSource struct {
 	Downloader    *urldownloader.URLDownloader
 	LastError     error
 	DownloadSpeed metrics.Meter
+	// Replica marks a second copy of another source's URL: the same host
+	// opened again so it can serve several ranges at once. A source that
+	// answers each file in seconds is otherwise bound by that latency, one
+	// request at a time. The user still sees one entry per URL: the stats
+	// fold the replicas' speed and error into the first copy.
+	Replica bool
 }
 
 // NewList builds a source per URL. Meters start nil (zero-valued) until a

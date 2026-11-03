@@ -22,7 +22,6 @@ func (t *torrent) handleWebseedPieceResult(msg *urldownloader.PieceResult) {
 	if msg.Error != nil {
 		t.log.Debugln("webseed download error:", msg.Error)
 		t.disableSource(msg.Downloader.URL, msg.Error, true)
-		t.webseedActiveDownloads--
 		t.startPieceDownloaders()
 		return
 	}
@@ -61,7 +60,7 @@ func (t *torrent) handleWebseedPieceResult(msg *urldownloader.PieceResult) {
 	go pw.Run(t.pieceWriterResultC, t.doneC, t.session.metrics.WritesPerSecond, t.session.metrics.SpeedWrite, t.session.semWrite)
 
 	if msg.Done {
-		t.rotateWebseedSource(msg.Downloader.URL)
+		t.rotateWebseedSource(msg.Downloader)
 	}
 }
 
@@ -88,22 +87,26 @@ func (t *torrent) discardStaleWebseedPiece(msg *urldownloader.PieceResult) {
 	}
 }
 
-// rotateWebseedSource closes a finished range (matched by URL) and starts
-// the source's next one.
-func (t *torrent) rotateWebseedSource(url string) {
+// rotateWebseedSource closes a finished range and starts that source's next
+// one. The range is matched by its downloader, not by the URL: a host can hold
+// several copies, and rotating the first one would close a stranger and
+// release a slot that is still in use.
+func (t *torrent) rotateWebseedSource(d *urldownloader.URLDownloader) {
 	for _, src := range t.webseedSources {
-		if src.URL != url {
+		if src.Downloader != d {
 			continue
 		}
 		t.closeWebseedDownloader(src)
 		t.webseedActiveDownloads--
 		t.startPieceDownloaderForWebseed(src)
-		break
+		return
 	}
 }
 
-// disableSource parks a failing source, optionally scheduling its retry in
-// a minute.
+// disableSource parks every copy of a failing source, optionally scheduling
+// the retry in a minute. Each copy still fetching is closed here and its
+// slot released, the one that failed included: the downloader is dropped
+// without going through the piece-result path.
 func (t *torrent) disableSource(srcurl string, err error, retry bool) {
 	for _, src := range t.webseedSources {
 		if src.URL != srcurl {
@@ -111,11 +114,15 @@ func (t *torrent) disableSource(srcurl string, err error, retry bool) {
 		}
 		src.Disabled = true
 		src.LastError = err
-		t.closeWebseedDownloader(src)
+		if src.Downloading() {
+			t.closeWebseedDownloader(src)
+			if t.webseedActiveDownloads > 0 {
+				t.webseedActiveDownloads--
+			}
+		}
 		if retry {
 			go t.notifyWebseedRetry(src)
 		}
-		break
 	}
 }
 
@@ -143,6 +150,47 @@ func capWebseedSources(sources []*webseedsource.WebseedSource, maxSources int) [
 	return sources[:maxSources]
 }
 
+// expandWebseedSources opens every source into up to `parallel` copies, one
+// per range the host can serve at once. The copies are interleaved (first
+// URL of each source, then their replicas) so a single pass over the list
+// spends the shared download budget fairly between the hosts, and every copy
+// after the first of its URL is marked Replica so the user still sees one
+// entry per URL.
+func expandWebseedSources(sources []*webseedsource.WebseedSource, parallel int) []*webseedsource.WebseedSource {
+	if parallel <= 1 || len(sources) == 0 {
+		return sources
+	}
+	out := make([]*webseedsource.WebseedSource, 0, len(sources)*parallel)
+	for copyIndex := 0; copyIndex < parallel; copyIndex++ {
+		for _, src := range sources {
+			if copyIndex == 0 {
+				out = append(out, src)
+				continue
+			}
+			out = append(out, &webseedsource.WebseedSource{
+				URL:           src.URL,
+				DownloadSpeed: metrics.NilMeter{},
+				Replica:       true,
+			})
+		}
+	}
+	return out
+}
+
+// newWebseedSources builds the sources of one URL: the primary and the
+// replicas that let one host serve several ranges at once.
+func newWebseedSources(url string, parallel int) []*webseedsource.WebseedSource {
+	if parallel < 1 {
+		parallel = 1
+	}
+	out := make([]*webseedsource.WebseedSource, 0, parallel)
+	out = append(out, &webseedsource.WebseedSource{URL: url, DownloadSpeed: metrics.NilMeter{}})
+	for i := 1; i < parallel; i++ {
+		out = append(out, &webseedsource.WebseedSource{URL: url, DownloadSpeed: metrics.NilMeter{}, Replica: true})
+	}
+	return out
+}
+
 // handleAddWebseeds appends webseed URLs at runtime, skipping blanks,
 // duplicates and the configured ceiling, persisting the survivors. Sources
 // added while the picker is missing wait for the next start.
@@ -163,13 +211,15 @@ func (t *torrent) handleAddWebseeds(urls []string) {
 		if maxSources > 0 && len(t.webseedSources) >= maxSources {
 			break
 		}
-		src := &webseedsource.WebseedSource{URL: url, DownloadSpeed: metrics.NilMeter{}}
-		t.webseedSources = append(t.webseedSources, src)
-		t.rawWebseedSources = append(t.rawWebseedSources, url)
+		sources := newWebseedSources(url, t.session.config.WebseedMaxDownloads)
 		existing[url] = struct{}{}
-		if t.piecePicker != nil {
-			t.piecePicker.AddWebseedSource(src)
-			t.startPieceDownloaderForWebseed(src)
+		t.rawWebseedSources = append(t.rawWebseedSources, url)
+		for _, src := range sources {
+			t.webseedSources = append(t.webseedSources, src)
+			if t.piecePicker != nil {
+				t.piecePicker.AddWebseedSource(src)
+				t.startPieceDownloaderForWebseed(src)
+			}
 		}
 	}
 	t.persistWebseeds()

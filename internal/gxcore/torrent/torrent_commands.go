@@ -128,9 +128,12 @@ func (t *torrent) Torrent() ([]byte, error) {
 	if t.info() == nil {
 		return nil, errors.New("torrent metadata not ready")
 	}
-	webseeds := make([]string, len(t.webseedSources))
-	for i, ws := range t.webseedSources {
-		webseeds[i] = ws.URL
+	webseeds := make([]string, 0, len(t.webseedSources))
+	for _, ws := range t.webseedSources {
+		if ws.Replica {
+			continue
+		}
+		webseeds = append(webseeds, ws.URL)
 	}
 	return metainfo.NewBytesWithHints(t.info().Bytes, t.getTieredTrackers(), webseeds, t.pieceLayers, "", t.info().Collections, t.info().Similar)
 }
