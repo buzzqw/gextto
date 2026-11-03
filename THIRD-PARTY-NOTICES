@@ -22,7 +22,7 @@ Contents (component — licence; full texts below)
 - github.com/google/btree v1.1.3 — Apache-2.0
 - github.com/google/uuid v1.6.0 — BSD-3-Clause
 - github.com/huin/goupnp v1.3.0 — BSD-2-Clause
-- github.com/jackpal/bencode-go v1.0.0 — BSD-3-Clause
+- github.com/jackpal/bencode-go v1.2.1 — BSD-3-Clause
 - github.com/jackpal/go-nat-pmp v1.1.0 — Apache-2.0
 - github.com/jlaffaye/ftp v0.2.4 — ISC
 - github.com/mattn/go-isatty v0.0.24 — MIT
@@ -32,7 +32,7 @@ Contents (component — licence; full texts below)
 - github.com/zeebo/bencode v1.0.0 — MIT
 - go.etcd.io/bbolt v1.5.0 — MIT
 - golang.org/x/crypto v0.58.0 — BSD-3-Clause
-- golang.org/x/net v0.61.0 — BSD-3-Clause
+- golang.org/x/net v0.62.0 — BSD-3-Clause
 - golang.org/x/sync v0.24.0 — BSD-3-Clause
 - golang.org/x/sys v0.49.0 — BSD-3-Clause
 - gopkg.in/yaml.v3 v3.0.1 — MIT and Apache-2.0 (dual licence)
@@ -531,7 +531,7 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ================================================================================
-github.com/jackpal/bencode-go v1.0.0
+github.com/jackpal/bencode-go v1.2.1
 ================================================================================
 
 // Copyright (c) 2009 The Go Authors. All rights reserved.
@@ -786,7 +786,7 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ================================================================================
-golang.org/x/net v0.61.0
+golang.org/x/net v0.62.0
 ================================================================================
 
 Copyright 2009 The Go Authors.

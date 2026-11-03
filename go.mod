@@ -6,7 +6,7 @@ require (
 	github.com/buzzqw/gextto/internal/dht v0.0.0
 	github.com/google/btree v1.1.3
 	github.com/huin/goupnp v1.3.0
-	github.com/jackpal/bencode-go v1.0.0
+	github.com/jackpal/bencode-go v1.2.1
 	github.com/jackpal/go-nat-pmp v1.1.0
 	github.com/jlaffaye/ftp v0.2.4
 	github.com/mattn/go-isatty v0.0.24
@@ -15,7 +15,7 @@ require (
 	github.com/zeebo/bencode v1.0.0
 	go.etcd.io/bbolt v1.5.0
 	golang.org/x/crypto v0.58.0
-	golang.org/x/net v0.61.0
+	golang.org/x/net v0.62.0
 	golang.org/x/sync v0.24.0
 	golang.org/x/sys v0.49.0
 	gopkg.in/yaml.v3 v3.0.1
