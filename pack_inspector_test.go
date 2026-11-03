@@ -101,6 +101,25 @@ func TestInspectActivePacksRemovesUselessPack(t *testing.T) {
 	}
 }
 
+// A pack added by hand is the user's choice: the inspection never discards it,
+// even when every episode is already in the library.
+func TestInspectActivePacksLeavesAManualPackAlone(t *testing.T) {
+	cfg, db, engine, hash := packInspectFixture(t, []models.FileView{
+		{Path: "Show.S01E01.mkv"},
+	})
+	if err := db.SetTorrentReason(hash, "manual"); err != nil {
+		t.Fatalf("set reason: %v", err)
+	}
+	checked := map[string]packInspectionCheck{}
+	InspectActivePacks(cfg, engine, db, checked)
+	if _, removed := engine.removed[hash]; removed {
+		t.Fatal("a pack added by hand was removed")
+	}
+	if blocked, err := db.IsBlocklisted(hash); err != nil || blocked {
+		t.Fatalf("a pack added by hand was blocklisted (err %v)", err)
+	}
+}
+
 func TestInspectActivePacksKeepsPackWithAWantedEpisode(t *testing.T) {
 	cfg, db, engine, hash := packInspectFixture(t, []models.FileView{
 		{Path: "Show.S01E01.mkv"},

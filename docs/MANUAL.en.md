@@ -433,7 +433,8 @@ and — if you enable it — asks eD2k once per season when torrents find nothin
 - With **pack inspection** on (*Configuration → Seeding and completion → Pack
   inspection*, off by default) Gextto reads the pack's file list as soon as it
   arrives: if the pack adds nothing it is dropped, if only some files are
-  useful only those are downloaded.
+  useful only those are downloaded. It applies only to packs chosen by the
+  cycle: a pack you start by hand is never dropped.
 - If a download stays **stuck at 0 B/s or waiting for metadata** longer than
   the time set in *Configuration → Quality and upgrades → Stuck downloads*, the
   search can start an alternative for the same episode (or season) without
