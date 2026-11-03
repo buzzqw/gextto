@@ -1,2165 +1,1770 @@
 # Manuale utente di Gextto
 
-Questa è la guida operativa per la UI web e la TUI terminale di Gextto. La UI è
-disponibile in italiano, inglese, tedesco, francese, spagnolo e polacco; qui sono usate le etichette italiane.
-Per le etichette inglesi consulta [MANUAL.en.md](MANUAL.en.md). La UI tedesca
-francese, spagnola e polacca usano i rispettivi cataloghi incorporati e, per la
-documentazione estesa, il manuale inglese come fallback. La voce **Manuale**
-apre il manuale aggiornato online nella lingua dell'interfaccia; la voce
-**Changelog** apre le novità. Manuale e changelog non sono incorporati nel
-binario: si aggiornano senza ricompilare Gextto.
+Questo manuale spiega **come si usa Gextto**: dall'installazione al primo
+download, dalle serie che segui ogni settimana alla manutenzione della
+libreria. È ordinato per compiti — *aggiungere una serie*, *capire perché un
+episodio non arriva*, *fare un backup* — e non per pagine dell'interfaccia.
+L'elenco completo di ogni impostazione, campo e pulsante è nelle appendici in
+fondo.
+
+La UI è disponibile in italiano, inglese, tedesco, francese, spagnolo e
+polacco; qui sono usate le etichette italiane. Per quelle inglesi c'è
+[MANUAL.en.md](MANUAL.en.md), che fa anche da manuale per tedesco, francese,
+spagnolo e polacco. La voce **Manuale** dell'interfaccia apre questo documento
+online, nella lingua scelta; **Changelog** apre le novità. Nessuno dei due è
+dentro il programma: si aggiornano senza aggiornare Gextto.
 
 > [!IMPORTANT]
-> Inizia in **dry-run**. Verifica percorsi, accesso alle sorgenti e un titolo di
-> prova prima di abilitare i download. La UI è amministrativa e per
-> impostazione predefinita è aperta: lasciala in una rete fidata oppure, per
-> l'accesso da fuori, attiva il login (*Configurazione → Accesso e servizi*) e usa HTTPS.
+> Inizia in **modalità prova** (dry-run): Gextto cerca e decide, ma non scarica
+> nulla. Verifica percorsi, sorgenti e un titolo di prova prima di passare ai
+> download veri. L'interfaccia web è amministrativa ed è aperta per
+> impostazione predefinita: tienila in una rete fidata oppure, per l'accesso da
+> fuori, attiva il login e usa HTTPS (vedi [Accesso e sicurezza](#20-accesso-e-sicurezza)).
 
-## Come usare questa guida
+## Indice
 
-Gextto è un demone unico: ricerca le sorgenti, valuta le release, gestisce
-il motore torrent attivo, rinomina i file e li archivia. Non è necessario avviare componenti
-separati per il funzionamento normale.
+**Parte I — Primi passi**
 
-L'interfaccia web funziona anche da telefono: sotto i 900 px il layout diventa
-compatto, con navigazione in alto scorrevole, metriche della dashboard su due
-colonne, finestre a tutta larghezza e tabelle che scorrono orizzontalmente
-dentro il loro pannello. Ogni azione resta raggiungibile col tocco. Le pagine
-e i file dell'interfaccia viaggiano compressi e i fogli di stile e gli script
-restano nella cache del browser, così la UI resta usabile anche su una rete
-lenta.
+1. [Cos'è Gextto e come lavora](#1-cosè-gextto-e-come-lavora)
+2. [Installare Gextto](#2-installare-gextto)
+3. [La configurazione iniziale](#3-la-configurazione-iniziale)
+4. [Il primo download, in prova e poi davvero](#4-il-primo-download-in-prova-e-poi-davvero)
+5. [Orientarsi nell'interfaccia](#5-orientarsi-nellinterfaccia)
 
-La UI ufficiale si apre su `http://<host>:5000/`; il vecchio prefisso `/v2`
-reindirizza alla radice e la vecchia route `/ui` non esiste più. La pagina **Scarico** aggiorna
-automaticamente la sessione ogni 5 secondi; la voce **Aggiorna ogni 5 s** del menu
-**Strumenti** disattiva o riattiva l'aggiornamento, e il pulsante **Aggiorna**
-della barra in alto (accanto a **Aggiungi torrent**) ricarica subito i dati.
-Anche le velocità e i carichi nella barra superiore vengono aggiornati ogni 5
-secondi. La barra mostra **CPU e RAM
-per processo**: **Gextto** (il demone), **gx-torrent** (il motore torrent, quando
-il demone è locale) e **aMule** (quando **eD2k e Kad tramite aMule** è attivo e
-`amuled` gira sulla stessa macchina). I badge dei processi remoti non compaiono,
-perché quei dati non sono leggibili da lì.
+**Parte II — Uso quotidiano**
 
-Il percorso consigliato per una nuova installazione è:
+6. [Seguire una serie TV](#6-seguire-una-serie-tv)
+7. [Seguire un film](#7-seguire-un-film)
+8. [Cercare e scaricare a mano](#8-cercare-e-scaricare-a-mano)
+9. [Seguire i download](#9-seguire-i-download)
+10. [Dove finiscono i file](#10-dove-finiscono-i-file)
+11. [Fumetti](#11-fumetti)
+12. [eD2k e Kad con aMule](#12-ed2k-e-kad-con-amule)
 
-1. configurare percorsi e sorgenti;
-2. lasciare il demone in **dry-run**;
-3. aggiungere un solo titolo di prova;
-4. eseguire una ricerca o un ciclo manuale;
-5. controllare Salute e Log;
-6. abilitare la modalità attiva solo dopo aver verificato i risultati.
+**Parte III — Configurare**
 
-## Accessibilità
+13. [Sorgenti: feed e indexer](#13-sorgenti-feed-e-indexer)
+14. [Qualità, punteggi e upgrade](#14-qualità-punteggi-e-upgrade)
+15. [Il motore torrent](#15-il-motore-torrent)
+16. [Velocità e rete](#16-velocità-e-rete)
+17. [Libreria, NAS e spazio](#17-libreria-nas-e-spazio)
+18. [Notifiche](#18-notifiche)
+19. [Integrazioni con altri programmi](#19-integrazioni-con-altri-programmi)
+20. [Accesso e sicurezza](#20-accesso-e-sicurezza)
 
-La UI web è stata migliorata per l'uso con tastiera e tecnologie assistive:
+**Parte IV — Tenere tutto in ordine**
 
-- i controlli di ricerca, configurazione e lingua hanno nomi accessibili;
-- i dialoghi gestiscono ingresso del focus, `Tab`, `Esc` e ritorno al controllo
-  che li ha aperti;
-- le intestazioni ordinabili delle tabelle sono attivabili da tastiera e
-  comunicano l'ordinamento corrente;
-- aggiornamenti asincroni, errori, progressi e notifiche usano regioni live;
-- tabelle, progress bar, tab e landmark espongono semantica aggiuntiva;
-- il layout supporta viewport stretti, reflow e contrasto migliorato nel tema
-  chiaro.
+21. [Controllare che tutto funzioni](#21-controllare-che-tutto-funzioni)
+22. [Curare la libreria](#22-curare-la-libreria)
+23. [Backup e ripristino](#23-backup-e-ripristino)
+24. [Aggiornare Gextto](#24-aggiornare-gextto)
+25. [Usare Gextto dal terminale (TUI)](#25-usare-gextto-dal-terminale-tui)
 
-Le verifiche automatiche si eseguono dal checkout sorgente:
+**Parte V — Quando qualcosa non va**
 
-```bash
-cd uiweb/end2end
-npm ci
-npm run test:a11y
-```
+26. [Risoluzione dei problemi](#26-risoluzione-dei-problemi)
+27. [Glossario](#27-glossario)
 
-La suite corrente esegue 14 controlli axe-core/Playwright sulle sezioni
-principali, compresi dialoghi, ordinamento da tastiera, polling e reflow a 320
-px. Il risultato non è una dichiarazione di conformità WCAG o normativa: per
-un'attestazione servono anche audit manuale con screen reader, tastiera,
-ingrandimento e tecnologie assistive, oltre alla valutazione dei requisiti
-applicabili. Per il dettaglio vedere
-[`ACCESSIBILITY.md`](ACCESSIBILITY.md).
+**Appendici — Riferimento**
 
-Il manuale distingue sempre tra:
-
-- **ricerca manuale**: serve a ispezionare risultati e accodare una scelta;
-- **ciclo automatico**: cerca i titoli monitorati e decide cosa scaricare;
-- **archivio**: i file già importati o archiviati nella libreria;
-- **sessione torrent**: i download ancora gestiti dal motore torrent attivo.
-
-### Checklist iniziale
-
-Prima di abilitare i download reali verifica:
-
-- `http://<host>:5000` è raggiungibile;
-- *Salute* non segnala problemi di permessi o spazio;
-- la cartella temporanea è scrivibile;
-- la cartella libreria/NAS è montata e scrivibile dall'utente del servizio;
-- almeno una sorgente risponde a *Verifica*;
-- una ricerca manuale restituisce release coerenti;
-- in dry-run Gextto non ha prodotto errori inattesi.
-
-Se usi un NAS, prova prima a creare un file nella destinazione con lo stesso
-utente che esegue `gextto.service`. Un percorso visibile dalla shell dell'utente
-personale può non essere visibile al servizio systemd.
-
-**Sicurezza.** La porta web è un'interfaccia amministrativa, aperta per
-impostazione predefinita. Lasciala sul loopback o sulla rete di casa; per
-l'accesso da fuori attiva il login facoltativo (vedi *Accesso*, la rete locale
-resta libera) dietro un reverse proxy HTTPS o una VPN. Nell'installazione standard, `/opt/gextto/gexttod --version`
-indica quale build è in esecuzione. Vedi
-[`SECURITY.md`](SECURITY.md) per il modello di rete completo.
-
-- [Accessibilità](#accessibilità)
-- [1. Primo avvio](#1-primo-avvio)
-- [2. Dashboard](#2-dashboard)
-- [3. Scarico](#3-scarico)
-- [4. Serie TV](#4-serie-tv)
-- [5. Film](#5-film)
-- [6. Esplora, Archivio, Fumetti](#6-esplora-archivio-fumetti)
-- [7. Configurazione](#7-configurazione)
-- [8. Integrazioni](#8-integrazioni)
-- [9. Manutenzione](#9-manutenzione)
-- [10. Salute, Log, Grafici](#10-salute-log-grafici)
-- [11. Notifiche](#11-notifiche)
-- [12. Riferimento rapido](#12-riferimento-rapido)
-- [13. Risoluzione problemi](#13-risoluzione-problemi)
+- [A. Configurazione, voce per voce](#appendice-a-riferimento--configurazione)
+- [B. Integrazioni](#appendice-b-riferimento--integrazioni)
+- [C. Manutenzione](#appendice-c-riferimento--manutenzione)
 
 ---
 
-## 1. Primo avvio
+# Parte I — Primi passi
 
-Gextto gira come un unico servizio. Apri la UI all'indirizzo `http://<host>:5000`.
+## 1. Cos'è Gextto e come lavora
 
-- Su un'installazione nuova la prima visita apre la **Configurazione iniziale**,
-  in cinque passi: *Accesso* (password, con accesso libero dalla rete locale se
-  vuoi), *Cartelle* (libreria, download, temporanei e cestino; **Sfoglia** apre
-  il selettore delle cartelle del server e può crearne di nuove; **Verifica**
-  controlla con l'utente del servizio se ogni cartella esiste ed è scrivibile,
-  il tipo di disco, NAS compreso, lo spazio libero e se sta sullo stesso disco
-  della libreria), *Fonti* (un indexer Prowlarr/Jackett/indexarr e la chiave TMDB,
-  consigliata, oppure in alternativa la chiave TVDB con l'eventuale PIN),
-  *Primo titolo* (la ricerca su TMDB, o su TVDB se manca la chiave TMDB, con il
-  pulsante per aggiungere) e *Attiva*
-  (ciclo automatico e uscita dalla modalità prova). Si può saltare e riaprire
-  in ogni momento da `/?view=setup`; un'installazione che ha già serie, film o
-  archivio non la mostra.
-- **Attivo vs dry-run**: il ciclo automatico è **acceso di default**, quindi
-  Gextto cerca da solo; con il **dry-run** attivo (la scelta *Scarica davvero*
-  nel wizard) non parte nessun download reale. L'interruttore del ciclo è *Ciclo
-  automatico (ricerca e download)* in *Configurazione → Generale*. Spegnere il
-  dry-run dalla pagina ha effetto subito, senza riavviare; un avvio con
-  `--dry-run` resta invece in sola lettura fino al riavvio.
-- Aggiungi serie/film da **Esplora** (TMDB) oppure da **Serie TV / Film → Aggiungi**.
-- I metadati (stagioni, episodi, locandine, calendario) arrivano da TMDB o da
-  TVDB: vedi *Configurazione → Metadati: TMDB o TVDB*.
-- Il pulsante **Dona** (PayPal) è sempre visibile in basso a destra: se Gextto ti
-  è utile puoi sostenere lo sviluppo; l'indirizzo è anche nel README.
-- **Una sola istanza per cartella dati.** Se un altro Gextto sta già usando la
-  stessa cartella dati, o se la porta dell'interfaccia è già occupata, il nuovo
-  processo si ferma subito e lo scrive nel log, senza aprire i database: ferma
-  l'istanza precedente e riavvia. Per una prova su un'altra cartella dati non
-  c'è nulla da configurare.
+Gextto è un **servizio unico** che gira su un computer sempre acceso (un mini
+PC, un server, un NAS): tu gli dici quali serie e quali film ti interessano, e
+lui li cerca, sceglie la versione migliore secondo le tue regole, la scarica, le
+dà un nome ordinato e la mette nella tua libreria. Si comanda dal browser
+(`http://<host>:5000`) o dal terminale. Non servono altri componenti: il motore
+torrent, **gx-torrent**, è incluso e Gextto lo avvia da solo.
 
-### Procedura consigliata per il primo ciclo
+### Il percorso di un episodio
 
-1. In *Configurazione → Archivio e spazio* controlla cartella download, temporanea,
-   libreria e cestino.
-2. In *Configurazione → Sorgenti* aggiungi una sola sorgente funzionante e
-   controllala in *Integrazioni → Verifica sorgenti*. Aggiungi le altre solo dopo aver validato la prima.
-3. Lascia disattivati i download reali e aggiungi una serie con una sola stagione
-   o un film di prova.
-4. Dalla Dashboard avvia il ciclo del dominio interessato.
-5. Apri *Salute* e *Log*: devi vedere il ciclo, le sorgenti interrogate e il
-   motivo per cui una release è stata accettata o scartata.
-6. Esegui una ricerca manuale e controlla un risultato con **Perché non questa?**.
-7. Quando percorsi, filtri e risultati sono corretti, abilita *Modalità attiva*.
+Ogni download segue sempre la stessa strada. Conoscerla aiuta a capire dove
+guardare quando qualcosa non va.
 
-In caso di dubbi non modificare contemporaneamente qualità, percorsi e sorgenti:
-una modifica alla volta rende il problema riproducibile.
+1. **Titolo seguito.** Aggiungi una serie o un film alla libreria, con un
+   profilo di qualità (risoluzione, lingua, sottotitoli, audio).
+2. **Ciclo di ricerca.** A intervalli regolari Gextto legge i feed e interroga
+   gli indexer (Jackett, Prowlarr, indexarr…) per i titoli che segui. Ogni
+   risultato è una **release**.
+3. **Scelta.** Ogni release passa una serie di controlli: è il titolo giusto?
+   rispetta qualità e lingua? è già in libreria una copia uguale o migliore?
+   Tra quelle valide vince quella con il **punteggio** più alto.
+4. **Download.** La release scelta va al motore torrent (o ad aMule, per
+   eD2k). La pagina **Scarico** mostra l'avanzamento.
+5. **Arrivo in libreria.** A download finito Gextto rinomina il file secondo il
+   tuo modello e lo copia, sposta o collega nella cartella della serie o del
+   film. Se in libreria c'era una versione peggiore, quella va nel **cestino**.
+6. **Seed.** Il torrent continua a condividere finché non raggiunge i limiti
+   di seed, poi esce dalla sessione.
 
-### Percorsi e responsabilità
+### Le parole che userai
 
-Gextto usa percorsi con ruoli diversi:
+| Parola | Cosa vuol dire |
+|---|---|
+| **Release** | un risultato trovato da un feed, un indexer o un motore web |
+| **Ciclo** | una passata automatica di ricerca e scelta |
+| **Modalità prova** (dry-run) | Gextto cerca e decide, ma non avvia nessun download |
+| **Sessione torrent** | i torrent che il motore sta ancora gestendo (in download o in seed) |
+| **Libreria** | le cartelle finali, ordinate, con serie e film (spesso su un NAS) |
+| **Archivio** | il catalogo locale delle release viste nei feed, consultabile e ricercabile |
+| **Cestino** | dove finiscono i file sostituiti o rimossi, prima della cancellazione definitiva |
+| **Upgrade** | la sostituzione di un file in libreria con una versione migliore |
 
-| Percorso | Uso | Può essere temporaneo? |
-|---|---|---|
-| Download | dati dei torrent in sessione | no, finché il torrent è attivo |
-| Temporaneo/incomplete | metadati e dati incompleti | sì, ma deve essere scrivibile |
-| Libreria/NAS | file finali archiviati | no |
-| Cestino | file rimossi durante upgrade/pulizia | sì, secondo retention |
-| Cartella osservata | `.torrent`/`.magnet` da importare | sì, ma non durante la copia |
+Tieni distinti questi quattro insiemi: **sessione torrent**, **libreria**,
+**archivio** e **cestino**. Una pulizia in uno non tocca gli altri: togliere un
+torrent dalla sessione non cancella il file dalla libreria, e svuotare l'archivio
+non cancella nessun video.
 
-Non usare la cartella temporanea come libreria finale e non cancellare a mano i
-file di un torrent ancora attivo: usa le azioni della sessione torrent.
+## 2. Installare Gextto
 
-### Riga di comando e aggiornamenti
+Servono Linux con systemd, su x86_64 o aarch64. Gextto è scritto in Go puro e
+non compila nulla sul server.
 
-Il demone gira normalmente nel servizio systemd. Eseguito direttamente
-comprende:
-
-- `gexttod --version` — versione installata, build number e marker di release;
-- `gexttod --help` — riepilogo d'uso;
-- `gexttod --update` — scarica e installa l'ultimo payload del canale installato
-  (continuous o stabile); tiene le versioni precedenti in `gexttod.prev` e
-  `gx-torrent.prev` (lo fa anche rilanciare `install.sh`) e le rimette da sole
-  se le nuove non partono;
-- `gexttod --config <file>` e `gexttod --dry-run` — usati dal servizio e per le
-  prove locali.
-
-#### TUI terminale
-
-La TUI si avvia con `/opt/gextto/gexttod tui` dopo aver avviato il daemon
-(sostituisci la directory se l'installazione è personalizzata). È un processo
-separato che usa esclusivamente le API HTTP e lo stream SSE del daemon: non
-legge direttamente i database e può quindi essere usata anche da una shell SSH.
-Su un terminale stretto — com'è tipicamente quello di un telefono collegato via
-SSH — l'interfaccia si compatta da sola (sotto le 60 colonne: intestazione,
-colonne e valori lunghi si adattano invece di essere tagliati).
-
-```bash
-/opt/gextto/gexttod tui
-/opt/gextto/gexttod tui --url http://host:5000 --lang it
-GEXTTO_URL=http://host:5000 /opt/gextto/gexttod tui
-```
-
-Le opzioni sono `--url`/`-u` e `--lang`/`-l`; la variabile d'ambiente per l'URL è
-`GEXTTO_URL`. Le nove schede sono Stato,
-Torrent, Log, Salute, Archivio, Mancanti, Blocklist, Libreria e Manutenzione. La guida completa dei tasti,
-dei prompt e delle azioni è in [`docs/tui.md`](tui.md).
-
-**Installazione e aggiornamento.** A ogni push su `main` viene pubblicato un
-payload Linux `continuous` testato. L'installer ufficiale lo scarica, verifica il
-checksum SHA-256 e lo installa senza compilare nulla sul server:
+### Con l'installer (consigliato)
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/buzzqw/gextto/main/install.sh | sudo bash
 ```
 
-L'installer deve essere eseguito come root e richiede systemd. Riconosce la
-distribuzione da `/etc/os-release` e installa i pacchetti di base con i nomi
-giusti per Debian, Ubuntu, Fedora, openSUSE e Arch; se i repository li
-forniscono installa anche `ffmpeg`, `mediainfo` e `mkvtoolnix`, usati per la
-qualità reale dei file e la pulizia delle tracce audio. `--no-media-tools` (o
-`GEXTTO_SKIP_MEDIA_TOOLS=1`) salta i tre strumenti multimediali. Usa
-`GEXTTO_REPO` e `GEXTTO_RELEASE` per scegliere un repository o una release
-diversi. Salva i
-dati del servizio in `/var/lib/gextto` e il programma in `/opt/gextto`; un file
-opzionale `/etc/gextto/gextto.env`, se presente, viene caricato come variabili
-d'ambiente (il token API non è lì: si imposta in *Configurazione → Accesso e
-servizi*). Installer e `gexttod --update` installano lo stesso payload. Per
-impostazione predefinita il servizio gira con **l'utente che esegue
-l'installer**; `--user NAME` (o `GEXTTO_USER`) sceglie un altro utente e
-`--user gextto` l'account di sistema isolato e senza login.
+L'installer scarica l'ultima versione pubblicata, ne verifica il checksum
+SHA-256 e la installa:
 
-Per un'installazione senza root da un checkout sorgente:
+- il programma in `/opt/gextto`, i dati in `/var/lib/gextto`;
+- il servizio `gextto.service`, avviato subito;
+- i pacchetti di base con i nomi giusti per Debian, Ubuntu, Fedora, openSUSE e
+  Arch e, se la distribuzione li fornisce, `ffmpeg`, `mediainfo` e
+  `mkvtoolnix` (servono per leggere la qualità reale dei file, controllarne
+  l'integrità e pulire le tracce audio). `--no-media-tools` li salta.
+
+Il servizio gira con **l'utente che esegue l'installer**, così può scrivere
+nelle cartelle dei tuoi media. Per un account separato usa `--user NOME`, oppure
+`--user gextto` per l'account di sistema isolato e senza login (con
+`--media-group` per dargli accesso ai media di altri utenti).
+
+Altre opzioni utili:
+
+| Opzione | Effetto |
+|---|---|
+| `--channel stable` / `--release <tag>` | installa la versione stabile o una release precisa invece dell'ultima |
+| `--local-archive <file>` | installa da un archivio già scaricato, senza rete |
+| `--no-media-tools` | non installa ffmpeg, mediainfo e mkvtoolnix |
+| `GEXTTO_REPO`, `GEXTTO_RELEASE` | scelgono un altro repository o un'altra release |
+
+Un file facoltativo `/etc/gextto/gextto.env`, se esiste, viene caricato come
+variabili d'ambiente del servizio.
+
+### Senza root, da un checkout
 
 ```bash
-make build          # Go puro, con gx-torrent
+make build
 GEXTTO_DATA_DIR="$HOME/gextto-data" \
   GEXTTO_LISTEN=127.0.0.1:5000 \
   scripts/install-user-service.sh
 systemctl --user status gextto.service
 ```
 
-Per Docker (Gextto, gx-torrent, Jackett, Prowlarr, FlareSolverr e aMule insieme) vedi [Docker: stack completo](DOCKER.it.md).
+È un servizio systemd **dell'utente**. Se deve restare acceso anche quando
+esci dalla sessione, esegui `loginctl enable-linger "$USER"`.
 
-Il servizio per-utente ascolta per default sulla porta 5000 su tutte le
-interfacce. Limita l'accesso con firewall o reverse proxy; usa
-`loginctl enable-linger "$USER"` se deve rimanere attivo dopo il logout.
-`--update` scarica `gextto-linux-<arch>.tar.gz`, verifica il `.sha256`
-pubblicato (obbligatorio: senza checksum l'aggiornamento viene rifiutato), prepara i file e poi sostituisce l'eseguibile (con la
-UI web inclusa), la `lib/` e `run.sh` con rename atomici. Dati e configurazione in
-`GEXTTO_DATA_DIR` (default `/var/lib/gextto`) non vengono mai toccati: un
-download, un checksum o un'estrazione falliti lasciano l'installazione in
-esecuzione invariata, e uno swap fallito viene ripristinato. Il marker `VERSION`
-accanto all'eseguibile viene aggiornato ed è mostrato da `--version`.
+### Con Docker
 
-Il repository ufficiale pubblica, per ogni release, gli asset Linux **x86_64 e
-aarch64** (archivio, `.sha256` e manifest). L'installer e `gexttod --update`
-scelgono l'asset in base all'architettura della macchina.
+Gextto, gx-torrent, Jackett, Prowlarr, FlareSolverr e aMule insieme in un'unica
+composizione: vedi [Docker: stack completo](DOCKER.it.md).
 
-- `--channel stable` / `--release <tag>` — scelgono la release da installare;
-- `--install-dir <dir>` — installa altrove (default: la directory del binario);
-- `--archive <file>` — installa da un archivio locale (offline);
-- `--force` — reinstalla anche se la versione è invariata;
-- `--no-restart` — non riavviare `gextto.service`.
+### Verificare che giri
 
-Esegui `/opt/gextto/gexttod --update` come root per riavviare automaticamente
-`gextto.service`; altrimenti stampa il
-comando `systemctl` esatto. L'unità systemd non viene sovrascritta, così le
-personalizzazioni locali (utente, porte, percorsi) restano. Lo stesso payload è
-il pacchetto di release usato dall'installer (README, *Installazione Linux*).
+Apri `http://<host>:5000`. Se la pagina non si apre:
 
-## 2. Dashboard
+```bash
+systemctl status gextto            # installazione di sistema
+systemctl --user status gextto     # servizio dell'utente
+/opt/gextto/gexttod --version      # versione installata
+```
 
-- **Controlli dell'interfaccia** — la barra superiore offre **Tema**, dimensione
-  del testo e **Font**. **Tema** apre un unico dialogo: in alto la griglia dei
-  temi con l'anteprima dei loro colori (*Scuro*, *Chiaro*, *Crema* — un chiaro
-  caldo per letture lunghe — e i classici Nord, Dracula, Solarized, Gruvbox,
-  Monokai, One Dark, Tokyo Night, Catppuccin, GitHub, Rosé Pine, Everforest,
-  Nero OLED, Alto contrasto, nelle varianti scure e chiare); il tema si applica
-  appena lo selezioni, anche con le frecce della tastiera. Sotto, *I tuoi temi*
-  elenca i temi salvati e **Personalizza** parte dal tema scelto con quattro
-  selettori (sfondo, pannelli, testo, accento): gli altri toni si calcolano da
-  questi, il testo sui pulsanti d'accento diventa chiaro o scuro per restare
-  leggibile e un avviso segnala un contrasto troppo basso. Dai un nome e premi
-  *Salva tema*: i temi salvati stanno sul server e compaiono su ogni
-  dispositivo (un nome già usato viene sovrascritto, ✕ elimina il tema). Il
-  tema attivo, la dimensione del testo e il font restano invece una scelta del
-  singolo browser; su telefono **Tema** è nel menu *Altro*. **Font** applica un
-  preset generico, un font locale rilevato o una famiglia inserita manualmente
-  all'interfaccia e ai log. Il rilevamento dei font installati dipende dal
-  supporto del browser alla Local Font Access API e può richiedere
-  un'autorizzazione.
-- **Riepilogo in barra** — all'estrema destra della riga dei comandi della
-  barra, sotto l'orologio, la Dashboard mostra due riquadri compatti: **Spazio
-  libero** e **Magnet in archivio** (con quelli visti nei feed). Compaiono solo
-  nella Dashboard; le altre pagine non li mostrano. Su schermo largo
-  **Italiano** apre quella riga sotto il primo riquadro (CPU e RAM di Gextto).
-- **Ricerca manuale globale** — cerca in archivio + indexer + motori web.
-- **Ricerca automatica** — avvia un ciclo completo o di un solo dominio (Serie,
-  Film, Fumetti); mostra prossima esecuzione, intervallo ed esito dell'ultimo
-  ciclo; backup immediato. Un ciclo di un solo dominio interroga gli indexer
-  solo per i titoli di quel dominio (nome e alias delle serie, `Nome Anno` dei
-  film); i feed si leggono comunque per intero, perché alimentano l'archivio
-  locale condiviso.
-- **In sessione** — un unico riquadro in cima: i torrent in scarico, fermi e in
-  seed, la banda degli ultimi 30 giorni e l'accesso diretto a Scarico, con sotto
-  il **grafico del traffico degli ultimi 30 minuti**: due **linee continue di
-  colore diverso** per il **download** e l'**upload** di tutto il traffico —
-  torrent e aMule —, con la velocità attuale, il **picco** del periodo —
-  etichettato **Picco download** e **Picco upload**, così non si confonde con
-  la velocità di adesso — e la
-  linea del **limite di banda in vigore** (limiti fissi, programmazione o
-  eccezione; non compare quando la velocità è *Auto*, cioè quando Gextto misura
-  la linea e si adatta; in quel caso il riquadro mostra il badge **Auto**, e il
-  ping misurato compare accanto alla velocità **↓ Download** nella barra in
-  alto, non «Nessun limite»). Le velocità
-  sotto 1 KB/s valgono 0: è solo rumore di protocollo, e il grafico resta
-  piatto invece di tremare. Con eD2k attivo aMule ha **linee tratteggiate**
-  degli stessi due colori, e la legenda riporta la ripartizione tra **Torrent**
-  ed **eD2k**; le velocità nella barra in alto sono la somma di torrent e
-  aMule, e
-  per l'eD2k sono la media dell'ultimo mezzo minuto: aMule dichiara una velocità
-  di un solo secondo, e un client che carica a blocchi la faceva sembrare ferma
-  tra un blocco e l'altro. Le velocità per file e per client nella pagina eD2k
-  restano invece quelle istantanee di aMule. Si
-  aggiorna da solo.
-- **Da controllare** — sotto la striscia: i download **fermi** (con il motivo,
-  il prossimo tentativo e quando verranno abbandonati; il nome si ferma alla
-  stagione/episodio e quello completo compare passando il mouse), gli
-  **spostamenti in libreria in sospeso** (destinazione e tentativi) e gli
-  avvisi, gli errori e i
-  recuperi di pack 🛟, uno per download. Un avviso **resta finché il download è
-  ancora in sessione** (o ha uno stallo o uno spostamento in sospeso): quando il
-  download esce dalla sessione senza nulla in sospeso **sparisce da solo**, e un
-  ciclo chiuso bene (file in libreria, copia sostituita) **non compare** mai —
-  niente scadenza a 24 ore. **Pulisci** segna come letti quelli ancora mostrati
-  (un nuovo avviso dello stesso download ricompare).
-  *Storia* apre
-  la storia completa di quel download. Si aggiorna da solo ogni minuto; se è
-  tutto a posto dice «Niente da controllare».
-- **Card statistiche** — libreria (serie/film), spazio libero, magnet in
-  archivio e motore.
-- **Rete e download attivi** — CPU/RAM e sparkline di rete in tempo reale.
-- **Operazioni in background** — compare quando un'operazione lunga è in corso
-  o si è appena conclusa: rinomina, scansione archivi, aggiornamento MediaInfo,
-  controllo integrità dei file, ricerca delle puntate mancanti, pulizia degli
-  orfani. Ogni riga mostra lo stato, la **percentuale** con la barra di
-  avanzamento, il messaggio (per esempio il file in controllo) e **Annulla**
-  finché l'operazione è in corso. Sul telefono ogni operazione diventa una
-  scheda, senza dover scorrere di lato.
-- **Prossime uscite**, **ultimi download**, **attività recente** e **ultimi
-  trovati nelle sorgenti**.
+Gextto accetta **una sola istanza per cartella dati**: se un altro Gextto usa
+già la stessa cartella, o la porta 5000 è occupata, il nuovo processo si ferma
+subito e lo scrive nel log, senza toccare i database.
 
-### Ricerca manuale dalla Dashboard
+## 3. La configurazione iniziale
 
-La ricerca manuale è utile per capire cosa vede Gextto prima di modificare una
-configurazione o avviare un download:
+La prima volta che apri l'interfaccia parte la **Configurazione iniziale**, in
+cinque passi. Puoi saltarla e riaprirla quando vuoi da `/?view=setup`; non
+compare più su un'installazione che ha già titoli o archivio.
 
-1. inserisci un titolo o una query tecnica;
-2. se l'integrazione con aMule è attiva (vedi [eD2k e Kad](#ed2k-e-kad-con-amule)),
-   spunta **eD2k** accanto al pulsante di ricerca per cercare anche su eD2k/Kad,
-   sulla rete scelta in Configurazione;
-3. attendi che le sorgenti terminino o che il timeout segnali quelle lente;
-4. confronta titolo, sorgente, qualità, dimensione e seed/peer;
-5. usa **Filtra i risultati già caricati** per restringere localmente la lista;
-6. apri **Perché non questa?** sui risultati interessanti;
-7. usa **Accoda** solo dopo aver controllato il motivo e il confronto archivio.
+1. **Accesso.** Scegli una password. Puoi lasciare libero l'accesso dalla rete
+   di casa e chiederla solo da fuori.
+2. **Cartelle.** Indica libreria, download, cartella temporanea e cestino.
+   **Sfoglia** apre le cartelle del server (e ne crea di nuove); **Verifica**
+   controlla, con l'utente del servizio, che ogni cartella esista e sia
+   scrivibile, e mostra il tipo di disco (NAS compreso), lo spazio libero e se
+   sta sullo stesso disco della libreria.
+3. **Fonti.** Un indexer (Prowlarr, Jackett o indexarr) e la chiave **TMDB**,
+   consigliata, per titoli, locandine ed episodi. In alternativa va bene la
+   chiave **TVDB**, con il PIN se lo hai.
+4. **Primo titolo.** Cerca una serie o un film e aggiungilo.
+5. **Attiva.** Accendi il ciclo automatico e scegli se uscire dalla modalità
+   prova (**Scarica davvero**). Per il primo giro lasciala accesa.
 
-Il filtro locale lavora sui risultati già ricevuti, inclusi titolo, sorgente e
-campi tecnici della qualità. Scrivere nel filtro non interroga nuovamente gli
-indexer e non modifica la query originale.
+### Le cartelle e il loro ruolo
 
-La ricerca manuale può mostrare release non idonee per permettere l’ispezione.
-Il fatto che una release sia visibile non significa che il ciclo automatico la
-scaricherebbe.
-
-### Come leggere un ciclo
-
-Un ciclo normale attraversa, in ordine, ricerca, filtri, confronto con archivio,
-selezione e accodamento. Il numero di release trovate non equivale al numero di
-download: una release può essere esclusa perché non monitorata, troppo vecchia,
-bloccata, già presente o inferiore al file archiviato.
-
-**Copie della stessa release.** Lo stesso torrent arriva spesso da più fonti: il
-feed e la ricerca dello stesso indexer, Jackett e Prowlarr, indexarr. Gextto le
-unisce in una sola release:
-- quando hanno lo stesso infohash, anche se una fonte lo dichiara accanto a un
-  link `.torrent` o lo scrive in base32;
-- quando una fonte non dà l'infohash, ma nome e dimensione coincidono, a meno
-  dell'arrotondamento con cui gli indexer scrivono le dimensioni.
-
-Due torrent con infohash diversi restano sempre separati, anche se hanno lo
-stesso nome. Restano separati anche i nomi che differiscono per gruppo,
-risoluzione, lingua, PROPER o episodio: nel dubbio Gextto non unisce.
-
-Della release unita usa la copia migliore: swarm vivo, più seeder, infohash
-noto. Tiene le altre copie come riserva: se il link `.torrent` scelto non
-funziona o è in quarantena, prova subito la stessa release da un'altra fonte,
-invece di lasciare l'episodio al ciclo successivo.
-
-## 3. Scarico
-
-- **Cerca una release**: il pannello in cima a Scarico cerca su archivio,
-  indexer, motori web e — se spunti **eD2k** e aMule è attivo — su eD2k/Kad,
-  senza cambiare pagina. I risultati si aprono sotto il campo; dopo un'aggiunta
-  resti in Scarico.
-- Il modulo **Aggiungi torrent** si apre dal pulsante con lo stesso nome nella
-  barra in alto, presente in **ogni pagina** (da un'altra pagina ti porta in
-  Scarico e apre il modulo): da chiuso non occupa spazio. Accetta un magnet/URL
-  `.torrent` oppure un file `.torrent`; opzionalmente percorso di salvataggio,
-  “Scarica subito” e “Non rinominare”.
-- **Download in sessione**: velocità download/upload, numero torrent e peer;
-  l'elenco si aggiorna automaticamente ogni 5 secondi.
-- I download HTTP dei fumetti mostrano stato, progressione, byte scaricati e
-  velocità nella stessa lista dei torrent.
-- I **download eD2k di aMule** compaiono nella stessa lista, con il badge
-  **eD2k** colorato: stato, progressione, velocità, **byte caricati**, **tempo
-  stimato** e **rapporto** caricato/scaricato, più le fonti (in trasferimento /
-  totali) e **Pausa**, **Riprendi** e **🗑️**. Su un download in corso 🗑️ lo annulla e
-  cancella la parte scaricata; su un file completato lo toglie solo dall'elenco
-  di aMule (il file resta nella cartella di arrivo). **ⓘ** apre il dettaglio:
-  stato, fonti, ultimo dato ricevuto, hash, link eD2k da copiare e la
-  **priorità in aMule** (bassa, normale, alta, automatica). Il contatore in alto
-  mostra anche **eD2k: N** quando l'integrazione è attiva; i download eD2k
-  contano anche nella dashboard e nel numero accanto a **Scarico**.
-- **Riga della vista**: casella per selezionare tutto, filtro per nome, filtro per
-  tag, **Ordina per** con il verso (↑/↓), **⟳** per aggiornare subito e il menu
-  **Strumenti**: **Pulisci completati**, **File orfani…**, **Aggiorna ogni 5 s**
-  e il collegamento a **Rimozione a fine seed** (l'opzione «Elimina i completati
-  dopo il seed» si imposta in Configurazione → Seeding; il segno ✓ dice se è attiva).
-- **Barra di selezione**: compare solo quando spunti almeno un torrent e resta
-  durante l'aggiornamento automatico. Mostra quanti ne hai scelti, **✕** per
-  deselezionarli, **Pausa**, **Riprendi**, **Ricontrolla**, il menu **Tag** (un clic
-  su un tag lo assegna; in fondo crei un tag nuovo o togli quello presente) e
-  **Rimuovi dalla sessione**.
-- **Banda** (in alto a destra del pannello). La velocità segue una **regola**
-  scelta in Configurazione → Velocità e rete (Auto, limiti fissi o programmazione
-  oraria); da qui fai un'**eccezione** per adesso, che vince sulla regola finché
-  non scade o non la togli. Il pulsante mostra cosa vale: ⚡ un'eccezione (con i
-  minuti che restano), ⏰ una fascia della programmazione, altrimenti la regola.
-  Con eD2k attivo **aMule segue gli stessi limiti** (regola, eccezione,
-  programmazione), riapplicati entro un minuto da ogni cambio. Il menu:
-  - **Adesso**: cosa vale e da dove viene; con un'eccezione attiva dice quando
-    finisce e quale regola torna dopo. **Togli l'eccezione** torna subito alla regola.
-  - **Auto**: Gextto misura la linea e si adatta, senza tetto. È grigio con
-    «È già la regola» quando la regola in quel momento è già Auto.
-  - **Limita download** / **Limita upload**: scegli un valore (da 512 KB/s a 10 MB/s
-    per il download, da 64 KB/s a 1 MB/s per l'upload, oppure **Senza limite**):
-    l'eccezione parte subito e l'altro verso resta com'era.
-  - **Durata** (con un'eccezione attiva, Auto compreso): 1 h, 3 h, 6 h, 12 h o
-    **Finché non la tolgo**. Un'eccezione nuova dura finché non la togli.
-  - **Valori personalizzati…**: DL e UL in KiB/s e durata in minuti (0 = finché
-    non la togli), poi **Applica**.
-  - **Cambia la regola** porta alla scelta in Configurazione.
-- **Pin**: un torrent forzato fuori coda mostra il badge **📌 pin**; si sblocca
-  dal pulsante **Sblocca pin** nella sua scheda di dettaglio (dove c'è anche **Pin**).
-- **Colonne tabella**: Nome, Stato, Progresso, ↓, ↑, ETA, Peers, Ratio — si ordinano
-  da **Ordina per**. L'ordine vale per tutta la lista, torrent, download HTTP e file
-  eD2k insieme: senza scegliere niente è alfabetico per nome, non i torrent prima e
-  i file di aMule sotto, nell'ordine in cui li dà aMule. Ogni riga di torrent mostra
-  anche lo **sciame** (🌐 seeder / leecher riportati dai tracker e dal DHT, non
-  necessariamente connessi): con **0 leecher** non c'è nessuno a cui caricare, anche
-  quando i peer connessi sono zero.
-- **Azioni riga**: pausa/riprendi, recheck, rimuovi.
-- **Dettagli**: si aprono cliccando il **nome del torrent** (o un punto qualsiasi
-  della riga; da tastiera il nome è il pulsante che li apre) come riquadro
-  **sopra lo Storico download**, non come finestra centrata: la sessione e lo
-  storico restano visibili mentre imposti i valori.
-- **Dettagli** (tab Generale, Tracker, Contenuto, Peers, Pezzi, Limiti, Storage):
-  copia magnet, limiti per torrent/giorni di seed, reannounce, pin, riavvia,
-  segna come fallito, sposta storage. Nella scheda **Limiti** ogni campo vive per
-  conto suo: **-1** usa il valore globale e **0** toglie il limite, e chi cambia
-  solo i giorni di seed (o solo il ratio, o solo la banda) non tocca gli altri.
-  Anche via API e dalla TUI un campo che non viene inviato resta com'è, non
-  torna al valore globale. Passando il mouse su un valore del tab
-  **Generale**, sui pulsanti delle azioni o sulle intestazioni delle tabelle
-  compare una spiegazione di cosa significa il dato o cosa fa il pulsante. In **Generale** trovi anche **Esporta
-  .torrent**, **Super seeding** (con gx-torrent vale solo a torrent completato e
-  riduce di proposito l'upload del seed) e l'aggiunta/rimozione di **web seed**;
-  con gx-torrent la scheda **Generale** elenca anche gli **hint BEP 38**
-  (`collections`/`similar`) con i torrent locali che li condividono, quando il
-  torrent ne ha; in
-  **Tracker** aggiungi i tracker nuovi (`tier|url` per riga) senza toccare
-  quelli già presenti, e il **Rimuovi** di ogni riga toglie solo quel tracker; in
-  **Contenuto** imposti la **priorità per file** (Salta/Normale/Alta/Massima: i
-  file ad alta priorità vengono scaricati per primi, e ogni livello viene prima
-  di quelli più bassi, Massima prima di Alta). Con gx-torrent cambiare
-  **solo il livello** è immediato, senza fermare il torrent; escludere o
-  reincludere un file lo riavvia per un attimo per spostarne i dati.
-  In **Pezzi** c'è la mappa dei pezzi (verde scaricato, giallo in corso, grigio
-  mancante, spento saltato): compare con i motori che la espongono (gx-torrent) e
-  resta leggibile anche con il torrent in pausa o parcheggiato, perché usa i
-  pezzi già verificati.
-  Con gx-torrent ogni file ha un pulsante **▶** che apre lo **streaming HTTP**
-  del file (con Range): i pezzi della parte letta vengono scaricati per primi,
-  così puoi iniziare a guardare prima che il download finisca. Lo stesso motore
-  di streaming serve il **media server DLNA/UPnP** (opzione *gx-torrent — server
-  DLNA/UPnP*): TV e console sulla rete locale vedono i media **completati** senza
-  configurare percorsi, e anche le **cartelle della libreria** (l'archivio sul
-  NAS: serie e film, navigabili per cartelle; opzione *gx-torrent — DLNA:
-  cartelle della libreria*, vuota = automatico). Video e cartelle mostrano le
-  **locandine e miniature** già presenti accanto ai file, nel formato di
-  Jellyfin, Kodi ed Emby (`episodio-thumb.jpg`, `film-poster.jpg`, `folder.jpg`,
-  `poster.jpg`, le locandine di stagione `season01-poster.jpg`): vengono
-  ridimensionate al volo, senza scrivere nulla nella libreria. I sottotitoli `.srt`/`.vtt` con lo stesso nome del video
-  vengono agganciati al video. I lettori possono anche **cercare per titolo**
-  (ContentDirectory Search) e **Xbox 360 e Windows Media Player** accettano il
-  server grazie al servizio `X_MS_MediaReceiverRegistrar`. Nella pagina delle
-  impostazioni di gx-torrent il pulsante **Cartella download** aggiunge alla
-  lista la cartella di download già configurata. È disattivato di default e non ha autenticazione:
-  per questo risponde **solo** ai dispositivi della rete locale (le richieste da
-  indirizzi pubblici sono rifiutate) e serve solo i media elencati. Nella pagina
-  delle impostazioni di gx-torrent compare l'indirizzo su cui è attivo.
-- Quando usi **Sposta storage**, il log registra richiesta, destinazione e
-  accettazione del comando; l'esito finale viene scritto quando il motore
-  completa o rifiuta lo spostamento. Con **Check** il log distingue comando
-  avviato e controllo terminato, includendo stato e byte verificati.
-- **Storico download**: elenca i download conclusi (nativi e migrati). Colonne:
-  nome (con badge **NAS** quando il file è archiviato), tipo/stagione/episodio,
-  **tag NAS** (regola di cartella), score, stato (*Completato*), **percorso
-  libreria/NAS** e data di conclusione.
-
-### Torrent stalled
-
-Quando un torrent non aumenta i byte completati per il tempo configurato, passa
-allo stato **stalled**: Gextto lo mette in pausa anche nel motore, quindi non
-occupa più gli slot attivi. Il torrent resta nella sessione; al tentativo
-successivo viene ripreso e riannunciato. I valori sono in *Configurazione →
-Seed e completamento → Torrent bloccati*:
-
-- **Considera stalled dopo** — default 60 minuti;
-- **Retry stalled** — default 60 minuti;
-- **Rimozione stalled** — default 20160 minuti (14 giorni), `0` = mai.
-
-La presenza di peer senza aumento dei byte non resetta il timer. Nel log (in
-inglese) cerca le righe `is stuck at`, che indicano anche il motivo, poi
-`is still stuck` a ogni nuovo tentativo e `is downloading again` quando
-riparte; solo dopo il limite finale compare `Gave up on`.
-
-Quando abbandona un **pack di stagione**, Gextto prima porta in libreria gli
-episodi i cui file sono già completi (tutti i pezzi verificati), come farebbe con
-un pack finito, e solo dopo rimuove il torrent e i dati parziali: nel log compare
-`🛟 … already complete, added to the library before giving up` con l'elenco
-degli episodi. Alla ricerca successiva vengono cercati solo quelli ancora
-mancanti. Il recupero richiede una cartella della libreria (quella della serie o
-quella generale); vale con ogni motore, anche per un torrent parcheggiato.
-
-### Stati e azioni consigliate
-
-| Stato | Significato | Azione consigliata |
+| Cartella | A cosa serve | Note |
 |---|---|---|
-| In coda | registrato ma non ancora avviato | attendere il ciclo/sessione |
-| Download | trasferimento in corso | controllare velocità e peer |
-| Stalled | nessun aumento reale dei byte | attendere il retry automatico |
-| Seeding | download completato, seed ancora attivo | lasciare il torrent o rimuoverlo secondo policy |
-| Errore | il torrent ha riportato un errore | leggere il motivo prima di rimuoverlo |
-| Archiviato/NAS | il file finale è stato copiato nella libreria | verificare il percorso, non cancellare la sorgente mentre è in uso |
+| **Download** | i dati dei torrent in sessione | non cancellarla a mano mentre un torrent è attivo |
+| **Temporanea** | dati incompleti e metadati | deve essere scrivibile; può stare su un disco veloce |
+| **Libreria** | i file finali, ordinati per serie e film | di solito sul NAS |
+| **Cestino** | i file sostituiti o rimossi | si svuota secondo la retention |
+| **Cartelle osservate** | `.torrent` e `.magnet` da importare | facoltative |
 
-**Rimuovi** agisce sulla sessione torrent e può chiedere se eliminare i file.
-**Pulisci completati** è più selettivo: rimuove i torrent che hanno raggiunto i
-limiti di seed. Un torrent impostato a **seed infinito** (rapporto 0 oppure
-giorni 0) non viene mai rimosso, nemmeno se è in pausa o già archiviato. Un
-torrent rimosso dalla sessione non equivale necessariamente a un file rimosso
-dalla libreria.
+Due consigli che evitano la maggior parte dei problemi:
 
-### Limiti di seed: regole per sorgente e seed inattivo
+- **Prova i permessi con l'utente del servizio**, non con il tuo. Una cartella
+  che vedi dalla tua shell può non essere visibile al servizio systemd.
+- **Metti download e libreria sullo stesso filesystem**, se puoi: Gextto potrà
+  usare gli hardlink, e un file in seed entrerà in libreria subito, senza
+  occupare spazio due volte (vedi [Dove finiscono i file](#10-dove-finiscono-i-file)).
 
-Quando un torrent finisce il seed lo decide Gextto, con lo stesso criterio per
-gx-torrent e per qBittorrent. Per ogni limite (ratio, tempo, inattività) vale il
-primo livello che lo imposta:
+## 4. Il primo download, in prova e poi davvero
 
-1. il limite del **torrent** (scheda di dettaglio: ratio e giorni di seed);
-2. la prima **regola di seed** che corrisponde al torrent (*Configurazione → Seed
-   e completamento → Regole di seed*);
-3. il limite **globale** della stessa scheda.
+Fai un solo cambiamento alla volta: se modifichi insieme percorsi, qualità e
+sorgenti, un problema diventa difficile da riprodurre.
 
-**Seed infinito.** 0 vuol dire infinito, per il rapporto come per il tempo
-(giorni e minuti a 0). **Basta che uno dei due sia infinito** perché il seed non
-finisca mai: il torrent resta in seed, non viene fermato nemmeno per
-inattività e, in modalità *Sposta*, non viene spostato in libreria (ne entra una
-copia, o un hardlink). Un limite di tempo non ferma un torrent con rapporto
-infinito, e viceversa. Quindi, per fermare il seed, rapporto **e** tempo devono
-essere entrambi maggiori di 0. Lo stesso vale per i download eD2k: con seed
-infinito il file viene copiato e aMule continua a condividerlo.
+1. **Controlla le cartelle** in *Configurazione → Archivio e spazio* e in
+   *Configurazione → Libreria e rinomina*.
+2. **Aggiungi una sola sorgente** in *Configurazione → Sorgenti* e premi
+   **Verifica**. Aggiungi le altre solo quando questa funziona (vedi
+   [Sorgenti](#13-sorgenti-feed-e-indexer)).
+3. **Aggiungi un titolo di prova**: una serie con una sola stagione o un film.
+4. **Avvia un ciclo** dalla Dashboard (*Ricerca automatica*, solo il dominio
+   che ti interessa: Serie, Film o Fumetti).
+5. **Guarda il Log**: devi vedere il ciclo, le sorgenti interrogate e, per ogni
+   release, perché è stata accettata o scartata.
+6. **Fai una ricerca manuale** dello stesso titolo e apri **Perché non questa?**
+   su un risultato (vedi [Cercare e scaricare a mano](#8-cercare-e-scaricare-a-mano)).
+7. **Passa ai download veri**: riapri l'ultimo passo della configurazione
+   iniziale (`/?view=setup&step=5`; il badge **DRY-RUN** in alto ti ricorda che
+   sei in prova), spunta **Scarica davvero** e premi **Completa**. Ha effetto
+   subito, senza riavviare; dalla TUI lo stesso interruttore è in
+   *Impostazioni*. Un Gextto avviato con `--dry-run` dalla riga di comando resta
+   invece in prova fino al riavvio.
 
-Una regola indica una **sorgente** (l'indexer da cui è arrivata la release, come
-appare nell'elenco dei download: basta una parte del nome, senza distinguere
-maiuscole e minuscole, quindi `mircrew` vale anche per `mircrew indexerr`) e/o
-una **categoria** (Serie TV, Film, Fumetti, Altro). È l'equivalente dei limiti per
-categoria di qBittorrent 5.2, con in più la sorgente: le regole di un tracker
-privato seguono il tracker, non il tipo di contenuto. Nei campi della regola un
-valore vuoto usa il limite globale, 0 vuol dire infinito (il torrent resta in
-seed per sempre anche se il globale lo fermerebbe). Un torrent arrivato dalla ricerca aggregata
-di Jackett (sorgente `jackett` senza nome dell'indexer) non porta il nome del
-tracker: per lui valgono la categoria o il globale.
+### Checklist prima dei download veri
 
-**Ferma il seed inattivo dopo** ferma un torrent in seed che non invia dati da
-quei minuti, come il limite di inattività di qBittorrent. Conta solo il tempo in
-seed attivo: un torrent in coda o in pausa non viene fermato perché fermo, e il
-conteggio riparte a ogni riavvio di Gextto (un riavvio può solo allungare il seed,
-mai accorciarlo). A fine seed segue quello che segue gli altri limiti:
-archiviazione in libreria e, se attiva, rimozione. Un torrent impostato a seed
-infinito non viene mai fermato per inattività.
+- [ ] `http://<host>:5000` si apre;
+- [ ] **Salute** non segnala problemi di permessi o di spazio;
+- [ ] la cartella temporanea è scrivibile;
+- [ ] la libreria (o il NAS) è montata e scrivibile dall'utente del servizio;
+- [ ] almeno una sorgente risponde a **Verifica**;
+- [ ] una ricerca manuale restituisce release sensate;
+- [ ] il ciclo in prova non ha prodotto errori inattesi.
 
-### Completamento di file e cartelle
+## 5. Orientarsi nell'interfaccia
 
-Il comportamento dipende dalla forma del torrent e dalla presenza di una
-destinazione **Libreria/NAS** configurata:
+### Il menu
 
-| Contenuto completato | NAS configurato | NAS non configurato |
+| Gruppo | Pagine | A cosa servono |
 |---|---|---|
-| Episodio singolo come file | il video viene archiviato e rinominato secondo le regole della serie | resta nel percorso di download secondo il comportamento del file singolo |
-| Episodio singolo dentro una cartella | il video viene copiato nel NAS e rinominato; la cartella sorgente resta intatta durante il seeding e poi viene spostata nel **Cestino** | la cartella resta intatta nella cartella Download, anche dopo la fine del seeding |
-| Season pack dentro una cartella | i video degli episodi vengono cercati ricorsivamente, copiati nel percorso NAS della serie e rinominati; il pack sorgente resta per il seeding e poi viene spostato nel **Cestino** | il pack resta intatto nella cartella Download, anche dopo la fine del seeding |
+| Panoramica | **Dashboard** | lo stato di tutto a colpo d'occhio, la ricerca, i cicli |
+| Download | **Scarico**, **Log** | i trasferimenti in corso; il log in diretta |
+| Libreria | **Serie TV**, **Film** | i titoli che segui, i loro episodi e i mancanti |
+| Scoperta | **Esplora**, **Archivio**, **Fumetti**, **eD2k** | trovare titoli nuovi, consultare le release viste, fumetti, aMule |
+| Sistema | **Configurazione**, **Integrazioni**, **Manutenzione**, **Salute**, **Blocklist**, **Manuale**, **Changelog** | impostazioni, servizi collegati, pulizie, diagnosi |
 
-Per i season pack vengono importati nell'archivio i file video che riportano una
-identità episodio riconoscibile, per esempio `S01E02` o `1x02`. Sottotitoli, NFO,
-artwork e altri allegati del pack non vengono copiati nell'archivio: restano nella
-cartella sorgente fino al suo spostamento nel Cestino. La cartella sorgente non
-viene mai spostata o eliminata mentre il torrent sta ancora facendo seeding.
+### La barra in alto
 
-#### Hardlink al posto della copia
+- **Aggiungi torrent**, presente in ogni pagina: apre il modulo per un magnet,
+  un URL o un file `.torrent` (vedi [Aggiungere un torrent o un magnet](#aggiungere-un-torrent-o-un-magnet)).
+- **Aggiorna**: ricarica subito i dati della pagina.
+- Le **velocità** di download e upload (torrent più aMule) e **CPU e RAM per
+  processo**: Gextto, gx-torrent e, se attivo e locale, aMule. Si aggiornano
+  ogni 5 secondi.
+- **Tema**, dimensione del testo e **Font**. Il dialogo **Tema** ha i temi
+  pronti (Scuro, Chiaro, Crema, Nord, Dracula, Solarized, Gruvbox, Alto
+  contrasto e altri, in versione chiara e scura); **Personalizza** crea un tema
+  tuo da quattro colori (sfondo, pannelli, testo, accento) e avvisa se il
+  contrasto è troppo basso. I temi salvati sono sul server e li ritrovi da ogni
+  dispositivo; il tema attivo, il testo e il font restano una scelta del
+  singolo browser.
+- La **lingua** dell'interfaccia.
+- **Dona**, in basso a destra, e **Aggiornamento disponibile** quando c'è una
+  versione nuova.
 
-Quando un file deve restare in seed e intanto entrare in libreria (episodi in
-cartella, season pack, episodi in modalità copia), Gextto prova prima a creare
-un **hardlink**: un secondo nome, nella cartella della serie, per gli stessi dati
-già scaricati. Il file compare in libreria subito e non occupa spazio una seconda
-volta.
+### Dal telefono
 
-- I due nomi sono alla pari: cancellare per errore il file nella cartella di
-  download **non** tocca quello in libreria (si interrompe solo il seed), e
-  viceversa. I dati spariscono solo quando sono cancellati entrambi i nomi.
-- Funziona solo se download e libreria stanno sullo **stesso filesystem**
-  (stesso disco o stessa condivisione NAS). Se non è possibile (dischi diversi,
-  RAM disk, condivisione senza hardlink) Gextto copia come prima e lo scrive una
-  volta nel log con il motivo.
-- Lo stesso NAS non basta se le due cartelle sono **mount separati** (per
-  esempio `192.168.1.119:/volume1/Trasferimento` e
-  `192.168.1.119:/volume1/SerieTVArchivio`): il kernel rifiuta l'hardlink tra
-  mount point anche se i dati sono sullo stesso volume. Monta una radice comune
-  (per esempio `192.168.1.119:/volume1`) o tieni la libreria dentro la stessa
-  condivisione dei download; il log te lo dice esplicitamente.
-- Un programma che modifica il video **sul posto** (riscrive i byte nello stesso
-  file, come alcuni tagger o `mkvpropedit`) cambierebbe anche il file in seed.
-  Gextto non lo fa; se usi strumenti del genere sulla libreria, disattiva
-  l'opzione.
+Sotto i 900 pixel di larghezza l'interfaccia si compatta: menu scorrevole in
+alto, metriche su due colonne, finestre a tutta larghezza, tabelle che scorrono
+dentro il loro riquadro. Ogni azione resta raggiungibile col tocco; **Tema** è
+nel menu *Altro*. Le pagine viaggiano compresse e gli script restano nella cache
+del browser, quindi l'interfaccia resta usabile anche su una rete lenta.
 
-Si disattiva con *Configurazione → Seed e completamento → Hardlink invece della
-copia durante il seed*.
+### Accessibilità
 
-Il Cestino deve essere configurato in *Configurazione → Archivio e spazio*. Se non c'è una
-destinazione NAS, Gextto non tratta la cartella Download come archivio e non la
-sposta automaticamente nel Cestino. Lo spostamento automatico della cartella
-sorgente nel Cestino avviene solo con NAS configurato, con una destinazione
-**Cestino** valida e con la rimozione automatica dei completati attiva; se il
-Cestino non è configurato i file sorgente non vengono mai cancellati
-automaticamente (viene rimossa solo la voce dalla sessione torrent).
+L'interfaccia si usa da tastiera e con le tecnologie assistive: i controlli
+hanno nomi accessibili; i dialoghi gestiscono il focus, `Tab`, `Esc` e il
+ritorno al controllo che li ha aperti; le intestazioni ordinabili si attivano da
+tastiera e annunciano l'ordinamento; aggiornamenti, errori e notifiche usano
+regioni live; il layout regge viewport stretti, ingrandimento e reflow a 320
+pixel. Le verifiche automatiche (axe-core e Playwright) si lanciano dal
+checkout con `cd uiweb/end2end && npm ci && npm run test:a11y`. Non sono una
+dichiarazione di conformità WCAG: per quella serve anche una verifica manuale.
+Dettagli in [ACCESSIBILITY.md](ACCESSIBILITY.md).
 
-## 4. Serie TV
+---
 
-Aggiungi una serie via ricerca TMDB o manualmente (titolo, qualità, lingue,
-stagioni, alias, esclusioni, percorso NAS, sottotitoli, timeframe). Il percorso
-NAS è precompilato con *cartella libreria + titolo*: lascia attivo «Crea
-cartella» per crearlo all'aggiunta (togli la spunta per modificare il percorso a
-mano). Nel nome della cartella i caratteri che Windows, exFAT e le condivisioni
-SMB rifiutano (`\ / : * ? " < > |`) e il punto o lo spazio finale vengono
-togliati — «Titolo: Sottotitolo» diventa «Titolo Sottotitolo» — così la libreria
-resta leggibile anche da un altro computer; i file delle puntate usano la stessa
-regola. «Sottocartelle per stagione» archivia gli episodi in *Stagione 01*,
-*Stagione 02*, … dentro la cartella della serie.
+# Parte II — Uso quotidiano
 
-- La lista mostra Nome, Stagioni, Qualità, Lingua, Episodi (scaricati/totali),
-  Completezza, Ultimo download; filtrala con la casella di ricerca.
-- La lista si può leggere in due modi, col selettore **Elenco / Locandine** sopra
-  la tabella: *Locandine* mostra una card per titolo con la copertina e i dati
-  essenziali (qualità, lingua, episodi, stato), e si entra nel dettaglio dal
-  titolo o dalla copertina. La scelta è ricordata e vale anche per la pagina
-  Film, così l'elenco si apre sempre come preferisci.
+## 6. Seguire una serie TV
 
-- Azioni bulk: imposta lingua, elimina selezionate.
-- **Dettaglio serie**: locandina/trama/cast, badge (anno, rete, stato,
-  completezza), link del cast alle schede TVDB/TMDB e, se configurate, un badge
-  **“stagioni disattivate”**. Il percorso archivio è visibile nella testata e
-  il form di modifica include **Sfoglia** per scegliere una cartella server.
-- Azioni: cerca mancanti, scansiona archivio, aggiorna da TMDB (o TVDB), anteprima/esegui
-  rinomina, modifica.
-  L'anteprima di rinomina elenca i nomi *Vecchio → Nuovo* e ha un pulsante
-  **Forza rinomina**: rielabora anche i file che superano il controllo rapido,
-  ricalcolando il nome esatto dal template e dai metadati TMDB/TVDB; è utile
-  quando un file sembra corretto ma non rispetta il template configurato.
-- **Episodi**: accordion per stagione; per ogni episodio puoi cercare, copiare il
-  magnet, ignorare/riattivare, forzare, riscaricare o eliminare; la ricerca
-  manuale (🔍) si apre in un riquadro sotto la puntata, non in una finestra che
-  copre la pagina, e mentre cerca online dice a che punto è: quante sorgenti sta
-  interrogando, quante hanno risposto e quando passa a eD2k/Kad; segnala i
-  risultati già presenti nel feed e, a ricerca finita, quante sorgenti ha
-  interrogato.
+### Aggiungere una serie
 
-### Aggiungere e configurare una serie
+1. Apri **Esplora**, cerca il titolo e scegli il risultato giusto: controlla
+   anno, rete e locandina, perché esistono spesso titoli omonimi. In
+   alternativa usa **Serie TV → Aggiungi**.
+2. Scegli il **Profilo di qualità**. È il profilo a dare alla serie qualità,
+   audio minimo, lingua, sottotitoli, esclusioni e «Permetti upgrade»: il modulo
+   non ha altri campi per questi valori, così non possono contraddirsi. I
+   profili si preparano in *Configurazione → Qualità e upgrade* (vedi
+   [Profili di qualità](#profili-di-qualità)).
+3. Aggiungi, se servono, **Esclusioni in più** solo per questa serie: parole
+   che, se compaiono nel nome della release, la scartano. Si sommano a quelle
+   del profilo.
+4. Scegli le **stagioni** da seguire. Gli intervalli sono ammessi.
+5. Controlla la **cartella**: è già proposta come *cartella della libreria +
+   titolo*. Con «Crea cartella» attivo viene creata all'aggiunta; togli la
+   spunta per scriverla a mano. «Sottocartelle per stagione» mette gli episodi
+   in *Stagione 01*, *Stagione 02*…
+6. Salva e apri la scheda della serie.
 
-Per una serie nuova il metodo più sicuro è la ricerca TMDB:
+Nel nome della cartella e dei file Gextto toglie i caratteri che Windows, exFAT
+e le condivisioni SMB rifiutano (`\ / : * ? " < > |`) e il punto o lo spazio
+finale: «Titolo: Sottotitolo» diventa «Titolo Sottotitolo». La libreria resta
+così leggibile da qualunque computer.
 
-1. apri **Esplora**, cerca il titolo e seleziona il risultato corretto;
-2. controlla titolo, anno, rete e poster;
-3. scegli il **Profilo di qualità**: è lui a decidere qualità, audio minimo,
-   lingua, sottotitoli, esclusioni e «Permetti upgrade» del nuovo titolo (il
-   modulo non ha altri campi per questi valori, così non possono contraddirsi);
-   aggiungi eventuali **Esclusioni in più** solo per questo titolo, che si
-   sommano a quelle del profilo, e le stagioni da monitorare;
-4. imposta il percorso archivio solo se non vuoi usare quello globale;
-5. salva in dry-run e controlla la pagina di dettaglio.
+> [!TIP]
+> Lascia attive anche le stagioni non ancora uscite: il calendario e la ricerca
+> dei mancanti continueranno a funzionare quando arriveranno.
 
-I campi più importanti sono:
+### La scheda della serie
+
+In testa trovi locandina, trama, cast (collegato alle schede TMDB o TVDB), anno,
+rete, stato, completezza e il percorso in libreria. Le azioni:
+
+| Azione | Quando usarla |
+|---|---|
+| **Cerca mancanti** | per cercare subito tutti gli episodi mancanti, senza aspettare il ciclo |
+| **Scansiona archivio** | hai copiato a mano dei file nella cartella della serie e vuoi che Gextto li riconosca |
+| **Aggiorna da TMDB** (o TVDB) | sono usciti episodi nuovi, o titoli e date sono cambiati |
+| **Anteprima rinomina** | vedi i nomi *Vecchio → Nuovo* prima di rinominare; **Forza rinomina** ricalcola anche i file che sembrano già corretti |
+| **Modifica** | cambi stagioni, cartella, alias, ID, profilo |
+| **Storia dei download** | ricostruisci cosa è successo a ogni episodio |
+
+I campi della scheda più importanti:
 
 | Campo | Effetto |
 |---|---|
-| Profilo di qualità | all'aggiunta e nella scheda del titolo: dà al titolo qualità, audio minimo, lingua, sottotitoli e «Permetti upgrade» del profilo e somma le sue esclusioni a quelle del titolo (vedi *Profili di qualità*). Nella scheda è preselezionato il profilo che corrisponde ai valori del titolo, esclusioni comprese; se nessuno corrisponde compare **Valori attuali**, che salvando non cambia nulla. Il profilo è un modello: cambiarlo dopo non tocca i titoli già creati |
-| Qualità | restringe le release accettabili e partecipa allo score |
-| Audio minimo | arriva dal profilo di qualità all'aggiunta e si cambia con *Modifica selezionati* (non c'è nella scheda del titolo); preset che include già i canali: `Lossless 5.1+`, `Lossless 7.1`, `DTS / DD+ 5.1+`, `DTS / DD+ 7.1`, `AC3 / 5.1`, `AAC / Opus 5.1+`; **Qualsiasi** non impone nulla ed è il default, anche per le serie già caricate |
-| Lingua | richiede la lingua configurata quando è riconoscibile nel titolo |
-| Sottotitoli | gestisce la preferenza senza accettare sottotitoli hardcoded |
-| Stagioni | decide quali stagioni sono monitorate; gli intervalli sono supportati |
-| ID TMDB / ID TVDB | identificativi della serie nei due servizi. **TMDB è la fonte predefinita** dei metadati (titoli degli episodi, trame, locandine) quando la chiave TMDB è impostata; TVDB si usa quando è configurata solo quella chiave. Sono due campi indipendenti: salvarne uno non cancella l'altro, e un ID sbagliato si corregge qui |
-| Alias | aiuta a collegare titoli diversi alla stessa serie |
-| Esclusioni | parole nel titolo che devono bloccare la release |
-| Permetti upgrade | **Sì** (predefinito): una release migliore sostituisce il file archiviato; **No**: i file già archiviati di questa serie restano. Arriva dal profilo di qualità all'aggiunta e si cambia con *Modifica selezionati*: non è nella scheda del titolo, così non c'è un secondo posto dove impostarlo |
+| **Profilo di qualità** | applica i valori di un profilo alla serie. È preselezionato il profilo che corrisponde ai valori attuali; se nessuno corrisponde compare **Valori attuali**, che salvando non cambia nulla |
+| **Stagioni** | quali stagioni sono seguite |
+| **Alias** | altri nomi con cui la serie compare nelle release |
+| **Esclusioni** | parole che scartano una release |
+| **ID TMDB / ID TVDB** | identificano la serie nei due servizi; un ID sbagliato si corregge qui. Sono indipendenti: salvarne uno non cancella l'altro |
 
-Lascia le stagioni non ancora disponibili abilitate se vuoi che il calendario e
-la ricerca dei mancanti continuino a funzionare. Usa *Ignora* solo per episodi
-che non vuoi più cercare: riattivandoli tornano candidati nei cicli successivi.
+**Audio minimo** e **Permetti upgrade** non sono nella scheda: arrivano dal
+profilo e si cambiano con [Modifica selezionati](#modificare-più-titoli-insieme).
 
-### Episodi mancanti e pack
+### Gli episodi
 
-Tutte le puntate già uscite che non sono in libreria sono nella scheda
-**Mancanti** di **Serie TV** (accanto a *Serie monitorate*; il numero dice
-quante sono). Sono raggruppate per serie, ognuna richiudibile, con una riga per
-stagione e le puntate come pulsanti (`S04E03`):
+Gli episodi sono raggruppati per stagione. Su ognuno puoi:
 
-- **un clic su una puntata** la cerca e apre i risultati, prima dall'archivio
-  locale e poi online, ognuno con **Scarica**, in un riquadro sotto la riga
-  della stagione: la ricerca online dice quante sorgenti ha interrogato e
-  quante hanno risposto mentre è in corso;
-- **Cerca mancanti** cerca tutte le puntate mancanti di quella serie, anche in
-  background: la scheda dice a che punto è e puoi annullare; quando finisce
-  elenca lì i risultati trovati, ognuno con la puntata e **Scarica**. Non scarica
-  nulla da solo. Lo stesso pulsante nella scheda della serie avvia la stessa
-  ricerca in background e ne mostra l'avanzamento e i risultati lì;
-- **Filtra per serie** mostra solo le serie che contengono il testo scritto.
+- **🔍 cercarlo**: la ricerca si apre in un riquadro sotto la puntata e dice a
+  che punto è (quante sorgenti sta interrogando, quante hanno risposto, quando
+  passa a eD2k);
+- **📜 vederne la storia**: tutti gli eventi di quel download (vedi
+  [Un episodio non è arrivato](#un-episodio-non-è-arrivato-dove-guardare));
+- copiare il magnet, **ignorarlo** (non verrà più cercato; riattivandolo torna
+  candidato), forzarlo, eliminarlo;
+- **↻ Riscarica**: sposta il file attuale nel cestino e rimette la puntata in
+  cerca, anche quando normalmente non risulterebbe mancante (per esempio perché
+  la stagione è coperta da un pack o ci sono già episodi successivi).
 
-Le puntate non ancora andate in onda non sono mancanti: una serie ancora in
-produzione che non ha mai trasmesso non compare, e una puntata con una data
-futura conosciuta aspetta il suo turno.
+### Gli episodi mancanti
 
-Se per una puntata non c'è nessuna copia nel profilo qualità, l'elenco mostra
+La scheda **Mancanti** di *Serie TV* raccoglie tutte le puntate già andate in
+onda che non sono in libreria, raggruppate per serie e per stagione:
+
+- **un clic su una puntata** la cerca, prima nell'archivio locale e poi online,
+  e mostra i risultati con **Scarica**;
+- **Cerca mancanti** cerca tutte le puntate mancanti di una serie in background:
+  la scheda mostra l'avanzamento, puoi annullare, e alla fine elenca i
+  risultati con **Scarica**. Non scarica nulla da sola;
+- **Filtra per serie** restringe l'elenco.
+
+Non sono mancanti le puntate non ancora andate in onda, né quelle che hanno già
+un download in corso (anche aggiunto a mano o da una cartella osservata), né le
+puntate di una stagione il cui pack sta scaricando. Se il download finisce in
+errore, la puntata torna tra i mancanti.
+
+Se per una puntata non esiste nessuna copia nel profilo, l'elenco propone
 l'unica copia nella lingua richiesta con il badge **🆘 ultima risorsa**: è quella
-che Gextto prenderebbe da solo, e l'upgrade la sostituisce appena esce una copia
-nel profilo. Vale anche per una copia che si trova solo nell'archivio locale.
+che Gextto prenderebbe da solo, e l'upgrade la sostituirà appena esce una copia
+nel profilo.
 
-Gextto cerca le puntate mancanti anche da solo, nei cicli automatici: prima
-nell'archivio locale, poi online, e quando i torrent non danno nulla chiede a
-eD2k una volta per stagione, così una stagione con molti buchi si riempie in un
-giro invece di una puntata per ciclo. **Cerca mancanti** serve a non aspettare il
-prossimo ciclo.
+Non devi fare tutto a mano: nei cicli automatici Gextto cerca i mancanti da
+solo, prima nell'archivio locale e poi online, e — se lo attivi — chiede a eD2k
+una volta per stagione quando i torrent non trovano nulla. **Cerca mancanti**
+serve solo a non aspettare il ciclo successivo.
 
-Il vecchio indirizzo della pagina *Mancanti* porta a questa scheda.
+### Season pack ed episodi singoli
 
-Da **Cerca mancanti** o dalla scheda episodio:
+- Un **season pack** può riempire molti episodi, ma il confronto con la
+  libreria resta episodio per episodio: un pack non sostituisce un episodio che
+  hai già in qualità uguale o migliore.
+- A parità di punteggio tra un episodio singolo e un pack che lo contiene,
+  vince la release che copre più episodi; poi un REMUX; poi quella con seed
+  noti.
+- Gextto non riscarica un episodio vecchio se hai già quelli successivi, a meno
+  che sia un buco riconosciuto, un upgrade vero o una tua richiesta esplicita
+  (↻ Riscarica).
+- Con il **controllo dei pack** attivo (*Configurazione → Seed e completamento →
+  Controllo dei pack*, spento di default) Gextto legge l'elenco dei file del
+  pack appena arriva: se il pack non aggiunge nulla lo scarta, se solo alcuni
+  file servono scarica soltanto quelli.
+- Se un download resta **fermo a 0 B/s o in attesa dei metadati** oltre il
+  tempo impostato in *Configurazione → Qualità e upgrade → Download bloccati*,
+  la ricerca può avviare un'alternativa della stessa puntata (o della stagione)
+  senza togliere quello bloccato: se si riprende, la libreria terrà comunque la
+  copia migliore.
+- Se un pack viene **abbandonato** perché fermo, gli episodi già completi
+  entrano comunque in libreria e solo quelli mancanti vengono cercati di nuovo
+  (nel log: `🛟 … already complete, added to the library before giving up`).
 
-1. controlla che la stagione sia monitorata;
-2. avvia la ricerca del singolo episodio o del dominio serie;
-3. confronta release singole e season pack;
-4. se un episodio è già sul disco ma non nel database, usa la scansione archivio;
-5. usa **Forza** solo per un’azione manuale consapevole.
-6. se torrent e archivio non trovano nulla e **Usa eD2k quando i torrent non
-   trovano nulla** è attivo, la ricerca chiede l’episodio anche a eD2k/Kad: i
-   risultati compaiono con la sorgente **eD2k/Kad** e il pulsante **Scarica** li
-   passa ad aMule.
+## 7. Seguire un film
 
-Con il fallback eD2k attivo la ricerca può richiedere più tempo: aMule raccoglie
-i risultati per la durata configurata in **Durata della ricerca eD2k**, e la
-ricerca di una serie fa una sola interrogazione per stagione.
+### Aggiungere un film
 
-Gextto evita normalmente di riscaricare episodi vecchi quando possiede episodi
-successivi, a meno che si tratti di un buco riconosciuto o di un upgrade reale.
-Un season pack può riempire più episodi, ma il confronto con l’archivio resta
-episodio per episodio. Quando nello stesso ciclo ci sono un episodio singolo e
-un pack che lo contiene con lo stesso punteggio, Gextto sceglie la release che
-copre più episodi. A parità di punteggio resta preferito un REMUX e, a ulteriore
-parità, vince la release con **seed noti** (uno swarm sano è meno a rischio di
-stallo).
+1. Cerca il film in **Esplora** e controlla anno e titolo originale.
+2. Aggiungilo e scegli il **Profilo di qualità**; aggiungi, se serve,
+   esclusioni del solo film.
+3. Apri la scheda e premi **Cerca subito** per vedere i risultati senza
+   aspettare il ciclo.
+4. Prima di accodare una release al limite, apri **Perché non questa?**.
 
-Mentre un pack scarica, Gextto legge l’elenco dei file appena arriva e lo
-confronta con la libreria episodio per episodio. Se il pack non aggiunge nulla
-lo scarta e, se l’approvazione aveva già sostituito un episodio, ripristina la
-versione precedente; se solo alcuni file sono utili può scaricare soltanto
-quelli. Il log dello scarto riporta il confronto (qualità e punteggio vecchi e
-nuovi) e gli episodi tenuti o saltati. Le due opzioni sono in
-*Configurazione → Seed e completamento → Controllo dei pack*; l’ispezione è
-spenta per default.
+Il film è riconosciuto da titolo e anno. Non aggiungere due volte lo stesso
+film scritto in modi diversi: correggi i metadati di quello che hai già.
 
-Un episodio che ha già un torrent in download non è un mancante: non viene
-cercato di nuovo e non compare tra i mancanti della serie, anche se il torrent è
-stato aggiunto a mano, da una cartella osservata o dal telefono. Lo stesso vale
-per tutta la stagione mentre se ne scarica il season pack. Se il download
-finisce in errore l'episodio torna tra i mancanti.
+### La scheda del film
 
-Eccezione: se un download resta **fermo a 0 B/s o ancora in attesa dei
-metadati** (l'elenco dei file non è mai arrivato) oltre il tempo configurato
-(*Configurazione → Qualità e upgrade → Download bloccati*), la ricerca può
-avviare un'alternativa della stessa puntata entro i punti tollerati, **senza
-rimuovere** il torrent bloccato: se quello si riprende, la deduplica
-dell'archivio terrà comunque la copia migliore. Vale anche per i season pack:
-un pack bloccato rende idonee tutte le puntate che contiene, e l'alternativa può
-essere una singola puntata o un altro pack.
+Mostra locandina, trama, cast, i **migliori risultati** trovati nelle sorgenti
+e le **corrispondenze in archivio**, ognuna con **Perché non questa?**. Dalla
+scheda puoi modificare il film, riscaricarlo o cercarlo subito.
 
-## 5. Film
+Nell'editor:
 
-- Tab **Monitorati / Scaricati**; colonne ordinabili (nome, anno, qualità, lingua). Come per le serie, il selettore **Elenco / Locandine** legge la tabella come
-  card con la copertina (la scelta è condivisa con la pagina Serie TV).
-- L'editor gestisce qualità, **Lingua**, **Sottotitoli** con
-  **Sottotitoli obbligatori** (Sì: una release senza quei sottotitoli è scartata;
-  No: sono solo preferiti) ed esclusioni; **Permetti upgrade** e audio minimo si
-  cambiano con *Modifica selezionati*. Ogni valore ha un
-  solo campo: le vecchie «Lingue richieste» sono confluite in **Lingua** (che vale
-  `chi`, `ita,eng`… anche oltre le voci dell'elenco) senza cambiare le decisioni.
-- **Dettaglio film**: locandina, trama, cast, modifica, riscarica, **Cerca subito**,
-  nomi del cast collegati alle schede TMDB, tabella dei “migliori trovati” dalle
-  sorgenti e tabella **corrispondenze archivio** dove ogni riga offre **Perché
-  non questa?**.
+- **Lingua** accetta un codice o più codici separati da virgola (`ita,eng`), anche
+  oltre le voci dell'elenco;
+- **Sottotitoli** con **Sottotitoli obbligatori**: *Sì* scarta una release senza
+  quei sottotitoli, *No* li tratta solo come preferenza;
+- **Permetti upgrade** e **audio minimo** si cambiano con *Modifica
+  selezionati*.
 
-### Aggiungere e scegliere un film
+La pagina **Film** ha due schede, **Monitorati** e **Scaricati**, con colonne
+ordinabili.
 
-1. cerca il film in **Esplora** e controlla anno e titolo originale;
-2. aggiungilo alla libreria;
-3. scegli il **Profilo di qualità** e aggiungi eventuali esclusioni del solo film;
-4. usa **Cerca subito** per vedere i risultati senza aspettare il ciclo;
-5. apri **Perché non questa?** prima di accodare una release borderline.
+### Elenco o locandine
 
-Il film viene identificato usando titolo e anno quando disponibili. Evita di
-creare duplicati con lo stesso film scritto in modi diversi: correggi i metadati
-del film monitorato invece di aggiungerlo nuovamente.
-
-Più lingue si indicano come codici separati da virgola, per esempio `ita,eng`.
-
-### Importare un file già presente
-
-**Importa file** (scheda di **Manutenzione**) serve per un video che hai già sul disco e che
-Gextto non ha scaricato: un episodio recuperato a mano, una vecchia stagione, un
-film copiato da un altro disco. Scrivi il percorso, oppure premi **Sfoglia**:
-si apre l'elenco delle cartelle del server (parte dalla cartella download) con
-i video di ogni cartella; un clic su un video lo sceglie, **Seleziona** prende
-la cartella intera. Poi premi
-**Analizza**: Gextto legge i nomi, propone la serie o il film configurato, la
-stagione e l'episodio e mostra la cartella di destinazione. Puoi correggere
-serie, stagione, episodio (o film e anno) prima di confermare. **Importa ora**
-rinomina il file secondo le regole, lo sposta nella libreria, registra
-l'episodio (o il film) e aggiorna Jellyfin/Plex se sono configurati. Se nella
-destinazione esiste già un file con lo stesso nome, l'import si ferma: metti la
-spunta **Sostituisci il file esistente** per spostare la copia vecchia nel
-cestino e mettere la nuova. I file multi-episodio vengono registrati per ogni
-episodio che contengono.
+Sopra le tabelle di *Serie TV* e *Film* il selettore **Elenco / Locandine**
+cambia la vista: *Locandine* mostra una card per titolo con copertina, qualità,
+lingua e stato. La scelta vale per entrambe le pagine ed è ricordata.
 
 ### Modificare più titoli insieme
 
-Nelle tabelle **Serie TV** e **Film** (vista *Elenco*) ogni riga ha una
-casella: con **Modifica selezionati** cambi gli stessi valori su tutte le righe
-spuntate in un colpo solo, ad esempio portare più film a `2160p` o mettere in
-pausa più serie.
+Per cambiare gli stessi valori su molti titoli — per esempio portare dieci film
+a `2160p` o mettere in pausa più serie — usa la vista *Elenco*:
 
-1. Spunta le righe nella tabella. La casella nell'intestazione spunta tutte le
-   righe visibili: combinala con *Filtra l'elenco…* per prendere, ad esempio,
-   tutti i titoli in `720p`.
-2. Premi **Modifica selezionati**, accanto ad *Aggiorna elenco*: sotto si
-   aprono i campi. Spunta solo quelli da
-   cambiare (qualità, audio minimo, lingua, sottotitoli, esclusioni), scrivendo
-   il nuovo valore. Un campo spuntato e lasciato vuoto viene svuotato; un campo
-   non spuntato resta com'è in ogni titolo. *Permetti upgrade* e *Stato*
-   cambiano solo se scegli un valore diverso da «Lascia com'è».
-3. *Parti da un profilo* copia nei campi qualità, audio minimo, lingua,
-   sottotitoli, esclusioni e upgrade di un profilo e li spunta, tranne le
-   **esclusioni**: sono di ogni titolo (nella scheda del titolo quelle del
-   profilo si sommano alle sue), quindi restano deselezionate e si spuntano solo
-   se vuoi sostituirle con quelle del profilo.
-4. Premi **Applica ai titoli selezionati**: la pagina si ricarica con i nuovi
-   valori nelle colonne. Gli altri valori di ogni titolo (stagioni, cartella,
-   alias…) non vengono toccati.
+1. **Spunta le righe.** La casella nell'intestazione spunta tutte le righe
+   visibili: combinala con *Filtra l'elenco…* per prendere, per esempio, tutti i
+   titoli in `720p`.
+2. Premi **Modifica selezionati**. Spunta solo i campi da cambiare (qualità,
+   audio minimo, lingua, sottotitoli, esclusioni) e scrivi il nuovo valore. Un
+   campo spuntato e vuoto viene svuotato; un campo non spuntato resta com'è.
+   *Permetti upgrade* e *Stato* cambiano solo se scegli un valore diverso da
+   «Lascia com'è».
+3. **Parti da un profilo** copia nei campi i valori di un profilo, tranne le
+   esclusioni, che restano di ogni titolo (spuntale solo se vuoi sostituirle).
+4. Premi **Applica ai titoli selezionati**.
 
-I requisiti obbligatori di un film (**Sottotitoli obbligatori**, e le
-eventuali lingue richieste) seguono il valore che qualificano: cambiando lingua
-o sottotitoli con **Modifica selezionati** viene aggiornato anche il requisito,
-così il titolo non continua a chiedere quello vecchio.
+Stagioni, cartella, alias e gli altri valori dei titoli non vengono toccati. I
+requisiti obbligatori di un film (sottotitoli, lingue richieste) seguono il
+valore che qualificano: cambiando lingua o sottotitoli si aggiorna anche il
+requisito.
 
-Nella vista *Locandine* le caselle non ci sono: passa a *Elenco*. **Aggiorna
-elenco** invece non modifica nulla: rilegge la tabella con il filtro scritto.
+## 8. Cercare e scaricare a mano
 
-## 6. Esplora, Archivio, Fumetti
+Il ciclo automatico fa quasi tutto da solo. La ricerca manuale serve a vedere
+**cosa c'è in giro** prima di cambiare una configurazione, a scegliere una
+release precisa o a scaricare qualcosa che non segui.
 
-- **Esplora** — TMDB: tendenze oggi/settimana, popolari, più votati, in
-  programmazione, prossime uscite; ricerca TMDB; ricerca release generica;
-  aggiunta alla libreria. Le liste esistono solo su TMDB: con la sola chiave
-  TVDB la ricerca dei titoli passa a TVDB. Le card sono mostrate in una griglia a cinque colonne;
-  un titolo già in libreria porta il badge **Già in lista** e il pulsante di
-  aggiunta è disattivato, così non crei duplicati per errore. Sotto la ricerca
-  release c'è il campo per **incollare uno o più link `ed2k://`** (uno per riga
-  o separati da spazi): Gextto li verifica, elimina i duplicati e li mostra come
-  risultati con nome, dimensione e hash. Con **Aggiungi tutti** li passa in
-  blocco ad aMule, oppure usi il pulsante **Aggiungi** della singola riga. Se
-  spunti **eD2k**, i risultati eD2k compaiono nella stessa tabella con il badge
-  **eD2k** e il numero di fonti, e si accodano con **Aggiungi** come i torrent:
-  il link `ed2k://` passa ad aMule. Se l'integrazione è spenta o non risponde i
-  risultati eD2k non compaiono.
-- **Archivio** — ricerca full-text delle release passate con paginazione, accoda
-  in blocco, copia magnet, elimina; tab **Serie/Film dal feed**. La ricerca
-  nell'archivio locale è **immediata**: parte da sola mentre digiti (dai tre
-  caratteri in su) e usa l'indice FTS5, quindi non pesa sul database. Per i
-  termini più corti (es. `IT`) premi **Invio** o **Cerca**: la soglia vale solo
-  per la ricerca automatica, non per quella esplicita. Il filtro `-parola`
-  esclude i titoli che la contengono. La casella **Cerca anche nel
-  web** estende la ricerca a indexer e motori online: è molto più lenta e per
-  questo parte solo quando premi **Cerca**, non a ogni tasto. Con aMule attivo
-  c'è anche **Cerca anche su eD2k**: anche questa parte solo da **Cerca**, e i
-  risultati eD2k compaiono in un blocco sotto l'archivio, ognuno con
-  **Scarica**. Il nome lungo resta su una riga accorciato con i puntini (il
-  testo completo è nel tooltip) e la colonna **Azioni** con **Scarica** resta
-  sempre visibile, anche sul telefono. La colonna
-  **Sorgente** mostra solo il provider/dominio (l'URL completo è nel tooltip) e
-  ogni riga offre **Perché non questa?** come nella tabella dei risultati. Il
-  titolo va a capo su più righe e le azioni di riga sono icone compatte (⬇️
-  accoda, 🔍 Perché non questa?, 🧲 copia magnet, 🗑️ elimina) per lasciare spazio
-  al nome della release. Lo stesso torrent (stesso infohash) compare **una volta
-  sola**, con la segnalazione più recente: le copie dello stesso contenuto con
-  magnet o titolo diverso non riempiono più i risultati.
-- **Visti dai feed** — ogni release vista nelle sorgenti, raggruppata per titolo
-  (film/serie) con numero, risoluzione e score migliori; espandi un gruppo per
-  accodare una singola release. Popolata ad ogni ciclo, anche per titoli non
-  monitorati.
-- **Perché non questa?** — nei risultati di ricerca puoi aprire una spiegazione
-  read-only della release. Mostra esito, score e componenti dello score, regole
-  superate o bloccanti, filtro sorgente, qualità/lingua/sottotitoli, blocklist,
-  download attivi e confronto con il file già presente nell'archivio. Non accoda
-  la release, non crea placeholder e non modifica il database. L'esito riguarda
-  i controlli del candidato: la scelta finale del ciclo può dipendere anche da
-  gap filling, smart episode, delay, spazio libero e confronto con altri
-  candidati.
-- **Fumetti** — in **Aggiungi fumetto** scrivi il titolo e premi **Trova**; scegli
-  il risultato esatto di GetComics e poi conferma. Gextto salva il post scelto,
-  il tag, la copertina e i metadati, e usa quel post per il download senza
-  sostituirlo con un albo omonimo. Un fumetto con il numero nel titolo (per
-  esempio «Poison Ivy #41») segue la serie da quel numero in avanti: il controllo
-  periodico scarica anche i numeri successivi, mentre numeri precedenti, altre
-  serie e raccolte vengono esclusi. Sono inoltre disponibili lista monitorati,
-  estrazione link da un post, impostazioni weekly pack e storico con
-  reinvia/elimina/forza. Un weekly pack viene accodato una volta sola: prima di
-  scaricarlo Gextto guarda nel suo storico se lo ha già preso (e controlla se è
-  ancora nella lista dei download), così un pack già scaricato non viene
-  ripreso nemmeno se dopo averlo letto hai cancellato la cartella. La riga del
-  log spiega anche il perché: nuovo pack della settimana, link di download
-  arrivato dopo che il pack era stato trovato senza, oppure già scaricato in
-  passato e quindi lasciato stare. Un pack trovato prima che GetComics
-  pubblicasse i link non aspetta il controllo settimanale successivo: Gextto
-  ricontrolla a ogni ciclo solo i pack in attesa e lo accoda appena il link
-  compare.
-  I download HTTP diretti compaiono in **Download in sessione** con stato,
-  byte, progressione, velocità e azioni pausa/riprendi.
-  Un fumetto completato dal suo pipeline compare come **Completato · archiviato**
-  al 100% anche se il torrent del pack è in pausa e ricontrollato a 0%.
-  Nei file **CBZ** scaricati direttamente (HTTP o Mega) Gextto aggiunge un
-  `ComicInfo.xml` con serie, numero e anno ricavati dal titolo (es.
-  «Poison Ivy #41 (2025)»): Komga, Kavita e i lettori su tablet lo usano per
-  raggruppare e ordinare gli albi. Un file che ha già il suo `ComicInfo.xml` non viene
-  toccato; i fumetti scaricati via torrent restano identici, perché sono in
-  seed, e i CBR (RAR) non si possono modificare. Il nome del file prende
-  comunque l'estensione del formato che contiene: un albo che arriva come RAR
-  viene salvato `.cbr` e non `.cbz`, così Komga e Kavita lo aprono.
+### Dove si cerca
 
-- **eD2k** — la pagina di aMule: vedi la sezione seguente.
+| Da dove | Cosa cerca |
+|---|---|
+| **Dashboard**, riquadro di ricerca | archivio locale, indexer, motori web; eD2k se spunti **eD2k** |
+| **Scarico**, *Cerca una release* | lo stesso, senza lasciare la pagina dei download |
+| **Esplora** | titoli su TMDB (tendenze, popolari, prossime uscite) da aggiungere; ricerca generica di release |
+| **Archivio** | le release viste nei feed, all'istante; online solo se spunti *Cerca anche nel web* |
+| 🔍 su un episodio, **Cerca subito** su un film | quel titolo preciso |
 
-### eD2k e Kad con aMule
+### Leggere i risultati
 
-Gextto usa **aMule** per la rete eD2k e Kad: `amuled` fa il lavoro di rete
-(server, Kad, fonti, code, crediti, trasferimenti) e Gextto lo comanda con il
-protocollo delle **connessioni esterne (EC)**, lo stesso di `amulecmd` e
-`amuleweb`. È tutto facoltativo e spento di default; con aMule spento i
-torrent non cambiano. Se aggiorni da una versione che usava il nostro demone
-`gx-ed2k`, l'aggiornamento rimuove il binario e le sue opzioni: per eD2k e Kad
-resta aMule.
+1. Scrivi un titolo (o una query tecnica) e attendi che le sorgenti rispondano;
+   quelle lente vengono segnalate al timeout.
+2. Confronta titolo, sorgente, qualità, dimensione e seed/peer.
+3. Restringi con **Filtra i risultati già caricati**: lavora sui risultati
+   ricevuti e non rifà la ricerca.
+4. Apri **Perché non questa?** sui risultati interessanti.
+5. Premi **Accoda** (o **Scarica**) quando sei convinto.
 
-**Come si prepara.** Installa aMule (`amule-daemon` su Debian/Ubuntu) e
-abilita le connessioni esterne in `amule.conf`:
+La ricerca manuale mostra anche release che il ciclo **non** sceglierebbe,
+proprio per permetterti di ispezionarle: vederla non significa che verrebbe
+scaricata.
 
-```ini
-[ExternalConnect]
-AcceptExternalConnections=1
-ECAddress=127.0.0.1
-ECPort=4712
-ECPassword=<md5 della password>
-```
+### «Perché non questa?»
 
-`ECPassword` è l'MD5 della password (`printf '%s' 'segreta' | md5sum`). Con
-aMule in **Docker** (`ngosang/amule`) monta la cartella dei download nel
-container **allo stesso percorso** dell'host e imposta lì `INCOMING_DIR` e
-`TEMP_DIR`, così Gextto trova i file completati; usa una cartella di arrivo
-dedicata, perché aMule condivide tutto quello che contiene. Per aprire le porte
-sul router con l'**UPnP** il container deve usare la rete dell'host
-(`network_mode: host`) con `UPnPEnabled=1` in `amule.conf`. Avvia
-`amuled`, poi in **Configurazione → eD2k e Kad** accendi
-**eD2k e Kad tramite aMule** e inserisci indirizzo, porta e password **in
-chiaro**. Gextto deve vedere la cartella di arrivo di aMule allo stesso
-percorso (succede quando girano sulla stessa macchina): è da lì che importa i
-file completati. Apri sul router le porte TCP e UDP di aMule per avere un ID
-alto e un Kad non dietro firewall, cioè più fonti.
+È una diagnosi in sola lettura di una release: non accoda nulla e non cambia
+niente. Mostra l'esito, il punteggio con le sue componenti e ogni controllo:
 
-**La pagina eD2k** (menu **Scoperta → eD2k**):
+- **Superata** — il controllo è passato;
+- **Bloccante** — basta da solo a scartare la release;
+- **Informativa** — dipende dal resto del ciclo (altri candidati, ritardo,
+  spazio libero, buchi da riempire).
 
-- **aMule**: versione, server eD2k a cui sei connesso con **ID alto/basso**,
-  stato di Kad (connesso, dietro firewall, fermo), velocità e limiti, utenti e
-  file della rete, coda di upload, byte scambiati in questa sessione e in
-  totale. I pulsanti **Connetti**, **Disconnetti**,
-  **Avvia/Ferma Kad** e **Lascia il server** comandano aMule; **Aggiorna**
-  rilegge lo stato. Se aMule non risponde la pagina lo dice e spiega cosa
-  controllare.
-- **Server eD2k**: la lista di aMule con utenti, file e ping; **Connetti** su
-  una riga collega aMule a quel server. Da qui scarichi anche un nuovo
-  `server.met` o un `nodes.dat` per Kad da un indirizzo.
-- **Cerca su eD2k e Kad**: scegli la rete (Kad, Kad + server eD2k, tutti i
-  server eD2k, solo il server connesso) e cerca; aMule raccoglie i risultati per qualche secondo.
-  Ogni risultato mostra nome, dimensione e fonti (totali / complete) e ha
-  **Scarica**; **già noto** segnala un file che aMule ha già. aMule ha **una
-  sola** lista di risultati, condivisa con la sua interfaccia e con ogni altro
-  strumento collegato: se un'altra ricerca la sostituisce mentre Gextto cerca,
-  Gextto rifà la ricerca e, se il disturbo continua, chiede di riprovare tra
-  qualche secondo invece di mostrare file non attinenti. Sopra i risultati c'è
-  il filtro (**Parole nel nome**, **Fonti minime**, **Dimensione minima**,
-  **Nascondi già noti**, **Ordina per**): lavora sui risultati già ricevuti da
-  aMule, quindi non fa ripartire la ricerca.
-- **Incolla link eD2k**: uno o più link `ed2k://`, anche mescolati a testo;
-  **Scarica con aMule** li aggiunge tutti.
-- **Log di aMule**: **Carica il log** mostra le ultime righe del log di amuled.
-  I blocchi delle notifiche UPnP del router (`UPNP_EVENT_RECEIVED`) sono
-  nascosti: arrivano a ogni cambio delle regole di inoltro e riempirebbero la
-  scheda.
-- **Cartelle di aMule**: se la cartella di arrivo o quella temporanea non
-  esistono (disco di rete smontato, cartella rimossa) la pagina lo segnala con
-  **Crea le cartelle**: senza, aMule riempie il log di *Failed to get file
-  system statistics* e non importa i file completati.
-- **File condivisi**: quello che aMule condivide, con i byte caricati in totale
-  e, sotto, quelli della sessione, richieste e accettate (sessione e
-  dall'inizio), client in coda, velocità di caricamento del file, ultimo
-  caricamento, priorità e il link `ed2k://` da copiare; sotto, i client a cui
-  stai caricando con velocità e posizione in coda. I contatori sono quelli di
-  aMule: il valore della sessione riparte da zero a ogni riavvio di `amuled`,
-  quello totale resta. **Ricarica
-  file condivisi** fa rileggere ad aMule le
-  cartelle (utile se hai aggiunto o tolto file a mano); le cartelle condivise
-  sono elencate in sola lettura.
+In fondo c'è il confronto con la libreria: primo download, possibile upgrade o
+copia non migliore di quella che hai. I controlli seguono quest'ordine: titolo
+seguito, blocklist e duplicati, filtri globali e della sorgente, sanità della
+release (sottotitoli impressi, dimensione assurda), qualità/lingua/sottotitoli/
+esclusioni del titolo, confronto con libreria e download attivi. Il punteggio
+sceglie solo tra le release che hanno superato tutti i controlli.
 
-I download aggiunti compaiono in **Scarico**. Un link a un file che non è un
-video (pdf, programma, archivio) viene solo scaricato da aMule e resta nella
-cartella di arrivo, come un torrent aggiunto a mano. Quando aMule completa un
-video, Gextto aspetta che il file sia davvero nella cartella di arrivo, con la
-dimensione attesa e stabile, poi lo tratta come un torrent completato: lo
-rinomina, lo importa in libreria, lo controlla con MediaInfo e manda la
-notifica. Lo stesso controllo di
-qualità dei torrent gira prima dell'importazione: se in libreria c'è già un file
-uguale o migliore il download viene scartato nel Cestino e non importato. Gli episodi e i film eD2k
-seguono l'opzione **Sposta gli episodi/pack in archivio**: se è attiva vengono
-spostati in libreria e rimossi dalla cartella di arrivo (aMule smette di
-condividerli), se è spenta entrano con **hardlink o copia** e aMule continua a
-condividerli (l'hardlink non occupa spazio in più se le due cartelle sono sullo
-stesso disco). Per eD2k lo spostamento avviene al completamento, perché il
-seeding è gestito da aMule e Gextto non ha un momento di fine seed da attendere.
-Un download eD2k non ha limiti di seed propri: valgono le regole di seed e i
-limiti globali. Con seed infinito (rapporto o tempo a 0) il file viene copiato e
-resta condiviso anche con *Sposta* attiva, e la riga mostra il badge «seed ∞».
+### Aggiungere un torrent o un magnet
 
-Per la guida completa — installazione di aMule, Docker, risoluzione dei
-problemi e dettagli del protocollo — vedi [`docs/amule.it.md`](amule.it.md).
+**Aggiungi torrent**, nella barra in alto di ogni pagina, accetta un magnet, un
+URL `.torrent` o un file `.torrent`. Puoi indicare la cartella di salvataggio,
+**Scarica subito** (fuori coda) e **Non rinominare**. Con gx-torrent ci sono
+anche:
 
-## 7. Configurazione
+- **Salta verifica**: aggiunge il torrent su file che hai già, senza verificarli
+  prima; va subito in seed e ogni pezzo viene controllato la prima volta che un
+  peer lo chiede. Usalo solo per dati che sai completi;
+- download **sequenziale** e **prima/ultima parte** dei file;
+- **preallocazione** dello spazio, disattivabile per il singolo torrent.
 
-La pagina è divisa in quattro aree: **Cosa cercare** (Generale, Sorgenti,
-eD2k e Kad, Qualità e upgrade), **Come scaricare** (Motore torrent, Velocità e rete, Code e
-prestazioni, Seed e completamento), **Dove salvare** (Libreria e rinomina,
-Archivio e spazio) e **Sistema** (Manutenzione automatica, Notifiche, Accesso e
-servizi, Diagnostica e aggiornamenti). Le modifiche non salvate sono
-evidenziate con la barra “Salva tutte”. L'elenco completo di ogni voce, tab per
-tab, è nell'[Appendice A](#appendice-a-riferimento--configurazione).
+Un magnet con `so=` scarica solo i file indicati; con `ws=` aggiunge web seed.
+Un indirizzo che risponde con un magnet viene aggiunto come magnet.
 
-- **Sorgenti** — lista feed RSS, indexer (Jackett, Prowlarr, indexarr o un
-  Torznab diretto) con pulsante *Verifica*, URL FlareSolverr + test, motori web,
-  filtri contenuto, blacklist. Per Jackett puoi indicare l'URL base, ad esempio
-  `http://host:9117`, e la relativa API key: Gextto costruisce l'endpoint Torznab
-  `/api/v2.0/indexers/all/results/torznab/api`. Il controllo di salute usa
-  `t=caps` con la stessa API key, quindi verifica l'API e non soltanto la home di
-  Jackett. Per indexarr l'URL base è di solito `http://host:8788`: la ricerca
-  aggregata usa l'endpoint nativo `/api`, mentre l'elenco degli indexer e le
-  singole lane usano i percorsi compatibili con Jackett. Nei risultati la
-  sorgente può apparire come `jackett:NomeTracker` o `indexarr:NomeTracker`.
-- **eD2k e Kad** — collegamento ad aMule (indirizzo, porta e password delle
-  connessioni esterne), rete di ricerca (Kad, server o entrambi), ripiego
-  automatico quando i torrent non trovano nulla e rinuncia ai download fermi.
-  Il pannello **aMule** della scheda ha l'interruttore **Prealloca l'intero file
-  in aMule** e i valori si
-  applicano subito ad aMule, senza salvataggio separato. Lo stato e i comandi di
-  aMule sono nella pagina eD2k.
-- **Velocità, rete e prestazioni** — connessioni/prestazioni,
-  protocolli/tracker, sicurezza, RAM disk e porte, limiti di velocità e
-  scheduler; applica e ottimizza. Se sposti lo storage di un torrent in una cartella che
-  **contiene già i dati**, non viene rifiutato: Gextto associa il torrent ai file
-  esistenti e li ricontrolla (seed) invece di riscaricarli. L'opzione
-  **Prealloca lo spazio su disco** (spenta di default)
-  riserva subito l'intera dimensione di ogni nuovo torrent: evita la
-  frammentazione su NAS/HDD e fa emergere subito la mancanza di spazio; puoi
-  disattivarla per singolo torrent quando lo aggiungi a mano. **Copia i file
-  .torrent in** indica una cartella in cui Gextto copia il `.torrent` di ogni
-  torrent avviato (appena i metadati sono disponibili), utile per riusarlo con
-  un altro client o come backup. In *Sicurezza,
-  proxy e rete* l'**interfaccia VPN (killswitch)**
-  vincola ascolto e traffico in uscita a una scheda scelta (es. `tun0`, `wg0`);
-  l'elenco è letto dal server e la modifica si applica dopo il riavvio.
-  Nella sezione RAM disk Gextto mostra i `tmpfs`/`ramfs` disponibili e consente
-  di sceglierne uno. Se non c'è un percorso configurato, il pulsante dedicato
-  crea `/dev/shm/gextto` e lo configura automaticamente. Il contenuto di
-  `/dev/shm` è temporaneo e viene perso al riavvio della macchina. La scelta di
-  un percorso calcola automaticamente dimensione massima per torrent, margine
-  libero e spazio minimo; i valori restano modificabili. Il pulsante **Testa
-  porte** verifica inoltre il bind locale delle porte indicate: non sostituisce
-  il controllo del port-forwarding sul router/firewall.
-- **Punteggi** — pesi per categoria, gestione dei gruppi custom (aggiungi, modifica
-  o rimuovi il gruppo e assegna un bonus/penalità) e **Prova una release**. In
-  testa ci sono le regole di upgrade, poi esempi, prova e profili di qualità; i
-  pesi seguono in schede chiuse. I pesi
-  audio sono una scheda per gruppo: Lossless (TrueHD, DTS-HD, FLAC, PCM),
-  DTS/DD+ (con DTS-HD HRA), AC3/5.1, AAC/Opus e MP3; canali e Atmos/DTS:X stanno
-  nella stessa scheda Audio. I pesi video sono in un'unica scheda **Video**
-  con i sottogruppi 4K, Full HD, HD, SD, Codec video, Sorgente e HDR/DV;
-  **Correzioni release** raccoglie PROPER, REPACK e REAL, mentre
-  **Upgrade e sostituzione** (in testa alla pagina) contiene soglie e
-  sostituzione. Il totale audio resta sotto la soglia di
-  upgrade, quindi l'audio contribuisce al confronto ma non fa scaricare da solo
-  un'altra release. Il nome del
-  gruppo deve coincidere con il tag release finale, per esempio `TBK`. La lingua
-  audio è un requisito di ammissibilità per titolo, non un bonus fisso per
-  l'italiano: si può quindi preferire l'inglese. I sottotitoli preferiti danno
-  invece un piccolo bonus opzionale, senza rendere la release obbligatoria. Il
-  punteggio effettivo è unico per acquisizione, ricerche, upgrade,
-  post-processing, archivio e rescore; comprende anche il bonus dimensione, che
-  però non basta mai da solo per un upgrade. I punteggi della libreria si
-  ricalcolano da soli dopo un cambio dei pesi o delle regole di calcolo.
-  Una release che l'indexer dichiara **freeleech** ha un bonus a parte
-  (**Bonus freeleech**, 150 di default, 0 lo spegne) che vale solo nella scelta
-  tra candidati per un episodio mancante: non entra nel punteggio salvato e non
-  provoca un upgrade. Gextto distingue tre stati: **freeleech**, **non
-  freeleech** (l'indexer dice che il download conta) e **non marcato** (non
-  dice nulla). Solo il primo riceve il bonus; il non marcato non viene mai
-  trattato come pagamento. Nella ricerca release il badge dice quale dei tre
-  stati è; quando l'indexer non dice nulla, il bonus non viene dato.
-  - **Rinomina** — abilita rinomina, editor del template con token e anteprima,
-  chiavi TMDB/TVDB, lingua e soglie di upgrade. Un file che copre più episodi
-  contigui viene nominato con l'intervallo (`S01E01-E02`), così i media server
-  elencano entrambi gli episodi; un intervallo non contiguo torna al primo
-  episodio. La verifica recupera il
-  token sorgente dal titolo originale della release nel database ed elimina i
-  blocchi placeholder vuoti (`[]`), così un `[WEB-DL]` perso viene ripristinato
-  invece di restare `unknown`.
-- **Avanzate** — spazio libero minimo, retention cestino, retention archivio,
-  pagine feed, intervallo verifica rinomina, sposta episodi, flag di debug.
-- **Acquisizione** — delay prima del download (serie/film, con bypass per
-  punteggio alto), intervallo di housekeeping, **Cartelle osservate**: Gextto
-  controlla le cartelle indicate e aggiunge i file `.torrent`/`.magnet` copiati,
-  aspettando due rilevazioni stabili prima di leggerli e ritentando gli errori con
-  backoff fino alla riuscita; li rimuove (o li rinomina `.imported`) dopo
-  l'aggiunta; la scansione ricorsiva scende al massimo di 8 livelli; **Sorgenti in
-  backoff**, con livello, scadenza, ultimo errore e reset per singola sorgente;
-  e il **backfill MediaInfo** automatico (file per volta e intervallo
-  configurabili), oltre al pulsante in Manutenzione per una scansione immediata.
-  L'**housekeeping non è la pulizia dell'Archivio**: mantiene ordinato il
-   database, ma non elimina i file della libreria, i download completati o le
-   release elencate nell'Archivio. Il campo *statistiche cicli di ricerca
-   conservate* riguarda solo i contatori di ogni ciclo — release analizzate,
-   candidate, download avviati, gap riempiti ed errori: con valore `200`, il
-   201° ciclo elimina i contatori del ciclo più vecchio, non la release
-   scaricata.
-  *Visti nel feed* elimina solo le righe storiche dei feed oltre il numero di
-   giorni indicato (`0` = nessuna pulizia); lo *Storico download* della sezione
-   **Scarico** elimina solo le righe dei torrent già rimossi (`0` = conserva),
-   senza toccare l'Archivio. A ogni esecuzione vengono
-   inoltre eliminati automaticamente torrent in errore, log dei gap e backup di
-   upgrade più vecchi delle rispettive retention configurate (predefinite:
-   7 giorni per gli errori e 30 per log gap e backup upgrade); vengono rimossi
-   anche i backoff delle sorgenti scaduti. Alla fine vengono compattati con
-   `VACUUM` solo i database con almeno il 20% (o 64 MB) di spazio libero da
-   recuperare. L'housekeeping gira una volta per intervallo anche se Gextto si
-   riavvia: un riavvio non lo fa ripartire.
-  La retention dell'Archivio è separata e si trova in **Configurazione →
-  Manutenzione automatica → Pulizia archivio release**: viene eseguita dallo
-  stesso worker dell'housekeeping, con la stessa cadenza, ma solo se «Pulizia
-  automatica archivio» è attiva. Rimuove esclusivamente le righe del catalogo
-  release; file scaricati, libreria, storico download e torrent attivi restano
-  intatti.
-- **Percorsi** — root libreria, cestino, cartelle download/temp/RAM disk, regole
-   per tag. Il percorso RAM disk selezionato resta configurato, ma la directory
-   creata sotto `/dev/shm` va ricreata dopo un riavvio.
- - **Lingua dell'interfaccia** — si sceglie dal selettore in alto, tra
-   italiano, inglese, tedesco, francese, spagnolo e polacco. I testi arrivano
-   con Gextto e si aggiornano con lui: non c'è più un editor per modificarli
-   a mano. Se manca una traduzione, la UI mostra il testo italiano.
+Puoi anche copiare file `.torrent` o `.magnet` in una **cartella osservata**
+(*Configurazione → Sorgenti → Cartelle osservate*): Gextto aspetta che il file
+smetta di cambiare, lo aggiunge e poi lo rimuove o lo rinomina `.imported`.
 
-### Motore torrent (gx-torrent, qBittorrent-nox)
+### L'Archivio
 
-Gextto possiede sempre database, coda, punteggi, post-processing, rinomina e
-archivio; è sostituibile solo il piano di trasferimento, scelto in
-*Configurazione → Motore torrent*. Un torrent è di un solo motore alla volta,
-quindi il passaggio è una migrazione controllata, non due client sugli stessi
-dati.
+**Archivio** è il catalogo di tutte le release viste nei feed, anche per titoli
+che non segui. La ricerca parte da sola mentre scrivi (da tre caratteri; per
+quelli più corti premi **Invio**) ed è immediata. `-parola` esclude i titoli che
+la contengono. Lo stesso torrent compare una volta sola. Dalle righe puoi
+accodare (⬇️), aprire **Perché non questa?** (🔍), copiare il magnet (🧲) o
+eliminare la riga (🗑️).
 
-Se il motore attivo non riesce a restare in piedi Gextto passa da solo a un
-altro motore: prima **qBittorrent-nox** (scaricato al momento e avviato con
-profilo privato, oppure quello esterno già configurato), infine uno stato di
-**recovery** con i trasferimenti fermi e la UI raggiungibile. Un demone
-`gx-torrent` aggiornato che non parte viene prima ripristinato alla versione
-precedente.
+- **Cerca anche nel web** estende la ricerca a indexer e motori online: è più
+  lenta e parte solo quando premi **Cerca**.
+- **Cerca anche su eD2k** (con aMule attivo) aggiunge sotto i risultati di
+  eD2k.
+- La scheda **Visti dai feed** raggruppa le release per titolo, con il numero di
+  versioni e la migliore risoluzione e punteggio: espandi un gruppo per
+  accodarne una.
 
-Il nucleo del motore predefinito, **`gx-core`** (`internal/gxcore`), e il DHT
-(`internal/dht`) sono codice originale scritto in questo repository, quindi
-coperti dalla stessa licenza EUPL-1.2 di Gextto (vedi la pagina *Licenza*
-dell'interfaccia web).
+### Link eD2k
 
-Nell'intestazione dell'interfaccia, accanto alla versione di Gextto, compare il
-**motore in uso con la sua versione**: `gx-core` seguito dal numero di versione
-(per esempio `1.1.242`) con gx-torrent,
-`qBittorrent-nox v…` con qBittorrent (il marchio e la versione del motore
-attivo, così si vede a colpo d'occhio cosa sta trasferendo i file).
+In **Esplora** e nella pagina **eD2k** puoi incollare uno o più link `ed2k://`
+(anche mescolati a testo): Gextto li verifica, toglie i doppioni e li passa ad
+aMule con **Aggiungi tutti** o uno per uno.
 
-- **gx-torrent** (predefinito) — demone BitTorrent in Go puro, avviato e
-  sorvegliato da Gextto in un processo separato; non ha dipendenze C/C++. Imposta **URL Web API**, **indirizzo di ascolto**
-  (predefinito `127.0.0.1:8890`: pagina web e API solo su questo server; usa
-  `0.0.0.0:8890` **e un token** per aprirle in LAN), **token** e **proxy**. Con
-  un proxy configurato passano dal tunnel anche feed RSS, indexer Torznab e
-  download di .torrent; i servizi su localhost e in rete locale restano diretti
-  e FlareSolverr non viene usato come ripiego, perché scaricherebbe fuori dal
-  tunnel. All'indirizzo configurato apre anche una **pagina
-  web operativa** (aggiungi magnet, pausa/riprendi, verifica, riannuncia, coda,
-  rimozione, filtro IP, scheda con il log di Gextto). Il demone **resta acceso
-  quando Gextto si riavvia** (ad esempio per un aggiornamento): al riavvio
-  Gextto lo riaggancia e i trasferimenti non si interrompono; viene riavviato
-  solo se il suo programma o le sue opzioni sono cambiati, e mai durante uno
-  spostamento di file. Se Gextto resta spento, il demone si ferma da solo dopo
-  15 minuti. La **cache disco è adattiva**: il demone la ricalcola
-  ogni pochi minuti da memoria disponibile, download/seed attivi e tipo di
-  storage (più grande su HDD/NFS, piccola su SSD) e la applica a caldo, come i
-  limiti di velocità, senza perdere i peer; il **filtro
-  IP** scaricato da un URL si aggiorna una volta al giorno; all'avvio si
-  riscarica solo se la copia in cache ha più di 24 ore. Se il demone non
-  riesce a restare attivo (6 avvii anomali in 10 minuti) Gextto torna da solo a
-  qBittorrent-nox. Supporta il **download sequenziale** e la **prima/ultima parte**
-  dei file (si impostano all'aggiunta, o per tutti i nuovi torrent in
-  *Configurazione → Code e prestazioni → Modalità di download*; valgono per i torrent
-  nuovi). **Salta verifica** nella finestra di aggiunta (lo *skip hash check* di
-  qBittorrent) aggiunge un torrent su file già presenti senza verificarli prima:
-  va subito in seeding, e ogni pezzo viene verificato la prima volta che un peer
-  lo chiede — un pezzo che non corrisponde non viene mai inviato, e il torrent
-  allora riverifica tutti i suoi file e riscarica ciò che non va. Anche lo
-  streaming aspetta lo stesso controllo prima di leggere un pezzo. Usalo per dati
-  che sai completi, come una copia di quello che già condividevi. Un magnet con
-  il parametro `so=` (BEP 53) scarica da subito solo i file
-  indicati; con `ws=` aggiunge web seed e con `dht=` un nodo DHT di bootstrap.
-  Un indirizzo di scaricamento che risponde con un magnet — come redirect o come
-  corpo della risposta — viene aggiunto come magnet invece di fallire.
-  Supporta i torrent **solo-v2** (BEP 52),
-  sia da `.torrent` sia da
-  magnet; non supporta WebTorrent/WebRTC. In **standalone** (senza Gextto) la
-  stessa pagina aggiunge la gestione delle categorie, le azioni a fine download
-  (sposta i dati completati in una cartella e/o esegui un programma con i
-  dettagli del torrent nell'ambiente), i **profili di qualità** con soglia e
-  aggiornamento a una release migliore, l'**elenco episodi reale** da TVmaze
-  (opzionale), la ricerca parallela sugli indexer con risultati ordinabili, e
-  l'app installabile con l'uscita dalla sessione.
-- **qBittorrent-nox** — Gextto pilota un qBittorrent-nox esistente tramite la sua
-  Web API. Imposta URL, utente/password, categoria, tag e intervallo di polling, e
-  le **mappature percorsi** `locale=remoto` quando i due processi vedono percorsi
-  diversi; senza mappature Gextto verifica che i percorsi necessari esistano in
-  locale. Se un percorso non è traducibile, l'attivazione viene rifiutata, così
-  uno spostamento non può finire nella cartella sbagliata. Funziona con
-  **qBittorrent-nox 4.6 e successivi, compresa la 5.3**: parla sia le convenzioni
-  della Web API 4.x sia quelle 5.x (login, pausa all'aggiunta, limiti di seed) e
-  non richiede impostazioni diverse. La **modalità gestita**
-  scarica l'ultima release statica di qBittorrent-nox, la installa nella cartella
-  dell'applicazione (accanto a `gexttod`), la avvia/ferma col servizio e la
-  aggiorna con backup e rollback; un watchdog la riavvia dopo un'uscita inattesa
-  e, dopo ripetuti crash, esegue la catena di fallback tra i motori. Se qBittorrent è spento
-  all'avvio, Gextto continua a riprovare invece di fallire. I passi completi
-  (installazione, Web UI, mappature, modalità gestita, problemi comuni) sono in
-  [`docs/qbittorrent-nox.md`](qbittorrent-nox.md).
-Se la configurazione salvata seleziona un backend non più supportato, Gextto
-torna a gx-torrent e registra un avviso nel log.
+## 9. Seguire i download
 
-Il riquadro di configurazione mostra il motore attivo, il suo stato e un test di
-raggiungibilità/percorsi, così puoi validare un backend prima di passare. Il
-pannello **Salute → Motore torrent** (icona 🩺 nella barra) riassume lo stato del
-motore attivo (coda, velocità, porta/router, DHT/uTP/LSD, cifratura, proxy,
-filtro IP, cache, connessioni in entrata, I/O disco con job in coda e totali di
-letture/scritture, totali di sessione), tutto nella lingua dell'interfaccia. Quale
-che sia il motore attivo, la schermata **Scarico** e tutte le automazioni restano
-identiche.
+La pagina **Scarico** mostra tutto quello che si sta trasferendo: torrent,
+download HTTP dei fumetti e file eD2k di aMule (con il badge **eD2k**), in
+un'unica lista che si aggiorna ogni 5 secondi.
 
-### Prestazioni: RAM e CPU
+### Leggere la lista
 
-Gextto non richiede una macchina potente: gira su un mini PC o su un NAS e lascia
-CPU e RAM al resto del sistema. A riposo non si nota; durante un trasferimento il
-costo è del motore, che vive in un processo separato e restituisce la memoria
-quando il download finisce. Non c'è niente da tarare: la cache si dimensiona da
-sola in base alla memoria libera e al tipo di disco.
+Ogni riga mostra nome, stato, progresso, velocità, tempo stimato, peer e
+rapporto. Lo **sciame** (🌐 seeder / leecher) è quello riportato da tracker e DHT:
+con **0 leecher** non c'è nessuno a cui caricare. Ordini con **Ordina per** (per
+tutta la lista insieme), filtri per nome e per tag.
 
-Se la macchina è piccola:
+| Stato | Cosa significa | Cosa fare |
+|---|---|---|
+| In coda | registrato ma non ancora partito | aspettare: lo avvierà la coda |
+| Download | sta trasferendo | controllare velocità e peer |
+| Stalled | nessun byte in più da troppo tempo; messo in pausa | aspettare il nuovo tentativo automatico |
+| Seeding | completato, sta condividendo | lasciarlo finire secondo i limiti di seed |
+| Errore | il motore ha segnalato un errore | leggere il motivo prima di rimuoverlo |
+| Archiviato | il file è in libreria | nulla; non cancellare la sorgente mentre è in seed |
+| 📌 pin | forzato fuori coda | **Sblocca pin** nella sua scheda per rimetterlo in coda |
 
-- attiva la **coda dinamica** e *Non contare i torrent fermi negli slot attivi*:
-  i torrent a 0 B/s non occupano slot e quelli **stalled** vengono messi in pausa
-  e ritentati, invece di continuare a girare a vuoto;
-- non impostare un limite di cache: il valore automatico è quasi sempre quello
-  giusto. Un valore manuale serve solo se hai una ragione precisa.
+### Agire sui download
 
-Se un torrent non scarica, **Salute** mostra lo stato del motore e la scheda del
-torrent spiega il motivo (swarm morto, nessun peer, tracker irraggiungibile).
+- **Su una riga**: pausa/riprendi, ricontrolla, rimuovi.
+- **Su più righe**: spunta i torrent e usa la barra di selezione: **Pausa**,
+  **Riprendi**, **Ricontrolla**, **Tag** (assegna, crea o togli un tag),
+  **Rimuovi dalla sessione**.
+- **Strumenti**: **Pulisci completati** (toglie i torrent che hanno finito il
+  seed), **File orfani…**, **Aggiorna ogni 5 s** e il collegamento a
+  **Rimozione a fine seed**.
+
+**Rimuovi** toglie il torrent dalla sessione e può chiedere se cancellare anche
+i dati. Togliere un torrent dalla sessione **non** toglie il file dalla
+libreria. Un torrent con seed infinito non viene mai tolto da *Pulisci
+completati*.
+
+### Il dettaglio di un torrent
+
+Clic sul nome: il dettaglio si apre sopra lo *Storico download*, così la lista
+resta visibile. Le schede:
+
+| Scheda | Cosa trovi |
+|---|---|
+| **Generale** | dati del torrent, copia magnet, **Esporta .torrent**, riannuncia, pin, riavvia, segna come fallito, **Super seeding**, web seed |
+| **Tracker** | aggiungi tracker (`tier|url` per riga) o rimuovine uno |
+| **Contenuto** | i file, con la **priorità** (Salta, Normale, Alta, Massima) e, con gx-torrent, **▶** per lo streaming |
+| **Peers** | i peer connessi |
+| **Pezzi** | la mappa dei pezzi: verde scaricato, giallo in corso, grigio mancante |
+| **Limiti** | rapporto, giorni di seed e banda di quel torrent: **-1** usa il valore globale, **0** toglie il limite |
+| **Storage** | **Sposta storage** in un'altra cartella |
+| **Storia** | ogni evento di quel download, dalla scelta all'arrivo in libreria |
+
+Passando il mouse su un valore o su un pulsante compare la spiegazione. Se
+sposti lo storage in una cartella che **contiene già i dati**, Gextto li
+ricontrolla e li riusa invece di riscaricarli.
+
+### Streaming e media server
+
+Con gx-torrent ogni file ha **▶**: apre lo **streaming HTTP**, e i pezzi della
+parte che stai guardando vengono scaricati per primi. Puoi iniziare a guardare
+prima che il download finisca.
+
+Lo stesso motore fa da **media server DLNA/UPnP** (*Configurazione → Motore
+torrent → server DLNA/UPnP*, spento di default): TV e console sulla rete di casa
+vedono i media completati e le cartelle della libreria, con locandine e
+miniature già presenti (nel formato di Jellyfin, Kodi ed Emby) e i sottotitoli
+`.srt`/`.vtt` con lo stesso nome del video. Non ha autenticazione, quindi
+risponde solo ai dispositivi della rete locale.
+
+### La banda
+
+Il pulsante **Banda**, in alto a destra nella pagina, mostra cosa limita la
+velocità in questo momento e permette un'**eccezione** temporanea alla regola
+impostata in *Configurazione → Velocità e rete*:
+
+- **Auto** — Gextto misura la linea e si adatta;
+- **Limita download** / **Limita upload** — un valore dall'elenco, o **Senza
+  limite**;
+- **Durata** — 1, 3, 6, 12 ore o **Finché non la tolgo**;
+- **Valori personalizzati…** — download e upload in KiB/s e durata in minuti;
+- **Togli l'eccezione** — torna subito alla regola.
+
+L'icona dice cosa vale: ⚡ un'eccezione (con i minuti rimasti), ⏰ una fascia
+della programmazione, altrimenti la regola. Con eD2k attivo **aMule segue gli
+stessi limiti**. Vedi anche [Velocità e rete](#16-velocità-e-rete).
+
+### Torrent fermi (stalled)
+
+Se un torrent non aggiunge byte per un certo tempo diventa **stalled**: Gextto
+lo mette in pausa, così non occupa uno slot della coda, e ogni tanto lo riprende
+e lo riannuncia. Se non riparte entro il limite finale, lo abbandona e cerca
+un'altra release. Avere peer connessi senza ricevere dati non azzera il timer.
+
+I tempi sono in *Configurazione → Seed e completamento → Torrent bloccati*:
+
+| Impostazione | Predefinito |
+|---|---|
+| Considera bloccato dopo | 60 minuti |
+| Riprova i torrent bloccati ogni | 60 minuti |
+| Rimuovi i torrent bloccati dopo | 14 giorni (`0` = mai) |
+
+Nel log, in inglese: `is stuck at` (con il motivo), `is still stuck` a ogni
+tentativo, `is downloading again` quando riparte, `Gave up on` quando viene
+abbandonato. La Dashboard elenca i download fermi in **Da controllare**, con il
+prossimo tentativo e quando verranno abbandonati.
+
+### Limiti di seed: regole per sorgente e seed inattivo
+
+Quando un torrent smette di condividere lo decide Gextto, con lo stesso criterio
+per gx-torrent e qBittorrent. Per ogni limite (rapporto, tempo, inattività) vale
+il primo livello che lo imposta:
+
+1. il limite del **singolo torrent** (scheda **Limiti**);
+2. la prima **regola di seed** che corrisponde (*Configurazione → Seed e
+   completamento → Regole di seed*);
+3. il limite **globale**.
+
+Una **regola di seed** indica una **sorgente** (basta una parte del nome
+dell'indexer, senza distinguere maiuscole: `mircrew` vale anche per `mircrew
+indexerr`) e/o una **categoria** (Serie TV, Film, Fumetti, Altro). Così le regole
+di un tracker privato valgono solo per i suoi torrent. Un campo vuoto usa il
+globale. Un torrent arrivato dalla ricerca aggregata di Jackett non porta il
+nome del tracker: per lui valgono categoria o globale.
+
+**Seed infinito.** `0` vuol dire infinito, per il rapporto come per il tempo, e
+**basta che uno dei due sia infinito** perché il seed non finisca mai: il torrent
+non viene fermato nemmeno per inattività e non viene spostato in libreria (ci
+entra una copia o un hardlink). Per fermare il seed, rapporto **e** tempo devono
+essere entrambi maggiori di zero. Vale anche per eD2k.
+
+**Ferma il seed inattivo dopo** ferma un torrent che non invia dati da quei
+minuti. Conta solo il tempo in seed attivo (non in coda né in pausa) e riparte a
+ogni riavvio di Gextto: un riavvio può solo allungare il seed.
+
+A fine seed il torrent segue il suo percorso: archiviazione in libreria e, se
+attiva, rimozione dalla sessione.
+
+### Lo storico
+
+**Storico download**, in fondo alla pagina, elenca i download conclusi: nome
+(con il badge **NAS** quando il file è archiviato), tipo, stagione ed episodio,
+regola di cartella, punteggio, percorso in libreria e data.
+
+## 10. Dove finiscono i file
+
+### Cosa succede a download finito
+
+Gextto riconosce il contenuto, lo rinomina con il tuo modello e lo mette nella
+cartella della serie o del film. Il comportamento dipende dalla forma del
+torrent e dalla presenza di una libreria configurata:
+
+| Contenuto | Con libreria configurata | Senza libreria |
+|---|---|---|
+| Un episodio, come file singolo | archiviato e rinominato secondo le regole della serie | resta nella cartella download |
+| Un episodio dentro una cartella | il video entra in libreria rinominato; la cartella resta per il seed e poi va nel **cestino** | la cartella resta intatta in Download |
+| Un season pack | i video degli episodi (riconosciuti da `S01E02`, `1x02`…) entrano in libreria; il pack resta per il seed e poi va nel **cestino** | il pack resta intatto in Download |
+
+Sottotitoli, NFO e immagini del pack restano nella cartella sorgente. Una
+cartella sorgente non viene mai spostata o cancellata mentre è in seed, e va
+nel cestino solo se il cestino è configurato e la rimozione a fine seed è
+attiva; senza cestino i file sorgente non vengono mai cancellati.
+
+### Copia, spostamento o hardlink
+
+- **Sposta** (*Sposta gli episodi/pack in archivio*): a fine seed il file viene
+  spostato in libreria.
+- **Hardlink**: finché il file è in seed, Gextto prova a creare in libreria un
+  **secondo nome per gli stessi dati**. Il file compare in libreria subito e non
+  occupa spazio due volte. Cancellare uno dei due nomi non tocca l'altro: i dati
+  spariscono solo quando li cancelli entrambi.
+- **Copia**: se l'hardlink non è possibile, Gextto copia e lo scrive una volta
+  nel log con il motivo.
+
+L'hardlink funziona solo se download e libreria sono sullo **stesso
+filesystem**. Due cartelle dello stesso NAS montate **separatamente** (per
+esempio `nas:/volume1/Download` e `nas:/volume1/Video` come due mount) non
+bastano: monta una radice comune (`nas:/volume1`). Se usi programmi che
+modificano i video **sul posto** (alcuni tagger, `mkvpropedit`), spegni l'opzione
+*Configurazione → Seed e completamento → Hardlink invece della copia durante il
+seed*: cambierebbero anche il file in seed.
+
+### Upgrade
+
+Quando arriva una versione migliore di un file che hai già, la nuova entra in
+libreria e la vecchia va nel **cestino**. Una versione uguale o peggiore viene
+scartata (nel log: `discarded as inferior`). Per congelare un titolo imposta
+**Permetti upgrade** su *No* con *Modifica selezionati*.
+
+### Il nome dei file
+
+Con **Rinomina episodi** attivo, il nome si sceglie in *Configurazione →
+Libreria e rinomina → Composizione del nome*, con quattro formati e
+un'anteprima:
+
+| Formato | Episodi | Film |
+|---|---|---|
+| **Base** (predefinito) | serie, stagione, episodio e titolo | `Titolo (Anno)` |
+| **Standard** | più risoluzione e codec | `Titolo (Anno) [risoluzione][codec]` |
+| **Completo** | più audio, HDR e lingua | `Titolo (Anno) [risoluzione][audio canali][HDR][codec]` |
+| **Personalizzato** | il tuo modello, con i token `{Serie}`, `{Stagione}`, `{Episodio}`, `{Titolo}`, `{Source}`, `{Gruppo}`, `{Risoluzione}`, `{VideoCodec}`, `{Audio}`, `{Canali}`, `{HDR}`, `{Lingue}` | `Titolo (Anno) [risoluzione]` |
+
+I tag tecnici non vengono presi solo dal nome della release: prima di
+rinominare Gextto legge il file con `mediainfo` (o, se manca, con `ffprobe`) e
+usa risoluzione, codec, audio, canali, HDR/Dolby Vision e lingue reali. Un tag
+già presente nel nome resta se il file non lo smentisce. Un file con più episodi
+contigui prende l'intervallo (`S01E01-E02`). Senza titolo dell'episodio (nessuna
+chiave TMDB o TVDB) il nome usa «Episodio N».
+
+### Importare un file che hai già
+
+Per un video che Gextto non ha scaricato — un episodio recuperato a mano, una
+vecchia stagione, un film da un altro disco — usa **Manutenzione → Importa
+file**:
+
+1. scrivi il percorso o premi **Sfoglia** (un clic su un video lo sceglie,
+   **Seleziona** prende la cartella intera);
+2. premi **Analizza**: Gextto propone serie o film, stagione, episodio e
+   cartella di destinazione;
+3. correggi se serve e premi **Importa ora**.
+
+Il file viene rinominato, spostato in libreria e registrato, e Jellyfin o Plex
+vengono aggiornati. Se esiste già un file con lo stesso nome l'import si ferma:
+spunta **Sostituisci il file esistente** per mandare il vecchio nel cestino.
+
+Se invece hai copiato file direttamente nella cartella di una serie, basta
+**Scansiona archivio** dalla scheda della serie.
+
+## 11. Fumetti
+
+1. In **Fumetti → Aggiungi fumetto** scrivi il titolo e premi **Trova**.
+2. Scegli il risultato esatto di GetComics e conferma. Gextto salva quel post e
+   lo usa per il download, senza confonderlo con un albo omonimo.
+3. Un titolo con il numero (per esempio «Titolo #41») segue la serie **da quel
+   numero in avanti**: i numeri successivi vengono scaricati, quelli precedenti,
+   le altre serie e le raccolte no.
+
+La pagina ha anche la lista dei fumetti seguiti, l'estrazione dei link da un
+post, le impostazioni dei **weekly pack** e lo storico con reinvia, elimina e
+forza. Un weekly pack si scarica una volta sola; uno trovato prima che fossero
+pubblicati i link viene ricontrollato a ogni ciclo e accodato appena il link
+compare.
+
+I download HTTP diretti compaiono in **Scarico** come gli altri. Nei file **CBZ**
+scaricati direttamente Gextto aggiunge un `ComicInfo.xml` con serie, numero e
+anno, che Komga, Kavita e i lettori usano per ordinare gli albi; un file che lo
+ha già, i fumetti da torrent (sono in seed) e i CBR non vengono toccati. Un albo
+che arriva come RAR viene salvato `.cbr`.
+
+## 12. eD2k e Kad con aMule
+
+Gextto può usare anche la rete **eD2k/Kad**, tramite **aMule**: `amuled` fa il
+lavoro di rete, Gextto lo comanda con le **connessioni esterne (EC)**, lo stesso
+protocollo di `amulecmd`. È facoltativo e spento di default; con aMule spento i
+torrent non cambiano.
+
+### Collegare aMule
+
+1. Installa aMule (`amule-daemon` su Debian/Ubuntu) e abilita le connessioni
+   esterne in `amule.conf`:
+
+   ```ini
+   [ExternalConnect]
+   AcceptExternalConnections=1
+   ECAddress=127.0.0.1
+   ECPort=4712
+   ECPassword=<md5 della password>
+   ```
+
+   `ECPassword` è l'MD5 della password: `printf '%s' 'segreta' | md5sum`.
+2. Avvia `amuled`.
+3. In **Configurazione → eD2k e Kad** accendi **eD2k e Kad tramite aMule** e
+   inserisci indirizzo, porta e password **in chiaro**.
+4. Apri sul router le porte TCP e UDP di aMule: avrai un **ID alto** e un Kad non
+   dietro firewall, cioè più fonti.
+
+Gextto deve vedere la **cartella di arrivo** di aMule allo stesso percorso (lo fa
+già se girano sulla stessa macchina): è da lì che importa i file completati.
+Usa una cartella dedicata, perché aMule condivide tutto quello che contiene. Con
+aMule in **Docker** monta la cartella dei download allo stesso percorso
+dell'host, imposta lì `INCOMING_DIR` e `TEMP_DIR` e, per l'UPnP, usa
+`network_mode: host`.
+
+### La pagina eD2k
+
+- **aMule** — versione, server, **ID alto/basso**, stato di Kad, velocità, coda
+  di upload, byte scambiati; i pulsanti **Connetti**, **Disconnetti**,
+  **Avvia/Ferma Kad**, **Lascia il server**. Se aMule non risponde, la pagina
+  dice cosa controllare.
+- **Server eD2k** — la lista dei server, con **Connetti**; da qui scarichi anche
+  un nuovo `server.met` o un `nodes.dat`.
+- **Cerca su eD2k e Kad** — scegli la rete e cerca; ogni risultato ha
+  **Scarica**, e **già noto** segnala un file che aMule ha già. Il filtro sopra i
+  risultati (parole, fonti minime, dimensione minima, nascondi già noti) non
+  rifà la ricerca.
+- **Incolla link eD2k** — uno o più link `ed2k://`, poi **Scarica con aMule**.
+- **Log di aMule**, **Cartelle di aMule** (con **Crea le cartelle** se mancano) e
+  **File condivisi** (byte caricati, richieste, client in coda, link da copiare;
+  **Ricarica file condivisi** dopo modifiche a mano).
+
+### Cosa succede a un download eD2k
+
+I download eD2k compaiono in **Scarico** con il badge **eD2k**, con pausa,
+riprendi e 🗑️ (su un download in corso lo annulla; su uno completato lo toglie
+solo dall'elenco di aMule). **ⓘ** apre il dettaglio, con fonti, hash, link e
+**priorità in aMule**.
+
+Quando aMule completa un video, Gextto aspetta che il file sia stabile nella
+cartella di arrivo, poi lo tratta come un torrent completato: stesso controllo
+di qualità, rinomina, libreria, MediaInfo, notifica. Con *Sposta gli
+episodi/pack in archivio* attiva il file viene spostato (e aMule smette di
+condividerlo); spenta, entra con hardlink o copia e resta condiviso. Un file che
+non è un video resta nella cartella di arrivo. Con seed infinito il file viene
+copiato e resta condiviso, con il badge «seed ∞».
+
+### eD2k come ripiego
+
+Con **Usa eD2k quando i torrent non trovano nulla** attivo, la ricerca dei
+mancanti chiede a eD2k/Kad quando torrent e archivio non hanno risultati: una
+sola interrogazione per stagione, che dura quanto **Durata della ricerca eD2k**.
+I risultati compaiono con la sorgente **eD2k/Kad** e **Scarica** li passa ad
+aMule.
+
+La guida completa — installazione, Docker, problemi comuni — è in
+[amule.it.md](amule.it.md).
+
+---
+
+# Parte III — Configurare
+
+La pagina **Configurazione** è divisa in quattro aree: **Cosa cercare**
+(Generale, Sorgenti, eD2k e Kad, Qualità e upgrade), **Come scaricare** (Motore
+torrent, Velocità e rete, Code e prestazioni, Seed e completamento), **Dove
+salvare** (Libreria e rinomina, Archivio e spazio) e **Sistema** (Manutenzione
+automatica, Notifiche, Accesso e servizi, Diagnostica e aggiornamenti).
+
+Come si usa:
+
+- le sezioni sono nella colonna a sinistra (dal telefono, nella tendina
+  *Sezione*); la casella di ricerca trova un'impostazione per nome o per chiave
+  tecnica;
+- ogni riga mostra nome, descrizione, unità e valori speciali (per esempio «0 =
+  mai»); le opzioni che dipendono da un'altra **compaiono solo quando servono**;
+- un valore cambiato e non salvato è segnato **non salvata** e compare la barra
+  *Modifiche non salvate* con **Salva tutto** e **Annulla modifiche**; uscire
+  dalla pagina con modifiche in sospeso chiede conferma;
+- **↺ Predefinito** rimette il valore predefinito; **Solo modificate** mostra
+  solo quello che hai cambiato;
+- le impostazioni che il motore torrent attivo non usa sono raccolte in **Non
+  usate dal motore attivo**; quelle rare in **Per esperti**.
+
+Questa parte spiega le scelte che contano. Ogni impostazione, una per una, è
+nell'[Appendice A](#appendice-a-riferimento--configurazione).
+
+## 13. Sorgenti: feed e indexer
+
+Gextto trova le release in tre modi: **feed RSS** (letti a ogni ciclo, riempiono
+l'archivio locale), **indexer Torznab** (interrogati per i titoli che segui) e
+**motori web**. Tutto si imposta in *Configurazione → Sorgenti*.
+
+### Aggiungere Jackett o Prowlarr
+
+1. In Jackett (o Prowlarr) abilita almeno un indexer e copia la **API key**.
+2. In Gextto premi **+ Jackett** (o aggiungi una riga alla lista *Indexer
+   Torznab* e scegli il tipo).
+3. Inserisci **solo l'indirizzo base**, per esempio `http://jackett:9117` o
+   `http://prowlarr:9696`, e la API key. Non aggiungere il percorso Torznab:
+   Gextto lo costruisce da sé.
+4. Salva e premi **Verifica**.
+5. Controlla *Salute → Stato API*.
+
+Gextto legge l'elenco degli indexer dal manager e li interroga **uno per uno**,
+così ognuno ha il suo timeout e la sua salute e il più lento non blocca gli
+altri. Se l'elenco non è leggibile, torna alla ricerca aggregata. Nei risultati
+la sorgente compare come `jackett:NomeTracker`.
+
+### Aggiungere indexarr
+
+Uguale, con tipo **indexarr** e indirizzo base `http://indexarr:8788`. indexarr
+si interroga in una volta sola: unisce da sé i doppioni delle sue fonti e dice
+da quale sito arriva ogni risultato. Le sue fonti eD2k restituiscono link
+`ed2k://`, che Gextto passa ad aMule invece che al motore torrent. Quando un
+download si completa, Gextto lo comunica a indexarr, che nella sua pagina
+Download segna la riga come **scaricato**. Non c'è nulla da configurare.
+
+### FlareSolverr
+
+I siti protetti da Cloudflare richiedono un **FlareSolverr** funzionante:
+inserisci l'URL in *Configurazione → Sorgenti* e premi il pulsante di test. Con
+un proxy configurato, FlareSolverr non viene usato come ripiego, perché
+scaricherebbe fuori dal tunnel.
+
+### Raggiungibile non vuol dire funzionante
+
+Un indexer può rispondere ma rifiutare la richiesta (API key sbagliata, nessun
+indexer abilitato in Jackett). Per questo *Salute* distingue:
+
+| Stato | Significato | Cosa fare |
+|---|---|---|
+| **OK** | risponde e accetta le richieste | nulla |
+| **Errore API** | risponde, ma rifiuta API key o configurazione | ricopia la API key, controlla gli indexer abilitati e l'URL base. Riavviare Gextto non serve |
+| **Non raggiungibile** | nessuna risposta entro il timeout | controlla DNS, container, porta, firewall |
+
+Dietro un manager la tabella mostra anche ogni suo indexer, così un tracker in
+errore o in pausa si vede anche se il manager risponde.
+
+### Backoff: quando una sorgente fallisce
+
+Una sorgente che continua a fallire viene messa in **backoff**: per un po'
+Gextto non la interroga, con pause sempre più lunghe. Se un indexer risponde
+`429 Too Many Requests` con `Retry-After`, la pausa rispetta almeno il tempo
+chiesto. Lo stato è in *Salute → Stato provider*, con livello, scadenza e
+ultimo errore. Dopo aver corretto la causa premi **Azzera** su quella
+sorgente; non usarlo per nascondere una API key sbagliata, o il backoff
+ricomincerà.
+
+Gextto avvisa da sé (log e notifica) quando una sorgente fallisce in tre delle
+ultime ricerche, quando i link `.torrent` di una sorgente falliscono su due
+release diverse nello stesso ciclo (di solito un login scaduto) e quando tutto
+torna regolare.
+
+### Copie della stessa release
+
+Lo stesso torrent arriva spesso da più fonti. Gextto le unisce in una sola
+release quando hanno lo stesso infohash, oppure — se una fonte non lo dà —
+quando nome e dimensione coincidono. Nel dubbio non unisce: gruppo, risoluzione,
+lingua, PROPER o episodio diversi restano separati. Della release usa la copia
+migliore e tiene le altre come riserva: se un link `.torrent` non funziona,
+prova subito la stessa release da un'altra fonte.
+
+## 14. Qualità, punteggi e upgrade
+
+### Come Gextto sceglie
+
+1. **Filtri.** Una release che non rispetta i requisiti del titolo (qualità,
+   lingua, sottotitoli obbligatori, esclusioni) o i controlli di sanità viene
+   scartata.
+2. **Punteggio.** Tra le release rimaste vince quella con il punteggio più alto.
+   Il punteggio somma i pesi di risoluzione, sorgente, codec, audio, HDR/Dolby
+   Vision, correzioni (PROPER, REPACK) e gruppo.
+3. **Confronto con la libreria.** Se hai già il file, la nuova release lo
+   sostituisce solo se è un **miglioramento reale** di qualità.
+
+I controlli di sanità sono automatici e non si configurano: sottotitoli impressi
+nel video (`HC`) e dimensioni assurde per la risoluzione vengono rifiutati. Gli
+scarti si vedono nel log a livello `DEBUG`.
 
 ### Profili di qualità
 
-In **Configurazione → Qualità e upgrade**, sotto *Profili di qualità*, dai un nome alle
-combinazioni di qualità, audio minimo, lingua, sottotitoli, esclusioni e
-upgrade («Permetti upgrade») che usi. La **Qualità** del profilo si sceglie da
-un elenco con le risoluzioni che Gextto riconosce (360p … 2160p, il minimo con
-«+», l'intervallo 720p-1080p, oppure Qualsiasi); un valore scritto a mano in
-passato resta selezionato finché non lo cambi. **Lingua** e **Sottotitoli**
-propongono le scelte comuni (ita, eng, ita,eng, multi, any) ma accettano
-anche un valore scritto a mano, per esempio `fre` o `ita,eng,fre`; una lingua
-lasciata vuota vale la lingua predefinita di Gextto (salvando viene scritta la
-predefinita del momento). Gextto
-genera automaticamente un profilo per ogni combinazione di qualità, audio
-minimo, lingua, sottotitoli e «Permetti upgrade» già presente nella libreria (le
-esclusioni di un singolo titolo e la qualità `any`, uguale a nessun limite, non
-creano profili a parte) e li espone a Jellyseerr tramite
-`/api/v3/qualityprofile`; il primo profilo è **Default**. La generazione
-automatica avviene **finché non salvi la lista**: da quel momento i profili sono
-quelli che hai salvato, e le combinazioni nuove non si aggiungono da sole.
-Due profili non possono avere lo stesso nome: salvando un nome già usato la
-modifica viene rifiutata con un messaggio, invece di far sparire una riga.
-
-**I profili sono modelli, non regole.** Quando usi un profilo (scegliendolo nel
-campo **Profilo di qualità** del modulo di aggiunta di una serie o di un film, da
-Jellyseerr o da *Modifica selezionati* nelle tabelle Serie TV e Film), Gextto
-**copia** i suoi valori nel titolo (le esclusioni scritte nel modulo di aggiunta
-si sommano a quelle del profilo); da quel
-momento a decidere sono i campi del titolo, come sempre. Se poi cambi il
-profilo, i titoli già creati non cambiano: per aggiornarne molti insieme usa
-*Modifica selezionati* nelle tabelle Serie TV e Film. A Gextto non serve una gestione "alla
-Sonarr" in cui il profilo governa i titoli: il campo Qualità accetta già un
-minimo (`1080p`), un massimo (`<1080p`) o un intervallo (`720p-1080p`), e
-lingua, sottotitoli, esclusioni e upgrade si impostano per titolo. Ogni
-profilo mantiene il suo numero anche se lo rinomini o ne togli e riordini altri: Jellyseerr
-ricorda il numero, non il nome. Se togli tutti i profili, alla lettura
-successiva Gextto li rigenera dalla libreria.
-
-### Configurare un indexer Torznab
-
-Per Jackett:
-
-1. crea o verifica almeno un indexer dentro Jackett;
-2. copia la API key dalla pagina Jackett;
-3. in Gextto premi **+ Jackett** (o aggiungi una riga alla lista *Indexer
-   Torznab* e scegli **Jackett** come tipo);
-4. inserisci URL base, ad esempio `http://jackett:9117`, e API key;
-5. salva e premi **Verifica**;
-6. controlla *Salute → Stato API*.
-
-Per indexarr:
-
-1. copia la API key da indexarr;
-2. in Gextto aggiungi una riga alla lista *Indexer Torznab* e scegli **indexarr**
-   come tipo;
-3. inserisci l'URL base, ad esempio `http://indexarr:8788`, e la API key;
-4. salva e premi **Verifica**;
-5. controlla *Salute → Stato API*.
-
-Una fonte indexarr con protocollo eD2k restituisce link `ed2k://` invece di
-magnet o `.torrent`. Gextto li riconosce dal `<link>` (e dall'attributo `ed2k`),
-li mostra come rete **eD2k** e li accoda in aMule al momento dello scarico: non
-passano dal client torrent. La ricerca aggregata li include quando il titolo non
-è già coperto da un torrent; per vederli tutti si può aggiungere
-`indexer_type=ed2k` alla richiesta Torznab. Per dare tempo alla fonte eD2k di
-aprire i topic, Gextto chiede a indexarr un'attesa fino a 45 secondi solo per le
-proprie ricerche (`live_wait=45`); le altre sorgenti e gli altri programmi non
-cambiano. Quando accoda in aMule un file preso da indexarr, Gextto apre una volta il suo
-link di download, senza far aspettare il download: indexarr registra così il
-download e la fonte che l'ha fornito in *Log → Download*. Il file scaricato resta il link `ed2k://`
-e, se il link di download non risponde, il download parte lo stesso.
-
-Quando un torrent o un file eD2k si completa, Gextto comunica a indexarr che il
-file è davvero arrivato, usando lo stesso indirizzo e la stessa API key delle
-ricerche. Nella pagina Download di indexarr quella riga diventa **scaricato**;
-quella solo consegnata resta **solo consegnato**. La comunicazione avviene in
-sottofondo e non rallenta mai il download; non c'è niente da configurare.
-
-Con Jackett e Prowlarr Gextto legge l'elenco degli indexer dal manager
-e ne interroga **uno alla volta** (l'endpoint Torznab del singolo indexer per
-Jackett, la ricerca per `indexerIds` per Prowlarr): ogni tracker ha
-così il proprio timeout e la propria salute, senza che il più lento blocchi gli
-altri. Se l'elenco non è leggibile torna alla ricerca aggregata: per Jackett è
-`/api/v2.0/indexers/all/results/torznab/api`. **indexarr** invece si interroga
-sempre in una volta sola, con una ricerca per titolo sul suo `/api`: interroga da
-sé le sue fonti in parallelo, unisce i doppioni e dice per ogni risultato da quale
-sito arriva, quindi espanderlo in una ricerca per sito moltiplicherebbe solo le
-richieste. Non
-aggiungere il percorso Torznab all'URL base: basta l'indirizzo del manager
-(Prowlarr normalmente sulla porta `9696`, indexarr sulla `8788`). Un percorso
-Torznab personalizzato già completo va lasciato come endpoint esplicito.
-
-Un indexer può essere raggiungibile ma non sano: per esempio Jackett può
-rispondere HTTP 200 con un errore Torznab dovuto a API key errata o nessun
-indexer abilitato. In questo caso *Salute* mostra **Errore API** e il dettaglio;
-il log del ciclo mostrerà anche il backoff della sorgente quando applicabile.
-
-### Punteggio, filtri e “Perché non questa?”
-
-I controlli principali sono indipendenti:
-
-1. titolo monitorato;
-2. blocklist e duplicati;
-3. filtri globali e filtro della sorgente;
-4. sanità della release, inclusi sottotitoli hardcoded e dimensione minima;
-5. qualità, lingua, sottotitoli ed esclusioni del titolo;
-6. confronto con file già archiviati e download attivi.
-
-La blocklist ferma la release prima di chiedere il torrent all'indexer: se il
-risultato contiene solo il link al `.torrent`, Gextto la riconosce dal titolo e
-la scarta senza aprire il link. L'archivio conserva anche l'identificativo del
-torrent che l'indexer dichiara accanto al link, così la stessa release non viene
-richiesta di nuovo né duplicata.
-
-Lo score aiuta a scegliere tra candidati ammessi; non rende valida una release
-che fallisce un filtro bloccante. Nel pannello **Perché non questa?**:
-
-- **Superata** significa che quel controllo è passato;
-- **Bloccante** indica un motivo sufficiente a rifiutare il candidato;
-- **Informativa** indica un controllo che dipende dal contesto dell'intero ciclo;
-- il confronto archivio mostra se si tratta di primo download o di possibile
-  upgrade.
-
-La spiegazione è una diagnosi, non una prenotazione: aprirla non crea righe
-torrent, non accoda magnet e non cambia la configurazione.
-
-### Ritardi e backoff delle sorgenti
-
-Il delay di acquisizione può trattenere una release prima dell'avvio per dare
-tempo a un risultato migliore. Un punteggio alto può bypassare il delay secondo
-la configurazione. Il backoff delle sorgenti è diverso: viene attivato da errori
-ripetuti e impedisce temporaneamente nuove richieste alla sorgente problematica.
-
-Il ritardo si imposta in *Configurazione → Generale → Ritardo prima di
-scaricare*. Lo stato dei backoff (livello, scadenza e ultimo errore) è in
-*Salute → Stato provider*, che elenca **solo gli indexer configurati e attivi**
-(quelli senza problemi come «Nessun problema rilevato»): una sorgente rimossa o
-disattivata sparisce anche se aveva un errore. La colonna *Dettaglio tecnico*
-riporta l'errore grezzo. Se un indexer risponde `429 Too Many Requests` con
-`Retry-After`, la scadenza rispetta almeno il tempo chiesto (al massimo un
-giorno). Usa **Azzera** per singola sorgente dopo aver corretto la causa; non usarlo per
-mascherare un'API key sbagliata, altrimenti il backoff ricomincerà.
-
-### Configurare il NAS senza sorprese
-
-Per una libreria su NAS:
-
-1. monta il filesystem prima dell'avvio di Gextto;
-2. assegna permessi di lettura/scrittura all'utente del servizio;
-3. imposta spazio minimo prudente;
-4. esegui una scansione archivio dopo aver copiato file esistenti;
-5. controlla il percorso effettivo nella cronologia dopo il primo completamento.
-
-Se il NAS non è montato, non sostituire temporaneamente il percorso con la root
-locale senza aver capito l'effetto: potresti archiviare file nel posto sbagliato.
-Meglio correggere il mount e lasciare il download in attesa.
-
-Un NAS smontato non cancella lo storico: quando un file archiviato non si trova,
-Gextto segna l'episodio come da recuperare solo se la cartella del file esiste
-ancora o se il percorso montato non è vuoto. Un mount point vuoto viene trattato
-come volume assente, e i dati dell'episodio restano intatti.
-
-I controlli di sanità delle release sono **automatici** e non configurabili:
-sottotitoli hardcoded (`HC`) e dimensioni assurde (una soglia per risoluzione
-derivata da un archivio reale) vengono rifiutati. Gli scarti sono eventi
-ordinari e vengono registrati a `DEBUG` con titolo, risoluzione, dimensione e
-motivo, così il log `INFO` di produzione resta pulito; abilita il debug per
-vederli. Anche la protezione dagli
-episodi vecchi è fissa: Gextto non riscarica un episodio precedente fuori dai
-buchi riconosciuti quando possiede già episodi successivi (gap-fill e azioni
-manuali restano sempre permessi). Per congelare un titolo imposta **Permetti
-upgrade** su No con *Modifica selezionati*.
-
-I dati reali dei file (`ffprobe`: HDR, codec, audio, lingue) sono salvati per
-episodio/film e **usati nei confronti di upgrade**: il file archiviato viene
-letto com'è davvero, non solo dal nome. Sono additivi (non declassano mai un
-file). I file nuovi vengono analizzati al completamento; gli altri vengono
-coperti dal **backfill MediaInfo** incrementale schedulato (o dal pulsante in
-Manutenzione per una scansione immediata). Se `ffprobe` non è installato il
-backfill si mette in pausa da solo.
-
-## 8. Integrazioni
-
-L'elenco completo dei campi e delle azioni è nell'[Appendice B](#appendice-b-riferimento--integrazioni).
-
-- **Simkl** — credenziali, flusso PIN, import watchlist, calendario e segna come
-  visto.
-- **Jellyfin / Plex** — URL + token del server e pulsante di aggiornamento
-  libreria.
-- **Metriche ed eventi** — gx-torrent espone `GET /api/v1/metrics` per
-  Prometheus e `GET /api/v1/events` per Home Assistant o uno script. Con il
-  token serve l'header `X-Gx-Token`. Esempi in `docs/API.md`.
-- **Hook eventi** — esegue un programma esterno su eventi Gextto
-  (`download_started`, `torrent_completed`, `season_pack_completed`,
-  `torrent_error`, …). I campi accettano segnaposto come `{title}`, `{hash}`,
-  `{path}`, `{series}`, `{episode}`; gli stessi valori sono esposti come variabili
-  d'ambiente `GEXTTO_*`. I programmi sono eseguiti senza shell e con timeout di
-  default pari a 60 secondi (massimo 24 ore; anche `0` usa il default). Ogni
-  segnaposto diventa un solo argomento anche se il valore contiene spazi: un
-  titolo come `Titolo Con Spazi` arriva intero, non spezzato in due. Allo scadere del
-  timeout viene terminato anche ogni processo figlio lanciato dal programma; al
-  massimo 4 hook girano contemporaneamente, gli altri attendono il proprio turno.
-
-### Jellyseerr / Sonarr / Radarr
-
-Gextto espone un sottoinsieme dell'API v3 di Sonarr/Radarr per Jellyseerr:
-`/api/v3/system/status`, `qualityprofile`, `languageprofile`, `rootfolder`,
-`tag`, `series/lookup` con `POST series`, `movie/lookup` con `POST movie` e
-`queue`. In Jellyseerr usa come URL il server Gextto e come chiave la **API key**
-di Gextto (Configurazione → Accesso). Non è una compatibilità completa: le
-richieste che Gextto non gestisce rispondono 404, e quality profile/custom
-formats non riproducono la semantica degli *arr*.
-
-Cosa succede a una richiesta: per una serie nuova Gextto segue solo le stagioni
-richieste in Jellyseerr (nessuna stagione indicata = dalla 1 in poi); se la
-serie è già in libreria, le stagioni richieste vengono aggiunte a quelle che
-segue già, senza toglierne. Un film già in libreria non viene duplicato: se era
-disattivato viene riattivato. La «ricerca immediata» di Jellyseerr
-(`/api/v3/command`) non è gestita: il titolo aggiunto viene cercato dai normali
-cicli di acquisizione di Gextto.
-
-### Collegare un servizio esterno
-
-Le integrazioni non sono necessarie per scaricare e archiviare i media. Attivale
-una alla volta e usa sempre il pulsante di test quando disponibile:
-
-- **Simkl**: completa il flusso PIN, verifica che l'account corretto sia
-  visualizzato e solo dopo usa l'import watchlist;
-- **Jellyfin/Plex**: inserisci URL raggiungibile dal demone e token con i permessi
-  minimi necessari, poi prova l'aggiornamento libreria;
-- **Hook**: configura prima un programma innocuo che scriva un log, verifica i
-  placeholder e solo dopo collegalo a script di automazione o notifiche.
-
-Gli hook vengono eseguiti senza shell: pipe, redirezioni e operatori come `&&`
-non vengono interpretati. Se servono, inserisci un vero script eseguibile e
-passagli i valori tramite i placeholder o le variabili `GEXTTO_*`. Non inserire
-token o password negli argomenti se il comando finisce nei log del sistema.
-
-## 9. Manutenzione
-
-L'elenco completo delle azioni e dei parametri è nell'[Appendice C](#appendice-c-riferimento--manutenzione).
-
-- **Aggiornamenti** — versione installata e canale, ultima versione pubblicata e
-  l'elenco delle novità (i commit successivi a quello installato, con il link a
-  GitHub). Il controllo avviene da solo ogni *Intervallo controllo
-  aggiornamenti* ore (6 di default; *Impostazioni → Sistema → Aggiornamenti*).
-  **Verifica aggiornamenti** interroga subito GitHub; quando c'è una build nuova
-  il pulsante diventa **Aggiorna** (accanto resta **Ricontrolla**), che fa un
-  backup dei database e chiede l'aggiornamento al servizio di sistema
-  `gextto-update`, installato dall'installer: Gextto attende la fine delle copie
-  verso la libreria, si riavvia con la nuova versione e il pannello lo segnala
-  da solo. L'aggiornamento è riuscito solo quando l'interfaccia della nuova
-  versione risponde: se il servizio cade, anche dopo qualche secondo, torna
-  subito la versione precedente; se è vivo ma lento a rispondere (per esempio
-  una migrazione lunga del database) viene solo segnalato. Il log dell'ultimo
-  aggiornamento è in fondo al pannello. Al primo accesso dopo il
-  riavvio un popup **Gextto aggiornato** mostra la versione di partenza, quella
-  nuova e i commit che ha portato; si chiude con **OK** (o `Esc`) e non
-  ricompare. Quando c'è una versione nuova compare anche il pulsante
-  **Aggiornamento disponibile** sopra **Dona**.
-  Su un'installazione da sorgenti il pannello indica di usare `git pull` e
-  `make build`.
-- **Versione esatta** — in fondo alla pagina una riga riporta la versione, la
-  **build** completa e il **commit** da cui è compilata (il commit breve; il
-  suggerimento del mouse mostra quello intero). Serve a riconoscere senza
-  ambiguità la build installata: il terzo numero della versione è sempre la
-  build (per esempio `1.2.2065`), quindi la build
-  piena e il commit sono l'identità esatta del programma in esecuzione.
-
-- Backup immediato, pulisci cestino, ricalcola scoring, scansiona archivi,
-  **Aggiorna MediaInfo** (analizza con `ffprobe` i file archiviati senza dati e
-  li salva) e riavvia il servizio.
-- Le operazioni lunghe (**Scansiona archivi**, **Aggiorna MediaInfo**, **Rinomina
-  tutto**) girano in background: la pagina non resta bloccata, puoi continuare a
-  usare Gextto, annullarle dal messaggio e vederne l'esito quando finiscono.
-- **Manutenzione notturna** — in *Configurazione → Manutenzione → Manutenzione
-  notturna* scegli una finestra (01:00–07:00 di default) in cui Gextto fa i
-  lavori pesanti: ottimizza e, una volta alla settimana, controlla i database;
-  prepara il rapporto della libreria con i file spariti dal disco; se lo
-  attivi, pulisce dalle altre lingue audio anche i file già in libreria. Con
-  l'opzione predefinita anche il controllo integrità e l'analisi MediaInfo
-  aspettano la finestra. Ogni lavoro parte solo quando Gextto è inattivo (nessun
-  download che trasferisce, nessuna importazione in corso, carico basso), uno
-  alla volta. Il pannello sotto le opzioni mostra cosa sta girando o perché
-  aspetta, e **Esegui ora** fa partire subito un passaggio. Il dettaglio è
-  nell'[Appendice A](#manutenzione-automatica).
-- **Controllo integrità file** — non ha un pannello in questa pagina: si attiva
-  e si gestisce in *Configurazione →
-  Manutenzione → Controllo integrità file*. Scegli se il controllo gira da solo,
-  ogni quanti minuti e quanti file per volta, e Gextto verifica la libreria un
-  po' alla volta in background, senza tenere aperta la pagina. Usa `ffprobe` e
-  `ffmpeg`: prima legge formato e tracce, poi
-  decodifica il file per intero per trovare danni nel mezzo, come una puntata
-  troncata o scaricata male. Salva la posizione e i file già controllati, quindi
-  riprende dopo un riavvio e salta quelli non cambiati; la prima passata è la
-  più lunga, le successive sono molto più rapide. Il tempo concesso alla
-  decodifica cresce con la durata del file, così un 4K lungo su un computer
-  modesto non viene scambiato per un file rotto; un file che non si riesce
-  comunque a leggere non è dato per danneggiato e viene ritentato in un
-  passaggio successivo. Un messaggio di `ffmpeg` che riguarda solo i timestamp
-  dell'output del controllo — succede con release sane di certi encoder — non
-  basta a dare il file per danneggiato: la decodifica conserva i timestamp
-  originali, così il controllo non produce da sé quell'avviso, e le righe che
-  `ffmpeg` scrive sul proprio output (`[null @ …]`) sono ignorate perché
-  descrivono il controllo, non il file. Conta un problema di
-  lettura o di decodifica del file stesso. Per i file 4K il controllo è veloce: legge tutto il file
-  ma decodifica solo i fotogrammi chiave, così trova comunque i file troncati o
-  illeggibili senza impiegare ore (si spegne nella stessa pagina). Nello stesso
-  gruppo, sotto le opzioni, il pannello **Stato del controllo** mostra
-  avanzamento ed elenco dei file danneggiati o illeggibili, con i due conteggi
-  separati e il motivo riportato da `ffmpeg`; **Controlla ora** avvia subito un
-  passaggio e **Riavvia da capo** ricontrolla tutta la libreria, anche con il
-  controllo automatico spento. Accanto a ogni puntata c'è **Riscarica**: sposta il file
-  danneggiato fuori dalla
-  libreria, mette la release in blocklist e cerca la stessa puntata scegliendo
-  una release diversa, così non riprende lo stesso file corrotto; quando la
-  nuova puntata entra in libreria, il log dice quale release ha sostituito il
-  file danneggiato. Con **Controllo integrità — riscarica i file danneggiati**
-  (spento di default) lo fa da solo: appena un file è davvero danneggiato la
-  release va in blocklist, il file esce dalla libreria e la ricerca parte subito,
-  senza aspettare la fine del giro e senza il tuo intervento; un file interrotto
-  da un riavvio non è dato per danneggiato e viene ricontrollato. Servono
-  `ffprobe` e `ffmpeg`; senza, il pannello lo dice e il controllo resta spento.
-- **Rinomina contenuto cartella** — inserisci una cartella e premi **Sfoglia** per
-  sceglierla dal server. Gextto analizza ricorsivamente i file video, riconosce
-  serie e film dal nome, confronta i titoli con TMDB/TVDB e mostra una proposta
-  di rinomina con eventuali alternative.
-- **Pulizia cestino** — sia **Pulisci trash** in *Manutenzione* sia **Svuota
-  cestino** nel pannello **Trash** sono azioni manuali forzate: rimuovono subito
-  il contenuto. `trash_retention_days` (0 = elimina tutto) si applica solo alle
-  pulizie non forzate richieste via API (`/api/maintenance/clean-trash` con
-  `force=false`). Dopo la pulizia un avviso dice quanti elementi sono stati
-  rimossi, quanto spazio si è liberato e i nomi (fino a 8); se qualcosa non si è
-  potuto rimuovere l'avviso lo dice invece di dichiarare un successo.
-- **Duplicati video** — *Anteprima duplicati* e *Pulisci duplicati* trovano i
-  file video chiaramente inferiori (risoluzione strettamente più bassa) rimasti
-  accanto alla versione migliore nella stessa cartella — es. il vecchio 480p
-  accanto al nuovo 1080p — e li spostano nel cestino. Il controllo usa il nome
-  del file e i dati tecnici dichiarati nel nome: non confronta il contenuto e
-  non calcola hash. A **pari risoluzione**
-  viene tenuta la versione nella lingua preferita (*Configurazione → Libreria e rinomina →
-  Lingua predefinita*) e il duplicato che dichiara esplicitamente un'altra lingua
-  va nel cestino; i file senza tag lingua restano intatti. I file dei torrent
-  ancora in sessione sono protetti e le sottocartelle svuotate vengono rimosse.
-  La verifica di rinomina esegue la stessa pulizia automaticamente e la pulizia
-  degli upgrade ora rispetta anche i motivi "forti" (risoluzione/sorgente/HDR/
-  repack). La verifica mantiene la grafia dei tag già presenti nel nome (per
-  esempio `EAC3` o `ddp`, `DV` o `DV HDR10`): non rinomina un file solo per
-  cambiare la forma dello stesso codec, e un file già corretto non viene
-  rinominato una seconda volta nello stesso controllo.
-- **Importa file** — tab per importare un video già sul disco che Gextto non
-  ha scaricato: vedi *Importare un file già presente*.
-- **Manutenzione SQL dell'archivio** — tab avanzato e distruttivo per
-  l'Archivio release. In cima un selettore sceglie la **lingua per le
-  operazioni**; il tab elenca le operazioni incluse in `scripts/sql`: release
-  più vecchie di 6 mesi o di 1 anno, release nella lingua scelta o senza quella
-  lingua, titoli vuoti, duplicati per titolo e fonte, più alcune diagnostiche di
-  sola lettura (release recenti, distribuzione per età, release per fonte, stato
-  dell'archivio, titoli duplicati).
-  L'archivio tiene una riga per ogni listing visto dagli scraper: per una
-  release con magnet l'identità è l'infohash, per una con solo un link
-  `.torrent` è l'identificatore stabile dell'indexer. Jackett rigenera il link
-  di download a ogni richiesta; senza quell'identificatore la stessa release
-  comparirebbe come nuova a ogni passata. **Duplicati per titolo e fonte**
-  ripulisce le righe già accumulate, confrontando fonte e titolo e tenendo la
-  più recente; non tocca i magnet.
-  Un'operazione che elimina mostra prima l'anteprima con il numero di righe
-  corrispondenti e le prime 200; solo dopo compare **Elimina definitivamente**,
-  con conferma. Mentre la query è in corso compare un indicatore; al termine il
-  pannello scorre al risultato. Non è una console SQL libera: esegue solo i file inclusi e non
-  tocca libreria, torrent attivi o impostazioni. La lingua è dedotta dal titolo,
-  quindi anche una release senza marcatore rientra nell'elenco “non nella
-  lingua selezionata”. Fai un backup prima di una cancellazione grande; dopo,
-  `VACUUM` compatta il file dell'archivio.
-- **Ripristina sorgente** — *Ripristina sorgente nei nomi* rimette il token
-  `[Source]` (WEB-DL, HDTV, BluRay…) nei nomi archiviati che l'hanno perso,
-  recuperandolo dal titolo originale della release nel database. Non inventa la
-  sorgente: se è sconosciuta il file resta invariato. Prima l'anteprima, poi
-  l'esecuzione; nessun riscaricamento.
-- **Log gx-torrent** — pannello con le ultime righe del log del motore torrent
-  (`gx-torrent/gx-torrent.log`), separato dal log di Gextto e conservato tra i
-  riavvii del servizio. Ogni riga ha data e livello (INFO, WARN, ERROR, DEBUG)
-  come il log di Gextto. Puoi filtrarne il testo, mostrare solo avvisi ed errori e
-  scegliere tra il file attivo e le rotazioni (`.1`, `.2`, `.3`). Utile quando un
-  download o un trasferimento non si comporta come previsto.
- - **Database**: prune per cicli/età errori, **retention dei "visti dai feed"**
-   (giorni; 0 conserva tutto), prune per keyword con elenco delle righe
-    corrispondenti e **VACUUM / ANALYZE** su tutti i database.
-    La pulizia dei "visti" rimuove solo righe storiche dei feed, non file o
-    download; applica anche la pulizia standard degli ultimi 50 cicli e degli
-    errori torrent oltre la retention configurata (7 giorni per impostazione
-    predefinita).
-- **Backup**: retention, schedulazione (manuale, ogni N ore o a un orario fisso
-   giornaliero HH:MM), FTP (host/utente/percorso) con **Test FTP** (verifica
-   connessione, percorso e upload di prova), copia su cartella cloud/sync, invio
-   Telegram, elenco backup. Lo snapshot contiene database e configurazione, non
-  i media né lo stato della sessione torrent.
-
-### Rinomina manuale di una cartella
-
-La scansione è solo un'anteprima e non modifica i file. Per ogni riga puoi:
-
-- scegliere un risultato TMDB/TVDB alternativo;
-- accettare o rifiutare singolarmente la proposta;
-- usare **Accetta tutte le proposte** e poi **Applica selezionate**.
-
-Vengono rinominati solo i file selezionati, realmente presenti e con una
-destinazione valida nella stessa sottocartella. I conflitti, i titoli non
-riconosciuti e le destinazioni già esistenti restano invariati. I sidecar
-associati (sottotitoli, immagini, NFO e simili) seguono il nuovo nome quando
-possibile.
-
-### Backup: cosa protegge e cosa no
-
-Un backup di Gextto protegge database e configurazione. Non contiene i video,
-gli archivi multimediali né lo stato completo della sessione torrent. Prima di
-un ripristino:
-
-1. ferma o metti in pausa i cicli automatici;
-2. conserva una copia del database attuale;
-3. verifica data e dimensione del backup;
-4. ripristina solo su un'installazione compatibile;
-5. controlla percorsi e permessi prima di riattivare i download.
-
-Il ripristino di un database non sposta automaticamente i file multimediali. Se
-la libreria è stata spostata, correggi i percorsi o esegui una scansione archivio
-prima di avviare upgrade e ricerche mancanti.
-
-**Cosa contiene un backup.** Uno ZIP chiamato `gextto-backup-<data>_<ora>.zip` in
-`<dati>/backups` (e su FTP, se configurato) con:
-
-- i quattro database come snapshot coerenti: `gextto_series.db` (serie,
-  episodi, film, download, storico, salute delle sorgenti), `gextto_config.db`
-  (tutte le impostazioni, gli indexer, i temi, le traduzioni),
-  `gextto_archive.db` (l'archivio dei feed), `gextto_comics.db`;
-- gli altri file di configurazione della cartella dati: il marker della
-  procedura guidata, i domini Cloudflare, lo stato del motore gx-torrent
-  (`gx-torrent/state.json`, `lifetime.json`).
-- i file e le cartelle fuori dalla cartella dati elencati in *File e cartelle
-  da includere* (uno per riga), sotto `extra/` con il loro percorso originale;
-  i percorsi che non esistono più vengono saltati.
-
-Lascia fuori ciò che si riscarica o si ricostruisce: la sessione torrent e i suoi
-dati di ripresa (`gextto_torrents_state`, `gx-torrent/session.db`), il filtro IP,
-le cache degli scraper, i fumetti, i log e il cestino predefinito
-(`<dati>/trash`). Non contiene nemmeno le cartelle di transito dei download:
-`gx-ed2k/incoming` (file eD2k ancora in arrivo) e `gx-torrent/parts` (pezzi
-temporanei), perché sono dati parziali che si riscaricano. Fuori dalla cartella
-dati non contiene `/etc/gextto/gextto.env` (le tue variabili d'ambiente, se ne
-hai aggiunte): conservane una copia tu.
-
-**Ripristino sulla stessa macchina o su una nuova.**
-
-1. Installa Gextto con le stesse opzioni di prima (`--user`, `--data-dir`,
-   `--port`, …), oppure ferma il servizio esistente:
-   `sudo systemctl stop gextto`.
-2. Metti da parte la cartella dati attuale: `sudo mv /var/lib/gextto
-   /var/lib/gextto.old` (usa la tua cartella dati se è altrove).
-3. Estrai il backup in una cartella dati nuova e assegnala all'utente del
-   servizio:
-   ```bash
-   sudo install -d /var/lib/gextto
-   sudo unzip /percorso/gextto-backup-<data>.zip -d /var/lib/gextto
-   sudo chown -R <utente del servizio>:<suo gruppo> /var/lib/gextto
-   ```
-4. Rimetti `/etc/gextto/gextto.env` se l'avevi, poi
-   `sudo systemctl start gextto`.
-5. Apri **Salute**: i database vengono controllati all'avvio. Con gx-torrent i
-   download che erano in corso vengono riaggiunti dal loro magnet salvato nel
-   database, e i dati già nelle cartelle di download si ricontrollano e si
-   riusano.
-
-### Pulizia e operazioni irreversibili
-
-Usa prima le anteprime quando disponibili. In particolare:
-
-- *Anteprima duplicati* mostra cosa finirebbe nel cestino;
-- *Anteprima rinomina* mostra vecchio e nuovo nome;
-- *Pulizia database* riguarda righe storiche, non la libreria;
-- la pulizia del cestino può eliminare definitivamente i file;
-- l'eliminazione di un torrent può chiedere di cancellare anche i dati.
-
-Non confondere **cestino**, **Archivio**, **Storico download** e **sessione
-torrent**: sono insiemi diversi e una pulizia in uno non implica automaticamente
-la pulizia degli altri.
-
-## 10. Salute, Log, Grafici
-
-- **Salute** — stato processo/sistema, runtime (3 colonne), stato del servizio
-  Gextto, **raggiungibilità degli indexer**, permessi percorsi, stato sorgenti,
-  ultimi errori, dischi. Per Jackett il controllo usa l'endpoint Torznab `caps`;
-  un problema di API key o di configurazione degli indexer viene quindi distinto
-  dalla semplice raggiungibilità della macchina.
-- **Ricerche** — nel riquadro omonimo della pagina Salute c'è lo storico degli
-  ultimi cicli: quando, durata, release esaminate, download avviati, errori e
-  quante sorgenti non hanno risposto (il motivo compare passando il mouse sul
-  numero). Serve a riconoscere una sorgente che fallisce ripetutamente o un ciclo
-  diventato più lento. API: `GET /api/last_cycles`. Su questi stessi dati Gextto
-  avvisa da sé (riga WARN e notifica) se una sorgente ha fallito in tre delle
-  ultime ricerche, se l'ultima ricerca ha impiegato più di tre ore o se non c'è
-  una ricerca senza errori da tre intervalli (minimo due ore); avvisa anche
-  quando tutto torna regolare. In più, se i link `.torrent` di una stessa
-  sorgente falliscono su due release diverse nello stesso ciclo — di solito un
-  login scaduto, come il 502 «login failed» di mircrew — Gextto scrive una riga
-  WARN e manda una notifica (al massimo ogni 12 ore per sorgente) con il motivo
-  restituito dall'indexer e cosa fare: rifare il login e, finché non funziona,
-  disabilitare quella sorgente nelle ricerche. Un link che si risolve riarma
-  l'avviso.
-- **Coda titoli** — riquadro con i titoli trattenuti dal *delay profile* (serie e
-  film) prima del download: titolo, da quanto sono in attesa (`first_seen_at`) e
-  quanto manca al `due_at`. Serve a vedere quando la coda cresce o un titolo
-  resta fermo.
-- **Import falliti** — riquadro con il numero di import falliti per giorno (ultimi
-  7), ricavato dagli eventi di acquisizione; utile a riconoscere un disco o un NAS
-  che rifiuta gli spostamenti.
-- **Log web** — stream SSE live con filtro testuale, numero righe e segui/pausa.
-  Le righe sono in inglese e in formato esplicito: `data ora  LIVELLO messaggio
-  · campo: valore`, con parole chiave evidenziate (NAS, download, sorgenti,
-  filtri, errori). Ogni ciclo stampa un **SOURCE REPORT** con l'esito di ogni
-  sorgente, le decisioni dei filtri e gli eventi di download (avvio, metadati,
-  completamento, eventuale spostamento su NAS e importazione in archivio). I
-  messaggi torrent includono sempre nome o titolo leggibile; gli hash torrent
-  sono nascosti nel log utente. Le righe periodiche non si ripetono a ogni
-  controllo: la liberazione della memoria di gx-torrent compare quando il riposo
-  inizia e poi ogni sei ore, e un avviso su una sorgente guasta torna al massimo
-  ogni sei ore.
-- **ID acquisizione e storia dei download** — le righe che riguardano un
-  download finiscono con `acq: 7f3a2c`: un ID corto che resta lo stesso
-  dall'avvio del download all'arrivo in libreria, per i torrent come per i
-  download eD2k (anche quelli avviati a mano da «Scarica» o da un link
-  incollato). Scrivendolo nel filtro del log
-  si vede solo quel download. Le stesse righe (INFO, WARN ed ERROR, anche con il
-  log impostato su `warn`) vengono salvate come **storia**: scheda *Storia* nel
-  dettaglio del torrent, pulsante 📜 su ogni puntata e pannello *Storia dei
-  download* nella pagina della serie. Le righe ripetute uguali diventano una sola
-  con il contatore (×N); la storia si conserva 180 giorni e resta leggibile anche
-  dopo la rotazione del log e la rimozione del torrent. API: `GET
-  /api/acquisitions?hash=…`, `?acq=…` oppure `?series=…&season=…&episode=…`.
-- **Grafici** — sparkline CPU/RAM/download/upload/disco/RAM disk e consumo
-  giornaliero.
-- **Attività** — eventi torrent recenti e download.
-
-### TUI: uso rapido
-
-Nella TUI `1`-`9` o `Tab` cambiano scheda, `r` aggiorna e `?` apre l'aiuto.
-Con eD2k attivo, nella scheda **Stato** compare la riga **aMule** (versione,
-server e ID alto/basso, Kad, velocità di upload e coda) e nella scheda
-**Torrent** i download di aMule sono elencati con gli altri: `Invio` apre il
-dettaglio (stato, fonti, priorità, ultimo dato, link `ed2k://`), `y` copia il
-link, `p` mette in pausa o riprende, `d` lo toglie da aMule.
-Nella scheda **Log**, `/` filtra le righe e `f` attiva o ferma il follow; quando
-il follow è fermo la posizione resta congelata anche se arrivano nuovi log.
-Archivio, Mancanti e Blocklist dispongono di selezione e scrolling con le frecce
-e i tasti pagina. Per l'elenco completo dei comandi vedi [`docs/tui.md`](tui.md).
-
-### Salute: interpretare lo stato delle sorgenti
-
-Per ogni indexer la tabella distingue:
-
-- **OK**: risposta HTTP valida e nessun errore Torznab applicativo;
-- **Errore API**: il servizio risponde, ma API key o configurazione indexer non
-  sono accettate;
-- **Non raggiungibile**: non è arrivata una risposta entro il timeout.
-
-Questa distinzione è importante: riavviare Gextto non risolve un errore API key,
-mentre un problema di rete può richiedere di controllare DNS, container, porta o
-firewall.
-
-Dietro un manager la tabella elenca anche gli indexer del manager, una riga per
-ciascuno, così un tracker in errore o in pausa si vede anche se il manager
-risponde: vale per Prowlarr e per indexarr, che espone gli stessi documenti di
-sola lettura (elenco e stato). Quando indexarr ha messo una sorgente in pausa la
-riga lo dice e, se il manager lo sa, mostra il momento in cui sarà riprovata;
-non c'è niente da configurare.
-
-Con eD2k attivo la pagina **Salute** ha anche una scheda **eD2k e Kad (aMule)**
-con lo stato della connessione, le velocità, i byte scambiati nella sessione, le
-cartelle di aMule mancanti e le ultime righe di problema dal log di aMule
-(disconnessioni, server non validi, errori), una volta per messaggio e senza i
-tentativi che aMule riprova e completa da solo (per esempio il database IP→paese
-all'inizio del mese), così non devi aprire il log per accorgerti che qualcosa non
-va. La scheda dice anche che il client eD2k in uso è **aMule**, con la versione,
-l'indirizzo EC e **Dove gira**: su questa macchina, in un container sulla stessa
-macchina oppure su un'altra macchina.
-
-## 11. Notifiche
-
-Configura Telegram, e-mail (SMTP), un webhook e i canali dedicati — Discord,
-Slack, Gotify, ntfy, Pushover e Apprise — più, se vuoi, un programma personale,
-e invia un test. Le notifiche di completamento
-includono dimensione, tempo di download e velocità media. Per un season pack
-l'avviso distingue gli episodi **nuovi** da quelli che hanno **sostituito una
-versione inferiore** già in libreria: questi ultimi non vengono contati fra i
-nuovi, così scaricare un episodio singolo e poi il suo season pack non sembra
-un doppione.
-
-### Notifiche di stato (Gextto e gx-torrent)
-
-Oltre agli eventi di download, Gextto notifica i problemi del servizio:
-
-- **riavvio di Gextto** — a ogni avvio dopo il primo, con il numero di avvio e
-  da quanto era fermo; se l'arresto precedente non è stato registrato (crash,
-  `kill -9`) lo segnala come arresto anomalo;
-- **arresto per errore** — quando il servizio termina per un errore fatale;
-- **gx-torrent** — uscita inattesa del demone gestito, riavvio dopo l'uscita,
-  ripristino del binario precedente dopo un aggiornamento che non parte,
-  demone attivo ma che non risponde più, e passaggio automatico a un altro
-  motore (prima qBittorrent-nox, scaricato al momento, infine recovery con i
-  trasferimenti fermi);
-- **problemi di salute** — quando il controllo di salute rileva un problema e
-  quando torna operativo.
-- **login a MirCrew** — quando il login al forum del servizio
-  `mircrew-indexer` resta rotto per più di 15 minuti, e di nuovo quando torna a
-  funzionare. Il servizio continua a rispondere alle ricerche dal suo indice
-  locale, quindi senza questo controllo un login rotto non produrrebbe altri
-  avvisi.
-
-Un processo morto non può notificare la propria caduta: il crash di Gextto si
-riceve quindi al riavvio successivo. Se Gextto non riparte (per esempio il
-servizio è disattivato) nessuna notifica parte: per quel caso usa un watchdog di
-systemd (`OnFailure=`).
+Un profilo è un **modello con un nome**: qualità, audio minimo, lingua,
+sottotitoli, esclusioni e «Permetti upgrade». Si gestiscono in *Configurazione
+→ Qualità e upgrade → Profili di qualità*.
+
+- **Qualità** si sceglie da un elenco (360p … 2160p, un minimo con «+»,
+  l'intervallo `720p-1080p`, oppure *Qualsiasi*).
+- **Lingua** e **Sottotitoli** propongono le scelte comuni (`ita`, `eng`,
+  `ita,eng`, `multi`, `any`) ma accettano anche altri codici (`fre`,
+  `ita,eng,fre`). Vuota vale la lingua predefinita di Gextto.
+- Finché non salvi la lista, Gextto genera da sé un profilo per ogni
+  combinazione già presente in libreria; il primo è **Default**. Due profili non
+  possono avere lo stesso nome.
+
+**I profili sono modelli, non regole.** Quando scegli un profilo per un titolo,
+i suoi valori vengono **copiati** nel titolo. Cambiare il profilo dopo non
+cambia i titoli già creati: per aggiornarne molti insieme usa [Modifica
+selezionati](#modificare-più-titoli-insieme). La lista dei profili è anche
+quella che vede Jellyseerr; ogni profilo conserva il suo numero anche se lo
+rinomini, perché Jellyseerr ricorda il numero.
+
+### Provare prima di cambiare
+
+In cima a *Qualità e upgrade*:
+
+- **Esempi con i pesi attuali** — i punteggi di alcune release tipiche;
+- **Impatto sulla libreria → Verifica ora** — quanti episodi in libreria
+  verrebbero sostituiti con le regole attuali. Usalo dopo aver cambiato pesi o
+  soglie: un numero alto vuol dire che i prossimi cicli riscaricheranno molto;
+- **Prova una release** — incolla un nome di release: vedi il punteggio voce per
+  voce e se sostituirebbe la copia in libreria, con il motivo.
+
+Nessuno dei tre scarica nulla.
+
+### I pesi
+
+Sotto ci sono i pesi, in schede chiuse: **Video** (4K, Full HD, HD, SD, codec,
+sorgente, HDR/DV), **Audio** (Lossless, DTS/DD+, AC3, AAC/Opus, MP3, canali,
+Atmos), **Correzioni release** e **Gruppi custom** (un bonus o una penalità per
+un release group, scritto come il tag finale della release, per esempio `TBK`).
+Più alto vuol dire più preferito. Dopo un cambio dei pesi i punteggi della
+libreria si ricalcolano da soli.
+
+La lingua non è un bonus: è un requisito del titolo, quindi puoi preferire
+l'inglese quanto l'italiano. I sottotitoli preferiti danno un piccolo bonus. Una
+release **freeleech** riceve un bonus a parte solo nella scelta tra candidati,
+mai per un upgrade.
+
+### Quando un file viene sostituito
+
+| Impostazione | Effetto |
+|---|---|
+| **Differenza minima score per upgrade** | quanto deve essere migliore la nuova release. Conta solo la qualità: dimensione, sottotitoli e salute dello sciame non bastano |
+| **Smetti di migliorare oltre questo punteggio** | sopra questo punteggio il file non viene più sostituito, salvo un REPACK o PROPER |
+| **Sostituisci le versioni già archiviate** | attiva gli upgrade dei file già in libreria |
+
+Prima di sostituire un file Gextto legge con `ffprobe` sia il nuovo sia quello in
+libreria: se il nome prometteva più di quanto c'è (un «2160p» ingrandito da un
+1080p, un «HDR» senza HDR) il download viene scartato e messo in blocklist
+(nel log: `Upgrade not confirmed by MediaInfo`). Un file in libreria che non
+dichiara sorgente o gruppo non viene considerato peggiore senza prove.
+
+### Ritardo prima di scaricare
+
+In *Configurazione → Generale → Ritardo prima di scaricare* puoi far aspettare
+Gextto qualche minuto dopo aver trovato una release, per dare tempo a una
+versione migliore di comparire. **Ignora il ritardo da questo punteggio** fa
+partire subito le release già ottime. I titoli in attesa sono nel riquadro
+**Coda titoli** di *Salute*.
+
+## 15. Il motore torrent
+
+Gextto gestisce sempre database, coda, punteggi, rinomina e libreria; il
+**motore** fa solo il trasferimento. Si sceglie in *Configurazione → Motore
+torrent*, e la pagina **Scarico** e le automazioni sono identiche con entrambi.
+L'intestazione dell'interfaccia mostra il motore in uso con la sua versione.
+
+### gx-torrent (predefinito)
+
+Il motore incluso, in Go puro. Gextto lo avvia e lo sorveglia in un processo
+separato; non c'è nulla da installare.
+
+- **Resta acceso quando Gextto si riavvia** (per esempio per un aggiornamento):
+  i trasferimenti non si interrompono. Viene riavviato solo se è cambiato il suo
+  programma o le sue opzioni, mai durante uno spostamento di file. Se Gextto
+  resta spento, si ferma da solo dopo 15 minuti.
+- Ha una **pagina web** propria all'indirizzo di ascolto (predefinito
+  `127.0.0.1:8890`, solo da questo computer): magnet, pausa, verifica, coda,
+  filtro IP, log. Per aprirla in rete usa `0.0.0.0:8890` **e un token**.
+- La **cache disco** si regola da sola in base alla memoria libera e al tipo di
+  disco. Il **filtro IP** da URL si aggiorna una volta al giorno.
+- Con un **proxy** configurato passano dal tunnel anche feed, indexer e
+  download dei `.torrent`; i servizi in rete locale restano diretti.
+- Supporta streaming, DLNA, download sequenziale, torrent v2 e i magnet con
+  `so=`, `ws=` e `dht=`.
+
+Se il motore non riesce a restare in piedi (6 avvii anomali in 10 minuti),
+Gextto passa da solo a qBittorrent-nox e, come ultima risorsa, a uno stato di
+recupero con i trasferimenti fermi e l'interfaccia raggiungibile. Un
+aggiornamento di gx-torrent che non parte viene prima riportato alla versione
+precedente. Ricevi una notifica in ogni caso.
+
+### qBittorrent-nox
+
+Gextto può pilotare un **qBittorrent-nox** (dalla 4.6 alla 5.3) tramite la sua
+Web API: imposta URL, utente, password, categoria e tag. Se i due programmi
+vedono le cartelle con percorsi diversi (Docker, NAS, altra macchina) servono le
+**mappature percorsi** `locale=remoto`: **Proponi** le legge da qBittorrent.
+Se un percorso non è traducibile l'attivazione viene rifiutata, così un file non
+può finire nella cartella sbagliata.
+
+In **modalità gestita** Gextto scarica qBittorrent-nox, lo installa accanto a
+sé, lo avvia e lo ferma col servizio, lo aggiorna e lo riavvia se cade. I passi
+completi sono in [qbittorrent-nox.md](qbittorrent-nox.md).
+
+### Cambiare motore
+
+Un torrent appartiene a un solo motore alla volta: il passaggio è una
+migrazione, non due client sugli stessi dati. Il riquadro del motore ha un
+**test** di raggiungibilità e percorsi: usalo prima di passare. Lo stato del
+motore attivo (coda, porta, DHT, cifratura, proxy, cache, I/O disco) è in
+*Salute → Motore torrent*.
+
+### Su una macchina piccola
+
+Gextto gira bene su un mini PC o un NAS. A riposo non si nota; durante un
+trasferimento il costo è del motore, che restituisce la memoria a download
+finito. Se le risorse sono poche:
+
+- attiva la **coda dinamica** e *Non contare i torrent fermi negli slot
+  attivi* (*Configurazione → Code e prestazioni*);
+- non impostare un limite di cache: il valore automatico è quasi sempre il
+  migliore.
+
+## 16. Velocità e rete
+
+### La regola della velocità
+
+In *Configurazione → Velocità e rete*, **Come si decide la velocità** offre tre
+regole:
+
+- **Auto** — Gextto misura la linea (il ping verso server pubblici) e alza o
+  abbassa la velocità per non saturarla. Se conosci la velocità reale della tua
+  linea, scrivila in *Auto — velocità massima linea*: Auto trova il punto giusto
+  più in fretta.
+- **Limiti fissi** — un tetto per il download e uno per l'upload.
+- **Programmazione oraria** — una riga per giorno, con *Non attiva*, *Limite*
+  (i tuoi valori) o *Auto*, più ora di inizio e fine. **Fuori dalle fasce
+  orarie: Auto** decide cosa vale fuori dalle fasce.
+
+I peer della rete di casa non sono limitati, a meno che tu non attivi *Applica i
+limiti anche ai peer della rete locale*. Per un'eccezione temporanea usa il
+pulsante **Banda** in Scarico (vedi [La banda](#la-banda)).
+
+### Porte, VPN, cifratura
+
+- **Porte**: apri sul router la porta di ascolto; UPnP e NAT-PMP possono farlo
+  da soli. **Testa porte** controlla solo che la porta si apra su questo
+  computer, non l'inoltro sul router.
+- **Interfaccia VPN (killswitch)**: vincola il traffico torrent a una scheda di
+  rete (`tun0`, `wg0`); se la VPN cade, il traffico si ferma invece di uscire
+  in chiaro. Si applica dopo il riavvio.
+- **Cifratura e filtro IP**: in *Velocità e rete → Cifratura e filtro IP*.
+
+### RAM disk
+
+Per risparmiare scritture su un disco lento puoi far lavorare i dati incompleti
+in RAM (*Configurazione → Code e prestazioni → RAM disk*). Gextto elenca i
+`tmpfs` disponibili e, se non ce n'è uno, crea `/dev/shm/gextto`. Il contenuto
+si perde al riavvio della macchina e la cartella va ricreata.
+
+## 17. Libreria, NAS e spazio
+
+### Una libreria su NAS
+
+1. Monta il NAS **prima** che Gextto parta (per esempio con un'unità systemd o
+   `fstab`).
+2. Dai lettura e scrittura all'utente del servizio.
+3. Imposta uno **spazio libero minimo** prudente (*Archivio e spazio → Spazio
+   su disco*): sotto quella soglia Gextto non avvia download nuovi.
+4. Se hai copiato file esistenti, esegui **Scansiona archivio**.
+5. Dopo il primo download controlla il percorso effettivo nello *Storico
+   download*.
+
+Se il NAS non è montato, **non** sostituire il percorso con una cartella locale
+per farlo funzionare: i file finirebbero nel posto sbagliato. Correggi il mount
+e lascia aspettare il download: gli spostamenti falliti vengono ritentati dopo
+1, 2, 4, 8, 16 e 32 minuti. Un NAS smontato non cancella nulla: un mount point
+vuoto viene trattato come volume assente e gli episodi restano registrati.
+
+### Cestino
+
+Il **cestino** (*Archivio e spazio → Cestino*) riceve i file sostituiti da un
+upgrade, i pack a fine seed e i duplicati. Viene svuotato secondo la retention;
+**Pulisci trash** in Manutenzione lo svuota subito. Senza cestino configurato
+Gextto non cancella mai file sorgente da solo.
+
+### Lingua e metadati
+
+- **Lingua predefinita** (*Libreria e rinomina*): la lingua che serie e film
+  ricevono se non ne indichi un'altra.
+- **Metadati**: TMDB è la fonte predefinita di titoli, episodi e locandine;
+  TVDB si usa quando c'è solo la sua chiave. Le chiavi si inseriscono in
+  *Accesso e servizi → Servizi metadati*.
+- **Rimuovi le tracce audio in altre lingue**: dopo l'importazione tiene solo
+  l'audio nella lingua scelta, senza ricodificare, e controlla la copia prima
+  di sostituire il file. Servono `ffprobe`, `ffmpeg` e `mkvmerge`.
+
+## 18. Notifiche
+
+Gextto può avvisarti su **Telegram**, **e-mail**, **webhook**, **Discord**,
+**Slack**, **Gotify**, **ntfy**, **Pushover**, **Apprise** o con un tuo
+**programma**. Si configura in *Configurazione → Notifiche*.
+
+### Configurare un canale
+
+1. Compila i campi del canale (un campo vuoto spegne il canale).
+2. Nel gruppo **Eventi** scegli cosa ricevere.
+3. Premi **Invia notifica di test**: usa tutti i canali configurati e mostra
+   subito un errore.
+4. Prova un completamento vero solo con un download non importante.
+
+### Quali eventi
+
+| Gruppo | Cosa comprende |
+|---|---|
+| **Notifiche dei download** | un download parte, si completa o riempie un episodio mancante |
+| **Notifiche degli errori** | un download fallisce, un torrent o un fumetto va in errore, il servizio si ferma per errore |
+| **Notifiche di salute e motore** | problemi di salute, del ciclo, degli indexer, dei login, del motore torrent, e il ritorno alla normalità |
+| **Notifiche di manutenzione** | riavvii, backup completati, pulizia delle tracce audio |
+
+Le notifiche di completamento riportano dimensione, durata e velocità media. Per
+un season pack distinguono gli episodi **nuovi** da quelli che hanno
+**sostituito** una versione peggiore. **Anti-spam — intervallo minimo** evita di
+ricevere più volte lo stesso evento; **Lingua dei messaggi** sceglie la lingua,
+indipendente da quella dell'interfaccia.
+
+Gextto avvisa anche di riavvii (e di arresti anomali, al riavvio successivo:
+un processo morto non può notificare la propria caduta), errori fatali,
+problemi di gx-torrent e del passaggio a un altro motore.
 
 ### Webhook: quale URL e quale formato
 
-Il canale **Webhook** manda gli eventi a un servizio esterno senza bisogno di
-un'app dedicata: scegli il **Formato** del servizio, incolla l'**URL** e, se
-serve, metti la credenziale nel campo **Webhook token** (e in **Webhook user**
-per Pushover). L'URL resta pulito, senza token dentro.
+Il canale **Webhook** manda gli eventi a un servizio esterno. Scegli il
+**Formato**, incolla l'**URL** e metti la credenziale in **Webhook token**, non
+nell'URL.
 
 | Servizio | Webhook URL | Formato | Credenziale |
 |---|---|---|---|
 | Endpoint tuo | il tuo URL | **Gextto (JSON firmato)** | «Webhook secret» firma il corpo (HMAC SHA-256, header `x-gextto-signature`) |
 | Discord | URL del webhook del canale | **Discord** | nessuna |
 | Slack | URL del webhook in ingresso | **Slack** | nessuna |
-| ntfy | `https://ntfy.sh/<argomento>` (o il tuo server) | **ntfy** | «Webhook token» = token Bearer, se l'argomento è protetto |
+| ntfy | `https://ntfy.sh/<argomento>` | **ntfy** | «Webhook token» = token Bearer, se l'argomento è protetto |
 | Gotify | `https://gotify.esempio/message` | **Gotify** | «Webhook token» = application token |
 | Pushover | `https://api.pushover.net/1/messages.json` | **Pushover** | «Webhook token» = application token, «Webhook user» = user key |
 
-Note:
+Ogni servizio ha anche **campi dedicati** (Discord, Slack, Gotify, ntfy,
+Pushover, Apprise, Programma), così più canali possono restare accesi insieme.
+Ogni canale riceve lo stesso evento, e uno lento non trattiene gli altri. Il
+**Programma** riceve i dati nelle variabili `GEXTTO_*` e gira senza shell.
 
-- con Formato **Gextto** il messaggio è un JSON `{"event":…,"data":…}` e, se
-  imposti il segreto, viene firmato; con gli altri formati Gextto invia il
-  **testo leggibile** già composto e la firma HMAC non viene applicata (è
-  specifica del formato Gextto);
-- la credenziale va nel campo **Webhook token**, non nell'URL; solo Discord e
-  Slack non ne hanno bisogno;
-- usa il pulsante di **test** nella scheda Notifiche: se l'URL o il token sono
-  sbagliati lo dice subito, invece di fallire in silenzio alla prima consegna.
+## 19. Integrazioni con altri programmi
 
-### Canali dedicati
+Nessuna integrazione è necessaria per scaricare e archiviare. Attivale una alla
+volta e usa sempre il pulsante di test. Campi e azioni sono
+nell'[Appendice B](#appendice-b-riferimento--integrazioni).
 
-Ogni servizio ha anche i suoi campi, così più canali possono restare accesi
-insieme senza condividere l'URL del webhook. Ogni canale configurato riceve lo
-stesso evento, e uno lento o irraggiungibile non trattiene gli altri.
+### Jellyseerr (al posto di Sonarr e Radarr)
 
-| Canale | Campi | Note |
+Gextto risponde alle richieste di Jellyseerr come farebbero Sonarr e Radarr:
+
+1. in Jellyseerr aggiungi un server Sonarr e uno Radarr con l'indirizzo di
+   Gextto;
+2. come chiave usa la **Chiave API** di Gextto (*Configurazione → Accesso e
+   servizi*);
+3. scegli profilo di qualità e cartella dagli elenchi che Gextto espone.
+
+Una serie richiesta viene seguita solo per le stagioni chieste; se la segui già,
+le stagioni si aggiungono. Un film già presente non viene duplicato. La
+«ricerca immediata» di Jellyseerr non è gestita: il titolo viene cercato dal
+ciclo normale. Non è una compatibilità completa con Sonarr e Radarr: le
+richieste non gestite rispondono 404.
+
+### Jellyfin e Plex
+
+Inserisci l'URL del server (raggiungibile dal computer di Gextto) e un token:
+Gextto chiede un aggiornamento della libreria quando arriva un file nuovo.
+
+### Simkl, calendario, hook
+
+- **Simkl**: completa il flusso PIN, verifica l'account e poi importa la
+  watchlist.
+- **Calendario iCal**: le prossime uscite in un calendario che puoi aggiungere
+  al telefono.
+- **Hook eventi**: un programma lanciato su eventi come `download_started`,
+  `torrent_completed`, `season_pack_completed`, `torrent_error`. I campi
+  accettano segnaposto (`{title}`, `{path}`, `{series}`, `{episode}`…) e
+  ricevono le variabili `GEXTTO_*`. Gira senza shell (niente pipe né `&&`: usa
+  uno script), con un timeout predefinito di 60 secondi e al massimo quattro
+  hook insieme. Prova prima con un programma innocuo che scrive un log.
+- **Metriche ed eventi** di gx-torrent: `GET /api/v1/metrics` per Prometheus e
+  `GET /api/v1/events` per Home Assistant (vedi [API.md](API.md)).
+
+## 20. Accesso e sicurezza
+
+L'interfaccia è un **pannello di amministrazione**: chi la apre può cambiare
+tutto. Per impostazione predefinita è aperta, perché Gextto è pensato per una
+rete di casa fidata.
+
+- **Solo in casa**: lasciala così, o limita la porta 5000 con il firewall.
+- **Da fuori**: in *Configurazione → Accesso e servizi* attiva **Richiedi
+  l'accesso (login)** e imposta una password. Con **Nessun login dalla rete
+  locale** (predefinito) in casa non serve. Metti Gextto dietro un reverse proxy
+  HTTPS o una VPN.
+- **Script, TUI, calendario**: usano la **Chiave API** (header `X-Api-Key` o
+  `?apikey=`). **Genera** crea un valore casuale, **Copia** lo copia.
+- **gx-torrent in rete**: se apri la sua pagina in LAN, imposta il suo **token**.
+
+Indipendentemente dal login, Gextto rifiuta le modifiche che il browser dichiara
+provenire da un altro sito: una pagina malevola non può riconfigurarlo
+attraverso il tuo browser. Il modello completo è in [SECURITY.md](SECURITY.md);
+le chiavi in [Chiavi di accesso](api-keys.it.md).
+
+---
+
+# Parte IV — Tenere tutto in ordine
+
+## 21. Controllare che tutto funzioni
+
+### La Dashboard
+
+È la pagina da guardare ogni giorno. Dall'alto:
+
+- **In sessione** — torrent in scarico, fermi e in seed, la banda degli ultimi
+  30 giorni e il **grafico del traffico** degli ultimi 30 minuti (download e
+  upload, con il picco e il limite in vigore; con eD2k, aMule a linee
+  tratteggiate);
+- **Da controllare** — download fermi (con motivo e prossimo tentativo),
+  spostamenti in libreria in sospeso, avvisi ed errori. Un avviso resta finché il
+  download è in sessione e sparisce da solo quando esce senza nulla in sospeso;
+  **Pulisci** li segna come letti. Se è tutto a posto dice «Niente da
+  controllare»;
+- **Ricerca manuale** e **Ricerca automatica** — la prossima esecuzione,
+  l'esito dell'ultimo ciclo e i pulsanti per avviarne uno (tutto, o solo Serie,
+  Film, Fumetti);
+- **Operazioni in background** — rinomine, scansioni, MediaInfo, controllo
+  integrità, ricerche dei mancanti: con la percentuale e **Annulla**;
+- **Prossime uscite**, **ultimi download**, **attività recente** e **ultimi
+  trovati**.
+
+Il badge **DRY-RUN** o **ATTIVO** in alto dice se Gextto scarica davvero.
+
+### Salute
+
+*Salute* (🩺) risponde a «funziona tutto?»:
+
+- stato di processo, sistema e servizio, permessi delle cartelle, dischi;
+- **Stato API** e **Stato provider**: ogni indexer con il suo stato e i backoff
+  (vedi [Sorgenti](#raggiungibile-non-vuol-dire-funzionante));
+- **Ricerche**: gli ultimi cicli, con durata, release esaminate, download
+  avviati, errori e sorgenti che non hanno risposto;
+- **Coda titoli**: i titoli trattenuti dal ritardo, e da quanto;
+- **Import falliti**: quanti al giorno, negli ultimi 7 giorni (un numero che
+  cresce indica un disco o un NAS che rifiuta gli spostamenti);
+- **Motore torrent** e, con eD2k attivo, **eD2k e Kad (aMule)**.
+
+### Il log
+
+**Log** mostra il log in diretta, con filtro, numero di righe e segui/pausa. Le
+righe sono in inglese, in frasi leggibili. Ogni ciclo stampa un **SOURCE
+REPORT** con l'esito di ogni sorgente e le decisioni prese. Il file è in
+`<dati>/gextto.log` (ruotato a 5 MB); quello del motore è in
+`<dati>/gx-torrent/gx-torrent.log`, consultabile anche da *Manutenzione → Log
+gx-torrent*.
+
+### La storia di un download
+
+Ogni riga del log che riguarda un download finisce con un **ID di
+acquisizione** (`acq: 7f3a2c`), lo stesso dalla scelta della release all'arrivo
+in libreria. Scrivilo nel filtro del log per vedere solo quel download. Le
+stesse righe sono conservate per 180 giorni come **storia**: scheda *Storia* nel
+dettaglio del torrent, 📜 su ogni episodio, *Storia dei download* nella scheda
+della serie. Restano leggibili anche dopo la rotazione del log e la rimozione
+del torrent.
+
+### Grafici e attività
+
+**Grafici** mostra CPU, RAM, rete, disco e consumo giornaliero; **Attività** gli
+eventi recenti.
+
+## 22. Curare la libreria
+
+Tutte queste azioni sono in **Manutenzione** (elenco completo
+nell'[Appendice C](#appendice-c-riferimento--manutenzione)). Le operazioni lunghe
+girano in background: puoi continuare a usare Gextto e annullarle.
+
+> [!TIP]
+> Usa sempre prima l'**anteprima**, dove c'è. Le operazioni che spostano file
+> mandano nel cestino, non cancellano.
+
+### Rinominare
+
+- **Anteprima rinomina** su una serie, o **Rinomina tutto** per la libreria
+  intera: prima vedi *Vecchio → Nuovo*, poi applichi.
+- **Rinomina contenuto cartella**: scegli una cartella qualsiasi; Gextto
+  riconosce serie e film dai nomi, li confronta con TMDB/TVDB e propone i nomi
+  nuovi. Puoi scegliere un risultato alternativo, accettare o rifiutare ogni
+  proposta e poi **Applica selezionate**. I conflitti restano invariati;
+  sottotitoli, immagini e NFO seguono il nuovo nome.
+- **Ripristina sorgente nei nomi**: rimette il token `[WEB-DL]`, `[BluRay]`…
+  nei nomi che l'hanno perso, ricavandolo dalla release originale. Se non è
+  noto, il file non cambia.
+
+### Duplicati
+
+*Anteprima duplicati* e *Pulisci duplicati* trovano i video chiaramente
+peggiori rimasti accanto alla versione migliore nella stessa cartella (il
+vecchio 480p accanto al nuovo 1080p) e li spostano nel cestino. A pari
+risoluzione tiene la versione nella lingua preferita. I file dei torrent in
+sessione sono protetti.
+
+### Qualità reale e integrità dei file
+
+- **Aggiorna MediaInfo** legge con `ffprobe` risoluzione, codec, HDR, audio e
+  lingue dei file in libreria. Questi dati servono a confrontare gli upgrade
+  con il file com'è davvero, non con il suo nome. I file nuovi vengono letti a
+  download finito; per gli altri c'è anche il backfill automatico.
+- **Controllo integrità file** (*Configurazione → Manutenzione automatica*)
+  decodifica i video un po' alla volta, in background, e trova i file troncati
+  o danneggiati. Il pannello **Stato del controllo** elenca i file danneggiati
+  o illeggibili con il motivo; **Riscarica** accanto a una puntata la toglie
+  dalla libreria, mette in blocklist quella release e ne cerca una diversa. Con
+  *riscarica i file danneggiati* attivo lo fa da solo. Servono `ffprobe` e
+  `ffmpeg`.
+
+### Manutenzione notturna
+
+In *Configurazione → Manutenzione automatica → Manutenzione notturna* scegli
+una finestra (predefinita 01:00–07:00) per i lavori pesanti: ottimizzazione e
+controllo dei database, rapporto sui file spariti dal disco, pulizia
+dell'audio dei file già in libreria (se la attivi), controllo integrità e
+MediaInfo. Ogni lavoro parte solo quando Gextto è inattivo, uno alla volta. Il
+pannello mostra cosa sta girando o perché aspetta; **Esegui ora** fa partire
+subito un passaggio.
+
+### Pulizie del database
+
+- **Housekeeping** tiene ordinato il database (statistiche dei cicli, errori
+  vecchi, backoff scaduti, `VACUUM` quando serve). **Non** tocca la libreria, i
+  download né l'Archivio.
+- **Pulizia archivio release** (*Manutenzione automatica*) toglie dal catalogo
+  le release vecchie, se la attivi. Non tocca file né download.
+- **Manutenzione SQL dell'archivio** (in *Manutenzione*) esegue operazioni
+  pronte sul catalogo: release più vecchie di 6 mesi o di 1 anno, in una lingua
+  o senza, titoli vuoti, duplicati. Prima mostra l'anteprima con il numero di
+  righe, poi **Elimina definitivamente**. Fai un backup prima di una pulizia
+  grande.
+
+### Cosa non confondere
+
+| Insieme | Cosa contiene | Cosa lo pulisce |
 |---|---|---|
-| Discord | **Discord webhook URL** | il webhook del canale |
-| Slack | **Slack webhook URL** | il webhook in ingresso |
-| Gotify | **Gotify URL** e **Gotify token** | le notifiche vengono inviate a `/message` |
-| ntfy | **ntfy URL**, **ntfy topic** e, se l'argomento è protetto, **ntfy token** | le notifiche vengono inviate a `<server>/<argomento>` |
-| Pushover | **Pushover token** e **Pushover user key** | token dell'applicazione e user o group key |
-| Apprise | **Apprise URL** e, se ne usi una, **Apprise key** | le notifiche vengono inviate a `/notify` e Apprise le inoltra ai servizi configurati lì |
-| Programma | **Programma** e **Argomenti del programma** | eseguito su ogni evento, con i dati nelle variabili d'ambiente `GEXTTO_*` (app, evento, titolo, messaggio); l'evento non passa mai dalla riga di comando |
+| **Sessione torrent** | i torrent nel motore | *Rimuovi*, *Pulisci completati*, fine seed |
+| **Libreria** | i tuoi video | *Pulisci duplicati*, upgrade (verso il cestino) |
+| **Cestino** | i file tolti dalla libreria | retention, *Pulisci trash* (definitivo) |
+| **Archivio** | il catalogo delle release viste | *Pulizia archivio release*, Manutenzione SQL |
+| **Storico download** | l'elenco dei download conclusi | retention dello storico |
 
-Un campo lasciato vuoto spegne il suo canale. Il programma gira senza shell: le
-virgolette tengono insieme un argomento con spazi e la barra rovesciata protegge
-il carattere successivo. Per un test riceve anche `GEXTTO_TEST=true`.
+## 23. Backup e ripristino
 
-### Quali eventi, ogni quanto, in quale lingua
+### Cosa contiene un backup
 
-Il gruppo **Eventi** decide cosa ricevono i canali:
+Uno ZIP `gextto-backup-<data>_<ora>.zip` in `<dati>/backups` con:
 
-- **Notifiche dei download** — un download parte, si completa o riempie un
-  episodio mancante;
-- **Notifiche degli errori** — un download fallisce, un torrent o fumetto va in
-  errore, o il servizio si ferma per un errore fatale;
-- **Notifiche di salute e motore** — problemi di salute, del ciclo di ricerca,
-  degli indexer, del login ai provider e del motore torrent, e il loro ritorno
-  alla normalità;
-- **Notifiche di manutenzione** — riavvii, backup completati e pulizia delle
-  tracce audio.
+- i quattro database: serie, episodi, film e download (`gextto_series.db`),
+  impostazioni e indexer (`gextto_config.db`), archivio dei feed
+  (`gextto_archive.db`), fumetti (`gextto_comics.db`);
+- gli altri file di configurazione della cartella dati, compreso lo stato di
+  gx-torrent;
+- le cartelle esterne che elenchi in *File e cartelle da includere*.
 
-Un semplice messaggio di test non viene mai filtrato. L'opzione **Anti-spam —
-intervallo minimo** non rimanda lo stesso evento (stesso titolo, serie, episodio,
-fonte e motivo) prima che siano passati quei minuti, così un errore ripetuto non
-inonda il canale; `0` lo disattiva. **Lingua dei messaggi** sceglie la lingua
-delle notifiche: vuota segue la lingua dell'interfaccia, e la scelta è
-indipendente da essa. **Invia notifica di test**, in cima alla scheda, usa
-insieme tutti i canali configurati.
+**Non** contiene i video, la sessione torrent, il filtro IP, le cache, i log, il
+cestino né `/etc/gextto/gextto.env`: tienine una copia tu.
 
-### Procedura di configurazione
+### Programmare i backup
 
-1. salva le credenziali nella scheda **Notifiche**;
-2. abilita solo gli eventi che vuoi ricevere;
-3. invia il test dalla UI;
-4. controlla sia la risposta del provider sia il log Gextto;
-5. esegui un test di completamento solo con un download non importante.
+In *Manutenzione → Backup* scegli la retention e quando farli (a mano, ogni N
+ore o a un'ora fissa). Puoi mandarli anche su **FTP** (con **Test FTP**, che
+dice quale passo fallisce), in una cartella sincronizzata o su Telegram. Il
+pulsante della Dashboard fa un backup immediato.
 
-Per un webhook verifica il segreto HMAC sul ricevente e non confondere il test
-HTTP con la consegna dell'evento reale. Per SMTP controlla host, porta, TLS,
-utente e mittente: un server raggiungibile può comunque rifiutare il mittente o
-richiedere autenticazione diversa.
+### Ripristinare
 
-Le notifiche degli eventi partono in background: un provider lento o
-irraggiungibile non rallenta download, seeding e archiviazione, e un eventuale
-errore di consegna compare nel log. Il test dalla UI invece attende la risposta
-e mostra subito l'errore. Una consegna SMTP che non risponde viene interrotta
-dopo 30 secondi.
+1. Installa Gextto con le stesse opzioni di prima, oppure ferma il servizio:
+   `sudo systemctl stop gextto`.
+2. Metti da parte la cartella dati attuale:
+   `sudo mv /var/lib/gextto /var/lib/gextto.old`.
+3. Estrai il backup e assegnalo all'utente del servizio:
 
-## 12. Riferimento rapido
+   ```bash
+   sudo install -d /var/lib/gextto
+   sudo unzip /percorso/gextto-backup-<data>.zip -d /var/lib/gextto
+   sudo chown -R <utente>:<gruppo> /var/lib/gextto
+   ```
 
-### Quando usare quale azione
+4. Rimetti `/etc/gextto/gextto.env` se lo avevi, poi
+   `sudo systemctl start gextto`.
+5. Apri **Salute**. Con gx-torrent i download in corso vengono riaggiunti dai
+   magnet salvati, e i dati già scaricati vengono ricontrollati e riusati.
 
-| Obiettivo | Azione |
+Un ripristino non sposta i video. Se nel frattempo la libreria ha cambiato
+posto, correggi i percorsi o esegui *Scansiona archivio* prima di riattivare le
+ricerche.
+
+## 24. Aggiornare Gextto
+
+### Dall'interfaccia
+
+*Manutenzione → Aggiornamenti* mostra la versione installata, il canale,
+l'ultima versione pubblicata e le novità. Gextto controlla da solo ogni 6 ore
+(*Intervallo controllo aggiornamenti*); **Verifica aggiornamenti** controlla
+subito. Quando c'è una versione nuova:
+
+1. premi **Aggiorna**: Gextto fa un backup dei database e chiede l'aggiornamento
+   al servizio di sistema `gextto-update`;
+2. aspetta: Gextto finisce le copie verso la libreria, si riavvia e il pannello
+   lo segnala da solo;
+3. al primo accesso un popup **Gextto aggiornato** mostra le novità.
+
+Se la nuova versione non parte, torna da sola quella precedente. In fondo alla
+pagina trovi la versione esatta: il terzo numero è la build (`1.2.2065`), con il
+commit da cui è compilata.
+
+### Dalla riga di comando
+
+```bash
+sudo /opt/gextto/gexttod --update
+```
+
+Scarica l'archivio, ne verifica il checksum (obbligatorio), sostituisce
+programma e motore e riavvia il servizio, tenendo le versioni precedenti
+(`gexttod.prev`, `gx-torrent.prev`) e rimettendole se le nuove non partono. Dati
+e configurazione non vengono toccati, e nemmeno l'unità systemd: le tue
+personalizzazioni restano. Opzioni: `--channel stable`, `--release <tag>`,
+`--archive <file>` (senza rete), `--force`, `--no-restart`.
+
+Su un'installazione da sorgenti: `git pull` e `make build`.
+
+### Altri comandi
+
+| Comando | Effetto |
 |---|---|
-| Capire cosa esiste online | Ricerca manuale |
-| Riempire episodi mancanti | Cerca mancanti / ciclo Serie |
-| Scegliere una release specifica | **Perché non questa?** → Accoda |
-| Far riconoscere file già presenti | Scansiona archivio |
-| Riscaricare una puntata già archiviata | ↻ Riscarica (sposta il file nel cestino e la rimette in coda) |
-| Cambiare il nome senza riscaricare | Anteprima rinomina |
-| Correggere un servizio esterno | Salute → sorgente → Verifica |
-| Eliminare file inferiori | Anteprima duplicati → Pulizia |
-| Salvare configurazione e DB | Backup |
+| `gexttod --version` | versione, build e canale installati |
+| `gexttod --help` | riepilogo d'uso |
+| `gexttod --config <file>` | usa un file di configurazione diverso |
+| `gexttod --dry-run` | avvia in modalità prova fino al riavvio |
+| `gexttod tui` | apre l'interfaccia da terminale |
 
-### Glossario
+## 25. Usare Gextto dal terminale (TUI)
 
-- **Release**: risultato trovato da feed, indexer o motore web.
-- **Ciclo**: una passata automatica di ricerca e selezione.
-- **Gap**: episodio mancante riconosciuto nell'archivio.
-- **Gap forzato**: richiesta esplicita di riscaricare una puntata (azione ↻
-  Riscarica). Scavalca la copertura di un pack di stagione e la regola
-  «episodio successivo già archiviato», così la puntata può essere ripresa
-  anche quando normalmente non sarebbe considerata mancante.
-- **Placeholder**: riga temporanea che rappresenta un download non ancora
-  completato.
-- **Upgrade**: sostituzione di un file archiviato con una release migliore.
-- **Backoff**: pausa progressiva delle richieste a una sorgente che fallisce.
-- **Seed**: condivisione del torrent dopo il completamento.
-- **NAS**: destinazione di rete usata per la libreria o per i percorsi configurati.
+La TUI è un'interfaccia a schede per il terminale, comoda via SSH anche dal
+telefono. Usa solo le API del servizio, quindi funziona anche da un altro
+computer.
 
-## 13. Risoluzione problemi
+```bash
+/opt/gextto/gexttod tui
+/opt/gextto/gexttod tui --url http://host:5000 --lang it
+GEXTTO_URL=http://host:5000 GEXTTO_API_KEY=<chiave> /opt/gextto/gexttod tui
+```
 
-- **Una sorgente non risponde** — controlla *Integrazioni → Verifica sorgenti*
-  e il pannello stato sorgenti; per Jackett verifica URL base, API key e che
-  almeno un indexer sia abilitato in Jackett; per indexarr controlla la API key
-  e che l'URL base sia quello di indexarr (di solito porta `8788`). Gli errori
-  Torznab vengono mostrati anche quando il manager risponde HTTP 200. I siti
-  protetti da Cloudflare richiedono un FlareSolverr funzionante.
-- **Jackett è raggiungibile ma mostra errore API** — copia nuovamente la API key,
-  controlla che almeno un indexer sia abilitato in Jackett e verifica che l'URL
-  inserito in Gextto sia quello base corretto. Non aggiungere due volte il
-  percorso `/api/v2.0/indexers/all/results/torznab/api`. Lo stesso vale per
-  indexarr: usa l'URL base (`http://host:8788`), non un percorso già completo,
-  e scegli **indexarr** come tipo.
-- **Non scarica nulla** — verifica la *modalità attiva*, che serie/film siano
-  abilitati, e controlla filtri qualità/lingua e il limite di spazio libero.
-- **Una puntata archiviata non si riscarica** — usa **↻ Riscarica** nel
-  dettaglio serie: sposta il file nel cestino, cancella la riga dell'episodio e
-  registra un *gap forzato*. È necessario quando la stagione è coperta da un
-  pack o quando un episodio successivo è già archiviato; senza il gap forzato
-  la puntata non risulta mancante. Uno speciale `SxxE00`, invece, è un singolo
-  file e **non** copre la stagione.
-- **Un torrent è stalled** — controlla i valori in *Configurazione →
-  Seed e completamento → Torrent bloccati*. Il torrent è intenzionalmente pausato e fuori dalla coda attiva;
-  attendi il retry oppure usa **Riprendi/Riavvia** manualmente.
-- **Una cartella osservata non importa il file** — lascia il file con estensione
-  `.torrent` o `.magnet`; Gextto aspetta che dimensione e timestamp restino
-  stabili, poi ritenta automaticamente gli errori. Controlla il log del watcher.
-- **Un file non viene rinominato** — conviene avere `mediainfo` installato (tag
-  tecnici); controlla le impostazioni *Rinomina* e la chiave TMDB (o TVDB e il
-  suo PIN). Senza metadati il titolo dell'episodio diventa «Episodio N».
-- **La release è visibile ma non viene scelta** — apri **Perché non questa?**:
-  controlla prima titolo monitorato, filtri globali, sanità, qualità/lingua e
-  confronto archivio. Se tutti questi passano, guarda il controllo informativo
-  sulla selezione del ciclo: altri candidati, delay, spazio libero e gap filling
-  possono ancora cambiare il risultato.
-- **Un file esiste sul NAS ma Gextto lo considera mancante** — controlla nome
-  episodio, percorso associato alla serie e permessi; poi usa *Scansiona archivio*.
-  La scansione riconosce i nomi video con stagione/episodio, non file arbitrari
-  che non permettono di identificare il contenuto.
-- **Il download è completo ma non compare nella libreria** — guarda il log per
-  spostamento, permessi e spazio; non cancellare la sorgente finché il percorso
-  archiviato non è visibile nella cronologia. Gli errori temporanei (NAS non
-  raggiungibile, disco momentaneamente pieno, timeout, database occupato) vengono
-  ritentati da soli dopo 1, 2, 4, 8, 16 e 32 minuti: solo dopo l'ultimo
-  tentativo il torrent passa in errore. Uno spostamento verso l'archivio
-  interrotto da un riavvio di Gextto riprende da solo circa un minuto dopo
-  l'avvio. Lo stato dei download viene salvato ogni 2 minuti: dopo uno stop
-  brusco (crash, mancanza di corrente) i download ripartono da dove erano, e
-  quelli che il motore avesse comunque perso vengono riaggiunti all'avvio
-  riusando i dati già scaricati.
-- **Un episodio non è arrivato: dove guardare** — parti dalla serie e premi 📜
-  sulla puntata.
-  - *Nessun evento*: Gextto non l'ha mai scaricato. Usa 🔍 (ricerca manuale) e
-    **Perché non questa?** per capire se la release non c'è nelle sorgenti o se
-    è stata scartata da filtri, qualità, lingua o ritardi; controlla anche lo
-    stato delle sorgenti in *Salute*.
-  - *📥 Downloading e poi niente*: il download è in corso o fermo. Apri il
-    torrent da *Scarico*: «⏸️ is stuck» indica pochi utenti che condividono,
-    «❌ Gave up» che è stato abbandonato e alla prossima ricerca ne cercherà
-    un'altra versione.
-  - *🎉 downloaded ma nessun 📁*: il file è scaricato ma non è arrivato in
-    libreria. Cerca «⚠️ still cannot be moved» o «Could not move»: di solito
-    NAS non raggiungibile, permessi o spazio; i tentativi riprendono da soli.
-  - *«discarded as inferior»*: in libreria c'era già una versione almeno
-    altrettanto buona, quindi quella nuova è stata scartata. È il comportamento
-    previsto.
-  - *📁 added / ♻️ updated*: è in libreria; se il nome non è quello atteso vedi
-    il punto sulla rinomina qui sopra.
-  Per il dettaglio completo apri *Mostra nel log* dal torrent: filtra il log
-  sulle righe di quel solo download.
-- **Il backup FTP fallisce** — usa *Test FTP*: indica il passo che fallisce
-  (connessione, login, percorso remoto, upload, rimozione) e lo registra nel log.
-- **Log** — vedi `data/gextto.log` (rotazione a 5 MB) o il viewer nella UI.
+Le schede sono Stato, Torrent, Log, Salute, Archivio, Mancanti, Blocklist,
+Libreria e Manutenzione.
+
+| Tasto | Azione |
+|---|---|
+| `1`–`9`, `Tab` | cambia scheda |
+| `r` | aggiorna |
+| `?` | aiuto |
+| `/` | filtra (nel Log) |
+| `f` | segui o ferma il log |
+| `Invio` | apre il dettaglio |
+| `p` | pausa o riprendi |
+| `y` | copia il link |
+| `d` | toglie un download eD2k da aMule |
+
+Su un terminale stretto (sotto le 60 colonne) l'interfaccia si compatta. La
+guida completa è in [tui.md](tui.md).
+
+---
+
+# Parte V — Quando qualcosa non va
+
+## 26. Risoluzione dei problemi
+
+### Un episodio non è arrivato: dove guardare
+
+Parti dalla scheda della serie e premi **📜** sulla puntata:
+
+| Cosa vedi | Cosa vuol dire | Cosa fare |
+|---|---|---|
+| *Nessun evento* | Gextto non l'ha mai scaricata | 🔍 sulla puntata e **Perché non questa?**: la release non c'è nelle sorgenti, o è stata scartata da filtri, qualità, lingua o ritardo? Controlla anche *Salute* |
+| *📥 Downloading* e poi niente | il download è in corso o fermo | apri il torrent in *Scarico*: «⏸️ is stuck» vuol dire pochi utenti che condividono; «❌ Gave up» che è stato abbandonato e verrà cercata un'altra versione |
+| *🎉 downloaded* ma nessun 📁 | scaricato ma non arrivato in libreria | cerca «still cannot be moved» o «Could not move»: di solito NAS non raggiungibile, permessi o spazio. I tentativi riprendono da soli |
+| *discarded as inferior* | in libreria c'era già una versione almeno altrettanto buona | nulla: è il comportamento previsto |
+| *📁 added* / *♻️ updated* | è in libreria | se il nome non è quello atteso, vedi sotto *Un file non viene rinominato* |
+
+Per tutti i dettagli apri *Mostra nel log* dal torrent: il log si filtra su quel
+solo download.
+
+### Non scarica nulla
+
+1. Il badge in alto dice **DRY-RUN**? Sei in modalità prova (vedi
+   [capitolo 4](#4-il-primo-download-in-prova-e-poi-davvero)).
+2. Il *Ciclo automatico* è acceso (*Configurazione → Generale*)?
+3. La serie o il film sono attivi, e le stagioni sono seguite?
+4. Le sorgenti sono **OK** in *Salute*?
+5. Una ricerca manuale trova release? Se sì, apri **Perché non questa?**: di
+   solito è un filtro di qualità o lingua troppo stretto.
+6. C'è abbastanza spazio libero rispetto al minimo impostato?
+
+### Una release è visibile ma non viene scelta
+
+Apri **Perché non questa?** e guarda i controlli **Bloccanti**: titolo seguito,
+filtri, sanità, qualità/lingua, confronto con la libreria. Se passano tutti,
+guarda quelli **Informativi**: un altro candidato migliore, il ritardo, lo
+spazio libero o i buchi da riempire possono cambiare la scelta.
+
+### Una sorgente non risponde o dà «Errore API»
+
+- Controlla *Salute → Stato API* e premi **Verifica** sulla sorgente.
+- Jackett: URL **base** (`http://host:9117`), API key ricopiata, almeno un
+  indexer abilitato. Non aggiungere il percorso
+  `/api/v2.0/indexers/all/results/torznab/api`.
+- indexarr: URL base (`http://host:8788`) e tipo **indexarr**.
+- Siti con Cloudflare: serve FlareSolverr funzionante.
+- Dopo aver corretto, **Azzera** il backoff della sorgente.
+
+### Un torrent è fermo (stalled)
+
+È in pausa di proposito, fuori dalla coda attiva: verrà ripreso al prossimo
+tentativo. Puoi anche **Riprendi** o **Riavvia** a mano. Guarda lo sciame nella
+riga: con 0 seeder probabilmente non ripartirà, e Gextto cercherà un'altra
+versione. I tempi sono in [Torrent fermi](#torrent-fermi-stalled).
+
+### Il download è completo ma non è in libreria
+
+Guarda il log per spostamento, permessi e spazio. Gli errori temporanei (NAS
+non raggiungibile, disco pieno, timeout) vengono ritentati dopo 1, 2, 4, 8, 16 e
+32 minuti; solo dopo l'ultimo il torrent va in errore. Uno spostamento
+interrotto da un riavvio riprende da solo circa un minuto dopo. Non cancellare
+i file sorgente finché il percorso in libreria non compare nello storico.
+
+### Un file è sul NAS ma Gextto lo considera mancante
+
+Controlla nome del file (deve contenere stagione ed episodio, per esempio
+`S01E02`), percorso della serie e permessi, poi premi **Scansiona archivio**.
+
+### Una puntata in libreria non si riscarica
+
+Usa **↻ Riscarica** sulla puntata: sposta il file nel cestino e la rimette in
+cerca anche se la stagione è coperta da un pack o hai già episodi successivi.
+Uno speciale `SxxE00` non copre la stagione.
+
+### Un file non viene rinominato
+
+Controlla le impostazioni di *Libreria e rinomina* e la chiave TMDB (o TVDB e il
+suo PIN): senza metadati il titolo dell'episodio diventa «Episodio N». Conviene
+avere `mediainfo` installato.
+
+### Una cartella osservata non importa il file
+
+Il file deve avere estensione `.torrent` o `.magnet`. Gextto aspetta che
+dimensione e data restino stabili, poi ritenta da solo gli errori. Controlla le
+righe del log sulla cartella osservata.
+
+### L'interfaccia non si apre
+
+- Controlla il servizio: `systemctl status gextto` (o `systemctl --user status
+  gextto`).
+- Se il log dice che la cartella dati è già in uso o la porta è occupata, c'è
+  un'altra istanza: fermala e riavvia.
+- Dopo un riavvio Gextto può impiegare circa un minuto per essere pronto.
+
+### Il backup FTP fallisce
+
+Usa **Test FTP**: dice quale passo fallisce (connessione, login, percorso,
+upload, rimozione) e lo scrive nel log.
+
+### Dove sono i log
+
+- Gextto: `<dati>/gextto.log` (ruotato a 5 MB × 4), oppure la pagina **Log**.
+- gx-torrent: `<dati>/gx-torrent/gx-torrent.log`, oppure *Manutenzione → Log
+  gx-torrent*.
+- aMule: *eD2k → Log di aMule*.
+- Aggiornamenti: `/var/log/gextto-update.log`.
+
+## 27. Glossario
+
+| Termine | Significato |
+|---|---|
+| **Alias** | un altro nome con cui una serie compare nelle release |
+| **Archivio** | il catalogo locale delle release viste nei feed |
+| **Backoff** | la pausa crescente delle richieste a una sorgente che fallisce |
+| **Blocklist** | le release che non verranno più scaricate |
+| **Cestino** | dove vanno i file tolti dalla libreria, prima della cancellazione |
+| **Ciclo** | una passata automatica di ricerca e scelta |
+| **Dry-run** | la modalità prova: cerca e decide, ma non scarica |
+| **Gap** | un episodio mancante in mezzo a quelli che hai |
+| **Gap forzato** | la richiesta esplicita di riscaricare una puntata (↻ Riscarica) |
+| **Hardlink** | un secondo nome per gli stessi dati, senza occupare spazio due volte |
+| **Indexer** | un servizio che cerca release su uno o più siti (Jackett, Prowlarr, indexarr) |
+| **Libreria** | le cartelle finali con serie e film |
+| **Placeholder** | la riga temporanea di un download non ancora completato |
+| **Profilo di qualità** | un modello di qualità, lingua, sottotitoli ed esclusioni |
+| **Release** | un risultato trovato da un feed, un indexer o un motore web |
+| **Season pack** | un torrent con un'intera stagione |
+| **Seed** | la condivisione di un torrent dopo il completamento |
+| **Sessione torrent** | i torrent ancora gestiti dal motore |
+| **Stalled** | un torrent che non riceve dati da troppo tempo |
+| **Upgrade** | la sostituzione di un file con una versione migliore |
+
+---
 
 ## Appendice A. Riferimento — Configurazione
 
@@ -2287,7 +1892,7 @@ Più feed possono puntare allo stesso sito (le liste degli uploader di ext.to o 
 
 *Collegamento ad aMule, ricerca su Kad e sui server eD2k, ripiego automatico e download fermi.*
 
-eD2k e Kad passano da **aMule** (vedi [eD2k e Kad con aMule](#ed2k-e-kad-con-amule)):
+eD2k e Kad passano da **aMule** (vedi [eD2k e Kad con aMule](#12-ed2k-e-kad-con-amule)):
 Gextto comanda un `amuled` già avviato tramite le connessioni esterne (EC). È
 spento per default: senza il tuo consenso Gextto non contatta la rete.
 
