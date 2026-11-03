@@ -48,6 +48,14 @@ here.
   place. Gate: a client that needs transcoding or a thumbnail taken from the video.
 - **10 Gbps pipelining** — a validation, not code: the local single-pair ceiling is far
   below the target, multi-piece included. Gate: a multi-peer swarm on a fast link.
+- **Windows killswitch on a multihomed host** — `OutgoingInterface` binds the source
+  address, which on Windows does not pin the egress adapter, so in a VPN configuration the
+  traffic can leave by another interface (as in libtorrent issue 8941, where the fix is
+  `IP_UNICAST_IF`/`IPV6_UNICAST_IF`). Gate: a Windows host with a VPN and a second adapter
+  where a packet capture shows the leak.
+- **Hybrid torrents from the v2 swarm** — hybrids are downloaded as v1 only; when the
+  swarm of a hybrid has peers in the v2 one and none in the v1 one, the download waits
+  without needing to. Gate: a hybrid torrent where the v2 swarm is the only one with peers.
 
 ## Gextto, acquisition and UI
 
@@ -121,6 +129,26 @@ its gate; a rejected one moves to *Not planned*.
 - **Error wrapping and log wording** — 280 log calls build their sentence with `Sprintf`
   although the logger takes structured fields, and 490 `fmt.Errorf` calls drop the cause
   because they do not use `%w`. Mechanical, area by area, tests green.
+- **Reconnect over a stale connection** — the per-address duplicate gate refuses a new
+  incoming connection while the old one is still open, and a peer that vanished without a
+  FIN holds its slot for the whole two-minute read window, so it cannot reconnect until
+  then (the symptom of libtorrent issue 8367). The handshake happens after the gate, so
+  the peer id cannot be compared yet. Gate: a decision on the heuristic — prefer the new
+  connection when the old one has been silent for N seconds, or accept both when the peer
+  id differs — and on the threshold.
+- **Ceiling on the piece length of a parsed torrent** — `NewInfo` checks neither a power
+  of two nor a maximum, and the piece pool is sized from that number
+  (`bufferpool.New(int(PieceLength))`): a hostile `.torrent` or magnet can ask for a
+  multi-gigabyte buffer, while libtorrent refuses even 2 GiB (issue 8139). Gate: the
+  ceiling to adopt and its error message.
+- **DHT scrape keeps the peers** — a `get_peers` with `scrape=1` answers with the bloom
+  filters *instead of* `values`, while BEP 33 says the filters are added to the normal
+  reply (the question of libtorrent issue 8005); our own scrape client does not need it.
+  Gate: a decision on the extra bytes in the reply (BEP 32 warns about the 512-byte size).
+- **Duplicate connections per IPv6 subnet** — the duplicate-IP gate compares the full
+  address, so one host with rotating privacy addresses can hold several slots; libtorrent
+  issue 8934 asks for one host per /64, but a /64 is a subnet and may hold many real users.
+  Gate: a measurement of the slots one host takes on a public IPv6 swarm.
 
 ## Not planned
 
