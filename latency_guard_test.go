@@ -250,14 +250,14 @@ func TestGuardDirectionRampsAndCuts(t *testing.T) {
 	now := time.Unix(1_800_000_000, 0)
 	for i := 0; i < 20; i++ {
 		now = now.Add(3 * time.Second)
-		d.step(now, false, 9000, latencyGuardMaxDownKiB, latencyGuardMinFloorDownKiB, latencyGuardRiseDownKiB)
+		d.step(now, false, false, 9000, latencyGuardMaxDownKiB, latencyGuardMinFloorDownKiB, latencyGuardRiseDownKiB)
 	}
 	ramped := d.clamp.Value
 	if ramped <= 128 {
 		t.Fatalf("the cap did not ramp up: %d", ramped)
 	}
 	now = now.Add(3 * time.Second)
-	cut := d.step(now, true, 90000, latencyGuardMaxDownKiB, latencyGuardMinFloorDownKiB, latencyGuardRiseDownKiB)
+	cut := d.step(now, true, false, 90000, latencyGuardMaxDownKiB, latencyGuardMinFloorDownKiB, latencyGuardRiseDownKiB)
 	if cut >= ramped {
 		t.Fatalf("the cap did not cut on a high ping: %d → %d", ramped, cut)
 	}
@@ -428,5 +428,53 @@ func TestLatencyGuardSitsBelowTheKnee(t *testing.T) {
 		if share < 90 {
 			t.Errorf("line %d KiB/s: only %d%% of the line used", capacity, share)
 		}
+	}
+}
+
+// A light user on the line does not move the ping, so the router counters are
+// what make Auto stop growing: the cap is held, never lowered, while another
+// device is active, and it resumes when that device is gone.
+func TestGuardDirectionHoldsWithoutCutting(t *testing.T) {
+	var d guardDirection
+	d.start(512)
+	now := time.Unix(1_800_000_000, 0)
+	for i := 0; i < 10; i++ {
+		now = now.Add(3 * time.Second)
+		d.step(now, false, true, 9000, latencyGuardMaxDownKiB, latencyGuardMinFloorDownKiB, latencyGuardRiseDownKiB)
+	}
+	if d.clamp.Value != 512 {
+		t.Fatalf("the cap grew while another device was active: %d", d.clamp.Value)
+	}
+	// A high ping still cuts: holding is about not taking room, not about
+	// ignoring the queue.
+	now = now.Add(3 * time.Second)
+	if cut := d.step(now, true, true, 90000, latencyGuardMaxDownKiB, latencyGuardMinFloorDownKiB, latencyGuardRiseDownKiB); cut >= 512 {
+		t.Fatalf("the cap did not cut on a high ping while holding: %d", cut)
+	}
+	// Once the other device is gone the cap grows again.
+	released := d.clamp.Value
+	for i := 0; i < 20; i++ {
+		now = now.Add(3 * time.Second)
+		d.step(now, false, false, 9000, latencyGuardMaxDownKiB, latencyGuardMinFloorDownKiB, latencyGuardRiseDownKiB)
+	}
+	if d.clamp.Value <= released {
+		t.Fatalf("the cap did not resume after the other device left: %d", d.clamp.Value)
+	}
+}
+
+func TestLatencyGuardHoldsOnlyWhenTheCountersAreRead(t *testing.T) {
+	g := newLatencyGuard()
+	g.othersOnLine = true
+	g.readsRouter = false // "ping": the counters are not read at all
+	if g.holdsCaps() {
+		t.Fatal("ping mode must not hold the caps on the router counters")
+	}
+	g.readsRouter = true // "both"/"router"
+	if !g.holdsCaps() {
+		t.Fatal("both/router must hold the caps while another device is active")
+	}
+	g.othersOnLine = false
+	if g.holdsCaps() {
+		t.Fatal("with the line to itself the caps must grow again")
 	}
 }

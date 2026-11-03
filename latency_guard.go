@@ -16,11 +16,16 @@ package gextto
 // the line and the guard yields to them, lowering the caps step by step and
 // raising them, then lifting them, once the latency is back at rest. Both
 // directions are capped, and the upload one starts from a much lower load
-// because home uplinks are asymmetric and fill up first. When the router's WAN
-// counters answer (line_usage.go) their verdict on "someone else" comes first,
-// which also sees users of little bandwidth (a call, a game) that a trial
-// cannot. The controller is internal/autospeed, shared with the standalone
-// daemon.
+// because home uplinks are asymmetric and fill up first.
+//
+// The router's WAN counters (line_usage.go) are read in "both" and "router".
+// They see something a ping cannot: another device with little traffic — a
+// call, a game — which adds no queue, so the ping stays good while the line is
+// already shared. When they answer and someone else is active, Auto stops
+// taking more room (it holds its caps); it never cuts them on a counter that
+// can be missing, stale or wrong: only the latency, or the router in the
+// legacy "router" policy, lowers the caps. The controller is
+// internal/autospeed, shared with the standalone daemon.
 
 import (
 	"slices"
@@ -164,12 +169,13 @@ func (d *guardDirection) start(value int64) {
 }
 
 // step moves an active cap: up while the ping is good, down when it degrades.
-// It returns the cap (0 = none). ceilingKiB is the maximum the controller may
+// hold stops the upward move without lowering the cap: another device is using
+// the line, and the ping gives no reason to cut. It returns the cap (0 = none). ceilingKiB is the maximum the controller may
 // reach: the line maximum the user entered, or (0) twice the rate the line is
 // actually delivering. Using the current rate as the ceiling was the lock that
 // kept the cap at a slow sample; the 2x governor still lets it grow when the
 // rate grows, while a value entered by the user is respected exactly.
-func (d *guardDirection) step(now time.Time, high bool, rateKiB, ceilingKiB, floorKiB, riseKiB int64) int64 {
+func (d *guardDirection) step(now time.Time, high, hold bool, rateKiB, ceilingKiB, floorKiB, riseKiB int64) int64 {
 	if !d.active {
 		return 0
 	}
@@ -218,6 +224,11 @@ func (d *guardDirection) step(now time.Time, high bool, rateKiB, ceilingKiB, flo
 			d.clamp.Value = value
 		}
 	}
+	if hold && value > before {
+		// Someone else is on the line: keep the room we have and take no more.
+		value = before
+		d.clamp.Value = value
+	}
 	switch {
 	case high && value < before:
 		d.knee, d.cutAt = before, now
@@ -255,6 +266,10 @@ type latencyGuard struct {
 	// other traffic. With "ping"/"both" the latency decides and the router is
 	// only a diagnostic.
 	routerOnly bool
+	// readsRouter is set when the counters are read at all ("both"/"router"):
+	// they then also hold the caps from growing while another device is
+	// active. In "ping" they are not read, so they cannot affect anything.
+	readsRouter bool
 	// controlStarted is set when the controller applies its first cap of a
 	// session; tick logs it once, with the values and the ping.
 	controlStarted bool
@@ -379,6 +394,13 @@ func (g *latencyGuard) baselineLocked(now time.Time, windowMin time.Duration) (t
 	return windowMin, false
 }
 
+// holdsCaps is true when another device is on the line and the policy reads the
+// router's counters: Auto keeps the room it has and takes no more. The ping
+// alone cannot see a light user — a call, a game — because it adds no queue.
+func (g *latencyGuard) holdsCaps() bool {
+	return g.readsRouter && g.othersOnLine
+}
+
 // isHigh applies the shared rule of internal/autospeed to a reference.
 func isHigh(current, baseline time.Duration) bool {
 	return current > time.Duration(float64(baseline)*autospeed.HighFactor) && current > baseline+autospeed.HighMargin
@@ -403,6 +425,9 @@ func (g *latencyGuard) update(now time.Time, auto bool, line lineGuess, downByte
 	prevDown, prevUp := g.downCap, g.upCap
 	g.auto = auto
 	g.othersOnLine = line.known && line.others
+	// Another device is active, the counters answer and this policy reads them:
+	// do not take more room until it is gone.
+	hold := g.holdsCaps()
 	if !auto {
 		g.mode = guardFree
 		g.down, g.up = guardDirection{}, guardDirection{}
@@ -517,8 +542,8 @@ func (g *latencyGuard) update(now time.Time, auto bool, line lineGuess, downByte
 			g.upCap = max(int64(float64(rateUp)*latencyGuardTrialShare), latencyGuardMinFloorUpKiB)
 			g.up.start(g.upCap)
 		}
-		g.downCap = g.down.step(now, high, rateDown, g.lineMaxDown, latencyGuardMinFloorDownKiB, latencyGuardRiseDownKiB)
-		g.upCap = g.up.step(now, high, rateUp, g.lineMaxUp, latencyGuardMinFloorUpKiB, latencyGuardRiseUpKiB)
+		g.downCap = g.down.step(now, high, hold, rateDown, g.lineMaxDown, latencyGuardMinFloorDownKiB, latencyGuardRiseDownKiB)
+		g.upCap = g.up.step(now, high, hold, rateUp, g.lineMaxUp, latencyGuardMinFloorUpKiB, latencyGuardRiseUpKiB)
 		if !g.down.active && !g.up.active {
 			g.releaseLocked(now)
 		}
@@ -729,6 +754,7 @@ func (g *latencyGuard) tick(now time.Time, cfg *Config, engine TorrentEngine) {
 	}
 	g.mu.Lock()
 	g.routerOnly = latencyGuardRouterOnly(cfg)
+	g.readsRouter = latencyGuardRouterEnabled(cfg)
 	g.lineMaxDown, g.lineMaxUp = latencyGuardLineMaxKib(cfg)
 	g.mu.Unlock()
 	downCap, upCap, changed := g.update(now, true, line, down, up)

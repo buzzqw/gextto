@@ -54,10 +54,10 @@ here.
 - **Sonarr/Radarr v3** — acceptance test of the Jellyseerr subset against a real
   Jellyseerr; its calls decide any correction. Gate: a Jellyseerr instance driven by a
   real request.
-- **Latency guard in `ping` mode** — a user with little bandwidth who only needs a low
-  latency (a call, a game) fills no queue, so a ping alone cannot see them; in
-  `both`/`router` the WAN counters do. Gate: a real call or game next to a saturated
-  download, measured in `both` and in `ping`.
+- **Cutting, not only holding, for a light user** — in `both`/`router` Auto now stops
+  growing while the router sees another device, but it never lowers the caps on that
+  signal. Gate: a real call or game next to a saturated download, measured in `both` and
+  in `ping`, to decide the cut (and how much) without starving the download.
 - **Portable folder names for existing series** — a series added before the add dialog
   dropped the characters Windows, exFAT and SMB shares refuse keeps its folder; a check
   in Maintenance reports those folders and never moves files by itself. Gate: an
