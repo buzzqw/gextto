@@ -1193,19 +1193,9 @@ func AddArchiveEntry(w http.ResponseWriter, r *http.Request, s *AppState) {
 	jsonStatus(w, status, body)
 }
 
-func gh0_setupComplete(cfg *Config) bool {
-	info, err := os.Stat(filepath.Join(cfg.DataDir, ".gextto-setup.json"))
-	return err == nil && !info.IsDir()
-}
-
-func gh0_isTorrentURL(value string) bool {
-	lower := strings.ToLower(strings.TrimSpace(value))
-	return strings.HasPrefix(lower, "http://") || strings.HasPrefix(lower, "https://")
-}
-
 func gh0_sourceIsUsable(source string) bool {
 	source = strings.TrimSpace(source)
-	if gh0_isTorrentURL(source) {
+	if isHTTPURL(source) {
 		return true
 	}
 	if !strings.HasPrefix(source, "magnet:") {
@@ -1258,7 +1248,7 @@ func gh0_downloadAndAdd(ctx context.Context, s *AppState, url string) (*string, 
 
 func gh0_addParsedRelease(ctx context.Context, s *AppState, release models.Release) (int, map[string]any) {
 	source := strings.TrimSpace(release.Magnet)
-	if gh0_isTorrentURL(source) {
+	if isHTTPURL(source) {
 		hash, errMessage := gh0_downloadAndAdd(ctx, s, source)
 		if errMessage != "" {
 			return http.StatusBadRequest, map[string]any{"ok": false, "error": errMessage}
@@ -1300,10 +1290,10 @@ func gh0_addParsedRelease(ctx context.Context, s *AppState, release models.Relea
 }
 
 func gh0_addRelease(ctx context.Context, s *AppState, release models.Release) (int, map[string]any) {
-	if !gh0_setupComplete(s.cfg) {
+	if !SetupComplete(s.cfg) {
 		return http.StatusConflict, map[string]any{"ok": false, "error": "complete the initial setup first"}
 	}
-	isURL := gh0_isTorrentURL(release.Magnet)
+	isURL := isHTTPURL(release.Magnet)
 	status, body := gh0_addParsedRelease(ctx, s, release)
 	if isURL && status == http.StatusBadRequest {
 		if found := gh0_resolveBySearch(ctx, s, release.Title); found != nil {
@@ -1317,11 +1307,11 @@ func gh0_addRelease(ctx context.Context, s *AppState, release models.Release) (i
 }
 
 func gh0_addRawMagnet(ctx context.Context, s *AppState, source string) (int, map[string]any) {
-	if !gh0_setupComplete(s.cfg) {
+	if !SetupComplete(s.cfg) {
 		return http.StatusConflict, map[string]any{"ok": false, "error": "complete the initial setup first"}
 	}
 	trimmed := strings.TrimSpace(source)
-	if gh0_isTorrentURL(trimmed) {
+	if isHTTPURL(trimmed) {
 		hash, errMessage := gh0_downloadAndAdd(ctx, s, trimmed)
 		if errMessage != "" {
 			return http.StatusBadRequest, map[string]any{"ok": false, "error": errMessage}
@@ -1696,18 +1686,8 @@ func RemoveTorrentLegacy(w http.ResponseWriter, r *http.Request, s *AppState) {
 	}
 	cfg := latestConfig(s)
 	removed, err := SafeRemoveTorrent(s, cfg, input.Hash, input.DeleteFiles)
-	status, body := gh0_torrentAction(removed, err)
+	status, body := torrentActionResult(removed, err)
 	jsonStatus(w, status, body)
-}
-
-func gh0_torrentAction(ok bool, err error) (int, map[string]any) {
-	if err != nil {
-		return http.StatusBadRequest, map[string]any{"ok": false, "error": err.Error()}
-	}
-	if !ok {
-		return http.StatusNotFound, map[string]any{"ok": false, "error": "torrent unavailable in dry-run"}
-	}
-	return http.StatusOK, map[string]any{"ok": true}
 }
 
 // ---------------------------------------------------------------------------
@@ -1815,6 +1795,6 @@ func SetTorrentLimitsLegacy(w http.ResponseWriter, r *http.Request, s *AppState)
 		input.SeedRatio,
 		input.SeedDays,
 	)
-	status, body := gh0_torrentAction(ok, err)
+	status, body := torrentActionResult(ok, err)
 	jsonStatus(w, status, body)
 }

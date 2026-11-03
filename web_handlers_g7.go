@@ -181,20 +181,6 @@ type gh7_episode_result struct {
 	Score   int64          `json:"score"`
 }
 
-// gh7_torrent_action reproduces `torrent_action`: 200 on true, 404 when the
-// torrent session is unavailable (dry-run), 400 on error.
-func gh7_torrent_action(w http.ResponseWriter, result bool, err error) {
-	if err != nil {
-		jsonError(w, http.StatusBadRequest, err.Error())
-		return
-	}
-	if result {
-		jsonResponse(w, map[string]any{"ok": true})
-		return
-	}
-	jsonError(w, http.StatusNotFound, "torrent unavailable in dry-run")
-}
-
 // gh7_find_series reproduces `find_series`, returning a copy of the matching
 // configuration entry (name or alias match).
 func gh7_find_series(cfg *Config, name string) (SeriesConfig, bool) {
@@ -1095,7 +1081,7 @@ func MoveTorrentStorage(w http.ResponseWriter, r *http.Request, s *AppState) {
 		logging.Warn("manual torrent storage move not started: torrent session unavailable",
 			"hash", hash, "name", name, "destination", destination)
 	}
-	gh7_torrent_action(w, result, err)
+	torrentAction(w, result, err)
 }
 
 // gh7_isConfiguredArchive reports whether destination is inside a library
@@ -1132,7 +1118,7 @@ func NetworkInterfacesView(w http.ResponseWriter, r *http.Request, s *AppState) 
 func ReannounceTorrent(w http.ResponseWriter, r *http.Request, s *AppState) {
 	hash := pathParam(r, "hash")
 	result, err := s.activeEngine().Reannounce(hash)
-	gh7_torrent_action(w, result, err)
+	torrentAction(w, result, err)
 }
 
 // RemoveTorrent handles DELETE /api/torrents/{hash}.
@@ -1142,14 +1128,14 @@ func RemoveTorrent(w http.ResponseWriter, r *http.Request, s *AppState) {
 	deleteFiles := r.URL.Query().Get("delete_files") == "1" || r.URL.Query().Get("delete_files") == "true"
 	cfg := latestConfig(s)
 	removed, err := SafeRemoveTorrent(s, cfg, hash, deleteFiles)
-	gh7_torrent_action(w, removed, err)
+	torrentAction(w, removed, err)
 }
 
 // ResumeTorrent handles POST /api/torrents/{hash}/resume.
 func ResumeTorrent(w http.ResponseWriter, r *http.Request, s *AppState) {
 	hash := pathParam(r, "hash")
 	result, err := s.activeEngine().Resume(hash)
-	gh7_torrent_action(w, result, err)
+	torrentAction(w, result, err)
 }
 
 // SaveSetting handles POST /api/config/settings.
@@ -1503,7 +1489,7 @@ func SetTorrentLimits(w http.ResponseWriter, r *http.Request, s *AppState) {
 	// "unlimited"), which is what a client that edits one field at a time sends.
 	result, err := s.activeEngine().SetLimits(hash, input.DownloadLimit, input.UploadLimit, input.SeedRatio, input.SeedDays)
 	if err != nil {
-		gh7_torrent_action(w, result, err)
+		torrentAction(w, result, err)
 		return
 	}
 	if input.MaxConnections != nil || input.MaxUploads != nil {
@@ -1527,7 +1513,7 @@ func SetTorrentLimits(w http.ResponseWriter, r *http.Request, s *AppState) {
 			}
 		}
 	}
-	gh7_torrent_action(w, result, err)
+	torrentAction(w, result, err)
 }
 
 // SimklAuthPoll handles POST /api/simkl/auth/poll.

@@ -57,11 +57,6 @@ func gh6_decodeOptionalJSON(r *http.Request, target any) error {
 	return err
 }
 
-func gh6_isDir(path string) bool {
-	info, err := os.Stat(path)
-	return err == nil && info.IsDir()
-}
-
 func gh6_purgeRemovedLibrary(
 	db *Database,
 	previousSeries []SeriesConfig,
@@ -124,14 +119,6 @@ func gh6_parseSettingInt(cfg *Config, key string) int64 {
 	return parsed
 }
 
-// gh6_truthySetting reads a boolean setting. It delegates to settingTruthy so
-// every reader accepts the same spellings: "on" (one of the values the
-// settings page can store) used to be read as false here and as true
-// everywhere else, so the speed panel and the speed rule disagreed.
-func gh6_truthySetting(value string) bool {
-	return settingTruthy(value)
-}
-
 func gh6_scheduledSpeedLimits(cfg *Config) (int64, int64, bool) {
 	return scheduledSpeedLimitsAt(cfg, time.Now())
 }
@@ -164,10 +151,10 @@ func speedPolicy(cfg *Config) (download, upload int64, source string) {
 	now := time.Now().Unix()
 	tempUntil := gh6_parseSettingInt(cfg, "torrent_temp_limit_until")
 	tempLive := tempUntil == 0 || tempUntil > now
-	if gh6_truthySetting(cfg.Settings["torrent_temp_auto"]) && tempLive {
+	if settingTruthy(cfg.Settings["torrent_temp_auto"]) && tempLive {
 		return 0, 0, speedSourceTempAuto
 	}
-	if gh6_truthySetting(cfg.Settings["torrent_temp_limit_enabled"]) && tempLive {
+	if settingTruthy(cfg.Settings["torrent_temp_limit_enabled"]) && tempLive {
 		download, upload = gh6_parseSettingInt(cfg, "torrent_temp_dl_limit"), gh6_parseSettingInt(cfg, "torrent_temp_ul_limit")
 		if tempUntil == 0 {
 			return download, upload, speedSourceTempKeep
@@ -183,7 +170,7 @@ func speedRule(cfg *Config) (download, upload int64, source string) {
 	if cfg == nil {
 		return 0, 0, speedSourceBase
 	}
-	if gh6_truthySetting(cfg.Settings["torrent_sched_enabled"]) {
+	if settingTruthy(cfg.Settings["torrent_sched_enabled"]) {
 		if day, ok := speedScheduleWeek(cfg).AtDay(time.Now()); ok {
 			if day.Auto() {
 				// An "auto" window hands the limit to the guided tuning: it lifts
@@ -195,7 +182,7 @@ func speedRule(cfg *Config) (download, upload int64, source string) {
 		}
 	}
 	// Auto as the rule, or Auto outside the schedule windows.
-	if gh6_truthySetting(cfg.Settings["torrent_speed_auto"]) {
+	if settingTruthy(cfg.Settings["torrent_speed_auto"]) {
 		return 0, 0, speedSourceAuto
 	}
 	return max(cfg.Transfer.DownloadLimitKib, 0), max(cfg.Transfer.UploadLimitKib, 0), speedSourceBase
@@ -221,7 +208,7 @@ func gh6_directorySize(path string) uint64 {
 	var total uint64
 	for _, entry := range entries {
 		child := filepath.Join(path, entry.Name())
-		if gh6_isDir(child) {
+		if directoryExists(child) {
 			total += gh6_directorySize(child)
 			continue
 		}
@@ -584,7 +571,7 @@ func BrowseDir(w http.ResponseWriter, r *http.Request, s *AppState) {
 	} else {
 		for _, entry := range entries {
 			child := filepath.Join(canonical, entry.Name())
-			if gh6_isDir(child) {
+			if directoryExists(child) {
 				dirs = append(dirs, child)
 			} else if withVideos && entry.Type().IsRegular() && isVideoExtension(entry.Name()) {
 				files = append(files, child)
@@ -615,7 +602,7 @@ func BrowseDir(w http.ResponseWriter, r *http.Request, s *AppState) {
 // gh6_browseDefaultPath is where the folder picker starts with no path: the
 // service user's home when it is usable, otherwise the root.
 func gh6_browseDefaultPath() string {
-	if home := os.Getenv("HOME"); home != "" && gh6_isDir(home) {
+	if home := os.Getenv("HOME"); home != "" && directoryExists(home) {
 		return home
 	}
 	return "/"
@@ -863,7 +850,7 @@ func RamdiskView(w http.ResponseWriter, r *http.Request, s *AppState) {
 		// instead of silently disabling the RAM-disk tier.
 		mountType, isRamdisk := ramdiskMountType(*configured)
 		switch {
-		case !gh6_isDir(*configured):
+		case !directoryExists(*configured):
 			problem = fmt.Sprintf("La cartella RAM disk configurata non esiste più: %s", *configured)
 		case !DirectoryWritable(*configured):
 			problem = fmt.Sprintf("La cartella RAM disk configurata non è scrivibile: %s", *configured)
@@ -882,7 +869,7 @@ func RamdiskView(w http.ResponseWriter, r *http.Request, s *AppState) {
 		"problem":          problem,
 		"paths":            items,
 		"create_path":      filepath.Join(createRoot, "gextto"),
-		"create_available": gh6_isDir(createRoot) && DirectoryWritable(createRoot),
+		"create_available": directoryExists(createRoot) && DirectoryWritable(createRoot),
 		"warning":          "Il contenuto di /dev/shm e degli altri tmpfs non sopravvive al riavvio della macchina.",
 	})
 }
@@ -1440,7 +1427,7 @@ func GetTempLimits(w http.ResponseWriter, r *http.Request, s *AppState) {
 	cfg := latestConfig(s)
 	now := time.Now().Unix()
 	until := gh6_parseSettingInt(cfg, "torrent_temp_limit_until")
-	tempActive := gh6_truthySetting(cfg.Settings["torrent_temp_limit_enabled"]) && (until == 0 || until > now)
+	tempActive := settingTruthy(cfg.Settings["torrent_temp_limit_enabled"]) && (until == 0 || until > now)
 	remaining := int64(0)
 	if tempActive && until > 0 {
 		remaining = until - now
@@ -1454,7 +1441,7 @@ func GetTempLimits(w http.ResponseWriter, r *http.Request, s *AppState) {
 		"source":             source,
 		"download_kib":       download,
 		"upload_kib":         upload,
-		"temp_auto":          gh6_truthySetting(cfg.Settings["torrent_temp_auto"]),
+		"temp_auto":          settingTruthy(cfg.Settings["torrent_temp_auto"]),
 		"temp_active":        tempActive,
 		"temp_download_kib":  gh6_parseSettingInt(cfg, "torrent_temp_dl_limit"),
 		"temp_upload_kib":    gh6_parseSettingInt(cfg, "torrent_temp_ul_limit"),
@@ -1568,7 +1555,7 @@ func TrashEntries(w http.ResponseWriter, r *http.Request, s *AppState) {
 	if entries, err := os.ReadDir(path); err == nil {
 		for _, entry := range entries {
 			child := filepath.Join(path, entry.Name())
-			isDir := gh6_isDir(child)
+			isDir := directoryExists(child)
 			var size uint64
 			if isDir {
 				size = gh6_directorySize(child)
@@ -1593,7 +1580,7 @@ func TrashEntries(w http.ResponseWriter, r *http.Request, s *AppState) {
 	jsonResponse(w, map[string]any{
 		"ok":             true,
 		"path":           path,
-		"exists":         gh6_isDir(path),
+		"exists":         directoryExists(path),
 		"count":          len(items),
 		"total_bytes":    totalBytes,
 		"retention_days": retentionDays,

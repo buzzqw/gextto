@@ -1214,7 +1214,7 @@ func V2TableLibrary(w http.ResponseWriter, r *http.Request, s *AppState) {
 			}
 			break
 		}
-	} else if series := gh3FindSeries(cfg, name); series != nil {
+	} else if series := findSeries(cfg, name); series != nil {
 		path := "/api/series/" + url.PathEscape(series.Name)
 		if mode == "remove" {
 			v2InternalJSON(s, http.MethodDelete, path, nil, nil)

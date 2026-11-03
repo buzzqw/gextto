@@ -9,7 +9,6 @@ package gextto
 import (
 	"bytes"
 	"context"
-	"crypto/rand"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -25,7 +24,6 @@ import (
 	"github.com/buzzqw/gextto/internal/ed2k"
 	"github.com/buzzqw/gextto/internal/logging"
 	"github.com/buzzqw/gextto/internal/models"
-	"github.com/buzzqw/gextto/internal/rules"
 	"github.com/buzzqw/gextto/internal/utils"
 )
 
@@ -86,7 +84,7 @@ func BackupTestFtp(w http.ResponseWriter, r *http.Request, s *AppState) {
 		"entered_path", report.EnteredPath,
 		"uploaded", report.Uploaded,
 		"deleted", report.Deleted,
-		"error", gh3DerefString(report.Error))
+		"error", derefString(report.Error))
 	var reportError any
 	if report.Error != nil {
 		reportError = *report.Error
@@ -572,7 +570,7 @@ func SaveWatchedFoldersHandler(w http.ResponseWriter, r *http.Request, s *AppSta
 func SeriesDetail(w http.ResponseWriter, r *http.Request, s *AppState) {
 	cfg := latestConfig(s)
 	name := pathParam(r, "name")
-	series := gh3FindSeries(cfg, name)
+	series := findSeries(cfg, name)
 	if series == nil {
 		jsonError(w, http.StatusNotFound, "series not found")
 		return
@@ -749,7 +747,7 @@ func SystemStats(w http.ResponseWriter, r *http.Request, s *AppState) {
 		DataDir:      cfg.DataDir,
 		TrashPath:    trash,
 		DownloadPath: cfg.DownloadDir,
-		ArchiveRoot:  gh3DerefString(cfg.ArchiveRoot),
+		ArchiveRoot:  derefString(cfg.ArchiveRoot),
 		RamdiskPath:  ramdisk,
 	})
 	jsonResponse(w, map[string]any{
@@ -788,7 +786,7 @@ func Torrents(w http.ResponseWriter, r *http.Request, s *AppState) {
 // UploadTorrent is `upload_torrent`.
 func UploadTorrent(w http.ResponseWriter, r *http.Request, s *AppState) {
 	cfg := LatestConfig(s)
-	if !gh3SetupComplete(cfg) {
+	if !SetupComplete(cfg) {
 		jsonStatus(w, http.StatusConflict, map[string]any{"ok": false, "error": "complete the initial setup first"})
 		return
 	}
@@ -810,7 +808,7 @@ func UploadTorrent(w http.ResponseWriter, r *http.Request, s *AppState) {
 		dir = *cfg.DownloadTempDir
 	}
 	_ = os.MkdirAll(dir, 0o755)
-	path := filepath.Join(dir, fmt.Sprintf("upload-%s.torrent", gh3UUID()))
+	path := filepath.Join(dir, fmt.Sprintf("upload-%s.torrent", newUUID()))
 	if err := os.WriteFile(path, body, 0o644); err != nil {
 		jsonStatus(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": err.Error()})
 		return
@@ -858,47 +856,6 @@ func gh3DecodeOptionalJSON(w http.ResponseWriter, r *http.Request, target any) b
 		return false
 	}
 	return true
-}
-
-// gh3DerefString returns the pointed-to string or "".
-func gh3DerefString(value *string) string {
-	if value == nil {
-		return ""
-	}
-	return *value
-}
-
-// gh3UUID returns a random RFC 4122 version 4 UUID string.
-func gh3UUID() string {
-	var raw [16]byte
-	if _, err := rand.Read(raw[:]); err != nil {
-		return strconv.FormatInt(time.Now().UnixNano(), 16)
-	}
-	raw[6] = (raw[6] & 0x0f) | 0x40
-	raw[8] = (raw[8] & 0x3f) | 0x80
-	return fmt.Sprintf("%x-%x-%x-%x-%x", raw[0:4], raw[4:6], raw[6:8], raw[8:10], raw[10:16])
-}
-
-// gh3FindSeries implements `find_series`: exact name or alias match.
-func gh3FindSeries(cfg *Config, name string) *SeriesConfig {
-	for index := range cfg.Series {
-		series := &cfg.Series[index]
-		if series.Name == name {
-			return series
-		}
-		for _, alias := range series.Aliases {
-			if alias == name {
-				return series
-			}
-		}
-	}
-	return nil
-}
-
-// gh3SetupComplete implements `setup_complete`.
-func gh3SetupComplete(cfg *Config) bool {
-	info, err := os.Stat(filepath.Join(cfg.DataDir, ".gextto-setup.json"))
-	return err == nil && !info.IsDir()
 }
 
 // gh3SaveWatchedFolders stores watched folders under the `watched_folders`
@@ -1067,7 +1024,7 @@ func gh3SeenGrouped(state *AppState, kind string, r *http.Request) (int, any) {
 
 // gh3ManualSearch implements `manual_search`, reused by `manual_search_get`.
 func gh3ManualSearch(s *AppState, query string, kad ...bool) (int, any) {
-	if !gh3SetupComplete(LatestConfig(s)) {
+	if !SetupComplete(LatestConfig(s)) {
 		return http.StatusConflict, map[string]any{"ok": false, "error": "complete the initial setup first"}
 	}
 	query = strings.TrimSpace(query)
@@ -1086,7 +1043,7 @@ func gh3ManualSearch(s *AppState, query string, kad ...bool) (int, any) {
 			"timeout_secs", int64(gh3ManualSearchBudget.Seconds()))
 		results = nil
 	}
-	results = append(results, gh3ArchiveReleasesForQuery(s, cfg, query)...)
+	results = append(results, archiveReleasesForQuery(s, cfg, query)...)
 	if len(kad) > 0 && kad[0] {
 		results = append(results, SearchED2KManual(ctx, cfg, query)...)
 	}
@@ -1122,39 +1079,16 @@ func gh3ManualSearch(s *AppState, query string, kad ...bool) (int, any) {
 	return http.StatusOK, map[string]any{"ok": true, "query": query, "results": results}
 }
 
-// gh3ArchiveReleasesForQuery implements `archive_releases_for_query`.
-func gh3ArchiveReleasesForQuery(s *AppState, cfg *Config, query string) []models.Release {
-	results := []models.Release{}
-	entries, err := s.archive.Search(query)
-	if err != nil {
-		return results
-	}
-	for _, entry := range entries {
-		release := ParseRelease(entry[0], entry[1], "archive:"+entry[2])
-		if release == nil {
-			continue
-		}
-		if reason := cfg.AllReleaseDeniedReason(release); reason != "" {
-			if cfg.ReleaseIsMonitored(release) {
-				rules.LogRejection(release, reason)
-			}
-			continue
-		}
-		results = append(results, *release)
-	}
-	return results
-}
-
 // gh3AddRelease implements `add_release`.
 func gh3AddRelease(s *AppState, release models.Release) (int, any) {
-	if !gh3SetupComplete(LatestConfig(s)) {
+	if !SetupComplete(LatestConfig(s)) {
 		return http.StatusConflict, map[string]any{"ok": false, "error": "complete the initial setup first"}
 	}
 	source := strings.TrimSpace(release.Magnet)
 	if source == "" && release.TorrentURL != nil {
 		source = strings.TrimSpace(*release.TorrentURL)
 	}
-	isURL := gh3IsTorrentURL(source)
+	isURL := isHTTPURL(source)
 	status, value := gh3AddParsedRelease(s, release)
 	if isURL && status == http.StatusBadRequest {
 		if found := gh3ResolveBySearch(s, release.Title); found != nil {
@@ -1233,7 +1167,7 @@ func gh3AddParsedRelease(s *AppState, release models.Release) (int, any) {
 	if source == "" {
 		return http.StatusBadRequest, map[string]any{"ok": false, "error": "release has no magnet or torrent URL"}
 	}
-	if gh3IsTorrentURL(source) {
+	if isHTTPURL(source) {
 		hash, err := gh3DownloadAndAdd(s, source, AddOptions{})
 		if err != nil {
 			return http.StatusBadRequest, map[string]any{"ok": false, "error": err.Error()}
@@ -1307,12 +1241,6 @@ func identifyRelease(release *models.Release) {
 	}
 }
 
-// gh3IsTorrentURL implements `is_torrent_url`.
-func gh3IsTorrentURL(value string) bool {
-	value = strings.ToLower(strings.TrimSpace(value))
-	return strings.HasPrefix(value, "http://") || strings.HasPrefix(value, "https://")
-}
-
 // gh3DownloadAndAdd implements `download_and_add`.
 func gh3DownloadAndAdd(s *AppState, rawURL string, options AddOptions) (*string, error) {
 	cfg := LatestConfig(s)
@@ -1343,7 +1271,7 @@ func gh3DownloadAndAdd(s *AppState, rawURL string, options AddOptions) (*string,
 	if magnet != "" {
 		return addMagnet(magnet)
 	}
-	path := filepath.Join(cfg.StateDir, fmt.Sprintf(".manual-%s.torrent", gh3UUID()))
+	path := filepath.Join(cfg.StateDir, fmt.Sprintf(".manual-%s.torrent", newUUID()))
 	if err := os.WriteFile(path, payload, 0o644); err != nil {
 		return nil, err
 	}
@@ -1354,14 +1282,14 @@ func gh3DownloadAndAdd(s *AppState, rawURL string, options AddOptions) (*string,
 // gh3ResolveBySearch implements `resolve_by_search`.
 func gh3ResolveBySearch(s *AppState, title string) *models.Release {
 	query := gh3SearchQueryFromTitle(title)
-	normalized := gh3NormalizeSearch(query)
+	normalized := normalizeSearch(query)
 	if normalized == "" {
 		return nil
 	}
 	results := s.engine.SearchQueryManual(context.Background(), LatestConfig(s), query)
 	for i := range results {
 		release := &results[i]
-		if gh3SourceIsUsable(release.Magnet) && strings.HasPrefix(gh3NormalizeSearch(release.Title), normalized) {
+		if gh3SourceIsUsable(release.Magnet) && strings.HasPrefix(normalizeSearch(release.Title), normalized) {
 			return release
 		}
 	}
@@ -1393,7 +1321,7 @@ func gh3SearchQueryFromTitle(title string) string {
 	words := []string{}
 	for _, word := range strings.Fields(string(cleaned)) {
 		lower := strings.ToLower(word)
-		isYear := len(word) == 4 && gh3AllASCIIDigits(word)
+		isYear := len(word) == 4 && allASCIIDigits(word)
 		_, isMarker := markers[lower]
 		if !isMarker {
 			isMarker = strings.Contains(lower, "1080p") ||
@@ -1412,41 +1340,10 @@ func gh3SearchQueryFromTitle(title string) string {
 	return strings.Join(words, " ")
 }
 
-// gh3AllASCIIDigits reports whether every character is an ASCII digit.
-func gh3AllASCIIDigits(value string) bool {
-	if value == "" {
-		return false
-	}
-	for i := 0; i < len(value); i++ {
-		if value[i] < '0' || value[i] > '9' {
-			return false
-		}
-	}
-	return true
-}
-
-// gh3NormalizeSearch implements `normalize_search`.
-func gh3NormalizeSearch(value string) string {
-	head := value
-	if index := strings.Index(value, "["); index >= 0 {
-		head = value[:index]
-	}
-	cleaned := make([]rune, 0, len(head))
-	for _, character := range strings.ToLower(head) {
-		if (character >= '0' && character <= '9') ||
-			(character >= 'a' && character <= 'z') {
-			cleaned = append(cleaned, character)
-		} else {
-			cleaned = append(cleaned, ' ')
-		}
-	}
-	return strings.Join(strings.Fields(string(cleaned)), " ")
-}
-
 // gh3SourceIsUsable implements `source_is_usable`.
 func gh3SourceIsUsable(source string) bool {
 	source = strings.TrimSpace(source)
-	if gh3IsTorrentURL(source) {
+	if isHTTPURL(source) {
 		return true
 	}
 	if !strings.HasPrefix(source, "magnet:") {

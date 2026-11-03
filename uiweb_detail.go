@@ -195,7 +195,7 @@ func uiMagnetURL(value string) template.URL {
 func uiSeriesDetailFrom(s *AppState, r *http.Request) (uiSeriesDetail, bool) {
 	cfg := latestConfig(s)
 	name := r.URL.Query().Get("series")
-	series := gh3FindSeries(cfg, name)
+	series := findSeries(cfg, name)
 	if series == nil {
 		return uiSeriesDetail{}, false
 	}

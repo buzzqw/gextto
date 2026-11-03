@@ -18,32 +18,8 @@ import (
 
 	"github.com/buzzqw/gextto/internal/logging"
 	"github.com/buzzqw/gextto/internal/models"
-	"github.com/buzzqw/gextto/internal/rules"
 	"github.com/buzzqw/gextto/internal/utils"
 )
-
-// gh2_findSeries implements `find_series`: exact match on the configured name or one
-// of its aliases (the comparison is case-sensitive).
-func gh2_findSeries(cfg *Config, name string) *SeriesConfig {
-	for index := range cfg.Series {
-		series := &cfg.Series[index]
-		if series.Name == name {
-			return series
-		}
-		for _, alias := range series.Aliases {
-			if alias == name {
-				return series
-			}
-		}
-	}
-	return nil
-}
-
-// gh2_setupComplete implements `setup_complete`: the setup marker file exists.
-func gh2_setupComplete(cfg *Config) bool {
-	info, err := os.Stat(filepath.Join(cfg.DataDir, ".gextto-setup.json"))
-	return err == nil && !info.IsDir()
-}
 
 // gh2_settingsValue implements `settings_value`.
 func gh2_settingsValue(value any) (string, bool) {
@@ -70,11 +46,6 @@ func gh2_settingsValue(value any) (string, bool) {
 	}
 }
 
-// gh2_truthy ports the `matches!(value, "yes" | "true" | "1")` setting check.
-func gh2_truthy(value string) bool {
-	return settingTruthy(value)
-}
-
 // gh2_isJSONNull reports whether a flattened setting value is absent or JSON
 // null (JSON skips `value.is_null()`).
 func gh2_isJSONNull(value any) bool {
@@ -85,19 +56,6 @@ func gh2_isJSONNull(value any) bool {
 		return string(bytes.TrimSpace(raw)) == "null"
 	}
 	return false
-}
-
-// gh2_storedDownloadTags implements `stored_download_tags`.
-func gh2_storedDownloadTags(cfg *Config) []string {
-	raw, ok := cfg.Settings["download_tags"]
-	if !ok {
-		return []string{}
-	}
-	var tags []string
-	if err := json.Unmarshal([]byte(raw), &tags); err != nil || tags == nil {
-		return []string{}
-	}
-	return tags
 }
 
 // gh2_protectedTorrentPaths implements `protected_torrent_paths`.
@@ -113,54 +71,6 @@ func gh2_protectedTorrentPaths(torrents TorrentEngine) map[string]struct{} {
 		}
 	}
 	return protected
-}
-
-// gh2_decodeOptionalJSON decodes an optional JSON body: an empty body leaves
-// target untouched ( `Option<Json<T>>` = None), a malformed body is an
-// error.
-func gh2_decodeOptionalJSON(r *http.Request, target any) error {
-	body, err := io.ReadAll(r.Body)
-	if err != nil {
-		return err
-	}
-	if len(strings.TrimSpace(string(body))) == 0 {
-		return nil
-	}
-	return json.Unmarshal(body, target)
-}
-
-// gh2_torrentAction implements `torrent_action`.
-func gh2_torrentAction(result bool, err error) (int, any) {
-	if err != nil {
-		return http.StatusBadRequest, map[string]any{"ok": false, "error": err.Error()}
-	}
-	if result {
-		return http.StatusOK, map[string]any{"ok": true}
-	}
-	return http.StatusNotFound, map[string]any{"ok": false, "error": "torrent unavailable in dry-run"}
-}
-
-// gh2_archiveReleasesForQuery implements `archive_releases_for_query`.
-func gh2_archiveReleasesForQuery(s *AppState, cfg *Config, query string) []models.Release {
-	results := []models.Release{}
-	rows, err := s.archive.Search(query)
-	if err != nil {
-		return results
-	}
-	for _, row := range rows {
-		release := ParseRelease(row[0], row[1], "archive:"+row[2])
-		if release == nil {
-			continue
-		}
-		if reason := cfg.AllReleaseDeniedReason(release); reason != "" {
-			if cfg.ReleaseIsMonitored(release) {
-				rules.LogRejection(release, reason)
-			}
-		} else {
-			results = append(results, *release)
-		}
-	}
-	return results
 }
 
 // gh2_episodeSource is one found episode release together with its origin.
@@ -297,7 +207,7 @@ func AddDownloadTag(w http.ResponseWriter, r *http.Request, s *AppState) {
 		return
 	}
 	cfg := latestConfig(s)
-	tags := gh2_storedDownloadTags(cfg)
+	tags := storedDownloadTags(cfg)
 	exists := false
 	for _, existing := range tags {
 		if strings.EqualFold(existing, tag) {
@@ -339,7 +249,7 @@ func BackupSettings(w http.ResponseWriter, r *http.Request, s *AppState) {
 		"retention":               value("backup_retention", "5"),
 		"schedule_hours":          value("backup_schedule_hours", "0"),
 		"schedule_at":             value("backup_schedule_at", ""),
-		"send_telegram":           gh2_truthy(cfg.Settings["backup_send_telegram"]),
+		"send_telegram":           settingTruthy(cfg.Settings["backup_send_telegram"]),
 		"ftp_host":                value("backup_ftp_host", ""),
 		"ftp_user":                value("backup_ftp_user", ""),
 		"ftp_path":                value("backup_ftp_path", ""),
@@ -352,7 +262,7 @@ func BackupSettings(w http.ResponseWriter, r *http.Request, s *AppState) {
 // CleanDuplicates implements `clean_duplicates`.
 func CleanDuplicates(w http.ResponseWriter, r *http.Request, s *AppState) {
 	var input DuplicatesInput
-	if err := gh2_decodeOptionalJSON(r, &input); err != nil {
+	if err := decodeOptionalJSON(r, &input); err != nil {
 		jsonError(w, http.StatusBadRequest, err.Error())
 		return
 	}
@@ -562,7 +472,7 @@ func ManualSearchDashboard(w http.ResponseWriter, r *http.Request, s *AppState) 
 }
 
 func manualSearch(w http.ResponseWriter, r *http.Request, s *AppState, includeRejected bool) {
-	if !gh2_setupComplete(s.cfg) {
+	if !SetupComplete(s.cfg) {
 		jsonError(w, http.StatusConflict, uiText(s, "completa prima la configurazione iniziale"))
 		return
 	}
@@ -620,7 +530,7 @@ func manualSearch(w http.ResponseWriter, r *http.Request, s *AppState, includeRe
 			results = nil
 		}
 	}
-	results = append(results, gh2_archiveReleasesForQuery(s, cfg, query)...)
+	results = append(results, archiveReleasesForQuery(s, cfg, query)...)
 	seen := map[string]struct{}{}
 	deduped := make([]models.Release, 0, len(results))
 	for _, release := range results {
@@ -664,7 +574,7 @@ func PinTorrent(w http.ResponseWriter, r *http.Request, s *AppState) {
 	if err == nil {
 		_ = SaveSetting(s.cfg.DataDir, "torrent_pinned_hash", hash)
 	}
-	status, value := gh2_torrentAction(result, err)
+	status, value := torrentActionResult(result, err)
 	jsonStatus(w, status, value)
 }
 
@@ -725,7 +635,7 @@ func trashRoot(cfg *Config) string {
 // RenameAll implements `rename_all`.
 func RenameAll(w http.ResponseWriter, r *http.Request, s *AppState) {
 	var input RenameInput
-	if err := gh2_decodeOptionalJSON(r, &input); err != nil {
+	if err := decodeOptionalJSON(r, &input); err != nil {
 		jsonError(w, http.StatusBadRequest, err.Error())
 		return
 	}
@@ -874,7 +784,7 @@ func SaveBackupSettings(w http.ResponseWriter, r *http.Request, s *AppState) {
 
 // SendMagnet implements `send_magnet`.
 func SendMagnet(w http.ResponseWriter, r *http.Request, s *AppState) {
-	if !gh2_setupComplete(s.cfg) {
+	if !SetupComplete(s.cfg) {
 		jsonError(w, http.StatusConflict, "complete the initial setup first")
 		return
 	}
@@ -1241,7 +1151,7 @@ const missingSearchSyncBudget = 90 * time.Second
 func SeriesSearchMissing(w http.ResponseWriter, r *http.Request, s *AppState) {
 	name := pathParam(r, "name")
 	cfg := latestConfig(s)
-	series := gh2_findSeries(cfg, name)
+	series := findSeries(cfg, name)
 	if series == nil {
 		jsonError(w, http.StatusNotFound, "series not found")
 		return
@@ -1278,7 +1188,7 @@ func SetSequential(w http.ResponseWriter, r *http.Request, s *AppState) {
 	}
 	_ = SaveSetting(s.cfg.DataDir, "torrent_sequential", value)
 	result, err := s.activeEngine().SetSequential(input.Enabled)
-	status, response := gh2_torrentAction(result, err)
+	status, response := torrentActionResult(result, err)
 	jsonStatus(w, status, response)
 }
 

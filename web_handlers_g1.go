@@ -12,7 +12,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net"
 	"net/http"
 	"os"
@@ -25,7 +24,6 @@ import (
 
 	"github.com/buzzqw/gextto/internal/logging"
 	"github.com/buzzqw/gextto/internal/models"
-	"github.com/buzzqw/gextto/internal/rules"
 	"github.com/buzzqw/gextto/internal/utils"
 )
 
@@ -40,34 +38,9 @@ type gh1_ComicWeeklySettings struct {
 	HistoryLimit *int64  `json:"history_limit"`
 }
 
-// gh1_decodeOptionalJSON decodes an optional JSON body: an empty body leaves
-// target untouched ( `Option<Json<T>>` = None), a malformed body is an
-// error.
-func gh1_decodeOptionalJSON(r *http.Request, target any) error {
-	body, err := io.ReadAll(r.Body)
-	if err != nil {
-		return err
-	}
-	if len(strings.TrimSpace(string(body))) == 0 {
-		return nil
-	}
-	return json.Unmarshal(body, target)
-}
-
 // ---------------------------------------------------------------------------
 // File-local private helpers.
 // ---------------------------------------------------------------------------
-
-// gh1_torrentAction mirrors the web module `torrent_action`.
-func gh1_torrentAction(ok bool, err error) (int, any) {
-	if err != nil {
-		return http.StatusBadRequest, map[string]any{"ok": false, "error": err.Error()}
-	}
-	if ok {
-		return http.StatusOK, map[string]any{"ok": true}
-	}
-	return http.StatusNotFound, map[string]any{"ok": false, "error": "torrent unavailable in dry-run"}
-}
 
 // gh1_torrentDisplayName mirrors the web module `torrent_display_name`.
 func gh1_torrentDisplayName(torrents TorrentSession, hash string) string {
@@ -125,18 +98,6 @@ func gh1_blocklistMismatchedPack(torrents TorrentSession, db *Database, hash str
 	return true
 }
 
-// gh1_mediaTestError mirrors the web module `media_test_error`.
-func gh1_mediaTestError(provider string, status int) string {
-	switch status {
-	case 401, 403:
-		return fmt.Sprintf("%s: credenziali non valide", provider)
-	case 404:
-		return fmt.Sprintf("%s: endpoint not found, check the URL", provider)
-	default:
-		return fmt.Sprintf("%s: HTTP %d", provider, status)
-	}
-}
-
 // gh1_purgeRemovedLibrary mirrors the web module `purge_removed_library`.
 func gh1_purgeRemovedLibrary(db *Database, previousSeries []SeriesConfig, previousMovies []MovieConfig, series []SeriesConfig, movies []MovieConfig) {
 	for _, old := range previousSeries {
@@ -177,26 +138,6 @@ func gh1_purgeRemovedLibrary(db *Database, previousSeries []SeriesConfig, previo
 			}
 		}
 	}
-}
-
-// gh1_archiveReleasesForQuery mirrors the web module `archive_releases_for_query`.
-func gh1_archiveReleasesForQuery(s *AppState, cfg *Config, query string) []models.Release {
-	entries, _ := s.archive.Search(query)
-	results := make([]models.Release, 0, len(entries))
-	for _, entry := range entries {
-		release := ParseRelease(entry[0], entry[1], "archive:"+entry[2])
-		if release == nil {
-			continue
-		}
-		if reason := cfg.AllReleaseDeniedReason(release); reason != "" {
-			if cfg.ReleaseIsMonitored(release) {
-				rules.LogRejection(release, reason)
-			}
-		} else {
-			results = append(results, *release)
-		}
-	}
-	return results
 }
 
 var (
@@ -557,7 +498,7 @@ func JellyfinTest(w http.ResponseWriter, r *http.Request, s *AppState) {
 		jsonStatus(w, http.StatusOK, map[string]any{"ok": true, "server": server, "version": version})
 		return
 	}
-	mediaError := gh1_mediaTestError("Jellyfin", response.StatusCode)
+	mediaError := mediaTestError("Jellyfin", response.StatusCode)
 	logging.Info("jellyfin test", "host", domain_of(url), "ok", false, "status", response.StatusCode, "error", mediaError)
 	jsonStatus(w, http.StatusBadGateway, map[string]any{
 		"ok":    false,
@@ -581,7 +522,7 @@ func ManualArchiveSearch(w http.ResponseWriter, r *http.Request, s *AppState) {
 		return
 	}
 	cfg := latestConfig(s)
-	results := gh1_archiveReleasesForQuery(s, cfg, query)
+	results := archiveReleasesForQuery(s, cfg, query)
 	seen := map[string]struct{}{}
 	kept := results[:0]
 	for _, release := range results {
@@ -615,7 +556,7 @@ func MovieHistoryHandler(w http.ResponseWriter, r *http.Request, s *AppState) {
 
 func PauseTorrent(w http.ResponseWriter, r *http.Request, s *AppState) {
 	hash := pathParam(r, "hash")
-	status, value := gh1_torrentAction(s.activeEngine().Pause(hash))
+	status, value := torrentActionResult(s.activeEngine().Pause(hash))
 	jsonStatus(w, status, value)
 }
 
@@ -638,7 +579,7 @@ func RecheckTorrent(w http.ResponseWriter, r *http.Request, s *AppState) {
 	default:
 		logging.Warn("manual torrent integrity check not started: torrent session unavailable", "hash", hash, "name", name)
 	}
-	status, value := gh1_torrentAction(ok, err)
+	status, value := torrentActionResult(ok, err)
 	jsonStatus(w, status, value)
 }
 
@@ -663,7 +604,7 @@ func RemoveTorrentWithOptions(w http.ResponseWriter, r *http.Request, s *AppStat
 	} else {
 		removed, removeErr = SafeRemoveTorrent(s, cfg, hash, input.DeleteFiles)
 	}
-	status, value := gh1_torrentAction(removed, removeErr)
+	status, value := torrentActionResult(removed, removeErr)
 	jsonStatus(w, status, value)
 }
 
@@ -848,7 +789,7 @@ func SelectRamdisk(w http.ResponseWriter, r *http.Request, s *AppState) {
 func SeriesRenamePreview(w http.ResponseWriter, r *http.Request, s *AppState) {
 	name := pathParam(r, "name")
 	var input RenameInput
-	if err := gh1_decodeOptionalJSON(r, &input); err != nil {
+	if err := decodeOptionalJSON(r, &input); err != nil {
 		jsonError(w, http.StatusBadRequest, err.Error())
 		return
 	}
@@ -1107,7 +1048,7 @@ func UnpinTorrent(w http.ResponseWriter, r *http.Request, s *AppState) {
 	if err == nil {
 		_ = SaveSetting(s.cfg.DataDir, "torrent_pinned_hash", "")
 	}
-	status, value := gh1_torrentAction(ok, err)
+	status, value := torrentActionResult(ok, err)
 	jsonStatus(w, status, value)
 }
 

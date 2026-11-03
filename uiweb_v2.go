@@ -488,7 +488,7 @@ func v2DashboardCalendarFrom(s *AppState) []v2DashboardCalendarItem {
 		episode, _ := item["episode"].(map[string]any)
 		name := v2String(item["series"])
 		tmdb, tvdb := "", ""
-		if series := gh3FindSeries(cfg, name); series != nil {
+		if series := findSeries(cfg, name); series != nil {
 			tmdb = tmdbURL(series.TmdbID, "tv")
 			tvdb = tvdbURL(series.TvdbID, "series")
 		}

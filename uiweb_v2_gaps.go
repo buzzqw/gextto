@@ -178,7 +178,7 @@ func V2SeriesGapsSearch(w http.ResponseWriter, r *http.Request, s *AppState) {
 		view.Error = "Serie non indicata."
 	} else if cfg := latestConfig(s); cfg == nil {
 		view.Error = "Ricerca non avviata."
-	} else if series := gh2_findSeries(cfg, name); series == nil {
+	} else if series := findSeries(cfg, name); series == nil {
 		view.Error = "Serie non trovata."
 	} else {
 		if slot == "series" {

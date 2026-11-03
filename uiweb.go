@@ -521,7 +521,7 @@ func uiDashboardDataFrom(s *AppState) uiDashboardData {
 		DataDir:      cfg.DataDir,
 		TrashPath:    trash,
 		DownloadPath: cfg.DownloadDir,
-		ArchiveRoot:  gh3DerefString(cfg.ArchiveRoot),
+		ArchiveRoot:  derefString(cfg.ArchiveRoot),
 		RamdiskPath:  ramdisk,
 	})
 	data.FreeSpace = health.DiskFreeBytes
@@ -570,7 +570,7 @@ func uiHealthPathsFrom(s *AppState) *HealthPaths {
 		DataDir:      cfg.DataDir,
 		TrashPath:    trash,
 		DownloadPath: cfg.DownloadDir,
-		ArchiveRoot:  gh3DerefString(cfg.ArchiveRoot),
+		ArchiveRoot:  derefString(cfg.ArchiveRoot),
 		RamdiskPath:  ramdisk,
 	}
 }

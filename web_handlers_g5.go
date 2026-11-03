@@ -67,36 +67,6 @@ func gh5_asInt64(value any) (int64, bool) {
 	return 0, false
 }
 
-// gh5_torrentAction maps a libtorrent action result to the shared JSON
-// response used by the torrent endpoints.
-func gh5_torrentAction(w http.ResponseWriter, result bool, err error) {
-	if err != nil {
-		jsonError(w, http.StatusBadRequest, err.Error())
-		return
-	}
-	if result {
-		jsonResponse(w, map[string]any{"ok": true})
-		return
-	}
-	jsonError(w, http.StatusNotFound, "torrent unavailable in dry-run")
-}
-
-// gh5_findSeries mirrors the web module `find_series`: match by name or alias.
-func gh5_findSeries(cfg *Config, name string) *SeriesConfig {
-	for index := range cfg.Series {
-		series := &cfg.Series[index]
-		if series.Name == name {
-			return series
-		}
-		for _, alias := range series.Aliases {
-			if alias == name {
-				return series
-			}
-		}
-	}
-	return nil
-}
-
 // gh5_purgeRemovedLibrary removes the DB state of series/movies that are no
 // longer part of the saved library.
 func gh5_purgeRemovedLibrary(db *Database, previousSeries []SeriesConfig, previousMovies []MovieConfig, series []SeriesConfig, movies []MovieConfig) {
@@ -140,10 +110,6 @@ func gh5_purgeRemovedLibrary(db *Database, previousSeries []SeriesConfig, previo
 			logging.Warn("cannot remove the state of the deleted movie", "error", err, "movie", old.Name)
 		}
 	}
-}
-
-func gh5_archiveImportBusyContains(name string) bool {
-	return ArchiveImportBusyContains(name)
 }
 
 var gh5_seasonEpisodePatterns = []*regexp.Regexp{
@@ -1215,7 +1181,7 @@ func RemoveComic(w http.ResponseWriter, r *http.Request, s *AppState) {
 func RestartTorrent(w http.ResponseWriter, r *http.Request, s *AppState) {
 	hash := pathParam(r, "hash")
 	result, err := s.activeEngine().Restart(hash)
-	gh5_torrentAction(w, result, err)
+	torrentAction(w, result, err)
 }
 
 // SaveMoviesConfig implements `save_movies_config`.
@@ -1242,12 +1208,12 @@ func SaveMoviesConfig(w http.ResponseWriter, r *http.Request, s *AppState) {
 func ScanSeriesArchive(w http.ResponseWriter, r *http.Request, s *AppState) {
 	cfg := latestConfig(s)
 	name := pathParam(r, "name")
-	series := gh5_findSeries(cfg, name)
+	series := findSeries(cfg, name)
 	if series == nil {
 		jsonError(w, http.StatusNotFound, "series not found")
 		return
 	}
-	if gh5_archiveImportBusyContains(series.Name) {
+	if ArchiveImportBusyContains(series.Name) {
 		jsonResponse(w, map[string]any{
 			"ok":      true,
 			"skipped": true,
@@ -1294,7 +1260,7 @@ func ScanSeriesArchive(w http.ResponseWriter, r *http.Request, s *AppState) {
 func SeriesInfo(w http.ResponseWriter, r *http.Request, s *AppState) {
 	cfg := latestConfig(s)
 	name := pathParam(r, "name")
-	series := gh5_findSeries(cfg, name)
+	series := findSeries(cfg, name)
 	if series == nil {
 		jsonError(w, http.StatusNotFound, "series not found")
 		return

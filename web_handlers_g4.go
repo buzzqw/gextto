@@ -10,8 +10,6 @@ package gextto
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
@@ -88,30 +86,9 @@ type gh4_SpeedLimitsInput struct {
 	UploadKib   int64 `json:"upload_kib"`
 }
 
-// gh4_truthy ports the `matches!(value, "yes" | "true" | "1")` setting check.
-func gh4_truthy(value string) bool {
-	return settingTruthy(value)
-}
-
 // ---------------------------------------------------------------------------
 // Small private helpers based on the web module.
 // ---------------------------------------------------------------------------
-
-// gh4_findSeries mirrors the web module `find_series`: exact name or alias match.
-func gh4_findSeries(cfg *Config, name string) *SeriesConfig {
-	for index := range cfg.Series {
-		series := &cfg.Series[index]
-		if series.Name == name {
-			return series
-		}
-		for _, alias := range series.Aliases {
-			if alias == name {
-				return series
-			}
-		}
-	}
-	return nil
-}
 
 // gh4_purgeRemovedLibrary mirrors the web module `purge_removed_library`.
 func gh4_purgeRemovedLibrary(db *Database, previousSeries []SeriesConfig, previousMovies []MovieConfig, series []SeriesConfig, movies []MovieConfig) {
@@ -174,19 +151,6 @@ func gh4_seenEntries(s *AppState, kind string, r *http.Request) (int, any) {
 	return http.StatusOK, map[string]any{"ok": true, "items": items}
 }
 
-// gh4_storedDownloadTags mirrors the web module `stored_download_tags`.
-func gh4_storedDownloadTags(cfg *Config) []string {
-	raw, ok := cfg.Settings["download_tags"]
-	if !ok {
-		return []string{}
-	}
-	var tags []string
-	if err := json.Unmarshal([]byte(raw), &tags); err != nil || tags == nil {
-		return []string{}
-	}
-	return tags
-}
-
 // gh4_xmlAttribute mirrors the web module `xml_attribute`.
 func gh4_xmlAttribute(body, name string) *string {
 	needle := name + "=\""
@@ -201,18 +165,6 @@ func gh4_xmlAttribute(body, name string) *string {
 	}
 	value := rest[:end]
 	return &value
-}
-
-// gh4_mediaTestError mirrors the web module `media_test_error`.
-func gh4_mediaTestError(provider string, status int) string {
-	switch status {
-	case 401, 403:
-		return fmt.Sprintf("%s: credenziali non valide", provider)
-	case 404:
-		return fmt.Sprintf("%s: endpoint not found, check the URL", provider)
-	default:
-		return fmt.Sprintf("%s: HTTP %d", provider, status)
-	}
 }
 
 // gh4_removeFailedTorrent uses the same removal path as the automatic cleanup,
@@ -308,12 +260,6 @@ func archiveFileSize(path string) int64 {
 	return 0
 }
 
-// gh4_archiveImportBusyContains reports whether a series archive is currently
-// being written by a post-processing run (shared `archiveImportBusy` set).
-func gh4_archiveImportBusyContains(name string) bool {
-	return ArchiveImportBusyContains(name)
-}
-
 // ---------------------------------------------------------------------------
 // Add-release helpers (the web module `add_release`, `add_raw_magnet`, `add_parsed_release`,
 // `download_and_add`, `resolve_by_search` and their helpers).
@@ -324,7 +270,7 @@ func gh4_addRelease(s *AppState, release models.Release) (int, any) {
 	if !SetupComplete(s.cfg) {
 		return http.StatusConflict, map[string]any{"ok": false, "error": "complete the initial setup first"}
 	}
-	isURL := gh4_isTorrentURL(release.Magnet)
+	isURL := isHTTPURL(release.Magnet)
 	status, value := gh4_addParsedRelease(s, release)
 	if isURL && status == http.StatusBadRequest {
 		if found := gh4_resolveBySearch(s, release.Title); found != nil {
@@ -340,7 +286,7 @@ func gh4_addRelease(s *AppState, release models.Release) (int, any) {
 // gh4_addParsedRelease mirrors the web module `add_parsed_release`.
 func gh4_addParsedRelease(s *AppState, release models.Release) (int, any) {
 	source := strings.TrimSpace(release.Magnet)
-	if gh4_isTorrentURL(source) {
+	if isHTTPURL(source) {
 		hash, err := gh4_downloadAndAdd(s, source, AddOptions{})
 		if err != nil {
 			return http.StatusBadRequest, map[string]any{"ok": false, "error": err.Error()}
@@ -381,12 +327,6 @@ func gh4_addParsedRelease(s *AppState, release models.Release) (int, any) {
 	return http.StatusAccepted, map[string]any{"ok": true, "title": title, "queued": true}
 }
 
-// gh4_isTorrentURL mirrors the web module `is_torrent_url`.
-func gh4_isTorrentURL(value string) bool {
-	value = strings.ToLower(strings.TrimSpace(value))
-	return strings.HasPrefix(value, "http://") || strings.HasPrefix(value, "https://")
-}
-
 // gh4_downloadAndAdd mirrors the web module `download_and_add`.
 func gh4_downloadAndAdd(s *AppState, rawURL string, options AddOptions) (*string, error) {
 	cfg := LatestConfig(s)
@@ -417,7 +357,7 @@ func gh4_downloadAndAdd(s *AppState, rawURL string, options AddOptions) (*string
 	if magnet != "" {
 		return addMagnet(magnet)
 	}
-	path := filepath.Join(cfg.StateDir, fmt.Sprintf(".manual-%s.torrent", gh4_uuid()))
+	path := filepath.Join(cfg.StateDir, fmt.Sprintf(".manual-%s.torrent", newUUID()))
 	if err := os.WriteFile(path, payload, 0o644); err != nil {
 		return nil, err
 	}
@@ -428,14 +368,14 @@ func gh4_downloadAndAdd(s *AppState, rawURL string, options AddOptions) (*string
 // gh4_resolveBySearch mirrors the web module `resolve_by_search`.
 func gh4_resolveBySearch(s *AppState, title string) *models.Release {
 	query := gh4_searchQueryFromTitle(title)
-	normalized := gh4_normalizeSearch(query)
+	normalized := normalizeSearch(query)
 	if normalized == "" {
 		return nil
 	}
 	results := s.engine.SearchQueryManual(context.Background(), LatestConfig(s), query)
 	for i := range results {
 		release := &results[i]
-		if gh4_sourceIsUsable(release.Magnet) && strings.HasPrefix(gh4_normalizeSearch(release.Title), normalized) {
+		if gh4_sourceIsUsable(release.Magnet) && strings.HasPrefix(normalizeSearch(release.Title), normalized) {
 			return release
 		}
 	}
@@ -467,7 +407,7 @@ func gh4_searchQueryFromTitle(title string) string {
 	words := []string{}
 	for _, word := range strings.Fields(string(cleaned)) {
 		lower := strings.ToLower(word)
-		isYear := len(word) == 4 && gh4_allASCIIDigits(word)
+		isYear := len(word) == 4 && allASCIIDigits(word)
 		_, isMarker := markers[lower]
 		if !isMarker {
 			isMarker = strings.Contains(lower, "1080p") ||
@@ -486,41 +426,10 @@ func gh4_searchQueryFromTitle(title string) string {
 	return strings.Join(words, " ")
 }
 
-// gh4_allASCIIDigits reports whether every character is an ASCII digit.
-func gh4_allASCIIDigits(value string) bool {
-	if value == "" {
-		return false
-	}
-	for i := 0; i < len(value); i++ {
-		if value[i] < '0' || value[i] > '9' {
-			return false
-		}
-	}
-	return true
-}
-
-// gh4_normalizeSearch mirrors the web module `normalize_search`.
-func gh4_normalizeSearch(value string) string {
-	head := value
-	if index := strings.Index(value, "["); index >= 0 {
-		head = value[:index]
-	}
-	cleaned := make([]rune, 0, len(head))
-	for _, character := range strings.ToLower(head) {
-		if (character >= '0' && character <= '9') ||
-			(character >= 'a' && character <= 'z') {
-			cleaned = append(cleaned, character)
-		} else {
-			cleaned = append(cleaned, ' ')
-		}
-	}
-	return strings.Join(strings.Fields(string(cleaned)), " ")
-}
-
 // gh4_sourceIsUsable mirrors the web module `source_is_usable`.
 func gh4_sourceIsUsable(source string) bool {
 	source = strings.TrimSpace(source)
-	if gh4_isTorrentURL(source) {
+	if isHTTPURL(source) {
 		return true
 	}
 	if !strings.HasPrefix(source, "magnet:") {
@@ -536,7 +445,7 @@ func gh4_addRawMagnet(s *AppState, source string) (int, any) {
 		return http.StatusConflict, map[string]any{"ok": false, "error": "complete the initial setup first"}
 	}
 	source = strings.TrimSpace(source)
-	if gh4_isTorrentURL(source) {
+	if isHTTPURL(source) {
 		hash, err := gh4_downloadAndAdd(s, source, AddOptions{})
 		if err != nil {
 			return http.StatusBadRequest, map[string]any{"ok": false, "error": err.Error()}
@@ -554,25 +463,6 @@ func gh4_addRawMagnet(s *AppState, source string) (int, any) {
 		return http.StatusConflict, map[string]any{"ok": false, "error": "torrent duplicate"}
 	}
 	return http.StatusAccepted, map[string]any{"ok": true}
-}
-
-// gh4_uuid returns a random RFC 4122 version 4 UUID string.
-func gh4_uuid() string {
-	var raw [16]byte
-	if _, err := rand.Read(raw[:]); err != nil {
-		return strconv.FormatInt(time.Now().UnixNano(), 16)
-	}
-	raw[6] = (raw[6] & 0x0f) | 0x40
-	raw[8] = (raw[8] & 0x3f) | 0x80
-	return fmt.Sprintf("%x-%x-%x-%x-%x", raw[0:4], raw[4:6], raw[6:8], raw[8:10], raw[10:16])
-}
-
-// gh4_derefString returns the pointed-to string or "".
-func gh4_derefString(value *string) string {
-	if value == nil {
-		return ""
-	}
-	return *value
 }
 
 // ---------------------------------------------------------------------------
@@ -717,7 +607,7 @@ func ComicDownloadTag(w http.ResponseWriter, r *http.Request, s *AppState) {
 // ComicsWeekly implements `comics_weekly`.
 func ComicsWeekly(w http.ResponseWriter, r *http.Request, s *AppState) {
 	enabledRaw, _ := s.comics.Setting("weekly_enabled", "no")
-	enabled := gh4_truthy(enabledRaw)
+	enabled := settingTruthy(enabledRaw)
 	fromDate, _ := s.comics.Setting("weekly_from_date", "")
 	checkIntervalSecs := int64(604800)
 	if value, err := s.comics.Setting("comics_check_interval", "604800"); err == nil {
@@ -815,7 +705,7 @@ func DbPruneKeyword(w http.ResponseWriter, r *http.Request, s *AppState) {
 // DownloadTagsList implements `download_tags_list`.
 func DownloadTagsList(w http.ResponseWriter, r *http.Request, s *AppState) {
 	cfg := latestConfig(s)
-	jsonStatus(w, http.StatusOK, map[string]any{"ok": true, "items": gh4_storedDownloadTags(cfg)})
+	jsonStatus(w, http.StatusOK, map[string]any{"ok": true, "items": storedDownloadTags(cfg)})
 }
 
 // Gaps implements `gaps`.
@@ -1007,20 +897,20 @@ func PlexTest(w http.ResponseWriter, r *http.Request, s *AppState) {
 	defer response.Body.Close()
 	if response.StatusCode >= 200 && response.StatusCode < 300 {
 		identity, _ := readLimitedBody(response.Body, maxAPIResponseBytes)
-		machine := gh4_derefString(gh4_xmlAttribute(string(identity), "machineIdentifier"))
+		machine := derefString(gh4_xmlAttribute(string(identity), "machineIdentifier"))
 		server := ""
 		if root, rootErr := get("/"); rootErr == nil {
 			defer root.Body.Close()
 			if root.StatusCode >= 200 && root.StatusCode < 300 {
 				body, _ := readLimitedBody(root.Body, maxAPIResponseBytes)
-				server = gh4_derefString(gh4_xmlAttribute(string(body), "friendlyName"))
+				server = derefString(gh4_xmlAttribute(string(body), "friendlyName"))
 			}
 		}
 		logging.Info("plex test", "host", domain_of(base), "ok", true, "status", response.StatusCode, "server", server)
 		jsonStatus(w, http.StatusOK, map[string]any{"ok": true, "server": server, "version": "", "machine": machine})
 		return
 	}
-	mediaError := gh4_mediaTestError("Plex", response.StatusCode)
+	mediaError := mediaTestError("Plex", response.StatusCode)
 	logging.Info("plex test", "host", domain_of(base), "ok", false, "status", response.StatusCode, "error", mediaError)
 	jsonStatus(w, http.StatusBadGateway, map[string]any{
 		"ok":    false,
@@ -1122,7 +1012,7 @@ func ScanAllArchives(w http.ResponseWriter, r *http.Request, s *AppState) {
 		if !series.Enabled || resolved == nil || strings.TrimSpace(*resolved) == "" {
 			continue
 		}
-		if gh4_archiveImportBusyContains(series.Name) {
+		if ArchiveImportBusyContains(series.Name) {
 			continue
 		}
 		targets = append(targets, scanTarget{name: series.Name, path: *resolved})
@@ -1141,7 +1031,7 @@ func ScanAllArchives(w http.ResponseWriter, r *http.Request, s *AppState) {
 				return
 			}
 			s.jobs.SetProgress(jobID, float64(index)/float64(len(targets)), target.name)
-			series := gh4_findSeries(cfg, target.name)
+			series := findSeries(cfg, target.name)
 			if series == nil {
 				continue
 			}
@@ -1175,7 +1065,7 @@ func SeriesEpisodes(w http.ResponseWriter, r *http.Request, s *AppState) {
 	name := pathParam(r, "name")
 	cfg := latestConfig(s)
 	ignored := []int64{}
-	if series := gh4_findSeries(cfg, name); series != nil {
+	if series := findSeries(cfg, name); series != nil {
 		ignored = series.IgnoredSeasons
 	}
 	items, err := s.db.EpisodesForSeries(name, ignored)
@@ -1270,7 +1160,7 @@ func SimklSettings(w http.ResponseWriter, r *http.Request, s *AppState) {
 	}
 	markWatched := false
 	if value, ok := cfg.Settings["simkl_mark_watched"]; ok {
-		markWatched = gh4_truthy(value)
+		markWatched = settingTruthy(value)
 	}
 	jsonStatus(w, http.StatusOK, map[string]any{
 		"ok":                   true,
