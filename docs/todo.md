@@ -27,11 +27,6 @@ here.
 - **Mixed-mode TCP/uTP arbitration** — throttle TCP when uTP shares the line, as
   libtorrent does; today only the transfer caps react. Gate: a mixed swarm where the
   current caps lose throughput or latency.
-- **Batched uTP datagrams** — a loopback profile at 130 MB/s puts 50 % of the CPU in
-  `sendto`/`recvfrom` (one datagram per syscall, 2.6 s of 6.3 s). Batched I/O
-  (`sendmmsg`/`recvmmsg` on Linux, `WSASendMsg` on Windows) is the step; coalescing ACKs
-  alone is not, because beyond the current short delay it inflates the RTT the RTO is
-  built on.
 - **DHT feeds** — the resolver and the publisher exist; what is missing is a real
   multi-client audience. Gate: at least two independent clients consuming a published
   feed.

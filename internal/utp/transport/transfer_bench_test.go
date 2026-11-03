@@ -71,3 +71,12 @@ func BenchmarkTransferLoopback(b *testing.B) {
 		}
 	}
 }
+
+// BenchmarkTransferLoopbackNoGSO is the same transfer with the segmented send
+// turned off, one write per packet: the before-and-after of the burst sender
+// on the same code, same machine.
+func BenchmarkTransferLoopbackNoGSO(b *testing.B) {
+	gsoDisabled.Store(true)
+	defer gsoDisabled.Store(false)
+	BenchmarkTransferLoopback(b)
+}

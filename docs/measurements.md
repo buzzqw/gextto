@@ -283,7 +283,8 @@ of 2026-11-02.
 | uTP download on a 100 Mbit/s line, gx-torrent 1.1.296 | 11.2 MB/s, 48 s of CPU per GiB | state packets batched over 2 ms |
 | Piece check, v1 / v2, 4 MiB | 2.6 / 2.1 GB/s | one hash per piece |
 | uTP over loopback (`BenchmarkTransferLoopback`) | 178–188 MB/s | single connection |
-| uTP over loopback, CPU profile 2026-11-03 | 50 % in `sendto`/`recvfrom` (2.6 s / 0.5 s of 6.3 s) | one datagram per syscall: batched I/O (`sendmmsg`/`recvmmsg`) is the next step |
+| uTP over loopback, 16 KiB writes, 2026-11-03 | one syscall per packet: 50 % of the CPU in `sendto`/`recvfrom` (2.6 s / 0.5 s of 6.3 s) | what a burst sender had to fix |
+| uTP over loopback with UDP GSO | system CPU 5.9 s → 3.7 s for ~730 MB, total 13.3 → 11.2 µs/MB; throughput unchanged | one segmented `sendmsg` per write (`BenchmarkTransferLoopback` vs `…NoGSO`); the wall time is round-trip bound |
 | Picker, rarest pick with 150 peers | 10–12 µs | one pick in a dense swarm |
 | Peer departure, 27,250 pieces | 94–105 µs | touches only the pieces the peer held |
 | Refill of 250 requests over TCP | 248–256 µs, about 5 writes instead of 250 | small messages batched |

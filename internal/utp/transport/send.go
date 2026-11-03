@@ -70,7 +70,7 @@ func (s *send) resend() {
 	if s.acked.IsSet() {
 		return
 	}
-	if err := s.conn.send(s._type, s.connID, s.payload, s.seqNr); err != nil {
+	if err := s.conn.send(nil, s._type, s.connID, s.payload, s.seqNr); err != nil {
 		log.Printf("error resending packet: %s", err)
 	}
 }

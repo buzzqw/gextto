@@ -1496,6 +1496,16 @@ RPC server is disabled.
     A healthy connection never timeout-resends, so its RTO is
     unchanged.
   - Incoming, the handshake is routed as for TCP.
+  - **One write is one syscall**: the packets a `Write` produces travel as one
+    segmented datagram burst with UDP GSO (`sendmsg` with a `UDP_SEGMENT`
+    control message, Linux 4.18+), instead of one `sendto` per datagram. Where
+    the kernel or the batch shape does not allow it — another platform, a
+    link-local address with a zone — the packets go out one by one as before,
+    in the same order. On the loopback benchmark the system CPU for ~730 MB
+    fell from 5.9 s to 3.7 s
+    ([`measurements.md`](measurements.md#the-numbers-behind-engine-decisions));
+    `utpGSOBatches` and `utpGSOPackets` on `/debug/vars` show the ratio in a
+    real session.
   - The peer list indicates which ones are connected over uTP.
   - With a proxy uTP is off; with the outgoing interface the UDP socket is
     bound to the VPN's IP.

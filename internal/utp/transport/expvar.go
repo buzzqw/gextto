@@ -22,6 +22,10 @@ var (
 	unusedReads = expvar.NewInt("utpUnusedReads")
 	// unusedReadsDropped counts reads dropped for lack of a reader.
 	unusedReadsDropped = expvar.NewInt("utpUnusedReadsDropped")
+	// gsoBatches counts the bursts sent with one segmented write (UDP GSO),
+	// gsoPackets the datagrams they carried: the ratio is the syscalls saved.
+	gsoBatches = expvar.NewInt("utpGSOBatches")
+	gsoPackets = expvar.NewInt("utpGSOPackets")
 
 	// largestReceivedUTPPacket is the largest packet seen, exported below.
 	largestReceivedUTPPacket       int

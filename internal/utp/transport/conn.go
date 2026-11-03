@@ -47,6 +47,9 @@ type Conn struct {
 
 	socket           *Socket
 	remoteSocketAddr net.Addr
+	// sendBatchBuf is the burst buffer Write reuses: one allocation per
+	// connection instead of one per write (Write runs under mu).
+	sendBatchBuf sendBatch
 	// startTimestamp anchors the uTP microsecond clock (see timestamp).
 	startTimestamp uint32
 	created        time.Time
@@ -174,16 +177,26 @@ func (c *Conn) makePacket(_type st, connID, seqNr uint16, payload []byte) (p []b
 	return
 }
 
-// send writes one packet to the peer. Callers hold mu.
-func (c *Conn) send(_type st, connID uint16, payload []byte, seqNr uint16) (err error) {
+// send writes one packet to the peer, or adds it to the current burst when
+// batch is not nil (Conn.Write), so a whole write leaves in one syscall where
+// the platform allows it. Callers hold mu.
+func (c *Conn) send(batch *sendBatch, _type st, connID uint16, payload []byte, seqNr uint16) (err error) {
 	p, buffer := c.makePacket(_type, connID, seqNr, payload)
-	n1, err := c.socket.writeTo(p, c.remoteSocketAddr)
-	sendBufferPool.Put(buffer)
-	if err != nil {
-		return
-	}
-	if n1 != len(p) {
-		panic(n1)
+	if batch != nil {
+		err = batch.add(c.socket, c.remoteSocketAddr, p)
+		sendBufferPool.Put(buffer)
+		if err != nil {
+			return
+		}
+	} else {
+		n1, err := c.socket.writeTo(p, c.remoteSocketAddr)
+		sendBufferPool.Put(buffer)
+		if err != nil {
+			return err
+		}
+		if n1 != len(p) {
+			panic(n1)
+		}
 	}
 	if c.unpendSendState() && _type != stState {
 		// A data packet just covered the state packet we owed.
@@ -218,13 +231,13 @@ func (c *Conn) pendSendState() {
 
 // writeSyn introduces us to the peer (an initiator's first packet).
 func (c *Conn) writeSyn() {
-	c.write(stSyn, c.recv_id, nil, c.seq_nr)
+	c.write(nil, stSyn, c.recv_id, nil, c.seq_nr)
 }
 
 // write sends a data, SYN or FIN packet and records it for acknowledgement.
 // Data packets are truncated to maxPayloadSize. A write after FIN panics, which
 // is an internal invariant, not peer-reachable input.
-func (c *Conn) write(_type st, connID uint16, payload []byte, seqNr uint16) (n int, err error) {
+func (c *Conn) write(batch *sendBatch, _type st, connID uint16, payload []byte, seqNr uint16) (n int, err error) {
 	switch _type {
 	case stSyn, stFin, stData:
 	default:
@@ -236,7 +249,7 @@ func (c *Conn) write(_type st, connID uint16, payload []byte, seqNr uint16) (n i
 	if len(payload) > maxPayloadSize {
 		payload = payload[:maxPayloadSize]
 	}
-	if err := c.send(_type, connID, payload, seqNr); err != nil {
+	if err := c.send(batch, _type, connID, payload, seqNr); err != nil {
 		c.destroy(fmt.Errorf("error sending packet: %s", err))
 		return 0, err
 	}
@@ -291,13 +304,13 @@ func (c *Conn) latency() (ret time.Duration) {
 
 // sendState sends an (empty) state packet carrying our ACKs and window.
 func (c *Conn) sendState() {
-	c.send(stState, c.send_id, nil, c.seq_nr)
+	c.send(nil, stState, c.send_id, nil, c.seq_nr)
 	sentStatePackets.Add(1)
 }
 
 // sendReset sends an empty reset packet.
 func (c *Conn) sendReset() {
-	c.send(stReset, c.send_id, nil, c.seq_nr)
+	c.send(nil, stReset, c.send_id, nil, c.seq_nr)
 }
 
 // addLatency records one RTT sample, keeping the last ten.
@@ -708,7 +721,7 @@ func (c *Conn) writeFin() {
 	if c.wroteFin.IsSet() {
 		return
 	}
-	c.write(stFin, c.send_id, nil, c.seq_nr)
+	c.write(nil, stFin, c.send_id, nil, c.seq_nr)
 	c.wroteFin.Set()
 }
 
@@ -815,6 +828,18 @@ func (c *Conn) updateCanWrite() {
 func (c *Conn) Write(p []byte) (n int, err error) {
 	mu.Lock()
 	defer mu.Unlock()
+	// The packets of this write travel together: one syscall for the burst
+	// where the platform segments the datagrams (UDP GSO), one write per
+	// packet everywhere else. The batch is flushed before the connection
+	// waits for window space, or the ACK that would free it could never come.
+	batch := &c.sendBatchBuf
+	batch.reset()
+	defer func() {
+		if flushErr := batch.flush(c.socket, c.remoteSocketAddr); flushErr != nil && err == nil {
+			c.destroy(fmt.Errorf("error sending packet: %s", flushErr))
+			err = flushErr
+		}
+	}()
 	for len(p) != 0 {
 		switch {
 		case c.wroteFin.IsSet() || c.closed.IsSet():
@@ -827,7 +852,7 @@ func (c *Conn) Write(p []byte) (n int, err error) {
 		// With a zero peer window we still send one packet, so a stalled
 		// window does not deadlock the connection.
 		if c.canWrite.IsSet() {
-			n1, werr := c.write(stData, c.send_id, p, c.seq_nr)
+			n1, werr := c.write(batch, stData, c.send_id, p, c.seq_nr)
 			n += n1
 			if werr != nil {
 				return n, werr
@@ -837,6 +862,10 @@ func (c *Conn) Write(p []byte) (n int, err error) {
 			}
 			p = p[n1:]
 			continue
+		}
+		if flushErr := batch.flush(c.socket, c.remoteSocketAddr); flushErr != nil {
+			c.destroy(fmt.Errorf("error sending packet: %s", flushErr))
+			return n, flushErr
 		}
 		waitEvents(&mu,
 			&c.wroteFin,
