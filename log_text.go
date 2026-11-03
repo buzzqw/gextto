@@ -143,15 +143,6 @@ func speedLimitText(kib int64) string {
 	return fmt.Sprintf("%d KB/s", kib)
 }
 
-// speedLimitLabel is the older spelling used where the sentence already says
-// "unlimited"; new lines use speedLimitText.
-func speedLimitLabel(kib int64) string {
-	if kib <= 0 {
-		return "unlimited"
-	}
-	return speedLimitText(kib)
-}
-
 // speedPairText describes a download/upload limit pair in words:
 // "no speed limit", "download 2.5 MB/s, upload unlimited".
 func speedPairText(down, up int64) string {

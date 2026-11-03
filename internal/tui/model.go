@@ -856,8 +856,6 @@ func (m *Model) VisibleArchive() []ArchiveEntry {
 	return items
 }
 
-func (m *Model) visibleTorrents() []Torrent { return m.VisibleTorrents() }
-
 // SelectedTorrent returns the highlighted torrent, if any.
 func (m *Model) SelectedTorrent() *Torrent {
 	item := m.SelectedDownload()

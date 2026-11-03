@@ -13,11 +13,11 @@ import (
 // situation of one torrent (why it is or is not downloading), which makes
 // extreme cases such as a swarm with no seeders explicit.
 func TorrentWhy(w http.ResponseWriter, r *http.Request, s *AppState) {
-	engine := s.activeEngine()
-	if engine == nil {
+	if !s.hasTorrentEngine() {
 		jsonError(w, http.StatusServiceUnavailable, "no torrent engine is active")
 		return
 	}
+	engine := s.activeEngine()
 	hash := pathParam(r, "hash")
 	for _, torrent := range engine.List() {
 		if !strings.EqualFold(torrent.Hash, hash) {

@@ -184,7 +184,7 @@ func DbPruneByIds(w http.ResponseWriter, r *http.Request, s *AppState) {
 		jsonError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	if s.cfg.DryRun {
+	if s.dryRun() {
 		jsonStatus(w, http.StatusConflict, map[string]any{"ok": false, "error": "dry-run does not modify the database"})
 		return
 	}
@@ -711,7 +711,7 @@ func SetTorrentTrackers(w http.ResponseWriter, r *http.Request, s *AppState) {
 
 // SimklScrobble is `simkl_scrobble`.
 func SimklScrobble(w http.ResponseWriter, r *http.Request, s *AppState) {
-	if s.cfg.DryRun {
+	if s.dryRun() {
 		jsonStatus(w, http.StatusConflict, map[string]any{"ok": false, "error": "dry-run does not mark watched items"})
 		return
 	}
@@ -736,19 +736,20 @@ func SimklScrobble(w http.ResponseWriter, r *http.Request, s *AppState) {
 
 // SystemStats is `system_stats`.
 func SystemStats(w http.ResponseWriter, r *http.Request, s *AppState) {
-	trash := s.cfg.DataDir + "/trash"
-	if s.cfg.TrashPath != nil {
-		trash = *s.cfg.TrashPath
+	cfg := LatestConfig(s)
+	trash := cfg.DataDir + "/trash"
+	if cfg.TrashPath != nil {
+		trash = *cfg.TrashPath
 	}
 	ramdisk := ""
-	if value, ok := s.cfg.Settings["torrent_ramdisk_dir"]; ok && strings.TrimSpace(value) != "" {
+	if value, ok := cfg.Settings["torrent_ramdisk_dir"]; ok && strings.TrimSpace(value) != "" {
 		ramdisk = value
 	}
 	health := CheckWithPaths(&HealthPaths{
-		DataDir:      s.cfg.DataDir,
+		DataDir:      cfg.DataDir,
 		TrashPath:    trash,
-		DownloadPath: s.cfg.DownloadDir,
-		ArchiveRoot:  gh3DerefString(s.cfg.ArchiveRoot),
+		DownloadPath: cfg.DownloadDir,
+		ArchiveRoot:  gh3DerefString(cfg.ArchiveRoot),
 		RamdiskPath:  ramdisk,
 	})
 	jsonResponse(w, map[string]any{
@@ -777,7 +778,7 @@ func TorrentFiles(w http.ResponseWriter, r *http.Request, s *AppState) {
 // Torrents is `torrents`.
 func Torrents(w http.ResponseWriter, r *http.Request, s *AppState) {
 	live := s.activeEngine().List()
-	if len(live) == 0 && s.cfg.DryRun {
+	if len(live) == 0 && s.dryRun() {
 		jsonResponse(w, gh3DecorateTorrents(s, gh3DryRunSessionPreview(s)))
 		return
 	}
@@ -786,11 +787,12 @@ func Torrents(w http.ResponseWriter, r *http.Request, s *AppState) {
 
 // UploadTorrent is `upload_torrent`.
 func UploadTorrent(w http.ResponseWriter, r *http.Request, s *AppState) {
-	if !gh3SetupComplete(s.cfg) {
+	cfg := LatestConfig(s)
+	if !gh3SetupComplete(cfg) {
 		jsonStatus(w, http.StatusConflict, map[string]any{"ok": false, "error": "complete the initial setup first"})
 		return
 	}
-	if s.cfg.DryRun {
+	if cfg.DryRun {
 		jsonStatus(w, http.StatusConflict, map[string]any{"ok": false, "error": "dry-run does not add torrents"})
 		return
 	}
@@ -803,7 +805,6 @@ func UploadTorrent(w http.ResponseWriter, r *http.Request, s *AppState) {
 		jsonError(w, http.StatusBadRequest, "torrent file is empty or too large")
 		return
 	}
-	cfg := latestConfig(s)
 	dir := cfg.DataDir + "/incomplete"
 	if cfg.DownloadTempDir != nil {
 		dir = *cfg.DownloadTempDir
@@ -1066,7 +1067,7 @@ func gh3SeenGrouped(state *AppState, kind string, r *http.Request) (int, any) {
 
 // gh3ManualSearch implements `manual_search`, reused by `manual_search_get`.
 func gh3ManualSearch(s *AppState, query string, kad ...bool) (int, any) {
-	if !gh3SetupComplete(s.cfg) {
+	if !gh3SetupComplete(LatestConfig(s)) {
 		return http.StatusConflict, map[string]any{"ok": false, "error": "complete the initial setup first"}
 	}
 	query = strings.TrimSpace(query)
@@ -1146,7 +1147,7 @@ func gh3ArchiveReleasesForQuery(s *AppState, cfg *Config, query string) []models
 
 // gh3AddRelease implements `add_release`.
 func gh3AddRelease(s *AppState, release models.Release) (int, any) {
-	if !gh3SetupComplete(s.cfg) {
+	if !gh3SetupComplete(LatestConfig(s)) {
 		return http.StatusConflict, map[string]any{"ok": false, "error": "complete the initial setup first"}
 	}
 	source := strings.TrimSpace(release.Magnet)
@@ -1257,9 +1258,10 @@ func gh3AddParsedRelease(s *AppState, release models.Release) (int, any) {
 	}
 	title := release.Title
 	logHash, _ := utils.MagnetHash(release.Magnet)
+	cfg := LatestConfig(s)
 	go func() {
 		defer recoverGoroutine("g3 background")
-		added, err := s.activeEngine().Add(source, s.cfg)
+		added, err := s.activeEngine().Add(source, cfg)
 		switch {
 		case err != nil:
 			logging.Error(fmt.Sprintf("❌ Could not add «%s» to the downloads: %v", title, err), "hash", logHash)
@@ -1313,13 +1315,14 @@ func gh3IsTorrentURL(value string) bool {
 
 // gh3DownloadAndAdd implements `download_and_add`.
 func gh3DownloadAndAdd(s *AppState, rawURL string, options AddOptions) (*string, error) {
+	cfg := LatestConfig(s)
 	rawURL = strings.TrimSpace(rawURL)
 	addMagnet := func(m string) (*string, error) {
 		hash, ok := utils.MagnetHash(m)
 		if !ok {
 			return nil, fmt.Errorf("invalid magnet link")
 		}
-		added, err := s.activeEngine().AddWithOptions(m, s.cfg, nil, options)
+		added, err := s.activeEngine().AddWithOptions(m, cfg, nil, options)
 		if err != nil {
 			return nil, err
 		}
@@ -1340,12 +1343,12 @@ func gh3DownloadAndAdd(s *AppState, rawURL string, options AddOptions) (*string,
 	if magnet != "" {
 		return addMagnet(magnet)
 	}
-	path := filepath.Join(s.cfg.StateDir, fmt.Sprintf(".manual-%s.torrent", gh3UUID()))
+	path := filepath.Join(cfg.StateDir, fmt.Sprintf(".manual-%s.torrent", gh3UUID()))
 	if err := os.WriteFile(path, payload, 0o644); err != nil {
 		return nil, err
 	}
 	defer os.Remove(path)
-	return s.activeEngine().AddTorrentFileWithOptions(path, s.cfg, nil, options)
+	return s.activeEngine().AddTorrentFileWithOptions(path, cfg, nil, options)
 }
 
 // gh3ResolveBySearch implements `resolve_by_search`.
@@ -1355,7 +1358,7 @@ func gh3ResolveBySearch(s *AppState, title string) *models.Release {
 	if normalized == "" {
 		return nil
 	}
-	results := s.engine.SearchQueryManual(context.Background(), s.cfg, query)
+	results := s.engine.SearchQueryManual(context.Background(), LatestConfig(s), query)
 	for i := range results {
 		release := &results[i]
 		if gh3SourceIsUsable(release.Magnet) && strings.HasPrefix(gh3NormalizeSearch(release.Title), normalized) {
@@ -1505,8 +1508,9 @@ func gh3DecorateTorrents(s *AppState, items []models.TorrentView) []map[string]a
 
 // gh3DryRunSessionPreview implements `dry_run_session_preview`.
 func gh3DryRunSessionPreview(s *AppState) []models.TorrentView {
+	cfg := LatestConfig(s)
 	hashes := map[string]struct{}{}
-	if entries, err := os.ReadDir(s.cfg.StateDir); err == nil {
+	if entries, err := os.ReadDir(cfg.StateDir); err == nil {
 		for _, entry := range entries {
 			if entry.IsDir() {
 				continue
@@ -1543,7 +1547,7 @@ func gh3DryRunSessionPreview(s *AppState) []models.TorrentView {
 			State:           state,
 			DownloadRate:    0,
 			UploadRate:      0,
-			SavePath:        s.cfg.DownloadDir,
+			SavePath:        cfg.DownloadDir,
 			DownloadLimit:   -1,
 			UploadLimit:     -1,
 			AllTimeUpload:   0,

@@ -79,15 +79,6 @@ type uiTableSpec struct {
 	SelectKey  string
 }
 
-// uiSearchPage drives the Esplora page: a query form, a generic result table and
-// an "add" action that posts the selected release exactly like the classic UI.
-type uiSearchPage struct {
-	Title      string
-	Endpoint   string
-	ResultsKey string
-	AddPath    string
-}
-
 type uiActionButton struct {
 	Label   string
 	Class   string
@@ -1836,19 +1827,6 @@ func uiTableSpecFor(view string) (uiTableSpec, bool) {
 	default:
 		return uiTableSpec{}, false
 	}
-}
-
-// uiSearchPageFor defines the Esplora page.
-func uiSearchPageFor(view string) (uiSearchPage, bool) {
-	if view != "search" {
-		return uiSearchPage{}, false
-	}
-	return uiSearchPage{
-		Title:      "Esplora release",
-		Endpoint:   "/api/search",
-		ResultsKey: "results",
-		AddPath:    "/api/search/add",
-	}, true
 }
 
 // Maintenance and Integrations are rendered as panels pages

@@ -101,17 +101,6 @@ func (d *Daemon) saveWanted(list []wantedEntry) error {
 	return d.opts.Settings.Save()
 }
 
-// wantedIncludes are the include terms of a wanted entry: language, subtitles
-// and quality, formatted for display.
-func (w wantedEntry) includes() []string {
-	out := splitList(w.Language)
-	out = append(out, splitList(w.Subtitles)...)
-	if q := strings.TrimSpace(w.Quality); q != "" && q != "any" && q != "*" {
-		out = append(out, q)
-	}
-	return out
-}
-
 func extractResolutionNumber(s string) int {
 	s = strings.TrimSpace(strings.ToLower(s))
 	for _, res := range []struct {
@@ -216,10 +205,7 @@ func wantedIncludeMatch(w wantedEntry, title string) bool {
 			return false
 		}
 	}
-	if !w.qualityMatch(title) {
-		return false
-	}
-	return true
+	return w.qualityMatch(title)
 }
 
 // qualityMatch applies the quality profile when the title has one, otherwise
@@ -955,7 +941,7 @@ func (d *Daemon) wantedMissing(w wantedEntry) []wantedEpisode {
 			continue
 		}
 		// A season pack covers the whole season: nothing of it is missing.
-		if _, ok := taken[key]["0"]; ok || inSession[wantedEpisode{season: season, episode: 0}] {
+		if d.wantedPackTaken(w, season, inSession) {
 			continue
 		}
 		takenSeason := taken[key]

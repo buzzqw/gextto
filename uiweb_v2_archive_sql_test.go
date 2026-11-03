@@ -10,7 +10,11 @@ import (
 
 func TestV2ArchiveSQLMaintenance(t *testing.T) {
 	state := newTestAppState(t)
-	state.cfg.DryRun = false
+	// The handlers read the saved configuration, not the start-up snapshot:
+	// turning dry-run off has to be a persisted change.
+	if err := SaveSetting(state.cfg.DataDir, "dry_run", "no"); err != nil {
+		t.Fatalf("turn dry-run off: %v", err)
+	}
 	if _, err := state.archive.db.Exec(`INSERT INTO archive(title,magnet,magnet_key,source,added_at) VALUES
 		('Old Show ITA 1080p','magnet:?xt=urn:btih:sql-ui-1',gextto_magnet_key('magnet:?xt=urn:btih:sql-ui-1'),'feed',datetime('now','-8 months')),
 		('Old Show ENG 1080p','magnet:?xt=urn:btih:sql-ui-2',gextto_magnet_key('magnet:?xt=urn:btih:sql-ui-2'),'feed',datetime('now','-8 months'))`); err != nil {

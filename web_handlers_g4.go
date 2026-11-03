@@ -50,9 +50,7 @@ func gh4_historyDisplayName(name, source string) string {
 	if parts := strings.Split(source, ":"); len(parts) > 1 {
 		labels = append(labels, parts[len(parts)-1])
 	}
-	for _, part := range strings.Split(source, " - ") {
-		labels = append(labels, part)
-	}
+	labels = append(labels, strings.Split(source, " - ")...)
 	for _, label := range labels {
 		label = strings.TrimSpace(label)
 		if label == "" || strings.EqualFold(label, "archive") || strings.EqualFold(label, "unknown") {
@@ -217,42 +215,6 @@ func gh4_mediaTestError(provider string, status int) string {
 	}
 }
 
-// gh4_versionParts mirrors the web module `version_parts`.
-func gh4_versionParts(value string) []int {
-	trimmed := strings.TrimPrefix(strings.TrimSpace(value), "v")
-	fields := strings.FieldsFunc(trimmed, func(character rune) bool {
-		return character < '0' || character > '9'
-	})
-	parts := []int{}
-	for _, field := range fields {
-		if field == "" {
-			continue
-		}
-		if parsed, err := strconv.Atoi(field); err == nil {
-			parts = append(parts, parsed)
-		}
-	}
-	return parts
-}
-
-// gh4_versionIsNewer mirrors the web module `version_is_newer`.
-func gh4_versionIsNewer(candidate, current string) bool {
-	left := gh4_versionParts(candidate)
-	right := gh4_versionParts(current)
-	for len(left) < len(right) {
-		left = append(left, 0)
-	}
-	for len(right) < len(left) {
-		right = append(right, 0)
-	}
-	for i := range left {
-		if left[i] != right[i] {
-			return left[i] > right[i]
-		}
-	}
-	return false
-}
-
 // gh4_removeFailedTorrent uses the same removal path as the automatic cleanup,
 // so a manual failure and an automatic one read the same in the log.
 func gh4_removeFailedTorrent(torrents TorrentSession, hash string) bool {
@@ -403,9 +365,10 @@ func gh4_addParsedRelease(s *AppState, release models.Release) (int, any) {
 	}
 	title := release.Title
 	logHash, _ := utils.MagnetHash(release.Magnet)
+	cfg := LatestConfig(s)
 	go func() {
 		defer recoverGoroutine("g4 background")
-		added, err := s.activeEngine().Add(source, s.cfg)
+		added, err := s.activeEngine().Add(source, cfg)
 		switch {
 		case err != nil:
 			logging.Error(fmt.Sprintf("❌ Could not add «%s» to the downloads: %v", title, err), "hash", logHash)
@@ -426,13 +389,14 @@ func gh4_isTorrentURL(value string) bool {
 
 // gh4_downloadAndAdd mirrors the web module `download_and_add`.
 func gh4_downloadAndAdd(s *AppState, rawURL string, options AddOptions) (*string, error) {
+	cfg := LatestConfig(s)
 	rawURL = strings.TrimSpace(rawURL)
 	addMagnet := func(m string) (*string, error) {
 		hash, ok := utils.MagnetHash(m)
 		if !ok {
 			return nil, fmt.Errorf("invalid magnet link")
 		}
-		added, err := s.activeEngine().AddWithOptions(m, s.cfg, nil, options)
+		added, err := s.activeEngine().AddWithOptions(m, cfg, nil, options)
 		if err != nil {
 			return nil, err
 		}
@@ -453,12 +417,12 @@ func gh4_downloadAndAdd(s *AppState, rawURL string, options AddOptions) (*string
 	if magnet != "" {
 		return addMagnet(magnet)
 	}
-	path := filepath.Join(s.cfg.StateDir, fmt.Sprintf(".manual-%s.torrent", gh4_uuid()))
+	path := filepath.Join(cfg.StateDir, fmt.Sprintf(".manual-%s.torrent", gh4_uuid()))
 	if err := os.WriteFile(path, payload, 0o644); err != nil {
 		return nil, err
 	}
 	defer os.Remove(path)
-	return s.activeEngine().AddTorrentFileWithOptions(path, s.cfg, nil, options)
+	return s.activeEngine().AddTorrentFileWithOptions(path, cfg, nil, options)
 }
 
 // gh4_resolveBySearch mirrors the web module `resolve_by_search`.
@@ -468,7 +432,7 @@ func gh4_resolveBySearch(s *AppState, title string) *models.Release {
 	if normalized == "" {
 		return nil
 	}
-	results := s.engine.SearchQueryManual(context.Background(), s.cfg, query)
+	results := s.engine.SearchQueryManual(context.Background(), LatestConfig(s), query)
 	for i := range results {
 		release := &results[i]
 		if gh4_sourceIsUsable(release.Magnet) && strings.HasPrefix(gh4_normalizeSearch(release.Title), normalized) {
@@ -582,7 +546,7 @@ func gh4_addRawMagnet(s *AppState, source string) (int, any) {
 		}
 		return http.StatusAccepted, map[string]any{"ok": true}
 	}
-	added, err := s.activeEngine().Add(source, s.cfg)
+	added, err := s.activeEngine().Add(source, LatestConfig(s))
 	if err != nil {
 		return http.StatusBadRequest, map[string]any{"ok": false, "error": err.Error()}
 	}
@@ -715,7 +679,7 @@ func BatchArchiveDownload(w http.ResponseWriter, r *http.Request, s *AppState) {
 
 // CleanupDatabase implements `cleanup_database`.
 func CleanupDatabase(w http.ResponseWriter, r *http.Request, s *AppState) {
-	if s.cfg.DryRun {
+	if s.dryRun() {
 		jsonError(w, http.StatusConflict, "dry-run does not clean database")
 		return
 	}
@@ -836,7 +800,7 @@ func DbPruneKeyword(w http.ResponseWriter, r *http.Request, s *AppState) {
 		})
 		return
 	}
-	if s.cfg.DryRun {
+	if s.dryRun() {
 		jsonError(w, http.StatusConflict, "dry-run does not modify the database")
 		return
 	}
@@ -913,7 +877,7 @@ func libraryGaps(s *AppState) ([]libraryGap, error) {
 		}
 		result = append(result, libraryGap{
 			Series: gap.Series, Season: gap.Season, Episode: gap.Episode,
-			AirDate: airDates[airDateKey{Series: gap.Series, Season: gap.Season, Episode: gap.Episode}],
+			AirDate: airDates[airDateKey(gap)],
 			Aliases: series.Aliases,
 		})
 	}
@@ -1081,7 +1045,7 @@ func RemoveBlocklistEntry(w http.ResponseWriter, r *http.Request, s *AppState) {
 
 // RescoreDatabase implements `rescore_database`.
 func RescoreDatabase(w http.ResponseWriter, r *http.Request, s *AppState) {
-	if s.cfg.DryRun {
+	if s.dryRun() {
 		jsonError(w, http.StatusConflict, "dry-run does not modify database scores")
 		return
 	}

@@ -466,7 +466,7 @@ func DbPrune(w http.ResponseWriter, r *http.Request, s *AppState) {
 		})
 		return
 	}
-	if s.cfg.DryRun {
+	if s.dryRun() {
 		jsonError(w, http.StatusConflict, "dry-run does not modify the database")
 		return
 	}

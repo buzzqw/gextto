@@ -646,7 +646,7 @@ func SimklAuthRevoke(w http.ResponseWriter, r *http.Request, s *AppState) {
 }
 
 func gh0_revokeIntegrationTokens(s *AppState, keys []string) (int, map[string]any) {
-	if s.cfg.DryRun {
+	if s.dryRun() {
 		return http.StatusConflict, map[string]any{"ok": false, "error": "dry-run does not modify integration tokens"}
 	}
 	for _, key := range keys {
@@ -783,7 +783,7 @@ func SearchMissing(w http.ResponseWriter, r *http.Request, s *AppState) {
 			filtered = append(filtered, release)
 		}
 		sort.SliceStable(filtered, func(a, b int) bool {
-			return s.cfg.ReleaseScore(&filtered[a]) > s.cfg.ReleaseScore(&filtered[b])
+			return cfg.ReleaseScore(&filtered[a]) > cfg.ReleaseScore(&filtered[b])
 		})
 		return filtered
 	}
@@ -982,7 +982,7 @@ func gh0_sortCalendarItems(items []any) {
 // ---------------------------------------------------------------------------
 
 func ComicDownloadHandler(w http.ResponseWriter, r *http.Request, s *AppState) {
-	if s.cfg.DryRun {
+	if s.dryRun() {
 		jsonError(w, http.StatusConflict, "download manuali disabilitati in dry-run")
 		return
 	}
@@ -1216,13 +1216,14 @@ func gh0_sourceIsUsable(source string) bool {
 }
 
 func gh0_downloadAndAdd(ctx context.Context, s *AppState, url string) (*string, string) {
+	cfg := latestConfig(s)
 	url = strings.TrimSpace(url)
 	addMagnet := func(m string) (*string, string) {
 		hash, ok := utils.MagnetHash(m)
 		if !ok {
 			return nil, "invalid magnet link"
 		}
-		added, err := s.activeEngine().AddWithOptions(m, s.cfg, nil, AddOptions{})
+		added, err := s.activeEngine().AddWithOptions(m, cfg, nil, AddOptions{})
 		if err != nil {
 			return nil, err.Error()
 		}
@@ -1243,12 +1244,12 @@ func gh0_downloadAndAdd(ctx context.Context, s *AppState, url string) (*string, 
 	if magnet != "" {
 		return addMagnet(magnet)
 	}
-	path := filepath.Join(s.cfg.StateDir, fmt.Sprintf(".manual-%d.torrent", time.Now().UnixNano()))
+	path := filepath.Join(cfg.StateDir, fmt.Sprintf(".manual-%d.torrent", time.Now().UnixNano()))
 	if err := os.WriteFile(path, payload, 0o644); err != nil {
 		return nil, err.Error()
 	}
 	defer os.Remove(path)
-	result, err := s.activeEngine().AddTorrentFileWithOptions(path, s.cfg, nil, AddOptions{})
+	result, err := s.activeEngine().AddTorrentFileWithOptions(path, cfg, nil, AddOptions{})
 	if err != nil {
 		return nil, err.Error()
 	}
@@ -1283,7 +1284,7 @@ func gh0_addParsedRelease(ctx context.Context, s *AppState, release models.Relea
 	}
 	title := release.Title
 	engine := s.activeEngine()
-	cfg := s.cfg
+	cfg := latestConfig(s)
 	go func() {
 		defer recoverGoroutine("g0 background")
 		added, err := engine.Add(source, cfg)
@@ -1330,7 +1331,7 @@ func gh0_addRawMagnet(ctx context.Context, s *AppState, source string) (int, map
 		}
 		return http.StatusAccepted, map[string]any{"ok": true}
 	}
-	added, err := s.activeEngine().Add(trimmed, s.cfg)
+	added, err := s.activeEngine().Add(trimmed, latestConfig(s))
 	if err != nil {
 		return http.StatusBadRequest, map[string]any{"ok": false, "error": err.Error()}
 	}
@@ -1346,7 +1347,7 @@ func gh0_resolveBySearch(ctx context.Context, s *AppState, title string) *models
 	if normalizedQuery == "" {
 		return nil
 	}
-	results := s.engine.SearchQueryManual(ctx, s.cfg, query)
+	results := s.engine.SearchQueryManual(ctx, latestConfig(s), query)
 	for i := range results {
 		if gh0_sourceIsUsable(results[i].Magnet) && strings.HasPrefix(gh0_normalizeSearch(results[i].Title), normalizedQuery) {
 			return &results[i]
@@ -1697,21 +1698,6 @@ func RemoveTorrentLegacy(w http.ResponseWriter, r *http.Request, s *AppState) {
 	removed, err := SafeRemoveTorrent(s, cfg, input.Hash, input.DeleteFiles)
 	status, body := gh0_torrentAction(removed, err)
 	jsonStatus(w, status, body)
-}
-
-func gh0_torrentFilesAreDisposable(db *Database, hash string) bool {
-	meta, err := db.TorrentMeta(hash)
-	if err != nil || meta == nil {
-		return false
-	}
-	if !meta.Release.IsPack {
-		return false
-	}
-	status, err := db.TorrentStatus(hash)
-	if err != nil || status == nil {
-		return false
-	}
-	return *status == "completed"
 }
 
 func gh0_torrentAction(ok bool, err error) (int, map[string]any) {

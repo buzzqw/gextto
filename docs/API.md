@@ -346,7 +346,7 @@ state.
 | GET | `/api/torrents/{hash}/trackers` | trackers of a torrent |
 | POST | `/api/torrents/{hash}/trackers` | replace the tracker list (an empty list removes every tracker); the UI composes it from the add form and the per-row remove |
 | POST | `/api/torrents/{hash}/web-seeds` | set the web seeds |
-| GET | `/api/torrents/{hash}/why` | diagnose a torrent: reason and hint when it is not transferring |
+| GET | `/api/torrents/{hash}/why` | diagnose a torrent: reason and hint when it is not transferring; answers 503 when no torrent engine is active |
 | GET | `/api/trash` | recycle bin entries |
 | POST | `/api/trash/delete` | delete recycle bin entries |
 | POST | `/api/tvdb/search` | search TheTVDB |

@@ -3,19 +3,25 @@ package torrent
 import (
 	"errors"
 	"net"
+	"os"
+	"syscall"
 	"testing"
 	"time"
 
 	"github.com/buzzqw/gextto/internal/gxcore/internal/logger"
 )
 
-// temporaryAcceptError mimics a net.Error that reports itself as temporary,
-// like the EMFILE the kernel returns when the descriptor table is full.
-type temporaryAcceptError struct{}
+// transientAcceptError is what the kernel returns from Accept when the
+// descriptor table is full: net.OpError wrapping the syscall error.
+func transientAcceptError() error {
+	return &net.OpError{Op: "accept", Err: os.NewSyscallError("accept", syscall.EMFILE)}
+}
 
-func (temporaryAcceptError) Error() string   { return "too many open files" }
-func (temporaryAcceptError) Timeout() bool   { return false }
-func (temporaryAcceptError) Temporary() bool { return true }
+// timeoutAcceptError reports a timeout, which is transient too.
+type timeoutAcceptError struct{}
+
+func (timeoutAcceptError) Error() string { return "accept: i/o timeout" }
+func (timeoutAcceptError) Timeout() bool { return true }
 
 // TestAcceptRetryKeepsTheListenerOnTransientErrors locks the rule that a
 // transient Accept failure must not stop incoming peers until a restart: the
@@ -24,7 +30,7 @@ func TestAcceptRetryKeepsTheListenerOnTransientErrors(t *testing.T) {
 	s := &Session{closeC: make(chan struct{}), log: logger.New("test")}
 	delay, warned := acceptRetryInitial, false
 	start := time.Now()
-	if !s.acceptRetry(&net.OpError{Op: "accept", Err: temporaryAcceptError{}}, &delay, &warned) {
+	if !s.acceptRetry(transientAcceptError(), &delay, &warned) {
 		t.Fatal("a temporary Accept error must be retried")
 	}
 	if !warned {
@@ -44,6 +50,12 @@ func TestAcceptRetryKeepsTheListenerOnTransientErrors(t *testing.T) {
 	if permanent.acceptRetry(errors.New("listener is gone"), &delay, &warned) {
 		t.Fatal("a permanent Accept error must stop the listener")
 	}
+	if permanent.acceptRetry(net.ErrClosed, &delay, &warned) {
+		t.Fatal("a closed listener must stop the accept loop")
+	}
+	if !permanent.acceptRetry(&net.OpError{Op: "accept", Err: timeoutAcceptError{}}, &delay, &warned) {
+		t.Fatal("an Accept timeout must be retried")
+	}
 }
 
 // TestAcceptRetryStopsWhenTheSessionCloses: closing the session wins over a
@@ -52,7 +64,7 @@ func TestAcceptRetryStopsWhenTheSessionCloses(t *testing.T) {
 	s := &Session{closeC: make(chan struct{}), log: logger.New("test")}
 	close(s.closeC)
 	delay, warned := acceptRetryInitial, false
-	if s.acceptRetry(&net.OpError{Op: "accept", Err: temporaryAcceptError{}}, &delay, &warned) {
+	if s.acceptRetry(transientAcceptError(), &delay, &warned) {
 		t.Fatal("a closed session must stop the accept loop")
 	}
 }

@@ -1835,6 +1835,12 @@ func evaluateReleaseApprovalRaw(db *Database, release *models.Release, score, mi
 			evaluation = *approvalContext
 		}
 		evaluation.DryRun = dryRun
+		// The argument is authoritative for both kinds: the movie branch below
+		// reads it directly, so the series decision must not depend on the
+		// caller having also set ApprovalContext.ForbidUpgrade.
+		if forbidUpgrade {
+			evaluation.ForbidUpgrade = true
+		}
 		return db.CheckSeriesScored(release, score, minScoreDiff, &evaluation)
 	}
 	upgradeUntil := int64(0)

@@ -144,7 +144,9 @@ Gextto runs as a single service. Open the web UI at `http://<host>:5000`.
 - **Active vs dry-run**: the automatic cycle is **on by default**, so Gextto
   searches on its own; with **dry-run** enabled (the *Download for real* choice
   in the setup wizard) it starts no real downloads. The cycle switch is *Automatic
-  cycle (search and download)* in *Configuration → General*.
+  cycle (search and download)* in *Configuration → General*. Turning dry-run off
+  from the page takes effect at once, with no restart; a start with `--dry-run`
+  stays read-only until the next restart.
 - Add series/movies from **Explore** (TMDB) or **Series / Movies → Add**.
 - Metadata (seasons, episodes, posters, calendar) comes from TMDB or TVDB: see
   *Configuration → Metadata: TMDB or TVDB*.

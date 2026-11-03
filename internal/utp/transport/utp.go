@@ -54,9 +54,17 @@ const (
 	maxRTOBackoff = 4
 )
 
+// sendBuffer is one reusable packet buffer; the pool owns the pointer, so
+// returning a buffer never allocates.
+type sendBuffer struct{ bytes []byte }
+
 var (
+	// sendBufferPool recycles one packet buffer per Put/Get. It stores a
+	// pointer because a sync.Pool holding a bare []byte boxes the slice header
+	// on every Put, which allocates once per packet: exactly the allocation the
+	// pool exists to avoid.
 	sendBufferPool = sync.Pool{
-		New: func() any { return make([]byte, minMTU) },
+		New: func() any { return &sendBuffer{bytes: make([]byte, minMTU)} },
 	}
 	// initialLatency is the RTT assumed for a connection before any sample or
 	// seed is available. Deliberately generous so a new peer is not hammered
@@ -132,11 +140,11 @@ func (e timeoutError) Temporary() bool { return false }
 type st int
 
 const (
-	stData  st = 0
-	stFin      = 1
-	stState    = 2
-	stReset    = 3
-	stSyn      = 4
+	stData st = iota
+	stFin
+	stState
+	stReset
+	stSyn
 
 	// stMax is the highest valid packet type, used to validate headers.
 	stMax = stSyn

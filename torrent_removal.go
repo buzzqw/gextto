@@ -17,7 +17,7 @@ import (
 
 func manualTorrentRemovalInfo(s *AppState, hash string) (name, state string, hasMetadata bool) {
 	name = ""
-	if s != nil && s.activeEngine() != nil {
+	if s != nil && s.hasTorrentEngine() {
 		for _, torrent := range s.activeEngine().List() {
 			if !strings.EqualFold(torrent.Hash, hash) {
 				continue
@@ -100,7 +100,7 @@ func logAutomaticTorrentRemoval(hash, name, state string) {
 //     to the trash directory instead of being permanently unlinked.
 //  3. Engine removal is properly recorded in the database.
 func SafeRemoveTorrent(s *AppState, cfg *Config, hash string, requestedDeleteFiles bool) (bool, error) {
-	if s == nil || s.activeEngine() == nil {
+	if s == nil || !s.hasTorrentEngine() {
 		return false, fmt.Errorf("torrent engine not available")
 	}
 	hash = strings.ToLower(strings.TrimSpace(hash))
@@ -286,7 +286,7 @@ func notifyArchivedTorrent(s *AppState, hash string, release *models.Release, fi
 // none is configured), performs filename renaming and quality checks, updates
 // database records, and unloads the torrent from the engine.
 func ArchiveAndRemoveTorrent(s *AppState, cfg *Config, hash string) (bool, error) {
-	if s == nil || s.activeEngine() == nil {
+	if s == nil || !s.hasTorrentEngine() {
 		return false, fmt.Errorf("torrent engine not available")
 	}
 	hash = strings.ToLower(strings.TrimSpace(hash))

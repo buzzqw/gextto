@@ -16,6 +16,7 @@ type send struct {
 	_type       st
 	connID      uint16
 	payload     []byte
+	buffer      *sendBuffer
 	seqNr       uint16
 	conn        *Conn
 
@@ -41,8 +42,9 @@ func (s *send) Ack() (latency time.Duration, first bool) {
 	if first {
 		latency = time.Since(s.started)
 	}
-	if s.payload != nil {
-		sendBufferPool.Put(s.payload[:0:minMTU])
+	if s.buffer != nil {
+		sendBufferPool.Put(s.buffer)
+		s.buffer = nil
 		s.payload = nil
 	}
 	s.acked.Set()

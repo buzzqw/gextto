@@ -58,7 +58,7 @@ func NewAppState(
 	go stopRetiredGxEd2k()
 	// A pending migration manifest for the active backend is re-imported here:
 	// re-adding is idempotent and the manifest is marked completed on success.
-	if engine := ActiveTorrentBackend(state); engine != nil && engine.Name() != "none" {
+	if engine := ActiveTorrentBackend(state); engine.Name() != "none" {
 		if imported, warnings, importErr := ImportMigrationManifest(state, cfg); importErr != nil {
 			logging.Warn("migration import failed", "error", importErr)
 		} else {

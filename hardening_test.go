@@ -117,6 +117,9 @@ func TestDiagnoseTorrentExtremeCases(t *testing.T) {
 
 func TestTorrentWhyEndpointUnknownHash(t *testing.T) {
 	state := newTestAppState(t)
+	// An engine has to be wired: without one the endpoint answers "no torrent
+	// engine is active" before it can look the hash up.
+	state.setActiveEngine(fakeAddEngine{})
 	server := httptest.NewServer(Router(state))
 	t.Cleanup(server.Close)
 

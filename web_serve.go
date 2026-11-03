@@ -303,7 +303,8 @@ func Serve(state *AppState) error {
 		mode = "downloads are enabled"
 	}
 	engineName := "-"
-	if active := state.activeEngine(); active != nil {
+	if state.hasTorrentEngine() {
+		active := state.activeEngine()
 		engineName = active.Name()
 		// What the engine did at start-up (an adopted daemon keeps its
 		// transfers) belongs to the start line, not to a line of its own.

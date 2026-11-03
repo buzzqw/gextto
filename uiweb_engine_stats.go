@@ -151,9 +151,6 @@ func uiEngineStatsFrom(s *AppState) uiEngineStats {
 		return uiEngineStats{Error: "motore torrent non disponibile"}
 	}
 	engine := s.activeEngine()
-	if engine == nil {
-		return uiEngineStats{Backend: "-", Error: "nessun motore torrent attivo"}
-	}
 	switch engine.Name() {
 	case BackendQbittorrent:
 		return uiQbitEngineStats(engine)

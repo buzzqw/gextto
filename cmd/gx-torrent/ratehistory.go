@@ -147,9 +147,6 @@ func (h *rateHistory) pushHourLocked() {
 	h.hour.push(rateSample{Down: down / int64(n), Up: up / int64(n)})
 }
 
-// ranges lists the available range names, the short one first.
-func (h *rateHistory) ranges() []string { return []string{"1h", "24h", "7d"} }
-
 // snapshot returns one range with its peaks.
 func (h *rateHistory) snapshot(name string) rateRange {
 	h.mu.Lock()

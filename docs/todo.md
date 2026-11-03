@@ -86,6 +86,35 @@ its gate; a rejected one moves to *Not planned*.
   Windows, exFAT and SMB shares refuse, but a series added earlier keeps its folder and
   the path stored in the library. A check in Maintenance could report them and rename the
   folder with its files. Gate: a decision on moving files automatically or only reporting.
+- **Packages for the root** — 114k non-test lines share `package gextto`, so helpers are
+  told apart by prefixes (`gh0_`…`gh7_`, `tev_`, `bg_`) instead of by package. Gate: a
+  decision on the first boundary (HTTP handlers, acquisition, storage) and one area
+  migrated with the suite green.
+- **Handlers split by domain** — `web_handlers_g0..g7.go` are eight buckets of about 1.5k
+  lines split by size, and the split has already produced duplicated helpers (three
+  copies of the same webseed/free-check predicate). The route table in `web_router.go`
+  already groups by domain: `web_comics.go`, `web_series.go`, `web_torrents.go`, … Gate:
+  one domain moved, its `ghN_` prefix dropped.
+- **Settings as typed keys** — 110+ keys are read as `cfg.Settings["literal"]` with no Go
+  constant, so a typo compiles and returns the default. Gate: constants generated from
+  the settings index and one family of accessors migrated.
+- **Translation by key, not by rendered HTML** — the UI is written in Italian and the
+  finished page is re-tokenised and translated per request (`v2TranslateHTML`, the same
+  in `cmd/gx-torrent/i18n_html.go`), so a sentence built with `Sprintf` or a value inside
+  a phrase stays Italian in every language. Gate: a decision on stable keys and one page
+  migrated.
+- **`*Database` split** — 233 methods cover series, movies, torrents, providers,
+  blocklist, queues, cycles and maintenance. Gate: `internal/quality` extracted first (the
+  moved methods call the root package's scoring).
+- **Title parsing: one matcher table** — `ParseReleaseSource` is a ten-branch `else if`
+  chain: a title that matches a pattern but fails its sanity guard (a season above 40, a
+  "pack in progress" without a count) is returned as a movie without trying the remaining
+  matchers. Gate: a decision that the failed guard should fall through, and a corpus run
+  that shows which titles change kind.
+- **Naming and error wrapping** — 407 identifiers are `snake_case`, 280 log calls build
+  their sentence with `Sprintf` although the logger takes structured fields, and 490
+  `fmt.Errorf` calls drop the cause because they do not use `%w`. Mechanical, area by
+  area, tests green.
 
 ## Not planned
 

@@ -151,9 +151,7 @@ func runLibraryReport(ctx context.Context, state *AppState) {
 		}
 		missing++
 		if len(result.Missing) < maintenanceMissingLimit {
-			result.Missing = append(result.Missing, maintenanceMissingFile{
-				Series: row.Series, Season: row.Season, Episode: row.Episode, Path: row.Path,
-			})
+			result.Missing = append(result.Missing, maintenanceMissingFile(row))
 		}
 	}
 	for series := range unreachable {

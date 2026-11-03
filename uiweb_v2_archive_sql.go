@@ -82,7 +82,7 @@ func v2ArchiveSQLLanguageLabel(code string) string {
 func v2ArchiveSQLViewFrom(s *AppState, r *http.Request) v2ArchiveSQLView {
 	view := v2ArchiveSQLView{}
 	if s != nil && s.cfg != nil {
-		view.DryRun = s.cfg.DryRun
+		view.DryRun = s.dryRun()
 	}
 	selected := v2ArchiveSQLSelectedLanguage(r)
 	view.SelectedLanguage = selected
@@ -176,7 +176,7 @@ func v2ArchiveSQLPreviewResult(ctx context.Context, s *AppState, operation Archi
 	result.Total = preview.Total
 	result.Shown = preview.Shown
 	result.Limited = preview.Limited
-	dryRun := s != nil && s.cfg != nil && s.cfg.DryRun
+	dryRun := s != nil && s.cfg != nil && s.dryRun()
 	result.CanDelete = operation.Destructive && !dryRun && preview.Total > 0
 	result.DryRun = dryRun
 	return result
@@ -209,7 +209,7 @@ func V2ArchiveSQLDelete(w http.ResponseWriter, r *http.Request, s *AppState) {
 	}
 	language := v2ArchiveSQLSelectedLanguage(r)
 	result := v2ArchiveSQLResultFor(operation, language)
-	if s == nil || s.cfg == nil || s.cfg.DryRun {
+	if s == nil || s.cfg == nil || s.dryRun() {
 		result.Error = "La modalità prova è attiva: l'eliminazione è disabilitata."
 		v2Render(w, http.StatusOK, "v2_archive_sql_result", result, dict, eng)
 		return

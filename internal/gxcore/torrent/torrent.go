@@ -493,9 +493,7 @@ func (t *torrent) finishConstruction(s *Session, cfg Config, info *metainfo.Info
 	t.applyLocalPeerLimits(s.limitLocalPeers.Load())
 	t.downloadLimitKib = -1
 	t.uploadLimitKib = -1
-	if len(t.webseedSources) > s.config.WebseedMaxSources {
-		t.webseedSources = t.webseedSources[:10]
-	}
+	t.webseedSources = capWebseedSources(t.webseedSources, s.config.WebseedMaxSources)
 	t.bytesDownloaded.Inc(stats.BytesDownloaded)
 	t.bytesUploaded.Inc(stats.BytesUploaded)
 	t.bytesWasted.Inc(stats.BytesWasted)

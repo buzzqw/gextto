@@ -361,33 +361,6 @@ func gh5_modifiedSeconds(value any) uint64 {
 // Integration/watchlist helpers
 // ---------------------------------------------------------------------------
 
-type gh5_watchlistTitle struct {
-	title string
-	year  string
-}
-
-// gh5_collectWatchlistEntries mirrors the web module `collect_watchlist_entries`.
-func gh5_collectWatchlistEntries(value any, out *[]gh5_watchlistTitle) {
-	switch node := value.(type) {
-	case []any:
-		for _, item := range node {
-			gh5_collectWatchlistEntries(item, out)
-		}
-	case map[string]any:
-		if title, ok := node["title"].(string); ok {
-			year := ""
-			if parsed, ok := gh5_asInt64(node["year"]); ok {
-				year = strconv.FormatInt(parsed, 10)
-			}
-			*out = append(*out, gh5_watchlistTitle{title: title, year: year})
-			return
-		}
-		for _, child := range node {
-			gh5_collectWatchlistEntries(child, out)
-		}
-	}
-}
-
 // ---------------------------------------------------------------------------
 // Handlers
 // ---------------------------------------------------------------------------

@@ -269,13 +269,6 @@ func handleDuplicate(file string, cfg *Config) error {
 	return err
 }
 
-// logInferiorFileReplaced records that an existing lower-quality file was
-// removed because a better release replaced it, so the reason is visible in the
-// log instead of only a bare count.
-func logInferiorFileReplaced(cfg *Config, file, replacement string) {
-	logInferiorCopiesReplaced(cfg, []string{file}, replacement)
-}
-
 // logInferiorCopiesReplaced logs one line for the copies of one old file (the
 // same name in more than one folder of the library).
 func logInferiorCopiesReplaced(cfg *Config, files []string, replacement string) {
@@ -1239,11 +1232,6 @@ func ArchiveMovieQuality(cfg *Config, release *models.Release) *models.ArchiveQu
 // that every movie candidate does not walk the tree again. The walk reads each
 // file name once and stats each file once; the score of a matching file is
 // computed per candidate, because the settings can single out a movie by title.
-type MovieArchiveIndex struct {
-	root  bool
-	empty bool
-	files []movieArchiveFile
-}
 
 // movieArchiveFile is one video file of the archive.
 type movieArchiveFile struct {
@@ -1253,6 +1241,15 @@ type movieArchiveFile struct {
 	quality  models.Quality
 	size     int64
 	fileName string
+}
+
+// MovieArchiveIndex is one walk of the archive root, kept for the whole cycle so
+// that every movie candidate does not walk the tree again. The walk reads each
+// file name once and stats each file once; the score of a matching file is
+// computed per candidate, because the settings can single out a movie by title.
+type MovieArchiveIndex struct {
+	root  bool
+	files []movieArchiveFile
 }
 
 // BuildMovieArchiveIndex walks the archive root once. A nil or missing root

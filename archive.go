@@ -816,7 +816,6 @@ func (a *Archive) BrowseContentFilteredPage(query string, filters []string, page
 	if err != nil {
 		return nil, err
 	}
-	items := []ArchiveEntry{}
 	var total int64
 	start := int64((page - 1) * limit)
 	ids := make([]int64, 0, limit)
@@ -842,7 +841,7 @@ func (a *Archive) BrowseContentFilteredPage(query string, filters []string, page
 	if err := rows.Close(); err != nil {
 		return nil, err
 	}
-	items, err = a.entriesByIDs(ids)
+	items, err := a.entriesByIDs(ids)
 	if err != nil {
 		return nil, err
 	}

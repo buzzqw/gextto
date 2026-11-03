@@ -329,24 +329,25 @@ func HealthApi(w http.ResponseWriter, r *http.Request, s *AppState) {
 		jsonResponse(w, cached)
 		return
 	}
-	dataDir := s.cfg.DataDir
+	cfg := LatestConfig(s)
+	dataDir := cfg.DataDir
 	trashPath := filepath.Join(dataDir, "trash")
-	if s.cfg.TrashPath != nil {
-		trashPath = *s.cfg.TrashPath
+	if cfg.TrashPath != nil {
+		trashPath = *cfg.TrashPath
 	}
 	archiveRoot := ""
-	if s.cfg.ArchiveRoot != nil {
-		archiveRoot = *s.cfg.ArchiveRoot
+	if cfg.ArchiveRoot != nil {
+		archiveRoot = *cfg.ArchiveRoot
 	}
 	ramdiskPath := ""
-	if value, ok := s.cfg.Settings["torrent_ramdisk_dir"]; ok && value != "" {
+	if value, ok := cfg.Settings["torrent_ramdisk_dir"]; ok && value != "" {
 		ramdiskPath = value
 	}
 	healthCheckLimiter <- struct{}{}
 	report := CheckWithPaths(&HealthPaths{
 		DataDir:      dataDir,
 		TrashPath:    trashPath,
-		DownloadPath: s.cfg.DownloadDir,
+		DownloadPath: cfg.DownloadDir,
 		ArchiveRoot:  archiveRoot,
 		RamdiskPath:  ramdiskPath,
 	})
@@ -826,27 +827,6 @@ func settingsParseUint(cfg *Config, key string, fallback int) int {
 		}
 	}
 	return fallback
-}
-
-// coreStallGiveupMinutes implements `configured_stall_giveup_minutes`.
-func coreStallGiveupMinutes(cfg *Config) float64 {
-	if value, ok := cfg.Settings["torrent_stall_giveup_min"]; ok {
-		if minutes, err := strconv.ParseFloat(value, 64); err == nil {
-			return minutes
-		}
-	}
-	if value, ok := cfg.Settings["torrent_stall_timeout_min"]; ok {
-		if minutes, err := strconv.ParseFloat(value, 64); err == nil {
-			if minutes > 0 {
-				if minutes < 10080 {
-					minutes = 10080
-				}
-				return minutes
-			}
-			return 0
-		}
-	}
-	return 20160
 }
 
 // ConfigView returns the configuration snapshot shown by the settings UI.

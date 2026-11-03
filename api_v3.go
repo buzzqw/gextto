@@ -890,8 +890,8 @@ func V3MovieUpdate(w http.ResponseWriter, r *http.Request, s *AppState) {
 
 func V3Queue(w http.ResponseWriter, r *http.Request, s *AppState) {
 	items := []v3QueueItem{}
-	if engine := s.activeEngine(); engine != nil {
-		for _, torrent := range engine.List() {
+	if s.hasTorrentEngine() {
+		for _, torrent := range s.activeEngine().List() {
 			size := torrent.TotalSize
 			left := size - torrent.TotalDone
 			status := "downloading"
@@ -969,13 +969,4 @@ func v3ID(id int64) string {
 		return ""
 	}
 	return strconv.FormatInt(id, 10)
-}
-
-// v3FreeSpace is shared with tests: the free bytes of a folder, 0 when it does
-// not exist.
-func v3FreeSpace(path string) int64 {
-	for _, folder := range v3RootFolders(&Config{ArchiveRoot: &path}) {
-		return folder.FreeSpace
-	}
-	return 0
 }

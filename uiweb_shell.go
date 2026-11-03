@@ -245,7 +245,7 @@ func uiShellChromeFrom(s *AppState) uiShellChrome {
 			start, ok = *snapshot.LastStartedAt, true
 		}
 		if ok {
-			remaining := int64(start.Add(durationFromSeconds(cfg.RefreshSecs)).Sub(time.Now()).Seconds())
+			remaining := int64(time.Until(start.Add(durationFromSeconds(cfg.RefreshSecs))).Seconds())
 			if remaining < 0 {
 				remaining = 0
 			}

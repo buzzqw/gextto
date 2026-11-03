@@ -341,6 +341,22 @@ func LatestConfig(s *AppState) *Config {
 	return &cfg
 }
 
+// SetDryRunForced records that dry-run was requested on the command line, so
+// no settings change may take the daemon out of it. cmd/gexttod calls it once
+// after NewAppState.
+func (s *AppState) SetDryRunForced(forced bool) {
+	s.dryRunForced = forced
+}
+
+// dryRun reports whether the daemon must not modify anything right now: the
+// operator's current choice, or a dry-run launched from the command line.
+func (s *AppState) dryRun() bool {
+	if s.dryRunForced {
+		return true
+	}
+	return LatestConfig(s).DryRun
+}
+
 // latestConfig is the contract spelling used by the handler files.
 func latestConfig(s *AppState) *Config { return LatestConfig(s) }
 
@@ -541,16 +557,24 @@ func TryAcquireArchiveRename(series string) (func(), string, bool) {
 // Application state ( lines 296-320)
 // ---------------------------------------------------------------------------
 
-// AppState is shared by every web handler. Field names intentionally mirror the
-// struct so the port reads the same.
+// AppState is shared by every web handler.
 type AppState struct {
-	cfg         *Config // startup snapshot
+	// cfg is the configuration as it was at start-up. Read from it only the
+	// values that cannot change while the daemon runs (DataDir, StateDir, the
+	// configuration path): everything an operator can edit belongs to
+	// LatestConfig, because saving a setting bumps the config generation and
+	// only that reloaded copy reflects the change.
+	cfg         *Config
 	config_path string
-	i18n        *I18nDb
-	db          *Database
-	archive     *Archive
-	comics      *ComicsDb
-	engine      *Engine
+	// dryRunForced is the --dry-run command-line switch. It is not a setting:
+	// it survives a configuration change and it is the only reason a handler
+	// stays in dry-run after the operator turns dry-run off in the UI.
+	dryRunForced bool
+	i18n         *I18nDb
+	db           *Database
+	archive      *Archive
+	comics       *ComicsDb
+	engine       *Engine
 	// torrent_engine is the active transfer engine; nil until one is selected.
 	// engine_mu guards it because the backend can be switched at runtime while
 	// the background worker reads it.
@@ -1055,10 +1079,10 @@ type DiscoverInput struct {
 // TorrentLimits is the input of `set_torrent_limits`.
 type TorrentLimits struct {
 	// Nil leaves the current value alone; -1 = the global value, 0 = no limit.
-	DownloadLimit  *int64   `json:"download_limit"`
-	UploadLimit    *int64   `json:"upload_limit"`
-	SeedRatio      *float64 `json:"seed_ratio"`
-	SeedDays       *int64   `json:"seed_days"`
+	DownloadLimit *int64   `json:"download_limit"`
+	UploadLimit   *int64   `json:"upload_limit"`
+	SeedRatio     *float64 `json:"seed_ratio"`
+	SeedDays      *int64   `json:"seed_days"`
 	// Per-torrent connection ceilings (nil = leave unchanged, 0 = unlimited).
 	MaxConnections *int64 `json:"max_connections"`
 	MaxUploads     *int64 `json:"max_uploads"`

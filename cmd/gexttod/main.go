@@ -202,6 +202,9 @@ func runDaemon(dryRun bool, configOption *string) error {
 		gextto.FromConfig(&cfg),
 		gextto.NewTmdbClientWithLanguage(cfg.TmdbAPIKey, cfg.TmdbLanguage()),
 	)
+	// --dry-run is a command-line switch, not a setting: keep it in force even
+	// when the operator changes dry-run from the interface.
+	state.SetDryRunForced(dryRun)
 
 	serveErr := gextto.Serve(state)
 	if shutdownErr := gextto.ShutdownTorrentEngine(state); shutdownErr != nil {

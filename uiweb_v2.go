@@ -2163,7 +2163,7 @@ func V2DownloadsDetailAction(w http.ResponseWriter, r *http.Request, s *AppState
 	}
 	path := ""
 	body := []byte(r.FormValue("body"))
-	if body == nil || len(body) == 0 {
+	if len(body) == 0 {
 		body = []byte(`{}`)
 	}
 	switch op {

@@ -62,11 +62,6 @@ func gh6_isDir(path string) bool {
 	return err == nil && info.IsDir()
 }
 
-func gh6_fileExists(path string) bool {
-	info, err := os.Stat(path)
-	return err == nil && !info.IsDir()
-}
-
 func gh6_purgeRemovedLibrary(
 	db *Database,
 	previousSeries []SeriesConfig,
@@ -114,22 +109,6 @@ func gh6_purgeRemovedLibrary(
 	}
 }
 
-// gh6_revokeIntegrationTokens mirrors `revoke_integration_tokens`.
-func gh6_revokeIntegrationTokens(s *AppState, keys []string) (int, map[string]any) {
-	if s.cfg.DryRun {
-		return http.StatusConflict, map[string]any{
-			"ok":    false,
-			"error": "dry-run does not modify integration tokens",
-		}
-	}
-	for _, key := range keys {
-		if err := saveConfigSetting(s.cfg.DataDir, key, ""); err != nil {
-			return http.StatusInternalServerError, map[string]any{"ok": false, "error": err.Error()}
-		}
-	}
-	return http.StatusOK, map[string]any{"ok": true, "authenticated": false}
-}
-
 func gh6_parseSettingInt(cfg *Config, key string) int64 {
 	if cfg == nil {
 		return 0
@@ -145,12 +124,12 @@ func gh6_parseSettingInt(cfg *Config, key string) int64 {
 	return parsed
 }
 
+// gh6_truthySetting reads a boolean setting. It delegates to settingTruthy so
+// every reader accepts the same spellings: "on" (one of the values the
+// settings page can store) used to be read as false here and as true
+// everywhere else, so the speed panel and the speed rule disagreed.
 func gh6_truthySetting(value string) bool {
-	switch strings.ToLower(value) {
-	case "yes", "true", "1":
-		return true
-	}
-	return false
+	return settingTruthy(value)
 }
 
 func gh6_scheduledSpeedLimits(cfg *Config) (int64, int64, bool) {
@@ -746,7 +725,7 @@ func DeleteArchiveEntry(w http.ResponseWriter, r *http.Request, s *AppState) {
 		jsonError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	if s.cfg.DryRun {
+	if s.dryRun() {
 		jsonError(w, http.StatusConflict, "dry-run does not modify archive")
 		return
 	}
@@ -1102,7 +1081,7 @@ func RestoreSource(w http.ResponseWriter, r *http.Request, s *AppState) {
 		return
 	}
 	execute := input.Execute
-	if execute && s.cfg.DryRun {
+	if execute && s.dryRun() {
 		jsonError(w, http.StatusConflict, "dry-run does not modify files")
 		return
 	}

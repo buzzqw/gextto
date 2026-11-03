@@ -129,9 +129,7 @@ func uiRecentDestination(path string) string {
 	}
 	if home, err := os.UserHomeDir(); err == nil {
 		homePrefix := filepath.Clean(home) + string(filepath.Separator)
-		if strings.HasPrefix(folder, homePrefix) {
-			folder = strings.TrimPrefix(folder, homePrefix)
-		}
+		folder = strings.TrimPrefix(folder, homePrefix)
 	}
 	if folder == "trasferimento" || strings.HasPrefix(folder, "trasferimento"+string(filepath.Separator)) {
 		return "trasferimento"
@@ -355,12 +353,6 @@ type uiCycleRow struct {
 	SourceDetail string
 }
 
-// uiLogsData is the view-model of the Log page.
-type uiLogsData struct {
-	Lines []string
-	Count int
-}
-
 // uiLicenseData is the view-model of the Licenza page.
 type uiLicenseData struct {
 	Text string
@@ -427,7 +419,7 @@ func uiDashboardDataFrom(s *AppState) uiDashboardData {
 	engine := s.activeEngine()
 	var views []models.TorrentView
 	backend := "-"
-	if engine != nil {
+	if s.hasTorrentEngine() {
 		views = SessionSnapshot(engine)
 		backend = uiBackendLabel(engine.Name())
 	}
@@ -518,18 +510,18 @@ func uiDashboardDataFrom(s *AppState) uiDashboardData {
 		}
 	}
 	trash := ""
-	if s.cfg.TrashPath != nil {
-		trash = *s.cfg.TrashPath
+	if cfg.TrashPath != nil {
+		trash = *cfg.TrashPath
 	}
 	ramdisk := ""
-	if value, ok := s.cfg.Settings["torrent_ramdisk_dir"]; ok {
+	if value, ok := cfg.Settings["torrent_ramdisk_dir"]; ok {
 		ramdisk = value
 	}
 	health := CheckWithPaths(&HealthPaths{
-		DataDir:      s.cfg.DataDir,
+		DataDir:      cfg.DataDir,
 		TrashPath:    trash,
-		DownloadPath: s.cfg.DownloadDir,
-		ArchiveRoot:  gh3DerefString(s.cfg.ArchiveRoot),
+		DownloadPath: cfg.DownloadDir,
+		ArchiveRoot:  gh3DerefString(cfg.ArchiveRoot),
 		RamdiskPath:  ramdisk,
 	})
 	data.FreeSpace = health.DiskFreeBytes
@@ -541,7 +533,7 @@ func uiDashboardDataFrom(s *AppState) uiDashboardData {
 			start, ok = *snapshot.LastStartedAt, true
 		}
 		if ok {
-			remaining := int64(start.Add(durationFromSeconds(cfg.RefreshSecs)).Sub(time.Now()).Seconds())
+			remaining := int64(time.Until(start.Add(durationFromSeconds(cfg.RefreshSecs))).Seconds())
 			if remaining < 0 {
 				remaining = 0
 			}
@@ -565,19 +557,20 @@ func uiDashboardDataFrom(s *AppState) uiDashboardData {
 // uiHealthPathsFrom collects the operational paths inspected by the Salute page
 // from the live configuration, shared by the full page and the tile fragments.
 func uiHealthPathsFrom(s *AppState) *HealthPaths {
+	cfg := latestConfig(s)
 	trash := ""
-	if s.cfg.TrashPath != nil {
-		trash = *s.cfg.TrashPath
+	if cfg.TrashPath != nil {
+		trash = *cfg.TrashPath
 	}
 	ramdisk := ""
-	if value, ok := s.cfg.Settings["torrent_ramdisk_dir"]; ok {
+	if value, ok := cfg.Settings["torrent_ramdisk_dir"]; ok {
 		ramdisk = value
 	}
 	return &HealthPaths{
-		DataDir:      s.cfg.DataDir,
+		DataDir:      cfg.DataDir,
 		TrashPath:    trash,
-		DownloadPath: s.cfg.DownloadDir,
-		ArchiveRoot:  gh3DerefString(s.cfg.ArchiveRoot),
+		DownloadPath: cfg.DownloadDir,
+		ArchiveRoot:  gh3DerefString(cfg.ArchiveRoot),
 		RamdiskPath:  ramdisk,
 	}
 }
@@ -692,7 +685,7 @@ func uiQueueRowsFrom(items []PendingQueueItem) []uiQueueRow {
 func uiDailyRowsFrom(daily []DailyCount) []uiDailyRow {
 	rows := make([]uiDailyRow, 0, len(daily))
 	for _, d := range daily {
-		rows = append(rows, uiDailyRow{Day: d.Day, Count: d.Count})
+		rows = append(rows, uiDailyRow(d))
 	}
 	return rows
 }
@@ -814,12 +807,6 @@ func uiHealthDiskTileFrom(s *AppState) uiHealthData {
 		Health:      Health{DiskTotalBytes: totalBytes, DiskFreeBytes: freeBytes},
 		DiskUsedPct: usedPct,
 	}
-}
-
-// uiLogsDataFrom reads the same log tail the JSON API exposes.
-func uiLogsDataFrom(s *AppState) uiLogsData {
-	lines := coreTailLines(filepath.Join(s.cfg.DataDir, "gextto.log"), 500)
-	return uiLogsData{Lines: lines, Count: len(lines)}
 }
 
 // uiTorrentsDataFrom builds the Scarico view-model for both the full page and
@@ -1063,11 +1050,4 @@ func saturatingInt64(value uint64) int64 {
 		return math.MaxInt64
 	}
 	return int64(value)
-}
-
-func uiDerefInt64(value *int64) int64 {
-	if value == nil {
-		return 0
-	}
-	return *value
 }

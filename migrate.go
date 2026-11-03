@@ -193,7 +193,9 @@ func copyDatabase(source, destination string) error {
 	}
 	for _, suffix := range []string{"-wal", "-shm"} {
 		if _, err := os.Stat(source + suffix); err == nil {
-			_ = migrateCopyFile(source+suffix, destination+suffix)
+			if err := migrateCopyFile(source+suffix, destination+suffix); err != nil {
+				return fmt.Errorf("copy the SQLite %s journal of %s: %w", suffix, source, err)
+			}
 		}
 	}
 	db, err := sql.Open("sqlite", destination)
@@ -201,9 +203,17 @@ func copyDatabase(source, destination string) error {
 		return err
 	}
 	defer db.Close()
-	_, _ = db.Exec("PRAGMA wal_checkpoint(TRUNCATE)")
+	// The checkpoint folds the copied journal into the database file. Removing
+	// the journal before a successful checkpoint would drop every transaction
+	// it still holds, which is exactly the data a live database has not written
+	// yet: the copy must be complete before the old files go away.
+	if _, err := db.Exec("PRAGMA wal_checkpoint(TRUNCATE)"); err != nil {
+		return fmt.Errorf("checkpoint the copy of %s: %w", source, err)
+	}
 	for _, suffix := range []string{"-wal", "-shm"} {
-		_ = os.Remove(destination + suffix)
+		if err := os.Remove(destination + suffix); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("remove the copied %s journal of %s: %w", suffix, destination, err)
+		}
 	}
 	return nil
 }

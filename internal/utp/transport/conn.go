@@ -134,7 +134,7 @@ func (c *Conn) wndSize() uint32 {
 // makePacket builds a packet of _type with an up-to-date header, including a
 // selective ACK for the out-of-order packets currently held. The buffer comes
 // from sendBufferPool and must be returned there once sent.
-func (c *Conn) makePacket(_type st, connID, seqNr uint16, payload []byte) (p []byte) {
+func (c *Conn) makePacket(_type st, connID, seqNr uint16, payload []byte) (p []byte, buffer *sendBuffer) {
 	var selAck selectiveAckBitmask
 	for i := 1; i < len(c.inbound); i++ {
 		if c.inbound[i].seen {
@@ -162,7 +162,8 @@ func (c *Conn) makePacket(_type st, connID, seqNr uint16, payload []byte) (p []b
 			Bytes: selAck.Bytes,
 		})
 	}
-	p = sendBufferPool.Get().([]byte)[:0:minMTU]
+	buffer = sendBufferPool.Get().(*sendBuffer)
+	p = buffer.bytes[:0:minMTU]
 	n := h.Marshal(p)
 	p = p[:n]
 	// Extension headers are currently fixed in size.
@@ -175,9 +176,9 @@ func (c *Conn) makePacket(_type st, connID, seqNr uint16, payload []byte) (p []b
 
 // send writes one packet to the peer. Callers hold mu.
 func (c *Conn) send(_type st, connID uint16, payload []byte, seqNr uint16) (err error) {
-	p := c.makePacket(_type, connID, seqNr, payload)
+	p, buffer := c.makePacket(_type, connID, seqNr, payload)
 	n1, err := c.socket.writeTo(p, c.remoteSocketAddr)
-	sendBufferPool.Put(p[:0:minMTU])
+	sendBufferPool.Put(buffer)
 	if err != nil {
 		return
 	}
@@ -242,8 +243,10 @@ func (c *Conn) write(_type st, connID uint16, payload []byte, seqNr uint16) (n i
 	n = len(payload)
 	// Copy the payload: the caller keeps its buffer, and the copy outlives
 	// this call for a possible resend.
+	var buffer *sendBuffer
 	if payload != nil {
-		payload = append(sendBufferPool.Get().([]byte)[:0:minMTU], payload...)
+		buffer = sendBufferPool.Get().(*sendBuffer)
+		payload = append(buffer.bytes[:0:minMTU], payload...)
 	}
 	s := &send{
 		payloadSize: uint32(len(payload)),
@@ -251,6 +254,7 @@ func (c *Conn) write(_type st, connID uint16, payload []byte, seqNr uint16) (n i
 		_type:       _type,
 		connID:      connID,
 		payload:     payload,
+		buffer:      buffer,
 		seqNr:       seqNr,
 		conn:        c,
 	}

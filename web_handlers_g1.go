@@ -82,22 +82,6 @@ func gh1_torrentDisplayName(torrents TorrentSession, hash string) string {
 	return "unnamed torrent"
 }
 
-// gh1_torrentFilesAreDisposable mirrors the web module `torrent_files_are_disposable`.
-func gh1_torrentFilesAreDisposable(db *Database, hash string) bool {
-	meta, err := db.TorrentMeta(hash)
-	if err != nil || meta == nil {
-		return false
-	}
-	if !meta.Release.IsPack {
-		return false
-	}
-	status, err := db.TorrentStatus(hash)
-	if err != nil || status == nil {
-		return false
-	}
-	return *status == "completed"
-}
-
 // gh1_mismatchedPackRelease mirrors the web module `mismatched_pack_release`.
 func gh1_mismatchedPackRelease(torrents TorrentSession, db *Database, hash string) *models.Release {
 	meta, err := db.TorrentMeta(hash)
@@ -735,7 +719,7 @@ func requestCycle(s *AppState, domain *string, origin string) (running, queued b
 	if err != nil {
 		return false, false, err
 	}
-	if s.cfg.DryRun {
+	if s.dryRun() {
 		cfg.DryRun = true
 	}
 	if !SetupComplete(&cfg) {

@@ -72,15 +72,6 @@ func bg_jsonString(value any) string {
 	return string(data)
 }
 
-func bg_parseSettingInt(cfg *Config, key string) int64 {
-	if value, ok := cfg.Settings[key]; ok {
-		if parsed, err := strconv.ParseInt(strings.TrimSpace(value), 10, 64); err == nil {
-			return parsed
-		}
-	}
-	return 0
-}
-
 func bg_countKey(values map[string]any, key string) int64 {
 	switch typed := values[key].(type) {
 	case int:
@@ -865,7 +856,7 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 				}
 				lastConfigGen = ConfigGeneration()
 				if loaded, err := LoadConfig(configPath); err == nil {
-					if fallback.DryRun {
+					if state.dryRunForced {
 						loaded.DryRun = true
 					}
 					cfg = &loaded
@@ -1494,10 +1485,6 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 	}
 }
 
-// resumeSaveInterval is how often the torrent progress is saved while running,
-// so an unclean stop loses at most this much download state.
-const resumeSaveInterval = 2 * time.Minute
-
 // completionRecoveryInterval is how often the worker looks for completed
 // torrents whose completion event was lost. Transient completion retries
 // (completionRetries, first backoff one minute) also go through this scan.
@@ -1709,10 +1696,6 @@ type bg_speedPair struct {
 	download int64
 	upload   int64
 	source   string
-}
-
-func bg_scheduledSpeedLimits(cfg *Config) (int64, int64, bool) {
-	return scheduledSpeedLimitsAt(cfg, time.Now())
 }
 
 func bg_currentSpeedLimits(cfg *Config) (int64, int64) {
@@ -2469,7 +2452,7 @@ func cycleWorker(state *AppState) {
 			continue
 		}
 		cfg := loaded
-		if state.cfg.DryRun {
+		if state.dryRunForced {
 			cfg.DryRun = true
 		}
 		refresh := cfg.RefreshSecs
@@ -2504,7 +2487,7 @@ func cycleWorker(state *AppState) {
 								// this assignment the stale `cfg.Active` below could still
 								// launch exactly one unwanted scheduled cycle.
 								cfg = reloaded
-								if state.cfg.DryRun {
+								if state.dryRunForced {
 									cfg.DryRun = true
 								}
 								break

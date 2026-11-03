@@ -132,6 +132,17 @@ func (t *torrent) notifyWebseedRetry(src *webseedsource.WebseedSource) {
 	}
 }
 
+// capWebseedSources applies the configured ceiling to a list of webseed
+// sources. A ceiling of zero or less means "no ceiling", the same rule
+// handleAddWebseeds follows, so both entry points agree. The list is truncated
+// in place: the caller owns it and the dropped tail has no other owner.
+func capWebseedSources(sources []*webseedsource.WebseedSource, maxSources int) []*webseedsource.WebseedSource {
+	if maxSources <= 0 || len(sources) <= maxSources {
+		return sources
+	}
+	return sources[:maxSources]
+}
+
 // handleAddWebseeds appends webseed URLs at runtime, skipping blanks,
 // duplicates and the configured ceiling, persisting the survivors. Sources
 // added while the picker is missing wait for the next start.

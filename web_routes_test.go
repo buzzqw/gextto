@@ -79,6 +79,12 @@ func TestEveryGetRouteRespondsWithoutServerError(t *testing.T) {
 		"/api/logs/stream":          true,
 		"/api/notifications/stream": true,
 	}
+	// A route may answer 503 when the subsystem it reports is not configured in
+	// the test state (no torrent engine): that is an explicit, documented answer
+	// for a missing dependency, not a failed request.
+	unavailableAllowed := map[string]bool{
+		"GET /api/torrents/{hash}/why": true,
+	}
 
 	checked := 0
 	for _, pattern := range routes {
@@ -117,7 +123,7 @@ func TestEveryGetRouteRespondsWithoutServerError(t *testing.T) {
 		case <-time.After(20 * time.Second):
 			t.Fatalf("%s timed out", pattern)
 		}
-		if recorder.Code >= 500 {
+		if recorder.Code >= 500 && !(recorder.Code == http.StatusServiceUnavailable && unavailableAllowed[pattern]) {
 			t.Errorf("%s -> status %d (%s)", pattern, recorder.Code, strings.TrimSpace(recorder.Body.String()[:min(160, recorder.Body.Len())]))
 		}
 		checked++

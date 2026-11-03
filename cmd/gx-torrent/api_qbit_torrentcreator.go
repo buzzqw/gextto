@@ -202,9 +202,7 @@ func (d *Daemon) handleQbitTorrentCreatorFile(w http.ResponseWriter, r *http.Req
 func (d *Daemon) handleQbitTorrentCreatorDelete(w http.ResponseWriter, r *http.Request) {
 	id := qbitCreateID(r)
 	d.qbitCreateMu.Lock()
-	if _, ok := d.qbitCreate[id]; ok {
-		delete(d.qbitCreate, id)
-	}
+	delete(d.qbitCreate, id)
 	d.qbitCreateMu.Unlock()
 	w.WriteHeader(http.StatusOK)
 }

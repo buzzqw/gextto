@@ -135,7 +135,7 @@ func v2CardMetaFields(base string) []v2CardMetaField {
 // metadata provider. Both lookups are cached and run a few at a time.
 func v2LibraryCardsFrom(ctx context.Context, s *AppState, base string, items []map[string]any, columns []uiColumn) []v2CardItem {
 	cfg := latestConfig(s)
-	posters := map[string]string{}
+	var posters map[string]string
 	if base == "series" {
 		posters = v2SeriesPosters(ctx, cfg, seriesNames(items))
 	} else {

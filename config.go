@@ -1617,14 +1617,9 @@ func containsInt64(values []int64, needle int64) bool {
 // "Spider-Man" -> ["spider","man"], "Minions & Monsters" ->
 // ["minions","monsters"]. Punctuation must not prevent the match.
 func titleTokens(value string) []string {
-	lowered := strings.ToLower(value)
-	tokens := []string{}
-	for _, token := range strings.FieldsFunc(lowered, func(r rune) bool {
+	return strings.FieldsFunc(strings.ToLower(value), func(r rune) bool {
 		return !(r >= 'a' && r <= 'z') && !(r >= '0' && r <= '9')
-	}) {
-		tokens = append(tokens, token)
-	}
-	return tokens
+	})
 }
 
 // movieTitleMatches is true when the title contains every word of the monitored
@@ -2483,8 +2478,14 @@ func (c *Config) loadConfigDB() error {
 	defer conn.Close()
 	rows, err := conn.Query("SELECT key,value FROM settings")
 	if err != nil {
-		// Missing settings table: nothing to overlay.
-		return nil
+		// A first run has no settings table yet: nothing to overlay. Any other
+		// failure means the settings are unreadable, and continuing would hand
+		// the caller a configuration made only of defaults, which the next save
+		// would then write back over the real one.
+		if strings.Contains(strings.ToLower(err.Error()), "no such table") {
+			return nil
+		}
+		return fmt.Errorf("read the settings of %s: %w", path, err)
 	}
 	for rows.Next() {
 		var key, value string
@@ -2555,7 +2556,10 @@ func (c *Config) loadConfigDB() error {
 			}
 			c.Series = series
 		} else {
-			c.Series = []SeriesConfig{}
+			// Keep the list already loaded (the JSON file or the legacy series
+			// database): substituting an empty one would make the next save
+			// erase every monitored series.
+			logging.Error("The series list stored in the settings is unreadable; keeping the list loaded from the configuration file", "error", err)
 		}
 	}
 	if len(c.Series) == 0 {
@@ -2672,7 +2676,9 @@ func (c *Config) loadConfigDB() error {
 		if err := json.Unmarshal([]byte(value), &indexers); err == nil {
 			c.Indexers = indexers
 		} else {
-			c.Indexers = []IndexerConfig{}
+			// Same reasoning as the series list: an unreadable value must not
+			// replace the configured indexers with an empty list.
+			logging.Error("The indexer list stored in the settings is unreadable; keeping the list loaded from the configuration file", "error", err)
 		}
 	}
 	if value, ok := c.Settings["websearch_engines"]; ok {

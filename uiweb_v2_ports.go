@@ -47,11 +47,10 @@ func activeEngineStats(s *AppState) map[string]any {
 	if s == nil {
 		return nil
 	}
-	engine := s.activeEngine()
-	if engine == nil {
+	if !s.hasTorrentEngine() {
 		return nil
 	}
-	return engine.Stats()
+	return s.activeEngine().Stats()
 }
 
 // uiPeerPortNotice is the line shown on the ports panel: a confirmation when the

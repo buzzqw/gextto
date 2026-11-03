@@ -224,14 +224,6 @@ func foldLatinCharacter(character rune) rune {
 	}
 }
 
-// tokensMatchWithReleaseSuffix allows harmless suffixes commonly left in the
-// series prefix by indexers: bare years, season/episode markers and technical
-// tags. It intentionally only accepts suffixes, so `New Tricks` does not match
-// `Old Dog New Tricks`.
-func tokensMatchWithReleaseSuffix(configured, candidate string) bool {
-	return tokensMatchWithReleaseSuffixWords(strings.Fields(configured), strings.Fields(candidate))
-}
-
 // tokensMatchWithReleaseSuffixWords is tokensMatchWithReleaseSuffix on words
 // that are already split.
 func tokensMatchWithReleaseSuffixWords(configuredWords, candidateWords []string) bool {
@@ -267,15 +259,6 @@ func isReleaseSuffixToken(token string) bool {
 	}
 	regex, err := utils.CachedRegex(`(?i)^(?:s\d{1,2}|e\d{1,4}|\d{1,2}x\d{1,4}|\d{3,4}p)$`)
 	return err == nil && regex.MatchString(token)
-}
-
-// tokensMatch confronta due nomi già normalizzati: uguaglianza oppure token a
-// token con tolleranza per il plurale finale (`Show`/`Shows`).
-func tokensMatch(left, right string) bool {
-	if left == right {
-		return true
-	}
-	return tokensMatchWords(strings.Fields(left), strings.Fields(right))
 }
 
 // tokensMatchWords is tokensMatch on words that are already split.

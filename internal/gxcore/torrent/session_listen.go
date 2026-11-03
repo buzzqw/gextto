@@ -9,6 +9,7 @@ package torrent
 import (
 	"errors"
 	"net"
+	"syscall"
 	"time"
 
 	"github.com/buzzqw/gextto/internal/dht"
@@ -130,8 +131,7 @@ func (s *Session) acceptRetry(err error, delay *time.Duration, warned *bool) boo
 		return false
 	default:
 	}
-	var ne net.Error
-	if !errors.As(err, &ne) || !ne.Temporary() {
+	if !acceptFailureIsTransient(err) {
 		s.log.Errorln("incoming peer listener stopped:", err)
 		return false
 	}
@@ -153,6 +153,25 @@ func (s *Session) acceptRetry(err error, delay *time.Duration, warned *bool) boo
 		}
 	}
 	return true
+}
+
+// acceptFailureIsTransient classifies an Accept failure. It replaces
+// net.Error.Temporary, which Go deprecated in 1.18 because the classification
+// is unreliable: the cases the retry loop exists for are named explicitly here.
+// A closed listener is not transient, and neither is anything this function
+// does not recognise, so an unknown failure still stops the loop and is logged.
+func acceptFailureIsTransient(err error) bool {
+	switch {
+	case errors.Is(err, net.ErrClosed):
+		return false
+	case errors.Is(err, syscall.EINTR),
+		errors.Is(err, syscall.ECONNABORTED),
+		errors.Is(err, syscall.EMFILE),
+		errors.Is(err, syscall.ENFILE):
+		return true
+	}
+	var netErr net.Error
+	return errors.As(err, &netErr) && netErr.Timeout()
 }
 
 // sharedSKey finds the MSE secret (info hash) among all torrents.

@@ -76,6 +76,9 @@ func TestFetchTorrentRedirectsToMagnet(t *testing.T) {
 	if err != nil {
 		t.Fatalf("FetchTorrent direct magnet failed: %v", err)
 	}
+	if len(payload) > 0 {
+		t.Fatalf("expected nil payload for a direct magnet, got %d bytes", len(payload))
+	}
 	if magnet != magnetExpected {
 		t.Fatalf("got magnet %q, want %q", magnet, magnetExpected)
 	}

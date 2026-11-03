@@ -408,26 +408,6 @@ func gh7_torrent_display_name(torrents TorrentSession, hash string) string {
 	return "unnamed torrent"
 }
 
-// gh7_torrent_files_are_disposable is true when a completed season pack may be
-// deleted: the pack is already copied to the library (status `completed`).
-func gh7_torrent_files_are_disposable(db *Database, hash string) bool {
-	if db == nil {
-		return false
-	}
-	meta, err := db.TorrentMeta(hash)
-	if err != nil || meta == nil {
-		return false
-	}
-	if !meta.Release.IsPack {
-		return false
-	}
-	status, err := db.TorrentStatus(hash)
-	if err != nil || status == nil {
-		return false
-	}
-	return *status == "completed"
-}
-
 // gh7_mismatched_pack_release returns the configured release when the torrent's
 // real name identifies a different season.
 func gh7_mismatched_pack_release(torrents TorrentSession, db *Database, hash string) *models.Release {
@@ -1557,7 +1537,7 @@ func SimklAuthPoll(w http.ResponseWriter, r *http.Request, s *AppState) {
 		jsonError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	if s.cfg.DryRun {
+	if s.dryRun() {
 		jsonError(w, http.StatusConflict, "dry-run does not save integration tokens")
 		return
 	}

@@ -122,7 +122,7 @@ func MaintenanceRenameFolderApply(w http.ResponseWriter, r *http.Request, s *App
 		jsonError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	if s.cfg != nil && s.cfg.DryRun {
+	if s.cfg != nil && s.dryRun() {
 		jsonError(w, http.StatusConflict, "dry-run: la rinomina non modifica i file")
 		return
 	}
