@@ -193,6 +193,27 @@ func sameSettingValue(page, backend string) bool {
 // dry-run) without the user having to flip a switch first. The page default and
 // the backend default must agree, and the legacy "1" spelling must read as the
 // same on/off so the row is not flagged as modified.
+// A yes/no value saved as a one-item JSON list must keep its own control: the
+// automatic cycle stored as ["true"] showed a text area instead of its combo.
+func TestYesNoSettingSavedAsListKeepsItsControl(t *testing.T) {
+	field := uiSettingFieldFor("active", "active", `["true"]`)
+	if field.Kind != "select" || field.TagJSON {
+		t.Fatalf("active stored as [\"true\"]: kind %q (list %v), want the select", field.Kind, field.TagJSON)
+	}
+	selected := ""
+	for _, option := range field.Options {
+		if option.Selected {
+			selected = option.Value
+		}
+	}
+	if selected != "true" {
+		t.Fatalf("selected option = %q, want true", selected)
+	}
+	if list := uiSettingFieldFor("blacklist", "blacklist", `["cam","ts"]`); list.Kind == "select" || list.Kind == "bool" {
+		t.Fatalf("a real list must stay a list, got kind %q", list.Kind)
+	}
+}
+
 func TestAutomaticCycleIsOnByDefault(t *testing.T) {
 	if !DefaultConfig().Active {
 		t.Fatal("the automatic cycle must be on by default")

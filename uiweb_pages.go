@@ -1435,6 +1435,14 @@ func uiSettingFieldBase(key, label, value string) uiSettingField {
 	// Mirror rextto/extto: when the key was never saved, show the documented
 	// default instead of an empty control. Secrets and list-like values keep the
 	// default only as a placeholder so they are never written by accident.
+	// A yes/no setting saved as a one-item JSON list (["true"], written by an old
+	// list editor) is still one yes/no value: unwrap it, or the list rule below
+	// would turn the switch or combo into a one-value-per-line text area.
+	if def := strings.TrimSpace(uiSettingDefaults[key]); uiIsBoolSpelling(def) && !uiIsNumber(def) {
+		if items, ok := uiJSONScalarList(value); ok && len(items) == 1 && uiIsBoolSpelling(items[0]) {
+			value = items[0]
+		}
+	}
 	placeholder := ""
 	if strings.TrimSpace(value) == "" {
 		if def := uiSettingDefault(key); def != "" {
