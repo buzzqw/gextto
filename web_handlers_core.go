@@ -20,8 +20,6 @@ import (
 
 	"github.com/buzzqw/gextto/internal/constants"
 	"github.com/buzzqw/gextto/internal/messages"
-
-	"gopkg.in/yaml.v3"
 )
 
 // durationFromSeconds converts a non-negative seconds count to a time.Duration,
@@ -173,42 +171,6 @@ func Favicon(w http.ResponseWriter, r *http.Request, s *AppState) {
 // I18n
 // ---------------------------------------------------------------------------
 
-// I18nList returns the translations for a language.
-func I18nList(w http.ResponseWriter, r *http.Request, s *AppState) {
-	lang := queryParam(r, "lang")
-	if lang == "" {
-		if active, err := s.i18n.Language(); err == nil {
-			lang = active
-		} else {
-			lang = "it"
-		}
-	}
-	items, err := s.i18n.List(lang)
-	if err != nil {
-		jsonError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	jsonResponse(w, map[string]any{"lang": lang, "items": items})
-}
-
-// I18nSet stores one translation.
-func I18nSet(w http.ResponseWriter, r *http.Request, s *AppState) {
-	var input I18nInput
-	if err := decodeJSON(r, &input); err != nil {
-		jsonError(w, http.StatusBadRequest, err.Error())
-		return
-	}
-	if len(input.Lang) > 16 || strings.TrimSpace(input.Key) == "" || len(input.Key) > 256 || len(input.Value) > 4096 {
-		jsonError(w, http.StatusBadRequest, "invalid translation")
-		return
-	}
-	if err := s.i18n.Set(input.Lang, input.Key, input.Value); err != nil {
-		jsonError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	jsonResponse(w, map[string]any{"ok": true})
-}
-
 // I18nLanguage switches the active UI language.
 func I18nLanguage(w http.ResponseWriter, r *http.Request, s *AppState) {
 	var input LanguageInput
@@ -252,67 +214,6 @@ func I18nActive(w http.ResponseWriter, r *http.Request, s *AppState) {
 		return
 	}
 	jsonResponse(w, map[string]any{"ok": true, "lang": lang})
-}
-
-// I18nExport serialises a language to YAML.
-func I18nExport(w http.ResponseWriter, r *http.Request, s *AppState) {
-	lang := pathParam(r, "lang")
-	items, err := s.i18n.List(lang)
-	if err != nil {
-		jsonError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	values := map[string]string{}
-	for _, item := range items {
-		values[item.Key] = item.Value
-	}
-	payload, err := yaml.Marshal(values)
-	if err != nil {
-		jsonError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	w.Header().Set("Content-Type", "text/yaml; charset=utf-8")
-	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write(payload)
-}
-
-// I18nDeleteLang removes every translation of a language.
-func I18nDeleteLang(w http.ResponseWriter, r *http.Request, s *AppState) {
-	lang := pathParam(r, "lang")
-	if strings.TrimSpace(lang) == "" || len(lang) > 32 {
-		jsonError(w, http.StatusBadRequest, "invalid language code")
-		return
-	}
-	removed, err := s.i18n.DeleteLang(lang)
-	if err != nil {
-		jsonError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	jsonResponse(w, map[string]any{"ok": true, "lang": lang, "removed": removed})
-}
-
-// I18nImport merges a YAML translation file into a language.
-func I18nImport(w http.ResponseWriter, r *http.Request, s *AppState) {
-	lang := pathParam(r, "lang")
-	var input I18nYamlInput
-	if err := decodeJSON(r, &input); err != nil {
-		jsonError(w, http.StatusBadRequest, err.Error())
-		return
-	}
-	if len(input.Yaml) > 2_000_000 {
-		jsonError(w, http.StatusRequestEntityTooLarge, "translation file too large")
-		return
-	}
-	values := map[string]string{}
-	if err := yaml.Unmarshal([]byte(input.Yaml), &values); err != nil {
-		jsonError(w, http.StatusBadRequest, err.Error())
-		return
-	}
-	if err := s.i18n.SetBulk(lang, values); err != nil {
-		jsonError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	jsonResponse(w, map[string]any{"ok": true, "imported": len(values)})
 }
 
 // ---------------------------------------------------------------------------

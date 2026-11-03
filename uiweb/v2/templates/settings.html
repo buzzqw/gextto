@@ -90,8 +90,7 @@
     {{range .Groups}}{{template "v2_setting_group" .}}{{if and (eq $.ActiveID "maintenance") (eq .Title "Controllo integrità file")}}{{with $.MediaCheck}}{{template "v2_media_integrity_panel" .}}{{end}}{{end}}{{if and (eq $.ActiveID "maintenance") (eq .Title "Manutenzione notturna")}}{{with $.Night}}{{template "v2_night_maintenance_panel" .}}{{end}}{{end}}{{end}}
     {{if .Rename}}{{template "v2_rename_editor" .Rename}}{{end}}
     {{if and (not .EditorsFirst) (ne .ActiveID "scores")}}{{template "v2_settings_editors" .}}{{end}}
-    {{if .I18n}}{{template "v2_i18n_editor" .I18n}}{{end}}
-    {{if and (not .Groups) (not .I18n) (not .ShowFeeds) (not .Tuning) (not .Sources) (not .ScoreExamples) .Empty}}<p class="muted">{{tr .Empty}}</p>{{end}}
+    {{if and (not .Groups) (not .ShowFeeds) (not .Tuning) (not .Sources) (not .ScoreExamples) .Empty}}<p class="muted">{{tr .Empty}}</p>{{end}}
     {{if eq .ActiveID "scores"}}{{template "v2_score_groups" .}}{{end}}
     {{if eq .ActiveID "network"}}{{template "v2_ipfilter_action" .}}{{end}}
   </div>
@@ -487,47 +486,6 @@
 {{end}}
 
 {{define "v2_rename_preview_code"}}<code class="rename-preview" id="v2-rename-preview-code">{{tr .Preview}}</code>{{end}}
-
-{{define "v2_i18n_editor"}}
-<div class="card editor-card">
-  <h3>{{tr "Traduzioni"}}</h3>
-  <div class="toolbar">
-    <select class="input" name="lang" aria-label="{{tr "Lingua delle traduzioni"}}" hx-get="/settings/i18n" hx-target="#v2-i18n-table" hx-swap="outerHTML">
-      {{range .Languages}}<option value="{{.}}"{{if eq . $.Language}} selected{{end}}>{{tr .}}</option>{{end}}
-    </select>
-    <a class="btn sm" href="/api/i18n/export/{{.Language}}" target="_blank" rel="noopener" {{trTitle "Scarica le traduzioni in YAML"}}>{{tr "Esporta YAML"}}</a>
-    <form method="post" action="/settings/i18n/delete" hx-post="/settings/i18n/delete" hx-swap="none" style="display:inline">
-      <input type="hidden" name="lang" value="{{.Language}}" />
-      <button class="btn sm danger" type="submit" hx-confirm="{{tr "Eliminare tutte le traduzioni di questa lingua?"}}">{{tr "Elimina lingua"}}</button>
-    </form>
-  </div>
-  {{template "v2_i18n_table" .}}
-  <form method="post" action="/settings/i18n/import" hx-post="/settings/i18n/import" hx-swap="none">
-    <input type="hidden" name="lang" value="{{.Language}}" />
-    <label class="field"><span>{{tr "Importa YAML"}}</span><textarea class="input" name="yaml" rows="4"></textarea></label>
-    <div class="form-actions"><button class="btn sm primary" type="submit">{{tr "Importa"}}</button></div>
-  </form>
-</div>
-{{end}}
-
-{{define "v2_i18n_table"}}
-<div id="v2-i18n-table" class="table-wrap"><table class="data-table i18n-table">
-  <caption class="sr-only">{{tr "Traduzioni configurate"}}</caption>
-  <colgroup><col class="i18n-key-col" /><col class="i18n-value-col" /></colgroup>
-  <thead><tr><th scope="col">{{tr "Chiave"}}</th><th scope="col">{{tr "Valore"}}</th></tr></thead>
-  <tbody>{{range $i, $row := .Rows}}<tr>
-    <td class="i18n-key"><code id="v2-i18n-key-{{$i}}">{{$row.Key}}</code></td>
-    <td class="i18n-value">
-      <form class="i18n-value-form" hx-post="/settings/i18n/set" hx-target="#v2-i18n-table" hx-swap="outerHTML">
-        <input type="hidden" name="lang" value="{{$.Language}}" />
-        <input type="hidden" name="key" value="{{$row.Key}}" />
-        <input class="input" name="value" value="{{$row.Value}}" aria-labelledby="v2-i18n-key-{{$i}}" />
-        <button class="btn sm" type="submit" id="v2-i18n-save-{{$i}}" aria-labelledby="v2-i18n-save-{{$i}} v2-i18n-key-{{$i}}">{{tr "Salva"}}</button>
-      </form>
-    </td>
-  </tr>{{end}}</tbody>
-</table></div>
-{{end}}
 
 {{define "v2_setting_field"}}
 <form class="setting-row{{if .Modified}} setting-modified-row{{end}}" data-setting-key="{{.Key}}" id="v2-setting-{{.Key}}" method="post" action="/settings/save"

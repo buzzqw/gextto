@@ -211,7 +211,6 @@ type uiSettingsPage struct {
 	PeerPorts       uiPeerPortStatus
 	ShowSources     bool
 	ShowEditors     bool
-	ShowI18n        bool
 	ListEditors     []uiListEditor
 	SearchIndexJSON string
 	// Actions is an optional toolbar of API buttons shown at the top of the
@@ -777,7 +776,6 @@ func uiSettingsPageFrom(s *AppState, activeTab, mode string) uiSettingsPage {
 		}
 	}
 	page.ShowSources = active == "sources"
-	page.ShowI18n = active == "system"
 	page.ListEditors = uiSettingsTabEditors(active)
 	page.ShowEditors = len(page.ListEditors) > 0
 	switch active {
@@ -1177,7 +1175,6 @@ var uiSettingsEditorSearchEntries = []uiSearchEntry{
 	{Key: "", Label: "Regole tag → cartella", Tab: "rename"},
 	{Key: "", Label: "Hook eventi", Tab: "notify"},
 	{Key: "", Label: "Regole di seed", Tab: "seeding", Terms: "ratio seed tracker privato indexer categoria inattivo"},
-	{Key: "", Label: "Traduzioni", Tab: "system"},
 }
 
 // uiSettingCapability ties an option to the engine capability it configures

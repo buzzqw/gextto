@@ -349,8 +349,8 @@ func (i *I18nDb) mergeDefaultTranslations() (int, error) {
 		catalogs = append(catalogs, parsedCatalog{name: catalog.name, defaults: defaults})
 	}
 	// Older installations may still contain translations for the first aMule
-	// integration (and the old "fallback eD2k" option). They would otherwise
-	// keep obsolete options visible in the translation editor. Only rows that
+	// integration (and the old "fallback eD2k" option), which would otherwise
+	// stay in the database for good. Only rows that
 	// mention aMule and are no longer in the bundled catalogs go: the strings
 	// of the current aMule integration stay.
 	if err := i.removeObsoleteAmuleRows(bundled); err != nil {

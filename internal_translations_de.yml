@@ -1103,7 +1103,6 @@ deu:
   Esplora cartelle remote: Entfernte Ordner durchsuchen
   Esporta: Exportieren
   Esporta .torrent: .torrent exportieren
-  Esporta YAML: YAML exportieren
   Estrai link: Link extrahieren
   Estrai link da un post: Extrahieren Sie Links aus einem Beitrag
   Etichetta passata a qBittorrent per automatizzare spostamenti file.: An qBittorrent übergebenes Etikett zur Automatisierung von Dateiverschiebungen.
@@ -1462,7 +1461,6 @@ deu:
   Importa / Esporta File YAML: YAML-Datei importieren / exportieren
   Importa Selezionate: Ausgewählte importieren
   Importa Tutte le Nuove: Alle neuen importieren
-  Importa YAML: YAML importieren
   Importa config legacy: Legacy-Konfiguration importieren
   Importa dati esistenti: Vorhandene Daten importieren
   Importa le serie selezionate dalla watchlist Trakt in EXTTO: Ausgewählte Serien aus der Trakt-Watchlist in EXTTO importieren
@@ -1741,7 +1739,6 @@ deu:
   Lingua da applicare alle serie selezionate: Sprache, die auf die ausgewählte Serie angewendet werden soll
   Lingua default import: Standard-Importsprache
   Lingua dell'interfaccia: Schnittstellensprache
-  Lingua delle traduzioni: Übersetzungssprache
   Lingua errata: Falsche Sprache
   Lingua interfaccia / UI language: Oberflächensprache / UI language
   Lingua predefinita (es. ita): Standardsprache (z. B. ita)
@@ -3369,7 +3366,6 @@ deu:
   Tracker aggiornati: Aktualisierte Tracker
   Tracker aggiuntivi: Zusätzliche Tracker
   Tracker extra: Zusätzliche Tracker
-  Traduzioni: Übersetzungen
   Traduzioni YAML: YAML-Übersetzungen
   Traduzioni esportate: Exportierte Übersetzungen
   Traduzioni importate: Importierte Übersetzungen
@@ -3972,7 +3968,7 @@ deu:
   "Da dove arrivano le release: feed RSS, motori web, filtri e cartelle osservate.": "Woher Releases kommen: RSS-Feeds, Web-Suchmaschinen, Filter und überwachte Ordner."
   "Dati orfani — fermi da almeno": "Verwaiste Daten — unverändert seit mindestens"
   "Diagnostica": "Diagnose"
-  "Diagnostica e traduzioni": "Diagnose und Übersetzungen"
+  "Diagnostica e aggiornamenti": "Diagnose und Aktualisierungen"
   "Dimensione massima per torrent": "Maximale Größe pro Torrent"
   "Domenica": "Sonntag"
   "Dopo aver cambiato motore salva la scelta e premi «Applica motore»: Gextto verifica il motore e indica se serve un riavvio.": "Nach dem Wechsel des Clients die Auswahl speichern und «Client anwenden» drücken: Gextto prüft ihn und meldet, ob ein Neustart nötig ist."
@@ -4007,7 +4003,7 @@ deu:
   "Lingua TVDB": "TVDB-Sprache"
   "Lingua predefinita": "Standardsprache"
   "Lingue dei metadati": "Metadaten-Sprachen"
-  "Log dettagliati e testi dell'interfaccia.": "Ausführliche Protokolle und Texte der Oberfläche."
+  "Log dettagliati e controllo degli aggiornamenti.": "Ausführliche Protokolle und Prüfung auf Aktualisierungen."
   "Login": "Anmeldung"
   "Login, chiavi API e credenziali dei servizi esterni.": "Anmeldung, API-Schlüssel und Zugangsdaten externer Dienste."
   "Lunedì": "Montag"
@@ -4146,7 +4142,6 @@ deu:
   "Elimina il log delle ricerche degli episodi mancanti più vecchio di N giorni.": "Löscht das Suchprotokoll fehlender Episoden, das älter als N Tage ist."
   "Elimina le righe storiche delle release viste nei feed più vecchie di N giorni.": "Löscht Verlaufszeilen der in Feeds gesehenen Releases, die älter als N Tage sind."
   "Elimina le schede dei torrent in errore più vecchie di N giorni (minimo 1).": "Löscht Karten fehlerhafter Torrents, die älter als N Tage sind (mindestens 1)."
-  "Elimina lingua": "Sprache löschen"
   "Esclusioni future e pulizia dei risultati già archiviati": "Künftige Ausschlüsse und Bereinigung bereits archivierter Ergebnisse"
   "Esegue un programma su determinati eventi.": "Führt bei bestimmten Ereignissen ein Programm aus."
   "Filtra e Cancella": "Filtern und löschen"
@@ -4208,7 +4203,6 @@ deu:
   "Salva rinomina": "Umbenennung speichern"
   "Scarica dall'URL configurato (o usa il file locale) e applica subito il filtro IP al motore attivo": "Lädt von der konfigurierten URL (oder nutzt die lokale Datei) und wendet den IP-Filter sofort auf den aktiven Client an"
   "Scarica in RAM i torrent che rientrano nella soglia; i più grandi vanno su disco.": "Lädt Torrents innerhalb der Schwelle in den RAM; größere gehen auf die Festplatte."
-  "Scarica le traduzioni in YAML": "Übersetzungen als YAML herunterladen"
   "Scarica o aggiorna qBittorrent-nox nella cartella dell'app e imposta le opzioni ottimali (URL locale, utente admin, gestione automatica).": "Lädt oder aktualisiert qBittorrent-nox im Programmordner und setzt die optimalen Optionen (lokale URL, Benutzer admin, automatische Verwaltung)."
   "Scegli il formato predefinito per il nome": "Standard-Namensformat wählen"
   "Scegli il motore dalla tendina «Motore torrent». Il binario gestito è scaricato e aggiornato da Gextto.": "Wählen Sie den Client in der Liste «Torrent-Client». Das verwaltete Programm wird von Gextto geladen und aktualisiert."
@@ -4233,7 +4227,6 @@ deu:
   "Testa motori": "Suchmaschinen testen"
   "Timeout in secondi delle richieste HTTP verso gx-torrent.": "Timeout in Sekunden für HTTP-Anfragen an gx-torrent."
   "Timeout in secondi delle richieste HTTP verso qBittorrent-nox.": "Timeout in Sekunden für HTTP-Anfragen an qBittorrent-nox."
-  "Traduzioni configurate": "Konfigurierte Übersetzungen"
   "URL dell'interfaccia API di gx-torrent (es. http://127.0.0.1:8890).": "URL der gx-torrent-API (z. B. http://127.0.0.1:8890)."
   "URL dell'interfaccia Web di qBittorrent-nox (es. http://127.0.0.1:8080).": "URL der qBittorrent-nox-Weboberfläche (z. B. http://127.0.0.1:8080)."
   "Un URL per riga": "Eine URL pro Zeile"
@@ -4951,7 +4944,6 @@ deu:
   "Eliminare questo film dalla libreria?": "Diesen Film aus der Bibliothek löschen?"
   "Eliminare questo fumetto monitorizzato?": "Diesen überwachten Comic löschen?"
   "Eliminare solo questa voce dall’Archivio?": "Nur diesen Eintrag aus dem Archiv löschen?"
-  "Eliminare tutte le traduzioni di questa lingua?": "Alle Übersetzungen dieser Sprache löschen?"
   "Eliminare tutti gli elementi del cestino?": "Alle Elemente im Papierkorb löschen?"
   "Eliminare tutto lo storico degli scarichi dei fumetti?": "Den gesamten Comic-Download-Verlauf löschen?"
   "Eliminare tutto lo storico dei Weekly Pack?": "Den gesamten Weekly-Pack-Verlauf löschen?"

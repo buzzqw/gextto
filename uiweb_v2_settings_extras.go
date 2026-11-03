@@ -22,7 +22,6 @@ import (
 	"strings"
 
 	"github.com/buzzqw/gextto/internal/logging"
-	"gopkg.in/yaml.v3"
 )
 
 // --- feeds ------------------------------------------------------------------
@@ -643,56 +642,6 @@ func V2SettingsRenameSave(w http.ResponseWriter, r *http.Request, s *AppState) {
 	}
 	_ = saveConfigSetting(s.cfg.DataDir, "rename_template", r.FormValue("template"))
 	v2SettingsRedirect(w, r, "rename")
-}
-
-// --- translations editor ----------------------------------------------------
-
-type v2TranslationRow struct {
-	Key, Value string
-}
-
-type v2I18nView struct {
-	Language  string
-	Languages []string
-	Rows      []v2TranslationRow
-	Status    string
-}
-
-func v2I18nViewFrom(s *AppState, language string) v2I18nView {
-	if language == "" {
-		language, _ = s.i18n.Language()
-	}
-	view := v2I18nView{Language: language, Languages: []string{"it", "en", "de", "fr", "es", "pl"}}
-	if items, err := s.i18n.List(language); err == nil {
-		for _, item := range items {
-			view.Rows = append(view.Rows, v2TranslationRow{Key: item.Key, Value: item.Value})
-		}
-	}
-	return view
-}
-
-// V2SettingsI18nTable returns the translations table for a language.
-func V2SettingsI18nTable(w http.ResponseWriter, r *http.Request, s *AppState) {
-	v2Render(w, http.StatusOK, "v2_i18n_table", v2I18nViewFrom(s, r.FormValue("lang")), s)
-}
-
-// V2SettingsI18nImport imports a YAML dictionary for a language.
-func V2SettingsI18nImport(w http.ResponseWriter, r *http.Request, s *AppState) {
-	language := r.FormValue("lang")
-	values := map[string]string{}
-	if err := yaml.Unmarshal([]byte(r.FormValue("yaml")), &values); err == nil && len(values) > 0 {
-		_ = s.i18n.SetBulk(language, values)
-	}
-	v2SettingsRedirect(w, r, "i18n")
-}
-
-// V2SettingsI18nDelete removes every translation of a language.
-func V2SettingsI18nDelete(w http.ResponseWriter, r *http.Request, s *AppState) {
-	language := r.FormValue("lang")
-	if language != "" {
-		_, _ = s.i18n.DeleteLang(language)
-	}
-	v2SettingsRedirect(w, r, "i18n")
 }
 
 // --- content-filter archive cleanup ----------------------------------------

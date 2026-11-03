@@ -159,22 +159,6 @@ func TestV2OAuthAndTranslationKey(t *testing.T) {
 	if code, body := v2Request(t, server, http.MethodPost, "/oauth/poll", url.Values{"path": {"/api/simkl/auth/poll"}, "code": {"123456"}}); code != http.StatusOK {
 		t.Fatalf("oauth poll -> %d: %s", code, body)
 	}
-	if code, body := v2Request(t, server, http.MethodPost, "/settings/i18n/set", url.Values{"lang": {"en"}, "key": {"Chiave"}, "value": {"Key"}}); code != http.StatusOK || !strings.Contains(body, "v2-i18n-table") {
-		t.Fatalf("i18n set -> %d", code)
-	}
-	if items, err := state.i18n.List("en"); err != nil {
-		t.Fatalf("i18n list: %v", err)
-	} else {
-		found := false
-		for _, item := range items {
-			if item.Key == "Chiave" && item.Value == "Key" {
-				found = true
-			}
-		}
-		if !found {
-			t.Fatal("translation not persisted")
-		}
-	}
 }
 
 func TestTraktIntegrationRoutesRemoved(t *testing.T) {

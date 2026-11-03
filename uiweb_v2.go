@@ -201,9 +201,6 @@ func registerV2Routes(s *AppState, mux *http.ServeMux) {
 	v2Handle(s, mux, "POST /settings/rename-save", V2SettingsRenameSave)
 	v2Handle(s, mux, "GET /settings/ipfilter", V2SettingsIPFilterStatus)
 	v2Handle(s, mux, "POST /settings/ipfilter", V2SettingsIPFilterApply)
-	v2Handle(s, mux, "GET /settings/i18n", V2SettingsI18nTable)
-	v2Handle(s, mux, "POST /settings/i18n/import", V2SettingsI18nImport)
-	v2Handle(s, mux, "POST /settings/i18n/delete", V2SettingsI18nDelete)
 	v2Handle(s, mux, "GET /settings/content-archive", V2SettingsContentArchiveSearch)
 	v2Handle(s, mux, "POST /settings/content-archive/delete", V2SettingsContentArchiveDelete)
 
@@ -312,7 +309,6 @@ func registerV2Routes(s *AppState, mux *http.ServeMux) {
 	v2Handle(s, mux, "POST /downloads/add", V2DownloadsAdd)
 
 	// Traduzioni: modifica per chiave.
-	v2Handle(s, mux, "POST /settings/i18n/set", V2SettingsI18nSet)
 }
 
 // v2LegacyRedirect keeps the old /v2 prefix working: it strips it and redirects
@@ -2599,7 +2595,6 @@ type v2SettingsView struct {
 	CheckboxGroups []v2CheckboxGroup
 	ListEditors    []v2ListEditorView
 	Rename         *v2RenameView
-	I18n           *v2I18nView
 }
 
 // v2SettingsActions is the toolbar of API actions of a tab (Ottimizza, ...).
@@ -2763,10 +2758,6 @@ func v2SettingsViewFrom(s *AppState, tab, highlight, mode string) v2SettingsView
 		}
 		view.Rename = &v2RenameView{Format: selected, Template: page.Rename.Template, Formats: formats, Tokens: page.Rename.Tokens}
 		view.Rename.Preview = v2RenameCompose(view.Rename.Format, view.Rename.Template)
-	}
-	if page.ShowI18n {
-		i18nView := v2I18nViewFrom(s, "")
-		view.I18n = &i18nView
 	}
 	// Read-only insights built from the configured values: the stuck-download
 	// timeline on both of its panels, and the per-tab extras.

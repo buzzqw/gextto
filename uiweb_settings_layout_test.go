@@ -100,7 +100,7 @@ func TestSettingsEveryPreviousOptionIsStillAvailable(t *testing.T) {
 		"rename":      {"Composizione del nome", "Regole tag → cartella"},
 		"notify":      {"Hook eventi", "Invia notifica di test"},
 		"seeding":     {"Regole di seed"},
-		"system":      {"v2-i18n-table", "Esporta YAML", "Importa YAML"},
+		"system":      {`id="v2-setting-debug_enabled"`, `id="v2-setting-update_check"`},
 	} {
 		body := render(tab)
 		for _, marker := range markers {

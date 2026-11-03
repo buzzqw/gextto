@@ -94,7 +94,7 @@ var uiSettingsTabs = []uiSettingsTab{
 	{ID: "maintenance", Label: "Manutenzione automatica", Area: "system", Intro: "Pulizie periodiche dei dati tecnici, analisi MediaInfo e file orfani."},
 	{ID: "notify", Label: "Notifiche", Area: "system", Intro: "Telegram, email, webhook, Discord, Slack, Gotify, ntfy, Pushover, Apprise e programmi da eseguire sugli eventi."},
 	{ID: "access", Label: "Accesso e servizi", Area: "system", Intro: "Login, chiavi API e credenziali dei servizi esterni."},
-	{ID: "system", Label: "Diagnostica e traduzioni", Area: "system", Intro: "Log dettagliati e testi dell'interfaccia."},
+	{ID: "system", Label: "Diagnostica e aggiornamenti", Area: "system", Intro: "Log dettagliati e controllo degli aggiornamenti."},
 }
 
 // uiSettingsTabAliases keeps links and bookmarks to the sections of the
@@ -349,7 +349,7 @@ var uiSettingsIndex = []uiSettingDef{
 	{Key: "tvdb_api_key", Label: "TVDB API key (alternativa a TMDB)", Tab: "access", Group: "Servizi metadati"},
 	{Key: "tvdb_pin", Label: "TVDB PIN abbonato", Tab: "access", Group: "Servizi metadati"},
 
-	// --- Diagnostica e traduzioni -------------------------------------------
+	// --- Diagnostica e aggiornamenti ----------------------------------------
 	{Key: "debug_enabled", Label: "Debug (log dettagliati)", Tab: "system", Group: "Diagnostica"},
 	{Key: "update_check", Label: "Controlla gli aggiornamenti", Tab: "system", Group: "Aggiornamenti"},
 	{Key: "update_check_hours", Label: "Intervallo controllo aggiornamenti", Tab: "system", Group: "Aggiornamenti"},

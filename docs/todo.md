@@ -91,11 +91,6 @@ here.
 Ideas proposed but not decided yet. An accepted proposal moves to the matching area with
 its gate; a rejected one moves to *Not planned*.
 
-- **Remove the translation editor** — the Settings page that edits, imports, exports and
-  deletes single translations (and its `/api/i18n` write routes) is hardly used: the
-  bundled catalogs are the source of truth and an edit made there is lost from version
-  control. The language picker stays. Gate: the operator's decision; then the editor, its
-  routes, the TUI call and the manual section go in one change.
 - **Escalating dead-swarm block** — a release that comes back after its block expires and
   is refused again for an empty swarm would stay away longer the next time (a week, then
   a month) instead of a week every time. It needs a strike count that survives the

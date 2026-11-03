@@ -35,8 +35,8 @@ test("dashboard and configuration areas are usable", async ({ page }) => {
   await expect(page.getByRole("table", { name: "Archivio" })).toBeVisible();
 
   await nav(page, "Configurazione").click();
-  await page.getByRole("link", { name: "Traduzioni" }).click();
-  await expect(page.getByRole("link", { name: "Esporta YAML" })).toBeVisible();
+  await page.getByRole("link", { name: "Diagnostica e aggiornamenti" }).click();
+  await expect(page.locator("#v2-setting-debug_enabled")).toBeVisible();
 
   // The settings page hides the main navigation: the «Menu» button brings it
   // back before moving on.

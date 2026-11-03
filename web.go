@@ -828,26 +828,9 @@ type ScrobbleInput struct {
 	Payload any     `json:"payload"`
 }
 
-// I18nInput is the input of `i18n_set`.
-type I18nInput struct {
-	Lang  string `json:"lang"`
-	Key   string `json:"key"`
-	Value string `json:"value"`
-}
-
 // LanguageInput is the input of `i18n_language`.
 type LanguageInput struct {
 	Lang string `json:"lang"`
-}
-
-// I18nYamlInput is the input of `i18n_import`.
-type I18nYamlInput struct {
-	Yaml string `json:"yaml"`
-}
-
-// I18nQuery is the query of `i18n_list`.
-type I18nQuery struct {
-	Lang *string `json:"lang"`
 }
 
 // ArchiveQuery is the query of `archive_entries`.

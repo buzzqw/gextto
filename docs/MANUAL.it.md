@@ -1103,7 +1103,7 @@ La pagina è divisa in quattro aree: **Cosa cercare** (Generale, Sorgenti,
 eD2k e Kad, Qualità e upgrade), **Come scaricare** (Motore torrent, Velocità e rete, Code e
 prestazioni, Seed e completamento), **Dove salvare** (Libreria e rinomina,
 Archivio e spazio) e **Sistema** (Manutenzione automatica, Notifiche, Accesso e
-servizi, Diagnostica e traduzioni). Le modifiche non salvate sono
+servizi, Diagnostica e aggiornamenti). Le modifiche non salvate sono
 evidenziate con la barra “Salva tutte”. L'elenco completo di ogni voce, tab per
 tab, è nell'[Appendice A](#appendice-a-riferimento--configurazione).
 
@@ -1222,13 +1222,10 @@ tab, è nell'[Appendice A](#appendice-a-riferimento--configurazione).
 - **Percorsi** — root libreria, cestino, cartelle download/temp/RAM disk, regole
    per tag. Il percorso RAM disk selezionato resta configurato, ma la directory
    creata sotto `/dev/shm` va ricreata dopo un riavvio.
- - **Traduzioni** — pannello avanzato per esportare in YAML le traduzioni
-   salvate per italiano o inglese, modificarle e reimportarle. Il formato è una
-   mappa `chiave: valore`, ad esempio `"Testa porte": "Test ports"`.
-   L'importazione aggiorna o aggiunge le chiavi presenti e non cancella quelle
-  assenti dal file. Non cambia la lingua attiva: quella si sceglie dal
-  selettore in alto. La UI traduce le stringhe a runtime e, se manca una
-  traduzione, mostra la sorgente italiana.
+ - **Lingua dell'interfaccia** — si sceglie dal selettore in alto, tra
+   italiano, inglese, tedesco, francese, spagnolo e polacco. I testi arrivano
+   con Gextto e si aggiornano con lui: non c'è più un editor per modificarli
+   a mano. Se manca una traduzione, la UI mostra il testo italiano.
 
 ### Motore torrent (gx-torrent, qBittorrent-nox)
 
@@ -2169,12 +2166,12 @@ La pagina è divisa in quattro aree, ognuna con le sue sezioni: **Cosa cercare**
 (Generale, Sorgenti, Qualità e upgrade), **Come scaricare** (Motore torrent,
 Velocità e rete, Code e prestazioni, Seed e completamento), **Dove salvare**
 (Libreria e rinomina, Archivio e spazio) e **Sistema** (Manutenzione automatica,
-Notifiche, Accesso e servizi, Diagnostica e traduzioni). Su computer le sezioni
+Notifiche, Accesso e servizi, Diagnostica e aggiornamenti). Su computer le sezioni
 sono nella colonna a sinistra, con il numero di impostazioni; su telefono si
 scelgono dalla tendina *Sezione*. L'indirizzo della pagina segue la sezione
 aperta, quindi si può salvare nei preferiti. I link alle vecchie schede
 (*Acquisizione*, *Avanzate*, *Traduzioni*) aprono la sezione che ne ha preso il
-contenuto. Entrando in Configurazione la barra dei menu principale si nasconde; il
+contenuto (*Traduzioni* apre Diagnostica e aggiornamenti). Entrando in Configurazione la barra dei menu principale si nasconde; il
 pulsante **Menu** in alto a sinistra la fa ricomparire sopra il contenuto (Esc
 per richiuderla).
 
@@ -2960,9 +2957,9 @@ casa usa comunque HTTPS (reverse proxy con certificato o VPN), altrimenti la
 password viaggia in chiaro.
 
 
-#### Diagnostica e traduzioni
+#### Diagnostica e aggiornamenti
 
-*Log dettagliati e testi dell'interfaccia.*
+*Log dettagliati e controllo degli aggiornamenti.*
 
 **Diagnostica**
 
@@ -2976,12 +2973,6 @@ password viaggia in chiaro.
 |---|---|
 | Controlla gli aggiornamenti | Scarica periodicamente da GitHub le informazioni sull'ultima build (ogni quante ore lo decide «Intervallo controllo aggiornamenti») e, se ce n'è una nuova, mostra «Aggiornamento disponibile». Non invia dati e non aggiorna da solo: l'aggiornamento parte solo da Manutenzione. |
 | Intervallo controllo aggiornamenti | Ogni quante ore Gextto controlla se è uscita una nuova build (da 1 a 720, default 6). Il controllo scarica solo un piccolo file da GitHub; «Verifica aggiornamenti» in Manutenzione controlla subito. |
-
-**Editor**
-
-| Impostazione | Cosa fa |
-|---|---|
-| Traduzioni | Esporta/importa in YAML le traduzioni delle stringhe per italiano o inglese; l'import aggiorna o aggiunge chiavi senza cancellare le altre. |
 
 ## Appendice B. Riferimento — Integrazioni
 

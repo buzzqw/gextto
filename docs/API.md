@@ -156,15 +156,10 @@ change. `/ui` is not served. For operational checks use
 | POST | `/api/flaresolverr/test` | test FlareSolverr |
 | GET | `/api/gaps` | missing episodes |
 | GET | `/api/health` | health check |
-| GET | `/api/i18n` | UI translations |
-| POST | `/api/i18n` | save a translation |
 | GET | `/api/i18n/active` | active language and catalogue |
 | POST | `/api/i18n/active` | set the active language |
-| GET | `/api/i18n/export/{lang}` | export a catalogue |
-| POST | `/api/i18n/import/{lang}` | import a catalogue |
 | POST | `/api/i18n/language` | set the interface language |
 | GET | `/api/i18n/languages` | available languages |
-| DELETE | `/api/i18n/{lang}` | delete a language |
 | POST | `/api/indexer/test` | test an indexer |
 | POST | `/api/jellyfin/refresh` | refresh the Jellyfin library |
 | POST | `/api/jellyfin/test` | test Jellyfin |

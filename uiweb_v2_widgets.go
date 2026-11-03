@@ -909,22 +909,6 @@ func V2DownloadsAdd(w http.ResponseWriter, r *http.Request, s *AppState) {
 }
 
 // ---------------------------------------------------------------------------
-// Traduzioni: modifica per chiave
-// ---------------------------------------------------------------------------
-
-// V2SettingsI18nSet stores one translation and re-renders the table.
-func V2SettingsI18nSet(w http.ResponseWriter, r *http.Request, s *AppState) {
-	language := strings.TrimSpace(r.FormValue("lang"))
-	key := strings.TrimSpace(r.FormValue("key"))
-	value := r.FormValue("value")
-	if language != "" && key != "" {
-		body, _ := json.Marshal(map[string]string{"lang": language, "key": key, "value": value})
-		v2InternalJSON(s, http.MethodPost, "/api/i18n", nil, body)
-	}
-	v2Render(w, http.StatusOK, "v2_i18n_table", v2I18nViewFrom(s, language), s)
-}
-
-// ---------------------------------------------------------------------------
 // Anteprima rinomina (dettaglio serie)
 // ---------------------------------------------------------------------------
 

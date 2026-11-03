@@ -1186,15 +1186,22 @@ func TestV2SettingsStructuredEditors(t *testing.T) {
 	if code, body := v2Request(t, server, http.MethodGet, "/?view=settings&tab=sources", nil); code != http.StatusOK || !strings.Contains(body, "Filtri per sorgente") || !strings.Contains(body, "Cartelle osservate") {
 		t.Fatalf("source editors -> %d", code)
 	}
-	// The former Avanzate tab is an alias of Diagnostica e traduzioni.
-	if code, body := v2Request(t, server, http.MethodGet, "/?view=settings&tab=advanced", nil); code != http.StatusOK || !strings.Contains(body, "v2-i18n-table") || !strings.Contains(body, `id="v2-setting-debug_enabled"`) {
+	// The former Avanzate tab is an alias of Diagnostica e aggiornamenti.
+	if code, body := v2Request(t, server, http.MethodGet, "/?view=settings&tab=advanced", nil); code != http.StatusOK || !strings.Contains(body, `id="v2-setting-debug_enabled"`) {
 		t.Fatalf("advanced alias -> %d", code)
 	}
 	if code, body := v2Request(t, server, http.MethodGet, "/?view=settings&tab=rename", nil); code != http.StatusOK || !strings.Contains(body, "Composizione del nome") || !strings.Contains(body, "v2-rename-form") {
 		t.Fatalf("rename tab -> %d", code)
 	}
-	if code, body := v2Request(t, server, http.MethodGet, "/?view=settings&tab=i18n", nil); code != http.StatusOK || !strings.Contains(body, "v2-i18n-table") {
+	// The translation editor is gone: its old tab link lands on the system tab,
+	// and its routes no longer exist.
+	if code, body := v2Request(t, server, http.MethodGet, "/?view=settings&tab=i18n", nil); code != http.StatusOK || strings.Contains(body, "v2-i18n-table") || !strings.Contains(body, `id="v2-setting-debug_enabled"`) {
 		t.Fatalf("i18n tab -> %d", code)
+	}
+	for _, path := range []string{"/settings/i18n/set", "/settings/i18n/import", "/settings/i18n/delete"} {
+		if code, _ := v2Request(t, server, http.MethodPost, path, url.Values{"lang": {"en"}}); code != http.StatusNotFound && code != http.StatusMethodNotAllowed {
+			t.Errorf("%s -> %d, want the route gone", path, code)
+		}
 	}
 	// Add-row fragment for a structured editor.
 	if code, body := v2Request(t, server, http.MethodGet, "/settings/editor-row?editor=indexers&index=0&view=settings&tab=advanced", nil); code != http.StatusOK || !strings.Contains(body, "list-row") || !strings.Contains(body, "Testa") {

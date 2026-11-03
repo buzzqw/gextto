@@ -1074,7 +1074,7 @@ The page is split into four areas: **What to look for** (General, Sources,
 eD2k and Kad, Quality and upgrades), **How to download** (Torrent engine, Speed and network,
 Queues and performance, Seeding and completion), **Where to store** (Library and
 renaming, Archive and space) and **System** (Automatic maintenance,
-Notifications, Access and services, Diagnostics and translations). Unsaved changes are
+Notifications, Access and services, Diagnostics and updates). Unsaved changes are
 highlighted with a “Save all” bar. The complete per-tab list of every entry is in
 [Appendix A](#appendix-a-reference--configuration).
 
@@ -1184,13 +1184,10 @@ highlighted with a “Save all” bar. The complete per-tab list of every entry 
 - **Paths** — library root, trash, download/temp/RAM-disk dirs, per-tag rules.
    A selected RAM-disk path remains configured, but a directory created under
    `/dev/shm` must be recreated after a reboot.
- - **Translations** — advanced panel to export saved Italian or English
-   translations as YAML, edit them, and import them again. The format is a
-   `key: value` map, for example `"Testa porte": "Test ports"`.
-   Import updates or adds keys present in the file and does not delete missing
-    keys. It does not change the active language; use the selector at the top.
-    The interface translates strings at runtime and falls back to the Italian
-    source when a translation is missing.
+ - **Interface language** — chosen from the selector at the top, among
+   Italian, English, German, French, Spanish and Polish. The texts ship with
+   Gextto and are updated with it: there is no longer an editor to change them
+   by hand. When a translation is missing, the interface shows the Italian text.
 
 ### Torrent engine (gx-torrent, qBittorrent-nox)
 
@@ -2096,11 +2093,11 @@ for** (General, Sources, Quality and upgrades), **How to download** (Torrent
 engine, Speed and network, Queues and performance, Seeding and completion),
 **Where to store** (Library and renaming, Archive and space) and **System**
 (Automatic maintenance, Notifications, Access and services, Diagnostics and
-translations). On a computer the sections are in the left column, with the
+updates). On a computer the sections are in the left column, with the
 number of settings; on a phone you pick them from the *Section* list. The page
 address follows the open section, so it can be bookmarked. Links to the old
 tabs (*Acquisition*, *Advanced*, *Translations*) open the section that took
-over their content. Entering Configuration hides the main menu bar; the **Menu** button at the top
+over their content (*Translations* opens Diagnostics and updates). Entering Configuration hides the main menu bar; the **Menu** button at the top
 left brings it back over the content (Esc closes it).
 
 When a section gathers several groups of settings (for example **Search cycle**
@@ -2879,9 +2876,9 @@ is logged. If you lock yourself out, start Gextto with the environment variable
 can fix the settings. For access from outside always use HTTPS (reverse proxy
 with a certificate, or a VPN), otherwise the password travels in clear text.
 
-#### Diagnostics and translations
+#### Diagnostics and updates
 
-*Detailed logs and interface texts.*
+*Detailed logs and the update check.*
 
 **Diagnostics**
 
@@ -2895,12 +2892,6 @@ with a certificate, or a VPN), otherwise the password travels in clear text.
 |---|---|
 | Check for updates | Downloads the latest build information from GitHub on a timer (how often is set by «Update check interval») and, when a newer one exists, shows «Update available». It sends no data and never updates on its own: the update only starts from Maintenance. |
 | Update check interval | How many hours apart Gextto checks whether a new build is out (1 to 720, default 6). The check downloads only a small file from GitHub; «Check for updates» in Maintenance checks at once. |
-
-**Editors**
-
-| Setting | What it does |
-|---|---|
-| Translations | Export/import the UI string translations as YAML for Italian or English; import adds or updates keys without deleting the others. |
 
 ## Appendix B. Reference — Integrations
 

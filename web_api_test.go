@@ -477,14 +477,23 @@ func TestSeriesSearchMissingHasNoEpisodeCap(t *testing.T) {
 	}
 }
 
+// TestWebApiI18n: the language routes stay, the translation editor's write
+// routes are gone.
 func TestWebApiI18n(t *testing.T) {
 	state := newTestAppState(t)
 	server := httptest.NewServer(Router(state))
 	t.Cleanup(server.Close)
 
-	status, _, body := webGet(t, server, "/api/i18n?lang=it")
-	if status != http.StatusOK {
-		t.Fatalf("status code = %d, body = %s", status, body)
+	if status, _, body := webGet(t, server, "/api/i18n/active"); status != http.StatusOK {
+		t.Fatalf("active language: status code = %d, body = %s", status, body)
+	}
+	if status, _, body := webGet(t, server, "/api/i18n/languages"); status != http.StatusOK {
+		t.Fatalf("languages: status code = %d, body = %s", status, body)
+	}
+	for _, path := range []string{"/api/i18n?lang=it", "/api/i18n/export/it"} {
+		if status, _, _ := webGet(t, server, path); status == http.StatusOK {
+			t.Errorf("GET %s still answers", path)
+		}
 	}
 }
 
