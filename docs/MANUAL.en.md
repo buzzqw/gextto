@@ -474,8 +474,10 @@ It shows poster, plot, cast, the **best results** found in the sources and the
 **archive matches**, each with **Why not this one?**. Under the plot the
 **Alternative titles (TMDB)** line opens the list of names the film was released
 under abroad: they are the ones Gextto uses to recognise releases and to search
-the archive, and they stay saved with the movie. From the page you can edit the
-movie, download it again or search for it now.
+the archive, and they stay saved with the movie. If the film was added by hand
+and TMDB has not been asked yet, the line says **not read yet**: **Aggiorna
+TMDB** reads them at once, together with the metadata. From the page you can
+edit the movie, download it again or search for it now.
 
 In the editor:
 

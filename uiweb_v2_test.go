@@ -1129,7 +1129,14 @@ func TestV2PanelsPagesRender(t *testing.T) {
 
 func TestV2DetailPagesRender(t *testing.T) {
 	state := newTestAppState(t)
-	if err := SaveLibrary(state.cfg.DataDir, []SeriesConfig{{Name: "Test Show", Seasons: "*", Quality: "1080p", Language: "ita"}}, []MovieConfig{{ID: 7, Name: "Test Movie", Year: "2020", Enabled: true, LanguageRequirements: `[{"language":"ita","required":true}]`, Aliases: []string{"Foreign Title", "Titolo Estero"}}}); err != nil {
+	if err := SaveLibrary(state.cfg.DataDir, []SeriesConfig{{Name: "Test Show", Seasons: "*", Quality: "1080p", Language: "ita"}}, []MovieConfig{
+		{ID: 7, Name: "Test Movie", Year: "2020", Enabled: true, LanguageRequirements: `[{"language":"ita","required":true}]`, Aliases: []string{"Foreign Title", "Titolo Estero"}},
+		// A film added by hand: TMDB was never asked, so the page says so
+		// instead of dropping the row.
+		{ID: 8, Name: "Pending Movie", Year: "2021", Enabled: true},
+		// A film TMDB was asked about and had no other titles for.
+		{ID: 9, Name: "No Aliases Movie", Year: "2022", Enabled: true, Aliases: []string{}},
+	}); err != nil {
 		t.Fatalf("SaveLibrary: %v", err)
 	}
 	server := httptest.NewServer(Router(state))
@@ -1154,6 +1161,16 @@ func TestV2DetailPagesRender(t *testing.T) {
 	}
 	if !strings.Contains(body, "Titoli alternativi (TMDB)") || !strings.Contains(body, "Foreign Title") || !strings.Contains(body, "Titolo Estero") {
 		t.Fatalf("movie detail does not list the alternative titles: %d", code)
+	}
+	// The row exists even when there is nothing to list: a film never asked to
+	// TMDB says how to get them, one TMDB answered for says there are none.
+	code, body = v2Request(t, server, http.MethodGet, "/?view=movies&movie=8", nil)
+	if code != http.StatusOK || !strings.Contains(body, "Titoli alternativi (TMDB)") || !strings.Contains(body, "non ancora letti") {
+		t.Fatalf("movie detail without a TMDB lookup: %d", code)
+	}
+	code, body = v2Request(t, server, http.MethodGet, "/?view=movies&movie=9", nil)
+	if code != http.StatusOK || !strings.Contains(body, "Titoli alternativi (TMDB)") || !strings.Contains(body, "nessuno (TMDB non ne indica)") {
+		t.Fatalf("movie detail with no titles from TMDB: %d", code)
 	}
 	code, body = v2Request(t, server, http.MethodGet, "/?view=movies&movie=7", nil)
 	if code != http.StatusOK || !strings.Contains(body, "Test Movie") {

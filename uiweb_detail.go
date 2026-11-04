@@ -170,6 +170,9 @@ type uiMovieDetail struct {
 	// recognise releases and to search the archive, and the page lists them so
 	// the reader can see with which names the film is followed.
 	Aliases []string
+	// AliasesChecked tells an empty list that was read from TMDB ("none") from
+	// one that was never looked up, so the page can say which it is.
+	AliasesChecked bool
 	// Profiles is the «Profilo di qualità» choice of the page.
 	Profiles    v2TitleProfiles
 	Enabled     bool
@@ -431,6 +434,7 @@ func uiMovieDetailFrom(s *AppState, r *http.Request) (uiMovieDetail, bool) {
 		SubtitleRequired: strings.TrimSpace(movie.SubtitleRequirements) != "",
 		DisableUpgrades:  movie.DisableUpgrades,
 		Aliases:          cleanMovieAliases(movie.Aliases),
+		AliasesChecked:   movie.Aliases != nil,
 		Profiles: v2TitleProfilesFor(s, profileTitleValues{Quality: movie.Quality, Audio: audioPreferenceDisplay(movie.Audio, movie.AudioChannels),
 			Language: movieEffectiveLanguage(movie), Subtitle: movie.Subtitle, Exclude: movie.Exclude, DisableUpgrades: movie.DisableUpgrades}),
 		Enabled: movie.Enabled,

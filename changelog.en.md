@@ -28,8 +28,10 @@ the other hand, apply to both.
   said those titles stay saved with the film, but the page showed them
   nowhere. Under the plot, the **Alternative titles (TMDB)** line opens the
   list of names the film was released under abroad: they are the ones Gextto
-  uses to recognise releases and to search the archive. Nothing to configure:
-  the titles are already there, they come from TMDB.
+  uses to recognise releases and to search the archive. A film added by hand,
+  whose TMDB entry was never read, shows **not read yet**: **Aggiorna TMDB**
+  now reads the id, the metadata and the titles in one go — before, on those
+  films it answered «invalid id» and did nothing. Nothing to configure.
 - **Autotune and speed lines in the log only while something downloads.**
   The Autotune and speed-limit lines appeared even when nothing was
   downloading — with the session idle, with only seeding torrents, or after a

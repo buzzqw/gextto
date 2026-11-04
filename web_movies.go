@@ -683,11 +683,16 @@ func ApplyMovieMetadata(w http.ResponseWriter, r *http.Request, s *AppState) {
 	}
 	source := strings.ToLower(strings.TrimSpace(input.Source))
 	externalID := strings.TrimSpace(input.Id)
-	if externalID == "" || len(externalID) > 64 {
+	if len(externalID) > 64 {
 		jsonError(w, http.StatusBadRequest, "invalid metadata id")
 		return
 	}
 	var details map[string]any
+	// The alternative titles are read together with the details when the
+	// source is TMDB: the page then shows them right after the refresh,
+	// instead of waiting for the next automatic cycle.
+	var aliases []string
+	aliasesRead := false
 	if source == "tmdb" {
 		if cfg.TmdbAPIKey == nil {
 			jsonError(w, http.StatusConflict, "TMDB API key is not configured")
@@ -696,6 +701,26 @@ func ApplyMovieMetadata(w http.ResponseWriter, r *http.Request, s *AppState) {
 		tmdb := NewTmdbClientWithLanguage(cfg.TmdbAPIKey, cfg.TmdbLanguage())
 		ctx, cancel := context.WithTimeout(r.Context(), gh6ExternalSearchTimeout)
 		defer cancel()
+		// A movie added by hand has no TMDB id yet: «Aggiorna TMDB» resolves it
+		// by name and year, as the series refresh does, instead of refusing with
+		// "invalid metadata id" and leaving the film without the alternative
+		// titles the match needs.
+		if externalID == "" {
+			found, err := tmdb.SearchMovie(ctx, current.Name, parseIntPtr(current.Year))
+			if err != nil {
+				if ctx.Err() == context.DeadlineExceeded {
+					jsonError(w, http.StatusGatewayTimeout, "TMDB timed out")
+					return
+				}
+				jsonError(w, http.StatusBadGateway, err.Error())
+				return
+			}
+			if found == nil {
+				jsonError(w, http.StatusNotFound, "movie not found on TMDB")
+				return
+			}
+			externalID = strconv.FormatInt(found.ID, 10)
+		}
 		item, err := tmdb.MovieDetails(ctx, externalID)
 		if err != nil {
 			if ctx.Err() == context.DeadlineExceeded {
@@ -711,6 +736,21 @@ func ApplyMovieMetadata(w http.ResponseWriter, r *http.Request, s *AppState) {
 			"overview":       item.Overview,
 			"poster_path":    item.PosterPath,
 			"release_date":   item.ReleaseDate,
+		}
+		aliasMovie := MovieConfig{
+			Name:          strings.TrimSpace(gh6JsonString(details["title"])),
+			OriginalTitle: gh6JsonString(details["original_title"]),
+			TmdbID:        externalID,
+		}
+		if aliasMovie.Name == "" {
+			aliasMovie.Name = current.Name
+		}
+		if found, aliasErr := movieAliasTitles(ctx, cfg, &aliasMovie, tmdb); aliasErr != nil {
+			// The refresh is an extra: the metadata is saved all the same and
+			// the next cycle retries the titles.
+			logging.Debug("TMDB alternative titles unavailable", "movie", current.Name, "error", aliasErr)
+		} else {
+			aliases, aliasesRead = found, true
 		}
 	} else if source == "tvdb" {
 		tvdb := tvdbClientFor(cfg)
@@ -796,6 +836,11 @@ func ApplyMovieMetadata(w http.ResponseWriter, r *http.Request, s *AppState) {
 	if source == "tmdb" {
 		movie.TmdbID = externalID
 		movie.TvdbID = ""
+		// An empty non-nil list means "TMDB checked, none": the page says so
+		// instead of offering the refresh again.
+		if aliasesRead {
+			movie.Aliases = aliases
+		}
 	} else {
 		movie.TvdbID = externalID
 		movie.TmdbID = ""

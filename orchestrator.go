@@ -2129,9 +2129,30 @@ func refreshMovieAliases(ctx context.Context, cfg *Config) {
 // A movie with none is marked as checked (an empty non-nil list) so it is not
 // queried again on every cycle.
 func refreshMovieAlias(ctx context.Context, cfg *Config, movie *MovieConfig, client *TmdbClient) error {
-	titles, err := client.MovieAlternativeTitles(ctx, movie.TmdbID)
+	aliases, err := movieAliasTitles(ctx, cfg, movie, client)
 	if err != nil {
 		return err
+	}
+	if err := SaveMovieAliases(cfg.DataDir, movie.ID, aliases); err != nil {
+		return err
+	}
+	movie.Aliases = aliases
+	if len(aliases) > 0 {
+		logging.Info(fmt.Sprintf("🏷️ %s: %s added from TMDB",
+			movie.Name, countLabel(int64(len(aliases)), "alternative title", "alternative titles")))
+	}
+	return nil
+}
+
+// movieAliasTitles reads the alternative titles of one film from TMDB and
+// returns them cleaned: the film's own name and its original title are
+// dropped, the order of TMDB is kept, and at most movieAliasLimit entries are
+// returned. Shared by the periodic refresh and by «Aggiorna TMDB» on the
+// movie page, which then shows them at once.
+func movieAliasTitles(ctx context.Context, cfg *Config, movie *MovieConfig, client *TmdbClient) ([]string, error) {
+	titles, err := client.MovieAlternativeTitles(ctx, movie.TmdbID)
+	if err != nil {
+		return nil, err
 	}
 	// Indexers publish the international (English) title far more often than
 	// the localized one, and TMDB's alternative titles do not always contain
@@ -2154,16 +2175,7 @@ func refreshMovieAlias(ctx context.Context, cfg *Config, movie *MovieConfig, cli
 			break
 		}
 	}
-	aliases = cleanMovieAliases(aliases)
-	if err := SaveMovieAliases(cfg.DataDir, movie.ID, aliases); err != nil {
-		return err
-	}
-	movie.Aliases = aliases
-	if len(aliases) > 0 {
-		logging.Info(fmt.Sprintf("🏷️ %s: %s added from TMDB",
-			movie.Name, countLabel(int64(len(aliases)), "alternative title", "alternative titles")))
-	}
-	return nil
+	return cleanMovieAliases(aliases), nil
 }
 
 // Cross-module calls reconciled with the shared ports:

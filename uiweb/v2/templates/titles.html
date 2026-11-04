@@ -153,7 +153,8 @@
     <div class="panel-head"><h3>{{.Name}} {{.Year}}</h3><small class="muted">{{.Quality}} · {{.Language}}</small></div>
     <div class="panel-body">
       {{if .Poster}}<img class="detail-poster" loading="lazy" src="{{.Poster}}" alt="{{.Name}}" />{{end}}{{if .Overview}}<p>{{tr .Overview}}</p>{{end}}
-      {{if .Aliases}}<details class="detail-aliases"><summary><small><span>{{tr "Titoli alternativi (TMDB)"}}</span> ({{len .Aliases}})</small></summary><p class="muted"><small>{{range $index, $alias := .Aliases}}{{if $index}} · {{end}}{{tr $alias}}{{end}}</small></p></details>{{end}}
+      {{if .Aliases}}<details class="detail-aliases"><summary><small><span>{{tr "Titoli alternativi (TMDB)"}}</span> ({{len .Aliases}})</small></summary><p class="muted"><small>{{range $index, $alias := .Aliases}}{{if $index}} · {{end}}{{tr $alias}}{{end}}</small></p></details>
+      {{else}}<p class="muted detail-aliases"><small><span>{{tr "Titoli alternativi (TMDB)"}}</span>: {{if .AliasesChecked}}{{tr "nessuno (TMDB non ne indica)"}}{{else}}{{tr "non ancora letti: premi «Aggiorna TMDB»"}}{{end}}</small></p>{{end}}
       <div class="toolbar detail-links">{{if .TmdbURL}}<a class="btn sm" href="{{.TmdbURL}}" target="_blank" rel="noopener">{{tr "TMDB"}}</a>{{end}}{{if .TvdbURL}}<a class="btn sm" href="{{.TvdbURL}}" target="_blank" rel="noopener">{{tr "TVDB"}}</a>{{end}}{{if .ReleaseDate}}<span class="badge"><span>{{tr "uscita"}}</span> {{tr .ReleaseDate}}</span>{{end}}</div>
       {{if .Cast}}<p class="muted"><small><span>{{tr "Cast:"}}</span> {{range $index, $person := .Cast}}{{if $index}}, {{end}}{{if $person.URL}}<a href="{{$person.URL}}" target="_blank" rel="noopener">{{tr $person.Name}}</a>{{else}}{{tr $person.Name}}{{end}}{{if $person.Character}} ({{$person.Character}}){{end}}{{end}}</small></p>{{end}}
       <form class="form-grid" method="post" action="/section/form" hx-post="/section/form" hx-swap="none">

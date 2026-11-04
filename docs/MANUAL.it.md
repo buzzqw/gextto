@@ -476,8 +476,10 @@ Mostra locandina, trama, cast, i **migliori risultati** trovati nelle sorgenti
 e le **corrispondenze in archivio**, ognuna con **Perché non questa?**. Sotto la
 trama la riga **Titoli alternativi (TMDB)** apre l'elenco dei nomi con cui il
 film è uscito all'estero: sono quelli che Gextto usa per riconoscere le release
-e per cercare in archivio, e restano salvati con il film. Dalla scheda puoi
-modificare il film, riscaricarlo o cercarlo subito.
+e per cercare in archivio, e restano salvati con il film. Se il film è stato
+aggiunto a mano e TMDB non è ancora stato interrogato, la riga dice **non
+ancora letti**: **Aggiorna TMDB** li legge subito, insieme ai metadati. Dalla
+scheda puoi modificare il film, riscaricarlo o cercarlo subito.
 
 Nell'editor:
 
