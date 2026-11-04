@@ -23,6 +23,15 @@ create, the app on the phone — apply **only to the standalone version** and do
 not change Gextto's interface, where those pages do not exist. Engine fixes, on
 the other hand, apply to both.
 
+## 5 November 2026
+- **After an update the interface shows the new version at once.** The browser
+  was told to keep the stylesheets and scripts for a year, under an address
+  that changed only with the build number: an update that touched only the look
+  of a page could leave the old file on the phone or on the computer, and the
+  torrent titles went on appearing cut. The address of those files now changes
+  with their content too, so a reload is enough to see the new version. Nothing
+  to configure: from the next update it takes care of itself.
+
 ## 4 November 2026
 - **On a phone a torrent title is readable in full.** In the Downloads page a
   long name was cut on the first line, with an ellipsis and no way to see the

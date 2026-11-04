@@ -24,6 +24,9 @@ creazione, app sul telefono — valgono **soltanto per la versione standalone** 
 non cambiano l'interfaccia di Gextto, dove quelle pagine non esistono. Le
 correzioni al motore valgono invece per entrambi.
 
+## 5 novembre 2026
+- **Dopo un aggiornamento l'interfaccia mostra subito la versione nuova.** Il browser teneva in cache fogli di stile e script per un anno, con un indirizzo che cambiava solo col numero di build: un aggiornamento che toccava solo l'aspetto di una pagina poteva lasciare sul telefono o sul computer il file vecchio, e i titoli dei torrent continuavano a comparire tagliati. Ora l'indirizzo di quei file cambia anche col loro contenuto, quindi basta ricaricare per vedere la versione nuova. Niente da configurare: dal prossimo aggiornamento si sistema da solo.
+
 ## 4 novembre 2026
 - **Sul telefono i titoli dei torrent si leggono per intero.** Nella pagina Scarico un nome lungo veniva tagliato alla prima riga, con i puntini e senza modo di vedere il resto — sul telefono il suggerimento del mouse non c'è. Ora il nome va a capo e si legge tutto; il resto della scheda (avanzamento, velocità, azioni) resta al suo posto. Niente da configurare.
 - **Un film si riconosce anche con il titolo con cui è uscito all'estero.** I titoli alternativi che TMDB conosce per un film — quello internazionale e quelli usati in altri paesi — ora servono a riconoscere le release: un film che segui con il titolo italiano arriva anche quando la release porta un altro nome, sia nel ciclo automatico sia con **Cerca subito**, e le corrispondenze in archivio della scheda vengono cercate con tutti quei titoli. I titoli di lavorazione sono esclusi, perché a volte appartengono a un altro film. I titoli alternativi si leggono una volta sola e restano salvati con il film. Niente da configurare.

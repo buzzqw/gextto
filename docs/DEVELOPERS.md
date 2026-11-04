@@ -122,6 +122,14 @@ rendered by the `/partial/chrome` HTMX fragment, while the Downloads table uses 
 5-second polling fragment. Keep both polling fragments free of a recursive
 `load` trigger when they replace themselves with `outerHTML`.
 
+The shell references every stylesheet and script with `?v=<build>-<fingerprint>`
+and the assets are served `immutable` for a year. The fingerprint is a hash of
+the embedded files (`web_static.go`), so a change to a CSS or JS file changes
+the URL even when `build_number` does not: without it a release that touched
+only a stylesheet would keep the same URL and every browser that had already
+cached it would go on showing the old file. To ship a UI change, no cache
+clearing is needed on the client — just rebuild and restart.
+
 When adding an API endpoint:
 
 1. implement the handler with the shared `AppState` signature;

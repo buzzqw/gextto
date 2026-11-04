@@ -7,6 +7,8 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/buzzqw/gextto/internal/constants"
 )
 
 // TestStaticAssetsAreCacheable checks the validator and the cache lifetime of
@@ -60,7 +62,10 @@ func TestStaticAssetsAreCacheable(t *testing.T) {
 }
 
 // TestShellVersionsStaticAssets checks the page points the browser at the
-// versioned asset URLs, which is what makes the long cache safe.
+// versioned asset URLs, which is what makes the long cache safe. The version
+// carries a fingerprint of the embedded files and not just the build number:
+// a release that changes only a stylesheet keeps the same build, and a browser
+// that cached a ?v= URL immutably would otherwise keep the old CSS for a year.
 func TestShellVersionsStaticAssets(t *testing.T) {
 	state := newTestAppState(t)
 	server := httptest.NewServer(Router(state))
@@ -77,6 +82,31 @@ func TestShellVersionsStaticAssets(t *testing.T) {
 		if !strings.Contains(body, want) {
 			t.Fatalf("page is missing the versioned asset %q", want)
 		}
+	}
+	version := constants.Build + "-" + v2StaticFingerprint()
+	if !strings.Contains(body, `/static/gextto-ui.css?v=`+version) {
+		t.Fatalf("the stylesheet URL does not carry the asset version %q", version)
+	}
+	if len(v2StaticFingerprint()) != 8 {
+		t.Fatalf("asset fingerprint = %q, want 8 hex characters", v2StaticFingerprint())
+	}
+}
+
+// TestStaticFingerprintFollowsTheContent checks the token the shell puts in the
+// asset URLs changes when a file changes, and only then: that is what defeats
+// a stylesheet cached immutably under an unchanged build number.
+func TestStaticFingerprintFollowsTheContent(t *testing.T) {
+	base := map[string]string{"v2.css": `"aaaa"`, "v2-core.js": `"bbbb"`}
+	same := map[string]string{"v2-core.js": `"bbbb"`, "v2.css": `"aaaa"`}
+	if staticFingerprintOf(base) != staticFingerprintOf(same) {
+		t.Fatal("the fingerprint must not depend on the map order")
+	}
+	changed := map[string]string{"v2.css": `"cccc"`, "v2-core.js": `"bbbb"`}
+	if staticFingerprintOf(base) == staticFingerprintOf(changed) {
+		t.Fatal("a changed asset must change the fingerprint")
+	}
+	if got := len(staticFingerprintOf(nil)); got != 8 {
+		t.Fatalf("empty set fingerprint is %d characters, want 8", got)
 	}
 }
 
