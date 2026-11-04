@@ -115,6 +115,12 @@ its gate; a rejected one moves to *Not planned*.
   address, so one host with rotating privacy addresses can hold several slots; libtorrent
   issue 8934 asks for one host per /64, but a /64 is a subnet and may hold many real users.
   Gate: a measurement of the slots one host takes on a public IPv6 swarm.
+- **One library entry per film and series** — adding a film or a series already in the
+  library under a different spelling (a colon present or absent, one hyphen more, a double
+  space) creates a second row, because the "already present" check compares the name
+  character by character while the release match ignores punctuation. The key must
+  ignore punctuation and whitespace, as `movieTitleMatches` and `NormalizeSeriesName`
+  already do. Gate: an installation with a duplicated row (here there is one).
 
 ## Not planned
 
