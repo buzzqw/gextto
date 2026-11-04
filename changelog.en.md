@@ -24,6 +24,11 @@ not change Gextto's interface, where those pages do not exist. Engine fixes, on
 the other hand, apply to both.
 
 ## 4 November 2026
+- **On a phone a torrent title is readable in full.** In the Downloads page a
+  long name was cut on the first line, with an ellipsis and no way to see the
+  rest — on a phone the mouse tooltip that shows it does not exist. The name now
+  wraps and reads in full; the rest of the card (progress, speeds, actions)
+  stays where it was. Nothing to configure.
 - **A film is also recognised by the title it was released under abroad.** The alternative titles TMDB knows for a movie — the international one and those used in other countries — now help recognise releases: a film you follow under its Italian title arrives even when the release carries another name, both in the automatic cycle and with **Search now**, and the page's archive matches are searched with all those titles. Working titles are excluded, because they sometimes belong to another film. Alternative titles are read once and kept with the film. Nothing to configure.
 - **Archive entries holding only the `.torrent` link are no longer lost.** Some sources show an entry with no magnet, only the link to the `.torrent` file, and a title that often says neither resolution nor language: the entry was dropped. Gextto now opens the link once, reads the torrent's real name and stores it in place of the incomplete title, so the entry can be judged and is no longer opened in later cycles (at most twenty links per cycle). Nothing to configure.
 - **A film is no longer mistaken for another because of a number.** The alternative titles Gextto receives from TMDB can be written in other scripts — Korean, Hebrew, Cyrillic — and only the trailing number of those titles survived: that alone was enough to recognise a release, so a 2026 film with a «3» in its name was taken for another film of the same year and its release was downloaded in place of the right one. Every word of an alternative title now counts in its own script, and a title made of digits alone cannot identify a film. A download already started by mistake has to be removed from Downloads: the film goes back in the queue by itself at the next cycle. Nothing to configure.

@@ -33,6 +33,37 @@ test.describe("telefono", () => {
     });
   }
 
+  test("Scarico mostra per intero il titolo di un torrent lungo", async ({ page }) => {
+    await page.goto("/?view=downloads");
+    await page.waitForTimeout(400);
+    // Same markup as the session card: a long name must wrap instead of ending
+    // in an ellipsis, because a phone has no tooltip to reveal the rest.
+    const geometry = await page.evaluate(() => {
+      const table = document.createElement("table");
+      table.className = "data-table torrent-table";
+      table.innerHTML = `<tbody><tr><td class="torrent-card-cell"><div class="torrent-card">
+        <div class="torrent-head"><span class="torrent-select"></span>
+        <span class="torrent-name"><button class="torrent-open" type="button"><span class="truncate"></span></button></span>
+        <span class="torrent-state badge">In scarico</span></div>
+        <div class="torrent-body"></div><div class="row-actions"></div></div></td></tr></tbody>`;
+      const span = table.querySelector(".torrent-open .truncate") as HTMLElement;
+      span.textContent = "Serie.02x05.Il.Titolo.Della.Puntata.ITA.DLMux.x264-GRUPPO.mkv";
+      document.querySelector(".content")?.append(table);
+      const style = getComputedStyle(span);
+      const lineHeight = parseFloat(style.lineHeight) || parseFloat(style.fontSize) * 1.2;
+      const result = {
+        whiteSpace: style.whiteSpace,
+        clipped: span.scrollWidth - span.clientWidth,
+        lines: Math.round(span.getBoundingClientRect().height / lineHeight),
+      };
+      table.remove();
+      return result;
+    });
+    expect(geometry.whiteSpace).toBe("normal");
+    expect(geometry.clipped).toBeLessThanOrEqual(1);
+    expect(geometry.lines).toBeGreaterThan(1);
+  });
+
   test("Serie TV e Film mostrano l'elenco prima del modulo di aggiunta", async ({ page }) => {
     for (const [view, panel] of [
       ["series", "#v2-table-panel-series-t0"],

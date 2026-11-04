@@ -300,8 +300,10 @@ sorgenti, un problema diventa difficile da riprodurre.
 
 Sotto i 900 pixel di larghezza l'interfaccia si compatta: menu scorrevole in
 alto, metriche su due colonne, finestre a tutta larghezza, tabelle che scorrono
-dentro il loro riquadro. Ogni azione resta raggiungibile col tocco; **Tema** è
-nel menu *Altro*. Le pagine viaggiano compresse e gli script restano nella cache
+dentro il loro riquadro. Nella pagina **Scarico** il nome di un torrent va a capo
+per intero invece di fermarsi ai primi caratteri: sul telefono non c'è il
+suggerimento del mouse che mostra il resto. Ogni azione resta raggiungibile col
+tocco; **Tema** è nel menu *Altro*. Le pagine viaggiano compresse e gli script restano nella cache
 del browser, quindi l'interfaccia resta usabile anche su una rete lenta.
 
 ### Accessibilità

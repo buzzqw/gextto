@@ -701,6 +701,18 @@ label.field > span, .field > span, .field-label { color: var(--muted); font-size
   .torrent-card { grid-template-columns: minmax(0, 1fr); }
   .torrent-card > .row-actions { grid-column: 1; grid-row: auto; justify-content: flex-start; padding-top: 6px; border-top: 1px solid var(--line-soft); }
   .torrent-card > .row-actions .btn { min-height: 40px; }
+  /* On a phone the name has the whole card but no tooltip to reveal what the
+     ellipsis hides: it wraps over as many lines as it needs, so a long scene
+     name stays readable instead of being cut to its first words. */
+  .torrent-name > .truncate,
+  .torrent-open .truncate { overflow: visible; white-space: normal; text-overflow: clip; overflow-wrap: anywhere; }
+}
+/* A touch screen has no pointer to hover with: the tooltip that carries the
+   rest of the name never opens, in landscape and on a tablet no less than on a
+   phone in portrait. */
+@media (hover: none) {
+  .torrent-name > .truncate,
+  .torrent-open .truncate { overflow: visible; white-space: normal; text-overflow: clip; overflow-wrap: anywhere; }
 }
 .origin { display: block; margin-top: 2px; font-size: 0.72rem; }
 .th-sort { cursor: pointer; user-select: none; }

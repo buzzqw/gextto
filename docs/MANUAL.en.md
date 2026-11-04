@@ -300,7 +300,9 @@ problem becomes hard to reproduce.
 
 Below 900 pixels wide the interface becomes compact: scrollable menu at the
 top, metrics in two columns, full-width dialogs, tables that scroll inside
-their panel. Every action stays reachable by touch; **Theme** is in the *More*
+their panel. On the **Downloads** page a torrent name wraps in full instead of
+stopping after the first characters: on a phone there is no mouse tooltip to
+show the rest. Every action stays reachable by touch; **Theme** is in the *More*
 menu. Pages travel compressed and scripts stay in the browser cache, so the
 interface stays usable on a slow network too.
 
