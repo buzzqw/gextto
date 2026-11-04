@@ -166,6 +166,10 @@ type uiMovieDetail struct {
 	Exclude          string
 	SubtitleRequired bool
 	DisableUpgrades  bool
+	// Aliases are the other titles TMDB knows for the film: they are used to
+	// recognise releases and to search the archive, and the page lists them so
+	// the reader can see with which names the film is followed.
+	Aliases []string
 	// Profiles is the «Profilo di qualità» choice of the page.
 	Profiles    v2TitleProfiles
 	Enabled     bool
@@ -426,6 +430,7 @@ func uiMovieDetailFrom(s *AppState, r *http.Request) (uiMovieDetail, bool) {
 		Exclude:          movie.Exclude,
 		SubtitleRequired: strings.TrimSpace(movie.SubtitleRequirements) != "",
 		DisableUpgrades:  movie.DisableUpgrades,
+		Aliases:          cleanMovieAliases(movie.Aliases),
 		Profiles: v2TitleProfilesFor(s, profileTitleValues{Quality: movie.Quality, Audio: audioPreferenceDisplay(movie.Audio, movie.AudioChannels),
 			Language: movieEffectiveLanguage(movie), Subtitle: movie.Subtitle, Exclude: movie.Exclude, DisableUpgrades: movie.DisableUpgrades}),
 		Enabled: movie.Enabled,

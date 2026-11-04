@@ -24,6 +24,12 @@ not change Gextto's interface, where those pages do not exist. Engine fixes, on
 the other hand, apply to both.
 
 ## 5 November 2026
+- **A movie's alternative titles are visible on its page.** Yesterday's entry
+  said those titles stay saved with the film, but the page showed them
+  nowhere. Under the plot, the **Alternative titles (TMDB)** line opens the
+  list of names the film was released under abroad: they are the ones Gextto
+  uses to recognise releases and to search the archive. Nothing to configure:
+  the titles are already there, they come from TMDB.
 - **Autotune and speed lines in the log only while something downloads.**
   The Autotune and speed-limit lines appeared even when nothing was
   downloading — with the session idle, with only seeding torrents, or after a

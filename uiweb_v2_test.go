@@ -1129,7 +1129,7 @@ func TestV2PanelsPagesRender(t *testing.T) {
 
 func TestV2DetailPagesRender(t *testing.T) {
 	state := newTestAppState(t)
-	if err := SaveLibrary(state.cfg.DataDir, []SeriesConfig{{Name: "Test Show", Seasons: "*", Quality: "1080p", Language: "ita"}}, []MovieConfig{{ID: 7, Name: "Test Movie", Year: "2020", Enabled: true, LanguageRequirements: `[{"language":"ita","required":true}]`}}); err != nil {
+	if err := SaveLibrary(state.cfg.DataDir, []SeriesConfig{{Name: "Test Show", Seasons: "*", Quality: "1080p", Language: "ita"}}, []MovieConfig{{ID: 7, Name: "Test Movie", Year: "2020", Enabled: true, LanguageRequirements: `[{"language":"ita","required":true}]`, Aliases: []string{"Foreign Title", "Titolo Estero"}}}); err != nil {
 		t.Fatalf("SaveLibrary: %v", err)
 	}
 	server := httptest.NewServer(Router(state))
@@ -1145,10 +1145,15 @@ func TestV2DetailPagesRender(t *testing.T) {
 	}
 	code, body = v2Request(t, server, http.MethodGet, "/?view=movies&movie=7", nil)
 	// One «Lingua» (the legacy requirement decides, so it is what the form
-	// shows) and no separate requirement fields.
+	// shows) and no separate requirement fields. The alternative titles TMDB
+	// supplied are listed on the page, so the reader sees the names the film is
+	// followed under.
 	if code != http.StatusOK || !strings.Contains(body, "Test Movie") || !strings.Contains(body, `name="quality_profile_id"`) || !strings.Contains(body, `<input type="hidden" name="language" value="ita" />`) ||
 		strings.Contains(body, `name="language_requirements"`) || strings.Contains(body, `name="subtitle_requirements"`) || !strings.Contains(body, `name="subtitle_required"`) {
 		t.Fatalf("movie detail -> %d", code)
+	}
+	if !strings.Contains(body, "Titoli alternativi (TMDB)") || !strings.Contains(body, "Foreign Title") || !strings.Contains(body, "Titolo Estero") {
+		t.Fatalf("movie detail does not list the alternative titles: %d", code)
 	}
 	code, body = v2Request(t, server, http.MethodGet, "/?view=movies&movie=7", nil)
 	if code != http.StatusOK || !strings.Contains(body, "Test Movie") {

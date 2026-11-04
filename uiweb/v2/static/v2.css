@@ -1082,6 +1082,13 @@ form.htmx-request:not([hx-trigger*="every"]) button[type="submit"],
 }
 .series-overview { max-width: none; line-height: 1.5; }
 .series-genres, .detail-links { margin-top: 8px; }
+/* The alternative titles read from TMDB: a short summary under the plot that
+   opens the list in the scripts the titles come in (one with no spaces must
+   not overflow). It is closed by default: up to forty names would push the
+   editor far down, and the label above already says they are there. */
+.detail-aliases { margin: 6px 0 0; line-height: 1.5; }
+.detail-aliases summary { cursor: pointer; }
+.detail-aliases p { margin: 4px 0 0; overflow-wrap: anywhere; }
 .table-panel-footer { margin-top: 14px; border-top: 1px solid rgba(127,127,127,.18); padding-top: 12px; }
 .table-footer-form { align-items: end; }
 .comic-link-group { margin-top: 12px; }
