@@ -455,8 +455,10 @@ and — if you enable it — asks eD2k once per season when torrents find nothin
    for the cycle.
 4. Before queuing a borderline release, open **Why not this one?**.
 
-A movie is recognised by title and year. Do not add the same movie twice under
-different spellings: fix the metadata of the one you already have.
+A movie is recognised by title and year, and punctuation does not count: a
+release matches the same way with or without a colon. When one entry's name is
+contained in another's, the more specific one wins. Do not add the same movie
+twice under different spellings: fix the metadata of the one you already have.
 
 ### The movie page
 

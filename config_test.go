@@ -410,6 +410,86 @@ func TestManualMovieMatchingToleratesPunctuationAndMissingYear(t *testing.T) {
 	}
 }
 
+// A release can satisfy more than one monitored movie when one name is part of
+// another: the most specific title wins, so a short name cannot take the
+// releases of a longer film. Punctuation must not change the match.
+func TestMovieMatchingKeepsTheMostSpecificTitle(t *testing.T) {
+	year2026 := int64(2026)
+	for _, order := range [][]MovieConfig{
+		{
+			{Name: "Example Saga", Year: "2026", Enabled: true},
+			{Name: "Example Saga Chapter Two", Year: "2026", Enabled: true},
+			{Name: "Example Deep", Year: "2026", Enabled: true},
+			{Name: "Example Deep  Side Story", Year: "2026", Enabled: true},
+		},
+		{
+			{Name: "Example Deep  Side Story", Year: "2026", Enabled: true},
+			{Name: "Example Deep", Year: "2026", Enabled: true},
+			{Name: "Example Saga Chapter Two", Year: "2026", Enabled: true},
+			{Name: "Example Saga", Year: "2026", Enabled: true},
+		},
+	} {
+		cfg := DefaultConfig()
+		cfg.Movies = order
+		for _, title := range []string{
+			"Example Saga Chapter Two 2026 1080p",
+			"Example Saga Chapter Two (2026)",
+		} {
+			if got := cfg.FindMovieMatchManual(title, &year2026); got == nil || got.Name != "Example Saga Chapter Two" {
+				t.Errorf("release %q matched %v, want the longer title", title, got)
+			}
+		}
+		for _, title := range []string{
+			"Example Deep Side Story 2026 1080p",
+			"Example Deep  Side Story (2026)",
+		} {
+			if got := cfg.FindMovieMatchManual(title, &year2026); got == nil || got.Name != "Example Deep  Side Story" {
+				t.Errorf("release %q matched %v, want the longer title", title, got)
+			}
+		}
+		// The short film still matches its own release.
+		if got := cfg.FindMovieMatchManual("Example Saga 2026 1080p", &year2026); got == nil || got.Name != "Example Saga" {
+			t.Errorf("short film matched %v, want Example Saga", got)
+		}
+		if got := cfg.FindMovieMatch("Example Deep 2026 1080p", &year2026); got == nil || got.Name != "Example Deep" {
+			t.Errorf("short film matched %v, want Example Deep", got)
+		}
+	}
+}
+
+// The colon is a separator, not part of the title: a release with it matches a
+// configured movie without it and the other way round.
+func TestMovieMatchingIgnoresTheColon(t *testing.T) {
+	year2025 := int64(2025)
+	for _, configured := range []string{"Example Film: The Return", "Example Film The Return"} {
+		cfg := DefaultConfig()
+		cfg.Movies = []MovieConfig{{Name: configured, Year: "2025", Enabled: true}}
+		for _, title := range []string{
+			"Example Film The Return 2025 1080p WEB-DL",
+			"Example Film: The Return (2025) 1080p WEB-DL",
+		} {
+			if got := cfg.FindMovieMatch(title, &year2025); got == nil || got.Name != configured {
+				t.Errorf("configured %q, release %q matched %v", configured, title, got)
+			}
+		}
+	}
+}
+
+// The series match receives the name the parser extracted, which keeps the
+// colon: it must resolve against a configured name with or without it.
+func TestSeriesMatchingIgnoresTheColon(t *testing.T) {
+	season := int64(3)
+	for _, configured := range []string{"Example Show: The Next Chapter", "Example Show The Next Chapter"} {
+		cfg := DefaultConfig()
+		cfg.Series = []SeriesConfig{{Name: configured, Seasons: "1+", Enabled: true}}
+		for _, name := range []string{"Example Show The Next Chapter", "Example Show: The Next Chapter"} {
+			if got := cfg.FindSeriesMatch(name, &season); got == nil || got.Name != configured {
+				t.Errorf("configured %q, release name %q matched %v", configured, name, got)
+			}
+		}
+	}
+}
+
 func TestProwlarrTMDBIDMatchesMovieWithoutReleaseYear(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.Movies = []MovieConfig{{Name: "Example Film", Year: "2026", TmdbID: "987", Enabled: true}}

@@ -1622,37 +1622,46 @@ func titleTokens(value string) []string {
 	})
 }
 
+// movieTitleSpecificity is the number of words of the monitored name (or
+// original title) that appear in the release title, or 0 when the movie does
+// not match. When a release satisfies more than one monitored movie because one
+// name is part of another ("Example Saga" and "Example Saga Chapter Two"), the caller
+// keeps the highest value: a short name must not take the releases of a longer
+// film.
+func movieTitleSpecificity(movie *MovieConfig, title string) int {
+	tokens := titleTokens(title)
+	if len(tokens) == 0 {
+		return 0
+	}
+	present := make(map[string]struct{}, len(tokens))
+	for _, token := range tokens {
+		present[token] = struct{}{}
+	}
+	specificity := 0
+	for _, value := range []string{movie.Name, movie.OriginalTitle} {
+		words := titleTokens(value)
+		if len(words) == 0 {
+			continue
+		}
+		all := true
+		for _, word := range words {
+			if _, ok := present[word]; !ok {
+				all = false
+				break
+			}
+		}
+		if all && len(words) > specificity {
+			specificity = len(words)
+		}
+	}
+	return specificity
+}
+
 // movieTitleMatches is true when the title contains every word of the monitored
 // name (or original title), ignoring punctuation. Handles single-word names,
 // hyphens, "&", "vs." and double spaces.
 func movieTitleMatches(movie *MovieConfig, title string) bool {
-	tokens := titleTokens(title)
-	if len(tokens) == 0 {
-		return false
-	}
-	matchesName := func(value string) bool {
-		words := titleTokens(value)
-		if len(words) == 0 {
-			return false
-		}
-		for _, word := range words {
-			found := false
-			for _, token := range tokens {
-				if token == word {
-					found = true
-					break
-				}
-			}
-			if !found {
-				return false
-			}
-		}
-		return true
-	}
-	if matchesName(movie.Name) {
-		return true
-	}
-	return strings.TrimSpace(movie.OriginalTitle) != "" && matchesName(movie.OriginalTitle)
+	return movieTitleSpecificity(movie, title) > 0
 }
 
 // movieExcluded reports whether any exclusion word appears in the title.
@@ -1677,20 +1686,33 @@ func (c *Config) FindMovieMatch(title string, year *int64) *MovieConfig {
 	if !PassesMovieFilter(title) {
 		return nil
 	}
+	var matched *MovieConfig
+	best := 0
 	for index := range c.Movies {
 		movie := &c.Movies[index]
-		if !movie.Enabled || !movieTitleMatches(movie, title) || movieExcluded(movie, title) {
+		if !movie.Enabled || movieExcluded(movie, title) {
 			continue
 		}
-		configuredYear, err := strconv.ParseInt(movie.Year, 10, 64)
+		specificity := movieTitleSpecificity(movie, title)
+		if specificity == 0 {
+			continue
+		}
+		configuredYear, err := strconv.ParseInt(strings.TrimSpace(movie.Year), 10, 64)
 		if err != nil {
 			continue
 		}
-		if year != nil && absInt64(*year-configuredYear) <= 1 {
-			return movie
+		if year == nil || absInt64(*year-configuredYear) > 1 {
+			continue
+		}
+		// A release can satisfy more than one monitored movie when one name is
+		// part of another: keep the most specific one, so a short name cannot
+		// take the releases of a longer film.
+		if specificity > best {
+			best = specificity
+			matched = movie
 		}
 	}
-	return nil
+	return matched
 }
 
 // FindMovieMatchManual is like `FindMovieMatch`, but for manual queueing
@@ -1702,23 +1724,29 @@ func (c *Config) FindMovieMatchManual(title string, year *int64) *MovieConfig {
 	if !PassesMovieFilter(title) {
 		return nil
 	}
+	var matched *MovieConfig
+	best := 0
 	for index := range c.Movies {
 		movie := &c.Movies[index]
-		if !movie.Enabled || !movieTitleMatches(movie, title) || movieExcluded(movie, title) {
+		if !movie.Enabled || movieExcluded(movie, title) {
 			continue
 		}
-		configuredYear, err := strconv.ParseInt(movie.Year, 10, 64)
-		if err != nil {
-			return movie
+		specificity := movieTitleSpecificity(movie, title)
+		if specificity == 0 {
+			continue
 		}
-		if year == nil {
-			return movie
+		configuredYear, err := strconv.ParseInt(strings.TrimSpace(movie.Year), 10, 64)
+		if err == nil && year != nil && absInt64(*year-configuredYear) > 1 {
+			continue
 		}
-		if absInt64(*year-configuredYear) <= 1 {
-			return movie
+		// Same rule as FindMovieMatch: the most specific name wins, so a short
+		// name cannot take the releases of a longer film.
+		if specificity > best {
+			best = specificity
+			matched = movie
 		}
 	}
-	return nil
+	return matched
 }
 
 // FindMovieMatchForRelease resolves a monitored movie from a collected

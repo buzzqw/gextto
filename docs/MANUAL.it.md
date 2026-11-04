@@ -456,8 +456,11 @@ serve solo a non aspettare il ciclo successivo.
    aspettare il ciclo.
 4. Prima di accodare una release al limite, apri **Perché non questa?**.
 
-Il film è riconosciuto da titolo e anno. Non aggiungere due volte lo stesso
-film scritto in modi diversi: correggi i metadati di quello che hai già.
+Il film è riconosciuto da titolo e anno, e la punteggiatura non conta: una
+release si riconosce allo stesso modo con o senza i due punti. Se il nome di una
+voce è contenuto in quello di un'altra, vince la più specifica. Non aggiungere
+due volte lo stesso film scritto in modi diversi: correggi i metadati di quello
+che hai già.
 
 ### La scheda del film
 
