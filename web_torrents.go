@@ -1386,7 +1386,31 @@ func formUrlencode(value string) string {
 	return builder.String()
 }
 
-// ExportMagnet handles GET /api/torrents/{hash}/magnet.
+// torrentMagnet builds the magnet link from the info hash, the display name and
+// the trackers the engine knows about. It is the fallback when the release that
+// brought the torrent was never recorded — a .torrent added by hand, a torrent
+// restored after a migration — so the magnet is available for every torrent in
+// the session, not only for the ones that arrived from a magnet or a feed.
+func torrentMagnet(s *AppState, hash, name string) string {
+	magnet := "magnet:?xt=urn:btih:" + hash
+	if name != "" {
+		magnet += "&dn=" + formUrlencode(name)
+	}
+	if s.hasTorrentEngine() {
+		if trackers, ok, err := s.activeEngine().Trackers(hash); err == nil && ok {
+			for _, tracker := range trackers {
+				if !strings.Contains(magnet, tracker.URL) {
+					magnet += "&tr=" + formUrlencode(tracker.URL)
+				}
+			}
+		}
+	}
+	return magnet
+}
+
+// ExportMagnet handles GET /api/torrents/{hash}/magnet. With ?raw=1 it answers
+// with the magnet itself as text/plain, for the "open the magnet" link of the
+// detail page; without it the usual JSON body is returned.
 func ExportMagnet(w http.ResponseWriter, r *http.Request, s *AppState) {
 	hash := pathParam(r, "hash")
 	magnet := ""
@@ -1399,16 +1423,17 @@ func ExportMagnet(w http.ResponseWriter, r *http.Request, s *AppState) {
 		}
 	}
 	if magnet == "" {
-		magnet = "magnet:?xt=urn:btih:" + hash
-	}
-	if s.hasTorrentEngine() {
-		if trackers, ok, err := s.activeEngine().Trackers(hash); err == nil && ok {
-			for _, tracker := range trackers {
-				if !strings.Contains(magnet, tracker.URL) {
-					magnet += "&tr=" + formUrlencode(tracker.URL)
-				}
-			}
+		name := ""
+		if torrent, ok := v2FindTorrent(s, hash); ok {
+			name = torrent.Name
 		}
+		magnet = torrentMagnet(s, hash, name)
+	}
+	if r.URL.Query().Get("raw") == "1" {
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.Header().Set("Cache-Control", "no-store")
+		_, _ = w.Write([]byte(magnet))
+		return
 	}
 	jsonResponse(w, map[string]any{"ok": true, "magnet": magnet})
 }

@@ -322,7 +322,7 @@ state.
 | GET | `/api/torrents/{hash}/files` | files of a torrent |
 | POST | `/api/torrents/{hash}/files/priority` | set the file priorities |
 | POST | `/api/torrents/{hash}/limits` | per-torrent speed limits |
-| GET | `/api/torrents/{hash}/magnet` | export the magnet link |
+| GET | `/api/torrents/{hash}/magnet` | export the magnet link as JSON; with raw=1 it answers with the magnet itself as text/plain |
 | POST | `/api/torrents/{hash}/mark_failed` | mark a torrent as failed |
 | POST | `/api/torrents/{hash}/no_rename` | exclude a torrent from renaming |
 | POST | `/api/torrents/{hash}/pause` | pause a torrent |

@@ -1260,11 +1260,60 @@ func TestV2TorrentDetailExposesEditableTabs(t *testing.T) {
 // with a torrent that carries the engine statistics.
 type fakeDetailEngine struct {
 	nullEngine
-	torrent models.TorrentView
+	torrent  models.TorrentView
+	trackers []models.TrackerView
 }
 
 func (f fakeDetailEngine) Name() string               { return BackendGxTorrent }
 func (f fakeDetailEngine) List() []models.TorrentView { return []models.TorrentView{f.torrent} }
+func (f fakeDetailEngine) Trackers(string) ([]models.TrackerView, bool, error) {
+	if len(f.trackers) == 0 {
+		return nil, false, nil
+	}
+	return f.trackers, true, nil
+}
+
+// TestV2DetailMagnetIsRebuiltWhenTheReleaseHasNone: a torrent added from a
+// .torrent file, or restored after a migration, carries no stored release, so
+// the detail used to leave the magnet empty and the "copy magnet" button
+// disabled. The magnet is now rebuilt from the hash, the name and the engine's
+// trackers, and the same link is served as plain text for the "Magnet" anchor.
+func TestV2DetailMagnetIsRebuiltWhenTheReleaseHasNone(t *testing.T) {
+	state := newTestAppState(t)
+	state.setActiveEngine(fakeDetailEngine{
+		torrent:  models.TorrentView{Hash: "abc123", Name: "Avventure & co", State: "seeding", Progress: 100},
+		trackers: []models.TrackerView{{URL: "udp://tracker.example:80/announce"}},
+	})
+
+	view := v2DetailViewFrom(state, "abc123", "general")
+	want := "magnet:?xt=urn:btih:abc123&dn=Avventure+%26+co&tr=udp%3A%2F%2Ftracker.example%3A80%2Fannounce"
+	if view.Magnet != want {
+		t.Fatalf("magnet = %q, want %q", view.Magnet, want)
+	}
+
+	rec := httptest.NewRecorder()
+	v2Render(rec, http.StatusOK, "v2_detail_panel", view, state)
+	body := rec.Body.String()
+	if !strings.Contains(body, `data-v2-copy="magnet:?xt=urn:btih:abc123`) {
+		t.Fatalf("the detail panel does not offer the rebuilt magnet:\n%s", body)
+	}
+	if strings.Contains(body, `data-v2-copy=""`) {
+		t.Fatal("the copy magnet button is still empty")
+	}
+	if !strings.Contains(body, `/api/torrents/abc123/magnet?raw=1`) {
+		t.Fatal("the magnet anchor does not ask for the plain text form")
+	}
+
+	api := httptest.NewServer(Router(state))
+	defer api.Close()
+	code, header, raw := webGet(t, api, "/api/torrents/abc123/magnet?raw=1")
+	if code != http.StatusOK || string(raw) != want {
+		t.Fatalf("raw magnet -> %d %q", code, raw)
+	}
+	if got := header.Get("Content-Type"); !strings.HasPrefix(got, "text/plain") {
+		t.Fatalf("raw magnet content type = %q", got)
+	}
+}
 
 // TestV2TorrentDetailGeneralShowsEngineStats: the general tab surfaces the
 // transfer/piece statistics gx-core reports, not only the orchestration fields.
@@ -2002,6 +2051,10 @@ func (f fakePieceEngine) List() []models.TorrentView {
 	return []models.TorrentView{{Hash: f.hash, Name: "movie", State: "downloading", TotalSize: 700}}
 }
 
+func (fakePieceEngine) Trackers(string) ([]models.TrackerView, bool, error) {
+	return nil, false, nil
+}
+
 func (fakePieceEngine) PieceRuns(string) ([]TorrentPieceRun, bool, error) {
 	return []TorrentPieceRun{
 		{Begin: 0, End: 3, State: "have"},
@@ -2048,6 +2101,10 @@ type fakeBEP38Engine struct {
 }
 
 func (fakeBEP38Engine) Name() string { return BackendGxTorrent }
+
+func (fakeBEP38Engine) Trackers(string) ([]models.TrackerView, bool, error) {
+	return nil, false, nil
+}
 
 func (f fakeBEP38Engine) List() []models.TorrentView {
 	return []models.TorrentView{{

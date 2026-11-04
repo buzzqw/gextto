@@ -25,6 +25,10 @@ type fakeLimitsEngine struct {
 
 func (fakeLimitsEngine) Name() string { return BackendGxTorrent }
 
+func (fakeLimitsEngine) Trackers(string) ([]models.TrackerView, bool, error) {
+	return nil, false, nil
+}
+
 func (f *fakeLimitsEngine) List() []models.TorrentView {
 	return []models.TorrentView{{Hash: f.hash, Name: "movie", State: "downloading"}}
 }

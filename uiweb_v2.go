@@ -1959,6 +1959,12 @@ func v2DetailViewFrom(s *AppState, hash, tab string) v2DetailView {
 	if meta, err := s.db.TorrentMeta(hash); err == nil && meta != nil {
 		magnet = meta.Release.Magnet
 	}
+	// A torrent added from a .torrent file, or restored after a migration, has
+	// no stored release: the magnet is rebuilt from the hash, the name and the
+	// trackers so the detail page can always offer it.
+	if !strings.HasPrefix(magnet, "magnet:") {
+		magnet = torrentMagnet(s, hash, torrent.Name)
+	}
 	noRename, _ := s.db.TorrentNoRename(hash)
 	view.NoRename = noRename
 	view.Magnet = magnet

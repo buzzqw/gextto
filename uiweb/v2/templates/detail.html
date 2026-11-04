@@ -26,7 +26,7 @@
       <button class="btn sm" type="button" hx-get="/downloads/remove?hash={{.Hash}}" hx-target="#v2-modal" hx-swap="innerHTML" {{trTitle "Rimuove il torrent dalla sessione e chiede se eliminare anche i file."}}>{{tr "Rimuovi"}}</button>
     </div>
     <div class="toolbar detail-links">
-      <a class="btn sm" href="/api/torrents/{{.Hash}}/magnet" target="_blank" rel="noopener" {{trTitle "Apri il link magnet del torrent"}}>{{tr "Magnet"}}</a>
+      <a class="btn sm" href="/api/torrents/{{.Hash}}/magnet?raw=1" target="_blank" rel="noopener" {{trTitle "Apri il link magnet del torrent"}}>{{tr "Magnet"}}</a>
       <button class="btn sm" type="button" data-v2-copy="{{.Magnet}}"{{if not .Magnet}} disabled{{end}} {{trTitle "Copia il link magnet negli appunti"}}>{{tr "Copia magnet"}}</button>
       <a class="btn sm" href="/api/torrents/{{.Hash}}/export.torrent" download {{trTitle "Scarica il file .torrent"}}>{{tr "Esporta .torrent"}}</a>
     </div>
