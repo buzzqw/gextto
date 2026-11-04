@@ -851,3 +851,54 @@ func TestArchiveCompactionWorksWithTheReadHandle(t *testing.T) {
 		t.Fatalf("Count after vacuum = %d, want %d", count, len(releases))
 	}
 }
+
+func TestResolveListingReplacesATorrentURLWithTheMagnetAndRealTitle(t *testing.T) {
+	archive := openTestArchive(t)
+	link := "http://indexer.test/dl/42.torrent"
+	release := models.Release{
+		Title:        "Film (2026)",
+		Source:       "indexarr:ilDraGoNeRo",
+		TorrentURL:   &link,
+		Kind:         "movie",
+		DiscoveredAt: time.Now().UTC(),
+		Seeders:      -1,
+		Peers:        -1,
+	}
+	if err := archive.SaveBatch([]models.Release{release}, &Config{}); err != nil {
+		t.Fatalf("SaveBatch: %v", err)
+	}
+	hash := strings.Repeat("a", 40)
+	magnet := "magnet:?xt=urn:btih:" + hash + "&dn=Film.2026.ITA.1080p.WEB-DL"
+	changed, err := archive.ResolveListing(link, magnet, "Film.2026.ITA.1080p.WEB-DL", 1100)
+	if err != nil {
+		t.Fatalf("ResolveListing: %v", err)
+	}
+	if !changed {
+		t.Fatal("ResolveListing changed nothing")
+	}
+	entries, err := archive.SearchEntries("Film")
+	if err != nil {
+		t.Fatalf("SearchEntries: %v", err)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("entries = %d, want 1", len(entries))
+	}
+	entry := entries[0]
+	if entry.Title != "Film.2026.ITA.1080p.WEB-DL" {
+		t.Fatalf("title = %q", entry.Title)
+	}
+	if entry.Magnet != magnet {
+		t.Fatalf("magnet = %q", entry.Magnet)
+	}
+	if entry.InfoHash != hash {
+		t.Fatalf("infohash = %q", entry.InfoHash)
+	}
+	// The row is no longer link-only: a second resolution is a no-op.
+	changed, err = archive.ResolveListing(link, magnet, "Film.2026.ITA.1080p.WEB-DL", 1100)
+	if err != nil {
+		t.Fatalf("second ResolveListing: %v", err)
+	}
+	if changed {
+		t.Fatal("the second ResolveListing changed the row again")
+	}
+}

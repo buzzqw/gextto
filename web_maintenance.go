@@ -1166,6 +1166,13 @@ func BatchArchiveDownload(w http.ResponseWriter, r *http.Request, s *AppState) {
 			status, _ = AddRelease(s, release)
 		} else {
 			release := ParseRelease(item.Title, item.Magnet, source)
+			if release == nil && IsTorrentURL(item.Magnet) {
+				// An archive listing may hold only a `.torrent` link: keep it as
+				// the source so the add path resolves the magnet and registers
+				// the release against its film instead of adding it untracked.
+				link := strings.TrimSpace(item.Magnet)
+				release = ParseReleaseSource(item.Title, "", &link, source, time.Now().UTC())
+			}
 			if release == nil {
 				status, _ = addRawMagnet(s, item.Magnet)
 			} else {

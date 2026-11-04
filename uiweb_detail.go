@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/buzzqw/gextto/internal/logging"
 	"github.com/buzzqw/gextto/internal/models"
@@ -462,15 +463,33 @@ func uiMovieDetailFrom(s *AppState, r *http.Request) (uiMovieDetail, bool) {
 			}
 		}
 	}
-	query := movie.Name
-	if len(movie.Year) > 0 {
-		query = movie.Name + " " + movie.Year
-	}
-	if entries, err := s.archive.Search(query); err == nil {
-		for index, entry := range entries {
-			if index >= 20 {
+	// The film may be monitored under one title and released under another
+	// (the international one). Search every known title, not only the
+	// configured name.
+	queryBases := append([]string{movie.Name}, movie.Aliases...)
+	seenEntries := map[string]struct{}{}
+	for _, base := range queryBases {
+		base = strings.TrimSpace(base)
+		if base == "" {
+			continue
+		}
+		query := base
+		if len(movie.Year) > 0 {
+			query = base + " " + movie.Year
+		}
+		entries, err := s.archive.Search(query)
+		if err != nil {
+			continue
+		}
+		for _, entry := range entries {
+			if len(detail.Matches) >= 20 {
 				break
 			}
+			key := entry[0] + "\x00" + entry[1]
+			if _, exists := seenEntries[key]; exists {
+				continue
+			}
+			seenEntries[key] = struct{}{}
 			body, _ := json.Marshal(map[string]any{
 				"items": []map[string]string{{
 					"title":  entry[0],
@@ -479,11 +498,18 @@ func uiMovieDetailFrom(s *AppState, r *http.Request) (uiMovieDetail, bool) {
 				}},
 			})
 			release := ParseRelease(entry[0], entry[1], "archive:"+entry[2])
+			if release == nil && IsTorrentURL(entry[1]) {
+				link := strings.TrimSpace(entry[1])
+				release = ParseReleaseSource(entry[0], "", &link, "archive:"+entry[2], time.Now().UTC())
+			}
 			if release == nil {
 				release = &models.Release{Title: entry[0], Magnet: entry[1], Source: entry[2]}
 			}
 			explainBody, _ := json.Marshal(release)
 			detail.Matches = append(detail.Matches, uiMovieMatch{Title: entry[0], Magnet: uiMagnetURL(entry[1]), Source: entry[2], Body: string(body), ExplainBody: string(explainBody)})
+		}
+		if len(detail.Matches) >= 20 {
+			break
 		}
 	}
 	return detail, true

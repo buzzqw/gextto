@@ -81,20 +81,25 @@ type MovieConfig struct {
 	Year string `json:"year"`
 	// Identificativi e dati editoriali: non intervengono nei filtri o nello
 	// stato del download e possono essere aggiornati dalla scelta TMDB/TVDB.
-	TmdbID               string `json:"tmdb_id"`
-	TvdbID               string `json:"tvdb_id"`
-	OriginalTitle        string `json:"original_title"`
-	Overview             string `json:"overview"`
-	PosterPath           string `json:"poster_path"`
-	Quality              string `json:"quality"`
-	Audio                string `json:"audio"`
-	AudioChannels        string `json:"audio_channels"`
-	Language             string `json:"language"`
-	Enabled              bool   `json:"enabled"`
-	Subtitle             string `json:"subtitle"`
-	Exclude              string `json:"exclude"`
-	LanguageRequirements string `json:"language_requirements"`
-	SubtitleRequirements string `json:"subtitle_requirements"`
+	TmdbID        string `json:"tmdb_id"`
+	TvdbID        string `json:"tvdb_id"`
+	OriginalTitle string `json:"original_title"`
+	// Aliases are the other titles the film is released under (the
+	// international title, for example). They are filled from TMDB and used by
+	// the title match and the archive search, so a film monitored under its
+	// Italian title is also found when the release uses another one.
+	Aliases              []string `json:"aliases"`
+	Overview             string   `json:"overview"`
+	PosterPath           string   `json:"poster_path"`
+	Quality              string   `json:"quality"`
+	Audio                string   `json:"audio"`
+	AudioChannels        string   `json:"audio_channels"`
+	Language             string   `json:"language"`
+	Enabled              bool     `json:"enabled"`
+	Subtitle             string   `json:"subtitle"`
+	Exclude              string   `json:"exclude"`
+	LanguageRequirements string   `json:"language_requirements"`
+	SubtitleRequirements string   `json:"subtitle_requirements"`
 	// When true, a better release never replaces an archived file for this
 	// movie. Default false (= upgrades allowed).
 	DisableUpgrades bool `json:"disable_upgrades"`
@@ -1616,10 +1621,26 @@ func containsInt64(values []int64, needle int64) bool {
 // titleTokens returns the lowercase alphanumeric tokens of a title:
 // "Spider-Man" -> ["spider","man"], "Minions & Monsters" ->
 // ["minions","monsters"]. Punctuation must not prevent the match.
+// Letters and digits are recognised in every script, not only in Latin: an
+// alternative title such as "듄 3" must keep its own word instead of collapsing
+// to the bare number, which used to match any release carrying that number.
 func titleTokens(value string) []string {
 	return strings.FieldsFunc(strings.ToLower(value), func(r rune) bool {
-		return !(r >= 'a' && r <= 'z') && !(r >= '0' && r <= '9')
+		return !unicode.IsLetter(r) && !unicode.IsDigit(r)
 	})
+}
+
+// hasWordToken reports whether at least one token carries a letter, so a title
+// made of digits alone ("3") can never identify a film.
+func hasWordToken(words []string) bool {
+	for _, word := range words {
+		for _, r := range word {
+			if unicode.IsLetter(r) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // movieTitleSpecificity is the number of words of the monitored name (or
@@ -1638,9 +1659,12 @@ func movieTitleSpecificity(movie *MovieConfig, title string) int {
 		present[token] = struct{}{}
 	}
 	specificity := 0
-	for _, value := range []string{movie.Name, movie.OriginalTitle} {
+	titles := make([]string, 0, 2+len(movie.Aliases))
+	titles = append(titles, movie.Name, movie.OriginalTitle)
+	titles = append(titles, movie.Aliases...)
+	for _, value := range titles {
 		words := titleTokens(value)
-		if len(words) == 0 {
+		if len(words) == 0 || !hasWordToken(words) {
 			continue
 		}
 		all := true
@@ -2644,6 +2668,11 @@ func (c *Config) loadConfigDB() error {
 	} else {
 		selectColumns = append(selectColumns, "''")
 	}
+	if columns["aliases"] {
+		selectColumns = append(selectColumns, "COALESCE(aliases,'')")
+	} else {
+		selectColumns = append(selectColumns, "''")
+	}
 	movieQuery := "SELECT " + strings.Join(selectColumns, ",") + " FROM movies_config"
 	// Keep the library presentation stable when a newly added movie is saved:
 	// SQLite otherwise returns rows in insertion/rowid order.
@@ -2666,12 +2695,12 @@ func (c *Config) loadConfigDB() error {
 				tmdbID, tvdbID, originalTitle, overview     string
 				posterPath                                  string
 				disable                                     int64
-				audio, audioChannels                        string
+				audio, audioChannels, aliases               string
 			)
 			if err := rows.Scan(
 				&id, &name, &year, &quality, &language, &enabled, &subtitle, &exclude,
 				&languageReq, &subtitleReq, &tmdbID, &tvdbID, &originalTitle, &overview,
-				&posterPath, &disable, &audio, &audioChannels,
+				&posterPath, &disable, &audio, &audioChannels, &aliases,
 			); err != nil {
 				continue
 			}
@@ -2689,6 +2718,7 @@ func (c *Config) loadConfigDB() error {
 				TmdbID:               tmdbID,
 				TvdbID:               tvdbID,
 				OriginalTitle:        originalTitle,
+				Aliases:              decodeMovieAliases(aliases),
 				Overview:             overview,
 				PosterPath:           posterPath,
 				Audio:                normalizeAudioRequirement(audioPreferenceDisplay(audio, audioChannels)),
@@ -3165,6 +3195,76 @@ func DeleteSetting(dataDir string, key string) (bool, error) {
 	return removed > 0, nil
 }
 
+// decodeMovieAliases reads the JSON list stored in movies_config.aliases. A
+// plain comma-separated value written by an older configuration is accepted
+// too. An empty value means "not looked up yet" and returns nil, so the TMDB
+// refresh can tell it apart from a checked movie with no alternative titles.
+func decodeMovieAliases(raw string) []string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil
+	}
+	var aliases []string
+	if err := json.Unmarshal([]byte(raw), &aliases); err != nil {
+		aliases = strings.Split(raw, ",")
+	}
+	return cleanMovieAliases(aliases)
+}
+
+// encodeMovieAliases serialises the alternative titles for movies_config. A
+// nil list is stored as an empty value (still to look up); an empty but
+// non-nil list is stored as `[]` (looked up, none found).
+func encodeMovieAliases(aliases []string) string {
+	if aliases == nil {
+		return ""
+	}
+	data, err := json.Marshal(cleanMovieAliases(aliases))
+	if err != nil {
+		return ""
+	}
+	return string(data)
+}
+
+// cleanMovieAliases trims, drops empties and removes duplicates without
+// changing the order (TMDB puts the most relevant title first).
+func cleanMovieAliases(aliases []string) []string {
+	cleaned := make([]string, 0, len(aliases))
+	seen := make(map[string]struct{}, len(aliases))
+	for _, alias := range aliases {
+		alias = strings.TrimSpace(alias)
+		if alias == "" {
+			continue
+		}
+		key := strings.ToLower(alias)
+		if _, exists := seen[key]; exists {
+			continue
+		}
+		seen[key] = struct{}{}
+		cleaned = append(cleaned, alias)
+	}
+	return cleaned
+}
+
+// SaveMovieAliases stores the alternative titles of one movie without
+// rewriting the whole library: the TMDB refresh runs in the background and
+// must not overwrite a form the user is editing.
+func SaveMovieAliases(dataDir string, id int64, aliases []string) error {
+	if id <= 0 {
+		return nil
+	}
+	conn, err := OpenConfigDB(filepath.Join(dataDir, "gextto_config.db"))
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+	_ = sqlExec(conn, "ALTER TABLE movies_config ADD COLUMN aliases TEXT NOT NULL DEFAULT ''")
+	if _, err := conn.Exec("UPDATE movies_config SET aliases=?1 WHERE id=?2", encodeMovieAliases(aliases), id); err != nil {
+		return err
+	}
+	TouchConfigGeneration()
+	return nil
+}
+
 // SaveLibrary persists the monitored series and movies into `gextto_config.db`.
 func SaveLibrary(dataDir string, series []SeriesConfig, movies []MovieConfig) error {
 	if series == nil {
@@ -3178,7 +3278,7 @@ func SaveLibrary(dataDir string, series []SeriesConfig, movies []MovieConfig) er
 		return err
 	}
 	defer conn.Close()
-	if err := sqlExec(conn, "CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL); CREATE TABLE IF NOT EXISTS movies_config (id INTEGER PRIMARY KEY, name TEXT NOT NULL, year TEXT DEFAULT '', quality TEXT DEFAULT '', language TEXT DEFAULT '', enabled INTEGER DEFAULT 1, subtitle TEXT DEFAULT '', exclude TEXT DEFAULT '', language_requirements TEXT DEFAULT '', subtitle_requirements TEXT DEFAULT '', tmdb_id TEXT DEFAULT '', tvdb_id TEXT DEFAULT '', original_title TEXT DEFAULT '', overview TEXT DEFAULT '', poster_path TEXT DEFAULT '', disable_upgrades INTEGER NOT NULL DEFAULT 0, audio TEXT NOT NULL DEFAULT '', audio_channels TEXT NOT NULL DEFAULT '');"); err != nil {
+	if err := sqlExec(conn, "CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL); CREATE TABLE IF NOT EXISTS movies_config (id INTEGER PRIMARY KEY, name TEXT NOT NULL, year TEXT DEFAULT '', quality TEXT DEFAULT '', language TEXT DEFAULT '', enabled INTEGER DEFAULT 1, subtitle TEXT DEFAULT '', exclude TEXT DEFAULT '', language_requirements TEXT DEFAULT '', subtitle_requirements TEXT DEFAULT '', tmdb_id TEXT DEFAULT '', tvdb_id TEXT DEFAULT '', original_title TEXT DEFAULT '', overview TEXT DEFAULT '', poster_path TEXT DEFAULT '', disable_upgrades INTEGER NOT NULL DEFAULT 0, audio TEXT NOT NULL DEFAULT '', audio_channels TEXT NOT NULL DEFAULT '', aliases TEXT NOT NULL DEFAULT '');"); err != nil {
 		return err
 	}
 	_ = sqlExec(conn, "ALTER TABLE movies_config ADD COLUMN exclude TEXT NOT NULL DEFAULT ''")
@@ -3193,6 +3293,7 @@ func SaveLibrary(dataDir string, series []SeriesConfig, movies []MovieConfig) er
 		"disable_upgrades INTEGER NOT NULL DEFAULT 0",
 		"audio TEXT NOT NULL DEFAULT ''",
 		"audio_channels TEXT NOT NULL DEFAULT ''",
+		"aliases TEXT NOT NULL DEFAULT ''",
 	} {
 		_ = sqlExec(conn, fmt.Sprintf("ALTER TABLE movies_config ADD COLUMN %s", column))
 	}
@@ -3234,22 +3335,23 @@ func SaveLibrary(dataDir string, series []SeriesConfig, movies []MovieConfig) er
 		if id <= 0 {
 			id = existingIDs[[2]string{strings.ToLower(movie.Name), movie.Year}]
 		}
+		aliases := encodeMovieAliases(movie.Aliases)
 		if id > 0 {
 			if _, err := tx.Exec(
-				"INSERT INTO movies_config(id,name,year,quality,language,enabled,subtitle,exclude,language_requirements,subtitle_requirements,tmdb_id,tvdb_id,original_title,overview,poster_path,disable_upgrades,audio,audio_channels) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18)",
+				"INSERT INTO movies_config(id,name,year,quality,language,enabled,subtitle,exclude,language_requirements,subtitle_requirements,tmdb_id,tvdb_id,original_title,overview,poster_path,disable_upgrades,audio,audio_channels,aliases) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19)",
 				id, movie.Name, movie.Year, movie.Quality, movie.Language, boolToInt(movie.Enabled), movie.Subtitle, movie.Exclude,
 				movie.LanguageRequirements, movie.SubtitleRequirements, movie.TmdbID, movie.TvdbID, movie.OriginalTitle,
-				movie.Overview, movie.PosterPath, boolToInt(movie.DisableUpgrades), movie.Audio, movie.AudioChannels,
+				movie.Overview, movie.PosterPath, boolToInt(movie.DisableUpgrades), movie.Audio, movie.AudioChannels, aliases,
 			); err != nil {
 				tx.Rollback()
 				return err
 			}
 		} else {
 			if _, err := tx.Exec(
-				"INSERT INTO movies_config(name,year,quality,language,enabled,subtitle,exclude,language_requirements,subtitle_requirements,tmdb_id,tvdb_id,original_title,overview,poster_path,disable_upgrades,audio,audio_channels) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17)",
+				"INSERT INTO movies_config(name,year,quality,language,enabled,subtitle,exclude,language_requirements,subtitle_requirements,tmdb_id,tvdb_id,original_title,overview,poster_path,disable_upgrades,audio,audio_channels,aliases) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18)",
 				movie.Name, movie.Year, movie.Quality, movie.Language, boolToInt(movie.Enabled), movie.Subtitle, movie.Exclude,
 				movie.LanguageRequirements, movie.SubtitleRequirements, movie.TmdbID, movie.TvdbID, movie.OriginalTitle,
-				movie.Overview, movie.PosterPath, boolToInt(movie.DisableUpgrades), movie.Audio, movie.AudioChannels,
+				movie.Overview, movie.PosterPath, boolToInt(movie.DisableUpgrades), movie.Audio, movie.AudioChannels, aliases,
 			); err != nil {
 				tx.Rollback()
 				return err

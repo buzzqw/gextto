@@ -259,12 +259,20 @@ func RunCycleDomain(
 		}
 	}
 	if !domainIs(domain, "series") {
+		// Alternative titles let a film monitored under one name match the
+		// releases published under another (the international one, usually).
+		refreshMovieAliases(ctx, cfg)
 		for i := range cfg.Movies {
 			movie := &cfg.Movies[i]
 			if movie.Enabled {
 				addArchiveQuery(movie.Name)
 				if orig := strings.TrimSpace(movie.OriginalTitle); orig != "" && !strings.EqualFold(orig, movie.Name) {
 					addArchiveQuery(orig)
+				}
+				for _, alias := range movie.Aliases {
+					if strings.TrimSpace(alias) != "" && !strings.EqualFold(alias, movie.Name) && !strings.EqualFold(alias, movie.OriginalTitle) {
+						addArchiveQuery(alias)
+					}
 				}
 			}
 		}
@@ -279,6 +287,12 @@ func RunCycleDomain(
 		}
 	}
 	archiveMatches := 0
+	// Opening a `.torrent` link costs a request to the indexer (indexarr
+	// counts it as a download). Only the listings whose title cannot be judged
+	// need it, and a per-cycle budget keeps a large archive from turning one
+	// cycle into hundreds of requests. A resolved row is stored, so it is paid
+	// for once.
+	archiveLinkBudget := 20
 	for _, query := range archiveQueries {
 		items, err := archive.SearchEntries(query)
 		if err != nil {
@@ -286,6 +300,13 @@ func RunCycleDomain(
 		}
 		for _, item := range items {
 			release := ParseRelease(item.Title, item.Magnet, "archive:"+item.Source)
+			if release == nil && IsTorrentURL(item.Magnet) {
+				// A `.torrent`-only listing (for example indexarr's redirect
+				// links) has no magnet yet: keep the link so the candidate pass
+				// can open it, instead of dropping the entry as unparsable.
+				link := strings.TrimSpace(item.Magnet)
+				release = ParseReleaseSource(item.Title, "", &link, "archive:"+item.Source, time.Now().UTC())
+			}
 			if release == nil {
 				continue
 			}
@@ -295,11 +316,49 @@ func RunCycleDomain(
 			if release.InfoHash == "" && item.InfoHash != "" {
 				release.InfoHash = canonicalInfoHash(item.InfoHash)
 			}
-			hash := releaseInfoHash(release)
-			if hash == "" {
-				continue
+			// A listing whose title does not declare its quality cannot be
+			// judged (indexarr often shows just the film title). Open the link
+			// once, learn the real torrent name and infohash, and rewrite the
+			// archived row so the next cycles do not download it again.
+			if release.Magnet == "" && release.TorrentURL != nil &&
+				cfg.ReleaseIsMonitored(release) && !releaseAllowedByTitleProfile(cfg, release) &&
+				archiveLinkBudget > 0 {
+				archiveLinkBudget--
+				link := strings.TrimSpace(*release.TorrentURL)
+				magnet, _, realTitle, resolveErr := resolveTorrentSource(ctx, engine, cfg, link, &release.Title)
+				if resolveErr != nil {
+					logging.Debug("archive: could not open the .torrent link to read its name",
+						"title", item.Title, "source", item.Source, "error", resolveErr)
+				} else if realTitle != "" && !strings.EqualFold(realTitle, item.Title) {
+					if parsed := ParseRelease(realTitle, magnet, release.Source); parsed != nil {
+						parsed.DiscoveredAt = release.DiscoveredAt
+						release = parsed
+						if !cfg.DryRun {
+							if _, saveErr := archive.ResolveListing(link, magnet, realTitle, cfg.QualityScore(&release.Quality)); saveErr != nil {
+								logging.Warn("archive: could not store the resolved torrent",
+									"title", item.Title, "error", saveErr)
+							}
+						}
+					}
+				}
 			}
-			if _, blocked := blocklistedHashes[hash]; blocked {
+			hash := releaseInfoHash(release)
+			provisional := false
+			if hash == "" {
+				if release.Magnet == "" && release.TorrentURL != nil && IsTorrentURL(*release.TorrentURL) {
+					// The candidate pass resolves the link when it decides to
+					// download it; until then the link itself is the identity.
+					hash = provisionalLinkHash(*release.TorrentURL)
+					provisional = true
+				} else {
+					continue
+				}
+			}
+			if provisional {
+				if releaseBlockedByTitle(release, blocklistedTitles) {
+					continue
+				}
+			} else if _, blocked := blocklistedHashes[hash]; blocked {
 				continue
 			}
 			if _, seen := archiveHashes[hash]; seen {
@@ -1665,39 +1724,78 @@ func humanDuration(seconds int64) string {
 // Returns the equivalent magnet and the file path used when adding it (empty
 // when a magnet was resolved directly).
 func resolveTorrentURL(ctx context.Context, engine *Engine, cfg *Config, rawURL string, fallbackTitle *string) (string, string, error) {
+	magnet, path, _, err := resolveTorrentSource(ctx, engine, cfg, rawURL, fallbackTitle)
+	return magnet, path, err
+}
+
+// resolveTorrentSource is resolveTorrentURL plus the real torrent name when the
+// source reveals it: the magnet's `dn`, or the `name` field of the `.torrent`.
+// Callers that judge quality need it because a listing title can omit the
+// resolution and the language the torrent itself declares.
+func resolveTorrentSource(ctx context.Context, engine *Engine, cfg *Config, rawURL string, fallbackTitle *string) (magnet, path, name string, err error) {
 	rawURL = strings.TrimSpace(rawURL)
 	if strings.HasPrefix(rawURL, "magnet:?") {
+		name = magnetDisplayName(rawURL)
 		if magnet, ok := utils.SanitizeMagnet(rawURL, fallbackTitle); ok {
-			return magnet, "", nil
+			return magnet, "", name, nil
 		}
-		return rawURL, "", nil
+		return rawURL, "", name, nil
 	}
 	if !IsTorrentURL(rawURL) {
-		return "", "", fmt.Errorf("torrent source is not an HTTP(S) torrent link")
+		return "", "", "", fmt.Errorf("torrent source is not an HTTP(S) torrent link")
 	}
-	payload, magnet, err := engine.FetchTorrent(ctx, rawURL)
+	payload, resolved, err := engine.FetchTorrent(ctx, rawURL)
 	if err != nil {
-		return "", "", err
+		return "", "", "", err
 	}
-	if magnet != "" {
-		if sanitized, ok := utils.SanitizeMagnet(magnet, fallbackTitle); ok {
-			return sanitized, "", nil
+	if resolved != "" {
+		name = magnetDisplayName(resolved)
+		if magnet, ok := utils.SanitizeMagnet(resolved, fallbackTitle); ok {
+			return magnet, "", name, nil
 		}
-		return magnet, "", nil
+		return resolved, "", name, nil
 	}
 	hash, ok := utils.TorrentInfoHash(payload)
 	if !ok {
-		return "", "", fmt.Errorf("invalid torrent payload")
+		return "", "", "", fmt.Errorf("invalid torrent payload")
 	}
+	name, _ = utils.TorrentName(payload)
 	dir := filepath.Join(cfg.StateDir, "feed_torrents")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return "", "", err
+		return "", "", "", err
 	}
-	path := filepath.Join(dir, hash+".torrent")
+	path = filepath.Join(dir, hash+".torrent")
 	if err := os.WriteFile(path, payload, 0o644); err != nil {
-		return "", "", err
+		return "", "", "", err
 	}
-	return "magnet:?xt=urn:btih:" + hash, path, nil
+	return "magnet:?xt=urn:btih:" + hash, path, name, nil
+}
+
+// releaseAllowedByTitleProfile reports whether the release's parsed title
+// already satisfies the profile of the monitored title it belongs to. A
+// `.torrent`-only listing whose title does not declare its quality fails this
+// check even when the torrent itself would be accepted: that is the signal to
+// open the link and read the real torrent name.
+func releaseAllowedByTitleProfile(cfg *Config, release *models.Release) bool {
+	if cfg == nil || release == nil || !cfg.ReleaseIsMonitored(release) {
+		return false
+	}
+	switch release.Kind {
+	case "series":
+		series := cfg.FindSeriesMatch(*release.Series, release.Season)
+		if series == nil {
+			return false
+		}
+		return cfg.SeriesReleaseAllowed(series, &release.Quality, release.Title) ||
+			(release.LastResort && cfg.SeriesLastResortAllowed(series, &release.Quality, release.Title))
+	case "movie":
+		movie := cfg.FindMovieMatchForRelease(release, false)
+		if movie == nil {
+			return false
+		}
+		return cfg.MovieReleaseAllowedForTitle(movie, &release.Quality, release.Title)
+	}
+	return false
 }
 
 // provisionalLinkHash is a stand-in identity for a .torrent link whose
@@ -1991,6 +2089,81 @@ func refreshSeriesMetadata(ctx context.Context, cfg *Config, db *Database) {
 			}
 		}
 	}
+}
+
+// movieAliasLimit caps how many alternative titles one movie stores. TMDB
+// returns every localized title; a handful of them are enough for the match,
+// and a shorter list keeps movies_config readable.
+const movieAliasLimit = 40
+
+// refreshMovieAliases fills the alternative titles of the monitored movies
+// from TMDB. The title match and the archive search use them, so a film
+// monitored under its Italian title is also found when the release uses the
+// international one. It runs at most once per movie: an empty list is stored
+// as `[]` and not looked up again, while an error leaves it nil for the next
+// cycle. It stops at the first TMDB error to avoid hammering an outage.
+func refreshMovieAliases(ctx context.Context, cfg *Config) {
+	if cfg == nil || cfg.DryRun || cfg.TmdbAPIKey == nil || len(cfg.Movies) == 0 {
+		return
+	}
+	client := NewTmdbClientWithLanguage(cfg.TmdbAPIKey, cfg.TmdbLanguage())
+	if !client.Configured() {
+		return
+	}
+	for i := range cfg.Movies {
+		if cycleCancelled(ctx) {
+			break
+		}
+		movie := &cfg.Movies[i]
+		if !movie.Enabled || movie.Aliases != nil || strings.TrimSpace(movie.TmdbID) == "" {
+			continue
+		}
+		if err := refreshMovieAlias(ctx, cfg, movie, client); err != nil {
+			logging.Debug("TMDB alternative titles unavailable", "movie", movie.Name, "error", err)
+			return
+		}
+	}
+}
+
+// refreshMovieAlias looks up one movie's alternative titles and stores them.
+// A movie with none is marked as checked (an empty non-nil list) so it is not
+// queried again on every cycle.
+func refreshMovieAlias(ctx context.Context, cfg *Config, movie *MovieConfig, client *TmdbClient) error {
+	titles, err := client.MovieAlternativeTitles(ctx, movie.TmdbID)
+	if err != nil {
+		return err
+	}
+	// Indexers publish the international (English) title far more often than
+	// the localized one, and TMDB's alternative titles do not always contain
+	// it. The English details title is the most useful alias of all.
+	if cfg.TmdbAPIKey != nil {
+		if english := NewTmdbClientWithLanguage(cfg.TmdbAPIKey, "en-US"); english.Configured() {
+			if details, detailErr := english.MovieDetails(ctx, movie.TmdbID); detailErr == nil && details.Title != nil {
+				titles = append([]string{*details.Title}, titles...)
+			}
+		}
+	}
+	aliases := make([]string, 0, len(titles))
+	for _, title := range titles {
+		title = strings.TrimSpace(title)
+		if title == "" || strings.EqualFold(title, movie.Name) || strings.EqualFold(title, movie.OriginalTitle) {
+			continue
+		}
+		aliases = append(aliases, title)
+		if len(aliases) >= movieAliasLimit {
+			break
+		}
+	}
+	aliases = cleanMovieAliases(aliases)
+	if err := SaveMovieAliases(cfg.DataDir, movie.ID, aliases); err != nil {
+		return err
+	}
+	movie.Aliases = aliases
+	if len(aliases) > 0 {
+		logging.Info(fmt.Sprintf("🏷️ %s: %s added from TMDB",
+			movie.Name, countLabel(int64(len(aliases)), "alternative title", "alternative titles")))
+	}
+	return nil
 }
 
 // Cross-module calls reconciled with the shared ports:

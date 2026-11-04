@@ -507,13 +507,42 @@ func MovieSearch(w http.ResponseWriter, r *http.Request, s *AppState) {
 		jsonError(w, http.StatusNotFound, "movie not found")
 		return
 	}
+	// Fill the alternative titles on first search, so the archive is queried
+	// and the releases are matched under the title they were published with.
+	if movie.Aliases == nil && cfg.TmdbAPIKey != nil {
+		if client := NewTmdbClientWithLanguage(cfg.TmdbAPIKey, cfg.TmdbLanguage()); client.Configured() {
+			if err := refreshMovieAlias(r.Context(), cfg, movie, client); err != nil {
+				logging.Debug("TMDB alternative titles unavailable", "movie", movie.Name, "error", err)
+			}
+		}
+	}
 	query := strings.TrimSpace(movie.Name + " " + movie.Year)
 	results := s.engine.SearchMovie(r.Context(), cfg, movie, true, true)
-	entries, _ := s.archive.Search(query)
-	for _, entry := range entries {
-		release := ParseRelease(entry[0], entry[1], "archive:"+entry[2])
-		if release != nil {
-			results = append(results, *release)
+	archiveQueries := append([]string{movie.Name}, movie.Aliases...)
+	seenEntries := map[string]struct{}{}
+	for _, base := range archiveQueries {
+		base = strings.TrimSpace(base)
+		if base == "" {
+			continue
+		}
+		if strings.TrimSpace(movie.Year) != "" {
+			base += " " + strings.TrimSpace(movie.Year)
+		}
+		entries, _ := s.archive.Search(base)
+		for _, entry := range entries {
+			key := entry[0] + "\x00" + entry[1]
+			if _, exists := seenEntries[key]; exists {
+				continue
+			}
+			seenEntries[key] = struct{}{}
+			release := ParseRelease(entry[0], entry[1], "archive:"+entry[2])
+			if release == nil && IsTorrentURL(entry[1]) {
+				link := strings.TrimSpace(entry[1])
+				release = ParseReleaseSource(entry[0], "", &link, "archive:"+entry[2], time.Now().UTC())
+			}
+			if release != nil {
+				results = append(results, *release)
+			}
 		}
 	}
 	seen := map[string]struct{}{}

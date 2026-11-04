@@ -475,6 +475,68 @@ func TestMovieMatchingIgnoresTheColon(t *testing.T) {
 	}
 }
 
+// A film monitored under its localized title must also match the releases
+// published with the alternative titles TMDB provides.
+func TestMovieMatchingUsesAlternativeTitles(t *testing.T) {
+	year2026 := int64(2026)
+	cfg := DefaultConfig()
+	cfg.Movies = []MovieConfig{{
+		Name:          "Apocalipsis Z: Il Nuovo Mondo",
+		Year:          "2026",
+		OriginalTitle: "Apocalipsis Z: Nuevo Mundo",
+		Aliases:       []string{"Apocalypse Z: New World"},
+		Enabled:       true,
+	}}
+	for _, title := range []string{
+		"Apocalypse Z - New World (2026) 1080p H264 iTA EnG Spa AC3-MIRCrew",
+		"Apocalipsis.Z.Il.Nuovo.Mondo.2026.ENG-ITA.1080p.WEB-DL.DDP.5.1.H.264-ZioRip.mkv",
+		"Apocalipsis Z Nuevo Mundo (2026) 1080p",
+	} {
+		if got := cfg.FindMovieMatch(title, &year2026); got == nil {
+			t.Errorf("release %q did not match the film", title)
+		}
+	}
+	// An alias is not a wildcard: it only matches a release holding all of its
+	// words.
+	if got := cfg.FindMovieMatch("Another New World (2026) 1080p", &year2026); got != nil {
+		t.Errorf("release without the alias prefix matched %v", got)
+	}
+}
+
+// An alternative title written in another script must match only releases that
+// carry its own words, never the bare number it ends with: an alias such as
+// "듄 3" used to reduce to ["3"] and take every 2026 release with a "3" in the
+// title for the film.
+func TestMovieMatchingNeverMatchesOnNumbersAlone(t *testing.T) {
+	year2026 := int64(2026)
+	cfg := DefaultConfig()
+	cfg.Movies = []MovieConfig{{
+		Name:    "Dune - Parte tre",
+		Year:    "2026",
+		Aliases: []string{"Dune 3", "듄 3", "חולית 3", "Дюна: Частина Третя"},
+		Enabled: true,
+	}}
+	// Titles with a stray number that is not the film's own name.
+	for _, title := range []string{
+		"Camp.Rock.3.2026.iTA-ENG.WEBDL.2160p.HEVC.HDR.x265-CYBER.mkv",
+		"Another Film 3 2026 1080p WEB-DL iTA ENG",
+	} {
+		if got := cfg.FindMovieMatch(title, &year2026); got != nil {
+			t.Errorf("release %q matched %q on a number alone", title, got.Name)
+		}
+	}
+	// The film's own releases, in Latin and in another script, still match.
+	for _, title := range []string{
+		"Dune.Parte.tre.2026.iTA-ENG.WEBDL.2160p.HEVC.HDR.x265-CYBER.mkv",
+		"Dune 3 2026 2160p WEB-DL HDR ITA",
+		"Дюна Частина Третя 2026 2160p",
+	} {
+		if got := cfg.FindMovieMatch(title, &year2026); got == nil || got.Name != "Dune - Parte tre" {
+			t.Errorf("release %q matched %v, want the monitored film", title, got)
+		}
+	}
+}
+
 // The series match receives the name the parser extracted, which keeps the
 // colon: it must resolve against a configured name with or without it.
 func TestSeriesMatchingIgnoresTheColon(t *testing.T) {
@@ -801,6 +863,40 @@ func TestSavesAndReloadsMovieStaticMetadata(t *testing.T) {
 	}
 	if movie.Language != "ita" {
 		t.Fatalf("language = %q", movie.Language)
+	}
+}
+
+func TestSavesAndReloadsMovieAlternativeTitles(t *testing.T) {
+	dir := t.TempDir()
+	movies := []MovieConfig{{
+		ID:      7,
+		Name:    "Titolo Italiano",
+		Year:    "2026",
+		Aliases: []string{"Apocalypse Z: New World", "  ", "Apocalypse Z: New World"},
+		Enabled: true,
+	}}
+	if err := SaveLibrary(dir, []SeriesConfig{}, movies); err != nil {
+		t.Fatal(err)
+	}
+	cfg := DefaultConfig()
+	cfg.DataDir = dir
+	if err := cfg.loadConfigDB(); err != nil {
+		t.Fatal(err)
+	}
+	if got := cfg.Movies[0].Aliases; !reflect.DeepEqual(got, []string{"Apocalypse Z: New World"}) {
+		t.Fatalf("aliases = %#v", got)
+	}
+	// The targeted save used by the TMDB refresh updates only this film.
+	if err := SaveMovieAliases(dir, 7, []string{"Another Title"}); err != nil {
+		t.Fatal(err)
+	}
+	cfg = DefaultConfig()
+	cfg.DataDir = dir
+	if err := cfg.loadConfigDB(); err != nil {
+		t.Fatal(err)
+	}
+	if got := cfg.Movies[0].Aliases; !reflect.DeepEqual(got, []string{"Another Title"}) {
+		t.Fatalf("aliases after targeted save = %#v", got)
 	}
 }
 

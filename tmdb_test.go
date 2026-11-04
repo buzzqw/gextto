@@ -931,6 +931,30 @@ func TestTmdbSeasonCountsCaches(t *testing.T) {
 	}
 }
 
+func TestTmdbMovieAlternativeTitlesDeduplicates(t *testing.T) {
+	tmdbTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/movie/1507696/alternative_titles" {
+			t.Errorf("path = %q", r.URL.Path)
+		}
+		tmdbWriteJSON(t, w, `{"titles":[
+			{"iso_3166_1":"US","title":"Apocalypse Z: New World","type":""},
+			{"iso_3166_1":"IT","title":"Apocalipsis Z: Il Nuovo Mondo","type":""},
+			{"iso_3166_1":"GB","title":"Apocalypse Z: New World","type":""},
+			{"iso_3166_1":"US","title":"The Dark Knight","type":"working title"},
+			{"iso_3166_1":"ES","title":"  ","type":""}
+		]}`)
+	})
+	client := NewTmdbClient(tmdbTestKey())
+	titles, err := client.MovieAlternativeTitles(context.Background(), "1507696")
+	if err != nil {
+		t.Fatalf("MovieAlternativeTitles: %v", err)
+	}
+	want := []string{"Apocalypse Z: New World", "Apocalipsis Z: Il Nuovo Mondo"}
+	if !reflect.DeepEqual(titles, want) {
+		t.Fatalf("titles = %#v, want %#v", titles, want)
+	}
+}
+
 func ptr[T any](value T) *T {
 	return &value
 }

@@ -567,6 +567,65 @@ func (a *Archive) CanonicalizeRelease(release *models.Release, magnet string) er
 	return a.canonicalizeTorrentURL(strings.TrimSpace(*release.TorrentURL), magnet, release.Source, release.GUID)
 }
 
+// ResolveListing replaces a `.torrent`-only listing with the magnet and the
+// real torrent name learned by opening it. The row is found by its current
+// link text: the caller is a search result, which does not carry the listing
+// key (a guid), and the URL identifies the row anyway. It reports whether a
+// row changed.
+func (a *Archive) ResolveListing(torrentURL, magnet, title string, qualityScore int64) (bool, error) {
+	torrentURL = strings.TrimSpace(torrentURL)
+	magnet = strings.TrimSpace(magnet)
+	if torrentURL == "" || magnet == "" {
+		return false, nil
+	}
+	hash, ok := archiveInfoHash(magnet)
+	if !ok {
+		return false, nil
+	}
+	tx, err := a.db.Begin()
+	if err != nil {
+		return false, err
+	}
+	// Another row already carries this torrent: the link-only listing is a
+	// duplicate and is dropped instead of leaving two rows for one hash.
+	var duplicate int
+	if err := tx.QueryRow(
+		"SELECT COUNT(*) FROM archive WHERE magnet_hash=?1 AND magnet<>?2",
+		hash, torrentURL,
+	).Scan(&duplicate); err != nil {
+		_ = tx.Rollback()
+		return false, err
+	}
+	if duplicate > 0 {
+		result, err := tx.Exec(
+			"DELETE FROM archive WHERE magnet=?1 AND COALESCE(magnet_hash,'')=''",
+			torrentURL,
+		)
+		if err != nil {
+			_ = tx.Rollback()
+			return false, err
+		}
+		affected, _ := result.RowsAffected()
+		if err := tx.Commit(); err != nil {
+			return false, err
+		}
+		return affected > 0, nil
+	}
+	result, err := tx.Exec(
+		"UPDATE archive SET title=CASE WHEN ?2<>'' THEN ?2 ELSE title END, magnet=?3, magnet_hash=?4, quality_score=?5 WHERE id=(SELECT id FROM archive WHERE magnet=?1 AND COALESCE(magnet_hash,'')='' ORDER BY id DESC LIMIT 1)",
+		torrentURL, strings.TrimSpace(title), magnet, hash, qualityScore,
+	)
+	if err != nil {
+		_ = tx.Rollback()
+		return false, err
+	}
+	affected, _ := result.RowsAffected()
+	if err := tx.Commit(); err != nil {
+		return false, err
+	}
+	return affected > 0, nil
+}
+
 func (a *Archive) canonicalizeTorrentURL(torrentURL, magnet, source, guid string) error {
 	tx, err := a.db.Begin()
 	if err != nil {

@@ -476,6 +476,51 @@ func (t *TmdbClient) MovieDetails(ctx context.Context, tmdbID string) (*TmdbMovi
 	return &details, nil
 }
 
+// MovieAlternativeTitles returns the alternative titles TMDB knows for a
+// movie: localized titles and working titles. They let a film monitored under
+// one title be found under another (the international one, for example), which
+// is what indexers put in the release name.
+func (t *TmdbClient) MovieAlternativeTitles(ctx context.Context, tmdbID string) ([]string, error) {
+	if t.key == nil {
+		return nil, nil
+	}
+	id, err := strconv.ParseInt(strings.TrimSpace(tmdbID), 10, 64)
+	if err != nil {
+		return nil, errors.New("invalid TMDB movie id")
+	}
+	var payload struct {
+		Titles []struct {
+			Title string `json:"title"`
+			Type  string `json:"type"`
+		} `json:"titles"`
+	}
+	rawURL := fmt.Sprintf("%s/movie/%d/alternative_titles", tmdbAPIBaseURL, id)
+	if err := t.getJSON(ctx, rawURL, nil, &payload); err != nil {
+		return nil, err
+	}
+	seen := make(map[string]struct{}, len(payload.Titles))
+	aliases := make([]string, 0, len(payload.Titles))
+	for _, item := range payload.Titles {
+		title := strings.TrimSpace(item.Title)
+		if title == "" {
+			continue
+		}
+		// A working title is provisional and often belongs to another film
+		// ("The Dark Knight" was the working title of Citizen Vigilante):
+		// matching releases against it would fetch the wrong movie.
+		if strings.EqualFold(strings.TrimSpace(item.Type), "working title") {
+			continue
+		}
+		key := strings.ToLower(title)
+		if _, exists := seen[key]; exists {
+			continue
+		}
+		seen[key] = struct{}{}
+		aliases = append(aliases, title)
+	}
+	return aliases, nil
+}
+
 // MovieReleaseDate returns the release date of a movie in country (an ISO
 // 3166-1 code such as "IT") and its kind: "digital", "physical" or
 // "theatrical", preferring the first that exists. Movies reach a country

@@ -462,6 +462,12 @@ voce è contenuto in quello di un'altra, vince la più specifica. Non aggiungere
 due volte lo stesso film scritto in modi diversi: correggi i metadati di quello
 che hai già.
 
+Contano anche i **titoli alternativi** che TMDB conosce per il film — quello
+internazionale e quelli usati in altri paesi: una release pubblicata con un altro
+nome arriva lo stesso, e anche le corrispondenze in archivio della scheda vengono
+cercate con quei titoli. I titoli di lavorazione sono esclusi, perché a volte
+appartengono a un film diverso.
+
 ### La scheda del film
 
 Mostra locandina, trama, cast, i **migliori risultati** trovati nelle sorgenti
