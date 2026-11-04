@@ -1715,7 +1715,7 @@ func uiTableSpecFor(view string) (uiTableSpec, bool) {
 				{Key: "year", Label: "Anno", Format: "number", Sortable: true},
 				{Key: "quality", Label: "Qualità", Sortable: true},
 				{Key: "language", Label: "Lingua", Sortable: true},
-				{Key: "enabled", Label: "Stato", Format: "enabled"},
+				{Key: "enabled", Label: "Stato", Format: "movie_status"},
 			}),
 			ActionsJSON: uiJSON([]uiAction{
 				{Label: "Pausa", Kind: "library-toggle", Method: "POST", Path: "", Body: `{"enabled":false}`},

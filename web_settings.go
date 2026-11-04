@@ -444,7 +444,41 @@ func LibraryView(w http.ResponseWriter, r *http.Request, s *AppState) {
 			"tmdb_status":         statuses[series.Name],
 		})
 	}
-	jsonResponse(w, map[string]any{"series": seriesItems, "movies": cfg.Movies})
+	movieItems := make([]map[string]any, 0, len(cfg.Movies))
+	if raw, err := json.Marshal(cfg.Movies); err == nil {
+		_ = json.Unmarshal(raw, &movieItems)
+	}
+	copies, copiesErr := s.db.DownloadedMovieCopies()
+	for index := range movieItems {
+		if copiesErr != nil || index >= len(cfg.Movies) {
+			continue
+		}
+		if copy, ok := movieDownloadedCopyFor(cfg.Movies[index], copies); ok {
+			movieItems[index]["downloaded"] = true
+			movieItems[index]["downloaded_path"] = copy.Path
+			movieItems[index]["downloaded_title"] = copy.Title
+			movieItems[index]["downloaded_at"] = copy.DownloadedAt
+		}
+	}
+	jsonResponse(w, map[string]any{"series": seriesItems, "movies": movieItems})
+}
+
+// movieDownloadedCopyFor finds the library copy of a monitored movie: the title
+// must match (punctuation-insensitive, as the acquisition match does) and, when
+// both years are known, stay within the same ±1 tolerance. copies is newest
+// first, so the first match is the version currently in the library.
+func movieDownloadedCopyFor(movie MovieConfig, copies []DownloadedMovieCopy) (DownloadedMovieCopy, bool) {
+	configuredYear, yearErr := strconv.ParseInt(strings.TrimSpace(movie.Year), 10, 64)
+	for _, copy := range copies {
+		if !movieTitleMatches(&movie, copy.Name) && !movieTitleMatches(&movie, copy.Title) {
+			continue
+		}
+		if yearErr == nil && copy.Year != nil && absInt64(*copy.Year-configuredYear) > 1 {
+			continue
+		}
+		return copy, true
+	}
+	return DownloadedMovieCopy{}, false
 }
 
 // RenameProgressView returns the progress of the library rename.

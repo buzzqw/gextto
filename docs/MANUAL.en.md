@@ -473,7 +473,10 @@ In the editor:
 - **Allow upgrades** and **minimum audio** are changed with *Edit selected*.
 
 The **Movies** page has two tabs, **Monitored** and **Downloaded**, with
-sortable columns.
+sortable columns. In the *Monitored* tab, next to *active* or *paused*, a **✓**
+means a version of the movie has already been downloaded: hovering over the
+mark shows the path of the library file, or the archived title when the move
+was not recorded.
 
 ### List or posters
 

@@ -122,7 +122,7 @@ change. `/ui` is not served. For operational checks use
 | POST | `/api/config/add-all-from-archive` | add the series found in the archive folder to the configuration |
 | POST | `/api/config/add_all_from_archive` | alias of add-all-from-archive |
 | GET | `/api/config/check-ports` | check the configured transfer port range |
-| GET | `/api/config/library` | library folders |
+| GET | `/api/config/library` | library folders; each movie also carries downloaded, downloaded_path, downloaded_title and downloaded_at when a copy is already in the library |
 | POST | `/api/config/library` | save the library folders |
 | POST | `/api/config/movies` | save the movie defaults |
 | POST | `/api/config/series` | save the series defaults |

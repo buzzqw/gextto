@@ -804,6 +804,22 @@ func v2FormatCell(item map[string]any, column uiColumn) template.HTML {
 			return "attiva"
 		}
 		return "in pausa"
+	case "movie_status":
+		// The monitored-movies list adds a check when a copy is already in the
+		// library: the tooltip carries its path, or the archived title when the
+		// move was not recorded, so the list says at a glance what is done.
+		status := "in pausa"
+		if v2Truthy(item["enabled"]) {
+			status = "attiva"
+		}
+		where := strings.TrimSpace(v2String(item["downloaded_path"]))
+		if where == "" {
+			where = strings.TrimSpace(v2String(item["downloaded_title"]))
+		}
+		if where == "" {
+			return template.HTML(stdhtml.EscapeString(status))
+		}
+		return template.HTML(stdhtml.EscapeString(status) + ` <span class="badge ok" role="img" aria-label="` + stdhtml.EscapeString("Scaricato") + `" title="` + stdhtml.EscapeString(where) + `">✓</span>`)
 	case "nas_tag":
 		hasNAS := strings.TrimSpace(v2String(item["processed_path"])) != ""
 		tag := strings.TrimSpace(v2String(item["tag"]))

@@ -274,6 +274,21 @@ type EpisodeView struct {
 	Ignored      bool    `json:"ignored"`
 }
 
+// DownloadedMovieCopy is a movie already in the library, with the archive path
+// left by the torrent that imported it. The monitored-movies list shows the
+// path (or the title, when the move is not recorded) in the tooltip of its
+// "downloaded" check.
+type DownloadedMovieCopy struct {
+	ID           int64
+	Name         string
+	Year         *int64
+	Title        string
+	QualityScore int64
+	DownloadedAt *string
+	SizeBytes    int64
+	Path         string
+}
+
 // MovieHistory is one downloaded movie of the history view.
 type MovieHistory struct {
 	ID           int64   `json:"id"`
@@ -4222,6 +4237,31 @@ func (index *SeriesEpisodeIndex) Episodes(seriesName string, extraIgnored []int6
 		return items[i].Episode < items[j].Episode
 	})
 	return items
+}
+
+// DownloadedMovieCopies returns every movie already in the library, newest
+// first, with the archive path of the torrent that imported it. It feeds the
+// "downloaded" check of the monitored-movies list: a movie with a copy shows
+// where the file is, without opening its detail.
+func (d *Database) DownloadedMovieCopies() ([]DownloadedMovieCopy, error) {
+	rows, err := d.db.Query("SELECT m.id, COALESCE(m.name,''), m.year, COALESCE(NULLIF(m.title,''), m.name, ''), m.quality_score, m.downloaded_at, COALESCE(m.size_bytes,0), COALESCE(t.processed_path,'') FROM movies m LEFT JOIN torrent_meta t ON lower(t.hash)=lower(COALESCE(m.magnet_hash,'')) WHERE m.downloaded_at IS NOT NULL AND m.removed_at IS NULL ORDER BY m.downloaded_at DESC, m.id DESC")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	copies := make([]DownloadedMovieCopy, 0)
+	for rows.Next() {
+		var copy DownloadedMovieCopy
+		var year sql.NullInt64
+		var downloadedAt sql.NullString
+		if err := rows.Scan(&copy.ID, &copy.Name, &year, &copy.Title, &copy.QualityScore, &downloadedAt, &copy.SizeBytes, &copy.Path); err != nil {
+			return nil, err
+		}
+		copy.Year = nullInt64Ptr(year)
+		copy.DownloadedAt = nullStringPtr(downloadedAt)
+		copies = append(copies, copy)
+	}
+	return copies, rows.Err()
 }
 
 // DownloadedMovies returns the downloaded movies of the history view.

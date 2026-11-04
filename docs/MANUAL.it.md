@@ -475,7 +475,10 @@ Nell'editor:
   selezionati*.
 
 La pagina **Film** ha due schede, **Monitorati** e **Scaricati**, con colonne
-ordinabili.
+ordinabili. Nella scheda *Monitorati*, accanto a *attiva* o *in pausa*, un **✓**
+segnala che una versione del film è già stata scaricata: passando il mouse sul
+segno compare il percorso del file in libreria, oppure il titolo archiviato
+quando lo spostamento non è registrato.
 
 ### Elenco o locandine
 
