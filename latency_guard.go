@@ -762,7 +762,9 @@ func (g *latencyGuard) tick(now time.Time, cfg *Config, engine TorrentEngine) {
 	upCap = guardCapForEngine(upCap, latencyGuardMaxUpKiB)
 	// The first cap of a session is logged at once, with the values and the
 	// ping, even if it is the only line the controller ever prints: the user
-	// asked to see when autotune starts and at what speed.
+	// asked to see when autotune starts and at what speed. It is written only
+	// while something downloads: with only seeding the cap explains a speed
+	// nobody asked for, and Gextto's log stays quiet.
 	g.mu.Lock()
 	started := g.controlStarted
 	g.controlStarted = false
@@ -770,7 +772,7 @@ func (g *latencyGuard) tick(now time.Time, cfg *Config, engine TorrentEngine) {
 		g.capLoggedAt, g.capLoggedDown, g.capLoggedUp = now, downCap, upCap
 	}
 	g.mu.Unlock()
-	if started {
+	if started && down > 0 {
 		st := g.status()
 		logging.Info("🎚️ Autotune: starting with " + speedPairText(downCap, upCap) +
 			bgSpeedDetailSuffix(bgSpeedMaxText(cfg), bgPingText(st)))

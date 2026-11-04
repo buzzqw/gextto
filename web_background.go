@@ -976,10 +976,17 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 			if _, err := torrents.SetGlobalSpeedLimits(downloadKib, uploadKib); err != nil {
 				logging.Debug("speed policy apply failed", "error", err)
 			} else {
+				// The speed and autotune lines explain the speed of something
+				// that is downloading: with nothing downloading (only seeding,
+				// or an idle session) they are noise and are not written. The
+				// state that decides the next line is left as it is, so the
+				// first download after a quiet spell says at what speed it
+				// starts.
+				logSpeed := bgDownloading(torrents)
 				st := state.latency_guard.status()
 				ping := bgPingText(st)
 				maxText := bgSpeedMaxText(cfg)
-				if sourceChanged || !haveAutotuneLog {
+				if (sourceChanged || !haveAutotuneLog) && logSpeed {
 					label := map[string]string{
 						speedSourceTemp:         "exception, with expiry",
 						speedSourceTempKeep:     "exception, until removed",
@@ -1011,7 +1018,7 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 					lastAutotuneLog = now
 					lastAutotuneDown, lastAutotuneUp = downloadKib, uploadKib
 					haveAutotuneLog = true
-				} else if now.Sub(lastAutotuneLog) >= 60*time.Second {
+				} else if logSpeed && now.Sub(lastAutotuneLog) >= 60*time.Second {
 					guardAt, guardDown, guardUp := state.latency_guard.firstCapLog()
 					if at, ok := bgAdoptFirstCap(lastAutotuneLog, guardAt); ok {
 						// The guard printed this cap itself, at once: adopt
@@ -1047,8 +1054,10 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 						}
 					}
 				}
-				if line, ok := autotuneDigest.summary(now, downloadKib, uploadKib); ok {
-					logging.Info(line)
+				if logSpeed {
+					if line, ok := autotuneDigest.summary(now, downloadKib, uploadKib); ok {
+						logging.Info(line)
+					}
 				}
 				lastSpeed = &bgSpeedPair{download: downloadKib, upload: uploadKib, source: source}
 			}
@@ -1905,6 +1914,19 @@ func bgSpeedPairText(down, up int64) string {
 	default:
 		return "download unlimited, " + speedLimitText(up) + " up"
 	}
+}
+
+// bgDownloading reports whether any torrent is receiving data right now, with
+// the same rates the Downloads page shows. The speed and autotune lines are
+// worth a line only while something downloads: with only seeding, or in an
+// idle session, they would explain a speed nobody is using.
+func bgDownloading(torrents TorrentSession) bool {
+	for _, view := range SessionSnapshot(torrents) {
+		if view.DownloadRate > 0 {
+			return true
+		}
+	}
+	return false
 }
 
 // bg_pingText renders the latency measured by the guard next to the speed, or

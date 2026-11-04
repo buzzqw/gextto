@@ -24,6 +24,12 @@ not change Gextto's interface, where those pages do not exist. Engine fixes, on
 the other hand, apply to both.
 
 ## 5 November 2026
+- **Autotune and speed lines in the log only while something downloads.**
+  The Autotune and speed-limit lines appeared even when nothing was
+  downloading — with the session idle, with only seeding torrents, or after a
+  restart — and they talked about a speed nobody was using. They are now
+  written only while at least one torrent is receiving data; when a download
+  starts again, the first line says at what speed. Nothing to configure.
 - **After an update the interface shows the new version at once.** The browser
   was told to keep the stylesheets and scripts for a year, under an address
   that changed only with the build number: an update that touched only the look

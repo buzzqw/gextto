@@ -25,6 +25,7 @@ non cambiano l'interfaccia di Gextto, dove quelle pagine non esistono. Le
 correzioni al motore valgono invece per entrambi.
 
 ## 5 novembre 2026
+- **Autotune e velocità nel log solo mentre si scarica.** Le righe su Autotune e sul limite di velocità comparivano anche quando non c'era niente in scarico — a sessione ferma, con i soli torrent in seed, o dopo un riavvio — e parlavano di una velocità che nessuno stava usando. Ora si scrivono solo mentre almeno un torrent sta ricevendo dati; quando il download riparte, la prima riga dice a che velocità. Niente da configurare.
 - **Dopo un aggiornamento l'interfaccia mostra subito la versione nuova.** Il browser teneva in cache fogli di stile e script per un anno, con un indirizzo che cambiava solo col numero di build: un aggiornamento che toccava solo l'aspetto di una pagina poteva lasciare sul telefono o sul computer il file vecchio, e i titoli dei torrent continuavano a comparire tagliati. Ora l'indirizzo di quei file cambia anche col loro contenuto, quindi basta ricaricare per vedere la versione nuova. Niente da configurare: dal prossimo aggiornamento si sistema da solo.
 
 ## 4 novembre 2026

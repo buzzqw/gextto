@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/buzzqw/gextto/internal/bwschedule"
+	"github.com/buzzqw/gextto/internal/models"
 )
 
 // TestBGSpeedJumpedUsesTenPercent pins the log throttle: a 5 % step is not a
@@ -154,6 +155,23 @@ func TestSpeedStatusTextSpeaksPlainly(t *testing.T) {
 	}
 	if got := bgSpeedStatusText(500, 0, "scheduled limit", "line max 19.5 MB/s down, 2.0 MB/s up", ""); got != "🚦 Speed: download 500 KB/s, upload unlimited (scheduled limit) · line max 19.5 MB/s down, 2.0 MB/s up" {
 		t.Fatalf("scheduled speed line = %q", got)
+	}
+}
+
+// TestBGDownloadingOnlyWhileDataArrives: the speed and autotune lines are
+// written only while something downloads. Seeding alone, or an idle session,
+// is silent: there is no download whose speed those lines could explain.
+func TestBGDownloadingOnlyWhileDataArrives(t *testing.T) {
+	if bgDownloading(&stubTorrentSession{}) {
+		t.Fatal("an empty session is not downloading")
+	}
+	seeding := models.TorrentView{Name: "seed", UploadRate: 900}
+	if bgDownloading(&stubTorrentSession{list: []models.TorrentView{seeding}}) {
+		t.Fatal("a seeding torrent is not a download")
+	}
+	downloading := models.TorrentView{Name: "download", DownloadRate: 1200}
+	if !bgDownloading(&stubTorrentSession{list: []models.TorrentView{seeding, downloading}}) {
+		t.Fatal("a torrent receiving data must count as a download")
 	}
 }
 
