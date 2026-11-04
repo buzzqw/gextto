@@ -24,6 +24,14 @@ not change Gextto's interface, where those pages do not exist. Engine fixes, on
 the other hand, apply to both.
 
 ## 5 November 2026
+- **Larger season packs are no longer refused for their piece count.** A 4K
+  pack of a few hundred gigabytes can carry hundreds of thousands of pieces:
+  Gextto accepted at most 65,536 and discarded the torrent with «too many
+  pieces», even when the metadata was intact (it had been checked against the
+  info hash). The ceiling is now much higher, and the limits that remain are
+  the real ones: the size of the `.torrent` file and of the metadata. A torrent
+  discarded this way is not in the session: the one chosen by the automatic
+  cycle comes back on the next round, one added by hand has to be added again.
 - **A movie's alternative titles are visible on its page.** Yesterday's entry
   said those titles stay saved with the film, but the page showed them
   nowhere. Under the plot, the **Alternative titles (TMDB)** line opens the

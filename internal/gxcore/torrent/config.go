@@ -87,7 +87,12 @@ type Config struct {
 	MaxMetadataSize uint `yaml:"max-metadata-size"`
 	// Maximum allowed size to be read when adding torrent.
 	MaxTorrentSize uint `yaml:"max-torrent-size"`
-	// Maximum allowed number of pieces in a torrent.
+	// Maximum allowed number of pieces in a torrent. It is a guard against a
+	// hostile or broken info dict, not a practical ceiling: a 4K season pack of
+	// a few hundred gigabytes carries hundreds of thousands of pieces, and the
+	// sizes that really bound it are MaxTorrentSize and MaxMetadataSize (a
+	// 10 MiB .torrent can describe at most ~524k SHA-1 pieces). The old 64 Ki
+	// default refused genuine packs with "too many pieces".
 	MaxPieces uint32 `yaml:"max-pieces"`
 	// Time to wait when resolving host names for trackers and peers.
 	DNSResolveTimeout time.Duration `yaml:"dns-resolve-timeout"`
@@ -331,7 +336,7 @@ var DefaultConfig = Config{
 	TorrentAddHTTPTimeout:                  30 * time.Second,
 	MaxMetadataSize:                        30 << 20,
 	MaxTorrentSize:                         10 << 20,
-	MaxPieces:                              64 << 10,
+	MaxPieces:                              2 << 20,
 	DNSResolveTimeout:                      5 * time.Second,
 	ResumeOnStartup:                        true,
 	HealthCheckInterval:                    10 * time.Second,
