@@ -392,7 +392,7 @@ func (d *Daemon) pollWantedLocked(ctx context.Context, onlyName string) wantedPo
 		// A /regex/ title is searched by its literal words (none with "|").
 		searchText := titleSearchText(w.Name)
 		if searchText != "" && len(d.indexers()) > 0 && (onlyName != "" || d.wantedIndexerDue(w.Name, now)) {
-			found, err := d.searchFeedSuggest(ctx, searchText)
+			found, err := d.searchFeedWantedSuggest(ctx, searchText, w.Language)
 			if err != nil {
 				errorsList = append(errorsList, w.Name+": "+err.Error())
 			} else {
@@ -607,6 +607,35 @@ func (d *Daemon) setWantedTaken(name string, season, episode int, have bool) {
 		delete(d.state.WantedTakenQuality[key], token)
 		delete(d.state.WantedTakenTorrent[key], token)
 	}
+	d.dirty = true
+}
+
+// markWantedSeasonMissing clears the taken ledger of a whole season. Every
+// episode it held stays known (so it counts as missing and is searched again),
+// the metadata episodes that were not taken already count as missing, and the
+// per-title search timers are reset so the next cycle looks at the season
+// instead of waiting for the usual interval.
+func (d *Daemon) markWantedSeasonMissing(name string, season int) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	key := wantedKey(name, season)
+	if d.state.WantedSeen == nil {
+		d.state.WantedSeen = map[string]smartEpisodes{}
+	}
+	if d.state.WantedSeen[key] == nil {
+		d.state.WantedSeen[key] = smartEpisodes{}
+	}
+	now := time.Now().Unix()
+	for token := range d.state.WantedTaken[key] {
+		d.state.WantedSeen[key][token] = now
+	}
+	delete(d.state.WantedTaken, key)
+	delete(d.state.WantedTakenQuality, key)
+	delete(d.state.WantedTakenTorrent, key)
+	// A season the operator just marked missing must be looked at soon, not
+	// after the indexer and gap intervals.
+	delete(d.state.WantedSearchLast, strings.TrimSpace(name))
+	delete(d.state.WantedGapLast, strings.TrimSpace(name))
 	d.dirty = true
 }
 
@@ -1031,6 +1060,15 @@ func (d *Daemon) applyWanted(now time.Time, feedName string, items []rss.Item) (
 			if w.kind() != "movie" && season < 0 {
 				continue
 			}
+			if _, ok := inSession[w.Name]; !ok {
+				inSession[w.Name] = d.wantedSessionEpisodes(w)
+			}
+			// A season pack covers the whole season: individual episodes of it
+			// must not be downloaded as well. The set also sees a pack added
+			// earlier in this same batch, because it is updated below.
+			if episode > 0 && d.wantedPackTaken(w, season, inSession[w.Name]) {
+				continue
+			}
 			d.recordWantedSeen(w, season, episode)
 			if d.feedSeen(feedName, item.GUID) || d.archive().alreadyAdded(feedName, item) {
 				continue
@@ -1042,9 +1080,6 @@ func (d *Daemon) applyWanted(now time.Time, feedName string, items []rss.Item) (
 					continue
 				}
 				upgrade = true
-			}
-			if _, ok := inSession[w.Name]; !ok {
-				inSession[w.Name] = d.wantedSessionEpisodes(w)
 			}
 			if inSession[w.Name][wantedEpisode{season: season, episode: episode}] {
 				// Already downloaded by something else: had, not taken again.
@@ -1060,6 +1095,9 @@ func (d *Daemon) applyWanted(now time.Time, feedName string, items []rss.Item) (
 				continue
 			}
 			if newly {
+				// Taken within this batch: a following copy of the same episode
+				// (or an individual episode under a just-added pack) is skipped.
+				inSession[w.Name][wantedEpisode{season: season, episode: episode}] = true
 				if upgrade {
 					d.dropUpgradedTorrent(w, season, episode, hash)
 				}
@@ -1109,7 +1147,7 @@ func (d *Daemon) wantedGapSearch(ctx context.Context, now time.Time, w wantedEnt
 			break
 		}
 		query := fmt.Sprintf("%s S%02dE%02d", text, ep.season, ep.episode)
-		items, err := d.searchFeedSuggest(ctx, query)
+		items, err := d.searchFeedWantedSuggest(ctx, query, w.Language)
 		if err != nil {
 			continue
 		}

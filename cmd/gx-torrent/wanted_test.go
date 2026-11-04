@@ -173,6 +173,11 @@ func TestWantedRowShowsCounts(t *testing.T) {
 	if !strings.Contains(row, "Why not?") || !strings.Contains(row, `class="row-more"`) {
 		t.Fatalf("the row must keep the secondary actions in the More menu: %s", row)
 	}
+	// The title itself opens the edit dialog, so the configuration is one click
+	// away instead of hidden behind the More menu.
+	if !strings.Contains(row, `<button type="button" class="name name-link" data-wanted-edit`) {
+		t.Fatalf("the title must open the edit dialog: %s", row)
+	}
 	// A seen-but-not-taken episode shows as such.
 	d.recordWantedSeen(w, 1, 5)
 	row = d.uiWantedRowsHTML()
@@ -319,6 +324,13 @@ func TestUIWantedEpisodesManager(t *testing.T) {
 	if len(eps) != 2 || eps[0].Have {
 		t.Fatalf("after missing: %+v", eps)
 	}
+	// Mark S01E01 downloaded again, then clear the whole season with no
+	// episode: every known episode of the season must become missing.
+	post(url.Values{"op": {"have"}, "index": {"0"}, "season": {"1"}, "episode": {"1"}})
+	eps = post(url.Values{"op": {"missing"}, "index": {"0"}, "season": {"1"}})
+	if len(eps) != 2 || eps[0].Have || eps[1].Have {
+		t.Fatalf("after the whole season missing: %+v", eps)
+	}
 	// A movie has no episodes.
 	d.opts.Settings.Set(wantedSettingKey, `[{"name":"Film","kind":"movie"}]`)
 	resp, err := http.PostForm(srv.URL+"/ui/wanted-episodes", url.Values{"op": {"have"}, "index": {"0"}, "season": {"1"}, "episode": {"1"}})
@@ -328,6 +340,23 @@ func TestUIWantedEpisodesManager(t *testing.T) {
 	resp.Body.Close()
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("a movie must have no episodes: %d", resp.StatusCode)
+	}
+}
+
+// TestWantedPackSuppressesIndividualEpisodes: once a season pack is taken, an
+// individual episode of the same season is not recorded (and so cannot be
+// queued next to the pack); a pack must remain the only download of its season.
+func TestWantedPackSuppressesIndividualEpisodes(t *testing.T) {
+	d := standaloneTestDaemon(t, "", true)
+	d.opts.Settings.Set(wantedSettingKey, `[{"name":"Reacher","kind":"series","seasons":"1"}]`)
+	w := d.wantedList()[0]
+	d.recordWantedTaken(w, 1, 0)
+	d.applyWanted(time.Now(), "f", []rss.Item{{Title: "Reacher S01E02 1080p ITA", GUID: "g2"}})
+	if got := d.state.WantedSeen[wantedKey(w.Name, 1)]["2"]; got > 0 {
+		t.Fatalf("an individual episode under a taken pack must be skipped, seen = %d", got)
+	}
+	if !d.wantedPackTaken(w, 1, nil) {
+		t.Fatal("the taken pack must still cover the season")
 	}
 }
 
@@ -550,6 +579,19 @@ func TestWantedSeasonPacksMatch(t *testing.T) {
 	other := "Reacher S03 COMPLETE 1080p"
 	if w.matches(other, now) {
 		t.Fatalf("wanted Reacher S04 must not match %q", other)
+	}
+	// A season pack whose name has the resolution glued to the group still
+	// belongs to the season, and is downloaded as episode 0 (the whole pack).
+	pack1 := wantedEntry{Name: "Reacher", Kind: "series", Seasons: "1"}
+	sample := "Reacher.S01.ITA.ENG.2160p.UHD.BluRay.x265-MeM.GP2160p"
+	if season, ok := wantedPackSeason(sample); !ok || season != 1 {
+		t.Fatalf("wantedPackSeason(%q) = %d,%v want 1,true", sample, season, ok)
+	}
+	if !pack1.matches(sample, now) {
+		t.Fatalf("wanted Reacher S01 must match %q", sample)
+	}
+	if season, episode := wantedItemEpisode(pack1, sample); season != 1 || episode != 0 {
+		t.Fatalf("wantedItemEpisode(%q) = %d,%d want 1,0", sample, season, episode)
 	}
 	// The preview verdict takes the pack instead of reporting "No episode number".
 	re, _ := regexp.Compile(titleMatchRegex(w.Name))

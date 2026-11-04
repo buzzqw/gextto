@@ -193,6 +193,7 @@ details.hint summary{cursor:pointer}
       <details class="more" id="wanted-episodes-mgr" hidden>
         <summary>Episodes</summary>
         <p class="hint">Mark what you already have and what is missing; missing episodes are searched again.</p>
+        <p class="hint">Leave the episode empty to mark the whole season as missing.</p>
         <div class="epgrid" id="wanted-episodes-body" aria-live="polite"></div>
         <div class="epadd">
           <label class="field">Season<input type="number" min="0" id="wanted-ep-season" title="Season number"></label>
@@ -370,7 +371,7 @@ $$('[data-wanted-episodes]').forEach(function(btn){btn.addEventListener('click',
   grid.textContent=t('loading…');
   fetch('/ui/wanted-episodes?index='+encodeURIComponent(index),{cache:'no-store'}).then(function(r){return r.ok?r.json():Promise.reject();}).then(function(res){renderEpisodes(grid,res.episodes||[],index);}).catch(function(){grid.textContent=t('Error');});
 });});
-$('#wanted-ep-add').addEventListener('click',function(){var s=$('#wanted-ep-season').value,e=$('#wanted-ep-episode').value;if(s===''||e===''){toast(t('Enter a season and an episode'),true);return;}episodeOp(currentIndex,s,e,'add');$('#wanted-ep-episode').value='';});
+$('#wanted-ep-add').addEventListener('click',function(){var s=$('#wanted-ep-season').value,e=$('#wanted-ep-episode').value;if(s===''){toast(t('Enter a season'),true);return;}episodeOp(currentIndex,s,e||0,'add');$('#wanted-ep-episode').value='';});
 $('#wanted-ep-force').addEventListener('click',function(){if(currentIndex===null)return;poll(form.elements.name.value.trim(),null,this);});
 // Search one episode interactively: what the indexers return for "Title SxxEyy",
 // with the verdicts and an Add per release.

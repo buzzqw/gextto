@@ -300,18 +300,36 @@ func (d *Daemon) handleUIWantedEpisodes(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	season, errSeason := strconv.Atoi(strings.TrimSpace(r.FormValue("season")))
-	episode, errEpisode := strconv.Atoi(strings.TrimSpace(r.FormValue("episode")))
-	if errSeason != nil || errEpisode != nil || season < 0 || episode <= 0 {
-		writeError(w, http.StatusBadRequest, errors.New("season and episode are required"))
+	if errSeason != nil || season < 0 {
+		writeError(w, http.StatusBadRequest, errors.New("season is required"))
 		return
+	}
+	// The episode is optional for "missing": an empty episode marks the whole
+	// season, so the operator does not have to clear it one episode at a time.
+	episode := 0
+	if raw := strings.TrimSpace(r.FormValue("episode")); raw != "" {
+		value, errEpisode := strconv.Atoi(raw)
+		if errEpisode != nil || value < 0 {
+			writeError(w, http.StatusBadRequest, errors.New("episode is not valid"))
+			return
+		}
+		episode = value
 	}
 	switch strings.TrimSpace(r.FormValue("op")) {
 	case "have":
+		if episode <= 0 {
+			writeError(w, http.StatusBadRequest, errors.New("episode is required"))
+			return
+		}
 		d.setWantedTaken(entry.Name, season, episode, true)
 	case "missing", "add":
-		// Known and not downloaded: it counts as missing and is searched again.
-		d.addWantedSeen(entry.Name, season, episode)
-		d.setWantedTaken(entry.Name, season, episode, false)
+		if episode <= 0 {
+			d.markWantedSeasonMissing(entry.Name, season)
+		} else {
+			// Known and not downloaded: it counts as missing and is searched again.
+			d.addWantedSeen(entry.Name, season, episode)
+			d.setWantedTaken(entry.Name, season, episode, false)
+		}
 	default:
 		writeError(w, http.StatusBadRequest, errors.New("unknown episode operation"))
 		return
@@ -544,7 +562,7 @@ func (d *Daemon) handleUIWantedSearch(w http.ResponseWriter, r *http.Request) {
 	indexers := d.indexers()
 	result.Indexers = len(indexers)
 	if live && result.Indexers > 0 {
-		found, errs := searchIndexers(ctx, indexers, query)
+		found, errs := searchIndexersLanguage(ctx, indexers, query, strings.Join(langFilters, " "))
 		// Every failing indexer is reported, also when the others answered:
 		// a silent failure made a search look complete when it was not.
 		var failed []string
@@ -958,8 +976,21 @@ func (d *Daemon) uiWantedRowsHTML() string {
 		}
 		nextGap := d.wantedNextGap(w.Name, now)
 		hash := d.wantedSessionHash(w)
+		attrs := `data-wanted-edit data-index="` + idx + `"` +
+			` data-name="` + html.EscapeString(w.Name) + `"` +
+			` data-kind="` + w.kind() + `"` +
+			` data-seasons="` + html.EscapeString(w.Seasons) + `"` +
+			` data-language="` + html.EscapeString(w.Language) + `"` +
+			` data-subtitles="` + html.EscapeString(w.Subtitles) + `"` +
+			` data-quality="` + html.EscapeString(w.Quality) + `"` +
+			` data-profile="` + html.EscapeString(w.Profile) + `"` +
+			` data-exclude="` + html.EscapeString(w.Exclude) + `"` +
+			` data-episode="` + html.EscapeString(w.EpisodeFilter) + `"` +
+			` data-category="` + html.EscapeString(w.Category) + `"` +
+			` data-savepath="` + html.EscapeString(w.SavePath) + `"` +
+			` data-paused="` + strconv.FormatBool(w.Paused) + `"`
 		b.WriteString(`<li class="` + cls + `" data-wanted-row="` + idx + `" data-wanted-state="` + state + `" data-wanted-name="` + html.EscapeString(w.Name) + `" data-wanted-missing="` + strconv.Itoa(stats.Missing) + `" data-wanted-downloading="` + strconv.Itoa(stats.Downloading) + `" data-wanted-last="` + strconv.FormatInt(lastSearch.Unix(), 10) + `" data-wanted-gap="` + strconv.FormatInt(nextGap.Unix(), 10) + `" data-wanted-index="` + idx + `"><div class="kind-icon" aria-hidden="true"><svg class="i"><use href="/assets/icons.svg#` + icon + `"/></svg></div><div class="item-main">`)
-		b.WriteString(`<div class="item-title"><span class="name">` + html.EscapeString(w.Name) + `</span><span class="chip">` + kindLabel + `</span><span class="badge ` + badgeClass + `">` + badgeLabel + `</span></div>`)
+		b.WriteString(`<div class="item-title"><button type="button" class="name name-link" ` + attrs + ` title="Edit this title">` + html.EscapeString(w.Name) + `</button><span class="chip">` + kindLabel + `</span><span class="badge ` + badgeClass + `">` + badgeLabel + `</span></div>`)
 
 		var chips strings.Builder
 		if w.kind() != "movie" && strings.TrimSpace(w.Seasons) != "" {
@@ -1036,19 +1067,6 @@ func (d *Daemon) uiWantedRowsHTML() string {
 		default:
 			b.WriteString(searchButton)
 		}
-		attrs := `data-wanted-edit data-index="` + idx + `"` +
-			` data-name="` + html.EscapeString(w.Name) + `"` +
-			` data-kind="` + w.kind() + `"` +
-			` data-seasons="` + html.EscapeString(w.Seasons) + `"` +
-			` data-language="` + html.EscapeString(w.Language) + `"` +
-			` data-subtitles="` + html.EscapeString(w.Subtitles) + `"` +
-			` data-quality="` + html.EscapeString(w.Quality) + `"` +
-			` data-profile="` + html.EscapeString(w.Profile) + `"` +
-			` data-exclude="` + html.EscapeString(w.Exclude) + `"` +
-			` data-episode="` + html.EscapeString(w.EpisodeFilter) + `"` +
-			` data-category="` + html.EscapeString(w.Category) + `"` +
-			` data-savepath="` + html.EscapeString(w.SavePath) + `"` +
-			` data-paused="` + strconv.FormatBool(w.Paused) + `"`
 		b.WriteString(`<details class="row-more"><summary class="sm" aria-label="More actions for this title" title="More actions: releases, episodes, edit, pause, remove">More</summary><div class="row-more-menu">`)
 		b.WriteString(releasesButton)
 		if w.kind() != "movie" {

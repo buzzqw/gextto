@@ -18,22 +18,35 @@ import (
 // searchFeed queries every configured indexer and returns the results as feed
 // items. It fails only when nothing came back and at least one indexer errored.
 func (d *Daemon) searchFeed(ctx context.Context, name, query string) ([]rss.Item, error) {
-	return d.searchFeedLogged(ctx, name, query, true)
+	return d.searchFeedLogged(ctx, name, query, "", true)
 }
 
 // searchFeedSuggest is searchFeed for the interactive title suggestions: it does
 // not log per-indexer errors, so a down indexer does not flood the log while the
 // operator types.
 func (d *Daemon) searchFeedSuggest(ctx context.Context, query string) ([]rss.Item, error) {
-	return d.searchFeedLogged(ctx, "suggest", query, false)
+	return d.searchFeedLogged(ctx, "suggest", query, "", false)
 }
 
-func (d *Daemon) searchFeedLogged(ctx context.Context, name, query string, logErrors bool) ([]rss.Item, error) {
+// searchFeedWanted is searchFeed with the wanted language terms: indexarr adds
+// them to the query, so the releases in that language are on the first pages
+// instead of being fetched and filtered one by one.
+func (d *Daemon) searchFeedWanted(ctx context.Context, name, query, language string) ([]rss.Item, error) {
+	return d.searchFeedLogged(ctx, name, query, language, true)
+}
+
+// searchFeedWantedSuggest is searchFeedWanted for the automatic wanted search:
+// it keeps the log quiet like searchFeedSuggest.
+func (d *Daemon) searchFeedWantedSuggest(ctx context.Context, query, language string) ([]rss.Item, error) {
+	return d.searchFeedLogged(ctx, "suggest", query, language, false)
+}
+
+func (d *Daemon) searchFeedLogged(ctx context.Context, name, query, language string, logErrors bool) ([]rss.Item, error) {
 	indexers := d.indexers()
 	if len(indexers) == 0 {
 		return nil, fmt.Errorf("no indexers configured")
 	}
-	items, errs := searchIndexers(ctx, indexers, query)
+	items, errs := searchIndexersLanguage(ctx, indexers, query, language)
 	if logErrors {
 		for _, err := range errs {
 			logf("feed %s: %v", name, err)
@@ -50,7 +63,17 @@ func (d *Daemon) searchFeedLogged(ctx context.Context, name, query string, logEr
 // indexers are queried concurrently, so a slow or timing-out one does not add
 // its latency to the others; the result order still follows the indexer order.
 func searchIndexers(ctx context.Context, indexers []torznab.Indexer, query string) ([]rss.Item, []error) {
+	return searchIndexersLanguage(ctx, indexers, query, "")
+}
+
+// searchIndexersLanguage is searchIndexers with the wanted language terms. They
+// go into q only for indexarr, whose /api tokenizes the query and matches the
+// terms against the release title (the same words the wanted filter checks
+// later). The other endpoints keep the bare query: q is free text there, and a
+// tracker that matches the whole string would return nothing.
+func searchIndexersLanguage(ctx context.Context, indexers []torznab.Indexer, query, language string) ([]rss.Item, []error) {
 	query = strings.TrimSpace(query)
+	languageTerms := splitList(language)
 	type result struct {
 		items []rss.Item
 		err   error
@@ -61,7 +84,11 @@ func searchIndexers(ctx context.Context, indexers []torznab.Indexer, query strin
 		wg.Add(1)
 		go func(i int, idx torznab.Indexer) {
 			defer wg.Done()
-			found, err := idx.Search(ctx, query)
+			searchQuery := query
+			if len(languageTerms) > 0 && idx.IsIndexarr() {
+				searchQuery = strings.TrimSpace(query + " " + strings.Join(languageTerms, " "))
+			}
+			found, err := idx.Search(ctx, searchQuery)
 			if err != nil {
 				results[i].err = fmt.Errorf("%s: %w", idx.Name, err)
 				return

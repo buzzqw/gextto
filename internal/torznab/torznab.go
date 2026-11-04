@@ -13,6 +13,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -77,6 +78,7 @@ type rssItem struct {
 	Enclosure struct {
 		URL    string `xml:"url,attr"`
 		Length int64  `xml:"length,attr"`
+		Type   string `xml:"type,attr"`
 	} `xml:"enclosure"`
 	Attrs []struct {
 		Name  string `xml:"name,attr"`
@@ -120,6 +122,65 @@ func isProwlarrSearch(endpoint string) bool {
 	return strings.HasSuffix(strings.TrimRight(endpoint, "/"), prowlarrSearchPath)
 }
 
+const (
+	// searchPageSize is the page a Torznab search asks for: indexarr and
+	// Jackett cap a response at 100 results, and a smaller default would hide
+	// released titles behind the first page.
+	searchPageSize = 100
+	// indexarrMaxResults bounds the pages read from one indexarr search. A
+	// broad title can match thousands of releases and the wanted search only
+	// needs the ones it can still match, so reading stops at this ceiling.
+	indexarrMaxResults = 1000
+)
+
+var torznabResponseTotal = regexp.MustCompile(`<newznab:response[^>]*\btotal="(\d+)"`)
+
+// IsIndexarr reports whether the indexer is an indexarr instance. Its /api
+// tokenizes q, so a wanted language term can be sent there; the other Torznab
+// endpoints keep the bare query. Only there are the following pages read too:
+// indexarr keeps the merged result set for two minutes, so a page costs a few
+// milliseconds, while a single tracker would be searched again for every page.
+func (idx Indexer) IsIndexarr() bool {
+	lowerURL := strings.ToLower(strings.TrimSpace(idx.URL))
+	lowerName := strings.ToLower(strings.TrimSpace(idx.Name))
+	return strings.Contains(lowerURL, "indexarr") || strings.Contains(lowerName, "indexarr") ||
+		strings.Contains(lowerURL, ":8788") || strings.Contains(lowerURL, ":8484")
+}
+
+// indexarrMorePages reads the pages after the first of an indexarr search,
+// using the total the response declares. A page that fails ends the reading:
+// the results already read are kept.
+func (idx Indexer) indexarrMorePages(ctx context.Context, endpoint *url.URL, firstBody []byte) []Item {
+	match := torznabResponseTotal.FindSubmatch(firstBody)
+	if match == nil {
+		return nil
+	}
+	total, err := strconv.Atoi(string(match[1]))
+	if err != nil || total <= searchPageSize {
+		return nil
+	}
+	if total > indexarrMaxResults {
+		total = indexarrMaxResults
+	}
+	var out []Item
+	for offset := searchPageSize; offset < total && ctx.Err() == nil; offset += searchPageSize {
+		pageURL := *endpoint
+		params := pageURL.Query()
+		params.Set("offset", strconv.Itoa(offset))
+		pageURL.RawQuery = params.Encode()
+		data, status, err := idx.getBody(ctx, pageURL.String())
+		if err != nil || status < 200 || status >= 300 {
+			return out
+		}
+		page, err := Parse(bytes.NewReader(data), idx.Name)
+		if err != nil || len(page) == 0 {
+			return out
+		}
+		out = append(out, page...)
+	}
+	return out
+}
+
 // Search queries one indexer and returns its results.
 func (idx Indexer) Search(ctx context.Context, query string) ([]Item, error) {
 	ep := idx.Endpoint()
@@ -155,6 +216,10 @@ func (idx Indexer) searchEndpoint(ctx context.Context, endpointStr, query string
 	} else {
 		params.Set("t", "search")
 		params.Set("q", query)
+		// Ask for a full page: the Torznab default is smaller (indexarr
+		// answers 50), and a wanted title has to see the releases on the
+		// following pages too, not only the most seeded ones.
+		params.Set("limit", strconv.Itoa(searchPageSize))
 	}
 	if key := strings.TrimSpace(idx.APIKey); key != "" {
 		params.Set("apikey", key)
@@ -171,7 +236,14 @@ func (idx Indexer) searchEndpoint(ctx context.Context, endpointStr, query string
 	if prowlarr {
 		return ParseProwlarr(bytes.NewReader(data), idx.Name)
 	}
-	return Parse(bytes.NewReader(data), idx.Name)
+	first, err := Parse(bytes.NewReader(data), idx.Name)
+	if err != nil {
+		return nil, err
+	}
+	if !idx.IsIndexarr() {
+		return first, nil
+	}
+	return append(first, idx.indexarrMorePages(ctx, endpoint, data)...), nil
 }
 
 // getBody fetches rawURL with the indexer's Get hook (FlareSolverr) or with the
@@ -388,6 +460,16 @@ type torznabError struct {
 	Desc    string `xml:"description,attr"`
 }
 
+// isNonTorrentEnclosure reports whether an enclosure carries a payload a
+// torrent client cannot use: an eD2k file or a usenet NZB. indexarr emits the
+// same Torznab feed for every protocol it aggregates.
+func isNonTorrentEnclosure(kind string) bool {
+	lower := strings.ToLower(strings.TrimSpace(kind))
+	return strings.Contains(lower, "x-ed2k") ||
+		strings.Contains(lower, "x-nzb") ||
+		strings.Contains(lower, "x-usenet")
+}
+
 // Parse reads a Torznab RSS body into items.
 func Parse(r io.Reader, indexerName string) ([]Item, error) {
 	data, err := io.ReadAll(io.LimitReader(r, maxTorznabBody))
@@ -412,6 +494,13 @@ func Parse(r io.Reader, indexerName string) ([]Item, error) {
 	}
 	items := make([]Item, 0, len(feed.Items))
 	for _, raw := range feed.Items {
+		// indexarr returns eD2k and usenet releases in the same Torznab feed. A
+		// torrent client cannot use them: fetching the link would follow a
+		// redirect to an ed2k:// (or NZB) payload and fail. Skip them silently,
+		// instead of logging an error for every release of the wanted title.
+		if isNonTorrentEnclosure(raw.Enclosure.Type) {
+			continue
+		}
 		item := Item{
 			Title:    strings.TrimSpace(raw.Title),
 			Link:     strings.TrimSpace(raw.Enclosure.URL),
@@ -420,6 +509,10 @@ func Parse(r io.Reader, indexerName string) ([]Item, error) {
 		}
 		if item.Link == "" {
 			item.Link = strings.TrimSpace(raw.Link)
+		}
+		if strings.HasPrefix(strings.ToLower(item.Link), "ed2k:") ||
+			strings.HasPrefix(strings.ToLower(item.Link), "nzb:") {
+			continue
 		}
 		// A magnet in the link/enclosure is a magnet, not a .torrent URL: some
 		// indexers (MirCrew among them) put the magnet there and not in a

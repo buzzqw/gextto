@@ -109,6 +109,43 @@ func TestSearchIndexersRunsInParallel(t *testing.T) {
 	}
 }
 
+// TestSearchIndexersLanguageOnlyForIndexarr pins the wanted optimization: the
+// language terms go into q for indexarr (whose /api tokenizes them) and never
+// for a plain tracker, where q is free text and a whole-string match would
+// return nothing.
+func TestSearchIndexersLanguageOnlyForIndexarr(t *testing.T) {
+	var mu sync.Mutex
+	queries := map[string]string{}
+	server := func(name string) *httptest.Server {
+		return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			mu.Lock()
+			queries[name] = r.URL.Query().Get("q")
+			mu.Unlock()
+			_, _ = w.Write([]byte(searchFeedXML))
+		}))
+	}
+	indexarr := server("indexarr")
+	defer indexarr.Close()
+	plain := server("plain")
+	defer plain.Close()
+
+	items, errs := searchIndexersLanguage(context.Background(), []torznab.Indexer{
+		{Name: "indexarr", URL: indexarr.URL},
+		{Name: "private", URL: plain.URL},
+	}, "Reacher", "ita, eng")
+	if len(errs) != 0 || len(items) != 2 {
+		t.Fatalf("items=%d errs=%v, want 2 and none", len(items), errs)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if got := queries["indexarr"]; got != "Reacher ita eng" {
+		t.Fatalf("indexarr q = %q, want the language terms", got)
+	}
+	if got := queries["plain"]; got != "Reacher" {
+		t.Fatalf("plain tracker q = %q, want the bare query", got)
+	}
+}
+
 func TestRSSItemFromTorznabPrefersMagnetAsGUID(t *testing.T) {
 	it := rssItemFromTorznab(torznab.Item{Title: "t", Link: "http://x/a.torrent"})
 	if it.GUID != "http://x/a.torrent" {

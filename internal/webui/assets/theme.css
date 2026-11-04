@@ -412,6 +412,10 @@ ul.items { list-style: none; margin: 0; padding: 0; background: var(--surface); 
 .item-title .name { font-weight: 600; font-size: 14.5px; }
 .item-title .name a { color: var(--text); text-decoration: none; }
 .item-title .name a:hover { color: var(--accent); text-decoration: underline; }
+/* The title itself opens the edit dialog: a button styled as plain text, so
+   the row never shows an extra "Edit" affordance next to the name. */
+.item-title .name-link { background: none; border: 0; padding: 0; margin: 0; color: inherit; font-family: inherit; cursor: pointer; text-align: left; }
+.item-title .name-link:hover { color: var(--accent); text-decoration: underline; }
 /* A status tucked at the right end of the title row (feed last check). */
 .item-title > .item-status { margin-left: auto; text-align: right; }
 .item-sub { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12.5px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

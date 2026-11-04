@@ -2,8 +2,10 @@ package torznab
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -46,6 +48,26 @@ func TestParseEmptyFeedIsNotAnError(t *testing.T) {
 	items, err := Parse(strings.NewReader(`<?xml version="1.0"?><rss version="2.0"><channel></channel></rss>`), "jackett")
 	if err != nil || len(items) != 0 {
 		t.Fatalf("empty feed: items=%d err=%v", len(items), err)
+	}
+}
+
+// TestParseSkipsNonTorrentEnclosures: indexarr merges eD2k and usenet releases
+// into the same Torznab feed. A torrent client must not keep them: fetching
+// their link follows a redirect to an ed2k:// or NZB payload and fails, so the
+// wanted search would log an error for every such release.
+func TestParseSkipsNonTorrentEnclosures(t *testing.T) {
+	body := `<?xml version="1.0"?><rss version="2.0"><channel>
+<item><title>Torrent release</title><enclosure url="http://tracker/1.torrent" length="10" type="application/x-bittorrent"/></item>
+<item><title>eD2k release</title><enclosure url="http://tracker/2.torrent" length="20" type="application/x-ed2k"/></item>
+<item><title>Usenet release</title><enclosure url="http://tracker/3.torrent" length="30" type="application/x-nzb"/></item>
+<item><title>eD2k link</title><link>ed2k://|file|movie.mkv|123|0123456789abcdef0123456789abcdef|/</link></item>
+</channel></rss>`
+	items, err := Parse(strings.NewReader(body), "indexarr")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(items) != 1 || items[0].Title != "Torrent release" {
+		t.Fatalf("items = %+v, want only the torrent release", items)
 	}
 }
 
@@ -106,6 +128,80 @@ func TestSearchAgainstFakeServer(t *testing.T) {
 	}
 	if gotPath != "/api" || gotKey != "secret" || gotQuery != "movie 2024" {
 		t.Fatalf("request path=%q key=%q q=%q", gotPath, gotKey, gotQuery)
+	}
+}
+
+// TestIndexarrReadsFollowingPages gives the reported case a regression test:
+// a wanted title's Italian releases sit far beyond the first page, so an
+// indexarr search must read the pages its total declares instead of stopping
+// at the 50 results the default limit returned.
+func TestIndexarrReadsFollowingPages(t *testing.T) {
+	const total = 250
+	var offsets []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api" {
+			http.NotFound(w, r)
+			return
+		}
+		q := r.URL.Query()
+		if q.Get("t") != "search" || q.Get("q") != "Reacher" || q.Get("limit") != "100" {
+			http.Error(w, "bad params: "+r.URL.RawQuery, http.StatusBadRequest)
+			return
+		}
+		offset := q.Get("offset")
+		offsets = append(offsets, offset)
+		start := 0
+		if offset != "" {
+			start, _ = strconv.Atoi(offset)
+		}
+		end := start + searchPageSize
+		if end > total {
+			end = total
+		}
+		var b strings.Builder
+		fmt.Fprintf(&b, `<?xml version="1.0"?><rss version="2.0" xmlns:newznab="http://www.newznab.com/DTD/2010/feeds/attributes/"><channel><newznab:response offset="%d" total="%d"/>`, start, total)
+		for i := start; i < end; i++ {
+			fmt.Fprintf(&b, `<item><title>Reacher ITA %d</title><enclosure url="http://tracker/%d.torrent"/></item>`, i, i)
+		}
+		b.WriteString(`</channel></rss>`)
+		_, _ = w.Write([]byte(b.String()))
+	}))
+	defer srv.Close()
+
+	idx := Indexer{Name: "indexarr", URL: srv.URL, APIKey: "k"}
+	items, err := idx.Search(context.Background(), "Reacher")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(items) != total {
+		t.Fatalf("items = %d, want %d (the pages after the first must be read)", len(items), total)
+	}
+	want := []string{"", "100", "200"}
+	if len(offsets) != len(want) {
+		t.Fatalf("offsets = %v, want %v", offsets, want)
+	}
+	for i := range want {
+		if offsets[i] != want[i] {
+			t.Fatalf("offsets = %v, want %v", offsets, want)
+		}
+	}
+}
+
+// TestNonIndexarrKeepsFirstPage pins that a plain tracker is not paginated: it
+// would be searched again for every page.
+func TestNonIndexarrKeepsFirstPage(t *testing.T) {
+	calls := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		calls++
+		_, _ = w.Write([]byte(`<?xml version="1.0"?><rss version="2.0" xmlns:newznab="http://www.newznab.com/DTD/2010/feeds/attributes/"><channel><newznab:response offset="0" total="250"/><item><title>One</title><enclosure url="http://tracker/1.torrent"/></item></channel></rss>`))
+	}))
+	defer srv.Close()
+	items, err := (Indexer{Name: "private", URL: srv.URL}).Search(context.Background(), "x")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(items) != 1 || calls != 1 {
+		t.Fatalf("items=%d calls=%d, want the first page only", len(items), calls)
 	}
 }
 

@@ -91,6 +91,7 @@ func TestFindSeason(t *testing.T) {
 		{"Reacher - S04 (2026) [COMPLETE] SD AMZN Rip XviD ita eng Mp3 Sub ita eng[Pir8]", 4, true},
 		{"Reacher (2022) S04 1080p WEBRip 10bit EAC3 5 1 x265-iVy", 4, true},
 		{"The.Mandalorian.S01.2160p.UHD.BluRay", 1, true},
+		{"Reacher.S01.ITA.ENG.2160p.UHD.BluRay.x265-MeM.GP2160p", 1, true},
 		{"Show Season 2 Complete 1080p", 2, true},
 		{"Show Stagione 3 ITA", 3, true},
 		{"Movie 2024 1080p", 0, false},

@@ -191,7 +191,7 @@ func (d *Daemon) handleUIWantedPreview(w http.ResponseWriter, r *http.Request) {
 	indexers := len(d.indexers())
 	if live && text != "" && indexers > 0 {
 		ctx, cancel := context.WithTimeout(r.Context(), indexerSearchTimeout)
-		found, err := d.searchFeed(ctx, wantedFeedName(entry.Name), text)
+		found, err := d.searchFeedWanted(ctx, wantedFeedName(entry.Name), text, entry.Language)
 		cancel()
 		if err != nil {
 			indexerError = err.Error()
