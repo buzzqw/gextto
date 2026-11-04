@@ -1799,7 +1799,10 @@ type v2DetailView struct {
 	Error       string
 	// TabError explains why a tab is empty (engine unreachable, unsupported).
 	TabError string
-	Caps     v2DetailCaps
+	// Notice is the toast shown after a detail action: saving a tab must not
+	// look like nothing happened.
+	Notice *v2ActionNotice
+	Caps   v2DetailCaps
 }
 
 // v2DetailCaps tells the detail form which controls the active engine
@@ -2291,13 +2294,54 @@ func V2DownloadsDetailAction(w http.ResponseWriter, r *http.Request, s *AppState
 		http.Redirect(w, r, "/?view=downloads", http.StatusSeeOther)
 		return
 	}
+	view := v2DetailViewFrom(s, hash, tab)
 	if status >= 400 {
-		view := v2DetailViewFrom(s, hash, tab)
-		view.Error = v2JSONError(raw)
-		v2Render(w, http.StatusOK, "v2_detail_panel", view, s)
+		message := v2JSONError(raw)
+		if message == "" {
+			message = "Operazione non riuscita."
+		}
+		view.Notice = &v2ActionNotice{Title: "Operazione", Message: message, Error: true}
+		v2Render(w, http.StatusOK, "v2_detail_panel_result", view, s)
 		return
 	}
-	v2Render(w, http.StatusOK, "v2_detail_panel", v2DetailViewFrom(s, hash, tab), s)
+	view.Notice = v2DetailActionNotice(op, r)
+	v2Render(w, http.StatusOK, "v2_detail_panel_result", view, s)
+}
+
+// v2DetailActionNotice is the confirmation the detail modal shows after a
+// successful action, so a save never looks like a click that did nothing. The
+// strings are Italian catalog keys, translated by the template.
+func v2DetailActionNotice(op string, r *http.Request) *v2ActionNotice {
+	message := "Impostazione salvata."
+	switch op {
+	case "limits":
+		message = "Limiti del torrent salvati."
+	case "storage":
+		message = "Spostamento dello storage avviato."
+	case "trackers", "trackers-remove":
+		message = "Tracker aggiornati."
+	case "files-priority":
+		message = "Priorità del file aggiornata."
+	case "web-seeds":
+		if r.FormValue("remove") == "true" {
+			message = "Web seed rimossi."
+		} else {
+			message = "Web seed aggiunti."
+		}
+	case "tag":
+		if strings.TrimSpace(r.FormValue("tag")) == "" {
+			message = "Tag del torrent rimosso."
+		} else {
+			message = "Tag del torrent salvato."
+		}
+	case "reannounce":
+		message = "Annuncio inviato ai tracker."
+	case "restart":
+		message = "Torrent riavviato."
+	case "mark_failed":
+		message = "Torrent segnato come fallito."
+	}
+	return &v2ActionNotice{Title: "Operazione", Message: message}
 }
 
 func v2ParseInt32(value string, fallback int32) int32 {

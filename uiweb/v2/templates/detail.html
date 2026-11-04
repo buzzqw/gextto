@@ -95,6 +95,8 @@
 
 {{end}}
 
+{{define "v2_detail_panel_result"}}{{template "v2_detail_panel" .}}{{if .Notice}}<div id="v2-toast-region" hx-swap-oob="innerHTML">{{template "v2_action_notice" .Notice}}</div>{{end}}{{end}}
+
 {{define "v2_acquisition_events"}}
 {{if .AcqID}}<p class="hint"><span>{{tr "ID acquisizione:"}}</span> <code>{{tr .AcqID}}</code> · <a href="/?view=logs&amp;filter={{printf "acq: %s" .AcqID | urlquery}}" {{trTitle "Apri il log filtrato su questo download"}}>{{tr "Mostra nel log"}}</a></p>
 <p class="hint">{{tr "Ogni riga del log di questo download contiene questo ID."}}</p>{{end}}

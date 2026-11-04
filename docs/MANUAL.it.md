@@ -651,7 +651,9 @@ resta visibile. Le schede:
 
 Passando il mouse su un valore o su un pulsante compare la spiegazione. Se
 sposti lo storage in una cartella che **contiene già i dati**, Gextto li
-ricontrolla e li riusa invece di riscaricarli.
+ricontrolla e li riusa invece di riscaricarli. Ogni salvataggio mostra un
+avviso in alto che dice cosa è stato salvato; se qualcosa non riesce l'avviso è
+rosso, riporta il motivo e la scheda resta com'era, con i valori inseriti.
 
 ### Streaming e media server
 

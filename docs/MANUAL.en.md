@@ -644,7 +644,9 @@ stays visible. The tabs:
 
 Hovering over a value or a button shows what it means. If you move the storage
 to a folder that **already holds the data**, Gextto rechecks and reuses it
-instead of downloading it again.
+instead of downloading it again. Every save shows a notice at the top saying
+what was saved; if something fails the notice is red, gives the reason and the
+tab stays as it was, with the values you typed.
 
 ### Streaming and media server
 

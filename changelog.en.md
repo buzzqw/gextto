@@ -23,6 +23,9 @@ create, the app on the phone — apply **only to the standalone version** and do
 not change Gextto's interface, where those pages do not exist. Engine fixes, on
 the other hand, apply to both.
 
+## 4 November 2026
+- **Saving a torrent detail tab now confirms it.** Pressing **Save limits**, or saving trackers, tags, web seeds, file priorities and the storage move, rebuilt the tab with the new values without saying anything: it looked as if the click had done nothing. A notice now appears at the top saying what was saved (“Torrent limits saved.”, “Trackers updated.” and so on); if something fails the notice is red, gives the reason and the tab stays as it was, with the values you just typed. **Announce**, **Restart** and **Mark as failed** now leave the same notice too, where before they acted in silence. Nothing to configure.
+
 ## 3 November 2026
 - **A pack added by hand is no longer discarded.** With *Pack inspection* on, Gextto also took out of the session a season pack you had started yourself, as soon as it saw that all its episodes were already in the library: you added it again and a few minutes later it was gone. The check now applies only to packs chosen by the automatic cycle; what you download by hand — from *Add torrent*, a search, the Archive — keeps downloading. Nothing to configure.
 - **The manual has been rewritten as a guide to using Gextto.** Instead of describing one page after another, it now follows what you want to do: install, make the first download in test mode and then for real, follow a series or a movie, see where the files end up, set up sources and quality, keep the library in order, make a backup and solve problems starting from the symptom. The full list of settings stays in the appendices. It opens from the **Manual** entry, as before.

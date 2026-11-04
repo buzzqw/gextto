@@ -24,6 +24,9 @@ creazione, app sul telefono — valgono **soltanto per la versione standalone** 
 non cambiano l'interfaccia di Gextto, dove quelle pagine non esistono. Le
 correzioni al motore valgono invece per entrambi.
 
+## 4 novembre 2026
+- **Salvare una scheda del dettaglio torrent ora lo conferma.** Premendo **Salva limiti**, o salvando tracker, tag, web seed, priorità dei file e spostamento dello storage, la scheda si ricompilava con i nuovi valori senza dire nulla: sembrava che il clic non avesse fatto niente. Ora compare un avviso in alto che dice cosa è stato salvato («Limiti del torrent salvati.», «Tracker aggiornati.» e così via); se qualcosa non riesce l'avviso è rosso, riporta il motivo e la scheda resta com'era, con i valori appena digitati. Lo stesso avviso ora lo lasciano anche **Annuncia**, **Riavvia** e **Segna come fallito**, che prima agivano in silenzio. Niente da configurare.
+
 ## 3 novembre 2026
 - **Un pack aggiunto a mano non viene più scartato.** Con il *Controllo dei pack* attivo, Gextto toglieva dalla sessione anche un season pack che avevi avviato tu, appena vedeva che tutti i suoi episodi erano già in libreria: lo riaggiungevi e dopo pochi minuti spariva di nuovo. Ora il controllo vale solo per i pack scelti dal ciclo automatico; quello che scarichi a mano — da *Aggiungi torrent*, da una ricerca, dall'Archivio — resta in download. Niente da configurare.
 - **Il manuale è stato riscritto come guida all'uso.** Invece di descrivere una pagina dopo l'altra, ora segue quello che vuoi fare: installare, fare il primo download in prova e poi davvero, seguire una serie o un film, capire dove finiscono i file, configurare sorgenti e qualità, tenere in ordine la libreria, fare un backup e risolvere i problemi partendo dal sintomo. L'elenco completo delle impostazioni resta nelle appendici. Si apre dalla voce **Manuale**, come prima.
