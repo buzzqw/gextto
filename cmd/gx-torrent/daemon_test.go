@@ -1335,6 +1335,58 @@ func TestDaemonSetTrackersReplacesTheList(t *testing.T) {
 	waitFor(t, "cleared", func() bool { return len(trackerURLs()) == 0 })
 }
 
+// TestDaemonAddTrackerOnTrackerlessTorrent covers the first tracker added to a
+// torrent that never had one. Its resume record has no tracker key, so the
+// additive action must treat the missing value as an empty list instead of
+// failing to decode it as JSON. This is the common case for a .torrent without
+// any announce URL.
+func TestDaemonAddTrackerOnTrackerlessTorrent(t *testing.T) {
+	d := newTestDaemon(t)
+	src := filepath.Join(t.TempDir(), "src")
+	data := makeTorrent(t, src, "payload.bin", 100_000)
+	hash, _, err := d.add(addRequest{TorrentData: data, Destination: src, SeedRatio: -1, SeedDays: -1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "seeding", func() bool { return stateOf(d, hash) == "seeding" })
+
+	trackerURLs := func() []string {
+		d.mu.Lock()
+		tt, _ := d.findLocked(hash)
+		d.mu.Unlock()
+		if tt == nil {
+			return nil
+		}
+		var out []string
+		for _, tr := range tt.Trackers() {
+			out = append(out, tr.URL)
+		}
+		return out
+	}
+
+	// Clearing the list deletes the key from resume, like a torrent that was
+	// added without any announce URL: the additive action must still work.
+	if err := d.setTrackers(hash, nil); err != nil {
+		t.Fatal(err)
+	}
+	if got := trackerURLs(); len(got) != 0 {
+		t.Fatalf("the test torrent must start trackerless, got %v", got)
+	}
+	if err := d.addTrackers(hash, []string{"http://127.0.0.1:1/announce"}); err != nil {
+		t.Fatalf("adding the first tracker to a trackerless torrent: %v", err)
+	}
+	waitFor(t, "first tracker", func() bool {
+		got := trackerURLs()
+		return len(got) == 1 && got[0] == "http://127.0.0.1:1/announce"
+	})
+
+	// Additive, not replacement: the first one stays.
+	if err := d.addTrackers(hash, []string{"udp://127.0.0.1:2"}); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "two trackers", func() bool { return len(trackerURLs()) == 2 })
+}
+
 // TestDaemonAddAndRemoveWebseeds checks the runtime web seed list: duplicates
 // are ignored, removal matches by URL, and an empty removal changes nothing.
 func TestDaemonAddAndRemoveWebseeds(t *testing.T) {

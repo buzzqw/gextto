@@ -165,10 +165,18 @@ func (t *Torrent) AddTracker(uri string) error {
 	}
 	err = t.torrent.session.db.Update(func(tx *bbolt.Tx) error {
 		b := tx.Bucket(torrentsBucket).Bucket([]byte(t.torrent.id))
+		if b == nil {
+			return nil
+		}
 		value := b.Get(boltdbresumer.Keys.Trackers)
+		// A torrent that never had a tracker has no key in resume: the empty
+		// value is not JSON, and this is exactly the case AddTracker serves
+		// (adding the first tracker to a trackerless torrent).
 		var trackers [][]string
-		if err := json.Unmarshal(value, &trackers); err != nil {
-			return err
+		if len(value) > 0 {
+			if err := json.Unmarshal(value, &trackers); err != nil {
+				return err
+			}
 		}
 		trackers = append(trackers, []string{uri})
 		value, err = json.Marshal(trackers)
