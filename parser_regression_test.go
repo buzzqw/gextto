@@ -112,6 +112,28 @@ func TestParseQualityNoFalsePositives(t *testing.T) {
 	}
 }
 
+// A daily release is read as the day of the year. The components are bounded
+// before they become int and are compared after the calendar normalises them:
+// a title with a month or a day out of range stays a movie.
+func TestParseDailyReleaseRefusesImpossibleDates(t *testing.T) {
+	for _, title := range []string{
+		"Show.Name.2024-13-45.1080p",
+		"Show.Name.2024-05-32.1080p",
+		"Show.Name.2024-00-10.1080p",
+		"Show.Name.2024-05-00.1080p",
+	} {
+		release := ParseRelease(title, parserTestMagnet, "test")
+		if release == nil || release.Kind == "series" {
+			t.Errorf("%q must not be read as a series: %+v", title, release)
+		}
+	}
+	release := ParseRelease("Show.Name.2024-05-12.1080p", parserTestMagnet, "test")
+	if release == nil || release.Kind != "series" || release.Season == nil || *release.Season != 2024 ||
+		release.Episode == nil || *release.Episode != 133 {
+		t.Errorf("2024-05-12 must be S2024 day 133: %+v", release)
+	}
+}
+
 func TestParseEpisodeKeyFourDigitSeason(t *testing.T) {
 	key := ParseEpisodeKey("Show.Name.S2024E05.1080p")
 	if key == nil || key.Season != 2024 || key.Episode != 5 {

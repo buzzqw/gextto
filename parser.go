@@ -1099,8 +1099,15 @@ func readDate(capture []string) (releaseMatch, matchVerdict) {
 	if !ok {
 		return releaseMatch{}, matchRefused
 	}
-	date := time.Date(int(year), time.Month(month), int(day), 0, 0, 0, 0, time.UTC)
-	if date.Year() != int(year) || int(date.Month()) != int(month) || date.Day() != int(day) {
+	// The captures are int64 and the date components are int: bound them first,
+	// so the conversion cannot wrap and a title such as "2024-13-45" is refused
+	// instead of landing on a day invented by the wrap.
+	if year < 1 || year > 9999 || month < 1 || month > 12 || day < 1 || day > 31 {
+		return releaseMatch{}, matchRefused
+	}
+	yearInt, monthInt, dayInt := int(year), int(month), int(day)
+	date := time.Date(yearInt, time.Month(monthInt), dayInt, 0, 0, 0, 0, time.UTC)
+	if date.Year() != yearInt || int(date.Month()) != monthInt || date.Day() != dayInt {
 		return releaseMatch{}, matchRefused
 	}
 	ordinal := int64(date.YearDay())

@@ -48,6 +48,78 @@ func TestCleansComicSearchTitle(t *testing.T) {
 	}
 }
 
+// A comic may only be saved in a folder Gextto already knows: the data folder,
+// the download folder, the comics folder or the folder of a monitored comic. A
+// path chosen freely by the request is refused.
+func TestComicSavePathMustStayInsideAConfiguredFolder(t *testing.T) {
+	root := t.TempDir()
+	dataDir := filepath.Join(root, "data")
+	downloadDir := filepath.Join(root, "downloads")
+	comicDir := filepath.Join(root, "comics")
+	monitored := filepath.Join(root, "my-comics")
+	for _, dir := range []string{dataDir, downloadDir, comicDir, monitored} {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatalf("mkdir %s: %v", dir, err)
+		}
+	}
+	cfg := &Config{
+		DataDir:     dataDir,
+		DownloadDir: downloadDir,
+		Settings: map[string]string{
+			"tag_dir_rules": `[{"tag":"Comic","temp_dir":"` + comicDir + `","final_dir":"` + comicDir + `"}]`,
+		},
+	}
+	allowed := []string{
+		comicDir,
+		filepath.Join(comicDir, "Sub"),
+		downloadDir,
+		dataDir,
+		monitored,
+	}
+	for _, path := range allowed {
+		if !comicSavePathAllowed(cfg, []string{monitored}, path) {
+			t.Errorf("%q must be accepted", path)
+		}
+	}
+	refused := []string{
+		root,
+		filepath.Join(root, "elsewhere"),
+		filepath.Join(comicDir, "..", "..", "etc"),
+		"/etc",
+		"",
+	}
+	for _, path := range refused {
+		if comicSavePathAllowed(cfg, []string{monitored}, path) {
+			t.Errorf("%q must be refused", path)
+		}
+	}
+}
+
+// The manual storage move accepts the folders Gextto itself writes and refuses
+// a path chosen freely by the request.
+func TestMoveDestinationMustStayInsideAConfiguredFolder(t *testing.T) {
+	root := t.TempDir()
+	downloadDir := filepath.Join(root, "downloads")
+	tempDir := filepath.Join(root, "temp")
+	archiveRoot := filepath.Join(root, "archive")
+	seriesArchive := filepath.Join(root, "series-archive")
+	cfg := &Config{DownloadDir: downloadDir, DownloadTempDir: &tempDir, ArchiveRoot: &archiveRoot}
+	cfg.Series = []SeriesConfig{{Name: "Series A", ArchivePath: seriesArchive}}
+	for _, path := range []string{downloadDir, tempDir, archiveRoot, seriesArchive, filepath.Join(archiveRoot, "Show")} {
+		if !moveDestinationAllowed(cfg, nil, "", path) {
+			t.Errorf("%q must be accepted", path)
+		}
+	}
+	for _, path := range []string{root, "/etc", "", filepath.Join(downloadDir, "..", "..", "etc")} {
+		if moveDestinationAllowed(cfg, nil, "", path) {
+			t.Errorf("%q must be refused", path)
+		}
+	}
+	if pathStartsWith("/etc", "") {
+		t.Error("an empty root must never contain a path")
+	}
+}
+
 func TestHTTPDownloadTagIsTrimmedAndReportedWhenMissing(t *testing.T) {
 	id := registerHTTPDownload("Test Comic", "http", "https://example.test/file.cbz")
 	if !SetHTTPDownloadTag(id, "  fumetti  ") {

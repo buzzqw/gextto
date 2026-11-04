@@ -1386,20 +1386,6 @@ func formUrlencode(value string) string {
 	return builder.String()
 }
 
-// Reports whether path is root itself or lies inside it, comparing whole
-// components so that /media and /media2 do not match.
-func gh7PathStartsWith(path, root string) bool {
-	if strings.TrimSpace(root) == "" {
-		return false
-	}
-	cleanPath := filepath.Clean(path)
-	cleanRoot := filepath.Clean(root)
-	if cleanPath == cleanRoot {
-		return true
-	}
-	return strings.HasPrefix(cleanPath, cleanRoot+string(filepath.Separator))
-}
-
 // ExportMagnet handles GET /api/torrents/{hash}/magnet.
 func ExportMagnet(w http.ResponseWriter, r *http.Request, s *AppState) {
 	hash := pathParam(r, "hash")
@@ -1451,11 +1437,7 @@ func MoveTorrentStorage(w http.ResponseWriter, r *http.Request, s *AppState) {
 	}
 	cfg := latestConfig(s)
 	destination := strings.TrimSpace(input.Path)
-	allowed := gh7PathStartsWith(destination, cfg.DownloadDir) ||
-		(cfg.DownloadTempDir != nil && gh7PathStartsWith(destination, *cfg.DownloadTempDir)) ||
-		(cfg.ArchiveRoot != nil && gh7PathStartsWith(destination, *cfg.ArchiveRoot)) ||
-		isConfiguredArchive(cfg, s.db, hash, destination)
-	if !allowed {
+	if !moveDestinationAllowed(cfg, s.db, hash, destination) {
 		jsonError(w, http.StatusForbidden, "storage path must be inside a configured Gextto directory")
 		return
 	}
@@ -1466,7 +1448,13 @@ func MoveTorrentStorage(w http.ResponseWriter, r *http.Request, s *AppState) {
 			break
 		}
 	}
+	// The name comes from the torrent's metainfo, so a crafted one must not walk
+	// the target out of the folder the request was allowed to use.
 	target := filepath.Join(destination, name)
+	if !pathStartsWith(target, destination) {
+		name = filepath.Base(name)
+		target = filepath.Join(destination, name)
+	}
 	logging.Info("manual torrent storage move requested",
 		"hash", hash, "name", name, "destination", destination)
 	if _, statErr := os.Stat(target); statErr == nil {
@@ -1508,13 +1496,24 @@ func MoveTorrentStorage(w http.ResponseWriter, r *http.Request, s *AppState) {
 	torrentAction(w, result, err)
 }
 
+// moveDestinationAllowed reports whether a manual storage move may write into
+// destination: the download folder, the temporary folder, the archive root, a
+// series archive or the destination configured for this torrent's release. A
+// path chosen freely by the request is refused.
+func moveDestinationAllowed(cfg *Config, db *Database, hash, destination string) bool {
+	return pathStartsWith(destination, cfg.DownloadDir) ||
+		(cfg.DownloadTempDir != nil && pathStartsWith(destination, *cfg.DownloadTempDir)) ||
+		(cfg.ArchiveRoot != nil && pathStartsWith(destination, *cfg.ArchiveRoot)) ||
+		isConfiguredArchive(cfg, db, hash, destination)
+}
+
 // isConfiguredArchive reports whether destination is inside a library
 // folder Gextto itself would use: the archive of a configured series, or the
 // destination configured for this torrent's release (tag rules, series
 // archive). Post-seed moves go there, so a manual move must be allowed too.
 func isConfiguredArchive(cfg *Config, db *Database, hash, destination string) bool {
 	for index := range cfg.Series {
-		if archive := strings.TrimSpace(cfg.Series[index].ArchivePath); archive != "" && gh7PathStartsWith(destination, archive) {
+		if archive := strings.TrimSpace(cfg.Series[index].ArchivePath); archive != "" && pathStartsWith(destination, archive) {
 			return true
 		}
 	}
@@ -1526,7 +1525,7 @@ func isConfiguredArchive(cfg *Config, db *Database, hash, destination string) bo
 		return false
 	}
 	configured, ok := ConfiguredDestinationFor(&meta.Release, cfg)
-	return ok && strings.TrimSpace(configured) != "" && gh7PathStartsWith(destination, configured)
+	return ok && strings.TrimSpace(configured) != "" && pathStartsWith(destination, configured)
 }
 
 // ReannounceTorrent handles POST /api/torrents/{hash}/reannounce.

@@ -30,6 +30,17 @@ func anyPathStartsWith(path string, prefixes []string) bool {
 	return false
 }
 
+// comicSavePathAllowed reports whether a comic may be saved in target: only the
+// data folder, the download folder, the comics folder and the folder a
+// monitored comic already uses are accepted, never a path chosen freely.
+func comicSavePathAllowed(cfg *Config, monitoredPaths []string, target string) bool {
+	comicDir, hasComicDir := ComicDownloadDir(cfg)
+	return pathStartsWith(target, cfg.DataDir) ||
+		pathStartsWith(target, cfg.DownloadDir) ||
+		(hasComicDir && pathStartsWith(target, comicDir)) ||
+		anyPathStartsWith(target, monitoredPaths)
+}
+
 func ComicDownloadHandler(w http.ResponseWriter, r *http.Request, s *AppState) {
 	if s.dryRun() {
 		jsonError(w, http.StatusConflict, "download manuali disabilitati in dry-run")
@@ -62,11 +73,7 @@ func ComicDownloadHandler(w http.ResponseWriter, r *http.Request, s *AppState) {
 	} else {
 		target = strings.TrimSpace(input.SavePath)
 	}
-	allowed := pathStartsWith(target, cfg.DataDir) ||
-		pathStartsWith(target, cfg.DownloadDir) ||
-		(hasComicDir && pathStartsWith(target, comicDir)) ||
-		anyPathStartsWith(target, monitoredPaths)
-	if !allowed {
+	if !comicSavePathAllowed(cfg, monitoredPaths, target) {
 		jsonError(w, http.StatusForbidden, "percorso comics non configurato")
 		return
 	}

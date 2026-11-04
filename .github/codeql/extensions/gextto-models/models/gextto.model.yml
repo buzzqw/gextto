@@ -13,6 +13,19 @@ extensions:
       # manualImportAllowed(cfg, path): the manual import only reads files inside
       # the configured download and archive roots.
       - ["github.com/buzzqw/gextto", "", False, "manualImportAllowed", "", "", "Argument[1]", "true", "path-injection", "manual"]
+      # anyPathStartsWith(path, prefixes): the same check over the comics folders
+      # the operator configured; it is true only when one of them contains path.
+      - ["github.com/buzzqw/gextto", "", False, "anyPathStartsWith", "", "", "Argument[0]", "true", "path-injection", "manual"]
+      # isConfiguredArchive(cfg, db, hash, destination): the manual storage move
+      # goes to a folder Gextto itself would use (series archive or the
+      # destination configured for the release).
+      - ["github.com/buzzqw/gextto", "", False, "isConfiguredArchive", "", "", "Argument[3]", "true", "path-injection", "manual"]
+      # comicSavePathAllowed(cfg, monitored, target): a comic is saved only in
+      # the data, download or comics folder, or where a monitored comic lives.
+      - ["github.com/buzzqw/gextto", "", False, "comicSavePathAllowed", "", "", "Argument[2]", "true", "path-injection", "manual"]
+      # moveDestinationAllowed(cfg, db, hash, destination): a manual torrent
+      # storage move only goes to a folder Gextto itself writes.
+      - ["github.com/buzzqw/gextto", "", False, "moveDestinationAllowed", "", "", "Argument[3]", "true", "path-injection", "manual"]
   - addsTo:
       pack: codeql/go-all
       extensible: barrierModel

@@ -234,6 +234,9 @@ func canonicalizePath(path string) (string, error) {
 // pathStartsWith reports whether path lies at or below prefix, comparing whole
 // path components like `Path::starts_with`.
 func pathStartsWith(path, prefix string) bool {
+	if strings.TrimSpace(prefix) == "" {
+		return false
+	}
 	relative, err := filepath.Rel(prefix, path)
 	if err != nil {
 		return false
