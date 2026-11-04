@@ -116,6 +116,22 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          # The GitHub API answers 502 on the release endpoints now and then,
+          # and a single failed call must not cost the whole build: every asset
+          # is retried on its own, and release.json — the file the in-app
+          # updater reads — goes last so it is the least likely to be missing.
+          upload() {
+            local file="$1" attempt
+            for attempt in 1 2 3 4 5; do
+              if gh release upload continuous --repo "$GITHUB_REPOSITORY" --clobber "$file"; then
+                return 0
+              fi
+              echo "upload of $file failed (attempt $attempt), retrying" >&2
+              sleep $((attempt * 10))
+            done
+            return 1
+          }
+
           files=(
             dist/gextto-linux-*.tar.gz
             dist/gextto-linux-*.tar.gz.sha256
@@ -123,26 +139,36 @@ jobs:
             dist/gx-torrent-linux-*.tar.gz.sha256
             dist/gx-torrent-windows-*.zip
             dist/gx-torrent-windows-*.zip.sha256
-            dist/release.json
           )
           # Update the rolling release in place. Deleting it first left the
           # releases page empty whenever the create call failed (a transient
-          # GitHub 502 did exactly that): a failed upload now leaves the
-          # previous assets reachable, and the tag is moved to this build.
-          if gh release view continuous --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh api -X PATCH "repos/$GITHUB_REPOSITORY/git/refs/tags/continuous" \
-              -f sha="$GITHUB_SHA" -F force=true >/dev/null
-            gh release upload continuous --repo "$GITHUB_REPOSITORY" --clobber "${files[@]}"
-            gh release edit continuous --repo "$GITHUB_REPOSITORY" \
-              --title "Gextto continuous build" \
-              --notes "Automatic build from commit $GITHUB_SHA on main (build $(cat build_number))." \
-              --prerelease
-          else
+          # GitHub 502 did exactly that): the assets of the existing release
+          # are replaced, and the tag is moved to this build.
+          if ! gh release view continuous --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            # A draft is not visible on the releases page: it becomes public
+            # only after the assets are in place.
             gh release create continuous \
               --repo "$GITHUB_REPOSITORY" \
               --target "$GITHUB_SHA" \
               --title "Gextto continuous build" \
               --notes "Automatic build from commit $GITHUB_SHA on main (build $(cat build_number))." \
-              --prerelease \
-              "${files[@]}"
+              --draft --prerelease
+          fi
+          gh api -X PATCH "repos/$GITHUB_REPOSITORY/git/refs/tags/continuous" \
+            -f sha="$GITHUB_SHA" -F force=true >/dev/null || true
+          failed=()
+          for file in "${files[@]}"; do
+            upload "$file" || failed+=("$file")
+          done
+          # The updater reads release.json: it is replaced after the archives
+          # it describes, so a partial upload never advertises missing files.
+          upload dist/release.json || failed+=("dist/release.json")
+          gh release edit continuous --repo "$GITHUB_REPOSITORY" \
+            --draft=false \
+            --title "Gextto continuous build" \
+            --notes "Automatic build from commit $GITHUB_SHA on main (build $(cat build_number))." \
+            --prerelease
+          if [ "${#failed[@]}" -gt 0 ]; then
+            echo "Assets not uploaded: ${failed[*]}" >&2
+            exit 1
           fi
