@@ -76,7 +76,7 @@ textarea.json{width:100%;font:12.5px/1.45 var(--mono)}
   <button type="button" role="tab" id="tab-feeds" aria-controls="p-feeds" aria-selected="true" data-tab="feeds" title="RSS feeds and listing pages"><svg class="i"><use href="/assets/icons.svg#i-rss"/></svg> Feeds<span class="cnt">{{FEEDCOUNT}}</span></button>
   <button type="button" role="tab" id="tab-rules" aria-controls="p-rules" aria-selected="false" data-tab="rules" title="Download rules, evaluated in order"><svg class="i"><use href="/assets/icons.svg#i-filter"/></svg> Rules<span class="cnt">{{RULECOUNT}}</span></button>
   <button type="button" role="tab" id="tab-indexers" aria-controls="p-indexers" aria-selected="false" data-tab="indexers" title="Torznab indexers (Prowlarr, Jackett)"><svg class="i"><use href="/assets/icons.svg#i-server"/></svg> Indexers<span class="cnt">{{INDEXERCOUNT}}</span></button>
-  <button type="button" role="tab" id="tab-options" aria-controls="p-options" aria-selected="false" data-tab="options" title="Refresh interval, archive retention, FlareSolverr"><svg class="i"><use href="/assets/icons.svg#i-gear"/></svg> Options</button>
+  <button type="button" role="tab" id="tab-options" aria-controls="p-options" aria-selected="false" data-tab="options" title="Check interval, archive retention, FlareSolverr"><svg class="i"><use href="/assets/icons.svg#i-gear"/></svg> Options</button>
 </div>
 
 <section class="tabpanel" id="p-feeds" role="tabpanel" aria-labelledby="tab-feeds">
@@ -92,7 +92,7 @@ textarea.json{width:100%;font:12.5px/1.45 var(--mono)}
     <div class="actions" style="margin:0">
       <button type="button" class="primary sm" id="guide-new-feed" title="Add an RSS feed">New feed</button>
       <button type="button" class="sm" id="guide-new-rule" title="Add a download rule">New rule</button>
-      <a class="btn sm" href="#options" id="guide-import" title="Refresh interval, archive retention, FlareSolverr">Import a setup</a>
+      <a class="btn sm" href="#options" id="guide-import" title="Check interval, archive retention, FlareSolverr">Import a setup</a>
     </div>
   </div>
 </section>
@@ -128,7 +128,7 @@ textarea.json{width:100%;font:12.5px/1.45 var(--mono)}
 <section class="tabpanel" id="p-options" role="tabpanel" aria-labelledby="tab-options" hidden>
   <form method="post" action="/ui/rss-settings" id="rss-settings">
     <div class="optgrid">
-      <div class="panel"><h3>Refresh interval (minutes)</h3><p>How often every active feed is checked.</p><input type="number" min="1" max="1440" name="interval" value="{{FEEDINTERVAL}}" aria-label="Refresh interval (minutes)" title="How often every active feed is checked"></div>
+      <div class="panel"><h3>Check interval (minutes)</h3><p>How often feeds are checked and wanted titles are searched.</p><input type="number" min="1" max="1440" name="interval" value="{{FEEDINTERVAL}}" aria-label="Check interval (minutes)" title="How often feeds are checked and wanted titles are searched"></div>
       <div class="panel"><h3>Archive retention (days, 0 = keep all)</h3><p>Items found longer ago are removed from the archive.</p><input type="number" min="0" max="3650" name="archive_days" value="{{ARCHIVEDAYS}}" aria-label="Archive retention (days, 0 = keep all)" title="Items found longer ago are removed from the archive"></div>
       <div class="panel"><h3>FlareSolverr URL</h3><p>Used for feeds and indexers behind a Cloudflare challenge; empty to disable.</p>
         <input type="text" name="flaresolverr" value="{{FLARESOLVERR}}" placeholder="http://127.0.0.1:8191" autocomplete="off" aria-label="FlareSolverr URL" title="FlareSolverr service used to pass feeds and indexers behind a Cloudflare challenge; empty to disable">

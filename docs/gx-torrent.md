@@ -340,8 +340,9 @@ The standalone pages follow the same structure:
   line with the options of the form (folder, filter, category, paused, disabled,
   *Take everything*), deriving a readable name from each address and skipping the
   lines already configured or unusable, which it then reports on the page.
-  The options tab holds the refresh interval, the archive retention,
-  FlareSolverr (with its test) and **Copy the setup**: *Export* downloads the
+  The options tab holds the check interval — the period of the whole cycle, so
+  it covers both the feeds and the wanted titles, even with no feed configured —
+  the archive retention, FlareSolverr (with its test) and **Copy the setup**: *Export* downloads the
   feeds, rules and indexers as one JSON file (`GET /ui/rss-export`), *Import*
   loads such a file (validated) and replaces them; nothing is edited by hand.
   The Rules tab opens with a short *What are rules for?* explanation (a rule is
@@ -1125,8 +1126,10 @@ it does not take a line of its own), and per row the buttons **↻ Reload** (to 
 *Remove*: reads that feed immediately and refreshes the row), **Edit** (the form is filled,
 including the *Feed options*: folder, include/exclude, category, path, pause, disabled),
 **Enable/Disable** and **Remove**. An **RSS options** box sets
-the refresh interval (minutes) and the archive retention (days)
-and shows the time of the next automatic check. The **rule editor** has
+the check interval (minutes) and the archive retention (days) and shows the time
+of the next automatic check. The check interval is the period of the whole
+cycle: it decides how often the feeds are read and the wanted titles are
+searched on the indexers, so it applies even with no feed configured. The **rule editor** has
 one rule per row with **Edit** (loads the rule into the form; saving keeps it in
 its place in the order), **Enable/Disable**, arrows to change its order — the
 first that matches wins — and *Remove*; the form also has *Download once*

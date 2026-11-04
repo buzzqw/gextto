@@ -78,7 +78,7 @@ func (d *Daemon) handleUIRssSettings(w http.ResponseWriter, r *http.Request) {
 	_ = r.ParseForm()
 	minutes, err := strconv.Atoi(strings.TrimSpace(r.FormValue("interval")))
 	if err != nil || minutes < 1 || minutes > 24*60 {
-		d.renderRSS(w, r, "The refresh interval must be between 1 and 1440 minutes.")
+		d.renderRSS(w, r, "The check interval must be between 1 and 1440 minutes.")
 		return
 	}
 	days, err := strconv.Atoi(strings.TrimSpace(r.FormValue("archive_days")))
