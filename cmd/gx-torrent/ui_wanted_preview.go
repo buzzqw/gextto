@@ -111,7 +111,6 @@ func (d *Daemon) handleUIWantedPreview(w http.ResponseWriter, r *http.Request) {
 	if !d.uiAuthorized(w, r) {
 		return
 	}
-	lang := d.uiLang(r)
 	q := r.URL.Query()
 	entry := wantedEntry{
 		Name: strings.TrimSpace(q.Get("name")), Kind: q.Get("kind"), Seasons: q.Get("seasons"),
@@ -230,7 +229,7 @@ func (d *Daemon) handleUIWantedPreview(w http.ResponseWriter, r *http.Request) {
 		rel := release{Title: item.Title, Size: item.Size, Seeders: item.Seeders, Verdict: verdict, Take: take, Magnet: item.Download()}
 		if ep.season >= 0 {
 			if ep.episode == 0 {
-				rel.Episode = uiTr(lang, "S%02d pack", ep.season)
+				rel.Episode = fmt.Sprintf("S%02d pack", ep.season)
 			} else {
 				rel.Episode = fmt.Sprintf("S%02dE%02d", ep.season, ep.episode)
 			}
@@ -289,7 +288,7 @@ func (d *Daemon) handleUIWantedPreview(w http.ResponseWriter, r *http.Request) {
 		}
 		parts := []string{}
 		for _, season := range takePacks {
-			parts = append(parts, uiTr(lang, "S%02d pack", season))
+			parts = append(parts, fmt.Sprintf("S%02d pack", season))
 		}
 		if ranges := formatEpisodeRanges(takeRegular, wantedEpisodeListMax); ranges != "" {
 			parts = append(parts, ranges)

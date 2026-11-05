@@ -1279,8 +1279,7 @@ complete*, *feed added torrents* and *feed error*, each one switchable
 channels. Every configured channel is tried at once, so one slow service does
 not hold back the others. The notification messages stay in English, like the
 log: a channel can be shared by several people and the text is read by scripts
-too. The labels of the wanted preview (a season pack, the verdicts) are
-translated by the server, in the JSON the dialog reads.
+too.
 
 When a check finds a newer release, the status bar at the bottom of the
 Torrents page shows an **Update available** indicator linking to *Settings →

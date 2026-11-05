@@ -1801,7 +1801,6 @@ var uiCatalog = map[string][5]string{
 	"Showing %s of %s":                            {"Mostrati %s di %s", "%s von %s angezeigt", "%s sur %s affichés", "Mostrando %s de %s", "Pokazano %s z %s"},
 	"empty = no program":                          {"vuoto = nessun programma", "leer = kein Programm", "vide = aucun programme", "vacío = ningún programa", "puste = żaden program"},
 	"empty = stay in the download folder":         {"vuoto = resta nella cartella di download", "leer = bleibt im Download-Ordner", "vide = reste dans le dossier de téléchargement", "vacío = se queda en la carpeta de descargas", "puste = zostaje w folderze pobrania"},
-	"S%02d pack":                                  {"pack S%02d", "S%02d-Paket", "pack S%02d", "pack S%02d", "pack S%02d"},
 }
 
 // uiClientKeys are the catalog keys the page's JavaScript looks up at runtime
