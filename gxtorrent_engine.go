@@ -1008,6 +1008,10 @@ func sameFileContent(a, b string) bool {
 // List returns the last snapshot, refreshing it first.
 func (e *gxTorrentEngine) List() []models.TorrentView {
 	_ = e.sync()
+	// sync returns with e.mu released; the snapshot reads the cache and
+	// rebuilds the sorted copy, so it needs the lock like Snapshot does.
+	e.mu.Lock()
+	defer e.mu.Unlock()
 	return e.snapshotLocked()
 }
 

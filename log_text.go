@@ -13,6 +13,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/buzzqw/gextto/internal/models"
 )
@@ -75,7 +76,23 @@ func shortTorrentName(name string) string {
 	if len(name) <= 40 {
 		return name
 	}
-	return strings.TrimSpace(name[:39]) + "…"
+	return strings.TrimSpace(cutAtRune(name, 39)) + "…"
+}
+
+// cutAtRune returns at most limit bytes of value without splitting a
+// character: a byte cut in the middle of an accented letter leaves invalid
+// UTF-8 in the log line or the page.
+func cutAtRune(value string, limit int) string {
+	if len(value) <= limit {
+		return value
+	}
+	if limit <= 0 {
+		return ""
+	}
+	for limit > 0 && !utf8.RuneStart(value[limit]) {
+		limit--
+	}
+	return value[:limit]
 }
 
 func logPercent(progress float64) string {

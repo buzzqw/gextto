@@ -794,6 +794,9 @@ func (e *qbittorrentEngine) diffLocked(previous, current models.TorrentView) {
 // outage yields the stale cache (or an empty list) instead of an error.
 func (e *qbittorrentEngine) List() []models.TorrentView {
 	_ = e.sync()
+	// sync returns with e.mu released; the snapshot needs it (see Snapshot).
+	e.mu.Lock()
+	defer e.mu.Unlock()
 	return e.snapshotLocked()
 }
 

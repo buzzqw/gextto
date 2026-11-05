@@ -1480,7 +1480,8 @@ girano in background: puoi continuare a usare Gextto e annullarle.
   sottotitoli, immagini e NFO seguono il nuovo nome.
 - **Ripristina sorgente nei nomi**: rimette il token `[WEB-DL]`, `[BluRay]`…
   nei nomi che l'hanno perso, ricavandolo dalla release originale. Se non è
-  noto, il file non cambia.
+  noto, il file non cambia; se nella cartella esiste già un file con il nuovo
+  nome, l'episodio viene saltato e conta come errore, senza sovrascrivere nulla.
 
 ### Duplicati
 

@@ -1467,7 +1467,8 @@ background: you can keep using Gextto and cancel them.
   files follow the new name.
 - **Restore source**: puts the `[WEB-DL]`, `[BluRay]`… token back in names that
   lost it, taking it from the original release. If it is unknown, the file does
-  not change.
+  not change; if the folder already holds a file with the new name, the episode
+  is skipped and counts as an error, and nothing is overwritten.
 
 ### Duplicates
 

@@ -1446,3 +1446,29 @@ func TestGxSnapshotDoesNotPollTheDaemon(t *testing.T) {
 		t.Fatalf("the cache was modified through the returned slice: %q", got)
 	}
 }
+
+// TestGxEngineListAndSnapshotRunConcurrently: List rebuilds the sorted
+// snapshot, so it must hold the lock like Snapshot (go test -race).
+func TestGxEngineListAndSnapshotRunConcurrently(t *testing.T) {
+	engine, _ := newTestGxEngine(t, "")
+	var wg sync.WaitGroup
+	for i := 0; i < 4; i++ {
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			for j := 0; j < 50; j++ {
+				_ = engine.List()
+			}
+		}()
+		go func() {
+			defer wg.Done()
+			for j := 0; j < 50; j++ {
+				engine.mu.Lock()
+				engine.cacheVersion++
+				engine.mu.Unlock()
+				_ = engine.Snapshot()
+			}
+		}()
+	}
+	wg.Wait()
+}

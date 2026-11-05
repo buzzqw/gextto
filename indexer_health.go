@@ -62,7 +62,7 @@ func ManagerIndexerHealth(ctx context.Context, baseURL, apiKey, kind string) ([]
 				// in its log, so a Prowlarr row falls back to the state alone.
 				reason := strings.TrimSpace(managerScalar(status["message"]))
 				if len(reason) > 200 {
-					reason = strings.TrimSpace(reason[:200]) + "…"
+					reason = strings.TrimSpace(cutAtRune(reason, 200)) + "…"
 				}
 				detail := "in errore"
 				if reason != "" {

@@ -1343,14 +1343,14 @@ func safeFeedQuery(raw string) string {
 				continue
 			}
 			if len(value) > 40 {
-				value = value[:40] + "…"
+				value = cutAtRune(value, 40) + "…"
 			}
 			parts = append(parts, safeQueryPart(key)+"="+safeQueryPart(value))
 		}
 	}
 	out := strings.Join(parts, "&")
 	if len(out) > 80 {
-		out = out[:80] + "…"
+		out = cutAtRune(out, 80) + "…"
 	}
 	return out
 }

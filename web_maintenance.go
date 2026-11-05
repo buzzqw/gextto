@@ -1404,6 +1404,13 @@ func RestoreSource(w http.ResponseWriter, r *http.Request, s *AppState) {
 			if target == archivePath {
 				continue
 			}
+			// rename(2) replaces an existing file without a word: a library
+			// file already holding the restored name must not be overwritten.
+			if _, err := os.Lstat(target); err == nil {
+				errors++
+				logging.Warn(fmt.Sprintf("Did not restore the source in the name of %s: %s already exists", archivePath, target))
+				continue
+			}
 			if execute {
 				if _, err := RenameSidecars(archivePath, target, cfg); err != nil {
 					logging.Warn("restore source: sidecar rename failed", "error", err)

@@ -722,11 +722,18 @@ func audioCleanupMappedStreams(plan AudioCleanupPlan, matroska bool) []StreamInf
 	return streams
 }
 
+// mkvmergeIdentifyTimeout bounds "mkvmerge -J", which reads only the headers.
+const mkvmergeIdentifyTimeout = 2 * time.Minute
+
 // mkvmergeAudioTrackIDs reads the real mkvmerge track IDs (0-based). They are
 // not assumed to equal the ffprobe indexes: the count is checked and the order
 // is the container order, the same both tools use.
 func mkvmergeAudioTrackIDs(path string, want int) ([]int, error) {
-	command := exec.Command("mkvmerge", "-J", path)
+	// Identifying reads only the headers. The bound keeps a share that stops
+	// answering from holding the night maintenance forever on this call.
+	ctx, cancel := context.WithTimeout(context.Background(), mkvmergeIdentifyTimeout)
+	defer cancel()
+	command := exec.CommandContext(ctx, "mkvmerge", "-J", path)
 	var stderr bytes.Buffer
 	command.Stderr = &stderr
 	output, err := command.Output()

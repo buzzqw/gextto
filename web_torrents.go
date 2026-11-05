@@ -1007,8 +1007,7 @@ func RemoveCompletedTorrents(w http.ResponseWriter, r *http.Request, s *AppState
 		if label == "" {
 			label = "unnamed torrent"
 		}
-		status, _ := s.db.TorrentStatus(torrent.Hash)
-		processed, _ := s.db.TorrentProcessed(torrent.Hash)
+		status, processed, _ := s.db.TorrentStatusProcessed(torrent.Hash)
 		isArchived := processed != nil && strings.TrimSpace(*processed) != ""
 		isCompletedDB := status != nil && *status == "completed"
 		completed := torrent.Progress >= 99.99 || torrent.State == "finished" || torrent.State == "seeding" || isCompletedDB || isArchived

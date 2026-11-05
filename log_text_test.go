@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/buzzqw/gextto/internal/models"
 )
@@ -422,5 +423,19 @@ func TestRoutineSkipReasonKeepsBlocklistedCandidatesQuiet(t *testing.T) {
 		if routineSkipReason(reason) {
 			t.Errorf("routineSkipReason(%q) = true, want false", reason)
 		}
+	}
+}
+
+func TestCutAtRuneKeepsWholeCharacters(t *testing.T) {
+	name := strings.Repeat("a", 38) + "èè"
+	got := shortTorrentName(name + " altro")
+	if !utf8.ValidString(got) {
+		t.Fatalf("invalid UTF-8: %q", got)
+	}
+	if got != strings.Repeat("a", 38)+"…" {
+		t.Fatalf("shortTorrentName = %q", got)
+	}
+	if cutAtRune("abc", 10) != "abc" || cutAtRune("abc", 0) != "" || cutAtRune("èa", 1) != "" {
+		t.Fatal("cutAtRune edge cases")
 	}
 }

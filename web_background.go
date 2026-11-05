@@ -1344,10 +1344,9 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 			if event.Kind == "torrent_finished" || event.Kind == "storage_moved" {
 				if _, sent := completionNotified[strings.ToLower(hash)]; sent {
 					alreadyAnnounced = true
-				} else if status, statusErr := db.TorrentStatus(hash); statusErr == nil && status != nil && *status == "completed" {
-					if archived, archivedErr := db.TorrentProcessed(hash); archivedErr == nil && archived != nil && strings.TrimSpace(*archived) != "" {
-						alreadyAnnounced = true
-					}
+				} else if status, archived, err := db.TorrentStatusProcessed(hash); err == nil && status != nil && *status == "completed" &&
+					archived != nil && strings.TrimSpace(*archived) != "" {
+					alreadyAnnounced = true
 				}
 			}
 			processed, handleErr := HandleTorrentEvent(cfg, torrents, db, moveRequests, postSeedMoves, storageMoveRetries, event, tmdb, notifier)

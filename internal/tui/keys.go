@@ -123,7 +123,13 @@ func (p *KeyParser) consumePaste() (Key, bool) {
 func (p *KeyParser) finishPaste() Key {
 	text := p.paste.String()
 	if len(text) > maxPaste {
-		text = text[:maxPaste]
+		// Back off to the start of a character: a paste cut mid-letter would
+		// leave invalid UTF-8 in the field.
+		cut := maxPaste
+		for cut > 0 && !utf8.RuneStart(text[cut]) {
+			cut--
+		}
+		text = text[:cut]
 	}
 	p.paste.Reset()
 	p.pasting = false
