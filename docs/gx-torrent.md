@@ -551,8 +551,9 @@ handshake and sends no User-Agent to public trackers (private trackers keep
 the configured one, and the IP address is not hidden); *Announce to all
 trackers in a tier* (*Network*, on by default) contacts every tracker of a
 multi-tracker tier in parallel and merges the peers, while tiers themselves
-are already announced in parallel. The first two are read when the session
-opens, so a change applies at the next start; the page says so.
+are already announced in parallel. Anonymous mode and the tracker policy are
+read when the session opens, so a change applies at the next start; the
+recheck applies from the next completed download. The page says so.
 
 **In-app update** (`update.go`, standalone only). *Settings → Maintenance*
 shows the running version (build, commit, build date, release channel) and
