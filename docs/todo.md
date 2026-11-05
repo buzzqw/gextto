@@ -47,40 +47,36 @@ its gate; a rejected one moves to *Not planned*.
 - **Error wrapping and log wording** — 280 log calls build their sentence with `Sprintf`
   although the logger takes structured fields, and 490 `fmt.Errorf` calls drop the cause
   because they do not use `%w`. Mechanical, area by area, tests green.
-- **Daemon behind a sub-path** — every page link and API path is absolute (`/ui/…`,
-  `/api/…`, `/assets/…`), so a proxy that mounts the daemon under `/gx/` breaks at the
-  first navigation; read `X-Forwarded-Prefix` (and a `-base-path` for a proxy that does
-  not send it) and render the links relative. Gate: a deployment with no free root path.
-- **HTTPS listener** — qBittorrent's *Use HTTPS* has no equivalent here: serve the page
-  and the API with `-tls-cert`/`-tls-key` (also settings keys), add HSTS, keep the
-  `Secure` cookie logic that already reads `X-Forwarded-Proto`. Gate: an operator who
-  cannot put a TLS terminator in front of the daemon.
-- **One-line install and a user unit** — the archive carries the system unit only and
-  there is no fetch-and-install script: add a `curl … | bash` that verifies the published
-  `.sha256`, installs a systemd **user** service with lingering or a system one, and
-  uninstalls. Gate: a host where the daemon must run without root.
-- **More architectures** — the releases cover Linux x86_64/aarch64 and Windows
-  amd64/arm64; add Linux 386, armv7/armhf and riscv64. The daemon is pure Go, so it is a
-  cross-build and a CI matrix entry, not an engine change. Gate: a user on an ARM NAS or
-  a 32-bit host.
-- **Unattended first start** — `settings.json` can be written before the first run
-  (`setup-complete`, bcrypt password), but the keys are undocumented and the hash has no
-  helper: document the file and add a `hash-password` command so a container or a
-  configuration-management run skips the wizard. Gate: an installation that must start
-  without a browser.
-- **Build provenance and SBOM** — publish GitHub artifact attestations and an SBOM next to
-  the checksums, as qbittorrent-nox-static does, so `gh attestation verify` proves an
-  archive came from this workflow. Gate: none.
-- **Published container image** — build multi-arch and push to a registry on release;
-  today CI only builds and smoke-tests the `Dockerfile`. Gate: registry credentials in
-  the repository.
-- **CLI add and named profiles** — accept positional `.torrent`/magnet arguments with
-  save path, category, paused, sequential and first/last, and a `-profile NAME` that
-  derives the data folder and port for a second instance. Gate: an automation that must
-  start a transfer without the API.
-- **Reverse-proxy recipes and a debugging page** — ready nginx/Caddy/Traefik snippets
-  (unbuffered SSE, upload size, `trusted-proxies`, `allowed-hosts`) and a page on
-  diagnosis (`SIGQUIT` dump, `pprof`, debug log, log files). Gate: none.
+- **Embedded tracker** — qBittorrent ships an HTTP announce endpoint (port 9000) with
+  peer bookkeeping per info hash; here there is none, so sharing inside a LAN needs an
+  external tracker. Add a configurable port, the announce/scrape handler, peer expiry and
+  a switch on the page. Gate: a user who shares files without a public tracker.
+- **HTTPS on the web interface** — serve the page and the API with a certificate
+  (`-tls-cert`/`-tls-key` and the settings keys), add HSTS; the `Secure` cookie logic
+  already reads `X-Forwarded-Proto`. Gate: a deployment without a TLS terminator.
+- **File selection before adding** — the add dialog has no file tree: parse the metainfo
+  (for a magnet, wait for the metadata) and show files with checkboxes and priorities
+  before the transfer starts. Gate: a torrent whose unwanted files are large enough to
+  matter.
+- **Torrent creator v2 and hybrid** — the creator builds v1 only; add the BEP 52 file
+  tree, the piece layers and the hybrid layout, plus the `source` field and «start
+  seeding». Gate: a v2-only swarm or a tracker that asks for it.
+- **Anonymous mode** — mask the peer ID and the client version in the handshake and in
+  the tracker user-agent, omit the announce IP, and make the flag the qBittorrent API
+  reports real instead of a constant false. Gate: a user who needs it on top of a VPN.
+- **Multi-tracker announce policy** — a tier announces to one member and fails over; add
+  «announce to all trackers in a tier» and «to all tiers» with merged peers, as
+  qBittorrent defaults. Gate: a swarm whose first tracker is dead or partial.
+- **Recheck after completion** — verify the data once when a download completes, for
+  disks that lie. Gate: none.
+- **IP address reported to trackers** — send an operator-chosen address in the announce
+  (HTTP `ip=` and the UDP equivalent). Gate: a NAT or VPN setup where the tracker records
+  the wrong address.
+- **Incomplete file extension** — append `.!qB` while a file is incomplete and rename it
+  at completion, with resume, recheck, move and streaming kept consistent. Gate: a
+  workflow that reads the folder during a download.
+- **More interface languages** — the page has six catalogs (it, en, de, fr, es, pl); add
+  the largest missing ones with native review. Gate: a translator for each.
 ## Not planned
 
 Closed by choice, not waiting for a measurement:
@@ -89,6 +85,9 @@ Closed by choice, not waiting for a measurement:
   builds: gx-core is our own pure-Go code with no libtorrent, and the daemon already
   links nothing (`CGO_ENABLED=0`), so there is no third-party tree to patch and no
   second way to build it.
+- Distribution parity with qbittorrent-nox-static (one-line installer, user unit, extra
+  architectures, provenance/SBOM, published image, mounting under a sub-path): packaging
+  work, not native client features, and not the direction chosen by the operator.
 - Notification texts in the interface language: the daemon's page is translated, the
   messages it sends (Telegram, Discord, Slack, Gotify, ntfy, Pushover, webhook, e-mail,
   script) stay in English on purpose — a channel can be shared by several people and the
