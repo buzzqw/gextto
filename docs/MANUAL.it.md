@@ -1202,6 +1202,13 @@ separato; non c'è nulla da installare.
   download dei `.torrent`; i servizi in rete locale restano diretti.
 - Supporta streaming, DLNA, download sequenziale, torrent v2 e i magnet con
   `so=`, `ws=` e `dht=`.
+- In **Configurazione → Motore torrent → gx-torrent** ci sono tre opzioni native
+  di qBittorrent: **ricontrolla i dati al completamento** (verifica i file una
+  volta prima di seminarli), **modalità anonima** (nasconde la versione del
+  client a peer e tracker pubblici, non l'IP) e **annuncia a tutti i tracker del
+  tier** (interroga insieme tutti i tracker di un tier). Le prime due sono
+  spente di default, la terza è attiva. Dopo averle cambiate, riavvia Gextto
+  per applicarle al demone gestito.
 
 Se il motore non riesce a restare in piedi (6 avvii anomali in 10 minuti),
 Gextto passa da solo a qBittorrent-nox e, come ultima risorsa, a uno stato di
@@ -2091,6 +2098,9 @@ verifica.
 | gx-torrent — proxy (socks5:// o http://) | Proxy per peer, tracker HTTP, web seed, lista del filtro IP, feed RSS, indexer Torznab e download di .torrent; localhost e rete locale restano diretti. Con un proxy DHT e tracker UDP vengono spenti e FlareSolverr non viene usato come ripiego (non visualizzato). |
 | gx-torrent — identità del client annunciata | Cosa vedono peer e tracker: `gx-core` con la versione reale (default) oppure un preset qBittorrent, Transmission, Rain o anacrolix/torrent. Cambia solo l'identità annunciata, non il protocollo: alcuni tracker privati accettano solo client in whitelist, controlla le loro regole. |
 | gx-torrent — versione del client annunciata | Versione usata con il preset; vuoto usa quella predefinita del preset. |
+| gx-torrent — ricontrolla i dati al completamento | Verifica una volta i file di un download completato, prima di seminarlo: un disco che restituisce un blocco errato viene scoperto subito invece di essere seminato per ore. Costa una lettura completa dei dati. Vale per i download completati dopo l'attivazione. |
+| gx-torrent — modalità anonima | Nasconde la versione del client ai peer e ai tracker pubblici: il peer id la perde, l'handshake non invia la versione e i tracker pubblici non ricevono lo User-Agent. I tracker privati mantengono l'agente configurato. Non nasconde l'indirizzo IP: per quello serve una VPN. |
+| gx-torrent — annuncia a tutti i tracker del tier | Contatta insieme tutti i tracker di un tier con più tracker e unisce i peer, come fa qBittorrent (predefinito attivo). Disattivalo per contattare un tracker per tier e passare al successivo in caso di errore. |
 | gx-torrent — timeout richieste | Timeout in secondi delle richieste HTTP verso gx-torrent. *(Unità: secondi)* |
 | gx-torrent — intervallo polling | Intervallo minimo in millisecondi tra due letture dello stato dei torrent (la coda la gestisce il demone). *(Unità: ms)* |
 | gx-torrent — server DLNA/UPnP | Abilita il media server DLNA/UPnP del demone: i media **completati** dei torrent sono visibili a TV e console sulla rete locale. Solo rete locale, senza autenticazione; disattivato di default. Funziona con il motore gx-torrent. |

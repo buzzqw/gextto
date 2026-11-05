@@ -236,6 +236,15 @@ func buildManagedGxCommand(cfg *Config, settings gxTorrentSettings) (gxManagedCo
 	if version := strings.TrimSpace(cfg.Settings["gxtorrent_client_identity_version"]); version != "" {
 		args = append(args, "-client-identity-version", version)
 	}
+	if settings.AnonymousMode {
+		args = append(args, "-anonymous-mode")
+	}
+	if settings.RecheckOnComplete {
+		args = append(args, "-recheck-on-complete")
+	}
+	if !settings.AnnounceAllInTier {
+		args = append(args, "-announce-all-in-tier=false")
+	}
 	if dir := strings.TrimSpace(cfg.DownloadDir); dir != "" {
 		if absolute, absErr := filepath.Abs(dir); absErr == nil {
 			args = append(args, "-download-dir", absolute)

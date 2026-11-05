@@ -54,6 +54,15 @@ type Options struct {
 	// identity (managed mode: Gextto flags; standalone: settings.json wins).
 	ClientIdentity        string
 	ClientIdentityVersion string
+	// AnonymousMode masks the client version from peers and public trackers
+	// (managed mode: Gextto flag; standalone: settings.json wins).
+	AnonymousMode bool
+	// RecheckOnComplete verifies a finished download once before seeding it
+	// (managed mode: Gextto flag; standalone: settings.json wins).
+	RecheckOnComplete bool
+	// AnnounceAllInTier contacts every tracker of a multi-tracker tier
+	// (managed mode: Gextto flag; standalone: settings.json wins).
+	AnnounceAllInTier bool
 	// Fingerprint is reported by /api/v1/health so Gextto can adopt a daemon
 	// it started earlier with the same binary and options.
 	Fingerprint string
@@ -650,6 +659,15 @@ func (d *Daemon) applyClientIdentity(cfg *torrent.Config) {
 	logfDebug("client identity: %s %s (peer id %s)", identity.Name, identity.Version, identity.PeerID)
 }
 
+// recheckOnCompleteEnabled reports the option: standalone settings.json wins
+// over the flag, managed has only the flag Gextto passes.
+func (d *Daemon) recheckOnCompleteEnabled() bool {
+	if d.opts.Settings != nil {
+		return d.settingBool(recheckOnCompleteKey, d.opts.RecheckOnComplete)
+	}
+	return d.opts.RecheckOnComplete
+}
+
 func (d *Daemon) sessionConfig() torrent.Config {
 	cfg := torrent.DefaultConfig
 	cfg.Database = d.opts.DBPath
@@ -671,9 +689,17 @@ func (d *Daemon) sessionConfig() torrent.Config {
 	d.applyNetwork(&cfg)
 	d.applyCache(&cfg)
 	// qBittorrent's "announce to all trackers in a tier" (default on). Tiers
-	// are already announced in parallel; this is the per-tier policy.
-	cfg.AnnounceAllInTier = d.settingBool("announce-all-in-tier", true)
-	cfg.AnonymousMode = d.settingBool("anonymous-mode", false)
+	// are already announced in parallel; this is the per-tier policy. In
+	// standalone settings.json wins over the flag; in managed the flag Gextto
+	// passes is the only source.
+	announceAll := d.opts.AnnounceAllInTier
+	anonymous := d.opts.AnonymousMode
+	if d.opts.Settings != nil {
+		announceAll = d.settingBool("announce-all-in-tier", announceAll)
+		anonymous = d.settingBool("anonymous-mode", anonymous)
+	}
+	cfg.AnnounceAllInTier = announceAll
+	cfg.AnonymousMode = anonymous
 	cfg.FilePriorities = d.prioritiesFor
 	cfg.PartsDir = d.opts.PartsDir
 	cfg.SpeedLimitDownload = d.state.Config.SpeedLimitDownload
@@ -1203,7 +1229,7 @@ func (d *Daemon) tick(now time.Time) {
 			// Recheck the data once before seeding it: a disk that returns a
 			// wrong block is caught now instead of being seeded for hours.
 			// The flag is set first, so the next ticks do not start it again.
-			if !meta.RecheckedOnComplete && d.settingBool(recheckOnCompleteKey, false) {
+			if !meta.RecheckedOnComplete && d.recheckOnCompleteEnabled() {
 				meta.RecheckedOnComplete = true
 				d.dirty = true
 				pendingRechecks = append(pendingRechecks, id)

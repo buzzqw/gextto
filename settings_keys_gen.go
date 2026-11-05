@@ -41,6 +41,9 @@ const (
 	settingGxtorrentProxy                   = "gxtorrent_proxy"
 	settingGxtorrentClientIdentity          = "gxtorrent_client_identity"
 	settingGxtorrentClientIdentityVersion   = "gxtorrent_client_identity_version"
+	settingGxtorrentRecheckOnComplete       = "gxtorrent_recheck_on_complete"
+	settingGxtorrentAnonymousMode           = "gxtorrent_anonymous_mode"
+	settingGxtorrentAnnounceAllInTier       = "gxtorrent_announce_all_in_tier"
 	settingGxtorrentRequestTimeoutSecs      = "gxtorrent_request_timeout_secs"
 	settingGxtorrentPollIntervalMs          = "gxtorrent_poll_interval_ms"
 	settingGxtorrentDlna                    = "gxtorrent_dlna"
@@ -278,6 +281,9 @@ var settingKeyNames = []string{
 	"gxtorrent_proxy",
 	"gxtorrent_client_identity",
 	"gxtorrent_client_identity_version",
+	"gxtorrent_recheck_on_complete",
+	"gxtorrent_anonymous_mode",
+	"gxtorrent_announce_all_in_tier",
 	"gxtorrent_request_timeout_secs",
 	"gxtorrent_poll_interval_ms",
 	"gxtorrent_dlna",

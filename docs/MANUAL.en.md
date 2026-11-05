@@ -1192,6 +1192,13 @@ process; there is nothing to install.
   through the tunnel too; services on the local network stay direct.
 - It supports streaming, DLNA, sequential download, v2 torrents and magnets
   with `so=`, `ws=` and `dht=`.
+- In **Configuration → Torrent engine → gx-torrent** there are three native
+  qBittorrent options: **recheck data when a download completes** (verify the
+  files once before seeding them), **anonymous mode** (hide the client version
+  from peers and public trackers, not the IP) and **announce to all trackers in
+  a tier** (ask every tracker of a tier together). The first two are off by
+  default, the third is on. After changing them, restart Gextto to apply them
+  to the managed daemon.
 
 If the engine cannot stay up (6 abnormal starts in 10 minutes), Gextto switches
 by itself to qBittorrent-nox and, as a last resort, to a recovery state with
@@ -2066,6 +2073,9 @@ the download stands. Season packs do not go through this check.
 | gx-torrent — proxy (socks5:// or http://) | Proxy for peers, HTTP trackers, web seeds, the IP filter list, RSS feeds, Torznab indexers and .torrent downloads; localhost and the local network stay direct. With a proxy, DHT and UDP trackers are disabled and FlareSolverr is not used as a fallback (not shown). |
 | gx-torrent — announced client identity | What peers and trackers see: `gx-core` with the real version (default) or a qBittorrent, Transmission, Rain or anacrolix/torrent preset. It changes only the announced identity, not the protocol: some private trackers only accept whitelisted clients, check their rules. |
 | gx-torrent — announced client version | Version used with the preset; empty uses the preset's default. |
+| gx-torrent — recheck data when a download completes | Verifies the files of a finished download once, before seeding them: a disk that returns a wrong block is caught at once instead of being seeded for hours. It costs one full read of the data. Applies to downloads completed after it is turned on. |
+| gx-torrent — anonymous mode | Hides the client version from peers and public trackers: the peer id loses it, the handshake sends no version and public trackers receive no User-Agent. Private trackers keep the configured agent. It does not hide your IP address: a VPN does that. |
+| gx-torrent — announce to all trackers in a tier | Contacts every tracker of a multi-tracker tier at once and merges the peers, as qBittorrent does (on by default). Turn it off to contact one tracker per tier and move to the next on failure. |
 | gx-torrent — request timeout | Timeout in seconds for HTTP requests to gx-torrent. *(Unit: seconds)* |
 | gx-torrent — polling interval | Minimum interval in milliseconds between torrent status reads (the daemon owns the queue). *(Unit: ms)* |
 | gx-torrent — DLNA/UPnP server | Enables the daemon's DLNA/UPnP media server: the torrents' **completed** media is visible to TVs and consoles on the local network. Local network only, no authentication; off by default. Works with the gx-torrent engine. |

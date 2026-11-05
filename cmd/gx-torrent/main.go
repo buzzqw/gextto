@@ -309,6 +309,9 @@ func main() {
 	mmapStorage := flag.Bool("mmap", envBool("GX_TORRENT_MMAP", false), "serve torrent files from a shared memory mapping (Linux, experimental): writes are page-cache memcpy and reads avoid a syscall")
 	clientIdentity := flag.String("client-identity", envOr("GX_TORRENT_CLIENT_IDENTITY", ""), "announced client identity: gx-core, qbittorrent, transmission, rain or anacrolix (empty = gx-core)")
 	clientIdentityVersion := flag.String("client-identity-version", envOr("GX_TORRENT_CLIENT_IDENTITY_VERSION", ""), "version announced with -client-identity (empty = the preset's version)")
+	anonymousMode := flag.Bool("anonymous-mode", envBool("GX_TORRENT_ANONYMOUS_MODE", false), "hide the client version from peers and public trackers (private trackers keep their agent; the IP is not hidden)")
+	recheckOnComplete := flag.Bool("recheck-on-complete", envBool("GX_TORRENT_RECHECK_ON_COMPLETE", false), "verify a finished download once before seeding it")
+	announceAllInTier := flag.Bool("announce-all-in-tier", envBool("GX_TORRENT_ANNOUNCE_ALL_IN_TIER", true), "contact every tracker of a multi-tracker tier at once and merge the peers")
 	dlnaEnabled := flag.Bool("dlna", envBool("GX_TORRENT_DLNA", false), "enable the DLNA/UPnP media server for the completed media (LAN only)")
 	dlnaListen := flag.String("dlna-listen", envOr("GX_TORRENT_DLNA_LISTEN", ""), "DLNA media server HTTP bind address (default :8200)")
 	dlnaName := flag.String("dlna-name", envOr("GX_TORRENT_DLNA_NAME", ""), "DLNA media server friendly name (default gx-torrent)")
@@ -414,6 +417,9 @@ func main() {
 		}
 	}
 
+	anonymousModeValue := optBool(settingsStore, "anonymous-mode", *anonymousMode)
+	recheckOnCompleteValue := optBool(settingsStore, "recheck-on-complete", *recheckOnComplete)
+	announceAllInTierValue := optBool(settingsStore, "announce-all-in-tier", *announceAllInTier)
 	opts := Options{
 		Listen:       listenValue,
 		DataDir:      data,
@@ -461,6 +467,9 @@ func main() {
 		DLNAExclude:           dlnaExclude,
 		ClientIdentity:        *clientIdentity,
 		ClientIdentityVersion: *clientIdentityVersion,
+		AnonymousMode:         anonymousModeValue,
+		RecheckOnComplete:     recheckOnCompleteValue,
+		AnnounceAllInTier:     announceAllInTierValue,
 		Tick:                  3 * time.Second,
 		ProbeWindow:           15 * time.Minute,
 	}

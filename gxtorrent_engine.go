@@ -49,7 +49,14 @@ type gxTorrentSettings struct {
 	Listen       string
 	Timeout      time.Duration
 	PollInterval time.Duration
-	Managed      bool
+	// AnonymousMode, RecheckOnComplete and AnnounceAllInTier are the engine
+	// options Gextto passes to the managed daemon. The daemon reads its own
+	// settings.json only in standalone, so in managed these flags are the only
+	// source.
+	AnonymousMode     bool
+	RecheckOnComplete bool
+	AnnounceAllInTier bool
+	Managed           bool
 	// SafeMode starts the managed daemon without uTP and holepunching. The
 	// supervisor sets it when gx-torrent keeps crashing and no other engine can
 	// take over the transfers.
@@ -92,11 +99,14 @@ func gxTorrentSettingsFromConfig(cfg *Config) (gxTorrentSettings, error) {
 		listen, baseURL = overrideListen, overrideURL
 	}
 	return gxTorrentSettings{
-		BaseURL:      baseURL,
-		Token:        strings.TrimSpace(cfg.Settings["gxtorrent_token"]),
-		Listen:       listen,
-		Timeout:      timeout,
-		PollInterval: poll,
+		BaseURL:           baseURL,
+		Token:             strings.TrimSpace(cfg.Settings["gxtorrent_token"]),
+		Listen:            listen,
+		Timeout:           timeout,
+		PollInterval:      poll,
+		AnonymousMode:     settingsBool(cfg, "gxtorrent_anonymous_mode", false),
+		RecheckOnComplete: settingsBool(cfg, "gxtorrent_recheck_on_complete", false),
+		AnnounceAllInTier: settingsBool(cfg, "gxtorrent_announce_all_in_tier", true),
 		// Gextto always starts and supervises its own gx-torrent daemon. An
 		// external daemon already answering on the URL is used as-is.
 		Managed:  true,

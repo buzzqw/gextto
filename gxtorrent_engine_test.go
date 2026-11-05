@@ -870,6 +870,48 @@ func TestGxListenOverride(t *testing.T) {
 	}
 }
 
+func TestGxNativeOptionFlags(t *testing.T) {
+	cfg := &Config{
+		DataDir: t.TempDir(),
+		Settings: map[string]string{
+			"gxtorrent_anonymous_mode":       "true",
+			"gxtorrent_recheck_on_complete":  "true",
+			"gxtorrent_announce_all_in_tier": "false",
+		},
+	}
+	settings, err := gxTorrentSettingsFromConfig(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !settings.AnonymousMode || !settings.RecheckOnComplete || settings.AnnounceAllInTier {
+		t.Fatalf("settings = %+v", settings)
+	}
+
+	bin := t.TempDir()
+	if err := os.WriteFile(filepath.Join(bin, "gx-torrent"), []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin)
+	command, err := buildManagedGxCommand(cfg, settings)
+	if err != nil {
+		t.Fatal(err)
+	}
+	joined := strings.Join(command.args, " ")
+	for _, want := range []string{"-anonymous-mode", "-recheck-on-complete", "-announce-all-in-tier=false"} {
+		if !strings.Contains(joined, want) {
+			t.Errorf("managed args lack %q: %s", want, joined)
+		}
+	}
+
+	defaults, err := gxTorrentSettingsFromConfig(&Config{DataDir: t.TempDir(), Settings: map[string]string{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if defaults.AnonymousMode || defaults.RecheckOnComplete || !defaults.AnnounceAllInTier {
+		t.Fatalf("defaults = %+v", defaults)
+	}
+}
+
 func TestAdoptedGxProcessDetectsExitAndStops(t *testing.T) {
 	sleeper := exec.Command("sleep", "30")
 	if err := sleeper.Start(); err != nil {
