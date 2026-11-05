@@ -313,14 +313,20 @@ func (e *Engine) ScrapeAllDomain(ctx context.Context, cfg *Config, domain *strin
 			if domainIs(domain, "series") || !movie.Enabled {
 				continue
 			}
-			query := fmt.Sprintf("%s %s", movie.Name, movie.Year)
-			key := strings.ToLower(query)
-			if _, exists := seenTargets[key]; !exists {
-				seenTargets[key] = struct{}{}
-				ids := [][2]string{}
-				if tmdbID := strings.TrimSpace(movie.TmdbID); tmdbID != "" {
-					ids = append(ids, [2]string{"tmdbid", tmdbID})
+			// A film monitored under its Chinese (or any localized) title is
+			// often published under its international one: search the names
+			// TMDB knows too, not only the monitored name.
+			ids := [][2]string{}
+			if tmdbID := strings.TrimSpace(movie.TmdbID); tmdbID != "" {
+				ids = append(ids, [2]string{"tmdbid", tmdbID})
+			}
+			for _, title := range movieSearchTitles(&movie, movieIndexerAliasLimit) {
+				query := strings.TrimSpace(title + " " + movie.Year)
+				key := strings.ToLower(query)
+				if _, exists := seenTargets[key]; exists {
+					continue
 				}
+				seenTargets[key] = struct{}{}
 				targets = append(targets, searchTarget{Query: query, IDs: ids, Type: searchTypeMovie})
 			}
 		}
@@ -840,13 +846,14 @@ func (e *Engine) SearchSeriesSeason(ctx context.Context, cfg *Config, series *Se
 }
 
 // SearchMovie searches one configured movie using its movie mode and TMDB id
-// where available. `includeRejected` is reserved for the manual movie view,
-// which applies its own per-movie filters before displaying results.
+// where available, under every title it is known by (the monitored name, the
+// original title and the first alternative titles TMDB supplied). `includeRejected`
+// is reserved for the manual movie view, which applies its own per-movie
+// filters before displaying results.
 func (e *Engine) SearchMovie(ctx context.Context, cfg *Config, movie *MovieConfig, manual, includeRejected bool) []models.Release {
 	if movie == nil || !movie.Enabled {
 		return nil
 	}
-	query := strings.TrimSpace(movie.Name + " " + movie.Year)
 	ids := make([][2]string, 0, 1)
 	if tmdbID := strings.TrimSpace(movie.TmdbID); tmdbID != "" {
 		ids = append(ids, [2]string{"tmdbid", tmdbID})
@@ -856,7 +863,42 @@ func (e *Engine) SearchMovie(ctx context.Context, cfg *Config, movie *MovieConfi
 		timeout := manualSearchTimeout
 		webTimeout = &timeout
 	}
-	return searchOneWithDBType(ctx, cfg, query, ids, webTimeout, e.db, includeRejected, searchTypeMovie, true)
+	titles := movieSearchTitles(movie, movieIndexerAliasLimit)
+	if len(titles) <= 1 {
+		query := strings.TrimSpace(movie.Name + " " + movie.Year)
+		return searchOneWithDBType(ctx, cfg, query, ids, webTimeout, e.db, includeRejected, searchTypeMovie, true)
+	}
+	// One fan-out per known title, at the same time: searching them one after
+	// the other would multiply the wait of a manual search. Only the monitored
+	// name also goes to the web engines; the alternative titles stay on the
+	// indexers, where they are cheap and precise.
+	results := make([][]models.Release, len(titles))
+	var group sync.WaitGroup
+	for index, title := range titles {
+		group.Add(1)
+		go func(index int, title string) {
+			defer recoverGoroutine("movie title search")
+			defer group.Done()
+			query := strings.TrimSpace(title + " " + movie.Year)
+			results[index] = searchOneWithDBType(ctx, cfg, query, ids, webTimeout, e.db, includeRejected, searchTypeMovie, index == 0)
+		}(index, title)
+	}
+	group.Wait()
+	merged := make([]models.Release, 0, 32)
+	seen := map[string]struct{}{}
+	for _, items := range results {
+		for _, item := range items {
+			key := strings.ToLower(strings.TrimSpace(releaseInfoHash(&item)))
+			if key != "" {
+				if _, exists := seen[key]; exists {
+					continue
+				}
+				seen[key] = struct{}{}
+			}
+			merged = append(merged, item)
+		}
+	}
+	return merged
 }
 
 // searchOneWithDB runs the indexer and web fan-outs concurrently, then applies

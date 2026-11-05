@@ -24,6 +24,15 @@ not change Gextto's interface, where those pages do not exist. Engine fixes, on
 the other hand, apply to both.
 
 ## 5 November 2026
+- **A film is really searched under every title TMDB knows.** After **Aggiorna
+  TMDB** a film without an Italian title can take its original name — Chinese,
+  for instance — and before this fix the indexer searches used only that name:
+  releases published under the international title were never asked for. The
+  automatic cycle and **Search** now try the monitored name, the original title
+  and the first alternative titles (up to four, so the queries do not
+  multiply), while release recognition and the archive search already used the
+  whole list. Nothing to configure: if you do not like a title you can change
+  **Name** on the page, and the other titles are still searched.
 - **Larger season packs are no longer refused for their piece count.** A 4K
   pack of a few hundred gigabytes can carry hundreds of thousands of pieces:
   Gextto accepted at most 65,536 and discarded the torrent with «too many

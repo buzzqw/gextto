@@ -537,6 +537,34 @@ func TestMovieMatchingNeverMatchesOnNumbersAlone(t *testing.T) {
 	}
 }
 
+// A film monitored under a localized title must be searched under every name
+// TMDB knows (the international one in particular), not only under the name
+// the page shows.
+func TestMovieSearchTitlesUseNameOriginalTitleAndAliases(t *testing.T) {
+	movie := &MovieConfig{
+		Name:          "封神第二部：战火西岐",
+		OriginalTitle: "封神第二部：战火西岐",
+		Aliases: []string{
+			"Creation of the Gods II: Demon Force",
+			"creation of the gods ii: demon force", // same title, different case
+			"Feng Shen 2",
+			"封神第二部",
+		},
+	}
+	got := movieSearchTitles(movie, 2)
+	want := []string{"封神第二部：战火西岐", "Creation of the Gods II: Demon Force", "Feng Shen 2"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("movieSearchTitles = %q, want %q", got, want)
+	}
+	all := movieSearchTitles(movie, 0)
+	if len(all) != 4 || all[3] != "封神第二部" {
+		t.Fatalf("all titles = %q", all)
+	}
+	if nil != movieSearchTitles(nil, 3) {
+		t.Fatal("a nil movie must return no titles")
+	}
+}
+
 // The series match receives the name the parser extracted, which keeps the
 // colon: it must resolve against a configured name with or without it.
 func TestSeriesMatchingIgnoresTheColon(t *testing.T) {

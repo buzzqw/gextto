@@ -475,7 +475,7 @@ func uiMovieDetailFrom(s *AppState, r *http.Request) (uiMovieDetail, bool) {
 	// The film may be monitored under one title and released under another
 	// (the international one). Search every known title, not only the
 	// configured name.
-	queryBases := append([]string{movie.Name}, movie.Aliases...)
+	queryBases := movieSearchTitles(movie, 0)
 	seenEntries := map[string]struct{}{}
 	for _, base := range queryBases {
 		base = strings.TrimSpace(base)

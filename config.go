@@ -1643,6 +1643,52 @@ func hasWordToken(words []string) bool {
 	return false
 }
 
+// movieIndexerAliasLimit is how many alternative titles of one film are sent
+// to the indexers in the automatic cycle and by «Cerca». Searching every title
+// TMDB lists (up to forty) would turn one film into forty requests per cycle,
+// with almost the same results each time.
+const movieIndexerAliasLimit = 4
+
+// movieSearchTitles returns the names a film can be released under, in search
+// order: the monitored name, the original title and the alternative titles
+// TMDB knows. Empty and repeated values are dropped, so the same query is not
+// sent twice. aliasLimit caps how many alternative titles are returned (0 or
+// less: all of them); an indexer query is a request, and TMDB can list dozens
+// of localized titles for one film. The first aliases are the most useful:
+// refreshMovieAlias puts the English/international title first.
+func movieSearchTitles(movie *MovieConfig, aliasLimit int) []string {
+	if movie == nil {
+		return nil
+	}
+	seen := map[string]struct{}{}
+	titles := make([]string, 0, 2+aliasLimit)
+	add := func(value string) bool {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			return false
+		}
+		key := strings.ToLower(value)
+		if _, exists := seen[key]; exists {
+			return false
+		}
+		seen[key] = struct{}{}
+		titles = append(titles, value)
+		return true
+	}
+	add(movie.Name)
+	add(movie.OriginalTitle)
+	used := 0
+	for _, alias := range movie.Aliases {
+		if aliasLimit > 0 && used >= aliasLimit {
+			break
+		}
+		if add(alias) {
+			used++
+		}
+	}
+	return titles
+}
+
 // movieTitleSpecificity is the number of words of the monitored name (or
 // original title) that appear in the release title, or 0 when the movie does
 // not match. When a release satisfies more than one monitored movie because one

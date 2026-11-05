@@ -518,7 +518,7 @@ func MovieSearch(w http.ResponseWriter, r *http.Request, s *AppState) {
 	}
 	query := strings.TrimSpace(movie.Name + " " + movie.Year)
 	results := s.engine.SearchMovie(r.Context(), cfg, movie, true, true)
-	archiveQueries := append([]string{movie.Name}, movie.Aliases...)
+	archiveQueries := movieSearchTitles(movie, 0)
 	seenEntries := map[string]struct{}{}
 	for _, base := range archiveQueries {
 		base = strings.TrimSpace(base)

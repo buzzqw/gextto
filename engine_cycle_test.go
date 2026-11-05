@@ -308,6 +308,84 @@ func TestScrapeAllSearchesSeriesAliases(t *testing.T) {
 	}
 }
 
+func TestScrapeAllSearchesMovieAliases(t *testing.T) {
+	var mutex sync.Mutex
+	queries := map[string]int{}
+	indexer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		query := r.URL.Query().Get("q")
+		mutex.Lock()
+		queries[query]++
+		mutex.Unlock()
+		_, _ = io.WriteString(w, `<rss><channel></channel></rss>`)
+	}))
+	defer indexer.Close()
+
+	state := newTestAppState(t)
+	cfg := DefaultConfig()
+	cfg.DataDir = state.cfg.DataDir
+	cfg.Movies = []MovieConfig{{
+		Name:    "封神第二部：战火西岐",
+		Year:    "2025",
+		Enabled: true,
+		Aliases: []string{"Creation of the Gods II: Demon Force", "Feng Shen 2"},
+	}}
+	cfg.FeedURLs = nil
+	cfg.Indexers = []IndexerConfig{{Name: "test", URL: indexer.URL, Enabled: true}}
+	cfg.WebsearchEngines = nil
+
+	if _, _, err := state.engine.ScrapeAll(context.Background(), &cfg); err != nil {
+		t.Fatal(err)
+	}
+	mutex.Lock()
+	defer mutex.Unlock()
+	for _, query := range []string{
+		"封神第二部：战火西岐 2025",
+		"Creation of the Gods II: Demon Force 2025",
+		"Feng Shen 2 2025",
+	} {
+		if queries[query] != 1 {
+			t.Fatalf("query %q sent %d times, all queries: %+v", query, queries[query], queries)
+		}
+	}
+}
+
+func TestSearchMovieSearchesEveryKnownTitle(t *testing.T) {
+	var mutex sync.Mutex
+	queries := map[string]int{}
+	indexer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		query := r.URL.Query().Get("q")
+		mutex.Lock()
+		queries[query]++
+		mutex.Unlock()
+		_, _ = io.WriteString(w, `<rss><channel></channel></rss>`)
+	}))
+	defer indexer.Close()
+
+	state := newTestAppState(t)
+	cfg := DefaultConfig()
+	cfg.DataDir = state.cfg.DataDir
+	cfg.Indexers = []IndexerConfig{{Name: "test", URL: indexer.URL, Enabled: true}}
+	cfg.WebsearchEngines = nil
+	movie := &MovieConfig{
+		Name:    "封神第二部：战火西岐",
+		Year:    "2025",
+		Enabled: true,
+		Aliases: []string{"Creation of the Gods II: Demon Force"},
+	}
+
+	state.engine.SearchMovie(context.Background(), &cfg, movie, true, true)
+	mutex.Lock()
+	defer mutex.Unlock()
+	for _, query := range []string{
+		"封神第二部：战火西岐 2025",
+		"Creation of the Gods II: Demon Force 2025",
+	} {
+		if queries[query] != 1 {
+			t.Fatalf("query %q sent %d times, all queries: %+v", query, queries[query], queries)
+		}
+	}
+}
+
 func TestScrapeAllDomainSearchesOnlyTheCycleTitles(t *testing.T) {
 	var mutex sync.Mutex
 	queries := map[string]int{}
