@@ -16,10 +16,6 @@ here.
 
 ## Engine (gx-core, gx-torrent)
 
-- **Peer turnover** — at the connection cap, close the slowest peers periodically and
-  try new addresses (`prunePeers` frees only a useless peer today). Gate: a real swarm
-  larger than the cap where turnover beats the current download rate on the same
-  torrent.
 - **Choking on a real swarm** — campaign against libtorrent/qBittorrent on the same
   public torrent, with the same policy and metrics (upload efficiency while seeding,
   reciprocation, first-block time, stall rate). Gate: a host with a reachable inbound

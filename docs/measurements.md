@@ -361,6 +361,7 @@ Closed with a measurement, so they are not retried without new data.
 | One PEX loop per torrent | 0.0025 % of a core and 2–3 MB at 500 peers | |
 | Multi-path `get_peers` | `peers_confirmed_multi` is 0 in real runs | |
 | Anti-Sybil cap on by default | the table is not concentrated, and CGNAT subnets would be capped | |
+| Peer turnover (closing the slowest peers at the cap) | on the Ubuntu ISO swarm the engine never filled the cap: peaks of 13–17 peers at 20, 5–6 at 8, against a default of 55, so turnover never acted | a real swarm that keeps a torrent at its cap |
 | Choking changes | reciprocation works locally and against libtorrent | a gap on a real swarm |
 | Super-seeding by default | no upload saved on measurable swarms, about 24 % slower locally | |
 | Merge candidates ordered by reusable bytes | superseded by the dedup | |
