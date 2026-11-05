@@ -18,8 +18,10 @@ here.
 
 - **Choking on a real swarm** — campaign against libtorrent/qBittorrent on the same
   public torrent, with the same policy and metrics (upload efficiency while seeding,
-  reciprocation, first-block time, stall rate). Gate: a host with a reachable inbound
-  port; only a gap justifies touching `internal/unchoker`.
+  reciprocation, first-block time, stall rate). Gate: a public swarm with more leechers
+  than seeds and a reachable inbound port; only a gap justifies touching
+  `internal/unchoker`. A fresh Ubuntu release is not one: seeds outnumber leechers and
+  nobody uploads.
 - **Mixed-mode TCP/uTP arbitration** — throttle TCP when uTP shares the line, as
   libtorrent does; today only the transfer caps react. Gate: a mixed swarm where the
   current caps lose throughput or latency.
@@ -50,10 +52,6 @@ here.
 - **Sonarr/Radarr v3** — acceptance test of the Jellyseerr subset against a real
   Jellyseerr; its calls decide any correction. Gate: a Jellyseerr instance driven by a
   real request.
-- **Cutting, not only holding, for a light user** — in `both`/`router` Auto now stops
-  growing while the router sees another device, but it never lowers the caps on that
-  signal. Gate: a real call or game next to a saturated download, measured in `both` and
-  in `ping`, to decide the cut (and how much) without starving the download.
 - **Portable folder names for existing series** — a series added before the add dialog
   dropped the characters Windows, exFAT and SMB shares refuse keeps its folder; a check
   in Maintenance reports those folders and never moves files by itself. Gate: an

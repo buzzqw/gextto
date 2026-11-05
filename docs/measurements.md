@@ -221,6 +221,7 @@ CPU** than a fixed 55 per torrent, for 4 % fewer bytes, inside the ±10 % spread
 |---|---|---|
 | Ubuntu ISO on an FTTC 100/15 line | **9.3–9.4 MiB/s**, libtorrent 6.3–7.1 MiB/s on the same swarm; one campaign, so not a ranking | `make measure-realswarm` |
 | Sharing the line (latency guard) | alone 8,503 KiB/s kept; another device downloading gets 55–66 % more | `TestMeasureLatencyGuard` |
+| Seeding a fresh Ubuntu release (137 seeds, 8 leechers), inbound port closed | 0 bytes uploaded by gx-torrent and qBittorrent, 4 alternated rounds of 3 minutes; qBittorrent held 6–11 leechers, gx-torrent (10 seeding dials) 0–1 | by hand: `scripts/gx-core-test.sh` next to qBittorrent 5.2.3 |
 | Public DHT, 5 minutes | 389 nodes, 35.1 % of queries answered, no concentrated subnet | `make measure-dht` |
 | Real libtorrent leecher, loopback | the whole 50 MiB file in 4.8 s | `make measure-choking` |
 | Request queue at 50 ms RTT | 303 KiB/s with one block in flight, 6,743 KiB/s with the default queue | `make measure-pipeline` |
@@ -362,6 +363,7 @@ Closed with a measurement, so they are not retried without new data.
 | Multi-path `get_peers` | `peers_confirmed_multi` is 0 in real runs | |
 | Anti-Sybil cap on by default | the table is not concentrated, and CGNAT subnets would be capped | |
 | Peer turnover (closing the slowest peers at the cap) | on the Ubuntu ISO swarm the engine never filled the cap: peaks of 13–17 peers at 20, 5–6 at 8, against a default of 55, so turnover never acted | a real swarm that keeps a torrent at its cap |
+| Auto cutting the caps when the router sees another device | a call (5 pings/s) next to a download filling the line: median 15 ms idle, 36–50 ms loaded, 2–6 of 300 lost; the spikes above 150 ms were there with Gextto idle too, from another device on the line | a call that degrades next to a download |
 | Choking changes | reciprocation works locally and against libtorrent | a gap on a real swarm |
 | Super-seeding by default | no upload saved on measurable swarms, about 24 % slower locally | |
 | Merge candidates ordered by reusable bytes | superseded by the dedup | |
