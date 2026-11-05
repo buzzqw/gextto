@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"html"
+	"html/template"
 	"net/http"
 	"net/url"
 	"slices"
@@ -25,7 +26,6 @@ import (
 	"github.com/buzzqw/gextto/internal/notify"
 	"github.com/buzzqw/gextto/internal/queue"
 	"github.com/buzzqw/gextto/internal/settings"
-	"github.com/buzzqw/gextto/internal/webui/assets"
 )
 
 // handleUILang saves the interface language chosen from the sidebar picker of
@@ -380,9 +380,10 @@ func parseScheduleWeekForm(r *http.Request) (bwschedule.Week, string) {
 // scheduleWeekRows renders the per-day scheduler table body, Monday first.
 // The day names and column headers are catalog strings, translated with the
 // page; every input is named by its row header plus its column header.
-func scheduleWeekRows(week bwschedule.Week) string {
-	names := map[time.Weekday]string{time.Monday: "Mon", time.Tuesday: "Tue", time.Wednesday: "Wed",
-		time.Thursday: "Thu", time.Friday: "Fri", time.Saturday: "Sat", time.Sunday: "Sun"}
+func scheduleWeekRows(lang string, week bwschedule.Week) string {
+	tr := func(phrase string, args ...any) string { return uiTr(lang, phrase, args...) }
+	names := map[time.Weekday]string{time.Monday: tr("Mon"), time.Tuesday: tr("Tue"), time.Wednesday: tr("Wed"),
+		time.Thursday: tr("Thu"), time.Friday: tr("Fri"), time.Saturday: tr("Sat"), time.Sunday: tr("Sun")}
 	var b strings.Builder
 	for _, weekday := range bwschedule.MondayFirst {
 		day := week[weekday]
@@ -408,11 +409,13 @@ func scheduleWeekRows(week bwschedule.Week) string {
 			disabled, dl, ul = " disabled", 0, 0
 		}
 		fmt.Fprintf(&b, `<tr><th scope="row" id="%s">%s</th>`, row, names[weekday])
-		fmt.Fprintf(&b, `<td><select name="%smode" aria-labelledby="%s sched-col-mode" title="Mode of the day: Off (no window), Limit (your values) or Auto (no cap, the auto-speed measures the line)"><option value="off"%s>Off</option><option value="limit"%s>Limit</option><option value="auto"%s>Auto</option></select></td>`, prefix, row, selected("off"), selected("limit"), selected("auto"))
-		fmt.Fprintf(&b, `<td><input type="time" name="%sstart" value="%s" aria-labelledby="%s sched-col-start" title="Start time of the scheduled bandwidth window (HH:MM)"></td>`, prefix, bwschedule.FormatClock(day.Start), row)
-		fmt.Fprintf(&b, `<td><input type="time" name="%send" value="%s" aria-labelledby="%s sched-col-end" title="End time of the scheduled bandwidth window (HH:MM)"></td>`, prefix, bwschedule.FormatClock(day.End), row)
-		fmt.Fprintf(&b, `<td><input type="number" min="0" name="%sdl" value="%d"%s aria-labelledby="%s sched-col-dl" title="Download speed limit during scheduled window in KiB/s"></td>`, prefix, dl, disabled, row)
-		fmt.Fprintf(&b, `<td><input type="number" min="0" name="%sul" value="%d"%s aria-labelledby="%s sched-col-ul" title="Upload speed limit during scheduled window in KiB/s"></td></tr>`, prefix, ul, disabled, row)
+		fmt.Fprintf(&b, `<td><select name="%smode" aria-labelledby="%s sched-col-mode" title="%s"><option value="off"%s>%s</option><option value="limit"%s>%s</option><option value="auto"%s>%s</option></select></td>`, prefix, row,
+			tr("Mode of the day: Off (no window), Limit (your values) or Auto (no cap, the auto-speed measures the line)"),
+			selected("off"), tr("Off"), selected("limit"), tr("Limit"), selected("auto"), tr("Auto"))
+		fmt.Fprintf(&b, `<td><input type="time" name="%sstart" value="%s" aria-labelledby="%s sched-col-start" title="%s"></td>`, prefix, bwschedule.FormatClock(day.Start), row, tr("Start time of the scheduled bandwidth window (HH:MM)"))
+		fmt.Fprintf(&b, `<td><input type="time" name="%send" value="%s" aria-labelledby="%s sched-col-end" title="%s"></td>`, prefix, bwschedule.FormatClock(day.End), row, tr("End time of the scheduled bandwidth window (HH:MM)"))
+		fmt.Fprintf(&b, `<td><input type="number" min="0" name="%sdl" value="%d"%s aria-labelledby="%s sched-col-dl" title="%s"></td>`, prefix, dl, disabled, row, tr("Download speed limit during scheduled window in KiB/s"))
+		fmt.Fprintf(&b, `<td><input type="number" min="0" name="%sul" value="%d"%s aria-labelledby="%s sched-col-ul" title="%s"></td></tr>`, prefix, ul, disabled, row, tr("Upload speed limit during scheduled window in KiB/s"))
 	}
 	return b.String()
 }
@@ -452,7 +455,7 @@ func (d *Daemon) applyScheduleNow() {
 }
 
 // encryptionOptions renders the encryption select, marking the current value.
-func encryptionOptions(selected string) string {
+func encryptionOptions(lang, selected string) string {
 	selected = strings.TrimSpace(selected)
 	var b strings.Builder
 	for _, option := range []struct{ value, label string }{
@@ -464,13 +467,13 @@ func encryptionOptions(selected string) string {
 		if option.value == selected {
 			mark = " selected"
 		}
-		b.WriteString(`<option value="` + option.value + `"` + mark + `>` + html.EscapeString(option.label) + `</option>`)
+		b.WriteString(`<option value="` + option.value + `"` + mark + `>` + html.EscapeString(uiTr(lang, option.label)) + `</option>`)
 	}
 	return b.String()
 }
 
 // contentLayoutOptions renders the default content layout select.
-func contentLayoutOptions(selected string) string {
+func contentLayoutOptions(lang, selected string) string {
 	var b strings.Builder
 	for _, option := range []struct{ value, label string }{
 		{torrent.ContentLayoutOriginal, "Original"},
@@ -481,13 +484,13 @@ func contentLayoutOptions(selected string) string {
 		if option.value == selected {
 			mark = " selected"
 		}
-		b.WriteString(`<option value="` + option.value + `"` + mark + `>` + html.EscapeString(option.label) + `</option>`)
+		b.WriteString(`<option value="` + option.value + `"` + mark + `>` + html.EscapeString(uiTr(lang, option.label)) + `</option>`)
 	}
 	return b.String()
 }
 
 // languageOptions renders the UI language select with the endonyms.
-func languageOptions(selected string) string {
+func languageOptions(lang, selected string) string {
 	selected = strings.ToLower(strings.TrimSpace(selected))
 	var b strings.Builder
 	for _, item := range uiLanguageNames {
@@ -504,7 +507,7 @@ func languageOptions(selected string) string {
 // its save path editable in place and a remove button. The page creates the
 // category automatically when a torrent is assigned a new name; this table is
 // where the path that automatic torrent management moves to is set.
-func (d *Daemon) categoryRows() string {
+func (d *Daemon) categoryRows(lang string) string {
 	categories := d.categoriesSnapshot()
 	names := make([]string, 0, len(categories))
 	for name := range categories {
@@ -512,7 +515,7 @@ func (d *Daemon) categoryRows() string {
 	}
 	sort.Strings(names)
 	if len(names) == 0 {
-		return `<tr><td colspan="3" class="muted">No categories yet. Add one below: torrents can then be assigned to it and moved to its folder.</td></tr>`
+		return `<tr><td colspan="3" class="muted">` + uiTr(lang, "No categories yet. Add one below: torrents can then be assigned to it and moved to its folder.") + `</td></tr>`
 	}
 	var b strings.Builder
 	for _, name := range names {
@@ -520,12 +523,12 @@ func (d *Daemon) categoryRows() string {
 		fmt.Fprintf(&b, `<tr><td><strong>%s</strong></td><td>`+
 			`<form method="post" action="/ui/category-manage" class="cat-edit">`+
 			`<input type="hidden" name="op" value="edit"><input type="hidden" name="name" value="%s">`+
-			`<input type="text" name="savepath" value="%s" placeholder="download folder" autocomplete="off" aria-label="Save path of %s" title="Folder where the torrents of this category are saved (empty = the main download folder)">`+
-			`<button type="submit" class="sm" title="Save the save path of this category">Save</button>`+
+			`<input type="text" name="savepath" value="%s" placeholder="download folder" autocomplete="off" aria-label="`+uiTr(lang, "Save path of %s", name)+`" title="`+uiTr(lang, "Folder where the torrents of this category are saved (empty = the main download folder)")+`">`+
+			`<button type="submit" class="sm" title="`+uiTr(lang, "Save the save path of this category")+`">`+uiTr(lang, "Save")+`</button>`+
 			`</form></td><td>`+
-			`<form method="post" action="/ui/category-manage" data-confirm="Remove this category? Its torrents keep their files and lose the category.">`+
+			`<form method="post" action="/ui/category-manage" data-confirm="`+uiTr(lang, "Remove this category? Its torrents keep their files and lose the category.")+`">`+
 			`<input type="hidden" name="op" value="remove"><input type="hidden" name="name" value="%s">`+
-			`<button type="submit" class="sm danger" title="Remove this category; its torrents keep their files and lose the category">Remove</button>`+
+			`<button type="submit" class="sm danger" title="`+uiTr(lang, "Remove this category; its torrents keep their files and lose the category")+`">`+uiTr(lang, "Remove")+`</button>`+
 			`</form></td></tr>`, escaped, escaped, html.EscapeString(categories[name]), escaped, escaped)
 	}
 	return b.String()
@@ -535,11 +538,18 @@ func (d *Daemon) categoryRows() string {
 func (d *Daemon) renderSettings(w http.ResponseWriter, r *http.Request, errKey string, isError bool) {
 	cfg, _, _ := d.config()
 	store := d.opts.Settings
-	page := assets.SettingsPage()
-	repl := func(placeholder, value string) {
-		page = strings.Replace(page, placeholder, value, 1)
+	lang := d.uiLang(r)
+	data := map[string]any{}
+	// The values are HTML (fragments, escaped text, attributes): repl keeps
+	// what the builder produced and lets the template place it.
+	repl := func(key string, value any) {
+		if text, ok := value.(string); ok {
+			data[key] = template.HTML(text)
+			return
+		}
+		data[key] = value
 	}
-	checkedIf := func(cond bool) string {
+	checkedIf := func(cond bool) template.HTMLAttr {
 		if cond {
 			return " checked"
 		}
@@ -552,156 +562,156 @@ func (d *Daemon) renderSettings(w http.ResponseWriter, r *http.Request, errKey s
 	featureOn := func(key string) bool { return !boolSetting("no-" + key) }
 	get := func(key string) string { return html.EscapeString(store.Get(key, "")) }
 
-	repl("{{SPEED_DL}}", strconv.FormatInt(cfg.SpeedLimitDownload, 10))
-	repl("{{SPEED_UL}}", strconv.FormatInt(cfg.SpeedLimitUpload, 10))
+	repl("SPEED_DL", strconv.FormatInt(cfg.SpeedLimitDownload, 10))
+	repl("SPEED_UL", strconv.FormatInt(cfg.SpeedLimitUpload, 10))
 	altDL, altUL, altManual := d.altSpeedSettings()
-	repl("{{ALT_SPEED_DL}}", strconv.FormatInt(altDL, 10))
-	repl("{{ALT_SPEED_UL}}", strconv.FormatInt(altUL, 10))
-	repl("{{ALT_SPEED_ON}}", checkedIf(altManual))
-	repl("{{LIMIT_LAN_PEERS}}", checkedIf(d.limitLANPeers()))
-	repl("{{SCHED_ENABLED}}", checkedIf(boolSetting(scheduleEnabledKey)))
+	repl("ALT_SPEED_DL", strconv.FormatInt(altDL, 10))
+	repl("ALT_SPEED_UL", strconv.FormatInt(altUL, 10))
+	repl("ALT_SPEED_ON", checkedIf(altManual))
+	repl("LIMIT_LAN_PEERS", checkedIf(d.limitLANPeers()))
+	repl("SCHED_ENABLED", checkedIf(boolSetting(scheduleEnabledKey)))
 	week, ok := d.scheduleWeek()
 	if !ok {
 		// Nothing usable saved yet: a night window, every day off, as a start.
 		week = bwschedule.Uniform([7]bool{}, 1*60, 8*60, 0, 0)
 	}
-	repl("{{SCHED_WEEK_ROWS}}", scheduleWeekRows(week))
-	repl("{{AUTOSPEED_ENABLED}}", checkedIf(boolSetting(autospeedEnabledKey)))
-	repl("{{AUTOSPEED_TARGET}}", get(autospeedTargetKey))
+	repl("SCHED_WEEK_ROWS", scheduleWeekRows(lang, week))
+	repl("AUTOSPEED_ENABLED", checkedIf(boolSetting(autospeedEnabledKey)))
+	repl("AUTOSPEED_TARGET", get(autospeedTargetKey))
 	autoSpeedMin := int64FromSetting(store.Get(autospeedMinKey, strconv.Itoa(autoSpeedDefaultMinKiB)))
 	if autoSpeedMin < 1 {
 		autoSpeedMin = autoSpeedDefaultMinKiB
 	}
-	repl("{{AUTOSPEED_MIN}}", strconv.FormatInt(autoSpeedMin, 10))
+	repl("AUTOSPEED_MIN", strconv.FormatInt(autoSpeedMin, 10))
 	autoLineDown := max(int64FromSetting(store.Get(autospeedLineDownKey, "0")), 0)
 	autoLineUp := max(int64FromSetting(store.Get(autospeedLineUpKey, "0")), 0)
-	repl("{{AUTOSPEED_LINE_DOWN}}", strconv.FormatInt(autoLineDown, 10))
-	repl("{{AUTOSPEED_LINE_UP}}", strconv.FormatInt(autoLineUp, 10))
-	repl("{{AUTOSPEED_STATUS}}", html.EscapeString(d.autoSpeedStatus(time.Now())))
+	repl("AUTOSPEED_LINE_DOWN", strconv.FormatInt(autoLineDown, 10))
+	repl("AUTOSPEED_LINE_UP", strconv.FormatInt(autoLineUp, 10))
+	repl("AUTOSPEED_STATUS", html.EscapeString(d.autoSpeedStatus(time.Now())))
 
-	repl("{{DOWNLOAD_DIR}}", get("download-dir"))
+	repl("DOWNLOAD_DIR", get("download-dir"))
 	// The same value is proposed in the DLNA library-folders field; a distinct
 	// placeholder is needed because repl replaces only the first occurrence.
-	repl("{{DLNA_DOWNLOAD_DIR}}", get("download-dir"))
+	repl("DLNA_DOWNLOAD_DIR", get("download-dir"))
 	if strings.TrimSpace(store.Get("download-dir", "")) == "" {
-		repl("{{DOWNLOAD_DIR_DISABLED}}", " disabled")
+		repl("DOWNLOAD_DIR_DISABLED", template.HTMLAttr(" disabled"))
 	} else {
-		repl("{{DOWNLOAD_DIR_DISABLED}}", "")
+		repl("DOWNLOAD_DIR_DISABLED", template.HTMLAttr(""))
 	}
-	repl("{{TEMP_DIR}}", get("temp-dir"))
-	repl("{{EXPORT_DIR}}", get("export-dir"))
-	repl("{{EXPORT_FIN_DIR}}", get("export-dir-fin"))
-	repl("{{METADATA_EPISODES_ON}}", checkedIf(d.metadataEpisodesEnabled()))
-	repl("{{POSTPROCESS_MOVE}}", get(postProcessMoveKey))
-	repl("{{POSTPROCESS_MOVE_CATEGORY}}", checkedIf(boolSetting(postProcessMoveCategoryKey)))
-	repl("{{POSTPROCESS_RUN}}", get(postProcessRunKey))
-	repl("{{AUTO_TMM_ON}}", checkedIf(boolSetting(autoTMMEnabledKey)))
-	repl("{{MAX_RATIO_ON}}", checkedIf(boolSetting(maxRatioEnabledKey)))
-	repl("{{MAX_RATIO}}", strconv.FormatFloat(d.settingFloat(maxRatioKey, -1), 'f', -1, 64))
-	repl("{{MAX_RATIO_REMOVE}}", checkedIf(d.settingInt(maxRatioActKey, 0) == 1))
-	repl("{{MAX_TIME_ON}}", checkedIf(boolSetting(maxSeedingTimeEnabledKey)))
-	repl("{{MAX_TIME}}", strconv.Itoa(d.settingInt(maxSeedingTimeKey, -1)))
-	repl("{{MAX_IDLE_ON}}", checkedIf(boolSetting(maxInactiveSeedingTimeEnabledKey)))
-	repl("{{MAX_IDLE}}", strconv.Itoa(d.settingInt(maxInactiveSeedingTimeKey, -1)))
-	repl("{{CLIENT_IDENTITY_OPTIONS}}", clientIdentityOptions(store.Get(clientIdentityKey, defaultClientIdentity)))
-	repl("{{CLIENT_IDENTITY_VERSION}}", html.EscapeString(clientIdentityVersion(store.Get(clientIdentityVersionKey, ""))))
-	repl("{{WATCH_FOLDERS}}", get("watch-folders"))
-	repl("{{CATEGORIES_ROWS}}", d.categoryRows())
-	repl("{{QUALITY_PROFILE_ROWS}}", d.qualityProfileRows())
-	repl("{{COOKIES}}", html.EscapeString(d.cookiesPretty()))
-	repl("{{ALT_WEBUI_ON}}", checkedIf(d.altWebUIEnabled()))
+	repl("TEMP_DIR", get("temp-dir"))
+	repl("EXPORT_DIR", get("export-dir"))
+	repl("EXPORT_FIN_DIR", get("export-dir-fin"))
+	repl("METADATA_EPISODES_ON", checkedIf(d.metadataEpisodesEnabled()))
+	repl("POSTPROCESS_MOVE", get(postProcessMoveKey))
+	repl("POSTPROCESS_MOVE_CATEGORY", checkedIf(boolSetting(postProcessMoveCategoryKey)))
+	repl("POSTPROCESS_RUN", get(postProcessRunKey))
+	repl("AUTO_TMM_ON", checkedIf(boolSetting(autoTMMEnabledKey)))
+	repl("MAX_RATIO_ON", checkedIf(boolSetting(maxRatioEnabledKey)))
+	repl("MAX_RATIO", strconv.FormatFloat(d.settingFloat(maxRatioKey, -1), 'f', -1, 64))
+	repl("MAX_RATIO_REMOVE", checkedIf(d.settingInt(maxRatioActKey, 0) == 1))
+	repl("MAX_TIME_ON", checkedIf(boolSetting(maxSeedingTimeEnabledKey)))
+	repl("MAX_TIME", strconv.Itoa(d.settingInt(maxSeedingTimeKey, -1)))
+	repl("MAX_IDLE_ON", checkedIf(boolSetting(maxInactiveSeedingTimeEnabledKey)))
+	repl("MAX_IDLE", strconv.Itoa(d.settingInt(maxInactiveSeedingTimeKey, -1)))
+	repl("CLIENT_IDENTITY_OPTIONS", clientIdentityOptions(store.Get(clientIdentityKey, defaultClientIdentity)))
+	repl("CLIENT_IDENTITY_VERSION", html.EscapeString(clientIdentityVersion(store.Get(clientIdentityVersionKey, ""))))
+	repl("WATCH_FOLDERS", get("watch-folders"))
+	repl("CATEGORIES_ROWS", d.categoryRows(lang))
+	repl("QUALITY_PROFILE_ROWS", d.qualityProfileRows(lang))
+	repl("COOKIES", html.EscapeString(d.cookiesPretty()))
+	repl("ALT_WEBUI_ON", checkedIf(d.altWebUIEnabled()))
 	altVersion := d.altWebUIVersion()
 	if altVersion == "" {
-		altVersion = "not installed"
+		altVersion = uiTr(lang, "not installed")
 	}
-	repl("{{ALT_WEBUI_VERSION}}", html.EscapeString(altVersion))
+	repl("ALT_WEBUI_VERSION", html.EscapeString(altVersion))
 	logoutForm := ""
 	if d.loginEnabled() {
-		logoutForm = `<button type="submit" formaction="/ui/logout" formmethod="post" class="secondary sm" title="Sign out of the web interface">Sign out</button>`
+		logoutForm = `<button type="submit" formaction="/ui/logout" formmethod="post" class="secondary sm" title="` + uiTr(lang, "Sign out of the web interface") + `">` + uiTr(lang, "Sign out") + `</button>`
 	}
-	repl("{{LOGOUT_FORM}}", logoutForm)
-	repl("{{LISTEN}}", get("listen"))
-	repl("{{PEER_PORTS}}", get("peer-ports"))
-	repl("{{LISTEN_IFACE}}", get("listen-interface"))
-	repl("{{OUT_IFACE}}", get("outgoing-interface"))
-	repl("{{PROXY}}", get("proxy"))
-	repl("{{TOKEN}}", get("token"))
-	repl("{{QBIT_API_KEY}}", get(qbitAPIKey))
-	repl("{{QBIT_VERSION}}", get(qbitVersionKey))
-	repl("{{IPFILTER}}", get("ipfilter"))
-	repl("{{IPFILTER_REFRESH}}", strconv.Itoa(int(d.ipFilterRefreshEvery()/time.Hour)))
-	repl("{{IPFILTER_STATUS}}", d.ipFilterStatusHTML())
-	repl("{{OPT_STATUS}}", d.optimizationStatusHTML())
-	repl("{{IPFILTER_TRACKERS}}", checkedIf(!strings.EqualFold(strings.TrimSpace(store.Get("ipfilter-trackers", "false")), "false")))
-	repl("{{ENC_OPTIONS}}", encryptionOptions(store.Get("encryption", "1")))
-	repl("{{LAYOUT_OPTIONS}}", contentLayoutOptions(d.defaultContentLayout()))
-	repl("{{DHT_BOOTSTRAP}}", get("dht-bootstrap"))
-	repl("{{DHT_ON}}", checkedIf(featureOn("dht")))
-	repl("{{PEX_ON}}", checkedIf(featureOn("pex")))
-	repl("{{UTP_ON}}", checkedIf(featureOn("utp")))
-	repl("{{HOLEPUNCH_ON}}", checkedIf(featureOn("holepunch")))
-	repl("{{LSD_ON}}", checkedIf(featureOn("lsd")))
-	repl("{{UPNP_ON}}", checkedIf(featureOn("upnp")))
-	repl("{{NATPMP_ON}}", checkedIf(featureOn("natpmp")))
-	repl("{{DHT_READONLY}}", checkedIf(boolSetting("dht-read-only")))
-	repl("{{WEB_PRIVATE}}", checkedIf(boolSetting("web-sources-allow-private")))
+	repl("LOGOUT_FORM", logoutForm)
+	repl("LISTEN", get("listen"))
+	repl("PEER_PORTS", get("peer-ports"))
+	repl("LISTEN_IFACE", get("listen-interface"))
+	repl("OUT_IFACE", get("outgoing-interface"))
+	repl("PROXY", get("proxy"))
+	repl("TOKEN", get("token"))
+	repl("QBIT_API_KEY", get(qbitAPIKey))
+	repl("QBIT_VERSION", get(qbitVersionKey))
+	repl("IPFILTER", get("ipfilter"))
+	repl("IPFILTER_REFRESH", strconv.Itoa(int(d.ipFilterRefreshEvery()/time.Hour)))
+	repl("IPFILTER_STATUS", d.ipFilterStatusHTML(lang))
+	repl("OPT_STATUS", d.optimizationStatusHTML(lang))
+	repl("IPFILTER_TRACKERS", checkedIf(!strings.EqualFold(strings.TrimSpace(store.Get("ipfilter-trackers", "false")), "false")))
+	repl("ENC_OPTIONS", encryptionOptions(lang, store.Get("encryption", "1")))
+	repl("LAYOUT_OPTIONS", contentLayoutOptions(lang, d.defaultContentLayout()))
+	repl("DHT_BOOTSTRAP", get("dht-bootstrap"))
+	repl("DHT_ON", checkedIf(featureOn("dht")))
+	repl("PEX_ON", checkedIf(featureOn("pex")))
+	repl("UTP_ON", checkedIf(featureOn("utp")))
+	repl("HOLEPUNCH_ON", checkedIf(featureOn("holepunch")))
+	repl("LSD_ON", checkedIf(featureOn("lsd")))
+	repl("UPNP_ON", checkedIf(featureOn("upnp")))
+	repl("NATPMP_ON", checkedIf(featureOn("natpmp")))
+	repl("DHT_READONLY", checkedIf(boolSetting("dht-read-only")))
+	repl("WEB_PRIVATE", checkedIf(boolSetting("web-sources-allow-private")))
 
-	repl("{{ACTIVE_DL}}", strconv.Itoa(cfg.ActiveDownloads))
-	repl("{{ACTIVE_SEEDS}}", strconv.Itoa(cfg.ActiveSeeds))
-	repl("{{MIN_FREE_MB}}", strconv.FormatInt(cfg.MinFree()>>20, 10))
-	repl("{{ACTIVE_LIMIT}}", strconv.Itoa(cfg.ActiveLimit))
-	repl("{{MAX_CONNS_TORRENT}}", strconv.Itoa(cfg.MaxConnectionsPerTorrent))
-	repl("{{CONN_AUTO}}", checkedIf(queue.BoolOn(cfg.ConnAuto)))
+	repl("ACTIVE_DL", strconv.Itoa(cfg.ActiveDownloads))
+	repl("ACTIVE_SEEDS", strconv.Itoa(cfg.ActiveSeeds))
+	repl("MIN_FREE_MB", strconv.FormatInt(cfg.MinFree()>>20, 10))
+	repl("ACTIVE_LIMIT", strconv.Itoa(cfg.ActiveLimit))
+	repl("MAX_CONNS_TORRENT", strconv.Itoa(cfg.MaxConnectionsPerTorrent))
+	repl("CONN_AUTO", checkedIf(queue.BoolOn(cfg.ConnAuto)))
 	cacheMB := cfg.CacheMB
 	if cacheMB < 0 {
 		cacheMB = 0
 	}
-	repl("{{CACHE_MB}}", strconv.FormatInt(cacheMB, 10))
-	repl("{{PREALLOCATE}}", checkedIf(cfg.Preallocate))
-	repl("{{SEQUENTIAL}}", checkedIf(cfg.Sequential))
-	repl("{{DLNA_ENABLED}}", checkedIf(boolSetting(dlnaEnabledKey)))
-	repl("{{DLNA_LISTEN}}", get(dlnaListenKey))
-	repl("{{DLNA_NAME}}", get(dlnaNameKey))
+	repl("CACHE_MB", strconv.FormatInt(cacheMB, 10))
+	repl("PREALLOCATE", checkedIf(cfg.Preallocate))
+	repl("SEQUENTIAL", checkedIf(cfg.Sequential))
+	repl("DLNA_ENABLED", checkedIf(boolSetting(dlnaEnabledKey)))
+	repl("DLNA_LISTEN", get(dlnaListenKey))
+	repl("DLNA_NAME", get(dlnaNameKey))
 	// One folder per line in the textarea; stored ";"-separated.
-	repl("{{DLNA_FOLDERS}}", html.EscapeString(strings.Join(dlnaSplitList(store.Get(dlnaFoldersKey, "")), "\n")))
-	dlnaStatus := "Media server off."
+	repl("DLNA_FOLDERS", html.EscapeString(strings.Join(dlnaSplitList(store.Get(dlnaFoldersKey, "")), "\n")))
+	dlnaStatus := uiTr(lang, "Media server off.")
 	if base := d.dlnaStatusURL(); base != "" {
-		dlnaStatus = "Media server running at <code>" + html.EscapeString(base) + "</code>"
+		dlnaStatus = uiTr(lang, "Media server running at %s", "<code>"+html.EscapeString(base)+"</code>")
 	}
-	repl("{{DLNA_STATUS}}", dlnaStatus)
+	repl("DLNA_STATUS", dlnaStatus)
 
-	repl("{{UPDATE_CHECK}}", checkedIf(d.updateCheckEnabled()))
-	repl("{{UPDATE_HOURS}}", strconv.Itoa(d.updateHours()))
-	repl("{{UPDATE_STATUS}}", d.updateSectionHTML())
-	repl("<!--UPDATE_NOTES-->", d.updateNotesDialogHTML())
+	repl("UPDATE_CHECK", checkedIf(d.updateCheckEnabled()))
+	repl("UPDATE_HOURS", strconv.Itoa(d.updateHours()))
+	repl("UPDATE_STATUS", d.updateSectionHTML(lang))
+	repl("UPDATE_NOTES", d.updateNotesDialogHTML(lang))
 
-	repl("{{LANG_OPTIONS}}", languageOptions(store.Get("lang", "")))
-	repl("{{NOTIFY_URL}}", get("notify-url"))
-	repl("{{NOTIFY_TG_TOKEN}}", get(notifyTelegramTokenKey))
-	repl("{{NOTIFY_TG_CHAT}}", get(notifyTelegramChatKey))
-	repl("{{NOTIFY_WH_TOKEN}}", get(notifyWebhookTokenKey))
-	repl("{{NOTIFY_WH_USER}}", get(notifyWebhookUserKey))
-	repl("{{NOTIFY_SMTP}}", get(notifyEmailSMTPKey))
-	repl("{{NOTIFY_FROM}}", get(notifyEmailFromKey))
-	repl("{{NOTIFY_TO}}", get(notifyEmailToKey))
-	repl("{{NOTIFY_PASSWORD}}", get(notifyEmailPasswordKey))
-	repl("{{NOTIFY_DISCORD_URL}}", get(notifyDiscordURLKey))
-	repl("{{NOTIFY_SLACK_URL}}", get(notifySlackURLKey))
-	repl("{{NOTIFY_GOTIFY_URL}}", get(notifyGotifyURLKey))
-	repl("{{NOTIFY_GOTIFY_TOKEN}}", get(notifyGotifyTokenKey))
-	repl("{{NOTIFY_NTFY_URL}}", get(notifyNtfyURLKey))
-	repl("{{NOTIFY_NTFY_TOPIC}}", get(notifyNtfyTopicKey))
-	repl("{{NOTIFY_NTFY_TOKEN}}", get(notifyNtfyTokenKey))
-	repl("{{NOTIFY_PUSHOVER_TOKEN}}", get(notifyPushoverTokenKey))
-	repl("{{NOTIFY_PUSHOVER_USER}}", get(notifyPushoverUserKey))
-	repl("{{NOTIFY_APPRISE_URL}}", get(notifyAppriseURLKey))
-	repl("{{NOTIFY_APPRISE_KEY}}", get(notifyAppriseKeyKey))
-	repl("{{NOTIFY_SCRIPT}}", get(notifyScriptKey))
-	repl("{{NOTIFY_SCRIPT_ARGS}}", get(notifyScriptArgsKey))
-	repl("{{NOTIFY_ON_COMPLETE}}", checkedIf(d.notifyEventOn("download_complete")))
-	repl("{{NOTIFY_ON_MATCH}}", checkedIf(d.notifyEventOn("feed_match")))
-	repl("{{NOTIFY_ON_ERROR}}", checkedIf(d.notifyEventOn("feed_error")))
-	formatLabels := map[string]string{"json": "Generic JSON", "discord": "Discord", "slack": "Slack", "gotify": "Gotify", "ntfy": "ntfy", "pushover": "Pushover"}
+	repl("LANG_OPTIONS", languageOptions(lang, store.Get("lang", "")))
+	repl("NOTIFY_URL", get("notify-url"))
+	repl("NOTIFY_TG_TOKEN", get(notifyTelegramTokenKey))
+	repl("NOTIFY_TG_CHAT", get(notifyTelegramChatKey))
+	repl("NOTIFY_WH_TOKEN", get(notifyWebhookTokenKey))
+	repl("NOTIFY_WH_USER", get(notifyWebhookUserKey))
+	repl("NOTIFY_SMTP", get(notifyEmailSMTPKey))
+	repl("NOTIFY_FROM", get(notifyEmailFromKey))
+	repl("NOTIFY_TO", get(notifyEmailToKey))
+	repl("NOTIFY_PASSWORD", get(notifyEmailPasswordKey))
+	repl("NOTIFY_DISCORD_URL", get(notifyDiscordURLKey))
+	repl("NOTIFY_SLACK_URL", get(notifySlackURLKey))
+	repl("NOTIFY_GOTIFY_URL", get(notifyGotifyURLKey))
+	repl("NOTIFY_GOTIFY_TOKEN", get(notifyGotifyTokenKey))
+	repl("NOTIFY_NTFY_URL", get(notifyNtfyURLKey))
+	repl("NOTIFY_NTFY_TOPIC", get(notifyNtfyTopicKey))
+	repl("NOTIFY_NTFY_TOKEN", get(notifyNtfyTokenKey))
+	repl("NOTIFY_PUSHOVER_TOKEN", get(notifyPushoverTokenKey))
+	repl("NOTIFY_PUSHOVER_USER", get(notifyPushoverUserKey))
+	repl("NOTIFY_APPRISE_URL", get(notifyAppriseURLKey))
+	repl("NOTIFY_APPRISE_KEY", get(notifyAppriseKeyKey))
+	repl("NOTIFY_SCRIPT", get(notifyScriptKey))
+	repl("NOTIFY_SCRIPT_ARGS", get(notifyScriptArgsKey))
+	repl("NOTIFY_ON_COMPLETE", checkedIf(d.notifyEventOn("download_complete")))
+	repl("NOTIFY_ON_MATCH", checkedIf(d.notifyEventOn("feed_match")))
+	repl("NOTIFY_ON_ERROR", checkedIf(d.notifyEventOn("feed_error")))
+	formatLabels := map[string]string{"json": uiTr(lang, "Generic JSON"), "discord": "Discord", "slack": "Slack", "gotify": "Gotify", "ntfy": "ntfy", "pushover": "Pushover"}
 	var formats strings.Builder
 	selectedFormat := store.Get(notifyFormatKey, "json")
 	for _, format := range notify.Formats {
@@ -711,9 +721,8 @@ func (d *Daemon) renderSettings(w http.ResponseWriter, r *http.Request, errKey s
 		}
 		formats.WriteString(`<option value="` + format + `"` + mark + `>` + formatLabels[format] + `</option>`)
 	}
-	repl("{{NOTIFY_FORMAT_OPTIONS}}", formats.String())
+	repl("NOTIFY_FORMAT_OPTIONS", formats.String())
 
-	errorHTML := ""
 	if errKey != "" {
 		// A toast, so the confirmation of an action is visible wherever the
 		// operator is in the page (a sub-tab, scrolled to a section) instead of
@@ -722,16 +731,7 @@ func (d *Daemon) renderSettings(w http.ResponseWriter, r *http.Request, errKey s
 		if isError {
 			class = "notice err"
 		}
-		errorHTML = `<p class="` + class + `" data-toast>` + html.EscapeString(errKey) + `</p>`
+		data["ERROR"] = template.HTML(`<p class="` + class + `" data-toast role="alert">` + html.EscapeString(uiTr(lang, errKey)) + `</p>`)
 	}
-	repl("<!--ERROR-->", errorHTML)
-
-	lang := d.uiLang(r)
-	if lang != "" && lang != "en" {
-		page = strings.Replace(page, `lang="en"`, `lang="`+lang+`"`, 1)
-	}
-	page = uiTranslateHTML(page, uiDictionary(lang))
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Header().Set("Cache-Control", "no-store")
-	_, _ = w.Write([]byte(page))
+	d.uiWritePage(w, r, "settings", data)
 }

@@ -372,7 +372,7 @@ func TestIPFilterSourceURLIsDownloadedAndReported(t *testing.T) {
 	if status.Rules != 2 || status.LoadedAt.IsZero() || status.Error != "" {
 		t.Fatalf("status = %+v", status)
 	}
-	if html := d.ipFilterStatusHTML(); !strings.Contains(html, "rules loaded") {
+	if html := d.ipFilterStatusHTML(""); !strings.Contains(html, "rules loaded") {
 		t.Fatalf("status html = %s", html)
 	}
 }

@@ -16,6 +16,7 @@ import (
 	"errors"
 	"fmt"
 	"html"
+	"html/template"
 	"net/http"
 	"regexp"
 	"sort"
@@ -25,7 +26,6 @@ import (
 	"unicode"
 
 	"github.com/buzzqw/gextto/internal/rss"
-	"github.com/buzzqw/gextto/internal/webui/assets"
 )
 
 // wantedEpisodeListMax bounds how many episodes the Have/Missing list of a
@@ -354,7 +354,7 @@ func keepLegacyQuality(r *http.Request, entry wantedEntry, previous string) want
 }
 
 func (d *Daemon) renderWanted(w http.ResponseWriter, r *http.Request, errKey string) {
-	page := assets.WantedPage()
+	lang := d.uiLang(r)
 	wanteds := d.wantedList()
 	missingCount, downloadingCount, completeCount, pausedCount := 0, 0, 0, 0
 	for _, w := range wanteds {
@@ -370,31 +370,20 @@ func (d *Daemon) renderWanted(w http.ResponseWriter, r *http.Request, errKey str
 			completeCount++
 		}
 	}
-	// Each count appears both in the summary card and in the filter button, so
-	// every occurrence is replaced, not only the first one.
-	page = strings.ReplaceAll(page, "{{WANTEDCOUNT}}", strconv.Itoa(len(wanteds)))
-	page = strings.ReplaceAll(page, "{{WANTEDMISSING}}", strconv.Itoa(missingCount))
-	page = strings.ReplaceAll(page, "{{WANTEDDOWNLOADING}}", strconv.Itoa(downloadingCount))
-	page = strings.ReplaceAll(page, "{{WANTEDCOMPLETE}}", strconv.Itoa(completeCount))
-	page = strings.ReplaceAll(page, "{{WANTEDPAUSED}}", strconv.Itoa(pausedCount))
-	page = strings.ReplaceAll(page, "{{PROFILE_OPTIONS}}", d.wantedProfileOptions(""))
-	page = strings.Replace(page, "{{WANTEDROWS}}", d.uiWantedRowsHTML(), 1)
-
-	errorHTML := ""
+	errorHTML := template.HTML("")
 	if errKey != "" {
-		errorHTML = `<div class="notice err" role="alert">` + html.EscapeString(errKey) + `</div>`
+		errorHTML = template.HTML(`<div class="notice err" role="alert">` + html.EscapeString(uiTr(lang, errKey)) + `</div>`)
 	}
-	page = strings.Replace(page, "<!--ERROR-->", errorHTML, 1)
-
-	lang := d.uiLang(r)
-	if lang != "" && lang != "en" {
-		page = strings.Replace(page, `lang="en"`, `lang="`+lang+`"`, 1)
-	}
-	page = uiTranslateHTML(page, uiDictionary(lang))
-	page = uiInjectClientDictionary(page, lang)
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Header().Set("Cache-Control", "no-store")
-	_, _ = w.Write([]byte(page))
+	d.uiWritePage(w, r, "wanted", map[string]any{
+		"WANTEDCOUNT":       strconv.Itoa(len(wanteds)),
+		"WANTEDMISSING":     strconv.Itoa(missingCount),
+		"WANTEDDOWNLOADING": strconv.Itoa(downloadingCount),
+		"WANTEDCOMPLETE":    strconv.Itoa(completeCount),
+		"WANTEDPAUSED":      strconv.Itoa(pausedCount),
+		"PROFILE_OPTIONS":   template.HTML(d.wantedProfileOptions(lang, "")),
+		"WANTEDROWS":        template.HTML(d.uiWantedRowsHTML(lang)),
+		"ERROR":             errorHTML,
+	})
 }
 
 func (d *Daemon) handleUIWantedPoll(w http.ResponseWriter, r *http.Request) {
@@ -948,10 +937,11 @@ func (d *Daemon) wantedSessionHash(w wantedEntry) string {
 
 // uiWantedRowsHTML renders the wanted titles as rows, each with Search,
 // Edit, Pause/Resume and Remove actions, and the missing episodes found so far.
-func (d *Daemon) uiWantedRowsHTML() string {
+func (d *Daemon) uiWantedRowsHTML(lang string) string {
+	tr := func(phrase string) string { return uiTr(lang, phrase) }
 	list := d.wantedList()
 	if len(list) == 0 {
-		return `<li class="empty"><svg class="i" style="width:40px;height:40px;color:var(--subtle)"><use href="/assets/icons.svg#i-tv"/></svg><h3>Nothing wanted yet</h3><p>Add a series or a movie: gx-torrent watches the feeds and the indexers for it and downloads what is missing.</p><button type="button" class="primary sm" onclick="document.getElementById('add-wanted').click()" title="Add a series or a movie to the wanted list">Add title</button></li>`
+		return `<li class="empty"><svg class="i" style="width:40px;height:40px;color:var(--subtle)"><use href="/assets/icons.svg#i-tv"/></svg><h3>` + tr("Nothing wanted yet") + `</h3><p>` + tr("Add a series or a movie: gx-torrent watches the feeds and the indexers for it and downloads what is missing.") + `</p><button type="button" class="primary sm" onclick="document.getElementById('add-wanted').click()" title="` + tr("Add a series or a movie to the wanted list") + `">` + tr("Add title") + `</button></li>`
 	}
 	var b strings.Builder
 	now := time.Now()
@@ -959,18 +949,18 @@ func (d *Daemon) uiWantedRowsHTML() string {
 		idx := strconv.Itoa(index)
 		stats := d.wantedStatsFor(w)
 		state := wantedTitleState(w, stats)
-		badgeClass, badgeLabel := wantedBadge(state)
-		icon, kindLabel := "i-tv", "Series"
+		badgeClass, badgeLabel := wantedBadge(lang, state)
+		icon, kindLabel := "i-tv", tr("Series")
 		if w.kind() == "movie" {
-			icon, kindLabel = "i-film", "Movie"
+			icon, kindLabel = "i-film", tr("Movie")
 		}
 		cls := "item"
 		if w.Paused {
 			cls += " off"
 		}
-		pauseText, pauseTitle := "Pause monitoring", "Pause monitoring this title"
+		pauseText, pauseTitle := tr("Pause monitoring"), tr("Pause monitoring this title")
 		if w.Paused {
-			pauseText, pauseTitle = "Resume monitoring", "Resume monitoring this title"
+			pauseText, pauseTitle = tr("Resume monitoring"), tr("Resume monitoring this title")
 		}
 		lastSearch := time.Time{}
 		if _, last := d.wantedProgress(w); !last.IsZero() {
@@ -992,38 +982,38 @@ func (d *Daemon) uiWantedRowsHTML() string {
 			` data-savepath="` + html.EscapeString(w.SavePath) + `"` +
 			` data-paused="` + strconv.FormatBool(w.Paused) + `"`
 		b.WriteString(`<li class="` + cls + `" data-wanted-row="` + idx + `" data-wanted-state="` + state + `" data-wanted-name="` + html.EscapeString(w.Name) + `" data-wanted-missing="` + strconv.Itoa(stats.Missing) + `" data-wanted-downloading="` + strconv.Itoa(stats.Downloading) + `" data-wanted-last="` + strconv.FormatInt(lastSearch.Unix(), 10) + `" data-wanted-gap="` + strconv.FormatInt(nextGap.Unix(), 10) + `" data-wanted-index="` + idx + `"><div class="kind-icon" aria-hidden="true"><svg class="i"><use href="/assets/icons.svg#` + icon + `"/></svg></div><div class="item-main">`)
-		b.WriteString(`<div class="item-title"><button type="button" class="name name-link" ` + attrs + ` title="Edit this title">` + html.EscapeString(w.Name) + `</button><span class="chip">` + kindLabel + `</span><span class="badge ` + badgeClass + `">` + badgeLabel + `</span></div>`)
+		b.WriteString(`<div class="item-title"><button type="button" class="name name-link" ` + attrs + ` title="` + tr("Edit this title") + `">` + html.EscapeString(w.Name) + `</button><span class="chip">` + kindLabel + `</span><span class="badge ` + badgeClass + `">` + badgeLabel + `</span></div>`)
 
 		var chips strings.Builder
 		if w.kind() != "movie" && strings.TrimSpace(w.Seasons) != "" {
-			chips.WriteString(uiChip("", "Seasons", w.Seasons))
+			chips.WriteString(uiChip("", tr("Seasons"), w.Seasons))
 		}
 		if strings.TrimSpace(w.Language) != "" {
-			chips.WriteString(uiChip("in", "Language", w.Language))
+			chips.WriteString(uiChip("in", tr("Language"), w.Language))
 		}
 		if strings.TrimSpace(w.Subtitles) != "" {
-			chips.WriteString(uiChip("in", "Subtitles", w.Subtitles))
+			chips.WriteString(uiChip("in", tr("Subtitles"), w.Subtitles))
 		}
 		if q := strings.TrimSpace(w.Quality); q != "" {
-			chips.WriteString(uiChip("in", "Quality", q))
+			chips.WriteString(uiChip("in", tr("Quality"), q))
 		}
 		if profile := strings.TrimSpace(w.Profile); profile != "" {
-			chips.WriteString(uiChip("in", "Profile", profile))
+			chips.WriteString(uiChip("in", tr("Profile"), profile))
 		}
 		if metaChip := d.wantedMetadataChip(w); metaChip != "" {
-			chips.WriteString(uiChip("in", "Episode list", metaChip))
+			chips.WriteString(uiChip("in", tr("Episode list"), metaChip))
 		}
 		if strings.TrimSpace(w.Exclude) != "" {
-			chips.WriteString(uiChip("out", "Exclude", w.Exclude))
+			chips.WriteString(uiChip("out", tr("Exclude"), w.Exclude))
 		}
 		if strings.TrimSpace(w.EpisodeFilter) != "" {
-			chips.WriteString(uiChip("", "Episodes", w.EpisodeFilter))
+			chips.WriteString(uiChip("", tr("Episodes"), w.EpisodeFilter))
 		}
 		if strings.TrimSpace(w.Category) != "" {
-			chips.WriteString(uiChip("act", "Category", w.Category))
+			chips.WriteString(uiChip("act", tr("Category"), w.Category))
 		}
 		if strings.TrimSpace(w.SavePath) != "" {
-			chips.WriteString(uiChip("act", "Save to", w.SavePath))
+			chips.WriteString(uiChip("act", tr("Save to"), w.SavePath))
 		}
 		if chips.Len() > 0 {
 			b.WriteString(`<div class="chips">` + chips.String() + `</div>`)
@@ -1033,12 +1023,12 @@ func (d *Daemon) uiWantedRowsHTML() string {
 		// how many are still downloading and how many were found but not taken.
 		// A season we only partly saw is never claimed complete.
 		b.WriteString(`<div class="item-status">`)
-		b.WriteString(d.uiWantedStatusHTML(w, stats))
+		b.WriteString(d.uiWantedStatusHTML(w, stats, lang))
 		if !lastSearch.IsZero() {
-			b.WriteString(` · <span class="muted" title="When the indexers were last searched for this title"><span>Last search</span> ` + lastSearch.Format("02/01 15:04") + `</span>`)
+			b.WriteString(` · <span class="muted" title="` + tr("When the indexers were last searched for this title") + `"><span>` + tr("Last search") + `</span> ` + lastSearch.Format("02/01 15:04") + `</span>`)
 		}
 		if !w.Paused {
-			b.WriteString(` · <span class="muted" title="When the missing episodes are searched next"><span>Next search</span> ` + uiWantedWait(int64(time.Until(nextGap).Seconds())) + `</span>`)
+			b.WriteString(` · <span class="muted" title="` + tr("When the missing episodes are searched next") + `"><span>` + tr("Next search") + `</span> ` + uiWantedWait(lang, int64(time.Until(nextGap).Seconds())) + `</span>`)
 		}
 		b.WriteString(`</div>`)
 		if w.kind() != "movie" {
@@ -1049,17 +1039,17 @@ func (d *Daemon) uiWantedRowsHTML() string {
 
 		// One primary action, chosen from the state; everything else is in the
 		// "More" menu so the row never becomes a wall of buttons.
-		episodesButton := `<button type="button" class="sm" data-wanted-episodes data-index="` + idx + `" data-name="` + html.EscapeString(w.Name) + `" aria-expanded="false" title="Show or hide the episodes of this title"><svg class="i"><use href="/assets/icons.svg#i-list"/></svg>Episodes</button>`
-		releasesButton := `<button type="button" class="sm" data-wanted-releases data-index="` + idx + `" data-name="` + html.EscapeString(w.Name) + `" title="See the releases found and why they were not taken">Why not?</button>`
-		searchButton := `<button type="button" class="sm" data-wanted-poll data-index="` + idx + `" data-name="` + html.EscapeString(w.Name) + `" title="Search this title now"><svg class="i"><use href="/assets/icons.svg#i-search"/></svg>Search now</button>`
-		missingButton := `<button type="button" class="sm primary" data-wanted-poll data-index="` + idx + `" data-name="` + html.EscapeString(w.Name) + `" title="Search the missing episodes now"><svg class="i"><use href="/assets/icons.svg#i-search"/></svg>Search missing</button>`
+		episodesButton := `<button type="button" class="sm" data-wanted-episodes data-index="` + idx + `" data-name="` + html.EscapeString(w.Name) + `" aria-expanded="false" title="` + tr("Show or hide the episodes of this title") + `"><svg class="i"><use href="/assets/icons.svg#i-list"/></svg>` + tr("Episodes") + `</button>`
+		releasesButton := `<button type="button" class="sm" data-wanted-releases data-index="` + idx + `" data-name="` + html.EscapeString(w.Name) + `" title="` + tr("See the releases found and why they were not taken") + `">` + tr("Why not?") + `</button>`
+		searchButton := `<button type="button" class="sm" data-wanted-poll data-index="` + idx + `" data-name="` + html.EscapeString(w.Name) + `" title="` + tr("Search this title now") + `"><svg class="i"><use href="/assets/icons.svg#i-search"/></svg>` + tr("Search now") + `</button>`
+		missingButton := `<button type="button" class="sm primary" data-wanted-poll data-index="` + idx + `" data-name="` + html.EscapeString(w.Name) + `" title="` + tr("Search the missing episodes now") + `"><svg class="i"><use href="/assets/icons.svg#i-search"/></svg>` + tr("Search missing") + `</button>`
 		switch {
 		case w.Paused:
-			b.WriteString(`<form method="post" action="/ui/wanted"><input type="hidden" name="op" value="toggle-pause"><input type="hidden" name="index" value="` + idx + `"><button type="submit" class="sm primary" title="Resume monitoring this title">Resume monitoring</button></form>`)
+			b.WriteString(`<form method="post" action="/ui/wanted"><input type="hidden" name="op" value="toggle-pause"><input type="hidden" name="index" value="` + idx + `"><button type="submit" class="sm primary" title="` + tr("Resume monitoring this title") + `">` + tr("Resume monitoring") + `</button></form>`)
 		case stats.Missing > 0:
 			b.WriteString(missingButton)
 		case stats.Downloading > 0 && hash != "":
-			b.WriteString(`<a class="btn sm primary" href="/?open=` + html.EscapeString(hash) + `" title="Open the torrent in the session">Open</a>`)
+			b.WriteString(`<a class="btn sm primary" href="/?open=` + html.EscapeString(hash) + `" title="` + tr("Open the torrent in the session") + `">` + tr("Open") + `</a>`)
 		case stats.Downloading > 0:
 			b.WriteString(searchButton)
 		case stats.Downloaded > 0 && w.kind() != "movie":
@@ -1069,15 +1059,15 @@ func (d *Daemon) uiWantedRowsHTML() string {
 		default:
 			b.WriteString(searchButton)
 		}
-		b.WriteString(`<details class="row-more"><summary class="sm" aria-label="More actions for this title" title="More actions: releases, episodes, edit, pause, remove">More</summary><div class="row-more-menu">`)
+		b.WriteString(`<details class="row-more"><summary class="sm" aria-label="` + tr("More actions for this title") + `" title="` + tr("More actions: releases, episodes, edit, pause, remove") + `">` + tr("More") + `</summary><div class="row-more-menu">`)
 		b.WriteString(releasesButton)
 		if w.kind() != "movie" {
 			b.WriteString(episodesButton)
 		}
 		b.WriteString(searchButton)
-		b.WriteString(`<button type="button" class="sm" ` + attrs + ` title="Edit this title">Edit</button>`)
+		b.WriteString(`<button type="button" class="sm" ` + attrs + ` title="` + tr("Edit this title") + `">` + tr("Edit") + `</button>`)
 		b.WriteString(`<form method="post" action="/ui/wanted"><input type="hidden" name="op" value="toggle-pause"><input type="hidden" name="index" value="` + idx + `"><button type="submit" class="sm ghost" title="` + pauseTitle + `">` + pauseText + `</button></form>`)
-		b.WriteString(`<form method="post" action="/ui/wanted" data-confirm="Stop monitoring this title?"><input type="hidden" name="op" value="remove"><input type="hidden" name="index" value="` + idx + `"><button type="submit" class="ghost icon sm danger" title="Remove this title from the list" aria-label="Remove this title from the list"><svg class="i"><use href="/assets/icons.svg#i-trash"/></svg></button></form>`)
+		b.WriteString(`<form method="post" action="/ui/wanted" data-confirm="Stop monitoring this title?"><input type="hidden" name="op" value="remove"><input type="hidden" name="index" value="` + idx + `"><button type="submit" class="ghost icon sm danger" title="` + tr("Remove this title from the list") + `" aria-label="` + tr("Remove this title from the list") + `"><svg class="i"><use href="/assets/icons.svg#i-trash"/></svg></button></form>`)
 		b.WriteString(`</div></details></div></li>`)
 	}
 	return b.String()
@@ -1085,56 +1075,59 @@ func (d *Daemon) uiWantedRowsHTML() string {
 
 // uiWantedWait formats the time until the next search; a title never searched
 // is "soon" rather than "0s".
-func uiWantedWait(seconds int64) string {
+func uiWantedWait(lang string, seconds int64) string {
+	tr := func(phrase string) string { return uiTr(lang, phrase) }
 	if seconds <= 0 {
-		return "soon"
+		return tr("soon")
 	}
 	return uiDuration(seconds)
 }
 
 // wantedBadge maps a title state to its badge class and label (a catalog key).
-func wantedBadge(state string) (class, label string) {
+func wantedBadge(lang, state string) (class, label string) {
+	tr := func(phrase string) string { return uiTr(lang, phrase) }
 	switch state {
 	case "paused":
-		return "b-paused", "Not monitored"
+		return "b-paused", tr("Not monitored")
 	case "downloading":
-		return "b-downloading", "Downloading"
+		return "b-downloading", tr("Downloading")
 	case "missing":
-		return "b-missing", "Episodes missing"
+		return "b-missing", tr("Episodes missing")
 	case "uptodate":
-		return "b-seeding", "Complete"
+		return "b-seeding", tr("Complete")
 	default:
-		return "b-paused", "No episodes yet"
+		return "b-paused", tr("No episodes yet")
 	}
 }
 
 // uiWantedStatusHTML renders the "what I have" line of one wanted title: the
 // counts of downloaded, downloading and known-missing episodes, with a chip per
 // season. For a movie it shows the single release and links to its torrent.
-func (d *Daemon) uiWantedStatusHTML(w wantedEntry, stats wantedStats) string {
+func (d *Daemon) uiWantedStatusHTML(w wantedEntry, stats wantedStats, lang string) string {
+	tr := func(phrase string) string { return uiTr(lang, phrase) }
 	if w.kind() == "movie" {
-		return d.uiWantedMovieStatusHTML(w, stats)
+		return d.uiWantedMovieStatusHTML(w, stats, lang)
 	}
 	var parts []string
 	if stats.Downloaded > 0 {
-		parts = append(parts, `<span class="ok" title="Episodes downloaded for this title">✓</span> <b>`+strconv.Itoa(stats.Downloaded)+`</b> <span>Downloaded</span>`)
+		parts = append(parts, `<span class="ok" title="`+tr("Episodes downloaded for this title")+`">✓</span> <b>`+strconv.Itoa(stats.Downloaded)+`</b> <span>`+tr("Downloaded")+`</span>`)
 	}
 	if stats.Downloading > 0 {
-		parts = append(parts, `<span class="warn" title="Episodes still downloading">◐</span> <b>`+strconv.Itoa(stats.Downloading)+`</b> <span>Downloading</span>`)
+		parts = append(parts, `<span class="warn" title="`+tr("Episodes still downloading")+`">◐</span> <b>`+strconv.Itoa(stats.Downloading)+`</b> <span>`+tr("Downloading")+`</span>`)
 	}
 	if stats.Missing > 0 {
-		parts = append(parts, `<span class="warn" title="Episodes found in the feeds or indexers and not downloaded yet">○</span> <b>`+strconv.Itoa(stats.Missing)+`</b> <span>Found, not downloaded</span>`)
+		parts = append(parts, `<span class="warn" title="`+tr("Episodes found in the feeds or indexers and not downloaded yet")+`">○</span> <b>`+strconv.Itoa(stats.Missing)+`</b> <span>`+tr("Found, not downloaded")+`</span>`)
 	}
 	if len(parts) == 0 {
-		return `<span class="muted">No episodes found yet</span>`
+		return `<span class="muted">` + tr("No episodes found yet") + `</span>`
 	}
-	status := d.uiWantedProgressHTML(stats) + strings.Join(parts, ` · `)
+	status := d.uiWantedProgressHTML(stats, lang) + strings.Join(parts, ` · `)
 	if len(stats.Seasons) > 0 {
 		var chips []string
 		for _, season := range stats.Seasons {
 			chips = append(chips, uiWantedSeasonChip(season))
 		}
-		status += `<div class="seasons" title="Episodes per season">` + strings.Join(chips, " ") + `</div>`
+		status += `<div class="seasons" title="` + tr("Episodes per season") + `">` + strings.Join(chips, " ") + `</div>`
 	}
 	return status
 }
@@ -1143,13 +1136,14 @@ func (d *Daemon) uiWantedStatusHTML(w wantedEntry, stats wantedStats) string {
 // is downloaded / (downloaded + downloading + found but not downloaded). It is
 // deliberately not a claim about the whole series, which gx-torrent does not
 // know: the tooltip says "of the episodes found so far".
-func (d *Daemon) uiWantedProgressHTML(stats wantedStats) string {
+func (d *Daemon) uiWantedProgressHTML(stats wantedStats, lang string) string {
+	tr := func(phrase string) string { return uiTr(lang, phrase) }
 	known := stats.Downloaded + stats.Downloading + stats.Missing
 	if known == 0 {
 		return ""
 	}
 	pct := stats.Downloaded * 100 / known
-	return `<div class="wprogress" role="progressbar" aria-valuenow="` + strconv.Itoa(pct) + `" aria-valuemin="0" aria-valuemax="100" aria-label="Downloaded episodes out of the ones found so far" title="Downloaded episodes out of the ones found so far"><i style="width:` + strconv.Itoa(pct) + `%"></i></div>`
+	return `<div class="wprogress" role="progressbar" aria-valuenow="` + strconv.Itoa(pct) + `" aria-valuemin="0" aria-valuemax="100" aria-label="` + tr("Downloaded episodes out of the ones found so far") + `" title="` + tr("Downloaded episodes out of the ones found so far") + `"><i style="width:` + strconv.Itoa(pct) + `%"></i></div>`
 }
 
 // uiWantedSeasonChip renders one season with its episode counts (only the
@@ -1170,19 +1164,20 @@ func uiWantedSeasonChip(s wantedSeasonStat) string {
 
 // uiWantedMovieStatusHTML shows the state of a wanted movie and links to its
 // torrent in the session when there is one.
-func (d *Daemon) uiWantedMovieStatusHTML(w wantedEntry, stats wantedStats) string {
+func (d *Daemon) uiWantedMovieStatusHTML(w wantedEntry, stats wantedStats, lang string) string {
+	tr := func(phrase string) string { return uiTr(lang, phrase) }
 	media, _ := d.wantedSessionMedia(w)[wantedEpisode{season: -1}]
 	if media.Hash != "" {
-		link := `<a class="eplink" href="/?open=` + media.Hash + `" title="Opens the torrent in the session">` + html.EscapeString(media.Name) + `</a>`
+		link := `<a class="eplink" href="/?open=` + media.Hash + `" title="` + tr("Opens the torrent in the session") + `">` + html.EscapeString(media.Name) + `</a>`
 		if mediaDownloaded(media) {
-			return `<span class="ok">✓</span> <span>Downloaded</span> · ` + link
+			return `<span class="ok">✓</span> <span>` + tr("Downloaded") + `</span> · ` + link
 		}
-		return `<span class="warn">◐</span> <span>Downloading</span> <b>` + fmt.Sprintf("%.0f%%", media.Progress) + `</b> · ` + link
+		return `<span class="warn">◐</span> <span>` + tr("Downloading") + `</span> <b>` + fmt.Sprintf("%.0f%%", media.Progress) + `</b> · ` + link
 	}
 	if stats.Downloaded > 0 {
-		return `<span class="ok">✓</span> <span>Downloaded</span> · <span class="muted">Downloaded earlier, not in the session</span>`
+		return `<span class="ok">✓</span> <span>` + tr("Downloaded") + `</span> · <span class="muted">` + tr("Downloaded earlier, not in the session") + `</span>`
 	}
-	return `<span class="muted">No release found yet</span>`
+	return `<span class="muted">` + tr("No release found yet") + `</span>`
 }
 
 // wantedProgress returns how many episodes (or releases) were taken for a

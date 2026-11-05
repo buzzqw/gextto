@@ -292,6 +292,7 @@ one.
 |---|---|
 | `main.go`, `daemon.go`, `lifecycle.go`, `mode.go` | startup and lifecycle of the daemon (managed or standalone mode). |
 | `ui.go`, `ui_search.go`, `ui_categories.go` | web UI of the daemon (`handleUI`), live fragments, search and categories. |
+| `ui_render.go`, `i18n_tr.go`, `i18n.go` | pages served in the request language: one parsed template set per page and per language with `tr` bound to its dictionary, and the catalog of every text in six languages. Nothing is translated after rendering. |
 | `internal/webui/assets/*` | templates and embedded assets of the daemon UI (see §7). |
 | `api.go` | routes of the native JSON API (`/api/v1/...`) and `/ui/...` pages. |
 | `api_qbit.go` | qBittorrent-compatible API (`/api/v2/...`). |

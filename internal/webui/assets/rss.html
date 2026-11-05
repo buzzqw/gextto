@@ -54,96 +54,96 @@ textarea.json{width:100%;font:12.5px/1.45 var(--mono)}
 <body>
 <header class="topbar">
   <a class="brand" href="/" title="gx-torrent"><img src="/favicon.ico" alt=""><span>gx-torrent</span></a>
-  <nav class="nav" aria-label="Sections"><a href="/" title="Torrents list and transfer status">Torrents</a><a href="/ui/wanted" title="TV series and movies you follow">Series &amp; movies</a><a class="on" href="/ui/rss" aria-current="page" title="RSS feeds, indexers and rules">RSS &amp; indexers</a><a href="/ui/archive" title="Everything the feeds found, searchable">Archive</a><a href="/ui/stats" title="Transfer, disk and network statistics">Statistics</a><a href="/ui/settings" title="Daemon configuration and options">Settings</a><div class="navmenu"><button type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="nav-menu" title="Log, tools and indexer search">More <span class="caret" aria-hidden="true">▾</span></button><div class="menu" id="nav-menu" role="menu" aria-label="More" hidden><a role="menuitem" href="/?show=log" title="Switch to live server log view">Log</a><a role="menuitem" href="/?show=tools" title="IP filter, create a .torrent, feeds">Tools</a><a role="menuitem" href="/?show=search" title="Search configured Torznab indexers for releases">Search indexers</a></div></div></nav>
+  <nav class="nav" aria-label="{{tr "Sections"}}"><a href="/" title="{{tr "Torrents list and transfer status"}}">{{tr "Torrents"}}</a><a href="/ui/wanted" title="{{tr "TV series and movies you follow"}}">{{tr "Series & movies"}}</a><a class="on" href="/ui/rss" aria-current="page" title="{{tr "RSS feeds, indexers and rules"}}">{{tr "RSS & indexers"}}</a><a href="/ui/archive" title="{{tr "Everything the feeds found, searchable"}}">{{tr "Archive"}}</a><a href="/ui/stats" title="{{tr "Transfer, disk and network statistics"}}">{{tr "Statistics"}}</a><a href="/ui/settings" title="{{tr "Daemon configuration and options"}}">{{tr "Settings"}}</a><div class="navmenu"><button type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="nav-menu" title="{{tr "Log, tools and indexer search"}}">{{tr "More"}} <span class="caret" aria-hidden="true">▾</span></button><div class="menu" id="nav-menu" role="menu" aria-label="{{tr "More"}}" hidden><a role="menuitem" href="/?show=log" title="{{tr "Switch to live server log view"}}">{{tr "Log"}}</a><a role="menuitem" href="/?show=tools" title="{{tr "IP filter, create a .torrent, feeds"}}">{{tr "Tools"}}</a><a role="menuitem" href="/?show=search" title="{{tr "Search configured Torznab indexers for releases"}}">{{tr "Search indexers"}}</a></div></div></nav>
   <span class="spacer"></span>
-  <button type="button" class="ghost icon" data-theme-switch data-label-auto="Theme: automatic (follows the system)" data-label-light="Theme: light" data-label-dark="Theme: dark" aria-label="Theme: automatic (follows the system)" title="Switch theme (automatic, light, dark)"><svg class="i" data-theme-icon="auto"><use href="/assets/icons.svg#i-auto"/></svg><svg class="i" data-theme-icon="light" hidden><use href="/assets/icons.svg#i-sun"/></svg><svg class="i" data-theme-icon="dark" hidden><use href="/assets/icons.svg#i-moon"/></svg></button>
+  <button type="button" class="ghost icon" data-theme-switch data-label-auto="{{tr "Theme: automatic (follows the system)"}}" data-label-light="{{tr "Theme: light"}}" data-label-dark="{{tr "Theme: dark"}}" aria-label="{{tr "Theme: automatic (follows the system)"}}" title="{{tr "Switch theme (automatic, light, dark)"}}"><svg class="i" data-theme-icon="auto"><use href="/assets/icons.svg#i-auto"/></svg><svg class="i" data-theme-icon="light" hidden><use href="/assets/icons.svg#i-sun"/></svg><svg class="i" data-theme-icon="dark" hidden><use href="/assets/icons.svg#i-moon"/></svg></button>
 </header>
 <main class="page" style="max-width:1100px">
-<!--NOTICE-->
-<!--ERROR-->
+{{.NOTICE}}
+{{.ERROR}}
 <div class="page-head">
   <div class="grow">
-    <h1>RSS &amp; indexers</h1>
-    <p>Feeds fill the archive; rules decide what to download, in order: the first match wins. Indexers answer searches and wanted titles.</p>
+    <h1>{{tr "RSS & indexers"}}</h1>
+    <p>{{tr "Feeds fill the archive; rules decide what to download, in order: the first match wins. Indexers answer searches and wanted titles."}}</p>
   </div>
   <div class="actions">
-    <span class="muted" style="font-size:13px"><svg class="i"><use href="/assets/icons.svg#i-clock"/></svg> <span>Next automatic check</span>: <b>{{NEXTPOLL}}</b></span>
-    <button type="button" id="poll-all" title="Fetch new items from configured RSS feeds now"><svg class="i"><use href="/assets/icons.svg#i-reload"/></svg>Check feeds</button>
+    <span class="muted" style="font-size:13px"><svg class="i"><use href="/assets/icons.svg#i-clock"/></svg> <span>{{tr "Next automatic check"}}</span>: <b>{{.NEXTPOLL}}</b></span>
+    <button type="button" id="poll-all" title="{{tr "Fetch new items from configured RSS feeds now"}}"><svg class="i"><use href="/assets/icons.svg#i-reload"/></svg>{{tr "Check feeds"}}</button>
   </div>
 </div>
 
-<div class="tabbar" role="tablist" aria-label="RSS sections">
-  <button type="button" role="tab" id="tab-feeds" aria-controls="p-feeds" aria-selected="true" data-tab="feeds" title="RSS feeds and listing pages"><svg class="i"><use href="/assets/icons.svg#i-rss"/></svg> Feeds<span class="cnt">{{FEEDCOUNT}}</span></button>
-  <button type="button" role="tab" id="tab-rules" aria-controls="p-rules" aria-selected="false" data-tab="rules" title="Download rules, evaluated in order"><svg class="i"><use href="/assets/icons.svg#i-filter"/></svg> Rules<span class="cnt">{{RULECOUNT}}</span></button>
-  <button type="button" role="tab" id="tab-indexers" aria-controls="p-indexers" aria-selected="false" data-tab="indexers" title="Torznab indexers (Prowlarr, Jackett)"><svg class="i"><use href="/assets/icons.svg#i-server"/></svg> Indexers<span class="cnt">{{INDEXERCOUNT}}</span></button>
-  <button type="button" role="tab" id="tab-options" aria-controls="p-options" aria-selected="false" data-tab="options" title="Check interval, archive retention, FlareSolverr"><svg class="i"><use href="/assets/icons.svg#i-gear"/></svg> Options</button>
+<div class="tabbar" role="tablist" aria-label="{{tr "RSS sections"}}">
+  <button type="button" role="tab" id="tab-feeds" aria-controls="p-feeds" aria-selected="true" data-tab="feeds" title="{{tr "RSS feeds and listing pages"}}"><svg class="i"><use href="/assets/icons.svg#i-rss"/></svg> {{tr "Feeds"}}<span class="cnt">{{.FEEDCOUNT}}</span></button>
+  <button type="button" role="tab" id="tab-rules" aria-controls="p-rules" aria-selected="false" data-tab="rules" title="{{tr "Download rules, evaluated in order"}}"><svg class="i"><use href="/assets/icons.svg#i-filter"/></svg> {{tr "Rules"}}<span class="cnt">{{.RULECOUNT}}</span></button>
+  <button type="button" role="tab" id="tab-indexers" aria-controls="p-indexers" aria-selected="false" data-tab="indexers" title="{{tr "Torznab indexers (Prowlarr, Jackett)"}}"><svg class="i"><use href="/assets/icons.svg#i-server"/></svg> {{tr "Indexers"}}<span class="cnt">{{.INDEXERCOUNT}}</span></button>
+  <button type="button" role="tab" id="tab-options" aria-controls="p-options" aria-selected="false" data-tab="options" title="{{tr "Check interval, archive retention, FlareSolverr"}}"><svg class="i"><use href="/assets/icons.svg#i-gear"/></svg> {{tr "Options"}}</button>
 </div>
 
 <section class="tabpanel" id="p-feeds" role="tabpanel" aria-labelledby="tab-feeds">
   <div class="panel-head">
-    <h2>Feeds</h2>
-    <button type="button" class="primary" id="new-feed" title="Add an RSS feed"><svg class="i"><use href="/assets/icons.svg#i-plus"/></svg>New feed</button>
-    <p class="hint">A feed is an RSS URL, or the page of an ext.to or TorrentGalaxy listing. Its items are fetched periodically, kept in the archive and evaluated by rules and wanted titles.</p>
+    <h2>{{tr "Feeds"}}</h2>
+    <button type="button" class="primary" id="new-feed" title="{{tr "Add an RSS feed"}}"><svg class="i"><use href="/assets/icons.svg#i-plus"/></svg>{{tr "New feed"}}</button>
+    <p class="hint">{{tr "A feed is an RSS URL, or the page of an ext.to or TorrentGalaxy listing. Its items are fetched periodically, kept in the archive and evaluated by rules and wanted titles."}}</p>
   </div>
-  <ul class="items" id="feed-list">{{FEEDROWS}}</ul>
+  <ul class="items" id="feed-list">{{.FEEDROWS}}</ul>
   <div class="panel" id="feed-guide" hidden style="margin-top:12px;padding:14px">
-    <h3>No feeds yet: pick a way to start</h3>
-    <p class="muted" style="margin:0 0 10px;font-size:13px">Feeds fill the archive with releases; rules and wanted titles decide what gets downloaded. Without a feed nothing can arrive on its own.</p>
+    <h3>{{tr "No feeds yet: pick a way to start"}}</h3>
+    <p class="muted" style="margin:0 0 10px;font-size:13px">{{tr "Feeds fill the archive with releases; rules and wanted titles decide what gets downloaded. Without a feed nothing can arrive on its own."}}</p>
     <div class="actions" style="margin:0">
-      <button type="button" class="primary sm" id="guide-new-feed" title="Add an RSS feed">New feed</button>
-      <button type="button" class="sm" id="guide-new-rule" title="Add a download rule">New rule</button>
-      <a class="btn sm" href="#options" id="guide-import" title="Check interval, archive retention, FlareSolverr">Import a setup</a>
+      <button type="button" class="primary sm" id="guide-new-feed" title="{{tr "Add an RSS feed"}}">{{tr "New feed"}}</button>
+      <button type="button" class="sm" id="guide-new-rule" title="{{tr "Add a download rule"}}">{{tr "New rule"}}</button>
+      <a class="btn sm" href="#options" id="guide-import" title="{{tr "Check interval, archive retention, FlareSolverr"}}">{{tr "Import a setup"}}</a>
     </div>
   </div>
 </section>
 
 <section class="tabpanel" id="p-rules" role="tabpanel" aria-labelledby="tab-rules" hidden>
   <div class="panel-head">
-    <h2>Rules</h2>
-    <button type="button" class="primary" id="new-rule" title="Add a download rule"><svg class="i"><use href="/assets/icons.svg#i-plus"/></svg>New rule</button>
-    <p class="hint">With at least one rule, only items matching a rule are added: a Skip rule rejects, an Add rule accepts with its save path, category, tags and flags. Rules are evaluated top to bottom.</p>
+    <h2>{{tr "Rules"}}</h2>
+    <button type="button" class="primary" id="new-rule" title="{{tr "Add a download rule"}}"><svg class="i"><use href="/assets/icons.svg#i-plus"/></svg>{{tr "New rule"}}</button>
+    <p class="hint">{{tr "With at least one rule, only items matching a rule are added: a Skip rule rejects, an Add rule accepts with its save path, category, tags and flags. Rules are evaluated top to bottom."}}</p>
   </div>
   <details class="more rules-help">
-    <summary>What are rules for?</summary>
-    <p>A rule downloads by itself what your feeds publish: think of it as a more powerful "add a series to Wanted". You choose which feeds it watches, which titles it takes and where it saves them.</p>
+    <summary>{{tr "What are rules for?"}}</summary>
+    <p>{{tr "A rule downloads by itself what your feeds publish: think of it as a more powerful \"add a series to Wanted\". You choose which feeds it watches, which titles it takes and where it saves them."}}</p>
     <ul>
-      <li>Follow a series only in the quality you want: Include "1080p", Episode filter or Smart episode, so every episode is taken once.</li>
-      <li>Take everything a feed publishes into one folder, with its category and tags.</li>
-      <li>Reject what you never want (cam, a language, too small or too big) with a Skip rule placed above the others.</li>
+      <li>{{tr "Follow a series only in the quality you want: Include \"1080p\", Episode filter or Smart episode, so every episode is taken once."}}</li>
+      <li>{{tr "Take everything a feed publishes into one folder, with its category and tags."}}</li>
+      <li>{{tr "Reject what you never want (cam, a language, too small or too big) with a Skip rule placed above the others."}}</li>
     </ul>
-    <p>Before saving, Preview matches in the editor shows what the rule would take from the archive. Without rules a feed only fills the archive, unless its own Include/Exclude select something.</p>
+    <p>{{tr "Before saving, Preview matches in the editor shows what the rule would take from the archive. Without rules a feed only fills the archive, unless its own Include/Exclude select something."}}</p>
   </details>
-  <ul class="items" id="rule-list">{{RULEROWS}}</ul>
+  <ul class="items" id="rule-list">{{.RULEROWS}}</ul>
 </section>
 
 <section class="tabpanel" id="p-indexers" role="tabpanel" aria-labelledby="tab-indexers" hidden>
   <div class="panel-head">
-    <h2>Indexers</h2>
-    <button type="button" class="primary" id="new-indexer" title="Add a Torznab indexer"><svg class="i"><use href="/assets/icons.svg#i-plus"/></svg>New indexer</button>
-    <p class="hint">Torznab endpoints of Prowlarr, Jackett or another manager. They are searched on demand and for the wanted titles, and their results are archived.</p>
+    <h2>{{tr "Indexers"}}</h2>
+    <button type="button" class="primary" id="new-indexer" title="{{tr "Add a Torznab indexer"}}"><svg class="i"><use href="/assets/icons.svg#i-plus"/></svg>{{tr "New indexer"}}</button>
+    <p class="hint">{{tr "Torznab endpoints of Prowlarr, Jackett or another manager. They are searched on demand and for the wanted titles, and their results are archived."}}</p>
   </div>
-  <ul class="items">{{INDEXERROWS}}</ul>
+  <ul class="items">{{.INDEXERROWS}}</ul>
 </section>
 
 <section class="tabpanel" id="p-options" role="tabpanel" aria-labelledby="tab-options" hidden>
   <form method="post" action="/ui/rss-settings" id="rss-settings">
     <div class="optgrid">
-      <div class="panel"><h3>Check interval (minutes)</h3><p>How often feeds are checked and wanted titles are searched.</p><input type="number" min="1" max="1440" name="interval" value="{{FEEDINTERVAL}}" aria-label="Check interval (minutes)" title="How often feeds are checked and wanted titles are searched"></div>
-      <div class="panel"><h3>Archive retention (days, 0 = keep all)</h3><p>Items found longer ago are removed from the archive.</p><input type="number" min="0" max="3650" name="archive_days" value="{{ARCHIVEDAYS}}" aria-label="Archive retention (days, 0 = keep all)" title="Items found longer ago are removed from the archive"></div>
-      <div class="panel"><h3>FlareSolverr URL</h3><p>Used for feeds and indexers behind a Cloudflare challenge; empty to disable.</p>
-        <input type="text" name="flaresolverr" value="{{FLARESOLVERR}}" placeholder="http://127.0.0.1:8191" autocomplete="off" aria-label="FlareSolverr URL" title="FlareSolverr service used to pass feeds and indexers behind a Cloudflare challenge; empty to disable">
-        <div class="actions" style="margin:0"><button type="button" class="sm" id="flare-test" title="Check that the configured FlareSolverr answers">Test FlareSolverr</button><span class="muted" id="flare-status" aria-live="polite"></span></div>
+      <div class="panel"><h3>{{tr "Check interval (minutes)"}}</h3><p>{{tr "How often feeds are checked and wanted titles are searched."}}</p><input type="number" min="1" max="1440" name="interval" value="{{.FEEDINTERVAL}}" aria-label="{{tr "Check interval (minutes)"}}" title="{{tr "How often feeds are checked and wanted titles are searched"}}"></div>
+      <div class="panel"><h3>{{tr "Archive retention (days, 0 = keep all)"}}</h3><p>{{tr "Items found longer ago are removed from the archive."}}</p><input type="number" min="0" max="3650" name="archive_days" value="{{.ARCHIVEDAYS}}" aria-label="{{tr "Archive retention (days, 0 = keep all)"}}" title="{{tr "Items found longer ago are removed from the archive"}}"></div>
+      <div class="panel"><h3>{{tr "FlareSolverr URL"}}</h3><p>{{tr "Used for feeds and indexers behind a Cloudflare challenge; empty to disable."}}</p>
+        <input type="text" name="flaresolverr" value="{{.FLARESOLVERR}}" placeholder="http://127.0.0.1:8191" autocomplete="off" aria-label="{{tr "FlareSolverr URL"}}" title="{{tr "FlareSolverr service used to pass feeds and indexers behind a Cloudflare challenge; empty to disable"}}">
+        <div class="actions" style="margin:0"><button type="button" class="sm" id="flare-test" title="{{tr "Check that the configured FlareSolverr answers"}}">{{tr "Test FlareSolverr"}}</button><span class="muted" id="flare-status" aria-live="polite"></span></div>
       </div>
     </div>
-    <div class="actions" style="margin-top:14px"><button type="submit" class="primary" title="Save the RSS options">Save</button></div>
+    <div class="actions" style="margin-top:14px"><button type="submit" class="primary" title="{{tr "Save the RSS options"}}">{{tr "Save"}}</button></div>
   </form>
   <div class="panel" style="margin-top:20px;padding:14px">
-    <h3>Copy the setup</h3>
-    <p class="muted" style="margin:0 0 10px;font-size:13px">Export saves the feeds, rules and indexers in one file, as a backup or to bring them to another gx-torrent. Import loads such a file and replaces the feeds, rules and indexers it contains.</p>
+    <h3>{{tr "Copy the setup"}}</h3>
+    <p class="muted" style="margin:0 0 10px;font-size:13px">{{tr "Export saves the feeds, rules and indexers in one file, as a backup or to bring them to another gx-torrent. Import loads such a file and replaces the feeds, rules and indexers it contains."}}</p>
     <form method="post" action="/ui/rss-config" enctype="multipart/form-data" class="actions" style="margin:0;align-items:flex-end" id="rss-import-form">
-      <a class="btn sm" href="/ui/rss-export" download title="Download the feeds, rules and indexers as a file">Export</a>
-      <label class="field" style="margin:0">Setup file<input type="file" name="setup" id="rss-import-file" accept="application/json,.json" required title="A file exported from a gx-torrent RSS page"></label>
-      <button type="submit" class="sm" title="Replace the feeds, rules and indexers with those in the file">Import</button>
+      <a class="btn sm" href="/ui/rss-export" download title="{{tr "Download the feeds, rules and indexers as a file"}}">{{tr "Export"}}</a>
+      <label class="field" style="margin:0">{{tr "Setup file"}}<input type="file" name="setup" id="rss-import-file" accept="application/json,.json" required title="{{tr "A file exported from a gx-torrent RSS page"}}"></label>
+      <button type="submit" class="sm" title="{{tr "Replace the feeds, rules and indexers with those in the file"}}">{{tr "Import"}}</button>
     </form>
     <p class="muted" id="rss-import-preview" style="margin:8px 0 0;font-size:13px" aria-live="polite"></p>
   </div>
@@ -153,38 +153,38 @@ textarea.json{width:100%;font:12.5px/1.45 var(--mono)}
 <dialog id="dlg-feed" aria-labelledby="dlg-feed-title">
   <form method="post" action="/ui/rss-feed" id="feed-form">
     <input type="hidden" name="op" value="add"><input type="hidden" name="index" id="feed-index">
-    <div class="dlg-head"><h2 id="dlg-feed-title">New feed</h2><button type="button" class="ghost icon" data-close aria-label="Close" title="Close"><svg class="i"><use href="/assets/icons.svg#i-x"/></svg></button></div>
+    <div class="dlg-head"><h2 id="dlg-feed-title">{{tr "New feed"}}</h2><button type="button" class="ghost icon" data-close aria-label="{{tr "Close"}}" title="{{tr "Close"}}"><svg class="i"><use href="/assets/icons.svg#i-x"/></svg></button></div>
     <div class="dlg-body">
       <div class="fsec">
-        <label class="field">Name<input type="text" name="name" placeholder="Feed name" autocomplete="off" required title="Feed name"></label>
-        <label class="field">Feed URL<input type="text" name="url" id="feed-url" placeholder="http://…/rss" autocomplete="off" required title="RSS feed URL, the page of an ext.to or TorrentGalaxy listing, or a BEP 46 DHT feed (dht://…)"></label>
-        <div class="actions" style="margin:0"><button type="button" class="sm" id="feed-test" title="Fetch this URL now and show how many items it returns, before saving">Test</button><span class="muted" id="feed-test-status" aria-live="polite"></span></div>
-        <label class="field">Folder<input type="text" name="folder" placeholder="tv" autocomplete="off" title="Group shown next to the feed name"></label>
+        <label class="field">{{tr "Name"}}<input type="text" name="name" placeholder="{{tr "Feed name"}}" autocomplete="off" required title="{{tr "Feed name"}}"></label>
+        <label class="field">{{tr "Feed URL"}}<input type="text" name="url" id="feed-url" placeholder="http://…/rss" autocomplete="off" required title="{{tr "RSS feed URL, the page of an ext.to or TorrentGalaxy listing, or a BEP 46 DHT feed (dht://…)"}}"></label>
+        <div class="actions" style="margin:0"><button type="button" class="sm" id="feed-test" title="{{tr "Fetch this URL now and show how many items it returns, before saving"}}">{{tr "Test"}}</button><span class="muted" id="feed-test-status" aria-live="polite"></span></div>
+        <label class="field">{{tr "Folder"}}<input type="text" name="folder" placeholder="tv" autocomplete="off" title="{{tr "Group shown next to the feed name"}}"></label>
       </div>
       <div class="fsec">
-        <h3>Add several feeds at once</h3>
-        <p class="muted" style="margin:0 0 8px;font-size:13px">One URL per line. When you want to name a feed, put the name before its URL separated by a vertical bar. The folder and the options below apply to every feed added.</p>
-        <label class="field">Feed URLs<textarea name="urls" id="feed-urls" rows="4" placeholder="https://…/rss&#10;https://…/browse/?filter=u=name" title="One feed per line: an RSS URL, the page of an ext.to or TorrentGalaxy listing, or a BEP 46 DHT feed (dht://…). A line may read Name | URL; without a name it is taken from the address."></textarea></label>
+        <h3>{{tr "Add several feeds at once"}}</h3>
+        <p class="muted" style="margin:0 0 8px;font-size:13px">{{tr "One URL per line. When you want to name a feed, put the name before its URL separated by a vertical bar. The folder and the options below apply to every feed added."}}</p>
+        <label class="field">{{tr "Feed URLs"}}<textarea name="urls" id="feed-urls" rows="4" placeholder="https://…/rss&#10;https://…/browse/?filter=u=name" title="{{tr "One feed per line: an RSS URL, the page of an ext.to or TorrentGalaxy listing, or a BEP 46 DHT feed (dht://…). A line may read Name | URL; without a name it is taken from the address."}}"></textarea></label>
       </div>
       <div class="fsec" id="feed-fallback">
-        <h3>When no rule covers this feed</h3>
-        <p class="notice warn" id="feed-covered" role="status" hidden><span>These rules watch this feed, so the fields below are not used:</span> <b id="feed-covered-names"></b></p>
+        <h3>{{tr "When no rule covers this feed"}}</h3>
+        <p class="notice warn" id="feed-covered" role="status" hidden><span>{{tr "These rules watch this feed, so the fields below are not used:"}}</span> <b id="feed-covered-names"></b></p>
         <div class="fgrid">
-          <label class="field">Contains one of<input type="text" name="include" placeholder="1080p, 2160p" autocomplete="off" title="At least one of these terms must be in the title (used when no rule covers this feed)"></label>
-          <label class="field">Contains none of<input type="text" name="exclude" placeholder="cam, ts" autocomplete="off" title="A title with any of these terms is not taken (used when no rule covers this feed)"></label>
-          <label class="field">Save path<input type="text" name="savepath" placeholder="/srv/tv" autocomplete="off" title="Folder on disk where files will be saved"></label>
-          <label class="field">Category<input type="text" name="category" placeholder="tv" autocomplete="off" title="Category assigned to added torrents"></label>
+          <label class="field">{{tr "Contains one of"}}<input type="text" name="include" placeholder="1080p, 2160p" autocomplete="off" title="{{tr "At least one of these terms must be in the title (used when no rule covers this feed)"}}"></label>
+          <label class="field">{{tr "Contains none of"}}<input type="text" name="exclude" placeholder="{{tr "cam, ts"}}" autocomplete="off" title="{{tr "A title with any of these terms is not taken (used when no rule covers this feed)"}}"></label>
+          <label class="field">{{tr "Save path"}}<input type="text" name="savepath" placeholder="/srv/tv" autocomplete="off" title="{{tr "Folder on disk where files will be saved"}}"></label>
+          <label class="field">{{tr "Category"}}<input type="text" name="category" placeholder="tv" autocomplete="off" title="{{tr "Category assigned to added torrents"}}"></label>
         </div>
         <div class="checks">
-          <label class="chk"><input type="checkbox" name="all" value="1" title="Download every item this feed returns even without a covering rule and without Include/Exclude; otherwise such a feed only grows the archive"> Take everything</label>
-          <label class="chk"><input type="checkbox" name="paused" value="1" title="Add matched torrents in paused state"> Paused</label>
-          <label class="chk"><input type="checkbox" name="disabled" value="1" title="Do not check this feed automatically (the reload button still works)"> Disabled</label>
+          <label class="chk"><input type="checkbox" name="all" value="1" title="{{tr "Download every item this feed returns even without a covering rule and without Include/Exclude; otherwise such a feed only grows the archive"}}"> {{tr "Take everything"}}</label>
+          <label class="chk"><input type="checkbox" name="paused" value="1" title="{{tr "Add matched torrents in paused state"}}"> {{tr "Paused"}}</label>
+          <label class="chk"><input type="checkbox" name="disabled" value="1" title="{{tr "Do not check this feed automatically (the reload button still works)"}}"> {{tr "Disabled"}}</label>
         </div>
       </div>
     </div>
     <div class="dlg-foot">
-      <button type="button" data-close title="Close without saving">Cancel</button>
-      <button type="submit" class="primary" id="feed-submit" title="Add RSS feed">Add feed</button>
+      <button type="button" data-close title="{{tr "Close without saving"}}">{{tr "Cancel"}}</button>
+      <button type="submit" class="primary" id="feed-submit" title="{{tr "Add RSS feed"}}">{{tr "Add feed"}}</button>
     </div>
   </form>
 </dialog>
@@ -193,93 +193,93 @@ textarea.json{width:100%;font:12.5px/1.45 var(--mono)}
 <dialog id="dlg-rule" class="wide" aria-labelledby="dlg-rule-title">
   <form method="post" action="/ui/rss-rule" id="rule-form">
     <input type="hidden" name="op" value="add"><input type="hidden" name="index" id="rule-index">
-    <div class="dlg-head"><h2 id="dlg-rule-title">New rule</h2><button type="button" class="ghost icon" data-close aria-label="Close" title="Close"><svg class="i"><use href="/assets/icons.svg#i-x"/></svg></button></div>
+    <div class="dlg-head"><h2 id="dlg-rule-title">{{tr "New rule"}}</h2><button type="button" class="ghost icon" data-close aria-label="{{tr "Close"}}" title="{{tr "Close"}}"><svg class="i"><use href="/assets/icons.svg#i-x"/></svg></button></div>
     <div class="dlg-body">
       <div class="fsec" id="rule-presets">
-        <h3>Presets</h3>
+        <h3>{{tr "Presets"}}</h3>
         <div class="actions" style="margin:0">
-          <button type="button" class="sm" data-preset="series" title="Fill the rule for TV series: Italian 1080p episodes, each taken once">TV series</button>
-          <button type="button" class="sm" data-preset="movie" title="Fill the rule for movies: 1080p or 2160p, no CAM or TS">Movie</button>
-          <button type="button" class="sm" data-preset="all" title="Fill the rule to take everything except CAM and TS releases">Take all</button>
+          <button type="button" class="sm" data-preset="series" title="{{tr "Fill the rule for TV series: Italian 1080p episodes, each taken once"}}">{{tr "TV series"}}</button>
+          <button type="button" class="sm" data-preset="movie" title="{{tr "Fill the rule for movies: 1080p or 2160p, no CAM or TS"}}">{{tr "Movie"}}</button>
+          <button type="button" class="sm" data-preset="all" title="{{tr "Fill the rule to take everything except CAM and TS releases"}}">{{tr "Take all"}}</button>
         </div>
       </div>
       <div class="rule-layout">
         <div>
           <div class="fsec">
             <div class="fgrid">
-              <label class="field span2">Rule name<input type="text" name="name" placeholder="shows" autocomplete="off" required title="Rule name"></label>
-              <div class="field"><span>Kind</span>
-                <div class="seg" role="radiogroup" aria-label="Kind">
-                  <label title="Items matching the rule are downloaded"><input type="radio" name="kind" value="add" checked> Add</label>
-                  <label title="Skip and reject matching releases"><input type="radio" name="kind" value="skip"> Skip</label>
+              <label class="field span2">{{tr "Rule name"}}<input type="text" name="name" placeholder="shows" autocomplete="off" required title="{{tr "Rule name"}}"></label>
+              <div class="field"><span>{{tr "Kind"}}</span>
+                <div class="seg" role="radiogroup" aria-label="{{tr "Kind"}}">
+                  <label title="{{tr "Items matching the rule are downloaded"}}"><input type="radio" name="kind" value="add" checked> {{tr "Add"}}</label>
+                  <label title="{{tr "Skip and reject matching releases"}}"><input type="radio" name="kind" value="skip"> {{tr "Skip"}}</label>
                 </div>
               </div>
             </div>
-            <input type="checkbox" name="fail" value="1" hidden aria-hidden="true" tabindex="-1" title="Skip and reject matching releases">
-            <div class="checks"><label class="chk"><input type="checkbox" name="enabled" value="1" checked title="Enable this rule"> Enabled</label></div>
+            <input type="checkbox" name="fail" value="1" hidden aria-hidden="true" tabindex="-1" title="{{tr "Skip and reject matching releases"}}">
+            <div class="checks"><label class="chk"><input type="checkbox" name="enabled" value="1" checked title="{{tr "Enable this rule"}}"> {{tr "Enabled"}}</label></div>
           </div>
           <div class="fsec">
-            <h3>Which items</h3>
+            <h3>{{tr "Which items"}}</h3>
             <div class="fgrid">
               <fieldset class="feedpick">
-                <legend>Apply this rule to these feeds</legend>
-                <p class="hint">No feed checked = every feed.</p>
-                <div class="feedpick-list">{{RULEFEEDS}}</div>
+                <legend>{{tr "Apply this rule to these feeds"}}</legend>
+                <p class="hint">{{tr "No feed checked = every feed."}}</p>
+                <div class="feedpick-list">{{.RULEFEEDS}}</div>
               </fieldset>
-              <label class="field full">Contains all of<input type="text" name="require" placeholder="the office, 1080p" autocomplete="off" title="Every one of these terms must be in the title (comma separated): use it for the series name and what you always want"></label>
-              <label class="field">Contains one of<input type="text" name="include" placeholder="1080p, 2160p" autocomplete="off" title="At least one of these terms must be in the title (comma separated): use it for alternatives"></label>
-              <label class="field">Contains none of<input type="text" name="exclude" placeholder="cam, ts" autocomplete="off" title="A title with any of these terms is not taken (comma separated)"></label>
-              <label class="field">Episode filter<input type="text" name="episode_filter" placeholder="1x01-05, 1x07" autocomplete="off" title="Episode pattern (e.g. 1x01-05)"></label>
+              <label class="field full">{{tr "Contains all of"}}<input type="text" name="require" placeholder="{{tr "the office, 1080p"}}" autocomplete="off" title="{{tr "Every one of these terms must be in the title (comma separated): use it for the series name and what you always want"}}"></label>
+              <label class="field">{{tr "Contains one of"}}<input type="text" name="include" placeholder="1080p, 2160p" autocomplete="off" title="{{tr "At least one of these terms must be in the title (comma separated): use it for alternatives"}}"></label>
+              <label class="field">{{tr "Contains none of"}}<input type="text" name="exclude" placeholder="{{tr "cam, ts"}}" autocomplete="off" title="{{tr "A title with any of these terms is not taken (comma separated)"}}"></label>
+              <label class="field">{{tr "Episode filter"}}<input type="text" name="episode_filter" placeholder="1x01-05, 1x07" autocomplete="off" title="{{tr "Episode pattern (e.g. 1x01-05)"}}"></label>
             </div>
-            <p class="hint">Terms are separated by commas. Dots, dashes and spaces in release names count the same, and a term matches from the start of a word: "the office" finds The.Office.US, "ita" finds ITA but not Capitan.</p>
+            <p class="hint">{{tr "Terms are separated by commas. Dots, dashes and spaces in release names count the same, and a term matches from the start of a word: \"the office\" finds The.Office.US, \"ita\" finds ITA but not Capitan."}}</p>
             <div class="checks">
-              <label class="chk"><input type="checkbox" name="require_episode" value="1" title="Take only titles with an episode number (S01E02 or 1x02): no movies and no season packs"> Episodes only</label>
-              <label class="chk"><input type="checkbox" name="smart_episode" value="1" title="Download each episode only once, even when several releases of it appear"> Each episode once</label>
-              <label class="chk"><input type="checkbox" name="only_freeleech" value="1" title="Take only releases the indexer marks as freeleech: the download does not count toward the tracker ratio"> Freeleech only</label>
+              <label class="chk"><input type="checkbox" name="require_episode" value="1" title="{{tr "Take only titles with an episode number (S01E02 or 1x02): no movies and no season packs"}}"> {{tr "Episodes only"}}</label>
+              <label class="chk"><input type="checkbox" name="smart_episode" value="1" title="{{tr "Download each episode only once, even when several releases of it appear"}}"> {{tr "Each episode once"}}</label>
+              <label class="chk"><input type="checkbox" name="only_freeleech" value="1" title="{{tr "Take only releases the indexer marks as freeleech: the download does not count toward the tracker ratio"}}"> {{tr "Freeleech only"}}</label>
             </div>
             <details class="more">
-              <summary>Advanced filters</summary>
+              <summary>{{tr "Advanced filters"}}</summary>
               <div class="fgrid">
-                <label class="field">Regex<input type="text" name="regex" placeholder="S0E0" autocomplete="off" title="Regular expression that release title must match"></label>
-                <label class="field">Not regex<input type="text" name="not_regex" placeholder="cam" autocomplete="off" title="Regular expression that release title must not match"></label>
-                <label class="field">Min size (MiB)<input type="number" step="1" min="0" name="min_size" title="Minimum release size in MiB"></label>
-                <label class="field">Max size (MiB)<input type="number" step="1" min="0" name="max_size" title="Maximum release size in MiB"></label>
-                <label class="field">Min seeders<input type="number" name="min_seeders" title="Minimum seeders required on release"></label>
-                <label class="field">Max seeders<input type="number" name="max_seeders" title="Maximum seeders allowed on release"></label>
-                <label class="field">Min peers<input type="number" name="min_peers" title="Minimum peers required on release"></label>
-                <label class="field">Max age (days)<input type="number" name="max_age_days" title="Maximum age of release in days"></label>
-                <label class="field">Cooldown between matches (days)<input type="number" name="ignore_days" title="Days to wait before matching the same title again"></label>
+                <label class="field">{{tr "Regex"}}<input type="text" name="regex" placeholder="S0E0" autocomplete="off" title="{{tr "Regular expression that release title must match"}}"></label>
+                <label class="field">{{tr "Not regex"}}<input type="text" name="not_regex" placeholder="cam" autocomplete="off" title="{{tr "Regular expression that release title must not match"}}"></label>
+                <label class="field">{{tr "Min size (MiB)"}}<input type="number" step="1" min="0" name="min_size" title="{{tr "Minimum release size in MiB"}}"></label>
+                <label class="field">{{tr "Max size (MiB)"}}<input type="number" step="1" min="0" name="max_size" title="{{tr "Maximum release size in MiB"}}"></label>
+                <label class="field">{{tr "Min seeders"}}<input type="number" name="min_seeders" title="{{tr "Minimum seeders required on release"}}"></label>
+                <label class="field">{{tr "Max seeders"}}<input type="number" name="max_seeders" title="{{tr "Maximum seeders allowed on release"}}"></label>
+                <label class="field">{{tr "Min peers"}}<input type="number" name="min_peers" title="{{tr "Minimum peers required on release"}}"></label>
+                <label class="field">{{tr "Max age (days)"}}<input type="number" name="max_age_days" title="{{tr "Maximum age of release in days"}}"></label>
+                <label class="field">{{tr "Cooldown between matches (days)"}}<input type="number" name="ignore_days" title="{{tr "Days to wait before matching the same title again"}}"></label>
               </div>
             </details>
           </div>
           <div class="fsec" id="rule-action">
-            <h3>What to do</h3>
+            <h3>{{tr "What to do"}}</h3>
             <div class="fgrid">
-              <label class="field span2">Save path<input type="text" name="savepath" placeholder="/srv/tv" autocomplete="off" title="Folder on disk where files will be saved"></label>
-              <label class="field">Category<input type="text" name="category" placeholder="tv" autocomplete="off" title="Category assigned to added torrents"></label>
-              <label class="field">Tags<input type="text" name="tags" placeholder="tag, tag" autocomplete="off" title="Tags assigned to added torrents"></label>
+              <label class="field span2">{{tr "Save path"}}<input type="text" name="savepath" placeholder="/srv/tv" autocomplete="off" title="{{tr "Folder on disk where files will be saved"}}"></label>
+              <label class="field">{{tr "Category"}}<input type="text" name="category" placeholder="tv" autocomplete="off" title="{{tr "Category assigned to added torrents"}}"></label>
+              <label class="field">{{tr "Tags"}}<input type="text" name="tags" placeholder="{{tr "tag, tag"}}" autocomplete="off" title="{{tr "Tags assigned to added torrents"}}"></label>
             </div>
             <div class="checks">
-              <label class="chk"><input type="checkbox" name="paused" value="1" title="Add matched torrents in paused state"> Paused</label>
-              <label class="chk"><input type="checkbox" name="top" value="1" title="Place matched torrents at top of queue"> top</label>
-              <label class="chk"><input type="checkbox" name="sequential" value="1" title="Download pieces in sequential order"> sequential</label>
-              <label class="chk"><input type="checkbox" name="first_last" value="1" title="Download start and end pieces of files first"> first/last</label>
-              <label class="chk"><input type="checkbox" name="once" value="1" title="Disable the rule after it adds its first torrent"> Download once</label>
+              <label class="chk"><input type="checkbox" name="paused" value="1" title="{{tr "Add matched torrents in paused state"}}"> {{tr "Paused"}}</label>
+              <label class="chk"><input type="checkbox" name="top" value="1" title="{{tr "Place matched torrents at top of queue"}}"> {{tr "top"}}</label>
+              <label class="chk"><input type="checkbox" name="sequential" value="1" title="{{tr "Download pieces in sequential order"}}"> {{tr "sequential"}}</label>
+              <label class="chk"><input type="checkbox" name="first_last" value="1" title="{{tr "Download start and end pieces of files first"}}"> {{tr "first/last"}}</label>
+              <label class="chk"><input type="checkbox" name="once" value="1" title="{{tr "Disable the rule after it adds its first torrent"}}"> {{tr "Download once"}}</label>
             </div>
           </div>
         </div>
         <aside class="rule-side" aria-labelledby="pv-title">
-          <h3 id="pv-title">Preview</h3>
-          <p class="muted" style="margin:0;font-size:12.5px">Which archived items this rule would take. It updates as you type.</p>
-          <button type="button" class="sm" id="rule-preview" title="Show which archived items this rule would match">Refresh preview</button>
+          <h3 id="pv-title">{{tr "Preview"}}</h3>
+          <p class="muted" style="margin:0;font-size:12.5px">{{tr "Which archived items this rule would take. It updates as you type."}}</p>
+          <button type="button" class="sm" id="rule-preview" title="{{tr "Show which archived items this rule would match"}}">{{tr "Refresh preview"}}</button>
           <div id="rule-preview-warn" aria-live="polite"></div>
-          <div class="preview" id="rule-preview-box" aria-live="polite" tabindex="0" role="region" aria-label="Preview"><span class="subtle">—</span></div>
+          <div class="preview" id="rule-preview-box" aria-live="polite" tabindex="0" role="region" aria-label="{{tr "Preview"}}"><span class="subtle">—</span></div>
         </aside>
       </div>
     </div>
     <div class="dlg-foot">
-      <button type="button" data-close title="Close without saving">Cancel</button>
-      <button type="submit" class="primary" id="rule-submit" title="Save filter rule">Add rule</button>
+      <button type="button" data-close title="{{tr "Close without saving"}}">{{tr "Cancel"}}</button>
+      <button type="submit" class="primary" id="rule-submit" title="{{tr "Save filter rule"}}">{{tr "Add rule"}}</button>
     </div>
   </form>
 </dialog>
@@ -288,29 +288,29 @@ textarea.json{width:100%;font:12.5px/1.45 var(--mono)}
 <dialog id="dlg-indexer" aria-labelledby="dlg-indexer-title">
   <form method="post" action="/ui/rss-indexer" id="indexer-form">
     <input type="hidden" name="op" value="add"><input type="hidden" name="index" id="indexer-index">
-    <div class="dlg-head"><h2 id="dlg-indexer-title">New indexer</h2><button type="button" class="ghost icon" data-close aria-label="Close" title="Close"><svg class="i"><use href="/assets/icons.svg#i-x"/></svg></button></div>
+    <div class="dlg-head"><h2 id="dlg-indexer-title">{{tr "New indexer"}}</h2><button type="button" class="ghost icon" data-close aria-label="{{tr "Close"}}" title="{{tr "Close"}}"><svg class="i"><use href="/assets/icons.svg#i-x"/></svg></button></div>
     <div class="dlg-body">
-      <label class="field">Type<select name="type" id="indexer-type" title="Indexer service type">{{INDEXEROPTIONS}}</select></label>
-      <label class="field">Name<input type="text" name="name" id="indexer-name" placeholder="prowlarr" autocomplete="off" required title="Indexer name"></label>
-      <label class="field">URL<input type="text" name="url" id="indexer-url" placeholder="http://127.0.0.1:9696" autocomplete="off" required title="Torznab endpoint URL"></label>
-      <label class="field">API key<input type="text" name="apikey" id="indexer-apikey" autocomplete="off" title="API key for authentication with the indexer"></label>
-      <div class="actions" style="margin:0"><button type="button" class="sm" id="indexer-test" title="Check that the indexer answers (Torznab caps)">Test</button><span class="muted" id="indexer-test-status" aria-live="polite"></span></div>
+      <label class="field">{{tr "Type"}}<select name="type" id="indexer-type" title="{{tr "Indexer service type"}}">{{.INDEXEROPTIONS}}</select></label>
+      <label class="field">{{tr "Name"}}<input type="text" name="name" id="indexer-name" placeholder="prowlarr" autocomplete="off" required title="{{tr "Indexer name"}}"></label>
+      <label class="field">{{tr "URL"}}<input type="text" name="url" id="indexer-url" placeholder="http://127.0.0.1:9696" autocomplete="off" required title="{{tr "Torznab endpoint URL"}}"></label>
+      <label class="field">{{tr "API key"}}<input type="text" name="apikey" id="indexer-apikey" autocomplete="off" title="{{tr "API key for authentication with the indexer"}}"></label>
+      <div class="actions" style="margin:0"><button type="button" class="sm" id="indexer-test" title="{{tr "Check that the indexer answers (Torznab caps)"}}">{{tr "Test"}}</button><span class="muted" id="indexer-test-status" aria-live="polite"></span></div>
     </div>
     <div class="dlg-foot">
-      <button type="button" data-close title="Close without saving">Cancel</button>
-      <button type="submit" class="primary" id="indexer-submit" title="Save indexer configuration">Add indexer</button>
+      <button type="button" data-close title="{{tr "Close without saving"}}">{{tr "Cancel"}}</button>
+      <button type="submit" class="primary" id="indexer-submit" title="{{tr "Save indexer configuration"}}">{{tr "Add indexer"}}</button>
     </div>
   </form>
 </dialog>
 
 <!-- Feed items -->
 <dialog id="dlg-items" class="wide" aria-labelledby="dlg-items-title">
-  <div class="dlg-head"><h2 id="dlg-items-title">Feed items</h2><button type="button" class="ghost icon" data-close aria-label="Close" title="Close"><svg class="i"><use href="/assets/icons.svg#i-x"/></svg></button></div>
+  <div class="dlg-head"><h2 id="dlg-items-title">{{tr "Feed items"}}</h2><button type="button" class="ghost icon" data-close aria-label="{{tr "Close"}}" title="{{tr "Close"}}"><svg class="i"><use href="/assets/icons.svg#i-x"/></svg></button></div>
   <div class="dlg-body">
     <p class="muted" id="items-info" style="margin:0" aria-live="polite"></p>
-    <div class="preview itemsview" id="items" style="max-height:60vh" tabindex="0" role="region" aria-label="Feed items"></div>
+    <div class="preview itemsview" id="items" style="max-height:60vh" tabindex="0" role="region" aria-label="{{tr "Feed items"}}"></div>
   </div>
-  <div class="dlg-foot"><button type="button" data-close title="Close">Close</button></div>
+  <div class="dlg-foot"><button type="button" data-close title="{{tr "Close"}}">{{tr "Close"}}</button></div>
 </dialog>
 
 <datalist id="feednames"></datalist>
@@ -320,7 +320,7 @@ textarea.json{width:100%;font:12.5px/1.45 var(--mono)}
 <script>
 (function(){
 "use strict";
-var FEEDNAMES={{FEEDNAMES}};
+var FEEDNAMES={{.FEEDNAMES}};
 function t(s){return (window.__uiI18n&&window.__uiI18n[s])||s;}
 var $=function(s,r){return (r||document).querySelector(s);};
 var $$=function(s,r){return Array.prototype.slice.call((r||document).querySelectorAll(s));};
@@ -581,5 +581,5 @@ $('#flare-test').addEventListener('click',function(){
 });
 })();
 </script>
-<a class="donate" href="https://www.paypal.com/cgi-bin/webscr?cmd=_donations&amp;business=azanzani@gmail.com&amp;item_name=Support+gx-torrent+Project" target="_blank" rel="noopener noreferrer" title="Support gx-torrent with a PayPal donation" aria-label="Support gx-torrent with a PayPal donation"><span class="donate-icon" aria-hidden="true">❤️</span><span class="donate-label">Donate</span></a>
+<a class="donate" href="https://www.paypal.com/cgi-bin/webscr?cmd=_donations&amp;business=azanzani@gmail.com&amp;item_name=Support+gx-torrent+Project" target="_blank" rel="noopener noreferrer" title="{{tr "Support gx-torrent with a PayPal donation"}}" aria-label="{{tr "Support gx-torrent with a PayPal donation"}}"><span class="donate-icon" aria-hidden="true">❤️</span><span class="donate-label">{{tr "Donate"}}</span></a>
 </body></html>

@@ -186,8 +186,8 @@ func TestSetupPagePrefillsDaemonFolders(t *testing.T) {
 		t.Fatalf("status = %d", rec.Code)
 	}
 	body := rec.Body.String()
-	if strings.Contains(body, setupDirToken) || strings.Contains(body, setupTempToken) {
-		t.Fatal("the wizard left an unfilled folder token in the page")
+	if strings.Contains(body, "{{") {
+		t.Fatal("the wizard left an unfilled template action in the page")
 	}
 	if want := `value="` + filepath.Join(base, "scarico") + `"`; !strings.Contains(body, want) {
 		t.Errorf("the download field is not pre-filled with %q", want)

@@ -627,11 +627,12 @@ func (d *Daemon) handleUIUpdateNotes(w http.ResponseWriter, r *http.Request) {
 // updateSectionHTML is the dynamic part of the Maintenance section: the
 // running version, the state of the check and the one button, which reads
 // "Check for updates" until a new version is found and "Update" then.
-func (d *Daemon) updateSectionHTML() string {
+func (d *Daemon) updateSectionHTML(lang string) string {
 	st := d.updateStatus()
+	tr := func(phrase string, args ...any) string { return uiTr(lang, phrase, args...) }
 	var b strings.Builder
 	esc := html.EscapeString
-	b.WriteString(`<p class="muted"><span>Version</span> <strong>` + esc(st.Version) + `</strong>`)
+	b.WriteString(`<p class="muted"><span>` + tr("Version") + `</span> <strong>` + esc(st.Version) + `</strong>`)
 	if st.Commit != "" {
 		b.WriteString(` · <code>` + esc(shortCommit(st.Commit)) + `</code>`)
 	}
@@ -639,23 +640,23 @@ func (d *Daemon) updateSectionHTML() string {
 		b.WriteString(` · ` + esc(st.BuiltAt[:10]))
 	}
 	if st.Channel != "" {
-		b.WriteString(` · <span>channel</span> ` + esc(st.Channel))
+		b.WriteString(` · <span>` + tr("channel") + `</span> ` + esc(st.Channel))
 	}
 	b.WriteString(`</p>`)
 	if st.Reason != "" {
-		b.WriteString(`<p class="muted">` + esc(st.Reason) + `</p>`)
+		b.WriteString(`<p class="muted">` + esc(tr(st.Reason)) + `</p>`)
 		return b.String()
 	}
 	if st.Applying {
 		// The page follows the installation and reloads on the new version.
-		b.WriteString(`<p class="muted" role="status" data-update-applying><span>Installing the update: gx-torrent restarts by itself.</span></p>`)
+		b.WriteString(`<p class="muted" role="status" data-update-applying><span>` + tr("Installing the update: gx-torrent restarts by itself.") + `</span></p>`)
 		return b.String()
 	}
 	if st.ApplyErr != "" {
-		b.WriteString(`<p class="err" role="alert"><span>Update failed:</span> ` + esc(st.ApplyErr) + `</p>`)
+		b.WriteString(`<p class="err" role="alert"><span>` + tr("Update failed:") + `</span> ` + esc(st.ApplyErr) + `</p>`)
 	}
 	if st.Err != "" {
-		b.WriteString(`<p class="err" role="alert"><span>Update check failed:</span> ` + esc(st.Err) + `</p>`)
+		b.WriteString(`<p class="err" role="alert"><span>` + tr("Update check failed:") + `</span> ` + esc(st.Err) + `</p>`)
 	}
 	switch {
 	case st.Available:
@@ -663,29 +664,29 @@ func (d *Daemon) updateSectionHTML() string {
 		if st.LatestVersion != "" {
 			latest = `<strong>` + esc(st.LatestVersion) + `</strong> · `
 		}
-		b.WriteString(`<p role="status"><span class="badge b-downloading">New version</span> ` + latest + `<code>` + esc(shortCommit(st.Latest)) + `</code> ` + esc(st.LatestDate) + `</p>`)
+		b.WriteString(`<p role="status"><span class="badge b-downloading">` + tr("New version") + `</span> ` + latest + `<code>` + esc(shortCommit(st.Latest)) + `</code> ` + esc(st.LatestDate) + `</p>`)
 		if len(st.Changes) > 0 {
-			b.WriteString(`<p class="muted">What changes:</p>` + updateChangesHTML(st.Changes))
+			b.WriteString(`<p class="muted">` + tr("What changes:") + `</p>` + updateChangesHTML(st.Changes))
 		}
 		if !st.Complete {
-			b.WriteString(`<p class="muted">Partial list: the running version is older than the changes shown.</p>`)
+			b.WriteString(`<p class="muted">` + tr("Partial list: the running version is older than the changes shown.") + `</p>`)
 		}
 	case !st.CheckedAt.IsZero() && st.Err == "":
-		b.WriteString(`<p role="status"><span class="badge b-seeding">Up to date</span> <span>gx-torrent is up to date.</span></p>`)
+		b.WriteString(`<p role="status"><span class="badge b-seeding">` + tr("Up to date") + `</span> <span>` + tr("gx-torrent is up to date.") + `</span></p>`)
 	}
 	b.WriteString(`<div class="actions">`)
 	if st.Available && st.CanApply {
-		b.WriteString(`<button type="button" class="primary sm" data-formaction="/ui/update" data-update="apply" title="Download the new version, install it and restart gx-torrent">Update</button>`)
-		b.WriteString(`<button type="button" class="secondary sm" data-formaction="/ui/update" data-update="check" title="Look for a newer version now">Check again</button>`)
+		b.WriteString(`<button type="button" class="primary sm" data-formaction="/ui/update" data-update="apply" title="` + tr("Download the new version, install it and restart gx-torrent") + `">` + tr("Update") + `</button>`)
+		b.WriteString(`<button type="button" class="secondary sm" data-formaction="/ui/update" data-update="check" title="` + tr("Look for a newer version now") + `">` + tr("Check again") + `</button>`)
 	} else {
-		b.WriteString(`<button type="button" class="primary sm" data-formaction="/ui/update" data-update="check" title="Look for a newer version now">Check for updates</button>`)
+		b.WriteString(`<button type="button" class="primary sm" data-formaction="/ui/update" data-update="check" title="` + tr("Look for a newer version now") + `">` + tr("Check for updates") + `</button>`)
 	}
 	if st.Available && !st.CanApply {
-		b.WriteString(` <a class="btn sm" href="https://github.com/` + updatecheck.Repo + `/releases" target="_blank" rel="noopener noreferrer" title="Open the release page to download the new version">Download</a>`)
+		b.WriteString(` <a class="btn sm" href="https://github.com/` + updatecheck.Repo + `/releases" target="_blank" rel="noopener noreferrer" title="` + tr("Open the release page to download the new version") + `">` + tr("Download") + `</a>`)
 	}
 	b.WriteString(`</div>`)
 	if !st.CheckedAt.IsZero() {
-		b.WriteString(`<p class="muted"><span>Last check:</span> ` + esc(st.CheckedAt.Local().Format("2006-01-02 15:04")) + `</p>`)
+		b.WriteString(`<p class="muted"><span>` + tr("Last check:") + `</span> ` + esc(st.CheckedAt.Local().Format("2006-01-02 15:04")) + `</p>`)
 	}
 	return b.String()
 }
@@ -705,7 +706,7 @@ func updateChangesHTML(changes []updatecheck.Commit) string {
 // updateNotesDialogHTML is the popup the new version shows once: what the
 // update brought (or why it was rolled back). "" when there is nothing to
 // show.
-func (d *Daemon) updateNotesDialogHTML() string {
+func (d *Daemon) updateNotesDialogHTML(lang string) string {
 	if d.opts.Mode != ModeStandalone {
 		return ""
 	}
@@ -718,20 +719,21 @@ func (d *Daemon) updateNotesDialogHTML() string {
 	if n.ToVersion == "" {
 		n.ToVersion, n.ToCommit = displayVersion(), constants.Commit
 	}
+	tr := func(phrase string) string { return uiTr(lang, phrase) }
 	esc := html.EscapeString
 	var b strings.Builder
 	b.WriteString(`<dialog id="dlg-updated" aria-labelledby="dlg-updated-title"><div class="dlg-head"><h2 id="dlg-updated-title">`)
 	if n.RolledBack || n.Error != "" {
-		b.WriteString(`Update not installed</h2></div><div class="dlg-body"><p class="err" role="alert">` + esc(n.Error) + `</p>`)
+		b.WriteString(tr("Update not installed") + `</h2></div><div class="dlg-body"><p class="err" role="alert">` + esc(n.Error) + `</p>`)
 	} else {
-		b.WriteString(`gx-torrent updated</h2></div><div class="dlg-body"><p><strong>` + esc(n.FromVersion) +
+		b.WriteString(tr("gx-torrent updated") + `</h2></div><div class="dlg-body"><p><strong>` + esc(n.FromVersion) +
 			`</strong> <code>` + esc(shortCommit(n.FromCommit)) + `</code> → <strong>` + esc(n.ToVersion) +
 			`</strong> <code>` + esc(shortCommit(n.ToCommit)) + `</code></p>`)
 		if len(n.Changes) > 0 {
-			b.WriteString(`<p class="muted">What changed:</p>` + updateChangesHTML(n.Changes))
+			b.WriteString(`<p class="muted">` + tr("What changed:") + `</p>` + updateChangesHTML(n.Changes))
 		}
 	}
-	b.WriteString(`</div><div class="dlg-foot"><button type="button" class="primary" data-updated-close title="Close this message">OK</button></div></dialog>`)
+	b.WriteString(`</div><div class="dlg-foot"><button type="button" class="primary" data-updated-close title="` + tr("Close this message") + `">` + tr("OK") + `</button></div></dialog>`)
 	b.WriteString(`<script>(function(){var d=document.getElementById('dlg-updated');if(!d||typeof d.showModal!=='function')return;` +
 		`function done(){try{fetch('/ui/update-notes',{method:'POST',credentials:'same-origin'});}catch(e){}}` +
 		`d.querySelector('[data-updated-close]').addEventListener('click',function(){d.close();});` +

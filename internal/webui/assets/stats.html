@@ -44,111 +44,111 @@ main.page{max-width:1080px}
 <body>
 <header class="topbar">
   <a class="brand" href="/" title="gx-torrent"><img src="/favicon.ico" alt=""><span>gx-torrent</span></a>
-  <nav class="nav" aria-label="Sections"><a href="/" title="Torrents list and transfer status">Torrents</a><a href="/ui/wanted" title="TV series and movies you follow">Series &amp; movies</a><a href="/ui/rss" title="RSS feeds, indexers and rules">RSS &amp; indexers</a><a href="/ui/archive" title="Everything the feeds found, searchable">Archive</a><a class="on" href="/ui/stats" aria-current="page" title="Transfer, disk and network statistics">Statistics</a><a href="/ui/settings" title="Daemon configuration and options">Settings</a><div class="navmenu"><button type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="nav-menu" title="Log, tools and indexer search">More <span class="caret" aria-hidden="true">▾</span></button><div class="menu" id="nav-menu" role="menu" aria-label="More" hidden><a role="menuitem" href="/?show=log" title="Switch to live server log view">Log</a><a role="menuitem" href="/?show=tools" title="IP filter, create a .torrent, feeds">Tools</a><a role="menuitem" href="/?show=search" title="Search configured Torznab indexers for releases">Search indexers</a></div></div></nav>
+  <nav class="nav" aria-label="{{tr "Sections"}}"><a href="/" title="{{tr "Torrents list and transfer status"}}">{{tr "Torrents"}}</a><a href="/ui/wanted" title="{{tr "TV series and movies you follow"}}">{{tr "Series & movies"}}</a><a href="/ui/rss" title="{{tr "RSS feeds, indexers and rules"}}">{{tr "RSS & indexers"}}</a><a href="/ui/archive" title="{{tr "Everything the feeds found, searchable"}}">{{tr "Archive"}}</a><a class="on" href="/ui/stats" aria-current="page" title="{{tr "Transfer, disk and network statistics"}}">{{tr "Statistics"}}</a><a href="/ui/settings" title="{{tr "Daemon configuration and options"}}">{{tr "Settings"}}</a><div class="navmenu"><button type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="nav-menu" title="{{tr "Log, tools and indexer search"}}">{{tr "More"}} <span class="caret" aria-hidden="true">▾</span></button><div class="menu" id="nav-menu" role="menu" aria-label="{{tr "More"}}" hidden><a role="menuitem" href="/?show=log" title="{{tr "Switch to live server log view"}}">{{tr "Log"}}</a><a role="menuitem" href="/?show=tools" title="{{tr "IP filter, create a .torrent, feeds"}}">{{tr "Tools"}}</a><a role="menuitem" href="/?show=search" title="{{tr "Search configured Torznab indexers for releases"}}">{{tr "Search indexers"}}</a></div></div></nav>
   <span class="spacer"></span>
-  <button type="button" class="ghost icon" data-theme-switch data-label-auto="Theme: automatic (follows the system)" data-label-light="Theme: light" data-label-dark="Theme: dark" aria-label="Theme: automatic (follows the system)" title="Switch theme (automatic, light, dark)"><svg class="i" data-theme-icon="auto"><use href="/assets/icons.svg#i-auto"/></svg><svg class="i" data-theme-icon="light" hidden><use href="/assets/icons.svg#i-sun"/></svg><svg class="i" data-theme-icon="dark" hidden><use href="/assets/icons.svg#i-moon"/></svg></button>
+  <button type="button" class="ghost icon" data-theme-switch data-label-auto="{{tr "Theme: automatic (follows the system)"}}" data-label-light="{{tr "Theme: light"}}" data-label-dark="{{tr "Theme: dark"}}" aria-label="{{tr "Theme: automatic (follows the system)"}}" title="{{tr "Switch theme (automatic, light, dark)"}}"><svg class="i" data-theme-icon="auto"><use href="/assets/icons.svg#i-auto"/></svg><svg class="i" data-theme-icon="light" hidden><use href="/assets/icons.svg#i-sun"/></svg><svg class="i" data-theme-icon="dark" hidden><use href="/assets/icons.svg#i-moon"/></svg></button>
 </header>
 <main class="page">
   <div class="page-head">
     <div class="grow">
-      <h1>Statistics</h1>
-      <p>Live transfer, the totals of this session and of every session, the disk and its cache, the network and the queue. The counters of this session start again when the daemon does.</p>
+      <h1>{{tr "Statistics"}}</h1>
+      <p>{{tr "Live transfer, the totals of this session and of every session, the disk and its cache, the network and the queue. The counters of this session start again when the daemon does."}}</p>
     </div>
   </div>
 
   <section class="panel" aria-labelledby="h-transfer">
     <div class="cardtitle">
-      <h2 id="h-transfer">Transfer</h2>
+      <h2 id="h-transfer">{{tr "Transfer"}}</h2>
       <div class="right">
         <span class="chip in">↓ <span id="s-rate-d">—</span></span>
         <span class="chip out">↑ <span id="s-rate-u">—</span></span>
-        <span class="chip"><span>Peak</span> ↓ <span id="s-peak-d">—</span> ↑ <span id="s-peak-u">—</span></span>
+        <span class="chip"><span>{{tr "Peak"}}</span> ↓ <span id="s-peak-d">—</span> ↑ <span id="s-peak-u">—</span></span>
       </div>
     </div>
     <div class="graph big">
-      <svg id="s-graph" viewBox="0 0 1024 170" preserveAspectRatio="none" role="img" aria-label="Download and upload speed over the selected period"></svg>
+      <svg id="s-graph" viewBox="0 0 1024 170" preserveAspectRatio="none" role="img" aria-label="{{tr "Download and upload speed over the selected period"}}"></svg>
       <div class="legend">
-        <span><i class="dl"></i><span>Downloaded</span> <span class="aux">—</span> <span id="s-legend-d">—</span></span>
-        <span><i class="ul"></i><span>Uploaded</span> <span class="aux">—</span> <span id="s-legend-u">—</span></span>
+        <span><i class="dl"></i><span>{{tr "Downloaded"}}</span> <span class="aux">—</span> <span id="s-legend-d">—</span></span>
+        <span><i class="ul"></i><span>{{tr "Uploaded"}}</span> <span class="aux">—</span> <span id="s-legend-u">—</span></span>
       </div>
     </div>
-    <div class="btn-group" role="group" aria-label="Time range" data-range-group style="margin-top:10px">
-      <button type="button" class="sm" data-range="1h" aria-pressed="true" title="Show the graph over this period">1 h</button>
-      <button type="button" class="sm" data-range="24h" aria-pressed="false" title="Show the graph over this period">24 h</button>
-      <button type="button" class="sm" data-range="7d" aria-pressed="false" title="Show the graph over this period">7 d</button>
+    <div class="btn-group" role="group" aria-label="{{tr "Time range"}}" data-range-group style="margin-top:10px">
+      <button type="button" class="sm" data-range="1h" aria-pressed="true" title="{{tr "Show the graph over this period"}}">1 h</button>
+      <button type="button" class="sm" data-range="24h" aria-pressed="false" title="{{tr "Show the graph over this period"}}">24 h</button>
+      <button type="button" class="sm" data-range="7d" aria-pressed="false" title="{{tr "Show the graph over this period"}}">7 d</button>
     </div>
   </section>
 
   <div class="stats">
-    <div class="stat"><b id="s-downloaded">—</b><span>Downloaded</span></div>
-    <div class="stat"><b id="s-uploaded">—</b><span>Uploaded</span></div>
-    <div class="stat"><b id="s-ratio">—</b><span>Session ratio</span></div>
-    <div class="stat"><b id="s-active">—</b><span>Active</span></div>
-    <div class="stat"><b id="s-peers">—</b><span>Peers</span></div>
-    <div class="stat"><b id="s-dht">—</b><span>DHT nodes</span></div>
+    <div class="stat"><b id="s-downloaded">—</b><span>{{tr "Downloaded"}}</span></div>
+    <div class="stat"><b id="s-uploaded">—</b><span>{{tr "Uploaded"}}</span></div>
+    <div class="stat"><b id="s-ratio">—</b><span>{{tr "Session ratio"}}</span></div>
+    <div class="stat"><b id="s-active">—</b><span>{{tr "Active"}}</span></div>
+    <div class="stat"><b id="s-peers">—</b><span>{{tr "Peers"}}</span></div>
+    <div class="stat"><b id="s-dht">—</b><span>{{tr "DHT nodes"}}</span></div>
   </div>
 
   <div class="cols">
     <section class="panel" aria-labelledby="h-lifetime">
-      <div class="cardtitle"><h2 id="h-lifetime">Session &amp; lifetime</h2></div>
+      <div class="cardtitle"><h2 id="h-lifetime">{{tr "Session & lifetime"}}</h2></div>
       <div class="kv">
-        <div class="row"><span>Downloaded this session</span><strong id="v-sess-d">—</strong></div>
-        <div class="row"><span>Uploaded this session</span><strong id="v-sess-u">—</strong></div>
-        <div class="row"><span>All-time downloaded</span><strong id="v-all-d">—</strong></div>
-        <div class="row"><span>All-time uploaded</span><strong id="v-all-u">—</strong></div>
-        <div class="row"><span>All-time ratio</span><strong id="v-all-ratio">—</strong></div>
-        <div class="row"><span>Protocol overhead</span><strong id="v-overhead">—</strong></div>
-        <div class="row"><span>Uptime</span><strong id="v-uptime">—</strong></div>
+        <div class="row"><span>{{tr "Downloaded this session"}}</span><strong id="v-sess-d">—</strong></div>
+        <div class="row"><span>{{tr "Uploaded this session"}}</span><strong id="v-sess-u">—</strong></div>
+        <div class="row"><span>{{tr "All-time downloaded"}}</span><strong id="v-all-d">—</strong></div>
+        <div class="row"><span>{{tr "All-time uploaded"}}</span><strong id="v-all-u">—</strong></div>
+        <div class="row"><span>{{tr "All-time ratio"}}</span><strong id="v-all-ratio">—</strong></div>
+        <div class="row"><span>{{tr "Protocol overhead"}}</span><strong id="v-overhead">—</strong></div>
+        <div class="row"><span>{{tr "Uptime"}}</span><strong id="v-uptime">—</strong></div>
       </div>
     </section>
 
     <section class="panel" aria-labelledby="h-disk">
-      <div class="cardtitle"><h2 id="h-disk">Disk &amp; cache</h2></div>
+      <div class="cardtitle"><h2 id="h-disk">{{tr "Disk & cache"}}</h2></div>
       <div class="kv">
-        <div class="row"><span>Free space</span><strong id="v-free">—</strong></div>
-        <div class="row"><span>Read cache</span><strong id="v-cache-r">—</strong></div>
-        <div class="row"><span>Write cache</span><strong id="v-cache-w">—</strong></div>
-        <div class="row"><span>Read / write operations</span><strong id="v-ops">—</strong></div>
-        <div class="row"><span>Memory available</span><strong id="v-mem">—</strong></div>
-        <div class="row"><span>Preallocate files</span><strong id="v-prealloc">—</strong></div>
-        <div class="row"><span>Storage errors</span><strong id="v-errors">—</strong></div>
+        <div class="row"><span>{{tr "Free space"}}</span><strong id="v-free">—</strong></div>
+        <div class="row"><span>{{tr "Read cache"}}</span><strong id="v-cache-r">—</strong></div>
+        <div class="row"><span>{{tr "Write cache"}}</span><strong id="v-cache-w">—</strong></div>
+        <div class="row"><span>{{tr "Read / write operations"}}</span><strong id="v-ops">—</strong></div>
+        <div class="row"><span>{{tr "Memory available"}}</span><strong id="v-mem">—</strong></div>
+        <div class="row"><span>{{tr "Preallocate files"}}</span><strong id="v-prealloc">—</strong></div>
+        <div class="row"><span>{{tr "Storage errors"}}</span><strong id="v-errors">—</strong></div>
       </div>
     </section>
 
     <section class="panel" aria-labelledby="h-network">
-      <div class="cardtitle"><h2 id="h-network">Network</h2></div>
+      <div class="cardtitle"><h2 id="h-network">{{tr "Network"}}</h2></div>
       <div class="kv">
-        <div class="row"><span>Peer port</span><strong id="v-port">—</strong></div>
-        <div class="row"><span>Listen address</span><strong id="v-listen">—</strong></div>
-        <div class="row"><span>Port mapping</span><strong id="v-mapping">—</strong></div>
-        <div class="row"><span>DHT</span><strong id="v-dht">—</strong></div>
-        <div class="row"><span>Local peer discovery</span><strong id="v-lsd">—</strong></div>
-        <div class="row"><span>uTP</span><strong id="v-utp">—</strong></div>
-        <div class="row"><span>Encryption</span><strong id="v-crypto">—</strong></div>
-        <div class="row"><span>Proxy</span><strong id="v-proxy">—</strong></div>
-        <div class="row"><span>IP filter rules</span><strong id="v-ipfilter">—</strong></div>
+        <div class="row"><span>{{tr "Peer port"}}</span><strong id="v-port">—</strong></div>
+        <div class="row"><span>{{tr "Listen address"}}</span><strong id="v-listen">—</strong></div>
+        <div class="row"><span>{{tr "Port mapping"}}</span><strong id="v-mapping">—</strong></div>
+        <div class="row"><span>{{tr "DHT"}}</span><strong id="v-dht">—</strong></div>
+        <div class="row"><span>{{tr "Local peer discovery"}}</span><strong id="v-lsd">—</strong></div>
+        <div class="row"><span>{{tr "uTP"}}</span><strong id="v-utp">—</strong></div>
+        <div class="row"><span>{{tr "Encryption"}}</span><strong id="v-crypto">—</strong></div>
+        <div class="row"><span>{{tr "Proxy"}}</span><strong id="v-proxy">—</strong></div>
+        <div class="row"><span>{{tr "IP filter rules"}}</span><strong id="v-ipfilter">—</strong></div>
       </div>
     </section>
 
     <section class="panel" aria-labelledby="h-queue">
-      <div class="cardtitle"><h2 id="h-queue">Queue &amp; state</h2><span class="chip"><span id="v-torrents">—</span>&nbsp;<span>Torrents</span></span></div>
+      <div class="cardtitle"><h2 id="h-queue">{{tr "Queue & state"}}</h2><span class="chip"><span id="v-torrents">—</span>&nbsp;<span>{{tr "Torrents"}}</span></span></div>
       <div class="kv">
-        <div class="row"><span>Active downloads</span><strong id="v-adl">—</strong></div>
-        <div class="row"><span>Active seeds</span><strong id="v-aseed">—</strong></div>
-        <div class="row"><span>Queued</span><strong id="v-queued">—</strong></div>
-        <div class="row"><span>Stalled</span><strong id="v-stalled">—</strong></div>
-        <div class="row"><span>Slow</span><strong id="v-slow">—</strong></div>
-        <div class="row"><span>Moving</span><strong id="v-moving">—</strong></div>
-        <div class="row"><span>Paused</span><strong id="v-paused">—</strong></div>
+        <div class="row"><span>{{tr "Active downloads"}}</span><strong id="v-adl">—</strong></div>
+        <div class="row"><span>{{tr "Active seeds"}}</span><strong id="v-aseed">—</strong></div>
+        <div class="row"><span>{{tr "Queued"}}</span><strong id="v-queued">—</strong></div>
+        <div class="row"><span>{{tr "Stalled"}}</span><strong id="v-stalled">—</strong></div>
+        <div class="row"><span>{{tr "Slow"}}</span><strong id="v-slow">—</strong></div>
+        <div class="row"><span>{{tr "Moving"}}</span><strong id="v-moving">—</strong></div>
+        <div class="row"><span>{{tr "Paused"}}</span><strong id="v-paused">—</strong></div>
       </div>
     </section>
   </div>
 
   <section class="panel" aria-labelledby="h-busiest">
-    <div class="cardtitle"><h2 id="h-busiest">Busiest right now</h2><span class="aux">At page load</span></div>
+    <div class="cardtitle"><h2 id="h-busiest">{{tr "Busiest right now"}}</h2><span class="aux">{{tr "At page load"}}</span></div>
     <div class="table-wrap">
       <table class="tbl" style="width:100%">
-        <thead><tr><th scope="col">Name</th><th scope="col" class="num">↓</th><th scope="col" class="num">↑</th><th scope="col" class="num">Ratio</th><th scope="col" class="num">Peers</th></tr></thead>
+        <thead><tr><th scope="col">{{tr "Name"}}</th><th scope="col" class="num">↓</th><th scope="col" class="num">↑</th><th scope="col" class="num">{{tr "Ratio"}}</th><th scope="col" class="num">{{tr "Peers"}}</th></tr></thead>
         <tbody id="s-busiest"></tbody>
       </table>
     </div>
@@ -311,6 +311,6 @@ main.page{max-width:1080px}
   setInterval(refresh, 3000);
 })();
 </script>
-<a class="donate" href="https://www.paypal.com/cgi-bin/webscr?cmd=_donations&amp;business=azanzani@gmail.com&amp;item_name=Support+gx-torrent+Project" target="_blank" rel="noopener noreferrer" title="Support gx-torrent with a PayPal donation" aria-label="Support gx-torrent with a PayPal donation"><span class="donate-icon" aria-hidden="true">❤️</span><span class="donate-label">Donate</span></a>
+<a class="donate" href="https://www.paypal.com/cgi-bin/webscr?cmd=_donations&amp;business=azanzani@gmail.com&amp;item_name=Support+gx-torrent+Project" target="_blank" rel="noopener noreferrer" title="{{tr "Support gx-torrent with a PayPal donation"}}" aria-label="{{tr "Support gx-torrent with a PayPal donation"}}"><span class="donate-icon" aria-hidden="true">❤️</span><span class="donate-label">{{tr "Donate"}}</span></a>
 </body>
 </html>

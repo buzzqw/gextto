@@ -77,149 +77,149 @@ details.hint summary{cursor:pointer}
 <body>
 <header class="topbar">
   <a class="brand" href="/" title="gx-torrent"><img src="/favicon.ico" alt=""><span>gx-torrent</span></a>
-  <nav class="nav" aria-label="Sections"><a href="/" title="Torrents list and transfer status">Torrents</a><a class="on" href="/ui/wanted" aria-current="page" title="TV series and movies you follow">Series &amp; movies</a><a href="/ui/rss" title="RSS feeds, indexers and rules">RSS &amp; indexers</a><a href="/ui/archive" title="Everything the feeds found, searchable">Archive</a><a href="/ui/stats" title="Transfer, disk and network statistics">Statistics</a><a href="/ui/settings" title="Daemon configuration and options">Settings</a><div class="navmenu"><button type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="nav-menu" title="Log, tools and indexer search">More <span class="caret" aria-hidden="true">▾</span></button><div class="menu" id="nav-menu" role="menu" aria-label="More" hidden><a role="menuitem" href="/?show=log" title="Switch to live server log view">Log</a><a role="menuitem" href="/?show=tools" title="IP filter, create a .torrent, feeds">Tools</a><a role="menuitem" href="/?show=search" title="Search configured Torznab indexers for releases">Search indexers</a></div></div></nav>
+  <nav class="nav" aria-label="{{tr "Sections"}}"><a href="/" title="{{tr "Torrents list and transfer status"}}">{{tr "Torrents"}}</a><a class="on" href="/ui/wanted" aria-current="page" title="{{tr "TV series and movies you follow"}}">{{tr "Series & movies"}}</a><a href="/ui/rss" title="{{tr "RSS feeds, indexers and rules"}}">{{tr "RSS & indexers"}}</a><a href="/ui/archive" title="{{tr "Everything the feeds found, searchable"}}">{{tr "Archive"}}</a><a href="/ui/stats" title="{{tr "Transfer, disk and network statistics"}}">{{tr "Statistics"}}</a><a href="/ui/settings" title="{{tr "Daemon configuration and options"}}">{{tr "Settings"}}</a><div class="navmenu"><button type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="nav-menu" title="{{tr "Log, tools and indexer search"}}">{{tr "More"}} <span class="caret" aria-hidden="true">▾</span></button><div class="menu" id="nav-menu" role="menu" aria-label="{{tr "More"}}" hidden><a role="menuitem" href="/?show=log" title="{{tr "Switch to live server log view"}}">{{tr "Log"}}</a><a role="menuitem" href="/?show=tools" title="{{tr "IP filter, create a .torrent, feeds"}}">{{tr "Tools"}}</a><a role="menuitem" href="/?show=search" title="{{tr "Search configured Torznab indexers for releases"}}">{{tr "Search indexers"}}</a></div></div></nav>
   <span class="spacer"></span>
-  <button type="button" class="ghost icon" data-theme-switch data-label-auto="Theme: automatic (follows the system)" data-label-light="Theme: light" data-label-dark="Theme: dark" aria-label="Theme: automatic (follows the system)" title="Switch theme (automatic, light, dark)"><svg class="i" data-theme-icon="auto"><use href="/assets/icons.svg#i-auto"/></svg><svg class="i" data-theme-icon="light" hidden><use href="/assets/icons.svg#i-sun"/></svg><svg class="i" data-theme-icon="dark" hidden><use href="/assets/icons.svg#i-moon"/></svg></button>
+  <button type="button" class="ghost icon" data-theme-switch data-label-auto="{{tr "Theme: automatic (follows the system)"}}" data-label-light="{{tr "Theme: light"}}" data-label-dark="{{tr "Theme: dark"}}" aria-label="{{tr "Theme: automatic (follows the system)"}}" title="{{tr "Switch theme (automatic, light, dark)"}}"><svg class="i" data-theme-icon="auto"><use href="/assets/icons.svg#i-auto"/></svg><svg class="i" data-theme-icon="light" hidden><use href="/assets/icons.svg#i-sun"/></svg><svg class="i" data-theme-icon="dark" hidden><use href="/assets/icons.svg#i-moon"/></svg></button>
 </header>
 <main class="page" style="max-width:1100px">
-<!--ERROR-->
+{{.ERROR}}
 <div class="page-head">
   <div class="grow">
-    <h1>Series &amp; movies</h1>
-    <p>Follow the TV series and movies you want: gx-torrent searches the feeds and the indexers for what is missing and downloads it.</p>
+    <h1>{{tr "Series & movies"}}</h1>
+    <p>{{tr "Follow the TV series and movies you want: gx-torrent searches the feeds and the indexers for what is missing and downloads it."}}</p>
   </div>
   <div class="stats">
-    <div class="stat"><b>{{WANTEDMISSING}}</b><span>With missing episodes</span></div>
-    <div class="stat"><b>{{WANTEDDOWNLOADING}}</b><span>Downloading</span></div>
-    <div class="stat"><b>{{WANTEDCOMPLETE}}</b><span>Complete</span></div>
-    <div class="stat"><b>{{WANTEDPAUSED}}</b><span>Not monitored</span></div>
+    <div class="stat"><b>{{.WANTEDMISSING}}</b><span>{{tr "With missing episodes"}}</span></div>
+    <div class="stat"><b>{{.WANTEDDOWNLOADING}}</b><span>{{tr "Downloading"}}</span></div>
+    <div class="stat"><b>{{.WANTEDCOMPLETE}}</b><span>{{tr "Complete"}}</span></div>
+    <div class="stat"><b>{{.WANTEDPAUSED}}</b><span>{{tr "Not monitored"}}</span></div>
   </div>
 </div>
 
 <div class="toolbar2">
-  <button type="button" class="primary" id="add-wanted" title="Add a series or a movie to the list"><svg class="i"><use href="/assets/icons.svg#i-plus"/></svg>Add title</button>
-  <button type="button" id="wanted-poll-all" title="Search configured indexers and feeds for all titles now"><svg class="i"><use href="/assets/icons.svg#i-search"/></svg>Search all now</button>
-  <input type="search" id="wanted-filter" placeholder="Filter titles…" autocomplete="off" aria-label="Filter titles" title="Filter the titles by name">
+  <button type="button" class="primary" id="add-wanted" title="{{tr "Add a series or a movie to the list"}}"><svg class="i"><use href="/assets/icons.svg#i-plus"/></svg>{{tr "Add title"}}</button>
+  <button type="button" id="wanted-poll-all" title="{{tr "Search configured indexers and feeds for all titles now"}}"><svg class="i"><use href="/assets/icons.svg#i-search"/></svg>{{tr "Search all now"}}</button>
+  <input type="search" id="wanted-filter" placeholder="{{tr "Filter titles…"}}" autocomplete="off" aria-label="{{tr "Filter titles"}}" title="{{tr "Filter the titles by name"}}">
 </div>
-<div class="toolbar2" role="group" aria-label="Filter by state">
-  <button type="button" class="sm" data-wanted-state="all" aria-pressed="true" title="Show every title">All <span class="n">{{WANTEDCOUNT}}</span></button>
-  <button type="button" class="sm" data-wanted-state="missing" aria-pressed="false" title="Titles with episodes found but not downloaded">With missing <span class="n">{{WANTEDMISSING}}</span></button>
-  <button type="button" class="sm" data-wanted-state="downloading" aria-pressed="false" title="Titles with a download in progress">Downloading <span class="n">{{WANTEDDOWNLOADING}}</span></button>
-  <button type="button" class="sm" data-wanted-state="uptodate" aria-pressed="false" title="Titles with no episode missing among the ones found">Complete <span class="n">{{WANTEDCOMPLETE}}</span></button>
-  <button type="button" class="sm" data-wanted-state="paused" aria-pressed="false" title="Titles whose monitoring is paused">Not monitored <span class="n">{{WANTEDPAUSED}}</span></button>
-  <label class="sortsel">Sort
-    <select id="wanted-sort" title="Order of the titles">
-      <option value="name">Name</option>
-      <option value="missing">Missing</option>
-      <option value="last">Last search</option>
-      <option value="added">Added</option>
+<div class="toolbar2" role="group" aria-label="{{tr "Filter by state"}}">
+  <button type="button" class="sm" data-wanted-state="all" aria-pressed="true" title="{{tr "Show every title"}}">{{tr "All"}} <span class="n">{{.WANTEDCOUNT}}</span></button>
+  <button type="button" class="sm" data-wanted-state="missing" aria-pressed="false" title="{{tr "Titles with episodes found but not downloaded"}}">{{tr "With missing"}} <span class="n">{{.WANTEDMISSING}}</span></button>
+  <button type="button" class="sm" data-wanted-state="downloading" aria-pressed="false" title="{{tr "Titles with a download in progress"}}">{{tr "Downloading"}} <span class="n">{{.WANTEDDOWNLOADING}}</span></button>
+  <button type="button" class="sm" data-wanted-state="uptodate" aria-pressed="false" title="{{tr "Titles with no episode missing among the ones found"}}">{{tr "Complete"}} <span class="n">{{.WANTEDCOMPLETE}}</span></button>
+  <button type="button" class="sm" data-wanted-state="paused" aria-pressed="false" title="{{tr "Titles whose monitoring is paused"}}">{{tr "Not monitored"}} <span class="n">{{.WANTEDPAUSED}}</span></button>
+  <label class="sortsel">{{tr "Sort"}}
+    <select id="wanted-sort" title="{{tr "Order of the titles"}}">
+      <option value="name">{{tr "Name"}}</option>
+      <option value="missing">{{tr "Missing"}}</option>
+      <option value="last">{{tr "Last search"}}</option>
+      <option value="added">{{tr "Added"}}</option>
     </select>
   </label>
 </div>
 
 <p class="legend">
-  <span class="lgitem"><span class="epchip have">✓</span> <span>Downloaded</span></span>
-  <span class="lgitem"><span class="epchip dl">◐</span> <span>Downloading</span></span>
-  <span class="lgitem"><span class="epchip miss">○</span> <span>Found, not downloaded</span></span>
-  <span class="hint">“Found” means the feeds or the indexers have seen it; gx-torrent does not know the complete episode list of a series.</span>
+  <span class="lgitem"><span class="epchip have">✓</span> <span>{{tr "Downloaded"}}</span></span>
+  <span class="lgitem"><span class="epchip dl">◐</span> <span>{{tr "Downloading"}}</span></span>
+  <span class="lgitem"><span class="epchip miss">○</span> <span>{{tr "Found, not downloaded"}}</span></span>
+  <span class="hint">{{tr "“Found” means the feeds or the indexers have seen it; gx-torrent does not know the complete episode list of a series."}}</span>
 </p>
-<h2 class="sr-only" id="wanted-list-title">Series &amp; movies list</h2>
-<ul class="items" id="wanted-list" aria-labelledby="wanted-list-title">{{WANTEDROWS}}</ul>
-<p class="hint" id="wanted-filter-empty" hidden>No title matches this filter.</p>
+<h2 class="sr-only" id="wanted-list-title">{{tr "Series & movies list"}}</h2>
+<ul class="items" id="wanted-list" aria-labelledby="wanted-list-title">{{.WANTEDROWS}}</ul>
+<p class="hint" id="wanted-filter-empty" hidden>{{tr "No title matches this filter."}}</p>
 
 <dialog id="dlg-wanted" class="wide" aria-labelledby="dlg-wanted-title">
   <form method="post" action="/ui/wanted" id="wanted-form">
     <input type="hidden" name="op" value="add"><input type="hidden" name="index" id="wanted-index">
-    <div class="dlg-head"><h2 id="dlg-wanted-title">Add title</h2><button type="button" class="ghost icon" data-close aria-label="Close" title="Close"><svg class="i"><use href="/assets/icons.svg#i-x"/></svg></button></div>
+    <div class="dlg-head"><h2 id="dlg-wanted-title">{{tr "Add title"}}</h2><button type="button" class="ghost icon" data-close aria-label="{{tr "Close"}}" title="{{tr "Close"}}"><svg class="i"><use href="/assets/icons.svg#i-x"/></svg></button></div>
     <div class="dlg-body">
       <div class="fsec">
-        <h3>1 · What do you want?</h3>
-        <div class="seg" role="radiogroup" aria-label="Type">
-          <label title="A TV series: missing episodes are tracked"><input type="radio" name="kind" value="series" checked><svg class="i"><use href="/assets/icons.svg#i-tv"/></svg> Series</label>
-          <label title="A movie: one release is taken"><input type="radio" name="kind" value="movie"><svg class="i"><use href="/assets/icons.svg#i-film"/></svg> Movie</label>
+        <h3>{{tr "1 · What do you want?"}}</h3>
+        <div class="seg" role="radiogroup" aria-label="{{tr "Type"}}">
+          <label title="{{tr "A TV series: missing episodes are tracked"}}"><input type="radio" name="kind" value="series" checked><svg class="i"><use href="/assets/icons.svg#i-tv"/></svg> {{tr "Series"}}</label>
+          <label title="{{tr "A movie: one release is taken"}}"><input type="radio" name="kind" value="movie"><svg class="i"><use href="/assets/icons.svg#i-film"/></svg> {{tr "Movie"}}</label>
         </div>
-        <label class="field">Title
+        <label class="field">{{tr "Title"}}
           <div class="searchrow">
-            <input type="text" name="name" id="wanted-name" list="series-list" placeholder="Title" autocomplete="off" required aria-describedby="wanted-regex-hint" title="Series or movie title to search for">
-            <button type="button" id="wanted-search" title="Search the archive (fast) for matching titles"><svg class="i"><use href="/assets/icons.svg#i-search"/></svg>Search</button>
+            <input type="text" name="name" id="wanted-name" list="series-list" placeholder="{{tr "Title"}}" autocomplete="off" required aria-describedby="wanted-regex-hint" title="{{tr "Series or movie title to search for"}}">
+            <button type="button" id="wanted-search" title="{{tr "Search the archive (fast) for matching titles"}}"><svg class="i"><use href="/assets/icons.svg#i-search"/></svg>{{tr "Search"}}</button>
           </div>
         </label>
         <datalist id="series-list"></datalist>
-        <details class="hint" id="wanted-regex-hint"><summary>Advanced: match the title with a regular expression</summary>Write the title between slashes, e.g. /ted.?lasso/ or /^the office/ (case-insensitive). The release must match the expression instead of the plain words.</details>
-        <label class="chk"><input type="checkbox" id="wanted-live" title="Also query the configured indexers live (slow); for a title not yet in the archive"> Search indexers too</label>
-        <p class="hint" id="wanted-search-source" aria-live="polite">Search to see how the title is named in the feeds and pick the right one.</p>
+        <details class="hint" id="wanted-regex-hint"><summary>{{tr "Advanced: match the title with a regular expression"}}</summary>{{tr "Write the title between slashes, e.g. /ted.?lasso/ or /^the office/ (case-insensitive). The release must match the expression instead of the plain words."}}</details>
+        <label class="chk"><input type="checkbox" id="wanted-live" title="{{tr "Also query the configured indexers live (slow); for a title not yet in the archive"}}"> {{tr "Search indexers too"}}</label>
+        <p class="hint" id="wanted-search-source" aria-live="polite">{{tr "Search to see how the title is named in the feeds and pick the right one."}}</p>
         <div class="pick" id="wanted-results" aria-live="polite"></div>
       </div>
       <div class="fsec">
-        <h3>2 · How should it be downloaded?</h3>
+        <h3>{{tr "2 · How should it be downloaded?"}}</h3>
         <div class="fgrid">
-          <div class="field" id="seasons-field"><span>Seasons</span>
+          <div class="field" id="seasons-field"><span>{{tr "Seasons"}}</span>
             <div class="season-range">
-              <label class="chk"><input type="checkbox" id="wanted-seasons-all" checked title="Monitor every season">All</label>
-              <label>From <input type="number" min="1" id="wanted-season-from" title="First season to monitor"></label>
-              <label>To <input type="number" min="1" id="wanted-season-to" title="Last season to monitor; empty means from the first season on"></label>
+              <label class="chk"><input type="checkbox" id="wanted-seasons-all" checked title="{{tr "Monitor every season"}}">{{tr "All"}}</label>
+              <label>{{tr "From"}} <input type="number" min="1" id="wanted-season-from" title="{{tr "First season to monitor"}}"></label>
+              <label>To <input type="number" min="1" id="wanted-season-to" title="{{tr "Last season to monitor; empty means from the first season on"}}"></label>
             </div>
-            <span class="hint" id="wanted-seasons-hint">All seasons</span>
+            <span class="hint" id="wanted-seasons-hint">{{tr "All seasons"}}</span>
           </div>
-          <label class="field">Language<input type="text" name="language" id="wanted-language" placeholder="ita" autocomplete="off" title="Required language terms (e.g. ita, eng)">
-            <span class="quick" role="group" aria-label="Common languages"><button type="button" data-lang="ita" aria-pressed="false" title="Italian releases">ita</button><button type="button" data-lang="eng" aria-pressed="false" title="English releases">eng</button><button type="button" data-lang="multi" aria-pressed="false" title="Releases with several audio tracks">multi</button></span>
+          <label class="field">{{tr "Language"}}<input type="text" name="language" id="wanted-language" placeholder="ita" autocomplete="off" title="{{tr "Required language terms (e.g. ita, eng)"}}">
+            <span class="quick" role="group" aria-label="{{tr "Common languages"}}"><button type="button" data-lang="ita" aria-pressed="false" title="{{tr "Italian releases"}}">ita</button><button type="button" data-lang="eng" aria-pressed="false" title="{{tr "English releases"}}">eng</button><button type="button" data-lang="multi" aria-pressed="false" title="{{tr "Releases with several audio tracks"}}">multi</button></span>
           </label>
           <input type="hidden" name="quality" id="wanted-quality" value="">
-          <label class="field">Quality profile<select name="profile" id="wanted-profile" title="Quality profile for this title: it decides the accepted qualities and the upgrade cutoff">{{PROFILE_OPTIONS}}</select></label>
-          <label class="field">Category<input type="text" name="category" placeholder="tv" autocomplete="off" title="Category assigned to added torrents"></label>
-          <label class="field">Save path<input type="text" name="savepath" placeholder="/srv/tv" autocomplete="off" title="Folder on disk where files will be saved"></label>
+          <label class="field">{{tr "Quality profile"}}<select name="profile" id="wanted-profile" title="{{tr "Quality profile for this title: it decides the accepted qualities and the upgrade cutoff"}}">{{.PROFILE_OPTIONS}}</select></label>
+          <label class="field">{{tr "Category"}}<input type="text" name="category" placeholder="tv" autocomplete="off" title="{{tr "Category assigned to added torrents"}}"></label>
+          <label class="field">{{tr "Save path"}}<input type="text" name="savepath" placeholder="/srv/tv" autocomplete="off" title="{{tr "Folder on disk where files will be saved"}}"></label>
         </div>
         <p class="hint" id="wanted-quality-note" hidden></p>
-        <p class="hint"><a href="/ui/settings#quality-profiles" target="_blank" rel="noopener">Create or edit profiles</a></p>
-        <label class="field">Subtitles (optional)<input type="text" name="subtitles" id="wanted-subtitles" placeholder="sub ita" autocomplete="off" title="Subtitle terms matched on the release name (e.g. sub ita)">
-          <span class="quick" role="group" aria-label="Common subtitles"><button type="button" data-sub="sub ita" aria-pressed="false" title="Italian subtitles">sub ita</button><button type="button" data-sub="sub eng" aria-pressed="false" title="English subtitles">sub eng</button></span>
+        <p class="hint"><a href="/ui/settings#quality-profiles" target="_blank" rel="noopener">{{tr "Create or edit profiles"}}</a></p>
+        <label class="field">{{tr "Subtitles (optional)"}}<input type="text" name="subtitles" id="wanted-subtitles" placeholder="sub ita" autocomplete="off" title="{{tr "Subtitle terms matched on the release name (e.g. sub ita)"}}">
+          <span class="quick" role="group" aria-label="{{tr "Common subtitles"}}"><button type="button" data-sub="sub ita" aria-pressed="false" title="{{tr "Italian subtitles"}}">sub ita</button><button type="button" data-sub="sub eng" aria-pressed="false" title="{{tr "English subtitles"}}">sub eng</button></span>
         </label>
       </div>
       <details class="more" id="wanted-more">
-        <summary>Advanced options</summary>
+        <summary>{{tr "Advanced options"}}</summary>
         <div class="fgrid">
-          <label class="field">Exclude<input type="text" name="exclude" placeholder="cam" autocomplete="off" title="Terms to exclude from release titles"></label>
-          <label class="field">Episode filter<input type="text" name="episode_filter" placeholder="1x01-05, 1x07" autocomplete="off" title="Specific episode filter (e.g. 1x01-05, 1x07)"></label>
-          <label class="field">Seasons filter (advanced)<input type="text" name="seasons" id="wanted-seasons" placeholder="1+ / 2-4 / 1" autocomplete="off" title="Season numbers or range (e.g. 1+, 2-4, 1); the two fields above fill it for the common cases"></label>
+          <label class="field">{{tr "Exclude"}}<input type="text" name="exclude" placeholder="cam" autocomplete="off" title="{{tr "Terms to exclude from release titles"}}"></label>
+          <label class="field">{{tr "Episode filter"}}<input type="text" name="episode_filter" placeholder="1x01-05, 1x07" autocomplete="off" title="{{tr "Specific episode filter (e.g. 1x01-05, 1x07)"}}"></label>
+          <label class="field">{{tr "Seasons filter (advanced)"}}<input type="text" name="seasons" id="wanted-seasons" placeholder="1+ / 2-4 / 1" autocomplete="off" title="{{tr "Season numbers or range (e.g. 1+, 2-4, 1); the two fields above fill it for the common cases"}}"></label>
         </div>
-        <div class="checks"><label class="chk"><input type="checkbox" name="paused" value="1" title="Do not search for this title until it is resumed; what was found stays"> Do not monitor this title</label></div>
+        <div class="checks"><label class="chk"><input type="checkbox" name="paused" value="1" title="{{tr "Do not search for this title until it is resumed; what was found stays"}}"> {{tr "Do not monitor this title"}}</label></div>
       </details>
       <div class="fsec" id="wanted-preview-sec">
-        <h3>Preview: what would be taken now</h3>
-        <p class="hint" id="wanted-preview-sum" role="status" aria-live="polite">Type a title to see which releases in the archive it would take, and why the others are left out.</p>
+        <h3>{{tr "Preview: what would be taken now"}}</h3>
+        <p class="hint" id="wanted-preview-sum" role="status" aria-live="polite">{{tr "Type a title to see which releases in the archive it would take, and why the others are left out."}}</p>
         <div class="vcounts" id="wanted-preview-counts"></div>
-        <div class="preview relview" id="wanted-preview-list" tabindex="0" role="region" aria-label="Releases"></div>
+        <div class="preview relview" id="wanted-preview-list" tabindex="0" role="region" aria-label="{{tr "Releases"}}"></div>
       </div>
       <details class="more" id="wanted-episodes-mgr" hidden>
-        <summary>Episodes</summary>
-        <p class="hint">Mark what you already have and what is missing; missing episodes are searched again.</p>
-        <p class="hint">Leave the episode empty to mark the whole season as missing.</p>
+        <summary>{{tr "Episodes"}}</summary>
+        <p class="hint">{{tr "Mark what you already have and what is missing; missing episodes are searched again."}}</p>
+        <p class="hint">{{tr "Leave the episode empty to mark the whole season as missing."}}</p>
         <div class="epgrid" id="wanted-episodes-body" aria-live="polite"></div>
         <div class="epadd">
-          <label class="field">Season<input type="number" min="0" id="wanted-ep-season" title="Season number"></label>
-          <label class="field">Episode<input type="number" min="1" id="wanted-ep-episode" title="Episode number"></label>
-          <button type="button" id="wanted-ep-add" title="Add the episode as missing, so it is searched">Add as missing</button>
-          <button type="button" id="wanted-ep-search" title="Search this episode">Search this episode</button>
-          <button type="button" id="wanted-ep-force" title="Search the indexers now for the missing episodes"><svg class="i"><use href="/assets/icons.svg#i-search"/></svg>Search missing now</button>
+          <label class="field">{{tr "Season"}}<input type="number" min="0" id="wanted-ep-season" title="{{tr "Season number"}}"></label>
+          <label class="field">{{tr "Episode"}}<input type="number" min="1" id="wanted-ep-episode" title="{{tr "Episode number"}}"></label>
+          <button type="button" id="wanted-ep-add" title="{{tr "Add the episode as missing, so it is searched"}}">{{tr "Add as missing"}}</button>
+          <button type="button" id="wanted-ep-search" title="{{tr "Search this episode"}}">{{tr "Search this episode"}}</button>
+          <button type="button" id="wanted-ep-force" title="{{tr "Search the indexers now for the missing episodes"}}"><svg class="i"><use href="/assets/icons.svg#i-search"/></svg>{{tr "Search missing now"}}</button>
         </div>
       </details>
     </div>
     <div class="dlg-foot">
-      <button type="button" data-close title="Close without saving">Cancel</button>
-      <button type="submit" class="primary" id="wanted-submit" title="Add the title to the list">Add title</button>
+      <button type="button" data-close title="{{tr "Close without saving"}}">{{tr "Cancel"}}</button>
+      <button type="submit" class="primary" id="wanted-submit" title="{{tr "Add the title to the list"}}">{{tr "Add title"}}</button>
     </div>
   </form>
 </dialog>
 
 <dialog id="dlg-releases" class="wide" aria-labelledby="dlg-releases-title">
-  <div class="dlg-head"><h2 id="dlg-releases-title">Releases and why not</h2><button type="button" class="ghost icon" data-close aria-label="Close" title="Close"><svg class="i"><use href="/assets/icons.svg#i-x"/></svg></button></div>
+  <div class="dlg-head"><h2 id="dlg-releases-title">{{tr "Releases and why not"}}</h2><button type="button" class="ghost icon" data-close aria-label="{{tr "Close"}}" title="{{tr "Close"}}"><svg class="i"><use href="/assets/icons.svg#i-x"/></svg></button></div>
   <div class="dlg-body">
-    <p class="hint">What the archive and the indexers found for this title, with the verdict: what would be taken, and why the others are not.</p>
+    <p class="hint">{{tr "What the archive and the indexers found for this title, with the verdict: what would be taken, and why the others are not."}}</p>
     <p class="hint" id="releases-sum" role="status" aria-live="polite"></p>
     <div class="vcounts" id="releases-counts"></div>
-    <div class="preview relview" id="releases-list" style="max-height:60vh" tabindex="0" role="region" aria-label="Releases"></div>
+    <div class="preview relview" id="releases-list" style="max-height:60vh" tabindex="0" role="region" aria-label="{{tr "Releases"}}"></div>
   </div>
-  <div class="dlg-foot"><button type="button" id="releases-live" title="Search the indexers now">Search the indexers now</button><button type="button" data-close title="Close">Close</button></div>
+  <div class="dlg-foot"><button type="button" id="releases-live" title="{{tr "Search the indexers now"}}">{{tr "Search the indexers now"}}</button><button type="button" data-close title="{{tr "Close"}}">{{tr "Close"}}</button></div>
 </dialog>
 </main>
 <script id="ui-i18n"></script>
@@ -575,5 +575,5 @@ $$('[data-wanted-poll]').forEach(function(btn){btn.addEventListener('click',func
 applyWantedView();
 })();
 </script>
-<a class="donate" href="https://www.paypal.com/cgi-bin/webscr?cmd=_donations&amp;business=azanzani@gmail.com&amp;item_name=Support+gx-torrent+Project" target="_blank" rel="noopener noreferrer" title="Support gx-torrent with a PayPal donation" aria-label="Support gx-torrent with a PayPal donation"><span class="donate-icon" aria-hidden="true">❤️</span><span class="donate-label">Donate</span></a>
+<a class="donate" href="https://www.paypal.com/cgi-bin/webscr?cmd=_donations&amp;business=azanzani@gmail.com&amp;item_name=Support+gx-torrent+Project" target="_blank" rel="noopener noreferrer" title="{{tr "Support gx-torrent with a PayPal donation"}}" aria-label="{{tr "Support gx-torrent with a PayPal donation"}}"><span class="donate-icon" aria-hidden="true">❤️</span><span class="donate-label">{{tr "Donate"}}</span></a>
 </body></html>

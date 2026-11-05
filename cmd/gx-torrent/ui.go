@@ -42,6 +42,9 @@ type uiPageData struct {
 	Now     string
 	Notice  string
 	Error   bool
+	// UpdateNotes is the "updated" popup of a new version, already rendered
+	// (it carries its own labels) or empty.
+	UpdateNotes template.HTML `json:"-"`
 
 	Torrents int
 	Down     int
@@ -362,41 +365,9 @@ type uiPieceRun struct {
 	Pct   string
 }
 
-// uiTemplates parses and compiles the web UI template once, on first use. A
-// managed daemon that never serves the page pays nothing for the parse. The
-// template source lives in internal/webui/assets (embed.FS), not in Go strings.
-var (
-	uiTemplateOnce sync.Once
-	uiTemplate     *template.Template
-)
-
-func uiTemplates() *template.Template {
-	uiTemplateOnce.Do(func() {
-		uiTemplate = template.Must(template.New("ui").Funcs(template.FuncMap{
-			"percent": func(p float64) string { return fmt.Sprintf("%.1f", p) },
-			"bytes":   uiBytes,
-			"rate":    uiRate,
-			"dur":     uiDuration,
-			// stateLabel prints the human name of a state, a catalog key.
-			"stateLabel": uiStateLabel,
-			// kibrate prints a KiB/s limit as a rate ("∞" when unlimited).
-			"kibrate": func(kib int64) string {
-				if kib <= 0 {
-					return "∞"
-				}
-				return uiRate(kib * 1024)
-			},
-			// pct is done over size in percent, for the Files tab bars.
-			"pct": func(done, size int64) string {
-				if size <= 0 {
-					return "0.0"
-				}
-				return fmt.Sprintf("%.1f", min(100, float64(done)*100/float64(size)))
-			},
-		}).Parse(assets.UITemplate()))
-	})
-	return uiTemplate
-}
+// The web UI templates are parsed per page and language in i18n_tr.go: the
+// template source lives in internal/webui/assets (embed.FS), not in Go strings,
+// and `tr` has to be bound to the dictionary of the language in force.
 
 // handleFavicon serves the site icon; like the page shell it needs no token.
 func handleFavicon(w http.ResponseWriter, _ *http.Request) {
@@ -442,13 +413,14 @@ func (d *Daemon) handleUI(w http.ResponseWriter, r *http.Request) {
 		d.handleAltWebUI(w, r)
 		return
 	}
-	page, err := d.uiPageData(d.uiRowLimit(r))
+	lang := d.uiLang(r)
+	page, err := d.uiPageData(d.uiRowLimit(r), lang)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	if page.Standalone {
-		page.LangOptions = uiLanguageChoices(d.uiLang(r))
+		page.LangOptions = uiLanguageChoices(lang)
 	}
 	if msg := strings.TrimSpace(r.URL.Query().Get("msg")); msg != "" {
 		page.Notice = msg
@@ -471,7 +443,7 @@ func (d *Daemon) handleUILive(w http.ResponseWriter, r *http.Request) {
 		// speeds, status) still travels as HTML, translated by the server.
 		name = "fragments-notable"
 	}
-	page, err := d.uiPageData(d.uiRowLimit(r))
+	page, err := d.uiPageData(d.uiRowLimit(r), d.uiLang(r))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -488,7 +460,7 @@ func (d *Daemon) handleUIRows(w http.ResponseWriter, r *http.Request) {
 	if !d.uiAuthorized(w, r) {
 		return
 	}
-	page, err := d.uiPageData(d.uiRowLimit(r))
+	page, err := d.uiPageData(d.uiRowLimit(r), d.uiLang(r))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -538,7 +510,7 @@ func (d *Daemon) handleUILog(w http.ResponseWriter, r *http.Request) {
 // a short explanation.
 // uiPeerErrors renders the demoted peer/tracker error totals compactly, e.g.
 // "handshake 12 · reset 3". Empty when there is no noise yet.
-func uiPeerErrors(counts map[string]int64) string {
+func uiPeerErrors(lang string, counts map[string]int64) string {
 	if len(counts) == 0 {
 		return ""
 	}
@@ -549,7 +521,7 @@ func uiPeerErrors(counts map[string]int64) string {
 	sort.Strings(keys)
 	parts := make([]string, 0, len(keys))
 	for _, key := range keys {
-		parts = append(parts, fmt.Sprintf("%s %d", key, counts[key]))
+		parts = append(parts, uiTr(lang, "%s %d", key, counts[key]))
 	}
 	return strings.Join(parts, " · ")
 }
@@ -557,19 +529,19 @@ func uiPeerErrors(counts map[string]int64) string {
 // uiUTPSocketSummary renders the uTP socket counter summary for the status
 // bar, or ("", false) while the socket never dialled nor accepted. Resends and
 // dropped SYNs are the congestion/burst signals and appear only when non-zero.
-func uiUTPSocketSummary(dials, accepts, dialErrs, acceptErrs, resendsTimeout, resendsFast, synDrops int64) (string, bool) {
+func uiUTPSocketSummary(lang string, dials, accepts, dialErrs, acceptErrs, resendsTimeout, resendsFast, synDrops int64) (string, bool) {
 	if dials <= 0 && accepts <= 0 {
 		return "", false
 	}
-	out := fmt.Sprintf("%d dial / %d accept", dials, accepts)
+	out := uiTr(lang, "%d dial / %d accept", dials, accepts)
 	if dialErrs+acceptErrs > 0 {
-		out += fmt.Sprintf(" · errors: %d dial, %d accept", dialErrs, acceptErrs)
+		out += uiTr(lang, " · errors: %d dial, %d accept", dialErrs, acceptErrs)
 	}
 	if resendsTimeout+resendsFast > 0 {
-		out += fmt.Sprintf(" · resends: %d RTO, %d fast", resendsTimeout, resendsFast)
+		out += uiTr(lang, " · resends: %d RTO, %d fast", resendsTimeout, resendsFast)
 	}
 	if synDrops > 0 {
-		out += fmt.Sprintf(" · SYN drops: %d", synDrops)
+		out += uiTr(lang, " · SYN drops: %d", synDrops)
 	}
 	return out, true
 }
@@ -594,7 +566,7 @@ func (d *Daemon) handleUIPortCheck(w http.ResponseWriter, r *http.Request) {
 	case check.Listening:
 		class, label = "warn", "listening, not forwarded"
 	}
-	label = uiTranslateText(label, uiDictionary(d.uiLang(r)))
+	label = uiTr(d.uiLang(r), label)
 	detail := check.Detail
 	if check.ExternalIP != "" {
 		if detail != "" {
@@ -624,21 +596,15 @@ func (d *Daemon) handleUIDetail(w http.ResponseWriter, r *http.Request) {
 	if !d.uiAuthorized(w, r) {
 		return
 	}
-	data, err := d.uiDetailData(r.URL.Query().Get("hash"), r.URL.Query().Get("tab"))
+	lang := d.uiLang(r)
+	data, err := d.uiDetailData(r.URL.Query().Get("hash"), r.URL.Query().Get("tab"), lang)
 	if err != nil {
 		http.Error(w, "torrent not found", http.StatusNotFound)
 		return
 	}
-	// Render to a buffer first: a template error must not leave a half-written
-	// fragment (the page would silently truncate).
-	var buf bytes.Buffer
-	if err := uiTemplates().ExecuteTemplate(&buf, "detail", data); err != nil {
-		http.Error(w, "rendering error: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
-	_, _ = w.Write([]byte(uiTranslateHTML(buf.String(), uiDictionary(d.uiLang(r)))))
+	d.renderUI(w, r, "detail", data)
 }
 
 // handleUITorrentFile streams the .torrent of one torrent, so the page can offer
@@ -767,10 +733,9 @@ func (d *Daemon) handleUIBulk(w http.ResponseWriter, r *http.Request) {
 			firstErr = err
 		}
 	}
-	// The count is printed, so the message is translated before formatting:
-	// the whole string would never match a catalog key.
-	msg := uiTranslateText(uiActionMessage(op), uiDictionary(d.uiLang(r)))
-	d.uiDone(w, r, fmt.Sprintf("%d torrent: %s", len(hashes), msg), firstErr)
+	// The count and the action are two values inside one sentence: the phrase
+	// is translated first and filled after, so a translator can order them.
+	d.uiDonef(w, r, firstErr, "%d torrent: %s", len(hashes), uiTr(d.uiLang(r), uiActionMessage(op)))
 }
 
 func (d *Daemon) handleUIRemove(w http.ResponseWriter, r *http.Request) {
@@ -1079,37 +1044,32 @@ func (d *Daemon) handleUIIPFilter(w http.ResponseWriter, r *http.Request) {
 	// The settings page's "Load now" posts its own form: the source is its
 	// "ipfilter" field and the answer goes back to that page.
 	fromSettings := r.FormValue("return") == "settings"
-	done := func(message string, err error) {
+	done := func(err error, message string, args ...any) {
 		if !fromSettings {
-			d.uiDone(w, r, message, err)
+			d.uiDonef(w, r, err, message, args...)
 			return
 		}
 		ok := "1"
+		msg := uiTr(d.uiLang(r), message, args...)
 		if err != nil {
-			ok, message = "0", "Error: "+err.Error()
+			ok, msg = "0", uiTr(d.uiLang(r), "Error: %s", err.Error())
 		}
-		http.Redirect(w, r, uiSettingsPath+"?msg="+url.QueryEscape(message)+"&ok="+ok+"#ipfilter", http.StatusSeeOther)
+		http.Redirect(w, r, uiSettingsPath+"?msg="+url.QueryEscape(msg)+"&ok="+ok+"#ipfilter", http.StatusSeeOther)
 	}
 	source := strings.TrimSpace(r.FormValue("source"))
 	if source == "" {
 		source = strings.TrimSpace(r.FormValue("ipfilter"))
 	}
 	if source == "" {
-		done("", fmt.Errorf("provide a URL or a file path"))
+		done(fmt.Errorf("provide a URL or a file path"), "")
 		return
 	}
 	rules, err := d.loadIPFilterSource(source)
 	if err != nil {
-		done("", err)
+		done(err, "")
 		return
 	}
-	if fromSettings {
-		// The rule count is in the page's status line: a fixed message stays
-		// translatable.
-		done("IP filter loaded", nil)
-		return
-	}
-	done(fmt.Sprintf("IP filter loaded: %d rules", rules), nil)
+	done(nil, "IP filter loaded: %d rules", rules)
 }
 
 // handleUIFilePriority sets one file's priority. 0 = skip, 1..4 = normal,
@@ -1211,7 +1171,7 @@ func (d *Daemon) handleUITrackers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	err := d.addTrackers(hash, urls)
-	d.uiDoneDetail(w, r, hash, "trackers", fmt.Sprintf("%d trackers added", len(urls)), err)
+	d.uiDoneDetailf(w, r, err, hash, "trackers", "%d trackers added", len(urls))
 }
 
 func (d *Daemon) handleUIWebSeeds(w http.ResponseWriter, r *http.Request) {
@@ -1366,43 +1326,54 @@ func uiActionMessage(op string) string {
 // uiDone redirects back to the page with a short message. A redirect (instead of
 // rendering) keeps a refresh from repeating the action.
 func (d *Daemon) uiDone(w http.ResponseWriter, r *http.Request, okMessage string, err error) {
-	d.uiRedirect(w, r, nil, okMessage, err)
+	d.uiRedirect(w, r, nil, okMessage, nil, err)
+}
+
+// uiDonef is uiDone for a message with a value inside the phrase: the phrase is
+// translated first and the values are filled after, so a translator can move
+// them where the language wants them.
+func (d *Daemon) uiDonef(w http.ResponseWriter, r *http.Request, err error, okMessage string, args ...any) {
+	d.uiRedirect(w, r, nil, okMessage, args, err)
 }
 
 // uiDoneDetail is uiDone but reopens the torrent's detail tab after the action.
 func (d *Daemon) uiDoneDetail(w http.ResponseWriter, r *http.Request, hash, tab, okMessage string, err error) {
+	d.uiDoneDetailf(w, r, err, hash, tab, okMessage)
+}
+
+// uiDoneDetailf is uiDoneDetail for a message with values inside the phrase.
+func (d *Daemon) uiDoneDetailf(w http.ResponseWriter, r *http.Request, err error, hash, tab, okMessage string, args ...any) {
 	extra := url.Values{}
 	if strings.TrimSpace(hash) != "" {
 		extra.Set("open", hash)
 		extra.Set("tab", tab)
 	}
-	d.uiRedirect(w, r, extra, okMessage, err)
+	d.uiRedirect(w, r, extra, okMessage, args, err)
 }
 
-func (d *Daemon) uiRedirect(w http.ResponseWriter, r *http.Request, extra url.Values, okMessage string, err error) {
-	// The page's own script posts with X-GX-Fetch and wants the outcome, not
-	// a reload: answer with JSON (message translated for the page language).
-	if r.Header.Get("X-GX-Fetch") == "1" {
-		msg := okMessage
-		if err != nil {
-			msg = "Error: " + err.Error()
-		} else if msg == "" {
-			msg = "Done"
-		}
-		writeJSON(w, http.StatusOK, map[string]any{"ok": err == nil, "msg": uiTranslateText(msg, uiDictionary(d.uiLang(r)))})
-		return
-	}
-	query := url.Values{}
+func (d *Daemon) uiRedirect(w http.ResponseWriter, r *http.Request, extra url.Values, okMessage string, args []any, err error) {
+	lang := d.uiLang(r)
+	msg := ""
 	if err != nil {
-		query.Set("ok", "0")
-		query.Set("msg", "Error: "+err.Error())
+		msg = uiTr(lang, "Error: %s", err.Error())
 	} else {
-		query.Set("ok", "1")
 		if okMessage == "" {
 			okMessage = "Done"
 		}
-		query.Set("msg", okMessage)
+		msg = uiTr(lang, okMessage, args...)
 	}
+	// The page's own script posts with X-GX-Fetch and wants the outcome, not
+	// a reload: answer with JSON.
+	if r.Header.Get("X-GX-Fetch") == "1" {
+		writeJSON(w, http.StatusOK, map[string]any{"ok": err == nil, "msg": msg})
+		return
+	}
+	query := url.Values{}
+	query.Set("ok", "1")
+	if err != nil {
+		query.Set("ok", "0")
+	}
+	query.Set("msg", msg)
 	for key, values := range extra {
 		for _, value := range values {
 			query.Set(key, value)
@@ -1460,7 +1431,7 @@ func (d *Daemon) uiAuthorized(w http.ResponseWriter, r *http.Request) bool {
 	return false
 }
 
-func (d *Daemon) uiPageData(limit int) (uiPageData, error) {
+func (d *Daemon) uiPageData(limit int, lang string) (uiPageData, error) {
 	stats := d.stats()
 	views := d.snapshotViews()
 	page := uiPageData{
@@ -1484,7 +1455,7 @@ func (d *Daemon) uiPageData(limit int) (uiPageData, error) {
 		DHT:            stats.DHT,
 		DHTNodes:       stats.Session["dht_nodes"],
 		UTP:            stats.UTP,
-		Encryption:     uiEncryption(stats.Encryption),
+		Encryption:     uiTr(lang, uiEncryption(stats.Encryption)),
 		Proxy:          stats.Proxy,
 		IPFilter:       stats.IPFilterRules,
 		IPFilterPath:   stats.IPFilterPath,
@@ -1499,7 +1470,7 @@ func (d *Daemon) uiPageData(limit int) (uiPageData, error) {
 		DiskFree:       stats.DiskFreeBytes,
 		DiskTotal:      stats.DiskTotalBytes,
 	}
-	page.UTPSocket, _ = uiUTPSocketSummary(
+	page.UTPSocket, _ = uiUTPSocketSummary(lang,
 		stats.Session["utp_dials"], stats.Session["utp_accepts"],
 		stats.Session["utp_dial_errors"], stats.Session["utp_accept_errors"],
 		stats.Session["utp_resends_timeout"], stats.Session["utp_resends_fast"],
@@ -1521,12 +1492,12 @@ func (d *Daemon) uiPageData(limit int) (uiPageData, error) {
 		page.Router = strings.ToUpper(stats.PortMapping.Method)
 		page.ExternalIP = stats.PortMapping.ExternalIP
 	case stats.PortMapping.Error != "":
-		page.Router = "not open"
+		page.Router = uiTr(lang, "not open")
 	default:
 		page.Router = "—"
 	}
 	page.PortReachable = page.PortOpen || page.IncomingConns > 0
-	page.PeerErrors = uiPeerErrors(stats.PeerErrors)
+	page.PeerErrors = uiPeerErrors(lang, stats.PeerErrors)
 	for name := range d.categoriesSnapshot() {
 		page.Categories = append(page.Categories, name)
 	}
@@ -1572,17 +1543,17 @@ func (d *Daemon) uiPageData(limit int) (uiPageData, error) {
 		}
 		switch {
 		case view.SeedRatio > 0:
-			row.RatioGoal = fmt.Sprintf("seed until ratio %.2f", view.SeedRatio)
+			row.RatioGoal = uiTr(lang, "seed until ratio %.2f", view.SeedRatio)
 		case view.SeedRatio == 0:
-			row.RatioGoal = "seed without a ratio limit"
+			row.RatioGoal = uiTr(lang, "seed without a ratio limit")
 		default:
-			row.RatioGoal = "global seed ratio"
+			row.RatioGoal = uiTr(lang, "global seed ratio")
 		}
 		if view.DiskWait {
 			// Paused by the disk guard: shown apart from a user pause.
 			row.State = "disk_wait"
 		}
-		row.StateLabel = uiStateLabel(row.State)
+		row.StateLabel = uiTr(lang, uiStateLabel(row.State))
 		if view.Progress < 99.99 && view.ETASeconds >= 0 {
 			row.ETA = uiDuration(view.ETASeconds)
 			row.ETAVal = view.ETASeconds
@@ -1741,7 +1712,7 @@ func (d *Daemon) uiRowLimit(r *http.Request) int {
 // uiDetailData builds one torrent's detail tab. The torrent pointers are read
 // under the daemon lock, the per-torrent calls (files/peers/trackers) run
 // outside it, like the REST inspection does.
-func (d *Daemon) uiDetailData(hash, tab string) (uiDetailData, error) {
+func (d *Daemon) uiDetailData(hash, tab, lang string) (uiDetailData, error) {
 	if tab != "files" && tab != "peers" && tab != "trackers" && tab != "pieces" {
 		tab = "general"
 	}
@@ -1921,7 +1892,7 @@ func (d *Daemon) uiDetailData(hash, tab string) (uiDetailData, error) {
 				Down: int64(peer.DownloadSpeed), Up: int64(peer.UploadSpeed), Progress: peer.Progress * 100,
 				Seed: peer.Seed, Incoming: peer.Source == torrent.SourceIncoming,
 				Encrypted: peer.EncryptedStream, UTP: peer.UTP,
-				Source: sourceName(peer.Source), Downloading: peer.Downloading,
+				Source: uiTr(lang, sourceName(peer.Source)), Downloading: peer.Downloading,
 				ClientInt: peer.ClientInterested, ClientChoke: peer.ClientChoking,
 				PeerInt: peer.PeerInterested, PeerChoke: peer.PeerChoking,
 				Optimistic: peer.OptimisticUnchoked, Snubbed: peer.Snubbed,
@@ -1940,6 +1911,7 @@ func (d *Daemon) uiDetailData(hash, tab string) (uiDetailData, error) {
 			case torrent.NotWorking:
 				status = "not working"
 			}
+			status = uiTr(lang, status)
 			message := tracker.Warning
 			if tracker.Error != nil {
 				message = tracker.Error.Error()

@@ -21,10 +21,10 @@ button[type=submit]{background:var(--accent);border-color:var(--accent);color:va
 </style></head>
 <body><form method="post" action="/ui/login">
 <h2 style="margin:0 0 6px">gx-torrent</h2>
-<p class="m">Sign in to the gx-torrent page.</p>
-<input type="text" name="user" placeholder="user" autocomplete="username" autofocus title="Admin username for login">
-<input type="password" name="password" placeholder="password" autocomplete="current-password" title="Password for web interface login">
-<button type="submit" title="Sign in to the web interface">Sign in</button>
-<!--ERROR-->
+<p class="m">{{tr "Sign in to the gx-torrent page."}}</p>
+<input type="text" name="user" placeholder="{{tr "user"}}" autocomplete="username" autofocus title="{{tr "Admin username for login"}}">
+<input type="password" name="password" placeholder="{{tr "password"}}" autocomplete="current-password" title="{{tr "Password for web interface login"}}">
+<button type="submit" title="{{tr "Sign in to the web interface"}}">{{tr "Sign in"}}</button>
+{{.ERROR}}
 </form><script src="/assets/common.js"></script>
 </body></html>

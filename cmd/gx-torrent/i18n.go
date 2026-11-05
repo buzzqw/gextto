@@ -1,9 +1,9 @@
 package main
 
 // i18n.go holds the page strings and their translations.
-// The page source is English; uiDictionary returns, for a language, the
-// map used by translateHTML to localize the rendered page (the same
-// post-processing approach used by Gextto's web UI).
+// The page source is English, so a phrase is also its key: the templates look
+// it up with `tr` while they render (i18n_tr.go) and the handlers with uiTr.
+// uiDictionary returns the English-to-language map of one language.
 
 // uiCatalog maps an English page string to {it, de, fr, es, pl}.
 var uiCatalog = map[string][5]string{
@@ -1764,6 +1764,43 @@ var uiCatalog = map[string][5]string{
 	"Write cache":                           {"Cache di scrittura", "Schreibcache", "Cache d'écriture", "Caché de escritura", "Pamięć podręczna zapisu"},
 	"Yes":                                   {"Sì", "Ja", "Oui", "Sí", "Tak"},
 	"No":                                    {"No", "Nein", "Non", "No", "Nie"},
+	"%d torrent: %s":                        {"%d torrent: %s", "%d Torrent(s): %s", "%d torrent : %s", "%d torrent: %s", "%d torrent(ów): %s"},
+	"%d dial / %d accept":                   {"%d dial / %d accept", "%d dial / %d accept", "%d dial / %d accept", "%d dial / %d accept", "%d dial / %d accept"},
+	"%s %d":                                 {"%s %d", "%s %d", "%s %d", "%s %d", "%s %d"},
+	"%d trackers added":                     {"%d tracker aggiunti", "%d Tracker hinzugefügt", "%d trackers ajoutés", "%d trackers añadidos", "Dodane trackery: %d"},
+	"IP filter loaded: %d rules":            {"Filtro IP caricato: %d regole", "IP-Filter geladen: %d Regeln", "Filtre IP chargé : %d règles", "Filtro IP cargado: %d reglas", "Filtr IP wczytany: %d reguł"},
+	" · errors: %d dial, %d accept":         {" · errori: %d dial, %d accept", " · Fehler: %d dial, %d accept", " · erreurs : %d dial, %d accept", " · errores: %d dial, %d accept", " · błędy: %d dial, %d accept"},
+	" · resends: %d RTO, %d fast":           {" · reinvii: %d RTO, %d fast", " · erneut gesendet: %d RTO, %d schnell", " · renvois : %d RTO, %d rapides", " · reenvíos: %d RTO, %d rápidos", " · ponowienia: %d RTO, %d szybkie"},
+	" · SYN drops: %d":                      {" · SYN scartati: %d", " · verworfene SYN: %d", " · SYN ignorés : %d", " · SYN descartados: %d", " · odrzucone SYN: %d"},
+	"Error: %s":                             {"Errore: %s", "Fehler: %s", "Erreur : %s", "Error: %s", "Błąd: %s"},
+	"seed until ratio %.2f":                 {"condivide fino al rapporto %.2f", "Seeden bis Verhältnis %.2f", "partage jusqu'au ratio %.2f", "siembra hasta el ratio %.2f", "seeduj do współczynnika %.2f"},
+	"seed without a ratio limit":            {"condivide senza limite di rapporto", "Seeden ohne Verhältnisgrenze", "partage sans limite de ratio", "siembra sin límite de ratio", "seeduj bez limitu współczynnika"},
+	"global seed ratio":                     {"rapporto di condivisione globale", "globales Seeding-Verhältnis", "ratio de partage global", "ratio de siembra global", "globalny współczynnik seedowania"},
+	"No episodes yet":                       {"Nessun episodio", "Noch keine Episoden", "Aucun épisode", "Sin episodios", "Brak odcinków"},
+	"More actions for this title":           {"Altre azioni per questo titolo", "Weitere Aktionen für diesen Titel", "Autres actions pour ce titre", "Más acciones para este título", "Więcej działań dla tego tytułu"},
+	"Open the torrent in the session":       {"Apri il torrent nella sessione", "Den Torrent in der Sitzung öffnen", "Ouvrir le torrent dans la session", "Abrir el torrent en la sesión", "Otwórz torrent w sesji"},
+	"Search the missing episodes now":       {"Cerca ora gli episodi mancanti", "Jetzt die fehlenden Episoden suchen", "Chercher maintenant les épisodes manquants", "Buscar ahora los episodios que faltan", "Szukaj teraz brakujących odcinków"},
+	"Why not?":                              {"Perché no?", "Warum nicht?", "Pourquoi pas ?", "¿Por qué no?", "Dlaczego nie?"},
+	"Media server running at %s":            {"Server multimediale attivo su %s", "Medienserver läuft unter %s", "Serveur multimédia actif sur %s", "Servidor multimedia activo en %s", "Serwer multimediów działa pod %s"},
+	"Save path of %s":                       {"Cartella di salvataggio di %s", "Speicherpfad von %s", "Chemin d'enregistrement de %s", "Ruta de guardado de %s", "Ścieżka zapisu: %s"},
+	"Qualities of %s":                       {"Qualità di %s", "Qualitäten von %s", "Qualités de %s", "Calidades de %s", "Jakości: %s"},
+	"Cutoff of %s":                          {"Limite di %s", "Obergrenze von %s", "Plafond de %s", "Límite de %s", "Limit: %s"},
+	"up to %s":                              {"fino a %s", "bis %s", "jusqu'à %s", "hasta %s", "do %s"},
+	"no upgrades":                           {"nessun aggiornamento", "keine Upgrades", "aucune mise à niveau", "sin mejoras", "bez aktualizacji"},
+	"No quality profiles. Add one below to choose allowed qualities and an optional cutoff.": {"Nessun profilo di qualità. Aggiungine uno qui sotto per scegliere le qualità ammesse e un limite facoltativo.", "Keine Qualitätsprofile. Füge unten eines hinzu, um erlaubte Qualitäten und eine optionale Obergrenze zu wählen.", "Aucun profil de qualité. Ajoutez-en un ci-dessous pour choisir les qualités autorisées et un plafond facultatif.", "No hay perfiles de calidad. Añade uno abajo para elegir las calidades permitidas y un límite opcional.", "Brak profili jakości. Dodaj jeden poniżej, aby wybrać dozwolone jakości i opcjonalny limit."},
+	"Save this quality profile":   {"Salva questo profilo di qualità", "Dieses Qualitätsprofil speichern", "Enregistrer ce profil de qualité", "Guardar este perfil de calidad", "Zapisz ten profil jakości"},
+	"Remove this quality profile": {"Rimuovi questo profilo di qualità", "Dieses Qualitätsprofil entfernen", "Supprimer ce profil de qualité", "Eliminar este perfil de calidad", "Usuń ten profil jakości"},
+	"Remove this quality profile? Titles that use it fall back to their quality field.": {"Rimuovere questo profilo di qualità? I titoli che lo usano tornano al loro campo qualità.", "Dieses Qualitätsprofil entfernen? Titel, die es nutzen, fallen auf ihr Qualitätsfeld zurück.", "Supprimer ce profil de qualité ? Les titres qui l'utilisent reviennent à leur champ qualité.", "¿Eliminar este perfil de calidad? Los títulos que lo usan vuelven a su campo de calidad.", "Usunąć ten profil jakości? Tytuły, które go używają, wrócą do swojego pola jakości."},
+	"Not delivered: %s":       {"Non consegnata: %s", "Nicht zugestellt: %s", "Non délivrée : %s", "No entregada: %s", "Nie dostarczono: %s"},
+	"VueTorrent %s installed": {"VueTorrent %s installato", "VueTorrent %s installiert", "VueTorrent %s installé", "VueTorrent %s instalado", "VueTorrent %s zainstalowany"},
+	"This instance requires the token configured in Gextto.": {"Questa istanza richiede il token configurato in Gextto.", "Diese Instanz verlangt das in Gextto konfigurierte Token.", "Cette instance exige le jeton configuré dans Gextto.", "Esta instancia requiere el token configurado en Gextto.", "Ta instancja wymaga tokenu skonfigurowanego w Gextto."},
+	"Cookies: %s": {"Cookie: %s", "Cookies: %s", "Cookies : %s", "Cookies: %s", "Pliki cookie: %s"},
+	"The queue settings could not be applied: %s": {"Non è stato possibile applicare le impostazioni della coda: %s", "Die Einstellungen der Warteschlange konnten nicht angewendet werden: %s", "Les réglages de la file n'ont pas pu être appliqués : %s", "No se pudo aplicar la configuración de la cola: %s", "Nie udało się zastosować ustawień kolejki: %s"},
+	"Cannot save the settings: %s":                {"Impossibile salvare le impostazioni: %s", "Die Einstellungen konnten nicht gespeichert werden: %s", "Impossible d'enregistrer les réglages : %s", "No se puede guardar la configuración: %s", "Nie można zapisać ustawień: %s"},
+	"TVmaze: error":                               {"TVmaze: errore", "TVmaze: Fehler", "TVmaze : erreur", "TVmaze: error", "TVmaze: błąd"},
+	"Showing %s of %s":                            {"Mostrati %s di %s", "%s von %s angezeigt", "%s sur %s affichés", "Mostrando %s de %s", "Pokazano %s z %s"},
+	"empty = no program":                          {"vuoto = nessun programma", "leer = kein Programm", "vide = aucun programme", "vacío = ningún programa", "puste = żaden program"},
+	"empty = stay in the download folder":         {"vuoto = resta nella cartella di download", "leer = bleibt im Download-Ordner", "vide = reste dans le dossier de téléchargement", "vacío = se queda en la carpeta de descargas", "puste = zostaje w folderze pobrania"},
 }
 
 // uiClientKeys are the catalog keys the page's JavaScript looks up at runtime

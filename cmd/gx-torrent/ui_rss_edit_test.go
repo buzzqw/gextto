@@ -665,7 +665,7 @@ func TestFeedErrorHint(t *testing.T) {
 			t.Errorf("feedErrorHint(%q) = %q, want %q", errText, got, want)
 		}
 	}
-	row := uiFeedStatusHTML(feedStatus{Name: "f", LastCheck: 1700000000, LastError: "HTTP 401"}, 3)
+	row := uiFeedStatusHTML("", feedStatus{Name: "f", LastCheck: 1700000000, LastError: "HTTP 401"}, 3)
 	if !strings.Contains(row, "HTTP 401") || !strings.Contains(row, "Check the indexer") {
 		t.Errorf("error row misses the error or its hint: %s", row)
 	}

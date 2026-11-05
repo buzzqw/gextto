@@ -208,6 +208,13 @@ in the list.
   wake-ups, 9–10 % MSE encryption, 5–7 % piece hashing, 2–3 % TLS of web seeds, 9 % the piece
   picker with about 200 peers.
 
+### The web page
+
+The gx-torrent main page, rendered in German on this machine (2026-11-05): **0.78 ms and
+141 KB allocated** per page, 0.01 ms per small fragment, with the translations already in
+place. Translating the finished HTML afterwards cost about 2 ms and a tokenizer pass per
+page.
+
 ### Peer cap
 
 CPU follows established peers (about 0.1 % of a core each) far more than bytes, when the line

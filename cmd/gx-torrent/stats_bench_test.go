@@ -5,10 +5,9 @@ package main
 // page translation. The numbers live in docs/measurements.md.
 
 import (
+	"io"
 	"testing"
 	"time"
-
-	"github.com/buzzqw/gextto/internal/webui/assets"
 )
 
 func BenchmarkRateHistoryAdd(b *testing.B) {
@@ -42,12 +41,14 @@ func BenchmarkLifetimeAccumulate(b *testing.B) {
 	}
 }
 
-func BenchmarkStatsPageTranslate(b *testing.B) {
-	page := assets.StatsPage()
-	dict := uiDictionary("it")
-	b.SetBytes(int64(len(page)))
+func BenchmarkStatsPageRender(b *testing.B) {
+	set := uiTemplatesFor("stats", "it")
+	source := uiPageSource["stats"]()
+	b.SetBytes(int64(len(source)))
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		_ = uiTranslateHTML(page, dict)
+		if err := set.ExecuteTemplate(io.Discard, "stats", nil); err != nil {
+			b.Fatal(err)
+		}
 	}
 }

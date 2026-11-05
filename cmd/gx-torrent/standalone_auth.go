@@ -7,14 +7,12 @@ package main
 import (
 	"crypto/subtle"
 	"errors"
-	"html"
 	"net"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/buzzqw/gextto/internal/auth"
-	"github.com/buzzqw/gextto/internal/webui/assets"
 )
 
 const (
@@ -349,18 +347,5 @@ func secureRequest(r *http.Request) bool {
 // renderLogin writes the sign-in page, localized like the daemon page. errKey
 // is shown as an error when non-empty.
 func (d *Daemon) renderLogin(w http.ResponseWriter, r *http.Request, errKey string) {
-	page := assets.LoginPage()
-	errorHTML := ""
-	if errKey != "" {
-		errorHTML = `<p class="m err">` + html.EscapeString(errKey) + `</p>`
-	}
-	page = strings.Replace(page, "<!--ERROR-->", errorHTML, 1)
-	lang := d.uiLang(r)
-	if lang != "" && lang != "en" {
-		page = strings.Replace(page, `lang="en"`, `lang="`+lang+`"`, 1)
-	}
-	page = uiTranslateHTML(page, uiDictionary(lang))
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Header().Set("Cache-Control", "no-store")
-	_, _ = w.Write([]byte(page))
+	d.uiWritePage(w, r, "login", map[string]any{"ERROR": uiErrorHTML(d, r, errKey)})
 }

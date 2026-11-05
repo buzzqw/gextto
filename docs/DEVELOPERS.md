@@ -201,6 +201,16 @@ catalogs (and, for rows already stored, into `internal_translations_fixes.yml`).
 its own six-language catalog (IT, EN, DE, FR, ES, PL) in `internal/tui/i18n.go`; daemon log lines are
 English only.
 
+The **gx-torrent daemon** translates its own pages the same way: the English
+text is the key, `cmd/gx-torrent/i18n.go` holds the six columns, and the pages
+in `internal/webui/assets` write every text and tooltip as `{{tr "…"}}` (with
+printf verbs when a value sits inside the phrase). The pages are parsed once
+per page and language, so nothing is translated after rendering and a value can
+never be mistaken for a phrase; the labels a handler builds in Go go through
+`uiTr(lang, …)`. Two tests guard it: `TestUIPageIsFullyTranslatable` (static,
+every asset) and `TestDaemonPagesTranslateEveryLabel` (the pages rendered in
+German), plus `TestDaemonPageKeepsDataUntranslated` for the other direction.
+
 ## Database changes
 
 Database schema changes must be migration-safe for existing installations.

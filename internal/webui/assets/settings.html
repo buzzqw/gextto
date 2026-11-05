@@ -41,361 +41,361 @@ h3.sub{margin:14px 0 2px;font-size:13px;color:var(--subtle);text-transform:upper
 <body>
 <header class="topbar">
   <a class="brand" href="/" title="gx-torrent"><img src="/favicon.ico" alt=""><span>gx-torrent</span></a>
-  <nav class="nav" aria-label="Sections"><a href="/" title="Torrents list and transfer status">Torrents</a><a href="/ui/wanted" title="TV series and movies you follow">Series &amp; movies</a><a href="/ui/rss" title="RSS feeds, indexers and rules">RSS &amp; indexers</a><a href="/ui/archive" title="Everything the feeds found, searchable">Archive</a><a href="/ui/stats" title="Transfer, disk and network statistics">Statistics</a><a class="on" href="/ui/settings" aria-current="page" title="Daemon configuration and options">Settings</a><div class="navmenu"><button type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="nav-menu" title="Log, tools and indexer search">More <span class="caret" aria-hidden="true">▾</span></button><div class="menu" id="nav-menu" role="menu" aria-label="More" hidden><a role="menuitem" href="/?show=log" title="Switch to live server log view">Log</a><a role="menuitem" href="/?show=tools" title="IP filter, create a .torrent, feeds">Tools</a><a role="menuitem" href="/?show=search" title="Search configured Torznab indexers for releases">Search indexers</a></div></div></nav>
+  <nav class="nav" aria-label="{{tr "Sections"}}"><a href="/" title="{{tr "Torrents list and transfer status"}}">{{tr "Torrents"}}</a><a href="/ui/wanted" title="{{tr "TV series and movies you follow"}}">{{tr "Series & movies"}}</a><a href="/ui/rss" title="{{tr "RSS feeds, indexers and rules"}}">{{tr "RSS & indexers"}}</a><a href="/ui/archive" title="{{tr "Everything the feeds found, searchable"}}">{{tr "Archive"}}</a><a href="/ui/stats" title="{{tr "Transfer, disk and network statistics"}}">{{tr "Statistics"}}</a><a class="on" href="/ui/settings" aria-current="page" title="{{tr "Daemon configuration and options"}}">{{tr "Settings"}}</a><div class="navmenu"><button type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="nav-menu" title="{{tr "Log, tools and indexer search"}}">{{tr "More"}} <span class="caret" aria-hidden="true">▾</span></button><div class="menu" id="nav-menu" role="menu" aria-label="{{tr "More"}}" hidden><a role="menuitem" href="/?show=log" title="{{tr "Switch to live server log view"}}">{{tr "Log"}}</a><a role="menuitem" href="/?show=tools" title="{{tr "IP filter, create a .torrent, feeds"}}">{{tr "Tools"}}</a><a role="menuitem" href="/?show=search" title="{{tr "Search configured Torznab indexers for releases"}}">{{tr "Search indexers"}}</a></div></div></nav>
   <span class="spacer"></span>
-  <button type="button" class="ghost icon" data-theme-switch data-label-auto="Theme: automatic (follows the system)" data-label-light="Theme: light" data-label-dark="Theme: dark" aria-label="Theme: automatic (follows the system)" title="Switch theme (automatic, light, dark)"><svg class="i" data-theme-icon="auto"><use href="/assets/icons.svg#i-auto"/></svg><svg class="i" data-theme-icon="light" hidden><use href="/assets/icons.svg#i-sun"/></svg><svg class="i" data-theme-icon="dark" hidden><use href="/assets/icons.svg#i-moon"/></svg></button>
+  <button type="button" class="ghost icon" data-theme-switch data-label-auto="{{tr "Theme: automatic (follows the system)"}}" data-label-light="{{tr "Theme: light"}}" data-label-dark="{{tr "Theme: dark"}}" aria-label="{{tr "Theme: automatic (follows the system)"}}" title="{{tr "Switch theme (automatic, light, dark)"}}"><svg class="i" data-theme-icon="auto"><use href="/assets/icons.svg#i-auto"/></svg><svg class="i" data-theme-icon="light" hidden><use href="/assets/icons.svg#i-sun"/></svg><svg class="i" data-theme-icon="dark" hidden><use href="/assets/icons.svg#i-moon"/></svg></button>
 </header>
 <main>
-<div class="page-head"><div class="grow"><h1>Settings</h1></div></div>
-<p class="muted">Folders, network, ports and the engine options apply from the next start; the bandwidth, queue limits and language apply at once.</p>
+<div class="page-head"><div class="grow"><h1>{{tr "Settings"}}</h1></div></div>
+<p class="muted">{{tr "Folders, network, ports and the engine options apply from the next start; the bandwidth, queue limits and language apply at once."}}</p>
 <div role="search" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
-  <input type="search" id="settings-filter" placeholder="Filter settings…" autocomplete="off" aria-label="Filter settings" title="Show only the sections mentioning this text" style="max-width:340px">
+  <input type="search" id="settings-filter" placeholder="{{tr "Filter settings…"}}" autocomplete="off" aria-label="{{tr "Filter settings"}}" title="{{tr "Show only the sections mentioning this text"}}" style="max-width:340px">
   <span class="muted" id="settings-filter-info" aria-live="polite"></span>
 </div>
-<!--ERROR-->
-<div class="tabbar settings-tabs" role="tablist" aria-label="Settings sections" hidden>
-  <button type="button" role="tab" id="tab-folders" aria-controls="p-folders" aria-selected="true" tabindex="0" data-tab="folders" title="Download folders, completion actions, watch folders and cookies">Folders &amp; files</button>
-  <button type="button" role="tab" id="tab-network" aria-controls="p-network" aria-selected="false" tabindex="-1" data-tab="network" title="Listen address, ports, proxy, IP filter and protocols">Network</button>
-  <button type="button" role="tab" id="tab-bandwidth" aria-controls="p-bandwidth" aria-selected="false" tabindex="-1" data-tab="bandwidth" title="Speed limits, scheduler, seeding limits and the one-click optimization">Bandwidth</button>
-  <button type="button" role="tab" id="tab-queue" aria-controls="p-queue" aria-selected="false" tabindex="-1" data-tab="queue" title="Active torrents, peer caps, disk cache and the free-space guard">Queue</button>
-  <button type="button" role="tab" id="tab-library" aria-controls="p-library-settings p-library" aria-selected="false" tabindex="-1" data-tab="library" title="Series metadata, categories, quality profiles and the media server">Library</button>
-  <button type="button" role="tab" id="tab-interface" aria-controls="p-interface" aria-selected="false" tabindex="-1" data-tab="interface" title="Language, web interface and notifications">Interface</button>
-  <button type="button" role="tab" id="tab-system" aria-controls="p-system" aria-selected="false" tabindex="-1" data-tab="system" title="Updates and the archive database">System</button>
+{{.ERROR}}
+<div class="tabbar settings-tabs" role="tablist" aria-label="{{tr "Settings sections"}}" hidden>
+  <button type="button" role="tab" id="tab-folders" aria-controls="p-folders" aria-selected="true" tabindex="0" data-tab="folders" title="{{tr "Download folders, completion actions, watch folders and cookies"}}">{{tr "Folders & files"}}</button>
+  <button type="button" role="tab" id="tab-network" aria-controls="p-network" aria-selected="false" tabindex="-1" data-tab="network" title="{{tr "Listen address, ports, proxy, IP filter and protocols"}}">{{tr "Network"}}</button>
+  <button type="button" role="tab" id="tab-bandwidth" aria-controls="p-bandwidth" aria-selected="false" tabindex="-1" data-tab="bandwidth" title="{{tr "Speed limits, scheduler, seeding limits and the one-click optimization"}}">{{tr "Bandwidth"}}</button>
+  <button type="button" role="tab" id="tab-queue" aria-controls="p-queue" aria-selected="false" tabindex="-1" data-tab="queue" title="{{tr "Active torrents, peer caps, disk cache and the free-space guard"}}">{{tr "Queue"}}</button>
+  <button type="button" role="tab" id="tab-library" aria-controls="p-library-settings p-library" aria-selected="false" tabindex="-1" data-tab="library" title="{{tr "Series metadata, categories, quality profiles and the media server"}}">{{tr "Library"}}</button>
+  <button type="button" role="tab" id="tab-interface" aria-controls="p-interface" aria-selected="false" tabindex="-1" data-tab="interface" title="{{tr "Language, web interface and notifications"}}">{{tr "Interface"}}</button>
+  <button type="button" role="tab" id="tab-system" aria-controls="p-system" aria-selected="false" tabindex="-1" data-tab="system" title="{{tr "Updates and the archive database"}}">{{tr "System"}}</button>
 </div>
 <form method="post" action="/ui/settings" id="settings-form">
 <section class="tabpanel" id="p-folders" role="tabpanel" aria-labelledby="tab-folders" tabindex="0">
 <fieldset>
-  <legend>Folders</legend>
+  <legend>{{tr "Folders"}}</legend>
   <div class="grid">
-    <label>Download folder<span class="field-row"><input type="text" id="download-dir" name="download-dir" value="{{DOWNLOAD_DIR}}" placeholder="/srv/downloads" autocomplete="off" title="Main folder for completed downloads"><button type="button" class="browse" data-target="download-dir" title="Choose an existing folder on the server">Browse…</button></span></label>
-    <label>Temporary folder for incomplete files<span class="field-row"><input type="text" id="temp-dir" name="temp-dir" value="{{TEMP_DIR}}" autocomplete="off" title="Temporary folder for incomplete downloads"><button type="button" class="browse" data-target="temp-dir" title="Choose an existing folder on the server">Browse…</button></span></label>
-    <label>Export .torrent on add<span class="field-row"><input type="text" id="export-dir" name="export-dir" value="{{EXPORT_DIR}}" autocomplete="off" title="Copy each added torrent's .torrent file to this folder (empty = off)"><button type="button" class="browse" data-target="export-dir" title="Choose an existing folder on the server">Browse…</button></span></label>
-    <label>Export .torrent on completion<span class="field-row"><input type="text" id="export-dir-fin" name="export-dir-fin" value="{{EXPORT_FIN_DIR}}" autocomplete="off" title="Copy the .torrent file of each completed torrent to this folder (empty = off)"><button type="button" class="browse" data-target="export-dir-fin" title="Choose an existing folder on the server">Browse…</button></span></label>
-    <label>Content layout<select name="content-layout" title="How the files of a new torrent are placed in its folder: as in the torrent, always inside a folder of their own, or straight in the download folder without the torrent's root folder (qBittorrent content layout)">{{LAYOUT_OPTIONS}}</select></label>
-    <label class="chk"><input type="checkbox" name="auto-tmm-enabled" value="1"{{AUTO_TMM_ON}} title="New torrents follow their category's save path by default; assigning a category moves them (qBittorrent automatic torrent management, off by default)"> New torrents follow their category's folder (autoTMM)</label>
+    <label>{{tr "Download folder"}}<span class="field-row"><input type="text" id="download-dir" name="download-dir" value="{{.DOWNLOAD_DIR}}" placeholder="/srv/downloads" autocomplete="off" title="{{tr "Main folder for completed downloads"}}"><button type="button" class="browse" data-target="download-dir" title="{{tr "Choose an existing folder on the server"}}">{{tr "Browse…"}}</button></span></label>
+    <label>{{tr "Temporary folder for incomplete files"}}<span class="field-row"><input type="text" id="temp-dir" name="temp-dir" value="{{.TEMP_DIR}}" autocomplete="off" title="{{tr "Temporary folder for incomplete downloads"}}"><button type="button" class="browse" data-target="temp-dir" title="{{tr "Choose an existing folder on the server"}}">{{tr "Browse…"}}</button></span></label>
+    <label>{{tr "Export .torrent on add"}}<span class="field-row"><input type="text" id="export-dir" name="export-dir" value="{{.EXPORT_DIR}}" autocomplete="off" title="{{tr "Copy each added torrent's .torrent file to this folder (empty = off)"}}"><button type="button" class="browse" data-target="export-dir" title="{{tr "Choose an existing folder on the server"}}">{{tr "Browse…"}}</button></span></label>
+    <label>{{tr "Export .torrent on completion"}}<span class="field-row"><input type="text" id="export-dir-fin" name="export-dir-fin" value="{{.EXPORT_FIN_DIR}}" autocomplete="off" title="{{tr "Copy the .torrent file of each completed torrent to this folder (empty = off)"}}"><button type="button" class="browse" data-target="export-dir-fin" title="{{tr "Choose an existing folder on the server"}}">{{tr "Browse…"}}</button></span></label>
+    <label>{{tr "Content layout"}}<select name="content-layout" title="{{tr "How the files of a new torrent are placed in its folder: as in the torrent, always inside a folder of their own, or straight in the download folder without the torrent's root folder (qBittorrent content layout)"}}">{{.LAYOUT_OPTIONS}}</select></label>
+    <label class="chk"><input type="checkbox" name="auto-tmm-enabled" value="1"{{.AUTO_TMM_ON}} title="{{tr "New torrents follow their category's save path by default; assigning a category moves them (qBittorrent automatic torrent management, off by default)"}}"> {{tr "New torrents follow their category's folder (autoTMM)"}}</label>
   </div>
 </fieldset>
 <fieldset id="after-download">
-  <legend>After download</legend>
-  <label>Move completed downloads to<span class="field-row"><input type="text" name="postprocess-move" value="{{POSTPROCESS_MOVE}}" autocomplete="off" placeholder="empty = stay in the download folder" title="Folder where finished torrents are moved; empty disables the move. The torrent keeps seeding from the new folder."><button type="button" class="browse" data-target="postprocess-move" title="Choose an existing folder on the server">Browse…</button></span></label>
-  <label class="chk"><input type="checkbox" name="postprocess-move-category" value="1"{{POSTPROCESS_MOVE_CATEGORY}} title="Put each finished torrent in a subfolder named after its category, inside the completion folder"> Put each torrent in a subfolder named after its category</label>
-  <label>Run a program on completion<input type="text" name="postprocess-run" value="{{POSTPROCESS_RUN}}" autocomplete="off" placeholder="empty = no program" title="Program and arguments separated by spaces; empty disables it. The torrent is not passed on the command line: its details arrive in GX_HASH, GX_NAME, GX_PATH, GX_CATEGORY and GX_SIZE."></label>
-  <p class="muted">The command runs only when a download completes, with the torrent details in the environment. The move runs first: the command finds the final folder in GX_PATH. A torrent that cannot be moved keeps its old folder and the command is told so.</p>
+  <legend>{{tr "After download"}}</legend>
+  <label>{{tr "Move completed downloads to"}}<span class="field-row"><input type="text" name="postprocess-move" value="{{.POSTPROCESS_MOVE}}" autocomplete="off" placeholder="{{tr "empty = stay in the download folder"}}" title="{{tr "Folder where finished torrents are moved; empty disables the move. The torrent keeps seeding from the new folder."}}"><button type="button" class="browse" data-target="postprocess-move" title="{{tr "Choose an existing folder on the server"}}">{{tr "Browse…"}}</button></span></label>
+  <label class="chk"><input type="checkbox" name="postprocess-move-category" value="1"{{.POSTPROCESS_MOVE_CATEGORY}} title="{{tr "Put each finished torrent in a subfolder named after its category, inside the completion folder"}}"> {{tr "Put each torrent in a subfolder named after its category"}}</label>
+  <label>{{tr "Run a program on completion"}}<input type="text" name="postprocess-run" value="{{.POSTPROCESS_RUN}}" autocomplete="off" placeholder="{{tr "empty = no program"}}" title="{{tr "Program and arguments separated by spaces; empty disables it. The torrent is not passed on the command line: its details arrive in GX_HASH, GX_NAME, GX_PATH, GX_CATEGORY and GX_SIZE."}}"></label>
+  <p class="muted">{{tr "The command runs only when a download completes, with the torrent details in the environment. The move runs first: the command finds the final folder in GX_PATH. A torrent that cannot be moved keeps its old folder and the command is told so."}}</p>
 </fieldset>
 <fieldset>
-  <legend>Watch folders</legend>
-  <label>Folders to watch for .torrent files (one per line)<textarea name="watch-folders" rows="3" spellcheck="false" autocomplete="off" title="Folders whose .torrent files are downloaded and added automatically: each file is read and its content added to the session; each line is a folder, or folder=destination to choose where its torrents are saved. The .torrent is removed after a successful add; a file that is not a valid .torrent is renamed to .invalid. Empty disables the feature.">{{WATCH_FOLDERS}}</textarea></label>
+  <legend>{{tr "Watch folders"}}</legend>
+  <label>{{tr "Folders to watch for .torrent files (one per line)"}}<textarea name="watch-folders" rows="3" spellcheck="false" autocomplete="off" title="{{tr "Folders whose .torrent files are downloaded and added automatically: each file is read and its content added to the session; each line is a folder, or folder=destination to choose where its torrents are saved. The .torrent is removed after a successful add; a file that is not a valid .torrent is renamed to .invalid. Empty disables the feature."}}">{{.WATCH_FOLDERS}}</textarea></label>
 </fieldset>
 <fieldset id="cookies">
-  <legend>Cookies</legend>
-  <label>Cookies sent when fetching .torrent files and metadata (JSON array)<textarea name="cookies" rows="4" spellcheck="false" autocomplete="off" title="A JSON array of cookie objects, sent when the daemon fetches .torrent files and metadata over HTTP (private trackers); the same shape as the qBittorrent cookie API. Each entry has name, value, domain and path. Empty means no cookies.">{{COOKIES}}</textarea></label>
+  <legend>{{tr "Cookies"}}</legend>
+  <label>{{tr "Cookies sent when fetching .torrent files and metadata (JSON array)"}}<textarea name="cookies" rows="4" spellcheck="false" autocomplete="off" title="{{tr "A JSON array of cookie objects, sent when the daemon fetches .torrent files and metadata over HTTP (private trackers); the same shape as the qBittorrent cookie API. Each entry has name, value, domain and path. Empty means no cookies."}}">{{.COOKIES}}</textarea></label>
 </fieldset>
 </section>
 <section class="tabpanel" id="p-network" role="tabpanel" aria-labelledby="tab-network" tabindex="0">
 <fieldset>
-  <legend>Network</legend>
+  <legend>{{tr "Network"}}</legend>
   <div class="grid">
-    <label>Web UI / API listen address<input type="text" name="listen" value="{{LISTEN}}" placeholder="0.0.0.0:8890" autocomplete="off" title="IP address and port for the web interface and API"></label>
-    <label>Peer port range<input type="text" name="peer-ports" value="{{PEER_PORTS}}" placeholder="6881-6891" autocomplete="off" title="Port or port range for incoming BitTorrent peer traffic"></label>
-    <label>Incoming interface (IP or name)<input type="text" name="listen-interface" value="{{LISTEN_IFACE}}" autocomplete="off" title="Network interface or IP address for incoming connections"></label>
-    <label>Outgoing interface (VPN killswitch)<input type="text" name="outgoing-interface" value="{{OUT_IFACE}}" autocomplete="off" title="Network interface for outgoing traffic (VPN killswitch)"></label>
-    <label>Proxy (socks5:// or http://)<input type="text" name="proxy" value="{{PROXY}}" autocomplete="off" title="SOCKS5 or HTTP proxy URL for peer traffic"></label>
-    <label>API token<input type="text" name="token" value="{{TOKEN}}" autocomplete="off" title="Authentication token for API requests"></label>
-    <label>qBittorrent API key<input type="text" name="qbit-api-key" value="{{QBIT_API_KEY}}" autocomplete="off" title="API key accepted by the qBittorrent-compatible API (X-Api-Key or Bearer); empty disables this way of signing in"></label>
-    <label>qBittorrent version reported<input type="text" name="qbit-version" value="{{QBIT_VERSION}}" autocomplete="off" placeholder="4.6.7" title="Version string returned to qBittorrent clients by app/version; keep 4.6.7 unless a client requires another version"></label>
-    <label>Client identity<select name="client-identity" title="What peers and trackers see: gx-core with its real version by default, or a compatibility preset. Some private trackers only accept whitelisted clients; check their rules before using a preset.">{{CLIENT_IDENTITY_OPTIONS}}</select></label>
-    <label>Client version (empty = preset)<input type="text" name="client-identity-version" value="{{CLIENT_IDENTITY_VERSION}}" autocomplete="off" placeholder="5.2.3" title="Version announced with the preset; empty uses the preset version"></label>
-    <label class="chk"><input type="checkbox" name="web-sources-allow-private" value="1"{{WEB_PRIVATE}} title="Web seeds and magnet sources (xs=/as=) come from torrent data: by default they cannot reach the local network, so a torrent from a feed cannot make the client request the router or the NAS"> Allow web seeds and magnet sources on the local network</label>
+    <label>{{tr "Web UI / API listen address"}}<input type="text" name="listen" value="{{.LISTEN}}" placeholder="0.0.0.0:8890" autocomplete="off" title="{{tr "IP address and port for the web interface and API"}}"></label>
+    <label>{{tr "Peer port range"}}<input type="text" name="peer-ports" value="{{.PEER_PORTS}}" placeholder="6881-6891" autocomplete="off" title="{{tr "Port or port range for incoming BitTorrent peer traffic"}}"></label>
+    <label>{{tr "Incoming interface (IP or name)"}}<input type="text" name="listen-interface" value="{{.LISTEN_IFACE}}" autocomplete="off" title="{{tr "Network interface or IP address for incoming connections"}}"></label>
+    <label>{{tr "Outgoing interface (VPN killswitch)"}}<input type="text" name="outgoing-interface" value="{{.OUT_IFACE}}" autocomplete="off" title="{{tr "Network interface for outgoing traffic (VPN killswitch)"}}"></label>
+    <label>{{tr "Proxy (socks5:// or http://)"}}<input type="text" name="proxy" value="{{.PROXY}}" autocomplete="off" title="{{tr "SOCKS5 or HTTP proxy URL for peer traffic"}}"></label>
+    <label>{{tr "API token"}}<input type="text" name="token" value="{{.TOKEN}}" autocomplete="off" title="{{tr "Authentication token for API requests"}}"></label>
+    <label>{{tr "qBittorrent API key"}}<input type="text" name="qbit-api-key" value="{{.QBIT_API_KEY}}" autocomplete="off" title="{{tr "API key accepted by the qBittorrent-compatible API (X-Api-Key or Bearer); empty disables this way of signing in"}}"></label>
+    <label>{{tr "qBittorrent version reported"}}<input type="text" name="qbit-version" value="{{.QBIT_VERSION}}" autocomplete="off" placeholder="4.6.7" title="{{tr "Version string returned to qBittorrent clients by app/version; keep 4.6.7 unless a client requires another version"}}"></label>
+    <label>{{tr "Client identity"}}<select name="client-identity" title="{{tr "What peers and trackers see: gx-core with its real version by default, or a compatibility preset. Some private trackers only accept whitelisted clients; check their rules before using a preset."}}">{{.CLIENT_IDENTITY_OPTIONS}}</select></label>
+    <label>{{tr "Client version (empty = preset)"}}<input type="text" name="client-identity-version" value="{{.CLIENT_IDENTITY_VERSION}}" autocomplete="off" placeholder="5.2.3" title="{{tr "Version announced with the preset; empty uses the preset version"}}"></label>
+    <label class="chk"><input type="checkbox" name="web-sources-allow-private" value="1"{{.WEB_PRIVATE}} title="{{tr "Web seeds and magnet sources (xs=/as=) come from torrent data: by default they cannot reach the local network, so a torrent from a feed cannot make the client request the router or the NAS"}}"> {{tr "Allow web seeds and magnet sources on the local network"}}</label>
   </div>
-  <div class="actions"><button type="button" class="secondary sm" id="port-test" title="Test whether the peer port is reachable from the Internet (uses the port saved above)">Test port</button></div>
+  <div class="actions"><button type="button" class="secondary sm" id="port-test" title="{{tr "Test whether the peer port is reachable from the Internet (uses the port saved above)"}}">{{tr "Test port"}}</button></div>
   <p class="muted" id="port-test-result" role="status" aria-live="polite"></p>
 </fieldset>
 <fieldset id="ipfilter">
-  <legend>IP filter</legend>
+  <legend>{{tr "IP filter"}}</legend>
   <div class="grid">
-    <label>IP filter (file or URL)<input type="text" name="ipfilter" value="{{IPFILTER}}" autocomplete="off" placeholder="https://…/blocklist.gz" title="Path or URL to IP filter blocklist (P2P, eMule or CIDR format, plain or gzip)"></label>
-    <label>Update every (hours, 0 = never)<input type="number" min="0" max="720" name="ipfilter-refresh-hours" value="{{IPFILTER_REFRESH}}" title="How often a URL list is downloaded again; a local file is reloaded when it changes"></label>
-    <label class="chk"><input type="checkbox" name="ipfilter-trackers" value="1"{{IPFILTER_TRACKERS}} title="Block filtered IP addresses on tracker connections too"> Apply the IP filter to trackers</label>
+    <label>{{tr "IP filter (file or URL)"}}<input type="text" name="ipfilter" value="{{.IPFILTER}}" autocomplete="off" placeholder="https://…/blocklist.gz" title="{{tr "Path or URL to IP filter blocklist (P2P, eMule or CIDR format, plain or gzip)"}}"></label>
+    <label>{{tr "Update every (hours, 0 = never)"}}<input type="number" min="0" max="720" name="ipfilter-refresh-hours" value="{{.IPFILTER_REFRESH}}" title="{{tr "How often a URL list is downloaded again; a local file is reloaded when it changes"}}"></label>
+    <label class="chk"><input type="checkbox" name="ipfilter-trackers" value="1"{{.IPFILTER_TRACKERS}} title="{{tr "Block filtered IP addresses on tracker connections too"}}"> {{tr "Apply the IP filter to trackers"}}</label>
   </div>
-  <p class="muted" aria-live="polite">{{IPFILTER_STATUS}}</p>
+  <p class="muted" aria-live="polite">{{.IPFILTER_STATUS}}</p>
   <input type="hidden" name="return" value="settings">
-  <button type="button" class="secondary sm" data-formaction="/ui/ipfilter" title="Download (if a URL) and apply the IP filter in the field now, without saving the other settings">Load now</button>
-  <p class="muted">A URL is downloaded at start-up and again at the interval above; a local file is reloaded when it changes on disk.</p>
+  <button type="button" class="secondary sm" data-formaction="/ui/ipfilter" title="{{tr "Download (if a URL) and apply the IP filter in the field now, without saving the other settings"}}">{{tr "Load now"}}</button>
+  <p class="muted">{{tr "A URL is downloaded at start-up and again at the interval above; a local file is reloaded when it changes on disk."}}</p>
 </fieldset>
 <fieldset>
-  <legend>Protocols</legend>
+  <legend>{{tr "Protocols"}}</legend>
   <div class="grid">
-    <label>Encryption<select name="encryption" title="Protocol encryption policy: plain, preferred, or required encryption (MSE/PE)">{{ENC_OPTIONS}}</select></label>
-    <label>DHT bootstrap nodes<input type="text" name="dht-bootstrap" value="{{DHT_BOOTSTRAP}}" autocomplete="off" title="Initial bootstrap nodes for the DHT network"></label>
+    <label>{{tr "Encryption"}}<select name="encryption" title="{{tr "Protocol encryption policy: plain, preferred, or required encryption (MSE/PE)"}}">{{.ENC_OPTIONS}}</select></label>
+    <label>{{tr "DHT bootstrap nodes"}}<input type="text" name="dht-bootstrap" value="{{.DHT_BOOTSTRAP}}" autocomplete="off" title="{{tr "Initial bootstrap nodes for the DHT network"}}"></label>
   </div>
   <div class="grid">
-    <label class="chk"><input type="checkbox" name="dht" value="1"{{DHT_ON}} title="Mainline DHT for decentralized peer discovery without trackers (BEP 5)"> DHT</label>
-    <label class="chk"><input type="checkbox" name="pex" value="1"{{PEX_ON}} title="Peer Exchange (PEX) to discover peers from connected swarms (BEP 11)"> Peer exchange (PEX)</label>
-    <label class="chk"><input type="checkbox" name="utp" value="1"{{UTP_ON}} title="Micro Transport Protocol (uTP) over UDP for congestion-aware transfers (BEP 29)"> uTP</label>
-    <label class="chk"><input type="checkbox" name="holepunch" value="1"{{HOLEPUNCH_ON}} title="BEP 55 NAT traversal holepunching over uTP via relay peers"> Holepunching</label>
-    <label class="chk"><input type="checkbox" name="lsd" value="1"{{LSD_ON}} title="Local Service Discovery (LSD) via multicast on LAN (BEP 14)"> Local discovery (LSD)</label>
-    <label class="chk"><input type="checkbox" name="upnp" value="1"{{UPNP_ON}} title="UPnP automatic port forwarding on the router gateway"> UPnP port mapping</label>
-    <label class="chk"><input type="checkbox" name="natpmp" value="1"{{NATPMP_ON}} title="NAT-PMP / PCP automatic port forwarding on the router gateway"> NAT-PMP port mapping</label>
-    <label class="chk"><input type="checkbox" name="dht-read-only" value="1"{{DHT_READONLY}} title="Run DHT in read-only mode without answering queries"> DHT read-only (BEP 43)</label>
+    <label class="chk"><input type="checkbox" name="dht" value="1"{{.DHT_ON}} title="{{tr "Mainline DHT for decentralized peer discovery without trackers (BEP 5)"}}"> {{tr "DHT"}}</label>
+    <label class="chk"><input type="checkbox" name="pex" value="1"{{.PEX_ON}} title="{{tr "Peer Exchange (PEX) to discover peers from connected swarms (BEP 11)"}}"> {{tr "Peer exchange (PEX)"}}</label>
+    <label class="chk"><input type="checkbox" name="utp" value="1"{{.UTP_ON}} title="{{tr "Micro Transport Protocol (uTP) over UDP for congestion-aware transfers (BEP 29)"}}"> {{tr "uTP"}}</label>
+    <label class="chk"><input type="checkbox" name="holepunch" value="1"{{.HOLEPUNCH_ON}} title="{{tr "BEP 55 NAT traversal holepunching over uTP via relay peers"}}"> {{tr "Holepunching"}}</label>
+    <label class="chk"><input type="checkbox" name="lsd" value="1"{{.LSD_ON}} title="{{tr "Local Service Discovery (LSD) via multicast on LAN (BEP 14)"}}"> {{tr "Local discovery (LSD)"}}</label>
+    <label class="chk"><input type="checkbox" name="upnp" value="1"{{.UPNP_ON}} title="{{tr "UPnP automatic port forwarding on the router gateway"}}"> {{tr "UPnP port mapping"}}</label>
+    <label class="chk"><input type="checkbox" name="natpmp" value="1"{{.NATPMP_ON}} title="{{tr "NAT-PMP / PCP automatic port forwarding on the router gateway"}}"> {{tr "NAT-PMP port mapping"}}</label>
+    <label class="chk"><input type="checkbox" name="dht-read-only" value="1"{{.DHT_READONLY}} title="{{tr "Run DHT in read-only mode without answering queries"}}"> {{tr "DHT read-only (BEP 43)"}}</label>
   </div>
 </fieldset>
 </section>
 <section class="tabpanel" id="p-queue" role="tabpanel" aria-labelledby="tab-queue" tabindex="0">
 <fieldset>
-  <legend>Queue and cache</legend>
+  <legend>{{tr "Queue and cache"}}</legend>
   <div class="grid">
-    <label>Active downloads<input type="number" min="1" name="active-downloads" value="{{ACTIVE_DL}}" title="Maximum number of simultaneous downloading torrents"></label>
-    <label>Active seeds<input type="number" min="0" name="active-seeds" value="{{ACTIVE_SEEDS}}" title="Maximum number of simultaneous seeding torrents"></label>
-    <label>Active limit (downloads + seeds)<input type="number" min="1" name="active-limit" value="{{ACTIVE_LIMIT}}" title="Maximum total active torrents (downloads and seeds)"></label>
-    <label>Peers per torrent (0 = no cap)<input type="number" min="0" name="max-conns-per-torrent" value="{{MAX_CONNS_TORRENT}}" title="Ceiling on the connected peers of each torrent that has no cap of its own (0 = no ceiling). With the automatic cap on, the daemon stays below it according to the machine"></label>
-    <label class="chk"><input type="checkbox" name="conn-auto" value="1"{{CONN_AUTO}} title="Size the peer cap of every torrent from the machine (cores and RAM) and trim torrents that make no progress, instead of using the value above as a fixed number"> Automatic peer cap</label>
-    <label>Disk cache (MiB, 0 = automatic)<input type="number" min="0" name="cache-mb" value="{{CACHE_MB}}" title="Disk cache memory size in MiB (0 = automatic)"></label>
-    <label>Pause downloads below free space (MiB, 0 = off)<input type="number" min="0" name="min-free-mb" value="{{MIN_FREE_MB}}" title="Downloads on a folder with less free space than this are paused and resume by themselves when space returns; seeding goes on. Not applied when preallocation is on"></label>
-    <label class="chk"><input type="checkbox" name="preallocate" value="1"{{PREALLOCATE}} title="Preallocate disk space before writing file chunks to avoid disk fragmentation"> Preallocate disk space</label>
-    <label class="chk"><input type="checkbox" name="sequential" value="1"{{SEQUENTIAL}} title="Download torrent pieces in sequential order for media streaming preview"> Download in sequential order</label>
+    <label>{{tr "Active downloads"}}<input type="number" min="1" name="active-downloads" value="{{.ACTIVE_DL}}" title="{{tr "Maximum number of simultaneous downloading torrents"}}"></label>
+    <label>{{tr "Active seeds"}}<input type="number" min="0" name="active-seeds" value="{{.ACTIVE_SEEDS}}" title="{{tr "Maximum number of simultaneous seeding torrents"}}"></label>
+    <label>{{tr "Active limit (downloads + seeds)"}}<input type="number" min="1" name="active-limit" value="{{.ACTIVE_LIMIT}}" title="{{tr "Maximum total active torrents (downloads and seeds)"}}"></label>
+    <label>{{tr "Peers per torrent (0 = no cap)"}}<input type="number" min="0" name="max-conns-per-torrent" value="{{.MAX_CONNS_TORRENT}}" title="{{tr "Ceiling on the connected peers of each torrent that has no cap of its own (0 = no ceiling). With the automatic cap on, the daemon stays below it according to the machine"}}"></label>
+    <label class="chk"><input type="checkbox" name="conn-auto" value="1"{{.CONN_AUTO}} title="{{tr "Size the peer cap of every torrent from the machine (cores and RAM) and trim torrents that make no progress, instead of using the value above as a fixed number"}}"> {{tr "Automatic peer cap"}}</label>
+    <label>{{tr "Disk cache (MiB, 0 = automatic)"}}<input type="number" min="0" name="cache-mb" value="{{.CACHE_MB}}" title="{{tr "Disk cache memory size in MiB (0 = automatic)"}}"></label>
+    <label>{{tr "Pause downloads below free space (MiB, 0 = off)"}}<input type="number" min="0" name="min-free-mb" value="{{.MIN_FREE_MB}}" title="{{tr "Downloads on a folder with less free space than this are paused and resume by themselves when space returns; seeding goes on. Not applied when preallocation is on"}}"></label>
+    <label class="chk"><input type="checkbox" name="preallocate" value="1"{{.PREALLOCATE}} title="{{tr "Preallocate disk space before writing file chunks to avoid disk fragmentation"}}"> {{tr "Preallocate disk space"}}</label>
+    <label class="chk"><input type="checkbox" name="sequential" value="1"{{.SEQUENTIAL}} title="{{tr "Download torrent pieces in sequential order for media streaming preview"}}"> {{tr "Download in sequential order"}}</label>
   </div>
 </fieldset>
 </section>
 <section class="tabpanel" id="p-library-settings" role="tabpanel" aria-labelledby="tab-library" tabindex="0">
 <fieldset id="series-metadata">
-  <legend>Series and movies</legend>
+  <legend>{{tr "Series and movies"}}</legend>
   <input type="hidden" name="metadata-form" value="1">
-  <label class="chk"><input type="checkbox" name="metadata-episodes" value="1"{{METADATA_EPISODES_ON}} title="Ask TVmaze for the complete episode list of each series, so missing episodes are known even if no release ever appeared in the feeds. The series title is sent to api.tvmaze.com."> Use TVmaze for the real episode list</label>
-  <p class="muted">The public TVmaze API needs no key. It tells gx-torrent which episodes exist and when they aired, so a series is not limited to what the feeds happened to show. Turn it off to keep the title on this machine only.</p>
+  <label class="chk"><input type="checkbox" name="metadata-episodes" value="1"{{.METADATA_EPISODES_ON}} title="{{tr "Ask TVmaze for the complete episode list of each series, so missing episodes are known even if no release ever appeared in the feeds. The series title is sent to api.tvmaze.com."}}"> {{tr "Use TVmaze for the real episode list"}}</label>
+  <p class="muted">{{tr "The public TVmaze API needs no key. It tells gx-torrent which episodes exist and when they aired, so a series is not limited to what the feeds happened to show. Turn it off to keep the title on this machine only."}}</p>
 </fieldset>
 <fieldset>
-  <legend>Media server (DLNA)</legend>
+  <legend>{{tr "Media server (DLNA)"}}</legend>
   <div class="grid">
-    <label class="chk"><input type="checkbox" name="dlna-enabled" value="1"{{DLNA_ENABLED}} title="Advertise the completed media to DLNA/UPnP players (TV, console) on the local network. Off by default; local network only, no authentication."> Enable DLNA/UPnP media server</label>
-    <label>HTTP bind<input type="text" name="dlna-listen" value="{{DLNA_LISTEN}}" autocomplete="off" placeholder=":8200" title="Address and port the media server listens on, e.g. :8200 for all interfaces or 192.168.1.10:8200 for one. Discovery uses UDP 1900 on the same interface."></label>
-    <label>Server name<input type="text" name="dlna-name" value="{{DLNA_NAME}}" autocomplete="off" placeholder="gx-torrent" title="Friendly name shown to the DLNA players on the network."></label>
+    <label class="chk"><input type="checkbox" name="dlna-enabled" value="1"{{.DLNA_ENABLED}} title="{{tr "Advertise the completed media to DLNA/UPnP players (TV, console) on the local network. Off by default; local network only, no authentication."}}"> {{tr "Enable DLNA/UPnP media server"}}</label>
+    <label>{{tr "HTTP bind"}}<input type="text" name="dlna-listen" value="{{.DLNA_LISTEN}}" autocomplete="off" placeholder=":8200" title="{{tr "Address and port the media server listens on, e.g. :8200 for all interfaces or 192.168.1.10:8200 for one. Discovery uses UDP 1900 on the same interface."}}"></label>
+    <label>{{tr "Server name"}}<input type="text" name="dlna-name" value="{{.DLNA_NAME}}" autocomplete="off" placeholder="gx-torrent" title="{{tr "Friendly name shown to the DLNA players on the network."}}"></label>
   </div>
-  <label>Library folders<span class="field-row"><textarea name="dlna-folders" id="dlna-folders" rows="3" placeholder="/srv/media/Movies&#10;/srv/media/TV" autocomplete="off" aria-describedby="dlna-folders-help" title="Folders shown to the DLNA players beside the torrents, as browsable folders (e.g. the archive on the NAS). One folder per line. Read only; hidden and NAS system folders are skipped.">{{DLNA_FOLDERS}}</textarea><button type="button" class="browse" data-target="dlna-folders" data-append="1" title="Add an existing folder on the server to the list">Add folder…</button><button type="button" class="browse" data-target="dlna-folders" data-append="1" data-path="{{DLNA_DOWNLOAD_DIR}}"{{DOWNLOAD_DIR_DISABLED}} title="Add the configured Download folder, where completed media already is">Download folder</button></span></label>
-  <p class="muted" id="dlna-folders-help">Any number of folders, one per line: each one appears to the players as a browsable folder beside the torrents. Add folder… appends the chosen folder to the list; Download folder adds the one configured above. To remove one, delete its line.</p>
-  <p class="muted" role="status">{{DLNA_STATUS}}</p>
+  <label>{{tr "Library folders"}}<span class="field-row"><textarea name="dlna-folders" id="dlna-folders" rows="3" placeholder="{{tr "/srv/media/Movies\n/srv/media/TV"}}" autocomplete="off" aria-describedby="dlna-folders-help" title="{{tr "Folders shown to the DLNA players beside the torrents, as browsable folders (e.g. the archive on the NAS). One folder per line. Read only; hidden and NAS system folders are skipped."}}">{{.DLNA_FOLDERS}}</textarea><button type="button" class="browse" data-target="dlna-folders" data-append="1" title="{{tr "Add an existing folder on the server to the list"}}">{{tr "Add folder…"}}</button><button type="button" class="browse" data-target="dlna-folders" data-append="1" data-path="{{.DLNA_DOWNLOAD_DIR}}"{{.DOWNLOAD_DIR_DISABLED}} title="{{tr "Add the configured Download folder, where completed media already is"}}">{{tr "Download folder"}}</button></span></label>
+  <p class="muted" id="dlna-folders-help">{{tr "Any number of folders, one per line: each one appears to the players as a browsable folder beside the torrents. Add folder… appends the chosen folder to the list; Download folder adds the one configured above. To remove one, delete its line."}}</p>
+  <p class="muted" role="status">{{.DLNA_STATUS}}</p>
 </fieldset>
 </section>
 <section class="tabpanel" id="p-bandwidth" role="tabpanel" aria-labelledby="tab-bandwidth" tabindex="0">
 <fieldset id="optimize">
-  <legend>Optimization</legend>
-  <p class="muted">One click puts the queue, the disk cache and the bandwidth on values that work well.</p>
+  <legend>{{tr "Optimization"}}</legend>
+  <p class="muted">{{tr "One click puts the queue, the disk cache and the bandwidth on values that work well."}}</p>
   <div class="actions">
-    <button type="button" class="primary sm" data-formaction="/ui/optimize" data-optimize="all" title="Set the queue, the disk cache and automatic speed to values that work well">Optimize</button>
+    <button type="button" class="primary sm" data-formaction="/ui/optimize" data-optimize="all" title="{{tr "Set the queue, the disk cache and automatic speed to values that work well"}}">{{tr "Optimize"}}</button>
   </div>
   <details class="more">
-    <summary>Advanced</summary>
+    <summary>{{tr "Advanced"}}</summary>
     <div class="actions">
-      <button type="button" class="secondary sm" data-formaction="/ui/optimize" data-optimize="queue" title="3 downloads, 3 seeds, 5 active, dynamic queue between 1 and 10 slots, slow torrents not counted">Optimize queue</button>
-      <button type="button" class="secondary sm" data-formaction="/ui/optimize" data-optimize="cache" title="Disk cache back to automatic: sized from the RAM and the disk type, adapted while running">Optimize cache</button>
-      <button type="button" class="secondary sm" data-formaction="/ui/optimize" data-optimize="bandwidth" title="Clear both limits and turn automatic speed on: it measures the line and sets download and upload itself">Optimize bandwidth</button>
+      <button type="button" class="secondary sm" data-formaction="/ui/optimize" data-optimize="queue" title="{{tr "3 downloads, 3 seeds, 5 active, dynamic queue between 1 and 10 slots, slow torrents not counted"}}">{{tr "Optimize queue"}}</button>
+      <button type="button" class="secondary sm" data-formaction="/ui/optimize" data-optimize="cache" title="{{tr "Disk cache back to automatic: sized from the RAM and the disk type, adapted while running"}}">{{tr "Optimize cache"}}</button>
+      <button type="button" class="secondary sm" data-formaction="/ui/optimize" data-optimize="bandwidth" title="{{tr "Clear both limits and turn automatic speed on: it measures the line and sets download and upload itself"}}">{{tr "Optimize bandwidth"}}</button>
     </div>
   </details>
-  <p class="muted">{{OPT_STATUS}}</p>
+  <p class="muted">{{.OPT_STATUS}}</p>
 </fieldset>
 <fieldset>
-  <legend>Bandwidth</legend>
-  <label>Download limit (KiB/s, 0 = unlimited)<input type="number" min="0" name="speed-download" value="{{SPEED_DL}}" title="Global download speed limit in KiB/s (0 = unlimited)"></label>
-  <label>Upload limit (KiB/s, 0 = unlimited)<input type="number" min="0" name="speed-upload" value="{{SPEED_UL}}" title="Global upload speed limit in KiB/s (0 = unlimited)"></label>
-  <label>Alternative download limit (KiB/s, 0 = unlimited)<input type="number" min="0" name="alt-speed-download" value="{{ALT_SPEED_DL}}" title="Alternative download speed limit in KiB/s, applied when the alternative limits are active (0 = unlimited)"></label>
-  <label>Alternative upload limit (KiB/s, 0 = unlimited)<input type="number" min="0" name="alt-speed-upload" value="{{ALT_SPEED_UL}}" title="Alternative upload speed limit in KiB/s, applied when the alternative limits are active (0 = unlimited)"></label>
-  <label class="chk"><input type="checkbox" name="alt-speed-limits-on" value="1"{{ALT_SPEED_ON}} title="Apply the alternative limits now, like qBittorrent's speed-limit button; the scheduler still applies inside its window"> Alternative limits active</label>
-  <label class="chk"><input type="checkbox" name="limit-lan-peers" value="1"{{LIMIT_LAN_PEERS}} title="Also slow down the peers on your local network (home or office) to the limits above; off, they transfer at full speed"> Apply the limits to peers on the local network</label>
+  <legend>{{tr "Bandwidth"}}</legend>
+  <label>{{tr "Download limit (KiB/s, 0 = unlimited)"}}<input type="number" min="0" name="speed-download" value="{{.SPEED_DL}}" title="{{tr "Global download speed limit in KiB/s (0 = unlimited)"}}"></label>
+  <label>{{tr "Upload limit (KiB/s, 0 = unlimited)"}}<input type="number" min="0" name="speed-upload" value="{{.SPEED_UL}}" title="{{tr "Global upload speed limit in KiB/s (0 = unlimited)"}}"></label>
+  <label>{{tr "Alternative download limit (KiB/s, 0 = unlimited)"}}<input type="number" min="0" name="alt-speed-download" value="{{.ALT_SPEED_DL}}" title="{{tr "Alternative download speed limit in KiB/s, applied when the alternative limits are active (0 = unlimited)"}}"></label>
+  <label>{{tr "Alternative upload limit (KiB/s, 0 = unlimited)"}}<input type="number" min="0" name="alt-speed-upload" value="{{.ALT_SPEED_UL}}" title="{{tr "Alternative upload speed limit in KiB/s, applied when the alternative limits are active (0 = unlimited)"}}"></label>
+  <label class="chk"><input type="checkbox" name="alt-speed-limits-on" value="1"{{.ALT_SPEED_ON}} title="{{tr "Apply the alternative limits now, like qBittorrent's speed-limit button; the scheduler still applies inside its window"}}"> {{tr "Alternative limits active"}}</label>
+  <label class="chk"><input type="checkbox" name="limit-lan-peers" value="1"{{.LIMIT_LAN_PEERS}} title="{{tr "Also slow down the peers on your local network (home or office) to the limits above; off, they transfer at full speed"}}"> {{tr "Apply the limits to peers on the local network"}}</label>
 </fieldset>
 <fieldset>
-  <legend>Bandwidth scheduler</legend>
-  <label class="chk"><input type="checkbox" name="schedule-enabled" value="1"{{SCHED_ENABLED}} title="Activate time-based speed limits schedule"> Enable the scheduler</label>
+  <legend>{{tr "Bandwidth scheduler"}}</legend>
+  <label class="chk"><input type="checkbox" name="schedule-enabled" value="1"{{.SCHED_ENABLED}} title="{{tr "Activate time-based speed limits schedule"}}"> {{tr "Enable the scheduler"}}</label>
   <input type="hidden" name="schedule-week-form" value="1">
   <div class="table-scroll">
   <table class="sched-week">
-    <caption class="sr-only">Window and limits for each day of the week</caption>
-    <thead><tr><th scope="col">Day</th><th scope="col" id="sched-col-mode">Mode</th><th scope="col" id="sched-col-start">Start</th><th scope="col" id="sched-col-end">End</th><th scope="col" id="sched-col-dl">Download (KiB/s)</th><th scope="col" id="sched-col-ul">Upload (KiB/s)</th></tr></thead>
-    <tbody>{{SCHED_WEEK_ROWS}}</tbody>
+    <caption class="sr-only">{{tr "Window and limits for each day of the week"}}</caption>
+    <thead><tr><th scope="col">{{tr "Day"}}</th><th scope="col" id="sched-col-mode">{{tr "Mode"}}</th><th scope="col" id="sched-col-start">{{tr "Start"}}</th><th scope="col" id="sched-col-end">{{tr "End"}}</th><th scope="col" id="sched-col-dl">{{tr "Download (KiB/s)"}}</th><th scope="col" id="sched-col-ul">{{tr "Upload (KiB/s)"}}</th></tr></thead>
+    <tbody>{{.SCHED_WEEK_ROWS}}</tbody>
   </table>
   </div>
-  <p class="muted">Every day has its own window and limits (0 = unlimited). The mode decides: Off (no window), Limit (the values apply inside the window) or Auto (no cap, the auto-speed measures the line there). Outside the window, the global limits above apply. A window may cross midnight: it then belongs to the day it starts on (Friday 23:00–07:00 covers Saturday morning too).</p>
+  <p class="muted">{{tr "Every day has its own window and limits (0 = unlimited). The mode decides: Off (no window), Limit (the values apply inside the window) or Auto (no cap, the auto-speed measures the line there). Outside the window, the global limits above apply. A window may cross midnight: it then belongs to the day it starts on (Friday 23:00–07:00 covers Saturday morning too)."}}</p>
 </fieldset>
 <fieldset>
-  <legend>Seeding limits</legend>
-  <label class="chk"><input type="checkbox" name="max-ratio-enabled" value="1"{{MAX_RATIO_ON}} title="Stop seeding a torrent that reaches the share ratio below, unless the torrent has its own limit"> Enable the share-ratio limit</label>
+  <legend>{{tr "Seeding limits"}}</legend>
+  <label class="chk"><input type="checkbox" name="max-ratio-enabled" value="1"{{.MAX_RATIO_ON}} title="{{tr "Stop seeding a torrent that reaches the share ratio below, unless the torrent has its own limit"}}"> {{tr "Enable the share-ratio limit"}}</label>
   <div class="grid">
-    <label>Share ratio<input type="number" min="-1" step="any" name="max-ratio" value="{{MAX_RATIO}}" title="Global share ratio: seeding stops when a torrent uploads this many times its own size (0 = never stop)"></label>
-    <label class="chk"><input type="checkbox" name="max-ratio-remove" value="1"{{MAX_RATIO_REMOVE}} title="Remove the torrent (keeping the files) instead of pausing it when a limit is reached"> Remove instead of pausing</label>
+    <label>{{tr "Share ratio"}}<input type="number" min="-1" step="any" name="max-ratio" value="{{.MAX_RATIO}}" title="{{tr "Global share ratio: seeding stops when a torrent uploads this many times its own size (0 = never stop)"}}"></label>
+    <label class="chk"><input type="checkbox" name="max-ratio-remove" value="1"{{.MAX_RATIO_REMOVE}} title="{{tr "Remove the torrent (keeping the files) instead of pausing it when a limit is reached"}}"> {{tr "Remove instead of pausing"}}</label>
   </div>
-  <label class="chk"><input type="checkbox" name="max-seeding-time-enabled" value="1"{{MAX_TIME_ON}} title="Stop seeding a torrent after the time below, unless the torrent has its own limit"> Enable the seeding-time limit</label>
-  <label>Seeding time (minutes)<input type="number" min="-1" name="max-seeding-time" value="{{MAX_TIME}}" title="Global seeding time in minutes (0 = never stop)"></label>
-  <label class="chk"><input type="checkbox" name="max-inactive-seeding-time-enabled" value="1"{{MAX_IDLE_ON}} title="Stop seeding a torrent that uploaded nothing for the time below while seeding, unless the torrent is set to seed forever"> Enable the inactive-seeding limit</label>
-  <label>Inactive seeding time (minutes)<input type="number" min="-1" name="max-inactive-seeding-time" value="{{MAX_IDLE}}" title="Minutes without any upload while seeding before the torrent stops (only time spent seeding counts; 0 = never stop)"></label>
+  <label class="chk"><input type="checkbox" name="max-seeding-time-enabled" value="1"{{.MAX_TIME_ON}} title="{{tr "Stop seeding a torrent after the time below, unless the torrent has its own limit"}}"> {{tr "Enable the seeding-time limit"}}</label>
+  <label>{{tr "Seeding time (minutes)"}}<input type="number" min="-1" name="max-seeding-time" value="{{.MAX_TIME}}" title="{{tr "Global seeding time in minutes (0 = never stop)"}}"></label>
+  <label class="chk"><input type="checkbox" name="max-inactive-seeding-time-enabled" value="1"{{.MAX_IDLE_ON}} title="{{tr "Stop seeding a torrent that uploaded nothing for the time below while seeding, unless the torrent is set to seed forever"}}"> {{tr "Enable the inactive-seeding limit"}}</label>
+  <label>{{tr "Inactive seeding time (minutes)"}}<input type="number" min="-1" name="max-inactive-seeding-time" value="{{.MAX_IDLE}}" title="{{tr "Minutes without any upload while seeding before the torrent stops (only time spent seeding counts; 0 = never stop)"}}"></label>
 </fieldset>
 <fieldset>
-  <legend>Automatic speed (measures the line)</legend>
-  <label class="chk"><input type="checkbox" name="autospeed-enabled" value="1"{{AUTOSPEED_ENABLED}} title="Measure the round-trip latency and move the download and upload limits to the highest rate the line takes without queueing; manual limits above stay the ceiling"> Enable automatic speed</label>
+  <legend>{{tr "Automatic speed (measures the line)"}}</legend>
+  <label class="chk"><input type="checkbox" name="autospeed-enabled" value="1"{{.AUTOSPEED_ENABLED}} title="{{tr "Measure the round-trip latency and move the download and upload limits to the highest rate the line takes without queueing; manual limits above stay the ceiling"}}"> {{tr "Enable automatic speed"}}</label>
   <div class="grid">
-    <label>Latency target (empty = Google/Cloudflare)<input type="text" name="autospeed-target" value="{{AUTOSPEED_TARGET}}" placeholder="8.8.8.8:443" autocomplete="off" title="Host, or host:port, to measure the round-trip latency against; empty uses Google and Cloudflare, then the default gateway"></label>
-    <label>Minimum upload (KiB/s)<input type="number" min="1" name="autospeed-min" value="{{AUTOSPEED_MIN}}" title="Lowest upload the automatic speed may reduce to, in KiB/s"></label>
-    <label>Line download maximum (KiB/s, 0 = unknown)<input type="number" min="0" name="autospeed-line-down" value="{{AUTOSPEED_LINE_DOWN}}" title="The real maximum download speed of your line, in KiB/s; 0 lets automatic speed discover it. It is a ceiling, not a fixed limit below it."></label>
-    <label>Line upload maximum (KiB/s, 0 = unknown)<input type="number" min="0" name="autospeed-line-up" value="{{AUTOSPEED_LINE_UP}}" title="The real maximum upload speed of your line, in KiB/s; 0 lets automatic speed discover it. It is a ceiling, not a fixed limit below it."></label>
+    <label>{{tr "Latency target (empty = Google/Cloudflare)"}}<input type="text" name="autospeed-target" value="{{.AUTOSPEED_TARGET}}" placeholder="8.8.8.8:443" autocomplete="off" title="{{tr "Host, or host:port, to measure the round-trip latency against; empty uses Google and Cloudflare, then the default gateway"}}"></label>
+    <label>{{tr "Minimum upload (KiB/s)"}}<input type="number" min="1" name="autospeed-min" value="{{.AUTOSPEED_MIN}}" title="{{tr "Lowest upload the automatic speed may reduce to, in KiB/s"}}"></label>
+    <label>{{tr "Line download maximum (KiB/s, 0 = unknown)"}}<input type="number" min="0" name="autospeed-line-down" value="{{.AUTOSPEED_LINE_DOWN}}" title="{{tr "The real maximum download speed of your line, in KiB/s; 0 lets automatic speed discover it. It is a ceiling, not a fixed limit below it."}}"></label>
+    <label>{{tr "Line upload maximum (KiB/s, 0 = unknown)"}}<input type="number" min="0" name="autospeed-line-up" value="{{.AUTOSPEED_LINE_UP}}" title="{{tr "The real maximum upload speed of your line, in KiB/s; 0 lets automatic speed discover it. It is a ceiling, not a fixed limit below it."}}"></label>
   </div>
-  <p class="muted">When the line queues, the round-trip latency rises: automatic speed lowers download and upload until it is responsive, then raises them again. A manual limit above stays the ceiling; 0 in a maximum lets it discover that direction.</p>
-  <p class="muted"><span>Current latency / caps</span>: {{AUTOSPEED_STATUS}}</p>
+  <p class="muted">{{tr "When the line queues, the round-trip latency rises: automatic speed lowers download and upload until it is responsive, then raises them again. A manual limit above stays the ceiling; 0 in a maximum lets it discover that direction."}}</p>
+  <p class="muted"><span>{{tr "Current latency / caps"}}</span>: {{.AUTOSPEED_STATUS}}</p>
 </fieldset>
 </section>
 <section class="tabpanel" id="p-interface" role="tabpanel" aria-labelledby="tab-interface" tabindex="0">
 <fieldset>
-  <legend>Web interface</legend>
-  <label class="chk"><input type="checkbox" name="webui-alternative" value="1"{{ALT_WEBUI_ON}} title="Serve a downloaded VueTorrent at the root address; the standard interface stays available at /ui"> Use the alternative web interface (VueTorrent)</label>
-  <p class="muted" style="margin:0;font-size:12.5px"><span>Installed version</span>: {{ALT_WEBUI_VERSION}}</p>
+  <legend>{{tr "Web interface"}}</legend>
+  <label class="chk"><input type="checkbox" name="webui-alternative" value="1"{{.ALT_WEBUI_ON}} title="{{tr "Serve a downloaded VueTorrent at the root address; the standard interface stays available at /ui"}}"> {{tr "Use the alternative web interface (VueTorrent)"}}</label>
+  <p class="muted" style="margin:0;font-size:12.5px"><span>{{tr "Installed version"}}</span>: {{.ALT_WEBUI_VERSION}}</p>
   <div class="actions">
-    <button type="button" class="secondary sm" data-formaction="/ui/webui-install" title="Download the latest VueTorrent release and install (or update) it here">Install or update VueTorrent</button>
+    <button type="button" class="secondary sm" data-formaction="/ui/webui-install" title="{{tr "Download the latest VueTorrent release and install (or update) it here"}}">{{tr "Install or update VueTorrent"}}</button>
   </div>
-  <p class="muted" style="margin:0;font-size:12.5px">The standard interface is always available at <a href="/ui">/ui</a>.</p>
-  {{LOGOUT_FORM}}
+  <p class="muted" style="margin:0;font-size:12.5px">{{tr "The standard interface is always available at"}} <a href="/ui">/ui</a>.</p>
+  {{.LOGOUT_FORM}}
 </fieldset>
 <fieldset>
-  <legend>Interface</legend>
-  <label>Language<select name="lang" title="Web interface language">{{LANG_OPTIONS}}</select></label>
+  <legend>{{tr "Interface"}}</legend>
+  <label>{{tr "Language"}}<select name="lang" title="{{tr "Web interface language"}}">{{.LANG_OPTIONS}}</select></label>
 </fieldset>
 <fieldset id="notifications">
-  <legend>Notifications</legend>
-  <p class="muted">The same channels as Gextto and indexarr: fill in the ones you use, leave the others empty. Every filled channel receives every enabled event.</p>
+  <legend>{{tr "Notifications"}}</legend>
+  <p class="muted">{{tr "The same channels as Gextto and indexarr: fill in the ones you use, leave the others empty. Every filled channel receives every enabled event."}}</p>
   <div class="days" role="group" aria-labelledby="notify-events-label">
-    <span id="notify-events-label" class="days-label">Events</span>
-    <label class="chk"><input type="checkbox" name="notify-on-complete" value="1"{{NOTIFY_ON_COMPLETE}} title="Notify when a download finishes"> Download complete</label>
-    <label class="chk"><input type="checkbox" name="notify-on-feed-match" value="1"{{NOTIFY_ON_MATCH}} title="Notify when a feed rule or a wanted title adds torrents"> Feed added torrents</label>
-    <label class="chk"><input type="checkbox" name="notify-on-feed-error" value="1"{{NOTIFY_ON_ERROR}} title="Notify when a feed cannot be read"> Feed error</label>
+    <span id="notify-events-label" class="days-label">{{tr "Events"}}</span>
+    <label class="chk"><input type="checkbox" name="notify-on-complete" value="1"{{.NOTIFY_ON_COMPLETE}} title="{{tr "Notify when a download finishes"}}"> {{tr "Download complete"}}</label>
+    <label class="chk"><input type="checkbox" name="notify-on-feed-match" value="1"{{.NOTIFY_ON_MATCH}} title="{{tr "Notify when a feed rule or a wanted title adds torrents"}}"> {{tr "Feed added torrents"}}</label>
+    <label class="chk"><input type="checkbox" name="notify-on-feed-error" value="1"{{.NOTIFY_ON_ERROR}} title="{{tr "Notify when a feed cannot be read"}}"> {{tr "Feed error"}}</label>
   </div>
-  <h3 class="sub">Telegram</h3>
+  <h3 class="sub">{{tr "Telegram"}}</h3>
   <div class="grid">
-    <label>Bot token<input type="password" name="notify-telegram-token" value="{{NOTIFY_TG_TOKEN}}" autocomplete="off" title="Token of your Telegram bot, from @BotFather"></label>
-    <label>Chat ID<input type="text" name="notify-telegram-chat" value="{{NOTIFY_TG_CHAT}}" autocomplete="off" title="Chat or channel the bot writes to (e.g. 123456789 or @channel)"></label>
+    <label>{{tr "Bot token"}}<input type="password" name="notify-telegram-token" value="{{.NOTIFY_TG_TOKEN}}" autocomplete="off" title="{{tr "Token of your Telegram bot, from @BotFather"}}"></label>
+    <label>{{tr "Chat ID"}}<input type="text" name="notify-telegram-chat" value="{{.NOTIFY_TG_CHAT}}" autocomplete="off" title="{{tr "Chat or channel the bot writes to (e.g. 123456789 or @channel)"}}"></label>
   </div>
-  <h3 class="sub">Webhook</h3>
+  <h3 class="sub">{{tr "Webhook"}}</h3>
   <div class="grid">
-    <label>Webhook URL<input type="text" name="notify-url" value="{{NOTIFY_URL}}" autocomplete="off" placeholder="https://ntfy.sh/my-topic" title="Address the notifications are posted to"></label>
-    <label>Format<select name="notify-webhook-format" title="Payload of the webhook: generic JSON or the format of a service">{{NOTIFY_FORMAT_OPTIONS}}</select></label>
-    <label>Webhook token<input type="password" name="notify-webhook-token" value="{{NOTIFY_WH_TOKEN}}" autocomplete="off" title="Credential of the service: ntfy access token, Gotify application key or Pushover application token"></label>
-    <label>Pushover user key<input type="text" name="notify-webhook-user" value="{{NOTIFY_WH_USER}}" autocomplete="off" title="Your Pushover user key (Pushover format only)"></label>
+    <label>{{tr "Webhook URL"}}<input type="text" name="notify-url" value="{{.NOTIFY_URL}}" autocomplete="off" placeholder="https://ntfy.sh/my-topic" title="{{tr "Address the notifications are posted to"}}"></label>
+    <label>{{tr "Format"}}<select name="notify-webhook-format" title="{{tr "Payload of the webhook: generic JSON or the format of a service"}}">{{.NOTIFY_FORMAT_OPTIONS}}</select></label>
+    <label>{{tr "Webhook token"}}<input type="password" name="notify-webhook-token" value="{{.NOTIFY_WH_TOKEN}}" autocomplete="off" title="{{tr "Credential of the service: ntfy access token, Gotify application key or Pushover application token"}}"></label>
+    <label>{{tr "Pushover user key"}}<input type="text" name="notify-webhook-user" value="{{.NOTIFY_WH_USER}}" autocomplete="off" title="{{tr "Your Pushover user key (Pushover format only)"}}"></label>
   </div>
-  <h3 class="sub">Discord</h3>
+  <h3 class="sub">{{tr "Discord"}}</h3>
   <div class="grid">
-    <label>Discord webhook URL<input type="text" name="notify-discord-url" value="{{NOTIFY_DISCORD_URL}}" autocomplete="off" title="Incoming webhook URL of the Discord channel the notifications are posted to"></label>
+    <label>{{tr "Discord webhook URL"}}<input type="text" name="notify-discord-url" value="{{.NOTIFY_DISCORD_URL}}" autocomplete="off" title="{{tr "Incoming webhook URL of the Discord channel the notifications are posted to"}}"></label>
   </div>
-  <h3 class="sub">Slack</h3>
+  <h3 class="sub">{{tr "Slack"}}</h3>
   <div class="grid">
-    <label>Slack webhook URL<input type="text" name="notify-slack-url" value="{{NOTIFY_SLACK_URL}}" autocomplete="off" title="Incoming webhook URL of the Slack channel the notifications are posted to"></label>
+    <label>{{tr "Slack webhook URL"}}<input type="text" name="notify-slack-url" value="{{.NOTIFY_SLACK_URL}}" autocomplete="off" title="{{tr "Incoming webhook URL of the Slack channel the notifications are posted to"}}"></label>
   </div>
-  <h3 class="sub">Gotify</h3>
+  <h3 class="sub">{{tr "Gotify"}}</h3>
   <div class="grid">
-    <label>Gotify server URL<input type="text" name="notify-gotify-url" value="{{NOTIFY_GOTIFY_URL}}" autocomplete="off" title="Address of the Gotify server, for example https://gotify.example.com: notifications are posted to /message"></label>
-    <label>Gotify app token<input type="password" name="notify-gotify-token" value="{{NOTIFY_GOTIFY_TOKEN}}" autocomplete="off" title="Token of the Gotify application that receives the notifications"></label>
+    <label>{{tr "Gotify server URL"}}<input type="text" name="notify-gotify-url" value="{{.NOTIFY_GOTIFY_URL}}" autocomplete="off" title="{{tr "Address of the Gotify server, for example https://gotify.example.com: notifications are posted to /message"}}"></label>
+    <label>{{tr "Gotify app token"}}<input type="password" name="notify-gotify-token" value="{{.NOTIFY_GOTIFY_TOKEN}}" autocomplete="off" title="{{tr "Token of the Gotify application that receives the notifications"}}"></label>
   </div>
   <h3 class="sub">ntfy</h3>
   <div class="grid">
-    <label>ntfy server URL<input type="text" name="notify-ntfy-url" value="{{NOTIFY_NTFY_URL}}" autocomplete="off" title="Address of the ntfy server; use https://ntfy.sh for the public one"></label>
-    <label>ntfy topic<input type="text" name="notify-ntfy-topic" value="{{NOTIFY_NTFY_TOPIC}}" autocomplete="off" title="Topic that receives the message: choose a name that is hard to guess when the server is public"></label>
-    <label>ntfy access token<input type="password" name="notify-ntfy-token" value="{{NOTIFY_NTFY_TOKEN}}" autocomplete="off" title="Optional token for a protected topic; leave it empty for a public one"></label>
+    <label>{{tr "ntfy server URL"}}<input type="text" name="notify-ntfy-url" value="{{.NOTIFY_NTFY_URL}}" autocomplete="off" title="{{tr "Address of the ntfy server; use https://ntfy.sh for the public one"}}"></label>
+    <label>{{tr "ntfy topic"}}<input type="text" name="notify-ntfy-topic" value="{{.NOTIFY_NTFY_TOPIC}}" autocomplete="off" title="{{tr "Topic that receives the message: choose a name that is hard to guess when the server is public"}}"></label>
+    <label>{{tr "ntfy access token"}}<input type="password" name="notify-ntfy-token" value="{{.NOTIFY_NTFY_TOKEN}}" autocomplete="off" title="{{tr "Optional token for a protected topic; leave it empty for a public one"}}"></label>
   </div>
-  <h3 class="sub">Pushover</h3>
+  <h3 class="sub">{{tr "Pushover"}}</h3>
   <div class="grid">
-    <label>Pushover application token<input type="password" name="notify-pushover-token" value="{{NOTIFY_PUSHOVER_TOKEN}}" autocomplete="off" title="Token of your Pushover application"></label>
-    <label>Pushover user key<input type="text" name="notify-pushover-user" value="{{NOTIFY_PUSHOVER_USER}}" autocomplete="off" title="Your Pushover user or group key"></label>
+    <label>{{tr "Pushover application token"}}<input type="password" name="notify-pushover-token" value="{{.NOTIFY_PUSHOVER_TOKEN}}" autocomplete="off" title="{{tr "Token of your Pushover application"}}"></label>
+    <label>{{tr "Pushover user key"}}<input type="text" name="notify-pushover-user" value="{{.NOTIFY_PUSHOVER_USER}}" autocomplete="off" title="{{tr "Your Pushover user or group key"}}"></label>
   </div>
-  <h3 class="sub">Apprise</h3>
+  <h3 class="sub">{{tr "Apprise"}}</h3>
   <div class="grid">
-    <label>Apprise API URL<input type="text" name="notify-apprise-url" value="{{NOTIFY_APPRISE_URL}}" autocomplete="off" title="Address of an Apprise API server, for example http://192.168.1.10:8000: notifications are posted to /notify and it forwards them to the services configured there"></label>
-    <label>Apprise key<input type="password" name="notify-apprise-key" value="{{NOTIFY_APPRISE_KEY}}" autocomplete="off" title="Optional key of one Apprise configuration; leave it empty to use the default one"></label>
+    <label>{{tr "Apprise API URL"}}<input type="text" name="notify-apprise-url" value="{{.NOTIFY_APPRISE_URL}}" autocomplete="off" title="{{tr "Address of an Apprise API server, for example http://192.168.1.10:8000: notifications are posted to /notify and it forwards them to the services configured there"}}"></label>
+    <label>{{tr "Apprise key"}}<input type="password" name="notify-apprise-key" value="{{.NOTIFY_APPRISE_KEY}}" autocomplete="off" title="{{tr "Optional key of one Apprise configuration; leave it empty to use the default one"}}"></label>
   </div>
-  <h3 class="sub">E-mail</h3>
+  <h3 class="sub">{{tr "E-mail"}}</h3>
   <div class="grid">
-    <label>SMTP server (host:port)<input type="text" name="notify-email-smtp" value="{{NOTIFY_SMTP}}" autocomplete="off" placeholder="smtp.example.com:587" title="Mail server and port; STARTTLS is used when the server offers it"></label>
-    <label>From<input type="text" name="notify-email-from" value="{{NOTIFY_FROM}}" autocomplete="off" placeholder="gx-torrent@example.com" title="Sender address, also the SMTP login"></label>
-    <label>To (comma separated)<input type="text" name="notify-email-to" value="{{NOTIFY_TO}}" autocomplete="off" title="Recipients of the notifications, separated by commas"></label>
-    <label>SMTP password<input type="password" name="notify-email-password" value="{{NOTIFY_PASSWORD}}" autocomplete="new-password" title="Password of the sender account on the SMTP server"></label>
+    <label>{{tr "SMTP server (host:port)"}}<input type="text" name="notify-email-smtp" value="{{.NOTIFY_SMTP}}" autocomplete="off" placeholder="smtp.example.com:587" title="{{tr "Mail server and port; STARTTLS is used when the server offers it"}}"></label>
+    <label>{{tr "From"}}<input type="text" name="notify-email-from" value="{{.NOTIFY_FROM}}" autocomplete="off" placeholder="{{tr "gx-torrent@example.com"}}" title="{{tr "Sender address, also the SMTP login"}}"></label>
+    <label>{{tr "To (comma separated)"}}<input type="text" name="notify-email-to" value="{{.NOTIFY_TO}}" autocomplete="off" title="{{tr "Recipients of the notifications, separated by commas"}}"></label>
+    <label>{{tr "SMTP password"}}<input type="password" name="notify-email-password" value="{{.NOTIFY_PASSWORD}}" autocomplete="new-password" title="{{tr "Password of the sender account on the SMTP server"}}"></label>
   </div>
-  <h3 class="sub">Custom script</h3>
+  <h3 class="sub">{{tr "Custom script"}}</h3>
   <div class="grid">
-    <label>Script path<input type="text" name="notify-script" value="{{NOTIFY_SCRIPT}}" autocomplete="off" placeholder="/usr/local/bin/gx-torrent-notify" title="Executable run on this machine for every event, for example /usr/local/bin/gx-torrent-notify"></label>
-    <label>Script arguments<input type="text" name="notify-script-args" value="{{NOTIFY_SCRIPT_ARGS}}" autocomplete="off" title="Optional arguments separated by spaces; quotes keep a value with spaces together. The event travels in the GX_TORRENT_* variables: app, event, title and message"></label>
+    <label>{{tr "Script path"}}<input type="text" name="notify-script" value="{{.NOTIFY_SCRIPT}}" autocomplete="off" placeholder="/usr/local/bin/gx-torrent-notify" title="{{tr "Executable run on this machine for every event, for example /usr/local/bin/gx-torrent-notify"}}"></label>
+    <label>{{tr "Script arguments"}}<input type="text" name="notify-script-args" value="{{.NOTIFY_SCRIPT_ARGS}}" autocomplete="off" title="{{tr "Optional arguments separated by spaces; quotes keep a value with spaces together. The event travels in the GX_TORRENT_* variables: app, event, title and message"}}"></label>
   </div>
-  <div class="actions"><button type="button" class="secondary sm" id="notify-test" title="Send a test notification with the saved channels">Send test</button></div>
+  <div class="actions"><button type="button" class="secondary sm" id="notify-test" title="{{tr "Send a test notification with the saved channels"}}">{{tr "Send test"}}</button></div>
   <p class="muted" id="notify-test-result" role="status" aria-live="polite"></p>
 </fieldset>
 </section>
 <section class="tabpanel" id="p-system" role="tabpanel" aria-labelledby="tab-system" tabindex="0">
 <fieldset id="maintenance">
-  <legend>Maintenance</legend>
-  <label class="chk"><input type="checkbox" name="update-check" value="1"{{UPDATE_CHECK}} title="Look for a new version of gx-torrent on a timer; nothing is installed without your click"> Check for updates automatically</label>
-  <label>Check every (hours)<input type="number" min="1" max="720" name="update-check-hours" value="{{UPDATE_HOURS}}" title="Hours between two automatic checks for a new version (1 to 720)"></label>
-  {{UPDATE_STATUS}}
-  <span hidden id="update-confirm">Install the update now? gx-torrent restarts by itself and the transfers resume after the restart.</span>
+  <legend>{{tr "Maintenance"}}</legend>
+  <label class="chk"><input type="checkbox" name="update-check" value="1"{{.UPDATE_CHECK}} title="{{tr "Look for a new version of gx-torrent on a timer; nothing is installed without your click"}}"> {{tr "Check for updates automatically"}}</label>
+  <label>{{tr "Check every (hours)"}}<input type="number" min="1" max="720" name="update-check-hours" value="{{.UPDATE_HOURS}}" title="{{tr "Hours between two automatic checks for a new version (1 to 720)"}}"></label>
+  {{.UPDATE_STATUS}}
+  <span hidden id="update-confirm">{{tr "Install the update now? gx-torrent restarts by itself and the transfers resume after the restart."}}</span>
 </fieldset>
 <fieldset id="archive-db">
-  <legend>Archive database</legend>
-  <p class="muted">Everything the feeds found is kept in the archive database. Delete the old items to free space, then optimize to give the freed space back to the filesystem.</p>
+  <legend>{{tr "Archive database"}}</legend>
+  <p class="muted">{{tr "Everything the feeds found is kept in the archive database. Delete the old items to free space, then optimize to give the freed space back to the filesystem."}}</p>
   <div class="actions">
-    <label>Older than (days)<input type="number" min="1" id="archive-maint-days" value="90" title="Delete the items found more than this many days ago"></label>
-    <button type="button" class="secondary sm" id="archive-maint-prune" title="Delete the items found more than this many days ago">Delete old items</button>
-    <button type="button" class="secondary sm" id="archive-maint-compact" title="Rewrite the archive database compactly so the file shrinks after deletions">Optimize archive</button>
+    <label>{{tr "Older than (days)"}}<input type="number" min="1" id="archive-maint-days" value="90" title="{{tr "Delete the items found more than this many days ago"}}"></label>
+    <button type="button" class="secondary sm" id="archive-maint-prune" title="{{tr "Delete the items found more than this many days ago"}}">{{tr "Delete old items"}}</button>
+    <button type="button" class="secondary sm" id="archive-maint-compact" title="{{tr "Rewrite the archive database compactly so the file shrinks after deletions"}}">{{tr "Optimize archive"}}</button>
   </div>
   <p class="muted" id="archive-maint-result" role="status" aria-live="polite"></p>
 </fieldset>
 </section>
-<div class="savebar" id="settings-savebar"><button type="submit" class="primary" title="Save settings to settings.json">Save</button></div>
+<div class="savebar" id="settings-savebar"><button type="submit" class="primary" title="{{tr "Save settings to settings.json"}}">{{tr "Save"}}</button></div>
 </form>
 <section class="tabpanel" id="p-library" role="tabpanel" aria-labelledby="tab-library" tabindex="0">
 <fieldset id="categories">
-  <legend>Categories</legend>
-  <p class="muted">A category can have its own folder. When a torrent is assigned to it with automatic management on, the torrent moves to that folder; with a category created from the torrent dialog the folder starts empty, so set it here.</p>
+  <legend>{{tr "Categories"}}</legend>
+  <p class="muted">{{tr "A category can have its own folder. When a torrent is assigned to it with automatic management on, the torrent moves to that folder; with a category created from the torrent dialog the folder starts empty, so set it here."}}</p>
   <div class="table-scroll">
     <table class="cat-manage">
-      <thead><tr><th scope="col">Category</th><th scope="col">Save path</th><th scope="col"><span class="sr-only">Actions</span></th></tr></thead>
-      <tbody>{{CATEGORIES_ROWS}}</tbody>
+      <thead><tr><th scope="col">{{tr "Category"}}</th><th scope="col">{{tr "Save path"}}</th><th scope="col"><span class="sr-only">{{tr "Actions"}}</span></th></tr></thead>
+      <tbody>{{.CATEGORIES_ROWS}}</tbody>
     </table>
   </div>
   <form method="post" action="/ui/category-manage" class="form-grid">
     <input type="hidden" name="op" value="add">
-    <label>New category
-      <input type="text" name="name" required autocomplete="off" title="Name of the new category, for example Movies or TV">
+    <label>{{tr "New category"}}
+      <input type="text" name="name" required autocomplete="off" title="{{tr "Name of the new category, for example Movies or TV"}}">
     </label>
-    <label>Save path
-      <input type="text" name="savepath" autocomplete="off" placeholder="download folder" title="Folder where the torrents of this category are saved (empty = the main download folder)">
+    <label>{{tr "Save path"}}
+      <input type="text" name="savepath" autocomplete="off" placeholder="download folder" title="{{tr "Folder where the torrents of this category are saved (empty = the main download folder)"}}">
     </label>
-    <div><button type="submit" class="primary sm" title="Create the category with this save path">Add category</button></div>
+    <div><button type="submit" class="primary sm" title="{{tr "Create the category with this save path"}}">{{tr "Add category"}}</button></div>
   </form>
 </fieldset>
 <fieldset id="quality-profiles">
-  <legend>Quality profiles</legend>
-  <p class="muted">A profile is a named set of accepted resolutions. A title can choose one instead of the plain quality field; the cutoff is the quality at which upgrades stop (empty = no upgrades).</p>
+  <legend>{{tr "Quality profiles"}}</legend>
+  <p class="muted">{{tr "A profile is a named set of accepted resolutions. A title can choose one instead of the plain quality field; the cutoff is the quality at which upgrades stop (empty = no upgrades)."}}</p>
   <div class="table-scroll">
     <table class="cat-manage">
-      <thead><tr><th scope="col">Profile</th><th scope="col">Qualities and cutoff</th><th scope="col">Upgrades</th><th scope="col"><span class="sr-only">Actions</span></th></tr></thead>
-      <tbody>{{QUALITY_PROFILE_ROWS}}</tbody>
+      <thead><tr><th scope="col">{{tr "Profile"}}</th><th scope="col">{{tr "Qualities and cutoff"}}</th><th scope="col">{{tr "Upgrades"}}</th><th scope="col"><span class="sr-only">{{tr "Actions"}}</span></th></tr></thead>
+      <tbody>{{.QUALITY_PROFILE_ROWS}}</tbody>
     </table>
   </div>
   <form method="post" action="/ui/quality-profile" class="form-grid">
     <input type="hidden" name="op" value="add">
-    <label>New profile
-      <input type="text" name="name" required autocomplete="off" title="Name of the new quality profile, for example HD or Best">
+    <label>{{tr "New profile"}}
+      <input type="text" name="name" required autocomplete="off" title="{{tr "Name of the new quality profile, for example HD or Best"}}">
     </label>
-    <label>Qualities
-      <input type="text" name="qualities" autocomplete="off" placeholder="720p, 1080p" title="Accepted resolutions, separated by commas (360p, 480p, 576p, 720p, 1080p, 2160p)">
+    <label>{{tr "Qualities"}}
+      <input type="text" name="qualities" autocomplete="off" placeholder="720p, 1080p" title="{{tr "Accepted resolutions, separated by commas (360p, 480p, 576p, 720p, 1080p, 2160p)"}}">
     </label>
-    <label>Cutoff
-      <select name="cutoff" title="Stop upgrading when this quality is downloaded (empty = no upgrades)">
-        <option value="">No upgrade</option><option value="360p">360p</option><option value="480p">480p</option><option value="576p">576p</option><option value="720p">720p</option><option value="1080p">1080p</option><option value="2160p">2160p</option>
+    <label>{{tr "Cutoff"}}
+      <select name="cutoff" title="{{tr "Stop upgrading when this quality is downloaded (empty = no upgrades)"}}">
+        <option value="">{{tr "No upgrade"}}</option><option value="360p">360p</option><option value="480p">480p</option><option value="576p">576p</option><option value="720p">720p</option><option value="1080p">1080p</option><option value="2160p">2160p</option>
       </select>
     </label>
-    <div><button type="submit" class="primary sm" title="Create this quality profile">Add profile</button></div>
+    <div><button type="submit" class="primary sm" title="{{tr "Create this quality profile"}}">{{tr "Add profile"}}</button></div>
   </form>
 </fieldset>
 </section>
-<!--UPDATE_NOTES-->
+{{.UPDATE_NOTES}}
 </main>
-<dialog id="browse-overlay" class="picker" data-browse-endpoint="/ui/browse-dir" aria-label="Choose an existing folder on the server">
-  <div class="picker-head"><code id="browse-path"></code><button type="button" data-picker-close title="Cancel folder selection">Cancel</button></div>
+<dialog id="browse-overlay" class="picker" data-browse-endpoint="/ui/browse-dir" aria-label="{{tr "Choose an existing folder on the server"}}">
+  <div class="picker-head"><code id="browse-path"></code><button type="button" data-picker-close title="{{tr "Cancel folder selection"}}">{{tr "Cancel"}}</button></div>
   <div class="picker-list" id="browse-list"></div>
   <div class="picker-foot">
-    <button type="button" data-picker-up title="Navigate to parent directory">↑ Parent</button>
-    <button type="button" class="primary" data-picker-choose title="Select the current directory as destination folder">Choose this folder</button>
+    <button type="button" data-picker-up title="{{tr "Navigate to parent directory"}}">{{tr "↑ Parent"}}</button>
+    <button type="button" class="primary" data-picker-choose title="{{tr "Select the current directory as destination folder"}}">{{tr "Choose this folder"}}</button>
   </div>
 </dialog>
 <script id="ui-i18n"></script>
@@ -665,5 +665,5 @@ document.addEventListener('DOMContentLoaded', function () { ensureTooltips(docum
 ensureTooltips(document);
 syncSchedModes();
 </script>
-<a class="donate" href="https://www.paypal.com/cgi-bin/webscr?cmd=_donations&amp;business=azanzani@gmail.com&amp;item_name=Support+gx-torrent+Project" target="_blank" rel="noopener noreferrer" title="Support gx-torrent with a PayPal donation" aria-label="Support gx-torrent with a PayPal donation"><span class="donate-icon" aria-hidden="true">❤️</span><span class="donate-label">Donate</span></a>
+<a class="donate" href="https://www.paypal.com/cgi-bin/webscr?cmd=_donations&amp;business=azanzani@gmail.com&amp;item_name=Support+gx-torrent+Project" target="_blank" rel="noopener noreferrer" title="{{tr "Support gx-torrent with a PayPal donation"}}" aria-label="{{tr "Support gx-torrent with a PayPal donation"}}"><span class="donate-icon" aria-hidden="true">❤️</span><span class="donate-label">{{tr "Donate"}}</span></a>
 </body></html>

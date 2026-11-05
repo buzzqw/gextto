@@ -24,53 +24,53 @@ h3{margin:22px 0 0;font-size:12px;color:var(--subtle);text-transform:uppercase;l
 .m{color:var(--muted)}
 </style></head>
 <body><form method="post" action="/ui/setup">
-<h2>gx-torrent setup</h2>
-<p class="m">First run: choose how the daemon works. The settings are saved in settings.json.</p>
-<label>Language<select name="lang" title="Web interface language">
-<option value="en">English</option>
-<option value="it">Italiano</option>
-<option value="de">Deutsch</option>
-<option value="fr">Français</option>
-<option value="es">Español</option>
-<option value="pl">Polski</option>
+<h2>{{tr "gx-torrent setup"}}</h2>
+<p class="m">{{tr "First run: choose how the daemon works. The settings are saved in settings.json."}}</p>
+<label>{{tr "Language"}}<select name="lang" title="{{tr "Web interface language"}}">
+<option value="en">{{tr "English"}}</option>
+<option value="it">{{tr "Italiano"}}</option>
+<option value="de">{{tr "Deutsch"}}</option>
+<option value="fr">{{tr "Français"}}</option>
+<option value="es">{{tr "Español"}}</option>
+<option value="pl">{{tr "Polski"}}</option>
 </select></label>
-<label>Download folder<span class="field-row"><input type="text" name="download-dir" id="download-dir" value="{{DOWNLOAD_DIR}}" placeholder="/srv/media/downloads" autocomplete="off" title="Main folder for completed downloads"><button type="button" class="browse" data-target="download-dir" title="Choose an existing folder on the server">Browse…</button></span></label>
-<label>Temporary folder<span class="field-row"><input type="text" name="temp-dir" id="temp-dir" value="{{TEMP_DIR}}" placeholder="/var/tmp/gx-torrent" autocomplete="off" title="Temporary folder for incomplete downloads"><button type="button" class="browse" data-target="temp-dir" title="Choose an existing folder on the server">Browse…</button></span></label>
-<h3>Access</h3>
-<label>Username<input type="text" name="user" value="admin" autocomplete="username" title="Admin username for web interface login"></label>
-<label>Password<input type="password" name="password" autocomplete="new-password" title="Password for web interface login"></label>
-<label>Confirm password<input type="password" name="password2" autocomplete="new-password" title="Confirm password to prevent typos"></label>
-<label class="chk"><input type="checkbox" name="local-bypass" value="1" checked title="Allow access from local network without authentication"> Allow the LAN without a password</label>
-<h3>Network</h3>
-<label>Peer port<input type="number" name="peer-port" id="peer-port" placeholder="6881" min="0" max="65535" title="TCP and UDP port for incoming BitTorrent peer traffic (0 = random)"></label>
-<button type="button" class="secondary" id="ptest" title="Test if the peer port is reachable and forwarded">Test port</button>
+<label>{{tr "Download folder"}}<span class="field-row"><input type="text" name="download-dir" id="download-dir" value="{{.DOWNLOAD_DIR}}" placeholder="/srv/media/downloads" autocomplete="off" title="{{tr "Main folder for completed downloads"}}"><button type="button" class="browse" data-target="download-dir" title="{{tr "Choose an existing folder on the server"}}">{{tr "Browse…"}}</button></span></label>
+<label>{{tr "Temporary folder"}}<span class="field-row"><input type="text" name="temp-dir" id="temp-dir" value="{{.TEMP_DIR}}" placeholder="/var/tmp/gx-torrent" autocomplete="off" title="{{tr "Temporary folder for incomplete downloads"}}"><button type="button" class="browse" data-target="temp-dir" title="{{tr "Choose an existing folder on the server"}}">{{tr "Browse…"}}</button></span></label>
+<h3>{{tr "Access"}}</h3>
+<label>{{tr "Username"}}<input type="text" name="user" value="admin" autocomplete="username" title="{{tr "Admin username for web interface login"}}"></label>
+<label>{{tr "Password"}}<input type="password" name="password" autocomplete="new-password" title="{{tr "Password for web interface login"}}"></label>
+<label>{{tr "Confirm password"}}<input type="password" name="password2" autocomplete="new-password" title="{{tr "Confirm password to prevent typos"}}"></label>
+<label class="chk"><input type="checkbox" name="local-bypass" value="1" checked title="{{tr "Allow access from local network without authentication"}}"> {{tr "Allow the LAN without a password"}}</label>
+<h3>{{tr "Network"}}</h3>
+<label>{{tr "Peer port"}}<input type="number" name="peer-port" id="peer-port" placeholder="6881" min="0" max="65535" title="{{tr "TCP and UDP port for incoming BitTorrent peer traffic (0 = random)"}}"></label>
+<button type="button" class="secondary" id="ptest" title="{{tr "Test if the peer port is reachable and forwarded"}}">{{tr "Test port"}}</button>
 <p class="m" id="presult"></p>
-<h3>Bandwidth</h3>
-<label>Download limit (KiB/s, 0 = unlimited)<input type="number" name="speed-download" min="0" placeholder="0" title="Global download speed limit in KiB/s (0 = unlimited)"></label>
-<label>Upload limit (KiB/s, 0 = unlimited)<input type="number" name="speed-upload" min="0" placeholder="0" title="Global upload speed limit in KiB/s (0 = unlimited)"></label>
-<h3>Indexer</h3>
-<label>Indexer<select name="indexer-name" id="indexer-name" title="Indexer service preset">
-<option value="" data-url="">None</option>
-<option value="Prowlarr" data-url="http://127.0.0.1:9696">Prowlarr</option>
-<option value="Jackett" data-url="http://127.0.0.1:9117">Jackett</option>
+<h3>{{tr "Bandwidth"}}</h3>
+<label>{{tr "Download limit (KiB/s, 0 = unlimited)"}}<input type="number" name="speed-download" min="0" placeholder="0" title="{{tr "Global download speed limit in KiB/s (0 = unlimited)"}}"></label>
+<label>{{tr "Upload limit (KiB/s, 0 = unlimited)"}}<input type="number" name="speed-upload" min="0" placeholder="0" title="{{tr "Global upload speed limit in KiB/s (0 = unlimited)"}}"></label>
+<h3>{{tr "Indexer"}}</h3>
+<label>{{tr "Indexer"}}<select name="indexer-name" id="indexer-name" title="{{tr "Indexer service preset"}}">
+<option value="" data-url="">{{tr "None"}}</option>
+<option value="Prowlarr" data-url="http://127.0.0.1:9696">{{tr "Prowlarr"}}</option>
+<option value="Jackett" data-url="http://127.0.0.1:9117">{{tr "Jackett"}}</option>
 <option value="indexarr" data-url="http://127.0.0.1:8788">indexarr</option>
-<option value="MIRCrew" data-url="">MIRCrew</option>
-<option value="other" data-url="">Other</option>
+<option value="MIRCrew" data-url="">{{tr "MIRCrew"}}</option>
+<option value="other" data-url="">{{tr "Other"}}</option>
 </select></label>
-<label>Indexer URL<input type="text" name="indexer-url" id="indexer-url" placeholder="http://127.0.0.1:9117" autocomplete="off" title="Torznab endpoint URL"></label>
-<label>Indexer API key<input type="text" name="indexer-key" autocomplete="off" title="API key for authentication with the Torznab indexer"></label>
-<p class="m">Pick an indexer to enable the search; leave it empty to add one later from the RSS page. Prowlarr, Jackett and indexarr fill the URL with their usual local address and port. For any other Torznab service (a MirCrew indexer, a remote manager) choose Other and type its URL.</p>
-<p class="m">The download folder and the peer port apply at the next start.</p>
-<p class="m">The bandwidth limits apply immediately.</p>
-<button type="submit" title="Complete setup and start using gx-torrent">Finish setup</button>
-<!--ERROR-->
+<label>{{tr "Indexer URL"}}<input type="text" name="indexer-url" id="indexer-url" placeholder="http://127.0.0.1:9117" autocomplete="off" title="{{tr "Torznab endpoint URL"}}"></label>
+<label>{{tr "Indexer API key"}}<input type="text" name="indexer-key" autocomplete="off" title="{{tr "API key for authentication with the Torznab indexer"}}"></label>
+<p class="m">{{tr "Pick an indexer to enable the search; leave it empty to add one later from the RSS page. Prowlarr, Jackett and indexarr fill the URL with their usual local address and port. For any other Torznab service (a MirCrew indexer, a remote manager) choose Other and type its URL."}}</p>
+<p class="m">{{tr "The download folder and the peer port apply at the next start."}}</p>
+<p class="m">{{tr "The bandwidth limits apply immediately."}}</p>
+<button type="submit" title="{{tr "Complete setup and start using gx-torrent"}}">{{tr "Finish setup"}}</button>
+{{.ERROR}}
 </form>
-<dialog id="browse-overlay" class="picker" data-browse-endpoint="/ui/browse-dir" aria-label="Choose an existing folder on the server">
-  <div class="picker-head"><code id="browse-path"></code><button type="button" data-picker-close title="Cancel folder selection">Cancel</button></div>
+<dialog id="browse-overlay" class="picker" data-browse-endpoint="/ui/browse-dir" aria-label="{{tr "Choose an existing folder on the server"}}">
+  <div class="picker-head"><code id="browse-path"></code><button type="button" data-picker-close title="{{tr "Cancel folder selection"}}">{{tr "Cancel"}}</button></div>
   <div class="picker-list" id="browse-list"></div>
   <div class="picker-foot">
-    <button type="button" data-picker-up title="Navigate to parent directory">↑ Parent</button>
-    <button type="button" class="primary" data-picker-choose title="Select the current directory as destination folder">Choose this folder</button>
+    <button type="button" data-picker-up title="{{tr "Navigate to parent directory"}}">{{tr "↑ Parent"}}</button>
+    <button type="button" class="primary" data-picker-choose title="{{tr "Select the current directory as destination folder"}}">{{tr "Choose this folder"}}</button>
   </div>
 </dialog>
 <script>

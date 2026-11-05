@@ -41,17 +41,18 @@ its gate; a rejected one moves to *Not planned*.
 - **Settings as typed keys** — the constants are generated from the settings index
   (`settings_keys_gen.go`), but many reads still use `cfg.Settings["literal"]`, so a typo
   compiles and returns the default. Gate: one family of accessors migrated.
-- **gx-torrent page: translation by key** — the daemon page is still translated after it
-  renders (`cmd/gx-torrent/i18n_html.go` re-tokenises the finished HTML), so a value
-  inside a phrase stays in English. Gextto's pages already translate while they render
-  (`tr`). Gate: the same `tr` helper on the daemon templates and a guard like
-  `TestTemplatesTranslateEveryText`.
 - **`*Database` split** — 233 methods cover series, movies, torrents, providers,
   blocklist, queues, cycles and maintenance. Gate: `internal/quality` extracted first (the
   moved methods call the root package's scoring).
 - **Error wrapping and log wording** — 280 log calls build their sentence with `Sprintf`
   although the logger takes structured fields, and 490 `fmt.Errorf` calls drop the cause
   because they do not use `%w`. Mechanical, area by area, tests green.
+- **Notification texts in the interface language** — the daemon's web page is translated
+  while it renders, but the messages it sends (Telegram, Discord, Slack, Gotify, ntfy,
+  Pushover, webhook, e-mail, script) are built in English in `notify.go`, and the wanted
+  preview labels an episode `S01 pack`. Gate: a decision on whether outgoing notifications
+  follow the interface language or stay English, since a channel can be shared by several
+  people.
 - **Archive rows of a removed feed** — a feed deleted from *Sources* leaves its listings
   in the archive; a `.torrent` link that fails is quarantined (6h, then 24h, then a week)
   but still retried. A switched-off indexer is recognised by its URL, a removed feed is

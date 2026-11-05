@@ -264,10 +264,10 @@ type qualityProfileError struct{ message string }
 func (e *qualityProfileError) Error() string { return e.message }
 
 // qualityProfileRows renders the settings table of quality profiles.
-func (d *Daemon) qualityProfileRows() string {
+func (d *Daemon) qualityProfileRows(lang string) string {
 	profiles := d.qualityProfiles()
 	if len(profiles) == 0 {
-		return `<tr><td colspan="4" class="muted">No quality profiles. Add one below to choose allowed qualities and an optional cutoff.</td></tr>`
+		return `<tr><td colspan="4" class="muted">` + uiTr(lang, "No quality profiles. Add one below to choose allowed qualities and an optional cutoff.") + `</td></tr>`
 	}
 	var b strings.Builder
 	for _, profile := range profiles {
@@ -275,22 +275,22 @@ func (d *Daemon) qualityProfileRows() string {
 		b.WriteString(`<tr><td><strong>` + name + `</strong></td><td>` +
 			`<form method="post" action="/ui/quality-profile" class="cat-edit">` +
 			`<input type="hidden" name="op" value="edit"><input type="hidden" name="name" value="` + name + `">` +
-			`<input type="text" name="qualities" value="` + html.EscapeString(strings.Join(profile.Qualities, ", ")) + `" autocomplete="off" aria-label="Qualities of ` + name + `" title="Accepted resolutions, separated by commas (360p, 480p, 576p, 720p, 1080p, 2160p)">` +
-			`<select name="cutoff" aria-label="Cutoff of ` + name + `" title="Stop upgrading when this quality is downloaded (empty = no upgrades)">` + qualityCutoffOptions(profile.Cutoff) + `</select>` +
-			`<button type="submit" class="sm" title="Save this quality profile">Save</button>` +
-			`</form></td><td>` + cutoffLabel(profile) + `</td><td>` +
-			`<form method="post" action="/ui/quality-profile" data-confirm="Remove this quality profile? Titles that use it fall back to their quality field.">` +
+			`<input type="text" name="qualities" value="` + html.EscapeString(strings.Join(profile.Qualities, ", ")) + `" autocomplete="off" aria-label="` + uiTr(lang, "Qualities of %s", profile.Name) + `" title="` + uiTr(lang, "Accepted resolutions, separated by commas (360p, 480p, 576p, 720p, 1080p, 2160p)") + `">` +
+			`<select name="cutoff" aria-label="` + uiTr(lang, "Cutoff of %s", profile.Name) + `" title="` + uiTr(lang, "Stop upgrading when this quality is downloaded (empty = no upgrades)") + `">` + qualityCutoffOptions(lang, profile.Cutoff) + `</select>` +
+			`<button type="submit" class="sm" title="` + uiTr(lang, "Save this quality profile") + `">` + uiTr(lang, "Save") + `</button>` +
+			`</form></td><td>` + cutoffLabel(lang, profile) + `</td><td>` +
+			`<form method="post" action="/ui/quality-profile" data-confirm="` + uiTr(lang, "Remove this quality profile? Titles that use it fall back to their quality field.") + `">` +
 			`<input type="hidden" name="op" value="remove"><input type="hidden" name="name" value="` + name + `">` +
-			`<button type="submit" class="sm danger" title="Remove this quality profile">Remove</button>` +
+			`<button type="submit" class="sm danger" title="` + uiTr(lang, "Remove this quality profile") + `">` + uiTr(lang, "Remove") + `</button>` +
 			`</form></td></tr>`)
 	}
 	return b.String()
 }
 
-func qualityCutoffOptions(selected string) string {
+func qualityCutoffOptions(lang, selected string) string {
 	selected = strings.ToLower(strings.TrimSpace(selected))
 	var b strings.Builder
-	b.WriteString(`<option value=""` + selectedIf(selected == "") + `>No upgrade</option>`)
+	b.WriteString(`<option value=""` + selectedIf(selected == "") + `>` + uiTr(lang, "No upgrade") + `</option>`)
 	for _, quality := range qualityLabels {
 		b.WriteString(`<option value="` + quality + `"` + selectedIf(selected == quality) + `>` + quality + `</option>`)
 	}
@@ -304,18 +304,18 @@ func selectedIf(ok bool) string {
 	return ""
 }
 
-func cutoffLabel(profile qualityProfile) string {
+func cutoffLabel(lang string, profile qualityProfile) string {
 	if profile.Cutoff == "" {
-		return "no upgrades"
+		return uiTr(lang, "no upgrades")
 	}
-	return "up to " + profile.Cutoff
+	return uiTr(lang, "up to %s", profile.Cutoff)
 }
 
 // wantedProfileOptions is the select in the add/edit dialog.
-func (d *Daemon) wantedProfileOptions(selected string) string {
+func (d *Daemon) wantedProfileOptions(lang, selected string) string {
 	selected = strings.TrimSpace(selected)
 	var b strings.Builder
-	b.WriteString(`<option value="">Any quality</option>`)
+	b.WriteString(`<option value="">` + uiTr(lang, "Any quality") + `</option>`)
 	for _, profile := range d.qualityProfiles() {
 		mark := ""
 		if strings.EqualFold(profile.Name, selected) {

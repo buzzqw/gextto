@@ -133,33 +133,33 @@ func (d *Daemon) enableAutoSpeed() {
 
 // optimizationStatusHTML shows the measured peaks for information: automatic
 // speed no longer derives a cap from them, it measures the line itself.
-func (d *Daemon) optimizationStatusHTML() string {
+func (d *Daemon) optimizationStatusHTML(lang string) string {
 	d.mu.Lock()
 	down, up := d.peakDown, d.peakUp
 	d.mu.Unlock()
-	return `<span>Peak rates measured since start</span>: ↓ ` + uiRate(down) + ` · ↑ ` + uiRate(up)
+	return `<span>` + uiTr(lang, "Peak rates measured since start") + `</span>: ↓ ` + uiRate(down) + ` · ↑ ` + uiRate(up)
 }
 
 // ipFilterStatusHTML renders the filter status: rules, source, when it was
 // loaded and when the next refresh is due.
-func (d *Daemon) ipFilterStatusHTML() string {
+func (d *Daemon) ipFilterStatusHTML(lang string) string {
 	status := d.ipFilterStatusSnapshot()
 	var out string
 	if status.Rules > 0 {
-		out = `<span class="ok">` + strconv.Itoa(status.Rules) + `</span> <span>rules loaded</span>`
+		out = `<span class="ok">` + strconv.Itoa(status.Rules) + `</span> <span>` + uiTr(lang, "rules loaded") + `</span>`
 		if !status.LoadedAt.IsZero() {
-			out += ` · <span>loaded at</span> ` + status.LoadedAt.Format("02/01 15:04")
+			out += ` · <span>` + uiTr(lang, "loaded at") + `</span> ` + status.LoadedAt.Format("02/01 15:04")
 		}
 		if status.Path != "" {
 			out += ` · <span class="mono">` + html.EscapeString(status.Path) + `</span>`
 		}
 	} else {
-		out = `<span>No IP filter loaded</span>`
+		out = `<span>` + uiTr(lang, "No IP filter loaded") + `</span>`
 	}
 	if !status.Next.IsZero() {
-		out += ` · <span>next update</span> ` + status.Next.Format("02/01 15:04")
+		out += ` · <span>` + uiTr(lang, "next update") + `</span> ` + status.Next.Format("02/01 15:04")
 	} else if src := d.ipFilterSource(); src != "" && !isIPFilterURL(src) {
-		out += ` · <span>reloaded when the file changes</span>`
+		out += ` · <span>` + uiTr(lang, "reloaded when the file changes") + `</span>`
 	}
 	if status.Error != "" {
 		out += ` · <span class="err" role="status">` + html.EscapeString(status.Error) + `</span>`

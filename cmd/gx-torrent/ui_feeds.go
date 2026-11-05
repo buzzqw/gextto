@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"html"
+	"html/template"
 	"io"
 	"net/http"
 	"strconv"
@@ -18,7 +19,6 @@ import (
 
 	"github.com/buzzqw/gextto/internal/rss"
 	"github.com/buzzqw/gextto/internal/torznab"
-	"github.com/buzzqw/gextto/internal/webui/assets"
 )
 
 func (d *Daemon) handleUIFeeds(w http.ResponseWriter, r *http.Request) {
@@ -302,27 +302,11 @@ func (d *Daemon) renderRSS(w http.ResponseWriter, r *http.Request, errKey string
 // outcome of an action, e.g. how many feeds a pasted list added). Both are shown
 // at the top of the page; noticeHTML is already-built markup.
 func (d *Daemon) renderRSSPage(w http.ResponseWriter, r *http.Request, errKey, noticeHTML string) {
-	page := assets.RSSPage()
-	page = strings.Replace(page, "{{FEEDS}}", html.EscapeString(orEmptyJSON(d.opts.Settings.Get(feedsSettingKey, ""))), 1)
-	page = strings.Replace(page, "{{RULES}}", html.EscapeString(orEmptyJSON(d.opts.Settings.Get(rulesSettingKey, ""))), 1)
-	page = strings.Replace(page, "{{INDEXERS}}", html.EscapeString(orEmptyJSON(d.opts.Settings.Get(indexersSettingKey, ""))), 1)
-	page = strings.Replace(page, "{{INDEXERROWS}}", d.uiIndexerRowsHTML(), 1)
-	page = strings.Replace(page, "{{FEEDROWS}}", d.uiFeedRowsHTML(), 1)
-	page = strings.Replace(page, "{{INDEXEROPTIONS}}", uiIndexerOptionsHTML(), 1)
-	page = strings.Replace(page, "{{RULEFEEDS}}", d.uiRuleFeedsHTML(), 1)
-	page = strings.Replace(page, "{{INDEXERCOUNT}}", strconv.Itoa(len(d.indexers())), 1)
-	page = strings.Replace(page, "{{FEEDCOUNT}}", strconv.Itoa(len(d.feeds())), 1)
-	page = strings.Replace(page, "{{RULEROWS}}", d.uiRuleRowsHTML(), 1)
-	page = strings.Replace(page, "{{RULECOUNT}}", strconv.Itoa(len(d.rules())), 1)
-	page = strings.Replace(page, "{{FEEDINTERVAL}}", strconv.Itoa(int(d.feedInterval()/time.Minute)), 1)
-	page = strings.Replace(page, "{{ARCHIVEDAYS}}", strconv.Itoa(d.archiveRetentionDays()), 1)
-	page = strings.Replace(page, "{{FLARESOLVERR}}", html.EscapeString(strings.TrimSpace(d.opts.Settings.Get(flareURLKey, ""))), 1)
+	lang := d.uiLang(r)
 	nextPoll := "—"
 	if next := d.nextFeedPoll(); !next.IsZero() {
 		nextPoll = next.Format("15:04")
 	}
-	page = strings.Replace(page, "{{NEXTPOLL}}", nextPoll, 1)
-
 	names := make([]string, 0, 8)
 	for _, feed := range d.feeds() {
 		name := feed.Name
@@ -332,24 +316,27 @@ func (d *Daemon) renderRSSPage(w http.ResponseWriter, r *http.Request, errKey, n
 		names = append(names, name)
 	}
 	namesJSON, _ := json.Marshal(names)
-	page = strings.Replace(page, "{{FEEDNAMES}}", string(namesJSON), 1)
-
-	errorHTML := ""
+	errorHTML := template.HTML("")
 	if errKey != "" {
-		errorHTML = `<div class="notice err" role="alert">` + html.EscapeString(errKey) + `</div>`
+		errorHTML = template.HTML(`<div class="notice err" role="alert">` + html.EscapeString(uiTr(lang, errKey)) + `</div>`)
 	}
-	page = strings.Replace(page, "<!--NOTICE-->", noticeHTML, 1)
-	page = strings.Replace(page, "<!--ERROR-->", errorHTML, 1)
-
-	lang := d.uiLang(r)
-	if lang != "" && lang != "en" {
-		page = strings.Replace(page, `lang="en"`, `lang="`+lang+`"`, 1)
-	}
-	page = uiTranslateHTML(page, uiDictionary(lang))
-	page = uiInjectClientDictionary(page, lang)
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Header().Set("Cache-Control", "no-store")
-	_, _ = w.Write([]byte(page))
+	d.uiWritePage(w, r, "rss", map[string]any{
+		"INDEXERROWS":    template.HTML(d.uiIndexerRowsHTML(lang)),
+		"FEEDROWS":       template.HTML(d.uiFeedRowsHTML(lang)),
+		"INDEXEROPTIONS": template.HTML(uiIndexerOptionsHTML(lang)),
+		"RULEFEEDS":      template.HTML(d.uiRuleFeedsHTML(lang)),
+		"RULEROWS":       template.HTML(d.uiRuleRowsHTML(lang)),
+		"INDEXERCOUNT":   strconv.Itoa(len(d.indexers())),
+		"FEEDCOUNT":      strconv.Itoa(len(d.feeds())),
+		"RULECOUNT":      strconv.Itoa(len(d.rules())),
+		"FEEDINTERVAL":   strconv.Itoa(int(d.feedInterval() / time.Minute)),
+		"ARCHIVEDAYS":    strconv.Itoa(d.archiveRetentionDays()),
+		"FLARESOLVERR":   html.EscapeString(strings.TrimSpace(d.opts.Settings.Get(flareURLKey, ""))),
+		"NEXTPOLL":       nextPoll,
+		"FEEDNAMES":      template.JS(namesJSON),
+		"NOTICE":         template.HTML(noticeHTML),
+		"ERROR":          errorHTML,
+	})
 }
 
 func orEmptyJSON(value string) string {

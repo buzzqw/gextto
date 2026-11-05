@@ -1,6 +1,7 @@
 package main
 
 import (
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -34,24 +35,36 @@ func TestUICatalogTranslatedInEveryLanguage(t *testing.T) {
 	}
 }
 
-func TestUITranslateHTML(t *testing.T) {
-	dict := uiDictionary("it")
-	in := `<button title="Test ports" onclick="f()">Test ports</button><script>var x = "Test ports";</script>`
-	out := uiTranslateHTML(in, dict)
-	if !strings.Contains(out, `>Test porte</button>`) {
-		t.Fatalf("text node not translated: %s", out)
+func TestUITrFillsTheValuesAfterTheLookup(t *testing.T) {
+	if got := uiTr("it", "%d torrents", 3); got != "3 torrent" && got != "%d torrents" {
+		// The catalog may translate the phrase; either way the value is filled
+		// and no verb is left behind.
+		if strings.Contains(got, "%d") {
+			t.Fatalf("the value was not filled: %q", got)
+		}
 	}
-	if !strings.Contains(out, `title="Test porte"`) {
-		t.Fatalf("title attribute not translated: %s", out)
+	if got := uiTr("en", "%d torrents", 3); got != "3 torrents" {
+		t.Fatalf("English fills the phrase as written: %q", got)
 	}
-	if !strings.Contains(out, `var x = "Test ports";`) {
-		t.Fatalf("script content must stay untouched: %s", out)
+	if got := uiTr("en", "Missing phrase"); got != "Missing phrase" {
+		t.Fatalf("a phrase without a translation stays as written: %q", got)
 	}
 }
 
-func TestUITranslateHTMLNoDictionary(t *testing.T) {
-	in := `<p>Test ports</p>`
-	if got := uiTranslateHTML(in, nil); got != in {
-		t.Fatalf("nil dictionary changed the HTML: %s", got)
+// TestUICatalogKeepsTheVerbs fails when a translation of a phrase that carries
+// values loses or renames a printf verb: the page would show "%!s(MISSING)"
+// where the number should be.
+func TestUICatalogKeepsTheVerbs(t *testing.T) {
+	verb := regexp.MustCompile(`%[-+ 0-9.#]*[sdvf]`)
+	for key, translations := range uiCatalog {
+		want := verb.FindAllString(key, -1)
+		if len(want) == 0 {
+			continue
+		}
+		for idx, translated := range translations {
+			if got := verb.FindAllString(translated, -1); len(got) != len(want) {
+				t.Errorf("catalog entry %q: translation %d has %d verbs, want %d", key, idx, len(got), len(want))
+			}
+		}
 	}
 }

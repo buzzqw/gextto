@@ -37,8 +37,8 @@ Code:
 | `cmd/gx-torrent/selection.go` | file selection |
 | `cmd/gx-torrent/cache.go` | adaptive cache (available RAM, load, storage type) |
 | `cmd/gx-torrent/stream.go` | HTTP streaming (Range) with piece readahead |
-| `cmd/gx-torrent/ui.go` | daemon web pages, live fragments and actions |
-| `cmd/gx-torrent/i18n.go` | web page translations (it/en/de/fr/es/pl) |
+| `cmd/gx-torrent/ui.go`, `ui_render.go` | daemon web pages, live fragments and actions; pages rendered in the request language |
+| `cmd/gx-torrent/i18n.go`, `i18n_tr.go` | catalog of the page texts (it/en/de/fr/es/pl) and the `tr` helper that translates them while they render |
 | `cmd/gx-torrent/lsd.go` | local network discovery (BEP 14) |
 | `cmd/gx-torrent/tracker_health.go` | removal of trackers that never responded |
 | `cmd/gx-torrent/lifecycle.go` | rotated daemon log, orphan watchdog, Gextto log queue |
@@ -174,7 +174,10 @@ Web UI. It refreshes by itself every 2 seconds without reloading the page
 The browser tab shows the daemon icon (a blue download arrow),
 included in the page and also served by `GET /favicon.ico` without a token.
 The page is **translated** (Italian, English, German, French, Spanish,
-Polish): at startup Gextto passes the interface language to the daemon with
+Polish): every text and every tooltip goes through `tr` while the page is
+rendered, so a sentence that carries a value can be translated too, and the
+values themselves (torrent and category names, paths, tags) are printed as
+they are. At startup Gextto passes the interface language to the daemon with
 `-lang`, and `?lang=xx` overrides it for the single request. The language is
 also chosen from the picker at the bottom of the sidebar of the main page (the
 endonyms, six of them): the choice is written to `settings.json` like the

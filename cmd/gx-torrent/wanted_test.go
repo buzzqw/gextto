@@ -157,7 +157,7 @@ func TestWantedRowShowsCounts(t *testing.T) {
 		d.recordWantedSeen(w, 1, ep)
 		d.recordWantedTaken(w, 1, ep)
 	}
-	row := d.uiWantedRowsHTML()
+	row := d.uiWantedRowsHTML("")
 	if strings.Contains(row, `>Have</span>`) || strings.Contains(row, ">Missing</span>") {
 		t.Fatalf("the row must use the new counts, not Have/Missing: %s", row)
 	}
@@ -180,7 +180,7 @@ func TestWantedRowShowsCounts(t *testing.T) {
 	}
 	// A seen-but-not-taken episode shows as such.
 	d.recordWantedSeen(w, 1, 5)
-	row = d.uiWantedRowsHTML()
+	row = d.uiWantedRowsHTML("")
 	if !strings.Contains(row, "Found, not downloaded") {
 		t.Fatalf("a known missing episode must be flagged: %s", row)
 	}
@@ -252,7 +252,7 @@ func TestWantedMovieStatusLinksToTorrent(t *testing.T) {
 	d.snapshot = []torrentInfo{{Hash: "deadbeef", Name: "Big Movie 2024 1080p", State: "seeding", Progress: 100}}
 	d.snapMu.Unlock()
 
-	row := d.uiWantedRowsHTML()
+	row := d.uiWantedRowsHTML("")
 	if !strings.Contains(row, `/?open=deadbeef`) {
 		t.Fatalf("the movie row must link to its torrent: %s", row)
 	}

@@ -117,7 +117,7 @@ func TestUIBulkLimitsAndGlobalLimits(t *testing.T) {
 	if cfg, _, _ := d.config(); cfg.SpeedLimitDownload != 2048 || cfg.SpeedLimitUpload != 512 {
 		t.Fatalf("global limits = %d/%d, want 2048/512", cfg.SpeedLimitDownload, cfg.SpeedLimitUpload)
 	}
-	page, err := d.uiPageData(0)
+	page, err := d.uiPageData(0, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -135,17 +135,17 @@ func TestUIPageCountsEveryStatusFilter(t *testing.T) {
 	uiTestTorrent(t, d, "b.bin")
 	// The data is on disk: wait for both to be verified complete first.
 	waitFor(t, "both complete", func() bool {
-		page, _ := d.uiPageData(0)
+		page, _ := d.uiPageData(0, "")
 		return page.CountCompleted == 2
 	})
 	if err := d.pause(a); err != nil {
 		t.Fatal(err)
 	}
 	waitFor(t, "paused in the snapshot", func() bool {
-		page, _ := d.uiPageData(0)
+		page, _ := d.uiPageData(0, "")
 		return page.CountPaused == 1
 	})
-	page, err := d.uiPageData(0)
+	page, err := d.uiPageData(0, "")
 	if err != nil {
 		t.Fatal(err)
 	}

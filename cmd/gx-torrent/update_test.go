@@ -148,7 +148,7 @@ func TestUpdateCheckInstallAndRestart(t *testing.T) {
 	if !st.Available || len(st.Changes) != 1 || st.Changes[0].Subject != "feat(dlna): a daemon change" || st.Latest != updGx {
 		t.Fatalf("status = %+v", st)
 	}
-	section := d.updateSectionHTML()
+	section := d.updateSectionHTML("")
 	for _, want := range []string{`data-update="apply"`, ">Update</button>", "feat(dlna): a daemon change", "Check again"} {
 		if !strings.Contains(section, want) {
 			t.Fatalf("section misses %q:\n%s", want, section)
@@ -184,11 +184,11 @@ func TestUpdateCheckInstallAndRestart(t *testing.T) {
 		t.Fatalf("notes = %+v", n)
 	}
 	// The old process does not show the popup; the new one does.
-	if d.updateNotesDialogHTML() != "" {
+	if d.updateNotesDialogHTML("") != "" {
 		t.Fatal("the popup must not show before the restart")
 	}
 	constants.Commit = updGx
-	dlg := d.updateNotesDialogHTML()
+	dlg := d.updateNotesDialogHTML("")
 	if !strings.Contains(dlg, "gx-torrent updated") || !strings.Contains(dlg, "feat(dlna): a daemon change") || !strings.Contains(dlg, "<code>1111111</code>") {
 		t.Fatalf("popup = %s", dlg)
 	}
@@ -207,7 +207,7 @@ func TestUpdateCheckInstallAndRestart(t *testing.T) {
 	req := httptest.NewRequest("POST", "/ui/update-notes", nil)
 	rec := httptest.NewRecorder()
 	d.handleUIUpdateNotes(rec, req)
-	if n, ok := readUpdateNotes(d.opts.DataDir); rec.Code != http.StatusNoContent || !ok || !n.Seen || d.updateNotesDialogHTML() != "" {
+	if n, ok := readUpdateNotes(d.opts.DataDir); rec.Code != http.StatusNoContent || !ok || !n.Seen || d.updateNotesDialogHTML("") != "" {
 		t.Fatalf("dismiss: %d %+v", rec.Code, n)
 	}
 }
@@ -266,7 +266,7 @@ func TestUpdateBootGuardRollsBack(t *testing.T) {
 		t.Fatalf("notes = %+v", n)
 	}
 	d := &Daemon{opts: Options{Mode: ModeStandalone, DataDir: dir}}
-	if dlg := d.updateNotesDialogHTML(); !strings.Contains(dlg, "Update not installed") {
+	if dlg := d.updateNotesDialogHTML(""); !strings.Contains(dlg, "Update not installed") {
 		t.Fatalf("rollback popup = %s", dlg)
 	}
 	// A normal start (nothing pending) is left alone.
@@ -290,7 +290,7 @@ func TestUpdateOffWhenManagedOrLocal(t *testing.T) {
 	if err := d.checkUpdate(context.Background()); err == nil {
 		t.Fatal("a local build checked for updates")
 	}
-	if html := d.updateSectionHTML(); strings.Contains(html, "data-update") {
+	if html := d.updateSectionHTML(""); strings.Contains(html, "data-update") {
 		t.Fatalf("a local build shows the update button: %s", html)
 	}
 }

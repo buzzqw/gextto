@@ -212,26 +212,26 @@ func (d *Daemon) uiRssAddFeedsBulk(w http.ResponseWriter, r *http.Request, list 
 		http.Redirect(w, r, "/ui/rss#feeds", http.StatusSeeOther)
 		return
 	}
-	d.renderRSSPage(w, r, "", feedBulkNoticeHTML(added, skipped, unusable))
+	d.renderRSSPage(w, r, "", feedBulkNoticeHTML(d.uiLang(r), added, skipped, unusable))
 }
 
 // feedBulkNoticeHTML is the outcome of a pasted list: how many feeds were added,
 // how many lines were skipped, and the lines that are not usable addresses. The
 // words are catalog keys, so the page translates them like the rest.
-func feedBulkNoticeHTML(added, skipped int, unusable []string) string {
+func feedBulkNoticeHTML(lang string, added, skipped int, unusable []string) string {
 	var b strings.Builder
 	b.WriteString(`<div class="notice" role="status">`)
 	if added > 0 {
-		b.WriteString(`<b>` + strconv.Itoa(added) + `</b> <span>feeds added</span>`)
+		b.WriteString(`<b>` + strconv.Itoa(added) + `</b> <span>` + uiTr(lang, "feeds added") + `</span>`)
 	} else {
-		b.WriteString(`<span>No feed added</span>`)
+		b.WriteString(`<span>` + uiTr(lang, "No feed added") + `</span>`)
 	}
 	if skipped > 0 {
-		b.WriteString(` · <b>` + strconv.Itoa(skipped) + `</b> <span>skipped</span>`)
+		b.WriteString(` · <b>` + strconv.Itoa(skipped) + `</b> <span>` + uiTr(lang, "skipped") + `</span>`)
 	}
 	b.WriteString(`</div>`)
 	if len(unusable) > 0 {
-		b.WriteString(`<div class="notice err" role="alert"><span>These lines are not feed addresses:</span> <code>` + html.EscapeString(strings.Join(unusable, " · ")) + `</code></div>`)
+		b.WriteString(`<div class="notice err" role="alert"><span>` + uiTr(lang, "These lines are not feed addresses:") + `</span> <code>` + html.EscapeString(strings.Join(unusable, " · ")) + `</code></div>`)
 	}
 	return b.String()
 }

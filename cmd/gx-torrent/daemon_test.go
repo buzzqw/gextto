@@ -1552,7 +1552,7 @@ func TestDaemonUIPiecesTab(t *testing.T) {
 	}
 	waitFor(t, "seeding", func() bool { return stateOf(d, hash) == "seeding" })
 
-	detail, err := d.uiDetailData(hash, "pieces")
+	detail, err := d.uiDetailData(hash, "pieces", "")
 	if err != nil {
 		t.Fatal(err)
 	}

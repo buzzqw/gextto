@@ -171,20 +171,20 @@ func (d *Daemon) handleUINotifyTest(w http.ResponseWriter, r *http.Request) {
 	if !d.uiAuthorized(w, r) || !d.uiSameOrigin(w, r) {
 		return
 	}
-	lang := uiDictionary(d.uiLang(r))
+	lang := d.uiLang(r)
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
 	cfg := d.notifyConfig()
 	if !cfg.Enabled() {
-		_, _ = w.Write([]byte(uiTranslateText("No notification channel is configured: save one first.", lang)))
+		_, _ = w.Write([]byte(uiTr(lang, "No notification channel is configured: save one first.")))
 		return
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 60*time.Second)
 	defer cancel()
 	if err := notify.Send(ctx, cfg, notify.Event{Name: "test", Title: notifyTitle("test", nil), Text: notifyText("test", nil)}); err != nil {
 		w.WriteHeader(http.StatusBadGateway)
-		_, _ = w.Write([]byte(uiTranslateText("Not delivered:", lang) + " " + err.Error()))
+		_, _ = w.Write([]byte(uiTr(lang, "Not delivered: %s", err.Error())))
 		return
 	}
-	_, _ = w.Write([]byte(uiTranslateText("Test notification sent.", lang)))
+	_, _ = w.Write([]byte(uiTr(lang, "Test notification sent.")))
 }

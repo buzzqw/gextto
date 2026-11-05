@@ -572,10 +572,11 @@ func mibToBytes(raw string) int64 {
 // uiRuleFeedsHTML is the "apply this rule to these feeds" picker: one checkbox
 // per configured feed (qBittorrent's RSS Downloader), nothing checked meaning
 // every feed. The feed names are data, not strings to translate.
-func (d *Daemon) uiRuleFeedsHTML() string {
+func (d *Daemon) uiRuleFeedsHTML(lang string) string {
+	tr := func(phrase string) string { return uiTr(lang, phrase) }
 	feeds := d.feeds()
 	if len(feeds) == 0 {
-		return `<span class="muted">No feeds configured yet: add one in the Feeds tab and it can be picked here.</span>`
+		return `<span class="muted">` + tr("No feeds configured yet: add one in the Feeds tab and it can be picked here.") + `</span>`
 	}
 	names := make([]string, 0, len(feeds))
 	for _, feed := range feeds {
@@ -612,23 +613,24 @@ func formList(r *http.Request, key string) []string {
 
 // uiRuleRowsHTML renders the ordered rules as table rows, each with up/down and
 // remove buttons (the order is the precedence).
-func (d *Daemon) uiRuleRowsHTML() string {
+func (d *Daemon) uiRuleRowsHTML(lang string) string {
+	tr := func(phrase string) string { return uiTr(lang, phrase) }
 	list := d.rules()
 	if len(list) == 0 {
-		return `<li class="empty"><p>No rules yet: every feed only grows the archive, or takes what its own Include/Exclude allow.</p></li>`
+		return `<li class="empty"><p>` + tr("No rules yet: every feed only grows the archive, or takes what its own Include/Exclude allow.") + `</p></li>`
 	}
 	var b strings.Builder
 	for index, rule := range list {
 		idx := strconv.Itoa(index)
 		enabled := rss.RuleEnabled(rule)
-		kind := `<span class="badge b-seeding">Add</span>`
+		kind := `<span class="badge b-seeding">` + tr("Add") + `</span>`
 		if rule.Fail {
-			kind = `<span class="badge b-error">Skip</span>`
+			kind = `<span class="badge b-error">` + tr("Skip") + `</span>`
 		}
 		if !enabled {
-			kind += ` <span class="badge b-paused">Disabled</span>`
+			kind += ` <span class="badge b-paused">` + tr("Disabled") + `</span>`
 		}
-		scope := `<span>All feeds</span>`
+		scope := `<span>` + tr("All feeds") + `</span>`
 		if len(rule.Feeds) > 0 {
 			scope = html.EscapeString(strings.Join(rule.Feeds, ", "))
 		}
@@ -639,7 +641,7 @@ func (d *Daemon) uiRuleRowsHTML() string {
 		b.WriteString(`<li class="` + cls + `"><div class="item-order" aria-hidden="true">` + strconv.Itoa(index+1) + `</div><div class="item-main">`)
 		b.WriteString(`<div class="item-title"><span class="name">` + html.EscapeString(orDefault(rule.Name, "—")) + `</span>` + kind + `</div>`)
 		b.WriteString(`<div class="item-sub"><svg class="i"><use href="/assets/icons.svg#i-rss"/></svg>` + scope + `</div>`)
-		if chips := uiRuleChipsHTML(rule); chips != "" {
+		if chips := uiRuleChipsHTML(rule, lang); chips != "" {
 			b.WriteString(`<div class="chips">` + chips + `</div>`)
 		}
 		// Cooldown visibility: with ignore_days the rule stops matching for a
@@ -648,21 +650,21 @@ func (d *Daemon) uiRuleRowsHTML() string {
 		if rule.IgnoreDays > 0 {
 			if last := d.ruleLastMatch(rule.Name); !last.IsZero() {
 				if next := last.Add(time.Duration(rule.IgnoreDays) * 24 * time.Hour); time.Now().Before(next) {
-					b.WriteString(`<div class="item-sub">` + uiChip("", "Next match", next.Format("2006-01-02 15:04")) + `</div>`)
+					b.WriteString(`<div class="item-sub">` + uiChip("", tr("Next match"), next.Format("2006-01-02 15:04")) + `</div>`)
 				}
 			}
 		}
 		b.WriteString(`</div><div class="item-actions">`)
 		ruleJSON, _ := json.Marshal(rule)
-		toggle := "Disable"
+		toggle := tr("Disable")
 		if !enabled {
-			toggle = "Enable"
+			toggle = tr("Enable")
 		}
-		b.WriteString(`<form method="post" action="/ui/rss-rule"><input type="hidden" name="op" value="up"><input type="hidden" name="index" value="` + idx + `"><button type="submit" class="ghost icon sm" title="Move up: rules are evaluated in order" aria-label="Move up"` + disabledIf(index == 0) + `><svg class="i"><use href="/assets/icons.svg#i-up"/></svg></button></form>`)
-		b.WriteString(`<form method="post" action="/ui/rss-rule"><input type="hidden" name="op" value="down"><input type="hidden" name="index" value="` + idx + `"><button type="submit" class="ghost icon sm" title="Move down: rules are evaluated in order" aria-label="Move down"` + disabledIf(index == len(list)-1) + `><svg class="i"><use href="/assets/icons.svg#i-down"/></svg></button></form>`)
-		b.WriteString(`<button type="button" class="sm" data-rule-edit data-index="` + idx + `" data-rule="` + html.EscapeString(string(ruleJSON)) + `" title="Open this rule to change it">Edit</button>`)
-		b.WriteString(`<form method="post" action="/ui/rss-rule"><input type="hidden" name="op" value="toggle"><input type="hidden" name="index" value="` + idx + `"><button type="submit" class="sm ghost" title="Turn this rule on or off without deleting it">` + toggle + `</button></form>`)
-		b.WriteString(`<form method="post" action="/ui/rss-rule" data-confirm="Delete this rule?"><input type="hidden" name="op" value="remove"><input type="hidden" name="index" value="` + idx + `"><button type="submit" class="ghost icon sm danger" title="Delete this rule" aria-label="Delete this rule"><svg class="i"><use href="/assets/icons.svg#i-trash"/></svg></button></form>`)
+		b.WriteString(`<form method="post" action="/ui/rss-rule"><input type="hidden" name="op" value="up"><input type="hidden" name="index" value="` + idx + `"><button type="submit" class="ghost icon sm" title="` + tr("Move up: rules are evaluated in order") + `" aria-label="` + tr("Move up") + `"` + disabledIf(index == 0) + `><svg class="i"><use href="/assets/icons.svg#i-up"/></svg></button></form>`)
+		b.WriteString(`<form method="post" action="/ui/rss-rule"><input type="hidden" name="op" value="down"><input type="hidden" name="index" value="` + idx + `"><button type="submit" class="ghost icon sm" title="` + tr("Move down: rules are evaluated in order") + `" aria-label="` + tr("Move down") + `"` + disabledIf(index == len(list)-1) + `><svg class="i"><use href="/assets/icons.svg#i-down"/></svg></button></form>`)
+		b.WriteString(`<button type="button" class="sm" data-rule-edit data-index="` + idx + `" data-rule="` + html.EscapeString(string(ruleJSON)) + `" title="` + tr("Open this rule to change it") + `">` + tr("Edit") + `</button>`)
+		b.WriteString(`<form method="post" action="/ui/rss-rule"><input type="hidden" name="op" value="toggle"><input type="hidden" name="index" value="` + idx + `"><button type="submit" class="sm ghost" title="` + tr("Turn this rule on or off without deleting it") + `">` + toggle + `</button></form>`)
+		b.WriteString(`<form method="post" action="/ui/rss-rule" data-confirm="` + tr("Delete this rule?") + `"><input type="hidden" name="op" value="remove"><input type="hidden" name="index" value="` + idx + `"><button type="submit" class="ghost icon sm danger" title="` + tr("Delete this rule") + `" aria-label="` + tr("Delete this rule") + `"><svg class="i"><use href="/assets/icons.svg#i-trash"/></svg></button></form>`)
 		b.WriteString(`</div></li>`)
 	}
 	return b.String()
@@ -684,82 +686,83 @@ func uiChip(class, label, value string) string {
 
 // uiRuleChipsHTML shows a rule as readable chips: what it matches, then what
 // it does with what it matched.
-func uiRuleChipsHTML(rule rss.Rule) string {
+func uiRuleChipsHTML(rule rss.Rule, lang string) string {
+	tr := func(phrase string) string { return uiTr(lang, phrase) }
 	m, a := rule.Match, rule.Action
 	var b strings.Builder
 	add := func(class, label, value string) { b.WriteString(uiChip(class, label, value)) }
 	flag := func(label string) { b.WriteString(`<span class="chip"><span>` + label + `</span></span>`) }
 	if len(m.Require) > 0 {
-		add("in", "All of", strings.Join(m.Require, ", "))
+		add("in", tr("All of"), strings.Join(m.Require, ", "))
 	}
 	if len(m.Include) > 0 {
-		add("in", "One of", strings.Join(m.Include, ", "))
+		add("in", tr("One of"), strings.Join(m.Include, ", "))
 	}
 	if len(m.Exclude) > 0 {
-		add("out", "None of", strings.Join(m.Exclude, ", "))
+		add("out", tr("None of"), strings.Join(m.Exclude, ", "))
 	}
 	if m.Regex != "" {
-		add("in", "Regex", m.Regex)
+		add("in", tr("Regex"), m.Regex)
 	}
 	if m.NotRegex != "" {
-		add("out", "Not regex", m.NotRegex)
+		add("out", tr("Not regex"), m.NotRegex)
 	}
 	if m.EpisodeFilter != "" {
-		add("", "Episodes", m.EpisodeFilter)
+		add("", tr("Episodes"), m.EpisodeFilter)
 	}
 	if m.MinSize > 0 {
-		add("", "Min size", uiBytes(m.MinSize))
+		add("", tr("Min size"), uiBytes(m.MinSize))
 	}
 	if m.MaxSize > 0 {
-		add("", "Max size", uiBytes(m.MaxSize))
+		add("", tr("Max size"), uiBytes(m.MaxSize))
 	}
 	if m.MinSeeders != 0 {
-		add("", "Min seeders", strconv.Itoa(m.MinSeeders))
+		add("", tr("Min seeders"), strconv.Itoa(m.MinSeeders))
 	}
 	if m.MaxSeeders != 0 {
-		add("", "Max seeders", strconv.Itoa(m.MaxSeeders))
+		add("", tr("Max seeders"), strconv.Itoa(m.MaxSeeders))
 	}
 	if m.MinPeers != 0 {
-		add("", "Min peers", strconv.Itoa(m.MinPeers))
+		add("", tr("Min peers"), strconv.Itoa(m.MinPeers))
 	}
 	if m.MaxAgeDays != 0 {
-		add("", "Max age (days)", strconv.Itoa(m.MaxAgeDays))
+		add("", tr("Max age (days)"), strconv.Itoa(m.MaxAgeDays))
 	}
 	if rule.IgnoreDays > 0 {
-		add("", "Cooldown (days)", strconv.Itoa(rule.IgnoreDays))
+		add("", tr("Cooldown (days)"), strconv.Itoa(rule.IgnoreDays))
 	}
 	if m.RequireEpisode {
-		flag("Episodes only")
+		flag(tr("Episodes only"))
 	}
 	if m.SmartEpisode {
-		flag("Each episode once")
+		flag(tr("Each episode once"))
 	}
 	if m.OnlyFreeleech {
-		flag("Freeleech only")
+		flag(tr("Freeleech only"))
 	}
 	if a.SavePath != "" {
-		add("act", "Save to", a.SavePath)
+		add("act", tr("Save to"), a.SavePath)
 	}
 	if a.Category != "" {
-		add("act", "Category", a.Category)
+		add("act", tr("Category"), a.Category)
 	}
 	if len(a.Tags) > 0 {
-		add("act", "Tags", strings.Join(a.Tags, ", "))
+		add("act", tr("Tags"), strings.Join(a.Tags, ", "))
 	}
 	if a.Paused {
-		flag("Paused")
+		flag(tr("Paused"))
 	}
 	if a.Sequential {
-		flag("sequential")
+		flag(tr("sequential"))
 	}
 	if a.FirstLast {
-		flag("first/last")
+		flag(tr("first/last"))
 	}
 	if a.Top {
-		flag("top")
+		flag(tr("top"))
 	}
 	if a.Once {
-		flag("Download once")
+		flag(tr("Download once"))
 	}
 	return b.String()
 }
@@ -767,41 +770,43 @@ func uiRuleChipsHTML(rule rss.Rule) string {
 // uiIndexerOptionsHTML renders the "type" options of the add-indexer form: the
 // known presets carry their usual URL in data-url (the page fills the URL field
 // with it), plus a generic custom choice.
-func uiIndexerOptionsHTML() string {
+func uiIndexerOptionsHTML(lang string) string {
+	tr := func(phrase string) string { return uiTr(lang, phrase) }
 	var b strings.Builder
 	for _, preset := range uiIndexerPresets {
 		b.WriteString(`<option value="` + html.EscapeString(preset.Name) + `" data-url="` + html.EscapeString(preset.URL) + `">` + html.EscapeString(preset.Name) + `</option>`)
 	}
-	b.WriteString(`<option value="" data-url="">Other</option>`)
+	b.WriteString(`<option value="" data-url="">` + tr("Other") + `</option>`)
 	return b.String()
 }
 
 // uiIndexerRowsHTML renders the configured indexers as table rows, each with a
 // remove button; the row index is the removal key.
-func (d *Daemon) uiIndexerRowsHTML() string {
+func (d *Daemon) uiIndexerRowsHTML(lang string) string {
+	tr := func(phrase string) string { return uiTr(lang, phrase) }
 	list := d.indexers()
 	if len(list) == 0 {
-		return `<li class="empty"><p>No indexers: add Prowlarr or Jackett to search releases and to let wanted titles find what the feeds miss.</p></li>`
+		return `<li class="empty"><p>` + tr("No indexers: add Prowlarr or Jackett to search releases and to let wanted titles find what the feeds miss.") + `</p></li>`
 	}
 	var b strings.Builder
 	for index, indexer := range list {
 		idx := strconv.Itoa(index)
 		name := html.EscapeString(orDefault(indexer.Name, "—"))
 		if page := indexerPageURL(indexer.URL); page != "" {
-			name = `<a href="` + html.EscapeString(page) + `" target="_blank" rel="noopener noreferrer" title="Open the indexer's web page in a new tab">` + name + ` <span aria-hidden="true">↗</span></a>`
+			name = `<a href="` + html.EscapeString(page) + `" target="_blank" rel="noopener noreferrer" title="` + tr("Open the indexer's web page in a new tab") + `">` + name + ` <span aria-hidden="true">↗</span></a>`
 		}
-		key := `<span class="badge b-paused">No API key</span>`
+		key := `<span class="badge b-paused">` + tr("No API key") + `</span>`
 		if strings.TrimSpace(indexer.APIKey) != "" {
-			key = `<span class="badge b-seeding">API key set</span>`
+			key = `<span class="badge b-seeding">` + tr("API key set") + `</span>`
 		}
 		b.WriteString(`<li class="item"><div class="item-main">`)
 		b.WriteString(`<div class="item-title"><span class="name">` + name + `</span>` + key + `</div>`)
 		b.WriteString(`<div class="item-sub mono">` + html.EscapeString(indexer.URL) + `</div>`)
 		b.WriteString(`<div class="item-status" data-idx-status="` + idx + `" aria-live="polite"></div>`)
 		b.WriteString(`</div><div class="item-actions">`)
-		b.WriteString(`<button type="button" class="sm" data-idx-test data-index="` + idx + `" title="Check that the indexer answers (Torznab caps)">Test</button>`)
-		b.WriteString(`<button type="button" class="sm" data-idx-edit data-index="` + idx + `" data-name="` + html.EscapeString(indexer.Name) + `" data-url="` + html.EscapeString(indexer.URL) + `" title="Change this indexer">Edit</button>`)
-		b.WriteString(`<form method="post" action="/ui/rss-indexer" data-confirm="Delete this indexer?"><input type="hidden" name="op" value="remove"><input type="hidden" name="index" value="` + idx + `"><button type="submit" class="ghost icon sm danger" title="Delete this indexer" aria-label="Delete this indexer"><svg class="i"><use href="/assets/icons.svg#i-trash"/></svg></button></form>`)
+		b.WriteString(`<button type="button" class="sm" data-idx-test data-index="` + idx + `" title="` + tr("Check that the indexer answers (Torznab caps)") + `">` + tr("Test") + `</button>`)
+		b.WriteString(`<button type="button" class="sm" data-idx-edit data-index="` + idx + `" data-name="` + html.EscapeString(indexer.Name) + `" data-url="` + html.EscapeString(indexer.URL) + `" title="` + tr("Change this indexer") + `">` + tr("Edit") + `</button>`)
+		b.WriteString(`<form method="post" action="/ui/rss-indexer" data-confirm="` + tr("Delete this indexer?") + `"><input type="hidden" name="op" value="remove"><input type="hidden" name="index" value="` + idx + `"><button type="submit" class="ghost icon sm danger" title="` + tr("Delete this indexer") + `" aria-label="` + tr("Delete this indexer") + `"><svg class="i"><use href="/assets/icons.svg#i-trash"/></svg></button></form>`)
 		b.WriteString(`</div></li>`)
 	}
 	return b.String()
@@ -810,10 +815,11 @@ func (d *Daemon) uiIndexerRowsHTML() string {
 // uiFeedRowsHTML renders the configured feeds as table rows with their last
 // outcome and the reload, edit, enable/disable and remove buttons; the row
 // index is the key of the edit/remove operations.
-func (d *Daemon) uiFeedRowsHTML() string {
+func (d *Daemon) uiFeedRowsHTML(lang string) string {
+	tr := func(phrase string) string { return uiTr(lang, phrase) }
 	list := d.feeds()
 	if len(list) == 0 {
-		return `<li class="empty"><p>No feeds yet. Add an RSS URL, or the page of an ext.to or TorrentGalaxy listing: its items fill the archive and the rules decide what to download.</p></li>`
+		return `<li class="empty"><p>` + tr("No feeds yet. Add an RSS URL, or the page of an ext.to or TorrentGalaxy listing: its items fill the archive and the rules decide what to download.") + `</p></li>`
 	}
 	statuses := map[string]feedStatus{}
 	for _, status := range d.feedStatusesSnapshot() {
@@ -859,7 +865,7 @@ func (d *Daemon) uiFeedRowsHTML() string {
 		index := strconv.Itoa(row.index)
 		folder := strings.TrimSpace(feed.Folder)
 		if folderCounts[folder] > 0 {
-			b.WriteString(uiFeedFolderHeaderHTML(folder, folderCounts[folder], len(order) > 1))
+			b.WriteString(uiFeedFolderHeaderHTML(lang, folder, folderCounts[folder], len(order) > 1))
 			folderCounts[folder] = 0 // once per group
 		}
 		source := strings.TrimSpace(feed.URL)
@@ -872,37 +878,37 @@ func (d *Daemon) uiFeedRowsHTML() string {
 		}
 		badges := ""
 		if feed.Disabled {
-			badges += `<span class="badge b-paused">disabled</span>`
+			badges += `<span class="badge b-paused">` + tr("disabled") + `</span>`
 		}
 		if feed.Paused {
-			badges += `<span class="badge plain" title="Torrents from this feed are added paused">adds paused</span>`
+			badges += `<span class="badge plain" title="` + tr("Torrents from this feed are added paused") + `">` + tr("adds paused") + `</span>`
 		}
 		if feedTakesEverything(rules, feed, key) {
-			badges += `<span class="badge b-stalled" title="No rule and no Include/Exclude: this feed only grows the archive, nothing is downloaded">archive only</span>`
+			badges += `<span class="badge b-stalled" title="` + tr("No rule and no Include/Exclude: this feed only grows the archive, nothing is downloaded") + `">` + tr("archive only") + `</span>`
 		}
 		cls := "item"
 		if feed.Disabled {
 			cls += " off"
 		}
 		b.WriteString(`<li class="` + cls + `" data-feed-row="` + html.EscapeString(key) + `" data-folder="` + html.EscapeString(folder) + `"><div class="item-main">`)
-		b.WriteString(`<div class="item-title"><span class="name">` + html.EscapeString(orDefault(feed.Name, "—")) + `</span>` + badges + `<span class="item-status" data-feed-status>` + uiFeedStatusHTML(statuses[key], totals[key]) + `</span></div>`)
+		b.WriteString(`<div class="item-title"><span class="name">` + html.EscapeString(orDefault(feed.Name, "—")) + `</span>` + badges + `<span class="item-status" data-feed-status>` + uiFeedStatusHTML(lang, statuses[key], totals[key]) + `</span></div>`)
 		b.WriteString(`<div class="item-sub mono" title="` + html.EscapeString(source) + `">` + html.EscapeString(source) + `</div>`)
 		covering := feedCoveringRules(rules, key)
-		b.WriteString(uiFeedGovernanceHTML(rules, feed, key, covering, wantedOn))
-		if chips := uiFeedChipsHTML(feed); chips != "" {
+		b.WriteString(uiFeedGovernanceHTML(lang, rules, feed, key, covering, wantedOn))
+		if chips := uiFeedChipsHTML(lang, feed); chips != "" {
 			b.WriteString(`<div class="chips">` + chips + `</div>`)
 		}
 		feedJSON, _ := json.Marshal(feed)
-		toggle := "Disable"
+		toggle := tr("Disable")
 		if feed.Disabled {
-			toggle = "Enable"
+			toggle = tr("Enable")
 		}
 		b.WriteString(`</div><div class="item-actions">`)
-		b.WriteString(`<button type="button" class="sm" data-feed-reload="` + html.EscapeString(key) + `" title="Fetch this feed now and apply the rules" aria-label="Reload this feed now"><svg class="i"><use href="/assets/icons.svg#i-reload"/></svg>Reload</button>`)
-		b.WriteString(`<button type="button" class="sm" data-feed-items="` + html.EscapeString(key) + `" title="Show the items of this feed and the rule that takes each one">Items</button>`)
-		b.WriteString(`<button type="button" class="sm" data-feed-edit data-index="` + index + `" data-feed="` + html.EscapeString(string(feedJSON)) + `" data-covered="` + html.EscapeString(strings.Join(covering, ", ")) + `" title="Open this feed to change it">Edit</button>`)
-		b.WriteString(`<form method="post" action="/ui/rss-feed"><input type="hidden" name="op" value="toggle"><input type="hidden" name="index" value="` + index + `"><button type="submit" class="sm ghost" title="Stop or resume the automatic checks of this feed without deleting it">` + toggle + `</button></form>`)
-		b.WriteString(`<form method="post" action="/ui/rss-feed" data-confirm="Delete this feed?"><input type="hidden" name="op" value="remove"><input type="hidden" name="index" value="` + index + `"><button type="submit" class="ghost icon sm danger" title="Delete this feed" aria-label="Delete this feed"><svg class="i"><use href="/assets/icons.svg#i-trash"/></svg></button></form>`)
+		b.WriteString(`<button type="button" class="sm" data-feed-reload="` + html.EscapeString(key) + `" title="` + tr("Fetch this feed now and apply the rules") + `" aria-label="` + tr("Reload this feed now") + `"><svg class="i"><use href="/assets/icons.svg#i-reload"/></svg>` + tr("Reload") + `</button>`)
+		b.WriteString(`<button type="button" class="sm" data-feed-items="` + html.EscapeString(key) + `" title="` + tr("Show the items of this feed and the rule that takes each one") + `">` + tr("Items") + `</button>`)
+		b.WriteString(`<button type="button" class="sm" data-feed-edit data-index="` + index + `" data-feed="` + html.EscapeString(string(feedJSON)) + `" data-covered="` + html.EscapeString(strings.Join(covering, ", ")) + `" title="` + tr("Open this feed to change it") + `">` + tr("Edit") + `</button>`)
+		b.WriteString(`<form method="post" action="/ui/rss-feed"><input type="hidden" name="op" value="toggle"><input type="hidden" name="index" value="` + index + `"><button type="submit" class="sm ghost" title="` + tr("Stop or resume the automatic checks of this feed without deleting it") + `">` + toggle + `</button></form>`)
+		b.WriteString(`<form method="post" action="/ui/rss-feed" data-confirm="` + tr("Delete this feed?") + `"><input type="hidden" name="op" value="remove"><input type="hidden" name="index" value="` + index + `"><button type="submit" class="ghost icon sm danger" title="` + tr("Delete this feed") + `" aria-label="` + tr("Delete this feed") + `"><svg class="i"><use href="/assets/icons.svg#i-trash"/></svg></button></form>`)
 		b.WriteString(`</div></li>`)
 	}
 	return b.String()
@@ -912,7 +918,8 @@ func (d *Daemon) uiFeedRowsHTML() string {
 // away with the header (the state is remembered per folder in the browser). The
 // count says how many feeds the group holds. A single group (all the feeds
 // unfiled, say) gets no header: there would be nothing to fold.
-func uiFeedFolderHeaderHTML(folder string, feeds int, grouped bool) string {
+func uiFeedFolderHeaderHTML(lang, folder string, feeds int, grouped bool) string {
+	tr := func(phrase string) string { return uiTr(lang, phrase) }
 	if !grouped {
 		return ""
 	}
@@ -920,7 +927,7 @@ func uiFeedFolderHeaderHTML(folder string, feeds int, grouped bool) string {
 	if name == "" {
 		name = "No folder"
 	}
-	return `<li class="feed-folder" data-folder-head="` + html.EscapeString(folder) + `"><button type="button" class="folder-toggle" data-folder-toggle="` + html.EscapeString(folder) + `" aria-expanded="true" title="Show or hide this folder"><svg class="i"><use href="/assets/icons.svg#i-down"/></svg><span class="fname">` + html.EscapeString(name) + `</span><span class="cnt">` + strconv.Itoa(feeds) + `</span></button></li>`
+	return `<li class="feed-folder" data-folder-head="` + html.EscapeString(folder) + `"><button type="button" class="folder-toggle" data-folder-toggle="` + html.EscapeString(folder) + `" aria-expanded="true" title="` + tr("Show or hide this folder") + `"><svg class="i"><use href="/assets/icons.svg#i-down"/></svg><span class="fname">` + html.EscapeString(name) + `</span><span class="cnt">` + strconv.Itoa(feeds) + `</span></button></li>`
 }
 
 // uiFeedChipsHTML shows the options of a feed that change what it adds.
@@ -940,12 +947,13 @@ func feedCoveringRules(rules []rss.Rule, feedName string) []string {
 // downloads: the rules that watch it, its own filter, everything, or nothing
 // (archive only), and whether the wanted titles also take from it. Watching
 // rules are buttons: one click opens the rule editor for that rule.
-func uiFeedGovernanceHTML(rules []rss.Rule, feed feedConfig, key string, covering []string, wantedOn bool) string {
+func uiFeedGovernanceHTML(lang string, rules []rss.Rule, feed feedConfig, key string, covering []string, wantedOn bool) string {
+	tr := func(phrase string) string { return uiTr(lang, phrase) }
 	var b strings.Builder
 	b.WriteString(`<div class="item-sub governs"><svg class="i"><use href="/assets/icons.svg#i-filter"/></svg>`)
 	switch {
 	case len(covering) > 0:
-		b.WriteString(`<span>Downloads what these rules take:</span> `)
+		b.WriteString(`<span>` + tr("Downloads what these rules take:") + `</span> `)
 		indexByName := map[string]int{}
 		for index, rule := range rules {
 			if _, ok := indexByName[orDefault(rule.Name, "—")]; !ok {
@@ -957,26 +965,27 @@ func uiFeedGovernanceHTML(rules []rss.Rule, feed feedConfig, key string, coverin
 				b.WriteString(`<span>, </span>`)
 			}
 			if index, ok := indexByName[name]; ok {
-				b.WriteString(`<button type="button" class="linklike" data-open-rule="` + strconv.Itoa(index) + `" title="Open this rule to change it"><b>` + html.EscapeString(name) + `</b></button>`)
+				b.WriteString(`<button type="button" class="linklike" data-open-rule="` + strconv.Itoa(index) + `" title="` + tr("Open this rule to change it") + `"><b>` + html.EscapeString(name) + `</b></button>`)
 			} else {
 				b.WriteString(`<b>` + html.EscapeString(name) + `</b>`)
 			}
 		}
 	case feed.All:
-		b.WriteString(`<span>Downloads every item (Take everything)</span>`)
+		b.WriteString(`<span>` + tr("Downloads every item (Take everything)") + `</span>`)
 	case feedTakesEverything(rules, feed, key):
-		b.WriteString(`<span>Archive only: no rule watches it and it has no filter, so nothing is downloaded</span>`)
+		b.WriteString(`<span>` + tr("Archive only: no rule watches it and it has no filter, so nothing is downloaded") + `</span>`)
 	default:
-		b.WriteString(`<span>Downloads what its own filter takes</span>`)
+		b.WriteString(`<span>` + tr("Downloads what its own filter takes") + `</span>`)
 	}
 	if wantedOn {
-		b.WriteString(` · <span>the wanted titles also take from it</span>`)
+		b.WriteString(` · <span>` + tr("the wanted titles also take from it") + `</span>`)
 	}
 	b.WriteString(`</div>`)
 	return b.String()
 }
 
-func uiFeedChipsHTML(feed feedConfig) string {
+func uiFeedChipsHTML(lang string, feed feedConfig) string {
+	tr := func(phrase string) string { return uiTr(lang, phrase) }
 	var b strings.Builder
 	if strings.TrimSpace(feed.Include) != "" {
 		b.WriteString(uiChip("in", "One of", feed.Include))
@@ -991,7 +1000,7 @@ func uiFeedChipsHTML(feed feedConfig) string {
 		b.WriteString(uiChip("act", "Category", feed.Category))
 	}
 	if feed.All {
-		b.WriteString(`<span class="chip act"><span>Take everything</span></span>`)
+		b.WriteString(`<span class="chip act"><span>` + tr("Take everything") + `</span></span>`)
 	}
 	return b.String()
 }
@@ -1000,16 +1009,17 @@ func uiFeedChipsHTML(feed feedConfig) string {
 // many items it returned (and how many were new or added), or its error.
 // uiFeedStatusHTML renders a feed's row status: the total of torrents it has
 // brought into the archive, then the outcome of the last check.
-func uiFeedStatusHTML(status feedStatus, total int) string {
-	totalHTML := `<span title="Torrents this feed has brought into the archive">` + strconv.Itoa(total) + `</span> <span class="muted">torrents</span>`
+func uiFeedStatusHTML(lang string, status feedStatus, total int) string {
+	tr := func(phrase string) string { return uiTr(lang, phrase) }
+	totalHTML := `<span title="` + tr("Torrents this feed has brought into the archive") + `">` + strconv.Itoa(total) + `</span> <span class="muted">` + tr("torrents") + `</span>`
 	if status.LastCheck == 0 {
 		if total > 0 {
 			return totalHTML
 		}
-		return `<span class="muted">not checked yet</span>`
+		return `<span class="muted">` + tr("not checked yet") + `</span>`
 	}
 	when := time.Unix(status.LastCheck, 0).Format("02/01 15:04")
-	out := `<span class="muted" title="Last check">` + when + `</span> `
+	out := `<span class="muted" title="` + tr("Last check") + `">` + when + `</span> `
 	if status.LastError != "" {
 		errHTML := `<span class="err" role="status">` + html.EscapeString(status.LastError) + `</span>`
 		if hint := feedErrorHint(status.LastError); hint != "" {
@@ -1019,10 +1029,10 @@ func uiFeedStatusHTML(status feedStatus, total int) string {
 	}
 	out += totalHTML
 	if status.New > 0 {
-		out += ` · <span class="ok">` + strconv.Itoa(status.New) + `</span> <span class="muted">new</span>`
+		out += ` · <span class="ok">` + strconv.Itoa(status.New) + `</span> <span class="muted">` + tr("new") + `</span>`
 	}
 	if status.Added > 0 {
-		out += ` · <span class="ok">` + strconv.Itoa(status.Added) + `</span> <span class="muted">added</span>`
+		out += ` · <span class="ok">` + strconv.Itoa(status.Added) + `</span> <span class="muted">` + tr("added") + `</span>`
 	}
 	return out
 }

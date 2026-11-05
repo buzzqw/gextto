@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"html"
+	"html/template"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -16,7 +17,6 @@ import (
 
 	"github.com/buzzqw/gextto/internal/auth"
 	"github.com/buzzqw/gextto/internal/torznab"
-	"github.com/buzzqw/gextto/internal/webui/assets"
 )
 
 const (
@@ -27,13 +27,6 @@ const (
 	// (incomplete) downloads folder. It is the same in every language so the
 	// path stays predictable when the interface language changes later.
 	setupTempFolderName = "download-temp"
-)
-
-// setupDirToken and setupTempToken are placeholders in assets/setup.html that
-// renderSetup fills with the proposed storage folders.
-const (
-	setupDirToken  = "{{DOWNLOAD_DIR}}"
-	setupTempToken = "{{TEMP_DIR}}"
 )
 
 // setupComplete reports whether the standalone wizard has run. With no settings
@@ -241,24 +234,20 @@ func setupDownloadFolderName(lang string) string {
 
 // renderSetup writes the wizard page, localized like the daemon page.
 func (d *Daemon) renderSetup(w http.ResponseWriter, r *http.Request, errKey string) {
-	page := assets.SetupPage()
-	errorHTML := ""
-	if errKey != "" {
-		errorHTML = `<p class="m err">` + html.EscapeString(errKey) + `</p>`
+	// The storage folders (subfolders of the daemon's own directory) are
+	// proposed, not imposed: the operator can accept, change or clear them.
+	download, temp := setupDefaultDirs(d.uiLang(r))
+	d.uiWritePage(w, r, "setup", map[string]any{
+		"DOWNLOAD_DIR": download,
+		"TEMP_DIR":     temp,
+		"ERROR":        uiErrorHTML(d, r, errKey),
+	})
+}
+
+// uiErrorHTML renders a one-line error, translated, or nothing.
+func uiErrorHTML(d *Daemon, r *http.Request, errKey string) template.HTML {
+	if errKey == "" {
+		return ""
 	}
-	page = strings.Replace(page, "<!--ERROR-->", errorHTML, 1)
-	lang := d.uiLang(r)
-	if lang != "" && lang != "en" {
-		page = strings.Replace(page, `lang="en"`, `lang="`+lang+`"`, 1)
-	}
-	page = uiTranslateHTML(page, uiDictionary(lang))
-	// Propose the storage folders (subfolders of the daemon's own directory):
-	// pre-filled only, so the operator can accept, change or clear them. Fill the
-	// tokens after translation, escaping every value as an HTML attribute.
-	download, temp := setupDefaultDirs(lang)
-	page = strings.Replace(page, setupDirToken, html.EscapeString(download), 1)
-	page = strings.Replace(page, setupTempToken, html.EscapeString(temp), 1)
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Header().Set("Cache-Control", "no-store")
-	_, _ = w.Write([]byte(page))
+	return template.HTML(`<p class="m err" role="alert">` + html.EscapeString(uiTr(d.uiLang(r), errKey)) + `</p>`)
 }

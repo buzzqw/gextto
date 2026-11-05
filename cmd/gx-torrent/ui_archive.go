@@ -8,6 +8,7 @@ package main
 import (
 	"errors"
 	"html"
+	"html/template"
 	"net/http"
 	"sort"
 	"strconv"
@@ -15,7 +16,6 @@ import (
 	"time"
 
 	"github.com/buzzqw/gextto/internal/rss"
-	"github.com/buzzqw/gextto/internal/webui/assets"
 )
 
 const (
@@ -38,7 +38,6 @@ func (d *Daemon) handleUIArchive(w http.ResponseWriter, r *http.Request) {
 	if !d.archiveAvailable(w, r) {
 		return
 	}
-	page := assets.ArchivePage()
 	stats := d.archive().stats(true)
 	var options strings.Builder
 	for _, feed := range stats.Feeds {
@@ -49,17 +48,10 @@ func (d *Daemon) handleUIArchive(w http.ResponseWriter, r *http.Request) {
 		}
 		options.WriteString(`<option value="` + html.EscapeString(feed) + `">` + html.EscapeString(feed) + `</option>`)
 	}
-	page = strings.Replace(page, "{{FEEDOPTIONS}}", options.String(), 1)
-	page = strings.Replace(page, "{{ARCHIVE_DAYS}}", strconv.Itoa(d.archiveRetentionDays()), 1)
-	lang := d.uiLang(r)
-	if lang != "" && lang != "en" {
-		page = strings.Replace(page, `lang="en"`, `lang="`+lang+`"`, 1)
-	}
-	page = uiTranslateHTML(page, uiDictionary(lang))
-	page = uiInjectClientDictionary(page, lang)
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Header().Set("Cache-Control", "no-store")
-	_, _ = w.Write([]byte(page))
+	d.uiWritePage(w, r, "archive", map[string]any{
+		"FEEDOPTIONS":  template.HTML(options.String()),
+		"ARCHIVE_DAYS": strconv.Itoa(d.archiveRetentionDays()),
+	})
 }
 
 // archiveItemView is one search result with what the page derives from the
@@ -276,10 +268,10 @@ func (d *Daemon) handleUIRssRulePreview(w http.ResponseWriter, r *http.Request) 
 		titles = append(titles, group{Name: name, Count: groups[name]})
 	}
 	sort.SliceStable(titles, func(i, j int) bool { return titles[i].Count > titles[j].Count })
-	dict := uiDictionary(d.uiLang(r))
+	lang := d.uiLang(r)
 	leftOut := make([]group, 0, len(rejectedOrder))
 	for _, reason := range rejectedOrder {
-		leftOut = append(leftOut, group{Name: uiTranslateText(rejectReasonLabel(reason), dict), Count: rejected[reason]})
+		leftOut = append(leftOut, group{Name: uiTr(lang, rejectReasonLabel(reason)), Count: rejected[reason]})
 	}
 	sort.SliceStable(leftOut, func(i, j int) bool { return leftOut[i].Count > leftOut[j].Count })
 	writeJSON(w, http.StatusOK, map[string]any{"matches": matches, "total": total, "scanned": len(result.Items), "titles": titles, "skip": rule.Fail, "rejected": leftOut})

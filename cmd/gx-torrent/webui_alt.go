@@ -314,14 +314,14 @@ func (d *Daemon) handleUIWebUIInstall(w http.ResponseWriter, r *http.Request) {
 	}
 	version, err := d.installAltWebUI()
 	if err != nil {
-		d.uiRedirect(w, r, nil, "", fmt.Errorf("VueTorrent: %w", err))
+		d.uiRedirect(w, r, nil, "", nil, fmt.Errorf("VueTorrent: %w", err))
 		return
 	}
 	if err := d.applyAltWebUICheckbox(r); err != nil {
-		d.uiRedirect(w, r, nil, "", fmt.Errorf("VueTorrent: %w", err))
+		d.uiRedirect(w, r, nil, "", nil, fmt.Errorf("VueTorrent: %w", err))
 		return
 	}
-	d.uiRedirect(w, r, nil, "VueTorrent "+version+" installed", nil)
+	d.uiDonef(w, r, nil, "VueTorrent %s installed", version)
 }
 
 // applyAltWebUICheckbox turns the alternative interface on when the install

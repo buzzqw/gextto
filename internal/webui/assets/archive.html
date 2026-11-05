@@ -51,58 +51,58 @@ summary{cursor:pointer;color:var(--muted);font-weight:550}
 <body>
 <header class="topbar">
   <a class="brand" href="/" title="gx-torrent"><img src="/favicon.ico" alt=""><span>gx-torrent</span></a>
-  <nav class="nav" aria-label="Sections"><a href="/" title="Torrents list and transfer status">Torrents</a><a href="/ui/wanted" title="TV series and movies you follow">Series &amp; movies</a><a href="/ui/rss" title="RSS feeds, indexers and rules">RSS &amp; indexers</a><a class="on" href="/ui/archive" aria-current="page" title="Everything the feeds found, searchable">Archive</a><a href="/ui/stats" title="Transfer, disk and network statistics">Statistics</a><a href="/ui/settings" title="Daemon configuration and options">Settings</a><div class="navmenu"><button type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="nav-menu" title="Log, tools and indexer search">More <span class="caret" aria-hidden="true">▾</span></button><div class="menu" id="nav-menu" role="menu" aria-label="More" hidden><a role="menuitem" href="/?show=log" title="Switch to live server log view">Log</a><a role="menuitem" href="/?show=tools" title="IP filter, create a .torrent, feeds">Tools</a><a role="menuitem" href="/?show=search" title="Search configured Torznab indexers for releases">Search indexers</a></div></div></nav>
+  <nav class="nav" aria-label="{{tr "Sections"}}"><a href="/" title="{{tr "Torrents list and transfer status"}}">{{tr "Torrents"}}</a><a href="/ui/wanted" title="{{tr "TV series and movies you follow"}}">{{tr "Series & movies"}}</a><a href="/ui/rss" title="{{tr "RSS feeds, indexers and rules"}}">{{tr "RSS & indexers"}}</a><a class="on" href="/ui/archive" aria-current="page" title="{{tr "Everything the feeds found, searchable"}}">{{tr "Archive"}}</a><a href="/ui/stats" title="{{tr "Transfer, disk and network statistics"}}">{{tr "Statistics"}}</a><a href="/ui/settings" title="{{tr "Daemon configuration and options"}}">{{tr "Settings"}}</a><div class="navmenu"><button type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="nav-menu" title="{{tr "Log, tools and indexer search"}}">{{tr "More"}} <span class="caret" aria-hidden="true">▾</span></button><div class="menu" id="nav-menu" role="menu" aria-label="{{tr "More"}}" hidden><a role="menuitem" href="/?show=log" title="{{tr "Switch to live server log view"}}">{{tr "Log"}}</a><a role="menuitem" href="/?show=tools" title="{{tr "IP filter, create a .torrent, feeds"}}">{{tr "Tools"}}</a><a role="menuitem" href="/?show=search" title="{{tr "Search configured Torznab indexers for releases"}}">{{tr "Search indexers"}}</a></div></div></nav>
   <span class="spacer"></span>
-  <button type="button" class="ghost icon" data-theme-switch data-label-auto="Theme: automatic (follows the system)" data-label-light="Theme: light" data-label-dark="Theme: dark" aria-label="Theme: automatic (follows the system)" title="Switch theme (automatic, light, dark)"><svg class="i" data-theme-icon="auto"><use href="/assets/icons.svg#i-auto"/></svg><svg class="i" data-theme-icon="light" hidden><use href="/assets/icons.svg#i-sun"/></svg><svg class="i" data-theme-icon="dark" hidden><use href="/assets/icons.svg#i-moon"/></svg></button>
+  <button type="button" class="ghost icon" data-theme-switch data-label-auto="{{tr "Theme: automatic (follows the system)"}}" data-label-light="{{tr "Theme: light"}}" data-label-dark="{{tr "Theme: dark"}}" aria-label="{{tr "Theme: automatic (follows the system)"}}" title="{{tr "Switch theme (automatic, light, dark)"}}"><svg class="i" data-theme-icon="auto"><use href="/assets/icons.svg#i-auto"/></svg><svg class="i" data-theme-icon="light" hidden><use href="/assets/icons.svg#i-sun"/></svg><svg class="i" data-theme-icon="dark" hidden><use href="/assets/icons.svg#i-moon"/></svg></button>
 </header>
 <main>
-<div class="page-head"><div class="grow"><h1>Archive</h1></div></div>
-<p class="muted">Every item the RSS feeds returned is kept here, also after it leaves the feed. Search with words, phrases in quotes and -excluded words.</p>
+<div class="page-head"><div class="grow"><h1>{{tr "Archive"}}</h1></div></div>
+<p class="muted">{{tr "Every item the RSS feeds returned is kept here, also after it leaves the feed. Search with words, phrases in quotes and -excluded words."}}</p>
 <form class="row" id="archive-form" role="search">
-  <label>Search<input type="search" id="archive-q" name="q" placeholder="title words, -exclude" autocomplete="off" title="Words that must all appear in the title; -word excludes, quotes match a phrase"></label>
-  <label>Feed<select id="archive-feed" name="feed" title="Show only the items of one feed"><option value="">All feeds</option>{{FEEDOPTIONS}}</select></label>
-  <label>Sort<select id="archive-sort" name="sort" title="Order of the results">
-    <option value="new">Newest first</option>
-    <option value="old">Oldest first</option>
-    <option value="seeds">Most seeders</option>
-    <option value="size">Largest</option>
-    <option value="title">Title</option>
+  <label>{{tr "Search"}}<input type="search" id="archive-q" name="q" placeholder="{{tr "title words, -exclude"}}" autocomplete="off" title="{{tr "Words that must all appear in the title; -word excludes, quotes match a phrase"}}"></label>
+  <label>{{tr "Feed"}}<select id="archive-feed" name="feed" title="{{tr "Show only the items of one feed"}}"><option value="">{{tr "All feeds"}}</option>{{.FEEDOPTIONS}}</select></label>
+  <label>{{tr "Sort"}}<select id="archive-sort" name="sort" title="{{tr "Order of the results"}}">
+    <option value="new">{{tr "Newest first"}}</option>
+    <option value="old">{{tr "Oldest first"}}</option>
+    <option value="seeds">{{tr "Most seeders"}}</option>
+    <option value="size">{{tr "Largest"}}</option>
+    <option value="title">{{tr "Title"}}</option>
   </select></label>
-  <label class="chk"><input type="checkbox" id="archive-added" name="added" value="1" title="Show only the items already downloaded"> Downloaded only</label>
-  <label class="chk"><input type="checkbox" id="archive-live" name="live" value="1" title="Also query the configured Torznab indexers (Jackett, Prowlarr) live, so items the feeds have not returned show up too">Search the indexers too</label>
-  <button type="submit" title="Search the archive">Search</button>
+  <label class="chk"><input type="checkbox" id="archive-added" name="added" value="1" title="{{tr "Show only the items already downloaded"}}"> {{tr "Downloaded only"}}</label>
+  <label class="chk"><input type="checkbox" id="archive-live" name="live" value="1" title="{{tr "Also query the configured Torznab indexers (Jackett, Prowlarr) live, so items the feeds have not returned show up too"}}">{{tr "Search the indexers too"}}</label>
+  <button type="submit" title="{{tr "Search the archive"}}">{{tr "Search"}}</button>
 </form>
 <p class="muted" id="archive-info" aria-live="polite"></p>
 <div class="panel" id="archive-guide" hidden style="margin:0 0 12px;padding:14px">
-  <h3 style="margin:0 0 6px">The archive is empty</h3>
-  <p class="muted" style="margin:0 0 10px;font-size:13px">Every item the feeds and the indexers find lands here. Nothing arrived yet: add a feed or check the indexers.</p>
-  <div class="actions" style="margin:0"><a class="btn sm primary" href="/ui/rss" title="RSS feeds, indexers and rules">RSS &amp; indexers</a></div>
+  <h3 style="margin:0 0 6px">{{tr "The archive is empty"}}</h3>
+  <p class="muted" style="margin:0 0 10px;font-size:13px">{{tr "Every item the feeds and the indexers find lands here. Nothing arrived yet: add a feed or check the indexers."}}</p>
+  <div class="actions" style="margin:0"><a class="btn sm primary" href="/ui/rss" title="{{tr "RSS feeds, indexers and rules"}}">{{tr "RSS & indexers"}}</a></div>
 </div>
 <table>
-  <caption class="sr-only">Archive search results</caption>
-  <thead><tr><th scope="col">Title</th><th scope="col" class="c-size">Size</th><th scope="col" class="c-seeds">Seeds</th><th scope="col" class="c-feed">Feed</th><th scope="col" class="c-seen">Found</th><th scope="col" class="c-act"><span class="sr-only">Actions</span></th></tr></thead>
+  <caption class="sr-only">{{tr "Archive search results"}}</caption>
+  <thead><tr><th scope="col">{{tr "Title"}}</th><th scope="col" class="c-size">{{tr "Size"}}</th><th scope="col" class="c-seeds">{{tr "Seeds"}}</th><th scope="col" class="c-feed">{{tr "Feed"}}</th><th scope="col" class="c-seen">{{tr "Found"}}</th><th scope="col" class="c-act"><span class="sr-only">{{tr "Actions"}}</span></th></tr></thead>
   <tbody id="archive-rows"></tbody>
 </table>
-<div class="pager"><button type="button" class="sm" id="archive-prev" title="Previous page">‹ Previous</button><span class="muted" id="archive-page" aria-live="polite"></span><button type="button" class="sm" id="archive-next" title="Next page">Next ›</button></div>
+<div class="pager"><button type="button" class="sm" id="archive-prev" title="{{tr "Previous page"}}">{{tr "‹ Previous"}}</button><span class="muted" id="archive-page" aria-live="polite"></span><button type="button" class="sm" id="archive-next" title="{{tr "Next page"}}">{{tr "Next ›"}}</button></div>
 <section id="archive-live-section" hidden aria-labelledby="archive-live-title">
-  <h2 id="archive-live-title">From the indexers</h2>
+  <h2 id="archive-live-title">{{tr "From the indexers"}}</h2>
   <p class="muted" id="archive-live-info" aria-live="polite"></p>
   <table>
-    <caption class="sr-only">Live indexer search results</caption>
-    <thead><tr><th scope="col">Title</th><th scope="col" class="c-size">Size</th><th scope="col" class="c-seeds">Seeds</th><th scope="col" class="c-feed">Indexer</th><th scope="col" class="c-seen">Published</th><th scope="col" class="c-act"><span class="sr-only">Actions</span></th></tr></thead>
+    <caption class="sr-only">{{tr "Live indexer search results"}}</caption>
+    <thead><tr><th scope="col">{{tr "Title"}}</th><th scope="col" class="c-size">{{tr "Size"}}</th><th scope="col" class="c-seeds">{{tr "Seeds"}}</th><th scope="col" class="c-feed">{{tr "Indexer"}}</th><th scope="col" class="c-seen">{{tr "Published"}}</th><th scope="col" class="c-act"><span class="sr-only">{{tr "Actions"}}</span></th></tr></thead>
     <tbody id="archive-live-rows"></tbody>
   </table>
 </section>
 <details>
-  <summary>Clean up</summary>
+  <summary>{{tr "Clean up"}}</summary>
   <div class="row">
-    <button type="button" class="danger" id="archive-delete-results" title="Delete every item matching the current search">Delete the search results</button>
+    <button type="button" class="danger" id="archive-delete-results" title="{{tr "Delete every item matching the current search"}}">{{tr "Delete the search results"}}</button>
   </div>
   <div class="row">
-    <label>Older than (days)<input type="number" min="1" id="archive-days" value="90" title="Delete the items found more than this many days ago"></label>
-    <button type="button" class="danger" id="archive-prune" title="Delete the items found more than this many days ago">Delete old items</button>
+    <label>{{tr "Older than (days)"}}<input type="number" min="1" id="archive-days" value="90" title="{{tr "Delete the items found more than this many days ago"}}"></label>
+    <button type="button" class="danger" id="archive-prune" title="{{tr "Delete the items found more than this many days ago"}}">{{tr "Delete old items"}}</button>
   </div>
-  <p class="muted"><span>Automatic retention (days, 0 = keep all)</span>: {{ARCHIVE_DAYS}} · <a href="/ui/rss#rss-settings" title="Change the retention on the RSS page">RSS &amp; indexers</a></p>
+  <p class="muted"><span>{{tr "Automatic retention (days, 0 = keep all)"}}</span>: {{.ARCHIVE_DAYS}} · <a href="/ui/rss#rss-settings" title="{{tr "Change the retention on the RSS page"}}">{{tr "RSS & indexers"}}</a></p>
 </details>
 </main>
 <script id="ui-i18n"></script>
@@ -127,5 +127,5 @@ document.getElementById('archive-delete-results').onclick=function(){if(!confirm
 document.getElementById('archive-prune').onclick=function(){var days=document.getElementById('archive-days').value;if(!confirm(t('Delete the items found more than this many days ago?'))){return;}var f=new URLSearchParams();f.set('days',days);post('/ui/archive/delete',f).then(function(res){document.getElementById('archive-info').textContent=res.removed+' '+t('items deleted');load(1);}).catch(function(e){document.getElementById('archive-info').textContent=t('Error')+': '+e.message;});};
 load(1);
 </script>
-<a class="donate" href="https://www.paypal.com/cgi-bin/webscr?cmd=_donations&amp;business=azanzani@gmail.com&amp;item_name=Support+gx-torrent+Project" target="_blank" rel="noopener noreferrer" title="Support gx-torrent with a PayPal donation" aria-label="Support gx-torrent with a PayPal donation"><span class="donate-icon" aria-hidden="true">❤️</span><span class="donate-label">Donate</span></a>
+<a class="donate" href="https://www.paypal.com/cgi-bin/webscr?cmd=_donations&amp;business=azanzani@gmail.com&amp;item_name=Support+gx-torrent+Project" target="_blank" rel="noopener noreferrer" title="{{tr "Support gx-torrent with a PayPal donation"}}" aria-label="{{tr "Support gx-torrent with a PayPal donation"}}"><span class="donate-icon" aria-hidden="true">❤️</span><span class="donate-label">{{tr "Donate"}}</span></a>
 </body></html>

@@ -302,24 +302,24 @@ body{display:flex;flex-direction:column;overflow:hidden}
   <symbol id="i-server" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 7.5h.01M7 16.5h.01"/></symbol>
   <symbol id="i-ban" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m5.7 5.7 12.6 12.6"/></symbol>
 </svg>
-<a class="sr-only" href="#torrent-list">Skip to the torrent list</a>
+<a class="sr-only" href="#torrent-list">{{tr "Skip to the torrent list"}}</a>
 <header class="topbar">
-  <button type="button" class="ghost icon menu-side" id="side-toggle" aria-controls="side" aria-expanded="false" aria-label="Show filters" title="Show filters"><svg class="i"><use href="#i-menu"/></svg></button>
+  <button type="button" class="ghost icon menu-side" id="side-toggle" aria-controls="side" aria-expanded="false" aria-label="{{tr "Show filters"}}" title="{{tr "Show filters"}}"><svg class="i"><use href="#i-menu"/></svg></button>
   <a class="brand" href="/" title="gx-torrent"><img src="/favicon.ico" alt=""><span>gx-torrent</span> <small>{{.Version}}</small></a>
   {{if .Standalone}}
-  <nav class="nav" aria-label="Sections">
-    <a class="on" href="/" aria-current="page" title="Torrents list and transfer status">Torrents</a>
-    <a href="/ui/wanted" title="TV series and movies you follow">Series &amp; movies</a>
-    <a href="/ui/rss" title="RSS feeds, indexers and rules">RSS &amp; indexers</a>
-    <a href="/ui/archive" title="Everything the feeds found, searchable">Archive</a>
-    <a href="/ui/stats" title="Transfer, disk and network statistics">Statistics</a>
-    <a href="/ui/settings" title="Daemon configuration and options">Settings</a>
+  <nav class="nav" aria-label="{{tr "Sections"}}">
+    <a class="on" href="/" aria-current="page" title="{{tr "Torrents list and transfer status"}}">{{tr "Torrents"}}</a>
+    <a href="/ui/wanted" title="{{tr "TV series and movies you follow"}}">{{tr "Series & movies"}}</a>
+    <a href="/ui/rss" title="{{tr "RSS feeds, indexers and rules"}}">{{tr "RSS & indexers"}}</a>
+    <a href="/ui/archive" title="{{tr "Everything the feeds found, searchable"}}">{{tr "Archive"}}</a>
+    <a href="/ui/stats" title="{{tr "Transfer, disk and network statistics"}}">{{tr "Statistics"}}</a>
+    <a href="/ui/settings" title="{{tr "Daemon configuration and options"}}">{{tr "Settings"}}</a>
     <div class="navmenu">
-      <button type="button" id="nav-more" aria-haspopup="menu" aria-expanded="false" aria-controls="nav-menu" title="Log, tools and indexer search">More <span class="caret" aria-hidden="true">▾</span></button>
-      <div class="menu" id="nav-menu" role="menu" aria-label="More" hidden>
-        <button type="button" role="menuitem" data-navshow="log" title="Switch to live server log view"><svg class="i"><use href="#i-log"/></svg>Log</button>
-        <button type="button" role="menuitem" data-navshow="tools" title="IP filter, create a .torrent, feeds"><svg class="i"><use href="#i-tools"/></svg>Tools</button>
-        <button type="button" role="menuitem" data-navshow="search" title="Search configured Torznab indexers for releases"><svg class="i"><use href="#i-search"/></svg>Search indexers</button>
+      <button type="button" id="nav-more" aria-haspopup="menu" aria-expanded="false" aria-controls="nav-menu" title="{{tr "Log, tools and indexer search"}}">{{tr "More"}} <span class="caret" aria-hidden="true">▾</span></button>
+      <div class="menu" id="nav-menu" role="menu" aria-label="{{tr "More"}}" hidden>
+        <button type="button" role="menuitem" data-navshow="log" title="{{tr "Switch to live server log view"}}"><svg class="i"><use href="#i-log"/></svg>{{tr "Log"}}</button>
+        <button type="button" role="menuitem" data-navshow="tools" title="{{tr "IP filter, create a .torrent, feeds"}}"><svg class="i"><use href="#i-tools"/></svg>{{tr "Tools"}}</button>
+        <button type="button" role="menuitem" data-navshow="search" title="{{tr "Search configured Torznab indexers for releases"}}"><svg class="i"><use href="#i-search"/></svg>{{tr "Search indexers"}}</button>
       </div>
     </div>
   </nav>
@@ -327,68 +327,68 @@ body{display:flex;flex-direction:column;overflow:hidden}
   <span class="spacer"></span>
   <div class="search" role="search">
     <svg class="i"><use href="#i-search"/></svg>
-    <input type="search" id="filter" placeholder="Filter torrents…" autocomplete="off" aria-label="Filter torrents by name, hash, tracker, category or tag" title="Filter displayed torrents by name, info hash, tracker, category or tag">
+    <input type="search" id="filter" placeholder="{{tr "Filter torrents…"}}" autocomplete="off" aria-label="{{tr "Filter torrents by name, hash, tracker, category or tag"}}" title="{{tr "Filter displayed torrents by name, info hash, tracker, category or tag"}}">
     <kbd aria-hidden="true">/</kbd>
   </div>
   <div class="speeds" id="top-speeds" aria-live="off">{{template "speeds" .}}</div>
   <div class="tools">
-    <button type="button" class="ghost icon" data-theme-switch data-label-auto="Theme: automatic (follows the system)" data-label-light="Theme: light" data-label-dark="Theme: dark" aria-label="Theme: automatic (follows the system)" title="Switch theme (automatic, light, dark)">
+    <button type="button" class="ghost icon" data-theme-switch data-label-auto="{{tr "Theme: automatic (follows the system)"}}" data-label-light="{{tr "Theme: light"}}" data-label-dark="{{tr "Theme: dark"}}" aria-label="{{tr "Theme: automatic (follows the system)"}}" title="{{tr "Switch theme (automatic, light, dark)"}}">
       <svg class="i" data-theme-icon="auto"><use href="#i-auto"/></svg><svg class="i" data-theme-icon="light" hidden><use href="#i-sun"/></svg><svg class="i" data-theme-icon="dark" hidden><use href="#i-moon"/></svg>
     </button>
-    {{if .LoginEnabled}}<form method="post" action="/ui/logout" class="logout-form"><button type="submit" class="ghost icon" aria-label="Sign out" title="Sign out of the web interface"><svg class="i"><use href="#i-exit"/></svg></button></form>{{end}}
+    {{if .LoginEnabled}}<form method="post" action="/ui/logout" class="logout-form"><button type="submit" class="ghost icon" aria-label="{{tr "Sign out"}}" title="{{tr "Sign out of the web interface"}}"><svg class="i"><use href="#i-exit"/></svg></button></form>{{end}}
   </div>
 </header>
 
 {{if .Notice}}<div class="notice{{if .Error}} err{{end}}" data-toast>{{.Notice}}</div>{{end}}
 
 <div class="shell">
-  <aside class="side" id="side" aria-label="Filters">
+  <aside class="side" id="side" aria-label="{{tr "Filters"}}">
     <div class="side-scroll">
       <div id="side-live">{{template "side" .}}</div>
       <section aria-labelledby="h-transfer">
-        <h2 id="h-transfer"><button type="button" aria-expanded="true" aria-controls="sec-transfer" data-sec="transfer"><svg class="i"><use href="#i-chev"/></svg><span>Transfer</span></button></h2>
+        <h2 id="h-transfer"><button type="button" aria-expanded="true" aria-controls="sec-transfer" data-sec="transfer"><svg class="i"><use href="#i-chev"/></svg><span>{{tr "Transfer"}}</span></button></h2>
         <div class="graph flist" id="sec-transfer">
-          <svg viewBox="0 0 120 40" preserveAspectRatio="none" role="img" aria-label="Download and upload speed over the last two minutes"><path class="da" id="g-da"/><path class="d" id="g-d"/><path class="u" id="g-u"/></svg>
+          <svg viewBox="0 0 120 40" preserveAspectRatio="none" role="img" aria-label="{{tr "Download and upload speed over the last two minutes"}}"><path class="da" id="g-da"/><path class="d" id="g-d"/><path class="u" id="g-u"/></svg>
           <div class="legend"><span class="d" id="g-dl">↓ {{.DownloadRate}}</span><span class="u" id="g-ul">↑ {{.UploadRate}}</span></div>
         </div>
       </section>
     </div>
     {{if .Standalone}}
     <section class="langpick" aria-labelledby="h-lang">
-      <h2 id="h-lang"><svg class="i" aria-hidden="true"><use href="#i-globe"/></svg><span>Language</span></h2>
+      <h2 id="h-lang"><svg class="i" aria-hidden="true"><use href="#i-globe"/></svg><span>{{tr "Language"}}</span></h2>
       <form method="post" action="/ui/lang">
-        <select name="lang" aria-label="Language" title="Web interface language" onchange="this.form.requestSubmit()">{{range .LangOptions}}<option value="{{.Code}}"{{if .Selected}} selected{{end}}>{{.Name}}</option>{{end}}</select>
-        <button type="submit" class="sm" title="Apply the language">Apply</button>
+        <select name="lang" aria-label="{{tr "Language"}}" title="{{tr "Web interface language"}}" onchange="this.form.requestSubmit()">{{range .LangOptions}}<option value="{{.Code}}"{{if .Selected}} selected{{end}}>{{.Name}}</option>{{end}}</select>
+        <button type="submit" class="sm" title="{{tr "Apply the language"}}">{{tr "Apply"}}</button>
       </form>
     </section>
     {{end}}
   </aside>
 
   <main class="work" id="main">
-    <div class="toolbar" role="toolbar" aria-label="Torrent actions" id="toolbar">
-      <button type="button" class="primary" id="btn-add" title="Add torrents: magnet links, .torrent URLs or files (shortcut N)"><svg class="i"><use href="#i-plus"/></svg><span class="lbl">Add</span></button>
+    <div class="toolbar" role="toolbar" aria-label="{{tr "Torrent actions"}}" id="toolbar">
+      <button type="button" class="primary" id="btn-add" title="{{tr "Add torrents: magnet links, .torrent URLs or files (shortcut N)"}}"><svg class="i"><use href="#i-plus"/></svg><span class="lbl">{{tr "Add"}}</span></button>
       <span class="sep" aria-hidden="true"></span>
-      <button type="button" class="ghost" id="btn-resume-all" title="Resume every torrent in the session"><svg class="i"><use href="#i-play"/></svg><span class="lbl">Resume all</span></button>
-      <button type="button" class="ghost" id="btn-pause-all" title="Pause every torrent in the session"><svg class="i"><use href="#i-pause"/></svg><span class="lbl">Pause all</span></button>
+      <button type="button" class="ghost" id="btn-resume-all" title="{{tr "Resume every torrent in the session"}}"><svg class="i"><use href="#i-play"/></svg><span class="lbl">{{tr "Resume all"}}</span></button>
+      <button type="button" class="ghost" id="btn-pause-all" title="{{tr "Pause every torrent in the session"}}"><svg class="i"><use href="#i-pause"/></svg><span class="lbl">{{tr "Pause all"}}</span></button>
       <span class="sep" aria-hidden="true"></span>
       <!-- Without their label the two "selected" buttons look exactly like
            "Resume all" and "Pause all": on a phone only the all ones stay, the
            per-torrent actions are in the row menu. -->
-      <button type="button" class="ghost hide-m" data-bulk="resume" title="Start the selected torrents (Resume; qBittorrent Start)"><svg class="i"><use href="#i-play"/></svg><span class="lbl">Resume</span></button>
-      <button type="button" class="ghost hide-m" data-bulk="pause" title="Stop the selected torrents (Pause; qBittorrent Stop) (P)"><svg class="i"><use href="#i-pause"/></svg><span class="lbl">Pause</span></button>
-      <button type="button" class="ghost hide-m" data-bulk="force-start" aria-label="Force start the selected torrents" title="Force start: run now, outside the queue limits"><svg class="i"><use href="#i-bolt"/></svg></button>
-      <button type="button" class="ghost danger" data-bulk="remove-ask" title="Remove the selected torrents (Delete)"><svg class="i"><use href="#i-trash"/></svg><span class="lbl">Remove</span></button>
+      <button type="button" class="ghost hide-m" data-bulk="resume" title="{{tr "Start the selected torrents (Resume; qBittorrent Start)"}}"><svg class="i"><use href="#i-play"/></svg><span class="lbl">{{tr "Resume"}}</span></button>
+      <button type="button" class="ghost hide-m" data-bulk="pause" title="{{tr "Stop the selected torrents (Pause; qBittorrent Stop) (P)"}}"><svg class="i"><use href="#i-pause"/></svg><span class="lbl">{{tr "Pause"}}</span></button>
+      <button type="button" class="ghost hide-m" data-bulk="force-start" aria-label="{{tr "Force start the selected torrents"}}" title="{{tr "Force start: run now, outside the queue limits"}}"><svg class="i"><use href="#i-bolt"/></svg></button>
+      <button type="button" class="ghost danger" data-bulk="remove-ask" title="{{tr "Remove the selected torrents (Delete)"}}"><svg class="i"><use href="#i-trash"/></svg><span class="lbl">{{tr "Remove"}}</span></button>
       <span class="sep hide-m" aria-hidden="true"></span>
-      <button type="button" class="ghost icon hide-m" data-bulk="top" aria-label="Move to the top of the queue" title="Move the selected torrents to the top of the queue"><svg class="i"><use href="#i-top"/></svg></button>
-      <button type="button" class="ghost icon hide-m" data-bulk="up" aria-label="Move up in the queue" title="Move the selected torrents up in the queue"><svg class="i"><use href="#i-up"/></svg></button>
-      <button type="button" class="ghost icon hide-m" data-bulk="down" aria-label="Move down in the queue" title="Move the selected torrents down in the queue"><svg class="i"><use href="#i-down"/></svg></button>
-      <button type="button" class="ghost icon hide-m" data-bulk="bottom" aria-label="Move to the bottom of the queue" title="Move the selected torrents to the bottom of the queue"><svg class="i"><use href="#i-bottom"/></svg></button>
+      <button type="button" class="ghost icon hide-m" data-bulk="top" aria-label="{{tr "Move to the top of the queue"}}" title="{{tr "Move the selected torrents to the top of the queue"}}"><svg class="i"><use href="#i-top"/></svg></button>
+      <button type="button" class="ghost icon hide-m" data-bulk="up" aria-label="{{tr "Move up in the queue"}}" title="{{tr "Move the selected torrents up in the queue"}}"><svg class="i"><use href="#i-up"/></svg></button>
+      <button type="button" class="ghost icon hide-m" data-bulk="down" aria-label="{{tr "Move down in the queue"}}" title="{{tr "Move the selected torrents down in the queue"}}"><svg class="i"><use href="#i-down"/></svg></button>
+      <button type="button" class="ghost icon hide-m" data-bulk="bottom" aria-label="{{tr "Move to the bottom of the queue"}}" title="{{tr "Move the selected torrents to the bottom of the queue"}}"><svg class="i"><use href="#i-bottom"/></svg></button>
       <span class="selinfo" id="selinfo" aria-live="polite"></span>
       <div class="right">
-        <button type="button" class="ghost hide-m" id="btn-cols" aria-haspopup="menu" aria-expanded="false" aria-controls="cols-menu" title="Choose the columns of the list (also with a right click on the header)"><svg class="i"><use href="#i-columns"/></svg><span class="lbl">Columns</span></button>
-        {{if .SearchEnabled}}<button type="button" class="ghost" id="btn-search" title="Search configured Torznab indexers for releases"><svg class="i"><use href="#i-search"/></svg><span class="lbl">Search indexers</span></button>{{end}}
-        {{if or .Standalone .GexttoLog}}<button type="button" class="ghost" id="btn-log" aria-pressed="false" data-log-url="{{if .Standalone}}/ui/log{{else}}/ui/gextto-log{{end}}" title="Switch to live server log view"><svg class="i"><use href="#i-log"/></svg><span class="lbl">{{if .Standalone}}Log{{else if .GexttoLog}}Gextto log{{end}}</span></button>{{end}}
-        <button type="button" class="ghost" id="btn-tools" aria-haspopup="menu" aria-expanded="false" aria-controls="tools-menu" title="IP filter, create a .torrent, feeds"><svg class="i"><use href="#i-tools"/></svg><span class="lbl">Tools</span></button>
+        <button type="button" class="ghost hide-m" id="btn-cols" aria-haspopup="menu" aria-expanded="false" aria-controls="cols-menu" title="{{tr "Choose the columns of the list (also with a right click on the header)"}}"><svg class="i"><use href="#i-columns"/></svg><span class="lbl">{{tr "Columns"}}</span></button>
+        {{if .SearchEnabled}}<button type="button" class="ghost" id="btn-search" title="{{tr "Search configured Torznab indexers for releases"}}"><svg class="i"><use href="#i-search"/></svg><span class="lbl">{{tr "Search indexers"}}</span></button>{{end}}
+        {{if or .Standalone .GexttoLog}}<button type="button" class="ghost" id="btn-log" aria-pressed="false" data-log-url="{{if .Standalone}}/ui/log{{else}}/ui/gextto-log{{end}}" title="{{tr "Switch to live server log view"}}"><svg class="i"><use href="#i-log"/></svg><span class="lbl">{{if .Standalone}}{{tr "Log"}}{{else if .GexttoLog}}{{tr "Gextto log"}}{{end}}</span></button>{{end}}
+        <button type="button" class="ghost" id="btn-tools" aria-haspopup="menu" aria-expanded="false" aria-controls="tools-menu" title="{{tr "IP filter, create a .torrent, feeds"}}"><svg class="i"><use href="#i-tools"/></svg><span class="lbl">{{tr "Tools"}}</span></button>
       </div>
     </div>
 
@@ -397,25 +397,25 @@ body{display:flex;flex-direction:column;overflow:hidden}
         <div id="live">{{template "live" .}}</div>
       </div>
       <aside class="drawer" id="drawer" hidden aria-labelledby="drawer-title">
-        <div class="dsplit" id="dsplit" role="separator" aria-orientation="horizontal" aria-valuemin="120" aria-valuemax="800" aria-valuenow="320" tabindex="0" aria-label="Resize the details panel" title="Drag, or use the up and down arrows, to resize the details panel"></div>
+        <div class="dsplit" id="dsplit" role="separator" aria-orientation="horizontal" aria-valuemin="120" aria-valuemax="800" aria-valuenow="320" tabindex="0" aria-label="{{tr "Resize the details panel"}}" title="{{tr "Drag, or use the up and down arrows, to resize the details panel"}}"></div>
         <div id="drawer-body"></div>
       </aside>
     </div>
     {{if or .Standalone .GexttoLog}}
     <div id="pane-log" class="logpane" hidden>
       <div class="logbar">
-        <label class="chk">Lines <select id="log-lines" title="Number of recent log lines to display"><option>200</option><option selected>500</option><option>1000</option><option>2000</option></select></label>
-        <input type="search" id="log-filter" placeholder="Filter lines…" autocomplete="off" aria-label="Filter lines…" title="Filter log lines by keyword or severity level">
-        <span class="lvl" role="group" aria-label="Log levels" title="Show only the selected severity levels">
-          <label class="chk"><input type="checkbox" id="log-debug" title="Show low-level debug messages"> DEBUG</label>
-          <label class="chk"><input type="checkbox" id="log-info" checked title="Show informational messages"> INFO</label>
-          <label class="chk"><input type="checkbox" id="log-warn" checked title="Show warnings"> WARN</label>
-          <label class="chk"><input type="checkbox" id="log-error" checked title="Show errors"> ERROR</label>
+        <label class="chk">{{tr "Lines"}} <select id="log-lines" title="{{tr "Number of recent log lines to display"}}"><option>200</option><option selected>500</option><option>1000</option><option>2000</option></select></label>
+        <input type="search" id="log-filter" placeholder="{{tr "Filter lines…"}}" autocomplete="off" aria-label="{{tr "Filter lines…"}}" title="{{tr "Filter log lines by keyword or severity level"}}">
+        <span class="lvl" role="group" aria-label="{{tr "Log levels"}}" title="{{tr "Show only the selected severity levels"}}">
+          <label class="chk"><input type="checkbox" id="log-debug" title="{{tr "Show low-level debug messages"}}"> {{tr "DEBUG"}}</label>
+          <label class="chk"><input type="checkbox" id="log-info" checked title="{{tr "Show informational messages"}}"> {{tr "INFO"}}</label>
+          <label class="chk"><input type="checkbox" id="log-warn" checked title="{{tr "Show warnings"}}"> {{tr "WARN"}}</label>
+          <label class="chk"><input type="checkbox" id="log-error" checked title="{{tr "Show errors"}}"> {{tr "ERROR"}}</label>
         </span>
-        <button type="button" class="sm" id="log-reload" title="Reload latest logs from server">Reload</button>
+        <button type="button" class="sm" id="log-reload" title="{{tr "Reload latest logs from server"}}">{{tr "Reload"}}</button>
         <span class="muted" id="log-info"></span>
       </div>
-      <pre class="logview" id="log-view" tabindex="0" role="region" aria-label="Log">Loading…</pre>
+      <pre class="logview" id="log-view" tabindex="0" role="region" aria-label="{{tr "Log"}}">{{tr "Loading…"}}</pre>
     </div>
     {{end}}
 
@@ -423,307 +423,307 @@ body{display:flex;flex-direction:column;overflow:hidden}
   </main>
 </div>
 <div class="sbmore" id="sb-more" role="region" aria-labelledby="sb-more-title" hidden>{{template "sbmore" .}}</div>
-<div class="undobar" id="undo-bar" hidden><span id="undo-text" role="status"></span><button type="button" class="sm primary" id="undo-btn" title="Bring the removed torrents back (their files stayed on disk)">Undo</button></div>
+<div class="undobar" id="undo-bar" hidden><span id="undo-text" role="status"></span><button type="button" class="sm primary" id="undo-btn" title="{{tr "Bring the removed torrents back (their files stayed on disk)"}}">{{tr "Undo"}}</button></div>
 
-<div class="menu" id="row-menu" role="menu" aria-label="Torrent actions" hidden>
-  <button type="button" role="menuitem" data-act="details" title="Details: files, peers, trackers"><svg class="i"><use href="#i-info"/></svg>Details<kbd>Enter</kbd></button>
+<div class="menu" id="row-menu" role="menu" aria-label="{{tr "Torrent actions"}}" hidden>
+  <button type="button" role="menuitem" data-act="details" title="{{tr "Details: files, peers, trackers"}}"><svg class="i"><use href="#i-info"/></svg>{{tr "Details"}}<kbd>{{tr "Enter"}}</kbd></button>
   <hr>
-  <button type="button" role="menuitem" data-act="resume" title="Resume the selected torrents"><svg class="i"><use href="#i-play"/></svg>Resume</button>
-  <button type="button" role="menuitem" data-act="pause" title="Pause the selected torrents"><svg class="i"><use href="#i-pause"/></svg>Pause</button>
-  <button type="button" role="menuitemcheckbox" aria-checked="false" data-act="force" title="Force start: run now, outside the queue limits"><svg class="i"><use href="#i-bolt"/></svg>Force start</button>
+  <button type="button" role="menuitem" data-act="resume" title="{{tr "Resume the selected torrents"}}"><svg class="i"><use href="#i-play"/></svg>{{tr "Resume"}}</button>
+  <button type="button" role="menuitem" data-act="pause" title="{{tr "Pause the selected torrents"}}"><svg class="i"><use href="#i-pause"/></svg>{{tr "Pause"}}</button>
+  <button type="button" role="menuitemcheckbox" aria-checked="false" data-act="force" title="{{tr "Force start: run now, outside the queue limits"}}"><svg class="i"><use href="#i-bolt"/></svg>{{tr "Force start"}}</button>
   <hr>
-  <button type="button" role="menuitem" class="danger" data-act="remove" title="Remove from the session (you choose whether the files stay)"><svg class="i"><use href="#i-trash"/></svg>Remove…<kbd>Del</kbd></button>
+  <button type="button" role="menuitem" class="danger" data-act="remove" title="{{tr "Remove from the session (you choose whether the files stay)"}}"><svg class="i"><use href="#i-trash"/></svg>{{tr "Remove…"}}<kbd>{{tr "Del"}}</kbd></button>
   <hr>
-  <button type="button" role="menuitem" data-act="location" title="Move the downloaded data to another folder"><svg class="i"><use href="#i-move"/></svg>Set location…</button>
-  {{if .Standalone}}<button type="button" role="menuitem" data-act="rename" title="Rename this torrent's name and content folder"><svg class="i"><use href="#i-edit"/></svg>Rename…</button>
-  <button type="button" role="menuitem" aria-haspopup="menu" aria-expanded="false" data-sub="#cat-menu" title="Assign a category to the selected torrents"><svg class="i"><use href="#i-folder"/></svg>Category</button>
-  <button type="button" role="menuitem" data-act="category" title="Category assigned to this torrent for organization and filtering"><svg class="i"><use href="#i-tag"/></svg>Category and tags…</button>
-  <button type="button" role="menuitemcheckbox" aria-checked="false" data-act="tmm" title="Let the category decide the save path: assigning a category moves the torrent to its folder (qBittorrent automatic torrent management)"><svg class="i"><use href="#i-folder"/></svg>Automatic management</button>{{end}}
+  <button type="button" role="menuitem" data-act="location" title="{{tr "Move the downloaded data to another folder"}}"><svg class="i"><use href="#i-move"/></svg>{{tr "Set location…"}}</button>
+  {{if .Standalone}}<button type="button" role="menuitem" data-act="rename" title="{{tr "Rename this torrent's name and content folder"}}"><svg class="i"><use href="#i-edit"/></svg>{{tr "Rename…"}}</button>
+  <button type="button" role="menuitem" aria-haspopup="menu" aria-expanded="false" data-sub="#cat-menu" title="{{tr "Assign a category to the selected torrents"}}"><svg class="i"><use href="#i-folder"/></svg>{{tr "Category"}}</button>
+  <button type="button" role="menuitem" data-act="category" title="{{tr "Category assigned to this torrent for organization and filtering"}}"><svg class="i"><use href="#i-tag"/></svg>{{tr "Category and tags…"}}</button>
+  <button type="button" role="menuitemcheckbox" aria-checked="false" data-act="tmm" title="{{tr "Let the category decide the save path: assigning a category moves the torrent to its folder (qBittorrent automatic torrent management)"}}"><svg class="i"><use href="#i-folder"/></svg>{{tr "Automatic management"}}</button>{{end}}
   <hr>
-  <button type="button" role="menuitem" data-act="limits" title="Download and upload speed limits of the selected torrents"><svg class="i"><use href="#i-gauge"/></svg>Limit speed…</button>
-  <button type="button" role="menuitemcheckbox" aria-checked="false" data-act="superseed" title="BEP 16 super-seeding: advertise one piece at a time so the swarm spreads the data. For initial seeding only; it reduces the seed's upload throughput"><svg class="i"><use href="#i-seed"/></svg>Super-seeding</button>
+  <button type="button" role="menuitem" data-act="limits" title="{{tr "Download and upload speed limits of the selected torrents"}}"><svg class="i"><use href="#i-gauge"/></svg>{{tr "Limit speed…"}}</button>
+  <button type="button" role="menuitemcheckbox" aria-checked="false" data-act="superseed" title="{{tr "BEP 16 super-seeding: advertise one piece at a time so the swarm spreads the data. For initial seeding only; it reduces the seed's upload throughput"}}"><svg class="i"><use href="#i-seed"/></svg>{{tr "Super-seeding"}}</button>
   <hr>
-  <button type="button" role="menuitem" data-act="verify" title="Recheck data on disk"><svg class="i"><use href="#i-check"/></svg>Force recheck</button>
-  <button type="button" role="menuitem" data-act="reannounce" title="Reannounce to trackers"><svg class="i"><use href="#i-signal"/></svg>Force reannounce</button>
-  <button type="button" role="menuitemcheckbox" aria-checked="false" data-act="sequential" title="Download pieces in order (streaming); slower overall"><svg class="i"><use href="#i-list"/></svg>Sequential download</button>
-  <button type="button" role="menuitemcheckbox" aria-checked="false" data-act="firstlast" title="Download the ends of every file first"><svg class="i"><use href="#i-list"/></svg>First and last pieces first</button>
-  <button type="button" role="menuitem" aria-haspopup="menu" aria-expanded="false" data-sub="#queue-menu" title="Position of the selected torrents in the download queue"><svg class="i"><use href="#i-top"/></svg>Queue</button>
+  <button type="button" role="menuitem" data-act="verify" title="{{tr "Recheck data on disk"}}"><svg class="i"><use href="#i-check"/></svg>{{tr "Force recheck"}}</button>
+  <button type="button" role="menuitem" data-act="reannounce" title="{{tr "Reannounce to trackers"}}"><svg class="i"><use href="#i-signal"/></svg>{{tr "Force reannounce"}}</button>
+  <button type="button" role="menuitemcheckbox" aria-checked="false" data-act="sequential" title="{{tr "Download pieces in order (streaming); slower overall"}}"><svg class="i"><use href="#i-list"/></svg>{{tr "Sequential download"}}</button>
+  <button type="button" role="menuitemcheckbox" aria-checked="false" data-act="firstlast" title="{{tr "Download the ends of every file first"}}"><svg class="i"><use href="#i-list"/></svg>{{tr "First and last pieces first"}}</button>
+  <button type="button" role="menuitem" aria-haspopup="menu" aria-expanded="false" data-sub="#queue-menu" title="{{tr "Position of the selected torrents in the download queue"}}"><svg class="i"><use href="#i-top"/></svg>{{tr "Queue"}}</button>
   <hr>
-  <button type="button" role="menuitem" aria-haspopup="menu" aria-expanded="false" data-sub="#copy-menu" title="Copy the name, the info hash or the magnet link"><svg class="i"><use href="#i-copy"/></svg>Copy</button>
-  <button type="button" role="menuitem" data-act="export" title="Export and download the .torrent metainfo file"><svg class="i"><use href="#i-file"/></svg>Export .torrent</button>
+  <button type="button" role="menuitem" aria-haspopup="menu" aria-expanded="false" data-sub="#copy-menu" title="{{tr "Copy the name, the info hash or the magnet link"}}"><svg class="i"><use href="#i-copy"/></svg>{{tr "Copy"}}</button>
+  <button type="button" role="menuitem" data-act="export" title="{{tr "Export and download the .torrent metainfo file"}}"><svg class="i"><use href="#i-file"/></svg>{{tr "Export .torrent"}}</button>
 </div>
 
-<div class="menu" id="queue-menu" role="menu" aria-label="Queue" hidden>
-  <button type="button" role="menuitem" data-act="top" title="Move to the top of the queue"><svg class="i"><use href="#i-top"/></svg>Move to top</button>
-  <button type="button" role="menuitem" data-act="up" title="Move up in the queue"><svg class="i"><use href="#i-up"/></svg>Move up</button>
-  <button type="button" role="menuitem" data-act="down" title="Move down in the queue"><svg class="i"><use href="#i-down"/></svg>Move down</button>
-  <button type="button" role="menuitem" data-act="bottom" title="Move to the bottom of the queue"><svg class="i"><use href="#i-bottom"/></svg>Move to bottom</button>
+<div class="menu" id="queue-menu" role="menu" aria-label="{{tr "Queue"}}" hidden>
+  <button type="button" role="menuitem" data-act="top" title="{{tr "Move to the top of the queue"}}"><svg class="i"><use href="#i-top"/></svg>{{tr "Move to top"}}</button>
+  <button type="button" role="menuitem" data-act="up" title="{{tr "Move up in the queue"}}"><svg class="i"><use href="#i-up"/></svg>{{tr "Move up"}}</button>
+  <button type="button" role="menuitem" data-act="down" title="{{tr "Move down in the queue"}}"><svg class="i"><use href="#i-down"/></svg>{{tr "Move down"}}</button>
+  <button type="button" role="menuitem" data-act="bottom" title="{{tr "Move to the bottom of the queue"}}"><svg class="i"><use href="#i-bottom"/></svg>{{tr "Move to bottom"}}</button>
 </div>
 
-<div class="menu" id="copy-menu" role="menu" aria-label="Copy" hidden>
-  <button type="button" role="menuitem" data-act="copy-name" title="Copy the names of the selected torrents"><svg class="i"><use href="#i-copy"/></svg>Name</button>
-  <button type="button" role="menuitem" data-act="copy-hash" title="Copy the info hashes of the selected torrents"><svg class="i"><use href="#i-copy"/></svg>Info hash</button>
-  <button type="button" role="menuitem" data-act="magnet" title="Copy magnet URI with info hash and trackers to clipboard"><svg class="i"><use href="#i-copy"/></svg>Magnet link</button>
+<div class="menu" id="copy-menu" role="menu" aria-label="{{tr "Copy"}}" hidden>
+  <button type="button" role="menuitem" data-act="copy-name" title="{{tr "Copy the names of the selected torrents"}}"><svg class="i"><use href="#i-copy"/></svg>{{tr "Name"}}</button>
+  <button type="button" role="menuitem" data-act="copy-hash" title="{{tr "Copy the info hashes of the selected torrents"}}"><svg class="i"><use href="#i-copy"/></svg>{{tr "Info hash"}}</button>
+  <button type="button" role="menuitem" data-act="magnet" title="{{tr "Copy magnet URI with info hash and trackers to clipboard"}}"><svg class="i"><use href="#i-copy"/></svg>{{tr "Magnet link"}}</button>
 </div>
 
 {{if .Standalone}}
-<div class="menu" id="cat-menu" role="menu" aria-label="Category" hidden>
-  <button type="button" role="menuitemradio" aria-checked="false" data-setcat="" title="Remove the category from the selected torrents"><svg class="i"><use href="#i-x"/></svg>No category</button>
+<div class="menu" id="cat-menu" role="menu" aria-label="{{tr "Category"}}" hidden>
+  <button type="button" role="menuitemradio" aria-checked="false" data-setcat="" title="{{tr "Remove the category from the selected torrents"}}"><svg class="i"><use href="#i-x"/></svg>{{tr "No category"}}</button>
   <div id="cat-menu-list"></div>
   <hr>
-  <button type="button" role="menuitem" data-act="category" title="Type a new category, or edit the tags"><svg class="i"><use href="#i-plus"/></svg>New category…</button>
+  <button type="button" role="menuitem" data-act="category" title="{{tr "Type a new category, or edit the tags"}}"><svg class="i"><use href="#i-plus"/></svg>{{tr "New category…"}}</button>
 </div>
 {{end}}
 
-<div class="menu cols" id="cols-menu" role="menu" aria-label="Columns" hidden>
-  <div class="mhead" aria-hidden="true">Columns</div>
-  <button type="button" role="menuitemcheckbox" aria-checked="true" data-col="size" title="Show or hide this column">Size</button>
-  <button type="button" role="menuitemcheckbox" aria-checked="true" data-col="progress" title="Show or hide this column">Progress</button>
-  <button type="button" role="menuitemcheckbox" aria-checked="true" data-col="state" title="Show or hide this column">Status</button>
-  <button type="button" role="menuitemcheckbox" aria-checked="true" data-col="seeds" title="Show or hide this column">Seeds</button>
-  <button type="button" role="menuitemcheckbox" aria-checked="true" data-col="peers" title="Show or hide this column">Peers</button>
-  <button type="button" role="menuitemcheckbox" aria-checked="true" data-col="down" title="Show or hide this column">Down speed</button>
-  <button type="button" role="menuitemcheckbox" aria-checked="true" data-col="up" title="Show or hide this column">Up speed</button>
-  <button type="button" role="menuitemcheckbox" aria-checked="true" data-col="eta" title="Show or hide this column">ETA</button>
-  <button type="button" role="menuitemcheckbox" aria-checked="true" data-col="ratio" title="Show or hide this column">Ratio</button>
-  <button type="button" role="menuitemcheckbox" aria-checked="true" data-col="category" title="Show or hide this column">Category</button>
-  <button type="button" role="menuitemcheckbox" aria-checked="false" data-col="tags" title="Show or hide this column">Tags</button>
-  <button type="button" role="menuitemcheckbox" aria-checked="false" data-col="added" title="Show or hide this column">Added on</button>
-  <button type="button" role="menuitemcheckbox" aria-checked="false" data-col="completed" title="Show or hide this column">Completed on</button>
-  <button type="button" role="menuitemcheckbox" aria-checked="false" data-col="downloaded" title="Show or hide this column">Downloaded</button>
-  <button type="button" role="menuitemcheckbox" aria-checked="false" data-col="uploaded" title="Show or hide this column">Uploaded</button>
-  <button type="button" role="menuitemcheckbox" aria-checked="false" data-col="remaining" title="Show or hide this column">Remaining</button>
-  <button type="button" role="menuitemcheckbox" aria-checked="false" data-col="queue" title="Show or hide this column">Queue position</button>
-  <button type="button" role="menuitemcheckbox" aria-checked="false" data-col="tracker" title="Show or hide this column">Tracker</button>
-  <button type="button" role="menuitemcheckbox" aria-checked="false" data-col="path" title="Show or hide this column">Save path</button>
-  <button type="button" role="menuitemcheckbox" aria-checked="false" data-col="availability" title="Show or hide this column">Availability</button>
-  <button type="button" role="menuitemcheckbox" aria-checked="false" data-col="active" title="Show or hide this column">Time active</button>
-  <button type="button" role="menuitemcheckbox" aria-checked="false" data-col="lastactive" title="Show or hide this column">Last activity</button>
-  <button type="button" role="menuitemcheckbox" aria-checked="false" data-col="wasted" title="Show or hide this column">Wasted</button>
+<div class="menu cols" id="cols-menu" role="menu" aria-label="{{tr "Columns"}}" hidden>
+  <div class="mhead" aria-hidden="true">{{tr "Columns"}}</div>
+  <button type="button" role="menuitemcheckbox" aria-checked="true" data-col="size" title="{{tr "Show or hide this column"}}">{{tr "Size"}}</button>
+  <button type="button" role="menuitemcheckbox" aria-checked="true" data-col="progress" title="{{tr "Show or hide this column"}}">{{tr "Progress"}}</button>
+  <button type="button" role="menuitemcheckbox" aria-checked="true" data-col="state" title="{{tr "Show or hide this column"}}">{{tr "Status"}}</button>
+  <button type="button" role="menuitemcheckbox" aria-checked="true" data-col="seeds" title="{{tr "Show or hide this column"}}">{{tr "Seeds"}}</button>
+  <button type="button" role="menuitemcheckbox" aria-checked="true" data-col="peers" title="{{tr "Show or hide this column"}}">{{tr "Peers"}}</button>
+  <button type="button" role="menuitemcheckbox" aria-checked="true" data-col="down" title="{{tr "Show or hide this column"}}">{{tr "Down speed"}}</button>
+  <button type="button" role="menuitemcheckbox" aria-checked="true" data-col="up" title="{{tr "Show or hide this column"}}">{{tr "Up speed"}}</button>
+  <button type="button" role="menuitemcheckbox" aria-checked="true" data-col="eta" title="{{tr "Show or hide this column"}}">{{tr "ETA"}}</button>
+  <button type="button" role="menuitemcheckbox" aria-checked="true" data-col="ratio" title="{{tr "Show or hide this column"}}">{{tr "Ratio"}}</button>
+  <button type="button" role="menuitemcheckbox" aria-checked="true" data-col="category" title="{{tr "Show or hide this column"}}">{{tr "Category"}}</button>
+  <button type="button" role="menuitemcheckbox" aria-checked="false" data-col="tags" title="{{tr "Show or hide this column"}}">{{tr "Tags"}}</button>
+  <button type="button" role="menuitemcheckbox" aria-checked="false" data-col="added" title="{{tr "Show or hide this column"}}">{{tr "Added on"}}</button>
+  <button type="button" role="menuitemcheckbox" aria-checked="false" data-col="completed" title="{{tr "Show or hide this column"}}">{{tr "Completed on"}}</button>
+  <button type="button" role="menuitemcheckbox" aria-checked="false" data-col="downloaded" title="{{tr "Show or hide this column"}}">{{tr "Downloaded"}}</button>
+  <button type="button" role="menuitemcheckbox" aria-checked="false" data-col="uploaded" title="{{tr "Show or hide this column"}}">{{tr "Uploaded"}}</button>
+  <button type="button" role="menuitemcheckbox" aria-checked="false" data-col="remaining" title="{{tr "Show or hide this column"}}">{{tr "Remaining"}}</button>
+  <button type="button" role="menuitemcheckbox" aria-checked="false" data-col="queue" title="{{tr "Show or hide this column"}}">{{tr "Queue position"}}</button>
+  <button type="button" role="menuitemcheckbox" aria-checked="false" data-col="tracker" title="{{tr "Show or hide this column"}}">{{tr "Tracker"}}</button>
+  <button type="button" role="menuitemcheckbox" aria-checked="false" data-col="path" title="{{tr "Show or hide this column"}}">{{tr "Save path"}}</button>
+  <button type="button" role="menuitemcheckbox" aria-checked="false" data-col="availability" title="{{tr "Show or hide this column"}}">{{tr "Availability"}}</button>
+  <button type="button" role="menuitemcheckbox" aria-checked="false" data-col="active" title="{{tr "Show or hide this column"}}">{{tr "Time active"}}</button>
+  <button type="button" role="menuitemcheckbox" aria-checked="false" data-col="lastactive" title="{{tr "Show or hide this column"}}">{{tr "Last activity"}}</button>
+  <button type="button" role="menuitemcheckbox" aria-checked="false" data-col="wasted" title="{{tr "Show or hide this column"}}">{{tr "Wasted"}}</button>
   <hr>
-  <button type="button" role="menuitem" data-col-reset title="Show the default columns with their default widths">Reset columns</button>
+  <button type="button" role="menuitem" data-col-reset title="{{tr "Show the default columns with their default widths"}}">{{tr "Reset columns"}}</button>
 </div>
 
-<div class="menu" id="tools-menu" role="menu" aria-label="Tools" hidden>
-  <button type="button" role="menuitem" data-tool="ipfilter" title="IP filter blocklist file path or URL (eMule, DAT, P2P or CIDR format)"><svg class="i"><use href="#i-xc"/></svg>IP filter…</button>
-  <button type="button" role="menuitem" data-tool="create" title="Create .torrent file from the specified path and start seeding"><svg class="i"><use href="#i-file"/></svg>Create .torrent…</button>
-  {{if .FeedsEnabled}}<button type="button" role="menuitem" data-tool="feeds" title="Fetch new items from configured RSS feeds now"><svg class="i"><use href="#i-rss"/></svg>Check feeds</button>{{end}}
-  {{if .Standalone}}<button type="button" role="menuitem" data-tool="dhtfeed" title="Sign a BEP 46 feed of the selected torrents (or all of them) and publish it on the DHT"><svg class="i"><use href="#i-copy"/></svg>Publish DHT feed…</button>{{end}}
-  <button type="button" role="menuitem" data-tool="ports" title="Check that the peer port is listening and forwarded by the router"><svg class="i"><use href="#i-signal"/></svg>Test ports</button>
+<div class="menu" id="tools-menu" role="menu" aria-label="{{tr "Tools"}}" hidden>
+  <button type="button" role="menuitem" data-tool="ipfilter" title="{{tr "IP filter blocklist file path or URL (eMule, DAT, P2P or CIDR format)"}}"><svg class="i"><use href="#i-xc"/></svg>{{tr "IP filter…"}}</button>
+  <button type="button" role="menuitem" data-tool="create" title="{{tr "Create .torrent file from the specified path and start seeding"}}"><svg class="i"><use href="#i-file"/></svg>{{tr "Create .torrent…"}}</button>
+  {{if .FeedsEnabled}}<button type="button" role="menuitem" data-tool="feeds" title="{{tr "Fetch new items from configured RSS feeds now"}}"><svg class="i"><use href="#i-rss"/></svg>{{tr "Check feeds"}}</button>{{end}}
+  {{if .Standalone}}<button type="button" role="menuitem" data-tool="dhtfeed" title="{{tr "Sign a BEP 46 feed of the selected torrents (or all of them) and publish it on the DHT"}}"><svg class="i"><use href="#i-copy"/></svg>{{tr "Publish DHT feed…"}}</button>{{end}}
+  <button type="button" role="menuitem" data-tool="ports" title="{{tr "Check that the peer port is listening and forwarded by the router"}}"><svg class="i"><use href="#i-signal"/></svg>{{tr "Test ports"}}</button>
 </div>
 
 <dialog id="dlg-shortcuts" aria-labelledby="dlg-shortcuts-title">
-  <div class="dlg-head"><h2 id="dlg-shortcuts-title">Keyboard shortcuts</h2><button type="button" class="ghost icon" data-close aria-label="Close" title="Close"><svg class="i"><use href="#i-x"/></svg></button></div>
+  <div class="dlg-head"><h2 id="dlg-shortcuts-title">{{tr "Keyboard shortcuts"}}</h2><button type="button" class="ghost icon" data-close aria-label="{{tr "Close"}}" title="{{tr "Close"}}"><svg class="i"><use href="#i-x"/></svg></button></div>
   <div class="dlg-body">
     <div class="kv" style="grid-template-columns:1fr;gap:0">
-      <div class="row"><span>Filter torrents</span><strong>/</strong></div>
-      <div class="row"><span>Add torrents</span><strong>N</strong></div>
-      <div class="row"><span>Pause / resume selection</span><strong>P</strong></div>
-      <div class="row"><span>Remove selection</span><strong>Del</strong></div>
-      <div class="row"><span>Select all visible</span><strong>Ctrl+A</strong></div>
-      <div class="row"><span>Open details</span><strong>Enter</strong></div>
-      <div class="row"><span>Toggle selection</span><strong>Space</strong></div>
-      <div class="row"><span>Range select</span><strong>Shift+↑↓</strong></div>
-      <div class="row"><span>This help</span><strong>?</strong></div>
-      <div class="row"><span>Close panel</span><strong>Esc</strong></div>
+      <div class="row"><span>{{tr "Filter torrents"}}</span><strong>/</strong></div>
+      <div class="row"><span>{{tr "Add torrents"}}</span><strong>N</strong></div>
+      <div class="row"><span>{{tr "Pause / resume selection"}}</span><strong>P</strong></div>
+      <div class="row"><span>{{tr "Remove selection"}}</span><strong>{{tr "Del"}}</strong></div>
+      <div class="row"><span>{{tr "Select all visible"}}</span><strong>{{tr "Ctrl+A"}}</strong></div>
+      <div class="row"><span>{{tr "Open details"}}</span><strong>{{tr "Enter"}}</strong></div>
+      <div class="row"><span>{{tr "Toggle selection"}}</span><strong>{{tr "Space"}}</strong></div>
+      <div class="row"><span>{{tr "Range select"}}</span><strong>{{tr "Shift+↑↓"}}</strong></div>
+      <div class="row"><span>{{tr "This help"}}</span><strong>?</strong></div>
+      <div class="row"><span>{{tr "Close panel"}}</span><strong>{{tr "Esc"}}</strong></div>
     </div>
   </div>
-  <div class="dlg-foot"><button type="button" class="primary" data-close title="Close">Close</button></div>
+  <div class="dlg-foot"><button type="button" class="primary" data-close title="{{tr "Close"}}">{{tr "Close"}}</button></div>
 </dialog>
 
-<div hidden data-update-notes-slot></div>
+{{.UpdateNotes}}
 <dialog id="dlg-add" aria-labelledby="dlg-add-title">
   <form method="post" action="/ui/add" enctype="multipart/form-data" id="form-add">
-    <div class="dlg-head"><h2 id="dlg-add-title">Add torrents</h2><button type="button" class="ghost icon" data-close aria-label="Close" title="Close"><svg class="i"><use href="#i-x"/></svg></button></div>
+    <div class="dlg-head"><h2 id="dlg-add-title">{{tr "Add torrents"}}</h2><button type="button" class="ghost icon" data-close aria-label="{{tr "Close"}}" title="{{tr "Close"}}"><svg class="i"><use href="#i-x"/></svg></button></div>
     <div class="dlg-body">
-      <label class="field">Magnet links or .torrent URLs, one per line
-        <textarea name="source" id="add-source" rows="3" placeholder="magnet:?xt=…" autocomplete="off" title="Magnet link (magnet:?) or HTTP URL of a .torrent file to download"></textarea>
+      <label class="field">{{tr "Magnet links or .torrent URLs, one per line"}}
+        <textarea name="source" id="add-source" rows="3" placeholder="{{tr "magnet:?xt=…"}}" autocomplete="off" title="{{tr "Magnet link (magnet:?) or HTTP URL of a .torrent file to download"}}"></textarea>
       </label>
       <div class="results" id="add-preview" aria-live="polite" hidden style="max-height:22vh"></div>
       <p class="dlg-help" id="add-cookies" aria-live="polite" hidden></p>
-      <p class="dlg-help">A .torrent URL from a private tracker needs its login cookies: <a href="/ui/settings#cookies" title="Cookies sent when fetching .torrent files and metadata">manage cookies</a>.</p>
+      <p class="dlg-help">{{tr "A .torrent URL from a private tracker needs its login cookies:"}} <a href="/ui/settings#cookies" title="{{tr "Cookies sent when fetching .torrent files and metadata"}}">{{tr "manage cookies"}}</a>.</p>
       <div class="filepick" id="filepick">
-        <span id="filepick-text">Drop .torrent files anywhere on the page, or</span>
-        <input type="file" name="torrent" id="add-files" multiple accept=".torrent,application/x-bittorrent" aria-label="Choose .torrent files" title="Select a local .torrent file to upload and start downloading">
+        <span id="filepick-text">{{tr "Drop .torrent files anywhere on the page, or"}}</span>
+        <input type="file" name="torrent" id="add-files" multiple accept=".torrent,application/x-bittorrent" aria-label="{{tr "Choose .torrent files"}}" title="{{tr "Select a local .torrent file to upload and start downloading"}}">
       </div>
-      <label class="field">Save to
-        <span class="field-row"><input type="text" id="add-destination" name="destination" list="savepaths" placeholder="destination (empty = default)" autocomplete="off" title="Destination directory for download files (empty uses default download folder)">{{if .Standalone}}<button type="button" class="browse" data-target="add-destination" title="Choose an existing folder on the server">Browse…</button>{{end}}</span>
+      <label class="field">{{tr "Save to"}}
+        <span class="field-row"><input type="text" id="add-destination" name="destination" list="savepaths" placeholder="{{tr "destination (empty = default)"}}" autocomplete="off" title="{{tr "Destination directory for download files (empty uses default download folder)"}}">{{if .Standalone}}<button type="button" class="browse" data-target="add-destination" title="{{tr "Choose an existing folder on the server"}}">{{tr "Browse…"}}</button>{{end}}</span>
       </label>
       {{if .Standalone}}
-      <label class="field">Category
-        <input type="text" name="category" list="catlist-all" autocomplete="off" title="Category assigned to the added torrents for organization and filtering">
+      <label class="field">{{tr "Category"}}
+        <input type="text" name="category" list="catlist-all" autocomplete="off" title="{{tr "Category assigned to the added torrents for organization and filtering"}}">
       </label>
-      <label class="field">Tags
-        <input type="text" name="tags" placeholder="tag, tag" autocomplete="off" title="Tags assigned to the added torrents, separated by commas">
+      <label class="field">{{tr "Tags"}}
+        <input type="text" name="tags" placeholder="{{tr "tag, tag"}}" autocomplete="off" title="{{tr "Tags assigned to the added torrents, separated by commas"}}">
       </label>
-      <label class="chk" title="Let the category decide the save path: assigning a category moves the torrent to its folder (qBittorrent automatic torrent management)"><input type="checkbox" name="auto_tmm" value="1"> Save path managed by the category</label>
+      <label class="chk" title="{{tr "Let the category decide the save path: assigning a category moves the torrent to its folder (qBittorrent automatic torrent management)"}}"><input type="checkbox" name="auto_tmm" value="1"> {{tr "Save path managed by the category"}}</label>
       {{end}}
       {{template "addopts"}}
     </div>
     <div class="dlg-foot">
-      <button type="button" data-close title="Close without adding">Cancel</button>
-      <button type="submit" class="primary" title="Add this torrent to the download queue">Add</button>
+      <button type="button" data-close title="{{tr "Close without adding"}}">{{tr "Cancel"}}</button>
+      <button type="submit" class="primary" title="{{tr "Add this torrent to the download queue"}}">{{tr "Add"}}</button>
     </div>
   </form>
 </dialog>
 
 <dialog id="dlg-remove" aria-labelledby="dlg-remove-title">
   <form method="post" action="/ui/remove" id="form-remove">
-    <div class="dlg-head"><h2 id="dlg-remove-title">Remove torrents</h2></div>
+    <div class="dlg-head"><h2 id="dlg-remove-title">{{tr "Remove torrents"}}</h2></div>
     <div class="dlg-body">
       <p id="remove-what" style="margin:0"></p>
-      <label class="chk"><input type="checkbox" name="delete_files" value="1" id="remove-files" title="Also permanently delete the downloaded files from disk"> Also delete the files from disk</label>
-      <p class="muted" style="margin:0;font-size:12.5px">Without it the files stay where they are.</p>
+      <label class="chk"><input type="checkbox" name="delete_files" value="1" id="remove-files" title="{{tr "Also permanently delete the downloaded files from disk"}}"> {{tr "Also delete the files from disk"}}</label>
+      <p class="muted" style="margin:0;font-size:12.5px">{{tr "Without it the files stay where they are."}}</p>
     </div>
     <div class="dlg-foot">
-      <button type="button" data-close title="Close without removing">Cancel</button>
-      <button type="submit" class="danger solid" title="Remove the selected torrents">Remove</button>
+      <button type="button" data-close title="{{tr "Close without removing"}}">{{tr "Cancel"}}</button>
+      <button type="submit" class="danger solid" title="{{tr "Remove the selected torrents"}}">{{tr "Remove"}}</button>
     </div>
   </form>
 </dialog>
 
 <dialog id="dlg-rename" aria-labelledby="dlg-rename-title">
   <form method="post" action="/ui/rename" id="form-rename">
-    <div class="dlg-head"><h2 id="dlg-rename-title">Rename torrent</h2><button type="button" class="ghost icon" data-close aria-label="Close" title="Close"><svg class="i"><use href="#i-x"/></svg></button></div>
+    <div class="dlg-head"><h2 id="dlg-rename-title">{{tr "Rename torrent"}}</h2><button type="button" class="ghost icon" data-close aria-label="{{tr "Close"}}" title="{{tr "Close"}}"><svg class="i"><use href="#i-x"/></svg></button></div>
     <div class="dlg-body">
       <input type="hidden" name="hash">
-      <label class="field">New name<input type="text" name="name" autocomplete="off" required title="The torrent's new name; the content folder is renamed too"></label>
-      <p class="muted" style="margin:0;font-size:12.5px">The downloaded content is renamed on disk; the torrent keeps its info hash.</p>
+      <label class="field">{{tr "New name"}}<input type="text" name="name" autocomplete="off" required title="{{tr "The torrent's new name; the content folder is renamed too"}}"></label>
+      <p class="muted" style="margin:0;font-size:12.5px">{{tr "The downloaded content is renamed on disk; the torrent keeps its info hash."}}</p>
     </div>
     <div class="dlg-foot">
-      <button type="button" data-close title="Close without renaming">Cancel</button>
-      <button type="submit" class="primary" title="Rename this torrent">Rename</button>
+      <button type="button" data-close title="{{tr "Close without renaming"}}">{{tr "Cancel"}}</button>
+      <button type="submit" class="primary" title="{{tr "Rename this torrent"}}">{{tr "Rename"}}</button>
     </div>
   </form>
 </dialog>
 
 <dialog id="dlg-rename-file" aria-labelledby="dlg-rename-file-title">
   <form method="post" action="/ui/rename-file" id="form-rename-file">
-    <div class="dlg-head"><h2 id="dlg-rename-file-title">Rename file</h2><button type="button" class="ghost icon" data-close aria-label="Close" title="Close"><svg class="i"><use href="#i-x"/></svg></button></div>
+    <div class="dlg-head"><h2 id="dlg-rename-file-title">{{tr "Rename file"}}</h2><button type="button" class="ghost icon" data-close aria-label="{{tr "Close"}}" title="{{tr "Close"}}"><svg class="i"><use href="#i-x"/></svg></button></div>
     <div class="dlg-body">
       <input type="hidden" name="hash">
       <input type="hidden" name="old">
-      <label class="field">New path<input type="text" name="new" autocomplete="off" required title="The new path of the file inside the torrent (folders are allowed)"></label>
+      <label class="field">{{tr "New path"}}<input type="text" name="new" autocomplete="off" required title="{{tr "The new path of the file inside the torrent (folders are allowed)"}}"></label>
     </div>
     <div class="dlg-foot">
-      <button type="button" data-close title="Close without renaming">Cancel</button>
-      <button type="submit" class="primary" title="Rename this file">Rename</button>
+      <button type="button" data-close title="{{tr "Close without renaming"}}">{{tr "Cancel"}}</button>
+      <button type="submit" class="primary" title="{{tr "Rename this file"}}">{{tr "Rename"}}</button>
     </div>
   </form>
 </dialog>
 
 <dialog id="dlg-rename-folder" aria-labelledby="dlg-rename-folder-title">
   <form method="post" action="/ui/rename-folder" id="form-rename-folder">
-    <div class="dlg-head"><h2 id="dlg-rename-folder-title">Rename folder</h2><button type="button" class="ghost icon" data-close aria-label="Close" title="Close"><svg class="i"><use href="#i-x"/></svg></button></div>
+    <div class="dlg-head"><h2 id="dlg-rename-folder-title">{{tr "Rename folder"}}</h2><button type="button" class="ghost icon" data-close aria-label="{{tr "Close"}}" title="{{tr "Close"}}"><svg class="i"><use href="#i-x"/></svg></button></div>
     <div class="dlg-body">
       <input type="hidden" name="hash">
       <input type="hidden" name="old">
-      <label class="field">New folder name<input type="text" name="new" autocomplete="off" required title="The new name of the folder inside the torrent"></label>
-      <p class="muted" style="margin:0;font-size:12.5px">Every file in the folder moves with it; the torrent keeps its info hash.</p>
+      <label class="field">{{tr "New folder name"}}<input type="text" name="new" autocomplete="off" required title="{{tr "The new name of the folder inside the torrent"}}"></label>
+      <p class="muted" style="margin:0;font-size:12.5px">{{tr "Every file in the folder moves with it; the torrent keeps its info hash."}}</p>
     </div>
     <div class="dlg-foot">
-      <button type="button" data-close title="Close without renaming">Cancel</button>
-      <button type="submit" class="primary" title="Rename this folder">Rename</button>
+      <button type="button" data-close title="{{tr "Close without renaming"}}">{{tr "Cancel"}}</button>
+      <button type="submit" class="primary" title="{{tr "Rename this folder"}}">{{tr "Rename"}}</button>
     </div>
   </form>
 </dialog>
 
 <dialog id="dlg-cat" aria-labelledby="dlg-cat-title">
   <form method="post" action="/ui/category" id="form-cat">
-    <div class="dlg-head"><h2 id="dlg-cat-title">Category and tags</h2><button type="button" class="ghost icon" data-close aria-label="Close" title="Close"><svg class="i"><use href="#i-x"/></svg></button></div>
+    <div class="dlg-head"><h2 id="dlg-cat-title">{{tr "Category and tags"}}</h2><button type="button" class="ghost icon" data-close aria-label="{{tr "Close"}}" title="{{tr "Close"}}"><svg class="i"><use href="#i-x"/></svg></button></div>
     <div class="dlg-body">
-      <label class="field">Category<input type="text" name="category" list="catlist-all" autocomplete="off" title="Category assigned to this torrent for organization and filtering"></label>
-      <label class="field">Tags<input type="text" name="tags" placeholder="tag, tag" autocomplete="off" title="Tags assigned to this torrent, separated by commas"></label>
-      <label class="chk"><input type="checkbox" name="auto_tmm" value="1" title="Let the category decide the save path: assigning a category moves the torrent to its folder (qBittorrent automatic torrent management)"> Save path managed by the category</label>
+      <label class="field">{{tr "Category"}}<input type="text" name="category" list="catlist-all" autocomplete="off" title="{{tr "Category assigned to this torrent for organization and filtering"}}"></label>
+      <label class="field">{{tr "Tags"}}<input type="text" name="tags" placeholder="{{tr "tag, tag"}}" autocomplete="off" title="{{tr "Tags assigned to this torrent, separated by commas"}}"></label>
+      <label class="chk"><input type="checkbox" name="auto_tmm" value="1" title="{{tr "Let the category decide the save path: assigning a category moves the torrent to its folder (qBittorrent automatic torrent management)"}}"> {{tr "Save path managed by the category"}}</label>
     </div>
     <div class="dlg-foot">
-      <button type="button" data-close title="Close without saving">Cancel</button>
-      <button type="submit" class="primary" title="Save category and tags for this torrent">Save</button>
+      <button type="button" data-close title="{{tr "Close without saving"}}">{{tr "Cancel"}}</button>
+      <button type="submit" class="primary" title="{{tr "Save category and tags for this torrent"}}">{{tr "Save"}}</button>
     </div>
   </form>
 </dialog>
 
 <dialog id="dlg-location" aria-labelledby="dlg-location-title">
   <form method="post" action="/ui/bulk-move" id="form-location">
-    <div class="dlg-head"><h2 id="dlg-location-title">Set location</h2><button type="button" class="ghost icon" data-close aria-label="Close" title="Close"><svg class="i"><use href="#i-x"/></svg></button></div>
+    <div class="dlg-head"><h2 id="dlg-location-title">{{tr "Set location"}}</h2><button type="button" class="ghost icon" data-close aria-label="{{tr "Close"}}" title="{{tr "Close"}}"><svg class="i"><use href="#i-x"/></svg></button></div>
     <div class="dlg-body">
       <p class="dlg-help" id="location-what"></p>
-      <label class="field">New folder
-        <span class="field-row"><input type="text" id="location-dest" name="destination" list="savepaths" required autocomplete="off" title="Folder on the server the downloaded data is moved to">{{if .Standalone}}<button type="button" class="browse" data-target="location-dest" title="Choose an existing folder on the server">Browse…</button>{{end}}</span>
+      <label class="field">{{tr "New folder"}}
+        <span class="field-row"><input type="text" id="location-dest" name="destination" list="savepaths" required autocomplete="off" title="{{tr "Folder on the server the downloaded data is moved to"}}">{{if .Standalone}}<button type="button" class="browse" data-target="location-dest" title="{{tr "Choose an existing folder on the server"}}">{{tr "Browse…"}}</button>{{end}}</span>
       </label>
-      <p class="dlg-help">The files are moved in the background; the torrents keep seeding from the new folder.</p>
+      <p class="dlg-help">{{tr "The files are moved in the background; the torrents keep seeding from the new folder."}}</p>
     </div>
     <div class="dlg-foot">
-      <button type="button" data-close title="Close without moving">Cancel</button>
-      <button type="submit" class="primary" title="Move the data of the selected torrents to this folder">Move</button>
+      <button type="button" data-close title="{{tr "Close without moving"}}">{{tr "Cancel"}}</button>
+      <button type="submit" class="primary" title="{{tr "Move the data of the selected torrents to this folder"}}">{{tr "Move"}}</button>
     </div>
   </form>
 </dialog>
 
 <dialog id="dlg-limits" aria-labelledby="dlg-limits-title">
   <form method="post" action="/ui/bulk-limits" id="form-limits">
-    <div class="dlg-head"><h2 id="dlg-limits-title">Limit speed</h2><button type="button" class="ghost icon" data-close aria-label="Close" title="Close"><svg class="i"><use href="#i-x"/></svg></button></div>
+    <div class="dlg-head"><h2 id="dlg-limits-title">{{tr "Limit speed"}}</h2><button type="button" class="ghost icon" data-close aria-label="{{tr "Close"}}" title="{{tr "Close"}}"><svg class="i"><use href="#i-x"/></svg></button></div>
     <div class="dlg-body">
       <p class="dlg-help" id="limits-what"></p>
-      <label class="field">Download limit (KiB/s)<input type="number" min="0" name="download_limit" id="limits-dl" placeholder="global" title="Download speed limit of the selected torrents in KiB/s: 0 = unlimited, empty = follow the global limit"></label>
-      <label class="field">Upload limit (KiB/s)<input type="number" min="0" name="upload_limit" id="limits-ul" placeholder="global" title="Upload speed limit of the selected torrents in KiB/s: 0 = unlimited, empty = follow the global limit"></label>
-      <p class="dlg-help">0 means unlimited; leave a field empty to follow the global limit.</p>
+      <label class="field">{{tr "Download limit (KiB/s)"}}<input type="number" min="0" name="download_limit" id="limits-dl" placeholder="global" title="{{tr "Download speed limit of the selected torrents in KiB/s: 0 = unlimited, empty = follow the global limit"}}"></label>
+      <label class="field">{{tr "Upload limit (KiB/s)"}}<input type="number" min="0" name="upload_limit" id="limits-ul" placeholder="global" title="{{tr "Upload speed limit of the selected torrents in KiB/s: 0 = unlimited, empty = follow the global limit"}}"></label>
+      <p class="dlg-help">{{tr "0 means unlimited; leave a field empty to follow the global limit."}}</p>
     </div>
     <div class="dlg-foot">
-      <button type="button" data-close title="Close without saving">Cancel</button>
-      <button type="submit" class="primary" title="Apply these limits to the selected torrents">Save limits</button>
+      <button type="button" data-close title="{{tr "Close without saving"}}">{{tr "Cancel"}}</button>
+      <button type="submit" class="primary" title="{{tr "Apply these limits to the selected torrents"}}">{{tr "Save limits"}}</button>
     </div>
   </form>
 </dialog>
 
 <dialog id="dlg-global" aria-labelledby="dlg-global-title">
   <form method="post" action="/ui/global-limits" id="form-global">
-    <div class="dlg-head"><h2 id="dlg-global-title">Global speed limits</h2><button type="button" class="ghost icon" data-close aria-label="Close" title="Close"><svg class="i"><use href="#i-x"/></svg></button></div>
+    <div class="dlg-head"><h2 id="dlg-global-title">{{tr "Global speed limits"}}</h2><button type="button" class="ghost icon" data-close aria-label="{{tr "Close"}}" title="{{tr "Close"}}"><svg class="i"><use href="#i-x"/></svg></button></div>
     <div class="dlg-body">
-      <label class="field">Download limit (KiB/s)<input type="number" min="0" name="download_limit" id="global-dl" title="Global download speed limit in KiB/s (0 = unlimited)"></label>
-      <label class="field">Upload limit (KiB/s)<input type="number" min="0" name="upload_limit" id="global-ul" title="Global upload speed limit in KiB/s (0 = unlimited)"></label>
-      <p class="dlg-help">0 means unlimited. The scheduler and the alternative limits, when active, take precedence.</p>
+      <label class="field">{{tr "Download limit (KiB/s)"}}<input type="number" min="0" name="download_limit" id="global-dl" title="{{tr "Global download speed limit in KiB/s (0 = unlimited)"}}"></label>
+      <label class="field">{{tr "Upload limit (KiB/s)"}}<input type="number" min="0" name="upload_limit" id="global-ul" title="{{tr "Global upload speed limit in KiB/s (0 = unlimited)"}}"></label>
+      <p class="dlg-help">{{tr "0 means unlimited. The scheduler and the alternative limits, when active, take precedence."}}</p>
     </div>
     <div class="dlg-foot">
-      <button type="button" data-close title="Close without saving">Cancel</button>
-      <button type="submit" class="primary" title="Save the global speed limits">Save limits</button>
+      <button type="button" data-close title="{{tr "Close without saving"}}">{{tr "Cancel"}}</button>
+      <button type="submit" class="primary" title="{{tr "Save the global speed limits"}}">{{tr "Save limits"}}</button>
     </div>
   </form>
 </dialog>
 
 <dialog id="dlg-ipfilter" aria-labelledby="dlg-ip-title">
   <form method="post" action="/ui/ipfilter">
-    <div class="dlg-head"><h2 id="dlg-ip-title">IP filter</h2><button type="button" class="ghost icon" data-close aria-label="Close" title="Close"><svg class="i"><use href="#i-x"/></svg></button></div>
+    <div class="dlg-head"><h2 id="dlg-ip-title">{{tr "IP filter"}}</h2><button type="button" class="ghost icon" data-close aria-label="{{tr "Close"}}" title="{{tr "Close"}}"><svg class="i"><use href="#i-x"/></svg></button></div>
     <div class="dlg-body">
-      <label class="field">Blocklist file or URL
-        <input type="text" name="source" placeholder="URL or local file" autocomplete="off" value="{{.IPFilterSource}}" title="IP filter blocklist file path or URL (eMule, DAT, P2P or CIDR format)">
+      <label class="field">{{tr "Blocklist file or URL"}}
+        <input type="text" name="source" placeholder="{{tr "URL or local file"}}" autocomplete="off" value="{{.IPFilterSource}}" title="{{tr "IP filter blocklist file path or URL (eMule, DAT, P2P or CIDR format)"}}">
       </label>
-      <p class="muted" style="margin:0;font-size:12.5px"><span>Rules loaded:</span> <b>{{.IPFilter}}</b></p>
+      <p class="muted" style="margin:0;font-size:12.5px"><span>{{tr "Rules loaded:"}}</span> <b>{{.IPFilter}}</b></p>
     </div>
     <div class="dlg-foot">
-      <button type="button" data-close title="Close without loading">Cancel</button>
-      <button type="submit" class="primary" title="Download (if a URL) and apply the IP filter now">Load filter</button>
+      <button type="button" data-close title="{{tr "Close without loading"}}">{{tr "Cancel"}}</button>
+      <button type="submit" class="primary" title="{{tr "Download (if a URL) and apply the IP filter now"}}">{{tr "Load filter"}}</button>
     </div>
   </form>
 </dialog>
 
 <dialog id="dlg-create" aria-labelledby="dlg-create-title">
   <form method="post" action="/ui/create-torrent" data-native>
-    <div class="dlg-head"><h2 id="dlg-create-title">Create .torrent</h2><button type="button" class="ghost icon" data-close aria-label="Close" title="Close"><svg class="i"><use href="#i-x"/></svg></button></div>
+    <div class="dlg-head"><h2 id="dlg-create-title">{{tr "Create .torrent"}}</h2><button type="button" class="ghost icon" data-close aria-label="{{tr "Close"}}" title="{{tr "Close"}}"><svg class="i"><use href="#i-x"/></svg></button></div>
     <div class="dlg-body">
-      <label class="field">Folder or file on the server<input type="text" name="path" placeholder="/srv/share/folder" autocomplete="off" title="Path to folder or file on the server to package into .torrent"></label>
-      <label class="field">Name (optional)<input type="text" name="name" autocomplete="off" title="Display name for the torrent (optional, defaults to filename or folder name)"></label>
+      <label class="field">{{tr "Folder or file on the server"}}<input type="text" name="path" placeholder="/srv/share/folder" autocomplete="off" title="{{tr "Path to folder or file on the server to package into .torrent"}}"></label>
+      <label class="field">{{tr "Name (optional)"}}<input type="text" name="name" autocomplete="off" title="{{tr "Display name for the torrent (optional, defaults to filename or folder name)"}}"></label>
       <div class="form-grid">
-        <label>Piece size<select name="piece_size" title="Size of each piece in the .torrent: Auto picks one from the total size, a fixed size is useful to match an existing torrent"><option value="0">Auto</option><option value="32">32 KiB</option><option value="64">64 KiB</option><option value="128">128 KiB</option><option value="256">256 KiB</option><option value="512">512 KiB</option><option value="1024">1 MiB</option><option value="2048">2 MiB</option><option value="4096">4 MiB</option><option value="8192">8 MiB</option><option value="16384">16 MiB</option></select></label>
-        <label class="chk" title="Mark the torrent private (BEP 27): DHT, PEX and local discovery are disabled and only the trackers are used"><input type="checkbox" name="private" value="1"> Private</label>
+        <label>{{tr "Piece size"}}<select name="piece_size" title="{{tr "Size of each piece in the .torrent: Auto picks one from the total size, a fixed size is useful to match an existing torrent"}}"><option value="0">{{tr "Auto"}}</option><option value="32">{{tr "32 KiB"}}</option><option value="64">{{tr "64 KiB"}}</option><option value="128">{{tr "128 KiB"}}</option><option value="256">{{tr "256 KiB"}}</option><option value="512">{{tr "512 KiB"}}</option><option value="1024">{{tr "1 MiB"}}</option><option value="2048">{{tr "2 MiB"}}</option><option value="4096">{{tr "4 MiB"}}</option><option value="8192">{{tr "8 MiB"}}</option><option value="16384">{{tr "16 MiB"}}</option></select></label>
+        <label class="chk" title="{{tr "Mark the torrent private (BEP 27): DHT, PEX and local discovery are disabled and only the trackers are used"}}"><input type="checkbox" name="private" value="1"> {{tr "Private"}}</label>
       </div>
-      <label class="field">Comment (optional)<input type="text" name="comment" autocomplete="off" title="Comment stored in the .torrent, for example the source or the release group"></label>
-      <label class="field">Trackers, one per line<textarea name="trackers" rows="3" autocomplete="off" title="Tracker announce URLs, one per line (optional, for swarm discovery)"></textarea></label>
-      <label class="field">Web seeds, one per line<textarea name="webseeds" rows="2" autocomplete="off" placeholder="https://example/file" title="HTTP/HTTPS web seeds stored in the .torrent, one per line (optional, BEP 19)"></textarea></label>
+      <label class="field">{{tr "Comment (optional)"}}<input type="text" name="comment" autocomplete="off" title="{{tr "Comment stored in the .torrent, for example the source or the release group"}}"></label>
+      <label class="field">{{tr "Trackers, one per line"}}<textarea name="trackers" rows="3" autocomplete="off" title="{{tr "Tracker announce URLs, one per line (optional, for swarm discovery)"}}"></textarea></label>
+      <label class="field">{{tr "Web seeds, one per line"}}<textarea name="webseeds" rows="2" autocomplete="off" placeholder="https://example/file" title="{{tr "HTTP/HTTPS web seeds stored in the .torrent, one per line (optional, BEP 19)"}}"></textarea></label>
     </div>
     <div class="dlg-foot">
-      <button type="button" data-close title="Close without creating">Cancel</button>
-      <button type="submit" class="primary" title="Create and download the .torrent file">Create .torrent</button>
+      <button type="button" data-close title="{{tr "Close without creating"}}">{{tr "Cancel"}}</button>
+      <button type="submit" class="primary" title="{{tr "Create and download the .torrent file"}}">{{tr "Create .torrent"}}</button>
     </div>
   </form>
 </dialog>
@@ -731,17 +731,17 @@ body{display:flex;flex-direction:column;overflow:hidden}
 {{if .SearchEnabled}}
 <dialog id="dlg-search" aria-labelledby="dlg-search-title" style="width:min(760px,calc(100vw - 32px))">
   <form method="dialog" id="form-search">
-    <div class="dlg-head"><h2 id="dlg-search-title">Search indexers</h2><button type="button" class="ghost icon" data-close aria-label="Close" title="Close"><svg class="i"><use href="#i-x"/></svg></button></div>
+    <div class="dlg-head"><h2 id="dlg-search-title">{{tr "Search indexers"}}</h2><button type="button" class="ghost icon" data-close aria-label="{{tr "Close"}}" title="{{tr "Close"}}"><svg class="i"><use href="#i-x"/></svg></button></div>
     <div class="dlg-body">
       <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <input type="search" id="searchbox" style="flex:1;min-width:220px" placeholder="Search indexers…" autocomplete="off" aria-label="Search indexers…" title="Search configured Torznab indexers for releases">
-        <select id="search-sort" aria-label="Sort results" title="Order of the search results: most seeders, largest, newest or name">
-          <option value="seeders">Seeds</option>
-          <option value="size">Size</option>
-          <option value="date">Newest</option>
-          <option value="name">Name</option>
+        <input type="search" id="searchbox" style="flex:1;min-width:220px" placeholder="{{tr "Search indexers…"}}" autocomplete="off" aria-label="{{tr "Search indexers…"}}" title="{{tr "Search configured Torznab indexers for releases"}}">
+        <select id="search-sort" aria-label="{{tr "Sort results"}}" title="{{tr "Order of the search results: most seeders, largest, newest or name"}}">
+          <option value="seeders">{{tr "Seeds"}}</option>
+          <option value="size">{{tr "Size"}}</option>
+          <option value="date">{{tr "Newest"}}</option>
+          <option value="name">{{tr "Name"}}</option>
         </select>
-        <button type="submit" class="primary" title="Execute search query across configured indexers">Search</button>
+        <button type="submit" class="primary" title="{{tr "Execute search query across configured indexers"}}">{{tr "Search"}}</button>
       </div>
       <p class="muted" id="searchinfo" style="margin:0" aria-live="polite"></p>
       <div class="results" id="searchresults"></div>
@@ -751,19 +751,19 @@ body{display:flex;flex-direction:column;overflow:hidden}
 {{end}}
 
 {{if .Standalone}}
-<dialog id="browse-overlay" class="picker" data-browse-endpoint="/ui/browse-dir" aria-label="Choose an existing folder on the server">
-  <div class="picker-head"><code id="browse-path"></code><button type="button" data-picker-close title="Cancel folder selection">Cancel</button></div>
+<dialog id="browse-overlay" class="picker" data-browse-endpoint="/ui/browse-dir" aria-label="{{tr "Choose an existing folder on the server"}}">
+  <div class="picker-head"><code id="browse-path"></code><button type="button" data-picker-close title="{{tr "Cancel folder selection"}}">{{tr "Cancel"}}</button></div>
   <div class="picker-list" id="browse-list"></div>
   <div class="picker-foot">
-    <button type="button" data-picker-up title="Navigate to parent directory">↑ Parent</button>
-    <button type="button" class="primary" data-picker-choose title="Select the current directory as destination folder">Choose this folder</button>
+    <button type="button" data-picker-up title="{{tr "Navigate to parent directory"}}">{{tr "↑ Parent"}}</button>
+    <button type="button" class="primary" data-picker-choose title="{{tr "Select the current directory as destination folder"}}">{{tr "Choose this folder"}}</button>
   </div>
 </dialog>
 {{end}}
 
 <datalist id="catlist-all">{{range .Categories}}<option value="{{.}}">{{end}}</datalist>
 <datalist id="savepaths"></datalist>
-<div class="dropzone" id="dropzone" hidden>Drop .torrent files to add them</div>
+<div class="dropzone" id="dropzone" hidden>{{tr "Drop .torrent files to add them"}}</div>
 
 <script id="ui-i18n"></script>
 <script src="/assets/common.js"></script>
@@ -1833,128 +1833,128 @@ window.gxShowMore=function(){if(virtualAllowed()){state.rows=0;state.virtual=fal
 window.gxClearFilters=function(){state.filter={status:'all',cat:null,tag:null,tracker:null};state.q='';var f=$('#filter');if(f)f.value='';store.set('filter',state.filter);applyFilters();};
 })();
 </script>
-<a class="donate" href="https://www.paypal.com/cgi-bin/webscr?cmd=_donations&amp;business=azanzani@gmail.com&amp;item_name=Support+gx-torrent+Project" target="_blank" rel="noopener noreferrer" title="Support gx-torrent with a PayPal donation" aria-label="Support gx-torrent with a PayPal donation"><span class="donate-icon" aria-hidden="true">❤️</span><span class="donate-label">Donate</span></a>
+<a class="donate" href="https://www.paypal.com/cgi-bin/webscr?cmd=_donations&amp;business=azanzani@gmail.com&amp;item_name=Support+gx-torrent+Project" target="_blank" rel="noopener noreferrer" title="{{tr "Support gx-torrent with a PayPal donation"}}" aria-label="{{tr "Support gx-torrent with a PayPal donation"}}"><span class="donate-icon" aria-hidden="true">❤️</span><span class="donate-label">{{tr "Donate"}}</span></a>
 </body>
 </html>{{define "addopts"}}
       <details class="addmore">
-        <summary>Options</summary>
+        <summary>{{tr "Options"}}</summary>
         <div class="opts" style="margin-top:10px">
-          <label class="chk" title="Add torrent in paused state without starting download immediately"><input type="checkbox" name="paused" value="1"> paused</label>
-          <label class="chk" title="Place torrent at the top of the download queue"><input type="checkbox" name="top" value="1"> top</label>
-          <label class="chk" title="Download pieces in order (streaming); slower overall"><input type="checkbox" name="sequential" value="1"> sequential</label>
-          <label class="chk" title="Download the ends of every file first"><input type="checkbox" name="first_last" value="1"> first/last</label>
-          <label class="chk" title="BEP 16 super-seeding: advertise one piece at a time so the swarm spreads the data. For initial seeding only; it reduces the seed's upload throughput"><input type="checkbox" name="super_seeding" value="1"> super-seeding</label>
-          <label class="chk" title="Skip the initial check: the files already on disk are trusted as complete and seeding starts at once. Each piece is checked the first time a peer asks for it and is never sent if it does not match; a piece that fails ends this mode and every file is checked again"><input type="checkbox" name="seed_mode" value="1"> skip check</label>
+          <label class="chk" title="{{tr "Add torrent in paused state without starting download immediately"}}"><input type="checkbox" name="paused" value="1"> {{tr "paused"}}</label>
+          <label class="chk" title="{{tr "Place torrent at the top of the download queue"}}"><input type="checkbox" name="top" value="1"> {{tr "top"}}</label>
+          <label class="chk" title="{{tr "Download pieces in order (streaming); slower overall"}}"><input type="checkbox" name="sequential" value="1"> {{tr "sequential"}}</label>
+          <label class="chk" title="{{tr "Download the ends of every file first"}}"><input type="checkbox" name="first_last" value="1"> {{tr "first/last"}}</label>
+          <label class="chk" title="{{tr "BEP 16 super-seeding: advertise one piece at a time so the swarm spreads the data. For initial seeding only; it reduces the seed's upload throughput"}}"><input type="checkbox" name="super_seeding" value="1"> {{tr "super-seeding"}}</label>
+          <label class="chk" title="{{tr "Skip the initial check: the files already on disk are trusted as complete and seeding starts at once. Each piece is checked the first time a peer asks for it and is never sent if it does not match; a piece that fails ends this mode and every file is checked again"}}"><input type="checkbox" name="seed_mode" value="1"> {{tr "skip check"}}</label>
         </div>
         <div class="form-grid" style="margin-top:10px">
-          <label title="Download speed limit for the added torrents in KiB/s: 0 = unlimited, empty = follow the global limit">Download limit (KiB/s)<input type="number" min="0" name="download_limit" placeholder="global"></label>
-          <label title="Upload speed limit for the added torrents in KiB/s: 0 = unlimited, empty = follow the global limit">Upload limit (KiB/s)<input type="number" min="0" name="upload_limit" placeholder="global"></label>
-          {{if .Standalone}}<label title="Seed ratio limit for the added torrents: 0 = unlimited, empty = follow the global limit">Seed ratio<input type="number" min="0" step="any" name="seed_ratio" placeholder="global"></label>
-          <label title="Maximum seeding time for the added torrents in days: 0 = unlimited, empty = follow the global limit">Seed days<input type="number" min="0" name="seed_days" placeholder="global"></label>{{end}}
-          <label title="How the files are placed in the save folder: as in the torrent, always inside a folder of their own, or without the torrent's root folder. Default follows the settings">Content layout<select name="content_layout"><option value="">Default</option><option value="Original">Original</option><option value="Subfolder">Create subfolder</option><option value="NoSubfolder">Don't create subfolder</option></select></label>
+          <label title="{{tr "Download speed limit for the added torrents in KiB/s: 0 = unlimited, empty = follow the global limit"}}">{{tr "Download limit (KiB/s)"}}<input type="number" min="0" name="download_limit" placeholder="global"></label>
+          <label title="{{tr "Upload speed limit for the added torrents in KiB/s: 0 = unlimited, empty = follow the global limit"}}">{{tr "Upload limit (KiB/s)"}}<input type="number" min="0" name="upload_limit" placeholder="global"></label>
+          {{if .Standalone}}<label title="{{tr "Seed ratio limit for the added torrents: 0 = unlimited, empty = follow the global limit"}}">{{tr "Seed ratio"}}<input type="number" min="0" step="any" name="seed_ratio" placeholder="global"></label>
+          <label title="{{tr "Maximum seeding time for the added torrents in days: 0 = unlimited, empty = follow the global limit"}}">{{tr "Seed days"}}<input type="number" min="0" name="seed_days" placeholder="global"></label>{{end}}
+          <label title="{{tr "How the files are placed in the save folder: as in the torrent, always inside a folder of their own, or without the torrent's root folder. Default follows the settings"}}">{{tr "Content layout"}}<select name="content_layout"><option value="">{{tr "Default"}}</option><option value="Original">{{tr "Original"}}</option><option value="Subfolder">{{tr "Create subfolder"}}</option><option value="NoSubfolder">{{tr "Don't create subfolder"}}</option></select></label>
         </div>
       </details>
-{{end}}{{define "fragments"}}<div id="frag-side">{{template "side" .}}</div><div id="frag-live">{{template "live" .}}</div><div id="frag-status">{{template "status" .}}</div><div id="frag-speeds">{{template "speeds" .}}</div><div id="frag-sbmore">{{template "sbmore" .}}</div>{{end}}{{define "fragments-notable"}}<div id="frag-side">{{template "side" .}}</div><div id="frag-status">{{template "status" .}}</div><div id="frag-speeds">{{template "speeds" .}}</div><div id="frag-sbmore">{{template "sbmore" .}}</div>{{end}}{{define "speeds"}}<span class="d" title="Download speed"><svg class="i"><use href="#i-down"/></svg>{{.DownloadRate}}</span><span class="u" title="Upload speed"><svg class="i"><use href="#i-up"/></svg>{{.UploadRate}}</span>{{end}}{{define "side"}}
+{{end}}{{define "fragments"}}<div id="frag-side">{{template "side" .}}</div><div id="frag-live">{{template "live" .}}</div><div id="frag-status">{{template "status" .}}</div><div id="frag-speeds">{{template "speeds" .}}</div><div id="frag-sbmore">{{template "sbmore" .}}</div>{{end}}{{define "fragments-notable"}}<div id="frag-side">{{template "side" .}}</div><div id="frag-status">{{template "status" .}}</div><div id="frag-speeds">{{template "speeds" .}}</div><div id="frag-sbmore">{{template "sbmore" .}}</div>{{end}}{{define "speeds"}}<span class="d" title="{{tr "Download speed"}}"><svg class="i"><use href="#i-down"/></svg>{{.DownloadRate}}</span><span class="u" title="{{tr "Upload speed"}}"><svg class="i"><use href="#i-up"/></svg>{{.UploadRate}}</span>{{end}}{{define "side"}}
     <section aria-labelledby="h-status">
-      <h2 id="h-status"><button type="button" aria-expanded="true" aria-controls="sec-status" data-sec="status"><svg class="i"><use href="#i-chev"/></svg><span>Status</span></button></h2>
+      <h2 id="h-status"><button type="button" aria-expanded="true" aria-controls="sec-status" data-sec="status"><svg class="i"><use href="#i-chev"/></svg><span>{{tr "Status"}}</span></button></h2>
       <ul class="flist" id="sec-status">
-        <li><button type="button" data-status="all" aria-pressed="true" title="Show all torrents in the session"><svg class="i"><use href="#i-list"/></svg><span class="lbl">All</span><span class="n">{{.CountAll}}</span></button></li>
-        <li><button type="button" data-status="downloading" aria-pressed="false" title="Show only torrents currently downloading"><svg class="i"><use href="#i-dl"/></svg><span class="lbl">Downloading</span><span class="n">{{.CountDown}}</span></button></li>
-        <li><button type="button" data-status="seeding" aria-pressed="false" title="Show only torrents currently seeding"><svg class="i"><use href="#i-seed"/></svg><span class="lbl">Seeding</span><span class="n">{{.CountSeeding}}</span></button></li>
-        <li><button type="button" data-status="completed" aria-pressed="false" title="Show only torrents whose download is complete"><svg class="i"><use href="#i-done"/></svg><span class="lbl">Completed</span><span class="n">{{.CountCompleted}}</span></button></li>
-        <li><button type="button" data-status="running" aria-pressed="false" title="Show only torrents that are not paused"><svg class="i"><use href="#i-run"/></svg><span class="lbl">Running</span><span class="n">{{.CountRunning}}</span></button></li>
-        <li><button type="button" data-status="paused" aria-pressed="false" title="Show only paused torrents"><svg class="i"><use href="#i-pausec"/></svg><span class="lbl">Paused</span><span class="n">{{.CountPaused}}</span></button></li>
-        <li><button type="button" data-status="active" aria-pressed="false" title="Show only torrents moving data right now"><svg class="i"><use href="#i-activity"/></svg><span class="lbl">Active</span><span class="n">{{.CountActive}}</span></button></li>
-        <li><button type="button" data-status="inactive" aria-pressed="false" title="Show only torrents not moving data right now"><svg class="i"><use href="#i-sleep"/></svg><span class="lbl">Inactive</span><span class="n">{{.CountInactive}}</span></button></li>
-        <li><button type="button" data-status="stalled" aria-pressed="false" title="Show only stalled torrents (no seeders or peers)"><svg class="i"><use href="#i-warn"/></svg><span class="lbl">Stalled</span><span class="n">{{.CountStalled}}</span></button></li>
-        <li><button type="button" data-status="checking" aria-pressed="false" title="Show only torrents whose data is being checked"><svg class="i"><use href="#i-check"/></svg><span class="lbl">Checking</span><span class="n">{{.CountChecking}}</span></button></li>
-        <li><button type="button" data-status="moving" aria-pressed="false" title="Show only torrents currently being moved across storage"><svg class="i"><use href="#i-move"/></svg><span class="lbl">Moving</span><span class="n">{{.CountMoving}}</span></button></li>
-        <li><button type="button" data-status="error" aria-pressed="false" title="Show only torrents in error state"><svg class="i"><use href="#i-xc"/></svg><span class="lbl">Errored</span><span class="n">{{.CountError}}</span></button></li>
+        <li><button type="button" data-status="all" aria-pressed="true" title="{{tr "Show all torrents in the session"}}"><svg class="i"><use href="#i-list"/></svg><span class="lbl">{{tr "All"}}</span><span class="n">{{.CountAll}}</span></button></li>
+        <li><button type="button" data-status="downloading" aria-pressed="false" title="{{tr "Show only torrents currently downloading"}}"><svg class="i"><use href="#i-dl"/></svg><span class="lbl">{{tr "Downloading"}}</span><span class="n">{{.CountDown}}</span></button></li>
+        <li><button type="button" data-status="seeding" aria-pressed="false" title="{{tr "Show only torrents currently seeding"}}"><svg class="i"><use href="#i-seed"/></svg><span class="lbl">{{tr "Seeding"}}</span><span class="n">{{.CountSeeding}}</span></button></li>
+        <li><button type="button" data-status="completed" aria-pressed="false" title="{{tr "Show only torrents whose download is complete"}}"><svg class="i"><use href="#i-done"/></svg><span class="lbl">{{tr "Completed"}}</span><span class="n">{{.CountCompleted}}</span></button></li>
+        <li><button type="button" data-status="running" aria-pressed="false" title="{{tr "Show only torrents that are not paused"}}"><svg class="i"><use href="#i-run"/></svg><span class="lbl">{{tr "Running"}}</span><span class="n">{{.CountRunning}}</span></button></li>
+        <li><button type="button" data-status="paused" aria-pressed="false" title="{{tr "Show only paused torrents"}}"><svg class="i"><use href="#i-pausec"/></svg><span class="lbl">{{tr "Paused"}}</span><span class="n">{{.CountPaused}}</span></button></li>
+        <li><button type="button" data-status="active" aria-pressed="false" title="{{tr "Show only torrents moving data right now"}}"><svg class="i"><use href="#i-activity"/></svg><span class="lbl">{{tr "Active"}}</span><span class="n">{{.CountActive}}</span></button></li>
+        <li><button type="button" data-status="inactive" aria-pressed="false" title="{{tr "Show only torrents not moving data right now"}}"><svg class="i"><use href="#i-sleep"/></svg><span class="lbl">{{tr "Inactive"}}</span><span class="n">{{.CountInactive}}</span></button></li>
+        <li><button type="button" data-status="stalled" aria-pressed="false" title="{{tr "Show only stalled torrents (no seeders or peers)"}}"><svg class="i"><use href="#i-warn"/></svg><span class="lbl">{{tr "Stalled"}}</span><span class="n">{{.CountStalled}}</span></button></li>
+        <li><button type="button" data-status="checking" aria-pressed="false" title="{{tr "Show only torrents whose data is being checked"}}"><svg class="i"><use href="#i-check"/></svg><span class="lbl">{{tr "Checking"}}</span><span class="n">{{.CountChecking}}</span></button></li>
+        <li><button type="button" data-status="moving" aria-pressed="false" title="{{tr "Show only torrents currently being moved across storage"}}"><svg class="i"><use href="#i-move"/></svg><span class="lbl">{{tr "Moving"}}</span><span class="n">{{.CountMoving}}</span></button></li>
+        <li><button type="button" data-status="error" aria-pressed="false" title="{{tr "Show only torrents in error state"}}"><svg class="i"><use href="#i-xc"/></svg><span class="lbl">{{tr "Errored"}}</span><span class="n">{{.CountError}}</span></button></li>
       </ul>
     </section>
     {{if .Standalone}}
     <section aria-labelledby="h-cats">
-      <h2 id="h-cats"><button type="button" aria-expanded="true" aria-controls="sec-cats" data-sec="cats"><svg class="i"><use href="#i-chev"/></svg><span>Categories</span></button></h2>
+      <h2 id="h-cats"><button type="button" aria-expanded="true" aria-controls="sec-cats" data-sec="cats"><svg class="i"><use href="#i-chev"/></svg><span>{{tr "Categories"}}</span></button></h2>
       <ul class="flist" id="sec-cats">
-        <li><button type="button" data-catbtn data-all data-cat="" aria-pressed="true" title="Torrents of every category"><svg class="i"><use href="#i-folder"/></svg><span class="lbl">All</span><span class="n">{{.CountAll}}</span></button></li>
-        <li><button type="button" data-catbtn data-cat="" aria-pressed="false" title="Torrents without a category"><svg class="i"><use href="#i-folder"/></svg><span class="lbl">Uncategorized</span><span class="n">0</span></button></li>
-        {{range .Categories}}<li><button type="button" data-catbtn data-cat="{{.}}" aria-pressed="false" title="Filter torrents by category"><svg class="i"><use href="#i-folder"/></svg><span class="lbl">{{.}}</span><span class="n">0</span></button></li>{{end}}
+        <li><button type="button" data-catbtn data-all data-cat="" aria-pressed="true" title="{{tr "Torrents of every category"}}"><svg class="i"><use href="#i-folder"/></svg><span class="lbl">{{tr "All"}}</span><span class="n">{{.CountAll}}</span></button></li>
+        <li><button type="button" data-catbtn data-cat="" aria-pressed="false" title="{{tr "Torrents without a category"}}"><svg class="i"><use href="#i-folder"/></svg><span class="lbl">{{tr "Uncategorized"}}</span><span class="n">0</span></button></li>
+        {{range .Categories}}<li><button type="button" data-catbtn data-cat="{{.}}" aria-pressed="false" title="{{tr "Filter torrents by category"}}"><svg class="i"><use href="#i-folder"/></svg><span class="lbl">{{.}}</span><span class="n">0</span></button></li>{{end}}
       </ul>
     </section>
     <section aria-labelledby="h-tags">
-      <h2 id="h-tags"><button type="button" aria-expanded="true" aria-controls="sec-tags" data-sec="tags"><svg class="i"><use href="#i-chev"/></svg><span>Tags</span></button></h2>
+      <h2 id="h-tags"><button type="button" aria-expanded="true" aria-controls="sec-tags" data-sec="tags"><svg class="i"><use href="#i-chev"/></svg><span>{{tr "Tags"}}</span></button></h2>
       <ul class="flist" id="sec-tags">
-        <li><button type="button" data-tagbtn data-all data-tag="" aria-pressed="true" title="Torrents with any tag or none"><svg class="i"><use href="#i-tag"/></svg><span class="lbl">All</span><span class="n">{{.CountAll}}</span></button></li>
-        <li><button type="button" data-tagbtn data-tag="" aria-pressed="false" title="Torrents without tags"><svg class="i"><use href="#i-tag"/></svg><span class="lbl">Untagged</span><span class="n">0</span></button></li>
-        {{range .Tags}}<li><button type="button" data-tagbtn data-tag="{{.}}" aria-pressed="false" title="Filter torrents by tag"><svg class="i"><use href="#i-tag"/></svg><span class="lbl">{{.}}</span><span class="n">0</span></button></li>{{end}}
+        <li><button type="button" data-tagbtn data-all data-tag="" aria-pressed="true" title="{{tr "Torrents with any tag or none"}}"><svg class="i"><use href="#i-tag"/></svg><span class="lbl">{{tr "All"}}</span><span class="n">{{.CountAll}}</span></button></li>
+        <li><button type="button" data-tagbtn data-tag="" aria-pressed="false" title="{{tr "Torrents without tags"}}"><svg class="i"><use href="#i-tag"/></svg><span class="lbl">{{tr "Untagged"}}</span><span class="n">0</span></button></li>
+        {{range .Tags}}<li><button type="button" data-tagbtn data-tag="{{.}}" aria-pressed="false" title="{{tr "Filter torrents by tag"}}"><svg class="i"><use href="#i-tag"/></svg><span class="lbl">{{.}}</span><span class="n">0</span></button></li>{{end}}
       </ul>
     </section>
     {{end}}
     <section aria-labelledby="h-trackers">
-      <h2 id="h-trackers"><button type="button" aria-expanded="true" aria-controls="sec-trackers" data-sec="trackers"><svg class="i"><use href="#i-chev"/></svg><span>Trackers</span></button></h2>
+      <h2 id="h-trackers"><button type="button" aria-expanded="true" aria-controls="sec-trackers" data-sec="trackers"><svg class="i"><use href="#i-chev"/></svg><span>{{tr "Trackers"}}</span></button></h2>
       <ul class="flist" id="sec-trackers">
-        <li><button type="button" data-trkbtn data-all data-tracker="" aria-pressed="true" title="Torrents of every tracker"><svg class="i"><use href="#i-server"/></svg><span class="lbl">All</span><span class="n">{{.CountAll}}</span></button></li>
-        {{range .TrackerHosts}}{{if .Name}}<li><button type="button" data-trkbtn data-tracker="{{.Name}}" aria-pressed="false" title="Filter torrents by the tracker that answers for them"><svg class="i"><use href="#i-server"/></svg><span class="lbl">{{.Name}}</span><span class="n">{{.Count}}</span></button></li>{{else}}<li><button type="button" data-trkbtn data-tracker="" aria-pressed="false" title="Torrents without a working tracker: none answers yet, or they have none (DHT and peer exchange only)"><svg class="i"><use href="#i-server"/></svg><span class="lbl">No working tracker</span><span class="n">{{.Count}}</span></button></li>{{end}}{{end}}
+        <li><button type="button" data-trkbtn data-all data-tracker="" aria-pressed="true" title="{{tr "Torrents of every tracker"}}"><svg class="i"><use href="#i-server"/></svg><span class="lbl">{{tr "All"}}</span><span class="n">{{.CountAll}}</span></button></li>
+        {{range .TrackerHosts}}{{if .Name}}<li><button type="button" data-trkbtn data-tracker="{{.Name}}" aria-pressed="false" title="{{tr "Filter torrents by the tracker that answers for them"}}"><svg class="i"><use href="#i-server"/></svg><span class="lbl">{{.Name}}</span><span class="n">{{.Count}}</span></button></li>{{else}}<li><button type="button" data-trkbtn data-tracker="" aria-pressed="false" title="{{tr "Torrents without a working tracker: none answers yet, or they have none (DHT and peer exchange only)"}}"><svg class="i"><use href="#i-server"/></svg><span class="lbl">{{tr "No working tracker"}}</span><span class="n">{{.Count}}</span></button></li>{{end}}{{end}}
       </ul>
     </section>
 {{end}}{{define "status"}}
-    <span {{if .PortReachable}}title="The peer port is reachable from the internet (router mapping or incoming peers)"{{else}}title="No router mapping and no incoming peer yet: the peer port may be closed"{{end}}><span class="dot {{if .PortReachable}}ok{{else}}bad{{end}}" aria-hidden="true"></span><span>Port</span> <b>{{.PeerPort}}</b> {{if not .PortOpen}}<span class="subtle hide-m">not open</span>{{end}}</span>
-    <span title="Nodes in the DHT routing table">DHT <b>{{if .DHT}}{{.DHTNodes}}{{else}}<span>off</span>{{end}}</b></span>
-    <span class="disk" title="Free space on the download folder"><svg class="i"><use href="#i-disk"/></svg><span class="hide-m">Free space</span> <b>{{bytes .DiskFree}}</b><span class="subtle hide-m">/ {{bytes .DiskTotal}}</span></span>
+    <span {{if .PortReachable}}title="{{tr "The peer port is reachable from the internet (router mapping or incoming peers)"}}"{{else}}title="{{tr "No router mapping and no incoming peer yet: the peer port may be closed"}}"{{end}}><span class="dot {{if .PortReachable}}ok{{else}}bad{{end}}" aria-hidden="true"></span><span>{{tr "Port"}}</span> <b>{{.PeerPort}}</b> {{if not .PortOpen}}<span class="subtle hide-m">{{tr "not open"}}</span>{{end}}</span>
+    <span title="{{tr "Nodes in the DHT routing table"}}">{{tr "DHT"}} <b>{{if .DHT}}{{.DHTNodes}}{{else}}<span>{{tr "off"}}</span>{{end}}</b></span>
+    <span class="disk" title="{{tr "Free space on the download folder"}}"><svg class="i"><use href="#i-disk"/></svg><span class="hide-m">{{tr "Free space"}}</span> <b>{{bytes .DiskFree}}</b><span class="subtle hide-m">/ {{bytes .DiskTotal}}</span></span>
     <span class="spacer"></span>
-    {{if .UpdateAvailable}}<a class="sb-update" href="/ui/settings#maintenance" title="A new version of gx-torrent is available: open Settings, Maintenance to see the changes and install it"><span class="dot warn" aria-hidden="true"></span><span>Update available</span>{{if .UpdateDate}} <span class="subtle">{{.UpdateDate}}</span>{{end}}</a>{{end}}
-    {{if .Standalone}}<button type="button" class="sb-alt" role="switch" aria-checked="{{if .AltSpeed}}true{{else}}false{{end}}" data-alt-speed title="Toggle the alternative speed limits (the scheduler's window or the configured alternative limits)"><svg class="i"><use href="#i-clock"/></svg><span class="hide-m">Alternative limits</span></button>{{end}}
-    <button type="button" class="sb-btn" data-global-limits data-dl="{{.GlobalDownKib}}" data-ul="{{.GlobalUpKib}}" data-down="{{.DownRateRaw}}" data-up="{{.UpRateRaw}}" data-down-s="{{.DownloadRate}}" data-up-s="{{.UploadRate}}" title="Download and upload speed with the global limits: click to change the limits"><svg class="i d"><use href="#i-down"/></svg><b>{{.DownloadRate}}</b><span class="subtle">({{kibrate .GlobalDownKib}})</span><svg class="i u"><use href="#i-up"/></svg><b>{{.UploadRate}}</b><span class="subtle">({{kibrate .GlobalUpKib}})</span></button>
-    <button type="button" class="sb-btn" id="sb-more-btn" aria-expanded="false" aria-controls="sb-more" aria-label="Connection details" title="Connection details: totals, IP filter, encryption, process"><svg class="i"><use href="#i-info"/></svg></button>
+    {{if .UpdateAvailable}}<a class="sb-update" href="/ui/settings#maintenance" title="{{tr "A new version of gx-torrent is available: open Settings, Maintenance to see the changes and install it"}}"><span class="dot warn" aria-hidden="true"></span><span>{{tr "Update available"}}</span>{{if .UpdateDate}} <span class="subtle">{{.UpdateDate}}</span>{{end}}</a>{{end}}
+    {{if .Standalone}}<button type="button" class="sb-alt" role="switch" aria-checked="{{if .AltSpeed}}true{{else}}false{{end}}" data-alt-speed title="{{tr "Toggle the alternative speed limits (the scheduler's window or the configured alternative limits)"}}"><svg class="i"><use href="#i-clock"/></svg><span class="hide-m">{{tr "Alternative limits"}}</span></button>{{end}}
+    <button type="button" class="sb-btn" data-global-limits data-dl="{{.GlobalDownKib}}" data-ul="{{.GlobalUpKib}}" data-down="{{.DownRateRaw}}" data-up="{{.UpRateRaw}}" data-down-s="{{.DownloadRate}}" data-up-s="{{.UploadRate}}" title="{{tr "Download and upload speed with the global limits: click to change the limits"}}"><svg class="i d"><use href="#i-down"/></svg><b>{{.DownloadRate}}</b><span class="subtle">({{kibrate .GlobalDownKib}})</span><svg class="i u"><use href="#i-up"/></svg><b>{{.UploadRate}}</b><span class="subtle">({{kibrate .GlobalUpKib}})</span></button>
+    <button type="button" class="sb-btn" id="sb-more-btn" aria-expanded="false" aria-controls="sb-more" aria-label="{{tr "Connection details"}}" title="{{tr "Connection details: totals, IP filter, encryption, process"}}"><svg class="i"><use href="#i-info"/></svg></button>
 {{end}}{{define "sbmore"}}
-  <h2 id="sb-more-title">Connection details</h2>
-  <div class="row"><span>Downloaded / uploaded since start</span><b>{{bytes .TotalDown}} / {{bytes .TotalUp}}</b></div>
-  <div class="row"><span>External address</span><b>{{if .PortOpen}}{{.Router}}{{if .ExternalIP}} · {{.ExternalIP}}{{end}}{{else}}<span>not open</span>{{end}}</b></div>
-  <div class="row"><span>Incoming connections</span><b>{{.IncomingConns}}</b></div>
-  <div class="row"><span>IP filter</span><b {{if .IPFilterPath}}title="{{.IPFilterPath}}"{{end}}>{{if .IPFilter}}{{.IPFilter}}{{else}}<span>none</span>{{end}}</b></div>
-  <div class="row"><span>Encryption</span><b>{{.Encryption}}</b></div>
-  <div class="row"><span>Process (CPU, memory)</span><b>{{percent .CPUPercent}}% · {{bytes .ProcRSS}}</b></div>
-  {{if not .Standalone}}<div class="row"><span>Read / write cache</span><b>{{.CacheReadMB}}/{{.CacheWB}} MB</b></div>{{end}}
-  {{if .PeerErrors}}<div class="row"><span>Peer errors</span><b>{{.PeerErrors}}</b></div>{{end}}
-  {{if .UTPSocket}}<div class="row"><span>uTP socket</span><b>{{.UTPSocket}}</b></div>{{end}}
+  <h2 id="sb-more-title">{{tr "Connection details"}}</h2>
+  <div class="row"><span>{{tr "Downloaded / uploaded since start"}}</span><b>{{bytes .TotalDown}} / {{bytes .TotalUp}}</b></div>
+  <div class="row"><span>{{tr "External address"}}</span><b>{{if .PortOpen}}{{.Router}}{{if .ExternalIP}} · {{.ExternalIP}}{{end}}{{else}}<span>{{tr "not open"}}</span>{{end}}</b></div>
+  <div class="row"><span>{{tr "Incoming connections"}}</span><b>{{.IncomingConns}}</b></div>
+  <div class="row"><span>{{tr "IP filter"}}</span><b {{if .IPFilterPath}}title="{{.IPFilterPath}}"{{end}}>{{if .IPFilter}}{{.IPFilter}}{{else}}<span>{{tr "none"}}</span>{{end}}</b></div>
+  <div class="row"><span>{{tr "Encryption"}}</span><b>{{.Encryption}}</b></div>
+  <div class="row"><span>{{tr "Process (CPU, memory)"}}</span><b>{{percent .CPUPercent}}% · {{bytes .ProcRSS}}</b></div>
+  {{if not .Standalone}}<div class="row"><span>{{tr "Read / write cache"}}</span><b>{{.CacheReadMB}}/{{.CacheWB}} MB</b></div>{{end}}
+  {{if .PeerErrors}}<div class="row"><span>{{tr "Peer errors"}}</span><b>{{.PeerErrors}}</b></div>{{end}}
+  {{if .UTPSocket}}<div class="row"><span>{{tr "uTP socket"}}</span><b>{{.UTPSocket}}</b></div>{{end}}
 {{end}}{{define "live"}}
   {{if .Rows}}
-  <table class="tbl t" id="torrents" role="grid" aria-multiselectable="true" aria-label="Torrents">
+  <table class="tbl t" id="torrents" role="grid" aria-multiselectable="true" aria-label="{{tr "Torrents"}}">
     <thead><tr>
-      <th class="sel" scope="col"><input type="checkbox" id="selall" aria-label="Select all" title="Select all"></th>
-      <th scope="col" class="c-name" data-col="name" data-sort="name" aria-sort="none"><button type="button" class="sort" title="Sort by name">Name<span class="arrow" aria-hidden="true"></span></button></th>
-      {{template "th" "size"}}<button type="button" class="sort" title="Sort by size">Size<span class="arrow" aria-hidden="true"></span></button>{{template "rz"}}</th>
-      {{template "th" "progress"}}<button type="button" class="sort" title="Sort by progress">Progress<span class="arrow" aria-hidden="true"></span></button>{{template "rz"}}</th>
-      {{template "th" "state"}}<button type="button" class="sort" title="Sort by state">Status<span class="arrow" aria-hidden="true"></span></button>{{template "rz"}}</th>
-      {{template "thnum" "seeds"}}<button type="button" class="sort" title="Sort by connected seeds; in brackets the seeds the trackers report">Seeds<span class="arrow" aria-hidden="true"></span></button>{{template "rz"}}</th>
-      {{template "thnum" "peers"}}<button type="button" class="sort" title="Sort by connected peers; in brackets the peers the trackers report">Peers<span class="arrow" aria-hidden="true"></span></button>{{template "rz"}}</th>
-      {{template "thnum" "down"}}<button type="button" class="sort" title="Sort by download speed">Down speed<span class="arrow" aria-hidden="true"></span></button>{{template "rz"}}</th>
-      {{template "thnum" "up"}}<button type="button" class="sort" title="Sort by upload speed">Up speed<span class="arrow" aria-hidden="true"></span></button>{{template "rz"}}</th>
-      {{template "thnum" "eta"}}<button type="button" class="sort" title="Sort by time left">ETA<span class="arrow" aria-hidden="true"></span></button>{{template "rz"}}</th>
-      {{template "thnum" "ratio"}}<button type="button" class="sort" title="Sort by share ratio">Ratio<span class="arrow" aria-hidden="true"></span></button>{{template "rz"}}</th>
-      {{template "th" "category"}}<button type="button" class="sort" title="Sort by category">Category<span class="arrow" aria-hidden="true"></span></button>{{template "rz"}}</th>
-      {{template "th" "tags"}}<button type="button" class="sort" title="Sort by tags">Tags<span class="arrow" aria-hidden="true"></span></button>{{template "rz"}}</th>
-      {{template "th" "added"}}<button type="button" class="sort" title="Sort by the date the torrent was added">Added on<span class="arrow" aria-hidden="true"></span></button>{{template "rz"}}</th>
-      {{template "th" "completed"}}<button type="button" class="sort" title="Sort by the date the download completed">Completed on<span class="arrow" aria-hidden="true"></span></button>{{template "rz"}}</th>
-      {{template "thnum" "downloaded"}}<button type="button" class="sort" title="Sort by data downloaded">Downloaded<span class="arrow" aria-hidden="true"></span></button>{{template "rz"}}</th>
-      {{template "thnum" "uploaded"}}<button type="button" class="sort" title="Sort by data uploaded">Uploaded<span class="arrow" aria-hidden="true"></span></button>{{template "rz"}}</th>
-      {{template "thnum" "remaining"}}<button type="button" class="sort" title="Sort by data still to download">Remaining<span class="arrow" aria-hidden="true"></span></button>{{template "rz"}}</th>
-      {{template "thnum" "queue"}}<button type="button" class="sort" title="Sort by queue position">#<span class="arrow" aria-hidden="true"></span></button>{{template "rz"}}</th>
-      {{template "th" "tracker"}}<button type="button" class="sort" title="Sort by the tracker that answers">Tracker<span class="arrow" aria-hidden="true"></span></button>{{template "rz"}}</th>
-      {{template "th" "path"}}<button type="button" class="sort" title="Sort by save path">Save path<span class="arrow" aria-hidden="true"></span></button>{{template "rz"}}</th>
-      {{template "thnum" "availability"}}<button type="button" class="sort" title="Sort by swarm availability (average pieces available)">Availability<span class="arrow" aria-hidden="true"></span></button>{{template "rz"}}</th>
-      {{template "thnum" "active"}}<button type="button" class="sort" title="Sort by time since the torrent started">Time active<span class="arrow" aria-hidden="true"></span></button>{{template "rz"}}</th>
-      {{template "th" "lastactive"}}<button type="button" class="sort" title="Sort by the last data movement">Last activity<span class="arrow" aria-hidden="true"></span></button>{{template "rz"}}</th>
-      {{template "thnum" "wasted"}}<button type="button" class="sort" title="Sort by discarded data">Wasted<span class="arrow" aria-hidden="true"></span></button>{{template "rz"}}</th>
-      <th scope="col" class="c-more"><span class="sr-only">Actions</span></th>
+      <th class="sel" scope="col"><input type="checkbox" id="selall" aria-label="{{tr "Select all"}}" title="{{tr "Select all"}}"></th>
+      <th scope="col" class="c-name" data-col="name" data-sort="name" aria-sort="none"><button type="button" class="sort" title="{{tr "Sort by name"}}">{{tr "Name"}}<span class="arrow" aria-hidden="true"></span></button></th>
+      {{template "th" "size"}}<button type="button" class="sort" title="{{tr "Sort by size"}}">{{tr "Size"}}<span class="arrow" aria-hidden="true"></span></button>{{template "rz"}}</th>
+      {{template "th" "progress"}}<button type="button" class="sort" title="{{tr "Sort by progress"}}">{{tr "Progress"}}<span class="arrow" aria-hidden="true"></span></button>{{template "rz"}}</th>
+      {{template "th" "state"}}<button type="button" class="sort" title="{{tr "Sort by state"}}">{{tr "Status"}}<span class="arrow" aria-hidden="true"></span></button>{{template "rz"}}</th>
+      {{template "thnum" "seeds"}}<button type="button" class="sort" title="{{tr "Sort by connected seeds; in brackets the seeds the trackers report"}}">{{tr "Seeds"}}<span class="arrow" aria-hidden="true"></span></button>{{template "rz"}}</th>
+      {{template "thnum" "peers"}}<button type="button" class="sort" title="{{tr "Sort by connected peers; in brackets the peers the trackers report"}}">{{tr "Peers"}}<span class="arrow" aria-hidden="true"></span></button>{{template "rz"}}</th>
+      {{template "thnum" "down"}}<button type="button" class="sort" title="{{tr "Sort by download speed"}}">{{tr "Down speed"}}<span class="arrow" aria-hidden="true"></span></button>{{template "rz"}}</th>
+      {{template "thnum" "up"}}<button type="button" class="sort" title="{{tr "Sort by upload speed"}}">{{tr "Up speed"}}<span class="arrow" aria-hidden="true"></span></button>{{template "rz"}}</th>
+      {{template "thnum" "eta"}}<button type="button" class="sort" title="{{tr "Sort by time left"}}">{{tr "ETA"}}<span class="arrow" aria-hidden="true"></span></button>{{template "rz"}}</th>
+      {{template "thnum" "ratio"}}<button type="button" class="sort" title="{{tr "Sort by share ratio"}}">{{tr "Ratio"}}<span class="arrow" aria-hidden="true"></span></button>{{template "rz"}}</th>
+      {{template "th" "category"}}<button type="button" class="sort" title="{{tr "Sort by category"}}">{{tr "Category"}}<span class="arrow" aria-hidden="true"></span></button>{{template "rz"}}</th>
+      {{template "th" "tags"}}<button type="button" class="sort" title="{{tr "Sort by tags"}}">{{tr "Tags"}}<span class="arrow" aria-hidden="true"></span></button>{{template "rz"}}</th>
+      {{template "th" "added"}}<button type="button" class="sort" title="{{tr "Sort by the date the torrent was added"}}">{{tr "Added on"}}<span class="arrow" aria-hidden="true"></span></button>{{template "rz"}}</th>
+      {{template "th" "completed"}}<button type="button" class="sort" title="{{tr "Sort by the date the download completed"}}">{{tr "Completed on"}}<span class="arrow" aria-hidden="true"></span></button>{{template "rz"}}</th>
+      {{template "thnum" "downloaded"}}<button type="button" class="sort" title="{{tr "Sort by data downloaded"}}">{{tr "Downloaded"}}<span class="arrow" aria-hidden="true"></span></button>{{template "rz"}}</th>
+      {{template "thnum" "uploaded"}}<button type="button" class="sort" title="{{tr "Sort by data uploaded"}}">{{tr "Uploaded"}}<span class="arrow" aria-hidden="true"></span></button>{{template "rz"}}</th>
+      {{template "thnum" "remaining"}}<button type="button" class="sort" title="{{tr "Sort by data still to download"}}">{{tr "Remaining"}}<span class="arrow" aria-hidden="true"></span></button>{{template "rz"}}</th>
+      {{template "thnum" "queue"}}<button type="button" class="sort" title="{{tr "Sort by queue position"}}">#<span class="arrow" aria-hidden="true"></span></button>{{template "rz"}}</th>
+      {{template "th" "tracker"}}<button type="button" class="sort" title="{{tr "Sort by the tracker that answers"}}">{{tr "Tracker"}}<span class="arrow" aria-hidden="true"></span></button>{{template "rz"}}</th>
+      {{template "th" "path"}}<button type="button" class="sort" title="{{tr "Sort by save path"}}">{{tr "Save path"}}<span class="arrow" aria-hidden="true"></span></button>{{template "rz"}}</th>
+      {{template "thnum" "availability"}}<button type="button" class="sort" title="{{tr "Sort by swarm availability (average pieces available)"}}">{{tr "Availability"}}<span class="arrow" aria-hidden="true"></span></button>{{template "rz"}}</th>
+      {{template "thnum" "active"}}<button type="button" class="sort" title="{{tr "Sort by time since the torrent started"}}">{{tr "Time active"}}<span class="arrow" aria-hidden="true"></span></button>{{template "rz"}}</th>
+      {{template "th" "lastactive"}}<button type="button" class="sort" title="{{tr "Sort by the last data movement"}}">{{tr "Last activity"}}<span class="arrow" aria-hidden="true"></span></button>{{template "rz"}}</th>
+      {{template "thnum" "wasted"}}<button type="button" class="sort" title="{{tr "Sort by discarded data"}}">{{tr "Wasted"}}<span class="arrow" aria-hidden="true"></span></button>{{template "rz"}}</th>
+      <th scope="col" class="c-more"><span class="sr-only">{{tr "Actions"}}</span></th>
     </tr></thead>
     <tbody id="torrent-rows">
     {{range .Rows}}
     <tr tabindex="-1" aria-selected="false" data-hash="{{.Hash}}" data-name="{{.Name}}" data-state="{{.State}}" data-cat="{{.Category}}" data-tags="{{.Tags}}" data-tracker="{{.Tracker}}" data-tmm="{{if .AutoTMM}}1{{end}}" data-pin="{{if .Pinned}}1{{end}}" data-seq="{{if .Sequential}}1{{end}}" data-fl="{{if .FirstLast}}1{{end}}" data-ss="{{if .SuperSeeding}}1{{end}}" data-dll="{{.DLLimitKib}}" data-ull="{{.ULLimitKib}}" data-down="{{.DLRate}}" data-up="{{.ULRate}}" data-k-name="{{.Name}}" data-k-size="{{.TotalSize}}" data-k-progress="{{.Progress}}" data-k-state="{{.State}}" data-k-seeds="{{.Seeds}}" data-k-peers="{{.Peers}}" data-k-down="{{.DLRate}}" data-k-up="{{.ULRate}}" data-k-eta="{{.ETAVal}}" data-k-ratio="{{.RatioVal}}" data-k-category="{{.Category}}" data-k-tags="{{.Tags}}" data-k-added="{{.AddedVal}}" data-k-completed="{{.CompletedVal}}" data-k-downloaded="{{.DownloadedVal}}" data-k-uploaded="{{.UploadedVal}}" data-k-remaining="{{.RemainingVal}}" data-k-queue="{{.QueuePos}}" data-k-tracker="{{.Tracker}}" data-k-path="{{.SavePath}}" data-k-availability="{{.AvailabilityVal}}" data-k-active="{{.ActiveVal}}" data-k-lastactive="{{.LastActiveVal}}" data-k-wasted="{{.WastedVal}}">
-      <td class="sel"><input class="rowsel" type="checkbox" value="{{.Hash}}" aria-label="Select torrent" title="Select this torrent for batch actions"></td>
-      <td class="name c-name" title="{{.Name}}"><a class="open" href="/?open={{.Hash}}">{{.Name}}</a>{{if .Pinned}}<span class="fl" title="Force started: runs outside the queue limits">F</span>{{end}}</td>
+      <td class="sel"><input class="rowsel" type="checkbox" value="{{.Hash}}" aria-label="{{tr "Select torrent"}}" title="{{tr "Select this torrent for batch actions"}}"></td>
+      <td class="name c-name" title="{{.Name}}"><a class="open" href="/?open={{.Hash}}">{{.Name}}</a>{{if .Pinned}}<span class="fl" title="{{tr "Force started: runs outside the queue limits"}}">F</span>{{end}}</td>
       <td class="num c-size" title="{{.DoneSize}}">{{.Size}}</td>
-      <td class="c-progress"><div class="prog"><div class="pbar {{.State}}" role="progressbar" aria-valuenow="{{percent .Progress}}" aria-valuemin="0" aria-valuemax="100" aria-label="Progress"><i style="width:{{percent .Progress}}%"></i></div><span class="pct" aria-hidden="true">{{.ProgressS}}</span></div></td>
+      <td class="c-progress"><div class="prog"><div class="pbar {{.State}}" role="progressbar" aria-valuenow="{{percent .Progress}}" aria-valuemin="0" aria-valuemax="100" aria-label="{{tr "Progress"}}"><i style="width:{{percent .Progress}}%"></i></div><span class="pct" aria-hidden="true">{{.ProgressS}}</span></div></td>
       <td class="state c-state"><span class="badge b-{{.State}}">{{.StateLabel}}</span></td>
       <td class="num c-seeds">{{.Seeds}}{{if ge .SwarmSeeds 0}}<span class="subtle"> ({{.SwarmSeeds}})</span>{{end}}</td>
       <td class="num c-peers">{{.Peers}}{{if ge .SwarmPeers 0}}<span class="subtle"> ({{.SwarmPeers}})</span>{{end}}</td>
@@ -1977,210 +1977,210 @@ window.gxClearFilters=function(){state.filter={status:'all',cat:null,tag:null,tr
       <td class="c-lastactive">{{.LastActive}}</td>
       <td class="num c-wasted">{{.Wasted}}</td>
       <td class="meta-m"><span class="badge b-{{.State}}">{{.StateLabel}}</span><span>{{.Size}}</span><span>↓ {{.Down}}</span><span>↑ {{.Up}}</span><span>{{.ETA}}</span></td>
-      <td class="more"><button type="button" class="ghost icon sm" aria-haspopup="menu" aria-label="More actions" title="More actions"><svg class="i"><use href="#i-dots"/></svg></button></td>
+      <td class="more"><button type="button" class="ghost icon sm" aria-haspopup="menu" aria-label="{{tr "More actions"}}" title="{{tr "More actions"}}"><svg class="i"><use href="#i-dots"/></svg></button></td>
     </tr>
     {{end}}
     </tbody>
   </table>
-  <div class="emptystate" id="filtered-empty" hidden><svg class="i"><use href="#i-search"/></svg><h3>No torrent matches the filters</h3><button type="button" class="sm" onclick="gxClearFilters()" title="Show all torrents again">Clear filters</button></div>
+  <div class="emptystate" id="filtered-empty" hidden><svg class="i"><use href="#i-search"/></svg><h3>{{tr "No torrent matches the filters"}}</h3><button type="button" class="sm" onclick="gxClearFilters()" title="{{tr "Show all torrents again"}}">{{tr "Clear filters"}}</button></div>
   {{if .RowsLimited}}
-  <p class="more-rows muted"><span>Showing</span> {{.RowsShown}} <span>of</span> {{.RowsTotal}} · <button type="button" class="sm" onclick="gxShowMore()" title="Load more torrent rows in the table">Show more</button></p>
+  <p class="more-rows muted">{{tr "Showing %s of %s" .RowsShown .RowsTotal}} · <button type="button" class="sm" onclick="gxShowMore()" title="{{tr "Load more torrent rows in the table"}}">{{tr "Show more"}}</button></p>
   {{end}}
   {{else}}
   <div class="emptystate">
     <svg class="i"><use href="#i-inbox"/></svg>
-    <h3>No torrents in the session.</h3>
-    <p>Add a magnet link or a .torrent file, or drop one on the page.</p>
+    <h3>{{tr "No torrents in the session."}}</h3>
+    <p>{{tr "Add a magnet link or a .torrent file, or drop one on the page."}}</p>
     <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center">
-      <button type="button" class="primary" onclick="document.getElementById('btn-add').click()" title="Add torrents: magnet links, .torrent URLs or files (shortcut N)"><svg class="i"><use href="#i-plus"/></svg>Add</button>
-      {{if .SearchEnabled}}<button type="button" onclick="document.getElementById('btn-search').click()" title="Search configured Torznab indexers for releases">Search indexers</button>{{end}}
-      {{if .Standalone}}<a class="btn" href="/ui/rss" title="RSS feeds, indexers and rules">RSS &amp; indexers</a>{{end}}
+      <button type="button" class="primary" onclick="document.getElementById('btn-add').click()" title="{{tr "Add torrents: magnet links, .torrent URLs or files (shortcut N)"}}"><svg class="i"><use href="#i-plus"/></svg>{{tr "Add"}}</button>
+      {{if .SearchEnabled}}<button type="button" onclick="document.getElementById('btn-search').click()" title="{{tr "Search configured Torznab indexers for releases"}}">{{tr "Search indexers"}}</button>{{end}}
+      {{if .Standalone}}<a class="btn" href="/ui/rss" title="{{tr "RSS feeds, indexers and rules"}}">{{tr "RSS & indexers"}}</a>{{end}}
     </div>
   </div>
   {{end}}
-{{end}}{{define "th"}}<th scope="col" class="c-{{.}}" data-col="{{.}}" data-sort="{{.}}" aria-sort="none" style="position:sticky">{{end}}{{define "thnum"}}<th scope="col" class="num c-{{.}}" data-col="{{.}}" data-sort="{{.}}" aria-sort="none" style="position:sticky">{{end}}{{define "rz"}}<span class="rz" role="separator" aria-orientation="vertical" aria-valuemin="40" aria-valuemax="800" aria-valuenow="100" tabindex="0" aria-label="Resize column" title="Drag, or use the left and right arrows, to resize the column; double click for the default width"></span>{{end}}{{define "detail"}}
+{{end}}{{define "th"}}<th scope="col" class="c-{{.}}" data-col="{{.}}" data-sort="{{.}}" aria-sort="none" style="position:sticky">{{end}}{{define "thnum"}}<th scope="col" class="num c-{{.}}" data-col="{{.}}" data-sort="{{.}}" aria-sort="none" style="position:sticky">{{end}}{{define "rz"}}<span class="rz" role="separator" aria-orientation="vertical" aria-valuemin="40" aria-valuemax="800" aria-valuenow="100" tabindex="0" aria-label="{{tr "Resize column"}}" title="{{tr "Drag, or use the left and right arrows, to resize the column; double click for the default width"}}"></span>{{end}}{{define "detail"}}
 <div class="dhead">
   <h2 id="drawer-title">{{.Name}}</h2>
-  <button type="button" class="ghost icon" data-close-drawer aria-label="Close details" title="Close details"><svg class="i"><use href="#i-x"/></svg></button>
+  <button type="button" class="ghost icon" data-close-drawer aria-label="{{tr "Close details"}}" title="{{tr "Close details"}}"><svg class="i"><use href="#i-x"/></svg></button>
 </div>
 <div class="dbody">
-<div class="tabs" role="tablist" aria-label="Torrent details">
-  <button type="button" role="tab" data-tab="general" aria-selected="{{if eq .Tab "general"}}true{{else}}false{{end}}" title="General torrent information, transfer stats and limits">General</button>
-  <button type="button" role="tab" data-tab="files" aria-selected="{{if eq .Tab "files"}}true{{else}}false{{end}}" title="List of files in the torrent, individual progress and download priority"><span>Files</span> <span class="cnt">{{.FileCount}}</span></button>
-  <button type="button" role="tab" data-tab="peers" aria-selected="{{if eq .Tab "peers"}}true{{else}}false{{end}}" title="Connected peers, client software, flags and transfer rates"><span>Peers</span> <span class="cnt">{{.PeerCount}}</span></button>
-  <button type="button" role="tab" data-tab="trackers" aria-selected="{{if eq .Tab "trackers"}}true{{else}}false{{end}}" title="Trackers list, announce URLs, tiers and response status"><span>Trackers</span> <span class="cnt">{{.TrackerCount}}</span></button>
-  <button type="button" role="tab" data-tab="pieces" aria-selected="{{if eq .Tab "pieces"}}true{{else}}false{{end}}" title="Piece availability map and verified chunks">Pieces</button>
+<div class="tabs" role="tablist" aria-label="{{tr "Torrent details"}}">
+  <button type="button" role="tab" data-tab="general" aria-selected="{{if eq .Tab "general"}}true{{else}}false{{end}}" title="{{tr "General torrent information, transfer stats and limits"}}">{{tr "General"}}</button>
+  <button type="button" role="tab" data-tab="files" aria-selected="{{if eq .Tab "files"}}true{{else}}false{{end}}" title="{{tr "List of files in the torrent, individual progress and download priority"}}"><span>{{tr "Files"}}</span> <span class="cnt">{{.FileCount}}</span></button>
+  <button type="button" role="tab" data-tab="peers" aria-selected="{{if eq .Tab "peers"}}true{{else}}false{{end}}" title="{{tr "Connected peers, client software, flags and transfer rates"}}"><span>{{tr "Peers"}}</span> <span class="cnt">{{.PeerCount}}</span></button>
+  <button type="button" role="tab" data-tab="trackers" aria-selected="{{if eq .Tab "trackers"}}true{{else}}false{{end}}" title="{{tr "Trackers list, announce URLs, tiers and response status"}}"><span>{{tr "Trackers"}}</span> <span class="cnt">{{.TrackerCount}}</span></button>
+  <button type="button" role="tab" data-tab="pieces" aria-selected="{{if eq .Tab "pieces"}}true{{else}}false{{end}}" title="{{tr "Piece availability map and verified chunks"}}">{{tr "Pieces"}}</button>
 </div>
 <div role="tabpanel">
 {{if .Error}}<p class="notice err">{{.Error}}</p>{{end}}
 
 {{if eq .Tab "general"}}
   <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">
-    <button type="button" class="sm" data-dact="resume" title="Resume this torrent"><svg class="i"><use href="#i-play"/></svg>Resume</button>
-    <button type="button" class="sm" data-dact="pause" title="Pause this torrent"><svg class="i"><use href="#i-pause"/></svg>Pause</button>
-    <button type="button" class="sm" data-dact="verify" title="Recheck data on disk"><svg class="i"><use href="#i-check"/></svg>Recheck</button>
-    <button type="button" class="sm" data-dact="magnet" title="Copy magnet URI with info hash and trackers to clipboard"><svg class="i"><use href="#i-copy"/></svg>Copy magnet</button>
-    <button type="button" class="sm" data-dact="dht" title="Query the DHT network for active seeders and peers">DHT swarm</button>
-    <a class="btn sm" href="/ui/torrent-file?hash={{.Hash}}" download title="Export and download the .torrent metainfo file"><svg class="i"><use href="#i-file"/></svg>Export .torrent</a>
+    <button type="button" class="sm" data-dact="resume" title="{{tr "Resume this torrent"}}"><svg class="i"><use href="#i-play"/></svg>{{tr "Resume"}}</button>
+    <button type="button" class="sm" data-dact="pause" title="{{tr "Pause this torrent"}}"><svg class="i"><use href="#i-pause"/></svg>{{tr "Pause"}}</button>
+    <button type="button" class="sm" data-dact="verify" title="{{tr "Recheck data on disk"}}"><svg class="i"><use href="#i-check"/></svg>{{tr "Recheck"}}</button>
+    <button type="button" class="sm" data-dact="magnet" title="{{tr "Copy magnet URI with info hash and trackers to clipboard"}}"><svg class="i"><use href="#i-copy"/></svg>{{tr "Copy magnet"}}</button>
+    <button type="button" class="sm" data-dact="dht" title="{{tr "Query the DHT network for active seeders and peers"}}">{{tr "DHT swarm"}}</button>
+    <a class="btn sm" href="/ui/torrent-file?hash={{.Hash}}" download title="{{tr "Export and download the .torrent metainfo file"}}"><svg class="i"><use href="#i-file"/></svg>{{tr "Export .torrent"}}</a>
   </div>
-  <div class="progress {{.State}}" role="progressbar" aria-valuenow="{{percent .Progress}}" aria-valuemin="0" aria-valuemax="100" aria-label="Progress" style="height:8px;margin-bottom:14px"><i style="width:{{percent .Progress}}%"></i></div>
+  <div class="progress {{.State}}" role="progressbar" aria-valuenow="{{percent .Progress}}" aria-valuemin="0" aria-valuemax="100" aria-label="{{tr "Progress"}}" style="height:8px;margin-bottom:14px"><i style="width:{{percent .Progress}}%"></i></div>
   <div class="kv">
-    <div class="row"><span>State</span><strong><span>{{stateLabel .State}}</span></strong></div>
-    <div class="row"><span>Progress</span><strong>{{percent .Progress}}%</strong></div>
-    <div class="row"><span>Size</span><strong>{{bytes .TotalSize}}</strong></div>
-    <div class="row"><span>Done</span><strong>{{bytes .TotalDone}}</strong></div>
-    <div class="row"><span>Downloaded</span><strong>{{bytes .Downloaded}}</strong></div>
-    <div class="row"><span>Uploaded</span><strong>{{bytes .Uploaded}}</strong></div>
-    <div class="row"><span>Ratio</span><strong>{{printf "%.2f" .Ratio}}</strong></div>
+    <div class="row"><span>{{tr "State"}}</span><strong><span>{{tr (stateLabel .State)}}</span></strong></div>
+    <div class="row"><span>{{tr "Progress"}}</span><strong>{{percent .Progress}}%</strong></div>
+    <div class="row"><span>{{tr "Size"}}</span><strong>{{bytes .TotalSize}}</strong></div>
+    <div class="row"><span>{{tr "Done"}}</span><strong>{{bytes .TotalDone}}</strong></div>
+    <div class="row"><span>{{tr "Downloaded"}}</span><strong>{{bytes .Downloaded}}</strong></div>
+    <div class="row"><span>{{tr "Uploaded"}}</span><strong>{{bytes .Uploaded}}</strong></div>
+    <div class="row"><span>{{tr "Ratio"}}</span><strong>{{printf "%.2f" .Ratio}}</strong></div>
     <div class="row"><span>↓ / ↑</span><strong>{{rate .DownRate}} / {{rate .UpRate}}</strong></div>
-    <div class="row"><span>Peer / Seed</span><strong>{{.NumPeers}} / {{.NumSeeds}}</strong></div>
-    <div class="row"><span>Swarm (seeds / peers)</span><strong>{{if lt .NumComplete 0}}—{{else}}{{.NumComplete}}{{end}} / {{if lt .NumIncomplete 0}}—{{else}}{{.NumIncomplete}}{{end}}</strong></div>
-    <div class="row"><span>Availability</span><strong>{{if lt .AvailabilityPct 0.0}}—{{else}}{{printf "%.2f" .AvailabilityPct}}{{end}}</strong></div>
-    <div class="row"><span>ETA</span><strong>{{if lt .ETA 0}}—{{else}}{{dur .ETA}}{{end}}</strong></div>
-    <div class="row"><span>Time active</span><strong>{{if .ActiveStr}}{{.ActiveStr}}{{else}}—{{end}}</strong></div>
-    <div class="row"><span>Last activity</span><strong>{{if .LastActiveStr}}{{.LastActiveStr}}{{else}}—{{end}}</strong></div>
-    <div class="row"><span>Seeding time</span><strong>{{if .SeedingStr}}{{.SeedingStr}}{{else}}—{{end}}</strong></div>
-    <div class="row"><span>Next announce</span><strong>{{if lt .NextAnnounce 0}}—{{else}}{{dur .NextAnnounce}}{{end}}</strong></div>
-    <div class="row"><span>Folder</span><strong>{{.SavePath}}</strong></div>
-    <div class="row"><span>Seed ratio set</span><strong>{{if lt .SeedRatio 0.0}}<span>Global</span>{{else if eq .SeedRatio 0.0}}<span>Unlimited</span>{{else}}{{printf "%.2f" .SeedRatio}}{{end}}</strong></div>
-    <div class="row"><span>Seed days</span><strong>{{if lt .SeedDays 0}}<span>Global</span>{{else if eq .SeedDays 0}}<span>Unlimited</span>{{else}}{{.SeedDays}}{{end}}</strong></div>
-    <div class="row"><span>Pin</span><strong>{{if .Pinned}}yes{{else}}no{{end}}</strong></div>
-    <div class="row"><span>Private</span><strong>{{if .Private}}yes{{else}}no{{end}}</strong></div>
-    <div class="row"><span>File</span><strong>{{.FileCount}}</strong></div>
-    <div class="row"><span>Available / total pieces</span><strong>{{.PiecesAvailable}} / {{.PiecesTotal}} ({{percent .PiecesPercent}}%)</strong></div>
-    <div class="row"><span>Completed pieces</span><strong>{{.PiecesHave}}</strong></div>
-    <div class="row"><span>Piece size</span><strong>{{bytes .PieceLength}}</strong></div>
-    <div class="row"><span>Wasted</span><strong>{{bytes .Wasted}}</strong></div>
-    <div class="row"><span>Allocated on disk</span><strong>{{bytes .Allocated}}</strong></div>
-    <div class="row"><span>Added</span><strong>{{if .AddedStr}}{{.AddedStr}}{{else}}—{{end}}</strong></div>
-    <div class="row"><span>Completed</span><strong>{{if .CompletedStr}}{{.CompletedStr}}{{else}}—{{end}}</strong></div>
+    <div class="row"><span>{{tr "Peer / Seed"}}</span><strong>{{.NumPeers}} / {{.NumSeeds}}</strong></div>
+    <div class="row"><span>{{tr "Swarm (seeds / peers)"}}</span><strong>{{if lt .NumComplete 0}}—{{else}}{{.NumComplete}}{{end}} / {{if lt .NumIncomplete 0}}—{{else}}{{.NumIncomplete}}{{end}}</strong></div>
+    <div class="row"><span>{{tr "Availability"}}</span><strong>{{if lt .AvailabilityPct 0.0}}—{{else}}{{printf "%.2f" .AvailabilityPct}}{{end}}</strong></div>
+    <div class="row"><span>{{tr "ETA"}}</span><strong>{{if lt .ETA 0}}—{{else}}{{dur .ETA}}{{end}}</strong></div>
+    <div class="row"><span>{{tr "Time active"}}</span><strong>{{if .ActiveStr}}{{.ActiveStr}}{{else}}—{{end}}</strong></div>
+    <div class="row"><span>{{tr "Last activity"}}</span><strong>{{if .LastActiveStr}}{{.LastActiveStr}}{{else}}—{{end}}</strong></div>
+    <div class="row"><span>{{tr "Seeding time"}}</span><strong>{{if .SeedingStr}}{{.SeedingStr}}{{else}}—{{end}}</strong></div>
+    <div class="row"><span>{{tr "Next announce"}}</span><strong>{{if lt .NextAnnounce 0}}—{{else}}{{dur .NextAnnounce}}{{end}}</strong></div>
+    <div class="row"><span>{{tr "Folder"}}</span><strong>{{.SavePath}}</strong></div>
+    <div class="row"><span>{{tr "Seed ratio set"}}</span><strong>{{if lt .SeedRatio 0.0}}<span>{{tr "Global"}}</span>{{else if eq .SeedRatio 0.0}}<span>{{tr "Unlimited"}}</span>{{else}}{{printf "%.2f" .SeedRatio}}{{end}}</strong></div>
+    <div class="row"><span>{{tr "Seed days"}}</span><strong>{{if lt .SeedDays 0}}<span>{{tr "Global"}}</span>{{else if eq .SeedDays 0}}<span>{{tr "Unlimited"}}</span>{{else}}{{.SeedDays}}{{end}}</strong></div>
+    <div class="row"><span>{{tr "Pin"}}</span><strong>{{if .Pinned}}yes{{else}}no{{end}}</strong></div>
+    <div class="row"><span>{{tr "Private"}}</span><strong>{{if .Private}}yes{{else}}no{{end}}</strong></div>
+    <div class="row"><span>{{tr "File"}}</span><strong>{{.FileCount}}</strong></div>
+    <div class="row"><span>{{tr "Available / total pieces"}}</span><strong>{{.PiecesAvailable}} / {{.PiecesTotal}} ({{percent .PiecesPercent}}%)</strong></div>
+    <div class="row"><span>{{tr "Completed pieces"}}</span><strong>{{.PiecesHave}}</strong></div>
+    <div class="row"><span>{{tr "Piece size"}}</span><strong>{{bytes .PieceLength}}</strong></div>
+    <div class="row"><span>{{tr "Wasted"}}</span><strong>{{bytes .Wasted}}</strong></div>
+    <div class="row"><span>{{tr "Allocated on disk"}}</span><strong>{{bytes .Allocated}}</strong></div>
+    <div class="row"><span>{{tr "Added"}}</span><strong>{{if .AddedStr}}{{.AddedStr}}{{else}}—{{end}}</strong></div>
+    <div class="row"><span>{{tr "Completed"}}</span><strong>{{if .CompletedStr}}{{.CompletedStr}}{{else}}—{{end}}</strong></div>
   </div>
   {{if .HasBEP38}}
-  <h3 class="dsec">BEP 38 local data hints</h3>
+  <h3 class="dsec">{{tr "BEP 38 local data hints"}}</h3>
   <div class="kv">
-    <div class="row"><span>Collections</span><strong>{{.CollectionsStr}}</strong></div>
-    <div class="row"><span>Similar torrents</span><strong>{{.SimilarCount}}</strong></div>
-    {{if .LocalDataStr}}<div class="row"><span>Local data to reuse</span><strong>{{.LocalDataStr}}</strong></div>{{end}}
+    <div class="row"><span>{{tr "Collections"}}</span><strong>{{.CollectionsStr}}</strong></div>
+    <div class="row"><span>{{tr "Similar torrents"}}</span><strong>{{.SimilarCount}}</strong></div>
+    {{if .LocalDataStr}}<div class="row"><span>{{tr "Local data to reuse"}}</span><strong>{{.LocalDataStr}}</strong></div>{{end}}
   </div>
   {{end}}
-  <form method="post" action="/ui/pin" style="margin:8px 0"><input type="hidden" name="hash" value="{{.Hash}}"><input type="hidden" name="tab" value="general"><input type="hidden" name="pinned" value="{{if .Pinned}}0{{else}}1{{end}}">{{if .Pinned}}<button type="submit" class="sm" title="Unpin torrent to restore normal queue management">Unpin</button>{{else}}<button type="submit" class="sm" title="Pin torrent to keep it active outside queue limits">Pin (outside the queue)</button>{{end}}</form>
-  <h3 class="dsec">Limits &amp; seeding (-1 global, 0 unlimited).</h3>
+  <form method="post" action="/ui/pin" style="margin:8px 0"><input type="hidden" name="hash" value="{{.Hash}}"><input type="hidden" name="tab" value="general"><input type="hidden" name="pinned" value="{{if .Pinned}}0{{else}}1{{end}}">{{if .Pinned}}<button type="submit" class="sm" title="{{tr "Unpin torrent to restore normal queue management"}}">{{tr "Unpin"}}</button>{{else}}<button type="submit" class="sm" title="{{tr "Pin torrent to keep it active outside queue limits"}}">{{tr "Pin (outside the queue)"}}</button>{{end}}</form>
+  <h3 class="dsec">{{tr "Limits & seeding (-1 global, 0 unlimited)."}}</h3>
   <form class="form-grid" method="post" action="/ui/seed-limits">
     <input type="hidden" name="hash" value="{{.Hash}}"><input type="hidden" name="tab" value="general">
-    <label>Download limit KiB/s<input type="number" name="download_limit" value="{{.DownloadLimitKib}}" title="Maximum download speed limit for this torrent in KiB/s (0 = unlimited)"></label>
-    <label>Upload limit KiB/s<input type="number" name="upload_limit" value="{{.UploadLimitKib}}" title="Maximum upload speed limit for this torrent in KiB/s (0 = unlimited)"></label>
-    <label>Max connections<input type="number" name="max_connections" value="{{.MaxConnections}}" title="Maximum number of simultaneous peer connections for this torrent (0 = default)"></label>
-    <label>Max uploads<input type="number" name="max_uploads" value="{{.MaxUploads}}" title="Maximum number of simultaneous active upload slots for this torrent (0 = default)"></label>
-    <label>Seed ratio<input type="number" step="any" name="seed_ratio" value="{{.SeedRatio}}" title="Target upload/download ratio to reach before stopping seed (0 = unlimited)"></label>
-    <label>Seed days<input type="number" name="seed_days" value="{{.SeedDays}}" title="Maximum seeding time in days before stopping seed (0 = unlimited)"></label>
-    <div><button type="submit" class="primary" title="Apply speed limits and seeding targets to this torrent">Save limits</button></div>
+    <label>{{tr "Download limit KiB/s"}}<input type="number" name="download_limit" value="{{.DownloadLimitKib}}" title="{{tr "Maximum download speed limit for this torrent in KiB/s (0 = unlimited)"}}"></label>
+    <label>{{tr "Upload limit KiB/s"}}<input type="number" name="upload_limit" value="{{.UploadLimitKib}}" title="{{tr "Maximum upload speed limit for this torrent in KiB/s (0 = unlimited)"}}"></label>
+    <label>{{tr "Max connections"}}<input type="number" name="max_connections" value="{{.MaxConnections}}" title="{{tr "Maximum number of simultaneous peer connections for this torrent (0 = default)"}}"></label>
+    <label>{{tr "Max uploads"}}<input type="number" name="max_uploads" value="{{.MaxUploads}}" title="{{tr "Maximum number of simultaneous active upload slots for this torrent (0 = default)"}}"></label>
+    <label>{{tr "Seed ratio"}}<input type="number" step="any" name="seed_ratio" value="{{.SeedRatio}}" title="{{tr "Target upload/download ratio to reach before stopping seed (0 = unlimited)"}}"></label>
+    <label>{{tr "Seed days"}}<input type="number" name="seed_days" value="{{.SeedDays}}" title="{{tr "Maximum seeding time in days before stopping seed (0 = unlimited)"}}"></label>
+    <div><button type="submit" class="primary" title="{{tr "Apply speed limits and seeding targets to this torrent"}}">{{tr "Save limits"}}</button></div>
   </form>
   <form class="form-grid" method="post" action="/ui/super-seeding">
     <input type="hidden" name="hash" value="{{.Hash}}"><input type="hidden" name="tab" value="general">
-    <label class="chk" title="BEP 16 super-seeding: advertise one piece at a time so the swarm spreads the data. For initial seeding only; it reduces the seed's upload throughput"><input type="checkbox" name="enabled" value="1"{{if .SuperSeeding}} checked{{end}}> Super-seeding (BEP 16)</label>
-    <div><button type="submit" class="sm" title="Save super-seeding setting">Save</button></div>
+    <label class="chk" title="{{tr "BEP 16 super-seeding: advertise one piece at a time so the swarm spreads the data. For initial seeding only; it reduces the seed's upload throughput"}}"><input type="checkbox" name="enabled" value="1"{{if .SuperSeeding}} checked{{end}}> {{tr "Super-seeding (BEP 16)"}}</label>
+    <div><button type="submit" class="sm" title="{{tr "Save super-seeding setting"}}">{{tr "Save"}}</button></div>
   </form>
-  <h3 class="dsec">Storage</h3>
+  <h3 class="dsec">{{tr "Storage"}}</h3>
   <form class="form-grid" method="post" action="/ui/move">
     <input type="hidden" name="hash" value="{{.Hash}}"><input type="hidden" name="tab" value="general">
-    <label class="wide">Move data to<input type="text" name="destination" value="{{.SavePath}}" list="savepaths" title="Destination directory on the server to move torrent data to"></label>
-    <div><button type="submit" class="sm" title="Relocate torrent files to the specified directory">Move</button></div>
+    <label class="wide">{{tr "Move data to"}}<input type="text" name="destination" value="{{.SavePath}}" list="savepaths" title="{{tr "Destination directory on the server to move torrent data to"}}"></label>
+    <div><button type="submit" class="sm" title="{{tr "Relocate torrent files to the specified directory"}}">{{tr "Move"}}</button></div>
   </form>
   {{if .Standalone}}
   <form class="form-grid" method="post" action="/ui/category">
     <input type="hidden" name="hash" value="{{.Hash}}"><input type="hidden" name="tab" value="general">
-    <label>Category<input type="text" name="category" value="{{.Category}}" list="catlist" title="Category assigned to this torrent for organization and filtering"></label>
-    <label>Tags<input type="text" name="tags" value="{{.Tags}}" placeholder="tag, tag" title="Tags assigned to this torrent, separated by commas"></label>
-    <div><button type="submit" class="sm" title="Save category and tags for this torrent">Save</button></div>
+    <label>{{tr "Category"}}<input type="text" name="category" value="{{.Category}}" list="catlist" title="{{tr "Category assigned to this torrent for organization and filtering"}}"></label>
+    <label>{{tr "Tags"}}<input type="text" name="tags" value="{{.Tags}}" placeholder="{{tr "tag, tag"}}" title="{{tr "Tags assigned to this torrent, separated by commas"}}"></label>
+    <div><button type="submit" class="sm" title="{{tr "Save category and tags for this torrent"}}">{{tr "Save"}}</button></div>
   </form>
   <datalist id="catlist">{{range .Categories}}<option value="{{.}}">{{end}}</datalist>
   {{end}}
-  <h3 class="dsec">Web seeds</h3>
+  <h3 class="dsec">{{tr "Web seeds"}}</h3>
   <form class="form-grid" method="post" action="/ui/webseeds">
     <input type="hidden" name="hash" value="{{.Hash}}"><input type="hidden" name="tab" value="general">
-    <label class="wide">Web seed (one URL per line)<textarea name="urls" rows="3" placeholder="http://example/file" title="HTTP/HTTPS web seed URLs for this torrent, one per line (BEP 19)">{{range .WebSeeds}}{{.}}
+    <label class="wide">{{tr "Web seed (one URL per line)"}}<textarea name="urls" rows="3" placeholder="http://example/file" title="{{tr "HTTP/HTTPS web seed URLs for this torrent, one per line (BEP 19)"}}">{{range .WebSeeds}}{{.}}
 {{end}}</textarea></label>
-    <div style="display:flex;gap:6px"><button type="submit" class="sm" title="Add web seeds to torrent">Add</button><button type="submit" class="sm" name="remove" value="1" title="Remove selected web seed">Remove</button></div>
+    <div style="display:flex;gap:6px"><button type="submit" class="sm" title="{{tr "Add web seeds to torrent"}}">{{tr "Add"}}</button><button type="submit" class="sm" name="remove" value="1" title="{{tr "Remove selected web seed"}}">{{tr "Remove"}}</button></div>
   </form>
 {{else if eq .Tab "files"}}
   {{if .Files}}
   <form class="filesbar" method="post" action="/ui/file-priority" id="files-bulk">
     <input type="hidden" name="hash" value="{{.Hash}}"><input type="hidden" name="tab" value="files">
-    <label class="chk" for="files-prio">With the selected files:</label>
-    <select name="priority" id="files-prio" title="Download priority to give to the ticked files"><option value="0">Skip</option><option value="4" selected>Normal</option><option value="6">High</option><option value="7">Maximum</option></select>
-    <button type="submit" class="sm" title="Apply this priority to the ticked files">Apply</button>
-    <label class="chk" title="Group the files by their folder, with one priority control per folder"><input type="checkbox" id="files-tree"> Group by folder</label>
+    <label class="chk" for="files-prio">{{tr "With the selected files:"}}</label>
+    <select name="priority" id="files-prio" title="{{tr "Download priority to give to the ticked files"}}"><option value="0">{{tr "Skip"}}</option><option value="4" selected>{{tr "Normal"}}</option><option value="6">{{tr "High"}}</option><option value="7">{{tr "Maximum"}}</option></select>
+    <button type="submit" class="sm" title="{{tr "Apply this priority to the ticked files"}}">{{tr "Apply"}}</button>
+    <label class="chk" title="{{tr "Group the files by their folder, with one priority control per folder"}}"><input type="checkbox" id="files-tree"> {{tr "Group by folder"}}</label>
   </form>
   <table class="tbl files">
-    <thead><tr><th scope="col" class="sel"><input type="checkbox" id="files-all" aria-label="Select all files" title="Select all files"></th><th scope="col">File</th><th scope="col" class="num">Size</th><th scope="col">Progress</th><th scope="col">Priority</th><th scope="col"><span class="sr-only">Actions</span></th></tr></thead>
+    <thead><tr><th scope="col" class="sel"><input type="checkbox" id="files-all" aria-label="{{tr "Select all files"}}" title="{{tr "Select all files"}}"></th><th scope="col">{{tr "File"}}</th><th scope="col" class="num">{{tr "Size"}}</th><th scope="col">{{tr "Progress"}}</th><th scope="col">{{tr "Priority"}}</th><th scope="col"><span class="sr-only">{{tr "Actions"}}</span></th></tr></thead>
     <tbody id="files-body">
     {{range .Files}}
       <tr data-path="{{.Path}}">
-        <td class="sel"><input type="checkbox" class="filesel" name="index" value="{{.Index}}" form="files-bulk" aria-label="Select file" title="Select this file to change its priority with the others"></td>
+        <td class="sel"><input type="checkbox" class="filesel" name="index" value="{{.Index}}" form="files-bulk" aria-label="{{tr "Select file"}}" title="{{tr "Select this file to change its priority with the others"}}"></td>
         <td class="fname" style="word-break:break-word">{{.Path}}</td>
         <td class="num">{{bytes .Size}}</td>
-        <td class="fp"><div class="prog"><div class="pbar{{if not .Wanted}} paused{{end}}" role="progressbar" aria-valuenow="{{pct .Done .Size}}" aria-valuemin="0" aria-valuemax="100" aria-label="Progress"><i style="width:{{pct .Done .Size}}%"></i></div><span class="pct" aria-hidden="true">{{pct .Done .Size}}%</span></div></td>
+        <td class="fp"><div class="prog"><div class="pbar{{if not .Wanted}} paused{{end}}" role="progressbar" aria-valuenow="{{pct .Done .Size}}" aria-valuemin="0" aria-valuemax="100" aria-label="{{tr "Progress"}}"><i style="width:{{pct .Done .Size}}%"></i></div><span class="pct" aria-hidden="true">{{pct .Done .Size}}%</span></div></td>
         <td><form method="post" action="/ui/file-priority" class="autosubmit">
           <input type="hidden" name="hash" value="{{$.Hash}}"><input type="hidden" name="tab" value="files"><input type="hidden" name="index" value="{{.Index}}">
-          <select name="priority" aria-label="Priority" title="Download priority for this file (Skip, Normal, High, Maximum)" onchange="this.form.requestSubmit()"><option value="0"{{if eq .Priority 0}} selected{{end}}>Skip</option><option value="4"{{if eq .Priority 4}} selected{{end}}>Normal</option><option value="6"{{if eq .Priority 6}} selected{{end}}>High</option><option value="7"{{if eq .Priority 7}} selected{{end}}>Maximum</option></select>
+          <select name="priority" aria-label="{{tr "Priority"}}" title="{{tr "Download priority for this file (Skip, Normal, High, Maximum)"}}" onchange="this.form.requestSubmit()"><option value="0"{{if eq .Priority 0}} selected{{end}}>{{tr "Skip"}}</option><option value="4"{{if eq .Priority 4}} selected{{end}}>{{tr "Normal"}}</option><option value="6"{{if eq .Priority 6}} selected{{end}}>{{tr "High"}}</option><option value="7"{{if eq .Priority 7}} selected{{end}}>{{tr "Maximum"}}</option></select>
         </form></td>
-        <td><span style="display:inline-flex;gap:4px"><a class="btn sm" href="/ui/stream?hash={{$.Hash}}&file={{.Index}}" target="_blank" rel="noopener" aria-label="Stream" title="Stream this file with HTTP Range; the pieces of the window are downloaded first"><svg class="i"><use href="#i-play"/></svg>Stream</a>{{if $.Standalone}}<button type="button" class="btn ghost icon sm" data-rename-file="{{.Path}}" data-hash="{{$.Hash}}" aria-label="Rename file" title="Rename this file"><svg class="i"><use href="#i-edit"/></svg></button>{{end}}</span></td>
+        <td><span style="display:inline-flex;gap:4px"><a class="btn sm" href="/ui/stream?hash={{$.Hash}}&file={{.Index}}" target="_blank" rel="noopener" aria-label="{{tr "Stream"}}" title="{{tr "Stream this file with HTTP Range; the pieces of the window are downloaded first"}}"><svg class="i"><use href="#i-play"/></svg>{{tr "Stream"}}</a>{{if $.Standalone}}<button type="button" class="btn ghost icon sm" data-rename-file="{{.Path}}" data-hash="{{$.Hash}}" aria-label="{{tr "Rename file"}}" title="{{tr "Rename this file"}}"><svg class="i"><use href="#i-edit"/></svg></button>{{end}}</span></td>
       </tr>
     {{end}}
     </tbody>
   </table>
-  {{else}}<p class="muted">Metadata not available yet.</p>{{end}}
+  {{else}}<p class="muted">{{tr "Metadata not available yet."}}</p>{{end}}
 {{else if eq .Tab "peers"}}
   {{if .Peers}}
   <table class="tbl">
-    <thead><tr><th scope="col">Peer</th><th scope="col">Client</th><th scope="col" class="num">↓</th><th scope="col" class="num">↑</th><th scope="col" class="num">Prog.</th><th scope="col">Flag</th><th scope="col" class="num">For</th><th scope="col"><span class="sr-only">Actions</span></th></tr></thead>
+    <thead><tr><th scope="col">{{tr "Peer"}}</th><th scope="col">{{tr "Client"}}</th><th scope="col" class="num">↓</th><th scope="col" class="num">↑</th><th scope="col" class="num">{{tr "Prog."}}</th><th scope="col">{{tr "Flag"}}</th><th scope="col" class="num">{{tr "For"}}</th><th scope="col"><span class="sr-only">{{tr "Actions"}}</span></th></tr></thead>
     <tbody>
     {{range .Peers}}
       <tr><td class="mono" title="{{.Source}}">{{.Address}}</td><td>{{if .Client}}{{.Client}}{{else}}—{{end}}</td>
       <td class="num">{{rate .Down}}</td><td class="num">{{rate .Up}}</td>
       <td class="num">{{printf "%.1f" .Progress}}%</td>
-      <td><div class="flags">{{if .Seed}}<span class="flag on">seed</span>{{end}}{{if .Incoming}}<span class="flag">incoming</span>{{else}}<span class="flag">outgoing</span>{{end}}{{if .UTP}}<span class="flag">uTP</span>{{else}}<span class="flag">TCP</span>{{end}}{{if .Encrypted}}<span class="flag on">encrypted</span>{{end}}{{if .Handshake}}<span class="flag on">encrypted HS</span>{{end}}{{if .Snubbed}}<span class="flag">snubbed</span>{{end}}{{if .Optimistic}}<span class="flag on">optimistic</span>{{end}}{{if .ClientChoke}}<span class="flag">choking us</span>{{end}}{{if .PeerChoke}}<span class="flag">we choke</span>{{end}}{{if .ClientInt}}<span class="flag">interested</span>{{end}}{{if .PeerInt}}<span class="flag">interested in us</span>{{end}}{{if .Downloading}}<span class="flag">downloading</span>{{end}}</div></td>
+      <td><div class="flags">{{if .Seed}}<span class="flag on">{{tr "seed"}}</span>{{end}}{{if .Incoming}}<span class="flag">{{tr "incoming"}}</span>{{else}}<span class="flag">{{tr "outgoing"}}</span>{{end}}{{if .UTP}}<span class="flag">{{tr "uTP"}}</span>{{else}}<span class="flag">{{tr "TCP"}}</span>{{end}}{{if .Encrypted}}<span class="flag on">{{tr "encrypted"}}</span>{{end}}{{if .Handshake}}<span class="flag on">{{tr "encrypted HS"}}</span>{{end}}{{if .Snubbed}}<span class="flag">{{tr "snubbed"}}</span>{{end}}{{if .Optimistic}}<span class="flag on">{{tr "optimistic"}}</span>{{end}}{{if .ClientChoke}}<span class="flag">{{tr "choking us"}}</span>{{end}}{{if .PeerChoke}}<span class="flag">{{tr "we choke"}}</span>{{end}}{{if .ClientInt}}<span class="flag">{{tr "interested"}}</span>{{end}}{{if .PeerInt}}<span class="flag">{{tr "interested in us"}}</span>{{end}}{{if .Downloading}}<span class="flag">{{tr "downloading"}}</span>{{end}}</div></td>
       <td class="num">{{dur .Connected}}</td>
-      <td><form method="post" action="/ui/peers" data-confirm-ban><input type="hidden" name="hash" value="{{$.Hash}}"><input type="hidden" name="tab" value="peers"><input type="hidden" name="op" value="ban"><input type="hidden" name="peers" value="{{.Address}}"><button type="submit" class="ghost icon sm danger" aria-label="Ban this peer" title="Ban this peer's IP address for 30 minutes"><svg class="i"><use href="#i-ban"/></svg></button></form></td></tr>
+      <td><form method="post" action="/ui/peers" data-confirm-ban><input type="hidden" name="hash" value="{{$.Hash}}"><input type="hidden" name="tab" value="peers"><input type="hidden" name="op" value="ban"><input type="hidden" name="peers" value="{{.Address}}"><button type="submit" class="ghost icon sm danger" aria-label="{{tr "Ban this peer"}}" title="{{tr "Ban this peer's IP address for 30 minutes"}}"><svg class="i"><use href="#i-ban"/></svg></button></form></td></tr>
     {{end}}
     </tbody>
   </table>
-  {{else}}<p class="muted">No peers connected.</p>{{end}}
+  {{else}}<p class="muted">{{tr "No peers connected."}}</p>{{end}}
   <form class="form-grid" method="post" action="/ui/peers">
     <input type="hidden" name="hash" value="{{.Hash}}"><input type="hidden" name="tab" value="peers"><input type="hidden" name="op" value="add">
-    <label class="wide">Add peers (ip:port, one per line)<textarea name="peers" rows="2" placeholder="203.0.113.5:51413" title="Peers to connect to now, as ip:port, one per line"></textarea></label>
-    <div><button type="submit" class="sm" title="Connect to these peers now">Add peers</button></div>
+    <label class="wide">{{tr "Add peers (ip:port, one per line)"}}<textarea name="peers" rows="2" placeholder="203.0.113.5:51413" title="{{tr "Peers to connect to now, as ip:port, one per line"}}"></textarea></label>
+    <div><button type="submit" class="sm" title="{{tr "Connect to these peers now"}}">{{tr "Add peers"}}</button></div>
   </form>
 {{else if eq .Tab "trackers"}}
   {{if .Trackers}}
   <table class="tbl">
-    <thead><tr><th scope="col">URL</th><th scope="col">State</th><th scope="col" class="num">Seeds</th><th scope="col" class="num">Peers</th><th scope="col" class="num">Next</th><th scope="col"><span class="sr-only">Actions</span></th></tr></thead>
+    <thead><tr><th scope="col">{{tr "URL"}}</th><th scope="col">{{tr "State"}}</th><th scope="col" class="num">{{tr "Seeds"}}</th><th scope="col" class="num">{{tr "Peers"}}</th><th scope="col" class="num">{{tr "Next"}}</th><th scope="col"><span class="sr-only">{{tr "Actions"}}</span></th></tr></thead>
     <tbody>
     {{range .Trackers}}
       <tr><td style="word-break:break-all" title="{{.Message}}"><form method="post" action="/ui/trackers" class="trk-edit">
         <input type="hidden" name="hash" value="{{$.Hash}}"><input type="hidden" name="tab" value="trackers"><input type="hidden" name="op" value="edit"><input type="hidden" name="old" value="{{.URL}}">
-        <input type="text" name="new" value="{{.URL}}" aria-label="Tracker URL" title="Change this tracker URL; the torrent keeps its data">
-        <button type="submit" class="sm" title="Save the tracker URL">Save</button>
+        <input type="text" name="new" value="{{.URL}}" aria-label="{{tr "Tracker URL"}}" title="{{tr "Change this tracker URL; the torrent keeps its data"}}">
+        <button type="submit" class="sm" title="{{tr "Save the tracker URL"}}">{{tr "Save"}}</button>
       </form></td><td>{{.Status}}</td>
       <td class="num">{{.Seeders}}</td><td class="num">{{.Leechers}}</td>
       <td class="num">{{if gt .Next 0}}{{dur .Next}}{{else}}—{{end}}</td>
-      <td><form method="post" action="/ui/trackers"><input type="hidden" name="hash" value="{{$.Hash}}"><input type="hidden" name="tab" value="trackers"><input type="hidden" name="op" value="remove"><input type="hidden" name="url" value="{{.URL}}"><button type="submit" class="ghost icon sm" aria-label="Remove this tracker" title="Remove this tracker"><svg class="i"><use href="#i-trash"/></svg></button></form></td></tr>
+      <td><form method="post" action="/ui/trackers"><input type="hidden" name="hash" value="{{$.Hash}}"><input type="hidden" name="tab" value="trackers"><input type="hidden" name="op" value="remove"><input type="hidden" name="url" value="{{.URL}}"><button type="submit" class="ghost icon sm" aria-label="{{tr "Remove this tracker"}}" title="{{tr "Remove this tracker"}}"><svg class="i"><use href="#i-trash"/></svg></button></form></td></tr>
     {{end}}
     </tbody>
   </table>
-  {{else}}<p class="muted">No trackers.</p>{{end}}
+  {{else}}<p class="muted">{{tr "No trackers."}}</p>{{end}}
   <form class="form-grid" method="post" action="/ui/trackers">
     <input type="hidden" name="hash" value="{{.Hash}}"><input type="hidden" name="tab" value="trackers">
-    <label class="wide">Add trackers (one per line)<textarea name="urls" rows="3" placeholder="https://tracker.example/announce" title="Tracker announce URLs to add, one per line"></textarea></label>
-    <div><button type="submit" class="sm" title="Add trackers to this torrent">Add trackers</button></div>
+    <label class="wide">{{tr "Add trackers (one per line)"}}<textarea name="urls" rows="3" placeholder="https://tracker.example/announce" title="{{tr "Tracker announce URLs to add, one per line"}}"></textarea></label>
+    <div><button type="submit" class="sm" title="{{tr "Add trackers to this torrent"}}">{{tr "Add trackers"}}</button></div>
   </form>
 {{else if eq .Tab "pieces"}}
   {{if .Pieces}}
-  <p class="muted"><b>{{.PiecesHave}}/{{.PiecesTotal}}</b> <span>pieces downloaded. Green: have, yellow: downloading, grey: missing, dimmed: skipped.</span></p>
-  <div class="piece-map" role="img" aria-label="Piece map">
+  <p class="muted"><b>{{.PiecesHave}}/{{.PiecesTotal}}</b> <span>{{tr "pieces downloaded. Green: have, yellow: downloading, grey: missing, dimmed: skipped."}}</span></p>
+  <div class="piece-map" role="img" aria-label="{{tr "Piece map"}}">
     {{range .Pieces}}<span class="piece-run piece-{{if eq .State "have"}}have{{else if eq .State "downloading"}}down{{else if eq .State "skipped"}}skip{{else}}missing{{end}}" style="width:{{.Pct}}%" title="{{if eq .State "have"}}have{{else if eq .State "downloading"}}downloading{{else if eq .State "skipped"}}skipped{{else}}missing{{end}}"></span>{{end}}
   </div>
-  {{else}}<p class="muted">Piece map is not available yet (metadata missing).</p>{{end}}
+  {{else}}<p class="muted">{{tr "Piece map is not available yet (metadata missing)."}}</p>{{end}}
 {{end}}
 </div>
 </div>

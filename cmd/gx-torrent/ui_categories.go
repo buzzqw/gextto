@@ -65,7 +65,7 @@ func (d *Daemon) handleUICategory(w http.ResponseWriter, r *http.Request) {
 	}
 	hash := strings.ToLower(strings.TrimSpace(r.FormValue("hash")))
 	if d.opts.Mode != ModeStandalone {
-		d.uiRedirect(w, r, nil, "", errors.New("categories are a standalone feature"))
+		d.uiRedirect(w, r, nil, "", nil, errors.New("categories are a standalone feature"))
 		return
 	}
 	category := strings.TrimSpace(r.FormValue("category"))
@@ -81,5 +81,5 @@ func (d *Daemon) handleUICategory(w http.ResponseWriter, r *http.Request) {
 	if err == nil {
 		err = d.setTags(hash, tags)
 	}
-	d.uiRedirect(w, r, url.Values{"open": {hash}, "tab": {"general"}}, "Category and tags updated", err)
+	d.uiRedirect(w, r, url.Values{"open": {hash}, "tab": {"general"}}, "Category and tags updated", nil, err)
 }
