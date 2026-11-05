@@ -1213,26 +1213,29 @@ func (d *Daemon) tick(now time.Time) {
 			}
 		}
 
-		if complete && meta.CompletedAt.IsZero() {
-			meta.CompletedAt = now
-			d.dirty = true
-			// Only a download that moved data now is news; a torrent added
-			// over files already on disk completes at its first check.
-			if stats.Bytes.Downloaded > 0 {
-				d.notify("download_complete", map[string]any{"name": stats.Name, "hash": id})
-			}
-			if !meta.PostProcessed && d.postProcessEnabled() {
-				meta.PostProcessed = true
-				d.dirty = true
-				pendingPostProcess = append(pendingPostProcess, id)
-			}
-			// Recheck the data once before seeding it: a disk that returns a
-			// wrong block is caught now instead of being seeded for hours.
-			// The flag is set first, so the next ticks do not start it again.
+		if complete && meta.CompletedAt.IsZero() && stats.Status != torrent.Verifying {
+			// With the recheck on, completion is announced only after the
+			// data has been verified: Gextto's completion actions (archive,
+			// rename, move) must not start on data a bad disk still has to
+			// prove. The flag is set first, so the next ticks do not start the
+			// check again; the torrent completes for good once it passes.
 			if !meta.RecheckedOnComplete && d.recheckOnCompleteEnabled() {
 				meta.RecheckedOnComplete = true
 				d.dirty = true
 				pendingRechecks = append(pendingRechecks, id)
+			} else {
+				meta.CompletedAt = now
+				d.dirty = true
+				// Only a download that moved data now is news; a torrent added
+				// over files already on disk completes at its first check.
+				if stats.Bytes.Downloaded > 0 {
+					d.notify("download_complete", map[string]any{"name": stats.Name, "hash": id})
+				}
+				if !meta.PostProcessed && d.postProcessEnabled() {
+					meta.PostProcessed = true
+					d.dirty = true
+					pendingPostProcess = append(pendingPostProcess, id)
+				}
 			}
 		}
 		// export_dir / export_dir_fin: copy the .torrent once the metadata is
