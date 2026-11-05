@@ -80,12 +80,6 @@ its gate; a rejected one moves to *Not planned*.
   downloads and the library are on the same filesystem (here they are not: the library
   is on the NAS, the downloads on the local disk) and a byte-for-byte comparison before
   linking.
-- **One switch for test mode** — today test mode (`dry_run`) is a separate setting from
-  «Automatic cycle (search and download)» and can be turned off only from the last step
-  of the initial setup or the TUI; the operator proposes that the automatic cycle switch
-  be the one choice: on = really downloads. Gate: a decision on what «cycle off» means
-  then (no search at all, or search without downloading) and on `--dry-run`, which stays
-  for tests and the end2end suite.
 - **Personalized name template for movies** — with the *Personalized* rename format a
   movie gets only `Title (Year) [resolution]`: the template and its MediaInfo tags
   (codec, audio, channels, HDR/DV) apply to episodes only. Gate: movie tokens (year, no
@@ -116,35 +110,13 @@ its gate; a rejected one moves to *Not planned*.
   issue 8934 asks for one host per /64, but a /64 is a subnet and may hold many real users.
   Gate: a measurement of the slots one host takes on a public IPv6 swarm.
 
-- **Phone header of Gextto** — on a phone every page spends about 150 px (a third of the
-  first screen) on the language menu, Font, Theme and the status chips before any content.
-  Proposal: title, add and refresh only; language, font and theme move to *Altro*. Gate:
-  the operator's choice of where they go, the end2end mobile tests realigned.
-- **Phone lists of series and movies as cards** — the monitored lists are a table whose
-  every row carries *Pausa* and a red *Elimina* within thumb reach. Proposal: a card per
-  title that opens its page on tap, actions in a "⋯" menu like the gx-torrent rows. Gate:
-  the bulk selection kept, keyboard and screen-reader order checked.
-- **Donate button that covers controls** — the floating button is meant to be always
-  visible, and on a phone it sits over the rows it scrolls past (a *Pausa*, a settings
-  field). Options: a bottom padding so the last row clears it, or the link moved into
-  *Altro* / the menu on narrow screens. Gate: the operator's choice.
-- **One navigation on the gx-torrent phone page** — the standalone page shows both the
-  menu button and the horizontal tab strip, clipped mid-word at the edges. Gate: which
-  one stays under 760 px.
-- **gx-torrent table at 1366 px** — the torrent table overflows (the *Categoria* column is
-  cut) and the toolbar wraps on two rows. Gate: which columns hide by default at that
-  width (the column picker already exists).
-- **Idle bandwidth chart on the dashboard** — at 0 B/s the chart is a tall empty box.
-  Proposal: a one-line summary while nothing transfers. Gate: the operator's choice.
-- **gx-torrent before the first setup** — the torrents page is served while the other
-  pages redirect to the setup, and its event stream receives the setup HTML (the browser
-  console reports the MIME type). Gate: redirect the page too, or open the stream only
-  after setup.
-
 ## Not planned
 
 Closed by choice, not waiting for a measurement:
 
+- One switch for test mode (merging `dry_run` into «Automatic cycle»): the operator does
+  not want to invest in it — users want to download, not to test; `--dry-run` stays for
+  the test suites.
 - Preventing a second row when the same film or series is added under another spelling
   (a colon present or absent, one hyphen more, a double space): the operator does not
   mind the duplicated rows, and the release match already ignores punctuation.

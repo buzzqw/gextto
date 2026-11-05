@@ -240,8 +240,17 @@
   }
   window.gx.revealActive = revealActive;
 
+  // The top bar wraps to two rows on a phone (the sections go under the
+  // brand): the filters drawer reads its real height instead of 52 px.
+  function measureTopbar() {
+    var bar = document.querySelector(".topbar");
+    if (bar) document.documentElement.style.setProperty("--topbar-h", bar.offsetHeight + "px");
+  }
+
   function init() {
     apply(read());
+    measureTopbar();
+    window.addEventListener("resize", measureTopbar);
     // The settings tab bar is shown by its own script while the page parses,
     // before this runs.
     revealActive();

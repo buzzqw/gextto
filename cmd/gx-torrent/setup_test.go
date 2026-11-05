@@ -230,6 +230,16 @@ func TestSetupRedirectsUntilComplete(t *testing.T) {
 		t.Fatalf("first run must redirect to the wizard: status=%d loc=%q", rec.Code, rec.Header().Get("Location"))
 	}
 
+	// /ui is the torrents page too: before the setup it served the page while
+	// its event stream was redirected, and the browser reported the HTML.
+	for _, path := range []string{"/ui", "/ui/events", "/ui/settings"} {
+		rec = httptest.NewRecorder()
+		guard.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "http://127.0.0.1:8890"+path, nil))
+		if rec.Code != http.StatusSeeOther || rec.Header().Get("Location") != setupPath || called {
+			t.Fatalf("%s before the setup: status=%d loc=%q", path, rec.Code, rec.Header().Get("Location"))
+		}
+	}
+
 	rec = httptest.NewRecorder()
 	guard.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "http://127.0.0.1:8890/ui/setup", nil))
 	if !called || rec.Code != http.StatusOK {

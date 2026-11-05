@@ -1623,6 +1623,48 @@ pre.log-view { margin: 0; }
   .data-table.series-table .row-actions,
   .data-table.movie-table .row-actions { flex-wrap: wrap; min-width: 0; white-space: normal; }
 
+  /* Each title is a compact card: checkbox, name and state on one line, the
+     row actions side by side under them, aligned right. The stacked buttons
+     made every row three lines tall with Elimina right under the thumb. The
+     header keeps only the select-all box and the sortable name. */
+  .data-table.series-table,
+  .data-table.movie-table,
+  .data-table.series-table tbody,
+  .data-table.movie-table tbody,
+  .data-table.series-table thead,
+  .data-table.movie-table thead { display: block; width: 100%; }
+  .data-table.series-table tr,
+  .data-table.movie-table tr {
+    display: grid;
+    grid-template-columns: 34px minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: 8px;
+  }
+  .data-table.series-table tbody tr,
+  .data-table.movie-table tbody tr {
+    row-gap: 6px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--line-soft);
+  }
+  .data-table.series-table th,
+  .data-table.series-table td,
+  .data-table.movie-table th,
+  .data-table.movie-table td { width: auto !important; padding: 0; border: 0; }
+  .data-table.series-table thead th:nth-last-child(-n+2),
+  .data-table.movie-table thead th:nth-last-child(-n+2) { display: none; }
+  .data-table.series-table td:nth-child(2),
+  .data-table.movie-table td:nth-child(2) { overflow-wrap: anywhere; font-weight: 600; }
+  .data-table.series-table td.row-actions,
+  .data-table.movie-table td.row-actions {
+    display: flex;
+    grid-column: 2 / -1;
+    flex-wrap: nowrap;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+  .data-table.series-table tbody td[colspan],
+  .data-table.movie-table tbody td[colspan] { grid-column: 1 / -1; }
+
   /* Keep the download controls readable instead of producing a long row of
      tiny buttons. */
   .download-temp-toolbar {

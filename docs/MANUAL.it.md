@@ -293,8 +293,8 @@ sorgenti, un problema diventa difficile da riprodurre.
   dispositivo; il tema attivo, il testo e il font restano una scelta del
   singolo browser.
 - La **lingua** dell'interfaccia.
-- **Dona**, in basso a destra, e **Aggiornamento disponibile** quando c'è una
-  versione nuova.
+- **Dona**, in basso a destra (sul telefono è nel menu *Altro*), e
+  **Aggiornamento disponibile** quando c'è una versione nuova.
 
 ### Dal telefono
 
@@ -303,7 +303,12 @@ alto, metriche su due colonne, finestre a tutta larghezza, tabelle che scorrono
 dentro il loro riquadro. Nella pagina **Scarico** il nome di un torrent va a capo
 per intero invece di fermarsi ai primi caratteri: sul telefono non c'è il
 suggerimento del mouse che mostra il resto. Ogni azione resta raggiungibile col
-tocco; **Tema** è nel menu *Altro*. Le pagine viaggiano compresse e gli script restano nella cache
+tocco. Tema, dimensione del testo, **Font**, lingua e **Dona** sono nel menu
+*Altro*, così la barra in alto tiene solo il titolo, **＋** e **Aggiorna**. Nelle
+liste **Serie TV** e **Film** ogni titolo è una scheda: nome e stato su una
+riga, **Pausa** ed **Elimina** affiancati sotto. Nella **Dashboard**, quando
+negli ultimi 30 minuti non si è trasferito nulla, al posto del grafico della
+banda c'è una riga che lo dice. Le pagine viaggiano compresse e gli script restano nella cache
 del browser, quindi l'interfaccia resta usabile anche su una rete lenta.
 
 ### Accessibilità

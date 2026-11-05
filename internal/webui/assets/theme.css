@@ -187,6 +187,18 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
 }
 .navmenu .menu a:hover { background: var(--hover); }
 .topbar .spacer { flex: 1; }
+/* On a phone the sections leave the brand row and take a row of their own,
+   full width: squeezed beside the brand they were cut mid-word at both edges.
+   The fade at the edges says the row scrolls sideways. */
+@media (max-width: 760px) {
+  .topbar { flex-wrap: wrap; height: auto; min-height: 52px; padding-top: 6px; padding-bottom: 6px; row-gap: 4px; }
+  .topbar .nav {
+    order: 10; flex: 1 1 100%; margin: 0 -16px; padding: 0 12px;
+    -webkit-mask-image: linear-gradient(to right, transparent 0, #000 14px, #000 calc(100% - 14px), transparent 100%);
+    mask-image: linear-gradient(to right, transparent 0, #000 14px, #000 calc(100% - 14px), transparent 100%);
+  }
+  .topbar .nav a, .navmenu > button { min-height: 36px; }
+}
 .topbar .tools { display: flex; align-items: center; gap: 6px; }
 
 /* ---------- buttons ---------- */
@@ -480,7 +492,13 @@ details.more > .fgrid, details.more > .checks { margin-bottom: 14px; }
   transform: translateY(-1px); border-color: var(--accent); color: var(--accent);
 }
 .donate-icon { font-size: 1rem; line-height: 1; }
+/* On a phone a floating button sat over the rows scrolling under it (a field,
+   a torrent's actions): it moves into the empty space of the brand row, left of
+   the theme switch, and stays there while the page scrolls under the bar. */
 @media (max-width: 760px) {
-  .donate { right: 12px; bottom: calc(88px + env(safe-area-inset-bottom)); padding: 10px; }
+  .donate {
+    top: calc(8px + env(safe-area-inset-top)); bottom: auto; right: 58px;
+    z-index: 31; padding: 7px 9px; box-shadow: none;
+  }
   .donate-label { display: none; }
 }

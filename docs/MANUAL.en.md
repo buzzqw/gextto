@@ -294,7 +294,8 @@ problem becomes hard to reproduce.
   device; the active theme, text size and font remain a choice of each
   browser.
 - The interface **language**.
-- **Donate**, bottom right, and **Update available** when a new version is out.
+- **Donate**, bottom right (on a phone it is in the *More* menu), and **Update
+  available** when a new version is out.
 
 ### From a phone
 
@@ -302,8 +303,12 @@ Below 900 pixels wide the interface becomes compact: scrollable menu at the
 top, metrics in two columns, full-width dialogs, tables that scroll inside
 their panel. On the **Downloads** page a torrent name wraps in full instead of
 stopping after the first characters: on a phone there is no mouse tooltip to
-show the rest. Every action stays reachable by touch; **Theme** is in the *More*
-menu. Pages travel compressed and scripts stay in the browser cache, so the
+show the rest. Every action stays reachable by touch. Theme, text size, **Font**, language and **Donate** are in the *More*
+menu, so the top bar keeps only the title, **＋** and **Refresh**. In the
+**TV series** and **Movies** lists every title is a card: name and status on
+one line, **Pause** and **Delete** side by side below. On the **Dashboard**,
+when nothing was transferred in the last 30 minutes, one line says so instead
+of the bandwidth chart. Pages travel compressed and scripts stay in the browser cache, so the
 interface stays usable on a slow network too.
 
 ### Accessibility

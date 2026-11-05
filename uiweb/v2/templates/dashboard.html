@@ -133,11 +133,12 @@
     <span class="traffic-stat down" {{trTitle "Velocità di download totale: torrent e aMule"}}><span aria-hidden="true">↓</span> {{tr .CurrentDown}}</span>
     <span class="traffic-stat up" {{trTitle "Velocità di upload totale: torrent e aMule"}}><span aria-hidden="true">↑</span> {{tr .CurrentUp}}</span>
     {{if .HasEd2k}}<span class="muted traffic-breakdown" {{trTitle "Ripartizione della velocità totale"}}><span>{{tr "Torrent"}}</span> ↓ {{.TorrentDown}} ↑ {{.TorrentUp}} <span class="traffic-breakdown-sep" aria-hidden="true">·</span> <span>{{tr "eD2k"}}</span> <span class="traffic-ed2k-figure">↓ {{.CurrentEd2kDown}} ↑ {{.CurrentEd2kUp}}</span></span>{{end}}
-    {{if .HasData}}<span class="muted traffic-peak"><span class="traffic-peak-figure" {{trTitle "Picco di download nel periodo"}}><span class="traffic-peak-label">{{tr "Picco download"}}</span> {{tr .PeakDown}}</span>
+    {{if and .HasData (not .Idle)}}<span class="muted traffic-peak"><span class="traffic-peak-figure" {{trTitle "Picco di download nel periodo"}}><span class="traffic-peak-label">{{tr "Picco download"}}</span> {{tr .PeakDown}}</span>
     <span class="traffic-peak-figure" {{trTitle "Picco di upload nel periodo"}}><span class="traffic-peak-label">{{tr "Picco upload"}}</span> {{tr .PeakUp}}</span></span>{{end}}
     {{if .HasLimit}}<span class="badge warn" {{trTitle "Limite di banda attivo"}}>{{tr "Limite"}} <strong>{{tr .LimitLabel}}</strong></span>{{else if .Auto}}<span class="badge" {{trTitle "Auto attivo: Gextto misura la linea e adatta la velocità, senza un tetto fisso"}}>{{tr "Auto"}}</span>{{else}}<span class="badge" {{trTitle "Nessun limite di banda attivo"}}>{{tr "Nessun limite"}}</span>{{end}}
   </div>
-  {{if .HasData}}
+  {{if .Idle}}<p class="muted traffic-idle">{{tr "Nessun trasferimento negli ultimi 30 minuti."}}</p>
+  {{else if .HasData}}
   <svg class="traffic-chart" viewBox="0 0 {{.Width}} {{.Height}}" preserveAspectRatio="none" role="img" aria-label="{{tr "Grafico del traffico totale di download e upload, ultimi 30 minuti"}}">
     <polygon class="traffic-area down" points="{{.DownArea}}" />
     {{if .HasLimit}}<line class="traffic-limit" x1="0" y1="{{.LimitY}}" x2="{{.Width}}" y2="{{.LimitY}}" />{{end}}

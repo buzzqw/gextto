@@ -4571,6 +4571,7 @@ eng:
   "Nessun limite di banda attivo": "No active bandwidth limit"
   "Nessun limite": "No limit"
   "Raccolta dati in corso…": "Collecting data…"
+  "Nessun trasferimento negli ultimi 30 minuti.": "No transfers in the last 30 minutes."
   "Grafico della banda di rete, ultimi 30 minuti": "Network bandwidth chart, last 30 minutes"
   "Grafico del traffico totale di download e upload, ultimi 30 minuti": "Chart of the total download and upload traffic, last 30 minutes"
   "Velocità di download totale: torrent e aMule": "Total download speed: torrents and aMule"

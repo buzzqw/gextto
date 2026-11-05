@@ -227,10 +227,11 @@ Every page is checked with axe-core (WCAG 2 A/AA) in both themes.
 - **Table**: one compact line per torrent. The **columns are chosen** by the
   user (*Columns* in the toolbar, or a right click on the header): name, size,
   progress, status, seeds and peers (connected, with the swarm the trackers
-  report in brackets), speeds, ETA, ratio, category, availability, time active,
-  last activity and wasted by default; tags, added
-  on, completed on, downloaded, uploaded, remaining, queue position, tracker,
-  save path on demand. Columns are **resizable** by dragging the header
+  report in brackets), speeds, ETA, ratio and category by default, which fit a
+  1366-pixel screen beside the sidebar; availability, time active, last
+  activity, wasted, tags, added on, completed on, downloaded, uploaded,
+  remaining, queue position, tracker and save path on demand. A choice already
+  saved keeps its columns. Columns are **resizable** by dragging the header
   edge or with the arrow keys on it (double click restores the default);
   choice and widths are remembered in the browser and applied before the
   table is drawn, so a hidden column never flashes. Columns are sortable (the
@@ -405,7 +406,9 @@ The standalone pages follow the same structure:
   indistinguishable, and the per-torrent ones stay in the row menu.
 - Every interface page carries the **Donate** link (PayPal, new tab) in the
   bottom-right corner, above the status bar and the settings save bar; on a
-  phone only the heart remains. Its label and accessible name are in the
+  phone only the heart remains, in the brand row of the top bar, so it never
+  covers the page. On a phone the section links take a row of their own under
+  the brand, scrolling sideways. Its label and accessible name are in the
   catalog, so it is translated like the rest of the page.
 - **Settings** is split into seven tabs — *Folders & files*, *Network*,
   *Bandwidth*, *Queue*, *Library*, *Interface* and *System* — each showing only

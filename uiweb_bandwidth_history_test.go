@@ -368,3 +368,21 @@ func TestV2DashboardHostsTrafficPanel(t *testing.T) {
 		}
 	}
 }
+
+// TestV2TrafficViewIdleWindow: a window of zero samples is idle (one line on
+// the page instead of an empty chart); real traffic is not.
+func TestV2TrafficViewIdleWindow(t *testing.T) {
+	cfg := DefaultConfig()
+	state := trafficTestState(&cfg)
+	now := time.Now()
+	for i := 0; i < 5; i++ {
+		state.rate_history.add(rateSample{At: now.Add(time.Duration(i-5) * time.Second)})
+	}
+	if view := v2TrafficViewFrom(state); !view.HasData || !view.Idle {
+		t.Fatalf("zero samples: HasData=%v Idle=%v, want both", view.HasData, view.Idle)
+	}
+	state.rate_history.add(rateSample{At: now, Up: 64 * 1024})
+	if view := v2TrafficViewFrom(state); view.Idle {
+		t.Fatal("a window with traffic must draw the chart")
+	}
+}

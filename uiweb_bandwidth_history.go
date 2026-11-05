@@ -158,7 +158,10 @@ func v2SampleUp(sample rateSample) uint64 {
 // areas are precomputed as SVG coordinate strings; the numbers are already
 // formatted so the template stays free of arithmetic.
 type v2TrafficView struct {
-	HasData     bool
+	HasData bool
+	// Idle: every sample of the window is zero. The page shows one line
+	// instead of a tall empty chart and zero peaks.
+	Idle        bool
 	Width       int
 	Height      int
 	DownPoints  string
@@ -241,6 +244,8 @@ func v2TrafficViewFrom(s *AppState) v2TrafficView {
 			peakUp = up
 		}
 	}
+
+	view.Idle = peakDown == 0 && peakUp == 0
 
 	// The vertical scale covers both curves and the limit line, with a margin
 	// so a peak at the top of the window does not sit on the frame.

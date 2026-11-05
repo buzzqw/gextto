@@ -187,12 +187,15 @@ func TestPollFeedsDoesNotReaddAfterSeenMapExpiry(t *testing.T) {
 	if err := d.remove(d.snapshotViews()[0].Hash, false); err != nil {
 		t.Fatalf("remove torrent: %v", err)
 	}
+	// remove does not republish the snapshot (the next queue tick does): read
+	// the fresh list, or a slow tick shows the removed torrent as a re-add.
+	waitFor(t, "the removal", func() bool { return len(d.list()) == 0 })
 	d.mu.Lock()
 	d.state.FeedSeen = nil
 	d.mu.Unlock()
 
 	d.pollFeeds()
-	if views := d.snapshotViews(); len(views) != 0 {
+	if views := d.list(); len(views) != 0 {
 		t.Fatalf("the expired seen map re-added %d torrent(s)", len(views))
 	}
 	if statuses := d.feedStatusesSnapshot(); len(statuses) != 1 || statuses[0].Added != 0 {

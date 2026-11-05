@@ -5174,6 +5174,7 @@ pol:
   "Nessun limite di banda attivo": "Brak aktywnego limitu przepustowości"
   "Nessun limite": "Bez limitu"
   "Raccolta dati in corso…": "Zbieranie danych…"
+  "Nessun trasferimento negli ultimi 30 minuti.": "Brak transferów w ciągu ostatnich 30 minut."
   "Grafico della banda di rete, ultimi 30 minuti": "Wykres przepustowości sieci, ostatnie 30 minut"
   "Grafico del traffico totale di download e upload, ultimi 30 minuti": "Wykres całkowitego ruchu pobierania i wysyłania, ostatnie 30 minut"
   "Velocità di download totale: torrent e aMule": "Całkowita prędkość pobierania: torrenty i aMule"

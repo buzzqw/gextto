@@ -1458,6 +1458,12 @@ details.add-torrent-panel > summary::-webkit-details-marker { display: none; }
   .v2-topbar-sticky .top-live-metrics { display: none; }
   .v2-topbar-sticky .top-live-status { display: none; } /* the strip shows the state */
   .v2-topbar-sticky .btn-refresh { min-width: 40px; min-height: 40px; padding: 0 10px; }
+  /* Language, font and theme are in "Altro" on a phone (.nav-prefs): the copy
+     in the top bar cost a whole row on every page. The row stays only for the
+     Dashboard badges. */
+  .v2-topbar-sticky .top-controls > .lang-form,
+  .v2-topbar-sticky .top-controls > .btn { display: none; }
+  .v2-topbar-sticky .top-controls:not(:has(.top-kpis)) { display: none; }
 
   /* --- Bottom navigation: one row, Log always at hand ------------------- */
   .sidebar nav {
@@ -1507,6 +1513,9 @@ details.add-torrent-panel > summary::-webkit-details-marker { display: none; }
     bottom: calc(66px + env(safe-area-inset-bottom));
     flex-direction: row;
     align-content: flex-start;
+    /* Room for the appearance row (theme, text size, font, language, donate)
+       without a scroll on an ordinary phone. */
+    max-height: min(72dvh, 540px);
   }
   .sidebar .system-group.open .nav-item {
     flex: 1 1 calc(50% - 4px);
@@ -1998,9 +2007,9 @@ html.settings-only-modified .settings-panel:not(:has(.setting-modified-row)):not
 }
 .v2-donate-icon { font-size: 1rem; line-height: 1; }
 @media (max-width: 560px) {
-  /* Stay above the phone bottom navigation. */
-  .v2-donate { right: 12px; bottom: calc(80px + env(safe-area-inset-bottom)); padding: 10px; }
-  .v2-donate-label { display: none; }
+  /* On a phone the floating button sat over the rows scrolling under it (a
+     Pausa, a settings field): the link is in "Altro" instead (.nav-prefs). */
+  .v2-donate { display: none; }
 }
 /* Update available: stacked right above the donate button, same shape. */
 .v2-update-badge {
@@ -2026,7 +2035,7 @@ html.settings-only-modified .settings-panel:not(:has(.setting-modified-row)):not
 .v2-update-changes { margin: 0 0 12px; padding-left: 18px; max-height: 40vh; overflow: auto; }
 .v2-update-changes li { margin: 2px 0; overflow-wrap: anywhere; }
 @media (max-width: 560px) {
-  .v2-update-badge { right: 12px; bottom: calc(128px + env(safe-area-inset-bottom)); padding: 10px; }
+  .v2-update-badge { right: 12px; bottom: calc(80px + env(safe-area-inset-bottom)); padding: 10px; }
   .v2-update-badge-label { display: none; }
 }
 
