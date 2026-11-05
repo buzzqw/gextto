@@ -176,17 +176,18 @@ func resolveAnimeReleases(ctx context.Context, cfg *Config, releases []models.Re
 // searchArchiveForEpisode runs the archive query for one episode and, for an
 // anime series, also the absolute-number query, so releases named
 // "Title - 1071" are found in the local archive too.
-func searchArchiveForEpisode(ctx context.Context, cfg *Config, archive *Archive, series *SeriesConfig, query string, season, episode int64) ([][3]string, error) {
-	items, err := archive.Search(query)
+func searchArchiveForEpisode(ctx context.Context, cfg *Config, archive *Archive, series *SeriesConfig, query string, season, episode int64) ([]ArchiveListing, error) {
+	items, err := archive.SearchEntries(query)
 	if err != nil {
 		return items, err
 	}
-	// A row whose only source is a switched-off indexer cannot be downloaded:
-	// keep it out of the gap filling instead of trying its link again.
+	// A row whose only source is a switched-off indexer, or that came from a
+	// feed removed from Sources, cannot be downloaded: keep it out of the gap
+	// filling instead of trying its link again.
 	if cfg != nil {
 		usable := items[:0]
 		for _, item := range items {
-			if IsTorrentURL(item[1]) && cfg.TorrentLinkFromDisabledIndexer(item[1]) {
+			if IsTorrentURL(item.Magnet) && cfg.ArchiveTorrentLinkUnavailable(item.Magnet, item.FeedURL) {
 				continue
 			}
 			usable = append(usable, item)
@@ -197,9 +198,9 @@ func searchArchiveForEpisode(ctx context.Context, cfg *Config, archive *Archive,
 		return items, nil
 	}
 	if absolute, ok := animeNumberingFor(ctx, cfg, series).absolute(season, episode); ok {
-		if extra, extraErr := archive.Search(fmt.Sprintf("%s %02d", series.Name, absolute)); extraErr == nil {
+		if extra, extraErr := archive.SearchEntries(fmt.Sprintf("%s %02d", series.Name, absolute)); extraErr == nil {
 			for _, item := range extra {
-				if IsTorrentURL(item[1]) && cfg.TorrentLinkFromDisabledIndexer(item[1]) {
+				if IsTorrentURL(item.Magnet) && cfg.ArchiveTorrentLinkUnavailable(item.Magnet, item.FeedURL) {
 					continue
 				}
 				items = append(items, item)
@@ -211,8 +212,8 @@ func searchArchiveForEpisode(ctx context.Context, cfg *Config, archive *Archive,
 
 // parseArchiveRelease parses an archive row, resolving anime numbering for an
 // anime series.
-func parseArchiveRelease(ctx context.Context, cfg *Config, series *SeriesConfig, item [3]string) *models.Release {
-	release := ParseRelease(item[0], item[1], "archive:"+item[2])
+func parseArchiveRelease(ctx context.Context, cfg *Config, series *SeriesConfig, item ArchiveListing) *models.Release {
+	release := ParseRelease(item.Title, item.Magnet, "archive:"+item.Source)
 	if release == nil || series == nil || !series.Anime {
 		return release
 	}

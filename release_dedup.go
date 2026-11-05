@@ -350,6 +350,7 @@ func switchToMirror(release *models.Release, usable func(*models.Release) bool) 
 		release.TorrentURL = mirror.TorrentURL
 		release.GUID = mirror.GUID
 		release.Source = mirror.Source
+		release.FeedURL = mirror.FeedURL
 		if mirror.InfoHash != "" {
 			release.InfoHash = mirror.InfoHash
 		}

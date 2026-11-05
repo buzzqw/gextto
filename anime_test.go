@@ -90,6 +90,10 @@ func TestSearchArchiveForEpisodeSkipsLinksOfDisabledIndexers(t *testing.T) {
 	ctx := context.Background()
 	disabled := "http://192.168.1.161:9117/dl/1.torrent?jackett_api=1&path=a"
 	enabled := "http://192.168.1.161:8788/dl/2.torrent?apikey=b"
+	activeFeedLink := "https://rss.example.org/rss/download/2/b4ae63ba/Show.S01E02.torrent"
+	removedFeedLink := "https://rss.old.example.org/rss/download/1/a4ae63ba/Show.S01E02.torrent"
+	activeFeed := "https://rss.example.org/rss"
+	removedFeed := "https://rss.old.example.org/rss"
 	releases := []models.Release{
 		{Title: "Show S01E02 1080p", Source: "Jackett RSS - AnIndexer", TorrentURL: &disabled,
 			Kind: "series", DiscoveredAt: time.Now().UTC(), Seeders: -1, Peers: -1},
@@ -98,24 +102,41 @@ func TestSearchArchiveForEpisodeSkipsLinksOfDisabledIndexers(t *testing.T) {
 		{Title: "Show S01E02 2160p", Source: "a feed",
 			Magnet: "magnet:?xt=urn:btih:" + strings.Repeat("c", 40),
 			Kind:   "series", DiscoveredAt: time.Now().UTC(), Seeders: -1, Peers: -1},
+		{Title: "Show S01E02 1080p", Source: "ExampleFeed", FeedURL: activeFeed, TorrentURL: &activeFeedLink,
+			Kind: "series", DiscoveredAt: time.Now().UTC(), Seeders: -1, Peers: -1},
+		{Title: "Show S01E02 1080p", Source: "OldFeed", FeedURL: removedFeed, TorrentURL: &removedFeedLink,
+			Kind: "series", DiscoveredAt: time.Now().UTC(), Seeders: -1, Peers: -1},
 	}
 	if err := archive.SaveBatch(releases, &Config{}); err != nil {
 		t.Fatalf("SaveBatch: %v", err)
 	}
-	cfg := &Config{Indexers: []IndexerConfig{
-		{Name: "jackett", URL: "http://192.168.1.161:9117", Enabled: false},
-		{Name: "indexarr", URL: "http://192.168.1.161:8788", Enabled: true},
-	}}
+	cfg := &Config{
+		FeedURLs: []string{activeFeed},
+		Indexers: []IndexerConfig{
+			{Name: "jackett", URL: "http://192.168.1.161:9117", Enabled: false},
+			{Name: "indexarr", URL: "http://192.168.1.161:8788", Enabled: true},
+		},
+	}
 	items, err := searchArchiveForEpisode(ctx, cfg, archive, nil, "Show", 1, 2)
 	if err != nil {
 		t.Fatalf("searchArchiveForEpisode: %v", err)
 	}
-	if len(items) != 2 {
-		t.Fatalf("items = %d, want 2: %+v", len(items), items)
+	if len(items) != 3 {
+		t.Fatalf("items = %d, want 3: %+v", len(items), items)
 	}
+	kept := false
 	for _, item := range items {
-		if strings.Contains(item[1], "192.168.1.161:9117") {
+		if strings.Contains(item.Magnet, "192.168.1.161:9117") {
 			t.Fatalf("a listing of a disabled indexer was proposed: %+v", item)
 		}
+		if strings.Contains(item.Magnet, "rss.old.example.org") {
+			t.Fatalf("a listing of a removed feed was proposed: %+v", item)
+		}
+		if item.Magnet == activeFeedLink {
+			kept = true
+		}
+	}
+	if !kept {
+		t.Fatal("the listing of the feed still in Sources was not proposed")
 	}
 }

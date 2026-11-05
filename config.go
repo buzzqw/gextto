@@ -483,6 +483,37 @@ func (c *Config) TorrentLinkFromDisabledIndexer(rawURL string) bool {
 	return false
 }
 
+// TorrentLinkFromRemovedFeed reports whether a listing comes from a feed that
+// is no longer in Sources. The archive row remembers the feed line it came from
+// (models.Release.FeedURL), because the source label does not identify it: the
+// ext.to uploader listings all read as `ExtTo - <user>` and several feeds can
+// share a name. A feed deleted or commented out in the list behaves like a
+// switched-off indexer: its rows stay in the catalogue and stay browsable, but
+// their `.torrent` links are no longer opened. Rows archived before the feed
+// line was stored carry an empty value and keep the old behaviour.
+func (c *Config) TorrentLinkFromRemovedFeed(feedURL string) bool {
+	if c == nil {
+		return false
+	}
+	feedURL = strings.TrimSpace(feedURL)
+	if feedURL == "" {
+		return false
+	}
+	for _, raw := range c.FeedURLs {
+		if strings.TrimSpace(raw) == feedURL {
+			return false
+		}
+	}
+	return true
+}
+
+// ArchiveTorrentLinkUnavailable reports whether an archived `.torrent` link
+// must not be opened any more: it belongs to a switched-off indexer or to a
+// feed removed from Sources.
+func (c *Config) ArchiveTorrentLinkUnavailable(rawURL, feedURL string) bool {
+	return c.TorrentLinkFromDisabledIndexer(rawURL) || c.TorrentLinkFromRemovedFeed(feedURL)
+}
+
 // contentFilterRanges maps a named Unicode-script filter to its code point
 // ranges.
 func contentFilterRanges(filter string) ([][2]int64, bool) {

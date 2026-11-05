@@ -311,13 +311,14 @@ func RunCycleDomain(
 				continue
 			}
 			// A listing whose `.torrent` lives on an indexer the operator
-			// switched off cannot be downloaded any more: the manager no longer
-			// serves it. The archive keeps the row for its whole retention, so
-			// without this skip one cycle after another would ask a disabled
-			// source and report its error.
+			// switched off, or that came from a feed removed from Sources,
+			// cannot be downloaded any more: the manager no longer serves it
+			// and the feed is gone. The archive keeps the row for its whole
+			// retention, so without this skip one cycle after another would ask
+			// a disabled source and report its error.
 			if release.Magnet == "" && release.TorrentURL != nil &&
-				cfg.TorrentLinkFromDisabledIndexer(*release.TorrentURL) {
-				logging.Debug("archive: listing skipped, its indexer is switched off",
+				cfg.ArchiveTorrentLinkUnavailable(*release.TorrentURL, item.FeedURL) {
+				logging.Debug("archive: listing skipped, its source is switched off",
 					"title", item.Title, "source", item.Source)
 				continue
 			}
@@ -772,7 +773,7 @@ func collectGapReleases(ctx context.Context, cfg *Config, engine *Engine, db *Da
 		found := false
 		if items, err := searchArchiveForEpisode(ctx, cfg, archive, series, query, gap.Season, gap.Episode); err == nil {
 			for _, item := range items {
-				hash, ok := utils.MagnetHash(item[1])
+				hash, ok := utils.MagnetHash(item.Magnet)
 				if !ok {
 					continue
 				}
@@ -1191,7 +1192,7 @@ func prioritizeArchiveGapDownloads(
 			return searchErr
 		}
 		for _, item := range items {
-			hash, ok := utils.MagnetHash(item[1])
+			hash, ok := utils.MagnetHash(item.Magnet)
 			if !ok {
 				continue
 			}

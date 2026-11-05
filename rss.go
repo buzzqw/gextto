@@ -1464,8 +1464,23 @@ func fetchBody(ctx context.Context, client *http.Client, rawURL string, flaresol
 }
 
 // FetchFeed downloads a feed/listing and parses it. ext.to / Corsaro /
-// TorrentGalaxy are HTML listings, not RSS.
+// TorrentGalaxy are HTML listings, not RSS. Every release carries the feed line
+// it came from, so the archive can tell the rows of a feed removed from Sources
+// apart from the ones still configured.
 func FetchFeed(ctx context.Context, rawURL string, flaresolverr *string, maxPages int, maxAgeDays int64, oldRatio float64) ([]models.Release, error) {
+	items, err := fetchFeedItems(ctx, rawURL, flaresolverr, maxPages, maxAgeDays, oldRatio)
+	if err != nil {
+		return nil, err
+	}
+	for i := range items {
+		items[i].FeedURL = strings.TrimSpace(rawURL)
+	}
+	return items, nil
+}
+
+// fetchFeedItems reads and parses one feed; FetchFeed stamps the feed line on
+// every release it returns.
+func fetchFeedItems(ctx context.Context, rawURL string, flaresolverr *string, maxPages int, maxAgeDays int64, oldRatio float64) ([]models.Release, error) {
 	lower := feedKindSubject(rawURL)
 	kind := ""
 	switch {

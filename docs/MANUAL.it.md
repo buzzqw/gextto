@@ -629,6 +629,12 @@ eliminare la riga (🗑️).
   versioni e la migliore risoluzione e punteggio: espandi un gruppo per
   accodarne una.
 
+Le release di un **feed tolto da Sorgenti** (o commentato con `#` nella lista)
+restano nel catalogo, come quelle di un indexer spento: i loro collegamenti
+`.torrent` non vengono più aperti, quindi Gextto non riporta più l'errore di un
+feed che non c'è più. Rimettendo il feed tornano utilizzabili da sole; le righe
+archiviate prima di questa versione si comportano come prima.
+
 ### Link eD2k
 
 In **Esplora** e nella pagina **eD2k** puoi incollare uno o più link `ed2k://`

@@ -47,13 +47,6 @@ its gate; a rejected one moves to *Not planned*.
 - **Error wrapping and log wording** — 280 log calls build their sentence with `Sprintf`
   although the logger takes structured fields, and 490 `fmt.Errorf` calls drop the cause
   because they do not use `%w`. Mechanical, area by area, tests green.
-- **Archive rows of a removed feed** — a feed deleted from *Sources* leaves its listings
-  in the archive; a `.torrent` link that fails is quarantined (6h, then 24h, then a week)
-  but still retried. A switched-off indexer is recognised by its URL, a removed feed is
-  not: the row does not remember the feed it came from. Storing the feed URL next to the
-  source label would let the archive skip those listings the same way. Gate: a feed
-  removed from an installation that still sees its old links tried now and then.
-
 ## Not planned
 
 Closed by choice, not waiting for a measurement:

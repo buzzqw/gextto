@@ -480,6 +480,13 @@ func TestFetchFeedStopsWhenAPageAddsNoNewHash(t *testing.T) {
 	if requests != 2 {
 		t.Fatalf("requests = %d, want 2 (first page + one repeated page)", requests)
 	}
+	// Every release remembers the feed line it came from: the archive stores
+	// it and uses it to stop trying the links of a feed removed from Sources.
+	for index, release := range releases {
+		if release.FeedURL != server.URL+"/ext.to/browse/" {
+			t.Fatalf("release %d feed URL = %q, want the feed line", index, release.FeedURL)
+		}
+	}
 }
 
 func TestDetailCacheDoesNotShareMagnetsBetweenSameTitles(t *testing.T) {

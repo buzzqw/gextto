@@ -1725,3 +1725,35 @@ func TestTorrentLinkFromDisabledIndexer(t *testing.T) {
 		t.Error("a nil configuration reported a disabled indexer")
 	}
 }
+
+// A feed removed from Sources (or commented out) leaves its listings in the
+// archive, but their `.torrent` links must stop being tried: the feed line
+// stored with the row is what tells them apart, because the source label is
+// shared by several feeds.
+func TestTorrentLinkFromRemovedFeed(t *testing.T) {
+	active := "https://extto.org/browse/?filter=u=Paso77"
+	removed := "https://extto.org/browse/?filter=u=LittleMouse"
+	cfg := &Config{FeedURLs: []string{active, "  https://rss.knaben.org/ita  "}}
+	if cfg.TorrentLinkFromRemovedFeed(active) {
+		t.Error("an active feed was reported as removed")
+	}
+	if !cfg.TorrentLinkFromRemovedFeed(removed) {
+		t.Error("a removed feed was not reported")
+	}
+	if cfg.TorrentLinkFromRemovedFeed("https://rss.knaben.org/ita") {
+		t.Error("a feed line with surrounding spaces in the configuration was not recognised")
+	}
+	if cfg.TorrentLinkFromRemovedFeed("") {
+		t.Error("a row archived before the feed line was stored must keep today's behaviour")
+	}
+	if (&Config{FeedURLs: []string{active}}).ArchiveTorrentLinkUnavailable("https://rss.example.org/x.torrent", removed) == false {
+		t.Error("a link from a removed feed should be unavailable")
+	}
+	if (&Config{}).ArchiveTorrentLinkUnavailable("https://rss24h.torrentleech.org/rss/download/1/a", "") {
+		t.Error("a link without a feed must stay usable")
+	}
+	var nilConfig *Config
+	if nilConfig.TorrentLinkFromRemovedFeed(active) {
+		t.Error("a nil configuration reported a removed feed")
+	}
+}

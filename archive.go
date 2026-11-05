@@ -85,7 +85,11 @@ type ArchivePage struct {
 // UNIQUE index on the magnet text itself (≈400 bytes with the tracker list)
 // was 207 MB of a 572 MB archive. Titles are searched through archive_fts, so
 // there is no plain index on them.
-const archiveSchema = `CREATE TABLE IF NOT EXISTS archive (id INTEGER PRIMARY KEY, title TEXT NOT NULL, magnet TEXT NOT NULL, magnet_key BLOB NOT NULL UNIQUE, magnet_hash TEXT, source TEXT, quality_score INTEGER, added_at TEXT NOT NULL); CREATE INDEX IF NOT EXISTS idx_archive_added ON archive(added_at DESC); CREATE VIRTUAL TABLE IF NOT EXISTS archive_fts USING fts5(title, content='archive', content_rowid='id'); CREATE TRIGGER IF NOT EXISTS archive_fts_ai AFTER INSERT ON archive BEGIN INSERT INTO archive_fts(rowid,title) VALUES (new.id,new.title); END; CREATE TRIGGER IF NOT EXISTS archive_fts_ad AFTER DELETE ON archive BEGIN INSERT INTO archive_fts(archive_fts,rowid,title) VALUES('delete',old.id,old.title); END; CREATE TRIGGER IF NOT EXISTS archive_fts_au AFTER UPDATE OF title ON archive BEGIN INSERT INTO archive_fts(archive_fts,rowid,title) VALUES('delete',old.id,old.title); INSERT INTO archive_fts(rowid,title) VALUES(new.id,new.title); END;`
+// feed_url is the feed line a listing came from (see models.Release.FeedURL):
+// it is what lets the archive stop trying the `.torrent` links of a feed
+// removed from Sources. Empty for the rows archived before it existed and for
+// the indexer results.
+const archiveSchema = `CREATE TABLE IF NOT EXISTS archive (id INTEGER PRIMARY KEY, title TEXT NOT NULL, magnet TEXT NOT NULL, magnet_key BLOB NOT NULL UNIQUE, magnet_hash TEXT, source TEXT, feed_url TEXT DEFAULT '', quality_score INTEGER, added_at TEXT NOT NULL); CREATE INDEX IF NOT EXISTS idx_archive_added ON archive(added_at DESC); CREATE VIRTUAL TABLE IF NOT EXISTS archive_fts USING fts5(title, content='archive', content_rowid='id'); CREATE TRIGGER IF NOT EXISTS archive_fts_ai AFTER INSERT ON archive BEGIN INSERT INTO archive_fts(rowid,title) VALUES (new.id,new.title); END; CREATE TRIGGER IF NOT EXISTS archive_fts_ad AFTER DELETE ON archive BEGIN INSERT INTO archive_fts(archive_fts,rowid,title) VALUES('delete',old.id,old.title); END; CREATE TRIGGER IF NOT EXISTS archive_fts_au AFTER UPDATE OF title ON archive BEGIN INSERT INTO archive_fts(archive_fts,rowid,title) VALUES('delete',old.id,old.title); INSERT INTO archive_fts(rowid,title) VALUES(new.id,new.title); END;`
 
 // archiveMagnetKeySQL is the SQL function computing magnet_key.
 const archiveMagnetKeySQL = "gextto_magnet_key"
@@ -302,6 +306,12 @@ func OpenArchive(path string) (*Archive, error) {
 		_ = db.Close()
 		return nil, fmt.Errorf("archive schema: %w", err)
 	}
+	// Existing archives learn the feed of the rows archived from now on; the
+	// old rows keep an empty value and behave as before.
+	if err := ensureColumn(db, "archive", "feed_url", "TEXT DEFAULT ''"); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("archive schema: %w", err)
+	}
 	if err := migrateArchiveOneRowPerHash(db); err != nil {
 		_ = db.Close()
 		return nil, err
@@ -371,21 +381,24 @@ func openArchiveReader(path string) *sql.DB {
 
 // archiveInsertSQL and archiveRefreshSQL archive one release: ?1 title, ?2
 // magnet or `.torrent` URL, ?3 infohash or NULL, ?4 source, ?5 quality score,
-// ?6 identity key. The key is the infohash magnet, the indexer guid for a
-// `.torrent`-only listing, or the URL as a last resort (see archiveIdentity).
-// The refresh runs only when the insert was ignored. A single upsert with two
-// conflict targets measured 71 ms per 1000 releases against 54 ms.
+// ?6 identity key, ?7 feed line. The key is the infohash magnet, the indexer
+// guid for a `.torrent`-only listing, or the URL as a last resort (see
+// archiveIdentity). The refresh runs only when the insert was ignored. A single
+// upsert with two conflict targets measured 71 ms per 1000 releases against
+// 54 ms.
 //
 // archiveRefreshSQL keeps magnet_key: the key belongs to the listing, so a
 // magnet arriving from another source must not steal it. archiveRefreshKeySQL
 // refreshes a listing by that stable key and upgrades a guid-keyed row from
-// its ephemeral URL to the magnet once one is known.
+// its ephemeral URL to the magnet once one is known. The feed line follows the
+// source, because it describes the link the row holds: a listing re-archived
+// from an indexer clears it.
 const (
-	archiveInsertSQL = "INSERT OR IGNORE INTO archive(title,magnet,magnet_key,magnet_hash,source,quality_score,added_at) VALUES (?1,?2,?6,?3,?4,?5,datetime('now'))"
+	archiveInsertSQL = "INSERT OR IGNORE INTO archive(title,magnet,magnet_key,magnet_hash,source,feed_url,quality_score,added_at) VALUES (?1,?2,?6,?3,?4,?7,?5,datetime('now'))"
 	// A link-only listing of a torrent already archived must not replace its
 	// durable magnet with an ephemeral URL: keep the magnet, refresh the rest.
-	archiveRefreshSQL    = "UPDATE archive SET title=?1, magnet=CASE WHEN ?2 LIKE 'magnet:%' THEN ?2 ELSE magnet END, source=?4, quality_score=?5, added_at=datetime('now') WHERE magnet_hash<>'' AND magnet_hash=?3 AND magnet_key<>?6"
-	archiveRefreshKeySQL = "UPDATE OR IGNORE archive SET title=?1, magnet=CASE WHEN COALESCE(magnet_hash,'')='' THEN ?2 ELSE magnet END, magnet_hash=COALESCE(NULLIF(magnet_hash,''), ?3), source=?4, quality_score=?5, added_at=datetime('now') WHERE magnet_key=?6"
+	archiveRefreshSQL    = "UPDATE archive SET title=?1, magnet=CASE WHEN ?2 LIKE 'magnet:%' THEN ?2 ELSE magnet END, source=?4, feed_url=?7, quality_score=?5, added_at=datetime('now') WHERE magnet_hash<>'' AND magnet_hash=?3 AND magnet_key<>?6"
+	archiveRefreshKeySQL = "UPDATE OR IGNORE archive SET title=?1, magnet=CASE WHEN COALESCE(magnet_hash,'')='' THEN ?2 ELSE magnet END, magnet_hash=COALESCE(NULLIF(magnet_hash,''), ?3), source=?4, feed_url=?7, quality_score=?5, added_at=datetime('now') WHERE magnet_key=?6"
 	// The same torrent is already archived under another listing: a link-only
 	// copy that has just learned its infohash is redundant and must go, or the
 	// archive keeps a second row without a magnet and the archive pass keeps
@@ -486,7 +499,7 @@ func (a *Archive) saveChunk(releases []models.Release, cfg *Config) error {
 		// refreshes its one row, which becomes the newest, as a new row did. A
 		// guid-keyed listing is refreshed in place instead of being appended
 		// again when Jackett regenerates its download URL.
-		args := []any{r.Title, source, hash, r.Source, cfg.ReleaseScore(r), archiveMagnetKeyString(identity)}
+		args := []any{r.Title, source, hash, r.Source, cfg.ReleaseScore(r), archiveMagnetKeyString(identity), strings.TrimSpace(r.FeedURL)}
 		result, err := insert.Exec(args...)
 		if err != nil {
 			_ = tx.Rollback()
@@ -688,6 +701,9 @@ type ArchiveListing struct {
 	Magnet   string
 	Source   string
 	InfoHash string
+	// FeedURL is the feed the listing came from, empty for indexer results and
+	// for the rows archived before it was stored.
+	FeedURL string
 }
 
 // SearchEntries returns up to 200 newest archived listings matching the FTS5
@@ -699,7 +715,7 @@ func (a *Archive) SearchEntries(query string) ([]ArchiveListing, error) {
 	if term == "" {
 		return []ArchiveListing{}, nil
 	}
-	rows, err := a.reader().Query("SELECT archive.title,archive.magnet,COALESCE(archive.source,'archive'),COALESCE(archive.magnet_hash,'') FROM archive JOIN archive_fts ON archive_fts.rowid=archive.id WHERE archive_fts MATCH ?1 ORDER BY archive.added_at DESC,archive.id DESC LIMIT 200", term)
+	rows, err := a.reader().Query("SELECT archive.title,archive.magnet,COALESCE(archive.source,'archive'),COALESCE(archive.magnet_hash,''),COALESCE(archive.feed_url,'') FROM archive JOIN archive_fts ON archive_fts.rowid=archive.id WHERE archive_fts MATCH ?1 ORDER BY archive.added_at DESC,archive.id DESC LIMIT 200", term)
 	if err != nil {
 		return nil, err
 	}
@@ -707,7 +723,7 @@ func (a *Archive) SearchEntries(query string) ([]ArchiveListing, error) {
 	results := []ArchiveListing{}
 	for rows.Next() {
 		var entry ArchiveListing
-		if err := rows.Scan(&entry.Title, &entry.Magnet, &entry.Source, &entry.InfoHash); err != nil {
+		if err := rows.Scan(&entry.Title, &entry.Magnet, &entry.Source, &entry.InfoHash, &entry.FeedURL); err != nil {
 			continue
 		}
 		results = append(results, entry)

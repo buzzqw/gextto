@@ -960,3 +960,84 @@ func TestResolveListingDropsTheLinkOnlyCopyOfATorrentAlreadyArchived(t *testing.
 		t.Fatalf("the remaining row lost its infohash: %q", storedHash)
 	}
 }
+
+// The archive remembers the feed line a listing came from: the cycle uses it to
+// stop trying the `.torrent` links of a feed removed from Sources. A listing
+// re-archived from another source follows that source, because the stored link
+// is now the new one's.
+func TestArchiveRemembersTheFeedOfAListing(t *testing.T) {
+	archive := openTestArchive(t)
+	const hash = "0123456789abcdef0123456789abcdef01234567"
+	link := "https://rss.example.org/rss/download/1/a4ae63ba/Example.Show.S01E01.torrent"
+	feed := "https://rss.example.org/rss"
+	base := models.Release{
+		Title:        "Example Show S01E01 1080p",
+		Kind:         "series",
+		DiscoveredAt: time.Now().UTC(),
+		Seeders:      -1,
+		Peers:        -1,
+	}
+	fromFeed := base
+	fromFeed.TorrentURL = &link
+	fromFeed.InfoHash = hash
+	fromFeed.Source = "ExampleFeed"
+	fromFeed.FeedURL = feed
+	if err := archive.SaveBatch([]models.Release{fromFeed}, &Config{}); err != nil {
+		t.Fatalf("SaveBatch from the feed: %v", err)
+	}
+	listings, err := archive.SearchEntries("Example")
+	if err != nil {
+		t.Fatalf("SearchEntries: %v", err)
+	}
+	if len(listings) != 1 {
+		t.Fatalf("listings = %d, want 1", len(listings))
+	}
+	if listings[0].FeedURL != feed {
+		t.Fatalf("feed URL = %q, want %q", listings[0].FeedURL, feed)
+	}
+	// The same torrent arrives from an indexer: the row keeps one copy and
+	// follows the source that supplied the link now stored.
+	fromIndexer := base
+	fromIndexer.Magnet = "magnet:?xt=urn:btih:" + hash
+	fromIndexer.Source = "indexarr"
+	if err := archive.SaveBatch([]models.Release{fromIndexer}, &Config{}); err != nil {
+		t.Fatalf("SaveBatch from the indexer: %v", err)
+	}
+	listings, err = archive.SearchEntries("Example")
+	if err != nil {
+		t.Fatalf("SearchEntries after the refresh: %v", err)
+	}
+	if len(listings) != 1 {
+		t.Fatalf("listings after the refresh = %d, want 1", len(listings))
+	}
+	if listings[0].Source != "indexarr" || listings[0].FeedURL != "" {
+		t.Fatalf("source/feed after the refresh = %q/%q, want indexarr and no feed", listings[0].Source, listings[0].FeedURL)
+	}
+}
+
+// An archive created before the feed line was stored learns the column without
+// losing a row; those rows keep an empty feed and behave as before.
+func TestOldArchiveLearnsTheFeedColumn(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "gextto_archive.db")
+	db, err := OpenSQLite(path)
+	if err != nil {
+		t.Fatalf("OpenSQLite: %v", err)
+	}
+	if _, err := db.Exec(`CREATE TABLE archive (id INTEGER PRIMARY KEY, title TEXT NOT NULL, magnet TEXT NOT NULL, magnet_key BLOB NOT NULL UNIQUE, magnet_hash TEXT, source TEXT, quality_score INTEGER, added_at TEXT NOT NULL);
+		INSERT INTO archive(title,magnet,magnet_key,source,added_at) VALUES ('Legacy Release','magnet:?xt=urn:btih:1123456789abcdef0123456789abcdef01234567',gextto_magnet_key('magnet:?xt=urn:btih:1123456789abcdef0123456789abcdef01234567'),'ExampleFeed','2026-06-16')`); err != nil {
+		t.Fatalf("create the old schema: %v", err)
+	}
+	_ = db.Close()
+	archive, err := OpenArchive(path)
+	if err != nil {
+		t.Fatalf("OpenArchive on the old archive: %v", err)
+	}
+	defer archive.Close()
+	listings, err := archive.SearchEntries("Legacy")
+	if err != nil {
+		t.Fatalf("SearchEntries: %v", err)
+	}
+	if len(listings) != 1 || listings[0].FeedURL != "" {
+		t.Fatalf("listings = %+v, want the old row with an empty feed", listings)
+	}
+}

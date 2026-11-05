@@ -620,6 +620,12 @@ the row (🗑️).
 - The **Seen in feeds** tab groups releases by title, with the number of
   versions and the best resolution and score: expand a group to queue one.
 
+The releases of a **feed removed from Sources** (or commented out with `#` in
+the list) stay in the catalogue, like those of a switched-off indexer: their
+`.torrent` links are no longer opened, so Gextto no longer reports the error of
+a feed that is gone. Putting the feed back makes them usable again on their
+own; rows archived before this version behave as before.
+
 ### eD2k links
 
 In **Explore** and on the **eD2k** page you can paste one or more `ed2k://`

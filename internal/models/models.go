@@ -635,15 +635,20 @@ type Release struct {
 	// Mirrors are other copies of the same torrent from other sources, folded
 	// into this release by the duplicate merge. The acquisition falls back to
 	// them when the link of this copy fails. Never persisted.
-	Mirrors      []Release `json:"-"`
-	Source       string    `json:"source"`
-	Quality      Quality   `json:"quality"`
-	Kind         string    `json:"kind"`
-	Series       *string   `json:"series"`
-	Season       *int64    `json:"season"`
-	Episode      *int64    `json:"episode"`
-	IsPack       bool      `json:"is_pack"`
-	EpisodeRange []int64   `json:"episode_range"`
+	Mirrors []Release `json:"-"`
+	Source  string    `json:"source"`
+	// FeedURL is the feed line the listing came from, stored with the archive
+	// row so the `.torrent` links of a feed removed from Sources are no longer
+	// tried: the source label is shared by several feeds and cannot identify
+	// the one a row belongs to. Empty for indexer results.
+	FeedURL      string  `json:"-"`
+	Quality      Quality `json:"quality"`
+	Kind         string  `json:"kind"`
+	Series       *string `json:"series"`
+	Season       *int64  `json:"season"`
+	Episode      *int64  `json:"episode"`
+	IsPack       bool    `json:"is_pack"`
+	EpisodeRange []int64 `json:"episode_range"`
 	// Network names the acquisition network: "" or "torrent" for BitTorrent,
 	// "ed2k" for a file found on Kad/eD2k. The provider sets it so the UI can
 	// label a result without guessing from the link.
