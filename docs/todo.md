@@ -16,9 +16,8 @@ here.
 
 ## Engine (gx-core, gx-torrent)
 
-- **Mixed-mode TCP/uTP arbitration** — throttle TCP when uTP shares the line, as
-  libtorrent does; today only the transfer caps react. Gate: a mixed swarm where the
-  current caps lose throughput or latency.
+Nothing open: every engine item waits for a condition listed under
+[Not planned](#not-planned).
 
 ## Gextto, acquisition and UI
 

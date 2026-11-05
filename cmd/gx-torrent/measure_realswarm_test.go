@@ -16,7 +16,8 @@ package main
 // GX_MEASURE_MAXCONN sets the per-torrent peer cap (default: the daemon's own,
 // no cap): the controlled half of the cap measurement, where the same swarm is
 // run with and without a cap to see what it costs in CPU and what it changes in
-// throughput. The point is not the throughput (a public swarm is noisy) but
+// throughput. GX_MEASURE_TRANSPORT=tcp|utp|mixed restricts the peers to one
+// transport (default mixed), for the TCP/uTP A/B. The point is not the throughput (a public swarm is noisy) but
 // that real uTP peers connect and that the retransmission counters stay sane: a
 // healthy swarm must not show a resend storm, and the adaptive backoff must not
 // fire on clean paths.
@@ -44,10 +45,22 @@ func TestMeasureRealSwarm(t *testing.T) {
 		}
 	}
 
-	d := newTestDaemonWith(t, NetworkOptions{
+	// GX_MEASURE_TRANSPORT=tcp|utp picks one transport for the peers (the
+	// mixed-mode A/B); empty or "mixed" keeps both, the daemon's default.
+	opts := NetworkOptions{
 		PortBegin: 45800, PortEnd: 45819,
 		Encryption: 1, DHT: true, UTP: true, PEX: true,
-	})
+	}
+	switch transport := os.Getenv("GX_MEASURE_TRANSPORT"); transport {
+	case "", "mixed":
+	case "tcp":
+		opts.UTP = false
+	case "utp":
+		opts.UTPOnly = true
+	default:
+		t.Fatalf("GX_MEASURE_TRANSPORT=%q: want tcp, utp or mixed", transport)
+	}
+	d := newTestDaemonWith(t, opts)
 	if os.Getenv("GX_MEASURE_AUTO") == "1" {
 		// The daemon's automatic cap (connauto.go): same swarm, machine-sized.
 		d.state.Config.ConnAuto = queue.BoolPtr(true)

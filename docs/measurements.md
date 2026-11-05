@@ -364,6 +364,7 @@ Closed with a measurement, so they are not retried without new data.
 | Anti-Sybil cap on by default | the table is not concentrated, and CGNAT subnets would be capped | |
 | Peer turnover (closing the slowest peers at the cap) | on the Ubuntu ISO swarm the engine never filled the cap: peaks of 13–17 peers at 20, 5–6 at 8, against a default of 55, so turnover never acted | a real swarm that keeps a torrent at its cap |
 | Auto cutting the caps when the router sees another device | a call (5 pings/s) next to a download filling the line: median 15 ms idle, 36–50 ms loaded, 2–6 of 300 lost; the spikes above 150 ms were there with Gextto idle too, from another device on the line | a call that degrades next to a download |
+| Throttling TCP while uTP peers share the line (libtorrent's mixed mode) | Ubuntu 26.10, 3-minute rounds: mixed 5.9 and 7.7 MB/s, TCP only 3.9 and 6.7, uTP only 2.0 and 3.4; in the clean round mixed also had the lowest p90/p99 ping (67/163 ms against 79/850 for TCP only) | a mixed swarm where mixed loses speed or latency against one transport |
 | Choking changes | reciprocation works locally and against libtorrent | a gap on a real swarm |
 | Super-seeding by default | no upload saved on measurable swarms, about 24 % slower locally | |
 | Merge candidates ordered by reusable bytes | superseded by the dedup | |
