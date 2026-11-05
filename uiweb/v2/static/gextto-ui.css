@@ -641,6 +641,9 @@ label.field > span, .field > span, .field-label { color: var(--muted); font-size
 .badge.ed2k { background: color-mix(in srgb, var(--accent-2) 22%, transparent); color: var(--accent-2); }
 .acquisition-events td.nowrap { white-space: nowrap; }
 .dashboard-problems-table td.nowrap { white-space: nowrap; }
+/* A release name is one long word (dots, no spaces): let it wrap, so the
+   Actions column stays in view instead of behind a horizontal scroll. */
+.dashboard-problems-table td:not(.nowrap) { overflow-wrap: anywhere; }
 .dashboard-problems-panel h4 { margin: 12px 0 6px; }
 .dashboard-problems-panel h4:first-child { margin-top: 0; }
 .dashboard-problems-panel .problems-section-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }

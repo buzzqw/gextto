@@ -25,6 +25,7 @@ non cambiano l'interfaccia di Gextto, dove quelle pagine non esistono. Le
 correzioni al motore valgono invece per entrambi.
 
 ## 5 novembre 2026
+- **Due ritocchi all'interfaccia.** Nella dashboard, la tabella **Avvisi** va a capo sui nomi delle release lunghi invece di allargarsi: la colonna **Azioni** resta in vista senza scorrere di lato. Nella pagina di gx-torrent, il pulsante **Aggiungi** al centro della lista vuota mostrava un «+» grigio enorme sopra la scritta: ora ha la sua icona normale.
 - **L'elenco dei download non si legge più a metà mentre si aggiorna.** Con gx-torrent o qBittorrent, il lavoro in sottofondo di Gextto e l'interfaccia potevano leggere l'elenco dei torrent nello stesso momento in cui veniva aggiornato: in rari casi un controllo poteva vedere un elenco incompleto o rovinato. Ora la lettura aspetta che l'aggiornamento sia finito.
 - **«Ripristina la sorgente nei nomi» non sovrascrive più un file della libreria.** Se nella cartella c'era già un file con il nome da ripristinare, la rinomina lo sostituiva senza avvisare e uno dei due file andava perso. Ora quell'episodio viene saltato, conta come errore nel riepilogo e il log dice quale file esiste già.
 - **La pulizia audio notturna non può più restare bloccata su un file del NAS.** La lettura delle tracce con mkvmerge non aveva un tempo massimo: se la condivisione smetteva di rispondere, la manutenzione restava ferma lì. Ora dopo due minuti quel file viene lasciato com'è e si passa al successivo.

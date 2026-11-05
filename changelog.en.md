@@ -24,6 +24,7 @@ not change Gextto's interface, where those pages do not exist. Engine fixes, on
 the other hand, apply to both.
 
 ## 5 November 2026
+- **Two interface fixes.** On the dashboard, the **Warnings** table wraps long release names instead of growing wider: the **Actions** column stays in view without scrolling sideways. On the gx-torrent page, the **Add** button in the middle of the empty list showed a huge grey "+" over its label: now it has its normal icon.
 - **The download list is no longer read halfway through an update.** With gx-torrent or qBittorrent, Gextto's background work and the interface could read the torrent list at the same moment it was being updated: in rare cases a check could see an incomplete or damaged list. Now the read waits for the update to finish.
 - **"Restore the source in the names" no longer overwrites a library file.** If the folder already held a file with the name to restore, the rename replaced it without a warning and one of the two files was lost. Now that episode is skipped, counts as an error in the summary, and the log says which file already exists.
 - **The night audio clean-up can no longer hang on a NAS file.** Reading the tracks with mkvmerge had no time limit: if the share stopped answering, the maintenance stayed stuck there. Now after two minutes that file is left as it is and the next one follows.
