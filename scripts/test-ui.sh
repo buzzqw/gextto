@@ -10,7 +10,13 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-scripts/build-daemon.sh
+# The binaries under test go to a directory of their own, never to bin/: bin/
+# is what the service on this machine runs, and a gx-torrent rebuilt there for
+# a test replaced the live one without raising its build number.
+bin_dir="$(mktemp -d "${TMPDIR:-/tmp}/gextto-test-ui-bin.XXXXXX")"
+trap 'rm -rf "$bin_dir"' EXIT
+GEXTTO_BINARY="$bin_dir/gexttod" scripts/build-daemon.sh
+export GEXTTO_TEST_BINARY="$bin_dir/gexttod"
 
 if [[ ! -d "$ROOT/uiweb/end2end/node_modules" ]]; then
     (cd "$ROOT/uiweb/end2end" && npm ci --no-audit --no-fund)
@@ -18,7 +24,9 @@ fi
 
 if [[ "${CI:-}" == "true" || "${GEXTTO_TEST_UI_SERIAL:-0}" == "1" ]]; then
     cd "$ROOT/uiweb/end2end"
-    exec npx playwright test
+    # Not exec: the EXIT trap removes the binaries of the run.
+    npx playwright test
+    exit $?
 fi
 
 run_dir="$(mktemp -d "${TMPDIR:-/tmp}/gextto-test-ui.XXXXXX")"
@@ -30,7 +38,8 @@ cleanup() {
         [[ -n "$pid" ]] && kill "$pid" 2>/dev/null || true
     done
     pkill -f "$run_dir" 2>/dev/null || true
-    rm -rf "$run_dir"
+    pkill -f "$bin_dir" 2>/dev/null || true
+    rm -rf "$run_dir" "$bin_dir"
 }
 trap cleanup EXIT
 

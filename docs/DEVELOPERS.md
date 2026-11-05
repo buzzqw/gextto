@@ -236,7 +236,8 @@ itself. `make test-ui` runs three groups (three daemons and three Chromium):
 the mini PC it runs on does not take more.
 
 The end-to-end suite is under `uiweb/end2end` (Playwright + Node). `make test-ui`
-builds the daemon, starts it in dry-run on its own port, completes the first-run
+builds the daemon and gx-torrent in a temporary directory of the run (never in
+`bin/`, which the service on the machine runs), starts it in dry-run on its own port, completes the first-run
 wizard once in `global-setup.ts` and drives the real interface in a browser:
 
 ```bash

@@ -16,6 +16,11 @@ const htmlReportDir = process.env.GEXTTO_TEST_HTML_DIR || "playwright-report";
 /**
  * See https://playwright.dev/docs/test-configuration.
  */
+// The daemon under test. scripts/test-ui.sh builds it (and the gx-torrent
+// next to it) in the run directory: building into bin/ replaced the binary of
+// the running service with an unbumped build number.
+const testBinary = process.env.GEXTTO_TEST_BINARY || "bin/gexttod";
+
 export default defineConfig({
   testDir: "./tests",
   /* A fresh data dir shows the first-run wizard; complete it once. */
@@ -100,7 +105,7 @@ export default defineConfig({
     // be adopted and reconfigured by the test instance. UPnP and NAT-PMP are
     // off: a test run must not add port mappings to the real router (gx-torrent
     // would inherit the environment and open them with the peer port).
-    command: `GX_TORRENT_NO_UPNP=1 GX_TORRENT_NO_NATPMP=1 GEXTTO_DATA_DIR=${testDataDir} GEXTTO_LISTEN=127.0.0.1:${port} GEXTTO_ENGINE_LISTEN=127.0.0.1:${enginePort} GEXTTO_GXTORRENT_LISTEN=127.0.0.1:${gxtorrentPort} bin/gexttod --dry-run`,
+    command: `GX_TORRENT_NO_UPNP=1 GX_TORRENT_NO_NATPMP=1 GEXTTO_DATA_DIR=${testDataDir} GEXTTO_LISTEN=127.0.0.1:${port} GEXTTO_ENGINE_LISTEN=127.0.0.1:${enginePort} GEXTTO_GXTORRENT_LISTEN=127.0.0.1:${gxtorrentPort} ${testBinary} --dry-run`,
     cwd: "../..",
     port,
     reuseExistingServer: process.env.GEXTTO_TEST_REUSE !== "0" && !process.env.CI,
