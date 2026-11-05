@@ -310,6 +310,15 @@ func TestAudioLibraryNeedsCheck(t *testing.T) {
 	if !audioLibraryNeedsCheck(record, true, 10, 20, now.Add(8*24*time.Hour)) {
 		t.Fatal("a failed file is never retried")
 	}
+	// Every tool produced a copy the checks refused: the same file would fail
+	// the same way, so it waits for a new size or date instead of a timer.
+	record.Outcome = "unsupported: the cleaned copy would not be identical to the source"
+	if audioLibraryNeedsCheck(record, true, 10, 20, now.Add(365*24*time.Hour)) {
+		t.Fatal("a file that cannot be cleaned is probed again")
+	}
+	if !audioLibraryNeedsCheck(record, true, 11, 20, now) {
+		t.Fatal("a changed file is not probed again")
+	}
 }
 
 func TestMaintenanceNightTextAndNotification(t *testing.T) {

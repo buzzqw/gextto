@@ -178,12 +178,32 @@ func resolveAnimeReleases(ctx context.Context, cfg *Config, releases []models.Re
 // "Title - 1071" are found in the local archive too.
 func searchArchiveForEpisode(ctx context.Context, cfg *Config, archive *Archive, series *SeriesConfig, query string, season, episode int64) ([][3]string, error) {
 	items, err := archive.Search(query)
-	if err != nil || series == nil || !series.Anime {
+	if err != nil {
 		return items, err
+	}
+	// A row whose only source is a switched-off indexer cannot be downloaded:
+	// keep it out of the gap filling instead of trying its link again.
+	if cfg != nil {
+		usable := items[:0]
+		for _, item := range items {
+			if IsTorrentURL(item[1]) && cfg.TorrentLinkFromDisabledIndexer(item[1]) {
+				continue
+			}
+			usable = append(usable, item)
+		}
+		items = usable
+	}
+	if series == nil || !series.Anime {
+		return items, nil
 	}
 	if absolute, ok := animeNumberingFor(ctx, cfg, series).absolute(season, episode); ok {
 		if extra, extraErr := archive.Search(fmt.Sprintf("%s %02d", series.Name, absolute)); extraErr == nil {
-			items = append(items, extra...)
+			for _, item := range extra {
+				if IsTorrentURL(item[1]) && cfg.TorrentLinkFromDisabledIndexer(item[1]) {
+					continue
+				}
+				items = append(items, item)
+			}
 		}
 	}
 	return items, nil

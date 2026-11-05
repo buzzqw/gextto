@@ -1011,6 +1011,12 @@ così ognuno ha il suo timeout e la sua salute e il più lento non blocca gli
 altri. Se l'elenco non è leggibile, torna alla ricerca aggregata. Nei risultati
 la sorgente compare come `jackett:NomeTracker`.
 
+Un indexer **spento** non viene interrogato, e i collegamenti `.torrent` delle
+sue release già raccolte non vengono più aperti: le release restano nel catalogo
+dell'archivio — nessun dato viene cancellato — ma Gextto non prova a scaricarle
+e non riporta più l'errore del servizio spento. Riaccendendo l'indexer tornano
+utilizzabili.
+
 ### Aggiungere indexarr
 
 Uguale, con tipo **indexarr** e indirizzo base `http://indexarr:8788`. indexarr
@@ -2374,7 +2380,7 @@ spazio del `tmpfs`, come prima.
 | Finestra notturna — fine | Ora di fine (HH:MM, predefinita 07:00). Dopo non parte nessun lavoro nuovo; quello in corso viene completato. Se la fine è prima dell'inizio la finestra passa la mezzanotte; inizio e fine uguali vogliono dire tutto il giorno. |
 | Controllo integrità e analisi MediaInfo solo nella finestra | Sì (predefinito): il controllo integrità e l'analisi MediaInfo girano al loro intervallo ma solo dentro la finestra e con Gextto inattivo. No: girano al loro intervallo a qualsiasi ora, come prima. I comandi manuali (**Controlla ora**, **Aggiorna MediaInfo**) partono sempre subito. |
 | Manutenzione del database ogni notte | Sì (predefinito): una volta per notte i database vengono ottimizzati (`PRAGMA optimize`) e compattati quando hanno almeno il 20% o 64 MB di spazio libero; una volta alla settimana un controllo completo (`integrity_check`) legge ogni pagina e ogni indice, e se trova un problema arriva subito una notifica, senza aspettare il riepilogo. |
-| Pulisci l'audio dei file già in libreria | Applica **Rimuovi le tracce audio in altre lingue**, con la stessa lingua e le stesse scelte, ai file già archiviati: uno alla volta, nella finestra, con gli stessi controlli della pulizia dopo l'importazione. Ogni file viene esaminato una sola volta (Gextto ne ricorda dimensione e data); un file ancora in seed tramite hardlink aspetta la fine del seed, così la copia pulita non occupa spazio due volte, e un file scritto nell'ultima ora aspetta la notte dopo. Un file che non supera il controllo resta com'è e viene riprovato dopo una settimana. Spento di default; si attiva solo con la pulizia audio accesa. |
+| Pulisci l'audio dei file già in libreria | Applica **Rimuovi le tracce audio in altre lingue**, con la stessa lingua e le stesse scelte, ai file già archiviati: uno alla volta, nella finestra, con gli stessi controlli della pulizia dopo l'importazione. Ogni file viene esaminato una sola volta (Gextto ne ricorda dimensione e data); un file ancora in seed tramite hardlink aspetta la fine del seed, così la copia pulita non occupa spazio due volte, e un file scritto nell'ultima ora aspetta la notte dopo. Un file che non supera il controllo per un motivo passeggero (uno strumento interrotto, il disco che non risponde) resta com'è e viene riprovato dopo una settimana; un file che non si può pulire senza cambiarne il contenuto — la verifica delle tracce non torna — viene ricordato e non viene più riprovato, a meno che il file cambi (dimensione o data). Spento di default; si attiva solo con la pulizia audio accesa. |
 
 **Manutenzione notturna — pannello**
 

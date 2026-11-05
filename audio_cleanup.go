@@ -431,6 +431,9 @@ func RunAudioCleanup(ctx context.Context, path string, opts AudioCleanupOptions)
 	}
 	temporary := ""
 	failures := make([]string, 0, len(backends))
+	// The copy was refused by a check, not by a tool that broke: when every
+	// tool ends that way the file cannot be cleaned, now or later.
+	wouldDiffer := true
 	for attempt, backend := range backends {
 		candidate := audioCleanupTemporaryPath(path)
 		attemptErr := audioCleanupAttempt(ctx, backend, path, candidate, media, plan, opts)
@@ -443,6 +446,9 @@ func RunAudioCleanup(ctx context.Context, path string, opts AudioCleanupOptions)
 		if ctx.Err() != nil {
 			return report, fmt.Errorf("%s: %w", backend, attemptErr)
 		}
+		if !errors.Is(attemptErr, errAudioCleanupWouldDiffer) {
+			wouldDiffer = false
+		}
 		failures = append(failures, fmt.Sprintf("%s: %v", backend, attemptErr))
 		if attempt+1 < len(backends) {
 			logging.Debug("the remuxed copy did not pass the checks, trying the next tool",
@@ -450,6 +456,9 @@ func RunAudioCleanup(ctx context.Context, path string, opts AudioCleanupOptions)
 		}
 	}
 	if temporary == "" {
+		if wouldDiffer {
+			return report, fmt.Errorf("%w: %s", errAudioCleanupWouldDiffer, strings.Join(failures, "; "))
+		}
 		return report, errors.New(strings.Join(failures, "; "))
 	}
 	published := false
@@ -506,10 +515,20 @@ func audioCleanupAttempt(ctx context.Context, backend, source, temporary string,
 		return fmt.Errorf("cannot analyse the remuxed file: %w", err)
 	}
 	if err := verifyAudioCleanupOutput(media, output, plan, opts, isMatroskaPath(temporary)); err != nil {
+		return fmt.Errorf("%w: %v", errAudioCleanupWouldDiffer, err)
+	}
+	if err := verifyAudioCleanupPackets(ctx, source, temporary, media, output, plan, isMatroskaPath(temporary)); err != nil {
 		return err
 	}
-	return verifyAudioCleanupPackets(ctx, source, temporary, media, output, plan, isMatroskaPath(temporary))
+	return nil
 }
+
+// errAudioCleanupWouldDiffer marks a remux that one of the checks refused
+// because the copy is not exactly the source minus the dropped tracks. The
+// same file would be refused in the same way at every attempt — it is a
+// permanent outcome, not a failure to retry — so the library remembers it and
+// stops probing the file unless it changes.
+var errAudioCleanupWouldDiffer = errors.New("the cleaned copy would not be identical to the source")
 
 // audioCleanupBackends lists the tools to try, in order. For Matroska
 // mkvmerge comes first and ffmpeg is the second chance: mkvmerge rewrites some

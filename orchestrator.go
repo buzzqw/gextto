@@ -310,6 +310,17 @@ func RunCycleDomain(
 			if release == nil {
 				continue
 			}
+			// A listing whose `.torrent` lives on an indexer the operator
+			// switched off cannot be downloaded any more: the manager no longer
+			// serves it. The archive keeps the row for its whole retention, so
+			// without this skip one cycle after another would ask a disabled
+			// source and report its error.
+			if release.Magnet == "" && release.TorrentURL != nil &&
+				cfg.TorrentLinkFromDisabledIndexer(*release.TorrentURL) {
+				logging.Debug("archive: listing skipped, its indexer is switched off",
+					"title", item.Title, "source", item.Source)
+				continue
+			}
 			// The archive may know the infohash an indexer declared next to a
 			// `.torrent`-only listing: use it, so the blocklist and the
 			// duplicate checks do not need to open the link.

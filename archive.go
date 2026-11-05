@@ -6,6 +6,7 @@ import (
 	"database/sql/driver"
 	"encoding/base32"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -570,8 +571,10 @@ func (a *Archive) CanonicalizeRelease(release *models.Release, magnet string) er
 // ResolveListing replaces a `.torrent`-only listing with the magnet and the
 // real torrent name learned by opening it. The row is found by its current
 // link text: the caller is a search result, which does not carry the listing
-// key (a guid), and the URL identifies the row anyway. It reports whether a
-// row changed.
+// key (a guid), and the URL identifies the row anyway. When another row
+// already holds that torrent the link-only copy is dropped, not rewritten: it
+// is the same listing seen twice and only one row may carry an infohash. It
+// reports whether a row changed.
 func (a *Archive) ResolveListing(torrentURL, magnet, title string, qualityScore int64) (bool, error) {
 	torrentURL = strings.TrimSpace(torrentURL)
 	magnet = strings.TrimSpace(magnet)
@@ -586,21 +589,34 @@ func (a *Archive) ResolveListing(torrentURL, magnet, title string, qualityScore 
 	if err != nil {
 		return false, err
 	}
-	// Another row already carries this torrent: the link-only listing is a
-	// duplicate and is dropped instead of leaving two rows for one hash.
+	// The row to rewrite is the newest link-only listing of this URL: a feed
+	// that listed it again must not be left with an older copy.
+	var id int64
+	if err := tx.QueryRow(
+		"SELECT id FROM archive WHERE magnet=?1 AND COALESCE(magnet_hash,'')='' ORDER BY id DESC LIMIT 1",
+		torrentURL,
+	).Scan(&id); err != nil {
+		_ = tx.Rollback()
+		if errors.Is(err, sql.ErrNoRows) {
+			return false, nil
+		}
+		return false, err
+	}
+	// Another row already carries this torrent: that one stays, and the
+	// link-only listing is dropped. Comparing by id is what keeps the check
+	// honest — a row can hold both the link and the infohash the indexer
+	// declared next to it, and rewriting the link-only copy too would collide
+	// with the unique index on magnet_hash.
 	var duplicate int
 	if err := tx.QueryRow(
-		"SELECT COUNT(*) FROM archive WHERE magnet_hash=?1 AND magnet<>?2",
-		hash, torrentURL,
+		"SELECT COUNT(*) FROM archive WHERE magnet_hash=?1 AND id<>?2",
+		hash, id,
 	).Scan(&duplicate); err != nil {
 		_ = tx.Rollback()
 		return false, err
 	}
 	if duplicate > 0 {
-		result, err := tx.Exec(
-			"DELETE FROM archive WHERE magnet=?1 AND COALESCE(magnet_hash,'')=''",
-			torrentURL,
-		)
+		result, err := tx.Exec("DELETE FROM archive WHERE id=?1", id)
 		if err != nil {
 			_ = tx.Rollback()
 			return false, err
@@ -612,8 +628,8 @@ func (a *Archive) ResolveListing(torrentURL, magnet, title string, qualityScore 
 		return affected > 0, nil
 	}
 	result, err := tx.Exec(
-		"UPDATE archive SET title=CASE WHEN ?2<>'' THEN ?2 ELSE title END, magnet=?3, magnet_hash=?4, quality_score=?5 WHERE id=(SELECT id FROM archive WHERE magnet=?1 AND COALESCE(magnet_hash,'')='' ORDER BY id DESC LIMIT 1)",
-		torrentURL, strings.TrimSpace(title), magnet, hash, qualityScore,
+		"UPDATE archive SET title=CASE WHEN ?2<>'' THEN ?2 ELSE title END, magnet=?3, magnet_hash=?4, quality_score=?5 WHERE id=?1",
+		id, strings.TrimSpace(title), magnet, hash, qualityScore,
 	)
 	if err != nil {
 		_ = tx.Rollback()

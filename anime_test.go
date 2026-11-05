@@ -1,7 +1,10 @@
 package gextto
 
 import (
+	"context"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/buzzqw/gextto/internal/models"
 )
@@ -76,5 +79,43 @@ func TestResolveAnimeReleasesOnlyForAnimeSeries(t *testing.T) {
 	}
 	if releases[1].Kind != "movie" {
 		t.Fatal("a series not marked as anime must not be touched")
+	}
+}
+
+// The gap filling reads the local release archive too. A row whose only source
+// is a `.torrent` link on a switched-off indexer cannot be downloaded, so it
+// must never become a candidate.
+func TestSearchArchiveForEpisodeSkipsLinksOfDisabledIndexers(t *testing.T) {
+	archive := openTestArchive(t)
+	ctx := context.Background()
+	disabled := "http://192.168.1.161:9117/dl/1.torrent?jackett_api=1&path=a"
+	enabled := "http://192.168.1.161:8788/dl/2.torrent?apikey=b"
+	releases := []models.Release{
+		{Title: "Show S01E02 1080p", Source: "Jackett RSS - AnIndexer", TorrentURL: &disabled,
+			Kind: "series", DiscoveredAt: time.Now().UTC(), Seeders: -1, Peers: -1},
+		{Title: "Show S01E02 720p", Source: "indexarr:ExtTo", TorrentURL: &enabled,
+			Kind: "series", DiscoveredAt: time.Now().UTC(), Seeders: -1, Peers: -1},
+		{Title: "Show S01E02 2160p", Source: "a feed",
+			Magnet: "magnet:?xt=urn:btih:" + strings.Repeat("c", 40),
+			Kind:   "series", DiscoveredAt: time.Now().UTC(), Seeders: -1, Peers: -1},
+	}
+	if err := archive.SaveBatch(releases, &Config{}); err != nil {
+		t.Fatalf("SaveBatch: %v", err)
+	}
+	cfg := &Config{Indexers: []IndexerConfig{
+		{Name: "jackett", URL: "http://192.168.1.161:9117", Enabled: false},
+		{Name: "indexarr", URL: "http://192.168.1.161:8788", Enabled: true},
+	}}
+	items, err := searchArchiveForEpisode(ctx, cfg, archive, nil, "Show", 1, 2)
+	if err != nil {
+		t.Fatalf("searchArchiveForEpisode: %v", err)
+	}
+	if len(items) != 2 {
+		t.Fatalf("items = %d, want 2: %+v", len(items), items)
+	}
+	for _, item := range items {
+		if strings.Contains(item[1], "192.168.1.161:9117") {
+			t.Fatalf("a listing of a disabled indexer was proposed: %+v", item)
+		}
 	}
 }

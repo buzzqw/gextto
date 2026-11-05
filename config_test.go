@@ -1651,3 +1651,36 @@ func TestMovieRenameTemplateIsLoadedAndDefaults(t *testing.T) {
 		t.Fatalf("emptied movie template: %q", fresh.RenameMovieTemplate)
 	}
 }
+
+// A link that points at an indexer manager the operator switched off is not
+// worth a request: Jackett answers "this indexer is not configured" for the
+// downloads it still holds. The archive keeps those listings for its whole
+// retention, so the check is what stops a cycle from asking a disabled source
+// again and again.
+func TestTorrentLinkFromDisabledIndexer(t *testing.T) {
+	cfg := &Config{Indexers: []IndexerConfig{
+		{Name: "jackett", URL: "http://192.168.1.161:9117", Enabled: false},
+		{Name: "prowlarr", URL: "http://192.168.1.161:9696/", Enabled: false},
+		{Name: "indexarr", URL: "http://192.168.1.161:8788", Enabled: true},
+	}}
+	cases := map[string]bool{
+		"http://192.168.1.161:9117/dl/torrentgalaxyclone/?jackett_api=1&path=x": true,
+		"http://192.168.1.161:9696/1/download?apikey=x":                          true,
+		"http://192.168.1.161:8788/dl/590515.torrent?apikey=x":                   false,
+		"https://rss24h.torrentleech.org/rss/download/241864488/a4ae63ba":        false,
+		"magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567":           false,
+		"not a url": false,
+	}
+	for link, want := range cases {
+		if got := cfg.TorrentLinkFromDisabledIndexer(link); got != want {
+			t.Errorf("TorrentLinkFromDisabledIndexer(%q) = %v, want %v", link, got, want)
+		}
+	}
+	if (&Config{}).TorrentLinkFromDisabledIndexer("http://192.168.1.161:9117/dl/1.torrent") {
+		t.Error("an empty configuration reported a disabled indexer")
+	}
+	var nilConfig *Config
+	if nilConfig.TorrentLinkFromDisabledIndexer("http://192.168.1.161:9117/dl/1.torrent") {
+		t.Error("a nil configuration reported a disabled indexer")
+	}
+}

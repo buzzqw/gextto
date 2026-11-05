@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -450,6 +451,36 @@ func activeFeedURLs(lines []string) []string {
 		feeds = append(feeds, trimmed)
 	}
 	return feeds
+}
+
+// TorrentLinkFromDisabledIndexer reports whether a `.torrent` link belongs to
+// an indexer manager that is configured but switched off. Its links are no
+// longer served — Jackett answers "this indexer is not configured" for the
+// downloads it still has in its catalogue — so a release whose only source is
+// one of them cannot be downloaded. The release archive keeps those listings
+// for a year: opening one every cycle costs a request and an error message
+// about a source the operator already turned off.
+func (c *Config) TorrentLinkFromDisabledIndexer(rawURL string) bool {
+	if c == nil {
+		return false
+	}
+	parsed, err := url.Parse(strings.TrimSpace(rawURL))
+	if err != nil || parsed.Host == "" {
+		return false
+	}
+	for _, indexer := range c.Indexers {
+		if indexer.Enabled {
+			continue
+		}
+		manager, err := url.Parse(strings.TrimSpace(indexer.URL))
+		if err != nil || manager.Host == "" {
+			continue
+		}
+		if strings.EqualFold(manager.Host, parsed.Host) {
+			return true
+		}
+	}
+	return false
 }
 
 // contentFilterRanges maps a named Unicode-script filter to its code point

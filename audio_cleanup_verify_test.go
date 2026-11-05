@@ -3,6 +3,7 @@ package gextto
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -316,6 +317,11 @@ func checkRefused(t *testing.T, source, copied string, info MediaInfo, plan Audi
 	err = verifyAudioCleanupPackets(context.Background(), source, copied, info, output, plan, true)
 	if err == nil || !strings.Contains(err.Error(), reason) {
 		t.Fatalf("the damaged copy %s was accepted or refused for another reason: %v", filepath.Base(copied), err)
+	}
+	// A copy the checks refuse is a permanent outcome: the library records it
+	// as unsupported instead of probing the file again every week.
+	if !errors.Is(err, errAudioCleanupWouldDiffer) {
+		t.Fatalf("the refusal %q is not marked as permanent", err)
 	}
 }
 

@@ -163,7 +163,7 @@ func audioCleanupStreamPairs(plan AudioCleanupPlan, output MediaInfo, matroska b
 func verifyAudioCleanupPackets(ctx context.Context, sourcePath, outputPath string, source, output MediaInfo, plan AudioCleanupPlan, matroska bool) error {
 	pairs, kinds, err := audioCleanupStreamPairs(plan, output, matroska)
 	if err != nil {
-		return err
+		return fmt.Errorf("%w: %v", errAudioCleanupWouldDiffer, err)
 	}
 	if len(pairs) == 0 {
 		return nil
@@ -197,11 +197,11 @@ func verifyAudioCleanupPackets(ctx context.Context, sourcePath, outputPath strin
 		seen[original] = position + 1
 		packets := sourcePackets[original]
 		if position >= len(packets) {
-			return fmt.Errorf("%s stream %d has more packets than the source", kinds[original], original)
+			return fmt.Errorf("%w: %s stream %d has more packets than the source", errAudioCleanupWouldDiffer, kinds[original], original)
 		}
 		want := packets[position]
 		if want.hash != line.packet.hash {
-			return fmt.Errorf("%s stream %d: packet %d differs from the source", kinds[original], original, position)
+			return fmt.Errorf("%w: %s stream %d: packet %d differs from the source", errAudioCleanupWouldDiffer, kinds[original], original, position)
 		}
 		if position == 0 {
 			if line.packet.hasTime {
@@ -215,7 +215,7 @@ func verifyAudioCleanupPackets(ctx context.Context, sourcePath, outputPath strin
 			return nil
 		}
 		if delta := math.Abs((want.time - first.time) - (line.packet.time - start)); delta > audioCleanupPacketTolerance {
-			return fmt.Errorf("%s stream %d: packet %d moved by %.0f ms", kinds[original], original, position, delta*1000)
+			return fmt.Errorf("%w: %s stream %d: packet %d moved by %.0f ms", errAudioCleanupWouldDiffer, kinds[original], original, position, delta*1000)
 		}
 		return nil
 	}); err != nil {
@@ -224,7 +224,7 @@ func verifyAudioCleanupPackets(ctx context.Context, sourcePath, outputPath strin
 
 	for original := range kinds {
 		if seen[original] != len(sourcePackets[original]) {
-			return fmt.Errorf("%s stream %d has %d packets instead of %d", kinds[original], original, seen[original], len(sourcePackets[original]))
+			return fmt.Errorf("%w: %s stream %d has %d packets instead of %d", errAudioCleanupWouldDiffer, kinds[original], original, seen[original], len(sourcePackets[original]))
 		}
 	}
 
@@ -248,7 +248,7 @@ func verifyAudioCleanupPackets(ctx context.Context, sourcePath, outputPath strin
 		before := sourcePackets[original][0].time - sourcePackets[firstVideo][0].time
 		after := start - videoStart
 		if math.Abs(before-after) > audioCleanupPacketTolerance {
-			return fmt.Errorf("%s stream %d: the distance from the video moved from %.3fs to %.3fs", kind, original, before, after)
+			return fmt.Errorf("%w: %s stream %d: the distance from the video moved from %.3fs to %.3fs", errAudioCleanupWouldDiffer, kind, original, before, after)
 		}
 	}
 	return nil

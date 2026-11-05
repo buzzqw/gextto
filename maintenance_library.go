@@ -278,7 +278,10 @@ func audioLibraryCandidates(state *AppState) ([]audioLibraryCandidate, error) {
 }
 
 // audioLibraryNeedsCheck decides from the remembered record whether the file
-// has to be probed again.
+// has to be probed again. A new size or modification time always does; a
+// `failed` record waits the retry interval. An `unsupported` one — every tool
+// produced a copy the checks refused — is never retried on its own: the same
+// file would fail the same way at every pass.
 func audioLibraryNeedsCheck(record audioLibraryRecord, known bool, size, modified int64, now time.Time) bool {
 	if !known || record.Size != size || record.Modified != modified {
 		return true
@@ -378,9 +381,9 @@ func runLibraryAudioCleanup(ctx context.Context, state *AppState, keepGoing func
 				status.Audio.Saved += report.SavedBytes
 				status.Night.AudioCleaned++
 				status.Night.AudioSaved += report.SavedBytes
-			case strings.HasPrefix(outcome, "failed"):
+			case strings.HasPrefix(outcome, "failed"), strings.HasPrefix(outcome, "unsupported"):
 				status.Audio.Failed++
-				status.Audio.LastFail = filepath.Base(item.candidate.Path) + ": " + strings.TrimPrefix(outcome, "failed: ")
+				status.Audio.LastFail = filepath.Base(item.candidate.Path) + ": " + strings.TrimPrefix(strings.TrimPrefix(outcome, "failed: "), "unsupported: ")
 				status.Night.AudioFailed++
 			}
 		})
@@ -410,6 +413,14 @@ func runLibraryAudioCleanupFile(ctx context.Context, state *AppState, candidate 
 	report, err := RunAudioCleanup(fileCtx, candidate.Path, opts)
 	switch {
 	case err != nil:
+		if errors.Is(err, errAudioCleanupWouldDiffer) {
+			// Every tool produced a copy the checks refused: this file cannot be
+			// cleaned without changing it, so it is remembered as such and the
+			// next nights leave it alone (a new size or date probes it again).
+			logging.Info(fmt.Sprintf("🎧 «%s»: the audio cleanup would change the file, so it stays as it is and will not be tried again",
+				filepath.Base(candidate.Path)), "path", candidate.Path, "error", err)
+			return "unsupported: " + err.Error(), report
+		}
 		logging.Warn(fmt.Sprintf("🎧 «%s»: audio cleanup failed, the file was left untouched",
 			filepath.Base(candidate.Path)), "path", candidate.Path, "error", err)
 		return "failed: " + err.Error(), report

@@ -101,6 +101,12 @@ its gate; a rejected one moves to *Not planned*.
 - **TLS origination to the proxy** — the proxy is reached in plain text (HTTP CONNECT or
   SOCKS5); an `https://` proxy that terminates TLS itself is not supported, as in
   libtorrent before PR 9039. Gate: an operator who runs an HTTPS proxy.
+- **Archive rows of a removed feed** — a feed deleted from *Sources* leaves its listings
+  in the archive; a `.torrent` link that fails is quarantined (6h, then 24h, then a week)
+  but still retried. A switched-off indexer is recognised by its URL, a removed feed is
+  not: the row does not remember the feed it came from. Storing the feed URL next to the
+  source label would let the archive skip those listings the same way. Gate: a feed
+  removed from an installation that still sees its old links tried now and then.
 - **Duplicate connections per IPv6 subnet** — the duplicate-IP gate compares the full
   address, so one host with rotating privacy addresses can hold several slots; libtorrent
   issue 8934 asks for one host per /64, but a /64 is a subnet and may hold many real users.

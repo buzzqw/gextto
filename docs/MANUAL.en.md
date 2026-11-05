@@ -1003,6 +1003,12 @@ one**, so each has its own timeout and health and the slowest does not hold up
 the others. If the list cannot be read, it falls back to the aggregate search.
 In the results the source shows as `jackett:TrackerName`.
 
+A **switched-off** indexer is not queried, and the `.torrent` links of the
+releases already collected from it are no longer opened: the releases stay in
+the archive catalogue — nothing is deleted — but Gextto does not try to download
+them and no longer reports the error of the service you turned off. Switching
+the indexer back on makes them usable again.
+
 ### Adding indexarr
 
 The same, with type **indexarr** and base address `http://indexarr:8788`.
@@ -2349,7 +2355,7 @@ files. When the memory cannot be read, only the `tmpfs` space counts, as before.
 | Night window — end | End time (HH:MM, 07:00 by default). After it no new job starts; the one in progress is completed. An end before the start makes the window cross midnight; the same start and end mean the whole day. |
 | Integrity check and MediaInfo analysis only in the window | Yes (default): the integrity check and the MediaInfo analysis run at their interval but only inside the window and while Gextto is idle. No: they run at their interval at any hour, as before. The manual commands (**Check now**, **Refresh MediaInfo**) always start at once. |
 | Database maintenance every night | Yes (default): once a night the databases are optimised (`PRAGMA optimize`) and compacted when at least 20% or 64 MB of them is free space; once a week a full check (`integrity_check`) reads every page and every index, and a problem sends a notification at once, without waiting for the summary. |
-| Clean the audio of files already in the library | Applies **Remove audio tracks in other languages**, with the same language and choices, to the files already archived: one at a time, in the window, with the same checks as the cleanup after an import. Every file is examined once (Gextto remembers its size and date); a file still seeding through a hardlink waits for the end of the seed, so the cleaned copy does not use the space twice, and a file written in the last hour waits for the next night. A file that fails the check stays as it is and is tried again after a week. Off by default; it works only with the audio cleanup on. |
+| Clean the audio of files already in the library | Applies **Remove audio tracks in other languages**, with the same language and choices, to the files already archived: one at a time, in the window, with the same checks as the cleanup after an import. Every file is examined once (Gextto remembers its size and date); a file still seeding through a hardlink waits for the end of the seed, so the cleaned copy does not use the space twice, and a file written in the last hour waits for the next night. A file that fails the check for a passing reason (a tool interrupted, a disk that does not answer) stays as it is and is tried again after a week; a file that cannot be cleaned without changing it — the track check does not match — is remembered and not tried again unless the file changes (size or date). Off by default; it works only with the audio cleanup on. |
 
 **Night maintenance — panel**
 

@@ -902,3 +902,61 @@ func TestResolveListingReplacesATorrentURLWithTheMagnetAndRealTitle(t *testing.T
 		t.Fatal("the second ResolveListing changed the row again")
 	}
 }
+
+// A listing can be archived twice: once with the infohash the indexer declared
+// next to the link, once as a bare link from another source. Resolving the bare
+// link must drop that copy — before, the lookup treated the row that already
+// held the torrent as "not a duplicate" (it compared the magnet, not the id)
+// and the rewrite died on the unique index on magnet_hash.
+func TestResolveListingDropsTheLinkOnlyCopyOfATorrentAlreadyArchived(t *testing.T) {
+	archive := openTestArchive(t)
+	link := "http://indexer.test/dl/42.torrent"
+	hash := strings.Repeat("b", 40)
+	// The indexer declares the infohash next to the link: the row keeps the
+	// link (the transfer still needs it) and learns the hash.
+	declared := models.Release{
+		Title:        "Show S01E03 1080p",
+		Source:       "indexarr:AnIndexer",
+		TorrentURL:   &link,
+		InfoHash:     hash,
+		GUID:         "an-indexer-guid",
+		Kind:         "series",
+		DiscoveredAt: time.Now().UTC(),
+		Seeders:      -1,
+		Peers:        -1,
+	}
+	if err := archive.SaveBatch([]models.Release{declared}, &Config{}); err != nil {
+		t.Fatalf("SaveBatch: %v", err)
+	}
+	// The same URL arrives again from a feed that knows no infohash.
+	bare := declared
+	bare.InfoHash = ""
+	bare.Source = "Jackett RSS - AnIndexer"
+	bare.Title = "AnIndexer Show S01E03"
+	if err := archive.SaveBatch([]models.Release{bare}, &Config{}); err != nil {
+		t.Fatalf("SaveBatch of the bare listing: %v", err)
+	}
+	if rows, err := archive.Count(); err != nil || rows != 2 {
+		t.Fatalf("rows before resolving = %d (err %v), want 2", rows, err)
+	}
+
+	magnet := "magnet:?xt=urn:btih:" + hash + "&dn=Show.S01E03.1080p"
+	changed, err := archive.ResolveListing(link, magnet, "Show.S01E03.1080p", 1100)
+	if err != nil {
+		t.Fatalf("ResolveListing: %v", err)
+	}
+	if !changed {
+		t.Fatal("the link-only copy was not dropped")
+	}
+	// One row is left and it is the one that already knew the torrent.
+	if rows, err := archive.Count(); err != nil || rows != 1 {
+		t.Fatalf("rows after resolving = %d (err %v), want 1", rows, err)
+	}
+	var title, storedHash string
+	if err := archive.db.QueryRow("SELECT title, COALESCE(magnet_hash,'') FROM archive").Scan(&title, &storedHash); err != nil {
+		t.Fatalf("reading the remaining row: %v", err)
+	}
+	if storedHash != hash {
+		t.Fatalf("the remaining row lost its infohash: %q", storedHash)
+	}
+}
