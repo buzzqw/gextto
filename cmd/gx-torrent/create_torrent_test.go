@@ -76,3 +76,35 @@ func TestHandleCreateTorrentMissingPath(t *testing.T) {
 		t.Fatalf("status = %d, want 400", rec.Code)
 	}
 }
+
+// TestHandleCreateTorrentV2AndHybrid covers the new formats through the native
+// API: the info dict must carry the BEP 52 version and tree, and the source
+// field.
+func TestHandleCreateTorrentV2AndHybrid(t *testing.T) {
+	d := newQuietDaemon(t)
+	dir := t.TempDir()
+	for _, name := range []string{"a.bin", "b.bin"} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(strings.Repeat("x", 70<<10)), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, format := range []string{"v2", "hybrid"} {
+		body, _ := json.Marshal(map[string]any{
+			"path":   dir,
+			"format": format,
+			"source": "site",
+		})
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest("POST", "/api/v1/create-torrent", strings.NewReader(string(body)))
+		d.handleCreateTorrent(rec, req)
+		if rec.Code != 200 {
+			t.Fatalf("%s: status = %d: %s", format, rec.Code, rec.Body.String())
+		}
+		out := rec.Body.String()
+		for _, want := range []string{"12:meta versioni2e", "9:file tree", "6:source4:site"} {
+			if !strings.Contains(out, want) {
+				t.Errorf("%s: created torrent lacks %q", format, want)
+			}
+		}
+	}
+}

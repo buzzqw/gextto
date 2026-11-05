@@ -409,7 +409,7 @@ everything a standalone client needs.
   ([examples](docs/API.md#integrating-with-other-systems)).
 - **Web UI** laid out like qBittorrent's: light and dark themes; status,
   category, tag and tracker filters; the interface **language** at the bottom of
-  the sidebar (six languages, saved like the field in the settings); a column
+  the sidebar (six languages plus the JSON packs in `<data>/lang`, saved like the field in the settings); a column
   chooser (24 columns) with resizable columns kept on the server; a full context
   menu; a resizable detail panel (files grouped by folder, rename, peers);
   magnet preview while typing; undo after removal; keyboard shortcuts,

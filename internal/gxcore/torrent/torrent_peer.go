@@ -299,12 +299,21 @@ func (t *torrent) sendBitfield(p *peer.Peer) {
 }
 
 // getClientVersion reports the extension-handshake client string, masked for
-// private torrents.
+// private torrents and omitted in anonymous mode.
 func (t *torrent) getClientVersion() string {
-	if t.info() != nil && t.info().Private {
-		return t.session.config.PrivateExtensionHandshakeClientVersion
+	private := t.info() != nil && t.info().Private
+	return t.session.clientVersion(private)
+}
+
+// clientVersion is the BEP 10 client string for a public or private torrent.
+func (s *Session) clientVersion(private bool) string {
+	if s.config.AnonymousMode {
+		return ""
 	}
-	if version := t.session.config.PublicExtensionHandshakeClientVersion; version != "" {
+	if private {
+		return s.config.PrivateExtensionHandshakeClientVersion
+	}
+	if version := s.config.PublicExtensionHandshakeClientVersion; version != "" {
 		return version
 	}
 	return publicExtensionHandshakeClientVersion

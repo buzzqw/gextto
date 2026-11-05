@@ -366,10 +366,13 @@ Access the dashboard at `http://<server-ip>:8890/`:
   content layout; **Pause all / Resume all**; columns chosen and resized and
   remembered on the server; a full context menu (queue, limits, move, rename,
   verify, reannounce, super-seeding, remove); undo after a removal; drag-and-drop
-  of `.torrent` files; keys and phone-friendly cards.
+  of `.torrent` files; keys and phone-friendly cards. A chosen `.torrent` shows
+  its files with a checkbox each before the add; **Tools → Create .torrent**
+  writes v1, v2 or hybrid, with a source string and optional immediate seeding.
 - **Sidebar.** Filters by state, category, tag and tracker; at the bottom, the
-  interface **language** (English, Italiano, Deutsch, Français, Español, Polski),
-  saved like the field in the settings and applied at once.
+  interface **language** (English, Italiano, Deutsch, Français, Español, Polski)
+  and any JSON pack in `<data>/lang`, saved like the field in the settings and
+  applied at once.
 - **Details.** Five tabs: **General** (state, pieces, space, dates, limits, web
   seeds), **Files** (per-file progress, priority, folders, rename and **HTTP
   streaming** while downloading), **Peers** (client, transport, encryption,

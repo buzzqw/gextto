@@ -67,6 +67,12 @@ type Config struct {
 	// Client version that is sent in BEP 10 handshake message.
 	// Only applies to private torrents.
 	PrivateExtensionHandshakeClientVersion string `yaml:"private-extension-handshake-client-version"`
+	// Anonymous mode masks what peers and public trackers see: the peer id
+	// loses the version, the extension handshake carries no client version and
+	// public trackers get no client User-Agent. Private trackers keep their
+	// configured agent, as qBittorrent does. It does not hide the IP address.
+	AnonymousMode bool `yaml:"anonymous-mode"`
+
 	// URL to the blocklist file in CIDR format.
 	BlocklistURL string `yaml:"blocklist-url"`
 	// When to refresh blocklist
@@ -199,6 +205,10 @@ type Config struct {
 	// Trackers.
 	// Number of peer addresses to request in announce request.
 	TrackerNumWant int `yaml:"tracker-num-want"`
+	// AnnounceAllInTier contacts every tracker of a tier in parallel and merges
+	// the peers (qBittorrent's "always announce to all trackers in a tier").
+	// Tiers themselves already announce in parallel: one announcer per tier.
+	AnnounceAllInTier bool `yaml:"announce-all-in-tier"`
 	// Time to wait for announcing stopped event.
 	// Stopped event is sent to the tracker when torrent is stopped.
 	TrackerStopTimeout time.Duration `yaml:"tracker-stop-timeout"`
@@ -351,6 +361,7 @@ var DefaultConfig = Config{
 
 	// Tracker
 	TrackerNumWant:              200,
+	AnnounceAllInTier:           true,
 	TrackerStopTimeout:          5 * time.Second,
 	TrackerMinAnnounceInterval:  time.Minute,
 	TrackerHTTPTimeout:          10 * time.Second,

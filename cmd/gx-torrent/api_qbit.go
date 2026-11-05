@@ -1387,7 +1387,7 @@ func (d *Daemon) handleQbitPreferences(w http.ResponseWriter, _ *http.Request) {
 		"use_category_paths_in_manual_mode":      false,
 		"scheduler_enabled":                      d.settingBool(scheduleEnabledKey, false),
 		"proxy_type":                             proxyType,
-		"anonymous_mode":                         false,
+		"anonymous_mode":                         d.settingBool("anonymous-mode", false),
 		"ip_filter_enabled":                      stats.IPFilterRules > 0,
 		"ip_filter_path":                         stats.IPFilterPath,
 		"ip_filter_trackers":                     d.settingBool("ipfilter-trackers", false),
@@ -1744,6 +1744,7 @@ func (d *Daemon) handleQbitSetPreferences(w http.ResponseWriter, r *http.Request
 		for _, b := range []struct{ pref, key string }{
 			{"use_alt_speed_limits", altSpeedEnabledKey},
 			{"limit_lan_peers", limitLANPeersKey},
+			{"anonymous_mode", "anonymous-mode"},
 		} {
 			if v, ok := prefs[b.pref]; ok {
 				var on bool

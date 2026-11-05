@@ -97,13 +97,21 @@ e si banna un indirizzo. **Tracker** mostra stato, swarm e prossimo annuncio;
 ## 3. Aggiungere e creare
 
 La finestra di aggiunta accetta più magnet o URL insieme; il trascinamento di
-un `.torrent` sulla pagina la apre già compilata.
+un `.torrent` sulla pagina la apre già compilata. Quando scegli un `.torrent`
+con il pulsante, la finestra elenca i file che contiene con una casella
+ciascuno: togli la spunta a quello che non vuoi e vengono scaricati solo i file
+selezionati. Un magnet non ha l'elenco dei file finché non arrivano i metadati;
+aggiungilo con **in pausa** e **ferma ai metadati**, poi scegli i file dalla
+scheda *File*.
 
 ![Aggiungi](screenshots/gx-core/it/add-dialog.png)
 
 Da **Strumenti → Crea .torrent** si crea un torrent da un file o una cartella
-del server, con dimensione dei pezzi, flag privato, commento, tracker e web
-seed.
+del server, con dimensione dei pezzi, **formato** (v1, letto da ogni client; v2,
+BEP 52; ibrido, che serve i due swarm), flag privato, commento, una stringa
+**source**, tracker e web seed. **Avvia il seeding dopo la creazione** aggiunge
+il nuovo torrent alla sessione e semina subito la cartella o il file, invece di
+scaricare il `.torrent`.
 
 ![Crea torrent](screenshots/gx-core/it/create-torrent.png)
 
@@ -181,6 +189,14 @@ scheda e conferma con un messaggio in basso a destra, così si vede che il
 pulsante ha fatto qualcosa.
 
 ![Impostazioni](screenshots/gx-core/it/settings.png)
+
+Alcune opzioni sono l'equivalente nativo di quelle di qBittorrent: **Ricontrolla
+i dati al completamento del download** (Coda) verifica i file una volta prima di
+seminarli; **Modalità anonima** (Rete) nasconde la versione del client ai peer e
+ai tracker pubblici, senza nascondere l'indirizzo IP; **Annuncia a tutti i
+tracker di un tier** (Rete, attivo di default) interroga insieme tutti i tracker
+di un tier con più tracker; e **Interfaccia → Lingua** elenca ogni language pack
+messo in `<data>/lang` accanto alle sei lingue integrate.
 
 La gestione delle categorie e il loro percorso è nella stessa pagina: è ciò che
 fa funzionare davvero la gestione automatica dei torrent.

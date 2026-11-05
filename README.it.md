@@ -426,7 +426,7 @@ semplice con tutto ciò che serve a un client autonomo.
   ([esempi](docs/API.md#integrating-with-other-systems)).
 - **Web UI** disposta come quella di qBittorrent: temi chiaro e scuro; filtri
   per stato, categoria, tag e tracker; la **lingua** dell'interfaccia in fondo
-  alla barra laterale (sei lingue, salvata come il campo nelle impostazioni);
+  alla barra laterale (sei lingue più i pack JSON in `<data>/lang`, salvata come il campo nelle impostazioni);
   scelta delle colonne (24) con colonne ridimensionabili salvate sul server;
   menu contestuale completo; pannello di dettaglio ridimensionabile (file
   raggruppati per cartella, rinomina, peer); anteprima del magnet mentre lo

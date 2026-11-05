@@ -3,8 +3,8 @@ package main
 // api_qbit_torrentcreator.go implements the qBittorrent torrent-creator API
 // (/api/v2/torrentcreator/*) on top of torrent.CreateTorrent. qBittorrent runs
 // the creation as a background task; here too: addTask starts it and keeps the
-// result until the client deletes the task. The engine builds a v1 .torrent, so
-// a requested v2/hybrid format is produced as v1 (widely compatible).
+// result until the client deletes the task. The creator builds v1, v2 (BEP 52)
+// or hybrid torrents.
 // Registered only in standalone mode, like the rest of /api/v2.
 
 import (
@@ -27,6 +27,8 @@ type qbitCreateTask struct {
 	pieceSize       int
 	private         bool
 	comment         string
+	format          string
+	source          string
 	trackers        []string
 	urlSeeds        []string
 	status          string // Queued, Running, Finished, Failed
@@ -59,6 +61,8 @@ func (d *Daemon) handleQbitTorrentCreatorAdd(w http.ResponseWriter, r *http.Requ
 		pieceSize:       pieceSize,
 		private:         formBool(r, "private"),
 		comment:         r.FormValue("comment"),
+		format:          strings.TrimSpace(r.FormValue("torrentFormat")),
+		source:          strings.TrimSpace(r.FormValue("source")),
 		trackers:        qbitCreatorURLs(r.FormValue("trackers")),
 		urlSeeds:        qbitCreatorURLs(r.FormValue("urlSeeds")),
 		status:          "Running",
@@ -92,6 +96,8 @@ func (d *Daemon) qbitCreateRun(id string) {
 		Private:     task.private,
 		PieceLength: uint32(task.pieceSize),
 		Comment:     task.comment,
+		Format:      task.format,
+		Source:      task.source,
 	})
 	if err == nil && task.torrentFilePath != "" {
 		if writeErr := os.WriteFile(task.torrentFilePath, data, 0o644); writeErr != nil {

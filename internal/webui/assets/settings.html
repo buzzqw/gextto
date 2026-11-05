@@ -136,7 +136,9 @@ h3.sub{margin:14px 0 2px;font-size:13px;color:var(--subtle);text-transform:upper
     <label class="chk"><input type="checkbox" name="lsd" value="1"{{.LSD_ON}} title="{{tr "Local Service Discovery (LSD) via multicast on LAN (BEP 14)"}}"> {{tr "Local discovery (LSD)"}}</label>
     <label class="chk"><input type="checkbox" name="upnp" value="1"{{.UPNP_ON}} title="{{tr "UPnP automatic port forwarding on the router gateway"}}"> {{tr "UPnP port mapping"}}</label>
     <label class="chk"><input type="checkbox" name="natpmp" value="1"{{.NATPMP_ON}} title="{{tr "NAT-PMP / PCP automatic port forwarding on the router gateway"}}"> {{tr "NAT-PMP port mapping"}}</label>
+    <label class="chk"><input type="checkbox" name="announce-all-in-tier" value="1"{{.ANNOUNCE_ALL_TIER}} title="{{tr "Contact every tracker of a multi-tracker tier at once and merge the peers they return, as qBittorrent does; the default. Turning it off contacts one tracker per tier and moves to the next on failure."}}"> {{tr "Announce to all trackers in a tier"}}</label>
     <label class="chk"><input type="checkbox" name="dht-read-only" value="1"{{.DHT_READONLY}} title="{{tr "Run DHT in read-only mode without answering queries"}}"> {{tr "DHT read-only (BEP 43)"}}</label>
+    <label class="chk"><input type="checkbox" name="anonymous-mode" value="1"{{.ANONYMOUS_ON}} title="{{tr "Hide the client version from peers and public trackers: the peer id loses it, the extension handshake sends no version and public trackers get no User-Agent. It does not hide your IP address; use a VPN for that."}}"> {{tr "Anonymous mode"}}</label>
   </div>
 </fieldset>
 </section>
@@ -153,6 +155,7 @@ h3.sub{margin:14px 0 2px;font-size:13px;color:var(--subtle);text-transform:upper
     <label>{{tr "Pause downloads below free space (MiB, 0 = off)"}}<input type="number" min="0" name="min-free-mb" value="{{.MIN_FREE_MB}}" title="{{tr "Downloads on a folder with less free space than this are paused and resume by themselves when space returns; seeding goes on. Not applied when preallocation is on"}}"></label>
     <label class="chk"><input type="checkbox" name="preallocate" value="1"{{.PREALLOCATE}} title="{{tr "Preallocate disk space before writing file chunks to avoid disk fragmentation"}}"> {{tr "Preallocate disk space"}}</label>
     <label class="chk"><input type="checkbox" name="sequential" value="1"{{.SEQUENTIAL}} title="{{tr "Download torrent pieces in sequential order for media streaming preview"}}"> {{tr "Download in sequential order"}}</label>
+    <label class="chk"><input type="checkbox" name="recheck-on-complete" value="1"{{.RECHECK_ON_COMPLETE}} title="{{tr "Verify every file once when a download completes, before seeding it: a disk that returns a wrong block is caught at once instead of being seeded for hours. Costs one full read of the data."}}"> {{tr "Recheck data when a download completes"}}</label>
   </div>
 </fieldset>
 </section>

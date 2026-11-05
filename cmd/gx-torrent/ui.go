@@ -20,7 +20,9 @@ import (
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/hex"
+	"errors"
 	"fmt"
+	"html"
 	"html/template"
 	"io"
 	"net/http"
@@ -913,6 +915,56 @@ func (d *Daemon) handleUIAdd(w http.ResponseWriter, r *http.Request) {
 	d.uiFinishAdd(w, r, req, err)
 }
 
+// handleUIAddPreview answers the add dialog with the file tree of a .torrent,
+// so the operator can choose what to download before the torrent is added.
+// A magnet has no metadata yet: the dialog says the list will appear when it
+// arrives (the Files tab after the add).
+func (d *Daemon) handleUIAddPreview(w http.ResponseWriter, r *http.Request) {
+	if !d.uiAuthorized(w, r) {
+		return
+	}
+	if !d.uiSameOrigin(w, r) {
+		return
+	}
+	if strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/") {
+		r.Body = http.MaxBytesReader(w, r.Body, maxTorrentFile+1<<20)
+		if err := r.ParseMultipartForm(maxTorrentFile); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+	} else {
+		r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+		_ = r.ParseForm()
+	}
+	req, err := uiBuildAddRequest(d, r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	lang := d.uiLang(r)
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if req.Magnet != "" {
+		_, _ = io.WriteString(w, `<p class="muted">`+html.EscapeString(uiTr(lang, "The file list appears when the metadata arrives."))+`</p>`)
+		return
+	}
+	files, err := torrent.PreviewFiles(req.TorrentData)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	var b strings.Builder
+	b.WriteString(`<div class="filetree"><p class="muted">` + html.EscapeString(uiTr(lang, "Select the files to download; unchecked files are skipped.")) + `</p>`)
+	b.WriteString(`<div class="row"><button type="button" class="ghost sm" data-file-all="1" title="` + html.EscapeString(uiTr(lang, "Select every file")) + `">` + html.EscapeString(uiTr(lang, "Select all")) + `</button>`)
+	b.WriteString(`<button type="button" class="ghost sm" data-file-none="1" title="` + html.EscapeString(uiTr(lang, "Select no file")) + `">` + html.EscapeString(uiTr(lang, "Select none")) + `</button></div>`)
+	for i, f := range files {
+		b.WriteString(`<label class="chk" title="` + html.EscapeString(uiTr(lang, "Check this file to download it; leave it unchecked to skip it")) + `">`)
+		b.WriteString(`<input type="checkbox" data-file-index="` + strconv.Itoa(i) + `" checked> `)
+		b.WriteString(html.EscapeString(f.Name) + ` <span class="muted">` + humanBytes(f.Length) + `</span></label>`)
+	}
+	b.WriteString(`</div>`)
+	_, _ = io.WriteString(w, b.String())
+}
+
 // handleUIDhtScrape returns the BEP 33 DHT swarm estimate (seeders, peers) for
 // one torrent, for the page's "DHT swarm" button.
 func (d *Daemon) handleUIDhtScrape(w http.ResponseWriter, r *http.Request) {
@@ -974,9 +1026,30 @@ func (d *Daemon) handleUICreateTorrent(w http.ResponseWriter, r *http.Request) {
 		Private:     formBool(r, "private"),
 		PieceLength: pieceLength,
 		Comment:     strings.TrimSpace(r.FormValue("comment")),
+		Format:      strings.TrimSpace(r.FormValue("format")),
+		Source:      strings.TrimSpace(r.FormValue("source")),
 	})
 	if err != nil {
 		d.uiDone(w, r, "", err)
+		return
+	}
+	if formBool(r, "start_seeding") {
+		base := filepath.Base(filepath.Clean(path))
+		if name != "" && name != base {
+			d.uiDone(w, r, "", errors.New("start seeding needs the torrent name to match the folder or file name"))
+			return
+		}
+		if _, _, err := d.add(addRequest{
+			TorrentData: data,
+			Destination: filepath.Dir(filepath.Clean(path)),
+			SeedMode:    true,
+			SeedRatio:   -1,
+			SeedDays:    -1,
+		}); err != nil {
+			d.uiDone(w, r, "", err)
+			return
+		}
+		d.uiDone(w, r, "Torrent created and added to the session", nil)
 		return
 	}
 	if name == "" {

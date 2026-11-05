@@ -215,6 +215,8 @@ func (d *Daemon) handleUISettings(w http.ResponseWriter, r *http.Request) {
 	store.Set(autoTMMEnabledKey, strconv.FormatBool(formBool(r, "auto-tmm-enabled")))
 	// Completion actions: move the finished data and/or run a program.
 	store.Set(postProcessMoveCategoryKey, strconv.FormatBool(formBool(r, "postprocess-move-category")))
+	// Verify a finished download once before seeding it.
+	store.Set(recheckOnCompleteKey, strconv.FormatBool(formBool(r, "recheck-on-complete")))
 	if r.FormValue("metadata-form") == "1" {
 		store.Set(metadataEpisodesKey, strconv.FormatBool(formBool(r, "metadata-episodes")))
 	}
@@ -285,6 +287,7 @@ func (d *Daemon) handleUISettings(w http.ResponseWriter, r *http.Request) {
 	}
 	store.Set("dht-read-only", strconv.FormatBool(formBool(r, "dht-read-only")))
 	store.Set("web-sources-allow-private", strconv.FormatBool(formBool(r, "web-sources-allow-private")))
+	store.Set("anonymous-mode", strconv.FormatBool(formBool(r, "anonymous-mode")))
 	store.Set(clientIdentityKey, normalizeClientIdentity(r.FormValue(clientIdentityKey)))
 	store.Set(clientIdentityVersionKey, validClientIdentityVersion(r.FormValue(clientIdentityVersionKey)))
 	// DLNA media server (settings.json, applied by the DLNA loop).
@@ -299,6 +302,7 @@ func (d *Daemon) handleUISettings(w http.ResponseWriter, r *http.Request) {
 	for _, toggle := range []string{"dht", "pex", "utp", "holepunch", "lsd", "upnp", "natpmp"} {
 		store.Set("no-"+toggle, strconv.FormatBool(!formBool(r, toggle)))
 	}
+	store.Set("announce-all-in-tier", strconv.FormatBool(formBool(r, "announce-all-in-tier")))
 	if err := store.Save(); err != nil {
 		d.renderSettings(w, r, "Cannot save the settings: "+err.Error(), true)
 		return
@@ -653,7 +657,9 @@ func (d *Daemon) renderSettings(w http.ResponseWriter, r *http.Request, errKey s
 	repl("LSD_ON", checkedIf(featureOn("lsd")))
 	repl("UPNP_ON", checkedIf(featureOn("upnp")))
 	repl("NATPMP_ON", checkedIf(featureOn("natpmp")))
+	repl("ANNOUNCE_ALL_TIER", checkedIf(d.settingBool("announce-all-in-tier", true)))
 	repl("DHT_READONLY", checkedIf(boolSetting("dht-read-only")))
+	repl("ANONYMOUS_ON", checkedIf(boolSetting("anonymous-mode")))
 	repl("WEB_PRIVATE", checkedIf(boolSetting("web-sources-allow-private")))
 
 	repl("ACTIVE_DL", strconv.Itoa(cfg.ActiveDownloads))
@@ -669,6 +675,7 @@ func (d *Daemon) renderSettings(w http.ResponseWriter, r *http.Request, errKey s
 	repl("CACHE_MB", strconv.FormatInt(cacheMB, 10))
 	repl("PREALLOCATE", checkedIf(cfg.Preallocate))
 	repl("SEQUENTIAL", checkedIf(cfg.Sequential))
+	repl("RECHECK_ON_COMPLETE", checkedIf(boolSetting(recheckOnCompleteKey)))
 	repl("DLNA_ENABLED", checkedIf(boolSetting(dlnaEnabledKey)))
 	repl("DLNA_LISTEN", get(dlnaListenKey))
 	repl("DLNA_NAME", get(dlnaNameKey))

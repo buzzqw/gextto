@@ -130,6 +130,7 @@ func (d *Daemon) routes() http.Handler {
 	root.HandleFunc("POST /ui/rename-folder", d.handleUIRenameFolder)
 	root.HandleFunc("POST /ui/alt-speed", d.handleUIAltSpeed)
 	root.HandleFunc("POST /ui/add", d.handleUIAdd)
+	root.HandleFunc("POST /ui/add-preview", d.handleUIAddPreview)
 	root.HandleFunc("POST /ui/add-file", d.handleUIAddFile)
 	root.HandleFunc("POST /ui/ipfilter", d.handleUIIPFilter)
 	root.HandleFunc("POST /ui/optimize", d.handleUIOptimize)
@@ -360,6 +361,24 @@ func addRequestFromForm(r *http.Request) addRequest {
 	// only when ticked, otherwise the global default applies.
 	if _, ok := r.Form["auto_tmm"]; ok {
 		req.AutoTMM, req.AutoTMMSet = formBool(r, "auto_tmm"), true
+	}
+	// File selection from the add dialog: one priority per real file, in
+	// metadata order (0 = skip, 4 = normal). A malformed value is ignored
+	// whole, rather than applying half a selection.
+	if raw := strings.TrimSpace(r.FormValue("file_priorities")); raw != "" {
+		priorities := make([]int, 0, 8)
+		valid := true
+		for _, part := range strings.Split(raw, ",") {
+			v, err := strconv.Atoi(strings.TrimSpace(part))
+			if err != nil || v < 0 || v > 7 {
+				valid = false
+				break
+			}
+			priorities = append(priorities, v)
+		}
+		if valid && len(priorities) > 0 {
+			req.FilePriorities = priorities
+		}
 	}
 	return req
 }
@@ -866,6 +885,8 @@ func (d *Daemon) handleCreateTorrent(w http.ResponseWriter, r *http.Request) {
 		Private     bool     `json:"private"`
 		PieceLength uint32   `json:"piece_length"`
 		Comment     string   `json:"comment"`
+		Format      string   `json:"format"`
+		Source      string   `json:"source"`
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -879,6 +900,8 @@ func (d *Daemon) handleCreateTorrent(w http.ResponseWriter, r *http.Request) {
 		Private:     req.Private,
 		PieceLength: req.PieceLength,
 		Comment:     req.Comment,
+		Format:      req.Format,
+		Source:      req.Source,
 	})
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err)

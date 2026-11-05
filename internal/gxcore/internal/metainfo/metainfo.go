@@ -190,7 +190,7 @@ func NewBytesWithHints(info []byte, trackers [][]string, webseeds []string, laye
 	}
 	mi := struct {
 		Info         bencode.RawMessage `bencode:"info"`
-		PieceLayers  map[string][]byte  `bencode:"piece layers,omitempty"`
+		PieceLayers  bencode.RawMessage `bencode:"piece layers,omitempty"`
 		Collections  []string           `bencode:"collections,omitempty"`
 		Similar      []string           `bencode:"similar,omitempty"`
 		Announce     string             `bencode:"announce,omitempty"`
@@ -201,12 +201,21 @@ func NewBytesWithHints(info []byte, trackers [][]string, webseeds []string, laye
 		CreatedBy    string             `bencode:"created by,omitempty"`
 	}{
 		Info:         info,
-		PieceLayers:  layers,
 		Collections:  collections,
 		Similar:      similarStrings,
 		Comment:      comment,
 		CreationDate: time.Now().UTC().Unix(),
 		CreatedBy:    Creator,
+	}
+	// A v2 torrent must carry "piece layers", even as an empty dictionary when
+	// every file fits in one piece. A nil map means a v1 torrent, which has no
+	// such field.
+	if layers != nil {
+		raw, err := bencode.EncodeBytes(layers)
+		if err != nil {
+			return nil, err
+		}
+		mi.PieceLayers = raw
 	}
 	switch {
 	case len(trackers) == 1 && len(trackers[0]) == 1:

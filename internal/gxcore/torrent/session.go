@@ -432,14 +432,21 @@ func (s *Session) parseTrackers(tiers [][]string, private bool) []tracker.Tracke
 			trackers = append(trackers, t)
 		}
 		if len(trackers) > 0 {
-			ret = append(ret, tracker.NewTier(trackers))
+			tier := tracker.NewTier(trackers)
+			tier.SetAnnounceAll(s.config.AnnounceAllInTier)
+			ret = append(ret, tier)
 		}
 	}
 	return ret
 }
 
-// getTrackerUserAgent masks the client string on private torrents.
+// getTrackerUserAgent masks the client string on private torrents. In
+// anonymous mode public trackers get an empty User-Agent (no client/version);
+// private trackers keep the configured one, as qBittorrent does.
 func (s *Session) getTrackerUserAgent(private bool) string {
+	if s.config.AnonymousMode && !private {
+		return ""
+	}
 	if private {
 		return s.config.TrackerHTTPPrivateUserAgent
 	}

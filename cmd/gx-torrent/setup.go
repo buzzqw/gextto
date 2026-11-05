@@ -39,11 +39,7 @@ func (d *Daemon) setupComplete() bool {
 }
 
 func validStandaloneLang(lang string) bool {
-	if lang == "en" {
-		return true
-	}
-	_, ok := uiLangIndex[lang]
-	return ok
+	return uiLangKnown(lang)
 }
 
 // handleUISetup renders the wizard (GET) and saves its result (POST).

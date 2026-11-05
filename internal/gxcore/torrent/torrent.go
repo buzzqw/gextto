@@ -510,16 +510,31 @@ func (t *torrent) finishConstruction(s *Session, cfg Config, info *metainfo.Info
 }
 
 // copyPeerIDPrefix stamps the peer id prefix (masked on private torrents),
-// returning the random tail's offset.
+// returning the random tail's offset. Anonymous mode removes the version from
+// the prefix, leaving the client code and zeros.
 func (t *torrent) copyPeerIDPrefix() int {
+	var prefix string
 	if t.info() != nil && t.info().Private {
-		return copy(t.peerID[:], t.session.config.PrivatePeerIDPrefix)
+		prefix = t.session.config.PrivatePeerIDPrefix
+	} else {
+		prefix = t.session.config.PublicPeerIDPrefix
+		if prefix == "" {
+			prefix = publicPeerIDPrefix
+		}
 	}
-	prefix := t.session.config.PublicPeerIDPrefix
-	if prefix == "" {
-		prefix = publicPeerIDPrefix
+	if t.session.config.AnonymousMode {
+		prefix = anonymousPeerIDPrefix(prefix)
 	}
 	return copy(t.peerID[:], prefix)
+}
+
+// anonymousPeerIDPrefix turns "-GX1.2.2066-" (or any client's prefix) into
+// "-GX0000-": the client code stays, the version does not.
+func anonymousPeerIDPrefix(prefix string) string {
+	if len(prefix) >= 3 && prefix[0] == '-' {
+		return prefix[:3] + "0000-"
+	}
+	return "-GX0000-"
 }
 
 // getPeersForUnchoker snapshots the peers for the unchoke round.

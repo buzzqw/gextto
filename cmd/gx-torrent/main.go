@@ -340,6 +340,8 @@ func main() {
 	if err != nil {
 		daemonFatal("%v", err)
 	}
+	// Optional interface languages: <data>/lang/*.json, read once at startup.
+	loadLanguagePacks(filepath.Join(data, "lang"))
 	modeValue, err := resolveMode(*mode, *fingerprint)
 	if err != nil {
 		daemonFatal("%v", err)

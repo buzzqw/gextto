@@ -26,6 +26,9 @@ const (
 	// that uploaded nothing for that many minutes while seeding stops.
 	maxInactiveSeedingTimeEnabledKey = "max-inactive-seeding-time-enabled"
 	maxInactiveSeedingTimeKey        = "max-inactive-seeding-time"
+	// recheckOnCompleteKey verifies a finished download once before it seeds
+	// (qBittorrent's "Recheck torrents on completion").
+	recheckOnCompleteKey = "recheck-on-complete"
 	// contentLayoutKey is the default content layout of the torrents added
 	// from the page and the compatible API (qBittorrent torrent_content_layout).
 	contentLayoutKey = "torrent-content-layout"

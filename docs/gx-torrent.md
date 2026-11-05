@@ -180,8 +180,9 @@ values themselves (torrent and category names, paths, tags) are printed as
 they are. At startup Gextto passes the interface language to the daemon with
 `-lang`, and `?lang=xx` overrides it for the single request. The language is
 also chosen from the picker at the bottom of the sidebar of the main page (the
-endonyms, six of them): the choice is written to `settings.json` like the
-settings page's field and the page is reloaded already translated.
+endonyms, six of them, plus the language packs loaded from `<data>/lang`): the
+choice is written to `settings.json` like the settings page's field and the
+page is reloaded already translated.
 
 The built-in page can be replaced by an **alternative web interface**
 (*Settings → Web interface*): the daemon downloads the latest **VueTorrent**
@@ -542,6 +543,17 @@ precisely so as not to cut the user out. The basic defence remains the login (an
 Windows, the service runs as a dedicated account and not SYSTEM, so writing
 is still confined to what that account can write).
 
+**Native options.** Three qBittorrent options have an equivalent in the
+standalone page: *Recheck data when a download completes* (*Queue and cache*)
+verifies a finished download once before seeding it; *Anonymous mode*
+(*Network*) removes the client version from the peer id and the BEP 10
+handshake and sends no User-Agent to public trackers (private trackers keep
+the configured one, and the IP address is not hidden); *Announce to all
+trackers in a tier* (*Network*, on by default) contacts every tracker of a
+multi-tracker tier in parallel and merges the peers, while tiers themselves
+are already announced in parallel. The first two are read when the session
+opens, so a change applies at the next start; the page says so.
+
 **In-app update** (`update.go`, standalone only). *Settings → Maintenance*
 shows the running version (build, commit, build date, release channel) and
 reads the `release.json` CI publishes beside the archives
@@ -813,14 +825,62 @@ travel. The **cookie API**
 fetches `.torrent` files and metadata over HTTP (private trackers): they are
 used by the daemon's URL adds, the magnet `xs=`/`as=` sources and the web
 seeds. The **torrent creator** API (`torrentcreator/addTask`, `status`,
-`torrentFile`, `deleteTask`) builds a v1 `.torrent` from a path on the server
-(a requested v2/hybrid format is produced as v1). The same cookies are editable
+`torrentFile`, `deleteTask`) builds a `.torrent` from a path on the server in
+v1, v2 or hybrid format (`torrentFormat`). The same cookies are editable
 from the Settings page (*Cookies*), stored in settings.json. The API uses the
 same access criteria as the page: without a password it is open, otherwise the LAN bypass
 is needed (if `local-bypass` is active) or a session (`SID` qBittorrent or `gx_session`
 of the page). In managed it is **not** exposed: only Gextto commands.
 Compatibility is verified by tests using Gextto's qBittorrent client
 (`internal/qbittorrent`) against the daemon.
+
+### Adding and creating
+
+The add dialog of the page reads the chosen `.torrent` before adding it
+(`POST /ui/add-preview`, internal to the page) and shows its files with a
+checkbox each: unchecked files are skipped, and the selection travels to the
+server as `file_priorities` (one value per real file, `0` skip, `4` normal). A
+selection with every file unchecked is refused, and a magnet has no metadata
+yet: the dialog says the list will appear when it arrives (the *Files* tab
+after the add, or `stop_at_metadata`). Files are the only thing chosen before
+the add; priorities can still be changed from the *Files* tab afterwards.
+
+The creator (the *Create .torrent* dialog, `POST /api/v1/create-torrent` and
+the qBittorrent `torrentcreator` API) writes three formats: **v1** (the
+default, read by every client), **v2** (BEP 52: file tree, per-file merkle
+roots and the top-level piece layers) and **hybrid** (the v1 piece stream plus
+BEP 47 pad files in `.pad`, so every real file starts on a piece boundary as
+v2 requires, with the v2 file tree listing only the real files). It also stores
+the optional `source` string in the info dict and the page can **start seeding
+the new torrent at once** instead of downloading the file, when the name
+matches the folder or file.
+
+### Language packs
+
+The page ships six complete catalogs (English, Italian, German, French, Spanish
+and Polish). Another language can be added without rebuilding the daemon: put a
+JSON file in `<data>/lang/`, for example `pt-br.json`:
+
+```json
+{
+  "code": "pt-br",
+  "name": "Português (Brasil)",
+  "translations": {
+    "Torrents": "Torrentes",
+    "Settings": "Configurações"
+  }
+}
+```
+
+`code` is 2–12 letters, digits, `-` or `_`; `name` is the endonym shown in the
+language pickers. `translations` maps the English catalog key to the
+translation; a key the pack does not carry stays in English, so a partial pack
+is usable from the first file. Packs are read at startup, a malformed file or a
+code that collides with a built-in language is logged and skipped (it never
+keeps the daemon from starting), and a pack is selected like any other language
+(in the wizard, the settings page or the sidebar picker). The daemon's log
+lines stay in English: the pack translates the page, not the daemon's
+messages.
 
 ### Container
 
@@ -2475,9 +2535,9 @@ describes the payloads of the v1 resources.
 | `GET /api/v1/portcheck` | port test: the peer port is listening and the router forwards it |
 | `GET /api/v1/torrents` | full list (progress %, sizes, speeds, peers, swarm, status, path, seed limits, queue flags). Optional `?limit=`/`?offset=` page the list (the offset may be negative, counted from the end); without them the response is unchanged |
 | `GET /api/v1/torrents/{hash}` | the published view of one torrent (cheap polling). Additive: the list and the `{hash}/{what}` resources are unchanged |
-| `POST /api/v1/add` | form fields: `magnet`, `destination`, `paused`, `top`, `sequential`, `first_last`, `super_seeding`, `seed_mode`, `stop_at_metadata`, `seed_ratio`, `seed_days`. Responds `{hash, existing}` |
-| `POST /api/v1/add-file` | multipart `torrent` plus the same fields |
-| `POST /api/v1/create-torrent` | JSON `path`/`name`/`trackers`/`webseeds`/`private`/`piece_length`/`comment`: creates a `.torrent` from a file or folder of the server and returns it as a download (mktorrent-style). `piece_length` (multiple of 16 KiB, 0 = automatic) is limited to 16 MiB so as not to turn an arbitrary value into a huge allocation |
+| `POST /api/v1/add` | form fields: `magnet`, `destination`, `paused`, `top`, `sequential`, `first_last`, `super_seeding`, `seed_mode`, `stop_at_metadata`, `seed_ratio`, `seed_days`, `file_priorities` (comma-separated priorities, one per real file: 0 = skip, 4 = normal, 5–7 = high; an all-zero list is refused). Responds `{hash, existing}` |
+| `POST /api/v1/add-file` | multipart `torrent` plus the same fields, `file_priorities` included |
+| `POST /api/v1/create-torrent` | JSON `path`/`name`/`trackers`/`webseeds`/`private`/`piece_length`/`comment`/`format`/`source`: creates a `.torrent` from a file or folder of the server and returns it as a download (mktorrent-style). `format` is `v1` (default), `v2` (BEP 52) or `hybrid`; `piece_length` (multiple of 16 KiB, 0 = automatic) is limited to 16 MiB, and v2/hybrid need a power-of-two size |
 | `DELETE /api/v1/torrents/{hash}?delete_files=1` | removal |
 | `POST /api/v1/torrents/{hash}/{action}` | see list below |
 | `GET /api/v1/torrents/{hash}/{what}` | inspection with `{what}` in `files`, `peers`, `trackers`, `webseeds`, `pieces`, `torrent-file`, `scrape`, `dhtscrape`, `collections` (files include `priority`; `webseeds` lists the HTTP sources; `pieces` reports the status intervals; `scrape` queries the trackers for seeders/leechers, BEP 48; `dhtscrape` estimates the swarm from the DHT, BEP 33; `collections` reports the BEP 38 hints — `collections`, `similar` in hex and the local torrents that share a hint) |

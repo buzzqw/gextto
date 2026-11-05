@@ -152,6 +152,9 @@ type torrentMeta struct {
 	// PostProcessed is set when the completion action (move and/or command) has
 	// been launched, so a restart does not run it twice.
 	PostProcessed bool `json:"post_processed,omitempty"`
+	// RecheckedOnComplete records the integrity check run once when the torrent
+	// completed, so the tick does not start it again on every pass.
+	RecheckedOnComplete bool `json:"rechecked_on_complete,omitempty"`
 }
 
 type persistedState struct {
@@ -667,6 +670,10 @@ func (d *Daemon) sessionConfig() torrent.Config {
 	cfg.ResumeWriteInterval = 2 * time.Minute
 	d.applyNetwork(&cfg)
 	d.applyCache(&cfg)
+	// qBittorrent's "announce to all trackers in a tier" (default on). Tiers
+	// are already announced in parallel; this is the per-tier policy.
+	cfg.AnnounceAllInTier = d.settingBool("announce-all-in-tier", true)
+	cfg.AnonymousMode = d.settingBool("anonymous-mode", false)
 	cfg.FilePriorities = d.prioritiesFor
 	cfg.PartsDir = d.opts.PartsDir
 	cfg.SpeedLimitDownload = d.state.Config.SpeedLimitDownload
@@ -1158,6 +1165,7 @@ func (d *Daemon) tick(now time.Time) {
 	var pendingSelectOnly []selectOnlyJob
 	var pendingRemovals []string
 	var pendingPostProcess []string
+	var pendingRechecks []string
 	for _, t := range torrents {
 		id := t.ID()
 		stats, ok := statsOf[id]
@@ -1191,6 +1199,14 @@ func (d *Daemon) tick(now time.Time) {
 				meta.PostProcessed = true
 				d.dirty = true
 				pendingPostProcess = append(pendingPostProcess, id)
+			}
+			// Recheck the data once before seeding it: a disk that returns a
+			// wrong block is caught now instead of being seeded for hours.
+			// The flag is set first, so the next ticks do not start it again.
+			if !meta.RecheckedOnComplete && d.settingBool(recheckOnCompleteKey, false) {
+				meta.RecheckedOnComplete = true
+				d.dirty = true
+				pendingRechecks = append(pendingRechecks, id)
 			}
 		}
 		// export_dir / export_dir_fin: copy the .torrent once the metadata is
@@ -1405,6 +1421,14 @@ func (d *Daemon) tick(now time.Time) {
 	// command may take minutes.
 	for _, id := range pendingPostProcess {
 		go d.runPostProcess(id)
+	}
+	// Rechecks run outside d.mu, verify() takes it again: the torrent stops,
+	// verifies and the queue resumes it on a later tick.
+	for _, id := range pendingRechecks {
+		logf("checking the data of «%s» before seeding it", statsOf[id].Name)
+		if err := d.verify(id); err != nil {
+			logfError("cannot check the data of «%s»: %v", statsOf[id].Name, err)
+		}
 	}
 	// Watch folders (standalone): scan and add dropped .torrent files.
 	d.maybeScanWatchFolders(now)
@@ -1788,6 +1812,10 @@ type addRequest struct {
 	// Category and Tags are the qBittorrent-style labels (standalone mode).
 	Category string
 	Tags     []string
+	// FilePriorities chooses which files to download (0 = skip, 1..4 normal,
+	// 5..7 high), one entry per non-padding file in metadata order. Empty
+	// means every file.
+	FilePriorities []int
 	// AutoTMM: the category decides the save path (qBittorrent autoTMM).
 	AutoTMM bool
 	// AutoTMMSet marks AutoTMM as explicitly given by the caller: when it is
@@ -1807,6 +1835,18 @@ func autoTMMForAdd(req addRequest, globalDefault bool) bool {
 // add registers a torrent stopped and lets the queue start it. A torrent
 // already in the session is reported with existing=true and left untouched.
 func (d *Daemon) add(req addRequest) (string, bool, error) {
+	if len(req.FilePriorities) > 0 {
+		wanted := false
+		for _, priority := range req.FilePriorities {
+			if priority > 0 {
+				wanted = true
+				break
+			}
+		}
+		if !wanted {
+			return "", false, errors.New("select at least one file to download")
+		}
+	}
 	if req.Magnet != "" {
 		// The engine reads only the first xt: keep the v1 hash in front so a hybrid
 		// magnet whose btmh comes first is still downloadable.
@@ -1911,7 +1951,10 @@ func (d *Daemon) add(req addRequest) (string, bool, error) {
 		// BEP 53 "so": keep the magnet's file selection to apply when metadata
 		// arrives (the engine already uses it as a seed meanwhile).
 		SelectOnly: t.SelectOnly(),
-		SeedRatio:  req.SeedRatio, SeedDays: req.SeedDays, SwarmSeeds: -1, SwarmPeers: -1,
+		// Files chosen in the add dialog: recorded before the queue starts the
+		// torrent, so the engine reads the selection on its first run.
+		FilePriorities: append([]int(nil), req.FilePriorities...),
+		SeedRatio:      req.SeedRatio, SeedDays: req.SeedDays, SwarmSeeds: -1, SwarmPeers: -1,
 		// Per-torrent limits chosen in the add dialog (nil = global).
 		DownloadLimitKib: req.DownloadLimitKib, UploadLimitKib: req.UploadLimitKib,
 		Category: req.Category,
@@ -1922,6 +1965,9 @@ func (d *Daemon) add(req addRequest) (string, bool, error) {
 	}
 	if limit := d.state.Config.MaxConnectionsPerTorrent; limit > 0 {
 		t.SetMaxConnections(limit)
+	}
+	if len(req.FilePriorities) > 0 {
+		d.setSelection(id, req.FilePriorities)
 	}
 	d.state.Tags = mergeTagNames(d.state.Tags, req.Tags)
 	d.indexTorrentLocked(t)

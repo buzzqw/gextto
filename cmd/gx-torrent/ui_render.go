@@ -55,7 +55,7 @@ func (d *Daemon) uiLang(r *http.Request) string {
 		if v == "en" {
 			return "en"
 		}
-		if _, ok := uiLangIndex[v]; ok {
+		if uiLangKnown(v) {
 			return v
 		}
 	}
@@ -64,7 +64,7 @@ func (d *Daemon) uiLang(r *http.Request) string {
 		case v == "en":
 			return "en"
 		case v != "":
-			if _, ok := uiLangIndex[v]; ok {
+			if uiLangKnown(v) {
 				return v
 			}
 		}

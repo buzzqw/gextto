@@ -47,40 +47,22 @@ its gate; a rejected one moves to *Not planned*.
 - **Error wrapping and log wording** — 280 log calls build their sentence with `Sprintf`
   although the logger takes structured fields, and 490 `fmt.Errorf` calls drop the cause
   because they do not use `%w`. Mechanical, area by area, tests green.
-- **Embedded tracker** — qBittorrent ships an HTTP announce endpoint (port 9000) with
-  peer bookkeeping per info hash; here there is none, so sharing inside a LAN needs an
-  external tracker. Add a configurable port, the announce/scrape handler, peer expiry and
-  a switch on the page. Gate: a user who shares files without a public tracker.
-- **HTTPS on the web interface** — serve the page and the API with a certificate
-  (`-tls-cert`/`-tls-key` and the settings keys), add HSTS; the `Secure` cookie logic
-  already reads `X-Forwarded-Proto`. Gate: a deployment without a TLS terminator.
-- **File selection before adding** — the add dialog has no file tree: parse the metainfo
-  (for a magnet, wait for the metadata) and show files with checkboxes and priorities
-  before the transfer starts. Gate: a torrent whose unwanted files are large enough to
-  matter.
-- **Torrent creator v2 and hybrid** — the creator builds v1 only; add the BEP 52 file
-  tree, the piece layers and the hybrid layout, plus the `source` field and «start
-  seeding». Gate: a v2-only swarm or a tracker that asks for it.
-- **Anonymous mode** — mask the peer ID and the client version in the handshake and in
-  the tracker user-agent, omit the announce IP, and make the flag the qBittorrent API
-  reports real instead of a constant false. Gate: a user who needs it on top of a VPN.
-- **Multi-tracker announce policy** — a tier announces to one member and fails over; add
-  «announce to all trackers in a tier» and «to all tiers» with merged peers, as
-  qBittorrent defaults. Gate: a swarm whose first tracker is dead or partial.
-- **Recheck after completion** — verify the data once when a download completes, for
-  disks that lie. Gate: none.
 - **IP address reported to trackers** — send an operator-chosen address in the announce
   (HTTP `ip=` and the UDP equivalent). Gate: a NAT or VPN setup where the tracker records
   the wrong address.
 - **Incomplete file extension** — append `.!qB` while a file is incomplete and rename it
   at completion, with resume, recheck, move and streaming kept consistent. Gate: a
   workflow that reads the folder during a download.
-- **More interface languages** — the page has six catalogs (it, en, de, fr, es, pl); add
-  the largest missing ones with native review. Gate: a translator for each.
+- **Bundle more languages** — the pack loader is in place (`<data>/lang/*.json`, English
+  fallback, partial packs allowed); the six compiled catalogs are still the only complete
+  ones. Gate: a translator for each language.
 ## Not planned
 
 Closed by choice, not waiting for a measurement:
 
+- Embedded tracker (an HTTP announce endpoint of its own): the operator chose not to
+  build it in this cycle.
+- HTTPS on the web interface: the operator chose to keep a TLS terminator in front.
 - Build-time source patching, libtorrent 1.2/2.x variants and musl/glibc «static-ish»
   builds: gx-core is our own pure-Go code with no libtorrent, and the daemon already
   links nothing (`CGO_ENABLED=0`), so there is no third-party tree to patch and no

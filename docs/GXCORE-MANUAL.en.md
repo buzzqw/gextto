@@ -96,12 +96,20 @@ and ban an address. **Trackers** shows status, swarm and next announce;
 ## 3. Add and create
 
 The add dialog takes several magnets or URLs at once; dropping a `.torrent`
-anywhere on the page opens it already filled in.
+anywhere on the page opens it already filled in. When you choose a `.torrent`
+with the button, the dialog lists the files it contains with a checkbox each:
+uncheck what you do not want, and only the checked files are downloaded. A
+magnet has no file list until its metadata arrives; add it with **paused** and
+**stop at metadata**, then choose the files from the *Files* tab.
 
 ![Add](screenshots/gx-core/en/add-dialog.png)
 
 From **Tools → Create .torrent** you build a torrent from a file or folder on
-the server, with piece size, private flag, comment, trackers and web seeds.
+the server, with piece size, **format** (v1, read by every client; v2, BEP 52;
+hybrid, which serves both swarms), private flag, comment, a **source** string,
+trackers and web seeds. **Start seeding after creating** adds the new torrent
+to the session and seeds the folder or file at once, instead of downloading
+the `.torrent`.
 
 ![Create torrent](screenshots/gx-core/en/create-torrent.png)
 
@@ -178,6 +186,14 @@ sending a test notification) the page stays on that tab and confirms with a
 message in the bottom-right corner, so the button visibly did something.
 
 ![Settings](screenshots/gx-core/en/settings.png)
+
+A few options are the native counterpart of qBittorrent's: **Recheck data when a
+download completes** (Queue) verifies the files once before seeding them;
+**Anonymous mode** (Network) hides the client version from peers and public
+trackers, without hiding your IP address; **Announce to all trackers in a tier**
+(Network, on by default) asks every tracker of a multi-tracker tier at once;
+and **Interface → Language** lists any language pack you put in `<data>/lang`
+beside the six built-in languages.
 
 Category management and its path are on the same page: that is what makes
 automatic torrent management really work.

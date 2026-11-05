@@ -198,6 +198,8 @@ body{display:flex;flex-direction:column;overflow:hidden}
 .dropzone[hidden]{display:none}
 .filepick{display:flex;flex-direction:column;align-items:center;gap:6px;padding:16px;border:1.5px dashed var(--border-strong);border-radius:var(--radius);text-align:center;color:var(--muted);font-size:13px}
 .filepick.has{border-color:var(--accent);color:var(--text)}
+.filetree{margin:8px 0;max-height:26vh;overflow:auto;border:1px solid var(--border);border-radius:var(--radius);padding:8px 10px;background:var(--surface)}
+.filetree .chk{margin:2px 0}
 .opts{display:flex;flex-wrap:wrap;gap:10px 18px}
 .addmore{border:0;padding:0}
 .addmore summary{cursor:pointer;color:var(--muted);font-size:13px}
@@ -546,6 +548,7 @@ body{display:flex;flex-direction:column;overflow:hidden}
         <span id="filepick-text">{{tr "Drop .torrent files anywhere on the page, or"}}</span>
         <input type="file" name="torrent" id="add-files" multiple accept=".torrent,application/x-bittorrent" aria-label="{{tr "Choose .torrent files"}}" title="{{tr "Select a local .torrent file to upload and start downloading"}}">
       </div>
+      <div id="add-file-tree" class="filetree" aria-live="polite" hidden></div>
       <label class="field">{{tr "Save to"}}
         <span class="field-row"><input type="text" id="add-destination" name="destination" list="savepaths" placeholder="{{tr "destination (empty = default)"}}" autocomplete="off" title="{{tr "Destination directory for download files (empty uses default download folder)"}}">{{if .Standalone}}<button type="button" class="browse" data-target="add-destination" title="{{tr "Choose an existing folder on the server"}}">{{tr "Browse…"}}</button>{{end}}</span>
       </label>
@@ -715,9 +718,12 @@ body{display:flex;flex-direction:column;overflow:hidden}
       <label class="field">{{tr "Name (optional)"}}<input type="text" name="name" autocomplete="off" title="{{tr "Display name for the torrent (optional, defaults to filename or folder name)"}}"></label>
       <div class="form-grid">
         <label>{{tr "Piece size"}}<select name="piece_size" title="{{tr "Size of each piece in the .torrent: Auto picks one from the total size, a fixed size is useful to match an existing torrent"}}"><option value="0">{{tr "Auto"}}</option><option value="32">{{tr "32 KiB"}}</option><option value="64">{{tr "64 KiB"}}</option><option value="128">{{tr "128 KiB"}}</option><option value="256">{{tr "256 KiB"}}</option><option value="512">{{tr "512 KiB"}}</option><option value="1024">{{tr "1 MiB"}}</option><option value="2048">{{tr "2 MiB"}}</option><option value="4096">{{tr "4 MiB"}}</option><option value="8192">{{tr "8 MiB"}}</option><option value="16384">{{tr "16 MiB"}}</option></select></label>
+        <label>{{tr "Torrent format"}}<select name="format" title="{{tr "v1 is read by every client; v2 is the BEP 52 format; hybrid carries both and serves the two swarms. Hybrid and v2 need a power-of-two piece size."}}"><option value="v1">{{tr "v1 (widest compatibility)"}}</option><option value="v2">{{tr "v2 (BEP 52)"}}</option><option value="hybrid">{{tr "Hybrid (v1 + v2)"}}</option></select></label>
         <label class="chk" title="{{tr "Mark the torrent private (BEP 27): DHT, PEX and local discovery are disabled and only the trackers are used"}}"><input type="checkbox" name="private" value="1"> {{tr "Private"}}</label>
       </div>
       <label class="field">{{tr "Comment (optional)"}}<input type="text" name="comment" autocomplete="off" title="{{tr "Comment stored in the .torrent, for example the source or the release group"}}"></label>
+      <label class="field">{{tr "Source (optional)"}}<input type="text" name="source" autocomplete="off" title="{{tr "Value stored in the source field of the .torrent, used to tell releases from different sites apart for cross-seeding"}}"></label>
+      <label class="chk" title="{{tr "Add the new torrent to the session and seed the folder or file immediately; the .torrent is not downloaded. The name must match the folder or file name."}}"><input type="checkbox" name="start_seeding" value="1"> {{tr "Start seeding after creating"}}</label>
       <label class="field">{{tr "Trackers, one per line"}}<textarea name="trackers" rows="3" autocomplete="off" title="{{tr "Tracker announce URLs, one per line (optional, for swarm discovery)"}}"></textarea></label>
       <label class="field">{{tr "Web seeds, one per line"}}<textarea name="webseeds" rows="2" autocomplete="off" placeholder="https://example/file" title="{{tr "HTTP/HTTPS web seeds stored in the .torrent, one per line (optional, BEP 19)"}}"></textarea></label>
     </div>
@@ -1519,7 +1525,20 @@ function renderLog(scroll){var view=$('#log-view'),q=($('#log-filter').value||''
 
 // ---------- add ----------
 function setFiles(files){var input=$('#add-files');try{input.files=files;}catch(e){}updateFilePick();}
-function updateFilePick(){var input=$('#add-files'),n=input.files?input.files.length:0;$('#filepick').classList.toggle('has',n>0);$('#filepick-text').textContent=n?n+' '+t('file(s) selected'):t('Drop .torrent files anywhere on the page, or');}
+function updateFilePick(){var input=$('#add-files'),n=input.files?input.files.length:0;$('#filepick').classList.toggle('has',n>0);$('#filepick-text').textContent=n?n+' '+t('file(s) selected'):t('Drop .torrent files anywhere on the page, or');updateFileTree();}
+// updateFileTree asks the server for the files of the single chosen .torrent,
+// so the operator unchecks what must not be downloaded before adding it. With
+// several files the tree is hidden: the add sends one request per file.
+function updateFileTree(){
+  var tree=$('#add-file-tree');if(!tree)return;
+  var input=$('#add-files'),files=input&&input.files?input.files:[];
+  if(files.length!==1){tree.hidden=true;tree.innerHTML='';return;}
+  var fd=new FormData();fd.set('torrent',files[0]);
+  fetch('/ui/add-preview',{method:'POST',body:fd,headers:{'X-GX-Fetch':'1'}})
+    .then(function(r){return r.text();})
+    .then(function(html){tree.innerHTML=html;tree.hidden=!html.trim();})
+    .catch(function(){tree.hidden=true;tree.innerHTML='';});
+}
 // ---------- add preview ----------
 // What will be added: each magnet line shows its display name (dn) and info
 // hash (btih), each URL its address, so a paste is checked before sending.
@@ -1598,6 +1617,11 @@ function submitAdd(form){
   var opts=new FormData(form),sources=String(opts.get('source')||'').split(/\r?\n/).map(function(s){return s.trim();}).filter(Boolean),files=$('#add-files').files||[];
   if(!sources.length&&!files.length){toast(t('Paste a magnet link or choose a .torrent file'),true);return;}
   var base={};['destination','category','auto_tmm','paused','top','sequential','first_last','super_seeding','download_limit','upload_limit'].forEach(function(k){var v=opts.get(k);if(v)base[k]=v;});
+  var tree=$('#add-file-tree');
+  if(tree&&!tree.hidden&&files.length===1){
+    var boxes=$$('input[data-file-index]',tree);
+    if(boxes.length)base.file_priorities=boxes.map(function(b){return b.checked?'4':'0';}).join(',');
+  }
   var jobs=[],ok=0,fail=[];
   sources.forEach(function(s){var p=new URLSearchParams(base);p.set('source',s);jobs.push(post('/ui/add',p));});
   Array.prototype.forEach.call(files,function(file){var fd=new FormData();Object.keys(base).forEach(function(k){fd.set(k,base[k]);});fd.set('torrent',file);jobs.push(fetch('/ui/add',{method:'POST',body:fd,headers:{'X-GX-Fetch':'1'}}).then(function(r){return r.json();}).catch(function(e){return {ok:false,msg:e.message};}));});
@@ -1606,6 +1630,13 @@ function submitAdd(form){
     if(!fail.length){closeDialog($('#dlg-add'));form.reset();updateFilePick();updateAddPreview();}
     refresh();});
 }
+// Select all / none in the file tree of the add dialog.
+document.addEventListener('click',function(e){
+  var all=e.target.closest&&e.target.closest('[data-file-all]'),none=e.target.closest&&e.target.closest('[data-file-none]');
+  if(!all&&!none)return;
+  var tree=$('#add-file-tree');if(!tree)return;
+  $$('input[data-file-index]',tree).forEach(function(b){b.checked=!!all;});
+});
 
 // ---------- wiring ----------
 document.addEventListener('click',function(e){

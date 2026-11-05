@@ -525,11 +525,11 @@ server-rendered UI under `/ui`; those HTML routes are not part of this table.
 
 | Method | Path | Description |
 |---|---|---|
-| POST | `/api/v1/add` | add a torrent (magnet, URL or JSON body); content_layout = Original, Subfolder or NoSubfolder (empty = Original); seed_mode=1 skips the initial check (each piece is checked when first uploaded). A URL that answers with a redirect to a magnet: link — indexarr and Jackett do this for a source that has no .torrent file to serve — is followed and added as that magnet |
-| POST | `/api/v1/add-file` | add a .torrent file upload (same content_layout and seed_mode) |
+| POST | `/api/v1/add` | add a torrent (magnet, URL or JSON body); content_layout = Original, Subfolder or NoSubfolder (empty = Original); seed_mode=1 skips the initial check (each piece is checked when first uploaded); file_priorities = comma-separated priorities, one per real file (0 = skip, 4 = normal, 5–7 = high; an all-zero list is refused). A URL that answers with a redirect to a magnet: link — indexarr and Jackett do this for a source that has no .torrent file to serve — is followed and added as that magnet |
+| POST | `/api/v1/add-file` | add a .torrent file upload (same content_layout, seed_mode and file_priorities) |
 | GET | `/api/v1/config` | daemon configuration |
 | POST | `/api/v1/config` | change the daemon configuration |
-| POST | `/api/v1/create-torrent` | create a .torrent from a folder |
+| POST | `/api/v1/create-torrent` | create a .torrent from a folder; JSON fields include format (v1, v2 or hybrid) and source |
 | GET | `/api/v1/dht-feed` | recent DHT discovery feed |
 | GET | `/api/v1/dht-feed/publish` | sign and publish a BEP 46 feed (?name=…&hash=…), returns the dht:// URL |
 | POST | `/api/v1/dht-feed/publish` | sign and publish a BEP 46 feed (JSON name/hashes), returns the dht:// URL |
@@ -619,7 +619,7 @@ flat fields and in the `torrentParams` object (where the tags are).
 | POST | `/api/v2/search/updatePlugins` | update the search plugins |
 | GET | `/api/v2/sync/maindata` | incremental state for the qBittorrent sync: the diff since the reply whose rid the client echoes (the last 16 replies are remembered, so several clients stay incremental), otherwise a full snapshot |
 | GET | `/api/v2/sync/torrentPeers` | peers of one torrent |
-| POST | `/api/v2/torrentcreator/addTask` | start a torrent creation task |
+| POST | `/api/v2/torrentcreator/addTask` | start a torrent creation task (sourcePath, pieceSize, private, comment, trackers, urlSeeds, torrentFilePath; torrentFormat = v1/v2/hybrid and source are accepted) |
 | POST | `/api/v2/torrentcreator/deleteTask` | delete a creation task |
 | GET | `/api/v2/torrentcreator/status` | creation task status |
 | GET | `/api/v2/torrentcreator/torrentFile` | download the created .torrent |

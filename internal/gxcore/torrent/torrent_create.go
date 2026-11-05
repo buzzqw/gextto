@@ -23,12 +23,16 @@ type CreateOptions struct {
 	PieceLength uint32
 	// Comment is stored in the metainfo.
 	Comment string
+	// Format is "v1" (default), "v2" or "hybrid".
+	Format string
+	// Source is the qBittorrent "source" string stored in the info dict.
+	Source string
 }
 
-// CreateTorrent builds a BitTorrent v1 .torrent from a single file or directory
-// on disk. A directory becomes a multi-file torrent named after it (or after
-// opt.Name); a file becomes a single-file torrent. The returned bytes are a
-// ready-to-use .torrent.
+// CreateTorrent builds a .torrent from a single file or directory on disk. A
+// directory becomes a multi-file torrent named after it (or after opt.Name); a
+// file becomes a single-file torrent. The returned bytes are a ready-to-use
+// .torrent.
 func CreateTorrent(path string, opt CreateOptions) ([]byte, error) {
 	if path == "" {
 		return nil, errors.New("no path specified")
@@ -36,7 +40,15 @@ func CreateTorrent(path string, opt CreateOptions) ([]byte, error) {
 	if _, err := os.Stat(path); err != nil {
 		return nil, err
 	}
-	info, err := metainfo.NewInfoBytes("", []string{path}, opt.Private, opt.PieceLength, opt.Name, logger.New("create torrent"))
+	info, layers, err := metainfo.CreateInfo(metainfo.CreationOptions{
+		Paths:       []string{path},
+		Name:        opt.Name,
+		Private:     opt.Private,
+		PieceLength: opt.PieceLength,
+		Format:      opt.Format,
+		Source:      opt.Source,
+		Log:         logger.New("create torrent"),
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -44,5 +56,5 @@ func CreateTorrent(path string, opt CreateOptions) ([]byte, error) {
 	if len(opt.Trackers) > 0 {
 		trackers = [][]string{opt.Trackers}
 	}
-	return metainfo.NewBytes(info, trackers, opt.Webseeds, opt.Comment)
+	return metainfo.NewBytesWithLayers(info, trackers, opt.Webseeds, layers, opt.Comment)
 }
