@@ -16,46 +16,12 @@ here.
 
 ## Engine (gx-core, gx-torrent)
 
-- **Choking on a real swarm** — campaign against libtorrent/qBittorrent on the same
-  public torrent, with the same policy and metrics (upload efficiency while seeding,
-  reciprocation, first-block time, stall rate). Gate: a public swarm with more leechers
-  than seeds and a reachable inbound port; only a gap justifies touching
-  `internal/unchoker`. A fresh Ubuntu release is not one: seeds outnumber leechers and
-  nobody uploads.
 - **Mixed-mode TCP/uTP arbitration** — throttle TCP when uTP shares the line, as
   libtorrent does; today only the transfer caps react. Gate: a mixed swarm where the
   current caps lose throughput or latency.
-- **DHT feeds** — the resolver and the publisher exist; what is missing is a real
-  multi-client audience. Gate: at least two independent clients consuming a published
-  feed.
-- **DLNA** — transcoding and frames extracted from the video are missing; browsing,
-  Search, Range playback, subtitles, library folders, artwork and Xbox/WMP are in
-  place. Gate: a client that needs transcoding or a thumbnail taken from the video.
-- **10 Gbps pipelining** — a validation, not code: the local single-pair ceiling is far
-  below the target, multi-piece included. Gate: a multi-peer swarm on a fast link.
-- **Windows killswitch on a multihomed host** — `OutgoingInterface` binds the source
-  address, which on Windows does not pin the egress adapter, so in a VPN configuration the
-  traffic can leave by another interface (as in libtorrent issue 8941, where the fix is
-  `IP_UNICAST_IF`/`IPV6_UNICAST_IF`). Gate: a Windows host with a VPN and a second adapter
-  where a packet capture shows the leak.
-- **Hybrid torrents from the v2 swarm** — hybrids are downloaded as v1 only; when the
-  swarm of a hybrid has peers in the v2 one and none in the v1 one, the download waits
-  without needing to. Gate: a hybrid torrent where the v2 swarm is the only one with peers.
 
 ## Gextto, acquisition and UI
 
-- **Managed amuled (optional)** — a convenience starter for eD2k: a private config
-  directory, a generated EC password and the ports. It is not a Gextto engine and it is
-  not required. Gate: users who want eD2k without configuring aMule by hand.
-- **Remote aMule** — import completed files from a remote core with a path mapping like
-  `qbittorrent_path_mappings`. Gate: an operator running aMule on another host.
-- **Sonarr/Radarr v3** — acceptance test of the Jellyseerr subset against a real
-  Jellyseerr; its calls decide any correction. Gate: a Jellyseerr instance driven by a
-  real request.
-- **Portable folder names for existing series** — a series added before the add dialog
-  dropped the characters Windows, exFAT and SMB shares refuse keeps its folder; a check
-  in Maintenance reports those folders and never moves files by itself. Gate: an
-  installation with at least one such folder (none here).
 - **Functions too long to review** — `torrentEventWorker`, `HandleTorrentEvent`,
   `formatEventLang`, `seriesRenameApply`, `loadConfigDB` and the candidate pass
   (`candidatePass.try`) are each several hundred lines with state shared across the
@@ -69,18 +35,13 @@ here.
 Ideas proposed but not decided yet. An accepted proposal moves to the matching area with
 its gate; a rejected one moves to *Not planned*.
 
-- **Relink duplicated copies** — a library file identical to a seeding download but not
-  hardlinked to it is linked again to save the space. Gate: an installation where the
-  downloads and the library are on the same filesystem (here they are not: the library
-  is on the NAS, the downloads on the local disk) and a byte-for-byte comparison before
-  linking.
 - **Packages for the root** — 114k non-test lines share `package gextto`, so helpers are
   told apart by prefixes (`gh0_`…`gh7_`, `tev_`, `bg_`) instead of by package. Gate: a
   decision on the first boundary (HTTP handlers, acquisition, storage) and one area
   migrated with the suite green.
-- **Settings as typed keys** — 110+ keys are read as `cfg.Settings["literal"]` with no Go
-  constant, so a typo compiles and returns the default. Gate: constants generated from
-  the settings index and one family of accessors migrated.
+- **Settings as typed keys** — the constants are generated from the settings index
+  (`settings_keys_gen.go`), but many reads still use `cfg.Settings["literal"]`, so a typo
+  compiles and returns the default. Gate: one family of accessors migrated.
 - **gx-torrent page: translation by key** — the daemon page is still translated after it
   renders (`cmd/gx-torrent/i18n_html.go` re-tokenises the finished HTML), so a value
   inside a phrase stays in English. Gextto's pages already translate while they render
@@ -92,19 +53,12 @@ its gate; a rejected one moves to *Not planned*.
 - **Error wrapping and log wording** — 280 log calls build their sentence with `Sprintf`
   although the logger takes structured fields, and 490 `fmt.Errorf` calls drop the cause
   because they do not use `%w`. Mechanical, area by area, tests green.
-- **TLS origination to the proxy** — the proxy is reached in plain text (HTTP CONNECT or
-  SOCKS5); an `https://` proxy that terminates TLS itself is not supported, as in
-  libtorrent before PR 9039. Gate: an operator who runs an HTTPS proxy.
 - **Archive rows of a removed feed** — a feed deleted from *Sources* leaves its listings
   in the archive; a `.torrent` link that fails is quarantined (6h, then 24h, then a week)
   but still retried. A switched-off indexer is recognised by its URL, a removed feed is
   not: the row does not remember the feed it came from. Storing the feed URL next to the
   source label would let the archive skip those listings the same way. Gate: a feed
   removed from an installation that still sees its old links tried now and then.
-- **Duplicate connections per IPv6 subnet** — the duplicate-IP gate compares the full
-  address, so one host with rotating privacy addresses can hold several slots; libtorrent
-  issue 8934 asks for one host per /64, but a /64 is a subnet and may hold many real users.
-  Gate: a measurement of the slots one host takes on a public IPv6 swarm.
 
 ## Not planned
 
@@ -136,6 +90,25 @@ Closed by choice, not waiting for a measurement:
 - Full `*arr` v3 compatibility, multi-user authentication, Usenet, write-back cache,
   specialist fields in the add form, a content layout in Gextto's Add dialog, a UI
   benchmark in CI, a cache cap on NFS, Trakt.
+
+Not feasible here: the gate needs something this installation does not have and cannot
+create. Reopen one when its condition appears.
+
+- Choking changes: a public swarm with more leechers than seeds (seeds outnumber
+  leechers on the legal ones, and nobody uploads).
+- DHT feeds: an audience of independent clients.
+- DLNA transcoding and frames from the video: a client that needs them.
+- 10 Gbps pipelining: a multi-peer swarm on a fast link.
+- Windows killswitch on a multihomed host (`IP_UNICAST_IF`): a Windows host with a VPN
+  where a capture shows the leak.
+- Hybrid torrents from the v2 swarm: a hybrid whose only peers are in the v2 swarm.
+- Managed amuled and remote aMule: operators who ask for them.
+- Sonarr/Radarr v3 acceptance: a real Jellyseerr instance.
+- Portable folder names for existing series: a folder with characters other systems
+  refuse.
+- Relinking duplicated copies: downloads and library on the same filesystem.
+- TLS origination to an `https://` proxy: an operator who runs one.
+- One connection per IPv6 /64: a public IPv6 swarm (this line has no IPv6).
 
 Engine designs rejected on a measurement — `io_uring`/AIO, contiguous-write coalescing,
 multi-path `get_peers`, the anti-Sybil cap on by default, super-seeding by default,
