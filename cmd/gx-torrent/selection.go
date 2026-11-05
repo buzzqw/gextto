@@ -117,7 +117,17 @@ func (d *Daemon) setFilePriorities(key string, priorities []int) error {
 		t.RefreshSelection()
 		return nil
 	}
-	wasRunning := isRunning(t.Stats().Status)
+	stats := t.Stats()
+	// A torrent that has not verified a single piece holds nothing but empty
+	// files. Moving them between the save path and the parts folder copies
+	// gigabytes of zeros when the two are on different filesystems (a NAS
+	// download folder and a local disk), and the selection would only be in
+	// force once the copy ended: dropping them and letting the engine recreate
+	// them at their destination costs nothing. Same rule as moving a whole
+	// torrent (see d.move): only a running download qualifies, its piece table
+	// is authoritative.
+	empty := selectionDropsEmpty(stats)
+	wasRunning := isRunning(stats.Status)
 	d.moving[id] = true
 	if err := t.Stop(); err != nil {
 		delete(d.moving, id)
@@ -132,17 +142,18 @@ func (d *Daemon) setFilePriorities(key string, priorities []int) error {
 	d.saveLocked()
 	d.mu.Unlock()
 
-	go d.finishSelection(id, t, paths, oldMask, newMask, stored, savePath, wasRunning)
+	go d.finishSelection(id, t, paths, oldMask, newMask, stored, savePath, wasRunning, empty)
 	return nil
 }
 
-func (d *Daemon) finishSelection(id string, t *torrent.Torrent, paths []string, oldMask, newMask []bool, priorities []int, savePath string, wasRunning bool) {
+func (d *Daemon) finishSelection(id string, t *torrent.Torrent, paths []string, oldMask, newMask []bool, priorities []int, savePath string, wasRunning, empty bool) {
 	deadline := time.Now().Add(30 * time.Second)
 	for time.Now().Before(deadline) && t.Stats().Status != torrent.Stopped {
 		time.Sleep(100 * time.Millisecond)
 	}
 	skipped := func(mask []bool, i int) bool { return i < len(mask) && mask[i] }
 	var moveErr error
+	dropped := 0
 	for i, rel := range paths {
 		was, now := skipped(oldMask, i), skipped(newMask, i)
 		if was == now {
@@ -154,9 +165,21 @@ func (d *Daemon) finishSelection(id string, t *torrent.Torrent, paths []string, 
 		if was {
 			from, to = part, real
 		}
-		if err := relocateFile(from, to); err != nil && moveErr == nil {
+		var err error
+		if empty {
+			// Nothing was downloaded: there is no byte to preserve, so the
+			// file is dropped instead of copied.
+			err = dropEmptyFile(from, to)
+			dropped++
+		} else {
+			err = relocateFile(from, to)
+		}
+		if err != nil && moveErr == nil {
 			moveErr = err
 		}
+	}
+	if dropped > 0 {
+		logf("file selection of %s: %d empty files dropped instead of being copied", id, dropped)
 	}
 	d.setSelection(id, priorities)
 
@@ -174,6 +197,28 @@ func (d *Daemon) finishSelection(id string, t *torrent.Torrent, paths []string, 
 	}
 	d.saveLocked()
 	d.poke()
+}
+
+// selectionDropsEmpty reports whether a selection change can drop the files
+// instead of moving them: the torrent is downloading and not one piece has been
+// verified, so every file on disk is empty. A stopped torrent may hold data
+// that was never checked, and a finished one must never lose it.
+func selectionDropsEmpty(stats torrent.Stats) bool {
+	return stats.Status == torrent.Downloading && stats.Pieces.Have == 0 && stats.Bytes.Completed == 0
+}
+
+// dropEmptyFile removes a file that holds no downloaded piece instead of
+// moving it to its new place: the engine recreates it, empty and with its final
+// size, where the selection wants it when the torrent starts again. A missing
+// source is not an error: the file may already be at the destination.
+func dropEmptyFile(from, to string) error {
+	if err := os.MkdirAll(filepath.Dir(to), 0o755); err != nil {
+		return err
+	}
+	if err := os.Remove(from); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	return nil
 }
 
 // relocateFile moves one file (rename, or copy across filesystems). A

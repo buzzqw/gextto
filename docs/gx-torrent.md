@@ -1618,7 +1618,12 @@ qBittorrent-compatible API uses its 0/1/6/7 scale.
 - Changing **which** files are excluded stops the torrent for a moment, moves the
   affected files between `parts` and the destination and starts it again; changing **only
   the priority levels** (in the same downloaded files) is instead applied to the
-  torrent in progress, without stopping it or moving files.
+  torrent in progress, without stopping it or moving files. A file that has no
+  downloaded piece yet is dropped instead of moved, and the engine recreates it
+  at its destination: a pack that has just received its metadata holds only
+  empty (preallocated) files, and copying them across filesystems — a network
+  download folder and a local `parts` — would write gigabytes of zeros before
+  the download could start.
 - The engine computes the priority of each piece as the **maximum** between the files it
   touches: a piece spanning a normal and a high-priority file is high. The
   picker requests the highest level still to fetch right after the
