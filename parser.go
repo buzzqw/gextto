@@ -64,6 +64,8 @@ var (
 	parserNormalizeCache   = map[string]string{}
 )
 
+var normalizeSeriesNameReplacer = strings.NewReplacer(".", " ", "_", " ", "-", " ", "/", " ", "\\", " ", ":", " ")
+
 // NormalizeSeriesName normalizza il nome di una serie per il confronto.
 func NormalizeSeriesName(value string) string {
 	parserNormalizeCacheMu.RLock()
@@ -76,9 +78,7 @@ func NormalizeSeriesName(value string) string {
 	// separators while the configured name is usually human-readable. Keep
 	// parentheses intact because they carry useful year information.
 	normalized := parserASCIILower(value)
-	normalized = strings.NewReplacer(
-		".", " ", "_", " ", "-", " ", "/", " ", "\\", " ", ":", " ",
-	).Replace(normalized)
+	normalized = normalizeSeriesNameReplacer.Replace(normalized)
 	normalized = strings.ReplaceAll(normalized, "'s", "")
 	normalized = strings.ReplaceAll(normalized, "’s", "")
 	words := strings.Fields(normalized)
@@ -1313,6 +1313,8 @@ var (
 	leadingGroupRe      = regexp.MustCompile(`^\[[^\]]*\][ ._]*`)
 )
 
+var parseAbsoluteEpisodeReplacer = strings.NewReplacer(".", " ", "_", " ")
+
 // parseAbsoluteEpisode returns the series name and absolute episode number of
 // an anime-style title, or nil when the title does not look like one.
 func parseAbsoluteEpisode(title string) (*string, *int64) {
@@ -1330,7 +1332,7 @@ func parseAbsoluteEpisode(title string) (*string, *int64) {
 			continue
 		}
 		name := leadingGroupRe.ReplaceAllString(capture[1], "")
-		name = strings.NewReplacer(".", " ", "_", " ").Replace(name)
+		name = parseAbsoluteEpisodeReplacer.Replace(name)
 		name = trailingResolutionRe.ReplaceAllString(strings.TrimSpace(name), "")
 		name = strings.TrimSpace(strings.TrimRight(strings.TrimSpace(name), "-"))
 		if name == "" {

@@ -378,9 +378,11 @@ func icsLatestArchivedSeason(db *Database, series string) int64 {
 	return season
 }
 
+var icsEscapeReplacer = strings.NewReplacer(`\`, `\\`, ";", `\;`, ",", `\,`, "\r\n", `\n`, "\n", `\n`, "\r", `\n`)
+
 // icsEscape escapes a TEXT value (RFC 5545 §3.3.11).
 func icsEscape(value string) string {
-	replacer := strings.NewReplacer(`\`, `\\`, ";", `\;`, ",", `\,`, "\r\n", `\n`, "\n", `\n`, "\r", `\n`)
+	replacer := icsEscapeReplacer
 	return replacer.Replace(value)
 }
 

@@ -629,4 +629,3 @@ func (p *candidatePass) archiveFor(release *models.Release) (*models.ArchiveQual
 	}
 	return p.emptyArchiveIndex, nil
 }
-

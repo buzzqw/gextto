@@ -479,6 +479,10 @@ func titleRegexPattern(title string) (string, bool) {
 	return title[1 : len(title)-1], true
 }
 
+// titleSearchSyntax is the regexp syntax titleSearchText drops before taking
+// the words: escapes (\d, \s), character classes and repetition counts.
+var titleSearchSyntax = regexp.MustCompile(`\\.|\[[^\]]*\]|\{[^}]*\}`)
+
 // titleSearchText is the plain text an indexer or the archive is searched with
 // for a title: the title itself, or for a /regex/ title its literal words. A
 // regex with alternatives (|) has no single text: it is matched only against
@@ -492,7 +496,7 @@ func titleSearchText(title string) string {
 		return ""
 	}
 	// Drop escapes and classes (\d, \s, [..]) before taking the words.
-	cleaned := regexp.MustCompile(`\\.|\[[^\]]*\]|\{[^}]*\}`).ReplaceAllString(pattern, " ")
+	cleaned := titleSearchSyntax.ReplaceAllString(pattern, " ")
 	words := strings.FieldsFunc(cleaned, func(r rune) bool {
 		return !unicode.IsLetter(r) && !unicode.IsDigit(r)
 	})

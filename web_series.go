@@ -14,7 +14,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -574,28 +573,6 @@ func asInt64(value any) (int64, bool) {
 	return 0, false
 }
 
-var gh5SeasonEpisodePatterns = []*regexp.Regexp{
-	regexp.MustCompile(`(?i)\bs(?:tagione)?\s*(\d{1,2})\s*e(?:p(?:isodio)?)?\.?\s*(\d{1,4})`),
-	regexp.MustCompile(`(?i)\b(\d{1,2})\s*x\s*(\d{1,4})`),
-	regexp.MustCompile(`(?i)stagione\s*(\d{1,2}).*?episodio\s*(\d{1,4})`),
-}
-
-// gh5_parseSeasonEpisode reads the first season and episode pair of a file name.
-func gh5ParseSeasonEpisode(name string) (int64, int64, bool) {
-	for _, pattern := range gh5SeasonEpisodePatterns {
-		match := pattern.FindStringSubmatch(name)
-		if match == nil {
-			continue
-		}
-		season, errSeason := strconv.ParseInt(match[1], 10, 64)
-		episode, errEpisode := strconv.ParseInt(match[2], 10, 64)
-		if errSeason == nil && errEpisode == nil {
-			return season, episode, true
-		}
-	}
-	return 0, 0, false
-}
-
 // parseSeasonEpisodes parses the season and every episode a file name
 // carries: one episode, or the contiguous range of a multi-episode file
 // ("S01E01-E02"), so an archive scan registers the file under each of them.
@@ -607,7 +584,7 @@ func parseSeasonEpisodes(name string) (int64, []int64, bool) {
 		}
 		return season, episodes, true
 	}
-	season, episode, ok := gh5ParseSeasonEpisode(name)
+	season, episode, ok := parseSeasonEpisode(name)
 	if !ok {
 		return 0, nil, false
 	}

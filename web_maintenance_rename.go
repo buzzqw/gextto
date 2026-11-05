@@ -597,8 +597,10 @@ func folderRenameMovieTitle(base string) (string, *int64) {
 	return folderRenameTitle(title), &year
 }
 
+var folderRenameTitleReplacer = strings.NewReplacer(".", " ", "_", " ")
+
 func folderRenameTitle(value string) string {
-	value = strings.NewReplacer(".", " ", "_", " ").Replace(value)
+	value = folderRenameTitleReplacer.Replace(value)
 	return strings.Join(strings.Fields(strings.TrimSpace(value)), " ")
 }
 

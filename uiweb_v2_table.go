@@ -678,6 +678,8 @@ func v2NetworkLabel(value string) string {
 	return "BitTorrent"
 }
 
+var v2SourceLabelReplacer = strings.NewReplacer("-", " ", "_", " ")
+
 func v2SourceLabel(value string) string {
 	raw := strings.TrimSpace(value)
 	if raw == "" {
@@ -714,7 +716,7 @@ func v2SourceLabel(value string) string {
 			candidate = filtered[0]
 		}
 	}
-	candidate = strings.TrimSpace(strings.NewReplacer("-", " ", "_", " ").Replace(candidate))
+	candidate = strings.TrimSpace(v2SourceLabelReplacer.Replace(candidate))
 	return candidate
 }
 
@@ -1261,12 +1263,14 @@ func V2TableGapSearch(w http.ResponseWriter, r *http.Request, s *AppState) {
 	w.WriteHeader(http.StatusOK)
 }
 
+var templateEscapeJSAttrReplacer = strings.NewReplacer(`\`, `\\`, `"`, `\"`, `'`, `&#39;`, "<", `\u003c`, ">", `\u003e`, "&", `\u0026`)
+
 // templateEscapeJSAttr escapes a value for use inside a single-quoted
 // hx-vals JSON attribute. Backslash and double quote are escaped for the JSON
 // string, while the apostrophe becomes the HTML entity &#39;: a backslash does
 // not escape a quote in HTML, so `\'` would terminate the attribute and drop
 // the whole hx-vals payload (for example a title containing "l'Agente").
 func templateEscapeJSAttr(value string) string {
-	replacer := strings.NewReplacer(`\`, `\\`, `"`, `\"`, `'`, `&#39;`, "<", `\u003c`, ">", `\u003e`, "&", `\u0026`)
+	replacer := templateEscapeJSAttrReplacer
 	return replacer.Replace(value)
 }

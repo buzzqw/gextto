@@ -3305,6 +3305,8 @@ func parseComicArticles(html, fromDate, pageURL string) []ComicPost {
 	return posts
 }
 
+var parseComicLinksReplacer = strings.NewReplacer("-", " ", "_", " ")
+
 func parseComicLinks(html, pageURL string) (ComicLinks, error) {
 	root := parseHTML(html)
 	links := ComicLinks{
@@ -3331,9 +3333,9 @@ func parseComicLinks(html, pageURL string) (ComicLinks, error) {
 			continue
 		}
 		text := strings.ToLower(textContentHTML(anchor))
-		normalizedText := strings.NewReplacer("-", " ", "_", " ").Replace(text)
+		normalizedText := parseComicLinksReplacer.Replace(text)
 		titleAttr := strings.ToLower(anchor.attrs["title"])
-		normalizedTitle := strings.NewReplacer("-", " ", "_", " ").Replace(titleAttr)
+		normalizedTitle := parseComicLinksReplacer.Replace(titleAttr)
 		isDownloadNow := strings.Contains(normalizedText, "download now") ||
 			strings.Contains(normalizedTitle, "download now")
 		isTorrent := strings.Contains(normalizedText, "torrent") || strings.Contains(normalizedTitle, "torrent")

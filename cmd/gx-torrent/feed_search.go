@@ -21,13 +21,6 @@ func (d *Daemon) searchFeed(ctx context.Context, name, query string) ([]rss.Item
 	return d.searchFeedLogged(ctx, name, query, "", true)
 }
 
-// searchFeedSuggest is searchFeed for the interactive title suggestions: it does
-// not log per-indexer errors, so a down indexer does not flood the log while the
-// operator types.
-func (d *Daemon) searchFeedSuggest(ctx context.Context, query string) ([]rss.Item, error) {
-	return d.searchFeedLogged(ctx, "suggest", query, "", false)
-}
-
 // searchFeedWanted is searchFeed with the wanted language terms: indexarr adds
 // them to the query, so the releases in that language are on the first pages
 // instead of being fetched and filtered one by one.
@@ -36,7 +29,7 @@ func (d *Daemon) searchFeedWanted(ctx context.Context, name, query, language str
 }
 
 // searchFeedWantedSuggest is searchFeedWanted for the automatic wanted search:
-// it keeps the log quiet like searchFeedSuggest.
+// it does not log per-indexer errors, so a down indexer does not flood the log.
 func (d *Daemon) searchFeedWantedSuggest(ctx context.Context, query, language string) ([]rss.Item, error) {
 	return d.searchFeedLogged(ctx, "suggest", query, language, false)
 }

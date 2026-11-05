@@ -65,10 +65,12 @@ func cachePut(key string, value map[string]any)                     { CachePut(k
 // RAM disk helpers ( lines 68-188)
 // ---------------------------------------------------------------------------
 
+var decodeMountFieldReplacer = strings.NewReplacer(`\040`, " ", `\011`, "\t", `\134`, `\`)
+
 // DecodeMountField decodes the octal escaping used for mount points in
 // /proc/self/mountinfo.
 func DecodeMountField(value string) string {
-	return strings.NewReplacer(`\040`, " ", `\011`, "\t", `\134`, `\`).Replace(value)
+	return decodeMountFieldReplacer.Replace(value)
 }
 
 // DetectedRamdiskMounts returns the mounted tmpfs/ramfs roots visible to the

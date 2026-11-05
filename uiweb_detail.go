@@ -121,6 +121,8 @@ type uiMovieMatch struct {
 	ExplainBody string
 }
 
+var uiSourceLabelReplacer = strings.NewReplacer("-", " ", "_", " ")
+
 // uiSourceLabel turns long feed URLs into a compact provider label while the
 // raw value remains available in the title/JSON action payload.
 func uiSourceLabel(raw string) string {
@@ -148,7 +150,7 @@ func uiSourceLabel(raw string) string {
 			}
 		}
 	}
-	return strings.TrimSpace(strings.NewReplacer("-", " ", "_", " ").Replace(candidate))
+	return strings.TrimSpace(uiSourceLabelReplacer.Replace(candidate))
 }
 
 type uiMovieDetail struct {

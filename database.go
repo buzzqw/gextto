@@ -541,13 +541,15 @@ func qualityIsKnown(quality models.Quality) bool {
 		quality.Score() > 0
 }
 
+var seenLikePatternReplacer = strings.NewReplacer("*", "%", "?", "_")
+
 func seenLikePattern(query string) string {
 	trimmed := strings.TrimSpace(query)
 	if trimmed == "" {
 		return "%"
 	}
 	if strings.Contains(trimmed, "*") || strings.Contains(trimmed, "?") {
-		return strings.NewReplacer("*", "%", "?", "_").Replace(trimmed)
+		return seenLikePatternReplacer.Replace(trimmed)
 	}
 	return "%" + trimmed + "%"
 }
@@ -6921,30 +6923,52 @@ func (d *Database) PrunePreview(retainCycles, errorAgeDays, seenDays int64) (Pru
 	return preview, nil
 }
 
-// PruneSeenByIDs deletes specific "seen in feed" rows by id.
+// PruneSeenByIDs deletes specific "seen in feed" rows by id, at most 1000 per
+// table. The deletes share one transaction: with synchronous=FULL every
+// autocommit statement is an fsync, and a selection can be a thousand rows.
 func (d *Database) PruneSeenByIDs(movieIDs, seriesIDs []int64) (int, int, error) {
 	defer d.forgetSeenCounts()
-	movies := 0
-	for index, id := range movieIDs {
-		if index >= 1000 {
-			break
-		}
-		if result, err := d.db.Exec("DELETE FROM movie_feed_seen WHERE id=?1", id); err != nil {
-			return movies, 0, err
-		} else if affected, _ := result.RowsAffected(); affected > 0 {
-			movies += int(affected)
-		}
+	movieIDs = movieIDs[:min(len(movieIDs), 1000)]
+	seriesIDs = seriesIDs[:min(len(seriesIDs), 1000)]
+	if len(movieIDs) == 0 && len(seriesIDs) == 0 {
+		return 0, 0, nil
 	}
-	series := 0
-	for index, id := range seriesIDs {
-		if index >= 1000 {
-			break
+	tx, err := d.db.Begin()
+	if err != nil {
+		return 0, 0, err
+	}
+	defer tx.Rollback()
+	deleteIDs := func(statement string, ids []int64) (int, error) {
+		if len(ids) == 0 {
+			return 0, nil
 		}
-		if result, err := d.db.Exec("DELETE FROM series_feed_seen WHERE id=?1", id); err != nil {
-			return movies, series, err
-		} else if affected, _ := result.RowsAffected(); affected > 0 {
-			series += int(affected)
+		stmt, err := tx.Prepare(statement)
+		if err != nil {
+			return 0, err
 		}
+		defer stmt.Close()
+		removed := 0
+		for _, id := range ids {
+			result, err := stmt.Exec(id)
+			if err != nil {
+				return removed, err
+			}
+			if affected, _ := result.RowsAffected(); affected > 0 {
+				removed += int(affected)
+			}
+		}
+		return removed, nil
+	}
+	movies, err := deleteIDs("DELETE FROM movie_feed_seen WHERE id=?1", movieIDs)
+	if err != nil {
+		return 0, 0, err
+	}
+	series, err := deleteIDs("DELETE FROM series_feed_seen WHERE id=?1", seriesIDs)
+	if err != nil {
+		return 0, 0, err
+	}
+	if err := tx.Commit(); err != nil {
+		return 0, 0, err
 	}
 	return movies, series, nil
 }

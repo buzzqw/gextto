@@ -127,10 +127,12 @@ func FindSeason(title string) (season int, ok bool) {
 	return 0, false
 }
 
+var normalizeSeriesReplacer = strings.NewReplacer(".", " ", "_", " ", "-", " ")
+
 // normalizeSeries reduces the part before the episode marker to a stable key.
 func normalizeSeries(value string) string {
 	value = strings.ToLower(value)
-	value = strings.NewReplacer(".", " ", "_", " ", "-", " ").Replace(value)
+	value = normalizeSeriesReplacer.Replace(value)
 	return strings.Join(strings.Fields(value), " ")
 }
 
@@ -154,13 +156,13 @@ func (c Criteria) Match(item Item, now time.Time) bool {
 		return false
 	}
 	if c.Regex != "" {
-		re, err := regexp.Compile(c.Regex)
+		re, err := compiledRegex(c.Regex)
 		if err != nil || !re.MatchString(title) {
 			return false
 		}
 	}
 	if c.NotRegex != "" {
-		if re, err := regexp.Compile(c.NotRegex); err == nil && re.MatchString(title) {
+		if re, err := compiledRegex(c.NotRegex); err == nil && re.MatchString(title) {
 			return false
 		}
 	}
@@ -227,13 +229,13 @@ func (c Criteria) RejectReason(item Item, now time.Time) string {
 		return "exclude"
 	}
 	if c.Regex != "" {
-		re, err := regexp.Compile(c.Regex)
+		re, err := compiledRegex(c.Regex)
 		if err != nil || !re.MatchString(title) {
 			return "regex"
 		}
 	}
 	if c.NotRegex != "" {
-		if re, err := regexp.Compile(c.NotRegex); err == nil && re.MatchString(title) {
+		if re, err := compiledRegex(c.NotRegex); err == nil && re.MatchString(title) {
 			return "not_regex"
 		}
 	}

@@ -958,9 +958,11 @@ func v3ItemPoster(item TmdbItem) string {
 	return "https://image.tmdb.org/t/p/w500" + *item.PosterPath
 }
 
+var v3SlugReplacer = strings.NewReplacer(" ", "-", "/", "-", "\\", "-", ".", "-", "'", "")
+
 func v3Slug(title string) string {
 	slug := strings.ToLower(strings.TrimSpace(title))
-	slug = strings.NewReplacer(" ", "-", "/", "-", "\\", "-", ".", "-", "'", "").Replace(slug)
+	slug = v3SlugReplacer.Replace(slug)
 	return strings.Trim(slug, "-")
 }
 

@@ -2812,3 +2812,42 @@ func TestProviderFailureUntilHonoursTheStatedPause(t *testing.T) {
 		t.Fatalf("level = %d, want the first backoff step", level)
 	}
 }
+
+func TestPruneSeenByIDsRemovesOnlyTheChosenRows(t *testing.T) {
+	db := newTestDB(t)
+	cfg := DefaultConfig()
+	movie := func(title string) models.Release {
+		return models.Release{
+			Title: title, Magnet: "magnet:?xt=urn:btih:" + utils.StableID(title), Source: "rss",
+			Quality: models.Quality{Resolution: "1080p"}, Kind: "movie", Year: int64Ptr(2024), Seeders: -1, Peers: -1,
+		}
+	}
+	seriesRelease := testRelease()
+	seriesRelease.Series = stringPtr("Example Show")
+	if err := db.RecordSeenBatch([]models.Release{movie("Example.Movie.2024.1080p.WEB"), movie("Example.Movie.2024.720p.WEB"), seriesRelease}, &cfg); err != nil {
+		t.Fatal(err)
+	}
+	var movieID, seriesID int64
+	if err := db.db.QueryRow("SELECT MIN(id) FROM movie_feed_seen").Scan(&movieID); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.db.QueryRow("SELECT MIN(id) FROM series_feed_seen").Scan(&seriesID); err != nil {
+		t.Fatal(err)
+	}
+	movies, series, err := db.PruneSeenByIDs([]int64{movieID, 999999}, []int64{seriesID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertEqual(t, movies, 1)
+	assertEqual(t, series, 1)
+	movieCount, seriesCount, err := db.SeenCounts()
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertEqual(t, movieCount, int64(1))
+	assertEqual(t, seriesCount, int64(0))
+	movies, series, err = db.PruneSeenByIDs(nil, nil)
+	if err != nil || movies != 0 || series != 0 {
+		t.Fatalf("an empty selection removes nothing: %d %d %v", movies, series, err)
+	}
+}

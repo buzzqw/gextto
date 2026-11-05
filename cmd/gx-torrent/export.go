@@ -67,10 +67,12 @@ func exportTorrent(dir, name string, data []byte) error {
 	return os.WriteFile(filepath.Join(dir, exportFilename(name)+".torrent"), data, 0o644)
 }
 
+var exportFilenameReplacer = strings.NewReplacer("/", "_", "\\", "_")
+
 // exportFilename turns the torrent name into a safe file name.
 func exportFilename(name string) string {
 	name = strings.TrimSpace(name)
-	name = strings.NewReplacer("/", "_", "\\", "_").Replace(name)
+	name = exportFilenameReplacer.Replace(name)
 	if name == "" || name == "." || name == ".." {
 		return "torrent"
 	}

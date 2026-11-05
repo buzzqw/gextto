@@ -24,6 +24,8 @@ not change Gextto's interface, where those pages do not exist. Engine fixes, on
 the other hand, apply to both.
 
 ## 5 November 2026
+- **The movie list can no longer be emptied by an interrupted read.** If, at start-up or when the configuration was read again, the settings database was busy or damaged halfway through reading the movies, Gextto kept the part read so far; the next library save then rewrote the list from that part, and the missing movies disappeared from the monitored ones. Now an incomplete read stops with a clear error and leaves the library alone: restart once the database is readable again.
+- **Lighter feed rules, and faster clean-up of the "seen in feeds" entries.** Rules with a regular expression no longer compile it again for every release of every feed on every check: the same rule takes about half the time and a quarter of the memory. In **Maintenance**, deleting a selection of seen-in-feed entries writes everything at once instead of one entry at a time, so even a thousand entries go in a moment. Nothing to configure.
 - **A film is searched in the chosen language, in English and in the original
   language.** After **Aggiorna TMDB** a film without an Italian title can take
   its original name — Chinese, for instance — and before this fix the indexer

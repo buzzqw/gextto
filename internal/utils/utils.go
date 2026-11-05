@@ -593,10 +593,12 @@ func CondensedKey(value string) string {
 	return strings.ToLower(out.String())
 }
 
+var extractCleanMovieNameReplacer = strings.NewReplacer(".", " ", "_", " ")
+
 // ExtractCleanMovieName extracts the readable movie name from a release title.
 func ExtractCleanMovieName(title string) string {
 	cleaned := stripBrackets(title)
-	cleaned = strings.NewReplacer(".", " ", "_", " ").Replace(cleaned)
+	cleaned = extractCleanMovieNameReplacer.Replace(cleaned)
 	cleaned = strings.Join(strings.Fields(cleaned), " ")
 	trimmed := func(value string) string {
 		return strings.TrimSpace(strings.TrimRight(value, "(-._ "))

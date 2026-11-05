@@ -96,6 +96,8 @@ func feedURLDetail(parsed *url.URL) string {
 	return ""
 }
 
+var feedNameFromPathSegmentReplacer = strings.NewReplacer("|", " ", "+", " ", "_", " ")
+
 // feedNameFromPathSegment turns one path segment into a name: "user:MIRCrewRS"
 // becomes "MIRCrewRS", "feed.rss" becomes "feed", and the tag filters of an
 // RSS-Bridge listing become readable words. The generic segments of a listing
@@ -108,7 +110,7 @@ func feedNameFromPathSegment(segment string) string {
 	if ext := path.Ext(name); ext != "" && len(ext) <= 5 {
 		name = strings.TrimSuffix(name, ext)
 	}
-	name = strings.TrimSpace(strings.NewReplacer("|", " ", "+", " ", "_", " ").Replace(name))
+	name = strings.TrimSpace(feedNameFromPathSegmentReplacer.Replace(name))
 	switch strings.ToLower(name) {
 	case "", "browse", "index", "feed", "rss", "api", "search":
 		return ""

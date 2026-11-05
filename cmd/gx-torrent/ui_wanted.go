@@ -856,6 +856,8 @@ var (
 	releaseNameSymbols  = regexp.MustCompile(`[^\p{L}\p{N}' ]+`)
 )
 
+var releaseBaseNameReplacer = strings.NewReplacer(".", " ", "_", " ")
+
 // releaseBaseName reduces a release title to the name it is about and says
 // whether it is a season pack ("The.Mandalorian.S01.2160p" -> "the mandalorian",
 // true; "The Mandalorian and Grogu 2026 1080p" -> "the mandalorian and grogu",
@@ -881,7 +883,7 @@ func releaseBaseName(title string, terms ...string) (name string, seasonPack boo
 	}
 	name = strings.ToLower(title[:cut])
 	name = strings.ReplaceAll(name, "&", " and ")
-	name = releaseNameSymbols.ReplaceAllString(strings.NewReplacer(".", " ", "_", " ").Replace(name), " ")
+	name = releaseNameSymbols.ReplaceAllString(releaseBaseNameReplacer.Replace(name), " ")
 	return strings.Join(strings.Fields(name), " "), seasonPack
 }
 

@@ -202,7 +202,7 @@ func TestParseSeasonEpisodeFromArchiveFilenames(t *testing.T) {
 		{"Show.mkv", 0, 0, false},
 	}
 	for _, tc := range cases {
-		season, episode, ok := gh5ParseSeasonEpisode(tc.name)
+		season, episode, ok := parseSeasonEpisode(tc.name)
 		if ok != tc.ok || (ok && (season != tc.season || episode != tc.episode)) {
 			t.Errorf("parse(%q) = %d,%d,%v want %d,%d,%v", tc.name, season, episode, ok, tc.season, tc.episode, tc.ok)
 		}

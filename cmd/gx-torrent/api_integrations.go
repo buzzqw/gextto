@@ -138,9 +138,11 @@ func promName(key string) string {
 	return b.String()
 }
 
+var promLabelReplacer = strings.NewReplacer(`\`, `\\`, `"`, `\"`, "\n", `\n`)
+
 // promLabel escapes a label value.
 func promLabel(value string) string {
-	return strings.NewReplacer(`\`, `\\`, `"`, `\"`, "\n", `\n`).Replace(value)
+	return promLabelReplacer.Replace(value)
 }
 
 // handleQbitTorrentsCount answers torrents/count: the number of torrents, as

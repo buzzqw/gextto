@@ -905,9 +905,11 @@ func (m *Model) updatePaste(text string) Action {
 	return Action{}
 }
 
+var singleLineReplacer = strings.NewReplacer("\r\n", " ", "\n", " ", "\r", " ")
+
 // singleLine joins pasted lines with spaces and drops control characters.
 func singleLine(text string) string {
-	text = strings.NewReplacer("\r\n", " ", "\n", " ", "\r", " ").Replace(text)
+	text = singleLineReplacer.Replace(text)
 	return Sanitize(text)
 }
 

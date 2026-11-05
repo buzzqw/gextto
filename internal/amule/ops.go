@@ -619,9 +619,11 @@ type SearchResult struct {
 	Status int `json:"status"`
 }
 
+var linkReplacer = strings.NewReplacer("|", "_", "\r", " ", "\n", " ")
+
 // Link is the ed2k:// link of the result.
 func (r SearchResult) Link() string {
-	name := strings.NewReplacer("|", "_", "\r", " ", "\n", " ").Replace(r.Name)
+	name := linkReplacer.Replace(r.Name)
 	return fmt.Sprintf("ed2k://|file|%s|%d|%s|/", name, r.Size, r.Hash)
 }
 

@@ -154,9 +154,11 @@ func mountInfoFor(path string) (mountInfo, bool) {
 	return best, bestLen >= 0
 }
 
+var unescapeMountFieldReplacer = strings.NewReplacer(`\040`, " ", `\011`, "\t", `\012`, "\n", `\134`, `\`)
+
 // unescapeMountField decodes the octal escapes of /proc/self/mountinfo.
 func unescapeMountField(field string) string {
-	replacer := strings.NewReplacer(`\040`, " ", `\011`, "\t", `\012`, "\n", `\134`, `\`)
+	replacer := unescapeMountFieldReplacer
 	return replacer.Replace(field)
 }
 

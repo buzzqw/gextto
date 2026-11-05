@@ -246,7 +246,7 @@ func (w wantedEntry) matchesPack(title string) bool {
 		return false
 	}
 	if pattern := titleMatchRegex(w.Name); pattern != "" {
-		re, err := regexp.Compile(pattern)
+		re, err := rss.CompiledRegex(pattern)
 		if err != nil || !re.MatchString(title) {
 			return false
 		}

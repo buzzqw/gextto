@@ -516,12 +516,14 @@ var adultFilterKeywords = []string{
 
 var adultFilterRe = utils.MustCachedRegex(`\b(` + strings.Join(adultFilterKeywords, "|") + `)\b`)
 
+var titleIsBlacklistedReplacer = strings.NewReplacer(".", " ", "_", " ", "-", " ")
+
 // legacy blacklist semantics: exclude when a pattern matches the title as a word.
 func titleIsBlacklisted(title string, patterns []string) bool {
 	if title == "" || len(patterns) == 0 {
 		return false
 	}
-	normalized := strings.ToLower(strings.NewReplacer(".", " ", "_", " ", "-", " ").Replace(title))
+	normalized := strings.ToLower(titleIsBlacklistedReplacer.Replace(title))
 	for _, pattern := range patterns {
 		pattern = strings.ToLower(strings.TrimSpace(pattern))
 		if pattern == "" {
@@ -534,13 +536,15 @@ func titleIsBlacklisted(title string, patterns []string) bool {
 	return false
 }
 
+var titleIsContentFilteredReplacer = strings.NewReplacer(".", " ", "_", " ", "-", " ")
+
 // legacy content-filter semantics: exclude when the title contains a filtered
 // token (word) or a filtered Unicode script (e.g. `[non-latino]`).
 func titleIsContentFiltered(title string, filters []string) bool {
 	if title == "" || len(filters) == 0 {
 		return false
 	}
-	normalized := strings.ToLower(strings.NewReplacer(".", " ", "_", " ", "-", " ").Replace(title))
+	normalized := strings.ToLower(titleIsContentFilteredReplacer.Replace(title))
 	for _, filter := range filters {
 		filter = strings.ToLower(strings.TrimSpace(filter))
 		if filter == "" {
@@ -2791,10 +2795,12 @@ func (c *Config) loadConfigDB() error {
 	movieQuery += " ORDER BY name COLLATE NOCASE, year COLLATE NOCASE, id"
 	rows, err = conn.Query(movieQuery)
 	if err != nil {
-		// A missing movies_config table is benign (no movies configured yet);
-		// any other error must not silently drop the monitored movie list.
+		// A missing movies_config table is benign (no movies configured yet).
+		// Any other error must not hand back an empty movie list: the next
+		// SaveLibrary rewrites movies_config from it and would drop the
+		// monitored movies.
 		if !strings.Contains(strings.ToLower(err.Error()), "no such table") {
-			logging.Warn("loadConfigDB: cannot load movies", "error", err)
+			return fmt.Errorf("read the movies of %s: %w", path, err)
 		}
 	} else {
 		movies := []MovieConfig{}
@@ -2815,7 +2821,8 @@ func (c *Config) loadConfigDB() error {
 				&languageReq, &subtitleReq, &tmdbID, &tvdbID, &originalTitle, &overview,
 				&posterPath, &disable, &audio, &audioChannels, &aliases, &titleTranslations,
 			); err != nil {
-				continue
+				rows.Close()
+				return fmt.Errorf("read the movies of %s: %w", path, err)
 			}
 			movies = append(movies, MovieConfig{
 				ID:                   id,
@@ -2839,6 +2846,12 @@ func (c *Config) loadConfigDB() error {
 				AudioChannels:        normalizeAudioChannels(audioChannels),
 				DisableUpgrades:      disable != 0,
 			})
+		}
+		// An interrupted read (busy or damaged database) would otherwise
+		// return a partial list, which the next save writes back as the whole.
+		if err := rows.Err(); err != nil {
+			rows.Close()
+			return fmt.Errorf("read the movies of %s: %w", path, err)
 		}
 		rows.Close()
 		c.Movies = movies
