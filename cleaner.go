@@ -1607,19 +1607,28 @@ func SweepStaleTempFiles(cfg *Config) int {
 		return 0
 	}
 	roots := []string{}
+	// Each root is resolved once and deduplicated by its real path: comparing
+	// every series folder with every previous one through SamePath resolved
+	// the symlinks of both again for each pair, quadratic in the number of
+	// series and a stat per path component on a network share.
+	seenRoots := map[string]bool{}
 	addRoot := func(p string) {
 		p = strings.TrimSpace(p)
 		if p == "" {
 			return
 		}
-		if info, err := os.Stat(p); err == nil && info.IsDir() {
-			for _, r := range roots {
-				if SamePath(r, p) {
-					return
-				}
-			}
-			roots = append(roots, p)
+		if info, err := os.Stat(p); err != nil || !info.IsDir() {
+			return
 		}
+		key := filepath.Clean(p)
+		if resolved, err := canonicalizePath(p); err == nil {
+			key = resolved
+		}
+		if seenRoots[key] {
+			return
+		}
+		seenRoots[key] = true
+		roots = append(roots, p)
 	}
 	addRoot(cfg.DownloadDir)
 	if cfg.DownloadTempDir != nil {
@@ -1642,12 +1651,22 @@ func SweepStaleTempFiles(cfg *Config) int {
 	// WalkDir reads the entry types from the directory listing: only the few
 	// temporary names are stat'ed, not every file of a library on a NAS
 	// (measured on 32,672 entries: 843 → 550 ms CPU per pass, warm cache).
+	// A series folder inside the archive root is a root of its own, walked to
+	// its own depth: the walk of the parent skips it instead of reading the
+	// same folders twice.
+	rootSet := make(map[string]bool, len(roots))
+	for _, root := range roots {
+		rootSet[filepath.Clean(root)] = true
+	}
 	for _, root := range roots {
 		_ = filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
 			if err != nil {
 				return nil
 			}
 			if entry.IsDir() {
+				if path != root && rootSet[path] {
+					return filepath.SkipDir
+				}
 				rel, relErr := filepath.Rel(root, path)
 				if relErr == nil && strings.Count(rel, string(os.PathSeparator)) > 3 {
 					return filepath.SkipDir

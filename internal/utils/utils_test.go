@@ -1,6 +1,9 @@
 package utils
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestMagnetHashAcceptsHexBase32AndV2(t *testing.T) {
 	hex40 := "0123456789012345678901234567890123456789"
@@ -158,4 +161,36 @@ func contains(haystack, needle string) bool {
 		}
 	}
 	return false
+}
+func TestIndexASCIIFold(t *testing.T) {
+	cases := []struct {
+		s, needle string
+		want      int
+	}{
+		{"abc</Script>", "</script", 3},
+		{"\xe9\xe9</STYLE>", "</style", 2},
+		{"</scrip", "</script", -1},
+		{"", "</script", -1},
+		{"x", "", 0},
+	}
+	for _, c := range cases {
+		if got := IndexASCIIFold(c.s, c.needle); got != c.want {
+			t.Errorf("IndexASCIIFold(%q, %q) = %d, want %d", c.s, c.needle, got, c.want)
+		}
+	}
+}
+
+func TestRedactURLSecretsCatchesAnAPIKeyBeforeAnApikey(t *testing.T) {
+	got := RedactURLSecrets("first http://a/api?api_key=FIRST then http://b/api?apikey=SECOND")
+	if strings.Contains(got, "FIRST") || strings.Contains(got, "SECOND") {
+		t.Fatalf("a key stayed in the clear: %q", got)
+	}
+}
+
+func TestRedactURLSecretsKeepsOffsetsPastInvalidUTF8(t *testing.T) {
+	prefix := strings.Repeat("\xe9", 20)
+	got := RedactURLSecrets(prefix + " http://a/api?ApiKey=SECRET&t=search")
+	if got != prefix+" http://a/api?ApiKey=[redacted]&t=search" {
+		t.Fatalf("redaction landed in the wrong place: %q", got)
+	}
 }

@@ -1416,14 +1416,16 @@ func tevSeedLimitsReached(cfg *Config, torrent *models.TorrentView) (bool, bool)
 
 // tev_archivedPackSourceDisposable implements `archived_pack_source_disposable`.
 func tevArchivedPackSourceDisposable(db *Database, hash, savePath string) bool {
-	meta, _ := db.TorrentMeta(hash)
-	status, _ := db.TorrentStatus(hash)
-	processed, _ := db.TorrentProcessed(hash)
-	isPack := meta != nil && meta.Release.IsPack
-	if !isPack || status == nil || *status != "completed" {
+	// Status and archived path come from one row; the metadata (a JSON
+	// decode) is read only for a completed, archived torrent.
+	status, processed, _ := db.TorrentStatusProcessed(hash)
+	if status == nil || *status != "completed" {
 		return false
 	}
 	if processed == nil || strings.TrimSpace(*processed) == "" {
+		return false
+	}
+	if meta, _ := db.TorrentMeta(hash); meta == nil || !meta.Release.IsPack {
 		return false
 	}
 	return !pathStartsWith(*processed, savePath)
@@ -1431,8 +1433,7 @@ func tevArchivedPackSourceDisposable(db *Database, hash, savePath string) bool {
 
 // tev_completedSourceDisposable implements `completed_source_disposable`.
 func tevCompletedSourceDisposable(db *Database, hash, savePath string) bool {
-	status, _ := db.TorrentStatus(hash)
-	processed, _ := db.TorrentProcessed(hash)
+	status, processed, _ := db.TorrentStatusProcessed(hash)
 	if processed == nil || strings.TrimSpace(*processed) == "" {
 		return false
 	}
@@ -1453,6 +1454,13 @@ func tevCompletedSourceDisposable(db *Database, hash, savePath string) bool {
 
 // RemoveSeededCompleted implements `remove_seeded_completed`.
 func RemoveSeededCompleted(cfg *Config, torrents TorrentSession, db *Database, postSeedMoves map[string]struct{}) {
+	if !cfg.Transfer.AutoRemoveCompleted {
+		// The user wants completed torrents to stay listed (shown as
+		// completed) and to clear them manually with "Pulisci completati".
+		// Nothing below would be removed: skip the per-torrent queries and
+		// the disk checks at every tick.
+		return
+	}
 	policy := newSeedPolicy(cfg, db)
 	for _, torrent := range torrents.List() {
 		if _, ok := postSeedMoves[torrent.Hash]; ok {
@@ -1505,11 +1513,6 @@ func RemoveSeededCompleted(cfg *Config, torrents TorrentSession, db *Database, p
 		}
 		archiveFolder := archivedPack || (archivedCopy && sourceIsFolder)
 		if !archivedCopy {
-			continue
-		}
-		if !cfg.Transfer.AutoRemoveCompleted {
-			// The user wants completed torrents to stay listed (shown as
-			// completed) and to clear them manually with "Pulisci completati".
 			continue
 		}
 		trashConfigured := cfg.TrashPath != nil && strings.TrimSpace(*cfg.TrashPath) != "" && cfg.CleanupAction != "delete"

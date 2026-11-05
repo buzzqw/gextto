@@ -830,3 +830,52 @@ func TestAudioDowngradeCannotReplaceBetterTrack(t *testing.T) {
 		t.Fatalf("il nuovo file audio inferiore deve sparire")
 	}
 }
+
+func TestSweepStaleTempFilesWalksANestedSeriesFolderOnce(t *testing.T) {
+	archive := t.TempDir()
+	show := filepath.Join(archive, "Series A")
+	shallow := filepath.Join(show, "Season 01", "Series.A.S01E01.mkv.gextto-part")
+	// Five levels below the archive root: beyond its walk, inside the walk of
+	// the series folder.
+	deep := filepath.Join(show, "a", "b", "c", "Series.A.S01E02.mkv.gextto-part")
+	for _, path := range []string{shallow, deep} {
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		cleanerWrite(t, path, "stale part")
+		old := time.Now().Add(-3 * time.Hour)
+		if err := os.Chtimes(path, old, old); err != nil {
+			t.Fatal(err)
+		}
+	}
+	cfg := DefaultConfig()
+	cfg.ArchiveRoot = &archive
+	cfg.Series = []SeriesConfig{{Name: "Series A", ArchivePath: show}}
+	if cleaned := SweepStaleTempFiles(&cfg); cleaned != 2 {
+		t.Fatalf("expected both stale files cleaned, got %d", cleaned)
+	}
+	if cleanerFileExists(shallow) || cleanerFileExists(deep) {
+		t.Fatal("the stale files below the series folder must be removed")
+	}
+}
+
+func TestSweepStaleTempFilesWalksTheSameFolderOnce(t *testing.T) {
+	archive := t.TempDir()
+	link := filepath.Join(t.TempDir(), "archive-link")
+	if err := os.Symlink(archive, link); err != nil {
+		t.Skip("symlinks unavailable:", err)
+	}
+	stale := filepath.Join(archive, "Series.A.S01E01.mkv.gextto-part")
+	cleanerWrite(t, stale, "stale part")
+	old := time.Now().Add(-3 * time.Hour)
+	if err := os.Chtimes(stale, old, old); err != nil {
+		t.Fatal(err)
+	}
+	cfg := DefaultConfig()
+	cfg.ArchiveRoot = &archive
+	withSlash := archive + string(os.PathSeparator)
+	cfg.Series = []SeriesConfig{{Name: "Series A", ArchivePath: link}, {Name: "Series B", ArchivePath: withSlash}}
+	if cleaned := SweepStaleTempFiles(&cfg); cleaned != 1 {
+		t.Fatalf("one folder reached three ways is one root: cleaned %d", cleaned)
+	}
+}

@@ -2882,8 +2882,7 @@ func parseHTML(html string) *htmlNode {
 		stack = append(stack, node)
 		if isRawTextHTMLElement(name) {
 			closing := "</" + name
-			lower := strings.ToLower(html[i:])
-			if index := strings.Index(lower, closing); index >= 0 {
+			if index := utils.IndexASCIIFold(html[i:], closing); index >= 0 {
 				if index > 0 {
 					node.children = append(node.children, &htmlNode{text: html[i : i+index], parent: node})
 				}

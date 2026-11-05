@@ -1044,3 +1044,17 @@ func TestDownloadHTTPResumesToTheRightExtension(t *testing.T) {
 		t.Fatalf("the resumed file does not hold the payload: %v", readErr)
 	}
 }
+
+func TestParseHTMLRawTextKeepsOffsetsOnLatin1Bytes(t *testing.T) {
+	script := strings.Repeat("\xe9", 30)
+	root := parseHTML("<div><script>" + script + "</SCRIPT><p>after</p></div>")
+	div := root.children[0]
+	if len(div.children) != 2 || div.children[0].tag != "script" || div.children[1].tag != "p" {
+		t.Fatalf("unexpected tree: %+v", div.children)
+	}
+	if got := div.children[0].children[0].text; got != script {
+		t.Fatalf("script text = %q", got)
+	}
+	// A closing tag at the very end used to slice past the page.
+	parseHTML("<script>" + script + "</script>")
+}

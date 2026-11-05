@@ -383,6 +383,34 @@ func dedup(values []string) []string {
 	return out
 }
 
+// IndexASCIIFold is strings.Index with ASCII case folding, for a lower-case
+// ASCII needle such as "</script". It searches the original bytes: the offset
+// it returns is valid in s, which an index into strings.ToLower(s) is not when
+// s holds invalid UTF-8 (a Latin-1 page) or a rune whose lower case has another
+// length. It allocates nothing, so a page with many scripts is not copied once
+// per script.
+func IndexASCIIFold(s, needle string) int {
+	if needle == "" {
+		return 0
+	}
+	lower := func(c byte) byte {
+		if 'A' <= c && c <= 'Z' {
+			return c + 'a' - 'A'
+		}
+		return c
+	}
+	for i := 0; i+len(needle) <= len(s); i++ {
+		j := 0
+		for j < len(needle) && lower(s[i+j]) == needle[j] {
+			j++
+		}
+		if j == len(needle) {
+			return i
+		}
+	}
+	return -1
+}
+
 // RedactURLSecrets removes API keys from URLs embedded in error messages.
 func RedactURLSecrets(input string) string {
 	output := input
@@ -391,10 +419,13 @@ func RedactURLSecrets(input string) string {
 		if searchFrom >= len(output) {
 			break
 		}
-		lower := strings.ToLower(output[searchFrom:])
-		idx := strings.Index(lower, "apikey=")
-		if idx < 0 {
-			idx = strings.Index(lower, "api_key=")
+		// The earlier of the two spellings: taking "apikey=" first skipped an
+		// "api_key=" before it, which then stayed in the clear. The search
+		// runs on the original bytes, so the offset is valid in output (an
+		// index into strings.ToLower(output) is not, past invalid UTF-8).
+		idx := IndexASCIIFold(output[searchFrom:], "apikey=")
+		if other := IndexASCIIFold(output[searchFrom:], "api_key="); other >= 0 && (idx < 0 || other < idx) {
+			idx = other
 		}
 		if idx < 0 {
 			break
