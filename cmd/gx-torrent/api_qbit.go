@@ -8,6 +8,7 @@ package main
 import (
 	"crypto/subtle"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -1068,12 +1069,27 @@ func qbitRenameAfterAdd(d *Daemon, hash string, existing bool, name string) {
 	}
 }
 
+// qbitAddMaxBody bounds a torrents/add request: four .torrent files of the
+// largest accepted size, plus the form fields. A variable so a test can lower
+// it instead of uploading the real limit.
+var qbitAddMaxBody int64 = 4*maxTorrentFile + 1<<20
+
 // handleQbitAdd accepts "urls" (magnet links and .torrent URLs, one per line)
 // and an uploaded .torrent (multipart field "torrents"), plus savepath, paused,
 // sequentialDownload and firstLastPiecePrio, the way Sonarr and Radarr send
 // them. qBittorrent 4.x calls the "add stopped" flag "paused", 5.x "stopped":
 // both are accepted.
 func (d *Daemon) handleQbitAdd(w http.ResponseWriter, r *http.Request) {
+	// The body is bounded like the other upload endpoints: without the cap a
+	// request of any size was spooled to temporary files on disk. A few
+	// .torrent files of the largest accepted size still fit.
+	r.Body = http.MaxBytesReader(w, r.Body, qbitAddMaxBody)
+	if err := r.ParseMultipartForm(maxTorrentFile); err != nil {
+		if tooLarge := (*http.MaxBytesError)(nil); errors.As(err, &tooLarge) {
+			qbitText(w, http.StatusRequestEntityTooLarge, "request too large")
+			return
+		}
+	}
 	savePath := strings.TrimSpace(r.FormValue("savepath"))
 	category := strings.TrimSpace(r.FormValue("category"))
 	tags := splitFormList(r.FormValue("tags"))

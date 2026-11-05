@@ -623,7 +623,7 @@ flat fields and in the `torrentParams` object (where the tags are).
 | POST | `/api/v2/torrentcreator/deleteTask` | delete a creation task |
 | GET | `/api/v2/torrentcreator/status` | creation task status |
 | GET | `/api/v2/torrentcreator/torrentFile` | download the created .torrent |
-| POST | `/api/v2/torrents/add` | add torrents (contentLayout, or the older root_folder; none = the torrent_content_layout preference; skip_checking = seed mode) |
+| POST | `/api/v2/torrents/add` | add torrents (contentLayout, or the older root_folder; none = the torrent_content_layout preference; skip_checking = seed mode); a body over 129 MiB (four .torrent files of the 32 MiB maximum) is refused with 413 |
 | POST | `/api/v2/torrents/addPeers` | add peers |
 | POST | `/api/v2/torrents/addTags` | add tags to torrents |
 | POST | `/api/v2/torrents/addTrackers` | add trackers |

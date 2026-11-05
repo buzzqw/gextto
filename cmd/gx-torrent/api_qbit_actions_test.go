@@ -1,9 +1,11 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -484,5 +486,34 @@ func TestQbitLimitLANPeers(t *testing.T) {
 	set(false)
 	if readPref() || sessionOn() {
 		t.Fatal("limit_lan_peers=false must be saved and applied to the session")
+	}
+}
+
+// TestQbitAddRejectsAnOversizedBody: the add endpoint bounds its body like the
+// other uploads instead of spooling any size to disk.
+func TestQbitAddRejectsAnOversizedBody(t *testing.T) {
+	saved := qbitAddMaxBody
+	qbitAddMaxBody = 64 << 10
+	t.Cleanup(func() { qbitAddMaxBody = saved })
+	d := newTestDaemon(t)
+	srv := httptest.NewServer(d.routesQbit())
+	defer srv.Close()
+	var body bytes.Buffer
+	form := multipart.NewWriter(&body)
+	part, err := form.CreateFormFile("torrents", "big.torrent")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := part.Write(bytes.Repeat([]byte("a"), int(qbitAddMaxBody)+1)); err != nil {
+		t.Fatal(err)
+	}
+	form.Close()
+	resp, err := http.Post(srv.URL+"/api/v2/torrents/add", form.FormDataContentType(), &body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusRequestEntityTooLarge {
+		t.Fatalf("oversized add status = %d, want 413", resp.StatusCode)
 	}
 }
