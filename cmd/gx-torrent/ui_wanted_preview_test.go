@@ -330,3 +330,38 @@ func TestRulePreviewWarnsAboutSeveralTitles(t *testing.T) {
 		t.Fatalf("all of: total=%d titles=%v, want the two Office episodes", total, titles)
 	}
 }
+
+// TestWantedPreviewLabelsAPackInTheInterfaceLanguage: the preview travels as
+// JSON to the dialog, so its labels are translated by the server, not by the
+// page's client dictionary.
+func TestWantedPreviewLabelsAPackInTheInterfaceLanguage(t *testing.T) {
+	d := feedDaemon(t, "")
+	d.opts.Settings.Set("lang", "de")
+	srv := httptest.NewServer(d.routes())
+	defer srv.Close()
+	archiveItems(t, d, "feedA", "Show Name S01 1080p ITA WEB")
+	q := url.Values{"name": {"Show Name"}, "kind": {"series"}, "seasons": {"1"}, "language": {"ita"}, "quality": {"1080p"}}
+	resp, err := http.Get(srv.URL + "/ui/wanted-preview?lang=de&" + q.Encode())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	var out struct {
+		Releases []struct {
+			Episode string `json:"episode"`
+		} `json:"releases"`
+		TakeEpisodes string `json:"take_episodes"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		t.Fatal(err)
+	}
+	if len(out.Releases) == 0 {
+		t.Fatal("the season pack was not previewed")
+	}
+	if out.Releases[0].Episode != "S01-Paket" {
+		t.Errorf("episode label = %q, want S01-Paket", out.Releases[0].Episode)
+	}
+	if !strings.Contains(out.TakeEpisodes, "S01-Paket") {
+		t.Errorf("take summary = %q, want the translated pack label", out.TakeEpisodes)
+	}
+}

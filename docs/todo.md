@@ -47,12 +47,6 @@ its gate; a rejected one moves to *Not planned*.
 - **Error wrapping and log wording** — 280 log calls build their sentence with `Sprintf`
   although the logger takes structured fields, and 490 `fmt.Errorf` calls drop the cause
   because they do not use `%w`. Mechanical, area by area, tests green.
-- **Notification texts in the interface language** — the daemon's web page is translated
-  while it renders, but the messages it sends (Telegram, Discord, Slack, Gotify, ntfy,
-  Pushover, webhook, e-mail, script) are built in English in `notify.go`, and the wanted
-  preview labels an episode `S01 pack`. Gate: a decision on whether outgoing notifications
-  follow the interface language or stay English, since a channel can be shared by several
-  people.
 - **Archive rows of a removed feed** — a feed deleted from *Sources* leaves its listings
   in the archive; a `.torrent` link that fails is quarantined (6h, then 24h, then a week)
   but still retried. A switched-off indexer is recognised by its URL, a removed feed is
@@ -64,6 +58,10 @@ its gate; a rejected one moves to *Not planned*.
 
 Closed by choice, not waiting for a measurement:
 
+- Notification texts in the interface language: the daemon's page is translated, the
+  messages it sends (Telegram, Discord, Slack, Gotify, ntfy, Pushover, webhook, e-mail,
+  script) stay in English on purpose — a channel can be shared by several people and the
+  text is also read by scripts.
 - One switch for test mode (merging `dry_run` into «Automatic cycle»): the operator does
   not want to invest in it — users want to download, not to test; `--dry-run` stays for
   the test suites.
