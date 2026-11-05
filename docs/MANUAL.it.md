@@ -477,7 +477,11 @@ nome mostrato, il titolo originale (la lingua del film), il titolo nella lingua
 scelta per il film e quello inglese. Gli altri titoli che TMDB elenca non
 vengono interrogati uno per uno — moltiplicherebbero le richieste — ma restano
 validi per riconoscere le release e per la ricerca in archivio. I titoli di
-lavorazione sono esclusi, perché a volte appartengono a un film diverso.
+lavorazione sono esclusi, perché a volte appartengono a un film diverso. Un
+titolo di una parola sola — un nome di personaggio, per esempio — identifica una
+release solo se è tra le prime due parole del suo nome, dove il titolo del film
+sta davvero: altrimenti qualunque release che contenesse quella parola, anche di
+un film diverso, verrebbe presa per questa.
 
 ### La scheda del film
 

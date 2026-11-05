@@ -537,6 +537,38 @@ func TestMovieMatchingNeverMatchesOnNumbersAlone(t *testing.T) {
 	}
 }
 
+// A one-word title cannot be told apart from that word appearing anywhere in
+// the name of another film: an alias such as the name of a character used to
+// take every release carrying it, even when the film was clearly another one.
+// A single word identifies a release only when it opens the name, which is
+// where a release puts the title.
+func TestMovieMatchingSingleWordTitleNeedsToOpenTheRelease(t *testing.T) {
+	year2027 := int64(2027)
+	year2026 := int64(2026)
+	cfg := DefaultConfig()
+	cfg.Movies = []MovieConfig{{
+		Name:          "Example Cat",
+		Year:          "2027",
+		OriginalTitle: "Example Cat",
+		Aliases:       []string{"Nero"},
+		Enabled:       true,
+	}}
+	// Another film, published a year earlier (inside the ±1 window), whose
+	// episode title happens to carry the alias word.
+	if got := cfg.FindMovieMatch("Another.Film.Nero.2026.WebDL.1080p.ITA.mkv", &year2026); got != nil {
+		t.Errorf("a release of another film matched %q on a word in the middle of its name", got.Name)
+	}
+	// The film's own releases still match, through its name and its alias.
+	for _, title := range []string{
+		"Nero.2027.1080p.WEB-DL.ITA.mkv",
+		"Example.Cat.2027.1080p.WEB-DL.ITA.mkv",
+	} {
+		if got := cfg.FindMovieMatch(title, &year2027); got == nil || got.Name != "Example Cat" {
+			t.Errorf("release %q matched %v, want the monitored film", title, got)
+		}
+	}
+}
+
 // A film monitored under a localized title must be searched under the names
 // that matter: the monitored name, the original title (the original language
 // of the film), the title in the language chosen for it and the English one.

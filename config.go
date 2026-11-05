@@ -1821,6 +1821,15 @@ func movieTitleSpecificity(movie *MovieConfig, title string) int {
 		if len(words) == 0 || !hasWordToken(words) {
 			continue
 		}
+		// A one-word title cannot be told apart from that word appearing
+		// anywhere in the name of another film: a character's name is also a
+		// common word, and every release carrying it would be taken for this
+		// film. A single word identifies a release only when it opens the name
+		// (its first or second word, so a short prefix tag does not hide it),
+		// which is where a release puts the title.
+		if len(words) == 1 && !titleOpensWith(tokens, words[0]) {
+			continue
+		}
 		all := true
 		for _, word := range words {
 			if _, ok := present[word]; !ok {
@@ -1833,6 +1842,17 @@ func movieTitleSpecificity(movie *MovieConfig, title string) int {
 		}
 	}
 	return specificity
+}
+
+// titleOpensWith reports whether word is the first or second token of the
+// release name.
+func titleOpensWith(tokens []string, word string) bool {
+	for index := 0; index < len(tokens) && index < 2; index++ {
+		if tokens[index] == word {
+			return true
+		}
+	}
+	return false
 }
 
 // movieTitleMatches is true when the title contains every word of the monitored

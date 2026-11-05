@@ -475,7 +475,10 @@ name, the original title (the film's original language), the title in the
 language chosen for the film and the English one. The other titles TMDB lists
 are not queried one by one — they would multiply the requests — but they still
 count for recognising releases and for the archive search. Working titles are
-excluded, because they sometimes belong to another film.
+excluded, because they sometimes belong to another film. A one-word title — a
+character name, say — identifies a release only when it is among the first two
+words of its name, where the film title actually sits: otherwise any release
+carrying that word, even of a different film, would be taken for this one.
 
 ### The movie page
 
