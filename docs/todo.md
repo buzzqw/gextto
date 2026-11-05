@@ -47,10 +47,48 @@ its gate; a rejected one moves to *Not planned*.
 - **Error wrapping and log wording** — 280 log calls build their sentence with `Sprintf`
   although the logger takes structured fields, and 490 `fmt.Errorf` calls drop the cause
   because they do not use `%w`. Mechanical, area by area, tests green.
+- **Daemon behind a sub-path** — every page link and API path is absolute (`/ui/…`,
+  `/api/…`, `/assets/…`), so a proxy that mounts the daemon under `/gx/` breaks at the
+  first navigation; read `X-Forwarded-Prefix` (and a `-base-path` for a proxy that does
+  not send it) and render the links relative. Gate: a deployment with no free root path.
+- **HTTPS listener** — qBittorrent's *Use HTTPS* has no equivalent here: serve the page
+  and the API with `-tls-cert`/`-tls-key` (also settings keys), add HSTS, keep the
+  `Secure` cookie logic that already reads `X-Forwarded-Proto`. Gate: an operator who
+  cannot put a TLS terminator in front of the daemon.
+- **One-line install and a user unit** — the archive carries the system unit only and
+  there is no fetch-and-install script: add a `curl … | bash` that verifies the published
+  `.sha256`, installs a systemd **user** service with lingering or a system one, and
+  uninstalls. Gate: a host where the daemon must run without root.
+- **More architectures** — the releases cover Linux x86_64/aarch64 and Windows
+  amd64/arm64; add Linux 386, armv7/armhf and riscv64. The daemon is pure Go, so it is a
+  cross-build and a CI matrix entry, not an engine change. Gate: a user on an ARM NAS or
+  a 32-bit host.
+- **Unattended first start** — `settings.json` can be written before the first run
+  (`setup-complete`, bcrypt password), but the keys are undocumented and the hash has no
+  helper: document the file and add a `hash-password` command so a container or a
+  configuration-management run skips the wizard. Gate: an installation that must start
+  without a browser.
+- **Build provenance and SBOM** — publish GitHub artifact attestations and an SBOM next to
+  the checksums, as qbittorrent-nox-static does, so `gh attestation verify` proves an
+  archive came from this workflow. Gate: none.
+- **Published container image** — build multi-arch and push to a registry on release;
+  today CI only builds and smoke-tests the `Dockerfile`. Gate: registry credentials in
+  the repository.
+- **CLI add and named profiles** — accept positional `.torrent`/magnet arguments with
+  save path, category, paused, sequential and first/last, and a `-profile NAME` that
+  derives the data folder and port for a second instance. Gate: an automation that must
+  start a transfer without the API.
+- **Reverse-proxy recipes and a debugging page** — ready nginx/Caddy/Traefik snippets
+  (unbuffered SSE, upload size, `trusted-proxies`, `allowed-hosts`) and a page on
+  diagnosis (`SIGQUIT` dump, `pprof`, debug log, log files). Gate: none.
 ## Not planned
 
 Closed by choice, not waiting for a measurement:
 
+- Build-time source patching, libtorrent 1.2/2.x variants and musl/glibc «static-ish»
+  builds: gx-core is our own pure-Go code with no libtorrent, and the daemon already
+  links nothing (`CGO_ENABLED=0`), so there is no third-party tree to patch and no
+  second way to build it.
 - Notification texts in the interface language: the daemon's page is translated, the
   messages it sends (Telegram, Discord, Slack, Gotify, ntfy, Pushover, webhook, e-mail,
   script) stay in English on purpose — a channel can be shared by several people and the
