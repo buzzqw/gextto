@@ -507,18 +507,26 @@ func MovieSearch(w http.ResponseWriter, r *http.Request, s *AppState) {
 		jsonError(w, http.StatusNotFound, "movie not found")
 		return
 	}
-	// Fill the alternative titles on first search, so the archive is queried
-	// and the releases are matched under the title they were published with.
-	if movie.Aliases == nil && cfg.TmdbAPIKey != nil {
+	// Fill the names the film is known under on first search, so the archive is
+	// queried and the releases are matched under the title they were published
+	// with, and the indexer queries use the chosen language and English.
+	if (movie.Aliases == nil || movie.TitleTranslations == nil) && cfg.TmdbAPIKey != nil {
 		if client := NewTmdbClientWithLanguage(cfg.TmdbAPIKey, cfg.TmdbLanguage()); client.Configured() {
-			if err := refreshMovieAlias(r.Context(), cfg, movie, client); err != nil {
-				logging.Debug("TMDB alternative titles unavailable", "movie", movie.Name, "error", err)
+			if movie.Aliases == nil {
+				if err := refreshMovieAlias(r.Context(), cfg, movie, client); err != nil {
+					logging.Debug("TMDB alternative titles unavailable", "movie", movie.Name, "error", err)
+				}
+			}
+			if movie.TitleTranslations == nil {
+				if err := refreshMovieTranslations(r.Context(), cfg, movie, client); err != nil {
+					logging.Debug("TMDB localized titles unavailable", "movie", movie.Name, "error", err)
+				}
 			}
 		}
 	}
 	query := strings.TrimSpace(movie.Name + " " + movie.Year)
 	results := s.engine.SearchMovie(r.Context(), cfg, movie, true, true)
-	archiveQueries := movieSearchTitles(movie, 0)
+	archiveQueries := movieArchiveTitles(movie)
 	seenEntries := map[string]struct{}{}
 	for _, base := range archiveQueries {
 		base = strings.TrimSpace(base)
@@ -693,6 +701,9 @@ func ApplyMovieMetadata(w http.ResponseWriter, r *http.Request, s *AppState) {
 	// instead of waiting for the next automatic cycle.
 	var aliases []string
 	aliasesRead := false
+	// Same for the per-language titles the indexer search uses.
+	var titleTranslations map[string]string
+	translationsRead := false
 	if source == "tmdb" {
 		if cfg.TmdbAPIKey == nil {
 			jsonError(w, http.StatusConflict, "TMDB API key is not configured")
@@ -751,6 +762,14 @@ func ApplyMovieMetadata(w http.ResponseWriter, r *http.Request, s *AppState) {
 			logging.Debug("TMDB alternative titles unavailable", "movie", current.Name, "error", aliasErr)
 		} else {
 			aliases, aliasesRead = found, true
+		}
+		if found, translationsErr := tmdb.MovieTranslations(ctx, externalID); translationsErr != nil {
+			logging.Debug("TMDB localized titles unavailable", "movie", current.Name, "error", translationsErr)
+		} else {
+			if found == nil {
+				found = map[string]string{}
+			}
+			titleTranslations, translationsRead = found, true
 		}
 	} else if source == "tvdb" {
 		tvdb := tvdbClientFor(cfg)
@@ -840,6 +859,9 @@ func ApplyMovieMetadata(w http.ResponseWriter, r *http.Request, s *AppState) {
 		// instead of offering the refresh again.
 		if aliasesRead {
 			movie.Aliases = aliases
+		}
+		if translationsRead {
+			movie.TitleTranslations = titleTranslations
 		}
 	} else {
 		movie.TvdbID = externalID

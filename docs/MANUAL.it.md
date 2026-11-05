@@ -467,11 +467,12 @@ che hai già.
 Contano anche i **titoli alternativi** che TMDB conosce per il film — quello
 internazionale e quelli usati in altri paesi: una release pubblicata con un altro
 nome arriva lo stesso, e anche le corrispondenze in archivio della scheda vengono
-cercate con quei titoli. Le ricerche sugli indexer usano lo stesso elenco: il
-ciclo automatico e **Cerca** provano il nome, il titolo originale e i primi
-titoli alternativi, così un film che TMDB mostra in cinese viene cercato anche
-con il nome inglese. I titoli di lavorazione sono esclusi, perché a volte
-appartengono a un film diverso.
+cercate con quei titoli. Le ricerche sugli indexer usano i nomi che servono: il
+nome mostrato, il titolo originale (la lingua del film), il titolo nella lingua
+scelta per il film e quello inglese. Gli altri titoli che TMDB elenca non
+vengono interrogati uno per uno — moltiplicherebbero le richieste — ma restano
+validi per riconoscere le release e per la ricerca in archivio. I titoli di
+lavorazione sono esclusi, perché a volte appartengono a un film diverso.
 
 ### La scheda del film
 

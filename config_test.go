@@ -537,31 +537,57 @@ func TestMovieMatchingNeverMatchesOnNumbersAlone(t *testing.T) {
 	}
 }
 
-// A film monitored under a localized title must be searched under every name
-// TMDB knows (the international one in particular), not only under the name
-// the page shows.
-func TestMovieSearchTitlesUseNameOriginalTitleAndAliases(t *testing.T) {
+// A film monitored under a localized title must be searched under the names
+// that matter: the monitored name, the original title (the original language
+// of the film), the title in the language chosen for it and the English one.
+// The other localizations stay for the match and the archive, not for a query
+// of their own.
+func TestMovieIndexerTitlesUseTheChosenLanguageOriginalAndEnglish(t *testing.T) {
 	movie := &MovieConfig{
 		Name:          "封神第二部：战火西岐",
 		OriginalTitle: "封神第二部：战火西岐",
-		Aliases: []string{
-			"Creation of the Gods II: Demon Force",
-			"creation of the gods ii: demon force", // same title, different case
-			"Feng Shen 2",
-			"封神第二部",
+		Language:      "ita",
+		Aliases:       []string{"Feng Shen 2", "Criação dos Deuses 2", "Творение богов"},
+		TitleTranslations: map[string]string{
+			"it": "La Creazione degli Dei II",
+			"en": "Creation of the Gods II: Demon Force",
+			"pt": "Criação dos Deuses 2",
 		},
 	}
-	got := movieSearchTitles(movie, 2)
-	want := []string{"封神第二部：战火西岐", "Creation of the Gods II: Demon Force", "Feng Shen 2"}
+	got := movieIndexerTitles(movie)
+	want := []string{"封神第二部：战火西岐", "La Creazione degli Dei II", "Creation of the Gods II: Demon Force"}
 	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("movieSearchTitles = %q, want %q", got, want)
+		t.Fatalf("movieIndexerTitles = %q, want %q", got, want)
 	}
-	all := movieSearchTitles(movie, 0)
-	if len(all) != 4 || all[3] != "封神第二部" {
-		t.Fatalf("all titles = %q", all)
+
+	// While TMDB's per-language titles were never read, the aliases are the
+	// best remaining names (the English one comes first) and the list is
+	// capped: an indexer query is a request.
+	fallback := &MovieConfig{
+		Name:    "Film",
+		Aliases: []string{"Alias A", "Alias B", "Alias C", "Alias D", "Alias E"},
 	}
-	if nil != movieSearchTitles(nil, 3) {
-		t.Fatal("a nil movie must return no titles")
+	got = movieIndexerTitles(fallback)
+	want = []string{"Film", "Alias A", "Alias B", "Alias C", "Alias D"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("fallback titles = %q, want %q", got, want)
+	}
+
+	// The archive is local and cheap: it searches every known name.
+	archive := movieArchiveTitles(movie)
+	for _, name := range []string{"封神第二部：战火西岐", "Feng Shen 2", "Criação dos Deuses 2", "Творение богов", "La Creazione degli Dei II", "Creation of the Gods II: Demon Force"} {
+		found := false
+		for _, title := range archive {
+			if title == name {
+				found = true
+			}
+		}
+		if !found {
+			t.Errorf("archive titles %q do not contain %q", archive, name)
+		}
+	}
+	if got := movieIndexerTitles(nil); got != nil {
+		t.Fatalf("a nil movie must return no titles, got %q", got)
 	}
 }
 
@@ -925,6 +951,62 @@ func TestSavesAndReloadsMovieAlternativeTitles(t *testing.T) {
 	}
 	if got := cfg.Movies[0].Aliases; !reflect.DeepEqual(got, []string{"Another Title"}) {
 		t.Fatalf("aliases after targeted save = %#v", got)
+	}
+}
+
+// The per-language titles the indexer search uses are stored with the film and
+// survive a reload: "not read yet" (empty) and "read, none" (empty map) must
+// stay distinguishable too.
+func TestSavesAndReloadsMovieTitleTranslations(t *testing.T) {
+	dir := t.TempDir()
+	movies := []MovieConfig{{
+		ID:      7,
+		Name:    "封神第二部：战火西岐",
+		Year:    "2025",
+		Enabled: true,
+		TitleTranslations: map[string]string{
+			"en": "Creation of the Gods II: Demon Force",
+			"it": "La Creazione degli Dei II",
+			"pt": "Criação dos Deuses 2",
+		},
+	}}
+	if err := SaveLibrary(dir, []SeriesConfig{}, movies); err != nil {
+		t.Fatal(err)
+	}
+	cfg := DefaultConfig()
+	cfg.DataDir = dir
+	if err := cfg.loadConfigDB(); err != nil {
+		t.Fatal(err)
+	}
+	got := cfg.Movies[0].TitleTranslations
+	want := map[string]string{"en": "Creation of the Gods II: Demon Force", "it": "La Creazione degli Dei II", "pt": "Criação dos Deuses 2"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("title translations = %#v", got)
+	}
+	// The targeted save used by the TMDB refresh updates only this film.
+	if err := SaveMovieTitleTranslations(dir, 7, map[string]string{"en": "English Title"}); err != nil {
+		t.Fatal(err)
+	}
+	cfg = DefaultConfig()
+	cfg.DataDir = dir
+	if err := cfg.loadConfigDB(); err != nil {
+		t.Fatal(err)
+	}
+	got = cfg.Movies[0].TitleTranslations
+	if !reflect.DeepEqual(got, map[string]string{"en": "English Title"}) {
+		t.Fatalf("title translations after targeted save = %#v", got)
+	}
+	// A movie never looked up is nil, one looked up with no titles is empty.
+	if err := SaveMovieTitleTranslations(dir, 7, map[string]string{}); err != nil {
+		t.Fatal(err)
+	}
+	cfg = DefaultConfig()
+	cfg.DataDir = dir
+	if err := cfg.loadConfigDB(); err != nil {
+		t.Fatal(err)
+	}
+	if got := cfg.Movies[0].TitleTranslations; got == nil || len(got) != 0 {
+		t.Fatalf("an empty translation map must stay non-nil, got %#v", got)
 	}
 }
 

@@ -521,6 +521,46 @@ func (t *TmdbClient) MovieAlternativeTitles(ctx context.Context, tmdbID string) 
 	return aliases, nil
 }
 
+// MovieTranslations returns the localized title TMDB has for a movie, by
+// language code (ISO 639-1: "it", "en", …). The indexer search uses the title
+// in the language chosen for the film and the English one; the other entries
+// here are used by the match and the archive search.
+func (t *TmdbClient) MovieTranslations(ctx context.Context, tmdbID string) (map[string]string, error) {
+	if t.key == nil {
+		return nil, nil
+	}
+	id, err := strconv.ParseInt(strings.TrimSpace(tmdbID), 10, 64)
+	if err != nil {
+		return nil, errors.New("invalid TMDB movie id")
+	}
+	var payload struct {
+		Translations []struct {
+			Language string `json:"iso_639_1"`
+			Data     struct {
+				Title string `json:"title"`
+			} `json:"data"`
+		} `json:"translations"`
+	}
+	rawURL := fmt.Sprintf("%s/movie/%d/translations", tmdbAPIBaseURL, id)
+	if err := t.getJSON(ctx, rawURL, nil, &payload); err != nil {
+		return nil, err
+	}
+	titles := make(map[string]string, len(payload.Translations))
+	for _, item := range payload.Translations {
+		language := strings.ToLower(strings.TrimSpace(item.Language))
+		title := strings.TrimSpace(item.Data.Title)
+		if language == "" || title == "" {
+			continue
+		}
+		// The first entry of a language wins: TMDB can list a regional
+		// variant, and both carry the same title.
+		if _, exists := titles[language]; !exists {
+			titles[language] = title
+		}
+	}
+	return titles, nil
+}
+
 // MovieReleaseDate returns the release date of a movie in country (an ISO
 // 3166-1 code such as "IT") and its kind: "digital", "physical" or
 // "theatrical", preferring the first that exists. Movies reach a country

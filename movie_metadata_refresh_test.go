@@ -28,6 +28,8 @@ func TestApplyMovieMetadataResolvesTMDBIDAndAliases(t *testing.T) {
 			tmdbWriteJSON(t, w, `{"id":424242,"title":"Hand Added","original_title":"Aggiunto a mano","overview":"Trama","poster_path":"/p.jpg","release_date":"2026-03-01"}`)
 		case "/movie/424242/alternative_titles":
 			tmdbWriteJSON(t, w, `{"titles":[{"title":"Hand Added","iso_3166_1":"IT"},{"title":"Foreign Name","iso_3166_1":"US"}]}`)
+		case "/movie/424242/translations":
+			tmdbWriteJSON(t, w, `{"translations":[{"iso_639_1":"en","data":{"title":"Foreign Name"}},{"iso_639_1":"it","data":{"title":"Aggiunto a mano"}},{"iso_639_1":"fr","data":{"title":"Nom étranger"}}]}`)
 		default:
 			t.Errorf("unexpected TMDB path %q", r.URL.Path)
 			tmdbWriteJSON(t, w, `{}`)
@@ -60,11 +62,18 @@ func TestApplyMovieMetadataResolvesTMDBIDAndAliases(t *testing.T) {
 	if len(aliases) != 1 || aliases[0] != "Foreign Name" {
 		t.Fatalf("aliases = %v, want [Foreign Name]", aliases)
 	}
+	translations, _ := movie["title_translations"].(map[string]any)
+	if translations["en"] != "Foreign Name" || translations["it"] != "Aggiunto a mano" {
+		t.Fatalf("title_translations = %v", translations)
+	}
 
 	// The saved library carries the same titles, and the movie page shows them.
 	saved := latestConfig(state)
 	if len(saved.Movies) != 1 || saved.Movies[0].TmdbID != "424242" || len(saved.Movies[0].Aliases) != 1 {
 		t.Fatalf("saved movie = %+v", saved.Movies)
+	}
+	if got := saved.Movies[0].TitleTranslations; got["en"] != "Foreign Name" || got["fr"] != "Nom étranger" {
+		t.Fatalf("saved title translations = %#v", got)
 	}
 	code, page := v2Request(t, server, http.MethodGet, "/?view=movies&movie=9", nil)
 	if code != http.StatusOK || !strings.Contains(page, "Titoli alternativi (TMDB)") || !strings.Contains(page, "Foreign Name") {

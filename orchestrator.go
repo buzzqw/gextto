@@ -2096,12 +2096,20 @@ func refreshSeriesMetadata(ctx context.Context, cfg *Config, db *Database) {
 // and a shorter list keeps movies_config readable.
 const movieAliasLimit = 40
 
-// refreshMovieAliases fills the alternative titles of the monitored movies
-// from TMDB. The title match and the archive search use them, so a film
-// monitored under its Italian title is also found when the release uses the
-// international one. It runs at most once per movie: an empty list is stored
-// as `[]` and not looked up again, while an error leaves it nil for the next
-// cycle. It stops at the first TMDB error to avoid hammering an outage.
+// movieMetadataLookupsPerCycle caps how many movies a single cycle asks TMDB
+// about for the names that are not yet stored. The lookup happens once per
+// movie; on a large library a cap keeps the first cycle after an upgrade from
+// turning into hundreds of requests, and the rest is filled in the cycles
+// after.
+const movieMetadataLookupsPerCycle = 25
+
+// refreshMovieAliases fills the names the monitored movies are known under
+// from TMDB: the alternative titles (used by the title match, the archive and
+// the release names) and the per-language titles (used by the indexer search:
+// the language chosen for the film and English). It runs at most once per
+// movie: an empty list/map is stored as non-nil and not looked up again, while
+// an error leaves it nil for the next cycle. It stops at the first TMDB error
+// to avoid hammering an outage.
 func refreshMovieAliases(ctx context.Context, cfg *Config) {
 	if cfg == nil || cfg.DryRun || cfg.TmdbAPIKey == nil || len(cfg.Movies) == 0 {
 		return
@@ -2110,19 +2118,55 @@ func refreshMovieAliases(ctx context.Context, cfg *Config) {
 	if !client.Configured() {
 		return
 	}
+	lookups := 0
 	for i := range cfg.Movies {
 		if cycleCancelled(ctx) {
 			break
 		}
 		movie := &cfg.Movies[i]
-		if !movie.Enabled || movie.Aliases != nil || strings.TrimSpace(movie.TmdbID) == "" {
+		if !movie.Enabled || strings.TrimSpace(movie.TmdbID) == "" {
 			continue
 		}
-		if err := refreshMovieAlias(ctx, cfg, movie, client); err != nil {
-			logging.Debug("TMDB alternative titles unavailable", "movie", movie.Name, "error", err)
-			return
+		needAliases := movie.Aliases == nil
+		needTranslations := movie.TitleTranslations == nil
+		if !needAliases && !needTranslations {
+			continue
+		}
+		if lookups >= movieMetadataLookupsPerCycle {
+			break
+		}
+		lookups++
+		if needAliases {
+			if err := refreshMovieAlias(ctx, cfg, movie, client); err != nil {
+				logging.Debug("TMDB alternative titles unavailable", "movie", movie.Name, "error", err)
+				return
+			}
+		}
+		if needTranslations {
+			if err := refreshMovieTranslations(ctx, cfg, movie, client); err != nil {
+				logging.Debug("TMDB localized titles unavailable", "movie", movie.Name, "error", err)
+				return
+			}
 		}
 	}
+}
+
+// refreshMovieTranslations looks up one movie's localized titles and stores
+// them, so the indexer search can use the title in the language chosen for the
+// film without another TMDB call.
+func refreshMovieTranslations(ctx context.Context, cfg *Config, movie *MovieConfig, client *TmdbClient) error {
+	titles, err := client.MovieTranslations(ctx, movie.TmdbID)
+	if err != nil {
+		return err
+	}
+	if titles == nil {
+		titles = map[string]string{}
+	}
+	if err := SaveMovieTitleTranslations(cfg.DataDir, movie.ID, titles); err != nil {
+		return err
+	}
+	movie.TitleTranslations = titles
+	return nil
 }
 
 // refreshMovieAlias looks up one movie's alternative titles and stores them.

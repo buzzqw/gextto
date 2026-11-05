@@ -320,7 +320,7 @@ func (e *Engine) ScrapeAllDomain(ctx context.Context, cfg *Config, domain *strin
 			if tmdbID := strings.TrimSpace(movie.TmdbID); tmdbID != "" {
 				ids = append(ids, [2]string{"tmdbid", tmdbID})
 			}
-			for _, title := range movieSearchTitles(&movie, movieIndexerAliasLimit) {
+			for _, title := range movieIndexerTitles(&movie) {
 				query := strings.TrimSpace(title + " " + movie.Year)
 				key := strings.ToLower(query)
 				if _, exists := seenTargets[key]; exists {
@@ -863,7 +863,7 @@ func (e *Engine) SearchMovie(ctx context.Context, cfg *Config, movie *MovieConfi
 		timeout := manualSearchTimeout
 		webTimeout = &timeout
 	}
-	titles := movieSearchTitles(movie, movieIndexerAliasLimit)
+	titles := movieIndexerTitles(movie)
 	if len(titles) <= 1 {
 		query := strings.TrimSpace(movie.Name + " " + movie.Year)
 		return searchOneWithDBType(ctx, cfg, query, ids, webTimeout, e.db, includeRejected, searchTypeMovie, true)

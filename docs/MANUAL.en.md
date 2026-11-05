@@ -465,11 +465,12 @@ twice under different spellings: fix the metadata of the one you already have.
 The **alternative titles** TMDB knows for the movie also count — the
 international one and those used in other countries: a release published under
 another name still arrives, and the page's archive matches are searched with
-those titles too. The indexer searches use the same list: the automatic cycle
-and **Search** try the monitored name, the original title and the first
-alternative titles, so a film TMDB shows in Chinese is searched under its
-English name as well. Working titles are excluded, because they sometimes
-belong to another film.
+those titles too. The indexer searches use the names that matter: the monitored
+name, the original title (the film's original language), the title in the
+language chosen for the film and the English one. The other titles TMDB lists
+are not queried one by one — they would multiply the requests — but they still
+count for recognising releases and for the archive search. Working titles are
+excluded, because they sometimes belong to another film.
 
 ### The movie page
 

@@ -955,6 +955,30 @@ func TestTmdbMovieAlternativeTitlesDeduplicates(t *testing.T) {
 	}
 }
 
+func TestTmdbMovieTranslationsKeepOneTitlePerLanguage(t *testing.T) {
+	tmdbTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/movie/1507696/translations" {
+			t.Errorf("path = %q", r.URL.Path)
+		}
+		tmdbWriteJSON(t, w, `{"translations":[
+			{"iso_639_1":"en","data":{"title":"Apocalypse Z: New World"}},
+			{"iso_639_1":"IT","data":{"title":"Apocalipsis Z: Il Nuovo Mondo"}},
+			{"iso_639_1":"it","data":{"title":"Second Italian Title"}},
+			{"iso_639_1":"","data":{"title":"No Language"}},
+			{"iso_639_1":"es","data":{"title":"  "}}
+		]}`)
+	})
+	client := NewTmdbClient(tmdbTestKey())
+	titles, err := client.MovieTranslations(context.Background(), "1507696")
+	if err != nil {
+		t.Fatalf("MovieTranslations: %v", err)
+	}
+	want := map[string]string{"en": "Apocalypse Z: New World", "it": "Apocalipsis Z: Il Nuovo Mondo"}
+	if !reflect.DeepEqual(titles, want) {
+		t.Fatalf("translations = %#v, want %#v", titles, want)
+	}
+}
+
 func ptr[T any](value T) *T {
 	return &value
 }
