@@ -23,6 +23,7 @@ exclude_docs: |
 theme:
   name: material
   language: en
+  favicon: assets/favicon.png
   icon:
     repo: fontawesome/brands/github
   palette:
