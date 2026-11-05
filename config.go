@@ -308,6 +308,9 @@ type Config struct {
 	RenameEpisodes      bool              `json:"rename_episodes"`
 	RenameFormat        string            `json:"rename_format"`
 	RenameTemplate      string            `json:"rename_template"`
+	// RenameMovieTemplate is the "custom" format for movies: the episode
+	// template has season and episode tokens a movie does not have.
+	RenameMovieTemplate string `json:"rename_movie_template"`
 	ArchiveRoot         *string           `json:"archive_root"`
 	TrashPath           *string           `json:"trash_path"`
 	NotifyTelegram      bool              `json:"notify_telegram"`
@@ -363,6 +366,11 @@ type Config struct {
 
 const defaultRenameFormatValue = "base"
 const defaultRenameTemplateValue = "{Serie} - {Stagione}{Episodio} - {Titolo} [{Risoluzione}][{Lingue}]"
+
+// defaultRenameMovieTemplateValue is the name the custom format gave movies
+// before they had a template of their own, so an existing library keeps its
+// names until the operator edits it.
+const defaultRenameMovieTemplateValue = "{Titolo} ({Anno}) [{Risoluzione}]"
 
 // defaultBlacklist implements `default_blacklist()`.
 func defaultBlacklist() []string {
@@ -916,6 +924,7 @@ func DefaultConfig() Config {
 		Transfer:                  DefaultTransferSettings(),
 		RenameFormat:              defaultRenameFormatValue,
 		RenameTemplate:            defaultRenameTemplateValue,
+		RenameMovieTemplate:       defaultRenameMovieTemplateValue,
 	}
 }
 
@@ -944,6 +953,9 @@ func (c *Config) UnmarshalJSON(data []byte) error {
 	}
 	if _, ok := raw["rename_template"]; !ok {
 		c.RenameTemplate = defaultRenameTemplateValue
+	}
+	if _, ok := raw["rename_movie_template"]; !ok {
+		c.RenameMovieTemplate = defaultRenameMovieTemplateValue
 	}
 	if _, ok := raw["transfer"]; !ok {
 		c.Transfer = DefaultTransferSettings()
@@ -2941,6 +2953,9 @@ func (c *Config) loadConfigDB() error {
 	}
 	if value, ok := c.Settings["rename_template"]; ok {
 		c.RenameTemplate = value
+	}
+	if value, ok := c.Settings["rename_movie_template"]; ok && strings.TrimSpace(value) != "" {
+		c.RenameMovieTemplate = value
 	}
 	c.ArchiveRoot = configPathSetting(mapValue(c.Settings, "archive_root"))
 	if _, present := c.Settings["trash_path"]; present {

@@ -2830,8 +2830,9 @@ func v2SettingsViewFrom(s *AppState, tab, highlight, mode string) v2SettingsView
 		for _, format := range page.Rename.Formats {
 			formats = append(formats, uiFormOption{Value: format.Value, Label: format.Label, Selected: format.Value == selected})
 		}
-		view.Rename = &v2RenameView{Format: selected, Template: page.Rename.Template, Formats: formats, Tokens: page.Rename.Tokens}
+		view.Rename = &v2RenameView{Format: selected, Template: page.Rename.Template, MovieTemplate: page.Rename.MovieTemplate, Formats: formats, Tokens: page.Rename.Tokens, MovieTokens: page.Rename.MovieTokens}
 		view.Rename.Preview = v2RenameCompose(view.Rename.Format, view.Rename.Template)
+		view.Rename.MoviePreview = v2RenameComposeMovie(view.Rename.Format, view.Rename.MovieTemplate)
 	}
 	// Read-only insights built from the configured values: the stuck-download
 	// timeline on both of its panels, and the per-tab extras.

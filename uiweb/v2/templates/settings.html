@@ -475,17 +475,24 @@
     <form method="post" action="/settings/rename-save" hx-post="/settings/rename-save" hx-swap="none" class="form-grid v2-rename-form" data-v2-track>
       <label class="field" {{trTitle "Scegli il formato predefinito per il nome"}}><span>{{tr "Formato"}}</span><select class="input" name="format" hx-post="/settings/rename-preview" hx-include="#v2-rename-editor" hx-target="#v2-rename-preview-code" hx-swap="outerHTML" hx-trigger="change">{{range .Formats}}<option value="{{.Value}}"{{if .Selected}} selected{{end}}>{{tr .Label}}</option>{{end}}</select></label>
       <label class="field" {{trTitle "Template usato per comporre il nome personalizzato"}}><span>{{tr "Template personalizzato"}}</span><input class="input" name="template" value="{{.Template}}" placeholder="{{tr "{Serie} - {Stagione}{Episodio} - {Titolo} [{Risoluzione}][{Lingue}]"}}" hx-post="/settings/rename-preview" hx-include="#v2-rename-editor" hx-target="#v2-rename-preview-code" hx-swap="outerHTML" hx-trigger="input changed delay:300ms" /></label>
+      <label class="field" {{trTitle "Template usato per comporre il nome dei film con il formato Personalizzato"}}><span>{{tr "Template personalizzato per i film"}}</span><input class="input" name="movie_template" value="{{.MovieTemplate}}" placeholder="{{tr "{Titolo} ({Anno}) [{Risoluzione}]"}}" hx-post="/settings/rename-preview" hx-include="#v2-rename-editor" hx-target="#v2-rename-preview-code" hx-swap="outerHTML" hx-trigger="input changed delay:300ms" /></label>
       <div class="form-actions"><button class="btn sm primary" type="submit" {{trTitle "Salva la composizione del nome"}}>{{tr "Salva rinomina"}}</button></div>
     </form>
     <div class="field" style="margin-top:12px"><span>{{tr "Pezzi del nome (clicca per aggiungere)"}}</span>
       <div class="toolbar">{{range .Tokens}}<button class="btn sm" type="button" hx-post="/settings/rename-token" hx-vals='{"token":"{{.Token}}"}' hx-include="#v2-rename-editor" hx-target="#v2-rename-editor" hx-swap="outerHTML" data-v2-marks-dirty="#v2-rename-editor form" {{trTitle "Aggiungi questo pezzo al template"}}>{{tr .Label}}</button>{{end}}</div>
     </div>
+    <div class="field" style="margin-top:12px"><span>{{tr "Pezzi del nome dei film (clicca per aggiungere)"}}</span>
+      <div class="toolbar">{{range .MovieTokens}}<button class="btn sm" type="button" hx-post="/settings/rename-token" hx-vals='{"token":"{{.Token}}","target":"movie"}' hx-include="#v2-rename-editor" hx-target="#v2-rename-editor" hx-swap="outerHTML" data-v2-marks-dirty="#v2-rename-editor form" {{trTitle "Aggiungi questo pezzo al template dei film"}}>{{tr .Label}}</button>{{end}}</div>
+    </div>
     <div class="field" style="margin-top:12px"><span>{{tr "Anteprima"}}</span>{{template "v2_rename_preview_code" .}}</div>
+    <div class="field" style="margin-top:12px"><span>{{tr "Anteprima film"}}</span>{{template "v2_rename_movie_preview_code" .}}</div>
   </div>
 </div>
 {{end}}
 
-{{define "v2_rename_preview_code"}}<code class="rename-preview" id="v2-rename-preview-code">{{tr .Preview}}</code>{{end}}
+{{define "v2_rename_preview_code"}}<code class="rename-preview" id="v2-rename-preview-code">{{tr .Preview}}</code>{{if .PreviewOOB}}<code class="rename-preview" id="v2-rename-movie-preview-code" hx-swap-oob="true">{{tr .MoviePreview}}</code>{{end}}{{end}}
+
+{{define "v2_rename_movie_preview_code"}}<code class="rename-preview" id="v2-rename-movie-preview-code">{{tr .MoviePreview}}</code>{{end}}
 
 {{define "v2_setting_field"}}
 <form class="setting-row{{if .Modified}} setting-modified-row{{end}}" data-setting-key="{{.Key}}" id="v2-setting-{{.Key}}" method="post" action="/settings/save"

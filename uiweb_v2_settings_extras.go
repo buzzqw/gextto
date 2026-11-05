@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	"github.com/buzzqw/gextto/internal/logging"
+	"github.com/buzzqw/gextto/internal/models"
 )
 
 // --- feeds ------------------------------------------------------------------
@@ -573,23 +574,52 @@ func v2FieldRawValue(fields []uiListField, name, value string) any {
 // --- rename composer --------------------------------------------------------
 
 type v2RenameView struct {
-	Format   string
-	Template string
-	Formats  []uiFormOption
-	Tokens   []uiRenameToken
-	Status   string
-	Preview  string
+	Format        string
+	Template      string
+	MovieTemplate string
+	Formats       []uiFormOption
+	Tokens        []uiRenameToken
+	MovieTokens   []uiRenameToken
+	Status        string
+	Preview       string
+	MoviePreview  string
+	// PreviewOOB: the movie preview travels out of band in the answer to a
+	// preview request, whose target is the episode preview.
+	PreviewOOB bool
 }
 
-// V2SettingsRenamePreview recomputes the example file name without touching the
-// saved settings, so the composer shows a live preview while the user edits.
+// V2SettingsRenamePreview recomputes the example file names (episode and
+// movie) without touching the saved settings, so the composer shows a live
+// preview while the user edits.
 func V2SettingsRenamePreview(w http.ResponseWriter, r *http.Request, s *AppState) {
 	view := v2RenameView{
-		Format:   r.FormValue("format"),
-		Template: r.FormValue("template"),
+		Format:        r.FormValue("format"),
+		Template:      r.FormValue("template"),
+		MovieTemplate: r.FormValue("movie_template"),
+		PreviewOOB:    true,
 	}
 	view.Preview = v2RenameCompose(view.Format, view.Template)
+	view.MoviePreview = v2RenameComposeMovie(view.Format, view.MovieTemplate)
 	v2Render(w, http.StatusOK, "v2_rename_preview_code", view, s)
+}
+
+// v2RenameComposeMovie builds the sample movie file name with the same
+// renderer the rename uses, so the preview and the real name cannot differ.
+func v2RenameComposeMovie(format, template string) string {
+	title, year := "Titolo Film", "2024"
+	quality := models.Quality{Resolution: "2160p", Codec: "x265", Source: "webdl", Group: "GRP", HDR: "HDR10"}
+	var stem string
+	switch format {
+	case "standard":
+		stem = title + " (" + year + ") [" + quality.Resolution + "][" + quality.Codec + "]"
+	case "full", "completo":
+		stem = title + " (" + year + ") [" + quality.Resolution + "][DDP5.1][" + quality.HDR + "][" + quality.Codec + "]"
+	case "custom":
+		stem = cleanupFilename(sanitizeInvalid(renderMovieName(template, title, year, quality, "DDP5.1", "5.1", "ita")))
+	default:
+		stem = title + " (" + year + ")"
+	}
+	return stem + ".mkv"
 }
 
 // v2RenameCompose builds the sample file name exactly like the classic client.
@@ -622,16 +652,22 @@ func v2RenameCompose(format, template string) string {
 func V2SettingsRenameToken(w http.ResponseWriter, r *http.Request, s *AppState) {
 	editor := uiRenameEditorFrom(latestConfig(s))
 	template := r.FormValue("template")
+	movieTemplate := r.FormValue("movie_template")
 	if token := r.FormValue("token"); token != "" {
-		template += token
+		if r.FormValue("target") == "movie" {
+			movieTemplate += token
+		} else {
+			template += token
+		}
 	}
 	selected := r.FormValue("format")
 	formats := make([]uiFormOption, 0, len(editor.Formats))
 	for _, format := range editor.Formats {
 		formats = append(formats, uiFormOption{Value: format.Value, Label: format.Label, Selected: format.Value == selected})
 	}
-	view := v2RenameView{Format: selected, Template: template, Formats: formats, Tokens: editor.Tokens}
+	view := v2RenameView{Format: selected, Template: template, MovieTemplate: movieTemplate, Formats: formats, Tokens: editor.Tokens, MovieTokens: editor.MovieTokens}
 	view.Preview = v2RenameCompose(view.Format, view.Template)
+	view.MoviePreview = v2RenameComposeMovie(view.Format, view.MovieTemplate)
 	v2Render(w, http.StatusOK, "v2_rename_editor", view, s)
 }
 
@@ -641,6 +677,9 @@ func V2SettingsRenameSave(w http.ResponseWriter, r *http.Request, s *AppState) {
 		_ = saveConfigSetting(s.cfg.DataDir, "rename_format", key)
 	}
 	_ = saveConfigSetting(s.cfg.DataDir, "rename_template", r.FormValue("template"))
+	if r.Form.Has("movie_template") {
+		_ = saveConfigSetting(s.cfg.DataDir, "rename_movie_template", r.FormValue("movie_template"))
+	}
 	v2SettingsRedirect(w, r, "rename")
 }
 

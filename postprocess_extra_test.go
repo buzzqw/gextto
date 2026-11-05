@@ -164,3 +164,54 @@ func repeatTest(value string, count int) string {
 	}
 	return out
 }
+
+// TestRenameMovieFollowsTheMovieTemplate: with the Custom format a movie takes
+// its own template, with the tokens a movie has; the default keeps the name
+// movies had before the template existed.
+func TestRenameMovieFollowsTheMovieTemplate(t *testing.T) {
+	year := int64(1999)
+	release := func() *models.Release {
+		return &models.Release{
+			Title:   "Example Movie 1999 2160p WEB-DL x265 HDR10-GRP",
+			Quality: models.Quality{Resolution: "2160p", Source: "webdl", Codec: "x265", HDR: "HDR10", Group: "GRP"},
+			Kind:    "movie",
+			Year:    &year,
+		}
+	}
+	rename := func(template string) string {
+		t.Helper()
+		dir := t.TempDir()
+		source := filepath.Join(dir, "Example.Movie.1999.2160p.WEB-DL.x265.HDR10-GRP.mkv")
+		writeFile(t, source, validMKV(4096))
+		cfg := DefaultConfig()
+		cfg.DataDir = dir
+		cfg.RenameEpisodes = true
+		cfg.RenameFormat = "custom"
+		cfg.RenameMovieTemplate = template
+		cfg.Movies = []MovieConfig{{Name: "Example Movie", Year: "1999", Enabled: true}}
+		renamed, err := RenameMovie(context.Background(), source, release(), &cfg, nil)
+		if err != nil {
+			t.Fatalf("RenameMovie: %v", err)
+		}
+		return filepath.Base(renamed)
+	}
+	if got := rename(defaultRenameMovieTemplateValue); got != "Example Movie (1999) [2160p].mkv" {
+		t.Fatalf("default movie template = %q", got)
+	}
+	if got := rename("{Titolo} ({Anno}) [{Risoluzione}][{HDR}][{VideoCodec}] - {Gruppo}"); got != "Example Movie (1999) [2160p][HDR10][x265] - GRP.mkv" {
+		t.Fatalf("custom movie template = %q", got)
+	}
+	// Episode tokens mean nothing for a movie: they vanish with their brackets.
+	if got := rename("{Titolo} [{Stagione}{Episodio}] ({Anno})"); got != "Example Movie (1999).mkv" {
+		t.Fatalf("episode tokens in a movie template = %q", got)
+	}
+}
+
+func TestRenameMoviePreviewUsesTheMovieTemplate(t *testing.T) {
+	if got := v2RenameComposeMovie("custom", "{Titolo} ({Anno}) [{Risoluzione}][{Lingue}]"); got != "Titolo Film (2024) [2160p][ita].mkv" {
+		t.Fatalf("movie preview = %q", got)
+	}
+	if got := v2RenameComposeMovie("custom", ""); got != "Titolo Film (2024) [2160p].mkv" {
+		t.Fatalf("empty movie template preview = %q", got)
+	}
+}

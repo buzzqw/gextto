@@ -897,6 +897,7 @@ func ConfigView(w http.ResponseWriter, r *http.Request, s *AppState) {
 		"auto_remove_completed":                cfg.Transfer.AutoRemoveCompleted,
 		"rename_format":                        cfg.RenameFormat,
 		"rename_template":                      cfg.RenameTemplate,
+		"rename_movie_template":                cfg.RenameMovieTemplate,
 		"rename_episodes":                      cfg.RenameEpisodes,
 		// Torrent backend selection and its per-backend settings. The
 		// qBittorrent password is never echoed: only its presence is reported.

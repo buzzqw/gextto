@@ -1615,3 +1615,39 @@ func TestMovieUpdateSubtitleRequiredSwitch(t *testing.T) {
 		t.Fatalf("No must leave the subtitles as a preference: %+v", m)
 	}
 }
+
+func TestMovieRenameTemplateIsLoadedAndDefaults(t *testing.T) {
+	dir := t.TempDir()
+	if err := SaveSetting(dir, "rename_format", "custom"); err != nil {
+		t.Fatal(err)
+	}
+	cfg := DefaultConfig()
+	cfg.DataDir = dir
+	if err := cfg.loadConfigDB(); err != nil {
+		t.Fatal(err)
+	}
+	if cfg.RenameMovieTemplate != defaultRenameMovieTemplateValue {
+		t.Fatalf("no saved movie template: %q", cfg.RenameMovieTemplate)
+	}
+	if err := SaveSetting(dir, "rename_movie_template", "{Titolo} [{HDR}]"); err != nil {
+		t.Fatal(err)
+	}
+	if err := cfg.loadConfigDB(); err != nil {
+		t.Fatal(err)
+	}
+	if cfg.RenameMovieTemplate != "{Titolo} [{HDR}]" {
+		t.Fatalf("saved movie template: %q", cfg.RenameMovieTemplate)
+	}
+	// An emptied field is not an empty name: the default applies again.
+	if err := SaveSetting(dir, "rename_movie_template", ""); err != nil {
+		t.Fatal(err)
+	}
+	fresh := DefaultConfig()
+	fresh.DataDir = dir
+	if err := fresh.loadConfigDB(); err != nil {
+		t.Fatal(err)
+	}
+	if fresh.RenameMovieTemplate != defaultRenameMovieTemplateValue {
+		t.Fatalf("emptied movie template: %q", fresh.RenameMovieTemplate)
+	}
+}

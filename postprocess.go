@@ -1513,6 +1513,39 @@ func renderEpisodeName(cfg *Config, seriesName, title string, season int64, epis
 	}
 }
 
+// renderMovieName renders the custom movie template from resolved components;
+// an empty template falls back to the default. Tokens a movie does not have
+// ({Serie}, {Stagione}, {Episodio}) render empty, and the empty brackets they
+// leave are removed by cleanupFilename like every other missing value.
+func renderMovieName(template, title, year string, quality models.Quality, audioFull, channels, language string) string {
+	token := func(value string) string {
+		value = strings.TrimSpace(value)
+		if value == "" || strings.EqualFold(value, "unknown") {
+			return ""
+		}
+		return value
+	}
+	if strings.TrimSpace(template) == "" {
+		template = defaultRenameMovieTemplateValue
+	}
+	sourceToken := token(sourceLabel(quality.Source))
+	return strings.NewReplacer(
+		"{Titolo}", title,
+		"{Anno}", token(year),
+		"{Source}", sourceToken,
+		"{Sorgente}", sourceToken,
+		"{Gruppo}", token(quality.Group),
+		"{Risoluzione}", token(quality.Resolution),
+		"{VideoCodec}", token(quality.Codec),
+		"{Audio}", token(audioFull),
+		"{AudioCodec}", token(audioFull),
+		"{Canali}", token(channels),
+		"{HDR}", token(quality.HDR),
+		"{Lingue}", token(language),
+		"{Serie}", "", "{Stagione}", "", "{Episodio}", "",
+	).Replace(template)
+}
+
 // RenameMovie renames a movie file according to the configured template and
 // returns the new path, or "" when there is nothing to do (implementation of
 // `rename_movie`).
@@ -1591,7 +1624,19 @@ func RenameMovie(
 			officialTitle, yearTag, resolution, audioFull, hdr, codec,
 		)
 	case "custom":
-		stem = fmt.Sprintf("%s%s [%s]", officialTitle, yearTag, resolution)
+		language := cfg.DefaultLanguage()
+		if media.Languages != nil && *media.Languages != "" {
+			language = *media.Languages
+		} else if strings.TrimSpace(release.Quality.Language) != "" {
+			language = release.Quality.Language
+		}
+		channels := ""
+		if media.Channels != nil {
+			channels = *media.Channels
+		}
+		effective := release.Quality
+		effective.Resolution, effective.Codec, effective.Audio, effective.HDR = resolution, codec, audio, hdr
+		stem = renderMovieName(cfg.RenameMovieTemplate, officialTitle, year, effective, audioFull, channels, language)
 	default:
 		stem = officialTitle + yearTag
 	}

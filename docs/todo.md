@@ -80,10 +80,6 @@ its gate; a rejected one moves to *Not planned*.
   downloads and the library are on the same filesystem (here they are not: the library
   is on the NAS, the downloads on the local disk) and a byte-for-byte comparison before
   linking.
-- **Personalized name template for movies** — with the *Personalized* rename format a
-  movie gets only `Title (Year) [resolution]`: the template and its MediaInfo tags
-  (codec, audio, channels, HDR/DV) apply to episodes only. Gate: movie tokens (year, no
-  season or episode) in the template editor and its preview.
 - **Packages for the root** — 114k non-test lines share `package gextto`, so helpers are
   told apart by prefixes (`gh0_`…`gh7_`, `tev_`, `bg_`) instead of by package. Gate: a
   decision on the first boundary (HTTP handlers, acquisition, storage) and one area

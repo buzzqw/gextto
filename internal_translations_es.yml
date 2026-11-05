@@ -4134,6 +4134,12 @@ spa:
   "Parole vietate, una per riga: le release che le contengono vengono scartate.": "Palabras prohibidas, una por línea: se descartan las releases que las contienen."
   "Password dell'interfaccia Web di qBittorrent-nox (non visualizzata).": "Contraseña de la interfaz web de qBittorrent-nox (no se muestra)."
   "Pezzi del nome (clicca per aggiungere)": "Piezas del nombre (pulsa para añadir)"
+  "Template personalizzato per i film": "Plantilla personalizada para películas"
+  "Template usato per comporre il nome dei film con il formato Personalizzato": "Plantilla usada para componer el nombre de las películas con el formato Personalizado"
+  "Pezzi del nome dei film (clicca per aggiungere)": "Partes del nombre de las películas (haz clic para añadir)"
+  "Aggiungi questo pezzo al template dei film": "Añadir esta parte a la plantilla de películas"
+  "Anteprima film": "Vista previa de la película"
+  '{Titolo} ({Anno}) [{Risoluzione}]': '{Titolo} ({Anno}) [{Risoluzione}]'
   "Portoghese": "Portugués"
   "Portoghese (Brasile)": "Portugués (Brasil)"
   "Proxy per gx-torrent: socks5://utente:password@host:porta oppure http://host:porta. Peer, tracker HTTP e web seed passano dal proxy; DHT e tracker UDP vengono spenti per non uscire fuori dal proxy. Non visualizzato.": "Proxy para gx-torrent: socks5://usuario:contraseña@host:puerto o http://host:puerto. Pares, trackers HTTP y web seeds pasan por el proxy; DHT y trackers UDP se apagan para no saltárselo. No se muestra."

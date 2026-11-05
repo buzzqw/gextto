@@ -826,7 +826,16 @@ un'anteprima:
 | **Base** (predefinito) | serie, stagione, episodio e titolo | `Titolo (Anno)` |
 | **Standard** | più risoluzione e codec | `Titolo (Anno) [risoluzione][codec]` |
 | **Completo** | più audio, HDR e lingua | `Titolo (Anno) [risoluzione][audio canali][HDR][codec]` |
-| **Personalizzato** | il tuo modello, con i token `{Serie}`, `{Stagione}`, `{Episodio}`, `{Titolo}`, `{Source}`, `{Gruppo}`, `{Risoluzione}`, `{VideoCodec}`, `{Audio}`, `{Canali}`, `{HDR}`, `{Lingue}` | `Titolo (Anno) [risoluzione]` |
+| **Personalizzato** | il tuo modello, con i token `{Serie}`, `{Stagione}`, `{Episodio}`, `{Titolo}`, `{Source}`, `{Gruppo}`, `{Risoluzione}`, `{VideoCodec}`, `{Audio}`, `{Canali}`, `{HDR}`, `{Lingue}` | il modello dei film (sotto) |
+
+Con **Personalizzato** i film hanno un modello tutto loro, nel campo *Template
+personalizzato per i film*: i token sono `{Titolo}`, `{Anno}`, `{Source}`,
+`{Gruppo}`, `{Risoluzione}`, `{VideoCodec}`, `{Audio}`, `{AudioCodec}`,
+`{Canali}`, `{HDR}` e `{Lingue}`, con i loro pulsanti e la loro anteprima. Il
+predefinito, `{Titolo} ({Anno}) [{Risoluzione}]`, è il nome che i film avevano
+già, quindi una libreria già rinominata conserva i suoi nomi. Un token senza
+valore (un HDR sconosciuto, un anno mancante) sparisce insieme alle sue
+parentesi.
 
 I tag tecnici non vengono presi solo dal nome della release: prima di
 rinominare Gextto legge il file con `mediainfo` (o, se manca, con `ffprobe`) e

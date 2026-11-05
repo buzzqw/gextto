@@ -232,10 +232,12 @@ type uiSettingsPage struct {
 // uiRenameEditor composes the file-rename format: a preset, a custom template,
 // the placeholders and a live preview.
 type uiRenameEditor struct {
-	Format   string
-	Template string
-	Formats  []uiFormOption
-	Tokens   []uiRenameToken
+	Format        string
+	Template      string
+	MovieTemplate string
+	Formats       []uiFormOption
+	Tokens        []uiRenameToken
+	MovieTokens   []uiRenameToken
 }
 
 // uiRenameToken is one placeholder button of the rename editor.
@@ -609,7 +611,7 @@ func uiSettingsPageFrom(s *AppState, activeTab, mode string) uiSettingsPage {
 		// Edited as checkbox groups (see uiSourcesCheckboxGroups).
 		"websearch_engines": {}, "content_filters": {},
 		// Edited by the rename-composition editor (see uiRenameEditor).
-		"rename_format": {}, "rename_template": {},
+		"rename_format": {}, "rename_template": {}, "rename_movie_template": {},
 	}
 	indexed := map[string]struct{}{}
 	for _, def := range uiSettingsIndex {
@@ -1260,9 +1262,27 @@ func uiRenameEditorFrom(cfg *Config) *uiRenameEditor {
 	if strings.TrimSpace(template) == "" {
 		template = defaultRenameTemplateValue
 	}
+	movieTemplate := cfg.RenameMovieTemplate
+	if strings.TrimSpace(movieTemplate) == "" {
+		movieTemplate = defaultRenameMovieTemplateValue
+	}
 	return &uiRenameEditor{
-		Format:   format,
-		Template: template,
+		Format:        format,
+		Template:      template,
+		MovieTemplate: movieTemplate,
+		MovieTokens: []uiRenameToken{
+			{Token: "{Titolo}", Label: "Titolo"},
+			{Token: "{Anno}", Label: "Anno"},
+			{Token: "{Source}", Label: "Sorgente"},
+			{Token: "{Gruppo}", Label: "Gruppo"},
+			{Token: "{Risoluzione}", Label: "Risoluzione"},
+			{Token: "{VideoCodec}", Label: "Video codec"},
+			{Token: "{Audio}", Label: "Audio"},
+			{Token: "{AudioCodec}", Label: "Audio codec"},
+			{Token: "{Canali}", Label: "Canali"},
+			{Token: "{HDR}", Label: "HDR"},
+			{Token: "{Lingue}", Label: "Lingue"},
+		},
 		Formats: []uiFormOption{
 			{Value: "base", Label: "Base", Selected: format == "base"},
 			{Value: "standard", Label: "Standard", Selected: format == "standard"},

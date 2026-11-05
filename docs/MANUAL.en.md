@@ -819,7 +819,15 @@ renaming → Name composition*, with four formats and a preview:
 | **Basic** (default) | series, season, episode and title | `Title (Year)` |
 | **Standard** | plus resolution and codec | `Title (Year) [resolution][codec]` |
 | **Complete** | plus audio, HDR and language | `Title (Year) [resolution][audio channels][HDR][codec]` |
-| **Personalized** | your template, with the tokens `{Serie}`, `{Stagione}`, `{Episodio}`, `{Titolo}`, `{Source}`, `{Gruppo}`, `{Risoluzione}`, `{VideoCodec}`, `{Audio}`, `{Canali}`, `{HDR}`, `{Lingue}` | `Title (Year) [resolution]` |
+| **Personalized** | your template, with the tokens `{Serie}`, `{Stagione}`, `{Episodio}`, `{Titolo}`, `{Source}`, `{Gruppo}`, `{Risoluzione}`, `{VideoCodec}`, `{Audio}`, `{Canali}`, `{HDR}`, `{Lingue}` | the movie template (below) |
+
+With **Personalized** movies have a template of their own, in the field
+*Custom template for movies*: the tokens are `{Titolo}`, `{Anno}`, `{Source}`,
+`{Gruppo}`, `{Risoluzione}`, `{VideoCodec}`, `{Audio}`, `{AudioCodec}`,
+`{Canali}`, `{HDR}` and `{Lingue}`, with their own buttons and preview. The
+default, `{Titolo} ({Anno}) [{Risoluzione}]`, is the name movies had before,
+so a library already renamed keeps its names. A token with no value (an
+unknown HDR, a missing year) disappears together with its brackets.
 
 The technical tags are not taken from the release name alone: before renaming,
 Gextto reads the file with `mediainfo` (or, when missing, `ffprobe`) and uses the
