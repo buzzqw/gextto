@@ -1670,18 +1670,6 @@ func containsInt64(values []int64, needle int64) bool {
 	return false
 }
 
-// titleTokens returns the lowercase alphanumeric tokens of a title:
-// "Spider-Man" -> ["spider","man"], "Minions & Monsters" ->
-// ["minions","monsters"]. Punctuation must not prevent the match.
-// Letters and digits are recognised in every script, not only in Latin: an
-// alternative title such as "듄 3" must keep its own word instead of collapsing
-// to the bare number, which used to match any release carrying that number.
-func titleTokens(value string) []string {
-	return strings.FieldsFunc(strings.ToLower(value), func(r rune) bool {
-		return !unicode.IsLetter(r) && !unicode.IsDigit(r)
-	})
-}
-
 // hasWordToken reports whether at least one token carries a letter, so a title
 // made of digits alone ("3") can never identify a film.
 func hasWordToken(words []string) bool {
@@ -1794,70 +1782,154 @@ func movieArchiveTitles(movie *MovieConfig) []string {
 	return titles
 }
 
-// movieTitleSpecificity is the number of words of the monitored name (or
-// original title) that appear in the release title, or 0 when the movie does
-// not match. When a release satisfies more than one monitored movie because one
-// name is part of another ("Example Saga" and "Example Saga Chapter Two"), the caller
-// keeps the highest value: a short name must not take the releases of a longer
-// film.
+// movieTitleSpecificity is the number of words of the monitored title that the
+// release name opens with, or 0 when the film does not match.
+//
+// The comparison is the one Sonarr and Radarr make: a release carries the
+// title at its beginning, so the whole title is compared, word by word, with
+// the start of the name, exactly as `SeriesService.FindByTitleInexact` finds a
+// series and `MovieService.FindByTitle` requires a movie's clean title to be
+// the release's own title. Looking for the words anywhere in the name instead
+// made a film match any release that happened to carry one of its words — a
+// character's name, an alias — even when the release was of another film.
+//
+// When a release satisfies more than one monitored movie because one name is
+// part of another ("Example Saga" and "Example Saga Chapter Two"), the caller
+// keeps the highest value: the longer title wins, as the leftmost-and-longest
+// rule does in Sonarr.
 func movieTitleSpecificity(movie *MovieConfig, title string) int {
-	tokens := titleTokens(title)
-	if len(tokens) == 0 {
-		return 0
-	}
-	present := make(map[string]struct{}, len(tokens))
-	for _, token := range tokens {
-		present[token] = struct{}{}
-	}
-	specificity := 0
-	titles := make([]string, 0, 2+len(movie.Aliases)+len(movie.TitleTranslations))
-	titles = append(titles, movie.Name, movie.OriginalTitle)
-	titles = append(titles, movie.Aliases...)
-	for _, title := range movie.TitleTranslations {
-		titles = append(titles, title)
-	}
-	for _, value := range titles {
-		words := titleTokens(value)
-		if len(words) == 0 || !hasWordToken(words) {
-			continue
-		}
-		// A one-word title cannot be told apart from that word appearing
-		// anywhere in the name of another film: a character's name is also a
-		// common word, and every release carrying it would be taken for this
-		// film. A single word identifies a release only when it opens the name
-		// (its first or second word, so a short prefix tag does not hide it),
-		// which is where a release puts the title.
-		if len(words) == 1 && !titleOpensWith(tokens, words[0]) {
-			continue
-		}
-		all := true
-		for _, word := range words {
-			if _, ok := present[word]; !ok {
-				all = false
-				break
-			}
-		}
-		if all && len(words) > specificity {
-			specificity = len(words)
-		}
-	}
-	return specificity
+	return movieTitleSpecificityForWords(movie, releaseTitleWords(title))
 }
 
-// titleOpensWith reports whether word is the first or second token of the
-// release name.
-func titleOpensWith(tokens []string, word string) bool {
-	for index := 0; index < len(tokens) && index < 2; index++ {
-		if tokens[index] == word {
-			return true
+// movieTitleSpecificityForWords is movieTitleSpecificity with the release name
+// already reduced: a cycle compares the same release with every monitored film,
+// so the reduction is done once (see FindMovieMatch).
+func movieTitleSpecificityForWords(movie *MovieConfig, releaseWords []string) int {
+	return movieTitleMatchFor(movie, releaseWords).words
+}
+
+// movieTitleMatch is how well a release name fits a monitored film: the number
+// of title words it opens with, and the kind of title that matched. Radarr
+// looks for the monitored name and the original title first, and only then
+// gives the alternative titles and the translations a chance: two films of the
+// library can carry the same name in different languages (the Italian title of
+// one is an alternative title of the other), and the film named by the release
+// itself must win.
+type movieTitleMatch struct {
+	words int
+	tier  int
+}
+
+// movieTitleMatchFor finds the best title of the film the release name opens
+// with. Tiers, the order Radarr tries them in: 0 = the monitored name, 1 = the
+// original title, 2 = an alternative title, 3 = a translation.
+func movieTitleMatchFor(movie *MovieConfig, releaseWords []string) movieTitleMatch {
+	best := movieTitleMatch{}
+	if len(releaseWords) == 0 {
+		return best
+	}
+	tiers := make([][]string, 0, 4)
+	tiers = append(tiers, []string{movie.Name})
+	tiers = append(tiers, []string{movie.OriginalTitle})
+	tiers = append(tiers, movie.Aliases)
+	translations := make([]string, 0, len(movie.TitleTranslations))
+	for _, title := range movie.TitleTranslations {
+		translations = append(translations, title)
+	}
+	tiers = append(tiers, translations)
+	for tier, titles := range tiers {
+		for _, value := range titles {
+			words := movieTitleWords(value)
+			if len(words) == 0 || !hasWordToken(words) {
+				continue
+			}
+			if !wordsOpenTitle(releaseWords, words) {
+				continue
+			}
+			candidate := movieTitleMatch{words: len(words), tier: tier}
+			if candidate.betterThan(best) {
+				best = candidate
+			}
 		}
+	}
+	return best
+}
+
+// betterThan keeps a longer title first (so a short name cannot take the
+// releases of a longer film) and, at the same length, the film's own name over
+// an alternative title or a translation.
+func (match movieTitleMatch) betterThan(other movieTitleMatch) bool {
+	if match.words != other.words {
+		return match.words > other.words
+	}
+	return match.tier < other.tier
+}
+
+// movieTitleWords reduces a title to the words the movie match compares:
+// articles are dropped and accents folded (the same reduction the series match
+// uses), punctuation becomes a separator, a bracketed year is removed and "&"
+// reads as "and", the way a release spells it.
+func movieTitleWords(value string) []string {
+	words := strings.Fields(matchingName(stripYearTokens(NormalizeSeriesName(value))))
+	kept := make([]string, 0, len(words))
+	for _, word := range words {
+		if word == "and" {
+			continue
+		}
+		kept = append(kept, word)
+	}
+	return kept
+}
+
+// releaseTitleWords reduces a release name to the words its title starts with:
+// the tags an indexer puts in front of the title (a bracketed group such as
+// "[ITA] Title", a language or a resolution) are skipped, then the name is
+// reduced like a title.
+func releaseTitleWords(value string) []string {
+	words := movieTitleWords(value)
+	for len(words) > 1 && isLeadingReleaseTag(words[0]) {
+		words = words[1:]
+	}
+	return words
+}
+
+// wordsOpenTitle reports whether title are the first words of the release name.
+// A plural ("Minion" against "Minions") does not break it, as in the series
+// match.
+func wordsOpenTitle(release, title []string) bool {
+	if len(title) > len(release) {
+		return false
+	}
+	for index, word := range title {
+		if !tokenEqualsOrPlural(word, release[index]) {
+			return false
+		}
+	}
+	return true
+}
+
+// isLeadingReleaseTag reports whether a word is a tag an indexer puts before a
+// title, not part of it. Only unambiguous words are listed — a language, a
+// quality, a source, a codec — never a word that could name a film ("It", "Up",
+// "Her"). A year is not a tag either: a film can be titled with one ("1917",
+// "2012").
+func isLeadingReleaseTag(word string) bool {
+	switch word {
+	case "ita", "italian", "italiano", "eng", "english",
+		"jpn", "japanese", "kor", "korean", "spa", "spanish", "ger", "german",
+		"fre", "french", "rus", "russian", "pol", "polish", "por", "portuguese",
+		"chi", "chinese", "sub", "subs", "multisub", "multi", "dual",
+		"1080p", "2160p", "720p", "576p", "480p", "360p", "4k", "uhd",
+		"hdtv", "web", "webdl", "webrip", "bluray", "bdrip", "brrip", "dvdrip",
+		"remux", "x264", "x265", "h264", "h265", "hevc", "avc", "aac", "ac3",
+		"dts", "mp3":
+		return true
 	}
 	return false
 }
 
-// movieTitleMatches is true when the title contains every word of the monitored
-// name (or original title), ignoring punctuation. Handles single-word names,
-// hyphens, "&", "vs." and double spaces.
+// movieTitleMatches is true when the release name opens with the monitored
+// title (name, original title, an alternative title or a translation).
 func movieTitleMatches(movie *MovieConfig, title string) bool {
 	return movieTitleSpecificity(movie, title) > 0
 }
@@ -1884,15 +1956,19 @@ func (c *Config) FindMovieMatch(title string, year *int64) *MovieConfig {
 	if !PassesMovieFilter(title) {
 		return nil
 	}
+	releaseWords := releaseTitleWords(title)
+	if len(releaseWords) == 0 {
+		return nil
+	}
 	var matched *MovieConfig
-	best := 0
+	best := movieTitleMatch{}
 	for index := range c.Movies {
 		movie := &c.Movies[index]
 		if !movie.Enabled || movieExcluded(movie, title) {
 			continue
 		}
-		specificity := movieTitleSpecificity(movie, title)
-		if specificity == 0 {
+		match := movieTitleMatchFor(movie, releaseWords)
+		if match.words == 0 {
 			continue
 		}
 		configuredYear, err := strconv.ParseInt(strings.TrimSpace(movie.Year), 10, 64)
@@ -1904,9 +1980,10 @@ func (c *Config) FindMovieMatch(title string, year *int64) *MovieConfig {
 		}
 		// A release can satisfy more than one monitored movie when one name is
 		// part of another: keep the most specific one, so a short name cannot
-		// take the releases of a longer film.
-		if specificity > best {
-			best = specificity
+		// take the releases of a longer film. At the same length the film's own
+		// name wins over an alternative title.
+		if match.betterThan(best) {
+			best = match
 			matched = movie
 		}
 	}
@@ -1922,15 +1999,19 @@ func (c *Config) FindMovieMatchManual(title string, year *int64) *MovieConfig {
 	if !PassesMovieFilter(title) {
 		return nil
 	}
+	releaseWords := releaseTitleWords(title)
+	if len(releaseWords) == 0 {
+		return nil
+	}
 	var matched *MovieConfig
-	best := 0
+	best := movieTitleMatch{}
 	for index := range c.Movies {
 		movie := &c.Movies[index]
 		if !movie.Enabled || movieExcluded(movie, title) {
 			continue
 		}
-		specificity := movieTitleSpecificity(movie, title)
-		if specificity == 0 {
+		match := movieTitleMatchFor(movie, releaseWords)
+		if match.words == 0 {
 			continue
 		}
 		configuredYear, err := strconv.ParseInt(strings.TrimSpace(movie.Year), 10, 64)
@@ -1938,9 +2019,10 @@ func (c *Config) FindMovieMatchManual(title string, year *int64) *MovieConfig {
 			continue
 		}
 		// Same rule as FindMovieMatch: the most specific name wins, so a short
-		// name cannot take the releases of a longer film.
-		if specificity > best {
-			best = specificity
+		// name cannot take the releases of a longer film, and the film's own
+		// name wins over an alternative title.
+		if match.betterThan(best) {
+			best = match
 			matched = movie
 		}
 	}

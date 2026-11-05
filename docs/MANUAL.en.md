@@ -475,10 +475,18 @@ name, the original title (the film's original language), the title in the
 language chosen for the film and the English one. The other titles TMDB lists
 are not queried one by one — they would multiply the requests — but they still
 count for recognising releases and for the archive search. Working titles are
-excluded, because they sometimes belong to another film. A one-word title — a
-character name, say — identifies a release only when it is among the first two
-words of its name, where the film title actually sits: otherwise any release
-carrying that word, even of a different film, would be taken for this one.
+excluded, because they sometimes belong to another film.
+
+The comparison is the one Sonarr and Radarr make: the **whole** title counts,
+not a word found anywhere in the name. A release is recognised when its name
+**opens** with the film title or with one of its alternative titles, word by
+word, ignoring accents, capitals and punctuation; the tag an indexer puts before
+the title (a language such as "ITA", a resolution, a group in square brackets) is
+skipped. A one-word character name — which TMDB lists among the alternative
+titles — therefore no longer takes a release of another film. Leading articles do
+not count, and at the same length the film's own name wins over an alternative
+title. The page's **archive matches** show only the releases Gextto would really
+take.
 
 ### The movie page
 

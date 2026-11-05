@@ -477,11 +477,19 @@ nome mostrato, il titolo originale (la lingua del film), il titolo nella lingua
 scelta per il film e quello inglese. Gli altri titoli che TMDB elenca non
 vengono interrogati uno per uno — moltiplicherebbero le richieste — ma restano
 validi per riconoscere le release e per la ricerca in archivio. I titoli di
-lavorazione sono esclusi, perché a volte appartengono a un film diverso. Un
-titolo di una parola sola — un nome di personaggio, per esempio — identifica una
-release solo se è tra le prime due parole del suo nome, dove il titolo del film
-sta davvero: altrimenti qualunque release che contenesse quella parola, anche di
-un film diverso, verrebbe presa per questa.
+lavorazione sono esclusi, perché a volte appartengono a un film diverso.
+
+Il confronto è quello di Sonarr e Radarr: conta il titolo **intero**, non una
+parola trovata dovunque nel nome. Una release si riconosce quando il suo nome
+**si apre** con il titolo del film o con uno dei suoi titoli alternativi, parola
+per parola, senza badare ad accenti, maiuscole e punteggiatura; il tag che un
+indexer mette davanti al titolo (una lingua come «ITA», una risoluzione, un
+gruppo tra parentesi quadre) viene saltato. Così un nome di personaggio di una
+parola sola — che TMDB elenca tra i titoli alternativi — non basta più a far
+prendere la release di un altro film. Gli articoli iniziali non contano, e a
+parità di titolo vince il nome del film rispetto a un titolo alternativo. Le
+**corrispondenze in archivio** della scheda mostrano solo le release che
+Gextto riconoscerebbe davvero.
 
 ### La scheda del film
 

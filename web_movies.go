@@ -84,11 +84,27 @@ func MovieDetail(w http.ResponseWriter, r *http.Request, s *AppState) {
 	if strings.TrimSpace(movieCopy.Year) != "" {
 		query = fmt.Sprintf("%s %s", movieCopy.Name, movieCopy.Year)
 	}
+	// The archive matches shown on the page are the ones the film would
+	// actually take: the same whole-title rule as the cycle, so a listing that
+	// only shares a common word (the name of a character, say) is not offered
+	// as a copy of this film.
 	matches := []any{}
 	if entries, err := s.archive.Search(query); err == nil {
-		for index, entry := range entries {
-			if index >= 20 {
+		for _, entry := range entries {
+			if len(matches) >= 20 {
 				break
+			}
+			release := ParseRelease(entry[0], entry[1], "archive:"+entry[2])
+			if release == nil && IsTorrentURL(entry[1]) {
+				link := strings.TrimSpace(entry[1])
+				release = ParseReleaseSource(entry[0], "", &link, "archive:"+entry[2], time.Now().UTC())
+			}
+			if release == nil || release.Kind != "movie" {
+				continue
+			}
+			matched := cfg.FindMovieMatchForRelease(release, true)
+			if matched == nil || matched.ID != movieCopy.ID {
+				continue
 			}
 			matches = append(matches, map[string]any{"title": entry[0], "magnet": entry[1], "source": entry[2]})
 		}

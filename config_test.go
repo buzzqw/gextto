@@ -537,12 +537,11 @@ func TestMovieMatchingNeverMatchesOnNumbersAlone(t *testing.T) {
 	}
 }
 
-// A one-word title cannot be told apart from that word appearing anywhere in
-// the name of another film: an alias such as the name of a character used to
-// take every release carrying it, even when the film was clearly another one.
-// A single word identifies a release only when it opens the name, which is
-// where a release puts the title.
-func TestMovieMatchingSingleWordTitleNeedsToOpenTheRelease(t *testing.T) {
+// The film title is compared whole, as Sonarr and Radarr do: the release name
+// must open with it. Looking for its words anywhere took a release of another
+// film that happened to carry the name of a character, even a whole alias in
+// the middle of its name.
+func TestMovieMatchingComparesTheWholeTitleAtTheStart(t *testing.T) {
 	year2027 := int64(2027)
 	year2026 := int64(2026)
 	cfg := DefaultConfig()
@@ -550,18 +549,28 @@ func TestMovieMatchingSingleWordTitleNeedsToOpenTheRelease(t *testing.T) {
 		Name:          "Example Cat",
 		Year:          "2027",
 		OriginalTitle: "Example Cat",
-		Aliases:       []string{"Nero"},
+		Aliases:       []string{"Nero", "Example Alias"},
 		Enabled:       true,
 	}}
 	// Another film, published a year earlier (inside the ±1 window), whose
-	// episode title happens to carry the alias word.
-	if got := cfg.FindMovieMatch("Another.Film.Nero.2026.WebDL.1080p.ITA.mkv", &year2026); got != nil {
-		t.Errorf("a release of another film matched %q on a word in the middle of its name", got.Name)
+	// title carries an alias word or the whole alias, just not at the start.
+	for _, title := range []string{
+		"Another.Film.Nero.2026.WebDL.1080p.ITA.mkv",
+		"Another.Example.Alias.2026.WebDL.1080p.ITA.mkv",
+		"Cat.Example.2027.1080p.WEB-DL.ITA.mkv",
+	} {
+		if got := cfg.FindMovieMatch(title, &year2026); got != nil {
+			t.Errorf("release %q matched %q without opening with its title", title, got.Name)
+		}
 	}
-	// The film's own releases still match, through its name and its alias.
+	// The film's own releases match, through its name and its aliases, also
+	// when an indexer puts a tag before the title.
 	for _, title := range []string{
 		"Nero.2027.1080p.WEB-DL.ITA.mkv",
 		"Example.Cat.2027.1080p.WEB-DL.ITA.mkv",
+		"Example.Alias.2027.1080p.WEB-DL.ITA.mkv",
+		"[ITA] Example.Cat.2027.1080p.WEB-DL.mkv",
+		"ITA.Example.Cat.2027.1080p.WEB-DL.mkv",
 	} {
 		if got := cfg.FindMovieMatch(title, &year2027); got == nil || got.Name != "Example Cat" {
 			t.Errorf("release %q matched %v, want the monitored film", title, got)
