@@ -41,6 +41,18 @@ Nothing open: every engine item waits for a condition listed under
   of the event worker (completion, storage move, retry after a restart) that pins what
   the split must keep.
 
+## Measurements
+
+- **rain and anacrolix/torrent in the client comparison** — `make measure-compare`
+  (`scripts/compare`) compares gx-torrent with qBittorrent, Transmission and Deluge only.
+  Add the two Go clients: rain (`github.com/cenkalti/rain`, MIT) from a pinned tag, and
+  anacrolix/torrent from a pinned module version driven by a small program, because neither
+  has a client that adds a torrent file, rechecks it and reports the per-torrent state and
+  byte counts the harness reads. Same Debian base, CPUs 2-3 and 4 GiB, port 6881,
+  DHT/PEX/LSD off, the same rate and connection limits; median of three interleaved rounds
+  with the byte comparison. Two more clients open a new baseline: re-run every client and
+  replace the table in `measurements.md`. Gate: the next benchmark round.
+
 ## Proposals
 
 Ideas proposed but not decided yet. An accepted proposal moves to the matching area with
