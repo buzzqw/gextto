@@ -51,7 +51,7 @@ in this document.
 | Seeding on a fast LAN (gigabit and above) | **gx-torrent** | one write is one syscall: 242 MB/s, level with the libtorrent clients, at the lowest CPU per GiB (2.26 s against 2.46–2.70) |
 | A call or a game while something downloads | **Gextto**, Auto with latency source `both` | the guard leaves room for the other flow and stops taking more as soon as the router sees it |
 | The smallest memory at full speed | Transmission, 11 MiB against 30 | the one row where another client wins, and it costs speed |
-| Ratio farming, a seedbox, no library | qBittorrent or Deluge | Gextto is not built for it (`share_mode` is not planned) |
+| Ratio farming, a seedbox, no library | qBittorrent or Deluge | Gextto is a library: it seeds with ratio, day and idle rules and has super-seeding, but super-seeding *lowers* the upload by design and there is no seeding-first scheduler or share mode |
 | Windows | **gx-torrent, standalone** | native service, amd64 and arm64; Gextto itself is Unix |
 
 In short: a client that downloads and stops there is gx-torrent, the fastest of the four over
