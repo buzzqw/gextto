@@ -14,8 +14,8 @@ torrents and limits for every client.
 | Fastest download with nothing in the way | **gx-torrent**, 285 MB/s | Deluge, 250 MB/s | qBittorrent, 241 MB/s | Transmission, 56 MB/s | a fast disk and a fast peer |
 | Download on a 100 Mbit/s line, 4 peers, TCP | **gx-torrent**, 11.2 MB/s | Deluge, 10.7 MB/s | qBittorrent, 10.6 MB/s | Transmission, 9.4 MB/s | the common case at home |
 | The same line, uTP only | Deluge, 11.8 MB/s | qBittorrent, 11.6 MB/s | **gx-torrent**, 11.2 MB/s | Transmission, 9.6 MB/s | peers that prefer uTP |
-| Least own memory at full speed | Transmission, 11 MiB | qBittorrent, 25 MiB | **gx-torrent**, 30 MiB | Deluge, 59 MiB | what the client cannot give back to the system |
-| Least own memory on the 100 Mbit/s line | qBittorrent, 9.5 MiB | Transmission, 10 MiB | Deluge, 39 MiB | **gx-torrent**, 40 MiB | the same, when the line is the limit |
+| Smallest peak own memory while downloading at full speed | Transmission, 11 MiB | qBittorrent, 25 MiB | **gx-torrent**, 30 MiB | Deluge, 59 MiB | what the client cannot give back to the system |
+| Smallest peak own memory while downloading on a 100 Mbit/s line | qBittorrent, 9.5 MiB | Transmission, 10 MiB | Deluge, 39 MiB | **gx-torrent**, 40 MiB | the same, when the line is the limit |
 | Fastest upload | **gx-torrent**, 242 MB/s | qBittorrent, 236 MB/s | Deluge, 207 MB/s (up to 259) | Transmission, 125 MB/s | only matters above a gigabit link |
 | Fastest recheck of 4 GiB | **gx-torrent**, 3.6 s | Transmission, 3.7 s | Deluge, 4.6 s | qBittorrent, 5.6 s | after a move or a crash |
 | Lowest CPU at rest, nothing loaded | qBittorrent, 0.04 % | **gx-torrent**, 0.06 % | Deluge, 0.29 % | Transmission, 0.32 % | a machine that is always on |
@@ -26,11 +26,16 @@ The order is the order of the medians: where the ranges of two clients overlap t
 a tie, and a gap of a few percent is inside the spread of the rounds. The detailed tables below
 give the ranges. **gx-torrent** is in bold.
 
+**Own memory** is the anonymous memory the client really holds, without the file pages that RSS
+also counts; the 100-torrent row is the only one that uses RSS. The full-speed row is the 4 GiB
+download from one peer, the 100 Mbit/s row the 512 MiB download from four peers shaped to that
+line.
+
 In short: gx-torrent is the fastest downloader over TCP, is level with Transmission at a recheck
-(3.6 s against 3.7), and uploads as fast as the libtorrent clients. It holds the most own memory
-on the 100 Mbit/s line and while uploading, and with 100 torrents it spends the most CPU at rest
-(0.66 % against 0.06–0.35 %). Transmission spends less CPU on every download, at a lower speed.
-The tables are the round of 2026-11-06 on commit `40e58927`.
+(3.6 s against 3.7), and uploads as fast as the libtorrent clients. It is the heaviest in own
+memory while uploading, is level with Deluge on the 100 Mbit/s line, and with 100 torrents it
+spends the most CPU at rest (0.66 % against 0.06–0.35 %). Transmission spends less CPU on every
+download, at a lower speed. The tables are the round of 2026-11-06 on commit `40e58927`.
 
 ## What is best for me
 
