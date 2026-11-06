@@ -113,10 +113,8 @@ Closed by choice, not waiting for a measurement:
 - Pieces above 16 MiB when creating a torrent: older clients refuse them, and a torrent of
   several terabytes still works with more pieces.
 - Alternative storages (blob, bolt, SQLite).
-- `share_mode`: it serves ratio farming, not a library. The gate is an operator who runs a
-  seedbox and accepts torrents that stay incomplete on disk: this engine lacks only the
-  on-demand piece mode (libtorrent's `share_mode_target`), since unlimited upload slots,
-  seed ratio/day limits and super-seeding already exist.
+- `share_mode` (libtorrent's on-demand mode for ratio farming): the operator chose not to
+  build it — it leaves torrents incomplete on disk and Gextto is a library, not a seedbox.
 - Full `*arr` v3 compatibility, multi-user authentication, Usenet, write-back cache,
   specialist fields in the add form, a content layout in Gextto's Add dialog, a UI
   benchmark in CI, a cache cap on NFS, Trakt.
