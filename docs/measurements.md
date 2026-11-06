@@ -192,19 +192,21 @@ machine (2026-11-03; the gexttod row 2026-11-06).
 |---|---|---|
 | gx-torrent 1.1.306, live (DHT on, full IP filter, 3 seeds) | 0.9 % of a core, 32 MB RSS | 18–37 % of a core at 8.2–8.8 MB/s with 116–132 peers, 2.0–4.3 s of CPU per 100 MB |
 | gx-torrent, 10 torrents to a NAS | | about 507 MB outside the two caches, 1.1 GB peak with the NFS write cache |
-| gexttod 1.2.2258, same host | 0.4 % of a core, 45 MB anon (70 MB RSS) just started; 85 MB anon (110 MB RSS) after a search | peak 149–157 MB anon during a cycle of ~38,800 releases, about 40 s of CPU, and back to the figure at rest |
+| gexttod 1.2.2260, same host | 0.4 % of a core, 45 MB anon (70 MB RSS) just started; 97 MB anon (123 MB RSS) after a full search | peak 168 MB anon during a full cycle of 47,342 releases (series and movies), about 69 s of CPU, and back to the figure at rest; a series-only cycle of ~38,800 releases peaks at 149–157 MB anon and leaves 85 MB |
 
 At-rest figures: 90 s on 2026-11-03, with the integrity check off, no transfer and three seeds
-in the list. The gexttod row is the latest series-only cycle on 2026-11-06, with GOGC=50,
-transparent huge pages off for the process and `GODEBUG=madvdontneed=1`.
+in the list. The gexttod row is the latest full cycle and the latest series-only cycle on
+2026-11-06, with GOGC=50, transparent huge pages off for the process and
+`GODEBUG=madvdontneed=1`.
 
 - **After a burst** the daemon returns its piece buffers: with 7 torrents and no transfer the
   RSS falls from 550 MB to 35–40 MB.
-- **The free heap comes back to the OS.** The same cycle before the change peaked at 237 MB
-  anon and left 150–190 MB resident for hours; now it peaks at 149 MB anon and settles at
-  85 MB anon. The explicit release after a cycle or a completed transfer returns 12–92 MB
-  per call, and the 15-minute housekeeping call releases what the background workers free
-  afterwards. Go does not compact, so the spans still pinned by live objects stay.
+- **The free heap comes back to the OS.** The same series cycle before the change peaked at
+  237 MB anon and left 150–190 MB resident for hours; now it peaks at 149–157 MB anon and
+  settles at 85 MB anon (168 MB and 97 MB for a full cycle of 47,342 releases). The explicit
+  release after a cycle or a completed transfer returns 12–92 MB per call, and the 15-minute
+  housekeeping call releases what the background workers free afterwards. Go does not
+  compact, so the spans still pinned by live objects stay.
 - **A cycle allocates 1.37–1.43 GB instead of 2.01 GB** (~38,800 releases, 2026-11-06;
   the spread is the varying size of the feed and indexer replies). The deduplication, the
   blocklist and the kind filter work in place, the combined feed and indexer batches are
@@ -214,8 +216,9 @@ transparent huge pages off for the process and `GODEBUG=madvdontneed=1`.
   `encoding/xml` (about 170 MB of internal copies per cycle; 7 % of the CPU) and the HTML
   parser.
 - **`systemctl status` shows a large number** that is mostly page cache, not the process;
-  `anon` is the real figure (88 MB after a search on 2026-11-06). A `MemoryMax` on the unit
-  would count the file pages, so it must leave room for them.
+  `anon` is the real figure (85 MB after a series search, 97 MB after a full one on
+  2026-11-06). A `MemoryMax` on the unit would count the file pages, so it must leave room
+  for them.
 - **At rest gexttod** opens no directory and writes nothing to the NAS, so its disks can spin
   down.
 - **Where the CPU goes under load** (five public ISOs): about 50 % syscalls and scheduler
