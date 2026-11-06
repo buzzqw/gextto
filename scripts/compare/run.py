@@ -304,7 +304,7 @@ class Client:
         (self.dir / "cfg").mkdir(parents=True)
         (self.dir / "dl").mkdir()
         self.configure()
-        self.container = Container(f"gxc-{slot}", self.image, self.command(), self.dir, ip, cpus, memory, cap_add)
+        self.container = Container(slot, self.image, self.command(), self.dir, ip, cpus, memory, cap_add)
         self.ip = ip
         self.helpers = []
 
