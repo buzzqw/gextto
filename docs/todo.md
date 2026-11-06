@@ -127,6 +127,9 @@ Closed by choice, not waiting for a measurement:
 - Alternative storages (blob, bolt, SQLite).
 - `share_mode` (libtorrent's on-demand mode for ratio farming): the operator chose not to
   build it — it leaves torrents incomplete on disk and Gextto is a library, not a seedbox.
+- Removing the dead `share_mode`/`upload_mode` fields from the torrent view: nothing reads
+  or sets them, they only show up as `false` in `/api/torrents`, and the operator chose to
+  leave them where they are.
 - Full `*arr` v3 compatibility, multi-user authentication, Usenet, write-back cache,
   specialist fields in the add form, a content layout in Gextto's Add dialog, a UI
   benchmark in CI, a cache cap on NFS, Trakt.
