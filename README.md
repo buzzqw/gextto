@@ -316,15 +316,15 @@ the command to reproduce it.
 
 | Area | Result |
 |---|---|
-| **Compared with other clients** | Same limits in Docker, N97: **289 MB/s** at full speed against 56–250 MB/s for Transmission, qBittorrent and Deluge, with **28 MiB** of own memory. First on a shaped 100 Mbit/s line (**11.2 MB/s** against 9.5–10.7) and at a recheck of 4 GiB (**3.8 s** against 4.0–5.7), level with the libtorrent clients on upload (**258 MB/s** against 241–263). It holds more memory than the others while uploading. [Full tables](docs/measurements.md#compared-with-qbittorrent-transmission-and-deluge) |
+| **Compared with other clients** | Same limits in Docker, N97: **285 MB/s** at full speed against 56–250 MB/s for Transmission, qBittorrent and Deluge, with **30 MiB** of own memory. First on a shaped 100 Mbit/s line (**11.2 MB/s** against 9.4–10.7) and at a recheck of 4 GiB (**3.6 s** against 3.7–5.6), level with the libtorrent clients on upload (**242 MB/s**, the ranges overlapping their 207–236). It holds more memory than the others while uploading. [Full tables](docs/measurements.md#compared-with-qbittorrent-transmission-and-deluge) |
 | **Real swarm** | **9.3–9.4 MB/s** on the Ubuntu ISO, against **6.3–7.1 MB/s** for libtorrent on the same swarm (one measured campaign) |
-| **Engine memory** | **29–39 MB RSS** at rest, DHT on and a full IP filter (172,740 rules). With 10 torrents downloading to a NAS: **~507 MB** outside the two caches; the write cache sizes itself from free RAM |
-| **Engine CPU** | **18–37 % of one core** at 8.2–8.8 MB/s with 116–132 peers, **2.0–4.3 s of CPU per 100 MB**; **0.6–1.0 %** of one core at rest |
+| **Engine memory** | **28–30 MB RSS** at rest (16–18 MB anonymous), DHT on and a full IP filter (172,740 rules). With 10 torrents downloading to a NAS: **~507 MB** outside the two caches; the write cache sizes itself from free RAM |
+| **Engine CPU** | **18–37 % of one core** at 8.2–8.8 MB/s with 116–132 peers, **2.0–4.3 s of CPU per 100 MB**; **0.3–0.5 %** of one core at rest |
 | **Indexer searches** | Jackett and Prowlarr searched one indexer at a time: a cycle of 30 titles in **110 s**, **205 requests and none failed**, **5,935 releases** |
 | **Sharing the line** | A saturated download adds ~40 ms of latency to the whole house. Alone on the line Gextto keeps all of it (**8.5 MB/s**); with another device downloading, that device gets **6.8–7.3 MB/s** of the 9 MB/s FTTC line |
 | **Reusing local data** | A torrent sharing files with one already on disk takes only **25 %** of the file from the network (Debian and Arch ISOs), also after a restart and in any adding order |
 | **Disk writes** | 16 KiB writes on NFS at **81 MiB/s** with batched durability; opt-in mmap ~7.0 GB/s on tmpfs |
-| **Feed archive** | **447,000 releases in 320 MB**, one row per torrent; 1,000 releases archived in **41 ms**; the standalone archive searches 100,000 releases in **7.4 ms** |
+| **Feed archive** | **447,000 releases in 320 MB**, one row per torrent; 1,000 new releases archived in **36 ms** into an archive of 50,000, and 1,000 already archived in **9 ms**; the standalone archive searches 100,000 releases in **7.4 ms** |
 | **Daemon at rest** | **~0.7 %** CPU at rest; **~5,000 metadata calls a day** for 55 series; the health probes never write to a NAS, so its disks can sleep |
 
 The same document records what was measured and dropped — io_uring, batched
@@ -446,7 +446,7 @@ everything a standalone client needs.
 - **Updates itself** from the CI builds when its own code changed, verified by
   SHA-256, with automatic rollback.
 - **Light on the machine.** One pure-Go process, no external engine and no
-  database server: **0.6–1.0 % of one core and 29–39 MB RSS at rest**, with DHT
+  database server: **0.3–0.5 % of one core and 28–30 MB RSS at rest**, with DHT
   on and a full IP filter loaded; **18–37 % of one core** at 8.2–8.8 MB/s with
   116–132 peers, that is **2.0–4.3 s of CPU per 100 MB**. A loopback transfer
   reaches **234–274 MB/s** with about 100 MB peak RSS, and five minutes after a

@@ -232,12 +232,13 @@ tutti i canali salvati. Lo script riceve l’evento nelle variabili
 Motore, coda, pagina, RSS e API compatibile con qBittorrent sono un solo
 processo Go: nessun motore esterno, nessuna libreria C, nessun server di
 database. Questi numeri sono l’intero demone, misurati su un **mini-PC Intel N97**
-(4 core, 16 GB di RAM) il 26–30 ottobre 2026, con DHT attiva e un filtro IP
-completo caricato (172.740 regole):
+(4 core, 16 GB di RAM), con DHT attiva e un filtro IP completo caricato
+(172.740 regole); la riga a riposo è il campione del 6 novembre 2026, le altre
+sono del 26–30 ottobre 2026:
 
 | Situazione | CPU | Memoria (RSS) |
 | --- | --- | --- |
-| A riposo | **0,6–1,0 %** di un core | **29–39 MB** |
+| A riposo | **0,3–0,5 %** di un core | **28–30 MB** |
 | In download da sciami pubblici a 8,2–8,8 MB/s con 116–132 peer | **18–37 %** di un core, **2,0–4,3 s di CPU per 100 MB** | — |
 | Trasferimento in loopback (seed e leecher sullo stesso host) | **7,5–8,3 s di CPU per 1,09 GiB** per entrambi i lati | **≈ 100 MB di picco** |
 | Cinque minuti dopo un picco, senza trasferimenti | — | **550 MB → 35–40 MB** |

@@ -494,9 +494,9 @@ data folder is **not** read (so the fingerprint stays stable); in standalone
 **Footprint.** The daemon is one pure-Go process (`CGO_ENABLED=0`): engine,
 queue, web page, RSS reader and qBittorrent-compatible API, with no external
 engine, C library or database server. Measured on an Intel N97 (4 cores, 16 GB)
-on 26–30 October 2026; the at-rest and public-swarm figures are with DHT on and
-a full IP filter loaded (172,740 rules): at rest **0.6–1.0 % of one core and
-29–39 MB RSS**; on public swarms at
+on 26–30 October 2026, with the at-rest figures of 6 November 2026; they are
+with DHT on and a full IP filter loaded (172,740 rules): at rest **0.3–0.5 % of
+one core and 28–30 MB RSS**; on public swarms at
 8.2–8.8 MB/s with 116–132 peers **18–37 % of one core**, that is
 **2.0–4.3 s of CPU per 100 MB**; a loopback transfer runs at
 **234–274 MB/s** with about **100 MiB peak RSS** and 7.5–8.3 s of CPU per

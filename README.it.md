@@ -328,15 +328,15 @@ macchina, la data e il comando per rifarlo.
 
 | Area | Risultato |
 |---|---|
-| **Confronto con altri client** | Stessi limiti in Docker, N97: **289 MB/s** alla massima velocità contro 56–250 MB/s di Transmission, qBittorrent e Deluge, con **28 MiB** di memoria propria. Primo su una linea simulata da 100 Mbit/s (**11,2 MB/s** contro 9,5–10,7) e nel ricontrollo di 4 GiB (**3,8 s** contro 4,0–5,7), alla pari con i client libtorrent in upload (**258 MB/s** contro 241–263). In upload usa più memoria degli altri. [Tabelle complete](docs/measurements.md#compared-with-qbittorrent-transmission-and-deluge) |
+| **Confronto con altri client** | Stessi limiti in Docker, N97: **285 MB/s** alla massima velocità contro 56–250 MB/s di Transmission, qBittorrent e Deluge, con **30 MiB** di memoria propria. Primo su una linea simulata da 100 Mbit/s (**11,2 MB/s** contro 9,4–10,7) e nel ricontrollo di 4 GiB (**3,6 s** contro 3,7–5,6), alla pari con i client libtorrent in upload (**242 MB/s**, con gli intervalli che si sovrappongono ai loro 207–236). In upload usa più memoria degli altri. [Tabelle complete](docs/measurements.md#compared-with-qbittorrent-transmission-and-deluge) |
 | **Swarm reale** | **9,3–9,4 MB/s** sulla ISO di Ubuntu, contro **6,3–7,1 MB/s** di libtorrent sullo stesso swarm (una campagna di misura) |
-| **Memoria del motore** | **29–39 MB di RSS** a riposo, con DHT attiva e un filtro IP completo (172.740 regole). Con 10 torrent in download verso un NAS: **~507 MB** fuori dalle due cache; la cache di scrittura si dimensiona dalla RAM libera |
-| **CPU del motore** | **18–37 % di un core** a 8,2–8,8 MB/s con 116–132 peer, **2,0–4,3 s di CPU per 100 MB**; **0,6–1,0 %** di un core a riposo |
+| **Memoria del motore** | **28–30 MB di RSS** a riposo (16–18 MB anonimi), con DHT attiva e un filtro IP completo (172.740 regole). Con 10 torrent in download verso un NAS: **~507 MB** fuori dalle due cache; la cache di scrittura si dimensiona dalla RAM libera |
+| **CPU del motore** | **18–37 % di un core** a 8,2–8,8 MB/s con 116–132 peer, **2,0–4,3 s di CPU per 100 MB**; **0,3–0,5 %** di un core a riposo |
 | **Ricerche sugli indexer** | Jackett e Prowlarr interrogati un indexer alla volta: un ciclo di 30 titoli in **110 s**, **205 richieste e nessuna fallita**, **5.935 release** |
 | **Dividere la linea** | Un download a piena linea aggiunge ~40 ms di latenza a tutta la casa. Da solo sulla linea Gextto la usa tutta (**8,5 MB/s**); con un altro dispositivo che scarica, quel dispositivo ottiene **6,8–7,3 MB/s** dei 9 MB/s della linea FTTC |
 | **Riuso dei dati locali** | Un torrent che condivide file con uno già su disco prende dalla rete solo il **25 %** del file (ISO Debian e Arch), anche dopo un riavvio e in qualunque ordine si aggiungano |
 | **Scritture su disco** | Scritture da 16 KiB su NFS a **81 MiB/s** con durabilità a lotti; mmap opzionale ~7,0 GB/s su tmpfs |
-| **Archivio dei feed** | **447.000 release in 320 MB**, una riga per torrent; 1.000 release archiviate in **41 ms**; l'archivio standalone cerca su 100.000 release in **7,4 ms** |
+| **Archivio dei feed** | **447.000 release in 320 MB**, una riga per torrent; 1.000 release nuove archiviate in **36 ms** su un archivio di 50.000, e 1.000 già archiviate in **9 ms**; l'archivio standalone cerca su 100.000 release in **7,4 ms** |
 | **Demone a riposo** | **~0,7 %** di CPU a riposo; **~5.000 chiamate ai metadati al giorno** per 55 serie; i controlli di salute non scrivono mai su un NAS, così i suoi dischi possono dormire |
 
 Lo stesso documento registra cosa è stato misurato e scartato — io_uring, I/O
@@ -466,7 +466,7 @@ semplice con tutto ciò che serve a un client autonomo.
 - **Si aggiorna da solo** dalle build della CI quando cambia il suo codice,
   verificato SHA-256, con ripristino automatico.
 - **Leggero sulla macchina.** Un solo processo in Go puro, senza motore esterno
-  né server di database: **0,6–1,0 % di un core e 29–39 MB di RSS a riposo**,
+  né server di database: **0,3–0,5 % di un core e 28–30 MB di RSS a riposo**,
   con DHT attiva e un filtro IP completo caricato; **18–37 % di un core** a
   8,2–8,8 MB/s con 116–132 peer, cioè **2,0–4,3 s di CPU per 100 MB**. Un
   trasferimento in loopback arriva a **234–274 MB/s** con circa 100 MB di RSS

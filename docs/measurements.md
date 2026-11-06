@@ -189,12 +189,13 @@ machine (2026-11-03 for the engine measurements, 2026-11-06 for the live at-rest
 
 | What | At rest | Under load |
 |---|---|---|
-| gx-torrent 1.1.331, live (DHT on, full IP filter, 3 seeds) | 0.3 % of a core, 28 MB RSS (16 MB anon) | 18–37 % of a core at 8.2–8.8 MB/s with 116–132 peers, 2.0–4.3 s of CPU per 100 MB |
+| gx-torrent 1.1.331, live (DHT on, full IP filter, 3 seeds) | 0.3–0.5 % of a core, 28–30 MB RSS (16–18 MB anon) | 18–37 % of a core at 8.2–8.8 MB/s with 116–132 peers, 2.0–4.3 s of CPU per 100 MB |
 | gx-torrent, 10 torrents to a NAS | | about 507 MB outside the two caches, 1.1 GB peak with the NFS write cache |
 | gexttod 1.2.2260, same host | 0.4 % of a core, 45 MB anon (70 MB RSS) just started; 97 MB anon (123 MB RSS) after a full search | peak 168 MB anon during a full cycle of 47,342 releases (series and movies), about 69 s of CPU, and back to the figure at rest; a series-only cycle of ~38,800 releases peaks at 149–157 MB anon and leaves 85 MB |
 
-At-rest figures: 120 s on 2026-11-06 for gx-torrent (DHT on, full IP filter, three seeds,
-nothing transferring) and 90 s for gexttod with the integrity check off and no transfer. The
+At-rest figures: three samples of 2, 5 and 10 minutes on 2026-11-06 for gx-torrent (DHT on, full
+IP filter, three seeds, nothing transferring) and 90 s for gexttod with the integrity check off
+and no transfer. The
 gexttod row is the latest full cycle and the latest series-only cycle on 2026-11-06, with
 GOGC=50, transparent huge pages off for the process and
 `GODEBUG=madvdontneed=1`.

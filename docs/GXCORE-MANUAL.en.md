@@ -228,12 +228,13 @@ and message), never on the command line.
 
 Engine, queue, web page, RSS and the qBittorrent-compatible API are one pure-Go
 process: no external engine, no C library, no database server. These figures are
-the whole daemon, measured on an **Intel N97 mini-PC** (4 cores, 16 GB RAM) on
-26–30 October 2026, with DHT on and a full IP filter loaded (172,740 rules):
+the whole daemon, measured on an **Intel N97 mini-PC** (4 cores, 16 GB RAM),
+with DHT on and a full IP filter loaded (172,740 rules); the at-rest row is the
+sample of 6 November 2026, the others are from 26–30 October 2026:
 
 | Situation | CPU | Memory (RSS) |
 | --- | --- | --- |
-| At rest | **0.6–1.0 %** of one core | **29–39 MB** |
+| At rest | **0.3–0.5 %** of one core | **28–30 MB** |
 | Downloading from public swarms at 8.2–8.8 MB/s with 116–132 peers | **18–37 %** of one core, **2.0–4.3 s of CPU per 100 MB** | — |
 | Loopback transfer (seed and leecher on the same host) | **7.5–8.3 s of CPU per 1.09 GiB** for both sides | **≈ 100 MB peak** |
 | Five minutes after a burst, with no transfer | — | **550 MB → 35–40 MB** |
