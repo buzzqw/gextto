@@ -30,6 +30,26 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends deluged=2.2.0-1 deluge-web=2.2.0-1 \
     && rm -rf /var/lib/apt/lists/*
 
+# rain and anacrolix/torrent are Go code with no distribution package that pins
+# a version, so they are built from the tagged source (the same rule as
+# gx-torrent). anacrolix/torrent is a library: the image ships the small front
+# end in scripts/compare/anacrolix that adds, rechecks and reports the torrents.
+FROM golang:1.27 AS rain-build
+RUN CGO_ENABLED=0 go install github.com/cenkalti/rain/v2@v2.4.5
+
+FROM base AS rain
+COPY --from=rain-build /go/bin/rain /usr/local/bin/rain
+
+FROM golang:1.27 AS anacrolix-build
+WORKDIR /src
+COPY scripts/compare/anacrolix/go.mod scripts/compare/anacrolix/go.sum ./
+RUN go mod download
+COPY scripts/compare/anacrolix/main.go ./
+RUN CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags "-s -w" -o /out/anacrolix .
+
+FROM base AS anacrolix
+COPY --from=anacrolix-build /out/anacrolix /usr/local/bin/anacrolix
+
 # The tracker of the isolated network.
 FROM python:3.13-slim AS tracker
 COPY scripts/compare/tracker.py /tracker.py

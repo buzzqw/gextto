@@ -44,7 +44,7 @@ TEST_ROOT = Path(
 WORK = Path(os.environ.get("GX_COMPARE_DIR", TEST_ROOT / "compare"))
 RESULTS = Path(os.environ.get("GX_COMPARE_OUT", ROOT / "gextto-data" / "bench" / "compare.jsonl"))
 
-CLIENTS = ["gx-torrent", "qbittorrent", "transmission", "deluge"]
+CLIENTS = ["gx-torrent", "qbittorrent", "transmission", "deluge", "rain", "anacrolix"]
 SCENARIOS = ["idle", "full", "line", "line-utp", "check-upload", "many"]
 
 NET = "gxc-net"
@@ -65,7 +65,9 @@ LINE_PEERS = 4
 LINE_RATE = "25mbit"  # 4 peers x 25 Mbit/s = a 100 Mbit/s line
 LINE_DELAY = "40ms"
 MIN_AVAILABLE_KIB = 1500 * 1024
-QUIET_CORES = 1.0
+# A published round uses 1.0; GX_COMPARE_QUIET_CORES exists only for a smoke
+# run on a busy machine, whose numbers are thrown away.
+QUIET_CORES = float(os.environ.get("GX_COMPARE_QUIET_CORES", "1.0"))
 MAX_ATTEMPTS = 3
 
 
@@ -280,6 +282,10 @@ class Client:
 
     name = ""
     image = ""
+    # How often the harness asks for the state of the torrents. A client whose
+    # API has no bulk status call raises it, so the poll does not become part
+    # of its measured CPU.
+    poll_interval = 0.25
 
     def __init__(self, slot, ip, cpus, memory, reference=False, protocol="TCP", cap_add=(), utp=True):
         self.reference, self.protocol, self.utp = reference, protocol, utp
@@ -520,7 +526,102 @@ class Deluge(Client):
         return {h: (states.get(r["state"], r["state"]), float(r["progress"]) / 100.0) for h, r in rows.items()}
 
 
-CLIENT_CLASSES = {c.name: c for c in (GxTorrent, QBittorrent, Transmission, Deluge)}
+class Rain(Client):
+    """cenkalti/rain: a client-server pair with JSON-RPC 2.0 over HTTP."""
+
+    name = "rain"
+    image = "gxc-rain"
+    # The RPC reports one torrent at a time and has no bulk status call, so on
+    # a hundred torrents the harness asks less often: the poll itself is work
+    # in the client's container, and it would land in rain's CPU row.
+    poll_interval = 2.0
+
+    def configure(self):
+        (self.dir / "cfg" / "rain.yaml").write_text(
+            "database: /data/cfg/session.db\n"
+            "data-dir: /data/dl\n"
+            # A folder per torrent would hide the saved file from the byte
+            # comparison at the end of each scenario.
+            "data-dir-includes-torrent-id: false\n"
+            "host: 0.0.0.0\n"
+            # rain refuses a one-port range; it takes the first free port.
+            "port-begin: 6881\n"
+            "port-end: 6882\n"
+            "dht-enabled: false\n"
+            "pex-enabled: false\n"
+            "rpc-enabled: true\n"
+            "rpc-host: 0.0.0.0\n"
+            "rpc-port: 8080\n"
+            "resume-on-startup: true\n"
+        )
+
+    def command(self):
+        return ["rain", "server", "-c", "/data/cfg/rain.yaml"]
+
+    def rpc(self, method, params=None):
+        body = json.dumps({"jsonrpc": "2.0", "id": 1, "method": method, "params": params or {}}).encode()
+        answer = json.loads(http(f"http://{self.ip}:8080/", body, {"Content-Type": "application/json"}))
+        if answer.get("error"):
+            raise RuntimeError(f"rain {method}: {answer['error']}")
+        return answer["result"]
+
+    def ids(self):
+        """The RPC speaks torrent ids, the harness speaks info hashes."""
+        listing = self.rpc("Session.ListTorrents")["Torrents"]
+        return {item["InfoHash"].lower(): item["ID"] for item in listing}
+
+    def add(self, payload, skip_check=False):
+        self.rpc("Session.AddTorrent", {"Torrent": base64.b64encode(payload.data).decode()})
+
+    def recheck(self, payload):
+        self.rpc("Session.VerifyTorrent", {"ID": self.ids()[payload.info_hash]})
+
+    def status(self):
+        out = {}
+        for info_hash, torrent_id in self.ids().items():
+            stats = self.rpc("Session.GetTorrentStats", {"ID": torrent_id})["Stats"]
+            total, done = stats["Bytes"]["Total"], stats["Bytes"]["Completed"]
+            raw = stats["Status"]
+            if raw in ("Verifying", "Allocating"):
+                state = "checking"
+            elif raw == "Seeding":
+                state = "seeding"
+            elif raw in ("Downloading", "Downloading Metadata"):
+                state = "downloading"
+            else:
+                state = "seeding" if total and done >= total else "downloading"
+            out[info_hash] = (state, done / total if total else 0.0)
+        return out
+
+
+class Anacrolix(Client):
+    """anacrolix/torrent: the library, with the front end in scripts/compare/anacrolix."""
+
+    name = "anacrolix"
+    image = "gxc-anacrolix"
+
+    def url(self, path):
+        return f"http://{self.ip}:8080/{path}"
+
+    def command(self):
+        return ["anacrolix", "-data", "/data/dl", "-port", "6881"]
+
+    def add(self, payload, skip_check=False):
+        body, headers = multipart(
+            {"savepath": "/data/dl"},
+            {"torrent": (f"{payload.name}.torrent", payload.data)},
+        )
+        http(self.url("add"), body, headers, timeout=60)
+
+    def recheck(self, payload):
+        http(self.url("recheck"), urllib.parse.urlencode({"hash": payload.info_hash}).encode())
+
+    def status(self):
+        rows = json.loads(http(self.url("status")))
+        return {h: (row["state"], float(row["progress"])) for h, row in rows.items()}
+
+
+CLIENT_CLASSES = {c.name: c for c in (GxTorrent, QBittorrent, Transmission, Deluge, Rain, Anacrolix)}
 
 
 # ---------------------------------------------------------------------------
@@ -701,7 +802,7 @@ def wait_done(client, info_hash, timeout=900, want="seeding"):
         row = client.status().get(info_hash)
         if row and row[1] >= 0.9999 and (want is None or row[0] == want):
             return
-        time.sleep(0.25)
+        time.sleep(client.poll_interval)
     raise RuntimeError(f"{client.name}: timed out, status {client.status().get(info_hash)}")
 
 
@@ -711,7 +812,7 @@ def wait_check_started(client, info_hash, timeout=10):
         row = client.status().get(info_hash)
         if row and (row[0] != "seeding" or row[1] < 0.9999):
             return
-        time.sleep(0.02)
+        time.sleep(min(0.02, client.poll_interval))
 
 
 def same_file(a, b):
@@ -822,11 +923,11 @@ def scenario_many(client, env):
             try:
                 rows = sut.status()
             except Exception:
-                time.sleep(0.25)
+                time.sleep(max(0.25, sut.poll_interval))
                 continue
             if len(rows) == len(payloads) and all(r[1] >= 0.9999 and r[0] == "seeding" for r in rows.values()):
                 return
-            time.sleep(0.5)
+            time.sleep(max(0.5, sut.poll_interval))
         raise RuntimeError(f"{client}: not all torrents reached seeding")
 
     all_seeding()
