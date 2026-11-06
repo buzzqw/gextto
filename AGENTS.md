@@ -395,6 +395,11 @@ itself (or rolls back).
   configured by the operator (absolute save paths, fetching `.torrent`/IP
   filters) are intentional features, on an API protected by a token; protocol
   cryptography (RC4 in MSE, SHA-1 in the DHT) cannot be changed.
+- **A check a day, at night, when the assistant is active**: open the Code
+  Scanning page (`gh api 'repos/buzzqw/gextto/code-scanning/alerts?state=open&per_page=100'`)
+  once a day and triage the new alerts as above, without waiting to be asked.
+  An alert already dismissed with a reason stays dismissed; look at it again
+  only when the code it points at changes.
 - Open alerts: `gh api 'repos/buzzqw/gextto/code-scanning/alerts?state=open&per_page=100'`.
 
 ## Service running on this machine
