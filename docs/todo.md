@@ -53,6 +53,16 @@ Nothing open: every engine item waits for a condition listed under
   with the byte comparison. Two more clients open a new baseline: re-run every client and
   replace the table in `measurements.md`. Gate: the next benchmark round.
 
+- **The documents of the night round** — when the six-client comparison has run: replace
+  the tables and the method section of `docs/measurements.md` (six clients, the pinned
+  versions, the host, the date and the commit), say that anacrolix/torrent is driven by
+  `scripts/compare/anacrolix` with library defaults and that rain is asked torrent by
+  torrent because its RPC has no bulk status; then align every place that repeats the
+  numbers or the client list — `README.md`, `README.it.md`, the comparison lines in
+  `docs/gx-core.md`, `docs/gx-torrent.md`, `docs/bep.md`, `docs/DOCKER.*`, the harness
+  description in `docs/DEVELOPERS.md`, the benchmark rule in `AGENTS.md`, and the index in
+  `docs/README.md`. Gate: the round finished.
+
 ## Proposals
 
 Ideas proposed but not decided yet. An accepted proposal moves to the matching area with
