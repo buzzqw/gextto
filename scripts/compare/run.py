@@ -550,9 +550,10 @@ class Rain(Client):
             # comparison at the end of each scenario.
             "data-dir-includes-torrent-id: false\n"
             "host: 0.0.0.0\n"
-            # rain refuses a one-port range; it takes the first free port.
+            # rain refuses a one-port range and keeps one listening port per
+            # torrent, so the range covers a hundred of them.
             "port-begin: 6881\n"
-            "port-end: 6882\n"
+            "port-end: 6999\n"
             "dht-enabled: false\n"
             "pex-enabled: false\n"
             "rpc-enabled: true\n"
