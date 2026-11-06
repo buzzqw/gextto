@@ -25,18 +25,13 @@ non cambiano l'interfaccia di Gextto, dove quelle pagine non esistono. Le
 correzioni al motore valgono invece per entrambi.
 
 ## 6 novembre 2026
-- **Il log dice le cose una volta sola, e a parole.** Diversi messaggi si ripetevano o parlavano il linguaggio del programma invece del tuo:
-  - **Autotune**: su una linea trafficata la regolazione automatica scriveva «starting with…» ogni pochi minuti. Ora scrive al massimo una riga ogni 15 minuti, che spiega cosa sta facendo («limiting the speed to keep the line responsive»); i passaggi intermedi finiscono nel riepilogo dei 15 minuti, dove «nessun limite» si legge sempre allo stesso modo.
-  - **Riavvio**: niente più «(SIGTERM/SIGINT)» nella riga di arresto, e niente più una riga a parte con la versione *vecchia* di gx-torrent prima del separatore. Che gx-torrent sia stato riavviato con il nuovo programma lo dice la riga di avvio.
-  - **File spariti dalla libreria**: quando più puntate di una serie non sono più sul disco esce una sola riga per serie, con l'elenco delle puntate, invece di una per puntata nello stesso secondo.
-  - **File danneggiati**: la frase dice che il file non si riproduce fino in fondo senza errori; i messaggi tecnici del decoder restano come dettaglio in fondo alla riga.
-  - **Controllo di integrità**: il resoconto periodico esce ogni 50 file controllati, non a ogni giro di mezz'ora con gli stessi numeri; un arresto senza nessun file controllato non scrive più «stopped».
-  - **Riepilogo della ricerca**: le puntate mancanti trovate sono contate fra i download avviati, non come un tipo in più («2 downloads started (1 new, 1 upgrade; 1 of them fills a missing episode)»). Una qualità sconosciuta non diventa più «unknown unknown ITA».
-  - **Rinomina**: «rename skipped: archive import in progress» e le righe con «0 discarded, 0 errors» sono diventate frasi che nominano solo quello che è successo e quando verrà riprovato.
-  - **Archivio**: due collegamenti della stessa release risolti nella stessa ricerca non producono più un avviso con l'errore del database: la copia in più viene tolta senza rumore.
-  - All'arresto i lavori ancora in corso hanno il loro nome («media integrity check»), non quello interno, e l'attesa di una copia lunga si ripete ogni minuto invece che ogni 15 secondi. Spariti anche i «file(s)».
-
-  Niente da configurare.
+- **La regolazione automatica della velocità scrive al massimo una riga ogni 15 minuti.** Su una linea trafficata compariva «starting with…» ogni pochi minuti; ora la riga dice cosa sta facendo («limiting the speed to keep the line responsive») e i passaggi intermedi finiscono nel riepilogo dei 15 minuti, dove «nessun limite» si legge sempre allo stesso modo. Niente da configurare.
+- **Riavvio e arresto si leggono a parole.** L'arresto non scrive più «(SIGTERM/SIGINT)» e non compare più una riga a parte con la versione *vecchia* di gx-torrent prima del separatore: che gx-torrent sia ripartito con il nuovo programma lo dice la riga di avvio. I lavori ancora in corso hanno il loro nome («media integrity check»), non quello interno, e l'attesa di una copia lunga si ripete ogni minuto invece che ogni 15 secondi. Spariti anche i «file(s)». Niente da configurare.
+- **Le puntate sparite dalla libreria si leggono una volta per serie.** Quando più puntate di una serie non sono più sul disco esce una sola riga per serie, con l'elenco delle puntate, invece di una riga per puntata nello stesso secondo. Niente da configurare.
+- **La riga di un file danneggiato dice cosa non va, e i dettagli tecnici restano in fondo.** La frase dice che il file non si riproduce fino in fondo senza errori; i messaggi tecnici del decoder restano come dettaglio in fondo alla riga. Niente da configurare.
+- **Il controllo di integrità aggiorna il resoconto ogni 50 file.** Il riepilogo periodico esce ogni 50 file controllati, non a ogni giro di mezz'ora con gli stessi numeri; un arresto senza nessun file controllato non scrive più «stopped». Niente da configurare.
+- **Il riepilogo della ricerca non elenca le puntate mancanti come un tipo di download.** Le puntate che riempiono un buco sono contate fra i download avviati («2 downloads started (1 new, 1 upgrade; 1 of them fills a missing episode)»), e una qualità sconosciuta non diventa più «unknown unknown ITA». Niente da configurare.
+- **Rinomina e archivio spiegano cosa è successo.** Le righe «rename skipped: archive import in progress» e quelle con «0 discarded, 0 errors» sono diventate frasi che nominano solo quello che è successo e quando verrà riprovato; due collegamenti della stessa release risolti nella stessa ricerca non producono più un avviso con l'errore del database, perché la copia in più viene tolta senza rumore. Niente da configurare.
 
 ## 5 novembre 2026
 - **Gextto ha una nuova icona.** La scheda del browser, il collegamento sul telefono e il sito della documentazione mostrano il nuovo logo GX al posto della vecchia icona. Non c'è niente da configurare; se il browser mostra ancora la vecchia icona, ricarica la pagina o reinstalla l'app dal menu del browser.

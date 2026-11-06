@@ -24,18 +24,13 @@ not change Gextto's interface, where those pages do not exist. Engine fixes, on
 the other hand, apply to both.
 
 ## 6 November 2026
-- **The log says things once, and in words.** Several messages repeated themselves or spoke the program's language instead of yours:
-  - **Autotune**: on a busy line the automatic speed control wrote «starting with…» every few minutes. It now writes at most one line every 15 minutes, saying what it is doing («limiting the speed to keep the line responsive»); the steps in between go into the 15-minute summary, where «no limit» always reads the same way.
-  - **Restart**: no more «(SIGTERM/SIGINT)» in the stop line, and no separate line with the *old* gx-torrent version before the divider. The start line says that gx-torrent was restarted with its new program.
-  - **Files gone from the library**: when several episodes of a series are no longer on disk there is one line per series, listing the episodes, instead of one per episode in the same second.
-  - **Damaged files**: the sentence says the file cannot be played through without errors; the decoder's technical messages stay as a detail at the end of the line.
-  - **Integrity check**: the periodic report comes every 50 checked files, not at every half-hour round with the same numbers; a stop before any file was checked no longer writes «stopped».
-  - **Search summary**: the missing episodes filled are counted among the started downloads, not as one more kind («2 started (1 new, 1 upgrade; 1 of them fills a missing episode)»). An unknown quality no longer turns into «unknown unknown ITA».
-  - **Rename**: «rename skipped: archive import in progress» and the lines with «0 discarded, 0 errors» became sentences that name only what happened and when it will be retried.
-  - **Archive**: two links of the same release resolved in the same search no longer raise a warning with the database error: the extra copy is removed quietly.
-  - At shutdown the work still running is called by its name («media integrity check»), not the internal one, and the wait for a long copy repeats every minute instead of every 15 seconds. The «file(s)» are gone too.
-
-  Nothing to configure.
+- **The automatic speed control writes at most one line every 15 minutes.** On a busy line it wrote «starting with…» every few minutes; now the line says what it is doing («limiting the speed to keep the line responsive») and the steps in between go into the 15-minute summary, where «no limit» always reads the same way. Nothing to configure.
+- **Restart and shutdown read in words.** The stop line no longer writes «(SIGTERM/SIGINT)» and there is no separate line with the *old* gx-torrent version before the divider any more: the start line says that gx-torrent was restarted with its new program. The work still running is called by its name («media integrity check»), not the internal one, and the wait for a long copy repeats every minute instead of every 15 seconds. The «file(s)» are gone too. Nothing to configure.
+- **Files gone from the library are listed once per series.** When several episodes of a series are no longer on disk there is one line per series, listing the episodes, instead of one per episode in the same second. Nothing to configure.
+- **The line for a damaged file says what is wrong, and the technical details stay at the end.** The sentence says the file cannot be played through without errors; the decoder's technical messages stay as a detail at the end of the line. Nothing to configure.
+- **The integrity check reports every 50 files.** The periodic report comes every 50 checked files, not at every half-hour round with the same numbers; a stop before any file was checked no longer writes «stopped». Nothing to configure.
+- **The search summary no longer lists filled missing episodes as a kind of download.** The missing episodes found are counted among the started downloads («2 started (1 new, 1 upgrade; 1 of them fills a missing episode)»), and an unknown quality no longer turns into «unknown unknown ITA». Nothing to configure.
+- **Rename and archive say what happened.** The lines «rename skipped: archive import in progress» and those with «0 discarded, 0 errors» became sentences that name only what happened and when it will be retried; two links of the same release resolved in the same search no longer raise a warning with the database error, because the extra copy is removed quietly. Nothing to configure.
 
 ## 5 November 2026
 - **Gextto has a new icon.** The browser tab, the shortcut on your phone and the documentation site show the new GX logo instead of the old icon. Nothing to configure; if the browser still shows the old icon, reload the page or reinstall the app from the browser menu.
