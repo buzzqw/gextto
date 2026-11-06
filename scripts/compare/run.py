@@ -47,11 +47,17 @@ RESULTS = Path(os.environ.get("GX_COMPARE_OUT", ROOT / "gextto-data" / "bench" /
 CLIENTS = ["gx-torrent", "qbittorrent", "transmission", "deluge", "rain", "anacrolix"]
 SCENARIOS = ["idle", "full", "line", "line-utp", "check-upload", "many"]
 
-NET = "gxc-net"
-SUBNET = "172.30.0"
-TRACKER_IP = f"{SUBNET}.2"
-SUT_IP = f"{SUBNET}.10"
-ANNOUNCE = f"http://{TRACKER_IP}:6969/announce"
+# Every round owns a docker network and a prefix for its containers, chosen by
+# ensure_network() from the first free slot: a second round on the same machine
+# (a leftover, or someone measuring something else) cannot delete this one's
+# containers or answer on its address. GX_COMPARE_NET and GX_COMPARE_SUBNET pin
+# the pair instead.
+NET = os.environ.get("GX_COMPARE_NET", "")
+SUBNET = os.environ.get("GX_COMPARE_SUBNET", "")
+PREFIX = ""
+TRACKER_IP = ""
+SUT_IP = ""
+ANNOUNCE = ""
 SUT_CPUS = "2,3"
 REF_CPUS = "0,1"
 SUT_MEMORY = "4g"
@@ -217,6 +223,7 @@ def multipart(fields, files):
 
 class Container:
     def __init__(self, name, image, args, env_dir, ip, cpus, memory, cap_add=()):
+        name = f"{PREFIX}-{name}"
         self.name, self.ip, self.dir = name, ip, env_dir
         cmd = [
             "docker", "run", "-d", "--name", name, "--network", NET, "--ip", ip,
@@ -292,7 +299,7 @@ class Client:
 
     def __init__(self, slot, ip, cpus, memory, reference=False, protocol="TCP", cap_add=(), utp=True):
         self.reference, self.protocol, self.utp = reference, protocol, utp
-        self.dir = WORK / "run" / slot
+        self.dir = WORK / "run" / PREFIX / slot
         shutil.rmtree(self.dir, ignore_errors=True)
         (self.dir / "cfg").mkdir(parents=True)
         (self.dir / "dl").mkdir()
@@ -754,8 +761,8 @@ class Sampler:
 
 
 def start_tracker():
-    sh("docker", "rm", "-f", "gxc-tracker", check=False)
-    sh("docker", "run", "-d", "--name", "gxc-tracker", "--network", NET, "--ip", TRACKER_IP,
+    sh("docker", "rm", "-f", f"{PREFIX}-tracker", check=False)
+    sh("docker", "run", "-d", "--name", f"{PREFIX}-tracker", "--network", NET, "--ip", TRACKER_IP,
        "--cpuset-cpus", REF_CPUS, "gxc-tracker", "python3", "-u", "/tracker.py")
     deadline = time.time() + 20
     while time.time() < deadline:
@@ -829,10 +836,11 @@ def same_file(a, b):
 
 
 def cleanup():
-    names = sh("docker", "ps", "-aq", "--filter", "name=gxc-sut", "--filter", "name=gxc-ref", check=False)
+    """Remove this round's containers and folders, and nothing else."""
+    names = sh("docker", "ps", "-aq", "--filter", f"name={PREFIX}-sut", "--filter", f"name={PREFIX}-ref", check=False)
     for cid in names.split():
         sh("docker", "rm", "-f", cid, check=False)
-    shutil.rmtree(WORK / "run", ignore_errors=True)
+    shutil.rmtree(WORK / "run" / PREFIX, ignore_errors=True)
     os.sync()
 
 
@@ -975,8 +983,23 @@ def setup_env(args, scenarios):
 
 
 def ensure_network():
-    if not sh("docker", "network", "ls", "-q", "--filter", f"name=^{NET}$"):
+    """Pick this round's network and container prefix, then create the network."""
+    global NET, SUBNET, PREFIX, TRACKER_IP, SUT_IP, ANNOUNCE
+    if not NET or not SUBNET:
+        used = set(sh("docker", "network", "ls", "--format", "{{.Name}}").split())
+        for slot in range(30, 90):
+            if f"gxc-net-{slot}" in used:
+                continue
+            NET, SUBNET = f"gxc-net-{slot}", f"172.{slot}.0"
+            break
+        else:
+            raise SystemExit("no free gxc-net-N slot for this round")
+    if NET not in set(sh("docker", "network", "ls", "--format", "{{.Name}}").split()):
         sh("docker", "network", "create", "--internal", "--subnet", f"{SUBNET}.0/24", NET)
+    PREFIX = "gxc-" + SUBNET.split(".")[1]
+    TRACKER_IP = f"{SUBNET}.2"
+    SUT_IP = f"{SUBNET}.10"
+    ANNOUNCE = f"http://{TRACKER_IP}:6969/announce"
 
 
 def command_build(args):
@@ -994,12 +1017,18 @@ def command_clean(args):
     (several GiB, regenerated from the fixed formula). The images stay unless
     --images is given, because the next round would rebuild them from scratch."""
     cleanup()
-    sh("docker", "network", "rm", NET, check=False)
+    for network in sh("docker", "network", "ls", "--format", "{{.Name}}", check=False).split():
+        if network.startswith("gxc-net") and not attached_containers(network):
+            sh("docker", "network", "rm", network, check=False)
     if args.images:
         for target in CLIENTS + ["tracker"]:
             sh("docker", "image", "rm", "-f", f"gxc-{target}", check=False)
     shutil.rmtree(WORK, ignore_errors=True)
     print(f"removed {WORK}" + (" and the gxc-* images" if args.images else ""))
+
+
+def attached_containers(network):
+    return int(sh("docker", "network", "inspect", "-f", "{{len .Containers}}", network, check=False) or 0)
 
 
 def describe_host():
@@ -1040,7 +1069,7 @@ def command_run(args):
         failures = run_rounds(args, clients, scenarios, env, commit)
     finally:
         cleanup()
-        sh("docker", "rm", "-f", "gxc-tracker", check=False)
+        sh("docker", "rm", "-f", f"{PREFIX}-tracker", check=False)
     log("finished, failures:", failures)
     return 1 if failures else 0
 
