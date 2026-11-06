@@ -42,7 +42,7 @@ func TestMissingArchiveText(t *testing.T) {
 	many, folder := missingArchiveText("Series A", []missingArchiveEpisode{
 		{1, 3, "/lib/A/e3.mkv"}, {1, 1, "/lib/A/e1.mkv"}, {1, 2, "/lib/A/e2.mkv"},
 	})
-	if many != "3 library files of Series A are no longer on disk (S01E01, S01E02 and S01E03), so they can be downloaded again" || folder != "/lib/A" {
+	if many != "3 library files of Series A are no longer on disk, so they can be downloaded again" || folder != "/lib/A" {
 		t.Fatalf("many = %q (%q)", many, folder)
 	}
 }

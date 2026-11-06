@@ -61,6 +61,27 @@ func TestArchiveTitleHasEpisodeUsesTheFTSPrefixToken(t *testing.T) {
 	}
 }
 
+// TestSeasonFilterLeavesEachGapItsRows guards the season search: one set of
+// rows answers every missing episode of that season, so narrowing it for one
+// gap must not consume the rows another gap needs.
+func TestSeasonFilterLeavesEachGapItsRows(t *testing.T) {
+	items := []ArchiveListing{
+		{Title: "Example.Show.S02E01.1080p.WEB-DL"},
+		{Title: "Example.Show.S02E02.1080p.WEB-DL"},
+		{Title: "Example.Show.S02E03.1080p.WEB-DL"},
+	}
+	for _, episode := range []int64{1, 2, 3} {
+		got := filterArchiveEpisode(items, 2, episode)
+		if len(got) != 1 {
+			t.Fatalf("episode %d: got %d rows, want 1: %+v", episode, len(got), got)
+		}
+		want := fmt.Sprintf("Example.Show.S02E%02d.1080p.WEB-DL", episode)
+		if got[0].Title != want {
+			t.Fatalf("episode %d: got %q, want %q", episode, got[0].Title, want)
+		}
+	}
+}
+
 func TestCompleteSeasonPackCoversEveryGapInItsSeason(t *testing.T) {
 	series := "Example Show"
 	season := int64(2)

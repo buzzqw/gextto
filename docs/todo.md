@@ -95,6 +95,8 @@ Closed by choice, not waiting for a measurement:
 - Preventing a second row when the same film or series is added under another spelling
   (a colon present or absent, one hyphen more, a double space): the operator does not
   mind the duplicated rows, and the release match already ignores punctuation.
+- Listing every vanished episode inside the one line per series: the operator found the
+  list excessive; the line says how many library files are missing.
 
 - A night refresh of the episode titles: the periodic library check already retries the
   "Episodio N" names and falls back to the English title; the files that keep the

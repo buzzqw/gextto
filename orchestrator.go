@@ -1153,13 +1153,14 @@ func distributeSeasonED2K(cfg *Config, series *SeriesConfig, season int64, episo
 // filterArchiveEpisode keeps the listings whose title carries the episode as
 // an FTS token prefix, the same condition the per-episode query asked for.
 func filterArchiveEpisode(items []ArchiveListing, season, episode int64) []ArchiveListing {
-	kept := items[:0]
+	// The season's rows answer every gap of that season: leave the input
+	// untouched, or narrowing it for one episode empties it for the next.
+	kept := make([]ArchiveListing, 0, len(items))
 	for _, item := range items {
 		if archiveTitleHasEpisode(item.Title, season, episode) {
 			kept = append(kept, item)
 		}
 	}
-	clear(items[len(kept):])
 	return kept
 }
 
