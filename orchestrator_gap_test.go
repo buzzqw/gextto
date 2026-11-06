@@ -35,6 +35,32 @@ func TestReleaseMatchesConfiguredEpisodeRequiresExactIdentity(t *testing.T) {
 	}
 }
 
+// TestArchiveTitleHasEpisodeUsesTheFTSPrefixToken pins the condition that
+// replaces the per-episode FTS query with a filter over the season's rows: it
+// must accept exactly the titles that query would have matched.
+func TestArchiveTitleHasEpisodeUsesTheFTSPrefixToken(t *testing.T) {
+	for _, test := range []struct {
+		title   string
+		season  int64
+		episode int64
+		want    bool
+	}{
+		{"Rare.Show.S02E02.1080p.WEB-DL", 2, 2, true},
+		{"[Group] Rare Show - S02E02 [1080p]", 2, 2, true},
+		{"Rare.Show.S02E02E03.1080p", 2, 2, true},
+		{"Rare.Show.S02E02E03.1080p", 2, 3, false},
+		{"Rare.Show.S02E20.1080p", 2, 2, false},
+		{"Rare.Show.S2E2.1080p", 2, 2, false},
+		{"Rare.Show.S02E022.1080p", 2, 2, true},
+		{"Rare.Show.S102E02.1080p", 2, 2, false},
+		{"Rare.Show.S02E02.ITA", 3, 2, false},
+	} {
+		if got := archiveTitleHasEpisode(test.title, test.season, test.episode); got != test.want {
+			t.Errorf("%q S%02dE%02d = %v, want %v", test.title, test.season, test.episode, got, test.want)
+		}
+	}
+}
+
 func TestCompleteSeasonPackCoversEveryGapInItsSeason(t *testing.T) {
 	series := "Example Show"
 	season := int64(2)

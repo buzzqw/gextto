@@ -406,8 +406,42 @@ const (
 	archiveDeleteLinkSQL = "DELETE FROM archive WHERE magnet_key=?1 AND COALESCE(magnet_hash,'')='' AND EXISTS (SELECT 1 FROM archive AS other WHERE other.magnet_hash=?2 AND other.magnet_key<>?1)"
 )
 
+// knownArchiveIdentities loads the magnet keys and hashes already in the
+// archive. A cycle sees the same releases again and again: without the set,
+// every one of them costs an INSERT that SQLite has to resolve against two
+// unique indexes only to ignore it.
+func (a *Archive) knownArchiveIdentities() (map[string]struct{}, map[string]struct{}) {
+	rows, err := a.reader().Query("SELECT magnet_key, COALESCE(magnet_hash,'') FROM archive")
+	if err != nil {
+		logging.Debug("the archive identities could not be read; the batch inserts every release", "error", err)
+		return nil, nil
+	}
+	defer rows.Close()
+	keys := make(map[string]struct{}, 1<<14)
+	hashes := make(map[string]struct{}, 1<<14)
+	for rows.Next() {
+		var key []byte
+		var hash string
+		if err := rows.Scan(&key, &hash); err != nil {
+			continue
+		}
+		keys[string(key)] = struct{}{}
+		if hash != "" {
+			hashes[hash] = struct{}{}
+		}
+	}
+	if err := rows.Err(); err != nil {
+		logging.Debug("the archive identities could not be read completely; the batch inserts every release", "error", err)
+		return nil, nil
+	}
+	return keys, hashes
+}
+
 // SaveBatch archives releases: one row per magnet/listing and per infohash.
 func (a *Archive) SaveBatch(releases []models.Release, cfg *Config) error {
+	// The known identities are loaded once for the whole batch: most releases
+	// are already archived, and their write would be ignored anyway.
+	knownKeys, knownHashes := a.knownArchiveIdentities()
 	// Spezza il batch in transazioni più piccole: un'unica transazione da
 	// migliaia di righe con l'indice FTS5 generava un WAL enorme (osservato
 	// ~458 MB) e una finestra di scrittura molto lunga. Con chunk da 1000
@@ -418,7 +452,7 @@ func (a *Archive) SaveBatch(releases []models.Release, cfg *Config) error {
 		if end > len(releases) {
 			end = len(releases)
 		}
-		if err := a.saveChunk(releases[start:end], cfg); err != nil {
+		if err := a.saveChunk(releases[start:end], cfg, knownKeys, knownHashes); err != nil {
 			return err
 		}
 		// Trunca il WAL tra i chunk: la write amplification FTS5 non si
@@ -428,8 +462,11 @@ func (a *Archive) SaveBatch(releases []models.Release, cfg *Config) error {
 	return nil
 }
 
-// saveChunk writes one 1000-row transaction.
-func (a *Archive) saveChunk(releases []models.Release, cfg *Config) error {
+// saveChunk writes one 1000-row transaction. knownKeys and knownHashes are the
+// rows already archived (nil when the preload failed): a release whose exact
+// key is there needs no write, and one whose hash is there only refreshes that
+// row.
+func (a *Archive) saveChunk(releases []models.Release, cfg *Config, knownKeys, knownHashes map[string]struct{}) error {
 	tx, err := a.db.Begin()
 	if err != nil {
 		return err
@@ -499,25 +536,59 @@ func (a *Archive) saveChunk(releases []models.Release, cfg *Config) error {
 		// refreshes its one row, which becomes the newest, as a new row did. A
 		// guid-keyed listing is refreshed in place instead of being appended
 		// again when Jackett regenerates its download URL.
-		args := []any{r.Title, source, hash, r.Source, cfg.ReleaseScore(r), archiveMagnetKeyString(identity), strings.TrimSpace(r.FeedURL)}
-		result, err := insert.Exec(args...)
-		if err != nil {
-			_ = tx.Rollback()
-			return err
-		}
-		if inserted, _ := result.RowsAffected(); inserted == 0 {
-			if hash != nil {
-				refreshed, err := refresh.Exec(args...)
-				if err != nil {
+		key := archiveMagnetKeyString(identity)
+		hashText, _ := hash.(string)
+		args := []any{r.Title, source, hash, r.Source, cfg.ReleaseScore(r), key, strings.TrimSpace(r.FeedURL)}
+		// The preloaded sets make the common case cheap: an exact listing needs
+		// no write at all, and a torrent known by hash only refreshes its row.
+		if knownKeys != nil {
+			if _, exists := knownKeys[string(key)]; exists {
+				if strings.TrimSpace(r.Magnet) != "" {
+					// The exact magnet is already archived: the ignored insert
+					// would have refreshed no row.
+					continue
+				}
+				// A link-only row may have learned its hash: the torrent may
+				// already be archived under another listing, in which case the
+				// link-only copy is the redundant one.
+				if hash != nil {
+					refreshed, err := refresh.Exec(args...)
+					if err != nil {
+						_ = tx.Rollback()
+						return err
+					}
+					if affected, _ := refreshed.RowsAffected(); affected > 0 {
+						if _, err := deleteLink.Exec(key, hash); err != nil {
+							_ = tx.Rollback()
+							return err
+						}
+						continue
+					}
+				}
+				if _, err := refreshKey.Exec(args...); err != nil {
 					_ = tx.Rollback()
 					return err
 				}
-				if affected, _ := refreshed.RowsAffected(); affected > 0 {
-					// This link-only listing duplicates a torrent already
-					// archived under another key: drop the copy instead of
-					// keeping a row the archive pass cannot match by hash.
+				continue
+			}
+			if hashText != "" {
+				if _, exists := knownHashes[hashText]; exists {
+					refreshed, err := refresh.Exec(args...)
+					if err != nil {
+						_ = tx.Rollback()
+						return err
+					}
+					if affected, _ := refreshed.RowsAffected(); affected > 0 {
+						if strings.TrimSpace(r.Magnet) == "" {
+							if _, err := deleteLink.Exec(key, hash); err != nil {
+								_ = tx.Rollback()
+								return err
+							}
+						}
+						continue
+					}
 					if strings.TrimSpace(r.Magnet) == "" {
-						if _, err := deleteLink.Exec(archiveMagnetKeyString(identity), hash); err != nil {
+						if _, err := refreshKey.Exec(args...); err != nil {
 							_ = tx.Rollback()
 							return err
 						}
@@ -525,15 +596,50 @@ func (a *Archive) saveChunk(releases []models.Release, cfg *Config) error {
 					continue
 				}
 			}
-			// A link-only listing may still hold the previous ephemeral URL (or
-			// no magnet yet). For a release with a magnet the insert was
-			// ignored because that exact row is already there, and an extra
-			// UPDATE would just cost a write.
-			if strings.TrimSpace(r.Magnet) == "" {
-				if _, err := refreshKey.Exec(args...); err != nil {
-					_ = tx.Rollback()
-					return err
+		}
+		result, err := insert.Exec(args...)
+		if err != nil {
+			_ = tx.Rollback()
+			return err
+		}
+		if inserted, _ := result.RowsAffected(); inserted > 0 {
+			if knownKeys != nil {
+				knownKeys[string(key)] = struct{}{}
+			}
+			if knownHashes != nil && hashText != "" {
+				knownHashes[hashText] = struct{}{}
+			}
+			continue
+		}
+		// The insert was ignored: the row appeared after the preload (another
+		// writer) or its key changed. The refresh path handles both.
+		if hash != nil {
+			refreshed, err := refresh.Exec(args...)
+			if err != nil {
+				_ = tx.Rollback()
+				return err
+			}
+			if affected, _ := refreshed.RowsAffected(); affected > 0 {
+				// This link-only listing duplicates a torrent already
+				// archived under another key: drop the copy instead of
+				// keeping a row the archive pass cannot match by hash.
+				if strings.TrimSpace(r.Magnet) == "" {
+					if _, err := deleteLink.Exec(key, hash); err != nil {
+						_ = tx.Rollback()
+						return err
+					}
 				}
+				continue
+			}
+		}
+		// A link-only listing may still hold the previous ephemeral URL (or
+		// no magnet yet). For a release with a magnet the insert was ignored
+		// because that exact row is already there, and an extra UPDATE would
+		// just cost a write.
+		if strings.TrimSpace(r.Magnet) == "" {
+			if _, err := refreshKey.Exec(args...); err != nil {
+				_ = tx.Rollback()
+				return err
 			}
 		}
 	}
@@ -723,16 +829,22 @@ type ArchiveListing struct {
 	FeedURL string
 }
 
-// SearchEntries returns up to 200 newest archived listings matching the FTS5
-// query, with the infohash each row already knows. Ordering by discovery time
-// ensures recently released episodes are not hidden behind older catalogue
-// entries when a monitored title has more than 200 matches.
+// archiveSearchLimit is how many newest listings one archive search returns.
+// A caller that widens the query (one search per season instead of one per
+// episode) must fall back to the exact query when it gets this many rows: the
+// rest of the match may be beyond the limit.
+const archiveSearchLimit = 200
+
+// SearchEntries returns up to archiveSearchLimit newest archived listings
+// matching the FTS5 query, with the infohash each row already knows. Ordering
+// by discovery time ensures recently released episodes are not hidden behind
+// older catalogue entries when a monitored title has more matches.
 func (a *Archive) SearchEntries(query string) ([]ArchiveListing, error) {
 	term := ftsQuery(query)
 	if term == "" {
 		return []ArchiveListing{}, nil
 	}
-	rows, err := a.reader().Query("SELECT archive.title,archive.magnet,COALESCE(archive.source,'archive'),COALESCE(archive.magnet_hash,''),COALESCE(archive.feed_url,'') FROM archive JOIN archive_fts ON archive_fts.rowid=archive.id WHERE archive_fts MATCH ?1 ORDER BY archive.added_at DESC,archive.id DESC LIMIT 200", term)
+	rows, err := a.reader().Query("SELECT archive.title,archive.magnet,COALESCE(archive.source,'archive'),COALESCE(archive.magnet_hash,''),COALESCE(archive.feed_url,'') FROM archive JOIN archive_fts ON archive_fts.rowid=archive.id WHERE archive_fts MATCH ?1 ORDER BY archive.added_at DESC,archive.id DESC LIMIT ?2", term, archiveSearchLimit)
 	if err != nil {
 		return nil, err
 	}

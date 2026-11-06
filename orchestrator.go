@@ -1150,6 +1150,40 @@ func distributeSeasonED2K(cfg *Config, series *SeriesConfig, season int64, episo
 	return extra, accepted
 }
 
+// filterArchiveEpisode keeps the listings whose title carries the episode as
+// an FTS token prefix, the same condition the per-episode query asked for.
+func filterArchiveEpisode(items []ArchiveListing, season, episode int64) []ArchiveListing {
+	kept := items[:0]
+	for _, item := range items {
+		if archiveTitleHasEpisode(item.Title, season, episode) {
+			kept = append(kept, item)
+		}
+	}
+	clear(items[len(kept):])
+	return kept
+}
+
+func archiveTitleHasEpisode(title string, season, episode int64) bool {
+	token := fmt.Sprintf("s%02de%02d", season, episode)
+	low := strings.ToLower(title)
+	for i := 0; i+len(token) <= len(low); i++ {
+		if i > 0 && isArchiveTokenByte(low[i-1]) {
+			continue
+		}
+		if strings.HasPrefix(low[i:], token) {
+			return true
+		}
+	}
+	return false
+}
+
+// isArchiveTokenByte follows the FTS5 unicode61 tokenizer: letters and digits
+// form a token. Non-ASCII bytes are treated as token bytes too, so an episode
+// token that starts right after an accented letter is not a false match.
+func isArchiveTokenByte(c byte) bool {
+	return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c >= 0x80
+}
+
 // prioritizeArchiveGapDownloads starts archive-backed missing episodes before
 // the expensive all-title remote search. It intentionally uses the same
 // approval and torrent-registration path as the main candidate loop, while
@@ -1185,17 +1219,35 @@ func prioritizeArchiveGapDownloads(
 		score   int64
 	}
 	candidates := map[string]*priorityCandidate{}
+	// One archive search per series/season instead of one per episode: a gap
+	// list of hundreds of episodes runs hundreds of FTS queries, each with its
+	// own sort. The season query selects the same rows (same series words,
+	// plus the season as a token prefix); the exact episode token is checked
+	// locally, so the result is the one the per-episode query returned.
+	type gapGroup struct {
+		series *SeriesConfig
+		season int64
+		gaps   []SeriesGap
+	}
+	groups := []*gapGroup{}
+	byKey := map[string]*gapGroup{}
 	for _, gap := range gaps {
 		season := gap.Season
 		series := cfg.FindSeriesMatch(gap.Series, &season)
 		if series == nil {
 			continue
 		}
-		query := fmt.Sprintf("%s S%02dE%02d", gap.Series, gap.Season, gap.Episode)
-		items, searchErr := searchArchiveForEpisode(ctx, cfg, archive, series, query, gap.Season, gap.Episode)
-		if searchErr != nil {
-			return searchErr
+		key := gap.Series + "\x00" + strconv.FormatInt(gap.Season, 10)
+		group := byKey[key]
+		if group == nil {
+			group = &gapGroup{series: series, season: gap.Season}
+			byKey[key] = group
+			groups = append(groups, group)
 		}
+		group.gaps = append(group.gaps, gap)
+	}
+
+	processGap := func(gap SeriesGap, series *SeriesConfig, items []ArchiveListing) {
 		for _, item := range items {
 			hash, ok := utils.MagnetHash(item.Magnet)
 			if !ok {
@@ -1228,6 +1280,43 @@ func prioritizeArchiveGapDownloads(
 				candidates[hash] = candidate
 			}
 			candidate.gaps[gapTarget{Series: series.Name, Season: gap.Season, Episode: gap.Episode}] = struct{}{}
+		}
+	}
+
+	for _, group := range groups {
+		if group.series.Anime {
+			// Anime numbering needs the episode to resolve the absolute one:
+			// keep the exact query per gap.
+			for _, gap := range group.gaps {
+				query := fmt.Sprintf("%s S%02dE%02d", gap.Series, gap.Season, gap.Episode)
+				items, searchErr := searchArchiveForEpisode(ctx, cfg, archive, group.series, query, gap.Season, gap.Episode)
+				if searchErr != nil {
+					return searchErr
+				}
+				processGap(gap, group.series, items)
+			}
+			continue
+		}
+		query := fmt.Sprintf("%s S%02d", group.gaps[0].Series, group.season)
+		items, searchErr := searchArchiveForEpisode(ctx, cfg, archive, group.series, query, group.season, group.gaps[0].Episode)
+		if searchErr != nil {
+			return searchErr
+		}
+		if len(items) >= archiveSearchLimit {
+			// The season has more matches than one search returns: the oldest
+			// may be beyond the limit, so ask each episode exactly.
+			for _, gap := range group.gaps {
+				exact := fmt.Sprintf("%s S%02dE%02d", gap.Series, gap.Season, gap.Episode)
+				gapItems, err := searchArchiveForEpisode(ctx, cfg, archive, group.series, exact, gap.Season, gap.Episode)
+				if err != nil {
+					return err
+				}
+				processGap(gap, group.series, gapItems)
+			}
+			continue
+		}
+		for _, gap := range group.gaps {
+			processGap(gap, group.series, filterArchiveEpisode(items, gap.Season, gap.Episode))
 		}
 	}
 	if len(candidates) == 0 {

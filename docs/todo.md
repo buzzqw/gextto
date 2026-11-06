@@ -25,10 +25,6 @@ Nothing open: every engine item waits for a condition listed under
   backtracking still shows in the cycle profile: the episode matchers and the
   subtitle rewrite are the remaining patterns. Gate: a profile of a full cycle
   that names the pattern; replace it and re-measure on the same corpus.
-- **Archive write CPU** — SQLite writes in `Archive.SaveBatch` and the gap
-  query weigh more on a search's CPU than parsing does. Gate: a write path
-  with fewer statements (or an index on the gap query) that leaves the archive
-  contents identical, measured on a full cycle.
 - **Cycle allocation churn** — a 38k-release cycle still allocates about 1.4 GB,
   now mostly in `encoding/xml`'s tokenizer and in the HTML parser, which sets
   the peak and the fragmented heap left behind. Gate: a corpus of real feeds
