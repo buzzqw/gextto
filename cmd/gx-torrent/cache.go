@@ -24,14 +24,15 @@ import (
 const mib = 1 << 20
 
 const (
-	cacheBudgetMin  = 128 << 20
-	cacheBudgetMax  = 2 << 30
-	cacheReadMin    = 32 << 20
-	cacheReadMax    = 512 << 20
-	cacheWriteMin   = 96 << 20
-	cacheWriteMax   = 1536 << 20
-	cacheCheckEvery = 3 * time.Minute  // how often the target is recomputed
-	cacheApplyEvery = 10 * time.Minute // minimum time between adaptive retunes
+	cacheBudgetMin   = 128 << 20
+	cacheBudgetMax   = 2 << 30
+	cacheReadMin     = 8 << 20
+	cacheReadPerSeed = 8 << 20
+	cacheReadMax     = 512 << 20
+	cacheWriteMin    = 96 << 20
+	cacheWriteMax    = 1536 << 20
+	cacheCheckEvery  = 3 * time.Minute  // how often the target is recomputed
+	cacheApplyEvery  = 10 * time.Minute // minimum time between adaptive retunes
 )
 
 func clamp64(value, low, high int64) int64 {
@@ -100,9 +101,11 @@ func adaptiveCache(cfg queue.Config, in cacheInputs) (read, write int64, reason 
 	}
 	write = clamp64(write, cacheWriteMin, min(cacheWriteMax, budget))
 
-	// Read cache: grows with active seeds (reads served from RAM), doubled on
-	// network storage where a disk read is a round-trip.
-	read = cacheReadMin + int64(in.activeSeeds)*(cacheReadMin/2)
+	// Read cache: a small base while no seed is known, then grows with the
+	// active seeds (reads served from RAM), doubled on network storage where a
+	// disk read is a round-trip. A fresh session has nothing to reuse yet, so
+	// the base must not reserve the memory a seed may later need.
+	read = cacheReadMin + int64(in.activeSeeds)*cacheReadPerSeed
 	if in.class == "network" {
 		read *= 2
 	}

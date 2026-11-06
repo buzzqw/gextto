@@ -44,6 +44,16 @@ func TestAdaptiveCacheScalesWithWorkload(t *testing.T) {
 	}
 }
 
+func TestAdaptiveCacheReadStartsSmall(t *testing.T) {
+	// A session with no active seed has nothing to reuse: the read cache must
+	// not reserve the memory that a seed may later need (the upload footprint
+	// of the client comparison starts here).
+	read, _, _ := adaptiveCache(queue.Config{}, cacheInputs{ram: 16 << 30, available: 12 << 30, class: "ssd"})
+	if read > 16*mib {
+		t.Fatalf("read cache with no seed = %d MiB, want at most 16", read/mib)
+	}
+}
+
 func TestAdaptiveCacheSlowStorageLeansLarger(t *testing.T) {
 	in := cacheInputs{ram: 16 << 30, available: 12 << 30, activeDownloads: 2, class: "ssd"}
 	_, ssd, _ := adaptiveCache(queue.Config{}, in)
