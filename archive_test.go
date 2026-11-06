@@ -690,6 +690,40 @@ func BenchmarkArchiveSaveBatch(b *testing.B) {
 	b.ReportMetric(float64(seededSize)/(1<<20), "MiB-seeded")
 }
 
+// BenchmarkArchiveSaveBatchKnown measures the other half of a feed pass: 1000
+// releases the archive already holds under the very same magnet, which is what
+// a cycle re-reading its sources archives. The window rotates through the
+// seeded rows, so every iteration writes nothing and the number does not grow
+// with b.N.
+func BenchmarkArchiveSaveBatchKnown(b *testing.B) {
+	path := filepath.Join(b.TempDir(), "gextto_archive.db")
+	archive, err := OpenArchive(path)
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer archive.Close()
+	cfg := &Config{}
+	seed := make([]models.Release, 50000)
+	for i := range seed {
+		seed[i] = models.Release{Title: fmt.Sprintf("Some Show S01E%02d %d", i%99, i), Magnet: benchArchiveMagnet(i)}
+	}
+	if err := archive.SaveBatch(seed, cfg); err != nil {
+		b.Fatal(err)
+	}
+	next := 0
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		batch := make([]models.Release, 1000)
+		for j := range batch {
+			batch[j] = seed[(next+j)%len(seed)]
+		}
+		next = (next + 1000) % len(seed)
+		if err := archive.SaveBatch(batch, cfg); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
 // TestArchiveKeepsOneRowPerTorrent pins the infohash dedup: an archive with
 // several listings of the same torrent keeps only the newest one, a later
 // listing under another magnet refreshes that row, a base32 spelling is the

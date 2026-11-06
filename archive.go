@@ -406,42 +406,106 @@ const (
 	archiveDeleteLinkSQL = "DELETE FROM archive WHERE magnet_key=?1 AND COALESCE(magnet_hash,'')='' AND EXISTS (SELECT 1 FROM archive AS other WHERE other.magnet_hash=?2 AND other.magnet_key<>?1)"
 )
 
-// knownArchiveIdentities loads the magnet keys and hashes already in the
-// archive. A cycle sees the same releases again and again: without the set,
-// every one of them costs an INSERT that SQLite has to resolve against two
-// unique indexes only to ignore it.
-func (a *Archive) knownArchiveIdentities() (map[string]struct{}, map[string]struct{}) {
-	rows, err := a.reader().Query("SELECT magnet_key, COALESCE(magnet_hash,'') FROM archive")
+// archiveIdentityProbe bounds the parameters of one identity lookup: a short
+// statement keeps the plan on the unique index whatever the batch size.
+const archiveIdentityProbe = 400
+
+// archivePlaceholders writes "?,?,?" for n bound values.
+func archivePlaceholders(n int) string {
+	return strings.TrimSuffix(strings.Repeat("?,", n), ",")
+}
+
+// knownArchiveIdentities asks about the identities of this batch only. A cycle
+// sees the same releases again and again, and skipping their write also skips
+// the FTS5 rewrite the ignored insert used to trigger; reading the whole
+// archive to find them, though, cost more than the writes it saved once the
+// archive was large (2026-11-06: a 1000-row batch into a 50,000-row archive
+// went from 38 to 125 ms and from 3 to 17 MiB). These probes run on the two
+// unique indexes, which is what the write would have resolved anyway.
+func (a *Archive) knownArchiveIdentities(keys [][]byte, hashes []string) (map[string]struct{}, map[string]struct{}) {
+	knownKeys, err := a.probeArchiveKeys(keys)
 	if err != nil {
-		logging.Debug("the archive identities could not be read; the batch inserts every release", "error", err)
+		logging.Debug("the archived listings could not be checked; the batch writes every release", "error", err)
 		return nil, nil
 	}
-	defer rows.Close()
-	keys := make(map[string]struct{}, 1<<14)
-	hashes := make(map[string]struct{}, 1<<14)
-	for rows.Next() {
-		var key []byte
-		var hash string
-		if err := rows.Scan(&key, &hash); err != nil {
-			continue
-		}
-		keys[string(key)] = struct{}{}
-		if hash != "" {
-			hashes[hash] = struct{}{}
-		}
-	}
-	if err := rows.Err(); err != nil {
-		logging.Debug("the archive identities could not be read completely; the batch inserts every release", "error", err)
+	knownHashes, err := a.probeArchiveHashes(hashes)
+	if err != nil {
+		logging.Debug("the archived torrents could not be checked; the batch writes every release", "error", err)
 		return nil, nil
 	}
-	return keys, hashes
+	return knownKeys, knownHashes
+}
+
+// probeArchiveKeys returns the keys of this batch that the archive holds.
+func (a *Archive) probeArchiveKeys(keys [][]byte) (map[string]struct{}, error) {
+	found := make(map[string]struct{}, len(keys))
+	for start := 0; start < len(keys); start += archiveIdentityProbe {
+		end := start + archiveIdentityProbe
+		if end > len(keys) {
+			end = len(keys)
+		}
+		part := keys[start:end]
+		args := make([]any, len(part))
+		for i := range part {
+			args[i] = part[i]
+		}
+		rows, err := a.reader().Query("SELECT magnet_key FROM archive WHERE magnet_key IN ("+archivePlaceholders(len(part))+")", args...)
+		if err != nil {
+			return nil, err
+		}
+		for rows.Next() {
+			var key []byte
+			if err := rows.Scan(&key); err != nil {
+				rows.Close()
+				return nil, err
+			}
+			found[string(key)] = struct{}{}
+		}
+		err = rows.Err()
+		rows.Close()
+		if err != nil {
+			return nil, err
+		}
+	}
+	return found, nil
+}
+
+// probeArchiveHashes returns the infohashes of this batch that the archive holds.
+func (a *Archive) probeArchiveHashes(hashes []string) (map[string]struct{}, error) {
+	found := make(map[string]struct{}, len(hashes))
+	for start := 0; start < len(hashes); start += archiveIdentityProbe {
+		end := start + archiveIdentityProbe
+		if end > len(hashes) {
+			end = len(hashes)
+		}
+		part := hashes[start:end]
+		args := make([]any, len(part))
+		for i := range part {
+			args[i] = part[i]
+		}
+		rows, err := a.reader().Query("SELECT magnet_hash FROM archive WHERE magnet_hash<>'' AND magnet_hash IN ("+archivePlaceholders(len(part))+")", args...)
+		if err != nil {
+			return nil, err
+		}
+		for rows.Next() {
+			var hash string
+			if err := rows.Scan(&hash); err != nil {
+				rows.Close()
+				return nil, err
+			}
+			found[hash] = struct{}{}
+		}
+		err = rows.Err()
+		rows.Close()
+		if err != nil {
+			return nil, err
+		}
+	}
+	return found, nil
 }
 
 // SaveBatch archives releases: one row per magnet/listing and per infohash.
 func (a *Archive) SaveBatch(releases []models.Release, cfg *Config) error {
-	// The known identities are loaded once for the whole batch: most releases
-	// are already archived, and their write would be ignored anyway.
-	knownKeys, knownHashes := a.knownArchiveIdentities()
 	// Spezza il batch in transazioni più piccole: un'unica transazione da
 	// migliaia di righe con l'indice FTS5 generava un WAL enorme (osservato
 	// ~458 MB) e una finestra di scrittura molto lunga. Con chunk da 1000
@@ -452,7 +516,7 @@ func (a *Archive) SaveBatch(releases []models.Release, cfg *Config) error {
 		if end > len(releases) {
 			end = len(releases)
 		}
-		if err := a.saveChunk(releases[start:end], cfg, knownKeys, knownHashes); err != nil {
+		if err := a.saveChunk(releases[start:end], cfg); err != nil {
 			return err
 		}
 		// Trunca il WAL tra i chunk: la write amplification FTS5 non si
@@ -462,41 +526,21 @@ func (a *Archive) SaveBatch(releases []models.Release, cfg *Config) error {
 	return nil
 }
 
-// saveChunk writes one 1000-row transaction. knownKeys and knownHashes are the
-// rows already archived (nil when the preload failed): a release whose exact
-// key is there needs no write, and one whose hash is there only refreshes that
-// row.
-func (a *Archive) saveChunk(releases []models.Release, cfg *Config, knownKeys, knownHashes map[string]struct{}) error {
-	tx, err := a.db.Begin()
-	if err != nil {
-		return err
-	}
-	// Prepared once per chunk: compiling the SQL again for every release was
-	// a measurable part of a feed pass.
-	insert, err := tx.Prepare(archiveInsertSQL)
-	if err != nil {
-		_ = tx.Rollback()
-		return err
-	}
-	defer insert.Close()
-	refresh, err := tx.Prepare(archiveRefreshSQL)
-	if err != nil {
-		_ = tx.Rollback()
-		return err
-	}
-	defer refresh.Close()
-	refreshKey, err := tx.Prepare(archiveRefreshKeySQL)
-	if err != nil {
-		_ = tx.Rollback()
-		return err
-	}
-	defer refreshKey.Close()
-	deleteLink, err := tx.Prepare(archiveDeleteLinkSQL)
-	if err != nil {
-		_ = tx.Rollback()
-		return err
-	}
-	defer deleteLink.Close()
+// archivePending is one release of a chunk with the values the write needs.
+// The pre-pass computes them once, for the identity probe and for the insert,
+// so a release cannot be skipped for a different reason in the two places.
+type archivePending struct {
+	args      []any
+	key       []byte
+	hash      any
+	hashText  string
+	hasMagnet bool
+}
+
+// pendingArchiveRows turns the chunk into the rows the write will consider,
+// in the same order and with the same filters a direct pass would apply.
+func pendingArchiveRows(releases []models.Release, cfg *Config) []archivePending {
+	pending := make([]archivePending, 0, len(releases))
 	for i := range releases {
 		r := &releases[i]
 		// Content filters are also an archive-ingestion boundary: releases that
@@ -531,19 +575,74 @@ func (a *Archive) saveChunk(releases []models.Release, cfg *Config, knownKeys, k
 		if identity == "" {
 			continue
 		}
-		// The exact magnet already archived is left as it is. The same torrent
-		// under another magnet (other trackers, source or title spelling)
-		// refreshes its one row, which becomes the newest, as a new row did. A
-		// guid-keyed listing is refreshed in place instead of being appended
-		// again when Jackett regenerates its download URL.
 		key := archiveMagnetKeyString(identity)
 		hashText, _ := hash.(string)
-		args := []any{r.Title, source, hash, r.Source, cfg.ReleaseScore(r), key, strings.TrimSpace(r.FeedURL)}
-		// The preloaded sets make the common case cheap: an exact listing needs
-		// no write at all, and a torrent known by hash only refreshes its row.
+		pending = append(pending, archivePending{
+			args:      []any{r.Title, source, hash, r.Source, cfg.ReleaseScore(r), key, strings.TrimSpace(r.FeedURL)},
+			key:       key,
+			hash:      hash,
+			hashText:  hashText,
+			hasMagnet: strings.TrimSpace(r.Magnet) != "",
+		})
+	}
+	return pending
+}
+
+// saveChunk writes one 1000-row transaction. The identities are probed for this
+// chunk only (nil when the probe failed): a release whose exact key is already
+// archived needs no write, and one whose hash is there only refreshes that row.
+func (a *Archive) saveChunk(releases []models.Release, cfg *Config) error {
+	pending := pendingArchiveRows(releases, cfg)
+	if len(pending) == 0 {
+		return nil
+	}
+	keys := make([][]byte, len(pending))
+	hashes := make([]string, 0, len(pending))
+	for i := range pending {
+		keys[i] = pending[i].key
+		if pending[i].hashText != "" {
+			hashes = append(hashes, pending[i].hashText)
+		}
+	}
+	knownKeys, knownHashes := a.knownArchiveIdentities(keys, hashes)
+	tx, err := a.db.Begin()
+	if err != nil {
+		return err
+	}
+	// Prepared once per chunk: compiling the SQL again for every release was
+	// a measurable part of a feed pass.
+	insert, err := tx.Prepare(archiveInsertSQL)
+	if err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	defer insert.Close()
+	refresh, err := tx.Prepare(archiveRefreshSQL)
+	if err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	defer refresh.Close()
+	refreshKey, err := tx.Prepare(archiveRefreshKeySQL)
+	if err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	defer refreshKey.Close()
+	deleteLink, err := tx.Prepare(archiveDeleteLinkSQL)
+	if err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	defer deleteLink.Close()
+	for i := range pending {
+		p := &pending[i]
+		key, hash, hashText, args := p.key, p.hash, p.hashText, p.args
+		// The probes make the common case cheap: an exact listing needs no
+		// write at all, and a torrent known by hash only refreshes its row.
 		if knownKeys != nil {
 			if _, exists := knownKeys[string(key)]; exists {
-				if strings.TrimSpace(r.Magnet) != "" {
+				if p.hasMagnet {
 					// The exact magnet is already archived: the ignored insert
 					// would have refreshed no row.
 					continue
@@ -579,7 +678,7 @@ func (a *Archive) saveChunk(releases []models.Release, cfg *Config, knownKeys, k
 						return err
 					}
 					if affected, _ := refreshed.RowsAffected(); affected > 0 {
-						if strings.TrimSpace(r.Magnet) == "" {
+						if !p.hasMagnet {
 							if _, err := deleteLink.Exec(key, hash); err != nil {
 								_ = tx.Rollback()
 								return err
@@ -587,7 +686,7 @@ func (a *Archive) saveChunk(releases []models.Release, cfg *Config, knownKeys, k
 						}
 						continue
 					}
-					if strings.TrimSpace(r.Magnet) == "" {
+					if !p.hasMagnet {
 						if _, err := refreshKey.Exec(args...); err != nil {
 							_ = tx.Rollback()
 							return err
@@ -623,7 +722,7 @@ func (a *Archive) saveChunk(releases []models.Release, cfg *Config, knownKeys, k
 				// This link-only listing duplicates a torrent already
 				// archived under another key: drop the copy instead of
 				// keeping a row the archive pass cannot match by hash.
-				if strings.TrimSpace(r.Magnet) == "" {
+				if !p.hasMagnet {
 					if _, err := deleteLink.Exec(key, hash); err != nil {
 						_ = tx.Rollback()
 						return err
@@ -636,7 +735,7 @@ func (a *Archive) saveChunk(releases []models.Release, cfg *Config, knownKeys, k
 		// no magnet yet). For a release with a magnet the insert was ignored
 		// because that exact row is already there, and an extra UPDATE would
 		// just cost a write.
-		if strings.TrimSpace(r.Magnet) == "" {
+		if !p.hasMagnet {
 			if _, err := refreshKey.Exec(args...); err != nil {
 				_ = tx.Rollback()
 				return err

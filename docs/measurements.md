@@ -215,10 +215,13 @@ in the list. The gexttod row is the latest full cycle and the latest series-only
   of allocating a new one per page. What remains is the XML tokenizer inside
   `encoding/xml` (about 170 MB of internal copies per cycle; 7 % of the CPU) and the HTML
   parser.
-- **Archive writes and gap queries** are now a small part of a cycle: the identities already
-  archived are loaded once and their rows skipped, and the priority gap pass searches a
-  season once instead of once per episode. A series cycle of ~38,900 releases fell from
-  39–43 s of CPU to 29 s on the same host (2026-11-06).
+- **Archive writes and gap queries** are now a small part of a cycle: the identities of the
+  releases just read are probed against the archive's two unique indexes and their rows
+  skipped, and the priority gap pass searches a season once instead of once per episode. A
+  series cycle of ~38,900 releases fell from 39–43 s of CPU to 29 s on the same host
+  (2026-11-06). The probe covers the batch, not the archive: 1,000 releases a large archive
+  already holds cost **9.3 ms against 19.3 ms** with no probe at all, where reading the whole
+  archive first cost 65 ms and grew with it (50,000 rows, 2026-11-06).
 - **`systemctl status` shows a large number** that is mostly page cache, not the process;
   `anon` is the real figure (85 MB after a series search, 97 MB after a full one on
   2026-11-06). A `MemoryMax` on the unit would count the file pages, so it must leave room
