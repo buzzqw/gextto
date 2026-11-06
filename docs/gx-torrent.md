@@ -2101,14 +2101,20 @@ using fixed values.
 - **Idle memory release**: piece buffers are 1 MB and live in per-torrent
   `sync.Pool`s. After a burst they can stay reachable until a collection even
   when nothing is moving, because an idle daemon allocates too little to
-  trigger one. After **5 minutes with the total transfer rate (download and
-  upload) below the queue's slow-rate threshold** the daemon calls
-  `debug.FreeOSMemory` (at most
+  trigger one. After **5 minutes with the download rate below the queue's
+  slow-rate threshold** the daemon calls `debug.FreeOSMemory` (at most
   once every 10 minutes) and logs `memory released`; the caches rebuild on the
-  next transfer. The line is written when the idle period starts and then at
-  most every 6 hours, so a daemon that stays idle for a day does not fill the
-  log with the same sentence. On the N97 the RSS went from 550 MB to 35–40 MB
-  ([`measurements.md`](measurements.md#footprint)).
+  next transfer. Seeding alone does not hold the burst: an upload keeps the
+  daemon busy without needing the buffers that the download filled, so it must
+  not keep them resident. The line is written when the idle period starts and
+  then at most every 6 hours, so a daemon that stays idle for a day does not
+  fill the log with the same sentence. On the N97 the RSS went from 550 MB to
+  35–40 MB ([`measurements.md`](measurements.md#footprint)).
+- The service unit sets `GODEBUG=madvdontneed=1`: freed Go pages leave the
+  process at once (`MADV_DONTNEED`), instead of staying resident as lazy-free
+  pages (`MADV_FREE`) until the kernel needs them. Without it an idle daemon
+  keeps showing the footprint of its last download even though the memory is
+  already free.
 - The Health panel and `GET /api/v1/stats` show the effective cache, the
   chosen target (`cache_read_mb`, `cache_write_mb`), the **reason**
   (`cache_reason`), the storage class (`cache_storage`) and the available

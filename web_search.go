@@ -232,6 +232,9 @@ func requestCycle(s *AppState, domain *string, origin string) (running, queued b
 		if stats != nil {
 			s.last_cycle.Set(*stats)
 		}
+		// The same peak the scheduled cycle trims: a manual run leaves the
+		// scrape and evaluation heap resident until the next burst otherwise.
+		TrimMemory()
 	}()
 	return running, false, nil
 }

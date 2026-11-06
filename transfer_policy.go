@@ -9,7 +9,10 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"runtime"
+	"runtime/debug"
 	"strings"
+	"sync/atomic"
 	"syscall"
 	"unicode/utf8"
 
@@ -47,10 +50,41 @@ type TrackerEntry struct {
 	URL  string
 }
 
-// TrimMemory keeps the historical name used by its callers. It is a no-op: it
-// used to return the embedded libtorrent session's C++ heap to the operating
-// system, and the pure-Go build always stubbed it.
-func TrimMemory() {}
+// trimMemoryRunning coalesces overlapping TrimMemory calls: a burst of
+// completed transfers must not start a collection per event.
+var trimMemoryRunning atomic.Bool
+
+// TrimMemory returns the free heap to the operating system.
+//
+// The engine is pure Go: a cycle, a library scan or a finished transfer
+// allocates tens of times the live heap, and the collector keeps that headroom
+// until the next allocation burst. During the long idle window nothing
+// allocates, so the free pages stay resident even though the daemon does not
+// need them. debug.FreeOSMemory collects and hands the free spans back, what
+// the allocator trim of the old embedded engine used to do.
+func TrimMemory() {
+	if !trimMemoryRunning.CompareAndSwap(false, true) {
+		return
+	}
+	defer trimMemoryRunning.Store(false)
+	var before, after runtime.MemStats
+	runtime.ReadMemStats(&before)
+	debug.FreeOSMemory()
+	runtime.ReadMemStats(&after)
+	if after.HeapReleased <= before.HeapReleased {
+		return
+	}
+	returned := after.HeapReleased - before.HeapReleased
+	if returned < 1<<20 {
+		return
+	}
+	logging.Debug("memory returned to the operating system",
+		"returned", fmt.Sprintf("%d MiB", returned>>20),
+		"released", fmt.Sprintf("%d MiB", after.HeapReleased>>20),
+		"heap in use", fmt.Sprintf("%d MiB", after.HeapAlloc>>20),
+		"spans in use", fmt.Sprintf("%d MiB", after.HeapInuse>>20),
+		"heap reserved", fmt.Sprintf("%d MiB", after.HeapSys>>20))
+}
 
 // FreeSpaceBytes returns the free space in bytes for the filesystem containing
 // path, or nil when it cannot be determined.

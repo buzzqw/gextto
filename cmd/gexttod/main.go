@@ -62,6 +62,11 @@ func main() {
 }
 
 func runDaemon(dryRun bool, configOption *string) error {
+	// Before anything is allocated: the THP switch only covers pages collapsed
+	// after it (thp_*.go), and the GC default decides how far the heap grows
+	// over a search (gc.go).
+	disableTransparentHugePages()
+	applyGCDefault()
 	configPath := "gextto.json"
 	if configOption != nil {
 		configPath = *configOption

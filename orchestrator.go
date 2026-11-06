@@ -209,7 +209,9 @@ func RunCycleDomain(
 		if len(blockedHashes) > 0 {
 			logging.Debug("blocked releases removed from this cycle", "count", len(blockedHashes))
 		}
-		var kept []models.Release
+		// Filter in place: most releases survive, and a second slice would cost
+		// the whole batch again (tens of MB on a large cycle).
+		kept := releases[:0]
 		for i := range releases {
 			if hash := releaseInfoHash(&releases[i]); hash != "" {
 				if _, blocked := blocklistedHashes[hash]; !blocked {
@@ -224,6 +226,9 @@ func RunCycleDomain(
 			}
 			kept = append(kept, releases[i])
 		}
+		// Drop the references in the dropped tail: they would otherwise keep
+		// every blocked release's strings alive for the rest of the cycle.
+		clear(releases[len(kept):])
 		releases = kept
 	}
 	if !cfg.DryRun {
@@ -1872,7 +1877,9 @@ func mergeSeriesCandidate(best []models.Release, release models.Release, score i
 			return best, true
 		}
 	}
-	filtered := best[:0:0]
+	// Filter in place: this runs once per candidate and a fresh slice would
+	// copy the whole selection every time (hundreds of MB over a cycle).
+	filtered := best[:0]
 	for j := range best {
 		old := &best[j]
 		if sameSeason(old) {
@@ -1884,6 +1891,9 @@ func mergeSeriesCandidate(best []models.Release, release models.Release, score i
 		}
 		filtered = append(filtered, *old)
 	}
+	// Drop the removed tail so the selection does not keep those releases
+	// alive through the array behind it.
+	clear(best[len(filtered):])
 	best = filtered
 	for j := range best {
 		old := &best[j]

@@ -52,12 +52,12 @@ func memoryReleaseDue(now, lastActive, lastRelease time.Time) bool {
 // burst the heap can stay at hundreds of MB while the daemon is idle, because
 // nothing allocates enough to trigger a GC. debug.FreeOSMemory collects and
 // hands the free spans back; it is STW, so only after a quiet period and at
-// most every memoryReleaseEvery. Call without d.mu. moving is true while the
-// total transfer rate (download plus upload) is at least the queue's slow-rate
-// threshold: a quiet daemon needs no big cache and does not keep the heap
-// alive.
-func (d *Daemon) maybeReleaseMemory(now time.Time, moving bool) {
-	if moving {
+// most every memoryReleaseEvery. Call without d.mu. downloading is true while
+// the download rate is at least the queue's slow-rate threshold: a daemon that
+// is only seeding does not need the buffers of the burst that filled them, so
+// uploads alone must not keep the heap alive.
+func (d *Daemon) maybeReleaseMemory(now time.Time, downloading bool) {
+	if downloading {
 		d.lastDownloadAt = now
 		// A new idle period: its first release is news again, even when the
 		// previous period logged a few minutes ago.

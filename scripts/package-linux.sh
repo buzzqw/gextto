@@ -203,6 +203,10 @@ Environment=GEXTTO_DATA_DIR=/var/lib/gextto
 Environment=GEXTTO_LISTEN=0.0.0.0:5000
 Environment=GEXTTO_ENGINE_LISTEN=127.0.0.1:8889
 Environment=GEXTTO_LOG=info
+# Return freed heap to the OS at once (MADV_DONTNEED): with the default
+# MADV_FREE the pages stay resident until the kernel needs them, so an idle
+# daemon keeps showing the footprint of its last search.
+Environment=GODEBUG=madvdontneed=1
 WorkingDirectory=/var/lib/gextto
 ExecStart=/opt/gextto/run.sh
 Restart=on-failure

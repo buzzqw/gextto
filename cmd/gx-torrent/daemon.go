@@ -1418,9 +1418,11 @@ func (d *Daemon) tick(now time.Time) {
 	d.publishViewsLocked(views)
 	d.mu.Unlock()
 
-	// Return the heap of a finished burst when the daemon is quiet (gc.go).
-	moving := aggregate >= cfg.SlowRate || int64(engineStats.SpeedUpload) >= cfg.SlowRate
-	d.maybeReleaseMemory(now, moving)
+	// Return the heap of a finished burst when no download is running (gc.go).
+	// Uploads do not hold it: a seeding torrent would otherwise keep the whole
+	// download burst resident forever.
+	downloading := aggregate >= cfg.SlowRate
+	d.maybeReleaseMemory(now, downloading)
 
 	// The lifetime flush does file I/O: outside d.mu, and only on its cadence.
 	if saveLifetime {
