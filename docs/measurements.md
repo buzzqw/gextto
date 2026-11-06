@@ -9,21 +9,22 @@ history: a new round replaces the row it measures.
 Measured on 2026-11-06 on a low-power mini PC (Intel N97), in Docker, with the same
 torrents and limits for every client.
 
-| Question | Best | gx-torrent | Why it matters |
-|---|---|---|---|
-| Fastest download with nothing in the way | **gx-torrent, 285 MB/s** | **1st**, 285 MB/s; the others 56–250 MB/s | a fast disk and a fast peer |
-| Download on a 100 Mbit/s line, 4 peers, TCP | **gx-torrent, 11.2 MB/s** | **1st**, 11.2 MB/s; the others 9.4–10.7 MB/s | the common case at home |
-| The same line, uTP only | Deluge 11.8 MB/s, qBittorrent 11.6 | **3rd**, 11.2 MB/s, with the CPU of the libtorrent clients | peers that prefer uTP |
-| Least own memory at full speed | Transmission, 11 MiB | **3rd**, 30 MiB (qBittorrent 25, Deluge 59) | what the client cannot give back to the system |
-| Least own memory on the 100 Mbit/s line | qBittorrent, 9.5 MiB | **4th**, 40 MiB (Transmission 10, Deluge 39) | the same, when the line is the limit |
-| Fastest upload | no clear winner: gx-torrent 242, qBittorrent 236, Deluge 207 (up to 259) | **1st by median**, 242 MB/s, with 58 MiB of own memory | only matters above a gigabit link |
-| Fastest recheck of 4 GiB | tie: gx-torrent and Transmission, 3.6–3.7 s | **1st by median**, 3.6 s; qBittorrent 5.6 s | after a move or a crash |
-| Lowest CPU at rest, nothing loaded | qBittorrent, 0.04 % | **2nd**, 0.06 % (Deluge and Transmission 0.29–0.32 %) | a machine that is always on |
-| Lowest CPU at rest, 100 torrents | qBittorrent, 0.06 % | **4th**, 0.66 % (Transmission and Deluge 0.33–0.35 %) | the same, with a long list |
-| Lightest with 100 torrents | Transmission, 19 MB RSS | **2nd**, 29 MB RSS (14 MiB own; qBittorrent 119 MB) | a long seeding list |
+| Question | 1st | 2nd | 3rd | 4th | Why it matters |
+|---|---|---|---|---|---|
+| Fastest download with nothing in the way | **gx-torrent**, 285 MB/s | Deluge, 250 MB/s | qBittorrent, 241 MB/s | Transmission, 56 MB/s | a fast disk and a fast peer |
+| Download on a 100 Mbit/s line, 4 peers, TCP | **gx-torrent**, 11.2 MB/s | Deluge, 10.7 MB/s | qBittorrent, 10.6 MB/s | Transmission, 9.4 MB/s | the common case at home |
+| The same line, uTP only | Deluge, 11.8 MB/s | qBittorrent, 11.6 MB/s | **gx-torrent**, 11.2 MB/s | Transmission, 9.6 MB/s | peers that prefer uTP |
+| Least own memory at full speed | Transmission, 11 MiB | qBittorrent, 25 MiB | **gx-torrent**, 30 MiB | Deluge, 59 MiB | what the client cannot give back to the system |
+| Least own memory on the 100 Mbit/s line | qBittorrent, 9.5 MiB | Transmission, 10 MiB | Deluge, 39 MiB | **gx-torrent**, 40 MiB | the same, when the line is the limit |
+| Fastest upload | **gx-torrent**, 242 MB/s | qBittorrent, 236 MB/s | Deluge, 207 MB/s (up to 259) | Transmission, 125 MB/s | only matters above a gigabit link |
+| Fastest recheck of 4 GiB | **gx-torrent**, 3.6 s | Transmission, 3.7 s | Deluge, 4.6 s | qBittorrent, 5.6 s | after a move or a crash |
+| Lowest CPU at rest, nothing loaded | qBittorrent, 0.04 % | **gx-torrent**, 0.06 % | Deluge, 0.29 % | Transmission, 0.32 % | a machine that is always on |
+| Lowest CPU at rest, 100 torrents | qBittorrent, 0.06 % | Transmission, 0.33 % | Deluge, 0.35 % | **gx-torrent**, 0.66 % | the same, with a long list |
+| Lightest with 100 torrents | Transmission, 19 MB RSS | **gx-torrent**, 29 MB RSS | Deluge, 68 MB RSS | qBittorrent, 119 MB RSS | a long seeding list |
 
-The rank in the gx-torrent column is the order of the medians: where the ranges of the rounds
-overlap, the clients are tied and the rank only says which median is lower.
+The order is the order of the medians: where the ranges of two clients overlap the positions are
+a tie, and a gap of a few percent is inside the spread of the rounds. The detailed tables below
+give the ranges. **gx-torrent** is in bold.
 
 In short: gx-torrent is the fastest downloader over TCP, is level with Transmission at a recheck
 (3.6 s against 3.7), and uploads as fast as the libtorrent clients. It holds the most own memory
