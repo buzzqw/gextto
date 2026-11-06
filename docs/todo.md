@@ -21,11 +21,11 @@ Nothing open: every engine item waits for a condition listed under
 
 ## Gextto, acquisition and UI
 
-- **Cycle allocation churn** — a 38k-release cycle still allocates about 1.5 GB
-  (feed and indexer XML/HTML parsing, `mergeDuplicateReleases`), which sets the
-  peak and the fragmented heap left behind. Gate: an allocation profile of a
-  full cycle naming a hotspot of at least 100 MB; reduce it and re-measure peak
-  and resting RSS in `measurements.md`.
+- **Cycle allocation churn** — a 38k-release cycle still allocates about 1.4 GB,
+  mostly in the XML tokenizer and the body buffers, which sets the peak and the
+  fragmented heap left behind. Gate: an allocation profile of a full cycle
+  naming a hotspot of at least 100 MB; reduce it and re-measure peak and
+  resting RSS in `measurements.md`.
 - **Functions too long to review** — `torrentEventWorker`, `HandleTorrentEvent`,
   `formatEventLang`, `seriesRenameApply`, `loadConfigDB` and the candidate pass
   (`candidatePass.try`) are each several hundred lines with state shared across the

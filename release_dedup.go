@@ -243,7 +243,10 @@ func mergeDuplicateReleases(releases []models.Release) []models.Release {
 	if len(releases) < 2 {
 		return releases
 	}
-	out := make([]models.Release, 0, len(releases))
+	// Merge in place: the caller replaces the batch it passed, and a fresh
+	// slice sized on the input (which can be a hundred thousand copies before
+	// deduplication) costs tens of MB only to hold far fewer releases.
+	out := releases[:0]
 	// groupHash is the infohash known for each kept release, from any of its
 	// copies: a later copy with that hash joins it, a different hash never does.
 	groupHash := make([]string, 0, len(releases))
@@ -325,6 +328,9 @@ func mergeDuplicateReleases(releases []models.Release) []models.Release {
 			}
 		}
 	}
+	// Drop the copies left behind the merged batch: they would keep their
+	// strings alive through the array.
+	clear(releases[len(out):])
 	return out
 }
 

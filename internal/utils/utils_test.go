@@ -34,6 +34,39 @@ func TestMagnetHashAcceptsHexBase32AndV2(t *testing.T) {
 	}
 }
 
+// TestSimpleMagnetHashMatchesTheFullParser pins that the fast path over the
+// plain magnet form never disagrees with url.Parse, including the forms that
+// must fall back (escapes, fragment, ';' separator).
+func TestSimpleMagnetHashMatchesTheFullParser(t *testing.T) {
+	hex40 := "0123456789012345678901234567890123456789"
+	base32 := "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"
+	digest := strings.Repeat("a", 64)
+	cases := []string{
+		"magnet:?xt=urn:btih:" + hex40,
+		"magnet:?xt=urn:btih:" + strings.ToUpper(hex40),
+		"magnet:?xt=urn:btih:" + base32,
+		"magnet:?xt=urn:btih:" + base32 + "&dn=Name&tr=udp://tracker.example:80",
+		"magnet:?dn=Name&xt=urn:btih:" + hex40,
+		"magnet:?xt=urn:btmh:1220" + digest,
+		"magnet:?xt=urn:btmh:1220" + digest + "&xt=urn:btih:" + hex40,
+		"magnet:?xt=urn:btih:" + hex40 + "&xt=urn:btmh:1220" + digest,
+		"magnet:?xt=urn:btih:short",
+		"magnet:?xt=urn%3Abtih%3A" + hex40,
+		"magnet:?xt=urn:btih:" + hex40 + "#fragment",
+		"magnet:?xt=urn:btih:" + hex40 + ";dn=x",
+		"magnet:?xt=urn:btih:" + hex40 + "&dn=Name+With+Space",
+		"not a magnet",
+		"magnet:?",
+	}
+	for _, magnet := range cases {
+		want, wantOK := parsedMagnetHashSlow(magnet)
+		got, gotOK := ParsedMagnetHash(magnet)
+		if got != want || gotOK != wantOK {
+			t.Errorf("%q: got %q,%v want %q,%v", magnet, got, gotOK, want, wantOK)
+		}
+	}
+}
+
 func TestSanitizeMagnetKeepsNameAndTrackers(t *testing.T) {
 	hash := "0123456789012345678901234567890123456789"
 	input := "magnet:?xt=urn:btih:" + hash +

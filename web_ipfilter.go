@@ -27,7 +27,7 @@ func fetchIpfilter(ctx context.Context, rawURL string) ([]byte, string) {
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return nil, fmt.Sprintf("HTTP %d", resp.StatusCode)
 	}
-	data, err := readLimitedBody(resp.Body, maxFeedResponseBytes)
+	data, err := readLimitedBodyHint(resp.Body, maxFeedResponseBytes, resp.ContentLength)
 	if err != nil {
 		return nil, err.Error()
 	}

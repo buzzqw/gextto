@@ -192,7 +192,7 @@ machine (2026-11-03; the gexttod row 2026-11-06).
 |---|---|---|
 | gx-torrent 1.1.306, live (DHT on, full IP filter, 3 seeds) | 0.9 % of a core, 32 MB RSS | 18–37 % of a core at 8.2–8.8 MB/s with 116–132 peers, 2.0–4.3 s of CPU per 100 MB |
 | gx-torrent, 10 torrents to a NAS | | about 507 MB outside the two caches, 1.1 GB peak with the NFS write cache |
-| gexttod 1.2.2253, same host | 0.4 % of a core, 45 MB anon (70 MB RSS) just started; 88 MB anon (114 MB RSS) after a search | peak 180 MB anon (205 MB RSS) during a cycle of 38,750 releases, about 40 s of CPU, and back to the figure at rest |
+| gexttod 1.2.2256, same host | 0.4 % of a core, 45 MB anon (70 MB RSS) just started; 85 MB anon (110 MB RSS) after a search | peak 149 MB anon during a cycle of 38,770 releases, about 39 s of CPU, and back to the figure at rest |
 
 At-rest figures: 90 s on 2026-11-03, with the integrity check off, no transfer and three seeds
 in the list. The gexttod row is the latest series-only cycle on 2026-11-06, with GOGC=50,
@@ -201,10 +201,15 @@ transparent huge pages off for the process and `GODEBUG=madvdontneed=1`.
 - **After a burst** the daemon returns its piece buffers: with 7 torrents and no transfer the
   RSS falls from 550 MB to 35–40 MB.
 - **The free heap comes back to the OS.** The same cycle before the change peaked at 237 MB
-  anon and left 150–190 MB resident for hours; now it peaks at 180 MB anon and settles at
-  88 MB anon. The explicit release after a cycle or a completed transfer returns 12–92 MB
+  anon and left 150–190 MB resident for hours; now it peaks at 149 MB anon and settles at
+  85 MB anon. The explicit release after a cycle or a completed transfer returns 12–92 MB
   per call, and the 15-minute housekeeping call releases what the background workers free
   afterwards. Go does not compact, so the spans still pinned by live objects stay.
+- **A cycle allocates 1.37 GB instead of 2.01 GB** (38,770 releases, 2026-11-06). The
+  deduplication, the blocklist and the kind filter work in place, the combined feed and
+  indexer batches are sized once, the XML reader no longer translates namespaces, the
+  Torznab error check skips a body without the word, and a chunked body starts from a
+  64 KiB buffer. What remains is the XML tokenizer and the body buffers.
 - **`systemctl status` shows a large number** that is mostly page cache, not the process;
   `anon` is the real figure (88 MB after a search on 2026-11-06). A `MemoryMax` on the unit
   would count the file pages, so it must leave room for them.

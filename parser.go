@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 	"unicode"
+	"unicode/utf8"
 
 	"github.com/buzzqw/gextto/internal/ed2k"
 	"github.com/buzzqw/gextto/internal/models"
@@ -149,7 +150,10 @@ func seriesKeyWordsMatch(left, right string, leftWords, rightWords []string) boo
 // used to build torrent episode keys; matching needs the more permissive
 // behaviour of the legacy parser.
 func matchingName(value string) string {
-	var words []string
+	// A release name has a handful of words: sizing the two slices once keeps
+	// their growth out of this hot path (it runs for every release and every
+	// monitored title).
+	words := make([]string, 0, 8)
 	var current strings.Builder
 	for _, character := range value {
 		if unicode.IsLetter(character) || unicode.IsNumber(character) {
@@ -164,12 +168,12 @@ func matchingName(value string) string {
 	}
 
 	// Torrent names occasionally spell acronyms as `F B I` or `S W A T`.
-	var compacted []string
+	compacted := make([]string, 0, len(words))
 	index := 0
 	for index < len(words) {
-		if len([]rune(words[index])) == 1 {
+		if utf8.RuneCountInString(words[index]) == 1 {
 			start := index
-			for index < len(words) && len([]rune(words[index])) == 1 {
+			for index < len(words) && utf8.RuneCountInString(words[index]) == 1 {
 				index++
 			}
 			if index-start >= 2 {

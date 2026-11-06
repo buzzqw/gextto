@@ -19,6 +19,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -164,7 +165,7 @@ func (e *Engine) FetchTorrent(ctx context.Context, rawURL string) ([]byte, strin
 		}
 		return nil, "", fmt.Errorf("HTTP %d fetching torrent from %s", resp.StatusCode, host)
 	}
-	payload, err := readLimitedBody(resp.Body, maxFeedResponseBytes)
+	payload, err := readLimitedBodyHint(resp.Body, maxFeedResponseBytes, resp.ContentLength)
 	if err != nil {
 		return nil, "", err
 	}
@@ -256,6 +257,13 @@ func (e *Engine) ScrapeAllDomain(ctx context.Context, cfg *Config, domain *strin
 		}(i, feedURL)
 	}
 	feedWG.Wait()
+	// One allocation of the exact size instead of growing the combined slice
+	// one feed at a time: the copies are a large share of a cycle's churn.
+	feedTotal := 0
+	for _, items := range feedResults {
+		feedTotal += len(items)
+	}
+	all = make([]models.Release, 0, feedTotal)
 	for _, items := range feedResults {
 		all = append(all, items...)
 	}
@@ -484,6 +492,13 @@ func (e *Engine) ScrapeAllDomain(ctx context.Context, cfg *Config, domain *strin
 		targetsDone := 0
 		targetsWithHits := 0
 		step2Usable := 0
+		// Grow once for the whole batch: appending every target one by one
+		// reallocates the combined slice several times.
+		resultTotal := 0
+		for _, result := range results {
+			resultTotal += len(result.Items)
+		}
+		all = slices.Grow(all, resultTotal)
 		for _, result := range results {
 			targetsDone++
 			compatible := usable(result.Query, result.Items)
@@ -511,7 +526,9 @@ func (e *Engine) ScrapeAllDomain(ctx context.Context, cfg *Config, domain *strin
 		}
 	}
 
-	kept := make([]models.Release, 0, len(all))
+	// Filter in place: the batch is replaced by the filtered view, and a
+	// second slice of every release would cost another full copy.
+	kept := all[:0]
 	for _, release := range all {
 		if reason := cfg.AllReleaseDeniedReason(&release); reason != "" {
 			if cfg.ReleaseIsMonitored(&release) {
@@ -531,6 +548,7 @@ func (e *Engine) ScrapeAllDomain(ctx context.Context, cfg *Config, domain *strin
 		}
 		kept = append(kept, release)
 	}
+	clear(all[len(kept):])
 	// Copies of the same torrent from different sources become one release
 	// with mirrors (release_dedup.go).
 	all = mergeDuplicateReleases(kept)
@@ -1034,6 +1052,19 @@ func searchOneWithDBType(
 	}
 
 	indexerWG.Wait()
+	// Grow the combined slice once: one title search can bring thousands of
+	// releases from several indexers, and appending each batch reallocates.
+	batchTotal := 0
+	for _, result := range indexerResults {
+		if !result.Skipped && result.Err == nil {
+			batchTotal += len(result.Items)
+		}
+	}
+	if includeWeb && len(cfg.WebsearchEngines) > 0 {
+		webWG.Wait()
+		batchTotal += len(webResults)
+	}
+	all = slices.Grow(all, batchTotal)
 	for _, result := range indexerResults {
 		if result.Skipped {
 			continue
@@ -1084,11 +1115,11 @@ func searchOneWithDBType(
 		}
 	}
 	if includeWeb && len(cfg.WebsearchEngines) > 0 {
-		webWG.Wait()
 		all = append(all, webResults...)
 	}
 
-	kept := make([]models.Release, 0, len(all))
+	// Filter in place: the batch is replaced by the filtered view.
+	kept := all[:0]
 	for _, release := range all {
 		if !includeRejected {
 			if reason := cfg.AllReleaseDeniedReason(&release); reason != "" {
@@ -1103,6 +1134,7 @@ func searchOneWithDBType(
 		}
 		kept = append(kept, release)
 	}
+	clear(all[len(kept):])
 	return mergeDuplicateReleases(kept)
 }
 

@@ -1493,14 +1493,17 @@ func domainIs(domain *string, value string) bool {
 	return domain != nil && *domain == value
 }
 
-// retainKind keeps only the releases of the requested kind.
+// retainKind keeps only the releases of the requested kind. It filters in
+// place: the caller replaces the slice it passed, and a second copy of a
+// 30k-release batch costs tens of MB on every cycle.
 func retainKind(releases []models.Release, kind string) []models.Release {
-	kept := make([]models.Release, 0, len(releases))
+	kept := releases[:0]
 	for i := range releases {
 		if releases[i].Kind == kind {
 			kept = append(kept, releases[i])
 		}
 	}
+	clear(releases[len(kept):])
 	return kept
 }
 

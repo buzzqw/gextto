@@ -42,14 +42,37 @@ const (
 // readLimitedBody reads at most limit bytes from r; a larger body is an error
 // so a misconfigured or hostile response cannot exhaust memory.
 func readLimitedBody(r io.Reader, limit int64) ([]byte, error) {
-	data, err := io.ReadAll(io.LimitReader(r, limit+1))
-	if err != nil {
+	return readLimitedBodyHint(r, limit, 0)
+}
+
+// readLimitedBodyHint is readLimitedBody with the size the client expects
+// (an HTTP Content-Length). Without it the buffer grows by doubling, which for
+// a multi-MB feed is most of the body copied several times. When the size is
+// unknown (a chunked response) a 64 KiB start still saves most doublings. A
+// hint larger than the limit is ignored: the limit still decides.
+func readLimitedBodyHint(r io.Reader, limit, hint int64) ([]byte, error) {
+	if hint <= 0 {
+		if sized, ok := r.(interface{ Len() int }); ok {
+			hint = int64(sized.Len())
+		}
+	}
+	if hint <= 0 {
+		hint = 64 << 10
+	}
+	if hint > limit {
+		hint = limit
+	}
+	var buffer bytes.Buffer
+	if hint > 0 {
+		buffer.Grow(int(hint))
+	}
+	if _, err := buffer.ReadFrom(io.LimitReader(r, limit+1)); err != nil {
 		return nil, err
 	}
-	if int64(len(data)) > limit {
+	if int64(buffer.Len()) > limit {
 		return nil, fmt.Errorf("response body exceeds the %d byte limit", limit)
 	}
-	return data, nil
+	return buffer.Bytes(), nil
 }
 
 // copyLimited streams src into dst, failing when the source is larger than
@@ -96,7 +119,7 @@ func HTTPGetBytes(ctx context.Context, rawURL string, headers map[string]string)
 		return nil, 0, err
 	}
 	defer response.Body.Close()
-	payload, err := readLimitedBody(response.Body, maxFeedResponseBytes)
+	payload, err := readLimitedBodyHint(response.Body, maxFeedResponseBytes, response.ContentLength)
 	if err != nil {
 		return nil, response.StatusCode, err
 	}
@@ -116,7 +139,7 @@ func HTTPPostJSON(ctx context.Context, rawURL string, headers map[string]string,
 		return nil, 0, err
 	}
 	defer response.Body.Close()
-	body, err := readLimitedBody(response.Body, maxAPIResponseBytes)
+	body, err := readLimitedBodyHint(response.Body, maxAPIResponseBytes, response.ContentLength)
 	if err != nil {
 		return nil, response.StatusCode, err
 	}

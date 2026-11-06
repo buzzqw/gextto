@@ -179,7 +179,96 @@ const (
 )
 
 // ParsedMagnetHash returns the canonical hash used internally for a magnet.
+//
+// The plain form (no escapes, no fragment) is read directly: the dedup and
+// selection passes call this function several times per release, and
+// url.Parse plus Query allocates for every parameter of every magnet. Anything
+// unusual goes through the exact parser below.
 func ParsedMagnetHash(magnet string) (string, bool) {
+	if hash, ok, handled := simpleMagnetHash(magnet); handled {
+		return hash, ok
+	}
+	return parsedMagnetHashSlow(magnet)
+}
+
+// simpleMagnetHash reads the xt parameters of a plain magnet without
+// url.Parse. handled is false for forms whose decoding matters (percent
+// escapes, '+', ';' separators, a fragment, control characters): the caller
+// then uses the full parser.
+func simpleMagnetHash(magnet string) (hash string, ok, handled bool) {
+	const prefix = "magnet:?"
+	if !strings.HasPrefix(magnet, prefix) {
+		return "", false, false
+	}
+	query := magnet[len(prefix):]
+	if strings.ContainsAny(query, "%+;#") ||
+		strings.IndexFunc(query, func(r rune) bool { return r < 0x20 || r == 0x7f }) >= 0 {
+		return "", false, false
+	}
+	var v2 string
+	for query != "" {
+		pair := query
+		if index := strings.IndexByte(query, '&'); index >= 0 {
+			pair, query = query[:index], query[index+1:]
+		} else {
+			query = ""
+		}
+		key, value, _ := strings.Cut(pair, "=")
+		if key != "xt" {
+			continue
+		}
+		lower := strings.ToLower(value)
+		if strings.HasPrefix(lower, "urn:btih:") {
+			if h, valid := v1MagnetHash(strings.TrimPrefix(lower, "urn:btih:")); valid {
+				return h, true, true
+			}
+		} else if strings.HasPrefix(lower, "urn:btmh:") {
+			value := strings.TrimPrefix(lower, "urn:btmh:")
+			digest, cut := strings.CutPrefix(value, "1220")
+			if cut && len(digest) == 64 && isHex(digest) {
+				v2 = digest
+			}
+		}
+	}
+	if v2 != "" {
+		return v2, true, true
+	}
+	return "", false, true
+}
+
+// v1MagnetHash applies the v1 rule: lowercase alphanumerics only, then 40 hex
+// or 32 base32 characters. The value arrives already lowercased.
+func v1MagnetHash(value string) (string, bool) {
+	clean := true
+	for i := 0; i < len(value); i++ {
+		c := value[i]
+		if (c < '0' || c > '9') && (c < 'a' || c > 'z') {
+			clean = false
+			break
+		}
+	}
+	if clean {
+		if len(value) == 40 || len(value) == 32 {
+			return value, true
+		}
+		return "", false
+	}
+	var filtered strings.Builder
+	for _, r := range value {
+		if (r >= '0' && r <= '9') || (r >= 'a' && r <= 'z') {
+			filtered.WriteRune(r)
+		}
+	}
+	h := filtered.String()
+	if len(h) == 40 || len(h) == 32 {
+		return h, true
+	}
+	return "", false
+}
+
+// parsedMagnetHashSlow is the exact parser: url.Parse and Query handle every
+// escape and separator the same way the rest of the program expects.
+func parsedMagnetHashSlow(magnet string) (string, bool) {
 	parsed, err := url.Parse(magnet)
 	if err != nil {
 		return "", false
@@ -188,15 +277,7 @@ func ParsedMagnetHash(magnet string) (string, bool) {
 	for _, value := range parsed.Query()["xt"] {
 		lower := strings.ToLower(value)
 		if strings.HasPrefix(lower, "urn:btih:") {
-			value := strings.TrimPrefix(lower, "urn:btih:")
-			var filtered strings.Builder
-			for _, r := range value {
-				if (r >= '0' && r <= '9') || (r >= 'a' && r <= 'z') {
-					filtered.WriteRune(r)
-				}
-			}
-			h := filtered.String()
-			if len(h) == 40 || len(h) == 32 {
+			if h, ok := v1MagnetHash(strings.TrimPrefix(lower, "urn:btih:")); ok {
 				return h, true
 			}
 		} else if strings.HasPrefix(lower, "urn:btmh:") {
@@ -300,18 +381,21 @@ func SanitizeMagnet(input string, fallbackTitle *string) (string, bool) {
 	if err != nil {
 		return "", false
 	}
-	kind, hash, ok := parsedMagnetKind(input)
+	// One parse, one Query: the kind and the name/tracker values come from the
+	// same decoded query (the old path parsed the magnet twice).
+	query := parsed.Query()
+	kind, hash, ok := magnetKindFromQuery(query)
 	if !ok {
 		return "", false
 	}
-	var out string
+	var out strings.Builder
 	if kind == magnetHashV2 {
-		out = "magnet:?xt=urn:btmh:1220" + hash
+		out.WriteString("magnet:?xt=urn:btmh:1220")
 	} else {
-		out = "magnet:?xt=urn:btih:" + hash
+		out.WriteString("magnet:?xt=urn:btih:")
 	}
+	out.WriteString(hash)
 	name := ""
-	query := parsed.Query()
 	for _, dn := range query["dn"] {
 		name = dn
 		break
@@ -320,10 +404,11 @@ func SanitizeMagnet(input string, fallbackTitle *string) (string, bool) {
 		name = *fallbackTitle
 	}
 	if name != "" {
-		out += "&dn=" + url.QueryEscape(name)
+		out.WriteString("&dn=")
+		out.WriteString(url.QueryEscape(name))
 	}
 	trackers := query["tr"]
-	var filtered []string
+	filtered := make([]string, 0, len(trackers))
 	for _, t := range trackers {
 		if strings.TrimSpace(t) != "" {
 			filtered = append(filtered, t)
@@ -332,9 +417,10 @@ func SanitizeMagnet(input string, fallbackTitle *string) (string, bool) {
 	sort.Strings(filtered)
 	filtered = dedup(filtered)
 	for _, t := range filtered {
-		out += "&tr=" + encodeTracker(t)
+		out.WriteString("&tr=")
+		out.WriteString(encodeTracker(t))
 	}
-	return out, true
+	return out.String(), true
 }
 
 func parsedMagnetKind(magnet string) (int, string, bool) {
@@ -342,19 +428,16 @@ func parsedMagnetKind(magnet string) (int, string, bool) {
 	if err != nil {
 		return 0, "", false
 	}
+	return magnetKindFromQuery(parsed.Query())
+}
+
+// magnetKindFromQuery applies the xt rules to an already decoded query.
+func magnetKindFromQuery(query url.Values) (int, string, bool) {
 	var v2 string
-	for _, value := range parsed.Query()["xt"] {
+	for _, value := range query["xt"] {
 		lower := strings.ToLower(value)
 		if strings.HasPrefix(lower, "urn:btih:") {
-			value := strings.TrimPrefix(lower, "urn:btih:")
-			var filtered strings.Builder
-			for _, r := range value {
-				if (r >= '0' && r <= '9') || (r >= 'a' && r <= 'z') {
-					filtered.WriteRune(r)
-				}
-			}
-			h := filtered.String()
-			if len(h) == 40 || len(h) == 32 {
+			if h, ok := v1MagnetHash(strings.TrimPrefix(lower, "urn:btih:")); ok {
 				return magnetHashV1, h, true
 			}
 		} else if strings.HasPrefix(lower, "urn:btmh:") {

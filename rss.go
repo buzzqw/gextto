@@ -152,11 +152,40 @@ func parseRSSDate(value string) (time.Time, bool) {
 	return time.Time{}, false
 }
 
-// parse_feed_body parses an RSS/Atom body with `encoding/xml` ( used
-// `quick-xml`). Text and CDATA are both delivered as `xml.CharData`, so the two
-// branches collapse into one.
+const (
+	itemOpenTag  = "<item>"
+	entryOpenTag = "<entry>"
+)
+
+var (
+	itemOpenBytes  = []byte(itemOpenTag)
+	entryOpenBytes = []byte(entryOpenTag)
+)
+
+// itemSlots is a cheap upper bound of the items in a body, used to size the
+// result slice once: the per-item append growth was tens of MB per cycle.
+func itemSlots(body string) int {
+	return strings.Count(body, itemOpenTag) + strings.Count(body, entryOpenTag)
+}
+
+// parseFeedBody parses an RSS/Atom body already held as a string. Text and
+// CDATA are both delivered as `xml.CharData`, so the two branches collapse
+// into one.
 func parseFeedBody(body, source string) ([]models.Release, error) {
-	decoder := xml.NewDecoder(strings.NewReader(body))
+	return parseFeedReader(strings.NewReader(body), source, itemSlots(body))
+}
+
+// parseFeedBytes parses the same formats without copying the body into a
+// string: an indexarr page arrives as []byte and is decoded from that buffer.
+func parseFeedBytes(body []byte, source string) ([]models.Release, error) {
+	return parseFeedReader(bytes.NewReader(body), source,
+		bytes.Count(body, itemOpenBytes)+bytes.Count(body, entryOpenBytes))
+}
+
+// parseFeedReader is the shared parser. capacity is only a hint for the
+// result slice; zero means unknown.
+func parseFeedReader(reader io.Reader, source string, capacity int) ([]models.Release, error) {
+	decoder := xml.NewDecoder(reader)
 	current := ""
 	inItem := false
 	title := ""
@@ -175,8 +204,16 @@ func parseFeedBody(body, source string) ([]models.Release, error) {
 	var downloadFactor *float64
 	discoveredAt := time.Now().UTC()
 	var out []models.Release
+	if capacity > 0 {
+		out = make([]models.Release, 0, capacity)
+	}
+	// RawToken does not check that start and end elements match: keep the
+	// well-formedness check Token did, without its namespace translation (the
+	// local name is all this parser reads). A malformed feed must still be
+	// reported, and a body cut after some complete items is accepted below.
+	open := make([]string, 0, 8)
 	for {
-		token, err := decoder.Token()
+		token, err := decoder.RawToken()
 		if err != nil {
 			if err == io.EOF {
 				break
@@ -192,6 +229,7 @@ func parseFeedBody(body, source string) ([]models.Release, error) {
 		}
 		switch event := token.(type) {
 		case xml.StartElement:
+			open = append(open, event.Name.Local)
 			name := localName(event.Name.Local)
 			if name == "item" || name == "entry" {
 				inItem = true
@@ -310,6 +348,19 @@ func parseFeedBody(body, source string) ([]models.Release, error) {
 				}
 			}
 		case xml.EndElement:
+			if len(open) == 0 || open[len(open)-1] != event.Name.Local {
+				// Same case Token() reported: an end tag with no open element
+				// of that name. A body cut after some complete items keeps
+				// them, exactly like a truncated body at EOF.
+				if len(out) > 0 {
+					logging.Debug("accepting partial RSS body",
+						"error", fmt.Sprintf("unexpected end element </%s>", event.Name.Local),
+						"items", len(out))
+					return out, nil
+				}
+				return nil, fmt.Errorf("xml: unexpected end element </%s>", event.Name.Local)
+			}
+			open = open[:len(open)-1]
 			name := localName(event.Name.Local)
 			if inItem && (name == "item" || name == "entry") {
 				// size sanity (legacy `_sanity_check`): drop samples/NFO.
@@ -406,6 +457,13 @@ func parseFeedBody(body, source string) ([]models.Release, error) {
 // key; without this check the parser would return zero results and the provider
 // would be marked healthy instead of backing off. Returns "" when healthy.
 func TorznabError(body string) string {
+	// Torznab answers a successful search with megabytes of items and no
+	// error element: decoding the whole body only to learn that is wasted work
+	// on every response. The tag is lowercase; a title that happens to contain
+	// the word just costs the full scan it already cost before.
+	if !strings.Contains(body, "error") {
+		return ""
+	}
 	decoder := xml.NewDecoder(strings.NewReader(body))
 	for {
 		token, err := decoder.Token()
@@ -878,7 +936,7 @@ func fsAPI(ctx context.Context, client *http.Client, endpoint string, payload ma
 	if response.StatusCode >= 400 {
 		return fmt.Errorf("HTTP %d", response.StatusCode)
 	}
-	body, err := readLimitedBody(response.Body, maxAPIResponseBytes)
+	body, err := readLimitedBodyHint(response.Body, maxAPIResponseBytes, response.ContentLength)
 	if err != nil {
 		return err
 	}
@@ -1328,7 +1386,7 @@ func fetchBodyDirect(ctx context.Context, client *http.Client, rawURL string, ti
 			body, err = readKnabenStream(response)
 		} else {
 			var payload []byte
-			payload, err = readLimitedBody(response.Body, maxFeedResponseBytes)
+			payload, err = readLimitedBodyHint(response.Body, maxFeedResponseBytes, response.ContentLength)
 			body = string(payload)
 		}
 		if err != nil {
@@ -2617,7 +2675,7 @@ func fetchTorznabFlareSolverr(ctx context.Context, indexer IndexerConfig, query 
 		contentType = torznabContentType(body)
 	default:
 		contentType = response.Header.Get("Content-Type")
-		payload, readErr := readLimitedBody(response.Body, maxFeedResponseBytes)
+		payload, readErr := readLimitedBodyHint(response.Body, maxFeedResponseBytes, response.ContentLength)
 		if readErr != nil {
 			return nil, readErr
 		}
@@ -2688,26 +2746,26 @@ func fetchIndexarrMorePages(ctx context.Context, firstURL string, headers map[st
 	}
 	// The offset moves by the requested page size: indexarr can return a page
 	// a few items short (a release it cannot render) with more pages after it.
-	var out []models.Release
+	// The total is a known upper bound, so the batch is allocated once.
+	out := make([]models.Release, 0, total)
 	for offset := indexarrPageSize; offset < total && ctx.Err() == nil; offset += indexarrPageSize {
 		response, err := httpDo(ctx, defaultHTTPClient, http.MethodGet, firstURL+"&offset="+strconv.Itoa(offset), headers, nil, "")
 		if err != nil {
 			logging.Debug("indexarr page could not be read", "offset", offset, "error", torznabShortReason(err))
 			return out
 		}
-		payload, readErr := readLimitedBody(response.Body, maxFeedResponseBytes)
+		payload, readErr := readLimitedBodyHint(response.Body, maxFeedResponseBytes, response.ContentLength)
 		response.Body.Close()
 		if readErr != nil || response.StatusCode != http.StatusOK {
 			logging.Debug("indexarr page could not be read", "offset", offset, "status", response.StatusCode)
 			return out
 		}
-		page := string(payload)
-		items, err := parseFeedBody(page, source)
+		items, err := parseFeedBytes(payload, source)
 		if err != nil {
 			return out
 		}
 		out = append(out, items...)
-		if strings.Count(page, "<item>") == 0 {
+		if bytes.Count(payload, itemOpenBytes) == 0 {
 			return out
 		}
 	}
