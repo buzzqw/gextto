@@ -117,6 +117,22 @@ func TestTitleFuncMarksOnlyTranslatedTitles(t *testing.T) {
 	}
 }
 
+// TestBreakFuncSplitsTheTranslatedHeading keeps a two-word heading on two
+// lines: the split happens after the lookup, so each language breaks its own
+// words, and the text is still escaped.
+func TestBreakFuncSplitsTheTranslatedHeading(t *testing.T) {
+	trBreak := v2BreakFunc(map[string]string{"Dettaglio tecnico": "Technisches Detail"}, nil)
+	if got := string(trBreak("Dettaglio tecnico")); got != "Technisches<br>Detail" {
+		t.Errorf("translated heading: got %s", got)
+	}
+	if got := string(trBreak("Riga <e> tecnica")); got != "Riga<br>&lt;e&gt; tecnica" {
+		t.Errorf("the heading is escaped: got %s", got)
+	}
+	if got := string(trBreak("Situazione")); got != "Situazione" {
+		t.Errorf("a single word stays on one line: got %s", got)
+	}
+}
+
 // TestTemplatesRenderInTheActiveLanguage renders a fragment through the cached
 // per-language set and checks that a catalog change is picked up.
 func TestTemplatesRenderInTheActiveLanguage(t *testing.T) {

@@ -626,7 +626,7 @@ func uiHealthDataFrom(s *AppState) uiHealthData {
 					// The raw error the suggested actions refer to ("consulta il
 					// dettaglio tecnico"): kept apart so the message stays a
 					// translatable phrase.
-					{Key: "last_error", Label: "Dettaglio tecnico", Format: "truncate"},
+					{Key: "last_error", Label: "Dettaglio tecnico", Format: "truncate", Break: true},
 				}),
 				ActionsJSON: uiJSON([]uiAction{
 					{Label: "Azzera", Class: "primary", Method: "POST", Path: "/api/providers/status", Body: `{"provider":"{provider}"}`},

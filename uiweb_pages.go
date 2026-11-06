@@ -21,6 +21,9 @@ type uiColumn struct {
 	Format string `json:"format,omitempty"`
 	// Sortable renders a clickable header that sorts the client-side table.
 	Sortable bool `json:"sortable,omitempty"`
+	// Break puts the heading on two lines at its first space: a two-word
+	// heading in a narrow panel would otherwise widen its column.
+	Break bool `json:"break,omitempty"`
 }
 
 type uiAction struct {

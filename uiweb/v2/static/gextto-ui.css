@@ -908,7 +908,10 @@ label.field > span, .field > span, .field-label { color: var(--muted); font-size
 /* Salute → Stato provider: "Disabilitato fino a" goes on two lines, so the
    provider name stays whole and Situazione, which matters more, keeps the
    room. The three text columns do the same for their own heading, so the table
-   is narrower and the technical detail is not pushed off the panel. */
+   is narrower and the technical detail is not pushed off the panel.
+   "Dettaglio tecnico" carries Break on its column: the heading is split with a
+   <br> after the translation, so it always takes two lines in every language
+   and its column asks for much less horizontal room. */
 .provider-status-table thead th:nth-child(4),
 .provider-status-table thead th:nth-child(5),
 .provider-status-table thead th:nth-child(6),
@@ -937,10 +940,12 @@ label.field > span, .field > span, .field-label { color: var(--muted); font-size
   vertical-align: top;
 }
 /* The panel is half the page: the three sentences keep a readable width even
-   when the headings wrap, and the table scrolls instead of squeezing them. */
+   when the headings wrap, and the table scrolls instead of squeezing them. The
+   last column stops at 8rem so the two-line heading is enough and the table
+   fits the panel instead of scrolling sideways. */
 .provider-status-table tbody td:nth-child(5) { min-width: 12rem; }
 .provider-status-table tbody td:nth-child(6) { min-width: 11rem; }
-.provider-status-table tbody td:nth-child(7) { min-width: 10rem; }
+.provider-status-table tbody td:nth-child(7) { min-width: 8rem; }
 .provider-status-table tbody td:nth-child(6) .cell-truncate,
 .provider-status-table tbody td:nth-child(7) .cell-truncate { max-width: 22rem; }
 .row-actions { display: flex; flex-wrap: nowrap; gap: 6px; white-space: nowrap; min-width: max-content; }

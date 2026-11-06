@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"html/template"
 	"reflect"
+	"strings"
 	"sync"
 )
 
@@ -54,6 +55,7 @@ func v2TemplatesFor(s *AppState) *template.Template {
 	funcs := v2TemplateFuncMap()
 	funcs["tr"] = v2TranslateFunc(dict, eng)
 	funcs["trTitle"] = v2TitleFunc(dict, eng)
+	funcs["trBreak"] = v2BreakFunc(dict, eng)
 	set, err := template.New("v2").Funcs(funcs).ParseFS(v2TemplatesFS, "uiweb/v2/templates/*.html")
 	if err != nil {
 		// The templates are embedded, so a parse error is a build-time defect:
@@ -116,6 +118,22 @@ func v2TitleFunc(dict, eng map[string]string) func(value any, args ...any) templ
 			attr += ` data-v2-title-translated="true"`
 		}
 		return template.HTMLAttr(attr)
+	}
+}
+
+// v2BreakFunc builds `trBreak`, which translates a table heading like `tr` and
+// then puts it on two lines at its first space. A two-word heading in a narrow
+// panel would otherwise widen its column: the break happens after the lookup,
+// so every language breaks its own wording and non-Latin scripts are untouched.
+func v2BreakFunc(dict, eng map[string]string) func(value any) template.HTML {
+	tr := v2TranslateFunc(dict, eng)
+	return func(value any) template.HTML {
+		text := template.HTMLEscapeString(fmt.Sprint(tr(value)))
+		before, after, found := strings.Cut(text, " ")
+		if !found {
+			return template.HTML(text)
+		}
+		return template.HTML(before + "<br>" + after)
 	}
 }
 

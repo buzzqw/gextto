@@ -97,10 +97,11 @@ func v2TemplateFuncMap() template.FuncMap {
 			return fmt.Sprintf(" · %d min", minutes)
 		},
 		"div": func(a, b int64) int64 { return a / b },
-		// tr and trTitle are bound to a dictionary by v2TemplatesFor; these
-		// Italian-only versions let the package-level set parse.
+		// tr, trTitle and trBreak are bound to a dictionary by v2TemplatesFor;
+		// these Italian-only versions let the package-level set parse.
 		"tr":      v2TranslateFunc(nil, nil),
 		"trTitle": v2TitleFunc(nil, nil),
+		"trBreak": v2BreakFunc(nil, nil),
 	}
 }
 
