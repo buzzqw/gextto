@@ -2044,8 +2044,10 @@ using fixed values.
   - **active downloads** (write buffer) and **active seeds** (read cache);
   - **storage class** of the download folder: on HDD or NFS the values
     double (more coalescing, fewer round-trips), on SSD/NVMe they stay low.
-  - Limits: write 96 MB–1.5 GB, read 32–512 MB, never more than 1/4 of the RAM and
-    1/8 of the available memory.
+  - Limits: write 96 MB–1.5 GB, read 8–512 MB (8 MiB at start, plus 8 MiB for
+    each active seed), never more than 1/4 of the RAM and 1/8 of the available
+    memory. A fresh session starts small: before there is a seed to serve there
+    is nothing to reuse, so the memory a seed may later need is not reserved.
   - **Hysteresis**: it is reapplied only if the target changes by more than 25%, at
     most once every 10 minutes. The engine resizes read cache and write
     buffer on the session in progress: no reopening.

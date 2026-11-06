@@ -31,11 +31,17 @@ also counts; the 100-torrent row is the only one that uses RSS. The full-speed r
 download from one peer, the 100 Mbit/s row the 512 MiB download from four peers shaped to that
 line.
 
+The upload row is the last full round. After the read-cache change of 2026-11-06 gx-torrent's
+own memory while uploading is 22 MiB and the speed 288–318 MB/s, but the other clients were not
+run again ([details](#what-this-round-changed)).
+
 In short: gx-torrent is the fastest downloader over TCP, is level with Transmission at a recheck
-(3.6 s against 3.7), and uploads as fast as the libtorrent clients. It is the heaviest in own
-memory while uploading, is level with Deluge on the 100 Mbit/s line, and with 100 torrents it
-spends the most CPU at rest (0.66 % against 0.06–0.35 %). Transmission spends less CPU on every
-download, at a lower speed. The tables are the round of 2026-11-06 on commit `40e58927`.
+(3.6 s against 3.7), and uploads as fast as the libtorrent clients. Its read cache now starts
+small: while uploading it uses 22 MiB of own memory instead of 58, at 288–318 MB/s. It is level
+with Deluge on the 100 Mbit/s line, and with 100 torrents it spends the most CPU at rest
+(0.66 % against 0.06–0.35 %). Transmission spends less CPU on every download, at a lower speed.
+The tables are the round of 2026-11-06 on commit `40e58927`; the read-cache change is measured
+separately [below](#what-this-round-changed).
 
 ## What is best for me
 
@@ -145,7 +151,7 @@ then an upload to one unshaped reference peer.
 
 | Client | Recheck | CPU | Upload speed | CPU per GiB | Peak own memory | Peak RSS |
 |---|---|---|---|---|---|---|
-| gx-torrent | 3.6 s (1,182 MB/s) | 3.9 s | 242 MB/s (242–262) | 2.26 s | 58 MiB | 72 MiB |
+| gx-torrent | 3.6 s (1,182 MB/s) | 3.9 s | 242 MB/s (242–262) | 2.26 s | 58 MiB* | 72 MiB* |
 | Transmission | 3.7 s (1,151 MB/s) | 2.5 s | 125 MB/s (124–125) | 2.67 s | 35 MiB | 50 MiB |
 | Deluge | 4.6 s (939 MB/s) | 3.9 s | 207 MB/s (178–259) | 2.46 s | 44 MiB | 4,099 MiB |
 | qBittorrent | 5.6 s (761 MB/s) | 3.7 s | 236 MB/s (203–240) | 2.70 s | 13 MiB | 4,087 MiB |
@@ -157,6 +163,8 @@ The upload ranges are wide for every client, because repeated 4 GiB writes by th
 slow this disk over a session. The gap between gx-torrent and qBittorrent (242 against 236 MB/s,
 3 %) is smaller than the spread of their rounds, and Deluge reaches 259: none of the three is
 separated.
+
+\* 22 MiB of own memory and 36 MiB of RSS after the read-cache change below.
 
 ### 100 torrents
 
@@ -171,6 +179,25 @@ until all are seeding, then 60 s at rest and the time to come back after a resta
 | qBittorrent | 0.9 s | 100.8 s | 0.6 s | **0.06 %** | 90 MiB | 119 MiB |
 
 Transmission reaches seeding at once because it trusts existing files until asked to recheck.
+
+### What this round changed
+
+After the round above, gx-torrent's read cache starts at 8 MiB instead of 32 and grows by
+8 MiB for each active seed: before a seed exists there is nothing to reuse, so the daemon does
+not reserve the memory a seed may need. The other clients were not run again, so the tables keep
+the last full round. These are gx-torrent only, same harness and payload, three rounds before
+and three after, 2026-11-06.
+
+| Measure | Before | After |
+|---|---|---|
+| Peak own memory, upload | 55–59 MiB (median 57) | **22–24 MiB** (median 22) |
+| Peak RSS, upload | 70–74 MiB (median 72) | **36–38 MiB** (median 37) |
+| Upload speed | 179–283 MB/s | **288–318 MB/s** |
+| Upload CPU per GiB | 2.32–2.50 s | **2.31–2.45 s** |
+
+The upload speed did not fall: the fastest before round (283 MB/s) is close to the slowest after
+one (288 MB/s), and one before round was the slow outlier the disk produces. The recheck is
+unchanged. At rest and with 100 torrents the read cache is empty, so those rows do not move.
 
 ### What these numbers do not say
 

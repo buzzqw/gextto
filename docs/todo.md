@@ -83,6 +83,10 @@ its gate; a rejected one moves to *Not planned*.
 - **Bundle more languages** — the pack loader is in place (`<data>/lang/*.json`, English
   fallback, partial packs allowed); the six compiled catalogs are still the only complete
   ones. Gate: a translator for each language.
+- **Smaller piece buffers on the download path** — on the 100 Mbit/s line gx-torrent holds
+  40 MiB of own memory against 10–39 MiB for the other clients: two 2 MiB pieces per peer
+  plus up to four pieces waiting to be written. Gate: a measurement that one piece per peer
+  keeps the line at 11.2 MB/s before changing the default.
 ## Not planned
 
 Closed by choice, not waiting for a measurement:
