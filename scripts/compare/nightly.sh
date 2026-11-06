@@ -52,7 +52,7 @@ cd "$work"
 echo "--- smoke of the new Go clients, results thrown away"
 GX_COMPARE_OUT="$scratch/smoke.jsonl" \
     python3 scripts/compare/run.py run --clients rain,anacrolix \
-    --scenarios full,check-upload --rounds 1 --tag smoke
+    --scenarios full,check-upload,line,line-utp --rounds 1 --tag smoke
 GX_COMPARE_OUT="$scratch/smoke.jsonl" \
     python3 scripts/compare/run.py run --clients rain,anacrolix \
     --scenarios many --many 10 --rounds 1 --tag smoke

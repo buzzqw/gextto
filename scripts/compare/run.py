@@ -286,6 +286,9 @@ class Client:
     # API has no bulk status call raises it, so the poll does not become part
     # of its measured CPU.
     poll_interval = 0.25
+    # Scenarios the client cannot run at all: the row is left empty and the
+    # document says why, instead of a failure repeated in every round.
+    unsupported = frozenset()
 
     def __init__(self, slot, ip, cpus, memory, reference=False, protocol="TCP", cap_add=(), utp=True):
         self.reference, self.protocol, self.utp = reference, protocol, utp
@@ -535,6 +538,9 @@ class Rain(Client):
     # a hundred torrents the harness asks less often: the poll itself is work
     # in the client's container, and it would land in rain's CPU row.
     poll_interval = 2.0
+    # rain has no uTP: the line-utp scenario gives a peer reachable only over
+    # uTP, and there is nothing for this client to connect to.
+    unsupported = frozenset({"line-utp"})
 
     def configure(self):
         (self.dir / "cfg" / "rain.yaml").write_text(
@@ -1050,6 +1056,9 @@ def run_rounds(args, clients, scenarios, env, commit):
         order = clients[round_no % len(clients):] + clients[:round_no % len(clients)]
         for scenario in scenarios:
             for client in order:
+                if scenario in CLIENT_CLASSES[client].unsupported:
+                    log(f"round {round_no + 1}/{args.rounds} {scenario} {client}: not supported, skipped")
+                    continue
                 for attempt in range(MAX_ATTEMPTS):
                     quiet = wait_quiet()
                     FFMPEG_SEEN.clear()
