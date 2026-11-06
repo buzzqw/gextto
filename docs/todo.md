@@ -21,6 +21,11 @@ Nothing open: every engine item waits for a condition listed under
 
 ## Gextto, acquisition and UI
 
+- **Release parsing CPU** — about a third of a cycle's CPU is regexp
+  backtracking in `ParseQuality` and the title matchers, and the same names are
+  parsed once per candidate. Gate: a CPU profile of a full cycle with a parsing
+  hotspot above 20 %; replace the hot pattern with a table-driven scan (or
+  cache the result per release) and measure the cycle on the same corpus.
 - **Cycle allocation churn** — a 38k-release cycle still allocates about 1.4 GB,
   now mostly in `encoding/xml`'s tokenizer and in the HTML parser, which sets
   the peak and the fragmented heap left behind. Gate: a corpus of real feeds
