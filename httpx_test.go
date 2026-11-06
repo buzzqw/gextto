@@ -23,6 +23,31 @@ func TestReadLimitedBodyOverLimit(t *testing.T) {
 	}
 }
 
+func TestReadLimitedBodyIntoReusesTheBuffer(t *testing.T) {
+	data := bytes.Repeat([]byte("x"), 100)
+	first, err := readLimitedBodyInto(make([]byte, 0, 64), bytes.NewReader(data), 1000)
+	if err != nil {
+		t.Fatalf("first read: %v", err)
+	}
+	if len(first) != len(data) {
+		t.Fatalf("first read length = %d, want %d", len(first), len(data))
+	}
+	capacity := cap(first)
+	second, err := readLimitedBodyInto(first, strings.NewReader("hello"), 1000)
+	if err != nil {
+		t.Fatalf("second read: %v", err)
+	}
+	if string(second) != "hello" {
+		t.Fatalf("second body = %q, want hello", second)
+	}
+	if cap(second) != capacity {
+		t.Fatalf("second read reallocated: capacity %d -> %d", capacity, cap(second))
+	}
+	if _, err := readLimitedBodyInto(second, strings.NewReader("hello!"), 5); err == nil {
+		t.Fatal("readLimitedBodyInto must reject a body larger than the limit")
+	}
+}
+
 // unsizedReader hides the length of the source, like a chunked HTTP response.
 type unsizedReader struct{ r io.Reader }
 

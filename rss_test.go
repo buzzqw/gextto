@@ -245,6 +245,22 @@ func TestPreservesRSSPublicationDateForReleaseAgeFilters(t *testing.T) {
 	}
 }
 
+// TestTorznabErrorBytesMatchesTheStringVersion pins that the byte variant used
+// on the Torznab hot path reports exactly what the string one reports.
+func TestTorznabErrorBytesMatchesTheStringVersion(t *testing.T) {
+	for _, body := range []string{
+		"",
+		"<rss><channel><item><title>No error here</title></item></channel></rss>",
+		"<rss><channel><item><title>An error in a title</title></item></channel></rss>",
+		`<error code="202" description="no indexers configured"/>`,
+		`<rss><error code="203" description="tmdbid is not supported"/></rss>`,
+	} {
+		if got, want := TorznabErrorBytes([]byte(body)), TorznabError(body); got != want {
+			t.Errorf("%q: bytes = %q, string = %q", body, got, want)
+		}
+	}
+}
+
 func TestMalformedRSSIsReportedAsError(t *testing.T) {
 	// Malformed XML must surface an error (the caller then falls back to the
 	// listing parser or skips the feed).

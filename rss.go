@@ -160,6 +160,7 @@ const (
 var (
 	itemOpenBytes  = []byte(itemOpenTag)
 	entryOpenBytes = []byte(entryOpenTag)
+	magnetMarker   = []byte("magnet:?")
 )
 
 // itemSlots is a cheap upper bound of the items in a body, used to size the
@@ -295,8 +296,26 @@ func parseFeedReader(reader io.Reader, source string, capacity int) ([]models.Re
 			}
 			current = name
 		case xml.CharData:
-			if inItem {
-				value := strings.TrimSpace(string(event))
+			if !inItem {
+				continue
+			}
+			// Convert only text this parser stores or scans: most items carry
+			// category, comments and other nodes whose value is never read, and
+			// the copy is one allocation per text node.
+			text := bytes.TrimSpace(event)
+			if len(text) == 0 {
+				continue
+			}
+			switch current {
+			case "title", "guid", "id", "jackettindexer", "description", "size",
+				"seeders", "peers", "leechers", "pubdate", "published", "updated", "date", "link":
+			default:
+				if !bytes.Contains(text, magnetMarker) {
+					continue
+				}
+			}
+			{
+				value := string(text)
 				if current == "title" {
 					title = value
 				}
@@ -464,7 +483,21 @@ func TorznabError(body string) string {
 	if !strings.Contains(body, "error") {
 		return ""
 	}
-	decoder := xml.NewDecoder(strings.NewReader(body))
+	return torznabErrorFrom(xml.NewDecoder(strings.NewReader(body)))
+}
+
+// TorznabErrorBytes is TorznabError for a body kept as bytes: a Torznab
+// response is parsed from its buffer without copying it into a string.
+func TorznabErrorBytes(body []byte) string {
+	if !bytes.Contains(body, errorMarker) {
+		return ""
+	}
+	return torznabErrorFrom(xml.NewDecoder(bytes.NewReader(body)))
+}
+
+var errorMarker = []byte("error")
+
+func torznabErrorFrom(decoder *xml.Decoder) string {
 	for {
 		token, err := decoder.Token()
 		if err != nil {
@@ -538,6 +571,13 @@ func capRetryAfter(wait time.Duration) time.Duration {
 }
 
 func isCloudflareChallenge(body string) bool {
+	// The markers sit in the <head> of the challenge page: lowercasing a
+	// multi-MB Torznab body to look for them copied it in full on every
+	// response. The first 64 KiB are enough to recognise the page.
+	const probe = 64 << 10
+	if len(body) > probe {
+		body = body[:probe]
+	}
 	lower := strings.ToLower(body)
 	return strings.Contains(lower, "just a moment") ||
 		strings.Contains(lower, "cf-challenge") ||
@@ -2612,7 +2652,7 @@ func fetchTorznabFlareSolverr(ctx context.Context, indexer IndexerConfig, query 
 		defer response.Body.Close()
 	}
 	var contentType string
-	var body string
+	var body []byte
 	switch {
 	case transportErr != nil:
 		// Do not turn cancellation of the parent search into a FlareSolverr
@@ -2639,13 +2679,13 @@ func fetchTorznabFlareSolverr(ctx context.Context, indexer IndexerConfig, query 
 			return nil, fmt.Errorf("direct Torznab request failed (%s); FlareSolverr fallback failed: %w",
 				utils.RedactURLSecrets(transportErr.Error()), fetchErr)
 		}
-		body = fetched
+		body = []byte(fetched)
 		contentType = torznabContentType(body)
 	case response.StatusCode == http.StatusTooManyRequests:
 		// The indexer asked for a pause. Keep what it said so the provider
 		// backoff does not bring Gextto back sooner than the site allows.
 		payload, _ := readLimitedBody(response.Body, 64<<10)
-		detail := TorznabError(string(payload))
+		detail := TorznabErrorBytes(payload)
 		return nil, &indexerRateLimitError{
 			status:     response.StatusCode,
 			retryAfter: parseRetryAfter(response.Header.Get("Retry-After"), time.Now()),
@@ -2656,7 +2696,7 @@ func fetchTorznabFlareSolverr(ctx context.Context, indexer IndexerConfig, query 
 			// Keep the indexer's own explanation (Jackett: "Torznab 203:
 			// tmdbid is not supported…") instead of a bare status code.
 			payload, _ := readLimitedBody(response.Body, 64<<10)
-			if torznabError := TorznabError(string(payload)); torznabError != "" {
+			if torznabError := TorznabErrorBytes(payload); torznabError != "" {
 				if sentIDs && torznabUnsupportedParam(torznabError) {
 					return withoutIDs(torznabError)
 				}
@@ -2671,7 +2711,7 @@ func fetchTorznabFlareSolverr(ctx context.Context, indexer IndexerConfig, query 
 		if fetchErr != nil {
 			return nil, fetchErr
 		}
-		body = fetched
+		body = []byte(fetched)
 		contentType = torznabContentType(body)
 	default:
 		contentType = response.Header.Get("Content-Type")
@@ -2679,8 +2719,8 @@ func fetchTorznabFlareSolverr(ctx context.Context, indexer IndexerConfig, query 
 		if readErr != nil {
 			return nil, readErr
 		}
-		body = string(payload)
-		if isCloudflareChallenge(body) {
+		body = payload
+		if isCloudflareChallenge(bodyProbe(body, 64<<10)) {
 			if flaresolverr == nil || strings.TrimSpace(*flaresolverr) == "" {
 				return nil, fmt.Errorf("Cloudflare challenge")
 			}
@@ -2688,11 +2728,11 @@ func fetchTorznabFlareSolverr(ctx context.Context, indexer IndexerConfig, query 
 			if fetchErr != nil {
 				return nil, fetchErr
 			}
-			body = fetched
+			body = []byte(fetched)
 			contentType = torznabContentType(body)
 		}
 	}
-	if torznabError := TorznabError(body); torznabError != "" {
+	if torznabError := TorznabErrorBytes(body); torznabError != "" {
 		if sentIDs && torznabUnsupportedParam(torznabError) {
 			return withoutIDs(torznabError)
 		}
@@ -2700,8 +2740,8 @@ func fetchTorznabFlareSolverr(ctx context.Context, indexer IndexerConfig, query 
 	}
 	// Torznab/Prowlarr replies can be large; XML/JSON decoding also invokes the
 	// release parser for every item.
-	if strings.Contains(contentType, "json") || strings.HasPrefix(strings.TrimSpace(body), "[") {
-		items, err := parseProwlarrBody(ctx, body, indexer.Name)
+	if strings.Contains(contentType, "json") || bytes.HasPrefix(bytes.TrimSpace(body), []byte("[")) {
+		items, err := parseProwlarrBody(ctx, string(body), indexer.Name)
 		// Prowlarr answers an id search with nothing when its indexers cannot
 		// search by that id: try the title before concluding there is nothing.
 		if err == nil && len(items) == 0 && sentIDs && ctx.Err() == nil {
@@ -2709,7 +2749,7 @@ func fetchTorznabFlareSolverr(ctx context.Context, indexer IndexerConfig, query 
 		}
 		return items, err
 	}
-	items, err := parseFeedBody(body, indexer.Name)
+	items, err := parseFeedBytes(body, indexer.Name)
 	if err == nil && managerKind(indexer) == ManagerIndexarr {
 		items = append(items, fetchIndexarrMorePages(ctx, fullURL, headers, body, indexer.Name)...)
 	}
@@ -2725,47 +2765,75 @@ const indexarrPageSize = 100
 
 var torznabResponseTotal = regexp.MustCompile(`<newznab:response[^>]*\btotal="(\d+)"`)
 
+// indexarrPageBuffer bounds the buffer reused for the pages after the first:
+// one search can read ten in a row, and each page would otherwise allocate and
+// copy its body several times.
+const indexarrPageBuffer = 256 << 10
+
+var indexarrPagePool = sync.Pool{
+	New: func() any {
+		buffer := make([]byte, 0, indexarrPageBuffer)
+		return &buffer
+	},
+}
+
+// releaseIndexarrPage returns a page buffer to the pool. A page large enough
+// to be unrepresentative of the next ones is not kept alive.
+func releaseIndexarrPage(buffer *[]byte) {
+	const keep = 4 << 20
+	if cap(*buffer) > keep {
+		return
+	}
+	*buffer = (*buffer)[:0]
+	indexarrPagePool.Put(buffer)
+}
+
 // fetchIndexarrMorePages reads the pages after the first of an indexarr
 // search. indexarr keeps the merged result set for two minutes, so the
 // following pages cost a few milliseconds and never search the sites again.
 // A page that fails ends the reading: the results already read are kept.
-func fetchIndexarrMorePages(ctx context.Context, firstURL string, headers map[string]string, firstBody, source string) []models.Release {
-	match := torznabResponseTotal.FindStringSubmatch(firstBody)
+func fetchIndexarrMorePages(ctx context.Context, firstURL string, headers map[string]string, firstBody []byte, source string) []models.Release {
+	match := torznabResponseTotal.FindSubmatch(firstBody)
 	if match == nil {
 		return nil
 	}
-	total, err := strconv.Atoi(match[1])
+	total, err := strconv.Atoi(string(match[1]))
 	if err != nil {
 		return nil
 	}
 	if total > indexarrMaxResults {
 		total = indexarrMaxResults
 	}
-	if strings.Count(firstBody, "<item>") == 0 {
+	if bytes.Count(firstBody, itemOpenBytes) == 0 {
 		return nil
 	}
 	// The offset moves by the requested page size: indexarr can return a page
 	// a few items short (a release it cannot render) with more pages after it.
 	// The total is a known upper bound, so the batch is allocated once.
 	out := make([]models.Release, 0, total)
+	// One buffer for every page of this search: the parser copies what it
+	// keeps, so the page can be read into the same space again.
+	buffer := indexarrPagePool.Get().(*[]byte)
+	defer releaseIndexarrPage(buffer)
 	for offset := indexarrPageSize; offset < total && ctx.Err() == nil; offset += indexarrPageSize {
 		response, err := httpDo(ctx, defaultHTTPClient, http.MethodGet, firstURL+"&offset="+strconv.Itoa(offset), headers, nil, "")
 		if err != nil {
 			logging.Debug("indexarr page could not be read", "offset", offset, "error", torznabShortReason(err))
 			return out
 		}
-		payload, readErr := readLimitedBodyHint(response.Body, maxFeedResponseBytes, response.ContentLength)
+		var readErr error
+		*buffer, readErr = readLimitedBodyInto(*buffer, response.Body, maxFeedResponseBytes)
 		response.Body.Close()
 		if readErr != nil || response.StatusCode != http.StatusOK {
 			logging.Debug("indexarr page could not be read", "offset", offset, "status", response.StatusCode)
 			return out
 		}
-		items, err := parseFeedBytes(payload, source)
+		items, err := parseFeedBytes(*buffer, source)
 		if err != nil {
 			return out
 		}
 		out = append(out, items...)
-		if bytes.Count(payload, itemOpenBytes) == 0 {
+		if bytes.Count(*buffer, itemOpenBytes) == 0 {
 			return out
 		}
 	}
@@ -2814,11 +2882,21 @@ func torznabViaFlareSolverr(ctx context.Context, indexer IndexerConfig, flaresol
 	return body, nil
 }
 
-func torznabContentType(body string) string {
-	if strings.HasPrefix(strings.TrimSpace(body), "[") {
+func torznabContentType(body []byte) string {
+	if bytes.HasPrefix(bytes.TrimSpace(body), []byte("[")) {
 		return "application/json"
 	}
 	return "application/xml"
+}
+
+// bodyProbe returns the first limit bytes as a string. The Cloudflare check
+// only reads the head of the page; converting the whole Torznab body to a
+// string to look at it copied megabytes on every response.
+func bodyProbe(body []byte, limit int) string {
+	if len(body) > limit {
+		body = body[:limit]
+	}
+	return string(body)
 }
 
 // HealthProbeURL is the read-only endpoint used by the health check. For

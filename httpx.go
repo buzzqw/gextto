@@ -62,17 +62,42 @@ func readLimitedBodyHint(r io.Reader, limit, hint int64) ([]byte, error) {
 	if hint > limit {
 		hint = limit
 	}
-	var buffer bytes.Buffer
-	if hint > 0 {
-		buffer.Grow(int(hint))
+	if hint < 0 {
+		hint = 0
 	}
-	if _, err := buffer.ReadFrom(io.LimitReader(r, limit+1)); err != nil {
-		return nil, err
+	return readLimitedBodyInto(make([]byte, 0, int(hint)), r, limit)
+}
+
+// readLimitedBodyInto is readLimitedBody reusing buf, so a caller that reads
+// several pages in a row does not allocate a fresh buffer for each one. buf is
+// reset; its capacity is kept and grown only when the body needs it.
+func readLimitedBodyInto(buf []byte, r io.Reader, limit int64) ([]byte, error) {
+	buf = buf[:0]
+	if cap(buf) == 0 {
+		buf = make([]byte, 0, 64<<10)
 	}
-	if int64(buffer.Len()) > limit {
-		return nil, fmt.Errorf("response body exceeds the %d byte limit", limit)
+	for {
+		if len(buf) == cap(buf) {
+			next := cap(buf) * 2
+			if int64(next) > limit+1 {
+				next = int(limit) + 1
+			}
+			grown := make([]byte, len(buf), next)
+			copy(grown, buf)
+			buf = grown
+		}
+		n, err := r.Read(buf[len(buf):cap(buf)])
+		buf = buf[:len(buf)+n]
+		if int64(len(buf)) > limit {
+			return nil, fmt.Errorf("response body exceeds the %d byte limit", limit)
+		}
+		if err == io.EOF {
+			return buf, nil
+		}
+		if err != nil {
+			return nil, err
+		}
 	}
-	return buffer.Bytes(), nil
 }
 
 // copyLimited streams src into dst, failing when the source is larger than
