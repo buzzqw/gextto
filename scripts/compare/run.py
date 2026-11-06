@@ -982,18 +982,27 @@ def setup_env(args, scenarios):
     return env
 
 
+def docker_subnets():
+    """The subnets already taken on this machine, ours or not."""
+    taken = set()
+    for network in sh("docker", "network", "ls", "-q", check=False).split():
+        found = sh("docker", "network", "inspect", "-f", "{{range .IPAM.Config}}{{.Subnet}} {{end}}", network, check=False)
+        taken.update(found.split())
+    return taken
+
+
 def ensure_network():
     """Pick this round's network and container prefix, then create the network."""
     global NET, SUBNET, PREFIX, TRACKER_IP, SUT_IP, ANNOUNCE
     if not NET or not SUBNET:
-        used = set(sh("docker", "network", "ls", "--format", "{{.Name}}").split())
+        used = docker_subnets()
         for slot in range(30, 90):
-            if f"gxc-net-{slot}" in used:
+            if any(net.startswith(f"172.{slot}.") for net in used):
                 continue
             NET, SUBNET = f"gxc-net-{slot}", f"172.{slot}.0"
             break
         else:
-            raise SystemExit("no free gxc-net-N slot for this round")
+            raise SystemExit("no free 172.N.0.0/24 for this round")
     if NET not in set(sh("docker", "network", "ls", "--format", "{{.Name}}").split()):
         sh("docker", "network", "create", "--internal", "--subnet", f"{SUBNET}.0/24", NET)
     PREFIX = "gxc-" + SUBNET.split(".")[1]
