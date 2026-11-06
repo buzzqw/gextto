@@ -185,8 +185,8 @@ Transmission reaches seeding at once because it trusts existing files until aske
 After the round above, gx-torrent's read cache starts at 8 MiB instead of 32 and grows by
 8 MiB for each active seed: before a seed exists there is nothing to reuse, so the daemon does
 not reserve the memory a seed may need. The other clients were not run again, so the tables keep
-the last full round. These are gx-torrent only, same harness and payload, three rounds before
-and three after, 2026-11-06.
+the last full round. These are gx-torrent only, same harness and payload, two valid rounds before
+(the third found the network down) and three after, 2026-11-06.
 
 | Measure | Before | After |
 |---|---|---|
