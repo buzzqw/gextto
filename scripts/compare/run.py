@@ -818,7 +818,9 @@ def wait_check_started(client, info_hash, timeout=10):
         row = client.status().get(info_hash)
         if row and (row[0] != "seeding" or row[1] < 0.9999):
             return
-        time.sleep(min(0.02, client.poll_interval))
+        # Ask four times a second at most: a recheck starts at once, and the
+        # poll must not become work inside the client being measured.
+        time.sleep(min(0.25, client.poll_interval))
 
 
 def same_file(a, b):
