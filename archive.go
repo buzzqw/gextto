@@ -646,6 +646,17 @@ func (a *Archive) ResolveListing(torrentURL, magnet, title string, qualityScore 
 	)
 	if err != nil {
 		_ = tx.Rollback()
+		if archiveUniqueViolation(err) {
+			// Another listing of the same torrent was resolved meanwhile (two
+			// links of one search pointing at the same file): that row stays
+			// and this link-only copy goes, as in the duplicate case above.
+			result, delErr := a.db.Exec("DELETE FROM archive WHERE id=?1", id)
+			if delErr != nil {
+				return false, delErr
+			}
+			affected, _ := result.RowsAffected()
+			return affected > 0, nil
+		}
 		return false, err
 	}
 	affected, _ := result.RowsAffected()
@@ -653,6 +664,12 @@ func (a *Archive) ResolveListing(torrentURL, magnet, title string, qualityScore 
 		return false, err
 	}
 	return affected > 0, nil
+}
+
+// archiveUniqueViolation reports a write refused by a unique index: the row it
+// wanted to create already exists.
+func archiveUniqueViolation(err error) bool {
+	return err != nil && strings.Contains(err.Error(), "UNIQUE constraint failed")
 }
 
 func (a *Archive) canonicalizeTorrentURL(torrentURL, magnet, source, guid string) error {

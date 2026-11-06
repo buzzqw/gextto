@@ -1460,7 +1460,11 @@ func runMediaIntegrityScan(ctx context.Context, s *AppState, jobID string, limit
 		}
 		switch status {
 		case "damaged":
-			logging.Warn(fmt.Sprintf("🧪 The file of «%s» looks damaged: %s", target.Label(), detail))
+			// ffmpeg's own lines ("[h264 @ 0x55…] error while decoding MB…")
+			// mean nothing to most people: the sentence says what was found,
+			// the decoder's words follow as a detail.
+			logging.Warn(fmt.Sprintf("🧪 The file of «%s» looks damaged: it cannot be played through without errors", target.Label()),
+				"details", detail)
 			if domain := mediaIntegrityRedownload(s, target); domain != "" {
 				searchDomains[domain] = struct{}{}
 			}
@@ -1531,14 +1535,36 @@ func runMediaIntegrityScan(ctx context.Context, s *AppState, jobID string, limit
 		"duration_secs":    int64(time.Since(startedAt).Seconds()),
 	}
 	switch {
+	case ctx.Err() != nil && checkedThisRun == 0:
+		// Stopped by a restart before it checked anything: the same counts as
+		// the last line, nothing to tell.
+		logging.Debug(fmt.Sprintf("🧪 Media integrity check stopped: %s", mediaIntegritySummary(state.Checked, damaged, unreadable, false)))
 	case ctx.Err() != nil:
 		logging.Info(fmt.Sprintf("🧪 Media integrity check stopped: %s", mediaIntegritySummary(state.Checked, damaged, unreadable, false)))
 	case state.Done:
 		logging.Info(fmt.Sprintf("🧪 Media integrity check finished: %s", mediaIntegritySummary(state.Checked, damaged, unreadable, false)))
 	case checkedThisRun > 0:
-		logging.Info(fmt.Sprintf("🧪 Media integrity check: %s", mediaIntegritySummary(state.Checked, damaged, unreadable, true)))
+		// The periodic runs check a few files each, every half hour: a line
+		// per run repeated the same counts all day. A damaged file has its
+		// own warning already; the progress gets a line every
+		// mediaIntegrityProgressEvery files.
+		line := fmt.Sprintf("🧪 Media integrity check: %s", mediaIntegritySummary(state.Checked, damaged, unreadable, true))
+		if mediaIntegrityProgressDue(state.Checked-checkedThisRun, state.Checked) {
+			logging.Info(line)
+		} else {
+			logging.Debug(line)
+		}
 	}
 	return report, nil
+}
+
+// mediaIntegrityProgressEvery is how many checked files earn a progress line.
+const mediaIntegrityProgressEvery = 50
+
+// mediaIntegrityProgressDue reports a run that crossed a multiple of
+// mediaIntegrityProgressEvery checked files.
+func mediaIntegrityProgressDue(before, after int) bool {
+	return after/mediaIntegrityProgressEvery > before/mediaIntegrityProgressEvery
 }
 
 // mediaIntegritySummary is the tail of the summary line: how many files were

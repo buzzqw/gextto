@@ -119,7 +119,12 @@ func shutdownBanner(s runState, now time.Time, reason string) string {
 	if t, err := time.Parse(time.RFC3339, s.StartedAt); err == nil && !t.IsZero() {
 		uptime = humanDuration(int64(now.Sub(t).Seconds()))
 	}
-	return fmt.Sprintf("🛑 Gextto stopped (%s) after %s", reason, uptime)
+	// A stop asked by the system or by the user is the normal case and needs
+	// no cause; only an abnormal one (a fatal error) says why.
+	if strings.TrimSpace(reason) == "" {
+		return fmt.Sprintf("🛑 Gextto stopped after %s", uptime)
+	}
+	return fmt.Sprintf("🛑 Gextto stopped after %s: %s", uptime, reason)
 }
 
 // logStartupBanner logs the start line, records the run and returns the

@@ -188,7 +188,7 @@ func (q *audioCleanupQueueState) resume(cfg *Config, db *Database) {
 	}
 	if _, enabled := audioCleanupSettings(cfg); !enabled || !AudioCleanupAvailable() {
 		if len(saved) > 0 {
-			logging.Info(fmt.Sprintf("%d file(s) waiting for the audio cleanup were left as they are: the cleanup is switched off or its tools are missing", len(saved)))
+			logging.Info(fmt.Sprintf("%s waiting for the audio cleanup %s left as they are: the cleanup is switched off or its tools are missing", countLabel(len(saved), "file", "files"), pluralWord(len(saved), "was", "were")))
 		}
 		_ = os.Remove(statePath)
 		return
@@ -208,7 +208,7 @@ func (q *audioCleanupQueueState) resume(cfg *Config, db *Database) {
 		return
 	}
 	added := q.enqueue(jobs)
-	logging.Info(fmt.Sprintf("🎧 %d file(s) waiting for the audio cleanup before the restart are queued again", added))
+	logging.Info(fmt.Sprintf("🎧 %s waiting for the audio cleanup before the restart %s queued again", countLabel(added, "file", "files"), pluralWord(added, "is", "are")))
 }
 
 // ResumeAudioCleanup queues again the files the previous run did not finish
@@ -293,8 +293,8 @@ func audioCleanupProcess(job audioCleanupJob, cfg *Config, db *Database) {
 		if cfg != nil {
 			notifyAudioCleanup(FromConfig(cfg), job.Path, report)
 		}
-		logging.Info(fmt.Sprintf("🎧 «%s»: %d audio track(s) in another language removed, %s saved",
-			filepath.Base(job.Path), len(report.Dropped), logging.HumanBytesI64(report.SavedBytes)),
+		logging.Info(fmt.Sprintf("🎧 «%s»: %s in another language removed, %s saved",
+			filepath.Base(job.Path), countLabel(len(report.Dropped), "audio track", "audio tracks"), logging.HumanBytesI64(report.SavedBytes)),
 			"path", job.Path, "tool", report.Backend)
 	default:
 		logging.Debug("audio cleanup skipped", "path", job.Path, "reason", report.SkipReason)

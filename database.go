@@ -1209,8 +1209,7 @@ func (d *Database) checkSeriesScoredInner(release *models.Release, score, minSco
 				}
 				missingArchivedFile = true
 				if missingArchiveWarnDue(persistedArchivePath) {
-					logging.Warn(fmt.Sprintf("The library file of %s S%02dE%02d is no longer on disk, so the episode can be downloaded again",
-						seriesName, season, episode), "path", persistedArchivePath)
+					missingArchiveReports.add(seriesName, season, episode, persistedArchivePath)
 				}
 			}
 		}

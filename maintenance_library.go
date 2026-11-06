@@ -164,8 +164,8 @@ func runLibraryReport(ctx context.Context, state *AppState) {
 		status.Night.Missing = missing
 	})
 	if missing > 0 || len(result.Unreachable) > 0 {
-		logging.Info(fmt.Sprintf("📚 Library report: %d of %d archived files are missing from the disk, %d series folder(s) could not be read",
-			missing, len(rows), len(result.Unreachable)))
+		logging.Info(fmt.Sprintf("📚 Library report: %d of %d archived files are missing from the disk, %s could not be read",
+			missing, len(rows), countLabel(len(result.Unreachable), "series folder", "series folders")))
 	}
 }
 

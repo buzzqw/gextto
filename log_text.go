@@ -230,10 +230,19 @@ func friendlyQuality(quality models.Quality) string {
 		"hdtv": "HDTV", "dvdrip": "DVDRip", "dvd": "DVD", "web": "WEB",
 	}
 	parts := make([]string, 0, 4)
-	if value := strings.TrimSpace(quality.Resolution); value != "" {
+	// The parser's "unknown" placeholder says nothing: "(unknown unknown
+	// ITA)" read as a glitch. An unknown field is left out.
+	known := func(raw string) string {
+		raw = strings.TrimSpace(raw)
+		if strings.EqualFold(raw, "unknown") {
+			return ""
+		}
+		return raw
+	}
+	if value := known(quality.Resolution); value != "" {
 		parts = append(parts, value)
 	}
-	if value := strings.TrimSpace(quality.Source); value != "" {
+	if value := known(quality.Source); value != "" {
 		if label, ok := sources[strings.ToLower(value)]; ok {
 			value = label
 		}
@@ -241,10 +250,10 @@ func friendlyQuality(quality models.Quality) string {
 	}
 	if quality.IsDV {
 		parts = append(parts, "Dolby Vision")
-	} else if value := strings.TrimSpace(quality.HDR); value != "" {
+	} else if value := known(quality.HDR); value != "" {
 		parts = append(parts, strings.ToUpper(value))
 	}
-	if value := strings.TrimSpace(quality.Language); value != "" {
+	if value := known(quality.Language); value != "" {
 		parts = append(parts, strings.ToUpper(value))
 	}
 	if len(parts) == 0 {
@@ -475,13 +484,18 @@ func cycleReportText(duration string, stats *models.CycleStats, upgrades, newIte
 		if upgrades > 0 {
 			kinds = append(kinds, countLabel(int64(upgrades), "upgrade", "upgrades"))
 		}
-		if stats.GapsFilled > 0 {
-			kinds = append(kinds, fmt.Sprintf("%s missing %s",
-				logCount(stats.GapsFilled), plural(stats.GapsFilled, "episode filled", "episodes filled")))
-		}
 		downloads = countLabel(stats.DownloadsStarted, "download", "downloads") + " started"
-		if len(kinds) > 0 {
-			downloads += " (" + strings.Join(kinds, ", ") + ")"
+		// The filled gaps are some of the downloads above, not one more kind:
+		// "2 started (1 new, 1 upgrade, 1 missing episode filled)" read as three.
+		inner := strings.Join(kinds, ", ")
+		if gaps := cycleGapsText(stats.GapsFilled, stats.DownloadsStarted); gaps != "" {
+			if inner != "" {
+				inner += "; "
+			}
+			inner += gaps
+		}
+		if inner != "" {
+			downloads += " (" + inner + ")"
 		}
 		if why := skips.text(); why != "" {
 			downloads += "; the others: " + why
@@ -490,6 +504,22 @@ func cycleReportText(duration string, stats *models.CycleStats, upgrades, newIte
 	return fmt.Sprintf("📊 Search finished in %s: %s checked, %s matched your titles, %s%s",
 		duration, countLabel(stats.Scraped, "release", "releases"), logCount(stats.Candidates),
 		downloads, cycleErrorsSuffix(stats.Errors))
+}
+
+// cycleGapsText says how many of the started downloads fill a missing episode.
+func cycleGapsText[T logInteger](gaps, started T) string {
+	switch {
+	case gaps <= 0:
+		return ""
+	case started == 1:
+		return "it fills a missing episode"
+	case gaps >= started:
+		return "all of them fill missing episodes"
+	case gaps == 1:
+		return "1 of them fills a missing episode"
+	default:
+		return fmt.Sprintf("%s of them fill missing episodes", logCount(gaps))
+	}
 }
 
 // cycleErrorsSuffix reports the cycle errors, pointing to the warnings above.
@@ -764,10 +794,10 @@ func mediaInfoBackfillText(names []string, failed, missing, newDetails int) stri
 		text = fmt.Sprintf("🔬 Read the real quality of %s (%s%s)",
 			countLabel(len(names), "library file", "library files"), strings.Join(listed, ", "), more)
 		if newDetails > 0 {
-			text += fmt.Sprintf(": %s carried details the release name did not, so the next upgrades will be decided on the file itself",
-				countLabel(newDetails, "file", "files"))
+			text += fmt.Sprintf(": %s more than %s release %s (codec, audio, HDR), and upgrades will be compared with what is really in the file",
+				countLabel(newDetails, "file says", "files say"), pluralWord(newDetails, "its", "their"), pluralWord(newDetails, "name", "names"))
 		} else {
-			text += ": the release name already said everything, so the next upgrades will be decided on the file itself"
+			text += ": " + pluralWord(len(names), "it matches its release name", "they match their release names") + ", nothing changes for the upgrades"
 		}
 	} else {
 		text = "🔬 Library quality check"

@@ -99,8 +99,8 @@ func runDatabaseMaintenance(ctx context.Context, state *AppState, now time.Time)
 	})
 	switch {
 	case len(result.Problems) > 0 && checkDue:
-		logging.Error(fmt.Sprintf("🗄 The database integrity check found %d problem(s): %s",
-			len(result.Problems), strings.Join(result.Problems, "; ")))
+		logging.Error(fmt.Sprintf("🗄 The database integrity check found %s: %s",
+			countLabel(len(result.Problems), "problem", "problems"), strings.Join(result.Problems, "; ")))
 		maintenanceNotifyDatabaseProblem(latestConfig(state), result.Problems)
 	case result.ErrorMessage != "":
 		logging.Warn("🗄 The database maintenance did not complete: " + result.ErrorMessage)

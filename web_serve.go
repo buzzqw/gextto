@@ -130,7 +130,7 @@ var workerStopTimeout = 45 * time.Second
 
 // shutdownNoticeInterval is how often a long shutdown wait says what it is
 // waiting for, so a stop that takes minutes is visibly progressing.
-var shutdownNoticeInterval = 15 * time.Second
+var shutdownNoticeInterval = time.Minute
 
 // stopBackgroundWorkers signals every worker to stop and waits for them.
 // Copies and moves of media files in progress are always awaited to the end;
@@ -190,7 +190,7 @@ func stopBackgroundWorkers(state *AppState) {
 				if running := state.jobs.List("", JobRunning); len(running) > 0 {
 					kinds := make([]string, 0, len(running))
 					for _, job := range running {
-						if kind := strings.TrimSpace(job.Kind); kind != "" {
+						if kind := jobKindText(job.Kind); kind != "" {
 							kinds = append(kinds, kind)
 						}
 					}
@@ -206,6 +206,27 @@ func stopBackgroundWorkers(state *AppState) {
 			}
 			return
 		}
+	}
+}
+
+// jobKindText names a background job the way the interface does, not by its
+// internal kind ("media-integrity").
+func jobKindText(kind string) string {
+	switch kind = strings.TrimSpace(kind); kind {
+	case mediaIntegrityJobKind:
+		return "media integrity check"
+	case "orphan-cleanup":
+		return "cleanup of leftover download files"
+	case "rename-all":
+		return "renaming of the library"
+	case "scan-archives":
+		return "library scan"
+	case "missing-search":
+		return "search for missing episodes"
+	case "media-info-backfill":
+		return "reading of the real quality of library files"
+	default:
+		return strings.ReplaceAll(kind, "-", " ")
 	}
 }
 
@@ -377,7 +398,7 @@ func Serve(state *AppState) error {
 		cancelRequests()
 		shutdownServers(webServer, engineServer)
 		stopBackgroundWorkers(state)
-		recordShutdown(state.cfg.DataDir, "SIGTERM/SIGINT")
+		recordShutdown(state.cfg.DataDir, "")
 		return nil
 	}
 }

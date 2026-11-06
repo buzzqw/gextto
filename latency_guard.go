@@ -278,6 +278,11 @@ type latencyGuard struct {
 	// so it does not repeat the same numbers a few seconds later.
 	capLoggedAt                time.Time
 	capLoggedDown, capLoggedUp int64
+	// startLoggedAt is when a control phase last got its own info line. The
+	// guard opens a new phase every few minutes on a busy evening: one line
+	// per latencyGuardStartLogEvery is enough, the others are counted by the
+	// Autotune digest.
+	startLoggedAt time.Time
 	// lineMaxDown/Up are the user's line maxima in KiB/s (0 = unknown).
 	lineMaxDown, lineMaxUp int64
 
@@ -768,14 +773,20 @@ func (g *latencyGuard) tick(now time.Time, cfg *Config, engine TorrentEngine) {
 	g.mu.Lock()
 	started := g.controlStarted
 	g.controlStarted = false
-	if started {
+	logStart := started && down > 0 && (g.startLoggedAt.IsZero() || now.Sub(g.startLoggedAt) >= latencyGuardStartLogEvery)
+	if logStart {
 		g.capLoggedAt, g.capLoggedDown, g.capLoggedUp = now, downCap, upCap
+		g.startLoggedAt = now
 	}
 	g.mu.Unlock()
 	if started && down > 0 {
 		st := g.status()
-		logging.Info("🎚️ Autotune: starting with " + speedPairText(downCap, upCap) +
-			bgSpeedDetailSuffix(bgSpeedMaxText(cfg), bgPingText(st)))
+		line := latencyGuardStartText(downCap, upCap, bgSpeedMaxText(cfg), bgPingText(st))
+		if logStart {
+			logging.Info(line)
+		} else {
+			logging.Debug(line)
+		}
 	}
 	if !changed || engine == nil {
 		return
@@ -786,6 +797,17 @@ func (g *latencyGuard) tick(now time.Time, cfg *Config, engine TorrentEngine) {
 	}
 	st := g.status()
 	logging.Debug("latency guard", "mode", st.Mode, "latency_ms", st.LatencyMs, "baseline_ms", st.BaselineMs, "others_on_line", st.OthersOnLine, "download_cap_kib", downCap, "upload_cap_kib", upCap)
+}
+
+// latencyGuardStartLogEvery is the shortest gap between two info lines that
+// announce a new control phase of the guard.
+const latencyGuardStartLogEvery = 15 * time.Minute
+
+// latencyGuardStartText is the line of a new control phase: why the speed is
+// being limited and to what.
+func latencyGuardStartText(downCap, upCap int64, maxText, ping string) string {
+	return "🎚️ Autotune is limiting the speed to keep the line responsive: " +
+		speedPairText(downCap, upCap) + bgSpeedDetailSuffix(maxText, ping)
 }
 
 // medianDuration is the median of values, which it leaves untouched.

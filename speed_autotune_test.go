@@ -283,7 +283,7 @@ func TestAutotuneDigest(t *testing.T) {
 	if !ok {
 		t.Fatal("no digest after the window")
 	}
-	for _, want := range []string{"5 adjustments", "Download 128 KB/s–unlimited", "upload no limit", "now download 128 KB/s, upload unlimited"} {
+	for _, want := range []string{"5 adjustments", "Download 128 KB/s–unlimited", "upload unlimited;", "now download 128 KB/s, upload unlimited"} {
 		if !strings.Contains(line, want) {
 			t.Errorf("digest %q lacks %q", line, want)
 		}
@@ -293,5 +293,17 @@ func TestAutotuneDigest(t *testing.T) {
 	}
 	if !g.add(start.Add(32*time.Minute), 0, 0, "free") {
 		t.Fatal("a new mode was not logged at once")
+	}
+	// The guard flips mode every few minutes on a busy line: within the
+	// window the flips are counted, not written one by one.
+	if g.add(start.Add(35*time.Minute), 400, 0, "control") {
+		t.Fatal("a mode flip three minutes after the last line was logged at info level")
+	}
+	if g.add(start.Add(38*time.Minute), 0, 0, "free") {
+		t.Fatal("a second mode flip was logged at info level")
+	}
+	line, ok = g.summary(start.Add(47*time.Minute), 0, 0)
+	if !ok || !strings.Contains(line, "2 adjustments") {
+		t.Fatalf("the flips are missing from the digest: %q", line)
 	}
 }

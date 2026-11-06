@@ -347,8 +347,8 @@ func RunCycleDomain(
 						release = parsed
 						if !cfg.DryRun {
 							if _, saveErr := archive.ResolveListing(link, magnet, realTitle, cfg.QualityScore(&release.Quality)); saveErr != nil {
-								logging.Warn("archive: could not store the resolved torrent",
-									"title", item.Title, "error", saveErr)
+								logging.Warn(fmt.Sprintf("🗄️ The release archive could not save the real name of «%s»", item.Title),
+									"error", saveErr)
 							}
 						}
 					}

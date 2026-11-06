@@ -68,8 +68,11 @@ func TestRunStateCounterAndShutdown(t *testing.T) {
 
 func TestShutdownBannerUptime(t *testing.T) {
 	now := time.Date(2026, 10, 9, 12, 0, 0, 0, time.UTC)
-	line := shutdownBanner(runState{StartedAt: now.Add(-2 * time.Hour).Format(time.RFC3339)}, now, "SIGTERM/SIGINT")
-	if !strings.Contains(line, "stopped") || !strings.Contains(line, "after 2h 0m") {
+	line := shutdownBanner(runState{StartedAt: now.Add(-2 * time.Hour).Format(time.RFC3339)}, now, "")
+	if line != "🛑 Gextto stopped after 2h 0m" {
 		t.Fatalf("shutdown banner = %q", line)
+	}
+	if line := shutdownBanner(runState{StartedAt: now.Add(-time.Hour).Format(time.RFC3339)}, now, "fatal error: disk full"); line != "🛑 Gextto stopped after 1h 0m: fatal error: disk full" {
+		t.Fatalf("fatal shutdown banner = %q", line)
 	}
 }

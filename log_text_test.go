@@ -129,7 +129,7 @@ func TestUpgradeSourceTextNamesTheLibraryCopy(t *testing.T) {
 
 func TestCycleReportTextIsReadable(t *testing.T) {
 	stats := &models.CycleStats{Scraped: 3612, Candidates: 183, DownloadsStarted: 5, GapsFilled: 1}
-	want := "📊 Search finished in 5 minutes: 3,612 releases checked, 183 matched your titles, 5 downloads started (5 upgrades, 1 missing episode filled)"
+	want := "📊 Search finished in 5 minutes: 3,612 releases checked, 183 matched your titles, 5 downloads started (5 upgrades; 1 of them fills a missing episode)"
 	if got := cycleReportText("5 minutes", stats, 5, 0, cycleSkipCounts{}); got != want {
 		t.Fatalf("report =\n %q\nwant\n %q", got, want)
 	}
@@ -194,19 +194,19 @@ func TestComicPendingNoticeOncePerPost(t *testing.T) {
 }
 
 func TestMediaInfoBackfillTextNamesTheFiles(t *testing.T) {
-	got := mediaInfoBackfillText([]string{"Wolf Like Me S01E01", "Wolf Like Me S01E02", "Silo S03E04"}, 0, 0, 2)
-	want := "🔬 Read the real quality of 3 library files (Wolf Like Me S01E01, Wolf Like Me S01E02, Silo S03E04): 2 files carried details the release name did not, so the next upgrades will be decided on the file itself"
+	got := mediaInfoBackfillText([]string{"Series A S01E01", "Series A S01E02", "Series B S03E04"}, 0, 0, 2)
+	want := "🔬 Read the real quality of 3 library files (Series A S01E01, Series A S01E02, Series B S03E04): 2 files say more than their release names (codec, audio, HDR), and upgrades will be compared with what is really in the file"
 	if got != want {
 		t.Fatalf("got %q", got)
 	}
 	// Nothing new read: the line says so instead of repeating the purpose only.
-	got = mediaInfoBackfillText([]string{"Silo S03E04"}, 0, 0, 0)
-	if !strings.Contains(got, "the release name already said everything") {
+	got = mediaInfoBackfillText([]string{"Series B S03E04"}, 0, 0, 0)
+	if !strings.Contains(got, "it matches its release name") {
 		t.Fatalf("got %q", got)
 	}
 	got = mediaInfoBackfillText([]string{"A", "B", "C", "D", "E", "F"}, 1, 2, 3)
 	if !strings.Contains(got, "A, B, C, D and 2 more") || !strings.Contains(got, "1 file could not be read, 2 files are no longer on disk") ||
-		!strings.Contains(got, "3 files carried details the release name did not") {
+		!strings.Contains(got, "3 files say more than their release names") {
 		t.Fatalf("got %q", got)
 	}
 	if mediaInfoBackfillText(nil, 0, 0, 0) != "" {

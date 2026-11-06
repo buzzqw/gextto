@@ -502,11 +502,15 @@ func (e *gxTorrentEngine) adoptOrReplace(cfg *Config, health gxHealth) {
 		// old daemon until its moves are done, then replace it.
 		e.process = adoptGxProcess(health.Pid)
 		e.setStartupNote(fmt.Sprintf("%s (restarts once its moves in progress finish)", health.Version))
-		logging.Info(fmt.Sprintf("⏳ gx-torrent %s will restart with its new program or settings once %d move(s) in progress finish", health.Version, moving))
+		logging.Info(fmt.Sprintf("⏳ gx-torrent %s will restart with its new program or settings once %s to the library %s", health.Version, countLabel(moving, "move", "moves"), pluralWord(moving, "finishes", "finish")))
 		go e.replaceWhenIdle(health.Pid, health.Version)
 		return
 	}
-	logging.Info(fmt.Sprintf("🔄 Restarting gx-torrent %s: its program or settings changed", health.Version))
+	// The start line says it ("restarted with its new program or settings"):
+	// a line of its own before the divider showed the old version and made a
+	// restart read as one more message.
+	e.setStartupNote("(restarted with its new program or settings)")
+	logging.Debug("gx-torrent replaced", "previous version", health.Version)
 	gxStopPid(health.Pid)
 }
 

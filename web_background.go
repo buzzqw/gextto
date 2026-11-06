@@ -146,7 +146,8 @@ func seriesRenameApply(s *AppState, name string, execute, force, sourceOnly bool
 	if execute {
 		release, reason, ok := TryAcquireArchiveRename(series.Name)
 		if !ok {
-			logging.Info("rename skipped: "+reason, "series", series.Name)
+			logging.Info(fmt.Sprintf("✏️ The files of %s were not renamed now: %s; they will be renamed at the next library check",
+				series.Name, archiveRenameBusyText(reason)))
 			return 200, map[string]any{
 				"ok":      true,
 				"skipped": true,
@@ -500,7 +501,7 @@ func seriesRenameApply(s *AppState, name string, execute, force, sourceOnly bool
 		if removed, err := CleanupOrphanThumbs(cfg, resolvedArchive); err != nil {
 			logging.Warn("orphan thumbnail cleanup failed", "series", series.Name, "error", err)
 		} else if removed > 0 {
-			logging.Info(fmt.Sprintf("🗑️ %s: %d thumbnail(s) without their video removed", series.Name, removed))
+			logging.Info(fmt.Sprintf("🗑️ %s: %s without their video removed", series.Name, countLabel(removed, "thumbnail", "thumbnails")))
 		}
 	}
 
@@ -533,27 +534,37 @@ func seriesRenameApply(s *AppState, name string, execute, force, sourceOnly bool
 	}
 	note := ""
 	if force {
-		note = " [force]"
+		note = ", every file renamed again even if its name was already right"
 	} else if sourceOnly {
-		note = " [source only]"
+		note = ", only to put back the source (WEB-DL, BluRay…) the name had lost"
 	}
 	if execute {
 		// An execution that changes nothing (everything already correct) does not
 		// deserve an INFO line every cycle: keep it at debug level.
 		changed := renamedCount > 0 || discardedCount > 0 || duplicatesRemoved > 0 || errorCount > 0
 		if changed {
-			logging.Info(fmt.Sprintf("🗂 rename '%s': %d renamed, %d already correct, %d discarded, %d duplicates removed, %d errors — %d/%d files present%s",
-				series.Name, renamedCount, alreadyOkCount, discardedCount, duplicatesRemoved, errorCount, withPath, considered, note))
+			parts := []string{countLabel(renamedCount, "file renamed", "files renamed")}
+			if duplicatesRemoved > 0 {
+				parts = append(parts, countLabel(duplicatesRemoved, "duplicate removed", "duplicates removed"))
+			}
+			if discardedCount > 0 {
+				parts = append(parts, countLabel(discardedCount, "file discarded", "files discarded"))
+			}
+			if errorCount > 0 {
+				parts = append(parts, countLabel(errorCount, "file could not be renamed", "files could not be renamed"))
+			}
+			logging.Info(fmt.Sprintf("🗂 %s: %s; %s already had the right name%s",
+				series.Name, joinWithAnd(parts), countLabel(alreadyOkCount, "file", "files"), renameFilesPresentText(withPath, considered)+note))
 		} else {
-			logging.Debug(fmt.Sprintf("🗂 rename '%s': nothing to change (%d already correct, %d/%d files present)%s",
+			logging.Debug(fmt.Sprintf("🗂 %s: nothing to rename (%d already correct, %d/%d files present)%s",
 				series.Name, alreadyOkCount, withPath, considered, note))
 		}
 	} else if len(items) == 0 {
-		logging.Info(fmt.Sprintf("🗂 rename preview '%s': nothing to rename (%d already correct, %d/%d files present)%s",
-			series.Name, alreadyOkCount, withPath, considered, note))
+		logging.Info(fmt.Sprintf("🗂 Rename preview of %s: nothing to rename, %s already %s the right name%s",
+			series.Name, countLabel(alreadyOkCount, "file", "files"), pluralWord(alreadyOkCount, "has", "have"), renameFilesPresentText(withPath, considered)+note))
 	} else {
-		logging.Info(fmt.Sprintf("🗂 rename preview '%s': %d file(s) would change, %d already correct — %d/%d files present%s",
-			series.Name, len(items), alreadyOkCount, withPath, considered, note))
+		logging.Info(fmt.Sprintf("🗂 Rename preview of %s: %s would be renamed, %s already %s the right name%s",
+			series.Name, countLabel(len(items), "file", "files"), countLabel(alreadyOkCount, "file", "files"), pluralWord(alreadyOkCount, "has", "have"), renameFilesPresentText(withPath, considered)+note))
 	}
 
 	return 200, map[string]any{
@@ -1780,30 +1791,55 @@ func bgSpeedWorthLogging(prevLogged, current, prevApplied int64) bool {
 	return bgSpeedPct(prevLogged, current) >= 20
 }
 
+// renameFilesPresentText notes the episodes whose file is not on disk, which a
+// rename cannot touch; nothing when every file is there.
+func renameFilesPresentText(present, considered int) string {
+	if missing := considered - present; missing > 0 {
+		return fmt.Sprintf(" (%s without a file on disk)", countLabel(missing, "episode", "episodes"))
+	}
+	return ""
+}
+
+// archiveRenameBusyText puts the reason a rename waits into a sentence.
+func archiveRenameBusyText(reason string) string {
+	switch reason {
+	case "archive import in progress":
+		return "a download of this series is being copied into the library"
+	case "rename already in progress":
+		return "another rename of this series is already running"
+	default:
+		return reason
+	}
+}
+
 // bg_autotuneDigestEvery is how often the Autotune steps are summed up in the
 // info log.
 const bgAutotuneDigestEvery = 15 * time.Minute
 
 // bg_autotuneDigest gathers the Autotune steps between two info lines: the
 // range of the caps and how many steps there were. A mode change is reported at
-// once, the rest as one line every bg_autotuneDigestEvery.
+// once unless an Autotune line was written less than bg_autotuneDigestEvery
+// ago (the guard flips between free and control every few minutes on a busy
+// line); everything else becomes one line every bg_autotuneDigestEvery.
 type bgAutotuneDigest struct {
 	mode             string
 	since            time.Time
+	lastInfo         time.Time
 	steps            int
 	minDown, maxDown int64
 	minUp, maxUp     int64
 }
 
 // add records one step and reports whether it must be logged at info level
-// (the first step, or a new mode).
+// (the first step, or a new mode after a quiet window).
 func (g *bgAutotuneDigest) add(now time.Time, down, up int64, mode string) bool {
-	if g.since.IsZero() || mode != g.mode {
+	if g.since.IsZero() || (mode != g.mode && now.Sub(g.lastInfo) >= bgAutotuneDigestEvery) {
 		g.mode = mode
-		g.since, g.steps = now, 0
+		g.since, g.lastInfo, g.steps = now, now, 0
 		g.minDown, g.maxDown, g.minUp, g.maxUp = down, down, up, up
 		return true
 	}
+	g.mode = mode
 	if g.steps == 0 {
 		g.minDown, g.maxDown, g.minUp, g.maxUp = down, down, up, up
 	}
@@ -1821,7 +1857,7 @@ func (g *bgAutotuneDigest) summary(now time.Time, down, up int64) (string, bool)
 	}
 	elapsed := logging.HumanDuration(int64(now.Sub(g.since).Seconds()))
 	steps := g.steps
-	g.since, g.steps = now, 0
+	g.since, g.lastInfo, g.steps = now, now, 0
 	if down <= 0 && up <= 0 && g.minDown <= 0 && g.maxDown <= 0 && g.minUp <= 0 && g.maxUp <= 0 {
 		return fmt.Sprintf("🎚️ Autotune (last %s): %s, no speed limit the whole time.",
 			elapsed, countLabel(steps, "adjustment", "adjustments")), true
@@ -1857,6 +1893,9 @@ func bgLimitMax(a, b int64) int64 {
 // bg_limitRange renders "128 KB/s–1.0 MB/s", "up to unlimited" or a single
 // value, in the unit a person reads.
 func bgLimitRange(lo, hi int64) string {
+	if lo <= 0 && hi <= 0 {
+		return "unlimited"
+	}
 	if lo == hi {
 		return speedLimitText(lo)
 	}
