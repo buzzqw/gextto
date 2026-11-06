@@ -21,11 +21,14 @@ Nothing open: every engine item waits for a condition listed under
 
 ## Gextto, acquisition and UI
 
-- **Release parsing CPU** — about a third of a cycle's CPU is regexp
-  backtracking in `ParseQuality` and the title matchers, and the same names are
-  parsed once per candidate. Gate: a CPU profile of a full cycle with a parsing
-  hotspot above 20 %; replace the hot pattern with a table-driven scan (or
-  cache the result per release) and measure the cycle on the same corpus.
+- **Release parsing CPU** — the quality/language scans are in place, but regexp
+  backtracking still shows in the cycle profile: the episode matchers and the
+  subtitle rewrite are the remaining patterns. Gate: a profile of a full cycle
+  that names the pattern; replace it and re-measure on the same corpus.
+- **Archive write CPU** — SQLite writes in `Archive.SaveBatch` and the gap
+  query weigh more on a search's CPU than parsing does. Gate: a write path
+  with fewer statements (or an index on the gap query) that leaves the archive
+  contents identical, measured on a full cycle.
 - **Cycle allocation churn** — a 38k-release cycle still allocates about 1.4 GB,
   now mostly in `encoding/xml`'s tokenizer and in the HTML parser, which sets
   the peak and the fragmented heap left behind. Gate: a corpus of real feeds

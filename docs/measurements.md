@@ -222,6 +222,17 @@ transparent huge pages off for the process and `GODEBUG=madvdontneed=1`.
   wake-ups, 9–10 % MSE encryption, 5–7 % piece hashing, 2–3 % TLS of web seeds, 9 % the piece
   picker with about 200 peers.
 
+### Name parsing
+
+The quality/language reader runs on every release name and on every filename the library
+touches. On this machine, 2026-11-06, `BenchmarkParseQuality` over five typical names:
+**136 µs against 696 µs** before the word and separator scans replaced the regexes (5.1×),
+and **14.6 KB / 176 allocations against 21.6 KB / 361**. The release-title matchers skip the
+ten anchored regexes when the name carries no season marker.
+
+In a full cycle the regexp share of the CPU fell from about **39 % to 20 %** (profiles of
+2026-11-06); SQLite writes in `Archive.SaveBatch` and the gap query are now the largest cost.
+
 ### The web page
 
 The gx-torrent main page, rendered in German on this machine (2026-11-05): **0.78 ms and

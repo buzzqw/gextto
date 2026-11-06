@@ -405,65 +405,395 @@ func ParseEpisodeKey(name string) *models.LiveEpisodeKey {
 }
 
 // ParseQuality classifica la qualità tecnica di un titolo.
+// isQualitySeparator is the byte class the subtitle and language tags use:
+// [._ \-\[\]\(\)+].
+func isQualitySeparator(c byte) bool {
+	switch c {
+	case '.', '_', ' ', '-', '[', ']', '(', ')', '+':
+		return true
+	}
+	return false
+}
+
+// isWordByte follows regexp's \b: ASCII letters, digits and underscore.
+func isWordByte(c byte) bool {
+	return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '_'
+}
+
+// hasDigitBounded reports whether token appears in text without a digit on
+// either side, the boundary rule of the "5.1"/"7.1" audio channel tags: they
+// also appear across digits in "x265.10bit" and "2024.05.12".
+func hasDigitBounded(text, token string) bool {
+	for pos := 0; pos < len(text); {
+		index := strings.Index(text[pos:], token)
+		if index < 0 {
+			return false
+		}
+		start := pos + index
+		end := start + len(token)
+		beforeOK := start == 0 || text[start-1] < '0' || text[start-1] > '9'
+		afterOK := end == len(text) || text[end] < '0' || text[end] > '9'
+		if beforeOK && afterOK {
+			return true
+		}
+		pos = start + 1
+	}
+	return false
+}
+
+// hasHDToken is `(?:^|[^a-z0-9-])hd(?:[^a-z0-9-]|$)|hdtv` without the regex.
+func hasHDToken(low string) bool {
+	if strings.Contains(low, "hdtv") {
+		return true
+	}
+	for pos := 0; pos < len(low); {
+		index := strings.Index(low[pos:], "hd")
+		if index < 0 {
+			return false
+		}
+		start := pos + index
+		end := start + 2
+		beforeOK := start == 0 || !isHDNeighbor(low[start-1])
+		afterOK := end == len(low) || !isHDNeighbor(low[end])
+		if beforeOK && afterOK {
+			return true
+		}
+		pos = start + 1
+	}
+	return false
+}
+
+func isHDNeighbor(c byte) bool {
+	return c >= 'a' && c <= 'z' || c >= '0' && c <= '9' || c == '-'
+}
+
+// isASCIISpace is the \s class of a regexp.
+func isASCIISpace(c byte) bool {
+	switch c {
+	case ' ', '\t', '\n', '\r', '\v', '\f':
+		return true
+	}
+	return false
+}
+
+// hasWholeWord reports whether word appears as a whole word (\b semantics).
+// It replaces the single-word regexes that dominated ParseQuality: a cycle
+// parses tens of thousands of titles and each regex starts a new automaton.
+func hasWholeWord(text, word string) bool {
+	if word == "" {
+		return false
+	}
+	for pos := 0; pos < len(text); {
+		index := strings.Index(text[pos:], word)
+		if index < 0 {
+			return false
+		}
+		start := pos + index
+		end := start + len(word)
+		if (start == 0 || !isWordByte(text[start-1])) &&
+			(end == len(text) || !isWordByte(text[end])) {
+			return true
+		}
+		pos = start + 1
+	}
+	return false
+}
+
+// hasAnyWholeWord is hasWholeWord over several spellings.
+func hasAnyWholeWord(text string, words ...string) bool {
+	for _, word := range words {
+		if hasWholeWord(text, word) {
+			return true
+		}
+	}
+	return false
+}
+
+// hasSeparatedToken reports whether one of tokens appears between quality
+// separators or at the ends of text, the boundary rule of the language tags.
+func hasSeparatedToken(text string, tokens ...string) bool {
+	for _, token := range tokens {
+		for pos := 0; pos < len(text); {
+			index := strings.Index(text[pos:], token)
+			if index < 0 {
+				break
+			}
+			start := pos + index
+			end := start + len(token)
+			if (start == 0 || isQualitySeparator(text[start-1])) &&
+				(end == len(text) || isQualitySeparator(text[end])) {
+				return true
+			}
+			pos = start + 1
+		}
+	}
+	return false
+}
+
+// hasITPrefix catches the "it+" / "it|" / "[it]" forms of the Italian tag.
+func hasITPrefix(text string) bool {
+	for i := 0; i+1 < len(text); i++ {
+		if text[i] != 'i' || text[i+1] != 't' {
+			continue
+		}
+		if i > 0 && isWordByte(text[i-1]) {
+			continue
+		}
+		if i+2 < len(text) && (text[i+2] == '+' || text[i+2] == '|') {
+			return true
+		}
+	}
+	return strings.Contains(text, "[it]")
+}
+
+// isLowerAlnum reports whether value is a non-empty run of [a-z0-9].
+func isLowerAlnum(value string) bool {
+	if value == "" {
+		return false
+	}
+	for i := 0; i < len(value); i++ {
+		c := value[i]
+		if (c < 'a' || c > 'z') && (c < '0' || c > '9') {
+			return false
+		}
+	}
+	return true
+}
+
+// releaseGroupFromTail implements `[-]([a-z0-9]+)$|\[([a-z0-9]+)\]$` without
+// the automaton: a trailing word after the last hyphen, or the content of the
+// trailing square brackets.
+func releaseGroupFromTail(low string) string {
+	n := len(low)
+	if n == 0 {
+		return ""
+	}
+	if low[n-1] == ']' {
+		if open := strings.LastIndexByte(low[:n-1], '['); open >= 0 {
+			if tail := low[open+1 : n-1]; isLowerAlnum(tail) {
+				return tail
+			}
+		}
+		return ""
+	}
+	if dash := strings.LastIndexByte(low, '-'); dash >= 0 {
+		if tail := low[dash+1:]; isLowerAlnum(tail) {
+			return tail
+		}
+	}
+	return ""
+}
+
+const (
+	subtitleMarkerPattern = `(?:subs?|subforced|subtitles?|forced|sdh|cc|closedcaptions?)`
+	subtitleSepPattern    = `[\s._\-/\\\[\]()+|,:;]*`
+	subtitleLangPattern   = `(?:[a-z]{2,3}|english|italian|italiano|german|deutsch|french|francais|spanish|portuguese|japanese|chinese|korean|russian)`
+)
+
+// subtitleTagsPattern removes subtitle tags so "sub ita" is not read as
+// Italian audio. The nested language repetition is expensive, so it only runs
+// on names that contain a marker (stripSubtitleTags).
+var subtitleTagsPattern = `\b` + subtitleMarkerPattern + subtitleSepPattern +
+	`(?:` + subtitleLangPattern + subtitleSepPattern + `)*(?:it|ita|italian|italiano)\b|\b(?:it|ita|italian|italiano)` +
+	subtitleSepPattern + subtitleMarkerPattern + `\b`
+
+// stripSubtitleTags removes the subtitle tags from text. Most release names
+// carry none: the marker check keeps the regex off that path.
+func stripSubtitleTags(text string) string {
+	if !hasSubtitleMarker(text) {
+		return text
+	}
+	return utils.MustCachedRegex(subtitleTagsPattern).ReplaceAllString(text, " ")
+}
+
+// hasSubtitleMarker is a conservative pre-check for the subtitle-removal
+// regex: any marker substring means the regex may have work to do. It is
+// deliberately looser than the regex (a name that only contains "cc" inside
+// another word runs it too), because a false negative would leave a subtitle
+// tag in the audio-language text.
+func hasSubtitleMarker(text string) bool {
+	return strings.Contains(text, "sub") ||
+		strings.Contains(text, "forced") ||
+		strings.Contains(text, "sdh") ||
+		strings.Contains(text, "cc") ||
+		strings.Contains(text, "closedcaption")
+}
+
+// hasSubtitleMarkerLanguage finds a subtitle marker followed (past the
+// separators) by one of languages, which may be glued to it ("SubIta").
+func hasSubtitleMarkerLanguage(low string, languages ...string) bool {
+	markers := [...]string{"subtitles", "subtitle", "subs", "sub"}
+	for _, marker := range markers {
+		for pos := 0; pos < len(low); {
+			index := strings.Index(low[pos:], marker)
+			if index < 0 {
+				break
+			}
+			after := pos + index + len(marker)
+			for after < len(low) && isQualitySeparator(low[after]) {
+				after++
+			}
+			for _, language := range languages {
+				if !strings.HasPrefix(low[after:], language) {
+					continue
+				}
+				end := after + len(language)
+				if end == len(low) || isQualitySeparator(low[end]) {
+					return true
+				}
+			}
+			pos += index + 1
+		}
+	}
+	return false
+}
+
+// normalizeQualitySeparators is t_norm: [._ -\[\]] become spaces.
+func normalizeQualitySeparators(low string) string {
+	var builder strings.Builder
+	builder.Grow(len(low))
+	for i := 0; i < len(low); i++ {
+		switch low[i] {
+		case '.', '_', '-', ' ', '[', ']':
+			builder.WriteByte(' ')
+		default:
+			builder.WriteByte(low[i])
+		}
+	}
+	return builder.String()
+}
+
+// stripStreamingTags removes the streaming-service tags that contain "it"
+// (iTunes) or "nf" (Netflix): "it web" becomes " web", and the service words
+// disappear. The text is already normalized to spaces.
+func stripStreamingTags(text string) string {
+	var out strings.Builder
+	out.Grow(len(text))
+	last := 0
+	for i := 0; i < len(text); {
+		if !isWordByte(text[i]) {
+			i++
+			continue
+		}
+		start := i
+		for i < len(text) && isWordByte(text[i]) {
+			i++
+		}
+		switch word := text[start:i]; word {
+		case "itunes", "amzn", "dsnp", "hmax", "paramount":
+			out.WriteString(text[last:start])
+			out.WriteByte(' ')
+			last = i
+		case "it", "nf":
+			// The regex only drops the service tag when "web" follows it.
+			next := i
+			for next < len(text) && isASCIISpace(text[next]) {
+				next++
+			}
+			end := next
+			for end < len(text) && isWordByte(text[end]) {
+				end++
+			}
+			if end > next && text[next:end] == "web" {
+				out.WriteString(text[last:start])
+				last = i
+			}
+		}
+	}
+	out.WriteString(text[last:])
+	return out.String()
+}
+
+// itFalsePositives are the words that contain "it" and must not be read as
+// the Italian audio tag after the technical part of a name.
+var itFalsePositives = map[string]struct{}{
+	"with": {}, "bit": {}, "split": {}, "edit": {}, "unit": {}, "visit": {},
+	"limit": {}, "exit": {}, "profit": {}, "submit": {}, "commit": {},
+	"permit": {}, "admit": {}, "omit": {}, "hit": {}, "kit": {}, "pit": {},
+	"sit": {}, "fit": {}, "wit": {}, "knit": {}, "spit": {}, "slit": {},
+	"itunes": {},
+}
+
+// hasITFalsePositive reports whether a space-normalized text contains one of
+// the words that look like "it" but are not the language tag.
+func hasITFalsePositive(text string) bool {
+	for i := 0; i < len(text); {
+		for i < len(text) && text[i] == ' ' {
+			i++
+		}
+		start := i
+		for i < len(text) && text[i] != ' ' {
+			i++
+		}
+		if start < i {
+			if _, found := itFalsePositives[text[start:i]]; found {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// findResolutionIndex is the byte offset of the first technical token, the
+// point from which the language tag may be read (a title can contain "it").
+func findResolutionIndex(text string) int {
+	tokens := [...]string{
+		"2160p", "2160", "1080p", "1080", "720p", "720", "480p", "480",
+		"4k", "uhd", "bluray", "webrip", "hdtv", "webdl", "web dl",
+	}
+	best := -1
+	for _, token := range tokens {
+		for pos := 0; pos < len(text); {
+			index := strings.Index(text[pos:], token)
+			if index < 0 {
+				break
+			}
+			start := pos + index
+			end := start + len(token)
+			if (start == 0 || !isWordByte(text[start-1])) &&
+				(end == len(text) || !isWordByte(text[end])) {
+				if best < 0 || start < best {
+					best = start
+				}
+				break
+			}
+			pos = start + 1
+		}
+	}
+	return best
+}
+
 func ParseQuality(title string) models.Quality {
 	low := strings.ToLower(title)
 	// legacy normalisations: `t_norm` replaces [._-] with spaces; `t_norm_lang`
 	// also removes square brackets so renamed files like "[DV HDR10][IT][h265]"
 	// are recognised.
-	tNormLang := utils.MustCachedRegex(`[._ \-\[\]]`).ReplaceAllString(low, " ")
+	tNormLang := normalizeQualitySeparators(low)
 
 	// --- Riscrittura dei marker di sottotitoli prima del rilevamento lingua ---
 	// Il feed può riportare "ENG ... Sub ita ..." anche quando l'audio è solo
 	// inglese: se non rimossi, "sub ita" verrebbe letto come audio italiano.
-	const (
-		subtitleMarker = `(?:subs?|subforced|subtitles?|forced|sdh|cc|closedcaptions?)`
-		subtitleSep    = `[\s._\-/\\\[\]()+|,:;]*`
-		subtitleLang   = `(?:[a-z]{2,3}|english|italian|italiano|german|deutsch|french|francais|spanish|portuguese|japanese|chinese|korean|russian)`
-	)
-	subtitleTags := `\b` + subtitleMarker + subtitleSep +
-		`(?:` + subtitleLang + subtitleSep + `)*(?:it|ita|italian|italiano)\b|\b(?:it|ita|italian|italiano)` +
-		subtitleSep + subtitleMarker + `\b`
-	reSubtitle := utils.MustCachedRegex(subtitleTags)
-	tNormLangAudio := reSubtitle.ReplaceAllString(tNormLang, " ")
-	tAudio := reSubtitle.ReplaceAllString(low, " ")
-
-	// Tag dei servizi streaming che contengono "it"/"nf" e generano falsi
-	// positivi (iT = iTunes, NF = Netflix). La libreria `regex` non supporta i
-	// look-ahead, quindi "it web" viene sostituito con il solo " web".
-	stripStreaming := func(text string) string {
-		withoutItWeb := utils.MustCachedRegex(`(?i)\b(it|nf)(\s+web)\b`).ReplaceAllString(text, "$2")
-		return utils.MustCachedRegex(`(?i)\bitunes\b|\bamzn\b|\bdsnp\b|\bhmax\b|\bparamount\b`).ReplaceAllString(withoutItWeb, " ")
-	}
+	tNormLangAudio := stripSubtitleTags(tNormLang)
+	tAudio := stripSubtitleTags(low)
 
 	// --- Lingua italiana: tre livelli, dal più sicuro al più specifico ---
-	level1 := utils.MustCachedRegex(`\bita\b|\bitalian\b|\bitaliano\b`).MatchString(stripStreaming(tNormLangAudio))
-	level2 := utils.MustCachedRegex(`\bit[\+\|]|\[it\]`).MatchString(tAudio)
+	level1 := hasAnyWholeWord(stripStreamingTags(tNormLangAudio), "ita", "italian", "italiano")
+	level2 := hasITPrefix(tAudio)
 	ita := false
 	if level1 || level2 {
 		ita = true
 	} else {
 		// Livello 3: "\bit\b" solo dalla parte tecnica in poi, per non colpire
 		// parole del titolo come "It Chapter" o "Feel It Still".
-		resolutionRe := utils.MustCachedRegex(
-			`\b(2160p?|1080p?|720p?|480p?|4k|uhd|bluray|web[\s\-]?dl|webrip|hdtv)\b`,
-		)
-		if found := resolutionRe.FindStringIndex(tNormLangAudio); found != nil {
-			tech := stripStreaming(tNormLangAudio[found[0]:])
-			ita = utils.MustCachedRegex(`\bit\b`).MatchString(tech) &&
-				!utils.MustCachedRegex(
-					`\bwith\b|\bbit\b|\bsplit\b|\bedit\b|\bunit\b|\bvisit\b|\blimit\b|\bexit\b|\bprofit\b|\bsubmit\b|\bcommit\b|\bpermit\b|\badmit\b|\bomit\b|\bhit\b|\bkit\b|\bpit\b|\bsit\b|\bfit\b|\bwit\b|\bknit\b|\bspit\b|\bslit\b|\bitunes\b`,
-				).MatchString(tech)
+		if found := findResolutionIndex(tNormLangAudio); found >= 0 {
+			tech := stripStreamingTags(tNormLangAudio[found:])
+			ita = hasWholeWord(tech, "it") && !hasITFalsePositive(tech)
 		}
 	}
 
-	subtitleIta := utils.MustCachedRegex(
-		`(?i)(sub|subs|subtitle|subtitles)[._ \-\[\]\(\)+]*(ita|italian|it)([._ \-\[\]\(\)+]|$)`,
-	).MatchString(title)
-	subtitleEng := utils.MustCachedRegex(
-		`(?i)(sub|subs|subtitle|subtitles)[._ \-\[\]\(\)+]*(eng|english|en)([._ \-\[\]\(\)+]|$)`,
-	).MatchString(title)
-	eng := !subtitleEng &&
-		utils.MustCachedRegex(`(?i)(^|[._ \-\[\]\(\)+])(eng|english|en)([._ \-\[\]\(\)+]|$)`).MatchString(title)
+	subtitleIta := hasSubtitleMarkerLanguage(low, "ita", "italian", "it")
+	subtitleEng := hasSubtitleMarkerLanguage(low, "eng", "english", "en")
+	eng := !subtitleEng && hasSeparatedToken(low, "eng", "english", "en")
 	languages := []string{}
 	if ita {
 		languages = append(languages, "ita")
@@ -486,9 +816,9 @@ func ParseQuality(title string) models.Quality {
 		resolution = "2160p"
 	case strings.Contains(low, "1080p") || strings.Contains(low, "fullhd"):
 		resolution = "1080p"
-	case strings.Contains(low, "720p") || hdWordRe.MatchString(low):
+	case strings.Contains(low, "720p") || hasHDToken(low):
 		resolution = "720p"
-	case strings.Contains(low, "576p") || palWordRe.MatchString(low):
+	case strings.Contains(low, "576p") || hasWholeWord(low, "pal"):
 		resolution = "576p"
 	case strings.Contains(low, "480p") || strings.Contains(low, "ntsc"):
 		resolution = "480p"
@@ -551,7 +881,7 @@ func ParseQuality(title string) models.Quality {
 		hdr = "HDR10Plus"
 	case strings.Contains(tNormLang, "hdr10"):
 		hdr = "HDR10"
-	case utils.MustCachedRegex(`\bhdr\b|\bhlg\b`).MatchString(tNormLang):
+	case hasAnyWholeWord(tNormLang, "hdr", "hlg"):
 		hdr = "HDR"
 	}
 
@@ -573,9 +903,9 @@ func ParseQuality(title string) models.Quality {
 	// --- Audio: codec, canali e audio a oggetti sono campi separati. ---
 	// Il layout non deve scegliere il codec: "AAC 5.1" è AAC, non "5.1".
 	audioChannels := ""
-	if audio71Re.MatchString(low) {
+	if hasDigitBounded(low, "7.1") {
 		audioChannels = "7.1"
-	} else if audio51Re.MatchString(low) {
+	} else if hasDigitBounded(low, "5.1") {
 		audioChannels = "5.1"
 	}
 	audioObjects := []string{}
@@ -620,13 +950,8 @@ func ParseQuality(title string) models.Quality {
 
 	// --- Gruppo ---
 	group := "unknown"
-	if groups := utils.MustCachedRegex(`[-]([a-z0-9]+)$|\[([a-z0-9]+)\]$`).FindStringSubmatch(low); groups != nil {
-		// La prima alternativa vince quando il primo gruppo partecipa.
-		if groups[1] != "" {
-			group = groups[1]
-		} else if groups[2] != "" {
-			group = groups[2]
-		}
+	if tail := releaseGroupFromTail(low); tail != "" {
+		group = tail
 		// The tail of a hyphenated tag ("WEB-DL", "Blu-Ray") is not a release group.
 		if (group == "dl" && strings.HasSuffix(low, "web-dl")) || (group == "ray" && strings.HasSuffix(low, "blu-ray")) {
 			group = "unknown"
@@ -640,28 +965,24 @@ func ParseQuality(title string) models.Quality {
 		language = "eng"
 	}
 	return models.Quality{
-		Resolution:    resolution,
-		Source:        source,
-		Codec:         codec,
-		Audio:         audio,
-		AudioChannels: audioChannels,
-		AudioObjects:  strings.Join(audioObjects, ","),
-		HDR:           hdr,
-		Group:         group,
-		IsIta:         ita,
-		IsDV:          isDV,
-		IsRepack:      strings.Contains(low, "repack") || strings.Contains(low, "rerip"),
-		IsProper:      strings.Contains(low, "proper"),
-		IsReal:        utils.MustCachedRegex(`\breal\b`).MatchString(low),
-		Language:      language,
-		Languages:     languages,
-		HasSubtitle: utils.MustCachedRegex(
-			`(?i)(^|[._ \-\[\]\(\)+])(sub|subs|subtitle|subtitles)([._ \-\[\]\(\)+]|$)`,
-		).MatchString(title),
+		Resolution:        resolution,
+		Source:            source,
+		Codec:             codec,
+		Audio:             audio,
+		AudioChannels:     audioChannels,
+		AudioObjects:      strings.Join(audioObjects, ","),
+		HDR:               hdr,
+		Group:             group,
+		IsIta:             ita,
+		IsDV:              isDV,
+		IsRepack:          strings.Contains(low, "repack") || strings.Contains(low, "rerip"),
+		IsProper:          strings.Contains(low, "proper"),
+		IsReal:            hasWholeWord(low, "real"),
+		Language:          language,
+		Languages:         languages,
+		HasSubtitle:       hasSeparatedToken(low, "sub", "subs", "subtitle", "subtitles"),
 		SubtitleLanguages: subtitleLanguages,
-		HardcodedSubs: utils.MustCachedRegex(
-			`(?i)(^|[._ \-\[\]\(\)+])(hc|hardcoded|hardsub|hardsubs)([._ \-\[\]\(\)+]|$)`,
-		).MatchString(title),
+		HardcodedSubs:     hasSeparatedToken(low, "hc", "hardcoded", "hardsub", "hardsubs"),
 	}
 }
 
@@ -939,9 +1260,66 @@ var releaseMatchers = []releaseMatcher{
 	{utils.MustCachedRegex(`(?i)^(.+?)[ ._-]+(?:stagione[ ._-]*|season[ ._-]?|s)(\d{1,2})(?:[ ._-]+(?:complete|completa))?(?:[ ._-]|$)`), readSeasonPack},
 }
 
+// couldBeSeriesTitle is a cheap gate before the matcher list: a movie title
+// has no season marker, and running ten anchored regexes over it was a large
+// part of the parsing cost. It is deliberately generous: a title that passes
+// still goes through the exact matchers.
+func couldBeSeriesTitle(title string) bool {
+	low := strings.ToLower(title)
+	if strings.Contains(low, "season") || strings.Contains(low, "stagione") ||
+		strings.Contains(low, "episodio") || strings.Contains(low, "puntata") ||
+		strings.Contains(low, "episode") || strings.Contains(low, "in corso") ||
+		strings.Contains(low, "incomplete") {
+		return true
+	}
+	for i := 0; i < len(low); i++ {
+		c := low[i]
+		if c >= '0' && c <= '9' {
+			// "1x02"
+			if i+2 < len(low) && (low[i+1] == 'x' || low[i+1] == 'X') && low[i+2] >= '0' && low[i+2] <= '9' {
+				return true
+			}
+			// "2026-09-21" and "2026.9.21"
+			if i+4 < len(low) && isDigitByte(low[i+1]) && isDigitByte(low[i+2]) &&
+				isDigitByte(low[i+3]) && (low[i+4] == '-' || low[i+4] == '.') {
+				j := i + 5
+				digits := 0
+				for j < len(low) && isDigitByte(low[j]) && digits < 2 {
+					j++
+					digits++
+				}
+				if digits > 0 && j < len(low) && (low[j] == '-' || low[j] == '.') {
+					k := j + 1
+					day := 0
+					for k < len(low) && isDigitByte(low[k]) && day < 2 {
+						k++
+						day++
+					}
+					if day > 0 {
+						return true
+					}
+				}
+			}
+		}
+		if c == 's' || c == 'S' {
+			if i == 0 || !isWordByte(low[i-1]) {
+				if i+1 < len(low) && low[i+1] >= '0' && low[i+1] <= '9' {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+func isDigitByte(c byte) bool { return c >= '0' && c <= '9' }
+
 // parseReleaseTitle tries every matcher in order and returns what the title
 // says about season and episode. A title no matcher reads is a movie.
 func parseReleaseTitle(title string) releaseMatch {
+	if !couldBeSeriesTitle(title) {
+		return releaseMatch{}
+	}
 	for _, matcher := range releaseMatchers {
 		capture := matcher.pattern.FindStringSubmatch(title)
 		if capture == nil {
@@ -1296,15 +1674,6 @@ func releaseYear(title string) *int64 {
 	}
 	return &value
 }
-
-var (
-	// "5.1" must stand alone: it also appears across digits in "x265.10bit" or
-	// "2024.05.12". The same applies to 7.1.
-	audio51Re = regexp.MustCompile(`(?:^|[^0-9])5\.1(?:[^0-9]|$)`)
-	audio71Re = regexp.MustCompile(`(?:^|[^0-9])7\.1(?:[^0-9]|$)`)
-	hdWordRe  = regexp.MustCompile(`(?:^|[^a-z0-9-])hd(?:[^a-z0-9-]|$)|hdtv`)
-	palWordRe = regexp.MustCompile(`\bpal\b`)
-)
 
 // Anime releases number episodes from the first one onwards, without seasons:
 // "[SubsPlease] One Piece - 1071 (1080p)", "One Piece Ep 1071 SUB ITA",
