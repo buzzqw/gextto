@@ -233,12 +233,14 @@ in the list. The gexttod row is the latest full cycle and the latest series-only
 
 The quality/language reader runs on every release name and on every filename the library
 touches. On this machine, 2026-11-06, `BenchmarkParseQuality` over five typical names:
-**136 µs against 696 µs** before the word and separator scans replaced the regexes (5.1×),
-and **14.6 KB / 176 allocations against 21.6 KB / 361**. The release-title matchers skip the
-ten anchored regexes when the name carries no season marker.
+**95 µs against 696 µs** before the word, separator and episode scans replaced the regexes
+(7.3×), and **15.0 KB / 208 allocations against 21.6 KB / 361**. The release-title matchers
+skip the ten anchored regexes for a name with no season marker, and the SxxExx, date and
+pack shapes are read without them.
 
-In a full cycle the regexp share of the CPU fell from about **39 % to 20 %** (profiles of
-2026-11-06); SQLite writes in `Archive.SaveBatch` and the gap query are now the largest cost.
+In a cycle the regexp share of the CPU fell from about **39 % to 11 %** (profiles of
+2026-11-06); `ParseQuality` itself is now about 2 % of the sampled cycle. SQLite and the
+feed/HTML parsing are the larger costs.
 
 ### The web page
 

@@ -21,10 +21,11 @@ Nothing open: every engine item waits for a condition listed under
 
 ## Gextto, acquisition and UI
 
-- **Release parsing CPU** — the quality/language scans are in place, but regexp
-  backtracking still shows in the cycle profile: the episode matchers and the
-  subtitle rewrite are the remaining patterns. Gate: a profile of a full cycle
-  that names the pattern; replace it and re-measure on the same corpus.
+- **Release parsing CPU** — the quality/language scans, the subtitle rewrite and
+  the common episode shapes are in place; the x/season-word/in-progress matchers
+  and the absolute-episode parser still use regexes. Gate: a profile where the
+  regexp share climbs back above 20 % of a cycle; then replace the next pattern
+  and re-measure on the same corpus.
 - **Cycle allocation churn** — a 38k-release cycle still allocates about 1.4 GB,
   now mostly in `encoding/xml`'s tokenizer and in the HTML parser, which sets
   the peak and the fragmented heap left behind. Gate: a corpus of real feeds

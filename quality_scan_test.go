@@ -2,6 +2,7 @@ package gextto
 
 import (
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -65,6 +66,12 @@ func qualityCorpus() []string {
 		"Submit", "Commit", "Permit", "Admit", "Omit", "Hit", "Kit", "Pit", "Sit",
 		"Fit", "Wit", "Knit", "Spit", "Slit", "Itunes", "Sub", "Subs", "Subtitles",
 		"itaSub", "italianSubs", "itaSdh", "itaForced", "engSub",
+		"Sub.German.Ita", "Subs.Spanish.Ita", "Sub.French.Ita", "Sub.Japanese.Ita",
+		"Sub.Chinese.Ita", "Sub.Korean.Ita", "Sub.Portuguese.Ita", "Sub.Russian.Ita",
+		"Sub.Italiano", "Sub.Italian", "Subs.Italiano", "Sub.Eng.German.Ita",
+		"Sub.Eng.German.French.Spanish.Ita", "Ita.Subs.German", "Italian.Sub.Eng",
+		"ClosedCaptions.Ita", "ClosedCaption.Ita", "CC.Ita", "SDH.Ita", "Forced.Ita",
+		"Forced.Italian", "SUB.ITA", "Ita.Sub.Ita",
 		"2160p", "1080p", "720p", "480p", "4k", "UHD", "BluRay", "WEB-DL", "WEBRip",
 		"HDTV", "Sub.Eng", "Sub.Eng.Ita", "German", "French", "Spanish",
 	}
@@ -82,6 +89,93 @@ func qualityCorpus() []string {
 		}
 	}
 	return corpus
+}
+
+// TestParseSxxExxFastPathMatchesTheMatcherList keeps the old matcher loop as
+// the reference for the SxxExx fast path: the fast path must never read a
+// different shape, a different position or different values.
+func TestParseSxxExxFastPathMatchesTheMatcherList(t *testing.T) {
+	reference := func(title string) releaseMatch {
+		for _, matcher := range releaseMatchers {
+			capture := matcher.pattern.FindStringSubmatch(title)
+			if capture == nil {
+				continue
+			}
+			parsed, verdict := matcher.read(capture)
+			switch verdict {
+			case matchRead:
+				if parsed.episodeRange == nil {
+					parsed.episodeRange = []int64{}
+				}
+				return parsed
+			case matchDropped:
+				return releaseMatch{episodeRange: []int64{}, dropped: true}
+			}
+		}
+		return releaseMatch{episodeRange: []int64{}}
+	}
+	titles := []string{
+		"The.Pitt.S01E01.Pilot.1080p.WEB-DL.DDP5.1.H.264-ABC",
+		"Show.S02E01-05.720p.HDTV.x264.ITA.SUB.ITA",
+		"Show.S02E01E02E03.1080p.WEB-DL",
+		"Show.S01E01.1080p.WEB-DL.S02E10-E12",
+		"Show.S02E10-E12.1080p.WEB-DL.S01E01",
+		"Show.S01.E01.1080p.WEB-DL",
+		"Show.S01 E01.1080p.WEB-DL",
+		"Show.S01..E01.1080p.WEB-DL",
+		"Show.S01E01-E03.1080p.WEB-DL",
+		"Show.S01E01–E03.1080p.WEB-DL",
+		"Show.2160p.S02E10.1080p.WEB-DL",
+		"A.S01E01",
+		"S01E01",
+		"Show.S99E01",
+		"Show.S01E00",
+		"Show.S01E01E0",
+		"Show.S01E01X",
+		"Show.S01E01.S02E02.1080p",
+		"Show.S01E01-02.S03E03-04",
+		"Show.S01E01-1080p",
+		"Show.S01E01-E03.S02E10-E12",
+		"Movie.2024.2160p.UHD.BluRay.REMUX.DV.HDR10.ITA.ENG",
+		"Another.Movie.2021.1080p.WEBRip.AAC2.0.x264",
+		"Daily.Show.2026-09-21.WEB-DL.1080p",
+		"Daily Show 2026.09.21 1080p",
+		"Show.2026-13-45.1080p",
+		"Show.1x02.2026-09-21.1080p",
+		"Show.S01E01.2026-09-21.1080p",
+		"Show.S01",
+		"Show.S01.Complete.1080p",
+		"Show.S01.COMPLETA.1080p",
+		"Show.S01-1080p",
+		"Show.S01E01",
+		"Show.S01x",
+		"Show.Season.1.Complete",
+		"Show.Stagione.2",
+		"Show.S01.In.Corso.05.06",
+		"Show.S01.Incomplete.05.of.06",
+		"Show.Name.S01.IN.CORSO.00/18.1080p",
+		"Show.Name.S01.In.Progress.00/06.ITA",
+	}
+	for _, title := range titles {
+		want := reference(title)
+		got := parseReleaseTitle(title)
+		if got.dropped != want.dropped || got.seasonPack != want.seasonPack || got.inProgress != want.inProgress ||
+			!slices.Equal(got.episodeRange, want.episodeRange) ||
+			(got.season == nil) != (want.season == nil) ||
+			(got.episode == nil) != (want.episode == nil) ||
+			(got.series == nil) != (want.series == nil) {
+			t.Fatalf("%q: fast path = %+v, reference = %+v", title, got, want)
+		}
+		if got.season != nil && *got.season != *want.season {
+			t.Fatalf("%q: season = %d, reference %d", title, *got.season, *want.season)
+		}
+		if got.episode != nil && *got.episode != *want.episode {
+			t.Fatalf("%q: episode = %d, reference %d", title, *got.episode, *want.episode)
+		}
+		if got.series != nil && *got.series != *want.series {
+			t.Fatalf("%q: series = %q, reference %q", title, *got.series, *want.series)
+		}
+	}
 }
 
 func TestQualityScansMatchTheReferenceRegexes(t *testing.T) {

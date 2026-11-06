@@ -584,26 +584,175 @@ func releaseGroupFromTail(low string) string {
 	return ""
 }
 
-const (
-	subtitleMarkerPattern = `(?:subs?|subforced|subtitles?|forced|sdh|cc|closedcaptions?)`
-	subtitleSepPattern    = `[\s._\-/\\\[\]()+|,:;]*`
-	subtitleLangPattern   = `(?:[a-z]{2,3}|english|italian|italiano|german|deutsch|french|francais|spanish|portuguese|japanese|chinese|korean|russian)`
-)
-
-// subtitleTagsPattern removes subtitle tags so "sub ita" is not read as
-// Italian audio. The nested language repetition is expensive, so it only runs
-// on names that contain a marker (stripSubtitleTags).
-var subtitleTagsPattern = `\b` + subtitleMarkerPattern + subtitleSepPattern +
-	`(?:` + subtitleLangPattern + subtitleSepPattern + `)*(?:it|ita|italian|italiano)\b|\b(?:it|ita|italian|italiano)` +
-	subtitleSepPattern + subtitleMarkerPattern + `\b`
-
 // stripSubtitleTags removes the subtitle tags from text. Most release names
-// carry none: the marker check keeps the regex off that path.
+// carry none: the marker check keeps the scanner off that path.
 func stripSubtitleTags(text string) string {
 	if !hasSubtitleMarker(text) {
 		return text
 	}
-	return utils.MustCachedRegex(subtitleTagsPattern).ReplaceAllString(text, " ")
+	return removeSubtitleTags(text)
+}
+
+// removeSubtitleTags is the subtitle-tag rewrite without the regex. The pattern
+// was the most expensive one in ParseQuality: a marker, any number of short
+// language tokens separated by punctuation and an Italian token (or the
+// reverse). The scanner follows the same left-to-right, greedy rules; the
+// reference regex is kept in quality_scan_test.go and compared on a corpus.
+func removeSubtitleTags(text string) string {
+	var out strings.Builder
+	out.Grow(len(text))
+	last := 0
+	for i := 0; i < len(text); {
+		end := subtitleMatchEnd(text, i)
+		if end <= i {
+			i++
+			continue
+		}
+		out.WriteString(text[last:i])
+		out.WriteByte(' ')
+		last = end
+		i = end
+	}
+	out.WriteString(text[last:])
+	return out.String()
+}
+
+// subtitleMatchEnd returns the end of a subtitle tag starting at start, or 0.
+func subtitleMatchEnd(text string, start int) int {
+	if start >= len(text) || !isWordByte(text[start]) {
+		return 0
+	}
+	if start > 0 && isWordByte(text[start-1]) {
+		return 0
+	}
+	// The regex tries \bMARKER ... ITALIAN\b first, then the reverse.
+	if end := subtitleMarkerFirstEnd(text, start); end > 0 {
+		return end
+	}
+	return subtitleItalianFirstEnd(text, start)
+}
+
+// isSubtitleSeparator is the separator class [\s._\-/\\\[\]()+|,:;].
+func isSubtitleSeparator(c byte) bool {
+	switch c {
+	case ' ', '\t', '\n', '\r', '\v', '\f', '.', '_', '-', '/', '\\',
+		'[', ']', '(', ')', '+', '|', ',', ':', ';':
+		return true
+	}
+	return false
+}
+
+func skipSubtitleSeparators(text string, pos int) int {
+	for pos < len(text) && isSubtitleSeparator(text[pos]) {
+		pos++
+	}
+	return pos
+}
+
+// subtitleMarkerEnds lists the marker alternatives that match at pos, in the
+// order the regex tries them (a greedy `s?` comes before the bare form).
+func subtitleMarkerEnds(text string, pos int) []int {
+	ends := make([]int, 0, 3)
+	add := func(marker string) {
+		if strings.HasPrefix(text[pos:], marker) {
+			ends = append(ends, pos+len(marker))
+		}
+	}
+	add("subs")
+	add("sub")
+	add("subforced")
+	add("subtitles")
+	add("subtitle")
+	add("forced")
+	add("sdh")
+	add("cc")
+	add("closedcaptions")
+	add("closedcaption")
+	return ends
+}
+
+// subtitleLanguageEnds lists the [a-z]{2,3} chunks first (3 then 2, as the
+// greedy quantifier does) and then the full language names.
+func subtitleLanguageEnds(text string, pos int) []int {
+	ends := make([]int, 0, 8)
+	if pos+3 <= len(text) && isLowerASCII(text[pos:pos+3]) {
+		ends = append(ends, pos+3)
+	}
+	if pos+2 <= len(text) && isLowerASCII(text[pos:pos+2]) {
+		ends = append(ends, pos+2)
+	}
+	for _, name := range []string{
+		"english", "italian", "italiano", "german", "deutsch", "french",
+		"francais", "spanish", "portuguese", "japanese", "chinese", "korean", "russian",
+	} {
+		if strings.HasPrefix(text[pos:], name) {
+			ends = append(ends, pos+len(name))
+		}
+	}
+	return ends
+}
+
+func isLowerASCII(value string) bool {
+	for i := 0; i < len(value); i++ {
+		if value[i] < 'a' || value[i] > 'z' {
+			return false
+		}
+	}
+	return true
+}
+
+// subtitleItalianPrefixes lists the Italian spellings that match at pos in
+// the regex order: it, ita, italian, italiano.
+func subtitleItalianPrefixes(text string, pos int) []int {
+	ends := make([]int, 0, 4)
+	for _, word := range []string{"it", "ita", "italian", "italiano"} {
+		if strings.HasPrefix(text[pos:], word) {
+			ends = append(ends, pos+len(word))
+		}
+	}
+	return ends
+}
+
+// subtitleMarkerFirstEnd matches MARKER SEP* (LANG SEP*)* ITALIAN\b.
+func subtitleMarkerFirstEnd(text string, start int) int {
+	for _, markerEnd := range subtitleMarkerEnds(text, start) {
+		if end := subtitleTailEnd(text, markerEnd); end > 0 {
+			return end
+		}
+	}
+	return 0
+}
+
+// subtitleTailEnd is the greedy language run followed by the Italian token.
+func subtitleTailEnd(text string, pos int) int {
+	pos = skipSubtitleSeparators(text, pos)
+	// The regex's (LANG SEP*)* is greedy: try to consume a language first and
+	// only fall back to ending the run here.
+	for _, languageEnd := range subtitleLanguageEnds(text, pos) {
+		next := skipSubtitleSeparators(text, languageEnd)
+		if end := subtitleTailEnd(text, next); end > 0 {
+			return end
+		}
+	}
+	for _, italianEnd := range subtitleItalianPrefixes(text, pos) {
+		if italianEnd == len(text) || !isWordByte(text[italianEnd]) {
+			return italianEnd
+		}
+	}
+	return 0
+}
+
+// subtitleItalianFirstEnd matches ITALIAN SEP* MARKER\b.
+func subtitleItalianFirstEnd(text string, start int) int {
+	for _, italianEnd := range subtitleItalianPrefixes(text, start) {
+		pos := skipSubtitleSeparators(text, italianEnd)
+		for _, markerEnd := range subtitleMarkerEnds(text, pos) {
+			if markerEnd == len(text) || !isWordByte(text[markerEnd]) {
+				return markerEnd
+			}
+		}
+	}
+	return 0
 }
 
 // hasSubtitleMarker is a conservative pre-check for the subtitle-removal
@@ -1263,9 +1412,8 @@ var releaseMatchers = []releaseMatcher{
 // couldBeSeriesTitle is a cheap gate before the matcher list: a movie title
 // has no season marker, and running ten anchored regexes over it was a large
 // part of the parsing cost. It is deliberately generous: a title that passes
-// still goes through the exact matchers.
-func couldBeSeriesTitle(title string) bool {
-	low := strings.ToLower(title)
+// still goes through the exact matchers. low is the lowercased title.
+func couldBeSeriesTitle(low string) bool {
 	if strings.Contains(low, "season") || strings.Contains(low, "stagione") ||
 		strings.Contains(low, "episodio") || strings.Contains(low, "puntata") ||
 		strings.Contains(low, "episode") || strings.Contains(low, "in corso") ||
@@ -1314,11 +1462,317 @@ func couldBeSeriesTitle(title string) bool {
 
 func isDigitByte(c byte) bool { return c >= '0' && c <= '9' }
 
+func isEpisodeSeparator(c byte) bool {
+	return c == ' ' || c == '.' || c == '_' || c == '-'
+}
+
+// parseDigitsAt reads at most max digits at pos; the string is empty when
+// there is none.
+func parseDigitsAt(text string, pos, max int) (string, int) {
+	start := pos
+	for pos < len(text) && pos-start < max && text[pos] >= '0' && text[pos] <= '9' {
+		pos++
+	}
+	return text[start:pos], pos
+}
+
+// rangeDashLen is the length of the range dash: '-' or the en dash.
+func rangeDashLen(text string, pos int) int {
+	if pos < len(text) && text[pos] == '-' {
+		return 1
+	}
+	if pos+2 < len(text) && text[pos] == 0xE2 && text[pos+1] == 0x80 && text[pos+2] == 0x93 {
+		return 3
+	}
+	return 0
+}
+
+type sxxexxPattern int
+
+const (
+	sxxexxRange sxxexxPattern = iota
+	sxxexxJoined
+	sxxexxBasic
+)
+
+// parseSxxExxFast reads the three "S01E01" matchers without their regexes.
+// They are the first three patterns and the ones that match almost every
+// series title; the matcher loop stays as the fallback for the other shapes
+// and for a shape whose values the reader refuses.
+func parseSxxExxFast(title string) (releaseMatch, bool) {
+	// The matcher list tries all ranges before joined episodes and plain
+	// episodes: a later S02E10-E12 wins over an earlier S01E01.
+	for _, pattern := range []sxxexxPattern{sxxexxRange, sxxexxJoined, sxxexxBasic} {
+		match, found, read := scanSxxExx(title, pattern)
+		if found && read {
+			return match, true
+		}
+		if found {
+			// The leftmost match of this pattern was refused: the matcher list
+			// would move to the next pattern, and the fast path does the same.
+			continue
+		}
+	}
+	return releaseMatch{}, false
+}
+
+// scanSxxExx scans for the leftmost match of one pattern. found reports a
+// shape match, read whether its values were usable.
+func scanSxxExx(title string, pattern sxxexxPattern) (match releaseMatch, found, read bool) {
+	for i := 1; i < len(title); i++ {
+		if title[i] != 's' && title[i] != 'S' {
+			continue
+		}
+		if !isEpisodeSeparator(title[i-1]) {
+			continue
+		}
+		sepStart := i - 1
+		for sepStart > 0 && isEpisodeSeparator(title[sepStart-1]) {
+			sepStart--
+		}
+		if sepStart == 0 {
+			continue
+		}
+		season, pos := parseDigitsAt(title, i+1, 4)
+		if season == "" {
+			continue
+		}
+		var capture []string
+		var end int
+		switch pattern {
+		case sxxexxRange:
+			end, capture = sxxexxRangeCapture(title, pos, title[:sepStart], season)
+		case sxxexxJoined:
+			end, capture = sxxexxJoinedCapture(title, pos, title[:sepStart], season)
+		case sxxexxBasic:
+			end, capture = sxxexxBasicCapture(title, pos, title[:sepStart], season)
+		}
+		if end == 0 {
+			continue
+		}
+		capture[0] = title[:end]
+		var verdict matchVerdict
+		switch pattern {
+		case sxxexxRange:
+			match, verdict = readEpisodeRange(capture)
+		case sxxexxJoined:
+			match, verdict = readJoinedEpisodes(capture)
+		case sxxexxBasic:
+			match, verdict = readSeasonEpisode(capture)
+		}
+		return match, true, verdict == matchRead
+	}
+	return releaseMatch{}, false, false
+}
+
+func episodeMarkerAt(text string, pos int) int {
+	if pos < len(text) && (text[pos] == 'e' || text[pos] == 'E') {
+		return pos + 1
+	}
+	return 0
+}
+
+func sxxexxRangeCapture(title string, pos int, series, season string) (int, []string) {
+	pos = episodeMarkerAt(title, pos)
+	if pos == 0 {
+		return 0, nil
+	}
+	first, pos := parseDigitsAt(title, pos, 4)
+	if first == "" {
+		return 0, nil
+	}
+	dash := rangeDashLen(title, pos)
+	if dash == 0 {
+		return 0, nil
+	}
+	pos += dash
+	if next := episodeMarkerAt(title, pos); next != 0 {
+		pos = next
+	}
+	last, pos := parseDigitsAt(title, pos, 4)
+	if last == "" || pos < len(title) && !isEpisodeSeparator(title[pos]) {
+		return 0, nil
+	}
+	return pos, []string{"", series, season, first, last}
+}
+
+func sxxexxJoinedCapture(title string, pos int, series, season string) (int, []string) {
+	joinedStart := pos
+	groups := 0
+	for {
+		next := episodeMarkerAt(title, pos)
+		if next == 0 {
+			break
+		}
+		digits, end := parseDigitsAt(title, next, 4)
+		if digits == "" {
+			break
+		}
+		pos = end
+		groups++
+	}
+	if groups < 2 || pos < len(title) && !isEpisodeSeparator(title[pos]) {
+		return 0, nil
+	}
+	return pos, []string{"", series, season, title[joinedStart:pos]}
+}
+
+func sxxexxBasicCapture(title string, pos int, series, season string) (int, []string) {
+	if pos < len(title) && isEpisodeSeparator(title[pos]) {
+		pos++
+	}
+	pos = episodeMarkerAt(title, pos)
+	if pos == 0 {
+		return 0, nil
+	}
+	episode, pos := parseDigitsAt(title, pos, 4)
+	if episode == "" || pos < len(title) && !isEpisodeSeparator(title[pos]) {
+		return 0, nil
+	}
+	return pos, []string{"", series, season, episode}
+}
+
+// hasInProgressMarker reports an "in corso"/"in progress"/"incomplete" label,
+// with the separators the earlier matcher accepts between the words. The pack
+// fast path must not run when the in-progress matcher (which comes first) can.
+func hasInProgressMarker(low string) bool {
+	if strings.Contains(low, "incomplete") {
+		return true
+	}
+	for i := 0; i+2 < len(low); i++ {
+		if low[i] != 'i' || low[i+1] != 'n' {
+			continue
+		}
+		if i > 0 && isWordByte(low[i-1]) {
+			continue
+		}
+		j := i + 2
+		for j < len(low) && isEpisodeSeparator(low[j]) {
+			j++
+		}
+		if strings.HasPrefix(low[j:], "corso") || strings.HasPrefix(low[j:], "progress") {
+			return true
+		}
+	}
+	return false
+}
+
+// hasNXEpisodePattern is the "1x02" shape of matchers 4 and 5. It only gates
+// the date fast path: when an x pattern exists the matcher list must decide.
+func hasNXEpisodePattern(low string) bool {
+	for i := 1; i+1 < len(low); i++ {
+		if (low[i] == 'x' || low[i] == 'X') && isDigitByte(low[i-1]) && isDigitByte(low[i+1]) {
+			return true
+		}
+	}
+	return false
+}
+
+// parseDateFast reads the daily-release matcher "Show.2026-09-21" without its
+// regex. It is the eighth pattern, so the list used to run seven regexes over
+// a daily show before reaching it.
+func parseDateFast(title string) (releaseMatch, bool) {
+	for i := 1; i < len(title); i++ {
+		if !isDigitByte(title[i]) || !isEpisodeSeparator(title[i-1]) {
+			continue
+		}
+		year, pos := parseDigitsAt(title, i, 4)
+		if len(year) != 4 || pos >= len(title) || (title[pos] != '-' && title[pos] != '.') {
+			continue
+		}
+		month, pos := parseDigitsAt(title, pos+1, 2)
+		if month == "" || pos >= len(title) || (title[pos] != '-' && title[pos] != '.') {
+			continue
+		}
+		day, end := parseDigitsAt(title, pos+1, 2)
+		if day == "" || (end < len(title) && !isEpisodeSeparator(title[end])) {
+			continue
+		}
+		sepStart := i - 1
+		for sepStart > 0 && isEpisodeSeparator(title[sepStart-1]) {
+			sepStart--
+		}
+		if sepStart == 0 {
+			continue
+		}
+		capture := []string{title[:end], title[:sepStart], year, month, day}
+		parsed, verdict := readDate(capture)
+		if verdict == matchRead {
+			return parsed, true
+		}
+		return releaseMatch{}, false
+	}
+	return releaseMatch{}, false
+}
+
+// parseSeasonPackFast reads the "S01" pack shape of the tenth matcher. The
+// pack readers ignore the "Complete" suffix, so the digits and the boundary
+// are enough.
+func parseSeasonPackFast(title string) (releaseMatch, bool) {
+	for i := 1; i < len(title); i++ {
+		if title[i] != 's' && title[i] != 'S' {
+			continue
+		}
+		if !isEpisodeSeparator(title[i-1]) {
+			continue
+		}
+		season, pos := parseDigitsAt(title, i+1, 2)
+		if season == "" || (pos < len(title) && !isEpisodeSeparator(title[pos])) {
+			continue
+		}
+		sepStart := i - 1
+		for sepStart > 0 && isEpisodeSeparator(title[sepStart-1]) {
+			sepStart--
+		}
+		if sepStart == 0 {
+			continue
+		}
+		capture := []string{title[:pos], title[:sepStart], season}
+		parsed, verdict := readSeasonPack(capture)
+		if verdict == matchRead {
+			return parsed, true
+		}
+		return releaseMatch{}, false
+	}
+	return releaseMatch{}, false
+}
+
 // parseReleaseTitle tries every matcher in order and returns what the title
 // says about season and episode. A title no matcher reads is a movie.
 func parseReleaseTitle(title string) releaseMatch {
-	if !couldBeSeriesTitle(title) {
+	low := strings.ToLower(title)
+	if !couldBeSeriesTitle(low) {
 		return releaseMatch{}
+	}
+	if match, ok := parseSxxExxFast(title); ok {
+		if match.episodeRange == nil {
+			match.episodeRange = []int64{}
+		}
+		return match
+	}
+	// The x and season-word patterns come before the date: only try the date
+	// fast path when they cannot match, or the list would have chosen them.
+	if !hasNXEpisodePattern(low) && !strings.Contains(low, "season") && !strings.Contains(low, "stagione") {
+		if match, ok := parseDateFast(title); ok {
+			if match.episodeRange == nil {
+				match.episodeRange = []int64{}
+			}
+			return match
+		}
+	}
+	// The pack shape is the last matcher: try it only when none of the earlier
+	// season, date and in-progress shapes can match.
+	if !hasNXEpisodePattern(low) &&
+		!strings.Contains(low, "season") && !strings.Contains(low, "stagione") &&
+		!strings.Contains(low, "episodio") && !strings.Contains(low, "puntata") &&
+		!strings.Contains(low, "episode") &&
+		!hasInProgressMarker(low) {
+		if match, ok := parseSeasonPackFast(title); ok {
+			if match.episodeRange == nil {
+				match.episodeRange = []int64{}
+			}
+			return match
+		}
 	}
 	for _, matcher := range releaseMatchers {
 		capture := matcher.pattern.FindStringSubmatch(title)
