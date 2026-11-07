@@ -150,7 +150,7 @@ The same four peers with TCP blocked at the peer.
 | **gx-torrent** | 11.23 MB/s | 47.8 s | 39 % | 37.0 s | 33 MiB | 47 MiB |
 | Transmission | 8.28 MB/s | 64.8 s | 17 % | 21.7 s | 10 MiB | 21 MiB |
 
-The three that reach the line are within 6 % of each other; anacrolix pays twice the CPU per
+The four that reach the line are within 6 % of each other; anacrolix pays twice the CPU per
 GiB of the others on this path.
 
 ### Recheck and upload
@@ -161,14 +161,14 @@ then an upload to one unshaped reference peer.
 | Client | Recheck | CPU | Upload speed | CPU per GiB | Peak own memory | Peak RSS |
 |---|---|---|---|---|---|---|
 | gx-torrent | 3.7 s (1,149 MB/s) | 3.4 s | 244 MB/s (207–265) | 2.22 s | 22 MiB | 37 MiB |
-| Transmission | 4.0 s (1,083 MB/s) | 2.6 s | 15.9 MB/s | 6.08 s | 17 MiB | 27 MiB |
+| Transmission | 4.0 s (1,084 MB/s) | 2.7 s | 15.9 MB/s | 6.8 s | 17 MiB | 27 MiB |
 | Deluge | 4.1 s (1,056 MB/s) | 3.6 s | 257 MB/s (240–262) | 2.38 s | 43 MiB | 4,087 MiB |
 | qBittorrent | 5.8 s (735 MB/s) | 3.8 s | 258 MB/s (239–360) | 2.58 s | 13 MiB | 4,104 MiB |
 | anacrolix | 6.9 s (622 MB/s) | 9.5 s | 124 MB/s (114–125) | 5.26 s | 13 MiB | 4,069 MiB |
 
 gx-torrent and Transmission are level at the recheck (3.7 s against 4.0), ahead of the others.
 On upload qBittorrent, Deluge and gx-torrent are within 6 %; Transmission 3.00 sends 4 GiB in
-four and a half minutes, sixteen times slower than gx-torrent.
+four and a half minutes, fifteen times slower than gx-torrent.
 
 ### 100 torrents
 
@@ -183,9 +183,9 @@ until all are seeding, then 60 s at rest and the time to come back after a resta
 | Deluge | 2.5 s | 2.5 s | 1.0 s | 0.35 % | 43 MiB | 68 MiB |
 | gx-torrent | 1.6 s | 2.2 s | 0.5 s | 0.60 % | 14 MiB | 29 MiB |
 
-anacrolix and Transmission reach seeding at once because they trust existing files until asked
-to recheck, and qBittorrent takes a hundred seconds to verify them; gx-torrent spends the most
-CPU at rest, 0.6 % of a core.
+Transmission reaches seeding at once because it trusts existing files until asked to recheck;
+anacrolix hashes them, but a hundred files of 2 MiB cost it a second. qBittorrent takes a
+hundred seconds to verify them, and gx-torrent spends the most CPU at rest, 0.6 % of a core.
 
 ### What these numbers do not say
 
