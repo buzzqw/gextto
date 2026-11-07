@@ -58,6 +58,21 @@ Nothing open: every engine item waits for a condition listed under
 
 ## Proposals
 
+- **A client-wide cap on unverified data** — anacrolix/torrent holds at most
+  `MaxUnverifiedBytes` (64 MiB, `config.go`) of received bytes that are not yet hashed and
+  written; gx-core bounds a piece and a torrent, not the client. That is why the library's own
+  memory stays at 11 MiB at full speed ([measurements](measurements.md)). Gate: a run with
+  several torrents downloading at once where the hashing backlog is the peak.
+- **The mmap write path measured** — `Mmap` is off by default in gx-core
+  (`internal/gxcore/torrent/config.go`) and the library row gets much of its low memory from
+  writing straight into a file mapping (`storage/file-io-mmap.go`): no staging buffer, no
+  write cache. Gate: `full` and `many` with `Mmap` on and off, three rounds each, same speed
+  and lower own memory.
+- **Fewer wakeups at rest** — gx-torrent spends 0.06 % of a core with no torrents against
+  anacrolix's 0.01: the stats tick every 3 s, the automatic speed probe, DLNA/LSD and the SSE
+  keepalive all run when there is nothing to do. Gate: the `idle` scenario at 0.02 % or
+  better, with nothing else changed.
+
 Ideas proposed but not decided yet. An accepted proposal moves to the matching area with
 its gate; a rejected one moves to *Not planned*.
 
