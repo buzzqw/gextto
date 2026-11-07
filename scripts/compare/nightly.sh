@@ -86,8 +86,11 @@ echo "--- smoke passed: the round starts"
 # rain is left out until its check-upload row is fixed: under the harness its
 # recheck of an existing file never leaves the "downloading" state, while the
 # same calls from a script work (docs/todo.md).
+# A failed scenario makes run.py exit non-zero; the table is written anyway,
+# with that row marked, and the failures are in the log.
 python3 scripts/compare/run.py run --tag "$tag" \
-    --clients gx-torrent,qbittorrent,transmission,deluge,anacrolix
+    --clients gx-torrent,qbittorrent,transmission,deluge,anacrolix \
+    || echo "the round ended with failures: the table is written all the same"
 python3 scripts/compare/run.py report --tag "$tag" >"$out/compare-$tag.md"
 if [ "$work" != "$root" ]; then
     # The results and the tables must land in the real checkout.

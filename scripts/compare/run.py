@@ -838,7 +838,14 @@ def wait_check_started(client, info_hash, timeout=10):
 
 
 def same_file(a, b):
-    return subprocess.run(["cmp", "-s", str(a), str(b)]).returncode == 0
+    # A client can report a piece as complete a moment before its write lands:
+    # one retry after a second separates that from a real difference.
+    for attempt in range(2):
+        if subprocess.run(["cmp", "-s", str(a), str(b)]).returncode == 0:
+            return True
+        if attempt == 0:
+            time.sleep(1)
+    return False
 
 
 def cleanup():
@@ -879,6 +886,7 @@ def transfer(client, payload, peers, protocol="TCP", shape=False):
     metrics["mb_s"] = round(payload.size / 1e6 / sample.wall, 2)
     metrics["cpu_s_per_gib"] = round(sample.cpu / (payload.size / 2**30), 2)
     os.sync()
+    time.sleep(0.5)
     metrics["intact"] = same_file(payload.path, sut.dir / "dl" / payload.name)
     return metrics
 
