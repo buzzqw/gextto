@@ -57,7 +57,9 @@ SUBNET = os.environ.get("GX_COMPARE_SUBNET", "")
 PREFIX = ""
 TRACKER_IP = ""
 SUT_IP = ""
-ANNOUNCE = ""
+# The tracker is named, not addressed: the payloads are cached between rounds,
+# and their announce URL must not depend on the subnet this round picked.
+ANNOUNCE = "http://tracker:6969/announce"
 SUT_CPUS = "2,3"
 REF_CPUS = "0,1"
 SUT_MEMORY = "4g"
@@ -148,7 +150,9 @@ class Payload:
                     left -= size
                     number += 1
             self.torrent_path.unlink(missing_ok=True)
-        if self.torrent_path.exists():
+        # The payloads outlive a round, so the .torrent of an earlier network is
+        # rewritten when its tracker address changed.
+        if self.torrent_path.exists() and ANNOUNCE.encode() in self.torrent_path.read_bytes():
             return
         pieces = bytearray()
         with open(self.path, "rb") as src:
@@ -762,7 +766,8 @@ class Sampler:
 
 def start_tracker():
     sh("docker", "rm", "-f", f"{PREFIX}-tracker", check=False)
-    sh("docker", "run", "-d", "--name", f"{PREFIX}-tracker", "--network", NET, "--ip", TRACKER_IP,
+    sh("docker", "run", "-d", "--name", f"{PREFIX}-tracker", "--network", NET, "--network-alias", "tracker",
+       "--ip", TRACKER_IP,
        "--cpuset-cpus", REF_CPUS, "gxc-tracker", "python3", "-u", "/tracker.py")
     deadline = time.time() + 20
     while time.time() < deadline:
@@ -993,7 +998,7 @@ def docker_subnets():
 
 def ensure_network():
     """Pick this round's network and container prefix, then create the network."""
-    global NET, SUBNET, PREFIX, TRACKER_IP, SUT_IP, ANNOUNCE
+    global NET, SUBNET, PREFIX, TRACKER_IP, SUT_IP
     if not NET or not SUBNET:
         used = docker_subnets()
         for slot in range(30, 90):
@@ -1008,7 +1013,6 @@ def ensure_network():
     PREFIX = "gxc-" + SUBNET.split(".")[1]
     TRACKER_IP = f"{SUBNET}.2"
     SUT_IP = f"{SUBNET}.10"
-    ANNOUNCE = f"http://{TRACKER_IP}:6969/announce"
 
 
 def command_build(args):
