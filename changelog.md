@@ -25,6 +25,7 @@ non cambiano l'interfaccia di Gextto, dove quelle pagine non esistono. Le
 correzioni al motore valgono invece per entrambi.
 
 ## 7 novembre 2026
+- **Le correzioni alle traduzioni arrivano a chi ha già Gextto installato.** Fino a oggi una traduzione sbagliata, corretta nell'interfaccia, restava sbagliata per chi aveva già avviato Gextto almeno una volta: il programma non toccava le voci già salvate. Ora le voci salvate seguono i testi aggiornati: al riavvio si vedono le correzioni, compaiono le traduzioni nuove e spariscono quelle di testi che non esistono più, in tutte le lingue. La lingua scelta e le impostazioni non cambiano; niente da configurare.
 - **gx-torrent usa meno RAM mentre scarica.** Per non lasciare mai a secco il flusso dei dati ogni peer tiene aperti due pezzi, ma il secondo non riceve nulla finché il primo non è completo: ora la memoria di un pezzo viene presa quando arriva il suo primo blocco, non quando il pezzo si apre. Anche la ricezione via uTP non produce più memoria da buttare a ogni pacchetto, quindi ci sono meno pulizie della memoria durante il download. Nel confronto tra client, con quattro peer su una linea da 100 Mbit/s il picco scende da 41 a 32 MiB su TCP e da 48 a 33 MiB su uTP, a piena velocità da 27 a 24 MiB, con la stessa velocità e la stessa CPU. Vale per Gextto e per gx-torrent standalone. Niente da configurare.
 
 ## 6 novembre 2026

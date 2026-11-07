@@ -167,7 +167,7 @@ qBittorrent-nox.
 |---|---|
 | `notifier.go` | notifications via Telegram, HTTP webhook and SMTP, plus the dedicated Discord, Slack, Gotify, ntfy, Pushover and Apprise channels and a custom script (`internal/notify`), with per-event switches, anti-spam window and message language. |
 | `hooks.go` | user hooks on events. |
-| `i18n.go` | embedded translations (`internal_translations*.yml`). |
+| `i18n.go` | embedded translations (`internal_translations*.yml`), which the translation database mirrors at startup. |
 
 ### Torrent engines (transfer plane)
 | File | Role |

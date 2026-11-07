@@ -16,8 +16,7 @@ import (
 )
 
 // defaultTranslations holds the bundled English translations for strings added
-// after the first dictionary release. It is merged with `INSERT OR IGNORE`, so
-// user edits always win.
+// after the first dictionary release.
 //
 //go:embed internal_translations.yml
 var defaultTranslations string
@@ -34,11 +33,19 @@ var defaultSpanishTranslations string
 //go:embed internal_translations_pl.yml
 var defaultPolishTranslations string
 
-// translationFixes lists corrections to bundled values as {lang: {key: [old,
-// new]}}: see applyTranslationFixes.
-//
-//go:embed internal_translations_fixes.yml
-var translationFixes string
+// bundledTranslationCatalogs lists the embedded catalogs. They are the only
+// source of the interface texts: the translation database mirrors them, and a
+// correction written here reaches every installation at the next start.
+var bundledTranslationCatalogs = []struct {
+	name string
+	raw  string
+}{
+	{name: "default", raw: defaultTranslations},
+	{name: "German", raw: defaultGermanTranslations},
+	{name: "French", raw: defaultFrenchTranslations},
+	{name: "Spanish", raw: defaultSpanishTranslations},
+	{name: "Polish", raw: defaultPolishTranslations},
+}
 
 // I18nDb is the persisted interface-translation database. It shares the
 // `gextto_config.db` schema with the daemon.
@@ -286,22 +293,22 @@ func (i *I18nDb) SetBulk(lang string, values map[string]string) error {
 	return tx.Commit()
 }
 
-// bundledTranslationsDigest fingerprints the bundled catalogs and fixes, so a
-// restart with the same catalogs can skip the merge.
+// bundledTranslationsDigest fingerprints the bundled catalogs, so a restart
+// with the same catalogs can skip the merge.
 func bundledTranslationsDigest() string {
 	sum := sha256.New()
-	for _, raw := range []string{defaultTranslations, defaultGermanTranslations, defaultFrenchTranslations, defaultSpanishTranslations, defaultPolishTranslations, translationFixes} {
-		fmt.Fprintf(sum, "%d:", len(raw))
-		_, _ = sum.Write([]byte(raw))
+	for _, catalog := range bundledTranslationCatalogs {
+		fmt.Fprintf(sum, "%d:", len(catalog.raw))
+		_, _ = sum.Write([]byte(catalog.raw))
 	}
 	return hex.EncodeToString(sum.Sum(nil))
 }
 
-// SeedDefaultTranslations merges the bundled default translations into the
-// database without overwriting existing entries. It returns how many rows were
-// added. Parsing the catalogs and probing every key costs about a second of
-// CPU, so the merge is skipped while the database records the same catalogs as
-// already merged; deleting a language clears that record.
+// SeedDefaultTranslations makes the translation database mirror the bundled
+// catalogs. It returns how many rows were added. Parsing the catalogs and
+// rewriting the rows costs about a second of CPU, so the merge is skipped while
+// the database records the same catalogs as already merged; deleting a
+// language clears that record.
 func (i *I18nDb) SeedDefaultTranslations() (int, error) {
 	digest := bundledTranslationsDigest()
 	var seeded string
@@ -318,153 +325,133 @@ func (i *I18nDb) SeedDefaultTranslations() (int, error) {
 	return inserted, nil
 }
 
-// mergeDefaultTranslations does the merge SeedDefaultTranslations describes.
+// mergeDefaultTranslations does the merge SeedDefaultTranslations describes:
+// every language follows its catalog, and the rows of a language no catalog
+// covers are dropped, because an older edition may have left them behind.
 func (i *I18nDb) mergeDefaultTranslations() (int, error) {
 	defer i.invalidateCache()
-	type parsedCatalog struct {
-		name     string
-		defaults map[string]map[string]string
-	}
-	catalogs := make([]parsedCatalog, 0, 5)
 	bundled := map[string]struct{}{}
-	for _, catalog := range []struct {
-		name string
-		raw  string
-	}{
-		{name: "default", raw: defaultTranslations},
-		{name: "German", raw: defaultGermanTranslations},
-		{name: "French", raw: defaultFrenchTranslations},
-		{name: "Spanish", raw: defaultSpanishTranslations},
-		{name: "Polish", raw: defaultPolishTranslations},
-	} {
+	inserted := 0
+	for _, catalog := range bundledTranslationCatalogs {
 		var defaults map[string]map[string]string
 		if err := yaml.Unmarshal([]byte(catalog.raw), &defaults); err != nil {
-			return 0, fmt.Errorf("parse %s translations: %w", catalog.name, err)
+			return inserted, fmt.Errorf("parse %s translations: %w", catalog.name, err)
 		}
-		for _, entries := range defaults {
-			for key := range entries {
-				bundled[key] = struct{}{}
-			}
-		}
-		catalogs = append(catalogs, parsedCatalog{name: catalog.name, defaults: defaults})
-	}
-	// Older installations may still contain translations for the first aMule
-	// integration (and the old "fallback eD2k" option), which would otherwise
-	// stay in the database for good. Only rows that
-	// mention aMule and are no longer in the bundled catalogs go: the strings
-	// of the current aMule integration stay.
-	if err := i.removeObsoleteAmuleRows(bundled); err != nil {
-		return 0, err
-	}
-	inserted := 0
-	for _, catalog := range catalogs {
-		defaults := catalog.defaults
-		langs := make([]string, 0, len(defaults))
-		for lang := range defaults {
-			langs = append(langs, lang)
-		}
-		sort.Strings(langs)
-		for _, lang := range langs {
+		for _, lang := range sortedMapKeys(defaults) {
 			storage := storageLanguage(lang)
-			entries := defaults[lang]
-			keys := make([]string, 0, len(entries))
-			for key := range entries {
-				keys = append(keys, key)
-			}
-			sort.Strings(keys)
-			tx, err := i.db.Begin()
+			bundled[storage] = struct{}{}
+			added, err := i.mergeCatalogLanguage(storage, defaults[lang])
+			inserted += added
 			if err != nil {
-				return inserted, fmt.Errorf("begin %s translations: %w", catalog.name, err)
-			}
-			for _, key := range keys {
-				res, err := tx.Exec("INSERT OR IGNORE INTO translations(lang,key,value) VALUES (?1,?2,?3)", storage, key, entries[key])
-				if err != nil {
-					_ = tx.Rollback()
-					return inserted, err
-				}
-				affected, err := res.RowsAffected()
-				if err != nil {
-					_ = tx.Rollback()
-					return inserted, err
-				}
-				inserted += int(affected)
-			}
-			if err := tx.Commit(); err != nil {
 				return inserted, err
 			}
 		}
 	}
-	fixed, err := i.applyTranslationFixes()
-	if err != nil {
+	if err := i.dropUnbundledLanguages(bundled); err != nil {
 		return inserted, err
 	}
-	return inserted + fixed, nil
+	return inserted, nil
 }
 
-// removeObsoleteAmuleRows deletes the translation rows of the first aMule
-// integration: rows that mention aMule (or the old eD2k fallback option)
-// whose key is not in the bundled catalogs any more.
-func (i *I18nDb) removeObsoleteAmuleRows(bundled map[string]struct{}) error {
-	rows, err := i.db.Query(`SELECT DISTINCT key FROM translations
-		WHERE lower(key) LIKE '%amule%'
-		   OR lower(value) LIKE '%amule%'
-		   OR key = 'Gap Filling — Fallback eD2k (cerca su eD2k se Jackett non trova nulla)'`)
+// mergeCatalogLanguage reconciles one language with its catalog: a new key is
+// inserted, a changed value replaces the stored one, and a row whose key left
+// the catalog is removed. It returns how many rows it inserted.
+func (i *I18nDb) mergeCatalogLanguage(storage string, entries map[string]string) (int, error) {
+	tx, err := i.db.Begin()
 	if err != nil {
-		return fmt.Errorf("find obsolete aMule translations: %w", err)
+		return 0, fmt.Errorf("begin %s translations: %w", storage, err)
 	}
-	var obsolete []string
+	stored := map[string]string{}
+	rows, err := tx.Query("SELECT key,value FROM translations WHERE lang=?1", storage)
+	if err != nil {
+		_ = tx.Rollback()
+		return 0, fmt.Errorf("read %s translations: %w", storage, err)
+	}
 	for rows.Next() {
-		var key string
-		if err := rows.Scan(&key); err != nil {
+		var key, value string
+		if err := rows.Scan(&key, &value); err != nil {
 			_ = rows.Close()
-			return fmt.Errorf("find obsolete aMule translations: %w", err)
+			_ = tx.Rollback()
+			return 0, fmt.Errorf("read %s translations: %w", storage, err)
 		}
-		if _, current := bundled[key]; !current {
-			obsolete = append(obsolete, key)
+		stored[key] = value
+	}
+	if err := rows.Close(); err != nil {
+		_ = tx.Rollback()
+		return 0, fmt.Errorf("read %s translations: %w", storage, err)
+	}
+	inserted := 0
+	for _, key := range sortedMapKeys(entries) {
+		value := entries[key]
+		old, present := stored[key]
+		if present && old == value {
+			continue
+		}
+		if present {
+			if _, err := tx.Exec("UPDATE translations SET value=?1 WHERE lang=?2 AND key=?3", value, storage, key); err != nil {
+				_ = tx.Rollback()
+				return inserted, err
+			}
+			continue
+		}
+		if _, err := tx.Exec("INSERT INTO translations(lang,key,value) VALUES (?1,?2,?3)", storage, key, value); err != nil {
+			_ = tx.Rollback()
+			return inserted, err
+		}
+		inserted++
+	}
+	for _, key := range sortedMapKeys(stored) {
+		if _, current := entries[key]; current {
+			continue
+		}
+		if _, err := tx.Exec("DELETE FROM translations WHERE lang=?1 AND key=?2", storage, key); err != nil {
+			_ = tx.Rollback()
+			return inserted, err
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return inserted, err
+	}
+	return inserted, nil
+}
+
+// dropUnbundledLanguages removes the rows of every language no catalog covers.
+func (i *I18nDb) dropUnbundledLanguages(bundled map[string]struct{}) error {
+	rows, err := i.db.Query("SELECT DISTINCT lang FROM translations")
+	if err != nil {
+		return fmt.Errorf("read translation languages: %w", err)
+	}
+	var stale []string
+	for rows.Next() {
+		var lang string
+		if err := rows.Scan(&lang); err != nil {
+			_ = rows.Close()
+			return fmt.Errorf("read translation languages: %w", err)
+		}
+		if _, known := bundled[lang]; !known {
+			stale = append(stale, lang)
 		}
 	}
 	if err := rows.Close(); err != nil {
-		return fmt.Errorf("find obsolete aMule translations: %w", err)
+		return fmt.Errorf("read translation languages: %w", err)
 	}
-	for _, key := range obsolete {
-		if _, err := i.db.Exec("DELETE FROM translations WHERE key = ?1", key); err != nil {
-			return fmt.Errorf("remove obsolete aMule translations: %w", err)
+	for _, lang := range stale {
+		if _, err := i.db.Exec("DELETE FROM translations WHERE lang=?1", lang); err != nil {
+			return fmt.Errorf("remove %s translations: %w", lang, err)
 		}
 	}
 	return nil
 }
 
-// applyTranslationFixes brings corrected bundled translations to databases
-// seeded before the fix. INSERT OR IGNORE keeps the old row, so each fix
-// updates the row only while it still holds exactly the old bundled value:
-// a translation edited by the user is left alone.
-func (i *I18nDb) applyTranslationFixes() (int, error) {
-	var fixes map[string]map[string][2]string
-	if err := yaml.Unmarshal([]byte(translationFixes), &fixes); err != nil {
-		return 0, fmt.Errorf("parse translation fixes: %w", err)
+// sortedMapKeys returns the keys of m in order, so a merge writes the same rows
+// in the same sequence on every run.
+func sortedMapKeys[V any](m map[string]V) []string {
+	keys := make([]string, 0, len(m))
+	for key := range m {
+		keys = append(keys, key)
 	}
-	tx, err := i.db.Begin()
-	if err != nil {
-		return 0, fmt.Errorf("begin translation fixes: %w", err)
-	}
-	fixed := 0
-	for lang, entries := range fixes {
-		storage := storageLanguage(lang)
-		for key, values := range entries {
-			res, err := tx.Exec("UPDATE translations SET value=?1 WHERE lang=?2 AND key=?3 AND value=?4", values[1], storage, key, values[0])
-			if err != nil {
-				_ = tx.Rollback()
-				return fixed, err
-			}
-			affected, err := res.RowsAffected()
-			if err != nil {
-				_ = tx.Rollback()
-				return fixed, err
-			}
-			fixed += int(affected)
-		}
-	}
-	return fixed, tx.Commit()
+	sort.Strings(keys)
+	return keys
 }
 
 // DeleteLang removes every translation row for a language. It returns how many

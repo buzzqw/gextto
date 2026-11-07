@@ -194,10 +194,12 @@ translated for the client. `TestTemplatesTranslateEveryText` fails on any text
 left outside `tr`. Texts built outside the templates use `uiText(s, "…")` or
 `uiTextf(s, "… %d …", n)`; markup Go assembles itself (table cells, row actions)
 goes through `v2TranslateFragment`. The catalogs are
-merged into the translation database at startup only when they changed: a hash of
-them is kept in the `translation_seed` table. The catalogs are the only source of
-the texts: there is no editor in the interface, so a correction goes into the
-catalogs (and, for rows already stored, into `internal_translations_fixes.yml`). The TUI has
+the only source of the texts, and the translation database mirrors them: at
+startup, when a hash kept in the `translation_seed` table says they changed,
+every row follows its catalog (a new key is inserted, a corrected value replaces
+the stored one, a key that left the catalog is removed). There is no editor in
+the interface, so a correction goes into the catalogs and reaches every
+installation at the next start. The TUI has
 its own six-language catalog (IT, EN, DE, FR, ES, PL) in `internal/tui/i18n.go`; daemon log lines are
 English only.
 

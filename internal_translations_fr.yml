@@ -1,4 +1,5 @@
-# Bundled French translations for the web UI.
+# Bundled French translations for the web UI. The translation database mirrors
+# this catalog: a corrected value here replaces the stored one at the next start.
 fra:
   (download completati): (téléchargements terminés)
   (download in corso): (téléchargements en cours)

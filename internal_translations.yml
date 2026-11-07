@@ -1,7 +1,7 @@
 # Bundled English translations for strings introduced after the original
-# dictionary. Merged at startup with INSERT OR IGNORE, so an existing user
-# translation is never overwritten. Keys are the Italian source strings used
-# with `ctx_tr`.
+# dictionary. The translation database mirrors this catalog: at startup a new
+# key is inserted and a corrected value replaces the stored one. Keys are the
+# Italian source strings used with `ctx_tr`.
 eng:
   "CPU del processo Gextto": "Gextto process CPU"
   "RAM residente del processo Gextto": "Gextto process resident RAM"

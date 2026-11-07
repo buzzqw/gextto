@@ -1,4 +1,5 @@
-# Bundled German translations for the web UI.
+# Bundled German translations for the web UI. The translation database mirrors
+# this catalog: a corrected value here replaces the stored one at the next start.
 deu:
   (download completati): (abgeschlossene Downloads)
   (download in corso): (laufende Downloads)
