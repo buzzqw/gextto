@@ -21,6 +21,7 @@ import hashlib
 import json
 import os
 import platform
+import shlex
 import shutil
 import signal
 import statistics
@@ -417,10 +418,14 @@ class GxTorrent(QBitAPI):
     image = "gxc-gx-torrent"
 
     def command(self):
+        # GX_COMPARE_GX_ARGS adds flags for an A/B of the engine (for example
+        # "-mmap"); a round for the document uses no extra flags.
+        extra = shlex.split(os.environ.get("GX_COMPARE_GX_ARGS", ""))
         return [
             "gx-torrent", "-mode", "standalone", "-listen", "0.0.0.0:8080", "-insecure",
             "-data", "/data/cfg", "-download-dir", "/data/dl", "-peer-ports", "6881-6881",
             "-no-dht", "-no-pex", "-no-lsd", "-no-upnp", "-no-natpmp",
+            *extra,
         ]
 
 
