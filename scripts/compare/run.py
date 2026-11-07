@@ -606,6 +606,14 @@ class Rain(Client):
             stats = self.rpc("Session.GetTorrentStats", {"ID": torrent_id})["Stats"]
             total, done = stats["Bytes"]["Total"], stats["Bytes"]["Completed"]
             raw = stats["Status"]
+            if raw in ("Stopped", "Stopping"):
+                # rain stops the torrent when an explicit verification ends
+                # and never starts it again (torrent_verification.go:79 calls
+                # stop with doVerify cleared, and torrent_stop.go:22 only
+                # restarts while doVerify is set). A client restarts it, so the
+                # harness does, once, instead of waiting for a stopped torrent.
+                self.rpc("Session.StartTorrent", {"ID": torrent_id})
+                raw = "Downloading"
             if raw in ("Verifying", "Allocating"):
                 state = "checking"
             elif raw == "Seeding":
