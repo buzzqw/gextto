@@ -43,16 +43,6 @@ Nothing open: every engine item waits for a condition listed under
 
 ## Measurements
 
-- **rain and anacrolix/torrent in the client comparison** — `make measure-compare`
-  (`scripts/compare`) compares gx-torrent with qBittorrent, Transmission and Deluge only.
-  Add the two Go clients: rain (`github.com/cenkalti/rain`, MIT) from a pinned tag, and
-  anacrolix/torrent from a pinned module version driven by a small program, because neither
-  has a client that adds a torrent file, rechecks it and reports the per-torrent state and
-  byte counts the harness reads. Same Debian base, CPUs 2-3 and 4 GiB, port 6881,
-  DHT/PEX/LSD off, the same rate and connection limits; median of three interleaved rounds
-  with the byte comparison. Two more clients open a new baseline: re-run every client and
-  replace the table in `measurements.md`. Gate: the next benchmark round.
-
 - **rain's check-upload row** — under the harness rain never leaves the
   `downloading` state on `check-upload` (the file is linked into its download
   folder, the torrent is added, and fifteen minutes later the progress is still
@@ -61,15 +51,10 @@ Nothing open: every engine item waits for a condition listed under
   difference found and the row measured; until then rain is left out of the
   round (`scripts/compare/nightly.sh`).
 
-- **The documents of the night round** — when the six-client comparison has run: replace
-  the tables and the method section of `docs/measurements.md` (six clients, the pinned
-  versions, the host, the date and the commit), say that anacrolix/torrent is driven by
-  `scripts/compare/anacrolix` with library defaults and that rain is asked torrent by
-  torrent because its RPC has no bulk status; then align every place that repeats the
-  numbers or the client list — `README.md`, `README.it.md`, the comparison lines in
-  `docs/gx-core.md`, `docs/gx-torrent.md`, `docs/bep.md`, `docs/DOCKER.*`, the harness
-  description in `docs/DEVELOPERS.md`, the benchmark rule in `AGENTS.md`, and the index in
-  `docs/README.md`. Gate: the round finished.
+- **The documents after a round** — the round of 2026-11-07 is in
+  `docs/measurements.md`, `README.md`, `README.it.md`, `docs/README.md` and the
+  benchmark rule in `AGENTS.md`; every future round replaces those rows and the
+  tables, and nothing else. Gate: a round finished.
 
 ## Proposals
 
@@ -105,7 +90,7 @@ its gate; a rejected one moves to *Not planned*.
   piece being filled and the ones waiting to be written still hold the whole piece: taking
   256 KiB segments as blocks land would hold only the bytes received. It touches the hash
   (v1 and v2), the write, web seeds and the local block merge. Gate: a measurement where
-  those pieces dominate the memory, with the full-speed download still at 285 MB/s.
+  those pieces dominate the memory, with the full-speed download still at 290 MB/s.
 ## Not planned
 
 Closed by choice, not waiting for a measurement:

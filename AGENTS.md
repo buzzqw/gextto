@@ -293,8 +293,9 @@ not to break.
   client against the real API), plus the `gexttod tui` smoke test against the
   daemon. Always include the TUI verification in the final control round.
 - **The benchmark rule: one way to compare clients.** A comparison with
-  qBittorrent, Transmission or Deluge comes only from `make measure-compare`
-  (`scripts/compare/run.py`), so every round is the same experiment:
+  qBittorrent, Transmission, Deluge or anacrolix/torrent comes only from
+  `make measure-compare` (`scripts/compare/run.py`), so every round is the same
+  experiment:
   - *Same torrents*: the payloads are generated from a fixed formula and their
     info hashes are pinned in `OFFICIAL_HASHES`; a different payload is refused.
   - *Same images*: pinned Debian base and client versions in

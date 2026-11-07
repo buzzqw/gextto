@@ -371,7 +371,12 @@ the payloads, the containers and the network of a round (`--images` removes the
 `gxc-*` images too), `scripts/test-workdir.sh clean` the throwaway folders (it
 keeps a running instance and the long-lived gx-core test instance; `--all`
 removes those too). The only files that stay are the raw benchmark results in
-`gextto-data/bench/`, which the next run overwrites. Docker's build cache is not
+`gextto-data/bench/`, which the next run overwrites. The unattended comparison
+is `scripts/compare/nightly.sh`: it waits for five quiet minutes, smoke-tests
+the clients it does not trust yet, measures HEAD in a temporary worktree when
+the checkout has uncommitted changes, and writes the tables. The anacrolix row
+is driven by `scripts/compare/anacrolix`, a small HTTP front end over the
+library. Docker's build cache is not
 part of the work area: `docker builder prune` after a round that rebuilt the
 images.
 
