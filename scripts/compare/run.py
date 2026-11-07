@@ -1126,7 +1126,10 @@ def run_rounds(args, clients, scenarios, env, commit):
                         out.write(json.dumps(record) + "\n")
                     log(json.dumps({k: v for k, v in record.items()
                                     if k not in ("stamp", "tag", "commit", "round", "client", "scenario")}))
-                    if not record["disturbed"]:
+                    # A failure gets one more try: it can be the rest of the host
+                    # (a load spike, a peer that did not answer in time). A second
+                    # failure is the client's, and it stays in the row.
+                    if not record["disturbed"] and ("error" not in record or attempt >= 1):
                         break
                     log("disturbed by the rest of the host, running it again")
     return failures
