@@ -7,8 +7,7 @@ ones, not a history: a new round replaces the row it measures.
 ## Short answer
 
 Measured on 2026-11-07 on a low-power mini PC (Intel N97), in Docker, with the same torrents
-and limits for every client. Five clients: rain is not in this round yet, its `check-upload`
-row is open (see [`todo.md`](todo.md)).
+and limits for every client.
 
 | Question | 1st | 2nd | 3rd | 4th | 5th | Why it matters |
 |---|---|---|---|---|---|---|
@@ -187,6 +186,31 @@ Transmission reaches seeding at once because it trusts existing files until aske
 anacrolix hashes them, but a hundred files of 2 MiB cost it a second. qBittorrent takes a
 hundred seconds to verify them, and gx-torrent spends the most CPU at rest, 0.6 % of a core.
 
+### Why the anacrolix row is so light
+
+The library's row is a different trade, not a better engine: it holds almost nothing, and it
+pays for that in CPU. A few choices explain the 11 MiB of own memory at full speed against
+gx-torrent's 24, and the 0.01 % of a core at rest against 0.06:
+
+- **Writes go into a file mapping.** `storage.NewFile` (`client.go`) serves the pieces through
+  `storage/file-io-mmap.go`: a received block is copied into the shared mapping, with no
+  staging buffer and no write cache. gx-core writes through a buffer taken from a pool, keeps
+  a write cache (1 GiB target) and a read cache (256 MiB default, 8 MiB floor in the daemon).
+  That is more memory, and it is why gx-torrent uploads at 244 MB/s and 2.22 s of CPU per GiB
+  against 124 MB/s and 5.26.
+- **No read cache.** An upload reads back from the mapping, so the client reserves nothing for
+  it; the mapped pages show in RSS (3.2 GB on a 4 GiB file) and not in own memory.
+- **One cap on unverified bytes.** `MaxUnverifiedBytes` (64 MiB, `config.go`) limits the data
+  received and not yet hashed and written, for the whole client. gx-core bounds a piece and a
+  torrent, not the total.
+- **Small units.** 16 KiB chunks (`global.go`) and one buffer per request (`peerconn.go`),
+  against the 128 KiB blocks of our read cache and 1–2 MiB pieces.
+- **Fewer wakeups.** No statistics tick, no automatic speed probe, no DLNA, LSD or SSE
+  keepalive.
+
+What gx-core keeps in exchange: the fastest download (3.13 s of CPU per GiB against 4.96),
+the cheapest upload (244 MB/s against 124) and the cheaper uTP path (37 s per GiB against 67).
+
 ### What these numbers do not say
 
 - **No ranking on a real swarm.** These runs use few peers, no encryption from the peers and
@@ -200,8 +224,6 @@ hundred seconds to verify them, and gx-torrent spends the most CPU at rest, 0.6 
 - **anacrolix/torrent is a library**, not a client: its row is the library with its own
   defaults, driven by the small HTTP front end in `scripts/compare/anacrolix` that adds,
   rechecks and reports the torrents. It has no page, no queue and no library.
-- **rain is not in this round**: under the harness its explicit recheck of an existing file
-  never leaves the downloading state, and the reason is still open (`todo.md`).
 - **Small differences are not results.** A gap inside the ranges above means nothing.
 - **Deluge's web front end** runs in a separate container, so its CPU and memory are not
   counted.
@@ -226,7 +248,7 @@ table above.
 ## Gextto and gx-torrent on their own
 
 Same N97 machine, outside Docker unless stated. Every figure is the latest round on this
-machine (2026-11-03 for the engine measurements, 2026-11-06 for the live at-rest ones).
+machine.
 
 ### Footprint
 
@@ -236,10 +258,10 @@ machine (2026-11-03 for the engine measurements, 2026-11-06 for the live at-rest
 | gx-torrent, 10 torrents to a NAS | | about 507 MB outside the two caches, 1.1 GB peak with the NFS write cache |
 | gexttod 1.2.2260, same host | 0.4 % of a core, 45 MB anon (70 MB RSS) just started; 97 MB anon (123 MB RSS) after a full search | peak 168 MB anon during a full cycle of 47,342 releases (series and movies), about 69 s of CPU, and back to the figure at rest; a series-only cycle of ~38,800 releases peaks at 149–157 MB anon and leaves 85 MB |
 
-At-rest figures: three samples of 2, 5 and 10 minutes on 2026-11-06 for gx-torrent (DHT on, full
+At-rest figures: three samples of 2, 5 and 10 minutes for gx-torrent (DHT on, full
 IP filter, three seeds, nothing transferring) and 90 s for gexttod with the integrity check off
 and no transfer. The
-gexttod row is the latest full cycle and the latest series-only cycle on 2026-11-06, with
+gexttod row is the latest full cycle and the latest series-only cycle, with
 GOGC=50, transparent huge pages off for the process and
 `GODEBUG=madvdontneed=1`.
 
@@ -251,7 +273,7 @@ GOGC=50, transparent huge pages off for the process and
   release after a cycle or a completed transfer returns 12–92 MB per call, and the 15-minute
   housekeeping call releases what the background workers free afterwards. Go does not
   compact, so the spans still pinned by live objects stay.
-- **A cycle allocates 1.37–1.43 GB instead of 2.01 GB** (~38,800 releases, 2026-11-06;
+- **A cycle allocates 1.37–1.43 GB instead of 2.01 GB** (~38,800 releases;
   the spread is the varying size of the feed and indexer replies). The deduplication, the
   blocklist and the kind filter work in place, the combined feed and indexer batches are
   sized once, the XML reader no longer translates namespaces, the Torznab error check
@@ -263,12 +285,12 @@ GOGC=50, transparent huge pages off for the process and
   releases just read are probed against the archive's two unique indexes and their rows
   skipped, and the priority gap pass searches a season once instead of once per episode. A
   series cycle of ~38,900 releases fell from 39–43 s of CPU to 29 s on the same host
-  (2026-11-06). The probe covers the batch, not the archive: 1,000 releases a large archive
+  The probe covers the batch, not the archive: 1,000 releases a large archive
   already holds cost **9.3 ms against 19.3 ms** with no probe at all, where reading the whole
-  archive first cost 65 ms and grew with it (50,000 rows, 2026-11-06).
+  archive first cost 65 ms and grew with it (50,000 rows).
 - **`systemctl status` shows a large number** that is mostly page cache, not the process;
   `anon` is the real figure (85 MB after a series search, 97 MB after a full one on
-  2026-11-06). A `MemoryMax` on the unit would count the file pages, so it must leave room
+  A `MemoryMax` on the unit would count the file pages, so it must leave room
   for them.
 - **At rest gexttod** opens no directory and writes nothing to the NAS, so its disks can spin
   down.
@@ -279,19 +301,19 @@ GOGC=50, transparent huge pages off for the process and
 ### Name parsing
 
 The quality/language reader runs on every release name and on every filename the library
-touches. On this machine, 2026-11-06, `BenchmarkParseQuality` over five typical names:
+touches. On this machine, `BenchmarkParseQuality` over five typical names:
 **95 µs against 696 µs** before the word, separator and episode scans replaced the regexes
 (7.3×), and **15.0 KB / 208 allocations against 21.6 KB / 361**. The release-title matchers
 skip the ten anchored regexes for a name with no season marker, and the SxxExx, date and
 pack shapes are read without them.
 
 In a cycle the regexp share of the CPU fell from about **39 % to 11 %** (profiles of
-2026-11-06); `ParseQuality` itself is now about 2 % of the sampled cycle. SQLite and the
+`ParseQuality` itself is now about 2 % of the sampled cycle. SQLite and the
 feed/HTML parsing are the larger costs.
 
 ### The web page
 
-The gx-torrent main page, rendered in German on this machine (2026-11-05): **0.78 ms and
+The gx-torrent main page, rendered in German on this machine: **0.78 ms and
 141 KB allocated** per page, 0.01 ms per small fragment, with the translations already in
 place. Translating the finished HTML afterwards cost about 2 ms and a tokenizer pass per
 page.
@@ -358,7 +380,7 @@ Seeding, post-processing and several days of operation were not measured.
 
 A selection of the Go benchmarks: `make bench-all` runs all of them (six runs,
 `GOMAXPROCS=2`) and writes the raw log and a `benchstat` table to `gextto-data/bench/`. Round
-of 2026-11-03. Compare numbers only within one round: the absolute values follow the machine's
+Compare numbers only within one round: the absolute values follow the machine's
 state more than the code.
 
 | Path | Cost | What it means |
@@ -405,7 +427,7 @@ run at once per torrent.
 | CI (`ci.yml` / `continuous.yml` / `codeql.yml`), 2 vCPU runners | 411 s / 278 s / 210 s |
 
 The suite has 3,010 Go tests in 72 packages, 79 Playwright tests and 89 Go benchmarks (count
-of 2026-11-06; build times of 2026-10-17, test times of 2026-10-22, CI of 2026-10-17).
+build times, test times and CI times of the same rounds).
 
 ## Verified without a benchmark
 
@@ -447,6 +469,8 @@ Closed with a measurement, so they are not retried without new data.
 | Coalescing contiguous writes | the page cache already merges them | |
 | Rarity buckets, `pickFileEdge` cursor | no measurement justified the cost | |
 | `PieceDownloader` bitmask | 18 KB and 15 allocations per piece: about 450 KB/s of garbage at 100 MB/s | |
+| Writing through a file mapping (`-mmap`, the library's way) | same own memory at full speed (24.3 MiB against 24.2) with 12 % more CPU per GiB (3.28 s against 2.93), and with 100 torrents own memory rises (13.4 against 11.7); only RSS moves, to 3.9 GB of mapped pages | a storage where a write syscall costs more than a page fault |
+| Skipping the latency probe when nothing transfers | the at-rest figure does not move (0.05 % against 0.06, inside the 0.03–0.06 range): the one-second probe is not what the idle CPU is made of | a profile showing where the idle wakeups go |
 | Async `state.json` | 4 ms every few minutes at 1,000 torrents, 0.003 % of a core | thousands of torrents with frequent changes, or a visible UI stall |
 | Lock-free read cache | the lock costs about 0.2 % of a core at 100 MB/s of upload | |
 | One PEX loop per torrent | 0.0025 % of a core and 2–3 MB at 500 peers | |
