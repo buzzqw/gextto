@@ -838,13 +838,16 @@ def wait_check_started(client, info_hash, timeout=10):
 
 
 def same_file(a, b):
-    # A client can report a piece as complete a moment before its write lands:
-    # one retry after a second separates that from a real difference.
-    for attempt in range(2):
+    # A client can report 100 % a moment before its last blocks land on disk: a
+    # slow sender (Transmission seeds 4 GiB in four minutes) made the first
+    # comparison fail and the same file compare equal two seconds later. The
+    # check waits for the file to settle instead of calling it corrupt.
+    for attempt in range(6):
+        os.sync()
         if subprocess.run(["cmp", "-s", str(a), str(b)]).returncode == 0:
             return True
-        if attempt == 0:
-            time.sleep(1)
+        if attempt < 5:
+            time.sleep(2)
     return False
 
 
