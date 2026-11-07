@@ -43,14 +43,6 @@ Nothing open: every engine item waits for a condition listed under
 
 ## Measurements
 
-- **rain's check-upload row** — under the harness rain never leaves the
-  `downloading` state on `check-upload` (the file is linked into its download
-  folder, the torrent is added, and fifteen minutes later the progress is still
-  zero), while the same calls made from a script verify the file and seed in
-  seconds. The other scenarios and the `many` restart are fine. Gate: the
-  difference found and the row measured; until then rain is left out of the
-  round (`scripts/compare/nightly.sh`).
-
 - **The documents after a round** — the round of 2026-11-07 is in
   `docs/measurements.md`, `README.md`, `README.it.md`, `docs/README.md` and the
   benchmark rule in `AGENTS.md`; every future round replaces those rows and the
