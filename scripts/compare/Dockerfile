@@ -20,9 +20,14 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends qbittorrent-nox=5.1.0-2 \
     && rm -rf /var/lib/apt/lists/*
 
-FROM base AS transmission
+# Transmission 3.00 from Debian 12 on purpose: the 4.1.0 beta of Debian 13 gets
+# the peers from the tracker but never opens a uTP connection to them, so its
+# line-utp row was always empty (docs/measurements.md). 3.00 is the stable
+# release and speaks uTP.
+FROM debian:12-slim@sha256:734a72b3d6142a71993b4bc580ca01d8ca687f77a2c422d96a961d3376b179bc AS transmission
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends transmission-daemon=4.1.0~beta2+dfsg-3+deb13u2 \
+    && apt-get install -y --no-install-recommends iproute2 ca-certificates \
+       transmission-daemon=3.00-2.1+deb12u1 \
     && rm -rf /var/lib/apt/lists/*
 
 FROM base AS deluge

@@ -443,7 +443,8 @@ class Transmission(Client):
         }))
 
     def command(self):
-        return ["transmission-daemon", "-f", "-g", "/data/cfg", "--log-level=error"]
+        # 3.00 has no --log-level: it prints the usage and exits.
+        return ["transmission-daemon", "-f", "-g", "/data/cfg"]
 
     def rpc(self, method, **arguments):
         url = f"http://{self.ip}:9091/transmission/rpc"
