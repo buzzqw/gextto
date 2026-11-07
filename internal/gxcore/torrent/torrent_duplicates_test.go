@@ -85,7 +85,7 @@ func TestRequestBlocksSharesOneBudget(t *testing.T) {
 	wire := &pipePeer{}
 
 	// A big piece (16 blocks) fills the 10-request window by itself: no room.
-	big := piecedownloader.New(pipePiece(0, 16), wire, false, bufferpool.Buffer{})
+	big := piecedownloader.New(pipePiece(0, 16), wire, false, func() bufferpool.Buffer { return bufferpool.Buffer{} })
 	tr.pieceDownloaders = map[*peer.Peer]map[uint32]*piecedownloader.PieceDownloader{pe: {0: big}}
 	if tr.requestBlocks(pe) || tr.pipeHasRoom(pe) {
 		t.Fatal("a piece larger than the window must not open a second one")
@@ -97,13 +97,13 @@ func TestRequestBlocksSharesOneBudget(t *testing.T) {
 	// A small piece (4 blocks) leaves room in the window.
 	wire2 := &pipePeer{}
 	pe2 := &peer.Peer{}
-	small := piecedownloader.New(pipePiece(1, 4), wire2, false, bufferpool.Buffer{})
+	small := piecedownloader.New(pipePiece(1, 4), wire2, false, func() bufferpool.Buffer { return bufferpool.Buffer{} })
 	tr.pieceDownloaders[pe2] = map[uint32]*piecedownloader.PieceDownloader{1: small}
 	if !tr.requestBlocks(pe2) || !tr.pipeHasRoom(pe2) {
 		t.Fatal("a piece smaller than the window must leave room for a second one")
 	}
 	// The second piece only gets what is left of the shared window.
-	second := piecedownloader.New(pipePiece(2, 16), wire2, false, bufferpool.Buffer{})
+	second := piecedownloader.New(pipePiece(2, 16), wire2, false, func() bufferpool.Buffer { return bufferpool.Buffer{} })
 	tr.pieceDownloaders[pe2][2] = second
 	tr.requestBlocks(pe2)
 	if wire2.requests != 10 {

@@ -80,3 +80,75 @@ func BenchmarkTransferLoopbackNoGSO(b *testing.B) {
 	defer gsoDisabled.Store(false)
 	BenchmarkTransferLoopback(b)
 }
+
+// BenchmarkTransferLoopbackStream is a download as the engine does it: the
+// sender writes without waiting, the reader asks for each 16 KiB block with
+// HintRead and reads the message header and the block apart, so the receive
+// window fills and drains in bursts. The allocations it reports are the
+// receive path's, which the lockstep benchmark above never exercises.
+func BenchmarkTransferLoopbackStream(b *testing.B) {
+	serverPC, err := net.ListenPacket("udp", "127.0.0.1:0")
+	if err != nil {
+		b.Fatal(err)
+	}
+	server, err := NewSocketFromPacketConn(serverPC)
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer server.CloseNow()
+	clientPC, err := net.ListenPacket("udp", "127.0.0.1:0")
+	if err != nil {
+		b.Fatal(err)
+	}
+	client, err := NewSocketFromPacketConn(clientPC)
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer client.CloseNow()
+
+	accepted := make(chan net.Conn, 1)
+	go func() {
+		if c, err := server.Accept(); err == nil {
+			accepted <- c
+		}
+	}()
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	conn, err := client.DialContext(ctx, "udp", server.Addr().String())
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer conn.Close()
+	var srv net.Conn
+	select {
+	case srv = <-accepted:
+	case <-ctx.Done():
+		b.Fatal("accept timed out")
+	}
+	defer srv.Close()
+
+	const header, block = 13, 16 << 10
+	go func() {
+		send := make([]byte, 64*(header+block))
+		for {
+			if _, err := conn.Write(send); err != nil {
+				return
+			}
+		}
+	}()
+	hint := srv.(interface{ HintRead(int) })
+	head := make([]byte, header)
+	recv := make([]byte, block)
+	b.SetBytes(header + block)
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if _, err := io.ReadFull(srv, head); err != nil {
+			b.Fatal(err)
+		}
+		hint.HintRead(block)
+		if _, err := io.ReadFull(srv, recv); err != nil {
+			b.Fatal(err)
+		}
+	}
+}

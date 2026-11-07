@@ -35,7 +35,7 @@ func TestOutOfOrderPayloadSurvivesBufferReuse(t *testing.T) {
 	c.processDelivery(h, buf)
 	c.unpendSendState()
 
-	if got := string(c.readBuf[c.readPos:]); got != "AAAABBBB" {
+	if got := string(c.readBuf.Bytes()); got != "AAAABBBB" {
 		t.Fatalf("read buffer = %q, want %q", got, "AAAABBBB")
 	}
 }

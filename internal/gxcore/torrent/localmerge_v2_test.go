@@ -193,7 +193,7 @@ func TestPrefillV2CountsPartialSourcePieces(t *testing.T) {
 
 	// The downloader takes the block from disk and requests only the other.
 	wire := &pipePeer{}
-	pd := piecedownloader.New(&dst.pieces[0], wire, false, bufferpool.Buffer{Data: make([]byte, dst.pieces[0].Length)})
+	pd := piecedownloader.New(&dst.pieces[0], wire, false, func() bufferpool.Buffer { return bufferpool.Buffer{Data: make([]byte, dst.pieces[0].Length)} })
 	dst.prefillBlocks(pd)
 	if n := pd.RequestBlocks(10); n != 1 || wire.requests != 1 {
 		t.Fatalf("requested %d block(s), want only the missing one", n)

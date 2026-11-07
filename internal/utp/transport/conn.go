@@ -33,13 +33,8 @@ type Conn struct {
 	cur_window  uint32
 	connKey     connKey
 
-	// Data waiting to be read by the application. readBuf holds the received
-	// bytes and readPos is how far the application has consumed; the unread
-	// window is readBuf[readPos:]. Keeping the offset (rather than reslicing
-	// from the front) preserves the backing array's capacity, so a refilled
-	// window does not reallocate.
-	readBuf         []byte
-	readPos         int
+	// Data waiting to be read by the application, in pooled chunks.
+	readBuf         readQueue
 	readBufNotEmpty Event
 	// readWant, when set, holds the next Read back until this many bytes are
 	// buffered (see HintRead). It is consumed by that Read.
@@ -64,8 +59,10 @@ type Conn struct {
 
 	// unackedSends holds the packets awaiting acknowledgement, oldest first.
 	unackedSends []*send
+	unackedBase  []*send // the array behind unackedSends (appendFIFO)
 	// inbound holds out-of-order packets; inbound[0] is ack_nr+1.
 	inbound    []recv
+	inboundArr []recv // the array behind inbound (appendFIFO)
 	inboundWnd int
 	connDeadlines
 	// latencies are the recent RTT samples the moving average uses.
@@ -122,7 +119,7 @@ func (c *Conn) sendPendingState() {
 }
 
 // bufferedInbound is how many received bytes wait to be read.
-func (c *Conn) bufferedInbound() int { return len(c.readBuf) - c.readPos }
+func (c *Conn) bufferedInbound() int { return c.readBuf.Len() }
 
 // wndSize is how many more payload bytes fit in our receive buffers. That is
 // our advertised window.
@@ -271,7 +268,7 @@ func (c *Conn) write(batch *sendBatch, _type st, connID uint16, payload []byte, 
 		seqNr:       seqNr,
 		conn:        c,
 	}
-	c.unackedSends = append(c.unackedSends, s)
+	c.unackedSends = appendFIFO(&c.unackedBase, c.unackedSends, s)
 	c.scheduleResendLocked()
 	c.cur_window += s.payloadSize
 	c.updateCanWrite()
@@ -586,17 +583,18 @@ func (c *Conn) processDelivery(h header, payload []byte) {
 	}
 	// Extend inbound so the new packet has a slot.
 	for inboundIndex >= len(c.inbound) {
-		c.inbound = append(c.inbound, recv{})
+		c.inbound = appendFIFO(&c.inboundArr, c.inbound, recv{})
 	}
-	c.inbound[inboundIndex] = recv{true, payload, h.Type}
+	c.inbound[inboundIndex] = recv{seen: true, data: payload, Type: h.Type}
 	c.inboundWnd += len(payload)
 	before := len(c.inbound)
 	c.processInbound()
 	// payload points into the socket's receive buffer, reused for the next
 	// datagram. In-order data was just copied into readBuf; a packet still
-	// queued (out of order, or the read buffer full) must own its bytes.
+	// queued (out of order, or the read buffer full) must own its bytes, in a
+	// pooled datagram buffer given back when the packet is consumed.
 	if i := inboundIndex - (before - len(c.inbound)); i >= 0 {
-		c.inbound[i].data = append([]byte(nil), payload...)
+		c.inbound[i].own(payload)
 	}
 }
 
@@ -660,20 +658,6 @@ func (c *Conn) readHeldBack() bool {
 		!c.gotFin.IsSet() && !c.closed.IsSet() && !c.destroyed.IsSet() && !c.connDeadlines.read.passed.IsSet()
 }
 
-// appendReadBuf appends received bytes to the read window. When they would not fit
-// after the end and some of the array is already consumed, it first moves the
-// unread tail to the front, so the append reuses the capacity instead of
-// reallocating the whole window. A datagram rarely lands exactly on the end, so
-// waiting for a full array would grow it whenever the reader leaves bytes behind.
-func (c *Conn) appendReadBuf(p []byte) {
-	if c.readPos > 0 && len(c.readBuf)+len(p) > cap(c.readBuf) {
-		n := copy(c.readBuf, c.readBuf[c.readPos:])
-		c.readBuf = c.readBuf[:n]
-		c.readPos = 0
-	}
-	c.readBuf = append(c.readBuf, p...)
-}
-
 // processInbound moves consecutive buffered packets into the read buffer.
 func (c *Conn) processInbound() {
 	for !c.gotFin.IsSet() && len(c.inbound) > 0 && c.inbound[0].seen && c.bufferedInbound() < readBufferLen {
@@ -684,7 +668,8 @@ func (c *Conn) processInbound() {
 		c.inbound[0] = recv{}
 		c.inbound = c.inbound[1:]
 		c.inboundWnd -= len(p.data)
-		c.appendReadBuf(p.data)
+		c.readBuf.Write(p.data)
+		p.release()
 		c.updateReadBufNotEmpty()
 		if p.Type == stFin {
 			c.gotFin.Set()
@@ -766,19 +751,7 @@ func (c *Conn) Read(b []byte) (n int, err error) {
 			c.waitRead()
 		}
 		c.readWant = 0
-		n = copy(b, c.readBuf[c.readPos:])
-		c.readPos += n
-		if c.readPos == len(c.readBuf) {
-			// The window is fully consumed: keep the backing array for the
-			// next fill, unless a burst grew it past readBufKeep. Keeping
-			// those across idle connections held hundreds of MB under load.
-			if cap(c.readBuf) > readBufKeep {
-				c.readBuf = nil
-			} else {
-				c.readBuf = c.readBuf[:0]
-			}
-			c.readPos = 0
-		}
+		n = c.readBuf.Read(b)
 		c.updateReadBufNotEmpty()
 		if n != 0 {
 			// Refill the read buffer from any packets that were waiting.

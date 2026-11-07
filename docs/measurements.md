@@ -31,17 +31,19 @@ also counts; the 100-torrent row is the only one that uses RSS. The full-speed r
 download from one peer, the 100 Mbit/s row the 512 MiB download from four peers shaped to that
 line.
 
-The upload row is the last full round. After the read-cache change of 2026-11-06 gx-torrent's
-own memory while uploading is 22 MiB and the speed 288–318 MB/s, but the other clients were not
-run again ([details](#what-this-round-changed)).
+The memory rows are the last full round. After the read-cache change of 2026-11-06 gx-torrent's
+own memory while uploading is 22 MiB, and after the piece-buffer change of 2026-11-07 it is
+24 MiB at full speed and 32 MiB on the 100 Mbit/s line, at the same speeds; the other clients
+were not run again ([details](#what-this-round-changed)).
 
 In short: gx-torrent is the fastest downloader over TCP, is level with Transmission at a recheck
 (3.6 s against 3.7), and uploads as fast as the libtorrent clients. Its read cache now starts
-small: while uploading it uses 22 MiB of own memory instead of 58, at 288–318 MB/s. It is level
-with Deluge on the 100 Mbit/s line, and with 100 torrents it spends the most CPU at rest
+small: while uploading it uses 22 MiB of own memory instead of 58, at 288–318 MB/s. A piece now
+takes its buffer when its first block lands: on the 100 Mbit/s line it uses 32 MiB instead of 41,
+below Deluge and above qBittorrent and Transmission (about 10 MiB). With 100 torrents it spends the most CPU at rest
 (0.66 % against 0.06–0.35 %). Transmission spends less CPU on every download, at a lower speed.
-The tables are the round of 2026-11-06 on commit `40e58927`; the read-cache change is measured
-separately [below](#what-this-round-changed).
+The tables are the round of 2026-11-06 on commit `40e58927`; the read-cache and piece-buffer
+changes are measured separately [below](#what-this-round-changed).
 
 ## What is best for me
 
@@ -112,12 +114,14 @@ ceiling of each client on this machine.
 
 | Client | Speed | Time | CPU per GiB | Peak own memory | Peak RSS |
 |---|---|---|---|---|---|
-| **gx-torrent** | **285 MB/s** (285–286) | 15.0 s | 3.10 s | 30 MiB | 42 MiB |
+| **gx-torrent** | **285 MB/s** (285–286) | 15.0 s | 3.10 s | 30 MiB† | 42 MiB† |
 | Deluge | 250 MB/s (230–254) | 17.2 s | 2.85 s | 59 MiB | 3,963 MiB |
 | qBittorrent | 241 MB/s (219–242) | 17.8 s | 2.71 s | 25 MiB | 3,510 MiB |
 | Transmission | 56 MB/s (56–56) | 77.0 s | 2.20 s | 11 MiB | 26 MiB |
 
 Transmission's 56 MB/s repeats in every round; its cause was not investigated.
+
+† 24 MiB of own memory and 38 MiB of RSS after the piece-buffer change below.
 
 ### Download on a 100 Mbit/s line
 
@@ -126,10 +130,12 @@ before protocol overhead.
 
 | Client | Speed | Time | CPU (% of a core) | CPU per GiB | Peak own memory | Peak RSS |
 |---|---|---|---|---|---|---|
-| **gx-torrent** | **11.23 MB/s** | 47.8 s | 19 % | 17.9 s | 40 MiB | 54 MiB |
+| **gx-torrent** | **11.23 MB/s** | 47.8 s | 19 % | 17.9 s | 40 MiB† | 54 MiB† |
 | Deluge | 10.66 MB/s | 50.4 s | 27 % | 27.8 s | 39 MiB | 575 MiB |
 | qBittorrent | 10.55 MB/s | 50.9 s | 26 % | 26.0 s | 9.5 MiB | 543 MiB |
 | Transmission | 9.44 MB/s | 56.9 s | 14 % | 15.8 s | 10 MiB | 25 MiB |
+
+† 32 MiB of own memory and 47 MiB of RSS after the piece-buffer change below.
 
 ### The same line, uTP only
 
@@ -139,10 +145,12 @@ The same four peers with TCP blocked at the peer.
 |---|---|---|---|---|---|---|
 | Deluge | 11.80 MB/s | 45.5 s | 41 % | 37.9 s | 39 MiB | 571 MiB |
 | qBittorrent | 11.55 MB/s | 46.5 s | 39 % | 36.0 s | 9.7 MiB | 543 MiB |
-| gx-torrent | 11.21 MB/s | 47.9 s | 39 % | 37.5 s (37–38) | 51 MiB | 65 MiB |
+| gx-torrent | 11.21 MB/s | 47.9 s | 39 % | 37.5 s (37–38) | 51 MiB† | 65 MiB† |
 | Transmission | 9.59 MB/s | 56.0 s | 22 % | 24.2 s | 8.6 MiB | 24 MiB |
 
 On uTP gx-torrent now spends what the libtorrent clients spend and is 3–5 % slower than them.
+
+† 33 MiB of own memory and 47 MiB of RSS after the piece-buffer change below.
 
 ### Recheck and upload
 
@@ -198,6 +206,29 @@ the last full round. These are gx-torrent only, same harness and payload, two va
 The upload speed did not fall: the fastest before round (283 MB/s) is close to the slowest after
 one (288 MB/s), and one before round was the slow outlier the disk produces. The recheck is
 unchanged. At rest and with 100 torrents the read cache is empty, so those rows do not move.
+
+Then a piece took its buffer when its first block lands instead of when it opens, and the uTP
+receive path stopped allocating per packet. A peer keeps two pieces open so its request pipe
+never runs dry, but the blocks arrive in request order, so the second piece received nothing
+until the first was complete and still held 2 MiB. Inside the harness, at the peak of the four-peer
+line, piece buffers were 19–25 MiB of a 27–36 MiB live heap; the collector's headroom was under
+10 % of it. gx-torrent only, same harness and payload, rounds alternated, 2026-11-07; a round
+whose background was above one core is left out.
+
+| Measure | Before | After |
+|---|---|---|
+| Peak own memory, full speed | 26–30 MiB (median 27, 6 rounds) | **21–26 MiB** (median 24, 5 rounds) |
+| Peak own memory, 100 Mbit/s line | 40–42 MiB (median 41, 4 rounds) | **28–34 MiB** (median 32, 3 rounds) |
+| Peak own memory, same line over uTP | 47–51 MiB (median 48, 5 rounds) | **31–37 MiB** (median 33, 3 rounds) |
+| Speed: full / line / uTP line | 290 / 11.21 / 11.21 MB/s | 290 / 11.23 / 11.24 MB/s |
+| CPU per GiB: full / line / uTP line | 3.11 / 16.9 / 36.8 s | 3.07 / 17.4 / 34.9 s |
+| Upload CPU per GiB | 2.29–2.55 s (median 2.49) | 2.36–2.69 s (median 2.51) |
+
+At rest (6.8 against 7.6 MiB) and with 100 torrents (12.1 MiB both) nothing moves outside the
+spread. On the uTP receive path alone, a stream of 16 KiB blocks read as the engine reads them
+allocates **2.8 KB per block against 14.5 KB** at the same speed (median of 15 rounds,
+25.5 MB/s both, `BenchmarkTransferLoopbackStream`); between two gx-torrent over loopback uTP the
+old path allocated 4 GB for 2 GB downloaded and collected about 165 times a second.
 
 ### What these numbers do not say
 
@@ -441,6 +472,8 @@ Closed with a measurement, so they are not retried without new data.
 
 | Idea | Why it was closed | Reopen when |
 |---|---|---|
+| A bounded list instead of `sync.Pool` for piece buffers | no change in the harness peak (26–28 MiB at full speed either way): three buffers in use with one peer, the pool held nothing idle that mattered | |
+| A memory limit or a lower GOGC while downloading | at the download peak the next collection target is within 10 % of the live heap (40 against 36 MiB on the line): the memory is live piece buffers, not headroom | |
 | `io_uring` / AIO | the disk does 5.5–7.2 GB/s, far above any network; needs cgo or a dependency | storage slower than the network |
 | Write-back cache in the engine | the storage keeps up with the download | storage slower than the network |
 | Batched uTP datagrams (`recvmmsg`/`sendmmsg`) | 8.3 % of samples on real swarms; saves under 1 % of a core at the live rate | a uTP-only session above 8 MB/s |

@@ -182,21 +182,30 @@ func waitBuffered(t *testing.T, c *Conn, want int) {
 	}
 }
 
-// A reader that always leaves bytes behind must not make the read window grow: the
-// consumed head is reused, whatever the size of the datagrams.
+// A reader that always leaves bytes behind must not make the read window grow
+// or allocate: drained chunks go back to the pool, whatever the size of the
+// datagrams.
 func TestReadBufferReusesTheConsumedHead(t *testing.T) {
-	const window = 32 << 10
-	c := &Conn{readBuf: make([]byte, 0, window)}
+	var q readQueue
 	datagram := make([]byte, 1400)
+	out := make([]byte, len(datagram))
 	for range 8 {
-		c.appendReadBuf(datagram)
+		q.Write(datagram)
 	}
 	for i := range 20000 {
-		c.appendReadBuf(datagram)
-		c.readPos += len(datagram) // the reader keeps up, always 8 datagrams behind
-		if cap(c.readBuf) != window {
-			t.Fatalf("after %d datagrams the window went from %d to %d bytes with %d unread",
-				i, window, cap(c.readBuf), c.bufferedInbound())
+		q.Write(datagram)
+		if n := q.Read(out); n != len(datagram) {
+			t.Fatalf("read %d bytes, want %d", n, len(datagram))
 		}
+		if len(q.chunks) > 2 {
+			t.Fatalf("after %d datagrams %d chunks hold %d unread bytes", i, len(q.chunks), q.Len())
+		}
+	}
+	allocs := testing.AllocsPerRun(1000, func() {
+		q.Write(datagram)
+		q.Read(out)
+	})
+	if allocs > 0.1 {
+		t.Fatalf("%.2f allocations per datagram, want none in the steady state", allocs)
 	}
 }

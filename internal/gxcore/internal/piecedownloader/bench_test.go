@@ -18,13 +18,14 @@ func BenchmarkPieceDownloaderLifecycle(b *testing.B) {
 		Data:   filesection.Piece{{File: fakeFile{}, Offset: 0, Length: length}},
 	}
 	buf := bufferpool.Buffer{Data: make([]byte, length)}
+	alloc := func() bufferpool.Buffer { return buf }
 	block := make([]byte, piece.BlockSize)
 	pe := &fakePeer{requested: make([]uint32, 0, 256)}
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		pe.requested = pe.requested[:0]
-		d := New(pi, pe, false, buf)
+		d := New(pi, pe, false, alloc)
 		next := 0
 		for !d.Done() {
 			d.RequestBlocks(d.Pending() + 64)

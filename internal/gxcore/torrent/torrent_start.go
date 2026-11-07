@@ -6,7 +6,9 @@ import (
 	"github.com/buzzqw/gextto/internal/gxcore/internal/acceptor"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/allocator"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/announcer"
+	"github.com/buzzqw/gextto/internal/gxcore/internal/bufferpool"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/peer"
+	"github.com/buzzqw/gextto/internal/gxcore/internal/piece"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/piecedownloader"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/piecepicker"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/tracker"
@@ -384,14 +386,7 @@ func (t *torrent) startSinglePieceDownloader(pe *peer.Peer) (started bool) {
 	if pi == nil {
 		return false
 	}
-	// The blocks of a piece without padding cover all of it before it is
-	// hashed, so its buffer needs no clearing; padding bytes are never
-	// received and must read as zero.
-	buf := t.piecePool.GetUncleared(int(pi.Length))
-	if pi.Data.HasPadding() {
-		clear(buf.Data)
-	}
-	pd := piecedownloader.New(pi, pe, allowedFast, buf)
+	pd := piecedownloader.New(pi, pe, allowedFast, t.pieceBufferFor(pi))
 	t.prefillBlocks(pd)
 	if m := t.pieceDownloaders[pe]; m != nil {
 		if _, ok := m[pi.Index]; ok {
@@ -503,10 +498,25 @@ func (t *torrent) prefillBlocks(pd *piecedownloader.PieceDownloader) {
 		if !ok {
 			continue
 		}
-		data := pd.Buffer.Data[begin : begin+length]
+		data := pd.Data()[begin : begin+length]
 		if _, err := pd.Piece.Data.ReadAt(data, int64(begin)); err != nil {
 			continue
 		}
 		pd.Prefill(begin, data)
+	}
+}
+
+// pieceBufferFor returns how a downloader of pi takes its buffer. The blocks
+// of a piece without padding cover all of it before it is hashed, so its
+// buffer needs no clearing; padding bytes are never received and must read as
+// zero.
+func (t *torrent) pieceBufferFor(pi *piece.Piece) func() bufferpool.Buffer {
+	pool := t.piecePool
+	return func() bufferpool.Buffer {
+		buf := pool.GetUncleared(int(pi.Length))
+		if pi.Data.HasPadding() {
+			clear(buf.Data)
+		}
+		return buf
 	}
 }

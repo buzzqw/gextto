@@ -39,10 +39,6 @@ const (
 	// readBufferLen is the receive window each connection offers.
 	readBufferLen = 1 << 20 // ~1 MiB
 
-	// readBufKeep is the largest drained read buffer a connection keeps for
-	// reuse; a larger one (grown by a burst) is released.
-	readBufKeep = 256 << 10
-
 	// pendingSendStateDelay batches state packets: a state packet is not sent
 	// for every inbound packet, and an outgoing data packet fills the role. 2 ms
 	// spends 10% less CPU than 0.5 ms at 11 MB/s over four peers, at the same rate,
@@ -172,6 +168,40 @@ type recv struct {
 	seen bool
 	data []byte
 	Type st
+	// owned is the pooled buffer data lives in when the packet had to be
+	// kept (out of order, or the read buffer full); nil while data still
+	// points into the socket's receive buffer.
+	owned *[]byte
+}
+
+// pooledDatagramSize fits the payload of any datagram up to a 1500-byte MTU.
+const pooledDatagramSize = 2048
+
+// datagramPool holds the buffers queued inbound packets are copied into.
+var datagramPool = sync.Pool{New: func() any {
+	b := make([]byte, pooledDatagramSize)
+	return &b
+}}
+
+// own copies payload into a pooled buffer, so it survives the reuse of the
+// socket's receive buffer. A payload past a common MTU (rare: jumbo frames)
+// gets a buffer of its own.
+func (r *recv) own(payload []byte) {
+	if len(payload) > pooledDatagramSize {
+		r.data = append([]byte(nil), payload...)
+		return
+	}
+	b := datagramPool.Get().(*[]byte)
+	r.data = append((*b)[:0], payload...)
+	r.owned = b
+}
+
+// release gives the pooled buffer back once the payload has been consumed.
+func (r *recv) release() {
+	if r.owned != nil {
+		datagramPool.Put(r.owned)
+		r.owned = nil
+	}
 }
 
 // syn is an unaccepted connection request held in the backlog.

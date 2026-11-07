@@ -19,11 +19,22 @@ var (
 
 // PieceDownloader pulls every block of one piece from one peer into a
 // buffer. Padding ranges never travel: they are absent from the block map.
+//
+// The buffer is taken when the first byte has to land in it, not when the
+// piece opens. A peer keeps two pieces open so its request pipe never runs
+// dry, and the blocks arrive in request order: the second piece receives
+// nothing until the first is complete. Taking its buffer at the first block
+// lets it reuse the one the first piece just handed to the writer, instead of
+// holding a second piece of memory per peer for the whole download.
 type PieceDownloader struct {
 	Piece       *piece.Piece
 	Peer        Peer
 	AllowedFast bool
-	Buffer      bufferpool.Buffer
+	// Buffer is the piece's bytes; empty until Data or a block needs it.
+	Buffer bufferpool.Buffer
+
+	alloc     func() bufferpool.Buffer
+	hasBuffer bool
 
 	blocks    map[uint32]uint32   // begin -> length
 	remaining []uint32            // unrequested begins, in piece order
@@ -38,8 +49,9 @@ type Peer interface {
 	EnabledFast() bool
 }
 
-// New plans the block map of pi (padding excluded) for pe.
-func New(pi *piece.Piece, pe Peer, allowedFast bool, buf bufferpool.Buffer) *PieceDownloader {
+// New plans the block map of pi (padding excluded) for pe. alloc provides the
+// piece buffer, zeroed where padding is, the first time one is needed.
+func New(pi *piece.Piece, pe Peer, allowedFast bool, alloc func() bufferpool.Buffer) *PieceDownloader {
 	blocks := pi.CalculateBlocks()
 	byBegin := make(map[uint32]uint32, len(blocks))
 	order := make([]uint32, len(blocks))
@@ -51,13 +63,25 @@ func New(pi *piece.Piece, pe Peer, allowedFast bool, buf bufferpool.Buffer) *Pie
 		Piece:       pi,
 		Peer:        pe,
 		AllowedFast: allowedFast,
-		Buffer:      buf,
+		alloc:       alloc,
 		blocks:      byBegin,
 		remaining:   order,
 		pending:     make(map[uint32]struct{}, len(blocks)),
 		done:        make(map[uint32]struct{}, len(blocks)),
 	}
 }
+
+// Data returns the piece buffer, taking it on the first call.
+func (d *PieceDownloader) Data() []byte {
+	if !d.hasBuffer {
+		d.Buffer = d.alloc()
+		d.hasBuffer = true
+	}
+	return d.Buffer.Data
+}
+
+// HasBuffer reports whether the piece holds a buffer yet.
+func (d *PieceDownloader) HasBuffer() bool { return d.hasBuffer }
 
 // Choked requeues the in-flight requests — unless allowed-fast applies or
 // the peer speaks fast (it will cancel for us).
@@ -81,7 +105,7 @@ func (d *PieceDownloader) GotBlock(begin uint32, data []byte) error {
 	if _, ok := d.done[begin]; ok {
 		return ErrBlockDuplicate
 	}
-	copy(d.Buffer.Data[begin:begin+uint32(len(data))], data)
+	copy(d.Data()[begin:begin+uint32(len(data))], data)
 	d.done[begin] = struct{}{}
 	if _, ok := d.pending[begin]; !ok {
 		return ErrBlockNotRequested
@@ -105,7 +129,7 @@ func (d *PieceDownloader) Prefill(begin uint32, data []byte) bool {
 	if _, ok := d.pending[begin]; ok {
 		return false
 	}
-	copy(d.Buffer.Data[begin:begin+uint32(len(data))], data)
+	copy(d.Data()[begin:begin+uint32(len(data))], data)
 	d.done[begin] = struct{}{}
 	for i, b := range d.remaining {
 		if b == begin {

@@ -34,7 +34,7 @@ func TestRequestBlocksReturnsCount(t *testing.T) {
 		t.Fatalf("blocks = %d, want 3", got)
 	}
 	pe := &fakePeer{}
-	d := New(pi, pe, false, bufferpool.Buffer{Data: make([]byte, length)})
+	d := New(pi, pe, false, func() bufferpool.Buffer { return bufferpool.Buffer{Data: make([]byte, length)} })
 
 	if n := d.RequestBlocks(2); n != 2 {
 		t.Fatalf("RequestBlocks(2) = %d, want 2", n)
@@ -61,7 +61,7 @@ func TestPrefillSkipsTheBlock(t *testing.T) {
 	length := uint32(piece.BlockSize*2 + 100)
 	pi := &piece.Piece{Index: 0, Length: length, Data: filesection.Piece{{File: fakeFile{}, Offset: 0, Length: int64(length)}}}
 	pe := &fakePeer{}
-	d := New(pi, pe, false, bufferpool.Buffer{Data: make([]byte, length)})
+	d := New(pi, pe, false, func() bufferpool.Buffer { return bufferpool.Buffer{Data: make([]byte, length)} })
 
 	block := make([]byte, piece.BlockSize)
 	block[0] = 0xAB
@@ -93,5 +93,40 @@ func TestPrefillSkipsTheBlock(t *testing.T) {
 	}
 	if !d.Done() {
 		t.Fatal("piece not done with the prefilled block counted")
+	}
+}
+
+// TestBufferTakenAtTheFirstBlock: opening a piece and requesting its blocks
+// takes no memory; the buffer is taken once, when the first block lands.
+func TestBufferTakenAtTheFirstBlock(t *testing.T) {
+	length := uint32(piece.BlockSize * 3)
+	pi := &piece.Piece{Index: 0, Length: length, Data: filesection.Piece{{File: fakeFile{}, Offset: 0, Length: int64(length)}}}
+	pe := &fakePeer{}
+	taken := 0
+	d := New(pi, pe, false, func() bufferpool.Buffer {
+		taken++
+		return bufferpool.Buffer{Data: make([]byte, length)}
+	})
+	d.RequestBlocks(3)
+	if taken != 0 || d.HasBuffer() {
+		t.Fatal("the buffer was taken before any block arrived")
+	}
+	block := make([]byte, piece.BlockSize)
+	for i, begin := range pe.requested {
+		block[0] = byte(i + 1)
+		if err := d.GotBlock(begin, block); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if taken != 1 {
+		t.Fatalf("buffer taken %d times, want once", taken)
+	}
+	for i := range 3 {
+		if got := d.Data()[uint32(i)*piece.BlockSize]; got != byte(i+1) {
+			t.Fatalf("block %d holds %d, want %d", i, got, i+1)
+		}
+	}
+	if taken != 1 {
+		t.Fatal("Data took a second buffer")
 	}
 }

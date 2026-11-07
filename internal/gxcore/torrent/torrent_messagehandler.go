@@ -134,6 +134,9 @@ func (t *torrent) completePieceDownload(pe *peer.Peer, pd *piecedownloader.Piece
 	t.fillPeerDownloads(pe)
 	t.beginPieceWrite()
 
+	// A piece made of padding alone never received a block: Data takes its
+	// (zeroed) buffer now.
+	pd.Data()
 	pw := piecewriter.New(piece, pe, pd.Buffer)
 	go pw.Run(t.pieceWriterResultC, t.doneC, t.session.metrics.WritesPerSecond, t.session.metrics.SpeedWrite, t.session.semWrite)
 }
