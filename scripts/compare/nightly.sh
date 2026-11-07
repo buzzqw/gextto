@@ -27,7 +27,7 @@ mkdir -p "$out"
 exec >>"$log" 2>&1
 
 echo "=== comparison $tag, started $(date -Is)"
-if pgrep -f "scripts/compare/run.py run" >/dev/null; then
+if pgrep -f "^python3 scripts/compare/run[.]py run" >/dev/null; then
     echo "another comparison is running: stopping without touching it"
     exit 1
 fi
@@ -49,6 +49,31 @@ cleanup() {
 trap cleanup EXIT
 
 cd "$work"
+
+# The machine must be at rest: ffmpeg stops at 07:00, and a round that starts on
+# a busy host measures the host. Five quiet minutes in a row (no ffmpeg, load
+# under one) before the first container; an hour is the most it waits.
+quiet=0
+limit=$(( $(date +%s) + 3600 ))
+while [ "$quiet" -lt 5 ]; do
+    if [ "$(date +%s)" -gt "$limit" ]; then
+        echo "the host never settled: no round"
+        exit 1
+    fi
+    load=$(cut -d' ' -f1 /proc/loadavg)
+    if pgrep -x ffmpeg >/dev/null; then
+        echo "$(date +%T) ffmpeg is running, waiting"
+        quiet=0
+    elif awk "BEGIN{exit !($load < 1.0)}"; then
+        quiet=$((quiet + 1))
+        echo "$(date +%T) quiet (load $load), $quiet/5 minutes"
+    else
+        echo "$(date +%T) load $load, waiting"
+        quiet=0
+    fi
+    sleep 60
+done
+
 echo "--- smoke of the new Go clients, results thrown away"
 GX_COMPARE_OUT="$scratch/smoke.jsonl" \
     python3 scripts/compare/run.py run --clients anacrolix \

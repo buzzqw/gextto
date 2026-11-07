@@ -53,13 +53,6 @@ Nothing open: every engine item waits for a condition listed under
   with the byte comparison. Two more clients open a new baseline: re-run every client and
   replace the table in `measurements.md`. Gate: the next benchmark round.
 
-- **Wait loops that match themselves** — a wait written as `pgrep -f "compare/run.py"`
-  finds its own command line (the shell running it) and never ends; it happened twice
-  in a session. Use the anchored form `pgrep -f "^python3 scripts/compare/run[.]py run"`
-  (or `[c]ompare`), which cannot match itself. Gate: none, it is a one-line fix; apply it
-  to `scripts/compare/nightly.sh` when no round is running (a script being read by bash
-  must not be edited under it).
-
 - **rain's check-upload row** — under the harness rain never leaves the
   `downloading` state on `check-upload` (the file is linked into its download
   folder, the torrent is added, and fifteen minutes later the progress is still
