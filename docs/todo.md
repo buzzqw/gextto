@@ -53,6 +53,14 @@ Nothing open: every engine item waits for a condition listed under
   with the byte comparison. Two more clients open a new baseline: re-run every client and
   replace the table in `measurements.md`. Gate: the next benchmark round.
 
+- **rain's check-upload row** — under the harness rain never leaves the
+  `downloading` state on `check-upload` (the file is linked into its download
+  folder, the torrent is added, and fifteen minutes later the progress is still
+  zero), while the same calls made from a script verify the file and seed in
+  seconds. The other scenarios and the `many` restart are fine. Gate: the
+  difference found and the row measured; until then rain is left out of the
+  round (`scripts/compare/nightly.sh`).
+
 - **The documents of the night round** — when the six-client comparison has run: replace
   the tables and the method section of `docs/measurements.md` (six clients, the pinned
   versions, the host, the date and the commit), say that anacrolix/torrent is driven by

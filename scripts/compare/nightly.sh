@@ -8,10 +8,10 @@
 # changes (someone is working in it) the round runs in a temporary worktree of
 # HEAD, and the changes in progress are left alone.
 #
-# Before the six-client round it smoke-tests the two Go clients alone, rain and
-# anacrolix/torrent, on all the calls the harness makes (add, recheck, restart):
-# their results go to a scratch file and are thrown away, so a broken client
-# costs ten minutes instead of three hours.
+# Before the round it smoke-tests anacrolix/torrent on all the calls the harness
+# makes (add, recheck, restart): the results go to a scratch file and are thrown
+# away, so a broken client costs ten minutes instead of three hours. rain stays
+# out of the round until its check-upload row is fixed (docs/todo.md).
 #
 # One at a time: two rounds share the containers and the network of the harness,
 # so this exits instead of colliding with a comparison already running.
@@ -51,14 +51,18 @@ trap cleanup EXIT
 cd "$work"
 echo "--- smoke of the new Go clients, results thrown away"
 GX_COMPARE_OUT="$scratch/smoke.jsonl" \
-    python3 scripts/compare/run.py run --clients rain,anacrolix \
+    python3 scripts/compare/run.py run --clients anacrolix \
     --scenarios full,check-upload,line,line-utp --rounds 1 --tag smoke
 GX_COMPARE_OUT="$scratch/smoke.jsonl" \
-    python3 scripts/compare/run.py run --clients rain,anacrolix \
+    python3 scripts/compare/run.py run --clients anacrolix \
     --scenarios many --many 10 --rounds 1 --tag smoke
-echo "--- smoke passed: the six-client round starts"
+echo "--- smoke passed: the round starts"
 
-python3 scripts/compare/run.py run --tag "$tag"
+# rain is left out until its check-upload row is fixed: under the harness its
+# recheck of an existing file never leaves the "downloading" state, while the
+# same calls from a script work (docs/todo.md).
+python3 scripts/compare/run.py run --tag "$tag" \
+    --clients gx-torrent,qbittorrent,transmission,deluge,anacrolix
 python3 scripts/compare/run.py report --tag "$tag" >"$out/compare-$tag.md"
 if [ "$work" != "$root" ]; then
     # The results and the tables must land in the real checkout.
