@@ -30,6 +30,7 @@ type v2SearchResult struct {
 	FreeleechKnown bool
 	SizeBytes      int64
 	ReleaseJSON    string
+	AddBody        string
 	ExplainJSON    string
 }
 
@@ -103,6 +104,7 @@ func v2SearchViewFrom(s *AppState, query, redirect string, kad bool) v2SearchVie
 			if json.Unmarshal(raw, &payload) == nil {
 				for _, release := range payload.Results {
 					encoded, _ := json.Marshal(release)
+					addBody, _ := json.Marshal(map[string]json.RawMessage{"release": encoded})
 					view.Results = append(view.Results, v2SearchResult{
 						Title:    release.Title,
 						Source:   v2SearchSource(release),
@@ -119,6 +121,7 @@ func v2SearchViewFrom(s *AppState, query, redirect string, kad bool) v2SearchVie
 						FreeleechKnown: release.FreeleechKnown,
 						SizeBytes:      release.SizeBytes,
 						ReleaseJSON:    string(encoded),
+						AddBody:        string(addBody),
 						ExplainJSON:    string(encoded),
 					})
 				}
@@ -171,10 +174,12 @@ func V2SearchLink(w http.ResponseWriter, r *http.Request, s *AppState) {
 		}
 		release.Score = cfg.ReleaseScore(release)
 		encoded, _ := json.Marshal(release)
+		addBody, _ := json.Marshal(map[string]json.RawMessage{"release": encoded})
 		view.Results = append(view.Results, v2SearchResult{
 			Title: release.Title, Source: "eD2k/Kad", Network: "ed2k", Sources: 0,
 			Ed2kLink: release.Ed2kLink, Addable: download, Score: release.Score,
-			SizeBytes: release.SizeBytes, ReleaseJSON: string(encoded), ExplainJSON: string(encoded),
+			SizeBytes: release.SizeBytes, ReleaseJSON: string(encoded), AddBody: string(addBody),
+			ExplainJSON: string(encoded),
 		})
 		valid = append(valid, link)
 	}

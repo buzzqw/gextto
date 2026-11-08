@@ -97,6 +97,10 @@
 </div>
 {{end}}
 
+{{define "v2_action_notice_oob"}}
+<div id="v2-toast-region" hx-swap-oob="innerHTML">{{template "v2_action_notice" .}}</div>
+{{end}}
+
 {{define "v2_downloads_settings_result"}}
 {{template "v2_torrents_wrap" .View}}
 <div id="v2-toast-region" hx-swap-oob="innerHTML">{{template "v2_action_notice" .Notice}}</div>

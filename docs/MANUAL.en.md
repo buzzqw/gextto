@@ -408,7 +408,9 @@ not in the library, grouped by series and season:
   then online, and shows the results with **Download**;
 - **Search missing** searches for every missing episode of a series in the
   background: the tab shows the progress, you can cancel, and at the end it
-  lists the results with **Download**. It downloads nothing on its own;
+  lists the results with **Download**. It downloads nothing on its own, and the
+  list stays open after each download: you can take more than one without
+  running the search again;
 - **Filter by series** narrows the list.
 
 Not missing: episodes that have not aired yet, episodes that already have a
@@ -564,7 +566,8 @@ release, or download something you do not follow.
 3. Narrow down with **Filter the already loaded results**: it works on the
    results received and does not search again.
 4. Open **Why not this one?** on the interesting results.
-5. Press **Queue** (or **Download**) when you are convinced.
+5. Press **Queue** (or **Download**) when you are convinced: the results stay
+   in the list, so you can add others without running the search again.
 
 A manual search also shows releases the cycle would **not** pick, precisely so
 you can inspect them: seeing one does not mean it would be downloaded.

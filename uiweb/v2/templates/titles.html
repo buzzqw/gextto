@@ -135,6 +135,9 @@
   <input type="hidden" name="path" value="{{.Path}}" />
   <input type="hidden" name="method" value="{{.Method}}" />
   <input type="hidden" name="body" value="{{.Body}}" />
+  {{/* Stay: the answer is a toast, not a redirect. A list of results keeps its
+       rows, so the operator can queue several releases one after the other. */}}
+  {{if .Stay}}<input type="hidden" name="stay" value="1" /><input type="hidden" name="stay_title" value="{{.StayTitle}}" />{{end}}
   <button class="btn sm {{.Class}}" type="submit"{{if .Confirm}} hx-confirm="{{tr .Confirm}}"{{end}}{{if .Title}} {{trTitle .Title}}{{end}}>{{tr .Label}}</button>
 </form>
 {{end}}
@@ -215,7 +218,7 @@
   <tbody>{{range .Results}}<tr>{{if $.ShowEpisode}}<td class="nowrap">{{tr .Episode}}</td>{{end}}
     <td class="truncate" {{trTitle .Title}}>{{tr .Title}}{{if .LastResort}} <span class="badge warn" {{trTitle "Ultima risorsa: episodio mancante preso fuori dalla risoluzione del profilo perché era l'unica copia nella lingua richiesta. L'upgrade lo sostituisce appena esce una copia nel profilo."}}>{{tr "🆘 ultima risorsa"}}</span>{{end}}</td>
     <td>{{tr .Source}}</td><td class="numeric">{{tr .Score}}</td><td class="numeric">{{if .SizeBytes}}{{bytes .SizeBytes}}{{else}}—{{end}}</td>
-    <td class="row-actions">{{if .Magnet}}<button class="btn sm" type="button" data-v2-copy="{{.Magnet}}" {{trTitle "Copia il link magnet negli appunti"}}>{{tr "Copia magnet"}}</button>{{end}}{{if .Body}}{{template "v2_action_btn" (dict "Redirect" $.Redirect "Path" "/api/archive/batch-download" "Method" "POST" "Body" .Body "Label" "Scarica" "Class" "primary" "Title" "Aggiungi questa release ai download")}}{{end}}</td>
+    <td class="row-actions">{{if .Magnet}}<button class="btn sm" type="button" data-v2-copy="{{.Magnet}}" {{trTitle "Copia il link magnet negli appunti"}}>{{tr "Copia magnet"}}</button>{{end}}{{if .Body}}{{template "v2_action_btn" (dict "Redirect" $.Redirect "Path" "/api/archive/batch-download" "Method" "POST" "Body" .Body "Label" "Scarica" "Class" "primary" "Title" "Aggiungi questa release ai download" "Stay" true "StayTitle" "Download")}}{{end}}</td>
   </tr>{{end}}</tbody>
 </table></div>
 {{else}}<p class="muted">{{if .Hint}}{{tr .Hint}}{{else}}{{tr "Nessuna sorgente disponibile per questa puntata."}}{{end}}</p>{{end}}

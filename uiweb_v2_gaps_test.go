@@ -2,6 +2,10 @@ package gextto
 
 import (
 	"bytes"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"os"
 	"strings"
 	"testing"
@@ -92,6 +96,9 @@ func TestGapSearchResultListsTheReleases(t *testing.T) {
 	for _, want := range []string{
 		"Risultati:", "Puntate cercate:", "S06E03", "FBI S06E03 1080p ITA",
 		"Scarica", "Nessun download automatico",
+		`name="path" value="/api/archive/batch-download"`,
+		`name="stay" value="1"`,
+		`name="stay_title" value="Download"`,
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("missing %q in:\n%s", want, body)
@@ -99,6 +106,60 @@ func TestGapSearchResultListsTheReleases(t *testing.T) {
 	}
 	if strings.Contains(body, "clicca una puntata") {
 		t.Fatalf("old hint still in:\n%s", body)
+	}
+}
+
+// TestGapDownloadKeepsTheResultsList: the Download button of a result must not
+// navigate away. A whole-series search returns a long list and the operator
+// queues several releases one after the other: a page reload emptied the list
+// and hid the results after the first click. The answer is a toast instead.
+func TestGapDownloadKeepsTheResultsList(t *testing.T) {
+	state := newTestAppState(t)
+	if err := CompleteSetup(state.cfg); err != nil {
+		t.Fatalf("complete setup: %v", err)
+	}
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+
+	release := `{"items":[{"title":"FBI S06E03 1080p ITA","magnet":"magnet:?xt=urn:btih:` + strings.Repeat("a", 40) + `"}]}`
+	form := url.Values{
+		"path":       {"/api/archive/batch-download"},
+		"method":     {"POST"},
+		"body":       {release},
+		"stay":       {"1"},
+		"stay_title": {"Download"},
+		"redirect":   {"/?view=series&tab=gaps"},
+	}
+	request, err := http.NewRequest(http.MethodPost, server.URL+"/section/action", strings.NewReader(form.Encode()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	request.Header.Set("HX-Request", "true")
+	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	response, err := http.DefaultClient.Do(request)
+	if err != nil {
+		t.Fatalf("section action: %v", err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("stay action -> %d, want 200", response.StatusCode)
+	}
+	if redirect := response.Header.Get("HX-Redirect"); redirect != "" {
+		t.Fatalf("stay action must not reload the page, got HX-Redirect %q", redirect)
+	}
+	body, err := io.ReadAll(response.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{
+		`id="v2-toast-region" hx-swap-oob="innerHTML"`,
+		`class="v2-toast"`,
+		"Download",
+		"Torrent aggiunto ai download con successo.",
+	} {
+		if !strings.Contains(string(body), want) {
+			t.Fatalf("missing %q in:\n%s", want, body)
+		}
 	}
 }
 

@@ -223,6 +223,11 @@ func V2SectionAction(w http.ResponseWriter, r *http.Request, s *AppState) {
 	if body == "" {
 		body = "{}"
 	}
+	// stay marks an action that must not reload the page: it answers with a
+	// toast, so a list being worked through keeps its rows (the Download
+	// buttons of the search results). Without JavaScript the form still posts
+	// and falls back to the usual redirect.
+	stay := r.FormValue("stay") == "1"
 	flash := ""
 	flashErr := false
 	if strings.HasPrefix(path, "/api/") {
@@ -235,6 +240,15 @@ func V2SectionAction(w http.ResponseWriter, r *http.Request, s *AppState) {
 			view = "dashboard"
 		}
 		target = "/?view=" + url.QueryEscape(view)
+	}
+	if stay && r.Header.Get("HX-Request") != "" {
+		title := strings.TrimSpace(r.FormValue("stay_title"))
+		if title == "" {
+			title = "Operazione"
+		}
+		v2Render(w, http.StatusOK, "v2_action_notice_oob",
+			map[string]any{"Title": title, "Message": flash, "Error": flashErr}, s)
+		return
 	}
 	if flash != "" {
 		if parsed, err := url.Parse(target); err == nil {
@@ -273,6 +287,20 @@ func v2ActionFlash(path string, raw []byte, status int) (string, bool) {
 			}
 			return fmt.Sprintf("Ricerca completata: %d risultati tra %d episodi mancanti.", len(payload.Results), len(payload.Episodes)), false
 		}
+	}
+	if strings.HasPrefix(path, "/api/archive/batch-download") {
+		var payload struct {
+			Accepted int `json:"accepted"`
+		}
+		if json.Unmarshal(raw, &payload) == nil {
+			if payload.Accepted > 0 {
+				return "Torrent aggiunto ai download con successo.", false
+			}
+			return "Torrent non avviato o già presente nei download.", true
+		}
+	}
+	if path == "/api/search/add" {
+		return "Release aggiunta ai download.", false
 	}
 	if path == "/api/backup" {
 		return "Backup creato", false

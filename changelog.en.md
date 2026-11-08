@@ -23,6 +23,9 @@ create, the app on the phone — apply **only to the standalone version** and do
 not change Gextto's interface, where those pages do not exist. Engine fixes, on
 the other hand, apply to both.
 
+## 8 November 2026
+- **«Search missing»: several results are downloaded one after the other without losing the list.** Before, pressing «Download» on the first result reloaded the page and the results list vanished: anyone wanting several episodes had to run the search again every time. Now the download adds the release and shows a notice at the top, while the results stay where they are; this also applies to the manual search in Explore and to the search of a single episode. Nothing to configure.
+
 ## 7 November 2026
 - **Translation corrections reach people who already have Gextto installed.** Until today a wrong translation, corrected in the interface, stayed wrong for anyone who had already started Gextto at least once: the program never touched the entries it had already stored. Now the stored entries follow the updated texts: after a restart you see the corrections, the new translations appear and those of texts that no longer exist are gone, in every language. The chosen language and the settings do not change; nothing to configure.
 - **gx-torrent uses less RAM while downloading.** So that the data never stops flowing, each peer keeps two pieces open, but the second one receives nothing until the first is complete: a piece now takes its memory when its first block arrives, not when it opens. Receiving over uTP no longer creates throw-away memory for every packet either, so there are fewer memory clean-ups during a download. In the client comparison, with four peers on a 100 Mbit/s line the peak falls from 41 to 32 MiB over TCP and from 48 to 33 MiB over uTP, and at full speed from 27 to 24 MiB, at the same speed and CPU. It applies to Gextto and to standalone gx-torrent. Nothing to configure.

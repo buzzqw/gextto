@@ -409,7 +409,8 @@ onda che non sono in libreria, raggruppate per serie e per stagione:
   e mostra i risultati con **Scarica**;
 - **Cerca mancanti** cerca tutte le puntate mancanti di una serie in background:
   la scheda mostra l'avanzamento, puoi annullare, e alla fine elenca i
-  risultati con **Scarica**. Non scarica nulla da sola;
+  risultati con **Scarica**. Non scarica nulla da sola, e la lista resta aperta
+  dopo ogni download: puoi prenderne più di uno senza rifare la ricerca;
 - **Filtra per serie** restringe l'elenco.
 
 Non sono mancanti le puntate non ancora andate in onda, né quelle che hanno già
@@ -569,7 +570,8 @@ release precisa o a scaricare qualcosa che non segui.
 3. Restringi con **Filtra i risultati già caricati**: lavora sui risultati
    ricevuti e non rifà la ricerca.
 4. Apri **Perché non questa?** sui risultati interessanti.
-5. Premi **Accoda** (o **Scarica**) quando sei convinto.
+5. Premi **Accoda** (o **Scarica**) quando sei convinto: i risultati restano
+   nell'elenco, così puoi aggiungerne altri senza rifare la ricerca.
 
 La ricerca manuale mostra anche release che il ciclo **non** sceglierebbe,
 proprio per permetterti di ispezionarle: vederla non significa che verrebbe

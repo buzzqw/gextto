@@ -69,11 +69,7 @@
     <td class="numeric">{{tr .Seeders}}</td>
     <td class="row-actions">
       {{if .Addable}}
-      <form method="post" action="/search/add" hx-post="/search/add" hx-swap="none" style="display:inline">
-        <input type="hidden" name="release" value="{{.ReleaseJSON}}" />
-        <input type="hidden" name="redirect" value="{{$.Redirect}}" />
-        <button class="btn sm primary" type="submit">{{if eq .Network "ed2k"}}{{tr "Scarica"}}{{else}}{{tr "Aggiungi"}}{{end}}</button>
-      </form>
+      {{template "v2_action_btn" (dict "Redirect" $.Redirect "Path" "/api/search/add" "Method" "POST" "Body" .AddBody "Label" (ternary (eq .Network "ed2k") "Scarica" "Aggiungi") "Class" "primary" "Title" "Aggiungi questa release ai download" "Stay" true "StayTitle" "Download")}}
       {{else}}
       <span class="badge" {{trTitle "aMule non è attivo o non è raggiungibile."}}>{{tr "Solo ricerca"}}</span>
       {{end}}
