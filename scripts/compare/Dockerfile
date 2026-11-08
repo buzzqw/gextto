@@ -45,6 +45,11 @@ RUN CGO_ENABLED=0 go install github.com/cenkalti/rain/v2@v2.4.5
 FROM base AS rain
 COPY --from=rain-build /go/bin/rain /usr/local/bin/rain
 
+# anacrolix/torrent stays at v1.61.0 (scripts/compare/anacrolix/go.mod): the
+# bencode nesting fix Dependabot reports exists only in an unreleased commit,
+# which also replaces the uTP stack and the DHT, and would change the client
+# under test. It moves together with the next full baseline round; the other
+# indirect dependencies are kept at their patched versions.
 FROM golang:1.27 AS anacrolix-build
 WORKDIR /src
 COPY scripts/compare/anacrolix/go.mod scripts/compare/anacrolix/go.sum ./
