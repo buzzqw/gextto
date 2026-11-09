@@ -266,6 +266,9 @@ func runHousekeeping(s *AppState) (*HousekeepingReport, bool) {
 		logging.Warn("housekeeping failed", "error", err)
 		return nil, false
 	}
+	if cfg != nil {
+		report.StagedTorrentsRemoved = sweepStagedFeedTorrents(cfg.StateDir, time.Now())
+	}
 	return &report, true
 }
 

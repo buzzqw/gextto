@@ -740,12 +740,13 @@ func housekeepingSummary(report *HousekeepingReport, params HousekeepingParams) 
 	add(report.UpgradeBackupsRemoved, "upgrade backup", "upgrade backups", housekeepingOlderThan(params.UpgradeBackupDays))
 	add(report.OldHistoryRemoved, "download history entry", "download history entries", housekeepingOlderThan(params.HistoryDays))
 	add(report.StaleProvidersRemoved, "indexer cooldown", "indexer cooldowns", "expired more than a week ago")
+	add(report.StagedTorrentsRemoved, "staged .torrent file", "staged .torrent files", housekeepingOlderThan(feedTorrentRetentionDays))
 	if len(parts) == 0 {
 		return ""
 	}
 	total := report.OldCyclesRemoved + report.StaleTorrentsRemoved + report.SeenRemoved +
 		report.GapLogsRemoved + report.UpgradeBackupsRemoved + report.OldHistoryRemoved +
-		report.StaleProvidersRemoved
+		report.StaleProvidersRemoved + report.StagedTorrentsRemoved
 	return countLabel(total, "old entry", "old entries") + ": " + joinWithAnd(parts)
 }
 

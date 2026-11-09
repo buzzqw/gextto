@@ -75,9 +75,18 @@ func (p *candidatePass) try(ctx context.Context, candidate models.Release) (stop
 	// torrent engine and must never be passed to HTTPGetBytes.
 	promoteTorrentURLMagnet(&release)
 	// Feeds that expose only a `.torrent` link (for example TorrentLeech)
-	// have no magnet: download the file, derive its infohash, and retain the
-	// file for adding it (private trackers require it for announcing).
+	// have no magnet: download the file, derive its infohash, and keep it
+	// until the add completes (private trackers require it for announcing).
 	var torrentFile *string
+	// The .torrent downloaded from a feed is only a staging file: the engine
+	// keeps its own copy while the torrent is in the session. Remove it on
+	// every exit from this candidate, including refusals after the link was
+	// resolved, so the folder cannot grow with releases never added.
+	defer func() {
+		if torrentFile != nil {
+			removeTorrentFile(*torrentFile)
+		}
+	}()
 	// A mirror is another copy of the same torrent from another source
 	// (release_dedup.go): when this link fails, the next copy is tried in
 	// the same cycle instead of leaving the episode for the next one.
@@ -139,6 +148,9 @@ func (p *candidatePass) try(ctx context.Context, candidate models.Release) (stop
 				}
 			}
 			if path != "" {
+				if torrentFile != nil && *torrentFile != path {
+					removeTorrentFile(*torrentFile)
+				}
 				torrentFile = &path
 			}
 		}

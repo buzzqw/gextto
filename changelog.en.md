@@ -25,6 +25,7 @@ the other hand, apply to both.
 
 ## 9 November 2026
 - **The `.torrent` files of removed downloads no longer stay on disk.** Gextto kept an internal copy of every download's `.torrent` file and never deleted it when the torrent left the session: the state folder grew with every download, even after archiving. The internal copy is now removed when a torrent is removed or archived; the folder chosen in **Copy .torrent files to** is left untouched. Nothing to configure.
+- **The `.torrent` files downloaded from indexers no longer pile up either.** For listings that expose only a `.torrent` link, Gextto downloaded the file into a staging folder and never deleted it. It now removes it as soon as the candidate has been judged or added; the routine cleanup also removes any leftovers older than a week. The folder chosen in **Copy .torrent files to** is left untouched. Nothing to configure.
 
 ## 8 November 2026
 - **«Search missing»: several results are downloaded one after the other without losing the list.** Before, pressing «Download» on the first result reloaded the page and the results list vanished: anyone wanting several episodes had to run the search again every time. Now the download adds the release and shows a notice at the top, while the results stay where they are; this also applies to the manual search in Explore and to the search of a single episode. Nothing to configure.

@@ -221,6 +221,7 @@ type HousekeepingReport struct {
 	UpgradeBackupsRemoved int `json:"upgrade_backups_removed"`
 	OldHistoryRemoved     int `json:"old_history_removed"`
 	StaleProvidersRemoved int `json:"stale_providers_removed"`
+	StagedTorrentsRemoved int `json:"staged_torrents_removed"`
 }
 
 // PrunePreview counts what a maintenance run *would* remove.

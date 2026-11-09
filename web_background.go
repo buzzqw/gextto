@@ -2275,6 +2275,7 @@ func housekeepingWorker(state *AppState) {
 					"seen", report.SeenRemoved,
 					"gap_logs", report.GapLogsRemoved,
 					"providers", report.StaleProvidersRemoved,
+					"staged_torrents", report.StagedTorrentsRemoved,
 				)
 			}
 		}

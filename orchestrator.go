@@ -18,6 +18,7 @@ import (
 	"context"
 	"crypto/sha1"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"math"
 	"net/url"
@@ -342,7 +343,10 @@ func RunCycleDomain(
 				archiveLinkBudget > 0 {
 				archiveLinkBudget--
 				link := strings.TrimSpace(*release.TorrentURL)
-				magnet, _, realTitle, resolveErr := resolveTorrentSource(ctx, engine, cfg, link, &release.Title)
+				magnet, staged, realTitle, resolveErr := resolveTorrentSource(ctx, engine, cfg, link, &release.Title)
+				// Only the name was needed here: the archive row keeps the
+				// magnet, so the staged .torrent must not outlive this call.
+				removeTorrentFile(staged)
 				if resolveErr != nil {
 					logging.Debug("archive: could not open the .torrent link to read its name",
 						"title", item.Title, "source", item.Source, "error", resolveErr)
@@ -1879,6 +1883,50 @@ func resolveTorrentSource(ctx context.Context, engine *Engine, cfg *Config, rawU
 		return "", "", "", err
 	}
 	return "magnet:?xt=urn:btih:" + hash, path, name, nil
+}
+
+// feedTorrentRetention is how long a staged .torrent may stay in
+// StateDir/feed_torrents. The cycle deletes it as soon as the candidate is
+// over; this bound only catches leftovers of an interrupted cycle or of a
+// version that did not clean up. A file being downloaded right now is always
+// newer, so it is never touched. The days form names the bound in the
+// housekeeping summary.
+const (
+	feedTorrentRetentionDays = 7
+	feedTorrentRetention     = feedTorrentRetentionDays * 24 * time.Hour
+)
+
+// sweepStagedFeedTorrents removes the staged .torrent files older than
+// feedTorrentRetention and returns how many it deleted. It never reports a
+// missing folder: the first `.torrent`-only listing creates it.
+func sweepStagedFeedTorrents(stateDir string, now time.Time) int {
+	stateDir = strings.TrimSpace(stateDir)
+	if stateDir == "" {
+		return 0
+	}
+	dir := filepath.Join(stateDir, "feed_torrents")
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		if !errors.Is(err, os.ErrNotExist) {
+			logging.Debug("cannot read the staged .torrent folder", "path", dir, "error", err.Error())
+		}
+		return 0
+	}
+	cutoff := now.Add(-feedTorrentRetention)
+	removed := 0
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(strings.ToLower(entry.Name()), ".torrent") {
+			continue
+		}
+		info, err := entry.Info()
+		if err != nil || !info.Mode().IsRegular() || !info.ModTime().Before(cutoff) {
+			continue
+		}
+		if err := os.Remove(filepath.Join(dir, entry.Name())); err == nil {
+			removed++
+		}
+	}
+	return removed
 }
 
 // releaseAllowedByTitleProfile reports whether the release's parsed title

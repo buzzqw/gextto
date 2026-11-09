@@ -450,8 +450,19 @@ func dropStateTorrentFile(stateDir, hash string) {
 	if stateDir == "" || hash == "" {
 		return
 	}
-	if err := os.Remove(filepath.Join(stateDir, hash+".torrent")); err != nil && !errors.Is(err, os.ErrNotExist) {
-		logging.Debug("cannot remove the state .torrent copy", "hash", hash, "error", err.Error())
+	removeTorrentFile(filepath.Join(stateDir, hash+".torrent"))
+}
+
+// removeTorrentFile deletes one Gextto-owned .torrent copy. An already missing
+// file is not an error, and a real failure is only debug: it must never break
+// the transfer or the cycle that called it.
+func removeTorrentFile(path string) {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return
+	}
+	if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+		logging.Debug("cannot remove a .torrent copy", "path", path, "error", err.Error())
 	}
 }
 

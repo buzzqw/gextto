@@ -277,6 +277,14 @@ func TestHousekeepingSummaryNamesWhatWasRemoved(t *testing.T) {
 	}
 }
 
+func TestHousekeepingSummaryNamesStagedTorrents(t *testing.T) {
+	report := HousekeepingReport{StagedTorrentsRemoved: 2}
+	want := "2 old entries: 2 staged .torrent files older than 7 days"
+	if got := housekeepingSummary(&report, DefaultHousekeepingParams()); got != want {
+		t.Fatalf("summary = %q, want %q", got, want)
+	}
+}
+
 func TestTorznabShortReasonDropsTheURL(t *testing.T) {
 	err := &url.Error{Op: "Get", URL: "http://192.168.1.161:9118/api?t=tvsearch&apikey=secret", Err: io.EOF}
 	if got := torznabShortReason(err); got != "connection closed by the indexer (EOF)" {

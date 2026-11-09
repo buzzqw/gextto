@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -162,6 +164,75 @@ func TestRunCycleDomainResolvesTorrentURLRedirectToMagnet(t *testing.T) {
 	}
 	if stats.DownloadsStarted != 1 {
 		t.Fatalf("DownloadsStarted = %d, want 1", stats.DownloadsStarted)
+	}
+}
+
+// A `.torrent`-only listing is downloaded into feed_torrents so the candidate
+// can be added, then deleted when the candidate is over: the staging folder
+// must not keep a copy for a release the cycle has already judged.
+func TestRunCycleRemovesTheStagedFeedTorrent(t *testing.T) {
+	payload := []byte("d8:announce3:url4:infod6:lengthi1e4:name14:Show.S01E01.mk12:piece lengthi16384e6:pieces0:ee")
+	if _, ok := utils.TorrentInfoHash(payload); !ok {
+		t.Fatal("the test payload is not a valid torrent")
+	}
+	var fetches int32
+	var server *httptest.Server
+	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/feed.xml":
+			xml := fmt.Sprintf(`<rss><channel>
+<item>
+<title>Monitored.Show.S01E01.1080p.WEB-DL</title>
+<link>%s/download/item.torrent</link>
+</item>
+</channel></rss>`, server.URL)
+			w.Header().Set("Content-Type", "application/xml")
+			_, _ = w.Write([]byte(xml))
+		case "/download/item.torrent":
+			atomic.AddInt32(&fetches, 1)
+			w.Header().Set("Content-Type", "application/x-bittorrent")
+			_, _ = w.Write(payload)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	state := newCycleState(t)
+	cfg := *state.cfg
+	cfg.Series = []SeriesConfig{{Name: "Monitored Show", Enabled: true}}
+	cfg.FeedURLs = []string{server.URL + "/feed.xml"}
+	cfg.Indexers = nil
+	cfg.WebsearchEngines = nil
+	cfg.DryRun = true
+
+	domain := "series"
+	stats, err := RunCycleDomain(
+		context.Background(),
+		&cfg,
+		state.engine,
+		state.db,
+		state.archive,
+		state.comics,
+		state.notifier,
+		state.activeEngine(),
+		&domain,
+	)
+	if err != nil {
+		t.Fatalf("RunCycleDomain: %v", err)
+	}
+	if got := atomic.LoadInt32(&fetches); got != 1 {
+		t.Fatalf("the .torrent link was fetched %d times, want 1", got)
+	}
+	if stats == nil || stats.DownloadsStarted != 1 {
+		t.Fatalf("stats = %+v, want one download started", stats)
+	}
+	entries, err := os.ReadDir(filepath.Join(cfg.StateDir, "feed_torrents"))
+	if err != nil && !os.IsNotExist(err) {
+		t.Fatalf("read the staging folder: %v", err)
+	}
+	if len(entries) != 0 {
+		t.Fatalf("staged .torrent files left behind: %v", entries)
 	}
 }
 
