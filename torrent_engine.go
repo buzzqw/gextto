@@ -21,6 +21,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/buzzqw/gextto/internal/logging"
 	"github.com/buzzqw/gextto/internal/models"
 	"github.com/buzzqw/gextto/internal/qbittorrent"
 )
@@ -436,6 +437,22 @@ func torrentNotFoundError(err error) bool {
 		return true
 	}
 	return strings.Contains(strings.ToLower(err.Error()), "torrent not found")
+}
+
+// dropStateTorrentFile removes Gextto's own .torrent copy once a torrent
+// leaves the engine. The copy only serves export and migration while the
+// torrent is in the session; the operator's torrent_copy_dir is a separate
+// library and is deliberately left untouched. A missing or unremovable copy is
+// never fatal: the transfer already succeeded.
+func dropStateTorrentFile(stateDir, hash string) {
+	stateDir = strings.TrimSpace(stateDir)
+	hash = strings.ToLower(strings.TrimSpace(hash))
+	if stateDir == "" || hash == "" {
+		return
+	}
+	if err := os.Remove(filepath.Join(stateDir, hash+".torrent")); err != nil && !errors.Is(err, os.ErrNotExist) {
+		logging.Debug("cannot remove the state .torrent copy", "hash", hash, "error", err.Error())
+	}
 }
 
 // TorrentTransferring reports whether a torrent is really moving data right

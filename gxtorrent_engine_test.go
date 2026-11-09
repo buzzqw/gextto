@@ -246,6 +246,36 @@ func TestGxEngineAdjustQueuePushesPolicyOnce(t *testing.T) {
 	}
 }
 
+// TestGxRemoveDropsOnlyTheStateTorrentCopy pins the cleanup: when a torrent
+// leaves the engine its state copy is deleted, while the operator's configured
+// copy directory keeps the file.
+func TestGxRemoveDropsOnlyTheStateTorrentCopy(t *testing.T) {
+	engine, _ := newTestGxEngine(t, "")
+	state := filepath.Join(engine.settings.stateDir, "aa.torrent")
+	if err := os.MkdirAll(engine.settings.stateDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(state, []byte("torrent"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	copyDir := t.TempDir()
+	kept := filepath.Join(copyDir, "Show.torrent")
+	if err := os.WriteFile(kept, []byte("torrent"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	engine.cfg.Settings["torrent_copy_dir"] = copyDir
+
+	if ok, err := engine.Remove("aa", false); err != nil || !ok {
+		t.Fatalf("remove: %v %v", ok, err)
+	}
+	if _, err := os.Stat(state); !os.IsNotExist(err) {
+		t.Fatalf("the state copy must be removed, stat = %v", err)
+	}
+	if _, err := os.Stat(kept); err != nil {
+		t.Fatalf("the operator copy must be kept: %v", err)
+	}
+}
+
 func TestGxEngineOperations(t *testing.T) {
 	engine, fake := newTestGxEngine(t, "s3cret")
 	fake.set(gxTorrentItem{Hash: "aa", Name: "Show", State: "seeding", SavePath: "/dl", Progress: 100, TotalSize: 10, TotalDone: 10, HasMetadata: true})

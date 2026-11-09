@@ -2334,7 +2334,7 @@ files. When the memory cannot be read, only the `tmpfs` space counts, as before.
 | Archive folder | Default archive folder for content without a dedicated path. |
 | Download folder | Default download folder for every engine. |
 | Temporary folder | Temporary folder for in-progress downloads. |
-| Copy .torrent files to | Copy the .torrent files of downloads here (empty = no copy). |
+| Copy .torrent files to | Copy the .torrent files of downloads here (empty = no copy). Gextto keeps its own internal copy of the `.torrent` while the torrent is in the session and deletes it when you remove or archive it; this folder is left untouched. |
 
 **Trash**
 

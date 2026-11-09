@@ -1425,6 +1425,9 @@ func (e *gxTorrentEngine) Remove(hash string, deleteFiles bool) (bool, error) {
 	delete(e.pendingMoves, hash)
 	e.mu.Unlock()
 	e.refresh()
+	// After the refresh, so a daemon that still lists the torrent for one tick
+	// cannot make the re-export put the copy back.
+	dropStateTorrentFile(e.settings.stateDir, hash)
 	return true, nil
 }
 

@@ -24,6 +24,9 @@ creazione, app sul telefono — valgono **soltanto per la versione standalone** 
 non cambiano l'interfaccia di Gextto, dove quelle pagine non esistono. Le
 correzioni al motore valgono invece per entrambi.
 
+## 9 novembre 2026
+- **I `.torrent` dei download rimossi non restano più sul disco.** Gextto teneva una copia interna del file `.torrent` di ogni download e non la cancellava mai quando il torrent usciva dalla sessione: la cartella di stato cresceva a ogni download, anche dopo l'archiviazione. Ora la copia interna viene eliminata alla rimozione o all'archiviazione del torrent; la cartella scelta in **Copia i file .torrent in** non viene toccata. Niente da configurare.
+
 ## 8 novembre 2026
 - **«Cerca mancanti»: si scaricano più risultati uno dopo l'altro senza perdere la lista.** Prima, premendo «Scarica» sul primo risultato la pagina si ricaricava e la lista dei risultati spariva: chi voleva prendere più puntate doveva rifare la ricerca ogni volta. Ora il download aggiunge la release e compare un avviso in alto, mentre i risultati restano al loro posto; vale anche per la ricerca manuale in Esplora e per la ricerca di una singola puntata. Niente da configurare.
 

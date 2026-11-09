@@ -532,6 +532,25 @@ func TestQbittorrentEnginePersistsTorrentFile(t *testing.T) {
 	}
 }
 
+// TestQbittorrentEngineRemoveDropsStateTorrentCopy pins that removing a
+// torrent also deletes Gextto's own .torrent copy.
+func TestQbittorrentEngineRemoveDropsStateTorrentCopy(t *testing.T) {
+	_, engine, _ := newFakeQBEngine(t)
+	state := filepath.Join(engine.settings.stateDir, "abcdef.torrent")
+	if err := os.MkdirAll(engine.settings.stateDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(state, []byte("torrent"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if ok, err := engine.Remove("abcdef", false); err != nil || !ok {
+		t.Fatalf("remove: %v %v", ok, err)
+	}
+	if _, err := os.Stat(state); !os.IsNotExist(err) {
+		t.Fatalf("the state copy must be removed, stat = %v", err)
+	}
+}
+
 func TestQbittorrentEngineAdjustQueue(t *testing.T) {
 	fake, engine, downloads := newFakeQBEngine(t)
 	fake.setTorrents([]qbittorrent.Torrent{

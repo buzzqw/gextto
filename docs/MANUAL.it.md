@@ -2359,7 +2359,7 @@ spazio del `tmpfs`, come prima.
 | Cartella archivio | Cartella di archivio predefinita per i contenuti senza percorso dedicato. |
 | Cartella download | Cartella di download predefinita per tutti i motori. |
 | Cartella temporanea | Cartella temporanea per i download in corso. |
-| Copia i file .torrent in | Copia qui i file .torrent dei download (vuoto = nessuna copia). |
+| Copia i file .torrent in | Copia qui i file .torrent dei download (vuoto = nessuna copia). Gextto tiene una propria copia interna del `.torrent` finché il torrent è nella sessione e la elimina quando lo rimuovi o lo archivi; questa cartella non viene toccata. |
 
 **Cestino**
 

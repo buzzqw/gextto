@@ -1058,7 +1058,9 @@ func (e *qbittorrentEngine) Remove(hash string, deleteFiles bool) (bool, error) 
 	delete(e.previous, hash)
 	delete(e.stalled, hash)
 	delete(e.pendingMoves, hash)
+	delete(e.torrentFileSeen, hash)
 	e.mu.Unlock()
+	dropStateTorrentFile(e.settings.stateDir, hash)
 	return true, nil
 }
 
