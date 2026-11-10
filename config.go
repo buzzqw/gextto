@@ -2815,6 +2815,34 @@ func (c *Config) loadConfigDB() error {
 		return err
 	}
 	defer conn.Close()
+	if ok, err := c.readStoredSettings(conn, path); err != nil || !ok {
+		return err
+	}
+	if err := c.migrateStoredSettings(conn); err != nil {
+		return err
+	}
+	c.applyFilterSettings()
+	if err := c.loadStoredSeries(); err != nil {
+		return err
+	}
+	if err := c.loadStoredMovies(conn, path); err != nil {
+		return err
+	}
+	c.applySourceSettings()
+	c.applyCoreSettings()
+	c.applyNotifySettings()
+	c.applyUpgradeSettings()
+	c.applyTransferSettings()
+	if value := configPathSetting(mapValue(c.Settings, "torrent_dir")); value != nil {
+		c.DownloadDir = *value
+	}
+	c.DownloadTempDir = configPathSetting(mapValue(c.Settings, "torrent_temp_dir"))
+	return nil
+}
+
+// readStoredSettings overlays the settings table on c.Settings. ok is false
+// on a first run, when there is no settings table yet and nothing to overlay.
+func (c *Config) readStoredSettings(conn *sql.DB, path string) (ok bool, err error) {
 	rows, err := conn.Query("SELECT key,value FROM settings")
 	if err != nil {
 		// A first run has no settings table yet: nothing to overlay. Any other
@@ -2822,23 +2850,29 @@ func (c *Config) loadConfigDB() error {
 		// the caller a configuration made only of defaults, which the next save
 		// would then write back over the real one.
 		if strings.Contains(strings.ToLower(err.Error()), "no such table") {
-			return nil
+			return false, nil
 		}
-		return fmt.Errorf("read the settings of %s: %w", path, err)
+		return false, fmt.Errorf("read the settings of %s: %w", path, err)
 	}
 	for rows.Next() {
 		var key, value string
 		if err := rows.Scan(&key, &value); err != nil {
 			rows.Close()
-			return err
+			return false, err
 		}
 		c.Settings[key] = value
 	}
 	if err := rows.Err(); err != nil {
 		rows.Close()
-		return err
+		return false, err
 	}
 	rows.Close()
+	return true, nil
+}
+
+// migrateStoredSettings drops the retired keys and renames the old ones, in
+// the database as well as in c.Settings.
+func (c *Config) migrateStoredSettings(conn *sql.DB) error {
 	if _, ok := c.Settings["api_token"]; ok {
 		delete(c.Settings, "api_token")
 		if _, err := conn.Exec("DELETE FROM settings WHERE key = ?1", "api_token"); err != nil {
@@ -2857,6 +2891,12 @@ func (c *Config) loadConfigDB() error {
 	if err := migrateScoreGroupKeys(conn, c); err != nil {
 		return err
 	}
+	return nil
+}
+
+// applyFilterSettings reads the feeds and the release filters, the legacy
+// spellings of the keys included.
+func (c *Config) applyFilterSettings() {
 	if value, ok := c.Settings["url"]; ok {
 		c.FeedURLs = activeFeedURLs(feedLinesFromSetting(value))
 	}
@@ -2887,6 +2927,12 @@ func (c *Config) loadConfigDB() error {
 			c.MaxReleaseAgeDays = parsed
 		}
 	}
+}
+
+// loadStoredSeries reads the monitored series: the list in the settings, or
+// the legacy series database when there is no list yet. An unreadable list
+// keeps the one already loaded.
+func (c *Config) loadStoredSeries() error {
 	if value, ok := c.Settings["_migrated_series"]; ok {
 		var series []SeriesConfig
 		if err := json.Unmarshal([]byte(value), &series); err == nil {
@@ -2915,6 +2961,13 @@ func (c *Config) loadConfigDB() error {
 			}
 		}
 	}
+	return nil
+}
+
+// loadStoredMovies reads the monitored movies, whatever columns the table of
+// an older installation has. A read error keeps the configuration from being
+// handed back without its movies.
+func (c *Config) loadStoredMovies(conn *sql.DB, path string) error {
 	columns, err := tableColumns(conn, "movies_config")
 	if err != nil {
 		logging.Warn("Could not read the movie settings from the database; using the defaults", "error", err)
@@ -2969,7 +3022,7 @@ func (c *Config) loadConfigDB() error {
 	// Keep the library presentation stable when a newly added movie is saved:
 	// SQLite otherwise returns rows in insertion/rowid order.
 	movieQuery += " ORDER BY name COLLATE NOCASE, year COLLATE NOCASE, id"
-	rows, err = conn.Query(movieQuery)
+	rows, err := conn.Query(movieQuery)
 	if err != nil {
 		// A missing movies_config table is benign (no movies configured yet).
 		// Any other error must not hand back an empty movie list: the next
@@ -3032,6 +3085,12 @@ func (c *Config) loadConfigDB() error {
 		rows.Close()
 		c.Movies = movies
 	}
+	return nil
+}
+
+// applySourceSettings reads the indexers, the web engines and FlareSolverr,
+// turning the legacy Jackett and Prowlarr keys into indexers.
+func (c *Config) applySourceSettings() {
 	if value, ok := c.Settings["indexers"]; ok {
 		var indexers []IndexerConfig
 		if err := json.Unmarshal([]byte(value), &indexers); err == nil {
@@ -3091,6 +3150,11 @@ func (c *Config) loadConfigDB() error {
 			})
 		}
 	}
+}
+
+// applyCoreSettings reads the cycle, the metadata key, the rename format and
+// the library and trash folders.
+func (c *Config) applyCoreSettings() {
 	if value, ok := c.Settings[settingRefreshInterval]; ok {
 		if parsed, err := strconv.ParseUint(value, 10, 64); err == nil {
 			c.RefreshSecs = parsed
@@ -3135,6 +3199,10 @@ func (c *Config) loadConfigDB() error {
 	if c.TrashPath != nil && strings.TrimSpace(*c.TrashPath) == "" {
 		c.TrashPath = nil
 	}
+}
+
+// applyNotifySettings reads the notification channels and switches.
+func (c *Config) applyNotifySettings() {
 	c.NotifyTelegram = configBoolSetting(mapValue(c.Settings, "notify_telegram"))
 	if value, ok := c.Settings[settingTelegramBotToken]; ok && value != "" {
 		c.TelegramBotToken = &value
@@ -3216,6 +3284,10 @@ func (c *Config) loadConfigDB() error {
 		c.NotifyCooldownMinutes = 0
 	}
 	c.NotifyLanguage = configNotifyLanguage(settingsText(c.Settings, settingNotifyLanguage))
+}
+
+// applyUpgradeSettings reads the upgrade and cleanup thresholds.
+func (c *Config) applyUpgradeSettings() {
 	c.CleanupUpgrades = configBoolSetting(mapValue(c.Settings, "cleanup_upgrades"))
 	c.UpgradeMinScoreDiff = numberSettingInt(c.Settings, "upgrade_min_score_diff", 200)
 	if c.UpgradeMinScoreDiff < 0 {
@@ -3246,12 +3318,6 @@ func (c *Config) loadConfigDB() error {
 	} else {
 		c.CleanupAction = "move"
 	}
-	c.applyTransferSettings()
-	if value := configPathSetting(mapValue(c.Settings, "torrent_dir")); value != nil {
-		c.DownloadDir = *value
-	}
-	c.DownloadTempDir = configPathSetting(mapValue(c.Settings, "torrent_temp_dir"))
-	return nil
 }
 
 // applyTransferSettings derives the typed TransferSettings from the raw

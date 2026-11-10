@@ -33,17 +33,13 @@ Nothing open: every engine item waits for a condition listed under
   CDATA, namespaces, attributes), because the remaining gain is about 12 % of
   the allocations and 7 % of the CPU, not enough for a rewrite without that
   proof.
-- **Functions too long to review** — `formatEventLang`, `loadConfigDB`, the candidate
-  pass (`candidatePass.try`) and the search scheduler (`cycleWorker`, whose test needs an
-  injectable clock and sleep first) are each
-  hundreds of lines with state shared across the whole body: split them by phase, as
-  `HandleTorrentEvent` was split into one function per event and the event worker into
-  an `eventWorker` with one method per timed phase. Gate: for each, a behaviour test of
-  what it does (a config load with legacy keys; a candidate accepted, delayed and
-  refused), written before the split, as the `torrent_event_*_test.go` files pinned the
-  completion and the library import, `series_rename_apply_test.go` the rename pass and
-  the stall and seed tests `MonitorStalled`, `RemoveSeededCompleted` and
-  `EnforceSeedPolicy`.
+- **Functions too long to review** — the candidate pass (`candidatePass.try`, about 490
+  lines with three closures sharing the candidate's state) and the search scheduler
+  (`cycleWorker`): split them by phase, as the completion, the library import, the
+  rename pass, the configuration load and the event worker were. Gate: for each, a
+  behaviour test written before the split — for the candidate pass a release accepted,
+  held by a delay profile, refused by the blocklist and refused because the library
+  holds better; for the scheduler an injectable clock and sleep first.
 
 ## Measurements
 
@@ -71,17 +67,6 @@ its gate; a rejected one moves to *Not planned*.
   memory stays at 11 MiB at full speed ([measurements](measurements.md)). Gate: a run with
   several torrents downloading at once where the hashing backlog is the peak.
 
-- **Packages for the root** — 114k non-test lines share `package gextto`, so helpers are
-  told apart by prefixes (`gh0_`…`gh7_`, `tev_`, `bg_`) instead of by package. Gate: a
-  decision on the first boundary (HTTP handlers, acquisition, storage) and one area
-  migrated with the suite green.
-- **`*Database` split** — 233 methods cover series, movies, torrents, providers,
-  blocklist, queues, cycles and maintenance. Gate: `internal/quality` extracted first (the
-  moved methods call the root package's scoring).
-- **Log wording through structured fields** — about 280 log calls build their sentence
-  with `Sprintf`, which is also how a log line becomes the natural sentence the log rules
-  ask for; the open question is only where a field would read better than the sentence.
-  Gate: a decision on one area's lines, with `log_readability_test.go` green.
 - **The recorded score in the import comparison** — a completed download is compared with
   the library's copy by file name, and with the default name format a renamed file reads
   as unknown quality, so any download replaces it. The search only grabs upgrades, so
@@ -156,6 +141,14 @@ Closed by choice, not waiting for a measurement:
 - Removing the dead `share_mode`/`upload_mode` fields from the torrent view: nothing reads
   or sets them, they only show up as `false` in `/api/torrents`, and the operator chose to
   leave them where they are.
+- Splitting `package gextto` into packages and `*Database` into several types: a large
+  reorganisation with no effect for the people who use Gextto and no defect it would
+  remove today; the phase splits and the behaviour tests already make the long code
+  reviewable.
+- Log lines built from structured fields instead of sentences: the log rules ask for
+  natural sentences, which is what `Sprintf` builds.
+- Splitting `formatEventLang`: long but linear, and a mistake there shows at once in a
+  notification text.
 - Full `*arr` v3 compatibility, multi-user authentication, Usenet, write-back cache,
   specialist fields in the add form, a content layout in Gextto's Add dialog, a UI
   benchmark in CI, a cache cap on NFS, Trakt.
