@@ -561,3 +561,12 @@ test("Serie TV ha la scheda Mancanti al posto della pagina separata", async ({ p
   await expect(page.getByRole("heading", { name: "Puntate mancanti" })).toBeVisible();
   await expect(page.getByRole("searchbox", { name: "Filtra per serie" })).toBeVisible();
 });
+
+test("il filtro per stato della vista Download mostra Tutti i torrent premuto", async ({ page }) => {
+  await page.goto("/?view=downloads");
+  const group = page.locator(".state-chips");
+  await expect(group).toBeVisible();
+  const all = group.locator('button[value="all"]');
+  await expect(all).toHaveAttribute("aria-pressed", "true");
+  await expect(all.locator(".n")).toHaveText(/^\d+$/);
+});

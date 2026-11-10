@@ -647,7 +647,10 @@ refreshes every 5 seconds.
 Each row shows name, status, progress, speed, estimated time, peers and ratio.
 The **swarm** (🌐 seeders / leechers) is the one reported by trackers and DHT:
 with **0 leechers** there is nobody to upload to. Sort with **Sort by** (for the
-whole list at once), filter by name and by tag.
+whole list at once), filter by name and by tag, and pick a state with the
+buttons above the list (*All torrents*, *Downloading*, *Seeding*, *Paused*,
+*Completed*, *Waiting for seeds*, *Error*), each with its count; an empty
+state is not shown.
 
 | Status | What it means | What to do |
 |---|---|---|

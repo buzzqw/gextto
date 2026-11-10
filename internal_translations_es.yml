@@ -1,6 +1,9 @@
 # Bundled Spanish translations for the web UI. The translation database mirrors
 # this catalog: a corrected value here replaces the stored one at the next start.
 spa:
+  "Tutti i torrent": "Todos los torrents"
+  "Filtra per stato": "Filtrar por estado"
+  "Mostra solo i torrent in questo stato": "Mostrar solo los torrents en este estado"
   (download completati): (descargas completadas)
   (download in corso): (descargas en curso)
   (lascia vuoto = tutti i giorni): (dejar en blanco = todos los días)

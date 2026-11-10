@@ -1203,6 +1203,10 @@ type v2TorrentsView struct {
 	Columns     []v2Column
 	TagOptions  []string
 	TagFilter   string
+	// StateFilter is the state group shown (empty = all) and StateChips the
+	// groups with their counts, for the filter buttons.
+	StateFilter string
+	StateChips  []v2StateChip
 	// Speed is the exception and the rule shown by the bandwidth menu.
 	Speed               uiSpeedState
 	AutoRemoveCompleted bool
@@ -1570,6 +1574,23 @@ func v2TorrentsViewFrom(s *AppState, r *http.Request, message string, isErr bool
 		}
 		rows = filtered
 	}
+	stateFilter := strings.TrimSpace(r.FormValue("state_pick"))
+	if stateFilter == "" {
+		stateFilter = strings.TrimSpace(r.FormValue("state_filter"))
+	}
+	if stateFilter == "all" || !v2ValidStateGroup(stateFilter) {
+		stateFilter = ""
+	}
+	stateChips := v2StateChips(rows, stateFilter)
+	if stateFilter != "" {
+		filtered := rows[:0]
+		for _, row := range rows {
+			if v2RowInStateGroup(row, stateFilter) {
+				filtered = append(filtered, row)
+			}
+		}
+		rows = filtered
+	}
 	// Only the chrome around the table is needed here: the torrent snapshot is
 	// already in `data`, and asking for the whole page would list the engine and
 	// sort again on every poll.
@@ -1598,6 +1619,8 @@ func v2TorrentsViewFrom(s *AppState, r *http.Request, message string, isErr bool
 		Columns:             v2TorrentColumns,
 		TagOptions:          uiDownloadTagOptions(s, latestConfig(s)),
 		TagFilter:           tagFilter,
+		StateFilter:         stateFilter,
+		StateChips:          stateChips,
 		Speed:               settings.Speed,
 		AutoRemoveCompleted: settings.AutoRemoveCompleted,
 		Message:             message,

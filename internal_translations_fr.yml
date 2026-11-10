@@ -1,6 +1,9 @@
 # Bundled French translations for the web UI. The translation database mirrors
 # this catalog: a corrected value here replaces the stored one at the next start.
 fra:
+  "Tutti i torrent": "Tous les torrents"
+  "Filtra per stato": "Filtrer par état"
+  "Mostra solo i torrent in questo stato": "N'afficher que les torrents dans cet état"
   (download completati): (téléchargements terminés)
   (download in corso): (téléchargements en cours)
   (lascia vuoto = tutti i giorni): (laisser vide = tous les jours)

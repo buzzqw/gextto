@@ -3,6 +3,9 @@
 # key is inserted and a corrected value replaces the stored one. Keys are the
 # Italian source strings used with `ctx_tr`.
 eng:
+  "Tutti i torrent": "All torrents"
+  "Filtra per stato": "Filter by state"
+  "Mostra solo i torrent in questo stato": "Show only the torrents in this state"
   "CPU del processo Gextto": "Gextto process CPU"
   "RAM residente del processo Gextto": "Gextto process resident RAM"
   "Sessione torrent in tempo reale": "Live torrent session"

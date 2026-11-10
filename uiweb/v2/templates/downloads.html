@@ -147,6 +147,10 @@
         </details>
       </span>
     </div>
+    {{/* State filter: one button per state group with its count; the
+         choice travels in state_filter so the 5 s refresh keeps it. */}}
+    <input type="hidden" name="state_filter" value="{{.StateFilter}}">
+    <div class="state-chips" role="group" aria-label="{{tr "Filtra per stato"}}">{{range .StateChips}}<button class="state-chip{{if .On}} on{{end}}" type="submit" name="state_pick" value="{{.Key}}" aria-pressed="{{if .On}}true{{else}}false{{end}}" {{trTitle "Mostra solo i torrent in questo stato"}}><span>{{tr .Label}}</span> <span class="n">{{.Count}}</span></button>{{end}}</div>
     {{if .Message}}<p class="download-status" role="status"><small class="htx-status {{if .Error}}err{{else}}ok{{end}}">{{tr .Message}}</small></p>{{end}}
     <div class="toolbar download-bulk-toolbar" role="toolbar" aria-label="{{tr "Azioni sui torrent selezionati"}}">
       <strong data-v2-selected-count aria-live="polite">0 <span>{{tr "selezionati"}}</span></strong>

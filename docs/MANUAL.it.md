@@ -655,7 +655,10 @@ un'unica lista che si aggiorna ogni 5 secondi.
 Ogni riga mostra nome, stato, progresso, velocità, tempo stimato, peer e
 rapporto. Lo **sciame** (🌐 seeder / leecher) è quello riportato da tracker e DHT:
 con **0 leecher** non c'è nessuno a cui caricare. Ordini con **Ordina per** (per
-tutta la lista insieme), filtri per nome e per tag.
+tutta la lista insieme), filtri per nome e per tag, e scegli uno stato con i
+pulsanti sopra l'elenco (*Tutti i torrent*, *In scarico*, *In seed*, *In pausa*,
+*Completati*, *In attesa di seed*, *Errore*), ognuno con il suo conteggio; uno
+stato vuoto non compare.
 
 | Stato | Cosa significa | Cosa fare |
 |---|---|---|

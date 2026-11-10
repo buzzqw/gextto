@@ -1,6 +1,9 @@
 # Bundled Polish translations for the web UI. The translation database mirrors
 # this catalog: a corrected value here replaces the stored one at the next start.
 pol:
+  "Tutti i torrent": "Wszystkie torrenty"
+  "Filtra per stato": "Filtruj według stanu"
+  "Mostra solo i torrent in questo stato": "Pokaż tylko torrenty w tym stanie"
   (download completati): (pobieranie zakończone)
   (download in corso): (pobieranie w toku)
   (lascia vuoto = tutti i giorni): (pozostaw puste = codziennie)

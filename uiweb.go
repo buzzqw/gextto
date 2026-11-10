@@ -157,6 +157,9 @@ type uiTorrentRow struct {
 	Tags        []string
 	State       string
 	StateClass  string
+	// StateKey is the engine's own state (downloading, seeding, paused…),
+	// which the state filter of the Downloads view groups.
+	StateKey string
 	Progress    float64
 	ProgressPct string
 	// ProgressClass drives the progress bar colour (active|seed|paused).
@@ -858,6 +861,7 @@ func uiTorrentRows(s *AppState) []uiTorrentRow {
 			Name:          view.Name,
 			Tag:           tag,
 			State:         uiStateLabel(view.State),
+			StateKey:      view.State,
 			StateClass:    uiStateClass(view.State),
 			Progress:      progress,
 			ProgressPct:   strconv.FormatFloat(progress, 'f', 1, 64),
