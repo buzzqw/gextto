@@ -40,11 +40,6 @@ Nothing open: every engine item waits for a condition listed under
   `collectGapReleases`, `readGapFillPolicy` and `candidatePass`. Gate: a behaviour test
   of the event worker (completion, storage move, retry after a restart) that pins what
   the split must keep.
-- **`bt4g` returns nothing** — it answers 403 without FlareSolverr and no result even
-  through it, while staying in the list and being reported unreachable in the cycle.
-  BitSearch and Torrentz2 were removed on 2026-11-10 for the same reason (HTTP 500 and
-  parked domains). Gate: a working endpoint or a parser that reads what the block page
-  serves; otherwise it goes like the other two, and that is the operator's decision.
 
 ## Measurements
 
@@ -57,6 +52,24 @@ Nothing open: every engine item waits for a condition listed under
 
 Ideas proposed but not decided yet. An accepted proposal moves to the matching area with
 its gate; a rejected one moves to *Not planned*.
+
+- **Daemon page: lessons from Rookparcel's µTorrent-style window** — ideas for the gx-torrent
+  page, each its own decision:
+  - *details docked below the list*, resizable split, as an alternative to the side drawer:
+    pick a torrent and the tabs update in place;
+  - *General tab with two thin bars*: downloaded pieces and swarm availability, above a
+    three-column Transfer grid (time, remaining, wasted, connected/known seeds and peers);
+  - *per-torrent Speed tab* (download/upload graph of that torrent) and *Log tab* (its own
+    events: tracker errors, hash failures, moves);
+  - *state icon in the Name column* (down, up, queued, finished) next to the coloured badge;
+  - *status bar with session totals* (`↓ rate · total`, `↑ rate · total`) and a single
+    *network health* word (port reachable, DHT nodes);
+  - *add dialog*: priority column per file, «add to top of queue», «don't show this again»
+    (later additions go straight in with the last choices);
+  - *latency-aware throttling* («keep ping low»): watch the ping of the first hop past the
+    router and slow down while the queue builds. Gate: a measurement on a saturated uplink.
+  Gate for the UI items: the operator picks which ones, then a design check in both
+  themes, at phone width and with the accessibility suite.
 
 - **A client-wide cap on unverified data** — anacrolix/torrent holds at most
   `MaxUnverifiedBytes` (64 MiB, `config.go`) of received bytes that are not yet hashed and
