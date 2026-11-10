@@ -46,3 +46,10 @@ func preallocate(f *os.File, size int64) error {
 func isTransientReadError(err error) bool {
 	return errors.Is(err, syscall.EIO) || errors.Is(err, syscall.ESTALE)
 }
+
+// dropFileCache asks the kernel to drop the cached pages of a range (clean
+// pages only: dirty ones are written back first, never lost). It is advice:
+// a failure changes nothing but the memory the pages keep.
+func dropFileCache(f *os.File, off, length int64) {
+	_ = unix.Fadvise(int(f.Fd()), off, length, unix.FADV_DONTNEED)
+}

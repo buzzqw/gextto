@@ -63,6 +63,14 @@ func (f *osFile) ReadAt(p []byte, off int64) (int, error) {
 	return n, err
 }
 
+// DropCache drops the OS cache pages of a range just checked, so a recheck of
+// a large torrent does not push the rest of the machine out of memory.
+func (f *osFile) DropCache(off, length int64) {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
+	dropFileCache(f.file, off, length)
+}
+
 func (f *osFile) readAt(p []byte, off int64) (int, error) {
 	f.mu.RLock()
 	defer f.mu.RUnlock()

@@ -81,11 +81,6 @@ its gate; a rejected one moves to *Not planned*.
   remember the learned cap per network (gateway hardware address). Gate: a bloated-line
   test (network namespaces, a token-bucket uplink with half a second of buffer) measuring
   ping and rate with autospeed off, as today, and with the change.
-- **Gentle recheck** — the verify thread at idle I/O priority (`ioprio_set`, the thread
-  only), `posix_fadvise` sequential and `DONTNEED` behind it so a recheck of a large library
-  does not empty the page cache, a pause after a read much slower than the drive's usual
-  one, one check per physical drive and drives in parallel. Gate: a recheck measured on
-  the HDD while another program reads it.
 
 - **A client-wide cap on unverified data** — anacrolix/torrent holds at most
   `MaxUnverifiedBytes` (64 MiB, `config.go`) of received bytes that are not yet hashed and

@@ -99,6 +99,7 @@ func (t *torrent) startMergeVerifier(candidates []*Torrent, onlyMerged bool, res
 	resumed := func(i uint32) bool { return bitSet(resume, int(i)) }
 	t.verifier = verifier.New()
 	v := t.verifier
+	v.Gentle = true
 	if resume != nil {
 		v.Skip = resumed
 		v.Only = resumed

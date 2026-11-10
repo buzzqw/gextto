@@ -568,6 +568,19 @@ are already announced in parallel. Anonymous mode and the tracker policy are
 read when the session opens, so a change applies at the next start; the
 recheck applies from the next completed download. The page says so.
 
+**Rechecks give way** (`internal/verifier`). A full check reads its pieces on
+one thread at the lowest best-effort I/O priority (`ioprio_set` on that thread
+only, Linux; honoured by BFQ, ignored by the `none` scheduler and by a NAS). From
+the second read in a row that takes more than 2.5 times the check's median time
+per byte, someone else is using the disk: the check pauses for as long as that
+read took (at most 2 s), so it uses about half of a busy disk; reads faster than
+4 GB/s come from the cache and are left out. The pages of each piece hashed
+leave the OS cache (`posix_fadvise` `DONTNEED`, clean pages only), so a check of
+a large library does not push the rest of the machine out of memory. On the
+NAS it costs nothing (35 against 34 MiB/s alone) and a stream reading next to
+it keeps more of the line; a queue of one check per drive and read-ahead hints
+were measured and closed (*Closed designs* in `measurements.md`).
+
 **In-app update** (`update.go`, standalone only). *Settings → Maintenance*
 shows the running version (build, commit, build date, release channel) and
 reads the `release.json` CI publishes beside the archives

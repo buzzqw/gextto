@@ -399,6 +399,7 @@ state more than the code.
 | Disk write, buffered / mmap (`BenchmarkStorageWrite…`) | 5.5–5.6 / 7.0–7.2 GB/s | far above any network speed; mmap is opt-in |
 | 16 KiB writes on NFS, batched durability | 81 MiB/s (35 without) | one fsync per piece removed |
 | Recheck of 4 GiB, cold, gx-torrent 1.1.296 | 3.8–4.0 s, about 4 s of CPU | reading and hashing side by side, read-ahead on |
+| Recheck of 512 MiB on the NAS (NFS 4.1, Gigabit), alone, plain / gentle | 35 / 34 MiB/s | the gentle check costs nothing; with a stream reading the NAS next to it the stream got 47–55 MiB/s against 41–48 |
 | Upload to one peer, cold, gx-torrent 1.1.296 | 180–240 MB/s, 3.2 s of CPU per GiB | read-ahead on, next block loaded in the background |
 | uTP download on a 100 Mbit/s line, gx-torrent 1.1.296 | 11.2 MB/s, 48 s of CPU per GiB | state packets batched over 2 ms |
 | Piece check, v1 / v2, 4 MiB | 2.6 / 2.1 GB/s | one hash per piece |
@@ -487,16 +488,17 @@ Closed with a measurement, so they are not retried without new data.
 | One PEX loop per torrent | 0.0025 % of a core and 2–3 MB at 500 peers | |
 | Multi-path `get_peers` | `peers_confirmed_multi` is 0 in real runs | |
 | Anti-Sybil cap on by default | the table is not concentrated, and CGNAT subnets would be capped | |
-| Peer turnover (closing the slowest peers at the cap) | on the Ubuntu ISO swarm the engine never filled the cap: peaks of 13–17 peers at 20, 5–6 at 8, against a default of 55, so turnover never acted | a real swarm that keeps a torrent at its cap |
-| Auto cutting the caps when the router sees another device | a call (5 pings/s) next to a download filling the line: median 15 ms idle, 36–50 ms loaded, 2–6 of 300 lost; the spikes above 150 ms were there with Gextto idle too, from another device on the line | a call that degrades next to a download |
-| Throttling TCP while uTP peers share the line (libtorrent's mixed mode) | Ubuntu 26.10, 3-minute rounds: mixed 5.9 and 7.7 MB/s, TCP only 3.9 and 6.7, uTP only 2.0 and 3.4; in the clean round mixed also had the lowest p90/p99 ping (67/163 ms against 79/850 for TCP only) | a mixed swarm where mixed loses speed or latency against one transport |
+| Peer turnover (closing the slowest peers at the cap) | on a real swarm the engine never filled the cap (peaks of 13–17 peers at 20), so turnover never acted | a real swarm that keeps a torrent at its cap |
+| Auto cutting the caps when the router sees another device | a call next to a download filling the line: median 15 ms idle, 36–50 ms loaded; the spikes above 150 ms came from another device | a call that degrades next to a download |
+| Throttling TCP while uTP peers share the line (libtorrent's mixed mode) | 3-minute rounds on a real swarm: mixed 5.9 and 7.7 MB/s, TCP only 3.9 and 6.7, uTP only 2.0 and 3.4; mixed also had the lowest p90/p99 ping | a mixed swarm where mixed loses speed or latency against one transport |
+| One full check per drive at a time | NAS, NFS 4.1: two 512 MiB checks at once 13.1–14.2 s, one after the other 18.2–19.2 s | a local hard disk measured |
+| Read-ahead hints (`WILLNEED`) for the next pieces of a check | NAS, cold round: 34 MiB/s, 29 with two pieces ahead, 24 with four | |
 | Choking changes | reciprocation works locally and against libtorrent | a gap on a real swarm |
 | Super-seeding by default | no upload saved on measurable swarms, about 24 % slower locally | |
 | Merge candidates ordered by reusable bytes | superseded by the dedup | |
 | Upsert with two conflict targets (archive) | 17 ms more per 1,000 releases | |
 | `idx_archive_title`, index on `lower(magnet_hash)` | never used by the queries | |
 | Latency guard with a fixed ceiling or floor | locked to a slow sample or an arbitrary number | |
-| A third-party DHT library | not a measurement but a model: ours shares the UDP socket with uTP and serves every torrent from one channel | |
 
 Postponed: qBittorrent's `renameFile`/`renameFolder` (needs rename support in the engine) and
 its `setAutoManagement` tuning.

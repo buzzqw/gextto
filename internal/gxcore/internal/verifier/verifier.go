@@ -3,6 +3,8 @@ package verifier
 import (
 	"crypto/sha1"
 	"hash"
+	"runtime"
+	"time"
 
 	"github.com/buzzqw/gextto/internal/gxcore/internal/bitfield"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/piece"
@@ -26,6 +28,13 @@ type Verifier struct {
 	// (the merge's reads, hashes and writes) that must stay off the run
 	// loop. It may set Skip and Only; stop closes when Close is called.
 	Prepare func(stop <-chan struct{})
+	// Gentle makes the check give way to the rest of the machine: the reading
+	// thread runs at the lowest best-effort I/O priority where the platform
+	// has one, a read clearly slower than the check's usual pace (someone else
+	// is using the disk) is followed by a pause as long as that read, and the
+	// pages of each hashed piece are dropped from the OS cache, so a check of
+	// a large library does not push everything else out of memory.
+	Gentle bool
 
 	closeC chan struct{}
 	doneC  chan struct{}
@@ -118,6 +127,9 @@ func (v *Verifier) check(pieces []piece.Piece, progressC chan Progress) {
 				v.Bitfield.Set(r.piece.Index)
 			}
 			hash.Reset()
+			if v.Gentle {
+				dropPieceCache(r.piece)
+			}
 			freeC <- r.buf[:cap(r.buf)]
 		}
 		if !v.report(progressC, r.piece.Index+1) {
@@ -129,6 +141,14 @@ func (v *Verifier) check(pieces []piece.Piece, progressC chan Progress) {
 // readPieces feeds the hasher in piece order until the pieces end, a read fails
 // or the check stops. A read error ends the check, as it always did.
 func (v *Verifier) readPieces(pieces []piece.Piece, readC chan<- readPiece, freeC <-chan []byte, stopC <-chan struct{}) error {
+	if v.Gentle {
+		// The priority belongs to this OS thread: the goroutine keeps it and
+		// exits without unlocking, so the thread is discarded with it and the
+		// low priority never leaks to other goroutines.
+		runtime.LockOSThread()
+		lowerIOPriority()
+	}
+	var pace readPace
 	for i := range pieces {
 		p := &pieces[i]
 		if v.Only != nil && !v.Only(p.Index) {
@@ -146,8 +166,20 @@ func (v *Verifier) readPieces(pieces []piece.Piece, readC chan<- readPiece, free
 				return nil
 			}
 			next.buf = next.buf[:p.Length]
+			start := time.Now()
 			if _, err := p.Data.ReadAt(next.buf, 0); err != nil {
 				return err
+			}
+			if v.Gentle {
+				if wait := pace.after(len(next.buf), time.Since(start)); wait > 0 {
+					select {
+					case <-time.After(wait):
+					case <-stopC:
+						return nil
+					case <-v.closeC:
+						return nil
+					}
+				}
 			}
 		}
 		select {
@@ -189,5 +221,95 @@ func (v *Verifier) report(progressC chan Progress, checked uint32) bool {
 		return true
 	case <-v.closeC:
 		return false
+	}
+}
+
+// paceWindow is how many recent reads set the check's usual pace.
+const paceWindow = 32
+
+// readPace tells a read slowed by someone else's disk use from the check's
+// usual pace: it keeps the time per byte of the last reads and compares each
+// new read with their median.
+type readPace struct {
+	perByte [paceWindow]float64
+	n       int
+	slow    int // consecutive slow reads
+}
+
+// Reads faster than cacheSpeed come from the OS cache and say nothing about
+// the disk; reads shorter than minSlowRead are too short to be worth a pause.
+// A read is slow when it takes slowFactor times the usual time per byte, and
+// the check pauses only from the second slow read in a row: a single one is
+// the disk's own jitter (on an idle NVMe drive the read-ahead makes some reads
+// several times faster than the rest), while another program keeps the disk
+// busy for many reads.
+const (
+	cacheSpeed  = 4 << 30 // bytes per second
+	minSlowRead = 5 * time.Millisecond
+	maxPause    = 2 * time.Second
+	slowFactor  = 2.5
+	slowStreak  = 2
+)
+
+// after records one read of size bytes that took d and returns the pause to
+// take before the next: as long as the read itself while reads are slow, so
+// the check uses at most about half of a disk someone else is using.
+func (rp *readPace) after(size int, d time.Duration) time.Duration {
+	if size <= 0 || d <= 0 || float64(size)/d.Seconds() > cacheSpeed {
+		return 0
+	}
+	per := d.Seconds() / float64(size)
+	usual, known := rp.usual()
+	rp.perByte[rp.n%paceWindow] = per
+	rp.n++
+	if !known || d < minSlowRead || per <= slowFactor*usual {
+		rp.slow = 0
+		return 0
+	}
+	if rp.slow++; rp.slow < slowStreak {
+		return 0
+	}
+	if d > maxPause {
+		return maxPause
+	}
+	return d
+}
+
+// usual is the median of the recorded times per byte; known is false until
+// enough reads were seen.
+func (rp *readPace) usual() (float64, bool) {
+	k := rp.n
+	if k > paceWindow {
+		k = paceWindow
+	}
+	if k < 8 {
+		return 0, false
+	}
+	var tmp [paceWindow]float64
+	copy(tmp[:], rp.perByte[:k])
+	vals := tmp[:k]
+	for i := 1; i < len(vals); i++ { // insertion sort: 32 values at most
+		for j := i; j > 0 && vals[j] < vals[j-1]; j-- {
+			vals[j], vals[j-1] = vals[j-1], vals[j]
+		}
+	}
+	return vals[k/2], true
+}
+
+// cacheDropper is the optional storage file side of a gentle check: the
+// pages of a range just hashed leave the OS cache.
+type cacheDropper interface {
+	DropCache(off, length int64)
+}
+
+// dropPieceCache drops the OS cache pages of every file section of p.
+func dropPieceCache(p *piece.Piece) {
+	for _, sec := range p.Data {
+		if sec.Padding {
+			continue
+		}
+		if d, ok := sec.File.(cacheDropper); ok {
+			d.DropCache(sec.Offset, sec.Length)
+		}
 	}
 }

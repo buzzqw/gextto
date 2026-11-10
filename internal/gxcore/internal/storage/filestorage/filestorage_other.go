@@ -29,3 +29,6 @@ func preallocate(f *os.File, size int64) error {
 func isTransientReadError(err error) bool {
 	return errors.Is(err, syscall.EIO)
 }
+
+// dropFileCache has no portable equivalent here; the pages stay cached.
+func dropFileCache(*os.File, int64, int64) {}
