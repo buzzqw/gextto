@@ -270,6 +270,11 @@ func TestSeedModeRecheckReadsTheData(t *testing.T) {
 // TestRecheckRestartsWithoutWaitingForTheTick: a recheck ends stopped and the queue
 // restarts the torrent. With a tick far away it still comes back at once, because
 // the stop itself asks for a queue round.
+// recheckTestBudget is the wait of the recheck test. It is deliberately far
+// above the work it measures (a 300 KB file on a local disk) because the CI
+// runner is shared, and the test asserts the absence of a ten-minute wait.
+const recheckTestBudget = 90 * time.Second
+
 func TestRecheckRestartsWithoutWaitingForTheTick(t *testing.T) {
 	t.Setenv("GX_TEST_TICK", "10m")
 	src := filepath.Join(t.TempDir(), "src")
@@ -279,7 +284,11 @@ func TestRecheckRestartsWithoutWaitingForTheTick(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	waitFor(t, "the first check", func() bool {
+	// A shared CI runner needs more than the 20 s of waitFor: what this test
+	// proves is that the recheck restarts without waiting for the tick, which
+	// is ten minutes here, so a generous budget still fails if the daemon
+	// waits for it.
+	waitForLong(t, "the first check", recheckTestBudget, func() bool {
 		info, _ := findInfo(d, hash)
 		return info.State == "seeding"
 	})
@@ -289,8 +298,10 @@ func TestRecheckRestartsWithoutWaitingForTheTick(t *testing.T) {
 	if err := d.verify(hash); err != nil {
 		t.Fatal(err)
 	}
-	waitFor(t, "the recheck to stop the torrent", func() bool { return !isRunning(handle.Stats().Status) || handle.Stats().Status == torrent.Verifying })
-	waitFor(t, "the torrent to run again after the recheck", func() bool {
+	waitForLong(t, "the recheck to stop the torrent", recheckTestBudget, func() bool {
+		return !isRunning(handle.Stats().Status) || handle.Stats().Status == torrent.Verifying
+	})
+	waitForLong(t, "the torrent to run again after the recheck", recheckTestBudget, func() bool {
 		return handle.Stats().Status == torrent.Seeding
 	})
 }
