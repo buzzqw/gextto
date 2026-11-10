@@ -119,7 +119,7 @@ func SearchWithTimeout(ctx context.Context, cfg *Config, query string, timeout *
 func knownWebEngine(engine string) bool {
 	switch engine {
 	case "bitsearch", "tpb", "thepiratebay", "knaben", "nyaa", "eztv", "btdig",
-		"torrentscsv", "limetorrents", "torrentz2", "bt4g", "1337x", "1337":
+		"torrentscsv", "limetorrents", "bt4g", "1337x", "1337":
 		return true
 	default:
 		return false
@@ -254,8 +254,6 @@ func runWebEngine(ctx context.Context, engine, query string, flaresolverr *strin
 		return searchTorrentscsv(ctx, query)
 	case "limetorrents":
 		return searchLimetorrents(ctx, query, flaresolverr)
-	case "torrentz2":
-		return searchTorrentz2(ctx, query, flaresolverr)
 	case "bt4g":
 		return searchBt4g(ctx, query, flaresolverr)
 	case "1337x", "1337":
@@ -614,7 +612,7 @@ type searchDetailLink struct {
 }
 
 // magnetFromDetail fetches a detail page and returns its raw magnet match.
-// LimeTorrents/Torrentz2 push the raw match, matching the behaviour.
+// LimeTorrents pushes the raw match, matching the behaviour.
 func magnetFromDetail(ctx context.Context, rawURL string, flaresolverr *string) (string, error) {
 	body, err := fetchHtml(ctx, rawURL, flaresolverr)
 	if err != nil {
@@ -742,48 +740,6 @@ func searchLimetorrentsOn(ctx context.Context, mirror string, pathForm bool, que
 		}
 		if magnet != "" {
 			output = append(output, webResult{title: detail.title, magnet: magnet, source: "LimeTorrents"})
-		}
-	}
-	return output, nil
-}
-
-func searchTorrentz2(ctx context.Context, query string, flaresolverr *string) ([]webResult, error) {
-	rawURL := "https://torrentz2.nz/search?q=" + url.QueryEscape(query)
-	body, err := fetchHtml(ctx, rawURL, flaresolverr)
-	if err != nil {
-		return nil, err
-	}
-	base, err := url.Parse(rawURL)
-	if err != nil {
-		return nil, err
-	}
-	document, err := html.Parse(strings.NewReader(body))
-	if err != nil {
-		return nil, err
-	}
-	nodes := htmlSelectAll(document, "div.results a[href^='/torrent/']")
-	if len(nodes) > 8 {
-		nodes = nodes[:8]
-	}
-	var details []searchDetailLink
-	for _, link := range nodes {
-		title := strings.TrimSpace(htmlText(link))
-		href, _ := htmlAttr(link, "href")
-		if title == "" {
-			continue
-		}
-		if detail, err := base.Parse(href); err == nil {
-			details = append(details, searchDetailLink{title: title, url: detail.String()})
-		}
-	}
-	var output []webResult
-	for _, detail := range details {
-		magnet, err := magnetFromDetail(ctx, detail.url, flaresolverr)
-		if err != nil {
-			return nil, err
-		}
-		if magnet != "" {
-			output = append(output, webResult{title: detail.title, magnet: magnet, source: "Torrentz2"})
 		}
 	}
 	return output, nil

@@ -47,12 +47,6 @@ Nothing open: every engine item waits for a condition listed under
   parser that reads what the block page serves; otherwise they go, and that is the
   operator's decision.
 
-- **The `torrentz2` web engine points at a dead domain** — `torrentz2.nz` answers NXDOMAIN
-  and the other Torrentz2 addresses (`torrentz2.eu`, `.is`) redirect to a domain parking
-  page (`ww38.`), so the engine can never return a result; it stays in the list of web
-  engines and is not among the enabled ones today. Gate: a live Torrentz2 mirror, or the
-  operator's decision to drop the engine from the list.
-
 ## Measurements
 
 - **The documents after a round** — the round of 2026-11-07 is in

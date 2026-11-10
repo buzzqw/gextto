@@ -314,7 +314,6 @@ var uiWebsearchEngines = []uiCheckboxOption{
 	{Value: "eztv", Label: "EZTV"},
 	{Value: "btdig", Label: "BTDig"},
 	{Value: "limetorrents", Label: "LimeTorrents"},
-	{Value: "torrentz2", Label: "Torrentz2"},
 	{Value: "torrentscsv", Label: "TorrentsCSV"},
 }
 

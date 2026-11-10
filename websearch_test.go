@@ -387,3 +387,27 @@ func TestLimetorrentsMirrorForms(t *testing.T) {
 		t.Fatalf("path-form search URL = %q", got)
 	}
 }
+
+// TestWebEngineOptionsMatchTheKnownOnes keeps the checkboxes of the settings
+// page and the filter that runs a search in step. Removing a dead engine from
+// one list and not the other either offers a choice that does nothing or leaves
+// a value nobody can tick; Torrentz2 was retired on 2026-11-10 because every
+// address of the service was parked or gone.
+func TestWebEngineOptionsMatchTheKnownOnes(t *testing.T) {
+	offered := make(map[string]bool, len(uiWebsearchEngines))
+	for _, option := range uiWebsearchEngines {
+		offered[option.Value] = true
+		if !knownWebEngine(option.Value) {
+			t.Errorf("%q is offered in the settings but the search does not know it", option.Value)
+		}
+	}
+	for _, engine := range []string{"bitsearch", "tpb", "1337x", "bt4g", "knaben",
+		"nyaa", "eztv", "btdig", "limetorrents", "torrentscsv"} {
+		if !offered[engine] {
+			t.Errorf("%q runs a search but cannot be ticked", engine)
+		}
+	}
+	if offered["torrentz2"] || knownWebEngine("torrentz2") {
+		t.Error("torrentz2 is back: every Torrentz2 address is parked or gone")
+	}
+}

@@ -28,7 +28,7 @@ var i18nAllowlist = map[string]bool{
 	"WEB-DL": true, "WEBRip": true,
 	// Web search engines (proper names).
 	"BT4G": true, "BTDig": true, "BitSearch": true, "EZTV": true, "Knaben": true,
-	"LimeTorrents": true, "Nyaa": true, "TorrentsCSV": true, "Torrentz2": true,
+	"LimeTorrents": true, "Nyaa": true, "TorrentsCSV": true,
 	// Product tagline (the expansion of the name, same in every language).
 	"EXpert Torrent Transfer Orchestrator": true,
 	// Notification providers, client presets and signature label.
