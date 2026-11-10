@@ -78,7 +78,10 @@ status bar has the global controls.
 ### Torrent details
 
 Click a name to open the panel below. **General** brings together state,
-pieces, space, dates, limits, seeding and web seeds.
+pieces, space, dates, limits, seeding and web seeds. At its top two thin bars
+show where the downloaded pieces are and, while downloading, how many connected
+peers have the pieces still missing (red: nobody connected has them). In the
+list, a small icon before each name repeats its state.
 
 ![Details](screenshots/gx-core/en/detail-general.png)
 
@@ -89,7 +92,12 @@ grouping by folder, rename and **HTTP streaming**.
 
 **Peers** shows client, transport, encryption and flags; from here you add peers
 and ban an address. **Trackers** shows status, swarm and next announce;
-**Pieces** is the coloured piece map.
+**Pieces** is the coloured piece map. **Speed** draws the torrent's download
+and upload over the last four minutes, and **Log** lists what happened to it:
+added, completed, stopped, errors, a tracker that stops or starts answering
+again, pieces that failed their check (with the peer that sent them), moves and
+rechecks. Repeated lines are counted, not repeated. The status bar shows how
+much was downloaded and uploaded since start.
 
 ![Peers](screenshots/gx-core/en/detail-peers.png)
 
@@ -98,7 +106,11 @@ and ban an address. **Trackers** shows status, swarm and next announce;
 The add dialog takes several magnets or URLs at once; dropping a `.torrent`
 anywhere on the page opens it already filled in. When you choose a `.torrent`
 with the button, the dialog lists the files it contains with a checkbox each:
-uncheck what you do not want, and only the checked files are downloaded. A
+uncheck what you do not want, and only the checked files are downloaded; the
+menu next to each file sets its priority (Normal, High, Maximum). **Add dropped
+files straight away** makes the next `.torrent` dropped on the page go in at
+once with the default options; the **Add** button still opens the dialog,
+where the box can be unticked. A
 magnet has no file list until its metadata arrives; add it with **paused** and
 **stop at metadata**, then choose the files from the *Files* tab.
 

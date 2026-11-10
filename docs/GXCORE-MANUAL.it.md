@@ -79,7 +79,10 @@ alto mostra il traffico; in basso ci sono i comandi globali.
 ### Dettaglio di un torrent
 
 Clicca un nome per aprire il pannello in basso. La scheda **Generale** riunisce
-stato, pezzi, spazio, date, limiti, seed e web seed.
+stato, pezzi, spazio, date, limiti, seed e web seed. In alto due barre sottili
+mostrano dove sono i pezzi scaricati e, durante il download, quanti peer
+collegati hanno i pezzi che mancano (rosso: nessun peer collegato li ha).
+Nell'elenco, una piccola icona prima di ogni nome ripete il suo stato.
 
 ![Dettaglio](screenshots/gx-core/it/detail-general.png)
 
@@ -90,7 +93,13 @@ Maximum), il raggruppamento per cartella, la rinomina e lo **streaming HTTP**.
 
 **Peer** mostra client, trasporto, cifratura e flags; da qui si aggiungono peer
 e si banna un indirizzo. **Tracker** mostra stato, swarm e prossimo annuncio;
-**Pezzi** è la mappa colorata del torrent.
+**Pezzi** è la mappa colorata del torrent. **Velocità** disegna download e
+upload del torrent negli ultimi quattro minuti, e **Log** elenca cosa gli è
+successo: aggiunto, completato, fermato, errori, un tracker che smette di
+rispondere o torna a farlo, pezzi che non hanno superato il controllo (con il
+peer che li ha mandati), spostamenti e ricontrolli. Le righe ripetute vengono
+contate, non ripetute. La barra di stato mostra quanto è stato scaricato e
+inviato dall'avvio.
 
 ![Peer](screenshots/gx-core/it/detail-peers.png)
 
@@ -100,7 +109,10 @@ La finestra di aggiunta accetta più magnet o URL insieme; il trascinamento di
 un `.torrent` sulla pagina la apre già compilata. Quando scegli un `.torrent`
 con il pulsante, la finestra elenca i file che contiene con una casella
 ciascuno: togli la spunta a quello che non vuoi e vengono scaricati solo i file
-selezionati. Un magnet non ha l'elenco dei file finché non arrivano i metadati;
+selezionati; il menu accanto a ogni file ne sceglie la priorità (Normale,
+Alta, Massima). **Aggiungi subito i file trascinati** fa entrare il prossimo
+`.torrent` trascinato sulla pagina subito, con le opzioni predefinite; il
+pulsante **Aggiungi** apre comunque la finestra, dove si toglie la spunta. Un magnet non ha l'elenco dei file finché non arrivano i metadati;
 aggiungilo con **in pausa** e **ferma ai metadati**, poi scegli i file dalla
 scheda *File*.
 

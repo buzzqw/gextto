@@ -53,27 +53,11 @@ Nothing open: every engine item waits for a condition listed under
 Ideas proposed but not decided yet. An accepted proposal moves to the matching area with
 its gate; a rejected one moves to *Not planned*.
 
-- **Daemon page: lessons from Rookparcel's µTorrent-style window** — ideas for the gx-torrent
-  page, each its own decision:
-  - *details docked below the list*, resizable split, as an alternative to the side drawer:
-    pick a torrent and the tabs update in place;
-  - *General tab with two thin bars*: downloaded pieces and swarm availability, above a
-    three-column Transfer grid (time, remaining, wasted, connected/known seeds and peers);
-  - *per-torrent Speed tab* (download/upload graph of that torrent) and *Log tab* (its own
-    events: tracker errors, hash failures, moves);
-  - *state icon in the Name column* (down, up, queued, finished) next to the coloured badge;
-  - *status bar with session totals* (`↓ rate · total`, `↑ rate · total`) and a single
-    *network health* word (port reachable, DHT nodes);
-  - *add dialog*: priority column per file, «add to top of queue», «don't show this again»
-    (later additions go straight in with the last choices);
-  - *latency-aware throttling* («keep ping low»): watch the ping of the first hop past the
-    router and slow down while the queue builds. Gate: a measurement on a saturated uplink.
-  The operator wants all of them. Gate: a design check in both themes, at phone width and
-  with the accessibility suite.
 - **Gextto's Downloads view, the same lessons** — a state list with counts (downloading,
   seeding, paused, stalled, error) beside the tag filter, details docked below the list,
-  the two bars and the speed graph in the torrent drawer, session totals in the head.
-  Gate: the daemon page done first, so both share the wording.
+  the two bars and the speed graph in the torrent drawer, session totals in the head,
+  with the daemon page's wording. Gate: the qBittorrent engine has no per-piece holder
+  counts, so the availability bar is gx-torrent only.
 - **Autospeed, a quieter signal** — probe the first router past the home line (TTL-limited
   ICMP echoes on unprivileged ping sockets, the first public hop) instead of a TCP connect
   to public resolvers, and use the shared one-way delay of busy uTP peers as a free second

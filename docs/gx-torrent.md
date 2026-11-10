@@ -280,7 +280,9 @@ Every page is checked with axe-core (WCAG 2 A/AA) in both themes.
   first/last, super-seeding, per-torrent download/upload limits, seed ratio and
   seed days, automatic management). What is typed is previewed at once (magnet name and info hash,
   ignored lines); a `.torrent` dropped anywhere on the page or a
-  magnet pasted outside a field opens it pre-filled.
+  magnet pasted outside a field opens it pre-filled. The file list of a chosen
+  `.torrent` has a priority menu per file; *Add dropped files straight away*
+  (kept per browser) adds dropped files at once with the default options.
 - **Remove** asks in a dialog whether to delete the files too.
 - **Per-torrent detail** in a panel below the list (like qBittorrent; full width
   on a phone) whose **height is resizable** from its top edge (drag, or the up
@@ -293,7 +295,16 @@ Every page is checked with axe-core (WCAG 2 A/AA) in both themes.
   streaming** with a labelled *Stream* button), *Peers*
   (connection flags, transport, encryption; **add peers** by `ip:port` and
   **ban** a peer's IP for 30 minutes, `POST /ui/peers`), *Trackers* (status,
-  swarm, add, **edit the URL** and remove), *Pieces* (coloured map). Peers, trackers and pieces refresh while
+  swarm, add, **edit the URL** and remove), *Pieces* (coloured map), *Speed*
+  (the torrent's rates over the last four minutes, sampled by the page from the
+  list refresh, no server history) and *Log* (the torrent's last 50 events kept
+  in memory by `torrentlog.go`: added, completed, stopped, errors, tracker
+  failures and recoveries, pieces failing their hash with the sender, moves,
+  rechecks; identical lines folded with a count). *General* opens with two thin
+  bars of at most 160 cells: downloaded pieces and, while downloading, the fewest
+  connected holders of the missing pieces (`Torrent.PieceAvailability`). Each
+  list row carries a state icon; the status bar shows the session totals.
+  Peers, trackers, pieces and the log refresh while
   the panel is open; the forms save in place, without reloading the page.
 - **IP filter** from a URL or file (*Tools*); the field is pre-filled with the
   filter configured in Gextto.
@@ -2589,7 +2600,7 @@ describes the payloads of the v1 resources.
 | `GET /api/v1/config` | configuration and effective slots |
 | `POST /api/v1/config` | partial JSON: unknown keys rejected |
 | `GET /api/v1/metrics` | state in the Prometheus text format, computed only when scraped |
-| `GET /api/v1/events` | SSE of the session events (`torrent_added`, `torrent_completed`, `torrent_stopped`, `torrent_error`, `torrent_piece`, `peer_connected`, `peer_disconnected`, `tracker_announce`) |
+| `GET /api/v1/events` | SSE of the session events (`torrent_added`, `torrent_completed`, `torrent_stopped`, `torrent_error`, `torrent_piece`, `peer_connected`, `peer_disconnected`, `tracker_announce` with the `Tracker` URL, `piece_hash_failed` with `Piece` and the `Peer` or web seed `Source`) |
 
 The page's own live updates use `GET /ui/events`, the session-authenticated twin of
 `/api/v1/events` (no token: it follows the page's login), and refresh the table

@@ -83,6 +83,8 @@ func uiTemplateFuncMap() template.FuncMap {
 		"dur":     uiDuration,
 		// stateLabel prints the human name of a state, a catalog key.
 		"stateLabel": uiStateLabel,
+		// stateIcon picks the row's state icon and its label (a catalog key).
+		"stateIcon": uiStateIcon,
 		// kibrate prints a KiB/s limit as a rate ("∞" when unlimited).
 		"kibrate": func(kib int64) string {
 			if kib <= 0 {

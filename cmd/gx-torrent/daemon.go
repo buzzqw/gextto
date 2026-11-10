@@ -269,6 +269,8 @@ type runtimeInfo struct {
 
 // Daemon owns the engine session and the queue.
 type Daemon struct {
+	// tlog is the per-torrent history shown in the detail drawer's Log tab.
+	tlog torrentLog
 	opts Options
 	// updater is the in-app update of the standalone daemon (update.go).
 	updater gxUpdater
@@ -1020,6 +1022,7 @@ func (d *Daemon) pokeOnStops(events <-chan torrent.Event, done, stop <-chan stru
 			if !ok {
 				return false
 			}
+			d.tlog.record(ev)
 			if ev.Type == torrent.EventTorrentStopped || ev.Type == torrent.EventTorrentError {
 				d.poke()
 			}
@@ -2027,6 +2030,7 @@ func (d *Daemon) remove(key string, deleteFiles bool) error {
 	id := t.ID()
 	data := payloadOf(t, meta, t.Stats().Name)
 	savePath := meta.SavePath
+	d.tlog.forget(t.InfoHash().String())
 	d.protectLegacyDir(id)
 	err := d.session.RemoveTorrent(id, false)
 	d.unindexTorrentLocked(t)
@@ -2161,7 +2165,11 @@ func (d *Daemon) verify(key string) error {
 			return err
 		}
 		meta.Error = ""
-		return t.Verify()
+		if err := t.Verify(); err != nil {
+			return err
+		}
+		d.tlog.add(t.InfoHash().String(), time.Now(), "Recheck requested", "", false)
+		return nil
 	})
 }
 
@@ -2475,11 +2483,14 @@ func (d *Daemon) finishMove(id string, t *torrent.Torrent, from, dest, name stri
 	if !ok {
 		return
 	}
+	hash := t.InfoHash().String()
 	if err != nil {
 		meta.Error = "move failed: " + err.Error()
 		logfError("moving «%s» to %s failed: %v", name, dest, err)
+		d.tlog.add(hash, time.Now(), "Moving the data failed", dest+": "+err.Error(), true)
 	} else {
 		meta.SavePath = dest
+		d.tlog.add(hash, time.Now(), "Data moved", dest, false)
 		if empty {
 			logf("«%s» moved to %s (nothing downloaded yet: its empty files are recreated there)", name, dest)
 		} else {

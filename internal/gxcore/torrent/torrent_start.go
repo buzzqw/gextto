@@ -196,6 +196,7 @@ func (t *torrent) startNewAnnouncer(tr tracker.Tracker) {
 			return
 		}
 		ev := t.baseEvent(EventTrackerAnnounce)
+		ev.Tracker = tr.URL()
 		if err != nil {
 			ev.Error = err.Error()
 		} else {

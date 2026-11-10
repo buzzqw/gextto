@@ -350,7 +350,18 @@ type uiDetailData struct {
 	Peers    []uiPeerRow
 	Trackers []uiTrackerRow
 	Pieces   []uiPieceRun
-	WebSeeds []string
+	// PieceBar and AvailBar are the General tab's two thin bars, at most
+	// barCells cells each: the share of each stretch of pieces downloaded,
+	// and the fewest connected peers holding a piece of that stretch.
+	// AvailBar is empty when nothing is being downloaded; AvailMissing counts
+	// the wanted pieces no connected peer has.
+	// Log is the torrent's recent history (Log tab), newest first.
+	Log          []uiLogRow
+	PieceBar     []uiBarCell
+	AvailBar     []uiBarCell
+	AvailMissing int
+	AvailMost    uint32
+	WebSeeds     []string
 	// BEP 38 hints (see bep38.go), shown only when the torrent carries some.
 	HasBEP38       bool
 	CollectionsStr string
@@ -360,6 +371,105 @@ type uiDetailData struct {
 
 // uiPieceRun is one run of consecutive pieces sharing a state, with the width
 // (percentage) used to draw the piece map.
+// uiLogRow is one line of the Log tab.
+type uiLogRow struct {
+	When   string
+	Msg    string
+	Detail string
+	Count  int
+	Bad    bool
+}
+
+// uiBarCell is one cell of a thin bar: its fill (0..1, as a CSS opacity) and
+// a class (have, partial, missing, skip; avail, none).
+type uiBarCell struct {
+	Op    string
+	Class string
+}
+
+// barCells caps the cells of the General tab's bars: enough to see where the
+// holes are, few enough for a torrent of tens of thousands of pieces.
+const barCells = 160
+
+// pieceBarCells groups the piece states into at most barCells stretches and
+// gives each the share of its wanted pieces already downloaded.
+func pieceBarCells(states []string) []uiBarCell {
+	n := len(states)
+	if n == 0 {
+		return nil
+	}
+	cells := min(n, barCells)
+	out := make([]uiBarCell, cells)
+	for c := range out {
+		lo, hi := c*n/cells, (c+1)*n/cells
+		have, wanted := 0, 0
+		for _, st := range states[lo:hi] {
+			if st == "skipped" {
+				continue
+			}
+			wanted++
+			if st == "have" {
+				have++
+			}
+		}
+		switch {
+		case wanted == 0:
+			out[c] = uiBarCell{Op: "1", Class: "skip"}
+		case have == wanted:
+			out[c] = uiBarCell{Op: "1", Class: "have"}
+		case have == 0:
+			out[c] = uiBarCell{Op: "1", Class: "missing"}
+		default:
+			out[c] = uiBarCell{Op: strconv.FormatFloat(0.25+0.75*float64(have)/float64(wanted), 'f', 2, 64), Class: "partial"}
+		}
+	}
+	return out
+}
+
+// availBarCells groups the per-piece holder counts like pieceBarCells: each
+// cell shows the fewest peers holding one of its wanted, missing pieces (the
+// pieces already here do not need a source). It returns the cells, how many
+// wanted pieces nobody connected has, and the highest count seen.
+func availBarCells(states []string, holders []uint32) ([]uiBarCell, int, uint32) {
+	n := len(holders)
+	if n == 0 || len(states) != n {
+		return nil, 0, 0
+	}
+	var most uint32
+	for _, h := range holders {
+		most = max(most, h)
+	}
+	missing := 0
+	cells := min(n, barCells)
+	out := make([]uiBarCell, cells)
+	for c := range out {
+		lo, hi := c*n/cells, (c+1)*n/cells
+		fewest, needed := uint32(0), false
+		for i := lo; i < hi; i++ {
+			if states[i] == "have" || states[i] == "skipped" {
+				continue
+			}
+			if !needed || holders[i] < fewest {
+				fewest = holders[i]
+			}
+			needed = true
+			if holders[i] == 0 {
+				missing++
+			}
+		}
+		switch {
+		case !needed:
+			out[c] = uiBarCell{Op: "1", Class: "done"}
+		case fewest == 0:
+			out[c] = uiBarCell{Op: "1", Class: "none"}
+		default:
+			op := 0.3 + 0.7*float64(fewest)/float64(max(most, 1))
+			out[c] = uiBarCell{Op: strconv.FormatFloat(min(op, 1), 'f', 2, 64), Class: "avail"}
+		}
+	}
+	return out, missing, most
+}
+
 type uiPieceRun struct {
 	Begin int
 	End   int
@@ -956,10 +1066,17 @@ func (d *Daemon) handleUIAddPreview(w http.ResponseWriter, r *http.Request) {
 	b.WriteString(`<div class="filetree"><p class="muted">` + html.EscapeString(uiTr(lang, "Select the files to download; unchecked files are skipped.")) + `</p>`)
 	b.WriteString(`<div class="row"><button type="button" class="ghost sm" data-file-all="1" title="` + html.EscapeString(uiTr(lang, "Select every file")) + `">` + html.EscapeString(uiTr(lang, "Select all")) + `</button>`)
 	b.WriteString(`<button type="button" class="ghost sm" data-file-none="1" title="` + html.EscapeString(uiTr(lang, "Select no file")) + `">` + html.EscapeString(uiTr(lang, "Select none")) + `</button></div>`)
+	prioTitle := html.EscapeString(uiTr(lang, "Download priority of this file: higher priorities are fetched first"))
+	prioOptions := `<option value="4">` + html.EscapeString(uiTr(lang, "Normal")) + `</option><option value="6">` +
+		html.EscapeString(uiTr(lang, "High")) + `</option><option value="7">` + html.EscapeString(uiTr(lang, "Maximum")) + `</option>`
 	for i, f := range files {
+		idx := strconv.Itoa(i)
+		b.WriteString(`<div class="addfile">`)
 		b.WriteString(`<label class="chk" title="` + html.EscapeString(uiTr(lang, "Check this file to download it; leave it unchecked to skip it")) + `">`)
-		b.WriteString(`<input type="checkbox" data-file-index="` + strconv.Itoa(i) + `" checked> `)
+		b.WriteString(`<input type="checkbox" data-file-index="` + idx + `" checked> `)
 		b.WriteString(html.EscapeString(f.Name) + ` <span class="muted">` + humanBytes(f.Length) + `</span></label>`)
+		b.WriteString(`<select class="sm" data-file-prio="` + idx + `" aria-label="` + html.EscapeString(uiTr(lang, "Priority")+": "+f.Name) + `" title="` + prioTitle + `">` + prioOptions + `</select>`)
+		b.WriteString(`</div>`)
 	}
 	b.WriteString(`</div>`)
 	_, _ = io.WriteString(w, b.String())
@@ -1786,7 +1903,7 @@ func (d *Daemon) uiRowLimit(r *http.Request) int {
 // under the daemon lock, the per-torrent calls (files/peers/trackers) run
 // outside it, like the REST inspection does.
 func (d *Daemon) uiDetailData(hash, tab, lang string) (uiDetailData, error) {
-	if tab != "files" && tab != "peers" && tab != "trackers" && tab != "pieces" {
+	if tab != "files" && tab != "peers" && tab != "trackers" && tab != "pieces" && tab != "speed" && tab != "log" {
 		tab = "general"
 	}
 	// Sample the torrent run loop without d.mu: a torrent can be blocked on
@@ -1936,6 +2053,21 @@ func (d *Daemon) uiDetailData(hash, tab, lang string) (uiDetailData, error) {
 		data.LocalDataStr = strings.Join(localNames, ", ")
 	}
 	switch tab {
+	case "general":
+		if states, ready := t.PieceStates(); ready {
+			data.PieceBar = pieceBarCells(states)
+			if holders, ok := t.PieceAvailability(); ok {
+				data.AvailBar, data.AvailMissing, data.AvailMost = availBarCells(states, holders)
+			}
+		}
+	case "log":
+		for _, e := range d.tlog.entries(data.Hash) {
+			when := e.At.Format("15:04:05")
+			if time.Since(e.At) > 20*time.Hour {
+				when = e.At.Format("2006-01-02 15:04")
+			}
+			data.Log = append(data.Log, uiLogRow{When: when, Msg: e.Msg, Detail: e.Detail, Count: e.Count, Bad: e.Bad})
+		}
 	case "files":
 		files, err := t.Files()
 		if err != nil {
@@ -2156,6 +2288,40 @@ func uiEncryption(level int) string {
 
 // uiStateLabel is the human name of a torrent state, a catalog key the page
 // translator localizes.
+// uiStateIconData is the icon before a torrent's name and its label.
+type uiStateIconData struct {
+	Icon  string
+	Label string
+}
+
+// uiStateIcon picks the state icon of a list row: the sidebar's icon for the
+// state, a check mark for a paused torrent that is complete. The page's
+// stIcon mirrors it for the rows drawn in the browser.
+func uiStateIcon(state string, progress float64) uiStateIconData {
+	switch state {
+	case "downloading", "downloading_metadata":
+		return uiStateIconData{"i-dl", uiStateLabel(state)}
+	case "checking_files":
+		return uiStateIconData{"i-check", uiStateLabel(state)}
+	case "seeding":
+		return uiStateIconData{"i-seed", uiStateLabel(state)}
+	case "stalled":
+		return uiStateIconData{"i-warn", uiStateLabel(state)}
+	case "moving":
+		return uiStateIconData{"i-move", uiStateLabel(state)}
+	case "error":
+		return uiStateIconData{"i-xc", uiStateLabel(state)}
+	case "disk_wait":
+		return uiStateIconData{"i-disk", uiStateLabel(state)}
+	case "paused":
+		if progress >= 100 {
+			return uiStateIconData{"i-done", "Completed"}
+		}
+		return uiStateIconData{"i-pausec", uiStateLabel(state)}
+	}
+	return uiStateIconData{"i-sleep", uiStateLabel(state)}
+}
+
 func uiStateLabel(state string) string {
 	switch state {
 	case "downloading":

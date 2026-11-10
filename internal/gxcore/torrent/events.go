@@ -28,6 +28,10 @@ const (
 	// EventTrackerAnnounce fires after every announce attempt (success or
 	// failure) with the swarm counts on success.
 	EventTrackerAnnounce EventType = "tracker_announce"
+	// EventPieceHashFailed fires when a downloaded piece does not match its
+	// hash: Piece is the index, Peer the peer address or Source the web seed
+	// that sent it.
+	EventPieceHashFailed EventType = "piece_hash_failed"
 )
 
 // Event is a session-level notification. The engine pushes it to every
@@ -41,6 +45,10 @@ type Event struct {
 	Piece uint32
 	// Peer is the "ip:port" address for the peer events.
 	Peer string
+	// Tracker is the announce URL for EventTrackerAnnounce.
+	Tracker string `json:",omitempty"`
+	// Source is the web seed URL of a piece that failed its hash.
+	Source string `json:",omitempty"`
 	// Seeders/Leechers are set for a successful EventTrackerAnnounce.
 	Seeders  int
 	Leechers int

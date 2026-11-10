@@ -364,6 +364,14 @@ func (p *PiecePicker) RequestedWebseedSource(i uint32) *webseedsource.WebseedSou
 	return p.pieces[i].RequestedWebseed
 }
 
+// Holders reports how many connected peers have piece i.
+func (p *PiecePicker) Holders(i uint32) uint32 {
+	if int(i) >= len(p.pieces) {
+		return 0
+	}
+	return p.pieces[i].holders
+}
+
 // HandleHave records peer availability of piece i.
 func (p *PiecePicker) HandleHave(pe *peer.Peer, i uint32) {
 	if pe.Bitfield.Test(i) {

@@ -106,6 +106,12 @@ body{display:flex;flex-direction:column;overflow:hidden}
 .tbl.t td.sel{text-align:center}
 .tbl.t td.name a{color:var(--text);text-decoration:none;font-weight:550}
 .tbl.t td.name a:hover{text-decoration:underline;color:var(--accent)}
+.tbl.t td.name .sti{display:inline-flex;vertical-align:-3px;margin-right:6px;color:var(--subtle)}
+.tbl.t td.name .sti svg{width:15px;height:15px}
+.sti.st-downloading,.sti.st-downloading_metadata{color:var(--info)}
+.sti.st-seeding{color:var(--ok)}
+.sti.st-stalled,.sti.st-disk_wait{color:var(--warn)}
+.sti.st-error{color:var(--err)}
 .tbl.t td.name .fl{font-size:10.5px;font-weight:650;color:var(--accent-soft-fg);background:var(--accent-soft);border-radius:4px;padding:0 4px;margin-left:6px;vertical-align:1px}
 .tbl.t .state .badge{max-width:100%;overflow:hidden;text-overflow:ellipsis}
 .prog{display:flex;align-items:center;gap:6px}
@@ -134,7 +140,7 @@ body{display:flex;flex-direction:column;overflow:hidden}
 .statusbar .disk .progress{width:70px}
 .statusbar .sb-btn{display:inline-flex;align-items:center;gap:5px;height:24px;border:1px solid transparent;background:transparent;color:var(--muted);border-radius:6px;padding:0 7px;font:inherit;cursor:pointer}
 .statusbar .sb-btn:hover{background:var(--hover);color:var(--text)}
-.statusbar .sb-btn .d{color:var(--info)}.statusbar .sb-btn .u{color:var(--ok)}
+.statusbar .sb-btn .d,.statusbar .sb-tot .d{color:var(--info)}.statusbar .sb-btn .u,.statusbar .sb-tot .u{color:var(--ok)}
 .statusbar .sb-alt{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--border);background:var(--surface);color:var(--muted);border-radius:999px;padding:1px 9px;cursor:pointer;font:inherit}
 .statusbar .sb-alt[aria-checked=true]{border-color:var(--warn);color:var(--text);background:var(--warn-soft)}
 .sbmore{position:fixed;right:12px;bottom:38px;z-index:55;width:min(420px,calc(100vw - 24px));padding:12px 14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-lg);font-size:12.5px}
@@ -188,6 +194,30 @@ body{display:flex;flex-direction:column;overflow:hidden}
 .flags{display:flex;flex-wrap:wrap;gap:3px}
 .flag{font-size:11px;padding:0 6px;border-radius:5px;background:var(--surface-2);color:var(--muted);white-space:nowrap;line-height:18px}
 .flag.on{background:var(--ok-soft);color:var(--ok)}
+.tgraph{margin:4px 0}
+.tgraph svg{height:120px}
+.tgraph .tg-peak{margin:6px 0 0;font-size:12px}
+.tlog td{vertical-align:top}
+.tlog td.num{white-space:nowrap;font-variant-numeric:tabular-nums;color:var(--muted)}
+.tlog td.mono{font-family:var(--mono);font-size:11.5px;word-break:break-all}
+.tlog tr.bad td:nth-child(2){color:var(--err)}
+.addfile{display:flex;align-items:center;gap:8px;justify-content:space-between}
+.addfile .chk{flex:1;min-width:0;margin:2px 0;overflow-wrap:anywhere}
+.addfile select{flex:none;width:auto}
+.dlg-foot .add-direct{margin-right:auto;font-size:12.5px;color:var(--muted)}
+.dbars{display:grid;grid-template-columns:auto 1fr auto;gap:6px 10px;align-items:center;margin:0 0 14px;font-size:12.5px}
+.dbar-l{color:var(--muted)}
+.dbar-v{font-variant-numeric:tabular-nums;text-align:right;min-width:52px}
+.dbar-v .err-t{color:var(--err);font-weight:600}
+.dbar{display:flex;height:12px;border-radius:3px;overflow:hidden;background:var(--surface-2);border:1px solid var(--border)}
+.dbar i{flex:1;min-width:0}
+.dbar i.have,.dbar i.partial{background:var(--bar-down)}
+.dbar i.missing{background:transparent}
+.dbar i.skip{background:var(--bar-paused);opacity:.35!important}
+.dbar.av i.avail{background:var(--ok)}
+.dbar.av i.none{background:var(--err)}
+.dbar.av i.done{background:transparent}
+@media (forced-colors:active){.dbar i.have,.dbar i.partial,.dbar.av i.avail{background:CanvasText}.dbar.av i.none{background:Mark}}
 .piece-map{display:flex;width:100%;height:22px;margin:8px 0;border-radius:6px;overflow:hidden;background:var(--surface-2)}
 .piece-run{min-width:1px;height:100%}
 .piece-run.piece-have{background:var(--bar-seed)}
@@ -564,6 +594,7 @@ body{display:flex;flex-direction:column;overflow:hidden}
       {{template "addopts"}}
     </div>
     <div class="dlg-foot">
+      <label class="chk add-direct" title="{{tr "Next time, .torrent files dropped on the page are added at once with the default options, without this window; the Add button still opens it"}}"><input type="checkbox" id="add-direct"> {{tr "Add dropped files straight away"}}</label>
       <button type="button" data-close title="{{tr "Close without adding"}}">{{tr "Cancel"}}</button>
       <button type="submit" class="primary" title="{{tr "Add this torrent to the download queue"}}">{{tr "Add"}}</button>
     </div>
@@ -1078,7 +1109,7 @@ function rowHTML(r){
   var h='<tr tabindex="-1" aria-selected="false" data-hash="'+esc(r.Hash)+'" data-name="'+esc(r.Name)+'" data-state="'+esc(r.State)+'" data-cat="'+esc(r.Category)+'" data-tags="'+esc(r.Tags)+'" data-tracker="'+esc(r.Tracker)+'" data-tmm="'+flag(r.AutoTMM)+'" data-pin="'+flag(r.Pinned)+'" data-seq="'+flag(r.Sequential)+'" data-fl="'+flag(r.FirstLast)+'" data-ss="'+flag(r.SuperSeeding)+'" data-dll="'+r.DLLimitKib+'" data-ull="'+r.ULLimitKib+'" data-down="'+r.DLRate+'" data-up="'+r.ULRate+'"'+
   ' data-k-name="'+esc(r.Name)+'" data-k-size="'+r.TotalSize+'" data-k-progress="'+r.Progress+'" data-k-state="'+esc(r.State)+'" data-k-seeds="'+r.Seeds+'" data-k-peers="'+r.Peers+'" data-k-down="'+r.DLRate+'" data-k-up="'+r.ULRate+'" data-k-eta="'+r.ETAVal+'" data-k-ratio="'+r.RatioVal+'" data-k-category="'+esc(r.Category)+'" data-k-tags="'+esc(r.Tags)+'" data-k-added="'+r.AddedVal+'" data-k-completed="'+r.CompletedVal+'" data-k-downloaded="'+r.DownloadedVal+'" data-k-uploaded="'+r.UploadedVal+'" data-k-remaining="'+r.RemainingVal+'" data-k-queue="'+r.QueuePos+'" data-k-tracker="'+esc(r.Tracker)+'" data-k-path="'+esc(r.SavePath)+'" data-k-availability="'+r.AvailabilityVal+'" data-k-active="'+r.ActiveVal+'" data-k-lastactive="'+r.LastActiveVal+'" data-k-wasted="'+r.WastedVal+'">';
   h+='<td class="sel"><input class="rowsel" type="checkbox" value="'+esc(r.Hash)+'" aria-label="'+esc(t('Select torrent'))+'" title="'+esc(t('Select this torrent for batch actions'))+'"></td>';
-  h+='<td class="name c-name" title="'+esc(r.Name)+'"><a class="open" href="/?open='+esc(r.Hash)+'">'+esc(r.Name)+'</a>'+(r.Pinned?'<span class="fl" title="'+esc(t('Force started: runs outside the queue limits'))+'">F</span>':'')+'</td>';
+  h+='<td class="name c-name" title="'+esc(r.Name)+'">'+stIcon(r.State,r.Progress)+'<a class="open" href="/?open='+esc(r.Hash)+'">'+esc(r.Name)+'</a>'+(r.Pinned?'<span class="fl" title="'+esc(t('Force started: runs outside the queue limits'))+'">F</span>':'')+'</td>';
   h+='<td class="num c-size" title="'+esc(r.DoneSize)+'">'+esc(r.Size)+'</td>';
   h+='<td class="c-progress"><div class="prog"><div class="pbar '+esc(r.State)+'" role="progressbar" aria-valuenow="'+r.Progress.toFixed(1)+'" aria-valuemin="0" aria-valuemax="100" aria-label="'+esc(t('Progress'))+'"><i style="width:'+r.Progress.toFixed(1)+'%"></i></div><span class="pct" aria-hidden="true">'+esc(r.ProgressS)+'</span></div></td>';
   h+='<td class="state c-state"><span class="badge b-'+esc(r.State)+'">'+esc(t(r.StateLabel))+'</span></td>';
@@ -1234,7 +1265,41 @@ function savePaths(){var dl=$('#savepaths'),seen={},html='';var list=state.virtu
 
 // ---------- transfer graph and window title ----------
 var samples=[];
+// tHist keeps each torrent's last 120 speed samples (four minutes at the
+// two-second refresh) for the Speed tab. Only torrents that moved data are
+// kept, at most tHistMax, so a session of thousands costs nothing.
+var tHist=new Map(),tHistLen=120,tHistMax=300;
+function sampleTorrents(){
+  var list=state.virtual?state.allRows.map(function(r){return [r.Hash,+r.DLRate||0,+r.ULRate||0];}):rows().map(function(r){return [r.dataset.hash,+r.dataset.down||0,+r.dataset.up||0];});
+  list.forEach(function(x){
+    var h=tHist.get(x[0]);
+    if(!h){if(!x[1]&&!x[2])return;h=[];tHist.set(x[0],h);}
+    h.push([x[1],x[2]]);if(h.length>tHistLen)h.shift();
+  });
+  if(tHist.size>tHistMax){
+    for(var k of tHist.keys()){if(tHist.size<=tHistMax)break;var hh=tHist.get(k);if(!hh[hh.length-1][0]&&!hh[hh.length-1][1])tHist.delete(k);}
+  }
+  drawTorrentGraph();
+}
+function drawTorrentGraph(){
+  var g=$('#tgraph');if(!g)return;
+  var h=tHist.get(g.dataset.hash)||[];
+  var n=tHistLen,w=300,ht=80;
+  var max=Math.max(1024,Math.max.apply(null,h.map(function(s){return Math.max(s[0],s[1]);}).concat([0])));
+  function path(i){return h.map(function(s,k){var x=(w*(n-h.length+k)/(n-1)).toFixed(1),y=(ht-2-(ht-4)*s[i]/max).toFixed(1);return (k?'L':'M')+x+' '+y;}).join(' ');}
+  var d=path(0),u=path(1);
+  $('#tg-d').setAttribute('d',d);$('#tg-u').setAttribute('d',u);
+  if(h.length>1){var x0=(w*(n-h.length)/(n-1)).toFixed(1);$('#tg-da').setAttribute('d',d+' L'+w+' '+ht+' L'+x0+' '+ht+' Z');}
+  var row=state.virtual?state.allRows.find(function(r){return r.Hash===g.dataset.hash;}):null,dom=row?null:rowByHash(g.dataset.hash);
+  var down=row?row.DLRate:(dom?+dom.dataset.down:0),up=row?row.ULRate:(dom?+dom.dataset.up:0);
+  $('#tg-dl').textContent='↓ '+fmtRate(down);$('#tg-ul').textContent='↑ '+fmtRate(up);
+  var pd=0,pu=0;h.forEach(function(s){pd=Math.max(pd,s[0]);pu=Math.max(pu,s[1]);});
+  $('#tg-peak').textContent=h.length?t('Highest')+': ↓ '+fmtRate(pd)+' · ↑ '+fmtRate(pu):t('No transfer seen yet: the graph fills while the torrent moves data.');
+}
+// fmtRate writes a speed like the server's rate (1024 steps, two decimals).
+function fmtRate(b){b=+b||0;if(b<=0)return '—';var u=['B','KB','MB','GB','TB'],i=0;while(b>=1024&&i<u.length-1){b/=1024;i++;}return (i?b.toFixed(2):Math.round(b))+' '+u[i]+'/s';}
 function sampleGraph(){
+  sampleTorrents();
   var st=$('#statusbar [data-down]');if(!st)return;
   samples.push([+st.dataset.down||0,+st.dataset.up||0]);if(samples.length>60)samples.shift();
   var max=Math.max(1024,Math.max.apply(null,samples.map(function(s){return Math.max(s[0],s[1]);})));
@@ -1417,6 +1482,16 @@ function rowMenu(row,x,y,from){
   openMenu(menu,x,y,from||row);
 }
 
+// stIcon is the small state icon before a torrent's name (decorative: the
+// state is also a column, and the icon's title says it for the mouse). It
+// mirrors the server's stateIcon.
+var stIcons={downloading:'i-dl',downloading_metadata:'i-dl',checking_files:'i-check',seeding:'i-seed',stalled:'i-warn',moving:'i-move',error:'i-xc',disk_wait:'i-disk'};
+var stLabels={downloading:'Downloading',downloading_metadata:'Metadata',checking_files:'Checking',seeding:'Seeding',paused:'Paused',stalled:'Stalled',moving:'Moving',error:'Error',disk_wait:'Waiting for disk space'};
+function stIcon(st,pg){
+  var id=stIcons[st]||(st==='paused'?(+pg>=100?'i-done':'i-pausec'):'i-sleep');
+  var lbl=st==='paused'&&+pg>=100?t('Completed'):t(stLabels[st]||st);
+  return '<span class="sti st-'+esc(st)+'" title="'+esc(lbl)+'" aria-hidden="true"><svg class="i"><use href="#'+id+'"/></svg></span>';
+}
 // ---------- detail drawer ----------
 function setDrawerHeight(h){
   var max=Math.max(160,window.innerHeight-200);h=Math.max(120,Math.min(max,Math.round(h)));
@@ -1438,6 +1513,7 @@ function openDetail(hash,tab){
     if(!wasOpen){var sp=$('#dsplit');sp.setAttribute('aria-valuenow',Math.round(d.getBoundingClientRect().height));sp.setAttribute('aria-valuemin',120);sp.setAttribute('aria-valuemax',Math.max(160,window.innerHeight-200));}
     if(!wasOpen){var c=$('#drawer [data-close-drawer]');if(c)c.focus();}
     groupFiles();
+    drawTorrentGraph();
   });
 }
 // collapsedDirs remembers the collapsed folders per torrent while the drawer
@@ -1508,7 +1584,7 @@ function groupFiles(){
 function closeDetail(){var d=$('#drawer');if(d.hidden)return;d.hidden=true;var h=state.drawer&&state.drawer.hash;state.drawer=null;var r=h&&rowByHash(h);if(r)r.focus();}
 function refreshDetail(){
   var s=state.drawer;if(!s||document.hidden)return;
-  if(['peers','trackers','pieces','general'].indexOf(s.tab)<0)return;
+  if(['peers','trackers','pieces','general','log'].indexOf(s.tab)<0)return;
   if($('#drawer').contains(document.activeElement)&&document.activeElement.matches('input,textarea,select'))return;
   if($('#drawer form.dirty'))return;
   openDetail(s.hash,s.tab);
@@ -1620,7 +1696,7 @@ function submitAdd(form){
   var tree=$('#add-file-tree');
   if(tree&&!tree.hidden&&files.length===1){
     var boxes=$$('input[data-file-index]',tree);
-    if(boxes.length)base.file_priorities=boxes.map(function(b){return b.checked?'4':'0';}).join(',');
+    if(boxes.length)base.file_priorities=boxes.map(function(b){if(!b.checked)return '0';var sel=$('select[data-file-prio="'+b.dataset.fileIndex+'"]',tree);return sel?sel.value:'4';}).join(',');
   }
   var jobs=[],ok=0,fail=[];
   sources.forEach(function(s){var p=new URLSearchParams(base);p.set('source',s);jobs.push(post('/ui/add',p));});
@@ -1778,7 +1854,13 @@ var dragDepth=0;
 window.addEventListener('dragenter',function(e){if(e.dataTransfer&&Array.prototype.indexOf.call(e.dataTransfer.types,'Files')>=0){dragDepth++;$('#dropzone').hidden=false;}});
 window.addEventListener('dragleave',function(){dragDepth=Math.max(0,dragDepth-1);if(!dragDepth)$('#dropzone').hidden=true;});
 window.addEventListener('dragover',function(e){if(e.dataTransfer&&Array.prototype.indexOf.call(e.dataTransfer.types,'Files')>=0)e.preventDefault();});
-window.addEventListener('drop',function(e){dragDepth=0;$('#dropzone').hidden=true;if(!e.dataTransfer||!e.dataTransfer.files.length)return;e.preventDefault();var d=$('#dlg-add');if(!d.open)openDialog(d);setFiles(e.dataTransfer.files);});
+// addDirect: dropped .torrent files are added at once with the default
+// options instead of opening the dialog (the dialog's own checkbox, kept per
+// browser). The Add button always opens the dialog, where it can be turned off.
+function addDirect(){try{return localStorage.getItem('gx-add-direct')==='1';}catch(e){return false;}}
+window.addEventListener('drop',function(e){dragDepth=0;$('#dropzone').hidden=true;if(!e.dataTransfer||!e.dataTransfer.files.length)return;e.preventDefault();var d=$('#dlg-add');if(addDirect()&&!d.open){setFiles(e.dataTransfer.files);submitAdd($('#form-add'));return;}if(!d.open)openDialog(d);setFiles(e.dataTransfer.files);});
+document.addEventListener('change',function(e){if(e.target&&e.target.id==='add-direct'){try{localStorage.setItem('gx-add-direct',e.target.checked?'1':'0');}catch(err){}}});
+(function(){var c=$('#add-direct');if(c)c.checked=addDirect();})();
 document.addEventListener('paste',function(e){var tag=(document.activeElement&&document.activeElement.tagName)||'';if(/INPUT|TEXTAREA/.test(tag)||$('dialog[open]'))return;var text=(e.clipboardData&&e.clipboardData.getData('text'))||'';if(/^\s*(magnet:\?|https?:\/\/\S+\.torrent)/i.test(text)){e.preventDefault();var d=$('#dlg-add');openDialog(d);$('textarea[name=source]',d).value=text.trim();updateAddPreview();}});
 
 function navShow(which){
@@ -1935,6 +2017,7 @@ window.gxClearFilters=function(){state.filter={status:'all',cat:null,tag:null,tr
     <span class="spacer"></span>
     {{if .UpdateAvailable}}<a class="sb-update" href="/ui/settings#maintenance" title="{{tr "A new version of gx-torrent is available: open Settings, Maintenance to see the changes and install it"}}"><span class="dot warn" aria-hidden="true"></span><span>{{tr "Update available"}}</span>{{if .UpdateDate}} <span class="subtle">{{.UpdateDate}}</span>{{end}}</a>{{end}}
     {{if .Standalone}}<button type="button" class="sb-alt" role="switch" aria-checked="{{if .AltSpeed}}true{{else}}false{{end}}" data-alt-speed title="{{tr "Toggle the alternative speed limits (the scheduler's window or the configured alternative limits)"}}"><svg class="i"><use href="#i-clock"/></svg><span class="hide-m">{{tr "Alternative limits"}}</span></button>{{end}}
+    <span class="sb-tot hide-m" title="{{tr "Downloaded / uploaded since start"}}"><span class="sr-only">{{tr "Downloaded / uploaded since start"}}:</span><span class="d" aria-hidden="true">↓</span> <b>{{bytes .TotalDown}}</b> <span class="u" aria-hidden="true">↑</span> <b>{{bytes .TotalUp}}</b></span>
     <button type="button" class="sb-btn" data-global-limits data-dl="{{.GlobalDownKib}}" data-ul="{{.GlobalUpKib}}" data-down="{{.DownRateRaw}}" data-up="{{.UpRateRaw}}" data-down-s="{{.DownloadRate}}" data-up-s="{{.UploadRate}}" title="{{tr "Download and upload speed with the global limits: click to change the limits"}}"><svg class="i d"><use href="#i-down"/></svg><b>{{.DownloadRate}}</b><span class="subtle">({{kibrate .GlobalDownKib}})</span><svg class="i u"><use href="#i-up"/></svg><b>{{.UploadRate}}</b><span class="subtle">({{kibrate .GlobalUpKib}})</span></button>
     <button type="button" class="sb-btn" id="sb-more-btn" aria-expanded="false" aria-controls="sb-more" aria-label="{{tr "Connection details"}}" title="{{tr "Connection details: totals, IP filter, encryption, process"}}"><svg class="i"><use href="#i-info"/></svg></button>
 {{end}}{{define "sbmore"}}
@@ -1983,7 +2066,7 @@ window.gxClearFilters=function(){state.filter={status:'all',cat:null,tag:null,tr
     {{range .Rows}}
     <tr tabindex="-1" aria-selected="false" data-hash="{{.Hash}}" data-name="{{.Name}}" data-state="{{.State}}" data-cat="{{.Category}}" data-tags="{{.Tags}}" data-tracker="{{.Tracker}}" data-tmm="{{if .AutoTMM}}1{{end}}" data-pin="{{if .Pinned}}1{{end}}" data-seq="{{if .Sequential}}1{{end}}" data-fl="{{if .FirstLast}}1{{end}}" data-ss="{{if .SuperSeeding}}1{{end}}" data-dll="{{.DLLimitKib}}" data-ull="{{.ULLimitKib}}" data-down="{{.DLRate}}" data-up="{{.ULRate}}" data-k-name="{{.Name}}" data-k-size="{{.TotalSize}}" data-k-progress="{{.Progress}}" data-k-state="{{.State}}" data-k-seeds="{{.Seeds}}" data-k-peers="{{.Peers}}" data-k-down="{{.DLRate}}" data-k-up="{{.ULRate}}" data-k-eta="{{.ETAVal}}" data-k-ratio="{{.RatioVal}}" data-k-category="{{.Category}}" data-k-tags="{{.Tags}}" data-k-added="{{.AddedVal}}" data-k-completed="{{.CompletedVal}}" data-k-downloaded="{{.DownloadedVal}}" data-k-uploaded="{{.UploadedVal}}" data-k-remaining="{{.RemainingVal}}" data-k-queue="{{.QueuePos}}" data-k-tracker="{{.Tracker}}" data-k-path="{{.SavePath}}" data-k-availability="{{.AvailabilityVal}}" data-k-active="{{.ActiveVal}}" data-k-lastactive="{{.LastActiveVal}}" data-k-wasted="{{.WastedVal}}">
       <td class="sel"><input class="rowsel" type="checkbox" value="{{.Hash}}" aria-label="{{tr "Select torrent"}}" title="{{tr "Select this torrent for batch actions"}}"></td>
-      <td class="name c-name" title="{{.Name}}"><a class="open" href="/?open={{.Hash}}">{{.Name}}</a>{{if .Pinned}}<span class="fl" title="{{tr "Force started: runs outside the queue limits"}}">F</span>{{end}}</td>
+      <td class="name c-name" title="{{.Name}}">{{$st := stateIcon .State .Progress}}<span class="sti st-{{.State}}" title="{{tr $st.Label}}" aria-hidden="true"><svg class="i"><use href="#{{$st.Icon}}"/></svg></span><a class="open" href="/?open={{.Hash}}">{{.Name}}</a>{{if .Pinned}}<span class="fl" title="{{tr "Force started: runs outside the queue limits"}}">F</span>{{end}}</td>
       <td class="num c-size" title="{{.DoneSize}}">{{.Size}}</td>
       <td class="c-progress"><div class="prog"><div class="pbar {{.State}}" role="progressbar" aria-valuenow="{{percent .Progress}}" aria-valuemin="0" aria-valuemax="100" aria-label="{{tr "Progress"}}"><i style="width:{{percent .Progress}}%"></i></div><span class="pct" aria-hidden="true">{{.ProgressS}}</span></div></td>
       <td class="state c-state"><span class="badge b-{{.State}}">{{.StateLabel}}</span></td>
@@ -2041,6 +2124,8 @@ window.gxClearFilters=function(){state.filter={status:'all',cat:null,tag:null,tr
   <button type="button" role="tab" data-tab="peers" aria-selected="{{if eq .Tab "peers"}}true{{else}}false{{end}}" title="{{tr "Connected peers, client software, flags and transfer rates"}}"><span>{{tr "Peers"}}</span> <span class="cnt">{{.PeerCount}}</span></button>
   <button type="button" role="tab" data-tab="trackers" aria-selected="{{if eq .Tab "trackers"}}true{{else}}false{{end}}" title="{{tr "Trackers list, announce URLs, tiers and response status"}}"><span>{{tr "Trackers"}}</span> <span class="cnt">{{.TrackerCount}}</span></button>
   <button type="button" role="tab" data-tab="pieces" aria-selected="{{if eq .Tab "pieces"}}true{{else}}false{{end}}" title="{{tr "Piece availability map and verified chunks"}}">{{tr "Pieces"}}</button>
+  <button type="button" role="tab" data-tab="speed" aria-selected="{{if eq .Tab "speed"}}true{{else}}false{{end}}" title="{{tr "Download and upload speed of this torrent over the last minutes"}}">{{tr "Speed"}}</button>
+  <button type="button" role="tab" data-tab="log" aria-selected="{{if eq .Tab "log"}}true{{else}}false{{end}}" title="{{tr "What happened to this torrent: tracker errors, pieces that failed their check, moves, rechecks"}}">{{tr "Log"}}</button>
 </div>
 <div role="tabpanel">
 {{if .Error}}<p class="notice err">{{.Error}}</p>{{end}}
@@ -2054,7 +2139,14 @@ window.gxClearFilters=function(){state.filter={status:'all',cat:null,tag:null,tr
     <button type="button" class="sm" data-dact="dht" title="{{tr "Query the DHT network for active seeders and peers"}}">{{tr "DHT swarm"}}</button>
     <a class="btn sm" href="/ui/torrent-file?hash={{.Hash}}" download title="{{tr "Export and download the .torrent metainfo file"}}"><svg class="i"><use href="#i-file"/></svg>{{tr "Export .torrent"}}</a>
   </div>
-  <div class="progress {{.State}}" role="progressbar" aria-valuenow="{{percent .Progress}}" aria-valuemin="0" aria-valuemax="100" aria-label="{{tr "Progress"}}" style="height:8px;margin-bottom:14px"><i style="width:{{percent .Progress}}%"></i></div>
+  {{if .PieceBar}}<div class="dbars">
+    <span class="dbar-l" id="dbar-down-l">{{tr "Downloaded"}}</span>
+    <div class="dbar" role="img" aria-labelledby="dbar-down-l dbar-down-v" title="{{tr "Where the downloaded pieces are: full colour is complete, lighter is partly downloaded, grey is missing, dimmed is a skipped file"}}">{{range .PieceBar}}<i class="{{.Class}}" style="opacity:{{.Op}}"></i>{{end}}</div>
+    <span class="dbar-v" id="dbar-down-v">{{percent .Progress}}%</span>
+    {{if .AvailBar}}<span class="dbar-l" id="dbar-av-l">{{tr "Availability"}}</span>
+    <div class="dbar av" role="img" aria-labelledby="dbar-av-l dbar-av-v" title="{{tr "How many connected peers have the pieces still missing: darker is more peers, red is a piece nobody connected has"}}">{{range .AvailBar}}<i class="{{.Class}}" style="opacity:{{.Op}}"></i>{{end}}</div>
+    <span class="dbar-v" id="dbar-av-v">{{if .AvailMissing}}<span class="err-t">{{.AvailMissing}} <span>{{tr "pieces unavailable"}}</span></span>{{else if lt .AvailabilityPct 0.0}}—{{else}}{{printf "%.2f" .AvailabilityPct}}{{end}}</span>{{end}}
+  </div>{{else}}  <div class="progress {{.State}}" role="progressbar" aria-valuenow="{{percent .Progress}}" aria-valuemin="0" aria-valuemax="100" aria-label="{{tr "Progress"}}" style="height:8px;margin-bottom:14px"><i style="width:{{percent .Progress}}%"></i></div>{{end}}
   <div class="kv">
     <div class="row"><span>{{tr "State"}}</span><strong><span>{{tr (stateLabel .State)}}</span></strong></div>
     <div class="row"><span>{{tr "Progress"}}</span><strong>{{percent .Progress}}%</strong></div>
@@ -2205,6 +2297,19 @@ window.gxClearFilters=function(){state.filter={status:'all',cat:null,tag:null,tr
     <label class="wide">{{tr "Add trackers (one per line)"}}<textarea name="urls" rows="3" placeholder="https://tracker.example/announce" title="{{tr "Tracker announce URLs to add, one per line"}}"></textarea></label>
     <div><button type="submit" class="sm" title="{{tr "Add trackers to this torrent"}}">{{tr "Add trackers"}}</button></div>
   </form>
+{{else if eq .Tab "speed"}}
+  <div class="graph tgraph" id="tgraph" data-hash="{{.Hash}}">
+    <svg viewBox="0 0 300 80" preserveAspectRatio="none" role="img" aria-labelledby="tg-cap"><path class="da" id="tg-da"/><path class="d" id="tg-d"/><path class="u" id="tg-u"/></svg>
+    <div class="legend"><span class="d" id="tg-dl">↓ {{rate .DownRate}}</span><span class="muted" id="tg-cap">{{tr "Speed of this torrent, sampled every two seconds since the page was opened"}}</span><span class="u" id="tg-ul">↑ {{rate .UpRate}}</span></div>
+    <p class="muted tg-peak" id="tg-peak" aria-live="polite"></p>
+  </div>
+{{else if eq .Tab "log"}}
+  {{if .Log}}
+  <div class="table-wrap"><table class="tbl tlog">
+    <thead><tr><th scope="col">{{tr "Time"}}</th><th scope="col">{{tr "Event"}}</th><th scope="col">{{tr "Detail"}}</th></tr></thead>
+    <tbody>{{range .Log}}<tr{{if .Bad}} class="bad"{{end}}><td class="num">{{.When}}</td><td>{{tr .Msg}}{{if gt .Count 1}} <span class="badge">×{{.Count}}</span>{{end}}</td><td class="mono">{{.Detail}}</td></tr>{{end}}</tbody>
+  </table></div>
+  {{else}}<p class="muted">{{tr "Nothing has happened to this torrent since gx-torrent started."}}</p>{{end}}
 {{else if eq .Tab "pieces"}}
   {{if .Pieces}}
   <p class="muted"><b>{{.PiecesHave}}/{{.PiecesTotal}}</b> <span>{{tr "pieces downloaded. Green: have, yellow: downloading, grey: missing, dimmed: skipped."}}</span></p>

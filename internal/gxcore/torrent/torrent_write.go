@@ -101,6 +101,17 @@ func (t *torrent) handlePieceWriteDone(pw *piecewriter.PieceWriter) {
 // source kind is known).
 func (t *torrent) punishCorruptSource(pw *piecewriter.PieceWriter) {
 	t.bytesWasted.Inc(int64(len(pw.Buffer.Data)))
+	if t.session != nil {
+		ev := t.baseEvent(EventPieceHashFailed)
+		ev.Piece = pw.Piece.Index
+		switch src := pw.Source.(type) {
+		case *peer.Peer:
+			ev.Peer = src.Addr().String()
+		case *urldownloader.URLDownloader:
+			ev.Source = src.URL
+		}
+		t.session.emit(ev)
+	}
 	switch src := pw.Source.(type) {
 	case *peer.Peer:
 		t.log.Debugln("received corrupt piece from peer", src.String())

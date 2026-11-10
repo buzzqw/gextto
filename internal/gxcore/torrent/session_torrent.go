@@ -340,6 +340,25 @@ func (t *Torrent) PieceStates() ([]string, bool) {
 	return states, states != nil
 }
 
+// PieceAvailability reports, for every piece in index order, how many
+// connected peers have it. False while the torrent is not downloading (no
+// metadata, stopped, or complete: the picker that counts the holders exists
+// only while pieces are being fetched).
+func (t *Torrent) PieceAvailability() ([]uint32, bool) {
+	out := query(t.torrent, func() []uint32 {
+		pp := t.torrent.piecePicker
+		if pp == nil || len(t.torrent.pieces) == 0 {
+			return nil
+		}
+		counts := make([]uint32, len(t.torrent.pieces))
+		for i := range counts {
+			counts[i] = pp.Holders(uint32(i))
+		}
+		return counts
+	})
+	return out, out != nil
+}
+
 // pieceStatesFromBitfield maps a verified bitfield to piece states: "have",
 // "skipped" (deselected file) or "" (missing). Nil when there is nothing to
 // describe.
