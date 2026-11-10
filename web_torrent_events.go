@@ -3539,6 +3539,25 @@ func tevFinishedPack(cfg *Config, torrents TorrentSession, db *Database, event *
 	// files while they are still being copied.
 	guard := AcquireArchiveImport(release.Series)
 	defer guard.Release()
+	processed, err := tevStagePackFiles(cfg, release, matching, source, destination, tmdb)
+	if err != nil {
+		return false, err
+	}
+	if tevAllPackFilesDiscarded(processed) {
+		return tevRejectInferiorPack(cfg, torrents, db, event, release, processed)
+	}
+	entries, newEpisodes, upgradedList := tevPackEntries(release, processed)
+	if err := db.MarkPackCompleted(release, entries, destination, size); err != nil {
+		return false, err
+	}
+	tevReportPack(cfg, db, notifier, event, release, processed, entries, newEpisodes, upgradedList, destination, size)
+	return true, nil
+}
+
+// tevStagePackFiles places each matching file of a pack in the library, or
+// discards it when the library already holds a better copy, and post-processes
+// the placed ones.
+func tevStagePackFiles(cfg *Config, release *models.Release, matching []PackSourceFile, source, destination string, tmdb *TmdbClient) ([]PackFileResult, error) {
 	processed := []PackFileResult{}
 	// Enumerate the destination once and reuse it for every episode:
 	// each episode's "is there a better existing file?" check walks the
@@ -3549,7 +3568,7 @@ func tevFinishedPack(cfg *Config, torrents TorrentSession, db *Database, event *
 		file := matching[index]
 		placed, ok, err := StagePackFile(&file, source, destination, destinationFiles, cfg, release.Quality)
 		if err != nil {
-			return false, err
+			return nil, err
 		}
 		if !ok {
 			processed = append(processed, PackFileResult{
@@ -3561,31 +3580,40 @@ func tevFinishedPack(cfg *Config, torrents TorrentSession, db *Database, event *
 		}
 		partial, err := ProcessPackFiles(context.Background(), []PackInput{{Path: placed, Source: file}}, release, cfg, tmdb)
 		if err != nil {
-			return false, err
+			return nil, err
 		}
 		processed = append(processed, partial...)
 	}
-	allDiscarded := tevAllPackFilesDiscarded(processed)
-	if allDiscarded {
-		restored, err := db.RestoreUpgrade(event.Hash)
-		if err != nil {
-			return false, err
-		}
-		if !restored {
-			if err := db.RollbackRelease(release); err != nil {
-				return false, err
-			}
-		}
-		if err := db.MarkTorrentError(event.Hash, "season pack inferior to existing files"); err != nil {
-			return false, err
-		}
-		logging.Warn(fmt.Sprintf("🗑️ Season pack rejected — «%s» · no episodes kept · discarded %d: %s",
-			release.Title, len(processed), tevPackFileNames(processed)), "hash", event.Hash)
-		// Esito definitivo: il pack è stato scartato per intero. Esce
-		// dalla sessione e la sorgente va nel cestino.
-		tevDiscardCompletedSource(cfg, db, torrents, event, "season pack inferior to existing files")
-		return false, nil
+	return processed, nil
+}
+
+// tevRejectInferiorPack rejects a pack none of whose episodes beat the
+// library: the upgrade it replaced is restored, the release rolled back, and
+// the torrent leaves the session with its source in the trash.
+func tevRejectInferiorPack(cfg *Config, torrents TorrentSession, db *Database, event *models.TorrentEvent, release *models.Release, processed []PackFileResult) (bool, error) {
+	restored, err := db.RestoreUpgrade(event.Hash)
+	if err != nil {
+		return false, err
 	}
+	if !restored {
+		if err := db.RollbackRelease(release); err != nil {
+			return false, err
+		}
+	}
+	if err := db.MarkTorrentError(event.Hash, "season pack inferior to existing files"); err != nil {
+		return false, err
+	}
+	logging.Warn(fmt.Sprintf("🗑️ Season pack rejected — «%s» · no episodes kept · discarded %d: %s",
+		release.Title, len(processed), tevPackFileNames(processed)), "hash", event.Hash)
+	// Esito definitivo: il pack è stato scartato per intero. Esce
+	// dalla sessione e la sorgente va nel cestino.
+	tevDiscardCompletedSource(cfg, db, torrents, event, "season pack inferior to existing files")
+	return false, nil
+}
+
+// tevPackEntries lists the episodes a pack keeps, and splits them into the
+// new ones and those that replace a lower-quality copy.
+func tevPackEntries(release *models.Release, processed []PackFileResult) ([]PackEpisode, []any, []any) {
 	entries := []PackEpisode{}
 	// Separate the episodes the pack adds from those it upgrades: a
 	// pack often arrives right after a single episode was downloaded
@@ -3615,9 +3643,12 @@ func tevFinishedPack(cfg *Config, torrents TorrentSession, db *Database, event *
 		}
 		newEpisodes = append(newEpisodes, entry)
 	}
-	if err := db.MarkPackCompleted(release, entries, destination, size); err != nil {
-		return false, err
-	}
+	return entries, newEpisodes, upgradedList
+}
+
+// tevReportPack logs a completed pack, kept and discarded episodes apart, and
+// sends the season_pack_completed notification.
+func tevReportPack(cfg *Config, db *Database, notifier *Notifier, event *models.TorrentEvent, release *models.Release, processed []PackFileResult, entries []PackEpisode, newEpisodes, upgradedList []any, destination string, size int64) {
 	logging.Info(fmt.Sprintf("🎉 %s complete: %s (%s) added to the library in %s",
 		logTarget(release), countLabel(len(entries), "episode", "episodes"), logging.HumanBytesI64(size), destination), "hash", event.Hash)
 	if release.Series != nil && release.Season != nil {
@@ -3688,7 +3719,6 @@ func tevFinishedPack(cfg *Config, torrents TorrentSession, db *Database, event *
 	// seed and verify it.
 	logging.Debug(fmt.Sprintf("season pack copied to NAS, source kept for seeding · %s · %s",
 		logging.HumanBytesI64(size), destination))
-	return true, nil
 }
 
 // tevRequestLibraryMove asks the engine to move a completed download into the
