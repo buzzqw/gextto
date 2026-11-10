@@ -446,11 +446,33 @@ func torrentNotFoundError(err error) bool {
 // never fatal: the transfer already succeeded.
 func dropStateTorrentFile(stateDir, hash string) {
 	stateDir = strings.TrimSpace(stateDir)
-	hash = strings.ToLower(strings.TrimSpace(hash))
-	if stateDir == "" || hash == "" {
+	name := stateTorrentName(hash)
+	if stateDir == "" || name == "" {
 		return
 	}
-	removeTorrentFile(filepath.Join(stateDir, hash+".torrent"))
+	removeTorrentFile(filepath.Join(stateDir, name))
+}
+
+// stateTorrentName returns the file name of the .torrent copy Gextto keeps in
+// its state folder for one infohash: "<hash>.torrent". The hash arrives from
+// the API and from the engines, and a value carrying a separator or ".." would
+// make the join leave that folder (the copy would be written or removed
+// elsewhere), so anything that is not a v1 (40) or v2 (64) hexadecimal
+// infohash yields "" and the caller touches nothing.
+func stateTorrentName(hash string) string {
+	hash = strings.ToLower(strings.TrimSpace(hash))
+	switch len(hash) {
+	case 40, 64:
+	default:
+		return ""
+	}
+	for i := 0; i < len(hash); i++ {
+		c := hash[i]
+		if (c < '0' || c > '9') && (c < 'a' || c > 'f') {
+			return ""
+		}
+	}
+	return hash + ".torrent"
 }
 
 // removeTorrentFile deletes one Gextto-owned .torrent copy. An already missing

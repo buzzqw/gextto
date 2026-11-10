@@ -1878,7 +1878,11 @@ func resolveTorrentSource(ctx context.Context, engine *Engine, cfg *Config, rawU
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", "", "", err
 	}
-	path = filepath.Join(dir, hash+".torrent")
+	fileName := stateTorrentName(hash)
+	if fileName == "" {
+		return "", "", "", fmt.Errorf("invalid torrent infohash")
+	}
+	path = filepath.Join(dir, fileName)
 	if err := os.WriteFile(path, payload, 0o644); err != nil {
 		return "", "", "", err
 	}

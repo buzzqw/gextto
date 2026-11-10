@@ -588,7 +588,7 @@ func (e *qbittorrentEngine) sync() error {
 		if seen, ok := e.torrentFileSeen[hash]; ok && now.Sub(seen) < gxTorrentFilesRecheck {
 			continue
 		}
-		if fileExists(filepath.Join(e.settings.stateDir, hash+".torrent")) {
+		if name := stateTorrentName(hash); name != "" && fileExists(filepath.Join(e.settings.stateDir, name)) {
 			e.torrentFileSeen[hash] = now
 		} else {
 			export = append(export, hash)
@@ -629,7 +629,11 @@ func (e *qbittorrentEngine) ensureTorrentFile(hash string) {
 	if e.settings.stateDir == "" {
 		return
 	}
-	target := filepath.Join(e.settings.stateDir, hash+".torrent")
+	name := stateTorrentName(hash)
+	if name == "" {
+		return
+	}
+	target := filepath.Join(e.settings.stateDir, name)
 	if fileExists(target) {
 		return
 	}
@@ -1530,11 +1534,15 @@ func (e *qbittorrentEngine) TorrentFilePath(hash string) (string, bool) {
 	if hash == "" {
 		return "", false
 	}
+	name := stateTorrentName(hash)
+	if name == "" {
+		return "", false
+	}
 	for _, dir := range []string{e.stateDir(), e.dataDir()} {
 		if dir == "" {
 			continue
 		}
-		path := filepath.Join(dir, hash+".torrent")
+		path := filepath.Join(dir, name)
 		if fileExists(path) {
 			return path, true
 		}
@@ -1762,11 +1770,15 @@ func (e *qbittorrentEngine) persistTorrentCopy(hash, source string) {
 	if dir == "" {
 		return
 	}
+	name := stateTorrentName(hash)
+	if name == "" {
+		return
+	}
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		logging.Warn("cannot create torrent state directory", "dir", dir, "error", err.Error())
 		return
 	}
-	target := filepath.Join(dir, hash+".torrent")
+	target := filepath.Join(dir, name)
 	if err := copyFileAtomically(source, target); err != nil {
 		logging.Warn("cannot persist qbittorrent .torrent copy", "hash", hash, "error", err.Error())
 	}

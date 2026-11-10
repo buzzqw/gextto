@@ -227,3 +227,32 @@ func TestTorrentBackendOptionsHaveNoEmbedded(t *testing.T) {
 		}
 	}
 }
+
+// TestStateTorrentNameAcceptsOnlyInfohashes keeps the .torrent copy of the state
+// folder inside it: the hash arrives from the API and from the engines, and a
+// value with a separator or ".." would send the write or the removal somewhere
+// else. Both the v1 (40) and the v2 (64) infohash are accepted.
+func TestStateTorrentNameAcceptsOnlyInfohashes(t *testing.T) {
+	v1 := "0123456789abcdef0123456789abcdef01234567"
+	v2 := v1 + v1[:24]
+	cases := map[string]string{
+		v1:                               v1 + ".torrent",
+		strings.ToUpper(v1):              v1 + ".torrent",
+		"  " + v1 + "  ":                 v1 + ".torrent",
+		v2:                               v2 + ".torrent",
+		"":                               "",
+		"   ":                            "",
+		"../escape":                      "",
+		"../../etc/passwd":               "",
+		"/etc/passwd":                    "",
+		v1 + "/../../x":                  "",
+		strings.ReplaceAll(v1, "a", "g"): "",
+		v1[:39]:                          "",
+		v2 + "0":                         "",
+	}
+	for hash, want := range cases {
+		if got := stateTorrentName(hash); got != want {
+			t.Errorf("stateTorrentName(%q) = %q, want %q", hash, got, want)
+		}
+	}
+}
