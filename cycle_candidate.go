@@ -60,7 +60,7 @@ func (p *candidatePass) try(ctx context.Context, candidate models.Release) (stop
 	cfg, engine, db, archive, notifier, torrents, stats := p.cfg, p.engine, p.db, p.archive, p.notifier, p.torrents, p.stats
 	blocklistedHashes, blocklistedTitles, gapTargets := p.blocklistedHashes, p.blocklistedTitles, p.gapTargets
 	quarantinedLinks, readyPending, liveDownloads := p.quarantinedLinks, p.readyPending, p.liveDownloads
-	stallAlternatives, stallScoreDrop, minFreeBytes := p.stallAlternatives, p.stallScoreDrop, p.minFreeBytes
+	stallAlternatives, stallScoreDrop := p.stallAlternatives, p.stallScoreDrop
 	linkFailures := p.linkFailures
 
 	// Stop before starting another download when the daemon is shutting
@@ -237,22 +237,7 @@ func (p *candidatePass) try(ctx context.Context, candidate models.Release) (stop
 	}
 
 	archiveIndex, movieArchive := p.archiveFor(&release)
-	// Per-title "allow upgrades" toggle (default on). The gap flag feeds the
-	// always-on "no orphan older episode" best practice.
-	forbidUpgrade := false
-	if release.Kind == "series" {
-		seriesName := ""
-		if release.Series != nil {
-			seriesName = *release.Series
-		}
-		if series := cfg.FindSeriesMatch(seriesName, release.Season); series != nil {
-			forbidUpgrade = series.DisableUpgrades
-		}
-	} else {
-		if movie := cfg.FindMovieMatchForRelease(&release, false); movie != nil {
-			forbidUpgrade = movie.DisableUpgrades
-		}
-	}
+	forbidUpgrade := p.forbidUpgradeFor(&release)
 	// An "in progress" pack declares how many episodes it holds long before
 	// the .torrent is updated. The file list is already here: keep the pack
 	// when it holds at least one episode we need (a gap or a real upgrade),
@@ -321,25 +306,7 @@ func (p *candidatePass) try(ctx context.Context, candidate models.Release) (stop
 	}
 	score := releaseScore
 	fromArchive := strings.HasPrefix(release.Source, "archive:")
-	decisionReason := approvalReason
-	if fromArchive {
-		decisionReason = "gap_filled"
-	} else if len(gapEpisodes) > 0 {
-		decisionReason = "gap_fill"
-	}
-	if release.LastResort {
-		decisionReason = "last_resort"
-	}
-	// An episode whose download is stuck may now accept an alternative
-	// within the configured tolerance: mark it so the log, the notification
-	// and the torrent's "Motivo" say why this download was started.
-	stallStuckScore := int64(0)
-	stallApplies := false
-	if stuckScore, has := releaseStallScore(&release, stallAlternatives); has && stallScoreDrop > 0 {
-		stallStuckScore = stuckScore
-		stallApplies = true
-		decisionReason = "stall_alternative"
-	}
+	decisionReason, stallStuckScore, stallApplies := p.decisionReasonFor(&release, approvalReason, fromArchive, gapEpisodes)
 	if approved {
 		// The explicit path (or nil, to let the engine choose) is decided by
 		// the engine-independent RAM-disk policy: a known-too-big or
@@ -351,25 +318,8 @@ func (p *candidatePass) try(ctx context.Context, candidate models.Release) (stop
 		// download to another filesystem, so verify the chosen path too.
 		// When no explicit path is forced, mirror the engine fallback so the
 		// volume actually used is the one being checked.
-		checkPath := ""
-		if preferredPath != nil {
-			checkPath = *preferredPath
-		} else {
-			checkPath = preferredDownloadPath(cfg)
-		}
-		if floor := downloadPathFreeSpaceFloor(cfg, checkPath, minFreeBytes); floor != nil && checkPath != "" {
-			free := FreeSpaceBytes(checkPath)
-			if free == nil {
-				stats.Error("min_free_space_unavailable")
-				logging.Warn(fmt.Sprintf("⚠️ %s not downloaded: cannot read the free space of its download folder", logTarget(&release)), "folder", checkPath)
-				return false, nil
-			}
-			if *free < *floor {
-				stats.Error("min_free_space")
-				logging.Warn("cycle: free space below minimum for chosen download path, download skipped",
-					"path", checkPath, "free", logging.HumanBytes(*free), "minimum", logging.HumanBytes(*floor))
-				return false, nil
-			}
+		if p.freeSpaceRefuses(&release, preferredPath) {
+			return false, nil
 		}
 		if deferredHash != "" && !resolveDeferred() {
 			return false, nil
@@ -402,149 +352,241 @@ func (p *candidatePass) try(ctx context.Context, candidate models.Release) (stop
 				_ = db.SetTorrentReason(hash, decisionReason)
 			}
 		}
-		why := "new"
-		switch {
-		case release.Kind == "movie" && approvalReason == "upgrade":
-			why = "better version than the one you have"
-		case release.Kind == "movie" && approvalReason == "restored":
-			// The database remembered this film as removed, but its file is
-			// no longer anywhere: this is a new attempt, not an upgrade.
-			why = "the copy in the library is missing"
-		case release.Kind == "movie" && fromArchive:
-			// A film is not an episode: the archive branch below said
-			// "fills a missing episode" for a movie proposed from the
-			// release archive, which read as nonsense in the log.
-			why = "taken from the release archive"
-		case release.Kind == "movie":
-			why = "new"
-		case fromArchive || len(gapEpisodes) > 0:
-			why = "fills a missing episode"
-			if approvalReason == "upgrade" {
-				why = "fills a missing episode, better quality"
-			}
-		case approvalReason == "upgrade":
-			if archiveCoversRelease(approvalContext.Archive, &release) {
-				why = "better version than the one you have"
-			} else {
-				why = "fills a missing episode"
-			}
-		}
-		if release.LastResort {
-			why = "🆘 last resort: the only copy in the right language, outside the quality profile"
-		}
+		why := downloadWhy(&release, approvalReason, fromArchive, gapEpisodes, approvalContext.Archive)
 		if stallApplies {
 			why = "an alternative while the current download is stuck"
 			logging.Info(fmt.Sprintf("⏱️ %s: current download stuck for over %s, starting an alternative within %d points",
 				logTarget(&release), logDuration(time.Duration(cfg.StallAlternativeAfterMin)*time.Minute), stallScoreDrop),
 				"stuck_score", stallStuckScore, "candidate_score", releaseScore)
 		}
-		logMessage := fmt.Sprintf("📥 Downloading %s — %s (%s)", logTarget(&release), why, friendlyQuality(release.Quality))
-		if cfg.DryRun {
-			logMessage = fmt.Sprintf("🧪 Test mode: would download %s — %s (%s)", logTarget(&release), why, friendlyQuality(release.Quality))
+		p.announceDownload(&release, why, score, decisionReason, approvalReason, gapEpisodes, approvalContext.Archive, preferredPath, isReadyPending, fromArchive)
+	} else {
+		p.recordSkip(&release, score, decisionReason, approvalReason, gapEpisodes)
+	}
+	return false, nil
+}
+
+// forbidUpgradeFor reads the per-title "allow upgrades" switch (on by default).
+func (p *candidatePass) forbidUpgradeFor(release *models.Release) bool {
+	cfg := p.cfg
+	forbidUpgrade := false
+	if release.Kind == "series" {
+		seriesName := ""
+		if release.Series != nil {
+			seriesName = *release.Series
 		}
+		if series := cfg.FindSeriesMatch(seriesName, release.Season); series != nil {
+			forbidUpgrade = series.DisableUpgrades
+		}
+	} else {
+		if movie := cfg.FindMovieMatchForRelease(release, false); movie != nil {
+			forbidUpgrade = movie.DisableUpgrades
+		}
+	}
+	return forbidUpgrade
+}
+
+// decisionReasonFor is the reason a started download records: approved, a
+// gap filled from the feeds or the archive, the last resort, or an alternative
+// to a stuck download (with the stuck download's score).
+func (p *candidatePass) decisionReasonFor(release *models.Release, approvalReason string, fromArchive bool, gapEpisodes []int64) (decisionReason string, stallStuckScore int64, stallApplies bool) {
+	stallAlternatives, stallScoreDrop := p.stallAlternatives, p.stallScoreDrop
+	decisionReason = approvalReason
+	if fromArchive {
+		decisionReason = "gap_filled"
+	} else if len(gapEpisodes) > 0 {
+		decisionReason = "gap_fill"
+	}
+	if release.LastResort {
+		decisionReason = "last_resort"
+	}
+	// An episode whose download is stuck may now accept an alternative
+	// within the configured tolerance: mark it so the log, the notification
+	// and the torrent's "Motivo" say why this download was started.
+	if stuckScore, has := releaseStallScore(release, stallAlternatives); has && stallScoreDrop > 0 {
+		stallStuckScore = stuckScore
+		stallApplies = true
+		decisionReason = "stall_alternative"
+	}
+	return decisionReason, stallStuckScore, stallApplies
+}
+
+// freeSpaceRefuses checks the free space of the folder the download will use,
+// which a tag rule or the RAM disk can move off the default volume.
+func (p *candidatePass) freeSpaceRefuses(release *models.Release, preferredPath *string) bool {
+	cfg, stats, minFreeBytes := p.cfg, p.stats, p.minFreeBytes
+	checkPath := ""
+	if preferredPath != nil {
+		checkPath = *preferredPath
+	} else {
+		checkPath = preferredDownloadPath(cfg)
+	}
+	if floor := downloadPathFreeSpaceFloor(cfg, checkPath, minFreeBytes); floor != nil && checkPath != "" {
+		free := FreeSpaceBytes(checkPath)
+		if free == nil {
+			stats.Error("min_free_space_unavailable")
+			logging.Warn(fmt.Sprintf("⚠️ %s not downloaded: cannot read the free space of its download folder", logTarget(release)), "folder", checkPath)
+			return true
+		}
+		if *free < *floor {
+			stats.Error("min_free_space")
+			logging.Warn("cycle: free space below minimum for chosen download path, download skipped",
+				"path", checkPath, "free", logging.HumanBytes(*free), "minimum", logging.HumanBytes(*floor))
+			return true
+		}
+	}
+	return false
+}
+
+// downloadWhy is the reason the download line gives, in words.
+func downloadWhy(release *models.Release, approvalReason string, fromArchive bool, gapEpisodes []int64, archive *models.ArchiveQualityIndex) string {
+	why := "new"
+	switch {
+	case release.Kind == "movie" && approvalReason == "upgrade":
+		why = "better version than the one you have"
+	case release.Kind == "movie" && approvalReason == "restored":
+		// The database remembered this film as removed, but its file is
+		// no longer anywhere: this is a new attempt, not an upgrade.
+		why = "the copy in the library is missing"
+	case release.Kind == "movie" && fromArchive:
+		// A film is not an episode: the archive branch below said
+		// "fills a missing episode" for a movie proposed from the
+		// release archive, which read as nonsense in the log.
+		why = "taken from the release archive"
+	case release.Kind == "movie":
+		why = "new"
+	case fromArchive || len(gapEpisodes) > 0:
+		why = "fills a missing episode"
 		if approvalReason == "upgrade" {
-			if from := upgradeSourceText(approvalContext.Archive, &release); from != "" {
-				logMessage += " · replacing: " + from
+			why = "fills a missing episode, better quality"
+		}
+	case approvalReason == "upgrade":
+		if archiveCoversRelease(archive, release) {
+			why = "better version than the one you have"
+		} else {
+			why = "fills a missing episode"
+		}
+	}
+	if release.LastResort {
+		why = "🆘 last resort: the only copy in the right language, outside the quality profile"
+	}
+	return why
+}
+
+// announceDownload logs a started download, clears its delay row, counts it
+// and sends the download_started notification.
+func (p *candidatePass) announceDownload(release *models.Release, why string, score int64, decisionReason, approvalReason string, gapEpisodes []int64, archive *models.ArchiveQualityIndex, preferredPath *string, isReadyPending, fromArchive bool) {
+	cfg, db, notifier, stats := p.cfg, p.db, p.notifier, p.stats
+	logMessage := fmt.Sprintf("📥 Downloading %s — %s (%s)", logTarget(release), why, friendlyQuality(release.Quality))
+	if cfg.DryRun {
+		logMessage = fmt.Sprintf("🧪 Test mode: would download %s — %s (%s)", logTarget(release), why, friendlyQuality(release.Quality))
+	}
+	if approvalReason == "upgrade" {
+		if from := upgradeSourceText(archive, release); from != "" {
+			logMessage += " · replacing: " + from
+		}
+	}
+	if destination := releaseDestinationLabel(cfg, release, preferredPath); destination != "" {
+		logMessage += " → " + destination
+	}
+	logHash, _ := releaseHash(release)
+	logging.Info(logMessage, "release", shortTorrentName(release.Title), "from", release.Source, "hash", logHash)
+	logging.Debug("download decision",
+		"target", releaseTarget(release),
+		"quality", releaseQualityLabel(release),
+		"score", score,
+		"reason", decisionReason,
+		"approval_reason", approvalReason,
+		"gap_episodes", episodesLabel(gapEpisodes))
+	if isReadyPending && !cfg.DryRun {
+		// The download is registered: a stale pending row is harmless (the
+		// active hash blocks a second start), so never abort the cycle here.
+		if release.Series != nil && release.Season != nil && release.Episode != nil {
+			if err := db.RemovePending(*release.Series, *release.Season, *release.Episode); err != nil {
+				logging.Warn("could not clear the delayed release", "target", releaseTarget(release), "error", err)
+			}
+		} else if release.Kind == "movie" {
+			if err := db.RemovePendingMovie(release.Title, release.Year); err != nil {
+				logging.Warn("could not clear the delayed movie", "target", releaseTarget(release), "error", err)
 			}
 		}
-		if destination := releaseDestinationLabel(cfg, &release, preferredPath); destination != "" {
-			logMessage += " → " + destination
-		}
-		logHash, _ := releaseHash(&release)
-		logging.Info(logMessage, "release", shortTorrentName(release.Title), "from", release.Source, "hash", logHash)
-		logging.Debug("download decision",
-			"target", releaseTarget(&release),
-			"quality", releaseQualityLabel(&release),
+	}
+	stats.DownloadsStarted++
+	if !cfg.DryRun {
+		recordFeedAccepted(db, cfg, release)
+	}
+	if approvalReason == "upgrade" {
+		p.upgrades++
+	} else {
+		p.newItems++
+	}
+	if fromArchive || len(gapEpisodes) > 0 {
+		stats.GapsFilled++
+	}
+	var magnetHashValue any
+	if hash, ok := releaseHash(release); ok {
+		magnetHashValue = hash
+	}
+	payload := map[string]any{
+		"title":           release.Title,
+		"kind":            release.Kind,
+		"series":          release.Series,
+		"season":          release.Season,
+		"episode":         release.Episode,
+		"source":          release.Source,
+		"magnet_hash":     magnetHashValue,
+		"quality_score":   score,
+		"reason":          decisionReason,
+		"approval_reason": approvalReason,
+		"gap_episodes":    gapEpisodes,
+		"resolution":      release.Quality.Resolution,
+		"video_codec":     release.Quality.Codec,
+		"audio":           release.Quality.Audio,
+		"hdr":             release.Quality.HDR,
+		"language":        release.Quality.Language,
+	}
+	if err := notifier.NotifyEvent("download_started", payload); err != nil {
+		logging.Warn("download notification failed", "error", err)
+	}
+}
+
+// recordSkip counts and logs a refused candidate; a release nobody shares
+// waits on the blocklist.
+func (p *candidatePass) recordSkip(release *models.Release, score int64, decisionReason, approvalReason string, gapEpisodes []int64) {
+	cfg, db := p.cfg, p.db
+	// "Already present / already active" rejections (duplicate or episode
+	// active in the session) are routine, so keep them at debug level to
+	// keep the cycle log readable.
+	switch approvalReason {
+	case "duplicate":
+		p.skips.InLibrary++
+	case "active_episode", "active_pack":
+		p.skips.Downloading++
+	case "dead_swarm_empty", "dead_swarm_upgrade":
+		// Nobody is sharing it: the release waits on the blocklist for the
+		// configured period instead of coming back at every search.
+		p.skips.Other++
+		blockDeadSwarmRelease(db, cfg, release)
+	default:
+		p.skips.Other++
+	}
+	if routineSkipReason(approvalReason) {
+		logging.Debug("download skipped (routine rejection)",
+			"target", releaseTarget(release),
+			"score", score,
+			"reason", decisionReason,
+			"approval_reason", approvalReason)
+	} else {
+		logging.Info(fmt.Sprintf("⏭️ Skipped %s: %s", logTarget(release), skipReasonText(approvalReason)),
+			"release", release.Title)
+		logging.Debug("download skipped",
+			"target", releaseTarget(release),
+			"source", release.Source,
 			"score", score,
 			"reason", decisionReason,
 			"approval_reason", approvalReason,
 			"gap_episodes", episodesLabel(gapEpisodes))
-		if isReadyPending && !cfg.DryRun {
-			// The download is registered: a stale pending row is harmless (the
-			// active hash blocks a second start), so never abort the cycle here.
-			if release.Series != nil && release.Season != nil && release.Episode != nil {
-				if err := db.RemovePending(*release.Series, *release.Season, *release.Episode); err != nil {
-					logging.Warn("could not clear the delayed release", "target", releaseTarget(&release), "error", err)
-				}
-			} else if release.Kind == "movie" {
-				if err := db.RemovePendingMovie(release.Title, release.Year); err != nil {
-					logging.Warn("could not clear the delayed movie", "target", releaseTarget(&release), "error", err)
-				}
-			}
-		}
-		stats.DownloadsStarted++
-		if !cfg.DryRun {
-			recordFeedAccepted(db, cfg, &release)
-		}
-		if approvalReason == "upgrade" {
-			p.upgrades++
-		} else {
-			p.newItems++
-		}
-		if fromArchive || len(gapEpisodes) > 0 {
-			stats.GapsFilled++
-		}
-		var magnetHashValue any
-		if hash, ok := releaseHash(&release); ok {
-			magnetHashValue = hash
-		}
-		payload := map[string]any{
-			"title":           release.Title,
-			"kind":            release.Kind,
-			"series":          release.Series,
-			"season":          release.Season,
-			"episode":         release.Episode,
-			"source":          release.Source,
-			"magnet_hash":     magnetHashValue,
-			"quality_score":   score,
-			"reason":          decisionReason,
-			"approval_reason": approvalReason,
-			"gap_episodes":    gapEpisodes,
-			"resolution":      release.Quality.Resolution,
-			"video_codec":     release.Quality.Codec,
-			"audio":           release.Quality.Audio,
-			"hdr":             release.Quality.HDR,
-			"language":        release.Quality.Language,
-		}
-		if err := notifier.NotifyEvent("download_started", payload); err != nil {
-			logging.Warn("download notification failed", "error", err)
-		}
-	} else {
-		// "Already present / already active" rejections (duplicate or episode
-		// active in the session) are routine, so keep them at debug level to
-		// keep the cycle log readable.
-		switch approvalReason {
-		case "duplicate":
-			p.skips.InLibrary++
-		case "active_episode", "active_pack":
-			p.skips.Downloading++
-		case "dead_swarm_empty", "dead_swarm_upgrade":
-			// Nobody is sharing it: the release waits on the blocklist for the
-			// configured period instead of coming back at every search.
-			p.skips.Other++
-			blockDeadSwarmRelease(db, cfg, &release)
-		default:
-			p.skips.Other++
-		}
-		if routineSkipReason(approvalReason) {
-			logging.Debug("download skipped (routine rejection)",
-				"target", releaseTarget(&release),
-				"score", score,
-				"reason", decisionReason,
-				"approval_reason", approvalReason)
-		} else {
-			logging.Info(fmt.Sprintf("⏭️ Skipped %s: %s", logTarget(&release), skipReasonText(approvalReason)),
-				"release", release.Title)
-			logging.Debug("download skipped",
-				"target", releaseTarget(&release),
-				"source", release.Source,
-				"score", score,
-				"reason", decisionReason,
-				"approval_reason", approvalReason,
-				"gap_episodes", episodesLabel(gapEpisodes))
-		}
 	}
-	return false, nil
 }
 
 // holdForDelay puts the release in the delay queue when its series (its own

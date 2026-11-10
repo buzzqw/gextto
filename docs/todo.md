@@ -33,13 +33,13 @@ Nothing open: every engine item waits for a condition listed under
   CDATA, namespaces, attributes), because the remaining gain is about 12 % of
   the allocations and 7 % of the CPU, not enough for a rewrite without that
   proof.
-- **Functions too long to review** — the candidate pass (`candidatePass.try`, about 490
-  lines with three closures sharing the candidate's state) and the search scheduler
-  (`cycleWorker`): split them by phase, as the completion, the library import, the
-  rename pass, the configuration load and the event worker were. Gate: for each, a
-  behaviour test written before the split — for the candidate pass a release accepted,
-  held by a delay profile, refused by the blocklist and refused because the library
-  holds better; for the scheduler an injectable clock and sleep first.
+- **Functions too long to review** — the search scheduler (`cycleWorker`) and the rest of
+  the candidate pass (`candidatePass.try`, still about 300 lines around the closures that
+  resolve the link and check an in-progress pack): split them by phase, as the
+  completion, the library import, the rename pass, the configuration load, the event
+  worker and the decision tail of the candidate pass were. Gate: for the scheduler, an
+  injectable clock and sleep first; for the closures, a test of a `.torrent` link that
+  fails and falls back to a mirror, with `cycle_candidate_behaviour_test.go` green.
 
 ## Measurements
 
