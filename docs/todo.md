@@ -53,11 +53,6 @@ Nothing open: every engine item waits for a condition listed under
 Ideas proposed but not decided yet. An accepted proposal moves to the matching area with
 its gate; a rejected one moves to *Not planned*.
 
-- **Gextto's Downloads view, the rest of the lessons** — the state filter is in place; still
-  open: details docked below the list, the two bars and the speed graph in the torrent
-  drawer, session totals in the head,
-  with the daemon page's wording. Gate: the qBittorrent engine has no per-piece holder
-  counts, so the availability bar is gx-torrent only.
 - **Autospeed, a quieter signal** — probe the first router past the home line (TTL-limited
   ICMP echoes on unprivileged ping sockets, the first public hop) instead of a TCP connect
   to public resolvers, and use the shared one-way delay of busy uTP peers as a free second

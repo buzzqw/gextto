@@ -327,7 +327,7 @@ state.
 | POST | `/api/torrents/{hash}/no_rename` | exclude a torrent from renaming |
 | POST | `/api/torrents/{hash}/pause` | pause a torrent |
 | GET | `/api/torrents/{hash}/peers` | peers of a torrent |
-| GET | `/api/torrents/{hash}/pieces` | piece map |
+| GET | `/api/torrents/{hash}/pieces` | piece map (gx-torrent and qBittorrent) |
 | GET | `/api/torrents/{hash}/pieces/runs` | pieces being downloaded |
 | POST | `/api/torrents/{hash}/selective` | selective download profile |
 | POST | `/api/torrents/{hash}/reannounce` | reannounce to the trackers |
@@ -558,7 +558,10 @@ server-rendered UI under `/ui`; those HTML routes are not part of this table.
 
 The `{what}` of `GET /api/v1/torrents/{hash}/{what}` is one of `files`,
 `peers`, `trackers`, `webseeds`, `pieces`, `torrent-file`, `scrape`,
-`dhtscrape`, `collections`. The `{action}` of
+`dhtscrape`, `collections`. `pieces` answers the runs (`begin`/`end` inclusive,
+`state`) and, once peers are connected, `availability` (per stretch of the torrent
+the fewest connected peers holding a needed piece, `-1` when nothing is needed),
+`availability_missing` and `availability_most`. The `{action}` of
 `POST /api/v1/torrents/{hash}/{action}` is one of `pause`, `resume`,
 `verify`, `reannounce`, `restart`, `park`, `unpark`, `pin`, `top`, `rename`,
 `rename-file`, `rename-folder`, `move`, `associate`, `seed-limits`,

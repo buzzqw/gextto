@@ -1602,25 +1602,39 @@ func (e *gxTorrentEngine) Trackers(hash string) ([]models.TrackerView, bool, err
 // Gextto piece-diagnostics view. Run End is inclusive (the
 // daemon side).
 func (e *gxTorrentEngine) PieceRuns(hash string) ([]TorrentPieceRun, bool, error) {
+	runs, _, found, err := e.PieceMap(hash)
+	return runs, found, err
+}
+
+// PieceMap returns the piece runs and, when the daemon knows the connected
+// peers' pieces, how many of them hold the pieces still needed.
+func (e *gxTorrentEngine) PieceMap(hash string) ([]TorrentPieceRun, *TorrentPieceAvailability, bool, error) {
 	var payload struct {
 		Runs []struct {
 			Begin int    `json:"begin"`
 			End   int    `json:"end"`
 			State string `json:"state"`
 		} `json:"runs"`
+		Availability []int `json:"availability"`
+		Missing      int   `json:"availability_missing"`
+		Most         int   `json:"availability_most"`
 	}
 	if err := e.do(http.MethodGet, "/api/v1/torrents/"+url.PathEscape(strings.ToLower(hash))+"/pieces", nil, "", &payload); err != nil {
 		var apiErr gxAPIError
 		if errors.As(err, &apiErr) && apiErr.Status == http.StatusNotFound {
-			return nil, false, nil
+			return nil, nil, false, nil
 		}
-		return nil, false, err
+		return nil, nil, false, err
 	}
 	runs := make([]TorrentPieceRun, 0, len(payload.Runs))
 	for _, run := range payload.Runs {
 		runs = append(runs, TorrentPieceRun{Begin: run.Begin, End: run.End, State: run.State})
 	}
-	return runs, true, nil
+	var avail *TorrentPieceAvailability
+	if len(payload.Availability) > 0 {
+		avail = &TorrentPieceAvailability{Cells: payload.Availability, Missing: payload.Missing, Most: payload.Most}
+	}
+	return runs, avail, true, nil
 }
 
 // SetFilePriorities applies one priority per file on the libtorrent/qBittorrent
@@ -2033,6 +2047,16 @@ func (e *gxTorrentEngine) SessionStats() (map[string]int64, error) {
 		return nil, err
 	}
 	return gxSessionStats(stats.Session), nil
+}
+
+// SessionTotals returns the payload bytes downloaded and uploaded since the
+// daemon started, for the head of the Downloads panel.
+func (e *gxTorrentEngine) SessionTotals() (int64, int64, error) {
+	stats, err := e.SessionStats()
+	if err != nil {
+		return 0, 0, err
+	}
+	return stats["net.recv_payload_bytes"], stats["net.sent_payload_bytes"], nil
 }
 
 // gxSessionStats maps the daemon's session counters to libtorrent's counter

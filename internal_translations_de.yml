@@ -1,6 +1,20 @@
 # Bundled German translations for the web UI. The translation database mirrors
 # this catalog: a corrected value here replaces the stored one at the next start.
 deu:
+  "Dati scaricati e inviati da quando il motore torrent è partito": "Seit dem Start der Torrent-Engine herunter- und hochgeladene Daten"
+  "Disponibilità tra i peer": "Verfügbarkeit bei den Peers"
+  "Pezzi che nessun peer connesso ha": "Teile, die kein verbundener Peer hat"
+  "Più è pieno, più peer connessi hanno i pezzi che mancano; rosso: nessuno li ha; spento: niente da scaricare lì.": "Je voller, desto mehr verbundene Peers haben die fehlenden Teile; rot: niemand hat sie; blass: dort ist nichts herunterzuladen."
+  "Disponibilità dei pezzi: %d pezzi mancanti non li ha nessun peer connesso": "Verfügbarkeit der Teile: %d fehlende Teile hat kein verbundener Peer"
+  "Disponibilità dei pezzi: ogni pezzo mancante ha almeno un peer connesso": "Verfügbarkeit der Teile: jedes fehlende Teil hat mindestens einen verbundenen Peer"
+  "niente da scaricare": "nichts herunterzuladen"
+  "nessun peer connesso": "kein verbundener Peer"
+  "almeno %d peer connessi": "mindestens %d verbundene Peers"
+  "Velocità di download media di questo torrent negli ultimi 30 minuti": "Durchschnittliche Download-Geschwindigkeit dieses Torrents in den letzten 30 Minuten"
+  "Velocità di upload media di questo torrent negli ultimi 30 minuti": "Durchschnittliche Upload-Geschwindigkeit dieses Torrents in den letzten 30 Minuten"
+  "media": "Durchschnitt"
+  "Grafico di download e upload di questo torrent, ultimi 30 minuti": "Download- und Upload-Diagramm dieses Torrents, letzte 30 Minuten"
+  "Nessun trasferimento di questo torrent negli ultimi 30 minuti.": "Keine Übertragung dieses Torrents in den letzten 30 Minuten."
   "Tutti i torrent": "Alle Torrents"
   "Filtra per stato": "Nach Status filtern"
   "Mostra solo i torrent in questo stato": "Nur die Torrents in diesem Status anzeigen"

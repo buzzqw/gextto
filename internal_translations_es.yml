@@ -1,6 +1,20 @@
 # Bundled Spanish translations for the web UI. The translation database mirrors
 # this catalog: a corrected value here replaces the stored one at the next start.
 spa:
+  "Dati scaricati e inviati da quando il motore torrent è partito": "Datos descargados y subidos desde que se inició el motor torrent"
+  "Disponibilità tra i peer": "Disponibilidad entre los pares"
+  "Pezzi che nessun peer connesso ha": "Piezas que ningún par conectado tiene"
+  "Più è pieno, più peer connessi hanno i pezzi che mancano; rosso: nessuno li ha; spento: niente da scaricare lì.": "Cuanto más lleno, más pares conectados tienen las piezas que faltan; rojo: nadie las tiene; apagado: nada que descargar ahí."
+  "Disponibilità dei pezzi: %d pezzi mancanti non li ha nessun peer connesso": "Disponibilidad de piezas: ningún par conectado tiene %d piezas que faltan"
+  "Disponibilità dei pezzi: ogni pezzo mancante ha almeno un peer connesso": "Disponibilidad de piezas: cada pieza que falta tiene al menos un par conectado"
+  "niente da scaricare": "nada que descargar"
+  "nessun peer connesso": "ningún par conectado"
+  "almeno %d peer connessi": "al menos %d pares conectados"
+  "Velocità di download media di questo torrent negli ultimi 30 minuti": "Velocidad media de descarga de este torrent en los últimos 30 minutos"
+  "Velocità di upload media di questo torrent negli ultimi 30 minuti": "Velocidad media de subida de este torrent en los últimos 30 minutos"
+  "media": "media"
+  "Grafico di download e upload di questo torrent, ultimi 30 minuti": "Gráfico de descarga y subida de este torrent, últimos 30 minutos"
+  "Nessun trasferimento di questo torrent negli ultimi 30 minuti.": "Ninguna transferencia de este torrent en los últimos 30 minutos."
   "Tutti i torrent": "Todos los torrents"
   "Filtra per stato": "Filtrar por estado"
   "Mostra solo i torrent in questo stato": "Mostrar solo los torrents en este estado"

@@ -860,7 +860,17 @@ func (d *Daemon) handleInspect(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, http.StatusOK, map[string]any{"piece_count": 0, "runs": []pieceRun{}})
 			return
 		}
-		writeJSON(w, http.StatusOK, map[string]any{"piece_count": len(states), "runs": compressPieceRuns(states)})
+		out := map[string]any{"piece_count": len(states), "runs": compressPieceRuns(states)}
+		// Availability: per stretch of the torrent, the fewest connected peers
+		// holding a piece still needed (-1: nothing needed there).
+		if holders, ok := t.PieceAvailability(); ok {
+			if counts, missing, most := availCounts(states, holders, barCells); counts != nil {
+				out["availability"] = counts
+				out["availability_missing"] = missing
+				out["availability_most"] = most
+			}
+		}
+		writeJSON(w, http.StatusOK, out)
 	case "torrent-file":
 		data, err := t.Torrent()
 		if err != nil || len(data) == 0 {

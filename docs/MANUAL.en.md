@@ -650,7 +650,8 @@ with **0 leechers** there is nobody to upload to. Sort with **Sort by** (for the
 whole list at once), filter by name and by tag, and pick a state with the
 buttons above the list (*All torrents*, *Downloading*, *Seeding*, *Paused*,
 *Completed*, *Waiting for seeds*, *Error*), each with its count; an empty
-state is not shown.
+state is not shown. In the panel head, next to the counts, ↓ and ↑ say how much
+the engine downloaded and uploaded since it started.
 
 | Status | What it means | What to do |
 |---|---|---|
@@ -688,7 +689,8 @@ stays visible. The tabs:
 | **Tracker** | add trackers (`tier|url` per line) or remove one |
 | **Content** | the files, with **priority** (Skip, Normal, High, Maximum) and, with gx-torrent, **▶** for streaming |
 | **Peers** | the connected peers |
-| **Pieces** | the piece map: green downloaded, yellow in progress, grey missing |
+| **Pieces** | the piece map: green downloaded, yellow in progress, grey missing. With gx-torrent, below it is the **availability among peers**: the fuller the bar, the more connected peers have the pieces you are missing; red marks pieces no connected peer has. With qBittorrent there is the map only, and the pieces of skipped files show as missing |
+| **Speed** | that torrent's download and upload chart over the last 30 minutes, with average and peak. Gextto records the speed of the torrents that are transferring only, so the chart is already there when you open the tab |
 | **Limits** | ratio, seeding days and bandwidth of that torrent: **-1** uses the global value, **0** removes the limit |
 | **Storage** | **Move storage** to another folder |
 | **History** | every event of that download, from the choice to the library |

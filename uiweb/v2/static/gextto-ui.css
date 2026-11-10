@@ -1760,6 +1760,24 @@ pre.log-view { margin: 0; }
 .piece-run.piece-down { background: #d4a72c; }
 .piece-run.piece-skip { background: #8c959f; opacity: 0.4; }
 .piece-run.piece-missing { background: #d0d7de; }
+/* Availability bar under the map: one cell per stretch of the torrent, fuller
+   the more connected peers hold the pieces still needed there; red where none
+   does. */
+.detail-subhead { margin: 1rem 0 0.25rem; font-size: 0.95rem; }
+.avail-bar {
+  display: flex;
+  width: 100%;
+  height: 12px;
+  margin: 0.5rem 0;
+  border: 1px solid var(--border, #d0d7de);
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--surface-2, #f6f8fa);
+}
+.avail-bar > span { flex: 1 1 0; min-width: 1px; height: 100%; }
+.avail-bar .avail-avail { background: var(--accent, #2da44e); }
+.avail-bar .avail-none { background: var(--err, #cf222e); }
+.avail-bar .avail-done { background: transparent; }
 
 /* Library poster cards (Series/Movies): the Explore grid, with the title's own
    data under the cover; the switch sits in the panel head. */

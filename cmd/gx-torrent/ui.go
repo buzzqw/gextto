@@ -426,13 +426,15 @@ func pieceBarCells(states []string) []uiBarCell {
 	return out
 }
 
-// availBarCells groups the per-piece holder counts like pieceBarCells: each
-// cell shows the fewest peers holding one of its wanted, missing pieces (the
-// pieces already here do not need a source). It returns the cells, how many
-// wanted pieces nobody connected has, and the highest count seen.
-func availBarCells(states []string, holders []uint32) ([]uiBarCell, int, uint32) {
+// availCounts groups the per-piece holder counts into at most cells stretches:
+// each gives the fewest peers holding one of its wanted, missing pieces (the
+// pieces already here do not need a source), or -1 when the stretch needs
+// nothing. It also returns how many wanted pieces nobody connected has, and the
+// highest count seen. The daemon page and Gextto's piece tab draw the same
+// numbers.
+func availCounts(states []string, holders []uint32, cells int) ([]int, int, uint32) {
 	n := len(holders)
-	if n == 0 || len(states) != n {
+	if n == 0 || len(states) != n || cells <= 0 {
 		return nil, 0, 0
 	}
 	var most uint32
@@ -440,8 +442,8 @@ func availBarCells(states []string, holders []uint32) ([]uiBarCell, int, uint32)
 		most = max(most, h)
 	}
 	missing := 0
-	cells := min(n, barCells)
-	out := make([]uiBarCell, cells)
+	cells = min(n, cells)
+	out := make([]int, cells)
 	for c := range out {
 		lo, hi := c*n/cells, (c+1)*n/cells
 		fewest, needed := uint32(0), false
@@ -457,8 +459,25 @@ func availBarCells(states []string, holders []uint32) ([]uiBarCell, int, uint32)
 				missing++
 			}
 		}
+		out[c] = -1
+		if needed {
+			out[c] = int(fewest)
+		}
+	}
+	return out, missing, most
+}
+
+// availBarCells turns availCounts into the cells of the General tab's
+// availability bar.
+func availBarCells(states []string, holders []uint32) ([]uiBarCell, int, uint32) {
+	counts, missing, most := availCounts(states, holders, barCells)
+	if counts == nil {
+		return nil, 0, 0
+	}
+	out := make([]uiBarCell, len(counts))
+	for c, fewest := range counts {
 		switch {
-		case !needed:
+		case fewest < 0:
 			out[c] = uiBarCell{Op: "1", Class: "done"}
 		case fewest == 0:
 			out[c] = uiBarCell{Op: "1", Class: "none"}

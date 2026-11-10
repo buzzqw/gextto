@@ -1213,6 +1213,55 @@ func (e *qbittorrentEngine) SkippedVideoFiles(hash string) ([]string, bool, erro
 	return skipped, true, nil
 }
 
+// SessionTotals returns the bytes downloaded and uploaded since qBittorrent
+// started (transfer/info dl_info_data and up_info_data).
+func (e *qbittorrentEngine) SessionTotals() (int64, int64, error) {
+	ctx, cancel := e.requestContext()
+	defer cancel()
+	info, err := e.client.TransferInfo(ctx)
+	if err != nil {
+		return 0, 0, err
+	}
+	return engineNum(info, "dl_info_data"), engineNum(info, "up_info_data"), nil
+}
+
+// PieceRuns reads qBittorrent's per-piece states and groups them into runs for
+// the piece map. qBittorrent does not say which pieces belong to skipped
+// files, so a skipped piece shows as missing.
+func (e *qbittorrentEngine) PieceRuns(hash string) ([]TorrentPieceRun, bool, error) {
+	ctx, cancel := e.requestContext()
+	defer cancel()
+	states, err := e.client.PieceStates(ctx, hash)
+	if err != nil {
+		if errors.Is(err, qbittorrent.ErrNotFound) {
+			return nil, false, nil
+		}
+		return nil, false, err
+	}
+	return qbitPieceRuns(states), true, nil
+}
+
+// qbitPieceRuns groups qBittorrent piece states (0 missing, 1 downloading,
+// 2 downloaded) into runs with the names the piece map uses.
+func qbitPieceRuns(states []int) []TorrentPieceRun {
+	runs := make([]TorrentPieceRun, 0, 8)
+	for index, value := range states {
+		state := "" // missing, as gx-torrent reports it
+		switch value {
+		case 1:
+			state = "downloading"
+		case 2:
+			state = "have"
+		}
+		if last := len(runs) - 1; last >= 0 && runs[last].State == state {
+			runs[last].End = index
+			continue
+		}
+		runs = append(runs, TorrentPieceRun{Begin: index, End: index, State: state})
+	}
+	return runs
+}
+
 func (e *qbittorrentEngine) Peers(hash string) ([]models.PeerView, bool, error) {
 	ctx, cancel := e.requestContext()
 	defer cancel()

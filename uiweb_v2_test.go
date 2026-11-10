@@ -57,7 +57,7 @@ func v2Request(t *testing.T, server *httptest.Server, method, path string, form 
 func TestV2DetailCapsFollowCapabilityMatrix(t *testing.T) {
 	want := map[string]v2DetailCaps{
 		BackendGxTorrent:   {SuperSeeding: true, WebSeeds: true, Pieces: true, RateLimits: true, Connections: true, FileLevels: true},
-		BackendQbittorrent: {SuperSeeding: true, WebSeeds: false, Pieces: false, RateLimits: true, Connections: false, FileLevels: true},
+		BackendQbittorrent: {SuperSeeding: true, WebSeeds: false, Pieces: true, RateLimits: true, Connections: false, FileLevels: true},
 	}
 	for backend, expected := range want {
 		got := v2DetailCapsFor(backend)

@@ -3,6 +3,20 @@
 # key is inserted and a corrected value replaces the stored one. Keys are the
 # Italian source strings used with `ctx_tr`.
 eng:
+  "Dati scaricati e inviati da quando il motore torrent è partito": "Data downloaded and uploaded since the torrent engine started"
+  "Disponibilità tra i peer": "Availability among peers"
+  "Pezzi che nessun peer connesso ha": "Pieces no connected peer has"
+  "Più è pieno, più peer connessi hanno i pezzi che mancano; rosso: nessuno li ha; spento: niente da scaricare lì.": "The fuller, the more connected peers have the missing pieces; red: nobody has them; faded: nothing to download there."
+  "Disponibilità dei pezzi: %d pezzi mancanti non li ha nessun peer connesso": "Piece availability: %d missing pieces are held by no connected peer"
+  "Disponibilità dei pezzi: ogni pezzo mancante ha almeno un peer connesso": "Piece availability: every missing piece has at least one connected peer"
+  "niente da scaricare": "nothing to download"
+  "nessun peer connesso": "no connected peer"
+  "almeno %d peer connessi": "at least %d connected peers"
+  "Velocità di download media di questo torrent negli ultimi 30 minuti": "Average download speed of this torrent in the last 30 minutes"
+  "Velocità di upload media di questo torrent negli ultimi 30 minuti": "Average upload speed of this torrent in the last 30 minutes"
+  "media": "average"
+  "Grafico di download e upload di questo torrent, ultimi 30 minuti": "Download and upload chart of this torrent, last 30 minutes"
+  "Nessun trasferimento di questo torrent negli ultimi 30 minuti.": "No transfer for this torrent in the last 30 minutes."
   "Tutti i torrent": "All torrents"
   "Filtra per stato": "Filter by state"
   "Mostra solo i torrent in questo stato": "Show only the torrents in this state"

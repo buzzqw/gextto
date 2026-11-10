@@ -1544,3 +1544,26 @@ func TestGxEngineListAndSnapshotRunConcurrently(t *testing.T) {
 	}
 	wg.Wait()
 }
+
+// TestGxPieceMapReadsAvailability: the daemon's availability cells reach the
+// detail view; a daemon without them gives a nil availability.
+func TestGxPieceMapReadsAvailability(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"piece_count":          4,
+			"runs":                 []map[string]any{{"begin": 0, "end": 3, "state": ""}},
+			"availability":         []int{0, 2, -1},
+			"availability_missing": 1,
+			"availability_most":    2,
+		})
+	}))
+	defer server.Close()
+	e := &gxTorrentEngine{settings: gxTorrentSettings{BaseURL: server.URL, Timeout: time.Second}, client: server.Client()}
+	runs, avail, found, err := e.PieceMap("ABC")
+	if err != nil || !found || len(runs) != 1 || avail == nil {
+		t.Fatalf("PieceMap: runs=%v avail=%v found=%v err=%v", runs, avail, found, err)
+	}
+	if avail.Missing != 1 || avail.Most != 2 || len(avail.Cells) != 3 || avail.Cells[2] != -1 {
+		t.Fatalf("availability %+v", avail)
+	}
+}

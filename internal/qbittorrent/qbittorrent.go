@@ -613,6 +613,18 @@ func (c *Client) Files(ctx context.Context, hash string) ([]File, error) {
 	return files, nil
 }
 
+// PieceStates returns one state per piece of a torrent (torrents/pieceStates):
+// 0 not downloaded, 1 being downloaded, 2 downloaded. A torrent without
+// metadata yet answers an empty list.
+func (c *Client) PieceStates(ctx context.Context, hash string) ([]int, error) {
+	query := url.Values{"hash": {strings.ToLower(hash)}}
+	var states []int
+	if err := c.getJSON(ctx, "/api/v2/torrents/pieceStates?"+query.Encode(), &states); err != nil {
+		return nil, err
+	}
+	return states, nil
+}
+
 // Tracker is one entry of /torrents/trackers.
 type Tracker struct {
 	URL      string `json:"url"`

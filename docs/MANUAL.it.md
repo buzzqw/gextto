@@ -658,7 +658,8 @@ con **0 leecher** non c'è nessuno a cui caricare. Ordini con **Ordina per** (pe
 tutta la lista insieme), filtri per nome e per tag, e scegli uno stato con i
 pulsanti sopra l'elenco (*Tutti i torrent*, *In scarico*, *In seed*, *In pausa*,
 *Completati*, *In attesa di seed*, *Errore*), ognuno con il suo conteggio; uno
-stato vuoto non compare.
+stato vuoto non compare. Nella testa del pannello, accanto ai conteggi, ↓ e ↑
+dicono quanto il motore ha scaricato e inviato da quando è partito.
 
 | Stato | Cosa significa | Cosa fare |
 |---|---|---|
@@ -696,7 +697,8 @@ resta visibile. Le schede:
 | **Tracker** | aggiungi tracker (`tier|url` per riga) o rimuovine uno |
 | **Contenuto** | i file, con la **priorità** (Salta, Normale, Alta, Massima) e, con gx-torrent, **▶** per lo streaming |
 | **Peers** | i peer connessi |
-| **Pezzi** | la mappa dei pezzi: verde scaricato, giallo in corso, grigio mancante |
+| **Pezzi** | la mappa dei pezzi: verde scaricato, giallo in corso, grigio mancante. Con gx-torrent sotto c'è la **disponibilità tra i peer**: più la barra è piena, più peer connessi hanno i pezzi che ti mancano; il rosso indica pezzi che nessun peer connesso ha. Con qBittorrent c'è la sola mappa, e i pezzi dei file saltati risultano mancanti |
+| **Velocità** | il grafico di download e upload di quel torrent negli ultimi 30 minuti, con media e picco. Gextto registra la velocità solo dei torrent che stanno trasferendo, quindi il grafico c'è già quando apri la scheda |
 | **Limiti** | rapporto, giorni di seed e banda di quel torrent: **-1** usa il valore globale, **0** toglie il limite |
 | **Storage** | **Sposta storage** in un'altra cartella |
 | **Storia** | ogni evento di quel download, dalla scelta all'arrivo in libreria |

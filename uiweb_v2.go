@@ -1207,6 +1207,8 @@ type v2TorrentsView struct {
 	// groups with their counts, for the filter buttons.
 	StateFilter string
 	StateChips  []v2StateChip
+	// Totals is what the engine moved since it started, for the panel head.
+	Totals v2SessionTotalsView
 	// Speed is the exception and the rule shown by the bandwidth menu.
 	Speed               uiSpeedState
 	AutoRemoveCompleted bool
@@ -1621,6 +1623,7 @@ func v2TorrentsViewFrom(s *AppState, r *http.Request, message string, isErr bool
 		TagFilter:           tagFilter,
 		StateFilter:         stateFilter,
 		StateChips:          stateChips,
+		Totals:              v2SessionTotalsFrom(s),
 		Speed:               settings.Speed,
 		AutoRemoveCompleted: settings.AutoRemoveCompleted,
 		Message:             message,
@@ -1790,6 +1793,37 @@ type v2DetailTab struct {
 
 type v2KV struct{ Label, Value, Hint string }
 
+// v2AvailCell is one cell of the availability bar: done (nothing needed),
+// none (no connected peer has a needed piece) or avail, with an opacity that
+// grows with the number of holders.
+type v2AvailCell struct {
+	Class   string
+	Op      string
+	Holders int
+}
+
+// v2AvailCells maps the engine's per-stretch holder counts to bar cells, with
+// the same shading as the daemon's own page.
+func v2AvailCells(avail *TorrentPieceAvailability) []v2AvailCell {
+	out := make([]v2AvailCell, len(avail.Cells))
+	for index, fewest := range avail.Cells {
+		switch {
+		case fewest < 0:
+			out[index] = v2AvailCell{Class: "done", Op: "1", Holders: -1}
+		case fewest == 0:
+			out[index] = v2AvailCell{Class: "none", Op: "1"}
+		default:
+			most := avail.Most
+			if most < 1 {
+				most = 1
+			}
+			op := math.Min(0.3+0.7*float64(fewest)/float64(most), 1)
+			out[index] = v2AvailCell{Class: "avail", Op: strconv.FormatFloat(op, 'f', 2, 64), Holders: fewest}
+		}
+	}
+	return out
+}
+
 // v2PieceRun is one run of consecutive pieces sharing a state, with the width
 // (percentage) used to draw the piece map.
 type v2PieceRun struct {
@@ -1820,7 +1854,14 @@ type v2DetailView struct {
 	PieceCount  int
 	PiecesDone  int
 	PiecesReady bool
-	Error       string
+	// Avail is the availability bar of the Pieces tab (gx-torrent only).
+	Avail []v2AvailCell
+	// AvailMissing counts the needed pieces no connected peer has.
+	AvailMissing int
+	AvailKnown   bool
+	// Speed is the Speed tab's chart of this torrent.
+	Speed v2TorrentSpeedView
+	Error string
 	// TabError explains why a tab is empty (engine unreachable, unsupported).
 	TabError string
 	// Notice is the toast shown after a detail action: saving a tab must not
@@ -1967,7 +2008,7 @@ func v2DetailViewFrom(s *AppState, hash, tab string) v2DetailView {
 			view.Tabs = append(view.Tabs, v2DetailTab{ID: "pieces", Label: "Pezzi"})
 		}
 	}
-	view.Tabs = append(view.Tabs, v2DetailTab{ID: "history", Label: "Storia"})
+	view.Tabs = append(view.Tabs, v2DetailTab{ID: "speed", Label: "Velocità"}, v2DetailTab{ID: "history", Label: "Storia"})
 	view.AcqID = logging.AcqID(hash)
 	for index := range view.Tabs {
 		view.Tabs[index].Active = view.Tabs[index].ID == tab
@@ -2103,10 +2144,20 @@ func v2DetailViewFrom(s *AppState, hash, tab string) v2DetailView {
 		if view.History, historyErr = s.db.AcquisitionEvents(hash); historyErr != nil {
 			view.TabError = uiTextf(s, "Storia non disponibile: %s", historyErr.Error())
 		}
+	case "speed":
+		view.Speed = v2TorrentSpeedViewFrom(s.rate_history.torrentSamples(hash), time.Now())
 	case "pieces":
 		if inspector, ok := s.activeEngine().(TorrentPieceInspector); ok {
 			var runs []TorrentPieceRun
-			runs, _, tabErr = inspector.PieceRuns(hash)
+			if mapper, ok := s.activeEngine().(TorrentPieceMapper); ok {
+				var avail *TorrentPieceAvailability
+				runs, avail, _, tabErr = mapper.PieceMap(hash)
+				if avail != nil {
+					view.Avail, view.AvailMissing, view.AvailKnown = v2AvailCells(avail), avail.Missing, true
+				}
+			} else {
+				runs, _, tabErr = inspector.PieceRuns(hash)
+			}
 			total := 0
 			for _, run := range runs {
 				total += run.End - run.Begin + 1

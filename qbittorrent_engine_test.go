@@ -144,7 +144,9 @@ func (f *fakeQB) serveHTTP(w http.ResponseWriter, r *http.Request) {
 	case "/api/v2/sync/torrentPeers":
 		_, _ = w.Write([]byte(`{"peers":{"a":{"ip":"1.2.3.4","port":6881,"client":"qBit","progress":0.2,"dl_speed":10,"connection":"μTP","flags":"E I"}}}`))
 	case "/api/v2/transfer/info":
-		_, _ = w.Write([]byte(`{"dl_info_speed":100,"up_info_speed":50}`))
+		_, _ = w.Write([]byte(`{"dl_info_speed":100,"up_info_speed":50,"dl_info_data":3000,"up_info_data":1200}`))
+	case "/api/v2/torrents/pieceStates":
+		_, _ = w.Write([]byte(`[2,2,1,0]`))
 	default:
 		// Every remaining mutation is accepted and recorded.
 		f.record(r.URL.Path, r.PostForm)
@@ -607,3 +609,16 @@ func TestQbittorrentEngineApplyOptimization(t *testing.T) {
 // hexadecimal value, because the name is built from a hash that arrives from
 // the API and the engines.
 const testStateInfohash = "0123456789abcdef0123456789abcdef01234567"
+
+// The piece map and the session totals come from qBittorrent's own endpoints.
+func TestQbittorrentEnginePieceRunsAndTotals(t *testing.T) {
+	_, engine, _ := newFakeQBEngine(t)
+	runs, found, err := engine.PieceRuns("abc")
+	if err != nil || !found || len(runs) != 3 || runs[0].State != "have" || runs[1].State != "downloading" || runs[2].State != "" {
+		t.Fatalf("PieceRuns = %+v found=%v err=%v", runs, found, err)
+	}
+	down, up, err := engine.SessionTotals()
+	if err != nil || down != 3000 || up != 1200 {
+		t.Fatalf("SessionTotals = %d/%d err=%v", down, up, err)
+	}
+}

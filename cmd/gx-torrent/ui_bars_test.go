@@ -55,3 +55,20 @@ func TestAvailBarCells(t *testing.T) {
 		t.Fatal("mismatched lengths gave cells")
 	}
 }
+
+// availCounts gives, per stretch, the fewest holders of a needed piece, -1 when
+// the stretch needs nothing; availBarCells draws the same numbers.
+func TestAvailCounts(t *testing.T) {
+	states := []string{"have", "", "", "skipped"}
+	holders := []uint32{5, 0, 3, 1}
+	counts, missing, most := availCounts(states, holders, 4)
+	if want := []int{-1, 0, 3, -1}; len(counts) != 4 || counts[0] != want[0] || counts[1] != want[1] || counts[2] != want[2] || counts[3] != want[3] {
+		t.Fatalf("counts %v, want %v", counts, want)
+	}
+	if missing != 1 || most != 5 {
+		t.Fatalf("missing %d most %d", missing, most)
+	}
+	if c, _, _ := availCounts(states, holders[:2], 4); c != nil {
+		t.Fatal("mismatched lengths gave cells")
+	}
+}

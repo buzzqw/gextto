@@ -64,7 +64,29 @@
     <div class="piece-map" role="img" aria-label="{{tr "Mappa dei pezzi: %d su %d scaricati" .PiecesDone .PieceCount}}">
       {{range .Pieces}}<span class="piece-run piece-{{if eq .State "have"}}have{{else if eq .State "downloading"}}down{{else if eq .State "skipped"}}skip{{else}}missing{{end}}" style="width:{{.Pct}}%" title="{{if eq .State "have"}}{{tr "scaricato"}}{{else if eq .State "downloading"}}{{tr "in corso"}}{{else if eq .State "skipped"}}{{tr "saltato"}}{{else}}{{tr "mancante"}}{{end}} · {{tr "pezzi %d–%d" .Begin .End}}"></span>{{end}}
     </div>
+    {{if .AvailKnown}}
+    <h4 class="detail-subhead">{{tr "Disponibilità tra i peer"}}</h4>
+    <p class="hint">{{if .AvailMissing}}<span>{{tr "Pezzi che nessun peer connesso ha"}}</span>: {{.AvailMissing}}. {{end}}<span>{{tr "Più è pieno, più peer connessi hanno i pezzi che mancano; rosso: nessuno li ha; spento: niente da scaricare lì."}}</span></p>
+    <div class="avail-bar" role="img" aria-label="{{if .AvailMissing}}{{tr "Disponibilità dei pezzi: %d pezzi mancanti non li ha nessun peer connesso" .AvailMissing}}{{else}}{{tr "Disponibilità dei pezzi: ogni pezzo mancante ha almeno un peer connesso"}}{{end}}">{{range .Avail}}<span class="avail-{{.Class}}" style="opacity:{{.Op}}" title="{{if eq .Class "done"}}{{tr "niente da scaricare"}}{{else if eq .Class "none"}}{{tr "nessun peer connesso"}}{{else}}{{tr "almeno %d peer connessi" .Holders}}{{end}}"></span>{{end}}</div>
+    {{end}}
   {{else}}<p class="muted">{{tr "Mappa dei pezzi non disponibile: metadata non ancora presenti."}}</p>{{end}}
+{{else if eq .Tab "speed"}}{{$v := .Speed}}
+  <div class="traffic detail-traffic">
+    {{if $v.HasData}}<div class="traffic-legend">
+      <span class="traffic-stat down" {{trTitle "Velocità di download media di questo torrent negli ultimi 30 minuti"}}><span aria-hidden="true">↓</span> <span>{{tr "media"}}</span> {{$v.AvgDown}}</span>
+      <span class="traffic-stat up" {{trTitle "Velocità di upload media di questo torrent negli ultimi 30 minuti"}}><span aria-hidden="true">↑</span> <span>{{tr "media"}}</span> {{$v.AvgUp}}</span>
+      <span class="muted traffic-peak"><span class="traffic-peak-figure" {{trTitle "Picco di download nel periodo"}}><span class="traffic-peak-label">{{tr "Picco download"}}</span> {{$v.PeakDown}}</span>
+      <span class="traffic-peak-figure" {{trTitle "Picco di upload nel periodo"}}><span class="traffic-peak-label">{{tr "Picco upload"}}</span> {{$v.PeakUp}}</span></span>
+    </div>
+    <svg class="traffic-chart" viewBox="0 0 {{$v.Width}} {{$v.Height}}" preserveAspectRatio="none" role="img" aria-label="{{tr "Grafico di download e upload di questo torrent, ultimi 30 minuti"}}">
+      <polygon class="traffic-area down" points="{{$v.DownArea}}" />
+      <polyline class="traffic-line up" points="{{$v.UpPoints}}" />
+      <polyline class="traffic-line down" points="{{$v.DownPoints}}" />
+    </svg>
+    <div class="traffic-axis"><span>0</span><span>{{$v.ScaleLabel}}</span></div>
+    {{else if $v.Idle}}<p class="muted traffic-idle">{{tr "Nessun trasferimento di questo torrent negli ultimi 30 minuti."}}</p>
+    {{else}}<p class="muted">{{tr "Raccolta dati in corso…"}}</p>{{end}}
+  </div>
 {{else if eq .Tab "history"}}
   {{if .TabError}}<p class="alert">{{tr .TabError}}</p>{{end}}
   {{template "v2_acquisition_events" (dict "Events" .History "AcqID" .AcqID "ShowTitle" false)}}

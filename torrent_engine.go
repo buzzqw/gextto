@@ -99,6 +99,23 @@ type TorrentPieceInspector interface {
 	PieceRuns(hash string) ([]TorrentPieceRun, bool, error)
 }
 
+// TorrentPieceAvailability is how many connected peers hold the pieces still
+// needed, in fixed stretches of the torrent: each cell is the fewest holders of
+// a needed piece in that stretch, -1 when the stretch needs nothing. Missing is
+// how many needed pieces no connected peer has; Most the highest count seen.
+type TorrentPieceAvailability struct {
+	Cells   []int `json:"cells"`
+	Missing int   `json:"missing"`
+	Most    int   `json:"most"`
+}
+
+// TorrentPieceMapper is implemented by backends that report the piece map and
+// the availability in one call (gx-torrent). Availability is nil when the
+// engine does not know it.
+type TorrentPieceMapper interface {
+	PieceMap(hash string) ([]TorrentPieceRun, *TorrentPieceAvailability, bool, error)
+}
+
 // TorrentEngine is the full surface shared by the HTTP API and the acquisition
 // path. Backends that cannot implement an operation must return an explicit
 // error (ErrCapabilityUnavailable) instead of pretending success.
@@ -186,7 +203,7 @@ var capabilityLevels = map[string]map[string]string{
 		"recheck": "full", "move": "full", "limits": "full", "files": "full", "peers": "full",
 		"trackers": "full", "events": "full", "stats": "full", "sequential": "full",
 		"first_last": "full", "seed_policy": "partial", "ramdisk": "none", "fastresume": "none",
-		"piece_diagnostics": "none", "categories": "full", "tags": "full", "sync": "full",
+		"piece_diagnostics": "partial", "categories": "full", "tags": "full", "sync": "full",
 		"super_seeding": "partial", "seed_mode": "full",
 		"connections": "none", "file_priorities": "full",
 		"ip_filter": "partial", "session_stats": "partial", "web_seeds": "none",

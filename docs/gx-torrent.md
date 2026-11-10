@@ -2025,11 +2025,16 @@ unknown range answers `1h`).
 
 `GET /api/v1/torrents/{hash}/pieces` reports the status of every piece as
 compact intervals (`begin`/`end` inclusive, `state`): `have` (downloaded),
-`downloading` (in progress), `skipped` (excluded file) or `""` (missing). The daemon's
-web page has a **Pieces** tab with the coloured map; Gextto shows the
-same map in the **Pieces** tab of the torrent detail. gx-torrent is the first
-Gextto engine to expose piece diagnostics (libtorrent responds "not
-available").
+`downloading` (in progress), `skipped` (excluded file) or `""` (missing). When the
+daemon knows the connected peers' pieces, the answer also carries `availability`:
+the torrent cut into up to 160 stretches, each holding the fewest connected peers
+that have a piece still needed there (`-1`: nothing needed), with
+`availability_missing` (needed pieces no connected peer has) and
+`availability_most` (the highest count). The daemon's web page has a **Pieces** tab
+with the coloured map and the availability bar in **General**; Gextto shows the
+map and, under it, the same availability bar in the **Pieces** tab of the torrent
+detail. With qBittorrent Gextto draws the map from `torrents/pieceStates`, without
+availability and without the skipped state.
 
 ## Web seeds (BEP 19)
 

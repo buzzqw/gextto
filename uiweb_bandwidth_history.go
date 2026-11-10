@@ -54,13 +54,18 @@ type rateHistory struct {
 	mu       sync.RWMutex
 	samples  []rateSample
 	capacity int
+	// torrents is the per-torrent history of the Speed tab, totals the
+	// engine's session totals; both are sampled on the same tick.
+	torrents *torrentRateHistory
+	totals   *sessionTotals
 }
 
 func newRateHistory(capacity int) *rateHistory {
 	if capacity <= 0 {
 		capacity = 1
 	}
-	return &rateHistory{samples: make([]rateSample, 0, capacity), capacity: capacity}
+	return &rateHistory{samples: make([]rateSample, 0, capacity), capacity: capacity,
+		torrents: newTorrentRateHistory(), totals: &sessionTotals{}}
 }
 
 // add appends a sample, dropping the oldest once full. The backing array is
@@ -341,9 +346,17 @@ func bandwidthHistoryWorker(s *AppState) {
 		case <-s.bgStop:
 			return
 		case <-ticker.C:
-			down, up := v2CurrentRates(s)
+			now := time.Now()
+			views := SessionSnapshot(s.activeEngine())
+			var down, up uint64
+			for _, view := range views {
+				down += view.DownloadRate
+				up += view.UploadRate
+			}
 			ed2kDown, ed2kUp := v2Ed2kRates(s)
-			s.rate_history.add(rateSample{At: time.Now(), Down: down, Up: up, Ed2kDown: ed2kDown, Ed2kUp: ed2kUp})
+			s.rate_history.add(rateSample{At: now, Down: v2RateOrZero(down), Up: v2RateOrZero(up), Ed2kDown: ed2kDown, Ed2kUp: ed2kUp})
+			s.rate_history.torrents.record(now, views)
+			sampleSessionTotals(s)
 		}
 	}
 }

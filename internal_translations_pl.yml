@@ -1,6 +1,20 @@
 # Bundled Polish translations for the web UI. The translation database mirrors
 # this catalog: a corrected value here replaces the stored one at the next start.
 pol:
+  "Dati scaricati e inviati da quando il motore torrent è partito": "Dane pobrane i wysłane od uruchomienia silnika torrent"
+  "Disponibilità tra i peer": "Dostępność u peerów"
+  "Pezzi che nessun peer connesso ha": "Części, których nie ma żaden połączony peer"
+  "Più è pieno, più peer connessi hanno i pezzi che mancano; rosso: nessuno li ha; spento: niente da scaricare lì.": "Im pełniej, tym więcej połączonych peerów ma brakujące części; czerwony: nikt ich nie ma; wygaszony: nic tam do pobrania."
+  "Disponibilità dei pezzi: %d pezzi mancanti non li ha nessun peer connesso": "Dostępność części: %d brakujących części nie ma żaden połączony peer"
+  "Disponibilità dei pezzi: ogni pezzo mancante ha almeno un peer connesso": "Dostępność części: każda brakująca część ma co najmniej jednego połączonego peera"
+  "niente da scaricare": "nic do pobrania"
+  "nessun peer connesso": "brak połączonego peera"
+  "almeno %d peer connessi": "co najmniej %d połączonych peerów"
+  "Velocità di download media di questo torrent negli ultimi 30 minuti": "Średnia prędkość pobierania tego torrenta w ostatnich 30 minutach"
+  "Velocità di upload media di questo torrent negli ultimi 30 minuti": "Średnia prędkość wysyłania tego torrenta w ostatnich 30 minutach"
+  "media": "średnio"
+  "Grafico di download e upload di questo torrent, ultimi 30 minuti": "Wykres pobierania i wysyłania tego torrenta, ostatnie 30 minut"
+  "Nessun trasferimento di questo torrent negli ultimi 30 minuti.": "Brak transferu tego torrenta w ostatnich 30 minutach."
   "Tutti i torrent": "Wszystkie torrenty"
   "Filtra per stato": "Filtruj według stanu"
   "Mostra solo i torrent in questo stato": "Pokaż tylko torrenty w tym stanie"

@@ -56,7 +56,7 @@
     </div>
   </details>
   <div class="panel session-panel">
-    <div class="panel-head"><h3>{{tr "Download in sessione"}} <span class="session-count" id="v2-session-count"><span>{{tr "Torrent"}}</span>: {{.Count}} · <span>{{tr "HTTP"}}</span>: {{len .HTTPDownloads}}{{if .Ed2kEnabled}} · <span>{{tr "eD2k"}}</span>: {{len .Ed2kDownloads}}{{end}} · <span>{{tr "aggiornato"}}</span> {{tr .UpdatedAt}}</span></h3><details class="v2-menu speed-menu" data-v2-menu>
+    <div class="panel-head"><h3>{{tr "Download in sessione"}} <span class="session-count" id="v2-session-count">{{template "v2_session_count" .}}</span></h3><details class="v2-menu speed-menu" data-v2-menu>
       <summary class="btn sm" {{trTitle "Velocità: cosa vale adesso e un'eccezione temporanea"}}>{{tr "Banda"}} <span id="v2-temp-badge">{{template "v2_temp_badge" .}}</span> <span aria-hidden="true">▾</span></summary>
       <div class="v2-menu-panel v2-menu-end speed-panel" id="v2-speed-panel">{{template "v2_speed_panel" .}}</div>
     </details></div>
@@ -112,13 +112,17 @@
 
 {{define "v2_temp_badge"}}{{$s := .Speed}}{{if $s.ExceptionAuto}}<span class="badge warn" {{trTitle "Eccezione attiva: Auto"}}>⚡ <span>{{tr "Auto"}}</span>{{minutesLeft $s.ExceptionMinutes}}</span>{{else if $s.ExceptionLimit}}<span class="badge warn" {{trTitle "Eccezione attiva: limite di velocità"}}>⚡ {{badgeLimits $s.ExceptionDL $s.ExceptionUL}}{{minutesLeft $s.ExceptionMinutes}}</span>{{else if $s.RuleAuto}}<span class="badge{{if eq $s.Mode "schedule"}} ok{{end}}" {{if $s.InWindow}}{{trTitle "Dalla programmazione oraria"}}{{else}}{{trTitle "Regola della configurazione"}}{{end}}>{{if $s.InWindow}}⏰ {{end}}<span>{{tr "Auto"}}</span></span>{{else}}<span class="badge{{if $s.InWindow}} ok{{end}}" {{if $s.InWindow}}{{trTitle "Dalla programmazione oraria"}}{{else}}{{trTitle "Regola della configurazione"}}{{end}}>{{if $s.InWindow}}⏰ {{end}}{{badgeLimits $s.RuleDL $s.RuleUL}}</span>{{end}}{{if and (not $s.Guard.Active) (gt $s.Guard.LatencyMs 0) (or $s.ExceptionAuto (and (not $s.Exception) $s.RuleAuto))}} <span class="badge" role="status" {{trTitle "Ping misurato da Auto verso Google/Cloudflare; se sale, Auto riduce la velocità"}}>📶 {{$s.Guard.LatencyMs}} ms</span>{{end}}{{if $s.Guard.Active}} <span class="badge" role="status" {{trTitle "Auto riduce la velocità per mantenere basso il ping verso Google/Cloudflare"}}><span aria-hidden="true">🐢</span> <span>{{tr "Latenza"}}</span> {{$s.Guard.LatencyMs}}/{{$s.Guard.BaselineMs}} ms{{if $s.Guard.DownloadKib}} · DL {{$s.Guard.DownloadKib}} KiB/s{{end}}{{if $s.Guard.UploadKib}} · UL {{$s.Guard.UploadKib}} KiB/s{{end}}</span>{{end}}{{end}}
 
+{{/* Panel head counters: kept in one place, rendered in the head and
+     refreshed out of band by the table. */}}
+{{define "v2_session_count"}}<span>{{tr "Torrent"}}</span>: {{.Count}} · <span>{{tr "HTTP"}}</span>: {{len .HTTPDownloads}}{{if .Ed2kEnabled}} · <span>{{tr "eD2k"}}</span>: {{len .Ed2kDownloads}}{{end}} · <span>{{tr "aggiornato"}}</span> {{tr .UpdatedAt}}{{if .Totals.Known}} · <span class="session-totals" {{trTitle "Dati scaricati e inviati da quando il motore torrent è partito"}}><span class="sr-only">{{tr "Dati scaricati e inviati da quando il motore torrent è partito"}}: </span><span aria-hidden="true">↓</span> {{.Totals.Down}} <span aria-hidden="true">↑</span> {{.Totals.Up}}</span>{{end}}{{end}}
+
 {{define "v2_torrents_wrap"}}
 <div id="v2-torrents-wrap">
   <form id="v2-torrent-form" method="post" action="/downloads/table"
         hx-post="/downloads/table" hx-target="#v2-torrents-wrap" hx-swap="outerHTML"
          hx-trigger="submit, input changed delay:300ms from:#v2-filter, change from:#v2-tag-filter{{if .Auto}}, every 5s{{end}}">
     {{/* Live counter for the panel head (outside the refreshed fragment). */}}
-    <span id="v2-session-count" hx-swap-oob="innerHTML" hidden><span>{{tr "Torrent"}}</span>: {{.Count}} · <span>{{tr "HTTP"}}</span>: {{len .HTTPDownloads}}{{if .Ed2kEnabled}} · <span>{{tr "eD2k"}}</span>: {{len .Ed2kDownloads}}{{end}} · <span>{{tr "aggiornato"}}</span> {{tr .UpdatedAt}}</span>
+    <span id="v2-session-count" hx-swap-oob="innerHTML" hidden>{{template "v2_session_count" .}}</span>
     <input type="hidden" name="dir" value="{{.Dir}}">
     <input type="hidden" name="auto_state" value="{{if .Auto}}1{{else}}0{{end}}">
     {{/* Live head fragments (outside the refreshed area). */}}

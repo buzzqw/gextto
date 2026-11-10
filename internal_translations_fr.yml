@@ -1,6 +1,20 @@
 # Bundled French translations for the web UI. The translation database mirrors
 # this catalog: a corrected value here replaces the stored one at the next start.
 fra:
+  "Dati scaricati e inviati da quando il motore torrent è partito": "Données téléchargées et envoyées depuis le démarrage du moteur torrent"
+  "Disponibilità tra i peer": "Disponibilité chez les pairs"
+  "Pezzi che nessun peer connesso ha": "Pièces qu'aucun pair connecté ne possède"
+  "Più è pieno, più peer connessi hanno i pezzi che mancano; rosso: nessuno li ha; spento: niente da scaricare lì.": "Plus c'est plein, plus de pairs connectés ont les pièces manquantes ; rouge : personne ne les a ; estompé : rien à télécharger à cet endroit."
+  "Disponibilità dei pezzi: %d pezzi mancanti non li ha nessun peer connesso": "Disponibilité des pièces : %d pièces manquantes ne sont détenues par aucun pair connecté"
+  "Disponibilità dei pezzi: ogni pezzo mancante ha almeno un peer connesso": "Disponibilité des pièces : chaque pièce manquante a au moins un pair connecté"
+  "niente da scaricare": "rien à télécharger"
+  "nessun peer connesso": "aucun pair connecté"
+  "almeno %d peer connessi": "au moins %d pairs connectés"
+  "Velocità di download media di questo torrent negli ultimi 30 minuti": "Vitesse moyenne de téléchargement de ce torrent sur les 30 dernières minutes"
+  "Velocità di upload media di questo torrent negli ultimi 30 minuti": "Vitesse moyenne d'envoi de ce torrent sur les 30 dernières minutes"
+  "media": "moyenne"
+  "Grafico di download e upload di questo torrent, ultimi 30 minuti": "Graphique de téléchargement et d'envoi de ce torrent, 30 dernières minutes"
+  "Nessun trasferimento di questo torrent negli ultimi 30 minuti.": "Aucun transfert pour ce torrent au cours des 30 dernières minutes."
   "Tutti i torrent": "Tous les torrents"
   "Filtra per stato": "Filtrer par état"
   "Mostra solo i torrent in questo stato": "N'afficher que les torrents dans cet état"
