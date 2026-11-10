@@ -16,8 +16,19 @@ here.
 
 ## Engine (gx-core, gx-torrent)
 
-Nothing open: every engine item waits for a condition listed under
-[Not planned](#not-planned).
+- **Choke with the Fast extension (BEP 6)** — a choke purges the staged uploads in
+  silence; with Fast on, every request not served must get a `Reject`, and the allowed-fast
+  pieces keep being served. Gate: a test with a Fast peer choked while it has requests
+  queued.
+- **Audit against a sibling engine's bug hunt** — three defects another libtorrent-style
+  engine found in itself, to check in gx-core: peers kept across a magnet's file check that
+  never learn our pieces (no bitfield or `have` after the check); a spurious snub when a
+  request queue is refilled after a long idle; a borrowed file name that spans a separator
+  or is empty and collapses a file onto the torrent root. Gate: a test per case.
+- **Rate limiter burst** — a bucket holds one second of tokens, so on a slow capped uplink
+  it sends a second's quota at once and fills the modem queue by itself; while autospeed
+  holds a cap, a burst of a few tens of milliseconds. Gate: the ping-under-load measurement
+  below.
 
 ## Gextto, acquisition and UI
 
@@ -68,8 +79,24 @@ its gate; a rejected one moves to *Not planned*.
     (later additions go straight in with the last choices);
   - *latency-aware throttling* («keep ping low»): watch the ping of the first hop past the
     router and slow down while the queue builds. Gate: a measurement on a saturated uplink.
-  Gate for the UI items: the operator picks which ones, then a design check in both
-  themes, at phone width and with the accessibility suite.
+  The operator wants all of them. Gate: a design check in both themes, at phone width and
+  with the accessibility suite.
+- **Gextto's Downloads view, the same lessons** — a state list with counts (downloading,
+  seeding, paused, stalled, error) beside the tag filter, details docked below the list,
+  the two bars and the speed graph in the torrent drawer, session totals in the head.
+  Gate: the daemon page done first, so both share the wording.
+- **Autospeed, a quieter signal** — probe the first router past the home line (TTL-limited
+  ICMP echoes on unprivileged ping sockets, the first public hop) instead of a TCP connect
+  to public resolvers, and use the shared one-way delay of busy uTP peers as a free second
+  signal; learn the idle baseline at half rate until the lowest round trip stops falling;
+  remember the learned cap per network (gateway hardware address). Gate: a bloated-line
+  test (network namespaces, a token-bucket uplink with half a second of buffer) measuring
+  ping and rate with autospeed off, as today, and with the change.
+- **Gentle recheck** — the verify thread at idle I/O priority (`ioprio_set`, the thread
+  only), `posix_fadvise` sequential and `DONTNEED` behind it so a recheck of a large library
+  does not empty the page cache, a pause after a read much slower than the drive's usual
+  one, one check per physical drive and drives in parallel. Gate: a recheck measured on
+  the HDD while another program reads it.
 
 - **A client-wide cap on unverified data** — anacrolix/torrent holds at most
   `MaxUnverifiedBytes` (64 MiB, `config.go`) of received bytes that are not yet hashed and
