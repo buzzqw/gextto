@@ -67,9 +67,6 @@ its gate; a rejected one moves to *Not planned*.
   memory stays at 11 MiB at full speed ([measurements](measurements.md)). Gate: a run with
   several torrents downloading at once where the hashing backlog is the peak.
 
-- **Next search inside the restart line** — after a restart the «Next search at…» line still
-  follows the restart sentence, so a restart reads as two lines. Gate: the scheduler's first
-  due time known when the start line is written, without delaying the start.
 - **Packages for the root** — 114k non-test lines share `package gextto`, so helpers are
   told apart by prefixes (`gh0_`…`gh7_`, `tev_`, `bg_`) instead of by package. Gate: a
   decision on the first boundary (HTTP handlers, acquisition, storage) and one area

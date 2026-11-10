@@ -84,6 +84,9 @@ type startupDetails struct {
 	WebAddr string
 	Mode    string
 	Engine  string
+	// NextSearch says when the first automatic search runs, when it is not
+	// right away.
+	NextSearch string
 }
 
 // startupBanner is the log line for a start: one sentence with the version and
@@ -109,6 +112,9 @@ func startupBanner(prev runState, now time.Time, details startupDetails) string 
 	}
 	if details.Engine != "" {
 		parts = append(parts, "engine "+details.Engine)
+	}
+	if details.NextSearch != "" {
+		parts = append(parts, details.NextSearch)
 	}
 	return strings.Join(parts, " · ")
 }

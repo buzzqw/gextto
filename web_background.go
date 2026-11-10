@@ -2475,8 +2475,7 @@ func watchedFoldersWorker(state *AppState) {
 // cycle_worker
 // ---------------------------------------------------------------------------
 
-// cycleWorker runs the scheduled scrape/cycle loop and, every
-// `rename_verify_interval` hours, performs the archive rename repair.
+// formatScheduledCycleTime says when a cycle is due, relative to today.
 func formatScheduledCycleTime(now, due time.Time) string {
 	location := due.Location()
 	now = now.In(location)
@@ -2490,6 +2489,31 @@ func formatScheduledCycleTime(now, due time.Time) string {
 	return "on " + due.Format("02/01 at 15:04")
 }
 
+// resumedCycleDue is when the first cycle after a start runs: the previous
+// cycle's start plus the interval, when that is still in the future. ok is
+// false when the cycle runs at once (no previous cycle, interval elapsed) or
+// the automatic cycle is off.
+func resumedCycleDue(active bool, refreshSecs uint64, lastAt time.Time, haveLast bool, now time.Time) (time.Time, bool) {
+	if !active || !haveLast {
+		return time.Time{}, false
+	}
+	if refreshSecs < 1 {
+		refreshSecs = 1
+	}
+	due := lastAt.Add(durationFromSeconds(refreshSecs))
+	if !due.After(now) {
+		return time.Time{}, false
+	}
+	return due, true
+}
+
+// nextSearchNote is the start line's "next search" part.
+func nextSearchNote(now, due time.Time) string {
+	return fmt.Sprintf("next search %s (in %s)", formatScheduledCycleTime(now, due.Local()), logDuration(due.Sub(now)))
+}
+
+// cycleWorker runs the scheduled scrape/cycle loop and, every
+// `rename_verify_interval` hours, performs the archive rename repair.
 func cycleWorker(state *AppState) {
 	// Cancelled on shutdown so a cycle in progress releases the torrent engine
 	// before the daemon tears it down.
@@ -2529,8 +2553,12 @@ func cycleWorker(state *AppState) {
 				if lastAt, ok := state.db.LastCycleAt(); ok {
 					due := lastAt.Add(durationFromSeconds(refresh))
 					if remaining := time.Until(due); remaining > 0 {
-						logging.Info(fmt.Sprintf("⏰ Next search %s (in %s)",
-							formatScheduledCycleTime(time.Now(), due.Local()), logDuration(remaining)))
+						// The start line already says it when it knew the same
+						// time: a restart reads as one line, not two.
+						if announced := state.announcedNextSearch.Load(); announced != due.Unix() {
+							logging.Info(fmt.Sprintf("⏰ Next search %s (in %s)",
+								formatScheduledCycleTime(time.Now(), due.Local()), logDuration(remaining)))
+						}
 						for {
 							remaining = time.Until(due)
 							if remaining <= 0 {

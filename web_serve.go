@@ -335,7 +335,17 @@ func Serve(state *AppState) error {
 			}
 		}
 	}
-	prevRun := logStartupBanner(state.cfg.DataDir, startupDetails{WebAddr: webAddr, Mode: mode, Engine: engineName})
+	// The first search after a start resumes the previous schedule: say it
+	// in the start line, so the cycle worker does not add a line of its own.
+	nextSearch := ""
+	if cfg := latestConfig(state); cfg.Active {
+		lastAt, haveLast := state.db.LastCycleAt()
+		if due, ok := resumedCycleDue(true, cfg.RefreshSecs, lastAt, haveLast, time.Now()); ok {
+			nextSearch = nextSearchNote(time.Now(), due)
+			state.announcedNextSearch.Store(due.Unix())
+		}
+	}
+	prevRun := logStartupBanner(state.cfg.DataDir, startupDetails{WebAddr: webAddr, Mode: mode, Engine: engineName, NextSearch: nextSearch})
 	notifyRestart(state, prevRun)
 	logging.Debug("build details", "identity", buildIdentity(), "engine api", "http://"+engineAddr)
 

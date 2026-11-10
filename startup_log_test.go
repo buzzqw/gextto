@@ -76,3 +76,35 @@ func TestShutdownBannerUptime(t *testing.T) {
 		t.Fatalf("fatal shutdown banner = %q", line)
 	}
 }
+
+// A restart inside the search interval says when the next search runs in the
+// start line itself; an elapsed interval, no previous cycle or the automatic
+// cycle off leave the part out.
+func TestStartupBannerCarriesTheNextSearch(t *testing.T) {
+	now := time.Date(2026, 10, 9, 12, 0, 0, 0, time.Local)
+	last := now.Add(-20 * time.Minute)
+	due, ok := resumedCycleDue(true, 3600, last, true, now)
+	if !ok || !due.Equal(now.Add(40*time.Minute)) {
+		t.Fatalf("due = %v ok=%v, want in 40 minutes", due, ok)
+	}
+	note := nextSearchNote(now, due)
+	if note != "next search at 12:40 (in 40 minutes)" {
+		t.Fatalf("note = %q", note)
+	}
+	line := startupBanner(runState{Runs: 1}, now, startupDetails{Engine: "gx-torrent", NextSearch: note})
+	if !strings.HasSuffix(line, "engine gx-torrent · next search at 12:40 (in 40 minutes)") {
+		t.Fatalf("start line = %q", line)
+	}
+	for name, c := range map[string]struct {
+		active, have bool
+		last         time.Time
+	}{
+		"elapsed":     {true, true, now.Add(-2 * time.Hour)},
+		"no previous": {true, false, time.Time{}},
+		"cycle off":   {false, true, last},
+	} {
+		if _, ok := resumedCycleDue(c.active, 3600, c.last, c.have, now); ok {
+			t.Fatalf("%s: a due time was reported", name)
+		}
+	}
+}
