@@ -47,6 +47,12 @@ Nothing open: every engine item waits for a condition listed under
   parser that reads what the block page serves; otherwise they go, and that is the
   operator's decision.
 
+- **The `torrentz2` web engine points at a dead domain** — `torrentz2.nz` answers NXDOMAIN
+  and the other Torrentz2 addresses (`torrentz2.eu`, `.is`) redirect to a domain parking
+  page (`ww38.`), so the engine can never return a result; it stays in the list of web
+  engines and is not among the enabled ones today. Gate: a live Torrentz2 mirror, or the
+  operator's decision to drop the engine from the list.
+
 ## Measurements
 
 - **The documents after a round** — the round of 2026-11-07 is in
@@ -113,6 +119,13 @@ Closed by choice, not waiting for a measurement:
   messages it sends (Telegram, Discord, Slack, Gotify, ntfy, Pushover, webhook, e-mail,
   script) stay in English on purpose — a channel can be shared by several people and the
   text is also read by scripts.
+- The web engine `torrentz.eu.com` (checked on 2026-11-10): it is an article page about
+  Torrentz with a **Google Custom Search** widget on it (`cse.google.com/cse.js`), and no
+  search backend of its own — `/search?q=`, `/search/<q>/`, `/any?q=` and `/rss?q=` all
+  answer `404`, `/?q=` returns the same 14 KB page, and no line of it carries a magnet or
+  a torrent row. The `#gsc.tab=0` in the address is the widget's own tab. There is nothing
+  for an engine to read: the results would be Google's, not torrents. Gate: a server-side
+  search that returns torrents with magnets, in HTML, from the site itself.
 - One switch for test mode (merging `dry_run` into «Automatic cycle»): the operator does
   not want to invest in it — users want to download, not to test; `--dry-run` stays for
   the test suites.
