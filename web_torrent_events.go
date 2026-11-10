@@ -3232,7 +3232,7 @@ func HandleTorrentEvent(cfg *Config, torrents TorrentSession, db *Database, move
 	if metadata == nil {
 		return tevUnregisteredEvent(db, notifier, event)
 	}
-	if (event.Kind == "torrent_finished" || event.Kind == "storage_moved") && tevStaysInTransfer(db, event.Hash) {
+	if event.Kind == "torrent_finished" && tevStaysInTransfer(db, event.Hash) {
 		return tevCompleteInTransfer(db, notifier, event, metadata)
 	}
 	switch event.Kind {
@@ -3243,7 +3243,7 @@ func HandleTorrentEvent(cfg *Config, torrents TorrentSession, db *Database, move
 	case "storage_move_failed":
 		return tevStorageMoveFailed(cfg, torrents, db, moveRequests, postSeedMoves, retries, event)
 	case "storage_moved":
-		return tevStorageMoved(torrents, db, moveRequests, postSeedMoves, retries, metadata, event, cfg, tmdb)
+		return tevStorageMoved(torrents, db, moveRequests, postSeedMoves, retries, metadata, event, cfg, tmdb, notifier)
 	default:
 		return false, nil
 	}
@@ -3960,7 +3960,7 @@ func tevStorageMoveFailed(cfg *Config, torrents TorrentSession, db *Database, mo
 
 // tevStorageMoved imports a download whose files reached their new folder, or
 // resumes one the RAM-disk policy moved before it finished.
-func tevStorageMoved(torrents TorrentSession, db *Database, moveRequests map[string]struct{}, postSeedMoves map[string]struct{}, retries map[string]StorageMoveRetry, metadata *models.TorrentMeta, event models.TorrentEvent, cfg *Config, tmdb *TmdbClient) (bool, error) {
+func tevStorageMoved(torrents TorrentSession, db *Database, moveRequests map[string]struct{}, postSeedMoves map[string]struct{}, retries map[string]StorageMoveRetry, metadata *models.TorrentMeta, event models.TorrentEvent, cfg *Config, tmdb *TmdbClient, notifier *Notifier) (bool, error) {
 	logging.Debug("torrent storage move completed",
 		"hash", event.Hash, "name", event.Name, "save_path", event.SavePath)
 	// Save the new location now instead of at the next periodic save: if
@@ -4008,6 +4008,12 @@ func tevStorageMoved(torrents TorrentSession, db *Database, moveRequests map[str
 		return false, nil
 	}
 	delete(moveRequests, event.Hash)
+	// Added by hand from a free search: a move of the finished download (the
+	// RAM disk emptied, for instance) completes it where it is, never in the
+	// library. A move before the end is handled above like any other.
+	if tevStaysInTransfer(db, event.Hash) {
+		return tevCompleteInTransfer(db, notifier, event, metadata)
+	}
 	return tevCompleteTorrent(cfg, db, torrents, &event, &metadata.Release, tmdb)
 }
 

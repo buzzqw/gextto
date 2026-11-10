@@ -121,3 +121,21 @@ func TestLibraryManualDownloadIsImported(t *testing.T) {
 		t.Fatalf("library holds %v, want the episode", got)
 	}
 }
+
+// A free search download moved by the engine before it finished (out of the
+// RAM disk, for instance) is not completed by the move: it keeps downloading.
+func TestFreeSearchDownloadMovedBeforeTheEndKeepsDownloading(t *testing.T) {
+	p := newEpisodeEnv(t)
+	if err := p.db.SetTorrentReason(episodeHash, manualTransferReason); err != nil {
+		t.Fatal(err)
+	}
+	p.session.list[0].State, p.session.list[0].Progress, p.session.list[0].TotalDone = "downloading", 40, 2000
+	event := models.TorrentEvent{Kind: "storage_moved", Hash: episodeHash, Name: p.name, SavePath: p.downloads}
+	if processed, err := HandleTorrentEvent(p.cfg, p.session, p.db, p.moves, p.postSeed, p.retries, event,
+		NewTmdbClientWithLanguage(nil, "it-IT"), FromConfig(p.cfg)); processed || err != nil {
+		t.Fatalf("storage_moved mid-download: processed=%v err=%v", processed, err)
+	}
+	if status, _ := p.db.TorrentStatus(episodeHash); status != nil && *status == "completed" {
+		t.Fatal("a move before the end marked the download completed")
+	}
+}
