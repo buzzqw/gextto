@@ -1757,3 +1757,35 @@ func TestTorrentLinkFromRemovedFeed(t *testing.T) {
 		t.Error("a nil configuration reported a removed feed")
 	}
 }
+
+// TestRetiredWebEnginesAreDroppedFromTheSavedList keeps a name whose service was
+// retired out of the loaded configuration: it can never run, and left in place
+// it showed up in the health page and in every count of the enabled engines.
+// Torrentz2 and BitSearch were retired in November 2026.
+func TestRetiredWebEnginesAreDroppedFromTheSavedList(t *testing.T) {
+	cases := []struct {
+		name  string
+		value string
+		want  []string
+	}{
+		{"json", `["bitsearch","tpb","torrentz2","nope","limetorrents"]`, []string{"tpb", "limetorrents"}},
+		{"plain list", "tpb, bitsearch ,torrentz2", []string{"tpb"}},
+		{"empty", `[]`, []string{}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			if err := saveConfigSetting(dir, "websearch_engines", tc.value); err != nil {
+				t.Fatal(err)
+			}
+			cfg := DefaultConfig()
+			cfg.DataDir = dir
+			if err := cfg.loadConfigDB(); err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(cfg.WebsearchEngines, tc.want) {
+				t.Fatalf("engines = %#v, want %#v", cfg.WebsearchEngines, tc.want)
+			}
+		})
+	}
+}

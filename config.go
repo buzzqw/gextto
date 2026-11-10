@@ -288,45 +288,45 @@ func (s *TransferSettings) UnmarshalJSON(data []byte) error {
 
 // Config is the runtime configuration of the daemon.
 type Config struct {
-	DataDir             string            `json:"data_dir"`
-	Listen              string            `json:"listen"`
-	EngineListen        string            `json:"engine_listen"`
-	RefreshSecs         uint64            `json:"refresh_secs"`
-	Active              bool              `json:"active"`
-	DryRun              bool              `json:"dry_run"`
-	FeedURLs            []string          `json:"feed_urls"`
-	Blacklist           []string          `json:"blacklist"`
-	ContentFilters      []string          `json:"content_filters"`
-	SourceFilters       []SourceFilter    `json:"source_filters"`
-	MaxReleaseAgeDays   int64             `json:"max_release_age_days"`
-	Series              []SeriesConfig    `json:"series"`
-	Movies              []MovieConfig     `json:"movies"`
-	Indexers            []IndexerConfig   `json:"indexers"`
-	WebsearchEngines    []string          `json:"websearch_engines"`
-	FlaresolverrURL     *string           `json:"flaresolverr_url"`
-	Settings            map[string]string `json:"settings"`
-	TmdbAPIKey          *string           `json:"tmdb_api_key"`
-	RenameEpisodes      bool              `json:"rename_episodes"`
-	RenameFormat        string            `json:"rename_format"`
-	RenameTemplate      string            `json:"rename_template"`
+	DataDir           string            `json:"data_dir"`
+	Listen            string            `json:"listen"`
+	EngineListen      string            `json:"engine_listen"`
+	RefreshSecs       uint64            `json:"refresh_secs"`
+	Active            bool              `json:"active"`
+	DryRun            bool              `json:"dry_run"`
+	FeedURLs          []string          `json:"feed_urls"`
+	Blacklist         []string          `json:"blacklist"`
+	ContentFilters    []string          `json:"content_filters"`
+	SourceFilters     []SourceFilter    `json:"source_filters"`
+	MaxReleaseAgeDays int64             `json:"max_release_age_days"`
+	Series            []SeriesConfig    `json:"series"`
+	Movies            []MovieConfig     `json:"movies"`
+	Indexers          []IndexerConfig   `json:"indexers"`
+	WebsearchEngines  []string          `json:"websearch_engines"`
+	FlaresolverrURL   *string           `json:"flaresolverr_url"`
+	Settings          map[string]string `json:"settings"`
+	TmdbAPIKey        *string           `json:"tmdb_api_key"`
+	RenameEpisodes    bool              `json:"rename_episodes"`
+	RenameFormat      string            `json:"rename_format"`
+	RenameTemplate    string            `json:"rename_template"`
 	// RenameMovieTemplate is the "custom" format for movies: the episode
 	// template has season and episode tokens a movie does not have.
-	RenameMovieTemplate string `json:"rename_movie_template"`
-	ArchiveRoot         *string           `json:"archive_root"`
-	TrashPath           *string           `json:"trash_path"`
-	NotifyTelegram      bool              `json:"notify_telegram"`
-	TelegramBotToken    *string           `json:"telegram_bot_token"`
-	TelegramChatID      *string           `json:"telegram_chat_id"`
-	NotifyWebhookURL    *string           `json:"notify_webhook_url"`
-	NotifyWebhookSecret *string           `json:"notify_webhook_secret"`
-	NotifyWebhookFormat string            `json:"notify_webhook_format"`
-	NotifyWebhookToken  *string           `json:"notify_webhook_token"`
-	NotifyWebhookUser   *string           `json:"notify_webhook_user"`
-	NotifyEmail         bool              `json:"notify_email"`
-	EmailSMTP           string            `json:"email_smtp"`
-	EmailFrom           *string           `json:"email_from"`
-	EmailTo             *string           `json:"email_to"`
-	EmailPassword       *string           `json:"email_password"`
+	RenameMovieTemplate string  `json:"rename_movie_template"`
+	ArchiveRoot         *string `json:"archive_root"`
+	TrashPath           *string `json:"trash_path"`
+	NotifyTelegram      bool    `json:"notify_telegram"`
+	TelegramBotToken    *string `json:"telegram_bot_token"`
+	TelegramChatID      *string `json:"telegram_chat_id"`
+	NotifyWebhookURL    *string `json:"notify_webhook_url"`
+	NotifyWebhookSecret *string `json:"notify_webhook_secret"`
+	NotifyWebhookFormat string  `json:"notify_webhook_format"`
+	NotifyWebhookToken  *string `json:"notify_webhook_token"`
+	NotifyWebhookUser   *string `json:"notify_webhook_user"`
+	NotifyEmail         bool    `json:"notify_email"`
+	EmailSMTP           string  `json:"email_smtp"`
+	EmailFrom           *string `json:"email_from"`
+	EmailTo             *string `json:"email_to"`
+	EmailPassword       *string `json:"email_password"`
 	// Dedicated notification channels, the same ones indexarr and the
 	// gx-torrent daemon offer next to Telegram, the generic webhook and e-mail.
 	NotifyDiscordURL       *string `json:"notify_discord_url"`
@@ -3044,9 +3044,7 @@ func (c *Config) loadConfigDB() error {
 	}
 	if value, ok := c.Settings["websearch_engines"]; ok {
 		var engines []string
-		if err := json.Unmarshal([]byte(value), &engines); err == nil {
-			c.WebsearchEngines = engines
-		} else {
+		if err := json.Unmarshal([]byte(value), &engines); err != nil {
 			result := []string{}
 			for _, part := range strings.Split(value, ",") {
 				part = strings.TrimSpace(part)
@@ -3054,8 +3052,13 @@ func (c *Config) loadConfigDB() error {
 					result = append(result, strings.ToLower(part))
 				}
 			}
-			c.WebsearchEngines = result
+			engines = result
 		}
+		// A saved list can name an engine that no longer exists (Torrentz2 and
+		// BitSearch were retired in November 2026): it can never run, so it is
+		// dropped here instead of showing up in the health page and in every
+		// count of the enabled engines.
+		c.WebsearchEngines = knownWebEngines(engines)
 	}
 	if value, ok := c.Settings["flaresolverr_url"]; ok && strings.TrimSpace(value) != "" {
 		c.FlaresolverrURL = &value

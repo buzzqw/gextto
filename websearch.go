@@ -116,6 +116,20 @@ func SearchWithTimeout(ctx context.Context, cfg *Config, query string, timeout *
 	return releases
 }
 
+// knownWebEngines keeps only the engines that still exist, in the configured
+// order: a saved name whose service was retired is ignored everywhere.
+func knownWebEngines(engines []string) []string {
+	out := make([]string, 0, len(engines))
+	for _, engine := range engines {
+		engine = strings.ToLower(strings.TrimSpace(engine))
+		if engine == "" || !knownWebEngine(engine) {
+			continue
+		}
+		out = append(out, engine)
+	}
+	return out
+}
+
 func knownWebEngine(engine string) bool {
 	switch engine {
 	case "tpb", "thepiratebay", "knaben", "nyaa", "eztv", "btdig",
