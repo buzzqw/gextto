@@ -62,3 +62,56 @@ func TestLimiterInheritsSessionAndOverrides(t *testing.T) {
 		t.Fatalf("restored inherit rate = %d, want 1024", got)
 	}
 }
+
+// takeFree counts the bytes a limiter lets through at once, in 16 KiB blocks,
+// before the first wait.
+func takeFree(l *Limiter) int64 {
+	var n int64
+	for l.Take(16<<10) == 0 {
+		n += 16 << 10
+		if n > 1<<30 {
+			break
+		}
+	}
+	return n
+}
+
+// The burst is a few tens of milliseconds of the rate, not a whole second: a
+// second's quota sent at once is a queue in the modem on a slow uplink.
+func TestLimiterBurstIsShort(t *testing.T) {
+	const rate = 4 << 20 // 4 MiB/s: a second's burst would be 4 MiB
+	l := New(rate)
+	if got, limit := takeFree(l), int64(rate)/10; got > limit {
+		t.Fatalf("%d bytes left at once at %d B/s, want at most %d", got, rate, limit)
+	}
+}
+
+// A rate change keeps the balance: lowering the rate on a busy line must not
+// hand out a fresh burst.
+func TestLimiterRateChangeDoesNotRefill(t *testing.T) {
+	l := New(8 << 20)
+	takeFree(l) // the bucket is now empty or in debt
+	l.SetRate(4 << 20)
+	if d := l.Take(16 << 10); d == 0 {
+		t.Fatal("a rate change refilled the bucket")
+	}
+}
+
+// Over a stretch of time the limiter lets through the rate, not more: the
+// short burst must not change the average.
+func TestLimiterKeepsTheRate(t *testing.T) {
+	const rate = 2 << 20
+	l := New(rate)
+	start := time.Now()
+	var sent int64
+	var due time.Duration // a Take returns the wait until all taken so far is paid
+	for due < 500*time.Millisecond {
+		due = l.Take(16 << 10)
+		sent += 16 << 10
+	}
+	elapsed := due + time.Since(start)
+	got := float64(sent) / elapsed.Seconds()
+	if got > rate*1.08 || got < rate*0.92 {
+		t.Fatalf("average %.0f B/s, want about %d", got, rate)
+	}
+}

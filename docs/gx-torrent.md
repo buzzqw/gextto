@@ -2521,6 +2521,14 @@ caps reach the engine through the same `applyEffectiveSpeedLimitsLocked` path
 `SetSpeedLimits`; the caps are computed from the session's current rates, not
 from the all-time peaks.
 
+Every limit, manual or automatic, is a token bucket (`internal/bandwidth`) whose
+burst is **25 ms** of the rate (at least one 16 KiB block, at most one second):
+a whole second's quota sent at once is a queue in the modem on a slow uplink,
+which raises the ping by itself. A rate change keeps the bucket's balance
+instead of refilling it, so the controller's cuts do not hand out a fresh burst
+each time. At a steady rate every block waits its turn either way: the average
+is the limit.
+
 Keys in settings.json: `autospeed-enabled` (default `false`),
 `autospeed-target` (host or `host:port`; empty = Google/Cloudflare, then the
 gateway), `autospeed-min` (KiB/s, default 50), `autospeed-line-down` and

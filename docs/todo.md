@@ -16,10 +16,8 @@ here.
 
 ## Engine (gx-core, gx-torrent)
 
-- **Rate limiter burst** — a bucket holds one second of tokens, so on a slow capped uplink
-  it sends a second's quota at once and fills the modem queue by itself; while autospeed
-  holds a cap, a burst of a few tens of milliseconds. Gate: the ping-under-load measurement
-  below.
+Nothing open: every engine item waits for a condition listed under
+[Not planned](#not-planned), or is a proposal below.
 
 ## Gextto, acquisition and UI
 

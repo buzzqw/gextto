@@ -53,7 +53,10 @@ func (l *Limiter) SetLimitKiB(kib int64, session *Limiter) {
 
 // SetRate changes the rate (0 = unlimited). Peers pick it up on their next
 // Take; a wait already computed with the old rate is not shortened.
-// Raising or re-setting the rate refills the burst, like a fresh bucket.
+// A change keeps the bucket's balance (clamped to the new burst): the
+// automatic speed control moves the rate every few seconds, and refilling the
+// bucket each time handed out a fresh burst right when the line was already
+// queueing. Only a limit set where there was none starts with a full bucket.
 func (l *Limiter) SetRate(bytesPerSecond int64) {
 	if bytesPerSecond < 0 {
 		bytesPerSecond = 0
@@ -68,7 +71,11 @@ func (l *Limiter) SetRate(bytesPerSecond int64) {
 		l.rate.Store(0)
 		return
 	}
-	l.bucket = newBucket(bytesPerSecond)
+	if l.bucket != nil {
+		l.bucket.setRate(bytesPerSecond)
+	} else {
+		l.bucket = newBucket(bytesPerSecond)
+	}
 	l.rate.Store(bytesPerSecond)
 }
 
@@ -126,14 +133,56 @@ type bucket struct {
 	last   time.Time
 }
 
-// newBucket builds a full bucket: rate tokens per second, burst of one
-// second's worth. A fresh bucket therefore absorbs an immediate burst.
+// burstWindow is how much of a second's quota may leave at once. A burst of a
+// whole second filled the modem's queue on a slow capped uplink by itself, and
+// the ping of everything else on the line rose with it; 25 ms keeps that queue
+// short. At a steady rate the bucket is near empty and every block waits its
+// turn anyway, so a short burst changes only what leaves the moment traffic
+// resumes, not the rate.
+const burstWindow = 25 * time.Millisecond
+
+// minBurst lets one 16 KiB block through without a wait, so a moderate limit
+// does not make every block sleep a few milliseconds.
+const minBurst = 16 << 10
+
+// burstFor is the bucket size for a rate: burstWindow of it, at least one
+// block, and never more than one second's worth.
+func burstFor(rate float64) float64 {
+	b := rate * burstWindow.Seconds()
+	if b < minBurst {
+		b = minBurst
+	}
+	if b > rate {
+		b = rate
+	}
+	return b
+}
+
+// newBucket builds a full bucket: rate tokens per second, burst of
+// burstFor(rate). A fresh bucket therefore absorbs one short burst.
 func newBucket(bytesPerSecond int64) *bucket {
+	rate := float64(bytesPerSecond)
+	burst := burstFor(rate)
 	return &bucket{
-		rate:   float64(bytesPerSecond),
-		max:    float64(bytesPerSecond),
-		tokens: float64(bytesPerSecond),
+		rate:   rate,
+		max:    burst,
+		tokens: burst,
 		last:   time.Now(),
+	}
+}
+
+// setRate moves the bucket to a new rate, keeping the tokens (or the debt)
+// accrued so far and clamping them to the new burst.
+func (b *bucket) setRate(bytesPerSecond int64) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	now := time.Now()
+	b.tokens += now.Sub(b.last).Seconds() * b.rate
+	b.last = now
+	b.rate = float64(bytesPerSecond)
+	b.max = burstFor(b.rate)
+	if b.tokens > b.max {
+		b.tokens = b.max
 	}
 }
 
