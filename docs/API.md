@@ -57,7 +57,7 @@ change. `/ui` is not served. For operational checks use
 | GET | `/api/ed2k/shared` | the files aMule shares with what it uploaded for each (session and total bytes, requests and accepted requests session/total, queued clients, live upload rate and last upload time, priority, ed2k link), the upload queue (client, software, file, speed, upload position) and the shared folders; enabled is false while the integration is off |
 | POST | `/api/ed2k/shared/reload` | ask aMule to rescan its shared folders, so files added or removed outside aMule show up (the reload button of the aMule GUI) |
 | POST | `/api/archive/add` | add an entry to the archive |
-| POST | `/api/archive/batch-download` | download several archive entries (magnet or ed2k_link) |
+| POST | `/api/archive/batch-download` | download several archive entries (magnet or ed2k_link) for the library (reason manual) |
 | POST | `/api/archive/delete` | delete archive entries |
 | GET | `/api/backup` | list backups |
 | POST | `/api/backup` | create a backup |
@@ -224,7 +224,7 @@ change. `/ui` is not served. For operational checks use
 | POST | `/api/score/preview` | score a release with the current weights |
 | POST | `/api/search` | manual search |
 | POST | `/api/search/dashboard` | manual search for the dashboard (with the rejected ones) |
-| POST | `/api/search/add` | add a search result |
+| POST | `/api/search/add` | add a search result: it stays in the download folder (reason manual_transfer) |
 | POST | `/api/search/archive` | search the archive |
 | POST | `/api/search/explain` | explain a release decision |
 

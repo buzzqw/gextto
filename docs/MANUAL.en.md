@@ -573,6 +573,16 @@ release, or download something you do not follow.
 A manual search also shows releases the cycle would **not** pick, precisely so
 you can inspect them: seeing one does not mean it would be downloaded.
 
+### Where a download added by hand ends
+
+| Where you add it from | Where it ends |
+|---|---|
+| A free search: **Dashboard**, **Download** (*Search for a release*), **Explore**, a pasted eD2k link, the TUI | it stays in the **transfer folder**, under its own name: it does not go to the library, is not renamed and does not count as an episode or film you have. It is shared within the seed limits and then stopped; you take it out of the session |
+| **Download** on the results of a title you follow, from its page (🔍 on a missing episode, the archive matches of a film), **Queue** on the followed titles of the Dashboard | it goes to the **library**, next to the other episodes or films, like an automatic download |
+
+In the reason column a download of the first row reads *✋ added by hand,
+stays in the transfer folder*.
+
 ### «Why not this one?»
 
 It is a read-only diagnosis of a release: it queues nothing and changes

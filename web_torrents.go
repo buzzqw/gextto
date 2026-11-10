@@ -1630,9 +1630,35 @@ func TorrentPeersLegacy(w http.ResponseWriter, r *http.Request, s *AppState) {
 	TorrentPeers(w, legacy, s)
 }
 
-// AddRelease queues a release for download, falling back to a search of its title
-// when its URL cannot be fetched.
+// The reasons of a release queued by hand. manualReason is a release chosen
+// for the library (an episode searched from the series page, a monitored
+// release of the Dashboard): it is imported like any other. manualTransferReason
+// is a free search result or a pasted link: it stays in the download folder,
+// outside the library, where the person who added it finds it.
+const (
+	manualReason         = "manual"
+	manualTransferReason = "manual_transfer"
+)
+
+// reasonIsManual reports whether a torrent was started by hand, whichever
+// folder it ends in.
+func reasonIsManual(reason *string) bool {
+	return reason != nil && (*reason == manualReason || *reason == manualTransferReason)
+}
+
+// AddRelease queues a release chosen for the library, falling back to a
+// search of its title when its URL cannot be fetched.
 func AddRelease(s *AppState, release models.Release) (int, any) {
+	return addReleaseWithReason(s, release, manualReason)
+}
+
+// AddSearchRelease queues a free search result: it is downloaded into the
+// download folder and stays there, outside the library.
+func AddSearchRelease(s *AppState, release models.Release) (int, any) {
+	return addReleaseWithReason(s, release, manualTransferReason)
+}
+
+func addReleaseWithReason(s *AppState, release models.Release, reason string) (int, any) {
 	if !SetupComplete(LatestConfig(s)) {
 		return http.StatusConflict, map[string]any{"ok": false, "error": "complete the initial setup first"}
 	}
@@ -1641,10 +1667,10 @@ func AddRelease(s *AppState, release models.Release) (int, any) {
 		source = strings.TrimSpace(*release.TorrentURL)
 	}
 	isURL := isHTTPURL(source)
-	status, value := AddParsedRelease(s, release)
+	status, value := addParsedReleaseWithReason(s, release, reason)
 	if isURL && status == http.StatusBadRequest {
 		if found := ResolveBySearch(s, release.Title); found != nil {
-			retryStatus, retryValue := AddParsedRelease(s, *found)
+			retryStatus, retryValue := addParsedReleaseWithReason(s, *found, reason)
 			if retryStatus != http.StatusBadRequest {
 				return retryStatus, retryValue
 			}
@@ -1653,9 +1679,13 @@ func AddRelease(s *AppState, release models.Release) (int, any) {
 	return status, value
 }
 
-// AddParsedRelease queues a release: an eD2k link through aMule, a magnet or a
-// .torrent URL through the active torrent engine.
+// AddParsedRelease queues a release chosen for the library: an eD2k link
+// through aMule, a magnet or a .torrent URL through the active torrent engine.
 func AddParsedRelease(s *AppState, release models.Release) (int, any) {
+	return addParsedReleaseWithReason(s, release, manualReason)
+}
+
+func addParsedReleaseWithReason(s *AppState, release models.Release, reason string) (int, any) {
 	if strings.TrimSpace(release.Ed2kLink) != "" {
 		link, err := ed2k.ParseFileLink(release.Ed2kLink)
 		if err != nil {
@@ -1701,7 +1731,7 @@ func AddParsedRelease(s *AppState, release models.Release) (int, any) {
 		if err := s.db.RegisterTorrentScored(&release, score); err != nil {
 			return http.StatusInternalServerError, map[string]any{"ok": false, "error": err.Error()}
 		}
-		_ = s.db.SetTorrentReason(strings.ToLower(link.Hash), "manual")
+		_ = s.db.SetTorrentReason(strings.ToLower(link.Hash), reason)
 		// Logged after the registration, so the history row gets the title,
 		// series and episode of the download.
 		logging.Info("manual eD2k download queued", "title", release.Title, "score", score, "hash", strings.ToLower(link.Hash))
@@ -1733,7 +1763,7 @@ func AddParsedRelease(s *AppState, release models.Release) (int, any) {
 		if err := s.db.RegisterTorrentScored(&release, score); err != nil {
 			return http.StatusInternalServerError, map[string]any{"ok": false, "error": err.Error()}
 		}
-		_ = s.db.SetTorrentReason(*hash, "manual")
+		_ = s.db.SetTorrentReason(*hash, reason)
 		return http.StatusAccepted, map[string]any{"ok": true, "title": release.Title}
 	}
 	score := latestConfig(s).ReleaseScore(&release)
@@ -1741,7 +1771,7 @@ func AddParsedRelease(s *AppState, release models.Release) (int, any) {
 		return http.StatusInternalServerError, map[string]any{"ok": false, "error": err.Error()}
 	}
 	if hash, ok := utils.MagnetHash(release.Magnet); ok {
-		_ = s.db.SetTorrentReason(hash, "manual")
+		_ = s.db.SetTorrentReason(hash, reason)
 	}
 	title := release.Title
 	logHash, _ := utils.MagnetHash(release.Magnet)

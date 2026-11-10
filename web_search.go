@@ -81,7 +81,7 @@ func AddSearchResult(w http.ResponseWriter, r *http.Request, s *AppState) {
 		jsonError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	status, value := AddRelease(s, input.Release)
+	status, value := AddSearchRelease(s, input.Release)
 	jsonStatus(w, status, value)
 }
 

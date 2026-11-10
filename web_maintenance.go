@@ -280,7 +280,7 @@ func gh0AddParsedRelease(ctx context.Context, s *AppState, release models.Releas
 		if err := s.db.RegisterTorrentScored(&release, score); err != nil {
 			return http.StatusInternalServerError, map[string]any{"ok": false, "error": err.Error()}
 		}
-		_ = s.db.SetTorrentReason(*hash, "manual")
+		_ = s.db.SetTorrentReason(*hash, manualReason)
 		return http.StatusAccepted, map[string]any{"ok": true, "title": release.Title}
 	}
 
@@ -289,7 +289,7 @@ func gh0AddParsedRelease(ctx context.Context, s *AppState, release models.Releas
 		return http.StatusInternalServerError, map[string]any{"ok": false, "error": err.Error()}
 	}
 	if hash, ok := utils.MagnetHash(release.Magnet); ok {
-		_ = s.db.SetTorrentReason(hash, "manual")
+		_ = s.db.SetTorrentReason(hash, manualReason)
 	}
 	title := release.Title
 	engine := s.activeEngine()
@@ -963,7 +963,7 @@ func addParsedRelease(s *AppState, release models.Release) (int, any) {
 		if err := s.db.RegisterTorrentScored(&release, score); err != nil {
 			return http.StatusInternalServerError, map[string]any{"ok": false, "error": err.Error()}
 		}
-		_ = s.db.SetTorrentReason(*hash, "manual")
+		_ = s.db.SetTorrentReason(*hash, manualReason)
 		return http.StatusAccepted, map[string]any{"ok": true, "title": release.Title}
 	}
 	score := latestConfig(s).ReleaseScore(&release)
@@ -971,7 +971,7 @@ func addParsedRelease(s *AppState, release models.Release) (int, any) {
 		return http.StatusInternalServerError, map[string]any{"ok": false, "error": err.Error()}
 	}
 	if hash, ok := utils.MagnetHash(release.Magnet); ok {
-		_ = s.db.SetTorrentReason(hash, "manual")
+		_ = s.db.SetTorrentReason(hash, manualReason)
 	}
 	title := release.Title
 	logHash, _ := utils.MagnetHash(release.Magnet)

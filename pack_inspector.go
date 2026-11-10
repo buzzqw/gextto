@@ -101,7 +101,7 @@ func InspectActivePacks(cfg *Config, torrents TorrentEngine, db *Database, check
 		// A pack the user started by hand is their choice, not the cycle's:
 		// it is never discarded, even when every episode is already in the
 		// library (they may want it for the seed, another language, a check).
-		if reason, err := db.TorrentReason(torrent.Hash); err == nil && reason != nil && *reason == "manual" {
+		if reason, err := db.TorrentReason(torrent.Hash); err == nil && reasonIsManual(reason) {
 			checked[torrent.Hash] = settled
 			continue
 		}

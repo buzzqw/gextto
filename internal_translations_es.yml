@@ -1,6 +1,8 @@
 # Bundled Spanish translations for the web UI. The translation database mirrors
 # this catalog: a corrected value here replaces the stored one at the next start.
 spa:
+  "✋ aggiunto a mano, resta in trasferimento": "✋ añadido a mano, se queda en la carpeta de transferencia"
+  "Release aggiunta ai download: aggiunta a mano, resterà nella cartella di trasferimento.": "Release añadida a las descargas: añadida a mano, se quedará en la carpeta de transferencia."
   "Dati scaricati e inviati da quando il motore torrent è partito": "Datos descargados y subidos desde que se inició el motor torrent"
   "Disponibilità tra i peer": "Disponibilidad entre los pares"
   "Pezzi che nessun peer connesso ha": "Piezas que ningún par conectado tiene"

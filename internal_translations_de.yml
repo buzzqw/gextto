@@ -1,6 +1,8 @@
 # Bundled German translations for the web UI. The translation database mirrors
 # this catalog: a corrected value here replaces the stored one at the next start.
 deu:
+  "✋ aggiunto a mano, resta in trasferimento": "✋ von Hand hinzugefügt, bleibt im Transferordner"
+  "Release aggiunta ai download: aggiunta a mano, resterà nella cartella di trasferimento.": "Release zu den Downloads hinzugefügt: von Hand hinzugefügt, bleibt im Transferordner."
   "Dati scaricati e inviati da quando il motore torrent è partito": "Seit dem Start der Torrent-Engine herunter- und hochgeladene Daten"
   "Disponibilità tra i peer": "Verfügbarkeit bei den Peers"
   "Pezzi che nessun peer connesso ha": "Teile, die kein verbundener Peer hat"

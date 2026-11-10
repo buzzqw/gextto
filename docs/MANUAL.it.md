@@ -578,6 +578,16 @@ La ricerca manuale mostra anche release che il ciclo **non** sceglierebbe,
 proprio per permetterti di ispezionarle: vederla non significa che verrebbe
 scaricata.
 
+### Dove finisce un download aggiunto a mano
+
+| Da dove lo aggiungi | Dove finisce |
+|---|---|
+| Ricerca libera: **Dashboard**, **Scarico** (*Cerca una release*), **Esplora**, un link eD2k incollato, la TUI | resta nella **cartella di trasferimento**, con il suo nome: non va in libreria, non viene rinominato e non conta come episodio o film presente. Viene condiviso secondo i limiti di seed e poi fermato; lo togli tu dalla sessione |
+| **Scarica** sui risultati di un titolo che segui, dalla sua pagina (🔍 su un episodio mancante, le corrispondenze dell'archivio di un film), **Accoda** sui titoli seguiti della Dashboard | va in **libreria**, accanto agli altri episodi o film, come un download automatico |
+
+Nella colonna del motivo un download della prima riga si legge *✋ aggiunto a
+mano, resta in trasferimento*.
+
 ### «Perché non questa?»
 
 È una diagnosi in sola lettura di una release: non accoda nulla e non cambia

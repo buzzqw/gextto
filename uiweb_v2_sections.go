@@ -300,7 +300,7 @@ func v2ActionFlash(path string, raw []byte, status int) (string, bool) {
 		}
 	}
 	if path == "/api/search/add" {
-		return "Release aggiunta ai download.", false
+		return "Release aggiunta ai download: aggiunta a mano, resterà nella cartella di trasferimento.", false
 	}
 	if path == "/api/backup" {
 		return "Backup creato", false

@@ -2339,6 +2339,10 @@ func tevArchiveAfterSeed(cfg *Config, torrents TorrentSession, db *Database, pos
 	if _, archiving := postSeedMoves[torrent.Hash]; archiving {
 		return false
 	}
+	// Added by hand from a free search: it stays in the download folder.
+	if tevStaysInTransfer(db, torrent.Hash) {
+		return false
+	}
 	if _, retrying := retries[strings.ToLower(torrent.Hash)]; retrying {
 		return false
 	}
@@ -3228,6 +3232,9 @@ func HandleTorrentEvent(cfg *Config, torrents TorrentSession, db *Database, move
 	if metadata == nil {
 		return tevUnregisteredEvent(db, notifier, event)
 	}
+	if (event.Kind == "torrent_finished" || event.Kind == "storage_moved") && tevStaysInTransfer(db, event.Hash) {
+		return tevCompleteInTransfer(db, notifier, event, metadata)
+	}
 	switch event.Kind {
 	case "metadata_received":
 		return tevMetadataReceived(cfg, torrents, db, metadata, event)
@@ -3303,6 +3310,40 @@ func tevEngineAlert(event models.TorrentEvent, notifier *Notifier) bool {
 		return true
 	}
 	return false
+}
+
+// tevStaysInTransfer reports whether a download was added by hand from a free
+// search: it stays in the download folder, outside the library.
+func tevStaysInTransfer(db *Database, hash string) bool {
+	reason, err := db.TorrentReason(hash)
+	return err == nil && reason != nil && *reason == manualTransferReason
+}
+
+// tevCompleteInTransfer completes a download added by hand from a free
+// search where it was downloaded: no rename, no library import, no episode or
+// movie recorded as present. It is announced once.
+func tevCompleteInTransfer(db *Database, notifier *Notifier, event models.TorrentEvent, metadata *models.TorrentMeta) (bool, error) {
+	first, err := db.MarkTorrentCompletedUnarchived(event.Hash, event.Name)
+	if err != nil {
+		return false, err
+	}
+	if !first {
+		return false, nil
+	}
+	path := CompletionPath(&event)
+	size, _ := SizeOfPath(path)
+	logging.Info(fmt.Sprintf("🎉 %s downloaded; added by hand, it stays in %s", logTarget(&metadata.Release), path), "hash", event.Hash)
+	if err := notifier.NotifyEvent("torrent_completed", map[string]any{
+		"hash":       event.Hash,
+		"name":       event.Name,
+		"title":      metadata.Release.Title,
+		"path":       path,
+		"size_bytes": size,
+		"manual":     true,
+	}); err != nil {
+		logging.Warn("manual torrent completion notification failed", "hash", event.Hash, "title", metadata.Release.Title, "error", err)
+	}
+	return false, nil
 }
 
 // tevUnregisteredEvent handles an event of a torrent with no release behind

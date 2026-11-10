@@ -1,6 +1,8 @@
 # Bundled French translations for the web UI. The translation database mirrors
 # this catalog: a corrected value here replaces the stored one at the next start.
 fra:
+  "✋ aggiunto a mano, resta in trasferimento": "✋ ajouté à la main, reste dans le dossier de transfert"
+  "Release aggiunta ai download: aggiunta a mano, resterà nella cartella di trasferimento.": "Release ajoutée aux téléchargements : ajoutée à la main, elle restera dans le dossier de transfert."
   "Dati scaricati e inviati da quando il motore torrent è partito": "Données téléchargées et envoyées depuis le démarrage du moteur torrent"
   "Disponibilità tra i peer": "Disponibilité chez les pairs"
   "Pezzi che nessun peer connesso ha": "Pièces qu'aucun pair connecté ne possède"

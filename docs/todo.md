@@ -67,12 +67,6 @@ its gate; a rejected one moves to *Not planned*.
   memory stays at 11 MiB at full speed ([measurements](measurements.md)). Gate: a run with
   several torrents downloading at once where the hashing backlog is the peak.
 
-- **The recorded score in the import comparison** — a completed download is compared with
-  the library's copy by file name, and with the default name format a renamed file reads
-  as unknown quality, so any download replaces it. The search only grabs upgrades, so
-  this matters for a release added by hand; the library check already uses the
-  recorded score. Gate: a decision on whether a hand-added worse release should be
-  discarded instead of imported.
 - **IP address reported to trackers** — send an operator-chosen address in the announce
   (HTTP `ip=` and the UDP equivalent). Gate: a NAT or VPN setup where the tracker records
   the wrong address.

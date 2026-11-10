@@ -1,6 +1,8 @@
 # Bundled Polish translations for the web UI. The translation database mirrors
 # this catalog: a corrected value here replaces the stored one at the next start.
 pol:
+  "✋ aggiunto a mano, resta in trasferimento": "✋ dodane ręcznie, zostaje w folderze transferu"
+  "Release aggiunta ai download: aggiunta a mano, resterà nella cartella di trasferimento.": "Wydanie dodane do pobierania: dodane ręcznie, zostanie w folderze transferu."
   "Dati scaricati e inviati da quando il motore torrent è partito": "Dane pobrane i wysłane od uruchomienia silnika torrent"
   "Disponibilità tra i peer": "Dostępność u peerów"
   "Pezzi che nessun peer connesso ha": "Części, których nie ma żaden połączony peer"

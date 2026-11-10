@@ -570,7 +570,7 @@ func MonitorEd2kStalled(cfg *Config, db *Database, notifier *Notifier, now time.
 		if _, ok := wanted[download.Hash]; !ok || download.Complete() || download.Paused() {
 			continue
 		}
-		if reason, err := db.TorrentReason(download.Hash); err != nil || (reason != nil && *reason == "manual") {
+		if reason, err := db.TorrentReason(download.Hash); err != nil || reasonIsManual(reason) {
 			continue
 		}
 		last := time.Time{}

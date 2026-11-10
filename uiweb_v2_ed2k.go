@@ -313,7 +313,7 @@ func V2Ed2kAdd(w http.ResponseWriter, r *http.Request, s *AppState) {
 			failed = append(failed, file.Name)
 			continue
 		}
-		status, value := AddParsedRelease(s, *release)
+		status, value := addParsedReleaseWithReason(s, *release, manualTransferReason)
 		if status == http.StatusAccepted {
 			added++
 			continue

@@ -1296,6 +1296,7 @@ var v2ReasonLabels = map[string]string{
 	"restored":          "♻️ ripristinato",
 	"stall_alternative": "⏱️ download bloccato",
 	"manual":            "✋ aggiunto a mano",
+	"manual_transfer":   "✋ aggiunto a mano, resta in trasferimento",
 }
 
 func v2ReasonLabel(reason string) string {

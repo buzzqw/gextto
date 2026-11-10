@@ -59,7 +59,7 @@ func TestSearchRowsQueueWithoutLeavingTheList(t *testing.T) {
 // what happened instead of the generic "Operazione completata.".
 func TestSearchAddFlashNamesTheRelease(t *testing.T) {
 	message, isError := v2ActionFlash("/api/search/add", []byte(`{"ok":true}`), http.StatusAccepted)
-	if isError || message != "Release aggiunta ai download." {
+	if isError || message != "Release aggiunta ai download: aggiunta a mano, resterà nella cartella di trasferimento." {
 		t.Fatalf("flash = %q error=%v", message, isError)
 	}
 }

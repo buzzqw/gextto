@@ -3,6 +3,8 @@
 # key is inserted and a corrected value replaces the stored one. Keys are the
 # Italian source strings used with `ctx_tr`.
 eng:
+  "✋ aggiunto a mano, resta in trasferimento": "✋ added by hand, stays in the transfer folder"
+  "Release aggiunta ai download: aggiunta a mano, resterà nella cartella di trasferimento.": "Release added to downloads: added by hand, it will stay in the transfer folder."
   "Dati scaricati e inviati da quando il motore torrent è partito": "Data downloaded and uploaded since the torrent engine started"
   "Disponibilità tra i peer": "Availability among peers"
   "Pezzi che nessun peer connesso ha": "Pieces no connected peer has"
