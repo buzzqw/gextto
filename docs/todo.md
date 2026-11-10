@@ -33,14 +33,17 @@ Nothing open: every engine item waits for a condition listed under
   CDATA, namespaces, attributes), because the remaining gain is about 12 % of
   the allocations and 7 % of the CPU, not enough for a rewrite without that
   proof.
-- **Functions too long to review** — `formatEventLang`, `loadConfigDB` and the candidate
-  pass (`candidatePass.try`) are each
+- **Functions too long to review** — `formatEventLang`, `loadConfigDB`, the candidate
+  pass (`candidatePass.try`) and the search scheduler (`cycleWorker`, whose test needs an
+  injectable clock and sleep first) are each
   hundreds of lines with state shared across the whole body: split them by phase, as
   `HandleTorrentEvent` was split into one function per event and the event worker into
   an `eventWorker` with one method per timed phase. Gate: for each, a behaviour test of
   what it does (a config load with legacy keys; a candidate accepted, delayed and
   refused), written before the split, as the `torrent_event_*_test.go` files pinned the
-  completion and the library import and `series_rename_apply_test.go` the rename pass.
+  completion and the library import, `series_rename_apply_test.go` the rename pass and
+  the stall and seed tests `MonitorStalled`, `RemoveSeededCompleted` and
+  `EnforceSeedPolicy`.
 
 ## Measurements
 

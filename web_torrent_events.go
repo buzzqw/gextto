@@ -938,170 +938,12 @@ func MonitorStalled(cfg *Config, torrents TorrentSession, db *Database, notifier
 	if probeTimeout > retryTimeout/2 {
 		probeTimeout = retryTimeout / 2
 	}
-	now := time.Now()
+	m := &stallMonitor{cfg: cfg, torrents: torrents, db: db, notifier: notifier, watch: watch, now: time.Now(),
+		stallAfterMinutes: stallAfterMinutes, stallTimeout: stallTimeout, retryTimeout: retryTimeout, probeTimeout: probeTimeout}
 	live := map[string]struct{}{}
 	for _, torrent := range torrents.List() {
 		live[torrent.Hash] = struct{}{}
-		entry, watched := watch[torrent.Hash]
-		parked := watched && entry.stalledSince != nil
-		finished := torrent.Progress >= 100.0 || torrent.State == "finished" || torrent.State == "seeding"
-		// A data check or metadata fetch (typically right after a restart) is
-		// not a verdict: keep the clock as it is until the torrent settles.
-		transient := !finished && torrent.State != "downloading" && torrent.State != "stalled" && torrent.State != "paused"
-		if transient {
-			continue
-		}
-		// A parked torrent shows up as stalled, paused or downloading (during a
-		// probe): none of these ends the stall, so its clock and give-up
-		// deadline survive. A torrent that is not parked is timed only while it
-		// is really downloading; user-paused torrents never enter watch.
-		if finished || (!parked && torrent.State == "paused") {
-			if watched {
-				torrents.ClearStalled(torrent.Hash)
-				// Only idle or stalled entries were persisted: do not issue a DELETE
-				// for every seeding/paused torrent at every tick.
-				if entry.persisted {
-					_ = db.DeleteStallWatch(torrent.Hash)
-				}
-				delete(watch, torrent.Hash)
-			}
-			continue
-		}
-		if !parked {
-			if !watched {
-				entry = StallWatch{lastProgressAt: now, lastDone: torrent.TotalDone, firstSeen: now}
-			} else if entry.firstSeen.IsZero() {
-				entry.firstSeen = now
-			}
-			if tevFreshProbeExpired(entry.firstSeen, now, &torrent) {
-				tevAbandonTorrent(cfg, db, torrents, notifier, torrent, watch,
-					"no peer or seeder answered in "+logDuration(tevFreshProbeWindow), "probe timeout")
-				continue
-			}
-			progressAt := entry.lastProgressAt
-			lastDone := entry.lastDone
-			expired := tevStallExpired(&progressAt, &lastDone, now, torrent.TotalDone, stallTimeout)
-			entry.lastProgressAt = progressAt
-			entry.lastDone = lastDone
-			if !expired {
-				idle := now.Sub(entry.lastProgressAt) >= tevStallPersistAfter
-				switch {
-				case idle && !entry.persisted:
-					if err := db.SaveStallWatch(torrent.Hash, entry); err == nil {
-						entry.persisted = true
-						entry.savedState = stallPersistedState(entry)
-					}
-				case !idle && entry.persisted:
-					_ = db.DeleteStallWatch(torrent.Hash)
-					entry.persisted = false
-				}
-				watch[torrent.Hash] = entry
-				continue
-			}
-			if _, err := torrents.MarkStalled(torrent.Hash); err != nil {
-				logging.Debug("could not park stalled torrent",
-					"hash", torrent.Hash, "name", torrent.Name, "error", err.Error())
-				watch[torrent.Hash] = entry
-				continue
-			}
-			stamp := now
-			entry.stalledSince = &stamp
-			code, reason, hint := DiagnoseTorrent(&torrent)
-			logging.Warn(fmt.Sprintf("⏸️ «%s» is stuck at %s: %s. It is set aside so other downloads can proceed, and retried in %s, then less and less often (up to once a day)",
-				torrent.Name, logPercent(torrent.Progress), stallReasonForLog(code, &torrent),
-				logDuration(tevStallRetryDelay(0, retryTimeout))), "hash", torrent.Hash)
-			logging.Debug("download stalled",
-				"hash", torrent.Hash,
-				"name", torrent.Name,
-				"progress", torrent.Progress,
-				"num_peers", torrent.NumPeers,
-				"num_seeds", torrent.NumSeeds,
-				"swarm_seeds", torrent.NumComplete,
-				"swarm_peers", torrent.NumIncomplete,
-				"reason", code,
-				"detail", reason,
-				"hint", hint,
-				"stall_after_minutes", stallAfterMinutes,
-			)
-			tevScheduleStallRetry(&entry, now, retryTimeout)
-			if err := db.SaveStallWatch(torrent.Hash, entry); err != nil {
-				logging.Debug("could not persist stalled torrent retry state", "hash", torrent.Hash, "error", err.Error())
-			} else {
-				entry.persisted = true
-				entry.savedState = stallPersistedState(entry)
-			}
-			watch[torrent.Hash] = entry
-			continue
-		}
-
-		probing := !entry.probeUntil.IsZero()
-		if torrent.TotalDone > entry.lastDone {
-			// Only bytes received during a probe prove the swarm is back: while
-			// parked the torrent is paused, so a higher count there comes from a
-			// data check and merely moves the baseline.
-			if probing {
-				logging.Info(fmt.Sprintf("▶️ «%s» is downloading again (%s)", torrent.Name, logPercent(torrent.Progress)), "hash", torrent.Hash)
-				logging.Debug("stalled torrent made byte progress",
-					"hash", torrent.Hash, "recovered_bytes", torrent.TotalDone-entry.lastDone, "progress", torrent.Progress)
-				torrents.ClearStalled(torrent.Hash)
-				_ = db.DeleteStallWatch(torrent.Hash)
-				watch[torrent.Hash] = StallWatch{lastProgressAt: now, lastDone: torrent.TotalDone, firstSeen: now}
-				continue
-			}
-			entry.lastDone = torrent.TotalDone
-		}
-		stalledSince := *entry.stalledSince
-		entryGiveup, entryGiveupMinutes, hasEntryGiveup := tevStallGiveupWindow(cfg, &torrent)
-		if hasEntryGiveup && now.Sub(stalledSince) >= entryGiveup {
-			why := fmt.Sprintf("stuck at %s for %s", logPercent(torrent.Progress),
-				logDuration(time.Duration(entryGiveupMinutes*float64(time.Minute))))
-			tevAbandonTorrent(cfg, db, torrents, notifier, torrent, watch, why, "stalled download")
-			continue
-		}
-		switch {
-		case probing && !now.Before(entry.probeUntil):
-			// The probe brought no bytes: park it again until the next retry.
-			if _, err := torrents.MarkStalled(torrent.Hash); err != nil {
-				logging.Debug("could not park stalled torrent after its retry",
-					"hash", torrent.Hash, "name", torrent.Name, "error", err.Error())
-			} else {
-				entry.probeUntil = time.Time{}
-			}
-		case probing:
-			// Still probing: give the swarm time to answer the reannounce.
-		case !now.Before(entry.nextRetryAt):
-			value, err := torrents.Restart(torrent.Hash)
-			if err != nil {
-				logging.Debug("stalled torrent restart failed",
-					"hash", torrent.Hash, "name", torrent.Name, "error", err.Error())
-				entry.nextRetryAt = now.Add(15 * time.Second)
-			} else if value {
-				next := tevScheduleStallRetry(&entry, now, retryTimeout)
-				logging.Info(fmt.Sprintf("🔁 «%s» is still stuck; looking for other users to download from again (next attempt in %s)",
-					torrent.Name, logDuration(next)), "hash", torrent.Hash)
-				entry.probeUntil = now.Add(probeTimeout)
-			} else {
-				logging.Debug("stalled torrent restart unavailable in current mode",
-					"hash", torrent.Hash, "name", torrent.Name)
-				entry.nextRetryAt = now.Add(15 * time.Second)
-			}
-		case torrent.State != "stalled":
-			// After a daemon restart a parked torrent comes back merely paused, or
-			// running if it was probing: park it again.
-			if _, err := torrents.MarkStalled(torrent.Hash); err != nil {
-				logging.Debug("could not park stalled torrent",
-					"hash", torrent.Hash, "name", torrent.Name, "error", err.Error())
-			}
-		}
-		if state := stallPersistedState(entry); !entry.persisted || state != entry.savedState {
-			if err := db.SaveStallWatch(torrent.Hash, entry); err != nil {
-				logging.Debug("could not persist stalled torrent retry state", "hash", torrent.Hash, "error", err.Error())
-			} else {
-				entry.persisted = true
-				entry.savedState = state
-			}
-		}
-		watch[torrent.Hash] = entry
+		m.check(torrent)
 	}
 	for hash, entry := range watch {
 		if _, ok := live[hash]; !ok {
@@ -1111,6 +953,199 @@ func MonitorStalled(cfg *Config, torrents TorrentSession, db *Database, notifier
 			}
 		}
 	}
+}
+
+// stallMonitor is one pass of MonitorStalled: the timeouts of the settings and
+// the clocks of the watched torrents.
+type stallMonitor struct {
+	cfg               *Config
+	torrents          TorrentSession
+	db                *Database
+	notifier          *Notifier
+	watch             map[string]StallWatch
+	now               time.Time
+	stallAfterMinutes float64
+	stallTimeout      time.Duration
+	retryTimeout      time.Duration
+	probeTimeout      time.Duration
+}
+
+// check times one torrent: a finished or user-paused one leaves the watch, a
+// downloading one is timed and parked when it stops, a parked one is retried
+// or given up.
+func (m *stallMonitor) check(torrent models.TorrentView) {
+	entry, watched := m.watch[torrent.Hash]
+	parked := watched && entry.stalledSince != nil
+	finished := torrent.Progress >= 100.0 || torrent.State == "finished" || torrent.State == "seeding"
+	// A data check or metadata fetch (typically right after a restart) is
+	// not a verdict: keep the clock as it is until the torrent settles.
+	transient := !finished && torrent.State != "downloading" && torrent.State != "stalled" && torrent.State != "paused"
+	if transient {
+		return
+	}
+	// A parked torrent shows up as stalled, paused or downloading (during a
+	// probe): none of these ends the stall, so its clock and give-up
+	// deadline survive. A torrent that is not parked is timed only while it
+	// is really downloading; user-paused torrents never enter watch.
+	if finished || (!parked && torrent.State == "paused") {
+		if watched {
+			m.torrents.ClearStalled(torrent.Hash)
+			// Only idle or stalled entries were persisted: do not issue a DELETE
+			// for every seeding/paused torrent at every tick.
+			if entry.persisted {
+				_ = m.db.DeleteStallWatch(torrent.Hash)
+			}
+			delete(m.watch, torrent.Hash)
+		}
+		return
+	}
+	if !parked {
+		m.timeActive(torrent, entry, watched)
+		return
+	}
+	m.followParked(torrent, entry)
+}
+
+// timeActive times a downloading torrent and parks it once it made no progress
+// for the stall window; a fresh torrent nobody answers is abandoned.
+func (m *stallMonitor) timeActive(torrent models.TorrentView, entry StallWatch, watched bool) {
+	if !watched {
+		entry = StallWatch{lastProgressAt: m.now, lastDone: torrent.TotalDone, firstSeen: m.now}
+	} else if entry.firstSeen.IsZero() {
+		entry.firstSeen = m.now
+	}
+	if tevFreshProbeExpired(entry.firstSeen, m.now, &torrent) {
+		tevAbandonTorrent(m.cfg, m.db, m.torrents, m.notifier, torrent, m.watch,
+			"no peer or seeder answered in "+logDuration(tevFreshProbeWindow), "probe timeout")
+		return
+	}
+	progressAt := entry.lastProgressAt
+	lastDone := entry.lastDone
+	expired := tevStallExpired(&progressAt, &lastDone, m.now, torrent.TotalDone, m.stallTimeout)
+	entry.lastProgressAt = progressAt
+	entry.lastDone = lastDone
+	if !expired {
+		idle := m.now.Sub(entry.lastProgressAt) >= tevStallPersistAfter
+		switch {
+		case idle && !entry.persisted:
+			if err := m.db.SaveStallWatch(torrent.Hash, entry); err == nil {
+				entry.persisted = true
+				entry.savedState = stallPersistedState(entry)
+			}
+		case !idle && entry.persisted:
+			_ = m.db.DeleteStallWatch(torrent.Hash)
+			entry.persisted = false
+		}
+		m.watch[torrent.Hash] = entry
+		return
+	}
+	if _, err := m.torrents.MarkStalled(torrent.Hash); err != nil {
+		logging.Debug("could not park stalled torrent",
+			"hash", torrent.Hash, "name", torrent.Name, "error", err.Error())
+		m.watch[torrent.Hash] = entry
+		return
+	}
+	stamp := m.now
+	entry.stalledSince = &stamp
+	code, reason, hint := DiagnoseTorrent(&torrent)
+	logging.Warn(fmt.Sprintf("⏸️ «%s» is stuck at %s: %s. It is set aside so other downloads can proceed, and retried in %s, then less and less often (up to once a day)",
+		torrent.Name, logPercent(torrent.Progress), stallReasonForLog(code, &torrent),
+		logDuration(tevStallRetryDelay(0, m.retryTimeout))), "hash", torrent.Hash)
+	logging.Debug("download stalled",
+		"hash", torrent.Hash,
+		"name", torrent.Name,
+		"progress", torrent.Progress,
+		"num_peers", torrent.NumPeers,
+		"num_seeds", torrent.NumSeeds,
+		"swarm_seeds", torrent.NumComplete,
+		"swarm_peers", torrent.NumIncomplete,
+		"reason", code,
+		"detail", reason,
+		"hint", hint,
+		"stall_after_minutes", m.stallAfterMinutes,
+	)
+	tevScheduleStallRetry(&entry, m.now, m.retryTimeout)
+	if err := m.db.SaveStallWatch(torrent.Hash, entry); err != nil {
+		logging.Debug("could not persist stalled torrent retry state", "hash", torrent.Hash, "error", err.Error())
+	} else {
+		entry.persisted = true
+		entry.savedState = stallPersistedState(entry)
+	}
+	m.watch[torrent.Hash] = entry
+	return
+}
+
+// followParked retries a parked torrent on its schedule, resumes it when a
+// probe brings bytes, and abandons it after the give-up window.
+func (m *stallMonitor) followParked(torrent models.TorrentView, entry StallWatch) {
+	probing := !entry.probeUntil.IsZero()
+	if torrent.TotalDone > entry.lastDone {
+		// Only bytes received during a probe prove the swarm is back: while
+		// parked the torrent is paused, so a higher count there comes from a
+		// data check and merely moves the baseline.
+		if probing {
+			logging.Info(fmt.Sprintf("▶️ «%s» is downloading again (%s)", torrent.Name, logPercent(torrent.Progress)), "hash", torrent.Hash)
+			logging.Debug("stalled torrent made byte progress",
+				"hash", torrent.Hash, "recovered_bytes", torrent.TotalDone-entry.lastDone, "progress", torrent.Progress)
+			m.torrents.ClearStalled(torrent.Hash)
+			_ = m.db.DeleteStallWatch(torrent.Hash)
+			m.watch[torrent.Hash] = StallWatch{lastProgressAt: m.now, lastDone: torrent.TotalDone, firstSeen: m.now}
+			return
+		}
+		entry.lastDone = torrent.TotalDone
+	}
+	stalledSince := *entry.stalledSince
+	entryGiveup, entryGiveupMinutes, hasEntryGiveup := tevStallGiveupWindow(m.cfg, &torrent)
+	if hasEntryGiveup && m.now.Sub(stalledSince) >= entryGiveup {
+		why := fmt.Sprintf("stuck at %s for %s", logPercent(torrent.Progress),
+			logDuration(time.Duration(entryGiveupMinutes*float64(time.Minute))))
+		tevAbandonTorrent(m.cfg, m.db, m.torrents, m.notifier, torrent, m.watch, why, "stalled download")
+		return
+	}
+	switch {
+	case probing && !m.now.Before(entry.probeUntil):
+		// The probe brought no bytes: park it again until the next retry.
+		if _, err := m.torrents.MarkStalled(torrent.Hash); err != nil {
+			logging.Debug("could not park stalled torrent after its retry",
+				"hash", torrent.Hash, "name", torrent.Name, "error", err.Error())
+		} else {
+			entry.probeUntil = time.Time{}
+		}
+	case probing:
+		// Still probing: give the swarm time to answer the reannounce.
+	case !m.now.Before(entry.nextRetryAt):
+		value, err := m.torrents.Restart(torrent.Hash)
+		if err != nil {
+			logging.Debug("stalled torrent restart failed",
+				"hash", torrent.Hash, "name", torrent.Name, "error", err.Error())
+			entry.nextRetryAt = m.now.Add(15 * time.Second)
+		} else if value {
+			next := tevScheduleStallRetry(&entry, m.now, m.retryTimeout)
+			logging.Info(fmt.Sprintf("🔁 «%s» is still stuck; looking for other users to download from again (next attempt in %s)",
+				torrent.Name, logDuration(next)), "hash", torrent.Hash)
+			entry.probeUntil = m.now.Add(m.probeTimeout)
+		} else {
+			logging.Debug("stalled torrent restart unavailable in current mode",
+				"hash", torrent.Hash, "name", torrent.Name)
+			entry.nextRetryAt = m.now.Add(15 * time.Second)
+		}
+	case torrent.State != "stalled":
+		// After a daemon restart a parked torrent comes back merely paused, or
+		// running if it was probing: park it again.
+		if _, err := m.torrents.MarkStalled(torrent.Hash); err != nil {
+			logging.Debug("could not park stalled torrent",
+				"hash", torrent.Hash, "name", torrent.Name, "error", err.Error())
+		}
+	}
+	if state := stallPersistedState(entry); !entry.persisted || state != entry.savedState {
+		if err := m.db.SaveStallWatch(torrent.Hash, entry); err != nil {
+			logging.Debug("could not persist stalled torrent retry state", "hash", torrent.Hash, "error", err.Error())
+		} else {
+			entry.persisted = true
+			entry.savedState = state
+		}
+	}
+	m.watch[torrent.Hash] = entry
 }
 
 // stallWatchPersisted reports whether a monitor entry has a database row.
@@ -1463,121 +1498,133 @@ func RemoveSeededCompleted(cfg *Config, torrents TorrentSession, db *Database, p
 	}
 	policy := newSeedPolicy(cfg, db)
 	for _, torrent := range torrents.List() {
-		if _, ok := postSeedMoves[torrent.Hash]; ok {
-			continue
-		}
-		// Explicit infinite seeding: the torrent must remain seeding. The
-		// answer comes from the seed policy, the same one that decides the
-		// pause: reading the raw values here let a torrent the policy had
-		// stopped be handled as "seeds forever".
-		if policy.limitsFor(seedViewForPolicy(torrent)).none() {
-			continue
-		}
-		// The seed limits come from the session view alone: a torrent that has
-		// reached none of them and is not paused is skipped by the check below
-		// whatever the database says, so it costs no query at every tick.
-		limits := policy.limitsFor(&torrent)
-		ratioReached, timeLimitReached := limits.ratioReached(&torrent), limits.timeReached(&torrent)
-		// A seed stopped for inactivity ended its seed like one that reached
-		// its time limit.
-		idleReached := limits.IdleSeconds != nil && seedIdle.reached(torrent.Hash)
-		timeReached := timeLimitReached || idleReached
-		if !ratioReached && !timeReached && torrent.State != "paused" {
-			continue
-		}
-		// Real completeness, not just a momentary libtorrent state: a torrent
-		// that was relocated mid-download can briefly report "finished" while
-		// its file is still incomplete. Also recognize torrents already completed
-		// and archived in the database whose download files were moved to NAS.
-		status, processed, _ := db.TorrentStatusProcessed(torrent.Hash)
-		isArchived := processed != nil && strings.TrimSpace(*processed) != ""
-		isCompletedDB := status != nil && *status == "completed"
-		completed := (torrent.Progress >= 99.99 && torrent.TotalSize > 0 && torrent.TotalDone >= torrent.TotalSize) || isArchived || isCompletedDB
-		if !completed {
-			continue
-		}
-		if !ratioReached && !timeReached && !isArchived {
-			continue
-		}
-		archivedPack := tevArchivedPackSourceDisposable(db, torrent.Hash, torrent.SavePath)
-		archivedCopy := tevCompletedSourceDisposable(db, torrent.Hash, torrent.SavePath)
-		source := CompletionPath(&models.TorrentEvent{
-			Kind:     "torrent_finished",
-			Hash:     torrent.Hash,
-			Name:     torrent.Name,
-			SavePath: torrent.SavePath,
-		})
-		sourceIsFolder := false
-		if info, statErr := os.Stat(source); statErr == nil {
-			sourceIsFolder = info.IsDir()
-		}
-		archiveFolder := archivedPack || (archivedCopy && sourceIsFolder)
-		if !archivedCopy {
-			continue
-		}
-		trashConfigured := cfg.TrashPath != nil && strings.TrimSpace(*cfg.TrashPath) != "" && cfg.CleanupAction != "delete"
-		if archiveFolder && trashConfigured {
-			removed, err := torrents.Remove(torrent.Hash, false)
-			if err != nil {
-				logging.Warn("seeded archived folder removal failed",
-					"hash", torrent.Hash, "name", torrent.Name, "error", err.Error())
-				continue
+		tevRemoveIfSeeded(cfg, torrents, db, policy, postSeedMoves, torrent)
+	}
+}
+
+// tevRemoveIfSeeded removes one completed torrent whose seed is over and whose
+// library copy is in place: a folder goes to the trash, a single file with the
+// session entry.
+func tevRemoveIfSeeded(cfg *Config, torrents TorrentSession, db *Database, policy *seedPolicy, postSeedMoves map[string]struct{}, torrent models.TorrentView) {
+	if _, ok := postSeedMoves[torrent.Hash]; ok {
+		return
+	}
+	// Explicit infinite seeding: the torrent must remain seeding. The
+	// answer comes from the seed policy, the same one that decides the
+	// pause: reading the raw values here let a torrent the policy had
+	// stopped be handled as "seeds forever".
+	if policy.limitsFor(seedViewForPolicy(torrent)).none() {
+		return
+	}
+	// The seed limits come from the session view alone: a torrent that has
+	// reached none of them and is not paused is skipped by the check below
+	// whatever the database says, so it costs no query at every tick.
+	limits := policy.limitsFor(&torrent)
+	ratioReached, timeLimitReached := limits.ratioReached(&torrent), limits.timeReached(&torrent)
+	// A seed stopped for inactivity ended its seed like one that reached
+	// its time limit.
+	idleReached := limits.IdleSeconds != nil && seedIdle.reached(torrent.Hash)
+	timeReached := timeLimitReached || idleReached
+	if !ratioReached && !timeReached && torrent.State != "paused" {
+		return
+	}
+	// Real completeness, not just a momentary libtorrent state: a torrent
+	// that was relocated mid-download can briefly report "finished" while
+	// its file is still incomplete. Also recognize torrents already completed
+	// and archived in the database whose download files were moved to NAS.
+	status, processed, _ := db.TorrentStatusProcessed(torrent.Hash)
+	isArchived := processed != nil && strings.TrimSpace(*processed) != ""
+	isCompletedDB := status != nil && *status == "completed"
+	completed := (torrent.Progress >= 99.99 && torrent.TotalSize > 0 && torrent.TotalDone >= torrent.TotalSize) || isArchived || isCompletedDB
+	if !completed {
+		return
+	}
+	if !ratioReached && !timeReached && !isArchived {
+		return
+	}
+	archivedPack := tevArchivedPackSourceDisposable(db, torrent.Hash, torrent.SavePath)
+	archivedCopy := tevCompletedSourceDisposable(db, torrent.Hash, torrent.SavePath)
+	source := CompletionPath(&models.TorrentEvent{
+		Kind:     "torrent_finished",
+		Hash:     torrent.Hash,
+		Name:     torrent.Name,
+		SavePath: torrent.SavePath,
+	})
+	sourceIsFolder := false
+	if info, statErr := os.Stat(source); statErr == nil {
+		sourceIsFolder = info.IsDir()
+	}
+	archiveFolder := archivedPack || (archivedCopy && sourceIsFolder)
+	if !archivedCopy {
+		return
+	}
+	trashConfigured := cfg.TrashPath != nil && strings.TrimSpace(*cfg.TrashPath) != "" && cfg.CleanupAction != "delete"
+	if archiveFolder && trashConfigured {
+		tevTrashSeededFolder(cfg, torrents, db, torrent, source, processed, seedRemovalReason(ratioReached, timeLimitReached, idleReached))
+		return
+	}
+	deleteFiles := archivedCopy
+	if !archiveFolder && !settingsBool(cfg, settingMoveEpisodes, false) {
+		// Copy mode keeps the download source; move mode already moved it
+		// into the library at the end of the seed.
+		deleteFiles = false
+	}
+	if archiveFolder && cfg.CleanupAction != "delete" {
+		// The library copy is in place but no usable trash destination is
+		// configured: never delete the only other copy. Remove the torrent
+		// from the session and keep the files.
+		deleteFiles = false
+		logging.Warn("seeded archived folder has no trash destination; keeping the source files",
+			"hash", torrent.Hash, "name", torrent.Name, "source", source)
+	}
+	removed, err := torrents.Remove(torrent.Hash, deleteFiles)
+	if err != nil {
+		logging.Warn("seeded torrent removal failed",
+			"hash", torrent.Hash, "name", torrent.Name, "error", err.Error())
+		return
+	}
+	if !removed {
+		return
+	}
+	_ = db.MarkTorrentRemovedAt(torrent.Hash)
+	if archivedPack {
+		archivePath := "path unavailable"
+		archiveName := "name unavailable"
+		archiveFiles := "unavailable"
+		if processed, processedErr := db.TorrentProcessed(torrent.Hash); processedErr == nil && processed != nil && strings.TrimSpace(*processed) != "" {
+			archivePath = *processed
+			archiveName = filepath.Base(filepath.Clean(archivePath))
+			if files, filesErr := VideoFiles(archivePath); filesErr == nil {
+				archiveFiles = tevArchivedFileNames(files)
 			}
-			if removed {
-				_ = db.MarkTorrentRemovedAt(torrent.Hash)
-			}
-			libraryNote := "the library copy is kept"
-			if processed != nil && strings.TrimSpace(*processed) != "" {
-				libraryNote = "the library copy stays in " + *processed
-			}
-			reason := seedRemovalReason(ratioReached, timeLimitReached, idleReached)
-			if target, moveErr := MoveToTrash(source, *cfg.TrashPath); moveErr != nil {
-				logging.Error(fmt.Sprintf("❌ Could not move the download copy of «%s» to the trash after seeding (%s); %s", torrent.Name, source, libraryNote), "hash", torrent.Hash, "error", moveErr)
-			} else {
-				logging.Info(fmt.Sprintf("🗑️ «%s» has finished seeding (%s): the download copy moved to %s, %s", torrent.Name, reason, target, libraryNote), "hash", torrent.Hash)
-			}
-			continue
 		}
-		deleteFiles := archivedCopy
-		if !archiveFolder && !settingsBool(cfg, settingMoveEpisodes, false) {
-			// Copy mode keeps the download source; move mode already moved it
-			// into the library at the end of the seed.
-			deleteFiles = false
-		}
-		if archiveFolder && cfg.CleanupAction != "delete" {
-			// The library copy is in place but no usable trash destination is
-			// configured: never delete the only other copy. Remove the torrent
-			// from the session and keep the files.
-			deleteFiles = false
-			logging.Warn("seeded archived folder has no trash destination; keeping the source files",
-				"hash", torrent.Hash, "name", torrent.Name, "source", source)
-		}
-		removed, err := torrents.Remove(torrent.Hash, deleteFiles)
-		if err != nil {
-			logging.Warn("seeded torrent removal failed",
-				"hash", torrent.Hash, "name", torrent.Name, "error", err.Error())
-			continue
-		}
-		if !removed {
-			continue
-		}
+		logging.Info(fmt.Sprintf("🗑️ Seeding finished for «%s»: download copy removed, the library copy stays in %s", torrent.Name, archivePath), "hash", torrent.Hash)
+		logging.Debug("season pack seeded", "folder", archiveName, "files", archiveFiles)
+	} else {
+		logging.Info(fmt.Sprintf("🗑️ Seeding finished for «%s»: removed from the download list", torrent.Name), "hash", torrent.Hash)
+	}
+}
+
+// tevTrashSeededFolder takes a seeded torrent whose folder is archived out of
+// the session and moves its download copy to the trash.
+func tevTrashSeededFolder(cfg *Config, torrents TorrentSession, db *Database, torrent models.TorrentView, source string, processed *string, reason string) {
+	removed, err := torrents.Remove(torrent.Hash, false)
+	if err != nil {
+		logging.Warn("seeded archived folder removal failed",
+			"hash", torrent.Hash, "name", torrent.Name, "error", err.Error())
+		return
+	}
+	if removed {
 		_ = db.MarkTorrentRemovedAt(torrent.Hash)
-		if archivedPack {
-			archivePath := "path unavailable"
-			archiveName := "name unavailable"
-			archiveFiles := "unavailable"
-			if processed, processedErr := db.TorrentProcessed(torrent.Hash); processedErr == nil && processed != nil && strings.TrimSpace(*processed) != "" {
-				archivePath = *processed
-				archiveName = filepath.Base(filepath.Clean(archivePath))
-				if files, filesErr := VideoFiles(archivePath); filesErr == nil {
-					archiveFiles = tevArchivedFileNames(files)
-				}
-			}
-			logging.Info(fmt.Sprintf("🗑️ Seeding finished for «%s»: download copy removed, the library copy stays in %s", torrent.Name, archivePath), "hash", torrent.Hash)
-			logging.Debug("season pack seeded", "folder", archiveName, "files", archiveFiles)
-		} else {
-			logging.Info(fmt.Sprintf("🗑️ Seeding finished for «%s»: removed from the download list", torrent.Name), "hash", torrent.Hash)
-		}
+	}
+	libraryNote := "the library copy is kept"
+	if processed != nil && strings.TrimSpace(*processed) != "" {
+		libraryNote = "the library copy stays in " + *processed
+	}
+	if target, moveErr := MoveToTrash(source, *cfg.TrashPath); moveErr != nil {
+		logging.Error(fmt.Sprintf("❌ Could not move the download copy of «%s» to the trash after seeding (%s); %s", torrent.Name, source, libraryNote), "hash", torrent.Hash, "error", moveErr)
+	} else {
+		logging.Info(fmt.Sprintf("🗑️ «%s» has finished seeding (%s): the download copy moved to %s, %s", torrent.Name, reason, target, libraryNote), "hash", torrent.Hash)
 	}
 }
 
@@ -2164,8 +2211,15 @@ func EnforceSeedPolicy(cfg *Config, torrents TorrentSession, db *Database, postS
 	policy := newSeedPolicy(cfg, db)
 	now := time.Now()
 	defer seedIdle.sweep()
-	// An infinite-seed override means the torrent must keep seeding: if a
-	// previous seed limit left it paused after completion, resume it.
+	tevResumeInfiniteSeeds(torrents, policy)
+	for _, torrent := range torrents.List() {
+		tevApplySeedLimit(cfg, torrents, db, policy, now, postSeedMoves, retries, seedCopyWarnings, torrent)
+	}
+}
+
+// tevResumeInfiniteSeeds resumes the torrents an infinite-seed override wants
+// seeding that a previous seed limit left paused after completion.
+func tevResumeInfiniteSeeds(torrents TorrentSession, policy *seedPolicy) {
 	for _, torrent := range torrents.List() {
 		if !tevNeedsInfiniteSeedResume(policy, &torrent) {
 			continue
@@ -2178,119 +2232,144 @@ func EnforceSeedPolicy(cfg *Config, torrents TorrentSession, db *Database, postS
 			logging.Info(fmt.Sprintf("🔁 «%s» is sharing again (set to seed without limits)", torrent.Name), "hash", torrent.Hash)
 		}
 	}
-	for _, torrent := range torrents.List() {
-		// Never apply the seed policy to an incomplete torrent: relocating and
-		// pausing a still-downloading file corrupts its state.
-		if torrent.Progress < 99.99 || torrent.TotalSize <= 0 {
-			continue
-		}
-		eligible := torrent.State == "seeding" || torrent.State == "finished" ||
-			(torrent.State == "paused" && torrent.Progress >= 99.99 && !torrent.AutoManaged)
-		if !eligible {
-			continue
-		}
-		limits := policy.limitsFor(&torrent)
-		if limits.none() {
-			continue
-		}
-		ratioReached := limits.ratioReached(&torrent)
-		timeReached := limits.timeReached(&torrent)
-		idleReached := policy.idleReached(&torrent, limits, now)
-		if !ratioReached && !timeReached && !idleReached {
-			continue
-		}
-		stopped := torrent.State == "paused" && !torrent.AutoManaged
-		// Announced together with the move to the library when one follows,
-		// otherwise on its own below.
-		seedReason := ""
-		if !stopped {
-			value, err := torrents.Pause(torrent.Hash)
-			if err != nil {
-				if torrentNotFoundError(err) {
-					// The torrent vanished between the listing and the pause
-					// (already removed elsewhere): nothing to stop, not a warning.
-					logging.Debug("seed-limit pause skipped: torrent already removed from the session",
-						"hash", torrent.Hash, "name", torrent.Name)
-				} else {
-					logging.Warn("failed to stop torrent at seed limit",
-						"hash", torrent.Hash, "name", torrent.Name, "error", err.Error())
-				}
-			} else if value {
-				stopped = true
-				reason := seedEndReason(ratioReached, timeReached, idleReached)
-				if !timeReached && idleReached {
-					policy.markIdleStop(torrent.Hash)
-				}
-				if limits.Rule != "" {
-					reason += " (rule «" + limits.Rule + "»)"
-				}
-				seedReason = reason
-			} else {
-				logging.Warn("torrent seed limit could not be applied in current mode",
-					"hash", torrent.Hash, "name", torrent.Name)
-			}
-		}
-		if !stopped {
-			continue
-		}
-		if tevPostSeedRelocate(cfg, torrents, db, &torrent, postSeedMoves, retries, &seedReason) {
-			if seedReason != "" {
-				logging.Info(fmt.Sprintf("⏸️ %s", seedFinishedLead(torrent.Name, &seedReason)), "hash", torrent.Hash)
-			}
-			continue
-		}
-		// Archive at the end of the seed: a completed torrent that kept its
-		// source for seeding is moved into its library destination now, then
-		// renamed by the storage_moved handler. Removal happens after the move,
-		// so the file is never deleted before it is archived. `postSeedMoves`
-		// protects the source while libtorrent copies it, and the guard on
-		// `completed_source_disposable` skips torrents whose library copy is
-		// already in place (copy mode / folder and pack import).
-		if _, archiving := postSeedMoves[torrent.Hash]; !archiving {
-			if _, retrying := retries[strings.ToLower(torrent.Hash)]; !retrying {
-				if !tevCompletedSourceDisposable(db, torrent.Hash, torrent.SavePath) {
-					if meta, metaErr := db.TorrentMeta(torrent.Hash); metaErr == nil && meta != nil {
-						release := meta.Release
-						if dest, ok := ConfiguredDestinationFor(&release, cfg); ok && !SamePath(torrent.SavePath, dest) {
-							if moved, moveErr := torrents.MoveStorage(torrent.Hash, dest); moveErr == nil && moved {
-								postSeedMoves[torrent.Hash] = struct{}{}
-								retries[strings.ToLower(torrent.Hash)] = StorageMoveRetry{
-									destination: dest,
-									postSeed:    true,
-									attempts:    0,
-									nextAttempt: time.Now().Add(600 * time.Second),
-									inFlight:    true,
-								}
-								logging.Info(fmt.Sprintf("📁 %s: moving it to the library in %s (%s)",
-									seedFinishedLead(torrent.Name, &seedReason), dest, logging.HumanBytesI64(torrent.TotalSize)), "hash", torrent.Hash)
-								logging.Debug("post-seed archive move", "hash", torrent.Hash, "from", torrent.SavePath)
-								continue
-							}
-						}
-					}
-				}
-			}
-		}
+}
+
+// tevApplySeedLimit stops one completed torrent that reached a seed limit,
+// then moves it into the library or, with automatic removal, takes it out of
+// the session once its library copy is verified.
+func tevApplySeedLimit(cfg *Config, torrents TorrentSession, db *Database, policy *seedPolicy, now time.Time, postSeedMoves map[string]struct{}, retries map[string]StorageMoveRetry, seedCopyWarnings map[string]time.Time, torrent models.TorrentView) {
+	// Never apply the seed policy to an incomplete torrent: relocating and
+	// pausing a still-downloading file corrupts its state.
+	if torrent.Progress < 99.99 || torrent.TotalSize <= 0 {
+		return
+	}
+	eligible := torrent.State == "seeding" || torrent.State == "finished" ||
+		(torrent.State == "paused" && torrent.Progress >= 99.99 && !torrent.AutoManaged)
+	if !eligible {
+		return
+	}
+	limits := policy.limitsFor(&torrent)
+	if limits.none() {
+		return
+	}
+	ratioReached := limits.ratioReached(&torrent)
+	timeReached := limits.timeReached(&torrent)
+	idleReached := policy.idleReached(&torrent, limits, now)
+	if !ratioReached && !timeReached && !idleReached {
+		return
+	}
+	stopped, seedReason := tevStopAtSeedLimit(torrents, policy, limits, &torrent, ratioReached, timeReached, idleReached)
+	if !stopped {
+		return
+	}
+	if tevPostSeedRelocate(cfg, torrents, db, &torrent, postSeedMoves, retries, &seedReason) {
 		if seedReason != "" {
 			logging.Info(fmt.Sprintf("⏸️ %s", seedFinishedLead(torrent.Name, &seedReason)), "hash", torrent.Hash)
 		}
-		if cfg.Transfer.AutoRemoveCompleted {
-			if !tevCompletedSourceDisposable(db, torrent.Hash, torrent.SavePath) {
-				if tevSeedCopyWarningDue(seedCopyWarnings, torrent.Hash) {
-					logging.Debug("seed limit reached but archived copy is not verified; keeping torrent files",
-						"hash", torrent.Hash, "name", torrent.Name)
-				}
-				continue
+		return
+	}
+	if tevArchiveAfterSeed(cfg, torrents, db, postSeedMoves, retries, &torrent, &seedReason) {
+		return
+	}
+	if seedReason != "" {
+		logging.Info(fmt.Sprintf("⏸️ %s", seedFinishedLead(torrent.Name, &seedReason)), "hash", torrent.Hash)
+	}
+	if cfg.Transfer.AutoRemoveCompleted {
+		if !tevCompletedSourceDisposable(db, torrent.Hash, torrent.SavePath) {
+			if tevSeedCopyWarningDue(seedCopyWarnings, torrent.Hash) {
+				logging.Debug("seed limit reached but archived copy is not verified; keeping torrent files",
+					"hash", torrent.Hash, "name", torrent.Name)
 			}
-			removed, err := torrents.Remove(torrent.Hash, true)
-			if err != nil {
-				logging.Warn("failed to remove torrent at seed limit",
-					"hash", torrent.Hash, "name", torrent.Name, "error", err.Error())
-			} else if removed {
-				_ = db.MarkTorrentRemovedAt(torrent.Hash)
-			}
+			return
+		}
+		removed, err := torrents.Remove(torrent.Hash, true)
+		if err != nil {
+			logging.Warn("failed to remove torrent at seed limit",
+				"hash", torrent.Hash, "name", torrent.Name, "error", err.Error())
+		} else if removed {
+			_ = db.MarkTorrentRemovedAt(torrent.Hash)
 		}
 	}
+}
+
+// tevStopAtSeedLimit pauses a torrent that reached its seed limit, unless it
+// is already stopped. seedReason says why, for the line announced with what
+// follows (empty when the torrent was already stopped).
+func tevStopAtSeedLimit(torrents TorrentSession, policy *seedPolicy, limits seedLimits, torrent *models.TorrentView, ratioReached, timeReached, idleReached bool) (stopped bool, seedReason string) {
+	stopped = torrent.State == "paused" && !torrent.AutoManaged
+	if stopped {
+		return true, ""
+	}
+	value, err := torrents.Pause(torrent.Hash)
+	if err != nil {
+		if torrentNotFoundError(err) {
+			// The torrent vanished between the listing and the pause
+			// (already removed elsewhere): nothing to stop, not a warning.
+			logging.Debug("seed-limit pause skipped: torrent already removed from the session",
+				"hash", torrent.Hash, "name", torrent.Name)
+		} else {
+			logging.Warn("failed to stop torrent at seed limit",
+				"hash", torrent.Hash, "name", torrent.Name, "error", err.Error())
+		}
+		return false, ""
+	}
+	if !value {
+		logging.Warn("torrent seed limit could not be applied in current mode",
+			"hash", torrent.Hash, "name", torrent.Name)
+		return false, ""
+	}
+	reason := seedEndReason(ratioReached, timeReached, idleReached)
+	if !timeReached && idleReached {
+		policy.markIdleStop(torrent.Hash)
+	}
+	if limits.Rule != "" {
+		reason += " (rule «" + limits.Rule + "»)"
+	}
+	return true, reason
+}
+
+// tevArchiveAfterSeed moves a completed torrent that kept its source for
+// seeding into its library destination, where storage_moved renames it.
+// Removal happens after the move, so the file is never deleted before it is
+// archived. postSeedMoves protects the source while the engine copies it, and
+// the guard on the disposable source skips torrents whose library copy is
+// already in place (copy mode, folder and pack import). It reports whether
+// the move started.
+func tevArchiveAfterSeed(cfg *Config, torrents TorrentSession, db *Database, postSeedMoves map[string]struct{}, retries map[string]StorageMoveRetry, torrent *models.TorrentView, seedReason *string) bool {
+	if _, archiving := postSeedMoves[torrent.Hash]; archiving {
+		return false
+	}
+	if _, retrying := retries[strings.ToLower(torrent.Hash)]; retrying {
+		return false
+	}
+	if tevCompletedSourceDisposable(db, torrent.Hash, torrent.SavePath) {
+		return false
+	}
+	meta, metaErr := db.TorrentMeta(torrent.Hash)
+	if metaErr != nil || meta == nil {
+		return false
+	}
+	release := meta.Release
+	dest, ok := ConfiguredDestinationFor(&release, cfg)
+	if !ok || SamePath(torrent.SavePath, dest) {
+		return false
+	}
+	moved, moveErr := torrents.MoveStorage(torrent.Hash, dest)
+	if moveErr != nil || !moved {
+		return false
+	}
+	postSeedMoves[torrent.Hash] = struct{}{}
+	retries[strings.ToLower(torrent.Hash)] = StorageMoveRetry{
+		destination: dest,
+		postSeed:    true,
+		attempts:    0,
+		nextAttempt: time.Now().Add(600 * time.Second),
+		inFlight:    true,
+	}
+	logging.Info(fmt.Sprintf("📁 %s: moving it to the library in %s (%s)",
+		seedFinishedLead(torrent.Name, seedReason), dest, logging.HumanBytesI64(torrent.TotalSize)), "hash", torrent.Hash)
+	logging.Debug("post-seed archive move", "hash", torrent.Hash, "from", torrent.SavePath)
+	return true
 }
 
 // ---------------------------------------------------------------------------

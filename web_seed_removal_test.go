@@ -639,3 +639,49 @@ func TestRemoveCompletedDropsSupersededArchive(t *testing.T) {
 		t.Fatal("superseded archived torrent must be removed from the session")
 	}
 }
+
+// pauseCountingSession records the pauses on top of the stub session.
+type pauseCountingSession struct {
+	stubTorrentSession
+	paused []string
+}
+
+func (s *pauseCountingSession) Pause(hash string) (bool, error) {
+	s.paused = append(s.paused, hash)
+	return true, nil
+}
+
+// A seeding torrent past its ratio is paused by the seed policy and, with
+// automatic removal on and its library copy in place, leaves the session with
+// its download copy.
+func TestEnforceSeedPolicyStopsASeedAtItsRatio(t *testing.T) {
+	db, cfg, view, _, _ := seedTestSetup(t)
+	view.State = "seeding"
+	view.AutoManaged = true
+	cfg.Transfer.AutoRemoveCompleted = true
+	session := &pauseCountingSession{stubTorrentSession: stubTorrentSession{list: []models.TorrentView{view}}}
+
+	EnforceSeedPolicy(cfg, session, db, map[string]struct{}{}, map[string]StorageMoveRetry{}, map[string]time.Time{})
+
+	if len(session.paused) != 1 || session.paused[0] != seedTestHash {
+		t.Fatalf("paused %v, want the seed past its ratio", session.paused)
+	}
+	if len(session.removed) != 1 || !session.deleteFlags[0] {
+		t.Fatalf("removed %v (delete %v), want the torrent removed with its download copy", session.removed, session.deleteFlags)
+	}
+}
+
+// Below its limits a seed keeps seeding.
+func TestEnforceSeedPolicyLeavesASeedBelowItsLimits(t *testing.T) {
+	db, cfg, view, _, _ := seedTestSetup(t)
+	view.State = "seeding"
+	view.AutoManaged = true
+	view.AllTimeUpload = 10 // ratio 0.1 against 0.5
+	session := &pauseCountingSession{stubTorrentSession: stubTorrentSession{list: []models.TorrentView{view}}}
+
+	EnforceSeedPolicy(cfg, session, db, map[string]struct{}{}, map[string]StorageMoveRetry{}, map[string]time.Time{})
+
+	if len(session.paused) != 0 || len(session.removed) != 0 {
+		t.Fatalf("paused %v removed %v, want nothing below the limits", session.paused, session.removed)
+	}
+}

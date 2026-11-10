@@ -141,3 +141,41 @@ func TestEpisodeImportDiscardsAnInferiorRelease(t *testing.T) {
 		t.Fatalf("status = %v, want error for an inferior release", status)
 	}
 }
+
+// A completion whose file is no longer where the engine says (an earlier pass
+// already renamed it into the library) imports the copy found in the library
+// instead of failing.
+func TestEpisodeImportRecoversTheCopyAlreadyInTheLibrary(t *testing.T) {
+	p := newEpisodeEnv(t)
+	inLibrary := filepath.Join(p.library, "Series A - S01E03 - Episodio 3.mkv")
+	if err := os.Rename(filepath.Join(p.downloads, p.name), inLibrary); err != nil {
+		t.Fatal(err)
+	}
+	p.session.list[0].SavePath = p.library
+	event := models.TorrentEvent{Kind: "storage_moved", Hash: episodeHash, Name: p.name, SavePath: p.library}
+	processed, err := HandleTorrentEvent(p.cfg, p.session, p.db, p.moves, p.postSeed, p.retries, event,
+		NewTmdbClientWithLanguage(nil, "it-IT"), FromConfig(p.cfg))
+	if err != nil || !processed {
+		t.Fatalf("recovered import: processed=%v err=%v", processed, err)
+	}
+	archived, _ := p.db.TorrentProcessed(episodeHash)
+	if archived == nil || *archived != inLibrary {
+		t.Fatalf("recorded path = %v, want the library copy %q", archived, inLibrary)
+	}
+}
+
+// A completion whose file is nowhere fails instead of recording a path that
+// does not exist.
+func TestEpisodeImportFailsWhenTheFileIsGone(t *testing.T) {
+	p := newEpisodeEnv(t)
+	if err := os.Remove(filepath.Join(p.downloads, p.name)); err != nil {
+		t.Fatal(err)
+	}
+	p.session.list[0].SavePath = p.library
+	event := models.TorrentEvent{Kind: "storage_moved", Hash: episodeHash, Name: p.name, SavePath: p.library}
+	processed, err := HandleTorrentEvent(p.cfg, p.session, p.db, p.moves, p.postSeed, p.retries, event,
+		NewTmdbClientWithLanguage(nil, "it-IT"), FromConfig(p.cfg))
+	if err == nil || processed {
+		t.Fatalf("missing file: processed=%v err=%v, want an error", processed, err)
+	}
+}
