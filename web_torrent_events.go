@@ -2835,8 +2835,94 @@ func tevCompleteTorrentOptions(cfg *Config, db *Database, torrents TorrentSessio
 	guard := AcquireArchiveImport(release.Series)
 	defer guard.Release()
 
-	path := CompletionPath(event)
-	recoveredExisting := false
+	path, recoveredExisting, err := tevResolveCompletedPath(cfg, torrents, event, release)
+	if err != nil {
+		return false, err
+	}
+	// Refuse to archive a broken download: a zero-filled (preallocated but
+	// never written) or unrecognised video file must not replace a good copy.
+	if err := validateCompletedFile(path); err != nil {
+		quarantined := quarantineCorruptFile(path, cfg)
+		// The caller writes the single ERROR for this acquisition, with the
+		// same reason and the acquisition id: logging it here too made one
+		// failure look like two.
+		logging.Debug("completed file failed integrity validation; not archiving",
+			"name", event.Name, "path", path, "error", err.Error(), "quarantined", quarantined)
+		return false, fmt.Errorf("integrity validation failed: %w", err)
+	}
+	logging.Debug("completed file passed integrity check", "name", event.Name, "path", path)
+	if !release.IsPack && !recoveredExisting {
+		if reason := mediaInfoUpgradeRejection(cfg, db, event.Hash, path, release); reason != "" {
+			return false, tevRejectUnconfirmedUpgrade(cfg, db, torrents, event, release, reason)
+		}
+	}
+	size, err := SizeOfPath(path)
+	if err != nil {
+		return false, err
+	}
+	renamed, renamedSet, discarded, err := tevRenameIntoLibrary(cfg, db, event, release, path, tmdb)
+	if err != nil {
+		return false, err
+	}
+	processedPath := path
+	if renamedSet {
+		processedPath = renamed
+	}
+	// Files the new release supersedes, to log a single upgrade line.
+	var replaced []string
+	if !discarded {
+		inferior, superseded, err := tevSupersededFiles(cfg, release, path, renamed, renamedSet)
+		if err != nil {
+			return false, err
+		}
+		discarded, replaced = inferior, superseded
+	}
+	// A movie that arrived inside a torrent folder is moved up into the archive
+	// root as a flat file (with its subtitles and artwork) unless the operator
+	// disabled `movies_flat_files`.
+	if release.Kind == "movie" && !discarded {
+		flat, flatErr := flattenMovieFolder(cfg, release, processedPath)
+		if flatErr != nil {
+			logging.Warn("movie folder flatten failed",
+				"name", event.Name, "path", processedPath, "error", flatErr.Error())
+		} else if !SamePath(flat, processedPath) {
+			processedPath = flat
+			renamedSet = true
+		}
+	}
+	if discarded {
+		return tevDiscardInferiorRelease(cfg, db, torrents, event, release)
+	}
+	if err := tevMarkReleaseCompleted(cfg, db, release, processedPath, size); err != nil {
+		return false, err
+	}
+	suffix := " (kept original name)"
+	if renamedSet {
+		suffix = ""
+	}
+	// Download completion is logged when the payload first reaches 100%. This
+	// later handler records the separate archive/import phase (often after a
+	// seed period), so the two lifecycle messages retain their real order. When
+	// the release replaced existing files, one combined "updated" line is
+	// emitted instead of the import line plus one line per removed file.
+	logLibraryImport(cfg, event.Hash, logTarget(release), size, processedPath, suffix, source.note, replaced)
+	// If this release answers a "Riscarica" from the file integrity check, say
+	// which damaged copy it replaced.
+	logMediaIntegrityReplacementAfterRelease(db, event.Hash, release, processedPath)
+	// The file is in its final place: queue the optional audio cleanup. It runs
+	// in its own worker and never blocks the torrent event loop.
+	scheduleAudioCleanup(cfg, db, processedPath, event.Hash, release.Series)
+	if !source.preserveSource && cfg.Transfer.AutoRemoveCompleted && (recoveredExisting || (renamedSet && !SamePath(processedPath, path))) {
+		tevRemoveRenamedTorrent(db, torrents, event)
+	}
+	return true, nil
+}
+
+// tevResolveCompletedPath finds the completed file: where the engine says, or,
+// when it is gone, the copy already in the library (recovered); a movie folder
+// resolves to its video.
+func tevResolveCompletedPath(cfg *Config, torrents TorrentSession, event *models.TorrentEvent, release *models.Release) (path string, recoveredExisting bool, err error) {
+	path = CompletionPath(event)
 	if _, statErr := os.Stat(path); statErr != nil {
 		resolved := ""
 		found := false
@@ -2865,11 +2951,11 @@ func tevCompleteTorrentOptions(cfg *Config, db *Database, torrents TorrentSessio
 			if skippedErr := tevSkippedVideoError(torrents, event.Hash); skippedErr != nil {
 				logging.Warn("completed torrent has no importable video because the backend skipped it",
 					"hash", event.Hash, "name", event.Name, "path", path, "error", skippedErr.Error())
-				return false, skippedErr
+				return "", false, skippedErr
 			}
 			logging.Warn("completed torrent file not found (already moved or renamed); marking completion as failed",
 				"hash", event.Hash, "name", event.Name, "path", path)
-			return false, fmt.Errorf("completed torrent file not found: %s", path)
+			return "", false, fmt.Errorf("completed torrent file not found: %s", path)
 		}
 		logging.Debug("completed file already renamed — using the archived file",
 			"name", event.Name, "title", release.Title, "path", resolved)
@@ -2879,7 +2965,7 @@ func tevCompleteTorrentOptions(cfg *Config, db *Database, torrents TorrentSessio
 	if release.Kind == "movie" {
 		resolved, resolveErr := resolveMovieCompletedFile(path)
 		if resolveErr != nil {
-			return false, resolveErr
+			return "", false, resolveErr
 		}
 		if !SamePath(resolved, path) {
 			logging.Debug("completed movie folder resolved to its video file",
@@ -2890,31 +2976,14 @@ func tevCompleteTorrentOptions(cfg *Config, db *Database, torrents TorrentSessio
 			path = resolved
 		}
 	}
-	// Refuse to archive a broken download: a zero-filled (preallocated but
-	// never written) or unrecognised video file must not replace a good copy.
-	if err := validateCompletedFile(path); err != nil {
-		quarantined := quarantineCorruptFile(path, cfg)
-		// The caller writes the single ERROR for this acquisition, with the
-		// same reason and the acquisition id: logging it here too made one
-		// failure look like two.
-		logging.Debug("completed file failed integrity validation; not archiving",
-			"name", event.Name, "path", path, "error", err.Error(), "quarantined", quarantined)
-		return false, fmt.Errorf("integrity validation failed: %w", err)
-	}
-	logging.Debug("completed file passed integrity check", "name", event.Name, "path", path)
-	if !release.IsPack && !recoveredExisting {
-		if reason := mediaInfoUpgradeRejection(cfg, db, event.Hash, path, release); reason != "" {
-			return false, tevRejectUnconfirmedUpgrade(cfg, db, torrents, event, release, reason)
-		}
-	}
-	size, err := SizeOfPath(path)
-	if err != nil {
-		return false, err
-	}
+	return path, recoveredExisting, nil
+}
+
+// tevRenameIntoLibrary renames the file to its library name, unless the
+// torrent is marked no-rename. discarded is true when the library already
+// holds a copy at least as good under that name.
+func tevRenameIntoLibrary(cfg *Config, db *Database, event *models.TorrentEvent, release *models.Release, path string, tmdb *TmdbClient) (renamed string, renamedSet, discarded bool, err error) {
 	noRename, _ := db.TorrentNoRename(event.Hash)
-	renamed := ""
-	renamedSet := false
-	discarded := false
 	if noRename {
 		logging.Info(fmt.Sprintf("rename skipped — torrent marked no-rename: «%s»", event.Name),
 			"name", event.Name, "title", release.Title, "hash", event.Hash)
@@ -2923,7 +2992,7 @@ func tevCompleteTorrentOptions(cfg *Config, db *Database, torrents TorrentSessio
 		if errors.Is(err, ErrInferiorDuplicate) {
 			discarded = true
 		} else if err != nil {
-			return false, err
+			return "", false, false, err
 		} else if value != "" {
 			renamed = value
 			renamedSet = true
@@ -2933,143 +3002,95 @@ func tevCompleteTorrentOptions(cfg *Config, db *Database, torrents TorrentSessio
 		if errors.Is(err, ErrInferiorDuplicate) {
 			discarded = true
 		} else if err != nil {
-			return false, err
+			return "", false, false, err
 		} else if value != "" {
 			renamed = value
 			renamedSet = true
 		}
 	}
-	processedPath := path
-	if renamedSet {
-		processedPath = renamed
-	}
-	// Files the new release supersedes, to log a single upgrade line.
-	var replaced []string
-	if release.Kind == "series" && !release.IsPack {
-		if release.Series != nil && release.Season != nil && release.Episode != nil {
-			newFile := renamed
-			haveNewFile := renamedSet
-			if !haveNewFile {
-				files, _ := VideoFiles(path)
-				if len(files) == 1 {
-					newFile = files[0]
-					haveNewFile = true
-				}
-			}
-			archive := path
-			if info, statErr := os.Stat(path); statErr != nil || !info.IsDir() {
-				archive = filepath.Dir(path)
-			}
-			if haveNewFile {
-				score := cfg.ReleaseScore(release)
-				value, err := DiscardIfInferiorWithQuality(cfg, *release.Series, *release.Season, *release.Episode, score, newFile, archive, &release.Quality)
-				if err != nil {
-					return false, err
-				}
-				if value {
-					discarded = true
-				} else {
-					replaced, err = cleanupOldEpisode(cfg, *release.Series, *release.Season, *release.Episode, score, newFile, archive, &release.Quality)
-					if err != nil {
-						return false, err
-					}
-				}
-			}
-		}
-	} else if release.Kind == "movie" {
-		newFile := renamed
-		haveNewFile := renamedSet
-		if !haveNewFile {
-			files, _ := VideoFiles(path)
-			if len(files) == 1 {
-				newFile = files[0]
-				haveNewFile = true
-			}
-		}
-		archive := path
-		if info, statErr := os.Stat(path); statErr != nil || !info.IsDir() {
-			archive = filepath.Dir(path)
-		}
-		if haveNewFile {
-			score := cfg.ReleaseScore(release)
-			value, err := DiscardIfInferiorMovie(cfg, release.Title, release.Year, score, newFile, archive, &release.Quality)
-			if err != nil {
-				return false, err
-			}
-			if value {
-				discarded = true
-			} else {
-				replaced, err = cleanupOldMovie(cfg, release.Title, release.Year, score, newFile, archive, &release.Quality)
-				if err != nil {
-					return false, err
-				}
-			}
+	return renamed, renamedSet, discarded, nil
+}
+
+// tevImportedFile is the file a completion placed in the library and the
+// folder it sits in.
+func tevImportedFile(path, renamed string, renamedSet bool) (newFile, archive string, ok bool) {
+	newFile, ok = renamed, renamedSet
+	if !ok {
+		if files, _ := VideoFiles(path); len(files) == 1 {
+			newFile, ok = files[0], true
 		}
 	}
-	// A movie that arrived inside a torrent folder is moved up into the archive
-	// root as a flat file (with its subtitles and artwork) unless the operator
-	// disabled `movies_flat_files`.
-	if release.Kind == "movie" && !discarded {
-		flat, flatErr := flattenMovieFolder(cfg, release, processedPath)
-		if flatErr != nil {
-			logging.Warn("movie folder flatten failed",
-				"name", event.Name, "path", processedPath, "error", flatErr.Error())
-		} else if !SamePath(flat, processedPath) {
-			processedPath = flat
-			renamedSet = true
-		}
+	archive = path
+	if info, statErr := os.Stat(path); statErr != nil || !info.IsDir() {
+		archive = filepath.Dir(path)
 	}
-	if discarded {
-		restored, err := db.RestoreUpgrade(event.Hash)
-		if err != nil {
-			return false, err
-		}
-		if !restored {
-			if err := db.RollbackRelease(release); err != nil {
-				return false, err
-			}
-		}
-		if err := db.MarkTorrentError(event.Hash, "release inferior to existing file"); err != nil {
-			return false, err
-		}
-		tevDiscardCompletedSource(cfg, db, torrents, event, "release inferior to existing file")
-		logging.Warn(fmt.Sprintf("🗑️ %s discarded: the file is not better than the copy already in the library.",
-			shortTorrentName(event.Name)), "hash", event.Hash)
-		return false, nil
+	return newFile, archive, ok
+}
+
+// tevSupersededFiles compares the imported episode or movie with the copies
+// already in the library: inferior when one of them is better, otherwise the
+// worse ones are cleaned up and listed.
+func tevSupersededFiles(cfg *Config, release *models.Release, path, renamed string, renamedSet bool) (inferior bool, replaced []string, err error) {
+	newFile, archive, ok := tevImportedFile(path, renamed, renamedSet)
+	if !ok {
+		return false, nil, nil
 	}
-	if err := tevMarkReleaseCompleted(cfg, db, release, processedPath, size); err != nil {
+	score := cfg.ReleaseScore(release)
+	switch {
+	case release.Kind == "series" && !release.IsPack:
+		if release.Series == nil || release.Season == nil || release.Episode == nil {
+			return false, nil, nil
+		}
+		if inferior, err = DiscardIfInferiorWithQuality(cfg, *release.Series, *release.Season, *release.Episode, score, newFile, archive, &release.Quality); err != nil || inferior {
+			return inferior, nil, err
+		}
+		replaced, err = cleanupOldEpisode(cfg, *release.Series, *release.Season, *release.Episode, score, newFile, archive, &release.Quality)
+		return false, replaced, err
+	case release.Kind == "movie":
+		if inferior, err = DiscardIfInferiorMovie(cfg, release.Title, release.Year, score, newFile, archive, &release.Quality); err != nil || inferior {
+			return inferior, nil, err
+		}
+		replaced, err = cleanupOldMovie(cfg, release.Title, release.Year, score, newFile, archive, &release.Quality)
+		return false, replaced, err
+	}
+	return false, nil, nil
+}
+
+// tevDiscardInferiorRelease undoes a release no better than the library's
+// copy: the upgrade it replaced comes back, and its source goes.
+func tevDiscardInferiorRelease(cfg *Config, db *Database, torrents TorrentSession, event *models.TorrentEvent, release *models.Release) (bool, error) {
+	restored, err := db.RestoreUpgrade(event.Hash)
+	if err != nil {
 		return false, err
 	}
-	suffix := " (kept original name)"
-	if renamedSet {
-		suffix = ""
-	}
-	// Download completion is logged when the payload first reaches 100%. This
-	// later handler records the separate archive/import phase (often after a
-	// seed period), so the two lifecycle messages retain their real order. When
-	// the release replaced existing files, one combined "updated" line is
-	// emitted instead of the import line plus one line per removed file.
-	logLibraryImport(cfg, event.Hash, logTarget(release), size, processedPath, suffix, source.note, replaced)
-	// If this release answers a "Riscarica" from the file integrity check, say
-	// which damaged copy it replaced.
-	logMediaIntegrityReplacementAfterRelease(db, event.Hash, release, processedPath)
-	// The file is in its final place: queue the optional audio cleanup. It runs
-	// in its own worker and never blocks the torrent event loop.
-	scheduleAudioCleanup(cfg, db, processedPath, event.Hash, release.Series)
-	if !source.preserveSource && cfg.Transfer.AutoRemoveCompleted && (recoveredExisting || (renamedSet && !SamePath(processedPath, path))) {
-		removed, err := torrents.Remove(event.Hash, false)
-		if err != nil {
-			logging.Warn("renamed torrent removal failed",
-				"hash", event.Hash, "name", event.Name, "error", err.Error())
-		} else if removed {
-			_ = db.MarkTorrentRemovedAt(event.Hash)
-			logging.Debug("torrent removed after rename: archived under a different path",
-				"hash", event.Hash, "name", event.Name)
-		} else {
-			logging.Debug("renamed torrent already removed", "hash", event.Hash, "name", event.Name)
+	if !restored {
+		if err := db.RollbackRelease(release); err != nil {
+			return false, err
 		}
 	}
-	return true, nil
+	if err := db.MarkTorrentError(event.Hash, "release inferior to existing file"); err != nil {
+		return false, err
+	}
+	tevDiscardCompletedSource(cfg, db, torrents, event, "release inferior to existing file")
+	logging.Warn(fmt.Sprintf("🗑️ %s discarded: the file is not better than the copy already in the library.",
+		shortTorrentName(event.Name)), "hash", event.Hash)
+	return false, nil
+}
+
+// tevRemoveRenamedTorrent takes out of the session a torrent whose file now
+// lives under another name in the library: it could not seed it.
+func tevRemoveRenamedTorrent(db *Database, torrents TorrentSession, event *models.TorrentEvent) {
+	removed, err := torrents.Remove(event.Hash, false)
+	if err != nil {
+		logging.Warn("renamed torrent removal failed",
+			"hash", event.Hash, "name", event.Name, "error", err.Error())
+	} else if removed {
+		_ = db.MarkTorrentRemovedAt(event.Hash)
+		logging.Debug("torrent removed after rename: archived under a different path",
+			"hash", event.Hash, "name", event.Name)
+	} else {
+		logging.Debug("renamed torrent already removed", "hash", event.Hash, "name", event.Name)
+	}
 }
 
 // tev_logDownloadComplete logs the moment the torrent payload becomes complete,
