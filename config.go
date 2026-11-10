@@ -1870,8 +1870,8 @@ func movieTitleMatchFor(movie *MovieConfig, releaseWords []string) movieTitleMat
 	tiers = append(tiers, translations)
 	for tier, titles := range tiers {
 		for _, value := range titles {
-			words := movieTitleWords(value)
-			if len(words) == 0 || !hasWordToken(words) {
+			words, usable := libraryTitleWords(value)
+			if !usable {
 				continue
 			}
 			if !wordsOpenTitle(releaseWords, words) {
@@ -1884,6 +1884,42 @@ func movieTitleMatchFor(movie *MovieConfig, releaseWords []string) movieTitleMat
 		}
 	}
 	return best
+}
+
+// libraryTitleWordsCache holds the reduction of the library's film titles:
+// they change only with the configuration, while a cycle compares each of
+// tens of thousands of releases with every name, alias and translation of
+// every monitored film. Reducing them again for each release was a third of
+// the CPU of a search cycle. The slices are shared: callers only read them.
+var (
+	libraryTitleWordsCache sync.Map // string -> libraryTitle
+	libraryTitleWordsCount atomic.Int64
+)
+
+// libraryTitleWordsLimit bounds the cache: titles that left the library stay
+// until it is cleared, which happens once it holds this many.
+const libraryTitleWordsLimit = 20000
+
+type libraryTitle struct {
+	words  []string
+	usable bool
+}
+
+// libraryTitleWords is movieTitleWords for a library title, cached; usable is
+// false for a title with no word to match (empty, or only symbols).
+func libraryTitleWords(value string) ([]string, bool) {
+	if cached, ok := libraryTitleWordsCache.Load(value); ok {
+		title := cached.(libraryTitle)
+		return title.words, title.usable
+	}
+	words := movieTitleWords(value)
+	title := libraryTitle{words: words, usable: len(words) > 0 && hasWordToken(words)}
+	if libraryTitleWordsCount.Add(1) > libraryTitleWordsLimit {
+		libraryTitleWordsCache.Clear()
+		libraryTitleWordsCount.Store(1)
+	}
+	libraryTitleWordsCache.Store(value, title)
+	return title.words, title.usable
 }
 
 // betterThan keeps a longer title first (so a short name cannot take the

@@ -157,6 +157,12 @@ func matchingName(value string) string {
 	var current strings.Builder
 	for _, character := range value {
 		if unicode.IsLetter(character) || unicode.IsNumber(character) {
+			// The name arrives lowered for ASCII only: an accented capital
+			// ("È", "É", "À") is lowered here, or the fold below, which knows the
+			// small letters, left it as it was and "Élite" never met "Elite".
+			if character >= utf8.RuneSelf {
+				character = unicode.ToLower(character)
+			}
 			current.WriteRune(foldLatinCharacter(character))
 		} else if current.Len() > 0 {
 			words = append(words, current.String())

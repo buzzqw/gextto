@@ -23,16 +23,13 @@ Nothing open: every engine item waits for a condition listed under
 
 - **Release parsing CPU** — the quality/language scans, the subtitle rewrite and
   the common episode shapes are in place; the x/season-word/in-progress matchers
-  and the absolute-episode parser still use regexes. Gate: a profile where the
-  regexp share climbs back above 20 % of a cycle; then replace the next pattern
-  and re-measure on the same corpus.
-- **Cycle allocation churn** — a 38k-release cycle still allocates about 1.4 GB,
-  now mostly in `encoding/xml`'s tokenizer and in the HTML parser, which sets
-  the peak and the fragmented heap left behind. Gate: a corpus of real feeds
-  that a replacement reader must parse exactly like `encoding/xml` (entities,
-  CDATA, namespaces, attributes), because the remaining gain is about 12 % of
-  the allocations and 7 % of the CPU, not enough for a rewrite without that
-  proof.
+  and the absolute-episode parser still use regexes, under 10 % of a cycle. Gate: a
+  profile where the regexp share climbs back above 20 % of a cycle; then replace the
+  next pattern and re-measure on the same corpus.
+- **Cycle allocation churn** — the film match, which was most of a cycle's allocations,
+  is fixed; `encoding/xml` and the HTML parser are a few percent each, and the archive
+  write (`SaveBatch`, `RecordSeenBatch`) is the next large share. Gate: the profile of a
+  cycle after the film-match fix showing what is left, then the largest share first.
 - **Functions too long to review** — the search scheduler (`cycleWorker`) and the rest of
   the candidate pass (`candidatePass.try`, still about 300 lines around the closures that
   resolve the link and check an in-progress pack): split them by phase, as the

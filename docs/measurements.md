@@ -318,9 +318,18 @@ touches. On this machine, `BenchmarkParseQuality` over five typical names:
 skip the ten anchored regexes for a name with no season marker, and the SxxExx, date and
 pack shapes are read without them.
 
-In a cycle the regexp share of the CPU fell from about **39 % to 11 %** (profiles of
-`ParseQuality` itself is now about 2 % of the sampled cycle. SQLite and the
-feed/HTML parsing are the larger costs.
+In a cycle the regexp share of the CPU fell from about **39 % to 11 %**, and was
+**8.6 %** in the profile of a full search on 2026-11-10 (46,306 releases, 12 minutes):
+`ParseQuality` itself is about 2 % of a cycle.
+
+### Matching a release with the monitored films
+
+That same profile found the film match at **34 % of the cycle's CPU and 79 % of its
+allocations** (4.75 GB of 6.0): every release was compared with every name, alias and
+translation of every monitored film, and each library title was reduced to words again each
+time. The reduced titles are now cached, as they change only with the configuration.
+`BenchmarkFindMovieMatch` (35 films with 25 titles each, one release): **0.15 ms against
+1.80 ms** (12×) and **125 allocations against 13,146**.
 
 ### The web page
 
