@@ -1197,6 +1197,38 @@ func TestV2DetailPagesRender(t *testing.T) {
 	}
 }
 
+// TestV2SeriesPageRenamesTheSeries: the editor carries the series the page was
+// opened on (`original_name`) and the title to save (`name`), so the form can
+// rename the series instead of only changing its other fields.
+func TestV2SeriesPageRenamesTheSeries(t *testing.T) {
+	state := newTestAppState(t)
+	if err := SaveLibrary(state.cfg.DataDir, []SeriesConfig{{Name: "Old Show", Seasons: "1+", Quality: "1080p", Language: "ita", Enabled: true}}, nil); err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+
+	code, body := v2Request(t, server, http.MethodGet, "/?view=series&series=Old%20Show", nil)
+	if code != http.StatusOK || !strings.Contains(body, `name="original_name" value="Old Show"`) || !strings.Contains(body, `name="name" value="Old Show"`) {
+		t.Fatalf("series editor without the name field: %d", code)
+	}
+	if code, body := v2Request(t, server, http.MethodPost, "/series/save", url.Values{
+		"original_name": {"Old Show"},
+		"name":          {"New Show"},
+		"seasons":       {"1+"},
+		"quality":       {"1080p"},
+		"language":      {"ita"},
+	}); code != http.StatusNoContent {
+		t.Fatalf("rename -> %d: %s", code, body)
+	}
+	if got := latestConfig(state).Series[0].Name; got != "New Show" {
+		t.Fatalf("series name after save = %q", got)
+	}
+	if code, body := v2Request(t, server, http.MethodGet, "/?view=series&series=New%20Show", nil); code != http.StatusOK || !strings.Contains(body, "New Show") {
+		t.Fatalf("renamed series page -> %d", code)
+	}
+}
+
 func TestV2SettingsStructuredEditors(t *testing.T) {
 	state := newTestAppState(t)
 	server := httptest.NewServer(Router(state))

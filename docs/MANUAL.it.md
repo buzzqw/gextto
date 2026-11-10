@@ -369,13 +369,14 @@ rete, stato, completezza e il percorso in libreria. Le azioni:
 | **Scansiona archivio** | hai copiato a mano dei file nella cartella della serie e vuoi che Gextto li riconosca |
 | **Aggiorna da TMDB** (o TVDB) | sono usciti episodi nuovi, o titoli e date sono cambiati |
 | **Anteprima rinomina** | vedi i nomi *Vecchio → Nuovo* prima di rinominare; **Forza rinomina** ricalcola anche i file che sembrano già corretti |
-| **Modifica** | cambi stagioni, cartella, alias, ID, profilo |
+| **Modifica** | cambi nome, stagioni, cartella, alias, ID, profilo |
 | **Storia dei download** | ricostruisci cosa è successo a ogni episodio |
 
 I campi della scheda più importanti:
 
 | Campo | Effetto |
 |---|---|
+| **Nome** | il titolo mostrato in libreria. Cambiandolo restano collegati episodi, storia, ricerca dei mancanti ed esclusioni della serie; la cartella dell'archivio non viene spostata, quindi i file restano dove sono |
 | **Profilo di qualità** | applica i valori di un profilo alla serie. È preselezionato il profilo che corrisponde ai valori attuali; se nessuno corrisponde compare **Valori attuali**, che salvando non cambia nulla |
 | **Stagioni** | quali stagioni sono seguite |
 | **Alias** | altri nomi con cui la serie compare nelle release |

@@ -1,14 +1,20 @@
 package gextto
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
+
+	"github.com/buzzqw/gextto/internal/logging"
 )
 
 // SeriesUpdateInput is the input of `POST /api/series/{name}`. Every field is
 // optional: only the ones present are changed, so a client never has to send
 // (and possibly lose) fields it does not know about.
 type SeriesUpdateInput struct {
+	// Name renames the series in the library. Episodes and their history stay
+	// linked; the archive folder is not moved.
+	Name             *string   `json:"name"`
 	Seasons          *string   `json:"seasons"`
 	Quality          *string   `json:"quality"`
 	Audio            *string   `json:"audio"`
@@ -49,6 +55,49 @@ func seriesIndex(list []SeriesConfig, name string) int {
 	return -1
 }
 
+// validateSeriesName refuses names that cannot be stored or used as a URL
+// path segment. It is deliberately looser than a folder name: the rename
+// changes the library title, not the archive folder.
+func validateSeriesName(name string) error {
+	if name == "" {
+		return fmt.Errorf("the series name must not be empty")
+	}
+	if name == "." || name == ".." {
+		return fmt.Errorf("the series name is not valid")
+	}
+	if len([]rune(name)) > 200 {
+		return fmt.Errorf("the series name is too long")
+	}
+	if strings.ContainsAny(name, "/\\") {
+		return fmt.Errorf("the series name must not contain a slash")
+	}
+	for _, char := range name {
+		if char < 0x20 || char == 0x7f {
+			return fmt.Errorf("the series name contains a control character")
+		}
+	}
+	return nil
+}
+
+// seriesNameTaken reports whether another series in list already uses name as
+// its title or as one of its aliases.
+func seriesNameTaken(list []SeriesConfig, skip int, name string) bool {
+	for index := range list {
+		if index == skip {
+			continue
+		}
+		if strings.EqualFold(strings.TrimSpace(list[index].Name), name) {
+			return true
+		}
+		for _, alias := range list[index].Aliases {
+			if strings.EqualFold(strings.TrimSpace(alias), name) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // UpdateSeries changes the given fields of one monitored series.
 func UpdateSeries(w http.ResponseWriter, r *http.Request, s *AppState) {
 	name := pathParam(r, "name")
@@ -65,6 +114,33 @@ func UpdateSeries(w http.ResponseWriter, r *http.Request, s *AppState) {
 		return
 	}
 	series := &list[index]
+	// The rename is the only change that moves the stored state to a new key,
+	// so it is applied before the other fields and migrated after the save.
+	renamedFrom := ""
+	if input.Name != nil {
+		newName := strings.TrimSpace(*input.Name)
+		if err := validateSeriesName(newName); err != nil {
+			jsonError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		if newName != series.Name {
+			if seriesNameTaken(list, index, newName) {
+				jsonError(w, http.StatusConflict, "a series with this name already exists")
+				return
+			}
+			previous := *series
+			renamedFrom = previous.Name
+			series.Name = newName
+			// Keep new episodes in the folder the library was already using:
+			// an auto-detected path would no longer match the new name and
+			// would fall back to the archive root.
+			if strings.TrimSpace(series.ArchivePath) == "" {
+				if resolved := cfg.ResolveArchivePath(&previous); resolved != nil {
+					series.ArchivePath = *resolved
+				}
+			}
+		}
+	}
 	text := func(target *string, value *string) {
 		if value != nil {
 			*target = strings.TrimSpace(*value)
@@ -127,6 +203,17 @@ func UpdateSeries(w http.ResponseWriter, r *http.Request, s *AppState) {
 	if err := SaveLibrary(s.cfg.DataDir, list, cfg.Movies); err != nil {
 		jsonError(w, http.StatusInternalServerError, err.Error())
 		return
+	}
+	if renamedFrom != "" {
+		if err := s.db.RenameSeries(renamedFrom, updated.Name); err != nil {
+			// Never leave the library under a name whose episodes and history
+			// still answer to the old one.
+			if restoreErr := SaveLibrary(s.cfg.DataDir, cfg.Series, cfg.Movies); restoreErr != nil {
+				logging.Error("cannot restore the series name after a failed rename", "error", restoreErr, "series", renamedFrom)
+			}
+			jsonError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
 	}
 	jsonResponse(w, map[string]any{"ok": true, "series": updated})
 }

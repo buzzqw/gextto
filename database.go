@@ -6722,6 +6722,52 @@ func (d *Database) PruneKeywords(keywords []string) (int, error) {
 	return removed, nil
 }
 
+// RenameSeries moves every stored row of a monitored series from oldName to
+// newName in one transaction. Episodes and pending downloads point at the
+// series row's id, so they follow the renamed row automatically; the tables
+// keyed by series name (metadata, history, torrents, blocklist, integrity
+// checks) are updated in place. The archive files are not touched.
+func (d *Database) RenameSeries(oldName, newName string) error {
+	tx, err := d.db.Begin()
+	if err != nil {
+		return err
+	}
+	committed := false
+	defer func() {
+		if !committed {
+			_ = tx.Rollback()
+		}
+	}()
+	if _, err := tx.Exec("UPDATE series SET name=?1 WHERE lower(name)=lower(?2)", newName, oldName); err != nil {
+		return err
+	}
+	for _, table := range []string{
+		"series_metadata",
+		"episode_metadata",
+		"ignored_episodes",
+		"gap_search_log",
+		"forced_gaps",
+		"series_status",
+		"torrent_meta",
+		"blocklist",
+		"media_integrity",
+		"media_integrity_replacements",
+		"acquisition_events",
+	} {
+		if _, err := tx.Exec(fmt.Sprintf("UPDATE %s SET series_name=?1 WHERE lower(series_name)=lower(?2)", table), newName, oldName); err != nil {
+			return fmt.Errorf("%s: %w", table, err)
+		}
+	}
+	if _, err := tx.Exec("UPDATE series_feed_seen SET name=?1 WHERE lower(COALESCE(name,''))=lower(?2)", newName, oldName); err != nil {
+		return fmt.Errorf("series_feed_seen: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	committed = true
+	return nil
+}
+
 // PurgeSeries removes every trace of a series that is no longer monitored.
 func (d *Database) PurgeSeries(name string) (int, error) {
 	tx, err := d.db.Begin()

@@ -246,7 +246,7 @@ state.
 | GET | `/api/series/seen` | seen episodes |
 | GET | `/api/series/seen/grouped` | seen episodes, grouped |
 | GET | `/api/series/{name}` | series details |
-| POST | `/api/series/{name}` | update a series |
+| POST | `/api/series/{name}` | update a series (the name field renames it) |
 | DELETE | `/api/series/{name}` | remove a series |
 | GET | `/api/series/{name}/episodes` | episodes of a series |
 | GET | `/api/series/{name}/info` | metadata from the provider |
@@ -408,6 +408,15 @@ value, so a client that edits one field at a time never resets the others
 `-1` means «use the global value», `0` «no limit». The historical
 `POST /api/torrents/set_limits` (`dl_kbps`, `ul_kbps`, `seed_ratio`,
 `seed_days`) always carries the two rates and only the seed limits it names.
+
+### Renaming a series
+
+`POST /api/series/{name}` accepts an optional `name` field: when it differs from
+the path parameter the series is renamed in the library. Episodes, their history
+and every row keyed by the series name follow the rename; the archive folder is
+not moved, so the files stay where they are. A name already used by another
+series or by one of its aliases is refused with `409`; an empty name, or one
+carrying a slash or a control character, with `400`.
 
 ### Audio preferences
 

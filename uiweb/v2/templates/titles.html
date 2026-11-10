@@ -112,7 +112,8 @@
     <div class="panel-head"><h3>{{tr "Modifica serie"}}</h3></div>
     <div class="panel-body">
       <form class="form-grid" method="post" action="/series/save" hx-post="/series/save" hx-swap="none">
-        <input type="hidden" name="name" value="{{.Name}}" />
+        <input type="hidden" name="original_name" value="{{.Name}}" />
+        <label class="field span-full" {{trTitle "Cambia il nome della serie nella libreria. Le puntate e la loro storia restano collegate; la cartella dell'archivio non viene spostata."}}><span>{{tr "Nome"}}</span><input class="input" name="name" value="{{.Name}}" maxlength="200" required /></label>
         <label class="field"><span>{{tr "Stagioni"}}</span><input class="input" name="seasons" value="{{.Seasons}}" placeholder="{{tr "* oppure 1-5"}}" /></label>
         {{template "v2_title_profile" .Profiles}}
         <label class="field" {{trTitle "ID TMDB della serie (per titoli episodi e poster)"}}><span>{{tr "TMDB ID"}}</span><input class="input" name="tmdb_id" value="{{.TmdbID}}" /></label>

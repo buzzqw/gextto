@@ -23,6 +23,9 @@ create, the app on the phone — apply **only to the standalone version** and do
 not change Gextto's interface, where those pages do not exist. Engine fixes, on
 the other hand, apply to both.
 
+## 10 November 2026
+- **A TV series can be renamed.** Until now the name was chosen only when the series was added: correcting it meant removing the series and adding it again, losing the link with the archived episodes and their history. The series page now has a **Name** field in **Edit series**: changing it keeps episodes, the missing-episode search, exclusions, blocks and download history linked to the series. The archive folder is not moved: the files stay where they are and new episodes keep arriving in the same folder. Nothing to configure.
+
 ## 9 November 2026
 - **The `.torrent` files of removed downloads no longer stay on disk.** Gextto kept an internal copy of every download's `.torrent` file and never deleted it when the torrent left the session: the state folder grew with every download, even after archiving. The internal copy is now removed when a torrent is removed or archived; the folder chosen in **Copy .torrent files to** is left untouched. Nothing to configure.
 - **The `.torrent` files downloaded from indexers no longer pile up either.** For listings that expose only a `.torrent` link, Gextto downloaded the file into a staging folder and never deleted it. It now removes it as soon as the candidate has been judged or added; the routine cleanup also removes any leftovers older than a week. The folder chosen in **Copy .torrent files to** is left untouched. Nothing to configure.

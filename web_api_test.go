@@ -752,6 +752,153 @@ func TestUpdateAndDeleteSeriesChangeOnlyTheGivenFields(t *testing.T) {
 	}
 }
 
+// TestRenameSeriesMovesStoredState: changing the name in the series editor is
+// a rename of the library row, not a delete and re-add. Episodes, metadata,
+// history and every name-keyed table must follow it, so the series page still
+// shows the archived files and the search does not start from scratch.
+func TestRenameSeriesMovesStoredState(t *testing.T) {
+	state := newTestAppState(t)
+	original := SeriesConfig{Name: "Old Show", Seasons: "1+", Quality: "1080p", Language: "ita", Enabled: true}
+	if err := SaveLibrary(state.cfg.DataDir, []SeriesConfig{original}, nil); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := state.db.db.Exec("INSERT INTO series(name) VALUES('Old Show')"); err != nil {
+		t.Fatal(err)
+	}
+	var seriesID int64
+	if err := state.db.db.QueryRow("SELECT id FROM series WHERE name='Old Show'").Scan(&seriesID); err != nil {
+		t.Fatal(err)
+	}
+	exec := func(query string, args ...any) {
+		t.Helper()
+		if _, err := state.db.db.Exec(query, args...); err != nil {
+			t.Fatalf("%s: %v", query, err)
+		}
+	}
+	exec("INSERT INTO episodes(series_id,season,episode,title,archive_path,downloaded_at) VALUES(?1,1,1,'Pilot','/library/Old Show/S01E01.mkv',datetime('now'))", seriesID)
+	exec("INSERT INTO series_metadata(series_name,season,episode_count,updated_at) VALUES('Old Show',1,10,datetime('now'))")
+	exec("INSERT INTO episode_metadata(series_name,season,episode,air_date,updated_at) VALUES('Old Show',1,1,'2020-01-01',datetime('now'))")
+	exec("INSERT INTO ignored_episodes(series_name,season,episode,created_at) VALUES('Old Show',1,2,datetime('now'))")
+	exec("INSERT INTO gap_search_log(series_name,season,episode,last_searched_at) VALUES('Old Show',1,3,datetime('now'))")
+	exec("INSERT INTO series_status(series_name,status,last_air_date,updated_at) VALUES('Old Show','Ended','',datetime('now'))")
+	exec("INSERT INTO torrent_meta(hash,series_name,status,created_at,updated_at) VALUES('hash-old','Old Show','completed',datetime('now'),datetime('now'))")
+	exec("INSERT INTO blocklist(magnet_hash,title,reason,created_at,series_name,season,episode) VALUES('magnet-old','release','',datetime('now'),'Old Show',1,4)")
+	exec("INSERT INTO media_integrity(kind,series_name,season,episode,path,status,checked_at) VALUES('episode','Old Show',1,1,'/library/Old Show/S01E01.mkv','ok',datetime('now'))")
+	exec("INSERT INTO acquisition_events(hash,first_at,at,level,message,series_name,season,episode) VALUES('hash-old',datetime('now'),datetime('now'),'INFO','downloaded','Old Show',1,1)")
+	exec("INSERT INTO series_feed_seen(title,name,season,episode,found_at) VALUES('Old Show S01E01','Old Show',1,1,datetime('now'))")
+
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+
+	if code, body := webPostJSON(t, server, "/api/series/Old%20Show", `{"name":"New Show"}`); code != http.StatusOK {
+		t.Fatalf("rename -> %d: %s", code, body)
+	}
+	cfg := latestConfig(state)
+	if len(cfg.Series) != 1 || cfg.Series[0].Name != "New Show" || cfg.Series[0].Quality != "1080p" || cfg.Series[0].Seasons != "1+" {
+		t.Fatalf("series after rename: %+v", cfg.Series)
+	}
+	episodes, err := state.db.EpisodesForSeries("New Show", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	archived := false
+	for _, episode := range episodes {
+		if episode.Season == 1 && episode.Episode == 1 && episode.ArchivePath != nil && *episode.ArchivePath == "/library/Old Show/S01E01.mkv" {
+			archived = true
+		}
+	}
+	if !archived {
+		t.Fatalf("the archived episode did not follow the rename: %+v", episodes)
+	}
+	if old, err := state.db.EpisodesForSeries("Old Show", nil); err != nil || len(old) != 0 {
+		t.Fatalf("the old name must have no episodes left: %+v (%v)", old, err)
+	}
+	count := func(query string) int {
+		t.Helper()
+		var total int
+		if err := state.db.db.QueryRow(query).Scan(&total); err != nil {
+			t.Fatalf("%s: %v", query, err)
+		}
+		return total
+	}
+	if count("SELECT COUNT(*) FROM series WHERE name='New Show'") != 1 || count("SELECT COUNT(*) FROM series WHERE name='Old Show'") != 0 {
+		t.Fatal("the series row did not follow the rename")
+	}
+	for _, table := range []string{"series_metadata", "episode_metadata", "ignored_episodes", "gap_search_log", "series_status", "torrent_meta", "blocklist", "media_integrity", "acquisition_events"} {
+		if left := count("SELECT COUNT(*) FROM " + table + " WHERE series_name='Old Show'"); left != 0 {
+			t.Errorf("%s still has %d rows under the old name", table, left)
+		}
+		if moved := count("SELECT COUNT(*) FROM " + table + " WHERE series_name='New Show'"); moved == 0 {
+			t.Errorf("%s lost its rows", table)
+		}
+	}
+	if count("SELECT COUNT(*) FROM series_feed_seen WHERE name='New Show'") != 1 {
+		t.Error("the seen-in-feed row did not follow the rename")
+	}
+}
+
+// TestRenameSeriesRefusesBadNames: the rename goes through the same editor as
+// the other fields, so an empty name, a path separator or another series'
+// title (or alias) is refused before anything is saved.
+func TestRenameSeriesRefusesBadNames(t *testing.T) {
+	state := newTestAppState(t)
+	if err := SaveLibrary(state.cfg.DataDir, []SeriesConfig{
+		{Name: "Show", Seasons: "1+", Enabled: true},
+		{Name: "Other", Seasons: "1+", Enabled: true, Aliases: []string{"Other Alias"}},
+	}, nil); err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+
+	for _, step := range []struct {
+		name string
+		body string
+		want int
+	}{
+		{"empty", `{"name":"  "}`, http.StatusBadRequest},
+		{"slash", `{"name":"Show/Season"}`, http.StatusBadRequest},
+		{"another title", `{"name":"Other"}`, http.StatusConflict},
+		{"another alias", `{"name":"Other Alias"}`, http.StatusConflict},
+	} {
+		if code, body := webPostJSON(t, server, "/api/series/Show", step.body); code != step.want {
+			t.Fatalf("%s -> %d, want %d: %s", step.name, code, step.want, body)
+		}
+	}
+	cfg := latestConfig(state)
+	if cfg.Series[0].Name != "Show" || cfg.Series[1].Name != "Other" {
+		t.Fatalf("a refused rename changed the library: %+v", cfg.Series)
+	}
+}
+
+// TestRenameSeriesKeepsAutoDetectedArchiveFolder: when the folder was found by
+// name and not typed into the editor, the rename stores that folder as the
+// series path. Otherwise the new name would no longer match it and the next
+// episodes would fall back to the archive root.
+func TestRenameSeriesKeepsAutoDetectedArchiveFolder(t *testing.T) {
+	state := newTestAppState(t)
+	root := t.TempDir()
+	folder := filepath.Join(root, "Old Show")
+	if err := os.Mkdir(folder, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := saveConfigSetting(state.cfg.DataDir, "archive_root", root); err != nil {
+		t.Fatal(err)
+	}
+	if err := SaveLibrary(state.cfg.DataDir, []SeriesConfig{{Name: "Old Show", Seasons: "1+", Enabled: true}}, nil); err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+
+	if code, body := webPostJSON(t, server, "/api/series/Old%20Show", `{"name":"New Show"}`); code != http.StatusOK {
+		t.Fatalf("rename -> %d: %s", code, body)
+	}
+	if got := latestConfig(state).Series[0].ArchivePath; got != folder {
+		t.Fatalf("archive path after rename = %q, want %q", got, folder)
+	}
+}
+
 // The Storico "Oggi" switch must return only the downloads completed today,
 // comparing in the same local timezone the table displays.
 func TestTorrentHistoryTodayFilter(t *testing.T) {

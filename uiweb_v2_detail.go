@@ -39,11 +39,20 @@ func v2ContentDetail(s *AppState, r *http.Request, view string) (string, any, bo
 // replaces the edited series, then saves the array exactly like /api/config/series.
 func V2SeriesSave(w http.ResponseWriter, r *http.Request, s *AppState) {
 	name := strings.TrimSpace(r.FormValue("name"))
+	// `original_name` is the series the form was opened on; `name` is the
+	// (possibly different) title the operator saved.
+	original := strings.TrimSpace(r.FormValue("original_name"))
+	if original == "" {
+		original = name
+	}
 	redirect := "/?view=series"
+	if original != "" {
+		redirect = "/?view=series&series=" + url.QueryEscape(original)
+	}
 	if name != "" {
 		redirect = "/?view=series&series=" + url.QueryEscape(name)
 	}
-	if name != "" {
+	if original != "" {
 		aliases := []string{}
 		for _, part := range strings.Split(r.FormValue("aliases"), ",") {
 			if trimmed := strings.TrimSpace(part); trimmed != "" {
@@ -56,6 +65,12 @@ func V2SeriesSave(w http.ResponseWriter, r *http.Request, s *AppState) {
 			"archive_path": r.FormValue("archive_path"),
 			"exclude":      r.FormValue("exclude"),
 			"aliases":      aliases,
+		}
+		// Renaming is sent only when the page carries the field: an old form
+		// without it must not clear the name. An emptied field is sent too, so
+		// the API refuses it instead of silently keeping the old title.
+		if _, ok := r.Form["name"]; ok {
+			fields["name"] = name
 		}
 		// The ids are written only when the page carries them: a tab opened
 		// before the TMDB field existed must not clear the stored id.
@@ -92,7 +107,11 @@ func V2SeriesSave(w http.ResponseWriter, r *http.Request, s *AppState) {
 			}
 		}
 		body, _ := json.Marshal(fields)
-		v2InternalJSON(s, http.MethodPost, "/api/series/"+url.PathEscape(name), nil, body)
+		if _, status := v2InternalJSON(s, http.MethodPost, "/api/series/"+url.PathEscape(original), nil, body); status >= 400 {
+			// Keep the operator on the series that still exists: a refused
+			// rename must not lead to a page for a name that was never saved.
+			redirect = "/?view=series&series=" + url.QueryEscape(original)
+		}
 	}
 	if r.Header.Get("HX-Request") == "" {
 		http.Redirect(w, r, redirect, http.StatusSeeOther)

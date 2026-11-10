@@ -5309,6 +5309,7 @@ pol:
   "Adesso": "Teraz"
   "Applica l'eccezione con questi valori (0 minuti = finché non la togli)": "Zastosuj wyjątek z tymi wartościami (0 minut = do usunięcia)"
   "Auto: Gextto misura la linea e si adatta, senza tetto": "Auto: Gextto mierzy łącze i się dostosowuje, bez limitu"
+  "Cambia il nome della serie nella libreria. Le puntate e la loro storia restano collegate; la cartella dell'archivio non viene spostata.": "Zmienia nazwę serialu w bibliotece. Odcinki i ich historia pozostają powiązane; folder archiwum nie jest przenoszony."
   "Cambia la regola": "Zmień regułę"
   "Durata dell'eccezione": "Czas trwania wyjątku"
   "Durata dell'eccezione in minuti; 0 per mantenerla finché non la togli": "Czas trwania wyjątku w minutach; 0 utrzymuje go do usunięcia"

@@ -4705,6 +4705,7 @@ eng:
   "Adesso": "Now"
   "Applica l'eccezione con questi valori (0 minuti = finché non la togli)": "Apply the exception with these values (0 minutes = until you remove it)"
   "Auto: Gextto misura la linea e si adatta, senza tetto": "Auto: Gextto measures the line and adapts, no cap"
+  "Cambia il nome della serie nella libreria. Le puntate e la loro storia restano collegate; la cartella dell'archivio non viene spostata.": "Changes the series name in the library. Episodes and their history stay linked; the archive folder is not moved."
   "Cambia la regola": "Change the rule"
   "Durata dell'eccezione": "Exception duration"
   "Durata dell'eccezione in minuti; 0 per mantenerla finché non la togli": "Exception duration in minutes; 0 keeps it until you remove it"

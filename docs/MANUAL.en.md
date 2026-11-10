@@ -368,13 +368,14 @@ status, completeness and the library path. The actions:
 | **Scan archive** | you copied files into the series folder by hand and want Gextto to recognise them |
 | **Update from TMDB** (or TVDB) | new episodes are out, or titles and dates changed |
 | **Rename preview** | see the *Old → New* names before renaming; **Force rename** also recomputes the files that look correct already |
-| **Edit** | change seasons, folder, aliases, IDs, profile |
+| **Edit** | change name, seasons, folder, aliases, IDs, profile |
 | **Download history** | reconstruct what happened to each episode |
 
 The most important fields of the page:
 
 | Field | Effect |
 |---|---|
+| **Name** | the title shown in the library. Changing it keeps episodes, their history, the missing-episode search and the exclusions linked to the series; the archive folder is not moved, so the files stay where they are |
 | **Quality profile** | applies a profile's values to the series. The profile that matches the current values is preselected; if none matches you see **Current values**, which changes nothing when saved |
 | **Seasons** | which seasons are followed |
 | **Alias** | other names under which the series appears in releases |

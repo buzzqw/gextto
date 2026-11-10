@@ -24,6 +24,9 @@ creazione, app sul telefono — valgono **soltanto per la versione standalone** 
 non cambiano l'interfaccia di Gextto, dove quelle pagine non esistono. Le
 correzioni al motore valgono invece per entrambi.
 
+## 10 novembre 2026
+- **Si può cambiare il nome di una serie.** Prima il nome si sceglieva solo all'aggiunta: per correggerlo bisognava togliere la serie e rimetterla, perdendo il collegamento con le puntate già archiviate e la loro storia. Ora nella scheda della serie, in **Modifica serie**, c'è il campo **Nome**: cambiandolo restano collegati episodi, ricerca dei mancanti, esclusioni, blocchi e storia dei download. La cartella dell'archivio non viene spostata: i file restano dove sono e i nuovi episodi continuano ad arrivare nella stessa cartella. Niente da configurare.
+
 ## 9 novembre 2026
 - **I `.torrent` dei download rimossi non restano più sul disco.** Gextto teneva una copia interna del file `.torrent` di ogni download e non la cancellava mai quando il torrent usciva dalla sessione: la cartella di stato cresceva a ogni download, anche dopo l'archiviazione. Ora la copia interna viene eliminata alla rimozione o all'archiviazione del torrent; la cartella scelta in **Copia i file .torrent in** non viene toccata. Niente da configurare.
 - **Anche i `.torrent` scaricati dagli indexer non si accumulano più.** Per i listing che espongono solo un collegamento `.torrent`, Gextto scaricava il file in una cartella di appoggio e non lo eliminava più. Ora lo cancella appena il candidato è stato valutato o aggiunto; la pulizia periodica toglie comunque gli eventuali residui più vecchi di una settimana. La cartella scelta in **Copia i file .torrent in** non viene toccata. Niente da configurare.
