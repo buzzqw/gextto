@@ -220,7 +220,7 @@ func TestWebHTMLDoesNotUseFlareSolverrForNonCloudflareStatuses(t *testing.T) {
 // old path form (/search/all/<query>/seeds/1/) now answers 302 to http and
 // 301 back to https, so the engine reported itself unreachable at every cycle.
 func TestLimetorrentsSearchUsesTheFormEndpoint(t *testing.T) {
-	got := limetorrentsSearchURL("matrix resurrections")
+	got := limetorrentsSearchURL("https://limetorrent.store/", "matrix resurrections")
 	base, err := url.Parse(got)
 	if err != nil {
 		t.Fatalf("parse %q: %v", got, err)
@@ -253,7 +253,7 @@ func TestLimetorrentsDetailsDropsDuplicateRows(t *testing.T) {
 	}
 	page.WriteString(`</tbody></table></body></html>`)
 
-	base, err := url.Parse(limetorrentsSearchURL("example"))
+	base, err := url.Parse(limetorrentsSearchURL("https://limetorrent.store", "example"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -271,5 +271,90 @@ func TestLimetorrentsDetailsDropsDuplicateRows(t *testing.T) {
 		if detail.url != "https://limetorrent.store/example-release-"+strconv.Itoa(i+1)+".html" {
 			t.Fatalf("detail %d = %q: rows are duplicated or out of order", i, detail.url)
 		}
+	}
+}
+
+// limetorrentsTestServer serves a search page with one row and a detail page
+// with (or without) a magnet, like the real site does.
+func limetorrentsTestServer(t *testing.T, withMagnet bool) *httptest.Server {
+	t.Helper()
+	mux := http.NewServeMux()
+	server := httptest.NewServer(mux)
+	t.Cleanup(server.Close)
+	const hash = "0123456789abcdef0123456789abcdef01234567"
+	mux.HandleFunc("/search.php", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintf(w, `<html><body><table class="table2"><tbody><tr>
+			<td><div class="tt-name"><a href="/example-release-1.html">Example release</a></div></td>
+			</tr></tbody></table></body></html>`)
+	})
+	mux.HandleFunc("/example-release-1.html", func(w http.ResponseWriter, r *http.Request) {
+		if withMagnet {
+			fmt.Fprintf(w, `<html><body><a href="magnet:?xt=urn:btih:%s">Get this torrent</a></body></html>`, hash)
+			return
+		}
+		// The limetorrent.net shape: the detail page hands the magnet to another
+		// host and carries none of its own.
+		fmt.Fprint(w, `<html><body><a href="https://limetorrent.store/example-release-1.html">Get this torrent</a></body></html>`)
+	})
+	return server
+}
+
+// TestLimetorrentsFallsBackToTheNextMirror checks the two ways a mirror is
+// useless, both of which must move on to the next one instead of ending the
+// search: a host that errors, and a host whose search page has no magnet in
+// its detail pages (what limetorrent.net does today).
+func TestLimetorrentsFallsBackToTheNextMirror(t *testing.T) {
+	broken := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	t.Cleanup(broken.Close)
+	empty := limetorrentsTestServer(t, false)
+	working := limetorrentsTestServer(t, true)
+
+	for _, tc := range []struct {
+		name    string
+		mirrors []string
+	}{
+		{"host that errors", []string{broken.URL, working.URL}},
+		{"host without magnets", []string{empty.URL, working.URL}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			previous := limetorrentsMirrors
+			limetorrentsMirrors = tc.mirrors
+			t.Cleanup(func() { limetorrentsMirrors = previous })
+
+			results, err := searchLimetorrents(context.Background(), "example", nil)
+			if err != nil {
+				t.Fatalf("search: %v", err)
+			}
+			if len(results) != 1 {
+				t.Fatalf("results = %d, want 1 from the second mirror", len(results))
+			}
+			if results[0].source != "LimeTorrents" || !strings.HasPrefix(results[0].magnet, "magnet:?xt=urn:btih:") {
+				t.Fatalf("result = %+v", results[0])
+			}
+		})
+	}
+}
+
+// TestLimetorrentsReportsFailureWhenEveryMirrorFails keeps the warning honest:
+// with nothing from any mirror, the error reaches the cycle and the engine is
+// reported unreachable instead of silently finding nothing.
+func TestLimetorrentsReportsFailureWhenEveryMirrorFails(t *testing.T) {
+	broken := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	t.Cleanup(broken.Close)
+
+	previous := limetorrentsMirrors
+	limetorrentsMirrors = []string{broken.URL, broken.URL}
+	t.Cleanup(func() { limetorrentsMirrors = previous })
+
+	results, err := searchLimetorrents(context.Background(), "example", nil)
+	if err == nil {
+		t.Fatalf("no error and %d results, want the failure reported", len(results))
+	}
+	if results != nil {
+		t.Fatalf("results = %+v, want none", results)
 	}
 }

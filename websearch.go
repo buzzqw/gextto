@@ -632,15 +632,21 @@ func sanitizedMagnetFromDetail(ctx context.Context, rawURL string, flaresolverr 
 	return firstMagnet(body), nil
 }
 
-// limetorrentsSearchURL is the search page of LimeTorrents, ordered by seeds
-// like the old path form used to be. Two things moved: the path form
+// limetorrentsMirrors are the hosts of LimeTorrents, tried in order until one
+// gives results. The site moves between them: the path form
 // /search/all/<query>/seeds/1/ answers 302 to http and 301 back to https (an
-// endless redirect loop, which made every cycle report the engine
-// unreachable), and the detail pages of limetorrent.net no longer carry the
-// magnet, they hand it to limetorrent.store. Starting the search on the store
-// host keeps both steps on pages that still answer.
-func limetorrentsSearchURL(query string) string {
-	return "https://limetorrent.store/search.php?" + url.Values{
+// endless redirect loop) on one host, while the detail pages of limetorrent.net
+// no longer carry the magnet and hand it to limetorrent.store. Keeping both in
+// a list means a host that breaks only costs the next one being tried.
+var limetorrentsMirrors = []string{
+	"https://limetorrent.store",
+	"https://limetorrent.net",
+}
+
+// limetorrentsSearchURL is the search page of one mirror, ordered by seeds like
+// the old path form used to be.
+func limetorrentsSearchURL(mirror, query string) string {
+	return strings.TrimRight(mirror, "/") + "/search.php?" + url.Values{
 		"orderby": {"DESC"},
 		"order":   {"seeders"},
 		"q":       {query},
@@ -676,8 +682,32 @@ func limetorrentsDetails(body string, base *url.URL) ([]searchDetailLink, error)
 	return details, nil
 }
 
+// searchLimetorrents tries each mirror until one gives results: a host that
+// answers but serves nothing (a search page without magnets, a block page) is
+// as useless as one that fails, so both move on to the next.
 func searchLimetorrents(ctx context.Context, query string, flaresolverr *string) ([]webResult, error) {
-	rawURL := limetorrentsSearchURL(query)
+	var firstErr error
+	for _, mirror := range limetorrentsMirrors {
+		results, err := searchLimetorrentsOn(ctx, mirror, query, flaresolverr)
+		if err != nil {
+			if firstErr == nil {
+				firstErr = err
+			}
+			continue
+		}
+		if len(results) > 0 {
+			return results, nil
+		}
+	}
+	// With nothing from any mirror, a failure is still a failure: the engine is
+	// reported unreachable instead of quietly finding nothing.
+	return nil, firstErr
+}
+
+// searchLimetorrentsOn runs the search of one mirror: the results page, then
+// the detail page of each torrent for its magnet.
+func searchLimetorrentsOn(ctx context.Context, mirror, query string, flaresolverr *string) ([]webResult, error) {
+	rawURL := limetorrentsSearchURL(mirror, query)
 	body, err := fetchHtml(ctx, rawURL, flaresolverr)
 	if err != nil {
 		return nil, err
