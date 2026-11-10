@@ -40,12 +40,11 @@ Nothing open: every engine item waits for a condition listed under
   `collectGapReleases`, `readGapFillPolicy` and `candidatePass`. Gate: a behaviour test
   of the event worker (completion, storage move, retry after a restart) that pins what
   the split must keep.
-- **Two web engines still fail** — bitsearch answers HTTP 500 to every query; bt4g
-  answers 403 without FlareSolverr and no result even through it. Both stay enabled
-  and are reported unreachable in the cycle. LimeTorrents is fixed (three addresses
-  tried in order: store, www.limetorrents.fun, net). Gate: a working endpoint or a
-  parser that reads what the block page serves; otherwise they go, and that is the
-  operator's decision.
+- **`bt4g` returns nothing** — it answers 403 without FlareSolverr and no result even
+  through it, while staying in the list and being reported unreachable in the cycle.
+  BitSearch and Torrentz2 were removed on 2026-11-10 for the same reason (HTTP 500 and
+  parked domains). Gate: a working endpoint or a parser that reads what the block page
+  serves; otherwise it goes like the other two, and that is the operator's decision.
 
 ## Measurements
 

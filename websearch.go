@@ -118,7 +118,7 @@ func SearchWithTimeout(ctx context.Context, cfg *Config, query string, timeout *
 
 func knownWebEngine(engine string) bool {
 	switch engine {
-	case "bitsearch", "tpb", "thepiratebay", "knaben", "nyaa", "eztv", "btdig",
+	case "tpb", "thepiratebay", "knaben", "nyaa", "eztv", "btdig",
 		"torrentscsv", "limetorrents", "bt4g", "1337x", "1337":
 		return true
 	default:
@@ -238,8 +238,6 @@ collect:
 
 func runWebEngine(ctx context.Context, engine, query string, flaresolverr *string) ([]webResult, error) {
 	switch engine {
-	case "bitsearch":
-		return searchBitsearch(ctx, query)
 	case "tpb", "thepiratebay":
 		return searchTpb(ctx, query)
 	case "knaben":
@@ -327,29 +325,6 @@ func webContainsInt64(values []int64, needle int64) bool {
 		}
 	}
 	return false
-}
-
-func searchBitsearch(ctx context.Context, query string) ([]webResult, error) {
-	rawURL := "https://bitsearch.to/api/v1/search?" + encodeQueryPairs([][2]string{
-		{"q", query}, {"fuv", "yes"}, {"limit", "20"},
-	})
-	value, err := fetchJSON(ctx, rawURL)
-	if err != nil {
-		return nil, err
-	}
-	var results []webResult
-	for _, entry := range arrayValue(objectValue(value)["results"]) {
-		item := objectValue(entry)
-		title := strings.TrimSpace(jsonStringValue(item["title"]))
-		hash := strings.TrimSpace(jsonStringValue(item["infohash"]))
-		if title == "" || len(hash) != 40 {
-			continue
-		}
-		if magnet := buildMagnet(hash, title); magnet != "" {
-			results = append(results, webResult{title: title, magnet: magnet, source: "BitSearch"})
-		}
-	}
-	return results, nil
 }
 
 func searchTpb(ctx context.Context, query string) ([]webResult, error) {

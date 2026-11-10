@@ -401,7 +401,7 @@ func TestWebEngineOptionsMatchTheKnownOnes(t *testing.T) {
 			t.Errorf("%q is offered in the settings but the search does not know it", option.Value)
 		}
 	}
-	for _, engine := range []string{"bitsearch", "tpb", "1337x", "bt4g", "knaben",
+	for _, engine := range []string{"tpb", "1337x", "bt4g", "knaben",
 		"nyaa", "eztv", "btdig", "limetorrents", "torrentscsv"} {
 		if !offered[engine] {
 			t.Errorf("%q runs a search but cannot be ticked", engine)

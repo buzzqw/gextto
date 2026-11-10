@@ -305,7 +305,6 @@ type uiCheckboxGroup struct {
 
 // uiWebsearchEngines are the web search engines rextto exposes for gap filling.
 var uiWebsearchEngines = []uiCheckboxOption{
-	{Value: "bitsearch", Label: "BitSearch"},
 	{Value: "tpb", Label: "The Pirate Bay"},
 	{Value: "1337x", Label: "1337x"},
 	{Value: "bt4g", Label: "BT4G"},
