@@ -3,6 +3,7 @@ package gextto
 import (
 	"context"
 	"encoding/json"
+	"encoding/xml"
 	"fmt"
 	"io"
 	"net/http"
@@ -505,13 +506,24 @@ func searchBtdig(ctx context.Context, query string, flaresolverr *string) ([]web
 }
 
 func fetchHtml(ctx context.Context, rawURL string, flaresolverr *string) (string, error) {
+	return fetchPage(ctx, rawURL, flaresolverr, false)
+}
+
+// fetchHtmlRaw is fetchHtml for a page that is not HTML (an XML feed): it asks
+// the browser for the untouched body, which keeps the feed parsable instead of
+// nesting it in the browser's own viewer.
+func fetchHtmlRaw(ctx context.Context, rawURL string, flaresolverr *string) (string, error) {
+	return fetchPage(ctx, rawURL, flaresolverr, true)
+}
+
+func fetchPage(ctx context.Context, rawURL string, flaresolverr *string, rawBody bool) (string, error) {
 	useFlareSolverr := flaresolverr != nil && strings.TrimSpace(*flaresolverr) != ""
 	flareTried := false
 	if useFlareSolverr && cfDomainNeedsFlareSolverr(rawURL) {
 		_, hasSession := sessionFor(rawURL)
 		if !hasSession {
 			flareTried = true
-			if body, err := fetchWithFlaresolverr(ctx, defaultHTTPClient, *flaresolverr, rawURL); err == nil {
+			if body, err := fetchWithFlaresolverrMode(ctx, defaultHTTPClient, *flaresolverr, rawURL, rawBody); err == nil {
 				return body, nil
 			}
 		}
@@ -532,7 +544,7 @@ func fetchHtml(ctx context.Context, rawURL string, flaresolverr *string) (string
 		cancel()
 		if useFlareSolverr && !flareTried {
 			flareTried = true
-			if body, flareErr := fetchWithFlaresolverr(ctx, defaultHTTPClient, *flaresolverr, rawURL); flareErr == nil {
+			if body, flareErr := fetchWithFlaresolverrMode(ctx, defaultHTTPClient, *flaresolverr, rawURL, rawBody); flareErr == nil {
 				return body, nil
 			}
 		}
@@ -546,7 +558,7 @@ func fetchHtml(ctx context.Context, rawURL string, flaresolverr *string) (string
 	if readErr != nil {
 		if useFlareSolverr && !flareTried {
 			flareTried = true
-			if body, flareErr := fetchWithFlaresolverr(ctx, defaultHTTPClient, *flaresolverr, rawURL); flareErr == nil {
+			if body, flareErr := fetchWithFlaresolverrMode(ctx, defaultHTTPClient, *flaresolverr, rawURL, rawBody); flareErr == nil {
 				return body, nil
 			}
 		}
@@ -568,7 +580,7 @@ func fetchHtml(ctx context.Context, rawURL string, flaresolverr *string) (string
 		}
 		return "", directErr
 	}
-	return fetchWithFlaresolverr(ctx, defaultHTTPClient, *flaresolverr, rawURL)
+	return fetchWithFlaresolverrMode(ctx, defaultHTTPClient, *flaresolverr, rawURL, rawBody)
 }
 
 func searchTorrentscsv(ctx context.Context, query string) ([]webResult, error) {
@@ -734,72 +746,92 @@ func searchLimetorrentsOn(ctx context.Context, mirror string, pathForm bool, que
 	return output, nil
 }
 
+// searchBt4g reads the search feed of BT4G. The results page renders its rows
+// with client-side markup and each row links a /magnet/<id> whose id is not the
+// infohash, while the same search as a feed (page=rss) carries the magnet of
+// every result in its <link>: one request, no page per result.
 func searchBt4g(ctx context.Context, query string, flaresolverr *string) ([]webResult, error) {
 	encoded := url.QueryEscape(query)
 	candidates := []string{
-		"https://bt4gprx.com/search?q=" + encoded,
-		"https://bt4g.org/search?q=" + encoded,
+		"https://bt4gprx.com/search?q=" + encoded + "&page=rss",
+		"https://bt4g.org/search?q=" + encoded + "&page=rss",
 	}
-	var selected string
-	var body string
 	var lastErr error
 	for _, candidate := range candidates {
-		if value, err := fetchHtml(ctx, candidate, flaresolverr); err == nil {
-			selected = candidate
-			body = value
-			break
-		} else {
+		body, err := fetchHtmlRaw(ctx, candidate, flaresolverr)
+		if err != nil {
 			lastErr = err
-		}
-	}
-	if selected == "" {
-		if lastErr != nil {
-			return nil, fmt.Errorf("BT4G unavailable: %w", lastErr)
-		}
-		return nil, fmt.Errorf("invalid BT4G base URL")
-	}
-	if body == "" {
-		return nil, fmt.Errorf("BT4G returned no HTML")
-	}
-	base, err := url.Parse(selected)
-	if err != nil {
-		return nil, fmt.Errorf("invalid BT4G base URL: %w", err)
-	}
-	document, err := html.Parse(strings.NewReader(body))
-	if err != nil {
-		return nil, err
-	}
-	nodes := htmlSelectAll(document, "a[href*='/torrent/'], a[href*='/detail/']")
-	if len(nodes) > 20 {
-		nodes = nodes[:20]
-	}
-	var details []searchDetailLink
-	for _, link := range nodes {
-		title := strings.TrimSpace(htmlText(link))
-		href, _ := htmlAttr(link, "href")
-		if title == "" || href == "" {
 			continue
 		}
-		details = append(details, searchDetailLink{title: title, url: href})
+		results := parseBt4gFeed(body)
+		if len(results) > 0 {
+			return results, nil
+		}
 	}
-	var output []webResult
-	for _, detail := range details {
-		joined, err := base.Parse(detail.url)
-		if err != nil {
-			return nil, fmt.Errorf("invalid BT4G detail URL: %w", err)
+	if lastErr != nil {
+		return nil, fmt.Errorf("BT4G unavailable: %w", lastErr)
+	}
+	return nil, nil
+}
+
+// bt4gViewerID marks the element the browser wraps an XML feed in: without the
+// untouched body the feed arrives as the text of this element of the viewer.
+const bt4gViewerID = `id="webkit-xml-viewer-source-xml"`
+
+// bt4gFeedXML returns the XML of a BT4G search feed from the body a fetch handed
+// back, with or without the browser's viewer around it.
+func bt4gFeedXML(body string) string {
+	if index := strings.Index(body, bt4gViewerID); index >= 0 {
+		body = body[index:]
+		if start := strings.IndexByte(body, '>'); start >= 0 {
+			body = body[start+1:]
 		}
-		magnet, err := sanitizedMagnetFromDetail(ctx, joined.String(), flaresolverr)
-		if err != nil {
-			return nil, err
+		if end := strings.Index(body, "</div>"); end >= 0 {
+			body = body[:end]
 		}
-		if magnet != "" {
-			output = append(output, webResult{title: detail.title, magnet: magnet, source: "BT4G"})
+		// The rendered viewer holds the feed as escaped text: unescaping it once
+		// gives the document back (its own &amp; become the XML entity the
+		// parser expects).
+		if strings.Contains(body, "&lt;") {
+			body = html.UnescapeString(body)
 		}
+	}
+	return strings.TrimSpace(body)
+}
+
+// parseBt4gFeed turns the search feed into results, keeping the magnets only.
+func parseBt4gFeed(body string) []webResult {
+	xmlBody := bt4gFeedXML(body)
+	if !strings.Contains(xmlBody, "<item") {
+		return nil
+	}
+	var feed struct {
+		Items []struct {
+			Title string `xml:"title"`
+			Link  string `xml:"link"`
+		} `xml:"channel>item"`
+	}
+	if err := xml.Unmarshal([]byte(xmlBody), &feed); err != nil {
+		logging.Debug("BT4G feed is not readable", "error", err)
+		return nil
+	}
+	output := make([]webResult, 0, len(feed.Items))
+	for _, item := range feed.Items {
+		title := strings.TrimSpace(item.Title)
+		link := strings.TrimSpace(item.Link)
+		if title == "" || !strings.HasPrefix(strings.ToLower(link), "magnet:") {
+			continue
+		}
+		magnet, ok := utils.SanitizeMagnet(link, &title)
+		if !ok || magnet == "" || title == "" {
+			continue
+		}
+		output = append(output, webResult{title: title, magnet: magnet, source: "BT4G"})
 		if len(output) >= 20 {
 			break
 		}
 	}
-	return output, nil
+	return output
 }
 
 func search1337x(ctx context.Context, query string, flaresolverr *string) ([]webResult, error) {

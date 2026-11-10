@@ -1243,6 +1243,14 @@ func reconcileFlareSolverrSessions(ctx context.Context, client *http.Client, end
 }
 
 func fetchWithFlaresolverr(ctx context.Context, client *http.Client, flaresolverr, rawURL string) (string, error) {
+	return fetchWithFlaresolverrMode(ctx, client, flaresolverr, rawURL, false)
+}
+
+// fetchWithFlaresolverrMode is fetchWithFlaresolverr with a choice of what the
+// browser hands back. With rawBody it asks for the untouched response instead of
+// the rendered DOM: a page that is not HTML (an XML search feed) would otherwise
+// come back wrapped in the browser's own XML viewer.
+func fetchWithFlaresolverrMode(ctx context.Context, client *http.Client, flaresolverr, rawURL string, rawBody bool) (string, error) {
 	if err := utils.AcquireFlareSolverrContext(ctx); err != nil {
 		return "", err
 	}
@@ -1255,6 +1263,9 @@ func fetchWithFlaresolverr(ctx context.Context, client *http.Client, flaresolver
 			"cmd":        "request.get",
 			"url":        rawURL,
 			"maxTimeout": 20000,
+		}
+		if rawBody {
+			payload["returnRawHtml"] = true
 		}
 		if useSession != "" {
 			payload["session"] = useSession

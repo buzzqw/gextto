@@ -411,3 +411,60 @@ func TestWebEngineOptionsMatchTheKnownOnes(t *testing.T) {
 		t.Error("torrentz2 is back: every Torrentz2 address is parked or gone")
 	}
 }
+
+// TestParseBt4gFeedFromTheRawFeed covers the shape the site returns when the
+// challenge is already solved: the XML arrives untouched.
+func TestParseBt4gFeedFromTheRawFeed(t *testing.T) {
+	body := `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0"><channel><title>BT4G - Search RSS for matrix</title>
+<item><title>The Matrix Collection (1999-2021) [50FPS]</title>
+<link>magnet:?xt=urn:btih:e40b97fbce2107390e41f528b1aa26e27ac8b682&amp;dn=The+Matrix+Collection&amp;tr=udp%3A%2F%2Ftracker.opentrackr.org%3A1337%2Fannounce</link></item>
+<item><title>No magnet here</title><link>https://bt4gprx.com/some-page</link></item>
+<item><title>Second one</title>
+<link>magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567&amp;dn=Second</link></item>
+</channel></rss>`
+	results := parseBt4gFeed(body)
+	if len(results) != 2 {
+		t.Fatalf("results = %d, want the two items with a magnet", len(results))
+	}
+	if results[0].source != "BT4G" || !strings.HasPrefix(results[0].magnet, "magnet:?xt=urn:btih:e40b97") {
+		t.Fatalf("first result = %+v", results[0])
+	}
+	if results[1].title != "Second one" {
+		t.Fatalf("second result = %+v", results[1])
+	}
+}
+
+// TestParseBt4gFeedFromTheBrowserViewer covers the other shape: the browser
+// that solved the challenge hands back its own XML viewer, with the feed as
+// escaped text inside one element. The feed must survive that wrapping.
+func TestParseBt4gFeedFromTheBrowserViewer(t *testing.T) {
+	feed := `<rss xmlns="" version="2.0"><channel><title>BT4G - Search RSS for matrix</title>` +
+		`<item><title>Wrapped release</title><link>magnet:?xt=urn:btih:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&amp;dn=Wrapped</link></item>` +
+		`</channel></rss>`
+	escaped := strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;").Replace(feed)
+	body := `<html><head><style>#webkit-xml-viewer-source-xml { display: none; }</style></head>` +
+		`<body><div id="webkit-xml-viewer-source-xml">` + escaped + `</div></body></html>`
+	results := parseBt4gFeed(body)
+	if len(results) != 1 {
+		t.Fatalf("results = %d, want the wrapped item", len(results))
+	}
+	if results[0].title != "Wrapped release" || !strings.HasPrefix(results[0].magnet, "magnet:?xt=urn:btih:aaa") {
+		t.Fatalf("result = %+v", results[0])
+	}
+}
+
+// TestParseBt4gFeedIgnoresWhatIsNotAFeed keeps the engine quiet on an error
+// page or a block page instead of inventing results.
+func TestParseBt4gFeedIgnoresWhatIsNotAFeed(t *testing.T) {
+	for _, body := range []string{
+		"",
+		`<html><body>Just a moment...</body></html>`,
+		`<rss version="2.0"><channel><title>empty</title></channel></rss>`,
+		`<rss version="2.0"><channel><item><title>x</title></item></channel></rss>`,
+	} {
+		if results := parseBt4gFeed(body); len(results) != 0 {
+			t.Fatalf("results = %d for %q, want none", len(results), body)
+		}
+	}
+}
