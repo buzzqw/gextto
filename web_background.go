@@ -169,166 +169,11 @@ func seriesRenameApply(s *AppState, name string, execute, force, sourceOnly bool
 	}
 	tmdb := NewTmdbClientWithLanguage(cfg.TmdbAPIKey, cfg.TmdbLanguage())
 
-	items := []any{}
-	alreadyOk := []string{}
-	considered := 0
-	withPath := 0
-	// Files known to the database. It is built before the renames, then kept up
-	// to date with every new target: building it afterwards from the stale
-	// episode paths left a file renamed in this pass looking untracked, so the
-	// archive scan below processed it a second time (and renamed it again).
-	trackedPaths := map[string]bool{}
+	r := &seriesRenamePass{s: s, cfg: cfg, series: series, ctx: ctx, tmdb: tmdb, execute: execute, force: force,
+		sourceOnly: sourceOnly, episodes: episodes, items: []any{}, alreadyOk: []string{}, trackedPaths: map[string]bool{}}
+	r.trackKnownFiles()
 	for _, episode := range episodes {
-		if episode.ArchivePath == nil {
-			continue
-		}
-		candidate := *episode.ArchivePath
-		if _, err := os.Stat(candidate); err == nil {
-			trackedPaths[filepath.Clean(candidate)] = true
-		}
-	}
-
-	for _, episode := range episodes {
-		considered++
-		if episode.ArchivePath == nil || strings.TrimSpace(*episode.ArchivePath) == "" {
-			continue
-		}
-		archivePath := *episode.ArchivePath
-		configuredPath := archivePath
-		info, statErr := os.Stat(configuredPath)
-		if statErr != nil {
-			continue
-		}
-		// Older imports may store the series directory instead of the actual
-		// episode file. Resolve it before checking the naming convention;
-		// otherwise a correctly named S06E01 is treated as a file named after
-		// the directory and gets an unnecessary rename.
-		path := configuredPath
-		if info.IsDir() {
-			files, err := VideoFiles(configuredPath)
-			if err != nil {
-				continue
-			}
-			marker := fmt.Sprintf("s%02de%02d", episode.Season, episode.Episode)
-			matches := []string{}
-			for _, file := range files {
-				if strings.Contains(strings.ToLower(filepath.Base(file)), marker) {
-					matches = append(matches, file)
-				}
-			}
-			if len(matches) != 1 {
-				continue
-			}
-			path = matches[0]
-		}
-		withPath++
-		// A directory stored as the archive path is resolved to the real file
-		// above: mark that file as tracked, not just the directory.
-		trackedPaths[filepath.Clean(path)] = true
-
-		// The source (which MediaInfo does not provide) is recovered from the
-		// ORIGINAL release title, not from the current file name: if an earlier
-		// rename lost it, this restores it instead of leaving `unknown` forever.
-		// Fields missing from the original title fall back to the file name.
-		fallbackQuality := MergeQuality(ParseQuality(episode.Title), ParseQuality(filepath.Base(path)))
-		release := models.Release{
-			Title:        episode.Title,
-			Magnet:       "",
-			Source:       "archive",
-			Quality:      fallbackQuality,
-			Kind:         "series",
-			Series:       bgCopyStrPtr(&series.Name),
-			Season:       bgI64PtrValue(episode.Season),
-			Episode:      bgI64PtrValue(episode.Episode),
-			IsPack:       false,
-			EpisodeRange: []int64{episode.Episode},
-			SizeBytes:    0,
-			Seeders:      -1,
-			Peers:        -1,
-			DiscoveredAt: time.Now().UTC(),
-		}
-		// "Restore source" mode: rename only files whose name lost the source
-		// that the original DB title knows about.
-		dbSource := ParseQuality(episode.Title).Source
-		fileSource := ParseQuality(filepath.Base(path)).Source
-		needsSource := dbSource != "unknown" && strings.TrimSpace(dbSource) != "" && fileSource == "unknown"
-		if sourceOnly {
-			if !needsSource {
-				alreadyOk = append(alreadyOk, archivePath)
-				continue
-			}
-		} else if !force && EpisodeNameConforms(path, &release, cfg) {
-			// The video is already correct: on execute still clean up spurious
-			// sidecars (cheap, no TMDB/MediaInfo), then realign score/size to the
-			// real file so an upgraded episode is not re-downloaded.
-			if execute {
-				ApplySidecars(path, path, cfg)
-				_ = s.db.RefreshEpisodeFileStats(cfg, series.Name, episode.Season, episode.Episode, path)
-			}
-			alreadyOk = append(alreadyOk, archivePath)
-			continue
-		}
-
-		var target string
-		var renameErr error
-		if execute {
-			target, renameErr = RenameEpisode(ctx, path, &release, cfg, tmdb)
-		} else {
-			target, renameErr = PreviewEpisodeRename(ctx, path, &release, cfg, tmdb)
-		}
-		if errors.Is(renameErr, ErrInferiorDuplicate) {
-			// The library already holds a copy at least as good: the file went
-			// to the trash. That is a discarded duplicate, not a failure.
-			_, _ = DiscardSidecars(path, cfg)
-			items = append(items, map[string]any{
-				"season":    episode.Season,
-				"episode":   episode.Episode,
-				"from":      archivePath,
-				"discarded": true,
-			})
-			continue
-		}
-		if renameErr != nil {
-			logging.Warn("rename file failed", "series", series.Name, "season", episode.Season, "episode", episode.Episode, "error", renameErr)
-			items = append(items, map[string]any{
-				"season":  episode.Season,
-				"episode": episode.Episode,
-				"from":    archivePath,
-				"error":   renameErr.Error(),
-			})
-			continue
-		}
-		if target == "" {
-			continue
-		}
-		if SamePath(path, target) {
-			// No-op: the file already carries the target name (the cheap conform
-			// check can miss it). Never log or count this as a rename, but still
-			// realign the stored score/size to the file.
-			if execute {
-				_ = s.db.RefreshEpisodeFileStats(cfg, series.Name, episode.Season, episode.Episode, target)
-			}
-			alreadyOk = append(alreadyOk, archivePath)
-			continue
-		}
-		logging.Debug("rename file", "series", series.Name, "season", episode.Season, "episode", episode.Episode, "from", path, "to", target, "execute", execute)
-		// The file now lives at target: the scan must not mistake it for an
-		// untracked copy of the same episode.
-		trackedPaths[filepath.Clean(target)] = true
-		if execute {
-			// The renamed file has a new path: update the DB, otherwise the next
-			// preview no longer finds the file.
-			if err := s.db.SetEpisodeArchivePath(cfg, series.Name, episode.Season, episode.Episode, target); err != nil {
-				logging.Warn("rename: failed to update DB path", "error", err)
-			}
-		}
-		items = append(items, map[string]any{
-			"season":   episode.Season,
-			"episode":  episode.Episode,
-			"from":     path,
-			"to":       target,
-			"executed": execute,
-		})
+		r.renameTracked(episode)
 	}
 
 	// Effective archive folder: a per-series `archive_path` when set, otherwise
@@ -345,170 +190,412 @@ func seriesRenameApply(s *AppState, name string, execute, force, sourceOnly bool
 	// renamed and, when an existing episode is better, moved to trash.
 	// Source-restore mode does not scan untracked files: the source is recovered
 	// only from the original title in the DB.
-	if sourceOnly {
-		// no archive scan
-	} else if files, err := VideoFiles(resolvedArchive); err == nil {
-		nameIndex := bgArchiveEpisodePattern.SubexpIndex("name")
-		seasonIndex := bgArchiveEpisodePattern.SubexpIndex("s")
-		nsIndex := bgArchiveEpisodePattern.SubexpIndex("ns")
-		episodeIndex := bgArchiveEpisodePattern.SubexpIndex("e")
-		for _, file := range files {
-			if trackedPaths[filepath.Clean(file)] {
-				continue
+	if !sourceOnly {
+		if files, err := VideoFiles(resolvedArchive); err == nil {
+			for _, file := range files {
+				r.renameUntracked(file, resolvedArchive)
 			}
-			base := filepath.Base(file)
-			captures := bgArchiveEpisodePattern.FindStringSubmatch(base)
-			if captures == nil {
-				continue
-			}
-			fileSeries := ""
-			if nameIndex >= 0 && nameIndex < len(captures) {
-				fileSeries = captures[nameIndex]
-			}
-			if fileSeries == "" || !seriesNameMatchesAny(series.Name, series.Aliases, fileSeries) {
-				continue
-			}
-			seasonValue := ""
-			if seasonIndex >= 0 && seasonIndex < len(captures) && captures[seasonIndex] != "" {
-				seasonValue = captures[seasonIndex]
-			} else if nsIndex >= 0 && nsIndex < len(captures) {
-				seasonValue = captures[nsIndex]
-			}
-			season, err := strconv.ParseInt(seasonValue, 10, 64)
-			if err != nil {
-				continue
-			}
-			episodeNumber, err := strconv.ParseInt(captures[episodeIndex], 10, 64)
-			if err != nil {
-				continue
-			}
-			knownTitle := fmt.Sprintf("Episodio %d", episodeNumber)
-			for i := range episodes {
-				if episodes[i].Season == season && episodes[i].Episode == episodeNumber {
-					knownTitle = episodes[i].Title
-					break
-				}
-			}
-			release := models.Release{
-				Title:        knownTitle,
-				Magnet:       "",
-				Source:       "archive-scan",
-				Quality:      ParseQuality(base),
-				Kind:         "series",
-				Series:       bgCopyStrPtr(&series.Name),
-				Season:       bgI64PtrValue(season),
-				Episode:      bgI64PtrValue(episodeNumber),
-				IsPack:       false,
-				EpisodeRange: []int64{episodeNumber},
-				SizeBytes:    0,
-				Seeders:      -1,
-				Peers:        -1,
-				DiscoveredAt: time.Now().UTC(),
-			}
-			if !force && EpisodeNameConforms(file, &release, cfg) {
-				// Already conforming but untracked: link the file to the DB so
-				// the next cycle knows the episode exists.
-				if execute {
-					bgLinkArchiveFile(s.db, series.Name, season, episodeNumber, cfg, file)
-				}
-				continue
-			}
-			score := cfg.ReleaseScore(&release)
-			if execute {
-				discarded, err := DiscardIfInferiorWithQuality(cfg, series.Name, season, episodeNumber, score, file, resolvedArchive, &release.Quality)
-				if err != nil {
-					logging.Warn("archive duplicate check failed", "file", file, "error", err)
-					continue
-				}
-				if discarded {
-					_, _ = DiscardSidecars(file, cfg)
-					items = append(items, map[string]any{
-						"season":    season,
-						"episode":   episodeNumber,
-						"from":      file,
-						"discarded": true,
-					})
-					continue
-				}
-			}
-			if !execute {
-				if target, err := PreviewEpisodeRename(ctx, file, &release, cfg, tmdb); err == nil && target != "" {
-					items = append(items, map[string]any{
-						"season":   season,
-						"episode":  episodeNumber,
-						"from":     file,
-						"to":       target,
-						"executed": false,
-					})
-				}
-				continue
-			}
-			target, err := RenameEpisode(ctx, file, &release, cfg, tmdb)
-			if errors.Is(err, ErrInferiorDuplicate) {
-				_, _ = DiscardSidecars(file, cfg)
-				items = append(items, map[string]any{
-					"season":    season,
-					"episode":   episodeNumber,
-					"from":      file,
-					"discarded": true,
-				})
-				continue
-			}
-			if err != nil {
-				// Never surface API keys embedded in URLs (e.g. TMDB) in logs.
-				redacted := utils.RedactURLSecrets(err.Error())
-				// A TMDB 404 (e.g. a missing special episode) is expected: keep it
-				// at debug so it does not pollute the log.
-				if strings.Contains(redacted, "404") {
-					logging.Debug("archive file rename failed (not found)", "file", file, "error", redacted)
-				} else {
-					logging.Warn("archive file rename failed", "file", file, "error", redacted)
-				}
-				continue
-			}
-			if target == "" || SamePath(file, target) {
-				// No rename needed: link the existing file. RenameEpisode
-				// returns the target even when the name already matches (it
-				// still applies the sidecars), so without this guard the scan
-				// logged and counted a no-op rename every cycle.
-				bgLinkArchiveFile(s.db, series.Name, season, episodeNumber, cfg, file)
-				continue
-			}
-			_, _ = CleanupOldEpisodeWithQuality(cfg, series.Name, season, episodeNumber, score, target, filepath.Dir(target), release.Quality)
-			bgLinkArchiveFile(s.db, series.Name, season, episodeNumber, cfg, target)
-			items = append(items, map[string]any{
-				"season":   season,
-				"episode":  episodeNumber,
-				"from":     file,
-				"to":       target,
-				"executed": true,
-			})
 		}
 	}
-
 	// Clean up clearly inferior (lower resolution) duplicates in the series
 	// folder. Covers inherited libraries where the old 480p/720p stayed next to
 	// the 1080p. Execute only.
 	duplicatesRemoved := 0
 	if execute && cfg.CleanupUpgrades && !sourceOnly {
-		protected := bgProtectedTorrentPaths(s.activeEngine())
-		if removed, err := CleanupInferiorDuplicatesInDir(cfg, series.Name, resolvedArchive, protected); err == nil {
-			duplicatesRemoved = removed
-		} else {
-			logging.Warn("duplicate cleanup failed", "series", series.Name, "error", err)
+		duplicatesRemoved = r.cleanupDuplicates(resolvedArchive)
+	}
+	return r.report(duplicatesRemoved)
+}
+
+// seriesRenamePass is one rename pass over a series: what it was asked, the
+// files it already knows, and what it found and did.
+type seriesRenamePass struct {
+	s          *AppState
+	cfg        *Config
+	series     *SeriesConfig
+	ctx        context.Context
+	tmdb       *TmdbClient
+	execute    bool
+	force      bool
+	sourceOnly bool
+	episodes   []EpisodeView
+
+	items     []any
+	alreadyOk []string
+	// considered counts the episodes of the series, withPath those whose file
+	// is on disk.
+	considered int
+	withPath   int
+	// Files known to the database. It is built before the renames, then kept up
+	// to date with every new target: building it afterwards from the stale
+	// episode paths left a file renamed in this pass looking untracked, so the
+	// archive scan below processed it a second time (and renamed it again).
+	trackedPaths map[string]bool
+}
+
+// trackKnownFiles records the files the database knows, before any rename.
+func (r *seriesRenamePass) trackKnownFiles() {
+	for _, episode := range r.episodes {
+		if episode.ArchivePath == nil {
+			continue
 		}
-		// Thumbnails left behind by files renamed or discarded above.
-		if removed, err := CleanupOrphanThumbs(cfg, resolvedArchive); err != nil {
-			logging.Warn("orphan thumbnail cleanup failed", "series", series.Name, "error", err)
-		} else if removed > 0 {
-			logging.Info(fmt.Sprintf("🗑️ %s: %s without their video removed", series.Name, countLabel(removed, "thumbnail", "thumbnails")))
+		candidate := *episode.ArchivePath
+		if _, err := os.Stat(candidate); err == nil {
+			r.trackedPaths[filepath.Clean(candidate)] = true
 		}
 	}
+}
 
-	alreadyOkCount := len(alreadyOk)
+// renameTracked renames one episode the database knows, or counts it as
+// already right.
+func (r *seriesRenamePass) renameTracked(episode EpisodeView) {
+	r.considered++
+	if episode.ArchivePath == nil || strings.TrimSpace(*episode.ArchivePath) == "" {
+		return
+	}
+	archivePath := *episode.ArchivePath
+	configuredPath := archivePath
+	info, statErr := os.Stat(configuredPath)
+	if statErr != nil {
+		return
+	}
+	// Older imports may store the series directory instead of the actual
+	// episode file. Resolve it before checking the naming convention;
+	// otherwise a correctly named S06E01 is treated as a file named after
+	// the directory and gets an unnecessary rename.
+	path := configuredPath
+	if info.IsDir() {
+		files, err := VideoFiles(configuredPath)
+		if err != nil {
+			return
+		}
+		marker := fmt.Sprintf("s%02de%02d", episode.Season, episode.Episode)
+		matches := []string{}
+		for _, file := range files {
+			if strings.Contains(strings.ToLower(filepath.Base(file)), marker) {
+				matches = append(matches, file)
+			}
+		}
+		if len(matches) != 1 {
+			return
+		}
+		path = matches[0]
+	}
+	r.withPath++
+	// A directory stored as the archive path is resolved to the real file
+	// above: mark that file as tracked, not just the directory.
+	r.trackedPaths[filepath.Clean(path)] = true
+
+	// The source (which MediaInfo does not provide) is recovered from the
+	// ORIGINAL release title, not from the current file name: if an earlier
+	// rename lost it, this restores it instead of leaving `unknown` forever.
+	// Fields missing from the original title fall back to the file name.
+	fallbackQuality := MergeQuality(ParseQuality(episode.Title), ParseQuality(filepath.Base(path)))
+	release := models.Release{
+		Title:        episode.Title,
+		Magnet:       "",
+		Source:       "archive",
+		Quality:      fallbackQuality,
+		Kind:         "series",
+		Series:       bgCopyStrPtr(&r.series.Name),
+		Season:       bgI64PtrValue(episode.Season),
+		Episode:      bgI64PtrValue(episode.Episode),
+		IsPack:       false,
+		EpisodeRange: []int64{episode.Episode},
+		SizeBytes:    0,
+		Seeders:      -1,
+		Peers:        -1,
+		DiscoveredAt: time.Now().UTC(),
+	}
+	// "Restore source" mode: rename only files whose name lost the source
+	// that the original DB title knows about.
+	dbSource := ParseQuality(episode.Title).Source
+	fileSource := ParseQuality(filepath.Base(path)).Source
+	needsSource := dbSource != "unknown" && strings.TrimSpace(dbSource) != "" && fileSource == "unknown"
+	if r.sourceOnly {
+		if !needsSource {
+			r.alreadyOk = append(r.alreadyOk, archivePath)
+			return
+		}
+	} else if !r.force && EpisodeNameConforms(path, &release, r.cfg) {
+		// The video is already correct: on execute still clean up spurious
+		// sidecars (cheap, no TMDB/MediaInfo), then realign score/size to the
+		// real file so an upgraded episode is not re-downloaded.
+		if r.execute {
+			ApplySidecars(path, path, r.cfg)
+			_ = r.s.db.RefreshEpisodeFileStats(r.cfg, r.series.Name, episode.Season, episode.Episode, path)
+		}
+		r.alreadyOk = append(r.alreadyOk, archivePath)
+		return
+	}
+
+	var target string
+	var renameErr error
+	if r.execute {
+		target, renameErr = RenameEpisode(r.ctx, path, &release, r.cfg, r.tmdb)
+	} else {
+		target, renameErr = PreviewEpisodeRename(r.ctx, path, &release, r.cfg, r.tmdb)
+	}
+	if errors.Is(renameErr, ErrInferiorDuplicate) {
+		// The library already holds a copy at least as good: the file went
+		// to the trash. That is a discarded duplicate, not a failure.
+		_, _ = DiscardSidecars(path, r.cfg)
+		r.items = append(r.items, map[string]any{
+			"season":    episode.Season,
+			"episode":   episode.Episode,
+			"from":      archivePath,
+			"discarded": true,
+		})
+		return
+	}
+	if renameErr != nil {
+		logging.Warn("rename file failed", "series", r.series.Name, "season", episode.Season, "episode", episode.Episode, "error", renameErr)
+		r.items = append(r.items, map[string]any{
+			"season":  episode.Season,
+			"episode": episode.Episode,
+			"from":    archivePath,
+			"error":   renameErr.Error(),
+		})
+		return
+	}
+	if target == "" {
+		return
+	}
+	if SamePath(path, target) {
+		// No-op: the file already carries the target name (the cheap conform
+		// check can miss it). Never log or count this as a rename, but still
+		// realign the stored score/size to the file.
+		if r.execute {
+			_ = r.s.db.RefreshEpisodeFileStats(r.cfg, r.series.Name, episode.Season, episode.Episode, target)
+		}
+		r.alreadyOk = append(r.alreadyOk, archivePath)
+		return
+	}
+	logging.Debug("rename file", "series", r.series.Name, "season", episode.Season, "episode", episode.Episode, "from", path, "to", target, "execute", r.execute)
+	// The file now lives at target: the scan must not mistake it for an
+	// untracked copy of the same episode.
+	r.trackedPaths[filepath.Clean(target)] = true
+	if r.execute {
+		// The renamed file has a new path: update the DB, otherwise the next
+		// preview no longer finds the file.
+		if err := r.s.db.SetEpisodeArchivePath(r.cfg, r.series.Name, episode.Season, episode.Episode, target); err != nil {
+			logging.Warn("rename: failed to update DB path", "error", err)
+		}
+	}
+	r.items = append(r.items, map[string]any{
+		"season":   episode.Season,
+		"episode":  episode.Episode,
+		"from":     path,
+		"to":       target,
+		"executed": r.execute,
+	})
+}
+
+// renameUntracked renames, links or discards a video of the series folder the
+// database does not know: a file copied by hand or by an older import.
+func (r *seriesRenamePass) renameUntracked(file, resolvedArchive string) {
+	nameIndex := bgArchiveEpisodePattern.SubexpIndex("name")
+	seasonIndex := bgArchiveEpisodePattern.SubexpIndex("s")
+	nsIndex := bgArchiveEpisodePattern.SubexpIndex("ns")
+	episodeIndex := bgArchiveEpisodePattern.SubexpIndex("e")
+	if r.trackedPaths[filepath.Clean(file)] {
+		return
+	}
+	base := filepath.Base(file)
+	captures := bgArchiveEpisodePattern.FindStringSubmatch(base)
+	if captures == nil {
+		return
+	}
+	fileSeries := ""
+	if nameIndex >= 0 && nameIndex < len(captures) {
+		fileSeries = captures[nameIndex]
+	}
+	if fileSeries == "" || !seriesNameMatchesAny(r.series.Name, r.series.Aliases, fileSeries) {
+		return
+	}
+	seasonValue := ""
+	if seasonIndex >= 0 && seasonIndex < len(captures) && captures[seasonIndex] != "" {
+		seasonValue = captures[seasonIndex]
+	} else if nsIndex >= 0 && nsIndex < len(captures) {
+		seasonValue = captures[nsIndex]
+	}
+	season, err := strconv.ParseInt(seasonValue, 10, 64)
+	if err != nil {
+		return
+	}
+	episodeNumber, err := strconv.ParseInt(captures[episodeIndex], 10, 64)
+	if err != nil {
+		return
+	}
+	knownTitle := fmt.Sprintf("Episodio %d", episodeNumber)
+	for i := range r.episodes {
+		if r.episodes[i].Season == season && r.episodes[i].Episode == episodeNumber {
+			knownTitle = r.episodes[i].Title
+			break
+		}
+	}
+	release := models.Release{
+		Title:        knownTitle,
+		Magnet:       "",
+		Source:       "archive-scan",
+		Quality:      ParseQuality(base),
+		Kind:         "series",
+		Series:       bgCopyStrPtr(&r.series.Name),
+		Season:       bgI64PtrValue(season),
+		Episode:      bgI64PtrValue(episodeNumber),
+		IsPack:       false,
+		EpisodeRange: []int64{episodeNumber},
+		SizeBytes:    0,
+		Seeders:      -1,
+		Peers:        -1,
+		DiscoveredAt: time.Now().UTC(),
+	}
+	if !r.force && EpisodeNameConforms(file, &release, r.cfg) {
+		// Already conforming but untracked: link the file to the DB so
+		// the next cycle knows the episode exists.
+		if r.execute {
+			bgLinkArchiveFile(r.s.db, r.series.Name, season, episodeNumber, r.cfg, file)
+		}
+		return
+	}
+	score := r.cfg.ReleaseScore(&release)
+	// The library's copy of this episode is in the database with the score of
+	// the release it came from. Its renamed name may not say that quality (the
+	// default "base" format carries none), and compared by name alone it read
+	// as unknown: a worse stray copy then took its name and the good file went
+	// to the trash. A copy that does not beat the recorded score is the one
+	// discarded.
+	if known, ok := r.trackedEpisodeScore(season, episodeNumber, file); ok && score <= known {
+		if r.execute {
+			if err := handleDuplicate(file, r.cfg); err != nil {
+				logging.Warn("archive duplicate discard failed", "file", file, "error", err)
+				return
+			}
+			_, _ = DiscardSidecars(file, r.cfg)
+			r.items = append(r.items, map[string]any{
+				"season":    season,
+				"episode":   episodeNumber,
+				"from":      file,
+				"discarded": true,
+			})
+		}
+		return
+	}
+	if r.execute {
+		discarded, err := DiscardIfInferiorWithQuality(r.cfg, r.series.Name, season, episodeNumber, score, file, resolvedArchive, &release.Quality)
+		if err != nil {
+			logging.Warn("archive duplicate check failed", "file", file, "error", err)
+			return
+		}
+		if discarded {
+			_, _ = DiscardSidecars(file, r.cfg)
+			r.items = append(r.items, map[string]any{
+				"season":    season,
+				"episode":   episodeNumber,
+				"from":      file,
+				"discarded": true,
+			})
+			return
+		}
+	}
+	if !r.execute {
+		if target, err := PreviewEpisodeRename(r.ctx, file, &release, r.cfg, r.tmdb); err == nil && target != "" {
+			r.items = append(r.items, map[string]any{
+				"season":   season,
+				"episode":  episodeNumber,
+				"from":     file,
+				"to":       target,
+				"executed": false,
+			})
+		}
+		return
+	}
+	target, err := RenameEpisode(r.ctx, file, &release, r.cfg, r.tmdb)
+	if errors.Is(err, ErrInferiorDuplicate) {
+		_, _ = DiscardSidecars(file, r.cfg)
+		r.items = append(r.items, map[string]any{
+			"season":    season,
+			"episode":   episodeNumber,
+			"from":      file,
+			"discarded": true,
+		})
+		return
+	}
+	if err != nil {
+		// Never surface API keys embedded in URLs (e.g. TMDB) in logs.
+		redacted := utils.RedactURLSecrets(err.Error())
+		// A TMDB 404 (e.g. a missing special episode) is expected: keep it
+		// at debug so it does not pollute the log.
+		if strings.Contains(redacted, "404") {
+			logging.Debug("archive file rename failed (not found)", "file", file, "error", redacted)
+		} else {
+			logging.Warn("archive file rename failed", "file", file, "error", redacted)
+		}
+		return
+	}
+	if target == "" || SamePath(file, target) {
+		// No rename needed: link the existing file. RenameEpisode
+		// returns the target even when the name already matches (it
+		// still applies the sidecars), so without this guard the scan
+		// logged and counted a no-op rename every cycle.
+		bgLinkArchiveFile(r.s.db, r.series.Name, season, episodeNumber, r.cfg, file)
+		return
+	}
+	_, _ = CleanupOldEpisodeWithQuality(r.cfg, r.series.Name, season, episodeNumber, score, target, filepath.Dir(target), release.Quality)
+	bgLinkArchiveFile(r.s.db, r.series.Name, season, episodeNumber, r.cfg, target)
+	r.items = append(r.items, map[string]any{
+		"season":   season,
+		"episode":  episodeNumber,
+		"from":     file,
+		"to":       target,
+		"executed": true,
+	})
+}
+
+// trackedEpisodeScore is the recorded quality score of the episode's copy the
+// database knows, when that copy is still on disk and is not file itself.
+func (r *seriesRenamePass) trackedEpisodeScore(season, episode int64, file string) (int64, bool) {
+	for _, known := range r.episodes {
+		if known.Season != season || known.Episode != episode || known.ArchivePath == nil || known.QualityScore <= 0 {
+			continue
+		}
+		path := strings.TrimSpace(*known.ArchivePath)
+		if path == "" || SamePath(path, file) {
+			continue
+		}
+		if _, err := os.Stat(path); err != nil {
+			continue
+		}
+		return known.QualityScore, true
+	}
+	return 0, false
+}
+
+// cleanupDuplicates removes clearly inferior (lower resolution) duplicates and
+// the thumbnails left without their video.
+func (r *seriesRenamePass) cleanupDuplicates(resolvedArchive string) int {
+	duplicatesRemoved := 0
+	protected := bgProtectedTorrentPaths(r.s.activeEngine())
+	if removed, err := CleanupInferiorDuplicatesInDir(r.cfg, r.series.Name, resolvedArchive, protected); err == nil {
+		duplicatesRemoved = removed
+	} else {
+		logging.Warn("duplicate cleanup failed", "series", r.series.Name, "error", err)
+	}
+	// Thumbnails left behind by files renamed or discarded above.
+	if removed, err := CleanupOrphanThumbs(r.cfg, resolvedArchive); err != nil {
+		logging.Warn("orphan thumbnail cleanup failed", "series", r.series.Name, "error", err)
+	} else if removed > 0 {
+		logging.Info(fmt.Sprintf("🗑️ %s: %s without their video removed", r.series.Name, countLabel(removed, "thumbnail", "thumbnails")))
+	}
+	return duplicatesRemoved
+}
+
+// report logs the pass and builds the API answer.
+func (r *seriesRenamePass) report(duplicatesRemoved int) (int, any) {
+	alreadyOkCount := len(r.alreadyOk)
 	discardedCount := 0
 	errorCount := 0
-	for _, item := range items {
+	for _, item := range r.items {
 		entry, ok := item.(map[string]any)
 		if !ok {
 			continue
@@ -520,25 +607,25 @@ func seriesRenameApply(s *AppState, name string, execute, force, sourceOnly bool
 			errorCount++
 		}
 	}
-	renamedCount := len(items) - discardedCount - errorCount
-	if execute {
+	renamedCount := len(r.items) - discardedCount - errorCount
+	if r.execute {
 		// Say what changed, file by file: a bare count does not let the user
 		// find the episode afterwards. Failures already have their own WARN.
-		for _, item := range items {
+		for _, item := range r.items {
 			if entry, ok := item.(map[string]any); ok {
-				if text := renameItemLogText(series.Name, entry, cfg.CleanupAction); text != "" {
+				if text := renameItemLogText(r.series.Name, entry, r.cfg.CleanupAction); text != "" {
 					logging.Info(text)
 				}
 			}
 		}
 	}
 	note := ""
-	if force {
+	if r.force {
 		note = ", every file renamed again even if its name was already right"
-	} else if sourceOnly {
+	} else if r.sourceOnly {
 		note = ", only to put back the source (WEB-DL, BluRay…) the name had lost"
 	}
-	if execute {
+	if r.execute {
 		// An execution that changes nothing (everything already correct) does not
 		// deserve an INFO line every cycle: keep it at debug level.
 		changed := renamedCount > 0 || discardedCount > 0 || duplicatesRemoved > 0 || errorCount > 0
@@ -554,28 +641,28 @@ func seriesRenameApply(s *AppState, name string, execute, force, sourceOnly bool
 				parts = append(parts, countLabel(errorCount, "file could not be renamed", "files could not be renamed"))
 			}
 			logging.Info(fmt.Sprintf("🗂 %s: %s; %s already had the right name%s",
-				series.Name, joinWithAnd(parts), countLabel(alreadyOkCount, "file", "files"), renameFilesPresentText(withPath, considered)+note))
+				r.series.Name, joinWithAnd(parts), countLabel(alreadyOkCount, "file", "files"), renameFilesPresentText(r.withPath, r.considered)+note))
 		} else {
 			logging.Debug(fmt.Sprintf("🗂 %s: nothing to rename (%d already correct, %d/%d files present)%s",
-				series.Name, alreadyOkCount, withPath, considered, note))
+				r.series.Name, alreadyOkCount, r.withPath, r.considered, note))
 		}
-	} else if len(items) == 0 {
+	} else if len(r.items) == 0 {
 		logging.Info(fmt.Sprintf("🗂 Rename preview of %s: nothing to rename, %s already %s the right name%s",
-			series.Name, countLabel(alreadyOkCount, "file", "files"), pluralWord(alreadyOkCount, "has", "have"), renameFilesPresentText(withPath, considered)+note))
+			r.series.Name, countLabel(alreadyOkCount, "file", "files"), pluralWord(alreadyOkCount, "has", "have"), renameFilesPresentText(r.withPath, r.considered)+note))
 	} else {
 		logging.Info(fmt.Sprintf("🗂 Rename preview of %s: %s would be renamed, %s already %s the right name%s",
-			series.Name, countLabel(len(items), "file", "files"), countLabel(alreadyOkCount, "file", "files"), pluralWord(alreadyOkCount, "has", "have"), renameFilesPresentText(withPath, considered)+note))
+			r.series.Name, countLabel(len(r.items), "file", "files"), countLabel(alreadyOkCount, "file", "files"), pluralWord(alreadyOkCount, "has", "have"), renameFilesPresentText(r.withPath, r.considered)+note))
 	}
 
 	return 200, map[string]any{
 		"ok":                 true,
-		"series":             series.Name,
-		"execute":            execute,
-		"force":              force,
-		"episodes":           considered,
-		"with_path":          withPath,
-		"items":              items,
-		"already_ok":         alreadyOk,
+		"series":             r.series.Name,
+		"execute":            r.execute,
+		"force":              r.force,
+		"episodes":           r.considered,
+		"with_path":          r.withPath,
+		"items":              r.items,
+		"already_ok":         r.alreadyOk,
 		"already_ok_count":   alreadyOkCount,
 		"renamed_count":      renamedCount,
 		"discarded_count":    discardedCount,

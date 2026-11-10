@@ -33,14 +33,14 @@ Nothing open: every engine item waits for a condition listed under
   CDATA, namespaces, attributes), because the remaining gain is about 12 % of
   the allocations and 7 % of the CPU, not enough for a rewrite without that
   proof.
-- **Functions too long to review** — `formatEventLang`, `seriesRenameApply`,
-  `loadConfigDB` and the candidate pass (`candidatePass.try`) are each
+- **Functions too long to review** — `formatEventLang`, `loadConfigDB` and the candidate
+  pass (`candidatePass.try`) are each
   hundreds of lines with state shared across the whole body: split them by phase, as
   `HandleTorrentEvent` was split into one function per event and the event worker into
   an `eventWorker` with one method per timed phase. Gate: for each, a behaviour test of
-  what it does (a rename pass over a series folder; a config load with legacy keys; a
-  candidate accepted, delayed and refused), written before the split, as the
-  `torrent_event_*_test.go` files pinned the completion and the library import.
+  what it does (a config load with legacy keys; a candidate accepted, delayed and
+  refused), written before the split, as the `torrent_event_*_test.go` files pinned the
+  completion and the library import and `series_rename_apply_test.go` the rename pass.
 
 ## Measurements
 
@@ -79,6 +79,12 @@ its gate; a rejected one moves to *Not planned*.
   with `Sprintf`, which is also how a log line becomes the natural sentence the log rules
   ask for; the open question is only where a field would read better than the sentence.
   Gate: a decision on one area's lines, with `log_readability_test.go` green.
+- **The recorded score in the import comparison** — a completed download is compared with
+  the library's copy by file name, and with the default name format a renamed file reads
+  as unknown quality, so any download replaces it. The search only grabs upgrades, so
+  this matters for a release added by hand; the library check already uses the
+  recorded score. Gate: a decision on whether a hand-added worse release should be
+  discarded instead of imported.
 - **IP address reported to trackers** — send an operator-chosen address in the announce
   (HTTP `ip=` and the UDP equivalent). Gate: a NAT or VPN setup where the tracker records
   the wrong address.
