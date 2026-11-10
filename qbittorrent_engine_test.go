@@ -514,10 +514,10 @@ func TestQbittorrentEngineContextHonoursRequestContext(t *testing.T) {
 func TestQbittorrentEnginePersistsTorrentFile(t *testing.T) {
 	fake, engine, downloads := newFakeQBEngine(t)
 	fake.setTorrents([]qbittorrent.Torrent{{
-		Hash: "abc", Name: "x", State: "downloading", Progress: 0.5, Size: 100, SavePath: downloads,
+		Hash: testStateInfohash, Name: "x", State: "downloading", Progress: 0.5, Size: 100, SavePath: downloads,
 	}})
 	engine.List()
-	target := filepath.Join(engine.settings.stateDir, "abc.torrent")
+	target := filepath.Join(engine.settings.stateDir, testStateInfohash+".torrent")
 	if !fileExists(target) {
 		t.Fatalf(".torrent not persisted at %s", target)
 	}
@@ -536,14 +536,14 @@ func TestQbittorrentEnginePersistsTorrentFile(t *testing.T) {
 // torrent also deletes Gextto's own .torrent copy.
 func TestQbittorrentEngineRemoveDropsStateTorrentCopy(t *testing.T) {
 	_, engine, _ := newFakeQBEngine(t)
-	state := filepath.Join(engine.settings.stateDir, "abcdef.torrent")
+	state := filepath.Join(engine.settings.stateDir, testStateInfohash+".torrent")
 	if err := os.MkdirAll(engine.settings.stateDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(state, []byte("torrent"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if ok, err := engine.Remove("abcdef", false); err != nil || !ok {
+	if ok, err := engine.Remove(testStateInfohash, false); err != nil || !ok {
 		t.Fatalf("remove: %v %v", ok, err)
 	}
 	if _, err := os.Stat(state); !os.IsNotExist(err) {
@@ -601,3 +601,9 @@ func TestQbittorrentEngineApplyOptimization(t *testing.T) {
 		t.Fatalf("preferences = %q", encoded)
 	}
 }
+
+// testStateInfohash is a realistic infohash for the tests that go through the
+// state .torrent copy: stateTorrentName accepts only a v1 (40) or v2 (64)
+// hexadecimal value, because the name is built from a hash that arrives from
+// the API and the engines.
+const testStateInfohash = "0123456789abcdef0123456789abcdef01234567"

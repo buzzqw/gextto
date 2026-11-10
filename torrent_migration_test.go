@@ -78,7 +78,7 @@ func TestMigrationPlanListsManagedTorrents(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(fake.serveHTTP))
 	t.Cleanup(server.Close)
 	fake.setTorrents([]qbittorrent.Torrent{{
-		Hash: "abc", Name: "x", State: "downloading", Progress: 0.5, Size: 100,
+		Hash: testStateInfohash, Name: "x", State: "downloading", Progress: 0.5, Size: 100,
 	}})
 	cfg := state.cfg
 	cfg.Settings["torrent_backend"] = BackendQbittorrent
@@ -90,7 +90,7 @@ func TestMigrationPlanListsManagedTorrents(t *testing.T) {
 	state.setActiveEngine(engine)
 
 	plan := BuildMigrationPlan(state, cfg, BackendGxTorrent)
-	if len(plan.Items) != 1 || plan.Items[0].Hash != "abc" {
+	if len(plan.Items) != 1 || plan.Items[0].Hash != testStateInfohash {
 		t.Fatalf("plan items = %+v", plan.Items)
 	}
 	if plan.FromBackend != BackendQbittorrent {

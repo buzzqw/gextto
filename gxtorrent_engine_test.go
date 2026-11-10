@@ -251,7 +251,7 @@ func TestGxEngineAdjustQueuePushesPolicyOnce(t *testing.T) {
 // copy directory keeps the file.
 func TestGxRemoveDropsOnlyTheStateTorrentCopy(t *testing.T) {
 	engine, _ := newTestGxEngine(t, "")
-	state := filepath.Join(engine.settings.stateDir, "aa.torrent")
+	state := filepath.Join(engine.settings.stateDir, testStateInfohash+".torrent")
 	if err := os.MkdirAll(engine.settings.stateDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -265,7 +265,7 @@ func TestGxRemoveDropsOnlyTheStateTorrentCopy(t *testing.T) {
 	}
 	engine.cfg.Settings["torrent_copy_dir"] = copyDir
 
-	if ok, err := engine.Remove("aa", false); err != nil || !ok {
+	if ok, err := engine.Remove(testStateInfohash, false); err != nil || !ok {
 		t.Fatalf("remove: %v %v", ok, err)
 	}
 	if _, err := os.Stat(state); !os.IsNotExist(err) {
