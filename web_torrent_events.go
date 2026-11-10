@@ -3111,24 +3111,55 @@ func tevLogDownloadComplete(db *Database, event *models.TorrentEvent, release *m
 // handle_torrent_event
 // ---------------------------------------------------------------------------
 
-// HandleTorrentEvent implements `handle_torrent_event`.
+// HandleTorrentEvent implements `handle_torrent_event`: one engine event of a
+// download, dispatched by phase. Engine alerts are handled before the release
+// lookup; a torrent Gextto did not choose is only marked completed; the rest
+// follow the download from its metadata to the library.
 func HandleTorrentEvent(cfg *Config, torrents TorrentSession, db *Database, moveRequests map[string]struct{}, postSeedMoves map[string]struct{}, retries map[string]StorageMoveRetry, event models.TorrentEvent, tmdb *TmdbClient, notifier *Notifier) (bool, error) {
 	logging.Debug("torrent completion processing started",
 		"hash", event.Hash, "kind", event.Kind, "name", event.Name, "save_path", event.SavePath)
-	// libtorrent error alerts are handled before the metadata lookup: some of
-	// them (tracker/file errors) can arrive before a release row exists, and
-	// session-level errors have no hash at all.
-	//
-	// Tracker errors are routine (dead or unreachable trackers are common and
-	// libtorrent retries them) so they stay at DEBUG and never change a
-	// torrent's state. A torrent/file error is a real problem: WARN + a
-	// notification, but the state is left to the normal completion handling so
-	// a transient error cannot silently stop an acquisition.
+	if tevEngineAlert(event, notifier) {
+		return false, nil
+	}
+	metadata, err := db.TorrentMeta(event.Hash)
+	if err != nil {
+		return false, err
+	}
+	if metadata == nil {
+		return tevUnregisteredEvent(db, notifier, event)
+	}
+	switch event.Kind {
+	case "metadata_received":
+		return tevMetadataReceived(cfg, torrents, db, metadata, event)
+	case "torrent_finished":
+		return tevTorrentFinished(cfg, torrents, db, moveRequests, retries, metadata, event, tmdb, notifier)
+	case "storage_move_failed":
+		return tevStorageMoveFailed(cfg, torrents, db, moveRequests, postSeedMoves, retries, event)
+	case "storage_moved":
+		return tevStorageMoved(torrents, db, moveRequests, postSeedMoves, retries, metadata, event, cfg, tmdb)
+	default:
+		return false, nil
+	}
+}
+
+// tevEngineAlert handles the engine's error alerts and reports whether the
+// event was one.
+//
+// The error alerts are handled before the metadata lookup: some of
+// them (tracker/file errors) can arrive before a release row exists, and
+// session-level errors have no hash at all.
+//
+// Tracker errors are routine (dead or unreachable trackers are common and
+// libtorrent retries them) so they stay at DEBUG and never change a
+// torrent's state. A torrent/file error is a real problem: WARN + a
+// notification, but the state is left to the normal completion handling so
+// a transient error cannot silently stop an acquisition.
+func tevEngineAlert(event models.TorrentEvent, notifier *Notifier) bool {
 	switch event.Kind {
 	case "tracker_error":
 		logging.Debug("torrent tracker error",
 			"hash", event.Hash, "name", event.Name, "message", event.Message)
-		return false, nil
+		return true
 	case "hash_failed":
 		// A damaged piece is discarded and downloaded again automatically:
 		// routine, and alarming if reported one by one. Only a torrent that
@@ -3141,17 +3172,17 @@ func HandleTorrentEvent(cfg *Config, torrents TorrentSession, db *Database, move
 			logging.Warn(fmt.Sprintf("⚠️ «%s» keeps receiving damaged data (%d pieces so far). Gextto downloads them again automatically, but if it never finishes, remove it and choose another version",
 				event.Name, failures), "hash", event.Hash)
 		}
-		return false, nil
+		return true
 	case "resume_save_failed":
 		// The progress is saved again at the next periodic save and on a
 		// clean shutdown (which reports its own failure): not worth a warning.
 		logging.Debug("torrent resume data could not be saved", "name", event.Name, "message", event.Message)
-		return false, nil
+		return true
 	case "torrent_error", "file_error", "metadata_failed":
 		if !recordTorrentErrorNotice(event.Hash, event.Kind, time.Now()) {
 			logging.Debug("repeated torrent error; already reported",
 				"name", event.Name, "kind", event.Kind, "message", event.Message)
-			return false, nil
+			return true
 		}
 		logging.Warn(fmt.Sprintf("⚠️ Problem with «%s»: %s", event.Name, torrentErrorText(event.Kind, event.Message)), "hash", event.Hash)
 		_ = notifier.NotifyEvent("torrent_error", map[string]any{
@@ -3161,7 +3192,7 @@ func HandleTorrentEvent(cfg *Config, torrents TorrentSession, db *Database, move
 			"error":   event.Message,
 			"message": event.Message,
 		})
-		return false, nil
+		return true
 	case "portmap_error", "session_error":
 		if event.Kind == "portmap_error" {
 			logging.Warn("⚠️ The router did not open the listening port automatically (UPnP/NAT-PMP); downloads work but may find fewer users",
@@ -3169,606 +3200,644 @@ func HandleTorrentEvent(cfg *Config, torrents TorrentSession, db *Database, move
 		} else {
 			logging.Warn("⚠️ Torrent engine problem: " + event.Message)
 		}
+		return true
+	}
+	return false
+}
+
+// tevUnregisteredEvent handles an event of a torrent with no release behind
+// it: added by hand or by another program.
+func tevUnregisteredEvent(db *Database, notifier *Notifier, event models.TorrentEvent) (bool, error) {
+	// Expected for manually added or foreign torrents: not an error. Still
+	// mark the row completed so it does not stay "downloading" forever, but
+	// without an archive path (the files are not moved).
+	if event.Kind == "torrent_finished" {
+		firstCompletion, err := db.MarkTorrentCompletedUnarchived(event.Hash, event.Name)
+		if err != nil {
+			logging.Debug("cannot mark foreign torrent completed",
+				"hash", event.Hash, "error", err.Error())
+			return false, err
+		}
+		if firstCompletion {
+			path := CompletionPath(&event)
+			sizeBytes, _ := SizeOfPath(path)
+			if err := notifier.NotifyEvent("torrent_completed", map[string]any{
+				"hash":       event.Hash,
+				"name":       event.Name,
+				"title":      event.Name,
+				"path":       path,
+				"size_bytes": sizeBytes,
+				"manual":     true,
+			}); err != nil {
+				logging.Warn("manual torrent completion notification failed",
+					"hash", event.Hash, "title", event.Name, "error", err)
+			} else {
+				logging.Debug("manual torrent completion notification sent",
+					"hash", event.Hash, "title", event.Name)
+			}
+		}
+		// A foreign torrent can emit this lifecycle alert again after a
+		// session refresh/restart. Completion is not an actionable change for
+		// the user; the INFO log is reserved for the later removal from the
+		// sharing session.
+		logging.Debug(fmt.Sprintf("torrent completed (no release metadata, kept in place) — «%s»", event.Name))
+	}
+	logging.Debug("torrent alert has no registered release metadata",
+		"hash", event.Hash, "kind", event.Kind, "name", event.Name)
+	return false, nil
+}
+
+// A release whose size is unknown at `add()` is staged off the RAM disk;
+// once metadata arrives the real size decides: it is moved onto the RAM
+// disk when it fits, and out of it when it no longer does.
+func tevMetadataReceived(cfg *Config, torrents TorrentSession, db *Database, metadata *models.TorrentMeta, event models.TorrentEvent) (bool, error) {
+	// The indexer title can disagree with the torrent's real name (for
+	// example S06 in Jackett while the payload is S05). Reject this before
+	// pieces are downloaded; completion-time validation is still kept as a
+	// second line of defence.
+	if metadata.Release.IsPack {
+		corrected := ReconcilePackIdentity(&metadata.Release, event.Name)
+		if corrected != nil && !tevOptionalInt64Equal(corrected.Season, metadata.Release.Season) {
+			errorMessage := "torrent metadata season does not match declared season"
+			logging.Warn("rejecting season pack before download: metadata identity mismatch",
+				"hash", event.Hash,
+				"declared_season", metadata.Release.Season,
+				"torrent_season", corrected.Season,
+				"name", event.Name,
+			)
+			if err := db.MarkTorrentError(event.Hash, errorMessage); err != nil {
+				return false, err
+			}
+			if err := db.Blocklist(&metadata.Release, "season_pack_identity_mismatch"); err != nil {
+				return false, err
+			}
+			if _, err := torrents.Remove(event.Hash, true); err != nil {
+				logging.Warn("failed to remove mismatched season pack",
+					"hash", event.Hash, "error", err.Error())
+			}
+			return false, nil
+		}
+	}
+	for _, torrent := range torrents.List() {
+		if strings.EqualFold(torrent.Hash, event.Hash) {
+			logging.Debug(fmt.Sprintf("📦 Download metadata received — «%s» · %s (torrent: %s)",
+				metadata.Release.Title, logging.HumanBytesI64(torrent.TotalSize), torrent.Name))
+			break
+		}
+	}
+	tevEnforceRamdiskCapacity(cfg, torrents, &event)
+	tevAdmitToRamdisk(cfg, torrents, &event)
+	return false, nil
+}
+
+// tevTorrentFinished handles the end of a download: an episode kept for its
+// seed or imported, a season pack, a film, or the move into the library.
+func tevTorrentFinished(cfg *Config, torrents TorrentSession, db *Database, moveRequests map[string]struct{}, retries map[string]StorageMoveRetry, metadata *models.TorrentMeta, event models.TorrentEvent, tmdb *TmdbClient, notifier *Notifier) (bool, error) {
+	// Completion can be triggered twice (a recovered event after a
+	// restart, or storage_moved): never post-process an already archived
+	// release again. A "completed" row whose file is missing is re-processed
+	// instead of being skipped forever.
+	if tevIgnoreRepeatedCompletion(db, event.Hash) {
 		return false, nil
 	}
-	metadata, err := db.TorrentMeta(event.Hash)
+	if tevSeedingCompletionAlreadyRecorded(db, event.Hash) {
+		logging.Debug("ignoring duplicate completion while single episode is seeding", "name", event.Name)
+		return false, nil
+	}
+	release := metadata.Release
+	// A download queued by hand from an eD2k result was registered without
+	// its identity (only the file name): parse it now, or an episode would
+	// miss its series branch and the library import.
+	identifyRelease(&release)
+	source := CompletionPath(&event)
+	corrected := ReconcilePackIdentity(&release, event.Name)
+	if corrected == nil {
+		corrected = tevReconcilePackIdentityFromFiles(&release, source)
+	}
+	if corrected != nil {
+		logging.Warn("correcting season-pack identity from the actual torrent name",
+			"hash", event.Hash,
+			"title", release.Title,
+			"torrent_name", event.Name,
+			"declared_season", release.Season,
+			"torrent_season", corrected.Season,
+		)
+		if err := db.ReconcilePackRelease(event.Hash, corrected, cfg); err != nil {
+			return false, err
+		}
+		release = *corrected
+	}
+	normalizeReleaseSeries(cfg, &release)
+	archiveDestination, hasArchiveDestination := ConfiguredDestinationFor(&release, cfg)
+	destination, _ := DestinationFor(&release, cfg)
+	current := event.SavePath
+	if release.Kind == "series" && !release.IsPack {
+		if handled, processed, err := tevFinishedEpisode(cfg, torrents, db, &event, &release, source, archiveDestination, hasArchiveDestination, tmdb, notifier); handled {
+			return processed, err
+		}
+	}
+	if release.IsPack {
+		return tevFinishedPack(cfg, torrents, db, &event, &release, source, destination, hasArchiveDestination, tmdb, notifier)
+	}
+	if SamePath(current, destination) {
+		return tevCompleteTorrent(cfg, db, torrents, &event, &release, tmdb)
+	}
+	// A session that cannot relocate storage (aMule's eD2k queue) imports the
+	// movie by link or copy, like an episode in copy mode: the quality gate
+	// below still runs before anything reaches the library, and the download
+	// stays in aMule's incoming folder so it keeps being shared.
+	if release.Kind == "movie" && tevImportsByCopy(torrents) {
+		if hasArchiveDestination {
+			return tevCompleteMovieWithArchive(cfg, db, torrents, &event, &release, archiveDestination, tmdb, false)
+		}
+		size, sizeErr := SizeOfPath(source)
+		if sizeErr != nil {
+			return false, sizeErr
+		}
+		if err := db.MarkReleaseCompleted(&release, source, size); err != nil {
+			return false, err
+		}
+		logging.Info(fmt.Sprintf("🎉 «%s» downloaded; no library folder is set for it, so it stays in %s", event.Name, source), "hash", event.Hash)
+		return true, nil
+	}
+	// aMule has no seed policy in Gextto: in move mode its completed movie
+	// is moved now, either to the library or, without a library folder, it
+	// is left in the incoming folder and marked complete.
+	if release.Kind == "movie" && tevMovesCompletedImmediately(torrents) {
+		if hasArchiveDestination {
+			// An unlimited seed keeps the movie in aMule's incoming folder,
+			// shared, and imports a copy, as for its episodes.
+			move := settingsBool(cfg, "move_episodes", false) && !tevSeedsForeverByPolicy(cfg, db, torrents, event.Hash)
+			return tevCompleteMovieWithArchive(cfg, db, torrents, &event, &release, archiveDestination, tmdb, move)
+		}
+		size, sizeErr := SizeOfPath(source)
+		if sizeErr != nil {
+			return false, sizeErr
+		}
+		if err := db.MarkReleaseCompleted(&release, source, size); err != nil {
+			return false, err
+		}
+		logging.Info(fmt.Sprintf("🎉 «%s» downloaded; no library folder is set for it, so it stays in %s", event.Name, source), "hash", event.Hash)
+		return true, nil
+	}
+	// Movies are always relocated to the configured destination (or to the
+	// default download volume when no archive is set); unlike episodes they
+	// do not have a separate copy-mode deferral.
+	if release.Kind == "movie" && hasArchiveDestination && settingsBool(cfg, "move_episodes", false) {
+		// Move mode: keep the movie in the download folder so the torrent can
+		// seed; the move and rename into the library happen at the end of the
+		// seed (see EnforceSeedPolicy). The release is marked downloaded now
+		// (without an archive path) so the gap filler does not fetch it again.
+		size, sizeErr := SizeOfPath(source)
+		if sizeErr != nil {
+			return false, sizeErr
+		}
+		if err := db.MarkReleaseCompleted(&release, "", size); err != nil {
+			return false, err
+		}
+		tevNotifySeeding(db, notifier, &event, &release, source, size)
+		logging.Info(fmt.Sprintf("🎉 %s downloaded. It stays in the download folder while it is shared, then moves to the library", logTarget(&release)),
+			"folder", source, "hash", event.Hash)
+		return false, nil
+	}
+	// aMule cannot relocate a download: a file that reaches this point (no
+	// series or film Gextto recognises) stays in its incoming folder, still
+	// shared, and the download is closed instead of retrying a move that
+	// can never succeed.
+	if tevMovesCompletedImmediately(torrents) {
+		size, sizeErr := SizeOfPath(source)
+		if sizeErr != nil {
+			return false, sizeErr
+		}
+		if err := db.MarkReleaseCompleted(&release, source, size); err != nil {
+			return false, err
+		}
+		logging.Info(fmt.Sprintf("🎉 «%s» downloaded; Gextto does not recognise it as an episode or a film of your library, so it stays in %s", event.Name, source), "hash", event.Hash)
+		return true, nil
+	}
+	return tevRequestLibraryMove(cfg, torrents, moveRequests, retries, &event, &release, current, destination)
+}
+
+// tevHandled marks a completion result as final for tevFinishedEpisode.
+func tevHandled(processed bool, err error) (bool, bool, error) {
+	return true, processed, err
+}
+
+// tevFinishedEpisode completes a single episode whose file is on disk. handled
+// is false when the episode goes on like any other download (the rename in
+// place, or the move into the library).
+func tevFinishedEpisode(cfg *Config, torrents TorrentSession, db *Database, event *models.TorrentEvent, release *models.Release, source, archiveDestination string, hasArchiveDestination bool, tmdb *TmdbClient, notifier *Notifier) (handled bool, processed bool, err error) {
+	if sourceInfo, sourceErr := os.Stat(source); sourceErr == nil {
+		if !hasArchiveDestination {
+			size, sizeErr := SizeOfPath(source)
+			if sizeErr != nil {
+				return true, false, sizeErr
+			}
+			if err := db.MarkReleaseCompleted(release, source, size); err != nil {
+				return true, false, err
+			}
+			logging.Info(fmt.Sprintf("🎉 «%s» downloaded; no library folder is set for it, so it stays in %s", event.Name, source), "hash", event.Hash)
+			return true, true, nil
+		}
+		// For eD2k the seed policy is the configured one (seed rules and
+		// global limits): with an unlimited seed the episode is copied and
+		// aMule keeps sharing it, as a torrent seeding forever.
+		if sourceInfo.IsDir() || !settingsBool(cfg, "move_episodes", false) || tevSeedsForeverByPolicy(cfg, db, torrents, event.Hash) {
+			// Folder episodes, single files in copy mode, and any torrent
+			// configured to seed forever are imported by copying the video
+			// while the source stays in the download folder for seeding.
+			return tevHandled(tevCompleteEpisodeFolderWithArchive(cfg, db, torrents, event, release, archiveDestination, tmdb, false))
+		}
+		// aMule has no seed policy in Gextto: with move mode on, the eD2k
+		// source is moved at completion instead of being kept for a seed
+		// that Gextto cannot end.
+		if tevMovesCompletedImmediately(torrents) {
+			return tevHandled(tevCompleteEpisodeFolderWithArchive(cfg, db, torrents, event, release, archiveDestination, tmdb, true))
+		}
+		// Move mode: keep the source in the download folder so the torrent
+		// can actually seed; the move and rename into the library happen at
+		// the end of the seed (see EnforceSeedPolicy). The episode is marked
+		// downloaded now (without an archive path, so the library still looks
+		// empty) so the gap filler does not fetch it again while it seeds.
+		// When the archive destination IS the download folder there is
+		// nothing to move: fall through to the in-place rename below.
+		if !SamePath(filepath.Dir(source), archiveDestination) {
+			size, sizeErr := SizeOfPath(source)
+			if sizeErr != nil {
+				return true, false, sizeErr
+			}
+			if err := db.MarkReleaseCompleted(release, "", size); err != nil {
+				return true, false, err
+			}
+			tevLogDownloadComplete(db, event, release, source, size)
+			tevNotifySeeding(db, notifier, event, release, source, size)
+			return true, false, nil
+		}
+	}
+	return false, false, nil
+}
+
+// tevFinishedPack imports a completed season pack: the files matching the
+// declared season are copied into the library, the torrent keeps its tree to
+// seed.
+func tevFinishedPack(cfg *Config, torrents TorrentSession, db *Database, event *models.TorrentEvent, release *models.Release, source, destination string, hasArchiveDestination bool, tmdb *TmdbClient, notifier *Notifier) (bool, error) {
+	size, err := SizeOfPath(source)
 	if err != nil {
 		return false, err
 	}
-	if metadata == nil {
-		// Expected for manually added or foreign torrents: not an error. Still
-		// mark the row completed so it does not stay "downloading" forever, but
-		// without an archive path (the files are not moved).
-		if event.Kind == "torrent_finished" {
-			firstCompletion, err := db.MarkTorrentCompletedUnarchived(event.Hash, event.Name)
-			if err != nil {
-				logging.Debug("cannot mark foreign torrent completed",
-					"hash", event.Hash, "error", err.Error())
-				return false, err
-			}
-			if firstCompletion {
-				path := CompletionPath(&event)
-				sizeBytes, _ := SizeOfPath(path)
-				if err := notifier.NotifyEvent("torrent_completed", map[string]any{
-					"hash":       event.Hash,
-					"name":       event.Name,
-					"title":      event.Name,
-					"path":       path,
-					"size_bytes": sizeBytes,
-					"manual":     true,
-				}); err != nil {
-					logging.Warn("manual torrent completion notification failed",
-						"hash", event.Hash, "title", event.Name, "error", err)
-				} else {
-					logging.Debug("manual torrent completion notification sent",
-						"hash", event.Hash, "title", event.Name)
-				}
-			}
-			// A foreign torrent can emit this lifecycle alert again after a
-			// session refresh/restart. Completion is not an actionable change for
-			// the user; the INFO log is reserved for the later removal from the
-			// sharing session.
-			logging.Debug(fmt.Sprintf("torrent completed (no release metadata, kept in place) — «%s»", event.Name))
-		}
-		logging.Debug("torrent alert has no registered release metadata",
-			"hash", event.Hash, "kind", event.Kind, "name", event.Name)
-		return false, nil
+	matching, err := MatchingPackFiles(source, release)
+	if err != nil {
+		return false, err
 	}
-	switch event.Kind {
-	// A release whose size is unknown at `add()` is staged off the RAM disk;
-	// once metadata arrives the real size decides: it is moved onto the RAM
-	// disk when it fits, and out of it when it no longer does.
-	case "metadata_received":
-		// The indexer title can disagree with the torrent's real name (for
-		// example S06 in Jackett while the payload is S05). Reject this before
-		// pieces are downloaded; completion-time validation is still kept as a
-		// second line of defence.
-		if metadata.Release.IsPack {
-			corrected := ReconcilePackIdentity(&metadata.Release, event.Name)
-			if corrected != nil && !tevOptionalInt64Equal(corrected.Season, metadata.Release.Season) {
-				errorMessage := "torrent metadata season does not match declared season"
-				logging.Warn("rejecting season pack before download: metadata identity mismatch",
-					"hash", event.Hash,
-					"declared_season", metadata.Release.Season,
-					"torrent_season", corrected.Season,
-					"name", event.Name,
-				)
-				if err := db.MarkTorrentError(event.Hash, errorMessage); err != nil {
-					return false, err
-				}
-				if err := db.Blocklist(&metadata.Release, "season_pack_identity_mismatch"); err != nil {
-					return false, err
-				}
-				if _, err := torrents.Remove(event.Hash, true); err != nil {
-					logging.Warn("failed to remove mismatched season pack",
-						"hash", event.Hash, "error", err.Error())
-				}
-				return false, nil
-			}
+	if len(matching) == 0 {
+		errorMessage := "season pack filenames do not match declared season"
+		declaredSeason := "unknown"
+		if release.Season != nil {
+			declaredSeason = strconv.FormatInt(*release.Season, 10)
 		}
-		for _, torrent := range torrents.List() {
-			if strings.EqualFold(torrent.Hash, event.Hash) {
-				logging.Debug(fmt.Sprintf("📦 Download metadata received — «%s» · %s (torrent: %s)",
-					metadata.Release.Title, logging.HumanBytesI64(torrent.TotalSize), torrent.Name))
-				break
-			}
-		}
-		tevEnforceRamdiskCapacity(cfg, torrents, &event)
-		tevAdmitToRamdisk(cfg, torrents, &event)
-		return false, nil
-	case "torrent_finished":
-		// Completion can be triggered twice (a recovered event after a
-		// restart, or storage_moved): never post-process an already archived
-		// release again. A "completed" row whose file is missing is re-processed
-		// instead of being skipped forever.
-		if tevIgnoreRepeatedCompletion(db, event.Hash) {
-			return false, nil
-		}
-		if tevSeedingCompletionAlreadyRecorded(db, event.Hash) {
-			logging.Debug("ignoring duplicate completion while single episode is seeding", "name", event.Name)
-			return false, nil
-		}
-		release := metadata.Release
-		// A download queued by hand from an eD2k result was registered without
-		// its identity (only the file name): parse it now, or an episode would
-		// miss its series branch and the library import.
-		identifyRelease(&release)
-		source := CompletionPath(&event)
-		corrected := ReconcilePackIdentity(&release, event.Name)
-		if corrected == nil {
-			corrected = tevReconcilePackIdentityFromFiles(&release, source)
-		}
-		if corrected != nil {
-			logging.Warn("correcting season-pack identity from the actual torrent name",
-				"hash", event.Hash,
-				"title", release.Title,
-				"torrent_name", event.Name,
-				"declared_season", release.Season,
-				"torrent_season", corrected.Season,
-			)
-			if err := db.ReconcilePackRelease(event.Hash, corrected, cfg); err != nil {
-				return false, err
-			}
-			release = *corrected
-		}
-		normalizeReleaseSeries(cfg, &release)
-		archiveDestination, hasArchiveDestination := ConfiguredDestinationFor(&release, cfg)
-		destination, _ := DestinationFor(&release, cfg)
-		current := event.SavePath
-		if release.Kind == "series" && !release.IsPack {
-			if sourceInfo, sourceErr := os.Stat(source); sourceErr == nil {
-				if !hasArchiveDestination {
-					size, sizeErr := SizeOfPath(source)
-					if sizeErr != nil {
-						return false, sizeErr
-					}
-					if err := db.MarkReleaseCompleted(&release, source, size); err != nil {
-						return false, err
-					}
-					logging.Info(fmt.Sprintf("🎉 «%s» downloaded; no library folder is set for it, so it stays in %s", event.Name, source), "hash", event.Hash)
-					return true, nil
-				}
-				// For eD2k the seed policy is the configured one (seed rules and
-				// global limits): with an unlimited seed the episode is copied and
-				// aMule keeps sharing it, as a torrent seeding forever.
-				if sourceInfo.IsDir() || !settingsBool(cfg, "move_episodes", false) || tevSeedsForeverByPolicy(cfg, db, torrents, event.Hash) {
-					// Folder episodes, single files in copy mode, and any torrent
-					// configured to seed forever are imported by copying the video
-					// while the source stays in the download folder for seeding.
-					return tevCompleteEpisodeFolderWithArchive(cfg, db, torrents, &event, &release, archiveDestination, tmdb, false)
-				}
-				// aMule has no seed policy in Gextto: with move mode on, the eD2k
-				// source is moved at completion instead of being kept for a seed
-				// that Gextto cannot end.
-				if tevMovesCompletedImmediately(torrents) {
-					return tevCompleteEpisodeFolderWithArchive(cfg, db, torrents, &event, &release, archiveDestination, tmdb, true)
-				}
-				// Move mode: keep the source in the download folder so the torrent
-				// can actually seed; the move and rename into the library happen at
-				// the end of the seed (see EnforceSeedPolicy). The episode is marked
-				// downloaded now (without an archive path, so the library still looks
-				// empty) so the gap filler does not fetch it again while it seeds.
-				// When the archive destination IS the download folder there is
-				// nothing to move: fall through to the in-place rename below.
-				if !SamePath(filepath.Dir(source), archiveDestination) {
-					size, sizeErr := SizeOfPath(source)
-					if sizeErr != nil {
-						return false, sizeErr
-					}
-					if err := db.MarkReleaseCompleted(&release, "", size); err != nil {
-						return false, err
-					}
-					tevLogDownloadComplete(db, &event, &release, source, size)
-					tevNotifySeeding(db, notifier, &event, &release, source, size)
-					return false, nil
-				}
-			}
-		}
-		if release.IsPack {
-			size, err := SizeOfPath(source)
-			if err != nil {
-				return false, err
-			}
-			matching, err := MatchingPackFiles(source, &release)
-			if err != nil {
-				return false, err
-			}
-			if len(matching) == 0 {
-				errorMessage := "season pack filenames do not match declared season"
-				declaredSeason := "unknown"
-				if release.Season != nil {
-					declaredSeason = strconv.FormatInt(*release.Season, 10)
-				}
-				logging.Warn("season pack rejected: files do not match the declared season",
-					"hash", event.Hash,
-					"name", event.Name,
-					"title", release.Title,
-					"declared_season", declaredSeason,
-					"source", source,
-				)
-				if err := db.MarkTorrentError(event.Hash, errorMessage); err != nil {
-					return false, err
-				}
-				// A completed pack whose files contradict its declared season
-				// is a bad indexer identity, not a transient download failure.
-				if err := db.Blocklist(&release, "season_pack_identity_mismatch"); err != nil {
-					return false, err
-				}
-				tevDiscardCompletedSource(cfg, db, torrents, &event, errorMessage)
-				return false, nil
-			}
-			if !hasArchiveDestination {
-				entries := make([]PackEpisode, 0, len(matching))
-				for _, file := range matching {
-					fileSize, sizeErr := SizeOfPath(file.Path)
-					if sizeErr != nil {
-						return false, sizeErr
-					}
-					entries = append(entries, PackEpisode{
-						Episode:   file.Episode,
-						Path:      file.Path,
-						SizeBytes: fileSize,
-						Score:     cfg.ReleaseScore(&release),
-					})
-				}
-				if err := db.MarkPackCompleted(&release, entries, source, size); err != nil {
-					return false, err
-				}
-				logging.Info(fmt.Sprintf("🎉 «%s» downloaded (%s); no library folder is set for it, so it stays in %s",
-					event.Name, countLabel(len(entries), "episode", "episodes"), source), "hash", event.Hash)
-				return true, nil
-			}
-			// Serialize against the periodic/manual rename repair for this
-			// series: it scans the archive and would otherwise rename/trash
-			// files while they are still being copied.
-			guard := AcquireArchiveImport(release.Series)
-			defer guard.Release()
-			processed := []PackFileResult{}
-			// Enumerate the destination once and reuse it for every episode:
-			// each episode's "is there a better existing file?" check walks the
-			// directory, and a full-season pack would otherwise re-walk it N
-			// times on the (possibly slow) archive mount.
-			destinationFiles, _ := VideoFiles(destination)
-			for index := range matching {
-				file := matching[index]
-				placed, ok, err := StagePackFile(&file, source, destination, destinationFiles, cfg, release.Quality)
-				if err != nil {
-					return false, err
-				}
-				if !ok {
-					processed = append(processed, PackFileResult{
-						Episode:   file.Episode,
-						Path:      file.Path,
-						Discarded: true,
-					})
-					continue
-				}
-				partial, err := ProcessPackFiles(context.Background(), []PackInput{{Path: placed, Source: file}}, &release, cfg, tmdb)
-				if err != nil {
-					return false, err
-				}
-				processed = append(processed, partial...)
-			}
-			allDiscarded := tevAllPackFilesDiscarded(processed)
-			if allDiscarded {
-				restored, err := db.RestoreUpgrade(event.Hash)
-				if err != nil {
-					return false, err
-				}
-				if !restored {
-					if err := db.RollbackRelease(&release); err != nil {
-						return false, err
-					}
-				}
-				if err := db.MarkTorrentError(event.Hash, "season pack inferior to existing files"); err != nil {
-					return false, err
-				}
-				logging.Warn(fmt.Sprintf("🗑️ Season pack rejected — «%s» · no episodes kept · discarded %d: %s",
-					release.Title, len(processed), tevPackFileNames(processed)), "hash", event.Hash)
-				// Esito definitivo: il pack è stato scartato per intero. Esce
-				// dalla sessione e la sorgente va nel cestino.
-				tevDiscardCompletedSource(cfg, db, torrents, &event, "season pack inferior to existing files")
-				return false, nil
-			}
-			entries := []PackEpisode{}
-			// Separate the episodes the pack adds from those it upgrades: a
-			// pack often arrives right after a single episode was downloaded
-			// and replaces that lower-quality copy. Telling them apart is what
-			// makes the notification honest ("still new" vs "replaced").
-			newEpisodes := []any{}
-			upgradedList := []any{}
-			for _, item := range processed {
-				if item.Discarded {
-					continue
-				}
-				entries = append(entries, PackEpisode{
-					Episode:   item.Episode,
-					Path:      item.Path,
-					SizeBytes: item.SizeBytes,
-					Score:     item.QualityScore,
-				})
-				entry := map[string]any{
-					"series":  release.Series,
-					"season":  release.Season,
-					"episode": item.Episode,
-					"path":    item.Path,
-				}
-				if item.Upgrade {
-					upgradedList = append(upgradedList, entry)
-					continue
-				}
-				newEpisodes = append(newEpisodes, entry)
-			}
-			if err := db.MarkPackCompleted(&release, entries, destination, size); err != nil {
-				return false, err
-			}
-			logging.Info(fmt.Sprintf("🎉 %s complete: %s (%s) added to the library in %s",
-				logTarget(&release), countLabel(len(entries), "episode", "episodes"), logging.HumanBytesI64(size), destination), "hash", event.Hash)
-			if release.Series != nil && release.Season != nil {
-				for _, item := range processed {
-					if item.Discarded {
-						continue
-					}
-					logMediaIntegrityReplacement(db, event.Hash, "episode", *release.Series, *release.Season, item.Episode, "", 0, release.Title, item.Path)
-				}
-			}
-			// Detail per file: which episodes were kept and which were discarded.
-			// The Python original logged this per file; the Rust port only kept
-			// the counts, which made a rejected episode impossible to trace.
-			keptDetail := []PackFileResult{}
-			discardedDetail := []PackFileResult{}
-			upgradedDetail := []PackFileResult{}
-			trashCount := 0
-			for _, item := range processed {
-				if item.Discarded {
-					discardedDetail = append(discardedDetail, item)
-				} else {
-					keptDetail = append(keptDetail, item)
-					if item.Upgrade {
-						upgradedDetail = append(upgradedDetail, item)
-					}
-					trashCount += item.TrashCount
-				}
-			}
-			cleanupLabel := "moved to trash"
-			if cfg.CleanupAction == "delete" {
-				cleanupLabel = "deleted"
-			}
-			logging.Debug(fmt.Sprintf("season pack detail — kept %d: %s · upgrades %d: %s · %s: %d file(s) · discarded %d: %s",
-				len(keptDetail), tevPackFileNames(keptDetail),
-				len(upgradedDetail), tevPackFileNames(upgradedDetail), cleanupLabel, trashCount,
-				len(discardedDetail), tevPackFileNames(discardedDetail)))
-			discardedCount := len(discardedDetail)
-			discardedList := []any{}
-			for _, item := range discardedDetail {
-				discardedList = append(discardedList, map[string]any{
-					"episode": item.Episode,
-					"path":    item.Path,
-					"name":    filepath.Base(item.Path),
-				})
-			}
-			notificationErr := notifier.NotifyEvent("season_pack_completed", map[string]any{
-				"series":          release.Series,
-				"season":          release.Season,
-				"title":           release.Title,
-				"path":            destination,
-				"size_bytes":      size,
-				"new_count":       len(newEpisodes),
-				"upgraded_count":  len(upgradedList),
-				"discarded_count": discardedCount,
-				"episodes":        newEpisodes,
-				"upgraded":        upgradedList,
-				"discarded":       discardedList,
-			})
-			if notificationErr != nil {
-				logging.Warn("completion notification failed",
-					"hash", event.Hash, "name", event.Name, "event", "season_pack_completed", "error", notificationErr.Error())
-			} else {
-				logging.Debug("completion notification sent",
-					"hash", event.Hash, "name", event.Name, "event", "season_pack_completed")
-			}
-			// A pack is copied into the library, never moved out of its torrent
-			// storage here: libtorrent must retain the exact original tree to
-			// seed and verify it.
-			logging.Debug(fmt.Sprintf("season pack copied to NAS, source kept for seeding · %s · %s",
-				logging.HumanBytesI64(size), destination))
-			return true, nil
-		}
-		if SamePath(current, destination) {
-			return tevCompleteTorrent(cfg, db, torrents, &event, &release, tmdb)
-		}
-		// A session that cannot relocate storage (aMule's eD2k queue) imports the
-		// movie by link or copy, like an episode in copy mode: the quality gate
-		// below still runs before anything reaches the library, and the download
-		// stays in aMule's incoming folder so it keeps being shared.
-		if release.Kind == "movie" && tevImportsByCopy(torrents) {
-			if hasArchiveDestination {
-				return tevCompleteMovieWithArchive(cfg, db, torrents, &event, &release, archiveDestination, tmdb, false)
-			}
-			size, sizeErr := SizeOfPath(source)
-			if sizeErr != nil {
-				return false, sizeErr
-			}
-			if err := db.MarkReleaseCompleted(&release, source, size); err != nil {
-				return false, err
-			}
-			logging.Info(fmt.Sprintf("🎉 «%s» downloaded; no library folder is set for it, so it stays in %s", event.Name, source), "hash", event.Hash)
-			return true, nil
-		}
-		// aMule has no seed policy in Gextto: in move mode its completed movie
-		// is moved now, either to the library or, without a library folder, it
-		// is left in the incoming folder and marked complete.
-		if release.Kind == "movie" && tevMovesCompletedImmediately(torrents) {
-			if hasArchiveDestination {
-				// An unlimited seed keeps the movie in aMule's incoming folder,
-				// shared, and imports a copy, as for its episodes.
-				move := settingsBool(cfg, "move_episodes", false) && !tevSeedsForeverByPolicy(cfg, db, torrents, event.Hash)
-				return tevCompleteMovieWithArchive(cfg, db, torrents, &event, &release, archiveDestination, tmdb, move)
-			}
-			size, sizeErr := SizeOfPath(source)
-			if sizeErr != nil {
-				return false, sizeErr
-			}
-			if err := db.MarkReleaseCompleted(&release, source, size); err != nil {
-				return false, err
-			}
-			logging.Info(fmt.Sprintf("🎉 «%s» downloaded; no library folder is set for it, so it stays in %s", event.Name, source), "hash", event.Hash)
-			return true, nil
-		}
-		// Movies are always relocated to the configured destination (or to the
-		// default download volume when no archive is set); unlike episodes they
-		// do not have a separate copy-mode deferral.
-		if release.Kind == "movie" && hasArchiveDestination && settingsBool(cfg, "move_episodes", false) {
-			// Move mode: keep the movie in the download folder so the torrent can
-			// seed; the move and rename into the library happen at the end of the
-			// seed (see EnforceSeedPolicy). The release is marked downloaded now
-			// (without an archive path) so the gap filler does not fetch it again.
-			size, sizeErr := SizeOfPath(source)
-			if sizeErr != nil {
-				return false, sizeErr
-			}
-			if err := db.MarkReleaseCompleted(&release, "", size); err != nil {
-				return false, err
-			}
-			tevNotifySeeding(db, notifier, &event, &release, source, size)
-			logging.Info(fmt.Sprintf("🎉 %s downloaded. It stays in the download folder while it is shared, then moves to the library", logTarget(&release)),
-				"folder", source, "hash", event.Hash)
-			return false, nil
-		}
-		// aMule cannot relocate a download: a file that reaches this point (no
-		// series or film Gextto recognises) stays in its incoming folder, still
-		// shared, and the download is closed instead of retrying a move that
-		// can never succeed.
-		if tevMovesCompletedImmediately(torrents) {
-			size, sizeErr := SizeOfPath(source)
-			if sizeErr != nil {
-				return false, sizeErr
-			}
-			if err := db.MarkReleaseCompleted(&release, source, size); err != nil {
-				return false, err
-			}
-			logging.Info(fmt.Sprintf("🎉 «%s» downloaded; Gextto does not recognise it as an episode or a film of your library, so it stays in %s", event.Name, source), "hash", event.Hash)
-			return true, nil
-		}
-		if _, exists := moveRequests[event.Hash]; exists {
-			return false, nil
-		}
-		moveRequests[event.Hash] = struct{}{}
-		if err := ValidateDestinationFrom(current, destination); err != nil {
-			return false, err
-		}
-		logging.Debug("📁 MOVING TO NAS — completed download leaves the work folder",
+		logging.Warn("season pack rejected: files do not match the declared season",
 			"hash", event.Hash,
 			"name", event.Name,
 			"title", release.Title,
-			"from", current,
-			"to", destination,
+			"declared_season", declaredSeason,
+			"source", source,
 		)
-		moved, err := torrents.MoveStorage(event.Hash, destination)
-		if err != nil {
-			delete(moveRequests, event.Hash)
-			fallbackDestination := cfg.DownloadDir
-			if alternative, ok := DestinationFor(&release, cfg); ok {
-				fallbackDestination = alternative
-			}
-			tevScheduleStorageMoveRetry(retries, event.Hash, fallbackDestination, false, time.Now())
-			logging.Warn(fmt.Sprintf("⚠️ Could not move the completed «%s»: it will be retried", event.Name), "hash", event.Hash, "error", err)
-		} else if moved {
-			retries[strings.ToLower(event.Hash)] = StorageMoveRetry{
-				destination: destination,
-				postSeed:    false,
-				attempts:    0,
-				nextAttempt: time.Now().Add(600 * time.Second),
-				inFlight:    true,
-			}
-		} else {
-			delete(moveRequests, event.Hash)
+		if err := db.MarkTorrentError(event.Hash, errorMessage); err != nil {
+			return false, err
 		}
-		return false, nil
-	case "storage_move_failed":
-		delete(moveRequests, event.Hash)
-		existing, hasExisting := retries[strings.ToLower(event.Hash)]
-		statusAtFailure, _ := db.TorrentStatus(event.Hash)
-		wasPostSeedMove := false
-		if hasExisting && existing.postSeed {
-			wasPostSeedMove = true
+		// A completed pack whose files contradict its declared season
+		// is a bad indexer identity, not a transient download failure.
+		if err := db.Blocklist(release, "season_pack_identity_mismatch"); err != nil {
+			return false, err
 		}
-		if !wasPostSeedMove {
-			if _, ok := postSeedMoves[event.Hash]; ok {
-				delete(postSeedMoves, event.Hash)
-				wasPostSeedMove = true
-			}
-		}
-		if !wasPostSeedMove {
-			wasPostSeedMove = statusAtFailure != nil && *statusAtFailure == "completed"
-		}
-		// Unknown move failures belong to RAM-disk/manual relocation, not to
-		// completion import. Never guess the archive destination for a
-		// still-downloading torrent.
-		var destination *string
-		if hasExisting {
-			value := existing.destination
-			destination = &value
-		} else {
-			statusNow, _ := db.TorrentStatus(event.Hash)
-			if wasPostSeedMove || (statusNow != nil && *statusNow == "completed") {
-				value := cfg.DownloadDir
-				destination = &value
-			}
-		}
-		// A move that fails once the payload is already in the destination is
-		// not a real failure: the post-seed relocation and the archive import
-		// race, so libtorrent refuses to overwrite the archived copy. Treat it
-		// as done instead of warning and scheduling a retry that can only fail
-		// again. The rename itself already ran on storage_moved.
-		if destination != nil && tevStorageMoveAlreadySatisfied(torrents, db, event.Hash, *destination) {
-			logging.Debug("storage move already satisfied; not retrying",
-				"hash", event.Hash, "name", event.Name, "save_path", event.SavePath)
-			delete(retries, strings.ToLower(event.Hash))
-			delete(postSeedMoves, event.Hash)
-			return false, nil
-		}
-		logging.Warn(fmt.Sprintf("⚠️ Could not move «%s» to the library; it stays where it is and will be retried", event.Name),
-			"folder", event.SavePath, "error", strings.TrimSpace(event.Message), "hash", event.Hash)
-		if destination != nil {
-			tevScheduleStorageMoveRetry(retries, event.Hash, *destination, wasPostSeedMove, time.Now())
-			if wasPostSeedMove {
-				postSeedMoves[event.Hash] = struct{}{}
-			}
-		}
-		return false, nil
-	case "storage_moved":
-		logging.Debug("torrent storage move completed",
-			"hash", event.Hash, "name", event.Name, "save_path", event.SavePath)
-		// Save the new location now instead of at the next periodic save: if
-		// Gextto stopped uncleanly in between, libtorrent would restore the
-		// torrent at its old path, recreate empty files there and download
-		// again what is already in the library.
-		if saver, ok := torrents.(interface{ RequestResumeSave() int }); ok {
-			saver.RequestResumeSave()
-		}
-		delete(postSeedMoves, event.Hash)
-		delete(retries, strings.ToLower(event.Hash))
-		// A post-seeding relocation happens after the release was already
-		// committed. Do not run rename/copy/pack processing a second time, but
-		// do re-process a "completed" torrent whose archived copy is missing.
-		if tevIgnoreRepeatedCompletion(db, event.Hash) {
-			delete(moveRequests, event.Hash)
-			return false, nil
-		}
-		var current *models.TorrentView
-		for _, torrent := range torrents.List() {
-			if strings.EqualFold(torrent.Hash, event.Hash) {
-				candidate := torrent
-				current = &candidate
-				break
-			}
-		}
-		isCompletedDB := false
-		if st, _ := db.TorrentStatus(event.Hash); st != nil && *st == "completed" {
-			isCompletedDB = true
-		}
-		done := isCompletedDB || (current != nil && current.Progress >= 99.99 && current.TotalSize > 0 && current.TotalDone >= current.TotalSize)
-		if !done {
-			delete(moveRequests, event.Hash)
-			// libtorrent pauses a torrent while it moves its data and does not
-			// always resume it; a relocation forced by the RAM-disk policy must
-			// not leave an incomplete download stopped forever.
-			if current != nil && current.State == "paused" && current.AutoManaged && current.Progress < 99.99 {
-				if resumed, rerr := torrents.Resume(event.Hash); rerr == nil && resumed {
-					logging.Info(fmt.Sprintf("▶️ «%s» resumed after its files were moved (%s done)", event.Name, logPercent(current.Progress)), "hash", event.Hash)
-				}
-				_, _ = torrents.Reannounce(event.Hash)
-			}
-			logging.Debug("ignoring storage move before torrent completion",
-				"hash", event.Hash, "name", event.Name)
-			return false, nil
-		}
-		delete(moveRequests, event.Hash)
-		return tevCompleteTorrent(cfg, db, torrents, &event, &metadata.Release, tmdb)
-	default:
+		tevDiscardCompletedSource(cfg, db, torrents, event, errorMessage)
 		return false, nil
 	}
+	if !hasArchiveDestination {
+		entries := make([]PackEpisode, 0, len(matching))
+		for _, file := range matching {
+			fileSize, sizeErr := SizeOfPath(file.Path)
+			if sizeErr != nil {
+				return false, sizeErr
+			}
+			entries = append(entries, PackEpisode{
+				Episode:   file.Episode,
+				Path:      file.Path,
+				SizeBytes: fileSize,
+				Score:     cfg.ReleaseScore(release),
+			})
+		}
+		if err := db.MarkPackCompleted(release, entries, source, size); err != nil {
+			return false, err
+		}
+		logging.Info(fmt.Sprintf("🎉 «%s» downloaded (%s); no library folder is set for it, so it stays in %s",
+			event.Name, countLabel(len(entries), "episode", "episodes"), source), "hash", event.Hash)
+		return true, nil
+	}
+	// Serialize against the periodic/manual rename repair for this
+	// series: it scans the archive and would otherwise rename/trash
+	// files while they are still being copied.
+	guard := AcquireArchiveImport(release.Series)
+	defer guard.Release()
+	processed := []PackFileResult{}
+	// Enumerate the destination once and reuse it for every episode:
+	// each episode's "is there a better existing file?" check walks the
+	// directory, and a full-season pack would otherwise re-walk it N
+	// times on the (possibly slow) archive mount.
+	destinationFiles, _ := VideoFiles(destination)
+	for index := range matching {
+		file := matching[index]
+		placed, ok, err := StagePackFile(&file, source, destination, destinationFiles, cfg, release.Quality)
+		if err != nil {
+			return false, err
+		}
+		if !ok {
+			processed = append(processed, PackFileResult{
+				Episode:   file.Episode,
+				Path:      file.Path,
+				Discarded: true,
+			})
+			continue
+		}
+		partial, err := ProcessPackFiles(context.Background(), []PackInput{{Path: placed, Source: file}}, release, cfg, tmdb)
+		if err != nil {
+			return false, err
+		}
+		processed = append(processed, partial...)
+	}
+	allDiscarded := tevAllPackFilesDiscarded(processed)
+	if allDiscarded {
+		restored, err := db.RestoreUpgrade(event.Hash)
+		if err != nil {
+			return false, err
+		}
+		if !restored {
+			if err := db.RollbackRelease(release); err != nil {
+				return false, err
+			}
+		}
+		if err := db.MarkTorrentError(event.Hash, "season pack inferior to existing files"); err != nil {
+			return false, err
+		}
+		logging.Warn(fmt.Sprintf("🗑️ Season pack rejected — «%s» · no episodes kept · discarded %d: %s",
+			release.Title, len(processed), tevPackFileNames(processed)), "hash", event.Hash)
+		// Esito definitivo: il pack è stato scartato per intero. Esce
+		// dalla sessione e la sorgente va nel cestino.
+		tevDiscardCompletedSource(cfg, db, torrents, event, "season pack inferior to existing files")
+		return false, nil
+	}
+	entries := []PackEpisode{}
+	// Separate the episodes the pack adds from those it upgrades: a
+	// pack often arrives right after a single episode was downloaded
+	// and replaces that lower-quality copy. Telling them apart is what
+	// makes the notification honest ("still new" vs "replaced").
+	newEpisodes := []any{}
+	upgradedList := []any{}
+	for _, item := range processed {
+		if item.Discarded {
+			continue
+		}
+		entries = append(entries, PackEpisode{
+			Episode:   item.Episode,
+			Path:      item.Path,
+			SizeBytes: item.SizeBytes,
+			Score:     item.QualityScore,
+		})
+		entry := map[string]any{
+			"series":  release.Series,
+			"season":  release.Season,
+			"episode": item.Episode,
+			"path":    item.Path,
+		}
+		if item.Upgrade {
+			upgradedList = append(upgradedList, entry)
+			continue
+		}
+		newEpisodes = append(newEpisodes, entry)
+	}
+	if err := db.MarkPackCompleted(release, entries, destination, size); err != nil {
+		return false, err
+	}
+	logging.Info(fmt.Sprintf("🎉 %s complete: %s (%s) added to the library in %s",
+		logTarget(release), countLabel(len(entries), "episode", "episodes"), logging.HumanBytesI64(size), destination), "hash", event.Hash)
+	if release.Series != nil && release.Season != nil {
+		for _, item := range processed {
+			if item.Discarded {
+				continue
+			}
+			logMediaIntegrityReplacement(db, event.Hash, "episode", *release.Series, *release.Season, item.Episode, "", 0, release.Title, item.Path)
+		}
+	}
+	// Detail per file: which episodes were kept and which were discarded.
+	// The Python original logged this per file; the Rust port only kept
+	// the counts, which made a rejected episode impossible to trace.
+	keptDetail := []PackFileResult{}
+	discardedDetail := []PackFileResult{}
+	upgradedDetail := []PackFileResult{}
+	trashCount := 0
+	for _, item := range processed {
+		if item.Discarded {
+			discardedDetail = append(discardedDetail, item)
+		} else {
+			keptDetail = append(keptDetail, item)
+			if item.Upgrade {
+				upgradedDetail = append(upgradedDetail, item)
+			}
+			trashCount += item.TrashCount
+		}
+	}
+	cleanupLabel := "moved to trash"
+	if cfg.CleanupAction == "delete" {
+		cleanupLabel = "deleted"
+	}
+	logging.Debug(fmt.Sprintf("season pack detail — kept %d: %s · upgrades %d: %s · %s: %d file(s) · discarded %d: %s",
+		len(keptDetail), tevPackFileNames(keptDetail),
+		len(upgradedDetail), tevPackFileNames(upgradedDetail), cleanupLabel, trashCount,
+		len(discardedDetail), tevPackFileNames(discardedDetail)))
+	discardedCount := len(discardedDetail)
+	discardedList := []any{}
+	for _, item := range discardedDetail {
+		discardedList = append(discardedList, map[string]any{
+			"episode": item.Episode,
+			"path":    item.Path,
+			"name":    filepath.Base(item.Path),
+		})
+	}
+	notificationErr := notifier.NotifyEvent("season_pack_completed", map[string]any{
+		"series":          release.Series,
+		"season":          release.Season,
+		"title":           release.Title,
+		"path":            destination,
+		"size_bytes":      size,
+		"new_count":       len(newEpisodes),
+		"upgraded_count":  len(upgradedList),
+		"discarded_count": discardedCount,
+		"episodes":        newEpisodes,
+		"upgraded":        upgradedList,
+		"discarded":       discardedList,
+	})
+	if notificationErr != nil {
+		logging.Warn("completion notification failed",
+			"hash", event.Hash, "name", event.Name, "event", "season_pack_completed", "error", notificationErr.Error())
+	} else {
+		logging.Debug("completion notification sent",
+			"hash", event.Hash, "name", event.Name, "event", "season_pack_completed")
+	}
+	// A pack is copied into the library, never moved out of its torrent
+	// storage here: libtorrent must retain the exact original tree to
+	// seed and verify it.
+	logging.Debug(fmt.Sprintf("season pack copied to NAS, source kept for seeding · %s · %s",
+		logging.HumanBytesI64(size), destination))
+	return true, nil
+}
+
+// tevRequestLibraryMove asks the engine to move a completed download into the
+// library, once: the import runs on storage_moved, a failure is retried.
+func tevRequestLibraryMove(cfg *Config, torrents TorrentSession, moveRequests map[string]struct{}, retries map[string]StorageMoveRetry, event *models.TorrentEvent, release *models.Release, current, destination string) (bool, error) {
+	if _, exists := moveRequests[event.Hash]; exists {
+		return false, nil
+	}
+	moveRequests[event.Hash] = struct{}{}
+	if err := ValidateDestinationFrom(current, destination); err != nil {
+		return false, err
+	}
+	logging.Debug("📁 MOVING TO NAS — completed download leaves the work folder",
+		"hash", event.Hash,
+		"name", event.Name,
+		"title", release.Title,
+		"from", current,
+		"to", destination,
+	)
+	moved, err := torrents.MoveStorage(event.Hash, destination)
+	if err != nil {
+		delete(moveRequests, event.Hash)
+		fallbackDestination := cfg.DownloadDir
+		if alternative, ok := DestinationFor(release, cfg); ok {
+			fallbackDestination = alternative
+		}
+		tevScheduleStorageMoveRetry(retries, event.Hash, fallbackDestination, false, time.Now())
+		logging.Warn(fmt.Sprintf("⚠️ Could not move the completed «%s»: it will be retried", event.Name), "hash", event.Hash, "error", err)
+	} else if moved {
+		retries[strings.ToLower(event.Hash)] = StorageMoveRetry{
+			destination: destination,
+			postSeed:    false,
+			attempts:    0,
+			nextAttempt: time.Now().Add(600 * time.Second),
+			inFlight:    true,
+		}
+	} else {
+		delete(moveRequests, event.Hash)
+	}
+	return false, nil
+}
+
+// tevStorageMoveFailed schedules a failed move again, unless the files already
+// reached the destination.
+func tevStorageMoveFailed(cfg *Config, torrents TorrentSession, db *Database, moveRequests map[string]struct{}, postSeedMoves map[string]struct{}, retries map[string]StorageMoveRetry, event models.TorrentEvent) (bool, error) {
+	delete(moveRequests, event.Hash)
+	existing, hasExisting := retries[strings.ToLower(event.Hash)]
+	statusAtFailure, _ := db.TorrentStatus(event.Hash)
+	wasPostSeedMove := false
+	if hasExisting && existing.postSeed {
+		wasPostSeedMove = true
+	}
+	if !wasPostSeedMove {
+		if _, ok := postSeedMoves[event.Hash]; ok {
+			delete(postSeedMoves, event.Hash)
+			wasPostSeedMove = true
+		}
+	}
+	if !wasPostSeedMove {
+		wasPostSeedMove = statusAtFailure != nil && *statusAtFailure == "completed"
+	}
+	// Unknown move failures belong to RAM-disk/manual relocation, not to
+	// completion import. Never guess the archive destination for a
+	// still-downloading torrent.
+	var destination *string
+	if hasExisting {
+		value := existing.destination
+		destination = &value
+	} else {
+		statusNow, _ := db.TorrentStatus(event.Hash)
+		if wasPostSeedMove || (statusNow != nil && *statusNow == "completed") {
+			value := cfg.DownloadDir
+			destination = &value
+		}
+	}
+	// A move that fails once the payload is already in the destination is
+	// not a real failure: the post-seed relocation and the archive import
+	// race, so libtorrent refuses to overwrite the archived copy. Treat it
+	// as done instead of warning and scheduling a retry that can only fail
+	// again. The rename itself already ran on storage_moved.
+	if destination != nil && tevStorageMoveAlreadySatisfied(torrents, db, event.Hash, *destination) {
+		logging.Debug("storage move already satisfied; not retrying",
+			"hash", event.Hash, "name", event.Name, "save_path", event.SavePath)
+		delete(retries, strings.ToLower(event.Hash))
+		delete(postSeedMoves, event.Hash)
+		return false, nil
+	}
+	logging.Warn(fmt.Sprintf("⚠️ Could not move «%s» to the library; it stays where it is and will be retried", event.Name),
+		"folder", event.SavePath, "error", strings.TrimSpace(event.Message), "hash", event.Hash)
+	if destination != nil {
+		tevScheduleStorageMoveRetry(retries, event.Hash, *destination, wasPostSeedMove, time.Now())
+		if wasPostSeedMove {
+			postSeedMoves[event.Hash] = struct{}{}
+		}
+	}
+	return false, nil
+}
+
+// tevStorageMoved imports a download whose files reached their new folder, or
+// resumes one the RAM-disk policy moved before it finished.
+func tevStorageMoved(torrents TorrentSession, db *Database, moveRequests map[string]struct{}, postSeedMoves map[string]struct{}, retries map[string]StorageMoveRetry, metadata *models.TorrentMeta, event models.TorrentEvent, cfg *Config, tmdb *TmdbClient) (bool, error) {
+	logging.Debug("torrent storage move completed",
+		"hash", event.Hash, "name", event.Name, "save_path", event.SavePath)
+	// Save the new location now instead of at the next periodic save: if
+	// Gextto stopped uncleanly in between, libtorrent would restore the
+	// torrent at its old path, recreate empty files there and download
+	// again what is already in the library.
+	if saver, ok := torrents.(interface{ RequestResumeSave() int }); ok {
+		saver.RequestResumeSave()
+	}
+	delete(postSeedMoves, event.Hash)
+	delete(retries, strings.ToLower(event.Hash))
+	// A post-seeding relocation happens after the release was already
+	// committed. Do not run rename/copy/pack processing a second time, but
+	// do re-process a "completed" torrent whose archived copy is missing.
+	if tevIgnoreRepeatedCompletion(db, event.Hash) {
+		delete(moveRequests, event.Hash)
+		return false, nil
+	}
+	var current *models.TorrentView
+	for _, torrent := range torrents.List() {
+		if strings.EqualFold(torrent.Hash, event.Hash) {
+			candidate := torrent
+			current = &candidate
+			break
+		}
+	}
+	isCompletedDB := false
+	if st, _ := db.TorrentStatus(event.Hash); st != nil && *st == "completed" {
+		isCompletedDB = true
+	}
+	done := isCompletedDB || (current != nil && current.Progress >= 99.99 && current.TotalSize > 0 && current.TotalDone >= current.TotalSize)
+	if !done {
+		delete(moveRequests, event.Hash)
+		// libtorrent pauses a torrent while it moves its data and does not
+		// always resume it; a relocation forced by the RAM-disk policy must
+		// not leave an incomplete download stopped forever.
+		if current != nil && current.State == "paused" && current.AutoManaged && current.Progress < 99.99 {
+			if resumed, rerr := torrents.Resume(event.Hash); rerr == nil && resumed {
+				logging.Info(fmt.Sprintf("▶️ «%s» resumed after its files were moved (%s done)", event.Name, logPercent(current.Progress)), "hash", event.Hash)
+			}
+			_, _ = torrents.Reannounce(event.Hash)
+		}
+		logging.Debug("ignoring storage move before torrent completion",
+			"hash", event.Hash, "name", event.Name)
+		return false, nil
+	}
+	delete(moveRequests, event.Hash)
+	return tevCompleteTorrent(cfg, db, torrents, &event, &metadata.Release, tmdb)
 }
 
 // tev_allPackFilesDiscarded is true when staging/post-processing retained no

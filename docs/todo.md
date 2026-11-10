@@ -33,13 +33,16 @@ Nothing open: every engine item waits for a condition listed under
   CDATA, namespaces, attributes), because the remaining gain is about 12 % of
   the allocations and 7 % of the CPU, not enough for a rewrite without that
   proof.
-- **Functions too long to review** — `torrentEventWorker`, `HandleTorrentEvent`,
-  `formatEventLang`, `seriesRenameApply`, `loadConfigDB` and the candidate pass
-  (`candidatePass.try`) are each several hundred lines with state shared across the
-  whole body: split them by phase, as the acquisition cycle was split into
-  `collectGapReleases`, `readGapFillPolicy` and `candidatePass`. Gate: a behaviour test
-  of the event worker (completion, storage move, retry after a restart) that pins what
-  the split must keep.
+- **Functions too long to review** — `torrentEventWorker`, `formatEventLang`,
+  `seriesRenameApply`, `loadConfigDB` and the candidate pass (`candidatePass.try`) are
+  each several hundred lines with state shared across the whole body: split them by
+  phase, as `HandleTorrentEvent` was split into one function per event and the
+  acquisition cycle into `collectGapReleases`, `readGapFillPolicy` and `candidatePass`.
+  The worker's fifty loop variables go into one struct first, then each timed phase
+  (config reload, queue adjustment, speed policy, completion recovery, event dispatch)
+  becomes a method. Gate: a test that drives the worker's tick (the completion recovery
+  scan and the restored move retries), as `torrent_event_behaviour_test.go` pins the
+  handler.
 
 ## Measurements
 
