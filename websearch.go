@@ -633,20 +633,34 @@ func sanitizedMagnetFromDetail(ctx context.Context, rawURL string, flaresolverr 
 }
 
 // limetorrentsMirrors are the hosts of LimeTorrents, tried in order until one
-// gives results. The site moves between them: the path form
-// /search/all/<query>/seeds/1/ answers 302 to http and 301 back to https (an
-// endless redirect loop) on one host, while the detail pages of limetorrent.net
-// no longer carry the magnet and hand it to limetorrent.store. Keeping both in
-// a list means a host that breaks only costs the next one being tried.
-var limetorrentsMirrors = []string{
-	"https://limetorrent.store",
-	"https://limetorrent.net",
+// gives results. The site moves between them and they do not all speak the same
+// URL: limetorrent.store and limetorrent.net answer /search.php (the path form
+// /search/all/<query>/seeds/1/ loops between http and https on .net, which made
+// every cycle report the engine unreachable), while www.limetorrents.fun serves
+// the older path form and 404s on /search.php. Only .store and .fun carry the
+// magnet in the detail page: .net hands it to .store, so it goes last.
+var limetorrentsMirrors = []limetorrentsMirror{
+	{host: "https://limetorrent.store"},
+	{host: "https://www.limetorrents.fun", pathForm: true},
+	{host: "https://limetorrent.net"},
 }
 
-// limetorrentsSearchURL is the search page of one mirror, ordered by seeds like
-// the old path form used to be.
-func limetorrentsSearchURL(mirror, query string) string {
-	return strings.TrimRight(mirror, "/") + "/search.php?" + url.Values{
+// limetorrentsMirror is one host of the site and the search URL it speaks.
+type limetorrentsMirror struct {
+	host string
+	// pathForm is the older /search/all/<query>/seeds/1/ instead of
+	// /search.php?q=<query>.
+	pathForm bool
+}
+
+// limetorrentsSearchURL is the search page of one mirror in its own form.
+func limetorrentsSearchURL(mirror string, pathForm bool, query string) string {
+	host := strings.TrimRight(mirror, "/")
+	if pathForm {
+		slug := strings.ReplaceAll(strings.TrimSpace(query), " ", "-")
+		return host + "/search/all/" + url.PathEscape(slug) + "/seeds/1/"
+	}
+	return host + "/search.php?" + url.Values{
 		"orderby": {"DESC"},
 		"order":   {"seeders"},
 		"q":       {query},
@@ -688,7 +702,7 @@ func limetorrentsDetails(body string, base *url.URL) ([]searchDetailLink, error)
 func searchLimetorrents(ctx context.Context, query string, flaresolverr *string) ([]webResult, error) {
 	var firstErr error
 	for _, mirror := range limetorrentsMirrors {
-		results, err := searchLimetorrentsOn(ctx, mirror, query, flaresolverr)
+		results, err := searchLimetorrentsOn(ctx, mirror.host, mirror.pathForm, query, flaresolverr)
 		if err != nil {
 			if firstErr == nil {
 				firstErr = err
@@ -706,8 +720,8 @@ func searchLimetorrents(ctx context.Context, query string, flaresolverr *string)
 
 // searchLimetorrentsOn runs the search of one mirror: the results page, then
 // the detail page of each torrent for its magnet.
-func searchLimetorrentsOn(ctx context.Context, mirror, query string, flaresolverr *string) ([]webResult, error) {
-	rawURL := limetorrentsSearchURL(mirror, query)
+func searchLimetorrentsOn(ctx context.Context, mirror string, pathForm bool, query string, flaresolverr *string) ([]webResult, error) {
+	rawURL := limetorrentsSearchURL(mirror, pathForm, query)
 	body, err := fetchHtml(ctx, rawURL, flaresolverr)
 	if err != nil {
 		return nil, err

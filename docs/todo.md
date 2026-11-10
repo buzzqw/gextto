@@ -42,9 +42,10 @@ Nothing open: every engine item waits for a condition listed under
   the split must keep.
 - **Two web engines still fail** — bitsearch answers HTTP 500 to every query; bt4g
   answers 403 without FlareSolverr and no result even through it. Both stay enabled
-  and are reported unreachable in the cycle. LimeTorrents is fixed (search and magnet
-  live on the store host, limetorrent.net as the fallback). Gate: a working endpoint or a parser that reads what the
-  block page serves; otherwise they go, and that is the operator's decision.
+  and are reported unreachable in the cycle. LimeTorrents is fixed (three addresses
+  tried in order: store, www.limetorrents.fun, net). Gate: a working endpoint or a
+  parser that reads what the block page serves; otherwise they go, and that is the
+  operator's decision.
 
 ## Measurements
 

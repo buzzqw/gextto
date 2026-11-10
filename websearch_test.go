@@ -220,7 +220,7 @@ func TestWebHTMLDoesNotUseFlareSolverrForNonCloudflareStatuses(t *testing.T) {
 // old path form (/search/all/<query>/seeds/1/) now answers 302 to http and
 // 301 back to https, so the engine reported itself unreachable at every cycle.
 func TestLimetorrentsSearchUsesTheFormEndpoint(t *testing.T) {
-	got := limetorrentsSearchURL("https://limetorrent.store/", "matrix resurrections")
+	got := limetorrentsSearchURL("https://limetorrent.store/", false, "matrix resurrections")
 	base, err := url.Parse(got)
 	if err != nil {
 		t.Fatalf("parse %q: %v", got, err)
@@ -253,7 +253,7 @@ func TestLimetorrentsDetailsDropsDuplicateRows(t *testing.T) {
 	}
 	page.WriteString(`</tbody></table></body></html>`)
 
-	base, err := url.Parse(limetorrentsSearchURL("https://limetorrent.store", "example"))
+	base, err := url.Parse(limetorrentsSearchURL("https://limetorrent.store", false, "example"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -282,11 +282,13 @@ func limetorrentsTestServer(t *testing.T, withMagnet bool) *httptest.Server {
 	server := httptest.NewServer(mux)
 	t.Cleanup(server.Close)
 	const hash = "0123456789abcdef0123456789abcdef01234567"
-	mux.HandleFunc("/search.php", func(w http.ResponseWriter, r *http.Request) {
+	searchPage := func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, `<html><body><table class="table2"><tbody><tr>
 			<td><div class="tt-name"><a href="/example-release-1.html">Example release</a></div></td>
 			</tr></tbody></table></body></html>`)
-	})
+	}
+	mux.HandleFunc("/search.php", searchPage)
+	mux.HandleFunc("/search/all/", searchPage)
 	mux.HandleFunc("/example-release-1.html", func(w http.ResponseWriter, r *http.Request) {
 		if withMagnet {
 			fmt.Fprintf(w, `<html><body><a href="magnet:?xt=urn:btih:%s">Get this torrent</a></body></html>`, hash)
@@ -313,10 +315,10 @@ func TestLimetorrentsFallsBackToTheNextMirror(t *testing.T) {
 
 	for _, tc := range []struct {
 		name    string
-		mirrors []string
+		mirrors []limetorrentsMirror
 	}{
-		{"host that errors", []string{broken.URL, working.URL}},
-		{"host without magnets", []string{empty.URL, working.URL}},
+		{"host that errors", []limetorrentsMirror{{host: broken.URL}, {host: working.URL}}},
+		{"host without magnets", []limetorrentsMirror{{host: empty.URL}, {host: working.URL}}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			previous := limetorrentsMirrors
@@ -347,7 +349,7 @@ func TestLimetorrentsReportsFailureWhenEveryMirrorFails(t *testing.T) {
 	t.Cleanup(broken.Close)
 
 	previous := limetorrentsMirrors
-	limetorrentsMirrors = []string{broken.URL, broken.URL}
+	limetorrentsMirrors = []limetorrentsMirror{{host: broken.URL}, {host: broken.URL}}
 	t.Cleanup(func() { limetorrentsMirrors = previous })
 
 	results, err := searchLimetorrents(context.Background(), "example", nil)
@@ -356,5 +358,32 @@ func TestLimetorrentsReportsFailureWhenEveryMirrorFails(t *testing.T) {
 	}
 	if results != nil {
 		t.Fatalf("results = %+v, want none", results)
+	}
+}
+
+// TestLimetorrentsMirrorForms pins each configured host and the search URL it
+// speaks: the store and net hosts answer /search.php, www.limetorrents.fun only
+// the older path form (it 404s on /search.php). A mirror whose form is wrong
+// costs a failed request in every cycle.
+func TestLimetorrentsMirrorForms(t *testing.T) {
+	hosts := map[string]limetorrentsMirror{}
+	for _, mirror := range limetorrentsMirrors {
+		hosts[mirror.host] = mirror
+	}
+	for _, host := range []string{"https://limetorrent.store", "https://www.limetorrents.fun", "https://limetorrent.net"} {
+		if _, ok := hosts[host]; !ok {
+			t.Fatalf("mirror %q is missing from the list", host)
+		}
+	}
+	if hosts["https://www.limetorrents.fun"].pathForm != true {
+		t.Fatal("www.limetorrents.fun must use the path form: /search.php is a 404 there")
+	}
+	if hosts["https://limetorrent.store"].pathForm != false {
+		t.Fatal("limetorrent.store must use /search.php")
+	}
+
+	got := limetorrentsSearchURL("https://www.limetorrents.fun", true, "matrix resurrections")
+	if got != "https://www.limetorrents.fun/search/all/matrix-resurrections/seeds/1/" {
+		t.Fatalf("path-form search URL = %q", got)
 	}
 }
