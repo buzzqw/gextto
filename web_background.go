@@ -674,11 +674,85 @@ func bgRestoredTorrentNamesLine(names []string, limit int) string {
 
 // ---------------------------------------------------------------------------
 
+// eventWorker is the state of the torrent event worker across its ticks: what
+// it is waiting for, what it already did and when each timed phase last ran.
+type eventWorker struct {
+	configPath string
+	state      *AppState
+	db         *Database
+	comics     *ComicsDb
+	eventLog   *EventLog
+	torrents   TorrentEngine
+	cfg        *Config
+	notifier   *Notifier
+	tmdb       *TmdbClient
+
+	moveRequests          map[string]struct{}
+	completionNotified    map[string]struct{}
+	completionRetries     map[string]completionRetry
+	settledTorrents       map[string]settledTorrent
+	packIdentityChecked   map[string]packIdentityCheck
+	packInspectionChecked map[string]packInspectionCheck
+	notErrorChecked       map[string]time.Time
+	notDetachable         map[string]time.Time
+	storageMoveRetries    map[string]StorageMoveRetry
+	seedCopyWarnings      map[string]time.Time
+	postSeedMoves         map[string]struct{}
+	persistedMoves        map[string]persistedMove
+	metadataWaitStart     map[string]time.Time
+	metadataFirstSeen     map[string]time.Time
+	metadataLastWarning   map[string]time.Time
+	stallWaitStart        map[string]StallWatch
+	ramdiskAttempts       map[string]time.Time
+	checking              map[string]eventWorkerDataCheck
+	startupHashes         map[string]struct{}
+
+	lastRecoveryScan      time.Time
+	lastRamdiskCheck      time.Time
+	lastEd2kStallCheck    time.Time
+	lastDynamicAdjustment time.Time
+	lastQueueCounts       string
+	queueTicks            int
+	lastSpeedPolicy       time.Time
+	lastSpeed             *bgSpeedPair
+	lastAutotuneLog       time.Time
+	lastAutotuneDown      int64
+	lastAutotuneUp        int64
+	haveAutotuneLog       bool
+	autotuneDigest        bgAutotuneDigest
+	lastDebugLog          time.Time
+	lastPin               *string
+	lastSequential        *bool
+	lastConfigReload      time.Time
+	lastConfigForce       time.Time
+	lastConfigMod         time.Time
+	lastConfigGen         uint64
+	lastFingerprint       string
+}
+
+// eventWorkerDataCheck is a torrent being re-checked: when the check started
+// and when its progress was last logged (at DEBUG; INFO gets only the start
+// and a summary).
+type eventWorkerDataCheck struct{ started, lastLog time.Time }
+
 // torrentEventWorker implements `torrent_event_worker`: it drives the
 // torrent session policy (config reload, metadata promotion, queue/speed
 // policy, pin/sequential flags), processes lifecycle events and then applies the
 // seed/cleanup policy once per tick.
 func torrentEventWorker(configPath string, fallback *Config, state *AppState, db *Database, comics *ComicsDb, eventLog *EventLog) {
+	w := newEventWorker(configPath, fallback, state, db, comics, eventLog)
+	for {
+		if !state.SleepBackground(750 * time.Millisecond) {
+			return
+		}
+		w.tick(time.Now())
+	}
+}
+
+// newEventWorker builds the worker's state, restores what a restart must not
+// lose (storage moves, metadata and stall clocks) and re-checks the torrents
+// that read as complete but never reached the library.
+func newEventWorker(configPath string, fallback *Config, state *AppState, db *Database, comics *ComicsDb, eventLog *EventLog) *eventWorker {
 	torrents := state.activeEngine()
 	moveRequests := map[string]struct{}{}
 	// Hashes whose final "completed" notification was already sent by this
@@ -770,8 +844,7 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 	// Visibility for long integrity checks (multi-gigabyte packs on the NAS).
 	// Torrents being re-checked: when the check started and when its progress
 	// was last logged (at DEBUG; INFO gets only the start and a summary).
-	type dataCheck struct{ started, lastLog time.Time }
-	checking := map[string]dataCheck{}
+	checking := map[string]eventWorkerDataCheck{}
 	// One-time startup reconciliation. libtorrent's save_resume_data can record
 	// a bitfield ahead of the bytes actually flushed to disk (its disk cache is
 	// not drained on every shutdown). A torrent that reads as complete but was
@@ -802,705 +875,788 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 	for _, torrent := range torrents.List() {
 		startupHashes[strings.ToLower(torrent.Hash)] = struct{}{}
 	}
-	for {
-		if !state.SleepBackground(750 * time.Millisecond) {
+	return &eventWorker{
+		configPath: configPath, state: state, db: db, comics: comics, eventLog: eventLog,
+		torrents: torrents, cfg: cfg, notifier: notifier, tmdb: tmdb,
+		moveRequests: moveRequests, completionNotified: completionNotified, completionRetries: completionRetries,
+		settledTorrents: settledTorrents, packIdentityChecked: packIdentityChecked, packInspectionChecked: packInspectionChecked,
+		notErrorChecked: notErrorChecked, notDetachable: notDetachable, storageMoveRetries: storageMoveRetries,
+		seedCopyWarnings: seedCopyWarnings, postSeedMoves: postSeedMoves, persistedMoves: persistedMoves,
+		metadataWaitStart: metadataWaitStart, metadataFirstSeen: metadataFirstSeen, metadataLastWarning: metadataLastWarning,
+		stallWaitStart: stallWaitStart, ramdiskAttempts: ramdiskAttempts, checking: checking, startupHashes: startupHashes,
+		lastRecoveryScan: lastRecoveryScan, lastRamdiskCheck: lastRamdiskCheck, lastEd2kStallCheck: lastEd2kStallCheck,
+		lastDynamicAdjustment: lastDynamicAdjustment, lastQueueCounts: lastQueueCounts, queueTicks: queueTicks,
+		lastSpeedPolicy: lastSpeedPolicy, lastSpeed: lastSpeed, lastAutotuneLog: lastAutotuneLog,
+		lastAutotuneDown: lastAutotuneDown, lastAutotuneUp: lastAutotuneUp, haveAutotuneLog: haveAutotuneLog,
+		autotuneDigest: autotuneDigest, lastDebugLog: lastDebugLog, lastPin: lastPin, lastSequential: lastSequential,
+		lastConfigReload: lastConfigReload, lastConfigForce: lastConfigForce, lastConfigMod: lastConfigMod,
+		lastConfigGen: lastConfigGen, lastFingerprint: lastFingerprint,
+	}
+}
+
+// tick is one pass of the worker: the timed phases, the event dispatch and
+// the seed and cleanup policy, in that order.
+func (w *eventWorker) tick(now time.Time) {
+	// The backend can be switched at runtime from the settings/API: pick
+	// up the new engine on the next tick so handlers and automation never
+	// diverge on which transfer plane they drive.
+	if active := w.state.activeEngine(); active != w.torrents {
+		w.torrents = active
+		logging.Info("torrent event worker switched backend", "backend", w.torrents.Name())
+	}
+	w.logDataChecks(now)
+	if now.Sub(w.lastConfigReload) >= 5*time.Second {
+		w.reloadConfig(now)
+	}
+	if now.Sub(w.lastDynamicAdjustment) >= 90*time.Second {
+		w.adjustQueue(now)
+	}
+	if now.Sub(w.lastSpeedPolicy) >= 60*time.Second {
+		w.applySpeedPolicy(now)
+	}
+	w.applyFlags(now)
+	MonitorMetadata(w.cfg, w.torrents, w.db, w.notifier, w.metadataWaitStart, w.metadataFirstSeen, w.metadataLastWarning)
+	MonitorStalled(w.cfg, w.torrents, w.db, w.notifier, w.stallWaitStart)
+	if ed2kEnabled(w.cfg) && now.Sub(w.lastEd2kStallCheck) >= 10*time.Minute {
+		w.lastEd2kStallCheck = now
+		MonitorEd2kStalled(w.cfg, w.db, w.notifier, now)
+	}
+	if now.Sub(w.lastRamdiskCheck) >= 30*time.Second {
+		ReconcileRamdisk(w.cfg, w.torrents, w.ramdiskAttempts)
+		w.lastRamdiskCheck = now
+	}
+	RetryStorageMoves(w.torrents, w.moveRequests, w.postSeedMoves, w.storageMoveRetries)
+	torrentEvents := w.torrents.PollEvents()
+	eventHashes := map[string]struct{}{}
+	for _, event := range torrentEvents {
+		eventHashes[strings.ToLower(event.Hash)] = struct{}{}
+		delete(w.settledTorrents, strings.ToLower(event.Hash))
+	}
+	// Forget torrents that left the session.
+	if len(w.settledTorrents) > 0 {
+		present := map[string]struct{}{}
+		for _, torrent := range w.torrents.List() {
+			present[strings.ToLower(torrent.Hash)] = struct{}{}
+		}
+		for hash := range w.settledTorrents {
+			if _, ok := present[hash]; !ok {
+				delete(w.settledTorrents, hash)
+			}
+		}
+	}
+	// A torrent may reach 100% while Gextto is restarting or while its
+	// completion event is already gone from libtorrent's alert queue.
+	// Recreate the event from the persisted torrent status so postprocess and
+	// notifications are not silently skipped. Events are the primary signal:
+	// this scan is only a safety net, so it runs at start-up and then every
+	// completionRecoveryInterval instead of at every tick.
+	if now.Sub(w.lastRecoveryScan) >= completionRecoveryInterval {
+		torrentEvents = w.recoverCompletions(now, torrentEvents, eventHashes)
+	}
+	w.dispatchEvents(now, torrentEvents)
+	DetachErrorTorrents(w.torrents, w.db, w.startupHashes, w.notErrorChecked)
+	DetachCompletedArchivedSingles(w.cfg, w.torrents, w.db, w.notDetachable)
+	RejectActivePackIdentityMismatches(w.torrents, w.db, w.packIdentityChecked)
+	InspectActivePacks(w.cfg, w.torrents, w.db, w.packInspectionChecked)
+	// Remove completed torrents that have finished seeding before the seed
+	// policy moves them to disk only to delete them. With automatic removal
+	// off, completed torrents stay listed as completed until the user runs
+	// "Pulisci completati".
+	RemoveSeededCompleted(w.cfg, w.torrents, w.db, w.postSeedMoves)
+	// Enforce the seed policy only after handling this tick's events: with a
+	// very low seed limit a just-finished torrent could otherwise be removed
+	// before its `torrent_finished` event is post-processed and archived.
+	EnforceSeedPolicy(w.cfg, w.torrents, w.db, w.postSeedMoves, w.storageMoveRetries, w.seedCopyWarnings)
+	syncTorrentMoves(w.db, w.persistedMoves, w.storageMoveRetries, w.postSeedMoves)
+}
+
+// logDataChecks gives a long re-check (a large pack on the NAS) one line when
+// it starts and one summary when it ends; the per-minute progress is DEBUG.
+func (w *eventWorker) logDataChecks(now time.Time) {
+	present := map[string]struct{}{}
+	for _, torrent := range w.torrents.List() {
+		key := strings.ToLower(torrent.Hash)
+		present[key] = struct{}{}
+		check, wasChecking := w.checking[key]
+		if torrent.State == "checking_files" {
+			if !wasChecking {
+				w.checking[key] = eventWorkerDataCheck{started: now, lastLog: now}
+				logging.Info(fmt.Sprintf("🔎 Checking the data already downloaded for «%s»…", torrent.Name))
+			} else if now.Sub(check.lastLog) >= 60*time.Second {
+				check.lastLog = now
+				w.checking[key] = check
+				logging.Debug("data check in progress", "name", torrent.Name, "progress", logPercent(torrent.Progress))
+			}
+			continue
+		}
+		if wasChecking {
+			delete(w.checking, key)
+			result := "the data is complete"
+			if torrent.Progress < 99.99 {
+				result = logPercent(torrent.Progress) + " was already downloaded, the rest will be downloaded"
+			}
+			logging.Info(fmt.Sprintf("✅ «%s» checked in %s: %s", torrent.Name, logDuration(now.Sub(check.started)), result))
+		}
+	}
+	for key := range w.checking {
+		if _, ok := present[key]; !ok {
+			delete(w.checking, key)
+		}
+	}
+}
+
+// reloadConfig reloads the configuration when it changed, and rebuilds the
+// notifier and the TMDB client when their settings did.
+func (w *eventWorker) reloadConfig(now time.Time) {
+	// Reload only when something actually changed (API writes bump the
+	// config generation, file edits bump the mtime) instead of opening
+	// the config database every 5 seconds. A forced reload every minute
+	// still catches out-of-band database edits.
+	reload := now.Sub(w.lastConfigForce) >= 60*time.Second
+	if !reload {
+		if info, err := os.Stat(w.configPath); err == nil && info.ModTime().After(w.lastConfigMod) {
+			reload = true
+		}
+	}
+	if !reload && ConfigGeneration() != w.lastConfigGen {
+		reload = true
+	}
+	if reload {
+		w.lastConfigForce = now
+		if info, err := os.Stat(w.configPath); err == nil {
+			w.lastConfigMod = info.ModTime()
+		}
+		w.lastConfigGen = ConfigGeneration()
+		if loaded, err := LoadConfig(w.configPath); err == nil {
+			if w.state.dryRunForced {
+				loaded.DryRun = true
+			}
+			w.cfg = &loaded
+		} else {
+			// Keep the last valid configuration: falling back to the startup
+			// one would silently revert paths, seed policy and limits.
+			logging.Warn("configuration reload failed; keeping the last valid configuration", "error", err)
+		}
+		// Rebuild the notifier/TMDB client only when the relevant config
+		// changed: they used to be rebuilt (with new HTTP clients) every 5s.
+		fingerprint := fmt.Sprintf("%s|%s|%s",
+			bgDerefStr(w.cfg.TmdbAPIKey),
+			w.cfg.TmdbLanguage(),
+			bgJsonString(w.cfg.Settings),
+		)
+		if fingerprint != w.lastFingerprint {
+			w.notifier = FromConfig(w.cfg).Async()
+			w.tmdb = NewTmdbClientWithLanguage(w.cfg.TmdbAPIKey, w.cfg.TmdbLanguage())
+			w.lastFingerprint = fingerprint
+		}
+	}
+	w.lastConfigReload = now
+}
+
+// adjustQueue runs the queue policy and logs the queue counts when they
+// change.
+func (w *eventWorker) adjustQueue(now time.Time) {
+	w.queueTicks++
+	effectiveDownloadKib, _ := bgCurrentSpeedLimits(w.cfg)
+	w.torrents.AdjustQueue(w.cfg, effectiveDownloadKib)
+	// Queue visibility: log when the counts shown in the line change, not
+	// on every tick. Comparing the engine "downloading" state instead
+	// re-logged the same counts twice per stall probe (resumed, then
+	// parked again ten minutes later).
+	snapshot := w.torrents.List()
+	queued := 0
+	transferring := 0
+	idle := 0
+	var rateKib uint64
+	var uploadBytes uint64
+	stuck := []string{}
+	for _, torrent := range snapshot {
+		// A torrent parked by the stall monitor is stuck whatever its
+		// engine state: after a restart it comes back merely paused
+		// until the monitor parks it again, and must not be reported
+		// as waiting in between.
+		if entry, ok := w.stallWaitStart[torrent.Hash]; ok && entry.stalledSince != nil && !TorrentTransferring(torrent) && torrent.Progress < 100 {
+			idle++
+			rateKib += torrent.DownloadRate
+			stuck = append(stuck, fmt.Sprintf("%s %s", shortTorrentName(torrent.Name), logPercent(torrent.Progress)))
+			continue
+		}
+		if torrent.State == "paused" {
+			queued++
+		}
+		switch {
+		case TorrentTransferring(torrent):
+			transferring++
+		case TorrentIdle(torrent):
+			idle++
+			stuck = append(stuck, fmt.Sprintf("%s %s", shortTorrentName(torrent.Name), logPercent(torrent.Progress)))
+		}
+		rateKib += torrent.DownloadRate
+		uploadBytes += torrent.UploadRate
+	}
+	// Record the line's observed peak for the guided tuning (never shown,
+	// only raises). The sample is the sum of the torrent rates in bytes/s.
+	// A direction under a speed limit is not the line, so it is skipped
+	// (and any earlier peak forgotten): only an uncapped rate counts.
+	peakDownKib, peakUpKib, _ := speedPolicy(w.cfg)
+	// A direction the latency guard is capping is neither the line nor
+	// a user limit: it is not learned from, and its peak is kept.
+	observedDown, observedUp := rateKib, uploadBytes
+	if guardDown, guardUp := w.state.latency_guard.caps(); guardDown > 0 || guardUp > 0 {
+		if guardDown > 0 {
+			observedDown = 0
+		}
+		if guardUp > 0 {
+			observedUp = 0
+		}
+	}
+	observeSpeedPeak(w.cfg, saturatingInt64(observedDown), saturatingInt64(observedUp), peakDownKib > 0, peakUpKib > 0)
+	counts := fmt.Sprintf("%d/%d/%d", transferring, idle, queued)
+	// Skip the first tick after start: the engine has not finished syncing
+	// and resumed torrents read as paused, so that triple is transient
+	// (e.g. "4 waiting" then "2"). Logging it made every restart print two
+	// near-identical lines with different counts.
+	if shouldLogQueueCounts(w.queueTicks, counts, w.lastQueueCounts) {
+		rateKib /= 1024
+		speed := fmt.Sprintf("speed %d KB/s", rateKib)
+		// "Active" means really transferring: a download stuck at 0 B/s
+		// is counted apart, not as active. Naming the stuck ones (with
+		// their real progress) tells a partially downloaded torrent
+		// apart from a dead one.
+		line := fmt.Sprintf("📊 Downloads: %d transferring, %d stuck at 0 B/s, %d waiting or paused · %s", transferring, idle, queued, speed)
+		if len(stuck) > 0 {
+			shown := stuck
+			extra := ""
+			if len(shown) > 3 {
+				extra = fmt.Sprintf(" +%d", len(shown)-3)
+				shown = shown[:3]
+			}
+			line += " · stuck: " + strings.Join(shown, ", ") + extra
+		}
+		logging.Debug(line)
+		w.lastQueueCounts = counts
+	}
+	w.lastDynamicAdjustment = now
+}
+
+// applySpeedPolicy re-asserts the effective speed limits on the engine and on
+// aMule, and logs them when they or their source change.
+func (w *eventWorker) applySpeedPolicy(now time.Time) {
+	downloadKib, uploadKib, source := effectiveSpeedLimits(w.cfg, w.state.latency_guard)
+	// Always re-assert, not just on change: "Apply now" and the optimizer
+	// set the session limit to the unscheduled value (e.g. 3000 by day)
+	// and the policy must correct it on its own within a minute. The log
+	// stays only on real changes, of the values or of their source (the
+	// schedule starting or ending is logged even with equal values).
+	sourceChanged := w.lastSpeed == nil || w.lastSpeed.source != source
+	// aMule follows the same limits as the torrents.
+	applyEd2kSpeedLimits(w.cfg, downloadKib, uploadKib, now)
+	if _, err := w.torrents.SetGlobalSpeedLimits(downloadKib, uploadKib); err != nil {
+		logging.Debug("speed policy apply failed", "error", err)
+	} else {
+		// The speed and autotune lines explain the speed of something
+		// that is downloading: with nothing downloading (only seeding,
+		// or an idle session) they are noise and are not written. The
+		// state that decides the next line is left as it is, so the
+		// first download after a quiet spell says at what speed it
+		// starts.
+		logSpeed := bgDownloading(w.torrents)
+		st := w.state.latency_guard.status()
+		ping := bgPingText(st)
+		maxText := bgSpeedMaxText(w.cfg)
+		if (sourceChanged || !w.haveAutotuneLog) && logSpeed {
+			label := map[string]string{
+				speedSourceTemp:         "exception, with expiry",
+				speedSourceTempKeep:     "exception, until removed",
+				speedSourceSchedule:     "scheduled limit",
+				speedSourceScheduleAuto: "schedule window on Auto",
+				speedSourceTempAuto:     "exception: Auto",
+				speedSourceAuto:         "Auto",
+				speedSourceBase:         "fixed limits",
+			}[source]
+			inSchedule := source == speedSourceSchedule || source == speedSourceScheduleAuto
+			wasScheduled := w.lastSpeed != nil && (w.lastSpeed.source == speedSourceSchedule || w.lastSpeed.source == speedSourceScheduleAuto)
+			switch {
+			case source == speedSourceScheduleAuto && !wasScheduled:
+				label = "schedule window on Auto started"
+			case source == speedSourceSchedule && !wasScheduled:
+				label = "schedule started"
+			case !inSchedule && wasScheduled:
+				label += ", schedule ended"
+			}
+			// An Auto window is not necessarily unlimited: while the latency
+			// guard is capping, the numbers are the guard's and the label must
+			// say so (the old "(unlimited)" read as a contradiction).
+			if speedSourceIsAuto(source) {
+				if d, u := w.state.latency_guard.caps(); d > 0 || u > 0 {
+					label += " · latency guard"
+				}
+			}
+			logging.Info(bgSpeedStatusText(downloadKib, uploadKib, label, maxText, ping))
+			w.lastAutotuneLog = now
+			w.lastAutotuneDown, w.lastAutotuneUp = downloadKib, uploadKib
+			w.haveAutotuneLog = true
+		} else if logSpeed && now.Sub(w.lastAutotuneLog) >= 60*time.Second {
+			guardAt, guardDown, guardUp := w.state.latency_guard.firstCapLog()
+			if at, ok := bgAdoptFirstCap(w.lastAutotuneLog, guardAt); ok {
+				// The guard printed this cap itself, at once: adopt
+				// that line as the last one logged instead of
+				// repeating the same numbers (and "from unlimited")
+				// a few seconds later.
+				w.lastAutotuneLog = at
+				w.lastAutotuneDown, w.lastAutotuneUp = guardDown, guardUp
+			} else {
+				prevDown, prevUp := int64(0), int64(0)
+				if w.lastSpeed != nil {
+					prevDown, prevUp = w.lastSpeed.download, w.lastSpeed.upload
+				}
+				if bgSpeedWorthLogging(w.lastAutotuneDown, downloadKib, prevDown) || bgSpeedWorthLogging(w.lastAutotuneUp, uploadKib, prevUp) {
+					changes := make([]string, 0, 2)
+					if downloadKib != w.lastAutotuneDown {
+						changes = append(changes, "download "+bgSpeedDeltaText(w.lastAutotuneDown, downloadKib))
+					}
+					if uploadKib != w.lastAutotuneUp {
+						changes = append(changes, "upload "+bgSpeedDeltaText(w.lastAutotuneUp, uploadKib))
+					}
+					// The control loop moves the cap every minute: each
+					// step goes to the debug log, the info log gets the
+					// first step of a mode and a digest every 15 minutes.
+					step := bgAutotuneStepText(downloadKib, uploadKib, changes, maxText, ping)
+					if w.autotuneDigest.add(now, downloadKib, uploadKib, st.Mode) {
+						logging.Info(step)
+					} else {
+						logging.Debug(step)
+					}
+					w.lastAutotuneLog = now
+					w.lastAutotuneDown, w.lastAutotuneUp = downloadKib, uploadKib
+				}
+			}
+		}
+		if logSpeed {
+			if line, ok := w.autotuneDigest.summary(now, downloadKib, uploadKib); ok {
+				logging.Info(line)
+			}
+		}
+		w.lastSpeed = &bgSpeedPair{download: downloadKib, upload: uploadKib, source: source}
+	}
+	w.lastSpeedPolicy = now
+}
+
+// applyFlags logs the periodic diagnostics and applies the pin, sequential
+// and first-and-last-piece flags when they changed.
+func (w *eventWorker) applyFlags(now time.Time) {
+	// `debug_enabled`: periodic diagnostics for crashes/RAM/loops.
+	if w.cfg.DebugEnabled() && now.Sub(w.lastDebugLog) >= 300*time.Second {
+		w.lastDebugLog = now
+		logging.Debug("debug diagnostics", "resident_kb", bgResidentKB(), "torrents", len(w.torrents.List()))
+	}
+	var pinned *string
+	if value, ok := w.cfg.Settings["torrent_pinned_hash"]; ok {
+		trimmed := strings.ToLower(strings.TrimSpace(value))
+		if trimmed != "" {
+			pinned = &trimmed
+		}
+	}
+	if !bgStrPtrEqual(w.lastPin, pinned) {
+		applied := false
+		if pinned != nil {
+			if _, err := w.torrents.SetPin(*pinned, true); err != nil {
+				logging.Debug("pin apply failed; will retry", "error", err)
+			} else {
+				applied = true
+			}
+		} else {
+			if _, err := w.torrents.SetPin("", false); err != nil {
+				logging.Debug("unpin apply failed; will retry", "error", err)
+			} else {
+				applied = true
+			}
+		}
+		if applied {
+			w.lastPin = bgCopyStrPtr(pinned)
+		}
+	}
+	sequential := false
+	if value, ok := w.cfg.Settings[settingTorrentSequential]; ok {
+		sequential = settingTruthy(value)
+	}
+	if w.lastSequential == nil || *w.lastSequential != sequential {
+		if _, err := w.torrents.SetSequential(sequential); err != nil {
+			logging.Debug("sequential apply failed; will retry", "error", err)
+		} else {
+			w.lastSequential = &sequential
+		}
+	}
+	// A plain flag on the engine: re-applying it each pass also covers a
+	// switch of the active engine.
+	w.torrents.SetFirstLastDefault(settingTruthy(w.cfg.Settings[settingTorrentFirstLast]))
+}
+
+// recoverCompletions recreates the completion events lost while Gextto was
+// down or dropped from the engine's alert queue.
+func (w *eventWorker) recoverCompletions(now time.Time, torrentEvents []models.TorrentEvent, eventHashes map[string]struct{}) []models.TorrentEvent {
+	w.lastRecoveryScan = now
+	for _, torrent := range w.torrents.List() {
+		if !torrent.HasMetadata {
+			continue
+		}
+		hash := strings.ToLower(torrent.Hash)
+		if _, ok := eventHashes[hash]; ok {
+			continue
+		}
+		if settled, ok := w.settledTorrents[hash]; ok {
+			if now.Before(settled.until) && settled.savePath == torrent.SavePath {
+				continue
+			}
+			delete(w.settledTorrents, hash)
+		}
+		// A completion that failed transiently is retried on its own backoff,
+		// not at every tick.
+		if retry, waiting := w.completionRetries[hash]; waiting && now.Before(retry.next) {
+			continue
+		}
+		_, inMoves := w.moveRequests[hash]
+		_, inRetries := w.storageMoveRetries[hash]
+		_, inPostSeed := w.postSeedMoves[hash]
+		if inMoves || inRetries || inPostSeed {
+			if meta, metaErr := w.db.TorrentMeta(hash); metaErr == nil && meta != nil {
+				if dest, ok := ConfiguredDestinationFor(&meta.Release, w.cfg); ok && SamePath(torrent.SavePath, dest) {
+					delete(w.moveRequests, hash)
+					delete(w.storageMoveRetries, hash)
+					delete(w.postSeedMoves, hash)
+					inMoves, inRetries, inPostSeed = false, false, false
+				}
+			}
+			if inMoves || inRetries || inPostSeed {
+				continue
+			}
+		}
+		// In-progress downloads that are actively downloading (<99.99% and State "downloading" or "queued")
+		// cannot possibly need completion recovery; skip immediately to avoid redundant SQLite queries.
+		if torrent.Progress < 99.99 && (torrent.State == "downloading" || torrent.State == "queued") {
+			continue
+		}
+		// A completed single whose end-of-seed move already reached the
+		// archive but whose import never ran (lost storage_moved alert, or a
+		// restart) is finalized through the normal storage_moved path. Marking
+		// the raw archive path complete here would skip the rename, the
+		// MediaInfo probe and the completion notification.
+		if bgTorrentNeedsArchiveImport(w.cfg, w.db, &torrent) {
+			status, _ := w.db.TorrentStatus(hash)
+			isCompletedDB := status != nil && *status == "completed"
+			if !isCompletedDB && torrent.Progress < 99.99 {
+				if checked, checkErr := w.torrents.ForceRecheck(hash); checkErr != nil || !checked {
+					logging.Debug("existing archive recheck could not be started", "error", checkErr)
+				}
+				continue
+			}
+			logging.Debug("recovering completed torrent without completion event",
+				"hash", hash, "name", torrent.Name, "save_path", torrent.SavePath,
+				"progress", torrent.Progress, "kind", "storage_moved")
+			torrentEvents = append(torrentEvents, models.TorrentEvent{
+				Kind:     "storage_moved",
+				Hash:     hash,
+				Name:     torrent.Name,
+				SavePath: torrent.SavePath,
+			})
+			eventHashes[hash] = struct{}{}
+			continue
+		}
+		if torrent.Progress < 99.99 {
+			continue
+		}
+		pending := false
+		if meta, err := w.db.TorrentMeta(hash); err == nil && meta != nil {
+			if status, err := w.db.TorrentStatus(hash); err == nil && status != nil {
+				if *status != "completed" && *status != "error" && *status != "removed" {
+					pending = true
+				}
+			}
+		}
+		if !pending {
+			w.settledTorrents[hash] = settledTorrent{savePath: torrent.SavePath, until: now.Add(settledRecheckInterval)}
+		}
+		if pending {
+			logging.Debug("recovering completed torrent without completion event",
+				"hash", hash, "name", torrent.Name, "save_path", torrent.SavePath, "progress", torrent.Progress)
+			torrentEvents = append(torrentEvents, models.TorrentEvent{
+				Kind:     "torrent_finished",
+				Hash:     hash,
+				Name:     torrent.Name,
+				SavePath: torrent.SavePath,
+			})
+			eventHashes[hash] = struct{}{}
+		}
+	}
+	return torrentEvents
+}
+
+// dispatchEvents handles this tick's events, the engine's and aMule's: comics
+// apart, every event goes through HandleTorrentEvent, then the completion
+// follow-ups (retry, error, library refresh, removal, notification).
+func (w *eventWorker) dispatchEvents(now time.Time, torrentEvents []models.TorrentEvent) {
+	// aMule's completed files join the same completion flow: each event is
+	// handled by its own session, and eD2k episodes are imported by link or
+	// copy so aMule keeps sharing them.
+	ed2kHashes := map[string]struct{}{}
+	var ed2kFiles TorrentEngine
+	if ed2kEnabled(w.cfg) {
+		ed2kFiles = ed2kSession{cfg: w.cfg, pending: w.db.PendingEd2kHashes}
+		for _, event := range ed2kFiles.PollEvents() {
+			ed2kHashes[strings.ToLower(event.Hash)] = struct{}{}
+			torrentEvents = append(torrentEvents, event)
+		}
+	}
+	completionSeen := false
+	for _, event := range torrentEvents {
+		torrents := w.torrents
+		if _, isEd2k := ed2kHashes[strings.ToLower(event.Hash)]; isEd2k {
+			torrents = ed2kFiles
+		}
+		if event.Kind == "torrent_finished" || event.Kind == "storage_moved" {
+			completionSeen = true
+		}
+		w.dispatchEvent(now, event, torrents, ed2kHashes)
+	}
+	if completionSeen {
+		// A finished transfer can leave libtorrent's peak arena resident;
+		// release it now instead of waiting for the next allocation burst.
+		TrimMemory()
+	}
+}
+
+// dispatchEvent handles one event: an integrity check is logged, a comic goes
+// to its own pipeline, everything else through HandleTorrentEvent and, for a
+// completion, its follow-ups. Every event handled reaches the event log.
+func (w *eventWorker) dispatchEvent(now time.Time, event models.TorrentEvent, torrents TorrentEngine, ed2kHashes map[string]struct{}) {
+	publicEvent := event
+	hash := event.Hash
+	cfg := w.cfg
+	if event.Kind == "torrent_checked" && w.logIntegrityCheck(torrents, event) {
+		return
+	}
+	if comic, err := w.comics.Torrent(hash); err == nil && comic != nil {
+		w.completeComic(event, comic)
+		w.eventLog.Push(publicEvent)
+		return
+	}
+	// A torrent already archived (completed with a recorded archive copy)
+	// has been announced before: a repeated completion event, or a
+	// re-process of a missing copy, must not notify a second time.
+	alreadyAnnounced := false
+	if event.Kind == "torrent_finished" || event.Kind == "storage_moved" {
+		if _, sent := w.completionNotified[strings.ToLower(hash)]; sent {
+			alreadyAnnounced = true
+		} else if status, archived, err := w.db.TorrentStatusProcessed(hash); err == nil && status != nil && *status == "completed" &&
+			archived != nil && strings.TrimSpace(*archived) != "" {
+			alreadyAnnounced = true
+		}
+	}
+	processed, handleErr := HandleTorrentEvent(cfg, torrents, w.db, w.moveRequests, w.postSeedMoves, w.storageMoveRetries, event, w.tmdb, w.notifier)
+	isCompletion := event.Kind == "torrent_finished" || event.Kind == "storage_moved"
+	if handleErr != nil && isCompletion && isTransientCompletionError(handleErr) {
+		key := strings.ToLower(hash)
+		retry := w.completionRetries[key]
+		if retry.attempts < completionRetryMaxAttempts {
+			retry.attempts++
+			retry.next = now.Add(completionRetryDelay(retry.attempts))
+			w.completionRetries[key] = retry
+			logging.Warn("torrent completion failed with a transient error; will retry",
+				"hash", hash, "name", event.Name, "attempt", retry.attempts,
+				"max_attempts", completionRetryMaxAttempts,
+				"retry_in", completionRetryDelay(retry.attempts).String(), "error", handleErr)
+			w.eventLog.Push(publicEvent)
 			return
 		}
-		now := time.Now()
-		// The backend can be switched at runtime from the settings/API: pick
-		// up the new engine on the next tick so handlers and automation never
-		// diverge on which transfer plane they drive.
-		if active := state.activeEngine(); active != torrents {
-			torrents = active
-			logging.Info("torrent event worker switched backend", "backend", torrents.Name())
-		}
-		// A long re-check (a large pack on the NAS) gets one line when it starts
-		// and one summary when it ends; the per-minute progress is DEBUG.
-		present := map[string]struct{}{}
-		for _, torrent := range torrents.List() {
-			key := strings.ToLower(torrent.Hash)
-			present[key] = struct{}{}
-			check, wasChecking := checking[key]
-			if torrent.State == "checking_files" {
-				if !wasChecking {
-					checking[key] = dataCheck{started: now, lastLog: now}
-					logging.Info(fmt.Sprintf("🔎 Checking the data already downloaded for «%s»…", torrent.Name))
-				} else if now.Sub(check.lastLog) >= 60*time.Second {
-					check.lastLog = now
-					checking[key] = check
-					logging.Debug("data check in progress", "name", torrent.Name, "progress", logPercent(torrent.Progress))
-				}
-				continue
-			}
-			if wasChecking {
-				delete(checking, key)
-				result := "the data is complete"
-				if torrent.Progress < 99.99 {
-					result = logPercent(torrent.Progress) + " was already downloaded, the rest will be downloaded"
-				}
-				logging.Info(fmt.Sprintf("✅ «%s» checked in %s: %s", torrent.Name, logDuration(now.Sub(check.started)), result))
+		logging.Warn("torrent completion still failing after retries; giving up",
+			"hash", hash, "name", event.Name, "attempts", retry.attempts)
+	}
+	if isCompletion {
+		delete(w.completionRetries, strings.ToLower(hash))
+	}
+	if handleErr != nil {
+		restored, _ := w.db.RestoreUpgrade(hash)
+		_ = w.db.MarkTorrentError(hash, handleErr.Error())
+		// Completion errors are terminal for the persisted state; detach
+		// the torrent so it cannot remain active forever. Keep its source
+		// files in place for manual inspection.
+		if isCompletion {
+			if removed, err := torrents.Remove(hash, false); err != nil {
+				logging.Warn("failed to detach torrent after completion error",
+					"hash", hash, "name", event.Name, "error", err)
+			} else if removed {
+				_ = w.db.MarkTorrentRemovedAt(hash)
 			}
 		}
-		for key := range checking {
-			if _, ok := present[key]; !ok {
-				delete(checking, key)
+		_ = w.notifier.NotifyEvent("torrent_error", map[string]any{
+			"hash":             hash,
+			"name":             event.Name,
+			"title":            event.Name,
+			"error":            handleErr.Error(),
+			"upgrade_restored": restored,
+		})
+		logging.Error(fmt.Sprintf("❌ «%s» finished downloading but could not be processed", event.Name), "hash", hash, "error", handleErr)
+		processed = false
+	}
+	if processed && isCompletion {
+		w.afterCompletion(cfg, torrents, event, ed2kHashes, alreadyAnnounced)
+	}
+	w.eventLog.Push(publicEvent)
+}
+
+// afterCompletion runs what follows a processed completion: the media library
+// refresh, the eD2k history, the removal of a renamed single, the
+// notification, the MediaInfo probe and the indexarr report.
+func (w *eventWorker) afterCompletion(cfg *Config, torrents TorrentEngine, event models.TorrentEvent, ed2kHashes map[string]struct{}, alreadyAnnounced bool) {
+	hash := event.Hash
+	requestMediaLibraryRefresh(cfg, mediaRefreshFolder(w.db, hash))
+	// A completed eD2k download has no seeding session to stay in: aMule
+	// drops it from its queue (3.x) or keeps it only to share the file
+	// (2.3). Record it as removed at once so it reaches the download
+	// history, instead of waiting for the next reconciliation.
+	if _, isEd2k := ed2kHashes[strings.ToLower(event.Hash)]; isEd2k {
+		recordEd2kCompletion(w.db, event.Hash, event.Name)
+	}
+	// A completed single episode/movie is moved into the archive and
+	// renamed, so the file is no longer at the path libtorrent tracks. It
+	// can no longer seed and would re-download the release on the next
+	// check (seen as a duplicate). Drop those torrents, but keep
+	// no-rename/in-place completions seeding as before.
+	//
+	// Only when the user asked for automatic removal: with the setting
+	// off the torrent is paused and stays listed as completed, and the
+	// user clears it with "Pulisci completati".
+	if cfg.Transfer.AutoRemoveCompleted {
+		isPack := false
+		if meta, err := w.db.TorrentMeta(event.Hash); err == nil && meta != nil {
+			isPack = meta.Release.IsPack
+		}
+		_, isEd2k := ed2kHashes[strings.ToLower(event.Hash)]
+		if isEd2k {
+			// aMule keeps sharing the file from its incoming folder: only
+			// the entry in its download list goes.
+			if removed, err := torrents.Remove(event.Hash, false); err == nil && removed {
+				logging.Debug("completed eD2k file taken off aMule's download list", "name", event.Name)
+			}
+		} else if !isPack {
+			if _, err := os.Stat(CompletionPath(&event)); err != nil {
+				if removed, err := torrents.Remove(event.Hash, false); err == nil && removed {
+					_ = w.db.MarkTorrentRemovedAt(event.Hash)
+					logging.Info(fmt.Sprintf("completed torrent removed: file renamed into the archive — «%s»", event.Name))
+				}
 			}
 		}
-		if now.Sub(lastConfigReload) >= 5*time.Second {
-			// Reload only when something actually changed (API writes bump the
-			// config generation, file edits bump the mtime) instead of opening
-			// the config database every 5 seconds. A forced reload every minute
-			// still catches out-of-band database edits.
-			reload := now.Sub(lastConfigForce) >= 60*time.Second
-			if !reload {
-				if info, err := os.Stat(configPath); err == nil && info.ModTime().After(lastConfigMod) {
-					reload = true
-				}
-			}
-			if !reload && ConfigGeneration() != lastConfigGen {
-				reload = true
-			}
-			if reload {
-				lastConfigForce = now
-				if info, err := os.Stat(configPath); err == nil {
-					lastConfigMod = info.ModTime()
-				}
-				lastConfigGen = ConfigGeneration()
-				if loaded, err := LoadConfig(configPath); err == nil {
-					if state.dryRunForced {
-						loaded.DryRun = true
-					}
-					cfg = &loaded
-				} else {
-					// Keep the last valid configuration: falling back to the startup
-					// one would silently revert paths, seed policy and limits.
-					logging.Warn("configuration reload failed; keeping the last valid configuration", "error", err)
-				}
-				// Rebuild the notifier/TMDB client only when the relevant config
-				// changed: they used to be rebuilt (with new HTTP clients) every 5s.
-				fingerprint := fmt.Sprintf("%s|%s|%s",
-					bgDerefStr(cfg.TmdbAPIKey),
-					cfg.TmdbLanguage(),
-					bgJsonString(cfg.Settings),
-				)
-				if fingerprint != lastFingerprint {
-					notifier = FromConfig(cfg).Async()
-					tmdb = NewTmdbClientWithLanguage(cfg.TmdbAPIKey, cfg.TmdbLanguage())
-					lastFingerprint = fingerprint
-				}
-			}
-			lastConfigReload = now
-		}
-		if now.Sub(lastDynamicAdjustment) >= 90*time.Second {
-			queueTicks++
-			effectiveDownloadKib, _ := bgCurrentSpeedLimits(cfg)
-			torrents.AdjustQueue(cfg, effectiveDownloadKib)
-			// Queue visibility: log when the counts shown in the line change, not
-			// on every tick. Comparing the engine "downloading" state instead
-			// re-logged the same counts twice per stall probe (resumed, then
-			// parked again ten minutes later).
-			snapshot := torrents.List()
-			queued := 0
-			transferring := 0
-			idle := 0
-			var rateKib uint64
-			var uploadBytes uint64
-			stuck := []string{}
-			for _, torrent := range snapshot {
-				// A torrent parked by the stall monitor is stuck whatever its
-				// engine state: after a restart it comes back merely paused
-				// until the monitor parks it again, and must not be reported
-				// as waiting in between.
-				if entry, ok := stallWaitStart[torrent.Hash]; ok && entry.stalledSince != nil && !TorrentTransferring(torrent) && torrent.Progress < 100 {
-					idle++
-					rateKib += torrent.DownloadRate
-					stuck = append(stuck, fmt.Sprintf("%s %s", shortTorrentName(torrent.Name), logPercent(torrent.Progress)))
-					continue
-				}
-				if torrent.State == "paused" {
-					queued++
-				}
-				switch {
-				case TorrentTransferring(torrent):
-					transferring++
-				case TorrentIdle(torrent):
-					idle++
-					stuck = append(stuck, fmt.Sprintf("%s %s", shortTorrentName(torrent.Name), logPercent(torrent.Progress)))
-				}
-				rateKib += torrent.DownloadRate
-				uploadBytes += torrent.UploadRate
-			}
-			// Record the line's observed peak for the guided tuning (never shown,
-			// only raises). The sample is the sum of the torrent rates in bytes/s.
-			// A direction under a speed limit is not the line, so it is skipped
-			// (and any earlier peak forgotten): only an uncapped rate counts.
-			peakDownKib, peakUpKib, _ := speedPolicy(cfg)
-			// A direction the latency guard is capping is neither the line nor
-			// a user limit: it is not learned from, and its peak is kept.
-			observedDown, observedUp := rateKib, uploadBytes
-			if guardDown, guardUp := state.latency_guard.caps(); guardDown > 0 || guardUp > 0 {
-				if guardDown > 0 {
-					observedDown = 0
-				}
-				if guardUp > 0 {
-					observedUp = 0
-				}
-			}
-			observeSpeedPeak(cfg, saturatingInt64(observedDown), saturatingInt64(observedUp), peakDownKib > 0, peakUpKib > 0)
-			counts := fmt.Sprintf("%d/%d/%d", transferring, idle, queued)
-			// Skip the first tick after start: the engine has not finished syncing
-			// and resumed torrents read as paused, so that triple is transient
-			// (e.g. "4 waiting" then "2"). Logging it made every restart print two
-			// near-identical lines with different counts.
-			if shouldLogQueueCounts(queueTicks, counts, lastQueueCounts) {
-				rateKib /= 1024
-				speed := fmt.Sprintf("speed %d KB/s", rateKib)
-				// "Active" means really transferring: a download stuck at 0 B/s
-				// is counted apart, not as active. Naming the stuck ones (with
-				// their real progress) tells a partially downloaded torrent
-				// apart from a dead one.
-				line := fmt.Sprintf("📊 Downloads: %d transferring, %d stuck at 0 B/s, %d waiting or paused · %s", transferring, idle, queued, speed)
-				if len(stuck) > 0 {
-					shown := stuck
-					extra := ""
-					if len(shown) > 3 {
-						extra = fmt.Sprintf(" +%d", len(shown)-3)
-						shown = shown[:3]
-					}
-					line += " · stuck: " + strings.Join(shown, ", ") + extra
-				}
-				logging.Debug(line)
-				lastQueueCounts = counts
-			}
-			lastDynamicAdjustment = now
-		}
-		if now.Sub(lastSpeedPolicy) >= 60*time.Second {
-			downloadKib, uploadKib, source := effectiveSpeedLimits(cfg, state.latency_guard)
-			// Always re-assert, not just on change: "Apply now" and the optimizer
-			// set the session limit to the unscheduled value (e.g. 3000 by day)
-			// and the policy must correct it on its own within a minute. The log
-			// stays only on real changes, of the values or of their source (the
-			// schedule starting or ending is logged even with equal values).
-			sourceChanged := lastSpeed == nil || lastSpeed.source != source
-			// aMule follows the same limits as the torrents.
-			applyEd2kSpeedLimits(cfg, downloadKib, uploadKib, now)
-			if _, err := torrents.SetGlobalSpeedLimits(downloadKib, uploadKib); err != nil {
-				logging.Debug("speed policy apply failed", "error", err)
+	}
+	completionMeta, _ := w.db.TorrentMeta(event.Hash)
+	isPack := completionMeta != nil && completionMeta.Release.IsPack
+	if !isPack {
+		processed := bgAnnounceCompletion(w.db, w.notifier, event, completionMeta, alreadyAnnounced, w.completionNotified)
+		// Ground-truth media inspection of the placed file. A missing
+		// ffprobe just leaves the filename-derived quality in place.
+		if completionMeta != nil {
+			probePath := processed
+			release := completionMeta.Release
+			if info, probeErr := ProbeResult(probePath); probeErr != nil {
+				logging.Warn("MediaInfo probe failed for completed file", "title", release.Title, "path", probePath, "error", probeErr)
+			} else if err := w.db.SetMediaInfo(&release, &info); err != nil {
+				logging.Warn("could not save MediaInfo for completed file", "title", release.Title, "path", probePath, "error", err)
 			} else {
-				// The speed and autotune lines explain the speed of something
-				// that is downloading: with nothing downloading (only seeding,
-				// or an idle session) they are noise and are not written. The
-				// state that decides the next line is left as it is, so the
-				// first download after a quiet spell says at what speed it
-				// starts.
-				logSpeed := bgDownloading(torrents)
-				st := state.latency_guard.status()
-				ping := bgPingText(st)
-				maxText := bgSpeedMaxText(cfg)
-				if (sourceChanged || !haveAutotuneLog) && logSpeed {
-					label := map[string]string{
-						speedSourceTemp:         "exception, with expiry",
-						speedSourceTempKeep:     "exception, until removed",
-						speedSourceSchedule:     "scheduled limit",
-						speedSourceScheduleAuto: "schedule window on Auto",
-						speedSourceTempAuto:     "exception: Auto",
-						speedSourceAuto:         "Auto",
-						speedSourceBase:         "fixed limits",
-					}[source]
-					inSchedule := source == speedSourceSchedule || source == speedSourceScheduleAuto
-					wasScheduled := lastSpeed != nil && (lastSpeed.source == speedSourceSchedule || lastSpeed.source == speedSourceScheduleAuto)
-					switch {
-					case source == speedSourceScheduleAuto && !wasScheduled:
-						label = "schedule window on Auto started"
-					case source == speedSourceSchedule && !wasScheduled:
-						label = "schedule started"
-					case !inSchedule && wasScheduled:
-						label += ", schedule ended"
-					}
-					// An Auto window is not necessarily unlimited: while the latency
-					// guard is capping, the numbers are the guard's and the label must
-					// say so (the old "(unlimited)" read as a contradiction).
-					if speedSourceIsAuto(source) {
-						if d, u := state.latency_guard.caps(); d > 0 || u > 0 {
-							label += " · latency guard"
-						}
-					}
-					logging.Info(bgSpeedStatusText(downloadKib, uploadKib, label, maxText, ping))
-					lastAutotuneLog = now
-					lastAutotuneDown, lastAutotuneUp = downloadKib, uploadKib
-					haveAutotuneLog = true
-				} else if logSpeed && now.Sub(lastAutotuneLog) >= 60*time.Second {
-					guardAt, guardDown, guardUp := state.latency_guard.firstCapLog()
-					if at, ok := bgAdoptFirstCap(lastAutotuneLog, guardAt); ok {
-						// The guard printed this cap itself, at once: adopt
-						// that line as the last one logged instead of
-						// repeating the same numbers (and "from unlimited")
-						// a few seconds later.
-						lastAutotuneLog = at
-						lastAutotuneDown, lastAutotuneUp = guardDown, guardUp
-					} else {
-						prevDown, prevUp := int64(0), int64(0)
-						if lastSpeed != nil {
-							prevDown, prevUp = lastSpeed.download, lastSpeed.upload
-						}
-						if bgSpeedWorthLogging(lastAutotuneDown, downloadKib, prevDown) || bgSpeedWorthLogging(lastAutotuneUp, uploadKib, prevUp) {
-							changes := make([]string, 0, 2)
-							if downloadKib != lastAutotuneDown {
-								changes = append(changes, "download "+bgSpeedDeltaText(lastAutotuneDown, downloadKib))
-							}
-							if uploadKib != lastAutotuneUp {
-								changes = append(changes, "upload "+bgSpeedDeltaText(lastAutotuneUp, uploadKib))
-							}
-							// The control loop moves the cap every minute: each
-							// step goes to the debug log, the info log gets the
-							// first step of a mode and a digest every 15 minutes.
-							step := bgAutotuneStepText(downloadKib, uploadKib, changes, maxText, ping)
-							if autotuneDigest.add(now, downloadKib, uploadKib, st.Mode) {
-								logging.Info(step)
-							} else {
-								logging.Debug(step)
-							}
-							lastAutotuneLog = now
-							lastAutotuneDown, lastAutotuneUp = downloadKib, uploadKib
-						}
-					}
-				}
-				if logSpeed {
-					if line, ok := autotuneDigest.summary(now, downloadKib, uploadKib); ok {
-						logging.Info(line)
-					}
-				}
-				lastSpeed = &bgSpeedPair{download: downloadKib, upload: uploadKib, source: source}
-			}
-			lastSpeedPolicy = now
-		}
-		// `debug_enabled`: periodic diagnostics for crashes/RAM/loops.
-		if cfg.DebugEnabled() && now.Sub(lastDebugLog) >= 300*time.Second {
-			lastDebugLog = now
-			logging.Debug("debug diagnostics", "resident_kb", bgResidentKB(), "torrents", len(torrents.List()))
-		}
-		var pinned *string
-		if value, ok := cfg.Settings["torrent_pinned_hash"]; ok {
-			trimmed := strings.ToLower(strings.TrimSpace(value))
-			if trimmed != "" {
-				pinned = &trimmed
+				logging.Debug("saved media details for completed file",
+					"title", release.Title, "path", probePath, "resolution", info.Resolution(), "hdr", info.HDR, "bit_depth", info.BitDepth)
 			}
 		}
-		if !bgStrPtrEqual(lastPin, pinned) {
-			applied := false
-			if pinned != nil {
-				if _, err := torrents.SetPin(*pinned, true); err != nil {
-					logging.Debug("pin apply failed; will retry", "error", err)
-				} else {
-					applied = true
-				}
+	}
+	// The file is complete: tell every configured indexarr which
+	// release arrived, so its Download tab can tell this grab from
+	// one that was only handed over. Off the request path and
+	// idempotent on both sides.
+	network := ""
+	title := event.Name
+	if completionMeta != nil {
+		network = completionMeta.Release.Network
+		title = completionMeta.Release.Title
+	}
+	notifyIndexarrCompletion(cfg, event.Hash, indexarrProtocol(network, event.Hash), title, 0, time.Now())
+}
+
+// logIntegrityCheck logs the end of a re-check, as a warning only when it
+// reveals a discrepancy. It reports true for the transient state that follows
+// a move into the archive, which is not processed further.
+func (w *eventWorker) logIntegrityCheck(torrents TorrentEngine, event models.TorrentEvent) bool {
+	var found *models.TorrentView
+	for _, torrent := range torrents.List() {
+		if strings.EqualFold(torrent.Hash, event.Hash) {
+			candidate := torrent
+			found = &candidate
+			break
+		}
+	}
+	if found != nil {
+		// A routine re-check of an in-progress download is normal and
+		// must not spam the log. Surface it only when it reveals a
+		// discrepancy: a torrent error, or data that the database
+		// already considers completed but that is not actually
+		// complete on disk.
+		discrepancy := strings.TrimSpace(found.Error) != ""
+		if status, statusErr := w.db.TorrentStatus(event.Hash); statusErr == nil && status != nil &&
+			*status == "completed" && found.Progress < 99.99 {
+			if archivePath, present := bgCompletedArchivePresent(w.db, event.Hash, found.TotalSize); present && strings.TrimSpace(found.Error) == "" {
+				// After MoveStorage, libtorrent may emit torrent_checked while
+				// its resumed session still reports paused/0%. The verified
+				// archived payload is present, so this is not corruption.
+				logging.Debug("integrity check reported a transient state after archive relocation",
+					"name", event.Name, "path", archivePath, "state", found.State)
+				return true
+			}
+			discrepancy = true
+		}
+		if discrepancy {
+			logging.Warn("completed torrent needs integrity verification",
+				"hash", event.Hash, "name", event.Name, "state", found.State,
+				"progress", found.Progress, "checked_bytes", found.TotalDone, "total_bytes", found.TotalSize,
+				"error", found.Error)
+		} else {
+			logging.Debug("torrent integrity check completed",
+				"hash", event.Hash, "name", event.Name, "state", found.State,
+				"progress", found.Progress, "checked_bytes", found.TotalDone, "total_bytes", found.TotalSize)
+		}
+	} else {
+		logging.Debug("torrent integrity check completed; torrent is no longer in the session",
+			"hash", event.Hash, "name", event.Name)
+	}
+	return false
+}
+
+// completeComic archives a finished comic torrent and notifies it.
+func (w *eventWorker) completeComic(event models.TorrentEvent, comic *ComicTorrent) {
+	hash := event.Hash
+	// A comic torrent always carries the "Comic" tag, so it can be
+	// filtered with the other downloads and routed by category.
+	_ = w.db.SetTorrentTag(hash, "Comic")
+	if event.Kind == "torrent_finished" || event.Kind == "storage_moved" {
+		if err := w.comics.CompleteTorrent(hash, event.SavePath); err != nil {
+			_ = w.notifier.NotifyEvent("comic_error", map[string]any{
+				"hash":  hash,
+				"title": comic.Title,
+				"error": err.Error(),
+			})
+			logging.Error(fmt.Sprintf("Could not save the completed comic «%s»", comic.Title), "error", err)
+		} else {
+			comicSize, _ := SizeOfPath(CompletionPath(&event))
+			if err := w.notifier.NotifyEvent("comic_completed", map[string]any{
+				"hash":       hash,
+				"title":      comic.Title,
+				"post_url":   comic.PostURL,
+				"path":       event.SavePath,
+				"size_bytes": comicSize,
+				"method":     "torrent",
+			}); err != nil {
+				logging.Warn(fmt.Sprintf("Could not send the notification for the comic «%s»", comic.Title), "error", err)
 			} else {
-				if _, err := torrents.SetPin("", false); err != nil {
-					logging.Debug("unpin apply failed; will retry", "error", err)
-				} else {
-					applied = true
-				}
+				logging.Debug("completion notification sent", "hash", hash, "title", comic.Title)
 			}
-			if applied {
-				lastPin = bgCopyStrPtr(pinned)
-			}
+			logging.Info(fmt.Sprintf("🎉 Comic «%s» downloaded and archived in %s", comic.Title, event.SavePath))
 		}
-		sequential := false
-		if value, ok := cfg.Settings[settingTorrentSequential]; ok {
-			sequential = settingTruthy(value)
-		}
-		if lastSequential == nil || *lastSequential != sequential {
-			if _, err := torrents.SetSequential(sequential); err != nil {
-				logging.Debug("sequential apply failed; will retry", "error", err)
-			} else {
-				lastSequential = &sequential
-			}
-		}
-		// A plain flag on the engine: re-applying it each pass also covers a
-		// switch of the active engine.
-		torrents.SetFirstLastDefault(settingTruthy(cfg.Settings[settingTorrentFirstLast]))
-		MonitorMetadata(cfg, torrents, db, notifier, metadataWaitStart, metadataFirstSeen, metadataLastWarning)
-		MonitorStalled(cfg, torrents, db, notifier, stallWaitStart)
-		if ed2kEnabled(cfg) && now.Sub(lastEd2kStallCheck) >= 10*time.Minute {
-			lastEd2kStallCheck = now
-			MonitorEd2kStalled(cfg, db, notifier, now)
-		}
-		if now.Sub(lastRamdiskCheck) >= 30*time.Second {
-			ReconcileRamdisk(cfg, torrents, ramdiskAttempts)
-			lastRamdiskCheck = now
-		}
-		RetryStorageMoves(torrents, moveRequests, postSeedMoves, storageMoveRetries)
-		torrentEvents := torrents.PollEvents()
-		eventHashes := map[string]struct{}{}
-		for _, event := range torrentEvents {
-			eventHashes[strings.ToLower(event.Hash)] = struct{}{}
-			delete(settledTorrents, strings.ToLower(event.Hash))
-		}
-		// Forget torrents that left the session.
-		if len(settledTorrents) > 0 {
-			present := map[string]struct{}{}
-			for _, torrent := range torrents.List() {
-				present[strings.ToLower(torrent.Hash)] = struct{}{}
-			}
-			for hash := range settledTorrents {
-				if _, ok := present[hash]; !ok {
-					delete(settledTorrents, hash)
-				}
-			}
-		}
-		// A torrent may reach 100% while Gextto is restarting or while its
-		// completion event is already gone from libtorrent's alert queue.
-		// Recreate the event from the persisted torrent status so postprocess and
-		// notifications are not silently skipped. Events are the primary signal:
-		// this scan is only a safety net, so it runs at start-up and then every
-		// completionRecoveryInterval instead of at every tick.
-		if now.Sub(lastRecoveryScan) >= completionRecoveryInterval {
-			lastRecoveryScan = now
-			for _, torrent := range torrents.List() {
-				if !torrent.HasMetadata {
-					continue
-				}
-				hash := strings.ToLower(torrent.Hash)
-				if _, ok := eventHashes[hash]; ok {
-					continue
-				}
-				if settled, ok := settledTorrents[hash]; ok {
-					if now.Before(settled.until) && settled.savePath == torrent.SavePath {
-						continue
-					}
-					delete(settledTorrents, hash)
-				}
-				// A completion that failed transiently is retried on its own backoff,
-				// not at every tick.
-				if retry, waiting := completionRetries[hash]; waiting && now.Before(retry.next) {
-					continue
-				}
-				_, inMoves := moveRequests[hash]
-				_, inRetries := storageMoveRetries[hash]
-				_, inPostSeed := postSeedMoves[hash]
-				if inMoves || inRetries || inPostSeed {
-					if meta, metaErr := db.TorrentMeta(hash); metaErr == nil && meta != nil {
-						if dest, ok := ConfiguredDestinationFor(&meta.Release, cfg); ok && SamePath(torrent.SavePath, dest) {
-							delete(moveRequests, hash)
-							delete(storageMoveRetries, hash)
-							delete(postSeedMoves, hash)
-							inMoves, inRetries, inPostSeed = false, false, false
-						}
-					}
-					if inMoves || inRetries || inPostSeed {
-						continue
-					}
-				}
-				// In-progress downloads that are actively downloading (<99.99% and State "downloading" or "queued")
-				// cannot possibly need completion recovery; skip immediately to avoid redundant SQLite queries.
-				if torrent.Progress < 99.99 && (torrent.State == "downloading" || torrent.State == "queued") {
-					continue
-				}
-				// A completed single whose end-of-seed move already reached the
-				// archive but whose import never ran (lost storage_moved alert, or a
-				// restart) is finalized through the normal storage_moved path. Marking
-				// the raw archive path complete here would skip the rename, the
-				// MediaInfo probe and the completion notification.
-				if bgTorrentNeedsArchiveImport(cfg, db, &torrent) {
-					status, _ := db.TorrentStatus(hash)
-					isCompletedDB := status != nil && *status == "completed"
-					if !isCompletedDB && torrent.Progress < 99.99 {
-						if checked, checkErr := torrents.ForceRecheck(hash); checkErr != nil || !checked {
-							logging.Debug("existing archive recheck could not be started", "error", checkErr)
-						}
-						continue
-					}
-					logging.Debug("recovering completed torrent without completion event",
-						"hash", hash, "name", torrent.Name, "save_path", torrent.SavePath,
-						"progress", torrent.Progress, "kind", "storage_moved")
-					torrentEvents = append(torrentEvents, models.TorrentEvent{
-						Kind:     "storage_moved",
-						Hash:     hash,
-						Name:     torrent.Name,
-						SavePath: torrent.SavePath,
-					})
-					eventHashes[hash] = struct{}{}
-					continue
-				}
-				if torrent.Progress < 99.99 {
-					continue
-				}
-				pending := false
-				if meta, err := db.TorrentMeta(hash); err == nil && meta != nil {
-					if status, err := db.TorrentStatus(hash); err == nil && status != nil {
-						if *status != "completed" && *status != "error" && *status != "removed" {
-							pending = true
-						}
-					}
-				}
-				if !pending {
-					settledTorrents[hash] = settledTorrent{savePath: torrent.SavePath, until: now.Add(settledRecheckInterval)}
-				}
-				if pending {
-					logging.Debug("recovering completed torrent without completion event",
-						"hash", hash, "name", torrent.Name, "save_path", torrent.SavePath, "progress", torrent.Progress)
-					torrentEvents = append(torrentEvents, models.TorrentEvent{
-						Kind:     "torrent_finished",
-						Hash:     hash,
-						Name:     torrent.Name,
-						SavePath: torrent.SavePath,
-					})
-					eventHashes[hash] = struct{}{}
-				}
-			}
-		}
-		// aMule's completed files join the same completion flow: each event is
-		// handled by its own session, and eD2k episodes are imported by link or
-		// copy so aMule keeps sharing them.
-		ed2kHashes := map[string]struct{}{}
-		var ed2kFiles TorrentEngine
-		if ed2kEnabled(cfg) {
-			ed2kFiles = ed2kSession{cfg: cfg, pending: db.PendingEd2kHashes}
-			for _, event := range ed2kFiles.PollEvents() {
-				ed2kHashes[strings.ToLower(event.Hash)] = struct{}{}
-				torrentEvents = append(torrentEvents, event)
-			}
-		}
-		completionSeen := false
-		for _, event := range torrentEvents {
-			publicEvent := event
-			hash := event.Hash
-			torrents := torrents
-			cfg := cfg
-			if _, isEd2k := ed2kHashes[strings.ToLower(hash)]; isEd2k {
-				torrents = ed2kFiles
-			}
-			if event.Kind == "torrent_finished" || event.Kind == "storage_moved" {
-				completionSeen = true
-			}
-			if event.Kind == "torrent_checked" {
-				var found *models.TorrentView
-				for _, torrent := range torrents.List() {
-					if strings.EqualFold(torrent.Hash, event.Hash) {
-						candidate := torrent
-						found = &candidate
-						break
-					}
-				}
-				if found != nil {
-					// A routine re-check of an in-progress download is normal and
-					// must not spam the log. Surface it only when it reveals a
-					// discrepancy: a torrent error, or data that the database
-					// already considers completed but that is not actually
-					// complete on disk.
-					discrepancy := strings.TrimSpace(found.Error) != ""
-					if status, statusErr := db.TorrentStatus(event.Hash); statusErr == nil && status != nil &&
-						*status == "completed" && found.Progress < 99.99 {
-						if archivePath, present := bgCompletedArchivePresent(db, event.Hash, found.TotalSize); present && strings.TrimSpace(found.Error) == "" {
-							// After MoveStorage, libtorrent may emit torrent_checked while
-							// its resumed session still reports paused/0%. The verified
-							// archived payload is present, so this is not corruption.
-							logging.Debug("integrity check reported a transient state after archive relocation",
-								"name", event.Name, "path", archivePath, "state", found.State)
-							continue
-						}
-						discrepancy = true
-					}
-					if discrepancy {
-						logging.Warn("completed torrent needs integrity verification",
-							"hash", event.Hash, "name", event.Name, "state", found.State,
-							"progress", found.Progress, "checked_bytes", found.TotalDone, "total_bytes", found.TotalSize,
-							"error", found.Error)
-					} else {
-						logging.Debug("torrent integrity check completed",
-							"hash", event.Hash, "name", event.Name, "state", found.State,
-							"progress", found.Progress, "checked_bytes", found.TotalDone, "total_bytes", found.TotalSize)
-					}
-				} else {
-					logging.Debug("torrent integrity check completed; torrent is no longer in the session",
-						"hash", event.Hash, "name", event.Name)
-				}
-			}
-			if comic, err := comics.Torrent(hash); err == nil && comic != nil {
-				// A comic torrent always carries the "Comic" tag, so it can be
-				// filtered with the other downloads and routed by category.
-				_ = db.SetTorrentTag(hash, "Comic")
-				if event.Kind == "torrent_finished" || event.Kind == "storage_moved" {
-					if err := comics.CompleteTorrent(hash, event.SavePath); err != nil {
-						_ = notifier.NotifyEvent("comic_error", map[string]any{
-							"hash":  hash,
-							"title": comic.Title,
-							"error": err.Error(),
-						})
-						logging.Error(fmt.Sprintf("Could not save the completed comic «%s»", comic.Title), "error", err)
-					} else {
-						comicSize, _ := SizeOfPath(CompletionPath(&event))
-						if err := notifier.NotifyEvent("comic_completed", map[string]any{
-							"hash":       hash,
-							"title":      comic.Title,
-							"post_url":   comic.PostURL,
-							"path":       event.SavePath,
-							"size_bytes": comicSize,
-							"method":     "torrent",
-						}); err != nil {
-							logging.Warn(fmt.Sprintf("Could not send the notification for the comic «%s»", comic.Title), "error", err)
-						} else {
-							logging.Debug("completion notification sent", "hash", hash, "title", comic.Title)
-						}
-						logging.Info(fmt.Sprintf("🎉 Comic «%s» downloaded and archived in %s", comic.Title, event.SavePath))
-					}
-				}
-				eventLog.Push(publicEvent)
-				continue
-			}
-			// A torrent already archived (completed with a recorded archive copy)
-			// has been announced before: a repeated completion event, or a
-			// re-process of a missing copy, must not notify a second time.
-			alreadyAnnounced := false
-			if event.Kind == "torrent_finished" || event.Kind == "storage_moved" {
-				if _, sent := completionNotified[strings.ToLower(hash)]; sent {
-					alreadyAnnounced = true
-				} else if status, archived, err := db.TorrentStatusProcessed(hash); err == nil && status != nil && *status == "completed" &&
-					archived != nil && strings.TrimSpace(*archived) != "" {
-					alreadyAnnounced = true
-				}
-			}
-			processed, handleErr := HandleTorrentEvent(cfg, torrents, db, moveRequests, postSeedMoves, storageMoveRetries, event, tmdb, notifier)
-			isCompletion := event.Kind == "torrent_finished" || event.Kind == "storage_moved"
-			if handleErr != nil && isCompletion && isTransientCompletionError(handleErr) {
-				key := strings.ToLower(hash)
-				retry := completionRetries[key]
-				if retry.attempts < completionRetryMaxAttempts {
-					retry.attempts++
-					retry.next = now.Add(completionRetryDelay(retry.attempts))
-					completionRetries[key] = retry
-					logging.Warn("torrent completion failed with a transient error; will retry",
-						"hash", hash, "name", event.Name, "attempt", retry.attempts,
-						"max_attempts", completionRetryMaxAttempts,
-						"retry_in", completionRetryDelay(retry.attempts).String(), "error", handleErr)
-					eventLog.Push(publicEvent)
-					continue
-				}
-				logging.Warn("torrent completion still failing after retries; giving up",
-					"hash", hash, "name", event.Name, "attempts", retry.attempts)
-			}
-			if isCompletion {
-				delete(completionRetries, strings.ToLower(hash))
-			}
-			if handleErr != nil {
-				restored, _ := db.RestoreUpgrade(hash)
-				_ = db.MarkTorrentError(hash, handleErr.Error())
-				// Completion errors are terminal for the persisted state; detach
-				// the torrent so it cannot remain active forever. Keep its source
-				// files in place for manual inspection.
-				if isCompletion {
-					if removed, err := torrents.Remove(hash, false); err != nil {
-						logging.Warn("failed to detach torrent after completion error",
-							"hash", hash, "name", event.Name, "error", err)
-					} else if removed {
-						_ = db.MarkTorrentRemovedAt(hash)
-					}
-				}
-				_ = notifier.NotifyEvent("torrent_error", map[string]any{
-					"hash":             hash,
-					"name":             event.Name,
-					"title":            event.Name,
-					"error":            handleErr.Error(),
-					"upgrade_restored": restored,
-				})
-				logging.Error(fmt.Sprintf("❌ «%s» finished downloading but could not be processed", event.Name), "hash", hash, "error", handleErr)
-				processed = false
-			}
-			if processed && (event.Kind == "torrent_finished" || event.Kind == "storage_moved") {
-				requestMediaLibraryRefresh(cfg, mediaRefreshFolder(db, hash))
-			}
-			// A completed eD2k download has no seeding session to stay in: aMule
-			// drops it from its queue (3.x) or keeps it only to share the file
-			// (2.3). Record it as removed at once so it reaches the download
-			// history, instead of waiting for the next reconciliation.
-			if processed && (event.Kind == "torrent_finished" || event.Kind == "storage_moved") {
-				if _, isEd2k := ed2kHashes[strings.ToLower(event.Hash)]; isEd2k {
-					recordEd2kCompletion(db, event.Hash, event.Name)
-				}
-			}
-			// A completed single episode/movie is moved into the archive and
-			// renamed, so the file is no longer at the path libtorrent tracks. It
-			// can no longer seed and would re-download the release on the next
-			// check (seen as a duplicate). Drop those torrents, but keep
-			// no-rename/in-place completions seeding as before.
-			//
-			// Only when the user asked for automatic removal: with the setting
-			// off the torrent is paused and stays listed as completed, and the
-			// user clears it with "Pulisci completati".
-			if processed && cfg.Transfer.AutoRemoveCompleted && (event.Kind == "torrent_finished" || event.Kind == "storage_moved") {
-				isPack := false
-				if meta, err := db.TorrentMeta(event.Hash); err == nil && meta != nil {
-					isPack = meta.Release.IsPack
-				}
-				_, isEd2k := ed2kHashes[strings.ToLower(event.Hash)]
-				if isEd2k {
-					// aMule keeps sharing the file from its incoming folder: only
-					// the entry in its download list goes.
-					if removed, err := torrents.Remove(event.Hash, false); err == nil && removed {
-						logging.Debug("completed eD2k file taken off aMule's download list", "name", event.Name)
-					}
-				} else if !isPack {
-					if _, err := os.Stat(CompletionPath(&event)); err != nil {
-						if removed, err := torrents.Remove(event.Hash, false); err == nil && removed {
-							_ = db.MarkTorrentRemovedAt(event.Hash)
-							logging.Info(fmt.Sprintf("completed torrent removed: file renamed into the archive — «%s»", event.Name))
-						}
-					}
-				}
-			}
-			if processed && (event.Kind == "torrent_finished" || event.Kind == "storage_moved") {
-				completionMeta, _ := db.TorrentMeta(event.Hash)
-				isPack := completionMeta != nil && completionMeta.Release.IsPack
-				if !isPack {
-					processed := bgAnnounceCompletion(db, notifier, event, completionMeta, alreadyAnnounced, completionNotified)
-					// Ground-truth media inspection of the placed file. A missing
-					// ffprobe just leaves the filename-derived quality in place.
-					if completionMeta != nil {
-						probePath := processed
-						release := completionMeta.Release
-						if info, probeErr := ProbeResult(probePath); probeErr != nil {
-							logging.Warn("MediaInfo probe failed for completed file", "title", release.Title, "path", probePath, "error", probeErr)
-						} else if err := db.SetMediaInfo(&release, &info); err != nil {
-							logging.Warn("could not save MediaInfo for completed file", "title", release.Title, "path", probePath, "error", err)
-						} else {
-							logging.Debug("saved media details for completed file",
-								"title", release.Title, "path", probePath, "resolution", info.Resolution(), "hdr", info.HDR, "bit_depth", info.BitDepth)
-						}
-					}
-				}
-				// The file is complete: tell every configured indexarr which
-				// release arrived, so its Download tab can tell this grab from
-				// one that was only handed over. Off the request path and
-				// idempotent on both sides.
-				network := ""
-				title := event.Name
-				if completionMeta != nil {
-					network = completionMeta.Release.Network
-					title = completionMeta.Release.Title
-				}
-				notifyIndexarrCompletion(cfg, event.Hash, indexarrProtocol(network, event.Hash), title, 0, time.Now())
-			}
-			eventLog.Push(publicEvent)
-		}
-		if completionSeen {
-			// A finished transfer can leave libtorrent's peak arena resident;
-			// release it now instead of waiting for the next allocation burst.
-			TrimMemory()
-		}
-		DetachErrorTorrents(torrents, db, startupHashes, notErrorChecked)
-		DetachCompletedArchivedSingles(cfg, torrents, db, notDetachable)
-		RejectActivePackIdentityMismatches(torrents, db, packIdentityChecked)
-		InspectActivePacks(cfg, torrents, db, packInspectionChecked)
-		// Remove completed torrents that have finished seeding before the seed
-		// policy moves them to disk only to delete them. With automatic removal
-		// off, completed torrents stay listed as completed until the user runs
-		// "Pulisci completati".
-		RemoveSeededCompleted(cfg, torrents, db, postSeedMoves)
-		// Enforce the seed policy only after handling this tick's events: with a
-		// very low seed limit a just-finished torrent could otherwise be removed
-		// before its `torrent_finished` event is post-processed and archived.
-		EnforceSeedPolicy(cfg, torrents, db, postSeedMoves, storageMoveRetries, seedCopyWarnings)
-		syncTorrentMoves(db, persistedMoves, storageMoveRetries, postSeedMoves)
 	}
 }
 
