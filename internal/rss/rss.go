@@ -85,7 +85,7 @@ func fetch(ctx context.Context, client *http.Client, rawURL, source string, foll
 	body, contentType, err := get(ctx, client, rawURL)
 	if err != nil {
 		if strings.HasPrefix(err.Error(), "HTTP ") {
-			return nil, fmt.Errorf("rss: %s returned %v", source, err)
+			return nil, fmt.Errorf("rss: %s returned %w", source, err)
 		}
 		return nil, err
 	}

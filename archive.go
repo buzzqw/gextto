@@ -1364,7 +1364,7 @@ func applyArchiveRetention(cfg *Config, archive *Archive) (int, error) {
 	if cfg == nil || archive == nil || cfg.DryRun {
 		return 0, nil
 	}
-	if !settingTruthy(cfg.Settings["archive_cleanup_enabled"]) {
+	if !settingTruthy(cfg.Settings[settingArchiveCleanupEnabled]) {
 		return 0, nil
 	}
 	days, ok := archiveRetentionDays(cfg.Settings)
@@ -1372,7 +1372,7 @@ func applyArchiveRetention(cfg *Config, archive *Archive) (int, error) {
 		return 0, nil
 	}
 	keep := int64(0)
-	if value, ok := cfg.Settings["archive_keep_min"]; ok {
+	if value, ok := cfg.Settings[settingArchiveKeepMin]; ok {
 		if parsed, err := strconv.ParseInt(strings.TrimSpace(value), 10, 64); err == nil && parsed > 0 {
 			keep = parsed
 		}

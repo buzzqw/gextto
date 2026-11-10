@@ -74,15 +74,13 @@ its gate; a rejected one moves to *Not planned*.
   told apart by prefixes (`gh0_`…`gh7_`, `tev_`, `bg_`) instead of by package. Gate: a
   decision on the first boundary (HTTP handlers, acquisition, storage) and one area
   migrated with the suite green.
-- **Settings as typed keys** — the constants are generated from the settings index
-  (`settings_keys_gen.go`), but many reads still use `cfg.Settings["literal"]`, so a typo
-  compiles and returns the default. Gate: one family of accessors migrated.
 - **`*Database` split** — 233 methods cover series, movies, torrents, providers,
   blocklist, queues, cycles and maintenance. Gate: `internal/quality` extracted first (the
   moved methods call the root package's scoring).
-- **Error wrapping and log wording** — 280 log calls build their sentence with `Sprintf`
-  although the logger takes structured fields, and 490 `fmt.Errorf` calls drop the cause
-  because they do not use `%w`. Mechanical, area by area, tests green.
+- **Log wording through structured fields** — about 280 log calls build their sentence
+  with `Sprintf`, which is also how a log line becomes the natural sentence the log rules
+  ask for; the open question is only where a field would read better than the sentence.
+  Gate: a decision on one area's lines, with `log_readability_test.go` green.
 - **IP address reported to trackers** — send an operator-chosen address in the announce
   (HTTP `ip=` and the UDP equivalent). Gate: a NAT or VPN setup where the tracker records
   the wrong address.

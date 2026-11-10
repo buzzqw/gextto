@@ -689,7 +689,7 @@ func CleanTrash(w http.ResponseWriter, r *http.Request, s *AppState) {
 	}
 	retentionDays := int64(0)
 	if !input.Force {
-		if parsed, err := strconv.ParseInt(cfg.Settings["trash_retention_days"], 10, 64); err == nil {
+		if parsed, err := strconv.ParseInt(cfg.Settings[settingTrashRetentionDays], 10, 64); err == nil {
 			retentionDays = parsed
 		}
 		if retentionDays < 0 {

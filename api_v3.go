@@ -231,7 +231,7 @@ func v3Tags(cfg *Config) []v3Tag {
 	}
 	raw := strings.TrimSpace(cfg.Settings["v3_tags"])
 	if raw == "" {
-		raw = strings.TrimSpace(cfg.Settings["qbittorrent_tag"])
+		raw = strings.TrimSpace(cfg.Settings[settingQbittorrentTag])
 	}
 	seen := map[string]bool{}
 	out := []v3Tag{}

@@ -54,7 +54,7 @@ func ActiveTorrentBackend(s *AppState) TorrentBackend {
 func TorrentBackendName(cfg *Config) string {
 	value := DefaultTorrentBackend
 	if cfg != nil {
-		if raw, ok := cfg.Settings["torrent_backend"]; ok {
+		if raw, ok := cfg.Settings[settingTorrentBackend]; ok {
 			value = strings.ToLower(strings.TrimSpace(raw))
 			if value == "" {
 				value = DefaultTorrentBackend
@@ -92,7 +92,7 @@ func TorrentBackendStatus(w http.ResponseWriter, r *http.Request, s *AppState) {
 		"capabilities":      active.Capabilities(),
 		"capability_matrix": CapabilityMatrix(active.Name()),
 		"capability_parity": CapabilityParity(),
-		"qbittorrent_url":   settingsOr(cfg, "qbittorrent_url", ""),
+		"qbittorrent_url":   settingsOr(cfg, settingQbittorrentUrl, ""),
 	}
 	if syncer, ok := active.(torrentSessionSyncer); ok {
 		payload["sync"] = syncer.SyncStats()
@@ -250,7 +250,7 @@ func proposeQbittorrentMappings(cfg *Config) (string, int, error) {
 	if !different {
 		return "", 0, nil
 	}
-	existing, err := ParsePathMappings(cfg.Settings["qbittorrent_path_mappings"])
+	existing, err := ParsePathMappings(cfg.Settings[settingQbittorrentPathMappings])
 	if err != nil {
 		return "", 0, err
 	}

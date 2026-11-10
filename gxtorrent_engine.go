@@ -70,7 +70,7 @@ func gxTorrentSettingsFromConfig(cfg *Config) (gxTorrentSettings, error) {
 		return gxTorrentSettings{}, fmt.Errorf("gx-torrent configuration is unavailable")
 	}
 	timeout := 15 * time.Second
-	if raw := strings.TrimSpace(cfg.Settings["gxtorrent_request_timeout_secs"]); raw != "" {
+	if raw := strings.TrimSpace(cfg.Settings[settingGxtorrentRequestTimeoutSecs]); raw != "" {
 		parsed, err := strconv.Atoi(raw)
 		if err != nil || parsed < 1 || parsed > 300 {
 			return gxTorrentSettings{}, fmt.Errorf("gxtorrent_request_timeout_secs must be between 1 and 300")
@@ -78,14 +78,14 @@ func gxTorrentSettingsFromConfig(cfg *Config) (gxTorrentSettings, error) {
 		timeout = time.Duration(parsed) * time.Second
 	}
 	poll := 1500 * time.Millisecond
-	if raw := strings.TrimSpace(cfg.Settings["gxtorrent_poll_interval_ms"]); raw != "" {
+	if raw := strings.TrimSpace(cfg.Settings[settingGxtorrentPollIntervalMs]); raw != "" {
 		parsed, err := strconv.Atoi(raw)
 		if err != nil || (parsed != 0 && (parsed < 250 || parsed > 60000)) {
 			return gxTorrentSettings{}, fmt.Errorf("gxtorrent_poll_interval_ms must be between 250 and 60000")
 		}
 		poll = time.Duration(parsed) * time.Millisecond
 	}
-	baseURL := strings.TrimRight(strings.TrimSpace(cfg.Settings["gxtorrent_url"]), "/")
+	baseURL := strings.TrimRight(strings.TrimSpace(cfg.Settings[settingGxtorrentUrl]), "/")
 	if baseURL == "" {
 		baseURL = "http://127.0.0.1:8890"
 	}
@@ -100,13 +100,13 @@ func gxTorrentSettingsFromConfig(cfg *Config) (gxTorrentSettings, error) {
 	}
 	return gxTorrentSettings{
 		BaseURL:           baseURL,
-		Token:             strings.TrimSpace(cfg.Settings["gxtorrent_token"]),
+		Token:             strings.TrimSpace(cfg.Settings[settingGxtorrentToken]),
 		Listen:            listen,
 		Timeout:           timeout,
 		PollInterval:      poll,
-		AnonymousMode:     settingsBool(cfg, "gxtorrent_anonymous_mode", false),
-		RecheckOnComplete: settingsBool(cfg, "gxtorrent_recheck_on_complete", false),
-		AnnounceAllInTier: settingsBool(cfg, "gxtorrent_announce_all_in_tier", true),
+		AnonymousMode:     settingsBool(cfg, settingGxtorrentAnonymousMode, false),
+		RecheckOnComplete: settingsBool(cfg, settingGxtorrentRecheckOnComplete, false),
+		AnnounceAllInTier: settingsBool(cfg, settingGxtorrentAnnounceAllInTier, true),
 		// Gextto always starts and supervises its own gx-torrent daemon. An
 		// external daemon already answering on the URL is used as-is.
 		Managed:  true,
@@ -123,7 +123,7 @@ func gxManagedListenSetting(cfg *Config) string {
 	if cfg == nil {
 		return "0.0.0.0:8890"
 	}
-	if listen := strings.TrimSpace(cfg.Settings["gxtorrent_listen"]); listen != "" {
+	if listen := strings.TrimSpace(cfg.Settings[settingGxtorrentListen]); listen != "" {
 		return listen
 	}
 	return "0.0.0.0:8890"
@@ -1146,7 +1146,7 @@ func gxQueuePolicy(cfg *Config) map[string]any {
 	// default. Disabling it makes the daemon use static sizing and the manual
 	// per-value settings, «Coda dinamica» (torrent_dynamic_queue) included: it
 	// used to be ignored, so the dynamic queue could not be kept on by hand.
-	auto := settingsBool(cfg, "gxtorrent_auto", true)
+	auto := settingsBool(cfg, settingGxtorrentAuto, true)
 	policy := map[string]any{
 		"active_downloads": clamp(lt.ActiveDownloads),
 		"active_seeds":     clamp(lt.ActiveSeeds),
@@ -1163,12 +1163,12 @@ func gxQueuePolicy(cfg *Config) map[string]any {
 		// settings page = no cap, 0 for the daemon). With conn_auto the daemon
 		// sizes the cap from the machine and this value is only the ceiling.
 		"max_connections_per_torrent": max(numberSettingInt(cfg.Settings, "torrent_max_connections_per_torrent", -1), 0),
-		"conn_auto":                   settingsBool(cfg, "torrent_connections_auto", true),
+		"conn_auto":                   settingsBool(cfg, settingTorrentConnectionsAuto, true),
 	}
 	// Disk guard: Gextto's minimum free space also pauses the daemon's running
 	// downloads below it. Not set (0) keeps the daemon's own default, so the
 	// running downloads stay protected even when the cycle check is off.
-	if gib, err := strconv.ParseFloat(strings.TrimSpace(cfg.Settings["min_free_space_gb"]), 64); err == nil && gib > 0 {
+	if gib, err := strconv.ParseFloat(strings.TrimSpace(cfg.Settings[settingMinFreeSpaceGb]), 64); err == nil && gib > 0 {
 		policy["min_free_mb"] = int64(math.Ceil(gib * 1024))
 	}
 	// The engine has no single "connections limit": map the global libtorrent limit

@@ -160,14 +160,14 @@ func updateManifestURL(channel string) string {
 }
 
 func updateCheckEnabled(cfg *Config) bool {
-	return cfg == nil || settingsBool(cfg, "update_check", true)
+	return cfg == nil || settingsBool(cfg, settingUpdateCheck, true)
 }
 
 // updateCheckHours is the period of the automatic check (update_check_hours).
 func updateCheckHours(cfg *Config) int {
 	hours := updateCheckDefaultHours
 	if cfg != nil {
-		if v, err := strconv.Atoi(strings.TrimSpace(cfg.Settings["update_check_hours"])); err == nil && v > 0 {
+		if v, err := strconv.Atoi(strings.TrimSpace(cfg.Settings[settingUpdateCheckHours])); err == nil && v > 0 {
 			hours = v
 		}
 	}

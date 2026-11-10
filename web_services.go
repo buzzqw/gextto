@@ -158,12 +158,12 @@ func gxTorrentClientPort(cfg *Config) string {
 	if cfg == nil {
 		return "8890"
 	}
-	if listen := strings.TrimSpace(cfg.Settings["gxtorrent_listen"]); listen != "" {
+	if listen := strings.TrimSpace(cfg.Settings[settingGxtorrentListen]); listen != "" {
 		if _, port, err := net.SplitHostPort(listen); err == nil && port != "" {
 			return port
 		}
 	}
-	if raw := strings.TrimSpace(cfg.Settings["gxtorrent_url"]); raw != "" {
+	if raw := strings.TrimSpace(cfg.Settings[settingGxtorrentUrl]); raw != "" {
 		if parsed, err := url.Parse(raw); err == nil && parsed.Port() != "" {
 			return parsed.Port()
 		}

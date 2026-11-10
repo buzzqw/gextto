@@ -52,7 +52,7 @@ func speedRule(cfg *Config) (download, upload int64, source string) {
 	if cfg == nil {
 		return 0, 0, speedSourceBase
 	}
-	if settingTruthy(cfg.Settings["torrent_sched_enabled"]) {
+	if settingTruthy(cfg.Settings[settingTorrentSchedEnabled]) {
 		if day, ok := speedScheduleWeek(cfg).AtDay(time.Now()); ok {
 			if day.Auto() {
 				// An "auto" window hands the limit to the guided tuning: it lifts
@@ -64,7 +64,7 @@ func speedRule(cfg *Config) (download, upload int64, source string) {
 		}
 	}
 	// Auto as the rule, or Auto outside the schedule windows.
-	if settingTruthy(cfg.Settings["torrent_speed_auto"]) {
+	if settingTruthy(cfg.Settings[settingTorrentSpeedAuto]) {
 		return 0, 0, speedSourceAuto
 	}
 	return max(cfg.Transfer.DownloadLimitKib, 0), max(cfg.Transfer.UploadLimitKib, 0), speedSourceBase

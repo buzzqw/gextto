@@ -800,7 +800,7 @@ func (d *Database) SaveMediaIntegrityState(state MediaIntegrityState) error {
 
 // mediaIntegrityEnabled reports whether the periodic check is switched on.
 func mediaIntegrityEnabled(cfg *Config) bool {
-	return cfg != nil && settingTruthy(cfg.Settings["media_integrity_enabled"])
+	return cfg != nil && settingTruthy(cfg.Settings[settingMediaIntegrityEnabled])
 }
 
 // mediaIntegrityQuick4K reports whether 4K files use the quick check: the whole
@@ -822,7 +822,7 @@ func mediaIntegrityQuick4K(cfg *Config) bool {
 func mediaIntegrityIntervalMinutes(cfg *Config) int {
 	value := 60
 	if cfg != nil {
-		if parsed, err := strconv.Atoi(strings.TrimSpace(cfg.Settings["media_integrity_interval_minutes"])); err == nil {
+		if parsed, err := strconv.Atoi(strings.TrimSpace(cfg.Settings[settingMediaIntegrityIntervalMinutes])); err == nil {
 			value = parsed
 		}
 	}
@@ -839,7 +839,7 @@ func mediaIntegrityIntervalMinutes(cfg *Config) int {
 func mediaIntegrityBatchSize(cfg *Config) int {
 	value := 1
 	if cfg != nil {
-		if parsed, err := strconv.Atoi(strings.TrimSpace(cfg.Settings["media_integrity_batch"])); err == nil {
+		if parsed, err := strconv.Atoi(strings.TrimSpace(cfg.Settings[settingMediaIntegrityBatch])); err == nil {
 			value = parsed
 		}
 	}

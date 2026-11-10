@@ -54,7 +54,7 @@ func qbittorrentSettingsFromConfig(cfg *Config) (qbittorrentSettings, error) {
 		return qbittorrentSettings{}, fmt.Errorf("qBittorrent configuration is unavailable")
 	}
 	timeout := 15 * time.Second
-	if value, ok := cfg.Settings["qbittorrent_request_timeout_secs"]; ok {
+	if value, ok := cfg.Settings[settingQbittorrentRequestTimeoutSecs]; ok {
 		raw := strings.TrimSpace(value)
 		parsed, err := strconv.Atoi(raw)
 		if raw == "" {
@@ -70,7 +70,7 @@ func qbittorrentSettingsFromConfig(cfg *Config) (qbittorrentSettings, error) {
 	// user saves a value from the UI, the adapter throttles reads to that
 	// interval (including outage retries).
 	poll := time.Duration(0)
-	if value, ok := cfg.Settings["qbittorrent_poll_interval_ms"]; ok {
+	if value, ok := cfg.Settings[settingQbittorrentPollIntervalMs]; ok {
 		raw := strings.TrimSpace(value)
 		parsed, err := strconv.Atoi(raw)
 		if raw == "" {
@@ -82,20 +82,20 @@ func qbittorrentSettingsFromConfig(cfg *Config) (qbittorrentSettings, error) {
 		}
 		poll = time.Duration(parsed) * time.Millisecond
 	}
-	mappings, err := ParsePathMappings(cfg.Settings["qbittorrent_path_mappings"])
+	mappings, err := ParsePathMappings(cfg.Settings[settingQbittorrentPathMappings])
 	if err != nil {
 		return qbittorrentSettings{}, err
 	}
 	return qbittorrentSettings{
 		Client: qbittorrent.Config{
-			BaseURL:        strings.TrimSpace(cfg.Settings["qbittorrent_url"]),
-			Username:       strings.TrimSpace(cfg.Settings["qbittorrent_username"]),
-			Password:       cfg.Settings["qbittorrent_password"],
+			BaseURL:        strings.TrimSpace(cfg.Settings[settingQbittorrentUrl]),
+			Username:       strings.TrimSpace(cfg.Settings[settingQbittorrentUsername]),
+			Password:       cfg.Settings[settingQbittorrentPassword],
 			RequestTimeout: timeout,
 		},
-		Category:     strings.TrimSpace(cfg.Settings["qbittorrent_category"]),
-		Tag:          strings.TrimSpace(cfg.Settings["qbittorrent_tag"]),
-		Managed:      settingsBool(cfg, "qbittorrent_managed", false),
+		Category:     strings.TrimSpace(cfg.Settings[settingQbittorrentCategory]),
+		Tag:          strings.TrimSpace(cfg.Settings[settingQbittorrentTag]),
+		Managed:      settingsBool(cfg, settingQbittorrentManaged, false),
 		Mappings:     mappings,
 		PollInterval: poll,
 		stateDir:     cfg.StateDir,

@@ -19,7 +19,7 @@ func TorrentStream(w http.ResponseWriter, r *http.Request, s *AppState) {
 		return
 	}
 	cfg := latestConfig(s)
-	base := strings.TrimRight(strings.TrimSpace(cfg.Settings["gxtorrent_url"]), "/")
+	base := strings.TrimRight(strings.TrimSpace(cfg.Settings[settingGxtorrentUrl]), "/")
 	if base == "" {
 		jsonError(w, http.StatusConflict, "gxtorrent_url non configurato")
 		return
@@ -32,7 +32,7 @@ func TorrentStream(w http.ResponseWriter, r *http.Request, s *AppState) {
 	}
 	target := fmt.Sprintf("%s/ui/stream?%s", base,
 		url.Values{"hash": {hash}, "file": {file}}.Encode())
-	if token := strings.TrimSpace(cfg.Settings["gxtorrent_token"]); token != "" {
+	if token := strings.TrimSpace(cfg.Settings[settingGxtorrentToken]); token != "" {
 		target += "&token=" + url.QueryEscape(token)
 	}
 	http.Redirect(w, r, target, http.StatusFound)

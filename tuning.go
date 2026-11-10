@@ -123,7 +123,7 @@ func ProposeTuning(facts SystemFacts, cfg *Config, manual map[string]bool) []Tun
 			add("torrent_ramdisk_margin_gb", margin,
 				"RAM disk: mantengo %s GB liberi, in base allo spazio disponibile.", margin)
 		}
-	} else if cfg != nil && settingTruthy(cfg.Settings["torrent_ramdisk_enabled"]) {
+	} else if cfg != nil && settingTruthy(cfg.Settings[settingTorrentRamdiskEnabled]) {
 		add("torrent_ramdisk_enabled", "no",
 			"Nessun RAM disk disponibile su questa macchina: lo disattivo.")
 	}

@@ -93,7 +93,7 @@ func rollbackGxTorrentBinary(binary string) (bool, error) {
 	if err := os.Rename(prev, binary); err != nil {
 		// Put the current binary back so the daemon still has something to run.
 		if restoreErr := os.Rename(failed, binary); restoreErr != nil {
-			return false, fmt.Errorf("gx-torrent rollback: %w (the current binary was not restored: %v)", err, restoreErr)
+			return false, fmt.Errorf("gx-torrent rollback: %w (the current binary was not restored: %w)", err, restoreErr)
 		}
 		return false, fmt.Errorf("rollback gx-torrent: %w", err)
 	}
@@ -237,10 +237,10 @@ func buildManagedGxCommand(cfg *Config, settings gxTorrentSettings) (gxManagedCo
 		args = append(args, "-insecure")
 		logging.Debug("gx-torrent listens on the network without a token: set gxtorrent_token to protect its API", "listen", listen)
 	}
-	if id := strings.TrimSpace(cfg.Settings["gxtorrent_client_identity"]); id != "" && !strings.EqualFold(id, "gx-core") {
+	if id := strings.TrimSpace(cfg.Settings[settingGxtorrentClientIdentity]); id != "" && !strings.EqualFold(id, "gx-core") {
 		args = append(args, "-client-identity", id)
 	}
-	if version := strings.TrimSpace(cfg.Settings["gxtorrent_client_identity_version"]); version != "" {
+	if version := strings.TrimSpace(cfg.Settings[settingGxtorrentClientIdentityVersion]); version != "" {
 		args = append(args, "-client-identity-version", version)
 	}
 	if settings.AnonymousMode {
@@ -273,16 +273,16 @@ func buildManagedGxCommand(cfg *Config, settings gxTorrentSettings) (gxManagedCo
 	if source := strings.TrimSpace(cfg.Transfer.IpFilterPath); source != "" {
 		args = append(args, "-ipfilter-source", source)
 	}
-	if strings.EqualFold(strings.TrimSpace(cfg.Settings["gxtorrent_dlna"]), "true") {
+	if strings.EqualFold(strings.TrimSpace(cfg.Settings[settingGxtorrentDlna]), "true") {
 		args = append(args, "-dlna")
 	}
-	if v := strings.TrimSpace(cfg.Settings["gxtorrent_dlna_listen"]); v != "" {
+	if v := strings.TrimSpace(cfg.Settings[settingGxtorrentDlnaListen]); v != "" {
 		args = append(args, "-dlna-listen", v)
 	}
-	if v := strings.TrimSpace(cfg.Settings["gxtorrent_dlna_name"]); v != "" {
+	if v := strings.TrimSpace(cfg.Settings[settingGxtorrentDlnaName]); v != "" {
 		args = append(args, "-dlna-name", v)
 	}
-	if strings.EqualFold(strings.TrimSpace(cfg.Settings["gxtorrent_dlna"]), "true") {
+	if strings.EqualFold(strings.TrimSpace(cfg.Settings[settingGxtorrentDlna]), "true") {
 		folders, exclude := gxDLNAFolders(cfg)
 		for _, f := range folders {
 			args = append(args, "-dlna-folder", f)
@@ -296,7 +296,7 @@ func buildManagedGxCommand(cfg *Config, settings gxTorrentSettings) (gxManagedCo
 		// Passed through the environment, not argv, so it never shows in ps.
 		env = append(env, "GX_TORRENT_TOKEN="+settings.Token)
 	}
-	proxy := strings.TrimSpace(cfg.Settings["gxtorrent_proxy"])
+	proxy := strings.TrimSpace(cfg.Settings[settingGxtorrentProxy])
 	if proxy != "" {
 		// May carry credentials: environment, not argv.
 		env = append(env, "GX_TORRENT_PROXY="+proxy)
@@ -950,7 +950,7 @@ func gxEnsureIPFilter(cfg *Config, force bool) bool {
 // folders collapse into their outermost one. Gextto's trash is excluded.
 func gxDLNAFolders(cfg *Config) (folders, exclude []string) {
 	var candidates []string
-	for _, f := range strings.Split(cfg.Settings["gxtorrent_dlna_folders"], ";") {
+	for _, f := range strings.Split(cfg.Settings[settingGxtorrentDlnaFolders], ";") {
 		if f = strings.TrimSpace(f); f != "" {
 			candidates = append(candidates, f)
 		}

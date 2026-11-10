@@ -1065,7 +1065,7 @@ func (c *Config) ScoreWeightsFingerprint() string {
 // TmdbLanguage returns the BCP-47 language used for TMDB API calls (e.g.
 // `it-IT`).
 func (c *Config) TmdbLanguage() string {
-	if value, ok := c.Settings["tmdb_language"]; ok {
+	if value, ok := c.Settings[settingTmdbLanguage]; ok {
 		value = strings.TrimSpace(value)
 		if value != "" {
 			return value
@@ -1096,7 +1096,7 @@ func (c *Config) DelayMinutes(kind string) int64 {
 // DelayBypassScore is the score at or above which a release is grabbed
 // immediately, bypassing the delay profile. `0` disables the bypass.
 func (c *Config) DelayBypassScore() int64 {
-	if value, ok := c.Settings["delay_bypass_score"]; ok {
+	if value, ok := c.Settings[settingDelayBypassScore]; ok {
 		if parsed, err := strconv.ParseInt(strings.TrimSpace(value), 10, 64); err == nil {
 			return parsed
 		}
@@ -1107,7 +1107,7 @@ func (c *Config) DelayBypassScore() int64 {
 // DefaultLanguage is the default language for acquisitions and rename fallback
 // (e.g. `ita`).
 func (c *Config) DefaultLanguage() string {
-	if value, ok := c.Settings["default_language"]; ok {
+	if value, ok := c.Settings[settingDefaultLanguage]; ok {
 		value = strings.TrimSpace(value)
 		if value != "" {
 			return value
@@ -1127,7 +1127,7 @@ func (c *Config) FeedMaxPages() int {
 	// count there and prefer the explicit `feed_max_pages` key when present.
 	pages := numberSettingUint64(c.Settings, "feed_max_pages", 0)
 	if pages == 0 {
-		if raw, ok := c.Settings["stop_on_old_page_threshold"]; ok {
+		if raw, ok := c.Settings[settingStopOnOldPageThreshold]; ok {
 			if parsed, err := strconv.ParseUint(strings.TrimSpace(raw), 10, 64); err == nil && parsed >= 1 {
 				pages = parsed
 			}
@@ -1146,7 +1146,7 @@ func (c *Config) FeedMaxPages() int {
 // of old releases on a page above which the listing walk stops early. Only
 // meaningful together with `max_release_age_days`.
 func (c *Config) StopOnOldPageRatio() float64 {
-	if value, ok := c.Settings["stop_on_old_page_threshold"]; ok {
+	if value, ok := c.Settings[settingStopOnOldPageThreshold]; ok {
 		if parsed, err := strconv.ParseFloat(value, 64); err == nil && parsed >= 0.0 && parsed <= 1.0 {
 			return parsed
 		}
@@ -1169,7 +1169,7 @@ func (c *Config) StopOnOldPageRatio() float64 {
 // - "always" / "yes" / "true": always search titles online during cycles.
 // - "auto" (default): search titles online only if FeedURLs is empty.
 func (c *Config) ShouldSearchTitlesInCycle() bool {
-	mode := strings.ToLower(strings.TrimSpace(c.Settings["cycle_title_search"]))
+	mode := strings.ToLower(strings.TrimSpace(c.Settings[settingCycleTitleSearch]))
 	if mode == "" {
 		mode = strings.ToLower(strings.TrimSpace(c.Settings["title_search_in_cycle"]))
 	}
@@ -1192,7 +1192,7 @@ func (c *Config) DebugEnabled() bool {
 
 // TvdbAPIKey returns TheTVDB API key, when configured.
 func (c *Config) TvdbAPIKey() *string {
-	if value, ok := c.Settings["tvdb_api_key"]; ok {
+	if value, ok := c.Settings[settingTvdbApiKey]; ok {
 		trimmed := strings.TrimSpace(value)
 		if trimmed != "" {
 			return &trimmed
@@ -1204,13 +1204,13 @@ func (c *Config) TvdbAPIKey() *string {
 // TvdbPin is the TheTVDB subscriber PIN, needed at login by the
 // "user-supported" API keys (blank when not set).
 func (c *Config) TvdbPin() string {
-	return strings.TrimSpace(c.Settings["tvdb_pin"])
+	return strings.TrimSpace(c.Settings[settingTvdbPin])
 }
 
 // TvdbLanguage is the preferred TVDB language (falls back to the default
 // acquisition language).
 func (c *Config) TvdbLanguage() string {
-	if value, ok := c.Settings["tvdb_language"]; ok {
+	if value, ok := c.Settings[settingTvdbLanguage]; ok {
 		value = strings.TrimSpace(value)
 		if value != "" {
 			return value
@@ -1229,7 +1229,7 @@ func (c *Config) RamdiskDir() *string {
 // explicitly falsy.
 func (c *Config) RamdiskEnabled() bool {
 	explicitlyOff := false
-	if value, ok := c.Settings["torrent_ramdisk_enabled"]; ok {
+	if value, ok := c.Settings[settingTorrentRamdiskEnabled]; ok {
 		switch strings.ToLower(strings.TrimSpace(value)) {
 		case "", "no", "false", "0":
 			explicitlyOff = true
@@ -1243,7 +1243,7 @@ func (c *Config) RamdiskEnabled() bool {
 // Default true: it avoids fragmentation on NAS/HDD and surfaces "no space"
 // immediately. It can be overridden per add.
 func (c *Config) TorrentPreallocate() bool {
-	value, ok := c.Settings["torrent_preallocate"]
+	value, ok := c.Settings[settingTorrentPreallocate]
 	if !ok {
 		return true
 	}
@@ -1275,7 +1275,7 @@ func (c *Config) RamdiskMarginBytes() uint64 {
 // RamdiskMinFreeBytes is the explicit free-space floor in bytes; `0` derives it
 // from the margin.
 func (c *Config) RamdiskMinFreeBytes() uint64 {
-	if value, ok := c.Settings["torrent_ramdisk_min_free_bytes"]; ok {
+	if value, ok := c.Settings[settingTorrentRamdiskMinFreeBytes]; ok {
 		if parsed, err := strconv.ParseUint(strings.TrimSpace(value), 10, 64); err == nil {
 			return parsed
 		}
@@ -2484,7 +2484,7 @@ func gapLastResortEnabled(c *Config) bool {
 	if c == nil {
 		return true
 	}
-	value, ok := c.Settings["gap_last_resort"]
+	value, ok := c.Settings[settingGapLastResort]
 	return !ok || strings.TrimSpace(value) == "" || settingIsTrue(value)
 }
 
@@ -2860,7 +2860,7 @@ func (c *Config) loadConfigDB() error {
 	if value, ok := c.Settings["url"]; ok {
 		c.FeedURLs = activeFeedURLs(feedLinesFromSetting(value))
 	}
-	if value, ok := c.Settings["blacklist"]; ok {
+	if value, ok := c.Settings[settingBlacklist]; ok {
 		c.Blacklist = parseConfigList(value)
 	} else {
 		c.Blacklist = defaultBlacklist()
@@ -2878,7 +2878,7 @@ func (c *Config) loadConfigDB() error {
 		c.SourceFilters = []SourceFilter{}
 	}
 	c.MaxReleaseAgeDays = 0
-	if value, ok := c.Settings["max_release_age_days"]; ok {
+	if value, ok := c.Settings[settingMaxReleaseAgeDays]; ok {
 		if parsed, err := strconv.ParseInt(value, 10, 64); err == nil {
 			c.MaxReleaseAgeDays = parsed
 		}
@@ -3091,18 +3091,18 @@ func (c *Config) loadConfigDB() error {
 			})
 		}
 	}
-	if value, ok := c.Settings["refresh_interval"]; ok {
+	if value, ok := c.Settings[settingRefreshInterval]; ok {
 		if parsed, err := strconv.ParseUint(value, 10, 64); err == nil {
 			c.RefreshSecs = parsed
 		}
 	}
-	if value, ok := c.Settings["active"]; ok {
+	if value, ok := c.Settings[settingActive]; ok {
 		c.Active = configBoolSetting(&value)
 	}
 	if value, ok := c.Settings["dry_run"]; ok {
 		c.DryRun = configBoolSetting(&value)
 	}
-	if value, ok := c.Settings["tmdb_api_key"]; ok && value != "" {
+	if value, ok := c.Settings[settingTmdbApiKey]; ok && value != "" {
 		c.TmdbAPIKey = &value
 	} else {
 		c.TmdbAPIKey = nil
@@ -3125,7 +3125,7 @@ func (c *Config) loadConfigDB() error {
 		c.RenameMovieTemplate = value
 	}
 	c.ArchiveRoot = configPathSetting(mapValue(c.Settings, "archive_root"))
-	if _, present := c.Settings["trash_path"]; present {
+	if _, present := c.Settings[settingTrashPath]; present {
 		// Honour an explicit value, including clearing it: an empty setting
 		// disables the trash instead of silently keeping the previous path.
 		c.TrashPath = configPathSetting(mapValue(c.Settings, "trash_path"))
@@ -3136,58 +3136,58 @@ func (c *Config) loadConfigDB() error {
 		c.TrashPath = nil
 	}
 	c.NotifyTelegram = configBoolSetting(mapValue(c.Settings, "notify_telegram"))
-	if value, ok := c.Settings["telegram_bot_token"]; ok && value != "" {
+	if value, ok := c.Settings[settingTelegramBotToken]; ok && value != "" {
 		c.TelegramBotToken = &value
 	} else {
 		c.TelegramBotToken = nil
 	}
-	if value, ok := c.Settings["telegram_chat_id"]; ok && value != "" {
+	if value, ok := c.Settings[settingTelegramChatId]; ok && value != "" {
 		c.TelegramChatID = &value
 	} else {
 		c.TelegramChatID = nil
 	}
-	if value, ok := c.Settings["notify_webhook_url"]; ok && value != "" {
+	if value, ok := c.Settings[settingNotifyWebhookUrl]; ok && value != "" {
 		c.NotifyWebhookURL = &value
 	} else {
 		c.NotifyWebhookURL = nil
 	}
-	if value, ok := c.Settings["notify_webhook_secret"]; ok && value != "" {
+	if value, ok := c.Settings[settingNotifyWebhookSecret]; ok && value != "" {
 		c.NotifyWebhookSecret = &value
 	} else {
 		c.NotifyWebhookSecret = nil
 	}
-	if value, ok := c.Settings["notify_webhook_format"]; ok && strings.TrimSpace(value) != "" {
+	if value, ok := c.Settings[settingNotifyWebhookFormat]; ok && strings.TrimSpace(value) != "" {
 		c.NotifyWebhookFormat = strings.TrimSpace(value)
 	} else {
 		c.NotifyWebhookFormat = "gextto"
 	}
-	if value, ok := c.Settings["notify_webhook_token"]; ok && value != "" {
+	if value, ok := c.Settings[settingNotifyWebhookToken]; ok && value != "" {
 		c.NotifyWebhookToken = &value
 	} else {
 		c.NotifyWebhookToken = nil
 	}
-	if value, ok := c.Settings["notify_webhook_user"]; ok && value != "" {
+	if value, ok := c.Settings[settingNotifyWebhookUser]; ok && value != "" {
 		c.NotifyWebhookUser = &value
 	} else {
 		c.NotifyWebhookUser = nil
 	}
 	c.NotifyEmail = configBoolSetting(mapValue(c.Settings, "notify_email"))
-	if value, ok := c.Settings["email_smtp"]; ok {
+	if value, ok := c.Settings[settingEmailSmtp]; ok {
 		c.EmailSMTP = value
 	} else {
 		c.EmailSMTP = "smtp.gmail.com:587"
 	}
-	if value, ok := c.Settings["email_from"]; ok && value != "" {
+	if value, ok := c.Settings[settingEmailFrom]; ok && value != "" {
 		c.EmailFrom = &value
 	} else {
 		c.EmailFrom = nil
 	}
-	if value, ok := c.Settings["email_to"]; ok && value != "" {
+	if value, ok := c.Settings[settingEmailTo]; ok && value != "" {
 		c.EmailTo = &value
 	} else {
 		c.EmailTo = nil
 	}
-	if value, ok := c.Settings["email_password"]; ok && value != "" {
+	if value, ok := c.Settings[settingEmailPassword]; ok && value != "" {
 		c.EmailPassword = &value
 	} else {
 		c.EmailPassword = nil
@@ -3215,7 +3215,7 @@ func (c *Config) loadConfigDB() error {
 	if c.NotifyCooldownMinutes < 0 {
 		c.NotifyCooldownMinutes = 0
 	}
-	c.NotifyLanguage = configNotifyLanguage(settingsText(c.Settings, "notify_language"))
+	c.NotifyLanguage = configNotifyLanguage(settingsText(c.Settings, settingNotifyLanguage))
 	c.CleanupUpgrades = configBoolSetting(mapValue(c.Settings, "cleanup_upgrades"))
 	c.UpgradeMinScoreDiff = numberSettingInt(c.Settings, "upgrade_min_score_diff", 200)
 	if c.UpgradeMinScoreDiff < 0 {
@@ -3236,7 +3236,7 @@ func (c *Config) loadConfigDB() error {
 	if c.StallAlternativeScoreDrop < 0 {
 		c.StallAlternativeScoreDrop = 0
 	}
-	if value, ok := c.Settings["cleanup_action"]; ok {
+	if value, ok := c.Settings[settingCleanupAction]; ok {
 		switch value {
 		case "move", "delete":
 			c.CleanupAction = value
@@ -3291,10 +3291,10 @@ func (c *Config) applyTransferSettings() {
 		LimitLanPeers:         boolSettingOr(c.Settings, "torrent_limit_lan_peers", false),
 		ApplyIpFilter:         boolSettingOr(c.Settings, "torrent_apply_ip_filter", false),
 		Encryption:            numberSettingInt(c.Settings, "torrent_encryption", 1),
-		IpFilterPath:          settingOrDefault(c.Settings, "torrent_ipfilter_url", constants.DefaultIPFilterURL),
-		ListenInterfaces:      settingOrDefault(c.Settings, "torrent_listen_interfaces", ""),
-		OutgoingInterface:     settingOrDefault(c.Settings, "torrent_outgoing_interface", ""),
-		DhtBootstrapNodes:     settingOrDefault(c.Settings, "torrent_dht_bootstrap_nodes", ""),
+		IpFilterPath:          settingOrDefault(c.Settings, settingTorrentIpfilterUrl, constants.DefaultIPFilterURL),
+		ListenInterfaces:      settingOrDefault(c.Settings, settingTorrentListenInterfaces, ""),
+		OutgoingInterface:     settingOrDefault(c.Settings, settingTorrentOutgoingInterface, ""),
+		DhtBootstrapNodes:     settingOrDefault(c.Settings, settingTorrentDhtBootstrapNodes, ""),
 	}
 }
 

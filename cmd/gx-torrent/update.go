@@ -384,7 +384,7 @@ func (d *Daemon) installUpdate(ctx context.Context, st gxUpdateStatus) error {
 	tryCancel()
 	if err != nil || !gexVersionPattern.MatchString(string(out)) {
 		os.Remove(newPath)
-		return fmt.Errorf("the new version does not run on this system: %v", err)
+		return fmt.Errorf("the new version does not run on this system: %w", err)
 	}
 	notes := &updateNotes{
 		FromVersion: st.Version, FromCommit: st.Commit, ToCommit: st.Latest,

@@ -129,6 +129,70 @@ func TestSettingsLiteralsAreKnownKeys(t *testing.T) {
 	}
 }
 
+// settingReadHelpers take the key as their second argument.
+var settingReadHelpers = map[string]bool{
+	"settingsOr": true, "settingsBool": true, "settingsNonEmpty": true, "settingOrDefault": true,
+	"settingsParseUint": true, "settingsParseInt": true, "settingListContains": true,
+	"settingsText": true, "settingsOrNil": true, "settingsBoolString": true,
+}
+
+// TestIndexedSettingsAreReadThroughConstants fails on a literal key that has a
+// generated constant: a key on the settings page is read by its constant, so a
+// typo stops the build instead of returning the default.
+func TestIndexedSettingsAreReadThroughConstants(t *testing.T) {
+	fset := token.NewFileSet()
+	gen, err := parser.ParseFile(fset, "settings_keys_gen.go", nil, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	constFor := map[string]string{}
+	ast.Inspect(gen, func(n ast.Node) bool {
+		if spec, ok := n.(*ast.ValueSpec); ok && len(spec.Names) == 1 && len(spec.Values) == 1 {
+			if lit, ok := spec.Values[0].(*ast.BasicLit); ok && lit.Kind == token.STRING {
+				constFor[strings.Trim(lit.Value, `"`)] = spec.Names[0].Name
+			}
+		}
+		return true
+	})
+	entries, err := os.ReadDir(".")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range entries {
+		name := entry.Name()
+		if entry.IsDir() || !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") || name == "settings_keys_gen.go" {
+			continue
+		}
+		file, err := parser.ParseFile(fset, name, nil, 0)
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		report := func(node ast.Node, lit *ast.BasicLit) {
+			key := strings.Trim(lit.Value, `"`)
+			if constant, ok := constFor[key]; ok {
+				t.Errorf("%s: settings key %q read as a literal; use %s", fset.Position(node.Pos()), key, constant)
+			}
+		}
+		ast.Inspect(file, func(n ast.Node) bool {
+			switch node := n.(type) {
+			case *ast.IndexExpr:
+				if sel, ok := node.X.(*ast.SelectorExpr); ok && sel.Sel.Name == "Settings" {
+					if lit, ok := node.Index.(*ast.BasicLit); ok && lit.Kind == token.STRING {
+						report(node, lit)
+					}
+				}
+			case *ast.CallExpr:
+				if fun, ok := node.Fun.(*ast.Ident); ok && settingReadHelpers[fun.Name] && len(node.Args) >= 2 {
+					if lit, ok := node.Args[1].(*ast.BasicLit); ok && lit.Kind == token.STRING {
+						report(node, lit)
+					}
+				}
+			}
+			return true
+		})
+	}
+}
+
 // settingKeyKnown is the whole surface: the page, the writable keys and the
 // keys that only Gextto itself reads.
 func settingKeyKnown(key string) bool {

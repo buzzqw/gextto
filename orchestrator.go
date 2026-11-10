@@ -91,7 +91,7 @@ func RunCycleDomain(
 	// The guided tuning's slow loop: once per cycle, re-fit the values the system
 	// already chose (never the user's) when the facts moved. The cycle is the
 	// natural cadence, and it keeps the values gentle rather than wobbling.
-	if !cfg.DryRun && settingTruthy(cfg.Settings["autotune_adaptive"]) {
+	if !cfg.DryRun && settingTruthy(cfg.Settings[settingAutotuneAdaptive]) {
 		if changed := RunAdaptiveTuning(cfg.DataDir, cfg); changed > 0 {
 			logging.Info("🛠️ Automatic tuning adjusted values for this hardware", "changed", changed)
 		}
@@ -595,7 +595,7 @@ func RunCycleDomain(
 	// Advanced setting: refuse to start downloads when the download disk is
 	// almost full. `min_free_space_gb = 0` disables the guard.
 	var minFreeBytes *uint64
-	if value, ok := cfg.Settings["min_free_space_gb"]; ok {
+	if value, ok := cfg.Settings[settingMinFreeSpaceGb]; ok {
 		if gib, err := strconv.ParseFloat(strings.TrimSpace(value), 64); err == nil && gib > 0 {
 			bytes := uint64(gib * 1024.0 * 1024.0 * 1024.0)
 			minFreeBytes = &bytes
@@ -698,7 +698,7 @@ func RunCycleDomain(
 func collectGapReleases(ctx context.Context, cfg *Config, engine *Engine, db *Database, archive *Archive,
 	domain *string, blocklistedHashes map[string]struct{}, releases []models.Release) ([]models.Release, map[gapTarget]struct{}, error) {
 	gapFilling := true
-	if value, ok := cfg.Settings["gap_filling"]; ok {
+	if value, ok := cfg.Settings[settingGapFilling]; ok {
 		gapFilling = settingTruthy(value)
 	}
 	var archiveGaps []SeriesGap
@@ -1058,12 +1058,12 @@ type gapFillPolicy struct {
 
 func readGapFillPolicy(cfg *Config, now time.Time) gapFillPolicy {
 	policy := gapFillPolicy{deepIntervalHours: 6, deepMaxPerCycle: 5, researchHours: 23, now: now.UTC().Unix()}
-	if value, ok := cfg.Settings["gap_fill_max_per_series"]; ok {
+	if value, ok := cfg.Settings[settingGapFillMaxPerSeries]; ok {
 		if parsed, err := strconv.Atoi(strings.TrimSpace(value)); err == nil && parsed >= 0 {
 			policy.perSeries = parsed
 		}
 	}
-	if value, ok := cfg.Settings["gap_deep_interval_hours"]; ok {
+	if value, ok := cfg.Settings[settingGapDeepIntervalHours]; ok {
 		if parsed, err := strconv.ParseInt(strings.TrimSpace(value), 10, 64); err == nil {
 			policy.deepIntervalHours = parsed
 		}
@@ -1071,7 +1071,7 @@ func readGapFillPolicy(cfg *Config, now time.Time) gapFillPolicy {
 	if policy.deepIntervalHours < 1 {
 		policy.deepIntervalHours = 1
 	}
-	if value, ok := cfg.Settings["gap_deep_max_per_cycle"]; ok {
+	if value, ok := cfg.Settings[settingGapDeepMaxPerCycle]; ok {
 		if parsed, err := strconv.Atoi(strings.TrimSpace(value)); err == nil && parsed >= 0 {
 			policy.deepMaxPerCycle = parsed
 		}
@@ -1203,7 +1203,7 @@ func prioritizeArchiveGapDownloads(
 	stats *models.CycleStats,
 ) error {
 	gapFilling := true
-	if value, ok := cfg.Settings["gap_filling"]; ok {
+	if value, ok := cfg.Settings[settingGapFilling]; ok {
 		gapFilling = settingTruthy(value)
 	}
 	if !gapFilling {

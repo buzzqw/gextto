@@ -25,9 +25,9 @@ func speedModeOf(cfg *Config) string {
 		return speedModeFixed
 	}
 	switch {
-	case settingTruthy(cfg.Settings["torrent_sched_enabled"]):
+	case settingTruthy(cfg.Settings[settingTorrentSchedEnabled]):
 		return speedModeSchedule
-	case settingTruthy(cfg.Settings["torrent_speed_auto"]):
+	case settingTruthy(cfg.Settings[settingTorrentSpeedAuto]):
 		return speedModeAuto
 	}
 	return speedModeFixed

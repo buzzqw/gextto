@@ -1539,7 +1539,7 @@ func RemoveSeededCompleted(cfg *Config, torrents TorrentSession, db *Database, p
 			continue
 		}
 		deleteFiles := archivedCopy
-		if !archiveFolder && !settingsBool(cfg, "move_episodes", false) {
+		if !archiveFolder && !settingsBool(cfg, settingMoveEpisodes, false) {
 			// Copy mode keeps the download source; move mode already moved it
 			// into the library at the end of the seed.
 			deleteFiles = false
@@ -3367,7 +3367,7 @@ func tevTorrentFinished(cfg *Config, torrents TorrentSession, db *Database, move
 		if hasArchiveDestination {
 			// An unlimited seed keeps the movie in aMule's incoming folder,
 			// shared, and imports a copy, as for its episodes.
-			move := settingsBool(cfg, "move_episodes", false) && !tevSeedsForeverByPolicy(cfg, db, torrents, event.Hash)
+			move := settingsBool(cfg, settingMoveEpisodes, false) && !tevSeedsForeverByPolicy(cfg, db, torrents, event.Hash)
 			return tevCompleteMovieWithArchive(cfg, db, torrents, &event, &release, archiveDestination, tmdb, move)
 		}
 		size, sizeErr := SizeOfPath(source)
@@ -3383,7 +3383,7 @@ func tevTorrentFinished(cfg *Config, torrents TorrentSession, db *Database, move
 	// Movies are always relocated to the configured destination (or to the
 	// default download volume when no archive is set); unlike episodes they
 	// do not have a separate copy-mode deferral.
-	if release.Kind == "movie" && hasArchiveDestination && settingsBool(cfg, "move_episodes", false) {
+	if release.Kind == "movie" && hasArchiveDestination && settingsBool(cfg, settingMoveEpisodes, false) {
 		// Move mode: keep the movie in the download folder so the torrent can
 		// seed; the move and rename into the library happen at the end of the
 		// seed (see EnforceSeedPolicy). The release is marked downloaded now
@@ -3442,7 +3442,7 @@ func tevFinishedEpisode(cfg *Config, torrents TorrentSession, db *Database, even
 		// For eD2k the seed policy is the configured one (seed rules and
 		// global limits): with an unlimited seed the episode is copied and
 		// aMule keeps sharing it, as a torrent seeding forever.
-		if sourceInfo.IsDir() || !settingsBool(cfg, "move_episodes", false) || tevSeedsForeverByPolicy(cfg, db, torrents, event.Hash) {
+		if sourceInfo.IsDir() || !settingsBool(cfg, settingMoveEpisodes, false) || tevSeedsForeverByPolicy(cfg, db, torrents, event.Hash) {
 			// Folder episodes, single files in copy mode, and any torrent
 			// configured to seed forever are imported by copying the video
 			// while the source stays in the download folder for seeding.

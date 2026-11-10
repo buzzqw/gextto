@@ -546,7 +546,7 @@ func uiRuleFromForm(r *http.Request) (rss.Rule, error) {
 			continue
 		}
 		if _, err := regexp.Compile(pattern); err != nil {
-			return rule, fmt.Errorf("%s is not a valid regular expression: %v", field, err)
+			return rule, fmt.Errorf("%s is not a valid regular expression: %w", field, err)
 		}
 	}
 	if _, err := rss.ParseEpisodeFilter(rule.Match.EpisodeFilter); err != nil {

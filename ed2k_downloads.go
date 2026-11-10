@@ -505,7 +505,7 @@ func (s ed2kSession) Pause(hash string) (bool, error) {
 // hardlink keep the source in the incoming folder for sharing. In move mode it
 // returns false and MoveCompletedImmediately moves the source at completion.
 func (s ed2kSession) ImportCompletedByCopy() bool {
-	return !settingsBool(s.cfg, "move_episodes", false)
+	return !settingsBool(s.cfg, settingMoveEpisodes, false)
 }
 
 // MoveCompletedImmediately reports that aMule cannot defer a storage move to
@@ -534,7 +534,7 @@ func ed2kStallDays(cfg *Config) int {
 	if cfg == nil {
 		return 7
 	}
-	raw := strings.TrimSpace(cfg.Settings["ed2k_stall_days"])
+	raw := strings.TrimSpace(cfg.Settings[settingEd2kStallDays])
 	if raw == "" {
 		return 7
 	}

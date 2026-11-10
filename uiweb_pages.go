@@ -588,13 +588,13 @@ func uiSettingsPageFrom(s *AppState, activeTab, mode string) uiSettingsPage {
 		// With gx-torrent self-management on, the daemon owns the cache and the
 		// queue tuning: show those settings as "Auto" (managed) instead of
 		// editable. Turning gxtorrent_auto off makes them editable again.
-		if activeBackend == BackendGxTorrent && settingsBool(cfg, "gxtorrent_auto", true) && gxAutoManagedKey(def.Key) {
+		if activeBackend == BackendGxTorrent && settingsBool(cfg, settingGxtorrentAuto, true) && gxAutoManagedKey(def.Key) {
 			field.Managed = true
 		}
 		// The settings the guided tuning owns by itself (the connections per
 		// torrent) render as "Auto" too, so they do not look like a number the
 		// user has to pick. A value the user set by hand stays editable.
-		if settingsBool(cfg, "autotune_adaptive", true) && autoInternalTuningKeys[def.Key] {
+		if settingsBool(cfg, settingAutotuneAdaptive, true) && autoInternalTuningKeys[def.Key] {
 			if originsErr != nil || origins[def.Key].Origin != OriginManual {
 				field.Managed = true
 			}

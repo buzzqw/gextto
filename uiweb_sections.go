@@ -592,7 +592,7 @@ func uiDownloadsPageFor(s *AppState) uiDownloadsPage {
 func uiDownloadsChromeFor(s *AppState, cfg *Config) uiDownloadsPage {
 	return uiDownloadsPage{
 		Speed:               uiSpeedStateFor(cfg, s.latency_guard.status()),
-		AutoRemoveCompleted: settingsBool(cfg, "auto_remove_completed", false),
+		AutoRemoveCompleted: settingsBool(cfg, settingAutoRemoveCompleted, false),
 	}
 }
 

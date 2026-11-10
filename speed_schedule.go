@@ -14,7 +14,7 @@ import (
 // libtorrent_sched_days (0 = Monday … 6 = Sunday). The week format and the
 // evaluation are shared with gx-torrent (internal/bwschedule).
 func speedScheduleWeek(cfg *Config) bwschedule.Week {
-	if week, ok := bwschedule.Parse(cfg.Settings["torrent_sched_week"]); ok {
+	if week, ok := bwschedule.Parse(cfg.Settings[settingTorrentSchedWeek]); ok {
 		return week
 	}
 	clock := func(key string, fallback int) int {
@@ -24,7 +24,7 @@ func speedScheduleWeek(cfg *Config) bwschedule.Week {
 		return fallback
 	}
 	var days [7]bool
-	for _, day := range strings.Split(cfg.Settings["torrent_sched_days"], ",") {
+	for _, day := range strings.Split(cfg.Settings[settingTorrentSchedDays], ",") {
 		if parsed, err := strconv.Atoi(strings.TrimSpace(day)); err == nil && parsed >= 0 && parsed <= 6 {
 			// Monday=0 here, time.Weekday has Sunday=0.
 			days[(parsed+1)%7] = true
@@ -37,7 +37,7 @@ func speedScheduleWeek(cfg *Config) bwschedule.Week {
 // scheduledSpeedLimitsAt returns the scheduled limits in force at now and
 // whether the schedule is active.
 func scheduledSpeedLimitsAt(cfg *Config, now time.Time) (int64, int64, bool) {
-	if cfg == nil || !settingTruthy(cfg.Settings["torrent_sched_enabled"]) {
+	if cfg == nil || !settingTruthy(cfg.Settings[settingTorrentSchedEnabled]) {
 		return 0, 0, false
 	}
 	return speedScheduleWeek(cfg).At(now)

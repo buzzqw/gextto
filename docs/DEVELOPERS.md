@@ -160,7 +160,10 @@ cannot compile. `TestSettingsKeyConstantsMatchTheIndex` fails when a row is
 added without regenerating the file, and `TestSettingsLiteralsAreKnownKeys`
 scans the package for a key read or saved through a literal and fails on one
 Gextto does not know (index, API-only list, writable prefix, or the explicit
-legacy/internal/panel lists in `settings_keys_test.go`). Every write path (the JSON API, the settings page,
+legacy/internal/panel lists in `settings_keys_test.go`), while
+`TestIndexedSettingsAreReadThroughConstants` fails on a literal key that has a
+constant — in `cfg.Settings[…]` or as the key of `settingsOr`, `settingsBool` and the
+other read helpers. Every write path (the JSON API, the settings page,
 the setup wizard) validates the value through `validateSettingValue`
 (`backend_config_validation.go`), so a rule added there applies everywhere.
 The starting value the page shows (`uiSettingDefaults`,

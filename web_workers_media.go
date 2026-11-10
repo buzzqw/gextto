@@ -57,11 +57,11 @@ func mediaInfoBackfillWorker(state *AppState) {
 	for {
 		cfg := latestConfig(state)
 		enabled := true
-		if value, ok := cfg.Settings["media_info_backfill_enabled"]; ok {
+		if value, ok := cfg.Settings[settingMediaInfoBackfillEnabled]; ok {
 			enabled = bwmTruthy(value)
 		}
 		intervalMinutes := int64(60)
-		if parsed, err := strconv.ParseInt(strings.TrimSpace(cfg.Settings["media_info_backfill_interval_minutes"]), 10, 64); err == nil {
+		if parsed, err := strconv.ParseInt(strings.TrimSpace(cfg.Settings[settingMediaInfoBackfillIntervalMinutes]), 10, 64); err == nil {
 			intervalMinutes = parsed
 		}
 		if intervalMinutes < 5 {
@@ -71,7 +71,7 @@ func mediaInfoBackfillWorker(state *AppState) {
 			intervalMinutes = 24 * 60
 		}
 		batch := 10
-		if parsed, err := strconv.Atoi(strings.TrimSpace(cfg.Settings["media_info_backfill_batch"])); err == nil {
+		if parsed, err := strconv.Atoi(strings.TrimSpace(cfg.Settings[settingMediaInfoBackfillBatch])); err == nil {
 			batch = parsed
 		}
 		if batch < 1 {

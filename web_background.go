@@ -1106,7 +1106,7 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 			}
 		}
 		sequential := false
-		if value, ok := cfg.Settings["torrent_sequential"]; ok {
+		if value, ok := cfg.Settings[settingTorrentSequential]; ok {
 			sequential = settingTruthy(value)
 		}
 		if lastSequential == nil || *lastSequential != sequential {
@@ -1118,7 +1118,7 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 		}
 		// A plain flag on the engine: re-applying it each pass also covers a
 		// switch of the active engine.
-		torrents.SetFirstLastDefault(settingTruthy(cfg.Settings["torrent_first_last"]))
+		torrents.SetFirstLastDefault(settingTruthy(cfg.Settings[settingTorrentFirstLast]))
 		MonitorMetadata(cfg, torrents, db, notifier, metadataWaitStart, metadataFirstSeen, metadataLastWarning)
 		MonitorStalled(cfg, torrents, db, notifier, stallWaitStart)
 		if ed2kEnabled(cfg) && now.Sub(lastEd2kStallCheck) >= 10*time.Minute {
@@ -2261,7 +2261,7 @@ func housekeepingWorker(state *AppState) {
 			logging.Debug("cannot record the housekeeping run", "error", err)
 		}
 		enabled := true
-		if value, ok := cfg.Settings["housekeeping_enabled"]; ok {
+		if value, ok := cfg.Settings[settingHousekeepingEnabled]; ok {
 			enabled = settingTruthy(value)
 		}
 		if enabled {
@@ -2295,7 +2295,7 @@ func housekeepingWorker(state *AppState) {
 // housekeepingInterval is `housekeeping_interval_hours` (default 24, 1–720).
 func housekeepingInterval(cfg *Config) time.Duration {
 	hours := int64(24)
-	if value, ok := cfg.Settings["housekeeping_interval_hours"]; ok {
+	if value, ok := cfg.Settings[settingHousekeepingIntervalHours]; ok {
 		if parsed, err := strconv.ParseInt(strings.TrimSpace(value), 10, 64); err == nil {
 			hours = parsed
 		}
@@ -2611,7 +2611,7 @@ func cycleWorker(state *AppState) {
 				TrimMemory()
 			}
 			renameHours := uint64(6)
-			if value, ok := cfg.Settings["rename_verify_interval"]; ok {
+			if value, ok := cfg.Settings[settingRenameVerifyInterval]; ok {
 				if parsed, err := strconv.ParseUint(strings.TrimSpace(value), 10, 64); err == nil {
 					renameHours = parsed
 				}

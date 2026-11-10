@@ -1700,7 +1700,7 @@ func movieFlatFilesEnabled(cfg *Config) bool {
 	if cfg == nil {
 		return false
 	}
-	value, ok := cfg.Settings["movies_flat_files"]
+	value, ok := cfg.Settings[settingMoviesFlatFiles]
 	if !ok {
 		return true
 	}

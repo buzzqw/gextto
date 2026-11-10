@@ -121,7 +121,7 @@ func externalQbittorrentConfigured(cfg *Config) bool {
 	if cfg == nil || qbittorrentManagedEnabled(cfg) {
 		return false
 	}
-	raw := strings.TrimSpace(cfg.Settings["qbittorrent_url"])
+	raw := strings.TrimSpace(cfg.Settings[settingQbittorrentUrl])
 	if raw == "" || raw == defaultManagedQbittorrentURL {
 		return false
 	}
@@ -318,6 +318,6 @@ func ApplyEngineOverride(cfg *Config) string {
 	if cfg.Settings == nil {
 		cfg.Settings = map[string]string{}
 	}
-	cfg.Settings["torrent_backend"] = value
+	cfg.Settings[settingTorrentBackend] = value
 	return value
 }

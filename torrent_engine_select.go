@@ -171,7 +171,7 @@ func ShutdownTorrentEngine(s *AppState) error {
 // It is called at startup and whenever the backend settings change.
 func ConfigureTorrentEngine(s *AppState, cfg *Config) error {
 	if cfg != nil {
-		if raw := strings.ToLower(strings.TrimSpace(cfg.Settings["torrent_backend"])); raw != "" && !isKnownTorrentBackend(raw) {
+		if raw := strings.ToLower(strings.TrimSpace(cfg.Settings[settingTorrentBackend])); raw != "" && !isKnownTorrentBackend(raw) {
 			logging.Warn("unknown torrent backend saved in the settings; using gx-torrent", "backend", raw)
 		}
 	}

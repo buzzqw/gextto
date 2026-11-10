@@ -247,7 +247,7 @@ func (c *Conn) write(batch *sendBatch, _type st, connID uint16, payload []byte, 
 		payload = payload[:maxPayloadSize]
 	}
 	if err := c.send(batch, _type, connID, payload, seqNr); err != nil {
-		c.destroy(fmt.Errorf("error sending packet: %s", err))
+		c.destroy(fmt.Errorf("error sending packet: %w", err))
 		return 0, err
 	}
 	n = len(payload)
@@ -809,7 +809,7 @@ func (c *Conn) Write(p []byte) (n int, err error) {
 	batch.reset()
 	defer func() {
 		if flushErr := batch.flush(c.socket, c.remoteSocketAddr); flushErr != nil && err == nil {
-			c.destroy(fmt.Errorf("error sending packet: %s", flushErr))
+			c.destroy(fmt.Errorf("error sending packet: %w", flushErr))
 			err = flushErr
 		}
 	}()
@@ -837,7 +837,7 @@ func (c *Conn) Write(p []byte) (n int, err error) {
 			continue
 		}
 		if flushErr := batch.flush(c.socket, c.remoteSocketAddr); flushErr != nil {
-			c.destroy(fmt.Errorf("error sending packet: %s", flushErr))
+			c.destroy(fmt.Errorf("error sending packet: %w", flushErr))
 			return n, flushErr
 		}
 		waitEvents(&mu,

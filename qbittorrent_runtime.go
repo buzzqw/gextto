@@ -104,7 +104,7 @@ func managedQbittorrentConfig(cfg *Config) (*Config, error) {
 	if prepared == nil {
 		return nil, errors.New("Gextto configuration is missing")
 	}
-	baseURL := strings.TrimSpace(prepared.Settings["qbittorrent_url"])
+	baseURL := strings.TrimSpace(prepared.Settings[settingQbittorrentUrl])
 	if baseURL == "" {
 		baseURL = "http://127.0.0.1:8080"
 	}
@@ -125,11 +125,11 @@ func managedQbittorrentConfig(cfg *Config) (*Config, error) {
 	parsed.Path = ""
 	parsed.RawPath = ""
 	baseURL = strings.TrimRight(parsed.String(), "/")
-	username := strings.TrimSpace(prepared.Settings["qbittorrent_username"])
+	username := strings.TrimSpace(prepared.Settings[settingQbittorrentUsername])
 	if username == "" {
 		username = defaultQbittorrentUsername
 	}
-	password := prepared.Settings["qbittorrent_password"]
+	password := prepared.Settings[settingQbittorrentPassword]
 	if password == "" {
 		bytes := make([]byte, 24)
 		if _, err := rand.Read(bytes); err != nil {
@@ -137,10 +137,10 @@ func managedQbittorrentConfig(cfg *Config) (*Config, error) {
 		}
 		password = hex.EncodeToString(bytes)
 	}
-	prepared.Settings["qbittorrent_url"] = baseURL
-	prepared.Settings["qbittorrent_username"] = username
-	prepared.Settings["qbittorrent_password"] = password
-	prepared.Settings["qbittorrent_managed"] = "true"
+	prepared.Settings[settingQbittorrentUrl] = baseURL
+	prepared.Settings[settingQbittorrentUsername] = username
+	prepared.Settings[settingQbittorrentPassword] = password
+	prepared.Settings[settingQbittorrentManaged] = "true"
 	return prepared, nil
 }
 
@@ -194,7 +194,7 @@ func ensureQbittorrentManagedDir(cfg *Config) (string, error) {
 }
 
 func qbittorrentManagedEnabled(cfg *Config) bool {
-	return cfg != nil && settingsBool(cfg, "qbittorrent_managed", false)
+	return cfg != nil && settingsBool(cfg, settingQbittorrentManaged, false)
 }
 
 func qbittorrentAssetArch() (string, error) {

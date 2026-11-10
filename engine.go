@@ -673,7 +673,7 @@ func feedAutoDisableDays(cfg *Config) int {
 	if cfg == nil {
 		return fallback
 	}
-	raw := strings.TrimSpace(cfg.Settings["feed_auto_disable_days"])
+	raw := strings.TrimSpace(cfg.Settings[settingFeedAutoDisableDays])
 	if raw == "" {
 		return fallback
 	}

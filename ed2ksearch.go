@@ -73,12 +73,12 @@ func ed2kSettingsFromConfig(cfg *Config) (ed2kSettings, error) {
 	if cfg == nil {
 		return ed2kSettings{}, errors.New("eD2k configuration is unavailable")
 	}
-	host := strings.TrimSpace(cfg.Settings["amule_host"])
+	host := strings.TrimSpace(cfg.Settings[settingAmuleHost])
 	if host == "" {
 		host = defaultAmuleHost
 	}
 	port := defaultAmulePort
-	if raw := strings.TrimSpace(cfg.Settings["amule_port"]); raw != "" {
+	if raw := strings.TrimSpace(cfg.Settings[settingAmulePort]); raw != "" {
 		parsed, err := strconv.Atoi(raw)
 		if err != nil || parsed < 1 || parsed > 65535 {
 			return ed2kSettings{}, errors.New("amule_port must be between 1 and 65535")
@@ -86,7 +86,7 @@ func ed2kSettingsFromConfig(cfg *Config) (ed2kSettings, error) {
 		port = parsed
 	}
 	timeout := defaultEd2kSearchTimeout
-	if raw := strings.TrimSpace(cfg.Settings["ed2k_search_timeout_secs"]); raw != "" {
+	if raw := strings.TrimSpace(cfg.Settings[settingEd2kSearchTimeoutSecs]); raw != "" {
 		parsed, err := strconv.Atoi(raw)
 		if err != nil || parsed < 5 || parsed > 120 {
 			return ed2kSettings{}, errors.New("ed2k_search_timeout_secs must be between 5 and 120")
@@ -95,8 +95,8 @@ func ed2kSettingsFromConfig(cfg *Config) (ed2kSettings, error) {
 	}
 	return ed2kSettings{
 		Address:  net.JoinHostPort(host, strconv.Itoa(port)),
-		Password: cfg.Settings["amule_password"],
-		Network:  ed2kSearchNetwork(cfg.Settings["ed2k_search_network"]),
+		Password: cfg.Settings[settingAmulePassword],
+		Network:  ed2kSearchNetwork(cfg.Settings[settingEd2kSearchNetwork]),
 		Timeout:  time.Duration(timeout) * time.Second,
 	}, nil
 }
@@ -125,7 +125,7 @@ func ed2kEnabled(cfg *Config) bool {
 	if cfg == nil {
 		return false
 	}
-	return settingIsTrue(cfg.Settings["ed2k_enabled"])
+	return settingIsTrue(cfg.Settings[settingEd2kEnabled])
 }
 
 // ed2kFallbackEnabled is the automatic gap-filling switch. It is separate from
@@ -135,7 +135,7 @@ func ed2kFallbackEnabled(cfg *Config) bool {
 	if cfg == nil || !ed2kEnabled(cfg) {
 		return false
 	}
-	return settingIsTrue(cfg.Settings["ed2k_fallback"])
+	return settingIsTrue(cfg.Settings[settingEd2kFallback])
 }
 
 // ed2kMinSources is the source floor the automatic fallback requires. A manual
@@ -144,7 +144,7 @@ func ed2kMinSources(cfg *Config) int64 {
 	if cfg == nil {
 		return 3
 	}
-	raw := strings.TrimSpace(cfg.Settings["ed2k_min_sources"])
+	raw := strings.TrimSpace(cfg.Settings[settingEd2kMinSources])
 	if raw == "" {
 		return 3
 	}
