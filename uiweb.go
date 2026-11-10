@@ -151,15 +151,15 @@ type uiUpcoming struct {
 
 // uiTorrentRow is one row of the Scarico table.
 type uiTorrentRow struct {
-	Hash        string
-	Name        string
-	Tag         string
-	Tags        []string
-	State       string
-	StateClass  string
+	Hash       string
+	Name       string
+	Tag        string
+	Tags       []string
+	State      string
+	StateClass string
 	// StateKey is the engine's own state (downloading, seeding, paused…),
 	// which the state filter of the Downloads view groups.
-	StateKey string
+	StateKey    string
 	Progress    float64
 	ProgressPct string
 	// ProgressClass drives the progress bar colour (active|seed|paused).

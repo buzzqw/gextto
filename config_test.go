@@ -1706,10 +1706,10 @@ func TestTorrentLinkFromDisabledIndexer(t *testing.T) {
 	}}
 	cases := map[string]bool{
 		"http://192.168.1.161:9117/dl/torrentgalaxyclone/?jackett_api=1&path=x": true,
-		"http://192.168.1.161:9696/1/download?apikey=x":                          true,
-		"http://192.168.1.161:8788/dl/590515.torrent?apikey=x":                   false,
-		"https://rss24h.torrentleech.org/rss/download/241864488/a4ae63ba":        false,
-		"magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567":           false,
+		"http://192.168.1.161:9696/1/download?apikey=x":                         true,
+		"http://192.168.1.161:8788/dl/590515.torrent?apikey=x":                  false,
+		"https://rss24h.torrentleech.org/rss/download/241864488/a4ae63ba":       false,
+		"magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567":          false,
 		"not a url": false,
 	}
 	for link, want := range cases {
