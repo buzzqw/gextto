@@ -90,6 +90,7 @@ type Peer struct {
 
 	snubTimeout time.Duration
 	snubTimer   *time.Timer
+	snubArmed   bool
 
 	closeC chan struct{}
 	doneC  chan struct{}
@@ -221,11 +222,19 @@ func (p *Peer) StartPEX(initialPeers map[*Peer]struct{}, recentlySeen *pexlist.R
 // ResetSnubTimer restarts the stall detector on activity.
 func (p *Peer) ResetSnubTimer() {
 	p.snubTimer.Reset(p.snubTimeout)
+	p.snubArmed = true
 }
 
 // StopSnubTimer disarms the stall detector.
 func (p *Peer) StopSnubTimer() {
 	p.snubTimer.Stop()
+	p.snubArmed = false
+}
+
+// SnubArmed reports whether the stall detector is running. It is read and
+// written by the torrent loop only.
+func (p *Peer) SnubArmed() bool {
+	return p.snubArmed
 }
 
 // DownloadSpeed is the 1-minute average in bytes/s.

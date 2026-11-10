@@ -117,6 +117,18 @@ func (t *torrent) onPieceProgress(pe *peer.Peer, pd *piecedownloader.PieceDownlo
 	}
 }
 
+// rearmSnubAfterPiece runs when a piece from pe is complete. A finished piece
+// is activity, so the stall detector restarts while the peer still has other
+// pieces in flight; it stops only when none is left. Stopping it outright
+// left those pieces waiting on a peer that went quiet, with nothing to notice.
+func (t *torrent) rearmSnubAfterPiece(pe *peer.Peer) {
+	if len(t.pieceDownloaders[pe]) > 0 {
+		pe.ResetSnubTimer()
+		return
+	}
+	pe.StopSnubTimer()
+}
+
 // completePieceDownload writes a fully received piece: duplicate suppression
 // against concurrent copies, optimistic pipelining of the next piece, and
 // the bounded write ring.
@@ -124,7 +136,7 @@ func (t *torrent) completePieceDownload(pe *peer.Peer, pd *piecedownloader.Piece
 	piece := pd.Piece
 	t.log.Debugf("piece #%d downloaded from %s", msg.Index, pe.IP())
 	t.closePieceDownloader(pd)
-	pe.StopSnubTimer()
+	t.rearmSnubAfterPiece(pe)
 
 	if piece.Writing {
 		t.crash("piece is already writing")

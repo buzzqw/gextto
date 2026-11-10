@@ -80,12 +80,15 @@ func (w *servedWindow) seen(r peerprotocol.RequestMessage) bool {
 // segments instead of 250 of each. Uploads still travel alone, so
 // cancellation, the choke purge and the throttle see them as before.
 type PeerWriter struct {
-	conn                  net.Conn
-	queueC                chan peerprotocol.Message
-	cancelC               chan peerprotocol.CancelMessage
-	writeQueue            *list.List
-	maxQueuedRequests     int
-	fastEnabled           bool
+	conn              net.Conn
+	queueC            chan peerprotocol.Message
+	cancelC           chan peerprotocol.CancelMessage
+	writeQueue        *list.List
+	maxQueuedRequests int
+	fastEnabled       bool
+	// allowedFast holds the pieces we granted with allowed_fast (BEP 6): their
+	// queued uploads survive a choke.
+	allowedFast           map[uint32]struct{}
 	currentQueuedRequests int
 	readyC                chan struct{}
 	batchC                chan []peerprotocol.Message
@@ -247,21 +250,38 @@ func (p *PeerWriter) queueMessage(msg peerprotocol.Message) {
 			return
 		}
 		p.currentQueuedRequests++
+	} else if af, ok := msg.(peerprotocol.AllowedFastMessage); ok {
+		if p.allowedFast == nil {
+			p.allowedFast = make(map[uint32]struct{})
+		}
+		p.allowedFast[af.Index] = struct{}{}
 	} else if _, ok := msg.(peerprotocol.ChokeMessage); ok {
 		p.cancelQueuedPieceMessages()
 	}
 	p.writeQueue.PushBack(msg)
 }
 
-// cancelQueuedPieceMessages purges every staged upload (on choke).
+// cancelQueuedPieceMessages withdraws the staged uploads on a choke. Without
+// the fast extension the choke itself tells the peer they are dropped. With
+// it (BEP 6) a choke rejects nothing by itself: every request not served gets
+// an explicit reject, and the uploads of allowed-fast pieces stay queued,
+// since those may be served while the peer is choked.
 func (p *PeerWriter) cancelQueuedPieceMessages() {
 	var next *list.Element
 	for e := p.writeQueue.Front(); e != nil; e = next {
 		next = e.Next()
-		if _, ok := e.Value.(Piece); ok {
-			p.writeQueue.Remove(e)
-			p.currentQueuedRequests--
+		pi, ok := e.Value.(Piece)
+		if !ok {
+			continue
 		}
+		if p.fastEnabled {
+			if _, keep := p.allowedFast[pi.Index]; keep {
+				continue
+			}
+			p.writeQueue.InsertBefore(peerprotocol.RejectMessage{RequestMessage: pi.RequestMessage}, e)
+		}
+		p.writeQueue.Remove(e)
+		p.currentQueuedRequests--
 	}
 }
 

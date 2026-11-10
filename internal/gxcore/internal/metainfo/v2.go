@@ -165,6 +165,9 @@ func NewV2Info(b []byte) (*Info, error) {
 		}
 		i.NumPieces = pieces
 		copy(i.Hash[:], i.V2Hash[:20])
+		if err := checkFileDirCollisions(i.Files); err != nil {
+			return nil, err
+		}
 		return i, nil
 	}
 	for _, f := range i.V2Files {
@@ -360,7 +363,7 @@ func sanitizeV2Path(p string) (string, error) {
 		if strings.TrimSpace(part) == ".." {
 			return "", fmt.Errorf("invalid file name: %q", p)
 		}
-		out = append(out, cleanName(part))
+		out = append(out, storageSegment(part))
 	}
 	return filepath.Join(out...), nil
 }

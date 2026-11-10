@@ -113,3 +113,41 @@ func TestSetFilePathsRefusesEscapingPaths(t *testing.T) {
 		t.Fatal("SetFilePaths refused a correct relative path")
 	}
 }
+
+// An empty or "." path component must not vanish in the join: a file named ""
+// would otherwise become the torrent's own folder, and "a/" would collide with
+// the folder "a" of another file.
+func TestEmptyPathComponentsStayComponents(t *testing.T) {
+	entries := []any{
+		map[string]any{"length": int64(10), "path": []string{""}},
+		map[string]any{"length": int64(10), "path": []string{"dir", "."}},
+		map[string]any{"length": int64(10), "path": []string{"dir", "file"}},
+	}
+	info, err := NewInfo(craftedInfo(t, "root", entries), true, true)
+	if err != nil {
+		t.Fatalf("refused: %v", err)
+	}
+	want := []string{
+		filepath.Join("root", "_"),
+		filepath.Join("root", "dir", "_"),
+		filepath.Join("root", "dir", "file"),
+	}
+	for j, w := range want {
+		if info.Files[j].Path != w {
+			t.Errorf("file %d stored as %q, want %q", j, info.Files[j].Path, w)
+		}
+	}
+}
+
+// A file whose path is also the folder of another file is refused at parse
+// time, not half way through the download.
+func TestFileUsedAsFolderIsRefused(t *testing.T) {
+	entries := []any{
+		map[string]any{"length": int64(10), "path": []string{"a"}},
+		map[string]any{"length": int64(10), "path": []string{"a", "b"}},
+	}
+	_, err := NewInfo(craftedInfo(t, "root", entries), true, true)
+	if err == nil || !strings.Contains(err.Error(), "folder") {
+		t.Fatalf("got %v, want a refusal naming the folder clash", err)
+	}
+}

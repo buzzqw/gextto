@@ -16,15 +16,6 @@ here.
 
 ## Engine (gx-core, gx-torrent)
 
-- **Choke with the Fast extension (BEP 6)** — a choke purges the staged uploads in
-  silence; with Fast on, every request not served must get a `Reject`, and the allowed-fast
-  pieces keep being served. Gate: a test with a Fast peer choked while it has requests
-  queued.
-- **Audit against a sibling engine's bug hunt** — three defects another libtorrent-style
-  engine found in itself, to check in gx-core: peers kept across a magnet's file check that
-  never learn our pieces (no bitfield or `have` after the check); a spurious snub when a
-  request queue is refilled after a long idle; a borrowed file name that spans a separator
-  or is empty and collapses a file onto the torrent root. Gate: a test per case.
 - **Rate limiter burst** — a bucket holds one second of tokens, so on a slow capped uplink
   it sends a second's quota at once and fills the modem queue by itself; while autospeed
   holds a cap, a burst of a few tens of milliseconds. Gate: the ping-under-load measurement

@@ -245,7 +245,7 @@ func NewInfo(b []byte, utf8 bool, pad bool) (*Info, error) {
 // per BEP 47) and any path that would leave the torrent storage.
 func (i *Info) buildFiles(entries []file, multiFile, pad bool) error {
 	if !multiFile {
-		name := cleanName(i.Name)
+		name := storageSegment(i.Name)
 		if !localStoragePath(name) {
 			return fmt.Errorf("unsafe torrent name: %q", i.Name)
 		}
@@ -256,9 +256,9 @@ func (i *Info) buildFiles(entries []file, multiFile, pad bool) error {
 	uniquePaths := make(map[string]any, len(entries))
 	for j, f := range entries {
 		parts := make([]string, 0, len(f.Path)+1)
-		parts = append(parts, cleanName(i.Name))
+		parts = append(parts, storageSegment(i.Name))
 		for _, p := range f.Path {
-			parts = append(parts, cleanName(p))
+			parts = append(parts, storageSegment(p))
 		}
 		joinedPath := filepath.Join(parts...)
 		// The name is the first component of every path and is not screened
@@ -281,7 +281,42 @@ func (i *Info) buildFiles(entries []file, multiFile, pad bool) error {
 			Padding: isPadding,
 		}
 	}
+	return checkFileDirCollisions(i.Files)
+}
+
+// checkFileDirCollisions refuses a layout where a file's path is also a
+// folder of another file ("a" and "a/b"): one of them could not be created,
+// and the storage would fail half way instead of at the start.
+func checkFileDirCollisions(files []File) error {
+	paths := make(map[string]struct{}, len(files))
+	for _, f := range files {
+		if !f.Padding {
+			paths[f.Path] = struct{}{}
+		}
+	}
+	for _, f := range files {
+		if f.Padding {
+			continue
+		}
+		for dir := filepath.Dir(f.Path); dir != "." && dir != string(filepath.Separator); dir = filepath.Dir(dir) {
+			if _, ok := paths[dir]; ok {
+				return fmt.Errorf("file name used as a folder too: %q", dir)
+			}
+		}
+	}
 	return nil
+}
+
+// storageSegment is cleanName for one path component that must stay a
+// component: an empty or "." segment would vanish when the path is joined,
+// moving the file up a level (a file named "" would become the torrent's own
+// folder), so it is written as "_".
+func storageSegment(s string) string {
+	c := cleanName(s)
+	if c == "" || c == "." {
+		return "_"
+	}
+	return c
 }
 
 // localStoragePath reports whether a torrent-relative storage path stays
