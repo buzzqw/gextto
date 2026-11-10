@@ -1492,6 +1492,14 @@ REPORT** con l'esito di ogni sorgente e le decisioni prese. Il file è in
 `<dati>/gx-torrent/gx-torrent.log`, consultabile anche da *Manutenzione → Log
 gx-torrent*.
 
+Una riga identica ripetuta a raffica — per esempio un file che il disco rifiuta
+centinaia di volte in un secondo — non riempie più il log: si vede la prima
+copia, le altre vengono contate e ogni mezz'ora un riepilogo dice quante sono
+state; passato un minuto la riga può ricomparire, così un problema che continua
+non resta nascosto. Se il motore esce con un errore mentre Gextto lo sta
+sostituendo (un aggiornamento o un riavvio), Gextto scrive una riga che dice
+dove sta il dettaglio: il file `<dati>/gx-torrent/gx-torrent.crash.log`.
+
 ### La storia di un download
 
 Ogni riga del log che riguarda un download finisce con un **ID di

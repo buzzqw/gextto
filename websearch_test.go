@@ -3,8 +3,11 @@ package gextto
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -210,5 +213,63 @@ func TestWebHTMLDoesNotUseFlareSolverrForNonCloudflareStatuses(t *testing.T) {
 				t.Fatalf("FlareSolverr calls for HTTP %d = %d", status, got)
 			}
 		})
+	}
+}
+
+// TestLimetorrentsSearchUsesTheFormEndpoint pins the URL of the engine: the
+// old path form (/search/all/<query>/seeds/1/) now answers 302 to http and
+// 301 back to https, so the engine reported itself unreachable at every cycle.
+func TestLimetorrentsSearchUsesTheFormEndpoint(t *testing.T) {
+	got := limetorrentsSearchURL("matrix resurrections")
+	base, err := url.Parse(got)
+	if err != nil {
+		t.Fatalf("parse %q: %v", got, err)
+	}
+	if base.Host != "limetorrent.store" || base.Path != "/search.php" {
+		t.Fatalf("search URL = %q, want https://limetorrent.store/search.php", got)
+	}
+	values := base.Query()
+	if values.Get("q") != "matrix resurrections" {
+		t.Fatalf("q = %q, want the query unchanged", values.Get("q"))
+	}
+	if values.Get("order") != "seeders" || values.Get("orderby") != "DESC" {
+		t.Fatalf("sort = %q/%q, want DESC by seeders", values.Get("orderby"), values.Get("order"))
+	}
+	if strings.Contains(got, "/search/all/") {
+		t.Fatalf("search URL still uses the redirecting path form: %q", got)
+	}
+}
+
+// TestLimetorrentsDetailsDropsDuplicateRows checks the parser against the
+// shape of the real page: every row links the title and the magnet to the same
+// detail URL, and eight rows mean eight torrents, not four.
+func TestLimetorrentsDetailsDropsDuplicateRows(t *testing.T) {
+	var page strings.Builder
+	page.WriteString(`<html><body><table class="table2"><tbody>`)
+	for i := 1; i <= 12; i++ {
+		href := fmt.Sprintf("https://limetorrent.store/example-release-%d.html", i)
+		page.WriteString(`<tr><td><a href="` + href + `" class="tt-name">Example release ` + strconv.Itoa(i) + `</a></td>`)
+		page.WriteString(`<td class="tdleft"><a href="` + href + `"><img src="/dl.png" alt=""></a></td></tr>`)
+	}
+	page.WriteString(`</tbody></table></body></html>`)
+
+	base, err := url.Parse(limetorrentsSearchURL("example"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	details, err := limetorrentsDetails(page.String(), base)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if len(details) != 8 {
+		t.Fatalf("details = %d, want the cap of 8 distinct torrents", len(details))
+	}
+	if details[0].title != "Example release 1" || !strings.HasSuffix(details[0].url, "/example-release-1.html") {
+		t.Fatalf("first detail = %+v", details[0])
+	}
+	for i, detail := range details {
+		if detail.url != "https://limetorrent.store/example-release-"+strconv.Itoa(i+1)+".html" {
+			t.Fatalf("detail %d = %q: rows are duplicated or out of order", i, detail.url)
+		}
 	}
 }

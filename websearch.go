@@ -632,9 +632,52 @@ func sanitizedMagnetFromDetail(ctx context.Context, rawURL string, flaresolverr 
 	return firstMagnet(body), nil
 }
 
+// limetorrentsSearchURL is the search page of LimeTorrents, ordered by seeds
+// like the old path form used to be. Two things moved: the path form
+// /search/all/<query>/seeds/1/ answers 302 to http and 301 back to https (an
+// endless redirect loop, which made every cycle report the engine
+// unreachable), and the detail pages of limetorrent.net no longer carry the
+// magnet, they hand it to limetorrent.store. Starting the search on the store
+// host keeps both steps on pages that still answer.
+func limetorrentsSearchURL(query string) string {
+	return "https://limetorrent.store/search.php?" + url.Values{
+		"orderby": {"DESC"},
+		"order":   {"seeders"},
+		"q":       {query},
+	}.Encode()
+}
+
+// limetorrentsDetails collects the result rows of a search page. Every row
+// links the title and the magnet to the same detail page, so the duplicates
+// are dropped before the cap: eight distinct torrents, not four.
+func limetorrentsDetails(body string, base *url.URL) ([]searchDetailLink, error) {
+	document, err := html.Parse(strings.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+	seen := make(map[string]bool, 8)
+	details := make([]searchDetailLink, 0, 8)
+	for _, link := range htmlSelectAll(document, "table.table2 a[href$='.html']") {
+		title := strings.TrimSpace(htmlText(link))
+		href, _ := htmlAttr(link, "href")
+		if title == "" {
+			continue
+		}
+		detail, err := base.Parse(href)
+		if err != nil || seen[detail.String()] {
+			continue
+		}
+		seen[detail.String()] = true
+		details = append(details, searchDetailLink{title: title, url: detail.String()})
+		if len(details) == 8 {
+			break
+		}
+	}
+	return details, nil
+}
+
 func searchLimetorrents(ctx context.Context, query string, flaresolverr *string) ([]webResult, error) {
-	slug := strings.ReplaceAll(query, " ", "-")
-	rawURL := fmt.Sprintf("https://limetorrent.net/search/all/%s/seeds/1/", slug)
+	rawURL := limetorrentsSearchURL(query)
 	body, err := fetchHtml(ctx, rawURL, flaresolverr)
 	if err != nil {
 		return nil, err
@@ -643,24 +686,9 @@ func searchLimetorrents(ctx context.Context, query string, flaresolverr *string)
 	if err != nil {
 		return nil, err
 	}
-	document, err := html.Parse(strings.NewReader(body))
+	details, err := limetorrentsDetails(body, base)
 	if err != nil {
 		return nil, err
-	}
-	nodes := htmlSelectAll(document, "table.table2 a[href$='.html']")
-	if len(nodes) > 8 {
-		nodes = nodes[:8]
-	}
-	var details []searchDetailLink
-	for _, link := range nodes {
-		title := strings.TrimSpace(htmlText(link))
-		href, _ := htmlAttr(link, "href")
-		if title == "" {
-			continue
-		}
-		if detail, err := base.Parse(href); err == nil {
-			details = append(details, searchDetailLink{title: title, url: detail.String()})
-		}
 	}
 	var output []webResult
 	for _, detail := range details {

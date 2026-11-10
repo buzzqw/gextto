@@ -107,6 +107,19 @@ Code:
      Gextto's log. Errors of individual peers (expired handshakes, resets) and
      of failed announces are at debug level, like the automatic peer caps, the
      cache retunes and the swarm noise: those detail lines need `-debug`;
+   - the same error or warning is written once and then counted
+     (`repeatedRecordFilter`, `lifecycle.go`): the identical copies that arrive
+     within a minute are collapsed, and the periodic summary — the same one that
+     reports the demoted peer errors, every 30 minutes — says how many they
+     were. A loop that fails a thousand times a second leaves a trace, not a
+     flood. Nothing is lost: the first copy is always written, and after the
+     minute the sentence can appear again;
+   - what the Go runtime prints when the daemon panics goes to
+     `DATA_DIR/gx-torrent/gx-torrent.crash.log` (stderr of the process). When
+     Gextto stops the daemon on purpose — a swap to a new binary, its own
+     shutdown — it logs nothing about the exit, so it checks that file and adds
+     one line (`gx-torrent saved a crash report while it was stopping`) when a
+     panic landed there, instead of leaving the dump orphaned;
    - default download folder equal to Gextto's configured download folder;
    - the daemon is restarted if it exits;
    - **it stays up when Gextto restarts** (for example for an

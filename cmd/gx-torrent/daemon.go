@@ -1093,10 +1093,12 @@ type collectedTorrent struct {
 // idle log does not hide a growing connectivity problem.
 const peerNoiseReportEvery = 30 * time.Minute
 
-// reportPeerNoise logs the peer/tracker errors demoted since the last report.
-// It normally runs on the single queue-loop goroutine; the timestamp is taken
-// under d.mu so a test (or a future caller) ticking concurrently cannot race it.
-func (d *Daemon) reportPeerNoise(now time.Time) {
+// reportEngineNoise logs what the engine's log kept out of the way since the
+// last report: the demoted peer/tracker errors, and the identical copies the
+// engine repeated (see repeatedRecordFilter). It normally runs on the single
+// queue-loop goroutine; the timestamp is taken under d.mu so a test (or a
+// future caller) ticking concurrently cannot race it.
+func (d *Daemon) reportEngineNoise(now time.Time) {
 	d.mu.Lock()
 	if !d.lastPeerNoiseReport.IsZero() && now.Sub(d.lastPeerNoiseReport) < peerNoiseReportEvery {
 		d.mu.Unlock()
@@ -1107,10 +1109,13 @@ func (d *Daemon) reportPeerNoise(now time.Time) {
 	if line := formatPeerNoise(peerNoiseCounters.drain()); line != "" {
 		logfDebug("peer noise: %s", line)
 	}
+	if line := formatRepeatedRecords(drainRepeatedRecords(), peerNoiseReportEvery); line != "" {
+		logfWarn("%s", line)
+	}
 }
 
 func (d *Daemon) tick(now time.Time) {
-	d.reportPeerNoise(now)
+	d.reportEngineNoise(now)
 	// Phase 1: sample the run loops without d.mu.
 	d.mu.Lock()
 	session := d.session

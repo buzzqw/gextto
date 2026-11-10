@@ -7,6 +7,7 @@ package gextto
 // An external daemon already answering on the URL is used as-is.
 
 import (
+	"bufio"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -37,6 +38,12 @@ type gxManagedProcess struct {
 	mu     sync.Mutex
 	closed bool
 	done   chan error
+	// crashLog and crashOffset point at the file the Go runtime writes a panic
+	// to, and at the size it had when this process started. An exit Gextto
+	// treats as deliberate (a swap to a new binary, its own shutdown) would
+	// otherwise leave a panic only there, with nothing in Gextto's log.
+	crashLog    string
+	crashOffset int64
 }
 
 // gxTorrentBinary finds the daemon executable: the one installed next to
@@ -371,9 +378,14 @@ func startManagedGxTorrent(cfg *Config, settings gxTorrentSettings) (*gxManagedP
 	command.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 	// The daemon writes its own rotating log (-log-file); this file only
 	// catches what the Go runtime prints on a crash.
-	crashLog, err := os.OpenFile(filepath.Join(spec.dataDir, "gx-torrent.crash.log"), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+	crashPath := filepath.Join(spec.dataDir, "gx-torrent.crash.log")
+	crashLog, err := os.OpenFile(crashPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
 	if err != nil {
 		return nil, err
+	}
+	crashOffset := int64(0)
+	if info, statErr := crashLog.Stat(); statErr == nil {
+		crashOffset = info.Size()
 	}
 	command.Stdout = crashLog
 	command.Stderr = crashLog
@@ -382,7 +394,10 @@ func startManagedGxTorrent(cfg *Config, settings gxTorrentSettings) (*gxManagedP
 		return nil, fmt.Errorf("avvio gx-torrent gestito: %w", err)
 	}
 	logging.Debug("gx-torrent avviato da Gextto", "binary", spec.binary, "listen", spec.listen, "data", spec.dataDir, "scope", gxCanUseScope())
-	process := &gxManagedProcess{cmd: command, pid: command.Process.Pid, done: make(chan error, 1)}
+	process := &gxManagedProcess{
+		cmd: command, pid: command.Process.Pid, done: make(chan error, 1),
+		crashLog: crashPath, crashOffset: crashOffset,
+	}
 	go func() {
 		defer recoverGoroutine("gx-torrent process wait")
 		err := command.Wait()
@@ -428,6 +443,51 @@ func (p *gxManagedProcess) wait() error {
 		return nil
 	}
 	return err
+}
+
+// crashReportScanBytes bounds how much of the crash log is read looking for a
+// panic banner: a real Go panic dumps every goroutine stack after it, and the
+// banner is what matters.
+const crashReportScanBytes = 8 << 20
+
+// crashReport tells whether the daemon wrote a panic or a Go runtime failure
+// to its crash log since this process started, and where the file is. Gextto
+// treats a swap to a new binary and its own shutdown as deliberate stops and
+// logs nothing about them, so this is the only trace of a panic during one.
+// An adopted process has no starting offset: nothing is claimed about it.
+func (p *gxManagedProcess) crashReport() (string, bool) {
+	if p == nil || p.crashLog == "" {
+		return "", false
+	}
+	file, err := os.Open(p.crashLog)
+	if err != nil {
+		return "", false
+	}
+	defer file.Close()
+	if _, err := file.Seek(p.crashOffset, io.SeekStart); err != nil {
+		return "", false
+	}
+	reader := bufio.NewReader(io.LimitReader(file, crashReportScanBytes))
+	for {
+		line, readErr := reader.ReadString('\n')
+		if strings.HasPrefix(line, "panic: ") || strings.HasPrefix(line, "fatal error: ") {
+			return p.crashLog, true
+		}
+		if readErr != nil {
+			return "", false
+		}
+	}
+}
+
+// logGxCrashReport writes the one line that keeps a panic visible when the
+// exit itself is a deliberate stop: without it the dump stays only in the
+// daemon's crash log, where nobody looks after a restart that went well.
+func logGxCrashReport(process *gxManagedProcess) {
+	path, crashed := process.crashReport()
+	if !crashed {
+		return
+	}
+	logging.Warn(fmt.Sprintf("gx-torrent saved a crash report while it was stopping: the detail is in %s", path))
 }
 
 // managedShutdownGrace is how long the managed daemon gets to exit after
@@ -652,6 +712,7 @@ func (e *gxTorrentEngine) superviseManagedProcess() {
 		go e.watchManagedHealth(process, watchStop)
 		err := process.wait()
 		close(watchStop)
+		logGxCrashReport(process)
 		e.processMu.Lock()
 		closed = e.closed
 		replacing := e.replacing

@@ -1479,6 +1479,14 @@ REPORT** with the outcome of each source and the decisions taken. The file is
 `<data>/gx-torrent/gx-torrent.log`, also readable from *Maintenance →
 gx-torrent log*.
 
+A line repeated in a burst — a file the disk refuses hundreds of times in a
+second, for instance — no longer fills the log: the first copy is shown, the
+others are counted and every half hour a summary says how many there were;
+after a minute the line can appear again, so a problem that goes on is never
+hidden. If the engine exits with an error while Gextto is replacing it (an
+update or a restart), Gextto writes a line saying where the detail is: the file
+`<data>/gx-torrent/gx-torrent.crash.log`.
+
 ### The history of a download
 
 Every log line about a download ends with an **acquisition ID** (`acq:

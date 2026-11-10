@@ -178,7 +178,11 @@ func engineLogHandler(debug bool) clog.Handler {
 	// Let the engine drop records below the handler level before building
 	// them; the handler would filter them out anyway.
 	clog.SetEngineLevel(level)
-	return &swarmNoiseFilter{Handler: handler}
+	// Order matters: the swarm noise is demoted first, so a peer error that
+	// the counters already summarise is never counted again as a repetition.
+	repeated := newRepeatedRecordFilter(handler)
+	engineRepeats.Store(repeated)
+	return &swarmNoiseFilter{Handler: repeated}
 }
 
 // daemonFormatter renders the engine's records like the daemon's own lines.
@@ -216,6 +220,146 @@ func (f *swarmNoiseFilter) Handle(rec *clog.Record) {
 		rec = &demoted
 	}
 	f.Handler.Handle(rec)
+}
+
+// repeatWindow is how long the identical copies of one engine error or warning
+// are collapsed into the first one that was written. A failed stop used to
+// print the same sentence 874 times in one second, which buried the log
+// without adding a single fact.
+const repeatWindow = time.Minute
+
+// maxRepeatedRecords bounds the map that tracks the last write of each
+// sentence, so a stream of all-different errors cannot grow the memory.
+const maxRepeatedRecords = 512
+
+// repeatedRecordFilter writes the first copy of an engine error or warning and
+// counts the identical ones that follow within repeatWindow. The periodic
+// summary reports how many arrived: the same sentence repeated is one event,
+// and the log is read by a person.
+type repeatedRecordFilter struct {
+	clog.Handler
+	mu      sync.Mutex
+	now     func() time.Time
+	last    map[repeatedRecordKey]time.Time
+	dropped map[string]int64
+}
+
+func newRepeatedRecordFilter(handler clog.Handler) *repeatedRecordFilter {
+	return &repeatedRecordFilter{
+		Handler: handler,
+		now:     time.Now,
+		last:    make(map[repeatedRecordKey]time.Time, 16),
+		dropped: make(map[string]int64, 4),
+	}
+}
+
+// repeatedRecordKey identifies a record by its sentence, level and logger: two
+// torrents failing the same way are two events and both keep their line. It is
+// a struct rather than a joined string so the hit path allocates nothing.
+type repeatedRecordKey struct {
+	logger  string
+	level   clog.Level
+	message string
+}
+
+func keyOfRepeatedRecord(rec *clog.Record) repeatedRecordKey {
+	return repeatedRecordKey{logger: rec.LoggerName, level: rec.Level, message: rec.Message}
+}
+
+// nowFor allows a test to move the clock without sleeping.
+func (f *repeatedRecordFilter) nowFor() time.Time {
+	if f.now == nil {
+		return time.Now()
+	}
+	return f.now()
+}
+
+func (f *repeatedRecordFilter) Handle(rec *clog.Record) {
+	// Only the records a person must see are collapsed: the debug and info
+	// lines are already filtered by level, and losing one of them silently
+	// would hide more than it saves.
+	if rec.Level > clog.WARNING {
+		f.Handler.Handle(rec)
+		return
+	}
+	key := keyOfRepeatedRecord(rec)
+	f.mu.Lock()
+	now := f.nowFor()
+	if writtenAt, seen := f.last[key]; seen && now.Sub(writtenAt) < repeatWindow {
+		f.last[key] = now
+		f.dropped[rec.Message]++
+		f.mu.Unlock()
+		return
+	}
+	if len(f.last) >= maxRepeatedRecords {
+		// Start over rather than grow: the summary keeps what was collapsed.
+		f.last = make(map[repeatedRecordKey]time.Time, 16)
+	}
+	f.last[key] = now
+	f.mu.Unlock()
+	f.Handler.Handle(rec)
+}
+
+// drain returns the collapsed copies since the last call, by sentence.
+func (f *repeatedRecordFilter) drain() map[string]int64 {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	out := f.dropped
+	f.dropped = make(map[string]int64, len(out))
+	return out
+}
+
+// engineRepeats is the filter in the daemon's engine log chain; the periodic
+// report drains the copies it kept out of the log.
+var engineRepeats atomic.Pointer[repeatedRecordFilter]
+
+// drainRepeatedRecords returns the copies the running filter collapsed since
+// the last call, by sentence.
+func drainRepeatedRecords() map[string]int64 {
+	if filter := engineRepeats.Load(); filter != nil {
+		return filter.drain()
+	}
+	return nil
+}
+
+// formatRepeatedRecords renders the collapsed copies as one sentence: the
+// message that repeated the most is quoted, the others are only counted.
+func formatRepeatedRecords(dropped map[string]int64, window time.Duration) string {
+	if len(dropped) == 0 {
+		return ""
+	}
+	messages := make([]string, 0, len(dropped))
+	for message := range dropped {
+		messages = append(messages, message)
+	}
+	sort.SliceStable(messages, func(i, j int) bool {
+		if dropped[messages[i]] != dropped[messages[j]] {
+			return dropped[messages[i]] > dropped[messages[j]]
+		}
+		return messages[i] < messages[j]
+	})
+	minutes := int(window.Round(time.Minute) / time.Minute)
+	period := fmt.Sprintf("%d minutes", minutes)
+	if minutes <= 1 {
+		period = "1 minute"
+	}
+	line := fmt.Sprintf("The engine repeated the same message %d times in the last %s, so only the first copy is in the log: %s",
+		dropped[messages[0]], period, truncateLogMessage(messages[0], 200))
+	if others := len(messages) - 1; others == 1 {
+		line += " (and one more sentence)"
+	} else if others > 1 {
+		line += fmt.Sprintf(" (and %d more sentences)", others)
+	}
+	return line
+}
+
+// truncateLogMessage cuts a quoted engine message to a readable length.
+func truncateLogMessage(message string, limit int) string {
+	message = strings.Join(strings.Fields(message), " ")
+	if len(message) <= limit {
+		return message
+	}
+	return strings.ToValidUTF8(message[:limit], "") + "…"
 }
 
 // isSwarmNoise recognises the per-peer and per-tracker errors the engine logs at
