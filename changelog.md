@@ -25,6 +25,7 @@ non cambiano l'interfaccia di Gextto, dove quelle pagine non esistono. Le
 correzioni al motore valgono invece per entrambi.
 
 ## 11 novembre 2026
+- **«Rinomina contenuto cartella» dà ai film il loro modello.** Per un film proponeva sempre solo «Titolo (Anno)», qualunque formato fosse scelto, perdendo sorgente, risoluzione, codec, HDR e lingue che il nome del file portava: ora usa il formato dei film, come fa già l'importazione e come faceva per gli episodi. Se hai personalizzato il modello degli episodi con i tag di qualità, controlla anche *Template personalizzato per i film*: il predefinito tiene solo la risoluzione.
 - **La ricerca automatica è più leggera e riconosce i titoli con una maiuscola accentata.** Confrontare ogni release con i film che segui (nome, titolo originale, alias e traduzioni) prendeva un terzo della CPU di una ricerca e quasi quattro quinti della memoria che usava: ora lo stesso confronto costa dodici volte meno. Nello stesso controllo un titolo, un alias o una traduzione che comincia con una maiuscola accentata («È…», «À…», «É…») non veniva mai riconosciuto in una release che lo scrive senza accento: ora sì, per i film e per le serie. Niente da configurare.
 
 ## 10 novembre 2026

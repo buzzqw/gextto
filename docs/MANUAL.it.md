@@ -869,7 +869,9 @@ personalizzato per i film*: i token sono `{Titolo}`, `{Anno}`, `{Source}`,
 `{Gruppo}`, `{Risoluzione}`, `{VideoCodec}`, `{Audio}`, `{AudioCodec}`,
 `{Canali}`, `{HDR}` e `{Lingue}`, con i loro pulsanti e la loro anteprima. Il
 predefinito, `{Titolo} ({Anno}) [{Risoluzione}]`, è il nome che i film avevano
-già, quindi una libreria già rinominata conserva i suoi nomi. Un token senza
+già, quindi una libreria già rinominata conserva i suoi nomi: se personalizzi
+il modello degli episodi con i tag di qualità, aggiungili anche a quello dei
+film, che non li prende da solo. Un token senza
 valore (un HDR sconosciuto, un anno mancante) sparisce insieme alle sue
 parentesi.
 
@@ -2852,7 +2854,7 @@ credenziali dell'interfaccia e riceve un cookie di sessione valido solo per
 | Voce | Cosa fa |
 |---|---|
 | Cartella / Sfoglia | Inserisci o scegli dal server la cartella da analizzare. |
-| Scansiona e proponi | Analizza ricorsivamente i video, riconosce serie/film con TMDB/TVDB e propone i nuovi nomi (solo anteprima). |
+| Scansiona e proponi | Analizza ricorsivamente i video, riconosce serie/film con TMDB/TVDB e propone i nuovi nomi (solo anteprima), con il formato scelto per episodi e film e i tag di qualità letti dal nome del file. |
 | Scelta risultato per riga | Seleziona un risultato TMDB/TVDB alternativo. |
 | Accetta / rifiuta | Approva o scarta la singola proposta. |
 | Accetta tutte le proposte | Approva in blocco le proposte. |

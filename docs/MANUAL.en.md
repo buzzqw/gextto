@@ -862,7 +862,9 @@ With **Personalized** movies have a template of their own, in the field
 `{Gruppo}`, `{Risoluzione}`, `{VideoCodec}`, `{Audio}`, `{AudioCodec}`,
 `{Canali}`, `{HDR}` and `{Lingue}`, with their own buttons and preview. The
 default, `{Titolo} ({Anno}) [{Risoluzione}]`, is the name movies had before,
-so a library already renamed keeps its names. A token with no value (an
+so a library already renamed keeps its names: if you give the episode template
+the quality tags, add them to the movie template too, which does not take them
+on its own. A token with no value (an
 unknown HDR, a missing year) disappears together with its brackets.
 
 The technical tags are not taken from the release name alone: before renaming,
@@ -2829,7 +2831,7 @@ of the interface stays protected.
 | Item | What it does |
 |---|---|
 | Folder / Browse | Type or pick the folder to analyse from the server. |
-| Scan and propose | Recursively analyses the videos, recognises series/movies with TMDB/TVDB and proposes new names (preview only). |
+| Scan and propose | Recursively analyses the videos, recognises series/movies with TMDB/TVDB and proposes new names (preview only), in the format chosen for episodes and movies, with the quality tags read from the file name. |
 | Per-row result | Selects an alternative TMDB/TVDB match. |
 | Accept / reject | Approves or discards the single proposal. |
 | Accept all proposals | Approves every proposal at once. |

@@ -24,6 +24,7 @@ not change Gextto's interface, where those pages do not exist. Engine fixes, on
 the other hand, apply to both.
 
 ## 11 November 2026
+- **«Rename folder content» gives movies their own template.** For a movie it always proposed a bare «Title (Year)», whatever format was chosen, dropping the source, resolution, codec, HDR and languages the file name carried: it now uses the movie format, as the import already does and as it did for episodes. If you gave the episode template the quality tags, check *Custom template for movies* too: the default keeps only the resolution.
 - **The automatic search is lighter and recognises titles with an accented capital.** Comparing every release with the films you follow (name, original title, aliases and translations) took a third of a search's CPU and almost four fifths of the memory it used: the same comparison now costs twelve times less. In the same check, a title, alias or translation starting with an accented capital («È…», «À…», «É…») was never recognised in a release that spells it without the accent: now it is, for films and series alike. Nothing to configure.
 
 ## 10 November 2026

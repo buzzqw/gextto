@@ -1546,6 +1546,27 @@ func renderMovieName(template, title, year string, quality models.Quality, audio
 	).Replace(template)
 }
 
+// movieNameStem renders a movie's file name, without extension, in the
+// configured rename format. It is the one place the format is applied to
+// movies, so the import, the folder-rename tool and the settings preview give
+// the same name.
+func movieNameStem(cfg *Config, title, year string, quality models.Quality, audioFull, channels, language string) string {
+	yearTag := ""
+	if year != "" {
+		yearTag = " (" + year + ")"
+	}
+	switch cfg.RenameFormat {
+	case "standard":
+		return fmt.Sprintf("%s%s [%s][%s]", title, yearTag, quality.Resolution, quality.Codec)
+	case "full", "completo":
+		return fmt.Sprintf("%s%s [%s][%s][%s][%s]", title, yearTag, quality.Resolution, audioFull, quality.HDR, quality.Codec)
+	case "custom":
+		return renderMovieName(cfg.RenameMovieTemplate, title, year, quality, audioFull, channels, language)
+	default:
+		return title + yearTag
+	}
+}
+
 // RenameMovie renames a movie file according to the configured template and
 // returns the new path, or "" when there is nothing to do (implementation of
 // `rename_movie`).
@@ -1610,36 +1631,19 @@ func RenameMovie(
 	if officialYear != nil {
 		year = strconv.FormatInt(*officialYear, 10)
 	}
-	yearTag := ""
-	if year != "" {
-		yearTag = fmt.Sprintf(" (%s)", year)
+	language := cfg.DefaultLanguage()
+	if media.Languages != nil && *media.Languages != "" {
+		language = *media.Languages
+	} else if strings.TrimSpace(release.Quality.Language) != "" {
+		language = release.Quality.Language
 	}
-	var stem string
-	switch cfg.RenameFormat {
-	case "standard":
-		stem = fmt.Sprintf("%s%s [%s][%s]", officialTitle, yearTag, resolution, codec)
-	case "full", "completo":
-		stem = fmt.Sprintf(
-			"%s%s [%s][%s][%s][%s]",
-			officialTitle, yearTag, resolution, audioFull, hdr, codec,
-		)
-	case "custom":
-		language := cfg.DefaultLanguage()
-		if media.Languages != nil && *media.Languages != "" {
-			language = *media.Languages
-		} else if strings.TrimSpace(release.Quality.Language) != "" {
-			language = release.Quality.Language
-		}
-		channels := ""
-		if media.Channels != nil {
-			channels = *media.Channels
-		}
-		effective := release.Quality
-		effective.Resolution, effective.Codec, effective.Audio, effective.HDR = resolution, codec, audio, hdr
-		stem = renderMovieName(cfg.RenameMovieTemplate, officialTitle, year, effective, audioFull, channels, language)
-	default:
-		stem = officialTitle + yearTag
+	channels := ""
+	if media.Channels != nil {
+		channels = *media.Channels
 	}
+	effective := release.Quality
+	effective.Resolution, effective.Codec, effective.Audio, effective.HDR = resolution, codec, audio, hdr
+	stem := movieNameStem(cfg, officialTitle, year, effective, audioFull, channels, language)
 	stem = cleanupFilename(sanitizeInvalid(stem))
 	extension := strings.TrimPrefix(filepath.Ext(source), ".")
 	if extension == "" {

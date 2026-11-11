@@ -608,17 +608,8 @@ func V2SettingsRenamePreview(w http.ResponseWriter, r *http.Request, s *AppState
 func v2RenameComposeMovie(format, template string) string {
 	title, year := "Titolo Film", "2024"
 	quality := models.Quality{Resolution: "2160p", Codec: "x265", Source: "webdl", Group: "GRP", HDR: "HDR10"}
-	var stem string
-	switch format {
-	case "standard":
-		stem = title + " (" + year + ") [" + quality.Resolution + "][" + quality.Codec + "]"
-	case "full", "completo":
-		stem = title + " (" + year + ") [" + quality.Resolution + "][DDP5.1][" + quality.HDR + "][" + quality.Codec + "]"
-	case "custom":
-		stem = cleanupFilename(sanitizeInvalid(renderMovieName(template, title, year, quality, "DDP5.1", "5.1", "ita")))
-	default:
-		stem = title + " (" + year + ")"
-	}
+	cfg := &Config{RenameFormat: format, RenameMovieTemplate: template}
+	stem := cleanupFilename(sanitizeInvalid(movieNameStem(cfg, title, year, quality, "DDP5.1", "5.1", "ita")))
 	return stem + ".mkv"
 }
 

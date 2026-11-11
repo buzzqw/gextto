@@ -14,6 +14,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/buzzqw/gextto/internal/models"
 )
 
 const (
@@ -520,24 +522,29 @@ func folderRenameTarget(cfg *Config, path string, item folderRenameItem, candida
 			title = fmt.Sprintf("Episodio %d", *item.Episode)
 		}
 		quality := ParseQuality(filepath.Base(path))
-		language := ""
-		if len(quality.Languages) > 0 {
-			language = folderRenameLanguages(quality.Languages)
-		} else if strings.TrimSpace(quality.Language) != "" {
-			language = strings.ToUpper(quality.Language)
-		}
-		stem := renderEpisodeName(cfg, candidate.Title, safeComponent(title), *item.Season, []int64{*item.Episode}, quality, folderRenameAudioLabel(quality.Audio), "", language)
+		stem := renderEpisodeName(cfg, candidate.Title, safeComponent(title), *item.Season, []int64{*item.Episode}, quality, folderRenameAudioLabel(quality.Audio), "", folderRenameLanguage(quality))
 		return filepath.Join(filepath.Dir(path), cleanupFilename(sanitizeInvalid(stem))+"."+ext)
 	}
-	name := candidate.Title
+	// A movie takes the movie format the same way, with its quality read from
+	// the file name for the same reason.
 	year := candidate.Year
 	if year == "" && item.Year != nil {
 		year = strconv.FormatInt(*item.Year, 10)
 	}
-	if year != "" {
-		name += " (" + year + ")"
+	quality := ParseQuality(filepath.Base(path))
+	stem := movieNameStem(cfg, candidate.Title, year, quality, folderRenameAudioLabel(quality.Audio), "", folderRenameLanguage(quality))
+	return filepath.Join(filepath.Dir(path), cleanupFilename(sanitizeInvalid(stem))+"."+ext)
+}
+
+// folderRenameLanguage is the language tag a file name carries, "" when none.
+func folderRenameLanguage(quality models.Quality) string {
+	if len(quality.Languages) > 0 {
+		return folderRenameLanguages(quality.Languages)
 	}
-	return filepath.Join(filepath.Dir(path), cleanupFilename(sanitizeInvalid(name))+"."+ext)
+	if strings.TrimSpace(quality.Language) != "" {
+		return strings.ToUpper(quality.Language)
+	}
+	return ""
 }
 
 // folderRenameLanguages renders the parsed language codes as the "IT+EN" tag
