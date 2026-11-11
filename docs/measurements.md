@@ -38,6 +38,24 @@ quietest with a hundred torrents (0.01 % of a core); on the shaped line over TCP
 level (11.2 against 11.5 MB/s, inside the spread), and there gx-torrent spends the least CPU
 per GiB (18.8 s against 21–29).
 
+## What is best for me
+
+One line per need, with the client that answers it and why. Every figure behind these lines is
+in this document.
+
+| Your need | Pick | Why |
+|---|---|---|
+| A library, not a downloader: episodes, gaps, renames, upgrades, archive | **Gextto** | it decides what to fetch and where it goes; none of the other clients does |
+| One torrent from a browser, on a NAS, a server or a phone, with a qBittorrent-style API | **gx-torrent, standalone** | the same engine with its own page and `/api/v2`, no library to configure |
+| The fastest download over TCP | **gx-torrent** | 285 MB/s, against 29–253 for the others |
+| A recheck of a 4 GiB file without a long wait | **gx-torrent** | 3.8 s, against 3.9–10.2 for the others |
+| Seeding on a fast LAN (gigabit and above) | **gx-torrent**, qBittorrent or Deluge | 223–285 MB/s, gx-torrent and qBittorrent within 4 %, at the lowest CPU per GiB for gx-torrent (2.32 s against 2.48–2.96) |
+| A call or a game while something downloads | **Gextto**, Auto with latency source `both` | the guard leaves room for the other flow and stops taking more as soon as the router sees it |
+| The smallest memory at full speed | anacrolix/torrent, 11 MiB against 14–53 | the lightest client when the disk is the limit, but its own engine is not a library manager |
+| The quietest client at rest | anacrolix/torrent or rain | 0.01 % of a core against 0.04–0.28, but rain spends 2.35 % with a hundred torrents and anacrolix 0.01 |
+| Ratio farming, a seedbox, no library | qBittorrent or Deluge | Gextto is a library: it seeds with ratio, day and idle rules and has super-seeding, which *lowers* the upload by design, but the on-demand `share_mode` is not offered |
+| Windows | **gx-torrent, standalone** | native service, amd64 and arm64; Gextto itself is Unix |
+
 ## Compared with qBittorrent, Transmission, Deluge, rain and anacrolix/torrent
 
 ### What was run

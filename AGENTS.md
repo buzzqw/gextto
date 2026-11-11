@@ -329,11 +329,12 @@ not to break.
 - **`docs/measurements.md` is figures and nothing else, and it stays short.**
   Comparison tables and results first, plain sentences, at most 35 KB. A new
   figure replaces the row it measures, with machine and date. Only a figure, its
-  method (what was run, the machine, the command) and, at most, the choice that
-  figure closed (*Closed designs*) belong there: no history and no
-  before-and-after, no narrative of a change, no table that recommends a client to
-  a reader, no list of every Go benchmark. Raw results stay in `gextto-data/bench/`,
-  and a figure enters the document only if a reader can decide something from it.
+  method (what was run, the machine, the command), the choice that figure closed
+  (*Closed designs*) and the table that answers a need with those same figures
+  (*What is best for me*) belong there: no history and no before-and-after, no
+  narrative of a change, no list of every Go benchmark. Raw results stay in
+  `gextto-data/bench/`, and a figure enters the document only if a reader can decide
+  something from it.
 
 ## Release, installer and updates
 
