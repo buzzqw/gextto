@@ -13,20 +13,27 @@ import (
 // masquerading as stalls in production.
 //
 // One goroutine per torrent keeps the probes independent (a torrent busy on a
-// slow share cannot delay the others) and costs about 4 KB each; the interval
-// is a ticker, so a running session allocates no timer per round.
+// slow share cannot delay the others) and costs about 4 KB each; the round is
+// one timer reset in place, so it allocates nothing. A stopped torrent does no
+// I/O and is probed every stoppedProbeFactor intervals: a long queue at rest
+// wakes a few times a minute instead of ten times a second.
 func (s *Session) checkTorrent(t *torrent) {
-	if s.config.HealthCheckInterval <= 0 {
-		return // disabled: no ticker, no probe
+	interval := s.config.HealthCheckInterval
+	if interval <= 0 {
+		return // disabled: no timer, no probe
 	}
-	ticker := time.NewTicker(s.config.HealthCheckInterval)
-	defer ticker.Stop()
+	timer := time.NewTimer(probeDelay(interval, t.loopStopped.Load()))
+	defer timer.Stop()
 	for {
 		select {
-		case <-ticker.C:
-			if !s.waitRunLoop(t) {
-				return
+		case <-timer.C:
+			if !answeredWithin(t.answeredAt.Load(), time.Now(), interval) {
+				if !s.waitRunLoop(t) {
+					return
+				}
 			}
+			// A poller that reached the loop a moment ago already proved it alive.
+			timer.Reset(probeDelay(interval, t.loopStopped.Load()))
 		case <-t.closeC:
 			return
 		case <-s.closeC:
@@ -34,6 +41,27 @@ func (s *Session) checkTorrent(t *torrent) {
 		}
 	}
 }
+
+// stoppedProbeFactor stretches the probe interval of a stopped torrent.
+const stoppedProbeFactor = 6
+
+// probeDelay is the wait before the next liveness probe.
+func probeDelay(interval time.Duration, stopped bool) time.Duration {
+	if stopped {
+		return interval * stoppedProbeFactor
+	}
+	return interval
+}
+
+// answeredWithin reports whether a loop that last took a command at (UnixNano,
+// 0 for never) did so less than window before now.
+func answeredWithin(at int64, now time.Time, window time.Duration) bool {
+	return at != 0 && now.Sub(time.Unix(0, at)) < window
+}
+
+// livenessProbe is the command the health check posts: it only proves the loop
+// answers, so it does not count as a change (see Torrent.Changes).
+func (t *torrent) livenessProbe() { t.quietCommand = true }
 
 // waitRunLoop posts the liveness probe and reports false when the torrent or
 // the session closes first. A loop still inside a data flush is slow, not
@@ -44,7 +72,7 @@ func (s *Session) waitRunLoop(t *torrent) bool {
 	for {
 		timeout := time.NewTimer(s.config.HealthCheckTimeout)
 		select {
-		case t.commandC <- func() {}:
+		case t.commandC <- t.livenessProbe:
 			timeout.Stop()
 			if warned {
 				t.log.Infof("The disk answered again: %q is running normally", t.Name())
@@ -65,7 +93,7 @@ func (s *Session) waitRunLoop(t *torrent) bool {
 				// declaring it dead, so the select's coin flip can never crash
 				// a loop that was answering.
 				select {
-				case t.commandC <- func() {}:
+				case t.commandC <- t.livenessProbe:
 					return true
 				default:
 				}

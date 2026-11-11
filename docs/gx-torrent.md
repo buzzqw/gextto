@@ -27,6 +27,7 @@ Code:
 |---|---|
 | `cmd/gx-torrent/main.go` | flags, startup, signals, clean shutdown |
 | `cmd/gx-torrent/daemon.go` | gx-core session, persistent state, queue loop, operations |
+| `cmd/gx-torrent/sample.go` | the tick's read of each torrent, kept while a stopped torrent does not change |
 | `internal/queue/queue.go` | queue scheduler (pure function) and dynamic queue |
 | `cmd/gx-torrent/storage.go` | per-torrent symlink, safe move and deletion |
 | `cmd/gx-torrent/api.go` | REST API with token |
@@ -2659,9 +2660,18 @@ a long copy to a network mount) cannot therefore make the API seem dead.
 The tick works in three phases, so as never to hold `d.mu` during an operation that
 can block:
 
-1. **Sampling** (without lock): for each torrent it reads stats, peers and trackers
-   from its run loop and classifies the storage (the `statfs` on the network mount can
-   block for a long time).
+1. **Sampling** (without lock): for each torrent it reads stats, peers, trackers and
+   the connection cap from its run loop in a single round trip (`Torrent.Sample`), and
+   classifies the storage (the `statfs` on the network mount can block for a long
+   time). A stopped torrent whose run loop has handled nothing since its last read
+   (`Torrent.Changes` has not moved) keeps that read and is not woken; the first
+   command or event after the pause moves the count, and the next tick reads it
+   again.
+
+A long list at rest wakes only what runs. A stopped or queued torrent also stops its
+10 s unchoke clock, and the engine's liveness probe (a no-op command each run loop must
+take within its timeout) checks it once a minute instead of every 10 s, and skips any
+loop that a poller reached within the interval.
 2. **Application** (with `d.mu`): it updates meta and queue from the samples,
    computes the plan and publishes the snapshot. No call to the run loop here.
 3. **Actions** (without lock): it runs the `Start`/`Stop` decided by the plan; if the run

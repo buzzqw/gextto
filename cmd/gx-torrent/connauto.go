@@ -221,7 +221,15 @@ func shareConnections(asks []connAutoAsk, budget int) {
 // skipped, so the cap cannot flap between two adjacent samples. Every change
 // and every new machine allowance is logged: an operator must be able to see
 // why the peer count moved.
-func (d *Daemon) applyAutoConnectionsLocked(now time.Time, torrents []*torrent.Torrent, stats map[string]torrent.Stats, limits connAutoLimits) {
+// caps holds each torrent's connection cap as the tick sampled it; a torrent
+// missing from it is asked directly.
+func (d *Daemon) applyAutoConnectionsLocked(now time.Time, torrents []*torrent.Torrent, stats map[string]torrent.Stats, caps map[string]int, limits connAutoLimits) {
+	capOf := func(t *torrent.Torrent) int {
+		if value, ok := caps[t.ID()]; ok {
+			return value
+		}
+		return t.MaxConnections()
+	}
 	if d.connAutoState == nil {
 		d.connAutoState = make(map[string]*connAutoProgress, len(torrents))
 	}
@@ -253,7 +261,7 @@ func (d *Daemon) applyAutoConnectionsLocked(now time.Time, torrents []*torrent.T
 			// A paused or queued torrent holds no peers: it takes nothing
 			// from the budget, but it starts with its allowance instead of
 			// no cap at all when the queue resumes it.
-			if t.MaxConnections() == 0 {
+			if capOf(t) == 0 {
 				t.SetMaxConnections(base)
 			}
 			continue
@@ -293,7 +301,7 @@ func (d *Daemon) applyAutoConnectionsLocked(now time.Time, torrents []*torrent.T
 		if a.target < a.ask {
 			reason = fmt.Sprintf("%s, shared with %d running torrents", reason, len(asks))
 		}
-		current := a.t.MaxConnections()
+		current := capOf(a.t)
 		if current == a.target {
 			continue
 		}

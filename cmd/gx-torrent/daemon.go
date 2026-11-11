@@ -482,6 +482,9 @@ type Daemon struct {
 	wake chan struct{}
 	// autoSpeedWake asks the latency probe for a round now (autospeed.go).
 	autoSpeedWake chan struct{}
+	// samples holds the tick's last read of each torrent handle (sample.go).
+	samplesMu sync.Mutex
+	samples   map[*torrent.Torrent]sampledTorrent
 }
 
 func newDaemon(opts Options) (*Daemon, error) {
@@ -1092,6 +1095,7 @@ type collectedTorrent struct {
 	stats    torrent.Stats
 	peers    []torrent.Peer
 	trackers []torrent.Tracker
+	maxConns int
 }
 
 // peerNoiseReportEvery is how often the demoted peer/tracker errors are
@@ -1133,14 +1137,7 @@ func (d *Daemon) tick(now time.Time) {
 	// history; sampled here, outside d.mu, like the per-torrent calls.
 	engineStats := session.Stats()
 	torrents := session.ListTorrents()
-	collected := make(map[string]collectedTorrent, len(torrents))
-	for _, t := range torrents {
-		collected[t.ID()] = collectedTorrent{
-			stats:    t.Stats(),
-			peers:    t.Peers(),
-			trackers: t.Trackers(),
-		}
-	}
+	collected := d.sampleTorrents(torrents)
 	// statfs on the download dir can block on a network mount: classify it
 	// outside d.mu.
 	d.refreshStorageClass(now)
@@ -1173,13 +1170,15 @@ func (d *Daemon) tick(now time.Time) {
 
 	torrents = d.session.ListTorrents()
 	statsOf := make(map[string]torrent.Stats, len(torrents))
+	capsOf := make(map[string]int, len(torrents))
 	for _, t := range torrents {
 		if sample, ok := collected[t.ID()]; ok {
 			statsOf[t.ID()] = d.adjustStatsLocked(t, sample.stats)
+			capsOf[t.ID()] = sample.maxConns
 		}
 	}
 	if autoLimits.perTorrent > 0 {
-		d.applyAutoConnectionsLocked(now, torrents, statsOf, autoLimits)
+		d.applyAutoConnectionsLocked(now, torrents, statsOf, capsOf, autoLimits)
 	}
 	var totalDown, totalUp int64
 	for _, stats := range statsOf {
@@ -1427,7 +1426,7 @@ func (d *Daemon) tick(now time.Time) {
 		if !ok {
 			continue
 		}
-		views = append(views, d.infoLocked(t, stats, d.runtimeLocked(id), d.moving[id], positions))
+		views = append(views, d.infoLocked(t, stats, len(collected[id].trackers), d.runtimeLocked(id), d.moving[id], positions))
 	}
 	sort.Slice(views, func(i, j int) bool { return views[i].Hash < views[j].Hash })
 	saveLifetime := d.accumulateLifetimeLocked(now, engineStats.BytesDownloaded, engineStats.BytesUploaded)
@@ -1624,7 +1623,9 @@ func stateFor(meta *torrentMeta, stats torrent.Stats, moving bool) string {
 	return "paused"
 }
 
-func (d *Daemon) infoLocked(t *torrent.Torrent, stats torrent.Stats, rt *runtimeInfo, moving bool, queuePos map[string]int) torrentInfo {
+// trackers is the tracker count, read with the stats: asking the run loop here
+// would call it under d.mu, and once more per torrent per tick.
+func (d *Daemon) infoLocked(t *torrent.Torrent, stats torrent.Stats, trackers int, rt *runtimeInfo, moving bool, queuePos map[string]int) torrentInfo {
 	meta := d.metaLocked(t)
 	if meta.Version == "" && stats.Status != torrent.DownloadingMetadata && stats.Bytes.Total > 0 {
 		if data, err := t.Torrent(); err == nil && len(data) > 0 {
@@ -1678,7 +1679,7 @@ func (d *Daemon) infoLocked(t *torrent.Torrent, stats torrent.Stats, rt *runtime
 		NumPeers:         stats.Peers.Total,
 		NumSeeds:         rt.numSeeds,
 		CurrentTracker:   rt.tracker,
-		TrackersCount:    len(t.Trackers()),
+		TrackersCount:    trackers,
 		NumComplete:      meta.SwarmSeeds,
 		NumIncomplete:    meta.SwarmPeers,
 		SeedRatio:        meta.SeedRatio,
@@ -1788,7 +1789,7 @@ func (d *Daemon) buildViewsLocked() []torrentInfo {
 	positions := d.queuePositionsLocked(torrents, statsOf)
 	out := make([]torrentInfo, 0, len(torrents))
 	for _, t := range torrents {
-		out = append(out, d.infoLocked(t, statsOf[t.ID()], d.runtimeLocked(t.ID()), d.moving[t.ID()], positions))
+		out = append(out, d.infoLocked(t, statsOf[t.ID()], len(t.Trackers()), d.runtimeLocked(t.ID()), d.moving[t.ID()], positions))
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Hash < out[j].Hash })
 	return out

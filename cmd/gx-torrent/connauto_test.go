@@ -88,7 +88,7 @@ func TestDaemonAutoConnectionsFollowProgress(t *testing.T) {
 		d.mu.Lock()
 		defer d.mu.Unlock()
 		limits := connAutoLimits{perTorrent: base, budget: 1000}
-		d.applyAutoConnectionsLocked(at, []*torrent.Torrent{tt}, map[string]torrent.Stats{id: stats}, limits)
+		d.applyAutoConnectionsLocked(at, []*torrent.Torrent{tt}, map[string]torrent.Stats{id: stats}, nil, limits)
 	}
 	downloading := func(peers int, completed int64) torrent.Stats {
 		st := torrent.Stats{Status: torrent.Downloading}

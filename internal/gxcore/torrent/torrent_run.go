@@ -10,9 +10,17 @@ import (
 // timers) reports here over channels, and the loop mutates the torrent
 // state single-threaded. Public API calls arrive as commands carrying their
 // own behavior — torrent_commands.go lists what can come through commandC.
+// unchokeEvery paces the unchoke round of a running torrent.
+const unchokeEvery = 10 * time.Second
+
 func (t *torrent) run() {
-	t.unchokeTicker = time.NewTicker(10 * time.Second)
+	t.unchokeTicker = time.NewTicker(unchokeEvery)
 	defer t.unchokeTicker.Stop()
+	if t.status() == Stopped {
+		// A queued or paused torrent has no peers to unchoke: start() turns
+		// the round on.
+		t.markStopped()
+	}
 
 	for {
 		select {
@@ -72,5 +80,29 @@ func (t *torrent) run() {
 		case pm := <-t.messages:
 			t.handlePeerMessage(pm)
 		}
+		if t.quietCommand {
+			t.quietCommand = false
+		} else {
+			t.changes.Add(1)
+		}
+	}
+}
+
+// markRunning turns the unchoke round on when the torrent starts and tells the
+// health check to probe it at the normal pace.
+func (t *torrent) markRunning() {
+	t.loopStopped.Store(false)
+	if t.unchokeTicker != nil {
+		t.unchokeTicker.Reset(unchokeEvery)
+	}
+}
+
+// markStopped turns them down when it stops: with no peers there is nothing
+// to unchoke and no I/O to watch, and a hundred queued torrents woke ten times
+// a second for each.
+func (t *torrent) markStopped() {
+	t.loopStopped.Store(true)
+	if t.unchokeTicker != nil {
+		t.unchokeTicker.Stop()
 	}
 }

@@ -114,6 +114,34 @@ func (t *Torrent) Peers() []Peer {
 	return t.torrent.Peers()
 }
 
+// Sample is what a periodic poller reads from one torrent: its stats, peers,
+// trackers and connection cap.
+type Sample struct {
+	Stats          Stats
+	Peers          []Peer
+	Trackers       []Tracker
+	MaxConnections int
+}
+
+// Sample reads the four in one round trip of the run loop. A poller asking
+// for each separately woke every torrent four times per round, which is what
+// a long list of idle torrents spent its CPU on.
+func (t *Torrent) Sample() Sample {
+	tt := t.torrent
+	return query(tt, func() Sample {
+		tt.quietCommand = true
+		return Sample{Stats: tt.stats(), Peers: tt.getPeers(), Trackers: tt.getTrackers(), MaxConnections: tt.maxConnections}
+	})
+}
+
+// Changes is a count that moves whenever the torrent's run loop handles
+// something other than a Sample or a liveness probe. Read without waking the
+// loop: a stopped torrent whose count has not moved since its last Sample
+// would answer the same Sample again.
+func (t *Torrent) Changes() uint64 {
+	return t.torrent.changes.Load()
+}
+
 // Webseeds lists the HTTP sources.
 func (t *Torrent) Webseeds() []Webseed {
 	return t.torrent.Webseeds()

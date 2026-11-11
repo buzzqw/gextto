@@ -24,6 +24,7 @@ import (
 func (t *torrent) sendCommand(f func()) bool {
 	select {
 	case t.commandC <- f:
+		t.answeredAt.Store(time.Now().UnixNano())
 		return true
 	case <-t.closeC:
 		return false

@@ -72,6 +72,7 @@ func (t *torrent) stop(err error) {
 		t.log.Error(err)
 	}
 
+	t.markStopped()
 	t.stopAcceptor()
 	t.stopPeers()
 	t.stopPiecedownloaders()

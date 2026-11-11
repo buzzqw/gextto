@@ -32,6 +32,7 @@ func (t *torrent) start() {
 	}
 
 	t.log.Info("starting torrent")
+	t.markRunning()
 	t.errC = make(chan error, 1)
 	t.portC = make(chan int, 1)
 	t.lastError = nil

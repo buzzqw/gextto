@@ -236,6 +236,20 @@ type torrent struct {
 	// none is running. The health check reads it off the run loop to tell a
 	// slow disk from a stuck loop.
 	syncingSince atomic.Int64
+	// answeredAt is when the run loop last took a command (UnixNano): a loop
+	// that answered a poller within the health-check interval is alive, and the
+	// probe does not wake it again.
+	answeredAt atomic.Int64
+	// changes counts the events and commands the run loop has handled, apart
+	// from the reads that change nothing (quietCommand): a poller that sees the
+	// same count on a stopped torrent can keep its last sample.
+	changes atomic.Uint64
+	// loopStopped is set while the torrent is stopped (markStopped), read by
+	// the health check to space out its probes.
+	loopStopped atomic.Bool
+	// quietCommand is set by a read-only command while it runs, so the loop
+	// does not count it in changes. Touched only by the run loop.
+	quietCommand bool
 
 	// mergedPieces holds merge re-verified pieces for the verifier to skip
 	// (consumed by startVerifier). See localmerge.go.
