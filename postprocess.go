@@ -1207,7 +1207,35 @@ func namingAudio(name string, release models.Quality, media mediaTags) string {
 			audio = *media.AudioCodec
 		}
 	}
-	return audio
+	return namingAudioDisplay(audio)
+}
+
+// namingAudioDisplays is how a codec reads in a file name when the only
+// spelling at hand is the parser's or ffprobe's lower-case label.
+var namingAudioDisplays = map[string]string{
+	"ddp": "DDP", "ac3": "AC3", "truehd": "TrueHD", "dts": "DTS", "dts-hd": "DTS-HD",
+	"dts-x": "DTS-X", "aac": "AAC", "flac": "FLAC", "opus": "Opus", "mp3": "MP3",
+}
+
+// namingAudioDisplay writes an all-lower-case audio label ("ddp", "ac3 atmos")
+// the way names spell it ("DDP", "AC3 Atmos"). A label with any capital came
+// from the file name or MediaInfo and is kept as written.
+func namingAudioDisplay(audio string) string {
+	if audio == "" || audio != strings.ToLower(audio) {
+		return audio
+	}
+	label, atmos := audio, false
+	if trimmed := strings.TrimSuffix(label, " atmos"); trimmed != label {
+		label, atmos = trimmed, true
+	}
+	display, ok := namingAudioDisplays[namingAudioFamily(label)]
+	if !ok {
+		return audio
+	}
+	if atmos {
+		display += " Atmos"
+	}
+	return display
 }
 
 // namingHDRToken returns the HDR label as written in a file name. As with the
@@ -2578,7 +2606,10 @@ func mediaAudioCodec(audio map[string]any) *string {
 
 // mediaChannels implements legacy `_channels_tag`.
 func mediaChannels(audio map[string]any) *string {
-	text, ok := mediaText(audio, "Channel_s")
+	// MediaInfo 21 and older wrote "Channel_s"; later releases write
+	// "Channels". Without the second the channels were lost on every file
+	// MediaInfo read in full, since ffprobe only fills the gaps.
+	text, ok := mediaText(audio, "Channels", "Channel_s")
 	if !ok {
 		return nil
 	}

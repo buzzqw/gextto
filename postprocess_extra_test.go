@@ -215,3 +215,30 @@ func TestRenameMoviePreviewUsesTheMovieTemplate(t *testing.T) {
 		t.Fatalf("empty movie template preview = %q", got)
 	}
 }
+
+// TestMediaChannelsReadsTheCurrentMediaInfoField: recent MediaInfo writes the
+// channel count as "Channels", older as "Channel_s"; both name the channels.
+func TestMediaChannelsReadsTheCurrentMediaInfoField(t *testing.T) {
+	for _, key := range []string{"Channels", "Channel_s"} {
+		got := mediaChannels(map[string]any{"@type": "Audio", "Format": "E-AC-3", key: "6"})
+		if got == nil || *got != "5.1" {
+			t.Fatalf("%s: channels = %v, want 5.1", key, got)
+		}
+	}
+}
+
+// TestNamingAudioWritesLowerCaseLabelsLikeANameDoes: when the only spelling is
+// the parser's lower-case label, the name gets the usual capitals; a spelling
+// from the file name is kept.
+func TestNamingAudioWritesLowerCaseLabelsLikeANameDoes(t *testing.T) {
+	cases := []struct{ name, audio, want string }{
+		{"Example Movie (2026) .mkv 2160p WEB-DL DDP 5.1 iTA.mkv", "ddp", "DDP"},
+		{"Example Movie (2026) [1080p].mkv", "truehd atmos", "TrueHD Atmos"},
+		{"Example.Movie.2026.1080p.DD+.5.1.mkv", "ddp", "DD+"},
+	}
+	for _, c := range cases {
+		if got := namingAudio(c.name, models.Quality{Audio: c.audio}, mediaTags{}); got != c.want {
+			t.Fatalf("namingAudio(%q, %q) = %q, want %q", c.name, c.audio, got, c.want)
+		}
+	}
+}

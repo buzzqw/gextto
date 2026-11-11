@@ -54,8 +54,15 @@ func TestNamingAudioKeepsTheExistingSpelling(t *testing.T) {
 
 	// No token in the name: the release value wins over an alias from a probe.
 	plain := "Show - S01E01 - Titolo - [1080p][h265][IT+EN].mkv"
-	if got := namingAudio(plain, release, media("EAC3")); got != "ddp" {
-		t.Fatalf("no name token: %q, want the release value ddp", got)
+	if got := namingAudio(plain, release, media("EAC3")); got != "DDP" {
+		t.Fatalf("no name token: %q, want the release value, written DDP", got)
+	}
+	// Once written, the next pass reads "DDP" back from the name and keeps it.
+	if got := namingAudio("Show - S01E01 - Titolo - [1080p][h265][DDP][IT+EN].mkv", release, media("ddp")); got != "DDP" {
+		t.Fatalf("second pass: %q, want DDP kept", got)
+	}
+	if got := namingAudio("Show - S01E01 - Titolo - [1080p][h265][ddp 5.1][IT+EN].mkv", release, media("EAC3")); got != "DDP" {
+		t.Fatalf("lower-case name token: %q, want DDP", got)
 	}
 }
 
