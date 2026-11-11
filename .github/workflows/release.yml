@@ -48,10 +48,20 @@ jobs:
       run:
         shell: bash
     steps:
+      # The runner's DNS sometimes fails for a few minutes: apt-get update then
+      # only warns and the install finds no package. Retry the pair instead of
+      # turning the build red with nothing wrong in the code.
       - name: Install git
         run: |
-          apt-get update -qq
-          apt-get install -y -qq --no-install-recommends ca-certificates git curl
+          for attempt in 1 2 3 4 5; do
+            if apt-get update -qq -o Acquire::Retries=3 &&
+              apt-get install -y -qq --no-install-recommends -o Acquire::Retries=3 ca-certificates git curl; then
+              exit 0
+            fi
+            echo "Package install failed (attempt $attempt of 5), retrying in 30 seconds"
+            sleep 30
+          done
+          exit 1
 
       - name: Check out source
         uses: actions/checkout@v7
