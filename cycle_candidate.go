@@ -50,6 +50,32 @@ type candidatePass struct {
 	skips    cycleSkipCounts
 }
 
+// candidateRun is the state of one candidate while the pass evaluates it: the
+// release (its link may switch to a mirror), the staged .torrent file, the
+// identity used before the link is opened, and what the judgement computed.
+type candidateRun struct {
+	p   *candidatePass
+	ctx context.Context
+
+	release models.Release
+	// torrentFile is the .torrent downloaded from a feed that exposes only a
+	// `.torrent` link; it is kept until the add completes (private trackers
+	// require it for announcing) and removed on every exit (cleanup).
+	torrentFile *string
+	// mirrorUsable accepts the mirrors whose link is not quarantined.
+	mirrorUsable func(*models.Release) bool
+	// deferredHash is the hash-only identity of a link not opened yet;
+	// provisional means it is derived from the link, not declared.
+	deferredHash string
+	provisional  bool
+
+	releaseScore  int64
+	gapEpisodes   []int64
+	archiveIndex  *models.ArchiveQualityIndex
+	movieArchive  *models.ArchiveQuality
+	forbidUpgrade bool
+}
+
 // try evaluates one candidate release and, when it wins, starts its download:
 // the link is resolved, the release is checked against the blocklist, the
 // delay profiles, the library and the free space, then added to the torrent
@@ -57,319 +83,336 @@ type candidatePass struct {
 // now (the daemon is shutting down) and an error only for a database failure
 // that ends the cycle; a refused or failed candidate returns neither.
 func (p *candidatePass) try(ctx context.Context, candidate models.Release) (stop bool, err error) {
-	cfg, engine, db, archive, notifier, torrents, stats := p.cfg, p.engine, p.db, p.archive, p.notifier, p.torrents, p.stats
-	blocklistedHashes, blocklistedTitles, gapTargets := p.blocklistedHashes, p.blocklistedTitles, p.gapTargets
-	quarantinedLinks, readyPending, liveDownloads := p.quarantinedLinks, p.readyPending, p.liveDownloads
-	stallAlternatives, stallScoreDrop := p.stallAlternatives, p.stallScoreDrop
-	linkFailures := p.linkFailures
-
 	// Stop before starting another download when the daemon is shutting
 	// down: the native session is destroyed right after the workers stop.
 	if cycleCancelled(ctx) {
 		return true, nil
 	}
-	release := candidate
+	r := &candidateRun{p: p, ctx: ctx, release: candidate, mirrorUsable: mirrorNotQuarantined(p.quarantinedLinks)}
+	defer r.cleanup()
 	// Older persisted entries and a few third-party feeds can store a valid
 	// magnet in TorrentURL. Recover it before deciding that a torrent file
 	// must be fetched over HTTP; a magnet is already directly usable by the
 	// torrent engine and must never be passed to HTTPGetBytes.
-	promoteTorrentURLMagnet(&release)
-	// Feeds that expose only a `.torrent` link (for example TorrentLeech)
-	// have no magnet: download the file, derive its infohash, and keep it
-	// until the add completes (private trackers require it for announcing).
-	var torrentFile *string
-	// The .torrent downloaded from a feed is only a staging file: the engine
-	// keeps its own copy while the torrent is in the session. Remove it on
-	// every exit from this candidate, including refusals after the link was
-	// resolved, so the folder cannot grow with releases never added.
-	defer func() {
-		if torrentFile != nil {
-			removeTorrentFile(*torrentFile)
-		}
-	}()
-	// A mirror is another copy of the same torrent from another source
-	// (release_dedup.go): when this link fails, the next copy is tried in
-	// the same cycle instead of leaving the episode for the next one.
-	mirrorUsable := mirrorNotQuarantined(quarantinedLinks)
-	linkResolved := true
-	resolveLink := func() {
-		for strings.TrimSpace(release.Magnet) == "" && release.TorrentURL != nil {
-			magnet, path, err := resolveTorrentURL(ctx, engine, cfg, *release.TorrentURL, &release.Title)
-			if err != nil {
-				failedSource := release.Source
-				if errors.Is(err, errTorrentNotAvailable) {
-					// The indexer knows the release but cannot serve it yet
-					// (mircrew: "no magnet for this request" until the topic
-					// is thanked, or a login that needs renewing). It is not
-					// a dead link: keep it eligible, no cycle error and no
-					// strike. The next cycle retries it. It still counts for
-					// the "indexer keeps failing" notice.
-					logging.Debug("torrent link not available yet",
-						"target", releaseTarget(&release),
-						"source", release.Source,
-						"error", err)
-					noteTorrentLinkFailure(linkFailures, release.Source, *release.TorrentURL, err, notifier)
-				} else {
-					// Two failures in different cycles mean the link is dead:
-					// quarantine it so the archive stops proposing it (and the
-					// cycle stops counting it as an error) until the retry.
-					if failures, qerr := db.RecordTorrentLinkFailure(*release.TorrentURL, err.Error(), time.Now()); qerr != nil {
-						logging.Debug("could not record the failed torrent link", "error", qerr)
-					} else if failures == torrentLinkFailureLimit {
-						logging.Info(fmt.Sprintf("🚫 The .torrent link of %s from %s failed again: it is set aside for %s",
-							releaseTarget(&release), release.Source, logDuration(torrentLinkQuarantine(failures))))
-					}
-					stats.Error("torrent_link")
-					logging.Warn(fmt.Sprintf("⚠️ Could not fetch the .torrent of %s from %s", releaseTarget(&release), release.Source), "error", err)
-					if source := strings.TrimSpace(release.Source); source != "" {
-						noteTorrentLinkFailure(linkFailures, source, *release.TorrentURL, err, notifier)
-					}
-				}
-				if switchToMirror(&release, mirrorUsable) {
-					logging.Info(fmt.Sprintf("🔁 %s: the link from %s did not work, trying the same release from %s",
-						logTarget(&release), failedSource, release.Source))
-					continue
-				}
-				linkResolved = false
-				break
-			}
-			// The link works: forget any previous failure so it is eligible
-			// again if the indexer breaks later.
-			_ = db.ClearTorrentLinkFailure(*release.TorrentURL)
-			clearIndexerFailureNotice(release.Source)
-			release.Magnet = magnet
-			// The feed was persisted before selection. Replace its
-			// short-lived Jackett URL with the stable magnet so a later
-			// archive search can use it without re-downloading an already
-			// expired link. Skipped in dry-run: it rewrites the archive DB.
-			if !cfg.DryRun {
-				if err := archive.CanonicalizeRelease(&release, release.Magnet); err != nil {
-					logging.Warn("could not canonicalize archived torrent URL", "error", err)
-				}
-			}
-			if path != "" {
-				if torrentFile != nil && *torrentFile != path {
-					removeTorrentFile(*torrentFile)
-				}
-				torrentFile = &path
-			}
-		}
+	promoteTorrentURLMagnet(&r.release)
+	if !r.prepareLink() {
+		return false, nil
 	}
-	// A link whose infohash the indexer declared (indexarr, Jackett and
-	// Prowlarr with "extended") is opened only for the release that is
-	// actually downloaded. The decision needs only the hash: opening the
-	// link of every candidate cost minutes per cycle, and an aggregator that
-	// counts downloads (indexarr) counted each candidate as one. An
-	// in-progress pack is checked against its file list after the link is
-	// opened (staleInProgressPack).
-	//
-	// A link without a declared hash (a MirCrew topic whose magnet indexarr
-	// fetches on demand) gets a provisional identity derived from the link:
-	// the candidate is judged on its title and quality first, and the link
-	// is opened only when that judgement would download it. The decision
-	// is then made again with the real hash (blocklist, live downloads).
-	deferredHash := ""
-	provisional := false
+	return r.judge()
+}
+
+// cleanup removes the staged .torrent: the engine keeps its own copy while
+// the torrent is in the session. It runs on every exit from the candidate,
+// refusals after the link was resolved included, so the folder cannot grow
+// with releases never added.
+func (r *candidateRun) cleanup() {
+	if r.torrentFile != nil {
+		removeTorrentFile(*r.torrentFile)
+	}
+}
+
+// prepareLink decides when the link is opened and reports whether the
+// candidate goes on.
+//
+// A link whose infohash the indexer declared (indexarr, Jackett and Prowlarr
+// with "extended") is opened only for the release that is actually
+// downloaded. The decision needs only the hash: opening the link of every
+// candidate cost minutes per cycle, and an aggregator that counts downloads
+// (indexarr) counted each candidate as one. An in-progress pack is checked
+// against its file list after the link is opened (staleInProgressPack).
+//
+// A link without a declared hash (a MirCrew topic whose magnet indexarr
+// fetches on demand) gets a provisional identity derived from the link: the
+// candidate is judged on its title and quality first, and the link is opened
+// only when that judgement would download it. The decision is then made again
+// with the real hash (blocklist, live downloads).
+func (r *candidateRun) prepareLink() bool {
+	release := &r.release
 	if strings.TrimSpace(release.Magnet) == "" && release.TorrentURL != nil && IsTorrentURL(*release.TorrentURL) {
 		if hash := canonicalInfoHash(release.InfoHash); len(hash) == 40 {
-			deferredHash = hash
+			r.deferredHash = hash
 		} else {
-			deferredHash = provisionalLinkHash(*release.TorrentURL)
-			provisional = true
+			r.deferredHash = provisionalLinkHash(*release.TorrentURL)
+			r.provisional = true
 		}
-		release.Magnet = "magnet:?xt=urn:btih:" + deferredHash
+		release.Magnet = "magnet:?xt=urn:btih:" + r.deferredHash
 	}
 	// A link with no declared hash cannot be matched by infohash before it
 	// is opened. Its title can: if the same release is on the blocklist,
 	// skip it here instead of asking the indexer for the magnet only to
 	// reject it a moment later.
-	if provisional && releaseBlockedByTitle(&release, blocklistedTitles) {
+	if r.provisional && releaseBlockedByTitle(release, r.p.blocklistedTitles) {
 		logging.Debug("release skipped: its title is on the blocklist",
-			"target", releaseTarget(&release),
+			"target", releaseTarget(release),
 			"release", release.Title)
-		return false, nil
+		return false
 	}
-	// resolveDeferred opens the deferred link and replaces the hash-only
-	// magnet with the real one (and the .torrent file when there is one).
-	resolveDeferred := func() bool {
-		release.Magnet = ""
-		resolveLink()
-		if !linkResolved {
+	if r.deferredHash == "" && !r.resolveLink() {
+		return false
+	}
+	reconcilePackIdentityFromMagnet(release)
+	return true
+}
+
+// resolveLink turns a `.torrent` link into a magnet (and a staged file when
+// the link serves one) and reports whether it worked. A mirror is another
+// copy of the same torrent from another source (release_dedup.go): when this
+// link fails, the next copy is tried in the same cycle instead of leaving the
+// episode for the next one.
+func (r *candidateRun) resolveLink() bool {
+	p, release := r.p, &r.release
+	for strings.TrimSpace(release.Magnet) == "" && release.TorrentURL != nil {
+		magnet, path, err := resolveTorrentURL(r.ctx, p.engine, p.cfg, *release.TorrentURL, &release.Title)
+		if err != nil {
+			failedSource := release.Source
+			r.recordLinkFailure(err)
+			if switchToMirror(release, r.mirrorUsable) {
+				logging.Info(fmt.Sprintf("🔁 %s: the link from %s did not work, trying the same release from %s",
+					logTarget(release), failedSource, release.Source))
+				continue
+			}
 			return false
 		}
-		if hash, ok := utils.MagnetHash(release.Magnet); ok && hash != deferredHash && !provisional {
-			logging.Debug("the downloaded torrent has another infohash than the one declared",
-				"target", releaseTarget(&release), "declared", deferredHash, "real", hash)
+		// The link works: forget any previous failure so it is eligible
+		// again if the indexer breaks later.
+		_ = p.db.ClearTorrentLinkFailure(*release.TorrentURL)
+		clearIndexerFailureNotice(release.Source)
+		release.Magnet = magnet
+		// The feed was persisted before selection. Replace its short-lived
+		// Jackett URL with the stable magnet so a later archive search can
+		// use it without re-downloading an already expired link. Skipped in
+		// dry-run: it rewrites the archive DB.
+		if !p.cfg.DryRun {
+			if err := p.archive.CanonicalizeRelease(release, release.Magnet); err != nil {
+				logging.Warn("could not canonicalize archived torrent URL", "error", err)
+			}
 		}
-		reconcilePackIdentityFromMagnet(&release)
-		deferredHash = ""
-		provisional = false
-		return true
+		if path != "" {
+			if r.torrentFile != nil && *r.torrentFile != path {
+				removeTorrentFile(*r.torrentFile)
+			}
+			r.torrentFile = &path
+		}
 	}
-	if deferredHash == "" {
-		resolveLink()
+	return true
+}
+
+// recordLinkFailure records a `.torrent` link that could not be fetched.
+func (r *candidateRun) recordLinkFailure(err error) {
+	p, release := r.p, &r.release
+	if errors.Is(err, errTorrentNotAvailable) {
+		// The indexer knows the release but cannot serve it yet (mircrew:
+		// "no magnet for this request" until the topic is thanked, or a
+		// login that needs renewing). It is not a dead link: keep it
+		// eligible, no cycle error and no strike. The next cycle retries it.
+		// It still counts for the "indexer keeps failing" notice.
+		logging.Debug("torrent link not available yet",
+			"target", releaseTarget(release),
+			"source", release.Source,
+			"error", err)
+		noteTorrentLinkFailure(p.linkFailures, release.Source, *release.TorrentURL, err, p.notifier)
+		return
 	}
-	if !linkResolved {
-		return false, nil
+	// Two failures in different cycles mean the link is dead: quarantine it
+	// so the archive stops proposing it (and the cycle stops counting it as
+	// an error) until the retry.
+	if failures, qerr := p.db.RecordTorrentLinkFailure(*release.TorrentURL, err.Error(), time.Now()); qerr != nil {
+		logging.Debug("could not record the failed torrent link", "error", qerr)
+	} else if failures == torrentLinkFailureLimit {
+		logging.Info(fmt.Sprintf("🚫 The .torrent link of %s from %s failed again: it is set aside for %s",
+			releaseTarget(release), release.Source, logDuration(torrentLinkQuarantine(failures))))
 	}
-	reconcilePackIdentityFromMagnet(&release)
+	p.stats.Error("torrent_link")
+	logging.Warn(fmt.Sprintf("⚠️ Could not fetch the .torrent of %s from %s", releaseTarget(release), release.Source), "error", err)
+	if source := strings.TrimSpace(release.Source); source != "" {
+		noteTorrentLinkFailure(p.linkFailures, source, *release.TorrentURL, err, p.notifier)
+	}
+}
+
+// resolveDeferred opens the deferred link and replaces the hash-only magnet
+// with the real one (and the .torrent file when there is one).
+func (r *candidateRun) resolveDeferred() bool {
+	r.release.Magnet = ""
+	if !r.resolveLink() {
+		return false
+	}
+	if hash, ok := utils.MagnetHash(r.release.Magnet); ok && hash != r.deferredHash && !r.provisional {
+		logging.Debug("the downloaded torrent has another infohash than the one declared",
+			"target", releaseTarget(&r.release), "declared", r.deferredHash, "real", hash)
+	}
+	reconcilePackIdentityFromMagnet(&r.release)
+	r.deferredHash = ""
+	r.provisional = false
+	return true
+}
+
+// judge runs the decision on a candidate whose link is ready (or deferred):
+// the delay profile, the in-progress pack check and the approval against the
+// library, then the start of the download or the record of the skip.
+func (r *candidateRun) judge() (stop bool, err error) {
+	p, cfg, release := r.p, r.p.cfg, &r.release
 	isReadyPending := false
-	if hash, ok := releaseHash(&release); ok {
-		if _, ok := readyPending[hash]; ok {
-			isReadyPending = true
-		}
+	if hash, ok := releaseHash(release); ok {
+		_, isReadyPending = p.readyPending[hash]
 	}
 	// AcquisitionScore chooses between candidates; the approval and the
 	// stored score must use ReleaseScore, so a swarm-health bonus can never
 	// masquerade as an upgrade of a file already in the library.
-	releaseScore := cfg.ReleaseScore(&release)
+	r.releaseScore = cfg.ReleaseScore(release)
 	// A candidate that fills a known archive gap, or that scores above the
 	// bypass threshold, is never held by a delay profile.
-	gapEpisodes := gapEpisodesForRelease(&release, gapTargets)
-	isGap := len(gapEpisodes) > 0
-	bypassDelay := isGap || (cfg.DelayBypassScore() > 0 && releaseScore >= cfg.DelayBypassScore())
+	r.gapEpisodes = gapEpisodesForRelease(release, p.gapTargets)
+	isGap := len(r.gapEpisodes) > 0
+	bypassDelay := isGap || (cfg.DelayBypassScore() > 0 && r.releaseScore >= cfg.DelayBypassScore())
 	if !isReadyPending && !bypassDelay {
-		if held, err := p.holdForDelay(&release, releaseScore, provisional, resolveDeferred); err != nil {
+		if held, err := p.holdForDelay(release, r.releaseScore, r.provisional, r.resolveDeferred); err != nil {
 			return true, err
 		} else if held {
 			return false, nil
 		}
 	}
-
-	archiveIndex, movieArchive := p.archiveFor(&release)
-	forbidUpgrade := p.forbidUpgradeFor(&release)
-	// An "in progress" pack declares how many episodes it holds long before
-	// the .torrent is updated. The file list is already here: keep the pack
-	// when it holds at least one episode we need (a gap or a real upgrade),
-	// and skip it only when everything inside is already better on disk.
-	// staleInProgressPack reads the file list of an in-progress pack and
-	// skips it when everything inside is already better on disk. It can
-	// only refuse, so a deferred link is checked once it is opened for a
-	// release that would be downloaded.
-	staleInProgressPack := func() bool {
-		if torrentFile != nil && release.IsPack && release.InProgressEpisodes > 0 {
-			reason, checkErr := incompletePackReason(
-				*torrentFile, &release, gapEpisodes, archiveIndex,
-				releaseScore, cfg.UpgradeMinScoreDiff, cfg.UpgradeUntilScore, forbidUpgrade, cfg.Settings,
-			)
-			if checkErr != nil {
-				logging.Debug("could not read the pack torrent contents",
-					"target", releaseTarget(&release), "error", checkErr)
-			} else if reason != "" {
-				logging.Warn(fmt.Sprintf("⏭️ Season pack skipped — «%s» · %s", release.Title, reason),
-					"target", releaseTarget(&release))
-				if !cfg.DryRun {
-					if release.TorrentURL != nil {
-						if qerr := db.QuarantineTorrentLink(*release.TorrentURL, reason, time.Now(), 7*24*time.Hour); qerr != nil {
-							logging.Debug("could not quarantine the stale pack link", "error", qerr)
-						}
-					}
-					if berr := db.Blocklist(&release, "in_progress_pack_incomplete"); berr != nil {
-						logging.Debug("could not blocklist the stale pack", "error", berr)
-					}
-				}
-				return true
-			}
-		}
-		return false
-	}
-	if staleInProgressPack() {
+	r.archiveIndex, r.movieArchive = p.archiveFor(release)
+	r.forbidUpgrade = p.forbidUpgradeFor(release)
+	if r.staleInProgressPack() {
 		return false, nil
 	}
 	approvalContext := &models.ApprovalContext{
-		Archive:           archiveIndex,
-		MovieArchive:      movieArchive,
-		Live:              liveDownloads,
-		ForbidUpgrade:     forbidUpgrade,
+		Archive:           r.archiveIndex,
+		MovieArchive:      r.movieArchive,
+		Live:              p.liveDownloads,
+		ForbidUpgrade:     r.forbidUpgrade,
 		UpgradeUntilScore: cfg.UpgradeUntilScore,
 		ScoreSettings:     cfg.Settings,
 		GapEpisode:        isGap,
 		DryRun:            cfg.DryRun,
-		StallAlternatives: stallAlternatives,
-		StallScoreDrop:    stallScoreDrop,
-		Blocklist:         blocklistedHashes,
+		StallAlternatives: p.stallAlternatives,
+		StallScoreDrop:    p.stallScoreDrop,
+		Blocklist:         p.blocklistedHashes,
 	}
 	// Decide only: the library is not written until the torrent is in the
 	// engine (see startApprovedRelease).
-	approved, approvalReason, err := evaluateReleaseApproval(db, &release, releaseScore, cfg.UpgradeMinScoreDiff, approvalContext, forbidUpgrade, true)
+	approved, approvalReason, err := evaluateReleaseApproval(p.db, release, r.releaseScore, cfg.UpgradeMinScoreDiff, approvalContext, r.forbidUpgrade, true)
 	if err != nil {
 		return true, err
 	}
-	if approved && provisional {
-		if !resolveDeferred() {
+	if approved && r.provisional {
+		if !r.resolveDeferred() {
 			return false, nil
 		}
-		approved, approvalReason, err = evaluateReleaseApproval(db, &release, releaseScore, cfg.UpgradeMinScoreDiff, approvalContext, forbidUpgrade, true)
+		approved, approvalReason, err = evaluateReleaseApproval(p.db, release, r.releaseScore, cfg.UpgradeMinScoreDiff, approvalContext, r.forbidUpgrade, true)
 		if err != nil {
 			return true, err
 		}
 	}
-	score := releaseScore
 	fromArchive := strings.HasPrefix(release.Source, "archive:")
-	decisionReason, stallStuckScore, stallApplies := p.decisionReasonFor(&release, approvalReason, fromArchive, gapEpisodes)
-	if approved {
-		// The explicit path (or nil, to let the engine choose) is decided by
-		// the engine-independent RAM-disk policy: a known-too-big or
-		// unknown-size release is staged off the tmpfs, and the RAM disk is
-		// used only for backends that support it.
-		preferredPath := automaticDownloadPath(&release, cfg, engineSupportsRamdisk(torrents))
-		// The global guard measures the default download volume; a tag rule,
-		// the RAM-disk overflow or the RAM disk itself can redirect the
-		// download to another filesystem, so verify the chosen path too.
-		// When no explicit path is forced, mirror the engine fallback so the
-		// volume actually used is the one being checked.
-		if p.freeSpaceRefuses(&release, preferredPath) {
-			return false, nil
-		}
-		if deferredHash != "" && !resolveDeferred() {
-			return false, nil
-		}
-		if staleInProgressPack() {
-			return false, nil
-		}
-		checkFilesFirst := packFileListUnknown(cfg, &release, torrentFile)
-		add := func() (bool, error) {
-			if release.Ed2kLink != "" {
-				return addEd2kRelease(cfg, &release)
-			}
-			if torrentFile != nil && *torrentFile != "" {
-				return torrents.AddFileWithPath(*torrentFile, cfg, preferredPath)
-			}
-			if checkFilesFirst {
-				// Only the metadata is fetched: the pack inspector starts the
-				// download once the file list shows a useful episode.
-				return torrents.AddWithOptions(release.Magnet, cfg, preferredPath, AddOptions{StopAtMetadata: true})
-			}
-			return torrents.AddWithPath(release.Magnet, cfg, preferredPath)
-		}
-		commit := func() (bool, string, error) {
-			return commitReleaseApproval(db, &release, releaseScore, cfg.UpgradeMinScoreDiff, approvalContext, forbidUpgrade)
-		}
-		outcome, commitReason, err := startApprovedRelease(db, torrents, &release, score, cfg.DryRun, add, commit)
-		if outcome != "" {
-			// A single release that cannot be started must not abort the whole
-			// cycle: record the failure and continue with the other candidates.
-			logStartFailure(stats, &release, outcome, commitReason, err)
-			return false, nil
-		}
-		if !cfg.DryRun {
-			approvalReason = commitReason
-			if hash, ok := releaseHash(&release); ok {
-				_ = db.SetTorrentReason(hash, decisionReason)
-			}
-		}
-		why := downloadWhy(&release, approvalReason, fromArchive, gapEpisodes, approvalContext.Archive)
-		if stallApplies {
-			why = "an alternative while the current download is stuck"
-			logging.Info(fmt.Sprintf("⏱️ %s: current download stuck for over %s, starting an alternative within %d points",
-				logTarget(&release), logDuration(time.Duration(cfg.StallAlternativeAfterMin)*time.Minute), stallScoreDrop),
-				"stuck_score", stallStuckScore, "candidate_score", releaseScore)
-		}
-		p.announceDownload(&release, why, score, decisionReason, approvalReason, gapEpisodes, approvalContext.Archive, preferredPath, isReadyPending, fromArchive, checkFilesFirst)
-	} else {
-		p.recordSkip(&release, score, decisionReason, approvalReason, gapEpisodes)
+	decisionReason, stallStuckScore, stallApplies := p.decisionReasonFor(release, approvalReason, fromArchive, r.gapEpisodes)
+	if !approved {
+		p.recordSkip(release, r.releaseScore, decisionReason, approvalReason, r.gapEpisodes)
+		return false, nil
 	}
+	r.start(approvalContext, approvalReason, decisionReason, fromArchive, isReadyPending, stallStuckScore, stallApplies)
 	return false, nil
+}
+
+// staleInProgressPack reads the file list of an in-progress pack and skips it
+// when everything inside is already better on disk. An "in progress" pack
+// declares how many episodes it holds long before the .torrent is updated: it
+// is kept when it holds at least one episode we need (a gap or a real
+// upgrade). It can only refuse, so a deferred link is checked once it is
+// opened for a release that would be downloaded.
+func (r *candidateRun) staleInProgressPack() bool {
+	p, cfg, release := r.p, r.p.cfg, &r.release
+	if r.torrentFile == nil || !release.IsPack || release.InProgressEpisodes <= 0 {
+		return false
+	}
+	reason, checkErr := incompletePackReason(
+		*r.torrentFile, release, r.gapEpisodes, r.archiveIndex,
+		r.releaseScore, cfg.UpgradeMinScoreDiff, cfg.UpgradeUntilScore, r.forbidUpgrade, cfg.Settings,
+	)
+	if checkErr != nil {
+		logging.Debug("could not read the pack torrent contents",
+			"target", releaseTarget(release), "error", checkErr)
+		return false
+	}
+	if reason == "" {
+		return false
+	}
+	logging.Warn(fmt.Sprintf("⏭️ Season pack skipped — «%s» · %s", release.Title, reason),
+		"target", releaseTarget(release))
+	if !cfg.DryRun {
+		if release.TorrentURL != nil {
+			if qerr := p.db.QuarantineTorrentLink(*release.TorrentURL, reason, time.Now(), 7*24*time.Hour); qerr != nil {
+				logging.Debug("could not quarantine the stale pack link", "error", qerr)
+			}
+		}
+		if berr := p.db.Blocklist(release, "in_progress_pack_incomplete"); berr != nil {
+			logging.Debug("could not blocklist the stale pack", "error", berr)
+		}
+	}
+	return true
+}
+
+// start hands an approved candidate to the engine (or to aMule), records it
+// and announces it. A single release that cannot be started does not abort
+// the cycle: the failure is recorded and the pass goes on.
+func (r *candidateRun) start(approvalContext *models.ApprovalContext, approvalReason, decisionReason string, fromArchive, isReadyPending bool, stallStuckScore int64, stallApplies bool) {
+	p, cfg, release := r.p, r.p.cfg, &r.release
+	// The explicit path (or nil, to let the engine choose) is decided by the
+	// engine-independent RAM-disk policy: a known-too-big or unknown-size
+	// release is staged off the tmpfs, and the RAM disk is used only for
+	// backends that support it.
+	preferredPath := automaticDownloadPath(release, cfg, engineSupportsRamdisk(p.torrents))
+	// The global guard measures the default download volume; a tag rule, the
+	// RAM-disk overflow or the RAM disk itself can redirect the download to
+	// another filesystem, so verify the chosen path too. When no explicit
+	// path is forced, mirror the engine fallback so the volume actually used
+	// is the one being checked.
+	if p.freeSpaceRefuses(release, preferredPath) {
+		return
+	}
+	if r.deferredHash != "" && !r.resolveDeferred() {
+		return
+	}
+	if r.staleInProgressPack() {
+		return
+	}
+	checkFilesFirst := packFileListUnknown(cfg, release, r.torrentFile)
+	add := func() (bool, error) {
+		if release.Ed2kLink != "" {
+			return addEd2kRelease(cfg, release)
+		}
+		if r.torrentFile != nil && *r.torrentFile != "" {
+			return p.torrents.AddFileWithPath(*r.torrentFile, cfg, preferredPath)
+		}
+		if checkFilesFirst {
+			// Only the metadata is fetched: the pack inspector starts the
+			// download once the file list shows a useful episode.
+			return p.torrents.AddWithOptions(release.Magnet, cfg, preferredPath, AddOptions{StopAtMetadata: true})
+		}
+		return p.torrents.AddWithPath(release.Magnet, cfg, preferredPath)
+	}
+	commit := func() (bool, string, error) {
+		return commitReleaseApproval(p.db, release, r.releaseScore, cfg.UpgradeMinScoreDiff, approvalContext, r.forbidUpgrade)
+	}
+	outcome, commitReason, err := startApprovedRelease(p.db, p.torrents, release, r.releaseScore, cfg.DryRun, add, commit)
+	if outcome != "" {
+		logStartFailure(p.stats, release, outcome, commitReason, err)
+		return
+	}
+	if !cfg.DryRun {
+		approvalReason = commitReason
+		if hash, ok := releaseHash(release); ok {
+			_ = p.db.SetTorrentReason(hash, decisionReason)
+		}
+	}
+	why := downloadWhy(release, approvalReason, fromArchive, r.gapEpisodes, approvalContext.Archive)
+	if stallApplies {
+		why = "an alternative while the current download is stuck"
+		logging.Info(fmt.Sprintf("⏱️ %s: current download stuck for over %s, starting an alternative within %d points",
+			logTarget(release), logDuration(time.Duration(cfg.StallAlternativeAfterMin)*time.Minute), p.stallScoreDrop),
+			"stuck_score", stallStuckScore, "candidate_score", r.releaseScore)
+	}
+	p.announceDownload(release, why, r.releaseScore, decisionReason, approvalReason, r.gapEpisodes, approvalContext.Archive, preferredPath, isReadyPending, fromArchive, checkFilesFirst)
 }
 
 // forbidUpgradeFor reads the per-title "allow upgrades" switch (on by default).

@@ -138,3 +138,59 @@ func TestCandidateRefusedWhenTheLibraryHoldsBetter(t *testing.T) {
 		t.Fatalf("a worse release was added %d time(s) over the library's copy", got)
 	}
 }
+
+// tryWithMirror runs one candidate through the pass directly: its `.torrent`
+// link answers an error, and its mirror carries a magnet. infoHash is the hash
+// the indexer declared for the link ("" for a link without one).
+func (e *candidateEnv) tryWithMirror(t *testing.T, infoHash string) *models.CycleStats {
+	t.Helper()
+	dead := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "gone", http.StatusInternalServerError)
+	}))
+	t.Cleanup(dead.Close)
+	link := dead.URL + "/download/1.torrent"
+	release := *e.release
+	mirror := release
+	release.Magnet = ""
+	release.TorrentURL = &link
+	release.InfoHash = infoHash
+	release.Source = "dead-indexer"
+	mirror.Source = "mirror-indexer"
+	release.Mirrors = []models.Release{mirror}
+	stats := &models.CycleStats{}
+	pass := &candidatePass{
+		cfg: &e.cfg, engine: e.state.engine, db: e.state.db, archive: e.state.archive,
+		notifier: e.state.notifier, torrents: e.torrents, stats: stats,
+		blocklistedHashes: map[string]struct{}{}, blocklistedTitles: map[string]struct{}{},
+		gapTargets: map[gapTarget]struct{}{}, quarantinedLinks: map[string]string{},
+		readyPending:      map[string]struct{}{},
+		liveDownloads:     &models.LiveDownloads{Hashes: map[string]struct{}{}, Episodes: map[models.LiveEpisodeKey]struct{}{}},
+		stallAlternatives: map[models.LiveEpisodeKey]int64{},
+		emptyArchiveIndex: &models.ArchiveQualityIndex{},
+		archiveIndexCache: map[string]*models.ArchiveQualityIndex{},
+		movieArchiveCache: map[string]*models.ArchiveQuality{},
+		linkFailures:      map[string]map[string]struct{}{},
+	}
+	stop, err := pass.try(context.Background(), release)
+	if err != nil || stop {
+		t.Fatalf("try: stop %v, err %v", stop, err)
+	}
+	return stats
+}
+
+// A `.torrent` link that fails falls back to the same release from another
+// source in the same cycle, whether the link declared its hash or not.
+func TestCandidateFailedLinkFallsBackToTheMirror(t *testing.T) {
+	for name, hash := range map[string]string{"declared hash": candidateHash, "no hash": ""} {
+		t.Run(name, func(t *testing.T) {
+			e := newCandidateEnv(t)
+			e.tryWithMirror(t, hash)
+			if got := e.torrents.adds.Load(); got != 1 {
+				t.Fatalf("adds %d; want the mirror's magnet added once", got)
+			}
+			if !e.registered(t) {
+				t.Fatal("the download started from the mirror has no database row")
+			}
+		})
+	}
+}
