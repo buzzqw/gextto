@@ -16,6 +16,7 @@ package gextto
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -78,6 +79,40 @@ func (d *Database) ArchivedEpisodeRows() ([]archivedEpisodeRow, error) {
 	return list, rows.Err()
 }
 
+// MonitoredArchivedEpisodeRows lists the archived episodes of a season the
+// series still follows. A file of a season the operator removed from the range,
+// or of a disabled series, is not a loss to report: the database keeps its row,
+// but the file was deleted on purpose and the search is not meant to bring it
+// back.
+func (d *Database) MonitoredArchivedEpisodeRows() ([]archivedEpisodeRow, error) {
+	rows, err := d.db.Query(`SELECT s.name, e.season, e.episode, e.archive_path,
+		COALESCE(s.seasons,''), COALESCE(s.ignored_seasons,'[]') FROM episodes e
+		JOIN series s ON s.id=e.series_id
+		WHERE COALESCE(e.archive_path,'')<>'' AND e.downloaded_at IS NOT NULL AND s.enabled=1
+		ORDER BY s.name, e.season, e.episode`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	list := []archivedEpisodeRow{}
+	for rows.Next() {
+		var row archivedEpisodeRow
+		var seasons, ignoredJSON string
+		if err := rows.Scan(&row.Series, &row.Season, &row.Episode, &row.Path, &seasons, &ignoredJSON); err != nil {
+			return nil, err
+		}
+		var ignored []int64
+		if json.Unmarshal([]byte(ignoredJSON), &ignored) != nil {
+			ignored = nil
+		}
+		if !seasonAllowed(seasons, row.Season) || containsInt64(ignored, row.Season) {
+			continue
+		}
+		list = append(list, row)
+	}
+	return list, rows.Err()
+}
+
 // ArchivedMoviePaths lists the library paths of the movies still in the
 // library.
 func (d *Database) ArchivedMoviePaths() ([]string, error) {
@@ -125,7 +160,7 @@ func runLibraryReport(ctx context.Context, state *AppState) {
 	if state == nil || state.db == nil {
 		return
 	}
-	rows, err := state.db.ArchivedEpisodeRows()
+	rows, err := state.db.MonitoredArchivedEpisodeRows()
 	if err != nil {
 		logging.Warn("the library report could not read the archive", "error", err.Error())
 		return

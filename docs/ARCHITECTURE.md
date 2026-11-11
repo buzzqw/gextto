@@ -136,7 +136,7 @@ qBittorrent-nox.
 | `audio_cleanup_queue.go` | the audio cleanup queue: one worker, no size limit, saved to `audio_cleanup_queue.json` in the data folder and resumed at startup. |
 | `maintenance_night.go` | the night maintenance window: settings, idle detection (download rate, imports, library and integrity checks, load), one heavy job at a time, the persisted status (`maintenance_status.json`), the worker and the night summary. |
 | `maintenance_db.go` | the database part of the night maintenance: `PRAGMA optimize` and `VACUUM` when worth it every night, a weekly `integrity_check` with an immediate notification. |
-| `maintenance_library.go` | the library report (files gone from the disk, unreadable folders apart) and the audio cleanup of the archived files, one at a time, remembered in `audio_cleanup_library`, hardlinked seeding files left for later. |
+| `maintenance_library.go` | the library report (files of the seasons still followed gone from the disk, unreadable folders apart) and the audio cleanup of the archived files, one at a time, remembered in `audio_cleanup_library`, hardlinked seeding files left for later. |
 | `uiweb_v2_night_maintenance.go`, `web_handlers_night_maintenance.go` | the Maintenance panel of the night maintenance and its API (`/api/maintenance/night`). |
 | `mediainfo_gate.go` | an upgrade is confirmed by probing both files with ffprobe: an attribute the streams do not show (resolution, video codec, audio family and channels, HDR10/HLG) discards the release, blocklists it and restores the archived row. |
 | `manual_import.go` | manual import of a file already on disk: parse the name, match a configured series or movie, propose the archive destination, replace an existing copy only on request. |

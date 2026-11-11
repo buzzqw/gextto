@@ -217,6 +217,48 @@ func TestLibraryReportFindsMissingFilesButNotUnreadableFolders(t *testing.T) {
 	}
 }
 
+func TestLibraryReportCountsOnlyTheSeasonsStillMonitored(t *testing.T) {
+	state := newTestAppState(t)
+	resetMaintenanceStatus(t, state.cfg.DataDir)
+	library := t.TempDir()
+	folder := filepath.Join(library, "Serie A")
+	if err := os.MkdirAll(folder, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	outside := filepath.Join(folder, "Serie A - S18E01.mkv")
+	inside := filepath.Join(folder, "Serie A - S21E01.mkv")
+	archiveTestEpisode(t, state.db, "Serie A", 18, 1, outside)
+	archiveTestEpisode(t, state.db, "Serie A", 21, 1, inside)
+	if _, err := state.db.db.Exec("UPDATE series SET seasons='21+' WHERE name='Serie A'"); err != nil {
+		t.Fatal(err)
+	}
+
+	runLibraryReport(context.Background(), state)
+	report := maintenanceStatusSnapshot().Library
+	if len(report.Missing) != 1 || report.Missing[0].Season != 21 || report.Missing[0].Path != inside {
+		t.Fatalf("missing = %+v", report.Missing)
+	}
+	if report.Files != 1 {
+		t.Fatalf("files counted = %d, want only the monitored season", report.Files)
+	}
+
+	// A season the operator ignores and a disabled series are not losses.
+	if _, err := state.db.db.Exec("UPDATE series SET ignored_seasons='[21]' WHERE name='Serie A'"); err != nil {
+		t.Fatal(err)
+	}
+	runLibraryReport(context.Background(), state)
+	if missing := maintenanceStatusSnapshot().Library.Missing; len(missing) != 0 {
+		t.Fatalf("an ignored season was reported: %+v", missing)
+	}
+	if _, err := state.db.db.Exec("UPDATE series SET ignored_seasons='[]', enabled=0 WHERE name='Serie A'"); err != nil {
+		t.Fatal(err)
+	}
+	runLibraryReport(context.Background(), state)
+	if missing := maintenanceStatusSnapshot().Library.Missing; len(missing) != 0 {
+		t.Fatalf("a disabled series was reported: %+v", missing)
+	}
+}
+
 func TestLibraryAudioCleanupCleansOnceAndWaitsForSeeding(t *testing.T) {
 	requireAllAudioTools(t)
 	state := newTestAppState(t)
