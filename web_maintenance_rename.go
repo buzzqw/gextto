@@ -65,6 +65,29 @@ type folderRenameItem struct {
 	Status     string                  `json:"status"`
 	Reason     string                  `json:"reason,omitempty"`
 	Conflict   bool                    `json:"conflict,omitempty"`
+	// naming is a movie's quality as the file reports it, read once per file
+	// and shared by every candidate's target.
+	naming *folderRenameNaming
+}
+
+// folderRenameNaming is the quality a movie is named with.
+type folderRenameNaming struct {
+	quality                       models.Quality
+	audioFull, channels, language string
+}
+
+// folderRenameMovieNaming reads a movie's quality from the file itself
+// (MediaInfo, or ffprobe), over the tags its name carries, the way the import
+// names it: a name already shortened to "Title (Year) [2160p]" gets back its
+// source, codec, HDR, audio and languages. One header read per movie; episodes
+// are not probed, a season folder can hold hundreds of files on a network
+// volume.
+func folderRenameMovieNaming(path string) *folderRenameNaming {
+	parsed := ParseQuality(filepath.Base(path))
+	fromName := folderRenameLanguage(parsed)
+	parsed.Language = ""
+	quality, audioFull, channels, language := namingQualityFor(path, parsed, fromName)
+	return &folderRenameNaming{quality: quality, audioFull: audioFull, channels: channels, language: language}
 }
 
 type folderRenameResult struct {
@@ -317,16 +340,23 @@ func folderRenameInspect(ctx context.Context, root, path string, cfg *Config, se
 			}
 		}
 	} else {
-		if cached, ok := movieCache[folderRenameCacheKey(item.Detected)]; ok {
+		// The year ranks the candidates, so it is part of the cache key.
+		key := folderRenameCacheKey(item.Detected)
+		if item.Year != nil {
+			key += "|" + strconv.FormatInt(*item.Year, 10)
+		}
+		if cached, ok := movieCache[key]; ok {
 			candidates = cached
 		} else {
 			candidates, err = folderRenameSearchMovies(ctx, cfg, item.Detected, item.Year)
 			if err != nil {
 				item.Reason = err.Error()
 			} else {
-				movieCache[folderRenameCacheKey(item.Detected)] = candidates
+				movieCache[key] = candidates
 			}
 		}
+		candidates = folderRenamePreferFollowedMovie(cfg, item, candidates)
+		item.naming = folderRenameMovieNaming(path)
 	}
 	for index := range candidates {
 		candidates[index].Target = folderRenameTarget(cfg, path, item, candidates[index], "")
@@ -439,7 +469,52 @@ func folderRenameSearchMovies(ctx context.Context, cfg *Config, query string, ye
 	if len(candidates) == 0 && firstErr != nil {
 		return nil, firstErr
 	}
+	folderRenameWeighYear(candidates, year)
 	return folderRenameSortCandidates(candidates), nil
+}
+
+// folderRenamePreferFollowedMovie puts first, as a certain match, the TMDB
+// entry of the followed film the file belongs to: its TMDB id was chosen when
+// the film was added, so it settles same-titled films and remakes that the
+// title and the year alone may not. The cached slice is not modified.
+func folderRenamePreferFollowedMovie(cfg *Config, item folderRenameItem, candidates []folderRenameCandidate) []folderRenameCandidate {
+	movie := cfg.FindMovieMatchManual(item.Detected, item.Year)
+	if movie == nil || strings.TrimSpace(movie.TmdbID) == "" {
+		return candidates
+	}
+	id := strings.TrimSpace(movie.TmdbID)
+	followed := folderRenameCandidate{Provider: "tmdb", ID: id, Title: movie.Name, Year: movie.Year}
+	result := make([]folderRenameCandidate, 0, len(candidates)+1)
+	for _, candidate := range candidates {
+		if candidate.Provider == "tmdb" && candidate.ID == id {
+			followed.Title, followed.Year = candidate.Title, candidate.Year
+			continue
+		}
+		result = append(result, candidate)
+	}
+	followed.Score = 100
+	return append([]folderRenameCandidate{followed}, result...)
+}
+
+// folderRenameYearMismatch is what a movie candidate loses when its year is not
+// the one the file name carries: enough to rank a same-titled film of the
+// right year first, and to send a lone wrong-year match to review.
+const folderRenameYearMismatch = 15
+
+// folderRenameWeighYear lowers the movie candidates whose release year differs
+// from the year in the file name. Remakes and same-titled films are common, and
+// the title alone ties them.
+func folderRenameWeighYear(candidates []folderRenameCandidate, year *int64) {
+	if year == nil {
+		return
+	}
+	want := strconv.FormatInt(*year, 10)
+	for index := range candidates {
+		if candidates[index].Year == "" || candidates[index].Year == want {
+			continue
+		}
+		candidates[index].Score = max(candidates[index].Score-folderRenameYearMismatch, 0)
+	}
 }
 
 func folderRenameTVDBCandidate(raw any, query string, movie bool) folderRenameCandidate {
@@ -531,8 +606,11 @@ func folderRenameTarget(cfg *Config, path string, item folderRenameItem, candida
 	if year == "" && item.Year != nil {
 		year = strconv.FormatInt(*item.Year, 10)
 	}
-	quality := ParseQuality(filepath.Base(path))
-	stem := movieNameStem(cfg, candidate.Title, year, quality, folderRenameAudioLabel(quality.Audio), "", folderRenameLanguage(quality))
+	naming := item.naming
+	if naming == nil {
+		naming = folderRenameMovieNaming(path)
+	}
+	stem := movieNameStem(cfg, candidate.Title, year, naming.quality, naming.audioFull, naming.channels, naming.language)
 	return filepath.Join(filepath.Dir(path), cleanupFilename(sanitizeInvalid(stem))+"."+ext)
 }
 
@@ -655,7 +733,10 @@ func folderRenameMatchScore(query, title, year string) int {
 			}
 		}
 	}
-	return matched * 80 / len(queryTokens)
+	// Measured on the longer of the two names: a title that only contains the
+	// query among many other words (a making-of, a special) ranks below one
+	// that is the query plus a word or two.
+	return matched * 80 / max(len(queryTokens), len(titleTokens))
 }
 
 func folderRenameCacheKey(value string) string {

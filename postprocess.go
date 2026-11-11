@@ -1368,44 +1368,45 @@ func episodeTarget(
 		extension = "mkv"
 	}
 	title = safeComponent(title)
-	media := readMediaTags(source)
-	resolution := release.Quality.Resolution
-	if media.Resolution != nil {
-		resolution = *media.Resolution
-	}
-	codec := release.Quality.Codec
-	if media.VideoCodec != nil {
-		codec = *media.VideoCodec
-	}
-	audio := namingAudio(filepath.Base(source), release.Quality, media)
-	hdr := namingHDR(filepath.Base(source), release.Quality, media)
-	defaultLanguage := cfg.DefaultLanguage()
-	language := defaultLanguage
-	if media.Languages != nil && *media.Languages != "" {
-		language = *media.Languages
-	} else if strings.TrimSpace(release.Quality.Language) != "" {
-		language = release.Quality.Language
-	}
-	// legacy `{Audio}` (and `{AudioCodec}`) join codec and channels: "AC3 5.1".
-	audioParts := []string{}
-	if audio != "" {
-		audioParts = append(audioParts, audio)
-	}
-	if media.Channels != nil && *media.Channels != "" {
-		audioParts = append(audioParts, *media.Channels)
-	}
-	audioFull := strings.Join(audioParts, " ")
-	channels := ""
-	if media.Channels != nil {
-		channels = *media.Channels
-	}
-	effective := release.Quality
-	effective.Resolution, effective.Codec, effective.Audio, effective.HDR = resolution, codec, audio, hdr
+	effective, audioFull, channels, language := namingQualityFor(source, release.Quality, cfg.DefaultLanguage())
 	targetStem := renderEpisodeName(cfg, series.Name, title, season, episodeFileRun(release), effective, audioFull, channels, language)
 	targetStem = cleanupFilename(sanitizeInvalid(targetStem))
 	targetName := fmt.Sprintf("%s.%s", targetStem, extension)
 	target := filepath.Join(filepath.Dir(source), targetName)
 	return source, target, true, nil
+}
+
+// namingQualityFor is the quality a file is named with: the release's tags,
+// corrected by what MediaInfo (or ffprobe) reads from the file itself, with
+// the audio joined to its channels ("AC3 5.1") for the legacy {Audio} token
+// and the languages of the tracks, or defaultLanguage when neither the file
+// nor the release says.
+func namingQualityFor(source string, quality models.Quality, defaultLanguage string) (effective models.Quality, audioFull, channels, language string) {
+	media := readMediaTags(source)
+	effective = quality
+	if media.Resolution != nil {
+		effective.Resolution = *media.Resolution
+	}
+	if media.VideoCodec != nil {
+		effective.Codec = *media.VideoCodec
+	}
+	effective.Audio = namingAudio(filepath.Base(source), quality, media)
+	effective.HDR = namingHDR(filepath.Base(source), quality, media)
+	language = defaultLanguage
+	if media.Languages != nil && *media.Languages != "" {
+		language = *media.Languages
+	} else if strings.TrimSpace(quality.Language) != "" {
+		language = quality.Language
+	}
+	audioParts := []string{}
+	if effective.Audio != "" {
+		audioParts = append(audioParts, effective.Audio)
+	}
+	if media.Channels != nil && *media.Channels != "" {
+		audioParts = append(audioParts, *media.Channels)
+		channels = *media.Channels
+	}
+	return effective, strings.Join(audioParts, " "), channels, language
 }
 
 // episodeFileRun is the run of episodes one file holds, used to name it: a
@@ -1607,42 +1608,12 @@ func RenameMovie(
 	if strings.Contains(strings.ToLower(filepath.Base(source)), "sample") {
 		return "", nil
 	}
-	media := readMediaTags(source)
-	resolution := release.Quality.Resolution
-	if media.Resolution != nil {
-		resolution = *media.Resolution
-	}
-	codec := release.Quality.Codec
-	if media.VideoCodec != nil {
-		codec = *media.VideoCodec
-	}
-	audio := namingAudio(filepath.Base(source), release.Quality, media)
-	hdr := namingHDR(filepath.Base(source), release.Quality, media)
-	audioParts := []string{}
-	if audio != "" {
-		audioParts = append(audioParts, audio)
-	}
-	if media.Channels != nil && *media.Channels != "" {
-		audioParts = append(audioParts, *media.Channels)
-	}
-	audioFull := strings.Join(audioParts, " ")
+	effective, audioFull, channels, language := namingQualityFor(source, release.Quality, cfg.DefaultLanguage())
 	officialTitle = sanitizeInvalid(officialTitle)
 	year := ""
 	if officialYear != nil {
 		year = strconv.FormatInt(*officialYear, 10)
 	}
-	language := cfg.DefaultLanguage()
-	if media.Languages != nil && *media.Languages != "" {
-		language = *media.Languages
-	} else if strings.TrimSpace(release.Quality.Language) != "" {
-		language = release.Quality.Language
-	}
-	channels := ""
-	if media.Channels != nil {
-		channels = *media.Channels
-	}
-	effective := release.Quality
-	effective.Resolution, effective.Codec, effective.Audio, effective.HDR = resolution, codec, audio, hdr
 	stem := movieNameStem(cfg, officialTitle, year, effective, audioFull, channels, language)
 	stem = cleanupFilename(sanitizeInvalid(stem))
 	extension := strings.TrimPrefix(filepath.Ext(source), ".")

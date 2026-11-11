@@ -2854,7 +2854,7 @@ credenziali dell'interfaccia e riceve un cookie di sessione valido solo per
 | Voce | Cosa fa |
 |---|---|
 | Cartella / Sfoglia | Inserisci o scegli dal server la cartella da analizzare. |
-| Scansiona e proponi | Analizza ricorsivamente i video, riconosce serie/film con TMDB/TVDB e propone i nuovi nomi (solo anteprima), con il formato scelto per episodi e film e i tag di qualità letti dal nome del file. |
+| Scansiona e proponi | Analizza ricorsivamente i video, riconosce serie/film con TMDB/TVDB e propone i nuovi nomi (solo anteprima), con il formato scelto per episodi e film. I tag degli episodi vengono dal nome del file, quelli dei film dal file stesso (MediaInfo); un film che segui prende il suo ID TMDB, altrimenti conta anche l'anno nel nome. |
 | Scelta risultato per riga | Seleziona un risultato TMDB/TVDB alternativo. |
 | Accetta / rifiuta | Approva o scarta la singola proposta. |
 | Accetta tutte le proposte | Approva in blocco le proposte. |

@@ -2831,7 +2831,7 @@ of the interface stays protected.
 | Item | What it does |
 |---|---|
 | Folder / Browse | Type or pick the folder to analyse from the server. |
-| Scan and propose | Recursively analyses the videos, recognises series/movies with TMDB/TVDB and proposes new names (preview only), in the format chosen for episodes and movies, with the quality tags read from the file name. |
+| Scan and propose | Recursively analyses the videos, recognises series/movies with TMDB/TVDB and proposes new names (preview only), in the format chosen for episodes and movies. Episode tags come from the file name, movie tags from the file itself (MediaInfo); a movie you follow takes its TMDB id, otherwise the year in the name counts too. |
 | Per-row result | Selects an alternative TMDB/TVDB match. |
 | Accept / reject | Approves or discards the single proposal. |
 | Accept all proposals | Approves every proposal at once. |
