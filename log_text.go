@@ -469,6 +469,9 @@ type cycleSkipCounts struct {
 	Downloading int // already in the torrent session
 	Waiting     int // held by a delay profile, in case a better version appears
 	Other       int // skipped for another reason (each one has its own INFO line)
+	// CheckingFiles are packs added stopped at their metadata: they download
+	// only once their file list shows something useful.
+	CheckingFiles int
 }
 
 func (c cycleSkipCounts) text() string {
@@ -484,6 +487,9 @@ func (c cycleSkipCounts) text() string {
 	}
 	if c.Other > 0 {
 		parts = append(parts, fmt.Sprintf("%s skipped (see above)", logCount(c.Other)))
+	}
+	if c.CheckingFiles > 0 {
+		parts = append(parts, countLabel(int64(c.CheckingFiles), "pack", "packs")+" having the file list read before downloading")
 	}
 	return strings.Join(parts, ", ")
 }

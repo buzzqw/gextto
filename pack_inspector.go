@@ -16,6 +16,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/buzzqw/gextto/internal/logging"
@@ -34,6 +35,9 @@ const (
 	// packInspectionSettled is how long an inspected torrent is skipped. The
 	// file list of a torrent never changes, so one verdict is enough.
 	packInspectionSettled = 6 * time.Hour
+	// packInspectionStopWait is how long a pack whose metadata just arrived
+	// is left to the engine to stop it before the verdict.
+	packInspectionStopWait = 2 * time.Second
 )
 
 // packInspectionCheck remembers until when a torrent needs no further look.
@@ -63,10 +67,10 @@ func InspectActivePacks(cfg *Config, torrents TorrentEngine, db *Database, notif
 	list := torrents.List()
 	live := make(map[string]struct{}, len(list))
 	for _, torrent := range list {
-		live[torrent.Hash] = struct{}{}
+		live[strings.ToLower(torrent.Hash)] = struct{}{}
 	}
 	for hash := range checked {
-		if _, ok := live[hash]; !ok {
+		if _, ok := live[strings.ToLower(hash)]; !ok {
 			delete(checked, hash)
 		}
 	}
@@ -110,6 +114,9 @@ func InspectActivePacks(cfg *Config, torrents TorrentEngine, db *Database, notif
 	if len(candidates) == 0 {
 		return
 	}
+	if err := db.PrunePackFileChecks(live); err != nil {
+		logging.Debug("could not prune the packs waiting for their file list", "error", err)
+	}
 
 	gapCache := map[string]map[int64]struct{}{}
 	for _, candidate := range candidates {
@@ -117,6 +124,17 @@ func InspectActivePacks(cfg *Config, torrents TorrentEngine, db *Database, notif
 		if err != nil || !ok || len(files) == 0 {
 			// Metadata has not arrived yet: ask again later.
 			checked[candidate.torrent.Hash] = packInspectionCheck{until: now.Add(packInspectionMetadataWait)}
+			continue
+		}
+		// A pack added stopped at its metadata waits for the engine to stop it
+		// (or, on an engine that ignores the request, to start receiving
+		// data): resuming it before that would be undone by the stop.
+		pending, pendingErr := db.PackFileCheck(candidate.torrent.Hash)
+		if pendingErr != nil {
+			logging.Debug("could not read the pack waiting for its file list", "hash", candidate.torrent.Hash, "error", pendingErr)
+		}
+		if pending != nil && candidate.torrent.State != "paused" && candidate.torrent.TotalDone == 0 {
+			checked[candidate.torrent.Hash] = packInspectionCheck{until: now.Add(packInspectionStopWait)}
 			continue
 		}
 		names := make([]string, 0, len(files))
@@ -127,6 +145,10 @@ func InspectActivePacks(cfg *Config, torrents TorrentEngine, db *Database, notif
 		if err != nil || len(found) == 0 {
 			// No season/episode identity in the names: the post-download check
 			// is the only safe verdict.
+			if pending != nil && !packStartAfterFileCheck(torrents, db, notifier, candidate.torrent.Hash, pending, "") {
+				checked[candidate.torrent.Hash] = packInspectionCheck{until: now.Add(packInspectionMetadataWait)}
+				continue
+			}
 			checked[candidate.torrent.Hash] = packInspectionCheck{until: now.Add(packInspectionSettled)}
 			continue
 		}
@@ -162,6 +184,10 @@ func InspectActivePacks(cfg *Config, torrents TorrentEngine, db *Database, notif
 					checked[candidate.torrent.Hash] = packInspectionCheck{until: now.Add(packInspectionMetadataWait)}
 					continue
 				}
+			}
+			if pending != nil && !packStartAfterFileCheck(torrents, db, notifier, candidate.torrent.Hash, pending, packHeldEpisodesText(*candidate.release.Season, found)) {
+				checked[candidate.torrent.Hash] = packInspectionCheck{until: now.Add(packInspectionMetadataWait)}
+				continue
 			}
 			checked[candidate.torrent.Hash] = packInspectionCheck{until: now.Add(packInspectionSettled)}
 			continue
@@ -205,11 +231,18 @@ func InspectActivePacks(cfg *Config, torrents TorrentEngine, db *Database, notif
 		if removeErr != nil || !removed {
 			fate = "to be removed"
 		}
-		logging.Info(fmt.Sprintf("🗑️ «%s» discarded while downloading: %s. It is %s with what it had downloaded (%s) and will not be taken again",
-			candidate.release.Title, why, fate, formatBytes(candidate.torrent.TotalDone)), "hash", candidate.torrent.Hash)
+		if pending != nil {
+			// Never announced: only its file list was read.
+			logging.Info(fmt.Sprintf("🗑️ «%s» not downloaded: %s. Only its file list was read; it is %s and will not be taken again",
+				candidate.release.Title, why, fate), "hash", candidate.torrent.Hash)
+			_ = db.DeletePackFileCheck(candidate.torrent.Hash)
+		} else {
+			logging.Info(fmt.Sprintf("🗑️ «%s» discarded while downloading: %s. It is %s with what it had downloaded (%s) and will not be taken again",
+				candidate.release.Title, why, fate, formatBytes(candidate.torrent.TotalDone)), "hash", candidate.torrent.Hash)
+		}
 		logging.Debug("discarded pack details", "hash", candidate.torrent.Hash, "name", candidate.torrent.Name,
 			"episodes", details, "restored upgrade", restored, "previous release", previous)
-		if notifier != nil {
+		if notifier != nil && pending == nil {
 			data := map[string]any{
 				"hash":             candidate.torrent.Hash,
 				"name":             candidate.torrent.Name,
@@ -230,6 +263,31 @@ func InspectActivePacks(cfg *Config, torrents TorrentEngine, db *Database, notif
 		}
 		delete(checked, candidate.torrent.Hash)
 	}
+}
+
+// packStartAfterFileCheck starts a pack whose file list was read before the
+// download and sends the announcement the cycle kept for it: the download line,
+// now with what the pack holds, and the download_started notification. false
+// leaves it waiting for the next pass (the engine refused the resume).
+func packStartAfterFileCheck(torrents TorrentEngine, db *Database, notifier *Notifier, hash string, pending *packFileCheck, held string) bool {
+	if _, err := torrents.Resume(hash); err != nil {
+		logging.Warn("could not start the pack after reading its file list", "hash", hash, "error", err.Error())
+		return false
+	}
+	message := pending.LogMessage
+	if held != "" {
+		message += " · its file list holds " + held
+	}
+	title, _ := pending.Payload["title"].(string)
+	source, _ := pending.Payload["source"].(string)
+	logging.Info(message, "release", shortTorrentName(title), "from", source, "hash", hash)
+	if notifier != nil {
+		if err := notifier.NotifyEvent("download_started", pending.Payload); err != nil {
+			logging.Warn("download notification failed", "error", err)
+		}
+	}
+	_ = db.DeletePackFileCheck(hash)
+	return true
 }
 
 // packHeldEpisodesText names the episodes a pack really holds: "S03E01",

@@ -443,8 +443,13 @@ serve solo a non aspettare il ciclo successivo.
 - Con il **controllo dei pack** attivo (*Configurazione → Seed e completamento →
   Controllo dei pack*, spento di default) Gextto legge l'elenco dei file del
   pack appena arriva: se il pack non aggiunge nulla lo scarta, se solo alcuni
-  file servono scarica soltanto quelli. Vale solo per i pack scelti dal ciclo:
-  un pack che avvii tu a mano non viene mai scartato.
+  file servono scarica soltanto quelli. Un pack che arriva da un magnet, e di
+  cui quindi l'elenco non si conosce ancora, viene aggiunto fermo: si
+  scaricano solo i metadati, pochi KB, e il download parte (con la sua riga nel
+  log e la sua notifica) solo se dentro c'è qualcosa che serve. Altrimenti il
+  log dice cosa conteneva e il pack sparisce senza aver scaricato nulla. Vale
+  solo per i pack scelti dal ciclo: un pack che avvii tu a mano non viene mai
+  scartato.
 - Se un download resta **fermo a 0 B/s o in attesa dei metadati** oltre il
   tempo impostato in *Configurazione → Qualità e upgrade → Download bloccati*,
   la ricerca può avviare un'alternativa della stessa puntata (o della stagione)

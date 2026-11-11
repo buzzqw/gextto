@@ -13,6 +13,15 @@ type packInspectEngine struct {
 	files      map[string][]models.FileView
 	removed    map[string]bool
 	priorities map[string][]int32
+	resumed    map[string]bool
+}
+
+func (m *packInspectEngine) Resume(hash string) (bool, error) {
+	if m.resumed == nil {
+		m.resumed = map[string]bool{}
+	}
+	m.resumed[hash] = true
+	return true, nil
 }
 
 func (m *packInspectEngine) List() []models.TorrentView { return m.torrents }

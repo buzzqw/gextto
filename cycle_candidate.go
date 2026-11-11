@@ -327,12 +327,18 @@ func (p *candidatePass) try(ctx context.Context, candidate models.Release) (stop
 		if staleInProgressPack() {
 			return false, nil
 		}
+		checkFilesFirst := packFileListUnknown(cfg, &release, torrentFile)
 		add := func() (bool, error) {
 			if release.Ed2kLink != "" {
 				return addEd2kRelease(cfg, &release)
 			}
 			if torrentFile != nil && *torrentFile != "" {
 				return torrents.AddFileWithPath(*torrentFile, cfg, preferredPath)
+			}
+			if checkFilesFirst {
+				// Only the metadata is fetched: the pack inspector starts the
+				// download once the file list shows a useful episode.
+				return torrents.AddWithOptions(release.Magnet, cfg, preferredPath, AddOptions{StopAtMetadata: true})
 			}
 			return torrents.AddWithPath(release.Magnet, cfg, preferredPath)
 		}
@@ -359,7 +365,7 @@ func (p *candidatePass) try(ctx context.Context, candidate models.Release) (stop
 				logTarget(&release), logDuration(time.Duration(cfg.StallAlternativeAfterMin)*time.Minute), stallScoreDrop),
 				"stuck_score", stallStuckScore, "candidate_score", releaseScore)
 		}
-		p.announceDownload(&release, why, score, decisionReason, approvalReason, gapEpisodes, approvalContext.Archive, preferredPath, isReadyPending, fromArchive)
+		p.announceDownload(&release, why, score, decisionReason, approvalReason, gapEpisodes, approvalContext.Archive, preferredPath, isReadyPending, fromArchive, checkFilesFirst)
 	} else {
 		p.recordSkip(&release, score, decisionReason, approvalReason, gapEpisodes)
 	}
@@ -475,7 +481,22 @@ func downloadWhy(release *models.Release, approvalReason string, fromArchive boo
 
 // announceDownload logs a started download, clears its delay row, counts it
 // and sends the download_started notification.
-func (p *candidatePass) announceDownload(release *models.Release, why string, score int64, decisionReason, approvalReason string, gapEpisodes []int64, archive *models.ArchiveQualityIndex, preferredPath *string, isReadyPending, fromArchive bool) {
+// packFileListUnknown reports a pack the cycle adds without knowing what is
+// inside: a magnet (no .torrent was read) of a series pack, with the pack
+// inspection on. Such a pack is added stopped at its metadata, so a name that
+// promises a season and holds one episode already in the library costs a few
+// kilobytes and no announcement.
+func packFileListUnknown(cfg *Config, release *models.Release, torrentFile *string) bool {
+	if cfg == nil || cfg.DryRun || release == nil || !packInspectionEnabled(cfg) {
+		return false
+	}
+	if release.Kind != "series" || !release.IsPack || release.Season == nil || release.Ed2kLink != "" {
+		return false
+	}
+	return torrentFile == nil || *torrentFile == ""
+}
+
+func (p *candidatePass) announceDownload(release *models.Release, why string, score int64, decisionReason, approvalReason string, gapEpisodes []int64, archive *models.ArchiveQualityIndex, preferredPath *string, isReadyPending, fromArchive, checkFilesFirst bool) {
 	cfg, db, notifier, stats := p.cfg, p.db, p.notifier, p.stats
 	logMessage := fmt.Sprintf("📥 Downloading %s — %s (%s)", logTarget(release), why, friendlyQuality(release.Quality))
 	if cfg.DryRun {
@@ -487,22 +508,24 @@ func (p *candidatePass) announceDownload(release *models.Release, why string, sc
 			logMessage += " · replacing: " + from
 		}
 	}
-	if wholeSeason {
+	if wholeSeason && len(gapEpisodes) > 0 {
 		// A whole-season pack lists no episodes of its own: say which missing
-		// ones it is meant to fill, and, when its file list is not known yet
-		// (a magnet), that the files are checked as soon as it arrives.
-		if len(gapEpisodes) > 0 {
-			logMessage += " · for the missing " + episodeRangeLabel(*release.Season, gapEpisodes)
-		}
-		if release.TorrentURL == nil && packInspectionEnabled(cfg) {
-			logMessage += " · its files are checked as soon as their list arrives, and it is discarded if none is useful"
-		}
+		// ones it is meant to fill.
+		logMessage += " · for the missing " + episodeRangeLabel(*release.Season, gapEpisodes)
 	}
 	if destination := releaseDestinationLabel(cfg, release, preferredPath); destination != "" {
 		logMessage += " → " + destination
 	}
 	logHash, _ := releaseHash(release)
-	logging.Info(logMessage, "release", shortTorrentName(release.Title), "from", release.Source, "hash", logHash)
+	if checkFilesFirst {
+		// The download line waits for the file list: what is announced now is
+		// only that the list is being read, and why the pack was chosen.
+		logging.Info(fmt.Sprintf("📋 Reading the file list of %s before downloading it — %s (%s)%s",
+			logTarget(release), why, friendlyQuality(release.Quality), packChosenForText(release, gapEpisodes)),
+			"release", shortTorrentName(release.Title), "from", release.Source, "hash", logHash)
+	} else {
+		logging.Info(logMessage, "release", shortTorrentName(release.Title), "from", release.Source, "hash", logHash)
+	}
 	logging.Debug("download decision",
 		"target", releaseTarget(release),
 		"quality", releaseQualityLabel(release),
@@ -523,17 +546,21 @@ func (p *candidatePass) announceDownload(release *models.Release, why string, sc
 			}
 		}
 	}
-	stats.DownloadsStarted++
 	if !cfg.DryRun {
 		recordFeedAccepted(db, cfg, release)
 	}
-	if approvalReason == "upgrade" {
-		p.upgrades++
+	if checkFilesFirst {
+		p.skips.CheckingFiles++
 	} else {
-		p.newItems++
-	}
-	if fromArchive || len(gapEpisodes) > 0 {
-		stats.GapsFilled++
+		stats.DownloadsStarted++
+		if approvalReason == "upgrade" {
+			p.upgrades++
+		} else {
+			p.newItems++
+		}
+		if fromArchive || len(gapEpisodes) > 0 {
+			stats.GapsFilled++
+		}
 	}
 	var magnetHashValue any
 	if hash, ok := releaseHash(release); ok {
@@ -557,9 +584,31 @@ func (p *candidatePass) announceDownload(release *models.Release, why string, sc
 		"hdr":             release.Quality.HDR,
 		"language":        release.Quality.Language,
 	}
+	if checkFilesFirst {
+		// The download line and the notification are sent by the pack
+		// inspector when the files turn out to be useful, never otherwise.
+		if hash, ok := releaseHash(release); ok {
+			if err := db.SetPackFileCheck(hash, logMessage, payload); err != nil {
+				logging.Warn("could not record the pack waiting for its file list", "target", releaseTarget(release), "error", err)
+			}
+		}
+		return
+	}
 	if err := notifier.NotifyEvent("download_started", payload); err != nil {
 		logging.Warn("download notification failed", "error", err)
 	}
+}
+
+// packChosenForText closes the file-list line with the episodes the pack is
+// expected to bring.
+func packChosenForText(release *models.Release, gapEpisodes []int64) string {
+	if release.Season == nil {
+		return ""
+	}
+	if len(gapEpisodes) > 0 {
+		return " · for the missing " + episodeRangeLabel(*release.Season, gapEpisodes)
+	}
+	return ""
 }
 
 // recordSkip counts and logs a refused candidate; a release nobody shares
