@@ -326,11 +326,14 @@ not to break.
   the daemon and of `gx-torrent`, `make measure-seeding`) and keep the result in
   `gextto-data/bench/`; a number a reader can decide something from goes in
   `docs/measurements.md`.
-- **`docs/measurements.md` is for people, and it stays short.** Comparison tables
-  and results first, plain sentences, at most 35 KB. A new figure replaces the row
-  it measures, with machine and date. No before-and-after log of every change, no
-  list of every Go benchmark: raw results stay in `gextto-data/bench/`, and a
-  figure enters the document only if a reader can decide something from it.
+- **`docs/measurements.md` is figures and nothing else, and it stays short.**
+  Comparison tables and results first, plain sentences, at most 35 KB. A new
+  figure replaces the row it measures, with machine and date. Only a figure, its
+  method (what was run, the machine, the command) and, at most, the choice that
+  figure closed (*Closed designs*) belong there: no history and no
+  before-and-after, no narrative of a change, no table that recommends a client to
+  a reader, no list of every Go benchmark. Raw results stay in `gextto-data/bench/`,
+  and a figure enters the document only if a reader can decide something from it.
 
 ## Release, installer and updates
 

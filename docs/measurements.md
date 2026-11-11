@@ -1,8 +1,9 @@
 # Measurements
 
-How gx-torrent compares with qBittorrent, Transmission, Deluge and anacrolix/torrent, what
-Gextto costs on a small machine, and how to repeat every number. The figures are the latest
-ones, not a history: a new round replaces the row it measures.
+Only figures: gx-torrent against qBittorrent, Transmission, Deluge, rain and
+anacrolix/torrent, then Gextto on its own, the build and test times, and the designs a number
+closed. Each row says what was run, the machine, the date and the command; a new round
+replaces the row it measures. No history, no before-and-after.
 
 ## Short answer
 
@@ -31,38 +32,11 @@ RSS also counts; the 100-torrent row is the only one that uses RSS. The full-spe
 4 GiB download from one peer, the 100 Mbit/s row the 512 MiB download from four peers shaped
 to that line.
 
-In short: gx-torrent is still the fastest over TCP (285 MB/s), the fastest at a recheck (3.8 s)
-and third on upload (223 MB/s), behind the libtorrent clients. The library row keeps the two
-rows it took last round: anacrolix/torrent is the lightest at full speed (11 MiB against 24)
-and the quietest with a hundred torrents (0.01 % of a core), and on the shaped line over TCP
-it is 2 % ahead — inside the spread, so the two are level; there gx-torrent spends the least
-CPU per GiB (18.8 s against 21–29). On uTP the libtorrent clients are 3–6 % ahead. rain joins
-at 162 MB/s and uploads at 120, is level with the best at rest (0.01 %), and pays for its
-caches: 667 MiB of own memory while uploading and 2.35 % of a core with a hundred torrents.
-Transmission 3.00 is the lightest with a hundred torrents but seeds 4 GiB at 16 MB/s.
-
-## What is best for me
-
-One line per need, with the client that answers it and why. Every figure behind these lines is
-in this document.
-
-| Your need | Pick | Why |
-|---|---|---|
-| A library, not a downloader: episodes, gaps, renames, upgrades, archive | **Gextto** | it decides what to fetch and where it goes; none of the other clients does |
-| One torrent from a browser, on a NAS, a server or a phone, with a qBittorrent-style API | **gx-torrent, standalone** | the same engine with its own page and `/api/v2`, no library to configure |
-| The fastest download over TCP | **gx-torrent** | 285 MB/s, against 29–253 for the others |
-| A recheck of a 4 GiB file without a long wait | **gx-torrent** | 3.7 s, against 4.0–6.9 for the others |
-| Seeding on a fast LAN (gigabit and above) | **gx-torrent**, qBittorrent or Deluge | 244–258 MB/s, three within 6 %, at the lowest CPU per GiB for gx-torrent (2.22 s against 2.38–2.58) |
-| A call or a game while something downloads | **Gextto**, Auto with latency source `both` | the guard leaves room for the other flow and stops taking more as soon as the router sees it |
-| The smallest memory at full speed | anacrolix/torrent, 11 MiB against 14–56 | the lightest client when the disk is the limit, but its own engine is not a library manager |
-| The quietest client at rest | anacrolix/torrent or rain | 0.01 % of a core against 0.04–0.28, but rain spends 2.35 % with a hundred torrents and anacrolix 0.01 |
-| Ratio farming, a seedbox, no library | qBittorrent or Deluge | Gextto is a library: it seeds with ratio, day and idle rules and has super-seeding, which *lowers* the upload by design, but the on-demand `share_mode` is not planned |
-| Windows | **gx-torrent, standalone** | native service, amd64 and arm64; Gextto itself is Unix |
-
-In short: a client that downloads and stops there is gx-torrent, the fastest of the six over
-TCP (285 MB/s against 29–253) and the fastest at a recheck (3.8 s against 3.9–10.2); a client
-that names, upgrades and keeps the files is Gextto, which is the only one that does it — and
-carries gx-torrent inside.
+In short: gx-torrent is the fastest over TCP (285 MB/s) and at a recheck (3.8 s), and third
+on upload (223 MB/s); anacrolix/torrent is the lightest at full speed (11 MiB) and the
+quietest with a hundred torrents (0.01 % of a core); on the shaped line over TCP the two are
+level (11.2 against 11.5 MB/s, inside the spread), and there gx-torrent spends the least CPU
+per GiB (18.8 s against 21–29).
 
 ## Compared with qBittorrent, Transmission, Deluge, rain and anacrolix/torrent
 
@@ -140,7 +114,7 @@ before protocol overhead.
 | Transmission | 8.84 MB/s | 60.7 s | 13 % | 15.8 s | 13 MiB | 23 MiB |
 
 The first five are within 9 % of each other; gx-torrent and rain use the least CPU per GiB of
-the four that reach the line.
+the five that reach the line.
 
 ### The same line, uTP only
 
@@ -230,8 +204,8 @@ the cheapest upload (223 MB/s against 120) and the cheaper uTP path (37 s per Gi
   a fixed peer port, and Transmission's uTP off in the TCP scenarios (it otherwise waits on
   uTP against a TCP-only peer).
 - **Transmission is 3.00 from Debian 12**, not the 4.1.0 beta of Debian 13: that beta receives
-  the peers from the tracker but never opens a uTP connection to them, so its uTP row was
-  always empty. The pinned image is in `scripts/compare/Dockerfile`.
+  the peers from the tracker but never opens a uTP connection to them, so its uTP row would
+  stay empty. The pinned image is in `scripts/compare/Dockerfile`.
 - **anacrolix/torrent is a library**, not a client: its row is the library with its own
   defaults, driven by the small HTTP front end in `scripts/compare/anacrolix` that adds,
   rechecks and reports the torrents. It has no page, no queue and no library.
@@ -269,40 +243,28 @@ machine.
 | gx-torrent, 10 torrents to a NAS | | about 507 MB outside the two caches, 1.1 GB peak with the NFS write cache |
 | gexttod 1.2.2260, same host | 0.4 % of a core, 45 MB anon (70 MB RSS) just started; 97 MB anon (123 MB RSS) after a full search | peak 168 MB anon during a full cycle of 47,342 releases (series and movies), about 69 s of CPU, and back to the figure at rest; a series-only cycle of ~38,800 releases peaks at 149–157 MB anon and leaves 85 MB |
 
-At-rest figures: three samples of 2, 5 and 10 minutes for gx-torrent (DHT on, full
-IP filter, three seeds, nothing transferring) and 90 s for gexttod with the integrity check off
-and no transfer. The
-gexttod row is the latest full cycle and the latest series-only cycle, with
-GOGC=50, transparent huge pages off for the process and
-`GODEBUG=madvdontneed=1`.
+At-rest figures: three samples of 2, 5 and 10 minutes for gx-torrent (DHT on, full IP filter,
+three seeds, nothing transferring) and 90 s for gexttod with the integrity check off and no
+transfer. The gexttod row is a full cycle and a series-only cycle, with GOGC=50, transparent
+huge pages off for the process and `GODEBUG=madvdontneed=1`.
 
 - **After a burst** the daemon returns its piece buffers: with 7 torrents and no transfer the
   RSS falls from 550 MB to 35–40 MB.
-- **The free heap comes back to the OS.** The same series cycle before the change peaked at
-  237 MB anon and left 150–190 MB resident for hours; now it peaks at 149–157 MB anon and
-  settles at 85 MB anon (168 MB and 97 MB for a full cycle of 47,342 releases). The explicit
-  release after a cycle or a completed transfer returns 12–92 MB per call, and the 15-minute
-  housekeeping call releases what the background workers free afterwards. Go does not
-  compact, so the spans still pinned by live objects stay.
-- **A cycle allocates 1.37–1.43 GB instead of 2.01 GB** (~38,800 releases;
-  the spread is the varying size of the feed and indexer replies). The deduplication, the
-  blocklist and the kind filter work in place, the combined feed and indexer batches are
-  sized once, the XML reader no longer translates namespaces, the Torznab error check
-  skips a body without the word, and the indexarr pages share one reused buffer instead
-  of allocating a new one per page. What remains is the XML tokenizer inside
-  `encoding/xml` (about 170 MB of internal copies per cycle; 7 % of the CPU) and the HTML
-  parser.
-- **Archive writes and gap queries** are now a small part of a cycle: the identities of the
-  releases just read are probed against the archive's two unique indexes and their rows
-  skipped, and the priority gap pass searches a season once instead of once per episode. A
-  series cycle of ~38,900 releases fell from 39–43 s of CPU to 29 s on the same host
-  The probe covers the batch, not the archive: 1,000 releases a large archive
+- **The free heap comes back to the OS.** A series-only cycle of ~38,800 releases peaks at
+  149–157 MB anon and settles at 85 MB; a full cycle of 47,342 releases peaks at 168 MB and
+  settles at 97 MB. The explicit release after a cycle or a completed transfer returns 12–92 MB
+  per call, and the 15-minute housekeeping call releases what the background workers free
+  afterwards. Go does not compact, so the spans still pinned by live objects stay.
+- **A cycle of ~38,800 releases allocates 1.37–1.43 GB**, the spread being the varying size of
+  the feed and indexer replies. Of what is left, the XML tokenizer inside `encoding/xml` is
+  about 170 MB of internal copies per cycle (7 % of the CPU), then the HTML parser.
+- **Archive writes and gap queries**: a series cycle of ~38,900 releases costs 29 s of CPU on
+  this host. The probe covers the batch, not the archive: 1,000 releases a large archive
   already holds cost **9.3 ms against 19.3 ms** with no probe at all, where reading the whole
   archive first cost 65 ms and grew with it (50,000 rows).
 - **`systemctl status` shows a large number** that is mostly page cache, not the process;
-  `anon` is the real figure (85 MB after a series search, 97 MB after a full one on
-  A `MemoryMax` on the unit would count the file pages, so it must leave room
-  for them.
+  `anon` is the real figure (85 MB after a series search, 97 MB after a full one). A
+  `MemoryMax` on the unit would count the file pages, so it must leave room for them.
 - **At rest gexttod** opens no directory and writes nothing to the NAS, so its disks can spin
   down.
 - **Where the CPU goes under load** (five public ISOs): about 50 % syscalls and scheduler
@@ -312,29 +274,22 @@ GOGC=50, transparent huge pages off for the process and
 ### Name parsing
 
 The quality/language reader runs on every release name and on every filename the library
-touches. On this machine, `BenchmarkParseQuality` over five typical names:
-**95 µs against 696 µs** before the word, separator and episode scans replaced the regexes
-(7.3×), and **15.0 KB / 208 allocations against 21.6 KB / 361**. The release-title matchers
-skip the ten anchored regexes for a name with no season marker, and the SxxExx, date and
-pack shapes are read without them.
+touches. `BenchmarkParseQuality` over five typical names: **95 µs, 15.0 KB and 208
+allocations** per name. The word, separator and episode scans answer the ten anchored
+regexes, which a name with no season marker never reaches, and the SxxExx, date and pack
+shapes are read without them.
 
-In a cycle the regexp share of the CPU fell from about **39 % to 11 %**, and was
-**8.6 %** in the profile of a full search on 2026-11-10 (46,306 releases, 12 minutes):
-`ParseQuality` itself is about 2 % of a cycle.
+In a cycle the regexp share of the CPU is **8.6 %** (profile of a full search on 2026-11-10,
+46,306 releases, 12 minutes); `ParseQuality` itself is about 2 % of a cycle.
 
 ### Matching a release with the monitored films
 
-That same profile found the film match at **34 % of the cycle's CPU and 79 % of its
-allocations** (4.75 GB of 6.0): every release was compared with every name, alias and
-translation of every monitored film, and each library title was reduced to words again each
-time. The reduced titles are now cached, as they change only with the configuration.
-`BenchmarkFindMovieMatch` (35 films with 25 titles each, one release): **0.15 ms against
-1.80 ms** (12×) and **26 allocations against 13,146** (the title lists are no longer
-rebuilt for each film either: 26 against 131, 2.1 KB against 8.9 KB).
+`BenchmarkFindMovieMatch` (35 films with 25 titles each, one release): **0.15 ms and 26
+allocations** with 2.1 KB of memory: the reduced titles and the title lists are built once
+per configuration, not for each film.
 
-A full search before and after (same host, 2026-11-10/11, ~46,500 releases): **1.99 GB
-allocated against 5.90 GB**, **49 s of CPU against 80 s**. Half of the rest is the indexer
-and feed replies.
+A full search on this host (2026-11-10/11, ~46,500 releases): **1.99 GB allocated and 49 s of
+CPU**, half of what is left being the indexer and feed replies.
 
 ### The web page
 
@@ -362,8 +317,6 @@ CPU** than a fixed 55 per torrent, for 4 % fewer bytes, inside the ±10 % spread
 | Request queue at 50 ms RTT | 303 KiB/s with one block in flight, 6,743 KiB/s with the default queue | `make measure-pipeline` |
 | Local swarm, 3 leechers | 3.00× the file uploaded; with leechers meshed the seed drops to 1.84× | `make measure-seeding` |
 | Indexers, 30 titles | 110 s, 205 requests, 0 failed, 5,935 releases | `TestMeasureManagerLanes` |
-
-The real-swarm figure comes from one campaign.
 
 ### Reusing local data
 
@@ -404,9 +357,9 @@ Seeding, post-processing and several days of operation were not measured.
 ### The numbers behind engine decisions
 
 A selection of the Go benchmarks: `make bench-all` runs all of them (six runs,
-`GOMAXPROCS=2`) and writes the raw log and a `benchstat` table to `gextto-data/bench/`. Round
-Compare numbers only within one round: the absolute values follow the machine's
-state more than the code.
+`GOMAXPROCS=2`) and writes the raw log and a `benchstat` table to `gextto-data/bench/`.
+Compare numbers only within one round: the absolute values follow the machine's state more
+than the code.
 
 | Path | Cost | What it means |
 |---|---|---|
@@ -452,8 +405,7 @@ run at once per torrent.
 | `make test-ui` (Playwright, Chromium) | 63–72 s |
 | CI (`ci.yml` / `continuous.yml` / `codeql.yml`), 2 vCPU runners | 411 s / 278 s / 210 s |
 
-The suite has 3,010 Go tests in 72 packages, 79 Playwright tests and 89 Go benchmarks (count
-build times, test times and CI times of the same rounds).
+The suite has 3,010 Go tests in 72 packages, 79 Playwright tests and 89 Go benchmarks.
 
 ## Verified without a benchmark
 
@@ -513,9 +465,6 @@ Closed with a measurement, so they are not retried without new data.
 | Upsert with two conflict targets (archive) | 17 ms more per 1,000 releases | |
 | `idx_archive_title`, index on `lower(magnet_hash)` | never used by the queries | |
 | Latency guard with a fixed ceiling or floor | locked to a slow sample or an arbitrary number | |
-
-Postponed: qBittorrent's `renameFile`/`renameFolder` (needs rename support in the engine) and
-its `setAutoManagement` tuning.
 
 ## Adding a measurement
 
