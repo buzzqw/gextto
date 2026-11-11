@@ -314,9 +314,18 @@ not to break.
     stays within 150 minutes. The fixed waits are short (3 s quiet check, 10 s
     settle, 30 s at rest) and `--max-minutes` stops starting runs when the
     budget is over; a client cut short shows fewer runs in the report.
-  - Changing any of these (machine, version, limit, payload) starts a new
-    baseline: re-run **every** client and replace the whole table. Never compare
-    with numbers from another setup. Results go in `docs/measurements.md`.
+  - *Measure only what changed.* When only gx-torrent changed (the other clients'
+    images and versions, the machine, the limits and the payloads are the same),
+    re-run gx-torrent alone (`--clients gx-torrent`, every scenario, three rounds)
+    and replace only its rows, marked with the commit and date they were measured
+    at. A full round of every client is run only when the operator asks for it,
+    or when the setup changes: machine, a client's version or image, a limit or a
+    payload start a new baseline, and then **every** client is re-run and the
+    whole table replaced. Never compare with numbers from another setup. When a
+    gx-torrent-only figure falls outside the range the last full round measured
+    for it on a disk-bound scenario (full speed, upload), say so instead of
+    publishing it as a gain or a loss: only a full round tells host from code.
+    Results go in `docs/measurements.md`.
   - *Findings are fixed, not filed*: a gap, defect or improvement a benchmark exposes
     is applied in the same cycle, with its test and its before-and-after number, and
     Gextto and the daemon are rebuilt and restarted as needed without asking. Only what
