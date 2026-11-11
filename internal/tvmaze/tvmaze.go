@@ -32,12 +32,34 @@ type Show struct {
 	Status    string `json:"status,omitempty"`
 	// Ended is the date of the last episode of a series TVmaze considers
 	// over ("" while it runs).
-	Ended string `json:"ended,omitempty"`
+	Ended    string   `json:"ended,omitempty"`
+	Language string   `json:"language,omitempty"`
+	Genres   []string `json:"genres,omitempty"`
+	// Summary is HTML (TVmaze writes it in English).
+	Summary string `json:"summary,omitempty"`
+	Image   *struct {
+		Medium   string `json:"medium"`
+		Original string `json:"original"`
+	} `json:"image,omitempty"`
+	Network    *Channel `json:"network,omitempty"`
+	WebChannel *Channel `json:"webChannel,omitempty"`
+	Externals  struct {
+		TheTVDB *int64  `json:"thetvdb"`
+		IMDb    *string `json:"imdb"`
+	} `json:"externals"`
 	Links struct {
 		NextEpisode *struct {
 			Href string `json:"href"`
 		} `json:"nextepisode,omitempty"`
 	} `json:"_links"`
+}
+
+// Channel is the broadcaster or the streaming service of a series.
+type Channel struct {
+	Name    string `json:"name"`
+	Country *struct {
+		Code string `json:"code"`
+	} `json:"country,omitempty"`
 }
 
 // HasNextEpisode reports whether TVmaze already lists an upcoming episode.
@@ -147,6 +169,18 @@ func (c *Client) Lookup(ctx context.Context, thetvdb int64, imdb string) (*Show,
 		return nil, errors.New("tvmaze: no id to look up")
 	}
 	return nil, ErrNotFound
+}
+
+// ShowByID returns the details of one series.
+func (c *Client) ShowByID(ctx context.Context, showID int) (*Show, error) {
+	if showID <= 0 {
+		return nil, errors.New("tvmaze: invalid show id")
+	}
+	var show Show
+	if err := c.get(ctx, fmt.Sprintf("/shows/%d", showID), &show); err != nil {
+		return nil, err
+	}
+	return &show, nil
 }
 
 // Episodes returns every episode of a series, specials included (season 0).

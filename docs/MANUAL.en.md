@@ -404,9 +404,9 @@ first:
 When TMDB and TVmaze give opposite answers, the page also shows **⚠ sources
 disagree**: you decide with *Series status*. Hovering the label tells you who
 decided it. The signals are refreshed once a day, together with the metadata, or
-at once with **Update from TMDB**. Only the TVDB and IMDb ids of the series are
-sent to TVmaze; turn it off with *Confirm with TVmaze whether a series has
-ended*, in *Settings → Access and services*.
+at once with **Update from TMDB**. TVmaze receives the TVDB and IMDb ids of the
+series (and the name, when TVmaze is the source because the keys are missing);
+turn it off with *Use TVmaze for series*, in *Settings → Access and services*.
 
 It is only a label: an ended series is still searched like the others, because
 missing episodes can always show up. To stop searching for it, pause it.
@@ -2644,9 +2644,9 @@ them is explained in [Access keys](api-keys.md).
 | TMDB API key (recommended) | Free TMDB API key: the main source of titles, posters and metadata. When set, it takes precedence over TVDB. |
 | TVDB API key (alternative to TMDB) | TheTVDB v4 API key: without the TMDB key it provides all the metadata. |
 | TVDB subscriber PIN | TheTVDB subscription PIN, asked at login only by “user-supported” keys. |
-| Confirm with TVmaze whether a series has ended | Once a day, asks TVmaze (free, no key) for the status of every series, besides TMDB or TVDB: TVmaze records cancellations sooner. Only the TVDB and IMDb ids of the series are sent to TVmaze. |
+| Use TVmaze for series | Once a day, asks TVmaze (free, no key) for the status of every series, as a second opinion after TMDB or TVDB. Without TMDB and TVDB keys it becomes the source of the series: seasons, episodes, dates, posters and status, with titles and plots in English and no movies. TVmaze receives the TVDB and IMDb ids of the series and, when it is the source, its name. |
 
-#### Metadata: TMDB or TVDB
+#### Metadata: TMDB, TVDB or TVmaze
 
 Gextto uses metadata to know how many episodes each season has (missing
 episodes, season packs, completeness), the series status, the
@@ -2662,9 +2662,15 @@ pages. One of the two keys is enough:
   *TVDB subscriber PIN*. Episode titles follow the *TVDB language* (e.g. `ita`);
   an untranslated episode keeps its original title.
 
-Without either key Gextto still downloads, but without the data above: missing
-episodes stop at the last one already downloaded and files get generic titles
-(“Episodio N”). TMDB and TVDB use different ids: a series added with TVDB keeps
+Without either key Gextto switches by itself to **TVmaze**, free and with no
+key: seasons, episodes and dates (so missing episodes, packs and the calendar),
+the next episode, posters and the series status. The limits: episode titles and
+plots are in English, the search by name finds the original title well but not
+always the Italian one (if the series has a TVDB id, Gextto looks it up by that),
+and there are no movies and no **Explore** lists. TVmaze can be turned off too,
+with *Use TVmaze for series*: with no source at all Gextto still downloads, but
+missing episodes stop at the last one already downloaded and files get generic
+titles (“Episodio N”). TMDB and TVDB use different ids: a series added with TVDB keeps
 its TVDB id, and if you later set the TMDB key Gextto finds the series on TMDB
 by name.
 

@@ -221,9 +221,17 @@ func TestV2TmdbExploreEndpoints(t *testing.T) {
 	server := httptest.NewServer(Router(state))
 	t.Cleanup(server.Close)
 
-	// No TMDB key in the hermetic state: the calendar fragment reports it.
+	// No TMDB/TVDB key in the hermetic state: TVmaze is the backup, so the
+	// calendar answers (empty library, nothing scheduled).
+	if code, body := v2Request(t, server, http.MethodGet, "/tmdb/calendar", nil); code != http.StatusOK || !strings.Contains(body, "Nessuna uscita in programma") {
+		t.Fatalf("tmdb calendar with TVmaze -> %d: %s", code, body)
+	}
+	// With TVmaze off too, the calendar fragment reports the missing key.
+	if err := SaveSetting(state.cfg.DataDir, settingTvmazeSeriesStatus, "false"); err != nil {
+		t.Fatal(err)
+	}
 	if code, body := v2Request(t, server, http.MethodGet, "/tmdb/calendar", nil); code != http.StatusOK || !strings.Contains(body, "TMDB API key") {
-		t.Fatalf("tmdb calendar -> %d: %s", code, body)
+		t.Fatalf("tmdb calendar without sources -> %d: %s", code, body)
 	}
 	// An empty search prompt does not call TMDB.
 	if code, body := v2Request(t, server, http.MethodPost, "/tmdb/search", url.Values{"kind": {"series"}, "query": {""}}); code != http.StatusOK || !strings.Contains(body, "Inserisci un titolo") {

@@ -78,14 +78,20 @@ func icsCollectEvents(ctx context.Context, cfg *Config, db *Database, tr func(st
 	// sourced names the provider in the event texts ("… (TMDB)" → "(TVDB)"),
 	// and keeps the TVDB UIDs apart from the TMDB ones.
 	sourced := func(text string) string {
-		if meta.Source() == "tvdb" {
+		switch meta.Source() {
+		case "tvdb":
 			return strings.ReplaceAll(text, "TMDB", "TVDB")
+		case "tvmaze":
+			return strings.ReplaceAll(text, "TMDB", "TVmaze")
 		}
 		return text
 	}
 	uidPrefix := ""
-	if meta.Source() == "tvdb" {
+	switch meta.Source() {
+	case "tvdb":
 		uidPrefix = "tvdb-"
+	case "tvmaze":
+		uidPrefix = "tvmaze-"
 	}
 	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
 	from := today.AddDate(0, 0, -icsPastDays)

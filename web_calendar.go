@@ -83,8 +83,11 @@ func buildCalendar(ctx context.Context, cfg *Config) map[string]any {
 				poster = &value
 			}
 			tmdbID, tvdbID := *seriesID, strings.TrimSpace(series.TvdbID)
-			if meta.Source() == "tvdb" {
+			switch meta.Source() {
+			case "tvdb":
 				tmdbID, tvdbID = strings.TrimSpace(series.TmdbID), *seriesID
+			case "tvmaze":
+				tmdbID = strings.TrimSpace(series.TmdbID)
 			}
 			items[position] = map[string]any{
 				"series":  series.Name,

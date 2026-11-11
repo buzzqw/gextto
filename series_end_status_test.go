@@ -170,3 +170,76 @@ func TestSeriesStatusOverrideIsSavedAndShown(t *testing.T) {
 		t.Fatalf("bad override answered %d, want 400", code)
 	}
 }
+
+func TestTvmazeIsTheBackupProviderWithoutKeys(t *testing.T) {
+	tvmazeCache.Lock()
+	tvmazeCache.entries = map[string]tvmazeCacheEntry{}
+	tvmazeCache.Unlock()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/search/shows" && r.URL.Query().Get("q") == "Series A":
+			_, _ = w.Write([]byte(`[{"score":1,"show":{"id":9,"name":"Series A"}}]`))
+		case r.URL.Path == "/lookup/shows" && r.URL.Query().Get("thetvdb") == "4242":
+			_, _ = w.Write([]byte(`{"id":9,"name":"Series A"}`))
+		case r.URL.Path == "/shows/9":
+			_, _ = w.Write([]byte(`{"id":9,"name":"Series A","status":"To Be Determined","premiered":"2020-01-01","genres":["Drama"],"summary":"<p>A <b>plot</b> &amp; more.</p>","image":{"medium":"https://img/m.jpg","original":"https://img/o.jpg"},"network":{"name":"Channel A","country":{"code":"GB"}},"externals":{"thetvdb":4242,"imdb":"tt0000001"}}`))
+		case r.URL.Path == "/shows/9/episodes":
+			_, _ = w.Write([]byte(`[{"id":1,"name":"First","season":1,"number":1,"airdate":"2020-01-01"},{"id":2,"name":"Second","season":1,"number":2,"airdate":"2020-01-08"},{"id":3,"name":"Later","season":2,"number":1,"airdate":"2099-01-01"}]`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	t.Cleanup(server.Close)
+	previous := newSeriesTvmazeClient
+	newSeriesTvmazeClient = func() *tvmaze.Client {
+		client := tvmaze.New()
+		client.BaseURL = server.URL
+		return client
+	}
+	t.Cleanup(func() { newSeriesTvmazeClient = previous })
+
+	cfg := &Config{Settings: map[string]string{}}
+	meta := seriesMetadataFor(cfg)
+	if meta.Source() != "tvmaze" || !meta.Configured() {
+		t.Fatalf("provider = %s", meta.Source())
+	}
+	ctx := context.Background()
+	id, err := meta.ResolveSeriesID(ctx, "Series A")
+	if err != nil || id == nil || *id != "9" {
+		t.Fatalf("resolve = %v, %v", id, err)
+	}
+	// A stored TVDB id is used instead of the name.
+	series := &SeriesConfig{Name: "Series A", TvdbID: "4242"}
+	if stored := meta.StoredID(series); stored != "tvdb:4242" {
+		t.Fatalf("stored id = %q", stored)
+	}
+	counts, err := meta.SeasonCounts(ctx, "tvdb:4242")
+	if err != nil || counts[1] != 2 || counts[2] != 1 {
+		t.Fatalf("counts = %v, %v", counts, err)
+	}
+	if title, err := meta.EpisodeTitle(ctx, "9", 1, 2); err != nil || title == nil || *title != "Second" {
+		t.Fatalf("title = %v, %v", title, err)
+	}
+	if next, err := meta.NextEpisode(ctx, "9"); err != nil || next == nil || *next.AirDate != "2099-01-01" {
+		t.Fatalf("next = %+v, %v", next, err)
+	}
+	info, err := meta.SeriesInfo(ctx, "Series A", nil)
+	if err != nil || info["status"] != "Returning Series" || info["overview"] != "A plot & more." || info["poster_path"] != "https://img/o.jpg" || info["last_air_date"] != "2020-01-08" {
+		t.Fatalf("info = %+v, %v", info, err)
+	}
+	if _, hasID := info["id"]; hasID {
+		t.Fatal("a TVmaze id must never be offered as a TMDB id")
+	}
+	// The status comes straight from the provider: "To Be Determined" reaches
+	// the verdict without asking TVmaze a second time.
+	record, err := refreshSeriesEndRecord(ctx, cfg, nil, series, info, SeriesEndRecord{})
+	if err != nil || record.TvmazeStatus != "To Be Determined" || record.NextAirDate != "2099-01-01" {
+		t.Fatalf("record = %+v, %v", record, err)
+	}
+	if verdict := seriesEndVerdict("", record, "tvmaze", time.Date(2026, 11, 11, 0, 0, 0, 0, time.UTC)); verdict.State != seriesEndContinuing || verdict.Source != "schedule" {
+		t.Fatalf("verdict = %+v", verdict)
+	}
+	if poster, err := meta.PosterForSeries(ctx, "Series A"); err != nil || poster == nil || *poster != "https://img/m.jpg" {
+		t.Fatalf("poster = %v, %v", poster, err)
+	}
+}

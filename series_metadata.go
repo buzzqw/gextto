@@ -54,8 +54,9 @@ func (tvdbSeriesMetadata) StoredID(series *SeriesConfig) string {
 }
 
 // seriesMetadataFor returns the series metadata provider of cfg: TMDB when
-// its key is set, else TVDB when its key is set, else a TMDB provider that is
-// not configured (every call answers "nothing known").
+// its key is set, else TVDB when its key is set, else TVMaze (no key, when
+// allowed), else a TMDB provider that is not configured (every call answers
+// "nothing known").
 func seriesMetadataFor(cfg *Config) seriesMetadata {
 	if cfg == nil {
 		return tmdbSeriesMetadata{NewTmdbClient(nil)}
@@ -71,6 +72,11 @@ func seriesMetadataWith(cfg *Config, tmdb *TmdbClient) seriesMetadata {
 	}
 	if tvdb := tvdbClientFor(cfg); tvdb.Configured() {
 		return tvdbSeriesMetadata{tvdb}
+	}
+	// No key at all: TVmaze (public, no key) is the automatic backup, unless
+	// the operator turned TVmaze off.
+	if tvmazeSeriesStatusEnabled(cfg) {
+		return tvmazeSeriesMetadata{}
 	}
 	if tmdb == nil {
 		tmdb = NewTmdbClient(nil)

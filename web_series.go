@@ -1277,7 +1277,8 @@ func SeriesMetadataRefresh(w http.ResponseWriter, r *http.Request, s *AppState) 
 		}
 	}
 	stored := false
-	if meta.StoredID(&series) == "" {
+	// A TVmaze id is not kept with the series: it is not a TMDB/TVDB id.
+	if meta.StoredID(&series) == "" && meta.Source() != "tvmaze" {
 		for i := range cfg.Series {
 			item := &cfg.Series[i]
 			aliasMatch := false
@@ -1309,8 +1310,11 @@ func SeriesMetadataRefresh(w http.ResponseWriter, r *http.Request, s *AppState) 
 		seasons = append(seasons, map[string]any{"season": value[0], "episodes": value[1]})
 	}
 	tmdbID, tvdbID := resolved, ""
-	if meta.Source() == "tvdb" {
+	switch meta.Source() {
+	case "tvdb":
 		tmdbID, tvdbID = "", resolved
+	case "tvmaze":
+		tmdbID, tvdbID = strings.TrimSpace(series.TmdbID), strings.TrimSpace(series.TvdbID)
 	}
 	jsonResponse(w, map[string]any{
 		"ok":                true,

@@ -143,8 +143,13 @@ func TestSeriesMetadataPrefersTmdb(t *testing.T) {
 	}
 	cfg.TmdbAPIKey = nil
 	delete(cfg.Settings, "tvdb_api_key")
+	// No key: TVmaze is the automatic backup, unless it is turned off.
+	if source := seriesMetadataFor(&cfg).Source(); source != "tvmaze" {
+		t.Fatalf("no key: the provider must be TVmaze, got %s", source)
+	}
+	cfg.Settings[settingTvmazeSeriesStatus] = "false"
 	if seriesMetadataFor(&cfg).Configured() {
-		t.Fatal("no key: the provider must not be configured")
+		t.Fatal("no key and TVmaze off: the provider must not be configured")
 	}
 	if got := metadataImageURL("/abc.jpg", "w154"); got != TmdbImageBaseURL+"/w154/abc.jpg" {
 		t.Fatalf("TMDB path = %q", got)

@@ -157,6 +157,7 @@ qBittorrent-nox.
 | `indexer_health.go` | indexer health (Prowlarr). |
 | `tmdb.go` / `tvdb.go` | TMDB and TheTVDB metadata. |
 | `series_metadata.go`, `tvdb_metadata.go` | where the series metadata comes from: TMDB when its key is set, otherwise TVDB with the same calls and result shapes. |
+| `tvmaze_metadata.go` | TVmaze as the automatic backup provider when neither the TMDB nor the TVDB key is set: the same calls and TMDB shapes (seasons, episodes, dates, posters, status), English titles, no movies. |
 | `series_end_status.go` | whether a series has ended: the operator's choice, the announced next episode, the TMDB/TVDB status and TVmaze (by TVDB/IMDb id, `internal/tvmaze`) combined into one verdict. |
 | `anime.go` | absolute anime episode numbers mapped onto the seasons TMDB uses, for the series marked as anime. |
 | `integrations.go` | base URLs of the external integrations. |
@@ -268,7 +269,7 @@ qBittorrent-nox.
 | `internal/messages` | messages/texts. |
 | `internal/qbittorrent` | qBittorrent API client. |
 | `internal/tui` | terminal client (TUI). |
-| `internal/tvmaze` | TVmaze client (no key): episode lists for the standalone gx-torrent, series status by TVDB/IMDb id for Gextto. |
+| `internal/tvmaze` | TVmaze client (no key): episode lists for the standalone gx-torrent; for Gextto, series status by TVDB/IMDb id and the backup metadata provider. |
 | `internal/auth` | access control of the standalone daemon: password hashing and login sessions (`/ui/login`); the managed mode does not use it. |
 | `internal/dht` | DHT implementation, a module of its own under the main module. |
 | `internal/ed2k` | eD2k links (`ed2k://|file|…|/`, server links) and the name filter for search results. |

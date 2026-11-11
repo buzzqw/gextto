@@ -273,7 +273,10 @@ func tvmazeSeriesStatus(ctx context.Context, info map[string]any, series *Series
 // stored record (it keeps TVmaze's answer when TVmaze is unreachable).
 func refreshSeriesEndRecord(ctx context.Context, cfg *Config, db *Database, series *SeriesConfig, info map[string]any, previous SeriesEndRecord) (SeriesEndRecord, error) {
 	record := seriesEndRecordFromInfo(info)
-	if tvmazeSeriesStatusEnabled(cfg) {
+	if raw, ok := info["tvmaze_status"].(string); ok {
+		// TVmaze is the provider itself: its answer is already here.
+		record.TvmazeStatus = strings.TrimSpace(raw)
+	} else if tvmazeSeriesStatusEnabled(cfg) {
 		record.TvmazeStatus = tvmazeSeriesStatus(ctx, info, series, previous.TvmazeStatus)
 	}
 	if db == nil {

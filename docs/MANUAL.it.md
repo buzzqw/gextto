@@ -406,9 +406,10 @@ più forte:
 Quando TMDB e TVmaze danno risposte opposte, la scheda mostra anche **⚠ fonti in
 disaccordo**: decidi tu con *Stato della serie*. Passando sopra l'etichetta vedi
 chi l'ha decisa. I segnali si aggiornano una volta al giorno, insieme ai
-metadati, o subito con **Aggiorna da TMDB**. A TVmaze vanno solo gli
-identificativi TVDB e IMDb della serie; si spegne con *Conferma con TVmaze se
-una serie è terminata*, in *Impostazioni → Accesso e servizi*.
+metadati, o subito con **Aggiorna da TMDB**. A TVmaze vanno gli identificativi
+TVDB e IMDb della serie (e il nome, quando TVmaze è la fonte perché mancano le
+chiavi); si spegne con *Usa TVmaze per le serie*, in *Impostazioni → Accesso e
+servizi*.
 
 È solo un'etichetta: una serie terminata continua a essere cercata come le
 altre, perché le puntate mancanti possono sempre uscire. Per smettere di
@@ -2667,9 +2668,9 @@ serve poi riavviare il demone perché venga applicato. Cosa sono e come si usano
 | TMDB API key (consigliata) | Chiave API TMDB, gratuita: fonte principale di titoli, poster e metadati. Se c'è, ha la precedenza su TVDB. |
 | TVDB API key (alternativa a TMDB) | Chiave API v4 di TheTVDB: senza la chiave TMDB fornisce tutti i metadati. |
 | TVDB PIN abbonato | PIN dell'abbonamento TheTVDB, richiesto al login solo dalle chiavi «user-supported». |
-| Conferma con TVmaze se una serie è terminata | Una volta al giorno chiede a TVmaze (gratuito, senza chiave) lo stato di ogni serie, oltre a TMDB o TVDB: TVmaze registra prima le cancellazioni. A TVmaze vanno solo gli identificativi TVDB e IMDb della serie. |
+| Usa TVmaze per le serie | Una volta al giorno chiede a TVmaze (gratuito, senza chiave) lo stato di ogni serie, come seconda opinione dopo TMDB o TVDB. Senza chiavi TMDB e TVDB diventa la fonte delle serie: stagioni, episodi, date, locandine e stato, con titoli e trame in inglese e senza film. A TVmaze vanno gli identificativi TVDB e IMDb della serie e, quando fa da fonte, il suo nome. |
 
-#### Metadati: TMDB o TVDB
+#### Metadati: TMDB, TVDB o TVmaze
 
 Gextto usa i metadati per sapere quanti episodi ha ogni stagione (episodi
 mancanti, pack di stagione, completezza), lo stato della serie, il calendario,
@@ -2685,9 +2686,15 @@ film. Basta una delle due chiavi:
   suo PIN in *TVDB PIN abbonato*. I titoli degli episodi seguono la *Lingua
   TVDB* (es. `ita`); se un episodio non è tradotto resta il titolo originale.
 
-Senza nessuna delle due chiavi Gextto scarica comunque, ma senza i dati sopra:
-gli episodi mancanti si fermano all'ultimo già scaricato e i file prendono
-titoli generici («Episodio N»). TMDB e TVDB usano ID diversi: una serie aggiunta
+Senza nessuna delle due chiavi Gextto passa da solo a **TVmaze**, gratuito e
+senza chiave: stagioni, episodi e date (quindi episodi mancanti, pack e
+calendario), la prossima puntata, le locandine e lo stato delle serie. I limiti:
+titoli degli episodi e trame sono in inglese, la ricerca per nome trova bene il
+titolo originale ma non sempre quello italiano (se la serie ha un ID TVDB,
+Gextto la cerca con quello), e non ci sono film né le liste di **Esplora**.
+Anche TVmaze si può spegnere con *Usa TVmaze per le serie*: senza nessuna fonte
+Gextto scarica comunque, ma gli episodi mancanti si fermano all'ultimo già
+scaricato e i file prendono titoli generici («Episodio N»). TMDB e TVDB usano ID diversi: una serie aggiunta
 con TVDB conserva l'ID TVDB, e se in seguito imposti la chiave TMDB Gextto
 ritrova la serie su TMDB dal nome.
 
