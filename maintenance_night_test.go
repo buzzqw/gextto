@@ -174,9 +174,19 @@ func archiveTestEpisode(t *testing.T, db *Database, series string, season, episo
 	}
 }
 
+func saveTestSeries(t *testing.T, state *AppState, series ...SeriesConfig) {
+	t.Helper()
+	if err := SaveLibrary(state.cfg.DataDir, series, nil); err != nil {
+		t.Fatalf("save library: %v", err)
+	}
+}
+
 func TestLibraryReportFindsMissingFilesButNotUnreadableFolders(t *testing.T) {
 	state := newTestAppState(t)
 	resetMaintenanceStatus(t, state.cfg.DataDir)
+	saveTestSeries(t, state,
+		SeriesConfig{Name: "Serie A", Seasons: "1+", Enabled: true},
+		SeriesConfig{Name: "Serie B", Seasons: "1+", Enabled: true})
 	library := t.TempDir()
 	present := filepath.Join(library, "Serie A", "Serie A - S01E01.mkv")
 	gone := filepath.Join(library, "Serie A", "Serie A - S01E02.mkv")
@@ -229,9 +239,7 @@ func TestLibraryReportCountsOnlyTheSeasonsStillMonitored(t *testing.T) {
 	inside := filepath.Join(folder, "Serie A - S21E01.mkv")
 	archiveTestEpisode(t, state.db, "Serie A", 18, 1, outside)
 	archiveTestEpisode(t, state.db, "Serie A", 21, 1, inside)
-	if _, err := state.db.db.Exec("UPDATE series SET seasons='21+' WHERE name='Serie A'"); err != nil {
-		t.Fatal(err)
-	}
+	saveTestSeries(t, state, SeriesConfig{Name: "Serie A", Seasons: "21+", Enabled: true})
 
 	runLibraryReport(context.Background(), state)
 	report := maintenanceStatusSnapshot().Library
@@ -242,17 +250,18 @@ func TestLibraryReportCountsOnlyTheSeasonsStillMonitored(t *testing.T) {
 		t.Fatalf("files counted = %d, want only the monitored season", report.Files)
 	}
 
-	// A season the operator ignores and a disabled series are not losses.
-	if _, err := state.db.db.Exec("UPDATE series SET ignored_seasons='[21]' WHERE name='Serie A'"); err != nil {
-		t.Fatal(err)
+	// The shape the page saves for "only season 23": the base range covers 21+
+	// and every season up to 22 is ignored.
+	ignored := make([]int64, 0, 22)
+	for season := int64(1); season <= 22; season++ {
+		ignored = append(ignored, season)
 	}
+	saveTestSeries(t, state, SeriesConfig{Name: "Serie A", Seasons: "21+", Enabled: true, IgnoredSeasons: ignored})
 	runLibraryReport(context.Background(), state)
 	if missing := maintenanceStatusSnapshot().Library.Missing; len(missing) != 0 {
 		t.Fatalf("an ignored season was reported: %+v", missing)
 	}
-	if _, err := state.db.db.Exec("UPDATE series SET ignored_seasons='[]', enabled=0 WHERE name='Serie A'"); err != nil {
-		t.Fatal(err)
-	}
+	saveTestSeries(t, state, SeriesConfig{Name: "Serie A", Seasons: "21+", Enabled: false})
 	runLibraryReport(context.Background(), state)
 	if missing := maintenanceStatusSnapshot().Library.Missing; len(missing) != 0 {
 		t.Fatalf("a disabled series was reported: %+v", missing)
