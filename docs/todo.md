@@ -25,7 +25,3 @@ Nothing open.
 ## Proposals
 
 Nothing open.
-
-Designs rejected on a measurement are not tracked here: they stay in
-[`measurements.md`](measurements.md#closed-designs), with the number that closed each one.
-Do not reopen one without new data.

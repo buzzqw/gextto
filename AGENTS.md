@@ -329,12 +329,11 @@ not to break.
 - **`docs/measurements.md` is figures and nothing else, and it stays short.**
   Comparison tables and results first, plain sentences, at most 35 KB. A new
   figure replaces the row it measures, with machine and date. Only a figure, its
-  method (what was run, the machine, the command), the choice that figure closed
-  (*Closed designs*) and the table that answers a need with those same figures
-  (*What is best for me*) belong there: no history and no before-and-after, no
-  narrative of a change, no list of every Go benchmark. Raw results stay in
-  `gextto-data/bench/`, and a figure enters the document only if a reader can decide
-  something from it.
+  method (what was run, the machine, the command) and the table that answers a need
+  with those same figures (*What is best for me*) belong there: no history and no
+  before-and-after, no narrative of a change, no list of every Go benchmark. Raw
+  results stay in `gextto-data/bench/`, and a figure enters the document only if a
+  reader can decide something from it.
 
 ## Release, installer and updates
 
@@ -553,8 +552,7 @@ only in the chat. It is not a changelog, a design document or a manual: no histo
 positioning, no implementation chronicles, no dates, build numbers, commit hashes or
 measurements. When an item lands, delete it; when a new one is accepted, add it. The state
 of the product is in `gx-torrent.md`, `gx-core.md` and the manuals; the numbers are in
-`measurements.md`; the rejected designs and the measurement that closed each one are in
-`measurements.md`, *Closed designs*.
+`measurements.md`.
 
 ## Interface accessibility and i18n
 - The pages of the gx-torrent daemon (`internal/webui/assets`) use the **shared

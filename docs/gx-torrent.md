@@ -590,7 +590,7 @@ leave the OS cache (`posix_fadvise` `DONTNEED`, clean pages only), so a check of
 a large library does not push the rest of the machine out of memory. On the
 NAS it costs nothing (35 against 34 MiB/s alone) and a stream reading next to
 it keeps more of the line; a queue of one check per drive and read-ahead hints
-were measured and closed (*Closed designs* in `measurements.md`).
+were measured and rejected.
 
 **In-app update** (`update.go`, standalone only). *Settings → Maintenance*
 shows the running version (build, commit, build date, release channel) and

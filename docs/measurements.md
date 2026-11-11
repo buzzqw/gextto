@@ -451,39 +451,6 @@ The suite has 3,010 Go tests in 72 packages, 79 Playwright tests and 89 Go bench
   refused instead of panicking, and the mmap fault guard turns a fault into an I/O error at
   the same write cost.
 
-## Closed designs
-
-Closed with a measurement, so they are not retried without new data.
-
-| Idea | Why it was closed | Reopen when |
-|---|---|---|
-| A bounded list instead of `sync.Pool` for piece buffers | no change in the harness peak (26–28 MiB at full speed either way): three buffers in use with one peer, the pool held nothing idle that mattered | |
-| A memory limit or a lower GOGC while downloading | at the download peak the next collection target is within 10 % of the live heap (40 against 36 MiB on the line): the memory is live piece buffers, not headroom | |
-| `io_uring` / AIO | the disk does 5.5–7.2 GB/s, far above any network; needs cgo or a dependency | storage slower than the network |
-| Write-back cache in the engine | the storage keeps up with the download | storage slower than the network |
-| Batched uTP datagrams (`recvmmsg`/`sendmmsg`) | 8.3 % of samples on real swarms; saves under 1 % of a core at the live rate | a uTP-only session above 8 MB/s |
-| Coalescing contiguous writes | the page cache already merges them | |
-| Rarity buckets, `pickFileEdge` cursor | no measurement justified the cost | |
-| `PieceDownloader` bitmask | 18 KB and 15 allocations per piece: about 450 KB/s of garbage at 100 MB/s | |
-| Writing through a file mapping (`-mmap`, the library's way) | same own memory at full speed (24.3 MiB against 24.2) with 12 % more CPU per GiB (3.28 s against 2.93), and with 100 torrents own memory rises (13.4 against 11.7); only RSS moves, to 3.9 GB of mapped pages | a storage where a write syscall costs more than a page fault |
-| Skipping the latency probe when nothing transfers | the at-rest figure does not move (0.05 % against 0.06, inside the 0.03–0.06 range): the one-second probe is not what the idle CPU is made of | a profile showing where the idle wakeups go |
-| Async `state.json` | 4 ms every few minutes at 1,000 torrents, 0.003 % of a core | thousands of torrents with frequent changes, or a visible UI stall |
-| Lock-free read cache | the lock costs about 0.2 % of a core at 100 MB/s of upload | |
-| One PEX loop per torrent | 0.0025 % of a core and 2–3 MB at 500 peers | |
-| Multi-path `get_peers` | `peers_confirmed_multi` is 0 in real runs | |
-| Anti-Sybil cap on by default | the table is not concentrated, and CGNAT subnets would be capped | |
-| Peer turnover (closing the slowest peers at the cap) | on a real swarm the engine never filled the cap (peaks of 13–17 peers at 20), so turnover never acted | a real swarm that keeps a torrent at its cap |
-| Auto cutting the caps when the router sees another device | a call next to a download filling the line: median 15 ms idle, 36–50 ms loaded; the spikes above 150 ms came from another device | a call that degrades next to a download |
-| Throttling TCP while uTP peers share the line (libtorrent's mixed mode) | 3-minute rounds on a real swarm: mixed 5.9 and 7.7 MB/s, TCP only 3.9 and 6.7, uTP only 2.0 and 3.4; mixed also had the lowest p90/p99 ping | a mixed swarm where mixed loses speed or latency against one transport |
-| One full check per drive at a time | NAS, NFS 4.1: two 512 MiB checks at once 13.1–14.2 s, one after the other 18.2–19.2 s | a local hard disk measured |
-| Read-ahead hints (`WILLNEED`) for the next pieces of a check | NAS, cold round: 34 MiB/s, 29 with two pieces ahead, 24 with four | |
-| Choking changes | reciprocation works locally and against libtorrent | a gap on a real swarm |
-| Super-seeding by default | no upload saved on measurable swarms, about 24 % slower locally | |
-| Merge candidates ordered by reusable bytes | superseded by the dedup | |
-| Upsert with two conflict targets (archive) | 17 ms more per 1,000 releases | |
-| `idx_archive_title`, index on `lower(magnet_hash)` | never used by the queries | |
-| Latency guard with a fixed ceiling or floor | locked to a slow sample or an arbitrary number | |
-
 ## Adding a measurement
 
 - **Compare clients only** with `make measure-compare`, and replace all the tables.
@@ -493,8 +460,7 @@ Closed with a measurement, so they are not retried without new data.
   on.
 - **Write the machine, date and command next to a number**, and replace the old row.
 - **Keep this page readable.** A number goes here only if a reader can decide something from
-  it; the rest stays in `gextto-data/bench/` and in the command that produces it. A rejected
-  idea goes under [Closed designs](#closed-designs).
+  it; the rest stays in `gextto-data/bench/` and in the command that produces it.
 
 The other harnesses are in the `Makefile` (`measure-*`, `bench-all`, `bench-all-docker`) and in
 `scripts/measure-baseline.sh`. Profilers are opt-in on loopback: `GX_TORRENT_PPROF=127.0.0.1:6061`
