@@ -6183,7 +6183,7 @@ fra:
   "Chiave opzionale di una configurazione Apprise; vuota usa quella predefinita.": "Clé facultative d'une configuration Apprise ; vide utilise celle par défaut."
   "Eseguibile lanciato su ogni evento. Riceve i dati nelle variabili d'ambiente GEXTTO_*.": "Exécutable lancé à chaque événement. Il reçoit les données dans les variables d'environnement GEXTTO_*."
   "Argomenti passati al programma, separati da spazi; le virgolette tengono insieme quelli con spazi.": "Arguments passés au programme, séparés par des espaces ; les guillemets gardent ensemble ceux qui contiennent des espaces."
-  "Avvisa quando un download parte, si completa o riempie un episodio mancante.": "Notifie quand un téléchargement démarre, se termine ou complète un épisode manquant."
+  "Avvisa quando un download parte, viene scartato, si completa o riempie un episodio mancante.": "Notifie quand un téléchargement démarre, est écarté, se termine ou complète un épisode manquant."
   "Avvisa quando un download fallisce o un torrent o fumetto va in errore.": "Notifie quand un téléchargement échoue ou qu'un torrent ou une bande dessinée passe en erreur."
   "Avvisa dei problemi di salute, del ciclo di ricerca, degli indexer, del login ai provider e del motore torrent.": "Notifie les problèmes de santé, de cycle de recherche, d'indexeur, de connexion au fournisseur et de moteur torrent."
   "Avvisa dei riavvii, dei backup completati e della pulizia delle tracce audio.": "Notifie les redémarrages, les sauvegardes terminées et le nettoyage des pistes audio."

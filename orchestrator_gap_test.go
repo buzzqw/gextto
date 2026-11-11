@@ -85,7 +85,7 @@ func TestSeasonFilterLeavesEachGapItsRows(t *testing.T) {
 func TestCompleteSeasonPackCoversEveryGapInItsSeason(t *testing.T) {
 	series := "Example Show"
 	season := int64(2)
-	pack := &models.Release{Series: &series, Season: &season, EpisodeRange: []int64{0}}
+	pack := &models.Release{Series: &series, Season: &season, EpisodeRange: []int64{0}, IsPack: true}
 	targets := map[gapTarget]struct{}{
 		{Series: series, Season: season, Episode: 1}: {},
 		{Series: series, Season: season, Episode: 3}: {},

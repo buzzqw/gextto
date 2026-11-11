@@ -5527,7 +5527,7 @@ eng:
   "Chiave opzionale di una configurazione Apprise; vuota usa quella predefinita.": "Optional key of one Apprise configuration; empty uses the default one."
   "Eseguibile lanciato su ogni evento. Riceve i dati nelle variabili d'ambiente GEXTTO_*.": "Executable run on every event. It receives the details in the GEXTTO_* environment variables."
   "Argomenti passati al programma, separati da spazi; le virgolette tengono insieme quelli con spazi.": "Arguments passed to the program, separated by spaces; quotes keep together the ones with spaces."
-  "Avvisa quando un download parte, si completa o riempie un episodio mancante.": "Notifies when a download starts, completes or fills a missing episode."
+  "Avvisa quando un download parte, viene scartato, si completa o riempie un episodio mancante.": "Notifies when a download starts, is discarded, completes or fills a missing episode."
   "Avvisa quando un download fallisce o un torrent o fumetto va in errore.": "Notifies when a download fails or a torrent or comic goes into error."
   "Avvisa dei problemi di salute, del ciclo di ricerca, degli indexer, del login ai provider e del motore torrent.": "Notifies about health, search cycle, indexer, provider login and torrent engine problems."
   "Avvisa dei riavvii, dei backup completati e della pulizia delle tracce audio.": "Notifies about restarts, completed backups and audio-track cleanup."

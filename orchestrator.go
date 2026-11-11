@@ -2162,7 +2162,8 @@ func gapEpisodesForRelease(release *models.Release, gapTargets map[gapTarget]str
 		}
 	} else {
 		for _, episode := range release.EpisodeRange {
-			if episode <= 0 {
+			// 0 here is a special (a whole-season pack took the branch above).
+			if episode < 0 {
 				continue
 			}
 			if _, ok := gapTargets[gapTarget{Series: series, Season: season, Episode: episode}]; ok {
@@ -2174,11 +2175,13 @@ func gapEpisodesForRelease(release *models.Release, gapTargets map[gapTarget]str
 	return slices.Compact(episodes)
 }
 
-// episodeSet returns the positive episodes of a release as a set.
+// episodeSet returns the episodes of a release as a set. The 0 of a pack is
+// the whole-season sentinel and stays out; the 0 of a single release is a real
+// episode, a special such as S03E00.
 func episodeSet(release *models.Release) map[int64]struct{} {
 	set := map[int64]struct{}{}
 	for _, episode := range release.EpisodeRange {
-		if episode > 0 {
+		if episode > 0 || (episode == 0 && !release.IsPack) {
 			set[episode] = struct{}{}
 		}
 	}
@@ -2186,8 +2189,10 @@ func episodeSet(release *models.Release) map[int64]struct{} {
 }
 
 // hasCompleteRange reports the `0` sentinel that marks a complete season pack.
+// Only a pack carries it: a single release numbered 0 is a special (S03E00),
+// not the whole season.
 func hasCompleteRange(release *models.Release) bool {
-	return slices.Contains(release.EpisodeRange, 0)
+	return release.IsPack && slices.Contains(release.EpisodeRange, 0)
 }
 
 // intSetSuperset reports whether `superset` contains every element of `subset`.

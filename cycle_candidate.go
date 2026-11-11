@@ -481,9 +481,21 @@ func (p *candidatePass) announceDownload(release *models.Release, why string, sc
 	if cfg.DryRun {
 		logMessage = fmt.Sprintf("🧪 Test mode: would download %s — %s (%s)", logTarget(release), why, friendlyQuality(release.Quality))
 	}
-	if approvalReason == "upgrade" {
+	wholeSeason := release.Kind == "series" && release.IsPack && hasCompleteRange(release) && release.Season != nil
+	if approvalReason == "upgrade" && !wholeSeason {
 		if from := upgradeSourceText(archive, release); from != "" {
 			logMessage += " · replacing: " + from
+		}
+	}
+	if wholeSeason {
+		// A whole-season pack lists no episodes of its own: say which missing
+		// ones it is meant to fill, and, when its file list is not known yet
+		// (a magnet), that the files are checked as soon as it arrives.
+		if len(gapEpisodes) > 0 {
+			logMessage += " · for the missing " + episodeRangeLabel(*release.Season, gapEpisodes)
+		}
+		if release.TorrentURL == nil && packInspectionEnabled(cfg) {
+			logMessage += " · its files are checked as soon as their list arrives, and it is discarded if none is useful"
 		}
 	}
 	if destination := releaseDestinationLabel(cfg, release, preferredPath); destination != "" {

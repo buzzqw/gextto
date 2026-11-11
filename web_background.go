@@ -1044,7 +1044,7 @@ func (w *eventWorker) tick(now time.Time) {
 	DetachErrorTorrents(w.torrents, w.db, w.startupHashes, w.notErrorChecked)
 	DetachCompletedArchivedSingles(w.cfg, w.torrents, w.db, w.notDetachable)
 	RejectActivePackIdentityMismatches(w.torrents, w.db, w.packIdentityChecked)
-	InspectActivePacks(w.cfg, w.torrents, w.db, w.packInspectionChecked)
+	InspectActivePacks(w.cfg, w.torrents, w.db, w.notifier, w.packInspectionChecked)
 	// Remove completed torrents that have finished seeding before the seed
 	// policy moves them to disk only to delete them. With automatic removal
 	// off, completed torrents stay listed as completed until the user runs

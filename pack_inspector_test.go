@@ -88,7 +88,7 @@ func TestInspectActivePacksRemovesUselessPack(t *testing.T) {
 		{Path: "Show.S01E01.mkv"},
 	})
 	checked := map[string]packInspectionCheck{}
-	InspectActivePacks(cfg, engine, db, checked)
+	InspectActivePacks(cfg, engine, db, nil, checked)
 	if got, ok := engine.removed[hash]; !ok || !got {
 		t.Fatalf("useless pack not removed with its files: %v", engine.removed)
 	}
@@ -111,7 +111,7 @@ func TestInspectActivePacksLeavesAManualPackAlone(t *testing.T) {
 		t.Fatalf("set reason: %v", err)
 	}
 	checked := map[string]packInspectionCheck{}
-	InspectActivePacks(cfg, engine, db, checked)
+	InspectActivePacks(cfg, engine, db, nil, checked)
 	if _, removed := engine.removed[hash]; removed {
 		t.Fatal("a pack added by hand was removed")
 	}
@@ -126,7 +126,7 @@ func TestInspectActivePacksKeepsPackWithAWantedEpisode(t *testing.T) {
 		{Path: "Show.S01E03.mkv"}, // not in the library: useful
 	})
 	checked := map[string]packInspectionCheck{}
-	InspectActivePacks(cfg, engine, db, checked)
+	InspectActivePacks(cfg, engine, db, nil, checked)
 	if _, removed := engine.removed[hash]; removed {
 		t.Fatal("a pack with a wanted episode was removed")
 	}
@@ -140,7 +140,7 @@ func TestInspectActivePacksDownloadsOnlyUsefulFiles(t *testing.T) {
 	})
 	cfg.Settings[packInspectionPrioritizeSetting] = "true"
 	checked := map[string]packInspectionCheck{}
-	InspectActivePacks(cfg, engine, db, checked)
+	InspectActivePacks(cfg, engine, db, nil, checked)
 	if _, removed := engine.removed[hash]; removed {
 		t.Fatal("a partially useful pack was removed")
 	}
@@ -219,7 +219,7 @@ func TestInspectActivePacksRestoresUpgradeBackup(t *testing.T) {
 	cfg.DryRun = false
 	cfg.Settings = map[string]string{packInspectionSetting: "true"}
 	cfg.Series = []SeriesConfig{{Name: seriesName, Enabled: true}}
-	InspectActivePacks(&cfg, engine, db, map[string]packInspectionCheck{})
+	InspectActivePacks(&cfg, engine, db, nil, map[string]packInspectionCheck{})
 	if _, removed := engine.removed[hash]; !removed {
 		t.Fatal("the useless pack was not removed")
 	}
@@ -249,7 +249,7 @@ func TestInspectActivePacksRespectsTheSetting(t *testing.T) {
 	})
 	cfg.Settings[packInspectionSetting] = "false"
 	checked := map[string]packInspectionCheck{}
-	InspectActivePacks(cfg, engine, db, checked)
+	InspectActivePacks(cfg, engine, db, nil, checked)
 	if _, removed := engine.removed[hash]; removed {
 		t.Fatal("inspection ran while the setting was off")
 	}

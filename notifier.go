@@ -99,7 +99,7 @@ func notifyEventsOn() notifyEventSwitches {
 // always be delivered.
 func notifyEventGroup(event string) string {
 	switch event {
-	case "download_started", "torrent_completed", "season_pack_completed",
+	case "download_started", "download_discarded", "torrent_completed", "season_pack_completed",
 		"comic_queued", "comic_completed", "comic_pending", "gap_filled":
 		return "downloads"
 	case "download_failed", "torrent_error", "comic_error", "daemon_error":
@@ -870,6 +870,11 @@ func formatEmailSubjectLang(lang, event string, data map[string]any) string {
 			return fmt.Sprintf("Gextto: %s — %s", messages.PickLang(lang, "Errore torrent", "Torrent error"), itemLabel)
 		}
 		return fmt.Sprintf("Gextto: %s", messages.PickLang(lang, "Errore torrent", "Torrent error"))
+	case "download_discarded":
+		if series != "" && hasSeason {
+			itemLabel = fmt.Sprintf("%s S%02d", series, season)
+		}
+		return fmt.Sprintf("Gextto: %s — %s", messages.PickLang(lang, "Download scartato", "Download discarded"), itemLabel)
 	case "download_failed":
 		if itemLabel != "" {
 			return fmt.Sprintf("Gextto: %s — %s", messages.PickLang(lang, "Download fallito", "Download failed"), itemLabel)
@@ -1102,6 +1107,32 @@ func formatEventLang(lang, event string, data map[string]any) string {
 			text("path"),
 			upgradeNote,
 		)
+	case "download_discarded":
+		season, _ := jsonInt(mapLookup(data, "season"))
+		downloaded, _ := jsonInt(mapLookup(data, "downloaded_bytes"))
+		held := text("held_episodes")
+		label := text("series")
+		if label == "" {
+			label = text("title")
+		} else {
+			label = fmt.Sprintf("%s S%02d", label, season)
+		}
+		var what string
+		if whole, ok := mapLookup(data, "whole_season").(bool); ok && whole {
+			what = fmt.Sprintf(messages.PickLang(lang,
+				"Il pack porta il nome dell'intera stagione %d ma contiene solo %s",
+				"The pack is named as the whole season %d but holds only %s"), season, held)
+		} else {
+			what = fmt.Sprintf(messages.PickLang(lang, "Il pack contiene %s", "The pack holds %s"), held)
+		}
+		return fmt.Sprintf("%s\n\n🎬 %s\n\n%s%s\n\n%s",
+			messages.PickLang(lang, "🗑️ DOWNLOAD SCARTATO", "🗑️ DOWNLOAD DISCARDED"),
+			label,
+			what,
+			messages.PickLang(lang, ", già in libreria in qualità uguale o migliore.", ", already in the library in equal or better quality."),
+			fmt.Sprintf(messages.PickLang(lang,
+				"Rimosso con quanto aveva scaricato (%s): non verrà ripreso.",
+				"Removed with what it had downloaded (%s): it will not be taken again."), formatBytes(downloaded)))
 	case "season_pack_completed":
 		season, _ := jsonInt(mapLookup(data, "season"))
 		size, _ := jsonInt(mapLookup(data, "size_bytes"))

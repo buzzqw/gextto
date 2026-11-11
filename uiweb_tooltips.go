@@ -123,7 +123,7 @@ var uiSettingTooltipText = map[string]string{
 	"notify_apprise_key":                   "Chiave opzionale di una configurazione Apprise; vuota usa quella predefinita.",
 	"notify_script_path":                   "Eseguibile lanciato su ogni evento. Riceve i dati nelle variabili d'ambiente GEXTTO_*.",
 	"notify_script_args":                   "Argomenti passati al programma, separati da spazi; le virgolette tengono insieme quelli con spazi.",
-	"notify_events_downloads":              "Avvisa quando un download parte, si completa o riempie un episodio mancante.",
+	"notify_events_downloads":              "Avvisa quando un download parte, viene scartato, si completa o riempie un episodio mancante.",
 	"notify_events_errors":                 "Avvisa quando un download fallisce o un torrent o fumetto va in errore.",
 	"notify_events_health":                 "Avvisa dei problemi di salute, del ciclo di ricerca, degli indexer, del login ai provider e del motore torrent.",
 	"notify_events_maintenance":            "Avvisa dei riavvii, dei backup completati e della pulizia delle tracce audio.",

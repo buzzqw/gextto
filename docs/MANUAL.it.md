@@ -1360,7 +1360,7 @@ Gextto può avvisarti su **Telegram**, **e-mail**, **webhook**, **Discord**,
 
 | Gruppo | Cosa comprende |
 |---|---|
-| **Notifiche dei download** | un download parte, si completa o riempie un episodio mancante |
+| **Notifiche dei download** | un download parte, viene scartato (un pack che non contiene nulla di utile), si completa o riempie un episodio mancante |
 | **Notifiche degli errori** | un download fallisce, un torrent o un fumetto va in errore, il servizio si ferma per errore |
 | **Notifiche di salute e motore** | problemi di salute, del ciclo, degli indexer, dei login, del motore torrent, e il ritorno alla normalità |
 | **Notifiche di manutenzione** | riavvii, backup completati, pulizia delle tracce audio |
@@ -2568,7 +2568,7 @@ Sotto le opzioni, nello stesso gruppo, il pannello mostra lo stato e i file trov
 
 | Impostazione | Cosa fa |
 |---|---|
-| Notifiche dei download | Avvisa quando un download parte, si completa o riempie un episodio mancante. |
+| Notifiche dei download | Avvisa quando un download parte, viene scartato, si completa o riempie un episodio mancante. |
 | Notifiche degli errori | Avvisa quando un download fallisce o un torrent o fumetto va in errore. |
 | Notifiche di salute e motore | Avvisa dei problemi di salute, del ciclo di ricerca, degli indexer, del login ai provider e del motore torrent. |
 | Notifiche di manutenzione | Avvisa dei riavvii, dei backup completati e della pulizia delle tracce audio. |

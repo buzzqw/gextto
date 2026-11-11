@@ -20,8 +20,9 @@ func selectionRelease(id int, episodes []int64, score int64, remux bool) models.
 		Series:       &series,
 		Season:       &season,
 		EpisodeRange: episodes,
-		IsPack:       len(episodes) != 1,
-		SizeBytes:    score, // carries the test score, see selectionScore
+		// The parser marks a whole-season pack with episode 0 and IsPack.
+		IsPack:    len(episodes) != 1 || (len(episodes) == 1 && episodes[0] == 0),
+		SizeBytes: score, // carries the test score, see selectionScore
 	}
 	if remux {
 		release.Quality.Source = "remux"

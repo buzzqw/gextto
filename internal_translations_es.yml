@@ -6137,7 +6137,7 @@ spa:
   "Chiave opzionale di una configurazione Apprise; vuota usa quella predefinita.": "Clave opcional de una configuración de Apprise; vacía usa la predeterminada."
   "Eseguibile lanciato su ogni evento. Riceve i dati nelle variabili d'ambiente GEXTTO_*.": "Ejecutable lanzado en cada evento. Recibe los datos en las variables de entorno GEXTTO_*."
   "Argomenti passati al programma, separati da spazi; le virgolette tengono insieme quelli con spazi.": "Argumentos pasados al programa, separados por espacios; las comillas mantienen juntos los que tienen espacios."
-  "Avvisa quando un download parte, si completa o riempie un episodio mancante.": "Avisa cuando una descarga empieza, termina o completa un episodio que faltaba."
+  "Avvisa quando un download parte, viene scartato, si completa o riempie un episodio mancante.": "Avisa cuando una descarga empieza, se descarta, termina o completa un episodio que faltaba."
   "Avvisa quando un download fallisce o un torrent o fumetto va in errore.": "Avisa cuando una descarga falla o un torrent o cómic entra en error."
   "Avvisa dei problemi di salute, del ciclo di ricerca, degli indexer, del login ai provider e del motore torrent.": "Avisa de problemas de salud, del ciclo de búsqueda, de los indexadores, del inicio de sesión en el proveedor y del motor torrent."
   "Avvisa dei riavvii, dei backup completati e della pulizia delle tracce audio.": "Avisa de los reinicios, las copias de seguridad completadas y la limpieza de pistas de audio."

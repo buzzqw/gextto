@@ -55,7 +55,7 @@ func packInspectionPrioritizeEnabled(cfg *Config) bool {
 // InspectActivePacks checks the packs currently downloading against what the
 // library already has. checked, when not nil, caches the verdicts so the 750 ms
 // tick does not call the engine and the database for every settled pack.
-func InspectActivePacks(cfg *Config, torrents TorrentEngine, db *Database, checked map[string]packInspectionCheck) {
+func InspectActivePacks(cfg *Config, torrents TorrentEngine, db *Database, notifier *Notifier, checked map[string]packInspectionCheck) {
 	if cfg == nil || db == nil || torrents == nil || checked == nil || !packInspectionEnabled(cfg) || cfg.DryRun {
 		return
 	}
@@ -174,7 +174,7 @@ func InspectActivePacks(cfg *Config, torrents TorrentEngine, db *Database, check
 		// otherwise the stale quality of the release we are throwing away
 		// stays in the library and the next inspection compares the pack
 		// with itself.
-		previous, hadPrevious := db.UpgradeReplacedInfo(candidate.torrent.Hash)
+		previous, _ := db.UpgradeReplacedInfo(candidate.torrent.Hash)
 		restored, restoreErr := db.RestoreUpgrade(candidate.torrent.Hash)
 		if restoreErr != nil {
 			logging.Warn("could not restore the version replaced by the discarded pack",
@@ -186,13 +186,6 @@ func InspectActivePacks(cfg *Config, torrents TorrentEngine, db *Database, check
 					"hash", candidate.torrent.Hash, "name", candidate.torrent.Name, "error", rollbackErr.Error())
 			}
 		}
-		logging.Warn(fmt.Sprintf("🗑️ Pack discarded while downloading — «%s» · %s", candidate.release.Title, reason),
-			"hash", candidate.torrent.Hash, "name", candidate.torrent.Name,
-			"episodes", details, "restored_upgrade", restored, "previous_release", previous)
-		if restored && hadPrevious {
-			logging.Info(fmt.Sprintf("♻️ Restored the previous version after discarding the pack — «%s» · %s",
-				candidate.release.Title, previous), "hash", candidate.torrent.Hash)
-		}
 		_ = db.MarkTorrentError(candidate.torrent.Hash, reason)
 		_ = db.Blocklist(&candidate.release, "pack_inspection_useless")
 		if candidate.release.TorrentURL != nil {
@@ -202,12 +195,61 @@ func InspectActivePacks(cfg *Config, torrents TorrentEngine, db *Database, check
 		removed, removeErr := torrents.Remove(candidate.torrent.Hash, true)
 		if removeErr != nil {
 			logging.Warn("could not remove the useless pack", "hash", candidate.torrent.Hash, "error", removeErr.Error())
-		} else if removed {
-			logging.Info(fmt.Sprintf("🧹 Removed «%s» while it was downloading: none of its files is useful (%s downloaded)",
-				candidate.torrent.Name, formatBytes(candidate.torrent.TotalDone)), "hash", candidate.torrent.Hash)
+		}
+		// One line says what was found, why it is of no use and what became of
+		// it; the per-episode comparison and the library bookkeeping (a row put
+		// back, no file touched) are for DEBUG.
+		held := packHeldEpisodesText(*candidate.release.Season, found)
+		why := packDiscardWhy(&candidate.release, held)
+		fate := "removed"
+		if removeErr != nil || !removed {
+			fate = "to be removed"
+		}
+		logging.Info(fmt.Sprintf("🗑️ «%s» discarded while downloading: %s. It is %s with what it had downloaded (%s) and will not be taken again",
+			candidate.release.Title, why, fate, formatBytes(candidate.torrent.TotalDone)), "hash", candidate.torrent.Hash)
+		logging.Debug("discarded pack details", "hash", candidate.torrent.Hash, "name", candidate.torrent.Name,
+			"episodes", details, "restored upgrade", restored, "previous release", previous)
+		if notifier != nil {
+			data := map[string]any{
+				"hash":             candidate.torrent.Hash,
+				"name":             candidate.torrent.Name,
+				"title":            candidate.release.Title,
+				"kind":             candidate.release.Kind,
+				"season":           *candidate.release.Season,
+				"held_episodes":    held,
+				"whole_season":     hasCompleteRange(&candidate.release),
+				"downloaded_bytes": candidate.torrent.TotalDone,
+				"reason":           why,
+			}
+			if candidate.release.Series != nil {
+				data["series"] = *candidate.release.Series
+			}
+			if err := notifier.NotifyEvent("download_discarded", data); err != nil {
+				logging.Warn("discard notification failed", "hash", candidate.torrent.Hash, "error", err)
+			}
 		}
 		delete(checked, candidate.torrent.Hash)
 	}
+}
+
+// packHeldEpisodesText names the episodes a pack really holds: "S03E01",
+// "S03E01–S03E04".
+func packHeldEpisodesText(season int64, found map[int64]struct{}) string {
+	episodes := make([]int64, 0, len(found))
+	for episode := range found {
+		episodes = append(episodes, episode)
+	}
+	slices.Sort(episodes)
+	return episodeRangeLabel(season, episodes)
+}
+
+// packDiscardWhy says, in words, why a pack is of no use: what its name
+// promised against what its files hold.
+func packDiscardWhy(release *models.Release, held string) string {
+	if hasCompleteRange(release) && release.Season != nil {
+		return fmt.Sprintf("it is named as the whole season %d but holds only %s, already in the library in equal or better quality", *release.Season, held)
+	}
+	return fmt.Sprintf("it holds %s, already in the library in equal or better quality", held)
 }
 
 // applyPackFilePriorities keeps only the files that carry a wanted episode: the

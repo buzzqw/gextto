@@ -6190,7 +6190,7 @@ deu:
   "Chiave opzionale di una configurazione Apprise; vuota usa quella predefinita.": "Optionaler Schlüssel einer Apprise-Konfiguration; leer verwendet die Standardkonfiguration."
   "Eseguibile lanciato su ogni evento. Riceve i dati nelle variabili d'ambiente GEXTTO_*.": "Ausführbare Datei, die bei jedem Ereignis gestartet wird. Sie erhält die Daten in den Umgebungsvariablen GEXTTO_*."
   "Argomenti passati al programma, separati da spazi; le virgolette tengono insieme quelli con spazi.": "Argumente für das Programm, durch Leerzeichen getrennt; Anführungszeichen halten Argumente mit Leerzeichen zusammen."
-  "Avvisa quando un download parte, si completa o riempie un episodio mancante.": "Benachrichtigt, wenn ein Download startet, abgeschlossen wird oder eine fehlende Episode ergänzt."
+  "Avvisa quando un download parte, viene scartato, si completa o riempie un episodio mancante.": "Benachrichtigt, wenn ein Download startet, verworfen wird, abgeschlossen wird oder eine fehlende Episode ergänzt."
   "Avvisa quando un download fallisce o un torrent o fumetto va in errore.": "Benachrichtigt, wenn ein Download fehlschlägt oder ein Torrent oder Comic in einen Fehler läuft."
   "Avvisa dei problemi di salute, del ciclo di ricerca, degli indexer, del login ai provider e del motore torrent.": "Benachrichtigt über Probleme mit Zustand, Suchzyklus, Indexern, Provider-Anmeldung und Torrent-Engine."
   "Avvisa dei riavvii, dei backup completati e della pulizia delle tracce audio.": "Benachrichtigt über Neustarts, abgeschlossene Sicherungen und die Bereinigung der Audiospuren."

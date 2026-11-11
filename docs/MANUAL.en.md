@@ -1349,7 +1349,7 @@ own **program**. It is set in *Configuration → Notifications*.
 
 | Group | What it covers |
 |---|---|
-| **Download notifications** | a download starts, completes or fills a missing episode |
+| **Download notifications** | a download starts, is discarded (a pack holding nothing useful), completes or fills a missing episode |
 | **Error notifications** | a download fails, a torrent or a comic goes into error, the service stops on an error |
 | **Health and engine notifications** | problems with health, the cycle, the indexers, logins, the torrent engine, and the return to normal |
 | **Maintenance notifications** | restarts, completed backups, audio track clean-up |
@@ -2548,7 +2548,7 @@ Under the options, in the same group, the panel shows the state and the files it
 
 | Setting | What it does |
 |---|---|
-| Download notifications | Notifies when a download starts, completes or fills a missing episode. |
+| Download notifications | Notifies when a download starts, is discarded, completes or fills a missing episode. |
 | Error notifications | Notifies when a download fails or a torrent or comic goes into error. |
 | Health and engine notifications | Notifies about health, search cycle, indexer, provider login and torrent engine problems. |
 | Maintenance notifications | Notifies about restarts, completed backups and audio-track cleanup. |

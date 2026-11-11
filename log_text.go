@@ -338,7 +338,13 @@ func upgradeSourceText(archive *models.ArchiveQualityIndex, release *models.Rele
 	if archive.IsEmpty() || release == nil || release.Kind != "series" || release.Season == nil {
 		return ""
 	}
+	// In a pack, episode 0 is how the parser marks the whole season: it is not
+	// an episode, and "S03E00 missing from the library" read as one. In a
+	// single release it is a real special and stays.
 	episodes := release.EpisodeRange
+	if release.IsPack {
+		episodes = positiveEpisodes(episodes)
+	}
 	if len(episodes) == 0 && release.Episode != nil && *release.Episode > 0 {
 		episodes = []int64{*release.Episode}
 	}
@@ -367,6 +373,17 @@ func upgradeSourceText(archive *models.ArchiveQualityIndex, release *models.Rele
 		}
 	}
 	return strings.Join(parts, ", ")
+}
+
+// positiveEpisodes drops the 0 a whole-season pack carries.
+func positiveEpisodes(episodes []int64) []int64 {
+	result := make([]int64, 0, len(episodes))
+	for _, episode := range episodes {
+		if episode > 0 {
+			result = append(result, episode)
+		}
+	}
+	return result
 }
 
 // archiveCoversRelease reports whether at least one episode of the release
