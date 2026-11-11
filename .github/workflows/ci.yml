@@ -97,9 +97,24 @@ jobs:
         working-directory: uiweb/end2end
         run: npm ci --no-audit --no-fund
 
+      # The suite drives the Chrome channel, which the ubuntu-24.04 runner
+      # image already ships: using it skips the apt downloads of
+      # `--with-deps`, whose mirrors failed to resolve and turned the job red
+      # with nothing wrong in the code. Without a preinstalled Chrome the
+      # install runs, with retries.
       - name: Install the browser
         working-directory: uiweb/end2end
-        run: npx playwright install --with-deps chrome
+        run: |
+          if command -v google-chrome >/dev/null 2>&1; then
+            echo "Using the runner's $(google-chrome --version)"
+            exit 0
+          fi
+          for attempt in 1 2 3; do
+            npx playwright install --with-deps chrome && exit 0
+            echo "Browser install failed (attempt $attempt of 3), retrying in 30 seconds"
+            sleep 30
+          done
+          exit 1
 
       - name: Build the daemon
         run: scripts/build-daemon.sh
