@@ -310,6 +310,10 @@ not to break.
     `background_cores` is above 1 is run again, not reported.
   - *Same reading*: three interleaved rounds, the median with its range, every
     downloaded file compared byte by byte.
+  - *Bounded time*: a full round (every client, every scenario, three rounds)
+    stays within 150 minutes. The fixed waits are short (3 s quiet check, 10 s
+    settle, 30 s at rest) and `--max-minutes` stops starting runs when the
+    budget is over; a client cut short shows fewer runs in the report.
   - Changing any of these (machine, version, limit, payload) starts a new
     baseline: re-run **every** client and replace the whole table. Never compare
     with numbers from another setup. Results go in `docs/measurements.md`.

@@ -78,6 +78,14 @@ MIN_AVAILABLE_KIB = 1500 * 1024
 # run on a busy machine, whose numbers are thrown away.
 QUIET_CORES = float(os.environ.get("GX_COMPARE_QUIET_CORES", "1.0"))
 MAX_ATTEMPTS = 3
+# The fixed waits of a run. A full round (six clients, six scenarios, three
+# rounds) must stay within ROUND_BUDGET_MIN: the waits are what can be cut, the
+# transfers are the measurement. The quiet check before a run is short because
+# the run measures its own background load and is repeated when it was disturbed.
+QUIET_WINDOW_S = 3
+SETTLE_S = 10
+REST_SAMPLE_S = 30
+ROUND_BUDGET_MIN = 150
 
 
 # The test torrents of every official round (docs/measurements.md). A payload that
@@ -700,8 +708,8 @@ def wait_quiet(limit=1200):
     while time.time() - started < limit:
         guard_host()
         before = host_busy_seconds()
-        time.sleep(10)
-        cores = (host_busy_seconds() - before) / 10
+        time.sleep(QUIET_WINDOW_S)
+        cores = (host_busy_seconds() - before) / QUIET_WINDOW_S
         if cores < QUIET_CORES and not ffmpeg_running():
             return cores
         log(f"host busy ({cores:.2f} cores), waiting")
@@ -880,9 +888,9 @@ def cleanup():
 
 def scenario_idle(client, env):
     sut = start_sut(client)
-    time.sleep(15)
+    time.sleep(SETTLE_S)
     with Sampler(sut) as sample:
-        time.sleep(60)
+        time.sleep(REST_SAMPLE_S)
     return sample.metrics()
 
 
@@ -979,9 +987,9 @@ def scenario_many(client, env):
 
     all_seeding()
     ready = time.time() - started
-    time.sleep(15)
+    time.sleep(SETTLE_S)
     with Sampler(sut) as sample:
-        time.sleep(60)
+        time.sleep(REST_SAMPLE_S)
     metrics = {"add_s": round(added, 2), "ready_s": round(ready, 2), **sample.metrics()}
 
     restart_from = sut.container.restart()
@@ -1121,6 +1129,9 @@ def disturbed(record):
 def run_rounds(args, clients, scenarios, env, commit):
     threading.Thread(target=watch_ffmpeg, daemon=True).start()
     failures = 0
+    # The budget is a hard stop: a run is not started once it has run out, and
+    # the report shows the clients with fewer runs.
+    deadline = time.time() + args.max_minutes * 60 if args.max_minutes > 0 else None
     for round_no in range(args.rounds):
         # Interleaved rounds: a slow hour touches every client, not just one.
         order = clients[round_no % len(clients):] + clients[:round_no % len(clients)]
@@ -1130,6 +1141,9 @@ def run_rounds(args, clients, scenarios, env, commit):
                     log(f"round {round_no + 1}/{args.rounds} {scenario} {client}: not supported, skipped")
                     continue
                 for attempt in range(MAX_ATTEMPTS):
+                    if deadline and time.time() > deadline:
+                        log(f"the {args.max_minutes:g}-minute budget is over: no more runs")
+                        return failures + 1
                     quiet = wait_quiet()
                     FFMPEG_SEEN.clear()
                     log(f"round {round_no + 1}/{args.rounds} {scenario} {client} (host {quiet:.2f} cores)")
@@ -1218,6 +1232,8 @@ def main():
     run.add_argument("--many", type=int, default=MANY_COUNT)
     run.add_argument("--no-build", action="store_true")
     run.add_argument("--tag", default="")
+    run.add_argument("--max-minutes", type=float, default=ROUND_BUDGET_MIN,
+                     help="stop starting runs after this many minutes (0: no limit)")
     report = sub.add_parser("report")
     report.add_argument("--tag", default="")
     clean = sub.add_parser("clean")
