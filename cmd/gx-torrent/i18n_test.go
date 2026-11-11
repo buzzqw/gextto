@@ -68,3 +68,19 @@ func TestUICatalogKeepsTheVerbs(t *testing.T) {
 		}
 	}
 }
+
+// The compiled columns and the language index agree, so every lazily built
+// dictionary reads its own column.
+func TestUICatalogColumnsMatchTheLanguageIndex(t *testing.T) {
+	for i, lang := range uiCatalogColumns {
+		if uiLangIndex[lang] != i {
+			t.Fatalf("column %d is %q, the index says %d", i, lang, uiLangIndex[lang])
+		}
+	}
+	if len(uiLangIndex) != len(uiCatalogColumns) {
+		t.Fatalf("index has %d languages, columns %d", len(uiLangIndex), len(uiCatalogColumns))
+	}
+	if got := uiDictionary("it")["Torrents"]; got != uiCatalog["Torrents"][0] {
+		t.Fatalf("it dictionary reads %q", got)
+	}
+}

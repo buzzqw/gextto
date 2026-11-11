@@ -1,5 +1,7 @@
 package main
 
+import "sync"
+
 // i18n.go holds the page strings and their translations.
 // The page source is English, so a phrase is also its key: the templates look
 // it up with `tr` while they render (i18n_tr.go) and the handlers with uiTr.
@@ -2057,22 +2059,36 @@ var uiClientKeys = []string{
 // uiLangIndex maps a language code to its column in uiCatalog.
 var uiLangIndex = map[string]int{"it": 0, "de": 1, "fr": 2, "es": 3, "pl": 4}
 
-// uiDicts holds one ready dictionary per language, built once at startup: the
-// catalog is static, so there is no reason to rebuild it per request.
-var uiDicts = func() map[string]map[string]string {
-	dicts := make(map[string]map[string]string, len(uiLangIndex))
-	for lang, idx := range uiLangIndex {
-		dict := make(map[string]string, len(uiCatalog))
-		for key, value := range uiCatalog {
-			dict[key] = value[idx]
-		}
-		dicts[lang] = dict
-	}
-	return dicts
-}()
+// uiDicts holds the dictionaries of the language packs (lang_packs.go),
+// loaded at startup before the page is served.
+var uiDicts = map[string]map[string]string{}
+
+// uiBuiltDicts are the dictionaries of the compiled languages, one per
+// uiCatalog column. Each is built the first time a page asks for its
+// language: a daemon whose page is never opened, or only in English, does not
+// hold five copies of the catalog (half a megabyte of live heap).
+var uiBuiltDicts [len(uiCatalogColumns)]struct {
+	once sync.Once
+	dict map[string]string
+}
+
+// uiCatalogColumns are the languages of the uiCatalog columns, in order.
+var uiCatalogColumns = [...]string{"it", "de", "fr", "es", "pl"}
 
 // uiDictionary returns the English-to-language map for lang, or nil when
 // lang is English or unknown (the page then stays as it is).
 func uiDictionary(lang string) map[string]string {
-	return uiDicts[lang]
+	idx, compiled := uiLangIndex[lang]
+	if !compiled {
+		return uiDicts[lang]
+	}
+	built := &uiBuiltDicts[idx]
+	built.once.Do(func() {
+		dict := make(map[string]string, len(uiCatalog))
+		for key, value := range uiCatalog {
+			dict[key] = value[idx]
+		}
+		built.dict = dict
+	})
+	return built.dict
 }

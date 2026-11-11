@@ -197,6 +197,7 @@ func (d *Daemon) handleUISettings(w http.ResponseWriter, r *http.Request) {
 	store.Set(autospeedMinKey, strconv.FormatInt(autoMin, 10))
 	store.Set(autospeedLineDownKey, strconv.FormatInt(autoLineDown, 10))
 	store.Set(autospeedLineUpKey, strconv.FormatInt(autoLineUp, 10))
+	d.wakeAutoSpeed()
 
 	// Global seeding limits (settings.json, enforced by the queue tick). The
 	// per-torrent limits set through the API always win.

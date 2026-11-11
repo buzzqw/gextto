@@ -43,6 +43,14 @@ const (
 	// autoSpeedWindow how far back the idle baseline is remembered.
 	autoSpeedProbeInterval = 1 * time.Second
 	autoSpeedWindow        = 10 * time.Minute
+	// autoSpeedRestProbeEvery is the probe cadence while nothing transfers and
+	// no cap is active: there is no queue to protect, and one sample every
+	// half minute keeps the idle baseline of the window fresh. The queue tick
+	// wakes the probe as soon as the line starts loading.
+	autoSpeedRestProbeEvery = 30 * time.Second
+	// autoSpeedOffCheckEvery is how often a disabled controller rereads its
+	// setting; saving the settings wakes it at once.
+	autoSpeedOffCheckEvery = time.Minute
 	// autoSpeedRecent is how many probes the current latency is the median of.
 	autoSpeedRecent = 5
 
@@ -225,6 +233,16 @@ func (a *autoSpeed) record(now time.Time, rtt time.Duration) {
 }
 
 // reset forgets the samples and every cap (on disable).
+// free reports that the controller is not acting: no trial and no cap.
+func (a *autoSpeed) free() bool {
+	if a == nil {
+		return true
+	}
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.mode == autoSpeedModeFree && a.downCap == 0 && a.upCap == 0
+}
+
 func (a *autoSpeed) reset() {
 	if a == nil {
 		return
@@ -536,24 +554,43 @@ func autoSpeedCapText(kib int64) string {
 // runAutoSpeed samples the latency while the option is enabled. It is started
 // beside the queue loop and stops with it. The gateway is cached for a minute
 // so probing does not resolve the default route every second.
+//
+// The cadence follows the line: every second while something transfers or a
+// cap is active, every autoSpeedRestProbeEvery while the line rests, and no
+// probe at all while the option is off. A rest or an off state is left at
+// once: the queue tick wakes the loop when the rates start loading the line,
+// and saving the settings wakes it too.
 func (d *Daemon) runAutoSpeed(stop <-chan struct{}) {
-	ticker := time.NewTicker(autoSpeedProbeInterval)
-	defer ticker.Stop()
+	timer := time.NewTimer(autoSpeedProbeInterval)
+	defer timer.Stop()
 	var gateway net.IP
-	var gatewayAt time.Time
+	var gatewayAt, probedAt time.Time
 	for {
 		select {
 		case <-stop:
 			return
-		case <-ticker.C:
+		case <-timer.C:
+		case <-d.autoSpeedWake:
+			if !timer.Stop() {
+				select {
+				case <-timer.C:
+				default:
+				}
+			}
 		}
 		enabled, target, _, _, _ := d.autoSpeedSettings()
 		if !enabled {
 			d.autoSpeed.reset()
-			gateway, gatewayAt = nil, time.Time{}
+			gateway, gatewayAt, probedAt = nil, time.Time{}, time.Time{}
+			timer.Reset(autoSpeedOffCheckEvery)
 			continue
 		}
 		now := time.Now()
+		resting := d.autoSpeedLineResting()
+		if wait := autoSpeedNextProbe(now, probedAt, resting); wait > 0 {
+			timer.Reset(wait)
+			continue
+		}
 		if target == "" && (gateway == nil || now.Sub(gatewayAt) > time.Minute) {
 			if resolved, err := defaultGateway(); err == nil {
 				gateway, gatewayAt = resolved, now
@@ -562,6 +599,45 @@ func (d *Daemon) runAutoSpeed(stop <-chan struct{}) {
 		if rtt, ok := probeLatency(target, gateway); ok {
 			d.autoSpeed.record(now, rtt)
 		}
+		probedAt = now
+		if resting {
+			timer.Reset(autoSpeedRestProbeEvery)
+		} else {
+			timer.Reset(autoSpeedProbeInterval)
+		}
+	}
+}
+
+// autoSpeedNextProbe is how long to wait before the next probe: none while the
+// line is loaded, the rest of autoSpeedRestProbeEvery while it rests.
+func autoSpeedNextProbe(now, probedAt time.Time, resting bool) time.Duration {
+	if !resting || probedAt.IsZero() {
+		return 0
+	}
+	return max(probedAt.Add(autoSpeedRestProbeEvery).Sub(now), 0)
+}
+
+// autoSpeedLoading reports whether the session rates (bytes/s) move enough
+// data for the controller to watch the line.
+func autoSpeedLoading(rateDown, rateUp int64) bool {
+	return rateDown/1024 >= autoSpeedIdleKiB || rateUp/1024 >= autoSpeedIdleKiB
+}
+
+// autoSpeedLineResting reports that nothing transfers and the controller holds
+// no cap: the probe can slow down.
+func (d *Daemon) autoSpeedLineResting() bool {
+	d.mu.Lock()
+	loading := autoSpeedLoading(d.rateDown, d.rateUp)
+	d.mu.Unlock()
+	return !loading && d.autoSpeed.free()
+}
+
+// wakeAutoSpeed asks the probe loop for a round now (a settings change, or a
+// line that starts loading). A wake already pending is enough.
+func (d *Daemon) wakeAutoSpeed() {
+	select {
+	case d.autoSpeedWake <- struct{}{}:
+	default:
 	}
 }
 

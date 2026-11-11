@@ -480,6 +480,8 @@ type Daemon struct {
 	selection map[string][]int
 
 	wake chan struct{}
+	// autoSpeedWake asks the latency probe for a round now (autospeed.go).
+	autoSpeedWake chan struct{}
 }
 
 func newDaemon(opts Options) (*Daemon, error) {
@@ -508,6 +510,7 @@ func newDaemon(opts Options) (*Daemon, error) {
 		startedAt:      time.Now(),
 		lastDownloadAt: time.Now(),
 		wake:           make(chan struct{}, 1),
+		autoSpeedWake:  make(chan struct{}, 1),
 		feedWake:       make(chan struct{}, 1),
 		feedPace:       newFeedPacer(feedHostGap, feedHostCooldown),
 		trackers:       newTrackerHealth(),
@@ -1186,8 +1189,14 @@ func (d *Daemon) tick(now time.Time) {
 	d.peakDown = max(d.peakDown, totalDown)
 	d.peakUp = max(d.peakUp, totalUp)
 	// The controller needs the current rates, not the all-time peaks.
+	wasLoading := autoSpeedLoading(d.rateDown, d.rateUp)
 	d.rateDown = int64(engineStats.SpeedDownload)
 	d.rateUp = int64(engineStats.SpeedUpload)
+	if !wasLoading && autoSpeedLoading(d.rateDown, d.rateUp) {
+		// The line starts loading: the resting probe must not wait for its
+		// half-minute round to see the queue grow.
+		d.wakeAutoSpeed()
+	}
 	positions := d.queuePositionsLocked(torrents, statsOf)
 
 	handles := make(map[string]*torrent.Torrent, len(torrents))

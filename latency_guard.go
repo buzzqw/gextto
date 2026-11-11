@@ -62,6 +62,12 @@ const (
 	// back the probe keeps samples.
 	latencyGuardProbeEvery = 2 * time.Second
 	latencyGuardWindow     = 10 * time.Minute
+	// latencyGuardRestProbeEvery is the probe cadence while nothing transfers
+	// and no cap is active: there is no queue to protect, and one sample every
+	// half minute keeps the idle baseline of the window fresh. The next round
+	// after the line starts loading probes again, so the guard reacts within
+	// latencyGuardProbeEvery.
+	latencyGuardRestProbeEvery = 30 * time.Second
 	// latencyGuardRecent is how many samples the current latency is the
 	// median of, so one late answer does not move the caps. Ten seconds at the
 	// two-second probe cadence: a single spike must not cut the line.
@@ -246,6 +252,9 @@ func (d *guardDirection) step(now time.Time, high, hold bool, rateKiB, ceilingKi
 type latencyGuard struct {
 	probe autospeed.Probe
 	usage lineUsage
+	// probedAt is the last latency probe; it paces the probes while the line
+	// rests (probeDue).
+	probedAt time.Time
 
 	mu             sync.Mutex
 	mode           guardMode
@@ -325,6 +334,22 @@ func (g *latencyGuard) ownRates(now time.Time, engine TorrentEngine) (down, up u
 		up += view.UploadRate
 	}
 	return down, up
+}
+
+// probeDue reports whether this round probes the latency: always while Gextto
+// transfers (down, up in bytes/s) or holds a cap, once every
+// latencyGuardRestProbeEvery while the line rests. A due probe is recorded as
+// taken.
+func (g *latencyGuard) probeDue(now time.Time, down, up uint64) bool {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	resting := g.mode == guardFree && g.downCap == 0 && g.upCap == 0 &&
+		down/1024 < latencyGuardIdleKiB && up/1024 < latencyGuardIdleKiB
+	if resting && !g.probedAt.IsZero() && now.Sub(g.probedAt) < latencyGuardRestProbeEvery {
+		return false
+	}
+	g.probedAt = now
+	return true
 }
 
 func newLatencyGuard() *latencyGuard {
@@ -736,17 +761,21 @@ func (g *latencyGuard) tick(now time.Time, cfg *Config, engine TorrentEngine) {
 		g.usage.reset()
 		g.mu.Lock()
 		g.wireAt = time.Time{}
+		g.probedAt = time.Time{}
 		g.mu.Unlock()
 		g.update(now, false, lineGuess{}, 0, 0)
 		return
 	}
+	down, up := g.ownRates(now, engine)
 	// Google and Cloudflare, several targets, best RTT: a single server can be
 	// far away, rate-limited or unreachable, and the router can be wrong or
-	// missing. The minimum of the answers is the line, not the server.
-	if rtt, ok := autospeed.MeasureBest(autospeed.Candidates(cfg.Settings[latencyGuardTargetKey], latencyGuardTargets)); ok {
-		g.probe.Record(now, rtt)
+	// missing. The minimum of the answers is the line, not the server. While
+	// the line rests the probe slows down (probeDue).
+	if g.probeDue(now, down, up) {
+		if rtt, ok := autospeed.MeasureBest(autospeed.Candidates(cfg.Settings[latencyGuardTargetKey], latencyGuardTargets)); ok {
+			g.probe.Record(now, rtt)
+		}
 	}
-	down, up := g.ownRates(now, engine)
 	g.usage.observe(now, down, up)
 	var line lineGuess
 	if latencyGuardRouterEnabled(cfg) {

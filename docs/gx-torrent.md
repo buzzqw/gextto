@@ -2521,7 +2521,9 @@ counterpart of Gextto's *Auto speed*. It measures the line and moves **both
 directions**: the download and the upload are lowered when the line queues and
 raised again while the latency stays at rest.
 
-A probe measures every second the **round-trip latency** with a TCP connection
+A probe measures the **round-trip latency** with a TCP connection to Google and
+Cloudflare every second while something transfers or a cap is active, and every
+30 seconds while the line rests (the first transfer wakes it at once). It goes
 to Google and Cloudflare (`8.8.8.8`, `8.8.4.4`, `1.1.1.1`, `1.0.0.1`), taking the
 lowest answer; a configured host replaces them, and the default gateway (ports
 80, 443, 53) is the fallback when the public probes do not answer. The median of

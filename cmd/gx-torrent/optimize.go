@@ -129,6 +129,7 @@ func (d *Daemon) enableAutoSpeed() {
 	if err := store.Save(); err != nil {
 		logfError("cannot save the automatic speed settings: %v", err)
 	}
+	d.wakeAutoSpeed()
 }
 
 // optimizationStatusHTML shows the measured peaks for information: automatic
