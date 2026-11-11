@@ -69,6 +69,10 @@ type SeriesConfig struct {
 	// When true, a better release never replaces an archived file for this
 	// series. Default false (= upgrades allowed).
 	DisableUpgrades bool `json:"disable_upgrades"`
+	// StatusOverride is the operator's answer to «is this series over?»: ""
+	// leaves it to the sources (series_end_status.go), "ended" or
+	// "continuing" beats them.
+	StatusOverride string `json:"status_override,omitempty"`
 }
 
 // UpgradesAllowed reports whether a better release may replace an archived

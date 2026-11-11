@@ -30,7 +30,23 @@ type Show struct {
 	Name      string `json:"name"`
 	Premiered string `json:"premiered,omitempty"`
 	Status    string `json:"status,omitempty"`
+	// Ended is the date of the last episode of a series TVmaze considers
+	// over ("" while it runs).
+	Ended string `json:"ended,omitempty"`
+	Links struct {
+		NextEpisode *struct {
+			Href string `json:"href"`
+		} `json:"nextepisode,omitempty"`
+	} `json:"_links"`
 }
+
+// HasNextEpisode reports whether TVmaze already lists an upcoming episode.
+func (s Show) HasNextEpisode() bool {
+	return s.Links.NextEpisode != nil && strings.TrimSpace(s.Links.NextEpisode.Href) != ""
+}
+
+// ErrNotFound is returned when TVmaze does not know the series asked for.
+var ErrNotFound = errors.New("tvmaze: not found")
 
 // Episode is one episode of a series.
 type Episode struct {
@@ -67,6 +83,8 @@ func (e Episode) Aired(now time.Time) bool {
 type Client struct {
 	BaseURL string
 	HTTP    *http.Client
+	// UserAgent names the program asking ("gx-torrent" when empty).
+	UserAgent string
 }
 
 // New returns a client with a bounded timeout.
@@ -97,6 +115,40 @@ func (c *Client) Search(ctx context.Context, query string) ([]Show, error) {
 	return out, nil
 }
 
+// Lookup finds a series by an id of another catalog: TheTVDB first, then
+// IMDb. A lookup by id never confuses two series with the same title, which a
+// search by name can. ErrNotFound means TVmaze knows neither id.
+func (c *Client) Lookup(ctx context.Context, thetvdb int64, imdb string) (*Show, error) {
+	imdb = strings.TrimSpace(imdb)
+	tried := false
+	if thetvdb > 0 {
+		tried = true
+		var show Show
+		err := c.get(ctx, fmt.Sprintf("/lookup/shows?thetvdb=%d", thetvdb), &show)
+		if err == nil && show.ID > 0 {
+			return &show, nil
+		}
+		if err != nil && !errors.Is(err, ErrNotFound) {
+			return nil, err
+		}
+	}
+	if strings.HasPrefix(imdb, "tt") {
+		tried = true
+		var show Show
+		err := c.get(ctx, "/lookup/shows?imdb="+url.QueryEscape(imdb), &show)
+		if err == nil && show.ID > 0 {
+			return &show, nil
+		}
+		if err != nil && !errors.Is(err, ErrNotFound) {
+			return nil, err
+		}
+	}
+	if !tried {
+		return nil, errors.New("tvmaze: no id to look up")
+	}
+	return nil, ErrNotFound
+}
+
 // Episodes returns every episode of a series, specials included (season 0).
 func (c *Client) Episodes(ctx context.Context, showID int) ([]Episode, error) {
 	if showID <= 0 {
@@ -125,7 +177,11 @@ func (c *Client) get(ctx context.Context, path string, target any) error {
 		return err
 	}
 	req.Header.Set("Accept", "application/json")
-	req.Header.Set("User-Agent", "gx-torrent")
+	agent := strings.TrimSpace(c.UserAgent)
+	if agent == "" {
+		agent = "gx-torrent"
+	}
+	req.Header.Set("User-Agent", agent)
 	client := c.HTTP
 	if client == nil {
 		client = http.DefaultClient
@@ -135,6 +191,10 @@ func (c *Client) get(ctx context.Context, path string, target any) error {
 		return err
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusNotFound {
+		_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 4096))
+		return ErrNotFound
+	}
 	if resp.StatusCode != http.StatusOK {
 		_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 4096))
 		return fmt.Errorf("tvmaze: HTTP %d", resp.StatusCode)

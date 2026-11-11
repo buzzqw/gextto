@@ -4,6 +4,8 @@ import (
 	"os"
 	"testing"
 	"time"
+
+	"github.com/buzzqw/gextto/internal/tvmaze"
 )
 
 // TestMain shortens the waits that only pace real servers and processes:
@@ -20,5 +22,13 @@ func TestMain(m *testing.M) {
 	tmdbRetryUnit = 5 * time.Millisecond
 	comicsRetryUnit = 5 * time.Millisecond
 	gxAdoptedPollInterval = 20 * time.Millisecond
+	// No test reaches the real TVmaze: a test that wants it installs its own
+	// fake server (series_end_status_test.go).
+	tvmazePacing.gap = 0
+	newSeriesTvmazeClient = func() *tvmaze.Client {
+		client := tvmaze.New()
+		client.BaseURL = "http://127.0.0.1:1"
+		return client
+	}
 	os.Exit(m.Run())
 }

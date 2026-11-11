@@ -714,7 +714,8 @@ func (t *TmdbClient) SeriesInfo(ctx context.Context, name string, tmdbID *string
 	}
 	var value map[string]any
 	rawURL := fmt.Sprintf("%s/tv/%s", tmdbAPIBaseURL, id)
-	if err := t.getJSON(ctx, rawURL, [][2]string{{"language", t.language}}, &value); err != nil {
+	// external_ids carries the TheTVDB and IMDb ids TVmaze is asked by.
+	if err := t.getJSON(ctx, rawURL, [][2]string{{"language", t.language}, {"append_to_response", "external_ids"}}, &value); err != nil {
 		return nil, err
 	}
 	return value, nil

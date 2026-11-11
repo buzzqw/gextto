@@ -351,6 +351,7 @@ var uiSettingsIndex = []uiSettingDef{
 	{Key: "tmdb_api_key", Label: "TMDB API key (consigliata)", Tab: "access", Group: "Servizi metadati"},
 	{Key: "tvdb_api_key", Label: "TVDB API key (alternativa a TMDB)", Tab: "access", Group: "Servizi metadati"},
 	{Key: "tvdb_pin", Label: "TVDB PIN abbonato", Tab: "access", Group: "Servizi metadati"},
+	{Key: "tvmaze_series_status", Label: "Conferma con TVmaze se una serie è terminata", Tab: "access", Group: "Servizi metadati"},
 
 	// --- Diagnostica e aggiornamenti ----------------------------------------
 	{Key: "debug_enabled", Label: "Debug (log dettagliati)", Tab: "system", Group: "Diagnostica"},

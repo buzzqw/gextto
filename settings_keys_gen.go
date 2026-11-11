@@ -212,6 +212,7 @@ const (
 	settingTmdbApiKey                       = "tmdb_api_key"
 	settingTvdbApiKey                       = "tvdb_api_key"
 	settingTvdbPin                          = "tvdb_pin"
+	settingTvmazeSeriesStatus               = "tvmaze_series_status"
 	settingDebugEnabled                     = "debug_enabled"
 	settingUpdateCheck                      = "update_check"
 	settingUpdateCheckHours                 = "update_check_hours"
@@ -452,6 +453,7 @@ var settingKeyNames = []string{
 	"tmdb_api_key",
 	"tvdb_api_key",
 	"tvdb_pin",
+	"tvmaze_series_status",
 	"debug_enabled",
 	"update_check",
 	"update_check_hours",

@@ -418,6 +418,17 @@ not moved, so the files stay where they are. A name already used by another
 series or by one of its aliases is refused with `409`; an empty name, or one
 carrying a slash or a control character, with `400`.
 
+### Whether a series has ended
+
+`POST /api/series/{name}` accepts `status_override`: `auto` (or empty) leaves
+the verdict to the sources, `ended` or `continuing` beats them; any other value
+is refused with `400`. `GET /api/config/library` gives each series, beside
+`tmdb_status` (the TMDB or TVDB status), `next_air_date` (the next announced
+episode), `tvmaze_status`, `status_override` and the combined verdict:
+`series_end_state` (`ended`, `continuing`, `uncertain`, `upcoming` or empty),
+`series_end_source` (`manual`, `schedule`, `tmdb`, `tvdb` or `tvmaze`) and
+`series_end_conflict` (true when TMDB and TVmaze give opposite answers).
+
 ### Audio preferences
 
 `POST /api/tmdb/add`, `POST /api/series/{name}` and `POST /api/movies/{id}`

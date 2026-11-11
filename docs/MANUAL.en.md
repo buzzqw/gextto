@@ -381,9 +381,35 @@ The most important fields of the page:
 | **Alias** | other names under which the series appears in releases |
 | **Exclusions** | words that reject a release |
 | **TMDB ID / TVDB ID** | identify the series in the two services; a wrong ID is fixed here. They are independent: saving one does not clear the other |
+| **Series status** | *Automatic* lets the sources decide (see below); *Ended* or *Running* beats every source, for when you know something the sources have not recorded yet |
 
 **Minimum audio** and **Allow upgrades** are not on the page: they come from
 the profile and are changed with [Edit selected](#editing-several-titles-at-once).
+
+### When a series has ended
+
+Gextto marks a series as ended (🏁) by putting four signals together, strongest
+first:
+
+1. **your choice** in *Series status*, which beats everything else;
+2. **a next episode with a date**: if TMDB (or TVDB) announces an episode from
+   today on, the series is **▶ running**, whatever the status says;
+3. **the TMDB status** (or TVDB's without the TMDB key): *Ended* or *Canceled*
+   mark it as ended;
+4. **TVmaze**, a free second opinion with no key, which often records
+   cancellations sooner. If TVmaze says the series is over while TMDB still has
+   it running, Gextto marks it as ended; if TVmaze is waiting for the renewal
+   decision and no episode is announced, it shows **⏳ renewal uncertain**.
+
+When TMDB and TVmaze give opposite answers, the page also shows **⚠ sources
+disagree**: you decide with *Series status*. Hovering the label tells you who
+decided it. The signals are refreshed once a day, together with the metadata, or
+at once with **Update from TMDB**. Only the TVDB and IMDb ids of the series are
+sent to TVmaze; turn it off with *Confirm with TVmaze whether a series has
+ended*, in *Settings → Access and services*.
+
+It is only a label: an ended series is still searched like the others, because
+missing episodes can always show up. To stop searching for it, pause it.
 
 ### The episodes
 
@@ -2618,6 +2644,7 @@ them is explained in [Access keys](api-keys.md).
 | TMDB API key (recommended) | Free TMDB API key: the main source of titles, posters and metadata. When set, it takes precedence over TVDB. |
 | TVDB API key (alternative to TMDB) | TheTVDB v4 API key: without the TMDB key it provides all the metadata. |
 | TVDB subscriber PIN | TheTVDB subscription PIN, asked at login only by “user-supported” keys. |
+| Confirm with TVmaze whether a series has ended | Once a day, asks TVmaze (free, no key) for the status of every series, besides TMDB or TVDB: TVmaze records cancellations sooner. Only the TVDB and IMDb ids of the series are sent to TVmaze. |
 
 #### Metadata: TMDB or TVDB
 

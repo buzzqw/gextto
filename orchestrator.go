@@ -2213,7 +2213,7 @@ func refreshSeriesMetadata(ctx context.Context, cfg *Config, db *Database) {
 	if !meta.Configured() {
 		return
 	}
-	knownStatuses, _ := db.SeriesStatuses()
+	knownStatuses, _ := db.SeriesEndRecords()
 	for i := range cfg.Series {
 		if ctx != nil && ctx.Err() != nil {
 			return
@@ -2228,7 +2228,7 @@ func refreshSeriesMetadata(ctx context.Context, cfg *Config, db *Database) {
 		}
 		// Fetch the status even when season metadata is recent if the status
 		// has never been persisted (the first refresh).
-		_, known := knownStatuses[series.Name]
+		previous, known := knownStatuses[series.Name]
 		needsStatus := !known
 		if !stale && !needsStatus {
 			continue
@@ -2251,13 +2251,11 @@ func refreshSeriesMetadata(ctx context.Context, cfg *Config, db *Database) {
 				logging.Debug("season metadata refresh failed", "series", series.Name, "source", meta.Source(), "error", err)
 			}
 		}
-		// Persist the status ("Ended"/"Returning Series") for the series-list
-		// badge.
+		// Persist the end-of-series signals (provider status, next episode,
+		// TVmaze) for the series-list badge.
 		if info, err := meta.SeriesInfo(ctx, series.Name, seriesID); err == nil && info != nil {
-			status, _ := info["status"].(string)
-			lastAirDate, _ := info["last_air_date"].(string)
-			if err := db.SaveSeriesStatus(series.Name, status, lastAirDate); err != nil {
-				logging.Warn("series status save failed", "series", series.Name, "error", err)
+			if _, err := refreshSeriesEndRecord(ctx, cfg, db, series, info, previous); err != nil {
+				logging.Warn("The status of a series could not be saved", "series", series.Name, "error", err)
 			}
 		}
 	}

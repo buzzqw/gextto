@@ -1078,6 +1078,10 @@ func (d *Database) migrate() error {
 		// Since when a magnet is waiting for its file list (monitor_metadata):
 		// the give-up clock must not start over at every restart.
 		{"torrent_meta", "metadata_wait_since", "TEXT DEFAULT ''"},
+		// The end-of-series signals beside the provider status
+		// (series_end_status.go): the announced next episode and TVmaze's view.
+		{"series_status", "next_air_date", "TEXT NOT NULL DEFAULT ''"},
+		{"series_status", "tvmaze_status", "TEXT NOT NULL DEFAULT ''"},
 		{"series", "timeframe", "INTEGER DEFAULT 0"},
 		{"series", "ignored_seasons", "TEXT DEFAULT '[]'"},
 		{"series", "subtitle", "TEXT DEFAULT ''"},
@@ -4453,6 +4457,33 @@ func (d *Database) SaveSeriesMetadata(seriesName string, counts [][2]int64) erro
 func (d *Database) SaveSeriesStatus(seriesName, status, lastAirDate string) error {
 	_, err := d.db.Exec("INSERT INTO series_status(series_name,status,last_air_date,updated_at) VALUES (?1,?2,?3,?4) ON CONFLICT(series_name) DO UPDATE SET status=excluded.status,last_air_date=excluded.last_air_date,updated_at=excluded.updated_at", seriesName, status, lastAirDate, nowSQLite())
 	return err
+}
+
+// SaveSeriesEndRecord stores every end-of-series signal of a series: the
+// provider status and dates, and TVmaze's status ("" when not asked).
+func (d *Database) SaveSeriesEndRecord(seriesName string, record SeriesEndRecord) error {
+	_, err := d.db.Exec("INSERT INTO series_status(series_name,status,last_air_date,next_air_date,tvmaze_status,updated_at) VALUES (?1,?2,?3,?4,?5,?6) ON CONFLICT(series_name) DO UPDATE SET status=excluded.status,last_air_date=excluded.last_air_date,next_air_date=excluded.next_air_date,tvmaze_status=excluded.tvmaze_status,updated_at=excluded.updated_at",
+		seriesName, record.Status, record.LastAirDate, record.NextAirDate, record.TvmazeStatus, nowSQLite())
+	return err
+}
+
+// SeriesEndRecords returns the stored end-of-series signals of every series.
+func (d *Database) SeriesEndRecords() (map[string]SeriesEndRecord, error) {
+	rows, err := d.db.Query("SELECT series_name,status,last_air_date,COALESCE(next_air_date,''),COALESCE(tvmaze_status,'') FROM series_status")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	records := make(map[string]SeriesEndRecord)
+	for rows.Next() {
+		var name string
+		var record SeriesEndRecord
+		if err := rows.Scan(&name, &record.Status, &record.LastAirDate, &record.NextAirDate, &record.TvmazeStatus); err != nil {
+			return nil, err
+		}
+		records[name] = record
+	}
+	return records, rows.Err()
 }
 
 // SeriesStatuses returns every stored series status.

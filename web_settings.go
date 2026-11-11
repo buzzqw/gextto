@@ -386,10 +386,12 @@ func RenameAll(w http.ResponseWriter, r *http.Request, s *AppState) {
 // last download of every series.
 func LibraryView(w http.ResponseWriter, r *http.Request, s *AppState) {
 	cfg := latestConfig(s)
-	statuses, err := s.db.SeriesStatuses()
-	if err != nil || statuses == nil {
-		statuses = map[string]string{}
+	records, err := s.db.SeriesEndRecords()
+	if err != nil || records == nil {
+		records = map[string]SeriesEndRecord{}
 	}
+	provider := seriesMetadataFor(cfg).Source()
+	now := time.Now()
 	seasonCounts, err := s.db.SeriesSeasonCountsBulk()
 	if err != nil || seasonCounts == nil {
 		seasonCounts = map[string][][2]int64{}
@@ -424,6 +426,7 @@ func LibraryView(w http.ResponseWriter, r *http.Request, s *AppState) {
 				}
 			}
 		}
+		verdict := seriesEndVerdict(series.StatusOverride, records[series.Name], provider, now)
 		seriesItems = append(seriesItems, map[string]any{
 			"name":                series.Name,
 			"seasons":             series.Seasons,
@@ -441,7 +444,13 @@ func LibraryView(w http.ResponseWriter, r *http.Request, s *AppState) {
 			"episodes_total":      total,
 			"episodes_downloaded": downloaded,
 			"last_downloaded_at":  last,
-			"tmdb_status":         statuses[series.Name],
+			"tmdb_status":         records[series.Name].Status,
+			"next_air_date":       records[series.Name].NextAirDate,
+			"tvmaze_status":       records[series.Name].TvmazeStatus,
+			"status_override":     series.StatusOverride,
+			"series_end_state":    verdict.State,
+			"series_end_source":   verdict.Source,
+			"series_end_conflict": verdict.Disagreement,
 		})
 	}
 	movieItems := make([]map[string]any, 0, len(cfg.Movies))

@@ -843,14 +843,18 @@ func v2FormatCell(item map[string]any, column uiColumn) template.HTML {
 		total := v2Float(item["episodes_total"])
 		done := v2Float(item["episodes_downloaded"])
 		complete := total > 0 && done >= total
-		status := strings.ToLower(v2String(item["tmdb_status"]))
-		ended := status == "ended" || status == "canceled" || status == "cancelled"
+		// The verdict combines the operator's choice, the announced next
+		// episode, TMDB/TVDB and TVmaze (series_end_status.go).
+		state := v2String(item["series_end_state"])
+		ended := state == seriesEndEnded
 		enabled := v2Truthy(item["enabled"])
 		switch {
 		case ended && complete:
 			return `<span class="badge ok" title="Serie terminata e completa">🏁 ✓✓</span>`
 		case ended:
 			return `<span class="badge" title="Serie terminata: mancano ancora episodi">🏁 terminata</span>`
+		case state == seriesEndUncertain:
+			return `<span class="badge warn" title="Nessuna puntata annunciata: TVmaze attende la decisione sul rinnovo">⏳ rinnovo incerto</span>`
 		case complete:
 			return `<span class="badge" title="Al passo con gli episodi pubblicati">✓ in pari</span>`
 		}

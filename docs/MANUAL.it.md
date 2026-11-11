@@ -382,9 +382,37 @@ I campi della scheda più importanti:
 | **Alias** | altri nomi con cui la serie compare nelle release |
 | **Esclusioni** | parole che scartano una release |
 | **ID TMDB / ID TVDB** | identificano la serie nei due servizi; un ID sbagliato si corregge qui. Sono indipendenti: salvarne uno non cancella l'altro |
+| **Stato della serie** | *Automatico* lascia decidere alle fonti (vedi sotto); *Terminata* o *In corso* vale più di qualsiasi fonte, quando sai qualcosa che le fonti non hanno ancora registrato |
 
 **Audio minimo** e **Permetti upgrade** non sono nella scheda: arrivano dal
 profilo e si cambiano con [Modifica selezionati](#modificare-più-titoli-insieme).
+
+### Quando una serie è terminata
+
+Gextto segna una serie come terminata (🏁) mettendo insieme quattro segnali, dal
+più forte:
+
+1. **la tua scelta** in *Stato della serie*, che vale più di tutto il resto;
+2. **una prossima puntata con la data**: se TMDB (o TVDB) annuncia un episodio
+   da oggi in poi, la serie è **▶ in corso**, qualunque cosa dica lo stato;
+3. **lo stato di TMDB** (o di TVDB senza la chiave TMDB): *Ended* o *Canceled*
+   la segnano come terminata;
+4. **TVmaze**, una seconda opinione gratuita e senza chiave, che spesso registra
+   prima le cancellazioni. Se TVmaze dice che la serie è finita mentre TMDB la
+   dà ancora in corso, Gextto la segna come terminata; se TVmaze aspetta la
+   decisione sul rinnovo e nessuna puntata è annunciata, mostra **⏳ rinnovo
+   incerto**.
+
+Quando TMDB e TVmaze danno risposte opposte, la scheda mostra anche **⚠ fonti in
+disaccordo**: decidi tu con *Stato della serie*. Passando sopra l'etichetta vedi
+chi l'ha decisa. I segnali si aggiornano una volta al giorno, insieme ai
+metadati, o subito con **Aggiorna da TMDB**. A TVmaze vanno solo gli
+identificativi TVDB e IMDb della serie; si spegne con *Conferma con TVmaze se
+una serie è terminata*, in *Impostazioni → Accesso e servizi*.
+
+È solo un'etichetta: una serie terminata continua a essere cercata come le
+altre, perché le puntate mancanti possono sempre uscire. Per smettere di
+cercarla, mettila in pausa.
 
 ### Gli episodi
 
@@ -2639,6 +2667,7 @@ serve poi riavviare il demone perché venga applicato. Cosa sono e come si usano
 | TMDB API key (consigliata) | Chiave API TMDB, gratuita: fonte principale di titoli, poster e metadati. Se c'è, ha la precedenza su TVDB. |
 | TVDB API key (alternativa a TMDB) | Chiave API v4 di TheTVDB: senza la chiave TMDB fornisce tutti i metadati. |
 | TVDB PIN abbonato | PIN dell'abbonamento TheTVDB, richiesto al login solo dalle chiavi «user-supported». |
+| Conferma con TVmaze se una serie è terminata | Una volta al giorno chiede a TVmaze (gratuito, senza chiave) lo stato di ogni serie, oltre a TMDB o TVDB: TVmaze registra prima le cancellazioni. A TVmaze vanno solo gli identificativi TVDB e IMDb della serie. |
 
 #### Metadati: TMDB o TVDB
 

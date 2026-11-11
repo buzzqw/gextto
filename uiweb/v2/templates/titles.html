@@ -33,6 +33,8 @@
           {{if .Gaps}}<span class="badge warn">{{tr .Gaps}} <span>{{tr "mancanti"}}</span></span>{{end}}
            <span class="badge {{if .Enabled}}ok{{else}}warn{{end}}">{{if .Enabled}}{{tr "attiva"}}{{else}}{{tr "in pausa"}}{{end}}</span>
            <span class="badge">{{tr .StatusLabel}}</span>
+           {{if .EndLabel}}<span class="badge" {{trTitle .EndTitle}}>{{tr .EndLabel}}<span class="sr-only">: {{tr .EndTitle}}</span></span>{{end}}
+           {{if .EndConflict}}<span class="badge warn" {{trTitle "Le fonti non sono d'accordo su questa serie: puoi decidere tu in «Stato della serie»"}}>{{tr "⚠ fonti in disaccordo"}}<span class="sr-only">: {{tr "Le fonti non sono d'accordo su questa serie: puoi decidere tu in «Stato della serie»"}}</span></span>{{end}}
            {{if .Year}}<span class="badge">{{tr .Year}}</span>{{end}}{{if .Network}}<span class="badge">{{tr .Network}}</span>{{end}}{{if .Country}}<span class="badge">{{tr .Country}}</span>{{end}}{{if .Vote}}<span class="badge">★ {{.Vote}}</span>{{end}}{{if .LastAirDate}}<span class="badge"><span>{{tr "ultima"}}</span> {{tr .LastAirDate}}</span>{{end}}{{if .NextEpisode}}<span class="badge"><span>{{tr "Prossima:"}}</span> {{tr .NextEpisode}}</span>{{end}}
          </div>
         {{if .Genres}}<div class="series-genres">{{range .Genres}}<span class="badge">{{tr .}}</span>{{end}}</div>{{end}}
@@ -123,6 +125,7 @@
         <label class="field span-full"><span>{{tr "Escludi"}}</span><input class="input" name="exclude" value="{{.Exclude}}" /></label>
         <input type="hidden" name="flags" value="1" />
         <label class="field" {{trTitle "Le release degli anime numerano gli episodi dall'inizio senza stagioni («Titolo - 1071»): Gextto converte il numero in stagione ed episodio con i dati TMDB e cerca anche il numero assoluto."}}><span>{{tr "Anime (numerazione assoluta)"}}</span><select class="input" name="anime"><option value="false"{{if not .Anime}} selected{{end}}>{{tr "No"}}</option><option value="true"{{if .Anime}} selected{{end}}>{{tr "Sì"}}</option></select></label>
+        <label class="field" {{trTitle "Automatico: decidono TMDB (o TVDB), la data della prossima puntata e TVmaze. Terminata o In corso: la tua scelta vale più delle fonti. È solo un'etichetta: per smettere di cercare la serie mettila in pausa."}}><span>{{tr "Stato della serie"}}</span><select class="input" name="status_override"><option value="auto"{{if eq .StatusOverride ""}} selected{{end}}>{{tr "Automatico (decidono le fonti)"}}</option><option value="ended"{{if eq .StatusOverride "ended"}} selected{{end}}>{{tr "Terminata"}}</option><option value="continuing"{{if eq .StatusOverride "continuing"}} selected{{end}}>{{tr "In corso"}}</option></select></label>
         <div class="form-actions"><button class="btn primary" type="submit">{{tr "Salva serie"}}</button></div>
       </form>
     </div>

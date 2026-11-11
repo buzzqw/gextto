@@ -31,6 +31,9 @@ type SeriesUpdateInput struct {
 	DisableUpgrades  *bool     `json:"disable_upgrades"`
 	Anime            *bool     `json:"anime"`
 	Timeframe        *int64    `json:"timeframe"`
+	// StatusOverride is «Serie terminata?»: "" or "auto" (the sources
+	// decide), "ended" or "continuing".
+	StatusOverride *string `json:"status_override"`
 	// QualityProfileID, when above 0, copies that profile's quality, audio,
 	// language, subtitles and upgrade switch into the series and adds its
 	// exclusions to the series' own (the profile is a template).
@@ -187,6 +190,14 @@ func UpdateSeries(w http.ResponseWriter, r *http.Request, s *AppState) {
 	}
 	if input.Timeframe != nil {
 		series.Timeframe = max(*input.Timeframe, 0)
+	}
+	if input.StatusOverride != nil {
+		override, ok := normalizeSeriesStatusOverride(*input.StatusOverride)
+		if !ok {
+			jsonError(w, http.StatusBadRequest, "status_override must be auto, ended or continuing")
+			return
+		}
+		series.StatusOverride = override
 	}
 	if input.QualityProfileID != nil && *input.QualityProfileID > 0 {
 		profile, ok := qualityProfileExact(ensureQualityProfiles(s), *input.QualityProfileID)

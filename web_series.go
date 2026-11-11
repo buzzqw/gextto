@@ -1268,8 +1268,12 @@ func SeriesMetadataRefresh(w http.ResponseWriter, r *http.Request, s *AppState) 
 		return
 	}
 	if info, err := meta.SeriesInfo(ctx, series.Name, &resolved); err == nil && info != nil {
-		if err := s.db.SaveSeriesStatus(series.Name, gh7JsonString(info, "status"), gh7JsonString(info, "last_air_date")); err != nil {
-			logging.Warn("series status save failed", "series", series.Name, "error", err.Error())
+		previous := SeriesEndRecord{}
+		if records, err := s.db.SeriesEndRecords(); err == nil {
+			previous = records[series.Name]
+		}
+		if _, err := refreshSeriesEndRecord(ctx, &cfg, s.db, &series, info, previous); err != nil {
+			logging.Warn("The status of a series could not be saved", "series", series.Name, "error", err.Error())
 		}
 	}
 	stored := false

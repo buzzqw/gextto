@@ -201,6 +201,7 @@ var uiSettingDefaults = map[string]string{
 	"pack_inspection_prioritize": "false",
 	"debug_enabled":              "false",
 	"update_check":               "true",
+	"tvmaze_series_status":       "true",
 	"update_check_hours":         "6",
 
 	// --- Acquisizione -------------------------------------------------------

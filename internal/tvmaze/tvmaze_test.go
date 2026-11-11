@@ -2,6 +2,7 @@ package tvmaze
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -51,5 +52,40 @@ func TestClientRejectsBadResponses(t *testing.T) {
 	}
 	if _, err := c.Episodes(context.Background(), 0); err == nil {
 		t.Fatal("an invalid id must be an error")
+	}
+}
+
+func TestLookupByIDs(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/lookup/shows" {
+			http.NotFound(w, r)
+			return
+		}
+		switch {
+		case r.URL.Query().Get("thetvdb") == "77":
+			_, _ = w.Write([]byte(`{"id":5,"name":"Series A","status":"Ended","ended":"2024-05-01","_links":{"self":{"href":"x"}}}`))
+		case r.URL.Query().Get("imdb") == "tt0000042":
+			_, _ = w.Write([]byte(`{"id":6,"name":"Series B","status":"Running","_links":{"nextepisode":{"href":"https://api.tvmaze.com/episodes/1"}}}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer srv.Close()
+	c := New()
+	c.BaseURL = srv.URL
+	show, err := c.Lookup(context.Background(), 77, "")
+	if err != nil || show.Status != "Ended" || show.Ended != "2024-05-01" || show.HasNextEpisode() {
+		t.Fatalf("thetvdb lookup = %+v err=%v", show, err)
+	}
+	// An unknown TVDB id falls back to IMDb.
+	show, err = c.Lookup(context.Background(), 99, "tt0000042")
+	if err != nil || show.ID != 6 || !show.HasNextEpisode() {
+		t.Fatalf("imdb fallback = %+v err=%v", show, err)
+	}
+	if _, err := c.Lookup(context.Background(), 99, "tt1"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("unknown ids: err=%v, want ErrNotFound", err)
+	}
+	if _, err := c.Lookup(context.Background(), 0, ""); err == nil || errors.Is(err, ErrNotFound) {
+		t.Fatalf("no ids: err=%v, want a plain error", err)
 	}
 }

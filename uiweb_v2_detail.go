@@ -87,6 +87,10 @@ func V2SeriesSave(w http.ResponseWriter, r *http.Request, s *AppState) {
 				fields[key] = r.FormValue(key)
 			}
 		}
+		// «Serie terminata?» is sent only when the page carries it.
+		if _, ok := r.Form["status_override"]; ok {
+			fields["status_override"] = r.FormValue("status_override")
+		}
 		if id, err := strconv.Atoi(strings.TrimSpace(r.FormValue("quality_profile_id"))); err == nil && id > 0 {
 			fields["quality_profile_id"] = id
 		}

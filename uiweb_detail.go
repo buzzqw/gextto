@@ -63,6 +63,15 @@ type uiSeriesDetail struct {
 	Enabled         bool
 	Anime           bool
 	DisableUpgrades bool
+	// StatusOverride is the «Stato della serie» choice: "" (automatic),
+	// "ended" or "continuing".
+	StatusOverride string
+	// EndLabel and EndTitle are the badge of the end-of-series verdict
+	// (empty when nothing is known); EndConflict adds the "sources disagree"
+	// badge.
+	EndLabel    string
+	EndTitle    string
+	EndConflict bool
 	// Profiles is the «Profilo di qualità» choice of the page.
 	Profiles        v2TitleProfiles
 	Episodes        []uiEpisodeRow
@@ -97,6 +106,40 @@ type uiDetailPerson struct {
 type uiSeasonButton struct {
 	Season  int64
 	Ignored bool
+}
+
+// uiSeriesEndBadge returns the text and the explanation of the badge of an
+// end-of-series verdict. Every string is fixed so the catalogs translate it.
+func uiSeriesEndBadge(verdict SeriesEndVerdict) (string, string) {
+	switch verdict.State {
+	case seriesEndEnded:
+		switch verdict.Source {
+		case seriesEndSourceManual:
+			return "🏁 terminata", "Segnata come terminata a mano in «Stato della serie»"
+		case seriesEndSourceTvmaze:
+			return "🏁 terminata", "Secondo TVmaze non usciranno altre puntate"
+		case "tvdb":
+			return "🏁 terminata", "Secondo TVDB non usciranno altre puntate"
+		}
+		return "🏁 terminata", "Secondo TMDB non usciranno altre puntate"
+	case seriesEndContinuing:
+		switch verdict.Source {
+		case seriesEndSourceManual:
+			return "▶ in corso", "Segnata come in corso a mano in «Stato della serie»"
+		case seriesEndSourceSchedule:
+			return "▶ in corso", "C'è già una data per la prossima puntata"
+		case seriesEndSourceTvmaze:
+			return "▶ in corso", "Secondo TVmaze la serie continua"
+		case "tvdb":
+			return "▶ in corso", "Secondo TVDB la serie continua"
+		}
+		return "▶ in corso", "Secondo TMDB la serie continua"
+	case seriesEndUncertain:
+		return "⏳ rinnovo incerto", "Nessuna puntata annunciata: TVmaze attende la decisione sul rinnovo"
+	case seriesEndUpcoming:
+		return "🕒 in arrivo", "Annunciata, nessuna puntata ancora uscita"
+	}
+	return "", ""
 }
 
 // uiSeriesStatusLabel mirrors rextto's series status wording.
@@ -328,6 +371,14 @@ func uiSeriesDetailFrom(s *AppState, r *http.Request) (uiSeriesDetail, bool) {
 		TmdbURL:         tmdbURL(series.TmdbID, "tv"),
 		TvdbURL:         tvdbURL(series.TvdbID, "series"),
 	}
+	detail.StatusOverride = series.StatusOverride
+	record := SeriesEndRecord{}
+	if records, err := s.db.SeriesEndRecords(); err == nil {
+		record = records[series.Name]
+	}
+	verdict := seriesEndVerdictFor(cfg, series, record)
+	detail.EndLabel, detail.EndTitle = uiSeriesEndBadge(verdict)
+	detail.EndConflict = verdict.Disagreement && verdict.Source != seriesEndSourceManual
 	// The v2 interface is served at /. Load the metadata so the root UI
 	// renders poster, genres and cast.
 	uiSeriesMetadataFrom(s, series.Name, &detail)
