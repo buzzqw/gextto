@@ -295,12 +295,23 @@ func TestRecheckRestartsWithoutWaitingForTheTick(t *testing.T) {
 	d.mu.Lock()
 	handle, _ := d.findLocked(hash)
 	d.mu.Unlock()
+	requested := time.Now()
 	if err := d.verify(hash); err != nil {
 		t.Fatal(err)
 	}
+	// A 300 KB file is rechecked in a few milliseconds: the stopped status can
+	// pass between two polls. The torrent's history keeps the line, so the test
+	// waits for the stop there instead of catching the status while it lasts.
 	waitForLong(t, "the recheck to stop the torrent", recheckTestBudget, func() bool {
-		return !isRunning(handle.Stats().Status) || handle.Stats().Status == torrent.Verifying
+		for _, entry := range d.tlog.entries(hash) {
+			if entry.Msg == "Stopped" && !entry.At.Before(requested) {
+				return true
+			}
+		}
+		return false
 	})
+	// The queue restarts it at once: a ten-minute wait for the tick would not
+	// reach seeding inside this budget.
 	waitForLong(t, "the torrent to run again after the recheck", recheckTestBudget, func() bool {
 		return handle.Stats().Status == torrent.Seeding
 	})
