@@ -26,10 +26,10 @@ Nothing open: every engine item waits for a condition listed under
   and the absolute-episode parser still use regexes, under 10 % of a cycle. Gate: a
   profile where the regexp share climbs back above 20 % of a cycle; then replace the
   next pattern and re-measure on the same corpus.
-- **Cycle allocation churn** — the film match, which was most of a cycle's allocations,
-  is fixed; `encoding/xml` and the HTML parser are a few percent each, and the archive
-  write (`SaveBatch`, `RecordSeenBatch`) is the next large share. Gate: the profile of a
-  cycle after the film-match fix showing what is left, then the largest share first.
+- **Cycle allocation churn** — the film match is fixed; what is left of a cycle's
+  allocations is the indexer and feed replies (`encoding/xml` tokenizer, HTML parser,
+  response bodies, about half) and the release score (10 %). Gate: a reply parser that
+  reads the items without copying every token, measured on the same corpus.
 - **Functions too long to review** — the search scheduler (`cycleWorker`) and the rest of
   the candidate pass (`candidatePass.try`, still about 300 lines around the closures that
   resolve the link and check an in-progress pack): split them by phase, as the

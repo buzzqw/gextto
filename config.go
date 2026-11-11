@@ -1859,29 +1859,26 @@ func movieTitleMatchFor(movie *MovieConfig, releaseWords []string) movieTitleMat
 	if len(releaseWords) == 0 {
 		return best
 	}
-	tiers := make([][]string, 0, 4)
-	tiers = append(tiers, []string{movie.Name})
-	tiers = append(tiers, []string{movie.OriginalTitle})
-	tiers = append(tiers, movie.Aliases)
-	translations := make([]string, 0, len(movie.TitleTranslations))
-	for _, title := range movie.TitleTranslations {
-		translations = append(translations, title)
-	}
-	tiers = append(tiers, translations)
-	for tier, titles := range tiers {
-		for _, value := range titles {
-			words, usable := libraryTitleWords(value)
-			if !usable {
-				continue
-			}
-			if !wordsOpenTitle(releaseWords, words) {
-				continue
-			}
-			candidate := movieTitleMatch{words: len(words), tier: tier}
-			if candidate.betterThan(best) {
-				best = candidate
-			}
+	// No slice is built per call: this runs for every release against every
+	// monitored film, and the per-call lists were a tenth of a cycle's
+	// allocations.
+	consider := func(value string, tier int) {
+		words, usable := libraryTitleWords(value)
+		if !usable || !wordsOpenTitle(releaseWords, words) {
+			return
 		}
+		candidate := movieTitleMatch{words: len(words), tier: tier}
+		if candidate.betterThan(best) {
+			best = candidate
+		}
+	}
+	consider(movie.Name, 0)
+	consider(movie.OriginalTitle, 1)
+	for _, alias := range movie.Aliases {
+		consider(alias, 2)
+	}
+	for _, title := range movie.TitleTranslations {
+		consider(title, 3)
 	}
 	return best
 }

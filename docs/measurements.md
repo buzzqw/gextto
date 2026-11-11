@@ -329,7 +329,12 @@ allocations** (4.75 GB of 6.0): every release was compared with every name, alia
 translation of every monitored film, and each library title was reduced to words again each
 time. The reduced titles are now cached, as they change only with the configuration.
 `BenchmarkFindMovieMatch` (35 films with 25 titles each, one release): **0.15 ms against
-1.80 ms** (12×) and **125 allocations against 13,146**.
+1.80 ms** (12×) and **26 allocations against 13,146** (the title lists are no longer
+rebuilt for each film either: 26 against 131, 2.1 KB against 8.9 KB).
+
+A full search before and after (same host, 2026-11-10/11, ~46,500 releases): **1.99 GB
+allocated against 5.90 GB**, **49 s of CPU against 80 s**. Half of the rest is the indexer
+and feed replies.
 
 ### The web page
 
