@@ -9,15 +9,14 @@ in [`measurements.md`](measurements.md).
 **Rule.** No speculative work: an item starts only when its gate is met. An item with no
 gate is ready to pick up. Every idea proposed by the operator or by the assistant in a
 working session is written here in the same cycle: under the matching area once accepted,
-under [Proposals](#proposals) while it is still a decision, and under
-[Not planned](#not-planned) when rejected. An idea must not stay only in the chat. Do not
-add a diary: a sentence that would still be true after the item lands does not belong
-here.
+under [Proposals](#proposals) while it is still a decision. A rejected idea is not
+recorded: this file holds only work that will be done. An idea must not stay only in the
+chat. Do not add a diary: a sentence that would still be true after the item lands does
+not belong here.
 
 ## Engine (gx-core, gx-torrent)
 
-Nothing open: every engine item waits for a condition listed under
-[Not planned](#not-planned), or is a proposal below.
+Nothing open: the engine items are proposals below.
 
 ## Gextto, acquisition and UI
 
@@ -45,10 +44,14 @@ Nothing open: every engine item waits for a condition listed under
   benchmark rule in `AGENTS.md`; every future round replaces those rows and the
   tables, and nothing else. Gate: a round finished.
 
+Designs rejected on a measurement are not tracked here: they stay in
+[`measurements.md`](measurements.md#closed-designs), with the number that closed each one.
+Do not reopen one without new data.
+
 ## Proposals
 
 Ideas proposed but not decided yet. An accepted proposal moves to the matching area with
-its gate; a rejected one moves to *Not planned*.
+its gate; a rejected one is removed from this file.
 
 - **Autospeed, a quieter signal** — probe the first router past the home line (TTL-limited
   ICMP echoes on unprivileged ping sockets, the first public hop) instead of a TCP connect
@@ -78,93 +81,3 @@ its gate; a rejected one moves to *Not planned*.
   256 KiB segments as blocks land would hold only the bytes received. It touches the hash
   (v1 and v2), the write, web seeds and the local block merge. Gate: a measurement where
   those pieces dominate the memory, with the full-speed download still at 290 MB/s.
-## Not planned
-
-Closed by choice, not waiting for a measurement:
-
-- Embedded tracker (an HTTP announce endpoint of its own): the operator chose not to
-  build it in this cycle.
-- HTTPS on the web interface: the operator chose to keep a TLS terminator in front.
-- Build-time source patching, libtorrent 1.2/2.x variants and musl/glibc «static-ish»
-  builds: gx-core is our own pure-Go code with no libtorrent, and the daemon already
-  links nothing (`CGO_ENABLED=0`), so there is no third-party tree to patch and no
-  second way to build it.
-- Distribution parity with qbittorrent-nox-static (one-line installer, user unit, extra
-  architectures, provenance/SBOM, published image, mounting under a sub-path): packaging
-  work, not native client features, and not the direction chosen by the operator.
-- Notification texts in the interface language: the daemon's page is translated, the
-  messages it sends (Telegram, Discord, Slack, Gotify, ntfy, Pushover, webhook, e-mail,
-  script) stay in English on purpose — a channel can be shared by several people and the
-  text is also read by scripts.
-- The web engine `torrentz.eu.com` (checked on 2026-11-10): it is an article page about
-  Torrentz with a **Google Custom Search** widget on it (`cse.google.com/cse.js`), and no
-  search backend of its own — `/search?q=`, `/search/<q>/`, `/any?q=` and `/rss?q=` all
-  answer `404`, `/?q=` returns the same 14 KB page, and no line of it carries a magnet or
-  a torrent row. The `#gsc.tab=0` in the address is the widget's own tab. There is nothing
-  for an engine to read: the results would be Google's, not torrents. Gate: a server-side
-  search that returns torrents with magnets, in HTML, from the site itself.
-- One switch for test mode (merging `dry_run` into «Automatic cycle»): the operator does
-  not want to invest in it — users want to download, not to test; `--dry-run` stays for
-  the test suites.
-- Preventing a second row when the same film or series is added under another spelling
-  (a colon present or absent, one hyphen more, a double space): the operator does not
-  mind the duplicated rows, and the release match already ignores punctuation.
-- Listing every vanished episode inside the one line per series: the operator found the
-  list excessive; the line says how many library files are missing.
-
-- A night refresh of the episode titles: the periodic library check already retries the
-  "Episodio N" names and falls back to the English title; the files that keep the
-  placeholder have no title at the provider in any language.
-
-- WebTorrent/WebRTC peers: niche, and the reference WebSocket tracker serves only
-  WebRTC peers to a WebSocket client.
-- Native I2P: reachable through a SOCKS5/HTTP proxy.
-- Alternative MSE stream ciphers (the AES-128-CTR of libtorrent PR 8585): the cipher is
-  negotiated between the two ends, so it is worth nothing on a swarm where no other client
-  speaks it.
-- HTTP/2 for announces: an announce is one small request per interval and the shared
-  HTTP/1.1 transport already reuses the connection (libtorrent PR 8025).
-- Pieces above 16 MiB when creating a torrent: older clients refuse them, and a torrent of
-  several terabytes still works with more pieces.
-- Alternative storages (blob, bolt, SQLite).
-- `share_mode` (libtorrent's on-demand mode for ratio farming): the operator chose not to
-  build it — it leaves torrents incomplete on disk and Gextto is a library, not a seedbox.
-- Removing the dead `share_mode`/`upload_mode` fields from the torrent view: nothing reads
-  or sets them, they only show up as `false` in `/api/torrents`, and the operator chose to
-  leave them where they are.
-- Splitting `package gextto` into packages and `*Database` into several types: a large
-  reorganisation with no effect for the people who use Gextto and no defect it would
-  remove today; the phase splits and the behaviour tests already make the long code
-  reviewable.
-- Log lines built from structured fields instead of sentences: the log rules ask for
-  natural sentences, which is what `Sprintf` builds.
-- Splitting `formatEventLang`: long but linear, and a mistake there shows at once in a
-  notification text.
-- Full `*arr` v3 compatibility, multi-user authentication, Usenet, write-back cache,
-  specialist fields in the add form, a content layout in Gextto's Add dialog, a UI
-  benchmark in CI, a cache cap on NFS, Trakt.
-
-Not feasible here: the gate needs something this installation does not have and cannot
-create. Reopen one when its condition appears.
-
-- Choking changes: a public swarm with more leechers than seeds (seeds outnumber
-  leechers on the legal ones, and nobody uploads).
-- DHT feeds: an audience of independent clients.
-- DLNA transcoding and frames from the video: a client that needs them.
-- 10 Gbps pipelining: a multi-peer swarm on a fast link.
-- Windows killswitch on a multihomed host (`IP_UNICAST_IF`): a Windows host with a VPN
-  where a capture shows the leak.
-- Hybrid torrents from the v2 swarm: a hybrid whose only peers are in the v2 swarm.
-- Managed amuled and remote aMule: operators who ask for them.
-- Sonarr/Radarr v3 acceptance: a real Jellyseerr instance.
-- Portable folder names for existing series: a folder with characters other systems
-  refuse.
-- Relinking duplicated copies: downloads and library on the same filesystem.
-- TLS origination to an `https://` proxy: an operator who runs one.
-- One connection per IPv6 /64: a public IPv6 swarm (this line has no IPv6).
-
-Engine designs rejected on a measurement — `io_uring`/AIO, contiguous-write coalescing,
-multi-path `get_peers`, the anti-Sybil cap on by default, super-seeding by default,
-async `state.json`, a lock-free read cache — are in
-[`measurements.md`](measurements.md#closed-designs) with the number that closed each one. Do not
-reopen one without new data.

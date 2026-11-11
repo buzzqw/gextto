@@ -28,7 +28,7 @@ conflict with another, the more specific one wins.
 2. **Manuals and README** if anything visible or operational changes
    (`docs/MANUAL.it.md`, `docs/MANUAL.en.md`, `README.md`, `README.it.md`).
 3. **Technical documents** touched by the change (see *Where things live* at the
-   bottom), and `docs/todo.md` when the cycle produced, accepted or rejected an
+   bottom), and `docs/todo.md` when the cycle produced or accepted an
    idea — yours or the operator's.
 4. **Tests green locally**: `make test`, `make vet` and, if you touched the UI,
    `make test-ui`; plus the TUI, performance and invariants described in *Build
@@ -543,13 +543,14 @@ not. Error strings reachable from a log line are English too.
 The maintained list of open work. One line per item: what to do and the gate that
 unblocks it. Every idea proposed by the operator or by the assistant during a session is
 recorded here in the same cycle, without waiting to be asked: in the matching area once
-accepted, under *Proposals* while it is still a decision, and under *Not planned* when
-rejected. An idea must not stay only in the chat. It is not a changelog, a design
-document or a manual: no history, no positioning, no implementation chronicles, no dates,
-build numbers, commit hashes or measurements. When an item lands, delete it; when a new
-one is accepted, add it. The state of the product is in `gx-torrent.md`, `gx-core.md` and
-the manuals; the numbers are in `measurements.md`; the rejected designs and the
-measurement that closed each one are in `measurements.md`, *Closed designs*.
+accepted, under *Proposals* while it is still a decision. An idea that is rejected is not
+written here at all: the file holds only work that will be done. An idea must not stay
+only in the chat. It is not a changelog, a design document or a manual: no history, no
+positioning, no implementation chronicles, no dates, build numbers, commit hashes or
+measurements. When an item lands, delete it; when a new one is accepted, add it. The state
+of the product is in `gx-torrent.md`, `gx-core.md` and the manuals; the numbers are in
+`measurements.md`; the rejected designs and the measurement that closed each one are in
+`measurements.md`, *Closed designs*.
 
 ## Interface accessibility and i18n
 - The pages of the gx-torrent daemon (`internal/webui/assets`) use the **shared

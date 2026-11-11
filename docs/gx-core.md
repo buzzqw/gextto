@@ -278,7 +278,8 @@ is non-destructive: the old torrent leaves the session, its files stay on disk.
   own.
 - **i18n**: the six languages of the page are assumed to be enough for the standalone
   product; extending the catalogue is not decided.
-- **WebTorrent/WebRTC** and **share mode**: not planned (see [`todo.md`](todo.md)).
+- **WebTorrent/WebRTC** and **share mode**: out of scope by decision, so they are not
+  kept in the [open items](todo.md).
 
 **Risks and countermeasures.** A regression on Gextto's path is prevented by the v1
 contract tests, by a `fingerprint` independent of `settings.json` and by switching the
