@@ -201,6 +201,9 @@ func uiGxEngineStats(engine TorrentEngine) uiEngineStats {
 	if refused := engineNum(session, "client_filter_refused"); refused > 0 {
 		add("Client rifiutati", engineParts("%d peer", refused), false)
 	}
+	if merged := engineNum(session, "external_merged_pieces"); merged > 0 {
+		add("Pezzi presi da eD2k", engineParts("%d pezzi del file di aMule verificati e usati dai torrent", merged), false)
+	}
 	if _, configured := session["tracker_list_trackers"]; configured {
 		add("Lista tracker", engineParts("%d tracker aggiunti ai nuovi torrent pubblici", engineNum(session, "tracker_list_trackers")), false)
 	}

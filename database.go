@@ -5458,6 +5458,18 @@ func (d *Database) MarkTorrentRemoved(hash string) error {
 	return nil
 }
 
+// MarkEd2kAbsorbed closes an eD2k download whose file another download of
+// the same episode took over (the torrent finished first, or took the eD2k
+// file to complete): it leaves the pending list without touching the
+// episode's placeholders, which the torrent still owns.
+func (d *Database) MarkEd2kAbsorbed(hash string) error {
+	if d == nil || d.db == nil {
+		return nil
+	}
+	_, err := d.db.Exec("UPDATE torrent_meta SET status='removed', removed_at=COALESCE(removed_at, ?2), updated_at=?2 WHERE hash=?1 AND status NOT IN ('completed','error','removed')", strings.ToLower(hash), nowSQLite())
+	return err
+}
+
 // MarkTorrentRemovedAt records that a torrent has left the session (entering
 // the download history).
 func (d *Database) MarkTorrentRemovedAt(hash string) error {

@@ -83,6 +83,8 @@ var uiSettingMetaByKey = map[string]uiSettingMeta{
 	"ed2k_min_sources":         {Unit: "fonti", Zero: "0 = nessun minimo", DependsOn: "ed2k_fallback"},
 	"ed2k_search_timeout_secs": {Unit: "secondi", DependsOn: "ed2k_enabled"},
 	"ed2k_stall_days":          {Unit: "giorni", Zero: "0 = mai", DependsOn: "ed2k_enabled"},
+	"torrent_ed2k_together":    {DependsOn: "ed2k_enabled"},
+	"torrent_ed2k_line_share":  {Unit: "%", DependsOn: "ed2k_enabled"},
 
 	// Velocità e rete
 	"torrent_speed_mode": {Kind: "select", Options: []uiFormOption{

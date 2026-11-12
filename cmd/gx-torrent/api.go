@@ -635,6 +635,9 @@ func (d *Daemon) handleAction(w http.ResponseWriter, r *http.Request) {
 			maxUploads = &value
 		}
 		err = d.setConnLimits(hash, maxConnections, maxUploads)
+	case "external-merge":
+		index := int(formInt(r, "file_index", -1))
+		err = d.mergeExternal(hash, index, strings.TrimSpace(r.FormValue("path")))
 	case "peer-options":
 		var weight *int64
 		if r.FormValue("bandwidth_weight") != "" {

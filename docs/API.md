@@ -578,8 +578,12 @@ the fewest connected peers holding a needed piece, `-1` when nothing is needed),
 `POST /api/v1/torrents/{hash}/{action}` is one of `pause`, `resume`,
 `verify`, `reannounce`, `restart`, `park`, `unpark`, `pin`, `top`, `rename`,
 `rename-file`, `rename-folder`, `move`, `associate`, `seed-limits`,
-`conn-limits`, `super-seeding`, `peer-options`, `file-priorities`, `trackers`,
-`set-trackers`, `webseeds`. `peer-options` takes `bandwidth_weight` (10–1000, the
+`conn-limits`, `super-seeding`, `peer-options`, `external-merge`,
+`file-priorities`, `trackers`, `set-trackers`, `webseeds`. `external-merge` takes
+`file_index` and an absolute `path`: a downloading torrent adopts from that file
+(another program's copy of the same file, such as aMule's `.part`) the pieces of
+that torrent file that pass its own hash check; the file must have the torrent
+file's exact size, and the answer comes at once while the merge runs. `peer-options` takes `bandwidth_weight` (10–1000, the
 torrent's share of a limited line in percent, 100 = normal) and `dht`, `pex`,
 `lsd` (`1`/`0`); a field left out keeps its value, and a private torrent keeps
 DHT, PEX and LSD off whatever is sent. The list (`GET /api/v1/torrents`) reports

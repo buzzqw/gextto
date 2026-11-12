@@ -97,9 +97,12 @@ func (t *torrent) handleLaterMergeRequest() {
 		return
 	}
 	candidates := t.mergeCandidates(t.session.ListTorrents())
-	if len(candidates) == 0 {
+	externals := t.externalSources
+	if len(candidates) == 0 && len(externals) == 0 {
 		return
 	}
+	t.externalSources = nil
+	t.mergeExternal = append(t.mergeExternal, externals...)
 	t.mergePending = candidates
 	t.mergeWaiting = true
 	t.maybeStartDeferredMerge()
@@ -116,7 +119,8 @@ func (t *torrent) maybeStartDeferredMerge() {
 	t.mergeWaiting = false
 	candidates := t.mergePending
 	t.mergePending = nil
-	if len(candidates) == 0 || t.status() != Downloading {
+	if (len(candidates) == 0 && len(t.mergeExternal) == 0) || t.status() != Downloading {
+		t.mergeExternal = nil
 		return
 	}
 	t.startLaterMerge(candidates)

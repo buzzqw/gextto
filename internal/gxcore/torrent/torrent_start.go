@@ -117,7 +117,9 @@ func (t *torrent) startMergeVerifier(candidates []*Torrent, onlyMerged bool, res
 			v.Only = v.Skip
 		}
 	}
-	if len(candidates) > 0 {
+	externals := t.mergeExternal
+	t.mergeExternal = nil
+	if len(candidates) > 0 || len(externals) > 0 {
 		v, skip := t.verifier, t.mergeSkips()
 		out := &mergeResult{}
 		t.mergeOut = out
@@ -125,6 +127,12 @@ func (t *torrent) startMergeVerifier(candidates []*Torrent, onlyMerged bool, res
 			// The run loop reads *out only after it receives this verifier's
 			// result, which happens after Prepare returns.
 			*out = t.mergeFrom(candidates, skip, stop)
+			if len(externals) > 0 && !stopped(stop) {
+				if out.pieces == nil {
+					out.pieces = make(map[uint32]bool)
+				}
+				out.merged += t.prefillExternal(externals, out.pieces, skip, stop)
+			}
 			merged := out.pieces
 			if resume != nil {
 				// Resume: keep the reloaded pieces, add the merged ones and

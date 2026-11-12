@@ -1639,6 +1639,19 @@ Environment variables: `GX_TORRENT_CLIENT_FILTER`,
 `GX_TORRENT_UPLOAD_TRADING_SHARE`. Gextto passes the flags to the managed
 daemon from its *Torrent engine* settings.
 
+### External merge
+
+`POST /api/v1/torrents/{hash}/external-merge` (`file_index`, absolute `path`)
+makes a downloading torrent read another program's copy of one of its files —
+Gextto uses it for aMule's `.part` file of the same episode. The file must have
+exactly that torrent file's size. The daemon queues it as a later merge
+(`Torrent.MergeExternal`): in-flight fetches pause, the pieces that lie wholly
+in that file (padding aside) are read at the file's offsets, an all-zero piece
+is skipped without hashing, and only the pieces that pass the torrent's own
+hashes are written and marked verified. The answer comes at once; the result
+shows in the progress and in `external_merged_pieces` of the session
+statistics.
+
 ### DHT diagnostics
 
 `GET /api/v1/dht` and the *DHT and peer sources* panel of the Statistics page

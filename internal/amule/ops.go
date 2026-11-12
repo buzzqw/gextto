@@ -298,6 +298,18 @@ type Download struct {
 	Category int    `json:"category"`
 	Link     string `json:"link"`
 	LastRecv int64  `json:"last_received"`
+	// PartMetID names the file being written in aMule's temporary folder:
+	// "%03d.part" (0 when the core does not say).
+	PartMetID int `json:"part_met_id,omitempty"`
+}
+
+// PartFile is the name of the file aMule writes the download into, in its
+// temporary folder, or "" when the core did not report it.
+func (d Download) PartFile() string {
+	if d.PartMetID <= 0 {
+		return ""
+	}
+	return fmt.Sprintf("%03d.part", d.PartMetID)
 }
 
 // Complete reports whether the core finished the file.
@@ -358,6 +370,7 @@ func (c *Client) Downloads(ctx context.Context) ([]Download, error) {
 			Category:    int(number(TagPartfileCat)),
 			Link:        tag.ChildString(TagPartfileEd2kLink),
 			LastRecv:    number(TagPartfileLastRecv),
+			PartMetID:   int(number(TagPartfilePartMetID)),
 		})
 	}
 	return out, nil

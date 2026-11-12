@@ -73,6 +73,8 @@ var uiSettingDefaults = map[string]string{
 	"ed2k_min_sources":         "3",
 	"ed2k_search_timeout_secs": "20",
 	"ed2k_stall_days":          "7",
+	"torrent_ed2k_together":    "true",
+	"torrent_ed2k_line_share":  "60",
 
 	// --- Transfer -----------------------------------------------------------
 	"torrent_dynamic_queue":               "false",

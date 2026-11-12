@@ -1009,6 +1009,39 @@ a hardlink or a copy and stays shared. A file that is not a video stays in the
 incoming folder. With infinite seeding the file is copied and stays shared,
 with the «seed ∞» badge.
 
+### Torrents and eD2k together on the same file
+
+When the same episode downloads both as a torrent (with gx-torrent) and on
+eD2k, and the eD2k file has **exactly the same size** as a video file of the
+torrent, Gextto makes them work together, as Shareaza did:
+
+- the torrent reads from aMule's `.part` file every piece that passes **its
+  own** SHA-1 check: a wrong or not yet written byte does not pass, so it is
+  safe even if the two files were not really the same. The read is repeated
+  every time aMule has added at least 32 MB, at most every 5 minutes;
+- if **the torrent finishes first**, the eD2k copy is no longer needed and is
+  removed from aMule;
+- if **eD2k finishes first**, its file completes the torrent, which imports the
+  episode **only once** and keeps sharing it; aMule's file stays in its folder
+  and aMule shares it on eD2k;
+- a **stuck torrent** (no new data for half an hour) is looked for on eD2k: a
+  result of exactly the same size is started beside it, and from there the two
+  download together. It needs **Use eD2k when torrents find nothing** on; the
+  search for the same torrent is repeated at most every 6 hours.
+
+The log lines with 🤝 say when two downloads are joined and which finished
+first; in *Health → Torrent engine* the **Pieces taken from eD2k** row counts
+the pieces passed from aMule's file to the torrent. It is turned off with
+**Torrents and eD2k download the same file together** in *Configuration → eD2k
+and Kad*.
+
+**One line.** With aMule active and a speed limit — fixed, scheduled or decided
+by Auto — torrents and eD2k no longer get the same limit each: they split it.
+The torrents get at least the chosen **minimum share** (60 % by default), eD2k
+the rest, and the part one of them is not using goes to the other, recomputed
+from the real rates. Auto counts aMule's traffic as Gextto's own too, so it
+steers the sum of the two.
+
 ### eD2k as a fallback
 
 With **Use eD2k when torrents find nothing** on, the search for missing episodes
@@ -2047,6 +2080,8 @@ network.
 | Minimum sources for the fallback | eD2k source floor for accepting a result automatically. Manual search shows everything. *(Unit: sources; 0 = no minimum)* |
 | eD2k search duration | How many seconds aMule collects results before Gextto shows them. *(Unit: seconds)* |
 | Give up on a stalled eD2k download after | An eD2k download chosen by Gextto that receives no data for this many days is cancelled in aMule, the release is blocklisted and the episode is searched again. Downloads added by hand and paused ones stay. *(Unit: days; 0 = never)* |
+| Torrents and eD2k download the same file together | On by default (needs gx-torrent): when the same episode downloads as a torrent and on eD2k with a file of exactly the same size, the torrent takes from aMule's `.part` the pieces that pass its check, whichever finishes first completes the other and the episode enters the library once; a torrent stuck for half an hour is looked for on eD2k and started there too. See *Torrents and eD2k together on the same file*. |
+| Torrents' minimum share of the line shared with eD2k | With aMule active and a speed limit (fixed, scheduled or Auto's), the percentage of the line that always stays with the torrents; eD2k gets the rest and what one does not use goes to the other. *(Unit: %; 10 to 90, default 60)* |
 
 The automatic fallback only accepts a result that matches the episode exactly,
 has a recognised quality, a plausible size and at least the source floor. In

@@ -86,6 +86,7 @@ const (
 
 	TagPartfile            = 0x0300
 	TagPartfileName        = 0x0301
+	TagPartfilePartMetID   = 0x0302
 	TagPartfileSizeFull    = 0x0303
 	TagPartfileSizeXfer    = 0x0304
 	TagPartfileSizeXferUp  = 0x0305

@@ -114,7 +114,9 @@ type SessionStats struct {
 	// MergedPieces/MergedBytes are the pieces and bytes Swarm Merging reused
 	// from sibling torrents without network traffic.
 	MergedPieces int64
-	MergedBytes  int64
+	// ExternalPieces are the pieces adopted from external files (MergeExternal).
+	ExternalPieces int64
+	MergedBytes    int64
 	// MergedPartialPieces counts the destination pieces reused at block level
 	// (Phase 3): part of their 16 KiB blocks came from a partially verified
 	// source, the rest from peers.
@@ -135,6 +137,7 @@ func (s *Session) Stats() SessionStats {
 	out.WriteOpsTotal = s.metrics.WritesPerSecond.Count()
 	out.StorageErrors = s.storageErrors.Load()
 	out.MergedPieces = mergedPiecesTotal.Load()
+	out.ExternalPieces = externalPiecesTotal.Load()
 	out.MergedBytes = mergedBytesTotal.Load()
 	out.MergedPartialPieces = partialSourcePieces.Load()
 	out.UTP = s.utpSocket != nil

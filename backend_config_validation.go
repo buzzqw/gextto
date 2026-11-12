@@ -294,6 +294,11 @@ func validateNumericSetting(key, value string) error {
 		if err != nil || parsed < 0 {
 			return fmt.Errorf("%s must be zero or a positive integer", key)
 		}
+	case key == "torrent_ed2k_line_share":
+		parsed, err := strconv.ParseInt(raw, 10, 64)
+		if err != nil || parsed < 10 || parsed > 90 {
+			return fmt.Errorf("%s must be between 10 and 90 percent", key)
+		}
 	case key == "torrent_upload_trading_share":
 		parsed, err := strconv.ParseInt(raw, 10, 64)
 		if err != nil || parsed < 0 || parsed > 99 {

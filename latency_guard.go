@@ -256,21 +256,25 @@ type latencyGuard struct {
 	// rests (probeDue).
 	probedAt time.Time
 
-	mu             sync.Mutex
-	mode           guardMode
-	down, up       guardDirection
-	downCap, upCap int64
-	current        time.Duration
-	rest           time.Duration // idle reference measured by a trial
-	restAt         time.Time
-	trialUntil     time.Time
-	trialLoaded    time.Duration // the latency when the trial started
-	trialHigh      bool          // whether that latency was already high
-	trialSamples   []time.Duration
-	cooldownUntil  time.Time
-	haveSample     bool
-	auto           bool
-	othersOnLine   bool
+	mu sync.Mutex
+	// pushedDown/pushedUp are the torrents' limits last pushed (the caps
+	// after the split with aMule); pushedSet is false until the first push.
+	pushedDown, pushedUp int64
+	pushedSet            bool
+	mode                 guardMode
+	down, up             guardDirection
+	downCap, upCap       int64
+	current              time.Duration
+	rest                 time.Duration // idle reference measured by a trial
+	restAt               time.Time
+	trialUntil           time.Time
+	trialLoaded          time.Duration // the latency when the trial started
+	trialHigh            bool          // whether that latency was already high
+	trialSamples         []time.Duration
+	cooldownUntil        time.Time
+	haveSample           bool
+	auto                 bool
+	othersOnLine         bool
 	// routerOnly selects the legacy policy: cap only when the router confirms
 	// other traffic. With "ping"/"both" the latency decides and the router is
 	// only a diagnostic.
@@ -769,11 +773,19 @@ func (g *latencyGuard) tick(now time.Time, cfg *Config, engine TorrentEngine) {
 		g.mu.Lock()
 		g.wireAt = time.Time{}
 		g.probedAt = time.Time{}
+		g.pushedSet = false
 		g.mu.Unlock()
 		g.update(now, false, lineGuess{}, 0, 0)
 		return
 	}
 	down, up := g.ownRates(now, engine)
+	// aMule shares the line (linesplit.go): its traffic is Gextto's own, not
+	// someone else's, so Auto steers the sum of the two engines.
+	if lineSplitActive(cfg) {
+		ed2kDown, ed2kUp := ed2kLiveRates(cfg)
+		down += ed2kDown
+		up += ed2kUp
+	}
 	// Google and Cloudflare, several targets, best RTT: a single server can be
 	// far away, rate-limited or unreachable, and the router can be wrong or
 	// missing. The minimum of the answers is the line, not the server. While
@@ -813,13 +825,26 @@ func (g *latencyGuard) tick(now time.Time, cfg *Config, engine TorrentEngine) {
 		st := g.status()
 		logControlStart(info, latencyGuardStartText(downCap, upCap, bgSpeedMaxText(cfg), bgPingText(st)))
 	}
-	if !changed || engine == nil {
+	if engine == nil {
 		return
 	}
-	if _, err := engine.SetGlobalSpeedLimits(downCap, upCap); err != nil {
+	// The caps are the whole line: with aMule active they are split between
+	// the two engines (linesplit.go), and the split moves with their rates,
+	// so it is pushed when either changes, not only when the caps do.
+	gxDown, gxUp := applyLineLimits(cfg, engine, downCap, upCap, now)
+	g.mu.Lock()
+	pushed := g.pushedSet && g.pushedDown == gxDown && g.pushedUp == gxUp
+	g.mu.Unlock()
+	if !changed && pushed {
+		return
+	}
+	if _, err := engine.SetGlobalSpeedLimits(gxDown, gxUp); err != nil {
 		logging.Debug("latency guard apply failed", "error", err)
 		return
 	}
+	g.mu.Lock()
+	g.pushedDown, g.pushedUp, g.pushedSet = gxDown, gxUp, true
+	g.mu.Unlock()
 	st := g.status()
 	logging.Debug("latency guard", "mode", st.Mode, "latency_ms", st.LatencyMs, "baseline_ms", st.BaselineMs, "others_on_line", st.OthersOnLine, "download_cap_kib", downCap, "upload_cap_kib", upCap)
 }

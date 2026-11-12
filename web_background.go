@@ -790,9 +790,11 @@ type eventWorker struct {
 	checking              map[string]eventWorkerDataCheck
 	startupHashes         map[string]struct{}
 
-	lastRecoveryScan      time.Time
-	lastRamdiskCheck      time.Time
-	lastEd2kStallCheck    time.Time
+	lastRecoveryScan   time.Time
+	lastRamdiskCheck   time.Time
+	lastEd2kStallCheck time.Time
+	// lastCrossnet paces the torrent/eD2k cooperation (crossnet.go).
+	lastCrossnet          time.Time
 	lastDynamicAdjustment time.Time
 	lastQueueCounts       string
 	queueTicks            int
@@ -1000,6 +1002,10 @@ func (w *eventWorker) tick(now time.Time) {
 	w.applyFlags(now)
 	MonitorMetadata(w.cfg, w.torrents, w.db, w.notifier, w.metadataWaitStart, w.metadataFirstSeen, w.metadataLastWarning)
 	MonitorStalled(w.cfg, w.torrents, w.db, w.notifier, w.stallWaitStart)
+	if now.Sub(w.lastCrossnet) >= time.Minute {
+		w.lastCrossnet = now
+		crossnetTick(w.cfg, w.db, w.torrents, w.state.engine, now)
+	}
 	if ed2kEnabled(w.cfg) && now.Sub(w.lastEd2kStallCheck) >= 10*time.Minute {
 		w.lastEd2kStallCheck = now
 		MonitorEd2kStalled(w.cfg, w.db, w.notifier, now)
@@ -1232,9 +1238,10 @@ func (w *eventWorker) applySpeedPolicy(now time.Time) {
 	// stays only on real changes, of the values or of their source (the
 	// schedule starting or ending is logged even with equal values).
 	sourceChanged := w.lastSpeed == nil || w.lastSpeed.source != source
-	// aMule follows the same limits as the torrents.
-	applyEd2kSpeedLimits(w.cfg, downloadKib, uploadKib, now)
-	if _, err := w.torrents.SetGlobalSpeedLimits(downloadKib, uploadKib); err != nil {
+	// With aMule active the limit is one line shared by the two engines
+	// (linesplit.go); otherwise aMule follows the torrents' limits.
+	gxDown, gxUp := applyLineLimits(w.cfg, w.torrents, downloadKib, uploadKib, now)
+	if _, err := w.torrents.SetGlobalSpeedLimits(gxDown, gxUp); err != nil {
 		logging.Debug("speed policy apply failed", "error", err)
 	} else {
 		// The speed and autotune lines explain the speed of something
@@ -1486,6 +1493,11 @@ func (w *eventWorker) dispatchEvents(now time.Time, torrentEvents []models.Torre
 	if ed2kEnabled(w.cfg) {
 		ed2kFiles = ed2kSession{cfg: w.cfg, pending: w.db.PendingEd2kHashes}
 		for _, event := range ed2kFiles.PollEvents() {
+			// The same file downloading as a torrent takes it and imports it
+			// once (crossnet.go): the eD2k completion is not imported again.
+			if crossnetAbsorbs(w.cfg, w.db, w.torrents, event) {
+				continue
+			}
 			ed2kHashes[strings.ToLower(event.Hash)] = struct{}{}
 			torrentEvents = append(torrentEvents, event)
 		}

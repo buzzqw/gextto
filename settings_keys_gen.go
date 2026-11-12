@@ -31,6 +31,8 @@ const (
 	settingEd2kMinSources                   = "ed2k_min_sources"
 	settingEd2kSearchTimeoutSecs            = "ed2k_search_timeout_secs"
 	settingEd2kStallDays                    = "ed2k_stall_days"
+	settingTorrentEd2kTogether              = "torrent_ed2k_together"
+	settingTorrentEd2kLineShare             = "torrent_ed2k_line_share"
 	settingUpgradeMinScoreDiff              = "upgrade_min_score_diff"
 	settingUpgradeUntilScore                = "upgrade_until_score"
 	settingCleanupUpgrades                  = "cleanup_upgrades"
@@ -279,6 +281,8 @@ var settingKeyNames = []string{
 	"ed2k_min_sources",
 	"ed2k_search_timeout_secs",
 	"ed2k_stall_days",
+	"torrent_ed2k_together",
+	"torrent_ed2k_line_share",
 	"upgrade_min_score_diff",
 	"upgrade_until_score",
 	"cleanup_upgrades",

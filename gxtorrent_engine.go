@@ -1787,6 +1787,17 @@ func (e *gxTorrentEngine) setConnLimit(hash, field string, value int) (bool, err
 	return true, nil
 }
 
+// MergeExternal asks gx-torrent to adopt, from a file outside its session,
+// the verified pieces of file fileIndex of the torrent (the same file
+// downloaded by aMule, for one).
+func (e *gxTorrentEngine) MergeExternal(hash string, fileIndex int, path string) (bool, error) {
+	values := url.Values{"file_index": {strconv.Itoa(fileIndex)}, "path": {path}}
+	if err := e.action(hash, "external-merge", values); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
 // SetPeerOptions sets the torrent's share of a limited line (percent, 100 =
 // normal, 10..1000) and turns DHT, PEX and LSD on or off for it alone.
 func (e *gxTorrentEngine) SetPeerOptions(hash string, weight int, dht, pex, lsd bool) (bool, error) {

@@ -43,6 +43,8 @@ type File struct {
 	// time of the last upload (0 = never).
 	UploadRate int64
 	LastUpload int64
+	// PartMetID names the .part file in the temporary folder (0 = none).
+	PartMetID int
 }
 
 // Result is one canned search result.
@@ -452,6 +454,7 @@ func (c *Core) answer(request amule.Packet) amule.Packet {
 				amule.IntTag(amule.TagPartfileSourceCount, uint64(file.Sources)),
 				amule.IntTag(amule.TagPartfileLastRecv, uint64(file.LastRecv)),
 				amule.IntTag(amule.TagPartfilePrio, uint64(file.Priority)),
+				amule.IntTag(amule.TagPartfilePartMetID, uint64(file.PartMetID)),
 			))
 		}
 		return reply

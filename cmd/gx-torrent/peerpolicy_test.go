@@ -190,3 +190,43 @@ func TestGeoDBReadsAFileOutOfOrder(t *testing.T) {
 		}
 	}
 }
+
+// TestDaemonExternalMergeCompletesATorrent: a torrent with no peers is
+// completed from a copy of its file elsewhere (another program's download),
+// every piece checked against its hashes; a wrong-size file is refused.
+func TestDaemonExternalMergeCompletesATorrent(t *testing.T) {
+	d := newTestDaemon(t)
+	src := filepath.Join(t.TempDir(), "src")
+	data := makeTorrent(t, src, "episode.mkv", 3<<20)
+	dest := filepath.Join(t.TempDir(), "dest")
+	if err := os.MkdirAll(dest, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	hash, _, err := d.add(addRequest{TorrentData: data, Destination: dest, SeedRatio: -1, SeedDays: -1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "torrent downloading", func() bool {
+		info, _ := findInfo(d, hash)
+		return info.State == "downloading" || info.State == "stalled"
+	})
+	external, err := filepath.Glob(filepath.Join(src, "*"))
+	if err != nil || len(external) == 0 {
+		t.Fatalf("no source file: %v", err)
+	}
+	short := filepath.Join(t.TempDir(), "short.mkv")
+	_ = os.WriteFile(short, []byte("short"), 0o644)
+	if err := d.mergeExternal(hash, 0, short); err == nil {
+		t.Fatal("a file of another size was accepted")
+	}
+	if err := d.mergeExternal(hash, 0, "relative.mkv"); err == nil {
+		t.Fatal("a relative path was accepted")
+	}
+	if err := d.mergeExternal(hash, 0, external[0]); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "torrent completed from the external copy", func() bool {
+		info, _ := findInfo(d, hash)
+		return info.Progress >= 100
+	})
+}

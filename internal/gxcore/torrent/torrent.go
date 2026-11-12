@@ -275,6 +275,10 @@ type torrent struct {
 	mergeWaiting bool
 	mergePending []*Torrent
 	mergeRecheck bool
+	// externalSources are the files MergeExternal queued; mergeExternal the
+	// ones a pending or running merge reads. Run loop only.
+	externalSources []ExternalSource
+	mergeExternal   []ExternalSource
 	// notifyCount is the verified-piece count at the last sibling wake-up: a
 	// torrent only notifies when it has gained verified pieces since, so two
 	// torrents cannot ping each other forever with no-op merges. Run loop only.

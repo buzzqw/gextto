@@ -2306,6 +2306,19 @@ func (d *Daemon) setConnLimits(key string, maxConnections, maxUploads *int64) er
 	})
 }
 
+// mergeExternal asks a downloading torrent to adopt the verified pieces of
+// one of its files from a file outside the session (another program's copy
+// of the same file, such as aMule's .part file). The bytes are checked
+// against the torrent's own hashes, so a wrong file adds nothing.
+func (d *Daemon) mergeExternal(key string, fileIndex int, path string) error {
+	if !filepath.IsAbs(path) {
+		return errors.New("the external file must be an absolute path")
+	}
+	return d.withTorrent(key, func(t *torrent.Torrent, _ *torrentMeta) error {
+		return t.MergeExternal([]torrent.ExternalSource{{FileIndex: fileIndex, Path: filepath.Clean(path)}})
+	})
+}
+
 // setPeerOptions changes a torrent's bandwidth weight and its DHT, PEX and
 // LSD switches; a nil field keeps the current value. The engine keeps the
 // weight, DHT and PEX in its own record, the daemon state keeps LSD.
@@ -2891,6 +2904,7 @@ func (d *Daemon) stats() daemonStats {
 			}
 		}
 		out.Session["client_filter_refused"] = d.session.ClientFilterRefused()
+		out.Session["external_merged_pieces"] = s.ExternalPieces
 		if _, list, _, _ := d.trackerList.snapshot(); d.trackerListURL() != "" {
 			out.Session["tracker_list_trackers"] = int64(len(list))
 		}
