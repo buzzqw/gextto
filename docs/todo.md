@@ -28,6 +28,7 @@ Nothing open.
 
 Each waits for the operator's choice.
 
+- **Torrent and eD2k on the same file (Shareaza-style)**: when one episode is downloading on both networks, gx-torrent takes from aMule's `.part` file the pieces that pass the torrent's SHA-1 check (the local-data reuse already does the verification), and a torrent that finishes first hands the complete file to aMule for sharing; a real in-flight merge needs our own eD2k client in gx-core. Gate: the operator's choice.
 - **One line shared by gx-torrent and aMule**: a single coordinator that gives each engine a floor share of the line (lent out when idle) instead of two separate limits, so eD2k and torrents stop competing for the same upload. Gate: the operator's choice.
 - **Compressed RAR archives**: extract releases packed with compression too, not only stored ones, with our own decoder. Gate: the operator's choice and a real release that arrived compressed.
 - **Confidence of eD2k results**: a column that scores a result whose name, size and sources look like a fake, with the reasons in a tooltip; it warns and never hides. Gate: the operator's choice.
