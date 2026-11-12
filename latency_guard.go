@@ -282,6 +282,11 @@ type latencyGuard struct {
 	// controlStarted is set when the controller applies its first cap of a
 	// session; tick logs it once, with the values and the ping.
 	controlStarted bool
+	// controlStartedHigh says whether that phase began because the ping was
+	// high, or only to learn the idle reference. Capping a good line to measure
+	// it is not "keeping the line responsive", and its first-cap line is not
+	// news for the user.
+	controlStartedHigh bool
 	// capLoggedAt/Down/Up are that first-cap line: when it was written and the
 	// caps it named. The periodic speed line adopts it as its own last line,
 	// so it does not repeat the same numbers a few seconds later.
@@ -490,7 +495,7 @@ func (g *latencyGuard) update(now time.Time, auto bool, line lineGuess, downByte
 			// only for them; our own queue, when nobody else is there, is not
 			// a reason to slow down.
 			if high && line.others {
-				g.controlLocked(rateDown, rateUp, loadDown, loadUp, 0.85)
+				g.controlLocked(high, rateDown, rateUp, loadDown, loadUp, 0.85)
 			}
 			break
 		}
@@ -612,16 +617,18 @@ func (g *latencyGuard) startTrialLocked(now time.Time, loaded time.Duration, hig
 	g.trialLoaded = loaded
 	g.trialHigh = high
 	g.trialSamples = g.trialSamples[:0]
-	g.controlLocked(rateDown, rateUp, loadDown, loadUp, latencyGuardTrialShare)
+	g.controlLocked(high, rateDown, rateUp, loadDown, loadUp, latencyGuardTrialShare)
 	g.mode = guardTrial
 }
 
 // controlLocked starts a control phase, capping the loading directions at
 // share of their current rate. The cap then ramps up while the ping is good
-// and is cut when it degrades.
-func (g *latencyGuard) controlLocked(rateDown, rateUp int64, loadDown, loadUp bool, share float64) {
+// and is cut when it degrades. high says whether the latency was high when the
+// phase began, which the first-cap line reports.
+func (g *latencyGuard) controlLocked(high bool, rateDown, rateUp int64, loadDown, loadUp bool, share float64) {
 	g.mode = guardControl
 	g.controlStarted = true
+	g.controlStartedHigh = high
 	g.down, g.up = guardDirection{}, guardDirection{}
 	g.downCap, g.upCap = 0, 0
 	if loadDown {
@@ -794,28 +801,17 @@ func (g *latencyGuard) tick(now time.Time, cfg *Config, engine TorrentEngine) {
 	downCap, upCap, changed := g.update(now, true, line, down, up)
 	downCap = guardCapForEngine(downCap, latencyGuardMaxDownKiB)
 	upCap = guardCapForEngine(upCap, latencyGuardMaxUpKiB)
-	// The first cap of a session is logged at once, with the values and the
-	// ping, even if it is the only line the controller ever prints: the user
-	// asked to see when autotune starts and at what speed. It is written only
-	// while something downloads: with only seeding the cap explains a speed
-	// nobody asked for, and Gextto's log stays quiet.
-	g.mu.Lock()
-	started := g.controlStarted
-	g.controlStarted = false
-	logStart := started && down > 0 && (g.startLoggedAt.IsZero() || now.Sub(g.startLoggedAt) >= latencyGuardStartLogEvery)
-	if logStart {
-		g.capLoggedAt, g.capLoggedDown, g.capLoggedUp = now, downCap, upCap
-		g.startLoggedAt = now
-	}
-	g.mu.Unlock()
-	if started && down > 0 {
+	// The first cap of a phase is logged at once, with the values and the ping:
+	// the user asked to see when autotune starts and at what speed. It reaches
+	// the info log only while something really downloads and the ping was high:
+	// with only seeding the cap explains a speed nobody asked for, and a phase
+	// started just to learn the idle reference is a measurement. Both stay in
+	// the debug detail.
+	downloading := engine != nil && bgDownloading(engine)
+	started, info := g.takeControlStart(now, downCap, upCap, downloading)
+	if started {
 		st := g.status()
-		line := latencyGuardStartText(downCap, upCap, bgSpeedMaxText(cfg), bgPingText(st))
-		if logStart {
-			logging.Info(line)
-		} else {
-			logging.Debug(line)
-		}
+		logControlStart(info, latencyGuardStartText(downCap, upCap, bgSpeedMaxText(cfg), bgPingText(st)))
 	}
 	if !changed || engine == nil {
 		return
@@ -831,6 +827,39 @@ func (g *latencyGuard) tick(now time.Time, cfg *Config, engine TorrentEngine) {
 // latencyGuardStartLogEvery is the shortest gap between two info lines that
 // announce a new control phase of the guard.
 const latencyGuardStartLogEvery = 15 * time.Minute
+
+// takeControlStart reports whether a control phase began in the last step and,
+// when it did, whether its first cap deserves an info line. That takes a phase
+// started on a high ping, a real download in progress (seeding alone is not a
+// download the user is waiting for) and no such line in the last
+// latencyGuardStartLogEvery. The line it is about to write is recorded, so the
+// periodic speed logger can adopt it instead of repeating the same numbers.
+func (g *latencyGuard) takeControlStart(now time.Time, downCap, upCap int64, downloading bool) (started, info bool) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	started, high := g.controlStarted, g.controlStartedHigh
+	g.controlStarted, g.controlStartedHigh = false, false
+	if !started {
+		return false, false
+	}
+	info = high && downloading &&
+		(g.startLoggedAt.IsZero() || now.Sub(g.startLoggedAt) >= latencyGuardStartLogEvery)
+	if info {
+		g.capLoggedAt, g.capLoggedDown, g.capLoggedUp = now, downCap, upCap
+		g.startLoggedAt = now
+	}
+	return started, info
+}
+
+// logControlStart writes the first-cap line: info when the ping was high, debug
+// when the phase only learns the idle reference and nothing is really wrong.
+func logControlStart(info bool, line string) {
+	if info {
+		logging.Info(line)
+		return
+	}
+	logging.Debug(line)
+}
 
 // latencyGuardStartText is the line of a new control phase: why the speed is
 // being limited and to what.

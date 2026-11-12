@@ -24,6 +24,7 @@ not change Gextto's interface, where those pages do not exist. Engine fixes, on
 the other hand, apply to both.
 
 ## 12 November 2026
+- **The autotune log no longer speaks when there is nothing to limit.** The line «Autotune is limiting the speed…» could appear with only seeding running: a trickle of background traffic (the DHT) was enough to write it, and it claimed to limit the speed to keep the line responsive even when the ping was good and the check only existed to measure the line. The line now arrives with a download in progress and a ping that really rose; a measuring check and seeding alone stay in the debug detail. **What changes for you:** nothing to configure; the speed stays the one autotune decides.
 - **The log says who is working on the series, and no longer promises downloads that do not exist.** When the library check found a series busy, it wrote that «a download of this series is being copied into the library»: the same wait also covered the night audio cleanup, which rewrites a file of the series to drop the tracks in the other languages, and the line sent people looking for a download that did not exist. The sentence now names the real operation — the copy into the library or the audio cleanup of the library — and the night window shows the cleanup running. **What changes for you:** the series is taken up again at the next check, as before; to see what the audio cleanup is doing, open *Settings → Maintenance*. Nothing to configure.
 
 ## 11 November 2026

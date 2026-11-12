@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/buzzqw/gextto/internal/logging"
 )
 
 // guardRun feeds the guard one sample per probe interval with a latency that
@@ -476,5 +478,67 @@ func TestLatencyGuardHoldsOnlyWhenTheCountersAreRead(t *testing.T) {
 	g.othersOnLine = false
 	if g.holdsCaps() {
 		t.Fatal("with the line to itself the caps must grow again")
+	}
+}
+
+// TestLatencyGuardLogsTheFirstCapOnlyForARealDownload is the regression for the
+// line «Autotune is limiting the speed… download unlimited, upload 93 KB/s»
+// written with no download in progress: the first cap of a phase reached the
+// info log as soon as the wire carried a few DHT bytes, and it claimed to keep
+// the line responsive even when the phase only existed to learn the idle
+// reference. It is news only with a high ping and a download the user is
+// waiting for.
+func TestLatencyGuardLogsTheFirstCapOnlyForARealDownload(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	g := newLatencyGuard()
+	startPhase := func(high bool) {
+		g.mu.Lock()
+		g.controlStarted, g.controlStartedHigh = true, high
+		g.mu.Unlock()
+	}
+
+	// Only seeding with a high ping: the user sees no download, no info line.
+	startPhase(true)
+	if started, info := g.takeControlStart(now, 900, 93, false); !started || info {
+		t.Fatalf("a seeding session got an info line (started=%v info=%v)", started, info)
+	}
+	// A download, but the phase only learns the idle reference: no line either.
+	startPhase(false)
+	if started, info := g.takeControlStart(now, 900, 0, true); !started || info {
+		t.Fatalf("a measuring phase got an info line (started=%v info=%v)", started, info)
+	}
+	// High ping and a real download: one line, which the speed logger adopts.
+	startPhase(true)
+	started, info := g.takeControlStart(now, 900, 93, true)
+	if !started || !info {
+		t.Fatalf("a real cap got no info line (started=%v info=%v)", started, info)
+	}
+	if at, down, up := g.firstCapLog(); !at.Equal(now) || down != 900 || up != 93 {
+		t.Fatalf("first cap line = %v %d/%d, want %v 900/93", at, down, up, now)
+	}
+	// A new phase within the minimum gap stays out of the info log.
+	startPhase(true)
+	if _, again := g.takeControlStart(now.Add(time.Minute), 900, 0, true); again {
+		t.Fatal("a second info line came within latencyGuardStartLogEvery")
+	}
+}
+
+// TestControlStartLineStaysOutOfTheInfoLog pins that a measurement phase writes
+// only a debug line, while a real limit is reported at info.
+func TestControlStartLineStaysOutOfTheInfoLog(t *testing.T) {
+	var captured strings.Builder
+	logging.SetOutput(&captured)
+	logging.SetLevel("info")
+	defer func() {
+		logging.SetOutput(os.Stdout)
+		logging.SetLevel("info")
+	}()
+	logControlStart(false, "🎚️ a measurement phase")
+	if strings.Contains(captured.String(), "a measurement phase") {
+		t.Fatalf("a measurement phase reached the info log: %q", captured.String())
+	}
+	logControlStart(true, "🎚️ Autotune is limiting the speed")
+	if !strings.Contains(captured.String(), "Autotune is limiting the speed") {
+		t.Fatalf("the info line was not written: %q", captured.String())
 	}
 }
