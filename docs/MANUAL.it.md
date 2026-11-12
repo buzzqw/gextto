@@ -780,8 +780,9 @@ impostata in *Configurazione → Velocità e rete*:
 - **Togli l'eccezione** — torna subito alla regola.
 
 L'icona dice cosa vale: ⚡ un'eccezione (con i minuti rimasti), ⏰ una fascia
-della programmazione, altrimenti la regola. Con eD2k attivo **aMule segue gli
-stessi limiti**. Vedi anche [Velocità e rete](#16-velocità-e-rete).
+della programmazione, altrimenti la regola. Con eD2k attivo il limite è **una
+sola linea divisa** tra torrent e aMule (vedi *Torrent ed eD2k insieme sullo
+stesso file*). Vedi anche [Velocità e rete](#16-velocità-e-rete).
 
 ### Torrent fermi (stalled)
 
@@ -1021,6 +1022,24 @@ episodi/pack in archivio* attiva il file viene spostato (e aMule smette di
 condividerlo); spenta, entra con hardlink o copia e resta condiviso. Un file che
 non è un video resta nella cartella di arrivo. Con seed infinito il file viene
 copiato e resta condiviso, con il badge «seed ∞».
+
+### Quanto fidarsi di un risultato eD2k
+
+Su eD2k nessun tracker controlla cosa viene condiviso, e i falsi sono frequenti.
+Ogni risultato eD2k, nella pagina **eD2k** e nella ricerca, può avere un badge:
+
+- **sospetto** (rosso): un programma invece di un video (`.exe`, `.scr`, una
+  doppia estensione come `.mkv.exe`…), un file molto più piccolo di quanto la
+  sua qualità richiede, o la **stessa dimensione esatta** che compare con titoli
+  di episodi diversi — il segno di un file rinominato per sembrare tanti;
+- **dubbio** (giallo): un archivio, un video più piccolo di quanto la qualità
+  dichiarata richiede, un nome con pubblicità o parole tipiche dei falsi
+  («password», «codec», un indirizzo web…);
+- **ⓘ**: una nota che non cambia il giudizio, per esempio una sola fonte.
+
+Passando il mouse sul badge leggi i motivi. Il badge avvisa e non nasconde
+niente: puoi sempre scaricare. Il ripiego automatico invece non prende mai da
+solo un risultato **sospetto**.
 
 ### Torrent ed eD2k insieme sullo stesso file
 
@@ -1883,8 +1902,9 @@ Se il download è arrivato **impacchettato in archivi RAR** (una serie di file
 video sciolto, Gextto estrae il video accanto agli archivi prima di importarlo,
 e lo scrive nel log («arrived packed in RAR archives»). Gli archivi restano,
 così il torrent continua a essere condiviso: mentre il seed dura lo spazio è
-occupato due volte. Si estraggono solo archivi **non compressi** (il formato
-usato di solito per i video divisi in parti) e completi: un archivio compresso,
+occupato due volte. Si estraggono gli archivi **non compressi** (il formato
+usato di solito per i video divisi in parti) e quelli **compressi RAR 5**, se
+completi: un archivio RAR 4 compresso o «solid»,
 protetto da password, con un volume mancante o con dati che non corrispondono al
 suo controllo resta com'è, e il log dice perché.
 

@@ -768,8 +768,9 @@ right now and lets you make a temporary **exception** to the rule set in
 - **Remove the exception** — back to the rule at once.
 
 The icon tells you what applies: ⚡ an exception (with the minutes left), ⏰ a
-window of the schedule, otherwise the rule. With eD2k active **aMule follows
-the same limits**. See also [Speed and network](#16-speed-and-network).
+window of the schedule, otherwise the rule. With eD2k active the limit is
+**one line shared** by torrents and aMule (see *Torrents and eD2k together on
+the same file*). See also [Speed and network](#16-speed-and-network).
 
 ### Stalled torrents
 
@@ -1008,6 +1009,24 @@ archive* on the file is moved (and aMule stops sharing it); off, it enters with
 a hardlink or a copy and stays shared. A file that is not a video stays in the
 incoming folder. With infinite seeding the file is copied and stays shared,
 with the «seed ∞» badge.
+
+### How far to trust an eD2k result
+
+On eD2k no tracker checks what is shared, and fakes are common. Every eD2k
+result, on the **eD2k** page and in the search, can carry a badge:
+
+- **suspect** (red): a program instead of a video (`.exe`, `.scr`, a double
+  extension such as `.mkv.exe`…), a file much smaller than its quality needs,
+  or the **same exact size** appearing under titles of different episodes — the
+  mark of one file renamed to look like many;
+- **doubtful** (yellow): an archive, a video smaller than its declared quality
+  needs, a name with advertising or words typical of fakes ("password",
+  "codec", a web address…);
+- **ⓘ**: a note that does not change the verdict, for example a single source.
+
+Hovering over the badge shows the reasons. The badge warns and hides nothing:
+you can always download. The automatic fallback, instead, never takes a
+**suspect** result by itself.
 
 ### Torrents and eD2k together on the same file
 
@@ -1864,9 +1883,9 @@ If the download arrived **packed in RAR archives** (a set of `.part01.rar`,
 `.part02.rar`… files, or `.rar`, `.r00`, `.r01`…) and holds no loose video,
 Gextto extracts the video next to the archives before importing it, and says so
 in the log ("arrived packed in RAR archives"). The archives stay, so the torrent
-keeps being shared: while seeding lasts the space is used twice. Only
-**uncompressed** archives (the form usually used for videos split into parts)
-that are complete are extracted: a compressed archive, one protected by a
+keeps being shared: while seeding lasts the space is used twice. **Uncompressed**
+archives (the form usually used for videos split into parts) and **RAR 5
+compressed** ones are extracted when complete: a compressed RAR 4 or solid archive, one protected by a
 password, one with a missing volume or with data that does not match its
 checksum stays as it is, and the log says why.
 

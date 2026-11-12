@@ -76,6 +76,16 @@ func rar5Header(body []byte) []byte {
 }
 
 func rar5Volume(name string, slice []byte, sliceCRC uint32, before, after bool, method uint64, more bool) []byte {
+	return rar5VolumeWith(name, slice, int64(len(slice)), sliceCRC, before, after, method<<7, more)
+}
+
+// rar5CompressedVolume is one volume of a RAR 5 compressed file (method 3,
+// 1 MiB dictionary) whose whole unpacked size is unpacked.
+func rar5CompressedVolume(name string, slice []byte, unpacked int64, sliceCRC uint32, before, after, more bool) []byte {
+	return rar5VolumeWith(name, slice, unpacked, sliceCRC, before, after, 3<<7|3<<10, more)
+}
+
+func rar5VolumeWith(name string, slice []byte, unpacked int64, sliceCRC uint32, before, after bool, compression uint64, more bool) []byte {
 	var b bytes.Buffer
 	b.Write(sigRAR5)
 	var main bytes.Buffer
@@ -95,12 +105,12 @@ func rar5Volume(name string, slice []byte, sliceCRC uint32, before, after bool, 
 	putVint(&file, flags)
 	putVint(&file, uint64(len(slice)))
 	putVint(&file, rar5FileCRC)
-	putVint(&file, uint64(len(slice)))
+	putVint(&file, uint64(unpacked))
 	putVint(&file, 0)
 	crc := make([]byte, 4)
 	binary.LittleEndian.PutUint32(crc, sliceCRC)
 	file.Write(crc)
-	putVint(&file, method<<7)
+	putVint(&file, compression)
 	putVint(&file, 1)
 	putVint(&file, uint64(len(name)))
 	file.WriteString(name)
@@ -204,10 +214,11 @@ func TestRefusesCompressedAndMissingVolumes(t *testing.T) {
 	if _, err := List(filepath.Join(dir, "c.rar")); !errors.Is(err, ErrCompressed) {
 		t.Fatalf("compressed RAR 4: %v", err)
 	}
-	data = rar5Volume("Episode.mkv", []byte("x"), crc32.ChecksumIEEE([]byte("x")), false, false, 3, false)
+	// A solid RAR 5 stream needs the files before it: refused.
+	data = rar5VolumeWith("Episode.mkv", []byte("x"), 1, crc32.ChecksumIEEE([]byte("x")), false, false, 3<<7|0x40, false)
 	_ = os.WriteFile(filepath.Join(dir, "c5.rar"), data, 0o644)
 	if _, err := List(filepath.Join(dir, "c5.rar")); !errors.Is(err, ErrCompressed) {
-		t.Fatalf("compressed RAR 5: %v", err)
+		t.Fatalf("solid RAR 5: %v", err)
 	}
 	missing := t.TempDir()
 	writeSet(t, missing, []string{"m.part1.rar", "m.part2.rar", "m.part3.rar"}, payload(), func(n string, s []byte, c uint32, b, a, m bool) []byte {

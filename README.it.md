@@ -55,6 +55,14 @@ altro.
   per Linux e Windows.
 - Coda, cache e banda seguono la macchina e la linea. Su Auto la linea è tutta
   di Gextto finché nessun altro ne ha bisogno, e la cede quando serve.
+- **Torrent ed eD2k scaricano insieme lo stesso file — come faceva Shareaza, e
+  quasi nessuno oggi.** Quando lo stesso episodio scarica sia come torrent sia
+  su eD2k (aMule) con un file della stessa dimensione esatta, il torrent prende
+  dal file parziale di aMule ogni pezzo che supera il suo controllo SHA-1, così
+  un byte sbagliato non può mai entrare. Chi finisce prima completa l'altro;
+  l'episodio entra in libreria una volta sola e resta condiviso. Un torrent
+  fermo al 95 % viene cercato su eD2k e finito con i dati dell'altra rete, e i
+  due motori dividono una sola linea invece di contendersela.
 
 ### In breve
 
@@ -64,6 +72,7 @@ altro.
 | **Protocollo** | BitTorrent v1, v2 e ibrido (BEP 52) · 34 BEP implementati e testati ([elenco](docs/bep.md)) |
 | **Rete** | TCP + uTP su una porta · UPnP, NAT-PMP, PCP · holepunching BEP 55 · proxy SOCKS5/HTTP · killswitch VPN |
 | **Automazione** | Serie TV, film, fumetti · Torznab (Jackett, Prowlarr, indexarr) · RSS · ricerca web · sostituzione dei download bloccati |
+| **Due reti, un file** | Torrent + eD2k sullo stesso file: pezzi verificati dal `.part` di aMule, chi finisce prima completa l'altro, una sola linea condivisa |
 | **Integrazioni** | Jellyfin, Plex, Jellyseerr (sottoinsieme API v3), aMule (eD2k e Kad), Telegram, e-mail, Discord/Slack/ntfy/Gotify/Pushover/Apprise, iCal |
 | **Interfacce** | Web UI (SSR + HTMX, Go puro, PWA installabile) · TUI da terminale via SSH · API JSON |
 | **Build** | Go puro (`CGO_ENABLED=0`) · Linux x86_64/aarch64 · gx-torrent anche su Windows |

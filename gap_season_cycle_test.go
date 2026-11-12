@@ -14,8 +14,8 @@ func TestGapPassAsksED2KOncePerSeasonAndFillsItsGaps(t *testing.T) {
 	core, coreCfg := ed2kTestCore(t, map[string]string{"ed2k_fallback": "true"})
 	core.SetResults([]amuletest.Result{
 		{Hash: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", Name: "Rare Show S02E02 1080p ITA.mkv", Size: 900000000, Sources: 4},
-		{Hash: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", Name: "Rare Show S02E03 1080p ITA.mkv", Size: 900000000, Sources: 4},
-		{Hash: "cccccccccccccccccccccccccccccccc", Name: "Rare Show S02E04 1080p ITA.mkv", Size: 900000000, Sources: 4},
+		{Hash: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", Name: "Rare Show S02E03 1080p ITA.mkv", Size: 905123456, Sources: 4},
+		{Hash: "cccccccccccccccccccccccccccccccc", Name: "Rare Show S02E04 1080p ITA.mkv", Size: 911987654, Sources: 4},
 	}, "")
 
 	state := newTestAppState(t)

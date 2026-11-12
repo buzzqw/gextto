@@ -68,6 +68,10 @@ type v2Ed2kResult struct {
 	Complete int64
 	Link     string
 	Known    bool
+	// Trust is the confidence level (ed2k_confidence.go) and TrustReasons
+	// why; they are shown, never used to hide the result.
+	Trust        string
+	TrustReasons []string
 }
 
 const (
@@ -283,14 +287,21 @@ func v2Ed2kSearchFor(ctx context.Context, cfg *Config, query string, network *ui
 			view.Error = "Ricerca non riuscita:"
 			view.Detail = err.Error()
 		}
+		candidates := make([]ed2kCandidate, 0, len(results))
 		for _, result := range results {
+			candidates = append(candidates, ed2kCandidate{Name: result.Name, Size: result.Size, Sources: result.Sources})
+		}
+		for i, result := range results {
+			trust := ed2kConfidence(candidates[i], candidates)
 			view.Results = append(view.Results, v2Ed2kResult{
-				Name:     result.Name,
-				Size:     result.Size,
-				Sources:  result.Sources,
-				Complete: result.CompleteSources,
-				Link:     result.Link(),
-				Known:    result.Status != 0,
+				Name:         result.Name,
+				Size:         result.Size,
+				Sources:      result.Sources,
+				Complete:     result.CompleteSources,
+				Link:         result.Link(),
+				Known:        result.Status != 0,
+				Trust:        trust.Level,
+				TrustReasons: trust.Reasons,
 			})
 		}
 	}

@@ -127,6 +127,7 @@ qBittorrent-nox.
 | `cleaner.go` | archive index, detection of lower duplicates, cleanup. |
 | `postprocess.go` | post-processing: move, rename, sidecar. |
 | `hardlink.go` | import into the library as hardlinks of the seeding files, with fallback to copy. |
+| `ed2k_confidence.go` | how far an eD2k result can be trusted (program, archive, size below its quality, one size under several episodes, spam name, single source): a badge with the reasons, and suspects left out of the automatic fallback. |
 | `crossnet.go` | torrent and eD2k on the same file: pairs by identity and exact size, the torrent reads aMule's `.part` (gx-torrent external merge), the first to finish completes the other, a stuck torrent is looked for on eD2k; the pairs Gextto starts are kept in `crossnet_pairs.json`. |
 | `linesplit.go` | one line for gx-torrent and aMule: the limit (fixed, scheduled or Auto's) is split with floors that lend their unused part, from the live rates. |
 | `rar_extract.go` | a completed download packed in stored RAR volumes is extracted next to them before the import looks for the video; the volumes stay for seeding. The reader is `internal/rarstore`. |

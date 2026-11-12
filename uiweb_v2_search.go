@@ -32,6 +32,31 @@ type v2SearchResult struct {
 	ReleaseJSON    string
 	AddBody        string
 	ExplainJSON    string
+	// Trust and TrustReasons are the confidence of an eD2k result
+	// (ed2k_confidence.go), shown as a badge.
+	Trust        string
+	TrustReasons []string
+}
+
+// v2SearchTrust scores the eD2k results of a list against each other.
+func v2SearchTrust(results []v2SearchResult) {
+	var all []ed2kCandidate
+	index := map[int]int{}
+	for i, r := range results {
+		if r.Network != "ed2k" {
+			continue
+		}
+		link, err := ed2k.ParseFileLink(r.Ed2kLink)
+		if err != nil {
+			continue
+		}
+		index[i] = len(all)
+		all = append(all, ed2kCandidate{Name: link.Name, Size: link.Size, Sources: r.Sources})
+	}
+	for i, at := range index {
+		trust := ed2kConfidence(all[at], all)
+		results[i].Trust, results[i].TrustReasons = trust.Level, trust.Reasons
+	}
 }
 
 type v2SearchView struct {
@@ -126,6 +151,7 @@ func v2SearchViewFrom(s *AppState, query, redirect string, kad bool) v2SearchVie
 					})
 				}
 			}
+			v2SearchTrust(view.Results)
 		} else {
 			view.Error = v2JSONError(raw)
 		}
@@ -183,6 +209,7 @@ func V2SearchLink(w http.ResponseWriter, r *http.Request, s *AppState) {
 		})
 		valid = append(valid, link)
 	}
+	v2SearchTrust(view.Results)
 	view.Links = strings.Join(valid, "\n")
 	view.Query = fmt.Sprintf("%d link eD2k", len(view.Results))
 	if download {

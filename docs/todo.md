@@ -16,7 +16,8 @@ still be true after the item lands does not belong here.
 
 ## Engine (gx-core, gx-torrent)
 
-- **uTP on a shaped line**: gx-torrent is fourth of four on the 100 Mbit/s uTP-only scenario; find where the gap comes from and close it. Gate: a CPU and latency profile of that scenario inside the comparison harness (it has no profiling hook yet).
+- **The last second on a shaped line**: on the 100 Mbit/s scenarios gx-torrent is level with the fastest clients at half the file and loses about 1.2 s in the second half (both TCP and uTP); it is not the start (the first block arrives in 13 ms locally) nor the endgame order (block sharing between duplicates was measured: no gain). Gate: a CPU and goroutine profile of the last seconds of the transfer (`GX_COMPARE_PPROF_DIR`, `first_s`/`half_s` in the harness).
+- **Compressed RAR 4 and solid archives**: extract them too (RAR 4 needs its own LZ and PPMd decoder). Gate: a real release that arrived that way.
 - **Memory on a shaped line**: own memory while downloading on the shaped 100 Mbit/s line is above qBittorrent, anacrolix and Transmission; close the gap on the paths a heap profile names. Gate: a heap profile of that scenario inside the comparison harness.
 - **CPU at rest with 100 torrents in the comparison**: the unchoke round now sleeps while a torrent has no peers (lower idle CPU in `TestMeasureIdleTorrents`); confirm the comparison row. Gate: the next gx-torrent round of `make measure-compare`.
 
@@ -28,7 +29,5 @@ Nothing open.
 
 Each waits for the operator's choice.
 
-- **Compressed RAR archives**: extract releases packed with compression too, not only stored ones, with our own decoder. Gate: the operator's choice and a real release that arrived compressed.
-- **Confidence of eD2k results**: a column that scores a result whose name, size and sources look like a fake, with the reasons in a tooltip; it warns and never hides. Gate: the operator's choice.
 - **MCP endpoint**: Gextto's API exposed as tools for an assistant, with a read-only switch. Gate: the operator's choice.
 - **Usenet as an acquisition source**: NZB search through the same indexers and an NNTP download path into the same import. Gate: the operator's choice.

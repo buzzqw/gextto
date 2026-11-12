@@ -156,7 +156,7 @@
   <caption class="sr-only">{{tr "Risultati della ricerca eD2k"}}</caption>
   <thead><tr><th scope="col">{{tr "Nome"}}</th><th scope="col" class="numeric">{{tr "Dimensione"}}</th><th scope="col" class="numeric">{{tr "Fonti"}}</th><th scope="col">{{tr "Azioni"}}</th></tr></thead>
   <tbody>{{range .Results}}<tr{{if .Known}} data-ed2k-known="1"{{end}} data-ed2k-name="{{.Name}}" data-ed2k-size="{{.Size}}" data-ed2k-sources="{{.Sources}}">
-    <td><span class="truncate" {{trTitle .Name}}>{{tr .Name}}</span>{{if .Known}} <span class="badge" {{trTitle "aMule conosce già questo file: è in coda, scaricato o condiviso"}}>{{tr "già noto"}}</span>{{end}}</td>
+    <td><span class="truncate" {{trTitle .Name}}>{{tr .Name}}</span>{{if .Known}} <span class="badge" {{trTitle "aMule conosce già questo file: è in coda, scaricato o condiviso"}}>{{tr "già noto"}}</span>{{end}}{{template "v2_ed2k_trust" .}}</td>
     <td class="numeric">{{bytes .Size}}</td>
     <td class="numeric" {{trTitle "Fonti totali / complete"}}>{{.Sources}} / {{.Complete}}</td>
     <td class="row-actions"><form method="post" action="/ed2k/add" hx-post="/ed2k/add" hx-target="this" hx-swap="outerHTML" style="display:inline"><input type="hidden" name="links" value="{{.Link}}"><button class="btn sm primary" type="submit" {{trTitle "Aggiungi questo file ai download di aMule"}} aria-label="{{tr "Scarica %s" .Name}}">{{tr "Scarica"}}</button></form></td>
@@ -165,3 +165,5 @@
 </div>
 {{else if and .Done (not .Error)}}<p class="muted" role="status"><span>{{tr "Nessun risultato per"}}</span> «{{.Query}}».</p>{{end}}
 {{end}}
+
+{{define "v2_ed2k_trust"}}{{if eq .Trust "suspect"}} <span class="badge err" title="{{range $i, $r := .TrustReasons}}{{if $i}} · {{end}}{{tr $r}}{{end}}">{{tr "sospetto"}}<span class="sr-only">: {{range $i, $r := .TrustReasons}}{{if $i}}; {{end}}{{tr $r}}{{end}}</span></span>{{else if eq .Trust "doubtful"}} <span class="badge warn" title="{{range $i, $r := .TrustReasons}}{{if $i}} · {{end}}{{tr $r}}{{end}}">{{tr "dubbio"}}<span class="sr-only">: {{range $i, $r := .TrustReasons}}{{if $i}}; {{end}}{{tr $r}}{{end}}</span></span>{{else if .TrustReasons}} <span class="badge" title="{{range $i, $r := .TrustReasons}}{{if $i}} · {{end}}{{tr $r}}{{end}}">ⓘ<span class="sr-only">{{range $i, $r := .TrustReasons}}{{if $i}}; {{end}}{{tr $r}}{{end}}</span></span>{{end}}{{end}}

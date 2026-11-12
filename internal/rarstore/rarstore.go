@@ -1,8 +1,9 @@
-// Package rarstore extracts files from RAR archives written in "store" mode
-// (no compression), the form video releases split into volumes use: the
-// payload is copied out of the volumes as it is, with its CRC checked. RAR 4
-// and RAR 5, single and multi-volume ("name.part01.rar" or "name.rar",
-// "name.r00", …). Compressed or encrypted entries are reported, never guessed.
+// Package rarstore extracts files from RAR archives: "store" mode (no
+// compression, the form video releases split into volumes use) for RAR 4
+// and RAR 5, and the RAR 5 compression (unpack5.go), single and
+// multi-volume ("name.part01.rar" or "name.rar", "name.r00", …), with the CRC
+// checked. RAR 4 compression, solid archives and encrypted entries are
+// reported, never guessed.
 package rarstore
 
 import (
@@ -23,7 +24,7 @@ import (
 // Errors a caller can tell apart.
 var (
 	ErrNotRAR      = errors.New("not a RAR archive")
-	ErrCompressed  = errors.New("the archive is compressed: only uncompressed (stored) RAR archives can be extracted")
+	ErrCompressed  = errors.New("the archive uses a compression that cannot be extracted (RAR 4 compression or a solid archive)")
 	ErrEncrypted   = errors.New("the archive is password-protected")
 	ErrMissingPart = errors.New("a volume of the archive is missing")
 	ErrCRC         = errors.New("the extracted data does not match the archive checksum")
@@ -43,6 +44,8 @@ type Entry struct {
 	// crc is the checksum of the whole file when the archive gives one.
 	crc    uint32
 	hasCRC bool
+	// dictionary is the RAR 5 window of a compressed entry (0 = stored).
+	dictionary int64
 }
 
 type part struct {
@@ -181,7 +184,12 @@ func List(first string) ([]*Entry, error) {
 				}
 			}
 			open.parts = append(open.parts, part{volume: volume, offset: c.offset, size: c.size, crc: c.crc, hasCRC: c.hasCRC})
-			open.Size += c.size
+			if c.dictionary > 0 {
+				open.dictionary = c.dictionary
+				open.Size = c.unpacked
+			} else if open.dictionary == 0 {
+				open.Size += c.size
+			}
 			if !c.continues {
 				open.crc, open.hasCRC = c.crc, c.hasCRC
 				open = nil
@@ -195,6 +203,36 @@ func List(first string) ([]*Entry, error) {
 		}
 	}
 	return order, nil
+}
+
+// Compressed reports whether the entry must be decompressed.
+func (e *Entry) Compressed() bool { return e.dictionary > 0 }
+
+// extractCompressed decompresses a RAR 5 entry read across its volumes.
+func extractCompressed(entry *Entry, w io.Writer) error {
+	var readers []io.Reader
+	var files []*os.File
+	defer func() {
+		for _, f := range files {
+			f.Close()
+		}
+	}()
+	for _, p := range entry.parts {
+		f, err := os.Open(p.volume)
+		if err != nil {
+			return err
+		}
+		files = append(files, f)
+		readers = append(readers, io.NewSectionReader(f, p.offset, p.size))
+	}
+	sum := crc32.NewIEEE()
+	if err := unpack5(io.MultiReader(readers...), io.MultiWriter(w, sum), entry.Size, entry.dictionary); err != nil {
+		return err
+	}
+	if entry.hasCRC && sum.Sum32() != entry.crc {
+		return ErrCRC
+	}
+	return nil
 }
 
 // Extract copies one entry to target, checking the checksum; a partial file
@@ -213,7 +251,16 @@ func Extract(entry *Entry, target string) error {
 	}()
 	whole := crc32.NewIEEE()
 	buffered := bufio.NewWriterSize(out, 1<<20)
+	if entry.Compressed() {
+		if err := extractCompressed(entry, buffered); err != nil {
+			out.Close()
+			return err
+		}
+	}
 	for i, p := range entry.parts {
+		if entry.Compressed() {
+			break
+		}
 		f, err := os.Open(p.volume)
 		if err != nil {
 			out.Close()
@@ -265,6 +312,9 @@ type chunk struct {
 	hasCRC    bool
 	continued bool // the slice goes on from the previous volume
 	continues bool // the slice goes on in the next volume
+	// dictionary and unpacked describe a RAR 5 compressed entry.
+	dictionary int64
+	unpacked   int64
 }
 
 // readVolume reads one volume's headers; more is false when the archive
@@ -522,7 +572,8 @@ func rar5FileChunk(head []byte, p int, extraSize, flags uint64) (chunk, bool, er
 	if err != nil {
 		return c, false, err
 	}
-	if _, err = vint(head, &p); err != nil { // unpacked size
+	unpacked, err := vint(head, &p)
+	if err != nil {
 		return c, false, err
 	}
 	if _, err = vint(head, &p); err != nil { // attributes
@@ -577,7 +628,13 @@ func rar5FileChunk(head []byte, p int, extraSize, flags uint64) (chunk, bool, er
 		return c, true, nil
 	}
 	if method := (compression >> 7) & 0x7; method != 0 {
-		return c, false, ErrCompressed
+		// RAR 5 compression (algorithm version 0); a solid stream needs the
+		// files before it, and later versions use other tables.
+		if compression&0x3f != 0 || compression&0x40 != 0 {
+			return c, false, ErrCompressed
+		}
+		c.dictionary = int64(0x20000) << ((compression >> 10) & 0xf)
+		c.unpacked = int64(unpacked)
 	}
 	c.continued = flags&rar5SplitBefore != 0
 	c.continues = flags&rar5SplitAfter != 0

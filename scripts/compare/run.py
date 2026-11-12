@@ -235,7 +235,7 @@ def multipart(fields, files):
 
 
 class Container:
-    def __init__(self, name, image, args, env_dir, ip, cpus, memory, cap_add=()):
+    def __init__(self, name, image, args, env_dir, ip, cpus, memory, cap_add=(), env=()):
         name = f"{PREFIX}-{name}"
         self.name, self.ip, self.dir = name, ip, env_dir
         cmd = [
@@ -247,6 +247,8 @@ class Container:
         ]
         for cap in cap_add:
             cmd += ["--cap-add", cap]
+        for item in env:
+            cmd += ["-e", item]
         self.id = sh(*cmd, image, *args)
 
     @property
@@ -317,9 +319,13 @@ class Client:
         (self.dir / "cfg").mkdir(parents=True)
         (self.dir / "dl").mkdir()
         self.configure()
-        self.container = Container(slot, self.image, self.command(), self.dir, ip, cpus, memory, cap_add)
+        self.container = Container(slot, self.image, self.command(), self.dir, ip, cpus, memory, cap_add,
+                                   env=self.environment() if not reference else ())
         self.ip = ip
         self.helpers = []
+
+    def environment(self):
+        return ()
 
     def configure(self):
         pass
@@ -421,9 +427,31 @@ class QBittorrent(QBitAPI):
         return ["qbittorrent-nox", "--profile=/data/cfg", "--confirm-legal-notice"]
 
 
+# GX_COMPARE_PPROF_DIR turns on profiling of gx-torrent: its pprof endpoint
+# listens on the container's loopback (the daemon refuses anything else) and
+# the profiles are read through docker exec, one CPU profile and one heap
+# snapshot per transfer scenario. Off (the default) a round is unchanged.
+PPROF_DIR = os.environ.get("GX_COMPARE_PPROF_DIR", "")
+PPROF_ADDR = "127.0.0.1:6060"
+
+
+def fetch_pprof(container, path, out):
+    """Reads http://PPROF_ADDR/<path> inside the container into out."""
+    host, port = PPROF_ADDR.split(":")
+    script = (f'exec 3<>/dev/tcp/{host}/{port}; '
+              f'printf "GET /{path} HTTP/1.0\\r\\nHost: x\\r\\n\\r\\n" >&3; cat <&3')
+    raw = subprocess.run(["docker", "exec", container.name, "bash", "-c", script],
+                         capture_output=True, timeout=120).stdout
+    body = raw.split(b"\r\n\r\n", 1)[-1]
+    Path(out).write_bytes(body)
+
+
 class GxTorrent(QBitAPI):
     name = "gx-torrent"
     image = "gxc-gx-torrent"
+
+    def environment(self):
+        return ("GX_TORRENT_PPROF=" + PPROF_ADDR,) if PPROF_DIR else ()
 
     def command(self):
         # GX_COMPARE_GX_ARGS adds flags for an A/B of the engine (for example
@@ -433,6 +461,9 @@ class GxTorrent(QBitAPI):
             "gx-torrent", "-mode", "standalone", "-listen", "0.0.0.0:8080", "-insecure",
             "-data", "/data/cfg", "-download-dir", "/data/dl", "-peer-ports", "6881-6881",
             "-no-dht", "-no-pex", "-no-lsd", "-no-upnp", "-no-natpmp",
+            # The other clients fetch no tracker list or country database and
+            # filter no client: neither does gx-torrent here.
+            "-tracker-list=false", "-peer-country=false", "-client-filter=false",
             *extra,
         ]
 
@@ -836,11 +867,19 @@ def wait_announced(payload, count, timeout=60):
     raise RuntimeError("the reference peers did not reach the tracker")
 
 
-def wait_done(client, info_hash, timeout=900, want="seeding"):
-    deadline = time.time() + timeout
+def wait_done(client, info_hash, timeout=900, want="seeding", marks=None):
+    """Waits for the torrent to finish. marks, when given, receives the
+    seconds from the call to the first progress and to half the file."""
+    start = time.time()
+    deadline = start + timeout
     while time.time() < deadline:
         guard_host()
         row = client.status().get(info_hash)
+        if marks is not None and row:
+            if row[1] > 0 and "first_s" not in marks:
+                marks["first_s"] = round(time.time() - start, 2)
+            if row[1] >= 0.5 and "half_s" not in marks:
+                marks["half_s"] = round(time.time() - start, 2)
         if row and row[1] >= 0.9999 and (want is None or row[0] == want):
             return
         time.sleep(client.poll_interval)
@@ -902,10 +941,29 @@ def transfer(client, payload, peers, protocol="TCP", shape=False):
         refs.append(start_reference(index, payload, protocol=protocol, shape=shape))
     wait_announced(payload, peers)
     sut = start_sut(client, utp=protocol != "TCP")
+    profiler = None
+    if PPROF_DIR and client == "gx-torrent":
+        tag = f"{payload.name}-{protocol.lower()}{'-line' if shape else ''}-{int(time.time())}"
+
+        def profile():
+            time.sleep(5)
+            fetch_pprof(sut.container, "debug/pprof/profile?seconds=20", Path(PPROF_DIR) / f"{tag}-cpu.pprof")
+            fetch_pprof(sut.container, "debug/pprof/heap", Path(PPROF_DIR) / f"{tag}-heap.pprof")
+            fetch_pprof(sut.container, "debug/pprof/allocs", Path(PPROF_DIR) / f"{tag}-allocs.pprof")
+
+        profiler = threading.Thread(target=profile, daemon=True)
     with Sampler(sut, refs) as sample:
         sut.add(payload)
-        wait_done(sut, payload.info_hash, want=None)
+        if profiler:
+            profiler.start()
+        marks = {}
+        wait_done(sut, payload.info_hash, want=None, marks=marks)
+    if profiler:
+        profiler.join(timeout=60)
     metrics = sample.metrics()
+    # When the first byte and half the file arrived: tells a slow start from
+    # a slow stream.
+    metrics.update(marks)
     metrics["size_mib"] = payload.size / 1048576
     metrics["mb_s"] = round(payload.size / 1e6 / sample.wall, 2)
     metrics["cpu_s_per_gib"] = round(sample.cpu / (payload.size / 2**30), 2)
@@ -988,8 +1046,22 @@ def scenario_many(client, env):
     all_seeding()
     ready = time.time() - started
     time.sleep(SETTLE_S)
+    profiler = None
+    if PPROF_DIR and client == "gx-torrent":
+        tag = f"many-{int(time.time())}"
+
+        def profile():
+            fetch_pprof(sut.container, f"debug/pprof/profile?seconds={max(REST_SAMPLE_S - 5, 5)}",
+                        Path(PPROF_DIR) / f"{tag}-cpu.pprof")
+            fetch_pprof(sut.container, "debug/pprof/heap", Path(PPROF_DIR) / f"{tag}-heap.pprof")
+
+        profiler = threading.Thread(target=profile, daemon=True)
     with Sampler(sut) as sample:
+        if profiler:
+            profiler.start()
         time.sleep(REST_SAMPLE_S)
+    if profiler:
+        profiler.join(timeout=60)
     metrics = {"add_s": round(added, 2), "ready_s": round(ready, 2), **sample.metrics()}
 
     restart_from = sut.container.restart()

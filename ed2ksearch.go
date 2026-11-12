@@ -809,12 +809,24 @@ func ed2kSeasonFallback(ctx context.Context, engine *Engine, cfg *Config, series
 	started := time.Now()
 	candidates := engine.SearchSeasonED2K(ctx, cfg, series, season)
 	accepted := make([]models.Release, 0, len(candidates))
+	// The whole season's results: one exact size under several episodes is
+	// the mark of a renamed fake (ed2k_confidence.go).
+	all := make([]ed2kCandidate, 0, len(candidates))
+	for _, release := range candidates {
+		if link, err := ed2k.ParseFileLink(release.Ed2kLink); err == nil {
+			all = append(all, ed2kCandidate{Name: link.Name, Size: link.Size, Sources: release.Sources})
+		}
+	}
 	for index := range candidates {
 		release := candidates[index]
 		if !releaseMatchesConfiguredSeason(&release, series, season) {
 			continue
 		}
 		if automatic && !ed2kAcceptAutomatic(cfg, release) {
+			continue
+		}
+		if link, err := ed2k.ParseFileLink(release.Ed2kLink); automatic && err == nil &&
+			ed2kConfidence(ed2kCandidate{Name: link.Name, Size: link.Size, Sources: release.Sources}, all).Level == ed2kTrustSuspect {
 			continue
 		}
 		name := series.Name
@@ -836,7 +848,13 @@ func ed2kSeasonFallback(ctx context.Context, engine *Engine, cfg *Config, series
 // resort, the same rule the torrent plane follows. An archive or a sample in
 // another format still cannot be imported.
 func ed2kAcceptAutomatic(cfg *Config, release models.Release) bool {
-	if link, err := ed2k.ParseFileLink(release.Ed2kLink); err != nil || !isVideoExtension(link.Name) {
+	link, err := ed2k.ParseFileLink(release.Ed2kLink)
+	if err != nil || !isVideoExtension(link.Name) {
+		return false
+	}
+	// A result the confidence check calls suspect (a tiny file posing as a
+	// full one, a spam name) is not taken without a person looking at it.
+	if ed2kConfidence(ed2kCandidate{Name: link.Name, Size: link.Size, Sources: release.Sources}, nil).Level == ed2kTrustSuspect {
 		return false
 	}
 	return release.Sources >= ed2kMinSources(cfg)

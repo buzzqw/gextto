@@ -63,7 +63,7 @@
   <thead><tr><th scope="col">{{tr "Titolo"}}</th><th scope="col">{{tr "Sorgente"}}</th><th scope="col">{{tr "Punteggio"}}</th><th scope="col">{{tr "Dimensione"}}</th><th scope="col">{{tr "Seed"}}</th><th scope="col">{{tr "Azioni"}}</th></tr></thead>
   <tbody>{{range .Results}}<tr>
     <td class="truncate" {{trTitle .Title}}>{{tr .Title}}</td>
-    <td>{{tr .Source}}{{if .Freeleech}} <span class="badge ok" {{trTitle "Il tracker non conta il download (freeleech)."}}>{{tr "Freeleech"}}</span>{{else if .FreeleechKnown}} <span class="badge" {{trTitle "Il tracker dichiara che il download conta per il rapporto."}}>{{tr "Non freeleech"}}</span>{{else}} <span class="badge" {{trTitle "Il tracker non dice se il download conta per il rapporto."}}>{{tr "Non marcato"}}</span>{{end}}{{if eq .Network "ed2k"}} <span class="badge" {{trTitle "Fonti eD2k"}}>{{tr .Sources}}</span>{{end}}</td>
+    <td>{{tr .Source}}{{if .Freeleech}} <span class="badge ok" {{trTitle "Il tracker non conta il download (freeleech)."}}>{{tr "Freeleech"}}</span>{{else if .FreeleechKnown}} <span class="badge" {{trTitle "Il tracker dichiara che il download conta per il rapporto."}}>{{tr "Non freeleech"}}</span>{{else}} <span class="badge" {{trTitle "Il tracker non dice se il download conta per il rapporto."}}>{{tr "Non marcato"}}</span>{{end}}{{if eq .Network "ed2k"}} <span class="badge" {{trTitle "Fonti eD2k"}}>{{tr .Sources}}</span>{{template "v2_ed2k_trust" .}}{{end}}</td>
     <td class="numeric">{{tr .Score}}</td>
     <td class="numeric">{{bytes .SizeBytes}}</td>
     <td class="numeric">{{tr .Seeders}}</td>
