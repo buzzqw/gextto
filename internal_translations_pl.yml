@@ -6440,3 +6440,5 @@ pol:
   "Mostra il paese dei peer": "Pokazuj kraj peerów"
   "vuoto = lista predefinita": "puste = lista domyślna"
   "vuoto = database DB-IP scaricato in automatico": "puste = baza DB-IP pobierana automatycznie"
+  "0 = automatica: chi ti restituisce di più riceve di più": "0 = automatycznie: kto więcej oddaje, więcej dostaje"
+  "Con 0 (default) è automatica: quando l'upload è limitato — sempre, con la velocità su Auto — ogni peer che ti manda dati per un torrent in download riceve di più quanto più ti restituisce, fino a 4 volte un peer normale, e i peer di solo seed restano alla quota normale. Una percentuale da 1 a 99 fissa invece la parte che va ai peer che restituiscono; il resto va al seed. Solo gx-torrent.": "Przy 0 (domyślnie) działa automatycznie: gdy wysyłanie jest ograniczone — zawsze przy prędkości Auto — każdy peer przesyłający ci dane torrenta w trakcie pobierania dostaje tym więcej, im więcej oddaje, do 4 razy więcej niż zwykły peer, a peerzy tylko seedujący zachowują normalny udział. Procent od 1 do 99 ustala natomiast część dla peerów, którzy oddają; reszta idzie na seedowanie. Tylko gx-torrent."

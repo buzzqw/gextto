@@ -6446,3 +6446,5 @@ spa:
   "Mostra il paese dei peer": "Mostrar el país de los pares"
   "vuoto = lista predefinita": "vacío = lista predeterminada"
   "vuoto = database DB-IP scaricato in automatico": "vacío = la base DB-IP descargada automáticamente"
+  "0 = automatica: chi ti restituisce di più riceve di più": "0 = automática: quien devuelve más recibe más"
+  "Con 0 (default) è automatica: quando l'upload è limitato — sempre, con la velocità su Auto — ogni peer che ti manda dati per un torrent in download riceve di più quanto più ti restituisce, fino a 4 volte un peer normale, e i peer di solo seed restano alla quota normale. Una percentuale da 1 a 99 fissa invece la parte che va ai peer che restituiscono; il resto va al seed. Solo gx-torrent.": "Con 0 (predeterminado) es automática: cuando la subida está limitada — siempre, con la velocidad en Auto — cada par que te envía datos de un torrent en descarga recibe más cuanto más devuelve, hasta 4 veces un par normal, y los pares de solo siembra mantienen la cuota normal. Un porcentaje de 1 a 99 fija en cambio la parte de los pares que devuelven; el resto va a la siembra. Solo gx-torrent."

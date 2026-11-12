@@ -2596,15 +2596,22 @@ a socket, keep-alives and a place in every per-peer loop for nothing
   100 it is the plain limiter. An unlimited line never waits, so the weight
   only matters while a limit — fixed, scheduled or autotune — is in place. The
   engine keeps it in the resume record (`bandwidth_weight`).
-- **Trading split** (`-upload-trading-share`, key `upload-trading-share`, 0 =
-  off, 1–99). At every unchoke round (10 s) each torrent sorts the peers it
-  uploads to (unchoked and interested) into *trading* — the torrent is still
-  downloading and the peer sends data back — and *seeding*, and adds the counts
-  to the session. A peer's upload wait is then scaled by its class share
-  divided by the peers in that class, so the two classes get the configured
-  split whatever their head counts; when only one class is present, or the
-  split is off, the factor is 1. The split is work-conserving: a class that
-  does not use its share leaves it to the other. It is applied live.
+- **Trading split** (`-upload-trading-share`, key `upload-trading-share`).
+  At every unchoke round (10 s) each torrent sorts the peers it uploads to
+  (unchoked and interested) into *trading* — the torrent is still downloading
+  and the peer sends data back — and *seeding*.
+  - **0, the default: automatic reciprocity.** No fixed split: each trading
+    peer gets a weight of 100 % plus 100 % × its download rate to us divided by
+    the average of the torrent's trading peers, capped at 400 %
+    (`reciprocityWeight`); seeding peers stay at 100 %, so they are never
+    starved. A peer that stops giving falls back to 100 % at the next round.
+  - **1–99: fixed split.** A peer's wait is scaled by its class share divided
+    by the peers in that class, so the two classes get the configured split
+    whatever their head counts; with only one class present the factor is 1.
+
+  Both are work-conserving (a share nobody uses goes to the others) and only
+  bite while an upload limit is in place — always, under automatic speed. The
+  value is applied live.
 
 ### Automatic speed (autotune)
 

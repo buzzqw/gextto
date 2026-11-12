@@ -106,6 +106,9 @@ type PeerWriter struct {
 	// upload (trading or seeding); nil or ClassNone leaves the plain share.
 	uploadClasses atomic.Pointer[bandwidth.UploadClasses]
 	uploadClass   atomic.Int32
+	// uploadWeight is this peer's own share of a limited upload in percent
+	// (0 = 100), set by the torrent from what the peer sends back.
+	uploadWeight atomic.Int32
 	log           logger.Logger
 	stopC         chan struct{}
 	doneC         chan struct{}
@@ -492,12 +495,26 @@ func (p *PeerWriter) SetUploadClass(class int32) { p.uploadClass.Store(class) }
 // UploadClass reports the class this peer's uploads count in.
 func (p *PeerWriter) UploadClass() int32 { return p.uploadClass.Load() }
 
+// SetUploadWeight sets this peer's own share in percent (<= 0 = 100).
+func (p *PeerWriter) SetUploadWeight(percent int32) { p.uploadWeight.Store(percent) }
+
+// UploadWeight reports this peer's own share in percent.
+func (p *PeerWriter) UploadWeight() int32 {
+	if w := p.uploadWeight.Load(); w > 0 {
+		return w
+	}
+	return 100
+}
+
 // waitBucket waits for the upload throttle to allow n bytes. False means the
 // writer was stopped meanwhile.
 func (p *PeerWriter) waitBucket(n int64) bool {
 	factor := 1.0
 	if classes := p.uploadClasses.Load(); classes != nil {
 		factor = classes.Factor(p.uploadClass.Load())
+	}
+	if w := p.uploadWeight.Load(); w > 0 && w != 100 {
+		factor *= float64(w) / 100
 	}
 	d := p.bucket.TakeWeighted(n, factor)
 	if d <= 0 {

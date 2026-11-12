@@ -168,8 +168,9 @@ type Config struct {
 	// UploadTradingShare is the percent of a limited upload that goes first to
 	// trading peers (peers of a torrent still downloading that send data back)
 	// when seeding peers want the same bandwidth; the rest goes to seeding.
-	// 0 turns the split off (every peer gets the same share). It only matters
-	// when an upload limit is in place.
+	// 0 (the default) is automatic: no fixed split, each trading peer weighs
+	// more the more it sends back (reciprocityWeight). It only matters when an
+	// upload limit is in place — always, with automatic speed.
 	UploadTradingShare int `yaml:"upload-trading-share"`
 	// ClientFilter lists the clients refused as peers: a rule starting with
 	// "-" is a peer ID prefix ("-XL"), any other rule is looked for in the

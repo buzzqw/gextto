@@ -47,7 +47,7 @@ var uiSettingTooltipText = map[string]string{
 	"torrent_outgoing_interface":           "Killswitch VPN: interfaccia usata per tutto il traffico BitTorrent in uscita.",
 	"torrent_dl_limit":                     "Limite globale di download in KiB/s (0 = illimitato).",
 	"torrent_ul_limit":                     "Limite globale di upload in KiB/s (0 = illimitato).",
-	"torrent_upload_trading_share":         "Quando l'upload è limitato, questa quota va prima ai peer che ti mandano dati per un torrent che stai ancora scaricando; il resto va al seed. 0 dà a tutti i peer la stessa quota. Conta solo con un limite di upload (anche quello di Auto). Solo gx-torrent.",
+	"torrent_upload_trading_share":         "Con 0 (default) è automatica: quando l'upload è limitato — sempre, con la velocità su Auto — ogni peer che ti manda dati per un torrent in download riceve di più quanto più ti restituisce, fino a 4 volte un peer normale, e i peer di solo seed restano alla quota normale. Una percentuale da 1 a 99 fissa invece la parte che va ai peer che restituiscono; il resto va al seed. Solo gx-torrent.",
 	"torrent_tracker_list":                 "Aggiunge ai nuovi torrent pubblici i tracker di una lista pubblica, scaricata ogni giorno; mai ai torrent privati. Attivo di default. Solo gx-torrent.",
 	"torrent_tracker_list_url":             "Indirizzo della lista di tracker, uno per riga. Di default è la lista «best» del progetto trackerslist; puoi indicarne un'altra. Vuoto = lista predefinita. Solo gx-torrent.",
 	"torrent_client_filter":                "Rifiuta i peer il cui client è nella lista: client noti per scaricare senza restituire mai nulla. Attivo di default. Solo gx-torrent.",

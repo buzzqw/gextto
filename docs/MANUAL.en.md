@@ -1258,10 +1258,9 @@ process; there is nothing to install.
   torrents, never to private ones: for a magnet it waits until it knows whether
   it is private) and the **peer country** (the free DB-IP database, downloaded
   every month, without sending the peers' addresses anywhere). The **upload
-  share for peers that give back** stays off until you choose a percentage:
-  when the upload is limited, by Auto too, that share goes first to the peers
-  that send you data for a torrent you are still downloading, the rest to
-  seeding.
+  share for peers that give back** works by itself too: with the speed on Auto
+  (or an upload limit) a peer sending you data for a torrent you are still
+  downloading gets more the more it gives back, and seeding never stops.
 - In *Health → Torrent engine*, the **DHT** row says how many nodes gx-torrent knows, how
   many answer and how many lookups are running; **Incoming DHT queries** says
   whether any node reached it from outside in the last hour (if not, the UDP
@@ -2216,7 +2215,7 @@ the download stands. Season packs do not go through this check.
 | Auto — line maximum, download | The real maximum download speed of the line, in KiB/s (e.g. 9000 for 9 MB/s). 0 = unknown: Auto discovers it. If you enter it, Auto never goes above it and finds the right point sooner. |
 | Auto — line maximum, upload | The real maximum upload speed of the line, in KiB/s (e.g. 800). 0 = unknown: Auto discovers it. If you enter it, Auto never goes above it and finds the right point sooner. |
 | Apply the limits to peers on the local network too | Off (default, recommended): the peers of your home or office network (private addresses 10.x, 172.16–31.x, 192.168.x, link-local, loopback and local IPv6 fc00::/7) download and upload at full speed, as in qBittorrent and libtorrent: the speed limits are meant for the Internet line. On: they follow the global and per-torrent limits too. With a proxy configured every peer follows the limits (behind a proxy gx-torrent cannot tell where a peer is). gx-torrent only (qBittorrent has its own option). Changing it restarts gx-torrent. |
-| Upload share for peers that give back | Percentage of the limited upload that goes first to the peers that send you data for a torrent you are still downloading (trading); the rest goes to the peers you only seed to. It matters only while an upload limit is in place — Auto's included — and when both groups want more than there is: what one group does not use goes to the other. 0 (default) = off, every peer gets the same share. Values from 1 to 99; 70–80 puts downloads first without stopping seeding. gx-torrent only. Changing it restarts gx-torrent. |
+| Upload share for peers that give back | **0 (default) = automatic.** While the upload is limited — always, with the speed on Auto — every peer sending you data for a torrent you are still downloading gets a share that grows with how much it gives back compared with the other peers of that torrent: from the normal share up to 4 times as much. It is recomputed every 10 seconds, so a peer that stops giving drops back to the normal share at once. The peers you only seed to keep the normal share and are never stopped, and what one peer does not use goes to the others. A percentage from 1 to 99 replaces the automatic mode with a fixed split: that part goes first to the peers that give back, the rest to seeding. Without an upload limit nothing changes. gx-torrent only. Changing it restarts gx-torrent. |
 
 **Ports and interfaces**
 

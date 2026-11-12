@@ -69,3 +69,15 @@ func TestClampWeight(t *testing.T) {
 		}
 	}
 }
+
+func TestReciprocityWeight(t *testing.T) {
+	cases := []struct {
+		rate, avg int
+		want      int32
+	}{{0, 100, 100}, {100, 0, 100}, {50, 100, 150}, {100, 100, 200}, {200, 100, 300}, {1000, 100, 400}}
+	for _, c := range cases {
+		if got := reciprocityWeight(c.rate, c.avg); got != c.want {
+			t.Errorf("reciprocityWeight(%d, %d) = %d, want %d", c.rate, c.avg, got, c.want)
+		}
+	}
+}

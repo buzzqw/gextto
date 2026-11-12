@@ -84,24 +84,58 @@ func (t *Torrent) PeerOptions() (weightPercent int, dht, pex bool) {
 	return got.weight, got.dht, got.pex
 }
 
+// Automatic reciprocity: with no fixed trading share, a trading peer's own
+// weight grows with what it sends back compared with the other trading peers
+// of the torrent, from 100 % (it gives little) to maxReciprocityWeight (it
+// gives several times the average). Seeding peers keep 100 %, so they are
+// never starved; the weights only matter while an upload limit is in place,
+// and a peer that stops giving falls back at the next round.
+const maxReciprocityWeight = 400
+
+// reciprocityWeight is the weight of a trading peer sending rate bytes/s
+// when the trading peers of the torrent send avg on average.
+func reciprocityWeight(rate, avg int) int32 {
+	if rate <= 0 || avg <= 0 {
+		return 100
+	}
+	extra := 100 * float64(rate) / float64(avg)
+	return int32(min(float64(maxReciprocityWeight), 100+extra))
+}
+
 // updateUploadClasses sorts the peers we upload to into trading (a torrent
 // still downloading, and the peer sends data back) and seeding (everyone
-// else), and moves the session counts by the difference since the last round.
-// stopped clears this torrent's share of the counts.
+// else), gives each trading peer its reciprocity weight when the split is
+// automatic, and moves the session counts by the difference since the last
+// round. stopped clears this torrent's share of the counts.
 func (t *torrent) updateUploadClasses(stopped bool) {
 	var counts [3]int64
 	if !stopped {
 		downloading := !t.completed
+		automatic := t.session.uploadClasses.TradingShare() == 0
+		total, traders := 0, 0
 		for pe := range t.peers {
 			class := bandwidth.ClassNone
 			if !pe.ClientChoking && pe.PeerInterested {
 				class = bandwidth.ClassSeeding
-				if downloading && pe.DownloadSpeed() > 0 {
+				if rate := pe.DownloadSpeed(); downloading && rate > 0 {
 					class = bandwidth.ClassTrading
+					total += rate
+					traders++
 				}
 			}
 			pe.SetUploadClass(class)
 			counts[class]++
+		}
+		avg := 0
+		if traders > 0 {
+			avg = total / traders
+		}
+		for pe := range t.peers {
+			weight := int32(100)
+			if automatic && pe.UploadClass() == bandwidth.ClassTrading {
+				weight = reciprocityWeight(pe.DownloadSpeed(), avg)
+			}
+			pe.SetUploadWeight(weight)
 		}
 	}
 	classes := &t.session.uploadClasses

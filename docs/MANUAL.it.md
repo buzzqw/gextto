@@ -1270,10 +1270,10 @@ separato; non c'è nulla da installare.
   progetto *trackerslist*, scaricata ogni giorno e aggiunta ai nuovi torrent
   pubblici, mai ai privati: per un magnet si aspetta di sapere se è privato) e
   il **paese dei peer** (il database gratuito DB-IP, scaricato ogni mese, senza
-  inviare a nessuno gli indirizzi dei peer). La **quota di upload per i peer
-  che restituiscono** invece è spenta finché non scegli una percentuale: quando
-  l'upload è limitato, anche da Auto, quella quota va prima ai peer che ti
-  mandano dati per un torrent che stai ancora scaricando, il resto al seed.
+  inviare a nessuno gli indirizzi dei peer). Anche la **quota di upload per i peer
+  che restituiscono** lavora da sola: con la velocità su Auto (o un limite di
+  upload) chi ti manda dati per un torrent che stai ancora scaricando riceve di
+  più quanto più ti restituisce, e il seed non si ferma mai.
 - In *Salute → Motore torrent*, la riga **DHT** dice quanti nodi conosce gx-torrent,
   quanti rispondono e quante ricerche sono in corso; **Query DHT in entrata**
   dice se nell'ultima ora qualche nodo l'ha raggiunto da fuori (se no, la porta
@@ -2243,7 +2243,7 @@ verifica.
 | Auto — velocità massima linea, download | Massima velocità reale della linea in download, in KiB/s (es. 9000 per 9 MB/s). 0 = non nota: la scopre Auto. Se la indichi, Auto non sale oltre e trova il punto giusto più in fretta. |
 | Auto — velocità massima linea, upload | Massima velocità reale della linea in upload, in KiB/s (es. 800). 0 = non nota: la scopre Auto. Se la indichi, Auto non sale oltre e trova il punto giusto più in fretta. |
 | Applica i limiti anche ai peer della rete locale | Spento (default, consigliato): i peer della tua rete di casa o d'ufficio (indirizzi privati 10.x, 172.16–31.x, 192.168.x, link-local, loopback e IPv6 locali fc00::/7) scaricano e caricano alla massima velocità, come in qBittorrent e libtorrent: i limiti di velocità servono per la linea Internet. Acceso: anche loro rispettano i limiti globali e del torrent. Con un proxy configurato tutti i peer rispettano i limiti (dietro un proxy gx-torrent non può sapere dove si trova un peer). Solo gx-torrent (qBittorrent ha la sua opzione). Cambiarla riavvia gx-torrent. |
-| Quota di upload per i peer che restituiscono | Percentuale dell'upload limitato che va per prima ai peer che ti mandano dati per un torrent che stai ancora scaricando (scambio); il resto va ai peer a cui fai solo seed. Conta solo quando un limite di upload è attivo — anche quello deciso da Auto — e quando entrambi i gruppi vogliono più banda di quella che c'è: la parte che un gruppo non usa va all'altro. 0 (default) = spento, ogni peer ha la stessa quota. Valori da 1 a 99; 70–80 dà precedenza ai download senza fermare il seed. Solo gx-torrent. Cambiarla riavvia gx-torrent. |
+| Quota di upload per i peer che restituiscono | **0 (default) = automatica.** Quando l'upload è limitato — sempre, con la velocità su Auto — ogni peer che ti manda dati per un torrent che stai ancora scaricando riceve una quota che cresce con quanto ti restituisce rispetto agli altri peer di quel torrent: da quella normale fino a 4 volte tanto. Si ricalcola ogni 10 secondi, quindi chi smette di dare torna subito alla quota normale. I peer a cui fai solo seed tengono la quota normale e non vengono mai fermati, e la banda che un peer non usa passa agli altri. Una percentuale da 1 a 99 sostituisce l'automatico con una divisione fissa: quella parte va per prima ai peer che restituiscono, il resto al seed. Senza un limite di upload non cambia nulla. Solo gx-torrent. Cambiarla riavvia gx-torrent. |
 
 **Porte e interfacce**
 

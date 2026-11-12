@@ -121,6 +121,12 @@ func (p *Conn) SetUploadClass(class int32) { p.writer.SetUploadClass(class) }
 // UploadClass reports the class this peer's uploads count in.
 func (p *Conn) UploadClass() int32 { return p.writer.UploadClass() }
 
+// SetUploadWeight sets this peer's own share of a limited upload in percent.
+func (p *Conn) SetUploadWeight(percent int32) { p.writer.SetUploadWeight(percent) }
+
+// UploadWeight reports this peer's own share of a limited upload in percent.
+func (p *Conn) UploadWeight() int32 { return p.writer.UploadWeight() }
+
 // Close stops the reader and writer and waits for the run loop to exit.
 func (p *Conn) Close() {
 	close(p.closeC)
