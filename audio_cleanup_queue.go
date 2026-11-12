@@ -268,7 +268,7 @@ func audioCleanupProcess(job audioCleanupJob, cfg *Config, db *Database) {
 	// One heavy job at a time: a night job running now finishes first.
 	release := acquireMaintenanceHeavy(context.Background())
 	defer release()
-	guard := AcquireArchiveImport(job.Series)
+	guard := AcquireArchiveImportFor(job.Series, archiveHoldAudioCleanup)
 	defer guard.Release()
 
 	ctx, cancel := context.WithTimeout(context.Background(), audioCleanupTimeout)

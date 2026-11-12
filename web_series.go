@@ -669,11 +669,11 @@ func ScanSeriesArchive(w http.ResponseWriter, r *http.Request, s *AppState) {
 		jsonError(w, http.StatusNotFound, "series not found")
 		return
 	}
-	if ArchiveImportBusyContains(series.Name) {
+	if reason := archiveHoldReason(series.Name); reason != "" {
 		jsonResponse(w, map[string]any{
 			"ok":      true,
 			"skipped": true,
-			"reason":  "archive import in progress",
+			"reason":  reason,
 		})
 		return
 	}

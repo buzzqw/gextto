@@ -458,32 +458,54 @@ type RenameProgress struct {
 
 var (
 	archiveImportBusyMu sync.Mutex
-	// archiveImportBusy counts the imports in progress per series: two imports of
-	// the same series may overlap, and the first one to finish must not clear
-	// the marker of the other.
-	archiveImportBusy = map[string]int{}
+	// archiveImportBusy counts, for every series, the operations holding its
+	// archive, by reason: a copy into the library and the audio cleanup both
+	// rewrite files there, and a rename must wait for either. Two holds of the
+	// same reason may overlap (two imports of the same series), and the first
+	// one to finish must not clear the marker of the other. The reason is kept
+	// so the log names the operation that is really running.
+	archiveImportBusy = map[string]map[string]int{}
 	// archiveRenameBusy marks the series whose archive is being renamed.
 	archiveRenameBusy = map[string]struct{}{}
 	// archiveImportCond wakes imports waiting for a rename of their series.
 	archiveImportCond = sync.NewCond(&archiveImportBusyMu)
 )
 
-// ArchiveImportGuard is an RAII marker for "this series is being imported right
-// now".
+// The reasons a series' archive is held. They are codes, not sentences:
+// archiveRenameBusyText turns them into what the log and the API show.
+const (
+	archiveHoldCopy         = "archive import in progress"
+	archiveHoldAudioCleanup = "audio cleanup in progress"
+)
+
+// ArchiveImportGuard is an RAII marker for "a download of this series is being
+// copied into the library right now".
 type ArchiveImportGuard struct {
 	series *string
+	reason string
 }
 
-// AcquireArchiveImport marks the trimmed series name as busy and returns the
-// guard. When a rename of the same series is running it waits for it to finish,
-// so files are never renamed while they are being copied. Imports never wait
-// for each other (nested acquisitions are safe). A nil or empty series yields
-// a no-op guard.
+// AcquireArchiveImport marks the trimmed series name as busy with a copy into
+// the library and returns the guard. When a rename of the same series is
+// running it waits for it to finish, so files are never renamed while they are
+// being copied. Imports never wait for each other (nested acquisitions are
+// safe). A nil or empty series yields a no-op guard.
 func AcquireArchiveImport(series *string) *ArchiveImportGuard {
+	return AcquireArchiveImportFor(series, archiveHoldCopy)
+}
+
+// AcquireArchiveImportFor is AcquireArchiveImport with the operation that holds
+// the archive: a rename that has to wait then names it (the audio cleanup of the
+// library is not a download being copied, and saying so sent people looking for
+// an import that never existed).
+func AcquireArchiveImportFor(series *string, reason string) *ArchiveImportGuard {
 	guard := &ArchiveImportGuard{}
 	if series != nil {
 		name := strings.TrimSpace(*series)
 		if name != "" {
+			if strings.TrimSpace(reason) == "" {
+				reason = archiveHoldCopy
+			}
 			archiveImportBusyMu.Lock()
 			for {
 				if _, renaming := archiveRenameBusy[name]; !renaming {
@@ -491,9 +513,15 @@ func AcquireArchiveImport(series *string) *ArchiveImportGuard {
 				}
 				archiveImportCond.Wait()
 			}
-			archiveImportBusy[name]++
+			holds := archiveImportBusy[name]
+			if holds == nil {
+				holds = map[string]int{}
+				archiveImportBusy[name] = holds
+			}
+			holds[reason]++
 			archiveImportBusyMu.Unlock()
 			guard.series = &name
+			guard.reason = reason
 		}
 	}
 	runtime.SetFinalizer(guard, func(value *ArchiveImportGuard) { value.Release() })
@@ -506,39 +534,73 @@ func (g *ArchiveImportGuard) Release() {
 		return
 	}
 	archiveImportBusyMu.Lock()
-	if archiveImportBusy[*g.series] <= 1 {
-		delete(archiveImportBusy, *g.series)
-	} else {
-		archiveImportBusy[*g.series]--
+	if holds := archiveImportBusy[*g.series]; holds != nil {
+		if holds[g.reason] <= 1 {
+			delete(holds, g.reason)
+		} else {
+			holds[g.reason]--
+		}
+		if len(holds) == 0 {
+			delete(archiveImportBusy, *g.series)
+		}
 	}
 	archiveImportBusyMu.Unlock()
 	g.series = nil
 }
 
-// ArchiveImportAnyBusy reports whether any archive import is in progress.
+// ArchiveImportAnyBusy reports whether any operation holds a series archive: a
+// copy into the library or the audio cleanup of the library.
 func ArchiveImportAnyBusy() bool {
 	archiveImportBusyMu.Lock()
 	defer archiveImportBusyMu.Unlock()
 	return len(archiveImportBusy) > 0
 }
 
-// ArchiveImportBusyContains reports whether an import of the series is running.
+// ArchiveImportBusyContains reports whether a copy or the audio cleanup is
+// working on the series.
 func ArchiveImportBusyContains(name string) bool {
 	archiveImportBusyMu.Lock()
 	defer archiveImportBusyMu.Unlock()
-	return archiveImportBusy[strings.TrimSpace(name)] > 0
+	return len(archiveImportBusy[strings.TrimSpace(name)]) > 0
+}
+
+// archiveHoldReason says why the archive of a series is busy, and "" when it is
+// free. A copy wins over the audio cleanup: it is the operation that moves the
+// library, so it is the one worth naming when both are running.
+func archiveHoldReason(name string) string {
+	archiveImportBusyMu.Lock()
+	defer archiveImportBusyMu.Unlock()
+	return archiveHoldReasonLocked(strings.TrimSpace(name))
+}
+
+func archiveHoldReasonLocked(name string) string {
+	holds := archiveImportBusy[name]
+	if len(holds) == 0 {
+		return ""
+	}
+	if holds[archiveHoldCopy] > 0 {
+		return archiveHoldCopy
+	}
+	if holds[archiveHoldAudioCleanup] > 0 {
+		return archiveHoldAudioCleanup
+	}
+	for reason := range holds {
+		return reason
+	}
+	return ""
 }
 
 // TryAcquireArchiveRename reserves the archive of a series for a rename. It
-// never waits: it fails when an import or another rename of the same series is
-// in progress, and the caller skips the rename. The returned function releases
-// the reservation and wakes the imports waiting for it.
+// never waits: it fails when a copy, the audio cleanup or another rename of the
+// same series is in progress, and the caller skips the rename. The returned
+// reason names the operation that is holding the archive. The returned function
+// releases the reservation and wakes the imports waiting for it.
 func TryAcquireArchiveRename(series string) (func(), string, bool) {
 	name := strings.TrimSpace(series)
 	archiveImportBusyMu.Lock()
 	defer archiveImportBusyMu.Unlock()
-	if archiveImportBusy[name] > 0 {
-		return func() {}, "archive import in progress", false
+	if reason := archiveHoldReasonLocked(name); reason != "" {
+		return func() {}, reason, false
 	}
 	if _, renaming := archiveRenameBusy[name]; renaming {
 		return func() {}, "rename already in progress", false

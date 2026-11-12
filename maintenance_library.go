@@ -432,8 +432,9 @@ func runLibraryAudioCleanupFile(ctx context.Context, state *AppState, candidate 
 	}
 	defer release()
 	maintenanceSetLive("Pulizia audio della libreria", "")
-	guard := AcquireArchiveImport(candidate.Series)
+	guard := AcquireArchiveImportFor(candidate.Series, archiveHoldAudioCleanup)
 	defer guard.Release()
+	logging.Debug("library audio cleanup started", "path", candidate.Path)
 
 	fileCtx, cancel := context.WithTimeout(ctx, audioCleanupTimeout)
 	defer cancel()

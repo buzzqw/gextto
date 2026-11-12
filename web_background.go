@@ -84,10 +84,6 @@ func bgCountKey(values map[string]any, key string) int64 {
 	return 0
 }
 
-func bgArchiveImportBusyContains(name string) bool {
-	return ArchiveImportBusyContains(name)
-}
-
 func bgLinkArchiveFile(db *Database, series string, season, episode int64, cfg *Config, path string) {
 	base := filepath.Base(path)
 	title := strings.TrimSuffix(base, filepath.Ext(base))
@@ -155,12 +151,12 @@ func seriesRenameApply(s *AppState, name string, execute, force, sourceOnly bool
 			}
 		}
 		defer release()
-	} else if bgArchiveImportBusyContains(series.Name) {
-		logging.Debug("rename skipped: archive import in progress", "series", series.Name)
+	} else if reason := archiveHoldReason(series.Name); reason != "" {
+		logging.Debug("rename skipped: the series archive is busy", "series", series.Name, "reason", reason)
 		return 200, map[string]any{
 			"ok":      true,
 			"skipped": true,
-			"reason":  "archive import in progress",
+			"reason":  reason,
 		}
 	}
 	episodes, err := s.db.EpisodesForSeries(series.Name, series.IgnoredSeasons)
@@ -2046,8 +2042,10 @@ func renameFilesPresentText(present, considered int) string {
 // archiveRenameBusyText puts the reason a rename waits into a sentence.
 func archiveRenameBusyText(reason string) string {
 	switch reason {
-	case "archive import in progress":
+	case archiveHoldCopy:
 		return "a download of this series is being copied into the library"
+	case archiveHoldAudioCleanup:
+		return "the audio cleanup of the library is working on a file of this series"
 	case "rename already in progress":
 		return "another rename of this series is already running"
 	default:
