@@ -150,6 +150,24 @@ func TestCycleReportTextIsReadable(t *testing.T) {
 	}
 }
 
+// A blocklisted release is logged only at DEBUG, so the summary names it
+// instead of pointing at a line that is not there.
+func TestCycleReportNamesBlocklistedReleases(t *testing.T) {
+	var skips cycleSkipCounts
+	skips.InLibrary = 3
+	for _, target := range []string{"Series A S01E01", "Series A S01E01", "Series B S02E03", "Series C S01", "Series D S04"} {
+		skips.addBlocklisted(target)
+	}
+	stats := &models.CycleStats{Scraped: 50, Candidates: 8}
+	want := "📊 Search finished in 1 minute: 50 releases checked, 8 matched your titles, nothing new to download: 3 already in the library, 5 on the blocklist (Series A S01E01, Series B S02E03, Series C S01, …)"
+	if got := cycleReportText("1 minute", stats, 0, 0, skips); got != want {
+		t.Fatalf("report =\n %q\nwant\n %q", got, want)
+	}
+	if strings.Contains(want, "see above") {
+		t.Fatal("blocklisted releases must not point at a log line that is only DEBUG")
+	}
+}
+
 func TestHashFailuresAlertOnceAfterThreshold(t *testing.T) {
 	hash := "ABCDEF0123456789abcdef0123456789abcdef01"
 	alerts := 0

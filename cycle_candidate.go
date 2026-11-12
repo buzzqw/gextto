@@ -666,6 +666,8 @@ func (p *candidatePass) recordSkip(release *models.Release, score int64, decisio
 		p.skips.InLibrary++
 	case "active_episode", "active_pack":
 		p.skips.Downloading++
+	case "blocklisted":
+		p.skips.addBlocklisted(logTarget(release))
 	case "dead_swarm_empty", "dead_swarm_upgrade":
 		// Nobody is sharing it: the release waits on the blocklist for the
 		// configured period instead of coming back at every search.

@@ -469,9 +469,31 @@ type cycleSkipCounts struct {
 	Downloading int // already in the torrent session
 	Waiting     int // held by a delay profile, in case a better version appears
 	Other       int // skipped for another reason (each one has its own INFO line)
+	// Blocklisted releases are routine (their line is DEBUG), so the summary
+	// names them itself: "skipped (see above)" pointed at nothing.
+	Blocklisted      int
+	BlocklistedNames []string // distinct targets, at most maxBlocklistedNames
 	// CheckingFiles are packs added stopped at their metadata: they download
 	// only once their file list shows something useful.
 	CheckingFiles int
+}
+
+// maxBlocklistedNames bounds the titles the end-of-cycle summary names.
+const maxBlocklistedNames = 3
+
+// addBlocklisted counts a blocklisted candidate and remembers its title for
+// the summary, once per title.
+func (c *cycleSkipCounts) addBlocklisted(target string) {
+	c.Blocklisted++
+	if target == "" || len(c.BlocklistedNames) >= maxBlocklistedNames {
+		return
+	}
+	for _, name := range c.BlocklistedNames {
+		if name == target {
+			return
+		}
+	}
+	c.BlocklistedNames = append(c.BlocklistedNames, target)
 }
 
 func (c cycleSkipCounts) text() string {
@@ -484,6 +506,17 @@ func (c cycleSkipCounts) text() string {
 	}
 	if c.Waiting > 0 {
 		parts = append(parts, fmt.Sprintf("%s waiting for a better version", logCount(c.Waiting)))
+	}
+	if c.Blocklisted > 0 {
+		text := fmt.Sprintf("%s on the blocklist", logCount(c.Blocklisted))
+		if len(c.BlocklistedNames) > 0 {
+			names := strings.Join(c.BlocklistedNames, ", ")
+			if c.Blocklisted > len(c.BlocklistedNames) {
+				names += ", …"
+			}
+			text += " (" + names + ")"
+		}
+		parts = append(parts, text)
 	}
 	if c.Other > 0 {
 		parts = append(parts, fmt.Sprintf("%s skipped (see above)", logCount(c.Other)))
