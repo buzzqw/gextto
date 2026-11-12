@@ -229,34 +229,38 @@ func (l *Limiter) TakeWeighted(n int64, factor float64) time.Duration {
 	if l == nil {
 		return 0
 	}
+	// Find the root first: an unlimited line answers with atomics only, as
+	// fast as before weights existed; the weights are read only under a limit.
+	root := l
+	for parent := root.parent.Load(); parent != nil; parent = root.parent.Load() {
+		root = parent
+	}
+	if root.rate.Load() == 0 {
+		return 0
+	}
+	root.mu.RLock()
+	bucket := root.bucket
+	root.mu.RUnlock()
+	if bucket == nil {
+		return 0
+	}
+	d := bucket.take(n)
+	if d <= 0 {
+		return d
+	}
 	if factor <= 0 {
 		factor = 1
 	}
-	for cur := l; cur != nil; {
+	for cur := l; cur != nil; cur = cur.parent.Load() {
 		if w := cur.weight.Load(); w > 0 && w != 100 {
 			factor *= float64(w) / 100
 		}
-		if parent := cur.parent.Load(); parent != nil {
-			cur = parent
-			continue
-		}
-		if cur.rate.Load() == 0 {
-			return 0
-		}
-		cur.mu.RLock()
-		bucket := cur.bucket
-		cur.mu.RUnlock()
-		if bucket == nil {
-			return 0
-		}
-		d := bucket.take(n)
-		if d <= 0 || factor == 1 {
-			return d
-		}
-		factor = min(max(factor, minWeightFactor), maxWeightFactor)
-		return time.Duration(float64(d) / factor)
 	}
-	return 0
+	if factor == 1 {
+		return d
+	}
+	factor = min(max(factor, minWeightFactor), maxWeightFactor)
+	return time.Duration(float64(d) / factor)
 }
 
 // Upload classes: a peer of a torrent still downloading that sends data back
