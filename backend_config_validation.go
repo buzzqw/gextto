@@ -182,6 +182,14 @@ func validateSettingValue(key, value string, cfg *Config) error {
 			return err
 		}
 	}
+	if key == "torrent_tracker_list_url" {
+		if raw := strings.TrimSpace(value); raw != "" {
+			u, err := url.Parse(raw)
+			if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+				return fmt.Errorf("the tracker list must be an http:// or https:// address")
+			}
+		}
+	}
 	if key == latencyGuardTargetKey {
 		if err := validateLatencyTarget(value); err != nil {
 			return err
@@ -285,6 +293,11 @@ func validateNumericSetting(key, value string) error {
 		parsed, err := strconv.ParseInt(raw, 10, 64)
 		if err != nil || parsed < 0 {
 			return fmt.Errorf("%s must be zero or a positive integer", key)
+		}
+	case key == "torrent_upload_trading_share":
+		parsed, err := strconv.ParseInt(raw, 10, 64)
+		if err != nil || parsed < 0 || parsed > 99 {
+			return fmt.Errorf("%s must be between 0 and 99 percent", key)
 		}
 	case key == latencyGuardLineMaxDownKey, key == latencyGuardLineMaxUpKey:
 		parsed, err := strconv.ParseInt(raw, 10, 64)

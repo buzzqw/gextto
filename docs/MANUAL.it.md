@@ -740,10 +740,10 @@ resta visibile. Le schede:
 | **Generale** | dati del torrent, copia magnet, **Esporta .torrent**, riannuncia, pin, riavvia, segna come fallito, **Super seeding**, web seed |
 | **Tracker** | aggiungi tracker (`tier|url` per riga) o rimuovine uno |
 | **Contenuto** | i file, con la **priorità** (Salta, Normale, Alta, Massima) e, con gx-torrent, **▶** per lo streaming |
-| **Peers** | i peer connessi |
+| **Peers** | i peer connessi; con gx-torrent e un database dei paesi configurato, accanto all'indirizzo c'è il **paese** del peer |
 | **Pezzi** | la mappa dei pezzi: verde scaricato, giallo in corso, grigio mancante. Con gx-torrent sotto c'è la **disponibilità tra i peer**: più la barra è piena, più peer connessi hanno i pezzi che ti mancano; il rosso indica pezzi che nessun peer connesso ha. Con qBittorrent c'è la sola mappa, e i pezzi dei file saltati risultano mancanti |
 | **Velocità** | il grafico di download e upload di quel torrent negli ultimi 30 minuti, con media e picco. Gextto registra la velocità solo dei torrent che stanno trasferendo, quindi il grafico c'è già quando apri la scheda |
-| **Limiti** | rapporto, giorni di seed e banda di quel torrent: **-1** usa il valore globale, **0** toglie il limite |
+| **Limiti** | rapporto, giorni di seed e banda di quel torrent: **-1** usa il valore globale, **0** toglie il limite. Con gx-torrent c'è anche **Peer e quota di banda**: la **quota di banda** (100 = normale, 200 = il doppio di un torrent normale, 50 = la metà) decide quanto prende quel torrent quando la linea è limitata, e **DHT**, **PEX** e **Scoperta locale** si accendono o spengono solo per lui. Un torrent privato tiene sempre spenti DHT, PEX e scoperta locale |
 | **Storage** | **Sposta storage** in un'altra cartella |
 | **Storia** | ogni evento di quel download, dalla scelta all'arrivo in libreria |
 
@@ -1263,6 +1263,22 @@ separato; non c'è nulla da installare.
   tier** (interroga insieme tutti i tracker di un tier). Le prime due sono
   spente di default, la terza è attiva. Dopo averle cambiate, riavvia Gextto
   per applicarle al demone gestito.
+- Nella stessa sezione di rete ci sono le regole sui peer, tutte spente di
+  default: la **quota di upload per i peer che restituiscono** (quando l'upload
+  è limitato, anche da Auto, la quota indicata va prima ai peer che ti mandano
+  dati per un torrent che stai ancora scaricando, il resto al seed), il
+  **filtro dei client** (rifiuta i client noti per scaricare senza restituire
+  nulla, riconosciuti dal peer ID o dal nome; la lista si modifica), la **lista
+  di tracker** da un indirizzo (scaricata ogni giorno e aggiunta ai nuovi
+  torrent pubblici, mai ai privati: per un magnet si aspetta di sapere se è
+  privato) e il **database dei paesi** (un file CSV DB-IP lite o IP2Location
+  LITE che scarichi tu: mostra il paese di ogni peer, senza chiamate in rete).
+- In *Salute → Motore torrent*, la riga **DHT** dice quanti nodi conosce gx-torrent,
+  quanti rispondono e quante ricerche sono in corso; **Query DHT in entrata**
+  dice se nell'ultima ora qualche nodo l'ha raggiunto da fuori (se no, la porta
+  UDP è forse chiusa sul router). La pagina **Statistiche** del demone mostra
+  anche la tabella dei nodi per distanza, i client rifiutati e lo stato della
+  lista di tracker.
 
 Se il motore non riesce a restare in piedi (6 avvii anomali in 10 minuti),
 Gextto passa da solo a qBittorrent-nox e, come ultima risorsa, a uno stato di
@@ -1829,6 +1845,16 @@ non raggiungibile, disco pieno, timeout) vengono ritentati dopo 1, 2, 4, 8, 16 e
 interrotto da un riavvio riprende da solo circa un minuto dopo. Non cancellare
 i file sorgente finché il percorso in libreria non compare nello storico.
 
+Se il download è arrivato **impacchettato in archivi RAR** (una serie di file
+`.part01.rar`, `.part02.rar`… oppure `.rar`, `.r00`, `.r01`…) e non contiene un
+video sciolto, Gextto estrae il video accanto agli archivi prima di importarlo,
+e lo scrive nel log («arrived packed in RAR archives»). Gli archivi restano,
+così il torrent continua a essere condiviso: mentre il seed dura lo spazio è
+occupato due volte. Si estraggono solo archivi **non compressi** (il formato
+usato di solito per i video divisi in parti) e completi: un archivio compresso,
+protetto da password, con un volume mancante o con dati che non corrispondono al
+suo controllo resta com'è, e il log dice perché.
+
 ### Un file è sul NAS ma Gextto lo considera mancante
 
 Controlla nome del file (deve contenere stagione ed episodio, per esempio
@@ -2216,6 +2242,7 @@ verifica.
 | Auto — velocità massima linea, download | Massima velocità reale della linea in download, in KiB/s (es. 9000 per 9 MB/s). 0 = non nota: la scopre Auto. Se la indichi, Auto non sale oltre e trova il punto giusto più in fretta. |
 | Auto — velocità massima linea, upload | Massima velocità reale della linea in upload, in KiB/s (es. 800). 0 = non nota: la scopre Auto. Se la indichi, Auto non sale oltre e trova il punto giusto più in fretta. |
 | Applica i limiti anche ai peer della rete locale | Spento (default, consigliato): i peer della tua rete di casa o d'ufficio (indirizzi privati 10.x, 172.16–31.x, 192.168.x, link-local, loopback e IPv6 locali fc00::/7) scaricano e caricano alla massima velocità, come in qBittorrent e libtorrent: i limiti di velocità servono per la linea Internet. Acceso: anche loro rispettano i limiti globali e del torrent. Con un proxy configurato tutti i peer rispettano i limiti (dietro un proxy gx-torrent non può sapere dove si trova un peer). Solo gx-torrent (qBittorrent ha la sua opzione). Cambiarla riavvia gx-torrent. |
+| Quota di upload per i peer che restituiscono | Percentuale dell'upload limitato che va per prima ai peer che ti mandano dati per un torrent che stai ancora scaricando (scambio); il resto va ai peer a cui fai solo seed. Conta solo quando un limite di upload è attivo — anche quello deciso da Auto — e quando entrambi i gruppi vogliono più banda di quella che c'è: la parte che un gruppo non usa va all'altro. 0 (default) = spento, ogni peer ha la stessa quota. Valori da 1 a 99; 70–80 dà precedenza ai download senza fermare il seed. Solo gx-torrent. Cambiarla riavvia gx-torrent. |
 
 **Porte e interfacce**
 
@@ -2239,6 +2266,10 @@ verifica.
 | uTP | Abilita il protocollo uTP (UDP) oltre a TCP. |
 | Holepunching (BEP 55) | Apre una connessione diretta ai peer dietro NAT tramite un peer che fa da relè (BEP 55). Richiede uTP. |
 | Nodi bootstrap DHT | Nodi DHT iniziali (host:porta separati da virgola). |
+| Lista di tracker da aggiungere (URL) | Indirizzo di una lista pubblica di tracker, uno per riga (`http`, `https`, `udp`, `ws`). gx-torrent la scarica ogni giorno (passando dal proxy o dall'interfaccia VPN, se configurati), la tiene per i riavvii e aggiunge i suoi tracker, al massimo 200, ai **nuovi** torrent **pubblici**: un magnet riceve i tracker solo quando i metadati confermano che non è privato. Vuoto (default) = spento. Solo gx-torrent. Cambiarla riavvia gx-torrent. |
+| Rifiuta i client della lista | Acceso: gx-torrent rifiuta i peer il cui client è nella lista qui sotto e non li richiama per quel torrent. Pensato per i client che scaricano senza restituire mai nulla (servizi di download offline e simili). Spento di default. Solo gx-torrent. Cambiarla riavvia gx-torrent. |
+| Client da rifiutare | Un client per riga o separati da virgola. Una voce che inizia con `-` è il prefisso del peer ID (per esempio `-XL`), le altre vengono cercate nel nome che il client dichiara (senza distinzione tra maiuscole e minuscole). Vuoto = la lista suggerita: `-XL`, `-SD`, `-XF`, `-QD`, `-BN`, Xunlei, Thunder, QQDownload, Xfplay. Visibile solo con il filtro acceso. |
+| Database dei paesi (file CSV) | Percorso di un file CSV offline indirizzo → paese, nel formato DB-IP «lite» (`primo,ultimo,PAESE` con indirizzi) o IP2Location LITE (con numeri), IPv4 e IPv6. Serve a mostrare il paese di ogni peer nella scheda *Peers*. Il file lo scarichi tu dal sito del fornitore e lo aggiorni quando vuoi: gx-torrent non fa nessuna chiamata in rete. Vuoto (default) = spento. Solo gx-torrent. |
 
 **Cifratura e filtro IP**
 

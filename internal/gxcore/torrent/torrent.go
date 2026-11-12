@@ -364,6 +364,17 @@ type torrent struct {
 	// land; peers hold these, so changes apply without reconnecting.
 	bucketDownload *bandwidth.Limiter
 	bucketUpload   *bandwidth.Limiter
+	// bandwidthWeight is the share of a limited line in percent (0 = 100);
+	// noDHT and noPEX turn those peer sources off for this torrent only.
+	bandwidthWeight int
+	noDHT           bool
+	noPEX           bool
+	// uploadClassCounts are this torrent's peers per upload class as last
+	// added to the session's split (index = bandwidth.Class*).
+	uploadClassCounts [3]int64
+	// unchokeIdle: the unchoke round is paused because no peer is connected
+	// (idleUnchokeIfAlone); the first peer restarts it.
+	unchokeIdle bool
 	// bucketLocalDownload/bucketLocalUpload are held by the peers on the local
 	// network: unlimited, or forwarding to the torrent limiters when the
 	// session applies the limits to LAN peers (applyLocalPeerLimits).
@@ -700,6 +711,17 @@ func (t *torrent) announceDHT() {
 // stops at info arrival.
 func (t *torrent) privateSwarm() bool {
 	return t.info() != nil && t.info().Private
+}
+
+// dhtAllowed reports whether this torrent may use the DHT: the session runs
+// it, the swarm is public and the torrent has not turned it off.
+func (t *torrent) dhtAllowed() bool {
+	return t.session.config.DHTEnabled && !t.privateSwarm() && !t.noDHT
+}
+
+// pexAllowed reports the same for Peer Exchange.
+func (t *torrent) pexAllowed() bool {
+	return t.session.config.PEXEnabled && !t.privateSwarm() && !t.noPEX
 }
 
 // DisableLogging silences console logging; call before NewSession.

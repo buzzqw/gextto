@@ -91,8 +91,12 @@ Maximum), il raggruppamento per cartella, la rinomina e lo **streaming HTTP**.
 
 ![File](screenshots/gx-core/it/detail-files.png)
 
-**Peer** mostra client, trasporto, cifratura e flags; da qui si aggiungono peer
-e si banna un indirizzo. **Tracker** mostra stato, swarm e prossimo annuncio;
+**Peer** mostra client, trasporto, cifratura e flags — e il paese, quando in
+*Impostazioni → Rete* c'è un database dei paesi — ; da qui si aggiungono peer e
+si banna un indirizzo. In **Generale** c'è anche **Peer e quota di banda**: la
+**quota di banda** del torrent quando la linea è limitata (100 = normale, 200 =
+il doppio, 50 = la metà) e **DHT**, **PEX** e **Scoperta locale** solo per quel
+torrent (un torrent privato li tiene spenti). **Tracker** mostra stato, swarm e prossimo annuncio;
 **Pezzi** è la mappa colorata del torrent. **Velocità** disegna download e
 upload del torrent negli ultimi quattro minuti, e **Log** elenca cosa gli è
 successo: aggiunto, completato, fermato, errori, un tracker che smette di
@@ -183,7 +187,11 @@ o con le opzioni (destinazione, categoria, tag).
 ## 6. Statistiche e impostazioni
 
 **Statistiche** mostra il grafico 1 h / 24 h / 7 g, i totali di sessione e di
-sempre, disco e cache, rete, coda e torrent più attivi.
+sempre, disco e cache, rete, coda e torrent più attivi. **DHT e fonti di peer**
+elenca i nodi DHT (buoni e noti, IPv4 e IPv6, per distanza da questo nodo), le
+ricerche in corso, se nell'ultima ora altri nodi hanno raggiunto questo
+dall'esterno (se no, la porta UDP è forse chiusa sul router), i client
+rifiutati e lo stato della lista di tracker.
 
 ![Statistiche](screenshots/gx-core/it/stats.png)
 
@@ -209,6 +217,18 @@ ai tracker pubblici, senza nascondere l'indirizzo IP; **Annuncia a tutti i
 tracker di un tier** (Rete, attivo di default) interroga insieme tutti i tracker
 di un tier con più tracker; e **Interfaccia → Lingua** elenca ogni language pack
 messo in `<data>/lang` accanto alle sei lingue integrate.
+
+**Rete → Fonti di peer e client** raccoglie quattro regole, tutte spente finché
+non le imposti: **Rifiuta i client della lista** respinge i client noti per
+prendere senza restituire (prefissi del peer ID come `-XL`, o nomi, uno per
+riga; vuoto ripristina la lista suggerita); **Lista di tracker** è l'indirizzo
+di una lista pubblica di tracker, scaricata ogni giorno e aggiunta ai nuovi
+torrent pubblici, mai ai privati; **Database dei paesi** è un file CSV DB-IP
+lite o IP2Location LITE che scarichi tu, per mostrare il paese di ogni peer
+senza chiamate in rete. **Banda → Quota di upload per i peer che restituiscono**
+dà quella percentuale di un upload limitato prima ai peer che rimandano dati a
+un torrent che stai ancora scaricando; il resto va al seed, e la quota che un
+gruppo non usa passa all'altro.
 
 La gestione delle categorie e il loro percorso è nella stessa pagina: è ciò che
 fa funzionare davvero la gestione automatica dei torrent.

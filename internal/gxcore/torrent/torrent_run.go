@@ -67,8 +67,10 @@ func (t *torrent) run() {
 		case <-t.unchokeTicker.C:
 			t.prunePeers()
 			t.unchoker.TickUnchoke(t.getPeersForUnchoker(), t.completed)
+			t.updateUploadClasses(false)
 			t.superSeedTick(time.Now())
 			t.expireV2HashRequests(time.Now())
+			t.idleUnchokeIfAlone()
 		case ih := <-t.incomingHandshakerResultC:
 			t.handleIncomingHandshakeDone(ih)
 		case oh := <-t.outgoingHandshakerResultC:
@@ -92,7 +94,28 @@ func (t *torrent) run() {
 // health check to probe it at the normal pace.
 func (t *torrent) markRunning() {
 	t.loopStopped.Store(false)
+	t.unchokeIdle = false
 	if t.unchokeTicker != nil {
+		t.unchokeTicker.Reset(unchokeEvery)
+	}
+}
+
+// idleUnchokeIfAlone pauses the unchoke round of a running torrent left
+// without peers: every job of the round (choking, pruning, super-seeding,
+// v2 hash-request expiry) is about connected peers, and a long seeding list
+// with nobody connected woke ten times a second for nothing. The first peer
+// brings the round back (wakeUnchoke).
+func (t *torrent) idleUnchokeIfAlone() {
+	if len(t.peers) == 0 && t.unchokeTicker != nil && !t.loopStopped.Load() {
+		t.unchokeTicker.Stop()
+		t.unchokeIdle = true
+	}
+}
+
+// wakeUnchoke restarts a round paused by idleUnchokeIfAlone.
+func (t *torrent) wakeUnchoke() {
+	if t.unchokeIdle && t.unchokeTicker != nil && !t.loopStopped.Load() {
+		t.unchokeIdle = false
 		t.unchokeTicker.Reset(unchokeEvery)
 	}
 }

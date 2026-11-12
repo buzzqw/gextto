@@ -219,6 +219,14 @@ func (p *Peer) StartPEX(initialPeers map[*Peer]struct{}, recentlySeen *pexlist.R
 	}
 }
 
+// StopPEX ends the PEX exchange with this peer, when one runs.
+func (p *Peer) StopPEX() {
+	if p.PEX != nil {
+		p.PEX.close()
+		p.PEX = nil
+	}
+}
+
 // ResetSnubTimer restarts the stall detector on activity.
 func (p *Peer) ResetSnubTimer() {
 	p.snubTimer.Reset(p.snubTimeout)

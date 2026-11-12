@@ -492,6 +492,8 @@ func (d *DHT) loop() {
 	defer cleanupTicker.Stop()
 	secretRotateTicker := time.NewTicker(secretRotatePeriod)
 	defer secretRotateTicker.Stop()
+	viewTicker := time.NewTicker(tableViewPeriod)
+	defer viewTicker.Stop()
 
 	var saveTicker *time.Ticker
 	var saveC <-chan time.Time
@@ -554,6 +556,8 @@ func (d *DHT) loop() {
 			d.runCleanupTick()
 		case node := <-d.pingRequest:
 			d.pingNode(node)
+		case now := <-viewTicker.C:
+			d.publishTableView(now)
 		case <-secretRotateTicker.C:
 			d.tokenSecrets = []string{d.newTokenSecret(), d.tokenSecrets[0]}
 		case d.portRequest <- d.config.Port:
@@ -812,6 +816,7 @@ func (d *DHT) handleQueryPacket(p packetType, r responseType) {
 		}
 	}
 	d.DebugLogger.Debugf("DHT processing %v request", r.Q)
+	noteIncomingQuery(time.Now())
 	switch r.Q {
 	case "ping":
 		totalRecvPing.Add(1)

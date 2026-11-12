@@ -139,6 +139,7 @@ func (s *Session) loadExistingTorrent(id string) (tt *Torrent, hasStarted bool, 
 	t.displayName = spec.DisplayName
 	t.contentLayout = spec.ContentLayout
 	t.seedMode = spec.SeedMode
+	t.applyPeerOptions(spec.BandwidthWeight, spec.NoDHT, spec.NoPEX)
 	go s.checkTorrent(t)
 	delete(s.availablePorts, spec.Port)
 
@@ -213,6 +214,9 @@ func (s *Session) CompactDatabase(output string) error {
 			FirstLast:         t.torrent.firstLast,
 			SuperSeeding:      t.torrent.superSeeding,
 			SeedMode:          t.torrent.seedMode,
+			BandwidthWeight:   t.torrent.bandwidthWeight,
+			NoDHT:             t.torrent.noDHT,
+			NoPEX:             t.torrent.noPEX,
 			FilePaths:         t.torrent.filePaths,
 			ContentLayout:     t.torrent.contentLayout,
 		}

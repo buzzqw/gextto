@@ -63,6 +63,19 @@ type NetworkOptions struct {
 	// too; off (the default) they transfer at full speed. The settings key
 	// limitLANPeersKey changes it at runtime.
 	LimitLANPeers bool
+	// UploadTradingShare is the percent of a limited upload that goes first
+	// to trading peers (0 = off); uploadTradingShareKey changes it live.
+	UploadTradingShare int
+	// ClientFilter refuses the clients on ClientFilterList (peer ID prefixes
+	// starting with "-", or client names); empty list = the suggested one.
+	ClientFilter     bool
+	ClientFilterList string
+	// TrackerListURL is a public list of trackers appended to new public
+	// torrents (empty = off); trackerListURLKey changes it.
+	TrackerListURL string
+	// GeoIPFile is an offline IP-to-country database (CSV ranges) used to
+	// show the country of each peer; empty = no country column.
+	GeoIPFile string
 	// MaxRequestsOut/DefaultRequestsOut size the adaptive per-peer request
 	// queue (pipelining): the depth starts at DefaultRequestsOut and grows by
 	// one per delivered block up to MaxRequestsOut (or the peer's reqq). Zero
@@ -215,6 +228,8 @@ func (d *Daemon) applyNetwork(cfg *torrent.Config) {
 	cfg.BlocklistEnabledForTrackers = n.IPFilterTrackers
 	cfg.WebSourcesAllowPrivate = n.WebSourcesAllowPrivate
 	cfg.LimitLocalPeers = d.limitLANPeers()
+	cfg.UploadTradingShare = d.uploadTradingShare()
+	cfg.ClientFilter = d.effectiveClientFilter()
 	cfg.BlocklistEnabledForIncomingConnections = true
 	cfg.BlocklistEnabledForOutgoingConnections = true
 }

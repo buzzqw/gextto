@@ -76,6 +76,7 @@ const (
 	settingTorrentLineMaxDownKib            = "torrent_line_max_down_kib"
 	settingTorrentLineMaxUpKib              = "torrent_line_max_up_kib"
 	settingTorrentLimitLanPeers             = "torrent_limit_lan_peers"
+	settingTorrentUploadTradingShare        = "torrent_upload_trading_share"
 	settingTorrentPortMin                   = "torrent_port_min"
 	settingTorrentPortMax                   = "torrent_port_max"
 	settingTorrentListenInterfaces          = "torrent_listen_interfaces"
@@ -88,6 +89,10 @@ const (
 	settingTorrentUtp                       = "torrent_utp"
 	settingTorrentHolepunch                 = "torrent_holepunch"
 	settingTorrentDhtBootstrapNodes         = "torrent_dht_bootstrap_nodes"
+	settingTorrentTrackerListUrl            = "torrent_tracker_list_url"
+	settingTorrentClientFilter              = "torrent_client_filter"
+	settingTorrentClientFilterList          = "torrent_client_filter_list"
+	settingTorrentGeoipFile                 = "torrent_geoip_file"
 	settingTorrentEncryption                = "torrent_encryption"
 	settingTorrentApplyIpFilter             = "torrent_apply_ip_filter"
 	settingTorrentIpfilterUrl               = "torrent_ipfilter_url"
@@ -317,6 +322,7 @@ var settingKeyNames = []string{
 	"torrent_line_max_down_kib",
 	"torrent_line_max_up_kib",
 	"torrent_limit_lan_peers",
+	"torrent_upload_trading_share",
 	"torrent_port_min",
 	"torrent_port_max",
 	"torrent_listen_interfaces",
@@ -329,6 +335,10 @@ var settingKeyNames = []string{
 	"torrent_utp",
 	"torrent_holepunch",
 	"torrent_dht_bootstrap_nodes",
+	"torrent_tracker_list_url",
+	"torrent_client_filter",
+	"torrent_client_filter_list",
+	"torrent_geoip_file",
 	"torrent_encryption",
 	"torrent_apply_ip_filter",
 	"torrent_ipfilter_url",

@@ -521,6 +521,12 @@ func (t *torrent) noteExtensionHandshake(pe *peer.Peer, msg peerprotocol.Extensi
 		return
 	}
 	pe.ExtensionHandshake = &msg
+	if t.session.refuseClientByName(msg.V) {
+		pe.Logger().Debugln("peer refused by the client filter:", msg.V)
+		rememberPeerIP(t.bannedPeerIPs, pe.IP())
+		t.closePeer(pe)
+		return
+	}
 
 	if len(msg.YourIP) == 4 || len(msg.YourIP) == 16 {
 		t.externalIP = net.IP(msg.YourIP)
@@ -529,11 +535,9 @@ func (t *torrent) noteExtensionHandshake(pe *peer.Peer, msg peerprotocol.Extensi
 		t.startInfoDownloaders()
 	}
 	t.startV2LayerDownload()
-	if t.session.config.PEXEnabled {
+	if t.pexAllowed() {
 		if _, ok := msg.M[peerprotocol.ExtensionKeyPEX]; ok {
-			if !t.privateSwarm() {
-				pe.StartPEX(t.peers, &t.recentlySeen)
-			}
+			pe.StartPEX(t.peers, &t.recentlySeen)
 		}
 	}
 }
@@ -541,10 +545,7 @@ func (t *torrent) noteExtensionHandshake(pe *peer.Peer, msg peerprotocol.Extensi
 // notePEX absorbs gossiped addresses (added lists only) on public swarms
 // with PEX enabled.
 func (t *torrent) notePEX(_ *peer.Peer, msg peerprotocol.ExtensionPEXMessage) {
-	if !t.session.config.PEXEnabled {
-		return
-	}
-	if t.privateSwarm() {
+	if !t.pexAllowed() {
 		return
 	}
 	added4, added6 := pexCandidates(msg)

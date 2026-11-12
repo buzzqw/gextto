@@ -115,3 +115,71 @@ func TestLimiterKeepsTheRate(t *testing.T) {
 		t.Fatalf("average %.0f B/s, want about %d", got, rate)
 	}
 }
+
+// A weight divides the wait for the shared debt: twice the weight, half the
+// wait; the root rate still bounds the sum (TestLimiterKeepsTheRate).
+func TestWeightScalesTheWait(t *testing.T) {
+	root := New(1 << 20)
+	light, heavy := New(0), New(0)
+	light.SetParent(root)
+	heavy.SetParent(root)
+	heavy.SetWeight(200)
+	takeFree(root)
+	base := light.Take(64 << 10)
+	weighted := heavy.Take(64 << 10)
+	if base <= 0 || weighted <= 0 {
+		t.Fatalf("no wait in debt: %v %v", base, weighted)
+	}
+	// The second take saw a larger debt; compare it with what a plain take
+	// would have waited for the same debt.
+	plain := light.Take(0)
+	if weighted >= plain {
+		t.Fatalf("weight 200 waited %v, plain take %v", weighted, plain)
+	}
+	if got := heavy.Weight(); got != 200 {
+		t.Fatalf("weight = %d", got)
+	}
+	heavy.SetWeight(0)
+	if got := heavy.Weight(); got != 100 {
+		t.Fatalf("reset weight = %d", got)
+	}
+}
+
+// An unlimited root never waits, whatever the weight.
+func TestWeightIgnoredWhenUnlimited(t *testing.T) {
+	root := New(0)
+	child := New(0)
+	child.SetParent(root)
+	child.SetWeight(10)
+	if d := child.TakeWeighted(1<<20, 0.01); d != 0 {
+		t.Fatalf("unlimited waited %v", d)
+	}
+}
+
+// The trading split gives each class its share whatever the head count, and
+// stays out of the way when it is off or only one class is present.
+func TestUploadClassesFactor(t *testing.T) {
+	var c UploadClasses
+	c.Add(ClassTrading, 2)
+	c.Add(ClassSeeding, 8)
+	if f := c.Factor(ClassTrading); f != 1 {
+		t.Fatalf("split off: factor %v", f)
+	}
+	c.SetTradingShare(80)
+	trading, seeding := c.Factor(ClassTrading), c.Factor(ClassSeeding)
+	// Shares: 2*trading : 8*seeding must be 80 : 20.
+	if got := 2 * trading / (2*trading + 8*seeding); got < 0.79 || got > 0.81 {
+		t.Fatalf("trading share = %v (factors %v, %v)", got, trading, seeding)
+	}
+	c.Add(ClassSeeding, -8)
+	if f := c.Factor(ClassTrading); f != 1 {
+		t.Fatalf("one class only: factor %v", f)
+	}
+	c.SetTradingShare(150)
+	if c.TradingShare() != 0 {
+		t.Fatal("an out-of-range share must turn the split off")
+	}
+	if f := c.Factor(ClassNone); f != 1 {
+		t.Fatalf("no class: factor %v", f)
+	}
+}

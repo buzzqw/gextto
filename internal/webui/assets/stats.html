@@ -144,6 +144,26 @@ main.page{max-width:1080px}
     </section>
   </div>
 
+  <section class="panel" aria-labelledby="h-dht">
+    <div class="cardtitle"><h2 id="h-dht">{{tr "DHT and peer sources"}}</h2><span class="aux" id="d-taken" aria-live="polite"></span></div>
+    <div class="kv">
+      <div class="row"><span>{{tr "DHT nodes (good / known)"}}</span><strong id="d-nodes">—</strong></div>
+      <div class="row"><span>{{tr "IPv4 / IPv6 nodes"}}</span><strong id="d-family">—</strong></div>
+      <div class="row"><span title="{{tr "Whether other DHT nodes reach this daemon: yes means the port is open from outside"}}">{{tr "Incoming DHT queries"}}</span><strong id="d-incoming">—</strong></div>
+      <div class="row"><span>{{tr "Lookups in progress"}}</span><strong id="d-searches">—</strong></div>
+      <div class="row"><span>{{tr "Node ID"}}</span><strong id="d-id" class="mono">—</strong></div>
+      <div class="row"><span title="{{tr "Peers refused because their client is on the client filter list"}}">{{tr "Clients refused"}}</span><strong id="d-refused">—</strong></div>
+      <div class="row"><span title="{{tr "Public tracker list appended to new public torrents"}}">{{tr "Tracker list"}}</span><strong id="d-trackers">—</strong></div>
+    </div>
+    <div class="table-wrap" style="margin-top:12px">
+      <table class="tbl" style="width:100%">
+        <caption class="sr-only">{{tr "Routing table by distance from this node"}}</caption>
+        <thead><tr><th scope="col" class="num" title="{{tr "Leading bits shared with this node's ID: higher is closer"}}">{{tr "Shared bits"}}</th><th scope="col" class="num">{{tr "Nodes"}}</th><th scope="col" class="num">{{tr "Good"}}</th></tr></thead>
+        <tbody id="d-buckets"></tbody>
+      </table>
+    </div>
+  </section>
+
   <section class="panel" aria-labelledby="h-busiest">
     <div class="cardtitle"><h2 id="h-busiest">{{tr "Busiest right now"}}</h2><span class="aux">{{tr "At page load"}}</span></div>
     <div class="table-wrap">
@@ -297,6 +317,46 @@ main.page{max-width:1080px}
       .then(function (r) { return r.json(); })
       .then(function (d) { busiest(Array.isArray(d) ? d : (d.torrents || [])); }).catch(function () {});
   }
+  function fillDHT(r) {
+    var v = r.view;
+    $('d-refused').textContent = (r.client_filter_refused || 0).toLocaleString();
+    var tl = r.tracker_list || {};
+    if (!tl.url) { $('d-trackers').textContent = t('Off'); }
+    else if (tl.error) { $('d-trackers').textContent = t('Download failed') + ': ' + tl.error; }
+    else { $('d-trackers').textContent = (tl.trackers || 0) + ' ' + t('trackers'); }
+    if (!r.enabled) {
+      ['d-nodes', 'd-family', 'd-incoming', 'd-searches', 'd-id'].forEach(function (id) { $(id).textContent = t('Off'); });
+      $('d-buckets').textContent = '';
+      return;
+    }
+    if (!v) {
+      $('d-nodes').textContent = t('Starting…');
+      return;
+    }
+    $('d-nodes').textContent = (v.good || 0) + ' / ' + (v.nodes || 0);
+    $('d-family').textContent = (v.ipv4 || 0) + ' / ' + (v.ipv6 || 0);
+    $('d-incoming').textContent = r.incoming === 'yes' ? t('Yes') : (r.incoming === 'no' ? t('No: the port does not seem reachable from outside') : t('Not known yet'));
+    $('d-searches').textContent = (v.searches || []).length;
+    $('d-id').textContent = (v.node_id || '').slice(0, 16) + '…';
+    $('d-taken').textContent = r.read_only ? t('Read-only DHT') : '';
+    var body = $('d-buckets');
+    body.textContent = '';
+    (v.buckets || []).forEach(function (b) {
+      var tr = document.createElement('tr');
+      [b.depth, b.nodes, b.good].forEach(function (n) {
+        var c = document.createElement('td');
+        c.className = 'num';
+        c.textContent = n;
+        tr.appendChild(c);
+      });
+      body.appendChild(tr);
+    });
+  }
+  function loadDHT() {
+    fetch('/api/v1/dht', { cache: 'no-store' })
+      .then(function (r) { return r.json(); })
+      .then(fillDHT).catch(function () {});
+  }
   Array.prototype.forEach.call(document.querySelectorAll('[data-range]'), function (btn) {
     btn.addEventListener('click', function () {
       range = btn.getAttribute('data-range');
@@ -306,7 +366,12 @@ main.page{max-width:1080px}
       loadHistory();
     });
   });
-  function refresh() { loadStats(); loadHistory(); loadBusiest(); }
+  var ticks = 0;
+  function refresh() {
+    loadStats(); loadHistory(); loadBusiest();
+    // The DHT view changes every 30 s: no need to ask every 3.
+    if (ticks++ % 5 === 0) { loadDHT(); }
+  }
   refresh();
   setInterval(refresh, 3000);
 })();

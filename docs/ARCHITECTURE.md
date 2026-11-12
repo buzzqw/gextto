@@ -127,6 +127,7 @@ qBittorrent-nox.
 | `cleaner.go` | archive index, detection of lower duplicates, cleanup. |
 | `postprocess.go` | post-processing: move, rename, sidecar. |
 | `hardlink.go` | import into the library as hardlinks of the seeding files, with fallback to copy. |
+| `rar_extract.go` | a completed download packed in stored RAR volumes is extracted next to them before the import looks for the video; the volumes stay for seeding. The reader is `internal/rarstore`. |
 | `media_guard.go` | guards on video files (extensions, protection). |
 | `mediainfo.go` | actual inspection of files via `ffprobe`. |
 | `comics.go` | comics: scraper, DB, HTTP download, dedicated cycle. |
@@ -262,6 +263,7 @@ qBittorrent-nox.
 | `internal/constants` | shared constants (ports, defaults, version/build). |
 | `internal/logging` | daemon logger; it turns hash fields into `acq: <id>` and passes those lines to the download history sink. |
 | `internal/models` | shared types. |
+| `internal/rarstore` | own reader of RAR 4 and RAR 5 archives in store mode (no compression), single and multi-volume, with CRC check; compressed, encrypted or incomplete sets are reported. |
 | `internal/rules` | matching rules. |
 | `internal/utils` | generic utilities. |
 | `internal/cache` | cache. |
@@ -320,6 +322,10 @@ one.
 | `stream.go` | media streaming server with HTTP Range requests. |
 | `standalone_auth.go` | standalone session tokens, password hashing and login management. |
 | `tracker_health.go` | tracker failure tracking and retry delay management. |
+| `peerpolicy.go`, `i18n_peer.go` | session peer policies read live from settings.json (trading share of a limited upload, client filter and its list), their status line and their strings. |
+| `trackerlist.go` | public tracker list from a URL: daily download through the engine transport, cache in `<data>/tracker-list.txt`, appended to new public torrents once their metadata is known. |
+| `geoip.go` | offline country database (DB-IP lite or IP2Location LITE CSV) for the peer country. |
+| `api_dht.go` | `GET /api/v1/dht`: routing-table view, incoming-query status, client-filter refusals, tracker-list state. |
 
 ## 7. eD2k and Kad through aMule (`internal/amule`)
 

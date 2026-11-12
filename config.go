@@ -233,11 +233,18 @@ type TransferSettings struct {
 	Holepunch        bool  `json:"holepunch"`
 	// LimitLanPeers applies the speed limits to the peers on the local network
 	// too (gx-torrent only); off, they transfer at full speed.
-	LimitLanPeers    bool   `json:"limit_lan_peers"`
-	ApplyIpFilter    bool   `json:"apply_ip_filter"`
-	Encryption       int64  `json:"encryption"`
-	IpFilterPath     string `json:"ip_filter_path"`
-	ListenInterfaces string `json:"listen_interfaces"`
+	LimitLanPeers bool `json:"limit_lan_peers"`
+	// UploadTradingShare, ClientFilter(List), TrackerListURL and GeoIPFile
+	// are gx-torrent peer policies passed as start arguments.
+	UploadTradingShare int64  `json:"upload_trading_share"`
+	ClientFilter       bool   `json:"client_filter"`
+	ClientFilterList   string `json:"client_filter_list"`
+	TrackerListURL     string `json:"tracker_list_url"`
+	GeoIPFile          string `json:"geoip_file"`
+	ApplyIpFilter      bool   `json:"apply_ip_filter"`
+	Encryption         int64  `json:"encryption"`
+	IpFilterPath       string `json:"ip_filter_path"`
+	ListenInterfaces   string `json:"listen_interfaces"`
 	// Interfaccia forzata per il traffico in uscita (killswitch VPN). Quando è
 	// impostata, libtorrent annuncia e si connette solo da questa scheda.
 	OutgoingInterface string `json:"outgoing_interface"`
@@ -3392,6 +3399,11 @@ func (c *Config) applyTransferSettings() {
 		Utp:                   boolSettingOr(c.Settings, "torrent_utp", true),
 		Holepunch:             boolSettingOr(c.Settings, "torrent_holepunch", true),
 		LimitLanPeers:         boolSettingOr(c.Settings, "torrent_limit_lan_peers", false),
+		UploadTradingShare:    numberSettingInt(c.Settings, "torrent_upload_trading_share", 0),
+		ClientFilter:          boolSettingOr(c.Settings, "torrent_client_filter", false),
+		ClientFilterList:      settingOrDefault(c.Settings, settingTorrentClientFilterList, ""),
+		TrackerListURL:        settingOrDefault(c.Settings, settingTorrentTrackerListUrl, ""),
+		GeoIPFile:             settingOrDefault(c.Settings, settingTorrentGeoipFile, ""),
 		ApplyIpFilter:         boolSettingOr(c.Settings, "torrent_apply_ip_filter", false),
 		Encryption:            numberSettingInt(c.Settings, "torrent_encryption", 1),
 		IpFilterPath:          settingOrDefault(c.Settings, settingTorrentIpfilterUrl, constants.DefaultIPFilterURL),

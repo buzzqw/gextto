@@ -2203,6 +2203,17 @@ window.gxClearFilters=function(){state.filter={status:'all',cat:null,tag:null,tr
     <label class="chk" title="{{tr "BEP 16 super-seeding: advertise one piece at a time so the swarm spreads the data. For initial seeding only; it reduces the seed's upload throughput"}}"><input type="checkbox" name="enabled" value="1"{{if .SuperSeeding}} checked{{end}}> {{tr "Super-seeding (BEP 16)"}}</label>
     <div><button type="submit" class="sm" title="{{tr "Save super-seeding setting"}}">{{tr "Save"}}</button></div>
   </form>
+  <h3 class="dsec">{{tr "Peers and bandwidth share"}}</h3>
+  <form class="form-grid" method="post" action="/ui/peer-options">
+    <input type="hidden" name="hash" value="{{.Hash}}"><input type="hidden" name="tab" value="general">
+    <label>{{tr "Bandwidth share %"}}<input type="number" name="bandwidth_weight" min="10" max="1000" step="10" value="{{.BandwidthWeight}}" title="{{tr "Share of a limited line for this torrent, in percent: 100 is normal, 200 takes twice as much as a normal torrent, 50 half (10 to 1000). It only matters while a speed limit is in place"}}"></label>
+    {{if .Private}}<input type="hidden" name="dht" value="{{if .DHTOn}}1{{end}}"><input type="hidden" name="pex" value="{{if .PEXOn}}1{{end}}"><input type="hidden" name="lsd" value="{{if .LSDOn}}1{{end}}"><p class="muted wide">{{tr "Private torrent: DHT, PEX and local discovery stay off, as the tracker requires."}}</p>{{else}}
+    <label class="chk" title="{{tr "Find peers for this torrent through the DHT"}}"><input type="checkbox" name="dht" value="1"{{if .DHTOn}} checked{{end}}> {{tr "DHT"}}</label>
+    <label class="chk" title="{{tr "Exchange peer lists with the peers of this torrent (PEX)"}}"><input type="checkbox" name="pex" value="1"{{if .PEXOn}} checked{{end}}> {{tr "PEX"}}</label>
+    <label class="chk" title="{{tr "Find peers for this torrent on the local network (LSD)"}}"><input type="checkbox" name="lsd" value="1"{{if .LSDOn}} checked{{end}}> {{tr "Local discovery"}}</label>
+    {{end}}
+    <div><button type="submit" class="sm" title="{{tr "Save the bandwidth share and the peer sources of this torrent"}}">{{tr "Save"}}</button></div>
+  </form>
   <h3 class="dsec">{{tr "Storage"}}</h3>
   <form class="form-grid" method="post" action="/ui/move">
     <input type="hidden" name="hash" value="{{.Hash}}"><input type="hidden" name="tab" value="general">
@@ -2259,7 +2270,7 @@ window.gxClearFilters=function(){state.filter={status:'all',cat:null,tag:null,tr
     <thead><tr><th scope="col">{{tr "Peer"}}</th><th scope="col">{{tr "Client"}}</th><th scope="col" class="num">↓</th><th scope="col" class="num">↑</th><th scope="col" class="num">{{tr "Prog."}}</th><th scope="col">{{tr "Flag"}}</th><th scope="col" class="num">{{tr "For"}}</th><th scope="col"><span class="sr-only">{{tr "Actions"}}</span></th></tr></thead>
     <tbody>
     {{range .Peers}}
-      <tr><td class="mono" title="{{.Source}}">{{.Address}}</td><td>{{if .Client}}{{.Client}}{{else}}—{{end}}</td>
+      <tr><td class="mono" title="{{.Source}}">{{.Address}}{{if .Country}} <span class="chip sm" title="{{tr "Country of the peer, from the offline country database"}}">{{.Country}}</span>{{end}}</td><td>{{if .Client}}{{.Client}}{{else}}—{{end}}</td>
       <td class="num">{{rate .Down}}</td><td class="num">{{rate .Up}}</td>
       <td class="num">{{printf "%.1f" .Progress}}%</td>
       <td><div class="flags">{{if .Seed}}<span class="flag on">{{tr "seed"}}</span>{{end}}{{if .Incoming}}<span class="flag">{{tr "incoming"}}</span>{{else}}<span class="flag">{{tr "outgoing"}}</span>{{end}}{{if .UTP}}<span class="flag">{{tr "uTP"}}</span>{{else}}<span class="flag">{{tr "TCP"}}</span>{{end}}{{if .Encrypted}}<span class="flag on">{{tr "encrypted"}}</span>{{end}}{{if .Handshake}}<span class="flag on">{{tr "encrypted HS"}}</span>{{end}}{{if .Snubbed}}<span class="flag">{{tr "snubbed"}}</span>{{end}}{{if .Optimistic}}<span class="flag on">{{tr "optimistic"}}</span>{{end}}{{if .ClientChoke}}<span class="flag">{{tr "choking us"}}</span>{{end}}{{if .PeerChoke}}<span class="flag">{{tr "we choke"}}</span>{{end}}{{if .ClientInt}}<span class="flag">{{tr "interested"}}</span>{{end}}{{if .PeerInt}}<span class="flag">{{tr "interested in us"}}</span>{{end}}{{if .Downloading}}<span class="flag">{{tr "downloading"}}</span>{{end}}</div></td>

@@ -101,6 +101,11 @@ type Stats struct {
 	Name string
 	// Private marks private torrents.
 	Private bool
+	// BandwidthWeight is the share of a limited line in percent (100 =
+	// normal); NoDHT and NoPEX report the per-torrent peer-source switches.
+	BandwidthWeight int
+	NoDHT           bool
+	NoPEX           bool
 	// SeedMode reports a torrent added without the initial check whose
 	// pieces are still being checked as they are uploaded.
 	SeedMode bool
@@ -131,6 +136,11 @@ func (t *torrent) stats() Stats {
 	s.Port = t.port
 	s.Status = t.status()
 	s.Error = t.lastError
+	s.BandwidthWeight = t.bandwidthWeight
+	if s.BandwidthWeight == 0 {
+		s.BandwidthWeight = 100
+	}
+	s.NoDHT, s.NoPEX = t.noDHT, t.noPEX
 	s.Addresses.Total = t.addrList.Len()
 	s.Addresses.Tracker = t.addrList.LenSource(peersource.Tracker)
 	s.Addresses.DHT = t.addrList.LenSource(peersource.DHT)

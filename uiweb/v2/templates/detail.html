@@ -55,7 +55,7 @@
   {{else}}<p class="muted">{{tr "Nessun file."}}</p>{{end}}
 {{else if eq .Tab "peers"}}
   {{if .TabError}}<p class="alert">{{tr .TabError}}</p>{{end}}
-  {{if .Peers}}<div class="table-wrap"><table class="data-table"><thead><tr><th scope="col">{{tr "Peer"}}</th><th scope="col">{{tr "Client"}}</th><th scope="col" {{trTitle "Velocità di download da questo peer."}}>↓</th><th scope="col" {{trTitle "Velocità di upload verso questo peer."}}>↑</th><th scope="col" {{trTitle "Percentuale del torrent che questo peer dichiara di avere."}}>{{tr "Progresso"}}</th><th scope="col" {{trTitle "Il peer ha già tutti i pezzi del torrent."}}>{{tr "Seed"}}</th><th scope="col" {{trTitle "Protocollo, cifratura e direzione della connessione"}}>{{tr "Connessione"}}</th></tr></thead><tbody>{{range .Peers}}<tr><td>{{tr .Address}}</td><td class="truncate">{{if .Client}}{{tr .Client}}{{else}}—{{end}}</td><td>{{rate .DownloadRate}}</td><td>{{rate .UploadRate}}</td><td>{{printf "%.1f" .Progress}}%</td><td>{{if .Seed}}{{tr "sì"}}{{else}}{{tr "no"}}{{end}}</td><td>{{if .Utp}}{{tr "uTP"}}{{else}}{{tr "TCP"}}{{end}}{{if .Encrypted}}<span> {{tr "· cifrata"}}</span>{{end}}<span>{{if .Incoming}} {{tr "· in entrata"}}{{else}} {{tr "· in uscita"}}{{end}}</span></td></tr>{{end}}</tbody></table></div>
+  {{if .Peers}}<div class="table-wrap"><table class="data-table"><thead><tr><th scope="col">{{tr "Peer"}}</th><th scope="col">{{tr "Client"}}</th><th scope="col" {{trTitle "Velocità di download da questo peer."}}>↓</th><th scope="col" {{trTitle "Velocità di upload verso questo peer."}}>↑</th><th scope="col" {{trTitle "Percentuale del torrent che questo peer dichiara di avere."}}>{{tr "Progresso"}}</th><th scope="col" {{trTitle "Il peer ha già tutti i pezzi del torrent."}}>{{tr "Seed"}}</th><th scope="col" {{trTitle "Protocollo, cifratura e direzione della connessione"}}>{{tr "Connessione"}}</th></tr></thead><tbody>{{range .Peers}}<tr><td>{{tr .Address}}{{if .Country}} <span class="badge" {{trTitle "Paese del peer, dal database dei paesi del motore"}}>{{tr .Country}}</span>{{end}}</td><td class="truncate">{{if .Client}}{{tr .Client}}{{else}}—{{end}}</td><td>{{rate .DownloadRate}}</td><td>{{rate .UploadRate}}</td><td>{{printf "%.1f" .Progress}}%</td><td>{{if .Seed}}{{tr "sì"}}{{else}}{{tr "no"}}{{end}}</td><td>{{if .Utp}}{{tr "uTP"}}{{else}}{{tr "TCP"}}{{end}}{{if .Encrypted}}<span> {{tr "· cifrata"}}</span>{{end}}<span>{{if .Incoming}} {{tr "· in entrata"}}{{else}} {{tr "· in uscita"}}{{end}}</span></td></tr>{{end}}</tbody></table></div>
   {{else}}<p class="muted">{{tr "Nessun peer connesso."}}</p>{{end}}
 {{else if eq .Tab "pieces"}}
   {{if .TabError}}<p class="alert">{{tr .TabError}}</p>{{end}}
@@ -102,6 +102,21 @@
      <label class="field"><span>{{tr "Upload massimi"}}</span><input class="input" type="number" name="max_uploads" value="-1" {{trTitle "Numero massimo di slot upload per questo torrent; -1 usa il valore globale"}} /></label>{{end}}
      <div class="form-actions"><button class="btn sm primary" type="submit" {{trTitle "Salva i limiti specifici di questo torrent"}}>{{tr "Salva limiti"}}</button></div>
   </form>
+  {{if and .Caps.PeerOptions .Torrent.PeerOptions}}
+  <form class="form-grid" hx-post="/downloads/detail/action" hx-target="#v2-detail-panel" hx-swap="innerHTML">
+    <input type="hidden" name="hash" value="{{.Hash}}" /><input type="hidden" name="tab" value="limits" /><input type="hidden" name="op" value="peer-options" />
+    <h3 class="span-full">{{tr "Peer e quota di banda"}}</h3>
+    <label class="field"><span>{{tr "Quota di banda (%)"}}</span><input class="input" type="number" name="bandwidth_weight" min="10" max="1000" step="10" value="{{.Torrent.BandwidthWeight}}" {{trTitle "Quota di questo torrent quando la linea è limitata: 100 è normale, 200 prende il doppio di un torrent normale, 50 la metà (da 10 a 1000). Conta solo mentre c'è un limite di velocità."}} /></label>
+    {{if .Torrent.Private}}<p class="hint span-full">{{tr "Torrent privato: DHT, PEX e scoperta locale restano spenti, come richiede il tracker."}}</p>
+    {{if .Torrent.DHTOn}}<input type="hidden" name="dht" value="1" />{{end}}{{if .Torrent.PEXOn}}<input type="hidden" name="pex" value="1" />{{end}}{{if .Torrent.LSDOn}}<input type="hidden" name="lsd" value="1" />{{end}}
+    {{else}}
+    <label class="check"><input type="checkbox" name="dht" value="1" {{if .Torrent.DHTOn}}checked{{end}} {{trTitle "Cerca peer per questo torrent attraverso la DHT"}} /> <span>{{tr "DHT"}}</span></label>
+    <label class="check"><input type="checkbox" name="pex" value="1" {{if .Torrent.PEXOn}}checked{{end}} {{trTitle "Scambia elenchi di peer con i peer di questo torrent (PEX)"}} /> <span>{{tr "PEX"}}</span></label>
+    <label class="check"><input type="checkbox" name="lsd" value="1" {{if .Torrent.LSDOn}}checked{{end}} {{trTitle "Cerca peer per questo torrent nella rete locale (LSD)"}} /> <span>{{tr "Scoperta locale"}}</span></label>
+    {{end}}
+    <div class="form-actions"><button class="btn sm primary" type="submit" {{trTitle "Salva la quota di banda e le fonti di peer di questo torrent"}}>{{tr "Salva"}}</button></div>
+  </form>
+  {{end}}
 {{else if eq .Tab "storage"}}
   <form class="form-grid" hx-post="/downloads/detail/action" hx-target="#v2-detail-panel" hx-swap="innerHTML">
     <input type="hidden" name="hash" value="{{.Hash}}" /><input type="hidden" name="tab" value="storage" /><input type="hidden" name="op" value="storage" />

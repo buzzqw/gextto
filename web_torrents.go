@@ -885,6 +885,51 @@ func SetSuperSeeding(w http.ResponseWriter, r *http.Request, s *AppState) {
 	jsonResponse(w, map[string]any{"ok": true})
 }
 
+// PeerOptionsInput is the body of POST /api/torrents/{hash}/peer-options.
+type PeerOptionsInput struct {
+	// BandwidthWeight is the share of a limited line in percent (100 =
+	// normal, 10..1000).
+	BandwidthWeight int  `json:"bandwidth_weight"`
+	Dht             bool `json:"dht"`
+	Pex             bool `json:"pex"`
+	Lsd             bool `json:"lsd"`
+}
+
+// SetPeerOptions sets a torrent's bandwidth share and its DHT, PEX and LSD
+// switches when the active engine supports them.
+func SetPeerOptions(w http.ResponseWriter, r *http.Request, s *AppState) {
+	type peerOptionsSetter interface {
+		SetPeerOptions(hash string, weight int, dht, pex, lsd bool) (bool, error)
+	}
+	client, ok := s.activeEngine().(peerOptionsSetter)
+	if !ok {
+		jsonError(w, http.StatusConflict, "the active engine does not support per-torrent peer options")
+		return
+	}
+	var input PeerOptionsInput
+	if err := decodeJSON(r, &input); err != nil {
+		jsonError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if input.BandwidthWeight == 0 {
+		input.BandwidthWeight = 100
+	}
+	if input.BandwidthWeight < 10 || input.BandwidthWeight > 1000 {
+		jsonError(w, http.StatusBadRequest, "the bandwidth share must be between 10 and 1000 percent")
+		return
+	}
+	result, err := client.SetPeerOptions(pathParam(r, "hash"), input.BandwidthWeight, input.Dht, input.Pex, input.Lsd)
+	if err != nil {
+		jsonError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if !result {
+		jsonError(w, http.StatusConflict, "torrent unavailable in dry-run")
+		return
+	}
+	jsonResponse(w, map[string]any{"ok": true})
+}
+
 // TorrentNoRenameList returns the torrents marked as not to be renamed.
 func TorrentNoRenameList(w http.ResponseWriter, r *http.Request, s *AppState) {
 	items, err := s.db.NoRenameTorrents()

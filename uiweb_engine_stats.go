@@ -189,7 +189,21 @@ func uiGxEngineStats(engine TorrentEngine) uiEngineStats {
 		add("Router", engineParts("porta non aperta automaticamente (né UPnP né NAT-PMP): aprila a mano, TCP e UDP %d", engineNum(stats, "peer_port")), true)
 		out.Rows[len(out.Rows)-1].Detail = engineString(mapping, "error")
 	}
-	add("DHT", onOff(engineBool(stats, "dht"), engineParts("%d nodi", engineNum(session, "dht_nodes"))), false)
+	add("DHT", onOff(engineBool(stats, "dht"), engineParts("%d nodi · %d buoni · %d ricerche in corso", engineNum(session, "dht_nodes"),
+		engineNum(session, "dht_good_nodes"), engineNum(session, "dht_lookups"))), false)
+	if _, sampled := session["dht_incoming_recent"]; sampled && engineBool(stats, "dht") {
+		if engineNum(session, "dht_incoming_recent") > 0 {
+			add("Query DHT in entrata", []string{"sì, la porta UDP riceve dall'esterno"}, false)
+		} else {
+			add("Query DHT in entrata", []string{"nessuna nell'ultima ora: la porta UDP forse è chiusa sul router"}, true)
+		}
+	}
+	if refused := engineNum(session, "client_filter_refused"); refused > 0 {
+		add("Client rifiutati", engineParts("%d peer", refused), false)
+	}
+	if _, configured := session["tracker_list_trackers"]; configured {
+		add("Lista tracker", engineParts("%d tracker aggiunti ai nuovi torrent pubblici", engineNum(session, "tracker_list_trackers")), false)
+	}
 	utpParts := engineParts("connessioni in uscita uTP %d / TCP %d · in entrata uTP %d",
 		engineNum(session, "peers_outgoing_utp"), engineNum(session, "peers_outgoing_tcp"), engineNum(session, "peers_incoming_utp"))
 	utpWarn := false

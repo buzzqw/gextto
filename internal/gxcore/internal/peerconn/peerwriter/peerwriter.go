@@ -8,6 +8,7 @@ import (
 	"io"
 	"net"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/buzzqw/gextto/internal/gxcore/internal/bandwidth"
@@ -101,9 +102,13 @@ type PeerWriter struct {
 	messages       chan any
 	servedRequests *servedWindow
 	bucket         *bandwidth.Limiter // rate changes at runtime
-	log            logger.Logger
-	stopC          chan struct{}
-	doneC          chan struct{}
+	// uploadClasses and uploadClass give this peer its share of a limited
+	// upload (trading or seeding); nil or ClassNone leaves the plain share.
+	uploadClasses atomic.Pointer[bandwidth.UploadClasses]
+	uploadClass   atomic.Int32
+	log           logger.Logger
+	stopC         chan struct{}
+	doneC         chan struct{}
 }
 
 // New stages a writer over conn.
@@ -476,10 +481,25 @@ func (p *PeerWriter) flushPieces(buf *bytes.Buffer, blocks, payload int, msg pee
 	return p.writeOK(err, msg)
 }
 
+// SetUploadClasses attaches the session's trading/seeding split.
+func (p *PeerWriter) SetUploadClasses(classes *bandwidth.UploadClasses) {
+	p.uploadClasses.Store(classes)
+}
+
+// SetUploadClass sets the class this peer's uploads count in.
+func (p *PeerWriter) SetUploadClass(class int32) { p.uploadClass.Store(class) }
+
+// UploadClass reports the class this peer's uploads count in.
+func (p *PeerWriter) UploadClass() int32 { return p.uploadClass.Load() }
+
 // waitBucket waits for the upload throttle to allow n bytes. False means the
 // writer was stopped meanwhile.
 func (p *PeerWriter) waitBucket(n int64) bool {
-	d := p.bucket.Take(n)
+	factor := 1.0
+	if classes := p.uploadClasses.Load(); classes != nil {
+		factor = classes.Factor(p.uploadClass.Load())
+	}
+	d := p.bucket.TakeWeighted(n, factor)
 	if d <= 0 {
 		return true
 	}

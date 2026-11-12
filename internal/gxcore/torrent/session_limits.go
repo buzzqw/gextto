@@ -74,3 +74,9 @@ func (s *Session) SetCacheSizes(readBytes, writeBytes int64) {
 		s.ram.SetLimit(writeBytes)
 	}
 }
+
+// SetUploadTradingShare changes the trading share of a limited upload in
+// percent (0 = off), live: the peers read it at their next block.
+func (s *Session) SetUploadTradingShare(percent int) {
+	s.uploadClasses.SetTradingShare(percent)
+}

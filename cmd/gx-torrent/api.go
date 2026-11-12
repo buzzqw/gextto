@@ -29,6 +29,7 @@ func (d *Daemon) routes() http.Handler {
 	api := http.NewServeMux()
 	api.HandleFunc("GET /api/v1/health", d.handleHealth)
 	api.HandleFunc("GET /api/v1/stats", d.handleStats)
+	api.HandleFunc("GET /api/v1/dht", d.handleDHT)
 	api.HandleFunc("GET /api/v1/stats/history", d.handleStatsHistory)
 	api.HandleFunc("GET /api/v1/portcheck", d.handlePortCheck)
 	api.HandleFunc("GET /api/v1/torrents", d.handleList)
@@ -141,6 +142,7 @@ func (d *Daemon) routes() http.Handler {
 	root.HandleFunc("POST /ui/create-torrent", d.handleUICreateTorrent)
 	root.HandleFunc("POST /ui/webseeds", d.handleUIWebSeeds)
 	root.HandleFunc("POST /ui/seed-limits", d.handleUISeedLimits)
+	root.HandleFunc("POST /ui/peer-options", d.handleUIPeerOptions)
 	root.HandleFunc("POST /ui/super-seeding", d.handleUISuperSeeding)
 	root.HandleFunc("POST /ui/move", d.handleUIMove)
 	root.HandleFunc("POST /ui/pin", d.handleUIPin)
@@ -633,6 +635,20 @@ func (d *Daemon) handleAction(w http.ResponseWriter, r *http.Request) {
 			maxUploads = &value
 		}
 		err = d.setConnLimits(hash, maxConnections, maxUploads)
+	case "peer-options":
+		var weight *int64
+		if r.FormValue("bandwidth_weight") != "" {
+			value := formInt(r, "bandwidth_weight", 100)
+			weight = &value
+		}
+		optional := func(field string) *bool {
+			if !r.Form.Has(field) {
+				return nil
+			}
+			value := formBool(r, field)
+			return &value
+		}
+		err = d.setPeerOptions(hash, weight, optional("dht"), optional("pex"), optional("lsd"))
 	case "super-seeding":
 		err = d.setSuperSeeding(hash, formBool(r, "enabled"))
 	case "file-priorities":
@@ -689,8 +705,11 @@ type fileInfo struct {
 }
 
 type peerInfo struct {
-	Address      string  `json:"address"`
-	Client       string  `json:"client"`
+	Address string `json:"address"`
+	Client  string `json:"client"`
+	// Country is the peer's two-letter country code from the offline
+	// database (empty without one).
+	Country      string  `json:"country,omitempty"`
 	Source       string  `json:"source"`
 	DownloadRate int     `json:"download_rate"`
 	UploadRate   int     `json:"upload_rate"`
@@ -782,6 +801,7 @@ func (d *Daemon) handleInspect(w http.ResponseWriter, r *http.Request) {
 			out = append(out, peerInfo{
 				Address:      peer.Addr.String(),
 				Client:       peer.Client,
+				Country:      d.peerCountry(peer.Addr.String()),
 				Source:       sourceName(peer.Source),
 				DownloadRate: peer.DownloadSpeed,
 				UploadRate:   peer.UploadSpeed,

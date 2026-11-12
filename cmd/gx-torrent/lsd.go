@@ -142,7 +142,7 @@ func (s *lsdService) message(host string, hashes []string) []byte {
 func (s *lsdService) dueHashes(now time.Time) []string {
 	var running []string
 	for _, v := range s.d.snapshotViews() {
-		if v.Private {
+		if v.Private || v.noLSD {
 			continue
 		}
 		switch v.State {
@@ -238,9 +238,10 @@ func (s *lsdService) receiveLoop(conn *net.UDPConn) {
 		peer := net.JoinHostPort(lsdPeerHost(from.IP), strconv.Itoa(port))
 		for _, hash := range hashes {
 			s.d.mu.Lock()
-			t, _ := s.d.findLocked(hash)
+			t, meta := s.d.findLocked(hash)
+			noLSD := meta != nil && meta.NoLSD
 			s.d.mu.Unlock()
-			if t == nil || t.Stats().Private {
+			if t == nil || noLSD || t.Stats().Private {
 				continue
 			}
 			if err := t.AddPeer(peer); err == nil {

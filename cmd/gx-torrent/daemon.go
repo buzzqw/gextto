@@ -148,6 +148,11 @@ type torrentMeta struct {
 	// (standalone mode). They do not affect the transfer.
 	Category string   `json:"category,omitempty"`
 	Tags     []string `json:"tags,omitempty"`
+	// TrackerListPending: the tracker list is still to be appended, once the
+	// metadata shows the torrent is public.
+	TrackerListPending bool `json:"tracker_list_pending,omitempty"`
+	// NoLSD keeps this torrent out of Local Service Discovery.
+	NoLSD bool `json:"no_lsd,omitempty"`
 	// AutoTMM: the category decides the save path (qBittorrent automatic torrent
 	// management). When on, assigning a category relocates the torrent.
 	AutoTMM bool `json:"auto_tmm,omitempty"`
@@ -389,6 +394,15 @@ type Daemon struct {
 	// opened on first use by archive().
 	archiveOnce sync.Once
 	feedArchive *feedArchive
+	// appliedTradingShare and appliedClientFilter are the peer policies last
+	// pushed to the session (applyPeerPoliciesLocked).
+	appliedTradingShare int
+	appliedClientFilter string
+	clientFilterApplied bool
+	// trackerList is the last tracker list read from TrackerListURL.
+	trackerList trackerListState
+	// geo is the offline country database of the peers (GeoIPFile).
+	geo geoState
 	// appliedDL/appliedUL are the global limits currently on the session.
 	appliedDL int64
 	appliedUL int64
@@ -978,6 +992,8 @@ func (d *Daemon) run(stop <-chan struct{}) {
 	go d.runDLNA(stop)
 	// A torrent that stops is a queue decision to take now, not at the next tick.
 	go d.runStopWatch(stop)
+	// The tracker list (when a URL is set) is downloaded and kept current.
+	go d.runTrackerList(stop)
 	ticker := time.NewTicker(d.opts.Tick)
 	defer ticker.Stop()
 	for {
@@ -1377,6 +1393,7 @@ func (d *Daemon) tick(now time.Time) {
 	d.limits = d.dyn.Limits(cfg, aggregate, queued, now)
 	d.adaptCacheLocked(now, activeDownloads, activeSeeds, aggregate)
 	d.applyEffectiveSpeedLimitsLocked(now)
+	d.applyTrackerListLocked()
 	plan := queue.PlanQueue(items, d.limits, cfg, now)
 	for _, id := range plan.Rotate {
 		if meta, ok := d.state.Torrents[id]; ok {
@@ -1566,8 +1583,17 @@ type torrentInfo struct {
 	// SeedMode: added without the initial check; pieces are checked as they
 	// are first uploaded (qBittorrent skip_checking).
 	SeedMode bool `json:"seed_mode,omitempty"`
-	Pinned   bool `json:"pinned"`
-	Parked   bool `json:"parked"`
+	// Per-torrent peer options: the share of a limited line in percent (100
+	// = normal) and the DHT, PEX and LSD switches (true = on).
+	BandwidthWeight int  `json:"bandwidth_weight"`
+	DHT             bool `json:"dht"`
+	PEX             bool `json:"pex"`
+	LSD             bool `json:"lsd"`
+	// noLSD keeps the torrent out of Local Service Discovery (the zero value
+	// of a view built elsewhere means "announce").
+	noLSD  bool
+	Pinned bool `json:"pinned"`
+	Parked bool `json:"parked"`
 	// DiskWait: paused by the disk guard until the folder has space again.
 	DiskWait       bool   `json:"disk_wait,omitempty"`
 	Probing        bool   `json:"probing"`
@@ -1677,6 +1703,11 @@ func (d *Daemon) infoLocked(t *torrent.Torrent, stats torrent.Stats, trackers in
 		ETASeconds:       eta,
 		QueuePosition:    pos,
 		NumPeers:         stats.Peers.Total,
+		BandwidthWeight:  stats.BandwidthWeight,
+		DHT:              !stats.NoDHT && !stats.Private,
+		PEX:              !stats.NoPEX && !stats.Private,
+		LSD:              !meta.NoLSD && !stats.Private,
+		noLSD:            meta.NoLSD,
 		NumSeeds:         rt.numSeeds,
 		CurrentTracker:   rt.tracker,
 		TrackersCount:    trackers,
@@ -2011,6 +2042,9 @@ func (d *Daemon) add(req addRequest) (string, bool, error) {
 		// AutoTMM off by default: an add that does not say otherwise follows the
 		// global auto-tmm-enabled default (false unless the operator turns it on).
 		AutoTMM: autoTMMForAdd(req, d.settingBool(autoTMMEnabledKey, false)),
+		// The tracker list is appended once the metadata says the torrent is
+		// public (applyTrackerListLocked), never to a private one.
+		TrackerListPending: d.trackerListURL() != "",
 	}
 	if limit := d.state.Config.MaxConnectionsPerTorrent; limit > 0 {
 		t.SetMaxConnections(limit)
@@ -2267,6 +2301,31 @@ func (d *Daemon) setConnLimits(key string, maxConnections, maxUploads *int64) er
 			}
 		}
 		return nil
+	})
+}
+
+// setPeerOptions changes a torrent's bandwidth weight and its DHT, PEX and
+// LSD switches; a nil field keeps the current value. The engine keeps the
+// weight, DHT and PEX in its own record, the daemon state keeps LSD.
+func (d *Daemon) setPeerOptions(key string, weight *int64, dht, pex, lsd *bool) error {
+	return d.withTorrent(key, func(t *torrent.Torrent, meta *torrentMeta) error {
+		curWeight, curDHT, curPEX := t.PeerOptions()
+		if weight != nil {
+			if *weight < 10 || *weight > 1000 {
+				return errors.New("the bandwidth weight must be between 10 and 1000 percent")
+			}
+			curWeight = int(*weight)
+		}
+		if dht != nil {
+			curDHT = *dht
+		}
+		if pex != nil {
+			curPEX = *pex
+		}
+		if lsd != nil {
+			meta.NoLSD = !*lsd
+		}
+		return t.SetPeerOptions(curWeight, curDHT, curPEX)
 	})
 }
 
@@ -2815,6 +2874,23 @@ func (d *Daemon) stats() daemonStats {
 		}
 		for key, value := range s.DHTStats {
 			out.Session["dht_"+key] = value
+		}
+		// The routing-table view: good nodes, lookups in flight and whether a
+		// remote node queried us in the last hour (1) or not (0).
+		if view := d.session.DHTView(); view != nil {
+			out.Session["dht_good_nodes"] = int64(view.Good)
+			out.Session["dht_lookups"] = int64(len(view.Searches))
+			// Unknown during the first hour: no key, so no warning.
+			switch {
+			case view.LastQuery != nil && time.Since(*view.LastQuery) < incomingWindow:
+				out.Session["dht_incoming_recent"] = 1
+			case time.Since(d.startedAt) >= incomingWindow:
+				out.Session["dht_incoming_recent"] = 0
+			}
+		}
+		out.Session["client_filter_refused"] = d.session.ClientFilterRefused()
+		if _, list, _, _ := d.trackerList.snapshot(); d.trackerListURL() != "" {
+			out.Session["tracker_list_trackers"] = int64(len(list))
 		}
 		out.Session["lsd_peers_found"] = out.LSD.PeersFound
 	}

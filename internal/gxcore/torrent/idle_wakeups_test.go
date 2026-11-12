@@ -69,3 +69,35 @@ func TestHealthProbeSpacesOutAStoppedTorrent(t *testing.T) {
 		t.Fatalf("stopped: %s", got)
 	}
 }
+
+// TestUnchokeRoundSleepsWithoutPeers: a running torrent with nobody connected
+// pauses its round, and the first peer brings it back.
+func TestUnchokeRoundSleepsWithoutPeers(t *testing.T) {
+	tr := &torrent{unchokeTicker: time.NewTicker(time.Millisecond)}
+	defer tr.unchokeTicker.Stop()
+	tr.markRunning()
+	tr.idleUnchokeIfAlone()
+	if !tr.unchokeIdle {
+		t.Fatal("a torrent without peers must pause its round")
+	}
+	select {
+	case <-tr.unchokeTicker.C:
+	default:
+	}
+	select {
+	case <-tr.unchokeTicker.C:
+		t.Fatal("a paused round still ticks")
+	case <-time.After(30 * time.Millisecond):
+	}
+	tr.wakeUnchoke()
+	if tr.unchokeIdle {
+		t.Fatal("the first peer must restart the round")
+	}
+	// A stopped torrent is not woken by a peer: start() turns the round on.
+	tr.markStopped()
+	tr.unchokeIdle = true
+	tr.wakeUnchoke()
+	if !tr.unchokeIdle {
+		t.Fatal("a stopped torrent's round was restarted")
+	}
+}

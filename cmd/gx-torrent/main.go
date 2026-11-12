@@ -296,6 +296,11 @@ func main() {
 	dhtBootstrap := flag.String("dht-bootstrap", envOr("GX_TORRENT_DHT_BOOTSTRAP", ""), "comma-separated DHT router addresses (empty = built-in bootstrap nodes)")
 	webSourcesAllowPrivate := flag.Bool("web-sources-allow-private", envBool("GX_TORRENT_WEB_SOURCES_ALLOW_PRIVATE", false), "let web seeds and magnet xs=/as= sources reach private/LAN addresses (off: protects the LAN from URLs in untrusted torrents)")
 	limitLANPeers := flag.Bool("limit-lan-peers", envBool("GX_TORRENT_LIMIT_LAN_PEERS", false), "apply the speed limits to peers on the local network too (default: LAN peers transfer at full speed)")
+	uploadTradingShare := flag.Int("upload-trading-share", envIntVal("GX_TORRENT_UPLOAD_TRADING_SHARE", 0, 0, 99), "percent of a limited upload that goes first to peers sending data back to a torrent still downloading (0 = off)")
+	clientFilter := flag.Bool("client-filter", envBool("GX_TORRENT_CLIENT_FILTER", false), "refuse the peers whose client is on the client filter list")
+	clientFilterList := flag.String("client-filter-list", envOr("GX_TORRENT_CLIENT_FILTER_LIST", ""), "comma-separated clients to refuse: peer ID prefixes such as -XL, or client names (empty = the suggested list)")
+	trackerListURL := flag.String("tracker-list-url", envOr("GX_TORRENT_TRACKER_LIST_URL", ""), "address of a public tracker list appended to new public torrents (empty = off)")
+	geoIPFile := flag.String("geoip-file", envOr("GX_TORRENT_GEOIP_FILE", ""), "offline IP-to-country database (CSV ranges) for the country of each peer (empty = off)")
 	dhtReadOnly := flag.Bool("dht-read-only", envBool("GX_TORRENT_DHT_READ_ONLY", false), "read-only DHT (BEP 43): do not answer queries and ask not to be added to routing tables")
 	insecure := flag.Bool("insecure", false, "allow a non-loopback listen address without a token")
 	debug := flag.Bool("debug", os.Getenv("GX_TORRENT_DEBUG") == "1", "verbose engine logging")
@@ -450,6 +455,11 @@ func main() {
 			DHTReadOnly:            dhtReadOnlyValue,
 			WebSourcesAllowPrivate: webSourcesAllowPrivateValue,
 			LimitLANPeers:          limitLANPeersValue,
+			UploadTradingShare:     *uploadTradingShare,
+			ClientFilter:           *clientFilter,
+			ClientFilterList:       *clientFilterList,
+			TrackerListURL:         strings.TrimSpace(*trackerListURL),
+			GeoIPFile:              strings.TrimSpace(*geoIPFile),
 		},
 		Debug:                 *debug,
 		Mode:                  modeValue,

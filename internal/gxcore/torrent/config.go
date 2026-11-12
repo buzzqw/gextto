@@ -165,6 +165,16 @@ type Config struct {
 	// the default, LAN peers transfer at full speed, as in libtorrent and
 	// qBittorrent: the limits exist for the internet line.
 	LimitLocalPeers bool `yaml:"limit-local-peers"`
+	// UploadTradingShare is the percent of a limited upload that goes first to
+	// trading peers (peers of a torrent still downloading that send data back)
+	// when seeding peers want the same bandwidth; the rest goes to seeding.
+	// 0 turns the split off (every peer gets the same share). It only matters
+	// when an upload limit is in place.
+	UploadTradingShare int `yaml:"upload-trading-share"`
+	// ClientFilter lists the clients refused as peers: a rule starting with
+	// "-" is a peer ID prefix ("-XL"), any other rule is looked for in the
+	// client name the peer announces. Empty turns the filter off.
+	ClientFilter []string `yaml:"client-filter"`
 	// Start torrent automatically if it was running when previous session was closed.
 	ResumeOnStartup bool `yaml:"resume-on-startup"`
 	// Check each torrent loop for aliveness. Helps to detect bugs earlier.

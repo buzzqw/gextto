@@ -110,6 +110,17 @@ func (p *Conn) String() string {
 	return p.conn.RemoteAddr().String()
 }
 
+// SetUploadClasses attaches the session's trading/seeding upload split.
+func (p *Conn) SetUploadClasses(classes *bandwidth.UploadClasses) {
+	p.writer.SetUploadClasses(classes)
+}
+
+// SetUploadClass sets the class this peer's uploads count in.
+func (p *Conn) SetUploadClass(class int32) { p.writer.SetUploadClass(class) }
+
+// UploadClass reports the class this peer's uploads count in.
+func (p *Conn) UploadClass() int32 { return p.writer.UploadClass() }
+
 // Close stops the reader and writer and waits for the run loop to exit.
 func (p *Conn) Close() {
 	close(p.closeC)

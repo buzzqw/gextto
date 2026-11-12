@@ -868,6 +868,21 @@ func gxNetworkArgs(cfg *Config) []string {
 	if lt.LimitLanPeers {
 		args = append(args, "-limit-lan-peers")
 	}
+	if share := lt.UploadTradingShare; share > 0 && share < 100 {
+		args = append(args, "-upload-trading-share", fmt.Sprint(share))
+	}
+	if lt.ClientFilter {
+		args = append(args, "-client-filter")
+		if list := strings.Join(strings.FieldsFunc(lt.ClientFilterList, func(r rune) bool { return r == '\n' || r == '\r' }), ","); strings.TrimSpace(list) != "" {
+			args = append(args, "-client-filter-list", list)
+		}
+	}
+	if u := strings.TrimSpace(lt.TrackerListURL); u != "" {
+		args = append(args, "-tracker-list-url", u)
+	}
+	if path := strings.TrimSpace(lt.GeoIPFile); path != "" {
+		args = append(args, "-geoip-file", path)
+	}
 	if !lt.Lsd {
 		args = append(args, "-no-lsd")
 	}

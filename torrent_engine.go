@@ -207,7 +207,7 @@ var capabilityLevels = map[string]map[string]string{
 		"super_seeding": "partial", "seed_mode": "full",
 		"connections": "none", "file_priorities": "full",
 		"ip_filter": "partial", "session_stats": "partial", "web_seeds": "none",
-		"holepunch": "none",
+		"holepunch": "none", "peer_options": "none",
 	},
 	BackendGxTorrent: {
 		"add": "full", "list": "full", "pause": "full", "resume": "full", "remove": "full",
@@ -218,7 +218,7 @@ var capabilityLevels = map[string]map[string]string{
 		"super_seeding": "full", "seed_mode": "full",
 		"connections": "full", "file_priorities": "full",
 		"ip_filter": "full", "session_stats": "full", "web_seeds": "full",
-		"holepunch": "full",
+		"holepunch": "full", "peer_options": "full",
 	},
 }
 

@@ -248,6 +248,14 @@ func (d *Daemon) handleUISettings(w http.ResponseWriter, r *http.Request) {
 		store.Set(altSpeedEnabledKey, strconv.FormatBool(formBool(r, "alt-speed-limits-on")))
 	}
 	store.Set(limitLANPeersKey, strconv.FormatBool(formBool(r, limitLANPeersKey)))
+	if share, err := strconv.Atoi(strings.TrimSpace(r.FormValue(uploadTradingShareKey))); err == nil && share >= 0 && share <= 99 {
+		store.Set(uploadTradingShareKey, strconv.Itoa(share))
+	}
+	// Peer sources and clients: applied live by the speed-limit tick.
+	store.Set(clientFilterKey, strconv.FormatBool(formBool(r, clientFilterKey)))
+	store.Set(clientFilterListKey, strings.Join(splitRuleList(r.FormValue(clientFilterListKey)), "\n"))
+	store.Set(trackerListURLKey, strings.TrimSpace(r.FormValue(trackerListURLKey)))
+	store.Set(geoIPFileKey, strings.TrimSpace(r.FormValue(geoIPFileKey)))
 
 	// Folders, network, protocols, language and notifications (settings.json,
 	// read at the next start).
@@ -574,6 +582,12 @@ func (d *Daemon) renderSettings(w http.ResponseWriter, r *http.Request, errKey s
 	repl("ALT_SPEED_UL", strconv.FormatInt(altUL, 10))
 	repl("ALT_SPEED_ON", checkedIf(altManual))
 	repl("LIMIT_LAN_PEERS", checkedIf(d.limitLANPeers()))
+	repl("UPLOAD_TRADING_SHARE", strconv.Itoa(d.uploadTradingShare()))
+	repl("CLIENT_FILTER_ON", checkedIf(d.clientFilterEnabled()))
+	repl("CLIENT_FILTER_LIST", html.EscapeString(strings.Join(d.clientFilterList(), "\n")))
+	repl("TRACKER_LIST_URL", html.EscapeString(d.trackerListURL()))
+	repl("GEOIP_FILE", html.EscapeString(d.geoIPFile()))
+	repl("PEER_POLICY_STATUS", d.peerPolicyStatus(lang))
 	repl("SCHED_ENABLED", checkedIf(boolSetting(scheduleEnabledKey)))
 	week, ok := d.scheduleWeek()
 	if !ok {

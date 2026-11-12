@@ -460,6 +460,18 @@ func TestGxNetworkArgs(t *testing.T) {
 	if got := strings.Join(gxNetworkArgs(cfg), " "); !strings.Contains(got, "-limit-lan-peers") {
 		t.Fatalf("limits for LAN peers not forwarded: %q", got)
 	}
+	// The peer policies reach the daemon only when set.
+	cfg.Transfer.UploadTradingShare = 75
+	cfg.Transfer.ClientFilter = true
+	cfg.Transfer.ClientFilterList = "-XL\nThunder"
+	cfg.Transfer.TrackerListURL = "https://lists.example/trackers.txt"
+	cfg.Transfer.GeoIPFile = "/data/geo.csv"
+	got = strings.Join(gxNetworkArgs(cfg), " ")
+	for _, part := range []string{"-upload-trading-share 75", "-client-filter -client-filter-list -XL,Thunder", "-tracker-list-url https://lists.example/trackers.txt", "-geoip-file /data/geo.csv"} {
+		if !strings.Contains(got, part) {
+			t.Fatalf("%q not forwarded: %q", part, got)
+		}
+	}
 	cfg.Transfer.ListenInterfaces = "0.0.0.0:6881-6891"
 	if host, ports := gxListenInterface(cfg.Transfer.ListenInterfaces); host != "" || ports != "6881-6891" {
 		t.Fatalf("all interfaces: %q %q", host, ports)

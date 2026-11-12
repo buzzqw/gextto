@@ -44,6 +44,9 @@ var Keys = struct {
 	FirstLast         []byte
 	SuperSeeding      []byte
 	SeedMode          []byte
+	BandwidthWeight   []byte
+	NoDHT             []byte
+	NoPEX             []byte
 	FilePaths         []byte
 	DisplayName       []byte
 	ContentLayout     []byte
@@ -72,6 +75,9 @@ var Keys = struct {
 	FirstLast:         []byte("first_last"),
 	SuperSeeding:      []byte("super_seeding"),
 	SeedMode:          []byte("seed_mode"),
+	BandwidthWeight:   []byte("bandwidth_weight"),
+	NoDHT:             []byte("no_dht"),
+	NoPEX:             []byte("no_pex"),
 	FilePaths:         []byte("file_paths"),
 	DisplayName:       []byte("display_name"),
 	ContentLayout:     []byte("content_layout"),
@@ -149,6 +155,9 @@ func (r *Resumer) Write(torrentID string, spec *Spec) error {
 		_ = b.Put(Keys.FirstLast, []byte(strconv.FormatBool(spec.FirstLast)))
 		_ = b.Put(Keys.SuperSeeding, []byte(strconv.FormatBool(spec.SuperSeeding)))
 		_ = b.Put(Keys.SeedMode, []byte(strconv.FormatBool(spec.SeedMode)))
+		_ = b.Put(Keys.BandwidthWeight, []byte(strconv.Itoa(spec.BandwidthWeight)))
+		_ = b.Put(Keys.NoDHT, []byte(strconv.FormatBool(spec.NoDHT)))
+		_ = b.Put(Keys.NoPEX, []byte(strconv.FormatBool(spec.NoPEX)))
 		_ = b.Put(Keys.FilePaths, filePaths)
 		_ = b.Put(Keys.DisplayName, []byte(spec.DisplayName))
 		_ = b.Put(Keys.ContentLayout, []byte(spec.ContentLayout))
@@ -250,6 +259,20 @@ func (r *Resumer) WriteSuperSeeding(torrentID string, value bool) error {
 	})
 }
 
+// WritePeerOptions replaces only the per-torrent peer options: bandwidth
+// weight and the DHT/PEX switches.
+func (r *Resumer) WritePeerOptions(torrentID string, weight int, noDHT, noPEX bool) error {
+	return r.update(torrentID, func(b *bbolt.Bucket) error {
+		if err := b.Put(Keys.BandwidthWeight, []byte(strconv.Itoa(weight))); err != nil {
+			return err
+		}
+		if err := b.Put(Keys.NoDHT, []byte(strconv.FormatBool(noDHT))); err != nil {
+			return err
+		}
+		return b.Put(Keys.NoPEX, []byte(strconv.FormatBool(noPEX)))
+	})
+}
+
 // WriteSeedMode replaces only the seed-mode flag.
 func (r *Resumer) WriteSeedMode(torrentID string, value bool) error {
 	return r.update(torrentID, func(b *bbolt.Bucket) error {
@@ -347,11 +370,18 @@ func (r *Resumer) Read(torrentID string) (spec *Spec, err error) {
 			{Keys.FirstLast, &spec.FirstLast},
 			{Keys.SuperSeeding, &spec.SuperSeeding},
 			{Keys.SeedMode, &spec.SeedMode},
+			{Keys.NoDHT, &spec.NoDHT},
+			{Keys.NoPEX, &spec.NoPEX},
 		} {
 			if v := b.Get(flag.key); v != nil {
 				if *flag.dst, err = strconv.ParseBool(string(v)); err != nil {
 					return err
 				}
+			}
+		}
+		if v := b.Get(Keys.BandwidthWeight); v != nil {
+			if spec.BandwidthWeight, err = strconv.Atoi(string(v)); err != nil {
+				return err
 			}
 		}
 		if v := b.Get(Keys.Version); v != nil {

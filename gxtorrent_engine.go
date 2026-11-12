@@ -628,6 +628,11 @@ type gxTorrentItem struct {
 	TorrentVersion   string `json:"torrent_version"`
 	// SuperSeeding is BEP 16 super-seeding, a seeding strategy.
 	SuperSeeding bool `json:"super_seeding"`
+	// Per-torrent peer options (a daemon without them omits the fields).
+	BandwidthWeight *int `json:"bandwidth_weight"`
+	DHT             bool `json:"dht"`
+	PEX             bool `json:"pex"`
+	LSD             bool `json:"lsd"`
 	// Engine statistics shown in the detail general tab.
 	ETASeconds      int64 `json:"eta_seconds"`
 	Private         bool  `json:"private"`
@@ -693,6 +698,11 @@ func (e *gxTorrentEngine) toView(item gxTorrentItem, now time.Time) models.Torre
 		Allocated:         item.Allocated,
 		AddedAt:           item.AddedAt,
 		CompletedAt:       item.CompletedAt,
+	}
+	if item.BandwidthWeight != nil {
+		view.PeerOptions = true
+		view.BandwidthWeight = *item.BandwidthWeight
+		view.DHTOn, view.PEXOn, view.LSDOn = item.DHT, item.PEX, item.LSD
 	}
 	if item.CompletedAt > 0 {
 		view.FinishedSeconds = int64(now.Sub(time.Unix(item.CompletedAt, 0)).Seconds())
@@ -1547,6 +1557,7 @@ func (e *gxTorrentEngine) Peers(hash string) ([]models.PeerView, bool, error) {
 		UTP          bool    `json:"utp"`
 		Progress     float64 `json:"progress"`
 		Seed         bool    `json:"seed"`
+		Country      string  `json:"country"`
 	}
 	if err := e.do(http.MethodGet, "/api/v1/torrents/"+url.PathEscape(strings.ToLower(hash))+"/peers", nil, "", &peers); err != nil {
 		return nil, false, err
@@ -1563,6 +1574,7 @@ func (e *gxTorrentEngine) Peers(hash string) ([]models.PeerView, bool, error) {
 			Utp:          peer.UTP,
 			Progress:     peer.Progress,
 			Seed:         peer.Seed,
+			Country:      peer.Country,
 		})
 	}
 	return out, true, nil
@@ -1770,6 +1782,27 @@ func (e *gxTorrentEngine) SetMaxUploads(hash string, value int) (bool, error) {
 
 func (e *gxTorrentEngine) setConnLimit(hash, field string, value int) (bool, error) {
 	if err := e.action(hash, "conn-limits", url.Values{field: {strconv.Itoa(value)}}); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// SetPeerOptions sets the torrent's share of a limited line (percent, 100 =
+// normal, 10..1000) and turns DHT, PEX and LSD on or off for it alone.
+func (e *gxTorrentEngine) SetPeerOptions(hash string, weight int, dht, pex, lsd bool) (bool, error) {
+	flag := func(on bool) string {
+		if on {
+			return "1"
+		}
+		return "0"
+	}
+	values := url.Values{
+		"bandwidth_weight": {strconv.Itoa(weight)},
+		"dht":              {flag(dht)},
+		"pex":              {flag(pex)},
+		"lsd":              {flag(lsd)},
+	}
+	if err := e.action(hash, "peer-options", values); err != nil {
 		return false, err
 	}
 	return true, nil

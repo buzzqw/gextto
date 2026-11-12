@@ -75,7 +75,12 @@ type Session struct {
 	// limitLocalPeers mirrors Config.LimitLocalPeers and is switched live by
 	// SetLimitLocalPeers.
 	limitLocalPeers atomic.Bool
-	closeC          chan struct{}
+	// uploadClasses splits a limited upload between trading and seeding
+	// peers (Config.UploadTradingShare, SetUploadTradingShare).
+	uploadClasses bandwidth.UploadClasses
+	// clientFilter refuses the clients on Config.ClientFilter.
+	clientFilter clientFilterState
+	closeC       chan struct{}
 
 	// bannedIPs quarantines corrupt-data peers session-wide with a TTL
 	// (libtorrent-style smart ban), consulted by every torrent.
@@ -363,6 +368,8 @@ func assembleSession(cfg Config, l logger.Logger, db *bbolt.DB, res *boltdbresum
 	c.bucketDownload = bandwidth.New(max(cfg.SpeedLimitDownload, 0) * 1024)
 	c.bucketUpload = bandwidth.New(max(cfg.SpeedLimitUpload, 0) * 1024)
 	c.limitLocalPeers.Store(cfg.LimitLocalPeers)
+	c.uploadClasses.SetTradingShare(cfg.UploadTradingShare)
+	c.SetClientFilter(cfg.ClientFilter)
 	if cfg.DHTEnabled {
 		c.dhtPeerRequests = make(map[*torrent]int)
 	}

@@ -3451,6 +3451,10 @@ func tevTorrentFinished(cfg *Config, torrents TorrentSession, db *Database, move
 	// miss its series branch and the library import.
 	identifyRelease(&release)
 	source := CompletionPath(&event)
+	// A release packed in stored RAR volumes is extracted first, so the
+	// import below finds its video; the reason a set cannot be extracted is
+	// logged there, and the import then reports the missing video as usual.
+	_, _ = extractReleaseArchives(source, "«"+event.Name+"»")
 	corrected := ReconcilePackIdentity(&release, event.Name)
 	if corrected == nil {
 		corrected = tevReconcilePackIdentityFromFiles(&release, source)

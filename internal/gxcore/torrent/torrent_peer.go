@@ -203,6 +203,15 @@ func (t *torrent) startPeer(
 	cipher mse.CryptoMethod,
 ) {
 	addr := conn.RemoteAddr().(*net.TCPAddr)
+	if t.session.refuseClientByID(peerID) {
+		t.log.Debugf("peer refused by the client filter. addr: %s", addr)
+		conn.Close()
+		delete(t.connectedPeerIPs, addr.IP.String())
+		// Not dialled again: the same client would be refused again.
+		rememberPeerIP(t.bannedPeerIPs, addr.IP.String())
+		t.dialAddresses()
+		return
+	}
 	t.pexAddPeer(addr)
 	if _, ok := t.peerIDs[peerID]; ok {
 		if old := t.silentPeer(func(pe *peer.Peer) bool { return pe.ID == peerID }); old != nil {
@@ -228,7 +237,9 @@ func (t *torrent) startPeer(
 
 	bucketDownload, bucketUpload := t.peerLimiters(conn.RemoteAddr())
 	pe := peer.New(conn, &t.session.wire, source, peerID, extensions, cipher, t.session.config.PieceReadTimeout, t.session.config.RequestTimeout, t.session.config.MaxRequestsIn, int(t.session.config.MaxMetadataSize), bucketDownload, bucketUpload)
+	pe.SetUploadClasses(&t.session.uploadClasses)
 	t.peers[pe] = struct{}{}
+	t.wakeUnchoke()
 	peers[pe] = struct{}{}
 	if t.info() != nil {
 		pe.Bitfield = bitfield.New(t.info().NumPieces)

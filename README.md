@@ -390,6 +390,13 @@ restarts: Gextto re-attaches when binary and options match.
   **DLNA/UPnP media server** for TVs, with the NAS library and its posters;
   SSRF-safe web seeds and `xs=`/`as=`; quarantine for peers sending corrupt
   blocks; live per-peer diagnostics, I/O rates and Server-Sent Events.
+- **Bandwidth and peers, Tixati-style.** A per-torrent **bandwidth share**
+  (100 = normal, 200 = twice) on a limited line; an optional **trading split**
+  that serves first the peers sending data back to a torrent still
+  downloading; DHT, PEX and LSD per torrent; an opt-in **client filter**
+  against take-only clients; a public **tracker list** appended to new public
+  torrents; the **country** of each peer from an offline database; a **DHT
+  view** with the node table and whether the port receives from outside.
 
 Engine statistics are in **Health → Torrent engine** (`/?view=health`), in the
 daemon's `GET /api/v1/stats` and in `GET /api/torrents/session-stats`.

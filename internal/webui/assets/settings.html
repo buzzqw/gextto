@@ -110,6 +110,16 @@ h3.sub{margin:14px 0 2px;font-size:13px;color:var(--subtle);text-transform:upper
   <div class="actions"><button type="button" class="secondary sm" id="port-test" title="{{tr "Test whether the peer port is reachable from the Internet (uses the port saved above)"}}">{{tr "Test port"}}</button></div>
   <p class="muted" id="port-test-result" role="status" aria-live="polite"></p>
 </fieldset>
+<fieldset id="peer-policy">
+  <legend>{{tr "Peer sources and clients"}}</legend>
+  <div class="grid">
+    <label class="chk"><input type="checkbox" name="client-filter" value="1"{{.CLIENT_FILTER_ON}} title="{{tr "Refuse the peers whose client is on the list below: clients known to download without ever uploading back"}}"> {{tr "Refuse the clients on the list"}}</label>
+    <label class="wide">{{tr "Clients to refuse (one per line)"}}<textarea name="client-filter-list" rows="3" title="{{tr "A line starting with - is a peer ID prefix (for example -XL); any other line is looked for in the client name the peer announces. Empty restores the suggested list"}}">{{.CLIENT_FILTER_LIST}}</textarea></label>
+    <label class="wide">{{tr "Tracker list (URL, empty = off)"}}<input type="text" name="tracker-list-url" value="{{.TRACKER_LIST_URL}}" autocomplete="off" placeholder="https://…/trackers.txt" title="{{tr "Address of a public list of trackers, one per line: it is downloaded every day and its trackers are added to the new public torrents, never to private ones"}}"></label>
+    <label class="wide">{{tr "Country database (CSV file, empty = off)"}}<input type="text" name="geoip-file" value="{{.GEOIP_FILE}}" autocomplete="off" placeholder="/path/dbip-country-lite.csv" title="{{tr "Offline IP-to-country file (DB-IP lite or IP2Location LITE CSV) used to show the country of each peer; nothing is downloaded"}}"></label>
+  </div>
+  <p class="muted" aria-live="polite">{{.PEER_POLICY_STATUS}}</p>
+</fieldset>
 <fieldset id="ipfilter">
   <legend>{{tr "IP filter"}}</legend>
   <div class="grid">
@@ -203,6 +213,7 @@ h3.sub{margin:14px 0 2px;font-size:13px;color:var(--subtle);text-transform:upper
   <label>{{tr "Alternative upload limit (KiB/s, 0 = unlimited)"}}<input type="number" min="0" name="alt-speed-upload" value="{{.ALT_SPEED_UL}}" title="{{tr "Alternative upload speed limit in KiB/s, applied when the alternative limits are active (0 = unlimited)"}}"></label>
   <label class="chk"><input type="checkbox" name="alt-speed-limits-on" value="1"{{.ALT_SPEED_ON}} title="{{tr "Apply the alternative limits now, like qBittorrent's speed-limit button; the scheduler still applies inside its window"}}"> {{tr "Alternative limits active"}}</label>
   <label class="chk"><input type="checkbox" name="limit-lan-peers" value="1"{{.LIMIT_LAN_PEERS}} title="{{tr "Also slow down the peers on your local network (home or office) to the limits above; off, they transfer at full speed"}}"> {{tr "Apply the limits to peers on the local network"}}</label>
+  <label>{{tr "Upload share for trading peers (%, 0 = off)"}}<input type="number" min="0" max="99" name="upload-trading-share" value="{{.UPLOAD_TRADING_SHARE}}" title="{{tr "When the upload is limited, this share goes first to the peers that send data back to a torrent you are still downloading; the rest goes to seeding. 0 gives every peer the same share"}}"></label>
 </fieldset>
 <fieldset>
   <legend>{{tr "Bandwidth scheduler"}}</legend>

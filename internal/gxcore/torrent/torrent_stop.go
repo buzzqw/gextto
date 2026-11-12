@@ -203,6 +203,7 @@ func (t *torrent) stopAcceptor() {
 }
 
 func (t *torrent) stopPeers() {
+	t.updateUploadClasses(true)
 	t.log.Debugln("closing peer connections")
 	for p := range t.peers {
 		t.closePeer(p)

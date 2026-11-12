@@ -503,7 +503,9 @@ gx-torrent [-listen 0.0.0.0:8890] [-data ~/.local/share/gx-torrent]
            [-encryption 0|1|2] [-no-dht] [-no-pex] [-no-utp] [-no-holepunch]
            [-no-lsd] [-no-upnp] [-no-natpmp] [-dht-bootstrap host:port,...]
            [-dht-read-only] [-web-sources-allow-private] [-limit-lan-peers]
-           [-ipfilter FILE] [-ipfilter-trackers] [-lang it]
+           [-upload-trading-share 0-99] [-client-filter]
+           [-client-filter-list -XL,Thunder] [-tracker-list-url URL]
+           [-geoip-file FILE.csv] [-ipfilter FILE] [-ipfilter-trackers] [-lang it]
            [-mode managed|standalone] [-notify-url URL] [-mmap]
            [-log-file FILE] [-insecure] [-debug] [-version]
 ```
@@ -1581,6 +1583,63 @@ RPC server is disabled.
     `GET /api/v1/torrents/{hash}/collections` and are rewritten in the export of the
     `.torrent`.
 
+### Peer sources and clients
+
+- **Client filter** (`-client-filter`, settings key `client-filter`, off by
+  default). The daemon refuses the peers whose client is on the list
+  (`-client-filter-list`, key `client-filter-list`, one rule per line or
+  comma-separated). A rule starting with `-` is an Azureus-style peer ID prefix,
+  checked at the handshake before the peer is registered; any other rule is
+  looked for, case-insensitively, in the client name of the BEP 10 extension
+  handshake, and the peer is closed when it announces it. A refused address is
+  not dialled again for that torrent. An empty list means the suggested one
+  (`torrent.DefaultClientFilter`: `-XL`, `-SD`, `-XF`, `-QD`, `-BN`, Xunlei,
+  Thunder, QQDownload, Xfplay). The list is applied live; the refusals are
+  counted (`client_filter_refused` in `GET /api/v1/stats` and in
+  `GET /api/v1/dht`).
+- **Tracker list** (`-tracker-list-url`, key `tracker-list-url`, empty = off). A
+  public list of trackers, one URL per line (`http`, `https`, `udp`, `ws`,
+  `wss`; at most 200), downloaded through the engine transport (proxy and VPN
+  interface included) at start and every 24 hours, an hour after a failure, and
+  kept in `<data>/tracker-list.txt` for the next start. A torrent added while a
+  list is configured is marked pending; the queue tick appends the list once its
+  metadata is known and only when the torrent is **public**, so a private
+  magnet never gets it. Torrents added before the list was set are not touched.
+- **Peer country** (`-geoip-file`, key `geoip-file`, empty = off). An offline
+  CSV of address ranges with a two-letter country code: the DB-IP "lite" form
+  (`first,last,CC` with addresses) or the IP2Location LITE form (decimal
+  integers, separate IPv4 and IPv6 files). It is loaded once per path into
+  sorted ranges and looked up by binary search; peers get a `country` field in
+  `GET /api/v1/torrents/{hash}/peers` and a chip on the daemon page. Nothing is
+  downloaded.
+- **Per-torrent peer sources.** `POST /api/v1/torrents/{hash}/peer-options`
+  (`dht`, `pex`, `lsd`) turns the DHT announcer, the PEX exchange and LSD on or
+  off for one torrent. DHT off closes its announcer at once; PEX off ends the
+  exchange with every connected peer and ignores incoming gossip; LSD off keeps
+  the torrent out of the announcements and of the peers LSD finds. The engine
+  keeps DHT and PEX in the torrent's resume record (`no_dht`, `no_pex`), the
+  daemon keeps LSD in its state. Private torrents keep all three off (BEP 27)
+  whatever is set.
+
+Environment variables: `GX_TORRENT_CLIENT_FILTER=1`,
+`GX_TORRENT_CLIENT_FILTER_LIST`, `GX_TORRENT_TRACKER_LIST_URL`,
+`GX_TORRENT_GEOIP_FILE` and, for the trading split below,
+`GX_TORRENT_UPLOAD_TRADING_SHARE`. Gextto passes the flags to the managed
+daemon from its *Torrent engine* settings.
+
+### DHT diagnostics
+
+`GET /api/v1/dht` and the *DHT and peer sources* panel of the Statistics page
+read a view of the routing table that the DHT run loop publishes every 30
+seconds: nodes known and good (answered in the last 15 minutes), IPv4/IPv6,
+the nodes grouped by the leading bits they share with our node ID, the
+`get_peers` lookups in flight (up to 50), and the time of the last query a
+remote node sent us. `incoming` is `yes` when that query is less than an hour
+old, `no` after an hour of uptime without one (the UDP port is probably not
+reachable from outside), `unknown` before. Gextto shows the same as the *DHT*
+and *Incoming DHT queries* rows of the engine page (`dht_good_nodes`,
+`dht_lookups`, `dht_incoming_recent` in the session statistics).
+
 ## uTP and LSD
 
 - **uTP** (`torrent_utp`, active by default) uses the same UDP port as the
@@ -2514,6 +2573,26 @@ hardly with the bytes when the line is the limit.
 we hold is closed at once: both sides only upload, so the connection would cost
 a socket, keep-alives and a place in every per-peer loop for nothing
 (libtorrent does the same).
+
+### Bandwidth share and trading split
+
+- **Per-torrent share** (`peer-options` action, `bandwidth_weight` 10–1000,
+  100 = normal). The limiter divides the wait for the shared debt by the
+  weight of the torrent (and of each limiter on the way to the root): because
+  the debt is shared, the root rate still caps the sum of every consumer, and
+  each torrent gets a share proportional to its weight. With every weight at
+  100 it is the plain limiter. An unlimited line never waits, so the weight
+  only matters while a limit — fixed, scheduled or autotune — is in place. The
+  engine keeps it in the resume record (`bandwidth_weight`).
+- **Trading split** (`-upload-trading-share`, key `upload-trading-share`, 0 =
+  off, 1–99). At every unchoke round (10 s) each torrent sorts the peers it
+  uploads to (unchoked and interested) into *trading* — the torrent is still
+  downloading and the peer sends data back — and *seeding*, and adds the counts
+  to the session. A peer's upload wait is then scaled by its class share
+  divided by the peers in that class, so the two classes get the configured
+  split whatever their head counts; when only one class is present, or the
+  split is off, the factor is 1. The split is work-conserving: a class that
+  does not use its share leaves it to the other. It is applied live.
 
 ### Automatic speed (autotune)
 

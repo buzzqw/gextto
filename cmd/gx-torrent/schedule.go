@@ -199,6 +199,7 @@ func (d *Daemon) applyEffectiveSpeedLimitsLocked(now time.Time) {
 		if lan := d.limitLANPeers(); d.session.LimitLocalPeers() != lan {
 			d.session.SetLimitLocalPeers(lan)
 		}
+		d.applyPeerPoliciesLocked()
 	}
 	if download == d.appliedDL && upload == d.appliedUL {
 		d.logSpeedLimitsLocked(now, reason)

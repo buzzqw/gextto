@@ -240,8 +240,10 @@ type uiFileRow struct {
 }
 
 type uiPeerRow struct {
-	Address     string
-	Client      string
+	Address string
+	Client  string
+	// Country is the two-letter country code from the offline database.
+	Country     string
 	Down        int64
 	Up          int64
 	Progress    float64
@@ -303,8 +305,13 @@ type uiDetailData struct {
 	MaxUploads     int64
 	// SuperSeeding is BEP 16 super-seeding, a seeding strategy.
 	SuperSeeding bool
-	Pinned       bool
-	Private      bool
+	// BandwidthWeight is the share of a limited line in percent; DHTOn,
+	// PEXOn and LSDOn are this torrent's peer-source switches.
+	BandwidthWeight int
+	DHTOn, PEXOn    bool
+	LSDOn           bool
+	Pinned          bool
+	Private         bool
 
 	// Category and Tags are the qBittorrent-style labels (standalone).
 	Category   string
@@ -1453,6 +1460,23 @@ func (d *Daemon) handleUISuperSeeding(w http.ResponseWriter, r *http.Request) {
 	d.uiDoneDetail(w, r, hash, "general", message, err)
 }
 
+// handleUIPeerOptions saves the bandwidth weight and the DHT, PEX and LSD
+// switches of one torrent from its detail page.
+func (d *Daemon) handleUIPeerOptions(w http.ResponseWriter, r *http.Request) {
+	if !d.uiAuthorized(w, r) {
+		return
+	}
+	if !d.uiSameOrigin(w, r) {
+		return
+	}
+	_ = r.ParseForm()
+	hash := strings.TrimSpace(r.FormValue("hash"))
+	weight := formInt(r, "bandwidth_weight", 100)
+	dht, pex, lsd := formBool(r, "dht"), formBool(r, "pex"), formBool(r, "lsd")
+	err := d.setPeerOptions(hash, &weight, &dht, &pex, &lsd)
+	d.uiDoneDetail(w, r, hash, "general", "Peer options saved", err)
+}
+
 func (d *Daemon) handleUIMove(w http.ResponseWriter, r *http.Request) {
 	if !d.uiAuthorized(w, r) {
 		return
@@ -1955,6 +1979,7 @@ func (d *Daemon) uiDetailData(hash, tab, lang string) (uiDetailData, error) {
 	maxConnections := kibOrInherit(meta.MaxConnections)
 	maxUploads := kibOrInherit(meta.MaxUploads)
 	superSeeding := meta.SuperSeeding
+	lsdOn := !meta.NoLSD
 	pinned := meta.Pinned
 	swarmSeeds := meta.SwarmSeeds
 	swarmPeers := meta.SwarmPeers
@@ -1999,6 +2024,7 @@ func (d *Daemon) uiDetailData(hash, tab, lang string) (uiDetailData, error) {
 		SeedRatio: seedRatio, SeedDays: seedDays, Pinned: pinned, Private: stats.Private,
 		DownloadLimitKib: downloadLimit, UploadLimitKib: uploadLimit,
 		MaxConnections: maxConnections, MaxUploads: maxUploads, SuperSeeding: superSeeding,
+		BandwidthWeight: stats.BandwidthWeight, DHTOn: !stats.NoDHT, PEXOn: !stats.NoPEX, LSDOn: lsdOn,
 		PiecesTotal: stats.Pieces.Total, PiecesHave: stats.Pieces.Have, PiecesAvailable: stats.Pieces.Available,
 		PiecesChecked: stats.Pieces.Checked, PieceLength: int64(stats.PieceLength),
 		Wasted: stats.Bytes.Wasted, Allocated: stats.Bytes.Allocated, FileCount: stats.FileCount,
@@ -2113,7 +2139,8 @@ func (d *Daemon) uiDetailData(hash, tab, lang string) (uiDetailData, error) {
 		for _, peer := range t.Peers() {
 			data.Peers = append(data.Peers, uiPeerRow{
 				Address: peer.Addr.String(), Client: peer.Client,
-				Down: int64(peer.DownloadSpeed), Up: int64(peer.UploadSpeed), Progress: peer.Progress * 100,
+				Country: d.peerCountry(peer.Addr.String()),
+				Down:    int64(peer.DownloadSpeed), Up: int64(peer.UploadSpeed), Progress: peer.Progress * 100,
 				Seed: peer.Seed, Incoming: peer.Source == torrent.SourceIncoming,
 				Encrypted: peer.EncryptedStream, UTP: peer.UTP,
 				Source: uiTr(lang, sourceName(peer.Source)), Downloading: peer.Downloading,

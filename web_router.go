@@ -306,6 +306,7 @@ func Router(s *AppState) *http.ServeMux {
 	handle(s, mux, "POST /api/torrents/{hash}/selective", TorrentSelective)
 	handle(s, mux, "POST /api/torrents/{hash}/web-seeds", SetWebSeeds)
 	handle(s, mux, "POST /api/torrents/{hash}/super-seeding", SetSuperSeeding)
+	handle(s, mux, "POST /api/torrents/{hash}/peer-options", SetPeerOptions)
 	handle(s, mux, "GET /api/torrents/session-stats", TorrentSessionStats)
 	handle(s, mux, "GET /api/torrents/{hash}/export.torrent", ExportTorrent)
 	handle(s, mux, "GET /api/torrents/{hash}/magnet", ExportMagnet)

@@ -338,6 +338,7 @@ state.
 | POST | `/api/torrents/{hash}/storage` | move a torrent to another folder |
 | GET | `/api/torrents/{hash}/stream` | stream a file from a torrent |
 | POST | `/api/torrents/{hash}/super-seeding` | super-seeding on or off |
+| POST | `/api/torrents/{hash}/peer-options` | gx-torrent only: the torrent's bandwidth share and its peer sources, JSON {"bandwidth_weight": 10–1000 (100 = normal), "dht": bool, "pex": bool, "lsd": bool}; 409 when the engine has no per-torrent peer options |
 | GET | `/api/torrents/{hash}/trackers` | trackers of a torrent |
 | POST | `/api/torrents/{hash}/trackers` | replace the tracker list (an empty list removes every tracker); the UI composes it from the add form and the per-row remove |
 | POST | `/api/torrents/{hash}/web-seeds` | set the web seeds |
@@ -560,6 +561,7 @@ server-rendered UI under `/ui`; those HTML routes are not part of this table.
 | POST | `/api/v1/pins/clear` | clear the pinned torrents |
 | GET | `/api/v1/portcheck` | check the peer port |
 | GET | `/api/v1/stats` | session statistics |
+| GET | `/api/v1/dht` | DHT diagnostics: routing-table view (good and known nodes, IPv4/IPv6, nodes by shared bits, lookups in progress, node ID, last incoming query), incoming (yes, no after an hour without queries, unknown), peers refused by the client filter and the tracker-list state |
 | GET | `/api/v1/stats/history` | statistics history |
 | GET | `/api/v1/torrents` | list torrents |
 | DELETE | `/api/v1/torrents/{hash}` | remove a torrent |
@@ -576,8 +578,13 @@ the fewest connected peers holding a needed piece, `-1` when nothing is needed),
 `POST /api/v1/torrents/{hash}/{action}` is one of `pause`, `resume`,
 `verify`, `reannounce`, `restart`, `park`, `unpark`, `pin`, `top`, `rename`,
 `rename-file`, `rename-folder`, `move`, `associate`, `seed-limits`,
-`conn-limits`, `super-seeding`, `file-priorities`, `trackers`, `set-trackers`,
-`webseeds`.
+`conn-limits`, `super-seeding`, `peer-options`, `file-priorities`, `trackers`,
+`set-trackers`, `webseeds`. `peer-options` takes `bandwidth_weight` (10–1000, the
+torrent's share of a limited line in percent, 100 = normal) and `dht`, `pex`,
+`lsd` (`1`/`0`); a field left out keeps its value, and a private torrent keeps
+DHT, PEX and LSD off whatever is sent. The list (`GET /api/v1/torrents`) reports
+`bandwidth_weight`, `dht`, `pex` and `lsd`, and the peers (`…/peers`) a
+`country` when a country database is configured.
 
 ### qBittorrent-compatible API (`/api/v2`)
 

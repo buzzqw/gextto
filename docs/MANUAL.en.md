@@ -728,10 +728,10 @@ stays visible. The tabs:
 | **General** | torrent data, copy magnet, **Export .torrent**, reannounce, pin, restart, mark as failed, **Super seeding**, web seeds |
 | **Tracker** | add trackers (`tier|url` per line) or remove one |
 | **Content** | the files, with **priority** (Skip, Normal, High, Maximum) and, with gx-torrent, **▶** for streaming |
-| **Peers** | the connected peers |
+| **Peers** | the connected peers; with gx-torrent and a country database configured, the peer's **country** sits next to its address |
 | **Pieces** | the piece map: green downloaded, yellow in progress, grey missing. With gx-torrent, below it is the **availability among peers**: the fuller the bar, the more connected peers have the pieces you are missing; red marks pieces no connected peer has. With qBittorrent there is the map only, and the pieces of skipped files show as missing |
 | **Speed** | that torrent's download and upload chart over the last 30 minutes, with average and peak. Gextto records the speed of the torrents that are transferring only, so the chart is already there when you open the tab |
-| **Limits** | ratio, seeding days and bandwidth of that torrent: **-1** uses the global value, **0** removes the limit |
+| **Limits** | ratio, seeding days and bandwidth of that torrent: **-1** uses the global value, **0** removes the limit. With gx-torrent there is also **Peers and bandwidth share**: the **bandwidth share** (100 = normal, 200 = twice a normal torrent, 50 = half) sets how much that torrent takes when the line is limited, and **DHT**, **PEX** and **Local discovery** are turned on or off for it alone. A private torrent always keeps DHT, PEX and local discovery off |
 | **Storage** | **Move storage** to another folder |
 | **History** | every event of that download, from the choice to the library |
 
@@ -1250,6 +1250,23 @@ process; there is nothing to install.
   a tier** (ask every tracker of a tier together). The first two are off by
   default, the third is on. After changing them, restart Gextto to apply them
   to the managed daemon.
+- The same network section holds the peer rules, all off by default: the
+  **upload share for peers that give back** (when the upload is limited, by
+  Auto too, that share goes first to the peers that send you data for a torrent
+  you are still downloading, the rest to seeding), the **client filter**
+  (refuses the clients known to download without giving anything back,
+  recognised by peer ID or name; the list can be edited), the **tracker list**
+  from an address (downloaded every day and added to new public torrents,
+  never to private ones: for a magnet it waits until it knows whether it is
+  private) and the **country database** (a DB-IP lite or IP2Location LITE CSV
+  file you download yourself: it shows the country of each peer, without any
+  network call).
+- In *Health → Torrent engine*, the **DHT** row says how many nodes gx-torrent knows, how
+  many answer and how many lookups are running; **Incoming DHT queries** says
+  whether any node reached it from outside in the last hour (if not, the UDP
+  port may be closed on the router). The daemon's **Statistics** page also
+  shows the node table by distance, the clients refused and the state of the
+  tracker list.
 
 If the engine cannot stay up (6 abnormal starts in 10 minutes), Gextto switches
 by itself to qBittorrent-nox and, as a last resort, to a recovery state with
@@ -1810,6 +1827,16 @@ minutes; only after the last one the torrent goes into error. A move
 interrupted by a restart resumes by itself about a minute later. Do not delete
 the source files until the library path shows up in the history.
 
+If the download arrived **packed in RAR archives** (a set of `.part01.rar`,
+`.part02.rar`… files, or `.rar`, `.r00`, `.r01`…) and holds no loose video,
+Gextto extracts the video next to the archives before importing it, and says so
+in the log ("arrived packed in RAR archives"). The archives stay, so the torrent
+keeps being shared: while seeding lasts the space is used twice. Only
+**uncompressed** archives (the form usually used for videos split into parts)
+that are complete are extracted: a compressed archive, one protected by a
+password, one with a missing volume or with data that does not match its
+checksum stays as it is, and the log says why.
+
 ### A file is on the NAS but Gextto counts it as missing
 
 Check the file name (it must contain season and episode, for example
@@ -2188,6 +2215,7 @@ the download stands. Season packs do not go through this check.
 | Auto — line maximum, download | The real maximum download speed of the line, in KiB/s (e.g. 9000 for 9 MB/s). 0 = unknown: Auto discovers it. If you enter it, Auto never goes above it and finds the right point sooner. |
 | Auto — line maximum, upload | The real maximum upload speed of the line, in KiB/s (e.g. 800). 0 = unknown: Auto discovers it. If you enter it, Auto never goes above it and finds the right point sooner. |
 | Apply the limits to peers on the local network too | Off (default, recommended): the peers of your home or office network (private addresses 10.x, 172.16–31.x, 192.168.x, link-local, loopback and local IPv6 fc00::/7) download and upload at full speed, as in qBittorrent and libtorrent: the speed limits are meant for the Internet line. On: they follow the global and per-torrent limits too. With a proxy configured every peer follows the limits (behind a proxy gx-torrent cannot tell where a peer is). gx-torrent only (qBittorrent has its own option). Changing it restarts gx-torrent. |
+| Upload share for peers that give back | Percentage of the limited upload that goes first to the peers that send you data for a torrent you are still downloading (trading); the rest goes to the peers you only seed to. It matters only while an upload limit is in place — Auto's included — and when both groups want more than there is: what one group does not use goes to the other. 0 (default) = off, every peer gets the same share. Values from 1 to 99; 70–80 puts downloads first without stopping seeding. gx-torrent only. Changing it restarts gx-torrent. |
 
 **Ports and interfaces**
 
@@ -2211,6 +2239,10 @@ the download stands. Season packs do not go through this check.
 | uTP | Enable the uTP (UDP) protocol in addition to TCP. |
 | Holepunching (BEP 55) | Opens a direct connection to peers behind NAT through a relaying peer (BEP 55). Requires uTP. |
 | DHT bootstrap nodes | Initial DHT nodes (host:port separated by comma). |
+| Tracker list to add (URL) | Address of a public list of trackers, one per line (`http`, `https`, `udp`, `ws`). gx-torrent downloads it every day (through the proxy or the VPN interface when configured), keeps it across restarts and adds its trackers, at most 200, to **new public** torrents: a magnet gets them only once its metadata confirms it is not private. Empty (default) = off. gx-torrent only. Changing it restarts gx-torrent. |
+| Refuse the clients on the list | On: gx-torrent refuses the peers whose client is on the list below and does not dial them again for that torrent. Meant for clients that download without ever giving anything back (offline-download services and the like). Off by default. gx-torrent only. Changing it restarts gx-torrent. |
+| Clients to refuse | One client per line or comma-separated. An entry starting with `-` is a peer ID prefix (for example `-XL`); the others are looked for in the name the client announces (case-insensitive). Empty = the suggested list: `-XL`, `-SD`, `-XF`, `-QD`, `-BN`, Xunlei, Thunder, QQDownload, Xfplay. Shown only with the filter on. |
+| Country database (CSV file) | Path of an offline address → country CSV file, in the DB-IP "lite" form (`first,last,COUNTRY` with addresses) or IP2Location LITE (with numbers), IPv4 and IPv6. It shows the country of each peer in the *Peers* tab. You download the file from the provider's site and update it when you like: gx-torrent makes no network call. Empty (default) = off. gx-torrent only. |
 
 **Encryption and IP filter**
 

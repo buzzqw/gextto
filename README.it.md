@@ -408,6 +408,14 @@ coincidono.
   suoi poster; web seed e `xs=`/`as=` protetti da SSRF; quarantena per i peer
   che mandano blocchi corrotti; diagnostica live per peer, tassi di I/O e
   Server-Sent Events.
+- **Banda e peer, come in Tixati.** Una **quota di banda** per torrent (100 =
+  normale, 200 = il doppio) quando la linea è limitata; una **divisione
+  scambio/seed** opzionale che serve prima i peer che rimandano dati a un
+  torrent ancora in download; DHT, PEX e LSD per singolo torrent; un **filtro
+  dei client** opzionale contro i client che prendono soltanto; una **lista di
+  tracker** pubblica aggiunta ai nuovi torrent pubblici; il **paese** di ogni
+  peer da un database offline; una **vista DHT** con la tabella dei nodi e se la
+  porta riceve dall'esterno.
 
 Le statistiche del motore sono in **Salute → Motore torrent** (`/?view=health`),
 in `GET /api/v1/stats` del demone e in `GET /api/torrents/session-stats`.

@@ -1879,6 +1879,8 @@ type v2DetailCaps struct {
 	WebSeeds     bool
 	RateLimits   bool
 	Connections  bool
+	// PeerOptions: bandwidth share and DHT/PEX/LSD switches per torrent.
+	PeerOptions bool
 	// Pieces: the engine can report per-piece diagnostics.
 	Pieces bool
 	// FileLevels: priority levels; without it only skip/download.
@@ -1911,6 +1913,7 @@ func v2DetailCapsFor(backend string) v2DetailCaps {
 		Pieces:       available("piece_diagnostics"),
 		RateLimits:   available("limits"),
 		Connections:  available("connections"),
+		PeerOptions:  available("peer_options"),
 		FileLevels:   available("file_priorities"),
 	}
 	switch backend {
@@ -2298,6 +2301,14 @@ func V2DownloadsDetailAction(w http.ResponseWriter, r *http.Request, s *AppState
 		maxUploads := v2ParseInt(r.FormValue("max_uploads"), -1)
 		body, _ = json.Marshal(map[string]any{"download_limit": download, "upload_limit": upload,
 			"seed_ratio": ratio, "seed_days": days, "max_connections": maxConnections, "max_uploads": maxUploads})
+	case "peer-options":
+		path = "/api/torrents/" + url.PathEscape(hash) + "/peer-options"
+		body, _ = json.Marshal(PeerOptionsInput{
+			BandwidthWeight: int(v2ParseInt(r.FormValue("bandwidth_weight"), 100)),
+			Dht:             r.FormValue("dht") != "",
+			Pex:             r.FormValue("pex") != "",
+			Lsd:             r.FormValue("lsd") != "",
+		})
 	case "storage":
 		path = "/api/torrents/" + url.PathEscape(hash) + "/storage"
 		body, _ = json.Marshal(StoragePath{Path: strings.TrimSpace(r.FormValue("path"))})

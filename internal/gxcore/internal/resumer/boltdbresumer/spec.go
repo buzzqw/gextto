@@ -38,6 +38,12 @@ type Spec struct {
 	// lazily as they are served (libtorrent seed_mode). The pieces already
 	// checked are not recorded, so a restart checks them again.
 	SeedMode bool
+	// BandwidthWeight is the torrent's share of a limited line in percent
+	// (0 = 100, the normal share).
+	BandwidthWeight int
+	// NoDHT and NoPEX turn those peer sources off for this torrent only.
+	NoDHT bool
+	NoPEX bool
 	// FilePaths overrides the on-disk storage paths of info.Files, in order,
 	// when a file or folder was renamed (qBittorrent renameFile/renameFolder).
 	// Nil when no rename happened. The info dict itself is never changed (its
@@ -89,6 +95,10 @@ type jsonSpec struct {
 	DisplayName string   `json:",omitempty"`
 	// Seed mode, appended last and omitted when off for the same reason.
 	SeedMode bool `json:",omitempty"`
+	// Per-torrent peer options, appended last and omitted when default.
+	BandwidthWeight int  `json:",omitempty"`
+	NoDHT           bool `json:",omitempty"`
+	NoPEX           bool `json:",omitempty"`
 }
 
 // MarshalJSON implements json.Marshaler.
@@ -112,14 +122,17 @@ func (s Spec) MarshalJSON() ([]byte, error) {
 		SuperSeeding:      s.SuperSeeding,
 		Version:           s.Version,
 
-		InfoHash:    base64.StdEncoding.EncodeToString(s.InfoHash),
-		Info:        base64.StdEncoding.EncodeToString(s.Info),
-		PieceLayers: base64.StdEncoding.EncodeToString(s.PieceLayers),
-		Bitfield:    base64.StdEncoding.EncodeToString(s.Bitfield),
-		SeededFor:   int64(s.SeededFor),
-		FilePaths:   s.FilePaths,
-		DisplayName: s.DisplayName,
-		SeedMode:    s.SeedMode,
+		InfoHash:        base64.StdEncoding.EncodeToString(s.InfoHash),
+		Info:            base64.StdEncoding.EncodeToString(s.Info),
+		PieceLayers:     base64.StdEncoding.EncodeToString(s.PieceLayers),
+		Bitfield:        base64.StdEncoding.EncodeToString(s.Bitfield),
+		SeededFor:       int64(s.SeededFor),
+		FilePaths:       s.FilePaths,
+		DisplayName:     s.DisplayName,
+		SeedMode:        s.SeedMode,
+		BandwidthWeight: s.BandwidthWeight,
+		NoDHT:           s.NoDHT,
+		NoPEX:           s.NoPEX,
 	})
 }
 
@@ -164,5 +177,8 @@ func (s *Spec) UnmarshalJSON(b []byte) error {
 	s.FilePaths = j.FilePaths
 	s.DisplayName = j.DisplayName
 	s.SeedMode = j.SeedMode
+	s.BandwidthWeight = j.BandwidthWeight
+	s.NoDHT = j.NoDHT
+	s.NoPEX = j.NoPEX
 	return nil
 }

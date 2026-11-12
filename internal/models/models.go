@@ -808,6 +808,14 @@ type TorrentView struct {
 	IsSeeding         bool   `json:"is_seeding"`
 	Sequential        bool   `json:"sequential_download"`
 	SuperSeeding      bool   `json:"super_seeding"`
+	// PeerOptions says the engine reports the per-torrent peer options below:
+	// the share of a limited line in percent (100 = normal) and the DHT, PEX
+	// and LSD switches (true = on).
+	PeerOptions     bool `json:"peer_options,omitempty"`
+	BandwidthWeight int  `json:"bandwidth_weight,omitempty"`
+	DHTOn           bool `json:"dht_on,omitempty"`
+	PEXOn           bool `json:"pex_on,omitempty"`
+	LSDOn           bool `json:"lsd_on,omitempty"`
 	// Collections and Similar are the BEP 38 hints: the collections the torrent
 	// belongs to, and the info hashes (hex) of torrents that might share files.
 	Collections       []string `json:"collections,omitempty"`
@@ -909,6 +917,9 @@ type PeerView struct {
 	Incoming      bool    `json:"incoming"`
 	Encrypted     bool    `json:"encrypted"`
 	Utp           bool    `json:"utp"`
+	// Country is the two-letter country code from the engine's offline
+	// database (empty without one).
+	Country string `json:"country,omitempty"`
 }
 
 // TrackerView is one tracker of a torrent.

@@ -284,3 +284,12 @@ func (s *Session) updateStats() {
 		s.log.Errorln("cannot update stats:", err.Error())
 	}
 }
+
+// DHTView returns the last routing-table view (nodes, buckets, lookups and
+// the last incoming query), or nil when the DHT is off or not yet sampled.
+func (s *Session) DHTView() *dht.TableView {
+	if !s.config.DHTEnabled {
+		return nil
+	}
+	return dht.View()
+}
