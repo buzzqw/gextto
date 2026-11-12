@@ -254,7 +254,9 @@ func (d *Daemon) handleUISettings(w http.ResponseWriter, r *http.Request) {
 	// Peer sources and clients: applied live by the speed-limit tick.
 	store.Set(clientFilterKey, strconv.FormatBool(formBool(r, clientFilterKey)))
 	store.Set(clientFilterListKey, strings.Join(splitRuleList(r.FormValue(clientFilterListKey)), "\n"))
+	store.Set(trackerListKey, strconv.FormatBool(formBool(r, trackerListKey)))
 	store.Set(trackerListURLKey, strings.TrimSpace(r.FormValue(trackerListURLKey)))
+	store.Set(peerCountryKey, strconv.FormatBool(formBool(r, peerCountryKey)))
 	store.Set(geoIPFileKey, strings.TrimSpace(r.FormValue(geoIPFileKey)))
 
 	// Folders, network, protocols, language and notifications (settings.json,
@@ -585,7 +587,9 @@ func (d *Daemon) renderSettings(w http.ResponseWriter, r *http.Request, errKey s
 	repl("UPLOAD_TRADING_SHARE", strconv.Itoa(d.uploadTradingShare()))
 	repl("CLIENT_FILTER_ON", checkedIf(d.clientFilterEnabled()))
 	repl("CLIENT_FILTER_LIST", html.EscapeString(strings.Join(d.clientFilterList(), "\n")))
-	repl("TRACKER_LIST_URL", html.EscapeString(d.trackerListURL()))
+	repl("TRACKER_LIST_ON", checkedIf(d.trackerListEnabled()))
+	repl("TRACKER_LIST_URL", html.EscapeString(d.trackerListAddress()))
+	repl("PEER_COUNTRY_ON", checkedIf(d.peerCountryEnabled()))
 	repl("GEOIP_FILE", html.EscapeString(d.geoIPFile()))
 	repl("PEER_POLICY_STATUS", d.peerPolicyStatus(lang))
 	repl("SCHED_ENABLED", checkedIf(boolSetting(scheduleEnabledKey)))

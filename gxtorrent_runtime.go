@@ -871,16 +871,26 @@ func gxNetworkArgs(cfg *Config) []string {
 	if share := lt.UploadTradingShare; share > 0 && share < 100 {
 		args = append(args, "-upload-trading-share", fmt.Sprint(share))
 	}
+	// The peer policies are on by default in the daemon too: their switches
+	// are always passed, so turning one off in Gextto reaches it.
+	args = append(args, fmt.Sprintf("-client-filter=%t", lt.ClientFilter))
 	if lt.ClientFilter {
-		args = append(args, "-client-filter")
-		if list := strings.Join(strings.FieldsFunc(lt.ClientFilterList, func(r rune) bool { return r == '\n' || r == '\r' }), ","); strings.TrimSpace(list) != "" {
-			args = append(args, "-client-filter-list", list)
+		var rules []string
+		for _, rule := range strings.FieldsFunc(lt.ClientFilterList, func(r rune) bool { return r == '\n' || r == '\r' || r == ',' || r == ';' }) {
+			if rule = strings.TrimSpace(rule); rule != "" {
+				rules = append(rules, rule)
+			}
+		}
+		if len(rules) > 0 {
+			args = append(args, "-client-filter-list", strings.Join(rules, ","))
 		}
 	}
-	if u := strings.TrimSpace(lt.TrackerListURL); u != "" {
+	args = append(args, fmt.Sprintf("-tracker-list=%t", lt.TrackerList))
+	if u := strings.TrimSpace(lt.TrackerListURL); lt.TrackerList && u != "" {
 		args = append(args, "-tracker-list-url", u)
 	}
-	if path := strings.TrimSpace(lt.GeoIPFile); path != "" {
+	args = append(args, fmt.Sprintf("-peer-country=%t", lt.PeerCountry))
+	if path := strings.TrimSpace(lt.GeoIPFile); lt.PeerCountry && path != "" {
 		args = append(args, "-geoip-file", path)
 	}
 	if !lt.Lsd {

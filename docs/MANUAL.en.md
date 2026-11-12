@@ -728,7 +728,7 @@ stays visible. The tabs:
 | **General** | torrent data, copy magnet, **Export .torrent**, reannounce, pin, restart, mark as failed, **Super seeding**, web seeds |
 | **Tracker** | add trackers (`tier|url` per line) or remove one |
 | **Content** | the files, with **priority** (Skip, Normal, High, Maximum) and, with gx-torrent, **▶** for streaming |
-| **Peers** | the connected peers; with gx-torrent and a country database configured, the peer's **country** sits next to its address |
+| **Peers** | the connected peers; with gx-torrent the peer's **country** sits next to its address, from the DB-IP database gx-torrent downloads by itself |
 | **Pieces** | the piece map: green downloaded, yellow in progress, grey missing. With gx-torrent, below it is the **availability among peers**: the fuller the bar, the more connected peers have the pieces you are missing; red marks pieces no connected peer has. With qBittorrent there is the map only, and the pieces of skipped files show as missing |
 | **Speed** | that torrent's download and upload chart over the last 30 minutes, with average and peak. Gextto records the speed of the torrents that are transferring only, so the chart is already there when you open the tab |
 | **Limits** | ratio, seeding days and bandwidth of that torrent: **-1** uses the global value, **0** removes the limit. With gx-torrent there is also **Peers and bandwidth share**: the **bandwidth share** (100 = normal, 200 = twice a normal torrent, 50 = half) sets how much that torrent takes when the line is limited, and **DHT**, **PEX** and **Local discovery** are turned on or off for it alone. A private torrent always keeps DHT, PEX and local discovery off |
@@ -1250,17 +1250,18 @@ process; there is nothing to install.
   a tier** (ask every tracker of a tier together). The first two are off by
   default, the third is on. After changing them, restart Gextto to apply them
   to the managed daemon.
-- The same network section holds the peer rules, all off by default: the
-  **upload share for peers that give back** (when the upload is limited, by
-  Auto too, that share goes first to the peers that send you data for a torrent
-  you are still downloading, the rest to seeding), the **client filter**
-  (refuses the clients known to download without giving anything back,
-  recognised by peer ID or name; the list can be edited), the **tracker list**
-  from an address (downloaded every day and added to new public torrents,
-  never to private ones: for a magnet it waits until it knows whether it is
-  private) and the **country database** (a DB-IP lite or IP2Location LITE CSV
-  file you download yourself: it shows the country of each peer, without any
-  network call).
+- The same network section holds the peer rules. Three work by themselves from
+  installation, with values Gextto sets and you can change: the **client
+  filter** (refuses the clients known to download without giving anything
+  back; the list is already filled), the **tracker list** (the "best" one of
+  the *trackerslist* project, downloaded every day and added to new public
+  torrents, never to private ones: for a magnet it waits until it knows whether
+  it is private) and the **peer country** (the free DB-IP database, downloaded
+  every month, without sending the peers' addresses anywhere). The **upload
+  share for peers that give back** stays off until you choose a percentage:
+  when the upload is limited, by Auto too, that share goes first to the peers
+  that send you data for a torrent you are still downloading, the rest to
+  seeding.
 - In *Health → Torrent engine*, the **DHT** row says how many nodes gx-torrent knows, how
   many answer and how many lookups are running; **Incoming DHT queries** says
   whether any node reached it from outside in the last hour (if not, the UDP
@@ -2239,10 +2240,12 @@ the download stands. Season packs do not go through this check.
 | uTP | Enable the uTP (UDP) protocol in addition to TCP. |
 | Holepunching (BEP 55) | Opens a direct connection to peers behind NAT through a relaying peer (BEP 55). Requires uTP. |
 | DHT bootstrap nodes | Initial DHT nodes (host:port separated by comma). |
-| Tracker list to add (URL) | Address of a public list of trackers, one per line (`http`, `https`, `udp`, `ws`). gx-torrent downloads it every day (through the proxy or the VPN interface when configured), keeps it across restarts and adds its trackers, at most 200, to **new public** torrents: a magnet gets them only once its metadata confirms it is not private. Empty (default) = off. gx-torrent only. Changing it restarts gx-torrent. |
-| Refuse the clients on the list | On: gx-torrent refuses the peers whose client is on the list below and does not dial them again for that torrent. Meant for clients that download without ever giving anything back (offline-download services and the like). Off by default. gx-torrent only. Changing it restarts gx-torrent. |
-| Clients to refuse | One client per line or comma-separated. An entry starting with `-` is a peer ID prefix (for example `-XL`); the others are looked for in the name the client announces (case-insensitive). Empty = the suggested list: `-XL`, `-SD`, `-XF`, `-QD`, `-BN`, Xunlei, Thunder, QQDownload, Xfplay. Shown only with the filter on. |
-| Country database (CSV file) | Path of an offline address → country CSV file, in the DB-IP "lite" form (`first,last,COUNTRY` with addresses) or IP2Location LITE (with numbers), IPv4 and IPv6. It shows the country of each peer in the *Peers* tab. You download the file from the provider's site and update it when you like: gx-torrent makes no network call. Empty (default) = off. gx-torrent only. |
+| Add the trackers of a public list | On by default: gx-torrent adds the trackers of the list below, at most 200, to **new public** torrents. The list is downloaded at start and then every day (through the proxy or the VPN interface when configured) and kept across restarts. A private torrent never gets it: for a magnet it waits until the metadata confirms it is not private. Torrents that were already there stay as they are. gx-torrent only. Changing it restarts gx-torrent. |
+| Tracker list to add (URL) | Address of the list, one tracker per line (`http`, `https`, `udp`, `ws`). By default it is the "best" list of the *trackerslist* project (`https://raw.githubusercontent.com/ngosang/trackerslist/master/trackers_best.txt`), kept current by its authors; you can name another one. Empty = the default list. Shown only with the option above on. |
+| Refuse the clients on the list | On by default: gx-torrent refuses the peers whose client is on the list below and does not dial them again for that torrent. Meant for clients that download without ever giving anything back (offline-download services and the like); a normal client that shares little is not touched. gx-torrent only. Changing it restarts gx-torrent. |
+| Clients to refuse | Already filled with the suggested list: `-XL, -SD, -XF, -QD, -BN, Xunlei, Thunder, QQDownload, Xfplay`. Comma-separated or one per line. An entry starting with `-` is a peer ID prefix (for example `-XL`); the others are looked for in the name the client announces (case-insensitive). Empty = the suggested list. Shown only with the filter on. |
+| Show the country of the peers | On by default: the *Peers* tab shows each address's country. gx-torrent downloads the free **DB-IP "IP to Country Lite"** database (about 5 MB) by itself at start and then once a month, and keeps it in the data folder; every lookup stays on this computer. The database is loaded into memory only when you open the *Peers* tab (about 6 MB) and released after 10 minutes unused. The data is DB-IP's, CC BY 4.0 licence: the tab says so. gx-torrent only. Changing it restarts gx-torrent. |
+| Country database (CSV file) | Optional: your own address → country CSV file instead of the one downloaded automatically, in the DB-IP "lite" form (`first,last,COUNTRY` with addresses) or IP2Location LITE (with numbers), IPv4 and IPv6. Empty (default) = the DB-IP database updated every month. Shown only with the option above on. |
 
 **Encryption and IP filter**
 

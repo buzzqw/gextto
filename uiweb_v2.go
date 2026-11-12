@@ -1846,6 +1846,8 @@ type v2DetailView struct {
 	Trackers []models.TrackerView
 	Files    []models.FileView
 	Peers    []models.PeerView
+	// PeerCountries: some peer carries a country, credited to DB-IP.
+	PeerCountries bool
 	// AcqID is the short acquisition ID printed in the log (`acq: 7f3a2c`).
 	AcqID string
 	// History is the stored story of this download (tab "history").
@@ -2143,6 +2145,12 @@ func v2DetailViewFrom(s *AppState, hash, tab string) v2DetailView {
 		view.Files, _, tabErr = s.activeEngine().Files(hash)
 	case "peers":
 		view.Peers, _, tabErr = s.activeEngine().Peers(hash)
+		for _, peer := range view.Peers {
+			if peer.Country != "" {
+				view.PeerCountries = true
+				break
+			}
+		}
 	case "history":
 		var historyErr error
 		if view.History, historyErr = s.db.AcquisitionEvents(hash); historyErr != nil {

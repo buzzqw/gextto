@@ -90,8 +90,8 @@ grouping by folder, rename and **HTTP streaming**.
 
 ![Files](screenshots/gx-core/en/detail-files.png)
 
-**Peers** shows client, transport, encryption and flags — and the country, when a
-country database is set in *Settings → Network* — ; from here you add peers and
+**Peers** shows client, transport, encryption, flags and the country of each
+peer (from the free DB-IP database, credited under the list); from here you add peers and
 ban an address. **General** also holds **Peers and bandwidth share**: the
 torrent's **bandwidth share** when the line is limited (100 = normal, 200 =
 twice, 50 = half) and **DHT**, **PEX** and **Local discovery** for that torrent
@@ -215,14 +215,15 @@ trackers, without hiding your IP address; **Announce to all trackers in a tier**
 and **Interface → Language** lists any language pack you put in `<data>/lang`
 beside the six built-in languages.
 
-**Network → Peer sources and clients** holds four rules, all off until you set
-them: **Refuse the clients on the list** turns away the clients known to take
-without giving back (peer ID prefixes such as `-XL`, or names, one per line;
-empty restores the suggested list); **Tracker list** is the address of a public
-list of trackers, downloaded every day and added to new public torrents, never
-to private ones; **Country database** is a DB-IP lite or IP2Location LITE CSV
-file you download yourself, to show each peer's country without any network
-call. **Bandwidth → Upload share for trading peers** gives that percentage of a
+**Network → Peer sources and clients** holds three rules that work from the
+first start, each with a switch and a value you can change: **Refuse the
+clients on the list** turns away the clients known to take without giving back
+(the suggested list — peer ID prefixes such as `-XL` and names — is already
+there); **Add trackers from a public list** adds the "best" list of the
+*trackerslist* project, downloaded every day, to new public torrents, never to
+private ones; **Show the country of each peer** downloads the free DB-IP
+database once a month (or reads your own CSV file) and every lookup stays on
+the machine. **Bandwidth → Upload share for trading peers** gives that percentage of a
 limited upload first to the peers sending data back to a torrent you are still
 downloading; the rest goes to seeding, and a share one group does not use goes
 to the other.

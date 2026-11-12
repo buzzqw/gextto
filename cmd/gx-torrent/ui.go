@@ -308,10 +308,12 @@ type uiDetailData struct {
 	// BandwidthWeight is the share of a limited line in percent; DHTOn,
 	// PEXOn and LSDOn are this torrent's peer-source switches.
 	BandwidthWeight int
-	DHTOn, PEXOn    bool
-	LSDOn           bool
-	Pinned          bool
-	Private         bool
+	// GeoAttribution credits DB-IP under a peer list that shows its data.
+	GeoAttribution bool
+	DHTOn, PEXOn   bool
+	LSDOn          bool
+	Pinned         bool
+	Private        bool
 
 	// Category and Tags are the qBittorrent-style labels (standalone).
 	Category   string
@@ -2150,6 +2152,9 @@ func (d *Daemon) uiDetailData(hash, tab, lang string) (uiDetailData, error) {
 				Handshake: peer.EncryptedHandshake,
 				Connected: int64(time.Since(peer.ConnectedAt).Seconds()),
 			})
+			if data.Peers[len(data.Peers)-1].Country != "" && d.geoAutomatic() {
+				data.GeoAttribution = true
+			}
 		}
 	case "trackers":
 		for _, tracker := range trackers {

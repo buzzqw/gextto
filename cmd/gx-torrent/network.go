@@ -70,12 +70,14 @@ type NetworkOptions struct {
 	// starting with "-", or client names); empty list = the suggested one.
 	ClientFilter     bool
 	ClientFilterList string
-	// TrackerListURL is a public list of trackers appended to new public
-	// torrents (empty = off); trackerListURLKey changes it.
+	// TrackerList appends the trackers of TrackerListURL (empty = the
+	// built-in default list) to new public torrents; on by default.
+	TrackerList    bool
 	TrackerListURL string
-	// GeoIPFile is an offline IP-to-country database (CSV ranges) used to
-	// show the country of each peer; empty = no country column.
-	GeoIPFile string
+	// PeerCountry shows the country of each peer, from GeoIPFile or, when
+	// that is empty, from the DB-IP database downloaded every month.
+	PeerCountry bool
+	GeoIPFile   string
 	// MaxRequestsOut/DefaultRequestsOut size the adaptive per-peer request
 	// queue (pipelining): the depth starts at DefaultRequestsOut and grows by
 	// one per delivered block up to MaxRequestsOut (or the peer's reqq). Zero

@@ -446,7 +446,7 @@ func TestGxNetworkArgs(t *testing.T) {
 	cfg.Transfer.Natpmp = true
 	cfg.Transfer.ApplyIpFilter = true
 	got := strings.Join(gxNetworkArgs(cfg), " ")
-	want := "-peer-ports 51413 -listen-interface wg0 -outgoing-interface wg0 -encryption 2 -no-pex -no-lsd -no-upnp -ipfilter-trackers=true"
+	want := "-peer-ports 51413 -listen-interface wg0 -outgoing-interface wg0 -encryption 2 -no-pex -client-filter=false -tracker-list=false -peer-country=false -no-lsd -no-upnp -ipfilter-trackers=true"
 	if got != want {
 		t.Fatalf("got  %q\nwant %q", got, want)
 	}
@@ -464,10 +464,12 @@ func TestGxNetworkArgs(t *testing.T) {
 	cfg.Transfer.UploadTradingShare = 75
 	cfg.Transfer.ClientFilter = true
 	cfg.Transfer.ClientFilterList = "-XL\nThunder"
+	cfg.Transfer.TrackerList = true
 	cfg.Transfer.TrackerListURL = "https://lists.example/trackers.txt"
+	cfg.Transfer.PeerCountry = true
 	cfg.Transfer.GeoIPFile = "/data/geo.csv"
 	got = strings.Join(gxNetworkArgs(cfg), " ")
-	for _, part := range []string{"-upload-trading-share 75", "-client-filter -client-filter-list -XL,Thunder", "-tracker-list-url https://lists.example/trackers.txt", "-geoip-file /data/geo.csv"} {
+	for _, part := range []string{"-upload-trading-share 75", "-client-filter=true -client-filter-list -XL,Thunder", "-tracker-list=true -tracker-list-url https://lists.example/trackers.txt", "-peer-country=true -geoip-file /data/geo.csv"} {
 		if !strings.Contains(got, part) {
 			t.Fatalf("%q not forwarded: %q", part, got)
 		}

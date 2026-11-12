@@ -89,9 +89,11 @@ const (
 	settingTorrentUtp                       = "torrent_utp"
 	settingTorrentHolepunch                 = "torrent_holepunch"
 	settingTorrentDhtBootstrapNodes         = "torrent_dht_bootstrap_nodes"
+	settingTorrentTrackerList               = "torrent_tracker_list"
 	settingTorrentTrackerListUrl            = "torrent_tracker_list_url"
 	settingTorrentClientFilter              = "torrent_client_filter"
 	settingTorrentClientFilterList          = "torrent_client_filter_list"
+	settingTorrentPeerCountry               = "torrent_peer_country"
 	settingTorrentGeoipFile                 = "torrent_geoip_file"
 	settingTorrentEncryption                = "torrent_encryption"
 	settingTorrentApplyIpFilter             = "torrent_apply_ip_filter"
@@ -335,9 +337,11 @@ var settingKeyNames = []string{
 	"torrent_utp",
 	"torrent_holepunch",
 	"torrent_dht_bootstrap_nodes",
+	"torrent_tracker_list",
 	"torrent_tracker_list_url",
 	"torrent_client_filter",
 	"torrent_client_filter_list",
+	"torrent_peer_country",
 	"torrent_geoip_file",
 	"torrent_encryption",
 	"torrent_apply_ip_filter",

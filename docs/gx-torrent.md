@@ -503,8 +503,9 @@ gx-torrent [-listen 0.0.0.0:8890] [-data ~/.local/share/gx-torrent]
            [-encryption 0|1|2] [-no-dht] [-no-pex] [-no-utp] [-no-holepunch]
            [-no-lsd] [-no-upnp] [-no-natpmp] [-dht-bootstrap host:port,...]
            [-dht-read-only] [-web-sources-allow-private] [-limit-lan-peers]
-           [-upload-trading-share 0-99] [-client-filter]
-           [-client-filter-list -XL,Thunder] [-tracker-list-url URL]
+           [-upload-trading-share 0-99] [-client-filter=true|false]
+           [-client-filter-list -XL,Thunder] [-tracker-list=true|false]
+           [-tracker-list-url URL] [-peer-country=true|false]
            [-geoip-file FILE.csv] [-ipfilter FILE] [-ipfilter-trackers] [-lang it]
            [-mode managed|standalone] [-notify-url URL] [-mmap]
            [-log-file FILE] [-insecure] [-debug] [-version]
@@ -1585,8 +1586,8 @@ RPC server is disabled.
 
 ### Peer sources and clients
 
-- **Client filter** (`-client-filter`, settings key `client-filter`, off by
-  default). The daemon refuses the peers whose client is on the list
+- **Client filter** (`-client-filter`, settings key `client-filter`, **on by
+  default**). The daemon refuses the peers whose client is on the list
   (`-client-filter-list`, key `client-filter-list`, one rule per line or
   comma-separated). A rule starting with `-` is an Azureus-style peer ID prefix,
   checked at the handshake before the peer is registered; any other rule is
@@ -1594,24 +1595,34 @@ RPC server is disabled.
   handshake, and the peer is closed when it announces it. A refused address is
   not dialled again for that torrent. An empty list means the suggested one
   (`torrent.DefaultClientFilter`: `-XL`, `-SD`, `-XF`, `-QD`, `-BN`, Xunlei,
-  Thunder, QQDownload, Xfplay). The list is applied live; the refusals are
-  counted (`client_filter_refused` in `GET /api/v1/stats` and in
-  `GET /api/v1/dht`).
-- **Tracker list** (`-tracker-list-url`, key `tracker-list-url`, empty = off). A
-  public list of trackers, one URL per line (`http`, `https`, `udp`, `ws`,
-  `wss`; at most 200), downloaded through the engine transport (proxy and VPN
-  interface included) at start and every 24 hours, an hour after a failure, and
-  kept in `<data>/tracker-list.txt` for the next start. A torrent added while a
-  list is configured is marked pending; the queue tick appends the list once its
-  metadata is known and only when the torrent is **public**, so a private
-  magnet never gets it. Torrents added before the list was set are not touched.
-- **Peer country** (`-geoip-file`, key `geoip-file`, empty = off). An offline
-  CSV of address ranges with a two-letter country code: the DB-IP "lite" form
-  (`first,last,CC` with addresses) or the IP2Location LITE form (decimal
-  integers, separate IPv4 and IPv6 files). It is loaded once per path into
-  sorted ranges and looked up by binary search; peers get a `country` field in
-  `GET /api/v1/torrents/{hash}/peers` and a chip on the daemon page. Nothing is
-  downloaded.
+  Thunder, QQDownload, Xfplay), which Gextto also prefills in its setting. The
+  list is applied live; the refusals are counted (`client_filter_refused` in
+  `GET /api/v1/stats` and in `GET /api/v1/dht`).
+- **Tracker list** (`-tracker-list`, key `tracker-list`, **on by default**;
+  `-tracker-list-url`, key `tracker-list-url`, empty = the built-in default,
+  the "best" list of the trackerslist project). A public list of trackers, one
+  URL per line (`http`, `https`, `udp`, `ws`, `wss`; at most 200), downloaded
+  through the engine transport (proxy and VPN interface included) at start and
+  every 24 hours, an hour after a failure, and kept in
+  `<data>/tracker-list.txt` for the next start. A torrent added while the list
+  is on is marked pending; the queue tick appends the list once its metadata is
+  known and only when the torrent is **public**, so a private magnet never gets
+  it. Torrents added before the list was on are not touched.
+- **Peer country** (`-peer-country`, key `peer-country`, **on by default**;
+  `-geoip-file`, key `geoip-file`, empty = automatic). By default the free
+  DB-IP "IP to Country Lite" CSV (CC BY 4.0, credited under the peer lists) is
+  downloaded through the engine transport into `<data>/dbip-country-lite.csv.gz`
+  at start and when it is older than 32 days (this month's edition, or the
+  previous one while the new is not out; six hours between failed attempts).
+  An operator file can replace it: the DB-IP lite form (`first,last,CC` with
+  addresses) or the IP2Location LITE form (decimal integers), plain or gzip.
+  The table is compacted to the start of each range and its country (a gap is
+  a start with no country; IPv6 keeps the upper 64 bits): about 6 MiB for the
+  ~730,000 DB-IP ranges. It is loaded in the background on the first lookup of
+  a peer list (that list shows no country yet) and dropped after 10 minutes
+  without lookups. Peers get a `country` field in
+  `GET /api/v1/torrents/{hash}/peers` and a chip on the daemon page. No
+  peer address leaves the machine.
 - **Per-torrent peer sources.** `POST /api/v1/torrents/{hash}/peer-options`
   (`dht`, `pex`, `lsd`) turns the DHT announcer, the PEX exchange and LSD on or
   off for one torrent. DHT off closes its announcer at once; PEX off ends the
@@ -1621,9 +1632,10 @@ RPC server is disabled.
   daemon keeps LSD in its state. Private torrents keep all three off (BEP 27)
   whatever is set.
 
-Environment variables: `GX_TORRENT_CLIENT_FILTER=1`,
-`GX_TORRENT_CLIENT_FILTER_LIST`, `GX_TORRENT_TRACKER_LIST_URL`,
-`GX_TORRENT_GEOIP_FILE` and, for the trading split below,
+Environment variables: `GX_TORRENT_CLIENT_FILTER`,
+`GX_TORRENT_CLIENT_FILTER_LIST`, `GX_TORRENT_TRACKER_LIST`,
+`GX_TORRENT_TRACKER_LIST_URL`, `GX_TORRENT_PEER_COUNTRY`,
+`GX_TORRENT_GEOIP_FILE` (`0`/`false` turns a default-on rule off) and, for the trading split below,
 `GX_TORRENT_UPLOAD_TRADING_SHARE`. Gextto passes the flags to the managed
 daemon from its *Torrent engine* settings.
 

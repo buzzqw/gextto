@@ -994,6 +994,8 @@ func (d *Daemon) run(stop <-chan struct{}) {
 	go d.runStopWatch(stop)
 	// The tracker list (when a URL is set) is downloaded and kept current.
 	go d.runTrackerList(stop)
+	// The country database is fetched monthly and dropped from memory when idle.
+	go d.runGeoIP(stop)
 	ticker := time.NewTicker(d.opts.Tick)
 	defer ticker.Stop()
 	for {

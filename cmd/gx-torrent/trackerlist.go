@@ -23,7 +23,14 @@ import (
 // shows it is public.
 
 const (
+	// trackerListKey turns the list on (default on); trackerListURLKey
+	// names it (empty = defaultTrackerListURL).
+	trackerListKey    = "tracker-list"
 	trackerListURLKey = "tracker-list-url"
+	// defaultTrackerListURL is the list used when none is named: the
+	// "best" public trackers of the trackerslist project, kept current
+	// upstream.
+	defaultTrackerListURL = "https://raw.githubusercontent.com/ngosang/trackerslist/master/trackers_best.txt"
 	// trackerListEvery is how often the list is downloaded again.
 	trackerListEvery = 24 * time.Hour
 	// trackerListRetry is the wait after a failed download.
@@ -50,14 +57,30 @@ func (s *trackerListState) snapshot() (string, []string, time.Time, string) {
 	return s.url, append([]string(nil), s.trackers...), s.fetchedAt, s.err
 }
 
-// trackerListURL returns the configured list address (empty = off).
-func (d *Daemon) trackerListURL() string {
+// trackerListEnabled reports whether the list is appended (default on).
+func (d *Daemon) trackerListEnabled() bool {
+	return d.settingBool(trackerListKey, d.opts.Network.TrackerList)
+}
+
+// trackerListAddress returns the named list or the default one.
+func (d *Daemon) trackerListAddress() string {
 	if d.opts.Settings != nil {
 		if v := strings.TrimSpace(d.opts.Settings.Get(trackerListURLKey, "")); v != "" {
 			return v
 		}
 	}
-	return strings.TrimSpace(d.opts.Network.TrackerListURL)
+	if v := strings.TrimSpace(d.opts.Network.TrackerListURL); v != "" {
+		return v
+	}
+	return defaultTrackerListURL
+}
+
+// trackerListURL returns the list in use, or "" when the list is off.
+func (d *Daemon) trackerListURL() string {
+	if !d.trackerListEnabled() {
+		return ""
+	}
+	return d.trackerListAddress()
 }
 
 // parseTrackerList keeps the valid tracker URLs of a list (http, https, udp,

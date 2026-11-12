@@ -412,10 +412,11 @@ coincidono.
   normale, 200 = il doppio) quando la linea è limitata; una **divisione
   scambio/seed** opzionale che serve prima i peer che rimandano dati a un
   torrent ancora in download; DHT, PEX e LSD per singolo torrent; un **filtro
-  dei client** opzionale contro i client che prendono soltanto; una **lista di
-  tracker** pubblica aggiunta ai nuovi torrent pubblici; il **paese** di ogni
-  peer da un database offline; una **vista DHT** con la tabella dei nodi e se la
-  porta riceve dall'esterno.
+  dei client** contro i client che prendono soltanto, una **lista di tracker**
+  pubblica aggiunta ai nuovi torrent pubblici e il **paese** di ogni peer
+  (DB-IP, scaricato ogni mese e consultato in locale) — tutti e tre attivi da
+  subito; una **vista DHT** con la tabella dei nodi e se la porta riceve
+  dall'esterno.
 
 Le statistiche del motore sono in **Salute → Motore torrent** (`/?view=health`),
 in `GET /api/v1/stats` del demone e in `GET /api/torrents/session-stats`.

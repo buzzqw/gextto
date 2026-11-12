@@ -393,10 +393,11 @@ restarts: Gextto re-attaches when binary and options match.
 - **Bandwidth and peers, Tixati-style.** A per-torrent **bandwidth share**
   (100 = normal, 200 = twice) on a limited line; an optional **trading split**
   that serves first the peers sending data back to a torrent still
-  downloading; DHT, PEX and LSD per torrent; an opt-in **client filter**
-  against take-only clients; a public **tracker list** appended to new public
-  torrents; the **country** of each peer from an offline database; a **DHT
-  view** with the node table and whether the port receives from outside.
+  downloading; DHT, PEX and LSD per torrent; a **client filter** against
+  take-only clients, a public **tracker list** appended to new public torrents
+  and the **country** of each peer (DB-IP, downloaded monthly, looked up
+  locally) — all three on out of the box; a **DHT view** with the node table
+  and whether the port receives from outside.
 
 Engine statistics are in **Health → Torrent engine** (`/?view=health`), in the
 daemon's `GET /api/v1/stats` and in `GET /api/torrents/session-stats`.

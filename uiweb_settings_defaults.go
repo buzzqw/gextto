@@ -124,9 +124,11 @@ var uiSettingDefaults = map[string]string{
 	"torrent_ul_limit":                    "0",
 	"torrent_limit_lan_peers":             "false",
 	"torrent_upload_trading_share":        "0",
-	"torrent_client_filter":               "false",
-	"torrent_client_filter_list":          "",
-	"torrent_tracker_list_url":            "",
+	"torrent_client_filter":               "true",
+	"torrent_client_filter_list":          defaultClientFilterList,
+	"torrent_tracker_list":                "true",
+	"torrent_tracker_list_url":            defaultTrackerListURL,
+	"torrent_peer_country":                "true",
 	"torrent_geoip_file":                  "",
 	"torrent_speed_auto":                  "false",
 	"torrent_speed_mode":                  "fixed",
@@ -271,3 +273,12 @@ var uiSettingNoPrefill = map[string]bool{
 func uiSettingDefault(key string) string {
 	return uiSettingDefaults[key]
 }
+
+// defaultClientFilterList is the suggested client filter of gx-torrent
+// (torrent.DefaultClientFilter, pinned by TestDefaultClientFilterMatchesEngine):
+// peer ID prefixes and client names of clients that only take.
+const defaultClientFilterList = "-XL, -SD, -XF, -QD, -BN, Xunlei, Thunder, QQDownload, Xfplay"
+
+// defaultTrackerListURL is the public tracker list gx-torrent appends to new
+// public torrents unless the operator names another one.
+const defaultTrackerListURL = "https://raw.githubusercontent.com/ngosang/trackerslist/master/trackers_best.txt"

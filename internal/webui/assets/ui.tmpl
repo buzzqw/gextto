@@ -2279,6 +2279,7 @@ window.gxClearFilters=function(){state.filter={status:'all',cat:null,tag:null,tr
     {{end}}
     </tbody>
   </table>
+  {{if .GeoAttribution}}<p class="muted small">{{tr "Countries:"}} <a href="https://db-ip.com" target="_blank" rel="noopener noreferrer">{{tr "IP Geolocation by DB-IP"}}</a></p>{{end}}
   {{else}}<p class="muted">{{tr "No peers connected."}}</p>{{end}}
   <form class="form-grid" method="post" action="/ui/peers">
     <input type="hidden" name="hash" value="{{.Hash}}"><input type="hidden" name="tab" value="peers"><input type="hidden" name="op" value="add">

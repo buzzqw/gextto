@@ -239,7 +239,9 @@ type TransferSettings struct {
 	UploadTradingShare int64  `json:"upload_trading_share"`
 	ClientFilter       bool   `json:"client_filter"`
 	ClientFilterList   string `json:"client_filter_list"`
+	TrackerList        bool   `json:"tracker_list"`
 	TrackerListURL     string `json:"tracker_list_url"`
+	PeerCountry        bool   `json:"peer_country"`
 	GeoIPFile          string `json:"geoip_file"`
 	ApplyIpFilter      bool   `json:"apply_ip_filter"`
 	Encryption         int64  `json:"encryption"`
@@ -280,12 +282,18 @@ func DefaultTransferSettings() TransferSettings {
 		CacheExpiry:           300,
 		Utp:                   true,
 		Holepunch:             true,
-		ApplyIpFilter:         false,
-		Encryption:            1,
-		IpFilterPath:          constants.DefaultIPFilterURL,
-		ListenInterfaces:      "",
-		OutgoingInterface:     "",
-		DhtBootstrapNodes:     "",
+		// The peer policies work out of the box (gx-torrent only).
+		ClientFilter:      true,
+		ClientFilterList:  defaultClientFilterList,
+		TrackerList:       true,
+		TrackerListURL:    defaultTrackerListURL,
+		PeerCountry:       true,
+		ApplyIpFilter:     false,
+		Encryption:        1,
+		IpFilterPath:      constants.DefaultIPFilterURL,
+		ListenInterfaces:  "",
+		OutgoingInterface: "",
+		DhtBootstrapNodes: "",
 	}
 }
 
@@ -3400,9 +3408,11 @@ func (c *Config) applyTransferSettings() {
 		Holepunch:             boolSettingOr(c.Settings, "torrent_holepunch", true),
 		LimitLanPeers:         boolSettingOr(c.Settings, "torrent_limit_lan_peers", false),
 		UploadTradingShare:    numberSettingInt(c.Settings, "torrent_upload_trading_share", 0),
-		ClientFilter:          boolSettingOr(c.Settings, "torrent_client_filter", false),
-		ClientFilterList:      settingOrDefault(c.Settings, settingTorrentClientFilterList, ""),
-		TrackerListURL:        settingOrDefault(c.Settings, settingTorrentTrackerListUrl, ""),
+		ClientFilter:          boolSettingOr(c.Settings, settingTorrentClientFilter, true),
+		ClientFilterList:      settingOrDefault(c.Settings, settingTorrentClientFilterList, defaultClientFilterList),
+		TrackerList:           boolSettingOr(c.Settings, settingTorrentTrackerList, true),
+		TrackerListURL:        settingOrDefault(c.Settings, settingTorrentTrackerListUrl, defaultTrackerListURL),
+		PeerCountry:           boolSettingOr(c.Settings, settingTorrentPeerCountry, true),
 		GeoIPFile:             settingOrDefault(c.Settings, settingTorrentGeoipFile, ""),
 		ApplyIpFilter:         boolSettingOr(c.Settings, "torrent_apply_ip_filter", false),
 		Encryption:            numberSettingInt(c.Settings, "torrent_encryption", 1),

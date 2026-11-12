@@ -105,16 +105,14 @@ func (d *Daemon) peerPolicyStatus(lang string) string {
 			parts = append(parts, uiTr(lang, "Tracker list")+": "+uiTr(lang, "waiting for the first download"))
 		}
 	}
-	if path := d.geoIPFile(); path != "" {
-		d.peerCountry("0.0.0.0")
-		d.geo.mu.Lock()
-		loaded, failure := d.geo.db, d.geo.err
-		d.geo.mu.Unlock()
+	if geo := d.geoStatusSnapshot(); geo.Enabled {
 		switch {
-		case failure != "":
-			parts = append(parts, uiTr(lang, "Country database")+": "+html.EscapeString(failure))
-		case loaded != nil:
-			parts = append(parts, uiTr(lang, "Country database")+": "+strconv.Itoa(len(loaded.v4)+len(loaded.v6))+" "+uiTr(lang, "address ranges"))
+		case geo.Error != "":
+			parts = append(parts, uiTr(lang, "Country database")+": "+html.EscapeString(geo.Error))
+		case geo.FetchedAt != nil:
+			parts = append(parts, uiTr(lang, "Country database")+": DB-IP · "+geo.FetchedAt.Format("02/01/2006"))
+		case geo.Automatic:
+			parts = append(parts, uiTr(lang, "Country database")+": "+uiTr(lang, "waiting for the first download"))
 		}
 	}
 	d.mu.Lock()

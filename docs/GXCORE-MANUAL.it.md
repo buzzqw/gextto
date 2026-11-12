@@ -91,8 +91,8 @@ Maximum), il raggruppamento per cartella, la rinomina e lo **streaming HTTP**.
 
 ![File](screenshots/gx-core/it/detail-files.png)
 
-**Peer** mostra client, trasporto, cifratura e flags — e il paese, quando in
-*Impostazioni → Rete* c'è un database dei paesi — ; da qui si aggiungono peer e
+**Peer** mostra client, trasporto, cifratura, flags e il paese di ogni peer
+(dal database gratuito DB-IP, citato sotto l'elenco); da qui si aggiungono peer e
 si banna un indirizzo. In **Generale** c'è anche **Peer e quota di banda**: la
 **quota di banda** del torrent quando la linea è limitata (100 = normale, 200 =
 il doppio, 50 = la metà) e **DHT**, **PEX** e **Scoperta locale** solo per quel
@@ -218,14 +218,15 @@ tracker di un tier** (Rete, attivo di default) interroga insieme tutti i tracker
 di un tier con più tracker; e **Interfaccia → Lingua** elenca ogni language pack
 messo in `<data>/lang` accanto alle sei lingue integrate.
 
-**Rete → Fonti di peer e client** raccoglie quattro regole, tutte spente finché
-non le imposti: **Rifiuta i client della lista** respinge i client noti per
-prendere senza restituire (prefissi del peer ID come `-XL`, o nomi, uno per
-riga; vuoto ripristina la lista suggerita); **Lista di tracker** è l'indirizzo
-di una lista pubblica di tracker, scaricata ogni giorno e aggiunta ai nuovi
-torrent pubblici, mai ai privati; **Database dei paesi** è un file CSV DB-IP
-lite o IP2Location LITE che scarichi tu, per mostrare il paese di ogni peer
-senza chiamate in rete. **Banda → Quota di upload per i peer che restituiscono**
+**Rete → Fonti di peer e client** raccoglie tre regole che funzionano dal primo
+avvio, ognuna con un interruttore e un valore che puoi cambiare: **Rifiuta i
+client della lista** respinge i client noti per prendere senza restituire (la
+lista suggerita — prefissi del peer ID come `-XL` e nomi — è già lì);
+**Aggiungi i tracker di una lista pubblica** aggiunge la lista «best» del
+progetto *trackerslist*, scaricata ogni giorno, ai nuovi torrent pubblici, mai
+ai privati; **Mostra il paese di ogni peer** scarica il database gratuito DB-IP
+una volta al mese (o legge un tuo file CSV) e ogni ricerca resta sulla
+macchina. **Banda → Quota di upload per i peer che restituiscono**
 dà quella percentuale di un upload limitato prima ai peer che rimandano dati a
 un torrent che stai ancora scaricando; il resto va al seed, e la quota che un
 gruppo non usa passa all'altro.

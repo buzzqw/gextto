@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"compress/gzip"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -9,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 // TestDaemonPeerOptionsActionAndPage sets the bandwidth share and the peer
@@ -85,7 +88,8 @@ func TestGeoDBReadsBothFormats(t *testing.T) {
 	}
 }
 
-// TestPeerCountryUsesTheConfiguredFile loads the database from the flag.
+// TestPeerCountryUsesTheConfiguredFile loads the operator's file in the
+// background on the first lookup and answers once it is ready.
 func TestPeerCountryUsesTheConfiguredFile(t *testing.T) {
 	d := newTestDaemon(t)
 	path := filepath.Join(t.TempDir(), "geo.csv")
@@ -93,12 +97,96 @@ func TestPeerCountryUsesTheConfiguredFile(t *testing.T) {
 		t.Fatal(err)
 	}
 	if got := d.peerCountry("1.0.0.9:6881"); got != "" {
-		t.Fatalf("without a file: %q", got)
+		t.Fatalf("with the column off: %q", got)
 	}
+	d.opts.Network.PeerCountry = true
 	d.opts.Network.GeoIPFile = path
-	if got := d.peerCountry("1.0.0.9:6881"); got != "AU" {
-		t.Fatalf("with a file: %q", got)
+	waitFor(t, "country loaded", func() bool { return d.peerCountry("1.0.0.9:6881") == "AU" })
+	if d.geoAutomatic() {
+		t.Fatal("an operator file is not the automatic database")
+	}
+	// Unused for long enough, the database leaves memory.
+	d.geo.mu.Lock()
+	d.geo.lastUsed = time.Now().Add(-2 * geoIdleUnload)
+	d.geo.mu.Unlock()
+	stop := make(chan struct{})
+	go d.runGeoIP(stop)
+	waitFor(t, "database dropped", func() bool {
+		d.geo.mu.Lock()
+		defer d.geo.mu.Unlock()
+		return d.geo.db == nil
+	})
+	close(stop)
+}
+
+// TestGeoAutomaticDownload fetches the monthly DB-IP file (the previous
+// month when this one is not out) into the data folder and reads it.
+func TestGeoAutomaticDownload(t *testing.T) {
+	var asked []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		asked = append(asked, r.URL.Path)
+		if strings.Contains(r.URL.Path, "2026-11") {
+			http.NotFound(w, r)
+			return
+		}
+		var buf bytes.Buffer
+		gz := gzip.NewWriter(&buf)
+		_, _ = gz.Write([]byte("0.0.0.0,0.255.255.255,ZZ\n1.0.0.0,1.0.0.255,AU\n"))
+		_ = gz.Close()
+		_, _ = w.Write(buf.Bytes())
+	}))
+	defer srv.Close()
+	old := geoAutoURL
+	geoAutoURL = func(month time.Time) string { return srv.URL + "/" + month.Format("2006-01") + ".csv.gz" }
+	defer func() { geoAutoURL = old }()
+	// A daemon without a run loop: only this test asks for the file.
+	d := &Daemon{opts: Options{DataDir: t.TempDir(), Network: NetworkOptions{PeerCountry: true}}}
+	path := filepath.Join(d.opts.DataDir, geoAutoFile)
+	d.fetchGeo(path, time.Date(2026, 11, 3, 0, 0, 0, 0, time.UTC))
+	if len(asked) != 2 || asked[0] != "/2026-11.csv.gz" || asked[1] != "/2026-10.csv.gz" {
+		t.Fatalf("asked %v, want this month then the previous one", asked)
+	}
+	if _, err := os.Stat(path); err != nil {
+		t.Fatalf("no database saved: %v", err)
+	}
+	waitFor(t, "automatic country", func() bool { return d.peerCountry("1.0.0.1") == "AU" })
+	if st := d.geoStatusSnapshot(); !st.Automatic || st.FetchedAt == nil {
+		t.Fatalf("status = %+v", st)
+	}
+}
+
+// TestGeoDBCompactsRanges: gaps read as no country, adjacent ranges of one
+// country merge, and IPv6 ranges in the same /64 keep the first country.
+func TestGeoDBCompactsRanges(t *testing.T) {
+	csv := "1.0.0.0,1.0.0.255,AU\n1.0.1.0,1.0.1.255,AU\n1.0.4.0,1.0.4.255,CN\n" +
+		"2001:db8::,2001:db8::ffff,IT\n2001:db8::1:0,2001:db8::ffff:ffff,FR\n2001:db9::,2001:db9:ffff:ffff:ffff:ffff:ffff:ffff,DE\n"
+	db, err := loadGeoDB(strings.NewReader(csv))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for addr, want := range map[string]string{"1.0.1.9": "AU", "1.0.2.1": "", "1.0.4.4": "CN", "1.0.5.0": "", "2001:db8::5": "IT", "2001:db9::1": "DE", "2001:dba::1": ""} {
+		if got := db.country(net.ParseIP(addr)); got != want {
+			t.Errorf("%s = %q, want %q", addr, got, want)
+		}
+	}
+	if len(db.v4Start) != 4 { // AU (merged), gap, CN, gap
+		t.Fatalf("IPv4 table = %v %v", db.v4Start, db.v4CC)
 	}
 }
 
 func parseIP(s string) net.IP { return net.ParseIP(s) }
+
+// TestGeoDBReadsAFileOutOfOrder: a file not in address order (sorted only
+// after part of it was compacted) gives the same answers as a sorted one.
+func TestGeoDBReadsAFileOutOfOrder(t *testing.T) {
+	csv := "1.0.4.0,1.0.4.255,CN\n1.0.0.0,1.0.0.255,AU\n2001:db9::,2001:db9:ffff:ffff:ffff:ffff:ffff:ffff,DE\n2001:db8::,2001:db8::ffff,IT\n5.0.0.0,5.0.0.255,FR\n"
+	db, err := loadGeoDB(strings.NewReader(csv))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for addr, want := range map[string]string{"1.0.0.9": "AU", "1.0.4.4": "CN", "1.0.2.1": "", "5.0.0.1": "FR", "2001:db8::5": "IT", "2001:db9::1": "DE"} {
+		if got := db.country(net.ParseIP(addr)); got != want {
+			t.Errorf("%s = %q, want %q", addr, got, want)
+		}
+	}
+}

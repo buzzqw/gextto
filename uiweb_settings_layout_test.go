@@ -46,8 +46,8 @@ func TestSettingsEveryPreviousOptionIsStillAvailable(t *testing.T) {
 	if got := len(uiSettingsKeysBeforeReorganization); got != 133 {
 		t.Fatalf("frozen list has %d keys, want 133", got)
 	}
-	if got := len(uiSettingsIndex); got != 214 {
-		t.Fatalf("settings index has %d options, want the 149 of before plus the 3 stall-alternative/update options, holepunch, the TVDB PIN, the first/last default, the 4 DLNA media server options, the update check interval, the per-day speed schedule, the adaptive tuning switch, the automatic speed policy and its latency guard (switch, source, target and line maxima), the idle-seed limit, the in-download pack inspection (abort and file priorities), the speed rule choice, the 9 eD2k/Kad (aMule) options, the two gx-torrent client-identity options, the three gx-torrent native options (recheck at completion, anonymous mode, all trackers of a tier), the automatic peer cap and the dead-swarm blocklist expiry, minus cleanup_min_score_diff (folded into upgrade_min_score_diff), plus the four audio-cleanup options, the missing-episode last resort, the speed limits for LAN peers, the six media integrity check options, the feed auto-disable days, the five night maintenance options, the TVmaze series-status check and the five gx-torrent peer policies (trading share, client filter and its list, tracker list, country database)", got)
+	if got := len(uiSettingsIndex); got != 216 {
+		t.Fatalf("settings index has %d options, want the 149 of before plus the 3 stall-alternative/update options, holepunch, the TVDB PIN, the first/last default, the 4 DLNA media server options, the update check interval, the per-day speed schedule, the adaptive tuning switch, the automatic speed policy and its latency guard (switch, source, target and line maxima), the idle-seed limit, the in-download pack inspection (abort and file priorities), the speed rule choice, the 9 eD2k/Kad (aMule) options, the two gx-torrent client-identity options, the three gx-torrent native options (recheck at completion, anonymous mode, all trackers of a tier), the automatic peer cap and the dead-swarm blocklist expiry, minus cleanup_min_score_diff (folded into upgrade_min_score_diff), plus the four audio-cleanup options, the missing-episode last resort, the speed limits for LAN peers, the six media integrity check options, the feed auto-disable days, the five night maintenance options, the TVmaze series-status check and the seven gx-torrent peer policies (trading share, client filter and its list, tracker list and its address, peer country and its file)", got)
 	}
 	if got := len(uiScoreSettingDefs); got != 28 {
 		t.Fatalf("score weights = %d, want 28", got)
@@ -86,8 +86,8 @@ func TestSettingsEveryPreviousOptionIsStillAvailable(t *testing.T) {
 		}
 		found++
 	}
-	if found != 242 {
-		t.Fatalf("rendered %d options, want 242", found)
+	if found != 244 {
+		t.Fatalf("rendered %d options, want 244", found)
 	}
 
 	// Editors, panels and actions without a single key.
