@@ -1657,6 +1657,80 @@ func TestDaemonPerTorrentConnLimits(t *testing.T) {
 	waitFor(t, "caps after reload", func() bool { c, u := connLimits(); return c == 25 && u == 4 })
 }
 
+// TestDaemonPerTorrentConnLimitsBounds: a cap above the accepted bound is
+// refused before it becomes an int, so it cannot truncate into another value;
+// the torrent keeps the caps it had.
+func TestDaemonPerTorrentConnLimitsBounds(t *testing.T) {
+	d := newTestDaemon(t)
+	src := filepath.Join(t.TempDir(), "src")
+	hash, _, err := d.add(addRequest{TorrentData: makeTorrent(t, src, "payload.bin", 100_000), Destination: src, SeedRatio: -1, SeedDays: -1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "seeding", func() bool { return stateOf(d, hash) == "seeding" })
+	srv := httptest.NewServer(d.routes())
+	defer srv.Close()
+	post := func(body string) (int, string) {
+		t.Helper()
+		resp, err := http.Post(srv.URL+"/api/v1/torrents/"+hash+"/conn-limits",
+			"application/x-www-form-urlencoded", strings.NewReader(body))
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		payload, _ := io.ReadAll(resp.Body)
+		return resp.StatusCode, string(payload)
+	}
+	for _, body := range []string{
+		fmt.Sprintf("max_connections=%d", maxPerTorrentPeerCap+1),
+		fmt.Sprintf("max_uploads=%d", maxPerTorrentPeerCap+1),
+		// 2^32+7 truncates into 7 on a 32-bit build.
+		"max_connections=4294967303",
+	} {
+		code, reply := post(body)
+		if code != http.StatusConflict {
+			t.Fatalf("%s -> %d %s, want a refusal", body, code, reply)
+		}
+		if !strings.Contains(reply, "at most") {
+			t.Fatalf("%s -> %s, want the bound in the message", body, reply)
+		}
+	}
+	d.mu.Lock()
+	tt, meta := d.findLocked(hash)
+	d.mu.Unlock()
+	if tt == nil || meta == nil {
+		t.Fatal("torrent disappeared")
+	}
+	if tt.MaxConnections() != 0 || tt.MaxUploads() != 0 || meta.MaxConnections != nil || meta.MaxUploads != nil {
+		t.Fatalf("caps changed by a refused value: %d/%d", tt.MaxConnections(), tt.MaxUploads())
+	}
+}
+
+// TestDaemonExternalMergeRefusesAnOutOfRangeFileIndex: an index that does not
+// fit an int is refused before the conversion instead of truncating into
+// another file of the torrent.
+func TestDaemonExternalMergeRefusesAnOutOfRangeFileIndex(t *testing.T) {
+	d := newTestDaemon(t)
+	src := filepath.Join(t.TempDir(), "src")
+	hash, _, err := d.add(addRequest{TorrentData: makeTorrent(t, src, "payload.bin", 100_000), Destination: src, SeedRatio: -1, SeedDays: -1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "seeding", func() bool { return stateOf(d, hash) == "seeding" })
+	srv := httptest.NewServer(d.routes())
+	defer srv.Close()
+	resp, err := http.Post(srv.URL+"/api/v1/torrents/"+hash+"/external-merge",
+		"application/x-www-form-urlencoded", strings.NewReader("file_index=4294967303&path=/tmp/payload.bin"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	payload, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusConflict || !strings.Contains(string(payload), "out of range") {
+		t.Fatalf("out-of-range index -> %d %s, want a refusal naming the range", resp.StatusCode, payload)
+	}
+}
+
 // TestDaemonSessionDefaultConnLimit checks the session-wide peer cap
 // (max_connections_per_torrent): it reaches the running torrents in place, a
 // torrent's own cap wins over it, clearing the own cap goes back to the

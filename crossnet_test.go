@@ -131,6 +131,28 @@ func TestCrossnetKeyNeedsTheSameEpisode(t *testing.T) {
 	}
 }
 
+// TestEd2kLineShareIsBounded: the stored share is bound to 10..90 before it
+// becomes an int, so a value from the settings cannot truncate into another
+// share on a 32-bit build.
+func TestEd2kLineShareIsBounded(t *testing.T) {
+	cfg := DefaultConfig()
+	for _, c := range []struct {
+		stored string
+		want   int
+	}{
+		{"", defaultEd2kLineShare},
+		{"0", 10},
+		{"5", 10},
+		{"100", 90},
+		{"4294967356", 90}, // 2^32+60 truncates into 60 on a 32-bit build
+	} {
+		cfg.Settings = map[string]string{ed2kLineShareSetting: c.stored}
+		if got := ed2kLineShare(&cfg); got != c.want {
+			t.Errorf("share for %q = %d, want %d", c.stored, got, c.want)
+		}
+	}
+}
+
 // TestSplitLineLendsTheIdleShare: both busy meet at the floors, an idle
 // engine lends its floor, an unlimited line is not split.
 func TestSplitLineLendsTheIdleShare(t *testing.T) {

@@ -2277,6 +2277,11 @@ func (d *Daemon) setLimits(key string, download, upload *int64, ratio *float64, 
 	})
 }
 
+// maxPerTorrentPeerCap bounds the per-torrent connection and upload-slot caps
+// the API and the page accept: above it the value is a typo, and the bound keeps
+// the conversion to int exact on every platform.
+const maxPerTorrentPeerCap = 10000
+
 // setConnLimits stores and applies the per-torrent connection and upload-slot
 // caps. A nil limit is left unchanged; a negative one clears it.
 func (d *Daemon) setConnLimits(key string, maxConnections, maxUploads *int64) error {
@@ -2287,6 +2292,9 @@ func (d *Daemon) setConnLimits(key string, maxConnections, maxUploads *int64) er
 				meta.MaxConnections = nil
 				t.SetMaxConnections(d.state.Config.MaxConnectionsPerTorrent)
 			} else {
+				if *maxConnections > maxPerTorrentPeerCap {
+					return fmt.Errorf("the connection cap must be at most %d", maxPerTorrentPeerCap)
+				}
 				value := *maxConnections
 				meta.MaxConnections = &value
 				t.SetMaxConnections(int(value))
@@ -2297,6 +2305,9 @@ func (d *Daemon) setConnLimits(key string, maxConnections, maxUploads *int64) er
 				meta.MaxUploads = nil
 				t.SetMaxUploads(-1)
 			} else {
+				if *maxUploads > maxPerTorrentPeerCap {
+					return fmt.Errorf("the upload slot cap must be at most %d", maxPerTorrentPeerCap)
+				}
 				value := *maxUploads
 				meta.MaxUploads = &value
 				t.SetMaxUploads(int(value))

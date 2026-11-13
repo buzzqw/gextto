@@ -24,14 +24,16 @@ const (
 
 // ed2kLineShare returns the torrents' floor in percent (10..90).
 func ed2kLineShare(cfg *Config) int {
-	share := int(numberSettingInt(cfg.Settings, ed2kLineShareSetting, defaultEd2kLineShare))
-	if share < 10 {
+	share := numberSettingInt(cfg.Settings, ed2kLineShareSetting, defaultEd2kLineShare)
+	// The range is bound before the conversion, so a stored value can never
+	// truncate into a different share when it becomes an int.
+	switch {
+	case share < 10:
 		return 10
-	}
-	if share > 90 {
+	case share > 90:
 		return 90
 	}
-	return share
+	return int(share)
 }
 
 // lineSplitActive reports whether aMule shares the line with the torrents:

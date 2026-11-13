@@ -2317,8 +2317,16 @@ func V2DownloadsDetailAction(w http.ResponseWriter, r *http.Request, s *AppState
 			"seed_ratio": ratio, "seed_days": days, "max_connections": maxConnections, "max_uploads": maxUploads})
 	case "peer-options":
 		path = "/api/torrents/" + url.PathEscape(hash) + "/peer-options"
+		weight := v2ParseInt(r.FormValue("bandwidth_weight"), 100)
+		// The accepted range, bound before the value becomes an int.
+		if weight < 10 {
+			weight = 10
+		}
+		if weight > 1000 {
+			weight = 1000
+		}
 		body, _ = json.Marshal(PeerOptionsInput{
-			BandwidthWeight: int(v2ParseInt(r.FormValue("bandwidth_weight"), 100)),
+			BandwidthWeight: int(weight),
 			Dht:             r.FormValue("dht") != "",
 			Pex:             r.FormValue("pex") != "",
 			Lsd:             r.FormValue("lsd") != "",

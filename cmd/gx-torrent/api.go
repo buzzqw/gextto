@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"github.com/buzzqw/gextto/internal/webui/assets"
 	"io"
+	"math"
 	"mime"
 	"net/http"
 	"net/url"
@@ -636,8 +637,14 @@ func (d *Daemon) handleAction(w http.ResponseWriter, r *http.Request) {
 		}
 		err = d.setConnLimits(hash, maxConnections, maxUploads)
 	case "external-merge":
-		index := int(formInt(r, "file_index", -1))
-		err = d.mergeExternal(hash, index, strings.TrimSpace(r.FormValue("path")))
+		fileIndex := formInt(r, "file_index", -1)
+		// A value that does not fit an int is refused before the conversion:
+		// on a 32-bit build int(...) would truncate it into another file.
+		if fileIndex < 0 || fileIndex > math.MaxInt32 {
+			err = errors.New("the file index is out of range")
+			break
+		}
+		err = d.mergeExternal(hash, int(fileIndex), strings.TrimSpace(r.FormValue("path")))
 	case "peer-options":
 		var weight *int64
 		if r.FormValue("bandwidth_weight") != "" {

@@ -406,7 +406,9 @@ router; the controller ramps while the ping is good and cuts when it rises.
 `max_connections` and `max_uploads`. A field that is left out keeps its current
 value, so a client that edits one field at a time never resets the others
 (setting the seed days to `0` must not move the ratio to the global value).
-`-1` means «use the global value», `0` «no limit». The historical
+`-1` means «use the global value», `0` «no limit»; `max_connections` and
+`max_uploads` accept at most `10000`, a larger value is refused with an error
+instead of being applied. The historical
 `POST /api/torrents/set_limits` (`dl_kbps`, `ul_kbps`, `seed_ratio`,
 `seed_days`) always carries the two rates and only the seed limits it names.
 
@@ -583,7 +585,9 @@ the fewest connected peers holding a needed piece, `-1` when nothing is needed),
 `file_index` and an absolute `path`: a downloading torrent adopts from that file
 (another program's copy of the same file, such as aMule's `.part`) the pieces of
 that torrent file that pass its own hash check; the file must have the torrent
-file's exact size, and the answer comes at once while the merge runs. `peer-options` takes `bandwidth_weight` (10–1000, the
+file's exact size, and the answer comes at once while the merge runs. A
+`file_index` that does not fit an int is refused instead of being truncated into
+another file. `peer-options` takes `bandwidth_weight` (10–1000, the
 torrent's share of a limited line in percent, 100 = normal) and `dht`, `pex`,
 `lsd` (`1`/`0`); a field left out keeps its value, and a private torrent keeps
 DHT, PEX and LSD off whatever is sent. The list (`GET /api/v1/torrents`) reports
