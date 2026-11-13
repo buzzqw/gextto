@@ -896,14 +896,17 @@ func firstMagnet(body string) string {
 	return sanitized
 }
 
+// buildMagnet builds the magnet of a release known only by its hash. It
+// carries no public tracker: a magnet's trackers are announced from the start,
+// while only the metadata can say whether the torrent is private (BEP 27) and
+// must keep to its own trackers alone. The daemon appends its public tracker
+// list by itself, once the metadata says the torrent is public (see
+// docs/gx-torrent.md, "Tracker list"); a torrent that is private never gets it.
 func buildMagnet(hash, title string) string {
 	magnet := "magnet:?xt=urn:btih:" + strings.ToLower(hash) + "&dn=" + url.QueryEscape(title)
 	sanitized, ok := utils.SanitizeMagnet(magnet, &title)
 	if !ok {
 		return ""
-	}
-	for _, tracker := range currentWebsearchTrackers() {
-		sanitized += "&tr=" + url.QueryEscape(tracker)
 	}
 	return sanitized
 }

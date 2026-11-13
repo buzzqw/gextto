@@ -2078,7 +2078,7 @@ them.
 | Setting | What it does |
 |---|---|
 | RSS feeds | List of RSS feeds read on every cycle (one URL per line). Put `#` at the start of a line to exclude it without deleting it: `# https://…` or `#https://…`. |
-| Web engines | Web search engines used by gap-filling when feeds and indexers find nothing. When an engine gives only the infohash of a release, Gextto builds the magnet with the trackers of the «best» public list of the *trackerslist* project, downloaded once a day and kept on disk between restarts, so the torrent finds peers before its metadata arrives. |
+| Web engines | Web search engines used by gap-filling when feeds and indexers find nothing. When an engine gives only the infohash of a release, the magnet Gextto builds carries the hash and the name, with no public tracker: a tracker written in a magnet is contacted at once, while only the metadata says whether the torrent is private (the `private` flag, BEP 27), and a private one must stay on its own trackers. The «best» public list of the *trackerslist* project is added by gx-torrent itself, downloaded once a day, to public torrents only, when their metadata arrives. |
 | Excluded content filters | Releases containing these words or scripts (e.g. [porno]) are excluded. |
 | Source filters | Keywords to accept or reject for a single source, enabled per row. |
 | Watched folders | The .torrent and .magnet files found in the given folders are **downloaded** and added to the session automatically (recursive, delete after). |

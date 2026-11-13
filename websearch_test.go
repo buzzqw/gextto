@@ -38,7 +38,10 @@ func TestEngineCooldownBlocksAfterAFailure(t *testing.T) {
 	}
 }
 
-func TestBuildsSanitizedMagnetWithTrackers(t *testing.T) {
+// TestBuildsSanitizedMagnetWithoutPublicTrackers: the magnet carries the hash
+// and the name, never a public tracker: a magnet's trackers are announced
+// before its metadata, when nobody can yet know whether the torrent is private.
+func TestBuildsSanitizedMagnetWithoutPublicTrackers(t *testing.T) {
 	magnet := buildMagnet("0123456789012345678901234567890123456789", "Example Show")
 	if magnet == "" {
 		t.Fatal("build_magnet returned no magnet")
@@ -49,8 +52,8 @@ func TestBuildsSanitizedMagnetWithTrackers(t *testing.T) {
 	if !strings.Contains(magnet, "&dn=Example%20Show") && !strings.Contains(magnet, "&dn=Example+Show") {
 		t.Fatalf("magnet missing display name: %q", magnet)
 	}
-	if !strings.Contains(magnet, "&tr=") {
-		t.Fatalf("magnet missing trackers: %q", magnet)
+	if strings.Contains(magnet, "&tr=") {
+		t.Fatalf("magnet carries a tracker: %q", magnet)
 	}
 }
 

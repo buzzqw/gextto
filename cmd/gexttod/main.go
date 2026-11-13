@@ -135,10 +135,6 @@ func runDaemon(dryRun bool, configOption *string) error {
 	// before the database closes, after flushing the pending events.
 	stopAcquisitions := gextto.StartAcquisitionRecorder(db)
 	defer stopAcquisitions()
-	// The public tracker list of the magnets built from an infohash: the copy
-	// kept on disk is used at once, then refreshed once a day.
-	stopTrackerList := gextto.StartWebsearchTrackerRefresh(cfg.DataDir)
-	defer stopTrackerList()
 	archive, err := gextto.OpenArchive(filepath.Join(cfg.DataDir, constants.DefaultArchiveFile))
 	if err != nil {
 		return err

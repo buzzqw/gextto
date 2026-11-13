@@ -1608,7 +1608,10 @@ RPC server is disabled.
   `<data>/tracker-list.txt` for the next start. A torrent added while the list
   is on is marked pending; the queue tick appends the list once its metadata is
   known and only when the torrent is **public**, so a private magnet never gets
-  it. Torrents added before the list was on are not touched.
+  it. Torrents added before the list was on are not touched. A magnet that
+  comes without trackers (for example the ones Gextto builds when a search
+  engine gives it only an infohash) is no exception: it reaches the list the
+  same way, and the DHT finds its peers until the metadata arrives.
 - **Peer country** (`-peer-country`, key `peer-country`, **on by default**;
   `-geoip-file`, key `geoip-file`, empty = automatic). By default the free
   DB-IP "IP to Country Lite" CSV (CC BY 4.0, credited under the peer lists) is
