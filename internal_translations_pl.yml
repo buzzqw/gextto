@@ -109,7 +109,7 @@ pol:
   Accettata: Zaakceptowano
   Accoda: Dołącz
   Accoda selezionate: Dołącz wybierz
-  Accoda un magnet o un URL .torrent senza uscire dall'archivio: Dołącz magnes lub adres URL .torrent bez opuszczania
+  Accoda un magnet o un URL .torrent senza uscire dall'archivio: Dodaj do kolejki link magnet lub adres URL .torrent bez opuszczania
   Acquisizione: Archiwum Nabycie
   Seed e completamento: Seedowanie i ukończenie
   Acquisizione automatica: Automatyczne pozyskiwanie
@@ -155,22 +155,22 @@ pol:
   Aggiungi / aggiorna: Dodaj / zaktualizuj
   Aggiungi Cartella: Dodaj folder
   Aggiungi Film: Dodaj film
-  Aggiungi Magnet: Dodaj magnes
+  Aggiungi Magnet: Dodaj link magnet
   Aggiungi Serie: Dodaj serię
   Aggiungi Serie TV: Dodaj serial telewizyjny
   Aggiungi Server: Dodaj serwer
-  Aggiungi Torrent/Magnet: Dodaj torrent/magnes
+  Aggiungi Torrent/Magnet: Dodaj torrent/link magnet
   Aggiungi alla libreria: Dodaj do biblioteki
   Aggiungi cartella: Dodaj folder
   Aggiungi feed: Dodaj kanał
   Aggiungi fumetto: Dodaj dymek
   Aggiungi fumetto selezionato: Dodaj wybrany komiks
   Aggiungi hook: Dodaj hak
-  Aggiungi il magnet o il link .torrent alla sessione: Dodaj magnes lub łącze .torrent do
+  Aggiungi il magnet o il link .torrent alla sessione: Dodaj link magnet lub łącze .torrent do
   Aggiungi il segnaposto {token} al template: sesja Dodaj symbol zastępczy {token} do
   Aggiungi in pausa: szablon Dodaj podczas pauzy
-  Aggiungi magnet: Dodaj magnes
-  Aggiungi magnet/torrent manualmente.: Dodaj magnes/torrent ręcznie.
+  Aggiungi magnet: Dodaj link magnet
+  Aggiungi magnet/torrent manualmente.: Dodaj link magnet/torrent ręcznie.
   Aggiungi manualmente: Dodaj
   Aggiungi manualmente senza usare TMDB: ręcznie Dodaj ręcznie bez użycia TMDB
   Aggiungi rapidamente un Magnet Link o un file .torrent da qualsiasi pagina ti trovi.: Szybko dodaj łącze Magnet Link lub plik .torrent z dowolnej
@@ -422,7 +422,7 @@ pol:
   Bonus per le release REPACK (ri-pacchettizzate dallo stesso gruppo).: Bonus za wydania REPACK (przepakowane przez tę samą grupę).
   Bonus per le release con Dolby Vision.: Bonus za wydania z Dolby Vision.
   Bonus per le release con HDR (HDR10/HDR10+).: Bonus za wydania z HDR (HDR10/HDR10+).
-  Browser (magnet / .torrent): Przeglądarka (magnes / .torrent)
+  Browser (magnet / .torrent): Przeglądarka (link magnet / .torrent)
   Bypassa il delay sopra questo punteggio (0 = mai): Pomiń opóźnienie powyżej tego wyniku (0 = nigdy)
   Byte: Bajty
   CARTELLE CONDIVISE: FOLDERY UDOSTĘPNIONE
@@ -696,15 +696,15 @@ pol:
   Controllo indexer...: Kontrola indeksatora...
   Controllo servizi...: Służby kontrolne...
   Copia: Kopiuj
-  Copia Magnet: Kopiuj magnes
+  Copia Magnet: Kopiuj link magnet
   Copia Magnet Link: Skopiuj link magnetyczny
-  Copia i magnet link negli appunti: Skopiuj linki magnesu do schowka
-  Copia il link magnet negli appunti: Skopiuj link magnesu do schowka
-  Copia il magnet associato all'episodio: Skopiuj magnes powiązany z odcinkiem
+  Copia i magnet link negli appunti: Skopiuj linki magnet do schowka
+  Copia il link magnet negli appunti: Skopiuj link magnet do schowka
+  Copia il magnet associato all'episodio: Skopiuj link magnet powiązany z odcinkiem
   'Copia lo snapshot anche in questa cartella: una directory cloud sincronizzata (OneDrive/Drive/Dropbox) o un mount remoto': 'Skopiuj migawkę
     także do tego folderu: zsynchronizowanego katalogu w chmurze (OneDrive/Drive/Dropbox) lub zdalnego podłączenia'
   Copia magnet: Kopiuj magnet
-  Copia negli appunti i magnet delle release selezionate: Skopiuj magnesy wybranych wydań
+  Copia negli appunti i magnet delle release selezionate: Skopiuj linki magnet wybranych wydań
   Copia non riuscita: do schowka Kopiowanie nie powiodło się
   'Copia/incolla un link: Gextto lo aggiunge alla sessione e inizia a scaricare.': 'Skopiuj/wklej link: Gextto dodaje go do sesji i rozpoczyna
     pobieranie.'
@@ -1328,8 +1328,8 @@ pol:
   Handler Magnet & Torrent per Browser: Magnet i moduł obsługi torrentów dla przeglądarki
   ? 'Handler magnet/.torrent: scarica i file nella stessa cartella ed esegui install.sh (Linux, xdg-utils). Da quel momento ogni click su un link
     magnet: o file .torrent nel browser invia il download a Gextto.'
-  : 'Obsługa Magnet/.torrent: Pobierz pliki do tego samego folderu i uruchom install.sh (Linux, xdg-utils). Od tego momentu każde kliknięcie magnesu:
-    linku lub pliku .torrent w przeglądarce powoduje przesłanie pliku do pobrania do Gextto.'
+  : 'Obsługa Magnet/.torrent: Pobierz pliki do tego samego folderu i uruchom install.sh (Linux, xdg-utils). Od tego momentu każde kliknięcie linku magnet
+    lub pliku .torrent w przeglądarce powoduje przesłanie pliku do pobrania do Gextto.'
   Hook eventi: Haki eventowe
   Hook salvati: Zapisane haki
   Host: Gospodarz
@@ -1426,12 +1426,12 @@ pol:
   Ignorato: Ignorowano
   ? 'Il browser chiama extto-magnet / extto-torrent via xdg-open, che manda una POST a EXTTO. L''URL del server è già scritto negli script scaricati.
     Per cambiarlo dopo l''installazione:'
-  : 'Przeglądarka wywołuje extto-magnes / extto-torrent poprzez xdg-open, który wysyła POST do EXTTO. Adres URL serwera jest już zapisany w pobranych
+  : 'Przeglądarka wywołuje extto-magnet / extto-torrent poprzez xdg-open, który wysyła POST do EXTTO. Adres URL serwera jest już zapisany w pobranych
     skryptach. Aby to zmienić po instalacji:'
   'Il browser non ha accettato la registrazione (serve HTTPS o localhost): usa gli handler xdg qui sopra': 'Przeglądarka nie zaakceptowała rejestracji
     (potrzebujesz HTTPS lub localhost): użyj powyższych procedur obsługi xdg'
   Il browser non ha accettato la registrazione del gestore magnet: Przeglądarka nie zaakceptowała rejestracji
-  Il download automatico avviene durante il ciclo programmato.: uchwyt magnesu Automatyczne pobieranie następuje podczas zaplanowanego cyklu.
+  Il download automatico avviene durante il ciclo programmato.: Automatyczne pobieranie następuje podczas zaplanowanego cyklu.
   Il download automatico avviene durante il ciclo programmato. La data minima filtra i pack più vecchi di quella data.: Pobieranie automatyczne
     następuje w trakcie zaplanowanego cyklu. Minimalna data filtruje pakiety starsze niż ta data.
   ? 'Il monitoraggio è globale: quando attivo, il weekly pack viene cercato e scaricato automaticamente. Per scaricare un solo pack specifico
@@ -1557,7 +1557,7 @@ pol:
   Inserisci prima il percorso del RAM disk.: Najpierw wprowadź ścieżkę do dysku RAM.
   Inserisci prima un pezzo di titolo da cercare!: Wpisz fragment tytułu, który chcesz najpierw wyszukać!
   Inserisci qui un link fisico al file o la URI magnet. Verrà convertito e inviato al motore principale.: Wprowadź tutaj fizyczny link do pliku
-    lub identyfikatora URI magnesu. Zostanie on przekonwertowany i przesłany do głównego silnika.
+    lub identyfikatora URI magnet. Zostanie on przekonwertowany i przesłany do głównego silnika.
   Inserisci un URL .met: Wprowadź adres URL .met
   Inserisci un URL per la blocklist: Wprowadź adres URL listy zablokowanych
   Inserisci un link o URL: Wprowadź link lub adres URL
@@ -1775,16 +1775,16 @@ pol:
     QxR:400
 
     YIFY:-200'
-  Magnet: Magnes
+  Magnet: Link magnet
   Magnet Link o URL (.torrent): Magnet Link lub URL (.torrent)
-  Magnet accodato: Magnes w kolejce
-  Magnet copiato negli appunti: Magnes skopiowany do schowka
-  Magnet in Archivio: Magnes w Archiwum
-  Magnet in archivio: Magnes w archiwum
-  Magnet non disponibile: Magnes niedostępny
-  Magnet non raggiungibile: Magnes nieosiągalny
-  Magnet o URL .torrent da aggiungere alla sessione: Adres URL magnesu lub .torrent do dodania do sesji
-  Magnet, torrent, limiti, peer e pulizia.: Magnes, torrenty, limity, peery i czystość.
+  Magnet accodato: Link magnet w kolejce
+  Magnet copiato negli appunti: Link magnet skopiowany do schowka
+  Magnet in Archivio: Link magnet w Archiwum
+  Magnet in archivio: Link magnet w archiwum
+  Magnet non disponibile: Link magnet niedostępny
+  Magnet non raggiungibile: Link magnet nieosiągalny
+  Magnet o URL .torrent da aggiungere alla sessione: Link magnet lub adres URL .torrent do dodania do sesji
+  Magnet, torrent, limiti, peer e pulizia.: Magnet, torrenty, limity, peery i czyszczenie.
   Mancante: Brakuje
   Mancanti: Brakuje
   Mantieni i file sul disco: Zachowaj pliki na dysku
@@ -1913,8 +1913,8 @@ pol:
   Nessun fumetto monitorato.: Nie monitorowano żadnych komiksów.
   Nessun indexer configurato o attivo da verificare: Brak skonfigurowanych lub aktywnych indeksatorów do sprawdzenia
   Nessun indexer o FlareSolverr configurato.: Nie skonfigurowano indeksatora ani FlareSolverr.
-  Nessun magnet bloccato.: Nie przykleiły się żadne magnesy.
-  Nessun magnet disponibile: Brak magnesu
+  Nessun magnet bloccato.: Brak zablokowanych linków magnet.
+  Nessun magnet disponibile: Brak linku magnet
   Nessun peer connesso.: Brak podłączonych urządzeń równorzędnych.
   Nessun percorso archivio impostato: Nie ustawiono ścieżki archiwum
   Nessun prossimo episodio disponibile.: Brak kolejnych odcinków.
@@ -1933,7 +1933,7 @@ pol:
   'Nessun torrent rimosso: {skipped} non hanno ancora raggiunto i limiti di seed (ratio/tempo) o sono in seed infinito.': 'Nie usunięto żadnych
     torrentów: {skipped} nie osiągnęły jeszcze limitów nasion (stosunek/czas) lub znajdują się w nieskończonej liczbie nasion.'
   Nessun torrent selezionato: Nie wybrano torrentów
-  Nessun torrent/magnet disponibile: Brak dostępnych torrentów/magnesów
+  Nessun torrent/magnet disponibile: Brak dostępnych torrentów/linków magnet
   Nessun tracker disponibile (metadata non ancora risolti).: Brak dostępnego modułu śledzącego (metadane nie zostały jeszcze rozwiązane).
   Nessun tracker inserito.: Nie włożono modułu śledzącego.
   Nessun weekly pack nello storico.: Brak tygodniowego pakietu w historii.
@@ -2086,8 +2086,8 @@ pol:
     ignorare l'anno di uscita.
   : Fakultatywny. Jeśli określono, filtruj torrenty według roku (tolerancja ± 1 rok w przypadku akceptowania opóźnionych wydań wideo w domu).
     Pozostaw puste, aby zignorować rok wydania.
-  Opzione 1 — Magnet o URL: Opcja 1 — Magnes lub adres URL
-  Opzione 1 — Magnet o URL .torrent: Opcja 1 — Adres URL magnesu lub .torrent
+  Opzione 1 — Magnet o URL: Opcja 1 — Link magnet lub adres URL
+  Opzione 1 — Magnet o URL .torrent: Opcja 1 — Link magnet lub adres URL .torrent
   Opzione 2 — Carica un file .torrent dal computer: Opcja 2 — Prześlij plik .torrent ze swojego komputera
   Opzione 2 — File .torrent: Opcja 2 — pliki .torrent
   Opzioni Import Trakt: Importuj opcje Traktu
@@ -2444,8 +2444,8 @@ pol:
     w swojej przeglądarce (działa tylko na HTTPS lub localhost)
   Registra Gextto come gestore dei link magnet nel browser (richiede HTTPS o localhost): Zarejestruj Gextto jako menedżera linków magnetycznych
     w swojej przeglądarce (wymaga HTTPS lub localhost)
-  Registra gestore magnet nel browser: Zarejestruj moduł obsługi magnesów w przeglądarce
-  Registrazione gestore magnet inviata al browser: Rejestracja obsługi magnesów wysłana do przeglądarki
+  Registra gestore magnet nel browser: Zarejestruj moduł obsługi linków magnet w przeglądarce
+  Registrazione gestore magnet inviata al browser: Rejestracja obsługi linków magnet wysłana do przeglądarki
   Regola automaticamente quanti torrent sono attivi in base al carico.: Automatycznie dostosowuje liczbę aktywnych torrentów w zależności od obciążenia.
   Regola di cartella applicata: Zastosowano regułę folderu
   Regole per questo Torrent: Zasady tego torrenta
@@ -2461,7 +2461,7 @@ pol:
     i silników internetowych, połączone z monitorowanymi elementami.
   ? 'Release scartate automaticamente dopo un fallimento (magnet non raggiungibile, download bloccato, errore irreversibile) o segnalate manualmente.
     Non verranno mai più riproposte: rimuovile da qui se vuoi ridarle una possibilità.'
-  : 'Wersje automatycznie odrzucane po awarii (nieosiągalny magnes, zablokowane pobieranie, błąd krytyczny) lub zgłaszane ręcznie. Nigdy więcej
+  : 'Wersje automatycznie odrzucane po awarii (nieosiągalny link magnet, zablokowane pobieranie, błąd krytyczny) lub zgłaszane ręcznie. Nigdy więcej
     nie będą one prezentowane: usuń je stąd, jeśli chcesz ponownie dać im szansę.'
   Release trovate: Znaleziono wydania
   Repack (Rifatto): Przepakuj
@@ -2760,7 +2760,7 @@ pol:
   Scarica di nuovo questo weekly pack: Pobierz ponownie ten cotygodniowy pakiet
   ? 'Scarica i 5 file qui sotto, mettili nella stessa cartella e lancia install.sh dal terminale. Da quel momento ogni click su un link magnet:
     o su un file .torrent nel browser invierà automaticamente il download a EXTTO.'
-  : 'Pobierz 5 plików poniżej, umieść je w tym samym folderze i uruchom install.sh z terminala. Od tego momentu każde kliknięcie w magnes: link
+  : 'Pobierz 5 plików poniżej, umieść je w tym samym folderze i uruchom install.sh z terminala. Od tego momentu każde kliknięcie w link magnet
     lub plik .torrent w przeglądarce spowoduje automatyczne przesłanie pliku do pobrania do EXTTO.'
   Scarica i file in ordine sequenziale (utile per la visione immediata): Pobierz pliki w kolejności (przydatne do natychmiastowego przeglądania)
   Scarica i file in ordine sequenziale invece che a pezzi sparsi.: Pobieraj pliki w kolejności, a nie w rozproszonych fragmentach.
@@ -2775,7 +2775,7 @@ pol:
   'Scarica solo i metadati e metti in pausa: utile per valutare la release prima di partire': 'Pobierz tylko metadane i pauzę: przydatne do oceny
     wydania przed rozpoczęciem'
   Scarica subito: Pobierz teraz
-  Scarica via torrent/magnet: Pobierz przez torrent/magnes
+  Scarica via torrent/magnet: Pobierz przez torrent/link magnet
   Scarica weekly pack a partire dal: Pobierz cotygodniowy pakiet zaczynający się od
   Scaricamento del file .torrent in corso...: Pobieram plik .torrent...
   Scaricamento file .torrent in corso...: Trwa pobieranie pliku .torrent...
@@ -2859,7 +2859,7 @@ pol:
     nigdy nie zastąpi pliku już zarchiwizowanego dla tej serii
   Se disattivo, una release migliore non sostituirà mai il file già archiviato per questo film: Jeśli wyłączę, lepsza wersja nigdy nie zastąpi
     pliku już zarchiwizowanego dla tego filmu
-  Se impostato su Sì, i nuovi magnet inviati da Extto rimarranno fermi in attesa di un tuo avvio manuale.: Jeśli ustawisz opcję Tak, nowe magnesy
+  Se impostato su Sì, i nuovi magnet inviati da Extto rimarranno fermi in attesa di un tuo avvio manuale.: Jeśli ustawisz opcję Tak, nowe linki magnet
     wysłane przez Extto będą czekać na ręczne uruchomienie.
   ? Se indicata, salva i file parziali su un disco separato (es. NVMe) spostandoli solo a completamento per evitare usura meccanica. Lascia vuoto
     per disabilitare.
@@ -3679,9 +3679,9 @@ pol:
   libera: wolny
   libere localmente: bezpłatnie lokalnie
   liberi: wolny
-  magnet al client: magnes na klienta
-  magnet copiati (uno per riga): skopiowane magnesy (po jednym w wierszu)
-  magnet:?xt=urn:btih:… / urn:btmh:1220… oppure https://…/file.torrent: magnes:?xt=urn:btih:… / urn:btmh:1220… lub https://…/file.torrent
+  magnet al client: linki magnet do klienta
+  magnet copiati (uno per riga): skopiowane linki magnet (po jednym w wierszu)
+  magnet:?xt=urn:btih:… / urn:btmh:1220… oppure https://…/file.torrent: magnet:?xt=urn:btih:… / urn:btmh:1220… lub https://…/file.torrent
   mancante: brak
   margine: margines
   massimo torrent: maksymalny potok
@@ -5677,7 +5677,7 @@ pol:
   "Release per fonte": "Wydania według źródła"
   "Conteggio delle release per fonte, con la più vecchia e la più recente.": "Liczba wydań według źródła, z najstarszym i najnowszym."
   "Stato dell'archivio": "Stan archiwum"
-  "Controlli rapidi su titoli, magnet, hash e indice full-text.": "Szybkie kontrole tytułów, magnesów, skrótów i indeksu pełnotekstowego."
+  "Controlli rapidi su titoli, magnet, hash e indice full-text.": "Szybkie kontrole tytułów, linków magnet, skrótów i indeksu pełnotekstowego."
   "Titoli duplicati": "Zduplikowane tytuły"
   "Titoli ripetuti con il numero di copie.": "Powtarzające się tytuły z liczbą kopii."
   "Aggiunta il": "Dodano"
@@ -5686,8 +5686,8 @@ pol:
   "Più recente": "Najnowsza"
   "Copie": "Kopie"
   "Release totali": "Wydania ogółem"
-  "Magnet vuoti": "Puste magnesy"
-  "Magnet non validi": "Nieprawidłowe magnesy"
+  "Magnet vuoti": "Puste linki magnet"
+  "Magnet non validi": "Nieprawidłowe linki magnet"
   "Hash mancanti": "Brakujące skróty"
   "Righe FTS": "Wiersze FTS"
   "Differenza FTS": "Różnica FTS"

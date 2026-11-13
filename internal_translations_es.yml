@@ -423,7 +423,7 @@ spa:
   Bonus per le release REPACK (ri-pacchettizzate dallo stesso gruppo).: Bonificación por lanzamientos REPACK (reempaquetados por el mismo grupo).
   Bonus per le release con Dolby Vision.: Bonificación por lanzamientos con Dolby Vision.
   Bonus per le release con HDR (HDR10/HDR10+).: Bonificación por lanzamientos con HDR (HDR10/HDR10+).
-  Browser (magnet / .torrent): Navegador (imán / .torrent)
+  Browser (magnet / .torrent): Navegador (magnet / .torrent)
   Bypassa il delay sopra questo punteggio (0 = mai): Omita el retraso por encima de esta puntuación (0 = nunca)
   Byte: Bytes
   CARTELLE CONDIVISE: CARPETAS COMPARTIDAS
@@ -453,7 +453,7 @@ spa:
   Carica risultati: Cargar resultados
   Carica un file .torrent locale (in alternativa al link a sinistra).: Sube un archivo .torrent local (alternativa al enlace de la izquierda).
   Carica un file .torrent salvato sul tuo computer, utile quando non c'è un link magnet: Sube un archivo .torrent guardado en tu computadora,
-    útil cuando no hay imán
+    útil cuando no hay enlace magnet
   Caricamento dischi...: Cargando discos...
   Caricamento release dai feed…: link Cargando lanzamientos desde feeds…
   Caricamento storico...: Cargando historial...
@@ -697,15 +697,15 @@ spa:
   Controllo indexer...: Comprobando indexador...
   Controllo servizi...: Comprobando servicios...
   Copia: Copiar
-  Copia Magnet: Copiar imán
+  Copia Magnet: Copiar magnet
   Copia Magnet Link: Copiar enlace magnético
   Copia i magnet link negli appunti: Copiar los enlaces magnet al portapapeles
   Copia il link magnet negli appunti: Copie el enlace magnético al portapapeles
-  Copia il magnet associato all'episodio: Copia el imán asociado al episodio
+  Copia il magnet associato all'episodio: Copia el enlace magnet asociado al episodio
   'Copia lo snapshot anche in questa cartella: una directory cloud sincronizzata (OneDrive/Drive/Dropbox) o un mount remoto': 'Copie la instantánea
     también en esta carpeta: un directorio de nube sincronizado (OneDrive/Drive/Dropbox) o un montaje remoto'
   Copia magnet: Copiar magnet
-  Copia negli appunti i magnet delle release selezionate: Copia los imanes de los lanzamientos seleccionados
+  Copia negli appunti i magnet delle release selezionate: Copia los enlaces magnet de las releases seleccionadas
   Copia non riuscita: Error al copiar
   'Copia/incolla un link: Gextto lo aggiunge alla sessione e inizia a scaricare.': 'al portapapeles Copiar/pegar un enlace: Gextto lo agrega a
     la sesión y comienza a descargar.'
@@ -1336,7 +1336,7 @@ spa:
   ? 'Handler magnet/.torrent: scarica i file nella stessa cartella ed esegui install.sh (Linux, xdg-utils). Da quel momento ogni click su un link
     magnet: o file .torrent nel browser invia il download a Gextto.'
   : 'Controlador Magnet/.torrent: descargue los archivos a la misma carpeta y ejecute install.sh (Linux, xdg-utils). A partir de ese momento,
-    cada clic en un imán: enlace o archivo .torrent en el navegador envía la descarga a Gextto.'
+    cada clic en un enlace magnet o en un archivo .torrent en el navegador envía la descarga a Gextto.'
   Hook eventi: Ganchos de eventos
   Hook salvati: Ganchos guardados
   Host: Host
@@ -1782,14 +1782,14 @@ spa:
   MIRCrew:500&#10;QxR:400&#10;YIFY:-200: MIRCrew:500&#10;QxR:400&#10;YIFY:-200
   Magnet: Magnet
   Magnet Link o URL (.torrent): Magnet Link o URL (.torrent)
-  Magnet accodato: Imán en cola
+  Magnet accodato: Magnet en cola
   Magnet copiato negli appunti: Magnet copiado al portapapeles
   Magnet in Archivio: Magnets en Archivo
-  Magnet in archivio: Imán en el archivo
+  Magnet in archivio: Magnet en el archivo
   Magnet non disponibile: Magnet no disponible
-  Magnet non raggiungibile: Imán no accesible
+  Magnet non raggiungibile: Magnet no accesible
   Magnet o URL .torrent da aggiungere alla sessione: URL magnética o .torrent para agregar a la sesión
-  Magnet, torrent, limiti, peer e pulizia.: Imán, torrentes, límites, pares y limpieza.
+  Magnet, torrent, limiti, peer e pulizia.: Magnet, torrents, límites, pares y limpieza.
   Mancante: Faltante
   Mancanti: Desaparecido
   Mantieni i file sul disco: Mantener archivos en el disco
@@ -1919,7 +1919,7 @@ spa:
   Nessun fumetto monitorato.: Ningún cómic monitorizado.
   Nessun indexer configurato o attivo da verificare: No hay indexadores configurados o activos para verificar
   Nessun indexer o FlareSolverr configurato.: No hay ningún indexador ni FlareSolverr configurado.
-  Nessun magnet bloccato.: No hay imanes pegados.
+  Nessun magnet bloccato.: No hay enlaces magnet bloqueados.
   Nessun magnet disponibile: Ningún magnet disponible
   Nessun peer connesso.: Ningún peer conectado.
   Nessun percorso archivio impostato: No se ha establecido ninguna ruta de archivo
@@ -2092,7 +2092,7 @@ spa:
     ignorare l'anno di uscita.
   : Opcional. Si se especifica, filtra los torrents por año (±1 año de tolerancia para aceptar lanzamientos retrasados en video doméstico). Déjalo
     en blanco para ignorar el año de estreno.
-  Opzione 1 — Magnet o URL: 'Opción 1: imán o URL'
+  Opzione 1 — Magnet o URL: 'Opción 1: magnet o URL'
   Opzione 1 — Magnet o URL .torrent: 'Opción 1: URL magnética o .torrent'
   Opzione 2 — Carica un file .torrent dal computer: 'Opción 2: cargue un archivo .torrent desde su computadora'
   Opzione 2 — File .torrent: 'Opción 2: archivos .torrent'
@@ -2463,7 +2463,7 @@ spa:
     y motores web, combinadas con elementos monitoreados.
   ? 'Release scartate automaticamente dopo un fallimento (magnet non raggiungibile, download bloccato, errore irreversibile) o segnalate manualmente.
     Non verranno mai più riproposte: rimuovile da qui se vuoi ridarle una possibilità.'
-  : 'Las versiones se descartan automáticamente después de una falla (imán inaccesible, descarga bloqueada, error fatal) o se informan manualmente.
+  : 'Las versiones se descartan automáticamente después de una falla (magnet inaccesible, descarga bloqueada, error fatal) o se informan manualmente.
     Nunca volverán a aparecer: elimínalos de aquí si quieres darles una oportunidad nuevamente.'
   Release trovate: Lanzamientos encontrados
   Repack (Rifatto): Repack (Rehecho)
@@ -3685,7 +3685,7 @@ spa:
   liberi: libres
   magnet al client: magnets al cliente
   magnet copiati (uno per riga): magnets copiados (uno por línea)
-  magnet:?xt=urn:btih:… / urn:btmh:1220… oppure https://…/file.torrent: imán:?xt=urn:btih:… / urn:btmh:1220… o https://…/file.torrent
+  magnet:?xt=urn:btih:… / urn:btmh:1220… oppure https://…/file.torrent: magnet:?xt=urn:btih:… / urn:btmh:1220… o https://…/file.torrent
   mancante: desaparecido
   margine: margen
   massimo torrent: torrente máximo
@@ -5683,7 +5683,7 @@ spa:
   "Release per fonte": "Versiones por fuente"
   "Conteggio delle release per fonte, con la più vecchia e la più recente.": "Número de versiones por fuente, con la más antigua y la más reciente."
   "Stato dell'archivio": "Estado del archivo"
-  "Controlli rapidi su titoli, magnet, hash e indice full-text.": "Comprobaciones rápidas de títulos, imanes, hashes e índice de texto completo."
+  "Controlli rapidi su titoli, magnet, hash e indice full-text.": "Comprobaciones rápidas de títulos, enlaces magnet, hashes e índice de texto completo."
   "Titoli duplicati": "Títulos duplicados"
   "Titoli ripetuti con il numero di copie.": "Títulos repetidos con el número de copias."
   "Aggiunta il": "Añadida el"
@@ -5692,8 +5692,8 @@ spa:
   "Più recente": "Más reciente"
   "Copie": "Copias"
   "Release totali": "Versiones totales"
-  "Magnet vuoti": "Imanes vacíos"
-  "Magnet non validi": "Imanes no válidos"
+  "Magnet vuoti": "Enlaces magnet vacíos"
+  "Magnet non validi": "Enlaces magnet no válidos"
   "Hash mancanti": "Hashes faltantes"
   "Righe FTS": "Filas FTS"
   "Differenza FTS": "Diferencia FTS"

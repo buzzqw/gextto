@@ -715,11 +715,11 @@ deu:
   Copia Magnet Link: Magnet-Link kopieren
   Copia i magnet link negli appunti: Magnet-Links in die Zwischenablage kopieren
   Copia il link magnet negli appunti: Kopieren Sie den Magnet-Link in die Zwischenablage
-  Copia il magnet associato all'episodio: Kopieren Sie den mit der Episode verknüpften Magneten
+  Copia il magnet associato all'episodio: Kopieren Sie den mit der Episode verknüpften Magnet-Link
   'Copia lo snapshot anche in questa cartella: una directory cloud sincronizzata (OneDrive/Drive/Dropbox) o un mount remoto': 'Kopieren Sie den
     Snapshot auch in diesen Ordner: ein synchronisiertes Cloud-Verzeichnis (OneDrive/Drive/Dropbox) oder einen Remote-Mount'
   Copia magnet: Magnet kopieren
-  Copia negli appunti i magnet delle release selezionate: Kopieren Sie die Magnete der ausgewählten Auslöser in die Zwischenablage
+  Copia negli appunti i magnet delle release selezionate: Kopieren Sie die Magnet-Links der ausgewählten Releases in die Zwischenablage
   Copia non riuscita: Kopieren fehlgeschlagen
   'Copia/incolla un link: Gextto lo aggiunge alla sessione e inizia a scaricare.': 'Einen Link kopieren/einfügen: Gextto fügt ihn der Sitzung
     hinzu und beginnt mit dem Herunterladen.'
@@ -1939,7 +1939,7 @@ deu:
   Nessun fumetto monitorato.: Keine überwachten Comics.
   Nessun indexer configurato o attivo da verificare: Keine konfigurierten oder aktiven Indexer zum Überprüfen
   Nessun indexer o FlareSolverr configurato.: Kein Indexer oder FlareSolverr konfiguriert.
-  Nessun magnet bloccato.: Es haften keine Magnete.
+  Nessun magnet bloccato.: Keine gesperrten Magnet-Links.
   Nessun magnet disponibile: Kein Magnet verfügbar
   Nessun peer connesso.: Keine Peers verbunden.
   Nessun percorso archivio impostato: Kein Archivpfad festgelegt
@@ -3736,8 +3736,8 @@ deu:
   libera: frei
   libere localmente: kostenlos vor Ort
   liberi: frei
-  magnet al client: Magnete an den Client
-  magnet copiati (uno per riga): Magnete kopiert (einer pro Zeile)
+  magnet al client: Magnet-Links an den Client
+  magnet copiati (uno per riga): Magnet-Links kopiert (einer pro Zeile)
   magnet:?xt=urn:btih:… / urn:btmh:1220… oppure https://…/file.torrent: magnet:?xt=urn:btih:… / urn:btmh:1220… oder https://…/file.torrent
   mancante: fehlen
   margine: Marge
@@ -4276,7 +4276,7 @@ deu:
   "Collegamenti": "Links"
   "Prova un'alternativa dopo (stallo)": "Alternative versuchen nach (Stockung)"
   "Punteggio in meno per l'alternativa": "Punkteabzug für die Alternative"
-  "Se un download è fermo da almeno questi minuti — a 0 B/s oppure ancora in attesa del suo elenco di file (metadati, tipico dei magnet morti) — la ricerca può avviare una versione alternativa della stessa puntata o film. Il download fermo resta in sessione e può riprendersi; la deduplica dell'archivio terrà poi la copia migliore. 0 disattiva.": "Wenn ein Download mindestens so viele Minuten hängt — bei 0 B/s oder noch wartend auf seine Dateiliste (Metadaten, typisch für tote Magnete) — kann die Suche eine alternative Version derselben Folge oder desselben Films starten. Der hängende Download bleibt in der Sitzung und kann sich noch erholen; die Archiv-Deduplizierung behält dann die beste Kopie. 0 deaktiviert."
+  "Se un download è fermo da almeno questi minuti — a 0 B/s oppure ancora in attesa del suo elenco di file (metadati, tipico dei magnet morti) — la ricerca può avviare una versione alternativa della stessa puntata o film. Il download fermo resta in sessione e può riprendersi; la deduplica dell'archivio terrà poi la copia migliore. 0 disattiva.": "Wenn ein Download mindestens so viele Minuten hängt — bei 0 B/s oder noch wartend auf seine Dateiliste (Metadaten, typisch für tote Magnet-Links) — kann die Suche eine alternative Version derselben Folge oder desselben Films starten. Der hängende Download bleibt in der Sitzung und kann sich noch erholen; die Archiv-Deduplizierung behält dann die beste Kopie. 0 deaktiviert."
   "Quanti punti di punteggio in meno sono accettati per l'alternativa rispetto alla release bloccata. Il download bloccato non viene rimosso: parte solo un'alternativa adeguata (non una versione scadente). 0 disattiva.": "Um wie viele Punkte die Alternative unter der hängenden Release liegen darf. Der hängende Download wird nicht entfernt: es wird nur eine angemessene Alternative gestartet (keine schlechte Version). 0 deaktiviert."
   "Dona": "Spenden"
   "Sostieni Gextto con una donazione PayPal": "Unterstütze Gextto mit einer PayPal-Spende"
@@ -5736,7 +5736,7 @@ deu:
   "Release per fonte": "Releases pro Quelle"
   "Conteggio delle release per fonte, con la più vecchia e la più recente.": "Anzahl der Releases pro Quelle mit der ältesten und der neuesten."
   "Stato dell'archivio": "Archivstatus"
-  "Controlli rapidi su titoli, magnet, hash e indice full-text.": "Schnelle Prüfungen von Titeln, Magneten, Hashes und Volltextindex."
+  "Controlli rapidi su titoli, magnet, hash e indice full-text.": "Schnelle Prüfungen von Titeln, Magnet-Links, Hashes und Volltextindex."
   "Titoli duplicati": "Doppelte Titel"
   "Titoli ripetuti con il numero di copie.": "Wiederholte Titel mit der Anzahl der Kopien."
   "Aggiunta il": "Hinzugefügt am"
@@ -5745,8 +5745,8 @@ deu:
   "Più recente": "Neueste"
   "Copie": "Kopien"
   "Release totali": "Releases gesamt"
-  "Magnet vuoti": "Leere Magnete"
-  "Magnet non validi": "Ungültige Magnete"
+  "Magnet vuoti": "Leere Magnet-Links"
+  "Magnet non validi": "Ungültige Magnet-Links"
   "Hash mancanti": "Fehlende Hashes"
   "Righe FTS": "FTS-Zeilen"
   "Differenza FTS": "FTS-Differenz"

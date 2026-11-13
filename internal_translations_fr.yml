@@ -110,7 +110,7 @@ fra:
   Accettata: Acceptée
   Accoda: Accoda
   Accoda selezionate: Accéder sélectionnées
-  Accoda un magnet o un URL .torrent senza uscire dall'archivio: Accordez un aimant ou une URL .torrent sans quitter l'archive
+  Accoda un magnet o un URL .torrent senza uscire dall'archivio: Mettez en file un magnet ou une URL .torrent sans quitter l'archive
   Acquisizione: Acquisition
   Seed e completamento: Seed et finalisation
   Acquisizione automatica: Acquisition automatique
@@ -167,7 +167,7 @@ fra:
   Aggiungi fumetto: Ajouter une bande dessinée
   Aggiungi fumetto selezionato: Ajouter une bande dessinée sélectionnée
   Aggiungi hook: Ajouter un crochet
-  Aggiungi il magnet o il link .torrent alla sessione: Ajouter un aimant ou un lien .torrent à la session
+  Aggiungi il magnet o il link .torrent alla sessione: Ajouter un magnet ou un lien .torrent à la session
   Aggiungi il segnaposto {token} al template: Ajouter l'espace réservé __ GEXTTO_TOKEN_0__ au modèle {token}
   Aggiungi in pausa: Ajouter en pause
   Aggiungi magnet: Ajouter un magnet
@@ -431,7 +431,7 @@ fra:
   Bonus per le release REPACK (ri-pacchettizzate dallo stesso gruppo).: Bonus pour les versions REPACK (reconditionnées par le même groupe).
   Bonus per le release con Dolby Vision.: Bonus pour les sorties avec Dolby Vision.
   Bonus per le release con HDR (HDR10/HDR10+).: Bonus pour les sorties avec HDR (HDR10/HDR10+).
-  Browser (magnet / .torrent): Navigateur (aimant / .torrent)
+  Browser (magnet / .torrent): Navigateur (magnet / .torrent)
   Bypassa il delay sopra questo punteggio (0 = mai): Contourner le délai au-dessus de ce score (0 = jamais)
   Byte: Octets
   CARTELLE CONDIVISE: DOSSIERS PARTAGÉS
@@ -711,7 +711,7 @@ fra:
   Controllo indexer...: Vérification de l'indexeur...
   Controllo servizi...: Vérification des services...
   Copia: Copier
-  Copia Magnet: Copier l’aimant
+  Copia Magnet: Copier le magnet
   Copia Magnet Link: Copier le lien magnétique
   Copia i magnet link negli appunti: Copier les liens magnet dans le presse-papiers
   Copia il link magnet negli appunti: Copiez le lien magnétique dans le presse-papiers
@@ -1354,7 +1354,7 @@ fra:
   ? 'Handler magnet/.torrent: scarica i file nella stessa cartella ed esegui install.sh (Linux, xdg-utils). Da quel momento ogni click su un link
     magnet: o file .torrent nel browser invia il download a Gextto.'
   : 'Gestionnaire Magnet/.torrent : téléchargez les fichiers dans le même dossier et exécutez install.sh (Linux, xdg-utils). À partir de ce moment,
-    chaque clic sur un aimant : lien ou fichier .torrent dans le navigateur envoie le téléchargement à Gextto.'
+    chaque clic sur un lien magnet ou un fichier .torrent dans le navigateur envoie le téléchargement à Gextto.'
   Hook eventi: Crochets d'événement
   Hook salvati: Crochets enregistrés
   Host: Hôte
@@ -1803,14 +1803,14 @@ fra:
   MIRCrew:500&#10;QxR:400&#10;YIFY:-200: MIRCrew:500&#10;QxR:400&#10;YIFY:-200
   Magnet: Magnet
   Magnet Link o URL (.torrent): Lien Magnet ou URL (.torrent)
-  Magnet accodato: Aimant en file d'attente
+  Magnet accodato: Magnet en file d'attente
   Magnet copiato negli appunti: Magnet copié dans le presse-papiers
   Magnet in Archivio: Magnets dans l'Archive
-  Magnet in archivio: Aimant dans les archives
+  Magnet in archivio: Magnet dans les archives
   Magnet non disponibile: Magnet non disponible
-  Magnet non raggiungibile: Aimant inaccessible
+  Magnet non raggiungibile: Magnet inaccessible
   Magnet o URL .torrent da aggiungere alla sessione: URL Magnet ou .torrent à ajouter à la session
-  Magnet, torrent, limiti, peer e pulizia.: Aimant, torrents, limites, pairs et propreté.
+  Magnet, torrent, limiti, peer e pulizia.: Magnet, torrents, limites, pairs et nettoyage.
   Mancante: Manquant
   Mancanti: Manquant
   Mantieni i file sul disco: Conserver les fichiers sur le disque
@@ -1941,7 +1941,7 @@ fra:
   Nessun fumetto monitorato.: Aucune BD suivie.
   Nessun indexer configurato o attivo da verificare: Aucun indexeur configuré ou actif à vérifier
   Nessun indexer o FlareSolverr configurato.: Aucun indexeur ou FlareSolverr configuré.
-  Nessun magnet bloccato.: Aucun aimant n'est coincé.
+  Nessun magnet bloccato.: Aucun magnet bloqué.
   Nessun magnet disponibile: Aucun magnet disponible
   Nessun peer connesso.: Aucun pair connecté.
   Nessun percorso archivio impostato: Aucun chemin d'archive défini
@@ -2118,7 +2118,7 @@ fra:
     ignorare l'anno di uscita.
   : Facultatif. Si spécifié, filtre les torrents par année (±1 an de tolérance pour accepter les sorties différées en vidéo domestique). Laissez
     vide pour ignorer l'année de sortie.
-  Opzione 1 — Magnet o URL: Option 1 — Aimant ou URL
+  Opzione 1 — Magnet o URL: Option 1 — Magnet ou URL
   Opzione 1 — Magnet o URL .torrent: Option 1 — URL magnétique ou .torrent
   Opzione 2 — Carica un file .torrent dal computer: Option 2 — Téléchargez un fichier .torrent depuis votre ordinateur
   Opzione 2 — File .torrent: Option 2 — Fichiers .torrent
@@ -2478,8 +2478,8 @@ fra:
     liens magnétiques dans votre navigateur (fonctionne uniquement sur HTTPS ou localhost)
   Registra Gextto come gestore dei link magnet nel browser (richiede HTTPS o localhost): Enregistrez Gextto en tant que gestionnaire de liens
     magnétiques dans votre navigateur (nécessite HTTPS ou localhost)
-  Registra gestore magnet nel browser: Enregistrer le gestionnaire d'aimants dans le navigateur
-  Registrazione gestore magnet inviata al browser: Inscription du gestionnaire d'aimants envoyée au navigateur
+  Registra gestore magnet nel browser: Enregistrer le gestionnaire de magnets dans le navigateur
+  Registrazione gestore magnet inviata al browser: Inscription du gestionnaire de magnets envoyée au navigateur
   Regola automaticamente quanti torrent sono attivi in base al carico.: Ajuste automatiquement le nombre de torrents actifs en fonction de la
     charge.
   Regola di cartella applicata: Règle de dossier appliquée
@@ -2496,7 +2496,7 @@ fra:
     et de moteurs Web, combinées à des éléments surveillés.
   ? 'Release scartate automaticamente dopo un fallimento (magnet non raggiungibile, download bloccato, errore irreversibile) o segnalate manualmente.
     Non verranno mai più riproposte: rimuovile da qui se vuoi ridarle una possibilità.'
-  : 'Les versions sont automatiquement supprimées après un échec (aimant inaccessible, téléchargement bloqué, erreur fatale) ou signalées manuellement.
+  : 'Les versions sont automatiquement supprimées après un échec (magnet inaccessible, téléchargement bloqué, erreur fatale) ou signalées manuellement.
     Ils ne seront plus jamais présentés : supprimez-les d''ici si vous souhaitez leur donner à nouveau une chance.'
   Release trovate: Sorties trouvées
   Repack (Rifatto): Repack (Refait)
@@ -5729,7 +5729,7 @@ fra:
   "Release per fonte": "Versions par source"
   "Conteggio delle release per fonte, con la più vecchia e la più recente.": "Nombre de versions par source, avec la plus ancienne et la plus récente."
   "Stato dell'archivio": "État de l'archive"
-  "Controlli rapidi su titoli, magnet, hash e indice full-text.": "Contrôles rapides des titres, aimants, hachages et index plein texte."
+  "Controlli rapidi su titoli, magnet, hash e indice full-text.": "Contrôles rapides des titres, magnets, hachages et index plein texte."
   "Titoli duplicati": "Titres en double"
   "Titoli ripetuti con il numero di copie.": "Titres répétés avec le nombre de copies."
   "Aggiunta il": "Ajoutée le"
@@ -5738,8 +5738,8 @@ fra:
   "Più recente": "Plus récente"
   "Copie": "Copies"
   "Release totali": "Versions totales"
-  "Magnet vuoti": "Aimants vides"
-  "Magnet non validi": "Aimants invalides"
+  "Magnet vuoti": "Magnets vides"
+  "Magnet non validi": "Magnets invalides"
   "Hash mancanti": "Hachages manquants"
   "Righe FTS": "Lignes FTS"
   "Differenza FTS": "Différence FTS"
