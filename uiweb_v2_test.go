@@ -1357,6 +1357,14 @@ func TestV2DetailMagnetIsRebuiltWhenTheReleaseHasNone(t *testing.T) {
 	if !strings.Contains(body, `/api/torrents/abc123/magnet?raw=1`) {
 		t.Fatal("the magnet anchor does not ask for the plain text form")
 	}
+	// The magnet row wraps on the whole width (not cut to one line with the
+	// label squeezed) and points to the button that copies the whole link.
+	if !strings.Contains(body, `class="row kv-wrap"`) || !strings.Contains(body, `<strong>magnet:?xt=urn:btih:abc123`) {
+		t.Fatalf("the magnet row is not the wrapped one:\n%s", body)
+	}
+	if !strings.Contains(body, "Copia magnet» qui sotto") {
+		t.Fatal("the magnet row does not point to the copy button")
+	}
 
 	api := httptest.NewServer(Router(state))
 	defer api.Close()

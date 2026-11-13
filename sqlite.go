@@ -14,11 +14,19 @@ import (
 // only adds resident memory, ~14 MB per connection from 2 to 8 MiB.
 const sqliteCacheSizeKiB = "-2000"
 
+// sqliteSynchronous is the durability of every Gextto database: FULL syncs
+// the WAL at each commit, so a power cut never loses a committed change (an
+// archived file whose row would be gone). It lives in the connection string,
+// so a connection the pool reopens after an error has it too: set only by a
+// statement after opening, a reopened connection fell back to the string's
+// value without anyone noticing.
+const sqliteSynchronous = "FULL"
+
 // OpenSQLite opens a SQLite database with conservative pragmas
-// (`busy_timeout`, WAL, foreign keys). A single connection is kept so
-// concurrent goroutines never race on write locks.
+// (`busy_timeout`, WAL, foreign keys, synchronous FULL). A single connection
+// is kept so concurrent goroutines never race on write locks.
 func OpenSQLite(path string) (*sql.DB, error) {
-	dsn := "file:" + path + "?_pragma=busy_timeout(10000)&_pragma=foreign_keys(1)&_pragma=synchronous(NORMAL)&_pragma=cache_size(" + sqliteCacheSizeKiB + ")"
+	dsn := "file:" + path + "?_pragma=busy_timeout(10000)&_pragma=foreign_keys(1)&_pragma=synchronous(" + sqliteSynchronous + ")&_pragma=cache_size(" + sqliteCacheSizeKiB + ")"
 	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("open %s: %w", path, err)
@@ -34,7 +42,6 @@ func OpenSQLite(path string) (*sql.DB, error) {
 		_ = db.Close()
 		return nil, fmt.Errorf("wal %s: %w", path, err)
 	}
-	_, _ = db.Exec("PRAGMA synchronous=NORMAL")
 	return db, nil
 }
 

@@ -734,7 +734,7 @@ stays visible. The tabs:
 
 | Tab | What you find |
 |---|---|
-| **General** | torrent data, copy magnet, **Export .torrent**, reannounce, pin, restart, mark as failed, **Super seeding**, web seeds |
+| **General** | torrent data (the magnet shows its first three lines), copy magnet, **Export .torrent**, reannounce, pin, restart, mark as failed, **Super seeding**, web seeds |
 | **Tracker** | add trackers (`tier|url` per line) or remove one |
 | **Content** | the files, with **priority** (Skip, Normal, High, Maximum) and, with gx-torrent, **▶** for streaming |
 | **Peers** | the connected peers; with gx-torrent the peer's **country** sits next to its address, from the DB-IP database gx-torrent downloads by itself |

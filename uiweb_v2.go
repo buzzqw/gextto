@@ -1792,7 +1792,13 @@ type v2DetailTab struct {
 	Active    bool
 }
 
-type v2KV struct{ Label, Value, Hint string }
+type v2KV struct {
+	Label, Value, Hint string
+	// Wrap shows a long value (a magnet) on the whole width of the grid,
+	// wrapped on a few lines instead of cut to one; Note follows it.
+	Wrap bool
+	Note string
+}
 
 // v2AvailCell is one cell of the availability bar: done (nothing needed),
 // none (no connected peer has a needed piece) or avail, with an opacity that
@@ -2088,7 +2094,7 @@ func v2DetailViewFrom(s *AppState, hash, tab string) v2DetailView {
 		{Label: "Percorso di salvataggio", Value: torrent.SavePath, Hint: "Cartella in cui il client scrive i file di questo torrent."},
 		{Label: "Tracker corrente", Value: torrent.CurrentTracker, Hint: "Ultimo tracker a cui il client ha inviato un annuncio. Vuoto se nessun tracker ha risposto."},
 		{Label: "Non rinominare", Value: fmt.Sprintf("%t", noRename), Hint: "Se attivo, Gextto non rinomina i file di questo torrent quando li archivia in libreria."},
-		{Label: "Magnet", Value: magnet, Hint: "Link magnet del torrent: contiene l'infohash e i tracker e serve per aggiungerlo altrove."},
+		{Label: "Magnet", Value: magnet, Hint: "Link magnet del torrent: contiene l'infohash e i tracker e serve per aggiungerlo altrove.", Wrap: true, Note: "Qui ne vedi l'inizio: per il link completo usa «Copia magnet» qui sotto."},
 		{Label: "ID acquisizione", Value: view.AcqID, Hint: "Identificatore breve con cui il log marca le righe di questo download: usalo per filtrarle."},
 	}
 	if torrent.Error != "" {

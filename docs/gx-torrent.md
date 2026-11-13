@@ -2322,7 +2322,12 @@ Gextto receives `storage_moved` when the new path appears in the list, and
 `storage_move_failed` on error. `AssociateStorage` re-points without
 moving and re-verifies.
 
-The daemon's own state is in `DATA/state.json`, written atomically.
+The daemon's own state is in `DATA/state.json`, written atomically. The data
+folder is locked (`DATA/gx-torrent.lock`, `flock` on Unix, `LockFileEx` on
+Windows) before the state is read: a second daemon on the same folder waits up
+to 30 seconds (an old process still closing during a restart) and then refuses
+to start, instead of loading and saving the same state. The kernel releases the
+lock when the process exits, so a crash leaves nothing to clean.
 For each torrent it contains:
 
 - path, queue position, user pause, park for stall, pin;

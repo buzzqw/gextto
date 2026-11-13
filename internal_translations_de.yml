@@ -718,7 +718,7 @@ deu:
   Copia il magnet associato all'episodio: Kopieren Sie den mit der Episode verknüpften Magneten
   'Copia lo snapshot anche in questa cartella: una directory cloud sincronizzata (OneDrive/Drive/Dropbox) o un mount remoto': 'Kopieren Sie den
     Snapshot auch in diesen Ordner: ein synchronisiertes Cloud-Verzeichnis (OneDrive/Drive/Dropbox) oder einen Remote-Mount'
-  Copia magnet: Magnetische Kopie
+  Copia magnet: Magnet kopieren
   Copia negli appunti i magnet delle release selezionate: Kopieren Sie die Magnete der ausgewählten Auslöser in die Zwischenablage
   Copia non riuscita: Kopieren fehlgeschlagen
   'Copia/incolla un link: Gextto lo aggiunge alla sessione e inizia a scaricare.': 'Einen Link kopieren/einfügen: Gextto fügt ihn der Sitzung
@@ -6519,3 +6519,4 @@ deu:
   "Si possono rilasciare solo file .torrent.": "Hier können nur .torrent-Dateien abgelegt werden."
   "File .torrent pronto: premi Aggiungi.": ".torrent-Datei bereit: Hinzufügen drücken."
   "Magnet incollato: premi Aggiungi.": "Magnet-Link eingefügt: Hinzufügen drücken."
+  "Qui ne vedi l'inizio: per il link completo usa «Copia magnet» qui sotto.": "Hier siehst du den Anfang: für den vollständigen Link nutze unten «Magnet kopieren»."

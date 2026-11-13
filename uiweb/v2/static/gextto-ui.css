@@ -764,6 +764,13 @@ label.field > span, .field > span, .field-label { color: var(--muted); font-size
 .torrent-drawer .stat-grid > .row > span { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; color: var(--muted); }
 .torrent-drawer .stat-grid > .row > strong { flex: 0 1 auto; min-width: 0; text-align: right; overflow-wrap: anywhere; }
 @media (max-width: 700px) { .torrent-drawer .stat-grid { grid-template-columns: minmax(0, 1fr); } }
+/* A long value (the magnet) takes the whole width: the label keeps its size,
+   the value wraps anywhere and shows its first three lines; the note under it
+   points to the button that copies the whole link. */
+.stat-grid > .row.kv-wrap { grid-column: 1 / -1; flex-wrap: wrap; align-items: baseline; }
+.stat-grid > .row.kv-wrap > span { flex: 0 0 auto; }
+.stat-grid > .row.kv-wrap > strong { flex: 1 1 0; min-width: 12ch; text-align: left; overflow-wrap: anywhere; word-break: break-all; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; }
+.stat-grid > .row.kv-wrap > small { flex: 1 0 100%; text-align: right; }
 
 /* tables */
 .table-wrap { position: relative; overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: var(--radius-sm); }

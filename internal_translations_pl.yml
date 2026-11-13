@@ -703,7 +703,7 @@ pol:
   Copia il magnet associato all'episodio: Skopiuj magnes powiązany z odcinkiem
   'Copia lo snapshot anche in questa cartella: una directory cloud sincronizzata (OneDrive/Drive/Dropbox) o un mount remoto': 'Skopiuj migawkę
     także do tego folderu: zsynchronizowanego katalogu w chmurze (OneDrive/Drive/Dropbox) lub zdalnego podłączenia'
-  Copia magnet: Kopiuj magnes
+  Copia magnet: Kopiuj magnet
   Copia negli appunti i magnet delle release selezionate: Skopiuj magnesy wybranych wydań
   Copia non riuscita: do schowka Kopiowanie nie powiodło się
   'Copia/incolla un link: Gextto lo aggiunge alla sessione e inizia a scaricare.': 'Skopiuj/wklej link: Gextto dodaje go do sesji i rozpoczyna
@@ -6460,3 +6460,4 @@ pol:
   "Si possono rilasciare solo file .torrent.": "Można tu upuszczać tylko pliki .torrent."
   "File .torrent pronto: premi Aggiungi.": "Plik .torrent gotowy: naciśnij Dodaj."
   "Magnet incollato: premi Aggiungi.": "Wklejono link magnet: naciśnij Dodaj."
+  "Qui ne vedi l'inizio: per il link completo usa «Copia magnet» qui sotto.": "Tu widać początek: pełny link skopiujesz przyciskiem «Kopiuj magnet» poniżej."

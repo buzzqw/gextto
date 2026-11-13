@@ -189,7 +189,7 @@ not to break.
     published in the release (`dist/gx-torrent-windows-*`).
   - CI: the `build-test` job cross-compiles **engine and daemon** for Windows;
     the `windows-platform` job runs the platform tests on `windows-latest`
-    (`go test -run "Windows|MountPoint|Setup|CrossDevice|DaemonStart"
+    (`go test -run "Windows|MountPoint|Setup|CrossDevice|DaemonStart|DataLock"
     ./cmd/gx-torrent/`); the `windows-service` job (non-blocking) actually
     installs the service with `scripts/gx-torrent-service-selftest.ps1`
     (install/start/health/stop). The junction buffer is built by

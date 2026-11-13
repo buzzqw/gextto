@@ -704,7 +704,7 @@ spa:
   Copia il magnet associato all'episodio: Copia el imán asociado al episodio
   'Copia lo snapshot anche in questa cartella: una directory cloud sincronizzata (OneDrive/Drive/Dropbox) o un mount remoto': 'Copie la instantánea
     también en esta carpeta: un directorio de nube sincronizado (OneDrive/Drive/Dropbox) o un montaje remoto'
-  Copia magnet: Copiar imán
+  Copia magnet: Copiar magnet
   Copia negli appunti i magnet delle release selezionate: Copia los imanes de los lanzamientos seleccionados
   Copia non riuscita: Error al copiar
   'Copia/incolla un link: Gextto lo aggiunge alla sessione e inizia a scaricare.': 'al portapapeles Copiar/pegar un enlace: Gextto lo agrega a
@@ -6466,3 +6466,4 @@ spa:
   "Si possono rilasciare solo file .torrent.": "Aquí solo se pueden soltar archivos .torrent."
   "File .torrent pronto: premi Aggiungi.": "Archivo .torrent listo: pulsa Añadir."
   "Magnet incollato: premi Aggiungi.": "Enlace magnet pegado: pulsa Añadir."
+  "Qui ne vedi l'inizio: per il link completo usa «Copia magnet» qui sotto.": "Aquí ves el comienzo: para el enlace completo usa «Copiar magnet» abajo."

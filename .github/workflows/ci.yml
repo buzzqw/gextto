@@ -142,7 +142,7 @@ jobs:
       - name: Platform tests
         env:
           CGO_ENABLED: "0"
-        run: go test -run "Windows|MountPoint|Setup|CrossDevice|DaemonStart" ./cmd/gx-torrent/
+        run: go test -run "Windows|MountPoint|Setup|CrossDevice|DaemonStart|DataLock" ./cmd/gx-torrent/
 
   # Install gx-torrent as a real Windows service (New-Service, the same binPath
   # the packaged install-service.ps1 builds), start it, check it answers

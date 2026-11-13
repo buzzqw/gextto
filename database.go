@@ -636,7 +636,7 @@ func HardenConnection(db *sql.DB) error {
 	if _, err := db.Exec("PRAGMA busy_timeout=5000"); err != nil {
 		return err
 	}
-	if _, err := db.Exec("PRAGMA synchronous=FULL"); err != nil {
+	if _, err := db.Exec("PRAGMA synchronous=" + sqliteSynchronous); err != nil {
 		return err
 	}
 	if _, err := db.Exec("PRAGMA journal_size_limit=67108864"); err != nil {

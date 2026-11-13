@@ -552,6 +552,8 @@ type daemonRun struct {
 	stop      chan struct{}
 	loopDone  chan struct{}
 	serverErr chan error
+	// releaseLock frees the data folder once the daemon has saved and closed.
+	releaseLock func()
 }
 
 // Addr is the address the HTTP server is listening on (useful when the port is
@@ -565,8 +567,15 @@ func (r *daemonRun) Addr() net.Addr { return r.addr }
 // service.
 func startDaemon(opts Options) (*daemonRun, error) {
 	startPProf()
+	// The data folder is locked before the state is read: a second daemon on
+	// the same folder must stop here, before it can load and save the state.
+	releaseLock, err := acquireDataLock(opts.DataDir)
+	if err != nil {
+		return nil, err
+	}
 	daemon, err := newDaemon(opts)
 	if err != nil {
+		releaseLock()
 		return nil, err
 	}
 	stop := make(chan struct{})
@@ -582,6 +591,7 @@ func startDaemon(opts Options) (*daemonRun, error) {
 		close(stop)
 		<-loopDone
 		daemon.close()
+		releaseLock()
 		return nil, err
 	}
 	server := &http.Server{Handler: daemon.routes(), ReadHeaderTimeout: 10 * time.Second}
@@ -615,7 +625,7 @@ func startDaemon(opts Options) (*daemonRun, error) {
 		go daemon.updateWorker(stop)
 		go daemon.updateMarkHealthy(stop)
 	}
-	return &daemonRun{daemon: daemon, server: server, addr: listener.Addr(), stop: stop, loopDone: loopDone, serverErr: serverErr}, nil
+	return &daemonRun{daemon: daemon, server: server, addr: listener.Addr(), stop: stop, loopDone: loopDone, serverErr: serverErr, releaseLock: releaseLock}, nil
 }
 
 // shutdown stops the HTTP server and the daemon run loop.
@@ -626,5 +636,8 @@ func (r *daemonRun) shutdown() {
 	close(r.stop)
 	<-r.loopDone
 	r.daemon.close()
+	if r.releaseLock != nil {
+		r.releaseLock()
+	}
 	logf("stopped")
 }

@@ -747,7 +747,7 @@ resta visibile. Le schede:
 
 | Scheda | Cosa trovi |
 |---|---|
-| **Generale** | dati del torrent, copia magnet, **Esporta .torrent**, riannuncia, pin, riavvia, segna come fallito, **Super seeding**, web seed |
+| **Generale** | dati del torrent (del magnet si vedono le prime tre righe), copia magnet, **Esporta .torrent**, riannuncia, pin, riavvia, segna come fallito, **Super seeding**, web seed |
 | **Tracker** | aggiungi tracker (`tier|url` per riga) o rimuovine uno |
 | **Contenuto** | i file, con la **priorità** (Salta, Normale, Alta, Massima) e, con gx-torrent, **▶** per lo streaming |
 | **Peers** | i peer connessi; con gx-torrent accanto all'indirizzo c'è il **paese** del peer, dal database DB-IP che gx-torrent scarica da solo |

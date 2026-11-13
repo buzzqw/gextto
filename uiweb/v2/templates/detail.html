@@ -15,7 +15,7 @@
 {{if .Error}}<p class="muted">{{tr .Error}}</p>{{else}}
 <div>
 {{if eq .Tab "general"}}
-  <div class="panel"><div class="panel-body"><div class="stat-grid">{{range .General}}<div class="row"{{if .Hint}} {{trTitle .Hint}}{{end}}><span>{{tr .Label}}</span><strong class="truncate" title="{{if .Hint}}{{tr .Hint}} — {{end}}{{tr .Value}}">{{tr .Value}}</strong></div>{{end}}</div>
+  <div class="panel"><div class="panel-body"><div class="stat-grid">{{range .General}}{{if .Wrap}}<div class="row kv-wrap"{{if .Hint}} {{trTitle .Hint}}{{end}}><span>{{tr .Label}}</span><strong>{{.Value}}</strong>{{if and .Value .Note}}<small class="muted">{{tr .Note}}</small>{{end}}</div>{{else}}<div class="row"{{if .Hint}} {{trTitle .Hint}}{{end}}><span>{{tr .Label}}</span><strong class="truncate" title="{{if .Hint}}{{tr .Hint}} — {{end}}{{tr .Value}}">{{tr .Value}}</strong></div>{{end}}{{end}}</div>
     <div class="toolbar detail-actions">
       {{template "v2_detail_action" (dict "Hash" .Hash "Tab" "general" "Op" "no_rename" "Body" (printf `{"value":%t}` (not .NoRename)) "Label" (ternary .NoRename "Rinomina abilitata" "Non rinominare") "Title" "Attiva o disattiva la rinomina dei file di questo torrent quando vengono archiviati in libreria.")}}
       {{template "v2_detail_action" (dict "Hash" .Hash "Tab" "general" "Op" "reannounce" "Body" "{}" "Label" "Annuncia" "Title" "Invia subito un annuncio ai tracker per cercare nuovi peer.")}}
