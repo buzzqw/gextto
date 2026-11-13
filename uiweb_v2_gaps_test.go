@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/buzzqw/gextto/internal/logging"
 	"github.com/buzzqw/gextto/internal/models"
 )
 
@@ -271,7 +272,7 @@ func TestGapBestPicksChooseScoreThenSeeders(t *testing.T) {
 	}
 	chosen := map[int64]string{}
 	for _, pick := range picks {
-		chosen[pick.Episode] = pick.Release.Title
+		chosen[pick.Result.Episode] = pick.Result.Release.Title
 	}
 	if chosen[1] != "ep1 high score" {
 		t.Fatalf("episode 1 pick = %q, want the highest score inside the profile", chosen[1])
@@ -299,9 +300,26 @@ func TestGapBestPicksQueueAPackOnce(t *testing.T) {
 	if len(picks) != 2 {
 		t.Fatalf("picks = %d, want the single episode and the pack once: %+v", len(picks), picks)
 	}
-	titles := []string{picks[0].Release.Title, picks[1].Release.Title}
+	titles := []string{picks[0].Result.Release.Title, picks[1].Result.Release.Title}
 	if titles[0] != "ep2 single" || titles[1] != "pack 01-02" {
 		t.Fatalf("pick order = %v, want the highest score first", titles)
+	}
+	if got := picks[1].Episodes; len(got) != 1 || got[0] != 1 {
+		t.Fatalf("pack episodes = %v, want only the one it still fills after the single", got)
+	}
+}
+
+// TestGapAddedEpisodesTextNamesEveryEpisode: the log after the bulk action says
+// which episodes were queued, season by season and with consecutive ones in one
+// range.
+func TestGapAddedEpisodesTextNamesEveryEpisode(t *testing.T) {
+	got := v2GapAddedEpisodesText([]v2GapPick{
+		{Season: 2, Episodes: []int64{4}},
+		{Season: 1, Episodes: []int64{1, 2, 3}},
+		{Season: 1, Episodes: []int64{5}},
+	})
+	if want := "S01E01–S01E03, S01E05, S02E04"; got != want {
+		t.Fatalf("episodes = %q, want %q", got, want)
 	}
 }
 
@@ -325,7 +343,7 @@ func TestGapDownloadBestRoute(t *testing.T) {
 		state.jobs.SetResult(id, v2GapSearchResult{
 			Series: "Show", Episodes: 1, Total: 1, Results: 1,
 			Sources: v2SourcesView{Results: []v2SourceRow{{Title: release.Title, Episode: "S01E01", Key: "k"}}},
-			picks:   []gh2EpisodeResult{{Release: release, Origin: episodeOriginIndexer, Season: 1, Episode: 1}},
+			picks:   []v2GapPick{{Result: gh2EpisodeResult{Release: release, Origin: episodeOriginIndexer, Season: 1, Episode: 1}, Season: 1, Episodes: []int64{1}}},
 		})
 	}); err != nil {
 		t.Fatalf("start search: %v", err)
@@ -336,6 +354,10 @@ func TestGapDownloadBestRoute(t *testing.T) {
 	if code != http.StatusOK || !strings.Contains(body, "Aggiungi le migliori puntate mancanti") {
 		t.Fatalf("result fragment has no bulk button -> %d: %s", code, body)
 	}
+
+	var captured bytes.Buffer
+	logging.SetOutput(&captured)
+	defer logging.SetOutput(os.Stdout)
 
 	response, err := http.PostForm(server.URL+"/series/gaps/download-best", url.Values{"job": {search.ID}})
 	if err != nil {
@@ -354,5 +376,8 @@ func TestGapDownloadBestRoute(t *testing.T) {
 	meta, err := state.db.TorrentMeta(strings.Repeat("c", 40))
 	if err != nil || meta == nil {
 		t.Fatalf("chosen release not queued: %v %+v", err, meta)
+	}
+	if out := captured.String(); !strings.Contains(out, "to the downloads: S01E01") {
+		t.Fatalf("the log does not name the episode it queued:\n%s", out)
 	}
 }

@@ -449,7 +449,8 @@ onda che non sono in libreria, raggruppate per serie e per stagione:
   scarico la copia migliore di ogni puntata trovata: prima il punteggio più
   alto, poi più seed. Una release che copre più puntate viene aggiunta una volta
   sola, e le puntate per cui la ricerca non ha trovato nulla restano fuori. Il
-  lavoro prosegue in background, così non devi aspettare ogni collegamento;
+  lavoro prosegue in background, così non devi aspettare ogni collegamento, e il
+  log dice quali puntate ha messo in scarico;
 - **Filtra per serie** restringe l'elenco.
 
 Non sono mancanti le puntate non ancora andate in onda, né quelle che hanno già

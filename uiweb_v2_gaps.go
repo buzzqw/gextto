@@ -142,7 +142,15 @@ type v2GapSearchResult struct {
 	Progress v2GapSearchProgress
 	// picks are the releases «Aggiungi le migliori puntate mancanti» queues:
 	// the best copy for each episode of the results. They are not rendered.
-	picks []gh2EpisodeResult
+	picks []v2GapPick
+}
+
+// v2GapPick is one release the bulk action queues and the missing episodes it
+// fills: a pack fills several at once, and the log has to name them all.
+type v2GapPick struct {
+	Result   gh2EpisodeResult
+	Season   int64
+	Episodes []int64
 }
 
 func v2GapSearchRedirect(filter string) string {
@@ -174,7 +182,7 @@ func v2GapSearchResultFromOutcome(outcome missingSearchOutcome, redirect, series
 // score, then the most seeders. A release that covers several episodes (a
 // multi-episode file or a pack) is queued once: the episodes it covers are not
 // downloaded again on their own.
-func v2BestGapPicks(results []gh2EpisodeResult) []gh2EpisodeResult {
+func v2BestGapPicks(results []gh2EpisodeResult) []v2GapPick {
 	type episodeKey struct{ season, episode int64 }
 	best := map[episodeKey]gh2EpisodeResult{}
 	for _, result := range results {
@@ -203,20 +211,24 @@ func v2BestGapPicks(results []gh2EpisodeResult) []gh2EpisodeResult {
 		return v2GapPickPreferred(ordered[i], ordered[j])
 	})
 	covered := map[episodeKey]bool{}
-	picks := make([]gh2EpisodeResult, 0, len(ordered))
+	picks := make([]v2GapPick, 0, len(ordered))
 	for _, candidate := range ordered {
-		serves := false
+		season := int64(0)
+		if candidate.Release.Season != nil {
+			season = *candidate.Release.Season
+		}
+		episodes := make([]int64, 0, 1)
 		for key := range best {
 			if covered[key] || !v2GapReleaseCovers(&candidate.Release, key.season, key.episode) {
 				continue
 			}
-			serves = true
-			break
+			episodes = append(episodes, key.episode)
 		}
-		if !serves {
+		if len(episodes) == 0 {
 			continue
 		}
-		picks = append(picks, candidate)
+		sort.Slice(episodes, func(i, j int) bool { return episodes[i] < episodes[j] })
+		picks = append(picks, v2GapPick{Result: candidate, Season: season, Episodes: episodes})
 		for key := range best {
 			if v2GapReleaseCovers(&candidate.Release, key.season, key.episode) {
 				covered[key] = true
@@ -224,6 +236,28 @@ func v2BestGapPicks(results []gh2EpisodeResult) []gh2EpisodeResult {
 		}
 	}
 	return picks
+}
+
+// v2GapAddedEpisodesText names the episodes the bulk action queued, season by
+// season and in the compact form of the log: "S01E01–S01E03, S02E04". A pack
+// counts once for every episode it fills.
+func v2GapAddedEpisodesText(picks []v2GapPick) string {
+	bySeason := map[int64][]int64{}
+	seasons := make([]int64, 0, 1)
+	for _, pick := range picks {
+		if _, seen := bySeason[pick.Season]; !seen {
+			seasons = append(seasons, pick.Season)
+		}
+		bySeason[pick.Season] = append(bySeason[pick.Season], pick.Episodes...)
+	}
+	sort.Slice(seasons, func(i, j int) bool { return seasons[i] < seasons[j] })
+	parts := make([]string, 0, len(seasons))
+	for _, season := range seasons {
+		if label := episodeRangeLabel(season, bySeason[season]); label != "" {
+			parts = append(parts, label)
+		}
+	}
+	return strings.Join(parts, ", ")
 }
 
 // v2GapPickPreferred reports whether candidate is the copy to queue over
@@ -484,22 +518,27 @@ func V2SeriesGapsDownloadBest(w http.ResponseWriter, r *http.Request, s *AppStat
 			series := result.Series
 			if err := s.jobs.Start(bulk.ID, func(ctx context.Context, id string) {
 				added, rejected := 0, 0
+				queued := make([]v2GapPick, 0, len(picks))
 				for index, pick := range picks {
 					if ctx.Err() != nil {
 						return
 					}
-					status, _ := AddRelease(s, pick.Release)
+					status, _ := AddRelease(s, pick.Result.Release)
 					if (status >= 200 && status < 300) || status == http.StatusAccepted {
 						added++
+						queued = append(queued, pick)
 					} else {
 						rejected++
 						logging.Debug("best missing episode not queued",
-							"series", series, "title", pick.Release.Title, "status", status)
+							"series", series, "title", pick.Result.Release.Title, "status", status)
 					}
 					s.jobs.SetProgress(id, float64(index+1)/float64(len(picks)), "")
 				}
 				message := fmt.Sprintf("📥 Added %s of «%s» to the downloads",
 					countLabel(int64(added), "best missing episode", "best missing episodes"), series)
+				if episodes := v2GapAddedEpisodesText(queued); episodes != "" {
+					message += ": " + episodes
+				}
 				if rejected > 0 {
 					message += fmt.Sprintf("; %d could not be started", rejected)
 				}

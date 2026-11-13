@@ -446,7 +446,7 @@ not in the library, grouped by series and season:
   best copy of every episode found: the highest score first, then the most
   seeders. A release covering several episodes is added once, and episodes the
   search found nothing for stay out. It keeps working in the background, so you
-  do not wait for every link;
+  do not wait for every link, and the log names the episodes it queued;
 - **Filter by series** narrows the list.
 
 Not missing: episodes that have not aired yet, episodes that already have a
