@@ -5,9 +5,9 @@ verifies it, names it and shelves it in your library — then keeps watching for
 a better copy.**
 
 Gextto is a self-hosted media automation daemon: it searches, downloads,
-verifies, renames and archives series, movies and comics. It has its own
-BitTorrent engine in Go, a server-rendered web UI and a terminal client. Two
-binaries, no C dependencies, no Node.js build, six languages.
+verifies, renames and archives series, movies and comics. It features its own
+pure-Go BitTorrent engine (`gx-torrent`), a server-rendered web UI and a terminal
+client. Two binaries, no C dependencies, no Node.js build, six languages.
 
 [![License: EUPL-1.2](https://img.shields.io/badge/license-EUPL--1.2-blue.svg)](LICENSE)
 ![Go](https://img.shields.io/badge/Go-pure%2C%20zero%20CGO-00ADD8?logo=go)
@@ -25,55 +25,53 @@ binaries, no C dependencies, no Node.js build, six languages.
 
 ## What it does
 
-Add a title and Gextto runs the chain by itself: it searches the sources you
-configured, scores the candidates, downloads the winner, checks the data and
-puts the file in the library under the right name. When a better release
-appears it replaces the old file; when a download stalls it looks for another
-one.
+Add a title and Gextto orchestrates the entire lifecycle autonomously: it queries your
+configured sources, scores candidate releases, downloads the best match, verifies file
+integrity, cleans audio tracks, and shelves the media into your library with proper naming.
+When a better quality release appears, it upgrades seamlessly; if a swarm stalls, it recovers
+automatically.
 
-- Candidates are scored on resolution, source, codec, audio, HDR, language and
-  size. A dead swarm cannot win over a working alternative, and every rejected
-  release keeps its reason in the log.
-- The library is protected by hardlinks while seeding, a mount guard that tells
-  an unmounted share from deleted files, and a recycle bin.
-- Foreign audio can be dropped on import: an optional setting keeps only the
-  tracks in your language (Italian by default) and removes the rest, copying
-  video and audio without re-encoding and comparing every packet with the
-  original, plus duration, flags and A/V sync, before replacing the file.
-  Untagged tracks are kept unless you choose otherwise.
-- A night maintenance window runs the heavy work while Gextto is idle, one job
-  at a time: database optimisation and a weekly integrity check, a report of
-  the library files gone from the disk, the audio cleanup of the existing
-  library, the file integrity check and the MediaInfo analysis.
-- The engine is our own Go code: BitTorrent v1, v2 and hybrid, TCP and uTP on
-  one port, holepunching, IPv6 DHT, streaming. It is fast on a real swarm and
-  light at rest — the figures are in [Numbers](#numbers). The same binary is
-  [gx-torrent](https://github.com/buzzqw/gextto/releases), a standalone client
-  for Linux and Windows.
-- Queue, cache and bandwidth follow the machine and the line. On Auto the whole
-  line is Gextto's while nobody else needs it, and it gives way when someone
-  does.
-- **Torrent and eD2k download the same file together — as Shareaza did, and
-  hardly anyone does today.** When one episode is downloading both as a torrent
-  and on eD2k (aMule) with a file of exactly the same size, the torrent takes
-  from aMule's partial file every piece that passes its own SHA-1 check, so a
-  wrong byte can never get in. Whichever finishes first completes the other;
-  the episode enters the library once and keeps being shared. A torrent stuck
-  at 95 % is looked for on eD2k and finished with the other network's data,
-  and the two engines share one line instead of competing for it.
+```mermaid
+flowchart LR
+    A["🎯 Title added<br/>(Web UI, PWA, Jellyseerr)"] --> B["🔍 Search & Scoring<br/>(Torznab, RSS, eD2k)"]
+    B --> C["⚡ Swarm Download<br/>(gx-torrent + aMule)"]
+    C --> D["🛡️ Verification & Audio Cleanup<br/>(Lossless, zero re-encode)"]
+    D --> E["📁 Media Library<br/>(Jellyfin, Plex, NAS)"]
+```
+
+### Key superpowers
+
+- 🤝 **Two networks, one file (Shareaza-style)**: When an episode downloads on both
+  BitTorrent and eD2k (aMule) with matching file size, verified blocks (SHA-1) are shared
+  between engines on the fly. Whichever finishes first completes the other, and a torrent
+  stuck at 95% recovers using eD2k sources while sharing a single speed limit.
+  ([read more](docs/amule.md))
+- ⚡ **Pure-Go BitTorrent engine (`gx-torrent`)**: Original, zero-CGO implementation
+  supporting BitTorrent v1, v2 and hybrid (BEP 52), IPv6 DHT, and uTP. Operates at ~28 MB RSS
+  at rest and up to 290 MB/s throughput — outperforming libtorrent-based clients. Also runs as
+  a standalone daemon on Linux and Windows. ([measurements](docs/measurements.md) · [BEP list](docs/bep.md))
+- 🧹 **Lossless smart audio cleanup**: Drops unwanted foreign audio tracks on import,
+  preserving only your preferred languages without re-encoding video or audio. Every packet
+  is compared with the original to guarantee 100% audio/video sync and zero quality loss.
+- 📉 **Latency-aware automatic bandwidth**: Auto mode takes the full line when idle,
+  but continuously probes ping latency. If someone in the house streams or games, Gextto yields
+  instantly and reclaims bandwidth once the line clears.
+- 🛡️ **Bulletproof library safety**: Zero duplicate storage using hardlinks during seeding,
+  NAS mount-loss protection to avoid accidental deletions, an automated recycle bin for upgrades,
+  and periodic background file integrity checks with automatic replacement.
 
 ### At a glance
 
-| | |
-|---|---|
-| **Numbers** | Speed, footprint, CPU, indexer cycles, disk writes: figures, machine and line in [Numbers](#numbers) |
-| **Protocol** | BitTorrent v1, v2 and hybrid (BEP 52) · 34 BEPs implemented and tested ([list](docs/bep.md)) |
-| **Network** | TCP + uTP on one port · UPnP, NAT-PMP, PCP · BEP 55 holepunching · SOCKS5/HTTP proxy · VPN killswitch |
-| **Automation** | TV series, movies, comics · Torznab (Jackett, Prowlarr, indexarr) · RSS · web search · stuck-download replacement |
-| **Two networks, one file** | Torrent + eD2k on the same file: verified pieces from aMule's `.part`, the first to finish completes the other, one shared line |
-| **Integrations** | Jellyfin, Plex, Jellyseerr (v3 API subset), aMule (eD2k and Kad), Telegram, e-mail, Discord/Slack/ntfy/Gotify/Pushover/Apprise, iCal |
-| **Interfaces** | Web UI (SSR + HTMX, pure Go, installable PWA) · terminal TUI over SSH · JSON API |
-| **Build** | Pure Go (`CGO_ENABLED=0`) · Linux x86_64/aarch64 · gx-torrent also on Windows |
+| Area | Highlights | Details |
+|---|---|---|
+| **Numbers** | 290 MB/s throughput · 28 MB RSS at rest · 0.3–0.5% CPU | [Benchmark figures](#numbers) |
+| **Protocol** | BitTorrent v1, v2 & hybrid (BEP 52) · 34 BEPs implemented and tested | [BEP compliance](docs/bep.md) |
+| **Network** | TCP + uTP on one port · UPnP, NAT-PMP, PCP · BEP 55 holepunching · SOCKS5/HTTP · VPN killswitch | [gx-torrent doc](docs/gx-torrent.md) |
+| **Automation** | TV series, movies, comics · Torznab, RSS, HTML listings · stuck-download replacement | [User manual](docs/MANUAL.en.md) |
+| **Two networks** | Simultaneous Torrent + eD2k downloads on matching files · verified pieces from aMule `.part` | [aMule integration](docs/amule.md) |
+| **Integrations** | Jellyfin, Plex, Jellyseerr (v3 API), aMule (eD2k/Kad), Telegram, Discord, Slack, ntfy, Pushover, iCal | [User manual](docs/MANUAL.en.md) |
+| **Interfaces** | Responsive web UI (SSR + HTMX, installable PWA, 20+ themes) · terminal TUI over SSH · JSON API | [TUI reference](docs/tui.md) · [API](docs/API.md) |
+| **Build** | Pure Go (`CGO_ENABLED=0`) · Linux x86_64/aarch64 · gx-torrent also native on Windows | [Developer manual](docs/DEVELOPERS.md) |
 
 ## A look
 
@@ -112,64 +110,49 @@ curl -fsSL https://raw.githubusercontent.com/buzzqw/gextto/main/install.sh | sud
 
 Prefer Docker? The [full stack](docs/DOCKER.en.md) starts Gextto, `gx-torrent`, indexarr, Jackett, Prowlarr, FlareSolverr and aMule together with `docker compose`.
 
-It installs to `/opt/gextto`, keeps data in `/var/lib/gextto` and serves the UI
+The installer sets up `/opt/gextto`, data in `/var/lib/gextto`, and serves the UI
 on port 5000, with `gx-torrent` alongside `gexttod` — pure Go, nothing else to
-install for torrents. The installer reads `/etc/os-release` and installs the
-base packages with the right names for Debian, Ubuntu, Fedora, openSUSE and
-Arch; when the repositories provide them it also installs `ffmpeg`,
-`mediainfo` and `mkvtoolnix`, used for the real file quality and audio-track
-cleanup. `--no-media-tools` (or `GEXTTO_SKIP_MEDIA_TOOLS=1`) skips them. eD2k
-and Kad are optional and need an `amuled` you run yourself
-([aMule integration](docs/amule.md)). The installer runs the program once
-first, so a missing library or an old glibc is reported at once. The
-service runs as **the user invoking the installer** by default; `--user gextto`
-uses an isolated system account and `--media-group <group>` grants access to
-someone else's NAS library.
+install for torrents. When available, it installs `ffmpeg`, `mediainfo` and `mkvtoolnix`
+for real media analysis and lossless audio-track cleanup (`--no-media-tools` skips them).
+eD2k and Kad are optional and connect to an `amuled` you run yourself
+([aMule integration](docs/amule.md)). By default, the service runs as the invoking user;
+`--user gextto` uses a dedicated system account.
 
 > [!IMPORTANT]
 > Gextto is meant for a trusted network: the web UI and API are open by
 > default. For access from outside, enable the optional login
 > (*Configuration → Access and services*; the LAN stays free) and still use
-> HTTPS via reverse proxy or VPN. Writes from a page of another origin are
-> refused (CSRF protection). Read the [security policy](docs/SECURITY.md)
+> HTTPS via reverse proxy or VPN. Read the [security policy](docs/SECURITY.md)
 > before exposing it remotely.
 
 ### Install from source
 
-Go 1.26.8+; the build is pure Go and the web UI is embedded. See the
-[developer manual](docs/DEVELOPERS.md).
+Go 1.26.8+; pure Go build, embedded web UI:
 
 ```bash
 make build                 # gexttod and gx-torrent in bin/
 ```
 
-`make build` advances the **committed** build number shared with CI, so a
-checkout and a release show the same version: `1.2.<n>`, where the third number
-is always the build (`1.2.2065`). The second number is raised **by hand**, in
-`version_series`, only when a new series is started (`1.3.<n>`); Gextto does
-not move it automatically. `gx-torrent` has its own counter, advanced only when
-its code changes, and its own `gx_torrent.version_series` file. `make test`
-runs the
-full suite, `make test-ui` the browser suite, `make fuzz-smoke` the fuzzers.
+`make test` runs the full test suite, `make test-ui` the browser suite, and `make fuzz-smoke` the network fuzzers.
+See the [developer manual](docs/DEVELOPERS.md) for details.
 
 ### First safe run
 
-1. Open `http://<server>:5000`: the first visit starts the **setup wizard**
+1. Open `http://<server>:5000`: the first visit opens the **setup wizard**
    (password, folders with permission check, indexer and TMDB, first title).
    Reopenable at `/?view=setup`.
 2. Keep **dry-run** on, add one test title and run a manual search.
 3. Check **Health** and **Logs**, then enable active mode.
 
-NAS setup and troubleshooting: the [user manual](docs/MANUAL.en.md).
+NAS setup and troubleshooting: the [user manual](docs/MANUAL.en.md) and [advanced guide](docs/ADVANCED.en.md).
 
 ### Update and uninstall
 
 An **Update available** button appears when a release is published;
-*Maintenance → Updates* shows the changes and **Update now** backs up the
-databases, installs, and restores the previous version if the new one does not
-answer. Re-running the installer updates from a shell too, with the same
-rollback and the same service user. The full list of changes is in the
-[changelog](changelog.en.md).
+*Maintenance → Updates* shows the changes and **Update now** backs up databases,
+installs the update, and rolls back automatically if the new version fails health checks.
+Re-running the installer updates from a shell with the same rollback.
+See the [changelog](changelog.en.md) for full change history.
 
 ```bash
 sudo bash install.sh --help       # all options
@@ -178,141 +161,73 @@ sudo bash install.sh --uninstall  # stop and remove the program (keeps data)
 sudo bash install.sh --uninstall --purge   # also remove the data directory
 ```
 
-`GEXTTO_DATA_DIR`, `GEXTTO_PORT`, `GEXTTO_USER`, … stay supported;
-`GEXTTO_LOCAL_ARCHIVE=/path/gextto-linux-x86_64.tar.gz` installs offline. From a
-checkout: `git pull --ff-only && ./scripts/update.sh`.
-
 ## Features
 
-### Finding and choosing releases
+### Smart search and acquisition
 
-- **Quality-aware scoring.** Deterministic scores grouped into video cards
-  (4K, Full HD, HD, SD, codec) and audio cards (lossless, DTS/DD+, AC3/5.1,
-  AAC/Opus, MP3), plus 5.1/7.1 and Atmos/DTS:X; per-title minimum audio presets
-  include the channels; higher-grade library files are protected; an optional
-  ceiling stops upgrades. The settings page scores
-  reference releases live with the current weights. `ffprobe` reads the real
-  quality of archived media.
-- **Named quality profiles.** In *Quality and upgrades* name the combinations
-  you use — quality, minimum audio, language, subtitles, exclusions and
-  upgrades. They are templates: choosing one in the add form, on the series or
-  movie page or in *Edit selected* copies its values into the title, which stays
-  editable. Profiles that already exist in a library are generated as *Default*
-  plus one per combination, and the same list is served to **Jellyseerr** through
-  the `/api/v3` subset (`system/status`, `qualityprofile`, `rootfolder`,
-  `series`/`movie` lookup and add, `queue`). Each profile keeps its number when
-  renamed or reordered.
-- **TV, movies, comics.** Standard `ComicInfo.xml` for CBZ archives (Komga,
-  Kavita, readers).
-- **Season packs only when useful.** A pack is downloaded only to fill a real
-  gap or upgrade an episode; one that would add nothing is refused before it is
-  downloaded, and a pack still airing (*IN CORSO n/m*) is read within the
-  episodes that exist.
-- **Stuck-download recovery.** A download that stops progressing, or a magnet
-  stuck waiting for metadata, is superseded by a valid alternative after a
-  configurable window; the abandoned release is blocklisted (one abandoned
-  for lack of seeders only for a configurable period, so it is retried if the
-  swarm recovers).
-- **Sources.** RSS feeds, HTML listings (ext.to, TorrentGalaxy, Corsaro),
-  Torznab indexers and the Jackett/Prowlarr/indexarr managers, web search, optional
-  FlareSolverr. The managers are searched **one indexer at a time**, each at the
-  pace it really serves, a tracker present in more than one only once, a slow tracker
-  costing only its own results. Each feed has its own **activity panel** (last success,
-  last error, attempts/successes/failures/taken over 1, 7 and 30 days) and is disabled
-  automatically after a configurable run of days without a success, with a warning frame
-  listing the disabled ones.
-- **Download confirmation.** At the end of a torrent or eD2k download, Gextto
-  tells the indexarr managers already configured which file arrived, so
-  indexarr's Download page can mark it as downloaded instead of only delivered.
-  The report runs in the background and never delays the download.
-- **eD2k and Kad through aMule, when torrents find nothing.** Optional and off by
-  default: Gextto drives an `amuled` you run (External Connections protocol,
-  our own Go client). Search Kad or the eD2k servers, paste `ed2k://` links,
-  connect to servers and follow aMule's state on the eD2k page; aMule's
-  downloads appear in **Downloads** next to the torrents and, once complete, are
-  renamed and imported into the library like any torrent (by hardlink or copy,
-  so aMule keeps sharing them). The eD2k page also shows **what aMule is
-  sharing and uploading** and lets you reload its shared folders. The automatic
-  gap-filling fallback is a second,
-  separate switch and accepts only an exact episode match with a recognised
-  quality and enough sources.
+- **Quality-aware scoring**: Deterministic scores grouped into video cards
+  (4K, Full HD, HD, SD, codec) and audio cards (lossless, DTS/DD+, AC3/5.1, AAC/Opus, MP3),
+  plus 5.1/7.1 and Atmos/DTS:X. Higher-grade library files are protected from downgrade,
+  and dead swarms cannot win over active ones.
+- **Named quality profiles**: Create reusable profiles (resolution, audio presets, language,
+  subtitles, upgrade cutoffs). The profile list is served directly to **Jellyseerr** through the
+  `/api/v3` subset (`system/status`, `qualityprofile`, `rootfolder`, `series`/`movie` lookup, `queue`).
+- **Season pack intelligence**: Packs are downloaded only when they fill real missing gaps;
+  unneeded episodes are excluded before downloading, and airing packs (*IN CORSO n/m*) are safely
+  imported for available episodes.
+- **Stuck-download auto-recovery**: A download that stalls or a magnet waiting endlessly for metadata
+  is automatically superseded by a valid alternative and temporarily blocklisted.
+- **Comprehensive source management**: Torznab indexers (Jackett, Prowlarr, indexarr), public RSS feeds,
+  HTML listings and web search. Indexer managers are queried one tracker at a time to prevent rate-limit
+  choking, with per-feed activity and failure tracking.
+- **Archive extraction (RAR)**: Automatically unpacks uncompressed and RAR 5 compressed multi-volume
+  archives directly into the library, preserving the original archive for continuous seeding.
+- **eD2k and Kad through aMule**: Drives `amuled` via the External Connections protocol. Search Kad,
+  paste `ed2k://` links, monitor downloads and share lists directly from Gextto.
+  ([read more](docs/amule.md))
 
-### Library safety
+→ *Full documentation: [Sources and Quality in the User Manual](docs/MANUAL.en.md#finding-and-choosing-releases)*
 
-- **Hardlinks while seeding**: completed files appear in the library at once,
-  with no duplicate disk use.
-- **NAS and mount guard**: an unmounted share is never mistaken for deleted
-  files, a burst of "missing" files is capped, a hung share cannot freeze the
-  engine; transient failures retry and interrupted moves resume. Starting a
-  download is crash-safe.
-- **Recycle bin**: files replaced by an upgrade and data removed "with data" go
-  to the trash first, after the torrent has left the engine.
-- **No pointless replacements**: a score-only difference — size, subtitles,
-  swarm health, a preferred group below the minimum — never replaces a file of
-  the same quality, neither in the cycle nor at completion, in season packs or
-  in the cleanup. A real technical gain, a REPACK/PROPER or the configured
-  minimum difference still does. *Library impact* replays the archived releases
-  through the same rules before anything is downloaded.
-- **Library tools**: tick rows in the Series and Movies tables to change
-  quality, language, subtitles, exclusions or the upgrade switch on many titles
-  at once; *Maintenance → Import file* reads a video already on disk (or a
-  folder), proposes series/season/episode or movie/year and archives it with the
-  normal rename and MediaInfo checks.
-- **Damaged-file check**: switch it on in *Settings → Maintenance → File
-  integrity check* and choose the interval and the files per pass; Gextto probes
-  and fully decodes the archived videos with `ffprobe` and `ffmpeg` a little at
-  a time in the background, keeping its position across a restart. Files
-  already checked and unchanged are skipped; *Start over* rechecks the whole
-  library. 4K files use the quick check (on by default): the whole file is read
-  but only the keyframes are decoded, so a 4K episode takes minutes instead of
-  an hour and truncation and unreadable data are still found. A damaged episode can be sent back to the
-  downloads from the report: the old release is blocklisted and a different one
-  is searched. An option, off by default, does it by itself as soon as a file is
-  found damaged and starts the search right away, so the replacement does not
-  wait for the end of the pass. The panel with the progress, the damaged files
-  and the manual **Check now** / **Stop** actions sits right under the options.
+### Library safety and maintenance
 
-### Bandwidth and the shared line
+- **Zero-waste seeding**: Uses hardlinks so completed downloads appear in your media library instantly
+  without duplicating disk space while seeding continues.
+- **NAS and mount guard**: Detects unmounted network shares to prevent accidental deletion storms,
+  resumes interrupted moves, and isolates hung storage without stalling the engine.
+- **Recycle bin**: Upgraded or deleted media moves to a safety bin first, protecting against accidental loss.
+- **No pointless replacements**: Score-only differences (file size, subtitles) never trigger an upgrade
+  unless real technical gain (REPACK, PROPER, higher resolution/codec) is achieved.
+- **Damaged-file watchdog**: Periodic background scans probe and decode archived videos with `ffprobe`
+  and `ffmpeg`. 4K keyframe check spots corruption in minutes; damaged files can be automatically replaced
+  and re-downloaded.
+- **Night maintenance window**: Runs heavy tasks when idle (database compaction, weekly integrity checks,
+  MediaInfo scans, audio cleanup).
 
-- **One rule, one exception**: the rule is a single choice — **Auto**, fixed
-  limits or a per-weekday schedule (each day **Off / Limit / Auto**). From the
-  Downloads page you make an exception for now — Auto or a limit, for 1 to 12 hours
-  or until you remove it — and it always wins over the rule. *Auto* leaves the
-  line uncapped so its real peak is learned.
-- **Auto respects latency** (on by default): when the latency to the Internet
-  rises, Gextto backs off for a few seconds to see whose queue it is. Its own:
-  it keeps the line. Someone else's: it yields step by step and takes the line
-  back when they are done. The router's UPnP counters, when present, tell who
-  else is on the line; the Downloads page shows the guard while it acts.
-- **Seeding that follows the tracker**: ratio, time and **inactivity** limits
-  (a seed that uploads nothing for N minutes stops), and **seed rules** by
-  source/indexer and category — a private tracker's rules apply to its torrents
-  only, with the same behaviour on gx-torrent and qBittorrent. How to set them:
-  [seeding limits](docs/MANUAL.en.md#seeding-limits-per-source-rules-and-idle-seeds).
+→ *Full documentation: [Library Safety and Maintenance](docs/MANUAL.en.md#file-integrity-check) · [Advanced NAS Guide](docs/ADVANCED.en.md)*
 
-### Integrations, control and interfaces
+### Bandwidth and latency control
 
-- **Notifications and media servers**: Telegram, e-mail, webhooks and the
-  dedicated Discord, Slack, Gotify, ntfy, Pushover and Apprise channels, a
-  custom program on any event, per-group event switches, an anti-spam window and
-  a message language of its own; Jellyfin and Plex folder refreshes, an iCal
-  feed of arrivals and air dates.
-- **From the browser**: magnets and `.torrent` files go straight into the queue,
-  with the `magnet:`/`.torrent` handlers or with any extension written for
-  qBittorrent (Torrent Control for Firefox), through the qBittorrent-compatible
-  `/api/v2` subset served on Gextto's own address.
-- **Traceability**: every download carries an **Acquisition ID** across
-  search, selection, transfer, post-processing and archive logs; the dashboard
-  **To check** panel keeps each warning while its download is active; a live
-  30-minute bandwidth chart; alerts when a source keeps failing or slows down.
-- **Interfaces**: responsive web UI installable as a PWA, keyboard-navigable
-  and axe-core checked; poster view for series and movies; 20+ contrast-checked
-  themes plus custom ones; a full terminal TUI for SSH that adapts to a phone
-  screen. Six languages (IT, EN, DE, FR, ES, PL).
+- **One rule, one exception**: Choose between **Auto**, fixed speed limits, or a weekly schedule.
+  From the Downloads page, set temporary exceptions (1 to 12 hours) in a single click.
+- **Latency-aware Auto mode**: Gextto measures ping round-trip times to the Internet; when someone else
+  uses the line, it backs off gracefully to keep interactive traffic and gaming responsive, then reclaims speed.
+- **Tracker-aware seeding rules**: Configure ratio, time, and inactivity limits globally or per indexer/tracker,
+  with identical behavior on both `gx-torrent` and `qBittorrent-nox`.
 
-The web UI listens on `http://<host>:5000/`. Setup and every section are covered
-by the [English manual](docs/MANUAL.en.md) and the
-[manuale italiano](docs/MANUAL.it.md).
+→ *Full documentation: [Speed and Seeding Rules](docs/MANUAL.en.md#speed-and-bandwidth)*
+
+### Integrations and interfaces
+
+- **Rich notifications**: Telegram, e-mail, webhooks, Discord, Slack, Gotify, ntfy, Pushover,
+  Apprise, and custom scripts, with fine-grained event filtering and anti-spam windows.
+- **Media server sync**: Automatic folder refresh triggers for Jellyfin and Plex, plus an iCal feed of arrivals and air dates.
+- **Browser & *arr ecosystem**: Direct magnet/torrent capture via browser handlers, support for qBittorrent
+  extensions (e.g. Torrent Control), and a qBittorrent-compatible `/api/v2` endpoint.
+- **Accessible & modern UI**: Server-rendered HTMX interface (PWA installable on mobile), 20+ contrast-checked
+  themes, keyboard navigation (axe-core WCAG verified), and a full terminal TUI over SSH. Available in six languages
+  (IT, EN, DE, FR, ES, PL).
+
+→ *Full documentation: [API Reference](docs/API.md) · [TUI Reference](docs/tui.md)*
 
 ## Numbers
 
@@ -365,119 +280,39 @@ written in this repository under EUPL-1.2, with no third-party-derived code
 `gx-torrent` runs it as a supervised process that survives orchestrator
 restarts: Gextto re-attaches when binary and options match.
 
-- **Protocol.** BitTorrent v1, v2-only and hybrid (BEP 52) from `.torrent` and
-  magnet (`urn:btmh:`), with SHA-256 Merkle verification. **34 BEPs implemented
-  and tested** — [`docs/bep.md`](docs/bep.md) is the source of truth: wire
-  protocol, Fast Extension, metadata, PEX with IPv6, multitracker, LSD,
-  super-seeding, web seeds, private torrents, local-data hints, `lt_donthave`,
-  UDP trackers with scrape, and the DHT suite (IPv6, scrape, secure node IDs,
-  read-only, K/V store, `urn:btpk:`). Beyond the BEPs: `ws://`/`wss://` trackers
-  and **DHT feeds** (`dht://<pubkey>`).
-- **Local reuse.** Pieces and 16 KiB blocks another local torrent already
-  verified — same layout or the same v2 file — are copied and re-checked instead
-  of downloaded; private torrents are never mixed (BEP 27).
-- **Network.** TCP and uTP (BEP 29) in parallel on one port, one UDP socket for
-  uTP and DHT; adaptive uTP retransmission (a latency floor and per-connection
-  backoff); `ut_holepunch`
-  (BEP 55) as client and relay; UPnP, NAT-PMP and **PCP**; a port check that
-  tells cone from symmetric NAT; SOCKS5 and HTTP CONNECT; an
-  `outgoing-interface` killswitch for VPNs.
-- **Self-management.** The active-download count follows throughput; slow and
-  stalled torrents step aside; the disk cache sizes itself from RAM and storage
-  class (NVMe, SSD, HDD, NFS); downloads pause before a folder fills up while
-  seeding goes on; per-peer request queues adapt and the slowest idle
-  connection is the one pruned; the connections are sized from the machine — a
-  cap per torrent and a total for the whole session (75 per core) shared among
-  the running torrents, downloads first — and two seeds never stay connected.
-- **Footprint by design.** Pieces are written through and the OS page cache
-  coalesces I/O; batched `fdatasync`, never `O_SYNC` per write; sparse files,
-  `fallocate`, RAM-disk temp folders, opt-in mmap; zero-allocation hot paths
-  (in-place RC4, word-wise bitfields, zero-copy uTP); the IP blocklist is
-  binary-searched with no allocation.
-- **Streaming and safety.** Separate playback and readahead windows, live
-  per-file priorities, HTTP Range with the right `Content-Type`; an opt-in
-  **DLNA/UPnP media server** for TVs, with the NAS library and its posters;
-  SSRF-safe web seeds and `xs=`/`as=`; quarantine for peers sending corrupt
-  blocks; live per-peer diagnostics, I/O rates and Server-Sent Events.
-- **Bandwidth and peers, Tixati-style.** A per-torrent **bandwidth share**
-  (100 = normal, 200 = twice) on a limited line; an optional **trading split**
-  that serves first the peers sending data back to a torrent still
-  downloading; DHT, PEX and LSD per torrent; a **client filter** against
-  take-only clients, a public **tracker list** appended to new public torrents
-  and the **country** of each peer (DB-IP, downloaded monthly, looked up
-  locally) — all three on out of the box; a **DHT view** with the node table
-  and whether the port receives from outside.
+- **Protocol**: BitTorrent v1, v2-only and hybrid (BEP 52) with SHA-256 Merkle verification.
+  **34 BEPs implemented and tested** ([docs/bep.md](docs/bep.md)): wire protocol, Fast Extension,
+  metadata, PEX with IPv6, multitracker, LSD, super-seeding, web seeds, private torrents,
+  `lt_donthave`, UDP trackers with scrape, DHT IPv6, scrape, secure IDs, and K/V store.
+- **Local reuse**: Automatically detects and reuses local pieces and 16 KiB blocks already
+  verified on disk by another torrent without redownloading; private torrents are kept strictly isolated.
+- **Network**: TCP and uTP (BEP 29) multiplexed on a single port; BEP 55 holepunching (client and relay);
+  UPnP, NAT-PMP, and PCP; SOCKS5 and HTTP CONNECT proxy; interface-bound VPN killswitch.
+- **Resource efficiency**: OS page cache coalescing, batched `fdatasync`, sparse files, `fallocate`,
+  zero-allocation hot paths (in-place RC4, zero-copy uTP), binary-searched IP blocklist.
+- **Streaming and DLNA**: Separate playback and readahead windows, live per-file priorities, HTTP Range
+  seeking, and an opt-in DLNA/UPnP media server for smart TVs.
+- **Bandwidth policies**: Per-torrent bandwidth shares (Tixati-style), trading split favoring peers
+  sending data, out-of-the-box client filtering against leechers, and local GeoIP country lookup (DB-IP).
 
-Engine statistics are in **Health → Torrent engine** (`/?view=health`), in the
-daemon's `GET /api/v1/stats` and in `GET /api/torrents/session-stats`.
+→ *Full details: [gx-torrent Technical Document](docs/gx-torrent.md) · [BEP Compliance](docs/bep.md)*
 
-## gx-torrent as a standalone client
+### gx-torrent as a standalone client
 
-gx-torrent is also a complete client without Gextto, like `qbittorrent-nox` or
-`transmission-daemon` — **the same binary** Gextto drives, a simpler Gextto with
-everything a standalone client needs.
+`gx-torrent` can also be used as a lightweight, full-featured standalone client without Gextto,
+serving as a pure-Go alternative to `qbittorrent-nox` or `transmission-daemon`:
 
-- **qBittorrent Web API v2** (`/api/v2/...`, qBittorrent 5 calls included,
-  with the API key and the fields the WebUIs read) for Sonarr, Radarr, Lidarr,
-  Readarr and mobile managers; its own JSON API;
-  **Prometheus metrics**
-  (`/api/v1/metrics`) for Grafana or Home Assistant, and an **event stream**
-  (`/api/v1/events`) for Node-RED, Home Assistant or scripts
-  ([examples](docs/API.md#integrating-with-other-systems)).
-- **Web UI** laid out like qBittorrent's: light and dark themes; status,
-  category, tag and tracker filters; the interface **language** at the bottom of
-  the sidebar (six languages plus the JSON packs in `<data>/lang`, saved like the field in the settings); a column
-  chooser (24 columns) with resizable columns kept on the server; a full context
-  menu; a resizable detail panel (files grouped by folder, rename, peers);
-  magnet preview while typing; undo after removal; keyboard shortcuts,
-  drag-and-drop, phone-friendly cards, a **Statistics** page (session and
-  all-time totals, 1 h/24 h/7 d graph) and a **Settings** page split into seven
-  tabs — *Folders & files*, *Network*, *Bandwidth*, *Queue*, *Library*,
-  *Interface*, *System* — with one search across all of them. Every page
-  axe-core checked.
-- **RSS and automation.** A **Series & movies** page
-  that says per title what is downloaded, downloading or found but not taken,
-  with state filters, one primary action and why each release would be taken or
-  refused; an **RSS & Indexers** page with
-  ordered PASS/FAIL rules, live match previews, rule templates, feed tests,
-  pasted feed lists, and a local **archive** of everything the feeds returned.
-- **Operations.** Limits, the per-weekday scheduler, **automatic speed** that
-  measures the line and moves download and upload (manual limits stay the
-  ceiling, with optional line maxima), one-click
-  optimisation, IP filter with scheduled refresh, categories and tags with a
-  category manager and its save path, port test; seeding limits by ratio, time
-  and **inactivity**, and qBittorrent's **content layout** (original, create
-  subfolder, no subfolder) when adding. **Quality profiles** with a cutoff
-  upgrade an episode already taken when a better release appears, without
-  deleting the files; the optional **real episode list** from TVmaze says what
-  is missing even when no release ever passed through the feeds.
-- **After the download.** Move the finished data to a folder (optionally one
-  subfolder per category) while it keeps seeding, or run a program with the
-  torrent details in the environment; both off by default.
-- **From the phone.** The page installs as an app (manifest and a service
-  worker for the shared assets only) and offers a sign-out when a password is
-  set.
-- **Notifications** on the same channels as Gextto and indexarr: Telegram, a
-  webhook, Discord, Slack, Gotify, ntfy, Pushover, an Apprise server, e-mail and
-  a custom script, with the events you choose and a test button.
-- **Updates itself** from the CI builds when its own code changed, verified by
-  SHA-256, with automatic rollback.
-- **Light on the machine.** One pure-Go process, no external engine and no
-  database server: **0.3–0.5 % of one core and 28–30 MB RSS at rest**, with DHT
-  on and a full IP filter loaded; **18–37 % of one core** at 8.2–8.8 MB/s with
-  116–132 peers, that is **2.0–4.3 s of CPU per 100 MB**. A loopback transfer
-  reaches **234–274 MB/s** with about 100 MB peak RSS, and five minutes after a
-  burst the memory falls from 550 MB to 35–40 MB. Figures, machine and
-  commands in [`docs/measurements.md`](docs/measurements.md).
-- **Platforms.** Linux x86_64/aarch64 (systemd unit, `run.sh`, and a `Dockerfile`
-  that builds an unprivileged image from the sources; no image is published) and
-  a native Windows service on amd64/arm64.
+- **qBittorrent Web API v2** (`/api/v2/...`): Fully compatible with Sonarr, Radarr, Lidarr,
+  Readarr, and mobile managers.
+- **Rich Web UI**: Dark and light themes, 24 customizable columns, category manager, tag filters,
+  detail drawer (peers, piece map, files), magnet preview, drag-and-drop, and mobile-friendly cards.
+- **Automation & RSS**: Dedicated *Series & movies* status page, rule-based RSS engine with PASS/FAIL
+  filters, and local feed archive.
+- **Prometheus & Events**: Exposes `/api/v1/metrics` for Grafana/Home Assistant and `/api/v1/events`
+  for Node-RED or shell integrations.
+- **Platforms**: Linux x86_64/aarch64 (systemd unit, Dockerfile) and a native Windows service (amd64/arm64).
 
-Open `http://<host>:8890/` for its setup wizard. The `Dockerfile` in the root
-builds the daemon alone (`docker build -t gx-torrent .`, then the `docker run`
-of the [manual](docs/GXCORE-MANUAL.en.md#1-start-in-three-minutes)): there is no
-published image, and the build needs the sources. Full reference: the
-[illustrated manual](docs/GXCORE-MANUAL.en.md) and the [gx-torrent technical document](docs/gx-torrent.md).
+→ *Full manual: [Illustrated gx-core Manual](docs/GXCORE-MANUAL.en.md)*
 
 ## Tests
 
@@ -507,7 +342,7 @@ assistive-technology testing is still required
 | Need | Document |
 |---|---|
 | Operate the service | [English manual](docs/MANUAL.en.md) · [Manuale italiano](docs/MANUAL.it.md) |
-| What changed | [Changelog](changelog.en.md) |
+| What changed | [Changelog](changelog.en.md) · [Italiano](changelog.md) |
 | Measurements and method | [Measurements](docs/measurements.md) |
 | Open work | [TODO](docs/todo.md) |
 | Architecture and design | [Architecture](docs/ARCHITECTURE.md) |
@@ -556,4 +391,3 @@ for the linked third-party libraries (also on the web UI *Licence* page).
 
 Thanks to **[DeepSeek](https://www.deepseek.com/)** for its support and patience
 while this project grew.
-
