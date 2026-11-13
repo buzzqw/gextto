@@ -291,10 +291,37 @@ func v2ActionFlash(path string, raw []byte, status int) (string, bool) {
 	if strings.HasPrefix(path, "/api/archive/batch-download") {
 		var payload struct {
 			Accepted int `json:"accepted"`
+			Rejected []struct {
+				Status int    `json:"status"`
+				Error  string `json:"error"`
+			} `json:"rejected"`
 		}
 		if json.Unmarshal(raw, &payload) == nil {
 			if payload.Accepted > 0 {
-				return "Torrent aggiunto ai download con successo.", false
+				if len(payload.Rejected) == 0 {
+					return "Torrent aggiunto ai download con successo.", false
+				}
+				return "Torrent aggiunti ai download; alcuni non sono stati avviati perché già presenti.", false
+			}
+			// A refusal must say why: «already present» and «invalid link» are
+			// different problems, and only the first one means «nothing to do».
+			duplicates := 0
+			detail := ""
+			for _, item := range payload.Rejected {
+				lowered := strings.ToLower(item.Error)
+				if item.Status == http.StatusConflict && (strings.Contains(lowered, "duplicate") || strings.Contains(lowered, "already")) {
+					duplicates++
+					continue
+				}
+				if detail == "" {
+					detail = item.Error
+				}
+			}
+			if len(payload.Rejected) > 0 && duplicates == len(payload.Rejected) {
+				return "Già presenti nei download: nessun nuovo torrent avviato.", true
+			}
+			if detail != "" {
+				return "Download non avviato: " + detail, true
 			}
 			return "Torrent non avviato o già presente nei download.", true
 		}

@@ -1658,6 +1658,21 @@ func TestV2ActionFlash(t *testing.T) {
 	if isErr || message != "Backup creato" {
 		t.Fatalf("backup success -> %q err=%v", message, isErr)
 	}
+	// A batch download must never report a wrong reason: a duplicate and an
+	// invalid link read differently, and only the duplicate means "already
+	// downloading".
+	message, isErr = v2ActionFlash("/api/archive/batch-download", []byte(`{"ok":true,"accepted":1,"rejected":[]}`), http.StatusOK)
+	if isErr || !strings.Contains(message, "aggiunto") {
+		t.Fatalf("batch accepted -> %q err=%v", message, isErr)
+	}
+	message, isErr = v2ActionFlash("/api/archive/batch-download", []byte(`{"ok":true,"accepted":0,"rejected":[{"title":"x","status":409,"error":"torrent duplicate"}]}`), http.StatusOK)
+	if !isErr || !strings.Contains(message, "Già presenti") {
+		t.Fatalf("batch duplicate -> %q err=%v", message, isErr)
+	}
+	message, isErr = v2ActionFlash("/api/archive/batch-download", []byte(`{"ok":true,"accepted":0,"rejected":[{"title":"x","status":400,"error":"invalid magnet link"}]}`), http.StatusOK)
+	if !isErr || !strings.Contains(message, "invalid magnet link") || strings.Contains(message, "Già presenti") {
+		t.Fatalf("batch refused -> %q err=%v", message, isErr)
+	}
 }
 
 // TestV2BackupButtonsAnnounceWork guards the Maintenance → Backup controls:

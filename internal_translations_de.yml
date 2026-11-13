@@ -4859,6 +4859,8 @@ deu:
   "Torrent aggiunto ai download con successo.": "Torrent erfolgreich zu den Downloads hinzugefügt."
   "Release aggiunta ai download.": "Release zu den Downloads hinzugefügt."
   "Torrent non avviato o già presente nei download.": "Torrent nicht gestartet oder bereits in den Downloads vorhanden."
+  "Torrent aggiunti ai download; alcuni non sono stati avviati perché già presenti.": "Torrents zu den Downloads hinzugefügt; einige wurden nicht gestartet, weil sie bereits vorhanden waren."
+  "Già presenti nei download: nessun nuovo torrent avviato.": "Bereits in den Downloads: kein neuer Torrent wurde gestartet."
   "Tracker corrente": "Aktueller Tracker"
   "Ultimo scaricato": "Zuletzt heruntergeladen"
   "Usa il PIN dell'app Simkl per collegare l'account.": "Verwende die PIN der Simkl-App, um das Konto zu verknüpfen."

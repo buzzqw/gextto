@@ -4806,6 +4806,8 @@ spa:
   "Torrent aggiunto ai download con successo.": "Torrent añadido a las descargas correctamente."
   "Release aggiunta ai download.": "Release añadida a las descargas."
   "Torrent non avviato o già presente nei download.": "Torrent no iniciado o ya presente en las descargas."
+  "Torrent aggiunti ai download; alcuni non sono stati avviati perché già presenti.": "Torrents añadidos a las descargas; algunos no se iniciaron porque ya estaban presentes."
+  "Già presenti nei download: nessun nuovo torrent avviato.": "Ya presentes en las descargas: no se inició ningún torrent nuevo."
   "Tracker corrente": "Tracker actual"
   "Ultimo scaricato": "Último descargado"
   "Usa il PIN dell'app Simkl per collegare l'account.": "Usa el PIN de la app de Simkl para vincular la cuenta."

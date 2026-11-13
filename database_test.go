@@ -2759,6 +2759,71 @@ func TestArchiveGapsSkipEpisodesAlreadyDownloading(t *testing.T) {
 	assertEqual(t, perSeries, [][2]int64{{1, 1}, {1, 3}, {1, 4}})
 }
 
+// The engine can be downloading an episode without the library holding a
+// placeholder for it: a reconcile or a restore clears and re-adds the torrent,
+// and the episode row goes with the placeholder. The series page must show the
+// episode as downloading, not as missing, and the manual "Cerca mancanti" must
+// not offer it again: the Missing tab already reads torrent_meta.
+func TestEpisodeListShowsDownloadsWithoutPlaceholders(t *testing.T) {
+	db := newTestDB(t)
+	if _, err := db.db.Exec("INSERT INTO series(id,name) VALUES (1,'Show')"); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.SaveSeriesMetadata("Show", [][2]int64{{1, 5}, {2, 2}}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.db.Exec("INSERT INTO episodes(series_id,season,episode,title,downloaded_at,archive_path) VALUES (1,1,1,'Show S01E01',datetime('now'),'/library/Show S01E01.mkv')"); err != nil {
+		t.Fatal(err)
+	}
+	// A single episode, a two-episode release and a whole season, none of them
+	// with an episode row.
+	rangeJSON := `{"release":{"title":"Show S01E03-04","season":1,"episode":3,"episode_range":[3,4]}}`
+	for _, row := range []struct {
+		hash, status string
+		season       int64
+		episode      any
+		metadata     string
+	}{
+		{"1111111111111111111111111111111111111111", "downloading", 1, 2, ""},
+		{"2222222222222222222222222222222222222222", "queued", 1, 3, rangeJSON},
+		{"3333333333333333333333333333333333333333", "downloading", 2, nil, ""},
+	} {
+		if _, err := db.db.Exec("INSERT INTO torrent_meta(hash,series_name,season,episode,status,title,metadata_json,created_at,updated_at) VALUES (?1,'Show',?2,?3,?4,'Show download',?5,datetime('now'),datetime('now'))", row.hash, row.season, row.episode, row.status, row.metadata); err != nil {
+			t.Fatal(err)
+		}
+	}
+	items, err := db.EpisodesForSeries("Show", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	statuses := map[[2]int64]string{}
+	for _, item := range items {
+		statuses[[2]int64{item.Season, item.Episode}] = item.Status
+	}
+	assertEqual(t, len(items), 7)
+	want := map[[2]int64]string{
+		{1, 1}: "downloaded",
+		{1, 2}: "downloading",
+		{1, 3}: "queued",
+		{1, 4}: "queued",
+		{1, 5}: "missing",
+		{2, 1}: "downloading",
+		{2, 2}: "downloading",
+	}
+	assertEqual(t, statuses, want)
+	// The manual search must return the same gaps as the Missing tab.
+	missing, err := db.UnarchivedEpisodesForSeries("Show", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertEqual(t, missing, [][2]int64{{1, 5}})
+	perSeries, err := db.ArchiveGapsForSeries("Show")
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertEqual(t, perSeries, [][2]int64{{1, 5}})
+}
+
 // eD2k files live in aMule, not in the torrent session: the reconciliation
 // must leave them alone, or PendingEd2kHashes stops watching them and a
 // finished file is never imported. Rows an earlier version marked as missing

@@ -4044,6 +4044,13 @@ func (d *Database) UnarchivedEpisodesForSeries(seriesName string, ignoredSeasons
 		return nil, err
 	}
 	ignoredRows.Close()
+	// An episode already on its way is not missing: the manual "Cerca mancanti"
+	// and the Missing tab must offer the same list, or a search returns a
+	// release the engine is already downloading.
+	downloading, err := d.activeDownloadEpisodes()
+	if err != nil {
+		return nil, err
+	}
 	seasons := make([]int64, 0, len(targets))
 	for season := range targets {
 		seasons = append(seasons, season)
@@ -4054,6 +4061,9 @@ func (d *Database) UnarchivedEpisodesForSeries(seriesName string, ignoredSeasons
 		if containsInt64(ignoredSeasons, season) {
 			continue
 		}
+		if downloading.season(seriesName, season) {
+			continue
+		}
 		for episode := int64(1); episode <= targets[season]; episode++ {
 			if _, ok := ignored[[2]int64{season, episode}]; ok {
 				continue
@@ -4062,6 +4072,9 @@ func (d *Database) UnarchivedEpisodesForSeries(seriesName string, ignoredSeasons
 				continue
 			}
 			if future[[2]int64{season, episode}] {
+				continue
+			}
+			if downloading.episode(seriesName, season, episode) {
 				continue
 			}
 			missing = append(missing, [2]int64{season, episode})
@@ -4089,6 +4102,27 @@ type SeriesEpisodeIndex struct {
 	ignoredEpisodes map[string]map[[2]int64]struct{}
 	episodes        map[string][]EpisodeView
 	expected        map[string][][2]int64
+	// downloading holds the episodes a torrent_meta row says are on their way
+	// even when the library has no placeholder for them: a restored, reconciled
+	// or hand-added torrent owns the download, not an episode row. Without it
+	// the series page shows those episodes as missing while the engine is
+	// downloading them (and the Missing tab, which reads torrent_meta, does not).
+	downloading map[string][]activeEpisodeRow
+	// downloadingSeasons holds the active whole-season downloads: every
+	// not-yet-archived episode of that season is on its way.
+	downloadingSeasons map[string]map[int64]activeEpisodeRow
+}
+
+// activeEpisodeRow is an episode declared by a torrent_meta row that still has
+// to be downloaded: what the episode list shows until the file is archived.
+type activeEpisodeRow struct {
+	Season     int64
+	Episode    int64
+	Status     string
+	Title      string
+	MagnetHash string
+	MagnetLink string
+	Error      string
 }
 
 // AllSeriesEpisodes reads the SeriesEpisodeIndex of the whole library.
@@ -4099,11 +4133,13 @@ func (d *Database) AllSeriesEpisodes() (*SeriesEpisodeIndex, error) {
 // loadSeriesEpisodeSources reads the rows of one series (single) or of all.
 func (d *Database) loadSeriesEpisodeSources(seriesName string, single bool) (*SeriesEpisodeIndex, error) {
 	index := &SeriesEpisodeIndex{
-		ignoredSeasons:  map[string][]int64{},
-		airDates:        map[string]map[[2]int64]string{},
-		ignoredEpisodes: map[string]map[[2]int64]struct{}{},
-		episodes:        map[string][]EpisodeView{},
-		expected:        map[string][][2]int64{},
+		ignoredSeasons:     map[string][]int64{},
+		airDates:           map[string]map[[2]int64]string{},
+		ignoredEpisodes:    map[string]map[[2]int64]struct{}{},
+		episodes:           map[string][]EpisodeView{},
+		expected:           map[string][][2]int64{},
+		downloading:        map[string][]activeEpisodeRow{},
+		downloadingSeasons: map[string]map[int64]activeEpisodeRow{},
 	}
 	var args []any
 	seriesFilter, metadataFilter := "", ""
@@ -4198,6 +4234,52 @@ func (d *Database) loadSeriesEpisodeSources(seriesName string, single bool) (*Se
 	}); err != nil {
 		return nil, err
 	}
+	// The episodes the engine is downloading even when the library has no
+	// placeholder for them: a reconciled or restored torrent is known only by
+	// its torrent_meta row, and the episode list must show it as queued or
+	// downloading instead of missing.
+	downloadingFilter := ""
+	if single {
+		downloadingFilter = " AND series_name=?1"
+	}
+	if err := scan(`SELECT COALESCE(series_name,''),season,episode,status,COALESCE(title,''),
+                    COALESCE(hash,''),COALESCE(link,''),COALESCE(error,''),COALESCE(metadata_json,'')
+             FROM torrent_meta
+             WHERE status NOT IN ('completed','error','removed') AND season IS NOT NULL AND COALESCE(series_name,'')<>''`+downloadingFilter,
+		func(rows *sql.Rows) error {
+			var name, status, title, hash, link, failure, metadataJSON string
+			var season int64
+			var episode sql.NullInt64
+			if err := rows.Scan(&name, &season, &episode, &status, &title, &hash, &link, &failure, &metadataJSON); err != nil {
+				return err
+			}
+			row := activeEpisodeRow{Season: season, Status: status, Title: title, MagnetHash: hash, MagnetLink: link, Error: failure}
+			// A multi-episode release lists its episodes in the stored metadata.
+			var metadata models.TorrentMeta
+			if metadataJSON != "" && json.Unmarshal([]byte(metadataJSON), &metadata) == nil && len(metadata.Release.EpisodeRange) > 1 {
+				for _, value := range metadata.Release.EpisodeRange {
+					episodeRow := row
+					episodeRow.Episode = value
+					key := NormalizeSeriesName(name)
+					index.downloading[key] = append(index.downloading[key], episodeRow)
+				}
+				return nil
+			}
+			if !episode.Valid || episode.Int64 == 0 {
+				key := NormalizeSeriesName(name)
+				if index.downloadingSeasons[key] == nil {
+					index.downloadingSeasons[key] = map[int64]activeEpisodeRow{}
+				}
+				index.downloadingSeasons[key][season] = row
+				return nil
+			}
+			row.Episode = episode.Int64
+			key := NormalizeSeriesName(name)
+			index.downloading[key] = append(index.downloading[key], row)
+			return nil
+		}); err != nil {
+		return nil, err
+	}
 	if err := scan("SELECT series_name,season,episode_count FROM series_metadata"+metadataFilter+" ORDER BY season", func(rows *sql.Rows) error {
 		var name string
 		var season, count int64
@@ -4237,6 +4319,29 @@ func (index *SeriesEpisodeIndex) Episodes(seriesName string, extraIgnored []int6
 	for _, item := range items {
 		present[[2]int64{item.Season, item.Episode}] = struct{}{}
 	}
+	downloading := make(map[[2]int64]activeEpisodeRow)
+	for _, row := range index.downloading[NormalizeSeriesName(seriesName)] {
+		downloading[[2]int64{row.Season, row.Episode}] = row
+	}
+	downloadingSeason := index.downloadingSeasons[NormalizeSeriesName(seriesName)]
+	// episodeViewForDownload turns one torrent_meta row into the row the page
+	// shows: the placeholder is missing, the download is not.
+	episodeViewForDownload := func(row activeEpisodeRow, ignored bool) EpisodeView {
+		hash := row.MagnetHash
+		link := row.MagnetLink
+		return EpisodeView{
+			SeriesName:   seriesName,
+			Season:       row.Season,
+			Episode:      row.Episode,
+			Title:        row.Title,
+			QualityScore: 0,
+			MagnetHash:   &hash,
+			MagnetLink:   &link,
+			Status:       row.Status,
+			Error:        row.Error,
+			Ignored:      ignored,
+		}
+	}
 	for _, pair := range index.expected[seriesName] {
 		season, count := pair[0], pair[1]
 		if _, ok := ignoredSeasons[season]; ok {
@@ -4247,6 +4352,25 @@ func (index *SeriesEpisodeIndex) Episodes(seriesName string, extraIgnored []int6
 				continue
 			}
 			_, ignored := ignoredEpisodes[[2]int64{season, episode}]
+			// An episode the engine is downloading is not missing, even when
+			// its placeholder was cleared by a reconcile.
+			if row, ok := downloading[[2]int64{season, episode}]; ok {
+				item := episodeViewForDownload(row, ignored)
+				item.AirDate = airDates[[2]int64{season, episode}]
+				items = append(items, item)
+				delete(downloading, [2]int64{season, episode})
+				continue
+			}
+			// An active whole-season pack downloads every episode of the
+			// season: none of them is a gap while it runs.
+			if row, ok := downloadingSeason[season]; ok {
+				item := episodeViewForDownload(row, ignored)
+				item.Episode = episode
+				item.Title = ""
+				item.AirDate = airDates[[2]int64{season, episode}]
+				items = append(items, item)
+				continue
+			}
 			items = append(items, EpisodeView{
 				ID:           0,
 				SeriesName:   seriesName,
@@ -4266,6 +4390,21 @@ func (index *SeriesEpisodeIndex) Episodes(seriesName string, extraIgnored []int6
 				Ignored:      ignored,
 			})
 		}
+	}
+	// A download may cover an episode the metadata does not list yet (a new
+	// season before the refresh): show it too, it is not a gap.
+	for key, row := range downloading {
+		if _, ok := present[key]; ok {
+			// The placeholder already carries the same download.
+			continue
+		}
+		if _, ok := ignoredSeasons[row.Season]; ok {
+			continue
+		}
+		_, ignored := ignoredEpisodes[[2]int64{row.Season, row.Episode}]
+		item := episodeViewForDownload(row, ignored)
+		item.AirDate = airDates[[2]int64{row.Season, row.Episode}]
+		items = append(items, item)
 	}
 	// Titolo mostrato nel dettaglio serie: il nome del file rinominato.
 	for i := range items {

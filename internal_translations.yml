@@ -4196,6 +4196,8 @@ eng:
   "Torrent aggiunto ai download con successo.": "Torrent added to downloads successfully."
   "Release aggiunta ai download.": "Release added to downloads."
   "Torrent non avviato o già presente nei download.": "Torrent not started or already present in downloads."
+  "Torrent aggiunti ai download; alcuni non sono stati avviati perché già presenti.": "Torrents added to downloads; some were not started because they were already there."
+  "Già presenti nei download: nessun nuovo torrent avviato.": "Already in the downloads: no new torrent was started."
   "Tracker corrente": "Current tracker"
   "Ultimo scaricato": "Last downloaded"
   "Usa il PIN dell'app Simkl per collegare l'account.": "Use the Simkl app PIN to link the account."

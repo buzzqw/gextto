@@ -1153,6 +1153,7 @@ func BatchArchiveDownload(w http.ResponseWriter, r *http.Request, s *AppState) {
 			source = item.Source
 		}
 		var status int
+		var value any
 		if strings.TrimSpace(item.Ed2kLink) != "" {
 			// An eD2k result has no magnet: queue its ed2k:// link through the
 			// same path as the search results, so aMule gets it. The release is
@@ -1163,7 +1164,7 @@ func BatchArchiveDownload(w http.ResponseWriter, r *http.Request, s *AppState) {
 			if parsed := ParseEd2kRelease(item.Title, link, source, 0, 0, time.Now().UTC()); parsed != nil {
 				release = *parsed
 			}
-			status, _ = AddRelease(s, release)
+			status, value = AddRelease(s, release)
 		} else {
 			release := ParseRelease(item.Title, item.Magnet, source)
 			if release == nil && IsTorrentURL(item.Magnet) {
@@ -1174,15 +1175,21 @@ func BatchArchiveDownload(w http.ResponseWriter, r *http.Request, s *AppState) {
 				release = ParseReleaseSource(item.Title, "", &link, source, time.Now().UTC())
 			}
 			if release == nil {
-				status, _ = addRawMagnet(s, item.Magnet)
+				status, value = addRawMagnet(s, item.Magnet)
 			} else {
-				status, _ = gh4AddRelease(s, *release)
+				status, value = gh4AddRelease(s, *release)
 			}
 		}
 		if (status >= 200 && status < 300) || status == http.StatusAccepted {
 			accepted++
 		} else {
-			rejected = append(rejected, map[string]any{"title": item.Title, "status": status})
+			// Carry the reason: «already present» and «invalid link» must not
+			// read the same in the answer of an action.
+			reason := ""
+			if payload, ok := value.(map[string]any); ok {
+				reason, _ = payload["error"].(string)
+			}
+			rejected = append(rejected, map[string]any{"title": item.Title, "status": status, "error": reason})
 		}
 	}
 	jsonStatus(w, http.StatusOK, map[string]any{"ok": true, "accepted": accepted, "rejected": rejected})
