@@ -417,7 +417,8 @@ The standalone pages follow the same structure:
   dialog: series or movie, the title with a search that shows how it is named in
   the archive, feeds and indexers (pick one to use it) and the episodes of it
   already in the archive, which fill the language when picked, then seasons,
-  language (with quick picks), subtitles (terms matched on the release name,
+  language (with quick picks `ita` and `eng`, and any code typed by hand),
+  subtitles (terms matched on the release name,
   with quick picks like `sub ita`) and the **quality profile** — the only quality
   control, with a link to create or edit the profiles — and the other options
   folded away.

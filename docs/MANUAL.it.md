@@ -1230,7 +1230,7 @@ sottotitoli, esclusioni e «Permetti upgrade». Si gestiscono in *Configurazione
 - **Qualità** si sceglie da un elenco (360p … 2160p, un minimo con «+»,
   l'intervallo `720p-1080p`, oppure *Qualsiasi*).
 - **Lingua** e **Sottotitoli** propongono le scelte comuni (`ita`, `eng`,
-  `ita,eng`, `multi`, `any`) ma accettano anche altri codici (`fre`,
+  `ita,eng`, `any`) ma accettano anche altri codici (`fre`,
   `ita,eng,fre`). Vuota vale la lingua predefinita di Gextto.
 - Finché non salvi la lista, Gextto genera da sé un profilo per ogni
   combinazione già presente in libreria; il primo è **Default**. Due profili non

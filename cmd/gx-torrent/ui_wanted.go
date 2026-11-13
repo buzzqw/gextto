@@ -699,7 +699,9 @@ func wantedArchiveEpisode(title string, terms []string) (base string, season, ep
 }
 
 // titleLanguageTags maps the language words a release name declares to the
-// terms the wanted filter uses, so the form can be filled with them.
+// terms the wanted filter uses, so the form can be filled with them. «multi»
+// and «multisub» are left out: they name a release with several tracks, not a
+// language, and the field asks for the audio language the title wants.
 var titleLanguageTags = map[string]string{
 	"ita": "ita", "italian": "ita", "italiano": "ita", "italiana": "ita",
 	"eng": "eng", "english": "eng", "inglese": "eng",
@@ -707,11 +709,10 @@ var titleLanguageTags = map[string]string{
 	"fra": "fra", "fre": "fra", "french": "fra", "francese": "fra",
 	"spa": "spa", "esp": "spa", "spanish": "spa", "spagnolo": "spa",
 	"pol": "pol", "polish": "pol", "polacco": "pol",
-	"multi": "multi", "multisub": "multi",
 }
 
 // titleLanguageTerms reads the audio languages a release name declares, as the
-// terms the wanted language field uses (ita, eng, multi, ...). A tag right
+// terms the wanted language field uses (ita, eng, ...). A tag right
 // after "sub" is a subtitle, not the audio, and is not reported: the form
 // fills the language field, not the subtitles. A release that declares none
 // reports nothing, so the field keeps what it had.

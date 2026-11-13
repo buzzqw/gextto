@@ -320,7 +320,8 @@ func TestTitleLanguageTerms(t *testing.T) {
 	}{
 		{"The Mandalorian S01E01 1080p ITA WEB-DL", "ita"},
 		{"The.Mandalorian.S01E02.1080p.ITA-ENG", "ita, eng"},
-		{"Show S01E01 2160p MULTI", "multi"},
+		{"Show S01E01 2160p MULTI", ""},
+		{"Show S01E01 1080p MULTISUB ITA", "ita"},
 		{"Show S01E01 1080p SUB ITA", ""},
 		{"Show S01E01 1080p ITA SUB ITA", "ita"},
 		{"Show S01E01 1080p English", "eng"},
@@ -374,7 +375,7 @@ func TestUIWantedSearchListsTheArchiveEpisodes(t *testing.T) {
 	}
 	want := []wantedSearchEpisode{
 		{Season: 1, Episode: 1, Quality: "1080p", Language: "ita"},
-		{Season: 1, Episode: 2, Quality: "2160p", Language: "multi"},
+		{Season: 1, Episode: 2, Quality: "2160p", Language: ""},
 		{Season: 1, Episode: 3, Quality: "720p", Language: "ita"},
 		{Season: 2, Episode: 0, Pack: true, Quality: "1080p", Language: "ita"},
 	}

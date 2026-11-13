@@ -486,12 +486,13 @@ var uiQualityPresetOptions = []uiListFieldOption{
 
 // uiLanguagePresetOptions are the usual audio/subtitle language choices of the
 // profile editor: suggestions of a field that also takes any other code (fre,
-// spa, ita,eng,fre, ...).
+// spa, ita,eng,fre, ...). «multi» is not offered: it names a release with
+// several audio tracks, not a language, and a title asks for the languages it
+// wants (ita, ita,eng, any for no requirement).
 var uiLanguagePresetOptions = []uiListFieldOption{
 	{Value: "ita", Label: "Italiano"},
 	{Value: "eng", Label: "Inglese"},
 	{Value: "ita,eng", Label: "Italiano + Inglese"},
-	{Value: "multi", Label: "Multi"},
 	{Value: "any", Label: "Qualsiasi"},
 }
 

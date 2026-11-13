@@ -2213,6 +2213,10 @@ func languageSubtitleAllowed(quality *models.Quality, language string, subtitle 
 				detected = append(detected, normalizeLanguageCode(value))
 			}
 		}
+		// «multi» is not a language: the profile editor no longer offers it
+		// (a title asks for the languages it wants), but a profile saved by an
+		// earlier version still carries it, and it keeps meaning the release
+		// declares more than one audio language.
 		if len(requested) == 1 && requested[0] == "multi" {
 			return len(detected) > 1
 		}

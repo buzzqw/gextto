@@ -1217,7 +1217,7 @@ and upgrades → Quality profiles*.
 - **Quality** is picked from a list (360p … 2160p, a minimum with «+», the
   `720p-1080p` range, or *Any*).
 - **Language** and **Subtitles** offer the common choices (`ita`, `eng`,
-  `ita,eng`, `multi`, `any`) but also take other codes (`fre`, `ita,eng,fre`).
+  `ita,eng`, `any`) but also take other codes (`fre`, `ita,eng,fre`).
   Empty means Gextto's default language.
 - Until you save the list, Gextto generates a profile for each combination
   already in the library; the first is **Default**. Two profiles cannot share a
