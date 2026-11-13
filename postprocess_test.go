@@ -534,6 +534,44 @@ func TestAcceptsPartialPackWhenEpisodesWereDeliberatelySkipped(t *testing.T) {
 	}
 }
 
+// An "in progress" pack declares how many episodes it held when it was
+// published; its .torrent may carry only the first one. The pre-download check
+// downloads such a pack because it holds a wanted episode, so the completion
+// check must accept that episode instead of rejecting the whole pack.
+func TestAcceptsInProgressPackHoldingFewerEpisodesThanDeclared(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "Example.S03E01.mkv"), []byte("one"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// A file the title does not declare (the pack grew past its count) is not
+	// part of this download and must not reject it either.
+	if err := os.WriteFile(filepath.Join(root, "05.mkv"), []byte("five"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	release := models.Release{
+		Title:              "Example - Stagione 3 (2026) [IN CORSO][04/08] 2160p WEB-DL",
+		Magnet:             "magnet:?xt=urn:btih:0123456789012345678901234567890123456789",
+		Source:             "test",
+		Kind:               "series",
+		Series:             stringPtr("Example"),
+		Season:             int64Ptr(3),
+		Episode:            int64Ptr(1),
+		IsPack:             true,
+		EpisodeRange:       []int64{1, 2, 3, 4},
+		InProgressEpisodes: 4,
+		Seeders:            -1,
+		Peers:              -1,
+		DiscoveredAt:       time.Now().UTC(),
+	}
+	files, err := MatchingPackFiles(root, &release)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(files) != 1 || files[0].Episode != 1 {
+		t.Fatalf("matched %v, want only episode 1", files)
+	}
+}
+
 func TestVideoFilesIncludeLegacyWebmAndWmvExtensions(t *testing.T) {
 	root := t.TempDir()
 	if err := os.WriteFile(filepath.Join(root, "Example.S01E01.webm"), []byte("webm"), 0o644); err != nil {

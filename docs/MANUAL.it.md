@@ -454,8 +454,9 @@ onda che non sono in libreria, raggruppate per serie e per stagione:
 
 Non sono mancanti le puntate non ancora andate in onda, né quelle che hanno già
 un download in corso (anche aggiunto a mano o da una cartella osservata), né le
-puntate di una stagione il cui pack sta scaricando. Se il download finisce in
-errore, la puntata torna tra i mancanti.
+puntate di una stagione il cui pack sta scaricando, né quelle già scaricate che
+stanno ancora seminando nella cartella di trasferimento prima di passare in
+libreria. Se il download finisce in errore, la puntata torna tra i mancanti.
 
 Se per una puntata non esiste nessuna copia nel profilo, l'elenco propone
 l'unica copia nella lingua richiesta con il badge **🆘 ultima risorsa**: è quella
@@ -490,6 +491,10 @@ serve solo a non aspettare il ciclo successivo.
   log dice cosa conteneva e il pack sparisce senza aver scaricato nulla. Vale
   solo per i pack scelti dal ciclo: un pack che avvii tu a mano non viene mai
   scartato.
+- Un pack annunciato **in corso** (per esempio «4 su 8» puntate) può contenere
+  solo le puntate già uscite: quelle che ci sono dentro entrano in libreria e le
+  altre restano mancanti, da cercare più avanti. Gextto non scarta il download
+  perché il pack è ancora incompleto.
 - Se un download resta **fermo a 0 B/s o in attesa dei metadati** oltre il
   tempo impostato in *Configurazione → Qualità e upgrade → Download bloccati*,
   la ricerca può avviare un'alternativa della stessa puntata (o della stagione)

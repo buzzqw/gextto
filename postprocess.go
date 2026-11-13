@@ -567,6 +567,14 @@ func MatchingPackFiles(source string, release *models.Release) ([]PackSourceFile
 	for episode := range declared {
 		expected[episode] = true
 	}
+	// An "in progress" pack ("Stagione 3 [IN CORSO][04/08]") declares how many
+	// episodes the pack held when it was published, not what its .torrent
+	// carries: the pre-download check keeps it as long as it holds at least one
+	// wanted episode (see incompletePackReason). The completion check reads the
+	// same declaration the same way, or a pack chosen because it holds S03E01
+	// would be rejected — and its download thrown away — because S03E02–S03E04
+	// are not inside it yet.
+	inProgress := release.InProgressEpisodes > 0
 	// Episodes left out on purpose by the in-download inspection (priority 0)
 	// are not expected on disk; the files that were kept are enough.
 	for _, skipped := range release.SkippedEpisodes {
@@ -597,6 +605,11 @@ func MatchingPackFiles(source string, release *models.Release) ([]PackSourceFile
 			return []PackSourceFile{}, nil
 		}
 		if !expected[episode] || found[episode] {
+			if inProgress {
+				// A pack that grew past its declared count is not a different
+				// pack: the extra files are simply outside this download.
+				continue
+			}
 			return []PackSourceFile{}, nil
 		}
 		found[episode] = true
@@ -615,6 +628,12 @@ func MatchingPackFiles(source string, release *models.Release) ([]PackSourceFile
 		deduped = append(deduped, file)
 	}
 	matched = deduped
+	if inProgress {
+		// The declared count is a promise, not a checklist: the files the pack
+		// holds are the ones that are imported, and the episodes that are still
+		// missing stay gaps the next search can fill.
+		return matched, nil
+	}
 	if len(release.SkippedEpisodes) > 0 {
 		// The pack was deliberately downloaded in part: accept the files that
 		// are here as long as every one of them belongs to the declared range.

@@ -450,9 +450,10 @@ not in the library, grouped by series and season:
 - **Filter by series** narrows the list.
 
 Not missing: episodes that have not aired yet, episodes that already have a
-download in progress (even added by hand or from a watched folder), and the
-episodes of a season whose pack is downloading. If the download ends in an
-error, the episode goes back to the missing list.
+download in progress (even added by hand or from a watched folder), the
+episodes of a season whose pack is downloading, and episodes already downloaded
+that are still seeding in the transfer folder before moving to the library. If
+the download ends in an error, the episode goes back to the missing list.
 
 If no copy of an episode matches the profile, the list offers the only copy in
 the requested language with the **🆘 last resort** badge: it is the one Gextto
@@ -486,6 +487,10 @@ and — if you enable it — asks eD2k once per season when torrents find nothin
   only if something useful is inside. Otherwise the log says what it held and
   the pack goes without having downloaded anything. It applies only to packs
   chosen by the cycle: a pack you start by hand is never dropped.
+- A pack announced as **in progress** (for example «4 of 8» episodes) can hold
+  only the episodes already aired: the ones inside it enter the library and the
+  others stay missing, to be searched later. Gextto does not throw the download
+  away because the pack is still incomplete.
 - If a download stays **stuck at 0 B/s or waiting for metadata** longer than
   the time set in *Configuration → Quality and upgrades → Stuck downloads*, the
   search can start an alternative for the same episode (or season) without
