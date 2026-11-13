@@ -375,7 +375,10 @@ func searchMissingEpisodes(ctx context.Context, s *AppState, cfg *Config, series
 			}
 		}
 	}
-	allGaps, err := s.db.UnarchivedEpisodesForSeries(series.Name, series.IgnoredSeasons)
+	// The Missing tab and this search must answer with the same list: an
+	// episode already in hand is not a gap, even while it is still seeding in
+	// the download folder and has no archive path yet.
+	allGaps, err := s.db.ArchiveGapsForSeries(series.Name)
 	if err != nil {
 		allGaps = nil
 	}

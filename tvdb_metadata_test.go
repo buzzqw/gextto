@@ -177,7 +177,7 @@ func TestTvdbOnlyCycleMetadataAndStatus(t *testing.T) {
 		t.Fatalf("status = %q", statuses["Example Show"])
 	}
 	// The missing episodes now include the seasons TVDB knows about.
-	gaps, err := db.UnarchivedEpisodesForSeries("Example Show", nil)
+	gaps, err := db.ArchiveGapsForSeries("Example Show")
 	if err != nil || len(gaps) < 5 {
 		t.Fatalf("gaps = %v, %v", gaps, err)
 	}

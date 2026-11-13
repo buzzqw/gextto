@@ -815,25 +815,33 @@ func TestTorrentMetadataRoundTripsAndCompletionUpdatesNormalizedState(t *testing
 	assertEqual(t, size, int64(42))
 }
 
-func TestManualMissingSearchUsesArchivePresenceNotClientState(t *testing.T) {
+// The manual missing search reads the same gaps as the Missing tab: an
+// episode already in hand is not missing, even while it is still seeding in
+// the download folder and has no archive path yet.
+func TestManualMissingSearchUsesTheMissingTabGaps(t *testing.T) {
 	db := newTestDB(t)
 	if _, err := db.db.Exec("INSERT INTO series(id,name) VALUES (1,'Example')"); err != nil {
 		t.Fatal(err)
 	}
-	if err := db.SaveSeriesMetadata("Example", [][2]int64{{1, 3}}); err != nil {
+	if err := db.SaveSeriesMetadata("Example", [][2]int64{{1, 4}}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.db.Exec("INSERT INTO episodes(series_id,season,episode,title,archive_path) VALUES (1,1,1,'Example S01E01','')"); err != nil {
+	// Downloaded, complete, still seeding: downloaded_at is set, the file has
+	// not moved to the library yet.
+	if _, err := db.db.Exec("INSERT INTO episodes(series_id,season,episode,title,downloaded_at,archive_path) VALUES (1,1,1,'Example S01E01',datetime('now'),'')"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.db.Exec("INSERT INTO episodes(series_id,season,episode,title,archive_path) VALUES (1,1,2,'Example S01E02','/nas/Example S01E02.mkv')"); err != nil {
+	if _, err := db.db.Exec("INSERT INTO episodes(series_id,season,episode,title,downloaded_at,archive_path) VALUES (1,1,2,'Example S01E02',datetime('now'),'/nas/Example S01E02.mkv')"); err != nil {
 		t.Fatal(err)
 	}
-	missing, err := db.UnarchivedEpisodesForSeries("Example", nil)
+	if _, err := db.db.Exec("INSERT INTO torrent_meta(hash,series_name,season,episode,status,created_at,updated_at) VALUES ('1111111111111111111111111111111111111111','Example',1,3,'queued',datetime('now'),datetime('now'))"); err != nil {
+		t.Fatal(err)
+	}
+	gaps, err := db.ArchiveGapsForSeries("Example")
 	if err != nil {
 		t.Fatal(err)
 	}
-	assertEqual(t, missing, [][2]int64{{1, 1}, {1, 3}})
+	assertEqual(t, gaps, [][2]int64{{1, 4}})
 }
 
 func TestMissingArchivedEpisodeIsEligibleForRecovery(t *testing.T) {
@@ -2633,11 +2641,6 @@ func TestGapsSkipSeriesNotYetAired(t *testing.T) {
 		t.Fatal(err)
 	}
 	assertEqual(t, gaps, []SeriesGap{})
-	missing, err := db.UnarchivedEpisodesForSeries("Unreleased", nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	assertEqual(t, missing, [][2]int64{})
 	perSeries, err := db.ArchiveGapsForSeries("Unreleased")
 	if err != nil {
 		t.Fatal(err)
@@ -2714,11 +2717,6 @@ func TestGapsSkipEpisodesNotAiredYet(t *testing.T) {
 		{Series: "Airing", Season: 1, Episode: 1},
 		{Series: "Airing", Season: 1, Episode: 3},
 	})
-	missing, err := db.UnarchivedEpisodesForSeries("Airing", nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	assertEqual(t, missing, [][2]int64{{1, 1}, {1, 3}})
 }
 
 func TestArchiveGapsSkipEpisodesAlreadyDownloading(t *testing.T) {
@@ -2811,12 +2809,7 @@ func TestEpisodeListShowsDownloadsWithoutPlaceholders(t *testing.T) {
 		{2, 2}: "downloading",
 	}
 	assertEqual(t, statuses, want)
-	// The manual search must return the same gaps as the Missing tab.
-	missing, err := db.UnarchivedEpisodesForSeries("Show", nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	assertEqual(t, missing, [][2]int64{{1, 5}})
+	// The manual search reads the same gaps as the Missing tab.
 	perSeries, err := db.ArchiveGapsForSeries("Show")
 	if err != nil {
 		t.Fatal(err)
