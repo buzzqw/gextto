@@ -224,6 +224,8 @@ func jobKindText(kind string) string {
 		return "library scan"
 	case "missing-search":
 		return "search for missing episodes"
+	case "missing-download":
+		return "download of the best missing episodes"
 	case "media-info-backfill":
 		return "reading of the real quality of library files"
 	default:

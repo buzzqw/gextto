@@ -71,8 +71,23 @@
 </div>
 {{else if .Error}}<p class="err">{{tr .Error}}</p>{{else if not .Episodes}}<p class="ok">{{tr "Nessuna puntata mancante da cercare."}}</p>{{else}}
 <p class="ok"><span>{{tr "Risultati:"}}</span> {{.Results}} · <span>{{tr "Puntate cercate:"}}</span> {{.Episodes}}.</p>
-{{if .Sources.Results}}{{template "v2_sources_rows" .Sources}}
-<p class="hint"><span>{{tr "Nessun download automatico: scegli un risultato e premi «Scarica»."}}</span></p>
+{{if .Sources.Results}}
+<div class="toolbar v2-gap-best">
+  <form method="post" action="/series/gaps/download-best" hx-post="/series/gaps/download-best" hx-swap="none" hx-disabled-elt="find button[type=submit]">
+    <input type="hidden" name="job" value="{{.JobID}}" />
+    <button class="btn sm primary" type="submit" {{trTitle "Aggiunge ai download la copia migliore di ogni puntata trovata: prima il punteggio più alto, poi più seed. Una release che copre più puntate viene aggiunta una volta sola."}}>{{tr "Aggiungi le migliori puntate mancanti"}}</button>
+  </form>
+</div>
+{{template "v2_sources_rows" .Sources}}
+<p class="hint"><span>{{tr "Nessun download automatico: scegli un risultato e premi «Scarica», oppure aggiungi in un colpo solo le copie migliori."}}</span></p>
 {{else}}<p class="muted">{{tr "Nessun risultato trovato."}}</p>{{end}}
 {{end}}
+{{end}}
+
+{{define "v2_gap_download_best_result"}}
+<div id="v2-toast-region" hx-swap-oob="innerHTML">
+  <div class="v2-toast{{if .Error}} error{{end}}" role="status">
+    <strong>{{tr "Download"}}</strong><span>{{if .Error}}{{tr .Message}}{{else}}{{tr "Aggiunta delle migliori puntate mancanti avviata: %d download." .Added}}{{end}}</span>
+  </div>
+</div>
 {{end}}

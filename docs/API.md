@@ -113,6 +113,7 @@ change. `/ui` is not served. For operational checks use
 | POST | `/series/gaps/search` | Series → Missing tab: start the background search of every missing episode of one series (form field series) |
 | GET | `/series/gaps/search/status` | Series → Missing tab: progress or result of that search (form field job) |
 | POST | `/series/gaps/search/cancel` | Series → Missing tab: cancel that search (form field job) |
+| POST | `/series/gaps/download-best` | Series → Missing tab: queue the best copy of every missing episode the search found, as a background job (form field job) |
 | GET | `/library/bulk/profile` | Series/Movies "Edit selected" panel: the value fields filled from a quality profile (?profile=ID&view=) |
 | POST | `/library/bulk` | Series/Movies "Edit selected" panel: apply the ticked values to the ticked rows |
 | GET | `/import/preview` | manual import page: preview fragment |

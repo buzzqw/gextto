@@ -13,6 +13,9 @@ import (
 	"net/url"
 	"sort"
 	"strings"
+
+	"github.com/buzzqw/gextto/internal/logging"
+	"github.com/buzzqw/gextto/internal/models"
 )
 
 // v2SeriesPage is /?view=series: the monitored list or the Missing tab.
@@ -129,6 +132,7 @@ type v2GapSearchResult struct {
 	Results  int
 	Episodes int
 	Total    int
+	Series   string
 	Sources  v2SourcesView
 	Running  bool
 	Queued   bool
@@ -136,6 +140,9 @@ type v2GapSearchResult struct {
 	Filter   string
 	Slot     string
 	Progress v2GapSearchProgress
+	// picks are the releases «Aggiungi le migliori puntate mancanti» queues:
+	// the best copy for each episode of the results. They are not rendered.
+	picks []gh2EpisodeResult
 }
 
 func v2GapSearchRedirect(filter string) string {
@@ -146,10 +153,11 @@ func v2GapSearchRedirect(filter string) string {
 	return redirect
 }
 
-func v2GapSearchResultFromOutcome(outcome missingSearchOutcome, redirect string) v2GapSearchResult {
+func v2GapSearchResultFromOutcome(outcome missingSearchOutcome, redirect, series string) v2GapSearchResult {
 	view := v2GapSearchResult{
 		Episodes: outcome.Searched,
 		Total:    outcome.TotalMissing,
+		Series:   series,
 		Sources:  v2SourcesView{Redirect: redirect, ShowEpisode: true},
 	}
 	for _, result := range outcome.Results {
@@ -157,7 +165,147 @@ func v2GapSearchResultFromOutcome(outcome missingSearchOutcome, redirect string)
 			v2SourceRowFromRelease(&result.Release, result.Origin, result.Season, result.Episode))
 	}
 	view.Results = len(view.Sources.Results)
+	view.picks = v2BestGapPicks(outcome.Results)
 	return view
+}
+
+// v2BestGapPicks chooses, for every missing episode the search found, the copy
+// to queue: within the profile before a last-resort copy, then the highest
+// score, then the most seeders. A release that covers several episodes (a
+// multi-episode file or a pack) is queued once: the episodes it covers are not
+// downloaded again on their own.
+func v2BestGapPicks(results []gh2EpisodeResult) []gh2EpisodeResult {
+	type episodeKey struct{ season, episode int64 }
+	best := map[episodeKey]gh2EpisodeResult{}
+	for _, result := range results {
+		if result.Season < 1 || result.Episode < 1 || !v2GapReleaseDownloadable(&result.Release) {
+			continue
+		}
+		key := episodeKey{season: result.Season, episode: result.Episode}
+		if current, ok := best[key]; !ok || v2GapPickPreferred(result, current) {
+			best[key] = result
+		}
+	}
+	// One entry per release: the same pack can be the best copy of several
+	// episodes, and it has to reach the engine once.
+	candidates := map[string]gh2EpisodeResult{}
+	for _, result := range best {
+		key := v2GapReleaseIdentity(&result.Release)
+		if current, ok := candidates[key]; !ok || v2GapPickPreferred(result, current) {
+			candidates[key] = result
+		}
+	}
+	ordered := make([]gh2EpisodeResult, 0, len(candidates))
+	for _, result := range candidates {
+		ordered = append(ordered, result)
+	}
+	sort.SliceStable(ordered, func(i, j int) bool {
+		return v2GapPickPreferred(ordered[i], ordered[j])
+	})
+	covered := map[episodeKey]bool{}
+	picks := make([]gh2EpisodeResult, 0, len(ordered))
+	for _, candidate := range ordered {
+		serves := false
+		for key := range best {
+			if covered[key] || !v2GapReleaseCovers(&candidate.Release, key.season, key.episode) {
+				continue
+			}
+			serves = true
+			break
+		}
+		if !serves {
+			continue
+		}
+		picks = append(picks, candidate)
+		for key := range best {
+			if v2GapReleaseCovers(&candidate.Release, key.season, key.episode) {
+				covered[key] = true
+			}
+		}
+	}
+	return picks
+}
+
+// v2GapPickPreferred reports whether candidate is the copy to queue over
+// current: the profile beats a last resort, then the score, then the seeders,
+// then the origin (a live indexer result over a stored one).
+func v2GapPickPreferred(candidate, current gh2EpisodeResult) bool {
+	if candidate.Release.LastResort != current.Release.LastResort {
+		return !candidate.Release.LastResort
+	}
+	if candidate.Release.Score != current.Release.Score {
+		return candidate.Release.Score > current.Release.Score
+	}
+	if candidate.Release.Seeders != current.Release.Seeders {
+		return candidate.Release.Seeders > current.Release.Seeders
+	}
+	if rank := v2GapOriginRank(candidate.Origin); rank != v2GapOriginRank(current.Origin) {
+		return rank > v2GapOriginRank(current.Origin)
+	}
+	// Same score, seeders and origin: pick the same one on every run.
+	return strings.ToLower(candidate.Release.Title) < strings.ToLower(current.Release.Title)
+}
+
+func v2GapOriginRank(origin string) int {
+	switch {
+	case strings.EqualFold(origin, episodeOriginIndexer):
+		return 3
+	case strings.EqualFold(origin, episodeOriginArchive):
+		return 2
+	case strings.EqualFold(origin, episodeOriginFeed):
+		return 1
+	default:
+		return 0
+	}
+}
+
+// v2GapReleaseDownloadable reports whether a result carries a usable transfer.
+func v2GapReleaseDownloadable(release *models.Release) bool {
+	if release == nil {
+		return false
+	}
+	if strings.TrimSpace(release.Magnet) != "" || strings.TrimSpace(release.Ed2kLink) != "" {
+		return true
+	}
+	return release.TorrentURL != nil && strings.TrimSpace(*release.TorrentURL) != ""
+}
+
+// v2GapReleaseIdentity names a release for de-duplication: its infohash, the
+// infohash the indexer declared, its link or, as a last resort, its title.
+func v2GapReleaseIdentity(release *models.Release) string {
+	if hash, err := releaseIdentityHash(release); err == nil && hash != "" {
+		return "hash:" + strings.ToLower(hash)
+	}
+	if hash := strings.ToLower(strings.TrimSpace(release.InfoHash)); hash != "" {
+		return "hash:" + hash
+	}
+	if strings.TrimSpace(release.Magnet) != "" {
+		return "link:" + strings.TrimSpace(release.Magnet)
+	}
+	if release.TorrentURL != nil && strings.TrimSpace(*release.TorrentURL) != "" {
+		return "url:" + strings.TrimSpace(*release.TorrentURL)
+	}
+	return "title:" + strings.ToLower(strings.TrimSpace(release.Title))
+}
+
+// v2GapReleaseCovers reports whether the release holds that episode: its own
+// number, its declared range, or the whole season of a complete pack.
+func v2GapReleaseCovers(release *models.Release, season, episode int64) bool {
+	if release == nil || release.Season == nil || *release.Season != season {
+		return false
+	}
+	if hasCompleteRange(release) {
+		return true
+	}
+	if release.Episode != nil && *release.Episode == episode {
+		return true
+	}
+	for _, value := range release.EpisodeRange {
+		if value == episode {
+			return true
+		}
+	}
+	return false
 }
 
 // V2SeriesGapsSearch is POST /series/gaps/search: it starts the whole-series
@@ -207,7 +355,7 @@ func V2SeriesGapsSearch(w http.ResponseWriter, r *http.Request, s *AppState) {
 				if ctx.Err() != nil {
 					return
 				}
-				s.jobs.SetResult(jobID, v2GapSearchResultFromOutcome(outcome, redirect))
+				s.jobs.SetResult(jobID, v2GapSearchResultFromOutcome(outcome, redirect, series.Name))
 				s.jobs.SetProgress(jobID, 1, "done")
 			}); err != nil {
 				s.jobs.Fail(job.ID, err)
@@ -261,6 +409,8 @@ func V2SeriesGapsSearchStatus(w http.ResponseWriter, r *http.Request, s *AppStat
 				view = result
 				view.Filter = filter
 				view.Slot = slot
+				// The bulk button needs the job to read the chosen releases.
+				view.JobID = job.ID
 				// The redirect was decided when the job started: the Missing
 				// tab comes back to the tab, the series page to the series.
 				view.Running = false
@@ -287,4 +437,81 @@ func V2SeriesGapsSearchCancel(w http.ResponseWriter, r *http.Request, s *AppStat
 		s.jobs.Cancel(id)
 	}
 	V2SeriesGapsSearchStatus(w, r, s)
+}
+
+// v2GapDownloadBestResult is the answer of the bulk action: a toast, because
+// the search results must stay on the page.
+type v2GapDownloadBestResult struct {
+	Added   int
+	Error   bool
+	Message string
+}
+
+// V2SeriesGapsDownloadBest is POST /series/gaps/download-best: it queues, for
+// every missing episode the search found, the best copy (the score, then the
+// seeders). It runs as a background job because a `.torrent` link has to be
+// opened first: a series with a hundred gaps would otherwise hold the request
+// for minutes.
+func V2SeriesGapsDownloadBest(w http.ResponseWriter, r *http.Request, s *AppState) {
+	view := v2GapDownloadBestResult{}
+	searchID := strings.TrimSpace(r.FormValue("job"))
+	job, found := s.jobs.Get(searchID)
+	result, resultOK := v2GapSearchResult{}, false
+	if found {
+		result, resultOK = job.Result.(v2GapSearchResult)
+	}
+	switch {
+	case !found:
+		view.Error = true
+		view.Message = "Ricerca non trovata o scaduta: rilancia «Cerca mancanti»."
+	case job.State != JobSucceeded || !resultOK:
+		view.Error = true
+		view.Message = "La ricerca non è ancora finita: aspetta i risultati."
+	case len(result.picks) == 0:
+		view.Error = true
+		view.Message = "Nessuna puntata da aggiungere: la ricerca non ha risultati scaricabili."
+	default:
+		bulk, created := s.jobs.Create("missing-download", "missing-download:"+searchID)
+		switch {
+		case bulk == nil:
+			view.Error = true
+			view.Message = "Aggiunta non avviata."
+		case !created:
+			view.Error = true
+			view.Message = "Aggiunta già in corso."
+		default:
+			picks := result.picks
+			series := result.Series
+			if err := s.jobs.Start(bulk.ID, func(ctx context.Context, id string) {
+				added, rejected := 0, 0
+				for index, pick := range picks {
+					if ctx.Err() != nil {
+						return
+					}
+					status, _ := AddRelease(s, pick.Release)
+					if (status >= 200 && status < 300) || status == http.StatusAccepted {
+						added++
+					} else {
+						rejected++
+						logging.Debug("best missing episode not queued",
+							"series", series, "title", pick.Release.Title, "status", status)
+					}
+					s.jobs.SetProgress(id, float64(index+1)/float64(len(picks)), "")
+				}
+				message := fmt.Sprintf("📥 Added %s of «%s» to the downloads",
+					countLabel(int64(added), "best missing episode", "best missing episodes"), series)
+				if rejected > 0 {
+					message += fmt.Sprintf("; %d could not be started", rejected)
+				}
+				logging.Info(message)
+			}); err != nil {
+				s.jobs.Fail(bulk.ID, err)
+				view.Error = true
+				view.Message = "Aggiunta non avviata."
+			} else {
+				view.Added = len(picks)
+			}
+		}
+	}
+	v2Render(w, http.StatusOK, "v2_gap_download_best_result", view, s)
 }

@@ -2,6 +2,7 @@ package gextto
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -9,6 +10,8 @@ import (
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/buzzqw/gextto/internal/models"
 )
 
 // TestGapsGroupedBySeriesAndSeason: the Missing tab shows one block per series
@@ -232,5 +235,124 @@ func TestSeriesDetailStartsTheBackgroundSearch(t *testing.T) {
 	}
 	if !strings.Contains(body, `id="v2-gap-result-series"`) {
 		t.Fatal("the series detail page has no target for the search job")
+	}
+}
+
+// gapTestRelease builds one search result of a missing episode.
+func gapTestRelease(title, hash string, season, episode int64, score, seeders int64, lastResort bool) models.Release {
+	s := season
+	e := episode
+	return models.Release{
+		Title:      title,
+		Magnet:     "magnet:?xt=urn:btih:" + hash,
+		Season:     &s,
+		Episode:    &e,
+		Kind:       "series",
+		Score:      score,
+		Seeders:    seeders,
+		LastResort: lastResort,
+	}
+}
+
+// TestGapBestPicksChooseScoreThenSeeders: the bulk button queues one copy per
+// missing episode, inside the profile first, then the highest score, then the
+// most seeders.
+func TestGapBestPicksChooseScoreThenSeeders(t *testing.T) {
+	results := []gh2EpisodeResult{
+		{Release: gapTestRelease("ep1 high seed", strings.Repeat("1", 40), 4, 1, 100, 90, false), Origin: episodeOriginIndexer, Season: 4, Episode: 1},
+		{Release: gapTestRelease("ep1 high score", strings.Repeat("2", 40), 4, 1, 300, 2, false), Origin: episodeOriginIndexer, Season: 4, Episode: 1},
+		{Release: gapTestRelease("ep1 last resort", strings.Repeat("3", 40), 4, 1, 900, 100, true), Origin: episodeOriginIndexer, Season: 4, Episode: 1},
+		{Release: gapTestRelease("ep2 few seeds", strings.Repeat("4", 40), 4, 2, 150, 3, false), Origin: episodeOriginIndexer, Season: 4, Episode: 2},
+		{Release: gapTestRelease("ep2 many seeds", strings.Repeat("5", 40), 4, 2, 150, 40, false), Origin: episodeOriginIndexer, Season: 4, Episode: 2},
+	}
+	picks := v2BestGapPicks(results)
+	if len(picks) != 2 {
+		t.Fatalf("picks = %d, want one per episode: %+v", len(picks), picks)
+	}
+	chosen := map[int64]string{}
+	for _, pick := range picks {
+		chosen[pick.Episode] = pick.Release.Title
+	}
+	if chosen[1] != "ep1 high score" {
+		t.Fatalf("episode 1 pick = %q, want the highest score inside the profile", chosen[1])
+	}
+	if chosen[2] != "ep2 many seeds" {
+		t.Fatalf("episode 2 pick = %q, want the most seeders at equal score", chosen[2])
+	}
+}
+
+// TestGapBestPicksQueueAPackOnce: a release covering two episodes reaches the
+// engine once, and a higher-scored single episode is still preferred for its
+// own episode.
+func TestGapBestPicksQueueAPackOnce(t *testing.T) {
+	pack := gapTestRelease("pack 01-02", strings.Repeat("a", 40), 4, 1, 200, 10, false)
+	pack.IsPack = true
+	pack.EpisodeRange = []int64{1, 2}
+	packB := pack
+	packB.Episode = int64Ptr(2)
+	single := gapTestRelease("ep2 single", strings.Repeat("b", 40), 4, 2, 500, 5, false)
+	picks := v2BestGapPicks([]gh2EpisodeResult{
+		{Release: pack, Origin: episodeOriginIndexer, Season: 4, Episode: 1},
+		{Release: packB, Origin: episodeOriginIndexer, Season: 4, Episode: 2},
+		{Release: single, Origin: episodeOriginIndexer, Season: 4, Episode: 2},
+	})
+	if len(picks) != 2 {
+		t.Fatalf("picks = %d, want the single episode and the pack once: %+v", len(picks), picks)
+	}
+	titles := []string{picks[0].Release.Title, picks[1].Release.Title}
+	if titles[0] != "ep2 single" || titles[1] != "pack 01-02" {
+		t.Fatalf("pick order = %v, want the highest score first", titles)
+	}
+}
+
+// TestGapDownloadBestRoute: a completed search exposes the bulk button, and
+// its action queues the chosen releases as a background job.
+func TestGapDownloadBestRoute(t *testing.T) {
+	state := newCycleState(t)
+	t.Cleanup(state.jobs.Close)
+	if err := CompleteSetup(state.cfg); err != nil {
+		t.Fatalf("complete setup: %v", err)
+	}
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+
+	release := gapTestRelease("Show S01E01 1080p", strings.Repeat("c", 40), 1, 1, 500, 12, false)
+	search, created := state.jobs.Create("missing-search", "missing-search:show")
+	if !created {
+		t.Fatal("search job not created")
+	}
+	if err := state.jobs.Start(search.ID, func(ctx context.Context, id string) {
+		state.jobs.SetResult(id, v2GapSearchResult{
+			Series: "Show", Episodes: 1, Total: 1, Results: 1,
+			Sources: v2SourcesView{Results: []v2SourceRow{{Title: release.Title, Episode: "S01E01", Key: "k"}}},
+			picks:   []gh2EpisodeResult{{Release: release, Origin: episodeOriginIndexer, Season: 1, Episode: 1}},
+		})
+	}); err != nil {
+		t.Fatalf("start search: %v", err)
+	}
+	waitJobState(t, state.jobs, search.ID, JobSucceeded)
+
+	code, body := v2Request(t, server, http.MethodGet, "/series/gaps/search/status?job="+url.QueryEscape(search.ID), nil)
+	if code != http.StatusOK || !strings.Contains(body, "Aggiungi le migliori puntate mancanti") {
+		t.Fatalf("result fragment has no bulk button -> %d: %s", code, body)
+	}
+
+	response, err := http.PostForm(server.URL+"/series/gaps/download-best", url.Values{"job": {search.ID}})
+	if err != nil {
+		t.Fatalf("post bulk action: %v", err)
+	}
+	defer response.Body.Close()
+	answer, _ := io.ReadAll(response.Body)
+	if response.StatusCode != http.StatusOK || !strings.Contains(string(answer), "1 download") {
+		t.Fatalf("bulk action -> %d: %s", response.StatusCode, answer)
+	}
+	bulk := state.jobs.List("missing-download", "")
+	if len(bulk) != 1 {
+		t.Fatalf("bulk jobs = %d, want 1", len(bulk))
+	}
+	waitJobState(t, state.jobs, bulk[0].ID, JobSucceeded)
+	meta, err := state.db.TorrentMeta(strings.Repeat("c", 40))
+	if err != nil || meta == nil {
+		t.Fatalf("chosen release not queued: %v %+v", err, meta)
 	}
 }

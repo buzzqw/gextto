@@ -445,6 +445,11 @@ onda che non sono in libreria, raggruppate per serie e per stagione:
   la scheda mostra l'avanzamento, puoi annullare, e alla fine elenca i
   risultati con **Scarica**. Non scarica nulla da sola, e la lista resta aperta
   dopo ogni download: puoi prenderne più di uno senza rifare la ricerca;
+- **Aggiungi le migliori puntate mancanti** compare sopra i risultati e mette in
+  scarico la copia migliore di ogni puntata trovata: prima il punteggio più
+  alto, poi più seed. Una release che copre più puntate viene aggiunta una volta
+  sola, e le puntate per cui la ricerca non ha trovato nulla restano fuori. Il
+  lavoro prosegue in background, così non devi aspettare ogni collegamento;
 - **Filtra per serie** restringe l'elenco.
 
 Non sono mancanti le puntate non ancora andate in onda, né quelle che hanno già

@@ -39,6 +39,7 @@ func Router(s *AppState) *http.ServeMux {
 	handle(s, mux, "POST /series/gaps/search", V2SeriesGapsSearch)
 	handle(s, mux, "GET /series/gaps/search/status", V2SeriesGapsSearchStatus)
 	handle(s, mux, "POST /series/gaps/search/cancel", V2SeriesGapsSearchCancel)
+	handle(s, mux, "POST /series/gaps/download-best", V2SeriesGapsDownloadBest)
 	handle(s, mux, "GET /library/bulk/profile", V2LibraryBulkProfile)
 	handle(s, mux, "POST /library/bulk", V2LibraryBulkApply)
 	// The Sonarr/Radarr v3 subset a request manager (Jellyseerr) speaks.
