@@ -832,9 +832,12 @@ type TorrentView struct {
 	PiecesTotal     int   `json:"pieces_total"`
 	PiecesHave      int   `json:"pieces_have"`
 	PiecesAvailable int   `json:"pieces_available"`
-	PieceLength     int64 `json:"piece_length"`
-	Wasted          int64 `json:"wasted"`
-	Allocated       int64 `json:"allocated"`
+	// PiecesChecked counts the pieces re-hashed by the current file check:
+	// while the torrent is in "checking_files" it says how far the check is.
+	PiecesChecked int   `json:"pieces_checked"`
+	PieceLength   int64 `json:"piece_length"`
+	Wasted        int64 `json:"wasted"`
+	Allocated     int64 `json:"allocated"`
 	// AddedAt and CompletedAt are Unix seconds.
 	AddedAt     int64 `json:"added_at"`
 	CompletedAt int64 `json:"completed_at"`

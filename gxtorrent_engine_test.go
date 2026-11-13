@@ -419,11 +419,11 @@ func TestGxTorrentItemCarriesEngineStats(t *testing.T) {
 	view := engine.toView(gxTorrentItem{
 		Hash: "AB", Name: "x", State: "downloading", Progress: 50,
 		ETASeconds: 120, Private: true, FileCount: 4,
-		PiecesTotal: 200, PiecesHave: 100, PiecesAvailable: 150, PieceLength: 1 << 20,
+		PiecesTotal: 200, PiecesHave: 100, PiecesAvailable: 150, PiecesChecked: 120, PieceLength: 1 << 20,
 		Wasted: 3 << 20, Allocated: 200 << 20, AddedAt: 1700000000,
 	}, time.Now())
 	if view.EtaSeconds != 120 || !view.Private || view.FileCount != 4 ||
-		view.PiecesTotal != 200 || view.PiecesHave != 100 || view.PiecesAvailable != 150 ||
+		view.PiecesTotal != 200 || view.PiecesHave != 100 || view.PiecesAvailable != 150 || view.PiecesChecked != 120 ||
 		view.PieceLength != 1<<20 || view.Wasted != 3<<20 || view.Allocated != 200<<20 ||
 		view.AddedAt != 1700000000 || view.CompletedAt != 0 {
 		t.Fatalf("toView dropped engine stats: %+v", view)

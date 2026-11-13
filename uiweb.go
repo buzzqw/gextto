@@ -162,6 +162,12 @@ type uiTorrentRow struct {
 	StateKey    string
 	Progress    float64
 	ProgressPct string
+	// Checking marks a torrent the engine is re-checking on disk: the bar and
+	// the percentage follow the pieces verified so far, not the downloaded
+	// data, so the operator sees the check advance.
+	Checking      bool
+	PiecesChecked int
+	PiecesTotal   int
 	// ProgressClass drives the progress bar colour (active|seed|paused).
 	ProgressClass string
 	DownloadRate  uint64
@@ -854,6 +860,22 @@ func uiTorrentRows(s *AppState) []uiTorrentRow {
 		if progress > 100 {
 			progress = 100
 		}
+		// While the engine verifies the files on disk, the download percentage
+		// stands still: show how far the check has gone instead.
+		checking := false
+		checkedPieces, totalPieces := 0, 0
+		if view.State == "checking_files" && view.PiecesTotal > 0 {
+			totalPieces = view.PiecesTotal
+			checkedPieces = view.PiecesChecked
+			if checkedPieces < 0 {
+				checkedPieces = 0
+			}
+			if checkedPieces > totalPieces {
+				checkedPieces = totalPieces
+			}
+			progress = float64(checkedPieces) / float64(totalPieces) * 100
+			checking = true
+		}
 		ratio := uiTorrentRatio(view.AllTimeUpload, view.AllTimeDownload, view.TotalDone, view.TotalSize)
 		tag := tags[strings.ToLower(view.Hash)]
 		row := uiTorrentRow{
@@ -866,6 +888,9 @@ func uiTorrentRows(s *AppState) []uiTorrentRow {
 			Progress:      progress,
 			ProgressPct:   strconv.FormatFloat(progress, 'f', 1, 64),
 			ProgressClass: uiProgressClass(view.State),
+			Checking:      checking,
+			PiecesChecked: checkedPieces,
+			PiecesTotal:   totalPieces,
 			DownloadRate:  view.DownloadRate,
 			UploadRate:    view.UploadRate,
 			NumPeers:      view.NumPeers,
@@ -1009,7 +1034,7 @@ func uiProgressClass(state string) string {
 	switch state {
 	case "seeding", "finished":
 		return "seed"
-	case "paused", "queued", "stalled", "checking_files", "checking_resume_data":
+	case "paused", "queued", "stalled":
 		return "paused"
 	}
 	return "active"

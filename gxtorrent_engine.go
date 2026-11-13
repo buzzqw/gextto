@@ -652,6 +652,7 @@ type gxTorrentItem struct {
 	PiecesTotal     int   `json:"pieces_total"`
 	PiecesHave      int   `json:"pieces_have"`
 	PiecesAvailable int   `json:"pieces_available"`
+	PiecesChecked   int   `json:"pieces_checked"`
 	PieceLength     int64 `json:"piece_length"`
 	Wasted          int64 `json:"wasted"`
 	Allocated       int64 `json:"allocated"`
@@ -705,6 +706,7 @@ func (e *gxTorrentEngine) toView(item gxTorrentItem, now time.Time) models.Torre
 		PiecesTotal:       item.PiecesTotal,
 		PiecesHave:        item.PiecesHave,
 		PiecesAvailable:   item.PiecesAvailable,
+		PiecesChecked:     item.PiecesChecked,
 		PieceLength:       item.PieceLength,
 		Wasted:            item.Wasted,
 		Allocated:         item.Allocated,

@@ -2100,6 +2100,17 @@ func v2DetailViewFrom(s *AppState, hash, tab string) v2DetailView {
 	if torrent.Error != "" {
 		view.General = append(view.General, v2KV{Label: "Errore", Value: torrent.Error, Hint: "Ultimo errore riportato dal motore torrent per questo download."})
 	}
+	// While the files are re-checked on disk the download percentage stands
+	// still: put the check progress right under it, so the drawer moves too.
+	if torrent.State == "checking_files" && torrent.PiecesTotal > 0 {
+		checked := clampInt(torrent.PiecesChecked, 0, torrent.PiecesTotal)
+		check := v2KV{
+			Label: "Verifica file",
+			Value: fmt.Sprintf("%d%% · %d/%d pezzi", checked*100/torrent.PiecesTotal, checked, torrent.PiecesTotal),
+			Hint:  "Percentuale dei pezzi già riletti e verificati sul disco: avanza mentre il torrent è in «Verifica file».",
+		}
+		view.General = append(view.General[:2], append([]v2KV{check}, view.General[2:]...)...)
+	}
 	// BEP 38: show the collection/similar hints only when the torrent has some,
 	// so the common torrent keeps its short general list.
 	if len(torrent.Collections) > 0 {

@@ -731,6 +731,7 @@ dicono quanto il motore ha scaricato e inviato da quando è partito.
 | Download | sta trasferendo | controllare velocità e peer |
 | Stalled | nessun byte in più da troppo tempo; messo in pausa | aspettare il nuovo tentativo automatico |
 | Seeding | completato, sta condividendo | lasciarlo finire secondo i limiti di seed |
+| Verifica file | il motore rilegge e verifica i pezzi già su disco | aspettare: la barra mostra l'avanzamento del controllo (pezzi verificati sul totale), non la percentuale dei dati |
 | Errore | il motore ha segnalato un errore | leggere il motivo prima di rimuoverlo |
 | Archiviato | il file è in libreria | nulla; non cancellare la sorgente mentre è in seed |
 | 📌 pin | forzato fuori coda | **Sblocca pin** nella sua scheda per rimetterlo in coda |

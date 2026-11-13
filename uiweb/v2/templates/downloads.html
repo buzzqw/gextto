@@ -208,7 +208,7 @@
                   <span class="torrent-state badge {{.StateClass}}">{{tr .State}}</span>
                 </div>
                 <div class="torrent-body">
-                  <div class="torrent-progress"><div class="progress {{.ProgressClass}}"><span style="width:{{.ProgressPct}}%"></span></div><small class="muted">{{.ProgressPct}}% · {{bytes .TotalDone}} / {{bytes .TotalSize}}</small></div>
+                  <div class="torrent-progress"><div class="progress {{.ProgressClass}}"><span style="width:{{.ProgressPct}}%"></span></div><small class="muted">{{if .Checking}}<span>{{tr "Verifica file"}}</span> {{.ProgressPct}}% · {{.PiecesChecked}}/{{.PiecesTotal}} <span>{{tr "pezzi"}}</span>{{else}}{{.ProgressPct}}% · {{bytes .TotalDone}} / {{bytes .TotalSize}}{{end}}</small></div>
                   <div class="torrent-metrics">
                     <span class="torrent-metric" {{trTitle "↓ Download"}}><span class="sr-only">{{tr "↓ Download"}}</span><span aria-hidden="true">↓</span> {{rate .DownloadRate}}</span>
                     <span class="torrent-metric" {{trTitle "↑ Upload"}}><span class="sr-only">{{tr "↑ Upload"}}</span><span aria-hidden="true">↑</span> {{rate .UploadRate}}</span>
