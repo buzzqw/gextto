@@ -2439,3 +2439,9 @@ html.settings-only-modified .settings-panel:not(:has(.setting-modified-row)):not
 .v2-gap-season-label { flex: none; min-width: 92px; padding-top: 6px; color: var(--muted); font-size: 0.86rem; }
 .v2-gap-episodes { display: flex; flex-wrap: wrap; gap: 6px; }
 .v2-gap-ep { cursor: pointer; font-variant-numeric: tabular-nums; }
+
+/* A .torrent file dragged over Downloads: the page shows it will accept it. */
+body.v2-drop-active main {
+  outline: 3px dashed var(--accent);
+  outline-offset: -6px;
+}

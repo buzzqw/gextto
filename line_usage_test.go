@@ -97,3 +97,51 @@ func TestCounterDeltaWraps(t *testing.T) {
 		t.Fatalf("64-bit reset delta = %d, want 0", got)
 	}
 }
+
+// slowWAN is a router that answers only when the test lets it.
+type slowWAN struct {
+	entered chan struct{}
+	release chan struct{}
+}
+
+func (s *slowWAN) GetTotalBytesReceived() (uint64, error) {
+	s.entered <- struct{}{}
+	<-s.release
+	return 1, nil
+}
+func (s *slowWAN) GetTotalBytesSent() (uint64, error) { return 1, nil }
+
+// TestLineUsageSlowRouterDoesNotHoldTheLock pins that the SOAP read of the
+// router runs without the lock: while the router is slow to answer, the
+// callers that only read or accumulate (others, observe, reset) go on.
+func TestLineUsageSlowRouterDoesNotHoldTheLock(t *testing.T) {
+	wan := &slowWAN{entered: make(chan struct{}, 1), release: make(chan struct{})}
+	saved := discoverWANCounters
+	discoverWANCounters = func() wanCounters { return wan }
+	t.Cleanup(func() { discoverWANCounters = saved })
+	l := &lineUsage{}
+	now := time.Unix(1_800_000_000, 0)
+	done := make(chan struct{})
+	go func() {
+		l.read(now)
+		close(done)
+	}()
+	<-wan.entered
+	free := make(chan struct{})
+	go func() {
+		l.observe(now, 1, 1)
+		l.others()
+		if present, known := l.read(now); present || known {
+			t.Errorf("a second read during the first one = %v, %v; want the last answer (false, false)", present, known)
+		}
+		l.reset()
+		close(free)
+	}()
+	select {
+	case <-free:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the other callers waited for the router: the lock is held during the SOAP read")
+	}
+	close(wan.release)
+	<-done
+}

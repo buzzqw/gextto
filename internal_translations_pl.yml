@@ -3471,7 +3471,7 @@ pol:
     qBittorrent pobranego z Gextto w katalogu DATA_DIR/qbittorrent; nigdy nie modyfikuje instalacji systemu.
   Usa il pannello: Użyj
   Usa la tab: panel Użyj
-  Usa questa cartella: tab Użyj tego folderu
+  Usa questa cartella: Użyj tego folderu
   Usa questi dati: Wykorzystaj te dane
   Usa questo percorso: Użyj tej ścieżki
   Usato: Używane
@@ -6457,3 +6457,6 @@ pol:
   "Una sola fonte: il download potrebbe non completarsi": "Tylko jedno źródło: pobieranie może się nie zakończyć"
   "sospetto": "podejrzany"
   "dubbio": "wątpliwy"
+  "Si possono rilasciare solo file .torrent.": "Można tu upuszczać tylko pliki .torrent."
+  "File .torrent pronto: premi Aggiungi.": "Plik .torrent gotowy: naciśnij Dodaj."
+  "Magnet incollato: premi Aggiungi.": "Wklejono link magnet: naciśnij Dodaj."

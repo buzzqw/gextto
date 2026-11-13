@@ -224,6 +224,18 @@ var (
 	_ TorrentEngineIdentity = (*gxTorrentEngine)(nil)
 )
 
+// gxEngineTransport carries every request of the adapter to the daemon. The
+// default transport keeps only two idle connections per host: the event
+// worker, the pages and the API talk to gx-torrent at the same time, so the
+// extra connections were closed after each answer and opened again at the
+// next one (a new TCP handshake, sockets piling up in TIME_WAIT).
+var gxEngineTransport = func() *http.Transport {
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.MaxIdleConnsPerHost = 16
+	transport.MaxIdleConns = 32
+	return transport
+}()
+
 // newGxTorrentEngine builds the adapter and, in managed mode, starts the
 // daemon. It does not require the daemon to answer: an outage degrades to a
 // stale view and the adapter keeps retrying.
@@ -234,7 +246,7 @@ func newGxTorrentEngine(cfg *Config, notifier *Notifier) (*gxTorrentEngine, erro
 	}
 	engine := &gxTorrentEngine{
 		settings:       settings,
-		client:         &http.Client{Timeout: settings.Timeout},
+		client:         &http.Client{Timeout: settings.Timeout, Transport: gxEngineTransport},
 		cfg:            cfg,
 		notifier:       notifier,
 		supervisorStop: make(chan struct{}),

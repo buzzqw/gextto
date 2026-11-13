@@ -4606,6 +4606,11 @@ func (d *Database) SyncArchiveFilesScored(seriesName string, records []ArchiveFi
 	if len(records) == 0 {
 		return 0, nil
 	}
+	// Whether a recorded better copy still exists is a filesystem question: it
+	// is answered before the transaction, because the database has a single
+	// connection and a stat on a slow or network share inside the transaction
+	// would hold every other query (web pages, workers) waiting behind it.
+	present := d.archivedPathsPresent(seriesName, records)
 	tx, err := d.db.Begin()
 	if err != nil {
 		return 0, err
@@ -4636,7 +4641,14 @@ func (d *Database) SyncArchiveFilesScored(seriesName string, records []ArchiveFi
 		var currentScore int64
 		rowErr := currentStmt.QueryRow(seriesID, record.Season, record.Episode).Scan(&currentPath, &currentScore)
 		if rowErr == nil && record.QualityScore < currentScore && strings.TrimSpace(currentPath) != "" {
-			if _, statErr := os.Stat(currentPath); statErr == nil {
+			exists, checked := present[currentPath]
+			if !checked {
+				// The row changed after the check above (another writer
+				// in between): rare, so ask the filesystem now.
+				_, statErr := os.Stat(currentPath)
+				exists = statErr == nil
+			}
+			if exists {
 				replacePath = false
 			}
 		} else if rowErr != nil && !errors.Is(rowErr, sql.ErrNoRows) {
@@ -4651,6 +4663,47 @@ func (d *Database) SyncArchiveFilesScored(seriesName string, records []ArchiveFi
 		return synced, err
 	}
 	return synced, nil
+}
+
+// archivedPathsPresent checks, outside any transaction, whether the recorded
+// file of every episode the scan would downgrade still exists. Only rows with
+// a better score than the scanned file are checked: the others are replaced
+// whatever is on disk.
+func (d *Database) archivedPathsPresent(seriesName string, records []ArchiveFileRecord) map[string]bool {
+	present := map[string]bool{}
+	scanned := make(map[[2]int64]int64, len(records))
+	for _, record := range records {
+		// The scan has just found these files: a duplicate later in the same
+		// list compares against them without another stat.
+		if strings.TrimSpace(record.Path) != "" {
+			present[record.Path] = true
+		}
+		key := [2]int64{record.Season, record.Episode}
+		if score, ok := scanned[key]; !ok || record.QualityScore < score {
+			scanned[key] = record.QualityScore
+		}
+	}
+	rows, err := d.db.Query("SELECT e.season,e.episode,COALESCE(e.archive_path,''),e.quality_score FROM episodes e JOIN series s ON s.id=e.series_id WHERE s.name=?1 AND COALESCE(e.archive_path,'')<>''", seriesName)
+	if err != nil {
+		return present
+	}
+	paths := []string{}
+	for rows.Next() {
+		var season, episode, score int64
+		var path string
+		if rows.Scan(&season, &episode, &path, &score) != nil {
+			continue
+		}
+		if lowest, ok := scanned[[2]int64{season, episode}]; ok && lowest < score && strings.TrimSpace(path) != "" {
+			paths = append(paths, path)
+		}
+	}
+	_ = rows.Close()
+	for _, path := range paths {
+		_, statErr := os.Stat(path)
+		present[path] = statErr == nil
+	}
+	return present
 }
 
 // SetEpisodeArchivePath updates the stored archive path of an episode,
@@ -6758,46 +6811,57 @@ func (d *Database) PruneKeywords(keywords []string) (int, error) {
 	if len(terms) == 0 {
 		return 0, nil
 	}
+	// The six deletes are one change: a stop halfway (crash, power cut, a
+	// failed statement) must not leave the series deleted and its episodes
+	// still there. One transaction is also one disk sync instead of six.
+	tx, err := d.db.Begin()
+	if err != nil {
+		return 0, err
+	}
+	defer func() { _ = tx.Rollback() }()
 	removed := 0
 	torrentClause := keywordClause([]string{"name", "title", "series_name"}, len(terms))
 	torrentBindings := keywordBindings(terms, []string{"name", "title", "series_name"})
-	if result, err := d.db.Exec(fmt.Sprintf("DELETE FROM torrent_meta WHERE %s", torrentClause), torrentBindings...); err != nil {
+	if result, err := tx.Exec(fmt.Sprintf("DELETE FROM torrent_meta WHERE %s", torrentClause), torrentBindings...); err != nil {
 		return removed, err
 	} else if affected, _ := result.RowsAffected(); affected > 0 {
 		removed += int(affected)
 	}
 	movieClause := keywordClause([]string{"COALESCE(title,name)"}, len(terms))
 	movieBindings := keywordBindings(terms, []string{"COALESCE(title,name)"})
-	if result, err := d.db.Exec(fmt.Sprintf("DELETE FROM movies WHERE %s", movieClause), movieBindings...); err != nil {
+	if result, err := tx.Exec(fmt.Sprintf("DELETE FROM movies WHERE %s", movieClause), movieBindings...); err != nil {
 		return removed, err
 	} else if affected, _ := result.RowsAffected(); affected > 0 {
 		removed += int(affected)
 	}
 	episodeClause := keywordClause([]string{"name"}, len(terms))
 	episodeBindings := keywordBindings(terms, []string{"name"})
-	if result, err := d.db.Exec(fmt.Sprintf("DELETE FROM episodes WHERE series_id IN (SELECT id FROM series WHERE %s)", episodeClause), episodeBindings...); err != nil {
+	if result, err := tx.Exec(fmt.Sprintf("DELETE FROM episodes WHERE series_id IN (SELECT id FROM series WHERE %s)", episodeClause), episodeBindings...); err != nil {
 		return removed, err
 	} else if affected, _ := result.RowsAffected(); affected > 0 {
 		removed += int(affected)
 	}
 	seriesClause := keywordClause([]string{"name"}, len(terms))
 	seriesBindings := keywordBindings(terms, []string{"name"})
-	if result, err := d.db.Exec(fmt.Sprintf("DELETE FROM series WHERE %s", seriesClause), seriesBindings...); err != nil {
+	if result, err := tx.Exec(fmt.Sprintf("DELETE FROM series WHERE %s", seriesClause), seriesBindings...); err != nil {
 		return removed, err
 	} else if affected, _ := result.RowsAffected(); affected > 0 {
 		removed += int(affected)
 	}
 	seenClause := keywordClause([]string{"COALESCE(name,title)"}, len(terms))
 	seenBindings := keywordBindings(terms, []string{"COALESCE(name,title)"})
-	if result, err := d.db.Exec(fmt.Sprintf("DELETE FROM movie_feed_seen WHERE %s", seenClause), seenBindings...); err != nil {
+	if result, err := tx.Exec(fmt.Sprintf("DELETE FROM movie_feed_seen WHERE %s", seenClause), seenBindings...); err != nil {
 		return removed, err
 	} else if affected, _ := result.RowsAffected(); affected > 0 {
 		removed += int(affected)
 	}
-	if result, err := d.db.Exec(fmt.Sprintf("DELETE FROM series_feed_seen WHERE %s", seenClause), seenBindings...); err != nil {
+	if result, err := tx.Exec(fmt.Sprintf("DELETE FROM series_feed_seen WHERE %s", seenClause), seenBindings...); err != nil {
 		return removed, err
 	} else if affected, _ := result.RowsAffected(); affected > 0 {
 		removed += int(affected)
+	}
+	if err := tx.Commit(); err != nil {
+		return 0, err
 	}
 	return removed, nil
 }

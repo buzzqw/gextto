@@ -586,3 +586,15 @@ func TestAudioCleanupUntaggedSettingIsValidated(t *testing.T) {
 		t.Errorf("default options = %+v enabled=%v", opts, enabled)
 	}
 }
+
+// BenchmarkParseAudioCleanupPacketLine measures the parser on a typical
+// ffprobe packet line, as read from the scanner's buffer.
+func BenchmarkParseAudioCleanupPacketLine(b *testing.B) {
+	line := []byte("stream_index=1|pts_time=1234.567000|dts_time=1234.567000|data_hash=MD5:00112233445566778899aabbccddeeff")
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		if _, ok := parseAudioCleanupPacketBytes(line); !ok {
+			b.Fatal("line not parsed")
+		}
+	}
+}

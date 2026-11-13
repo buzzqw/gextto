@@ -318,7 +318,11 @@ hanno nomi accessibili; i dialoghi gestiscono il focus, `Tab`, `Esc` e il
 ritorno al controllo che li ha aperti; le intestazioni ordinabili si attivano da
 tastiera e annunciano l'ordinamento; aggiornamenti, errori e notifiche usano
 regioni live; il layout regge viewport stretti, ingrandimento e reflow a 320
-pixel. Le verifiche automatiche (axe-core e Playwright) si lanciano dal
+pixel. `/` porta il focus sul filtro della pagina (il filtro della lista in
+Scarico, la ricerca in Configurazione, il filtro del log) quando non stai
+scrivendo in un campo. In una lista con le caselle di selezione, `Maiusc`+clic
+seleziona o deseleziona tutte le righe tra la casella cliccata prima e questa.
+Le verifiche automatiche (axe-core e Playwright) si lanciano dal
 checkout con `cd uiweb/end2end && npm ci && npm run test:a11y`. Non sono una
 dichiarazione di conformità WCAG: per quella serve anche una verifica manuale.
 Dettagli in [ACCESSIBILITY.md](ACCESSIBILITY.md).
@@ -644,7 +648,11 @@ sceglie solo tra le release che hanno superato tutti i controlli.
 ### Aggiungere un torrent o un magnet
 
 **Aggiungi torrent**, nella barra in alto di ogni pagina, accetta un magnet, un
-URL `.torrent` o un file `.torrent`. Puoi indicare la cartella di salvataggio,
+URL `.torrent` o un file `.torrent`. In **Scarico** ci sono due scorciatoie:
+trascina un file `.torrent` in un punto qualsiasi della pagina, oppure incolla
+un link magnet (`Ctrl+V`) quando nessun campo ha il focus. In entrambi i casi il
+modulo si compila, si apre e il focus va su **Aggiungi**, così puoi ancora
+guardare le opzioni prima di aggiungere. Puoi indicare la cartella di salvataggio,
 **Scarica subito** (fuori coda) e **Non rinominare**. Con gx-torrent ci sono
 anche:
 
@@ -2728,7 +2736,7 @@ VPN) puoi chiedere il login a chi non è in rete locale.
 | Impostazione | Cosa fa |
 |---|---|
 | Richiedi l'accesso (login) | Spento (predefinito): nessun controllo. Acceso: chi non è in rete locale deve fare il login o usare la chiave API. Finché non imposti una password o una chiave resta tutto aperto (e il log lo segnala). |
-| Nessun login dalla rete locale | Acceso (predefinito): da 127.0.0.1, 192.168.x.x, 10.x.x.x, 172.16–31.x.x e dagli indirizzi IPv6 locali non serve il login. Dietro un reverse proxy conta l'indirizzo reale del client inoltrato dal proxy (`X-Forwarded-For`, `X-Real-IP`, `Forwarded`), quindi chi arriva da Internet attraverso il proxy deve comunque autenticarsi. Compare solo con «Richiedi l'accesso (login)» attivo. |
+| Nessun login dalla rete locale | Acceso (predefinito): da 127.0.0.1, 192.168.x.x, 10.x.x.x, 172.16–31.x.x e dagli indirizzi IPv6 locali non serve il login. Dietro un reverse proxy conta l'indirizzo reale del client inoltrato dal proxy (`X-Forwarded-For`, `X-Real-IP`, `Forwarded`, e per i tunnel e le CDN `CF-Connecting-IP` e `True-Client-IP`), quindi chi arriva da Internet attraverso il proxy deve comunque autenticarsi. Un proxy che non inoltra nessuna di queste intestazioni fa sembrare locale ogni richiesta: in quel caso spegni questa opzione. Compare solo con «Richiedi l'accesso (login)» attivo. |
 | Utente | Nome utente per il login (predefinito `admin`). Compare solo con «Richiedi l'accesso (login)» attivo. |
 | Password | Salvata solo come hash bcrypt; cambiarla chiude tutte le sessioni aperte. Lascia il campo vuoto per non modificarla. Compare solo con «Richiedi l'accesso (login)» attivo. |
 

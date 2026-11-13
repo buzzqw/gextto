@@ -65,6 +65,10 @@ type PiecePicker struct {
 	// readaheadBegin/readaheadEnd is the likely-next window: second pick,
 	// independent of the stream window.
 	readaheadBegin, readaheadEnd uint32
+
+	// edges lists the indexes of the pieces that touch a file end, in index
+	// order, so the edge pass visits those few instead of every piece.
+	edges []uint32
 }
 
 // myPiece is a piece plus its swarm bookkeeping.
@@ -143,10 +147,12 @@ func New(pieces []piece.Piece, maxDuplicateDownload int, webseedSources []*webse
 	if maxWebseedPieces == 0 {
 		maxWebseedPieces = 1
 	}
+	var edges []uint32
 	if sequential || firstLast {
-		markFileEdges(ps)
+		edges = markFileEdges(ps)
 	}
 	picker := &PiecePicker{
+		edges:                edges,
 		pieces:               ps,
 		maxDuplicateDownload: maxDuplicateDownload,
 		maxWebseedPieces:     maxWebseedPieces,
@@ -170,7 +176,7 @@ func fileEdgeSize(fileSize int64) int64 {
 
 // markFileEdges flags pieces touching either end of a real (non-padding)
 // file.
-func markFileEdges(pieces []myPiece) {
+func markFileEdges(pieces []myPiece) []uint32 {
 	sizes := make(map[string]int64)
 	for i := range pieces {
 		for _, sec := range pieces[i].Data {
@@ -193,6 +199,13 @@ func markFileEdges(pieces []myPiece) {
 			}
 		}
 	}
+	edges := []uint32{}
+	for i := range pieces {
+		if pieces[i].FileHead || pieces[i].FileTail {
+			edges = append(edges, uint32(i))
+		}
+	}
+	return edges
 }
 
 // SetOrder switches the piece order live, (re)computing edge flags when an
@@ -200,7 +213,7 @@ func markFileEdges(pieces []myPiece) {
 // them then.
 func (p *PiecePicker) SetOrder(sequential, firstLast bool) {
 	if (sequential || firstLast) && !p.sequential && !p.firstLast {
-		markFileEdges(p.pieces)
+		p.edges = markFileEdges(p.pieces)
 	}
 	p.sequential = sequential
 	p.firstLast = firstLast
@@ -643,8 +656,8 @@ func (p *PiecePicker) pickRarest(pe *peer.Peer) *myPiece {
 // pickFileEdge takes the first edge piece the peer holds that nobody
 // fetches: players need file ends (indexes) before anything else.
 func (p *PiecePicker) pickFileEdge(pe *peer.Peer) *myPiece {
-	for i := range p.pieces {
-		if mp := &p.pieces[i]; (mp.FileHead || mp.FileTail) && mp.PickableBy(pe) {
+	for _, index := range p.edges {
+		if mp := &p.pieces[index]; mp.PickableBy(pe) {
 			return mp
 		}
 	}

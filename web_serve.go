@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/signal"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -263,9 +264,17 @@ func pluralWord(count int, singular, plural string) string {
 func shutdownServers(servers ...*http.Server) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+	// The servers drain at the same time, under one shared deadline: in turn,
+	// a slow first one (an open event stream) used up the time of the next.
+	var wg sync.WaitGroup
 	for _, server := range servers {
-		_ = server.Shutdown(ctx)
+		wg.Add(1)
+		go func(server *http.Server) {
+			defer wg.Done()
+			_ = server.Shutdown(ctx)
+		}(server)
 	}
+	wg.Wait()
 }
 
 // ListenConflicts reports the configured listen addresses that are already in
@@ -381,7 +390,10 @@ func Serve(state *AppState) error {
 	webServer := newServer()
 	engineServer := newServer()
 
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	// SIGHUP (the terminal that started Gextto closed) stops it the same
+	// clean way as SIGTERM: without it the process died at once, skipping
+	// the database checkpoint and the shutdown record.
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
 	defer stop()
 
 	errCh := make(chan error, 2)

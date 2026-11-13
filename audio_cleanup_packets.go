@@ -15,7 +15,6 @@ import (
 	"math"
 	"os/exec"
 	"strconv"
-	"strings"
 )
 
 // audioCleanupPacketTolerance is the timestamp difference accepted between a
@@ -41,18 +40,34 @@ type audioCleanupPacketLine struct {
 // "stream_index=1|pts_time=0.021|dts_time=0.021|data_hash=MD5:…". A line
 // without a stream index or a hash is not a packet.
 func parseAudioCleanupPacketLine(line string) (audioCleanupPacketLine, bool) {
+	return parseAudioCleanupPacketBytes([]byte(line))
+}
+
+// parseAudioCleanupPacketBytes is the parser working on the scanner's own
+// buffer: a film has about a million packets, and splitting each line into
+// strings cost several allocations per packet. The fields are read in place;
+// only a time that is not a plain number goes through ParseFloat's copy.
+func parseAudioCleanupPacketBytes(line []byte) (audioCleanupPacketLine, bool) {
 	var parsed audioCleanupPacketLine
 	haveStream, haveHash := false, false
-	pts, dts := "", ""
-	for _, field := range strings.Split(strings.TrimSpace(line), "|") {
-		key, value, ok := strings.Cut(field, "=")
-		if !ok {
+	var pts, dts []byte
+	line = bytes.TrimSpace(line)
+	for len(line) > 0 {
+		field := line
+		if sep := bytes.IndexByte(line, '|'); sep >= 0 {
+			field, line = line[:sep], line[sep+1:]
+		} else {
+			line = nil
+		}
+		eq := bytes.IndexByte(field, '=')
+		if eq < 0 {
 			continue
 		}
-		switch key {
+		key, value := field[:eq], field[eq+1:]
+		switch string(key) {
 		case "stream_index":
-			index, err := strconv.Atoi(value)
-			if err != nil {
+			index, ok := audioCleanupAtoi(value)
+			if !ok {
 				return parsed, false
 			}
 			parsed.stream = index
@@ -62,25 +77,46 @@ func parseAudioCleanupPacketLine(line string) (audioCleanupPacketLine, bool) {
 		case "dts_time":
 			dts = value
 		case "data_hash":
-			digest, err := hex.DecodeString(strings.TrimPrefix(value, "MD5:"))
-			if err != nil || len(digest) != len(parsed.packet.hash) {
+			value = bytes.TrimPrefix(value, []byte("MD5:"))
+			if hex.DecodedLen(len(value)) != len(parsed.packet.hash) {
 				return parsed, false
 			}
-			copy(parsed.packet.hash[:], digest)
+			if _, err := hex.Decode(parsed.packet.hash[:], value); err != nil {
+				return parsed, false
+			}
 			haveHash = true
 		}
 	}
 	if !haveStream || !haveHash {
 		return parsed, false
 	}
-	for _, value := range []string{pts, dts} {
-		if seconds, err := strconv.ParseFloat(value, 64); err == nil && !math.IsNaN(seconds) {
+	for _, value := range [2][]byte{pts, dts} {
+		if len(value) == 0 {
+			continue
+		}
+		if seconds, err := strconv.ParseFloat(string(value), 64); err == nil && !math.IsNaN(seconds) {
 			parsed.packet.time = seconds
 			parsed.packet.hasTime = true
 			break
 		}
 	}
 	return parsed, true
+}
+
+// audioCleanupAtoi parses a non-negative decimal stream index without
+// copying it.
+func audioCleanupAtoi(value []byte) (int, bool) {
+	if len(value) == 0 || len(value) > 9 {
+		return 0, false
+	}
+	n := 0
+	for _, c := range value {
+		if c < '0' || c > '9' {
+			return 0, false
+		}
+		n = n*10 + int(c-'0')
+	}
+	return n, true
 }
 
 // readAudioCleanupPackets streams the packets of path to visit, in file order.
@@ -107,7 +143,7 @@ func readAudioCleanupPackets(ctx context.Context, path string, visit func(audioC
 	scanner.Buffer(make([]byte, 64*1024), 1024*1024)
 	var visitErr error
 	for scanner.Scan() {
-		parsed, ok := parseAudioCleanupPacketLine(scanner.Text())
+		parsed, ok := parseAudioCleanupPacketBytes(scanner.Bytes())
 		if !ok {
 			continue
 		}

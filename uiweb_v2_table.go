@@ -500,29 +500,6 @@ func v2ItemSortValue(item map[string]any, column uiColumn) any {
 	return item[column.Key]
 }
 
-func v2CompareValues(a, b any) int {
-	af, aIsNumber := v2Numeric(a)
-	bf, bIsNumber := v2Numeric(b)
-	if aIsNumber && bIsNumber {
-		switch {
-		case af < bf:
-			return -1
-		case af > bf:
-			return 1
-		}
-		return 0
-	}
-	as := strings.ToLower(v2String(a))
-	bs := strings.ToLower(v2String(b))
-	switch {
-	case as < bs:
-		return -1
-	case as > bs:
-		return 1
-	}
-	return 0
-}
-
 func v2Numeric(value any) (float64, bool) {
 	switch typed := value.(type) {
 	case float64:
@@ -544,26 +521,104 @@ func v2Numeric(value any) (float64, bool) {
 }
 
 func v2SortItems(items []map[string]any, column uiColumn, dir string) {
-	sort.SliceStable(items, func(i, j int) bool {
-		compared := v2CompareValues(v2ItemSortValue(items[i], column), v2ItemSortValue(items[j], column))
+	// The sort key of every row is computed once, not at each of the
+	// N·log N comparisons (each lowered both strings again).
+	type sortEntry struct {
+		item    map[string]any
+		number  float64
+		numeric bool
+		text    string
+	}
+	entries := make([]sortEntry, len(items))
+	for i, item := range items {
+		value := v2ItemSortValue(item, column)
+		number, numeric := v2Numeric(value)
+		entries[i] = sortEntry{item: item, number: number, numeric: numeric, text: strings.ToLower(v2String(value))}
+	}
+	compare := func(a, b *sortEntry) int {
+		if a.numeric && b.numeric {
+			switch {
+			case a.number < b.number:
+				return -1
+			case a.number > b.number:
+				return 1
+			}
+			return 0
+		}
+		// A number compared with a text compares as text, as before.
+		return strings.Compare(a.text, b.text)
+	}
+	sort.SliceStable(entries, func(i, j int) bool {
+		compared := compare(&entries[i], &entries[j])
 		if dir == "desc" {
 			return compared > 0
 		}
 		return compared < 0
 	})
+	for i := range entries {
+		items[i] = entries[i].item
+	}
 }
 
-// v2FilterItems keeps the items whose JSON representation contains the filter
-// text (case-insensitive), mirroring the classic client-side row filter.
+// v2FilterItems keeps the items with a value that contains the filter text
+// (case-insensitive), mirroring the classic client-side row filter. filter is
+// already lowered. The values are searched as they are: encoding every row as
+// JSON at each keystroke cost one encoding per row, and matched the field
+// names too (a filter equal to a column name kept every row) while missing
+// "&", "<" and ">", which JSON escapes.
 func v2FilterItems(items []map[string]any, filter string) []map[string]any {
 	out := make([]map[string]any, 0, len(items))
 	for _, item := range items {
-		encoded, _ := json.Marshal(item)
-		if strings.Contains(strings.ToLower(string(encoded)), filter) {
+		if v2ValueContains(item, filter) {
 			out = append(out, item)
 		}
 	}
 	return out
+}
+
+// v2ValueContains reports whether value, or any value nested in it, contains
+// filter once lowered.
+func v2ValueContains(value any, filter string) bool {
+	switch typed := value.(type) {
+	case string:
+		return v2ContainsFold(typed, filter)
+	case float64:
+		return strings.Contains(strconv.FormatFloat(typed, 'f', -1, 64), filter)
+	case int:
+		return strings.Contains(strconv.Itoa(typed), filter)
+	case int64:
+		return strings.Contains(strconv.FormatInt(typed, 10), filter)
+	case []any:
+		for _, entry := range typed {
+			if v2ValueContains(entry, filter) {
+				return true
+			}
+		}
+	case map[string]any:
+		for _, entry := range typed {
+			if v2ValueContains(entry, filter) {
+				return true
+			}
+		}
+	case []map[string]any:
+		for _, entry := range typed {
+			if v2ValueContains(entry, filter) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// v2ContainsFold is strings.Contains(strings.ToLower(text), filter) without
+// lowering a copy when text is plain ASCII lower case already.
+func v2ContainsFold(text, filter string) bool {
+	for i := 0; i < len(text); i++ {
+		if c := text[i]; c >= 0x80 || ('A' <= c && c <= 'Z') {
+			return strings.Contains(strings.ToLower(text), filter)
+		}
+	}
+	return strings.Contains(text, filter)
 }
 
 func v2DeriveColumns(item map[string]any) []uiColumn {

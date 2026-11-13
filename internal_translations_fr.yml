@@ -6509,3 +6509,6 @@ fra:
   "Una sola fonte: il download potrebbe non completarsi": "Une seule source : le téléchargement pourrait ne pas se terminer"
   "sospetto": "suspect"
   "dubbio": "douteux"
+  "Si possono rilasciare solo file .torrent.": "Seuls des fichiers .torrent peuvent être déposés ici."
+  "File .torrent pronto: premi Aggiungi.": "Fichier .torrent prêt : appuyez sur Ajouter."
+  "Magnet incollato: premi Aggiungi.": "Lien magnet collé : appuyez sur Ajouter."

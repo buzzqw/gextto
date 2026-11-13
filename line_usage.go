@@ -125,6 +125,7 @@ type lineUsage struct {
 	othersDown  float64
 	othersUp    float64
 	lastPresent bool
+	reading     bool // a router read is in flight, made without the lock
 }
 
 // counterDelta is the growth of a 32- or 64-bit counter that may have
@@ -174,8 +175,21 @@ func (l *lineUsage) read(now time.Time) (present, known bool) {
 	if !l.lastAt.IsZero() && now.Sub(l.lastAt) < lineUsageReadEvery {
 		return l.lastPresent, l.known
 	}
-	rx, errRx := l.counters.GetTotalBytesReceived()
-	tx, errTx := l.counters.GetTotalBytesSent()
+	if l.reading {
+		// Another caller is asking the router right now: its answer will
+		// do for this one too.
+		return l.lastPresent, l.known
+	}
+	// The two counters are SOAP requests to the router: they are made without
+	// the lock, so a slow router never holds the callers of observe, others
+	// and reset waiting behind it.
+	counters := l.counters
+	l.reading = true
+	l.mu.Unlock()
+	rx, errRx := counters.GetTotalBytesReceived()
+	tx, errTx := counters.GetTotalBytesSent()
+	l.mu.Lock()
+	l.reading = false
 	if errRx != nil || errTx != nil {
 		l.counters, l.known = nil, false
 		l.discoverAt = now.Add(lineUsageRediscover)

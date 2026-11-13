@@ -318,6 +318,10 @@ controls have accessible names; dialogs manage focus, `Tab`, `Esc` and the
 return to the control that opened them; sortable headers work from the keyboard
 and announce the sort order; updates, errors and notifications use live
 regions; the layout holds up on narrow viewports, zoom and 320-pixel reflow.
+`/` moves the focus to the filter of the page (the list filter on Downloads,
+the search on Configuration, the log filter) when you are not typing in a field.
+In a list with checkboxes, `Shift`+click selects or clears every row between
+the previous box clicked and this one.
 The automated checks (axe-core and Playwright) run from the checkout with
 `cd uiweb/end2end && npm ci && npm run test:a11y`. They are not a WCAG
 conformance statement: that also needs a manual review. Details in
@@ -635,7 +639,10 @@ downloads. The score only chooses among the releases that passed every check.
 ### Adding a torrent or a magnet
 
 **Add torrent**, in the top bar of every page, takes a magnet, a `.torrent` URL
-or a `.torrent` file. You can set the save folder, **Download now** (outside
+or a `.torrent` file. On **Downloads** there are two shortcuts: drop a
+`.torrent` file anywhere on the page, or paste a magnet link (`Ctrl+V`) while no
+field has the focus. Either one fills the form, opens it and moves the focus to
+**Add**, so you can still look at the options before adding. You can set the save folder, **Download now** (outside
 the queue) and **Do not rename**. With gx-torrent there are also:
 
 - **Skip check**: adds the torrent on files you already have, without checking
@@ -2704,7 +2711,7 @@ login from clients that are not on the local network.
 | Setting | What it does |
 |---|---|
 | Require login | Off (default): no checks. On: clients outside the local network must log in or use the API key. Until a password or a key is set everything stays open (and the log says so). |
-| No login from the local network | On (default): 127.0.0.1, 192.168.x.x, 10.x.x.x, 172.16–31.x.x and local IPv6 addresses need no login. Behind a reverse proxy the real client address forwarded by the proxy counts (`X-Forwarded-For`, `X-Real-IP`, `Forwarded`), so a client coming from the Internet through the proxy still has to log in. Shown only while «Require login» is on. |
+| No login from the local network | On (default): 127.0.0.1, 192.168.x.x, 10.x.x.x, 172.16–31.x.x and local IPv6 addresses need no login. Behind a reverse proxy the real client address forwarded by the proxy counts (`X-Forwarded-For`, `X-Real-IP`, `Forwarded`, and for tunnels and CDNs `CF-Connecting-IP` and `True-Client-IP`), so a client coming from the Internet through the proxy still has to log in. A proxy that forwards none of these headers makes every request look local: in that case turn this option off. Shown only while «Require login» is on. |
 | Username | Login username (default `admin`). Shown only while «Require login» is on. |
 | Password | Stored only as a bcrypt hash; changing it closes every open session. Leave the field empty to keep it. Shown only while «Require login» is on. |
 

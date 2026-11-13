@@ -928,6 +928,122 @@
     }
   });
 
+  // Shift+click on a row checkbox selects (or clears) every row between it
+  // and the previous one clicked, as in a file manager. The keyboard keeps the
+  // plain toggle: Space on a focused box is a click without Shift.
+  var lastSelectBox = null;
+  document.addEventListener("click", function (event) {
+    var box = event.target;
+    if (!box.matches || !box.matches("[data-v2-select]")) return;
+    var rows = Array.prototype.slice.call(document.querySelectorAll("[data-v2-select]"));
+    var from = lastSelectBox && lastSelectBox.isConnected ? rows.indexOf(lastSelectBox) : -1;
+    lastSelectBox = box;
+    if (!event.shiftKey || from < 0) return;
+    var to = rows.indexOf(box);
+    var low = Math.min(from, to), high = Math.max(from, to);
+    for (var i = low; i <= high; i++) {
+      var row = rows[i].closest("tr");
+      if (row && row.hidden) continue;
+      rows[i].checked = box.checked;
+    }
+    updateTorrentSelection();
+  });
+
+  function v2Editable(node) {
+    if (!node || !node.closest) return false;
+    return !!node.closest("input, textarea, select, [contenteditable=''], [contenteditable='true']");
+  }
+
+  // "/" moves the focus to the filter of the page (the list filter on
+  // Downloads, the search on Settings, the log filter): the first visible
+  // search field, as in many web applications. Not while typing in a field.
+  document.addEventListener("keydown", function (event) {
+    if (event.key !== "/" || event.ctrlKey || event.metaKey || event.altKey || event.defaultPrevented) return;
+    if (v2Editable(event.target) || (activeDialog && !activeDialog.hidden)) return;
+    // The list filter first (querySelectorAll returns document order, which
+    // would put the release search above it on Downloads), then the others.
+    var fields = Array.prototype.slice.call(document.querySelectorAll("#v2-filter"))
+      .concat(Array.prototype.slice.call(document.querySelectorAll("main input[type='search']")));
+    for (var i = 0; i < fields.length; i++) {
+      var field = fields[i];
+      if (field.disabled || !(field.offsetWidth || field.offsetHeight || field.getClientRects().length)) continue;
+      event.preventDefault();
+      field.focus();
+      if (field.select) field.select();
+      return;
+    }
+  });
+
+  // On Downloads a .torrent file dropped anywhere on the page, or a magnet
+  // link pasted while no field has the focus, fills the "Add torrent" form,
+  // opens it and moves the focus to its Add button: the addition itself
+  // stays one press away, with the options in view.
+  function v2AddTorrentForm() {
+    var panel = document.getElementById("v2-add-torrent");
+    var form = panel && panel.querySelector("form.torrent-add-form");
+    return form ? { panel: panel, form: form } : null;
+  }
+  function v2OfferTorrent(target, message) {
+    target.panel.open = true;
+    var add = target.form.querySelector("button[type='submit']");
+    if (add) add.focus();
+    showToast(t("Aggiungi torrent"), t(message), false);
+  }
+  function v2DragHasFiles(event) {
+    var types = event.dataTransfer && event.dataTransfer.types;
+    if (!types) return false;
+    for (var i = 0; i < types.length; i++) if (types[i] === "Files") return true;
+    return false;
+  }
+  var dragDepth = 0;
+  document.addEventListener("dragenter", function (event) {
+    if (!v2AddTorrentForm() || !v2DragHasFiles(event)) return;
+    dragDepth++;
+    document.body.classList.add("v2-drop-active");
+  });
+  document.addEventListener("dragleave", function () {
+    if (dragDepth > 0 && --dragDepth === 0) document.body.classList.remove("v2-drop-active");
+  });
+  document.addEventListener("dragover", function (event) {
+    if (!v2AddTorrentForm() || !v2DragHasFiles(event)) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "copy";
+  });
+  document.addEventListener("drop", function (event) {
+    dragDepth = 0;
+    document.body.classList.remove("v2-drop-active");
+    var target = v2AddTorrentForm();
+    if (!target || !v2DragHasFiles(event)) return;
+    event.preventDefault();
+    var files = event.dataTransfer.files;
+    var picked = null;
+    for (var i = 0; i < files.length; i++) {
+      if (/\.torrent$/i.test(files[i].name)) { picked = files[i]; break; }
+    }
+    if (!picked) {
+      showToast(t("Aggiungi torrent"), t("Si possono rilasciare solo file .torrent."), true);
+      return;
+    }
+    var input = target.form.querySelector("input[type='file'][name='torrent']");
+    if (!input || typeof DataTransfer === "undefined") return;
+    var transfer = new DataTransfer();
+    transfer.items.add(picked);
+    input.files = transfer.files;
+    v2OfferTorrent(target, "File .torrent pronto: premi Aggiungi.");
+  });
+  document.addEventListener("paste", function (event) {
+    if (v2Editable(event.target)) return;
+    var target = v2AddTorrentForm();
+    if (!target || !event.clipboardData) return;
+    var text = (event.clipboardData.getData("text") || "").trim();
+    if (!/^magnet:\?/i.test(text)) return;
+    var field = target.form.querySelector("input[name='magnet']");
+    if (!field) return;
+    event.preventDefault();
+    field.value = text;
+    v2OfferTorrent(target, "Magnet incollato: premi Aggiungi.");
+  });
+
   // "Modifica selezionati" in the Series/Movies toolbar opens the bulk panel
   // under the toolbar and moves the focus to its first field.
   document.addEventListener("click", function (event) {

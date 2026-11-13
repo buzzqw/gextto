@@ -1,9 +1,11 @@
 package piecepicker
 
 import (
+	"fmt"
 	"math/rand"
 	"testing"
 
+	"github.com/buzzqw/gextto/internal/gxcore/internal/filesection"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/peer"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/piece"
 )
@@ -21,6 +23,23 @@ func benchPieces(n int) []piece.Piece {
 	pieces := make([]piece.Piece, n)
 	for i := range pieces {
 		pieces[i] = piece.Piece{Index: uint32(i), Length: testPieceLength}
+	}
+	return pieces
+}
+
+// benchPackPieces lays n pieces over files of equal size, as in a season
+// pack, so the file-edge pass has real edges to look at.
+func benchPackPieces(n, files int) []piece.Piece {
+	pieces := benchPieces(n)
+	perFile := n / files
+	for i := range pieces {
+		file := min(i/perFile, files-1)
+		start := file * perFile
+		pieces[i].Data = filesection.Piece{{
+			Name:   fmt.Sprintf("episode-%02d.mkv", file),
+			Offset: int64(i-start) * testPieceLength,
+			Length: testPieceLength,
+		}}
 	}
 	return pieces
 }
@@ -80,7 +99,7 @@ func BenchmarkPickerSequentialNearlyDone(b *testing.B) {
 // (no pickable edge), which is the worst case of the edge pass.
 func BenchmarkPickerFileEdgeFullScan(b *testing.B) {
 	const n = 27250
-	pp := New(benchPieces(n), 8, nil, false, true)
+	pp := New(benchPackPieces(n, 24), 8, nil, false, true)
 	pe := testPeer(n)
 	for i := 0; i < n; i++ {
 		pp.HandleHave(pe, uint32(i))

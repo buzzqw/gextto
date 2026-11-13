@@ -5852,3 +5852,6 @@ eng:
   "Una sola fonte: il download potrebbe non completarsi": "A single source: the download may not complete"
   "sospetto": "suspect"
   "dubbio": "doubtful"
+  "Si possono rilasciare solo file .torrent.": "Only .torrent files can be dropped here."
+  "File .torrent pronto: premi Aggiungi.": ".torrent file ready: press Add."
+  "Magnet incollato: premi Aggiungi.": "Magnet link pasted: press Add."

@@ -367,7 +367,10 @@ func startManagedGxTorrent(cfg *Config, settings gxTorrentSettings) (*gxManagedP
 	}
 	var command *exec.Cmd
 	if gxCanUseScope() {
-		scope := fmt.Sprintf("gextto-gx-torrent-%d", time.Now().Unix())
+		// Nanoseconds, not seconds: a quick restart of the daemon (a crash
+		// right after start) within the same second collided with the
+		// previous scope's name and systemd refused the new one.
+		scope := fmt.Sprintf("gextto-gx-torrent-%d", time.Now().UnixNano())
 		command = exec.Command("systemd-run", append([]string{"--user", "--scope", "--quiet", "--collect", "--unit=" + scope, "--", spec.binary}, spec.args...)...)
 	} else {
 		command = exec.Command(spec.binary, spec.args...)

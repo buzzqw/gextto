@@ -6463,3 +6463,6 @@ spa:
   "Una sola fonte: il download potrebbe non completarsi": "Una sola fuente: puede que la descarga no termine"
   "sospetto": "sospechoso"
   "dubbio": "dudoso"
+  "Si possono rilasciare solo file .torrent.": "Aquí solo se pueden soltar archivos .torrent."
+  "File .torrent pronto: premi Aggiungi.": "Archivo .torrent listo: pulsa Añadir."
+  "Magnet incollato: premi Aggiungi.": "Enlace magnet pegado: pulsa Añadir."

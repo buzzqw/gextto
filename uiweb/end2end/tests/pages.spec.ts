@@ -195,6 +195,47 @@ test("la selezione torrent aggiorna il riepilogo delle azioni", async ({ page })
   await expect(page.locator("[data-v2-selected-count]")).toContainText("1 selezionati");
 });
 
+test("shift+clic seleziona l'intervallo di righe", async ({ page }) => {
+  await page.route("**/downloads/table", async (route) => {
+    const rows = [1, 2, 3, 4].map((n) => `<tr><td><input type="checkbox" data-v2-select value="range-${n}" aria-label="Seleziona ${n}" /></td></tr>`).join("");
+    await route.fulfill({
+      contentType: "text/html; charset=utf-8",
+      body: `<div id="v2-torrents-wrap"><form id="v2-torrent-form">
+        <span data-v2-selected-count>0 selezionati</span>
+        <table><tbody>${rows}</tbody></table>
+      </form></div>
+      <div class="view" data-torrents-slot>
+      </div>`,
+    });
+  });
+  await page.goto("/?view=downloads");
+  const boxes = page.locator("[data-v2-select]");
+  if (!(await boxes.first().isVisible())) {
+    await page.locator('#v2-torrent-form button[name="refresh"]').click();
+  }
+  await expect(boxes).toHaveCount(4);
+  await boxes.nth(0).click();
+  await boxes.nth(3).click({ modifiers: ["Shift"] });
+  for (let i = 0; i < 4; i++) await expect(boxes.nth(i)).toBeChecked();
+  await expect(page.locator("[data-v2-selected-count]")).toContainText("4 selezionati");
+});
+
+test("/ porta al filtro e un magnet incollato compila Aggiungi torrent", async ({ page }) => {
+  await page.goto("/?view=downloads");
+  await page.locator("body").click({ position: { x: 5, y: 5 } });
+  await page.keyboard.press("/");
+  await expect(page.locator("#v2-filter")).toBeFocused();
+  await page.locator("h1").first().click();
+  const magnet = "magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567";
+  await page.evaluate((text) => {
+    const data = new DataTransfer();
+    data.setData("text/plain", text);
+    document.body.dispatchEvent(new ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true }));
+  }, magnet);
+  await expect(page.locator("#v2-add-torrent")).toHaveAttribute("open", "");
+  await expect(page.locator("#v2-add-torrent input[name='magnet']")).toHaveValue(magnet);
+});
+
 test("selettore lingua presente e selezionabile", async ({ page }) => {
   await page.goto("/");
   await expect(page.locator(".lang-select")).toBeVisible();

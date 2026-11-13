@@ -163,6 +163,10 @@ func requestIsLocal(r *http.Request) bool {
 		forwarded = append(forwarded, strings.Split(value, ",")...)
 	}
 	forwarded = append(forwarded, r.Header.Values("X-Real-Ip")...)
+	// Tunnels and CDNs that reach Gextto from the same host name the real
+	// client in their own header, sometimes without X-Forwarded-For.
+	forwarded = append(forwarded, r.Header.Values("Cf-Connecting-Ip")...)
+	forwarded = append(forwarded, r.Header.Values("True-Client-Ip")...)
 	for _, value := range r.Header.Values("Forwarded") {
 		for _, part := range strings.Split(value, ",") {
 			for _, pair := range strings.Split(part, ";") {
@@ -202,8 +206,10 @@ func authClientAddress(r *http.Request) string {
 	}
 	values := r.Header.Values("X-Forwarded-For")
 	if len(values) == 0 {
-		if real := strings.TrimSpace(r.Header.Get("X-Real-Ip")); real != "" {
-			return real
+		for _, header := range []string{"X-Real-Ip", "Cf-Connecting-Ip", "True-Client-Ip"} {
+			if real := strings.TrimSpace(r.Header.Get(header)); real != "" {
+				return real
+			}
 		}
 		return host
 	}
@@ -324,8 +330,25 @@ func authLoginBlocked(client string, now time.Time) bool {
 			recent = append(recent, at)
 		}
 	}
-	authLoginAttempts.failures[client] = recent
+	if len(recent) == 0 {
+		delete(authLoginAttempts.failures, client)
+	} else {
+		authLoginAttempts.failures[client] = recent
+	}
+	authLoginForgetIdle(now)
 	return len(recent) >= 5
+}
+
+// authLoginForgetIdle drops the addresses whose failures are all older than
+// the one-minute window. Without it every address that ever failed a login
+// stayed in memory: guesses from many addresses grew the table for good.
+// Called with authLoginAttempts held.
+func authLoginForgetIdle(now time.Time) {
+	for client, failures := range authLoginAttempts.failures {
+		if len(failures) == 0 || now.Sub(failures[len(failures)-1]) >= time.Minute {
+			delete(authLoginAttempts.failures, client)
+		}
+	}
 }
 
 func authLoginFailed(client string, now time.Time) {
@@ -347,7 +370,12 @@ func authLoginHandler(s *AppState, auth authSettings, w http.ResponseWriter, r *
 		return
 	}
 	username := strings.TrimSpace(r.FormValue("username"))
-	if !auth.usernameMatches(username) || !auth.passwordMatches(r.FormValue("password")) {
+	// Both checks always run: skipping the password check on a wrong user name
+	// answered a few milliseconds sooner, which tells a guesser the name is
+	// wrong without knowing the password.
+	userOK := auth.usernameMatches(username)
+	passwordOK := auth.passwordMatches(r.FormValue("password"))
+	if !userOK || !passwordOK {
 		authLoginFailed(client, now)
 		logging.Warn(fmt.Sprintf("Failed login to the web interface from %s", client))
 		authRenderLogin(s, w, next, "Utente o password errati.", http.StatusUnauthorized)

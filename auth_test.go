@@ -188,3 +188,54 @@ func TestAuthLogoutCookieSecureBehindHTTPS(t *testing.T) {
 		t.Fatalf("logout over HTTPS must expire a Secure cookie, got %+v", cookies)
 	}
 }
+
+// TestRequestIsLocalSeesTunnelHeaders pins that a tunnel or CDN reaching
+// Gextto from the same host, naming the real client only in its own header,
+// does not make an Internet visitor look local.
+func TestRequestIsLocalSeesTunnelHeaders(t *testing.T) {
+	for _, header := range []string{"Cf-Connecting-Ip", "True-Client-Ip"} {
+		r := httptest.NewRequest(http.MethodGet, "/", nil)
+		r.RemoteAddr = "127.0.0.1:40000"
+		r.Header.Set(header, "203.0.113.7")
+		if requestIsLocal(r) {
+			t.Errorf("%s from the Internet counted as local", header)
+		}
+		if got := authClientAddress(r); got != "203.0.113.7" {
+			t.Errorf("client address with %s = %q, want the forwarded one", header, got)
+		}
+		r.Header.Set(header, "192.168.1.20")
+		if !requestIsLocal(r) {
+			t.Errorf("%s from the local network not counted as local", header)
+		}
+	}
+}
+
+// TestAuthLoginAttemptsForgetIdleAddresses pins that the login slow-down does
+// not keep every address that ever failed: once its minute is over it goes.
+func TestAuthLoginAttemptsForgetIdleAddresses(t *testing.T) {
+	authLoginAttempts.Lock()
+	saved := authLoginAttempts.failures
+	authLoginAttempts.failures = map[string][]time.Time{}
+	authLoginAttempts.Unlock()
+	t.Cleanup(func() {
+		authLoginAttempts.Lock()
+		authLoginAttempts.failures = saved
+		authLoginAttempts.Unlock()
+	})
+	start := time.Unix(1_800_000_000, 0)
+	for i := 0; i < 100; i++ {
+		authLoginFailed("198.51.100."+strings.Repeat("1", 1+i%3)+string(rune('a'+i%26)), start)
+	}
+	for i := 0; i < 5; i++ {
+		authLoginFailed("203.0.113.9", start.Add(50*time.Second))
+	}
+	if !authLoginBlocked("203.0.113.9", start.Add(70*time.Second)) {
+		t.Fatal("an address with five recent failures is not slowed down")
+	}
+	authLoginAttempts.Lock()
+	left := len(authLoginAttempts.failures)
+	authLoginAttempts.Unlock()
+	if left != 1 {
+		t.Fatalf("%d addresses kept after their minute, want only the recent one", left)
+	}
+}

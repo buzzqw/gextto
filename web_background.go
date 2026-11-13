@@ -918,7 +918,10 @@ func newEventWorker(configPath string, fallback *Config, state *AppState, db *Da
 	lastDebugLog := time.Now().Add(-300 * time.Second)
 	var lastPin *string
 	var lastSequential *bool
-	cfg := fallback
+	// The worker writes into its configuration (the recorded speed peaks):
+	// it works on its own copy, never on the startup configuration that the
+	// web handlers read, or a write would race their reads of the same map.
+	cfg := cloneConfigWithSettings(fallback)
 	notifier := FromConfig(cfg).Async()
 	tmdb := NewTmdbClientWithLanguage(cfg.TmdbAPIKey, cfg.TmdbLanguage())
 	lastConfigReload := time.Now().Add(-5 * time.Second)
