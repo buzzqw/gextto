@@ -22,12 +22,6 @@ import (
 	"golang.org/x/net/html"
 )
 
-var websearchTrackers = [3]string{
-	"udp://tracker.opentrackr.org:1337/announce",
-	"udp://open.stealth.si:80/announce",
-	"udp://tracker.torrent.eu.org:451/announce",
-}
-
 // webEngineLimiter must be shared by *all* title searches. A limiter allocated
 // per query only caps one query; with several scheduled queries it still permits
 // dozens of simultaneous HTML fetches and parsers.
@@ -908,7 +902,7 @@ func buildMagnet(hash, title string) string {
 	if !ok {
 		return ""
 	}
-	for _, tracker := range websearchTrackers {
+	for _, tracker := range currentWebsearchTrackers() {
 		sanitized += "&tr=" + url.QueryEscape(tracker)
 	}
 	return sanitized

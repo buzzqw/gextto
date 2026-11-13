@@ -2102,7 +2102,7 @@ salvata** finché non li salvi.
 | Impostazione | Cosa fa |
 |---|---|
 | Feed RSS | Lista dei feed RSS da leggere a ogni ciclo (una riga per URL). Metti `#` all'inizio di una riga per escluderla senza cancellarla: `# https://…` o `#https://…`. |
-| Motori web | Motori di ricerca web usati dal gap-filling quando feed e indexer non trovano nulla. |
+| Motori web | Motori di ricerca web usati dal gap-filling quando feed e indexer non trovano nulla. Quando un motore dà solo l'hash di una release, Gextto costruisce il magnet con i tracker della lista pubblica «best» del progetto *trackerslist*, scaricata una volta al giorno e tenuta su disco fra un avvio e l'altro: così il torrent trova peer prima di ricevere i metadati. |
 | Filtri contenuto esclusi | Le release che contengono queste parole o script (es. [porno]) vengono escluse. |
 | Filtri per sorgente | Parole chiave da accettare o scartare per una singola sorgente, con attivazione per riga. |
 | Cartelle osservate | I .torrent e i .magnet trovati nelle cartelle indicate vengono **scaricati** e aggiunti automaticamente alla sessione (ricorsiva, elimina dopo). |
