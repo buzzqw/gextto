@@ -4005,8 +4005,8 @@ func (d *Database) loadSeriesEpisodeSources(seriesName string, single bool) (*Se
 		args = []any{seriesName}
 		seriesFilter, metadataFilter = " WHERE name=?1", " WHERE series_name=?1"
 	}
-	scan := func(query string, row func(*sql.Rows) error) error {
-		rows, err := d.db.Query(query, args...)
+	scan := func(query string, row func(*sql.Rows) error, queryArgs ...any) error {
+		rows, err := d.db.Query(query, queryArgs...)
 		if err != nil {
 			return err
 		}
@@ -4028,7 +4028,7 @@ func (d *Database) loadSeriesEpisodeSources(seriesName string, single bool) (*Se
 			index.ignoredSeasons[name] = seasons
 		}
 		return nil
-	}); err != nil {
+	}, args...); err != nil {
 		return nil, err
 	}
 	if err := scan("SELECT series_name,season,episode,air_date FROM episode_metadata"+metadataFilter, func(rows *sql.Rows) error {
@@ -4044,7 +4044,7 @@ func (d *Database) loadSeriesEpisodeSources(seriesName string, single bool) (*Se
 		}
 		dates[[2]int64{season, episode}] = airDate
 		return nil
-	}); err != nil {
+	}, args...); err != nil {
 		return nil, err
 	}
 	if err := scan("SELECT series_name,season,episode FROM ignored_episodes"+metadataFilter, func(rows *sql.Rows) error {
@@ -4060,7 +4060,7 @@ func (d *Database) loadSeriesEpisodeSources(seriesName string, single bool) (*Se
 		}
 		ignored[[2]int64{season, episode}] = struct{}{}
 		return nil
-	}); err != nil {
+	}, args...); err != nil {
 		return nil, err
 	}
 	episodeFilter := ""
@@ -4089,27 +4089,37 @@ func (d *Database) loadSeriesEpisodeSources(seriesName string, single bool) (*Se
 		item.MagnetLink = nullStringPtr(magnetLink)
 		index.episodes[item.SeriesName] = append(index.episodes[item.SeriesName], item)
 		return nil
-	}); err != nil {
+	}, args...); err != nil {
 		return nil, err
 	}
 	// The episodes the engine is downloading even when the library has no
 	// placeholder for them: a reconciled or restored torrent is known only by
 	// its torrent_meta row, and the episode list must show it as queued or
 	// downloading instead of missing.
-	downloadingFilter := ""
+	//
+	// A torrent_meta row carries the series name parsed from the release, which
+	// may spell the series differently from the configured one ("Show Name"
+	// against "Show: Name"): the rows are compared on the normalized name, as
+	// the Missing tab already does, and not with `series_name=?` in SQL, which
+	// would match one spelling only and leave the episodes missing on the
+	// series page while the Missing tab says there is nothing to search.
+	var downloadingSeries string
 	if single {
-		downloadingFilter = " AND series_name=?1"
+		downloadingSeries = NormalizeSeriesName(seriesName)
 	}
 	if err := scan(`SELECT COALESCE(series_name,''),season,episode,status,COALESCE(title,''),
                     COALESCE(hash,''),COALESCE(link,''),COALESCE(error,''),COALESCE(metadata_json,'')
              FROM torrent_meta
-             WHERE status NOT IN ('completed','error','removed') AND season IS NOT NULL AND COALESCE(series_name,'')<>''`+downloadingFilter,
+             WHERE status NOT IN ('completed','error','removed') AND season IS NOT NULL AND COALESCE(series_name,'')<>''`,
 		func(rows *sql.Rows) error {
 			var name, status, title, hash, link, failure, metadataJSON string
 			var season int64
 			var episode sql.NullInt64
 			if err := rows.Scan(&name, &season, &episode, &status, &title, &hash, &link, &failure, &metadataJSON); err != nil {
 				return err
+			}
+			if downloadingSeries != "" && NormalizeSeriesName(name) != downloadingSeries {
+				return nil
 			}
 			row := activeEpisodeRow{Season: season, Status: status, Title: title, MagnetHash: hash, MagnetLink: link, Error: failure}
 			// A multi-episode release lists its episodes in the stored metadata.
@@ -4146,7 +4156,7 @@ func (d *Database) loadSeriesEpisodeSources(seriesName string, single bool) (*Se
 		}
 		index.expected[name] = append(index.expected[name], [2]int64{season, count})
 		return nil
-	}); err != nil {
+	}, args...); err != nil {
 		return nil, err
 	}
 	return index, nil

@@ -2817,6 +2817,42 @@ func TestEpisodeListShowsDownloadsWithoutPlaceholders(t *testing.T) {
 	assertEqual(t, perSeries, [][2]int64{{1, 5}})
 }
 
+// A torrent_meta row carries the series name parsed from the release, which
+// may spell the series differently from the configured one ("Show Name" against
+// "Show: Name"). The series page has to match them on the normalized name, as
+// the Missing tab does: otherwise it shows the episode as missing while «Search
+// missing» answers that there is nothing to look for.
+func TestEpisodeListMatchesDownloadsOnNormalizedName(t *testing.T) {
+	db := newTestDB(t)
+	if _, err := db.db.Exec("INSERT INTO series(id,name) VALUES (1,'Show: Name')"); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.SaveSeriesMetadata("Show: Name", [][2]int64{{1, 3}}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.db.Exec("INSERT INTO torrent_meta(hash,series_name,season,episode,status,title,created_at,updated_at) VALUES ('1111111111111111111111111111111111111111','Show Name',1,2,'queued','Show Name S01E02',datetime('now'),datetime('now'))"); err != nil {
+		t.Fatal(err)
+	}
+	items, err := db.EpisodesForSeries("Show: Name", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	statuses := map[[2]int64]string{}
+	for _, item := range items {
+		statuses[[2]int64{item.Season, item.Episode}] = item.Status
+	}
+	assertEqual(t, statuses, map[[2]int64]string{
+		{1, 1}: "missing",
+		{1, 2}: "queued",
+		{1, 3}: "missing",
+	})
+	perSeries, err := db.ArchiveGapsForSeries("Show: Name")
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertEqual(t, perSeries, [][2]int64{{1, 1}, {1, 3}})
+}
+
 // eD2k files live in aMule, not in the torrent session: the reconciliation
 // must leave them alone, or PendingEd2kHashes stops watching them and a
 // finished file is never imported. Rows an earlier version marked as missing
