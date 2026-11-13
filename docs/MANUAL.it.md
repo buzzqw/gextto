@@ -760,7 +760,7 @@ resta visibile. Le schede:
 | Scheda | Cosa trovi |
 |---|---|
 | **Generale** | dati del torrent (del magnet si vedono le prime tre righe), copia magnet, **Esporta .torrent**, riannuncia, pin, riavvia, segna come fallito, **Super seeding**, web seed |
-| **Tracker** | aggiungi tracker (`tier|url` per riga) o rimuovine uno |
+| **Tracker** | aggiungi tracker (`tier\|url` per riga) o rimuovine uno |
 | **Contenuto** | i file, con la **priorità** (Salta, Normale, Alta, Massima) e, con gx-torrent, **▶** per lo streaming |
 | **Peers** | i peer connessi; con gx-torrent accanto all'indirizzo c'è il **paese** del peer, dal database DB-IP che gx-torrent scarica da solo |
 | **Pezzi** | la mappa dei pezzi: verde scaricato, giallo in corso, grigio mancante. Con gx-torrent sotto c'è la **disponibilità tra i peer**: più la barra è piena, più peer connessi hanno i pezzi che ti mancano; il rosso indica pezzi che nessun peer connesso ha. Con qBittorrent c'è la sola mappa, e i pezzi dei file saltati risultano mancanti |
@@ -838,8 +838,8 @@ il primo livello che lo imposta:
 3. il limite **globale**.
 
 Una **regola di seed** indica una **sorgente** (basta una parte del nome
-dell'indexer, senza distinguere maiuscole: `mircrew` vale anche per `mircrew
-indexerr`) e/o una **categoria** (Serie TV, Film, Fumetti, Altro). Così le regole
+dell'indexer, senza distinguere maiuscole: `mircrew` vale anche per
+`mircrew indexerr`) e/o una **categoria** (Serie TV, Film, Fumetti, Altro). Così le regole
 di un tracker privato valgono solo per i suoi torrent. Un campo vuoto usa il
 globale. Un torrent arrivato dalla ricerca aggregata di Jackett non porta il
 nome del tracker: per lui valgono categoria o globale.
@@ -1955,8 +1955,8 @@ righe del log sulla cartella osservata.
 
 ### L'interfaccia non si apre
 
-- Controlla il servizio: `systemctl status gextto` (o `systemctl --user status
-  gextto`).
+- Controlla il servizio: `systemctl status gextto` (o
+  `systemctl --user status gextto`).
 - Se il log dice che la cartella dati è già in uso o la porta è occupata, c'è
   un'altra istanza: fermala e riavvia.
 - Dopo un riavvio Gextto può impiegare circa un minuto per essere pronto.

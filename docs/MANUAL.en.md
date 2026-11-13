@@ -146,8 +146,8 @@ checksum and installs it:
   integrity and clean the audio tracks). `--no-media-tools` skips them.
 
 The service runs as **the user who runs the installer**, so it can write into
-your media folders. For a separate account use `--user NAME`, or `--user
-gextto` for the isolated system account without login (with `--media-group` to
+your media folders. For a separate account use `--user NAME`, or
+`--user gextto` for the isolated system account without login (with `--media-group` to
 give it access to other users' media).
 
 Other useful options:
@@ -746,7 +746,7 @@ stays visible. The tabs:
 | Tab | What you find |
 |---|---|
 | **General** | torrent data (the magnet shows its first three lines), copy magnet, **Export .torrent**, reannounce, pin, restart, mark as failed, **Super seeding**, web seeds |
-| **Tracker** | add trackers (`tier|url` per line) or remove one |
+| **Tracker** | add trackers (`tier\|url` per line) or remove one |
 | **Content** | the files, with **priority** (Skip, Normal, High, Maximum) and, with gx-torrent, **▶** for streaming |
 | **Peers** | the connected peers; with gx-torrent the peer's **country** sits next to its address, from the DB-IP database gx-torrent downloads by itself |
 | **Pieces** | the piece map: green downloaded, yellow in progress, grey missing. With gx-torrent, below it is the **availability among peers**: the fuller the bar, the more connected peers have the pieces you are missing; red marks pieces no connected peer has. With qBittorrent there is the map only, and the pieces of skipped files show as missing |
@@ -1182,8 +1182,8 @@ error or paused is visible even when the manager answers.
 ### Backoff: when a source fails
 
 A source that keeps failing is put in **backoff**: for a while Gextto does not
-query it, with longer and longer pauses. If an indexer answers `429 Too Many
-Requests` with `Retry-After`, the pause lasts at least the time asked. The state
+query it, with longer and longer pauses. If an indexer answers
+`429 Too Many Requests` with `Retry-After`, the pause lasts at least the time asked. The state
 is in *Health → Provider status*, with level, expiry and last error. Once you
 have fixed the cause press **Reset** on that source; do not use it to hide a
 wrong API key, or the backoff will start again.
@@ -1561,8 +1561,8 @@ network.
 
 Regardless of the login, Gextto refuses changes that the browser declares as
 coming from another site: a malicious page cannot reconfigure it through your
-browser. The full model is in [SECURITY.md](SECURITY.md); the keys in [Access
-keys](api-keys.md).
+browser. The full model is in [SECURITY.md](SECURITY.md); the keys in
+[Access keys](api-keys.md).
 
 ---
 
@@ -1625,8 +1625,8 @@ update or a restart), Gextto writes a line saying where the detail is: the file
 
 ### The history of a download
 
-Every log line about a download ends with an **acquisition ID** (`acq:
-7f3a2c`), the same from the choice of the release to its arrival in the
+Every log line about a download ends with an **acquisition ID**
+(`acq: 7f3a2c`), the same from the choice of the release to its arrival in the
 library. Type it in the log filter to see only that download. The same lines
 are kept for 180 days as **history**: *History* tab in the torrent's details,
 📜 on every episode, *Download history* on the series page. They stay readable
@@ -1934,8 +1934,8 @@ the watched folder.
 
 ### The interface does not open
 
-- Check the service: `systemctl status gextto` (or `systemctl --user status
-  gextto`).
+- Check the service: `systemctl status gextto` (or
+  `systemctl --user status gextto`).
 - If the log says the data folder is already in use or the port is taken,
   another instance is running: stop it and restart.
 - After a restart Gextto can take about a minute to be ready.
