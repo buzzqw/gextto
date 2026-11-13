@@ -927,70 +927,6 @@ func RemoveTrashContents(root string, olderThanDays int64) (int, uint64, error) 
 	return files, byteCount, nil
 }
 
-// gh4_addRelease queues a release for download, falling back to a search of its
-// title when the URL cannot be fetched.
-func gh4AddRelease(s *AppState, release models.Release) (int, any) {
-	if !SetupComplete(s.cfg) {
-		return http.StatusConflict, map[string]any{"ok": false, "error": "complete the initial setup first"}
-	}
-	isURL := isHTTPURL(release.Magnet)
-	status, value := addParsedRelease(s, release)
-	if isURL && status == http.StatusBadRequest {
-		if found := gh4ResolveBySearch(s, release.Title); found != nil {
-			retryStatus, retryValue := addParsedRelease(s, *found)
-			if retryStatus != http.StatusBadRequest {
-				return retryStatus, retryValue
-			}
-		}
-	}
-	return status, value
-}
-
-// gh4_addParsedRelease registers a release and queues it: a magnet goes to the
-// engine at once, an HTTP URL is fetched first.
-func addParsedRelease(s *AppState, release models.Release) (int, any) {
-	source := strings.TrimSpace(release.Magnet)
-	if isHTTPURL(source) {
-		hash, err := downloadAndAdd(s, source, AddOptions{})
-		if err != nil {
-			return http.StatusBadRequest, map[string]any{"ok": false, "error": err.Error()}
-		}
-		if hash == nil {
-			return http.StatusConflict, map[string]any{"ok": false, "error": "torrent duplicate"}
-		}
-		release.Magnet = "magnet:?xt=urn:btih:" + *hash
-		score := latestConfig(s).ReleaseScore(&release)
-		if err := s.db.RegisterTorrentScored(&release, score); err != nil {
-			return http.StatusInternalServerError, map[string]any{"ok": false, "error": err.Error()}
-		}
-		_ = s.db.SetTorrentReason(*hash, manualReason)
-		return http.StatusAccepted, map[string]any{"ok": true, "title": release.Title}
-	}
-	score := latestConfig(s).ReleaseScore(&release)
-	if err := s.db.RegisterTorrentScored(&release, score); err != nil {
-		return http.StatusInternalServerError, map[string]any{"ok": false, "error": err.Error()}
-	}
-	if hash, ok := utils.MagnetHash(release.Magnet); ok {
-		_ = s.db.SetTorrentReason(hash, manualReason)
-	}
-	title := release.Title
-	logHash, _ := utils.MagnetHash(release.Magnet)
-	cfg := LatestConfig(s)
-	go func() {
-		defer recoverGoroutine("g4 background")
-		added, err := s.activeEngine().Add(source, cfg)
-		switch {
-		case err != nil:
-			logging.Error(fmt.Sprintf("❌ Could not add «%s» to the downloads", title), "hash", logHash, "error", err)
-		case added:
-			logging.Info(fmt.Sprintf("📥 «%s» added to the downloads by hand (score %v)", title, score), "hash", logHash)
-		default:
-			logging.Info(fmt.Sprintf("«%s» is already among the downloads", title), "hash", logHash)
-		}
-	}()
-	return http.StatusAccepted, map[string]any{"ok": true, "title": title, "queued": true}
-}
-
 // gh4_downloadAndAdd adds a magnet link, or fetches and adds a .torrent file; it
 // returns the info hash, and nil when the torrent was already there.
 func downloadAndAdd(s *AppState, rawURL string, options AddOptions) (*string, error) {
@@ -1028,69 +964,6 @@ func downloadAndAdd(s *AppState, rawURL string, options AddOptions) (*string, er
 	}
 	defer os.Remove(path)
 	return s.activeEngine().AddTorrentFileWithOptions(path, cfg, nil, options)
-}
-
-// gh4_resolveBySearch searches for a release whose title starts with the one
-// given and whose source can be used.
-func gh4ResolveBySearch(s *AppState, title string) *models.Release {
-	query := searchQueryFromTitle(title)
-	normalized := normalizeSearch(query)
-	if normalized == "" {
-		return nil
-	}
-	results := s.engine.SearchQueryManual(context.Background(), LatestConfig(s), query)
-	for i := range results {
-		release := &results[i]
-		if sourceIsUsable(release.Magnet) && strings.HasPrefix(normalizeSearch(release.Title), normalized) {
-			return release
-		}
-	}
-	return nil
-}
-
-// gh4_searchQueryFromTitle turns a release title into a search query: it keeps
-// the leading words and stops at the year or at the first quality marker.
-func searchQueryFromTitle(title string) string {
-	head := title
-	if index := strings.Index(title, "["); index >= 0 {
-		head = title[:index]
-	}
-	cleaned := make([]rune, 0, len(head))
-	for _, character := range head {
-		if (character >= '0' && character <= '9') ||
-			(character >= 'a' && character <= 'z') ||
-			(character >= 'A' && character <= 'Z') {
-			cleaned = append(cleaned, character)
-		} else {
-			cleaned = append(cleaned, ' ')
-		}
-	}
-	markers := map[string]struct{}{
-		"4k": {}, "uhd": {}, "bluray": {}, "bdrip": {}, "web": {}, "webdl": {},
-		"webrip": {}, "hdtv": {}, "dvdrip": {}, "h264": {}, "h265": {}, "x264": {},
-		"x265": {}, "hevc": {}, "avc": {}, "aac": {}, "ac3": {}, "eac3": {},
-		"ddp": {}, "dts": {}, "proper": {}, "repack": {},
-	}
-	words := []string{}
-	for _, word := range strings.Fields(string(cleaned)) {
-		lower := strings.ToLower(word)
-		isYear := len(word) == 4 && allASCIIDigits(word)
-		_, isMarker := markers[lower]
-		if !isMarker {
-			isMarker = strings.Contains(lower, "1080p") ||
-				strings.Contains(lower, "720p") ||
-				strings.Contains(lower, "2160p") ||
-				strings.Contains(lower, "480p")
-		}
-		if isMarker {
-			break
-		}
-		words = append(words, word)
-		if isYear || len(words) >= 6 {
-			break
-		}
-	}
-	return strings.Join(words, " ")
 }
 
 // gh4_sourceIsUsable reports whether the source is an HTTP URL or a magnet link
@@ -1177,7 +1050,7 @@ func BatchArchiveDownload(w http.ResponseWriter, r *http.Request, s *AppState) {
 			if release == nil {
 				status, value = addRawMagnet(s, item.Magnet)
 			} else {
-				status, value = gh4AddRelease(s, *release)
+				status, value = AddRelease(s, *release)
 			}
 		}
 		if (status >= 200 && status < 300) || status == http.StatusAccepted {
