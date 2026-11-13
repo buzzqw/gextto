@@ -609,7 +609,8 @@ release, or download something you do not follow.
 
 1. Type a title (or a technical query) and wait for the sources to answer;
    slow ones are flagged at the timeout.
-2. Compare title, source, quality, size and seeds/peers.
+2. Compare title, source, quality, size and seeds/peers. A long release name
+   wraps over several lines, so the buttons of the row stay in view.
 3. Narrow down with **Filter the already loaded results**: it works on the
    results received and does not search again.
 4. Open **Why not this one?** on the interesting results.

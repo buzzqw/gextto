@@ -217,12 +217,12 @@
 
 {{define "v2_sources_rows"}}
 {{if .Results}}
-<div class="table-wrap"><table class="data-table">
-  <thead><tr>{{if .ShowEpisode}}<th scope="col">{{tr "Puntata"}}</th>{{end}}<th scope="col">{{tr "Titolo"}}</th><th scope="col">{{tr "Sorgente"}}</th><th scope="col">{{tr "Punteggio"}}</th><th scope="col">{{tr "Dimensione"}}</th><th scope="col">{{tr "Azioni"}}</th></tr></thead>
-  <tbody>{{range .Results}}<tr>{{if $.ShowEpisode}}<td class="nowrap">{{tr .Episode}}</td>{{end}}
-    <td class="truncate" {{trTitle .Title}}>{{tr .Title}}{{if .LastResort}} <span class="badge warn" {{trTitle "Ultima risorsa: episodio mancante preso fuori dalla risoluzione del profilo perché era l'unica copia nella lingua richiesta. L'upgrade lo sostituisce appena esce una copia nel profilo."}}>{{tr "🆘 ultima risorsa"}}</span>{{end}}</td>
-    <td>{{tr .Source}}</td><td class="numeric">{{tr .Score}}</td><td class="numeric">{{if .SizeBytes}}{{bytes .SizeBytes}}{{else}}—{{end}}</td>
-    <td class="row-actions">{{if .Magnet}}<button class="btn sm" type="button" data-v2-copy="{{.Magnet}}" {{trTitle "Copia il link magnet negli appunti"}}>{{tr "Copia magnet"}}</button>{{end}}{{if .Body}}{{template "v2_action_btn" (dict "Redirect" $.Redirect "Path" "/api/archive/batch-download" "Method" "POST" "Body" .Body "Label" "Scarica" "Class" "primary" "Title" "Aggiungi questa release ai download" "Stay" true "StayTitle" "Download")}}{{end}}</td>
+<div class="table-wrap"><table class="data-table sources-table">
+  <thead><tr>{{if .ShowEpisode}}<th scope="col" class="sources-episode">{{tr "Puntata"}}</th>{{end}}<th scope="col" class="sources-title">{{tr "Titolo"}}</th><th scope="col" class="sources-source">{{tr "Sorgente"}}</th><th scope="col" class="sources-score">{{tr "Punteggio"}}</th><th scope="col" class="sources-size">{{tr "Dimensione"}}</th><th scope="col" class="sources-actions">{{tr "Azioni"}}</th></tr></thead>
+  <tbody>{{range .Results}}<tr>{{if $.ShowEpisode}}<td class="nowrap sources-episode">{{tr .Episode}}</td>{{end}}
+    <td class="sources-title" {{trTitle .Title}}>{{tr .Title}}{{if .LastResort}} <span class="badge warn" {{trTitle "Ultima risorsa: episodio mancante preso fuori dalla risoluzione del profilo perché era l'unica copia nella lingua richiesta. L'upgrade lo sostituisce appena esce una copia nel profilo."}}>{{tr "🆘 ultima risorsa"}}</span>{{end}}</td>
+    <td class="sources-source">{{tr .Source}}</td><td class="numeric sources-score">{{tr .Score}}</td><td class="numeric sources-size">{{if .SizeBytes}}{{bytes .SizeBytes}}{{else}}—{{end}}</td>
+    <td class="row-actions sources-actions">{{if .Magnet}}<button class="btn sm" type="button" data-v2-copy="{{.Magnet}}" {{trTitle "Copia il link magnet negli appunti"}}>{{tr "Copia magnet"}}</button>{{end}}{{if .Body}}{{template "v2_action_btn" (dict "Redirect" $.Redirect "Path" "/api/archive/batch-download" "Method" "POST" "Body" .Body "Label" "Scarica" "Class" "primary" "Title" "Aggiungi questa release ai download" "Stay" true "StayTitle" "Download")}}{{end}}</td>
   </tr>{{end}}</tbody>
 </table></div>
 {{else}}<p class="muted">{{if .Hint}}{{tr .Hint}}{{else}}{{tr "Nessuna sorgente disponibile per questa puntata."}}{{end}}</p>{{end}}

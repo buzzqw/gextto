@@ -618,7 +618,9 @@ release precisa o a scaricare qualcosa che non segui.
 
 1. Scrivi un titolo (o una query tecnica) e attendi che le sorgenti rispondano;
    quelle lente vengono segnalate al timeout.
-2. Confronta titolo, sorgente, qualità, dimensione e seed/peer.
+2. Confronta titolo, sorgente, qualità, dimensione e seed/peer. Il nome lungo di
+   una release va a capo su più righe, così i pulsanti della riga restano
+   visibili.
 3. Restringi con **Filtra i risultati già caricati**: lavora sui risultati
    ricevuti e non rifà la ricerca.
 4. Apri **Perché non questa?** sui risultati interessanti.

@@ -843,6 +843,29 @@ label.field > span, .field > span, .field-label { color: var(--muted); font-size
   white-space: nowrap;
 }
 .archive-table td.row-actions .btn { margin-left: 4px; }
+/* Sources table (episode search, missing search, release archive): the release
+   name wraps over as many lines as it needs, so the actions column and its
+   «Scarica» button stay on screen instead of being pushed past the right edge. */
+.sources-table { width: 100%; min-width: 0; table-layout: fixed; }
+.sources-table th, .sources-table td { vertical-align: top; }
+.sources-table thead th { white-space: normal; overflow-wrap: anywhere; }
+.sources-table .sources-title { white-space: normal; overflow-wrap: anywhere; }
+.sources-table .sources-episode { width: 104px; }
+.sources-table .sources-source { width: 16%; white-space: normal; overflow-wrap: anywhere; }
+.sources-table .sources-score { width: 118px; }
+.sources-table .sources-size { width: 130px; }
+.sources-table .sources-actions { width: 150px; }
+.sources-table td.sources-actions { min-width: 0; white-space: normal; }
+.sources-table .row-actions { min-width: 0; flex-wrap: wrap; white-space: normal; gap: 4px; }
+@media (max-width: 640px) {
+  .sources-table .sources-source,
+  .sources-table .sources-score,
+  .sources-table .sources-size { display: none; }
+  .sources-table .sources-episode { width: 88px; }
+  .sources-table thead th { font-size: 0.68rem; letter-spacing: 0.02em; }
+  .data-table.sources-table th,
+  .data-table.sources-table td { padding: 8px 6px; }
+}
 .btn.icon { padding: 5px 8px; line-height: 1; }
 .table-pagination { display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 12px; }
 .table-pagination .page-label { color: var(--muted); font-size: 0.85rem; }
