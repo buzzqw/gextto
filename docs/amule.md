@@ -272,7 +272,9 @@ An eD2k download Gextto started by itself that receives nothing for as many
 days as **Give up on a stalled eD2k download after** says (7, 0 = never,
 measured on aMule's "last data received" time, so restarts do not reset it) is
 cancelled in aMule, its release is blocklisted and the gap is searched again.
-Downloads added by hand and paused ones are left alone.
+The block does not last for ever: the copy is tried again after the same wait,
+and stays away four times as long if it stalls again, then twelve times (at most
+three months). Downloads added by hand and paused ones are left alone.
 
 ### Shared files and uploads
 

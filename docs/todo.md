@@ -31,3 +31,4 @@ Each waits for the operator's choice.
 
 - **MCP endpoint**: Gextto's API exposed as tools for an assistant, with a read-only switch. Gate: the operator's choice.
 - **Usenet as an acquisition source**: NZB search through the same indexers and an NNTP download path into the same import. Gate: the operator's choice.
+- **Blocklist "Motivo" in words**: the column shows the internal code (`stalled_ed2k`, `dead_swarm`, `corrupt_file`) instead of a sentence translated in every language, which the log now writes. Gate: the operator's choice.

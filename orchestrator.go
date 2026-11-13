@@ -991,11 +991,16 @@ func collectGapReleases(ctx context.Context, cfg *Config, engine *Engine, db *Da
 		// release archive holds.
 		for i := range liveCandidates {
 			candidate := liveCandidates[i]
+			var blocked []blockedLastResort
 			if len(foundResults[i]) == 0 && len(lastResorts[i]) > 0 {
-				foundResults[i] = lastResorts[i]
-				logging.Info(fmt.Sprintf("🆘 Nothing within the quality profile for the missing %s S%02dE%02d: %s in the right language but outside the resolution, taken as a last resort",
-					candidate.Series.Name, candidate.Season, candidate.Episode,
-					countLabel(int64(len(lastResorts[i])), "copy", "copies")))
+				usable, refused := splitLastResorts(db, lastResorts[i], blocklistedHashes)
+				blocked = refused
+				if len(usable) > 0 {
+					foundResults[i] = usable
+					logging.Info(fmt.Sprintf("🆘 Nothing within the quality profile for the missing %s S%02dE%02d: %s in the right language but outside the resolution, taken as a last resort",
+						candidate.Series.Name, candidate.Season, candidate.Episode,
+						countLabel(int64(len(usable)), "copy", "copies")))
+				}
 			}
 			// The archive may hold the only copy, outside the profile: the
 			// live search does not look there, so the pass adds it now that
@@ -1003,11 +1008,20 @@ func collectGapReleases(ctx context.Context, cfg *Config, engine *Engine, db *Da
 			if len(foundResults[i]) == 0 {
 				key := gapTarget{Series: candidate.Series.Name, Season: candidate.Season, Episode: candidate.Episode}
 				if archived := archiveLastResorts[key]; len(archived) > 0 {
-					foundResults[i] = archived
-					logging.Info(fmt.Sprintf("🆘 Nothing within the quality profile for the missing %s S%02dE%02d: %s from the release archive, taken as a last resort",
-						candidate.Series.Name, candidate.Season, candidate.Episode,
-						countLabel(int64(len(archived)), "copy", "copies")))
+					usable, refused := splitLastResorts(db, archived, blocklistedHashes)
+					blocked = append(blocked, refused...)
+					if len(usable) > 0 {
+						foundResults[i] = usable
+						logging.Info(fmt.Sprintf("🆘 Nothing within the quality profile for the missing %s S%02dE%02d: %s from the release archive, taken as a last resort",
+							candidate.Series.Name, candidate.Season, candidate.Episode,
+							countLabel(int64(len(usable)), "copy", "copies")))
+					}
 				}
+			}
+			if len(foundResults[i]) == 0 && len(blocked) > 0 {
+				// A blocked copy starts nothing: announcing it as taken left
+				// the log claiming a download that never happened.
+				logBlockedLastResorts(candidate.Series.Name, candidate.Season, candidate.Episode, blocked)
 			}
 		}
 		for i := range liveCandidates {

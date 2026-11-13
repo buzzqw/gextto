@@ -5575,7 +5575,7 @@ fra:
 
   # eD2k and Kad through aMule (External Connections)
   "Rinuncia a un download eD2k fermo dopo": "Abandonner un téléchargement eD2k bloqué après"
-  "Un download eD2k scelto da Gextto che non riceve dati per questi giorni viene annullato in aMule, la release finisce in blocklist e l'episodio torna da cercare. I download aggiunti a mano e quelli in pausa non vengono toccati. 0 = mai.": "Un téléchargement eD2k choisi par Gextto qui ne reçoit aucune donnée pendant ce nombre de jours est annulé dans aMule, la release passe en liste de blocage et l'épisode est recherché à nouveau. Les téléchargements ajoutés à la main et ceux en pause ne sont pas touchés. 0 = jamais."
+  "Un download eD2k scelto da Gextto che non riceve dati per questi giorni viene annullato in aMule, la release finisce in blocklist e l'episodio torna da cercare. La copia viene riprovata dopo la stessa attesa, e resta fuori più a lungo se si ferma di nuovo. I download aggiunti a mano e quelli in pausa non vengono toccati. 0 = mai.": "Un téléchargement eD2k choisi par Gextto qui ne reçoit aucune donnée pendant ce nombre de jours est annulé dans aMule, la release passe en liste de blocage et l'épisode est recherché à nouveau. La copie est réessayée après la même attente et reste écartée plus longtemps si elle se bloque de nouveau. Les téléchargements ajoutés à la main et ceux en pause ne sont pas touchés. 0 = jamais."
 
   # eD2k and Kad through aMule (External Connections)
   "Priorità salvata.": "Priorité enregistrée."

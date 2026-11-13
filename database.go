@@ -1037,6 +1037,13 @@ func (d *Database) migrate() error {
 	if _, err := d.db.Exec("UPDATE blocklist SET expires_at = datetime(created_at, '+7 days') WHERE lower(reason) = 'dead_swarm' AND (expires_at IS NULL OR expires_at = '')"); err != nil {
 		logging.Warn("schema migration: cannot set the expiry of the dead-swarm blocks", "error", err)
 	}
+	// The eD2k download that stalled was blocked for good, so the only copy of
+	// its episode could never be tried again. It gets the setting's default
+	// wait here, on an installation that already has such an entry; the next
+	// stall follows the configured period and grows when it happens again.
+	if _, err := d.db.Exec("UPDATE blocklist SET expires_at = datetime(created_at, '+7 days') WHERE lower(reason) = 'stalled_ed2k' AND (expires_at IS NULL OR expires_at = '')"); err != nil {
+		logging.Warn("schema migration: cannot set the expiry of the stalled eD2k blocks", "error", err)
+	}
 	// "Visti nei feed": tutte le release che passano dalle sorgenti.
 	if _, err := d.db.Exec(databaseFeedSeenSchema); err != nil {
 		return err
@@ -2839,6 +2846,28 @@ func (d *Database) BlocklistedTitles() (map[string]struct{}, error) {
 	return titles, rows.Err()
 }
 
+// BlocklistRecord is the live entry that keeps one release out of the
+// candidates: why it was blocked and until when.
+type BlocklistRecord struct {
+	Reason string
+	// ExpiresAt is empty when the block stays for good: the operator's own
+	// entries and the permanent ones.
+	ExpiresAt string
+}
+
+// BlocklistRecordFor returns the live blocklist entry of a hash, if any. It is
+// asked one release at a time, for the few copies whose refusal is about to be
+// told in the log.
+func (d *Database) BlocklistRecordFor(hash string) (BlocklistRecord, bool) {
+	var record BlocklistRecord
+	err := d.db.QueryRow("SELECT COALESCE(reason,''), COALESCE(expires_at,'') FROM blocklist WHERE "+blocklistAliveSQL+" AND magnet_hash=?2",
+		nowSQLite(), strings.ToLower(strings.TrimSpace(hash))).Scan(&record.Reason, &record.ExpiresAt)
+	if err != nil {
+		return BlocklistRecord{}, false
+	}
+	return record, true
+}
+
 // Blocklist adds a release to the blocklist for good.
 func (d *Database) Blocklist(release *models.Release, reason string) error {
 	return d.BlocklistUntil(release, reason, time.Time{})
@@ -2852,6 +2881,14 @@ func (d *Database) Blocklist(release *models.Release, reason string) error {
 // revives is still seen again. A zero base keeps the release blocked forever,
 // as the setting says.
 func (d *Database) BlocklistDeadSwarm(release *models.Release, base time.Duration) (time.Duration, error) {
+	return d.BlocklistDeadSwarmBecause(release, base, "dead_swarm")
+}
+
+// BlocklistDeadSwarmBecause is BlocklistDeadSwarm for a release nobody was
+// sharing while it downloaded, under a reason of its own: an eD2k file that
+// stalled is the same situation, and its episode is left unfillable for ever
+// if the block never expires.
+func (d *Database) BlocklistDeadSwarmBecause(release *models.Release, base time.Duration, reason string) (time.Duration, error) {
 	hash, err := releaseIdentityHash(release)
 	if err != nil {
 		return 0, err
@@ -2862,9 +2899,9 @@ func (d *Database) BlocklistDeadSwarm(release *models.Release, base time.Duratio
 	}
 	period := deadSwarmBlockPeriod(base, strikes)
 	if period <= 0 {
-		return 0, d.BlocklistUntil(release, "dead_swarm", time.Time{})
+		return 0, d.BlocklistUntil(release, reason, time.Time{})
 	}
-	return period, d.BlocklistUntil(release, "dead_swarm", time.Now().Add(period))
+	return period, d.BlocklistUntil(release, reason, time.Now().Add(period))
 }
 
 // noteDeadSwarmStrike counts one more refusal for the release and returns how

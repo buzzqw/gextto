@@ -593,16 +593,29 @@ func MonitorEd2kStalled(cfg *Config, db *Database, notifier *Notifier, now time.
 		_ = db.MarkTorrentError(download.Hash, "stalled eD2k download")
 		_ = db.MarkTorrentRemovedAt(download.Hash)
 		title := download.Name
+		blockedFor := time.Duration(0)
 		if metadata != nil {
 			title = metadata.Release.Title
-			_ = db.Blocklist(&metadata.Release, "stalled_ed2k")
+			// The block is temporary: a file nobody was sharing can come back,
+			// and a permanent block would leave its episode unfillable for
+			// ever — the last resort of the gap remained that same file, so
+			// every search found it and refused it. The wait is the one the
+			// setting already names, and it grows when the same file stalls
+			// again.
+			if period, berr := db.BlocklistDeadSwarmBecause(&metadata.Release, limit, "stalled_ed2k"); berr == nil {
+				blockedFor = period
+			}
 			release := metadata.Release
 			if release.Series != nil && release.Season != nil && release.Episode != nil {
 				_ = db.ClearGapSearched(*release.Series, *release.Season, *release.Episode)
 			}
 		}
-		logging.Warn(fmt.Sprintf("❌ Gave up on the eD2k download «%s»: nothing received for %s (%s done). It is cancelled in aMule and the next search will look for another version",
-			download.Name, logDuration(limit), logPercent(download.Progress())), "title", title, "hash", download.Hash)
+		message := fmt.Sprintf("❌ Gave up on the eD2k download «%s»: nothing received for %s (%s done). It is cancelled in aMule and the next search will look for another version",
+			download.Name, logDuration(limit), logPercent(download.Progress()))
+		if blockedFor > 0 {
+			message += fmt.Sprintf("; this copy will not be tried again for %s", logDuration(blockedFor))
+		}
+		logging.Warn(message, "title", title, "hash", download.Hash)
 		_ = notifier.NotifyEvent("download_failed", map[string]any{
 			"hash":             download.Hash,
 			"title":            title,

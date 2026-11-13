@@ -448,7 +448,9 @@ error, the episode goes back to the missing list.
 If no copy of an episode matches the profile, the list offers the only copy in
 the requested language with the **🆘 last resort** badge: it is the one Gextto
 would take on its own, and an upgrade will replace it as soon as a copy within
-the profile comes out.
+the profile comes out. If that copy is on the blocklist it is not taken: the log
+says why it was blocked and, when the block expires, from which day it will be
+tried again; to try it sooner, remove it from the blocklist.
 
 You do not have to do it all by hand: in the automatic cycles Gextto searches
 for missing episodes on its own, first in the local archive and then online,

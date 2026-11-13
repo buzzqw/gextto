@@ -451,7 +451,9 @@ errore, la puntata torna tra i mancanti.
 Se per una puntata non esiste nessuna copia nel profilo, l'elenco propone
 l'unica copia nella lingua richiesta con il badge **🆘 ultima risorsa**: è quella
 che Gextto prenderebbe da solo, e l'upgrade la sostituirà appena esce una copia
-nel profilo.
+nel profilo. Se quella copia è nella blocklist non viene presa: il log dice
+perché è stata bloccata e, quando il blocco scade, da quale giorno verrà
+riprovata; per provarla prima, toglila dalla blocklist.
 
 Non devi fare tutto a mano: nei cicli automatici Gextto cerca i mancanti da
 solo, prima nell'archivio locale e poi online, e — se lo attivi — chiede a eD2k

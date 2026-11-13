@@ -444,6 +444,36 @@ func skipReasonText(approvalReason string) string {
 	}
 }
 
+// blocklistReasonText turns the reason saved with a blocklist entry into the
+// words the log uses: the entry is written by the program, the sentence is
+// read by a person.
+func blocklistReasonText(reason string) string {
+	switch strings.TrimSpace(reason) {
+	case "manual":
+		return "you added it by hand"
+	case "manual_failed":
+		return "you removed the failed download"
+	case "dead_swarm":
+		return "nobody was sharing it"
+	case "stalled_ed2k":
+		return "the eD2k download received nothing"
+	case "corrupt_file":
+		return "the downloaded file was damaged"
+	case "pack_inspection_useless":
+		return "the pack holds none of the episodes you need"
+	case "season_pack_identity_mismatch":
+		return "the pack does not hold the season it promises"
+	case "in_progress_pack_incomplete":
+		return "the pack is incomplete"
+	case "dead_magnet":
+		return "the magnet did not work"
+	case "":
+		return "the reason is not recorded"
+	default:
+		return reason
+	}
+}
+
 // cycleModeLabel describes which titles a search cycle covers.
 func cycleModeLabel(mode string) string {
 	switch mode {

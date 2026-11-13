@@ -275,7 +275,9 @@ Un download eD2k avviato da Gextto stesso che non riceve dati per tutti i giorni
 indicati in **Rinuncia a un download eD2k fermo dopo** (7, 0 = mai, misurati
 sull'ora di "ultimo dato ricevuto" di aMule, quindi i riavvii non la azzerano)
 viene annullato in aMule, la release va in blocklist e il buco torna da cercare.
-I download aggiunti a mano e quelli in pausa restano.
+Il blocco non è per sempre: la copia viene riprovata dopo la stessa attesa, e
+resta fuori quattro volte tanto se si ferma di nuovo, poi dodici volte (al
+massimo tre mesi). I download aggiunti a mano e quelli in pausa restano.
 
 ### File condivisi e caricamenti
 
