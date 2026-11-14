@@ -120,6 +120,9 @@ body{display:flex;flex-direction:column;overflow:hidden}
 .pbar>i{position:absolute;inset:0 auto 0 0;background:var(--bar-down)}
 .pbar.seeding>i{background:var(--bar-seed)}
 .pbar.paused>i,.pbar.stalled>i,.pbar.disk_wait>i{background:var(--bar-paused)}
+/* Complete payload: the bar is full, so it keeps the seeding colour even when
+   the torrent has been paused (by the seed policy or by the operator). */
+.pbar.done>i{background:var(--bar-seed)}
 .pbar.error>i{background:var(--err)}
 .tbl.t td.more{padding:0 4px}
 .tbl.t td.more button{opacity:.5;width:28px;height:24px}
@@ -1111,7 +1114,7 @@ function rowHTML(r){
   h+='<td class="sel"><input class="rowsel" type="checkbox" value="'+esc(r.Hash)+'" aria-label="'+esc(t('Select torrent'))+'" title="'+esc(t('Select this torrent for batch actions'))+'"></td>';
   h+='<td class="name c-name" title="'+esc(r.Name)+'">'+stIcon(r.State,r.Progress)+'<a class="open" href="/?open='+esc(r.Hash)+'">'+esc(r.Name)+'</a>'+(r.Pinned?'<span class="fl" title="'+esc(t('Force started: runs outside the queue limits'))+'">F</span>':'')+'</td>';
   h+='<td class="num c-size" title="'+esc(r.DoneSize)+'">'+esc(r.Size)+'</td>';
-  h+='<td class="c-progress"><div class="prog"><div class="pbar '+esc(r.State)+'" role="progressbar" aria-valuenow="'+r.Progress.toFixed(1)+'" aria-valuemin="0" aria-valuemax="100" aria-label="'+esc(t('Progress'))+'"><i style="width:'+r.Progress.toFixed(1)+'%"></i></div><span class="pct" aria-hidden="true">'+esc(r.ProgressS)+'</span></div></td>';
+  h+='<td class="c-progress"><div class="prog"><div class="pbar '+esc(barCls(r.State,r.Progress))+'" role="progressbar" aria-valuenow="'+r.Progress.toFixed(1)+'" aria-valuemin="0" aria-valuemax="100" aria-label="'+esc(t('Progress'))+'"><i style="width:'+r.Progress.toFixed(1)+'%"></i></div><span class="pct" aria-hidden="true">'+esc(r.ProgressS)+'</span></div></td>';
   h+='<td class="state c-state"><span class="badge b-'+esc(r.State)+'">'+esc(t(r.StateLabel))+'</span></td>';
   h+='<td class="num c-seeds">'+r.Seeds+(r.SwarmSeeds>=0?'<span class="subtle"> ('+r.SwarmSeeds+')</span>':'')+'</td>';
   h+='<td class="num c-peers">'+r.Peers+(r.SwarmPeers>=0?'<span class="subtle"> ('+r.SwarmPeers+')</span>':'')+'</td>';
@@ -1487,6 +1490,11 @@ function rowMenu(row,x,y,from){
 // mirrors the server's stateIcon.
 var stIcons={downloading:'i-dl',downloading_metadata:'i-dl',checking_files:'i-check',seeding:'i-seed',stalled:'i-warn',moving:'i-move',error:'i-xc',disk_wait:'i-disk'};
 var stLabels={downloading:'Downloading',downloading_metadata:'Metadata',checking_files:'Checking',seeding:'Seeding',paused:'Paused',stalled:'Stalled',moving:'Moving',error:'Error',disk_wait:'Waiting for disk space'};
+// barCls is the progress bar class of a live row; the server's barClass
+// mirrors it: a paused torrent whose payload is complete keeps the bar green.
+function barCls(st,pg){
+  return (st==='paused'&&+pg>=99.95)?'paused done':st;
+}
 function stIcon(st,pg){
   var id=stIcons[st]||(st==='paused'?(+pg>=100?'i-done':'i-pausec'):'i-sleep');
   var lbl=st==='paused'&&+pg>=100?t('Completed'):t(stLabels[st]||st);
@@ -2068,7 +2076,7 @@ window.gxClearFilters=function(){state.filter={status:'all',cat:null,tag:null,tr
       <td class="sel"><input class="rowsel" type="checkbox" value="{{.Hash}}" aria-label="{{tr "Select torrent"}}" title="{{tr "Select this torrent for batch actions"}}"></td>
       <td class="name c-name" title="{{.Name}}">{{$st := stateIcon .State .Progress}}<span class="sti st-{{.State}}" title="{{tr $st.Label}}" aria-hidden="true"><svg class="i"><use href="#{{$st.Icon}}"/></svg></span><a class="open" href="/?open={{.Hash}}">{{.Name}}</a>{{if .Pinned}}<span class="fl" title="{{tr "Force started: runs outside the queue limits"}}">F</span>{{end}}</td>
       <td class="num c-size" title="{{.DoneSize}}">{{.Size}}</td>
-      <td class="c-progress"><div class="prog"><div class="pbar {{.State}}" role="progressbar" aria-valuenow="{{percent .Progress}}" aria-valuemin="0" aria-valuemax="100" aria-label="{{tr "Progress"}}"><i style="width:{{percent .Progress}}%"></i></div><span class="pct" aria-hidden="true">{{.ProgressS}}</span></div></td>
+      <td class="c-progress"><div class="prog"><div class="pbar {{barClass .State .Progress}}" role="progressbar" aria-valuenow="{{percent .Progress}}" aria-valuemin="0" aria-valuemax="100" aria-label="{{tr "Progress"}}"><i style="width:{{percent .Progress}}%"></i></div><span class="pct" aria-hidden="true">{{.ProgressS}}</span></div></td>
       <td class="state c-state"><span class="badge b-{{.State}}">{{.StateLabel}}</span></td>
       <td class="num c-seeds">{{.Seeds}}{{if ge .SwarmSeeds 0}}<span class="subtle"> ({{.SwarmSeeds}})</span>{{end}}</td>
       <td class="num c-peers">{{.Peers}}{{if ge .SwarmPeers 0}}<span class="subtle"> ({{.SwarmPeers}})</span>{{end}}</td>

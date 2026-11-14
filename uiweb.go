@@ -907,7 +907,7 @@ func uiTorrentRows(s *AppState) []uiTorrentRow {
 			StateClass:    uiStateClass(view.State),
 			Progress:      progress,
 			ProgressPct:   strconv.FormatFloat(progress, 'f', 1, 64),
-			ProgressClass: uiProgressClass(view.State),
+			ProgressClass: uiProgressClass(view.State, progress, checking),
 			Checking:      checking,
 			PiecesChecked: checkedPieces,
 			PiecesTotal:   totalPieces,
@@ -1049,11 +1049,26 @@ func uiStateLabel(state string) string {
 	}
 }
 
-// uiProgressClass selects the progress bar colour, mirroring the classic UI.
-func uiProgressClass(state string) string {
+// uiProgressClass selects the progress bar colour: green when the payload is
+// complete, grey for a download that is paused or queued and still has data to
+// fetch, the accent colour otherwise. A finished download stays green when it
+// is paused afterwards — the seed policy or the operator stops a torrent that
+// has nothing left to fetch — while the badge still says it is not moving.
+// `progress` is the percentage the bar shows and `checking` is true while the
+// engine verifies the files: that bar shows the check, not the payload, so it
+// keeps its colour until the check is over.
+func uiProgressClass(state string, progress float64, checking bool) string {
 	switch state {
+	case "error":
+		// A failed download must not look finished, whatever it reports.
+		return "active"
 	case "seeding", "finished":
 		return "seed"
+	}
+	if !checking && progress >= 99.95 {
+		return "seed"
+	}
+	switch state {
 	case "paused", "queued", "stalled":
 		return "paused"
 	}

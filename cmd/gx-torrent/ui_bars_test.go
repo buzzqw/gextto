@@ -72,3 +72,25 @@ func TestAvailCounts(t *testing.T) {
 		t.Fatal("mismatched lengths gave cells")
 	}
 }
+
+// A finished download keeps the green (seeding) bar when it is paused
+// afterwards; a paused download that still has data to fetch stays grey.
+func TestBarClassOfAPausedCompleteTorrent(t *testing.T) {
+	cases := []struct {
+		state    string
+		progress float64
+		want     string
+	}{
+		{"paused", 100, "paused done"},
+		{"paused", 99.9, "paused"},
+		{"paused", 40, "paused"},
+		{"seeding", 100, "seeding"},
+		{"downloading", 100, "downloading"},
+		{"stalled", 0, "stalled"},
+	}
+	for _, tc := range cases {
+		if got := uiBarClass(tc.state, tc.progress); got != tc.want {
+			t.Fatalf("uiBarClass(%q, %.1f) = %q, want %q", tc.state, tc.progress, got, tc.want)
+		}
+	}
+}

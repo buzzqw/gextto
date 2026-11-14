@@ -2373,6 +2373,18 @@ func uiStateIcon(state string, progress float64) uiStateIconData {
 	return uiStateIconData{"i-sleep", uiStateLabel(state)}
 }
 
+// uiBarClass is the class of a row's progress bar: the state, plus "done" when
+// a paused torrent's payload is complete. A finished download keeps the
+// seeding colour when the seed policy or the operator pauses it afterwards —
+// the bar is full, so there is nothing left to fetch — while the state badge
+// still says it is not moving. The page's JS mirrors it for the live rows.
+func uiBarClass(state string, progress float64) string {
+	if state == "paused" && progress >= 99.95 {
+		return "paused done"
+	}
+	return state
+}
+
 func uiStateLabel(state string) string {
 	switch state {
 	case "downloading":

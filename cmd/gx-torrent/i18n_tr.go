@@ -85,6 +85,9 @@ func uiTemplateFuncMap() template.FuncMap {
 		"stateLabel": uiStateLabel,
 		// stateIcon picks the row's state icon and its label (a catalog key).
 		"stateIcon": uiStateIcon,
+		// barClass is the row's progress bar class: the state, plus done when
+		// a paused torrent's payload is complete.
+		"barClass": uiBarClass,
 		// kibrate prints a KiB/s limit as a rate ("∞" when unlimited).
 		"kibrate": func(kib int64) string {
 			if kib <= 0 {
