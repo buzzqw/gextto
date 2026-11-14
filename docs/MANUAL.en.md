@@ -741,6 +741,7 @@ the engine downloaded and uploaded since it started.
 | Queued | registered but not started yet | wait: the queue will start it |
 | Downloading | transferring | check speed and peers |
 | Stalled | no new bytes for too long; paused | wait for the automatic retry |
+| Waiting for disk space | the download folder's disk is full: the engine pauses the downloads until space returns | free some space or change folder: the download starts again by itself, and those seeding go on |
 | Seeding | complete, sharing | let it finish according to the seeding limits |
 | Checking | the engine re-reads and verifies the pieces already on disk | wait: the bar shows the check progress (verified pieces out of the total), not the data percentage |
 | Error | the engine reported an error | read the reason before removing it |

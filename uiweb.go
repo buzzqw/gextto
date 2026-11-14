@@ -954,6 +954,13 @@ func uiTorrentRows(s *AppState) []uiTorrentRow {
 				row.TotalDone = row.TotalSize
 			}
 		}
+		// The engine's disk guard holds a download when its folder has no free
+		// space: it is a pause, but saying only "paused" hides the reason and
+		// the operator looks for it. The state key stays "paused", so the
+		// filters and the pause button keep working.
+		if view.DiskWait && view.State == "paused" && !row.Archived {
+			row.State = "In attesa di spazio"
+		}
 		// The badge describes the seed policy of the torrent, not its current
 		// state: a torrent set to seed forever shows it from the moment the
 		// limits are saved, while it still downloads too.
@@ -1037,6 +1044,8 @@ func uiStateLabel(state string) string {
 		return "In attesa di seed"
 	case "moving":
 		return "Spostamento"
+	case "error":
+		return "In errore"
 	}
 	lowered := strings.ToLower(state)
 	switch {

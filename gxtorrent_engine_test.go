@@ -1581,3 +1581,15 @@ func TestGxPieceMapReadsAvailability(t *testing.T) {
 		t.Fatalf("availability %+v", avail)
 	}
 }
+
+// A download the daemon's disk guard is holding reports the reason, so the list
+// can say "waiting for disk space" instead of a plain pause.
+func TestGxEngineMapsTheDiskGuardPause(t *testing.T) {
+	engine, fake := newTestGxEngine(t, "")
+	fake.set(gxTorrentItem{Hash: "aa", Name: "Show", State: "paused", SavePath: "/dl",
+		Progress: 40, TotalSize: 100, TotalDone: 40, DiskWait: true})
+	views := engine.List()
+	if len(views) != 1 || !views[0].DiskWait {
+		t.Fatalf("disk guard reason not mapped: %+v", views)
+	}
+}

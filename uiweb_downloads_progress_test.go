@@ -79,3 +79,51 @@ func TestDownloadsShowAGreenBarForAFinishedMovie(t *testing.T) {
 		t.Fatal("the downloads page does not draw the finished movie with the green bar")
 	}
 }
+
+// An errored torrent is named, not left "Unknown": the detail page already
+// promised the state in words.
+func TestUIStateLabelNamesAnError(t *testing.T) {
+	if got := uiStateLabel("error"); got != "In errore" {
+		t.Fatalf("uiStateLabel(error) = %q, want In errore", got)
+	}
+	if got := uiStateClass("error"); got != "err" {
+		t.Fatalf("uiStateClass(error) = %q, want err", got)
+	}
+}
+
+// The engine's disk guard holds a download when its folder has no free space:
+// the list says why, while the row stays a pause for the filters and buttons.
+func TestDownloadsShowTheDiskGuardReason(t *testing.T) {
+	state := newTestAppState(t)
+	state.setActiveEngine(fakeProblemsEngine{list: []models.TorrentView{
+		{
+			Hash: "eeee000000000000000000000000000000000001", Name: "Movie.2028.1080p.mkv",
+			State: "paused", Progress: 40, TotalSize: 100, TotalDone: 40, DiskWait: true,
+		},
+	}})
+
+	rows := uiTorrentRows(state)
+	if len(rows) != 1 {
+		t.Fatalf("rows = %d, want 1", len(rows))
+	}
+	row := rows[0]
+	if row.State != "In attesa di spazio" {
+		t.Fatalf("state = %q, want the disk guard reason", row.State)
+	}
+	if row.StateKey != "paused" || row.StateClass != "warn" {
+		t.Fatalf("state key/class = %q/%q, want paused/warn", row.StateKey, row.StateClass)
+	}
+	if row.ProgressClass != "paused" {
+		t.Fatalf("progress class = %q, want paused", row.ProgressClass)
+	}
+
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+	code, body := v2Request(t, server, http.MethodGet, "/?view=downloads", nil)
+	if code != http.StatusOK {
+		t.Fatalf("downloads page -> %d", code)
+	}
+	if !strings.Contains(body, "In attesa di spazio") {
+		t.Fatal("the downloads page does not name the disk guard pause")
+	}
+}

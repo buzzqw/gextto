@@ -2315,6 +2315,11 @@ func v2DetailViewFrom(s *AppState, hash, tab string) v2DetailView {
 			}
 		}
 	}
+	// The engine's disk guard holds the download until the folder has space:
+	// the drawer says why, exactly as the row does.
+	if torrent.DiskWait && torrent.State == "paused" && !isCompleted {
+		stateLabel = "In attesa di spazio"
+	}
 	view.General = []v2KV{
 		{Label: "Stato", Value: stateLabel, Hint: "Stato del torrent nella sessione: in download, in seed, in pausa, in verifica o in errore. Lo decide il motore torrent."},
 		{Label: "Progresso", Value: fmt.Sprintf("%.1f%%", progressVal), Hint: "Percentuale dei dati verificati sul totale del torrent. I file saltati non contano."},

@@ -633,7 +633,10 @@ type gxTorrentItem struct {
 	AutoManaged      bool   `json:"auto_managed"`
 	Parked           bool   `json:"parked"`
 	Pinned           bool   `json:"pinned"`
-	Error            string `json:"error"`
+	// DiskWait is set while the daemon's disk guard holds the download: the
+	// folder it writes to has no free space, and it resumes by itself.
+	DiskWait bool   `json:"disk_wait"`
+	Error    string `json:"error"`
 	CompletedAt      int64  `json:"completed_at"`
 	AddedAt          int64  `json:"added_at"`
 	CurrentTracker   string `json:"current_tracker"`
@@ -697,6 +700,7 @@ func (e *gxTorrentEngine) toView(item gxTorrentItem, now time.Time) models.Torre
 		CurrentTracker:    item.CurrentTracker,
 		Error:             strings.TrimSpace(item.Error),
 		Stalled:           item.State == "stalled",
+		DiskWait:          item.DiskWait,
 		SuperSeeding:      item.SuperSeeding,
 		Collections:       item.Collections,
 		Similar:           item.Similar,

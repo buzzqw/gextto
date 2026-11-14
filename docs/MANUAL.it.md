@@ -754,6 +754,7 @@ dicono quanto il motore ha scaricato e inviato da quando è partito.
 | In coda | registrato ma non ancora partito | aspettare: lo avvierà la coda |
 | Download | sta trasferendo | controllare velocità e peer |
 | Stalled | nessun byte in più da troppo tempo; messo in pausa | aspettare il nuovo tentativo automatico |
+| In attesa di spazio | il disco della cartella di scarico è pieno: il motore mette in pausa i download finché lo spazio non torna | liberare spazio o cambiare cartella: il download riparte da solo, anche quelli in seed continuano |
 | Seeding | completato, sta condividendo | lasciarlo finire secondo i limiti di seed |
 | Verifica file | il motore rilegge e verifica i pezzi già su disco | aspettare: la barra mostra l'avanzamento del controllo (pezzi verificati sul totale), non la percentuale dei dati |
 | Errore | il motore ha segnalato un errore | leggere il motivo prima di rimuoverlo |

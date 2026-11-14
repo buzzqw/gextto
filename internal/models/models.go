@@ -793,6 +793,9 @@ type TorrentView struct {
 	TotalSize         int64   `json:"total_size"`
 	TotalDone         int64   `json:"total_done"`
 	Stalled           bool    `json:"stalled"`
+	// DiskWait marks a download the engine's disk guard paused because its
+	// folder ran out of free space; it resumes by itself when space returns.
+	DiskWait bool `json:"disk_wait,omitempty"`
 	// Pinned marks a torrent force-started outside the queue (libtorrent and
 	// qBittorrent call it "force start").
 	Pinned bool `json:"pinned"`
