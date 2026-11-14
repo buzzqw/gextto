@@ -490,7 +490,7 @@ and — if you enable it — asks eD2k once per season when torrents find nothin
 - A pack announced as **in progress** (for example «4 of 8» episodes) can hold
   only the episodes already aired: the ones inside it enter the library and the
   others stay missing, to be searched later. Gextto does not throw the download
-  away because the pack is still incomplete.
+  away because the pack is still incomplete. When its file list holds nothing you are missing, the pack is not refused for good: it is set aside for 24 hours and looked at again, every 24 hours, since its uploader keeps adding episodes.
 - If a download stays **stuck at 0 B/s or waiting for metadata** longer than
   the time set in *Configuration → Quality and upgrades → Stuck downloads*, the
   search can start an alternative for the same episode (or season) without

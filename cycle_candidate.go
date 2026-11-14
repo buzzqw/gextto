@@ -340,14 +340,7 @@ func (r *candidateRun) staleInProgressPack() bool {
 	logging.Warn(fmt.Sprintf("⏭️ Season pack skipped — «%s» · %s", release.Title, reason),
 		"target", releaseTarget(release))
 	if !cfg.DryRun {
-		if release.TorrentURL != nil {
-			if qerr := p.db.QuarantineTorrentLink(*release.TorrentURL, reason, time.Now(), 7*24*time.Hour); qerr != nil {
-				logging.Debug("could not quarantine the stale pack link", "error", qerr)
-			}
-		}
-		if berr := p.db.Blocklist(release, "in_progress_pack_incomplete"); berr != nil {
-			logging.Debug("could not blocklist the stale pack", "error", berr)
-		}
+		refuseUselessPack(p.db, release, "in_progress_pack_incomplete", reason, time.Now())
 	}
 	return true
 }

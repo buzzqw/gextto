@@ -213,9 +213,10 @@ func InspectActivePacks(cfg *Config, torrents TorrentEngine, db *Database, notif
 			}
 		}
 		_ = db.MarkTorrentError(candidate.torrent.Hash, reason)
-		_ = db.Blocklist(&candidate.release, "pack_inspection_useless")
-		if candidate.release.TorrentURL != nil {
-			_ = db.QuarantineTorrentLink(*candidate.release.TorrentURL, reason, now, 7*24*time.Hour)
+		retryWait := refuseUselessPack(db, &candidate.release, "pack_inspection_useless", reason, now)
+		again := "will not be taken again"
+		if retryWait > 0 {
+			again = "will be looked at again in 24 hours, as it is still being fed with new episodes"
 		}
 		_ = db.ForgetRemovedTorrent(candidate.torrent.Hash)
 		removed, removeErr := torrents.Remove(candidate.torrent.Hash, true)
@@ -233,12 +234,12 @@ func InspectActivePacks(cfg *Config, torrents TorrentEngine, db *Database, notif
 		}
 		if pending != nil {
 			// Never announced: only its file list was read.
-			logging.Info(fmt.Sprintf("🗑️ «%s» not downloaded: %s. Only its file list was read; it is %s and will not be taken again",
-				candidate.release.Title, why, fate), "hash", candidate.torrent.Hash)
+			logging.Info(fmt.Sprintf("🗑️ «%s» not downloaded: %s. Only its file list was read; it is %s and %s",
+				candidate.release.Title, why, fate, again), "hash", candidate.torrent.Hash)
 			_ = db.DeletePackFileCheck(candidate.torrent.Hash)
 		} else {
-			logging.Info(fmt.Sprintf("🗑️ «%s» discarded while downloading: %s. It is %s with what it had downloaded (%s) and will not be taken again",
-				candidate.release.Title, why, fate, formatBytes(candidate.torrent.TotalDone)), "hash", candidate.torrent.Hash)
+			logging.Info(fmt.Sprintf("🗑️ «%s» discarded while downloading: %s. It is %s with what it had downloaded (%s) and %s",
+				candidate.release.Title, why, fate, formatBytes(candidate.torrent.TotalDone), again), "hash", candidate.torrent.Hash)
 		}
 		logging.Debug("discarded pack details", "hash", candidate.torrent.Hash, "name", candidate.torrent.Name,
 			"episodes", details, "restored upgrade", restored, "previous release", previous)

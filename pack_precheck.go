@@ -17,6 +17,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/buzzqw/gextto/internal/models"
 	"github.com/buzzqw/gextto/internal/utils"
@@ -343,4 +344,31 @@ func episodeList(episodes []int64) string {
 		return "-"
 	}
 	return strings.Join(parts, ",")
+}
+
+// inProgressPackRetry is how long a season pack still being fed with new
+// episodes ("[IN CORSO][04/08]") stays out after its file list showed nothing
+// useful. The uploader keeps adding episodes to it, so it is not refused for
+// good: it is looked at again after this wait, and again each time it is still
+// of no use.
+const inProgressPackRetry = 24 * time.Hour
+
+// refuseUselessPack records that a pack is of no use. A pack that is still in
+// progress is blocked and quarantined for inProgressPackRetry only; any other
+// is blocked for good and its link quarantined for a week. It returns the wait
+// applied (zero means for good).
+func refuseUselessPack(db *Database, release *models.Release, blockReason, linkReason string, now time.Time) time.Duration {
+	linkWait := 7 * 24 * time.Hour
+	var wait time.Duration
+	if release.InProgressEpisodes > 0 {
+		wait = inProgressPackRetry
+		linkWait = wait
+		_ = db.BlocklistUntil(release, blockReason, now.Add(wait))
+	} else {
+		_ = db.Blocklist(release, blockReason)
+	}
+	if release.TorrentURL != nil {
+		_ = db.QuarantineTorrentLink(*release.TorrentURL, linkReason, now, linkWait)
+	}
+	return wait
 }
