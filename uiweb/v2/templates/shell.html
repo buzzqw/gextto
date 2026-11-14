@@ -3,6 +3,14 @@
   It uses the official embedded templates and static files.
 */}}
 
+{{/* One theme of the quick picker in the "Aspetto" menu: the same card as the
+     full dialog, with a name of its own so the two radio groups never mix. */}}
+{{define "v2_quick_theme_card"}}<label class="theme-card"{{if eq .ID "auto"}} {{trTitle "Tema automatico: segue il tema chiaro o scuro del sistema"}}{{end}}>
+  <input type="radio" name="v2-theme-quick" value="{{.ID}}" data-theme-mode="{{.Mode}}" data-bg="{{.Bg}}" data-surface="{{.Surface}}" data-text="{{.Text}}" data-accent="{{.Accent}}">
+  {{if eq .ID "auto"}}<span class="theme-swatch theme-swatch-auto" aria-hidden="true"><span class="theme-swatch-panel theme-swatch-panel-dark">{{tr "Aa"}}</span><span class="theme-swatch-panel theme-swatch-panel-light">{{tr "Aa"}}</span></span>{{else}}<span class="theme-swatch" aria-hidden="true" style="background:{{.Bg}}"><span class="theme-swatch-panel" style="background:{{.Surface}};color:{{.Text}}">{{tr "Aa"}}</span></span>{{end}}
+  <span class="theme-name">{{if eq .ID "auto"}}{{tr "Auto"}}{{else}}{{tr .Name}}{{end}}</span>
+</label>{{end}}
+
 {{define "v2_shell"}}<!doctype html>
 <html lang="{{.Chrome.Lang}}" data-theme="dark">
 <head>
@@ -70,20 +78,16 @@
        {{if .System}}<button class="nav-more" type="button" data-mobile-system-toggle aria-expanded="{{if .Open}}true{{else}}false{{end}}" aria-controls="app-system-menu"><span class="nav-icon" aria-hidden="true">⋯</span><span>{{tr "Altro"}}</span><span class="nav-more-indicator" aria-hidden="true">＋</span></button>{{end}}
        <div{{if .System}} id="app-system-menu"{{end}} class="nav-group{{if .System}} system-group{{end}}{{if .Open}} open{{end}}">
         {{range .Items}}
-         <a class="nav-item{{if .Active}} active{{end}}{{if .Optional}} nav-optional{{end}}{{if .MobileHidden}} nav-mobile-hidden{{end}}{{if .MobileAlways}} nav-mobile-always{{end}}" href="{{.Href}}" {{trTitle .Label}}{{if .External}} target="_blank" rel="noopener noreferrer"{{end}}{{if .Active}} aria-current="page"{{end}} data-nav="{{.ID}}"><span class="nav-icon" aria-hidden="true">{{if eq .ID "dashboard"}}🏠{{else if eq .ID "downloads"}}⬇️{{else if eq .ID "series"}}📺{{else if eq .ID "movies"}}🎬{{else if eq .ID "import"}}📥{{else if eq .ID "logs"}}📋{{else if eq .ID "health"}}🩺{{else if eq .ID "settings"}}⚙️{{else if eq .ID "search"}}🔎{{else if eq .ID "archive"}}📦{{else if eq .ID "comics"}}📚{{else if eq .ID "ed2k"}}🐴{{else if eq .ID "maintenance"}}🛠️{{else if eq .ID "gaps"}}⚠️{{else if eq .ID "integrations"}}🔌{{else if eq .ID "manual"}}📖{{else if eq .ID "changelog"}}📝{{else if eq .ID "license"}}📜{{else if eq .ID "blocklist"}}🚫{{else}}•{{end}}</span><span>{{tr .Label}}</span>{{if eq .ID "downloads"}}{{template "v2_nav_downloads_count" .}}{{else if or (eq .ID "series") (eq .ID "movies") (eq .ID "comics")}}<span class="nav-count"{{if or (not .Count) (eq .Count "0") (eq .Count "0/0")}} hidden{{end}}>{{tr .Count}}</span>{{end}}</a>
+         <a class="nav-item{{if .Active}} active{{end}}{{if .Optional}} nav-optional{{end}}{{if .MobileHidden}} nav-mobile-hidden{{end}}{{if .MobileAlways}} nav-mobile-always{{end}}" href="{{.Href}}" {{trTitle .Label}}{{if .External}} target="_blank" rel="noopener noreferrer"{{end}}{{if .Active}} aria-current="page"{{end}} data-nav="{{.ID}}"><span class="nav-icon" aria-hidden="true">{{icon .Icon}}</span><span>{{tr .Label}}</span>{{if eq .ID "downloads"}}{{template "v2_nav_downloads_count" .}}{{else if or (eq .ID "series") (eq .ID "movies") (eq .ID "comics")}}<span class="nav-count"{{if or (not .Count) (eq .Count "0") (eq .Count "0/0")}} hidden{{end}}>{{tr .Count}}</span>{{end}}</a>
          {{end}}
-         {{if .System}}{{range $.Groups}}{{range .Items}}{{if .MobileHidden}}<a class="nav-item nav-mobile-system-extra" href="{{.Href}}" {{trTitle .Label}}{{if .External}} target="_blank" rel="noopener noreferrer"{{end}} data-nav="{{.ID}}"><span class="nav-icon" aria-hidden="true">{{if eq .ID "search"}}🔎{{else if eq .ID "archive"}}📦{{else if eq .ID "comics"}}📚{{else if eq .ID "ed2k"}}🐴{{else if eq .ID "gaps"}}⚠️{{else}}•{{end}}</span><span>{{tr .Label}}</span></a>{{end}}{{end}}{{end}}{{end}}
-         {{if .System}}<div class="nav-prefs" aria-label="{{tr "Aspetto"}}">
-           <button class="btn sm" type="button" hx-get="/theme" hx-target="#v2-modal" hx-swap="innerHTML" {{trTitle "Scegli il tema dell'interfaccia o creane uno"}} aria-haspopup="dialog">{{tr "Tema"}}</button>
-           <button class="btn sm" type="button" data-font="-5" {{trTitle "Testo più piccolo"}}>{{tr "A−"}}</button>
-           <button class="btn sm" type="button" data-font="+5" {{trTitle "Testo più grande"}}>{{tr "A+"}}</button>
-           <button class="btn sm" type="button" data-font-open {{trTitle "Scegli il tipo di carattere dell'interfaccia"}} aria-haspopup="dialog">{{tr "Font"}}</button>
-           <form method="post" action="/language" class="nav-prefs-lang"><select class="input compact" name="lang" aria-label="{{tr "Lingua dell'interfaccia"}}" onchange="this.form.submit()">
-             <option value="it"{{if eq $.Chrome.Lang "it"}} selected{{end}}>{{tr "Italiano"}}</option><option value="en"{{if eq $.Chrome.Lang "en"}} selected{{end}}>{{tr "English"}}</option><option value="de"{{if eq $.Chrome.Lang "de"}} selected{{end}}>{{tr "Deutsch"}}</option><option value="fr"{{if eq $.Chrome.Lang "fr"}} selected{{end}}>{{tr "Français"}}</option><option value="es"{{if eq $.Chrome.Lang "es"}} selected{{end}}>{{tr "Español"}}</option><option value="pl"{{if eq $.Chrome.Lang "pl"}} selected{{end}}>{{tr "Polski"}}</option>
-           </select></form>
-           <a class="btn sm nav-prefs-donate" href="https://www.paypal.com/cgi-bin/webscr?cmd=_donations&business=azanzani@gmail.com&item_name=Support+Gextto+Project" target="_blank" rel="noopener noreferrer" {{trTitle "Sostieni Gextto con una donazione PayPal"}}><span aria-hidden="true">❤️</span> {{tr "Dona"}}</a>
+         {{if .System}}{{range $.Groups}}{{range .Items}}{{if .MobileHidden}}<a class="nav-item nav-mobile-system-extra" href="{{.Href}}" {{trTitle .Label}}{{if .External}} target="_blank" rel="noopener noreferrer"{{end}} data-nav="{{.ID}}"><span class="nav-icon" aria-hidden="true">{{icon .Icon}}</span><span>{{tr .Label}}</span></a>{{end}}{{end}}{{end}}{{end}}
+         {{/* Theme, text size, font and language are in the "Aspetto" menu of the
+             top bar on every screen size: only the donation link is left here,
+             because the floating button is hidden on a phone. */}}
+        {{if .System}}<div class="nav-prefs" aria-label="{{tr "Sostieni Gextto"}}">
+           <a class="btn sm nav-prefs-donate" href="https://www.paypal.com/cgi-bin/webscr?cmd=_donations&business=azanzani@gmail.com&item_name=Support+Gextto+Project" target="_blank" rel="noopener noreferrer" {{trTitle "Sostieni Gextto con una donazione PayPal"}}><span aria-hidden="true">{{icon "i-heart"}}</span> {{tr "Dona"}}</a>
          </div>{{end}}
-         {{if eq .Label "Panoramica"}}<a class="nav-item nav-search" href="/?view=settings" {{trTitle "Cerca tra tutte le impostazioni e vai al campo"}}><span class="nav-icon" aria-hidden="true">🔍</span><span>{{tr "Cerca impostazioni"}}</span></a>{{end}}
+         {{if eq .Label "Panoramica"}}<a class="nav-item nav-search" href="/?view=settings" {{trTitle "Cerca tra tutte le impostazioni e vai al campo"}}><span class="nav-icon" aria-hidden="true">{{icon "i-search"}}</span><span>{{tr "Cerca impostazioni"}}</span></a>{{end}}
       </div>
       {{end}}
     </nav>
@@ -97,33 +101,42 @@
       </div>
       <div class="top-actions">
         {{template "v2_live_top_metrics" .Chrome}}
-        <button class="btn add-torrent-toggle" type="button" data-add-torrent-toggle aria-label="{{tr "Aggiungi torrent"}}" {{trTitle "Apri o chiudi il modulo per aggiungere un torrent"}}{{if eq .Page "downloads"}} aria-expanded="false" aria-controls="v2-add-torrent"{{end}}><span aria-hidden="true">＋</span><span class="add-torrent-toggle-label">{{tr "Aggiungi torrent"}}</span></button>
-        <button class="btn btn-refresh" type="button" onclick="window.location.reload()" {{trTitle "Ricarica i dati mostrati"}} aria-label="{{tr "Ricarica i dati mostrati"}}"><span class="btn-refresh-icon" aria-hidden="true">↺</span><span class="btn-refresh-label">{{tr "Aggiorna"}}</span></button>
+        <button class="btn add-torrent-toggle" type="button" data-add-torrent-toggle aria-label="{{tr "Aggiungi torrent"}}" {{trTitle "Apri o chiudi il modulo per aggiungere un torrent"}}{{if eq .Page "downloads"}} aria-expanded="false" aria-controls="v2-add-torrent"{{end}}><span aria-hidden="true">{{icon "i-plus"}}</span><span class="add-torrent-toggle-label">{{tr "Aggiungi torrent"}}</span></button>
+        <button class="btn btn-refresh" type="button" onclick="window.location.reload()" {{trTitle "Ricarica i dati mostrati"}} aria-label="{{tr "Ricarica i dati mostrati"}}"><span class="btn-refresh-icon" aria-hidden="true">{{icon "i-reload"}}</span><span class="btn-refresh-label">{{tr "Aggiorna"}}</span></button>
         {{template "v2_live_status" .Chrome}}
       </div>
       <div class="top-controls">
-        <form method="post" action="/language" class="lang-form">
-          <select class="lang-select" name="lang" aria-label="{{tr "Lingua dell'interfaccia"}}" {{trTitle "Lingua dell'interfaccia"}} onchange="this.form.submit()">
-            <option value="it"{{if eq .Chrome.Lang "it"}} selected{{end}}>{{tr "Italiano"}}</option>
-            <option value="en"{{if eq .Chrome.Lang "en"}} selected{{end}}>{{tr "English"}}</option>
-            <option value="de"{{if eq .Chrome.Lang "de"}} selected{{end}}>{{tr "Deutsch"}}</option>
-            <option value="fr"{{if eq .Chrome.Lang "fr"}} selected{{end}}>{{tr "Français"}}</option>
-            <option value="es"{{if eq .Chrome.Lang "es"}} selected{{end}}>{{tr "Español"}}</option>
-            <option value="pl"{{if eq .Chrome.Lang "pl"}} selected{{end}}>{{tr "Polski"}}</option>
-          </select>
-        </form>
-        <button class="btn" type="button" data-font="-5" {{trTitle "Testo più piccolo"}}>{{tr "A−"}}</button>
-        <button class="btn" type="button" data-font="100" {{trTitle "Dimensione testo predefinita"}}><span data-font-label>{{tr "Testo 100%"}}</span></button>
-        <button class="btn" type="button" data-font="+5" {{trTitle "Testo più grande"}}>{{tr "A+"}}</button>
-        <button class="btn" type="button" data-font-open {{trTitle "Scegli il tipo di carattere dell'interfaccia"}} aria-haspopup="dialog">{{tr "Font"}}</button>
-        <button class="btn" type="button" hx-get="/theme" hx-target="#v2-modal" hx-swap="innerHTML" {{trTitle "Scegli il tema dell'interfaccia o creane uno"}} aria-haspopup="dialog">{{tr "Tema"}}</button>
         {{with .Dashboard}}
         <div class="top-kpis">
           <div class="top-kpi"><span class="top-kpi-label">{{tr "Spazio libero"}}</span><strong>{{bytesU .FreeSpace}}</strong></div>
           <div class="top-kpi"><span class="top-kpi-label">{{tr "Magnet in archivio"}}</span><strong>{{tr .ArchiveTotal}}</strong><small class="muted">{{tr .SeenGroups}}</small></div>
         </div>
         {{end}}
-      </div>
+        <details class="v2-menu appearance-menu" data-v2-menu>
+          <summary class="btn appearance-toggle" {{trTitle "Tema, dimensione del testo, carattere e lingua: le scelte valgono per questo browser"}}>
+            <span class="appearance-glyph" aria-hidden="true">{{tr "Aa"}}</span><span>{{tr "Aspetto"}}</span><span class="appearance-caret" aria-hidden="true">▾</span>
+          </summary>
+          <div class="v2-menu-panel appearance-panel">
+            <h4>{{tr "Tema"}}</h4>
+            <div class="appearance-quick">{{range quickThemes}}{{template "v2_quick_theme_card" .}}{{end}}</div>
+            <button class="appearance-more" type="button" hx-get="/theme" hx-target="#v2-modal" hx-swap="innerHTML">{{tr "Altri temi e personalizzato…"}}</button>
+            <h4>{{tr "Testo"}}</h4>
+            <div class="appearance-size">
+              <button class="btn sm" type="button" data-font="-5" {{trTitle "Testo più piccolo"}} aria-label="{{tr "Testo più piccolo"}}">{{tr "A−"}}</button>
+              <span class="appearance-value" data-font-label>{{tr "Testo"}} 100%</span>
+              <button class="btn sm" type="button" data-font="+5" {{trTitle "Testo più grande"}} aria-label="{{tr "Testo più grande"}}">{{tr "A+"}}</button>
+              <button class="btn sm appearance-reset" type="button" data-font="100" {{trTitle "Torna alla dimensione predefinita"}}>{{tr "Ripristina"}}</button>
+            </div>
+            <h4>{{tr "Carattere"}}</h4>
+            <button class="btn sm" type="button" data-font-open aria-haspopup="dialog" {{trTitle "Scegli il tipo di carattere dell'interfaccia"}}>{{tr "Scegli il carattere"}}</button>
+            <h4>{{tr "Lingua"}}</h4>
+            <form method="post" action="/language" class="appearance-row">
+              <select class="input lang-select" name="lang" aria-label="{{tr "Lingua dell'interfaccia"}}" {{trTitle "Lingua dell'interfaccia"}} onchange="this.form.submit()">
+                <option value="it"{{if eq .Chrome.Lang "it"}} selected{{end}}>{{tr "Italiano"}}</option><option value="en"{{if eq .Chrome.Lang "en"}} selected{{end}}>{{tr "English"}}</option><option value="de"{{if eq .Chrome.Lang "de"}} selected{{end}}>{{tr "Deutsch"}}</option><option value="fr"{{if eq .Chrome.Lang "fr"}} selected{{end}}>{{tr "Français"}}</option><option value="es"{{if eq .Chrome.Lang "es"}} selected{{end}}>{{tr "Español"}}</option><option value="pl"{{if eq .Chrome.Lang "pl"}} selected{{end}}>{{tr "Polski"}}</option>
+              </select>
+            </form>
+          </div>
+        </details>
     </header>
     <section class="mobile-performance" aria-label="{{tr "Connessioni e prestazioni"}}">
       <div class="mobile-performance-head"><span class="eyebrow">{{tr "Connessioni e prestazioni"}}</span><small class="muted">{{tr "Aggiornamento automatico"}}</small></div>
@@ -191,22 +204,22 @@
 }());
 </script>{{end}}
 {{if .Update.Available}}<a class="v2-update-badge" href="/?view=maintenance#v2-update-panel" {{trTitle "Nuova versione disponibile: apri Manutenzione"}}><span aria-hidden="true">⬆️</span><span class="v2-update-badge-label">{{tr "Aggiornamento disponibile"}}</span></a>{{end}}
-<a class="v2-donate" href="https://www.paypal.com/cgi-bin/webscr?cmd=_donations&business=azanzani@gmail.com&item_name=Support+Gextto+Project" target="_blank" rel="noopener noreferrer" {{trTitle "Sostieni Gextto con una donazione PayPal"}} aria-label="{{tr "Sostieni Gextto con una donazione PayPal"}}"><span class="v2-donate-icon" aria-hidden="true">❤️</span><span class="v2-donate-label">{{tr "Dona"}}</span></a>
+<a class="v2-donate" href="https://www.paypal.com/cgi-bin/webscr?cmd=_donations&business=azanzani@gmail.com&item_name=Support+Gextto+Project" target="_blank" rel="noopener noreferrer" {{trTitle "Sostieni Gextto con una donazione PayPal"}} aria-label="{{tr "Sostieni Gextto con una donazione PayPal"}}"><span class="v2-donate-icon" aria-hidden="true">{{icon "i-heart"}}</span><span class="v2-donate-label">{{tr "Dona"}}</span></a>
 </body>
 </html>{{end}}
 
 {{define "v2_nav_downloads_count"}}<span class="nav-count" id="v2-nav-downloads-count"{{if .OOB}} hx-swap-oob="true"{{end}} {{trTitle "Download in corso"}}{{if or (not .Count) (eq .Count "0") (eq .Count "0/0")}} hidden{{end}}>{{tr .Count}}</span>{{end}}
 
 {{define "v2_live_top_metrics"}}
+{{/* Fewer, wider tiles: the two Gextto processes share one and the two speeds
+     share one, so the figures are all still here and the bar has room for the
+     page. The next cycle is on the Dashboard ("Prossima esecuzione"). */}}
 <div id="v2-live-top-metrics" class="top-live-metrics" data-active-downloads="{{.ActiveDownloads}}">
-  <div class="top-metric" {{trTitle "CPU e RAM del processo Gextto"}}><span class="top-metric-label"><span>{{tr "Gextto"}}</span>{{if .CPUFrequency}} <small class="metric-frequency">{{tr .CPUFrequency}}</small>{{end}}</span><strong>{{.CPU}} · {{.RAM}}</strong></div>
-  {{if .GxLoad}}<div class="top-metric" {{trTitle "CPU e RAM del demone gx-torrent"}}><span class="top-metric-label">{{tr "gx-torrent"}}</span><strong>{{tr .GxLoad}}</strong></div>{{end}}
+  <div class="top-metric top-metric-process" {{if .GxLoad}}{{trTitle "CPU e RAM di Gextto e di gx-torrent"}}{{else}}{{trTitle "CPU e RAM del processo Gextto"}}{{end}}><span class="top-metric-label"><span>{{tr "Gextto"}}</span>{{if .GxLoad}}<span class="top-metric-more"> · {{tr "gx-torrent"}}</span>{{end}}{{if .CPUFrequency}} <small class="metric-frequency">{{tr .CPUFrequency}}</small>{{end}}</span><strong>{{.CPU}} · {{.RAM}}{{if .GxLoad}} <span class="top-metric-more">{{tr .GxLoad}}</span>{{end}}</strong></div>
   {{if .AmuleLoad}}<div class="top-metric" {{trTitle "CPU e RAM del processo amuled su questa macchina"}}><span class="top-metric-label">{{tr "aMule"}}</span><strong>{{tr .AmuleLoad}}</strong></div>{{end}}
-  <div class="top-metric top-metric-rate" {{trTitle "Velocità di download"}}><span class="top-metric-label">{{tr "↓ Download"}}</span><strong>{{tr .Download}}{{if gt .LatencyMs 0}} <span class="top-metric-ping" {{trTitle "Ping misurato da Auto verso Google/Cloudflare; se sale, Auto riduce la velocità"}}>📶 {{.LatencyMs}} ms</span>{{end}}</strong></div>
-  <div class="top-metric top-metric-rate" {{trTitle "Velocità di upload"}}><span class="top-metric-label">{{tr "↑ Upload"}}</span><strong>{{tr .Upload}}</strong></div>
+  <div class="top-metric top-metric-rate" {{trTitle "Velocità di download e di upload"}}><span class="top-metric-label">{{tr "↓ ↑"}}</span><strong>{{tr .Download}} · {{tr .Upload}}{{if gt .LatencyMs 0}} <span class="top-metric-ping" {{trTitle "Ping misurato da Auto verso Google/Cloudflare; se sale, Auto riduce la velocità"}}>📶 {{.LatencyMs}} ms</span>{{end}}</strong></div>
   <div class="top-metric" {{trTitle "Torrent nella sessione"}}><span class="top-metric-label">{{tr "Torrent"}}</span><strong>{{tr .Torrents}}</strong></div>
   <div class="top-metric" {{trTitle "Peer connessi / Seed"}}><span class="top-metric-label">{{tr "P/S"}}</span><strong>{{.Peers}}/{{.Seeds}}</strong></div>
-  <div class="top-metric top-metric-cycle" {{trTitle "Tempo stimato al prossimo ciclo"}}><span class="top-metric-label">{{tr "Prossimo ciclo"}}</span><strong>{{tr .NextCycle}}</strong></div>
 </div>
 {{end}}
 

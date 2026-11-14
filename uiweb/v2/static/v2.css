@@ -2091,6 +2091,116 @@ html.settings-only-modified .settings-panel:not(:has(.setting-modified-row)):not
   .v2-update-badge-label { display: none; }
 }
 
+/* One icon set for the whole interface: the symbols of /static/icons.svg,
+   drawn at the size of the text and in its colour. */
+.icon {
+  width: 1.15em;
+  height: 1.15em;
+  flex: 0 0 auto;
+  vertical-align: -.18em;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.btn .icon,
+.nav-icon .icon { width: 1.1em; height: 1.1em; }
+.torrent-metric .icon,
+.badge .icon { width: 1em; height: 1em; }
+
+.appearance-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.appearance-glyph {
+  font-weight: 700;
+  letter-spacing: -.02em;
+  color: var(--accent);
+}
+.appearance-caret { color: var(--muted); font-size: .7rem; }
+.appearance-panel {
+  left: 0;
+  right: auto;
+  width: min(360px, calc(100vw - 24px));
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+}
+.appearance-panel h4 {
+  margin: 4px 0 0;
+  font-size: .68rem;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.appearance-quick {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+.appearance-quick .theme-card { padding: 3px; gap: 3px; }
+.appearance-quick .theme-swatch { height: 34px; padding: 3px; }
+.appearance-quick .theme-swatch-panel { font-size: .6rem; padding: 1px 3px; }
+.appearance-quick .theme-name {
+  font-size: .66rem;
+  text-align: center;
+  white-space: normal;
+  line-height: 1.15;
+}
+.appearance-more {
+  justify-self: start;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-size: .78rem;
+  cursor: pointer;
+}
+.appearance-more:hover { text-decoration: underline; }
+.appearance-size { display: flex; align-items: center; gap: 6px; }
+.appearance-value {
+  min-width: 62px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  font-size: .86rem;
+}
+.appearance-reset { margin-left: auto; }
+.appearance-row { display: flex; gap: 6px; align-items: center; }
+.appearance-row .input { flex: 1 1 auto; min-width: 0; }
+.top-metric-more { color: var(--muted); font-weight: 500; }
+
+/* Touch targets on a phone: every action is a finger, so buttons and menu rows
+   grow to 44x44 CSS pixels (WCAG 2.5.5) and the icon-only ones to a full square.
+   The desktop look is unchanged. */
+@media (max-width: 560px) {
+  .btn,
+  .btn.sm,
+  .v2-menu > summary {
+    min-height: 44px;
+  }
+  .btn.sm { padding: 9px 12px; }
+  .btn.sm.icon-action {
+    width: 44px;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 9px 0;
+  }
+  .v2-menu-item { min-height: 44px; padding: 10px 12px; }
+  .v2-menu-panel { min-width: 0; width: min(300px, calc(100vw - 32px)); }
+  .row-actions { gap: 6px; }
+  .torrent-select input[type="checkbox"],
+  .check input[type="checkbox"],
+  .download-select-all input[type="checkbox"] {
+    width: 22px;
+    height: 22px;
+  }
+}
+
 /* ------------------------------------------------------------------------
    Configurazione iniziale (procedura guidata al primo avvio).
    ------------------------------------------------------------------------ */

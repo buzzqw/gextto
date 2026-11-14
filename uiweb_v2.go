@@ -54,8 +54,47 @@ var v2StaticFS embed.FS
 
 // v2TemplateFuncMap is the helper set every parsed template set carries. The
 // `tr` function is added per language by v2TemplatesFor.
+// v2NavIcons gives every navigation entry a symbol of the SVG sprite: the phone
+// bar draws them instead of emoji, which change shape with the system font.
+var v2NavIcons = map[string]string{
+	"dashboard":    "i-list",
+	"downloads":    "i-dl",
+	"series":       "i-tv",
+	"movies":       "i-film",
+	"search":       "i-search",
+	"archive":      "i-inbox",
+	"comics":       "i-file",
+	"ed2k":         "i-signal",
+	"import":       "i-inbox",
+	"settings":     "i-tools",
+	"health":       "i-activity",
+	"logs":         "i-log",
+	"gaps":         "i-warn",
+	"integrations": "i-rss",
+	"maintenance":  "i-tools",
+	"blocklist":    "i-xc",
+	"manual":       "i-file",
+	"changelog":    "i-edit",
+	"license":      "i-file",
+	"setup":        "i-plus",
+}
+
+func v2NavIcon(id string) string {
+	if icon, ok := v2NavIcons[id]; ok {
+		return icon
+	}
+	return "i-dots"
+}
+
+// v2Icon renders one symbol of /static/icons.svg. The name comes from the
+// template or from v2NavIcons, never from the request, so the markup is safe.
+func v2Icon(name string) template.HTML {
+	return template.HTML(`<svg class="icon" aria-hidden="true" focusable="false"><use href="/static/icons.svg#` + name + `"/></svg>`)
+}
+
 func v2TemplateFuncMap() template.FuncMap {
 	return template.FuncMap{
+		"icon": v2Icon,
 		"bytes":       logging.HumanBytesI64,
 		"bytesU":      func(value uint64) string { return logging.HumanBytesI64(saturatingInt64(value)) },
 		"rate":        func(value uint64) string { return logging.HumanRate(saturatingInt64(value)) },
@@ -71,6 +110,9 @@ func v2TemplateFuncMap() template.FuncMap {
 			return whenFalse
 		},
 		"addOne": func(value int) int { return value + 1 },
+		// quickThemes are the four hand-tuned themes offered in the "Aspetto"
+		// menu; the full picker adds the palettes and the saved ones.
+		"quickThemes": func() []v2Theme { return v2BuiltinThemes },
 		"kib": func(value int64) int64 {
 			if value < 0 {
 				return value
@@ -442,6 +484,7 @@ func v2NavGroups(s *AppState, view string, counts map[string]string) []uiNavGrou
 				ID:           item.ID,
 				Label:        item.Label,
 				Href:         href,
+				Icon:         v2NavIcon(item.ID),
 				Active:       item.ID == view,
 				Optional:     item.Optional,
 				MobileHidden: item.MobileHidden,

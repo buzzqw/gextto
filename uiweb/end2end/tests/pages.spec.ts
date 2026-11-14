@@ -126,48 +126,36 @@ test("Aggiorna e lo stato restano nella riga di Aggiungi torrent", async ({ page
   expect(Math.abs(chrome.refresh!.middle - chrome.pill!.middle)).toBeLessThanOrEqual(3);
 });
 
-test("il riepilogo della Dashboard vive nella barra in alto, dopo la lingua", async ({ page }) => {
+test("il riepilogo della Dashboard vive nella barra in alto, accanto al menu Aspetto", async ({ page }) => {
   await page.setViewportSize({ width: 1920, height: 900 });
   await page.goto("/");
   const kpis = page.locator(".top-kpis");
   await expect(kpis).toBeVisible();
-  // The badges are part of the header controls, after the Theme button, and no
+  // The badges are part of the header controls, beside the Aspetto menu, and no
   // longer occupy a row of their own in the page body.
   await expect(page.locator(".dashboard-summary-grid")).toHaveCount(0);
   await expect(page.locator(".top-kpi")).toHaveCount(2);
   const positions = await page.evaluate(() => {
     const kpis = document.querySelector(".top-kpis");
-    const lang = document.querySelector(".top-controls .lang-form");
-    const theme = document.querySelector(".top-controls .btn:last-of-type");
+    const appearance = document.querySelector(".top-controls .appearance-toggle");
     const controls = document.querySelector(".top-controls");
     const clock = document.querySelector(".current-time");
-    if (!kpis || !lang || !theme || !controls || !clock) return null;
+    if (!kpis || !appearance || !controls || !clock) return null;
     const kpiBox = kpis.getBoundingClientRect();
     const clockBox = clock.getBoundingClientRect();
     return {
       insideControls: kpis.closest(".top-controls") === controls,
-      langX: Math.round(lang.getBoundingClientRect().x),
-      themeX: Math.round(theme.getBoundingClientRect().x),
+      kpiX: Math.round(kpiBox.x),
+      appearanceX: Math.round(appearance.getBoundingClientRect().x),
       kpiRight: Math.round(kpiBox.right),
       clockRight: Math.round(clockBox.right),
     };
   });
   expect(positions).not.toBeNull();
   expect(positions!.insideControls).toBe(true);
-  // Language and controls stay at the left; the two badges sit at the far
-  // right of the row, under the clock.
-  expect(positions!.langX).toBeLessThan(positions!.themeX);
-  expect(positions!.kpiRight).toBeGreaterThan(positions!.themeX);
-  expect(Math.abs(positions!.kpiRight - positions!.clockRight)).toBeLessThanOrEqual(2);
-  // On a wide window the language select opens the controls row under the
-  // first metric (Gextto CPU/RAM), not under the page title.
-  const alignment = await page.evaluate(() => {
-    const lang = document.querySelector(".top-controls .lang-form")?.getBoundingClientRect();
-    const metric = document.querySelector(".top-actions .top-metric")?.getBoundingClientRect();
-    return lang && metric ? { langX: Math.round(lang.x), metricX: Math.round(metric.x) } : null;
-  });
-  expect(alignment).not.toBeNull();
-  expect(alignment!.langX).toBe(alignment!.metricX);
+  // The two badges sit at the left of the row, the Aspetto menu after them.
+  expect(positions!.kpiX).toBeLessThan(positions!.appearanceX);
+  expect(positions!.kpiRight).toBeLessThan(positions!.appearanceX);
   // Only the Dashboard carries them.
   await page.goto("/?view=downloads");
   await expect(page.locator(".top-kpis")).toHaveCount(0);
@@ -238,9 +226,14 @@ test("/ porta al filtro e un magnet incollato compila Aggiungi torrent", async (
 
 test("selettore lingua presente e selezionabile", async ({ page }) => {
   await page.goto("/");
+  // Language, text size, font and theme live in the Aspetto menu of the top bar.
+  await expect(page.locator(".lang-select")).toBeHidden();
+  await page.locator(".appearance-toggle").click();
   await expect(page.locator(".lang-select")).toBeVisible();
   await page.locator(".lang-select").selectOption("en");
+  await page.waitForLoadState("domcontentloaded");
   await expect(page.locator("aside .nav-item").first()).toBeVisible();
+  await page.locator(".appearance-toggle").click();
   await page.locator(".lang-select").selectOption("it");
   await expect(page.locator("aside .nav-item").filter({ hasText: "Scarico" }).first()).toBeVisible({ timeout: 15000 });
 });
@@ -426,9 +419,12 @@ test.describe("mobile", () => {
     await page.locator("[data-mobile-system-toggle]").click();
     await expect(nav(page, "Salute")).toBeVisible();
     await expect(nav(page, "Configurazione")).toBeVisible();
-    // The toggle stays in the bottom bar, and the appearance controls are here.
+    // The toggle stays in the bottom bar. The appearance controls left this
+    // panel for the Aspetto menu of the top bar; the donation link is still
+    // here, because the floating one is hidden on a phone.
     await expect(page.locator("[data-mobile-system-toggle]")).toBeVisible();
-    await expect(page.locator('.nav-prefs button[hx-get="/theme"]')).toBeVisible();
+    await expect(page.locator(".nav-prefs .nav-prefs-donate")).toBeVisible();
+    await expect(page.locator(".top-controls .appearance-toggle")).toBeVisible();
     await expect(page.locator(".nav-mobile-system-extra").filter({ hasText: "Esplora" })).toBeVisible();
     await expect(page.locator(".nav-mobile-system-extra").filter({ hasText: "Archivio" })).toBeVisible();
     // Le voci facoltative (Blocklist, Licenza) vivono solo nel pannello: se non

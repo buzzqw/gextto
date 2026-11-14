@@ -133,7 +133,7 @@
       <select id="v2-tag-filter" class="input" name="tag_filter" aria-label="{{tr "Filtra per tag"}}" {{trTitle "Mostra solo i torrent associati al tag selezionato"}}><option value="">{{tr "Tutti i tag"}}</option><option value="__none__"{{if eq .TagFilter "__none__"}} selected{{end}}>{{tr "Senza tag"}}</option>{{range .TagOptions}}<option value="{{.}}"{{if eq $.TagFilter .}} selected{{end}}>{{tr .}}</option>{{end}}</select>
       <span class="torrent-sort"><label for="v2-sort">{{tr "Ordina per"}}</label><select id="v2-sort" class="input compact" name="sort" onchange="this.form.requestSubmit()">{{range .Columns}}<option value="{{.Key}}"{{if eq $.Sort .Key}} selected{{end}}>{{tr .Label}}</option>{{end}}</select><button class="btn sm" type="submit" name="sort_click" value="{{.Sort}}" aria-label="{{tr "Inverti la direzione dell'ordinamento"}}" {{trTitle "Inverti la direzione dell'ordinamento"}}>{{if eq .Dir "desc"}}↓{{else}}↑{{end}}</button></span>
       <span class="download-view-tools">
-        <button class="btn sm" type="submit" name="refresh" value="1" aria-label="{{tr "Aggiorna"}}" {{trTitle "Ricarica l'elenco dei torrent e lo stato dei download"}}><span aria-hidden="true">⟳</span></button>
+        <button class="btn sm" type="submit" name="refresh" value="1" aria-label="{{tr "Aggiorna"}}" {{trTitle "Ricarica l'elenco dei torrent e lo stato dei download"}}><span aria-hidden="true">{{icon "i-reload"}}</span></button>
         <details class="v2-menu" data-v2-menu>
           <summary class="btn sm" {{trTitle "Pulizia della sessione e aggiornamento dell'elenco"}}>{{tr "Strumenti"}} <span aria-hidden="true">▾</span></summary>
           <div class="v2-menu-panel v2-menu-end">
@@ -232,11 +232,20 @@
                   </div>
                 </div>
                 <div class="row-actions">
-                  {{if .Paused}}<button class="btn sm icon-action" type="submit" id="v2-pause-{{.Hash}}" name="row_action" value="resume:{{.Hash}}" {{trTitle "Riprendi"}} aria-label="{{tr "Riprendi"}}"><span aria-hidden="true">▶</span></button>
-                  {{else}}<button class="btn sm icon-action" type="submit" id="v2-pause-{{.Hash}}" name="row_action" value="pause:{{.Hash}}" {{trTitle "Pausa"}} aria-label="{{tr "Pausa"}}"><span aria-hidden="true">⏸</span></button>{{end}}
-                  <button class="btn sm icon-action" type="submit" id="v2-recheck-{{.Hash}}" name="row_action" value="recheck:{{.Hash}}" {{trTitle "Verifica dati"}} aria-label="{{tr "Verifica dati"}}"><span aria-hidden="true">⟳</span></button>
-                  <button class="btn sm icon-action" type="submit" id="v2-reannounce-{{.Hash}}" name="row_action" value="reannounce:{{.Hash}}" {{trTitle "Riannuncia ai tracker"}} aria-label="{{tr "Riannuncia"}}"><span aria-hidden="true">↻</span></button>
-                  <button class="btn sm icon-action danger" type="button" id="v2-remove-{{.Hash}}" hx-get="/downloads/remove?hash={{.Hash}}" hx-target="#v2-modal" hx-swap="innerHTML" {{trTitle "Rimuovi"}} aria-label="{{tr "Rimuovi"}}"><span aria-hidden="true">🗑️</span></button>
+                  {{if .Paused}}<button class="btn sm icon-action" type="submit" id="v2-pause-{{.Hash}}" name="row_action" value="resume:{{.Hash}}" {{trTitle "Riprendi"}} aria-label="{{tr "Riprendi"}}"><span aria-hidden="true">{{icon "i-play"}}</span></button>
+                  {{else}}<button class="btn sm icon-action" type="submit" id="v2-pause-{{.Hash}}" name="row_action" value="pause:{{.Hash}}" {{trTitle "Pausa"}} aria-label="{{tr "Pausa"}}"><span aria-hidden="true">{{icon "i-pause"}}</span></button>{{end}}
+                  {{/* The rare actions live here, with their name written out:
+                       two icons side by side for "check" and "reannounce" were
+                       too alike to hit the right one. */}}
+                  <details class="v2-menu" data-v2-menu>
+                    <summary class="btn sm icon-action" id="v2-actions-{{.Hash}}" aria-label="{{tr "Altre azioni"}}" {{trTitle "Verifica, riannuncia, rimuovi"}}><span aria-hidden="true">{{icon "i-dots"}}</span></summary>
+                    <div class="v2-menu-panel v2-menu-end">
+                      <button class="v2-menu-item" type="submit" name="row_action" value="recheck:{{.Hash}}">{{tr "Verifica dati"}}</button>
+                      <button class="v2-menu-item" type="submit" name="row_action" value="reannounce:{{.Hash}}">{{tr "Riannuncia ai tracker"}}</button>
+                      <hr />
+                      <button class="v2-menu-item danger" type="button" hx-get="/downloads/remove?hash={{.Hash}}" hx-target="#v2-modal" hx-swap="innerHTML">{{tr "Rimuovi…"}}</button>
+                    </div>
+                  </details>
                 </div>
               </div>
             </td>
@@ -255,10 +264,16 @@
                   <div class="torrent-metrics">{{if .SpeedBytes}}<span class="torrent-metric" {{trTitle "↓ Download"}}><span class="sr-only">{{tr "↓ Download"}}</span><span aria-hidden="true">↓</span> {{rate .SpeedBytes}}</span>{{end}}</div>
                 </div>
                 <div class="row-actions">
-                  {{if eq .Status "downloading"}}<button class="btn sm icon-action" type="submit" id="v2-http-pause-{{.ID}}" name="http_action" value="pause:{{.ID}}" {{trTitle "Metti in pausa il download HTTP"}} aria-label="{{tr "Metti in pausa il download HTTP"}}"><span aria-hidden="true">⏸</span></button>{{end}}
-                  {{if eq .Status "paused"}}<button class="btn sm icon-action" type="submit" id="v2-http-pause-{{.ID}}" name="http_action" value="resume:{{.ID}}" {{trTitle "Riprendi il download HTTP"}} aria-label="{{tr "Riprendi il download HTTP"}}"><span aria-hidden="true">▶</span></button>{{end}}
-                  <button class="btn sm icon-action" type="button" id="v2-http-info-{{.ID}}" hx-get="/downloads/http-detail?id={{.ID}}" hx-target="#v2-modal" hx-swap="innerHTML" {{trTitle "Mostra i dettagli del download HTTP"}} aria-label="{{tr "Mostra i dettagli del download HTTP"}}"><span aria-hidden="true">ⓘ</span></button>
-                  <button class="btn sm icon-action danger" type="submit" id="v2-http-remove-{{.ID}}" name="http_action" value="remove:{{.ID}}" hx-disabled-elt="this" hx-on::before-request="document.getElementById('v2-http-download-{{.ID}}')?.remove()" {{trTitle "Rimuovi il download HTTP"}} aria-label="{{tr "Rimuovi il download HTTP"}}"><span aria-hidden="true">🗑️</span></button>
+                  {{if eq .Status "downloading"}}<button class="btn sm icon-action" type="submit" id="v2-http-pause-{{.ID}}" name="http_action" value="pause:{{.ID}}" {{trTitle "Metti in pausa il download HTTP"}} aria-label="{{tr "Metti in pausa il download HTTP"}}"><span aria-hidden="true">{{icon "i-pause"}}</span></button>{{end}}
+                  {{if eq .Status "paused"}}<button class="btn sm icon-action" type="submit" id="v2-http-pause-{{.ID}}" name="http_action" value="resume:{{.ID}}" {{trTitle "Riprendi il download HTTP"}} aria-label="{{tr "Riprendi il download HTTP"}}"><span aria-hidden="true">{{icon "i-play"}}</span></button>{{end}}
+                  <details class="v2-menu" data-v2-menu>
+                    <summary class="btn sm icon-action" id="v2-http-actions-{{.ID}}" aria-label="{{tr "Altre azioni"}}" {{trTitle "Dettagli e rimozione del download HTTP"}}><span aria-hidden="true">{{icon "i-dots"}}</span></summary>
+                    <div class="v2-menu-panel v2-menu-end">
+                      <button class="v2-menu-item" type="button" hx-get="/downloads/http-detail?id={{.ID}}" hx-target="#v2-modal" hx-swap="innerHTML">{{tr "Dettagli…"}}</button>
+                      <hr />
+                      <button class="v2-menu-item danger" type="submit" name="http_action" value="remove:{{.ID}}" hx-disabled-elt="this" hx-on::before-request="document.getElementById('v2-http-download-{{.ID}}')?.remove()">{{tr "Rimuovi il download"}}</button>
+                    </div>
+                  </details>
                 </div>
               </div>
             </td>
@@ -283,10 +298,16 @@
                   </div>
                 </div>
                 <div class="row-actions">
-                  {{if not .Complete}}{{if .Paused}}<button class="btn sm icon-action" type="submit" id="v2-ed2k-pause-{{.Hash}}" name="ed2k_action" value="resume:{{.Hash}}" {{trTitle "Riprendi il download eD2k"}} aria-label="{{tr "Riprendi il download eD2k"}}"><span aria-hidden="true">▶</span></button>
-                  {{else}}<button class="btn sm icon-action" type="submit" id="v2-ed2k-pause-{{.Hash}}" name="ed2k_action" value="pause:{{.Hash}}" {{trTitle "Metti in pausa il download eD2k"}} aria-label="{{tr "Metti in pausa il download eD2k"}}"><span aria-hidden="true">⏸</span></button>{{end}}{{end}}
-                  <button class="btn sm icon-action" type="button" id="v2-ed2k-info-{{.Hash}}" hx-get="/downloads/ed2k-detail?hash={{.Hash}}" hx-target="#v2-modal" hx-swap="innerHTML" {{trTitle "Mostra i dettagli del download eD2k"}} aria-label="{{tr "Mostra i dettagli del download eD2k"}}"><span aria-hidden="true">ⓘ</span></button>
-                  <button class="btn sm icon-action danger" type="submit" id="v2-ed2k-remove-{{.Hash}}" name="ed2k_action" value="remove:{{.Hash}}" hx-disabled-elt="this" hx-confirm="{{if .Complete}}{{tr "Togliere il file completato dall'elenco di aMule? Il file resta nella cartella di arrivo."}}{{else}}{{tr "Annullare il download eD2k e cancellare la parte già scaricata?"}}{{end}}" {{if .Complete}}{{trTitle "Togli dall'elenco di aMule"}}{{else}}{{trTitle "Annulla il download eD2k"}}{{end}} aria-label="{{if .Complete}}{{tr "Togli dall'elenco di aMule"}}{{else}}{{tr "Annulla il download eD2k"}}{{end}}"><span aria-hidden="true">🗑️</span></button>
+                  {{if not .Complete}}{{if .Paused}}<button class="btn sm icon-action" type="submit" id="v2-ed2k-pause-{{.Hash}}" name="ed2k_action" value="resume:{{.Hash}}" {{trTitle "Riprendi il download eD2k"}} aria-label="{{tr "Riprendi il download eD2k"}}"><span aria-hidden="true">{{icon "i-play"}}</span></button>
+                  {{else}}<button class="btn sm icon-action" type="submit" id="v2-ed2k-pause-{{.Hash}}" name="ed2k_action" value="pause:{{.Hash}}" {{trTitle "Metti in pausa il download eD2k"}} aria-label="{{tr "Metti in pausa il download eD2k"}}"><span aria-hidden="true">{{icon "i-pause"}}</span></button>{{end}}{{end}}
+                  <details class="v2-menu" data-v2-menu>
+                    <summary class="btn sm icon-action" id="v2-ed2k-actions-{{.Hash}}" aria-label="{{tr "Altre azioni"}}" {{trTitle "Dettagli e rimozione del download eD2k"}}><span aria-hidden="true">{{icon "i-dots"}}</span></summary>
+                    <div class="v2-menu-panel v2-menu-end">
+                      <button class="v2-menu-item" type="button" hx-get="/downloads/ed2k-detail?hash={{.Hash}}" hx-target="#v2-modal" hx-swap="innerHTML">{{tr "Dettagli…"}}</button>
+                      <hr />
+                      <button class="v2-menu-item danger" type="submit" name="ed2k_action" value="remove:{{.Hash}}" hx-disabled-elt="this" hx-confirm="{{if .Complete}}{{tr "Togliere il file completato dall'elenco di aMule? Il file resta nella cartella di arrivo."}}{{else}}{{tr "Annullare il download eD2k e cancellare la parte già scaricata?"}}{{end}}">{{if .Complete}}{{tr "Togli dall'elenco di aMule"}}{{else}}{{tr "Annulla il download eD2k"}}{{end}}</button>
+                    </div>
+                  </details>
                 </div>
               </div>
             </td>

@@ -287,14 +287,16 @@ problem becomes hard to reproduce.
   per process**: Gextto, gx-torrent and, when active and local, aMule. They
   refresh every 5 seconds, and stop when the browser tab is not in view: they
   pick up again as soon as you come back.
-- **Theme**, text size and **Font**. The **Theme** dialog has ready-made themes
-  (Dark, Light, Cream, Nord, Dracula, Solarized, Gruvbox, High contrast and
-  more, in light and dark variants); **Automatic** follows the light or dark
-  theme of the system and changes with it; **Customize** builds your own theme
-  from four colours (background, panels, text, accent) and warns you when the
-  contrast is too low. Saved themes live on the server and follow you to every
-  device; the active theme, text size and font remain a choice of each
-  browser.
+- **Appearance**: a single button gathers theme, text size, font and language,
+  instead of six controls scattered across the top of every page. The menu shows
+  the four ready-made themes (Automatic, Dark, Light, Cream): **Automatic**
+  follows the light or dark theme of the system and changes with it. **More
+  themes and custom…** opens the full dialog, with Nord, Dracula, Solarized,
+  Gruvbox, High contrast and the others, in light and dark variants, and
+  **Customize** builds your own theme from four colours (background, panels,
+  text, accent), warning you when the contrast is too low. Saved themes live on
+  the server and follow you to every device; the active theme, text size and
+  font remain a choice of each browser.
 - The interface **language**.
 - **Donate**, bottom right (on a phone it is in the *More* menu), and **Update
   available** when a new version is out.
@@ -305,8 +307,11 @@ Below 900 pixels wide the interface becomes compact: scrollable menu at the
 top, metrics in two columns, full-width dialogs, tables that scroll inside
 their panel. On the **Downloads** page a torrent name wraps in full instead of
 stopping after the first characters: on a phone there is no mouse tooltip to
-show the rest. Every action stays reachable by touch. Theme, text size, **Font**, language and **Donate** are in the *More*
-menu, so the top bar keeps only the title, **＋** and **Refresh**. In the
+show the rest. Every action stays reachable by touch, and buttons and menu rows
+grow to 44 pixels, the smallest size a finger hits reliably. Theme, text size,
+font and language are in the **Appearance** menu of the top bar, so on a phone
+the bar keeps only the title, **＋** and **Refresh**; **Donate** is in the
+*More* menu. In the
 **TV series** and **Movies** lists every title is a card: name and status on
 one line, **Pause** and **Delete** side by side below. On the **Dashboard**,
 when nothing was transferred in the last 30 minutes, one line says so instead
@@ -734,7 +739,8 @@ the engine downloaded and uploaded since it started.
 
 ### Acting on downloads
 
-- **On one row**: pause/resume, recheck, remove.
+- **On one row**: pause/resume stays in view; **⋯** opens recheck, reannounce
+  and remove, written out so they cannot be confused with each other.
 - **On several rows**: tick the torrents and use the selection bar: **Pause**,
   **Resume**, **Check again**, **Tag** (assign, create or remove a tag),
   **Remove from session**.

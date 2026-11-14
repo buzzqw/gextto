@@ -34,9 +34,11 @@ var uiThirdPartyText string
 
 // uiNavItem is one navigation entry of the new shell.
 type uiNavItem struct {
-	ID           string
-	Label        string
-	Href         string
+	ID    string
+	Label string
+	Href  string
+	// Icon is the symbol of the SVG sprite (icons.svg), drawn in the phone bar.
+	Icon         string
 	Active       bool
 	Optional     bool
 	MobileHidden bool

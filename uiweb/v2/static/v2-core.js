@@ -155,7 +155,7 @@
     storeColors(c);
     storageSet("gextto_theme_id", "");
     setTheme("custom");
-    var cards = document.querySelectorAll('input[name="v2-theme"]');
+    var cards = document.querySelectorAll('.theme-modal input[name="v2-theme"]');
     for (var i = 0; i < cards.length; i++) cards[i].checked = false;
     updateContrastHint();
   }
@@ -164,7 +164,7 @@
   function initThemeModal() {
     var modal = document.querySelector(".theme-modal");
     if (!modal) return;
-    var cards = document.querySelectorAll('input[name="v2-theme"]');
+    var cards = modal.querySelectorAll('input[name="v2-theme"]');
     var wanted = modal.getAttribute("data-theme-selected") || storageGet("gextto_theme_id") || "";
     if (!wanted) {
       var active = storageGet("gextto_theme") || "";
@@ -183,8 +183,25 @@
   }
   document.addEventListener("change", function (event) {
     var target = event.target;
-    if (target && target.name === "v2-theme" && target.checked) selectThemeCard(target);
+    if (target && (target.name === "v2-theme" || target.name === "v2-theme-quick") && target.checked) selectThemeCard(target);
   });
+
+  // The "Aspetto" menu shows which of the four themes is active: the choice is
+  // stored per browser, so the card is marked from storage when it opens.
+  function syncAppearanceMenu() {
+    var panel = document.querySelector(".appearance-panel");
+    if (!panel) return;
+    var stored = storageGet("gextto_theme") || "";
+    var id = storageGet("gextto_theme_id") || "";
+    if (!id) id = stored === "auto" ? "auto" : (doc.getAttribute("data-theme") || "");
+    var cards = panel.querySelectorAll('input[name="v2-theme-quick"]');
+    for (var i = 0; i < cards.length; i++) cards[i].checked = cards[i].value === id;
+  }
+  document.addEventListener("toggle", function (event) {
+    var menu = event.target;
+    if (menu && menu.classList && menu.classList.contains("appearance-menu") && menu.open) syncAppearanceMenu();
+  }, true);
+  syncAppearanceMenu();
   document.addEventListener("input", function (event) {
     var target = event.target;
     if (target && target.type === "color" && target.closest && target.closest(".theme-editor")) editThemeColors();
@@ -1189,9 +1206,11 @@
   // refreshes the bandwidth menu out of band): skip it while one is open.
   document.addEventListener("htmx:beforeRequest", function (event) {
     var elt = event.detail && event.detail.elt;
-    if (!elt || elt.id !== "v2-torrent-form") return;
+    if (!elt || (elt.id !== "v2-torrent-form" && elt.id !== "v2-download-rows")) return;
     var trig = event.detail.triggeringEvent || (event.detail.requestConfig && event.detail.requestConfig.triggeringEvent);
     var polling = !trig || trig.type === "hx:poll:trigger";
+    // The row menu is a <details> inside the rows: a swap would close it under
+    // the pointer, so the tick waits until it is closed.
     if (polling && document.querySelector(".downloads-view details[data-v2-menu][open]")) event.preventDefault();
   });
 

@@ -286,14 +286,16 @@ sorgenti, un problema diventa difficile da riprodurre.
   processo**: Gextto, gx-torrent e, se attivo e locale, aMule. Si aggiornano
   ogni 5 secondi, e si fermano quando la scheda del browser non è in vista:
   riprendono appena torni sulla pagina.
-- **Tema**, dimensione del testo e **Font**. Il dialogo **Tema** ha i temi
-  pronti (Scuro, Chiaro, Crema, Nord, Dracula, Solarized, Gruvbox, Alto
-  contrasto e altri, in versione chiara e scura); **Automatico** segue il tema
-  chiaro o scuro del sistema e cambia quando lo cambi anche tu;
-  **Personalizza** crea un tema tuo da quattro colori (sfondo, pannelli, testo,
-  accento) e avvisa se il contrasto è troppo basso. I temi salvati sono sul
-  server e li ritrovi da ogni dispositivo; il tema attivo, il testo e il font
-  restano una scelta del singolo browser.
+- **Aspetto**: un solo pulsante raccoglie tema, dimensione del testo,
+  carattere e lingua, invece di sei comandi sparsi in cima a ogni pagina. Il
+  menu mostra i quattro temi pronti (Automatico, Scuro, Chiaro, Crema): il tema
+  **Automatico** segue il chiaro o lo scuro del sistema e cambia quando lo cambi
+  anche tu. **Altri temi e personalizzato…** apre il dialogo completo, con Nord,
+  Dracula, Solarized, Gruvbox, Alto contrasto e gli altri, in versione chiara e
+  scura, e **Personalizza** crea un tema tuo da quattro colori (sfondo,
+  pannelli, testo, accento), con l'avviso se il contrasto è troppo basso. I temi
+  salvati sono sul server e li ritrovi da ogni dispositivo; il tema attivo, il
+  testo e il carattere restano una scelta del singolo browser.
 - La **lingua** dell'interfaccia.
 - **Dona**, in basso a destra (sul telefono è nel menu *Altro*), e
   **Aggiornamento disponibile** quando c'è una versione nuova.
@@ -305,8 +307,10 @@ alto, metriche su due colonne, finestre a tutta larghezza, tabelle che scorrono
 dentro il loro riquadro. Nella pagina **Scarico** il nome di un torrent va a capo
 per intero invece di fermarsi ai primi caratteri: sul telefono non c'è il
 suggerimento del mouse che mostra il resto. Ogni azione resta raggiungibile col
-tocco. Tema, dimensione del testo, **Font**, lingua e **Dona** sono nel menu
-*Altro*, così la barra in alto tiene solo il titolo, **＋** e **Aggiorna**. Nelle
+tocco, e pulsanti e voci di menu arrivano a 44 pixel, la misura più piccola che
+un dito colpisce senza sbagliare. Tema, dimensione del testo, carattere e lingua
+sono nel menu **Aspetto** della barra in alto, così sul telefono la barra tiene
+solo il titolo, **＋** e **Aggiorna**; **Dona** è nel menu *Altro*. Nelle
 liste **Serie TV** e **Film** ogni titolo è una scheda: nome e stato su una
 riga, **Pausa** ed **Elimina** affiancati sotto. Nella **Dashboard**, quando
 negli ultimi 30 minuti non si è trasferito nulla, al posto del grafico della
@@ -748,7 +752,8 @@ dicono quanto il motore ha scaricato e inviato da quando è partito.
 
 ### Agire sui download
 
-- **Su una riga**: pausa/riprendi, ricontrolla, rimuovi.
+- **Su una riga**: pausa/riprendi resta in vista; **⋯** apre ricontrolla,
+  riannuncia e rimuovi, con il nome scritto così non si confondono.
 - **Su più righe**: spunta i torrent e usa la barra di selezione: **Pausa**,
   **Riprendi**, **Ricontrolla**, **Tag** (assegna, crea o togli un tag),
   **Rimuovi dalla sessione**.

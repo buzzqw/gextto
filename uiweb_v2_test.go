@@ -2474,8 +2474,31 @@ func TestV2ThemePicker(t *testing.T) {
 	}
 
 	_, page := v2Request(t, server, http.MethodGet, "/", nil)
-	if n := strings.Count(page, `hx-get="/theme"`); n != 2 {
-		t.Fatalf("theme button found %d times, want 2 (top bar and phone menu)", n)
+	// One place: the "Aspetto" menu carries the four quick themes and the link
+	// to the full dialog, and the phone menu no longer repeats the controls.
+	if n := strings.Count(page, `hx-get="/theme"`); n != 1 {
+		t.Fatalf("theme button found %d times, want 1 (the Aspetto menu)", n)
+	}
+	for _, want := range []string{
+		`class="v2-menu appearance-menu"`,
+		`name="v2-theme-quick" value="auto" data-theme-mode="auto"`,
+		`name="v2-theme-quick" value="cream" data-theme-mode="cream"`,
+		`name="lang"`,
+		`data-font="-5"`,
+		`data-font-open`,
+	} {
+		if !strings.Contains(page, want) {
+			t.Fatalf("the Aspetto menu is missing %q", want)
+		}
+	}
+	// The language selector and the text-size buttons left the phone menu: they
+	// are inside the Aspetto panel now. (The setup panel of the dashboard keeps
+	// its own selector, which is a different thing.)
+	if strings.Contains(page, `nav-prefs-lang`) || strings.Contains(page, `data-font-open title="Scegli il tipo`) {
+		t.Fatal("the phone menu still repeats the appearance controls")
+	}
+	if !regexp.MustCompile(`appearance-panel[\s\S]*name="lang"`).MatchString(page) {
+		t.Fatal("the Aspetto panel has no language selector")
 	}
 	if strings.Contains(page, "data-theme-toggle") || strings.Contains(page, `hx-get="/colors"`) {
 		t.Fatal("the separate theme toggle and colours button must be gone")
