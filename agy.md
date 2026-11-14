@@ -187,3 +187,201 @@ Dall'analisi svolta derivano 5 proposte concrete, pragmatiche e in linea con l'a
 3. **Pre-flight swarm health probe**: verifica rapida tramite DHT / tracker scrape dello stato dei seeder prima di accodare candidati con dati di seed incerti o pari a zero, evitando il blocco degli slot su torrent inattivi.
 4. **Pre-download file tree safety guard**: estensione del controllo preventivo della lista file a tutti i torrent non appena i metadati sono noti (da `.torrent` o magnet risolti da gx-core), scartando release contenenti eseguibili o prive di stream video validi.
 5. **External watchlist sync**: worker opzionale in background per l'importazione periodica di titoli desiderati da watchlist o feed pubblici (es. Trakt, Letterboxd) direttamente nella coda di acquisizione di Gextto.
+
+---
+
+## 8. Specifiche Tecniche di Implementazione e Modelli Go
+
+L'analisi del codice sorgente di FlexGet effettuata dal subagente specializzato ha isolato gli algoritmi e le strutture dati dei quattro moduli chiave. Di seguito vengono definiti i progetti architetturali e i modelli per il porting nativo in Go puro per Gextto e `gx-core`.
+
+### 8.1 `series` Timeframe & Target: Macchina a Stati per Gextto
+
+#### Come opera FlexGet:
+FlexGet serializza l'intera `Entry` (titolo, magnet/torrent, metadati) nella tabella SQLite `backlog`.
+Ad ogni esecuzione della task, il plugin `backlog` re-inietta tutti i candidati in attesa.
+La logica (`flexget/components/series/series.py`) valuta se esiste una release che soddisfa `target`:
+- Se sì: accetta immediatamente (`entry.accept('target')`) senza attendere.
+- Se no: calcola `expires = first_seen + timeframe`. Se `now < expires`, salva il miglior candidato nel backlog e rimanda l'episodio al ciclo successivo; se `now >= expires`, la restrizione target cade e il miglior candidato del backlog viene promosso e scaricato.
+
+#### Architettura Go per Gextto (`cycle_candidate.go` e `database.go`):
+In Gextto la tabella `pending_downloads` memorizza già `(series_id, season, episode, best_magnet, best_quality_score, ready_at, best_title, first_seen_at, timeframe_hours, due_at, status)`.
+Quando arriva una release per un episodio in attesa, `QueuePendingScored` (`database.go:3144`) aggiorna già `best_magnet` e `best_quality_score` se la nuova release ha un punteggio più alto, preservando `first_seen_at` e `due_at`.
+
+Il limite attuale di Gextto è che in `cycle_candidate.go:judge()` / `holdForDelay()`:
+```go
+// Attualmente in cycle_candidate.go:
+delayMinutes = cfg.DelayMinutes("series")
+if series.Timeframe > 0 {
+    delayMinutes = saturatingMul(series.Timeframe, 60)
+}
+```
+la release viene trattenuta **anche se possiede già la massima qualità desiderata**.
+
+*Modifica architetturale proposta*:
+```go
+// Definizione del target match in cycle_candidate.go
+func (p *candidatePass) isTargetQuality(series *SeriesConfig, release *models.Release) bool {
+    if series == nil || release == nil {
+        return false
+    }
+    // Se la serie specifica una TargetQuality (es. "1080p webdl ita"),
+    // o se la release possiede i requisiti massimi (es. 1080p/2160p + WEB-DL/BluRay + Audio Italiano)
+    if series.TargetQuality != "" && release.Quality.MatchesRequirement(series.TargetQuality) {
+        return true
+    }
+    // Euristiche di default per release "top-tier": 1080p+ WEB-DL con audio nativo ita
+    return release.Quality.IsIta && 
+           (release.Quality.Resolution == "1080p" || release.Quality.Resolution == "2160p") &&
+           (release.Quality.Source == "webdl" || release.Quality.Source == "bluray" || release.Quality.Source == "remux")
+}
+```
+In `holdForDelay()`: se `p.isTargetQuality(series, release)` è vero, si imposta `delayMinutes = 0` e si ritorna `held = false`: il download parte all'istante, azzerando le ore di attesa inutile. Se invece è una qualità di riserva (es. 720p HDTV), entra normalmente nella finestra temporale in attesa che compaia il target.
+
+---
+
+### 8.2 `torrent_alive`: Protocollo di Scrape BEP 15 / HTTP / DHT
+
+#### Come opera FlexGet:
+In `torrent_alive.py`, FlexGet implementa manualmente i pacchetti binari BEP 15 UDP su socket grezzi e lo scrape HTTP (BEP 48).
+**FlexGet non supporta lo scrape DHT**: si affida unicamente a tracker UDP e HTTP.
+- **Protocollo UDP (BEP 15)**:
+  1. *Connect*: invia pacchetto di 16 byte (Connection ID fisso `0x41727101980` a 64-bit uint big-endian + Action `0` a 32-bit + Transaction ID a 32-bit random). Riceve 16 byte con il Connection ID dinamico.
+  2. *Scrape*: invia 36 byte (Connection ID + Action `2` + Transaction ID + 20 byte InfoHash).
+  3. *Risposta*: estrae 12 byte per torrent (3 interi a 32-bit: `seeders`, `completed`, `leechers`). Timeout: 5 secondi.
+- Se i seeder confermati sono minori di `min_seeds`, memorizza la tupla `(url, title)` con TTL in `remember_rejected` per un'ora (`reject_for: 1 hour`).
+
+#### Architettura Go per Gextto e `gx-core`:
+`gx-core` possiede già un'infrastruttura superiore a FlexGet:
+- `internal/gxcore/internal/tracker/udptracker`: implementazione Go pura di BEP 15 con retry ed exponential backoff.
+- `internal/gxcore/internal/tracker/httptracker`: client HTTP scrape BEP 48.
+- `internal/gxcore/torrent/torrent_dhtscrape.go`: **BEP 33 DHT Scrape nativo** (`t.DHTScrape(timeout)`), capace di stimare i seeder tramite la DHT anche quando i tracker sono offline o per magnet sprovvisti di tracker.
+
+*Integrazione in Gextto (`cycle_candidate.go` / `torrent_link_quarantine.go`)*:
+Prima di iniziare il download di un candidato con `seeders == 0` o assenti nei metadati Torznab, invocare un helper `ProbeSwarmSeeds(ctx context.Context, hash string, announceList []string) (int, error)` con timeout di 3 secondi. Se i seeder confermati sono 0, aggiungere l'URL/hash a `dead_torrent_links` con quarantena di 1-2 ore, evitando di impegnare slot con torrent fermi.
+
+---
+
+### 8.3 `content_filter`: Ispezione Bencode e Ratio Dimensionale
+
+#### Come opera FlexGet:
+`content_filter.py` interroga `Torrent.get_filelist()` che legge la struttura bencode:
+- Gestisce `info.name` (single-file) e `info.files` (multi-file), con fallback dei set di caratteri da `encoding` del torrent a `cp1252` e `utf-8`.
+- Regole principali:
+  - `reject`: se anche un solo file fa match con pattern vietati (`*.exe`, `*.scr`, `*.bat`, `*.wmv`, `*sample*`), rigetta il torrent.
+  - `require_mainfile`: calcola `(dimensione_file_più_grande / dimensione_totale_torrent) * 100`. Se inferiore all'85-90%, rigetta il torrent (protegge da finte release contenenti archivi suddivisi in decine di parti o sample gonfiati).
+
+#### Architettura Go per Gextto (`pack_precheck.go` esteso):
+Gextto possiede già `torrentFileList(torrentPath string)` in `pack_precheck.go`. Possiamo generalizzarla con una struct sicura:
+
+```go
+type TorrentFileEntry struct {
+    Path      string
+    SizeBytes int64
+}
+
+type TorrentInspection struct {
+    TotalSize int64
+    Files     []TorrentFileEntry
+}
+
+func InspectTorrentMeta(torrentPath string) (*TorrentInspection, error) {
+    // Decodifica bencode con zeebo/bencode
+    // Calcola TotalSize e popola Files
+}
+
+func ValidateTorrentContentSafety(insp *TorrentInspection) (bool, string) {
+    if insp == nil || len(insp.Files) == 0 {
+        return false, "empty torrent payload"
+    }
+    
+    var largestFile int64
+    hasMediaFile := false
+    
+    for _, f := range insp.Files {
+        lower := strings.ToLower(f.Path)
+        // Blacklist di sicurezza
+        if strings.HasSuffix(lower, ".exe") || strings.HasSuffix(lower, ".scr") ||
+           strings.HasSuffix(lower, ".bat") || strings.HasSuffix(lower, ".cmd") ||
+           strings.HasSuffix(lower, ".iso") || strings.HasSuffix(lower, ".lnk") {
+            return false, fmt.Sprintf("malicious extension in payload: %s", f.Path)
+        }
+        if isVideoExtension(lower) {
+            hasMediaFile = true
+            if f.SizeBytes > largestFile {
+                largestFile = f.SizeBytes
+            }
+        }
+    }
+    
+    if !hasMediaFile {
+        return false, "no valid video stream file found"
+    }
+    
+    // Regola require_mainfile: per film o release singole, il video principale
+    // deve pesare almeno il 75% del torrent (salvo pack con più puntate)
+    if len(insp.Files) > 1 && !isPackTorrent(insp.Files) {
+        ratio := float64(largestFile) / float64(insp.TotalSize)
+        if ratio < 0.75 {
+            return false, fmt.Sprintf("no dominant main video file (ratio %.2f < 0.75)", ratio)
+        }
+    }
+    return true, ""
+}
+```
+
+---
+
+### 8.4 `torrent_scrub`: Sanificazione Bencode a Due Livelli
+
+#### Come opera FlexGet:
+In `torrent_scrub.py`, FlexGet distingue nettamente due operazioni:
+1. **Top-Level Scrubbing (Info-Hash Invariato)**:
+   Rimuove dal dizionario root le chiavi estranee:
+   - `libtorrent_resume`: stato di fast-resume iniettato da libtorrent (chunk completati, priorità, path locali). Se importato su un altro client può causare crash, fallimento del check dei pezzi o errori I/O.
+   - `rtorrent`, `log_callback`, `err_callback`: metadati ruTorrent.
+   - `azureus_properties`: metadati Vuze (miniature thumbnail JPEG, categorie).
+   - `nodes`, `uTorrent`: chiavi spurie.
+   *Poiché `info` non viene toccato, `SHA-1(info)` resta identico al 100% e il torrent mantiene lo stesso sciame.*
+2. **Deep Scrubbing (Info-Hash Modificato)**:
+   Rimuove campi all'interno dell'info-dict come `info.source` (tag del tracker privato) o `info.md5sum`. Questo altera l'infohash ed è incompatibile con i tracker privati (che rigettano l'announce).
+
+#### Architettura Go per Gextto e `gx-core`:
+In `gx-core`, il package `metainfo` decodifica e riserializza già in modo pulito. Tuttavia, quando Gextto opera con client esterno (`qBittorrent-nox`), i `.torrent` salvati su disco possono ereditare resume data sporchi da indexer e tracker.
+
+*Funzione di sanificazione proposta per Gextto*:
+```go
+// ScrubTorrentBytes rimuove metadati di resume e proprietà spurie
+// preservando i byte esatti di 'info' per non alterare l'info-hash.
+func ScrubTorrentBytes(raw []byte) ([]byte, error) {
+    var rawMap map[string]bencode.RawMessage
+    if err := bencode.DecodeBytes(raw, &rawMap); err != nil {
+        return nil, err
+    }
+    
+    // Lista delle chiavi top-level dannose o proprietarie
+    bannedRootKeys := []string{
+        "libtorrent_resume",
+        "rtorrent",
+        "azureus_properties",
+        "log_callback",
+        "err_callback",
+        "codepage",
+    }
+    
+    modified := false
+    for _, key := range bannedRootKeys {
+        if _, exists := rawMap[key]; exists {
+            delete(rawMap, key)
+            modified = true
+        }
+    }
+    
+    if !modified {
+        return raw, nil
+    }
+    
+    return bencode.EncodeBytes(rawMap)
+}
+```
+Questa funzione garantisce che qualunque file `.torrent` manipolato o passato al backend sia esente da fast-resume inconsistenti, senza mai invalidare la compatibilità di hash con lo sciame.
+
