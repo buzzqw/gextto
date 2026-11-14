@@ -2474,8 +2474,13 @@ func V2DownloadsDetailAction(w http.ResponseWriter, r *http.Request, s *AppState
 			"seed_ratio": ratio, "seed_days": days, "max_connections": maxConnections, "max_uploads": maxUploads})
 	case "peer-options":
 		path = "/api/torrents/" + url.PathEscape(hash) + "/peer-options"
-		weight := v2ParseInt(r.FormValue("bandwidth_weight"), 100)
-		// The accepted range, bound before the value becomes an int.
+		// Atoi gives an int directly: the value never goes through a wider type
+		// that would have to be narrowed before reaching the daemon.
+		weight := 100
+		if parsed, err := strconv.Atoi(strings.TrimSpace(r.FormValue("bandwidth_weight"))); err == nil {
+			weight = parsed
+		}
+		// The accepted range, bound before the value leaves the interface.
 		if weight < 10 {
 			weight = 10
 		}
@@ -2483,7 +2488,7 @@ func V2DownloadsDetailAction(w http.ResponseWriter, r *http.Request, s *AppState
 			weight = 1000
 		}
 		body, _ = json.Marshal(PeerOptionsInput{
-			BandwidthWeight: int(weight),
+			BandwidthWeight: weight,
 			Dht:             r.FormValue("dht") != "",
 			Pex:             r.FormValue("pex") != "",
 			Lsd:             r.FormValue("lsd") != "",

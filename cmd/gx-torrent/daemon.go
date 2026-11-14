@@ -2282,6 +2282,9 @@ func (d *Daemon) setLimits(key string, download, upload *int64, ratio *float64, 
 // the conversion to int exact on every platform.
 const maxPerTorrentPeerCap = 10000
 
+// errBandwidthWeightRange refuses a bandwidth weight outside 10–1000 percent.
+var errBandwidthWeightRange = errors.New("the bandwidth weight must be between 10 and 1000 percent")
+
 // setConnLimits stores and applies the per-torrent connection and upload-slot
 // caps. A nil limit is left unchanged; a negative one clears it.
 func (d *Daemon) setConnLimits(key string, maxConnections, maxUploads *int64) error {
@@ -2292,10 +2295,10 @@ func (d *Daemon) setConnLimits(key string, maxConnections, maxUploads *int64) er
 				meta.MaxConnections = nil
 				t.SetMaxConnections(d.state.Config.MaxConnectionsPerTorrent)
 			} else {
-				if *maxConnections > maxPerTorrentPeerCap {
+				value := *maxConnections
+				if value > maxPerTorrentPeerCap {
 					return fmt.Errorf("the connection cap must be at most %d", maxPerTorrentPeerCap)
 				}
-				value := *maxConnections
 				meta.MaxConnections = &value
 				t.SetMaxConnections(int(value))
 			}
@@ -2305,10 +2308,10 @@ func (d *Daemon) setConnLimits(key string, maxConnections, maxUploads *int64) er
 				meta.MaxUploads = nil
 				t.SetMaxUploads(-1)
 			} else {
-				if *maxUploads > maxPerTorrentPeerCap {
+				value := *maxUploads
+				if value > maxPerTorrentPeerCap {
 					return fmt.Errorf("the upload slot cap must be at most %d", maxPerTorrentPeerCap)
 				}
-				value := *maxUploads
 				meta.MaxUploads = &value
 				t.SetMaxUploads(int(value))
 			}
@@ -2337,10 +2340,16 @@ func (d *Daemon) setPeerOptions(key string, weight *int64, dht, pex, lsd *bool) 
 	return d.withTorrent(key, func(t *torrent.Torrent, meta *torrentMeta) error {
 		curWeight, curDHT, curPEX := t.PeerOptions()
 		if weight != nil {
-			if *weight < 10 || *weight > 1000 {
-				return errors.New("the bandwidth weight must be between 10 and 1000 percent")
+			value := *weight
+			// Two checks, one per bound: the conversion below happens only on a
+			// value that is already inside int's range.
+			if value < 10 {
+				return errBandwidthWeightRange
 			}
-			curWeight = int(*weight)
+			if value > 1000 {
+				return errBandwidthWeightRange
+			}
+			curWeight = int(value)
 		}
 		if dht != nil {
 			curDHT = *dht
