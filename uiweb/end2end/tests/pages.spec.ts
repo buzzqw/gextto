@@ -319,6 +319,48 @@ test("ricerca impostazioni apre la tab e raggiunge il campo", async ({ page }) =
   await expect(page.locator("#input-torrent_ramdisk_dir")).toBeVisible();
 });
 
+test("il menu Aspetto resta dentro la finestra della Dashboard", async ({ page }) => {
+  // The Dashboard pushes the button to the far right of its row: the panel used
+  // to be cut by the window edge there.
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto("/");
+  await page.locator(".appearance-toggle").click();
+  const panel = page.locator(".appearance-panel");
+  await expect(panel).toBeVisible();
+  const box = await panel.boundingBox();
+  const width = await page.evaluate(() => window.innerWidth);
+  expect(box).not.toBeNull();
+  expect(box!.x).toBeGreaterThanOrEqual(0);
+  expect(box!.x + box!.width).toBeLessThanOrEqual(width);
+});
+
+test("il menu «⋯» di una riga non apre il dettaglio del torrent", async ({ page }) => {
+  // The row opens the detail drawer when the click lands on a dead area. The
+  // menu is a <details> whose head is a summary: it must stay its own thing.
+  await page.route("**/partial/downloads/rows", async (route) => {
+    await route.fulfill({
+      contentType: "text/html; charset=utf-8",
+      body: `<div id="v2-download-rows" data-v2-poll hx-post="/partial/downloads/rows" hx-target="this" hx-include="#v2-torrent-form" hx-trigger="every 5s [window.gexttoCanPoll()], v2wake" hx-swap="outerHTML">
+        <table class="data-table torrent-table"><tbody><tr id="v2-torrent-abc" data-hash="abc"><td class="torrent-card-cell"><div class="torrent-card">
+          <button class="torrent-open" type="button" hx-get="/downloads/detail?hash=abc&tab=general" hx-target="#v2-detail-drawer" hx-swap="innerHTML">Nome</button>
+          <div class="row-actions"><details class="v2-menu" data-v2-menu><summary class="btn sm icon-action" aria-label="Altre azioni">⋯</summary>
+            <div class="v2-menu-panel v2-menu-end"><button class="v2-menu-item" type="submit" name="row_action" value="recheck:abc">Verifica dati</button></div>
+          </details></div>
+        </div></td></tr></tbody></table></div>`,
+    });
+  });
+  let details = 0;
+  page.on("request", (request) => { if (request.url().includes("/downloads/detail")) details += 1; });
+  await page.goto("/?view=downloads");
+  const menu = page.locator("#v2-download-rows details.v2-menu");
+  await expect(menu).toBeVisible({ timeout: 15000 });
+  await page.locator("#v2-download-rows details.v2-menu > summary").click();
+  await expect(menu).toHaveAttribute("open", "");
+  await page.waitForTimeout(500);
+  expect(details).toBe(0);
+  await expect(page.locator("#v2-detail-drawer")).toBeHidden();
+});
+
 test.describe("mobile", () => {
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true });
 

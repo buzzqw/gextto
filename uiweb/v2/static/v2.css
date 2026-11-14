@@ -2091,6 +2091,10 @@ html.settings-only-modified .settings-panel:not(:has(.setting-modified-row)):not
   .v2-update-badge-label { display: none; }
 }
 
+/* The download table never scrolls sideways (its rows are cards), so its
+   wrapper must not clip the row menu that hangs below the row. */
+.downloads-view .table-wrap:has(> .torrent-table) { overflow: visible; }
+
 /* One icon set for the whole interface: the symbols of /static/icons.svg,
    drawn at the size of the text and in its colour. */
 .icon {

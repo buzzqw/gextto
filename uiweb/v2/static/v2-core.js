@@ -188,6 +188,28 @@
 
   // The "Aspetto" menu shows which of the four themes is active: the choice is
   // stored per browser, so the card is marked from storage when it opens.
+  // The panel hangs from its button and must not leave the window: it opens to
+  // the right when there is room and flips to the button's right edge when the
+  // button sits at the far right of the bar (the Dashboard summary pushes it
+  // there). Without this it was cut by the window edge.
+  function placeAppearancePanel(menu) {
+    var panel = menu.querySelector(".appearance-panel");
+    if (!panel) return;
+    panel.style.left = "0px";
+    panel.style.right = "auto";
+    var box = menu.getBoundingClientRect();
+    var width = panel.offsetWidth || 360;
+    var margin = 12;
+    if (box.left + width <= window.innerWidth - margin) return;
+    var left = box.width - width;
+    if (box.left + left < margin) left = margin - box.left;
+    panel.style.left = Math.round(left) + "px";
+  }
+  window.addEventListener("resize", function () {
+    var open = document.querySelector(".appearance-menu[open]");
+    if (open) placeAppearancePanel(open);
+  });
+
   function syncAppearanceMenu() {
     var panel = document.querySelector(".appearance-panel");
     if (!panel) return;
@@ -199,7 +221,10 @@
   }
   document.addEventListener("toggle", function (event) {
     var menu = event.target;
-    if (menu && menu.classList && menu.classList.contains("appearance-menu") && menu.open) syncAppearanceMenu();
+    if (!menu || !menu.classList || !menu.classList.contains("appearance-menu")) return;
+    if (!menu.open) return;
+    syncAppearanceMenu();
+    placeAppearancePanel(menu);
   }, true);
   syncAppearanceMenu();
   document.addEventListener("input", function (event) {
@@ -458,7 +483,11 @@
     // opener so focus returns to where the user was.
     var openBtn = event.target.closest("button[hx-get*='/downloads/detail']");
     if (openBtn) { detailDrawerOpener = openBtn; return; }
-    if (event.target.closest("button, a, input, select, textarea, label")) return;
+    // Anything interactive keeps its own meaning: the row opens the drawer only
+    // from a "dead" area. <summary> matters as much as <button>: the row menu
+    // is a <details> whose head is a summary, and the icon inside it is a plain
+    // element, so without it a click on ⋯ opened the detail drawer.
+    if (event.target.closest("button, a, input, select, textarea, label, summary, details")) return;
     var row = event.target.closest("tr[data-hash]");
     if (!row) return;
     var open = row.querySelector("button[hx-get*='/downloads/detail']");
@@ -1173,9 +1202,30 @@
     var open = document.querySelectorAll("details[data-v2-menu][open]");
     for (var i = 0; i < open.length; i++) if (open[i] !== except) open[i].open = false;
   }
+  // A menu opens downwards; near the bottom of the window it would be cut, so
+  // it flips above its button when there is more room there.
+  function flipMenuPanel(menu) {
+    var panel = menu.querySelector(".v2-menu-panel");
+    if (!panel) return;
+    panel.style.top = "";
+    panel.style.bottom = "";
+    var margin = 8;
+    var rect = panel.getBoundingClientRect();
+    if (rect.bottom <= window.innerHeight - margin) return;
+    if (menu.getBoundingClientRect().top < rect.height + margin) return;
+    panel.style.top = "auto";
+    panel.style.bottom = "calc(100% + 6px)";
+  }
   document.addEventListener("toggle", function (event) {
     var menu = event.target;
-    if (menu && menu.matches && menu.matches("details[data-v2-menu]") && menu.open) closeMenus(menu);
+    if (!menu || !menu.matches || !menu.matches("details[data-v2-menu]")) return;
+    if (menu.open) {
+      closeMenus(menu);
+      flipMenuPanel(menu);
+    } else {
+      var panel = menu.querySelector(".v2-menu-panel");
+      if (panel) { panel.style.top = ""; panel.style.bottom = ""; }
+    }
   }, true);
   document.addEventListener("click", function (event) {
     var menu = event.target.closest && event.target.closest("details[data-v2-menu]");
