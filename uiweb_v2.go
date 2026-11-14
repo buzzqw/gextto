@@ -373,6 +373,37 @@ func v2Render(w http.ResponseWriter, status int, name string, data any, s *AppSt
 	_, _ = w.Write(buffer.Bytes())
 }
 
+// v2RenderPlus writes a rendered fragment followed by extra markup: the
+// out-of-band swaps an answer carries beside its main swap.
+func v2RenderPlus(w http.ResponseWriter, status int, name string, data any, s *AppState, extra string) {
+	var buffer bytes.Buffer
+	if err := v2TemplatesFor(s).ExecuteTemplate(&buffer, name, data); err != nil {
+		logging.Error("v2 template render failed", "template", name, "error", err)
+		http.Error(w, "template error", http.StatusInternalServerError)
+		return
+	}
+	buffer.WriteString(extra)
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(status)
+	_, _ = w.Write(buffer.Bytes())
+}
+
+// v2NavDownloadsBadgeOOB renders the "Scarico" counter as an out-of-band
+// swap: a removal updates it at once instead of waiting for the next live
+// update (five seconds) or the next engine poll.
+func v2NavDownloadsBadgeOOB(s *AppState, gone v2Removals) string {
+	if gone.Empty() {
+		return ""
+	}
+	count := uiNavCountsAfterRemoval(s, latestConfig(s), gone)["downloads"]
+	var buffer bytes.Buffer
+	if err := v2TemplatesFor(s).ExecuteTemplate(&buffer, "v2_nav_downloads_count", uiNavItem{Count: count, OOB: true}); err != nil {
+		logging.Error("v2 template render failed", "template", "v2_nav_downloads_count", "error", err)
+		return ""
+	}
+	return buffer.String()
+}
+
 // v2PageLabel returns the navigation label for a view, falling back to the view
 // name itself for unknown views.
 func v2PageLabel(view string) string {
@@ -1538,7 +1569,77 @@ func v2FilterRows(rows []uiTorrentRow, filter string) []uiTorrentRow {
 }
 
 func v2TorrentsViewFrom(s *AppState, r *http.Request, message string, isErr bool) v2TorrentsView {
-	data := uiTorrentsDataFrom(s)
+	return v2TorrentsViewFromAfterRemoval(s, r, message, isErr, v2Removals{})
+}
+
+// v2Removals lists what a request has just deleted from the download list.
+// The engine, aMule and a running HTTP download can take a moment to drop an
+// item: the answer leaves it out, so the row does not come back for a tick and
+// the "Scarico" counter follows at once.
+type v2Removals struct {
+	Torrents map[string]struct{}
+	HTTP     map[string]struct{}
+	Ed2k     map[string]struct{}
+}
+
+func (r v2Removals) Empty() bool {
+	return len(r.Torrents) == 0 && len(r.HTTP) == 0 && len(r.Ed2k) == 0
+}
+
+// v2RemovedKeys builds the lookup set of the removed identifiers, lower-cased
+// like the hashes and ids the interface uses.
+func v2RemovedKeys(keys ...string) map[string]struct{} {
+	set := make(map[string]struct{}, len(keys))
+	for _, key := range keys {
+		if key = strings.ToLower(strings.TrimSpace(key)); key != "" {
+			set[key] = struct{}{}
+		}
+	}
+	return set
+}
+
+// dataWithoutRemoved drops the removed items from the snapshot the table is
+// about to render: what is derived from it (order, counter, state chips) is
+// then already right.
+func dataWithoutRemoved(data uiTorrentsData, gone v2Removals) uiTorrentsData {
+	if gone.Empty() {
+		return data
+	}
+	if len(gone.Torrents) > 0 {
+		rows := make([]uiTorrentRow, 0, len(data.Rows))
+		for _, row := range data.Rows {
+			if _, removed := gone.Torrents[strings.ToLower(strings.TrimSpace(row.Hash))]; !removed {
+				rows = append(rows, row)
+			}
+		}
+		data.Rows = rows
+		data.Count = len(rows)
+	}
+	if len(gone.HTTP) > 0 {
+		items := make([]ComicDownload, 0, len(data.HTTPDownloads))
+		for _, item := range data.HTTPDownloads {
+			if _, removed := gone.HTTP[strings.ToLower(strings.TrimSpace(item.ID))]; !removed {
+				items = append(items, item)
+			}
+		}
+		data.HTTPDownloads = items
+	}
+	if len(gone.Ed2k) > 0 {
+		items := make([]uiEd2kRow, 0, len(data.Ed2kDownloads))
+		for _, item := range data.Ed2kDownloads {
+			if _, removed := gone.Ed2k[strings.ToLower(strings.TrimSpace(item.Hash))]; !removed {
+				items = append(items, item)
+			}
+		}
+		data.Ed2kDownloads = items
+	}
+	return data
+}
+
+// v2TorrentsViewFromAfterRemoval renders the download list leaving out what
+// the request has just deleted.
+func v2TorrentsViewFromAfterRemoval(s *AppState, r *http.Request, message string, isErr bool, gone v2Removals) v2TorrentsView {
+	data := dataWithoutRemoved(uiTorrentsDataFrom(s), gone)
 
 	sortKey := strings.TrimSpace(r.FormValue("sort"))
 	dir := strings.TrimSpace(r.FormValue("dir"))
@@ -1636,23 +1737,36 @@ func v2TorrentsViewFrom(s *AppState, r *http.Request, message string, isErr bool
 func V2DownloadsTable(w http.ResponseWriter, r *http.Request, s *AppState) {
 	var message string
 	var isErr bool
+	gone := v2Removals{}
 	switch {
 	case r.FormValue("row_action") != "":
 		message, isErr = v2TorrentRowAction(s, r.FormValue("row_action"))
 	case r.FormValue("http_action") != "":
-		message, isErr = v2HTTPAction(r.FormValue("http_action"))
+		action := r.FormValue("http_action")
+		message, isErr = v2HTTPAction(action)
+		if kind, id, ok := strings.Cut(action, ":"); ok && kind == "remove" && !isErr {
+			gone.HTTP = v2RemovedKeys(id)
+		}
 	case r.FormValue("ed2k_action") != "":
-		message, isErr = v2Ed2kAction(latestConfig(s), r.FormValue("ed2k_action"))
+		action := r.FormValue("ed2k_action")
+		message, isErr = v2Ed2kAction(latestConfig(s), action)
+		if kind, hash, ok := strings.Cut(action, ":"); ok && kind == "remove" && !isErr {
+			gone.Ed2k = v2RemovedKeys(hash)
+		}
 	case r.FormValue("bulk") != "":
-		message, isErr = v2TorrentBulkAction(s, r, r.FormValue("bulk"))
+		var removed []string
+		message, isErr, removed = v2TorrentBulkAction(s, r, r.FormValue("bulk"))
+		if !isErr && len(removed) > 0 {
+			gone.Torrents = v2RemovedKeys(removed...)
+		}
 	}
 	if r.Header.Get("HX-Request") == "" {
 		http.Redirect(w, r, "/?view=downloads", http.StatusSeeOther)
 		return
 	}
-	view := v2TorrentsViewFrom(s, r, message, isErr)
+	view := v2TorrentsViewFromAfterRemoval(s, r, message, isErr, gone)
 	view.Partial = true
-	v2Render(w, http.StatusOK, "v2_torrents_wrap", view, s)
+	v2RenderPlus(w, http.StatusOK, "v2_torrents_wrap", view, s, v2NavDownloadsBadgeOOB(s, gone))
 }
 
 func v2TorrentRowAction(s *AppState, value string) (string, bool) {
@@ -1728,10 +1842,10 @@ func v2Ed2kAction(cfg *Config, value string) (string, bool) {
 	return "download eD2k rimosso", false
 }
 
-func v2TorrentBulkAction(s *AppState, r *http.Request, action string) (string, bool) {
+func v2TorrentBulkAction(s *AppState, r *http.Request, action string) (string, bool, []string) {
 	hashes := r.Form["hash"]
 	if len(hashes) == 0 {
-		return "nessun torrent selezionato", true
+		return "nessun torrent selezionato", true, nil
 	}
 	// The tag menu sends "tag:<name>" ("tag:__new__" for the new-tag field);
 	// plain "tag" with a separate "tag" field is still accepted.
@@ -1745,13 +1859,27 @@ func v2TorrentBulkAction(s *AppState, r *http.Request, action string) (string, b
 	if action == "tag" && tag == "__new__" {
 		tag = strings.TrimSpace(r.FormValue("new_tag"))
 		if tag == "" {
-			return "scrivi il nome del nuovo tag", true
+			return "scrivi il nome del nuovo tag", true, nil
 		}
 		catalogBody, _ := json.Marshal(map[string]string{"tag": tag})
 		v2InternalJSON(s, http.MethodPost, "/api/download-tags", nil, catalogBody)
 	}
 	engine := s.activeEngine()
 	done := 0
+	removed := make([]string, 0, len(hashes))
+	// The names are read before the removal: the engine stops listing the
+	// torrent at once, and the one line that reports the whole batch needs them.
+	type removalInfo struct {
+		name, state string
+		hasMetadata bool
+	}
+	names := make(map[string]removalInfo, len(hashes))
+	if action == "remove" {
+		for _, hash := range hashes {
+			name, state, hasMetadata := manualTorrentRemovalInfo(s, hash)
+			names[strings.ToLower(strings.TrimSpace(hash))] = removalInfo{name: name, state: state, hasMetadata: hasMetadata}
+		}
+	}
 	for _, hash := range hashes {
 		switch action {
 		case "pause":
@@ -1767,8 +1895,13 @@ func v2TorrentBulkAction(s *AppState, r *http.Request, action string) (string, b
 				done++
 			}
 		case "remove":
-			if removed, err := engine.Remove(hash, false); err == nil && removed {
+			// The same path as the trash dialog: it marks the download as
+			// removed and keeps the files. The log line is written below, once
+			// for the whole selection.
+			key := strings.ToLower(strings.TrimSpace(hash))
+			if ok, err := safeRemoveTorrent(s, latestConfig(s), hash, false, false); err == nil && ok {
 				done++
+				removed = append(removed, key)
 			}
 		case "unpin":
 			if raw, status := v2InternalJSON(s, http.MethodPost, "/api/torrents/unpin", nil, []byte(`{}`)); status < 400 && raw != nil {
@@ -1784,7 +1917,20 @@ func v2TorrentBulkAction(s *AppState, r *http.Request, action string) (string, b
 			}
 		}
 	}
-	return fmt.Sprintf("%s: %d/%d torrent", action, done, len(hashes)), false
+	if action == "remove" && len(removed) > 0 {
+		if len(removed) == 1 {
+			info := names[removed[0]]
+			logManualTorrentRemoval(removed[0], "its files are kept", info.name, info.state, info.hasMetadata)
+		} else {
+			labels := make([]string, 0, len(removed))
+			for _, hash := range removed {
+				labels = append(labels, names[hash].name)
+			}
+			logging.Info(fmt.Sprintf("🗑️ You removed %s from the download list; their files are kept (%s)",
+				countLabel(len(removed), "torrent", "torrents"), strings.Join(labels, ", ")))
+		}
+	}
+	return fmt.Sprintf("%s: %d/%d torrent", action, done, len(hashes)), false, removed
 }
 
 type v2DetailTab struct {
@@ -2564,6 +2710,12 @@ func V2DownloadsRemove(w http.ResponseWriter, r *http.Request, s *AppState) {
 	var err error
 	message := "torrent rimosso"
 	isErr := false
+	// Read before the archive: the engine stops listing the torrent at once.
+	var removalName, removalState string
+	var removalHasMetadata bool
+	if mode == "archive" {
+		removalName, removalState, removalHasMetadata = manualTorrentRemovalInfo(s, hash)
+	}
 
 	if mode == "archive" {
 		removed, err = ArchiveAndRemoveTorrent(s, cfg, hash)
@@ -2583,9 +2735,18 @@ func V2DownloadsRemove(w http.ResponseWriter, r *http.Request, s *AppState) {
 			message, isErr = "rimozione non riuscita", true
 		}
 	}
+	// The archive path removes the torrent without the line of its own: here it
+	// is still the user taking it off the list.
+	if mode == "archive" && removed && err == nil {
+		logManualTorrentRemoval(hash, "it was archived", removalName, removalState, removalHasMetadata)
+	}
 
 	var buffer bytes.Buffer
-	view := v2TorrentsViewFrom(s, r, message, isErr)
+	gone := v2Removals{}
+	if removed && err == nil {
+		gone.Torrents = v2RemovedKeys(hash)
+	}
+	view := v2TorrentsViewFromAfterRemoval(s, r, message, isErr, gone)
 	view.Partial = true
 	if err := v2TemplatesFor(s).ExecuteTemplate(&buffer, "v2_torrents_wrap", view); err != nil {
 		http.Error(w, "template error", http.StatusInternalServerError)
@@ -2593,6 +2754,7 @@ func V2DownloadsRemove(w http.ResponseWriter, r *http.Request, s *AppState) {
 	}
 	body := buffer.String()
 	body += `<div id="v2-modal" hx-swap-oob="true"></div>`
+	body += v2NavDownloadsBadgeOOB(s, gone)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte(body))

@@ -752,7 +752,11 @@ dicono quanto il motore ha scaricato e inviato da quando è partito.
 **Rimuovi** toglie il torrent dalla sessione e può chiedere se cancellare anche
 i dati. Togliere un torrent dalla sessione **non** toglie il file dalla
 libreria. Un torrent con seed infinito non viene mai tolto da *Pulisci
-completati*.
+completati*. Ogni rimozione — una riga con 🗑️ e le sue opzioni, oppure
+**Rimuovi dalla sessione** su più righe — lascia nel log una riga che dice cosa
+è successo ai file (mantenuti, nel cestino, eliminati, archiviati), e la lista e
+il contatore accanto a **Scarico** si aggiornano subito, senza aspettare
+l'aggiornamento automatico.
 
 ### Il dettaglio di un torrent
 

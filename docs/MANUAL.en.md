@@ -737,7 +737,10 @@ the engine downloaded and uploaded since it started.
 **Remove** takes the torrent out of the session and can ask whether to delete
 the data too. Removing a torrent from the session does **not** remove the file
 from the library. A torrent with infinite seeding is never removed by *Clean
-completed*.
+completed*. Every removal — one row with 🗑️ and its options, or **Remove from
+session** on several rows — leaves a line in the log saying what happened to the
+files (kept, moved to the trash, deleted, archived), and the list and the counter
+next to **Downloads** update at once, without waiting for the automatic refresh.
 
 ### A torrent's details
 

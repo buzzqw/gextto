@@ -215,10 +215,19 @@ func Ed2kDownloadAction(cfg *Config, action, hash string) error {
 				if download.Hash != hash {
 					continue
 				}
+				name := strings.TrimSpace(download.Name)
 				if download.Complete() {
-					return client.ClearCompleted(ctx)
+					err := client.ClearCompleted(ctx)
+					if err == nil {
+						logEd2kDownloadRemoval(name, "the file stays in aMule's incoming folder")
+					}
+					return err
 				}
-				return client.Delete(ctx, hash)
+				err := client.Delete(ctx, hash)
+				if err == nil {
+					logEd2kDownloadRemoval(name, "the partial file was deleted")
+				}
+				return err
 			}
 			// Not in the queue any more (aMule 3.x drops finished files at
 			// once): nothing to remove.
@@ -226,6 +235,15 @@ func Ed2kDownloadAction(cfg *Config, action, hash string) error {
 		}
 		return errors.New("unknown eD2k action")
 	})
+}
+
+// logEd2kDownloadRemoval writes the line for an eD2k file the user took off
+// the list, saying what happened to its file.
+func logEd2kDownloadRemoval(name, files string) {
+	if name == "" {
+		return
+	}
+	logging.Info(fmt.Sprintf("🗑️ You removed «%s» from the download list; %s", name, files))
 }
 
 // ed2kDownloadState maps aMule's file status to the states the UI uses.

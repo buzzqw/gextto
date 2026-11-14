@@ -45,6 +45,9 @@ type uiNavItem struct {
 	// External marks a link that leaves Gextto (the online manual and the
 	// changelog): the template opens it in a new tab.
 	External bool
+	// OOB marks the counter rendered alone, as an out-of-band swap that
+	// updates the sidebar without reloading the page.
+	OOB bool
 }
 
 type uiNavGroup struct {

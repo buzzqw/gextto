@@ -841,9 +841,18 @@ func ResumeHTTPDownload(id string) bool {
 // deletes the partial `.part` file and the finished file. MEGA downloads (which
 // have no control) are only removed from the list.
 func CancelHTTPDownload(id string, deleteFiles bool) bool {
+	// The title is read before the removal: the list no longer has it after.
+	title, status := "", ""
+	httpDownloadsMu.Lock()
+	if download, ok := httpDownloadsStore[id]; ok {
+		title = strings.TrimSpace(download.Title)
+		status = download.Status
+	}
+	httpDownloadsMu.Unlock()
 	control := httpControlByID(id)
 	if control == nil {
 		removeHTTPDownload(id)
+		logHTTPDownloadRemoval(title, status, deleteFiles)
 		return true
 	}
 	control.deleteOnCancel.Store(deleteFiles)
@@ -852,7 +861,24 @@ func CancelHTTPDownload(id string, deleteFiles bool) bool {
 	if !control.running.Load() {
 		finalizeCancelled(id, control)
 	}
+	logHTTPDownloadRemoval(title, status, deleteFiles)
 	return true
+}
+
+// logHTTPDownloadRemoval writes the line for a download the user took off the
+// list, saying what happened to its files.
+func logHTTPDownloadRemoval(title, status string, deleteFiles bool) {
+	if title == "" {
+		return
+	}
+	files := "its files are kept"
+	switch {
+	case deleteFiles:
+		files = "its files were deleted"
+	case status == "completed":
+		files = "the downloaded file is kept"
+	}
+	logging.Info(fmt.Sprintf("🗑️ You removed «%s» from the download list; %s", title, files))
 }
 
 func finalizeCancelled(id string, control *httpControl) {

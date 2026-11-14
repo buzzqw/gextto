@@ -1,6 +1,7 @@
 package gextto
 
 import (
+	"bytes"
 	"context"
 	"net"
 	"net/http"
@@ -14,6 +15,7 @@ import (
 	"time"
 
 	"github.com/buzzqw/gextto/internal/amule/amuletest"
+	"github.com/buzzqw/gextto/internal/logging"
 	"github.com/buzzqw/gextto/internal/models"
 )
 
@@ -446,11 +448,20 @@ func TestEd2kLinkAddAndDownloadActions(t *testing.T) {
 	if rows = uiEd2kRows(Ed2kDownloads(cfg)); !rows[0].Paused {
 		t.Fatalf("not paused: %+v", rows[0])
 	}
+	var captured bytes.Buffer
+	logging.SetOutput(&captured)
 	if err := Ed2kDownloadAction(cfg, "remove", rows[0].Hash); err != nil {
+		logging.SetOutput(os.Stdout)
 		t.Fatalf("remove: %v", err)
 	}
+	logging.SetOutput(os.Stdout)
 	if len(core.Downloads()) != 0 {
 		t.Fatalf("queue after remove = %+v", core.Downloads())
+	}
+	out := captured.String()
+	if !strings.Contains(out, "You removed «Rare Show S02E03.mkv» from the download list") ||
+		!strings.Contains(out, "the partial file was deleted") {
+		t.Fatalf("the removal is not logged:\n%s", out)
 	}
 }
 

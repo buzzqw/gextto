@@ -163,8 +163,15 @@ func TestCancellingADownloadRemovesItAndDeletesFilesWhenAsked(t *testing.T) {
 	control.destination = &destination
 	control.temporary = &temporary
 	control.pathsMu.Unlock()
-	if !CancelHTTPDownload(id, true) {
+	var captured bytes.Buffer
+	logging.SetOutput(&captured)
+	ok := CancelHTTPDownload(id, true)
+	logging.SetOutput(os.Stdout)
+	if !ok {
 		t.Fatal("cancel should return true")
+	}
+	if out := captured.String(); !strings.Contains(out, "You removed «Cancel Comic» from the download list; its files were deleted") {
+		t.Fatalf("the removal is not logged:\n%s", out)
 	}
 	for _, item := range HTTPDownloads() {
 		if item.ID == id {

@@ -265,21 +265,37 @@ func uiShellChromeFrom(s *AppState) uiShellChrome {
 // uiNavCounts computes the badges shown next to the sidebar entries, matching
 // SidebarCount of the classic UI.
 func uiNavCounts(s *AppState, cfg *Config) map[string]string {
+	return uiNavCountsAfterRemoval(s, cfg, v2Removals{})
+}
+
+// uiNavCountsAfterRemoval is uiNavCounts with the downloads a request has just
+// deleted left out: the engine, aMule and an HTTP download can report them for
+// a moment still, and the counter must not keep counting them.
+func uiNavCountsAfterRemoval(s *AppState, cfg *Config, gone v2Removals) map[string]string {
 	active := 0
 	total := 0
 	for _, download := range HTTPDownloads() {
+		if _, removed := gone.HTTP[strings.ToLower(strings.TrimSpace(download.ID))]; removed {
+			continue
+		}
 		total++
 		if download.Status == "downloading" {
 			active++
 		}
 	}
 	for _, view := range SessionSnapshot(s.activeEngine()) {
+		if _, removed := gone.Torrents[strings.ToLower(strings.TrimSpace(view.Hash))]; removed {
+			continue
+		}
 		total++
 		if view.Progress < 100 {
 			active++
 		}
 	}
 	for _, download := range Ed2kDownloads(cfg) {
+		if _, removed := gone.Ed2k[strings.ToLower(strings.TrimSpace(download.Hash))]; removed {
+			continue
+		}
 		total++
 		if !download.Complete() {
 			active++

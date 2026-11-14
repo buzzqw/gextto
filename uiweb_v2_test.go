@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/buzzqw/gextto/internal/bwschedule"
+	"github.com/buzzqw/gextto/internal/logging"
 	"github.com/buzzqw/gextto/internal/models"
 )
 
@@ -711,6 +712,135 @@ func TestV2DownloadsSortCoversEveryKind(t *testing.T) {
 	v2SortDownloadEntries(entries, "progress", "asc")
 	if got := firstEntryName(entries); got != "Bravo.Torrent" {
 		t.Fatalf("least advanced = %q", got)
+	}
+}
+
+// A removal must not wait for the engine, aMule or a running HTTP download to
+// drop the item: the answer leaves it out, so the row cannot come back for a
+// tick and the list stays as the user left it.
+func TestDownloadsViewDropsJustRemovedItems(t *testing.T) {
+	data := uiTorrentsData{
+		Rows:          []uiTorrentRow{{Hash: "aa", Name: "Series A S01E01"}, {Hash: "bb", Name: "Series B S01E01"}},
+		HTTPDownloads: []ComicDownload{{ID: "comic-11", Title: "Comic A"}, {ID: "comic-22", Title: "Comic B"}},
+		Ed2kDownloads: []uiEd2kRow{{Hash: "ee", Name: "eD2k A"}, {Hash: "ff", Name: "eD2k B"}},
+		Count:         2,
+	}
+	gone := v2Removals{
+		Torrents: v2RemovedKeys("AA"),
+		HTTP:     v2RemovedKeys("comic-11"),
+		Ed2k:     v2RemovedKeys("ee"),
+	}
+	got := dataWithoutRemoved(data, gone)
+	if len(got.Rows) != 1 || got.Rows[0].Hash != "bb" || got.Count != 1 {
+		t.Fatalf("torrents = %+v, count = %d: the removed one is still there", got.Rows, got.Count)
+	}
+	if len(got.HTTPDownloads) != 1 || got.HTTPDownloads[0].ID != "comic-22" {
+		t.Fatalf("HTTP downloads = %+v: the removed one is still there", got.HTTPDownloads)
+	}
+	if len(got.Ed2kDownloads) != 1 || got.Ed2kDownloads[0].Hash != "ff" {
+		t.Fatalf("eD2k downloads = %+v: the removed one is still there", got.Ed2kDownloads)
+	}
+	// Nothing removed: the snapshot is handed over untouched.
+	same := dataWithoutRemoved(data, v2Removals{})
+	if len(same.Rows) != 2 || same.Count != 2 || len(same.HTTPDownloads) != 2 || len(same.Ed2kDownloads) != 2 {
+		t.Fatalf("an empty removal changed the list: %+v", same)
+	}
+}
+
+// The "Scarico" counter follows a removal at once, even while the engine still
+// lists the torrent for one tick.
+func TestNavCountsSkipTheDownloadsJustRemoved(t *testing.T) {
+	engine := &mockTorrentEngine{torrents: []models.TorrentView{
+		{Hash: "aa", Progress: 40},
+		{Hash: "bb", Progress: 100},
+	}}
+	state := &AppState{torrent_engine: engine}
+	cfg := DefaultConfig()
+	before := uiNavCounts(state, &cfg)["downloads"]
+	after := uiNavCountsAfterRemoval(state, &cfg, v2Removals{Torrents: v2RemovedKeys("aa")})["downloads"]
+	beforeActive, beforeTotal := splitNavCount(t, before)
+	afterActive, afterTotal := splitNavCount(t, after)
+	if afterTotal != beforeTotal-1 || afterActive != beforeActive-1 {
+		t.Fatalf("counters %q -> %q: the removed download is still counted", before, after)
+	}
+}
+
+func splitNavCount(t *testing.T, value string) (active, total int) {
+	t.Helper()
+	parts := strings.SplitN(value, "/", 2)
+	if len(parts) != 2 {
+		t.Fatalf("counter = %q, want active/total", value)
+	}
+	active, err := strconv.Atoi(parts[0])
+	if err != nil {
+		t.Fatalf("counter = %q: %v", value, err)
+	}
+	total, err = strconv.Atoi(parts[1])
+	if err != nil {
+		t.Fatalf("counter = %q: %v", value, err)
+	}
+	return active, total
+}
+
+// Removing torrents in bulk writes one line for the whole selection, not one
+// line per torrent, and it goes through the same path as the trash dialog.
+func TestBulkRemoveTorrentsIsLogged(t *testing.T) {
+	var captured bytes.Buffer
+	logging.SetOutput(&captured)
+	defer logging.SetOutput(os.Stdout)
+
+	engine := &mockTorrentEngine{torrents: []models.TorrentView{
+		{Hash: "aa", Name: "Series A S01E01", State: "downloading"},
+		{Hash: "bb", Name: "Series B S01E01", State: "downloading"},
+	}}
+	cfg := DefaultConfig()
+	state := &AppState{torrent_engine: engine, cfg: &cfg}
+
+	form := url.Values{}
+	form.Add("hash", "aa")
+	form.Add("hash", "bb")
+	request := httptest.NewRequest(http.MethodPost, "/downloads/table", strings.NewReader(form.Encode()))
+	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	if err := request.ParseForm(); err != nil {
+		t.Fatal(err)
+	}
+
+	message, isErr, removed := v2TorrentBulkAction(state, request, "remove")
+	if isErr || len(removed) != 2 {
+		t.Fatalf("bulk remove: %q err=%v removed=%v", message, isErr, removed)
+	}
+	if len(engine.removed) != 2 {
+		t.Fatalf("engine removed %v, want both torrents", engine.removed)
+	}
+	out := captured.String()
+	if strings.Count(out, "from the download list") != 1 {
+		t.Fatalf("want one line for the whole batch:\n%s", out)
+	}
+	for _, want := range []string{"2 torrents", "Series A S01E01", "Series B S01E01"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("the line must carry %q:\n%s", want, out)
+		}
+	}
+}
+
+// The sidebar counter is swapped out of band with the answer, so the number
+// next to "Scarico" is already right while the engine still reports the torrent.
+func TestDownloadsBadgeIsSwappedOutOfBand(t *testing.T) {
+	engine := &mockTorrentEngine{torrents: []models.TorrentView{
+		{Hash: "aa", Progress: 40},
+		{Hash: "bb", Progress: 100},
+	}}
+	cfg := DefaultConfig()
+	state := &AppState{torrent_engine: engine, cfg: &cfg}
+	badge := v2NavDownloadsBadgeOOB(state, v2Removals{Torrents: v2RemovedKeys("aa")})
+	want := uiNavCountsAfterRemoval(state, &cfg, v2Removals{Torrents: v2RemovedKeys("aa")})["downloads"]
+	for _, fragment := range []string{`id="v2-nav-downloads-count"`, `class="nav-count"`, `hx-swap-oob="true"`, ">" + want + "<"} {
+		if !strings.Contains(badge, fragment) {
+			t.Fatalf("badge misses %q:\n%s", fragment, badge)
+		}
+	}
+	if got := v2NavDownloadsBadgeOOB(state, v2Removals{}); got != "" {
+		t.Fatalf("nothing removed, nothing to swap: %q", got)
 	}
 }
 

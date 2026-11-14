@@ -100,6 +100,12 @@ func logAutomaticTorrentRemoval(hash, name, state string) {
 //     to the trash directory instead of being permanently unlinked.
 //  3. Engine removal is properly recorded in the database.
 func SafeRemoveTorrent(s *AppState, cfg *Config, hash string, requestedDeleteFiles bool) (bool, error) {
+	return safeRemoveTorrent(s, cfg, hash, requestedDeleteFiles, true)
+}
+
+// safeRemoveTorrent is SafeRemoveTorrent; log says whether to write the
+// per-torrent line, so a bulk removal can write one line for all of them.
+func safeRemoveTorrent(s *AppState, cfg *Config, hash string, requestedDeleteFiles, log bool) (bool, error) {
 	if s == nil || !s.hasTorrentEngine() {
 		return false, fmt.Errorf("torrent engine not available")
 	}
@@ -161,11 +167,21 @@ func SafeRemoveTorrent(s *AppState, cfg *Config, hash string, requestedDeleteFil
 		case deleteFiles:
 			files = "its files were deleted"
 		}
-		logManualTorrentRemoval(hash, files, removalName, removalState, removalHasMetadata)
+		if log {
+			logManualTorrentRemoval(hash, files, removalName, removalState, removalHasMetadata)
+		}
 		if s.db != nil {
 			_ = s.db.MarkTorrentRemoved(hash)
 			_ = s.db.ForgetRemovedTorrent(hash)
 		}
+	} else {
+		// A removal the user asked for that did not go through is worth a
+		// line, whatever the caller does with the answer.
+		reason := "the torrent engine refused"
+		if err != nil {
+			reason = err.Error()
+		}
+		logging.Warn(fmt.Sprintf("❌ Could not remove «%s» from the download list: %s", removalName, reason), "hash", hash)
 	}
 	return removed, err
 }

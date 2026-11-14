@@ -1,10 +1,14 @@
 package gextto
 
 import (
+	"bytes"
+	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
+	"github.com/buzzqw/gextto/internal/logging"
 	"github.com/buzzqw/gextto/internal/models"
 )
 
@@ -13,6 +17,13 @@ type mockTorrentEngine struct {
 	torrents []models.TorrentView
 	removed  map[string]bool
 	paused   map[string]bool
+}
+
+// failingRemoveEngine refuses every removal, for the error path.
+type failingRemoveEngine struct{ mockTorrentEngine }
+
+func (f *failingRemoveEngine) Remove(hash string, deleteFiles bool) (bool, error) {
+	return false, errors.New("the engine is busy")
 }
 
 func (m *mockTorrentEngine) List() []models.TorrentView {
@@ -33,6 +44,28 @@ func (m *mockTorrentEngine) Pause(hash string) (bool, error) {
 	}
 	m.paused[hash] = true
 	return true, nil
+}
+
+// A removal the engine refuses says so in the log: the interface shows a short
+// notice, the reason has to stay somewhere.
+func TestFailedRemovalIsLogged(t *testing.T) {
+	var captured bytes.Buffer
+	logging.SetOutput(&captured)
+	defer logging.SetOutput(os.Stdout)
+
+	engine := &failingRemoveEngine{mockTorrentEngine{torrents: []models.TorrentView{
+		{Hash: "aa", Name: "Series A S01E01", State: "downloading"},
+	}}}
+	state := &AppState{torrent_engine: engine}
+	cfg := DefaultConfig()
+	removed, err := SafeRemoveTorrent(state, &cfg, "aa", false)
+	if removed || err == nil {
+		t.Fatalf("removed = %v, err = %v: the engine refused", removed, err)
+	}
+	out := captured.String()
+	if !strings.Contains(out, "Could not remove «Series A S01E01» from the download list") || !strings.Contains(out, "the engine is busy") {
+		t.Fatalf("the failed removal is not logged:\n%s", out)
+	}
 }
 
 func TestSafeRemoveTorrentMovesToTrash(t *testing.T) {
