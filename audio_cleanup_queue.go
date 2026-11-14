@@ -277,8 +277,8 @@ func audioCleanupProcess(job audioCleanupJob, cfg *Config, db *Database) {
 	switch {
 	case err != nil:
 		if errors.Is(err, errAudioCleanupWouldDiffer) {
-			logging.Info(fmt.Sprintf("🎧 «%s»: the audio cleanup would change the file, so it was left as it is",
-				filepath.Base(job.Path)), "path", job.Path, "error", err)
+			logging.Info(fmt.Sprintf("🎧 «%s»: the audio cleanup would change the file%s, so it was left as it is",
+				filepath.Base(job.Path), audioCleanupRefusedNote(err)), "path", job.Path)
 			return
 		}
 		logging.Warn(fmt.Sprintf("🎧 «%s»: audio cleanup failed, the file was left untouched: %v",

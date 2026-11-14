@@ -445,8 +445,8 @@ func runLibraryAudioCleanupFile(ctx context.Context, state *AppState, candidate 
 			// Every tool produced a copy the checks refused: this file cannot be
 			// cleaned without changing it, so it is remembered as such and the
 			// next nights leave it alone (a new size or date probes it again).
-			logging.Info(fmt.Sprintf("🎧 «%s»: the audio cleanup would change the file, so it stays as it is and will not be tried again",
-				filepath.Base(candidate.Path)), "path", candidate.Path, "error", err)
+			logging.Info(fmt.Sprintf("🎧 «%s»: the audio cleanup would change the file%s, so it stays as it is and will not be tried again",
+				filepath.Base(candidate.Path), audioCleanupRefusedNote(err)), "path", candidate.Path)
 			return "unsupported: " + err.Error(), report
 		}
 		logging.Warn(fmt.Sprintf("🎧 «%s»: audio cleanup failed, the file was left untouched",

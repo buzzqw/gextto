@@ -431,6 +431,7 @@ func RunAudioCleanup(ctx context.Context, path string, opts AudioCleanupOptions)
 	}
 	temporary := ""
 	failures := make([]string, 0, len(backends))
+	refusals := make([]string, 0, len(backends))
 	// The copy was refused by a check, not by a tool that broke: when every
 	// tool ends that way the file cannot be cleaned, now or later.
 	wouldDiffer := true
@@ -448,6 +449,8 @@ func RunAudioCleanup(ctx context.Context, path string, opts AudioCleanupOptions)
 		}
 		if !errors.Is(attemptErr, errAudioCleanupWouldDiffer) {
 			wouldDiffer = false
+		} else {
+			refusals = append(refusals, audioCleanupRefusal(attemptErr))
 		}
 		failures = append(failures, fmt.Sprintf("%s: %v", backend, attemptErr))
 		if attempt+1 < len(backends) {
@@ -456,8 +459,10 @@ func RunAudioCleanup(ctx context.Context, path string, opts AudioCleanupOptions)
 		}
 	}
 	if temporary == "" {
+		logging.Debug("the audio cleanup produced no copy that could replace the file", "path", path,
+			"attempts", strings.Join(failures, "; "))
 		if wouldDiffer {
-			return report, fmt.Errorf("%w: %s", errAudioCleanupWouldDiffer, strings.Join(failures, "; "))
+			return report, audioCleanupRefusedCopy(refusals)
 		}
 		return report, errors.New(strings.Join(failures, "; "))
 	}
@@ -515,9 +520,17 @@ func audioCleanupAttempt(ctx context.Context, backend, source, temporary string,
 		return fmt.Errorf("cannot analyse the remuxed file: %w", err)
 	}
 	if err := verifyAudioCleanupOutput(media, output, plan, opts, isMatroskaPath(temporary)); err != nil {
-		return fmt.Errorf("%w: %v", errAudioCleanupWouldDiffer, err)
+		return &audioCleanupDiffError{reason: err.Error()}
 	}
 	if err := verifyAudioCleanupPackets(ctx, source, temporary, media, output, plan, isMatroskaPath(temporary)); err != nil {
+		if errors.Is(err, errAudioCleanupWouldDiffer) {
+			// Which stream, which packet: a person cannot act on the detail, so
+			// it goes to DEBUG and the log line says only that the copy is not
+			// the original minus the removed tracks.
+			logging.Debug("the remuxed copy differs from the source packet by packet",
+				"path", source, "tool", backend, "error", err.Error())
+			return &audioCleanupDiffError{}
+		}
 		return err
 	}
 	return nil
@@ -529,6 +542,59 @@ func audioCleanupAttempt(ctx context.Context, backend, source, temporary string,
 // permanent outcome, not a failure to retry — so the library remembers it and
 // stops probing the file unless it changes.
 var errAudioCleanupWouldDiffer = errors.New("the cleaned copy would not be identical to the source")
+
+// audioCleanupDiffError says why the copy was refused. Error is one sentence a
+// person can follow ("the cleaned copy would be 10 seconds shorter"): the callers put
+// it in their own sentence, so the general "would not be identical" is not
+// repeated. reason is empty when the difference has no short explanation.
+type audioCleanupDiffError struct {
+	reason string
+}
+
+func (e *audioCleanupDiffError) Error() string {
+	if e.reason != "" {
+		return e.reason
+	}
+	return errAudioCleanupWouldDiffer.Error()
+}
+
+// Unwrap keeps errors.Is(err, errAudioCleanupWouldDiffer) working.
+func (e *audioCleanupDiffError) Unwrap() error { return errAudioCleanupWouldDiffer }
+
+// audioCleanupRefusal returns the reason of a copy the checks refused, or "".
+func audioCleanupRefusal(err error) string {
+	var diff *audioCleanupDiffError
+	if errors.As(err, &diff) {
+		return diff.reason
+	}
+	return ""
+}
+
+// audioCleanupRefusedNote is the parenthesis a log line puts after "would
+// change the file", or "" when the difference has no explanation worth
+// reading.
+func audioCleanupRefusedNote(err error) string {
+	if reason := audioCleanupRefusal(err); reason != "" {
+		return " (" + reason + ")"
+	}
+	return ""
+}
+
+// audioCleanupRefusedCopy builds the error for a file no tool could clean
+// without changing it. The parenthesis appears only when every tool refused
+// for the same reason and that reason is readable by a person.
+func audioCleanupRefusedCopy(reasons []string) error {
+	unique := make([]string, 0, len(reasons))
+	for _, reason := range reasons {
+		if !slices.Contains(unique, reason) {
+			unique = append(unique, reason)
+		}
+	}
+	if len(unique) == 1 && unique[0] != "" {
+		return &audioCleanupDiffError{reason: unique[0]}
+	}
+	return &audioCleanupDiffError{}
+}
 
 // audioCleanupBackends lists the tools to try, in order. For Matroska
 // mkvmerge comes first and ffmpeg is the second chance: mkvmerge rewrites some
@@ -923,9 +989,12 @@ func verifyAudioCleanupOutput(source, output MediaInfo, plan AudioCleanupPlan, o
 		return fmt.Errorf("audio track %d is still not tagged %q", track.Index, opts.Language)
 	}
 	if source.RuntimeSeconds > 0 && output.RuntimeSeconds > 0 {
-		delta := math.Abs(float64(source.RuntimeSeconds - output.RuntimeSeconds))
-		if delta > audioCleanupDurationTolerance {
-			return fmt.Errorf("the duration changed by %.0f seconds", delta)
+		delta := output.RuntimeSeconds - source.RuntimeSeconds
+		if math.Abs(float64(delta)) > audioCleanupDurationTolerance {
+			if delta > 0 {
+				return fmt.Errorf("the cleaned copy would be %d seconds longer", delta)
+			}
+			return fmt.Errorf("the cleaned copy would be %d seconds shorter", -delta)
 		}
 	}
 

@@ -363,7 +363,7 @@ func TestAudioLibraryNeedsCheck(t *testing.T) {
 	}
 	// Every tool produced a copy the checks refused: the same file would fail
 	// the same way, so it waits for a new size or date instead of a timer.
-	record.Outcome = "unsupported: the cleaned copy would not be identical to the source"
+	record.Outcome = "unsupported: the copy would be 10 seconds shorter"
 	if audioLibraryNeedsCheck(record, true, 10, 20, now.Add(365*24*time.Hour)) {
 		t.Fatal("a file that cannot be cleaned is probed again")
 	}

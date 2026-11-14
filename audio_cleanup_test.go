@@ -3,6 +3,7 @@ package gextto
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -641,6 +642,57 @@ func TestAudioCleanupUpdatesArchivedSize(t *testing.T) {
 	}
 	if size != 3_000 {
 		t.Fatalf("archived size = %d, want 3000", size)
+	}
+}
+
+// The log line for a copy the checks refused says why, once: the reason, not
+// the general sentence over and over for every tool.
+func TestAudioCleanupRefusedCopyExplainsOnce(t *testing.T) {
+	refused := audioCleanupRefusedCopy([]string{"the copy would be 10 seconds shorter"})
+	if !errors.Is(refused, errAudioCleanupWouldDiffer) {
+		t.Fatal("a refused copy is no longer recognised as a permanent outcome")
+	}
+	if got := refused.Error(); got != "the copy would be 10 seconds shorter" {
+		t.Fatalf("error = %q: the reason alone is the sentence", got)
+	}
+	if got := audioCleanupRefusedNote(refused); got != " (the copy would be 10 seconds shorter)" {
+		t.Fatalf("note = %q: the log line must say why", got)
+	}
+	if strings.Contains(audioCleanupRefusedNote(refused), errAudioCleanupWouldDiffer.Error()) {
+		t.Fatal("the general sentence is repeated inside the reason")
+	}
+	if got := audioCleanupRefusal(fmt.Errorf("wrapped: %w", refused)); got != "the copy would be 10 seconds shorter" {
+		t.Fatalf("refusal = %q: the reason must be read back from the error", got)
+	}
+	// Tools that refused for different reasons keep a sentence that is always
+	// true, with no parenthesis to read, instead of listing every check.
+	different := audioCleanupRefusedCopy([]string{"the copy would be 10 seconds shorter", "video stream 1 changed codec from h264 to hevc"})
+	if !errors.Is(different, errAudioCleanupWouldDiffer) {
+		t.Fatal("a copy refused for different reasons is no longer permanent")
+	}
+	if got := different.Error(); got != errAudioCleanupWouldDiffer.Error() {
+		t.Fatalf("two different reasons = %q, want the general sentence", got)
+	}
+	if got := audioCleanupRefusedNote(different); got != "" {
+		t.Fatalf("note = %q: nothing readable to put in the parenthesis", got)
+	}
+	// The same reason from both tools is still one reason.
+	same := audioCleanupRefusedCopy([]string{"the copy would be 10 seconds shorter", "the copy would be 10 seconds shorter"})
+	if got := audioCleanupRefusedNote(same); got != " (the copy would be 10 seconds shorter)" {
+		t.Fatalf("note = %q: the same reason from every tool is kept", got)
+	}
+	// One readable reason and one that has none: the sentence stays general.
+	mixed := audioCleanupRefusedCopy([]string{"the copy would be 10 seconds shorter", ""})
+	if got := audioCleanupRefusedNote(mixed); got != "" {
+		t.Fatalf("note = %q: not every tool refused for the same readable reason", got)
+	}
+	// A packet-level difference has no short explanation for a person.
+	packets := audioCleanupRefusedCopy(nil)
+	if got := audioCleanupRefusedNote(packets); got != "" {
+		t.Fatalf("note = %q: a packet difference must not spell out the packets", got)
+	}
+	if audioCleanupRefusal(errors.New("a tool broke")) != "" {
+		t.Fatal("a plain failure carries a refusal reason")
 	}
 }
 
