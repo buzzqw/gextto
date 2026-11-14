@@ -265,7 +265,7 @@
 {{end}}
 
 {{define "v2_media_integrity_panel"}}
-<div class="panel" id="v2-media-integrity-panel"{{if .Running}} hx-get="/settings/media-integrity" hx-trigger="every 4s" hx-swap="outerHTML" aria-busy="true"{{end}}>
+<div class="panel" id="v2-media-integrity-panel"{{if .Running}} data-v2-poll hx-get="/settings/media-integrity" hx-trigger="every 4s [window.gexttoCanPoll()], v2wake" hx-swap="outerHTML" aria-busy="true"{{end}}>
   <div class="panel-head"><h3>{{tr "Stato del controllo"}}</h3></div>
   <div class="panel-body">
     <p class="hint">{{tr "Legge ogni file archiviato con ffprobe e poi lo decodifica con ffmpeg, un file alla volta e in secondo piano, per trovare puntate e film danneggiati. Il controllo riparte dal punto salvato anche dopo un riavvio: puoi interromperlo e riprenderlo quando vuoi."}}</p>
@@ -322,7 +322,7 @@
 {{end}}
 
 {{define "v2_night_maintenance_panel"}}
-<div class="panel" id="v2-night-maintenance-panel"{{if .Activity}} hx-get="/settings/night-maintenance" hx-trigger="every 10s" hx-swap="outerHTML" aria-busy="true"{{end}}>
+<div class="panel" id="v2-night-maintenance-panel"{{if .Activity}} data-v2-poll hx-get="/settings/night-maintenance" hx-trigger="every 10s [window.gexttoCanPoll()], v2wake" hx-swap="outerHTML" aria-busy="true"{{end}}>
   <div class="panel-head"><h3>{{tr "Stato della manutenzione notturna"}}</h3></div>
   <div class="panel-body">
     <p class="hint">{{tr "Nella finestra notturna Gextto ottimizza i database, controlla la libreria e, se attivato, pulisce l'audio dei file già archiviati: un lavoro alla volta, solo quando nessun download sta trasferendo, nessun download viene archiviato e il sistema non è sotto carico."}}</p>
@@ -512,7 +512,7 @@
 {{end}}
 
 {{define "v2_update_panel"}}
-<div class="panel" id="v2-update-panel"{{if .Requested}} hx-get="/maintenance/update?from={{.Version}}" hx-trigger="every 5s" hx-swap="outerHTML"{{end}}>
+<div class="panel" id="v2-update-panel"{{if .Requested}} data-v2-poll hx-get="/maintenance/update?from={{.Version}}" hx-trigger="every 5s [window.gexttoCanPoll()], v2wake" hx-swap="outerHTML"{{end}}>
   <div class="panel-head"><h3>{{tr "Aggiornamenti"}}</h3><small class="muted">{{.Version}} · {{.Channel}}</small></div>
   <div class="panel-body">
     {{if .Message}}<p class="alert{{if not .Error}} ok{{end}}" role="status">{{tr .Message}}</p>{{end}}
@@ -623,7 +623,7 @@
 {{define "v2_rename_progress_panel"}}
 <div class="panel">
   <div class="panel-head"><h3>{{tr "Progresso rinomina"}}</h3></div>
-  <div class="panel-body" hx-get="/partial/rename-progress" hx-trigger="load, every 2s" hx-swap="innerHTML">{{template "v2_rename_progress" .}}</div>
+  <div class="panel-body" data-v2-poll hx-get="/partial/rename-progress" hx-trigger="load, every 2s [window.gexttoCanPoll()], v2wake" hx-swap="innerHTML">{{template "v2_rename_progress" .}}</div>
 </div>
 {{end}}
 
@@ -633,7 +633,7 @@
 {{end}}
 
 {{define "v2_jobs"}}
-<div class="panel" id="v2-jobs-panel" hx-get="/partial/jobs" hx-trigger="every 3s" hx-target="this" hx-swap="outerHTML"{{if not .Jobs}} style="display:none"{{end}}>
+<div class="panel" id="v2-jobs-panel" data-v2-poll hx-get="/partial/jobs" hx-trigger="every 3s [window.gexttoCanPoll()], v2wake" hx-target="this" hx-swap="outerHTML"{{if not .Jobs}} style="display:none"{{end}}>
   <div class="panel-head"><h3>{{tr "Operazioni in background"}}</h3><small class="muted">{{tr .Active}} <span>{{tr "in corso"}}</span> · {{len .Jobs}} <span>{{tr "recenti"}}</span></small></div>
   <div class="panel-body">
     {{if .Jobs}}

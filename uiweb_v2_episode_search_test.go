@@ -117,7 +117,7 @@ func TestEpisodeSearchPanelFollowsTheSearch(t *testing.T) {
 	if code != http.StatusOK {
 		t.Fatalf("status -> %d: %s", code, body)
 	}
-	for _, want := range []string{`hx-trigger="every 1s"`, "3/12", "sorgenti hanno risposto…"} {
+	for _, want := range []string{`hx-trigger="every 1s`, "3/12", "sorgenti hanno risposto…"} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("the running search is missing %q:\n%s", want, body)
 		}
@@ -132,12 +132,12 @@ func TestEpisodeSearchPanelFollowsTheSearch(t *testing.T) {
 	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
 		_, body = v2Request(t, server, http.MethodGet, "/series/episode-search-status?search="+url.QueryEscape(running.ID), nil)
-		if !strings.Contains(body, `hx-trigger="every 1s"`) {
+		if !strings.Contains(body, `hx-trigger="every 1s`) {
 			break
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
-	if strings.Contains(body, `hx-trigger="every 1s"`) {
+	if strings.Contains(body, `hx-trigger="every 1s`) {
 		t.Fatalf("the panel keeps polling a finished search:\n%s", body)
 	}
 	if !strings.Contains(body, "Nessun risultato online per questa puntata.") {

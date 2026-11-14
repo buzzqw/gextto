@@ -1729,9 +1729,10 @@ func TestV2ClientI18nDictionaryRendered(t *testing.T) {
 	}
 }
 
-// TestV2HealthTilesPollIndependently checks the Salute tiles refresh on their
-// own schedules: Stato, Memoria and Uptime every 5s, Disco dati hourly.
-func TestV2HealthTilesPollIndependently(t *testing.T) {
+// TestV2HealthTilesRefreshInOneRequest checks the quick Salute tiles travel
+// together: Stato, Memoria and Uptime share one 5 s request, Disco dati keeps
+// its hourly one, and the single tile addresses still answer.
+func TestV2HealthTilesRefreshInOneRequest(t *testing.T) {
 	state := newTestAppState(t)
 	server := httptest.NewServer(Router(state))
 	t.Cleanup(server.Close)
@@ -1741,13 +1742,30 @@ func TestV2HealthTilesPollIndependently(t *testing.T) {
 		t.Fatalf("GET /?view=health -> %d", code)
 	}
 	for _, want := range []string{
-		`id="v2-health-tile-status" hx-get="/partial/health/tile?name=status" hx-trigger="every 5s"`,
-		`id="v2-health-tile-memory" hx-get="/partial/health/tile?name=memory" hx-trigger="every 5s"`,
-		`id="v2-health-tile-uptime" hx-get="/partial/health/tile?name=uptime" hx-trigger="every 5s"`,
-		`id="v2-health-tile-disk" hx-get="/partial/health/tile?name=disk" hx-trigger="every 3600s"`,
+		`id="v2-health-fast-tiles" class="v2-health-fast-tiles" hx-get="/partial/health/tiles" hx-trigger="every 5s [window.gexttoCanPoll()]"`,
+		`id="v2-health-tile-status"`,
+		`id="v2-health-tile-memory"`,
+		`id="v2-health-tile-uptime"`,
+		`id="v2-health-tile-disk" hx-get="/partial/health/tile?name=disk" hx-trigger="every 3600s [window.gexttoCanPoll()]"`,
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("health page missing %q", want)
+		}
+	}
+	// One request, not three: none of the three quick tiles polls on its own.
+	for _, slow := range []string{"status", "memory", "uptime"} {
+		if strings.Contains(body, "/partial/health/tile?name="+slow) {
+			t.Fatalf("tile %s still polls on its own", slow)
+		}
+	}
+
+	code, body = v2Request(t, server, http.MethodGet, "/partial/health/tiles", nil)
+	if code != http.StatusOK {
+		t.Fatalf("tiles partial -> %d", code)
+	}
+	for _, name := range []string{"status", "memory", "uptime"} {
+		if !strings.Contains(body, `id="v2-health-tile-`+name+`"`) {
+			t.Fatalf("the tiles partial is missing %s: %s", name, body)
 		}
 	}
 
@@ -2388,11 +2406,39 @@ func TestV2CreamTheme(t *testing.T) {
 	if code, css := v2Request(t, server, http.MethodGet, "/static/v2.css", nil); code != http.StatusOK || !strings.Contains(css, `[data-theme="cream"] .chip.active`) {
 		t.Fatalf("cream active-chip contrast override missing -> %d", code)
 	}
-	if code, js := v2Request(t, server, http.MethodGet, "/static/v2-core.js", nil); code != http.StatusOK || !strings.Contains(js, `["dark", "light", "cream", "custom"]`) {
+	if code, js := v2Request(t, server, http.MethodGet, "/static/v2-core.js", nil); code != http.StatusOK || !strings.Contains(js, `["auto", "dark", "light", "cream", "custom"]`) {
 		t.Fatalf("theme modes missing cream -> %d", code)
 	}
 	if _, modal := v2Request(t, server, http.MethodGet, "/theme", nil); !strings.Contains(modal, `value="cream" data-theme-mode="cream"`) {
 		t.Fatal("cream theme missing from the theme picker")
+	}
+}
+
+// TestV2AutoThemeFollowsTheSystem pins the "Automatico" theme: it is a choice
+// stored as such (not a palette), it paints light or dark from the operating
+// system before the first frame, and it follows a change of the system theme.
+func TestV2AutoThemeFollowsTheSystem(t *testing.T) {
+	state := newTestAppState(t)
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+
+	_, modal := v2Request(t, server, http.MethodGet, "/theme", nil)
+	if !strings.Contains(modal, `value="auto" data-theme-mode="auto"`) {
+		t.Fatal("the Automatico theme is missing from the picker")
+	}
+	if !strings.Contains(modal, `theme-swatch-auto`) {
+		t.Fatal("the Automatico card must show both halves, dark and light")
+	}
+	_, page := v2Request(t, server, http.MethodGet, "/", nil)
+	if !strings.Contains(page, `matchMedia("(prefers-color-scheme: light)")`) {
+		t.Fatal("the bootstrap must resolve Automatico before the first paint")
+	}
+	if strings.Contains(page, `data-theme="auto"`) {
+		t.Fatal("data-theme must never be \"auto\": it is the light or dark palette")
+	}
+	_, js := v2Request(t, server, http.MethodGet, "/static/v2-core.js", nil)
+	if !strings.Contains(js, `(prefers-color-scheme: light)`) || !strings.Contains(js, `addEventListener("change", onSystemTheme)`) {
+		t.Fatal("the client must follow a change of the system theme while the page is open")
 	}
 }
 
@@ -3144,5 +3190,186 @@ func TestV2DownloadsRowShowsTheReasonInPlainWords(t *testing.T) {
 	}
 	if strings.Contains(rendered, "approved") {
 		t.Fatalf("the row still shows the raw reason code: %s", rendered)
+	}
+}
+
+// TestV2DownloadsRowsRefreshInPlace pins that the automatic tick redraws the
+// rows only: the filter, the sort menu and the tools above keep their state and
+// the focus, while the counters that live outside follow out of band. The whole
+// table used to be replaced every 5 s, toolbar included.
+func TestV2DownloadsRowsRefreshInPlace(t *testing.T) {
+	state := newTestAppState(t)
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+
+	code, page := v2Request(t, server, http.MethodGet, "/?view=downloads", nil)
+	if code != http.StatusOK {
+		t.Fatalf("GET /?view=downloads -> %d", code)
+	}
+	if !strings.Contains(page, `id="v2-download-rows" data-v2-poll hx-post="/partial/downloads/rows"`) {
+		t.Fatal("the rows are not the element that refreshes")
+	}
+	if strings.Contains(page, "change from:#v2-tag-filter, every 5s") {
+		t.Fatal("the whole table form must not poll any more")
+	}
+	if n := strings.Count(page, `id="v2-download-rows"`); n != 1 {
+		t.Fatalf("the rows fragment appears %d times on the page", n)
+	}
+	if n := strings.Count(page, `id="v2-state-chips"`); n != 1 {
+		t.Fatalf("the state chips appear %d times on the page, want 1", n)
+	}
+
+	code, rows := v2Request(t, server, http.MethodPost, "/partial/downloads/rows", nil)
+	if code != http.StatusOK {
+		t.Fatalf("rows partial -> %d", code)
+	}
+	if !strings.Contains(rows, `id="v2-download-rows"`) {
+		t.Fatalf("the answer is not the rows fragment: %s", rows)
+	}
+	if strings.Contains(rows, `id="v2-torrent-form"`) || strings.Contains(rows, `id="v2-filter"`) {
+		t.Fatal("the answer must not redraw the toolbar")
+	}
+	for _, want := range []string{
+		`id="v2-session-count" hx-swap-oob`, `id="v2-temp-badge" hx-swap-oob`,
+		`id="v2-state-chips" role="group"`, `hx-swap-oob="outerHTML"`,
+	} {
+		if !strings.Contains(rows, want) {
+			t.Fatalf("the rows answer is missing the out-of-band update %q", want)
+		}
+	}
+
+	code, rows = v2Request(t, server, http.MethodPost, "/partial/downloads/rows", url.Values{"auto_state": {"0"}})
+	if code != http.StatusOK {
+		t.Fatalf("rows partial with the refresh off -> %d", code)
+	}
+	if strings.Contains(rows, `data-v2-poll`) {
+		t.Fatal("with the automatic refresh off the fragment must not start polling again")
+	}
+}
+
+// TestV2DownloadsRowsPartialNeedsHtmx keeps the endpoint out of a plain browser
+// navigation: without the htmx header it answers with the page.
+func TestV2DownloadsRowsPartialNeedsHtmx(t *testing.T) {
+	state := newTestAppState(t)
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+
+	client := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error {
+		return http.ErrUseLastResponse
+	}}
+	response, err := client.PostForm(server.URL+"/partial/downloads/rows", url.Values{})
+	if err != nil {
+		t.Fatalf("POST /partial/downloads/rows: %v", err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusSeeOther {
+		t.Fatalf("without the htmx header -> %d, want 303", response.StatusCode)
+	}
+	if location := response.Header.Get("Location"); location != "/?view=downloads" {
+		t.Fatalf("a plain POST must go back to the page, got %q", location)
+	}
+}
+
+// TestV2ToastsAreReadableInEveryTheme pins the fix of the toast colours: the
+// background comes from the theme surface, never from an undefined variable, an
+// error is announced as an alert and waits for the person to close it.
+func TestV2ToastsAreReadableInEveryTheme(t *testing.T) {
+	state := newTestAppState(t)
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+
+	_, css := v2Request(t, server, http.MethodGet, "/static/v2.css", nil)
+	if strings.Contains(css, "var(--panel,") || strings.Contains(css, "var(--panel-bg") {
+		t.Fatal("a stylesheet still reads a variable nobody defines")
+	}
+	if !strings.Contains(css, "background: var(--surface);") {
+		t.Fatal("the toast background must be the theme surface")
+	}
+
+	_, page := v2Request(t, server, http.MethodGet, "/?view=dashboard&toast=Prova+non+riuscita&toast_err=1", nil)
+	if !strings.Contains(page, `<div class="v2-toast error" role="alert" data-v2-toast-sticky="1">`) {
+		t.Fatal("an error toast must be an alert that stays")
+	}
+	if !strings.Contains(page, `data-v2-toast-close`) {
+		t.Fatal("the toast has no way to be closed")
+	}
+
+	_, js := v2Request(t, server, http.MethodGet, "/static/v2-core.js", nil)
+	for _, want := range []string{"data-v2-toast-sticky", "data-v2-toast-close", `isError ? "alert" : "status"`} {
+		if !strings.Contains(js, want) {
+			t.Fatalf("v2-core.js missing %q", want)
+		}
+	}
+}
+
+// TestV2MissingListFiltersWhileTyping pins the live filter of the Missing tab:
+// the search box refreshes only the list, so the focus stays in the field.
+func TestV2MissingListFiltersWhileTyping(t *testing.T) {
+	state := newTestAppState(t)
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+
+	code, page := v2Request(t, server, http.MethodGet, "/?view=series&tab=gaps", nil)
+	if code != http.StatusOK {
+		t.Fatalf("GET /?view=series&tab=gaps -> %d", code)
+	}
+	for _, want := range []string{
+		`hx-get="/partial/series/gaps" hx-target="#v2-gaps-list" hx-swap="outerHTML"`,
+		`input changed delay:400ms`,
+		`id="v2-gaps-list"`,
+	} {
+		if !strings.Contains(page, want) {
+			t.Fatalf("the Missing filter is missing %q", want)
+		}
+	}
+
+	code, list := v2Request(t, server, http.MethodGet, "/partial/series/gaps?f=zzzznonesiste", nil)
+	if code != http.StatusOK {
+		t.Fatalf("gaps partial -> %d", code)
+	}
+	if !strings.Contains(list, `id="v2-gaps-list"`) {
+		t.Fatalf("the answer is not the list fragment: %s", list)
+	}
+	if !strings.Contains(list, "Nessuna serie con puntate mancanti corrisponde al filtro.") {
+		t.Fatalf("a filter that matches nothing must say so: %s", list)
+	}
+}
+
+// TestV2LiveUpdatesPauseWhenHidden pins the rule that nothing polls and no
+// stream stays open while the tab is in the background: the daemon must not be
+// woken for a page nobody is looking at, and the stream sends only the
+// fragments the open page hosts.
+func TestV2LiveUpdatesPauseWhenHidden(t *testing.T) {
+	state := newTestAppState(t)
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+
+	_, js := v2Request(t, server, http.MethodGet, "/static/v2-core.js", nil)
+	for _, want := range []string{
+		"function canPoll() { return !document.hidden; }",
+		"window.gexttoCanPoll = canPoll;",
+		`document.addEventListener("visibilitychange"`,
+		`stream.close();`,
+		`"/partial/chrome/sse?parts="`,
+	} {
+		if !strings.Contains(js, want) {
+			t.Fatalf("v2-core.js missing %q", want)
+		}
+	}
+
+	// The stream answers at once, and only with what the page asked for.
+	response, err := http.Get(server.URL + "/partial/chrome/sse?parts=status")
+	if err != nil {
+		t.Fatalf("GET the stream: %v", err)
+	}
+	defer response.Body.Close()
+	buffer := make([]byte, 4096)
+	n, _ := response.Body.Read(buffer)
+	frame := string(buffer[:n])
+	if !strings.Contains(frame, "event: chrome-status") {
+		t.Fatalf("the first frame must carry the wanted fragment: %q", frame)
+	}
+	if strings.Contains(frame, "event: chrome-traffic") || strings.Contains(frame, "event: chrome-top") {
+		t.Fatalf("the stream sent fragments the page did not ask for: %q", frame)
 	}
 }

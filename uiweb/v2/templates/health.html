@@ -3,7 +3,7 @@
 {{/* ------------------------------------------------------------------ */}}
 
 {{define "v2_health_queue"}}
-<div id="v2-health-queue" hx-get="/partial/health/queue" hx-trigger="every 60s" hx-swap="outerHTML">
+<div id="v2-health-queue" data-v2-poll hx-get="/partial/health/queue" hx-trigger="every 60s [window.gexttoCanPoll()], v2wake" hx-swap="outerHTML">
   <div class="grid-2">
     <div class="panel">
       <div class="panel-head"><h3 {{trTitle "Titoli trattenuti da un profilo di attesa: da quanto aspettano e quando saranno valutati di nuovo."}}>{{tr "Coda titoli"}}</h3></div>
@@ -47,10 +47,8 @@
 {{define "v2_health"}}
 <div class="view">
   <div class="grid-4">
-    {{template "v2_health_tile_status" .}}
-    {{template "v2_health_tile_memory" .}}
+    {{template "v2_health_fast_tiles" .}}
     {{template "v2_health_tile_disk" .}}
-    {{template "v2_health_tile_uptime" .}}
   </div>
   <div class="grid-2">
     <div class="panel">
@@ -163,21 +161,32 @@
 </div>
 {{end}}
 
+{{define "v2_health_fast_tiles"}}
+{{/* The three counters that move every few seconds travel in one request: the
+     page asked for three separate ones every 5 s, and on a small machine three
+     round trips are three times the work of one. */}}
+<div id="v2-health-fast-tiles" class="v2-health-fast-tiles" hx-get="/partial/health/tiles" hx-trigger="every 5s [window.gexttoCanPoll()]" hx-swap="outerHTML">
+  {{template "v2_health_tile_status" .}}
+  {{template "v2_health_tile_memory" .}}
+  {{template "v2_health_tile_uptime" .}}
+</div>
+{{end}}
+
 {{define "v2_health_tile_status"}}
-<div class="metric{{if ne .Health.Status "ok"}} amber{{end}}" id="v2-health-tile-status" hx-get="/partial/health/tile?name=status" hx-trigger="every 5s" hx-swap="outerHTML"><span class="metric-sub">{{tr "Stato"}}</span><strong>{{tr .Health.Status}}</strong>{{if .StatusReason}}<small class="muted">{{tr .StatusReason}}</small>{{end}}</div>
+<div class="metric{{if ne .Health.Status "ok"}} amber{{end}}" id="v2-health-tile-status"><span class="metric-sub">{{tr "Stato"}}</span><strong>{{tr .Health.Status}}</strong>{{if .StatusReason}}<small class="muted">{{tr .StatusReason}}</small>{{end}}</div>
 {{end}}
 
 {{define "v2_health_tile_memory"}}
-<div class="metric" id="v2-health-tile-memory" hx-get="/partial/health/tile?name=memory" hx-trigger="every 5s" hx-swap="outerHTML"><span class="metric-sub">{{tr "Memoria processo"}}</span><strong>{{bytesU .Health.ResidentBytes}}</strong><small class="muted"><span>{{tr "su"}}</span> {{bytesU .Health.MemoryTotalBytes}}</small></div>
+<div class="metric" id="v2-health-tile-memory"><span class="metric-sub">{{tr "Memoria processo"}}</span><strong>{{bytesU .Health.ResidentBytes}}</strong><small class="muted"><span>{{tr "su"}}</span> {{bytesU .Health.MemoryTotalBytes}}</small></div>
 {{end}}
 
 {{define "v2_health_tile_disk"}}
-<div class="metric" id="v2-health-tile-disk" hx-get="/partial/health/tile?name=disk" hx-trigger="every 3600s" hx-swap="outerHTML"><span class="metric-sub">{{tr "Disco dati"}}</span><strong>{{tr .DiskUsedPct}} <span>{{tr "usato"}}</span></strong><small class="muted">{{bytesU .Health.DiskFreeBytes}} <span>{{tr "liberi"}}</span></small></div>
+<div class="metric" id="v2-health-tile-disk" hx-get="/partial/health/tile?name=disk" hx-trigger="every 3600s [window.gexttoCanPoll()]" hx-swap="outerHTML"><span class="metric-sub">{{tr "Disco dati"}}</span><strong>{{tr .DiskUsedPct}} <span>{{tr "usato"}}</span></strong><small class="muted">{{bytesU .Health.DiskFreeBytes}} <span>{{tr "liberi"}}</span></small></div>
 {{end}}
 
 {{/* Motore torrent: stato del motore attivo, aggiornato ogni 15 s. */}}
 {{define "v2_health_engine"}}
-<div class="panel" id="v2-health-engine" hx-get="/partial/health/tile?name=engine" hx-trigger="every 15s" hx-swap="outerHTML">
+<div class="panel" id="v2-health-engine" data-v2-poll hx-get="/partial/health/tile?name=engine" hx-trigger="every 15s [window.gexttoCanPoll()], v2wake" hx-swap="outerHTML">
   <div class="panel-head"><h3>{{tr "Motore torrent"}}</h3>{{if .Backend}}<small class="muted">{{tr .Backend}}</small>{{end}}</div>
   <div class="panel-body">
     {{if .Error}}<div class="row"><span class="hl-err">{{tr .Error}}</span></div>{{end}}
@@ -187,7 +196,7 @@
 {{end}}
 
 {{define "v2_health_tile_uptime"}}
-<div class="metric" id="v2-health-tile-uptime" hx-get="/partial/health/tile?name=uptime" hx-trigger="every 5s" hx-swap="outerHTML"><span class="metric-sub">{{tr "Uptime Gextto"}}</span><strong>{{tr .ProcessUptime}}</strong><small class="muted"><span>{{tr "sistema"}}</span> {{tr .Uptime}}</small></div>
+<div class="metric" id="v2-health-tile-uptime"><span class="metric-sub">{{tr "Uptime Gextto"}}</span><strong>{{tr .ProcessUptime}}</strong><small class="muted"><span>{{tr "sistema"}}</span> {{tr .Uptime}}</small></div>
 {{end}}
 
 {{/* ------------------------------------------------------------------ */}}
@@ -199,8 +208,8 @@
   <div class="panel">
     <div class="panel-head"><h3>{{tr "Log daemon"}}</h3><small class="muted"><span id="v2-logs-count">{{tr .Count}}</span> {{tr "righe · auto ogni 5 s"}}</small></div>
     <div class="panel-body">
-      <form class="toolbar logs-toolbar" hx-get="/partial/logs" hx-target="#v2-logs-view" hx-swap="outerHTML"
-            hx-trigger="submit, input changed delay:300ms from:#v2-log-filter, change, every 5s [window.gexttoCanPollLogs && window.gexttoCanPollLogs()]">
+      <form class="toolbar logs-toolbar" data-v2-poll hx-get="/partial/logs" hx-target="#v2-logs-view" hx-swap="outerHTML"
+            hx-trigger="submit, input changed delay:300ms from:#v2-log-filter, change, every 5s [window.gexttoCanPollLogs && window.gexttoCanPollLogs()], v2wake">
          <input id="v2-log-filter" class="input" type="search" name="filter" value="{{.Filter}}" aria-label="{{tr "Filtra le righe del log"}}" placeholder="{{tr "Filtra le righe…"}}" {{trTitle "Filtra il testo delle righe del log"}} />
          <button class="btn sm primary" type="submit" {{trTitle "Filtra le righe del log"}}>{{tr "🔍 Filtra"}}</button>
          <select class="input compact logs-level" name="level" aria-label="{{tr "Livello"}}" {{trTitle "Mostra tutte le righe o solo avvisi ed errori"}}>
@@ -380,9 +389,10 @@
 </div>
 {{end}}
 
-{{define "v2_theme_card"}}<label class="theme-card">
+{{define "v2_theme_card"}}<label class="theme-card"{{if eq .ID "auto"}} title="{{tr "Tema automatico: segue il tema chiaro o scuro del sistema"}}"{{end}}>
   <input type="radio" name="v2-theme" value="{{.ID}}" data-theme-mode="{{.Mode}}" data-bg="{{.Bg}}" data-surface="{{.Surface}}" data-text="{{.Text}}" data-accent="{{.Accent}}">
-  <span class="theme-swatch" aria-hidden="true" style="background:{{.Bg}}"><span class="theme-swatch-panel" style="background:{{.Surface}};color:{{.Text}}">{{tr "Aa"}}<span class="theme-swatch-accent" style="background:{{.Accent}}"></span></span></span>
+  {{if eq .ID "auto"}}<span class="theme-swatch theme-swatch-auto" aria-hidden="true"><span class="theme-swatch-panel theme-swatch-panel-dark">{{tr "Aa"}}</span><span class="theme-swatch-panel theme-swatch-panel-light">{{tr "Aa"}}</span></span>
+  {{else}}<span class="theme-swatch" aria-hidden="true" style="background:{{.Bg}}"><span class="theme-swatch-panel" style="background:{{.Surface}};color:{{.Text}}">{{tr "Aa"}}<span class="theme-swatch-accent" style="background:{{.Accent}}"></span></span></span>{{end}}
   <span class="theme-name">{{tr .Name}}</span>
 </label>{{end}}
 

@@ -342,6 +342,14 @@ func v2GapReleaseCovers(release *models.Release, season, episode int64) bool {
 	return false
 }
 
+// V2SeriesGapsListPartial renders only the list of missing episodes, filtered
+// by `f`. The search box above it asks for this while the person types, so the
+// list narrows without a full page load and the focus stays in the field.
+func V2SeriesGapsListPartial(w http.ResponseWriter, r *http.Request, s *AppState) {
+	gaps, _ := libraryGaps(s)
+	v2Render(w, http.StatusOK, "v2_gaps_list_wrap", v2GapsViewFrom(gaps, r.FormValue("f")), s)
+}
+
 // V2SeriesGapsSearch is POST /series/gaps/search: it starts the whole-series
 // search as a background job and answers with a fragment that polls it. The
 // search used to stop at 15 episodes and hold the request open for minutes;

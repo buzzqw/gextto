@@ -121,7 +121,7 @@ func TestV2HealthQueueAndImportsPanels(t *testing.T) {
 	}
 
 	// The panels refresh on their own while the page is open.
-	if !strings.Contains(body, `id="v2-health-queue" hx-get="/partial/health/queue" hx-trigger="every 60s"`) {
+	if !strings.Contains(body, `id="v2-health-queue" data-v2-poll hx-get="/partial/health/queue" hx-trigger="every 60s [window.gexttoCanPoll()], v2wake"`) {
 		t.Fatal("the queue panels are not wired to auto-refresh")
 	}
 	code, partial := v2Request(t, server, http.MethodGet, "/partial/health/queue", nil)

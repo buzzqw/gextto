@@ -35,7 +35,12 @@
   // on the server), painted as data-theme="custom". The active choice is per
   // browser: gextto_theme (mode), gextto_colors (the four colours, read by the
   // inline bootstrap before first paint) and gextto_theme_id (the card).
-  var THEME_MODES = ["dark", "light", "cream", "custom"];
+  var THEME_MODES = ["auto", "dark", "light", "cream", "custom"];
+  // "Automatico" is a choice, not a palette: it paints with light or dark and
+  // follows the system while the window stays open.
+  function systemPrefersLight() {
+    return !!(window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches);
+  }
   function storedColors() {
     try {
       var raw = storageGet("gextto_colors");
@@ -80,8 +85,16 @@
   function setTheme(mode) {
     if (THEME_MODES.indexOf(mode) < 0 || (mode === "custom" && !storedColors())) mode = "dark";
     if (mode === "custom") applyColors(storedColors()); else clearColors();
-    doc.setAttribute("data-theme", mode);
+    doc.setAttribute("data-theme", mode === "auto" ? (systemPrefersLight() ? "light" : "dark") : mode);
     storageSet("gextto_theme", mode);
+  }
+  if (window.matchMedia) {
+    var systemTheme = window.matchMedia("(prefers-color-scheme: light)");
+    var onSystemTheme = function () {
+      if (storageGet("gextto_theme") === "auto") setTheme("auto");
+    };
+    if (systemTheme.addEventListener) systemTheme.addEventListener("change", onSystemTheme);
+    else if (systemTheme.addListener) systemTheme.addListener(onSystemTheme);
   }
   function storeColors(c) {
     // onAccent and tone are stored so the inline bootstrap paints readable
@@ -153,7 +166,10 @@
     if (!modal) return;
     var cards = document.querySelectorAll('input[name="v2-theme"]');
     var wanted = modal.getAttribute("data-theme-selected") || storageGet("gextto_theme_id") || "";
-    if (!wanted && doc.getAttribute("data-theme") !== "custom") wanted = doc.getAttribute("data-theme");
+    if (!wanted) {
+      var active = storageGet("gextto_theme") || "";
+      wanted = active === "auto" ? "auto" : (doc.getAttribute("data-theme") !== "custom" ? doc.getAttribute("data-theme") : "");
+    }
     for (var i = 0; i < cards.length; i++) {
       if (cards[i].value === wanted) {
         cards[i].checked = true;
@@ -495,9 +511,21 @@
   }
 
   function canPollLogs() {
-    return logsFollow && !isLogSelecting && !hasLogSelection();
+    return !document.hidden && logsFollow && !isLogSelecting && !hasLogSelection();
   }
   window.gexttoCanPollLogs = canPollLogs;
+
+  // Nothing polls while the tab is in the background: this machine runs Gextto
+  // and should not be woken for a page nobody is looking at. htmx asks this
+  // condition before every periodic request; the elements marked
+  // data-v2-poll catch up at once when the tab comes back.
+  function canPoll() { return !document.hidden; }
+  window.gexttoCanPoll = canPoll;
+  document.addEventListener("visibilitychange", function () {
+    if (document.hidden || !window.htmx) return;
+    var polled = document.querySelectorAll("[data-v2-poll]");
+    for (var i = 0; i < polled.length; i++) window.htmx.trigger(polled[i], "v2wake");
+  });
 
   // The archive holds hundreds of thousands of rows, so its toolbar searches
   // live while typing. Two cases are left to the explicit "Cerca" button: the
@@ -1820,10 +1848,22 @@
   // work started before the panel updates with the results.
   function autoDismissToast(el) {
     if (!el || el._v2DismissTimer) return;
+    // An error is announced as an alert and stays until the person closes it:
+    // it is the only explanation of an action that did not happen.
+    if (el.classList && (el.classList.contains("error") || el.getAttribute("data-v2-toast-sticky"))) return;
     el._v2DismissTimer = window.setTimeout(function () {
       if (el.parentNode) el.parentNode.removeChild(el);
     }, 6000);
   }
+
+  // The toast carries its own close button: transient messages go away by
+  // themselves, an error waits for this click.
+  document.addEventListener("click", function (event) {
+    var closer = event.target.closest ? event.target.closest("[data-v2-toast-close]") : null;
+    if (!closer) return;
+    var toast = closer.closest(".v2-toast");
+    if (toast && toast.parentNode) toast.parentNode.removeChild(toast);
+  });
 
   function initToastRegion() {
     var region = document.getElementById("v2-toast-region");
@@ -1854,13 +1894,21 @@
     if (!region) return;
     var toast = document.createElement("div");
     toast.className = "v2-toast" + (isError ? " error" : "");
-    toast.setAttribute("role", "status");
+    toast.setAttribute("role", isError ? "alert" : "status");
     var strong = document.createElement("strong");
-    strong.textContent = title || "Operazione";
+    strong.textContent = title || t("Operazione");
     var span = document.createElement("span");
     span.textContent = message || "";
+    var close = document.createElement("button");
+    close.className = "v2-toast-close";
+    close.type = "button";
+    close.setAttribute("data-v2-toast-close", "");
+    close.setAttribute("aria-label", t("Chiudi il messaggio"));
+    close.setAttribute("title", t("Chiudi il messaggio"));
+    close.textContent = "✕";
     toast.appendChild(strong);
     toast.appendChild(span);
+    toast.appendChild(close);
     region.appendChild(toast);
     autoDismissToast(toast);
   }
@@ -2028,27 +2076,55 @@
   }
   function initLiveMetrics() {
     if (!window.EventSource) return;
-    var es = new EventSource("/partial/chrome/sse");
-    es.addEventListener("chrome-top", function(e) {
-      var el = document.getElementById("v2-live-top-metrics");
-      if (el) el.outerHTML = e.data;
-      updateDownloadsBadge();
+    var stream = null;
+    // Only the fragments this page actually hosts: the dashboard is the only
+    // page with the traffic panel, and the stream used to build and send it
+    // everywhere.
+    function wantedParts() {
+      var wanted = [["top", "v2-live-top-metrics"], ["mobile", "v2-live-mobile-metrics"],
+        ["status", "v2-live-status"], ["traffic", "v2-live-traffic"]];
+      var parts = [];
+      for (var i = 0; i < wanted.length; i++) {
+        if (document.getElementById(wanted[i][1])) parts.push(wanted[i][0]);
+      }
+      return parts.join(",");
+    }
+    function openStream() {
+      if (stream || document.hidden) return;
+      stream = new EventSource("/partial/chrome/sse?parts=" + encodeURIComponent(wantedParts()));
+      stream.addEventListener("chrome-top", function (e) {
+        var el = document.getElementById("v2-live-top-metrics");
+        if (el) el.outerHTML = e.data;
+        updateDownloadsBadge();
+      });
+      stream.addEventListener("chrome-mobile", function (e) {
+        var el = document.getElementById("v2-live-mobile-metrics");
+        if (el) el.outerHTML = e.data;
+        updateDownloadsBadge();
+        updateProblemsChip();
+      });
+      stream.addEventListener("chrome-status", function (e) {
+        var el = document.getElementById("v2-live-status");
+        if (el) el.outerHTML = e.data;
+      });
+      stream.addEventListener("chrome-traffic", function (e) {
+        // Only the Dashboard hosts this panel; elsewhere it is a no-op.
+        var el = document.getElementById("v2-live-traffic");
+        if (el) el.outerHTML = e.data;
+      });
+    }
+    // A hidden tab keeps no stream open: the server stops rendering four
+    // fragments every 5 s for a page nobody sees. Coming back opens it again,
+    // and the server answers with a fresh frame at once.
+    function closeStream() {
+      if (!stream) return;
+      stream.close();
+      stream = null;
+    }
+    document.addEventListener("visibilitychange", function () {
+      if (document.hidden) closeStream(); else openStream();
     });
-    es.addEventListener("chrome-mobile", function(e) {
-      var el = document.getElementById("v2-live-mobile-metrics");
-      if (el) el.outerHTML = e.data;
-      updateDownloadsBadge();
-      updateProblemsChip();
-    });
-    es.addEventListener("chrome-status", function(e) {
-      var el = document.getElementById("v2-live-status");
-      if (el) el.outerHTML = e.data;
-    });
-    es.addEventListener("chrome-traffic", function(e) {
-      // Only the Dashboard hosts this panel; elsewhere it is a no-op.
-      var el = document.getElementById("v2-live-traffic");
-      if (el) el.outerHTML = e.data;
-    });
+    openStream();
   }
 
   if ("serviceWorker" in navigator && window.isSecureContext) {

@@ -806,6 +806,21 @@ func uiHealthUptimeTileFrom(s *AppState) uiHealthData {
 	}
 }
 
+// uiHealthFastTilesFrom builds Stato, Memoria and Uptime together: they share
+// one request and one render, so the page no longer asks three times.
+func uiHealthFastTilesFrom(s *AppState) uiHealthData {
+	merged := uiHealthStatusTileFrom(s)
+	memory := uiHealthMemoryTileFrom(s)
+	merged.Health.ResidentBytes = memory.Health.ResidentBytes
+	merged.Health.MemoryTotalBytes = memory.Health.MemoryTotalBytes
+	uptime := uiHealthUptimeTileFrom(s)
+	merged.Health.ProcessUptimeSeconds = uptime.Health.ProcessUptimeSeconds
+	merged.Health.UptimeSeconds = uptime.Health.UptimeSeconds
+	merged.Uptime = uptime.Uptime
+	merged.ProcessUptime = uptime.ProcessUptime
+	return merged
+}
+
 // uiHealthDiskTileFrom builds the Disco dati tile on its own so it can refresh
 // hourly without re-running the rest of the health check.
 func uiHealthDiskTileFrom(s *AppState) uiHealthData {

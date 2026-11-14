@@ -55,23 +55,42 @@ test.describe("accessibilità automatizzata", () => {
   });
 
   test("il polling non perde il focus sul controllo del torrent", async ({ page }) => {
-    await page.route("**/downloads/table", async (route) => {
-      await route.fulfill({
-        contentType: "text/html; charset=utf-8",
-        body: `<div class="view" data-torrents-slot>
-          <button type="button" data-action="pause" data-hash="focus-test">Pausa</button>
-        </div>`,
-      });
+    // Only the rows refresh: htmx restores the focus because the controls keep
+    // a stable id, and the toolbar above is not rebuilt at all.
+    const rows = `<div id="v2-download-rows" data-v2-poll hx-post="/partial/downloads/rows" hx-trigger="every 5s [window.gexttoCanPoll()], v2wake" hx-swap="outerHTML">
+        <button type="button" id="v2-pause-focus-test" data-action="pause" data-hash="focus-test">Pausa</button>
+      </div>`;
+    await page.route("**/partial/downloads/rows", async (route) => {
+      await route.fulfill({ contentType: "text/html; charset=utf-8", body: rows });
     });
     await page.clock.install();
     await page.goto("/?view=downloads");
-    // The first poll brings the test button into the table; focus it and let
-    // the next poll swap the table again. Fast-forwarding avoids two 5 s waits.
+    // The first poll brings the test button into the list; focus it and let the
+    // next poll swap the rows again. Fast-forwarding avoids two 5 s waits.
     await page.clock.fastForward(5000);
-    const pause = page.locator('[data-action="pause"][data-hash="focus-test"]');
+    const pause = page.locator("#v2-pause-focus-test");
+    await expect(pause).toBeVisible();
     await pause.focus();
     await page.clock.fastForward(5000);
     await expect(pause).toBeFocused();
+  });
+
+  test("l'aggiornamento automatico non ridisegna la barra dei filtri", async ({ page }) => {
+    await page.route("**/partial/downloads/rows", async (route) => {
+      await route.fulfill({
+        contentType: "text/html; charset=utf-8",
+        body: `<div id="v2-download-rows" data-v2-poll hx-post="/partial/downloads/rows" hx-trigger="every 5s [window.gexttoCanPoll()], v2wake" hx-swap="outerHTML"><p class="muted">nessun download</p></div>`,
+      });
+    });
+    await page.goto("/?view=downloads");
+    const filter = page.locator("#v2-filter");
+    await filter.focus();
+    await filter.fill("prova");
+    // A real poll goes by; the filter is not part of what it swaps, so it keeps
+    // both the focus and what was typed.
+    await page.waitForResponse((response) => response.url().includes("/partial/downloads/rows"), { timeout: 15000 });
+    await expect(filter).toBeFocused();
+    await expect(filter).toHaveValue("prova");
   });
 
   test("la ricerca release è utilizzabile da tastiera", async ({ page }) => {

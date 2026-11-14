@@ -258,7 +258,7 @@ func v2EpisodeSearchFinalBody(t *testing.T, server *httptest.Server, panel strin
 		if code != http.StatusOK {
 			t.Fatalf("episode search status -> %d: %s", code, body)
 		}
-		if !strings.Contains(body, `hx-trigger="every 1s"`) {
+		if !strings.Contains(body, `hx-trigger="every 1s`) {
 			return body
 		}
 		time.Sleep(20 * time.Millisecond)

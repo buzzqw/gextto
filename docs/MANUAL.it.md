@@ -284,14 +284,16 @@ sorgenti, un problema diventa difficile da riprodurre.
 - **Aggiorna**: ricarica subito i dati della pagina.
 - Le **velocità** di download e upload (torrent più aMule) e **CPU e RAM per
   processo**: Gextto, gx-torrent e, se attivo e locale, aMule. Si aggiornano
-  ogni 5 secondi.
+  ogni 5 secondi, e si fermano quando la scheda del browser non è in vista:
+  riprendono appena torni sulla pagina.
 - **Tema**, dimensione del testo e **Font**. Il dialogo **Tema** ha i temi
   pronti (Scuro, Chiaro, Crema, Nord, Dracula, Solarized, Gruvbox, Alto
-  contrasto e altri, in versione chiara e scura); **Personalizza** crea un tema
-  tuo da quattro colori (sfondo, pannelli, testo, accento) e avvisa se il
-  contrasto è troppo basso. I temi salvati sono sul server e li ritrovi da ogni
-  dispositivo; il tema attivo, il testo e il font restano una scelta del
-  singolo browser.
+  contrasto e altri, in versione chiara e scura); **Automatico** segue il tema
+  chiaro o scuro del sistema e cambia quando lo cambi anche tu;
+  **Personalizza** crea un tema tuo da quattro colori (sfondo, pannelli, testo,
+  accento) e avvisa se il contrasto è troppo basso. I temi salvati sono sul
+  server e li ritrovi da ogni dispositivo; il tema attivo, il testo e il font
+  restano una scelta del singolo browser.
 - La **lingua** dell'interfaccia.
 - **Dona**, in basso a destra (sul telefono è nel menu *Altro*), e
   **Aggiornamento disponibile** quando c'è una versione nuova.
@@ -318,7 +320,8 @@ hanno nomi accessibili; i dialoghi gestiscono il focus, `Tab`, `Esc` e il
 ritorno al controllo che li ha aperti; le intestazioni ordinabili si attivano da
 tastiera e annunciano l'ordinamento; aggiornamenti, errori e notifiche usano
 regioni live; il layout regge viewport stretti, ingrandimento e reflow a 320
-pixel. `/` porta il focus sul filtro della pagina (il filtro della lista in
+pixel. Un messaggio di conferma sparisce da solo, un errore resta finché non lo
+chiudi con la ✕ e viene annunciato subito come avviso. `/` porta il focus sul filtro della pagina (il filtro della lista in
 Scarico, la ricerca in Configurazione, il filtro del log) quando non stai
 scrivendo in un campo. In una lista con le caselle di selezione, `Maiusc`+clic
 seleziona o deseleziona tutte le righe tra la casella cliccata prima e questa.
@@ -451,7 +454,8 @@ onda che non sono in libreria, raggruppate per serie e per stagione:
   sola, e le puntate per cui la ricerca non ha trovato nulla restano fuori. Il
   lavoro prosegue in background, così non devi aspettare ogni collegamento, e il
   log dice quali puntate ha messo in scarico;
-- **Filtra per serie** restringe l'elenco.
+- **Filtra per serie** restringe l'elenco mentre scrivi, senza ricaricare la
+  pagina.
 
 Non sono mancanti le puntate non ancora andate in onda, né quelle che hanno già
 un download in corso (anche aggiunto a mano o da una cartella osservata), né le
@@ -715,7 +719,10 @@ aMule con **Aggiungi tutti** o uno per uno.
 
 La pagina **Scarico** mostra tutto quello che si sta trasferendo: torrent,
 download HTTP dei fumetti e file eD2k di aMule (con il badge **eD2k**), in
-un'unica lista che si aggiorna ogni 5 secondi.
+un'unica lista che si aggiorna ogni 5 secondi. L'aggiornamento cambia le
+righe e non la barra dei filtri e degli strumenti: la lista non sfarfalla e il
+cursore resta dove stai scrivendo. Quando la scheda del browser non è in vista
+l'aggiornamento si ferma, e riprende appena torni.
 
 ### Leggere la lista
 

@@ -22,12 +22,24 @@
   <div class="panel-head"><h3>{{tr "Puntate mancanti"}}</h3><small class="muted">{{tr .Total}} <span>{{tr "puntate in"}}</span> {{tr .SeriesCount}} <span>{{tr "serie"}}</span></small></div>
   <div class="panel-body">
     <p class="hint">{{tr "Un clic su una puntata la cerca e mostra i risultati, ognuno con «Scarica». «Cerca mancanti» cerca tutte le puntate mancanti della serie e mostra qui i risultati: non scarica nulla da solo."}}</p>
-    <form class="toolbar" method="get" action="/">
+    <form class="toolbar" method="get" action="/" hx-get="/partial/series/gaps" hx-target="#v2-gaps-list" hx-swap="outerHTML" hx-trigger="submit, input changed delay:400ms from:find input[name=f]">
       <input type="hidden" name="view" value="series" />
       <input type="hidden" name="tab" value="gaps" />
-      <input class="input" type="search" name="f" value="{{.Filter}}" placeholder="{{tr "Filtra per serie…"}}" aria-label="{{tr "Filtra per serie"}}" />
+      <input class="input" type="search" name="f" value="{{.Filter}}" placeholder="{{tr "Filtra per serie…"}}" aria-label="{{tr "Filtra per serie"}}" {{trTitle "L'elenco si restringe mentre scrivi"}} />
       <button class="btn sm" type="submit" {{trTitle "Mostra solo le serie il cui nome contiene il testo scritto"}}>{{tr "Filtra"}}</button>
     </form>
+    {{template "v2_gaps_list_wrap" .}}
+  </div>
+</section>
+{{end}}
+
+{{/* The filtered list alone: the search box above it refreshes only this, so the
+     focus stays in the field while the series narrow. */}}
+{{define "v2_gaps_list_wrap"}}
+<div id="v2-gaps-list">{{template "v2_gaps_list" .}}</div>
+{{end}}
+
+{{define "v2_gaps_list"}}
     {{if not .Series}}<p class="muted">{{if .Filter}}{{tr "Nessuna serie con puntate mancanti corrisponde al filtro."}}{{else}}{{tr "Nessuna puntata mancante."}}{{end}}</p>{{end}}
     {{range $i, $s := .Series}}
     <details class="v2-gap-series"{{if $.Open}} open{{end}}>
@@ -52,13 +64,11 @@
       </div>
     </details>
     {{end}}
-  </div>
-</section>
 {{end}}
 
 {{define "v2_gap_search_result"}}
 {{if .Running}}
-<div hx-get="/series/gaps/search/status?job={{.JobID}}&amp;filter={{.Filter | urlquery}}&amp;slot={{.Slot}}" hx-trigger="every 2s" hx-swap="outerHTML">
+<div data-v2-poll hx-get="/series/gaps/search/status?job={{.JobID}}&amp;filter={{.Filter | urlquery}}&amp;slot={{.Slot}}" hx-trigger="every 2s [window.gexttoCanPoll()], v2wake" hx-swap="outerHTML">
   <p class="muted" role="status" aria-live="polite">{{if .Queued}}<span>{{tr "Ricerca in coda…"}}</span>{{else if eq .Progress.Phase "ed2k"}}<span>{{tr "Ricerca in corso: controllo eD2k/Kad delle stagioni…"}}</span>{{else}}<span>{{tr "Ricerca in corso:"}}</span> {{.Progress.Done}}/{{.Progress.Total}} <span>{{tr "puntate…"}}</span>{{end}}</p>
   {{/* Kept across the two-second refresh: replacing it would take the keyboard
        focus away from «Annulla» while the search runs. */}}

@@ -283,7 +283,7 @@
 {{end}}
 
 {{define "v2_episode_search_online"}}
-<div id="v2-ep-online-{{.ID}}" class="v2-ep-online"{{if .Running}} hx-get="{{.URL}}" hx-trigger="every 1s" hx-swap="outerHTML"{{end}} role="status" aria-live="polite">
+<div id="v2-ep-online-{{.ID}}" class="v2-ep-online"{{if .Running}} data-v2-poll hx-get="{{.URL}}" hx-trigger="every 1s [window.gexttoCanPoll()], v2wake" hx-swap="outerHTML"{{end}} role="status" aria-live="polite">
   {{if .Running}}{{template "v2_episode_search_progress" .}}{{else if .Error}}<p class="err">{{tr .Error}}</p>{{else}}{{if gt .Total 0}}<p class="muted v2-ep-total"><span>{{tr "Sorgenti interrogate:"}}</span> {{tr .Total}}</p>{{end}}{{template "v2_sources_rows" .Sources}}{{end}}
 </div>
 {{end}}

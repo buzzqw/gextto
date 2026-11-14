@@ -744,6 +744,11 @@ label.field > span, .field > span, .field-label { color: var(--muted); font-size
 .theme-swatch { display: flex; align-items: flex-end; height: 58px; padding: 8px; border-radius: 6px; border: 1px solid var(--line-soft); }
 .theme-swatch-panel { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 4px 6px; border-radius: 4px; font-weight: 700; font-size: 0.85rem; }
 .theme-swatch-accent { width: 18px; height: 10px; border-radius: 3px; }
+/* "Automatico": one half dark, one half light, so the card says what it does. */
+.theme-swatch-auto { gap: 4px; }
+.theme-swatch-auto .theme-swatch-panel { width: auto; flex: 1 1 0; justify-content: center; }
+.theme-swatch-auto .theme-swatch-panel-dark { background: #0b1120; color: #e9f0fb; }
+.theme-swatch-auto .theme-swatch-panel-light { background: #d6e0ea; color: #2a3444; }
 .theme-name { font-size: 0.85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .theme-card:has(input:checked) .theme-name { font-weight: 600; }
 .theme-saved { position: relative; }
@@ -1293,6 +1298,9 @@ label.field > span, .field > span, .field-label { color: var(--muted); font-size
 
 /* keep the old utility classes used by a few pages */
 .grid-4 > *, .grid-2 > * { min-width: 0; }
+/* The three quick Salute tiles refresh in one request and stay children of the
+   grid, so they keep their place in it. */
+.v2-health-fast-tiles { display: contents; }
 pre.log-view { margin: 0; }
 
 /* select in the top bar looks like the other controls, not a full-width input */

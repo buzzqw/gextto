@@ -741,7 +741,7 @@ html, body {
   position: sticky;
   top: 0;
   z-index: 1;
-  background: var(--panel-bg, var(--surface, inherit));
+  background: var(--surface);
 }
 .data-table td,
 .data-table th {
@@ -782,10 +782,12 @@ form:has(.archive-web-check input[type="checkbox"]:checked) .htmx-request.archiv
 /* Busy feedback for user actions only. Auto-polling forms and buttons
    (hx-trigger containing "every") must not dim the interface on each
    background refresh: that produced a visible "blink" on Log, Downloads
-   and the Dashboard filter. */
-button.htmx-request:not([hx-trigger*="every"]),
-form.htmx-request:not([hx-trigger*="every"]) button[type="submit"],
-.btn.htmx-request:not([hx-trigger*="every"]) {
+   and the Dashboard filter. A form that asks the server while the person
+   types (data-v2-no-busy: the Downloads and archive filters) stays steady
+   too, or every keystroke would dim its buttons. */
+button.htmx-request:not([hx-trigger*="every"]):not([data-v2-no-busy]),
+form.htmx-request:not([hx-trigger*="every"]):not([data-v2-no-busy]) button[type="submit"],
+.btn.htmx-request:not([hx-trigger*="every"]):not([data-v2-no-busy]) {
   opacity: 0.6;
   cursor: wait;
 }
@@ -849,7 +851,7 @@ form.htmx-request:not([hx-trigger*="every"]) button[type="submit"],
   display: flex;
   flex-direction: column;
   margin: 0 0 16px;
-  background: var(--panel-bg, var(--panel, var(--surface, #1c2420)));
+  background: var(--surface);
   border: 1px solid var(--border, rgba(128, 128, 128, .25));
   border-radius: var(--v2-radius);
   box-shadow: var(--v2-shadow);
@@ -894,17 +896,37 @@ form.htmx-request:not([hx-trigger*="every"]) button[type="submit"],
 }
 .v2-toast {
   display: grid;
-  gap: 4px;
+  grid-template-columns: 1fr auto;
+  align-items: start;
+  gap: 4px 10px;
   padding: 14px 16px;
-  border: 1px solid rgba(78, 201, 122, .6);
+  border: 1px solid var(--ok);
   border-radius: var(--v2-radius);
-  background: var(--panel, #1c2420);
+  background: var(--surface);
   box-shadow: var(--v2-shadow);
-  color: inherit;
+  color: var(--text);
 }
-.v2-toast strong { color: #4ec97a; }
-.v2-toast.error { border-color: rgba(255, 107, 107, .7); }
-.v2-toast.error strong { color: #ff6b6b; }
+.v2-toast > strong,
+.v2-toast > span {
+  grid-column: 1;
+}
+.v2-toast strong { color: var(--ok); }
+.v2-toast .v2-toast-close {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
+  padding: 2px 6px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.v2-toast .v2-toast-close:hover { background: rgba(127, 127, 127, .18); }
+.v2-toast.error { border-color: var(--err); }
+.v2-toast.error strong { color: var(--err); }
 
 /* Log lines: one per row, readable in the <pre>. */
 .log-view { max-height: 60vh; overflow: auto; }

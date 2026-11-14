@@ -94,6 +94,8 @@ var v2ClientKeys = []string{
 	"font rilevati.",
 	"⏸ Ferma scorrimento",
 	"▶ Segui ultime righe",
+	"Operazione",
+	"Chiudi il messaggio",
 }
 
 // v2ClientI18nEntry memoizes the JSON dictionary of one i18n database and

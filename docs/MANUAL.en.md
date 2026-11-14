@@ -285,11 +285,13 @@ problem becomes hard to reproduce.
 - **Refresh**: reloads the page's data at once.
 - The download and upload **speeds** (torrents plus aMule) and **CPU and RAM
   per process**: Gextto, gx-torrent and, when active and local, aMule. They
-  refresh every 5 seconds.
+  refresh every 5 seconds, and stop when the browser tab is not in view: they
+  pick up again as soon as you come back.
 - **Theme**, text size and **Font**. The **Theme** dialog has ready-made themes
   (Dark, Light, Cream, Nord, Dracula, Solarized, Gruvbox, High contrast and
-  more, in light and dark variants); **Customize** builds your own theme from
-  four colours (background, panels, text, accent) and warns you when the
+  more, in light and dark variants); **Automatic** follows the light or dark
+  theme of the system and changes with it; **Customize** builds your own theme
+  from four colours (background, panels, text, accent) and warns you when the
   contrast is too low. Saved themes live on the server and follow you to every
   device; the active theme, text size and font remain a choice of each
   browser.
@@ -318,6 +320,8 @@ controls have accessible names; dialogs manage focus, `Tab`, `Esc` and the
 return to the control that opened them; sortable headers work from the keyboard
 and announce the sort order; updates, errors and notifications use live
 regions; the layout holds up on narrow viewports, zoom and 320-pixel reflow.
+A confirmation message goes away by itself, an error stays until you close it
+with the ✕ and is announced at once as an alert.
 `/` moves the focus to the filter of the page (the list filter on Downloads,
 the search on Configuration, the log filter) when you are not typing in a field.
 In a list with checkboxes, `Shift`+click selects or clears every row between
@@ -447,7 +451,8 @@ not in the library, grouped by series and season:
   seeders. A release covering several episodes is added once, and episodes the
   search found nothing for stay out. It keeps working in the background, so you
   do not wait for every link, and the log names the episodes it queued;
-- **Filter by series** narrows the list.
+- **Filter by series** narrows the list while you type, without reloading the
+  page.
 
 Not missing: episodes that have not aired yet, episodes that already have a
 download in progress (even added by hand or from a watched folder), the
@@ -700,7 +705,10 @@ them to aMule with **Add all** or one by one.
 
 The **Download** page shows everything being transferred: torrents, HTTP comic
 downloads and aMule eD2k files (with the **eD2k** badge), in a single list that
-refreshes every 5 seconds.
+refreshes every 5 seconds. The refresh replaces the rows and not the filter and
+tools bar: the list does not flicker and the caret stays where you are typing.
+While the browser tab is not in view the refresh stops, and picks up again as
+soon as you come back.
 
 ### Reading the list
 

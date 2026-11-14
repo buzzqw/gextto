@@ -173,6 +173,7 @@ func registerV2Routes(s *AppState, mux *http.ServeMux) {
 
 	// Scarico.
 	v2Handle(s, mux, "POST /downloads/table", V2DownloadsTable)
+	v2Handle(s, mux, "POST /partial/downloads/rows", V2DownloadsRowsPartial)
 	v2Handle(s, mux, "POST /downloads/settings", V2DownloadsSettings)
 	v2Handle(s, mux, "GET /downloads/http-detail", V2HTTPDownloadDetail)
 	v2Handle(s, mux, "GET /downloads/detail", V2DownloadsDetail)
@@ -211,11 +212,14 @@ func registerV2Routes(s *AppState, mux *http.ServeMux) {
 	v2Handle(s, mux, "GET /maintenance/gx-torrent/log", V2GxLogsPartial)
 	v2Handle(s, mux, "GET /partial/chrome", V2ChromePartial)
 	v2Handle(s, mux, "GET /partial/chrome/sse", V2ChromeSSE)
-	// Salute: singoli riquadri con cadenze di aggiornamento diverse.
+	// Salute: i tre riquadri veloci in una richiesta sola, gli altri con la
+	// loro cadenza.
+	v2Handle(s, mux, "GET /partial/health/tiles", V2HealthTilesPartial)
 	v2Handle(s, mux, "GET /partial/health/tile", V2HealthTilePartial)
 	v2Handle(s, mux, "GET /partial/health/queue", V2HealthQueuePartial)
 
 	// Tabelle generiche (Serie TV, Film, Mancanti, Archivio, Blocklist, Fumetti).
+	v2Handle(s, mux, "GET /partial/series/gaps", V2SeriesGapsListPartial)
 	v2Handle(s, mux, "GET /table", V2Table)
 	v2Handle(s, mux, "POST /table/action", V2TableAction)
 	v2Handle(s, mux, "POST /table/library", V2TableLibrary)
@@ -887,38 +891,71 @@ func V2ChromeSSE(w http.ResponseWriter, r *http.Request, s *AppState) {
 	w.Header().Set("Connection", "keep-alive")
 	w.Header().Set("X-Accel-Buffering", "no")
 
+	// The page names the fragments it hosts (parts=top,status): building and
+	// sending the ones it does not use costs the server work every 5 s for
+	// nothing. No parameter means every fragment, as before.
+	requested := map[string]bool{}
+	for _, part := range strings.Split(r.URL.Query().Get("parts"), ",") {
+		if part = strings.TrimSpace(part); part != "" {
+			requested[part] = true
+		}
+	}
+	wants := func(name string) bool { return len(requested) == 0 || requested[name] }
+
+	send := func() bool {
+		chrome := uiShellChromeFrom(s)
+		// The live chrome renders with the same translated templates as the
+		// page, so an update never puts the Italian labels back.
+		templates := v2TemplatesFor(s)
+		write := func(event, templateName string, data any) {
+			if !wants(event) {
+				return
+			}
+			var buf bytes.Buffer
+			if err := templates.ExecuteTemplate(&buf, templateName, data); err != nil {
+				return
+			}
+			fmt.Fprintf(w, "event: chrome-%s\ndata: %s\n\n", event, strings.ReplaceAll(buf.String(), "\n", ""))
+		}
+		write("top", "v2_live_top_metrics", chrome)
+		write("mobile", "v2_live_mobile_metrics", chrome)
+		write("status", "v2_live_status", chrome)
+		if wants("traffic") {
+			write("traffic", "v2_live_traffic", v2TrafficViewFrom(s))
+		}
+		flusher.Flush()
+		select {
+		case <-r.Context().Done():
+			return false
+		default:
+			return true
+		}
+	}
+
+	// The first frame goes out at once: a page that reconnects — the tab coming
+	// back into view — shows fresh numbers without waiting for the next tick.
+	if !send() {
+		return
+	}
 	tick := time.NewTicker(5 * time.Second)
 	defer tick.Stop()
-
 	for {
 		select {
 		case <-r.Context().Done():
 			return
 		case <-tick.C:
-			chrome := uiShellChromeFrom(s)
-			// The live chrome renders with the same translated templates as the
-			// page, so an update never puts the Italian labels back.
-			templates := v2TemplatesFor(s)
-
-			var topBuf bytes.Buffer
-			templates.ExecuteTemplate(&topBuf, "v2_live_top_metrics", chrome)
-			fmt.Fprintf(w, "event: chrome-top\ndata: %s\n\n", strings.ReplaceAll(topBuf.String(), "\n", ""))
-
-			var mobBuf bytes.Buffer
-			templates.ExecuteTemplate(&mobBuf, "v2_live_mobile_metrics", chrome)
-			fmt.Fprintf(w, "event: chrome-mobile\ndata: %s\n\n", strings.ReplaceAll(mobBuf.String(), "\n", ""))
-
-			var statBuf bytes.Buffer
-			templates.ExecuteTemplate(&statBuf, "v2_live_status", chrome)
-			fmt.Fprintf(w, "event: chrome-status\ndata: %s\n\n", strings.ReplaceAll(statBuf.String(), "\n", ""))
-
-			var trafficBuf bytes.Buffer
-			templates.ExecuteTemplate(&trafficBuf, "v2_live_traffic", v2TrafficViewFrom(s))
-			fmt.Fprintf(w, "event: chrome-traffic\ndata: %s\n\n", strings.ReplaceAll(trafficBuf.String(), "\n", ""))
-
-			flusher.Flush()
+			if !send() {
+				return
+			}
 		}
 	}
+}
+
+// V2HealthTilesPartial refreshes the three quick tiles (Stato, Memoria,
+// Uptime) in one answer. Each of them used to have its own 5 s request: three
+// round trips, three times the work of one on a small machine.
+func V2HealthTilesPartial(w http.ResponseWriter, r *http.Request, s *AppState) {
+	v2Render(w, http.StatusOK, "v2_health_fast_tiles", uiHealthFastTilesFrom(s), s)
 }
 
 // V2HealthTilePartial refreshes a single Salute tile without reloading the page.
@@ -1731,6 +1768,21 @@ func v2TorrentsViewFromAfterRemoval(s *AppState, r *http.Request, message string
 		Message:             message,
 		Error:               isErr,
 	}
+}
+
+// V2DownloadsRowsPartial refreshes only the rows of the download list: the 5 s
+// tick no longer rebuilds the filter, the sort menu and the tools above, so the
+// list updates in place without the toolbar flickering and without taking the
+// focus away from the filter. The counters that live outside travel with the
+// answer as out-of-band fragments.
+func V2DownloadsRowsPartial(w http.ResponseWriter, r *http.Request, s *AppState) {
+	if r.Header.Get("HX-Request") == "" {
+		http.Redirect(w, r, "/?view=downloads", http.StatusSeeOther)
+		return
+	}
+	view := v2TorrentsViewFrom(s, r, "", false)
+	view.Partial = true
+	v2RenderPlus(w, http.StatusOK, "v2_download_rows", view, s, v2NavDownloadsBadgeOOB(s, v2Removals{}))
 }
 
 // V2DownloadsTable is the single POST endpoint the torrent table form talks to.

@@ -25,7 +25,7 @@
   </div>
     <div class="panel dashboard-problems-panel">
     <div class="panel-head"><h3>{{tr "Da controllare"}}</h3><small class="muted">{{tr "Download fermi, spostamenti in sospeso e avvisi"}}</small></div>
-    <div class="panel-body" id="v2-dashboard-problems" hx-get="/dashboard/problems" hx-trigger="load, every 60s" hx-swap="innerHTML"><p class="muted">{{tr "Caricamento…"}}</p></div>
+    <div class="panel-body" id="v2-dashboard-problems" data-v2-poll hx-get="/dashboard/problems" hx-trigger="load, every 60s [window.gexttoCanPoll()], v2wake" hx-swap="innerHTML"><p class="muted">{{tr "Caricamento…"}}</p></div>
   </div>
   <div class="panel dashboard-cycle-panel">
     <div class="panel-head"><h3>{{tr "Ricerca automatica"}}</h3><small class="muted">{{tr "Serie TV, film e fumetti · riempimento gap"}}</small></div>
@@ -92,8 +92,9 @@
 {{end}}
 
 {{define "v2_action_notice"}}
-<div class="v2-toast{{if .Error}} error{{end}}" role="status">
+<div class="v2-toast{{if .Error}} error{{end}}" role="{{if .Error}}alert{{else}}status{{end}}"{{if .Error}} data-v2-toast-sticky="1"{{end}}>
   <strong>{{tr .Title}}</strong><span>{{tr .Message}}</span>
+  <button class="v2-toast-close" type="button" data-v2-toast-close aria-label="{{tr "Chiudi il messaggio"}}" title="{{tr "Chiudi il messaggio"}}">✕</button>
 </div>
 {{end}}
 
