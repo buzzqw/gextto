@@ -92,6 +92,45 @@ func TestSanitizeMagnetKeepsNameAndTrackers(t *testing.T) {
 	}
 }
 
+// TestSanitizeMagnetRepairsEscapedSeparators: an upstream may hand over a
+// magnet that travelled through HTML or a feed sanitiser, with `&amp;` where
+// the separator should be. Go's url.ParseQuery then drops everything after the
+// semicolon ("invalid semicolon separator in query"), so without the repair the
+// name falls back to the title and the trackers are lost.
+func TestSanitizeMagnetRepairsEscapedSeparators(t *testing.T) {
+	hash := "0123456789012345678901234567890123456789"
+	input := "magnet:?xt=urn:btih:" + hash +
+		"&amp;dn=Example.Show" +
+		"&amp;tr=udp%3A%2F%2Ftracker.example%3A80%2Fannounce" +
+		"&amp;tr=https%3A%2F%2Fother.example%2Fannounce"
+	out, ok := SanitizeMagnet(input, nil)
+	if !ok {
+		t.Fatal("sanitize failed")
+	}
+	if !strings.Contains(out, "&dn=Example.Show") {
+		t.Errorf("the escaped name was lost: %q", out)
+	}
+	if count := strings.Count(out, "&tr="); count != 2 {
+		t.Errorf("trackers = %d, want 2: %q", count, out)
+	}
+}
+
+func TestUnescapeMagnetSeparators(t *testing.T) {
+	cases := []struct{ in, want string }{
+		{"magnet:?xt=urn:btih:aa&amp;dn=Name", "magnet:?xt=urn:btih:aa&dn=Name"},
+		{"magnet:?xt=urn:btih:aa&#38;tr=x", "magnet:?xt=urn:btih:aa&tr=x"},
+		{"magnet:?xt=urn:btih:aa&#x26;tr=x", "magnet:?xt=urn:btih:aa&tr=x"},
+		{"magnet:?xt=urn:btih:aa&dn=AC&amp;DC", "magnet:?xt=urn:btih:aa&dn=AC&amp;DC"},
+		{"magnet:?xt=urn:btih:aa&amp;x1=y", "magnet:?xt=urn:btih:aa&amp;x1=y"},
+		{"", ""},
+	}
+	for _, tc := range cases {
+		if got := unescapeMagnetSeparators(tc.in); got != tc.want {
+			t.Errorf("unescapeMagnetSeparators(%q) = %q, want %q", tc.in, got, tc.want)
+		}
+	}
+}
+
 func TestParseSizeMB(t *testing.T) {
 	if got := ParseSizeMB("Size: 4.5 GB"); got != 4.5*1024 {
 		t.Fatalf("4.5 GB = %v", got)

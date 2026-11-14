@@ -377,6 +377,7 @@ func SanitizeMagnet(input string, fallbackTitle *string) (string, bool) {
 	if !strings.HasPrefix(input, "magnet:?") {
 		return "", false
 	}
+	input = unescapeMagnetSeparators(input)
 	parsed, err := url.Parse(input)
 	if err != nil {
 		return "", false
@@ -421,6 +422,55 @@ func SanitizeMagnet(input string, fallbackTitle *string) (string, bool) {
 		out.WriteString(encodeTracker(t))
 	}
 	return out.String(), true
+}
+
+// unescapeMagnetSeparators turns the escaped separators an upstream may hand
+// over (`&amp;dn=`, `&#38;tr=`, ...) back into '&'. A magnet that travelled
+// through HTML or a feed sanitiser carries them; url.Parse then reports
+// "invalid semicolon separator in query" and drops everything after the
+// semicolon, so the name and the trackers would be lost while the infohash
+// survives. Only an entity that introduces a magnet parameter is rewritten, so
+// a literal "&amp;" inside a title stays as it is.
+func unescapeMagnetSeparators(input string) string {
+	if !strings.Contains(input, "&amp;") && !strings.Contains(input, "&#38;") &&
+		!strings.Contains(input, "&#x26;") && !strings.Contains(input, "&#X26;") {
+		return input
+	}
+	entities := []string{"&amp;", "&#38;", "&#x26;", "&#X26;"}
+	var out strings.Builder
+	out.Grow(len(input))
+	for i := 0; i < len(input); {
+		matched := ""
+		for _, entity := range entities {
+			if strings.HasPrefix(input[i:], entity) {
+				matched = entity
+				break
+			}
+		}
+		if matched != "" && startsMagnetParam(input[i+len(matched):]) {
+			out.WriteByte('&')
+			i += len(matched)
+			continue
+		}
+		out.WriteByte(input[i])
+		i++
+	}
+	return out.String()
+}
+
+// startsMagnetParam reports whether rest opens a magnet parameter: at least
+// two letters followed by '=' (dn=, tr=, xl=, ...).
+func startsMagnetParam(rest string) bool {
+	letters := 0
+	for letters < len(rest) && letters < 16 {
+		c := rest[letters]
+		if (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') {
+			letters++
+			continue
+		}
+		break
+	}
+	return letters >= 2 && letters < len(rest) && rest[letters] == '='
 }
 
 func parsedMagnetKind(magnet string) (int, string, bool) {
