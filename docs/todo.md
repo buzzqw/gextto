@@ -31,7 +31,7 @@ Each waits for the operator's choice.
 
 - **MCP endpoint**: Gextto's API exposed as tools for an assistant, with a read-only switch. Gate: the operator's choice.
 - **Usenet as an acquisition source**: NZB search through the same indexers and an NNTP download path into the same import. Gate: the operator's choice.
-- **Blocklist "Motivo" in words**: the column shows the internal code (`stalled_ed2k`, `dead_swarm`, `corrupt_file`) instead of a sentence translated in every language, which the log now writes. Gate: the operator's choice.
+- **Blocklist "Motivo" in words**: the column shows the internal code (`stalled_ed2k`, `dead_swarm`, `corrupt_file`, `unsafe_payload`) instead of a sentence translated in every language, which the log now writes. Gate: the operator's choice.
 - **Inline styles and fixed colours**: the ~90 `style="…"` in the templates and the remaining hard-coded colours replaced by classes and the theme tokens. Gate: the operator's choice.
 - **Icon set, the rest**: the emoji that still sit inside translated labels (`🆘 ultima risorsa`, `📌 pin`, `🔍 Filtra`, `📋 Copia`, `⚡`, `🐢`, `📶`, `⏰`) become an icon beside the words, which means new catalog keys in six languages; then one design system (colours, spacing, type scale, radius) shared with the daemon and the two Gextto stylesheets folded into one with few breakpoints. Gate: the operator's choice; the visual review runs headless with `scripts/screenshots.sh`.
 - **Settings by level**: core options shown first, an "Show advanced options" switch, a mark on rows and tabs changed from their default. Gate: the operator's choice.
@@ -39,5 +39,4 @@ Each waits for the operator's choice.
 - **Target quality timeframe in pending queue**: releases below the preferred target quality wait in the pending queue for a configurable timeframe (e.g. 4 hours), while any release meeting the target quality bypasses the delay and downloads immediately. Gate: the operator's choice.
 - **Proper and repack freshness window**: the quality upgrade bonus for scene `PROPER` and `REPACK` releases applies only within a freshness window (e.g. 14 days from episode acquisition), preventing churn on long-established archive files. Gate: the operator's choice.
 - **Pre-flight swarm health probe**: a fast DHT or tracker scrape probe for releases with missing or zero seeder counts before queuing them, deferring unseeded torrents instead of occupying active slots until stalled timeouts. Gate: the operator's choice.
-- **Pre-download file tree safety guard**: extending the pack file-tree inspector to all incoming torrents as soon as metadata is resolved, rejecting torrents containing suspicious executables or missing valid media files before piece allocation. Gate: the operator's choice.
 - **External watchlist sync**: an optional background worker importing wanted titles from public Trakt or Letterboxd watchlists directly into Gextto's wanted queue. Gate: the operator's choice.

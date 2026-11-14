@@ -500,6 +500,16 @@ serve solo a non aspettare il ciclo successivo.
   log dice cosa conteneva e il pack sparisce senza aver scaricato nulla. Vale
   solo per i pack scelti dal ciclo: un pack che avvii tu a mano non viene mai
   scartato.
+- **Una release con un programma dentro, o senza video, viene rifiutata prima
+  di partire.** Appena conosce l'elenco dei file — dal `.torrent` già scaricato,
+  o dai metadati che arrivano pochi istanti dopo aver aggiunto un magnet —
+  Gextto scarta una release che contiene un eseguibile o uno script (`.exe`,
+  `.bat`, `.cmd`, `.msi`, `.ps1`, `.sh` e simili) o che non contiene alcun
+  video, a parte i sample. La release va in blocklist per trenta giorni e la
+  ricerca passa a un'altra versione. Un pacchetto in volumi RAR o 7z resta
+  accettato (il video è dentro e viene estratto prima dell'importazione), una
+  puntata con sottotitoli, `.nfo` o `.url` pure, e un torrent che avvii tu a
+  mano non viene mai toccato.
 - Un pack annunciato **in corso** (per esempio «4 su 8» puntate) può contenere
   solo le puntate già uscite: quelle che ci sono dentro entrano in libreria e le
   altre restano mancanti, da cercare più avanti. Gextto non scarta il download

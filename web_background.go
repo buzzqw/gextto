@@ -770,25 +770,26 @@ type eventWorker struct {
 	notifier   *Notifier
 	tmdb       *TmdbClient
 
-	moveRequests          map[string]struct{}
-	completionNotified    map[string]struct{}
-	completionRetries     map[string]completionRetry
-	settledTorrents       map[string]settledTorrent
-	packIdentityChecked   map[string]packIdentityCheck
-	packInspectionChecked map[string]packInspectionCheck
-	notErrorChecked       map[string]time.Time
-	notDetachable         map[string]time.Time
-	storageMoveRetries    map[string]StorageMoveRetry
-	seedCopyWarnings      map[string]time.Time
-	postSeedMoves         map[string]struct{}
-	persistedMoves        map[string]persistedMove
-	metadataWaitStart     map[string]time.Time
-	metadataFirstSeen     map[string]time.Time
-	metadataLastWarning   map[string]time.Time
-	stallWaitStart        map[string]StallWatch
-	ramdiskAttempts       map[string]time.Time
-	checking              map[string]eventWorkerDataCheck
-	startupHashes         map[string]struct{}
+	moveRequests             map[string]struct{}
+	completionNotified       map[string]struct{}
+	completionRetries        map[string]completionRetry
+	settledTorrents          map[string]settledTorrent
+	packIdentityChecked      map[string]packIdentityCheck
+	packInspectionChecked    map[string]packInspectionCheck
+	contentInspectionChecked map[string]contentInspectionCheck
+	notErrorChecked          map[string]time.Time
+	notDetachable            map[string]time.Time
+	storageMoveRetries       map[string]StorageMoveRetry
+	seedCopyWarnings         map[string]time.Time
+	postSeedMoves            map[string]struct{}
+	persistedMoves           map[string]persistedMove
+	metadataWaitStart        map[string]time.Time
+	metadataFirstSeen        map[string]time.Time
+	metadataLastWarning      map[string]time.Time
+	stallWaitStart           map[string]StallWatch
+	ramdiskAttempts          map[string]time.Time
+	checking                 map[string]eventWorkerDataCheck
+	startupHashes            map[string]struct{}
 
 	lastRecoveryScan   time.Time
 	lastRamdiskCheck   time.Time
@@ -857,6 +858,9 @@ func newEventWorker(configPath string, fallback *Config, state *AppState, db *Da
 	// Packs already inspected while downloading (see pack_inspector.go): the
 	// metadata never changes, so one verdict per torrent is enough.
 	packInspectionChecked := map[string]packInspectionCheck{}
+	// Torrents whose payload was already checked once the engine reported its
+	// file list (see content_inspector.go): one verdict per torrent.
+	contentInspectionChecked := map[string]contentInspectionCheck{}
 	// Startup torrents found not in error, skipped for notErrorRecheckInterval.
 	notErrorChecked := map[string]time.Time{}
 	// Torrents found not to be detached, skipped for notDetachableRecheckInterval.
@@ -968,7 +972,8 @@ func newEventWorker(configPath string, fallback *Config, state *AppState, db *Da
 		torrents: torrents, cfg: cfg, notifier: notifier, tmdb: tmdb,
 		moveRequests: moveRequests, completionNotified: completionNotified, completionRetries: completionRetries,
 		settledTorrents: settledTorrents, packIdentityChecked: packIdentityChecked, packInspectionChecked: packInspectionChecked,
-		notErrorChecked: notErrorChecked, notDetachable: notDetachable, storageMoveRetries: storageMoveRetries,
+		contentInspectionChecked: contentInspectionChecked,
+		notErrorChecked:          notErrorChecked, notDetachable: notDetachable, storageMoveRetries: storageMoveRetries,
 		seedCopyWarnings: seedCopyWarnings, postSeedMoves: postSeedMoves, persistedMoves: persistedMoves,
 		metadataWaitStart: metadataWaitStart, metadataFirstSeen: metadataFirstSeen, metadataLastWarning: metadataLastWarning,
 		stallWaitStart: stallWaitStart, ramdiskAttempts: ramdiskAttempts, checking: checking, startupHashes: startupHashes,
@@ -1049,6 +1054,7 @@ func (w *eventWorker) tick(now time.Time) {
 	DetachErrorTorrents(w.torrents, w.db, w.startupHashes, w.notErrorChecked)
 	DetachCompletedArchivedSingles(w.cfg, w.torrents, w.db, w.notDetachable)
 	RejectActivePackIdentityMismatches(w.torrents, w.db, w.packIdentityChecked)
+	InspectActiveContent(w.cfg, w.torrents, w.db, w.notifier, w.contentInspectionChecked)
 	InspectActivePacks(w.cfg, w.torrents, w.db, w.notifier, w.packInspectionChecked)
 	// Remove completed torrents that have finished seeding before the seed
 	// policy moves them to disk only to delete them. With automatic removal

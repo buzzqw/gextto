@@ -147,6 +147,8 @@ qBittorrent-nox.
 | `upgrade_impact.go` | "what would the next cycles replace?": the archived releases replayed through the series decision in dry-run. |
 | `pack_precheck.go` | an in-progress pack read from its `.torrent` file list before it is downloaded, so a pack that does not hold the wanted episode is not downloaded at all. |
 | `pack_inspector.go` | a pack inspected as soon as its metadata arrives (a magnet has none until the swarm answers): a pack with nothing useful is removed and its upgrade backup restored. |
+| `content_guard.go` | the payload guard: a file list carrying a program or a script, or holding no video file at all (a sample aside), is refused before the download starts, blocklisted for a month and its link quarantined; RAR and 7z sets are accepted, the video is inside. |
+| `content_inspector.go` | the same guard for a magnet: the file list the engine reports once the metadata arrives, for every series and movie torrent the cycle added (a manual or watched-folder torrent is the operator's choice), with the torrent removed and its upgrade backup restored. |
 | `orphan_cleanup.go` | guided cleanup of the download folders: entries no live torrent owns and whose videos all have a library copy at equal or better quality. |
 | `fileops.go` | long-running copies and moves registered so a shutdown waits for them: no half-copied file left in the library. |
 

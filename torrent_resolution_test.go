@@ -171,7 +171,7 @@ func TestRunCycleDomainResolvesTorrentURLRedirectToMagnet(t *testing.T) {
 // can be added, then deleted when the candidate is over: the staging folder
 // must not keep a copy for a release the cycle has already judged.
 func TestRunCycleRemovesTheStagedFeedTorrent(t *testing.T) {
-	payload := []byte("d8:announce3:url4:infod6:lengthi1e4:name14:Show.S01E01.mk12:piece lengthi16384e6:pieces0:ee")
+	payload := []byte("d8:announce3:url4:infod6:lengthi1e4:name15:Show.S01E01.mkv12:piece lengthi16384e6:pieces0:ee")
 	if _, ok := utils.TorrentInfoHash(payload); !ok {
 		t.Fatal("the test payload is not a valid torrent")
 	}

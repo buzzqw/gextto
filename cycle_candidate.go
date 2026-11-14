@@ -314,6 +314,33 @@ func (r *candidateRun) judge() (stop bool, err error) {
 	return false, nil
 }
 
+// unsafePayload reads the file list of the `.torrent` the cycle already
+// downloaded and stops a release whose payload the guard refuses
+// (content_guard.go): a program, a script, or no video file at all. A magnet
+// has no file list yet, so this verdict is taken by InspectActiveContent once
+// the engine has the metadata. It can only refuse.
+func (r *candidateRun) unsafePayload() bool {
+	if r.torrentFile == nil || *r.torrentFile == "" || r.release.Ed2kLink != "" {
+		return false
+	}
+	names, err := torrentFileList(*r.torrentFile)
+	if err != nil {
+		logging.Debug("could not read the torrent file list",
+			"target", releaseTarget(&r.release), "error", err)
+		return false
+	}
+	why := unsafePayloadReason(names, r.release.Kind)
+	if why == "" {
+		return false
+	}
+	logging.Warn(fmt.Sprintf("⏭️ Skipped %s: %s", logTarget(&r.release), why),
+		"release", r.release.Title)
+	if !r.p.cfg.DryRun {
+		refuseUnsafePayload(r.p.db, &r.release, time.Now())
+	}
+	return true
+}
+
 // staleInProgressPack reads the file list of an in-progress pack and skips it
 // when everything inside is already better on disk. An "in progress" pack
 // declares how many episodes it holds long before the .torrent is updated: it
@@ -364,6 +391,9 @@ func (r *candidateRun) start(approvalContext *models.ApprovalContext, approvalRe
 		return
 	}
 	if r.deferredHash != "" && !r.resolveDeferred() {
+		return
+	}
+	if r.unsafePayload() {
 		return
 	}
 	if r.staleInProgressPack() {

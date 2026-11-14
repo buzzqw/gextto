@@ -497,6 +497,16 @@ and — if you enable it — asks eD2k once per season when torrents find nothin
   only if something useful is inside. Otherwise the log says what it held and
   the pack goes without having downloaded anything. It applies only to packs
   chosen by the cycle: a pack you start by hand is never dropped.
+- **A release carrying a program, or holding no video, is refused before it
+  starts.** As soon as Gextto knows the file list — from the `.torrent` it
+  already downloaded, or from the metadata that arrives a few instants after a
+  magnet is added — it drops a release that carries an executable or a script
+  (`.exe`, `.bat`, `.cmd`, `.msi`, `.ps1`, `.sh` and the like) or that holds no
+  video at all, samples aside. The release goes on the blocklist for thirty
+  days and the search moves on to another version. A pack in RAR or 7z volumes
+  is still accepted (the video is inside and is extracted before the import),
+  and so is an episode with subtitles, `.nfo` or `.url`; a torrent you start by
+  hand is never touched.
 - A pack announced as **in progress** (for example «4 of 8» episodes) can hold
   only the episodes already aired: the ones inside it enter the library and the
   others stay missing, to be searched later. Gextto does not throw the download
