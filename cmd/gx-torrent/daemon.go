@@ -307,6 +307,11 @@ type Daemon struct {
 	rateHist       rateHistory
 	// lastPeerNoiseReport rate-limits the periodic peer/tracker error summary.
 	lastPeerNoiseReport time.Time
+	// rotateReportAt and rotatePending drive the summary of the torrents the
+	// queue set aside (rotate_report.go): when it was last written and the ones
+	// rotated since.
+	rotateReportAt time.Time
+	rotatePending  map[string]string
 	// connAutoAt/connAutoState drive the automatic per-torrent peer cap
 	// (connauto.go): the last pass and what each torrent has delivered since.
 	// connAutoLimits are the last machine limits logged, so a stable cap is
@@ -1402,7 +1407,11 @@ func (d *Daemon) tick(now time.Time) {
 			meta.RotatedAt = now
 			meta.Pos = d.nextPosLocked()
 			d.dirty = true
-			logf("«%s» moves no data: set aside so another torrent can run", statsOf[id].Name)
+			// The same torrents are rotated again at every pass: one line per
+			// torrent per pass said nothing new (rotate_report.go).
+			if line := d.noteRotationLocked(now, id, statsOf[id].Name); line != "" {
+				logf("%s", line)
+			}
 		}
 	}
 	for _, id := range plan.Stop {
