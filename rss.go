@@ -1714,13 +1714,19 @@ func fetchFeedItems(ctx context.Context, rawURL string, flaresolverr *string, ma
 }
 
 func fetchTraditionalListing(ctx context.Context, client *http.Client, rawURL, body, kind, label string, flaresolverr *string, cutoff *time.Time) ([]models.Release, int, int, error) {
-	selector := "a[href*='/torrent/'], a[href*='/torrents/'], a[href^='magnet:']"
-	if kind == "ExtTo" {
-		selector = "a.torrent-title-link, a[href^='magnet:']"
-	}
 	base, err := url.Parse(rawURL)
 	if err != nil {
 		return nil, 0, 0, err
+	}
+	// ext.to is scraped one row at a time: see fetchExtToRows.
+	if kind == "ExtTo" {
+		if releases, old, total, ok := fetchExtToRows(ctx, client, base, body, label, flaresolverr, cutoff); ok {
+			return releases, old, total, nil
+		}
+	}
+	selector := "a[href*='/torrent/'], a[href*='/torrents/'], a[href^='magnet:']"
+	if kind == "ExtTo" {
+		selector = "a.torrent-title-link, a[href^='magnet:']"
 	}
 	document, err := html.Parse(strings.NewReader(body))
 	if err != nil {
@@ -1756,6 +1762,84 @@ func fetchTraditionalListing(ctx context.Context, client *http.Client, rawURL, b
 	}
 	old := fetchDetailMagnets(ctx, client, pending, label, flaresolverr, &output, cutoff)
 	return output, old, pageTotal, nil
+}
+
+// extToRowSelector matches one release of an ext.to listing. Since 2026-11-13
+// the row carries both a title link and a magnet button, so reading the listing
+// node by node filled the 50-entry cap with the title link and the magnet of
+// the same 25 rows: half of every page was never seen, and each of those title
+// links cost a detail-page request for a magnet the row already had.
+const extToRowSelector = "table.search-table tbody tr"
+
+// extToRowsPerPage is what the listing carries: legacy walks 50 items per page.
+const extToRowsPerPage = 50
+
+// fetchExtToRows reads one ext.to listing row by row. Each row yields its title
+// and its magnet, so a page of 50 rows becomes 50 releases without opening a
+// single detail page. A row without a magnet keeps the old detail fallback, so
+// the parser survives a layout that only links the release page again. ok is
+// false when the page has no table rows: the caller then uses the generic
+// anchor walk.
+func fetchExtToRows(ctx context.Context, client *http.Client, base *url.URL, body, label string, flaresolverr *string, cutoff *time.Time) ([]models.Release, int, int, bool) {
+	document, err := html.Parse(strings.NewReader(body))
+	if err != nil {
+		return nil, 0, 0, false
+	}
+	rows := htmlSelectAll(document, extToRowSelector)
+	if len(rows) == 0 {
+		return nil, 0, 0, false
+	}
+	if len(rows) > extToRowsPerPage {
+		rows = rows[:extToRowsPerPage]
+	}
+	var output []models.Release
+	var pending []rssDetailLink
+	for _, row := range rows {
+		title := firstHTMLText(row, "a.torrent-title-link")
+		if title == "" {
+			// The layout of 2026-10-23 kept the title in `span.name`.
+			title = firstHTMLText(row, "span.name")
+		}
+		magnet := firstHTMLAttr(row, "a[href^='magnet:']", "href")
+		if magnet != "" {
+			if title == "" {
+				title = titleFromMagnet(magnet)
+			}
+			if title != "" {
+				pushRelease(&output, title, magnet, label)
+			}
+			continue
+		}
+		if title == "" {
+			continue
+		}
+		if href := firstHTMLAttr(row, "a[href*='/post-detail/']", "href"); href != "" {
+			if detail, err := base.Parse(href); err == nil {
+				pending = append(pending, rssDetailLink{title: title, url: detail})
+			}
+		}
+	}
+	old := fetchDetailMagnets(ctx, client, pending, label, flaresolverr, &output, cutoff)
+	return output, old, len(rows), true
+}
+
+// firstHTMLText returns the text of the first descendant matching selector.
+func firstHTMLText(root *html.Node, selector string) string {
+	nodes := htmlSelectAll(root, selector)
+	if len(nodes) == 0 {
+		return ""
+	}
+	return strings.TrimSpace(htmlText(nodes[0]))
+}
+
+// firstHTMLAttr returns one attribute of the first descendant matching selector.
+func firstHTMLAttr(root *html.Node, selector, attr string) string {
+	nodes := htmlSelectAll(root, selector)
+	if len(nodes) == 0 {
+		return ""
+	}
+	value, _ := htmlAttr(nodes[0], attr)
+	return strings.TrimSpace(value)
 }
 
 // rssDetailLink is a pending `(title, detail URL)` pair.

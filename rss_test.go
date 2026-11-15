@@ -473,6 +473,79 @@ func TestListingUsesMagnetDnWhenAnchorHasNoText(t *testing.T) {
 	}
 }
 
+// ext.to changed its listing on 2026-11-13: the row now carries a title link
+// and a magnet button, where before it carried a magnet button only (the title
+// was a plain anchor to the detail page). Reading the listing node by node
+// filled the 50-entry cap with the title link and the magnet of the same 25
+// rows, so half of every page was never seen and each of those title links cost
+// a detail request for a magnet the row already had. Both layouts must yield
+// every row of the page, without opening a detail page.
+func TestExtToListingReadsEveryRowOfBothLayouts(t *testing.T) {
+	layouts := map[string]func(index int) string{
+		"2026-10-23 layout": func(index int) string {
+			return fmt.Sprintf(`<tr>
+<td class="text-left">
+<a href="/post-detail/%06d/title/"><span class="name"><b>Release %02d</b></span></a>
+<div class="btn-blocks"><a class="dwn-btn torrent-dwn" href="magnet:?xt=urn:btih:%040x&amp;dn=Release%%20%02d">icon</a></div>
+</td>
+<td class="nowrap-td"><div class="add-block-wrapper"><span>1.5 GB</span></div></td>
+</tr>`, index, index, index, index)
+		},
+		"2026-11-15 layout": func(index int) string {
+			return fmt.Sprintf(`<tr>
+<td class="text-left">
+<div class="torrent-title-line"><i class="material-icons">movie</i>
+<a href="/post-detail/%06d/title/" class="torrent-title-link"><b>Release %02d</b></a></div>
+<div class="btn-blocks float-right"><a class="dwn-btn search-magnet-btn" rel="nofollow" href="magnet:?xt=urn:btih:%040x&amp;dn=Release%%20%02d">icon</a></div>
+</td>
+<td class="nowrap-td hide-on-mob"><div class="add-block-wrapper"><span class="add-block">Size</span><span>1.5 GB</span></div></td>
+</tr>`, index, index, index, index)
+		},
+	}
+	for name, row := range layouts {
+		t.Run(name, func(t *testing.T) {
+			var detailRequests int
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if strings.Contains(r.URL.Path, "post-detail") {
+					detailRequests++
+					_, _ = fmt.Fprint(w, `<html><body><a href="magnet:?xt=urn:btih:deadbeefdeadbeefdeadbeefdeadbeefdeadbeef">x</a></body></html>`)
+					return
+				}
+				var body strings.Builder
+				body.WriteString(`<html><body><table class="table search-table"><tbody>`)
+				for index := 0; index < 50; index++ {
+					body.WriteString(row(index))
+				}
+				body.WriteString(`</tbody></table></body></html>`)
+				_, _ = fmt.Fprint(w, body.String())
+			}))
+			defer server.Close()
+
+			releases, err := FetchFeed(context.Background(), server.URL+"/ext.to/browse/?filter=u=x", nil, 1, 0, 0)
+			if err != nil {
+				t.Fatalf("FetchFeed: %v", err)
+			}
+			if len(releases) != 50 {
+				t.Fatalf("releases = %d, want 50 (every row of the page)", len(releases))
+			}
+			if detailRequests != 0 {
+				t.Fatalf("detail requests = %d, want 0: the row carries the magnet", detailRequests)
+			}
+			if releases[0].Title == "" || releases[49].Title != "Release 49 [ExtTo - x]" {
+				t.Fatalf("first/last title = %q/%q, want the whole page in order",
+					releases[0].Title, releases[49].Title)
+			}
+			seen := map[string]bool{}
+			for _, release := range releases {
+				if seen[release.Magnet] {
+					t.Fatalf("the same row was collected twice: %q", release.Magnet)
+				}
+				seen[release.Magnet] = true
+			}
+		})
+	}
+}
+
 func TestFetchFeedStopsWhenAPageAddsNoNewHash(t *testing.T) {
 	const page = `<html><body>
 <a class="torrent-title-link" href="magnet:?xt=urn:btih:0123456789012345678901234567890123456789">One</a>

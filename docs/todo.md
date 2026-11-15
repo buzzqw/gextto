@@ -23,7 +23,7 @@ still be true after the item lands does not belong here.
 
 ## Gextto, acquisition and UI
 
-Nothing open.
+- **A listing page the parser no longer reads says so**: an ext.to or TorrentGalaxy page whose rows no longer match the parser ends up as "no result", the same as an uploader with nothing new, so the health row stays green while the feed is blind. Count the rows read and the releases kept for every feed read and keep the last outcome, so the feed activity says "page changed" instead of "empty". Gate: the count comes from the parser that already walks the page, no new request; verified on the next listing that changes its markup, or by hand against a saved page with zero kept releases and rows present.
 
 ## Proposals
 
