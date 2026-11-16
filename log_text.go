@@ -116,6 +116,10 @@ func logDuration(d time.Duration) string {
 		minutes := int64(math.Round(d.Minutes()))
 		return countLabel(minutes, "minute", "minutes")
 	}
+	if d >= 48*time.Hour {
+		days := int64(math.Round(d.Hours() / 24))
+		return countLabel(days, "day", "days")
+	}
 	hours := int64(d / time.Hour)
 	minutes := int64((d % time.Hour) / time.Minute)
 	text := countLabel(hours, "hour", "hours")

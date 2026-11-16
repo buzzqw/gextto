@@ -513,7 +513,7 @@ serve solo a non aspettare il ciclo successivo.
 - Un pack annunciato **in corso** (per esempio «4 su 8» puntate) può contenere
   solo le puntate già uscite: quelle che ci sono dentro entrano in libreria e le
   altre restano mancanti, da cercare più avanti. Gextto non scarta il download
-  perché il pack è ancora incompleto. Se l'elenco dei file non contiene nulla che ti manca, il pack non viene rifiutato per sempre: resta da parte 24 ore e viene riguardato, ogni 24 ore, perché chi lo pubblica continua ad aggiungere puntate.
+  perché il pack è ancora incompleto. Se l'elenco dei file non contiene nulla che ti manca, il pack non viene rifiutato per sempre: resta da parte una settimana e viene riguardato, ogni settimana, perché chi lo pubblica aggiunge le puntate man mano che escono: una stagione in corso può impiegare settimane a completarsi, e rileggerne l'elenco ogni giorno non aggiunge nulla.
 - Se un download resta **fermo a 0 B/s o in attesa dei metadati** oltre il
   tempo impostato in *Configurazione → Qualità e upgrade → Download bloccati*,
   la ricerca può avviare un'alternativa della stessa puntata (o della stagione)

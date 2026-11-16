@@ -216,7 +216,7 @@ func InspectActivePacks(cfg *Config, torrents TorrentEngine, db *Database, notif
 		retryWait := refuseUselessPack(db, &candidate.release, "pack_inspection_useless", reason, now)
 		again := "will not be taken again"
 		if retryWait > 0 {
-			again = "will be looked at again in 24 hours, as it is still being fed with new episodes"
+			again = fmt.Sprintf("will be looked at again in %s, as it is still being fed with new episodes", logDuration(retryWait))
 		}
 		_ = db.ForgetRemovedTorrent(candidate.torrent.Hash)
 		removed, removeErr := torrents.Remove(candidate.torrent.Hash, true)

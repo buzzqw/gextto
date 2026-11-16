@@ -348,10 +348,12 @@ func episodeList(episodes []int64) string {
 
 // inProgressPackRetry is how long a season pack still being fed with new
 // episodes ("[IN CORSO][04/08]") stays out after its file list showed nothing
-// useful. The uploader keeps adding episodes to it, so it is not refused for
-// good: it is looked at again after this wait, and again each time it is still
-// of no use.
-const inProgressPackRetry = 24 * time.Hour
+// useful. A season that is still airing gains an episode a week, and a pack can
+// take weeks to fill up: looking at it every day only downloaded the same file
+// list, so the wait is a week — about one new episode — and it repeats while the
+// pack stays of no use. A pack that gains an episode is a different torrent,
+// with its own infohash, so it is not covered by this wait and is taken at once.
+const inProgressPackRetry = 7 * 24 * time.Hour
 
 // refuseUselessPack records that a pack is of no use. A pack that is still in
 // progress is blocked and quarantined for inProgressPackRetry only; any other

@@ -25,6 +25,8 @@ func TestLogTextFormatsNumbersAndDurations(t *testing.T) {
 		logDuration(2*time.Hour + 34*time.Minute):   "2 hours 34 minutes",
 		logDuration(6 * time.Hour):                  "6 hours",
 		logDuration(3 * time.Second):                "3 seconds",
+		logDuration(7 * 24 * time.Hour):             "7 days",
+		logDuration(36 * time.Hour):                 "36 hours",
 	}
 	for got, want := range cases {
 		if got != want {
