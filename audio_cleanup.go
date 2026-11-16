@@ -54,6 +54,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/buzzqw/gextto/internal/logging"
@@ -444,7 +445,9 @@ func RunAudioCleanup(ctx context.Context, path string, opts AudioCleanupOptions)
 			break
 		}
 		_ = os.Remove(candidate)
-		if ctx.Err() != nil {
+		if errors.Is(attemptErr, errAudioCleanupInterrupted) || ctx.Err() != nil {
+			// A stop says nothing about the file, and after it there is no point
+			// in trying the next tool.
 			return report, fmt.Errorf("%s: %w", backend, attemptErr)
 		}
 		if !errors.Is(attemptErr, errAudioCleanupWouldDiffer) {
@@ -884,7 +887,39 @@ func runAudioCleanupCommand(ctx context.Context, argv []string, duration int64, 
 	if detail == "" {
 		detail = waitErr.Error()
 	}
+	if audioCleanupStoppedBySignal(waitErr) {
+		// The tool was terminated from outside — systemd sends SIGTERM to every
+		// process of the service when Gextto is stopped, the child included.
+		// Nothing was learned about the file: it must not be reported as a
+		// failure, and it must be tried again.
+		return fmt.Errorf("%w: %s: %s", errAudioCleanupInterrupted, filepath.Base(argv[0]), detail)
+	}
 	return fmt.Errorf("%s: %s", filepath.Base(argv[0]), detail)
+}
+
+// errAudioCleanupInterrupted marks a cleanup stopped from outside before it
+// could judge the file: a restart, a stop, a signal on the tool. It is not a
+// failure of the file and not a verdict about it, so the callers say so and
+// leave the file to be tried again.
+var errAudioCleanupInterrupted = errors.New("the audio cleanup was interrupted")
+
+// audioCleanupStoppedBySignal reports whether the tool ended on a signal a stop
+// sends (SIGTERM, SIGINT, SIGHUP) instead of failing on the file. The timeout
+// of the job kills the child with SIGKILL, which stays an ordinary failure.
+func audioCleanupStoppedBySignal(err error) bool {
+	var exitError *exec.ExitError
+	if !errors.As(err, &exitError) {
+		return false
+	}
+	status, ok := exitError.Sys().(syscall.WaitStatus)
+	if !ok || !status.Signaled() {
+		return false
+	}
+	switch status.Signal() {
+	case syscall.SIGTERM, syscall.SIGINT, syscall.SIGHUP:
+		return true
+	}
+	return false
 }
 
 // audioCleanupProgress reads mkvmerge --gui-mode and ffmpeg -progress output.

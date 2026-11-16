@@ -732,3 +732,59 @@ func TestRunAudioCleanupLeavesUntouchedFilesAlone(t *testing.T) {
 		})
 	}
 }
+
+// A tool stopped by a restart must not read as a failure of the file: systemd
+// signals every process of the service, the child included, and gextto was
+// reporting "audio cleanup failed" for a file it never looked at.
+func TestAudioCleanupStopIsInterruptedNotFailed(t *testing.T) {
+	if _, err := exec.LookPath("sh"); err != nil {
+		t.Skip("sh not installed")
+	}
+	err := runAudioCleanupCommand(context.Background(), []string{"sh", "-c", "kill -TERM $$"}, 0, "test")
+	if err == nil {
+		t.Fatal("a tool killed by SIGTERM must be an error")
+	}
+	if !errors.Is(err, errAudioCleanupInterrupted) {
+		t.Fatalf("a stop should be reported as interrupted, got %v", err)
+	}
+}
+
+// The helper reads the raw error of os/exec: the message keeps the tool's own
+// words, the rule looks at the signal.
+func TestAudioCleanupStoppedBySignal(t *testing.T) {
+	if _, err := exec.LookPath("sh"); err != nil {
+		t.Skip("sh not installed")
+	}
+	stopped := exec.Command("sh", "-c", "kill -TERM $$").Run()
+	if !audioCleanupStoppedBySignal(stopped) {
+		t.Fatalf("SIGTERM was not recognised: %v", stopped)
+	}
+	failed := exec.Command("sh", "-c", "exit 3").Run()
+	if audioCleanupStoppedBySignal(failed) {
+		t.Fatalf("an ordinary failure was taken for a stop: %v", failed)
+	}
+	if audioCleanupStoppedBySignal(nil) || audioCleanupStoppedBySignal(errors.New("boom")) {
+		t.Fatal("a non-exit error was taken for a stop")
+	}
+}
+
+// An ordinary failure of the tool stays a failure: the tool answered, and the
+// next attempt must know it failed on the file.
+func TestAudioCleanupPlainFailureIsNotAStop(t *testing.T) {
+	if _, err := exec.LookPath("sh"); err != nil {
+		t.Skip("sh not installed")
+	}
+	err := runAudioCleanupCommand(context.Background(), []string{"sh", "-c", "echo broken >&2; exit 3"}, 0, "test")
+	if err == nil {
+		t.Fatal("a non-zero exit must be an error")
+	}
+	if errors.Is(err, errAudioCleanupInterrupted) {
+		t.Fatalf("an ordinary failure was taken for a stop: %v", err)
+	}
+	if audioCleanupStoppedBySignal(err) {
+		t.Fatalf("an ordinary failure was taken for a signal: %v", err)
+	}
+	if !strings.Contains(err.Error(), "broken") {
+		t.Fatalf("the tool's own words were lost: %v", err)
+	}
+}

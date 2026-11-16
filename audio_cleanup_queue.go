@@ -275,6 +275,12 @@ func audioCleanupProcess(job audioCleanupJob, cfg *Config, db *Database) {
 	defer cancel()
 	report, err := RunAudioCleanup(ctx, job.Path, job.Options)
 	switch {
+	case errors.Is(err, errAudioCleanupInterrupted):
+		// A stop or a restart killed the tool: nothing was decided about the
+		// file. The job stays in the queue file and is resumed at the next
+		// start, so it is not counted as a failure here.
+		logging.Info(fmt.Sprintf("🎧 «%s»: the audio cleanup was interrupted before it could finish, the file is untouched",
+			filepath.Base(job.Path)), "path", job.Path)
 	case err != nil:
 		if errors.Is(err, errAudioCleanupWouldDiffer) {
 			logging.Info(fmt.Sprintf("🎧 «%s»: the audio cleanup would change the file%s, so it was left as it is",

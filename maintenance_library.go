@@ -390,6 +390,11 @@ func runLibraryAudioCleanup(ctx context.Context, state *AppState, keepGoing func
 		if ctx.Err() != nil {
 			return
 		}
+		if strings.HasPrefix(outcome, "interrupted") {
+			// Nothing was decided about this file: with no record it is looked
+			// at again at the next pass instead of a week from now.
+			continue
+		}
 		after, err := os.Stat(item.candidate.Path)
 		if err != nil {
 			continue
@@ -440,6 +445,12 @@ func runLibraryAudioCleanupFile(ctx context.Context, state *AppState, candidate 
 	defer cancel()
 	report, err := RunAudioCleanup(fileCtx, candidate.Path, opts)
 	switch {
+	case errors.Is(err, errAudioCleanupInterrupted):
+		// A stop or a restart killed the tool: the file was not judged, so no
+		// progress is recorded and the next pass looks at it again.
+		logging.Info(fmt.Sprintf("🎧 «%s»: the audio cleanup was interrupted before it could finish, the file is untouched",
+			filepath.Base(candidate.Path)), "path", candidate.Path)
+		return "interrupted", report
 	case err != nil:
 		if errors.Is(err, errAudioCleanupWouldDiffer) {
 			// Every tool produced a copy the checks refused: this file cannot be
