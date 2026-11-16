@@ -1220,7 +1220,9 @@ wrong API key, or the backoff will start again.
 Gextto warns you by itself (log and notification) when a source fails in three
 of the latest searches, when a source's `.torrent` links fail on two different
 releases in the same cycle (usually an expired login) and when everything is
-back to normal.
+back to normal. A missing login is not a dead link: the torrent stays available
+and is tried again at the next cycle, without waiting for the quarantine Gextto
+applies to links that really can no longer be served.
 
 ### Copies of the same release
 

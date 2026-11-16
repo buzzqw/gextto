@@ -133,8 +133,12 @@ func boundReason(reason string, limit int) string {
 
 // aggregatedSource splits a "manager:site" source, the form the Torznab
 // parser gives to a result that names its site (Jackett's jackettindexer
-// attribute, also written by indexarr).
+// attribute, also written by indexarr). A proposal kept in the archive carries
+// the "archive:" prefix, which says where the candidate came from and is not a
+// manager: it is dropped before splitting, or the warning would name the
+// manager "archive" and the site "indexarr:MirCrew".
 func aggregatedSource(source string) (string, string, bool) {
+	source = strings.TrimPrefix(strings.TrimSpace(source), "archive:")
 	manager, site, found := strings.Cut(source, ":")
 	manager = strings.TrimSpace(manager)
 	site = strings.TrimSpace(site)

@@ -2,9 +2,11 @@ package gextto
 
 // Dead torrent links: a release that only offers an HTTP `.torrent` link (no
 // magnet) is useless when the link keeps failing — a proxy that answers 502, an
-// indexer whose session is expired, an entry whose torrent was removed. The
-// archive keeps proposing the same URL on every cycle, so the failure repeats
-// forever and the cycle never counts as clean.
+// entry whose torrent was removed. The archive keeps proposing the same URL on
+// every cycle, so the failure repeats forever and the cycle never counts as
+// clean. An answer that names a login is not one of these: it fails every link
+// of the source until the session works again, so it is transient and never
+// quarantines (`errTorrentNotAvailable`, engine.go).
 //
 // A link that fails in two different cycles is quarantined: the archive search
 // skips it instead of asking the indexer again, for a wait that grows with the

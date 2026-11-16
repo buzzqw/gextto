@@ -1234,7 +1234,9 @@ ricomincerà.
 Gextto avvisa da sé (log e notifica) quando una sorgente fallisce in tre delle
 ultime ricerche, quando i link `.torrent` di una sorgente falliscono su due
 release diverse nello stesso ciclo (di solito un login scaduto) e quando tutto
-torna regolare.
+torna regolare. Un login che manca non è un link morto: il torrent resta
+disponibile e viene riprovato al ciclo successivo, senza aspettare la quarantena
+che Gextto applica ai link davvero non più servibili.
 
 ### Copie della stessa release
 

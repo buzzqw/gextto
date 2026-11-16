@@ -86,7 +86,13 @@ func TestAggregatedSourceNamesTheSite(t *testing.T) {
 	if !ok || manager != "indexarr" || site != "MirCrew" {
 		t.Fatalf("aggregatedSource = %q, %q, %v", manager, site, ok)
 	}
-	for _, plain := range []string{"mircrew", "indexarr:", ":site", ""} {
+	// A candidate proposed by the archive carries the origin of the proposal
+	// as a prefix: it is not the manager.
+	manager, site, ok = aggregatedSource("archive:indexarr:MirCrew")
+	if !ok || manager != "indexarr" || site != "MirCrew" {
+		t.Fatalf("archive proposal = %q, %q, %v", manager, site, ok)
+	}
+	for _, plain := range []string{"mircrew", "indexarr:", ":site", "", "archive:mircrew"} {
 		if _, _, ok := aggregatedSource(plain); ok {
 			t.Errorf("%q split as an aggregated source", plain)
 		}

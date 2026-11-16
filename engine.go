@@ -184,14 +184,19 @@ func (e *Engine) FetchTorrent(ctx context.Context, rawURL string) ([]byte, strin
 var errTorrentNotAvailable = errors.New("torrent not available yet")
 
 // torrentFetchTransient reports whether the source's own answer is "not now"
-// rather than "this link is dead".
+// rather than "this link is dead". A login is a whole-source condition: it
+// fails every link the source serves until it works again, and the link itself
+// is fine, so a login the source names in any form ("login failed: credenziali
+// rifiutate" from mircrew, "site requires a login" or "site returned a login
+// page" from an aggregator such as indexarr) must not quarantine the release.
 func torrentFetchTransient(status int, reason string) bool {
 	lower := strings.ToLower(reason)
 	if status == http.StatusNotFound && strings.Contains(lower, "no magnet") {
 		return true
 	}
-	return strings.Contains(lower, "login") &&
-		(strings.Contains(lower, "failed") || strings.Contains(lower, "credenziali"))
+	return strings.Contains(lower, "login") ||
+		strings.Contains(lower, "log in") ||
+		strings.Contains(lower, "credenziali")
 }
 
 // torrentFetchFailureReason is the readable cause a failed `.torrent` download

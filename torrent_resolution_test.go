@@ -393,6 +393,48 @@ func TestFetchTorrentLoginFailureIsTransient(t *testing.T) {
 	}
 }
 
+// An aggregator words the same login condition its own way: indexarr answers
+// HTTP 401 with a Torznab error "site requires a login" when its session with
+// the site behind it is stale. The link is not dead and must not be quarantined.
+func TestFetchTorrentLoginRequiredIsTransient(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+		_, _ = w.Write([]byte(`<?xml version="1.0" encoding="UTF-8"?><error code="100" description="site requires a login"/>`))
+	}))
+	defer server.Close()
+
+	engine := NewEngine()
+	_, _, err := engine.FetchTorrent(context.Background(), server.URL+"/dl/5976638.torrent")
+	if !errors.Is(err, errTorrentNotAvailable) {
+		t.Fatalf("a login required by the source should be transient, got %v", err)
+	}
+	if !strings.Contains(err.Error(), "Torznab 100: site requires a login") {
+		t.Fatalf("error %q lost the source's own words", err)
+	}
+}
+
+// torrentFetchTransient reads the source's words, whatever its status code: a
+// login is the source's whole condition, a wrong API key or a removed release
+// is not.
+func TestTorrentFetchTransientLoginWording(t *testing.T) {
+	for _, reason := range []string{
+		"Torznab 100: site requires a login",
+		"site returned a login page",
+		"login required",
+		"magnet not available: MirCrew login failed: credenziali rifiutate",
+		"you must log in to download this torrent",
+	} {
+		if !torrentFetchTransient(http.StatusUnauthorized, reason) {
+			t.Errorf("%q was taken for a dead link", reason)
+		}
+	}
+	for _, reason := range []string{"", "Torznab 100: invalid api key", "release not found", "HTTP 502"} {
+		if torrentFetchTransient(http.StatusBadGateway, reason) {
+			t.Errorf("%q was taken for a login", reason)
+		}
+	}
+}
+
 // A plain 404 is still a dead link: the quarantine must keep working.
 func TestFetchTorrentPlainNotFoundIsNotTransient(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
