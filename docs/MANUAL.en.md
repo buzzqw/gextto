@@ -488,6 +488,14 @@ and — if you enable it — asks eD2k once per season when torrents find nothin
 - Gextto does not download an old episode again when you already have later
   ones, unless it is a recognised gap, a real upgrade or your explicit request
   (↻ Redownload).
+- A pack is recognised even when the title does not spell the season number: a
+  **miniseries** published as «Miniserie TV [COMPLETA]» (Italian for "TV
+  miniseries [COMPLETE]") is the first season as a whole, and a batch of
+  episodes written with a space instead of a dash ("S01E01 02" for the first
+  two, "S01E01 08" for all eight) covers the range it declares. A number after
+  the episode is the end of a range only when it carries a leading zero ("02")
+  or a bracket follows it: in "S06E12 68 Seconds" that number belongs to the
+  episode title, not to a range.
 - With **pack inspection** on (*Configuration → Seeding and completion → Pack
   inspection*, off by default) Gextto reads the pack's file list as soon as it
   arrives: if the pack adds nothing it is dropped, if only some files are

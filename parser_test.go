@@ -478,6 +478,132 @@ func TestParsesConcatenatedMultiEpisode(t *testing.T) {
 	}
 }
 
+// An Italian miniseries has one season and no season marker in the title: the
+// pack says "Miniserie TV [COMPLETA]".
+func TestParsesMiniseriesPackWithoutSeasonMarker(t *testing.T) {
+	for _, title := range []string{
+		"Example - Miniserie TV [COMPLETA] 2160p H265 ITA ENG EAC3 SUB ITA ENG - GRUPPO CreW",
+		"Example - Miniserie (2023) [COMPLETA] 1080p H264 ITA ENG",
+	} {
+		release := ParseRelease(title, testMagnet, "test")
+		if release == nil {
+			t.Fatalf("%s: release is nil", title)
+		}
+		if release.Kind != "series" {
+			t.Fatalf("%s: kind = %q, want series", title, release.Kind)
+		}
+		if !release.IsPack {
+			t.Fatalf("%s: expected is_pack", title)
+		}
+		if release.Series == nil || *release.Series != "Example" {
+			t.Fatalf("%s: series = %v, want Example", title, release.Series)
+		}
+		if release.Season == nil || *release.Season != 1 {
+			t.Fatalf("%s: season = %v, want 1", title, release.Season)
+		}
+		if want := []int64{0}; !reflect.DeepEqual(release.EpisodeRange, want) {
+			t.Fatalf("%s: episode_range = %v, want %v", title, release.EpisodeRange, want)
+		}
+	}
+}
+
+// The word "miniserie" alone does not say that the season is over: without
+// the completeness label the pack may still be airing, and reading it as a
+// whole season would invent the episodes that are not out yet.
+func TestMiniseriesWithoutCompletenessLabelIsNotAPack(t *testing.T) {
+	for _, title := range []string{
+		"Example - Miniserie TV 1080p ITA ENG",
+		"Example - Miniserie TV [IN CORSO 03/08] 1080p ITA ENG",
+	} {
+		release := ParseRelease(title, testMagnet, "test")
+		if release == nil {
+			t.Fatalf("%s: release is nil", title)
+		}
+		if release.IsPack {
+			t.Fatalf("%s: must not be read as a complete season: %#v", title, release)
+		}
+	}
+}
+
+// A title that does carry a season number keeps it: a sequel miniseries is
+// not the first one.
+func TestMiniseriesPackKeepsAnExplicitSeason(t *testing.T) {
+	for _, title := range []string{
+		"Example - Miniserie TV - Stagione 2 [COMPLETA] 1080p ITA ENG",
+		"Example - Miniserie TV S02 [COMPLETA] 1080p ITA ENG",
+	} {
+		release := ParseRelease(title, testMagnet, "test")
+		if release == nil {
+			t.Fatalf("%s: release is nil", title)
+		}
+		if !release.IsPack {
+			t.Fatalf("%s: expected is_pack", title)
+		}
+		if release.Season == nil || *release.Season != 2 {
+			t.Fatalf("%s: season = %v, want 2", title, release.Season)
+		}
+	}
+}
+
+// Italian sites write a multi-episode release with a space instead of a dash:
+// "S01E01 02" holds the first two episodes.
+func TestParsesSpaceWrittenEpisodeBatch(t *testing.T) {
+	cases := []struct {
+		title string
+		want  []int64
+	}{
+		{"Example S01E01 02 WebDL 2160p Hevc HDR E AC3 AC3 ITA ENG SUBS", []int64{1, 2}},
+		{"Example S01E03 05 1080p DSNP WEBMux ITA ENG DDP5 1 H 264", []int64{3, 4, 5}},
+		{"Example S01E01 08 1080p DSNP WEBMux HEVC ITA ENG DDP5 1 x265", []int64{1, 2, 3, 4, 5, 6, 7, 8}},
+		{"Example S01E01 10 [720p Ita Eng Spa Subs] byGroup", []int64{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}},
+	}
+	for _, tc := range cases {
+		release := ParseRelease(tc.title, testMagnet, "test")
+		if release == nil {
+			t.Fatalf("%s: release is nil", tc.title)
+		}
+		if !release.IsPack {
+			t.Fatalf("%s: expected is_pack", tc.title)
+		}
+		if release.Season == nil || *release.Season != 1 {
+			t.Fatalf("%s: season = %v, want 1", tc.title, release.Season)
+		}
+		if release.Episode == nil || *release.Episode != tc.want[0] {
+			t.Fatalf("%s: episode = %v, want %d", tc.title, release.Episode, tc.want[0])
+		}
+		if !reflect.DeepEqual(release.EpisodeRange, tc.want) {
+			t.Fatalf("%s: episode_range = %v, want %v", tc.title, release.EpisodeRange, tc.want)
+		}
+	}
+}
+
+// A number after the episode marker is not always the end of a batch: an
+// episode title can start with one. Reading those as ranges would invent
+// dozens of episodes that do not exist.
+func TestSpaceWrittenNumberThatIsNotABatch(t *testing.T) {
+	cases := []struct {
+		title string
+		want  []int64
+	}{
+		{"Example Show S06E12 68 Seconds 1080p AMZN WEB-DL DDP5 1 H 264-NTb", []int64{12}},
+		{"Example Show 2022 S01E01 13 luglio 1985 ita eng 1080p amzn web-dlmux h 264", []int64{1}},
+		{"Example Show S01E05 11 00 a m ita eng 1080p amzn web-dl ddp5 1 h 264", []int64{5}},
+		{"Example Show S02E07 01 00 p m ita eng 1080p amzn web-dl ddp5 1 h 264", []int64{7}},
+	}
+	for _, tc := range cases {
+		release := ParseRelease(tc.title, testMagnet, "test")
+		if release == nil {
+			t.Fatalf("%s: release is nil", tc.title)
+		}
+		if release.IsPack {
+			t.Fatalf("%s: must not be a pack: %#v", tc.title, release)
+		}
+		if !reflect.DeepEqual(release.EpisodeRange, tc.want) {
+			t.Fatalf("%s: episode_range = %v, want %v", tc.title, release.EpisodeRange, tc.want)
+		}
+	}
+}
+
 func TestMovieFilterRejectsNonMovieReleases(t *testing.T) {
 	if !PassesMovieFilter("The.Batman.2022.1080p.WEB-DL") {
 		t.Fatal("expected movie to pass filter")

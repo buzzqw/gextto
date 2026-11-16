@@ -1395,6 +1395,12 @@ type releaseMatcher struct {
 var releaseMatchers = []releaseMatcher{
 	{utils.MustCachedRegex(`(?i)^(.+?)[ ._-]+s(\d{1,4})e(\d{1,4})[-–]e?(\d{1,4})(?:[ ._-]|$)`), readEpisodeRange},
 	{utils.MustCachedRegex(`(?i)^(.+?)[ ._-]+s(\d{1,4})((?:e\d{1,4}){2,})(?:[ ._-]|$)`), readJoinedEpisodes},
+	// A batch written with a space instead of a dash ("S01E01 02",
+	// "S01E03 05"): the shape the Italian sites use for a multi-episode
+	// release. The reader keeps only the ends written with their leading zero
+	// or followed by a bracket: after an episode a number can also be the
+	// first word of its title.
+	{utils.MustCachedRegex(`(?i)^(.+?)[ ._-]+s(\d{1,4})e(\d{1,4}) +(\d{1,2})(.*)$`), readSpaceRange},
 	// Season and episode markers may be separated by a dot or a space
 	// ("S01.E01", "S01 E01"), not only glued ("S01E01").
 	{utils.MustCachedRegex(`(?i)^(.+?)[ ._-]+s(\d{1,4})[ ._-]?e(\d{1,4})(?:[ ._-]|$)`), readSeasonEpisode},
@@ -1413,7 +1419,18 @@ var releaseMatchers = []releaseMatcher{
 	// use both. The total may be unknown ("02/??").
 	{utils.MustCachedRegex(`(?i)^(.+?)[ ._-]+(?:stagione[ ._-]*|season[ ._-]?|s)(\d{1,2})\b.*?\b(?:in[ ._-]*(?:corso|progress)|incomplete)\b\W{0,6}0?(\d{1,3})[ ._-]*(?:/|di|of)[ ._-]*(?:0?\d{1,3}|\?{1,3})`), readInProgressPack},
 	{utils.MustCachedRegex(`(?i)^(.+?)[ ._-]+(?:stagione[ ._-]*|season[ ._-]?|s)(\d{1,2})(?:[ ._-]+(?:complete|completa))?(?:[ ._-]|$)`), readSeasonPack},
+	// A miniseries has one season by definition, so the Italian sites publish
+	// the whole of it with no season marker at all ("Serie - Miniserie TV
+	// [COMPLETA] 2160p …"). Read as a movie it never fills a season, while
+	// reading it as a pack on the word "miniserie" alone would invent the
+	// episodes still to come: only a title that says both is a pack.
+	{miniseriesPackRe, readMiniseriesPack},
 }
+
+// miniseriesPackRe is the last matcher and the one with the narrowest gate:
+// its fast path ([`parseMiniseriesPackFast`]) checks the two words first, so
+// the regex never runs over the titles whose shape is not this one.
+var miniseriesPackRe = utils.MustCachedRegex(`(?i)^(.+?)[ ._-]+mini[ ._-]*seri(?:e|es)\b.*\b(?:completa|complete)\b`)
 
 // couldBeSeriesTitle is a cheap gate before the matcher list: a movie title
 // has no season marker, and running ten anchored regexes over it was a large
@@ -1423,7 +1440,8 @@ func couldBeSeriesTitle(low string) bool {
 	if strings.Contains(low, "season") || strings.Contains(low, "stagione") ||
 		strings.Contains(low, "episodio") || strings.Contains(low, "puntata") ||
 		strings.Contains(low, "episode") || strings.Contains(low, "in corso") ||
-		strings.Contains(low, "incomplete") {
+		strings.Contains(low, "incomplete") ||
+		strings.Contains(low, "miniserie") || strings.Contains(low, "miniseries") {
 		return true
 	}
 	for i := 0; i < len(low); i++ {
@@ -1501,10 +1519,10 @@ const (
 	sxxexxBasic
 )
 
-// parseSxxExxFast reads the three "S01E01" matchers without their regexes.
-// They are the first three patterns and the ones that match almost every
-// series title; the matcher loop stays as the fallback for the other shapes
-// and for a shape whose values the reader refuses.
+// parseSxxExxFast reads the "S01E01" matchers without their regexes. They are
+// the first patterns and the ones that match almost every series title; the
+// matcher loop stays as the fallback for the other shapes and for a shape
+// whose values the reader refuses.
 func parseSxxExxFast(title string) (releaseMatch, bool) {
 	// The matcher list tries all ranges before joined episodes and plain
 	// episodes: a later S02E10-E12 wins over an earlier S01E01.
@@ -1564,7 +1582,13 @@ func scanSxxExx(title string, pattern sxxexxPattern) (match releaseMatch, found,
 		case sxxexxJoined:
 			match, verdict = readJoinedEpisodes(capture)
 		case sxxexxBasic:
-			match, verdict = readSeasonEpisode(capture)
+			// A basic capture holding a fifth field is the batch read after
+			// the episode ("S01E01 02"), and it is read as its range.
+			if len(capture) == 5 {
+				match, verdict = readEpisodeRange(capture)
+			} else {
+				match, verdict = readSeasonEpisode(capture)
+			}
 		}
 		return match, true, verdict == matchRead
 	}
@@ -1623,6 +1647,54 @@ func sxxexxJoinedCapture(title string, pos int, series, season string) (int, []s
 	return pos, []string{"", series, season, title[joinedStart:pos]}
 }
 
+// spaceRangeAfter reads the end of a batch written with a space instead of a
+// dash after the episode ("S01E01 02", "S01E03 05", "S01E01 08"), the shape
+// the Italian sites use for a multi-episode release of a complete season. pos
+// is the position right after the first episode's digits; first is that
+// episode as written.
+//
+// Two numbers make a range only when the last one is written with its leading
+// zero ("02"), or when a bracket follows it ("S01E01 10 [720p ita eng]").
+// Everything else stays a single episode: "… S06E12 68 Seconds" and
+// "… S01E01 13 luglio 1985" are episodes whose title starts with a number,
+// and reading them as a range would invent dozens of episodes that do not
+// exist.
+func spaceRangeAfter(title string, pos int, series, season, first string) (int, []string) {
+	if pos >= len(title) || title[pos] != ' ' {
+		return 0, nil
+	}
+	// Only spaces: a dot separates the fields of a dotted name
+	// ("… S02E07.01.00.p.m") where the number is the hour of the episode
+	// title, not the end of a batch.
+	for pos < len(title) && title[pos] == ' ' {
+		pos++
+	}
+	last, end := parseDigitsAt(title, pos, 2)
+	if last == "" || end < len(title) && !isEpisodeSeparator(title[end]) {
+		return 0, nil
+	}
+	firstValue, firstOK := captureInt(first)
+	lastValue, lastOK := captureInt(last)
+	if !firstOK || !lastOK || firstValue < 1 || lastValue <= firstValue || lastValue > 99 {
+		return 0, nil
+	}
+	paddedEnd := len(last) == 2 && last[0] == '0'
+	if !paddedEnd && !opensBracket(title, end) {
+		return 0, nil
+	}
+	return end, []string{"", series, season, first, last}
+}
+
+// opensBracket reports a bracket right after the range, skipping the
+// separators: "S01E01 10 [720p ita eng]" is a batch, "S06E12 68 Seconds" is
+// not.
+func opensBracket(title string, pos int) bool {
+	for pos < len(title) && isEpisodeSeparator(title[pos]) {
+		pos++
+	}
+	return pos < len(title) && (title[pos] == '[' || title[pos] == '(')
+}
+
 func sxxexxBasicCapture(title string, pos int, series, season string) (int, []string) {
 	if pos < len(title) && isEpisodeSeparator(title[pos]) {
 		pos++
@@ -1634,6 +1706,12 @@ func sxxexxBasicCapture(title string, pos int, series, season string) (int, []st
 	episode, pos := parseDigitsAt(title, pos, 4)
 	if episode == "" || pos < len(title) && !isEpisodeSeparator(title[pos]) {
 		return 0, nil
+	}
+	// The batch is read here, on the episode the scan already found, instead
+	// of in a scan of its own: it is the shape of a small minority of the
+	// titles and the extra pass would be paid by every episode.
+	if end, capture := spaceRangeAfter(title, pos, series, season, episode); end != 0 {
+		return end, capture
 	}
 	return pos, []string{"", series, season, episode}
 }
@@ -1743,6 +1821,28 @@ func parseSeasonPackFast(title string) (releaseMatch, bool) {
 	return releaseMatch{}, false
 }
 
+// parseMiniseriesPackFast reads the "Miniserie … [COMPLETA]" shape of the last
+// matcher. The two words are checked first: a title that does not carry both
+// never runs its regex, which keeps the cost of the extra matcher at a pair of
+// substring searches for every other release.
+func parseMiniseriesPackFast(title, low string) (releaseMatch, bool) {
+	if !strings.Contains(low, "miniserie") && !strings.Contains(low, "miniseries") {
+		return releaseMatch{}, false
+	}
+	if !strings.Contains(low, "completa") && !strings.Contains(low, "complete") {
+		return releaseMatch{}, false
+	}
+	capture := miniseriesPackRe.FindStringSubmatch(title)
+	if capture == nil {
+		return releaseMatch{}, false
+	}
+	parsed, verdict := readMiniseriesPack(capture)
+	if verdict != matchRead {
+		return releaseMatch{}, false
+	}
+	return parsed, true
+}
+
 // parseReleaseTitle tries every matcher in order and returns what the title
 // says about season and episode. A title no matcher reads is a movie.
 func parseReleaseTitle(title string) releaseMatch {
@@ -1774,6 +1874,15 @@ func parseReleaseTitle(title string) releaseMatch {
 		!strings.Contains(low, "episode") &&
 		!hasInProgressMarker(low) {
 		if match, ok := parseSeasonPackFast(title); ok {
+			if match.episodeRange == nil {
+				match.episodeRange = []int64{}
+			}
+			return match
+		}
+		// The miniseries shape has no season marker of its own, so it is only
+		// read when none of the earlier shapes can speak: a title that says
+		// "Stagione 2" is that season, not the first one.
+		if match, ok := parseMiniseriesPackFast(title, low); ok {
 			if match.episodeRange == nil {
 				match.episodeRange = []int64{}
 			}
@@ -1989,6 +2098,57 @@ func readSeasonPack(capture []string) (releaseMatch, matchVerdict) {
 	if !ok {
 		return releaseMatch{}, matchRefused
 	}
+	zero := int64(0)
+	return releaseMatch{
+		series:       seriesName(capture),
+		season:       &season,
+		episode:      &zero,
+		episodeRange: []int64{0},
+		seasonPack:   true,
+	}, matchRead
+}
+
+// readSpaceRange reads "S01E01 02" and "S01E03 05": a batch of episodes written
+// with a space instead of a dash. The reader is the reference of the fast path
+// ([`spaceRangeAfter`]): the end of the range must be written with its
+// leading zero ("02") or be followed by a bracket, or the number belongs to the
+// episode title ("… S06E12 68 Seconds").
+func readSpaceRange(capture []string) (releaseMatch, matchVerdict) {
+	season, ok := captureInt(capture[2])
+	if !ok {
+		return releaseMatch{}, matchRefused
+	}
+	first, ok := captureInt(capture[3])
+	if !ok {
+		return releaseMatch{}, matchRefused
+	}
+	last, ok := captureInt(capture[4])
+	if !ok {
+		return releaseMatch{}, matchRefused
+	}
+	tail := capture[5]
+	if tail != "" && !isEpisodeSeparator(tail[0]) {
+		return releaseMatch{}, matchRefused
+	}
+	if first < 1 || last <= first || last > 99 {
+		return releaseMatch{}, matchRefused
+	}
+	paddedEnd := len(capture[4]) == 2 && capture[4][0] == '0'
+	if !paddedEnd && !opensBracket(tail, 0) {
+		return releaseMatch{}, matchRefused
+	}
+	episodes := make([]int64, 0, last-first+1)
+	for value := first; value <= last; value++ {
+		episodes = append(episodes, value)
+	}
+	return releaseMatch{series: seriesName(capture), season: &season, episode: &first, episodeRange: episodes}, matchRead
+}
+
+// readMiniseriesPack reads an Italian "Miniserie … [COMPLETA]" title: a
+// miniseries is one season, so the pack is the first one and every episode is
+// inside it.
+func readMiniseriesPack(capture []string) (releaseMatch, matchVerdict) {
+	season := int64(1)
 	zero := int64(0)
 	return releaseMatch{
 		series:       seriesName(capture),

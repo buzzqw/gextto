@@ -490,6 +490,14 @@ serve solo a non aspettare il ciclo successivo.
 - Gextto non riscarica un episodio vecchio se hai già quelli successivi, a meno
   che sia un buco riconosciuto, un upgrade vero o una tua richiesta esplicita
   (↻ Riscarica).
+- Un pack si riconosce anche quando il titolo non scrive il numero di stagione:
+  una **miniserie** pubblicata come «Miniserie TV [COMPLETA]» è la prima
+  stagione per intero, e una raccolta di puntate scritta con uno spazio invece
+  del trattino («S01E01 02» per le prime due, «S01E01 08» per tutte e otto) vale
+  per l'intervallo che dichiara. Un numero dopo la puntata è la fine di un
+  intervallo solo se ha lo zero davanti («02») o se lo segue una parentesi
+  quadra: in «S06E12 68 Seconds» quel numero fa parte del titolo della puntata,
+  non dell'intervallo.
 - Con il **controllo dei pack** attivo (*Configurazione → Seed e completamento →
   Controllo dei pack*, spento di default) Gextto legge l'elenco dei file del
   pack appena arriva: se il pack non aggiunge nulla lo scarta, se solo alcuni
