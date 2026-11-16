@@ -335,34 +335,43 @@
     for (var i = 0; i < panels.length; i++) panels[i].open = true;
   }());
 
-  // ------------------------------------------------ settings app menu ------
-  // The settings page hides the main navigation so the «Cosa cercare» sidebar
-  // is not squeezed between it and the entries. This button brings it back as
-  // a drawer over the content.
-  function setAppMenu(open) {
-    var shell = document.querySelector(".app-shell");
-    var toggle = document.querySelector("[data-app-menu-toggle]");
-    var backdrop = document.getElementById("app-menu-backdrop");
-    if (!shell || !toggle) return;
-    shell.classList.toggle("menu-open", open);
-    toggle.setAttribute("aria-expanded", open ? "true" : "false");
-    if (backdrop) backdrop.hidden = !open;
+  // -------------------------------- the setting reached from a search -----
+  // A result of the settings search deep-links to one row: it may live in a
+  // collapsed group or be hidden by a dependency, so it is brought into view
+  // and flashed. This runs on the page as it arrives and again after a content
+  // swap (the «Aggiorna» button, a new search): only the markup that carries
+  // data-highlight asks for it, once.
+  function revealHighlightedSetting(root) {
+    var body = null;
+    if (root && root.matches && root.matches("[data-highlight]")) body = root;
+    if (!body && root && root.querySelector) body = root.querySelector("[data-highlight]");
+    if (!body) body = document.querySelector("[data-highlight]");
+    if (!body) return;
+    var key = body.getAttribute("data-highlight");
+    if (!key || body.getAttribute("data-highlight-done") === key) return;
+    var row = document.getElementById("v2-setting-" + key);
+    if (!row) return;
+    body.setAttribute("data-highlight-done", key);
+    row.hidden = false;
+    var group = row.closest("details");
+    if (group) group.open = true;
+    try {
+      if (location.hash !== "#v2-setting-" + key) history.replaceState(null, "", "#v2-setting-" + key);
+    } catch (error) { /* history may be unavailable */ }
+    var still = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    row.scrollIntoView({ block: "center", behavior: still ? "auto" : "smooth" });
+    var control = row.querySelector("input:not([type=hidden]),select,textarea");
+    if (control) control.focus({ preventScroll: true });
+    row.classList.add("setting-flash");
+    window.setTimeout(function () { row.classList.remove("setting-flash"); }, 2500);
   }
-  document.addEventListener("click", function (event) {
-    if (event.target && event.target.id === "app-menu-backdrop") {
-      setAppMenu(false);
-      return;
-    }
-    var toggle = event.target.closest && event.target.closest("[data-app-menu-toggle]");
-    if (toggle) {
-      var shell = document.querySelector(".app-shell");
-      setAppMenu(!(shell && shell.classList.contains("menu-open")));
-      return;
-    }
-    // Selecting a destination closes the drawer (the page navigates anyway).
-    var link = event.target.closest && event.target.closest("#app-sidebar a[href]");
-    if (link) setAppMenu(false);
+  // The page's own controls initialise on the same event and one of them sets
+  // the switches above this row: the reveal runs just after them, so the focus
+  // it takes is the last one.
+  document.addEventListener("DOMContentLoaded", function () {
+    window.setTimeout(function () { revealHighlightedSetting(document); }, 0);
   });
+  document.addEventListener("htmx:afterSwap", function (event) { revealHighlightedSetting(event.target); });
 
   // ------------------------------------------------ torrent detail tabs --
   // HTMX replaces only the panel content. Keep the persistent tab bar in sync
@@ -1202,14 +1211,45 @@
     var open = document.querySelectorAll("details[data-v2-menu][open]");
     for (var i = 0; i < open.length; i++) if (open[i] !== except) open[i].open = false;
   }
+  function resetMenuPanel(panel) {
+    if (!panel) return;
+    panel.style.position = "";
+    panel.style.left = "";
+    panel.style.right = "";
+    panel.style.top = "";
+    panel.style.bottom = "";
+    panel.style.width = "";
+    panel.style.transform = "";
+    panel.style.maxWidth = "";
+    panel.style.maxHeight = "";
+  }
   // A menu opens downwards; near the bottom of the window it would be cut, so
-  // it flips above its button when there is more room there.
+  // it flips above its button when there is more room there. On a phone the
+  // panel becomes a sheet at the bottom of the screen instead: a table that
+  // scrolls sideways would clip a floating panel, and the bottom is where a
+  // thumb already is.
   function flipMenuPanel(menu) {
     var panel = menu.querySelector(".v2-menu-panel");
     if (!panel) return;
+    var margin = 8;
+    if (window.matchMedia && window.matchMedia("(max-width: 900px)").matches) {
+      resetMenuPanel(panel);
+      panel.style.position = "fixed";
+      panel.style.left = "50%";
+      panel.style.right = "auto";
+      panel.style.top = "auto";
+      panel.style.transform = "translateX(-50%)";
+      panel.style.width = "calc(100vw - 16px)";
+      panel.style.bottom = "calc(68px + env(safe-area-inset-bottom))";
+      panel.style.maxWidth = "none";
+      panel.style.maxHeight = "60vh";
+      return;
+    }
+    // A panel placed earlier as a phone sheet goes back to its own anchor; the
+    // Aspetto panel is anchored by its own code and keeps that placement.
+    if (panel.style.position === "fixed") resetMenuPanel(panel);
     panel.style.top = "";
     panel.style.bottom = "";
-    var margin = 8;
     var rect = panel.getBoundingClientRect();
     if (rect.bottom <= window.innerHeight - margin) return;
     if (menu.getBoundingClientRect().top < rect.height + margin) return;
@@ -1224,7 +1264,11 @@
       flipMenuPanel(menu);
     } else {
       var panel = menu.querySelector(".v2-menu-panel");
-      if (panel) { panel.style.top = ""; panel.style.bottom = ""; }
+      if (panel) {
+        panel.style.top = "";
+        panel.style.bottom = "";
+        if (panel.style.position === "fixed") resetMenuPanel(panel);
+      }
     }
   }, true);
   document.addEventListener("click", function (event) {

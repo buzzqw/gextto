@@ -282,14 +282,12 @@ func TestV2ManualRedirectsToTheOnlineManual(t *testing.T) {
 
 func TestV2NavigationLinksDocumentationOnline(t *testing.T) {
 	manual, changelog := uiNavItem{}, uiNavItem{}
-	for _, group := range v2NavGroups(nil, "dashboard", nil) {
-		for _, item := range group.Items {
-			switch item.ID {
-			case "manual":
-				manual = item
-			case "changelog":
-				changelog = item
-			}
+	for _, item := range v2NavDocs(nil, "dashboard") {
+		switch item.ID {
+		case "manual":
+			manual = item
+		case "changelog":
+			changelog = item
 		}
 	}
 	if manual.Href != "https://github.com/buzzqw/gextto/blob/main/docs/MANUAL.it.md" || !manual.External {
@@ -969,8 +967,12 @@ func TestV2SettingsPagesAndSave(t *testing.T) {
 	if code != http.StatusOK || !strings.Contains(body, `id="v2-setting-gxtorrent_auto"`) {
 		t.Fatalf("highlighted setting not rendered -> %d", code)
 	}
-	if !strings.Contains(body, "scrollIntoView") || !strings.Contains(body, "setting-flash") {
-		t.Fatalf("settings body must scroll to and flash the highlighted setting")
+	// The row is brought into view and flashed by the client (v2-core.js):
+	// the page's part is to name the setting, so the swap of a later refresh
+	// carries the same instruction. The browser behaviour is covered by the
+	// Playwright suite.
+	if !strings.Contains(body, `data-highlight="gxtorrent_auto"`) {
+		t.Fatalf("the settings body must name the setting to reveal")
 	}
 	code, body = v2Request(t, server, http.MethodPost, "/settings/save", url.Values{"key": {"refresh_interval"}, "value": {"3600"}})
 	if code != http.StatusOK || !strings.Contains(body, "salvata") {

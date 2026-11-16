@@ -1,6 +1,12 @@
 # Bundled Polish translations for the web UI. The translation database mirrors
 # this catalog: a corrected value here replaces the stored one at the next start.
 pol:
+  "Documentazione": "Dokumentacja"
+  "Episodi archiviati": "Zarchiwizowane odcinki"
+  "Sorgenti in archivio": "Źródła w archiwum"
+  "Sorgenti, storia, riscarica, ignora o elimina questa puntata": "Źródła, historia, ponowne pobranie, ignorowanie lub usunięcie tego odcinka"
+  "Riprendi la ricerca di questa puntata": "Wznów wyszukiwanie tego odcinka"
+  "Ignora questa puntata": "Ignoruj ten odcinek"
   "✋ aggiunto a mano, resta in trasferimento": "✋ dodane ręcznie, zostaje w folderze transferu"
   "Release aggiunta ai download: aggiunta a mano, resterà nella cartella di trasferimento.": "Wydanie dodane do pobierania: dodane ręcznie, zostanie w folderze transferu."
   "Dati scaricati e inviati da quando il motore torrent è partito": "Dane pobrane i wysłane od uruchomienia silnika torrent"

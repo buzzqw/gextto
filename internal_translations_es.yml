@@ -1,6 +1,12 @@
 # Bundled Spanish translations for the web UI. The translation database mirrors
 # this catalog: a corrected value here replaces the stored one at the next start.
 spa:
+  "Documentazione": "Documentación"
+  "Episodi archiviati": "Episodios archivados"
+  "Sorgenti in archivio": "Fuentes en el archivo"
+  "Sorgenti, storia, riscarica, ignora o elimina questa puntata": "Fuentes, historial, volver a descargar, ignorar o eliminar este episodio"
+  "Riprendi la ricerca di questa puntata": "Reanudar la búsqueda de este episodio"
+  "Ignora questa puntata": "Ignorar este episodio"
   "✋ aggiunto a mano, resta in trasferimento": "✋ añadido a mano, se queda en la carpeta de transferencia"
   "Release aggiunta ai download: aggiunta a mano, resterà nella cartella di trasferimento.": "Release añadida a las descargas: añadida a mano, se quedará en la carpeta de transferencia."
   "Dati scaricati e inviati da quando il motore torrent è partito": "Datos descargados y subidos desde que se inició el motor torrent"

@@ -71,6 +71,44 @@ func TestEpisodeSearchOpensUnderTheEpisode(t *testing.T) {
 	}
 }
 
+// TestEpisodeRowKeepsTwoActionsAndAMenu: a row has the search it exists for
+// and the forced download; sources, history, re-download, ignore and delete are
+// items of one «…» menu with their names written out. Seven squares side by
+// side were a lottery under a finger.
+func TestEpisodeRowKeepsTwoActionsAndAMenu(t *testing.T) {
+	state := episodeSearchTestState(t)
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+
+	code, body := v2Request(t, server, http.MethodGet, "/?view=series&series=Show", nil)
+	if code != http.StatusOK {
+		t.Fatalf("series page -> %d", code)
+	}
+	for _, want := range []string{
+		`class="btn sm icon-action primary"`, // the search
+		`class="v2-menu" data-v2-menu`,
+		`aria-label="Altre azioni"`,
+		`<span>Sorgenti in archivio</span>`,
+		`<span>Storia dei download</span>`,
+		`>Riscarica<`,
+		`>Ignora questa puntata<`,
+		`>Elimina dall&#39;archivio<`,
+		`class="v2-menu-item danger"`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("the episode row is missing %q", want)
+		}
+	}
+	// The season header carries its own completion bar, with the count intact.
+	if !strings.Contains(body, `class="pbar"`) || !strings.Contains(body, `max="3"`) {
+		t.Fatal("the season header has no completion bar")
+	}
+	// The row no longer offers the sources and history as loose icons.
+	if strings.Contains(body, `aria-label="Sorgenti in archivio S1E2"`) || strings.Contains(body, `aria-label="Storia dei download della puntata"`) {
+		t.Fatal("the sources and history actions are still standalone icons")
+	}
+}
+
 // TestEpisodeSearchPanelFollowsTheSearch checks the fragment the panel polls: it
 // says which stage the search is in and how many sources have answered, then
 // stops polling and shows the outcome.

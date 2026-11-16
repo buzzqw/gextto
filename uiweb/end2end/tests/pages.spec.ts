@@ -59,7 +59,7 @@ test("il menu non ha voci duplicate", async ({ page }) => {
 test("la navigazione desktop conserva la barra laterale verticale", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto("/");
-  const navStyle = await page.locator(".sidebar nav").evaluate((nav) => ({
+  const navStyle = await page.locator(".sidebar nav:not(.nav-docs)").evaluate((nav) => ({
     display: getComputedStyle(nav).display,
     direction: getComputedStyle(nav).flexDirection,
   }));
@@ -240,10 +240,10 @@ test("selettore lingua presente e selezionabile", async ({ page }) => {
 
 test("manuale e changelog puntano alla documentazione online", async ({ page }) => {
   await page.goto("/");
-  const manual = page.locator('aside .nav-item[data-nav="manual"]');
+  const manual = page.locator('aside .nav-docs .nav-doc[data-nav="manual"]');
   await expect(manual).toHaveAttribute("href", "https://github.com/buzzqw/gextto/blob/main/docs/MANUAL.it.md");
   await expect(manual).toHaveAttribute("target", "_blank");
-  const changelog = page.locator('aside .nav-item[data-nav="changelog"]');
+  const changelog = page.locator('aside .nav-docs .nav-doc[data-nav="changelog"]');
   await expect(changelog).toHaveAttribute("href", "https://github.com/buzzqw/gextto/blob/main/changelog.md");
   await expect(changelog).toHaveAttribute("target", "_blank");
 });
@@ -395,6 +395,9 @@ test.describe("mobile", () => {
 
   test("Scarico accetta più link eD2k e le impostazioni eD2k sono leggibili", async ({ page }) => {
     await page.goto("/?view=downloads");
+    // The search block (release search and eD2k links) is collapsed under the
+    // queue: on a phone it is one tap, and the list of transfers comes first.
+    await page.locator(".downloads-search-panel > summary").click();
     const links = page.locator('textarea[name="ed2k_link"]');
     await expect(links).toBeVisible();
     await expect(links).toHaveAttribute("rows", "2");
@@ -472,7 +475,7 @@ test.describe("mobile", () => {
     // Le voci facoltative (Blocklist, Licenza) vivono solo nel pannello: se non
     // comparissero qui resterebbero irraggiungibili dal telefono.
     await expect(page.locator('aside .nav-item[data-nav="blocklist"]')).toBeVisible();
-    await expect(page.locator('aside .nav-item[data-nav="license"]')).toBeVisible();
+    await expect(page.locator('#app-system-menu .nav-mobile-system-extra').filter({ hasText: "Licenza" })).toBeVisible();
   });
 
   test("le pagine di sistema non aprono il menu da sole", async ({ page }) => {

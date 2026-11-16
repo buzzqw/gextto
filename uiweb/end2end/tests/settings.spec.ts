@@ -46,21 +46,27 @@ test("la navigazione aggiorna titolo, sezione attiva e indirizzo", async ({ page
   await expect(page.locator("#v2-settings-heading")).toHaveText("Manutenzione automatica");
 });
 
-test("la configurazione nasconde il menu principale e lo riapre dal pulsante", async ({ page }) => {
+test("la configurazione non fa sparire il menu principale", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto("/?view=settings");
-  // The main navigation is out of the way, the «Cosa cercare» sidebar stays.
-  await expect(page.locator("#app-sidebar")).toBeHidden();
-  await expect(page.getByRole("navigation", { name: "Sezioni della configurazione" })).toBeVisible();
-  const toggle = page.locator("[data-app-menu-toggle]");
-  await expect(toggle).toBeVisible();
-  await expect(toggle).toHaveAttribute("aria-expanded", "false");
-  await toggle.click();
+  // The main navigation stays where it is: opening Configuration is not a
+  // place to get lost. The «Cosa cercare» list is a second column beside it.
   await expect(page.locator("#app-sidebar")).toBeVisible();
-  await expect(toggle).toHaveAttribute("aria-expanded", "true");
-  // Escape closes the drawer and returns to the focused button.
-  await page.keyboard.press("Escape");
-  await expect(page.locator("#app-sidebar")).toBeHidden();
+  await expect(page.getByRole("navigation", { name: "Sezioni della configurazione" })).toBeVisible();
+  await expect(page.locator("[data-app-menu-toggle]")).toHaveCount(0);
+  // A window too narrow for both columns keeps the menu and turns the section
+  // list into the same «Sezione» picker a phone uses.
+  await page.setViewportSize({ width: 1024, height: 800 });
+  await expect(page.locator("#app-sidebar")).toBeVisible();
+  await expect(page.locator(".settings-nav-select")).toBeVisible();
+  await expect(page.locator(".settings-nav-list")).toBeHidden();
+});
+
+test("l'impostazione raggiunta da una ricerca viene mostrata e messa a fuoco", async ({ page }) => {
+  await page.goto("/?view=settings&tab=backend&highlight=gxtorrent_auto");
+  const row = page.locator("#v2-setting-gxtorrent_auto");
+  await expect(row).toBeVisible();
+  await expect.poll(() => page.evaluate(() => !!document.activeElement?.closest("#v2-setting-gxtorrent_auto"))).toBe(true);
 });
 
 test("il menu principale resta visibile fuori dalla configurazione", async ({ page }) => {

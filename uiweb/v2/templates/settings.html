@@ -94,7 +94,6 @@
     {{if eq .ActiveID "scores"}}{{template "v2_score_groups" .}}{{end}}
     {{if eq .ActiveID "network"}}{{template "v2_ipfilter_action" .}}{{end}}
   </div>
-  {{if .Highlight}}<script>(function(){var e=document.getElementById('v2-setting-{{.Highlight}}');if(!e)return;e.hidden=false;var d=e.closest('details');if(d)d.open=true;try{if(location.hash!=='#v2-setting-{{.Highlight}}'){history.replaceState(null,'','#v2-setting-{{.Highlight}}');}}catch(_){}var still=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;e.scrollIntoView({block:'center',behavior:still?'auto':'smooth'});var c=e.querySelector('input:not([type=hidden]),select,textarea');if(c)c.focus({preventScroll:true});e.classList.add('setting-flash');setTimeout(function(){e.classList.remove('setting-flash');},2500);})();</script>{{end}}
 </div>
 {{end}}
 

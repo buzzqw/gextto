@@ -5,7 +5,10 @@
 {{define "v2_downloads"}}
 <div class="view downloads-view{{if .AddLink}} has-add-link{{end}}">
   {{if .Flash}}<p class="{{if .FlashErr}}alert{{else}}muted{{end}} downloads-flash" role="status" aria-live="polite">{{tr .Flash}}</p>{{end}}
-  <details class="panel downloads-search-panel" open>
+  {{/* Closed by default and below the queue: whoever opens «Scarico» wants to
+       see what is transferring now, not a form. The block is one click away,
+       and it opens itself when the page already carries a search. */}}
+  <details class="panel downloads-search-panel"{{if or .Search.Query .Search.Searched .Search.Error}} open{{end}}>
     <summary class="panel-head"><h3>{{tr "Cerca una release"}}</h3><small class="muted">{{tr "Archivio, indexer, motori web e Kad"}}</small></summary>
     <div class="panel-body">
       <form class="search-row" method="post" action="/search" hx-post="/search" hx-target="#v2-downloads-search-results" hx-swap="innerHTML">

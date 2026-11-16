@@ -662,18 +662,17 @@ html, body {
    controls below. */
 /* Wide screens: the controls row starts in the same column as the metrics, so
    the language select sits right under the first badge instead of under the
-   page title. :has keeps the settings page (which adds a menu button before the
-   title) on the flex layout. */
+   page title. */
 @media (min-width: 1500px) {
-  .v2-topbar-sticky:not(:has(.app-menu-toggle)) {
+  .v2-topbar-sticky {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr);
     align-items: center;
     column-gap: 10px;
   }
-  .v2-topbar-sticky:not(:has(.app-menu-toggle)) .topbar-title { grid-column: 1; grid-row: 1; }
-  .v2-topbar-sticky:not(:has(.app-menu-toggle)) .top-actions { grid-column: 2; grid-row: 1; }
-  .v2-topbar-sticky:not(:has(.app-menu-toggle)) .top-controls { grid-column: 2; grid-row: 2; }
+  .v2-topbar-sticky .topbar-title { grid-column: 1; grid-row: 1; }
+  .v2-topbar-sticky .top-actions { grid-column: 2; grid-row: 1; }
+  .v2-topbar-sticky .top-controls { grid-column: 2; grid-row: 2; }
 }
 
 @media (min-width: 701px) and (max-width: 1499px) {
@@ -1699,33 +1698,11 @@ details.add-torrent-panel > summary::-webkit-details-marker { display: none; }
 }
 .settings-keys-toggle { font-size: 0.82rem; color: var(--muted); }
 
-/* Configurazione focuses on its own sections: the main navigation is hidden on
-   desktop so the «Cosa cercare» sidebar is not squeezed between it and the
-   entries. The topbar button (and Escape) brings the menu back as a drawer. */
+/* Configurazione is a page like the others: the main navigation stays where it
+   is, so nobody loses the way to the rest of Gextto by opening the settings. */
 .app-menu-toggle { display: none; }
 .app-menu-backdrop,
 .app-menu-backdrop[hidden] { display: none !important; }
-
-.app-shell.is-settings .app-menu-toggle { display: inline-flex; align-items: center; gap: 6px; }
-
-@media (min-width: 901px) {
-  .app-shell.is-settings .main-shell { margin-left: 0; }
-  .app-shell.is-settings:not(.menu-open) #app-sidebar { display: none; }
-  .app-shell.is-settings .app-menu-backdrop:not([hidden]) {
-    display: block;
-    position: fixed;
-    inset: 0;
-    z-index: 39;
-    background: rgba(4, 18, 31, 0.55);
-    backdrop-filter: blur(2px);
-    -webkit-backdrop-filter: blur(2px);
-  }
-}
-@media (max-width: 900px) {
-  /* The compact horizontal navigation is not in the way: the button is not
-     needed and would only add noise. */
-  .app-shell.is-settings .app-menu-toggle { display: none; }
-}
 
 .settings-layout {
   display: grid;
@@ -1851,6 +1828,18 @@ html.settings-only-modified .settings-panel:not(:has(.setting-modified-row)):not
   font-weight: 700;
 }
 .settings-nav-count { color: var(--muted); font-size: 0.75rem; font-variant-numeric: tabular-nums; }
+
+/* The section list is a second column while the window has room for it: with
+   the main menu now always visible, two fixed columns of 250 and 230 pixels
+   would leave the fields too little on a laptop. Below this width the sections
+   become the same «Sezione» list a phone uses, and the menu stays. */
+@media (min-width: 901px) and (max-width: 1160px) {
+  .settings-layout { grid-template-columns: 1fr; gap: 12px; }
+  .settings-nav { position: static; max-height: none; overflow: visible; }
+  .settings-nav-list { display: none; }
+  .settings-nav-select { display: block; }
+  .settings-nav-select .input { min-height: 46px; width: 100%; }
+}
 .settings-nav-back { color: var(--muted); font-size: 0.85rem; }
 .settings-nav-back:hover { color: var(--text); }
 
@@ -2580,4 +2569,172 @@ html.settings-only-modified .settings-panel:not(:has(.setting-modified-row)):not
 body.v2-drop-active main {
   outline: 3px dashed var(--accent);
   outline-offset: -6px;
+}
+
+/* ======================================================================
+ * Menu on a computer: symbols and areas.
+ *
+ * Eighteen destinations in one column were an undifferentiated list: the eye
+ * now finds «Scarico» by its shape and reads which area it belongs to, the
+ * documentation sits at the foot as small links, and the rows are a little
+ * shorter. Brand, documentation and state line stay put; when the pages do not
+ * fit, only their list scrolls.
+ * The phone bar is untouched: it keeps its grid, its icons and its labels.
+ * ==================================================================== */
+.nav-docs { display: none; }
+
+@media (min-width: 901px) {
+  /* The list of destinations is the only part that scrolls: the brand, the
+     documentation and the state line stay where they are, however many pages
+     the menu holds. */
+  #app-sidebar { overflow: hidden; }
+  #app-sidebar nav { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+  #app-sidebar .nav-icon {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 1.3rem;
+    color: var(--muted);
+  }
+  #app-sidebar .nav-icon .icon { width: 1.05rem; height: 1.05rem; }
+  #app-sidebar .nav-item:hover .nav-icon,
+  #app-sidebar .nav-item:focus-visible .nav-icon,
+  #app-sidebar .nav-item.active .nav-icon { color: var(--accent); }
+
+  #app-sidebar .nav-item {
+    min-height: 34px;
+    padding: 5px 10px;
+    border-radius: var(--radius-sm);
+  }
+  #app-sidebar .nav-group { gap: 1px; margin-bottom: 2px; }
+
+  #app-sidebar .nav-group-label {
+    display: block;
+    margin: 6px 0 3px;
+    padding: 0 10px;
+    color: var(--muted);
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  #app-sidebar .nav-group:first-of-type .nav-group-label { margin-top: 0; }
+
+  /* «Cerca impostazioni» was a second way to the settings page, whose own
+     search field is at the top; it was already hidden on a phone. The menu
+     does not spend a row on it. */
+  #app-sidebar .nav-search { display: none; }
+
+  #app-sidebar .nav-docs {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 2px 8px;
+    padding: 8px 10px 0;
+    border-top: 1px solid var(--line-soft);
+  }
+  /* Documentation reads as a foot of small links, not as three more
+     destinations: it is where a page is read, not where the work happens. */
+  #app-sidebar .nav-docs .nav-item {
+    width: auto;
+    min-height: 0;
+    padding: 2px 0;
+    border-radius: 4px;
+    color: var(--muted);
+    font-size: 0.78rem;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+  #app-sidebar .nav-docs .nav-item:hover,
+  #app-sidebar .nav-docs .nav-item:focus-visible {
+    color: var(--text);
+    background: none;
+    text-decoration: underline;
+  }
+  #app-sidebar .nav-docs .nav-item.active {
+    color: var(--text);
+    background: none;
+    font-weight: 700;
+  }
+}
+
+/* ----------------------------------------------------------------------
+ * Completion of a title: the percentage with a bar beside it.
+ *
+ * The monitored lists said «43%» and left the rest to the reader. A native
+ * <progress> carries the same value to assistive technology and needs no
+ * inline width, so the bar follows the theme like everything else.
+ * -------------------------------------------------------------------- */
+.pbar { display: inline-flex; align-items: center; gap: 8px; min-width: 92px; }
+.pbar progress {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 64px;
+  height: 6px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--surface-3);
+  overflow: hidden;
+}
+.pbar progress::-webkit-progress-bar { background: var(--surface-3); border-radius: 999px; }
+.pbar progress::-webkit-progress-value {
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--accent-2), var(--accent));
+}
+.pbar progress::-moz-progress-bar { border-radius: 999px; background: var(--accent); }
+.pbar-value { color: var(--muted); font-size: 0.82rem; font-variant-numeric: tabular-nums; }
+.pbar[data-complete="1"] progress::-webkit-progress-value { background: var(--ok); }
+.pbar[data-complete="1"] progress::-moz-progress-bar { background: var(--ok); }
+.pbar[data-complete="1"] .pbar-value { color: var(--ok); }
+/* A poster card has no room for a table column: the bar shrinks. */
+.card-meta .pbar { min-width: 0; gap: 6px; }
+.card-meta .pbar progress { width: 44px; }
+
+@media (min-width: 901px) {
+  /* Scarico: the queue is what the page is for. The search that used to sit
+     on top of it is the same collapsed block a phone already shows. */
+  .downloads-view { display: flex; flex-direction: column; }
+  .downloads-view > .downloads-flash { order: 0; }
+  .downloads-view > .session-panel { order: 1; }
+  .downloads-view > .add-torrent-panel { order: 2; }
+  .downloads-view > .downloads-search-panel { order: 3; }
+  .downloads-view > * { order: 4; }
+  .downloads-view.has-add-link > .add-torrent-panel { order: 0; }
+}
+
+/* A collapsed search panel looks like any other panel: the chevron says it
+   opens, and turns when it is open. */
+.downloads-search-panel > summary {
+  cursor: pointer;
+  list-style: none;
+}
+.downloads-search-panel > summary::-webkit-details-marker { display: none; }
+.downloads-search-panel > summary::after {
+  content: "▾";
+  margin-left: auto;
+  color: var(--muted);
+  transition: transform 0.15s;
+}
+.downloads-search-panel[open] > summary::after { transform: rotate(180deg); }
+@media (prefers-reduced-motion: reduce) {
+  .downloads-search-panel > summary::after { transition: none; }
+}
+
+/* «Aggiorna» asks for the page again and replaces only its content: while the
+   request runs the button says so instead of looking dead. */
+.btn-refresh[disabled] { cursor: progress; opacity: 0.65; }
+
+/* ----------------------------------------------------------------------
+ * Episode row: two actions and a «…» menu.
+ *
+ * The menu opens inside the episodes table, whose wrapper scrolls sideways:
+ * on a computer the table fits and the wrapper must not clip the panel, as
+ * the torrent list already does.
+ * -------------------------------------------------------------------- */
+.series-episodes td.row-actions { white-space: nowrap; }
+.series-episodes td.row-actions > * { vertical-align: middle; }
+.series-episodes td.row-actions .v2-menu { display: inline-block; }
+@media (min-width: 901px) {
+  .table-wrap:has(> table.series-episodes) { overflow: visible; }
 }

@@ -389,6 +389,12 @@ type v2ShellData struct {
 	Content any
 	Chrome  uiShellChrome
 	Body    string
+	// Docs is the documentation block at the foot of the sidebar (manual,
+	// changelog, licence): pages to read, outside the column of destinations.
+	Docs []uiNavItem
+	// SelfURL is the address of this page with its query: the «Aggiorna»
+	// button asks for it again and swaps only the page content.
+	SelfURL string
 	// Flash carries a one-shot feedback message (usually set by V2SectionAction
 	// through the redirect URL) rendered as a toast on every page.
 	Flash    string
@@ -468,30 +474,18 @@ func v2PageLabel(view string) string {
 
 // v2NavGroups mirrors uiNavigation but points the links at /v2. The manual and
 // the changelog are documentation kept online: their entries are external
-// links, so editing either file never requires rebuilding Gextto.
+// links, so editing either file never requires rebuilding Gextto. The
+// documentation entries are not part of the groups: v2NavDocs collects them for
+// the foot of the sidebar.
 func v2NavGroups(s *AppState, view string, counts map[string]string) []uiNavGroup {
 	groups := make([]uiNavGroup, 0, len(uiNavGroups))
 	for index, group := range uiNavGroups {
 		out := uiNavGroup{Label: group.Label}
 		for _, item := range group.Items {
-			href := "/?view=" + item.ID
-			external := false
-			if online := v2NavExternalHref(s, item.ID); online != "" {
-				href = online
-				external = true
+			if item.Docs {
+				continue
 			}
-			out.Items = append(out.Items, uiNavItem{
-				ID:           item.ID,
-				Label:        item.Label,
-				Href:         href,
-				Icon:         v2NavIcon(item.ID),
-				Active:       item.ID == view,
-				Optional:     item.Optional,
-				MobileHidden: item.MobileHidden,
-				MobileAlways: item.MobileAlways,
-				Count:        counts[item.ID],
-				External:     external,
-			})
+			out.Items = append(out.Items, v2NavItemFrom(s, item, view, counts[item.ID]))
 		}
 		if index == len(uiNavGroups)-1 {
 			out.Open = uiIsSystemPage(view)
@@ -500,6 +494,39 @@ func v2NavGroups(s *AppState, view string, counts map[string]string) []uiNavGrou
 		groups = append(groups, out)
 	}
 	return groups
+}
+
+// v2NavDocs is the documentation block of the menu, in the same order as the
+// definition (manual, changelog, licence).
+func v2NavDocs(s *AppState, view string) []uiNavItem {
+	items := make([]uiNavItem, 0, len(uiNavDocs()))
+	for _, item := range uiNavDocs() {
+		items = append(items, v2NavItemFrom(s, item, view, ""))
+	}
+	return items
+}
+
+// v2NavItemFrom builds one menu entry: the link is internal unless the
+// documentation says it lives online.
+func v2NavItemFrom(s *AppState, item uiNavDefinitionItem, view, count string) uiNavItem {
+	href := "/?view=" + item.ID
+	external := false
+	if online := v2NavExternalHref(s, item.ID); online != "" {
+		href = online
+		external = true
+	}
+	return uiNavItem{
+		ID:           item.ID,
+		Label:        item.Label,
+		Href:         href,
+		Icon:         v2NavIcon(item.ID),
+		Active:       item.ID == view,
+		Optional:     item.Optional,
+		MobileHidden: item.MobileHidden,
+		MobileAlways: item.MobileAlways,
+		Count:        count,
+		External:     external,
+	}
 }
 
 // v2NavExternalHref returns the online address of a documentation entry, or ""
@@ -890,6 +917,8 @@ func V2Page(w http.ResponseWriter, r *http.Request, s *AppState) {
 		Content:  content,
 		Chrome:   uiShellChromeFrom(s),
 		Body:     body,
+		Docs:     v2NavDocs(s, view),
+		SelfURL:  r.URL.RequestURI(),
 		Flash:    strings.TrimSpace(r.FormValue("toast")),
 		FlashErr: r.FormValue("toast_err") == "1",
 		Update:   updates.Status(cfg),

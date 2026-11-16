@@ -389,6 +389,11 @@ type uiNavDefinitionItem struct {
 	Optional     bool
 	MobileHidden bool
 	MobileAlways bool
+	// Docs marks the entries of the documentation: the manual, the changelog
+	// and the licence. They are pages to read, not places to work, so the
+	// desktop sidebar keeps them at the bottom as small links instead of
+	// growing the column of destinations one more row.
+	Docs bool
 }
 
 var uiNavGroups = []uiNavDefinition{
@@ -413,10 +418,24 @@ var uiNavGroups = []uiNavDefinition{
 		{ID: "maintenance", Label: "Manutenzione"},
 		{ID: "health", Label: "Salute"},
 		{ID: "blocklist", Label: "Blocklist", Optional: true},
-		{ID: "manual", Label: "Manuale"},
-		{ID: "changelog", Label: "Changelog"},
-		{ID: "license", Label: "Licenza", Optional: true},
+		{ID: "manual", Label: "Manuale", Docs: true},
+		{ID: "changelog", Label: "Changelog", Docs: true},
+		{ID: "license", Label: "Licenza", Optional: true, Docs: true},
 	}},
+}
+
+// uiNavDocs returns the documentation entries in menu order (the manual, the
+// changelog, the licence): the desktop sidebar shows them at its foot.
+func uiNavDocs() []uiNavDefinitionItem {
+	var out []uiNavDefinitionItem
+	for _, group := range uiNavGroups {
+		for _, item := range group.Items {
+			if item.Docs {
+				out = append(out, item)
+			}
+		}
+	}
+	return out
 }
 
 func uiIsSystemPage(view string) bool {

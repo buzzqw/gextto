@@ -276,13 +276,24 @@ problem becomes hard to reproduce.
 | Download | **Download**, **Log** | the transfers in progress; the live log |
 | Library | **TV Series**, **Movies** | the titles you follow, their episodes and what is missing |
 | Discovery | **Explore**, **Archive**, **Comics**, **eD2k** | finding new titles, browsing the releases seen, comics, aMule |
-| System | **Configuration**, **Integrations**, **Maintenance**, **Health**, **Blocklist**, **Manual**, **Changelog** | settings, connected services, clean-ups, diagnosis |
+| System | **Configuration**, **Integrations**, **Maintenance**, **Health**, **Blocklist** | settings, connected services, clean-ups, diagnosis |
+
+On a computer every entry has its icon beside the name and every area its name
+in small capitals: the column is read at a glance. At the foot of the menu,
+below the areas, are the **Manual**, the **Changelog** and the **Licence**: they
+are pages to read, so they sit there as small links. When the entries do not fit
+on the screen only the list of pages scrolls: the brand, the documentation and
+the state line stay put. On a phone the bottom bar is unchanged, and the manual,
+the changelog and the licence are in the **More** panel.
 
 ### The top bar
 
 - **Add torrent**, on every page: opens the form for a magnet, a URL or a
   `.torrent` file (see [Adding a torrent or a magnet](#adding-a-torrent-or-a-magnet)).
-- **Refresh**: reloads the page's data at once.
+- **Refresh**: asks for the page again and replaces only its content. The screen
+  does not flash, the scroll position and the open panels stay where they are;
+  the live figures keep updating on their own, so it is only needed when you
+  want to read the list again.
 - The download and upload **speeds** (torrents plus aMule) and **CPU and RAM
   per process**: Gextto, gx-torrent and, when active and local, aMule. They
   refresh every 5 seconds, and stop when the browser tab is not in view: they
@@ -426,18 +437,25 @@ missing episodes can always show up. To stop searching for it, pause it.
 
 ### The episodes
 
-Episodes are grouped by season. On each one you can:
+Episodes are grouped by season, and every season has its completion bar beside
+the count (`10/10`, green when complete). On each episode you have two buttons
+and a menu:
 
 - **🔍 search for it**: the search opens in a panel below the episode and tells
   you how far it got (how many sources it is querying, how many answered, when
   it moves on to eD2k);
-- **📜 see its history**: every event of that download (see
-  [An episode did not arrive](#an-episode-did-not-arrive-where-to-look));
-- copy the magnet, **ignore** it (it will no longer be searched; re-enabling it
-  makes it a candidate again), force it, delete it;
-- **↻ Redownload**: moves the current file to the trash and searches for the
-  episode again, even when it would not normally count as missing (for example
-  because a pack covers the season or later episodes are already there).
+- **⤒ force it**: downloads it at once, without waiting for the cycle;
+- the **⋯** menu with the less frequent actions, written out: *Sources in the
+  archive* (what is already on disk), *Download history* (every event of that
+  download, see
+  [An episode did not arrive](#an-episode-did-not-arrive-where-to-look)),
+  *Redownload* (moves the current file to the trash and searches for the episode
+  again, even when it would not normally count as missing, for example because a
+  pack covers the season or later episodes are already there), *Ignore* or
+  *Resume searching* (an ignored episode is no longer searched; re-enabling it
+  makes it a candidate again) and *Delete from the archive*. On a phone that menu
+  opens as a sheet at the bottom of the screen, above the menu bar, instead of
+  staying inside the table that scrolls.
 
 ### Missing episodes
 
@@ -628,7 +646,7 @@ release, or download something you do not follow.
 | From | What it searches |
 |---|---|
 | **Dashboard**, search box | local archive, indexers, web engines; eD2k if you tick **eD2k** |
-| **Download**, *Search for a release* | the same, without leaving the downloads page |
+| **Download**, *Search for a release* | the same, without leaving the downloads page; the block sits under the queue of transfers and opens with one click |
 | **Explore** | titles on TMDB (trending, popular, upcoming) to add; generic release search |
 | **Archive** | the releases seen in the feeds, instantly; online only if you tick *Also search the web* |
 | 🔍 on an episode, **Search now** on a movie | that exact title |
@@ -2030,8 +2048,9 @@ updates). On a computer the sections are in the left column, with the
 number of settings; on a phone you pick them from the *Section* list. The page
 address follows the open section, so it can be bookmarked. Links to the old
 tabs (*Acquisition*, *Advanced*, *Translations*) open the section that took
-over their content (*Translations* opens Diagnostics and updates). Entering Configuration hides the main menu bar; the **Menu** button at the top
-left brings it back over the content (Esc closes it).
+over their content (*Translations* opens Diagnostics and updates). The main menu
+stays where it is: the sections sit beside it while the window is wide enough,
+and below 1160 pixels they become the *Section* list a phone uses.
 
 When a section gathers several groups of settings (for example **Search cycle**
 and **Missing episodes** under *Automatic maintenance*), the group title stays

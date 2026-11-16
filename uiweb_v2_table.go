@@ -851,11 +851,24 @@ func v2FormatCell(item map[string]any, column uiColumn) template.HTML {
 	case "completion":
 		total := v2Float(item["episodes_total"])
 		done := v2Float(item["episodes_downloaded"])
-		percent := 0.0
-		if total > 0 {
-			percent = done / total * 100
+		if total <= 0 {
+			return template.HTML(`<span class="muted">—</span>`)
 		}
-		return template.HTML(stdhtml.EscapeString(strconv.FormatFloat(percent, 'f', 0, 64) + "%"))
+		percent := done / total * 100
+		label := strconv.FormatFloat(percent, 'f', 0, 64) + "%"
+		complete := ""
+		if done >= total {
+			complete = ` data-complete="1"`
+		}
+		// The bar says at a glance how much of the title is complete; the
+		// percentage stays beside it. A native <progress> carries the same value
+		// to assistive technology and needs no inline width, so the bar follows
+		// the theme. aria-label names the measure; the visible number is the
+		// same value in words and must not be read twice.
+		return template.HTML(`<span class="pbar"` + complete + `><progress class="pbar-track" value="` +
+			strconv.FormatFloat(done, 'f', -1, 64) + `" max="` + strconv.FormatFloat(total, 'f', -1, 64) +
+			`" aria-label="Episodi archiviati"></progress><span class="pbar-value" aria-hidden="true">` +
+			stdhtml.EscapeString(label) + `</span></span>`)
 	case "enabled":
 		if v2Truthy(item["enabled"]) {
 			return "attiva"

@@ -1,6 +1,12 @@
 # Bundled French translations for the web UI. The translation database mirrors
 # this catalog: a corrected value here replaces the stored one at the next start.
 fra:
+  "Documentazione": "Documentation"
+  "Episodi archiviati": "Épisodes archivés"
+  "Sorgenti in archivio": "Sources dans l'archive"
+  "Sorgenti, storia, riscarica, ignora o elimina questa puntata": "Sources, historique, retélécharger, ignorer ou supprimer cet épisode"
+  "Riprendi la ricerca di questa puntata": "Reprendre la recherche de cet épisode"
+  "Ignora questa puntata": "Ignorer cet épisode"
   "✋ aggiunto a mano, resta in trasferimento": "✋ ajouté à la main, reste dans le dossier de transfert"
   "Release aggiunta ai download: aggiunta a mano, resterà nella cartella di trasferimento.": "Release ajoutée aux téléchargements : ajoutée à la main, elle restera dans le dossier de transfert."
   "Dati scaricati e inviati da quando il motore torrent è partito": "Données téléchargées et envoyées depuis le démarrage du moteur torrent"

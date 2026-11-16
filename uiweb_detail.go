@@ -44,6 +44,9 @@ type uiSeasonGroup struct {
 	Rows   []uiEpisodeRow
 	Owned  int
 	Total  int
+	// Percent is how much of the season is archived, rounded down: the bar in
+	// the season header reads it, and Go templates cannot do the division.
+	Percent int
 }
 
 type uiSeriesDetail struct {
@@ -335,6 +338,12 @@ func uiSeriesDetailFrom(s *AppState, r *http.Request) (uiSeriesDetail, bool) {
 	for _, season := range ignoredSeasons {
 		if season > maxSeason {
 			maxSeason = season
+		}
+	}
+	for index := range seasonGroups {
+		group := &seasonGroups[index]
+		if group.Total > 0 {
+			group.Percent = group.Owned * 100 / group.Total
 		}
 	}
 	seasonButtons := make([]uiSeasonButton, 0, maxSeason)

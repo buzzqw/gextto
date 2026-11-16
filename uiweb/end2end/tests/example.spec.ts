@@ -38,9 +38,8 @@ test("dashboard and configuration areas are usable", async ({ page }) => {
   await page.getByRole("link", { name: "Diagnostica e aggiornamenti" }).click();
   await expect(page.locator("#v2-setting-debug_enabled")).toBeVisible();
 
-  // The settings page hides the main navigation: the «Menu» button brings it
-  // back before moving on.
-  await page.locator("[data-app-menu-toggle]").click();
+  // The main navigation stays where it is: Configuration is a page like the
+  // others, so the next destination is one click away.
   await nav(page, "Manutenzione").click();
   await expect(page.getByRole("button", { name: "Backup ora" }).first()).toBeVisible();
 

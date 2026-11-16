@@ -2,6 +2,7 @@ package gextto
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 )
 
@@ -83,5 +84,33 @@ func BenchmarkV2SortItems(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		copy(items, base)
 		v2SortItems(items, uiColumn{Key: "name"}, "asc")
+	}
+}
+
+// TestV2CompletionIsABar: the completion column is a bar with the percentage
+// beside it, not a bare number. The bar is a native <progress> so the value
+// reaches assistive technology, and the wrapper carries the state a full
+// season needs (a colour of its own) without an inline width.
+func TestV2CompletionIsABar(t *testing.T) {
+	column := uiColumn{Label: "Complet.", Format: "completion"}
+	half := string(v2FormatCell(map[string]any{"episodes_downloaded": float64(5), "episodes_total": float64(10)}, column))
+	for _, want := range []string{`class="pbar"`, `class="pbar-track"`, `value="5"`, `max="10"`, `>50%<`, `aria-label="Episodi archiviati"`} {
+		if !strings.Contains(half, want) {
+			t.Fatalf("half-done cell is missing %q: %s", want, half)
+		}
+	}
+	if strings.Contains(half, `data-complete`) {
+		t.Fatalf("a half-done title is not complete: %s", half)
+	}
+
+	full := string(v2FormatCell(map[string]any{"episodes_downloaded": float64(3), "episodes_total": float64(3)}, column))
+	if !strings.Contains(full, `data-complete="1"`) || !strings.Contains(full, `>100%<`) {
+		t.Fatalf("a complete title must say so: %s", full)
+	}
+
+	// A title with no known episodes has nothing to measure: a dash, not "0%".
+	empty := string(v2FormatCell(map[string]any{}, column))
+	if !strings.Contains(empty, `—`) || strings.Contains(empty, "<progress") {
+		t.Fatalf("a title without episodes shows a dash: %s", empty)
 	}
 }

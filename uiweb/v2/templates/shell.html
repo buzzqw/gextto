@@ -62,8 +62,7 @@
 <body>
 <a class="skip-link" href="#v2-page">{{tr "Vai al contenuto"}}</a>
 <div id="app-system-backdrop" class="system-backdrop" hidden></div>
-<div id="app-menu-backdrop" class="app-menu-backdrop" hidden></div>
-<div class="app-shell{{if eq .Page "settings"}} is-settings{{end}}" data-page="{{.Page}}">
+<div class="app-shell" data-page="{{.Page}}">
   <aside class="sidebar" id="app-sidebar">
     <div class="brand" {{trTitle "Gextto EXpert Torrent Transfer Orchestrator"}} aria-label="{{tr "Gextto EXpert Torrent Transfer Orchestrator"}}">
       <span class="brand-mark" aria-hidden="true">{{tr "G"}}</span>
@@ -77,10 +76,18 @@
             floating panel, and the button must stay in the bottom bar. */}}
        {{if .System}}<button class="nav-more" type="button" data-mobile-system-toggle aria-expanded="{{if .Open}}true{{else}}false{{end}}" aria-controls="app-system-menu"><span class="nav-icon" aria-hidden="true">⋯</span><span>{{tr "Altro"}}</span><span class="nav-more-indicator" aria-hidden="true">＋</span></button>{{end}}
        <div{{if .System}} id="app-system-menu"{{end}} class="nav-group{{if .System}} system-group{{end}}{{if .Open}} open{{end}}">
+        {{/* The group name is written on a computer, where the column of
+             destinations needs its areas marked; on a phone the bar has no room
+             for it and the CSS keeps it out of the way. */}}
+        <p class="nav-group-label"><span>{{tr .Label}}</span></p>
         {{range .Items}}
          <a class="nav-item{{if .Active}} active{{end}}{{if .Optional}} nav-optional{{end}}{{if .MobileHidden}} nav-mobile-hidden{{end}}{{if .MobileAlways}} nav-mobile-always{{end}}" href="{{.Href}}" {{trTitle .Label}}{{if .External}} target="_blank" rel="noopener noreferrer"{{end}}{{if .Active}} aria-current="page"{{end}} data-nav="{{.ID}}"><span class="nav-icon" aria-hidden="true">{{icon .Icon}}</span><span>{{tr .Label}}</span>{{if eq .ID "downloads"}}{{template "v2_nav_downloads_count" .}}{{else if or (eq .ID "series") (eq .ID "movies") (eq .ID "comics")}}<span class="nav-count"{{if or (not .Count) (eq .Count "0") (eq .Count "0/0")}} hidden{{end}}>{{tr .Count}}</span>{{end}}</a>
          {{end}}
          {{if .System}}{{range $.Groups}}{{range .Items}}{{if .MobileHidden}}<a class="nav-item nav-mobile-system-extra" href="{{.Href}}" {{trTitle .Label}}{{if .External}} target="_blank" rel="noopener noreferrer"{{end}} data-nav="{{.ID}}"><span class="nav-icon" aria-hidden="true">{{icon .Icon}}</span><span>{{tr .Label}}</span></a>{{end}}{{end}}{{end}}{{end}}
+         {{/* The documentation is at the foot of the sidebar on a computer; on a
+              phone this panel is its only way in, so the same links are repeated
+              here without a menu identity of their own. */}}
+         {{if .System}}{{range $.Docs}}<a class="nav-item nav-mobile-system-extra" href="{{.Href}}" {{trTitle .Label}}{{if .External}} target="_blank" rel="noopener noreferrer"{{end}}><span class="nav-icon" aria-hidden="true">{{icon .Icon}}</span><span>{{tr .Label}}</span></a>{{end}}{{end}}
          {{/* Theme, text size, font and language are in the "Aspetto" menu of the
              top bar on every screen size: only the donation link is left here,
              because the floating button is hidden on a phone. */}}
@@ -91,18 +98,24 @@
       </div>
       {{end}}
     </nav>
+    {{if .Docs}}<nav class="nav-docs" aria-label="{{tr "Documentazione"}}">
+      {{range .Docs}}<a class="nav-item nav-doc{{if .Active}} active{{end}}" href="{{.Href}}" {{trTitle .Label}}{{if .External}} target="_blank" rel="noopener noreferrer"{{end}}{{if .Active}} aria-current="page"{{end}} data-nav="{{.ID}}"><span>{{tr .Label}}</span></a>{{end}}
+    </nav>{{end}}
     <div class="sidebar-foot"><span class="pulse"></span><span {{trTitle "Gextto è attivo: il servizio sta lavorando (scarica, importa, cerca). Non è lo stato di salute: quello è il badge «ok» in alto."}}>{{if .Chrome.DryRun}}{{tr "dry-run"}}{{else}}{{tr "attivo"}}{{end}}</span></div>
   </aside>
   <main class="main-shell">
     <header class="topbar v2-topbar-sticky">
-      {{if eq .Page "settings"}}<button class="btn app-menu-toggle" type="button" data-app-menu-toggle aria-expanded="false" aria-controls="app-sidebar" {{trTitle "Mostra o nascondi il menu principale"}}><span aria-hidden="true">☰</span><span class="app-menu-toggle-label">{{tr "Menu"}}</span></button>{{end}}
       <div class="topbar-title">
         <h1>{{tr .Title}}</h1>
       </div>
       <div class="top-actions">
         {{template "v2_live_top_metrics" .Chrome}}
         <button class="btn add-torrent-toggle" type="button" data-add-torrent-toggle aria-label="{{tr "Aggiungi torrent"}}" {{trTitle "Apri o chiudi il modulo per aggiungere un torrent"}}{{if eq .Page "downloads"}} aria-expanded="false" aria-controls="v2-add-torrent"{{end}}><span aria-hidden="true">{{icon "i-plus"}}</span><span class="add-torrent-toggle-label">{{tr "Aggiungi torrent"}}</span></button>
-        <button class="btn btn-refresh" type="button" onclick="window.location.reload()" {{trTitle "Ricarica i dati mostrati"}} aria-label="{{tr "Ricarica i dati mostrati"}}"><span class="btn-refresh-icon" aria-hidden="true">{{icon "i-reload"}}</span><span class="btn-refresh-label">{{tr "Aggiorna"}}</span></button>
+        {{/* HTMX asks for this page again and replaces only its content: the
+             screen does not go blank, the scroll and the open panels stay, and
+             the live figures keep their own rhythm. Without HTMX the button
+             falls back to a normal reload. */}}
+        <button class="btn btn-refresh" type="button" hx-get="{{.SelfURL}}" hx-target="#v2-page" hx-select="#v2-page" hx-swap="outerHTML" hx-disabled-elt="this" onclick="if(!window.htmx)window.location.reload()" {{trTitle "Ricarica i dati mostrati"}} aria-label="{{tr "Ricarica i dati mostrati"}}"><span class="btn-refresh-icon" aria-hidden="true">{{icon "i-reload"}}</span><span class="btn-refresh-label">{{tr "Aggiorna"}}</span></button>
         {{template "v2_live_status" .Chrome}}
       </div>
       <div class="top-controls">

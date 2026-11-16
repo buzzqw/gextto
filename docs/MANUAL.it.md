@@ -275,13 +275,24 @@ sorgenti, un problema diventa difficile da riprodurre.
 | Download | **Scarico**, **Log** | i trasferimenti in corso; il log in diretta |
 | Libreria | **Serie TV**, **Film** | i titoli che segui, i loro episodi e i mancanti |
 | Scoperta | **Esplora**, **Archivio**, **Fumetti**, **eD2k** | trovare titoli nuovi, consultare le release viste, fumetti, aMule |
-| Sistema | **Configurazione**, **Integrazioni**, **Manutenzione**, **Salute**, **Blocklist**, **Manuale**, **Changelog** | impostazioni, servizi collegati, pulizie, diagnosi |
+| Sistema | **Configurazione**, **Integrazioni**, **Manutenzione**, **Salute**, **Blocklist** | impostazioni, servizi collegati, pulizie, diagnosi |
+
+Sul computer ogni voce ha la sua icona accanto al nome e ogni area ha il suo
+titolo in maiuscoletto: la colonna si legge a colpo d'occhio. In fondo al menu,
+sotto le aree, ci sono il **Manuale**, il **Changelog** e la **Licenza**: sono
+pagine da leggere e stanno lì come piccoli collegamenti. Se le voci non entrano
+nello schermo, scorre solo la lista delle pagine: marca, documentazione e stato
+restano fermi. Sul telefono la barra in basso non cambia, e manuale, changelog e
+licenza sono nel menu **Altro**.
 
 ### La barra in alto
 
 - **Aggiungi torrent**, presente in ogni pagina: apre il modulo per un magnet,
   un URL o un file `.torrent` (vedi [Aggiungere un torrent o un magnet](#aggiungere-un-torrent-o-un-magnet)).
-- **Aggiorna**: ricarica subito i dati della pagina.
+- **Aggiorna**: richiede di nuovo la pagina e ne sostituisce soltanto il
+  contenuto. Lo schermo non lampeggia, la posizione di scorrimento e i pannelli
+  aperti restano dove sono; i dati in diretta continuano ad aggiornarsi da soli,
+  quindi serve solo quando vuoi rileggere l'elenco.
 - Le **velocità** di download e upload (torrent più aMule) e **CPU e RAM per
   processo**: Gextto, gx-torrent e, se attivo e locale, aMule. Si aggiornano
   ogni 5 secondi, e si fermano quando la scheda del browser non è in vista:
@@ -428,18 +439,25 @@ cercarla, mettila in pausa.
 
 ### Gli episodi
 
-Gli episodi sono raggruppati per stagione. Su ognuno puoi:
+Gli episodi sono raggruppati per stagione, e ogni stagione ha la sua barra di
+completamento accanto al conteggio (`10/10`, in verde quando è completa). Su
+ogni puntata hai due pulsanti e un menu:
 
-- **🔍 cercarlo**: la ricerca si apre in un riquadro sotto la puntata e dice a
+- **🔍 cercarla**: la ricerca si apre in un riquadro sotto la puntata e dice a
   che punto è (quante sorgenti sta interrogando, quante hanno risposto, quando
   passa a eD2k);
-- **📜 vederne la storia**: tutti gli eventi di quel download (vedi
-  [Un episodio non è arrivato](#un-episodio-non-è-arrivato-dove-guardare));
-- copiare il magnet, **ignorarlo** (non verrà più cercato; riattivandolo torna
-  candidato), forzarlo, eliminarlo;
-- **↻ Riscarica**: sposta il file attuale nel cestino e rimette la puntata in
-  cerca, anche quando normalmente non risulterebbe mancante (per esempio perché
-  la stagione è coperta da un pack o ci sono già episodi successivi).
+- **⤒ forzarla**: la scarica subito, senza aspettare il ciclo;
+- il menu **⋯** con le azioni meno frequenti, scritte per esteso: *Sorgenti in
+  archivio* (cosa c'è già sul disco), *Storia dei download* (tutti gli eventi di
+  quel download, vedi
+  [Un episodio non è arrivato](#un-episodio-non-è-arrivato-dove-guardare)),
+  *Riscarica* (sposta il file attuale nel cestino e rimette la puntata in cerca,
+  anche quando normalmente non risulterebbe mancante, per esempio perché la
+  stagione è coperta da un pack o ci sono già episodi successivi), *Ignora* o
+  *Riprendi la ricerca* (una puntata ignorata non viene più cercata; riattivandola
+  torna candidata) ed *Elimina dall'archivio*. Sul telefono il menu si apre come
+  foglio in basso, sopra la barra dei menu, così non resta chiuso dentro la
+  tabella che scorre.
 
 ### Gli episodi mancanti
 
@@ -635,7 +653,7 @@ release precisa o a scaricare qualcosa che non segui.
 | Da dove | Cosa cerca |
 |---|---|
 | **Dashboard**, riquadro di ricerca | archivio locale, indexer, motori web; eD2k se spunti **eD2k** |
-| **Scarico**, *Cerca una release* | lo stesso, senza lasciare la pagina dei download |
+| **Scarico**, *Cerca una release* | lo stesso, senza lasciare la pagina dei download; il blocco sta sotto la coda dei trasferimenti e si apre con un clic |
 | **Esplora** | titoli su TMDB (tendenze, popolari, prossime uscite) da aggiungere; ricerca generica di release |
 | **Archivio** | le release viste nei feed, all'istante; online solo se spunti *Cerca anche nel web* |
 | 🔍 su un episodio, **Cerca subito** su un film | quel titolo preciso |
@@ -2051,9 +2069,10 @@ sono nella colonna a sinistra, con il numero di impostazioni; su telefono si
 scelgono dalla tendina *Sezione*. L'indirizzo della pagina segue la sezione
 aperta, quindi si può salvare nei preferiti. I link alle vecchie schede
 (*Acquisizione*, *Avanzate*, *Traduzioni*) aprono la sezione che ne ha preso il
-contenuto (*Traduzioni* apre Diagnostica e aggiornamenti). Entrando in Configurazione la barra dei menu principale si nasconde; il
-pulsante **Menu** in alto a sinistra la fa ricomparire sopra il contenuto (Esc
-per richiuderla).
+contenuto (*Traduzioni* apre Diagnostica e aggiornamenti). Il menu principale
+resta al suo posto: le sezioni si affiancano a sinistra finché la finestra è
+larga abbastanza, e sotto i 1160 pixel diventano la tendina *Sezione* come sul
+telefono.
 
 Quando una sezione raccoglie più gruppi di impostazioni (per esempio **Ciclo di
 ricerca** ed **Episodi mancanti** in *Manutenzione automatica*), il titolo del
