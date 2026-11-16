@@ -29,6 +29,7 @@ still be true after the item lands does not belong here.
 
 Each waits for the operator's choice.
 
+- **A season with no season number, and a batch written with a space**: `Serie - Miniserie TV [COMPLETA] 2160p …` is read as a movie, because the title carries no season marker (a miniseries is one season), and `Serie S01E01 02`, `S01E03 05`, `S01E01 08` are read as their first episode only, so the complete Italian seasons arrive as one movie or as one episode and never fill a season. Gate: the operator's choice; the rule is «miniserie/miniseries with completa/complete is the season 1 pack» and «SxxEyy nn is the range up to nn».
 - **MCP endpoint**: Gextto's API exposed as tools for an assistant, with a read-only switch. Gate: the operator's choice.
 - **Usenet as an acquisition source**: NZB search through the same indexers and an NNTP download path into the same import. Gate: the operator's choice.
 - **Blocklist "Motivo" in words**: the column shows the internal code (`stalled_ed2k`, `dead_swarm`, `corrupt_file`, `unsafe_payload`) instead of a sentence translated in every language, which the log now writes. Gate: the operator's choice.
