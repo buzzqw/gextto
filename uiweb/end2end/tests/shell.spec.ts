@@ -140,7 +140,7 @@ test.describe("menu del telefono", () => {
 test.describe("aggiunta di un torrent", () => {
   test.use({ viewport: { width: 1280, height: 800 } });
 
-  test("il modulo si apre sopra la pagina e Escape lo chiude", async ({ page }) => {
+  test("il modulo è un frame che scende dall'alto, prende il focus e si chiude con Esc o con la ✕", async ({ page }) => {
     await page.goto("/?view=downloads");
     const panel = page.locator("#v2-add-torrent");
     await expect(panel).toBeHidden();
@@ -148,19 +148,43 @@ test.describe("aggiunta di un torrent", () => {
     await toggle.click();
     await expect(panel).toBeVisible();
     await expect(toggle).toHaveAttribute("aria-expanded", "true");
-    // It floats over the queue instead of pushing it down.
+
+    // A frame hanging from the top, as wide as the content column: the page
+    // stays visible under it instead of sitting behind a centred popup.
     const style = await panel.evaluate((element) => {
       const computed = getComputedStyle(element);
-      return { position: computed.position, zIndex: Number(computed.zIndex), shadow: computed.boxShadow };
+      return { position: computed.position, zIndex: Number(computed.zIndex) };
     });
     expect(style.position).toBe("fixed");
-    expect(style.zIndex).toBeGreaterThan(10);
-    expect(style.shadow).toContain("rgba");
-    // The field to paste into takes the focus.
+    expect(style.zIndex).toBeGreaterThan(40); // above the sticky top bar
+    const box = await panel.boundingBox();
+    const sidebar = await page.locator("#app-sidebar").boundingBox();
+    if (!box || !sidebar) throw new Error("geometria non disponibile");
+    expect(box.y).toBeLessThanOrEqual(1);
+    expect(box.x).toBeGreaterThanOrEqual(sidebar.width - 1);
+    expect(box.width).toBeGreaterThan(1280 - sidebar.width - 40);
+
+    // The field to paste into takes the focus at once.
     await expect.poll(() => page.evaluate(() => document.activeElement?.getAttribute("name"))).toBe("magnet");
-    await page.keyboard.press("Escape");
+
+    // The keyboard stays inside the frame while it is open.
+    const last = panel.locator("button[type=submit]").last();
+    await last.focus();
+    await page.keyboard.press("Tab");
+    const inside = await page.evaluate(() => !!document.activeElement?.closest("#v2-add-torrent"));
+    expect(inside).toBe(true);
+
+    // ✕ closes it and gives the focus back to the button that opened it.
+    await panel.locator("[data-add-torrent-close]").click();
     await expect(panel).toBeHidden();
     await expect(toggle).toHaveAttribute("aria-expanded", "false");
+    await expect(toggle).toBeFocused();
+
+    // Escape does the same.
+    await toggle.click();
+    await expect(panel).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(panel).toBeHidden();
     await expect(toggle).toBeFocused();
   });
 });

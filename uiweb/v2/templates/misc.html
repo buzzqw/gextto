@@ -170,7 +170,7 @@
   <input type="hidden" name="path" value="{{.Path}}">
   <input type="hidden" name="method" value="{{.Method}}">
   <input type="hidden" name="body" value="{{.Body}}">
-  <button class="btn sm {{.Class}}" type="submit" {{if .Hint}}{{trTitle .Hint}}{{else}}{{trTitle .Label}}{{end}}{{if .Confirm}} hx-confirm="{{tr .Confirm}}"{{end}}{{if .ToastMessage}} data-v2-toast-title="{{if .ToastTitle}}{{tr .ToastTitle}}{{else}}{{tr "Operazione"}}{{end}}" data-v2-toast-message="{{tr .ToastMessage}}"{{end}} hx-disabled-elt="this">{{tr .Label}}</button>
+  <button class="btn sm {{.Class}}" type="submit" {{if .Hint}} {{trTitle .Hint}}{{end}}{{if .Confirm}} hx-confirm="{{tr .Confirm}}"{{end}}{{if .ToastMessage}} data-v2-toast-title="{{if .ToastTitle}}{{tr .ToastTitle}}{{else}}{{tr "Operazione"}}{{end}}" data-v2-toast-message="{{tr .ToastMessage}}"{{end}} hx-disabled-elt="this">{{tr .Label}}</button>
 </form>
 {{end}}
 

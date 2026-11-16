@@ -605,6 +605,16 @@ of the product is in `gx-torrent.md`, `gx-core.md` and the manuals; the numbers 
   catalogs. Automatic guards: `TestSettingTooltipsAreTranslated` (Gextto),
   `TestEveryOptionHasATooltip` and `TestUIPageIsFullyTranslatable` (daemon). A
   missing or untranslated tooltip makes the tests fail.
+- **A tooltip speaks: it explains, it never repeats the label.** The rule is the
+  operator's and it holds for every tooltip, in both UIs, always. A title that
+  says the same words already written on the control ("Forza il download" on the
+  button «Forza il download») says nothing and must not exist: either there is a
+  sentence that tells what pressing it does, what the value means, what happens
+  afterwards, or there is no tooltip at all. A label that explains itself needs
+  no title. Guard: `TestTooltipsExplainAndNeverRepeatTheLabel` (Gextto) fails on
+  a `trTitle .Label` fallback, the shape this mistake takes in the templates.
+  When a control changes what it does, its tooltip is rewritten in the same
+  commit, in all six languages.
 
 ## Where things live
 

@@ -395,9 +395,7 @@
     // way it closes a dialog, and the button that opened it keeps the focus.
     var addPanel = document.getElementById("v2-add-torrent");
     if (addPanel && addPanel.hasAttribute("open")) {
-      addPanel.removeAttribute("open");
-      var opener = document.querySelector("[data-add-torrent-toggle]");
-      if (opener) { try { opener.focus(); } catch (error) { /* ignore */ } }
+      closeAddTorrent();
       return;
     }
     var group = document.getElementById("app-system-menu");
@@ -2135,6 +2133,32 @@
     var field = panel.querySelector('input[name="magnet"]');
     if (field) { try { field.focus(); } catch (error) { /* ignore */ } }
   }
+  function closeAddTorrent() {
+    var panel = document.getElementById("v2-add-torrent");
+    if (!panel || !panel.hasAttribute("open")) return;
+    panel.removeAttribute("open");
+    var opener = document.querySelector("[data-add-torrent-toggle]");
+    if (opener) { try { opener.focus(); } catch (error) { /* ignore */ } }
+  }
+  // The frame takes the keyboard while it is open: Tab stays inside it, as in a
+  // dialog, so a keystroke cannot land on the page hidden behind.
+  document.addEventListener("keydown", function (event) {
+    if (event.key !== "Tab") return;
+    var panel = document.getElementById("v2-add-torrent");
+    if (!panel || !panel.hasAttribute("open")) return;
+    var list = focusables(panel);
+    if (!list.length) return;
+    var first = list[0];
+    var last = list[list.length - 1];
+    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+  }, true);
+  document.addEventListener("click", function (event) {
+    var close = event.target.closest && event.target.closest("[data-add-torrent-close]");
+    if (!close) return;
+    event.preventDefault();
+    closeAddTorrent();
+  });
   document.addEventListener("click", function (event) {
     var toggle = event.target.closest && event.target.closest("[data-add-torrent-toggle]");
     if (!toggle) return;

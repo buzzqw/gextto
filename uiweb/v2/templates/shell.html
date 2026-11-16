@@ -81,13 +81,13 @@
              for it and the CSS keeps it out of the way. */}}
         <p class="nav-group-label"><span>{{tr .Label}}</span></p>
         {{range .Items}}
-         <a class="nav-item{{if .Active}} active{{end}}{{if .Optional}} nav-optional{{end}}{{if .MobileHidden}} nav-mobile-hidden{{end}}{{if .MobileAlways}} nav-mobile-always{{end}}" href="{{.Href}}" {{trTitle .Label}}{{if .External}} target="_blank" rel="noopener noreferrer"{{end}}{{if .Active}} aria-current="page"{{end}} data-nav="{{.ID}}"><span class="nav-icon" aria-hidden="true">{{icon .Icon}}</span><span>{{tr .Label}}</span>{{if eq .ID "downloads"}}{{template "v2_nav_downloads_count" .}}{{else if or (eq .ID "series") (eq .ID "movies") (eq .ID "comics")}}<span class="nav-count"{{if or (not .Count) (eq .Count "0") (eq .Count "0/0")}} hidden{{end}}>{{tr .Count}}</span>{{end}}</a>
+         <a class="nav-item{{if .Active}} active{{end}}{{if .Optional}} nav-optional{{end}}{{if .MobileHidden}} nav-mobile-hidden{{end}}{{if .MobileAlways}} nav-mobile-always{{end}}" href="{{.Href}}"{{if .External}} target="_blank" rel="noopener noreferrer"{{end}}{{if .Active}} aria-current="page"{{end}} data-nav="{{.ID}}"><span class="nav-icon" aria-hidden="true">{{icon .Icon}}</span><span>{{tr .Label}}</span>{{if eq .ID "downloads"}}{{template "v2_nav_downloads_count" .}}{{else if or (eq .ID "series") (eq .ID "movies") (eq .ID "comics")}}<span class="nav-count"{{if or (not .Count) (eq .Count "0") (eq .Count "0/0")}} hidden{{end}}>{{tr .Count}}</span>{{end}}</a>
          {{end}}
-         {{if .System}}{{range $.Groups}}{{range .Items}}{{if .MobileHidden}}<a class="nav-item nav-mobile-system-extra" href="{{.Href}}" {{trTitle .Label}}{{if .External}} target="_blank" rel="noopener noreferrer"{{end}} data-nav="{{.ID}}"><span class="nav-icon" aria-hidden="true">{{icon .Icon}}</span><span>{{tr .Label}}</span></a>{{end}}{{end}}{{end}}{{end}}
+         {{if .System}}{{range $.Groups}}{{range .Items}}{{if .MobileHidden}}<a class="nav-item nav-mobile-system-extra" href="{{.Href}}"{{if .External}} target="_blank" rel="noopener noreferrer"{{end}} data-nav="{{.ID}}"><span class="nav-icon" aria-hidden="true">{{icon .Icon}}</span><span>{{tr .Label}}</span></a>{{end}}{{end}}{{end}}{{end}}
          {{/* The documentation is at the foot of the sidebar on a computer; on a
               phone this panel is its only way in, so the same links are repeated
               here without a menu identity of their own. */}}
-         {{if .System}}{{range $.Docs}}<a class="nav-item nav-mobile-system-extra" href="{{.Href}}" {{trTitle .Label}}{{if .External}} target="_blank" rel="noopener noreferrer"{{end}}><span class="nav-icon" aria-hidden="true">{{icon .Icon}}</span><span>{{tr .Label}}</span></a>{{end}}{{end}}
+         {{if .System}}{{range $.Docs}}<a class="nav-item nav-mobile-system-extra" href="{{.Href}}"{{if .External}} target="_blank" rel="noopener noreferrer"{{end}}><span class="nav-icon" aria-hidden="true">{{icon .Icon}}</span><span>{{tr .Label}}</span></a>{{end}}{{end}}
          {{/* Theme, text size, font and language are in the "Aspetto" menu of the
              top bar on every screen size: only the donation link is left here,
              because the floating button is hidden on a phone. */}}
@@ -99,7 +99,7 @@
       {{end}}
     </nav>
     {{if .Docs}}<nav class="nav-docs" aria-label="{{tr "Documentazione"}}">
-      {{range .Docs}}<a class="nav-item nav-doc{{if .Active}} active{{end}}" href="{{.Href}}" {{trTitle .Label}}{{if .External}} target="_blank" rel="noopener noreferrer"{{end}}{{if .Active}} aria-current="page"{{end}} data-nav="{{.ID}}"><span>{{tr .Label}}</span></a>{{end}}
+      {{range .Docs}}<a class="nav-item nav-doc{{if .Active}} active{{end}}" href="{{.Href}}"{{if .External}} target="_blank" rel="noopener noreferrer"{{end}}{{if .Active}} aria-current="page"{{end}} data-nav="{{.ID}}"><span>{{tr .Label}}</span></a>{{end}}
     </nav>{{end}}
     <div class="sidebar-foot"><span class="pulse"></span><span {{trTitle "Gextto è attivo: il servizio sta lavorando (scarica, importa, cerca). Non è lo stato di salute: quello è il badge «ok» in alto."}}>{{if .Chrome.DryRun}}{{tr "dry-run"}}{{else}}{{tr "attivo"}}{{end}}</span></div>
   </aside>

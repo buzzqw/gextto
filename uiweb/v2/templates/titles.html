@@ -360,7 +360,7 @@
 
 {{define "v2_form_field"}}
 {{if eq .Kind "hidden"}}<input type="hidden" name="{{.Name}}" value="{{.Value}}" />
-{{else}}<label class="field{{if eq .Kind "area"}} span-full{{end}}" {{if .Hint}}{{trTitle .Hint}}{{else}}{{trTitle .Label}}{{end}}>
+{{else}}<label class="field{{if eq .Kind "area"}} span-full{{end}}" {{if .Hint}} {{trTitle .Hint}}{{end}}>
   <input type="hidden" name="_v2_kind_{{.Name}}" value="{{.Kind}}" />
   <span>{{tr .Label}}</span>
   {{if eq .Kind "select"}}<select class="input" name="{{.Name}}">{{range .Options}}<option value="{{.Value}}"{{if .Selected}} selected{{end}}>{{tr .Label}}</option>{{end}}</select>

@@ -27,6 +27,7 @@
   </details>
   <details class="panel add-torrent-panel" id="v2-add-torrent">
     <summary class="panel-head"><h3><span class="add-torrent-plus" aria-hidden="true">＋ </span>{{tr "Aggiungi torrent"}}</h3><small class="muted">{{tr "Magnet, URL .torrent o file locale"}}</small></summary>
+    <button class="btn sm add-torrent-close" type="button" data-add-torrent-close aria-label="{{tr "Chiudi"}}" {{trTitle "Chiude il modulo senza aggiungere niente; quello che hai scritto resta finché non ricarichi la pagina (Esc fa lo stesso)"}}><span aria-hidden="true">✕</span></button>
     <div class="panel-body">
       <form class="torrent-add-form" method="post" action="/downloads/add" enctype="multipart/form-data">
         <div class="torrent-add-main">

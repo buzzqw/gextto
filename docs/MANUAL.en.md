@@ -707,9 +707,11 @@ downloads. The score only chooses among the releases that passed every check.
 ### Adding a torrent or a magnet
 
 **Add torrent**, in the top bar of every page, takes a magnet, a `.torrent` URL
-or a `.torrent` file. The form opens **over the page**, in a panel that lets the
-queue show behind it instead of pushing it down; `Esc`, its own title or the
-button at the top close it, and that button is the only way in. On **Downloads**
+or a `.torrent` file. The form **drops from the top**, as wide as the content
+column: the page stays visible below instead of vanishing behind a box in the
+middle, and the cursor goes straight into the magnet field. `Esc`, the ✕ at the
+top right or its own title close it; the top-bar button is the only way in, and
+from the keyboard `Tab` stays inside the form while it is open. On **Downloads**
 there are two shortcuts: drop a `.torrent` file anywhere on the page, or paste a
 magnet link (`Ctrl+V`) while no field has the focus. Either one fills the form, opens it and moves the focus to
 **Add**, so you can still look at the options before adding. You can set the save folder, **Download now** (outside

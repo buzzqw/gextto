@@ -1,6 +1,7 @@
 # Bundled German translations for the web UI. The translation database mirrors
 # this catalog: a corrected value here replaces the stored one at the next start.
 deu:
+  "Chiude il modulo senza aggiungere niente; quello che hai scritto resta finché non ricarichi la pagina (Esc fa lo stesso)": "Schließt das Formular, ohne etwas hinzuzufügen; das Eingetippte bleibt, bis du die Seite neu lädst (Esc tut dasselbe)"
   "Rimette subito la puntata in ricerca: toglie l'attesa fra due tentativi e l'eventuale «ignorato», senza toccare i file già in archivio. La ricerca riparte al ciclo successivo.": "Setzt die Folge sofort wieder in die Suche: entfernt die Wartezeit zwischen zwei Versuchen und eine allfällige «ignoriert»-Markierung, ohne die bereits archivierten Dateien zu berühren. Die Suche beginnt beim nächsten Zyklus erneut."
   "Documentazione": "Dokumentation"
   "Episodi archiviati": "Archivierte Episoden"

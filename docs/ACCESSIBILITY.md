@@ -105,6 +105,10 @@ states:
    `Enter`/`Space`/`Esc` do, where the focus returns.
 4. If a state changes asynchronously, announce it in a live region.
 5. Add the string and its tooltip to the six catalogues; `make test` enforces it.
+   The tooltip **explains, it never repeats the label**: say what pressing the
+   control does, what the value means or what happens afterwards, or leave the
+   control without a title. `trTitle .Label` (a tooltip that says the same words
+   as the control) fails `TestTooltipsExplainAndNeverRepeatTheLabel`.
 6. Run `npm run test:a11y`. For a new page, add it to the axe list in
    `accessibility.spec.ts`.
 7. For anything that changes interaction, do the manual check on a phone and with a

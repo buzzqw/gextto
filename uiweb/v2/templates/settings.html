@@ -360,7 +360,7 @@
   <form id="v2-content-filter-form" method="post" action="/settings/checkbox" hx-post="/settings/checkbox" hx-target="#v2-content-filter-section" hx-swap="outerHTML" data-v2-track>
     <input type="hidden" name="key" value="{{.Key}}" />
     <div class="toolbar checkbox-row">
-      {{range .Options}}<label class="check" {{trTitle .Label}}><input type="checkbox" name="value" value="{{.Value}}"{{if .Selected}} checked{{end}} /> <span>{{tr .Label}}</span></label>{{end}}
+      {{range .Options}}<label class="check"><input type="checkbox" name="value" value="{{.Value}}"{{if .Selected}} checked{{end}} /> <span>{{tr .Label}}</span></label>{{end}}
     </div>
     {{if .Custom}}<div class="form-actions v2-checkbox-custom-actions"><input class="input" name="custom" placeholder="{{tr .CustomPlaceholder}}" /><button class="btn sm primary" type="submit">{{tr "Salva"}}</button></div>{{else}}<div class="form-actions"><button class="btn sm primary" type="submit">{{tr "Salva"}}</button></div>{{end}}
   </form>
@@ -375,7 +375,7 @@
     <form method="post" action="/settings/checkbox" hx-post="/settings/checkbox" hx-target="closest .panel" hx-swap="outerHTML" data-v2-track>
       <input type="hidden" name="key" value="{{.Key}}" />
       <div class="toolbar checkbox-row">
-         {{range .Options}}<label class="check" {{trTitle .Label}}><input type="checkbox" name="value" value="{{.Value}}"{{if .Selected}} checked{{end}} /> <span>{{tr .Label}}</span></label>{{end}}
+         {{range .Options}}<label class="check"><input type="checkbox" name="value" value="{{.Value}}"{{if .Selected}} checked{{end}} /> <span>{{tr .Label}}</span></label>{{end}}
       </div>
       {{if .Custom}}<div class="form-actions v2-checkbox-custom-actions"><input class="input" name="custom" placeholder="{{tr .CustomPlaceholder}}" /><button class="btn sm primary" type="submit">{{tr "Salva"}}</button></div>{{else}}<div class="form-actions">{{if .TestKind}}<input class="input" id="v2-test-query-{{.Key}}" name="q" value="{{.TestQuery}}" placeholder="{{tr "Termine di prova"}}" /><button class="btn sm" type="button" hx-get="/settings/source-test" hx-include="#v2-test-query-{{.Key}}" hx-vals='{"kind":"{{.TestKind}}"}' hx-target="#v2-source-test-{{.Key}}" hx-swap="innerHTML">{{if .TestLabel}}{{tr .TestLabel}}{{else}}{{tr "Testa selezionati"}}{{end}}</button><span id="v2-source-test-{{.Key}}" class="muted" aria-live="polite"></span>{{end}}<button class="btn sm primary" type="submit">{{tr "Salva"}}</button></div>{{end}}
     </form>
@@ -455,7 +455,7 @@
   {{range .Row.Fields}}
   {{$value := .Value}}{{$name := .Name}}{{$index := $.Row.Index}}
    {{if eq .Kind "id"}}<input type="hidden" name="{{$name}}__{{$index}}" value="{{$value}}" />{{else}}
-   <label class="field{{if .Wide}} wide{{end}}" {{trTitle .Label}}><span>{{tr .Label}}</span>
+   <label class="field{{if .Wide}} wide{{end}}"><span>{{tr .Label}}</span>
     {{if eq .Kind "bool"}}<select class="input" name="{{$name}}__{{$index}}"><option value="true"{{if eq $value "true"}} selected{{end}}>{{tr "Sì"}}</option><option value="false"{{if eq $value "false"}} selected{{end}}>{{tr "No"}}</option></select>
     {{else if eq .Kind "number"}}<input class="input" type="number" name="{{$name}}__{{$index}}" value="{{$value}}" />
     {{else if eq .Kind "select"}}<select class="input" name="{{$name}}__{{$index}}">{{range .Options}}<option value="{{.Value}}"{{if eq $value .Value}} selected{{end}}>{{tr .Label}}</option>{{end}}</select>

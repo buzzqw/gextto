@@ -3398,3 +3398,24 @@ func TestV2LiveUpdatesPauseWhenHidden(t *testing.T) {
 		t.Fatalf("the stream sent fragments the page did not ask for: %q", frame)
 	}
 }
+
+// TestTooltipsExplainAndNeverRepeatTheLabel: a tooltip that repeats the visible
+// label says nothing, and the interface is read by people who look at a control
+// wondering what it will do. The templates must not fall back to the label as a
+// title: either there is an explanation, or there is no tooltip.
+func TestTooltipsExplainAndNeverRepeatTheLabel(t *testing.T) {
+	paths, err := filepath.Glob("uiweb/v2/templates/*.html")
+	if err != nil {
+		t.Fatalf("glob templates: %v", err)
+	}
+	mute := regexp.MustCompile(`trTitle \.Label`)
+	for _, path := range paths {
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("read %s: %v", path, err)
+		}
+		if loc := mute.FindIndex(raw); loc != nil {
+			t.Fatalf("%s: %q is a tooltip that only repeats the label; explain the control or drop the tooltip", path, "trTitle .Label")
+		}
+	}
+}

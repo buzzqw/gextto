@@ -718,10 +718,12 @@ sceglie solo tra le release che hanno superato tutti i controlli.
 ### Aggiungere un torrent o un magnet
 
 **Aggiungi torrent**, nella barra in alto di ogni pagina, accetta un magnet, un
-URL `.torrent` o un file `.torrent`. Il modulo si apre **sopra la pagina**, in un
-pannello che lascia intravedere la coda dietro di sé invece di spingerla in
-basso; si chiude con `Esc`, con il suo stesso titolo o col pulsante in alto, che
-resta l'unico modo per aprirlo. In **Scarico** ci sono due scorciatoie:
+URL `.torrent` o un file `.torrent`. Il modulo **scende dall'alto**, largo quanto
+la colonna dei contenuti: la pagina resta visibile sotto, invece di sparire
+dietro un riquadro al centro, e il cursore va subito nel campo del magnet. Si
+chiude con `Esc`, con la ✕ in alto a destra o con il suo titolo; il pulsante
+della barra resta l'unico modo per aprirlo, e da tastiera `Tab` gira solo dentro
+il modulo finché è aperto. In **Scarico** ci sono due scorciatoie:
 trascina un file `.torrent` in un punto qualsiasi della pagina, oppure incolla
 un link magnet (`Ctrl+V`) quando nessun campo ha il focus. In entrambi i casi il
 modulo si compila, si apre e il focus va su **Aggiungi**, così puoi ancora

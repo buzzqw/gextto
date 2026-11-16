@@ -145,7 +145,7 @@
 {{define "v2_detail_action"}}
 <form method="post" action="/downloads/detail/action" hx-post="/downloads/detail/action" hx-target="#v2-detail-panel" hx-swap="innerHTML" style="display:inline">
   <input type="hidden" name="hash" value="{{.Hash}}" /><input type="hidden" name="tab" value="{{.Tab}}" /><input type="hidden" name="op" value="{{.Op}}" /><input type="hidden" name="body" value="{{.Body}}" />
-  <button class="btn sm {{.Class}}" type="submit" {{if .Title}}{{trTitle .Title}}{{else}}{{trTitle .Label}}{{end}}{{if .Confirm}} hx-confirm="{{tr .Confirm}}"{{end}}>{{tr .Label}}</button>
+  <button class="btn sm {{.Class}}" type="submit" {{if .Title}} {{trTitle .Title}}{{end}}{{if .Confirm}} hx-confirm="{{tr .Confirm}}"{{end}}>{{tr .Label}}</button>
 </form>
 {{end}}
 
