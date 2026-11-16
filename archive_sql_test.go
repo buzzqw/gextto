@@ -55,6 +55,7 @@ func TestArchiveSQLOperationsAreSafe(t *testing.T) {
 		"archive_empty_title",
 		"archive_recent",
 		"archive_duplicate_listings",
+		"archive_duplicate_titles",
 		"archive_age_distribution",
 		"archive_health",
 	} {
@@ -174,6 +175,58 @@ func TestArchiveSQLDuplicateListingsKeepsTheNewestURL(t *testing.T) {
 	var kept string
 	if err := archive.db.QueryRow("SELECT magnet FROM archive WHERE source='jackett:Test' AND magnet LIKE 'http%'").Scan(&kept); err != nil || kept != "http://jackett/dl/2" {
 		t.Fatalf("kept URL = %q, %v; want the newest", kept, err)
+	}
+}
+
+func TestArchiveSQLDuplicateTitlesKeepsTheMagnet(t *testing.T) {
+	archive := openTestArchive(t)
+	if _, err := archive.db.Exec(`INSERT INTO archive(title,magnet,magnet_key,magnet_hash,source,added_at) VALUES
+		('A Show','http://jackett/dl/a1',gextto_magnet_key('http://jackett/dl/a1'),'','jackett:One',datetime('now','-4 days')),
+		('a show','http://jackett/dl/a2',gextto_magnet_key('http://jackett/dl/a2'),'','jackett:Two',datetime('now','-1 day')),
+		('A Show','magnet:?xt=urn:btih:keep',gextto_magnet_key('magnet:?xt=urn:btih:keep'),'aabbcc','feed',datetime('now','-9 days')),
+		('B Show','http://jackett/dl/b1',gextto_magnet_key('http://jackett/dl/b1'),'','jackett:One',datetime('now','-5 days')),
+		('B Show','http://jackett/dl/b3',gextto_magnet_key('http://jackett/dl/b3'),'','jackett:One',datetime('now','-2 days')),
+		('B Show','http://jackett/dl/b2',gextto_magnet_key('http://jackett/dl/b2'),'','jackett:One',datetime('now','-1 day'))`); err != nil {
+		t.Fatalf("insert fixtures: %v", err)
+	}
+	ctx := context.Background()
+	operation := archiveSQLOperation(t, "archive_duplicate_titles")
+	if !operation.Destructive {
+		t.Fatal("the duplicate-title cleanup should be able to delete")
+	}
+	preview, err := archive.PreviewArchiveSQL(ctx, operation, "")
+	if err != nil {
+		t.Fatalf("preview duplicates: %v", err)
+	}
+	if preview.Total != 4 || preview.Shown != 4 {
+		t.Fatalf("duplicates preview = total %d, shown %d; want 4/4", preview.Total, preview.Shown)
+	}
+	for _, row := range preview.Rows {
+		if len(row) < 5 || row[4] == "magnet" {
+			t.Fatalf("the preview would delete a magnet row: %+v", row)
+		}
+	}
+	removed, err := archive.DeleteArchiveSQL(ctx, operation, "")
+	if err != nil || removed != 4 {
+		t.Fatalf("DeleteArchiveSQL duplicates = (%d, %v), want (4, nil)", removed, err)
+	}
+	// The title with a magnet keeps it even though an .torrent link is newer;
+	// the title without one keeps the newest .torrent link.
+	for title, want := range map[string]string{
+		"a show": "magnet:?xt=urn:btih:keep",
+		"b show": "http://jackett/dl/b2",
+	} {
+		var kept string
+		if err := archive.db.QueryRow("SELECT magnet FROM archive WHERE lower(title)=?1", title).Scan(&kept); err != nil || kept != want {
+			t.Fatalf("%s kept %q, %v; want %q", title, kept, err, want)
+		}
+	}
+	// A second pass finds nothing left to merge.
+	if again, err := archive.DeleteArchiveSQL(ctx, operation, ""); err != nil || again != 0 {
+		t.Fatalf("second pass = (%d, %v), want (0, nil)", again, err)
+	}
+	if _, err := archive.db.Exec("INSERT INTO archive_fts(archive_fts) VALUES('integrity-check')"); err != nil {
+		t.Fatalf("FTS integrity after delete: %v", err)
 	}
 }
 

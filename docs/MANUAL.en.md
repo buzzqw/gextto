@@ -1777,6 +1777,9 @@ waiting; **Run now** starts a pass at once.
   without it, empty titles, duplicates. It first shows the preview with the
   number of rows, then **Delete permanently**. Make a backup before a large
   clean-up.
+- **Duplicate titles** keeps one copy per title, with the same rule as the
+  night: the row with a magnet stays and, when the title has none, the most
+  recent one with a `.torrent` link.
 
 ### What not to confuse
 
@@ -2624,6 +2627,7 @@ files. When the memory cannot be read, only the `tmpfs` space counts, as before.
 | Night window — end | End time (HH:MM, 07:00 by default). After it no new job starts; the one in progress is completed. An end before the start makes the window cross midnight; the same start and end mean the whole day. |
 | Integrity check and MediaInfo analysis only in the window | Yes (default): the integrity check and the MediaInfo analysis run at their interval but only inside the window and while Gextto is idle. No: they run at their interval at any hour, as before. The manual commands (**Check now**, **Refresh MediaInfo**) always start at once. |
 | Database maintenance every night | Yes (default): once a night the databases are optimised (`PRAGMA optimize`) and compacted when at least 20% or 64 MB of them is free space; once a week a full check (`integrity_check`) reads every page and every index, and a problem sends a notification at once, without waiting for the summary. |
+| Merge duplicate archive titles every night | Yes (default): once a night Gextto removes from the release catalogue the copies with the same title. The row with a magnet stays (the most recent one, preferring those with the infohash); when that title has none, the most recent one with a `.torrent` link stays. The same job is in *Maintenance → Archive SQL → Duplicate titles*, where the preview says in advance what would go: it is worth a look the first time, because two sites can give the same title to different files. Downloaded files, the library, the download history and the active torrents are untouched. |
 | Clean the audio of files already in the library | Applies **Remove audio tracks in other languages**, with the same language and choices, to the files already archived: one at a time, in the window, with the same checks as the cleanup after an import. Every file is examined once (Gextto remembers its size and date); a file still seeding through a hardlink waits for the end of the seed, so the cleaned copy does not use the space twice, and a file written in the last hour waits for the next night. A file that fails the check for a passing reason (a tool interrupted by a restart, a disk that does not answer) stays as it is and is tried again: at the next pass when it was interrupted, after a week when the check failed; a file that cannot be cleaned without changing it — the track check does not match — is remembered and not tried again unless the file changes (size or date). Off by default; it works only with the audio cleanup on. |
 
 **Night maintenance — panel**
@@ -2634,11 +2638,12 @@ Under the options, in the same group, the **Night maintenance status** panel sho
 |---|---|
 | Run now | Runs a maintenance pass at once, even outside the window; it still waits until Gextto is idle. |
 | Database | Last optimisation, total size of the databases and space freed, last integrity check and the problems found. |
+| Duplicate archive titles | The last cleanup and how many copies with the same title were removed; when the last one failed, the error. |
 | Audio cleanup of the library | Files checked out of the total, files cleaned, space saved, files left as they were and the last check not passed. |
 | Library | The last pass of the library check (correct files, renamed, duplicates in the trash, errors: the check runs by itself every *Check renamed files every* hours) and the night report of the files the database knows but the disk no longer has. A folder that cannot be read, for example a NAS that is not mounted, is listed apart and does not count as missing files; only the seasons the series still follows are listed, so the files of a season removed from the range, or of a disabled series, are not reported. When a download of that series is being archived or the audio cleanup of the library is rewriting one of its files, the check skips the series for that pass and the log line says which of the two is keeping it busy; the series is taken up again at the next check. |
 | Mark as missing | Removes from the archive the episode whose file is gone, so the search downloads it again. It does nothing when the file is back or its folder cannot be read. |
 
-When the window closes, the log sums up the night in one line; a notification on the configured channels, in the maintenance group, also arrives when the night found database problems, missing files, cleaned files or files left as they were, or freed at least 64 MB.
+When the window closes, the log sums up the night in one line; a notification on the configured channels, in the maintenance group, also arrives when the night found database problems, copies with the same title removed from the archive, missing files, cleaned files or files left as they were, or freed at least 64 MB.
 
 **MediaInfo analysis**
 

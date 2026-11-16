@@ -373,20 +373,54 @@ func TestAudioLibraryNeedsCheck(t *testing.T) {
 }
 
 func TestMaintenanceNightTextAndNotification(t *testing.T) {
-	text := maintenanceNightText(maintenanceNightSummary{DBDone: true, DBFreed: 80 << 20, ReportDone: true, Missing: 2, AudioCleaned: 3, AudioSaved: 1 << 30, AudioFailed: 1})
-	for _, part := range []string{"databases optimised", "2 library file(s) missing", "3 file(s) cleaned", "1 left as they were"} {
+	text := maintenanceNightText(maintenanceNightSummary{DBDone: true, DBFreed: 80 << 20, ArchiveRemoved: 4, ReportDone: true, Missing: 2, AudioCleaned: 3, AudioSaved: 1 << 30, AudioFailed: 1})
+	for _, part := range []string{"databases optimised", "4 rows with the same title merged", "2 library file(s) missing", "3 file(s) cleaned", "1 left as they were"} {
 		if !strings.Contains(text, part) {
 			t.Errorf("summary misses %q: %s", part, text)
 		}
 	}
-	body := maintenanceReportNotificationBody("it", map[string]any{"db_problems": 1, "detail": "series: page 3 broken", "missing": 2, "audio_cleaned": 3, "audio_saved": 1 << 30})
-	for _, part := range []string{"Problemi trovati nel database: 1", "page 3 broken", "spariti dal disco: 2", "File puliti dalle altre lingue audio: 3"} {
+	body := maintenanceReportNotificationBody("it", map[string]any{"db_problems": 1, "detail": "series: page 3 broken", "missing": 2, "archive_removed": 4, "audio_cleaned": 3, "audio_saved": 1 << 30})
+	for _, part := range []string{"Problemi trovati nel database: 1", "page 3 broken", "spariti dal disco: 2", "Copie con lo stesso titolo tolte dall'archivio: 4", "File puliti dalle altre lingue audio: 3"} {
 		if !strings.Contains(body, part) {
 			t.Errorf("notification misses %q:\n%s", part, body)
 		}
 	}
 	if notifyEventGroup("maintenance_report") != "maintenance" {
 		t.Fatal("the report is not in the maintenance group")
+	}
+}
+
+func TestArchiveDuplicateCleanupKeepsTheMagnetAndRunsOncePerNight(t *testing.T) {
+	state := newTestAppState(t)
+	resetMaintenanceStatus(t, state.cfg.DataDir)
+	if _, err := state.archive.db.Exec(`INSERT INTO archive(title,magnet,magnet_key,magnet_hash,source,added_at) VALUES
+		('A Show','http://jackett/dl/a1',gextto_magnet_key('http://jackett/dl/a1'),'','jackett:One',datetime('now','-4 days')),
+		('a show','http://jackett/dl/a2',gextto_magnet_key('http://jackett/dl/a2'),'','jackett:Two',datetime('now','-1 day')),
+		('A Show','magnet:?xt=urn:btih:keep',gextto_magnet_key('magnet:?xt=urn:btih:keep'),'aabbcc','feed',datetime('now','-9 days'))`); err != nil {
+		t.Fatalf("insert fixtures: %v", err)
+	}
+	runArchiveDuplicateCleanup(context.Background(), state, time.Now())
+	status := maintenanceStatusSnapshot()
+	if !status.Night.ArchiveDedupDone || status.Night.ArchiveRemoved != 2 || status.Archive.Removed != 2 || status.Archive.ErrorMessage != "" {
+		t.Fatalf("archive cleanup: %+v night: %+v", status.Archive, status.Night)
+	}
+	var kept string
+	if err := state.archive.db.QueryRow("SELECT magnet FROM archive").Scan(&kept); err != nil || kept != "magnet:?xt=urn:btih:keep" {
+		t.Fatalf("kept %q, %v; want the magnet even though an .torrent link is newer", kept, err)
+	}
+	// A second pass finds nothing left, so the next night removes nothing.
+	runArchiveDuplicateCleanup(context.Background(), state, time.Now())
+	if got := maintenanceStatusSnapshot().Archive.Removed; got != 0 {
+		t.Fatalf("second cleanup removed %d rows, want 0", got)
+	}
+	// Unset means on; the switch turns the night step off.
+	cfg := &Config{Settings: map[string]string{}}
+	if !maintenanceArchiveDedupEnabled(cfg) {
+		t.Fatal("the cleanup should run by default")
+	}
+	cfg.Settings[maintenanceArchiveSetting] = "false"
+	if maintenanceArchiveDedupEnabled(cfg) {
+		t.Fatal("the switch was ignored")
 	}
 }
 
@@ -400,11 +434,11 @@ func TestNightMaintenancePassRunsOnlyInTheWindow(t *testing.T) {
 	resetMaintenanceStatus(t, state.cfg.DataDir)
 	ctx := context.Background()
 	nightMaintenancePass(ctx, state, clockAt(15, 0), false)
-	if status := maintenanceStatusSnapshot(); status.Night.DBDone || status.Night.ReportDone {
+	if status := maintenanceStatusSnapshot(); status.Night.DBDone || status.Night.ReportDone || status.Night.ArchiveDedupDone {
 		t.Fatalf("work done outside the window: %+v", status.Night)
 	}
 	nightMaintenancePass(ctx, state, clockAt(15, 0), true)
-	if status := maintenanceStatusSnapshot(); !status.Night.DBDone || !status.Night.ReportDone {
+	if status := maintenanceStatusSnapshot(); !status.Night.DBDone || !status.Night.ReportDone || !status.Night.ArchiveDedupDone {
 		t.Fatalf("a forced pass did nothing: %+v", status.Night)
 	}
 	// Outside the window the finished night is summed up once.

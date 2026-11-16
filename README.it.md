@@ -200,8 +200,8 @@ sudo bash install.sh --uninstall --purge   # cancella anche la cartella dati
 - **Controllo file danneggiati**: scansione periodica in background che verifica e decodifica i file con `ffprobe`
   e `ffmpeg`. Il controllo rapido dei soli keyframe trova troncamenti nei 4K in pochi minuti; i file corrotti
   possono essere riscaricati in automatico.
-- **Finestra di manutenzione notturna**: esegue le operazioni pesanti a riposo (compattazione database,
-  controllo d'integrità settimanale, scansione MediaInfo, pulizia audio).
+- **Finestra di manutenzione notturna**: esegue le operazioni pesanti a riposo (unione dei titoli
+  duplicati dell'archivio, compattazione database, controllo d'integrità settimanale, scansione MediaInfo, pulizia audio).
 
 → *Documentazione completa: [Strumenti libreria nel manuale](docs/MANUAL.it.md#strumenti-della-libreria) · [Guida NAS avanzata](docs/ADVANCED.en.md)*
 

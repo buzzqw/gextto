@@ -1801,6 +1801,9 @@ subito un passaggio.
   o senza, titoli vuoti, duplicati. Prima mostra l'anteprima con il numero di
   righe, poi **Elimina definitivamente**. Fai un backup prima di una pulizia
   grande.
+- **Titoli duplicati** tiene una copia per titolo, con la stessa regola della
+  notte: resta la riga con magnet e, se il titolo non ne ha, la più recente con
+  un link `.torrent`.
 
 ### Cosa non confondere
 
@@ -2658,6 +2661,7 @@ spazio del `tmpfs`, come prima.
 | Finestra notturna — fine | Ora di fine (HH:MM, predefinita 07:00). Dopo non parte nessun lavoro nuovo; quello in corso viene completato. Se la fine è prima dell'inizio la finestra passa la mezzanotte; inizio e fine uguali vogliono dire tutto il giorno. |
 | Controllo integrità e analisi MediaInfo solo nella finestra | Sì (predefinito): il controllo integrità e l'analisi MediaInfo girano al loro intervallo ma solo dentro la finestra e con Gextto inattivo. No: girano al loro intervallo a qualsiasi ora, come prima. I comandi manuali (**Controlla ora**, **Aggiorna MediaInfo**) partono sempre subito. |
 | Manutenzione del database ogni notte | Sì (predefinito): una volta per notte i database vengono ottimizzati (`PRAGMA optimize`) e compattati quando hanno almeno il 20% o 64 MB di spazio libero; una volta alla settimana un controllo completo (`integrity_check`) legge ogni pagina e ogni indice, e se trova un problema arriva subito una notifica, senza aspettare il riepilogo. |
+| Unisci i titoli duplicati dell'archivio ogni notte | Sì (predefinito): una volta per notte Gextto toglie dal catalogo delle release le copie con lo stesso titolo. Resta la riga con un magnet (la più recente, preferendo quelle con l'infohash); quando quel titolo non ne ha nessuna, resta la più recente con un link `.torrent`. Lo stesso lavoro è in *Manutenzione → Archivio SQL → Titoli duplicati*, dove l'anteprima dice in anticipo cosa uscirebbe: vale la pena guardarla la prima volta, perché due siti possono dare lo stesso titolo a file diversi. File scaricati, libreria, storico download e torrent attivi non vengono toccati. |
 | Pulisci l'audio dei file già in libreria | Applica **Rimuovi le tracce audio in altre lingue**, con la stessa lingua e le stesse scelte, ai file già archiviati: uno alla volta, nella finestra, con gli stessi controlli della pulizia dopo l'importazione. Ogni file viene esaminato una sola volta (Gextto ne ricorda dimensione e data); un file ancora in seed tramite hardlink aspetta la fine del seed, così la copia pulita non occupa spazio due volte, e un file scritto nell'ultima ora aspetta la notte dopo. Un file che non supera il controllo per un motivo passeggero (uno strumento interrotto da un riavvio, il disco che non risponde) resta com'è e viene riprovato: subito al passaggio successivo se è stato interrotto, dopo una settimana se il controllo è fallito; un file che non si può pulire senza cambiarne il contenuto — la verifica delle tracce non torna — viene ricordato e non viene più riprovato, a meno che il file cambi (dimensione o data). Spento di default; si attiva solo con la pulizia audio accesa. |
 
 **Manutenzione notturna — pannello**
@@ -2668,11 +2672,12 @@ Sotto le opzioni, nello stesso gruppo, il pannello **Stato della manutenzione no
 |---|---|
 | Esegui ora | Esegue subito un passaggio della manutenzione, anche fuori dalla finestra; aspetta comunque che Gextto sia inattivo. |
 | Database | Ultima ottimizzazione, dimensione totale dei database e spazio recuperato, ultimo controllo di integrità e i problemi trovati. |
+| Titoli duplicati dell'archivio | Ultima pulizia e quante copie con lo stesso titolo sono state tolte; se l'ultima non è riuscita, l'errore. |
 | Pulizia audio della libreria | File controllati sul totale, file puliti, spazio risparmiato, file lasciati com'erano e l'ultimo controllo non superato. |
 | Libreria | L'ultimo passaggio del controllo della libreria (file corretti, rinominati, doppioni nel cestino, errori: il controllo gira da solo ogni *Verifica dei file rinominati ogni* ore) e il rapporto notturno dei file che il database conosce ma che non sono più sul disco. Una cartella che non si legge, per esempio un NAS non montato, è indicata a parte e non conta come file mancanti; sono elencate solo le stagioni che la serie segue ancora, quindi i file di una stagione tolta dall'intervallo o di una serie disattivata non vengono segnalati. Se un download di quella serie è in archiviazione o la pulizia audio della libreria sta riscrivendo un suo file, il controllo salta la serie per quel passaggio e la riga nel log dice quale delle due operazioni la sta tenendo occupata; la serie viene ripresa al controllo successivo. |
 | Segna come mancante | Toglie dall'archivio la puntata il cui file non c'è più, così la ricerca la scarica di nuovo. Non fa niente se il file è tornato o se la cartella non si legge. |
 
-Quando la finestra si chiude, il log riassume la notte in una riga; arriva anche una notifica sui canali configurati, del gruppo manutenzione, se la notte ha trovato problemi nei database, file mancanti, file puliti o file lasciati com'erano, oppure ha recuperato almeno 64 MB.
+Quando la finestra si chiude, il log riassume la notte in una riga; arriva anche una notifica sui canali configurati, del gruppo manutenzione, se la notte ha trovato problemi nei database, copie con lo stesso titolo tolte dall'archivio, file mancanti, file puliti o file lasciati com'erano, oppure ha recuperato almeno 64 MB.
 
 **Analisi MediaInfo**
 

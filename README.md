@@ -200,8 +200,8 @@ sudo bash install.sh --uninstall --purge   # also remove the data directory
 - **Damaged-file watchdog**: Periodic background scans probe and decode archived videos with `ffprobe`
   and `ffmpeg`. 4K keyframe check spots corruption in minutes; damaged files can be automatically replaced
   and re-downloaded.
-- **Night maintenance window**: Runs heavy tasks when idle (database compaction, weekly integrity checks,
-  MediaInfo scans, audio cleanup).
+- **Night maintenance window**: Runs heavy tasks when idle (duplicate archive titles merged, database
+  compaction, weekly integrity checks, MediaInfo scans, audio cleanup).
 
 → *Full documentation: [Library Safety and Maintenance](docs/MANUAL.en.md#file-integrity-check) · [Advanced NAS Guide](docs/ADVANCED.en.md)*
 

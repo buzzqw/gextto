@@ -266,19 +266,19 @@ type maintenanceAudioResult struct {
 
 // maintenanceNightSummary is what the current night did, for the notification.
 type maintenanceNightSummary struct {
-	Night        string `json:"night"`
-	Notified     bool   `json:"notified"`
-	DBDone       bool   `json:"db_done"`
-	DBProblems   int    `json:"db_problems"`
-	DBFreed      int64  `json:"db_freed"`
+	Night      string `json:"night"`
+	Notified   bool   `json:"notified"`
+	DBDone     bool   `json:"db_done"`
+	DBProblems int    `json:"db_problems"`
+	DBFreed    int64  `json:"db_freed"`
 	// ArchiveDedupDone is set when the duplicate-title cleanup ran tonight.
 	ArchiveDedupDone bool  `json:"archive_dedup_done"`
 	ArchiveRemoved   int64 `json:"archive_removed"`
 	ReportDone       bool  `json:"report_done"`
 	Missing          int   `json:"missing"`
-	AudioCleaned int    `json:"audio_cleaned"`
-	AudioSaved   int64  `json:"audio_saved"`
-	AudioFailed  int    `json:"audio_failed"`
+	AudioCleaned     int   `json:"audio_cleaned"`
+	AudioSaved       int64 `json:"audio_saved"`
+	AudioFailed      int   `json:"audio_failed"`
 	// AudioDone is set when the library sweep found nothing left for tonight.
 	AudioDone bool `json:"audio_done"`
 }
@@ -515,14 +515,14 @@ func maintenanceNotifyNight(cfg *Config) {
 		return
 	}
 	if err := FromConfig(cfg).NotifyEvent("maintenance_report", map[string]any{
-		"title":          "Night maintenance",
-		"db_problems":    summary.DBProblems,
-		"db_freed":       summary.DBFreed,
+		"title":           "Night maintenance",
+		"db_problems":     summary.DBProblems,
+		"db_freed":        summary.DBFreed,
 		"archive_removed": summary.ArchiveRemoved,
-		"missing":        summary.Missing,
-		"audio_cleaned":  summary.AudioCleaned,
-		"audio_saved":    summary.AudioSaved,
-		"audio_failed":   summary.AudioFailed,
+		"missing":         summary.Missing,
+		"audio_cleaned":   summary.AudioCleaned,
+		"audio_saved":     summary.AudioSaved,
+		"audio_failed":    summary.AudioFailed,
 	}); err != nil {
 		logging.Warn("the night maintenance notification could not be sent", "error", err.Error())
 	}
