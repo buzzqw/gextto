@@ -890,6 +890,10 @@ func v2FormatCell(item map[string]any, column uiColumn) template.HTML {
 			return template.HTML(stdhtml.EscapeString(status))
 		}
 		return template.HTML(stdhtml.EscapeString(status) + ` <span class="badge ok" role="img" aria-label="` + stdhtml.EscapeString("Scaricato") + `" title="` + stdhtml.EscapeString(where) + `">✓</span>`)
+	case "block_reason":
+		// The blocklist stores a code the program writes; the column says in
+		// words why the release was blocked, in the reader's language.
+		return template.HTML(stdhtml.EscapeString(blocklistReasonLabel(v2String(raw))))
 	case "nas_tag":
 		hasNAS := strings.TrimSpace(v2String(item["processed_path"])) != ""
 		tag := strings.TrimSpace(v2String(item["tag"]))
@@ -996,6 +1000,39 @@ func v2FormatCell(item map[string]any, column uiColumn) template.HTML {
 		return template.HTML(`<a href="` + stdhtml.EscapeString(href) + `" target="_blank" rel="noopener">apri</a>`)
 	}
 	return template.HTML(stdhtml.EscapeString(v2Fmt(raw, column.Format)))
+}
+
+// blocklistReasonLabel says in words why a release sits in the blocklist. The
+// code is what the program writes; the sentence is translated like any other
+// text of a table cell, and an unknown code is shown as it is, so a new reason
+// is visible instead of silently empty.
+func blocklistReasonLabel(code string) string {
+	switch strings.TrimSpace(code) {
+	case "manual":
+		return "bloccata a mano"
+	case "manual_failed":
+		return "download fallito rimosso a mano"
+	case "dead_swarm":
+		return "nessuno la condivideva"
+	case "stalled_ed2k":
+		return "il download eD2k non riceveva dati"
+	case "corrupt_file":
+		return "il file scaricato era danneggiato"
+	case "pack_inspection_useless":
+		return "il pack non contiene puntate che servono"
+	case "season_pack_identity_mismatch":
+		return "il pack non contiene la stagione che promette"
+	case "in_progress_pack_incomplete":
+		return "il pack è incompleto"
+	case "dead_magnet":
+		return "il magnet non funzionava"
+	case "unsafe_payload":
+		return "il contenuto non è sicuro"
+	case "":
+		return "motivo non registrato"
+	default:
+		return code
+	}
 }
 
 func v2Fmt(value any, format string) string {

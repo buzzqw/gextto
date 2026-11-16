@@ -1808,7 +1808,7 @@ func uiTableSpecFor(view string) (uiTableSpec, bool) {
 			ItemsKey: "items",
 			ColumnsJSON: uiJSON([]uiColumn{
 				{Key: "title", Label: "Titolo"},
-				{Key: "reason", Label: "Motivo"},
+				{Key: "reason", Label: "Motivo", Format: "block_reason"},
 				{Key: "kind", Label: "Tipo"},
 				{Key: "created_at", Label: "Aggiunto"},
 				{Key: "expires_at", Label: "Scade", Format: "expiry"},

@@ -2034,7 +2034,7 @@ upload, removal) and writes it in the log.
 | **Alias** | another name under which a series appears in releases |
 | **Archive** | the local catalogue of the releases seen in the feeds |
 | **Backoff** | the growing pause in requests to a failing source |
-| **Blocklist** | the releases that will not be downloaded again |
+| **Blocklist** | the releases that will not be downloaded again; the **Reason** column says why in words; a reason this version does not know stays written as a code, so it is visible instead of vanishing |
 | **Cycle** | one automatic pass of searching and choosing |
 | **Dry-run** | test mode: searches and decides, but does not download |
 | **Forced gap** | the explicit request to download an episode again (↻ Redownload) |

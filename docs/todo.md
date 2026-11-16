@@ -29,7 +29,6 @@ Each waits for the operator's choice.
 
 - **MCP endpoint**: Gextto's API exposed as tools for an assistant, with a read-only switch. Gate: the operator's choice.
 - **Usenet as an acquisition source**: NZB search through the same indexers and an NNTP download path into the same import. Gate: the operator's choice.
-- **Blocklist "Motivo" in words**: the column shows the internal code (`stalled_ed2k`, `dead_swarm`, `corrupt_file`, `unsafe_payload`) instead of a sentence translated in every language, which the log now writes. Gate: the operator's choice.
 - **Inline styles and fixed colours**: the ~90 `style="…"` in the templates and the remaining hard-coded colours replaced by classes and the theme tokens. Gate: the operator's choice.
 - **Icon set, the rest**: the emoji that still sit inside translated labels (`🆘 ultima risorsa`, `📌 pin`, `🔍 Filtra`, `📋 Copia`, `⚡`, `🐢`, `📶`, `⏰`) become an icon beside the words, which means new catalog keys in six languages; then one design system (colours, spacing, type scale, radius) shared with the daemon and the two Gextto stylesheets folded into one with few breakpoints. Gate: the operator's choice; the visual review runs headless with `scripts/screenshots.sh`.
 - **Settings by level**: core options shown first, an "Show advanced options" switch, a mark on rows and tabs changed from their default. Gate: the operator's choice.

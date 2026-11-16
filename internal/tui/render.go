@@ -1482,7 +1482,7 @@ func (m *Model) renderBlocklist(width, contentHeight int) []Line {
 	}
 	texts := make([]string, len(m.Blocklist))
 	for index, entry := range m.Blocklist {
-		texts[index] = fmt.Sprintf("%s · %s · %s", entry.Title, firstNonEmpty(entry.Reason, "-"), entry.CreatedAt)
+		texts[index] = fmt.Sprintf("%s · %s · %s", entry.Title, m.Tr.BlockReasonLabel(entry.Reason), entry.CreatedAt)
 	}
 	return append(lines, catalogRows(texts, m.BlocklistSelected, &m.BlocklistScroll, contentHeight-1, width)...)
 }

@@ -2058,7 +2058,7 @@ upload, rimozione) e lo scrive nel log.
 | **Alias** | un altro nome con cui una serie compare nelle release |
 | **Archivio** | il catalogo locale delle release viste nei feed |
 | **Backoff** | la pausa crescente delle richieste a una sorgente che fallisce |
-| **Blocklist** | le release che non verranno più scaricate |
+| **Blocklist** | le release che non verranno più scaricate; la colonna **Motivo** dice in parole perché; un motivo che questa versione non conosce resta scritto come codice, così si vede invece di sparire |
 | **Cestino** | dove vanno i file tolti dalla libreria, prima della cancellazione |
 | **Ciclo** | una passata automatica di ricerca e scelta |
 | **Dry-run** | la modalità prova: cerca e decide, ma non scarica |
