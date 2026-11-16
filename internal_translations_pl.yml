@@ -1,6 +1,7 @@
 # Bundled Polish translations for the web UI. The translation database mirrors
 # this catalog: a corrected value here replaces the stored one at the next start.
 pol:
+  "Esce senza aggiungere niente: quello che hai scritto o scelto resta finché non ricarichi la pagina (Esc fa lo stesso)": "Wychodzi bez dodawania czegokolwiek: wpisane lub wybrane ustawienia zostają do przeładowania strony (Esc robi to samo)"
   "Chiude il modulo senza aggiungere niente; quello che hai scritto resta finché non ricarichi la pagina (Esc fa lo stesso)": "Zamyka formularz bez dodawania czegokolwiek; wpisana treść zostaje do przeładowania strony (Esc robi to samo)"
   "Rimette subito la puntata in ricerca: toglie l'attesa fra due tentativi e l'eventuale «ignorato», senza toccare i file già in archivio. La ricerca riparte al ciclo successivo.": "Natychmiast przywraca odcinek do wyszukiwania: usuwa oczekiwanie między dwiema próbami i ewentualne oznaczenie «ignorowany», nie ruszając plików już zarchiwizowanych. Wyszukiwanie rusza ponownie w następnym cyklu."
   "Documentazione": "Dokumentacja"

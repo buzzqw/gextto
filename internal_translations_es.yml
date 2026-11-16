@@ -1,6 +1,7 @@
 # Bundled Spanish translations for the web UI. The translation database mirrors
 # this catalog: a corrected value here replaces the stored one at the next start.
 spa:
+  "Esce senza aggiungere niente: quello che hai scritto o scelto resta finché non ricarichi la pagina (Esc fa lo stesso)": "Sale sin añadir nada: lo que has escrito o elegido se queda hasta que recargues la página (Esc hace lo mismo)"
   "Chiude il modulo senza aggiungere niente; quello che hai scritto resta finché non ricarichi la pagina (Esc fa lo stesso)": "Cierra el formulario sin añadir nada; lo que has escrito se queda hasta que recargues la página (Esc hace lo mismo)"
   "Rimette subito la puntata in ricerca: toglie l'attesa fra due tentativi e l'eventuale «ignorato», senza toccare i file già in archivio. La ricerca riparte al ciclo successivo.": "Vuelve a poner el episodio en búsqueda de inmediato: elimina la espera entre dos intentos y cualquier marca de «ignorado», sin tocar los archivos ya archivados. La búsqueda vuelve a empezar en el ciclo siguiente."
   "Documentazione": "Documentación"

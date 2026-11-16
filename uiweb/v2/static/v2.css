@@ -2927,3 +2927,7 @@ body.v2-drop-active main {
 @media (prefers-reduced-motion: reduce) {
   .skeleton-line { animation: none; }
 }
+
+/* «Annulla» closes the add-torrent frame from where the eye ends up after the
+   last option: the right end of the row, under the primary button. */
+.add-torrent-cancel { margin-left: auto; }

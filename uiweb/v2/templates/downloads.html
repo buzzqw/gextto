@@ -53,6 +53,9 @@
               <label class="check" {{trTitle "Scarica solo i metadati senza avviare i dati del contenuto"}}><input type="checkbox" name="metadata_only" value="1" /> <span>{{tr "Solo metadati"}}</span></label>
               <label class="check" {{trTitle "Mantiene il nome originale dei file invece di applicare la rinomina automatica"}}><input type="checkbox" name="no_rename" value="1" /> <span>{{tr "Non rinominare"}}</span></label>
               <label class="check warn" {{trTitle "Salta il controllo iniziale dei pezzi; usalo solo per torrent già verificati"}}><input type="checkbox" name="seed_mode" value="1" /> <span>{{tr "Salta verifica"}}</span></label>
+              {{/* Out of the form without adding anything: the same way out as the
+                   ✕, where the thumb and the eye end up after the last option. */}}
+              <button class="btn sm add-torrent-cancel" type="button" data-add-torrent-close {{trTitle "Esce senza aggiungere niente: quello che hai scritto o scelto resta finché non ricarichi la pagina (Esc fa lo stesso)"}}>{{tr "Annulla"}}</button>
             </div>
           </div>
         </div>

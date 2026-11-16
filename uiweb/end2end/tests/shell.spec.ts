@@ -174,13 +174,29 @@ test.describe("aggiunta di un torrent", () => {
     const inside = await page.evaluate(() => !!document.activeElement?.closest("#v2-add-torrent"));
     expect(inside).toBe(true);
 
+    // «Annulla» is the way out under the primary button, right of the last
+    // option: it leaves without adding anything.
+    const cancel = panel.locator(".add-torrent-cancel");
+    await expect(cancel).toBeVisible();
+    await expect(cancel).toHaveText("Annulla");
+    const seed = panel.getByText("Salta verifica").first();
+    const seedBox = await seed.boundingBox();
+    const cancelBox = await cancel.boundingBox();
+    if (!seedBox || !cancelBox) throw new Error("geometria non disponibile");
+    expect(cancelBox.x).toBeGreaterThan(seedBox.x);
+
     // ✕ closes it and gives the focus back to the button that opened it.
-    await panel.locator("[data-add-torrent-close]").click();
+    await panel.locator(".add-torrent-close").click();
     await expect(panel).toBeHidden();
     await expect(toggle).toHaveAttribute("aria-expanded", "false");
     await expect(toggle).toBeFocused();
 
-    // Escape does the same.
+    // So does «Annulla», and so does Escape.
+    await toggle.click();
+    await expect(panel).toBeVisible();
+    await panel.locator(".add-torrent-cancel").click();
+    await expect(panel).toBeHidden();
+    await expect(toggle).toBeFocused();
     await toggle.click();
     await expect(panel).toBeVisible();
     await page.keyboard.press("Escape");

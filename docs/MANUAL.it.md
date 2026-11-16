@@ -721,9 +721,11 @@ sceglie solo tra le release che hanno superato tutti i controlli.
 URL `.torrent` o un file `.torrent`. Il modulo **scende dall'alto**, largo quanto
 la colonna dei contenuti: la pagina resta visibile sotto, invece di sparire
 dietro un riquadro al centro, e il cursore va subito nel campo del magnet. Si
-chiude con `Esc`, con la ✕ in alto a destra o con il suo titolo; il pulsante
-della barra resta l'unico modo per aprirlo, e da tastiera `Tab` gira solo dentro
-il modulo finché è aperto. In **Scarico** ci sono due scorciatoie:
+chiude con `Esc`, con la ✕ in alto a destra, con **Annulla** — in fondo agli
+ultimi optioni, sotto **Aggiungi** — o con il suo titolo; il pulsante della barra
+resta l'unico modo per aprirlo, e da tastiera `Tab` gira solo dentro il modulo
+finché è aperto. **Annulla** esce senza aggiungere niente: quello che hai scritto
+o spuntato resta finché non ricarichi la pagina. In **Scarico** ci sono due scorciatoie:
 trascina un file `.torrent` in un punto qualsiasi della pagina, oppure incolla
 un link magnet (`Ctrl+V`) quando nessun campo ha il focus. In entrambi i casi il
 modulo si compila, si apre e il focus va su **Aggiungi**, così puoi ancora

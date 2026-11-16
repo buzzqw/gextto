@@ -1,6 +1,7 @@
 # Bundled French translations for the web UI. The translation database mirrors
 # this catalog: a corrected value here replaces the stored one at the next start.
 fra:
+  "Esce senza aggiungere niente: quello che hai scritto o scelto resta finché non ricarichi la pagina (Esc fa lo stesso)": "Sort sans rien ajouter : ce que tu as saisi ou choisi reste jusqu'au rechargement de la page (Échap fait de même)"
   "Chiude il modulo senza aggiungere niente; quello che hai scritto resta finché non ricarichi la pagina (Esc fa lo stesso)": "Ferme le formulaire sans rien ajouter ; ce que tu as saisi reste jusqu'au rechargement de la page (Échap fait de même)"
   "Rimette subito la puntata in ricerca: toglie l'attesa fra due tentativi e l'eventuale «ignorato», senza toccare i file già in archivio. La ricerca riparte al ciclo successivo.": "Remet immédiatement l'épisode en recherche : supprime l'attente entre deux tentatives et tout marquage « ignoré », sans toucher aux fichiers déjà archivés. La recherche repart au cycle suivant."
   "Documentazione": "Documentation"
