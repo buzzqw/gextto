@@ -1796,6 +1796,9 @@ func maintenanceReportNotificationBody(lang string, data map[string]any) string 
 	if freed := number("db_freed"); freed > 0 {
 		lines = append(lines, fmt.Sprintf("🗄 %s: %s", messages.PickLang(lang, "Spazio recuperato nei database", "Space freed in the databases"), formatBytes(freed)))
 	}
+	if removed := number("archive_removed"); removed > 0 {
+		lines = append(lines, fmt.Sprintf("🗂 %s: %d", messages.PickLang(lang, "Copie con lo stesso titolo tolte dall'archivio", "Copies with the same title merged in the archive"), removed))
+	}
 	if missing := number("missing"); missing > 0 {
 		lines = append(lines, fmt.Sprintf("📚 %s: %d", messages.PickLang(lang, "File della libreria spariti dal disco", "Library files gone from the disk"), missing))
 	}

@@ -325,7 +325,7 @@
 <div class="panel" id="v2-night-maintenance-panel"{{if .Activity}} data-v2-poll hx-get="/settings/night-maintenance" hx-trigger="every 10s [window.gexttoCanPoll()], v2wake" hx-swap="outerHTML" aria-busy="true"{{end}}>
   <div class="panel-head"><h3>{{tr "Stato della manutenzione notturna"}}</h3></div>
   <div class="panel-body">
-    <p class="hint">{{tr "Nella finestra notturna Gextto ottimizza i database, controlla la libreria e, se attivato, pulisce l'audio dei file già archiviati: un lavoro alla volta, solo quando nessun download sta trasferendo, nessun download viene archiviato e il sistema non è sotto carico."}}</p>
+    <p class="hint">{{tr "Nella finestra notturna Gextto unisce i titoli duplicati dell'archivio, ottimizza i database, controlla la libreria e, se attivato, pulisce l'audio dei file già archiviati: un lavoro alla volta, solo quando nessun download sta trasferendo, nessun download viene archiviato e il sistema non è sotto carico."}}</p>
     <p class="hint"><span>{{tr "Finestra:"}}</span> <strong>{{tr .Window}}</strong>{{if .HeavyWindow}} <span>{{tr "— anche il controllo integrità e l'analisi MediaInfo aspettano la finestra."}}</span>{{end}}</p>
     <p aria-live="polite">{{if .Activity}}<span class="badge ok">{{tr "In corso"}}</span> <strong>{{tr .Activity}}</strong>{{else if .Waiting}}<span class="badge warn">{{tr "In attesa"}}</span> <span>{{tr .Waiting}}</span>{{else if .Open}}<span class="badge">{{tr "Finestra aperta"}}</span> <span>{{tr "Niente da fare in questo momento."}}</span>{{else}}<span class="badge">{{tr "Finestra chiusa"}}</span> <span>{{tr "Prossima apertura alle"}}</span> <strong>{{tr .NextOpening}}</strong>{{end}}</p>
     <div class="toolbar">
@@ -335,6 +335,12 @@
       </form>
     </div>
     {{if .Message}}<p class="alert{{if not .Error}} ok{{end}}" role="{{if .Error}}alert{{else}}status{{end}}">{{tr .Message}}</p>{{end}}
+
+    <h4>{{tr "Titoli duplicati dell'archivio"}}</h4>
+    {{if not .ArchiveOn}}<p class="muted">{{tr "Spenta: si attiva con «Unisci i titoli duplicati dell'archivio ogni notte»."}}</p>
+    {{else if .ArchiveAt}}<p><span>{{tr "Ultima pulizia:"}}</span> <strong>{{tr .ArchiveAt}}</strong>{{if .ArchiveCut}} <span>—</span> <strong>{{tr .ArchiveCut}}</strong> <span>{{tr "Copie tolte"}}</span>{{end}}</p>
+    {{if .ArchiveError}}<p class="alert" role="alert"><span>{{tr "L'ultima pulizia non è stata completata:"}}</span> <code>{{tr .ArchiveError}}</code></p>{{end}}
+    {{else}}<p class="muted">{{tr "La pulizia dei titoli duplicati non è ancora stata eseguita."}}</p>{{end}}
 
     <h4>{{tr "Database"}}</h4>
     {{if not .DatabaseOn}}<p class="muted">{{tr "La manutenzione del database è disattivata."}}</p>

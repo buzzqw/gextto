@@ -442,7 +442,7 @@
       {{range .Rows}}{{template "v2_list_row" (dict "Editor" $ "Row" .)}}{{end}}
     </div>
     <div class="form-actions">
-       <button class="btn sm" type="button" id="v2-editor-{{.Key}}-add" hx-get="/settings/editor-row?editor={{.Key}}&amp;index={{.NextIndex}}&amp;view={{.View}}&amp;tab={{.Tab}}" hx-target="#v2-editor-{{.Key}}-rows" hx-swap="beforeend" data-v2-marks-dirty {{trTitle "Aggiungi una nuova riga"}}>{{tr "Aggiungi riga"}}</button>
+       <button class="btn sm" type="button" id="v2-editor-{{.Key}}-add" hx-get="/settings/editor-row?editor={{.Key}}&amp;index={{.NextIndex}}&amp;view={{.View}}&amp;tab={{.Tab}}" hx-target="#v2-editor-{{.Key}}-rows" hx-swap="beforeend" data-v2-marks-dirty >{{tr "Aggiungi riga"}}</button>
        <button class="btn sm primary" type="submit" {{trTitle "Salva le righe di questa sezione"}}>{{tr "Salva"}}</button>
        <span class="setting-badge setting-dirty" data-v2-dirty-badge hidden>{{tr "non salvata"}}</span>
     </div>
@@ -463,7 +463,7 @@
     {{else}}<span class="field-row"><input class="input" name="{{$name}}__{{$index}}" value="{{$value}}" placeholder="{{tr .Placeholder}}"{{if .Browse}} data-v2-browse-input{{end}} />{{if .Browse}}<button class="btn sm" type="button" data-v2-browse-for="{{$name}}__{{$index}}" {{trTitle "Sfoglia le cartelle disponibili sul server"}}>{{tr "Sfoglia"}}</button>{{end}}</span>{{end}}
   </label>{{end}}
   {{end}}
-  <div class="form-actions">{{if .Editor.HasTest}}<button class="btn sm" type="button" hx-post="/settings/editor-test" hx-include="closest .list-row" hx-vals='{"editor":"{{.Editor.Key}}","index":"{{.Row.Index}}"}' hx-target="#v2-list-test-{{.Editor.Key}}-{{.Row.Index}}" hx-swap="innerHTML" {{trTitle "Testa questa riga"}}>{{tr "Testa"}}</button><span id="v2-list-test-{{.Editor.Key}}-{{.Row.Index}}" class="muted" aria-live="polite"></span>{{end}}<button class="btn sm danger" type="button" hx-get="/empty" hx-target="closest .list-row" hx-swap="outerHTML" data-v2-marks-dirty {{trTitle "Rimuovi questa riga (da salvare)"}}>{{tr "Rimuovi"}}</button></div>
+  <div class="form-actions">{{if .Editor.HasTest}}<button class="btn sm" type="button" hx-post="/settings/editor-test" hx-include="closest .list-row" hx-vals='{"editor":"{{.Editor.Key}}","index":"{{.Row.Index}}"}' hx-target="#v2-list-test-{{.Editor.Key}}-{{.Row.Index}}" hx-swap="innerHTML" >{{tr "Testa"}}</button><span id="v2-list-test-{{.Editor.Key}}-{{.Row.Index}}" class="muted" aria-live="polite"></span>{{end}}<button class="btn sm danger" type="button" hx-get="/empty" hx-target="closest .list-row" hx-swap="outerHTML" data-v2-marks-dirty {{trTitle "Rimuovi questa riga (da salvare)"}}>{{tr "Rimuovi"}}</button></div>
 </div>
 {{end}}
 

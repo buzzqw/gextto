@@ -348,8 +348,8 @@ h3.sub{margin:14px 0 2px;font-size:13px;color:var(--subtle);text-transform:upper
   <legend>{{tr "Archive database"}}</legend>
   <p class="muted">{{tr "Everything the feeds found is kept in the archive database. Delete the old items to free space, then optimize to give the freed space back to the filesystem."}}</p>
   <div class="actions">
-    <label>{{tr "Older than (days)"}}<input type="number" min="1" id="archive-maint-days" value="90" title="{{tr "Delete the items found more than this many days ago"}}"></label>
-    <button type="button" class="secondary sm" id="archive-maint-prune" title="{{tr "Delete the items found more than this many days ago"}}">{{tr "Delete old items"}}</button>
+    <label>{{tr "Older than (days)"}}<input type="number" min="1" id="archive-maint-days" value="90" title="{{tr "It only touches the archive list: the library files and the downloads in progress are not touched"}}"></label>
+    <button type="button" class="secondary sm" id="archive-maint-prune">{{tr "Delete old items"}}</button>
     <button type="button" class="secondary sm" id="archive-maint-compact" title="{{tr "Rewrite the archive database compactly so the file shrinks after deletions"}}">{{tr "Optimize archive"}}</button>
   </div>
   <p class="muted" id="archive-maint-result" role="status" aria-live="polite"></p>
@@ -681,5 +681,5 @@ document.addEventListener('DOMContentLoaded', function () { ensureTooltips(docum
 ensureTooltips(document);
 syncSchedModes();
 </script>
-<a class="donate" href="https://www.paypal.com/cgi-bin/webscr?cmd=_donations&amp;business=azanzani@gmail.com&amp;item_name=Support+gx-torrent+Project" target="_blank" rel="noopener noreferrer" title="{{tr "Support gx-torrent with a PayPal donation"}}" aria-label="{{tr "Support gx-torrent with a PayPal donation"}}"><span class="donate-icon" aria-hidden="true">❤️</span><span class="donate-label">{{tr "Donate"}}</span></a>
+<a class="donate" href="https://www.paypal.com/cgi-bin/webscr?cmd=_donations&amp;business=azanzani@gmail.com&amp;item_name=Support+gx-torrent+Project" target="_blank" rel="noopener noreferrer" aria-label="{{tr "Support gx-torrent with a PayPal donation"}}"><span class="donate-icon" aria-hidden="true">❤️</span><span class="donate-label">{{tr "Donate"}}</span></a>
 </body></html>

@@ -230,6 +230,7 @@ var uiSettingDefaults = map[string]string{
 	"maintenance_window_end":               "07:00",
 	"maintenance_heavy_in_window":          "true",
 	"maintenance_db":                       "true",
+	"maintenance_archive_dedup":            "true",
 	"maintenance_audio_library":            "false",
 	"media_integrity_interval_minutes":     "60",
 	"media_integrity_batch":                "1",

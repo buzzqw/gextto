@@ -217,6 +217,14 @@ type maintenanceDBResult struct {
 	ErrorMessage string    `json:"error,omitempty"`
 }
 
+// maintenanceArchiveResult is the last duplicate-title cleanup of the release
+// archive.
+type maintenanceArchiveResult struct {
+	At           time.Time `json:"at"`
+	Removed      int64     `json:"removed"`
+	ErrorMessage string    `json:"error,omitempty"`
+}
+
 // maintenanceMissingFile is one library file the database knows and the disk
 // no longer has.
 type maintenanceMissingFile struct {
@@ -263,8 +271,11 @@ type maintenanceNightSummary struct {
 	DBDone       bool   `json:"db_done"`
 	DBProblems   int    `json:"db_problems"`
 	DBFreed      int64  `json:"db_freed"`
-	ReportDone   bool   `json:"report_done"`
-	Missing      int    `json:"missing"`
+	// ArchiveDedupDone is set when the duplicate-title cleanup ran tonight.
+	ArchiveDedupDone bool  `json:"archive_dedup_done"`
+	ArchiveRemoved   int64 `json:"archive_removed"`
+	ReportDone       bool  `json:"report_done"`
+	Missing          int   `json:"missing"`
 	AudioCleaned int    `json:"audio_cleaned"`
 	AudioSaved   int64  `json:"audio_saved"`
 	AudioFailed  int    `json:"audio_failed"`
@@ -277,6 +288,7 @@ func (n maintenanceNightSummary) audioDone() bool { return n.AudioDone }
 // maintenanceStatus is the persisted state of the night maintenance.
 type maintenanceStatus struct {
 	DB           maintenanceDBResult      `json:"db"`
+	Archive      maintenanceArchiveResult `json:"archive"`
 	Library      maintenanceLibraryResult `json:"library"`
 	LibraryCheck maintenanceLibraryCheck  `json:"library_check"`
 	Audio        maintenanceAudioResult   `json:"audio"`
@@ -450,6 +462,11 @@ func nightMaintenancePass(ctx context.Context, state *AppState, now time.Time, f
 	defer maintenanceSetLive("", "")
 
 	status := maintenanceStatusSnapshot()
+	if maintenanceArchiveDedupEnabled(cfg) && (forced || !status.Night.ArchiveDedupDone) && inWindow() && idle() {
+		runMaintenanceStep(ctx, "Pulizia dei titoli duplicati dell'archivio", func(ctx context.Context) {
+			runArchiveDuplicateCleanup(ctx, state, now)
+		})
+	}
 	if settingsBool(cfg, maintenanceDBSetting, true) && (forced || !status.Night.DBDone) && inWindow() && idle() {
 		runMaintenanceStep(ctx, "Manutenzione del database", func(ctx context.Context) {
 			runDatabaseMaintenance(ctx, state, now)
@@ -484,13 +501,13 @@ func maintenanceNotifyNight(cfg *Config) {
 	if summary.Night == "" || summary.Notified {
 		return
 	}
-	if !summary.DBDone && !summary.ReportDone && summary.AudioCleaned == 0 && summary.AudioFailed == 0 {
+	if !summary.DBDone && !summary.ReportDone && summary.ArchiveRemoved == 0 && summary.AudioCleaned == 0 && summary.AudioFailed == 0 {
 		return
 	}
 	maintenanceStatusUpdate(func(status *maintenanceStatus) { status.Night.Notified = true })
 	text := maintenanceNightText(summary)
 	logging.Info("🌙 Night maintenance: " + text)
-	if summary.DBProblems == 0 && summary.Missing == 0 && summary.AudioCleaned == 0 && summary.AudioFailed == 0 && summary.DBFreed < 64<<20 {
+	if summary.DBProblems == 0 && summary.Missing == 0 && summary.ArchiveRemoved == 0 && summary.AudioCleaned == 0 && summary.AudioFailed == 0 && summary.DBFreed < 64<<20 {
 		// A quiet night is in the log, not on the phone.
 		return
 	}
@@ -498,13 +515,14 @@ func maintenanceNotifyNight(cfg *Config) {
 		return
 	}
 	if err := FromConfig(cfg).NotifyEvent("maintenance_report", map[string]any{
-		"title":         "Night maintenance",
-		"db_problems":   summary.DBProblems,
-		"db_freed":      summary.DBFreed,
-		"missing":       summary.Missing,
-		"audio_cleaned": summary.AudioCleaned,
-		"audio_saved":   summary.AudioSaved,
-		"audio_failed":  summary.AudioFailed,
+		"title":          "Night maintenance",
+		"db_problems":    summary.DBProblems,
+		"db_freed":       summary.DBFreed,
+		"archive_removed": summary.ArchiveRemoved,
+		"missing":        summary.Missing,
+		"audio_cleaned":  summary.AudioCleaned,
+		"audio_saved":    summary.AudioSaved,
+		"audio_failed":   summary.AudioFailed,
 	}); err != nil {
 		logging.Warn("the night maintenance notification could not be sent", "error", err.Error())
 	}
@@ -522,6 +540,9 @@ func maintenanceNightText(summary maintenanceNightSummary) string {
 		default:
 			parts = append(parts, "databases optimised")
 		}
+	}
+	if summary.ArchiveRemoved > 0 {
+		parts = append(parts, fmt.Sprintf("%s with the same title merged in the release archive", countLabel(summary.ArchiveRemoved, "row", "rows")))
 	}
 	if summary.ReportDone {
 		if summary.Missing > 0 {

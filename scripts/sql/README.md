@@ -107,7 +107,7 @@ un'operazione serve una build di Gextto.
 | Distribuzione per età | Sola lettura | Conteggio per fascia di età |
 | Release per fonte | Sola lettura | Conteggio per fonte, con la più vecchia e la più recente |
 | Stato dell'archivio | Sola lettura | Controlli su titoli, magnet, hash e indice full-text |
-| Titoli duplicati | Sola lettura | Titoli ripetuti e numero di copie |
+| Titoli duplicati | Elimina | Copie con lo stesso titolo: resta la riga con magnet, altrimenti la più recente con un link `.torrent` |
 
 ## Perché nascono i duplicati
 
@@ -119,6 +119,18 @@ sembrerebbe nuova a ogni passata. L'operazione **Duplicati per titolo e fonte**
 è la pulizia di quelle righe già accumulate: confronta `source` e
 `lower(title)`, tiene la riga più recente e cancella le altre. Non tocca i
 magnet.
+
+L'operazione **Titoli duplicati** fa la stessa cosa senza guardare la fonte:
+per ogni titolo tiene la riga con un magnet (la più recente, preferendo quelle
+con l'infohash) e, quando il titolo non ne ha nessuna, la più recente con un
+link `.torrent`. Gira anche da sola una volta per notte nella finestra di
+manutenzione, con l'interruttore «Unisci i titoli duplicati dell'archivio ogni
+notte».
+
+Attenzione: **lo stesso titolo non è sempre lo stesso torrent.** Due siti
+possono dare lo stesso nome a file diversi (infohash diversi): la pulizia
+tiene la copia migliore e cancella le altre, quindi vale la pena guardare
+l'anteprima la prima volta, prima di lasciarla girare ogni notte.
 
 ## Come eseguire una select da terminale
 

@@ -304,6 +304,7 @@ var uiSettingsIndex = []uiSettingDef{
 	{Key: "maintenance_window_end", Label: "Finestra notturna — fine", Tab: "maintenance", Group: "Manutenzione notturna"},
 	{Key: "maintenance_heavy_in_window", Label: "Controllo integrità e analisi MediaInfo solo nella finestra", Tab: "maintenance", Group: "Manutenzione notturna"},
 	{Key: "maintenance_db", Label: "Manutenzione del database ogni notte", Tab: "maintenance", Group: "Manutenzione notturna"},
+	{Key: "maintenance_archive_dedup", Label: "Unisci i titoli duplicati dell'archivio ogni notte", Tab: "maintenance", Group: "Manutenzione notturna"},
 	{Key: "maintenance_audio_library", Label: "Pulisci l'audio dei file già in libreria", Tab: "maintenance", Group: "Manutenzione notturna"},
 	{Key: "media_info_backfill_enabled", Label: "Backfill MediaInfo automatico", Tab: "maintenance", Group: "Analisi MediaInfo"},
 	{Key: "media_info_backfill_interval_minutes", Label: "Backfill MediaInfo — intervallo", Tab: "maintenance", Group: "Analisi MediaInfo"},

@@ -130,7 +130,7 @@ details.hint summary{cursor:pointer}
 <dialog id="dlg-wanted" class="wide" aria-labelledby="dlg-wanted-title">
   <form method="post" action="/ui/wanted" id="wanted-form">
     <input type="hidden" name="op" value="add"><input type="hidden" name="index" id="wanted-index">
-    <div class="dlg-head"><h2 id="dlg-wanted-title">{{tr "Add title"}}</h2><button type="button" class="ghost icon" data-close aria-label="{{tr "Close"}}" title="{{tr "Close"}}"><svg class="i"><use href="/assets/icons.svg#i-x"/></svg></button></div>
+    <div class="dlg-head"><h2 id="dlg-wanted-title">{{tr "Add title"}}</h2><button type="button" class="ghost icon" data-close aria-label="{{tr "Close"}}"><svg class="i"><use href="/assets/icons.svg#i-x"/></svg></button></div>
     <div class="dlg-body">
       <div class="fsec">
         <h3>{{tr "1 · What do you want?"}}</h3>
@@ -199,7 +199,7 @@ details.hint summary{cursor:pointer}
           <label class="field">{{tr "Season"}}<input type="number" min="0" id="wanted-ep-season" title="{{tr "Season number"}}"></label>
           <label class="field">{{tr "Episode"}}<input type="number" min="1" id="wanted-ep-episode" title="{{tr "Episode number"}}"></label>
           <button type="button" id="wanted-ep-add" title="{{tr "Add the episode as missing, so it is searched"}}">{{tr "Add as missing"}}</button>
-          <button type="button" id="wanted-ep-search" title="{{tr "Search this episode"}}">{{tr "Search this episode"}}</button>
+          <button type="button" id="wanted-ep-search">{{tr "Search this episode"}}</button>
           <button type="button" id="wanted-ep-force" title="{{tr "Search the indexers now for the missing episodes"}}"><svg class="i"><use href="/assets/icons.svg#i-search"/></svg>{{tr "Search missing now"}}</button>
         </div>
       </details>
@@ -212,14 +212,14 @@ details.hint summary{cursor:pointer}
 </dialog>
 
 <dialog id="dlg-releases" class="wide" aria-labelledby="dlg-releases-title">
-  <div class="dlg-head"><h2 id="dlg-releases-title">{{tr "Releases and why not"}}</h2><button type="button" class="ghost icon" data-close aria-label="{{tr "Close"}}" title="{{tr "Close"}}"><svg class="i"><use href="/assets/icons.svg#i-x"/></svg></button></div>
+  <div class="dlg-head"><h2 id="dlg-releases-title">{{tr "Releases and why not"}}</h2><button type="button" class="ghost icon" data-close aria-label="{{tr "Close"}}"><svg class="i"><use href="/assets/icons.svg#i-x"/></svg></button></div>
   <div class="dlg-body">
     <p class="hint">{{tr "What the archive and the indexers found for this title, with the verdict: what would be taken, and why the others are not."}}</p>
     <p class="hint" id="releases-sum" role="status" aria-live="polite"></p>
     <div class="vcounts" id="releases-counts"></div>
     <div class="preview relview max-h-60" id="releases-list" tabindex="0" role="region" aria-label="{{tr "Releases"}}"></div>
   </div>
-  <div class="dlg-foot"><button type="button" id="releases-live" title="{{tr "Search the indexers now"}}">{{tr "Search the indexers now"}}</button><button type="button" data-close title="{{tr "Close"}}">{{tr "Close"}}</button></div>
+  <div class="dlg-foot"><button type="button" id="releases-live">{{tr "Search the indexers now"}}</button><button type="button" data-close>{{tr "Close"}}</button></div>
 </dialog>
 </main>
 <script id="ui-i18n"></script>

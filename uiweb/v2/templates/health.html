@@ -409,7 +409,7 @@
       </fieldset>
       <fieldset class="theme-group" {{trTitle "Temi salvati con un nome, disponibili su ogni dispositivo"}}>
         <legend>{{tr "I tuoi temi"}}</legend>
-        {{if .Saved}}<div class="theme-grid">{{range .Saved}}<div class="theme-saved">{{template "v2_theme_card" .}}<form class="theme-delete" hx-post="/theme/delete" hx-target="#v2-modal" hx-swap="innerHTML" hx-confirm="{{tr "Eliminare questo tema salvato?"}}"><input type="hidden" name="name" value="{{.Name}}"><button class="btn sm danger" type="submit" {{trTitle "Elimina questo tema salvato"}} aria-label="{{tr "Elimina questo tema salvato"}}">✕</button></form></div>{{end}}</div>
+        {{if .Saved}}<div class="theme-grid">{{range .Saved}}<div class="theme-saved">{{template "v2_theme_card" .}}<form class="theme-delete" hx-post="/theme/delete" hx-target="#v2-modal" hx-swap="innerHTML" hx-confirm="{{tr "Eliminare questo tema salvato?"}}"><input type="hidden" name="name" value="{{.Name}}"><button class="btn sm danger" type="submit" {{trTitle "Rimuove questo tema salvato dall'elenco; il tema attivo non cambia"}} aria-label="{{tr "Elimina questo tema salvato"}}">✕</button></form></div>{{end}}</div>
         {{else}}<p class="hint">{{tr "Nessun tema salvato: personalizzane uno qui sotto e dagli un nome."}}</p>{{end}}
       </fieldset>
       <form class="theme-editor" id="v2-theme-form" hx-post="/theme/save" hx-target="#v2-modal" hx-swap="innerHTML">

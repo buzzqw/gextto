@@ -98,6 +98,7 @@ var uiSettingTooltipText = map[string]string{
 	"maintenance_window_end":               "Ora di fine della finestra notturna (HH:MM): dopo non parte nessun lavoro nuovo, quello in corso viene completato.",
 	"maintenance_heavy_in_window":          "Sì: il controllo integrità e l'analisi MediaInfo girano solo nella finestra notturna e quando nessun download sta trasferendo. No: girano al loro intervallo a qualsiasi ora.",
 	"maintenance_db":                       "Ogni notte ottimizza i database e li compatta quando hanno molto spazio libero; una volta alla settimana ne controlla l'integrità e avvisa subito se trova problemi.",
+	"maintenance_archive_dedup":            "Toglie dall'archivio le copie con lo stesso titolo: resta la riga con magnet e, quando il titolo non ne ha, la più recente con un link .torrent. Riguarda solo il catalogo delle release: file scaricati, libreria e storico restano.",
 	"maintenance_audio_library":            "Applica la pulizia delle tracce audio anche ai file già in libreria, uno alla volta nella finestra notturna. Serve «Rimuovi le tracce audio in altre lingue» attivo.",
 	"media_integrity_enabled":              "Analizza periodicamente con ffprobe e ffmpeg i file della libreria, un file alla volta, per trovare quelli danneggiati.",
 	"media_integrity_interval_minutes":     "Minuti tra due passaggi del controllo integrità.",

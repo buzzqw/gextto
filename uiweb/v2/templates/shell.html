@@ -92,7 +92,7 @@
              top bar on every screen size: only the donation link is left here,
              because the floating button is hidden on a phone. */}}
         {{if .System}}<div class="nav-prefs" aria-label="{{tr "Sostieni Gextto"}}">
-           <a class="btn sm nav-prefs-donate" href="https://www.paypal.com/cgi-bin/webscr?cmd=_donations&business=azanzani@gmail.com&item_name=Support+Gextto+Project" target="_blank" rel="noopener noreferrer" {{trTitle "Sostieni Gextto con una donazione PayPal"}}><span aria-hidden="true">{{icon "i-heart"}}</span> {{tr "Dona"}}</a>
+           <a class="btn sm nav-prefs-donate" href="https://www.paypal.com/cgi-bin/webscr?cmd=_donations&business=azanzani@gmail.com&item_name=Support+Gextto+Project" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">{{icon "i-heart"}}</span> {{tr "Dona"}}</a>
          </div>{{end}}
          {{if eq .Label "Panoramica"}}<a class="nav-item nav-search" href="/?view=settings" {{trTitle "Cerca tra tutte le impostazioni e vai al campo"}}><span class="nav-icon" aria-hidden="true">{{icon "i-search"}}</span><span>{{tr "Cerca impostazioni"}}</span></a>{{end}}
       </div>
@@ -115,7 +115,7 @@
              screen does not go blank, the scroll and the open panels stay, and
              the live figures keep their own rhythm. Without HTMX the button
              falls back to a normal reload. */}}
-        <button class="btn btn-refresh" type="button" hx-get="{{.SelfURL}}" hx-target="#v2-page" hx-select="#v2-page" hx-swap="outerHTML" hx-disabled-elt="this" onclick="if(!window.htmx)window.location.reload()" {{trTitle "Ricarica i dati mostrati"}} aria-label="{{tr "Ricarica i dati mostrati"}}"><span class="btn-refresh-icon" aria-hidden="true">{{icon "i-reload"}}</span><span class="btn-refresh-label">{{tr "Aggiorna"}}</span></button>
+        <button class="btn btn-refresh" type="button" hx-get="{{.SelfURL}}" hx-target="#v2-page" hx-select="#v2-page" hx-swap="outerHTML" hx-disabled-elt="this" onclick="if(!window.htmx)window.location.reload()" {{trTitle "Rilegge lo stato dal daemon e sostituisce solo il contenuto: la posizione e i pannelli aperti restano"}} aria-label="{{tr "Ricarica i dati mostrati"}}"><span class="btn-refresh-icon" aria-hidden="true">{{icon "i-reload"}}</span><span class="btn-refresh-label">{{tr "Aggiorna"}}</span></button>
         {{template "v2_live_status" .Chrome}}
       </div>
       <div class="top-controls">
@@ -217,7 +217,7 @@
 }());
 </script>{{end}}
 {{if .Update.Available}}<a class="v2-update-badge" href="/?view=maintenance#v2-update-panel" {{trTitle "Nuova versione disponibile: apri Manutenzione"}}><span aria-hidden="true">⬆️</span><span class="v2-update-badge-label">{{tr "Aggiornamento disponibile"}}</span></a>{{end}}
-<a class="v2-donate" href="https://www.paypal.com/cgi-bin/webscr?cmd=_donations&business=azanzani@gmail.com&item_name=Support+Gextto+Project" target="_blank" rel="noopener noreferrer" {{trTitle "Sostieni Gextto con una donazione PayPal"}} aria-label="{{tr "Sostieni Gextto con una donazione PayPal"}}"><span class="v2-donate-icon" aria-hidden="true">{{icon "i-heart"}}</span><span class="v2-donate-label">{{tr "Dona"}}</span></a>
+<a class="v2-donate" href="https://www.paypal.com/cgi-bin/webscr?cmd=_donations&business=azanzani@gmail.com&item_name=Support+Gextto+Project" target="_blank" rel="noopener noreferrer" aria-label="{{tr "Sostieni Gextto con una donazione PayPal"}}"><span class="v2-donate-icon" aria-hidden="true">{{icon "i-heart"}}</span><span class="v2-donate-label">{{tr "Dona"}}</span></a>
 </body>
 </html>{{end}}
 

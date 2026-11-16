@@ -169,6 +169,7 @@ const (
 	settingMaintenanceWindowEnd             = "maintenance_window_end"
 	settingMaintenanceHeavyInWindow         = "maintenance_heavy_in_window"
 	settingMaintenanceDb                    = "maintenance_db"
+	settingMaintenanceArchiveDedup          = "maintenance_archive_dedup"
 	settingMaintenanceAudioLibrary          = "maintenance_audio_library"
 	settingMediaInfoBackfillEnabled         = "media_info_backfill_enabled"
 	settingMediaInfoBackfillIntervalMinutes = "media_info_backfill_interval_minutes"
@@ -419,6 +420,7 @@ var settingKeyNames = []string{
 	"maintenance_window_end",
 	"maintenance_heavy_in_window",
 	"maintenance_db",
+	"maintenance_archive_dedup",
 	"maintenance_audio_library",
 	"media_info_backfill_enabled",
 	"media_info_backfill_interval_minutes",

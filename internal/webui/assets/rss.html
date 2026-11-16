@@ -153,7 +153,7 @@ textarea.json{width:100%;font:12.5px/1.45 var(--mono)}
 <dialog id="dlg-feed" aria-labelledby="dlg-feed-title">
   <form method="post" action="/ui/rss-feed" id="feed-form">
     <input type="hidden" name="op" value="add"><input type="hidden" name="index" id="feed-index">
-    <div class="dlg-head"><h2 id="dlg-feed-title">{{tr "New feed"}}</h2><button type="button" class="ghost icon" data-close aria-label="{{tr "Close"}}" title="{{tr "Close"}}"><svg class="i"><use href="/assets/icons.svg#i-x"/></svg></button></div>
+    <div class="dlg-head"><h2 id="dlg-feed-title">{{tr "New feed"}}</h2><button type="button" class="ghost icon" data-close aria-label="{{tr "Close"}}"><svg class="i"><use href="/assets/icons.svg#i-x"/></svg></button></div>
     <div class="dlg-body">
       <div class="fsec">
         <label class="field">{{tr "Name"}}<input type="text" name="name" placeholder="{{tr "Feed name"}}" autocomplete="off" required title="{{tr "Feed name"}}"></label>
@@ -193,7 +193,7 @@ textarea.json{width:100%;font:12.5px/1.45 var(--mono)}
 <dialog id="dlg-rule" class="wide" aria-labelledby="dlg-rule-title">
   <form method="post" action="/ui/rss-rule" id="rule-form">
     <input type="hidden" name="op" value="add"><input type="hidden" name="index" id="rule-index">
-    <div class="dlg-head"><h2 id="dlg-rule-title">{{tr "New rule"}}</h2><button type="button" class="ghost icon" data-close aria-label="{{tr "Close"}}" title="{{tr "Close"}}"><svg class="i"><use href="/assets/icons.svg#i-x"/></svg></button></div>
+    <div class="dlg-head"><h2 id="dlg-rule-title">{{tr "New rule"}}</h2><button type="button" class="ghost icon" data-close aria-label="{{tr "Close"}}"><svg class="i"><use href="/assets/icons.svg#i-x"/></svg></button></div>
     <div class="dlg-body">
       <div class="fsec" id="rule-presets">
         <h3>{{tr "Presets"}}</h3>
@@ -288,7 +288,7 @@ textarea.json{width:100%;font:12.5px/1.45 var(--mono)}
 <dialog id="dlg-indexer" aria-labelledby="dlg-indexer-title">
   <form method="post" action="/ui/rss-indexer" id="indexer-form">
     <input type="hidden" name="op" value="add"><input type="hidden" name="index" id="indexer-index">
-    <div class="dlg-head"><h2 id="dlg-indexer-title">{{tr "New indexer"}}</h2><button type="button" class="ghost icon" data-close aria-label="{{tr "Close"}}" title="{{tr "Close"}}"><svg class="i"><use href="/assets/icons.svg#i-x"/></svg></button></div>
+    <div class="dlg-head"><h2 id="dlg-indexer-title">{{tr "New indexer"}}</h2><button type="button" class="ghost icon" data-close aria-label="{{tr "Close"}}"><svg class="i"><use href="/assets/icons.svg#i-x"/></svg></button></div>
     <div class="dlg-body">
       <label class="field">{{tr "Type"}}<select name="type" id="indexer-type" title="{{tr "Indexer service type"}}">{{.INDEXEROPTIONS}}</select></label>
       <label class="field">{{tr "Name"}}<input type="text" name="name" id="indexer-name" placeholder="prowlarr" autocomplete="off" required title="{{tr "Indexer name"}}"></label>
@@ -305,12 +305,12 @@ textarea.json{width:100%;font:12.5px/1.45 var(--mono)}
 
 <!-- Feed items -->
 <dialog id="dlg-items" class="wide" aria-labelledby="dlg-items-title">
-  <div class="dlg-head"><h2 id="dlg-items-title">{{tr "Feed items"}}</h2><button type="button" class="ghost icon" data-close aria-label="{{tr "Close"}}" title="{{tr "Close"}}"><svg class="i"><use href="/assets/icons.svg#i-x"/></svg></button></div>
+  <div class="dlg-head"><h2 id="dlg-items-title">{{tr "Feed items"}}</h2><button type="button" class="ghost icon" data-close aria-label="{{tr "Close"}}"><svg class="i"><use href="/assets/icons.svg#i-x"/></svg></button></div>
   <div class="dlg-body">
     <p class="muted m-0" id="items-info" aria-live="polite"></p>
     <div class="preview itemsview max-h-60" id="items" tabindex="0" role="region" aria-label="{{tr "Feed items"}}"></div>
   </div>
-  <div class="dlg-foot"><button type="button" data-close title="{{tr "Close"}}">{{tr "Close"}}</button></div>
+  <div class="dlg-foot"><button type="button" data-close>{{tr "Close"}}</button></div>
 </dialog>
 
 <datalist id="feednames"></datalist>

@@ -127,6 +127,12 @@ advance, the background of a theme preview — rides as a custom property
 in the stylesheet. A new literal colour in a component rule is a new token in
 the palette.
 
+A tooltip speaks: it explains what pressing the control does or what the value
+means, and it never repeats the label. A tooltip identical to its label fails
+`TestV2TooltipsDoNotRepeatTheirLabel` (and `TestDaemonTooltipsDoNotRepeatTheirLabel`
+for the daemon page); one that is only the label plus a word is the same mistake
+written by hand, so it is fixed in the same commit as the control it belongs to.
+
 A symbol of the interface is a `<symbol>` of `uiweb/v2/static/icons.svg` drawn
 with `{{icon "i-name"}}` (the daemon has its own sprite), never an emoji typed
 inside a label: an emoji is a font glyph whose shape changes from one system to

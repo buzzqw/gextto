@@ -30,6 +30,10 @@ type v2NightMaintenanceView struct {
 	DBCheckedAt  string
 	DBProblems   []string
 	DBError      string
+	ArchiveOn    bool
+	ArchiveAt    string
+	ArchiveCut   int64
+	ArchiveError string
 	AudioOn      bool
 	AudioAt      string
 	AudioChecked int
@@ -92,6 +96,10 @@ func v2NightMaintenanceViewFrom(s *AppState) v2NightMaintenanceView {
 		DBProblems:   status.DB.Problems,
 		DBError:      status.DB.ErrorMessage,
 		DBCompacted:  strings.Join(status.DB.Compacted, ", "),
+		ArchiveOn:    maintenanceArchiveDedupEnabled(cfg),
+		ArchiveAt:    v2NightTime(status.Archive.At),
+		ArchiveCut:   status.Archive.Removed,
+		ArchiveError: status.Archive.ErrorMessage,
 		AudioOn:      maintenanceAudioLibraryEnabled(cfg),
 		AudioAt:      v2NightTime(status.Audio.At),
 		AudioChecked: status.Audio.Checked,

@@ -491,7 +491,7 @@ body{display:flex;flex-direction:column;overflow:hidden}
 <div class="menu" id="queue-menu" role="menu" aria-label="{{tr "Queue"}}" hidden>
   <button type="button" role="menuitem" data-act="top" title="{{tr "Move to the top of the queue"}}"><svg class="i"><use href="#i-top"/></svg>{{tr "Move to top"}}</button>
   <button type="button" role="menuitem" data-act="up" title="{{tr "Move up in the queue"}}"><svg class="i"><use href="#i-up"/></svg>{{tr "Move up"}}</button>
-  <button type="button" role="menuitem" data-act="down" title="{{tr "Move down in the queue"}}"><svg class="i"><use href="#i-down"/></svg>{{tr "Move down"}}</button>
+  <button type="button" role="menuitem" data-act="down" title="{{tr "Move it further down the queue"}}"><svg class="i"><use href="#i-down"/></svg>{{tr "Move down"}}</button>
   <button type="button" role="menuitem" data-act="bottom" title="{{tr "Move to the bottom of the queue"}}"><svg class="i"><use href="#i-bottom"/></svg>{{tr "Move to bottom"}}</button>
 </div>
 
@@ -563,7 +563,7 @@ body{display:flex;flex-direction:column;overflow:hidden}
       <div class="row"><span>{{tr "Close panel"}}</span><strong>{{tr "Esc"}}</strong></div>
     </div>
   </div>
-  <div class="dlg-foot"><button type="button" class="primary" data-close title="{{tr "Close"}}">{{tr "Close"}}</button></div>
+  <div class="dlg-foot"><button type="button" class="primary" data-close>{{tr "Close"}}</button></div>
 </dialog>
 
 {{.UpdateNotes}}
@@ -2025,7 +2025,7 @@ window.gxClearFilters=function(){state.filter={status:'all',cat:null,tag:null,tr
     <span class="spacer"></span>
     {{if .UpdateAvailable}}<a class="sb-update" href="/ui/settings#maintenance" title="{{tr "A new version of gx-torrent is available: open Settings, Maintenance to see the changes and install it"}}"><span class="dot warn" aria-hidden="true"></span><span>{{tr "Update available"}}</span>{{if .UpdateDate}} <span class="subtle">{{.UpdateDate}}</span>{{end}}</a>{{end}}
     {{if .Standalone}}<button type="button" class="sb-alt" role="switch" aria-checked="{{if .AltSpeed}}true{{else}}false{{end}}" data-alt-speed title="{{tr "Toggle the alternative speed limits (the scheduler's window or the configured alternative limits)"}}"><svg class="i"><use href="#i-clock"/></svg><span class="hide-m">{{tr "Alternative limits"}}</span></button>{{end}}
-    <span class="sb-tot hide-m" title="{{tr "Downloaded / uploaded since start"}}"><span class="sr-only">{{tr "Downloaded / uploaded since start"}}:</span><span class="d" aria-hidden="true">↓</span> <b>{{bytes .TotalDown}}</b> <span class="u" aria-hidden="true">↑</span> <b>{{bytes .TotalUp}}</b></span>
+    <span class="sb-tot hide-m"><span class="sr-only">{{tr "Downloaded / uploaded since start"}}:</span><span class="d" aria-hidden="true">↓</span> <b>{{bytes .TotalDown}}</b> <span class="u" aria-hidden="true">↑</span> <b>{{bytes .TotalUp}}</b></span>
     <button type="button" class="sb-btn" data-global-limits data-dl="{{.GlobalDownKib}}" data-ul="{{.GlobalUpKib}}" data-down="{{.DownRateRaw}}" data-up="{{.UpRateRaw}}" data-down-s="{{.DownloadRate}}" data-up-s="{{.UploadRate}}" title="{{tr "Download and upload speed with the global limits: click to change the limits"}}"><svg class="i d"><use href="#i-down"/></svg><b>{{.DownloadRate}}</b><span class="subtle">({{kibrate .GlobalDownKib}})</span><svg class="i u"><use href="#i-up"/></svg><b>{{.UploadRate}}</b><span class="subtle">({{kibrate .GlobalUpKib}})</span></button>
     <button type="button" class="sb-btn" id="sb-more-btn" aria-expanded="false" aria-controls="sb-more" aria-label="{{tr "Connection details"}}" title="{{tr "Connection details: totals, IP filter, encryption, process"}}"><svg class="i"><use href="#i-info"/></svg></button>
 {{end}}{{define "sbmore"}}
