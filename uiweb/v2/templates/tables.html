@@ -49,13 +49,15 @@
 {{end}}
 
 {{define "v2_library_cards"}}
-<div class="tmdb-grid library-cards" id="v2-table-body-{{.View}}">
+<div class="library-cards" id="v2-table-body-{{.View}}" role="list">
   {{if not .Cards}}<p class="hint">{{tr .Empty}}</p>{{end}}
   {{range .Cards}}
-  <article class="tmdb-card">
-    <a class="tmdb-poster{{if not .Poster}} placeholder{{end}}" href="{{.Link}}" {{trTitle "Apri il dettaglio"}} aria-hidden="{{if .Poster}}false{{else}}true{{end}}">{{if .Poster}}<img src="{{.Poster}}" alt="" loading="lazy" />{{else}}<span>▤</span>{{end}}</a>
-    <div class="tmdb-card-body">
-      <strong><a href="{{.Link}}">{{tr .Name}}</a></strong>
+  <article class="library-card" role="listitem">
+    <a class="library-card-poster{{if not .Poster}} placeholder{{end}}" href="{{.Link}}" {{trTitle "Apri il dettaglio"}} aria-hidden="{{if .Poster}}false{{else}}true{{end}}">{{if .Poster}}<img src="{{.Poster}}" alt="" loading="lazy" />{{else}}<span aria-hidden="true">▤</span>{{end}}{{if .Badges}}<span class="library-card-badges">{{range $i, $b := .Badges}}<span class="library-card-badge"{{if $b.Label}} {{trTitle $b.Label}}{{end}}>{{tr $b.Value}}</span>{{end}}</span>{{end}}</a>
+    <div class="library-card-body">
+      <strong class="library-card-title"><a href="{{.Link}}">{{tr .Name}}</a></strong>
+      {{/* The completion bar takes a line of its own: it is the reason the
+           card is read at a glance. */}}
       <div class="card-meta">{{range $i, $m := .Meta}}{{if $i}}<span class="card-meta-sep" aria-hidden="true">·</span>{{end}}<span class="card-meta-item"{{if $m.Label}} {{trTitle $m.Label}}{{end}}>{{tr $m.Value}}</span>{{end}}</div>
     </div>
   </article>

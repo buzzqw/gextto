@@ -3,6 +3,7 @@
 # key is inserted and a corrected value replaces the stored one. Keys are the
 # Italian source strings used with `ctx_tr`.
 eng:
+  "Rimette subito la puntata in ricerca: toglie l'attesa fra due tentativi e l'eventuale «ignorato», senza toccare i file già in archivio. La ricerca riparte al ciclo successivo.": "Puts the episode back in the search at once: it clears the wait between two attempts and any «ignored» mark, without touching the files already in the archive. The search starts again at the next cycle."
   "Documentazione": "Documentation"
   "Episodi archiviati": "Episodes archived"
   "Sorgenti in archivio": "Sources in the archive"

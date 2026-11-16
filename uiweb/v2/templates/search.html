@@ -2,7 +2,7 @@
 <div class="view">
   <div class="panel">
     <div class="panel-head"><h3>{{tr "Calendario TMDB"}}</h3><small class="muted">{{tr "Prossime uscite"}}</small></div>
-    <div class="panel-body" hx-get="/tmdb/calendar" hx-trigger="load" hx-swap="innerHTML"><p class="muted">{{tr "Caricamento…"}}</p></div>
+    <div class="panel-body" hx-get="/tmdb/calendar" hx-trigger="load" hx-swap="innerHTML">{{template "v2_skeleton"}}</div>
   </div>
   <div class="panel">
     <div class="panel-head"><h3>{{tr "Di tendenza su TMDB"}}</h3><small class="muted">{{tr "Serie TV e film"}}</small></div>
@@ -19,7 +19,7 @@
          <form class="v2-discover-choice" data-v2-discover-choice="now_playing:week" hx-post="/tmdb/discover" hx-target="#v2-tmdb-results" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="kind" value="series" data-v2-discover-kind-input /><input type="hidden" name="window" value="week" /><button class="btn sm" type="submit" name="mode" value="now_playing">{{tr "In programmazione"}}</button></form>
          <form class="v2-discover-choice" data-v2-discover-choice="upcoming:week" hx-post="/tmdb/discover" hx-target="#v2-tmdb-results" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="kind" value="series" data-v2-discover-kind-input /><input type="hidden" name="window" value="week" /><button class="btn sm" type="submit" name="mode" value="upcoming">{{tr "Prossime uscite"}}</button></form>
       </div>
-      <div id="v2-tmdb-results" class="tmdb-results" aria-live="polite" hx-post="/tmdb/discover" hx-vals='{"kind":"series","mode":"trending","window":"week"}' hx-trigger="load" hx-swap="innerHTML"><p class="muted">{{tr "Caricamento…"}}</p></div>
+      <div id="v2-tmdb-results" class="tmdb-results" aria-live="polite" hx-post="/tmdb/discover" hx-vals='{"kind":"series","mode":"trending","window":"week"}' hx-trigger="load" hx-swap="innerHTML">{{template "v2_skeleton"}}</div>
     </div>
   </div>
   <div class="panel">

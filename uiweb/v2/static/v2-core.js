@@ -391,6 +391,15 @@
 
   document.addEventListener("keydown", function (event) {
     if (event.key !== "Escape") return;
+    // The add-torrent panel floats over the page: Escape closes it first, the
+    // way it closes a dialog, and the button that opened it keeps the focus.
+    var addPanel = document.getElementById("v2-add-torrent");
+    if (addPanel && addPanel.hasAttribute("open")) {
+      addPanel.removeAttribute("open");
+      var opener = document.querySelector("[data-add-torrent-toggle]");
+      if (opener) { try { opener.focus(); } catch (error) { /* ignore */ } }
+      return;
+    }
     var group = document.getElementById("app-system-menu");
     if (group && group.classList.contains("open")) {
       setSystemMenu(false);
@@ -2120,11 +2129,10 @@
   }
 
   // The top-bar "Aggiungi torrent" button is on every page. On Scarico it
-  // toggles the form; elsewhere it goes to Scarico with the form already open
+  // toggles the panel; elsewhere it goes to Scarico with the panel already open
   // (the anchor, since the ?add= parameter already carries a shared link).
   function focusAddTorrent(panel) {
     var field = panel.querySelector('input[name="magnet"]');
-    try { panel.scrollIntoView({ block: "nearest", behavior: "smooth" }); } catch (error) { /* ignore */ }
     if (field) { try { field.focus(); } catch (error) { /* ignore */ } }
   }
   document.addEventListener("click", function (event) {

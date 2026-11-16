@@ -25,7 +25,7 @@
   </div>
     <div class="panel dashboard-problems-panel">
     <div class="panel-head"><h3>{{tr "Da controllare"}}</h3><small class="muted">{{tr "Download fermi, spostamenti in sospeso e avvisi"}}</small></div>
-    <div class="panel-body" id="v2-dashboard-problems" data-v2-poll hx-get="/dashboard/problems" hx-trigger="load, every 60s [window.gexttoCanPoll()], v2wake" hx-swap="innerHTML"><p class="muted">{{tr "Caricamento…"}}</p></div>
+    <div class="panel-body" id="v2-dashboard-problems" data-v2-poll hx-get="/dashboard/problems" hx-trigger="load, every 60s [window.gexttoCanPoll()], v2wake" hx-swap="innerHTML">{{template "v2_skeleton"}}</div>
   </div>
   <div class="panel dashboard-cycle-panel">
     <div class="panel-head"><h3>{{tr "Ricerca automatica"}}</h3><small class="muted">{{tr "Serie TV, film e fumetti · riempimento gap"}}</small></div>

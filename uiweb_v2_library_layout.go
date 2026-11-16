@@ -50,6 +50,10 @@ type v2CardItem struct {
 	Name   string
 	Link   string
 	Poster string
+	// Badges are the technical marks drawn over the poster (quality, language):
+	// the two values that decide whether a title is the copy wanted, readable
+	// without opening the card.
+	Badges []v2CardMeta
 	// Meta holds the title's cells, in the order of v2CardMetaKeys: each is
 	// formatted by the table, so no second set of labels has to be translated.
 	Meta []v2CardMeta
@@ -159,7 +163,15 @@ func v2LibraryCardsFrom(ctx context.Context, s *AppState, base string, items []m
 		for _, field := range v2CardMetaFields(base) {
 			if column, ok := v2CardColumn(columns, field); ok {
 				if html := v2FormatCell(item, column); strings.TrimSpace(string(html)) != "" && string(html) != "—" {
-					card.Meta = append(card.Meta, v2CardMeta{Value: v2TranslateFragment(s, html), Label: column.Label})
+					meta := v2CardMeta{Value: v2TranslateFragment(s, html), Label: column.Label}
+					// Quality and language are the marks of the poster: drawn
+					// over the image, they say whether a title is the copy
+					// wanted without reading the line below it.
+					if field.Key == "quality" || field.Key == "language" {
+						card.Badges = append(card.Badges, meta)
+						continue
+					}
+					card.Meta = append(card.Meta, meta)
 				}
 			}
 		}

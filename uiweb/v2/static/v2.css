@@ -1525,13 +1525,25 @@ details.add-torrent-panel > summary::-webkit-details-marker { display: none; }
   #app-sidebar .nav-more { min-height: 50px; font-size: 0.72rem; padding: 4px 0; letter-spacing: -0.01em; }
   #app-sidebar .nav-more-indicator { display: none; }
   /* "Dashboard" is the longest label: a touch smaller so it fits its column. */
-  #app-sidebar .nav-item[data-nav="dashboard"] { font-size: 0.64rem; letter-spacing: -0.02em; }
-  /* On a 320px phone six columns leave ~53px each: the labels used to run past
-     their column and the first and last were cut by the screen edge. */
+  #app-sidebar .nav-item[data-nav="dashboard"] { font-size: 0.7rem; letter-spacing: -0.03em; }
+  /* On a 320px phone six columns leave about 50 pixels each: there is no room
+     for a word at a readable size, and 8.5 px is not read, it is guessed. The
+     labels step aside and the symbols stay; the name is still announced. */
   @media (max-width: 360px) {
     #app-sidebar .nav-item,
-    #app-sidebar .nav-more { font-size: 0.62rem; letter-spacing: -0.03em; padding: 4px 1px; }
-    #app-sidebar .nav-item[data-nav="dashboard"] { font-size: 0.53rem; }
+    #app-sidebar .nav-more { padding: 6px 1px; }
+    #app-sidebar .nav-group:not(.system-group) > .nav-item > span:not(.nav-icon):not(.nav-count),
+    #app-sidebar .nav-more > span:not(.nav-icon):not(.nav-count) {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      margin: -1px;
+      padding: 0;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+      border: 0;
+    }
   }
   #app-sidebar .nav-item.has-news { position: relative; }
   /* Downloads in progress: a small counter on the Scarico icon. */
@@ -2582,6 +2594,10 @@ body.v2-drop-active main {
  * The phone bar is untouched: it keeps its grid, its icons and its labels.
  * ==================================================================== */
 .nav-docs { display: none; }
+/* The phone bar is a grid of its own (`.sidebar nav`): the documentation block
+   is a nav too, so the id keeps it out of that rule until the sidebar is
+   vertical. */
+#app-sidebar nav.nav-docs { display: none; }
 
 @media (min-width: 901px) {
   /* The list of destinations is the only part that scrolls: the brand, the
@@ -2626,7 +2642,7 @@ body.v2-drop-active main {
      does not spend a row on it. */
   #app-sidebar .nav-search { display: none; }
 
-  #app-sidebar .nav-docs {
+  #app-sidebar nav.nav-docs {
     display: flex;
     flex-direction: row;
     flex-wrap: wrap;
@@ -2738,4 +2754,161 @@ body.v2-drop-active main {
 .series-episodes td.row-actions .v2-menu { display: inline-block; }
 @media (min-width: 901px) {
   .table-wrap:has(> table.series-episodes) { overflow: visible; }
+}
+
+/* ======================================================================
+ * Library as a wall of posters.
+ *
+ * Series and Movies can be read as a table or as one poster per title. The
+ * poster is 2:3 like the artwork, carries quality and language over the image
+ * and the completion bar under the title, and lifts by three pixels under the
+ * pointer: a collection is browsed by eye before it is searched.
+ * ==================================================================== */
+.library-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(152px, 1fr));
+  gap: 18px 16px;
+  margin-top: 12px;
+}
+.library-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.library-card-poster {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 2 / 3;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+.library-card-poster img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.library-card-poster.placeholder { display: grid; place-items: center; color: var(--muted); font-size: 1.6rem; }
+.library-card-poster:hover,
+.library-card-poster:focus-visible {
+  transform: translateY(-3px);
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+  box-shadow: 0 12px 26px rgba(2, 8, 23, 0.45);
+}
+@media (prefers-reduced-motion: reduce) {
+  .library-card-poster { transition: none; }
+  .library-card-poster:hover,
+  .library-card-poster:focus-visible { transform: none; }
+}
+/* The badges sit on the artwork in a satin pane, legible on any poster. */
+.library-card-badges {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px;
+  max-width: calc(100% - 12px);
+}
+.library-card-badge {
+  padding: 2px 6px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  background: rgba(6, 12, 22, 0.72);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  color: #f3f7ff;
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1.35;
+  white-space: nowrap;
+}
+.library-card-body { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.library-card-title { font-size: 0.9rem; line-height: 1.3; }
+.library-card-title a {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  color: var(--text);
+  text-decoration: none;
+}
+.library-card-title a:hover,
+.library-card-title a:focus-visible { color: var(--accent); text-decoration: underline; }
+.library-cards .card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 3px 6px;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+.library-cards .card-meta-sep { color: var(--muted); }
+.library-cards .card-meta .badge { font-size: 0.74rem; }
+/* The completion bar takes a line of its own under the meta. */
+.library-cards .card-meta .pbar { flex: 1 1 100%; min-width: 0; margin-top: 2px; }
+.library-cards .card-meta .pbar progress { width: 100%; }
+@media (max-width: 560px) {
+  .library-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 10px; }
+}
+
+/* ======================================================================
+ * «Aggiungi torrent»: a panel over the page.
+ *
+ * The form used to open inside the page and push the queue down; it now floats
+ * over the content, with the page dimmed by its own shadow (no extra element,
+ * nothing to keep in sync). It stays a <details>, so it opens with a click even
+ * with the script off, its summary closes it, and Escape does too.
+ * ==================================================================== */
+.add-torrent-panel[open] {
+  position: fixed;
+  z-index: 60;
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+  width: min(820px, calc(100vw - 32px));
+  max-height: min(84vh, 760px);
+  overflow: auto;
+  margin: 0;
+  box-shadow: 0 0 0 100vmax rgba(4, 18, 31, 0.62), var(--shadow);
+}
+.add-torrent-panel[open] > summary { cursor: pointer; }
+@media (max-width: 900px) {
+  /* A sheet from the bottom on a phone: the width is the screen, the rounded
+     corners are on top, and it stops above the menu bar. */
+  .add-torrent-panel[open] {
+    left: 0;
+    right: 0;
+    bottom: calc(64px + env(safe-area-inset-bottom));
+    transform: none;
+    width: auto;
+    max-height: min(86vh, 760px);
+    border-radius: var(--radius) var(--radius) 0 0;
+    box-shadow: 0 0 0 100vmax rgba(4, 18, 31, 0.68), 0 -10px 30px rgba(2, 8, 23, 0.5);
+  }
+}
+
+/* ======================================================================
+ * A list that is still arriving: three shimmering lines in the shape of the
+ * rows that will replace them, so the page does not jump. The words stay for
+ * screen readers; the movement stops for those who ask it.
+ * ==================================================================== */
+.skeleton-list { display: flex; flex-direction: column; gap: 8px; padding: 4px 0; }
+.skeleton-line {
+  display: block;
+  height: 12px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, var(--surface-2) 25%, var(--surface-3) 50%, var(--surface-2) 75%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s linear infinite;
+}
+.skeleton-line.w-80 { width: 80%; }
+.skeleton-line.w-60 { width: 60%; }
+@keyframes skeleton-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-line { animation: none; }
 }

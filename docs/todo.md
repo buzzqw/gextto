@@ -29,7 +29,6 @@ still be true after the item lands does not belong here.
 
 Each waits for the operator's choice.
 
-- **Phone labels in the bottom bar**: at 360 pixels and below the six columns push «Dashboard» to 0.53rem (about 8.5 px) to make it fit; a shorter label on a phone, or one column fewer, would keep every label at 11 px. Gate: the operator's choice.
 - **MCP endpoint**: Gextto's API exposed as tools for an assistant, with a read-only switch. Gate: the operator's choice.
 - **Usenet as an acquisition source**: NZB search through the same indexers and an NNTP download path into the same import. Gate: the operator's choice.
 - **Blocklist "Motivo" in words**: the column shows the internal code (`stalled_ed2k`, `dead_swarm`, `corrupt_file`, `unsafe_payload`) instead of a sentence translated in every language, which the log now writes. Gate: the operator's choice.

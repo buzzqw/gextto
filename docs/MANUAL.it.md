@@ -321,7 +321,13 @@ suggerimento del mouse che mostra il resto. Ogni azione resta raggiungibile col
 tocco, e pulsanti e voci di menu arrivano a 44 pixel, la misura più piccola che
 un dito colpisce senza sbagliare. Tema, dimensione del testo, carattere e lingua
 sono nel menu **Aspetto** della barra in alto, così sul telefono la barra tiene
-solo il titolo, **＋** e **Aggiorna**; **Dona** è nel menu *Altro*. Nelle
+solo il titolo, **＋** e **Aggiorna**; **Dona** è nel menu *Altro*. Su uno
+schermo molto stretto (360 pixel e meno) le etichette della barra in basso
+lasciano il posto ai soli simboli: sei colonne da 50 pixel non contengono una
+parola leggibile, e un testo da 8 pixel si indovina invece di leggerlo. Il nome
+resta annunciato alle tecnologie assistive. Le liste che si caricano da sole
+mostrano intanto la forma di ciò che sta per comparire — tre righe che scorrono —
+al posto della scritta «Caricamento…». Nelle
 liste **Serie TV** e **Film** ogni titolo è una scheda: nome e stato su una
 riga, **Pausa** ed **Elimina** affiancati sotto. Nella **Dashboard**, quando
 negli ultimi 30 minuti non si è trasferito nulla, al posto del grafico della
@@ -446,7 +452,9 @@ ogni puntata hai due pulsanti e un menu:
 - **🔍 cercarla**: la ricerca si apre in un riquadro sotto la puntata e dice a
   che punto è (quante sorgenti sta interrogando, quante hanno risposto, quando
   passa a eD2k);
-- **⤒ forzarla**: la scarica subito, senza aspettare il ciclo;
+- **⤒ forzarla**: la rimette in ricerca al ciclo successivo, togliendo l'attesa
+  fra due tentativi e l'eventuale «ignorato»; i file già in archivio non vengono
+  toccati (per sostituire un file usa *Riscarica*);
 - il menu **⋯** con le azioni meno frequenti, scritte per esteso: *Sorgenti in
   archivio* (cosa c'è già sul disco), *Storia dei download* (tutti gli eventi di
   quel download, vedi
@@ -617,8 +625,13 @@ quando lo spostamento non è registrato.
 ### Elenco o locandine
 
 Sopra le tabelle di *Serie TV* e *Film* il selettore **Elenco / Locandine**
-cambia la vista: *Locandine* mostra una card per titolo con copertina, qualità,
-lingua e stato. La scelta vale per entrambe le pagine ed è ricordata.
+cambia la vista: *Locandine* mostra una parete di copertine in proporzione 2:3,
+qualche decina per pagina, con il titolo sotto (fino a due righe) e una barra di
+completamento. Qualità e lingua stanno **sopra la copertina**, in due targhette
+leggibili su qualunque immagine, così si riconosce al volo la copia giusta senza
+aprire la scheda. Passando il mouse (o col focus da tastiera) la copertina si
+solleva di tre pixel e si illumina di bordo. La scelta vale per entrambe le
+pagine ed è ricordata.
 
 ### Modificare più titoli insieme
 
@@ -705,7 +718,10 @@ sceglie solo tra le release che hanno superato tutti i controlli.
 ### Aggiungere un torrent o un magnet
 
 **Aggiungi torrent**, nella barra in alto di ogni pagina, accetta un magnet, un
-URL `.torrent` o un file `.torrent`. In **Scarico** ci sono due scorciatoie:
+URL `.torrent` o un file `.torrent`. Il modulo si apre **sopra la pagina**, in un
+pannello che lascia intravedere la coda dietro di sé invece di spingerla in
+basso; si chiude con `Esc`, con il suo stesso titolo o col pulsante in alto, che
+resta l'unico modo per aprirlo. In **Scarico** ci sono due scorciatoie:
 trascina un file `.torrent` in un punto qualsiasi della pagina, oppure incolla
 un link magnet (`Ctrl+V`) quando nessun campo ha il focus. In entrambi i casi il
 modulo si compila, si apre e il focus va su **Aggiungi**, così puoi ancora

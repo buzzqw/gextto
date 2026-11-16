@@ -177,3 +177,7 @@
 {{define "v2_ftp_test_result"}}<span class="{{if .OK}}htx-status ok{{else}}htx-status err{{end}}">{{tr .Message}}</span>{{end}}
 {{define "v2_source_test_result"}}{{if .Items}}<span class="htx-status">{{len .Items}} <span>{{tr "sorgenti verificate"}}</span></span>{{else}}<span class="htx-status err">{{tr "Nessun risultato"}}</span>{{end}}{{end}}
 {{define "v2_list_test_result"}}<span class="htx-status {{if .OK}}ok{{else}}err{{end}}">{{tr .Message}}</span>{{end}}
+
+{{/* A list that is still arriving: the shape of what will be there, so the page
+     does not jump when the rows land. The text stays for screen readers. */}}
+{{define "v2_skeleton"}}<div class="skeleton-list" aria-hidden="true"><span class="skeleton-line"></span><span class="skeleton-line w-80"></span><span class="skeleton-line w-60"></span></div><p class="sr-only">{{tr "Caricamento…"}}</p>{{end}}

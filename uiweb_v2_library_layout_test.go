@@ -63,7 +63,7 @@ func TestV2LibraryLayoutSwitchAndCards(t *testing.T) {
 	if !strings.Contains(body, "layout=cards") || !strings.Contains(body, "Locandine") {
 		t.Fatal("the list does not offer the poster view")
 	}
-	if strings.Contains(body, `class="tmdb-grid library-cards"`) {
+	if strings.Contains(body, `class="library-cards"`) {
 		t.Fatal("the list must not render the cards")
 	}
 
@@ -74,7 +74,8 @@ func TestV2LibraryLayoutSwitchAndCards(t *testing.T) {
 		t.Fatalf("movies cards -> %d", code)
 	}
 	for _, marker := range []string{
-		`class="tmdb-grid library-cards"`,
+		`class="library-cards"`,
+		`class="library-card-poster`, 
 		"https://image.tmdb.org/t/p/w342/poster.jpg",
 		"Test Movie",
 		"/?view=movies&amp;movie=7",
@@ -105,7 +106,7 @@ func TestV2LibraryLayoutSwitchAndCards(t *testing.T) {
 	}
 	response = v2RequestWithCookie(t, server, "/?view=series", "gx_layout=cards")
 	body = readBody(t, response)
-	if !strings.Contains(body, `class="tmdb-grid library-cards"`) || !strings.Contains(body, "Test Show") {
+	if !strings.Contains(body, `class="library-cards"`) || !strings.Contains(body, "Test Show") {
 		t.Fatal("the remembered layout did not survive to the next page")
 	}
 }
@@ -137,6 +138,24 @@ func TestV2LibraryCardsShowProgressAndStatus(t *testing.T) {
 		if !strings.Contains(body, marker) {
 			t.Fatalf("the card is missing the %q field", marker)
 		}
+	}
+	// The poster is the card: 2:3 artwork with quality and language drawn over
+	// it, the completion bar under the title.
+	for _, marker := range []string{
+		`class="library-cards"`,
+		`class="library-card-poster`,
+		`class="library-card-badges"`,
+		`class="library-card-badge" title="Qualità"`,
+		`class="library-card-badge" title="Lingua"`,
+	} {
+		if !strings.Contains(body, marker) {
+			t.Fatalf("the poster wall is missing %q", marker)
+		}
+	}
+	// Quality and language are on the artwork: they must not be repeated in the
+	// line under it.
+	if strings.Contains(body, `class="card-meta-item" title="Qualità"`) {
+		t.Fatal("quality is repeated under the poster as well as on it")
 	}
 }
 

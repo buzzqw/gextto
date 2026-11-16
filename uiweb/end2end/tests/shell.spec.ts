@@ -47,8 +47,7 @@ test.describe("menu del computer", () => {
     await expect(page.locator(".downloads-search-panel")).not.toHaveAttribute("open", "");
   });
 
-  test("«Aggiorna» sostituisce il contenuto senza ricaricare la pagina", async ({ page }) => {
-    await page.goto("/?view=series");
+  test("«Aggiorna» sostituisce il contenuto senza ricaricare la pagina", async ({ page }) => {    await page.goto("/?view=series");
     await expect(page.locator("#v2-page")).toBeVisible();
     let requests = 0;
     page.on("request", (request) => {
@@ -62,6 +61,38 @@ test.describe("menu del computer", () => {
     expect(survived).toBe(true);
     expect(requests).toBe(0);
     await expect(page.locator("#v2-table-panel-series-t0")).toBeVisible();
+  });
+});
+
+test.describe("locandine", () => {
+  test("la card è una locandina 2:3 con i dati tecnici sopra la copertina", async ({ page }) => {
+    await page.goto("/?view=series");
+    // A card as the server renders it (the test library is empty): the measure
+    // is what the component promises, not what a screenshot happens to show.
+    await page.evaluate(() => {
+      const host = document.querySelector(".content");
+      if (!host) throw new Error("contenuto assente");
+      host.insertAdjacentHTML("beforeend", `<div class="library-cards"><article class="library-card">
+        <a class="library-card-poster" href="/"><span class="library-card-badges">
+          <span class="library-card-badge" title="Qualità">1080p</span><span class="library-card-badge" title="Lingua">ita</span></span></a>
+        <div class="library-card-body"><strong class="library-card-title"><a href="/">Series A</a></strong>
+          <div class="card-meta"><span class="pbar"><progress value="5" max="10"></progress><span class="pbar-value">50%</span></span></div></div>
+      </article></div>`);
+    });
+    const poster = page.locator(".library-card-poster");
+    const box = await poster.boundingBox();
+    if (!box) throw new Error("geometria non disponibile");
+    expect(box.height / box.width).toBeCloseTo(1.5, 1);
+    // The badges are over the artwork, not under it.
+    const badge = page.locator(".library-card-badge").first();
+    const badgeBox = await badge.boundingBox();
+    if (!badgeBox) throw new Error("badge non posizionato");
+    expect(badgeBox.y).toBeGreaterThan(box.y);
+    expect(badgeBox.y + badgeBox.height).toBeLessThan(box.y + box.height);
+    // The completion bar has a line of its own under the title.
+    const bar = page.locator(".card-meta .pbar");
+    await expect(bar).toBeVisible();
+    expect((await bar.boundingBox())!.width).toBeGreaterThan(box.width * 0.8);
   });
 });
 
@@ -103,5 +134,50 @@ test.describe("menu del telefono", () => {
     expect(box.y + box.height).toBeLessThan(844 - 40);
     const width = await page.evaluate(() => window.innerWidth);
     expect(box.width).toBeGreaterThan(width - 24);
+  });
+});
+
+test.describe("aggiunta di un torrent", () => {
+  test.use({ viewport: { width: 1280, height: 800 } });
+
+  test("il modulo si apre sopra la pagina e Escape lo chiude", async ({ page }) => {
+    await page.goto("/?view=downloads");
+    const panel = page.locator("#v2-add-torrent");
+    await expect(panel).toBeHidden();
+    const toggle = page.locator("[data-add-torrent-toggle]");
+    await toggle.click();
+    await expect(panel).toBeVisible();
+    await expect(toggle).toHaveAttribute("aria-expanded", "true");
+    // It floats over the queue instead of pushing it down.
+    const style = await panel.evaluate((element) => {
+      const computed = getComputedStyle(element);
+      return { position: computed.position, zIndex: Number(computed.zIndex), shadow: computed.boxShadow };
+    });
+    expect(style.position).toBe("fixed");
+    expect(style.zIndex).toBeGreaterThan(10);
+    expect(style.shadow).toContain("rgba");
+    // The field to paste into takes the focus.
+    await expect.poll(() => page.evaluate(() => document.activeElement?.getAttribute("name"))).toBe("magnet");
+    await page.keyboard.press("Escape");
+    await expect(panel).toBeHidden();
+    await expect(toggle).toHaveAttribute("aria-expanded", "false");
+    await expect(toggle).toBeFocused();
+  });
+});
+
+test.describe("telefono stretto", () => {
+  test.use({ viewport: { width: 320, height: 700 }, isMobile: true, hasTouch: true });
+
+  test("nella barra restano i simboli, con il nome ancora annunciato", async ({ page }) => {
+    await page.goto("/");
+    // A label at 8.5 px was not read, it was guessed: it steps aside and the
+    // name stays for assistive technology only.
+    const label = page.locator('#app-sidebar .nav-item[data-nav="dashboard"] > span:not(.nav-icon)');
+    const box = await label.boundingBox();
+    expect(box === null || box.width <= 2).toBe(true);
+    await expect(page.getByRole("link", { name: "Dashboard" }).first()).toBeVisible();
+    await expect(page.getByRole("link", { name: "Scarico" }).first()).toBeVisible();
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    expect(overflow).toBeLessThanOrEqual(2);
   });
 });

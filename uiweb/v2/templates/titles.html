@@ -87,7 +87,7 @@
                      and the rest are one step away: seven squares side by side
                      were a lottery under a finger. */}}
                 <button class="btn sm icon-action primary" type="button" hx-post="/series/episode-search?series={{$.PathName}}&amp;season={{.Season}}&amp;episode={{.Episode}}" hx-target="#v2-ep-search-{{.Season}}-{{.Episode}}" hx-swap="innerHTML" hx-disabled-elt="this" data-v2-ep-search-target="v2-ep-search-{{.Season}}-{{.Episode}}" aria-controls="v2-ep-search-{{.Season}}-{{.Episode}}" aria-expanded="false" {{trTitle "Cerca manualmente questa puntata"}} aria-label="{{tr "Cerca %s" (printf "S%vE%v" .Season .Episode)}}"><span aria-hidden="true">{{icon "i-search"}}</span></button>
-                {{template "v2_action_btn" (dict "Redirect" (printf "/?view=series&series=%s" $.PathName) "Path" .ForcePath "Method" "POST" "Body" "{}" "Icon" "i-top" "Aria" "Forza il download" "Class" "icon-action" "Title" "Forza il download")}}
+                {{template "v2_action_btn" (dict "Redirect" (printf "/?view=series&series=%s" $.PathName) "Path" .ForcePath "Method" "POST" "Body" "{}" "Icon" "i-top" "Aria" "Forza il download" "Class" "icon-action" "Title" "Rimette subito la puntata in ricerca: toglie l'attesa fra due tentativi e l'eventuale «ignorato», senza toccare i file già in archivio. La ricerca riparte al ciclo successivo.")}}
                 <details class="v2-menu" data-v2-menu>
                   <summary class="btn sm icon-action" aria-label="{{tr "Altre azioni"}}" {{trTitle "Sorgenti, storia, riscarica, ignora o elimina questa puntata"}}><span aria-hidden="true">{{icon "i-dots"}}</span></summary>
                   <div class="v2-menu-panel v2-menu-end">
@@ -117,7 +117,7 @@
 
   <div class="panel">
     <div class="panel-head"><h3>{{tr "Storia dei download"}}</h3><small class="muted">{{tr "Ultimi 50 eventi; 📜 su una puntata mostra la sua storia completa."}}</small></div>
-    <div class="panel-body" hx-get="/series/history?series={{.PathName}}" hx-trigger="load" hx-swap="innerHTML"><p class="muted">{{tr "Caricamento…"}}</p></div>
+    <div class="panel-body" hx-get="/series/history?series={{.PathName}}" hx-trigger="load" hx-swap="innerHTML">{{template "v2_skeleton"}}</div>
   </div>
 
   <div class="panel">

@@ -322,7 +322,12 @@ show the rest. Every action stays reachable by touch, and buttons and menu rows
 grow to 44 pixels, the smallest size a finger hits reliably. Theme, text size,
 font and language are in the **Appearance** menu of the top bar, so on a phone
 the bar keeps only the title, **＋** and **Refresh**; **Donate** is in the
-*More* menu. In the
+*More* menu. On a very narrow screen (360 pixels and less) the labels of the
+bottom bar give way to the symbols alone: six columns of 50 pixels cannot hold a
+readable word, and text at 8 pixels is guessed rather than read. The name is
+still announced to assistive technology. Lists that load by themselves show the
+shape of what is arriving — three shimmering lines — instead of the words
+"Loading…". In the
 **TV series** and **Movies** lists every title is a card: name and status on
 one line, **Pause** and **Delete** side by side below. On the **Dashboard**,
 when nothing was transferred in the last 30 minutes, one line says so instead
@@ -444,7 +449,9 @@ and a menu:
 - **🔍 search for it**: the search opens in a panel below the episode and tells
   you how far it got (how many sources it is querying, how many answered, when
   it moves on to eD2k);
-- **⤒ force it**: downloads it at once, without waiting for the cycle;
+- **⤒ force it**: puts it back in the search at the next cycle, clearing the
+  wait between two attempts and any "ignored" mark; the files already in the
+  archive are not touched (use *Redownload* to replace a file);
 - the **⋯** menu with the less frequent actions, written out: *Sources in the
   archive* (what is already on disk), *Download history* (every event of that
   download, see
@@ -611,8 +618,12 @@ was not recorded.
 ### List or posters
 
 Above the *TV Series* and *Movies* tables, the **List / Posters** switch
-changes the view: *Posters* shows one card per title with cover, quality,
-language and status. The choice applies to both pages and is remembered.
+changes the view: *Posters* shows a wall of 2:3 covers, a few dozen per page,
+with the title under it (up to two lines) and a completion bar. Quality and
+language sit **on the cover**, in two chips legible on any artwork, so the right
+copy is recognised without opening the title. Under the pointer (or the keyboard
+focus) the cover lifts by three pixels and its border lights up. The choice
+applies to both pages and is remembered.
 
 ### Editing several titles at once
 
@@ -696,9 +707,11 @@ downloads. The score only chooses among the releases that passed every check.
 ### Adding a torrent or a magnet
 
 **Add torrent**, in the top bar of every page, takes a magnet, a `.torrent` URL
-or a `.torrent` file. On **Downloads** there are two shortcuts: drop a
-`.torrent` file anywhere on the page, or paste a magnet link (`Ctrl+V`) while no
-field has the focus. Either one fills the form, opens it and moves the focus to
+or a `.torrent` file. The form opens **over the page**, in a panel that lets the
+queue show behind it instead of pushing it down; `Esc`, its own title or the
+button at the top close it, and that button is the only way in. On **Downloads**
+there are two shortcuts: drop a `.torrent` file anywhere on the page, or paste a
+magnet link (`Ctrl+V`) while no field has the focus. Either one fills the form, opens it and moves the focus to
 **Add**, so you can still look at the options before adding. You can set the save folder, **Download now** (outside
 the queue) and **Do not rename**. With gx-torrent there are also:
 
