@@ -144,14 +144,14 @@ func TestV2JobsRenderProgressAsPercentage(t *testing.T) {
 	if code != http.StatusOK {
 		t.Fatalf("jobs partial -> %d", code)
 	}
-	for _, want := range []string{`width:25%`, `aria-valuenow="25"`, "25%"} {
+	for _, want := range []string{`--pct:25%`, `aria-valuenow="25"`, "25%"} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("running job missing %q in %s", want, body)
 		}
 	}
 
 	state.jobs.SetProgress(job.ID, 1, "")
-	if code, body := v2Request(t, server, http.MethodGet, "/partial/jobs", nil); code != http.StatusOK || !strings.Contains(body, `width:100%`) || !strings.Contains(body, `aria-valuenow="100"`) {
+	if code, body := v2Request(t, server, http.MethodGet, "/partial/jobs", nil); code != http.StatusOK || !strings.Contains(body, `--pct:100%`) || !strings.Contains(body, `aria-valuenow="100"`) {
 		t.Fatalf("finished job is not shown at 100%% -> %d: %s", code, body)
 	}
 }

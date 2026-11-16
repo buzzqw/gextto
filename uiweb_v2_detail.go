@@ -289,7 +289,7 @@ func v2DedupSources(rows []v2SourceRow) []v2SourceRow {
 // search button for that.
 func V2SeriesSources(w http.ResponseWriter, r *http.Request, s *AppState) {
 	all := v2EpisodeResultsView(s, r.FormValue("series"), r.FormValue("season"), r.FormValue("episode"))
-	view := v2SourcesView{Label: all.Label, Hint: "Nessuna release in archivio per questa puntata. Usa 🔍 per cercare online.", Redirect: all.Redirect}
+	view := v2SourcesView{Label: all.Label, Hint: "Nessuna release in archivio per questa puntata. Usa il pulsante Cerca per cercare online.", Redirect: all.Redirect}
 	for _, row := range all.Results {
 		if strings.EqualFold(row.Origin, episodeOriginArchive) {
 			view.Results = append(view.Results, row)

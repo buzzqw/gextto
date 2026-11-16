@@ -446,7 +446,7 @@ Episodes are grouped by season, and every season has its completion bar beside
 the count (`10/10`, green when complete). On each episode you have two buttons
 and a menu:
 
-- **🔍 search for it**: the search opens in a panel below the episode and tells
+- **search for it** (the magnifier icon): the search opens in a panel below the episode and tells
   you how far it got (how many sources it is querying, how many answered, when
   it moves on to eD2k);
 - **⤒ force it**: puts it back in the search at the next cycle, clearing the
@@ -491,7 +491,7 @@ that are still seeding in the transfer folder before moving to the library. If
 the download ends in an error, the episode goes back to the missing list.
 
 If no copy of an episode matches the profile, the list offers the only copy in
-the requested language with the **🆘 last resort** badge: it is the one Gextto
+the requested language with the **last resort** badge (the life-buoy icon): it is the one Gextto
 would take on its own, and an upgrade will replace it as soon as a copy within
 the profile comes out. If that copy is on the blocklist it is not taken: the log
 says why it was blocked and, when the block expires, from which day it will be
@@ -660,7 +660,7 @@ release, or download something you do not follow.
 | **Download**, *Search for a release* | the same, without leaving the downloads page; the block sits under the queue of transfers and opens with one click |
 | **Explore** | titles on TMDB (trending, popular, upcoming) to add; generic release search |
 | **Archive** | the releases seen in the feeds, instantly; online only if you tick *Also search the web* |
-| 🔍 on an episode, **Search now** on a movie | that exact title |
+| the magnifier on an episode, **Search now** on a movie | that exact title |
 
 ### Reading the results
 
@@ -682,7 +682,7 @@ you can inspect them: seeing one does not mean it would be downloaded.
 | Where you add it from | Where it ends |
 |---|---|
 | A free search: **Dashboard**, **Download** (*Search for a release*), **Explore**, a pasted eD2k link, the TUI | it stays in the **transfer folder**, under its own name: it does not go to the library, is not renamed and does not count as an episode or film you have. It is shared within the seed limits and then stopped; you take it out of the session |
-| **Download** on the results of a title you follow, from its page (🔍 on a missing episode, the archive matches of a film), **Queue** on the followed titles of the Dashboard | it goes to the **library**, next to the other episodes or films, like an automatic download |
+| **Download** on the results of a title you follow, from its page (the magnifier on a missing episode, the archive matches of a film), **Queue** on the followed titles of the Dashboard | it goes to the **library**, next to the other episodes or films, like an automatic download |
 
 In the reason column a download of the first row reads *✋ added by hand,
 stays in the transfer folder*.
@@ -738,7 +738,7 @@ changing, adds it and then removes it or renames it `.imported`.
 titles you do not follow. The search starts by itself as you type (from three
 characters; for shorter ones press **Enter**) and is instant. `-word` excludes
 the titles containing it. The same torrent appears only once. From each row you
-can queue (⬇️), open **Why not this one?** (🔍), copy the magnet (🧲) or delete
+can queue (the down arrow), open **Why not this one?** (the magnifier), copy the magnet (the magnet icon) or delete
 the row (🗑️).
 
 - **Also search the web** extends the search to indexers and online engines:
@@ -789,7 +789,7 @@ the engine downloaded and uploaded since it started.
 | Checking | the engine re-reads and verifies the pieces already on disk | wait: the bar shows the check progress (verified pieces out of the total), not the data percentage |
 | Error | the engine reported an error | read the reason before removing it |
 | Archived | the file is in the library | nothing; do not delete the source while it seeds |
-| 📌 pin | forced outside the queue | **Unlock pin** on its page puts it back in the queue |
+| pin (the pushpin icon) | forced outside the queue | **Unlock pin** on its page puts it back in the queue |
 
 ### Acting on downloads
 
@@ -859,7 +859,7 @@ right now and lets you make a temporary **exception** to the rule set in
 - **Custom values…** — download and upload in KiB/s and duration in minutes;
 - **Remove the exception** — back to the rule at once.
 
-The icon tells you what applies: ⚡ an exception (with the minutes left), ⏰ a
+The icon tells you what applies: the bolt for an exception (with the minutes left), the clock for a
 window of the schedule, otherwise the rule. With eD2k active the limit is
 **one line shared** by torrents and aMule (see *Torrents and eD2k together on
 the same file*). See also [Speed and network](#16-speed-and-network).
@@ -1921,7 +1921,7 @@ Start from the series page and press **📜** on the episode:
 
 | What you see | What it means | What to do |
 |---|---|---|
-| *No events* | Gextto never downloaded it | 🔍 on the episode and **Why not this one?**: is the release missing from the sources, or was it rejected by filters, quality, language or delay? Check *Health* too |
+| *No events* | Gextto never downloaded it | the magnifier on the episode and **Why not this one?**: is the release missing from the sources, or was it rejected by filters, quality, language or delay? Check *Health* too |
 | *📥 Downloading* and then nothing | the download is running or stuck | open the torrent in *Download*: «⏸️ is stuck» means few people are sharing; «❌ Gave up» that it was given up and another version will be searched for |
 | *🎉 downloaded* but no 📁 | downloaded but not in the library | look for «still cannot be moved» or «Could not move»: usually the NAS is unreachable, permissions or space. The retries resume by themselves |
 | *discarded as inferior* | the library already had a version at least as good | nothing: this is the expected behaviour |
@@ -2137,7 +2137,7 @@ them.
 | Missing episodes per series in each cycle | Maximum gaps to search per series in one cycle (0 = unlimited). *(0 = unlimited)* Shown only while «Search for missing episodes» is on. |
 | Deep search interval | How many hours between targeted live indexer searches for gaps. *(Unit: hours)* Shown only while «Search for missing episodes» is on. |
 | Deep searches per cycle | Maximum number of live searches per cycle. The episodes never searched online come first, one per series in rotation (each pass starts after the series served last), then the ones searched longest ago. When the torrents have nothing, aMule answers once per season: one search fills every missing episode of that season, as **Search missing** does. Shown only while «Search for missing episodes» is on. |
-| Last resort: accept a resolution outside the profile | On by default. When a missing episode has no copy within the quality profile, Gextto takes the one in the requested language even with a resolution outside the profile or unknown; this also covers copies found on eD2k, which often do not state the resolution in the name. Language, subtitles, audio and exclusions always apply. The download carries the «🆘 last resort» badge in *Downloads*, the log and the notification say so, and the upgrade replaces it as soon as a copy within the profile appears. Shown only while «Search for missing episodes» is on. |
+| Last resort: accept a resolution outside the profile | On by default. When a missing episode has no copy within the quality profile, Gextto takes the one in the requested language even with a resolution outside the profile or unknown; this also covers copies found on eD2k, which often do not state the resolution in the name. Language, subtitles, audio and exclusions always apply. The download carries the «last resort» badge in *Downloads*, the log and the notification say so, and the upgrade replaces it as soon as a copy within the profile appears. Shown only while «Search for missing episodes» is on. |
 
 **Delay before downloading**
 
@@ -2938,8 +2938,8 @@ years after the original broadcast, so the calendar tells three things apart:
 | Entry | What it means |
 |---|---|
 | 📥 Series S01E04 | episode or movie that **arrived in the library**, on the day Gextto downloaded it (last 30 days). The only date that says when it is really available. |
-| 📺 Series S02E03 · Title | **original broadcast** (TMDB, or TVDB) of the current season, from the last week to the next two months. It is not the date of a localised release; ✓ when the episode is already in the library. |
-| 🎬 Movie | release of a monitored movie **in your country** (TMDB: digital, then home video, then cinema; the country follows the TMDB language, e.g. `it-IT`). When that country has no date yet the original one is shown, marked “(original release)”. With only the TVDB key the movie's first release is shown, always marked “(original release)”. |
+| Series S02E03 · Title | **original broadcast** (TMDB, or TVDB) of the current season, from the last week to the next two months. It is not the date of a localised release; ✓ when the episode is already in the library. |
+| Movie | release of a monitored movie **in your country** (TMDB: digital, then home video, then cinema; the country follows the TMDB language, e.g. `it-IT`). When that country has no date yet the original one is shown, marked “(original release)”. With only the TVDB key the movie's first release is shown, always marked “(original release)”. |
 
 A TMDB or TVDB key is required; the calendar is rebuilt at most every 30 minutes. With
 access control on (see *Access*) add `?apikey=<key>` to the address.

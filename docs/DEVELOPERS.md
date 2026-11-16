@@ -127,6 +127,13 @@ advance, the background of a theme preview — rides as a custom property
 in the stylesheet. A new literal colour in a component rule is a new token in
 the palette.
 
+A symbol of the interface is a `<symbol>` of `uiweb/v2/static/icons.svg` drawn
+with `{{icon "i-name"}}` (the daemon has its own sprite), never an emoji typed
+inside a label: an emoji is a font glyph whose shape changes from one system to
+another, and it cannot be translated, so a label that carries one is half
+translated in every language. The catalog key is the words; the template puts
+the icon beside them.
+
 The official UI is served at `/`; the old `/v2` prefix redirects to the root and
 the removed legacy `/ui` route must not be reintroduced. Live shell metrics are
 rendered by the `/partial/chrome` HTMX fragment, while the Downloads table uses its own

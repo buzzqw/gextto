@@ -211,7 +211,7 @@
       <form class="toolbar logs-toolbar" data-v2-poll hx-get="/partial/logs" hx-target="#v2-logs-view" hx-swap="outerHTML"
             hx-trigger="submit, input changed delay:300ms from:#v2-log-filter, change, every 5s [window.gexttoCanPollLogs && window.gexttoCanPollLogs()], v2wake">
          <input id="v2-log-filter" class="input" type="search" name="filter" value="{{.Filter}}" aria-label="{{tr "Filtra le righe del log"}}" placeholder="{{tr "Filtra le righe…"}}" {{trTitle "Filtra il testo delle righe del log"}} />
-         <button class="btn sm primary" type="submit" {{trTitle "Filtra le righe del log"}}>{{tr "🔍 Filtra"}}</button>
+         <button class="btn sm primary" type="submit" {{trTitle "Filtra le righe del log"}}>{{icon "i-filter"}} {{tr "Filtra"}}</button>
          <select class="input compact logs-level" name="level" aria-label="{{tr "Livello"}}" {{trTitle "Mostra tutte le righe o solo avvisi ed errori"}}>
           <option value="">{{tr "Tutte le righe"}}</option>
           <option value="problems"{{if .ProblemsOnly}} selected{{end}}>{{tr "Solo avvisi ed errori"}}</option>
@@ -224,7 +224,7 @@
          </select>
          <button class="btn sm primary" type="button" data-v2-logs-follow {{trTitle "Ferma o riattiva lo scorrimento automatico del log"}}>{{tr "⏸ Ferma scorrimento"}}</button>
          <button class="btn sm primary" type="submit" {{trTitle "Aggiorna le righe del log"}}>{{tr "Aggiorna"}}</button>
-         <button class="btn sm" type="button" data-v2-logs-copy {{trTitle "Copia le righe di log visibili o la selezione negli appunti"}}>{{tr "📋 Copia"}}</button>
+         <button class="btn sm" type="button" data-v2-logs-copy {{trTitle "Copia le righe di log visibili o la selezione negli appunti"}}>{{icon "i-copy"}} {{tr "Copia"}}</button>
          <select class="input" name="log" aria-label="{{tr "File di log"}}" {{trTitle "Scegli quale file di log leggere; il primo è quello attivo"}}>
           {{range .LogFiles}}<option value="{{.}}"{{if eq . $.Log}} selected{{end}}>{{tr .}}{{if eq . $.ActiveLog}} (<span>{{tr "attivo"}}</span>){{end}}</option>{{end}}
          </select>
@@ -246,7 +246,7 @@
     <p class="hint">{{tr "Ultime righe del log del motore torrent gx-torrent ("}}<code>{{tr "gx-torrent/gx-torrent.log"}}</code>{{tr "), separato dal log di Gextto e conservato tra i riavvii del servizio. Utile quando un download o un trasferimento non si comporta come previsto."}}</p>
     <form class="toolbar logs-toolbar" hx-get="/maintenance/gx-torrent/log" hx-target="#v2-gx-log-view" hx-swap="outerHTML" hx-trigger="submit, change">
       <input class="input" type="search" name="filter" value="{{.Filter}}" aria-label="{{tr "Filtra le righe del log gx-torrent"}}" placeholder="{{tr "Filtra le righe…"}}" {{trTitle "Filtra il testo delle righe del log"}} />
-      <button class="btn sm primary" type="submit" {{trTitle "Filtra le righe del log"}}>{{tr "🔍 Filtra"}}</button>
+      <button class="btn sm primary" type="submit" {{trTitle "Filtra le righe del log"}}>{{icon "i-filter"}} {{tr "Filtra"}}</button>
       <select class="input compact" name="level" aria-label="{{tr "Livello"}}" {{trTitle "Mostra tutte le righe o solo avvisi ed errori"}}>
         <option value="">{{tr "Tutte le righe"}}</option>
         <option value="problems"{{if .ProblemsOnly}} selected{{end}}>{{tr "Solo avvisi ed errori"}}</option>

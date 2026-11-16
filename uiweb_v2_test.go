@@ -657,7 +657,7 @@ func TestV2DownloadsScheduleAutoBadge(t *testing.T) {
 	if code != http.StatusOK {
 		t.Fatalf("downloads page -> %d", code)
 	}
-	if !strings.Contains(body, "⏰ <span>Auto</span>") || !strings.Contains(body, "<span>Programmazione oraria</span> ("+page.Speed.Window+")") {
+	if !strings.Contains(body, "icons.svg#i-clock") || !strings.Contains(body, "<span>Auto</span>") || !strings.Contains(body, "<span>Programmazione oraria</span> ("+page.Speed.Window+")") {
 		t.Fatalf("Auto schedule badge missing: %s", body)
 	}
 	if strings.Contains(body, "-1/-1") {
@@ -1131,9 +1131,9 @@ func TestV2GenericTableFragmentAndActions(t *testing.T) {
 	// An action with an Icon shows the icon and keeps the label as tooltip; the
 	// label stays the visible text when no icon is set.
 	iconAction := v2RenderAction("archive", map[string]any{"magnet": "magnet:?xt=x"}, uiAction{
-		Label: "Copia magnet", Icon: "🧲", Kind: "copy-magnet",
+		Label: "Copia magnet", Icon: "i-magnet", Kind: "copy-magnet",
 	}, uiTableSpec{})
-	if !strings.Contains(iconAction, ">🧲</button>") || !strings.Contains(iconAction, `title="Copia magnet"`) || strings.Contains(iconAction, ">Copia magnet<") {
+	if !strings.Contains(iconAction, "icons.svg#i-magnet") || !strings.Contains(iconAction, `title="Copia magnet"`) || strings.Contains(iconAction, ">Copia magnet<") {
 		t.Fatalf("icon action = %q", iconAction)
 	}
 	textAction := v2RenderAction("archive", map[string]any{"magnet": "magnet:?xt=x"}, uiAction{
@@ -3210,7 +3210,7 @@ func TestV2DownloadsRowShowsTheReasonInPlainWords(t *testing.T) {
 		t.Fatalf("render the downloads row: %v", err)
 	}
 	rendered := out.String()
-	if !strings.Contains(rendered, "✅ approvato") {
+	if !strings.Contains(rendered, "approvato") {
 		t.Fatalf("the row does not show the reason in plain words: %s", rendered)
 	}
 	if strings.Contains(rendered, "approved") {

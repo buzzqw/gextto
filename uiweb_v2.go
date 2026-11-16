@@ -94,7 +94,7 @@ func v2Icon(name string) template.HTML {
 
 func v2TemplateFuncMap() template.FuncMap {
 	return template.FuncMap{
-		"icon": v2Icon,
+		"icon":        v2Icon,
 		"bytes":       logging.HumanBytesI64,
 		"bytesU":      func(value uint64) string { return logging.HumanBytesI64(saturatingInt64(value)) },
 		"rate":        func(value uint64) string { return logging.HumanRate(saturatingInt64(value)) },
@@ -103,6 +103,7 @@ func v2TemplateFuncMap() template.FuncMap {
 		"sourceLabel": uiSourceLabel,
 		"httpState":   v2HTTPStateLabel,
 		"reasonLabel": v2ReasonLabel,
+		"reasonIcon":  v2ReasonIcon,
 		"ternary": func(cond bool, whenTrue, whenFalse string) string {
 			if cond {
 				return whenTrue
@@ -1428,15 +1429,39 @@ func v2HTTPStateLabel(status string) string {
 // translates with `tr`. Without it the "Perché:" line of Scarico showed the raw
 // code.
 var v2ReasonLabels = map[string]string{
-	"approved":          "✅ approvato",
-	"upgrade":           "⬆️ qualità superiore",
-	"gap_fill":          "🔎 lacuna riempita",
-	"gap_filled":        "🔎 lacuna riempita",
-	"last_resort":       "🆘 ultima risorsa",
-	"restored":          "♻️ ripristinato",
-	"stall_alternative": "⏱️ download bloccato",
-	"manual":            "✋ aggiunto a mano",
-	"manual_transfer":   "✋ aggiunto a mano, resta in trasferimento",
+	"approved":          "approvato",
+	"upgrade":           "qualità superiore",
+	"gap_fill":          "lacuna riempita",
+	"gap_filled":        "lacuna riempita",
+	"last_resort":       "ultima risorsa",
+	"restored":          "ripristinato",
+	"stall_alternative": "download bloccato",
+	"manual":            "aggiunto a mano",
+	"manual_transfer":   "aggiunto a mano, resta in trasferimento",
+}
+
+// v2ReasonIcons is the symbol that goes beside each label: the mark says what
+// kind of decision it was at a glance, the word says it in the reader's
+// language.
+var v2ReasonIcons = map[string]string{
+	"approved":          "i-check",
+	"upgrade":           "i-up",
+	"gap_fill":          "i-search",
+	"gap_filled":        "i-search",
+	"last_resort":       "i-sos",
+	"restored":          "i-reload",
+	"stall_alternative": "i-clock",
+	"manual":            "i-plus",
+	"manual_transfer":   "i-plus",
+}
+
+// v2ReasonIcon is the sprite symbol of a reason: the template draws it beside
+// the translated label.
+func v2ReasonIcon(reason string) string {
+	if icon, ok := v2ReasonIcons[strings.ToLower(strings.TrimSpace(reason))]; ok {
+		return icon
+	}
+	return "i-info"
 }
 
 func v2ReasonLabel(reason string) string {

@@ -10,7 +10,7 @@ deu:
   "Sorgenti, storia, riscarica, ignora o elimina questa puntata": "Quellen, Verlauf, erneut laden, ignorieren oder diese Folge löschen"
   "Riprendi la ricerca di questa puntata": "Suche nach dieser Folge wieder aufnehmen"
   "Ignora questa puntata": "Diese Folge ignorieren"
-  "✋ aggiunto a mano, resta in trasferimento": "✋ von Hand hinzugefügt, bleibt im Transferordner"
+  "aggiunto a mano, resta in trasferimento": "von Hand hinzugefügt, bleibt im Transferordner"
   "Release aggiunta ai download: aggiunta a mano, resterà nella cartella di trasferimento.": "Release zu den Downloads hinzugefügt: von Hand hinzugefügt, bleibt im Transferordner."
   "Dati scaricati e inviati da quando il motore torrent è partito": "Seit dem Start der Torrent-Engine herunter- und hochgeladene Daten"
   "Disponibilità tra i peer": "Verfügbarkeit bei den Peers"
@@ -3904,13 +3904,8 @@ deu:
   ➕ Nuovo tag…: ➕ Neuer Tag…
   ⬆ Upload (KB/s) — 0 = nessun limite: ⬆ Upload (KB/s) — 0 = kein Limit
   ⬇ Download (KB/s) — 0 = nessun limite: ⬇ Download (KB/s) — 0 = kein Limit
-  🎬 Film: 🎬 Filme
   🏁 terminata: 🏁 fertig
-  📚 Fumetti: 📚 Comics
-  📦 Archivio: 📦 Archiv
-  📺 Serie TV: 📺 Fernsehserie
-  🔎 Esplora release: 🔎 Entdecken Sie Veröffentlichungen
-  🛠 Manutenzione: 🛠 Wartung
+  "Esplora release": "Entdecken Sie Veröffentlichungen"
   Disattivata: Deaktiviert
   Attivata: Aktiviert
   HTTP con credenziali: HTTP mit Anmeldedaten
@@ -4423,7 +4418,7 @@ deu:
   "avviso": "Warnung"
   "Nessun evento registrato per questo download. La storia si costruisce dalle righe di log scritte da questa versione in poi.": "Für diesen Download wurde kein Ereignis aufgezeichnet. Der Verlauf entsteht aus den Protokollzeilen ab dieser Version."
   "Storia dei download": "Download-Verlauf"
-  "Ultimi 50 eventi; 📜 su una puntata mostra la sua storia completa.": "Letzte 50 Ereignisse; 📜 bei einer Folge zeigt ihren vollständigen Verlauf."
+  "Ultimi 50 eventi; il pulsante della storia su una puntata mostra la sua storia completa.": "Letzte 50 Ereignisse; die Verlaufsschaltfläche bei einer Folge zeigt ihren vollständigen Verlauf."
   "Storia dei download di questa puntata: ricerca, download, spostamenti, errori": "Download-Verlauf dieser Folge: Suche, Download, Verschiebungen, Fehler"
   "Storia dei download della puntata": "Download-Verlauf der Folge"
   "Stagione o episodio non validi.": "Ungültige Staffel oder Folge."
@@ -4713,9 +4708,7 @@ deu:
   "↑ Upload": "↑ Upload"
   "↓ Download": "↓ Download"
   "⚙ Opzioni": "⚙ Optionen"
-  "⚠ Mancanti": "⚠ Fehlend"
-  "📋 Copia": "📋 Kopieren"
-  "🔍 Filtra": "🔍 Filtern"
+  "Filtra": "Filtern"
   "in uso": "in Verwendung"
   "nuovi avvisi": "neue Warnungen"
   "Aggiungi all'archivio": "Zum Archiv hinzufügen"
@@ -4777,7 +4770,6 @@ deu:
   "Elimina tutte le voci dello storico Weekly Pack, senza toccare lo storico fumetti.": "Alle Einträge des Weekly Pack-Verlaufs löschen, ohne den Comics-Verlauf zu berühren."
   "Elimina tutte le voci dello storico fumetti, senza toccare i Weekly Pack.": "Alle Einträge des Comics-Verlaufs löschen, ohne die Weekly Packs zu berühren."
   "Esegue ora il controllo delle sorgenti configurate. Senza una ricerca verifica la raggiungibilità; con una ricerca controlla anche i risultati. Non modifica la configurazione.": "Führt jetzt die Prüfung der konfigurierten Quellen aus. Ohne Suche wird die Erreichbarkeit geprüft; mit Suche werden auch die Ergebnisse geprüft. Die Konfiguration wird nicht geändert."
-  "Esplora release": "Releases durchsuchen"
   "Etichetta": "Bezeichnung"
   "Event hook": "Event hook"
   "Eventi": "Ereignisse"
@@ -4815,7 +4807,7 @@ deu:
   "Nessun provider in backoff.": "Kein Anbieter im Backoff."
   "Nessun risultato online per questa puntata.": "Keine Online-Ergebnisse für diese Folge."
   "Nessuna impostazione in questa sezione.": "Keine Einstellungen in diesem Abschnitt."
-  "Nessuna release in archivio per questa puntata. Usa 🔍 per cercare online.": "Keine Releases im Archiv für diese Folge. Nutze 🔍, um online zu suchen."
+  "Nessuna release in archivio per questa puntata. Usa il pulsante Cerca per cercare online.": "Keine Releases im Archiv für diese Folge. Nutze die Schaltfläche Suche, um online zu suchen."
   "Nessuna sorgente da verificare.": "Keine Quellen zu prüfen."
   "Nessuna uscita o Simkl non configurato.": "Kein Release oder Simkl nicht konfiguriert."
   "Nome host o indirizzo del server FTP. Lascia vuoto per non inviare copie via FTP.": "Hostname oder Adresse des FTP-Servers. Leer lassen, um keine Kopien per FTP zu senden."
@@ -5371,7 +5363,7 @@ deu:
   "Rimozione a fine seed": "Entfernen nach dem Seeding"
   "Strumenti": "Werkzeuge"
   "Togli il tag": "Tag entfernen"
-  "📌 pin": "📌 angeheftet"
+  "pin": "angeheftet"
   "scrivi il nome del nuovo tag": "Namen des neuen Tags eingeben"
   "Banda": "Bandbreite"
   "Come da configurazione": "Wie konfiguriert"
@@ -5990,7 +5982,6 @@ deu:
   "Apri la scheda della serie": "Die Seite der Serie öffnen"
   "Apri la serie": "Serie öffnen"
   "Cerca tutte le puntate mancanti di questa serie sulle sorgenti configurate": "Alle fehlenden Episoden dieser Serie in den konfigurierten Quellen suchen"
-  "Filtra": "Filtern"
   "Filtra per serie": "Nach Serie filtern"
   "Filtra per serie…": "Nach Serie filtern…"
   "Mostra solo le serie il cui nome contiene il testo scritto": "Nur Serien zeigen, deren Name den eingegebenen Text enthält"
@@ -6167,14 +6158,14 @@ deu:
   "Ferma la ricerca in corso": "Die laufende Suche stoppen"
   "Ricerca in coda…": "Suche in der Warteschlange…"
   "Ultima risorsa: accetta una risoluzione fuori profilo": "Letzter Ausweg: eine Auflösung außerhalb des Profils akzeptieren"
-  "Quando per un episodio mancante non esiste nessuna copia nel profilo qualità, prende quella nella lingua richiesta anche se la risoluzione è fuori profilo o sconosciuta. Lingua, sottotitoli, audio ed esclusioni valgono sempre. Il download porta il badge «🆘 ultima risorsa» e l'upgrade lo sostituisce appena esce una copia nel profilo.": "Wenn es für eine fehlende Episode keine Kopie im Qualitätsprofil gibt, wird die Kopie in der gewünschten Sprache genommen, auch wenn ihre Auflösung außerhalb des Profils liegt oder unbekannt ist. Sprache, Untertitel, Audio und Ausschlüsse gelten immer. Der Download trägt das Abzeichen «🆘 letzter Ausweg», und das Upgrade ersetzt ihn, sobald eine Kopie im Profil erscheint."
-  "🆘 ultima risorsa": "🆘 letzter Ausweg"
-  "✅ approvato": "✅ freigegeben"
-  "⬆️ qualità superiore": "⬆️ höhere Qualität"
-  "🔎 lacuna riempita": "🔎 Lücke gefüllt"
-  "♻️ ripristinato": "♻️ wiederhergestellt"
-  "⏱️ download bloccato": "⏱️ Download blockiert"
-  "✋ aggiunto a mano": "✋ manuell hinzugefügt"
+  "Quando per un episodio mancante non esiste nessuna copia nel profilo qualità, prende quella nella lingua richiesta anche se la risoluzione è fuori profilo o sconosciuta. Lingua, sottotitoli, audio ed esclusioni valgono sempre. Il download porta il badge «ultima risorsa» e l'upgrade lo sostituisce appena esce una copia nel profilo.": "Wenn es für eine fehlende Episode keine Kopie im Qualitätsprofil gibt, wird die Kopie in der gewünschten Sprache genommen, auch wenn ihre Auflösung außerhalb des Profils liegt oder unbekannt ist. Sprache, Untertitel, Audio und Ausschlüsse gelten immer. Der Download trägt das Abzeichen «🆘 letzter Ausweg», und das Upgrade ersetzt ihn, sobald eine Kopie im Profil erscheint."
+  "ultima risorsa": "letzter Ausweg"
+  "approvato": "freigegeben"
+  "qualità superiore": "höhere Qualität"
+  "lacuna riempita": "Lücke gefüllt"
+  "ripristinato": "wiederhergestellt"
+  "download bloccato": "Download blockiert"
+  "aggiunto a mano": "manuell hinzugefügt"
   "Ultima risorsa: episodio mancante preso fuori dalla risoluzione del profilo perché era l'unica copia nella lingua richiesta. L'upgrade lo sostituisce appena esce una copia nel profilo.": "Letzter Ausweg: fehlende Episode außerhalb der Profilauflösung genommen, weil sie die einzige Kopie in der gewünschten Sprache war. Das Upgrade ersetzt sie, sobald eine Kopie im Profil erscheint."
   "Cerca in background le puntate mancanti di questa serie sulle sorgenti configurate: la scheda mostra l'avanzamento e i risultati": "Die fehlenden Folgen dieser Serie im Hintergrund auf den konfigurierten Quellen suchen: die Seite zeigt Fortschritt und Ergebnisse"
   "Chiudi i risultati della ricerca": "Die Suchergebnisse schließen"
@@ -6487,7 +6478,7 @@ deu:
   "🕒 in arrivo": "🕒 angekündigt"
   "Annunciata, nessuna puntata ancora uscita": "Angekündigt, noch keine Folge ausgestrahlt"
   "Le fonti non sono d'accordo su questa serie: puoi decidere tu in «Stato della serie»": "Die Quellen sind sich bei dieser Serie nicht einig: Du kannst in «Serienstatus» entscheiden"
-  "⚠ fonti in disaccordo": "⚠ Quellen uneinig"
+  "fonti in disaccordo": "Quellen uneinig"
   "Automatico: decidono TMDB (o TVDB), la data della prossima puntata e TVmaze. Terminata o In corso: la tua scelta vale più delle fonti. È solo un'etichetta: per smettere di cercare la serie mettila in pausa.": "Automatisch: TMDB (oder TVDB), das Datum der nächsten Folge und TVmaze entscheiden. Beendet oder Läuft: Deine Wahl zählt mehr als die Quellen. Es ist nur eine Kennzeichnung: Um die Serie nicht mehr zu suchen, pausiere sie."
   "Stato della serie": "Serienstatus"
   "Automatico (decidono le fonti)": "Automatisch (die Quellen entscheiden)"

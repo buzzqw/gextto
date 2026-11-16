@@ -1081,14 +1081,15 @@ func v2RenderActions(view string, item map[string]any, actions []uiAction, spec 
 
 // v2ActionInner is the content of an action button: the icon when the action
 // sets one (with the label as tooltip and accessible name), otherwise the
-// label. The boolean reports whether the icon replaced the text.
+// label. The icon is a symbol of /static/icons.svg, drawn in the button's own
+// colour; the boolean reports whether it replaced the text.
 func v2ActionInner(action uiAction) (inner, extra, class string, iconic bool) {
 	class = "btn sm"
 	if action.Icon == "" {
 		return stdhtml.EscapeString(action.Label), "", class, false
 	}
 	label := stdhtml.EscapeString(action.Label)
-	return stdhtml.EscapeString(action.Icon), ` title="` + label + `" aria-label="` + label + `"`, class + " icon", true
+	return string(v2Icon(action.Icon)), ` title="` + label + `" aria-label="` + label + `"`, class + " icon", true
 }
 
 func v2RenderAction(view string, item map[string]any, action uiAction, spec uiTableSpec) string {

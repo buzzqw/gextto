@@ -309,10 +309,10 @@ func uiPanelsPageFor(view string, s *AppState) (uiPanelsPage, bool) {
 	case "archive":
 		spec, _ := uiTableSpecFor("archive")
 		spec.ActionsJSON = uiJSON([]uiAction{
-			{Label: "Scarica", Icon: "⬇️", Method: "POST", Path: "/api/archive/batch-download", Body: `{"items":[{"title":"{title}","magnet":"{magnet}","source":"{source}"}]}`},
-			{Label: "Perché non questo?", Icon: "🔍", Kind: "release-explain", Method: "POST", Path: ""},
-			{Label: "Copia magnet", Icon: "🧲", Kind: "copy-magnet", Method: "POST", Path: ""},
-			{Label: "Elimina", Icon: "🗑️", Class: "danger", Method: "POST", Path: "/api/archive/delete", Body: `{"magnet":"{magnet}"}`, Confirm: "Eliminare questa voce dall'archivio?"},
+			{Label: "Scarica", Icon: "i-dl", Method: "POST", Path: "/api/archive/batch-download", Body: `{"items":[{"title":"{title}","magnet":"{magnet}","source":"{source}"}]}`},
+			{Label: "Perché non questo?", Icon: "i-search", Kind: "release-explain", Method: "POST", Path: ""},
+			{Label: "Copia magnet", Icon: "i-magnet", Kind: "copy-magnet", Method: "POST", Path: ""},
+			{Label: "Elimina", Icon: "i-trash", Class: "danger", Method: "POST", Path: "/api/archive/delete", Body: `{"magnet":"{magnet}"}`, Confirm: "Eliminare questa voce dall'archivio?"},
 		})
 		return uiPanelsPage{Sections: []uiPageSection{
 			sectionTable(spec),

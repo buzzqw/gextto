@@ -449,7 +449,7 @@ Gli episodi sono raggruppati per stagione, e ogni stagione ha la sua barra di
 completamento accanto al conteggio (`10/10`, in verde quando è completa). Su
 ogni puntata hai due pulsanti e un menu:
 
-- **🔍 cercarla**: la ricerca si apre in un riquadro sotto la puntata e dice a
+- **cercarla** (l'icona della lente): la ricerca si apre in un riquadro sotto la puntata e dice a
   che punto è (quante sorgenti sta interrogando, quante hanno risposto, quando
   passa a eD2k);
 - **⤒ forzarla**: la rimette in ricerca al ciclo successivo, togliendo l'attesa
@@ -494,7 +494,7 @@ stanno ancora seminando nella cartella di trasferimento prima di passare in
 libreria. Se il download finisce in errore, la puntata torna tra i mancanti.
 
 Se per una puntata non esiste nessuna copia nel profilo, l'elenco propone
-l'unica copia nella lingua richiesta con il badge **🆘 ultima risorsa**: è quella
+l'unica copia nella lingua richiesta con il badge **ultima risorsa** (l'icona del salvagente): è quella
 che Gextto prenderebbe da solo, e l'upgrade la sostituirà appena esce una copia
 nel profilo. Se quella copia è nella blocklist non viene presa: il log dice
 perché è stata bloccata e, quando il blocco scade, da quale giorno verrà
@@ -669,7 +669,7 @@ release precisa o a scaricare qualcosa che non segui.
 | **Scarico**, *Cerca una release* | lo stesso, senza lasciare la pagina dei download; il blocco sta sotto la coda dei trasferimenti e si apre con un clic |
 | **Esplora** | titoli su TMDB (tendenze, popolari, prossime uscite) da aggiungere; ricerca generica di release |
 | **Archivio** | le release viste nei feed, all'istante; online solo se spunti *Cerca anche nel web* |
-| 🔍 su un episodio, **Cerca subito** su un film | quel titolo preciso |
+| l'icona della lente su un episodio, **Cerca subito** su un film | quel titolo preciso |
 
 ### Leggere i risultati
 
@@ -693,7 +693,7 @@ scaricata.
 | Da dove lo aggiungi | Dove finisce |
 |---|---|
 | Ricerca libera: **Dashboard**, **Scarico** (*Cerca una release*), **Esplora**, un link eD2k incollato, la TUI | resta nella **cartella di trasferimento**, con il suo nome: non va in libreria, non viene rinominato e non conta come episodio o film presente. Viene condiviso secondo i limiti di seed e poi fermato; lo togli tu dalla sessione |
-| **Scarica** sui risultati di un titolo che segui, dalla sua pagina (🔍 su un episodio mancante, le corrispondenze dell'archivio di un film), **Accoda** sui titoli seguiti della Dashboard | va in **libreria**, accanto agli altri episodi o film, come un download automatico |
+| **Scarica** sui risultati di un titolo che segui, dalla sua pagina (l'icona della lente su un episodio mancante, le corrispondenze dell'archivio di un film), **Accoda** sui titoli seguiti della Dashboard | va in **libreria**, accanto agli altri episodi o film, come un download automatico |
 
 Nella colonna del motivo un download della prima riga si legge *✋ aggiunto a
 mano, resta in trasferimento*.
@@ -752,8 +752,8 @@ smetta di cambiare, lo aggiunge e poi lo rimuove o lo rinomina `.imported`.
 che non segui. La ricerca parte da sola mentre scrivi (da tre caratteri; per
 quelli più corti premi **Invio**) ed è immediata. `-parola` esclude i titoli che
 la contengono. Lo stesso torrent compare una volta sola. Dalle righe puoi
-accodare (⬇️), aprire **Perché non questa?** (🔍), copiare il magnet (🧲) o
-eliminare la riga (🗑️).
+accodare (l'icona della freccia in giù), aprire **Perché non questa?** (la
+lente), copiare il magnet (il magnete) o eliminare la riga (il cestino).
 
 - **Cerca anche nel web** estende la ricerca a indexer e motori online: è più
   lenta e parte solo quando premi **Cerca**.
@@ -805,7 +805,7 @@ dicono quanto il motore ha scaricato e inviato da quando è partito.
 | Verifica file | il motore rilegge e verifica i pezzi già su disco | aspettare: la barra mostra l'avanzamento del controllo (pezzi verificati sul totale), non la percentuale dei dati |
 | Errore | il motore ha segnalato un errore | leggere il motivo prima di rimuoverlo |
 | Archiviato | il file è in libreria | nulla; non cancellare la sorgente mentre è in seed |
-| 📌 pin | forzato fuori coda | **Sblocca pin** nella sua scheda per rimetterlo in coda |
+| pin (l'icona della puntina) | forzato fuori coda | **Sblocca pin** nella sua scheda per rimetterlo in coda |
 
 ### Agire sui download
 
@@ -876,8 +876,8 @@ impostata in *Configurazione → Velocità e rete*:
 - **Valori personalizzati…** — download e upload in KiB/s e durata in minuti;
 - **Togli l'eccezione** — torna subito alla regola.
 
-L'icona dice cosa vale: ⚡ un'eccezione (con i minuti rimasti), ⏰ una fascia
-della programmazione, altrimenti la regola. Con eD2k attivo il limite è **una
+L'icona dice cosa vale: il fulmine per un'eccezione (con i minuti rimasti),
+l'orologio per una fascia della programmazione, altrimenti la regola. Con eD2k attivo il limite è **una
 sola linea divisa** tra torrent e aMule (vedi *Torrent ed eD2k insieme sullo
 stesso file*). Vedi anche [Velocità e rete](#16-velocità-e-rete).
 
@@ -1944,7 +1944,7 @@ Parti dalla scheda della serie e premi **📜** sulla puntata:
 
 | Cosa vedi | Cosa vuol dire | Cosa fare |
 |---|---|---|
-| *Nessun evento* | Gextto non l'ha mai scaricata | 🔍 sulla puntata e **Perché non questa?**: la release non c'è nelle sorgenti, o è stata scartata da filtri, qualità, lingua o ritardo? Controlla anche *Salute* |
+| *Nessun evento* | Gextto non l'ha mai scaricata | la lente sulla puntata e **Perché non questa?**: la release non c'è nelle sorgenti, o è stata scartata da filtri, qualità, lingua o ritardo? Controlla anche *Salute* |
 | *📥 Downloading* e poi niente | il download è in corso o fermo | apri il torrent in *Scarico*: «⏸️ is stuck» vuol dire pochi utenti che condividono; «❌ Gave up» che è stato abbandonato e verrà cercata un'altra versione |
 | *🎉 downloaded* ma nessun 📁 | scaricato ma non arrivato in libreria | cerca «still cannot be moved» o «Could not move»: di solito NAS non raggiungibile, permessi o spazio. I tentativi riprendono da soli |
 | *discarded as inferior* | in libreria c'era già una versione almeno altrettanto buona | nulla: è il comportamento previsto |
@@ -2165,7 +2165,7 @@ salvata** finché non li salvi.
 | Episodi mancanti per serie a ogni ciclo | Numero massimo di gap da cercare per serie in un ciclo (0 = illimitato). *(0 = illimitato)* Compare solo con «Cerca gli episodi mancanti» attivo. |
 | Intervallo della ricerca approfondita | Ogni quante ore fare una ricerca live mirata sugli indexer per i gap. *(Unità: ore)* Compare solo con «Cerca gli episodi mancanti» attivo. |
 | Ricerche approfondite per ciclo | Numero massimo di ricerche live per ciclo. Vengono prima gli episodi mai cercati online, un episodio per serie a rotazione (ogni giro riparte dalla serie dopo l'ultima servita), poi quelli cercati da più tempo. Quando i torrent non danno nulla, aMule risponde una volta per stagione: una sola ricerca riempie tutte le puntate mancanti di quella stagione, come fa **Cerca mancanti**. Compare solo con «Cerca gli episodi mancanti» attivo. |
-| Ultima risorsa: accetta una risoluzione fuori profilo | Attivo per default. Se per un episodio mancante non esiste nessuna copia nel profilo qualità, Gextto prende quella nella lingua richiesta anche con una risoluzione fuori profilo o sconosciuta; vale anche per le copie trovate su eD2k, che spesso non dichiarano la risoluzione nel nome. Lingua, sottotitoli, audio ed esclusioni valgono sempre. Il download porta il badge «🆘 ultima risorsa» in *Scarico*, il log e la notifica lo dicono, e l'upgrade lo sostituisce appena esce una copia nel profilo. Compare solo con «Cerca gli episodi mancanti» attivo. |
+| Ultima risorsa: accetta una risoluzione fuori profilo | Attivo per default. Se per un episodio mancante non esiste nessuna copia nel profilo qualità, Gextto prende quella nella lingua richiesta anche con una risoluzione fuori profilo o sconosciuta; vale anche per le copie trovate su eD2k, che spesso non dichiarano la risoluzione nel nome. Lingua, sottotitoli, audio ed esclusioni valgono sempre. Il download porta il badge «ultima risorsa» in *Scarico*, il log e la notifica lo dicono, e l'upgrade lo sostituisce appena esce una copia nel profilo. Compare solo con «Cerca gli episodi mancanti» attivo. |
 
 **Ritardo prima di scaricare**
 
@@ -2971,8 +2971,8 @@ onda, quindi il calendario distingue tre cose:
 | Voce | Cosa indica |
 |---|---|
 | 📥 Serie S01E04 | episodio o film **arrivato in libreria**, nel giorno in cui Gextto l'ha scaricato (ultimi 30 giorni). È l'unica data che dice quando è davvero disponibile. |
-| 📺 Serie S02E03 · Titolo | **prima messa in onda originale** (TMDB, o TVDB) della stagione in corso, dall'ultima settimana ai prossimi due mesi. Non è la data della versione italiana; ✓ se l'episodio è già in libreria. |
-| 🎬 Film | uscita del film monitorato **in Italia** (TMDB: digitale, poi home video, poi cinema; il paese segue la lingua TMDB, es. `it-IT`). Se per l'Italia non c'è ancora una data compare quella originale, indicata come «(uscita originale)». Con la sola chiave TVDB compare la prima uscita del film, sempre come «(uscita originale)». |
+| Serie S02E03 · Titolo | **prima messa in onda originale** (TMDB, o TVDB) della stagione in corso, dall'ultima settimana ai prossimi due mesi. Non è la data della versione italiana; ✓ se l'episodio è già in libreria. |
+| Film | uscita del film monitorato **in Italia** (TMDB: digitale, poi home video, poi cinema; il paese segue la lingua TMDB, es. `it-IT`). Se per l'Italia non c'è ancora una data compare quella originale, indicata come «(uscita originale)». Con la sola chiave TVDB compare la prima uscita del film, sempre come «(uscita originale)». |
 
 Serve la chiave TMDB oppure quella TVDB; il calendario si aggiorna al massimo ogni 30 minuti. Con
 l'accesso protetto (vedi *Accesso*) aggiungi `?apikey=<chiave>` all'indirizzo.
