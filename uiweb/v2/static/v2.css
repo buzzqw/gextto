@@ -2588,7 +2588,7 @@ body.v2-drop-active main {
      documentation and the state line stay where they are, however many pages
      the menu holds. */
   #app-sidebar { overflow: hidden; }
-  #app-sidebar nav { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+  #app-sidebar nav:not(.nav-docs) { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
   #app-sidebar .nav-icon {
     display: inline-flex;
     flex: none;
@@ -2628,6 +2628,7 @@ body.v2-drop-active main {
 
   #app-sidebar .nav-docs {
     display: flex;
+    flex-direction: row;
     flex-wrap: wrap;
     align-items: center;
     gap: 2px 8px;
