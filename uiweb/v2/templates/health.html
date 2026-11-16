@@ -117,7 +117,7 @@
       <thead><tr><th scope="col">{{tr "Feed"}}</th><th scope="col">{{tr "Stato"}}</th><th scope="col">{{tr "Ultimo successo"}}</th><th scope="col">{{tr "Ultimo errore"}}</th><th scope="col">{{tr "Ultimi risultati"}}</th><th scope="col">{{tr "1 giorno"}}</th><th scope="col">{{tr "7 giorni"}}</th><th scope="col">{{tr "30 giorni"}}</th></tr></thead>
       <tbody>{{range .Feeds}}<tr>
         <td class="truncate" {{trTitle .Provider}}>{{tr .Label}}{{if .Disabled}} <span class="badge warn" {{trTitle "Riga disabilitata con #"}}>#</span>{{end}}</td>
-        <td><span class="badge {{.StateClass}}">{{tr .State}}</span></td>
+        <td><span class="badge {{.StateClass}}"{{if .PageChanged}} {{trTitle "%d righe nella pagina, nessuna release letta: il sito ha probabilmente cambiato l'impaginazione. Il feed è cieco finché il parser non viene aggiornato." .LastRows}}{{end}}>{{tr .State}}</span></td>
         <td class="nowrap">{{if .LastSuccess}}{{tr .LastSuccess}}{{else}}—{{end}}</td>
         <td class="truncate" {{trTitle .LastError}}>{{if .LastError}}{{tr .LastError}}{{else}}—{{end}}</td>
         <td class="numeric">{{tr .LastResults}}</td>

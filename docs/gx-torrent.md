@@ -1231,7 +1231,9 @@ direct request is tried first, FlareSolverr is the fallback, and local/LAN hosts
 are never retried there), like Gextto does.
 The **feeds** have a table with status (*active*/*disabled*, *adds paused*), **last check**
 with items, new and added or the error shown at the right end of the name row (so
-it does not take a line of its own), and per row the buttons **↻ Reload** (to the left of
+it does not take a line of its own); a page that lists rows but no longer yields an
+item shows **page changed** there, with the rows it carried in the tooltip, instead
+of passing for an idle feed. Per row the buttons **↻ Reload** (to the left of
 *Remove*: reads that feed immediately and refreshes the row), **Edit** (the form is filled,
 including the *Feed options*: folder, include/exclude, category, path, pause, disabled),
 **Enable/Disable** and **Remove**. An **RSS options** box sets

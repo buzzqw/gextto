@@ -670,3 +670,24 @@ func TestFeedErrorHint(t *testing.T) {
 		t.Errorf("error row misses the error or its hint: %s", row)
 	}
 }
+
+// A feed row whose page carried rows but yielded no item says the page changed:
+// an uploader with nothing new and a listing the parser no longer reads must not
+// look the same.
+func TestFeedStatusSaysPageChangedWhenRowsYieldNoItem(t *testing.T) {
+	blind := uiFeedStatusHTML("", feedStatus{Name: "f", LastCheck: 1700000000, Rows: 50}, 3)
+	if !strings.Contains(blind, "page changed") {
+		t.Errorf("a page with rows and no item must say the page changed: %s", blind)
+	}
+	if !strings.Contains(blind, "50 rows on the page") {
+		t.Errorf("the tooltip must carry the rows read: %s", blind)
+	}
+	healthy := uiFeedStatusHTML("", feedStatus{Name: "f", LastCheck: 1700000000, Rows: 50, Items: 50}, 3)
+	if strings.Contains(healthy, "page changed") {
+		t.Errorf("a feed that yields items must not carry the warning: %s", healthy)
+	}
+	empty := uiFeedStatusHTML("", feedStatus{Name: "f", LastCheck: 1700000000, Items: 0}, 3)
+	if strings.Contains(empty, "page changed") {
+		t.Errorf("an empty listing has no rows to warn about: %s", empty)
+	}
+}

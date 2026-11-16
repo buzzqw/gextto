@@ -1028,6 +1028,13 @@ func uiFeedStatusHTML(lang string, status feedStatus, total int) string {
 		return out + errHTML
 	}
 	out += totalHTML
+	if status.Rows > 0 && status.Items == 0 {
+		// The page carried rows and none of them became an item: the listing
+		// changed its layout, and the feed is blind while it looks idle.
+		out += ` · <span class="warn" role="status" title="` +
+			html.EscapeString(uiTr(lang, "%d rows on the page and not one of them a release: the site has probably changed its layout. The feed is blind until the parser is updated.", status.Rows)) +
+			`">` + tr("page changed") + `</span>`
+	}
 	if status.New > 0 {
 		out += ` · <span class="ok">` + strconv.Itoa(status.New) + `</span> <span class="muted">` + tr("new") + `</span>`
 	}

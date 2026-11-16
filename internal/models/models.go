@@ -896,6 +896,9 @@ type SourceStat struct {
 	LastAttemptAt  string `json:"last_attempt_at,omitempty"`
 	LastSuccessAt  string `json:"last_success_at,omitempty"`
 	LastResults    int64  `json:"last_results"`
+	// LastRows is how many rows the page of the last successful read carried:
+	// rows without releases mean the listing changed its markup.
+	LastRows       int64  `json:"last_rows"`
 	DisabledAt     string `json:"disabled_at,omitempty"`
 	DisabledReason string `json:"disabled_reason,omitempty"`
 }

@@ -546,6 +546,55 @@ func TestExtToListingReadsEveryRowOfBothLayouts(t *testing.T) {
 	}
 }
 
+// A listing whose rows no longer look like releases yields nothing, and the
+// read says how many rows it walked: that count is what tells the Health page
+// "the page changed" from "there is nothing new".
+func TestFetchFeedCountsTheRowsItWalked(t *testing.T) {
+	page := func(rows int, withRelease bool) string {
+		var body strings.Builder
+		body.WriteString(`<html><body><table class="table search-table"><tbody>`)
+		for index := 0; index < rows; index++ {
+			body.WriteString(`<tr><td class="text-left">`)
+			if withRelease {
+				body.WriteString(fmt.Sprintf(`<a class="torrent-title-link" href="magnet:?xt=urn:btih:%040x&amp;dn=Release%%20%02d">Release %02d</a>`, index, index, index))
+			} else {
+				body.WriteString(fmt.Sprintf(`<span class="something-else">Row %02d</span>`, index))
+			}
+			body.WriteString(`</td></tr>`)
+		}
+		body.WriteString(`</tbody></table></body></html>`)
+		return body.String()
+	}
+	for _, test := range []struct {
+		name        string
+		rows        int
+		withRelease bool
+		wantKept    int
+	}{
+		{"rows that are releases", 50, true, 50},
+		{"rows a changed layout no longer parses", 50, false, 0},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			body := page(test.rows, test.withRelease)
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				_, _ = fmt.Fprint(w, body)
+			}))
+			defer server.Close()
+
+			releases, read, err := FetchFeedWithRead(context.Background(), server.URL+"/ext.to/browse/?filter=u=x", nil, 1, 0, 0)
+			if err != nil {
+				t.Fatalf("FetchFeedWithRead: %v", err)
+			}
+			if read.Rows != test.rows {
+				t.Fatalf("rows = %d, want %d", read.Rows, test.rows)
+			}
+			if read.Kept != test.wantKept || len(releases) != test.wantKept {
+				t.Fatalf("kept = %d (%d releases), want %d", read.Kept, len(releases), test.wantKept)
+			}
+		})
+	}
+}
+
 func TestFetchFeedStopsWhenAPageAddsNoNewHash(t *testing.T) {
 	const page = `<html><body>
 <a class="torrent-title-link" href="magnet:?xt=urn:btih:0123456789012345678901234567890123456789">One</a>

@@ -775,6 +775,7 @@ const databaseSourceStatsSchema = `CREATE TABLE IF NOT EXISTS source_daily (
                 last_attempt_at TEXT,
                 last_success_at TEXT,
                 last_results INTEGER NOT NULL DEFAULT 0,
+                last_rows INTEGER NOT NULL DEFAULT 0,
                 disabled_at TEXT,
                 disabled_reason TEXT NOT NULL DEFAULT '',
                 PRIMARY KEY(kind, provider)
@@ -1052,6 +1053,10 @@ func (d *Database) migrate() error {
 		{"pending_downloads", "best_title", "TEXT DEFAULT ''"},
 		{"pending_downloads", "first_seen_at", "TEXT"},
 		{"pending_downloads", "timeframe_hours", "INTEGER DEFAULT 0"},
+		// Rows the last successful read of a feed carried, beside the releases
+		// it kept: a page that lists rows and yields none has changed its
+		// markup, and the feed panel must say that instead of "empty".
+		{"source_health", "last_rows", "INTEGER NOT NULL DEFAULT 0"},
 		{"pending_downloads", "status", "TEXT DEFAULT 'pending'"},
 		{"pending_downloads", "downloaded_at", "TEXT"},
 		{"pending_downloads", "due_at", "TEXT"},
@@ -2379,12 +2384,25 @@ func (d *Database) ResetProviderStatus(provider string) error {
 	return err
 }
 
+// SourceAttempt is one read of a source. Rows is how many rows the page carried
+// and Results how many releases Gextto kept from them: a page with rows and no
+// result is a listing whose markup no longer matches the parser, and the feed
+// panel tells it apart from a listing that is simply empty.
+type SourceAttempt struct {
+	Kind     string
+	Provider string
+	OK       bool
+	Results  int
+	Rows     int
+	Error    string
+}
+
 // RecordSourceAttempt appends one request outcome to the daily history and
 // refreshes the source's first/last success. A success also clears a previous
 // automatic-disable marker: the operator has re-enabled the feed and it works.
-func (d *Database) RecordSourceAttempt(kind, provider string, ok bool, results int, errText string) error {
-	kind = strings.TrimSpace(kind)
-	provider = strings.TrimSpace(provider)
+func (d *Database) RecordSourceAttempt(attempt SourceAttempt) error {
+	kind := strings.TrimSpace(attempt.Kind)
+	provider := strings.TrimSpace(attempt.Provider)
 	if kind == "" || provider == "" {
 		return nil
 	}
@@ -2392,10 +2410,17 @@ func (d *Database) RecordSourceAttempt(kind, provider string, ok bool, results i
 	day := now.Format("2006-01-02")
 	successes, failures := 0, 1
 	resultsValue := 0
-	if ok {
+	errText := attempt.Error
+	rowsValue := 0
+	if attempt.OK {
 		successes, failures = 1, 0
-		resultsValue = results
+		resultsValue = attempt.Results
 		errText = ""
+		if attempt.Rows < 0 {
+			rowsValue = 0
+		} else {
+			rowsValue = attempt.Rows
+		}
 	}
 	if resultsValue < 0 {
 		resultsValue = 0
@@ -2415,22 +2440,25 @@ func (d *Database) RecordSourceAttempt(kind, provider string, ok bool, results i
 	}
 	lastSuccess := ""
 	lastResults := int64(-1)
-	if ok {
+	lastRows := int64(-1)
+	if attempt.OK {
 		lastSuccess = sqliteTimestamp(now)
 		lastResults = int64(resultsValue)
+		lastRows = int64(rowsValue)
 	}
 	_, err = d.db.Exec(`
-		INSERT INTO source_health(kind, provider, first_attempt_at, last_attempt_at, last_success_at, last_results)
-		VALUES (?1, ?2, ?3, ?3, ?4, ?5)
+		INSERT INTO source_health(kind, provider, first_attempt_at, last_attempt_at, last_success_at, last_results, last_rows)
+		VALUES (?1, ?2, ?3, ?3, ?4, ?5, ?6)
 		ON CONFLICT(kind, provider) DO UPDATE SET
 			first_attempt_at = CASE WHEN source_health.first_attempt_at IS NULL OR source_health.first_attempt_at = ''
 				THEN excluded.first_attempt_at ELSE source_health.first_attempt_at END,
 			last_attempt_at = excluded.last_attempt_at,
 			last_success_at = CASE WHEN excluded.last_success_at <> '' THEN excluded.last_success_at ELSE source_health.last_success_at END,
 			last_results = CASE WHEN excluded.last_results >= 0 THEN excluded.last_results ELSE source_health.last_results END,
+			last_rows = CASE WHEN excluded.last_rows >= 0 THEN excluded.last_rows ELSE source_health.last_rows END,
 			disabled_at = CASE WHEN excluded.last_success_at <> '' THEN NULL ELSE source_health.disabled_at END,
 			disabled_reason = CASE WHEN excluded.last_success_at <> '' THEN '' ELSE source_health.disabled_reason END`,
-		kind, provider, sqliteTimestamp(now), lastSuccess, lastResults)
+		kind, provider, sqliteTimestamp(now), lastSuccess, lastResults, lastRows)
 	if err != nil {
 		return fmt.Errorf("record source health: %w", err)
 	}
@@ -2478,10 +2506,10 @@ func (d *Database) SourceHealth(kind, provider string) (models.SourceStat, error
 	var out models.SourceStat
 	var first, last, success, disabled, reason sql.NullString
 	err := d.db.QueryRow(`
-		SELECT first_attempt_at, last_attempt_at, last_success_at, last_results,
+		SELECT first_attempt_at, last_attempt_at, last_success_at, last_results, last_rows,
 			disabled_at, disabled_reason
 		FROM source_health WHERE kind=?1 AND provider=?2`, kind, provider).
-		Scan(&first, &last, &success, &out.LastResults, &disabled, &reason)
+		Scan(&first, &last, &success, &out.LastResults, &out.LastRows, &disabled, &reason)
 	if errors.Is(err, sql.ErrNoRows) {
 		return out, nil
 	}
@@ -2522,7 +2550,7 @@ func (d *Database) SourceStats(kind string) ([]models.SourceStat, error) {
 			COALESCE(SUM(CASE WHEN s.day >= ?3 THEN s.results ELSE 0 END), 0),
 			COALESCE(SUM(CASE WHEN s.day >= ?3 THEN s.accepted ELSE 0 END), 0),
 			MAX(h.first_attempt_at), MAX(h.last_attempt_at), MAX(h.last_success_at),
-			COALESCE(MAX(h.last_results), 0), MAX(h.disabled_at), MAX(h.disabled_reason)
+			COALESCE(MAX(h.last_results), 0), COALESCE(MAX(h.last_rows), 0), MAX(h.disabled_at), MAX(h.disabled_reason)
 		FROM source_daily s
 		LEFT JOIN source_health h ON h.kind = s.kind AND h.provider = s.provider
 		WHERE s.kind = ?4 AND s.day >= ?3
@@ -2540,7 +2568,7 @@ func (d *Database) SourceStats(kind string) ([]models.SourceStat, error) {
 			&item.Attempts1, &item.Successes1, &item.Failures1, &item.Results1, &item.Accepted1,
 			&item.Attempts7, &item.Successes7, &item.Failures7, &item.Results7, &item.Accepted7,
 			&item.Attempts30, &item.Successes30, &item.Failures30, &item.Results30, &item.Accepted30,
-			&first, &last, &success, &item.LastResults, &disabled, &reason); err != nil {
+			&first, &last, &success, &item.LastResults, &item.LastRows, &disabled, &reason); err != nil {
 			return nil, err
 		}
 		item.Kind = kind

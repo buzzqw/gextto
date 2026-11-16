@@ -6308,6 +6308,8 @@ deu:
 
   "in attesa del primo ciclo": "wartet auf den ersten Zyklus"
   "mai letto": "nie gelesen"
+  "pagina cambiata": "Seite geändert"
+  "%d righe nella pagina, nessuna release letta: il sito ha probabilmente cambiato l'impaginazione. Il feed è cieco finché il parser non viene aggiornato.": "%d Zeilen auf der Seite und keine davon eine Release: die Seite hat wahrscheinlich ihr Layout geändert. Der Feed ist blind, bis der Parser aktualisiert wird."
 
   "Client eD2k": "eD2k-Client"
   "Dove gira": "Wo es läuft"

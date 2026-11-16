@@ -6301,6 +6301,8 @@ fra:
 
   "in attesa del primo ciclo": "en attente du premier cycle"
   "mai letto": "jamais lu"
+  "pagina cambiata": "page modifiée"
+  "%d righe nella pagina, nessuna release letta: il sito ha probabilmente cambiato l'impaginazione. Il feed è cieco finché il parser non viene aggiornato.": "%d lignes sur la page et aucune n'est une release : le site a probablement changé sa mise en page. Le flux est aveugle jusqu'à la mise à jour du parseur."
 
   "Client eD2k": "Client eD2k"
   "Dove gira": "Où il tourne"

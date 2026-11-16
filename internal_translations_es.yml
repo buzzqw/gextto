@@ -6255,6 +6255,8 @@ spa:
 
   "in attesa del primo ciclo": "en espera del primer ciclo"
   "mai letto": "nunca leído"
+  "pagina cambiata": "página cambiada"
+  "%d righe nella pagina, nessuna release letta: il sito ha probabilmente cambiato l'impaginazione. Il feed è cieco finché il parser non viene aggiornato.": "%d filas en la página y ninguna es una release: el sitio probablemente ha cambiado su maquetación. El feed está ciego hasta que se actualice el analizador."
 
   "Client eD2k": "Cliente eD2k"
   "Dove gira": "Dónde se ejecuta"

@@ -75,14 +75,19 @@ type detailLink struct {
 }
 
 // parseListing extracts the items of an HTML listing. follow is false when the
-// page was itself reached through a feed link, so discovery cannot loop.
-func parseListing(ctx context.Context, client *http.Client, pageURL string, body []byte, source string, follow bool) ([]Item, error) {
+// page was itself reached through a feed link, so discovery cannot loop. rows is
+// how many listing rows the page carried, kept or not.
+func parseListing(ctx context.Context, client *http.Client, pageURL string, body []byte, source string, follow bool) ([]Item, int, error) {
 	doc, err := html.Parse(bytes.NewReader(body))
 	if err != nil {
-		return nil, fmt.Errorf("rss: cannot parse %s: %w", source, err)
+		return nil, 0, fmt.Errorf("rss: cannot parse %s: %w", source, err)
 	}
 	base, _ := url.Parse(pageURL)
 	var items []Item
+	// rows counts the torrent links the page carried, whether one of them
+	// yields an item or not: the caller tells a listing that went blind from
+	// one that is simply empty.
+	rows := 0
 	seen := map[string]bool{}
 	var details []detailLink
 	var feedLink string
@@ -104,6 +109,7 @@ func parseListing(ctx context.Context, client *http.Client, pageURL string, body
 					key := magnetKey(href)
 					if !seen[key] && len(items) < listingMaxItems {
 						seen[key] = true
+						rows++
 						title := cleanText(nodeText(n))
 						if title == "" || strings.EqualFold(title, "magnet") {
 							title = titleFromMagnet(href)
@@ -117,6 +123,7 @@ func parseListing(ctx context.Context, client *http.Client, pageURL string, body
 					target := resolve(base, href)
 					if title != "" && target != "" && !seen[target] && len(details) < listingMaxItems {
 						seen[target] = true
+						rows++
 						details = append(details, detailLink{title: title, url: target})
 					}
 				}
@@ -136,14 +143,19 @@ func parseListing(ctx context.Context, client *http.Client, pageURL string, body
 	}
 	if len(items) == 0 {
 		if len(details) > 0 {
-			return nil, fmt.Errorf("rss: %s: no magnet found in the detail pages", source)
+			return nil, rows, fmt.Errorf("rss: %s: no magnet found in the detail pages", source)
+		}
+		if rows > 0 {
+			// The page carries torrent links and none of them yields a title:
+			// the listing changed its markup, so it is not an empty listing.
+			return nil, rows, nil
 		}
 		// The page parsed as HTML but lists nothing: it can be a listing that is
 		// simply empty right now (an uploader with no release, a filter that
 		// matches nothing), not necessarily an address that is not a listing.
-		return nil, fmt.Errorf("rss: %s: the page has no torrent link (an empty listing, or a page that is not a torrent listing)", source)
+		return nil, 0, fmt.Errorf("rss: %s: the page has no torrent link (an empty listing, or a page that is not a torrent listing)", source)
 	}
-	return items, nil
+	return items, rows, nil
 }
 
 // resolveDetails fetches the detail pages (bounded, cached) and keeps the rows

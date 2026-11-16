@@ -75,30 +75,58 @@ func (r TitleFilter) Filter(list []Item) []Item {
 	return out
 }
 
+// Read is one successful read of a feed: how many rows the page carried and how
+// many items were kept from them. A page with rows and no item is a listing
+// whose markup no longer matches the parser, not an empty listing.
+type Read struct {
+	Rows int
+	Kept int
+}
+
 // Fetch downloads a feed and parses it. source is the feed's display name.
 func Fetch(ctx context.Context, client *http.Client, rawURL, source string) ([]Item, error) {
-	return fetch(ctx, client, rawURL, source, true)
+	items, _, err := FetchWithRead(ctx, client, rawURL, source)
+	return items, err
+}
+
+// FetchWithRead is Fetch plus the rows the page carried, for a caller that
+// reports the state of a feed: a listing that yields nothing must not look like
+// an uploader with nothing new.
+func FetchWithRead(ctx context.Context, client *http.Client, rawURL, source string) ([]Item, Read, error) {
+	items, rows, err := fetch(ctx, client, rawURL, source, true)
+	if err != nil {
+		return nil, Read{}, err
+	}
+	return items, Read{Rows: rows, Kept: len(items)}, nil
 }
 
 // fetch downloads a feed; an HTML page is read as a torrent listing (listing.go).
-func fetch(ctx context.Context, client *http.Client, rawURL, source string, follow bool) ([]Item, error) {
+func fetch(ctx context.Context, client *http.Client, rawURL, source string, follow bool) ([]Item, int, error) {
 	body, contentType, err := get(ctx, client, rawURL)
 	if err != nil {
 		if strings.HasPrefix(err.Error(), "HTTP ") {
-			return nil, fmt.Errorf("rss: %s returned %w", source, err)
+			return nil, 0, fmt.Errorf("rss: %s returned %w", source, err)
 		}
-		return nil, err
+		return nil, 0, err
 	}
 	if looksLikeHTML(contentType, body) {
 		return parseListing(ctx, client, rawURL, body, source, follow)
 	}
-	return Parse(bytes.NewReader(body), source)
+	return parseCounted(bytes.NewReader(body), source)
 }
 
 // Parse reads an RSS/Atom/Torznab body into items.
 func Parse(r io.Reader, source string) ([]Item, error) {
+	items, _, err := parseCounted(r, source)
+	return items, err
+}
+
+// parseCounted is Parse plus how many items/entries the body carried, whether
+// they parsed or not.
+func parseCounted(r io.Reader, source string) ([]Item, int, error) {
 	decoder := xml.NewDecoder(r)
 	var items []Item
+	var rows int
 	var current string
 	var item Item
 	var free, known *bool
@@ -115,13 +143,14 @@ func Parse(r io.Reader, source string) ([]Item, error) {
 			if len(items) > 0 {
 				break
 			}
-			return nil, fmt.Errorf("rss: cannot parse %s: %w", source, err)
+			return nil, rows, fmt.Errorf("rss: cannot parse %s: %w", source, err)
 		}
 		switch event := token.(type) {
 		case xml.StartElement:
 			name := localName(event.Name.Local)
 			if name == "item" || name == "entry" {
 				inItem = true
+				rows++
 				item = Item{Source: source}
 				free, known, factor = nil, nil, nil
 				current = ""
@@ -194,7 +223,7 @@ func Parse(r io.Reader, source string) ([]Item, error) {
 			current = ""
 		}
 	}
-	return items, nil
+	return items, rows, nil
 }
 
 var magnetPattern = regexp.MustCompile(`magnet:\?[^"'\s<>()]+`)

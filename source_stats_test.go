@@ -33,7 +33,7 @@ func TestSourceStatsWindowsAndHealth(t *testing.T) {
 	insertSourceDay(t, db, "feed", "example.com", twentyNineDaysAgo, 1, 0, 1, 0, 0)
 	insertSourceDay(t, db, "feed", "example.com", fortyDaysAgo, 9, 0, 9, 0, 0)
 
-	if err := db.RecordSourceAttempt("feed", "example.com", true, 7, ""); err != nil {
+	if err := db.RecordSourceAttempt(SourceAttempt{Kind: "feed", Provider: "example.com", OK: true, Results: 7, Rows: 50}); err != nil {
 		t.Fatalf("RecordSourceAttempt: %v", err)
 	}
 	if err := db.RecordSourceAccepted("feed", "example.com"); err != nil {
@@ -56,7 +56,7 @@ func TestSourceStatsWindowsAndHealth(t *testing.T) {
 	if got.Attempts30 != 5 || got.Successes30 != 3 || got.Failures30 != 2 || got.Results30 != 22 {
 		t.Fatalf("30d window = %+v", got)
 	}
-	if got.LastSuccessAt == "" || got.LastResults != 7 {
+	if got.LastSuccessAt == "" || got.LastResults != 7 || got.LastRows != 50 {
 		t.Fatalf("health = %+v", got)
 	}
 
@@ -76,7 +76,7 @@ func TestSourceStatsWindowsAndHealth(t *testing.T) {
 		t.Fatalf("disabled health = %+v", health)
 	}
 	// A later success clears the marker: the operator re-enabled the feed.
-	if err := db.RecordSourceAttempt("feed", "example.com", true, 3, ""); err != nil {
+	if err := db.RecordSourceAttempt(SourceAttempt{Kind: "feed", Provider: "example.com", OK: true, Results: 3}); err != nil {
 		t.Fatalf("RecordSourceAttempt success: %v", err)
 	}
 	health, _ = db.SourceHealth("feed", "example.com")
@@ -84,7 +84,7 @@ func TestSourceStatsWindowsAndHealth(t *testing.T) {
 		t.Fatalf("success did not clear the disable marker: %+v", health)
 	}
 
-	if err := db.RecordSourceAttempt("feed", "other.example", true, 1, ""); err != nil {
+	if err := db.RecordSourceAttempt(SourceAttempt{Kind: "feed", Provider: "other.example", OK: true, Results: 1}); err != nil {
 		t.Fatalf("RecordSourceAttempt other: %v", err)
 	}
 	if ok, err := db.AnySourceSuccessToday("feed", "example.com"); err != nil || !ok {
@@ -206,7 +206,7 @@ func TestMaybeAutoDisableFeedNeedsAnotherSuccess(t *testing.T) {
 	}
 
 	// Another feed succeeding today makes this one a single-source failure.
-	if err := db.RecordSourceAttempt("feed", "two.example", true, 1, ""); err != nil {
+	if err := db.RecordSourceAttempt(SourceAttempt{Kind: "feed", Provider: "two.example", OK: true, Results: 1}); err != nil {
 		t.Fatalf("RecordSourceAttempt other: %v", err)
 	}
 	engine.maybeAutoDisableFeed(cfg, rawURL, provider)

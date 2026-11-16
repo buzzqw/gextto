@@ -108,3 +108,24 @@ func TestFetchHTMLWithoutTorrentsExplainsTheError(t *testing.T) {
 		t.Fatalf("err = %v", err)
 	}
 }
+
+// A listing whose rows no longer yield a title is not an empty listing: the read
+// reports the rows it walked, so the page can say the layout changed.
+func TestFetchWithReadCountsRowsThatYieldNoItem(t *testing.T) {
+	page := `<!DOCTYPE html><html><body>
+<a href="magnet:?xt=urn:btih:0123456789012345678901234567890123456789"></a>
+<a href="magnet:?xt=urn:btih:1123456789012345678901234567890123456789"></a>
+</body></html>`
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_, _ = w.Write([]byte(page))
+	}))
+	defer srv.Close()
+	items, read, err := FetchWithRead(context.Background(), srv.Client(), srv.URL, "ext")
+	if err != nil {
+		t.Fatalf("FetchWithRead: %v", err)
+	}
+	if len(items) != 0 || read.Rows != 2 || read.Kept != 0 {
+		t.Fatalf("items = %d, read = %+v, want 0 items and 2 rows", len(items), read)
+	}
+}

@@ -62,8 +62,11 @@ type feedStatus struct {
 	Name  string `json:"name"`
 	URL   string `json:"url"`
 	Items int    `json:"items"`
-	Added int    `json:"added"`
-	New   int    `json:"new"` // items not seen before (archived)
+	// Rows is what the page of the last check carried: with Items at zero it
+	// means the listing changed its markup and the feed is blind.
+	Rows  int `json:"rows,omitempty"`
+	Added int `json:"added"`
+	New   int `json:"new"` // items not seen before (archived)
 	// Total is the torrents the feed has brought into the archive (filled for
 	// the page, not stored).
 	Total     int    `json:"total"`
@@ -259,6 +262,7 @@ func (d *Daemon) pollFeedsOnlyDetailed(only string) feedPollResult {
 			continue
 		}
 		var items []rss.Item
+		var rows int
 		var err error
 		switch {
 		case dht:
@@ -266,12 +270,12 @@ func (d *Daemon) pollFeedsOnlyDetailed(only string) feedPollResult {
 		case search != "":
 			items, err = d.searchFeed(ctx, name, search)
 		default:
-			items, err = d.fetchFeedItems(ctx, client, feed.URL, name)
+			items, rows, err = d.fetchFeedItems(ctx, client, feed.URL, name)
 		}
 		cancel()
 		d.feedPace.done(host, err)
 		feedsChecked++
-		status := feedStatus{Name: name, URL: source, LastCheck: time.Now().Unix()}
+		status := feedStatus{Name: name, URL: source, LastCheck: time.Now().Unix(), Rows: rows}
 		// Notify only when a feed enters the error state: a feed that keeps
 		// failing at every poll must not send the same webhook over and over.
 		wasError := d.feedErrorState(name)

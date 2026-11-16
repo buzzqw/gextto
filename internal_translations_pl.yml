@@ -6249,6 +6249,8 @@ pol:
 
   "in attesa del primo ciclo": "oczekiwanie na pierwszy cykl"
   "mai letto": "nigdy nie odczytano"
+  "pagina cambiata": "strona się zmieniła"
+  "%d righe nella pagina, nessuna release letta: il sito ha probabilmente cambiato l'impaginazione. Il feed è cieco finché il parser non viene aggiornato.": "%d wierszy na stronie i żaden nie jest wydaniem: strona prawdopodobnie zmieniła układ. Kanał jest ślepy, dopóki parser nie zostanie zaktualizowany."
 
   "Client eD2k": "Klient eD2k"
   "Dove gira": "Gdzie działa"

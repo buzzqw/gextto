@@ -17,10 +17,14 @@ type v2FeedStat struct {
 	Provider string
 	State    string
 	// StateClass is the badge class: ok, warn or err.
-	StateClass   string
-	LastSuccess  string
-	LastError    string
-	LastResults  int64
+	StateClass  string
+	LastSuccess string
+	LastError   string
+	LastResults int64
+	// LastRows is what the page of the last successful read carried; with
+	// LastResults at zero it means the listing changed its layout.
+	LastRows     int64
+	PageChanged  bool
 	OneDay       string
 	SevenDays    string
 	ThirtyDays   string
@@ -77,6 +81,7 @@ func v2FeedStatsFrom(s *AppState) ([]v2FeedStat, []v2DisabledFeed, v2FeedSummary
 				stats[row.Provider] = v2StatRow{
 					lastSuccess: row.LastSuccessAt,
 					lastResults: row.LastResults,
+					lastRows:    row.LastRows,
 					oneDay:      fmt.Sprintf("%d/%d/%d/%d", row.Attempts1, row.Successes1, row.Failures1, row.Accepted1),
 					sevenDays:   fmt.Sprintf("%d/%d/%d/%d", row.Attempts7, row.Successes7, row.Failures7, row.Accepted7),
 					thirtyDays:  fmt.Sprintf("%d/%d/%d/%d", row.Attempts30, row.Successes30, row.Failures30, row.Accepted30),
@@ -134,6 +139,9 @@ func v2FeedStatsFrom(s *AppState) ([]v2FeedStat, []v2DisabledFeed, v2FeedSummary
 			}
 		}
 		state, class := "attivo", "ok"
+		// The page carried rows and none of them became a release: the site
+		// changed its layout, and the feed is blind while looking healthy.
+		pageChanged := !isDisabled && statuses[source] == "" && row.lastRows > 0 && row.lastResults == 0
 		if isDisabled {
 			state, class = "disabilitato", "warn"
 			disabled = append(disabled, v2DisabledFeed{
@@ -148,6 +156,8 @@ func v2FeedStatsFrom(s *AppState) ([]v2FeedStat, []v2DisabledFeed, v2FeedSummary
 			state, class = "in attesa del primo ciclo", ""
 		} else if row.lastSuccess == "" {
 			state, class = "mai letto", "warn"
+		} else if pageChanged {
+			state, class = "pagina cambiata", "warn"
 		}
 		oneDay, sevenDays, thirtyDays := row.oneDay, row.sevenDays, row.thirtyDays
 		if oneDay == "" {
@@ -158,6 +168,8 @@ func v2FeedStatsFrom(s *AppState) ([]v2FeedStat, []v2DisabledFeed, v2FeedSummary
 			LastSuccess:  v2FeedTime(row.lastSuccess),
 			LastError:    statuses[source],
 			LastResults:  row.lastResults,
+			LastRows:     row.lastRows,
+			PageChanged:  pageChanged,
 			OneDay:       oneDay,
 			SevenDays:    sevenDays,
 			ThirtyDays:   thirtyDays,
@@ -188,6 +200,7 @@ func v2FeedStatsFrom(s *AppState) ([]v2FeedStat, []v2DisabledFeed, v2FeedSummary
 type v2StatRow struct {
 	lastSuccess string
 	lastResults int64
+	lastRows    int64
 	oneDay      string
 	sevenDays   string
 	thirtyDays  string

@@ -630,12 +630,21 @@ func (e *Engine) scrapeFeed(ctx context.Context, cfg *Config, rawURL string, max
 	}
 	fetchCtx, cancel := context.WithTimeout(ctx, feedFetchBudget)
 	defer cancel()
-	items, err := FetchFeed(fetchCtx, rawURL, cfg.FlaresolverrURL, maxPages, maxAgeDays, oldRatio)
+	items, read, err := FetchFeedWithRead(fetchCtx, rawURL, cfg.FlaresolverrURL, maxPages, maxAgeDays, oldRatio)
 	if err == nil {
+		// A page that lists rows and yields no release is a listing whose markup
+		// no longer matches the parser: it must not pass for a feed with nothing
+		// new, or the panel stays green while the feed is blind.
+		if read.Rows > 0 && read.Kept == 0 {
+			logging.Warn(fmt.Sprintf("⚠️ %s lists %d rows but Gextto reads none of them as a release: the page has probably changed its layout", feed, read.Rows))
+		}
 		logging.SourceOK("feed", source, len(items))
 		logging.Debug("RSS feed analyzed", "feed", feed, "items", len(items))
 		if e.db != nil {
-			_ = e.db.RecordSourceAttempt("feed", statKey, true, len(items), "")
+			_ = e.db.RecordSourceAttempt(SourceAttempt{
+				Kind: "feed", Provider: statKey, OK: true,
+				Results: len(items), Rows: read.Rows,
+			})
 			_ = e.db.ProviderSuccess("feed", source)
 		}
 		return items
@@ -664,7 +673,7 @@ func (e *Engine) scrapeFeed(ctx context.Context, cfg *Config, rawURL string, max
 	logging.SourceFail("feed", source, message)
 	logging.Warn(fmt.Sprintf("⚠️ RSS feed unavailable — %s: %s", feed, message))
 	if e.db != nil {
-		_ = e.db.RecordSourceAttempt("feed", statKey, false, 0, message)
+		_ = e.db.RecordSourceAttempt(SourceAttempt{Kind: "feed", Provider: statKey, Error: message})
 		_ = e.db.ProviderFailure("feed", source, message)
 		e.maybeAutoDisableFeed(cfg, rawURL, statKey)
 	}

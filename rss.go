@@ -1572,24 +1572,40 @@ func fetchBody(ctx context.Context, client *http.Client, rawURL string, flaresol
 	return "", fmt.Errorf("%s", lastTransient)
 }
 
+// FeedRead is one successful read of a feed line: the rows the page carried and
+// the releases the parser kept from them. A page with rows and no release is a
+// listing whose markup no longer matches the parser, not an empty listing.
+type FeedRead struct {
+	Rows int
+	Kept int
+}
+
 // FetchFeed downloads a feed/listing and parses it. ext.to / Corsaro /
 // TorrentGalaxy are HTML listings, not RSS. Every release carries the feed line
 // it came from, so the archive can tell the rows of a feed removed from Sources
 // apart from the ones still configured.
 func FetchFeed(ctx context.Context, rawURL string, flaresolverr *string, maxPages int, maxAgeDays int64, oldRatio float64) ([]models.Release, error) {
-	items, err := fetchFeedItems(ctx, rawURL, flaresolverr, maxPages, maxAgeDays, oldRatio)
+	items, _, err := FetchFeedWithRead(ctx, rawURL, flaresolverr, maxPages, maxAgeDays, oldRatio)
+	return items, err
+}
+
+// FetchFeedWithRead is FetchFeed plus how many rows the page carried: a caller
+// that reports the state of a feed tells a listing that yields nothing from one
+// that is simply empty.
+func FetchFeedWithRead(ctx context.Context, rawURL string, flaresolverr *string, maxPages int, maxAgeDays int64, oldRatio float64) ([]models.Release, FeedRead, error) {
+	items, rows, err := fetchFeedItems(ctx, rawURL, flaresolverr, maxPages, maxAgeDays, oldRatio)
 	if err != nil {
-		return nil, err
+		return nil, FeedRead{}, err
 	}
 	for i := range items {
 		items[i].FeedURL = strings.TrimSpace(rawURL)
 	}
-	return items, nil
+	return items, FeedRead{Rows: rows, Kept: len(items)}, nil
 }
 
-// fetchFeedItems reads and parses one feed; FetchFeed stamps the feed line on
-// every release it returns.
-func fetchFeedItems(ctx context.Context, rawURL string, flaresolverr *string, maxPages int, maxAgeDays int64, oldRatio float64) ([]models.Release, error) {
+// fetchFeedItems reads and parses one feed; FetchFeedWithRead stamps the feed
+// line on every release it returns and reports the rows it walked.
+func fetchFeedItems(ctx context.Context, rawURL string, flaresolverr *string, maxPages int, maxAgeDays int64, oldRatio float64) ([]models.Release, int, error) {
 	lower := feedKindSubject(rawURL)
 	kind := ""
 	switch {
@@ -1602,19 +1618,21 @@ func fetchFeedItems(ctx context.Context, rawURL string, flaresolverr *string, ma
 	default:
 		body, err := fetchBody(ctx, defaultHTTPClient, rawURL, flaresolverr)
 		if err != nil {
-			return nil, err
+			return nil, 0, err
 		}
-		return parseFeedBody(body, rawURL)
+		items, err := parseFeedBody(body, rawURL)
+		return items, itemSlots(body), err
 	}
 	body, err := fetchBody(ctx, defaultHTTPClient, rawURL, flaresolverr)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	label := uploaderSourceLabel(kind, rawURL)
 	// TorrentGalaxy uploader listings link to `/post-detail/...` pages instead
 	// of carrying magnets, so they need the dedicated parser (legacy `_tgx_user`).
 	if kind == "TorrentGalaxy" {
-		return fetchTgxListing(ctx, defaultHTTPClient, body, rawURL, label, flaresolverr)
+		items, rows, err := fetchTgxListing(ctx, defaultHTTPClient, body, rawURL, label, flaresolverr)
+		return items, rows, err
 	}
 	// Age filter + early-stop (legacy `max_age_days` / `stop_on_old_page_threshold`).
 	var cutoff *time.Time
@@ -1625,6 +1643,9 @@ func fetchFeedItems(ctx context.Context, rawURL string, flaresolverr *string, ma
 	var all []models.Release
 	oldTotal := 0
 	pageTotal := 0
+	// rowsTotal is what the pages carried, kept or not: the caller reports it
+	// so a listing whose rows no longer yield a release is visible.
+	rowsTotal := 0
 	// Infohashes already collected: a page that adds none means the source is
 	// ignoring paging or repeating the same listing, so stop walking.
 	seenHashes := map[string]struct{}{}
@@ -1658,7 +1679,7 @@ func fetchFeedItems(ctx context.Context, rawURL string, flaresolverr *string, ma
 		items, old, total, err := fetchTraditionalListing(ctx, defaultHTTPClient, pageURL, pageBody, kind, label, flaresolverr, cutoff)
 		if err != nil {
 			if page == 0 {
-				return nil, err
+				return nil, 0, err
 			}
 			// A later page that cannot be parsed must not discard the releases
 			// already collected from the previous pages.
@@ -1696,6 +1717,7 @@ func fetchFeedItems(ctx context.Context, rawURL string, flaresolverr *string, ma
 		all = append(all, items...)
 		oldTotal += old
 		pageTotal += total
+		rowsTotal += total
 		if cutoff != nil && pageTotal > 0 {
 			ratio := float64(oldTotal) / float64(pageTotal)
 			if ratio >= oldRatio {
@@ -1710,7 +1732,7 @@ func fetchFeedItems(ctx context.Context, rawURL string, flaresolverr *string, ma
 			}
 		}
 	}
-	return all, nil
+	return all, rowsTotal, nil
 }
 
 func fetchTraditionalListing(ctx context.Context, client *http.Client, rawURL, body, kind, label string, flaresolverr *string, cutoff *time.Time) ([]models.Release, int, int, error) {
@@ -1879,21 +1901,22 @@ func tgxDetailLinks(body string, base *url.URL) []rssDetailLink {
 }
 
 // fetch_tgx_listing resolves TorrentGalaxy uploader pages (`/get-posts/user:NAME/`)
-// to magnets. Ports legacy's `_tgx_user` parser (no age filter).
-func fetchTgxListing(ctx context.Context, client *http.Client, body, rawURL, label string, flaresolverr *string) ([]models.Release, error) {
+// to magnets. Ports legacy's `_tgx_user` parser (no age filter). rows is how many
+// `post-detail` rows the page carried, kept or not.
+func fetchTgxListing(ctx context.Context, client *http.Client, body, rawURL, label string, flaresolverr *string) ([]models.Release, int, error) {
 	base, err := url.Parse(rawURL)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	pending := tgxDetailLinks(body, base)
 	if len(pending) == 0 {
 		logging.Warn("torrentgalaxy listing returned no post-detail rows", "feed_url", rawURL)
-		return []models.Release{}, nil
+		return []models.Release{}, 0, nil
 	}
 	var output []models.Release
 	fetchDetailMagnets(ctx, client, pending, label, flaresolverr, &output, nil)
 	logging.Debug("torrentgalaxy listing parsed", "feed_url", rawURL, "label", label, "items", len(output))
-	return output, nil
+	return output, len(pending), nil
 }
 
 // fetch_detail_magnets resolves detail pages to magnets, reusing the persistent

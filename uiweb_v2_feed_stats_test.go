@@ -9,6 +9,43 @@ import (
 	"time"
 )
 
+// A listing whose rows the parser no longer reads must not pass for an uploader
+// with nothing new: the state says the page changed.
+func TestFeedStatsSayPageChangedWhenRowsYieldNoRelease(t *testing.T) {
+	state := newTestAppState(t)
+	lines := []string{"https://one.example/feed.xml"}
+	encoded, _ := json.Marshal(lines)
+	if err := saveConfigSetting(state.cfg.DataDir, "url", string(encoded)); err != nil {
+		t.Fatalf("save feed setting: %v", err)
+	}
+	key := feedStatKey("https://one.example/feed.xml")
+	if err := state.db.RecordSourceAttempt(SourceAttempt{Kind: "feed", Provider: key, OK: true, Results: 0, Rows: 50}); err != nil {
+		t.Fatalf("record attempt: %v", err)
+	}
+	table, _, _ := v2FeedStatsFrom(state)
+	if len(table) != 1 {
+		t.Fatalf("feed table = %+v, want one row", table)
+	}
+	row := table[0]
+	if row.State != "pagina cambiata" || row.StateClass != "warn" || !row.PageChanged {
+		t.Fatalf("state = %q (%q, page changed %v), want the page-changed warning",
+			row.State, row.StateClass, row.PageChanged)
+	}
+	if row.LastRows != 50 || row.LastResults != 0 {
+		t.Fatalf("last read = %d rows, %d releases, want 50 and 0", row.LastRows, row.LastResults)
+	}
+
+	// The same feed, read again after the page went back to normal, is healthy
+	// again: the warning belongs to the last read only.
+	if err := state.db.RecordSourceAttempt(SourceAttempt{Kind: "feed", Provider: key, OK: true, Results: 50, Rows: 50}); err != nil {
+		t.Fatalf("record second attempt: %v", err)
+	}
+	table, _, _ = v2FeedStatsFrom(state)
+	if table[0].State == "pagina cambiata" || table[0].PageChanged {
+		t.Fatalf("state after a good read = %q, want the feed healthy", table[0].State)
+	}
+}
+
 func TestFeedStatsPanelShowsActivityAndDisabledFrame(t *testing.T) {
 	state := newTestAppState(t)
 	lines := []string{
@@ -19,7 +56,7 @@ func TestFeedStatsPanelShowsActivityAndDisabledFrame(t *testing.T) {
 	if err := saveConfigSetting(state.cfg.DataDir, "url", string(encoded)); err != nil {
 		t.Fatalf("save feed setting: %v", err)
 	}
-	if err := state.db.RecordSourceAttempt("feed", feedStatKey("https://one.example/feed.xml"), true, 4, ""); err != nil {
+	if err := state.db.RecordSourceAttempt(SourceAttempt{Kind: "feed", Provider: feedStatKey("https://one.example/feed.xml"), OK: true, Results: 4, Rows: 50}); err != nil {
 		t.Fatalf("record attempt: %v", err)
 	}
 	if err := state.db.RecordSourceAccepted("feed", feedStatKey("https://one.example/feed.xml")); err != nil {

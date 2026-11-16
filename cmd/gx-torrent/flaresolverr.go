@@ -101,25 +101,27 @@ func isLocalURL(rawURL string) bool {
 
 // fetchFeedItems reads a feed: directly, and through FlareSolverr when the
 // direct read fails on a remote host (a Cloudflare-protected RSS/HTML page).
-func (d *Daemon) fetchFeedItems(ctx context.Context, client *http.Client, rawURL, name string) ([]rss.Item, error) {
-	items, err := rss.Fetch(ctx, client, rawURL, name)
+// rows is how many rows the page carried, so a listing whose markup changed is
+// visible instead of looking empty.
+func (d *Daemon) fetchFeedItems(ctx context.Context, client *http.Client, rawURL, name string) ([]rss.Item, int, error) {
+	items, read, err := rss.FetchWithRead(ctx, client, rawURL, name)
 	if err == nil {
-		return items, nil
+		return items, read.Rows, nil
 	}
 	ep := d.flareEndpoint()
 	// As in remoteGet: FlareSolverr would fetch on its own network.
 	if ep == "" || isLocalURL(rawURL) || torrent.ProxyEnabled() {
-		return nil, err
+		return nil, 0, err
 	}
 	data, ferr := flaresolverr.Get(ctx, ep, rawURL)
 	if ferr != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	parsed, perr := rss.Parse(bytes.NewReader(data), name)
 	if perr != nil {
-		return nil, err
+		return nil, 0, err
 	}
-	return parsed, nil
+	return parsed, 0, nil
 }
 
 // handleUIRssFlareTest checks the FlareSolverr URL typed in the field (before it
