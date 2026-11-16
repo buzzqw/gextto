@@ -72,7 +72,7 @@ main.page{max-width:1080px}
         <span><i class="ul"></i><span>{{tr "Uploaded"}}</span> <span class="aux">—</span> <span id="s-legend-u">—</span></span>
       </div>
     </div>
-    <div class="btn-group" role="group" aria-label="{{tr "Time range"}}" data-range-group style="margin-top:10px">
+    <div class="btn-group" role="group" aria-label="{{tr "Time range"}}" data-range-group class="mt-10">
       <button type="button" class="sm" data-range="1h" aria-pressed="true" title="{{tr "Show the graph over this period"}}">1 h</button>
       <button type="button" class="sm" data-range="24h" aria-pressed="false" title="{{tr "Show the graph over this period"}}">24 h</button>
       <button type="button" class="sm" data-range="7d" aria-pressed="false" title="{{tr "Show the graph over this period"}}">7 d</button>
@@ -155,8 +155,8 @@ main.page{max-width:1080px}
       <div class="row"><span title="{{tr "Peers refused because their client is on the client filter list"}}">{{tr "Clients refused"}}</span><strong id="d-refused">—</strong></div>
       <div class="row"><span title="{{tr "Public tracker list appended to new public torrents"}}">{{tr "Tracker list"}}</span><strong id="d-trackers">—</strong></div>
     </div>
-    <div class="table-wrap" style="margin-top:12px">
-      <table class="tbl" style="width:100%">
+    <div class="table-wrap mt-12">
+      <table class="tbl w-full">
         <caption class="sr-only">{{tr "Routing table by distance from this node"}}</caption>
         <thead><tr><th scope="col" class="num" title="{{tr "Leading bits shared with this node's ID: higher is closer"}}">{{tr "Shared bits"}}</th><th scope="col" class="num">{{tr "Nodes"}}</th><th scope="col" class="num">{{tr "Good"}}</th></tr></thead>
         <tbody id="d-buckets"></tbody>
@@ -167,7 +167,7 @@ main.page{max-width:1080px}
   <section class="panel" aria-labelledby="h-busiest">
     <div class="cardtitle"><h2 id="h-busiest">{{tr "Busiest right now"}}</h2><span class="aux">{{tr "At page load"}}</span></div>
     <div class="table-wrap">
-      <table class="tbl" style="width:100%">
+      <table class="tbl w-full">
         <thead><tr><th scope="col">{{tr "Name"}}</th><th scope="col" class="num">↓</th><th scope="col" class="num">↑</th><th scope="col" class="num">{{tr "Ratio"}}</th><th scope="col" class="num">{{tr "Peers"}}</th></tr></thead>
         <tbody id="s-busiest"></tbody>
       </table>

@@ -1,7 +1,7 @@
 {{define "v2_torrent_add_result"}}{{if .Error}}<p class="alert">{{tr .Message}}</p>{{else}}<p class="muted">{{tr .Message}}</p>{{end}}{{end}}
 
 {{define "v2_http_download_detail"}}
-<div class="overlay" style="display:block"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="v2-http-title">
+<div class="block overlay"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="v2-http-title">
    <div class="modal-head"><h3 id="v2-http-title">{{tr .Title}}</h3><button class="btn sm" type="button" hx-get="/empty" hx-target="#v2-modal" hx-swap="innerHTML" {{trTitle "Chiudi i dettagli del download HTTP"}}>{{tr "Chiudi"}}</button></div>
   <div class="modal-body"><div class="stat-grid"><div class="row"><span>{{tr "Metodo"}}</span><strong>{{tr .Method}}</strong></div><div class="row"><span>{{tr "Stato"}}</span><strong>{{tr .Status}}</strong></div><div class="row"><span>{{tr "Progresso"}}</span><strong>{{printf "%.1f" .Progress}}%</strong></div><div class="row"><span>{{tr "Scaricato"}}</span><strong>{{bytesU .DownloadedBytes}}</strong></div><div class="row"><span>{{tr "Velocità"}}</span><strong>{{rate .SpeedBytes}}</strong></div><div class="row"><span>{{tr "ETA"}}</span><strong>{{if .ETASeconds}}{{.ETASeconds}} s{{else}}—{{end}}</strong></div></div>
     {{if .URL}}<p class="muted"><strong>{{tr "URL:"}}</strong> <code>{{tr .URL}}</code></p>{{end}}{{if .Destination}}<p class="muted"><strong>{{tr "Destinazione:"}}</strong> <code>{{tr .Destination}}</code></p>{{end}}{{if .Temporary}}<p class="muted"><strong>{{tr "Temporaneo:"}}</strong> <code>{{tr .Temporary}}</code></p>{{end}}{{if .Error}}<p class="alert">{{tr .Error}}</p>{{end}}
@@ -10,7 +10,7 @@
 {{end}}
 
 {{define "v2_ed2k_detail"}}
-<div class="overlay" style="display:block"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="v2-ed2k-detail-title">
+<div class="block overlay"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="v2-ed2k-detail-title">
   <div class="modal-head"><h3 id="v2-ed2k-detail-title" class="truncate" {{trTitle .Name}}>{{tr .Name}}</h3><button class="btn sm" type="button" hx-get="/empty" hx-target="#v2-modal" hx-swap="innerHTML" {{trTitle "Chiudi i dettagli del download eD2k"}}>{{tr "Chiudi"}}</button></div>
   <div class="modal-body" id="v2-ed2k-detail-body">{{template "v2_ed2k_detail_body" .}}</div>
 </div></div>
@@ -46,7 +46,7 @@
 {{else if .Error}}<p class="alert" role="alert"><span>{{tr "File condivisi non disponibili:"}}</span> {{tr .Error}}</p>
 {{else}}
 <div class="toolbar">
-  <form method="post" action="/ed2k/shared/reload" style="display:inline">
+  <form method="post" action="/ed2k/shared/reload" class="inline">
     <button class="btn sm" type="submit" {{trTitle "Chiede ad aMule di rileggere le cartelle condivise: i file aggiunti o tolti compaiono qui"}}>{{tr "Ricarica file condivisi"}}</button>
   </form>
 </div>
@@ -149,7 +149,7 @@
 {{end}}
 
 {{define "v2_tmdb_manual"}}
-<div class="overlay" style="display:block"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="v2-manual-add-title">
+<div class="block overlay"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="v2-manual-add-title">
   <div class="modal-head"><h3 id="v2-manual-add-title">{{if eq .Kind "movie"}}{{tr "Aggiungi film"}}{{else}}{{tr "Aggiungi serie"}}{{end}}</h3><button class="btn sm" type="button" hx-get="/empty" hx-target="#v2-modal" hx-swap="innerHTML">{{tr "Chiudi"}}</button></div>
   <div class="modal-body"><form class="form-grid" method="post" action="/tmdb/add" hx-post="/tmdb/add" hx-target="#v2-tmdb-add-result" hx-swap="innerHTML">
     <input type="hidden" name="kind" value="{{.Kind}}"><input type="hidden" name="source" value="discover"><input type="hidden" name="redirect" value="{{.Redirect}}">
@@ -164,7 +164,7 @@
 {{end}}
 
 {{define "v2_button"}}
-<form method="post" action="/section/action" hx-post="/section/action" hx-swap="none" style="display:inline">
+<form method="post" action="/section/action" hx-post="/section/action" hx-swap="none" class="inline">
   <input type="hidden" name="view" value="{{.View}}">
   {{if .Redirect}}<input type="hidden" name="redirect" value="{{.Redirect}}">{{end}}
   <input type="hidden" name="path" value="{{.Path}}">

@@ -15,7 +15,7 @@
   {{$has := false}}
   {{range .Groups}}{{if .Items}}{{$has = true}}<div class="field comic-link-group"><span>{{tr .Label}}</span><div class="toolbar">
     {{range $i, $item := .Items}}
-    <form hx-post="/comics/download" hx-target="this" hx-swap="outerHTML" style="display:inline">
+    <form hx-post="/comics/download" hx-target="this" hx-swap="outerHTML" class="inline">
       <input type="hidden" name="url" value="{{$item}}" />
       <input type="hidden" name="method" value="{{.Method}}" />
       <input type="hidden" name="title" value="Comic {{.Label}} {{$i | addOne}}" />
@@ -30,7 +30,7 @@
 
 {{define "v2_comics_explore_results"}}
 {{if .Error}}<p class="alert">{{tr .Error}}</p>
-{{else if .Items}}<div class="table-wrap"><table class="data-table"><thead><tr><th>{{tr "Risultato GetComics"}}</th><th>{{tr "Data"}}</th><th>{{tr "Azioni"}}</th></tr></thead><tbody>{{range .Items}}<tr><td>{{if .URL}}<a href="{{.URL}}" target="_blank" rel="noopener">{{tr .Title}}</a>{{else}}{{tr .Title}}{{end}}</td><td>{{tr .Date}}</td><td class="row-actions"><form hx-post="/comics/explore/download" hx-target="this" hx-swap="outerHTML" style="display:inline"><input type="hidden" name="url" value="{{.URL}}"><input type="hidden" name="title" value="{{.Title}}"><button class="btn sm primary" type="submit">{{tr "Scarica"}}</button></form><button class="btn sm" type="button" hx-get="/comics/explore/select?title={{.Title | urlquery}}&amp;url={{.URL | urlquery}}&amp;tag_url={{.TagURL | urlquery}}&amp;cover_url={{.CoverURL | urlquery}}&amp;publisher={{.Publisher | urlquery}}&amp;description={{.Description | urlquery}}&amp;date={{.Date | urlquery}}" hx-target="#v2-form-output-comics-comics" hx-swap="afterend">{{tr "Seleziona"}}</button></td></tr>{{end}}</tbody></table></div>
+{{else if .Items}}<div class="table-wrap"><table class="data-table"><thead><tr><th>{{tr "Risultato GetComics"}}</th><th>{{tr "Data"}}</th><th>{{tr "Azioni"}}</th></tr></thead><tbody>{{range .Items}}<tr><td>{{if .URL}}<a href="{{.URL}}" target="_blank" rel="noopener">{{tr .Title}}</a>{{else}}{{tr .Title}}{{end}}</td><td>{{tr .Date}}</td><td class="row-actions"><form hx-post="/comics/explore/download" hx-target="this" hx-swap="outerHTML" class="inline"><input type="hidden" name="url" value="{{.URL}}"><input type="hidden" name="title" value="{{.Title}}"><button class="btn sm primary" type="submit">{{tr "Scarica"}}</button></form><button class="btn sm" type="button" hx-get="/comics/explore/select?title={{.Title | urlquery}}&amp;url={{.URL | urlquery}}&amp;tag_url={{.TagURL | urlquery}}&amp;cover_url={{.CoverURL | urlquery}}&amp;publisher={{.Publisher | urlquery}}&amp;description={{.Description | urlquery}}&amp;date={{.Date | urlquery}}" hx-target="#v2-form-output-comics-comics" hx-swap="afterend">{{tr "Seleziona"}}</button></td></tr>{{end}}</tbody></table></div>
 {{else}}<p class="muted">{{tr "Nessun risultato su GetComics."}}</p>{{end}}
 {{end}}
 
@@ -43,7 +43,7 @@
 {{define "v2_comics_download_result"}}{{if .Error}}<span class="badge err">{{tr .Message}}</span>{{else}}<span class="badge ok">{{tr .Message}}</span>{{end}}{{end}}
 
 {{define "v2_comic_edit_modal"}}
-<div class="overlay" style="display:block">
+<div class="block overlay">
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="v2-comic-edit-title">
     <div class="modal-head"><h3 id="v2-comic-edit-title">{{tr "Modifica fumetto monitorato"}}</h3>
       <button class="btn sm" type="button" hx-get="/empty" hx-target="#v2-modal" hx-swap="innerHTML">{{tr "Chiudi"}}</button></div>

@@ -95,11 +95,11 @@
       <div class="row"><span>{{tr "Preallocazione file"}}</span><strong>{{if .Prefs.AllocateFull}}<span class="badge warn" {{trTitle "aMule alloca l'intero file prima di scaricarlo: su un disco di rete può bloccare la coda per decine di secondi"}}>{{tr "attiva"}}</span>{{else}}<span class="badge ok" {{trTitle "aMule non prealloca l'intero file: sui dischi di rete è il comportamento consigliato"}}>{{tr "spenta"}}</span>{{end}}</strong></div>
     </div>
     <div class="toolbar">
-      <form method="post" action="/ed2k/action" hx-post="/ed2k/action" hx-target="#v2-ed2k-state" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="action" value="connect"><button class="btn primary" type="submit" {{trTitle "Connette eD2k a un server e avvia Kad"}}>{{tr "Connetti"}}</button></form>
-      <form method="post" action="/ed2k/action" hx-post="/ed2k/action" hx-target="#v2-ed2k-state" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="action" value="disconnect"><button class="btn" type="submit" {{trTitle "Disconnette eD2k e Kad; i download restano in coda"}}>{{tr "Disconnetti"}}</button></form>
-      {{if .Status.KadRunning}}<form method="post" action="/ed2k/action" hx-post="/ed2k/action" hx-target="#v2-ed2k-state" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="action" value="kad_stop"><button class="btn" type="submit" {{trTitle "Ferma la rete Kad"}}>{{tr "Ferma Kad"}}</button></form>
-      {{else}}<form method="post" action="/ed2k/action" hx-post="/ed2k/action" hx-target="#v2-ed2k-state" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="action" value="kad_start"><button class="btn" type="submit" {{trTitle "Avvia la rete Kad"}}>{{tr "Avvia Kad"}}</button></form>{{end}}
-      {{if .Status.Ed2kConnected}}<form method="post" action="/ed2k/action" hx-post="/ed2k/action" hx-target="#v2-ed2k-state" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="action" value="server_disconnect"><button class="btn" type="submit" {{trTitle "Lascia il server eD2k attuale; Kad resta attivo"}}>{{tr "Lascia il server"}}</button></form>{{end}}
+      <form method="post" action="/ed2k/action" hx-post="/ed2k/action" hx-target="#v2-ed2k-state" hx-swap="innerHTML" class="inline"><input type="hidden" name="action" value="connect"><button class="btn primary" type="submit" {{trTitle "Connette eD2k a un server e avvia Kad"}}>{{tr "Connetti"}}</button></form>
+      <form method="post" action="/ed2k/action" hx-post="/ed2k/action" hx-target="#v2-ed2k-state" hx-swap="innerHTML" class="inline"><input type="hidden" name="action" value="disconnect"><button class="btn" type="submit" {{trTitle "Disconnette eD2k e Kad; i download restano in coda"}}>{{tr "Disconnetti"}}</button></form>
+      {{if .Status.KadRunning}}<form method="post" action="/ed2k/action" hx-post="/ed2k/action" hx-target="#v2-ed2k-state" hx-swap="innerHTML" class="inline"><input type="hidden" name="action" value="kad_stop"><button class="btn" type="submit" {{trTitle "Ferma la rete Kad"}}>{{tr "Ferma Kad"}}</button></form>
+      {{else}}<form method="post" action="/ed2k/action" hx-post="/ed2k/action" hx-target="#v2-ed2k-state" hx-swap="innerHTML" class="inline"><input type="hidden" name="action" value="kad_start"><button class="btn" type="submit" {{trTitle "Avvia la rete Kad"}}>{{tr "Avvia Kad"}}</button></form>{{end}}
+      {{if .Status.Ed2kConnected}}<form method="post" action="/ed2k/action" hx-post="/ed2k/action" hx-target="#v2-ed2k-state" hx-swap="innerHTML" class="inline"><input type="hidden" name="action" value="server_disconnect"><button class="btn" type="submit" {{trTitle "Lascia il server eD2k attuale; Kad resta attivo"}}>{{tr "Lascia il server"}}</button></form>{{end}}
       <button class="btn" type="button" hx-get="/?view=ed2k" hx-select="#v2-ed2k-state" hx-target="#v2-ed2k-state" hx-swap="outerHTML" {{trTitle "Rilegge lo stato da aMule"}}>{{tr "Aggiorna"}}</button>
     </div>
   {{end}}
@@ -119,7 +119,7 @@
         <td class="numeric">{{tr .Users}}</td>
         <td class="numeric">{{tr .Files}}</td>
         <td class="numeric">{{if .Ping}}{{.Ping}} ms{{else}}—{{end}}</td>
-        <td class="row-actions">{{if not .Connected}}<form method="post" action="/ed2k/action" hx-post="/ed2k/action" hx-target="#v2-ed2k-state" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="action" value="server_connect"><input type="hidden" name="address" value="{{.Address}}"><button class="btn sm" type="submit" {{trTitle "Connetti aMule a questo server"}} aria-label="{{tr "Connetti a %s" .Address}}">{{tr "Connetti"}}</button></form>{{end}}</td>
+        <td class="row-actions">{{if not .Connected}}<form method="post" action="/ed2k/action" hx-post="/ed2k/action" hx-target="#v2-ed2k-state" hx-swap="innerHTML" class="inline"><input type="hidden" name="action" value="server_connect"><input type="hidden" name="address" value="{{.Address}}"><button class="btn sm" type="submit" {{trTitle "Connetti aMule a questo server"}} aria-label="{{tr "Connetti a %s" .Address}}">{{tr "Connetti"}}</button></form>{{end}}</td>
       </tr>{{end}}</tbody>
     </table></div>
     {{else}}<p class="muted">{{tr "La lista dei server è vuota: scaricane una qui sotto."}}</p>{{end}}
@@ -159,7 +159,7 @@
     <td><span class="truncate" {{trTitle .Name}}>{{tr .Name}}</span>{{if .Known}} <span class="badge" {{trTitle "aMule conosce già questo file: è in coda, scaricato o condiviso"}}>{{tr "già noto"}}</span>{{end}}{{template "v2_ed2k_trust" .}}</td>
     <td class="numeric">{{bytes .Size}}</td>
     <td class="numeric" {{trTitle "Fonti totali / complete"}}>{{.Sources}} / {{.Complete}}</td>
-    <td class="row-actions"><form method="post" action="/ed2k/add" hx-post="/ed2k/add" hx-target="this" hx-swap="outerHTML" style="display:inline"><input type="hidden" name="links" value="{{.Link}}"><button class="btn sm primary" type="submit" {{trTitle "Aggiungi questo file ai download di aMule"}} aria-label="{{tr "Scarica %s" .Name}}">{{tr "Scarica"}}</button></form></td>
+    <td class="row-actions"><form method="post" action="/ed2k/add" hx-post="/ed2k/add" hx-target="this" hx-swap="outerHTML" class="inline"><input type="hidden" name="links" value="{{.Link}}"><button class="btn sm primary" type="submit" {{trTitle "Aggiungi questo file ai download di aMule"}} aria-label="{{tr "Scarica %s" .Name}}">{{tr "Scarica"}}</button></form></td>
   </tr>{{end}}</tbody>
 </table></div>
 </div>

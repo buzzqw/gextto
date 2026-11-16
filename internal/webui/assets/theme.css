@@ -63,6 +63,9 @@
     --accent: #5b8cff;
     --accent-hover: #7aa1ff;
     --accent-fg: #0b1020;
+  /* Ink on a solid danger fill, and the veil behind a dialog. */
+  --on-danger: #fff;
+  --backdrop: rgba(8, 12, 20, .55);
     --accent-soft: #1b2744;
     --accent-soft-fg: #a9c2ff;
     --ok: #4ade80;
@@ -119,6 +122,57 @@
   --shadow-lg: 0 16px 48px rgba(0, 0, 0, .6);
   --focus: #8fb0ff;
 }
+
+/* ---------- utilities ----------
+   The pages carry a class instead of a style attribute: spacing, type size and
+   width live here, beside the colour tokens, so a value is changed once. */
+.m-0 { margin: 0; }
+.mt-8 { margin-top: 8px; }
+.mt-10 { margin-top: 10px; }
+.mt-12 { margin-top: 12px; }
+.mt-14 { margin-top: 14px; }
+.mt-20 { margin-top: 20px; }
+.mb-6 { margin-bottom: 6px; }
+.mb-8 { margin-bottom: 8px; }
+.mb-10 { margin-bottom: 10px; }
+.mb-12 { margin-bottom: 12px; }
+.p-14 { padding: 14px; }
+.fs-12 { font-size: 12.5px; }
+.fs-13 { font-size: 13px; }
+.w-full { width: 100%; }
+.max-w-page { max-width: 1100px; }
+.max-h-60 { max-height: 60vh; }
+.items-end { align-items: flex-end; }
+/* Settings filter and its field. */
+.search-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+.search-bar input[type="search"] { max-width: 340px; }
+/* A URL inside a table cell: it must wrap instead of widening the column. */
+.cell-url { word-break: break-all; }
+.fname { word-break: break-word; }
+.file-actions { display: inline-flex; gap: 4px; }
+.pin-form { margin: 8px 0; }
+/* The two buttons of an empty state, centred under its sentence. */
+.emptystate-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+/* The row of actions at the head of the detail drawer. */
+.action-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+.row-actions { display: flex; gap: 6px; }
+/* The indexer search dialog is wider than the standard one. */
+.dlg-wide { width: min(760px, calc(100vw - 32px)); }
+/* The icon sprite sits in the page without taking space. */
+.sprite { position: absolute; }
+/* A key/value list with one label per row. */
+.kv-single { grid-template-columns: 1fr; gap: 0; }
+.max-h-22 { max-height: 22vh; }
+/* The search field and its sort selector in the indexer dialog. */
+.search-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.search-row .grow { flex: 1; min-width: 220px; }
+/* The spacer row that keeps the scrollbar steady in the virtual list. */
+.vpad td { height: var(--vpad, 0px); padding: 0; border: 0; }
+/* The download progress of the detail head: shorter than the list bar. */
+.progress.detail { height: 8px; margin-bottom: 14px; }
+.dbar i { opacity: var(--op, 1); }
+/* The empty state of a page: a large muted symbol above the sentence. */
+.wanted-empty-icon { width: 40px; height: 40px; color: var(--subtle); }
 
 /* ---------- base ---------- */
 [hidden] { display: none !important; }
@@ -216,7 +270,7 @@ button.primary, .btn.primary { background: var(--accent); border-color: var(--ac
 button.primary:hover, .btn.primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); color: var(--accent-fg); }
 button.danger, .btn.danger { color: var(--err); border-color: var(--border-strong); }
 button.danger:hover, .btn.danger:hover { background: var(--err-soft); border-color: var(--err); }
-button.danger.solid { background: var(--err); border-color: var(--err); color: #fff; }
+button.danger.solid { background: var(--err); border-color: var(--err); color: var(--on-danger); }
 button.ghost, .btn.ghost { border-color: transparent; background: transparent; color: var(--muted); }
 button.ghost:hover, .btn.ghost:hover { background: var(--hover); color: var(--text); }
 button.icon, .btn.icon { width: 32px; padding: 0; }
@@ -305,7 +359,7 @@ table.tbl { width: 100%; border-collapse: separate; border-spacing: 0; font-size
 
 /* ---------- progress ---------- */
 .progress { position: relative; height: 6px; border-radius: 99px; background: var(--surface-2); overflow: hidden; }
-.progress > i { position: absolute; inset: 0 auto 0 0; border-radius: 99px; background: var(--bar-down); transition: width .4s ease; }
+.progress > i { position: absolute; inset: 0 auto 0 0; width: var(--pct, 0%); border-radius: 99px; background: var(--bar-down); transition: width .4s ease; }
 .progress.seeding > i { background: var(--bar-seed); }
 .progress.paused > i, .progress.stalled > i, .progress.disk_wait > i { background: var(--bar-paused); }
 .progress.error > i { background: var(--err); }
@@ -319,7 +373,7 @@ dialog {
 dialog[open] { display: flex; flex-direction: column; overflow: hidden; }
 dialog > form { display: flex; flex-direction: column; min-height: 0; max-height: calc(100vh - 48px); }
 dialog .dlg-body { flex: 1; min-height: 0; }
-dialog::backdrop { background: rgba(8, 12, 20, .55); backdrop-filter: blur(2px); }
+dialog::backdrop { background: var(--backdrop); backdrop-filter: blur(2px); }
 dialog .dlg-head { display: flex; align-items: center; gap: 10px; padding: 16px 18px 6px; }
 dialog .dlg-head h2 { margin: 0; font-size: 16px; flex: 1; }
 dialog .dlg-body { padding: 8px 18px 4px; display: flex; flex-direction: column; gap: 12px; overflow: auto; }
@@ -373,7 +427,7 @@ dialog.picker { width: min(640px, calc(100vw - 32px)); padding: 16px; gap: 10px;
   background: var(--text); color: var(--bg); box-shadow: var(--shadow-lg);
   font-size: 13.5px; transition: opacity .35s, transform .35s;
 }
-.toast.err { background: var(--err); color: #fff; }
+.toast.err { background: var(--err); color: var(--on-danger); }
 .toast.hide { opacity: 0; transform: translateY(6px); }
 
 /* ---------- generic page layout (secondary pages) ---------- */

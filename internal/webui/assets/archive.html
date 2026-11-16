@@ -73,10 +73,10 @@ summary{cursor:pointer;color:var(--muted);font-weight:550}
   <button type="submit" title="{{tr "Search the archive"}}">{{tr "Search"}}</button>
 </form>
 <p class="muted" id="archive-info" aria-live="polite"></p>
-<div class="panel" id="archive-guide" hidden style="margin:0 0 12px;padding:14px">
-  <h3 style="margin:0 0 6px">{{tr "The archive is empty"}}</h3>
-  <p class="muted" style="margin:0 0 10px;font-size:13px">{{tr "Every item the feeds and the indexers find lands here. Nothing arrived yet: add a feed or check the indexers."}}</p>
-  <div class="actions" style="margin:0"><a class="btn sm primary" href="/ui/rss" title="{{tr "RSS feeds, indexers and rules"}}">{{tr "RSS & indexers"}}</a></div>
+<div class="panel m-0 mb-12 p-14" id="archive-guide" hidden>
+  <h3 class="m-0 mb-6">{{tr "The archive is empty"}}</h3>
+  <p class="muted m-0 mb-10 fs-13">{{tr "Every item the feeds and the indexers find lands here. Nothing arrived yet: add a feed or check the indexers."}}</p>
+  <div class="actions m-0"><a class="btn sm primary" href="/ui/rss" title="{{tr "RSS feeds, indexers and rules"}}">{{tr "RSS & indexers"}}</a></div>
 </div>
 <table>
   <caption class="sr-only">{{tr "Archive search results"}}</caption>

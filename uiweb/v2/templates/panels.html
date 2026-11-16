@@ -87,7 +87,7 @@
   <div class="panel-body">
     {{if .Hint}}<p class="hint">{{tr .Hint}}</p>{{end}}
     <div class="settings-rows">{{range .SettingFields}}{{template "v2_setting_field" .}}{{end}}</div>
-    {{if .Buttons}}<div class="toolbar" style="margin-top:12px">{{range .Buttons}}{{template "v2_button" .}}{{end}}</div>{{end}}
+    {{if .Buttons}}<div class="mt-12 toolbar">{{range .Buttons}}{{template "v2_button" .}}{{end}}</div>{{end}}
   </div>
 </div>
 {{else if eq .Kind "links"}}
@@ -138,7 +138,7 @@
     <p class="hint">{{tr "Gli elementi nel cestino non occupano la libreria; eliminali singolarmente o svuota tutto."}}</p>
     <div class="toolbar">
       <button class="btn sm primary" type="button" hx-get="/partial/trash" hx-target="#v2-trash-output" hx-swap="innerHTML">{{tr "Apri cestino"}}</button>
-      <form method="post" action="/trash/delete" hx-post="/trash/delete" hx-swap="none" style="display:inline">
+      <form method="post" action="/trash/delete" hx-post="/trash/delete" hx-swap="none" class="inline">
         <input type="hidden" name="all" value="1" />
         <button class="btn sm danger" type="submit" hx-confirm="{{tr "Eliminare tutti gli elementi del cestino?"}}">{{tr "Svuota cestino"}}</button>
       </form>
@@ -181,7 +181,7 @@
   <div class="panel-head"><h3>{{tr .Title}}</h3></div>
   <div class="panel-body">
     <div class="toolbar">
-      <form hx-post="/oauth/start" hx-target="#v2-oauth-output-simkl" hx-swap="innerHTML" style="display:inline">
+      <form hx-post="/oauth/start" hx-target="#v2-oauth-output-simkl" hx-swap="innerHTML" class="inline">
         <input type="hidden" name="path" value="{{.OAuth.StartPath}}" />
         <button class="btn sm primary" type="submit" {{trTitle "Avvia il collegamento con il provider e mostra il codice da confermare"}}>{{tr "Avvia accesso"}}</button>
       </form>
@@ -206,11 +206,11 @@
   <div class="panel-body">
     <p class="hint">{{tr "Confronta le risoluzioni archiviate: l'anteprima non elimina nulla, la pulizia sposta le copie inferiori nel cestino."}}</p>
     <div class="toolbar">
-      <form hx-post="/maintenance/duplicates" hx-target="#v2-duplicates-panel" hx-swap="outerHTML" style="display:inline">
+      <form hx-post="/maintenance/duplicates" hx-target="#v2-duplicates-panel" hx-swap="outerHTML" class="inline">
         <input type="hidden" name="execute" value="0" />
         <button class="btn sm" type="submit" data-v2-toast-title="{{tr "Duplicati video"}}" data-v2-toast-message="{{tr "Analisi avviata: i risultati arriveranno qui tra poco."}}">{{tr "Anteprima duplicati"}}</button>
       </form>
-      <form hx-post="/maintenance/duplicates" hx-target="#v2-duplicates-panel" hx-swap="outerHTML" style="display:inline">
+      <form hx-post="/maintenance/duplicates" hx-target="#v2-duplicates-panel" hx-swap="outerHTML" class="inline">
         <input type="hidden" name="execute" value="1" />
         <button class="btn sm danger" type="submit" hx-confirm="{{tr "Spostare nel cestino le copie inferiori?"}}" data-v2-toast-title="{{tr "Duplicati video"}}" data-v2-toast-message="{{tr "Pulizia avviata: i risultati arriveranno qui tra poco."}}">{{tr "Pulisci duplicati"}}</button>
       </form>
@@ -240,26 +240,26 @@
       <thead><tr><th scope="col">{{tr "File"}}</th><th scope="col">{{tr "Dimensione"}}</th><th scope="col">{{tr "Stato"}}</th></tr></thead>
       <tbody>{{range .Files}}<tr><td class="truncate" {{trTitle .Path}}>{{tr .Name}}</td><td class="numeric">{{bytes .SizeBytes}}</td><td>{{if .Exists}}<span class="badge ok">{{tr "presente"}}</span>{{else}}<span class="badge">{{tr "assente"}}</span>{{end}}</td></tr>{{end}}</tbody>
     </table></div>
-    <div class="toolbar" style="margin-top:10px">
-      <form hx-post="/maintenance/db" hx-target="#v2-db-panel" hx-swap="outerHTML" style="display:inline" data-v2-toast-title="{{tr "Ottimizzazione database"}}" data-v2-toast-message="{{tr "VACUUM avviato: compattazione di tutti i database in corso..."}}">
+    <div class="mt-10 toolbar">
+      <form hx-post="/maintenance/db" hx-target="#v2-db-panel" hx-swap="outerHTML" class="inline" data-v2-toast-title="{{tr "Ottimizzazione database"}}" data-v2-toast-message="{{tr "VACUUM avviato: compattazione di tutti i database in corso..."}}">
         <input type="hidden" name="action" value="vacuum" />
         <button class="btn sm" type="submit" {{trTitle "Compatta tutti i database e libera spazio"}} data-v2-toast-title="{{tr "Ottimizzazione database"}}" data-v2-toast-message="{{tr "VACUUM avviato: compattazione di tutti i database in corso..."}}">{{tr "VACUUM"}}</button>
       </form>
-      <form hx-post="/maintenance/db" hx-target="#v2-db-panel" hx-swap="outerHTML" style="display:inline" data-v2-toast-title="{{tr "Ottimizzazione database"}}" data-v2-toast-message="{{tr "ANALYZE avviato: ottimizzazione delle statistiche SQLite su tutti i database in corso..."}}">
+      <form hx-post="/maintenance/db" hx-target="#v2-db-panel" hx-swap="outerHTML" class="inline" data-v2-toast-title="{{tr "Ottimizzazione database"}}" data-v2-toast-message="{{tr "ANALYZE avviato: ottimizzazione delle statistiche SQLite su tutti i database in corso..."}}">
         <input type="hidden" name="action" value="analyze" />
         <button class="btn sm" type="submit" {{trTitle "Aggiorna le statistiche del query planner su tutti i database"}} data-v2-toast-title="{{tr "Ottimizzazione database"}}" data-v2-toast-message="{{tr "ANALYZE avviato: ottimizzazione delle statistiche SQLite su tutti i database in corso..."}}">{{tr "ANALYZE"}}</button>
       </form>
-      <form hx-post="/maintenance/db" hx-target="#v2-db-panel" hx-swap="outerHTML" style="display:inline" data-v2-toast-title="{{tr "Ottimizzazione database"}}" data-v2-toast-message="{{tr "Aggiornamento dimensioni di tutti i database in corso..."}}">
+      <form hx-post="/maintenance/db" hx-target="#v2-db-panel" hx-swap="outerHTML" class="inline" data-v2-toast-title="{{tr "Ottimizzazione database"}}" data-v2-toast-message="{{tr "Aggiornamento dimensioni di tutti i database in corso..."}}">
         <input type="hidden" name="action" value="refresh" />
         <button class="btn sm" type="submit" data-v2-toast-title="{{tr "Ottimizzazione database"}}" data-v2-toast-message="{{tr "Aggiornamento dimensioni di tutti i database in corso..."}}">{{tr "Aggiorna dimensioni"}}</button>
       </form>
-      <form hx-post="/maintenance/db" hx-target="#v2-db-panel" hx-swap="outerHTML" style="display:inline" data-v2-toast-title="{{tr "Manutenzione database"}}" data-v2-toast-message="{{tr "Verifica di integrità e indici in corso..."}}">
+      <form hx-post="/maintenance/db" hx-target="#v2-db-panel" hx-swap="outerHTML" class="inline" data-v2-toast-title="{{tr "Manutenzione database"}}" data-v2-toast-message="{{tr "Verifica di integrità e indici in corso..."}}">
         <input type="hidden" name="action" value="check" />
         <button class="btn sm" type="submit" {{trTitle "Controlla integrità, chiavi esterne e indici di tutti i database"}} data-v2-toast-title="{{tr "Manutenzione database"}}" data-v2-toast-message="{{tr "Verifica di integrità e indici in corso..."}}">{{tr "Verifica integrità e indici"}}</button>
       </form>
     </div>
-    {{if and (or (eq .Action "vacuum") (eq .Action "analyze")) (not .Error)}}<div class="stat-grid" style="margin-top:10px"><span class="stat"><strong>{{bytes .BeforeSize}}</strong> {{tr "prima"}}</span><span class="stat"><strong>{{bytes .AfterSize}}</strong> {{tr "dopo"}}</span></div>{{end}}
-    {{if .Checks}}<div class="table-wrap" style="margin-top:10px"><table class="data-table"><caption class="sr-only">{{tr "Esito verifica database"}}</caption><thead><tr><th scope="col">{{tr "Database"}}</th><th scope="col">{{tr "Esito"}}</th><th scope="col">{{tr "Dettaglio"}}</th></tr></thead><tbody>{{range .Checks}}<tr><td>{{tr .Name}}</td><td>{{if .OK}}<span class="badge ok">{{tr "valido"}}</span>{{else}}<span class="badge err">{{tr "problema"}}</span>{{end}}</td><td>{{tr .Detail}}</td></tr>{{end}}</tbody></table></div>{{end}}
+    {{if and (or (eq .Action "vacuum") (eq .Action "analyze")) (not .Error)}}<div class="mt-10 stat-grid"><span class="stat"><strong>{{bytes .BeforeSize}}</strong> {{tr "prima"}}</span><span class="stat"><strong>{{bytes .AfterSize}}</strong> {{tr "dopo"}}</span></div>{{end}}
+    {{if .Checks}}<div class="mt-10 table-wrap"><table class="data-table"><caption class="sr-only">{{tr "Esito verifica database"}}</caption><thead><tr><th scope="col">{{tr "Database"}}</th><th scope="col">{{tr "Esito"}}</th><th scope="col">{{tr "Dettaglio"}}</th></tr></thead><tbody>{{range .Checks}}<tr><td>{{tr .Name}}</td><td>{{if .OK}}<span class="badge ok">{{tr "valido"}}</span>{{else}}<span class="badge err">{{tr "problema"}}</span>{{end}}</td><td>{{tr .Detail}}</td></tr>{{end}}</tbody></table></div>{{end}}
   </div>
 </div>
 {{end}}
@@ -276,22 +276,22 @@
     {{else}}<p class="alert" role="status">{{tr "Il controllo automatico è disattivato: puoi avviare un controllo a mano qui sotto, oppure attivarlo con l'opzione qui sopra."}}</p>{{end}}
     {{if .Available}}<div class="toolbar">
       {{if .Running}}
-      <form hx-post="/settings/media-integrity" hx-target="#v2-media-integrity-panel" hx-swap="outerHTML" style="display:inline">
+      <form hx-post="/settings/media-integrity" hx-target="#v2-media-integrity-panel" hx-swap="outerHTML" class="inline">
         <input type="hidden" name="action" value="stop" />
         <button class="btn sm danger" type="submit" {{trTitle "Ferma il controllo dopo il file in corso; la posizione resta salvata"}}>{{tr "Interrompi"}}</button>
       </form>
       {{else}}
-      <form hx-post="/settings/media-integrity" hx-target="#v2-media-integrity-panel" hx-swap="outerHTML" style="display:inline">
+      <form hx-post="/settings/media-integrity" hx-target="#v2-media-integrity-panel" hx-swap="outerHTML" class="inline">
         <input type="hidden" name="action" value="start" />
         <button class="btn sm primary" type="submit" {{trTitle "Avvia subito un passaggio del controllo sui file non ancora verificati"}}>{{tr "Controlla ora"}}</button>
       </form>
-      <form hx-post="/settings/media-integrity" hx-target="#v2-media-integrity-panel" hx-swap="outerHTML" style="display:inline">
+      <form hx-post="/settings/media-integrity" hx-target="#v2-media-integrity-panel" hx-swap="outerHTML" class="inline">
         <input type="hidden" name="action" value="restart" />
         <button class="btn sm" type="submit" hx-confirm="{{tr "Ricomincia dal primo file e cancella i risultati precedenti?"}}" {{trTitle "Ricomincia dal primo file e cancella i risultati precedenti"}}>{{tr "Riavvia da capo"}}</button>
       </form>
       {{end}}
     </div>{{end}}
-    {{if .Started}}<div class="stat-grid" style="margin-top:10px" aria-live="polite">
+    {{if .Started}}<div class="mt-10 stat-grid" aria-live="polite">
       <span class="stat"><strong>{{tr .Checked}}</strong> <span>{{tr "Controllati"}}</span></span>
       <span class="stat"><strong>{{tr .Damaged}}</strong> <span>{{tr "Danneggiati"}}</span></span>
       {{if .Unreadable}}<span class="stat"><strong>{{tr .Unreadable}}</strong> <span>{{tr "Illeggibili"}}</span></span>{{end}}
@@ -300,7 +300,7 @@
     </div>{{end}}
     {{if .Message}}<p class="alert{{if not .Error}} ok{{end}}" role="{{if .Error}}alert{{else}}status{{end}}">{{tr .Message}}</p>{{end}}
     {{if .Problems}}
-    <div class="table-wrap" style="margin-top:10px"><table class="data-table">
+    <div class="mt-10 table-wrap"><table class="data-table">
       <caption class="sr-only">{{tr "File danneggiati o illeggibili"}}</caption>
       <thead><tr><th scope="col">{{tr "Elemento"}}</th><th scope="col">{{tr "File"}}</th><th scope="col">{{tr "Esito"}}</th><th scope="col">{{tr "Dettaglio"}}</th><th scope="col">{{tr "Azioni"}}</th></tr></thead>
       <tbody>{{range .Problems}}<tr>
@@ -329,7 +329,7 @@
     <p class="hint"><span>{{tr "Finestra:"}}</span> <strong>{{tr .Window}}</strong>{{if .HeavyWindow}} <span>{{tr "— anche il controllo integrità e l'analisi MediaInfo aspettano la finestra."}}</span>{{end}}</p>
     <p aria-live="polite">{{if .Activity}}<span class="badge ok">{{tr "In corso"}}</span> <strong>{{tr .Activity}}</strong>{{else if .Waiting}}<span class="badge warn">{{tr "In attesa"}}</span> <span>{{tr .Waiting}}</span>{{else if .Open}}<span class="badge">{{tr "Finestra aperta"}}</span> <span>{{tr "Niente da fare in questo momento."}}</span>{{else}}<span class="badge">{{tr "Finestra chiusa"}}</span> <span>{{tr "Prossima apertura alle"}}</span> <strong>{{tr .NextOpening}}</strong>{{end}}</p>
     <div class="toolbar">
-      <form hx-post="/settings/night-maintenance" hx-target="#v2-night-maintenance-panel" hx-swap="outerHTML" style="display:inline">
+      <form hx-post="/settings/night-maintenance" hx-target="#v2-night-maintenance-panel" hx-swap="outerHTML" class="inline">
         <input type="hidden" name="action" value="run" />
         <button class="btn sm primary" type="submit" {{trTitle "Esegue subito un passaggio della manutenzione, anche fuori dalla finestra; aspetta comunque che nessun download stia trasferendo"}}>{{tr "Esegui ora"}}</button>
       </form>
@@ -362,13 +362,13 @@
     {{if .CheckAt}}<p><span>{{tr "Ultimo controllo della libreria:"}}</span> <strong>{{tr .CheckAt}}</strong> <span>—</span> <strong>{{tr .CheckSeries}}</strong> <span>{{tr "Serie,"}}</span> <strong>{{tr .CheckCorrect}}</strong> <span>{{tr "File corretti,"}}</span> <strong>{{tr .CheckRenamed}}</strong> <span>{{tr "Rinominati,"}}</span> <strong>{{tr .CheckRemoved}}</strong> <span>{{tr "Doppioni nel cestino,"}}</span> <strong>{{tr .CheckErrors}}</strong> <span>{{tr "Errori"}}</span></p>{{end}}
     {{if .ReportAt}}<p><span>{{tr "Ultimo rapporto:"}}</span> <strong>{{tr .ReportAt}}</strong> <span>—</span> <strong>{{tr .ReportFiles}}</strong> <span>{{tr "File in archivio"}}</span></p>
     {{if .Unreachable}}<p class="alert" role="status"><span>{{tr "Cartelle che non si potevano leggere (non contate come mancanti):"}}</span> <span>{{tr .Unreachable}}</span></p>{{end}}
-    {{if .Missing}}<div class="table-wrap" style="margin-top:10px"><table class="data-table">
+    {{if .Missing}}<div class="mt-10 table-wrap"><table class="data-table">
       <caption class="sr-only">{{tr "File della libreria spariti dal disco"}}</caption>
       <thead><tr><th scope="col">{{tr "Elemento"}}</th><th scope="col">{{tr "File"}}</th><th scope="col">{{tr "Azioni"}}</th></tr></thead>
       <tbody>{{range .Missing}}<tr>
         <td>{{tr .Label}}</td>
         <td class="truncate" {{trTitle .Path}}>{{tr .Path}}</td>
-        <td class="row-actions"><form hx-post="/settings/night-maintenance" hx-target="#v2-night-maintenance-panel" hx-swap="outerHTML" style="display:inline">
+        <td class="row-actions"><form hx-post="/settings/night-maintenance" hx-target="#v2-night-maintenance-panel" hx-swap="outerHTML" class="inline">
           <input type="hidden" name="action" value="forget" /><input type="hidden" name="series" value="{{.Series}}" /><input type="hidden" name="season" value="{{.Season}}" /><input type="hidden" name="episode" value="{{.Episode}}" />
           <button class="btn sm" type="submit" {{trTitle "Segna la puntata come mancante: la ricerca la scaricherà di nuovo"}} aria-label="{{tr "Segna come mancante: %s" .Label}}">{{tr "Segna come mancante"}}</button>
         </form></td>
@@ -539,9 +539,9 @@
     {{if .Error}}<p class="alert" role="alert"><span>{{tr "Controllo aggiornamenti non riuscito:"}}</span> {{tr .Error}}</p>{{end}}
     {{if not .CheckEnabled}}<p class="hint">{{tr "Controllo automatico disattivato (Impostazioni → Sistema → Aggiornamenti)."}}</p>{{else}}<p class="hint"><span>{{tr "Controllo automatico ogni"}}</span> {{tr .CheckHours}} <span>{{tr "ore"}}</span> <small class="muted">{{tr "(Impostazioni → Sistema → Aggiornamenti)"}}</small></p>{{end}}
     <div class="toolbar">
-      {{if .CanApply}}<form hx-post="/maintenance/update" hx-target="#v2-update-panel" hx-swap="outerHTML" hx-confirm="{{tr "Aggiornare Gextto ora? Il servizio si riavvia al termine."}}" style="display:inline"><input type="hidden" name="action" value="apply" /><button class="btn sm primary" type="submit" {{trTitle "Scarica l'ultima build, la installa e riavvia Gextto"}}>{{tr "Aggiorna"}}</button></form>
-      <form hx-post="/maintenance/update" hx-target="#v2-update-panel" hx-swap="outerHTML" style="display:inline"><input type="hidden" name="action" value="check" /><button class="btn sm" type="submit" {{trTitle "Cerca subito una versione più recente"}}>{{tr "Ricontrolla"}}</button></form>
-      {{else}}<form hx-post="/maintenance/update" hx-target="#v2-update-panel" hx-swap="outerHTML" style="display:inline"><input type="hidden" name="action" value="check" /><button class="btn sm primary" type="submit" {{trTitle "Cerca subito una versione più recente"}}>{{tr "Verifica aggiornamenti"}}</button></form>{{end}}
+      {{if .CanApply}}<form hx-post="/maintenance/update" hx-target="#v2-update-panel" hx-swap="outerHTML" hx-confirm="{{tr "Aggiornare Gextto ora? Il servizio si riavvia al termine."}}" class="inline"><input type="hidden" name="action" value="apply" /><button class="btn sm primary" type="submit" {{trTitle "Scarica l'ultima build, la installa e riavvia Gextto"}}>{{tr "Aggiorna"}}</button></form>
+      <form hx-post="/maintenance/update" hx-target="#v2-update-panel" hx-swap="outerHTML" class="inline"><input type="hidden" name="action" value="check" /><button class="btn sm" type="submit" {{trTitle "Cerca subito una versione più recente"}}>{{tr "Ricontrolla"}}</button></form>
+      {{else}}<form hx-post="/maintenance/update" hx-target="#v2-update-panel" hx-swap="outerHTML" class="inline"><input type="hidden" name="action" value="check" /><button class="btn sm primary" type="submit" {{trTitle "Cerca subito una versione più recente"}}>{{tr "Verifica aggiornamenti"}}</button></form>{{end}}
       {{if .CheckedAt}}<small class="muted"><span>{{tr "Ultimo controllo:"}}</span> {{tr .CheckedLabel}}</small>{{end}}
     </div>
     {{if .LastLog}}<details><summary id="v2-update-lastlog-heading">{{tr "Log dell'ultimo aggiornamento"}}</summary><pre class="log-view" tabindex="0" role="region" aria-labelledby="v2-update-lastlog-heading">{{tr .LastLog}}</pre></details>{{end}}
@@ -557,7 +557,7 @@
     {{if .Problem}}<p class="alert">{{tr .Problem}}</p>{{end}}
     <p class="hint">{{tr "Scegli una destinazione temporanea tmpfs/ramfs scrivibile: Gextto la configura con soglia e margine consigliati. /dev/shm viene perso al riavvio."}}</p>
     <div class="toolbar">
-      <form hx-post="/maintenance/ramdisk" hx-target="#v2-ramdisk-panel" hx-swap="outerHTML" style="display:inline"><button class="btn sm" type="submit">{{tr "Aggiorna"}}</button></form>
+      <form hx-post="/maintenance/ramdisk" hx-target="#v2-ramdisk-panel" hx-swap="outerHTML" class="inline"><button class="btn sm" type="submit">{{tr "Aggiorna"}}</button></form>
       {{if .Message}}<small class="htx-status {{if .Error}}err{{else}}ok{{end}}">{{tr .Message}}</small>{{end}}
     </div>
     {{if .Paths}}
@@ -570,7 +570,7 @@
         <td class="row-actions">
           {{if .Configured}}<span class="badge ok">{{tr "in uso"}}</span>
           {{else if .Writable}}
-          <form hx-post="/maintenance/ramdisk" hx-target="#v2-ramdisk-panel" hx-swap="outerHTML" style="display:inline">
+          <form hx-post="/maintenance/ramdisk" hx-target="#v2-ramdisk-panel" hx-swap="outerHTML" class="inline">
             <input type="hidden" name="action" value="select" /><input type="hidden" name="path" value="{{.Path}}" />
             <button class="btn sm primary" type="submit">{{tr "Usa questo percorso"}}</button>
           </form>
@@ -579,7 +579,7 @@
       </tr>{{end}}</tbody>
     </table></div>
     {{else}}<p class="muted">{{tr "Nessun tmpfs/ramfs scrivibile trovato."}}</p>{{end}}
-    {{if .CreateAvail}}<form class="toolbar" style="margin-top:10px" hx-post="/maintenance/ramdisk" hx-target="#v2-ramdisk-panel" hx-swap="outerHTML"><input type="hidden" name="action" value="create" /><input type="hidden" name="path" value="{{.CreatePath}}" /><button class="btn sm" type="submit" {{trTitle "Crea una sottocartella dedicata"}}><span>{{tr "Crea"}}</span> {{tr .CreatePath}}</button></form>{{end}}
+    {{if .CreateAvail}}<form class="mt-10 toolbar" hx-post="/maintenance/ramdisk" hx-target="#v2-ramdisk-panel" hx-swap="outerHTML"><input type="hidden" name="action" value="create" /><input type="hidden" name="path" value="{{.CreatePath}}" /><button class="btn sm" type="submit" {{trTitle "Crea una sottocartella dedicata"}}><span>{{tr "Crea"}}</span> {{tr .CreatePath}}</button></form>{{end}}
     {{if .Warning}}<p class="muted"><small>{{tr .Warning}}</small></p>{{end}}
   </div>
 </div>
@@ -613,7 +613,7 @@
           <td>{{if .Conflict}}{{tr "Conflitto"}}{{else if eq .Status "unmatched"}}{{tr "Non identificato"}}{{else if eq .Status "proposta"}}{{tr "Proposta forte"}}{{else}}{{tr "Da verificare"}}{{end}}</td>
         </tr>{{end}}</tbody>
       </table></div>
-      <div class="toolbar" style="margin-top:10px"><button class="btn sm primary" type="submit">{{tr "Applica selezionate"}}</button></div>
+      <div class="mt-10 toolbar"><button class="btn sm primary" type="submit">{{tr "Applica selezionate"}}</button></div>
     </form>
     {{else}}<p class="muted">{{tr "Nessun file video trovato o nessuna proposta."}}</p>{{end}}{{end}}
   </div>
@@ -628,12 +628,12 @@
 {{end}}
 
 {{define "v2_rename_progress"}}
-<div class="progress" role="progressbar" aria-label="{{tr "Avanzamento rinomina"}}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{.Percent}}"><span style="width:{{.Percent}}%"></span></div>
+<div class="progress" role="progressbar" aria-label="{{tr "Avanzamento rinomina"}}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{.Percent}}"><span style="--pct:{{.Percent}}%"></span></div>
 <p class="muted">{{if .Running}}<span>{{tr "In corso:"}}</span> {{.Current}}/{{.Total}}{{if .Series}} · {{.Series}}{{end}}{{if .Message}} · {{.Message}}{{end}}{{else}}<span>{{tr "Nessuna rinomina in corso."}}</span>{{end}}{{if .Errors}} · {{.Errors}} <span>{{tr "errori"}}</span>{{end}}</p>
 {{end}}
 
 {{define "v2_jobs"}}
-<div class="panel" id="v2-jobs-panel" data-v2-poll hx-get="/partial/jobs" hx-trigger="every 3s [window.gexttoCanPoll()], v2wake" hx-target="this" hx-swap="outerHTML"{{if not .Jobs}} style="display:none"{{end}}>
+<div class="panel" id="v2-jobs-panel" data-v2-poll hx-get="/partial/jobs" hx-trigger="every 3s [window.gexttoCanPoll()], v2wake" hx-target="this" hx-swap="outerHTML"{{if not .Jobs}} hidden{{end}}>
   <div class="panel-head"><h3>{{tr "Operazioni in background"}}</h3><small class="muted">{{tr .Active}} <span>{{tr "in corso"}}</span> · {{len .Jobs}} <span>{{tr "recenti"}}</span></small></div>
   <div class="panel-body">
     {{if .Jobs}}
@@ -643,9 +643,9 @@
       <tbody>{{range .Jobs}}<tr>
         <td class="job-kind">{{tr .Kind}}</td>
         <td class="job-state"><span class="badge {{.StateClass}}">{{tr .StateLabel}}</span></td>
-        <td class="job-progress-cell"><div class="progress" role="progressbar" aria-label="{{tr "Avanzamento di %s" (tr .Kind)}}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{.Progress}}"><span style="width:{{.Progress}}%"></span></div><small class="muted">{{.Progress}}%{{if .Started}} · {{.Started}}{{end}}</small></td>
+        <td class="job-progress-cell"><div class="progress" role="progressbar" aria-label="{{tr "Avanzamento di %s" (tr .Kind)}}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{.Progress}}"><span style="--pct:{{.Progress}}%"></span></div><small class="muted">{{.Progress}}%{{if .Started}} · {{.Started}}{{end}}</small></td>
         <td class="job-message truncate">{{if .Error}}{{tr .Error}}{{else}}{{tr .Message}}{{end}}</td>
-        <td class="row-actions job-actions">{{if not .Done}}<form hx-post="/jobs/cancel" hx-target="#v2-jobs-panel" hx-swap="outerHTML" style="display:inline"><input type="hidden" name="id" value="{{.ID}}" /><button class="btn sm danger" type="submit" hx-confirm="{{tr "Annullare l'operazione?"}}">{{tr "Annulla"}}</button></form>{{end}}</td>
+        <td class="row-actions job-actions">{{if not .Done}}<form hx-post="/jobs/cancel" hx-target="#v2-jobs-panel" hx-swap="outerHTML" class="inline"><input type="hidden" name="id" value="{{.ID}}" /><button class="btn sm danger" type="submit" hx-confirm="{{tr "Annullare l'operazione?"}}">{{tr "Annulla"}}</button></form>{{end}}</td>
       </tr>{{end}}</tbody>
     </table></div>
     {{else}}<p class="muted">{{tr "Nessuna operazione in background."}}</p>{{end}}

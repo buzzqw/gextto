@@ -7,7 +7,7 @@
      full dialog, with a name of its own so the two radio groups never mix. */}}
 {{define "v2_quick_theme_card"}}<label class="theme-card"{{if eq .ID "auto"}} {{trTitle "Tema automatico: segue il tema chiaro o scuro del sistema"}}{{end}}>
   <input type="radio" name="v2-theme-quick" value="{{.ID}}" data-theme-mode="{{.Mode}}" data-bg="{{.Bg}}" data-surface="{{.Surface}}" data-text="{{.Text}}" data-accent="{{.Accent}}">
-  {{if eq .ID "auto"}}<span class="theme-swatch theme-swatch-auto" aria-hidden="true"><span class="theme-swatch-panel theme-swatch-panel-dark">{{tr "Aa"}}</span><span class="theme-swatch-panel theme-swatch-panel-light">{{tr "Aa"}}</span></span>{{else}}<span class="theme-swatch" aria-hidden="true" style="background:{{.Bg}}"><span class="theme-swatch-panel" style="background:{{.Surface}};color:{{.Text}}">{{tr "Aa"}}</span></span>{{end}}
+  {{if eq .ID "auto"}}<span class="theme-swatch theme-swatch-auto" aria-hidden="true"><span class="theme-swatch-panel theme-swatch-panel-dark">{{tr "Aa"}}</span><span class="theme-swatch-panel theme-swatch-panel-light">{{tr "Aa"}}</span></span>{{else}}<span class="theme-swatch" aria-hidden="true" style="--swatch-bg:{{.Bg}}"><span class="theme-swatch-panel" style="--swatch-surface:{{.Surface}};--swatch-text:{{.Text}}">{{tr "Aa"}}</span></span>{{end}}
   <span class="theme-name">{{if eq .ID "auto"}}{{tr "Auto"}}{{else}}{{tr .Name}}{{end}}</span>
 </label>{{end}}
 
@@ -193,7 +193,7 @@
   </main>
 </div>
 <div id="v2-modal"></div>
-{{with .UpdateNotes}}<div class="overlay" style="display:flex" id="v2-update-notes">
+{{with .UpdateNotes}}<div class="overlay" id="v2-update-notes">
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="v2-update-notes-title">
     <div class="modal-head"><h3 id="v2-update-notes-title">{{tr "Gextto aggiornato"}}</h3></div>
     <div class="modal-body">

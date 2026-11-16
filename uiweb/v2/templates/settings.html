@@ -477,14 +477,14 @@
       <label class="field" {{trTitle "Template usato per comporre il nome dei film con il formato Personalizzato"}}><span>{{tr "Template personalizzato per i film"}}</span><input class="input" name="movie_template" value="{{.MovieTemplate}}" placeholder="{{tr "{Titolo} ({Anno}) [{Risoluzione}]"}}" hx-post="/settings/rename-preview" hx-include="#v2-rename-editor" hx-target="#v2-rename-preview-code" hx-swap="outerHTML" hx-trigger="input changed delay:300ms" /></label>
       <div class="form-actions"><button class="btn sm primary" type="submit" {{trTitle "Salva la composizione del nome"}}>{{tr "Salva rinomina"}}</button></div>
     </form>
-    <div class="field" style="margin-top:12px"><span>{{tr "Pezzi del nome (clicca per aggiungere)"}}</span>
+    <div class="mt-12 field"><span>{{tr "Pezzi del nome (clicca per aggiungere)"}}</span>
       <div class="toolbar">{{range .Tokens}}<button class="btn sm" type="button" hx-post="/settings/rename-token" hx-vals='{"token":"{{.Token}}"}' hx-include="#v2-rename-editor" hx-target="#v2-rename-editor" hx-swap="outerHTML" data-v2-marks-dirty="#v2-rename-editor form" {{trTitle "Aggiungi questo pezzo al template"}}>{{tr .Label}}</button>{{end}}</div>
     </div>
-    <div class="field" style="margin-top:12px"><span>{{tr "Pezzi del nome dei film (clicca per aggiungere)"}}</span>
+    <div class="mt-12 field"><span>{{tr "Pezzi del nome dei film (clicca per aggiungere)"}}</span>
       <div class="toolbar">{{range .MovieTokens}}<button class="btn sm" type="button" hx-post="/settings/rename-token" hx-vals='{"token":"{{.Token}}","target":"movie"}' hx-include="#v2-rename-editor" hx-target="#v2-rename-editor" hx-swap="outerHTML" data-v2-marks-dirty="#v2-rename-editor form" {{trTitle "Aggiungi questo pezzo al template dei film"}}>{{tr .Label}}</button>{{end}}</div>
     </div>
-    <div class="field" style="margin-top:12px"><span>{{tr "Anteprima"}}</span>{{template "v2_rename_preview_code" .}}</div>
-    <div class="field" style="margin-top:12px"><span>{{tr "Anteprima film"}}</span>{{template "v2_rename_movie_preview_code" .}}</div>
+    <div class="mt-12 field"><span>{{tr "Anteprima"}}</span>{{template "v2_rename_preview_code" .}}</div>
+    <div class="mt-12 field"><span>{{tr "Anteprima film"}}</span>{{template "v2_rename_movie_preview_code" .}}</div>
   </div>
 </div>
 {{end}}

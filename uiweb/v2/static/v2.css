@@ -199,7 +199,7 @@ html, body {
 .v2-discover-choice > .btn.active {
   background: var(--accent);
   border-color: var(--accent);
-  color: #04121f;
+  color: var(--on-accent);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 24%, transparent);
 }
 
@@ -875,7 +875,7 @@ form.htmx-request:not([hx-trigger*="every"]):not([data-v2-no-busy]) button[type=
 
 /* Stronger, always-visible keyboard focus ring. */
 :where(a, button, input, select, textarea, [tabindex]):focus-visible {
-  outline: 2px solid var(--accent, #4ec97a);
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
@@ -1384,7 +1384,7 @@ form.htmx-request:not([hx-trigger*="every"]):not([data-v2-no-busy]) button[type=
   border-radius: var(--v2-radius);
   background: var(--surface, transparent);
 }
-.v2-ep-search:focus-visible { outline: 2px solid var(--accent, #4ec97a); outline-offset: 2px; }
+.v2-ep-search:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .v2-ep-search-head { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
 .v2-ep-search-head h4 { margin: 0; flex: 1; min-width: 0; }
 .v2-ep-search-body h5 { margin: 14px 0 6px; font-size: .9rem; }
@@ -1397,7 +1397,7 @@ form.htmx-request:not([hx-trigger*="every"]):not([data-v2-no-busy]) button[type=
   width: 14px;
   height: 14px;
   border: 2px solid var(--line, rgba(128, 128, 128, .35));
-  border-top-color: var(--accent, #4ec97a);
+  border-top-color: var(--accent);
   border-radius: 50%;
   animation: v2-spin .9s linear infinite;
 }
@@ -1559,7 +1559,7 @@ details.add-torrent-panel > summary::-webkit-details-marker { display: none; }
     font-size: 0.62rem;
     line-height: 16px;
     background: var(--accent-action);
-    color: #04121f;
+    color: var(--on-accent);
   }
   #app-sidebar .nav-item[data-nav="downloads"] .nav-count[hidden] { display: none; }
   #app-sidebar .nav-item.has-news::after {
@@ -1692,7 +1692,7 @@ details.add-torrent-panel > summary::-webkit-details-marker { display: none; }
 :root[data-theme="light"] .chip.active,
 :root[data-theme="cream"] .chip.active,
 :root[data-theme="light"] .torrent-detail-tabs [role="tab"].tab-active,
-:root[data-theme="cream"] .torrent-detail-tabs [role="tab"].tab-active { color: #fff; }
+:root[data-theme="cream"] .torrent-detail-tabs [role="tab"].tab-active { color: var(--on-accent-strong); }
 
 .settings-mode { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; background: var(--surface-2); }
 .settings-mode-btn { padding: 5px 14px; text-decoration: none; color: var(--muted); font-weight: 600; font-size: 0.85rem; }
@@ -1971,7 +1971,7 @@ html.settings-only-modified .settings-panel:not(:has(.setting-modified-row)):not
   transition: transform .15s ease;
 }
 .switch input[role="switch"]:checked { background: var(--accent-action); border-color: var(--accent-action); }
-.switch input[role="switch"]:checked::after { transform: translateX(20px); background: #fff; }
+.switch input[role="switch"]:checked::after { transform: translateX(20px); background: var(--on-accent-strong); }
 .switch input[role="switch"]:checked ~ .switch-text .switch-off,
 .switch input[role="switch"]:not(:checked) ~ .switch-text .switch-on { display: none; }
 .switch-text { font-size: 0.85rem; font-weight: 600; }
@@ -2045,7 +2045,7 @@ html.settings-only-modified .settings-panel:not(:has(.setting-modified-row)):not
   padding: 9px 14px;
   border-radius: 999px;
   border: 1px solid var(--line-soft);
-  background: var(--surface-2, #16233c);
+  background: var(--surface-2);
   color: var(--text);
   font-size: 0.82rem;
   font-weight: 600;
@@ -2076,7 +2076,7 @@ html.settings-only-modified .settings-panel:not(:has(.setting-modified-row)):not
   padding: 9px 14px;
   border-radius: 999px;
   border: 1px solid var(--accent-action);
-  background: var(--surface-2, #16233c);
+  background: var(--surface-2);
   color: var(--accent-action);
   font-size: 0.82rem;
   font-weight: 600;
@@ -2818,7 +2818,7 @@ body.v2-drop-active main {
   background: rgba(6, 12, 22, 0.72);
   -webkit-backdrop-filter: blur(6px);
   backdrop-filter: blur(6px);
-  color: #f3f7ff;
+  color: var(--ink-on-artwork);
   font-size: 0.68rem;
   font-weight: 700;
   line-height: 1.35;
@@ -2931,3 +2931,43 @@ body.v2-drop-active main {
 /* «Annulla» closes the add-torrent frame from where the eye ends up after the
    last option: the right end of the row, under the primary button. */
 .add-torrent-cancel { margin-left: auto; }
+
+/* ======================================================================
+ * Utilities. The templates carry a class instead of a style attribute: what
+ * a piece of markup looks like belongs to the stylesheet, where the theme
+ * tokens are. The scale is deliberately small — only the values the pages
+ * actually use — so a new spacing step is a decision, not a habit.
+ * ==================================================================== */
+.inline { display: inline; }
+.block { display: block; }
+[hidden] { display: none !important; }
+.flex-1 { flex: 1; }
+.items-end { align-items: flex-end; }
+.m-0 { margin: 0; }
+.mt-8 { margin-top: 8px; }
+.mt-10 { margin-top: 10px; }
+.mt-12 { margin-top: 12px; }
+.mt-14 { margin-top: 14px; }
+.mt-20 { margin-top: 20px; }
+.mb-6 { margin-bottom: 6px; }
+.mb-8 { margin-bottom: 8px; }
+.mb-10 { margin-bottom: 10px; }
+.mb-12 { margin-bottom: 12px; }
+.p-14 { padding: 14px; }
+.fs-12 { font-size: 12.5px; }
+.fs-13 { font-size: 13px; }
+.w-full { width: 100%; }
+.w-40 { width: 40px; height: 40px; }
+.max-w-340 { max-width: 340px; }
+.max-w-page { max-width: 1100px; }
+.max-h-60 { max-height: 60vh; }
+
+/* Values that come from the data — an advance, a colour of a theme preview —
+   reach the page as custom properties: the number rides with the element, the
+   look stays here. */
+.progress > span { width: var(--pct, 0%); }
+.piece-run { width: var(--pct, 0%); }
+.avail-bar > span { opacity: var(--op, 1); }
+.theme-swatch { background: var(--swatch-bg); }
+.theme-swatch-panel { background: var(--swatch-surface); color: var(--swatch-text); }
+.theme-swatch-accent { background: var(--swatch-accent); }

@@ -58,7 +58,7 @@ textarea.json{width:100%;font:12.5px/1.45 var(--mono)}
   <span class="spacer"></span>
   <button type="button" class="ghost icon" data-theme-switch data-label-auto="{{tr "Theme: automatic (follows the system)"}}" data-label-light="{{tr "Theme: light"}}" data-label-dark="{{tr "Theme: dark"}}" aria-label="{{tr "Theme: automatic (follows the system)"}}" title="{{tr "Switch theme (automatic, light, dark)"}}"><svg class="i" data-theme-icon="auto"><use href="/assets/icons.svg#i-auto"/></svg><svg class="i" data-theme-icon="light" hidden><use href="/assets/icons.svg#i-sun"/></svg><svg class="i" data-theme-icon="dark" hidden><use href="/assets/icons.svg#i-moon"/></svg></button>
 </header>
-<main class="page" style="max-width:1100px">
+<main class="page max-w-page">
 {{.NOTICE}}
 {{.ERROR}}
 <div class="page-head">
@@ -67,7 +67,7 @@ textarea.json{width:100%;font:12.5px/1.45 var(--mono)}
     <p>{{tr "Feeds fill the archive; rules decide what to download, in order: the first match wins. Indexers answer searches and wanted titles."}}</p>
   </div>
   <div class="actions">
-    <span class="muted" style="font-size:13px"><svg class="i"><use href="/assets/icons.svg#i-clock"/></svg> <span>{{tr "Next automatic check"}}</span>: <b>{{.NEXTPOLL}}</b></span>
+    <span class="muted fs-13"><svg class="i"><use href="/assets/icons.svg#i-clock"/></svg> <span>{{tr "Next automatic check"}}</span>: <b>{{.NEXTPOLL}}</b></span>
     <button type="button" id="poll-all" title="{{tr "Fetch new items from configured RSS feeds now"}}"><svg class="i"><use href="/assets/icons.svg#i-reload"/></svg>{{tr "Check feeds"}}</button>
   </div>
 </div>
@@ -86,10 +86,10 @@ textarea.json{width:100%;font:12.5px/1.45 var(--mono)}
     <p class="hint">{{tr "A feed is an RSS URL, or the page of an ext.to or TorrentGalaxy listing. Its items are fetched periodically, kept in the archive and evaluated by rules and wanted titles."}}</p>
   </div>
   <ul class="items" id="feed-list">{{.FEEDROWS}}</ul>
-  <div class="panel" id="feed-guide" hidden style="margin-top:12px;padding:14px">
+  <div class="panel mt-12 p-14" id="feed-guide" hidden>
     <h3>{{tr "No feeds yet: pick a way to start"}}</h3>
-    <p class="muted" style="margin:0 0 10px;font-size:13px">{{tr "Feeds fill the archive with releases; rules and wanted titles decide what gets downloaded. Without a feed nothing can arrive on its own."}}</p>
-    <div class="actions" style="margin:0">
+    <p class="muted m-0 mb-10 fs-13">{{tr "Feeds fill the archive with releases; rules and wanted titles decide what gets downloaded. Without a feed nothing can arrive on its own."}}</p>
+    <div class="actions m-0">
       <button type="button" class="primary sm" id="guide-new-feed" title="{{tr "Add an RSS feed"}}">{{tr "New feed"}}</button>
       <button type="button" class="sm" id="guide-new-rule" title="{{tr "Add a download rule"}}">{{tr "New rule"}}</button>
       <a class="btn sm" href="#options" id="guide-import" title="{{tr "Check interval, archive retention, FlareSolverr"}}">{{tr "Import a setup"}}</a>
@@ -132,20 +132,20 @@ textarea.json{width:100%;font:12.5px/1.45 var(--mono)}
       <div class="panel"><h3>{{tr "Archive retention (days, 0 = keep all)"}}</h3><p>{{tr "Items found longer ago are removed from the archive."}}</p><input type="number" min="0" max="3650" name="archive_days" value="{{.ARCHIVEDAYS}}" aria-label="{{tr "Archive retention (days, 0 = keep all)"}}" title="{{tr "Items found longer ago are removed from the archive"}}"></div>
       <div class="panel"><h3>{{tr "FlareSolverr URL"}}</h3><p>{{tr "Used for feeds and indexers behind a Cloudflare challenge; empty to disable."}}</p>
         <input type="text" name="flaresolverr" value="{{.FLARESOLVERR}}" placeholder="http://127.0.0.1:8191" autocomplete="off" aria-label="{{tr "FlareSolverr URL"}}" title="{{tr "FlareSolverr service used to pass feeds and indexers behind a Cloudflare challenge; empty to disable"}}">
-        <div class="actions" style="margin:0"><button type="button" class="sm" id="flare-test" title="{{tr "Check that the configured FlareSolverr answers"}}">{{tr "Test FlareSolverr"}}</button><span class="muted" id="flare-status" aria-live="polite"></span></div>
+        <div class="actions m-0"><button type="button" class="sm" id="flare-test" title="{{tr "Check that the configured FlareSolverr answers"}}">{{tr "Test FlareSolverr"}}</button><span class="muted" id="flare-status" aria-live="polite"></span></div>
       </div>
     </div>
-    <div class="actions" style="margin-top:14px"><button type="submit" class="primary" title="{{tr "Save the RSS options"}}">{{tr "Save"}}</button></div>
+    <div class="actions mt-14"><button type="submit" class="primary" title="{{tr "Save the RSS options"}}">{{tr "Save"}}</button></div>
   </form>
-  <div class="panel" style="margin-top:20px;padding:14px">
+  <div class="panel mt-20 p-14">
     <h3>{{tr "Copy the setup"}}</h3>
-    <p class="muted" style="margin:0 0 10px;font-size:13px">{{tr "Export saves the feeds, rules and indexers in one file, as a backup or to bring them to another gx-torrent. Import loads such a file and replaces the feeds, rules and indexers it contains."}}</p>
-    <form method="post" action="/ui/rss-config" enctype="multipart/form-data" class="actions" style="margin:0;align-items:flex-end" id="rss-import-form">
+    <p class="muted m-0 mb-10 fs-13">{{tr "Export saves the feeds, rules and indexers in one file, as a backup or to bring them to another gx-torrent. Import loads such a file and replaces the feeds, rules and indexers it contains."}}</p>
+    <form method="post" action="/ui/rss-config" enctype="multipart/form-data" class="actions m-0 items-end" id="rss-import-form">
       <a class="btn sm" href="/ui/rss-export" download title="{{tr "Download the feeds, rules and indexers as a file"}}">{{tr "Export"}}</a>
-      <label class="field" style="margin:0">{{tr "Setup file"}}<input type="file" name="setup" id="rss-import-file" accept="application/json,.json" required title="{{tr "A file exported from a gx-torrent RSS page"}}"></label>
+      <label class="field m-0">{{tr "Setup file"}}<input type="file" name="setup" id="rss-import-file" accept="application/json,.json" required title="{{tr "A file exported from a gx-torrent RSS page"}}"></label>
       <button type="submit" class="sm" title="{{tr "Replace the feeds, rules and indexers with those in the file"}}">{{tr "Import"}}</button>
     </form>
-    <p class="muted" id="rss-import-preview" style="margin:8px 0 0;font-size:13px" aria-live="polite"></p>
+    <p class="muted fs-13 m-0 mt-8" id="rss-import-preview" aria-live="polite"></p>
   </div>
 </section>
 
@@ -158,12 +158,12 @@ textarea.json{width:100%;font:12.5px/1.45 var(--mono)}
       <div class="fsec">
         <label class="field">{{tr "Name"}}<input type="text" name="name" placeholder="{{tr "Feed name"}}" autocomplete="off" required title="{{tr "Feed name"}}"></label>
         <label class="field">{{tr "Feed URL"}}<input type="text" name="url" id="feed-url" placeholder="http://…/rss" autocomplete="off" required title="{{tr "RSS feed URL, the page of an ext.to or TorrentGalaxy listing, or a BEP 46 DHT feed (dht://…)"}}"></label>
-        <div class="actions" style="margin:0"><button type="button" class="sm" id="feed-test" title="{{tr "Fetch this URL now and show how many items it returns, before saving"}}">{{tr "Test"}}</button><span class="muted" id="feed-test-status" aria-live="polite"></span></div>
+        <div class="actions m-0"><button type="button" class="sm" id="feed-test" title="{{tr "Fetch this URL now and show how many items it returns, before saving"}}">{{tr "Test"}}</button><span class="muted" id="feed-test-status" aria-live="polite"></span></div>
         <label class="field">{{tr "Folder"}}<input type="text" name="folder" placeholder="tv" autocomplete="off" title="{{tr "Group shown next to the feed name"}}"></label>
       </div>
       <div class="fsec">
         <h3>{{tr "Add several feeds at once"}}</h3>
-        <p class="muted" style="margin:0 0 8px;font-size:13px">{{tr "One URL per line. When you want to name a feed, put the name before its URL separated by a vertical bar. The folder and the options below apply to every feed added."}}</p>
+        <p class="muted m-0 mb-8 fs-13">{{tr "One URL per line. When you want to name a feed, put the name before its URL separated by a vertical bar. The folder and the options below apply to every feed added."}}</p>
         <label class="field">{{tr "Feed URLs"}}<textarea name="urls" id="feed-urls" rows="4" placeholder="https://…/rss&#10;https://…/browse/?filter=u=name" title="{{tr "One feed per line: an RSS URL, the page of an ext.to or TorrentGalaxy listing, or a BEP 46 DHT feed (dht://…). A line may read Name | URL; without a name it is taken from the address."}}"></textarea></label>
       </div>
       <div class="fsec" id="feed-fallback">
@@ -197,7 +197,7 @@ textarea.json{width:100%;font:12.5px/1.45 var(--mono)}
     <div class="dlg-body">
       <div class="fsec" id="rule-presets">
         <h3>{{tr "Presets"}}</h3>
-        <div class="actions" style="margin:0">
+        <div class="actions m-0">
           <button type="button" class="sm" data-preset="series" title="{{tr "Fill the rule for TV series: Italian 1080p episodes, each taken once"}}">{{tr "TV series"}}</button>
           <button type="button" class="sm" data-preset="movie" title="{{tr "Fill the rule for movies: 1080p or 2160p, no CAM or TS"}}">{{tr "Movie"}}</button>
           <button type="button" class="sm" data-preset="all" title="{{tr "Fill the rule to take everything except CAM and TS releases"}}">{{tr "Take all"}}</button>
@@ -270,7 +270,7 @@ textarea.json{width:100%;font:12.5px/1.45 var(--mono)}
         </div>
         <aside class="rule-side" aria-labelledby="pv-title">
           <h3 id="pv-title">{{tr "Preview"}}</h3>
-          <p class="muted" style="margin:0;font-size:12.5px">{{tr "Which archived items this rule would take. It updates as you type."}}</p>
+          <p class="muted m-0 fs-12">{{tr "Which archived items this rule would take. It updates as you type."}}</p>
           <button type="button" class="sm" id="rule-preview" title="{{tr "Show which archived items this rule would match"}}">{{tr "Refresh preview"}}</button>
           <div id="rule-preview-warn" aria-live="polite"></div>
           <div class="preview" id="rule-preview-box" aria-live="polite" tabindex="0" role="region" aria-label="{{tr "Preview"}}"><span class="subtle">—</span></div>
@@ -294,7 +294,7 @@ textarea.json{width:100%;font:12.5px/1.45 var(--mono)}
       <label class="field">{{tr "Name"}}<input type="text" name="name" id="indexer-name" placeholder="prowlarr" autocomplete="off" required title="{{tr "Indexer name"}}"></label>
       <label class="field">{{tr "URL"}}<input type="text" name="url" id="indexer-url" placeholder="http://127.0.0.1:9696" autocomplete="off" required title="{{tr "Torznab endpoint URL"}}"></label>
       <label class="field">{{tr "API key"}}<input type="text" name="apikey" id="indexer-apikey" autocomplete="off" title="{{tr "API key for authentication with the indexer"}}"></label>
-      <div class="actions" style="margin:0"><button type="button" class="sm" id="indexer-test" title="{{tr "Check that the indexer answers (Torznab caps)"}}">{{tr "Test"}}</button><span class="muted" id="indexer-test-status" aria-live="polite"></span></div>
+      <div class="actions m-0"><button type="button" class="sm" id="indexer-test" title="{{tr "Check that the indexer answers (Torznab caps)"}}">{{tr "Test"}}</button><span class="muted" id="indexer-test-status" aria-live="polite"></span></div>
     </div>
     <div class="dlg-foot">
       <button type="button" data-close title="{{tr "Close without saving"}}">{{tr "Cancel"}}</button>
@@ -307,8 +307,8 @@ textarea.json{width:100%;font:12.5px/1.45 var(--mono)}
 <dialog id="dlg-items" class="wide" aria-labelledby="dlg-items-title">
   <div class="dlg-head"><h2 id="dlg-items-title">{{tr "Feed items"}}</h2><button type="button" class="ghost icon" data-close aria-label="{{tr "Close"}}" title="{{tr "Close"}}"><svg class="i"><use href="/assets/icons.svg#i-x"/></svg></button></div>
   <div class="dlg-body">
-    <p class="muted" id="items-info" style="margin:0" aria-live="polite"></p>
-    <div class="preview itemsview" id="items" style="max-height:60vh" tabindex="0" role="region" aria-label="{{tr "Feed items"}}"></div>
+    <p class="muted m-0" id="items-info" aria-live="polite"></p>
+    <div class="preview itemsview max-h-60" id="items" tabindex="0" role="region" aria-label="{{tr "Feed items"}}"></div>
   </div>
   <div class="dlg-foot"><button type="button" data-close title="{{tr "Close"}}">{{tr "Close"}}</button></div>
 </dialog>

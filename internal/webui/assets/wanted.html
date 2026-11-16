@@ -25,7 +25,7 @@
 .season-range label.chk{flex-direction:row;align-items:center;gap:5px}
 .season-range input[type=number]{width:6.5em}
 .wprogress{height:5px;border-radius:99px;background:var(--surface-2);overflow:hidden;margin:2px 0 5px}
-.wprogress i{display:block;height:100%;background:var(--ok)}
+.wprogress i{display:block;height:100%;width:var(--pct,0%);background:var(--ok)}
 .item-actions .row-more{position:relative}
 .item-actions .row-more>summary{list-style:none;cursor:pointer;display:inline-flex;align-items:center;height:28px;padding:0 9px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);font-size:12.5px}
 .item-actions .row-more>summary::-webkit-details-marker{display:none}
@@ -81,7 +81,7 @@ details.hint summary{cursor:pointer}
   <span class="spacer"></span>
   <button type="button" class="ghost icon" data-theme-switch data-label-auto="{{tr "Theme: automatic (follows the system)"}}" data-label-light="{{tr "Theme: light"}}" data-label-dark="{{tr "Theme: dark"}}" aria-label="{{tr "Theme: automatic (follows the system)"}}" title="{{tr "Switch theme (automatic, light, dark)"}}"><svg class="i" data-theme-icon="auto"><use href="/assets/icons.svg#i-auto"/></svg><svg class="i" data-theme-icon="light" hidden><use href="/assets/icons.svg#i-sun"/></svg><svg class="i" data-theme-icon="dark" hidden><use href="/assets/icons.svg#i-moon"/></svg></button>
 </header>
-<main class="page" style="max-width:1100px">
+<main class="page max-w-page">
 {{.ERROR}}
 <div class="page-head">
   <div class="grow">
@@ -217,7 +217,7 @@ details.hint summary{cursor:pointer}
     <p class="hint">{{tr "What the archive and the indexers found for this title, with the verdict: what would be taken, and why the others are not."}}</p>
     <p class="hint" id="releases-sum" role="status" aria-live="polite"></p>
     <div class="vcounts" id="releases-counts"></div>
-    <div class="preview relview" id="releases-list" style="max-height:60vh" tabindex="0" role="region" aria-label="{{tr "Releases"}}"></div>
+    <div class="preview relview max-h-60" id="releases-list" tabindex="0" role="region" aria-label="{{tr "Releases"}}"></div>
   </div>
   <div class="dlg-foot"><button type="button" id="releases-live" title="{{tr "Search the indexers now"}}">{{tr "Search the indexers now"}}</button><button type="button" data-close title="{{tr "Close"}}">{{tr "Close"}}</button></div>
 </dialog>

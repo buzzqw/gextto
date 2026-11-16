@@ -942,7 +942,7 @@ func (d *Daemon) uiWantedRowsHTML(lang string) string {
 	tr := func(phrase string) string { return uiTr(lang, phrase) }
 	list := d.wantedList()
 	if len(list) == 0 {
-		return `<li class="empty"><svg class="i" style="width:40px;height:40px;color:var(--subtle)"><use href="/assets/icons.svg#i-tv"/></svg><h3>` + tr("Nothing wanted yet") + `</h3><p>` + tr("Add a series or a movie: gx-torrent watches the feeds and the indexers for it and downloads what is missing.") + `</p><button type="button" class="primary sm" onclick="document.getElementById('add-wanted').click()" title="` + tr("Add a series or a movie to the wanted list") + `">` + tr("Add title") + `</button></li>`
+		return `<li class="empty"><svg class="i wanted-empty-icon"><use href="/assets/icons.svg#i-tv"/></svg><h3>` + tr("Nothing wanted yet") + `</h3><p>` + tr("Add a series or a movie: gx-torrent watches the feeds and the indexers for it and downloads what is missing.") + `</p><button type="button" class="primary sm" onclick="document.getElementById('add-wanted').click()" title="` + tr("Add a series or a movie to the wanted list") + `">` + tr("Add title") + `</button></li>`
 	}
 	var b strings.Builder
 	now := time.Now()
@@ -1144,7 +1144,7 @@ func (d *Daemon) uiWantedProgressHTML(stats wantedStats, lang string) string {
 		return ""
 	}
 	pct := stats.Downloaded * 100 / known
-	return `<div class="wprogress" role="progressbar" aria-valuenow="` + strconv.Itoa(pct) + `" aria-valuemin="0" aria-valuemax="100" aria-label="` + tr("Downloaded episodes out of the ones found so far") + `" title="` + tr("Downloaded episodes out of the ones found so far") + `"><i style="width:` + strconv.Itoa(pct) + `%"></i></div>`
+	return `<div class="wprogress" role="progressbar" aria-valuenow="` + strconv.Itoa(pct) + `" aria-valuemin="0" aria-valuemax="100" aria-label="` + tr("Downloaded episodes out of the ones found so far") + `" title="` + tr("Downloaded episodes out of the ones found so far") + `"><i style="--pct:` + strconv.Itoa(pct) + `%"></i></div>`
 }
 
 // uiWantedSeasonChip renders one season with its episode counts (only the

@@ -117,7 +117,7 @@ body{display:flex;flex-direction:column;overflow:hidden}
 .prog{display:flex;align-items:center;gap:6px}
 .prog .pct{flex:none;min-width:42px;text-align:right;font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums}
 .pbar{position:relative;flex:1;min-width:24px;height:8px;border-radius:4px;background:var(--surface-2);overflow:hidden}
-.pbar>i{position:absolute;inset:0 auto 0 0;background:var(--bar-down)}
+.pbar>i{position:absolute;inset:0 auto 0 0;width:var(--pct,0%);background:var(--bar-down)}
 .pbar.seeding>i{background:var(--bar-seed)}
 .pbar.paused>i,.pbar.stalled>i,.pbar.disk_wait>i{background:var(--bar-paused)}
 /* Complete payload: the bar is full, so it keeps the seeding colour even when
@@ -222,7 +222,7 @@ body{display:flex;flex-direction:column;overflow:hidden}
 .dbar.av i.done{background:transparent}
 @media (forced-colors:active){.dbar i.have,.dbar i.partial,.dbar.av i.avail{background:CanvasText}.dbar.av i.none{background:Mark}}
 .piece-map{display:flex;width:100%;height:22px;margin:8px 0;border-radius:6px;overflow:hidden;background:var(--surface-2)}
-.piece-run{min-width:1px;height:100%}
+.piece-run{min-width:1px;height:100%;width:var(--pct,0%)}
 .piece-run.piece-have{background:var(--bar-seed)}
 .piece-run.piece-down{background:var(--warn)}
 .piece-run.piece-skip{background:var(--bar-paused);opacity:.4}
@@ -289,7 +289,7 @@ body{display:flex;flex-direction:column;overflow:hidden}
 </style>
 </head>
 <body>
-<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<svg width="0" height="0" class="sprite" aria-hidden="true">
   <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
   <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4.5v15l12-7.5z"/></symbol>
   <symbol id="i-pause" viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></symbol>
@@ -550,7 +550,7 @@ body{display:flex;flex-direction:column;overflow:hidden}
 <dialog id="dlg-shortcuts" aria-labelledby="dlg-shortcuts-title">
   <div class="dlg-head"><h2 id="dlg-shortcuts-title">{{tr "Keyboard shortcuts"}}</h2><button type="button" class="ghost icon" data-close aria-label="{{tr "Close"}}" title="{{tr "Close"}}"><svg class="i"><use href="#i-x"/></svg></button></div>
   <div class="dlg-body">
-    <div class="kv" style="grid-template-columns:1fr;gap:0">
+    <div class="kv kv-single">
       <div class="row"><span>{{tr "Filter torrents"}}</span><strong>/</strong></div>
       <div class="row"><span>{{tr "Add torrents"}}</span><strong>N</strong></div>
       <div class="row"><span>{{tr "Pause / resume selection"}}</span><strong>P</strong></div>
@@ -574,7 +574,7 @@ body{display:flex;flex-direction:column;overflow:hidden}
       <label class="field">{{tr "Magnet links or .torrent URLs, one per line"}}
         <textarea name="source" id="add-source" rows="3" placeholder="{{tr "magnet:?xt=…"}}" autocomplete="off" title="{{tr "Magnet link (magnet:?) or HTTP URL of a .torrent file to download"}}"></textarea>
       </label>
-      <div class="results" id="add-preview" aria-live="polite" hidden style="max-height:22vh"></div>
+      <div class="results" id="add-preview" aria-live="polite" hidden class="max-h-22"></div>
       <p class="dlg-help" id="add-cookies" aria-live="polite" hidden></p>
       <p class="dlg-help">{{tr "A .torrent URL from a private tracker needs its login cookies:"}} <a href="/ui/settings#cookies" title="{{tr "Cookies sent when fetching .torrent files and metadata"}}">{{tr "manage cookies"}}</a>.</p>
       <div class="filepick" id="filepick">
@@ -608,9 +608,9 @@ body{display:flex;flex-direction:column;overflow:hidden}
   <form method="post" action="/ui/remove" id="form-remove">
     <div class="dlg-head"><h2 id="dlg-remove-title">{{tr "Remove torrents"}}</h2></div>
     <div class="dlg-body">
-      <p id="remove-what" style="margin:0"></p>
+      <p class="m-0" id="remove-what"></p>
       <label class="chk"><input type="checkbox" name="delete_files" value="1" id="remove-files" title="{{tr "Also permanently delete the downloaded files from disk"}}"> {{tr "Also delete the files from disk"}}</label>
-      <p class="muted" style="margin:0;font-size:12.5px">{{tr "Without it the files stay where they are."}}</p>
+      <p class="muted m-0 fs-12">{{tr "Without it the files stay where they are."}}</p>
     </div>
     <div class="dlg-foot">
       <button type="button" data-close title="{{tr "Close without removing"}}">{{tr "Cancel"}}</button>
@@ -625,7 +625,7 @@ body{display:flex;flex-direction:column;overflow:hidden}
     <div class="dlg-body">
       <input type="hidden" name="hash">
       <label class="field">{{tr "New name"}}<input type="text" name="name" autocomplete="off" required title="{{tr "The torrent's new name; the content folder is renamed too"}}"></label>
-      <p class="muted" style="margin:0;font-size:12.5px">{{tr "The downloaded content is renamed on disk; the torrent keeps its info hash."}}</p>
+      <p class="muted m-0 fs-12">{{tr "The downloaded content is renamed on disk; the torrent keeps its info hash."}}</p>
     </div>
     <div class="dlg-foot">
       <button type="button" data-close title="{{tr "Close without renaming"}}">{{tr "Cancel"}}</button>
@@ -656,7 +656,7 @@ body{display:flex;flex-direction:column;overflow:hidden}
       <input type="hidden" name="hash">
       <input type="hidden" name="old">
       <label class="field">{{tr "New folder name"}}<input type="text" name="new" autocomplete="off" required title="{{tr "The new name of the folder inside the torrent"}}"></label>
-      <p class="muted" style="margin:0;font-size:12.5px">{{tr "Every file in the folder moves with it; the torrent keeps its info hash."}}</p>
+      <p class="muted m-0 fs-12">{{tr "Every file in the folder moves with it; the torrent keeps its info hash."}}</p>
     </div>
     <div class="dlg-foot">
       <button type="button" data-close title="{{tr "Close without renaming"}}">{{tr "Cancel"}}</button>
@@ -735,7 +735,7 @@ body{display:flex;flex-direction:column;overflow:hidden}
       <label class="field">{{tr "Blocklist file or URL"}}
         <input type="text" name="source" placeholder="{{tr "URL or local file"}}" autocomplete="off" value="{{.IPFilterSource}}" title="{{tr "IP filter blocklist file path or URL (eMule, DAT, P2P or CIDR format)"}}">
       </label>
-      <p class="muted" style="margin:0;font-size:12.5px"><span>{{tr "Rules loaded:"}}</span> <b>{{.IPFilter}}</b></p>
+      <p class="muted m-0 fs-12"><span>{{tr "Rules loaded:"}}</span> <b>{{.IPFilter}}</b></p>
     </div>
     <div class="dlg-foot">
       <button type="button" data-close title="{{tr "Close without loading"}}">{{tr "Cancel"}}</button>
@@ -769,12 +769,12 @@ body{display:flex;flex-direction:column;overflow:hidden}
 </dialog>
 
 {{if .SearchEnabled}}
-<dialog id="dlg-search" aria-labelledby="dlg-search-title" style="width:min(760px,calc(100vw - 32px))">
+<dialog id="dlg-search" class="dlg-wide" aria-labelledby="dlg-search-title">
   <form method="dialog" id="form-search">
     <div class="dlg-head"><h2 id="dlg-search-title">{{tr "Search indexers"}}</h2><button type="button" class="ghost icon" data-close aria-label="{{tr "Close"}}" title="{{tr "Close"}}"><svg class="i"><use href="#i-x"/></svg></button></div>
     <div class="dlg-body">
-      <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <input type="search" id="searchbox" style="flex:1;min-width:220px" placeholder="{{tr "Search indexers…"}}" autocomplete="off" aria-label="{{tr "Search indexers…"}}" title="{{tr "Search configured Torznab indexers for releases"}}">
+      <div class="search-row">
+        <input type="search" id="searchbox" class="grow" placeholder="{{tr "Search indexers…"}}" autocomplete="off" aria-label="{{tr "Search indexers…"}}" title="{{tr "Search configured Torznab indexers for releases"}}">
         <select id="search-sort" aria-label="{{tr "Sort results"}}" title="{{tr "Order of the search results: most seeders, largest, newest or name"}}">
           <option value="seeders">{{tr "Seeds"}}</option>
           <option value="size">{{tr "Size"}}</option>
@@ -783,7 +783,7 @@ body{display:flex;flex-direction:column;overflow:hidden}
         </select>
         <button type="submit" class="primary" title="{{tr "Execute search query across configured indexers"}}">{{tr "Search"}}</button>
       </div>
-      <p class="muted" id="searchinfo" style="margin:0" aria-live="polite"></p>
+      <p class="muted m-0" id="searchinfo" aria-live="polite"></p>
       <div class="results" id="searchresults"></div>
     </div>
   </form>
@@ -1014,9 +1014,9 @@ function renderVirtual(force){
   if(!force&&start===state.winStart&&end===state.winEnd&&view.length===state.winLen)return;
   var cols=$$('#torrents thead th').length||1;
   var html='';
-  if(start>0)html+='<tr class="vpad" aria-hidden="true"><td colspan="'+cols+'" style="height:'+(start*rowH)+'px;padding:0;border:0"></td></tr>';
+  if(start>0)html+='<tr class="vpad" aria-hidden="true"><td colspan="'+cols+'" style="--vpad:'+(start*rowH)+'px"></td></tr>';
   for(var i=start;i<end;i++)html+=rowHTML(view[i]);
-  if(end<view.length)html+='<tr class="vpad" aria-hidden="true"><td colspan="'+cols+'" style="height:'+((view.length-end)*rowH)+'px;padding:0;border:0"></td></tr>';
+  if(end<view.length)html+='<tr class="vpad" aria-hidden="true"><td colspan="'+cols+'" style="--vpad:'+((view.length-end)*rowH)+'px"></td></tr>';
   tb.innerHTML=html;
   var table=tb.closest('table');
   if(table){table.setAttribute('aria-rowcount',String(view.length+1));}
@@ -1114,7 +1114,7 @@ function rowHTML(r){
   h+='<td class="sel"><input class="rowsel" type="checkbox" value="'+esc(r.Hash)+'" aria-label="'+esc(t('Select torrent'))+'" title="'+esc(t('Select this torrent for batch actions'))+'"></td>';
   h+='<td class="name c-name" title="'+esc(r.Name)+'">'+stIcon(r.State,r.Progress)+'<a class="open" href="/?open='+esc(r.Hash)+'">'+esc(r.Name)+'</a>'+(r.Pinned?'<span class="fl" title="'+esc(t('Force started: runs outside the queue limits'))+'">F</span>':'')+'</td>';
   h+='<td class="num c-size" title="'+esc(r.DoneSize)+'">'+esc(r.Size)+'</td>';
-  h+='<td class="c-progress"><div class="prog"><div class="pbar '+esc(barCls(r.State,r.Progress))+'" role="progressbar" aria-valuenow="'+r.Progress.toFixed(1)+'" aria-valuemin="0" aria-valuemax="100" aria-label="'+esc(t('Progress'))+'"><i style="width:'+r.Progress.toFixed(1)+'%"></i></div><span class="pct" aria-hidden="true">'+esc(r.ProgressS)+'</span></div></td>';
+  h+='<td class="c-progress"><div class="prog"><div class="pbar '+esc(barCls(r.State,r.Progress))+'" role="progressbar" aria-valuenow="'+r.Progress.toFixed(1)+'" aria-valuemin="0" aria-valuemax="100" aria-label="'+esc(t('Progress'))+'"><i style="--pct:'+r.Progress.toFixed(1)+'%"></i></div><span class="pct" aria-hidden="true">'+esc(r.ProgressS)+'</span></div></td>';
   h+='<td class="state c-state"><span class="badge b-'+esc(r.State)+'">'+esc(t(r.StateLabel))+'</span></td>';
   h+='<td class="num c-seeds">'+r.Seeds+(r.SwarmSeeds>=0?'<span class="subtle"> ('+r.SwarmSeeds+')</span>':'')+'</td>';
   h+='<td class="num c-peers">'+r.Peers+(r.SwarmPeers>=0?'<span class="subtle"> ('+r.SwarmPeers+')</span>':'')+'</td>';
@@ -1959,7 +1959,7 @@ window.gxClearFilters=function(){state.filter={status:'all',cat:null,tag:null,tr
 </html>{{define "addopts"}}
       <details class="addmore">
         <summary>{{tr "Options"}}</summary>
-        <div class="opts" style="margin-top:10px">
+        <div class="opts mt-10">
           <label class="chk" title="{{tr "Add torrent in paused state without starting download immediately"}}"><input type="checkbox" name="paused" value="1"> {{tr "paused"}}</label>
           <label class="chk" title="{{tr "Place torrent at the top of the download queue"}}"><input type="checkbox" name="top" value="1"> {{tr "top"}}</label>
           <label class="chk" title="{{tr "Download pieces in order (streaming); slower overall"}}"><input type="checkbox" name="sequential" value="1"> {{tr "sequential"}}</label>
@@ -1967,7 +1967,7 @@ window.gxClearFilters=function(){state.filter={status:'all',cat:null,tag:null,tr
           <label class="chk" title="{{tr "BEP 16 super-seeding: advertise one piece at a time so the swarm spreads the data. For initial seeding only; it reduces the seed's upload throughput"}}"><input type="checkbox" name="super_seeding" value="1"> {{tr "super-seeding"}}</label>
           <label class="chk" title="{{tr "Skip the initial check: the files already on disk are trusted as complete and seeding starts at once. Each piece is checked the first time a peer asks for it and is never sent if it does not match; a piece that fails ends this mode and every file is checked again"}}"><input type="checkbox" name="seed_mode" value="1"> {{tr "skip check"}}</label>
         </div>
-        <div class="form-grid" style="margin-top:10px">
+        <div class="form-grid mt-10">
           <label title="{{tr "Download speed limit for the added torrents in KiB/s: 0 = unlimited, empty = follow the global limit"}}">{{tr "Download limit (KiB/s)"}}<input type="number" min="0" name="download_limit" placeholder="global"></label>
           <label title="{{tr "Upload speed limit for the added torrents in KiB/s: 0 = unlimited, empty = follow the global limit"}}">{{tr "Upload limit (KiB/s)"}}<input type="number" min="0" name="upload_limit" placeholder="global"></label>
           {{if .Standalone}}<label title="{{tr "Seed ratio limit for the added torrents: 0 = unlimited, empty = follow the global limit"}}">{{tr "Seed ratio"}}<input type="number" min="0" step="any" name="seed_ratio" placeholder="global"></label>
@@ -2076,7 +2076,7 @@ window.gxClearFilters=function(){state.filter={status:'all',cat:null,tag:null,tr
       <td class="sel"><input class="rowsel" type="checkbox" value="{{.Hash}}" aria-label="{{tr "Select torrent"}}" title="{{tr "Select this torrent for batch actions"}}"></td>
       <td class="name c-name" title="{{.Name}}">{{$st := stateIcon .State .Progress}}<span class="sti st-{{.State}}" title="{{tr $st.Label}}" aria-hidden="true"><svg class="i"><use href="#{{$st.Icon}}"/></svg></span><a class="open" href="/?open={{.Hash}}">{{.Name}}</a>{{if .Pinned}}<span class="fl" title="{{tr "Force started: runs outside the queue limits"}}">F</span>{{end}}</td>
       <td class="num c-size" title="{{.DoneSize}}">{{.Size}}</td>
-      <td class="c-progress"><div class="prog"><div class="pbar {{barClass .State .Progress}}" role="progressbar" aria-valuenow="{{percent .Progress}}" aria-valuemin="0" aria-valuemax="100" aria-label="{{tr "Progress"}}"><i style="width:{{percent .Progress}}%"></i></div><span class="pct" aria-hidden="true">{{.ProgressS}}</span></div></td>
+      <td class="c-progress"><div class="prog"><div class="pbar {{barClass .State .Progress}}" role="progressbar" aria-valuenow="{{percent .Progress}}" aria-valuemin="0" aria-valuemax="100" aria-label="{{tr "Progress"}}"><i style="--pct:{{percent .Progress}}%"></i></div><span class="pct" aria-hidden="true">{{.ProgressS}}</span></div></td>
       <td class="state c-state"><span class="badge b-{{.State}}">{{.StateLabel}}</span></td>
       <td class="num c-seeds">{{.Seeds}}{{if ge .SwarmSeeds 0}}<span class="subtle"> ({{.SwarmSeeds}})</span>{{end}}</td>
       <td class="num c-peers">{{.Peers}}{{if ge .SwarmPeers 0}}<span class="subtle"> ({{.SwarmPeers}})</span>{{end}}</td>
@@ -2113,14 +2113,14 @@ window.gxClearFilters=function(){state.filter={status:'all',cat:null,tag:null,tr
     <svg class="i"><use href="#i-inbox"/></svg>
     <h3>{{tr "No torrents in the session."}}</h3>
     <p>{{tr "Add a magnet link or a .torrent file, or drop one on the page."}}</p>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center">
+    <div class="emptystate-actions">
       <button type="button" class="primary" onclick="document.getElementById('btn-add').click()" title="{{tr "Add torrents: magnet links, .torrent URLs or files (shortcut N)"}}"><svg class="i"><use href="#i-plus"/></svg>{{tr "Add"}}</button>
       {{if .SearchEnabled}}<button type="button" onclick="document.getElementById('btn-search').click()" title="{{tr "Search configured Torznab indexers for releases"}}">{{tr "Search indexers"}}</button>{{end}}
       {{if .Standalone}}<a class="btn" href="/ui/rss" title="{{tr "RSS feeds, indexers and rules"}}">{{tr "RSS & indexers"}}</a>{{end}}
     </div>
   </div>
   {{end}}
-{{end}}{{define "th"}}<th scope="col" class="c-{{.}}" data-col="{{.}}" data-sort="{{.}}" aria-sort="none" style="position:sticky">{{end}}{{define "thnum"}}<th scope="col" class="num c-{{.}}" data-col="{{.}}" data-sort="{{.}}" aria-sort="none" style="position:sticky">{{end}}{{define "rz"}}<span class="rz" role="separator" aria-orientation="vertical" aria-valuemin="40" aria-valuemax="800" aria-valuenow="100" tabindex="0" aria-label="{{tr "Resize column"}}" title="{{tr "Drag, or use the left and right arrows, to resize the column; double click for the default width"}}"></span>{{end}}{{define "detail"}}
+{{end}}{{define "th"}}<th scope="col" class="c-{{.}}" data-col="{{.}}" data-sort="{{.}}" aria-sort="none" class="sticky-head">{{end}}{{define "thnum"}}<th scope="col" class="num c-{{.}}" data-col="{{.}}" data-sort="{{.}}" aria-sort="none" class="sticky-head">{{end}}{{define "rz"}}<span class="rz" role="separator" aria-orientation="vertical" aria-valuemin="40" aria-valuemax="800" aria-valuenow="100" tabindex="0" aria-label="{{tr "Resize column"}}" title="{{tr "Drag, or use the left and right arrows, to resize the column; double click for the default width"}}"></span>{{end}}{{define "detail"}}
 <div class="dhead">
   <h2 id="drawer-title">{{.Name}}</h2>
   <button type="button" class="ghost icon" data-close-drawer aria-label="{{tr "Close details"}}" title="{{tr "Close details"}}"><svg class="i"><use href="#i-x"/></svg></button>
@@ -2139,7 +2139,7 @@ window.gxClearFilters=function(){state.filter={status:'all',cat:null,tag:null,tr
 {{if .Error}}<p class="notice err">{{.Error}}</p>{{end}}
 
 {{if eq .Tab "general"}}
-  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">
+  <div class="action-row">
     <button type="button" class="sm" data-dact="resume" title="{{tr "Resume this torrent"}}"><svg class="i"><use href="#i-play"/></svg>{{tr "Resume"}}</button>
     <button type="button" class="sm" data-dact="pause" title="{{tr "Pause this torrent"}}"><svg class="i"><use href="#i-pause"/></svg>{{tr "Pause"}}</button>
     <button type="button" class="sm" data-dact="verify" title="{{tr "Recheck data on disk"}}"><svg class="i"><use href="#i-check"/></svg>{{tr "Recheck"}}</button>
@@ -2149,12 +2149,12 @@ window.gxClearFilters=function(){state.filter={status:'all',cat:null,tag:null,tr
   </div>
   {{if .PieceBar}}<div class="dbars">
     <span class="dbar-l" id="dbar-down-l">{{tr "Downloaded"}}</span>
-    <div class="dbar" role="img" aria-labelledby="dbar-down-l dbar-down-v" title="{{tr "Where the downloaded pieces are: full colour is complete, lighter is partly downloaded, grey is missing, dimmed is a skipped file"}}">{{range .PieceBar}}<i class="{{.Class}}" style="opacity:{{.Op}}"></i>{{end}}</div>
+    <div class="dbar" role="img" aria-labelledby="dbar-down-l dbar-down-v" title="{{tr "Where the downloaded pieces are: full colour is complete, lighter is partly downloaded, grey is missing, dimmed is a skipped file"}}">{{range .PieceBar}}<i class="{{.Class}}" style="--op:{{.Op}}"></i>{{end}}</div>
     <span class="dbar-v" id="dbar-down-v">{{percent .Progress}}%</span>
     {{if .AvailBar}}<span class="dbar-l" id="dbar-av-l">{{tr "Availability"}}</span>
-    <div class="dbar av" role="img" aria-labelledby="dbar-av-l dbar-av-v" title="{{tr "How many connected peers have the pieces still missing: darker is more peers, red is a piece nobody connected has"}}">{{range .AvailBar}}<i class="{{.Class}}" style="opacity:{{.Op}}"></i>{{end}}</div>
+    <div class="dbar av" role="img" aria-labelledby="dbar-av-l dbar-av-v" title="{{tr "How many connected peers have the pieces still missing: darker is more peers, red is a piece nobody connected has"}}">{{range .AvailBar}}<i class="{{.Class}}" style="--op:{{.Op}}"></i>{{end}}</div>
     <span class="dbar-v" id="dbar-av-v">{{if .AvailMissing}}<span class="err-t">{{.AvailMissing}} <span>{{tr "pieces unavailable"}}</span></span>{{else if lt .AvailabilityPct 0.0}}—{{else}}{{printf "%.2f" .AvailabilityPct}}{{end}}</span>{{end}}
-  </div>{{else}}  <div class="progress {{.State}}" role="progressbar" aria-valuenow="{{percent .Progress}}" aria-valuemin="0" aria-valuemax="100" aria-label="{{tr "Progress"}}" style="height:8px;margin-bottom:14px"><i style="width:{{percent .Progress}}%"></i></div>{{end}}
+  </div>{{else}}  <div class="progress detail {{.State}}" role="progressbar" aria-valuenow="{{percent .Progress}}" aria-valuemin="0" aria-valuemax="100" aria-label="{{tr "Progress"}}"><i style="--pct:{{percent .Progress}}%"></i></div>{{end}}
   <div class="kv">
     <div class="row"><span>{{tr "State"}}</span><strong><span>{{tr (stateLabel .State)}}</span></strong></div>
     <div class="row"><span>{{tr "Progress"}}</span><strong>{{percent .Progress}}%</strong></div>
@@ -2194,7 +2194,7 @@ window.gxClearFilters=function(){state.filter={status:'all',cat:null,tag:null,tr
     {{if .LocalDataStr}}<div class="row"><span>{{tr "Local data to reuse"}}</span><strong>{{.LocalDataStr}}</strong></div>{{end}}
   </div>
   {{end}}
-  <form method="post" action="/ui/pin" style="margin:8px 0"><input type="hidden" name="hash" value="{{.Hash}}"><input type="hidden" name="tab" value="general"><input type="hidden" name="pinned" value="{{if .Pinned}}0{{else}}1{{end}}">{{if .Pinned}}<button type="submit" class="sm" title="{{tr "Unpin torrent to restore normal queue management"}}">{{tr "Unpin"}}</button>{{else}}<button type="submit" class="sm" title="{{tr "Pin torrent to keep it active outside queue limits"}}">{{tr "Pin (outside the queue)"}}</button>{{end}}</form>
+  <form class="pin-form" method="post" action="/ui/pin"><input type="hidden" name="hash" value="{{.Hash}}"><input type="hidden" name="tab" value="general"><input type="hidden" name="pinned" value="{{if .Pinned}}0{{else}}1{{end}}">{{if .Pinned}}<button type="submit" class="sm" title="{{tr "Unpin torrent to restore normal queue management"}}">{{tr "Unpin"}}</button>{{else}}<button type="submit" class="sm" title="{{tr "Pin torrent to keep it active outside queue limits"}}">{{tr "Pin (outside the queue)"}}</button>{{end}}</form>
   <h3 class="dsec">{{tr "Limits & seeding (-1 global, 0 unlimited)."}}</h3>
   <form class="form-grid" method="post" action="/ui/seed-limits">
     <input type="hidden" name="hash" value="{{.Hash}}"><input type="hidden" name="tab" value="general">
@@ -2242,7 +2242,7 @@ window.gxClearFilters=function(){state.filter={status:'all',cat:null,tag:null,tr
     <input type="hidden" name="hash" value="{{.Hash}}"><input type="hidden" name="tab" value="general">
     <label class="wide">{{tr "Web seed (one URL per line)"}}<textarea name="urls" rows="3" placeholder="http://example/file" title="{{tr "HTTP/HTTPS web seed URLs for this torrent, one per line (BEP 19)"}}">{{range .WebSeeds}}{{.}}
 {{end}}</textarea></label>
-    <div style="display:flex;gap:6px"><button type="submit" class="sm" title="{{tr "Add web seeds to torrent"}}">{{tr "Add"}}</button><button type="submit" class="sm" name="remove" value="1" title="{{tr "Remove selected web seed"}}">{{tr "Remove"}}</button></div>
+    <div class="row-actions"><button type="submit" class="sm" title="{{tr "Add web seeds to torrent"}}">{{tr "Add"}}</button><button type="submit" class="sm" name="remove" value="1" title="{{tr "Remove selected web seed"}}">{{tr "Remove"}}</button></div>
   </form>
 {{else if eq .Tab "files"}}
   {{if .Files}}
@@ -2259,14 +2259,14 @@ window.gxClearFilters=function(){state.filter={status:'all',cat:null,tag:null,tr
     {{range .Files}}
       <tr data-path="{{.Path}}">
         <td class="sel"><input type="checkbox" class="filesel" name="index" value="{{.Index}}" form="files-bulk" aria-label="{{tr "Select file"}}" title="{{tr "Select this file to change its priority with the others"}}"></td>
-        <td class="fname" style="word-break:break-word">{{.Path}}</td>
+        <td class="fname">{{.Path}}</td>
         <td class="num">{{bytes .Size}}</td>
-        <td class="fp"><div class="prog"><div class="pbar{{if not .Wanted}} paused{{end}}" role="progressbar" aria-valuenow="{{pct .Done .Size}}" aria-valuemin="0" aria-valuemax="100" aria-label="{{tr "Progress"}}"><i style="width:{{pct .Done .Size}}%"></i></div><span class="pct" aria-hidden="true">{{pct .Done .Size}}%</span></div></td>
+        <td class="fp"><div class="prog"><div class="pbar{{if not .Wanted}} paused{{end}}" role="progressbar" aria-valuenow="{{pct .Done .Size}}" aria-valuemin="0" aria-valuemax="100" aria-label="{{tr "Progress"}}"><i style="--pct:{{pct .Done .Size}}%"></i></div><span class="pct" aria-hidden="true">{{pct .Done .Size}}%</span></div></td>
         <td><form method="post" action="/ui/file-priority" class="autosubmit">
           <input type="hidden" name="hash" value="{{$.Hash}}"><input type="hidden" name="tab" value="files"><input type="hidden" name="index" value="{{.Index}}">
           <select name="priority" aria-label="{{tr "Priority"}}" title="{{tr "Download priority for this file (Skip, Normal, High, Maximum)"}}" onchange="this.form.requestSubmit()"><option value="0"{{if eq .Priority 0}} selected{{end}}>{{tr "Skip"}}</option><option value="4"{{if eq .Priority 4}} selected{{end}}>{{tr "Normal"}}</option><option value="6"{{if eq .Priority 6}} selected{{end}}>{{tr "High"}}</option><option value="7"{{if eq .Priority 7}} selected{{end}}>{{tr "Maximum"}}</option></select>
         </form></td>
-        <td><span style="display:inline-flex;gap:4px"><a class="btn sm" href="/ui/stream?hash={{$.Hash}}&file={{.Index}}" target="_blank" rel="noopener" aria-label="{{tr "Stream"}}" title="{{tr "Stream this file with HTTP Range; the pieces of the window are downloaded first"}}"><svg class="i"><use href="#i-play"/></svg>{{tr "Stream"}}</a>{{if $.Standalone}}<button type="button" class="btn ghost icon sm" data-rename-file="{{.Path}}" data-hash="{{$.Hash}}" aria-label="{{tr "Rename file"}}" title="{{tr "Rename this file"}}"><svg class="i"><use href="#i-edit"/></svg></button>{{end}}</span></td>
+        <td><span class="file-actions"><a class="btn sm" href="/ui/stream?hash={{$.Hash}}&file={{.Index}}" target="_blank" rel="noopener" aria-label="{{tr "Stream"}}" title="{{tr "Stream this file with HTTP Range; the pieces of the window are downloaded first"}}"><svg class="i"><use href="#i-play"/></svg>{{tr "Stream"}}</a>{{if $.Standalone}}<button type="button" class="btn ghost icon sm" data-rename-file="{{.Path}}" data-hash="{{$.Hash}}" aria-label="{{tr "Rename file"}}" title="{{tr "Rename this file"}}"><svg class="i"><use href="#i-edit"/></svg></button>{{end}}</span></td>
       </tr>
     {{end}}
     </tbody>
@@ -2300,7 +2300,7 @@ window.gxClearFilters=function(){state.filter={status:'all',cat:null,tag:null,tr
     <thead><tr><th scope="col">{{tr "URL"}}</th><th scope="col">{{tr "State"}}</th><th scope="col" class="num">{{tr "Seeds"}}</th><th scope="col" class="num">{{tr "Peers"}}</th><th scope="col" class="num">{{tr "Next"}}</th><th scope="col"><span class="sr-only">{{tr "Actions"}}</span></th></tr></thead>
     <tbody>
     {{range .Trackers}}
-      <tr><td style="word-break:break-all" title="{{.Message}}"><form method="post" action="/ui/trackers" class="trk-edit">
+      <tr><td class="cell-url" title="{{.Message}}"><form method="post" action="/ui/trackers" class="trk-edit">
         <input type="hidden" name="hash" value="{{$.Hash}}"><input type="hidden" name="tab" value="trackers"><input type="hidden" name="op" value="edit"><input type="hidden" name="old" value="{{.URL}}">
         <input type="text" name="new" value="{{.URL}}" aria-label="{{tr "Tracker URL"}}" title="{{tr "Change this tracker URL; the torrent keeps its data"}}">
         <button type="submit" class="sm" title="{{tr "Save the tracker URL"}}">{{tr "Save"}}</button>
@@ -2334,7 +2334,7 @@ window.gxClearFilters=function(){state.filter={status:'all',cat:null,tag:null,tr
   {{if .Pieces}}
   <p class="muted"><b>{{.PiecesHave}}/{{.PiecesTotal}}</b> <span>{{tr "pieces downloaded. Green: have, yellow: downloading, grey: missing, dimmed: skipped."}}</span></p>
   <div class="piece-map" role="img" aria-label="{{tr "Piece map"}}">
-    {{range .Pieces}}<span class="piece-run piece-{{if eq .State "have"}}have{{else if eq .State "downloading"}}down{{else if eq .State "skipped"}}skip{{else}}missing{{end}}" style="width:{{.Pct}}%" title="{{if eq .State "have"}}have{{else if eq .State "downloading"}}downloading{{else if eq .State "skipped"}}skipped{{else}}missing{{end}}"></span>{{end}}
+    {{range .Pieces}}<span class="piece-run piece-{{if eq .State "have"}}have{{else if eq .State "downloading"}}down{{else if eq .State "skipped"}}skip{{else}}missing{{end}}" style="--pct:{{.Pct}}%" title="{{if eq .State "have"}}have{{else if eq .State "downloading"}}downloading{{else if eq .State "skipped"}}skipped{{else}}missing{{end}}"></span>{{end}}
   </div>
   {{else}}<p class="muted">{{tr "Piece map is not available yet (metadata missing)."}}</p>{{end}}
 {{end}}

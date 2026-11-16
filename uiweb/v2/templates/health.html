@@ -392,12 +392,12 @@
 {{define "v2_theme_card"}}<label class="theme-card"{{if eq .ID "auto"}} title="{{tr "Tema automatico: segue il tema chiaro o scuro del sistema"}}"{{end}}>
   <input type="radio" name="v2-theme" value="{{.ID}}" data-theme-mode="{{.Mode}}" data-bg="{{.Bg}}" data-surface="{{.Surface}}" data-text="{{.Text}}" data-accent="{{.Accent}}">
   {{if eq .ID "auto"}}<span class="theme-swatch theme-swatch-auto" aria-hidden="true"><span class="theme-swatch-panel theme-swatch-panel-dark">{{tr "Aa"}}</span><span class="theme-swatch-panel theme-swatch-panel-light">{{tr "Aa"}}</span></span>
-  {{else}}<span class="theme-swatch" aria-hidden="true" style="background:{{.Bg}}"><span class="theme-swatch-panel" style="background:{{.Surface}};color:{{.Text}}">{{tr "Aa"}}<span class="theme-swatch-accent" style="background:{{.Accent}}"></span></span></span>{{end}}
+  {{else}}<span class="theme-swatch" aria-hidden="true" style="--swatch-bg:{{.Bg}}"><span class="theme-swatch-panel" style="--swatch-surface:{{.Surface}};--swatch-text:{{.Text}}">{{tr "Aa"}}<span class="theme-swatch-accent" style="--swatch-accent:{{.Accent}}"></span></span></span>{{end}}
   <span class="theme-name">{{tr .Name}}</span>
 </label>{{end}}
 
 {{define "v2_theme_modal"}}
-<div class="overlay" style="display:block">
+<div class="block overlay">
   <div class="modal theme-modal" role="dialog" aria-modal="true" aria-labelledby="v2-theme-title" data-theme-selected="{{.Selected}}">
     <div class="modal-head"><h3 id="v2-theme-title">{{tr "Tema"}}</h3>
       <button class="btn sm" type="button" hx-get="/empty" hx-target="#v2-modal" hx-swap="innerHTML" {{trTitle "Chiudi la scelta del tema"}}>{{tr "Chiudi"}}</button></div>

@@ -8,16 +8,16 @@
     <div class="panel-head"><h3>{{tr "Di tendenza su TMDB"}}</h3><small class="muted">{{tr "Serie TV e film"}}</small></div>
     <div class="panel-body">
       <div class="toolbar"><strong class="muted">{{tr "Tipo"}}</strong>
-         <form hx-post="/tmdb/discover" hx-target="#v2-tmdb-results" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="kind" value="series" data-v2-discover-kind-input /><input type="hidden" name="mode" value="trending" /><input type="hidden" name="window" value="week" /><button class="btn sm primary" data-v2-discover-kind="series" type="submit">{{tr "Serie TV"}}</button></form>
-         <form hx-post="/tmdb/discover" hx-target="#v2-tmdb-results" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="kind" value="movie" data-v2-discover-kind-input /><input type="hidden" name="mode" value="trending" /><input type="hidden" name="window" value="week" /><button class="btn sm" data-v2-discover-kind="movie" type="submit">{{tr "Film"}}</button></form>
+         <form hx-post="/tmdb/discover" hx-target="#v2-tmdb-results" hx-swap="innerHTML" class="inline"><input type="hidden" name="kind" value="series" data-v2-discover-kind-input /><input type="hidden" name="mode" value="trending" /><input type="hidden" name="window" value="week" /><button class="btn sm primary" data-v2-discover-kind="series" type="submit">{{tr "Serie TV"}}</button></form>
+         <form hx-post="/tmdb/discover" hx-target="#v2-tmdb-results" hx-swap="innerHTML" class="inline"><input type="hidden" name="kind" value="movie" data-v2-discover-kind-input /><input type="hidden" name="mode" value="trending" /><input type="hidden" name="window" value="week" /><button class="btn sm" data-v2-discover-kind="movie" type="submit">{{tr "Film"}}</button></form>
       </div>
-      <div class="toolbar" style="margin-top:8px"><strong class="muted">{{tr "Elenco"}}</strong>
-          <form class="v2-discover-choice" data-v2-discover-choice="trending:week" hx-post="/tmdb/discover" hx-target="#v2-tmdb-results" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="kind" value="series" data-v2-discover-kind-input /><input type="hidden" name="window" value="week" /><button class="btn sm active" type="submit" name="mode" value="trending" aria-pressed="true">{{tr "Tendenza settimana"}}</button></form>
-         <form class="v2-discover-choice" data-v2-discover-choice="trending:day" hx-post="/tmdb/discover" hx-target="#v2-tmdb-results" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="kind" value="series" data-v2-discover-kind-input /><input type="hidden" name="window" value="day" /><button class="btn sm" type="submit" name="mode" value="trending">{{tr "Tendenza oggi"}}</button></form>
-         <form class="v2-discover-choice" data-v2-discover-choice="popular:week" hx-post="/tmdb/discover" hx-target="#v2-tmdb-results" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="kind" value="series" data-v2-discover-kind-input /><input type="hidden" name="window" value="week" /><button class="btn sm" type="submit" name="mode" value="popular">{{tr "Popolari"}}</button></form>
-         <form class="v2-discover-choice" data-v2-discover-choice="top_rated:week" hx-post="/tmdb/discover" hx-target="#v2-tmdb-results" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="kind" value="series" data-v2-discover-kind-input /><input type="hidden" name="window" value="week" /><button class="btn sm" type="submit" name="mode" value="top_rated">{{tr "Più votati"}}</button></form>
-         <form class="v2-discover-choice" data-v2-discover-choice="now_playing:week" hx-post="/tmdb/discover" hx-target="#v2-tmdb-results" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="kind" value="series" data-v2-discover-kind-input /><input type="hidden" name="window" value="week" /><button class="btn sm" type="submit" name="mode" value="now_playing">{{tr "In programmazione"}}</button></form>
-         <form class="v2-discover-choice" data-v2-discover-choice="upcoming:week" hx-post="/tmdb/discover" hx-target="#v2-tmdb-results" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="kind" value="series" data-v2-discover-kind-input /><input type="hidden" name="window" value="week" /><button class="btn sm" type="submit" name="mode" value="upcoming">{{tr "Prossime uscite"}}</button></form>
+      <div class="mt-8 toolbar"><strong class="muted">{{tr "Elenco"}}</strong>
+          <form class="inline v2-discover-choice" data-v2-discover-choice="trending:week" hx-post="/tmdb/discover" hx-target="#v2-tmdb-results" hx-swap="innerHTML"><input type="hidden" name="kind" value="series" data-v2-discover-kind-input /><input type="hidden" name="window" value="week" /><button class="btn sm active" type="submit" name="mode" value="trending" aria-pressed="true">{{tr "Tendenza settimana"}}</button></form>
+         <form class="inline v2-discover-choice" data-v2-discover-choice="trending:day" hx-post="/tmdb/discover" hx-target="#v2-tmdb-results" hx-swap="innerHTML"><input type="hidden" name="kind" value="series" data-v2-discover-kind-input /><input type="hidden" name="window" value="day" /><button class="btn sm" type="submit" name="mode" value="trending">{{tr "Tendenza oggi"}}</button></form>
+         <form class="inline v2-discover-choice" data-v2-discover-choice="popular:week" hx-post="/tmdb/discover" hx-target="#v2-tmdb-results" hx-swap="innerHTML"><input type="hidden" name="kind" value="series" data-v2-discover-kind-input /><input type="hidden" name="window" value="week" /><button class="btn sm" type="submit" name="mode" value="popular">{{tr "Popolari"}}</button></form>
+         <form class="inline v2-discover-choice" data-v2-discover-choice="top_rated:week" hx-post="/tmdb/discover" hx-target="#v2-tmdb-results" hx-swap="innerHTML"><input type="hidden" name="kind" value="series" data-v2-discover-kind-input /><input type="hidden" name="window" value="week" /><button class="btn sm" type="submit" name="mode" value="top_rated">{{tr "Più votati"}}</button></form>
+         <form class="inline v2-discover-choice" data-v2-discover-choice="now_playing:week" hx-post="/tmdb/discover" hx-target="#v2-tmdb-results" hx-swap="innerHTML"><input type="hidden" name="kind" value="series" data-v2-discover-kind-input /><input type="hidden" name="window" value="week" /><button class="btn sm" type="submit" name="mode" value="now_playing">{{tr "In programmazione"}}</button></form>
+         <form class="inline v2-discover-choice" data-v2-discover-choice="upcoming:week" hx-post="/tmdb/discover" hx-target="#v2-tmdb-results" hx-swap="innerHTML"><input type="hidden" name="kind" value="series" data-v2-discover-kind-input /><input type="hidden" name="window" value="week" /><button class="btn sm" type="submit" name="mode" value="upcoming">{{tr "Prossime uscite"}}</button></form>
       </div>
       <div id="v2-tmdb-results" class="tmdb-results" aria-live="polite" hx-post="/tmdb/discover" hx-vals='{"kind":"series","mode":"trending","window":"week"}' hx-trigger="load" hx-swap="innerHTML">{{template "v2_skeleton"}}</div>
     </div>
@@ -54,7 +54,7 @@
 {{if .Error}}<p class="alert">{{tr .Error}}</p>
 {{else if .Results}}
 {{if .Notice}}<p class="muted">{{tr .Notice}}</p>{{end}}
-{{if .Links}}<form method="post" action="/search/add-all" hx-post="/search/add-all" hx-swap="none" style="display:inline">
+{{if .Links}}<form method="post" action="/search/add-all" hx-post="/search/add-all" hx-swap="none" class="inline">
   <textarea hidden name="ed2k_links">{{.Links}}</textarea>
   <input type="hidden" name="redirect" value="{{$.Redirect}}" />
   <button class="btn primary sm" type="submit" {{trTitle "Accoda tutti i link eD2k elencati"}}><span>{{tr "Aggiungi tutti"}}</span> ({{len .Results}})</button>
@@ -73,7 +73,7 @@
       {{else}}
       <span class="badge" {{trTitle "aMule non è attivo o non è raggiungibile."}}>{{tr "Solo ricerca"}}</span>
       {{end}}
-      <form method="post" action="/search/explain" hx-post="/search/explain" hx-target="#v2-modal" hx-swap="innerHTML" style="display:inline">
+      <form method="post" action="/search/explain" hx-post="/search/explain" hx-target="#v2-modal" hx-swap="innerHTML" class="inline">
         <input type="hidden" name="release" value="{{.ExplainJSON}}" />
         <button class="btn sm" type="submit">{{tr "Perché non questo?"}}</button>
       </form>
@@ -85,7 +85,7 @@
 {{end}}
 
 {{define "v2_explain_modal"}}
-<div class="overlay" style="display:block">
+<div class="block overlay">
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="v2-explain-title">
     <div class="modal-head"><h3 id="v2-explain-title">{{tr "Perché non questo?"}}</h3>
       <button class="btn sm" type="button" hx-get="/empty" hx-target="#v2-modal" hx-swap="innerHTML">{{tr "Chiudi"}}</button></div>

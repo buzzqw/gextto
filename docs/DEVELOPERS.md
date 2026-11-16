@@ -116,6 +116,17 @@ The server-rendered UI is assembled in `uiweb_v2.go`, `uiweb_sections.go`,
 `uiweb/v2/static/v2-core.js`; styles belong in `uiweb/v2/static/gextto-ui.css`
 and `v2.css`.
 
+Markup carries a class, never a look: a template with `style="display:inline"`
+or `style="margin-top:10px"` fails `TestV2TemplatesCarryNoInlineStyles` (and, for
+the daemon page, `TestDaemonPagesCarryNoInlineStyles`). Spacing, type size and
+width come from the utility classes at the end of `v2.css` (`inline`, `block`,
+`mt-10`, `fs-13`, `w-full`…, the same names in the daemon's `theme.css`), and
+colours come from the theme tokens. A value that comes from the data — an
+advance, the background of a theme preview — rides as a custom property
+(`style="--pct:42%"`, `style="--swatch-bg:…"`) and the rule that reads it lives
+in the stylesheet. A new literal colour in a component rule is a new token in
+the palette.
+
 The official UI is served at `/`; the old `/v2` prefix redirects to the root and
 the removed legacy `/ui` route must not be reintroduced. Live shell metrics are
 rendered by the `/partial/chrome` HTMX fragment, while the Downloads table uses its own

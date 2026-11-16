@@ -48,8 +48,8 @@ h3.sub{margin:14px 0 2px;font-size:13px;color:var(--subtle);text-transform:upper
 <main>
 <div class="page-head"><div class="grow"><h1>{{tr "Settings"}}</h1></div></div>
 <p class="muted">{{tr "Folders, network, ports and the engine options apply from the next start; the bandwidth, queue limits and language apply at once."}}</p>
-<div role="search" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
-  <input type="search" id="settings-filter" placeholder="{{tr "Filter settings…"}}" autocomplete="off" aria-label="{{tr "Filter settings"}}" title="{{tr "Show only the sections mentioning this text"}}" style="max-width:340px">
+<div role="search" class="search-bar">
+  <input type="search" id="settings-filter" placeholder="{{tr "Filter settings…"}}" autocomplete="off" aria-label="{{tr "Filter settings"}}" title="{{tr "Show only the sections mentioning this text"}}">
   <span class="muted" id="settings-filter-info" aria-live="polite"></span>
 </div>
 {{.ERROR}}
@@ -259,11 +259,11 @@ h3.sub{margin:14px 0 2px;font-size:13px;color:var(--subtle);text-transform:upper
 <fieldset>
   <legend>{{tr "Web interface"}}</legend>
   <label class="chk"><input type="checkbox" name="webui-alternative" value="1"{{.ALT_WEBUI_ON}} title="{{tr "Serve a downloaded VueTorrent at the root address; the standard interface stays available at /ui"}}"> {{tr "Use the alternative web interface (VueTorrent)"}}</label>
-  <p class="muted" style="margin:0;font-size:12.5px"><span>{{tr "Installed version"}}</span>: {{.ALT_WEBUI_VERSION}}</p>
+  <p class="muted m-0 fs-12"><span>{{tr "Installed version"}}</span>: {{.ALT_WEBUI_VERSION}}</p>
   <div class="actions">
     <button type="button" class="secondary sm" data-formaction="/ui/webui-install" title="{{tr "Download the latest VueTorrent release and install (or update) it here"}}">{{tr "Install or update VueTorrent"}}</button>
   </div>
-  <p class="muted" style="margin:0;font-size:12.5px">{{tr "The standard interface is always available at"}} <a href="/ui">/ui</a>.</p>
+  <p class="muted m-0 fs-12">{{tr "The standard interface is always available at"}} <a href="/ui">/ui</a>.</p>
   {{.LOGOUT_FORM}}
 </fieldset>
 <fieldset>

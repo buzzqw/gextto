@@ -228,7 +228,7 @@
                   <span class="torrent-state badge {{.StateClass}}">{{tr .State}}</span>
                 </div>
                 <div class="torrent-body">
-                  <div class="torrent-progress"><div class="progress {{.ProgressClass}}"><span style="width:{{.ProgressPct}}%"></span></div><small class="muted">{{if .Checking}}<span>{{tr "Verifica file"}}</span> {{.ProgressPct}}% · {{.PiecesChecked}}/{{.PiecesTotal}} <span>{{tr "pezzi"}}</span>{{else}}{{.ProgressPct}}% · {{bytes .TotalDone}} / {{bytes .TotalSize}}{{end}}</small></div>
+                  <div class="torrent-progress"><div class="progress {{.ProgressClass}}"><span style="--pct:{{.ProgressPct}}%"></span></div><small class="muted">{{if .Checking}}<span>{{tr "Verifica file"}}</span> {{.ProgressPct}}% · {{.PiecesChecked}}/{{.PiecesTotal}} <span>{{tr "pezzi"}}</span>{{else}}{{.ProgressPct}}% · {{bytes .TotalDone}} / {{bytes .TotalSize}}{{end}}</small></div>
                   <div class="torrent-metrics">
                     <span class="torrent-metric" {{trTitle "↓ Download"}}><span class="sr-only">{{tr "↓ Download"}}</span><span aria-hidden="true">↓</span> {{rate .DownloadRate}}</span>
                     <span class="torrent-metric" {{trTitle "↑ Upload"}}><span class="sr-only">{{tr "↑ Upload"}}</span><span aria-hidden="true">↑</span> {{rate .UploadRate}}</span>
@@ -267,7 +267,7 @@
                   <span class="torrent-state badge{{if eq .Status "completed"}} ok{{else if eq .Status "error"}} err{{else if eq .Status "paused"}} warn{{end}}">{{tr (httpState .Status)}}</span>
                 </div>
                 <div class="torrent-body">
-                  <div class="torrent-progress">{{if ge .Progress 0.0}}<div class="progress"><span style="width:{{printf "%.1f" .Progress}}%"></span></div><small class="muted">{{printf "%.1f" .Progress}}% · {{bytesU .DownloadedBytes}}</small>{{else}}<small class="muted">{{bytesU .DownloadedBytes}}</small>{{end}}</div>
+                  <div class="torrent-progress">{{if ge .Progress 0.0}}<div class="progress"><span style="--pct:{{printf "%.1f" .Progress}}%"></span></div><small class="muted">{{printf "%.1f" .Progress}}% · {{bytesU .DownloadedBytes}}</small>{{else}}<small class="muted">{{bytesU .DownloadedBytes}}</small>{{end}}</div>
                   <div class="torrent-metrics">{{if .SpeedBytes}}<span class="torrent-metric" {{trTitle "↓ Download"}}><span class="sr-only">{{tr "↓ Download"}}</span><span aria-hidden="true">↓</span> {{rate .SpeedBytes}}</span>{{end}}</div>
                 </div>
                 <div class="row-actions">
@@ -295,7 +295,7 @@
                   <span class="torrent-state badge {{.StateClass}}">{{tr .State}}</span>
                 </div>
                 <div class="torrent-body">
-                  <div class="torrent-progress"><div class="progress"><span style="width:{{.ProgressPct}}%"></span></div><small class="muted">{{.ProgressPct}}% · {{bytes .Done}} / {{bytes .Size}}</small></div>
+                  <div class="torrent-progress"><div class="progress"><span style="--pct:{{.ProgressPct}}%"></span></div><small class="muted">{{.ProgressPct}}% · {{bytes .Done}} / {{bytes .Size}}</small></div>
                   <div class="torrent-metrics">
                     <span class="torrent-metric" {{trTitle "↓ Download"}}><span class="sr-only">{{tr "↓ Download"}}</span><span aria-hidden="true">↓</span> {{rate .Speed}}</span>
                     <span class="torrent-metric" {{trTitle "↑ Dati caricati da questo file in questa sessione"}}><span class="sr-only">{{tr "↑ Dati caricati da questo file in questa sessione"}}</span><span aria-hidden="true">↑</span> {{bytes .Uploaded}}</span>

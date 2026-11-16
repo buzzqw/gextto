@@ -1133,7 +1133,7 @@ func v2RenderAction(view string, item map[string]any, action uiAction, spec uiTa
 		encoded, _ := json.Marshal(release)
 		escapedJSON := strings.ReplaceAll(stdhtml.EscapeString(string(encoded)), `"`, "&#34;")
 		inner, extra, class, _ := v2ActionInner(action)
-		return `<form method="post" action="/search/explain" hx-post="/search/explain" hx-target="#v2-modal" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="release" value="` + escapedJSON + `" /><button class="` + class + `" type="submit"` + extra + `>` + inner + `</button></form>`
+		return `<form method="post" action="/search/explain" hx-post="/search/explain" hx-target="#v2-modal" hx-swap="innerHTML" class="inline"><input type="hidden" name="release" value="` + escapedJSON + `" /><button class="` + class + `" type="submit"` + extra + `>` + inner + `</button></form>`
 	case "copy-magnet":
 		magnet := strings.TrimSpace(v2String(item["magnet"]))
 		disabled := ""
@@ -1152,7 +1152,7 @@ func v2RenderAction(view string, item map[string]any, action uiAction, spec uiTa
 		if magnet == "" && torrent == "" {
 			disabled = " disabled"
 		}
-		return `<form hx-post="/comics/weekly/force" hx-target="#v2-toast-region" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="date" value="` + stdhtml.EscapeString(v2String(item["pack_date"])) + `"><input type="hidden" name="magnet" value="` + stdhtml.EscapeString(magnet) + `"><input type="hidden" name="torrent" value="` + stdhtml.EscapeString(torrent) + `"><button class="btn sm" type="submit" title="Scarica di nuovo questo Weekly Pack"` + disabled + `>` + stdhtml.EscapeString(action.Label) + `</button></form>`
+		return `<form hx-post="/comics/weekly/force" hx-target="#v2-toast-region" hx-swap="innerHTML" class="inline"><input type="hidden" name="date" value="` + stdhtml.EscapeString(v2String(item["pack_date"])) + `"><input type="hidden" name="magnet" value="` + stdhtml.EscapeString(magnet) + `"><input type="hidden" name="torrent" value="` + stdhtml.EscapeString(torrent) + `"><button class="btn sm" type="submit" title="Scarica di nuovo questo Weekly Pack"` + disabled + `>` + stdhtml.EscapeString(action.Label) + `</button></form>`
 	}
 
 	path := v2Substitute(action.Path, item, true)

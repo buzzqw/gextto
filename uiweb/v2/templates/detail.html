@@ -63,12 +63,12 @@
   {{if .PiecesReady}}
     <p class="hint">{{.PiecesDone}}/{{.PieceCount}} <span>{{tr "pezzi scaricati."}}</span> <span>{{tr "Verde: scaricato, giallo: in corso, grigio: mancante, spento: saltato; passa il mouse su una cella per l'intervallo."}}</span></p>
     <div class="piece-map" role="img" aria-label="{{tr "Mappa dei pezzi: %d su %d scaricati" .PiecesDone .PieceCount}}">
-      {{range .Pieces}}<span class="piece-run piece-{{if eq .State "have"}}have{{else if eq .State "downloading"}}down{{else if eq .State "skipped"}}skip{{else}}missing{{end}}" style="width:{{.Pct}}%" title="{{if eq .State "have"}}{{tr "scaricato"}}{{else if eq .State "downloading"}}{{tr "in corso"}}{{else if eq .State "skipped"}}{{tr "saltato"}}{{else}}{{tr "mancante"}}{{end}} · {{tr "pezzi %d–%d" .Begin .End}}"></span>{{end}}
+      {{range .Pieces}}<span class="piece-run piece-{{if eq .State "have"}}have{{else if eq .State "downloading"}}down{{else if eq .State "skipped"}}skip{{else}}missing{{end}}" style="--pct:{{.Pct}}%" title="{{if eq .State "have"}}{{tr "scaricato"}}{{else if eq .State "downloading"}}{{tr "in corso"}}{{else if eq .State "skipped"}}{{tr "saltato"}}{{else}}{{tr "mancante"}}{{end}} · {{tr "pezzi %d–%d" .Begin .End}}"></span>{{end}}
     </div>
     {{if .AvailKnown}}
     <h4 class="detail-subhead">{{tr "Disponibilità tra i peer"}}</h4>
     <p class="hint">{{if .AvailMissing}}<span>{{tr "Pezzi che nessun peer connesso ha"}}</span>: {{.AvailMissing}}. {{end}}<span>{{tr "Più è pieno, più peer connessi hanno i pezzi che mancano; rosso: nessuno li ha; spento: niente da scaricare lì."}}</span></p>
-    <div class="avail-bar" role="img" aria-label="{{if .AvailMissing}}{{tr "Disponibilità dei pezzi: %d pezzi mancanti non li ha nessun peer connesso" .AvailMissing}}{{else}}{{tr "Disponibilità dei pezzi: ogni pezzo mancante ha almeno un peer connesso"}}{{end}}">{{range .Avail}}<span class="avail-{{.Class}}" style="opacity:{{.Op}}" title="{{if eq .Class "done"}}{{tr "niente da scaricare"}}{{else if eq .Class "none"}}{{tr "nessun peer connesso"}}{{else}}{{tr "almeno %d peer connessi" .Holders}}{{end}}"></span>{{end}}</div>
+    <div class="avail-bar" role="img" aria-label="{{if .AvailMissing}}{{tr "Disponibilità dei pezzi: %d pezzi mancanti non li ha nessun peer connesso" .AvailMissing}}{{else}}{{tr "Disponibilità dei pezzi: ogni pezzo mancante ha almeno un peer connesso"}}{{end}}">{{range .Avail}}<span class="avail-{{.Class}}" style="--op:{{.Op}}" title="{{if eq .Class "done"}}{{tr "niente da scaricare"}}{{else if eq .Class "none"}}{{tr "nessun peer connesso"}}{{else}}{{tr "almeno %d peer connessi" .Holders}}{{end}}"></span>{{end}}</div>
     {{end}}
   {{else}}<p class="muted">{{tr "Mappa dei pezzi non disponibile: metadata non ancora presenti."}}</p>{{end}}
 {{else if eq .Tab "speed"}}{{$v := .Speed}}
@@ -143,14 +143,14 @@
 {{end}}
 
 {{define "v2_detail_action"}}
-<form method="post" action="/downloads/detail/action" hx-post="/downloads/detail/action" hx-target="#v2-detail-panel" hx-swap="innerHTML" style="display:inline">
+<form method="post" action="/downloads/detail/action" hx-post="/downloads/detail/action" hx-target="#v2-detail-panel" hx-swap="innerHTML" class="inline">
   <input type="hidden" name="hash" value="{{.Hash}}" /><input type="hidden" name="tab" value="{{.Tab}}" /><input type="hidden" name="op" value="{{.Op}}" /><input type="hidden" name="body" value="{{.Body}}" />
   <button class="btn sm {{.Class}}" type="submit" {{if .Title}} {{trTitle .Title}}{{end}}{{if .Confirm}} hx-confirm="{{tr .Confirm}}"{{end}}>{{tr .Label}}</button>
 </form>
 {{end}}
 
 {{define "v2_orphans_modal"}}
-<div class="overlay" style="display:block">
+<div class="block overlay">
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="v2-orphans-title">
     <div class="modal-head"><h3 id="v2-orphans-title">{{tr "File orfani"}}</h3>
       <button class="btn sm" type="button" hx-get="/empty" hx-target="#v2-modal" hx-swap="innerHTML" {{trTitle "Chiudi la finestra dei file orfani"}}>{{tr "Chiudi"}}</button></div>
@@ -172,7 +172,7 @@
 {{end}}
 
 {{define "v2_remove_modal"}}
-<div class="overlay" style="display:block">
+<div class="block overlay">
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="v2-remove-title">
     <div class="modal-head"><h3 id="v2-remove-title">{{tr "Rimuovi torrent"}}</h3>
       <button class="btn sm" type="button" hx-get="/empty" hx-target="#v2-modal" hx-swap="innerHTML" {{trTitle "Chiudi la finestra di rimozione"}}>{{tr "Chiudi"}}</button></div>

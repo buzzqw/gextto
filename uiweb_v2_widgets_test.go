@@ -38,9 +38,18 @@ func TestV2WidgetsPanelsRender(t *testing.T) {
 		t.Fatal("maintenance page still shows unmigrated placeholders")
 	}
 	// The background-jobs panel polls its partial, so it stays in the DOM, but
-	// with no jobs it must take no space.
-	if !strings.Contains(body, `id="v2-jobs-panel"`) || !strings.Contains(body, `style="display:none"`) {
-		t.Fatal("empty background-jobs panel must be present but hidden")
+	// with no jobs it must take no space: the tag carries the hidden attribute
+	// and the stylesheet does the rest.
+	panel := strings.Index(body, `id="v2-jobs-panel"`)
+	if panel < 0 {
+		t.Fatal("the background-jobs panel is missing from the maintenance page")
+	}
+	panelTag := body[panel:]
+	if end := strings.Index(panelTag, ">"); end >= 0 {
+		panelTag = panelTag[:end]
+	}
+	if !strings.Contains(panelTag, " hidden") {
+		t.Fatalf("empty background-jobs panel must be hidden: %s", panelTag)
 	}
 
 	code, body = v2Request(t, server, http.MethodGet, "/?view=integrations", nil)

@@ -40,7 +40,7 @@
       <div class="row"><span>{{tr "Intervallo"}}</span><strong>{{if .CycleInterval}}{{tr .CycleInterval}}{{else}}—{{end}}</strong></div>
       <div class="row"><span>{{tr "Ultimo ciclo"}}</span><strong>{{tr .CycleStarted}} <span>{{tr "avviati"}}</span> · {{.CycleErrors}} <span>{{tr "errori"}}</span> · {{.CycleGaps}} <span>{{tr "gap"}}</span></strong></div>
       <div class="toolbar dashboard-cycle-foot">
-        <form method="post" action="/dashboard/backup" hx-post="/dashboard/backup" hx-target="#v2-toast-region" hx-swap="innerHTML" style="display:inline"><button class="btn sm" type="submit" {{trTitle "Crea uno snapshot di backup dei database"}}>{{tr "Backup"}}</button></form>
+        <form method="post" action="/dashboard/backup" hx-post="/dashboard/backup" hx-target="#v2-toast-region" hx-swap="innerHTML" class="inline"><button class="btn sm" type="submit" {{trTitle "Crea uno snapshot di backup dei database"}}>{{tr "Backup"}}</button></form>
         <a class="btn sm" href="/?view=settings">{{tr "Configurazione"}}</a>
       </div>
     </div>
@@ -127,7 +127,7 @@
 
 {{define "v2_dashboard_feed"}}
 {{if .Error}}<p class="alert">{{tr .Error}}</p>
-{{else if .Rows}}<table class="data-table"><thead><tr><th>{{tr "Monitorato"}}</th><th>{{tr "Tipo"}}</th><th>{{tr "Release"}}</th><th>{{tr "Fonte"}}</th><th>{{tr "Azioni"}}</th></tr></thead><tbody>{{range .Rows}}<tr><td>{{tr .Name}}</td><td>{{if eq .Kind "movie"}}{{tr "Film"}}{{else}}{{tr "Serie TV"}}{{end}}</td><td class="truncate" {{trTitle .Title}}>{{tr .Title}}</td><td>{{tr .Source}}</td><td><form hx-post="/dashboard/feed/add" hx-target="this" hx-swap="outerHTML" style="display:inline"><input type="hidden" name="title" value="{{.Title}}"><input type="hidden" name="magnet" value="{{.Magnet}}"><input type="hidden" name="source" value="{{.Source}}"><button class="btn sm primary" type="submit">{{tr "Accoda"}}</button></form></td></tr>{{end}}</tbody></table>
+{{else if .Rows}}<table class="data-table"><thead><tr><th>{{tr "Monitorato"}}</th><th>{{tr "Tipo"}}</th><th>{{tr "Release"}}</th><th>{{tr "Fonte"}}</th><th>{{tr "Azioni"}}</th></tr></thead><tbody>{{range .Rows}}<tr><td>{{tr .Name}}</td><td>{{if eq .Kind "movie"}}{{tr "Film"}}{{else}}{{tr "Serie TV"}}{{end}}</td><td class="truncate" {{trTitle .Title}}>{{tr .Title}}</td><td>{{tr .Source}}</td><td><form hx-post="/dashboard/feed/add" hx-target="this" hx-swap="outerHTML" class="inline"><input type="hidden" name="title" value="{{.Title}}"><input type="hidden" name="magnet" value="{{.Magnet}}"><input type="hidden" name="source" value="{{.Source}}"><button class="btn sm primary" type="submit">{{tr "Accoda"}}</button></form></td></tr>{{end}}</tbody></table>
 {{else}}<p class="muted">{{tr "Nessuna release trovata."}}</p>{{end}}
 {{end}}
 {{define "v2_dashboard_feed_result"}}{{if .Error}}<span class="badge err">{{tr .Message}}</span>{{else}}<span class="badge ok">{{tr .Message}}</span>{{end}}{{end}}
