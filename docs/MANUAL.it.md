@@ -1140,8 +1140,8 @@ solo un risultato **sospetto**.
 
 ### Torrent ed eD2k insieme sullo stesso file
 
-Quando lo stesso episodio scarica sia come torrent (con gx-torrent) sia su
-eD2k, e il file eD2k ha **esattamente la stessa dimensione** di un file video
+Quando lo stesso episodio o film scarica sia come torrent (con gx-torrent) sia
+su eD2k, e il file eD2k ha **esattamente la stessa dimensione** di un file video
 del torrent, Gextto li fa lavorare insieme, come faceva Shareaza:
 
 - il torrent legge dal file `.part` di aMule ogni pezzo che supera il **suo**
@@ -1153,10 +1153,16 @@ del torrent, Gextto li fa lavorare insieme, come faceva Shareaza:
 - se **eD2k finisce per primo**, il suo file completa il torrent, che importa
   l'episodio **una volta sola** e continua a condividerlo; il file di aMule
   resta nella sua cartella e aMule lo condivide su eD2k;
-- un **torrent fermo** da mezz'ora (nessun dato nuovo) viene cercato su eD2k:
-  un risultato della stessa dimensione esatta viene avviato accanto, e da lì i
-  due scaricano insieme. Serve **Usa eD2k quando i torrent non trovano nulla**
-  attivo; la ricerca per lo stesso torrent si ripete al più ogni 6 ore.
+- un torrent con **pochi seeder** — 3 o meno secondo l'indexer — viene cercato
+  su eD2k **appena parte**: le fonti eD2k rispondono solo dopo un po' di coda,
+  quindi prima aMule chiede, prima arrivano i dati. Ogni altro torrent viene
+  cercato quando è **fermo da 10 minuti** (nessun dato nuovo). Un risultato
+  della stessa dimensione esatta viene avviato accanto, e da lì i due scaricano
+  insieme. Un episodio si cerca per serie e numero, un film con i suoi titoli e
+  l'anno. Un torrent in pausa non viene aiutato; uno arrivato da un feed RSS o
+  da un magnet incollato, che non dice quanti seeder ha, aspetta i 10 minuti.
+  Serve **Usa eD2k quando i torrent non trovano nulla** attivo; la ricerca per
+  lo stesso torrent si ripete al più ogni 6 ore.
 
 Nel log le righe con 🤝 dicono quando due download vengono uniti e chi ha
 finito per primo; in *Salute → Motore torrent* la riga **Pezzi presi da eD2k**
@@ -2224,7 +2230,7 @@ spento per default: senza il tuo consenso Gextto non contatta la rete.
 | Fonti minime per il fallback | Soglia di fonti eD2k per accettare automaticamente un risultato. La ricerca manuale mostra tutto. *(Unità: fonti; 0 = nessun minimo)* |
 | Durata della ricerca eD2k | Per quanti secondi aMule raccoglie i risultati prima che Gextto li mostri. *(Unità: secondi)* |
 | Rinuncia a un download eD2k fermo dopo | Un download eD2k scelto da Gextto che non riceve dati per questi giorni viene annullato in aMule, la release va in blocklist e l'episodio torna da cercare. I download aggiunti a mano e quelli in pausa restano. *(Unità: giorni; 0 = mai)* |
-| Torrent ed eD2k scaricano insieme lo stesso file | Attivo di default (serve gx-torrent): quando lo stesso episodio scarica come torrent e su eD2k con un file della stessa dimensione esatta, il torrent prende dal `.part` di aMule i pezzi che superano il suo controllo, chi finisce prima completa l'altro e l'episodio entra in libreria una volta sola; un torrent fermo da mezz'ora viene cercato su eD2k e avviato anche lì. Vedi *Torrent ed eD2k insieme sullo stesso file*. |
+| Torrent ed eD2k scaricano insieme lo stesso file | Attivo di default (serve gx-torrent): quando lo stesso episodio o film scarica come torrent e su eD2k con un file della stessa dimensione esatta, il torrent prende dal `.part` di aMule i pezzi che superano il suo controllo, chi finisce prima completa l'altro e il file entra in libreria una volta sola; un torrent con 3 seeder o meno secondo l'indexer viene cercato su eD2k appena parte, uno fermo da 10 minuti dopo quell'attesa, e avviato anche lì. Vedi *Torrent ed eD2k insieme sullo stesso file*. |
 | Quota minima dei torrent sulla linea condivisa con eD2k | Con aMule attivo e un limite di velocità (fisso, programmato o di Auto), la percentuale della linea che resta sempre ai torrent; eD2k ha il resto e la parte che uno non usa passa all'altro. *(Unità: %; da 10 a 90, default 60)* |
 
 Il fallback automatico accetta solo un risultato che corrisponde esattamente

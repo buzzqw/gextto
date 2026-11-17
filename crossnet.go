@@ -30,8 +30,10 @@ import (
 //   - when eD2k finishes first, its file completes the torrent, which imports
 //     the episode once and keeps seeding it; the eD2k completion is not
 //     imported a second time;
-//   - a torrent stuck without progress is looked for on eD2k, and a result of
-//     the exact same size is started beside it.
+//   - a torrent the indexer listed with few seeders is looked for on eD2k as
+//     soon as it starts, one stuck without progress for ten minutes when it
+//     has not been yet, and a result of the exact same size is started beside
+//     it: an episode by series and number, a movie by its monitored titles.
 //
 // The pairs Gextto starts itself are kept in crossnet_pairs.json, because
 // their eD2k side is not a download of its own in the database.
@@ -48,9 +50,14 @@ const (
 	// crossnetStuckAfter is how long a torrent must make no progress before
 	// eD2k is searched for the same file; crossnetSearchEvery the gap
 	// between two searches for one torrent.
-	crossnetStuckAfter  = 30 * time.Minute
+	crossnetStuckAfter  = 10 * time.Minute
 	crossnetSearchEvery = 6 * time.Hour
-	crossnetFile        = "crossnet_pairs.json"
+	// crossnetFewSeeders is the most seeders the indexer may list for a
+	// torrent to be searched on eD2k at once instead of after the wait: a
+	// swarm that small is slow from the start, and eD2k sources answer only
+	// after a while in their queues, so the earlier aMule asks the better.
+	crossnetFewSeeders = 3
+	crossnetFile       = "crossnet_pairs.json"
 )
 
 // externalMerger is an engine that adopts verified pieces of one of its
@@ -66,7 +73,7 @@ type crossnetPair struct {
 	FileIndex   int    `json:"file_index"`
 	Size        int64  `json:"size"`
 	Label       string `json:"label"`
-	// Started marks a pair whose eD2k side Gextto started for a stuck torrent.
+	// Started marks a pair whose eD2k side Gextto started to help a torrent.
 	Started bool `json:"started,omitempty"`
 
 	lastDone  int64
@@ -82,9 +89,13 @@ type crossnetState struct {
 	stuckSince map[string]time.Time
 	lastDone   map[string]int64
 	searchedAt map[string]time.Time
-	searching  bool
-	tempDir    string
-	tempAt     time.Time
+	// checked holds the torrents whose indexer seeders were already read;
+	// early the ones with few seeders still waiting for their eD2k search.
+	checked   map[string]bool
+	early     map[string]int64
+	searching bool
+	tempDir   string
+	tempAt    time.Time
 }
 
 var crossnet = crossnetState{
@@ -93,6 +104,8 @@ var crossnet = crossnetState{
 	stuckSince: map[string]time.Time{},
 	lastDone:   map[string]int64{},
 	searchedAt: map[string]time.Time{},
+	checked:    map[string]bool{},
+	early:      map[string]int64{},
 }
 
 // crossnetEnabled reports whether torrents and eD2k work together.
@@ -538,9 +551,28 @@ func crossnetAbsorbs(cfg *Config, db *Database, engine TorrentEngine, event mode
 	return true
 }
 
-// crossnetFindStuck looks for the same file on eD2k for a torrent that has
-// not moved for crossnetStuckAfter, one search at a time, and starts a result
-// of exactly the size of the torrent's video file beside it.
+// crossnetFewSeeders reports the seeders the indexer listed for a release
+// and whether that count is small enough to search eD2k at once. A source
+// that reports no swarm at all (an RSS feed, a pasted magnet: seeders and
+// peers both 0) says nothing, and its torrent waits for the stuck rule.
+func crossnetFewSeedersOf(release *models.Release) (int64, bool) {
+	if release == nil || (release.Seeders == 0 && release.Peers == 0) {
+		return 0, false
+	}
+	return release.Seeders, release.Seeders <= crossnetFewSeeders
+}
+
+// crossnetPaused reports a torrent the operator stopped: it makes no
+// progress by choice, so it is not helped from eD2k.
+func crossnetPaused(view models.TorrentView) bool {
+	state := strings.ToLower(view.State)
+	return strings.Contains(state, "paused") || strings.Contains(state, "stopped")
+}
+
+// crossnetFindStuck looks for the same file on eD2k, one search at a time,
+// and starts a result of exactly the size of the torrent's video file beside
+// it. A torrent the indexer listed with few seeders is searched as soon as it
+// is seen; any other one after crossnetStuckAfter without progress.
 func crossnetFindStuck(cfg *Config, db *Database, engine TorrentEngine, searcher *Engine, torrents map[string]models.TorrentView, now time.Time) {
 	if searcher == nil || !ed2kFallbackEligible(cfg) {
 		return
@@ -550,12 +582,44 @@ func crossnetFindStuck(cfg *Config, db *Database, engine TorrentEngine, searcher
 	for _, p := range crossnet.pairs {
 		paired[p.TorrentHash] = true
 	}
+	crossnet.mu.Unlock()
+	// The seeders come from the database: read them once per torrent,
+	// outside the lock.
+	var unchecked []string
+	crossnet.mu.Lock()
+	for hash, view := range torrents {
+		if !crossnet.checked[hash] && !crossnetTorrentDone(view) && !paired[hash] {
+			unchecked = append(unchecked, hash)
+		}
+	}
+	crossnet.mu.Unlock()
+	few := map[string]int64{}
+	for _, hash := range unchecked {
+		if meta, err := db.TorrentMeta(hash); err == nil && meta != nil && crossnetKey(&meta.Release) != "" {
+			if seeders, ok := crossnetFewSeedersOf(&meta.Release); ok {
+				few[hash] = seeders
+			}
+		}
+	}
+
+	crossnet.mu.Lock()
+	for _, hash := range unchecked {
+		crossnet.checked[hash] = true
+		if seeders, ok := few[hash]; ok {
+			crossnet.early[hash] = seeders
+		}
+	}
 	var candidate string
+	early := false
 	for hash, view := range torrents {
 		done := int64(view.TotalDone)
-		if crossnetTorrentDone(view) || paired[hash] {
+		if crossnetTorrentDone(view) || paired[hash] || crossnetPaused(view) {
 			delete(crossnet.stuckSince, hash)
+			delete(crossnet.early, hash)
 			continue
+		}
+		if _, waiting := crossnet.early[hash]; waiting && !early {
+			candidate, early = hash, true
 		}
 		if done != crossnet.lastDone[hash] || view.DownloadRate > 0 {
 			crossnet.lastDone[hash] = done
@@ -571,6 +635,14 @@ func crossnetFindStuck(cfg *Config, db *Database, engine TorrentEngine, searcher
 			candidate = hash
 		}
 	}
+	for hash := range crossnet.checked {
+		if _, live := torrents[hash]; !live {
+			delete(crossnet.stuckSince, hash)
+			delete(crossnet.lastDone, hash)
+			delete(crossnet.checked, hash)
+			delete(crossnet.early, hash)
+		}
+	}
 	for hash := range crossnet.stuckSince {
 		if _, live := torrents[hash]; !live {
 			delete(crossnet.stuckSince, hash)
@@ -581,6 +653,17 @@ func crossnetFindStuck(cfg *Config, db *Database, engine TorrentEngine, searcher
 		crossnet.mu.Unlock()
 		return
 	}
+	reason := fmt.Sprintf("has not moved for %s", logDuration(crossnetStuckAfter))
+	if early {
+		seeders := crossnet.early[candidate]
+		delete(crossnet.early, candidate)
+		reason = fmt.Sprintf("has only %d seeders", seeders)
+		if seeders == 1 {
+			reason = "has only one seeder"
+		} else if seeders == 0 {
+			reason = "has no seeders"
+		}
+	}
 	crossnet.searching = true
 	crossnet.searchedAt[candidate] = now
 	crossnet.mu.Unlock()
@@ -590,23 +673,20 @@ func crossnetFindStuck(cfg *Config, db *Database, engine TorrentEngine, searcher
 			crossnet.searching = false
 			crossnet.mu.Unlock()
 		}()
-		crossnetSearchFor(cfg, db, engine, searcher, candidate)
+		crossnetSearchFor(cfg, db, engine, searcher, candidate, reason)
 	}()
 }
 
-// crossnetSearchFor searches eD2k for the episode of a stuck torrent and
-// starts the result whose size is exactly that of the torrent's video file.
-func crossnetSearchFor(cfg *Config, db *Database, engine TorrentEngine, searcher *Engine, hash string) {
+// crossnetSearchFor searches eD2k for the episode or movie of a torrent and
+// starts the result whose size is exactly that of one of the torrent's files.
+// reason completes the log sentence ("has only 2 seeders").
+func crossnetSearchFor(cfg *Config, db *Database, engine TorrentEngine, searcher *Engine, hash, reason string) {
 	meta, err := db.TorrentMeta(hash)
 	if err != nil || meta == nil {
 		return
 	}
 	release := meta.Release
-	if crossnetKey(&release) == "" || release.Kind != "series" {
-		return
-	}
-	series := cfg.FindSeriesMatch(*release.Series, release.Season)
-	if series == nil {
+	if crossnetKey(&release) == "" {
 		return
 	}
 	files := crossnetFiles(engine, hash)
@@ -615,7 +695,23 @@ func crossnetSearchFor(cfg *Config, db *Database, engine TorrentEngine, searcher
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
-	results := searcher.SearchSeriesED2K(ctx, cfg, series, *release.Season, *release.Episode, false)
+	var results []models.Release
+	switch release.Kind {
+	case "series":
+		series := cfg.FindSeriesMatch(*release.Series, release.Season)
+		if series == nil {
+			return
+		}
+		results = searcher.SearchSeriesED2K(ctx, cfg, series, *release.Season, *release.Episode, false)
+	case "movie":
+		movie := cfg.FindMovieMatchForRelease(&release, false)
+		if movie == nil {
+			return
+		}
+		results = searcher.SearchMovieED2K(ctx, cfg, movie)
+	default:
+		return
+	}
 	for i := range results {
 		link, err := ed2k.ParseFileLink(results[i].Ed2kLink)
 		if err != nil {
@@ -637,9 +733,9 @@ func crossnetSearchFor(cfg *Config, db *Database, engine TorrentEngine, searcher
 		crossnetSaveLocked(cfg)
 		crossnet.mu.Unlock()
 		if added {
-			logging.Info(fmt.Sprintf("🤝 %s has not moved for %s: the same file was found on eD2k and now downloads on both networks", pair.Label, logDuration(crossnetStuckAfter)))
+			logging.Info(fmt.Sprintf("🤝 %s %s: the same file was found on eD2k and now downloads on both networks", pair.Label, reason))
 		}
 		return
 	}
-	logging.Debug("no eD2k copy of the stuck torrent's file", "torrent", hash, "results", len(results))
+	logging.Debug("no eD2k copy of the torrent's file", "torrent", hash, "results", len(results))
 }

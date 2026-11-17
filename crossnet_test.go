@@ -40,6 +40,8 @@ func resetCrossnet() {
 	crossnet.stuckSince = map[string]time.Time{}
 	crossnet.lastDone = map[string]int64{}
 	crossnet.searchedAt = map[string]time.Time{}
+	crossnet.checked = map[string]bool{}
+	crossnet.early = map[string]int64{}
 	crossnet.tempDir = ""
 	crossnet.mu.Unlock()
 }
@@ -217,5 +219,143 @@ func TestCrossnetEd2kFinishedFirstCompletesTheTorrent(t *testing.T) {
 	engine.views = nil
 	if crossnetAbsorbs(cfg, db, engine, models.TorrentEvent{Kind: "torrent_finished", Hash: "11111111111111111111111111111111", Name: "x.mkv", SavePath: incoming}) {
 		t.Fatal("an unpaired eD2k completion was absorbed")
+	}
+}
+
+// crossnetWaitIdle waits for the eD2k search a tick started in the
+// background.
+func crossnetWaitIdle(t *testing.T) {
+	t.Helper()
+	deadline := time.Now().Add(20 * time.Second)
+	for time.Now().Before(deadline) {
+		crossnet.mu.Lock()
+		busy := crossnet.searching
+		crossnet.mu.Unlock()
+		if !busy {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatal("the eD2k search did not end")
+}
+
+// crossnetSearchSetup is a reachable aMule with the fallback on, a database
+// and a gx-torrent stand-in holding one downloading torrent of release.
+func crossnetSearchSetup(t *testing.T, release models.Release, fileName string, size int64, ed2kHash string) (*amuletest.Core, *Config, *Database, *crossnetEngine, string) {
+	t.Helper()
+	resetCrossnet()
+	t.Cleanup(resetCrossnet)
+	core, cfg := ed2kTestCore(t, map[string]string{"ed2k_fallback": "true"})
+	cfg.DataDir = t.TempDir()
+	cfg.Series = []SeriesConfig{{Name: "Show", Enabled: true}}
+	cfg.Movies = []MovieConfig{{ID: 1, Name: "Example Movie", Year: "2010", Enabled: true}}
+	core.SetResults([]amuletest.Result{{Hash: ed2kHash, Name: fileName, Size: size, Sources: 12}}, "")
+	db := newTestDB(t)
+	torrentHash := "cccccccccccccccccccccccccccccccccccccccc"
+	release.Magnet = "magnet:?xt=urn:btih:" + torrentHash
+	if err := db.RegisterTorrent(&release); err != nil {
+		t.Fatal(err)
+	}
+	engine := &crossnetEngine{
+		views: []models.TorrentView{{Hash: torrentHash, Name: release.Title, Progress: 5, TotalDone: 1 << 20, DownloadRate: 50 << 10, State: "downloading"}},
+		files: map[string][]models.FileView{torrentHash: {{Path: fileName, Size: size}}},
+	}
+	return core, cfg, db, engine, torrentHash
+}
+
+func crossnetPairedWith(torrentHash string) bool {
+	crossnet.mu.Lock()
+	defer crossnet.mu.Unlock()
+	for _, p := range crossnet.pairs {
+		if p.TorrentHash == torrentHash && p.Started {
+			return true
+		}
+	}
+	return false
+}
+
+// TestCrossnetFewSeedersSearchesEd2kAtOnce: an episode the indexer listed
+// with two seeders is looked for on eD2k at the first tick, while it is still
+// moving, and the copy of the same size starts beside it.
+func TestCrossnetFewSeedersSearchesEd2kAtOnce(t *testing.T) {
+	const size = 1500 << 20
+	ed2kHash := "00112233445566778899aabbccddeeff"
+	release := episodeRelease(t, "Show.S01E02.1080p")
+	release.Seeders, release.Peers = 2, 6
+	core, cfg, db, engine, torrentHash := crossnetSearchSetup(t, release, "Show.S01E02.1080p.mkv", size, ed2kHash)
+	crossnetTick(cfg, db, engine, &Engine{}, time.Now())
+	crossnetWaitIdle(t)
+	if len(core.Searches()) == 0 {
+		t.Fatal("a torrent with few seeders was not searched on eD2k at once")
+	}
+	if !crossnetPairedWith(torrentHash) || len(core.Downloads()) != 1 {
+		t.Fatalf("the eD2k copy was not started beside the torrent: %+v", core.Downloads())
+	}
+}
+
+// TestCrossnetFewSeedersCoversMovies: a movie with one seeder is searched
+// under its monitored title and year and paired by exact size.
+func TestCrossnetFewSeedersCoversMovies(t *testing.T) {
+	const size = 4000 << 20
+	ed2kHash := "ffeeddccbbaa99887766554433221100"
+	year := int64(2010)
+	release := models.Release{Title: "Example.Movie.2010.1080p.BluRay.x264", Kind: "movie", Year: &year, Seeders: 1, Peers: 3}
+	core, cfg, db, engine, torrentHash := crossnetSearchSetup(t, release, "Example.Movie.2010.1080p.BluRay.x264.mkv", size, ed2kHash)
+	crossnetTick(cfg, db, engine, &Engine{}, time.Now())
+	crossnetWaitIdle(t)
+	searched := false
+	for _, query := range core.Searches() {
+		searched = searched || query == "Example Movie 2010"
+	}
+	if !searched {
+		t.Fatalf("searches = %v, want the movie title with its year", core.Searches())
+	}
+	if !crossnetPairedWith(torrentHash) {
+		t.Fatalf("the movie's eD2k copy was not paired: %+v", core.Downloads())
+	}
+}
+
+// TestCrossnetUnknownSwarmWaitsForTheStuckRule: a torrent whose source gave
+// no swarm figures is not searched while it moves, and is searched once it
+// has made no progress for ten minutes.
+func TestCrossnetUnknownSwarmWaitsForTheStuckRule(t *testing.T) {
+	const size = 1500 << 20
+	release := episodeRelease(t, "Show.S01E02.1080p")
+	core, cfg, db, engine, torrentHash := crossnetSearchSetup(t, release, "Show.S01E02.1080p.mkv", size, "0123456789abcdef0123456789abcdef")
+	now := time.Now()
+	crossnetTick(cfg, db, engine, &Engine{}, now)
+	crossnetWaitIdle(t)
+	if len(core.Searches()) != 0 {
+		t.Fatalf("a moving torrent without swarm figures was searched: %v", core.Searches())
+	}
+	engine.views[0].DownloadRate = 0
+	crossnetTick(cfg, db, engine, &Engine{}, now.Add(time.Minute))
+	// The wait counts from the last progress, the first tick.
+	crossnetTick(cfg, db, engine, &Engine{}, now.Add(crossnetStuckAfter-time.Second))
+	crossnetWaitIdle(t)
+	if len(core.Searches()) != 0 {
+		t.Fatal("searched before the ten minutes")
+	}
+	crossnetTick(cfg, db, engine, &Engine{}, now.Add(crossnetStuckAfter))
+	crossnetWaitIdle(t)
+	if len(core.Searches()) == 0 || !crossnetPairedWith(torrentHash) {
+		t.Fatalf("the stuck torrent was not helped from eD2k: searches %v", core.Searches())
+	}
+}
+
+// TestCrossnetPausedTorrentIsNotHelped: a torrent the operator paused is
+// left alone, whatever its seeders.
+func TestCrossnetPausedTorrentIsNotHelped(t *testing.T) {
+	release := episodeRelease(t, "Show.S01E02.1080p")
+	release.Seeders, release.Peers = 1, 1
+	core, cfg, db, engine, _ := crossnetSearchSetup(t, release, "Show.S01E02.1080p.mkv", 1500<<20, "0123456789abcdef0123456789abcdef")
+	engine.views[0].State = "paused"
+	engine.views[0].DownloadRate = 0
+	now := time.Now()
+	crossnetTick(cfg, db, engine, &Engine{}, now)
+	crossnetTick(cfg, db, engine, &Engine{}, now.Add(2*crossnetStuckAfter))
+	crossnetWaitIdle(t)
+	if len(core.Searches()) != 0 {
+		t.Fatalf("a paused torrent was searched on eD2k: %v", core.Searches())
 	}
 }

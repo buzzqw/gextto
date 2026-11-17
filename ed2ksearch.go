@@ -735,6 +735,42 @@ func (e *Engine) searchED2KSeriesQueries(ctx context.Context, cfg *Config, serie
 		seenName[key] = struct{}{}
 		names = append(names, name)
 	}
+	return searchED2KNames(ctx, cfg, names, network, query)
+}
+
+// SearchMovieED2K looks a monitored movie up on eD2k: one search per title it
+// is released under ("Title 2010"), on Kad and the servers, keeping the
+// results that resolve to the same movie and pass the automatic acceptance.
+// It is what helps a slow torrent of that movie.
+func (e *Engine) SearchMovieED2K(ctx context.Context, cfg *Config, movie *MovieConfig) []models.Release {
+	if movie == nil || !ed2kEnabled(cfg) {
+		return nil
+	}
+	year := strings.TrimSpace(movie.Year)
+	candidates := searchED2KNames(ctx, cfg, movieIndexerTitles(movie), ed2kSearchBoth, func(name string) string {
+		if year == "" {
+			return name
+		}
+		return name + " " + year
+	})
+	accepted := make([]models.Release, 0, len(candidates))
+	for index := range candidates {
+		release := candidates[index]
+		match := cfg.FindMovieMatchForRelease(&release, false)
+		if match == nil || match.ID != movie.ID || !strings.EqualFold(match.Name, movie.Name) {
+			continue
+		}
+		if !ed2kAcceptAutomatic(cfg, release) {
+			continue
+		}
+		accepted = append(accepted, release)
+	}
+	return accepted
+}
+
+// searchED2KNames runs one eD2k search per name, one after the other, and
+// merges the results by release identity.
+func searchED2KNames(ctx context.Context, cfg *Config, names []string, network uint8, query func(name string) string) []models.Release {
 	candidates := make([]models.Release, 0)
 	seenRelease := map[string]struct{}{}
 	for _, name := range names {
