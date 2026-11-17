@@ -1161,7 +1161,9 @@ torrent, Gextto makes them work together, as Shareaza did:
   removed from aMule;
 - if **eD2k finishes first**, its file completes the torrent, which imports the
   episode **only once** and keeps sharing it; aMule's file stays in its folder
-  and aMule shares it on eD2k;
+  and aMule shares it on eD2k. The pieces the torrent was already fetching from
+  peers at that moment it finishes by itself; if anything is still missing,
+  Gextto hands it the finished file again every 5 minutes until the end;
 - a torrent with **few seeders** — 3 or fewer according to the indexer — is
   looked for on eD2k **as soon as it starts**: eD2k sources answer only after a
   while in their queues, so the sooner aMule asks, the sooner data arrives.

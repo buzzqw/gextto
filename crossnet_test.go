@@ -359,3 +359,55 @@ func TestCrossnetPausedTorrentIsNotHelped(t *testing.T) {
 		t.Fatalf("a paused torrent was searched on eD2k: %v", core.Searches())
 	}
 }
+
+// TestCrossnetFinishedEd2kFileIsHandedOverAgain: a torrent that still misses
+// pieces after taking the finished eD2k file (pieces it was fetching from a
+// peer at that moment) gets the file again every merge interval, so a peer
+// that goes away cannot leave it short of the end.
+func TestCrossnetFinishedEd2kFileIsHandedOverAgain(t *testing.T) {
+	resetCrossnet()
+	t.Cleanup(resetCrossnet)
+	core, cfg := ed2kTestCore(t, nil)
+	cfg.DataDir = t.TempDir()
+	incoming := t.TempDir()
+	const size = 5 << 20
+	ed2kHash := "fedcba9876543210fedcba9876543210"
+	if err := os.WriteFile(filepath.Join(incoming, "Show.S01E02.mkv"), make([]byte, size), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	core.SetShared([]amuletest.File{{Hash: ed2kHash, Name: "Show.S01E02.mkv", Size: size}}, incoming)
+	db := newTestDB(t)
+	torrentHash := "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+	tr := episodeRelease(t, "Show.S01E02.1080p")
+	tr.Magnet = "magnet:?xt=urn:btih:" + torrentHash
+	er := episodeRelease(t, "Show.S01E02.mkv")
+	er.Ed2kLink = fmt.Sprintf("ed2k://|file|Show.S01E02.mkv|%d|%s|/", size, ed2kHash)
+	for _, r := range []*models.Release{&tr, &er} {
+		if err := db.RegisterTorrent(r); err != nil {
+			t.Fatal(err)
+		}
+	}
+	engine := &crossnetEngine{
+		views: []models.TorrentView{{Hash: torrentHash, Progress: 30, State: "downloading"}},
+		files: map[string][]models.FileView{torrentHash: {{Path: "Show.S01E02.mkv", Size: size}}},
+	}
+	event := models.TorrentEvent{Kind: "torrent_finished", Hash: ed2kHash, Name: "Show.S01E02.mkv", SavePath: incoming}
+	if !crossnetAbsorbs(cfg, db, engine, event) || len(engine.merged) != 1 {
+		t.Fatalf("first hand-over: merges %v", engine.merged)
+	}
+	now := time.Now()
+	engine.views[0].Progress = 99.9
+	crossnetTick(cfg, db, engine, nil, now.Add(time.Minute))
+	if len(engine.merged) != 1 {
+		t.Fatalf("handed over again before the interval: %v", engine.merged)
+	}
+	crossnetTick(cfg, db, engine, nil, now.Add(crossnetMergeEvery+time.Minute))
+	if len(engine.merged) != 2 {
+		t.Fatalf("a torrent still short of the end did not get the finished file again: %v", engine.merged)
+	}
+	engine.views[0].Progress = 100
+	crossnetTick(cfg, db, engine, nil, now.Add(3*crossnetMergeEvery))
+	if len(engine.merged) != 2 {
+		t.Fatalf("a finished torrent got the file again: %v", engine.merged)
+	}
+}

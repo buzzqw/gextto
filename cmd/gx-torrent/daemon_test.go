@@ -1616,6 +1616,30 @@ func TestDaemonPerTorrentSpeedLimits(t *testing.T) {
 	waitFor(t, "limits after reload", func() bool { dl, ul := speedLimits(); return dl == 512 && ul == 0 })
 }
 
+// TestDaemonAddAppliesTheChosenSpeedLimits: limits given with the add (the
+// add dialog, the qBittorrent dlLimit) hold on the running torrent at once,
+// not only after a restart reapplies the stored ones.
+func TestDaemonAddAppliesTheChosenSpeedLimits(t *testing.T) {
+	d := newTestDaemon(t)
+	src := filepath.Join(t.TempDir(), "src")
+	data := makeTorrent(t, src, "payload.bin", 100_000)
+	download, upload := int64(1024), int64(0)
+	hash, _, err := d.add(addRequest{TorrentData: data, Destination: src, SeedRatio: -1, SeedDays: -1,
+		DownloadLimitKib: &download, UploadLimitKib: &upload})
+	if err != nil {
+		t.Fatal(err)
+	}
+	d.mu.Lock()
+	tt, _ := d.findLocked(hash)
+	d.mu.Unlock()
+	if tt == nil {
+		t.Fatal("torrent not found")
+	}
+	if dl, ul := tt.SpeedLimits(); dl != 1024 || ul != 0 {
+		t.Fatalf("limits right after the add = %d/%d, want 1024/0", dl, ul)
+	}
+}
+
 // TestDaemonPerTorrentConnLimits checks the per-torrent connection and upload
 // caps: the action sets them and a session reload reapplies them.
 func TestDaemonPerTorrentConnLimits(t *testing.T) {

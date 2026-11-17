@@ -23,6 +23,10 @@ import (
 // 14721), so a real aMule or emule-qt on the same machine keeps running, and
 // UPnP is off so the router is not asked to forward test ports. The
 // container is removed at the end; the image stays for the next run.
+// GEXTTO_EMULEQT_LIVE_UPNP=1 keeps UPnP on (a High ID, more sources for a
+// real download) and GEXTTO_EMULEQT_LIVE_KEEP=1 leaves the core running for
+// a hand-driven try-out: its address and key are in the test log, and
+// `docker rm -f gextto-emuleqt-livetest` removes it.
 func TestEmuleqtLive(t *testing.T) {
 	dir := strings.TrimSpace(os.Getenv("GEXTTO_EMULEQT_LIVE_DIR"))
 	if dir == "" {
@@ -49,16 +53,23 @@ func TestEmuleqtLive(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(prefsPath, []byte(strings.Replace(string(raw), "enableUPnP: true", "enableUPnP: false", 1)), 0o600); err != nil {
-		t.Fatal(err)
+	if os.Getenv("GEXTTO_EMULEQT_LIVE_UPNP") != "1" {
+		if err := os.WriteFile(prefsPath, []byte(strings.Replace(string(raw), "enableUPnP: true", "enableUPnP: false", 1)), 0o600); err != nil {
+			t.Fatal(err)
+		}
 	}
+	keep := os.Getenv("GEXTTO_EMULEQT_LIVE_KEEP") == "1"
 	t.Cleanup(func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 		defer cancel()
 		if out, err := emuleqtDocker(ctx, "logs", "--tail", "40", emuleqtContainer); err == nil {
 			t.Logf("container log, last lines:\n%s", out)
 		}
-		emuleqtRemove(ctx)
+		if keep {
+			t.Logf("kept running: %s, API key %s, data %s", managed.URL, managed.APIKey, managed.HostData)
+		} else {
+			emuleqtRemove(ctx)
+		}
 		ed2kInvalidateHealth()
 	})
 

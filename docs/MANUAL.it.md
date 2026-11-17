@@ -1179,7 +1179,10 @@ del torrent, Gextto li fa lavorare insieme, come faceva Shareaza:
   da aMule;
 - se **eD2k finisce per primo**, il suo file completa il torrent, che importa
   l'episodio **una volta sola** e continua a condividerlo; il file di aMule
-  resta nella sua cartella e aMule lo condivide su eD2k;
+  resta nella sua cartella e aMule lo condivide su eD2k. I pezzi che il torrent
+  stava già chiedendo ai peer in quel momento li finisce da sé; se gli manca
+  ancora qualcosa, Gextto gli ripassa il file completo ogni 5 minuti fino alla
+  fine;
 - un torrent con **pochi seeder** — 3 o meno secondo l'indexer — viene cercato
   su eD2k **appena parte**: le fonti eD2k rispondono solo dopo un po' di coda,
   quindi prima aMule chiede, prima arrivano i dati. Ogni altro torrent viene

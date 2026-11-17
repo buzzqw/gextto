@@ -2060,6 +2060,12 @@ func (d *Daemon) add(req addRequest) (string, bool, error) {
 	if limit := d.state.Config.MaxConnectionsPerTorrent; limit > 0 {
 		t.SetMaxConnections(limit)
 	}
+	// The limits chosen in the add dialog (or the qBittorrent add's
+	// dlLimit/upLimit) hold from the first byte, not only after a restart
+	// reapplies the stored ones.
+	if req.DownloadLimitKib != nil || req.UploadLimitKib != nil {
+		t.SetSpeedLimits(kibOrInherit(req.DownloadLimitKib), kibOrInherit(req.UploadLimitKib))
+	}
 	if len(req.FilePriorities) > 0 {
 		d.setSelection(id, req.FilePriorities)
 	}

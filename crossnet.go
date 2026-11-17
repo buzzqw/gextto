@@ -389,16 +389,16 @@ func crossnetTick(cfg *Config, db *Database, engine TorrentEngine, searcher *Eng
 			// aMule 3.x moves a finished file out of the queue into its shared
 			// files; a file in neither was cancelled by hand.
 			if path := crossnetSharedPath(cfg, pair.Ed2kHash); path != "" {
-				if !pair.completed {
-					crossnetMergeComplete(cfg, db, merger, pair, path)
+				if crossnetMergeDue(pair, now) {
+					crossnetMergeComplete(cfg, db, merger, pair, path, now)
 				}
 				continue
 			}
 			crossnetForget(pair)
 			changed = true
 		case download.Complete():
-			if !pair.completed {
-				crossnetMergeComplete(cfg, db, merger, pair, crossnetCompletedPath(cfg, download))
+			if crossnetMergeDue(pair, now) {
+				crossnetMergeComplete(cfg, db, merger, pair, crossnetCompletedPath(cfg, download), now)
 			}
 		default:
 			crossnetMergePartial(cfg, merger, pair, download, now)
@@ -454,8 +454,12 @@ func crossnetMergePartial(cfg *Config, merger externalMerger, pair *crossnetPair
 	logging.Debug("torrent reads the eD2k part file", "label", pair.Label, "ed2k_done", download.Done)
 }
 
-// crossnetMergeComplete hands the finished eD2k file to the torrent.
-func crossnetMergeComplete(cfg *Config, db *Database, merger externalMerger, pair *crossnetPair, path string) {
+// crossnetMergeComplete hands the finished eD2k file to the torrent. A piece
+// the torrent is fetching from a peer at that moment is not taken (its own
+// download is under way); if the peer then goes, the piece would stay
+// missing, so crossnetMergeDue hands the file over again while the torrent
+// has not finished.
+func crossnetMergeComplete(cfg *Config, db *Database, merger externalMerger, pair *crossnetPair, path string, now time.Time) {
 	path = crossnetLocalPath(path)
 	if path == "" {
 		return
@@ -464,9 +468,20 @@ func crossnetMergeComplete(cfg *Config, db *Database, merger externalMerger, pai
 		logging.Debug("external merge of the finished eD2k file refused", "torrent", pair.TorrentHash, "error", err)
 		return
 	}
+	pair.lastMerge = now
+	if pair.completed {
+		return
+	}
 	pair.completed = true
 	_ = db.MarkEd2kAbsorbed(pair.Ed2kHash)
 	logging.Info(fmt.Sprintf("🤝 %s: eD2k finished first and its file completes the torrent, which imports the episode and keeps sharing it", pair.Label))
+}
+
+// crossnetMergeDue reports whether the finished eD2k file is handed to the
+// torrent now: the first time, and again every crossnetMergeEvery while the
+// torrent (not done, or the pair would be gone) still misses pieces.
+func crossnetMergeDue(pair *crossnetPair, now time.Time) bool {
+	return !pair.completed || now.Sub(pair.lastMerge) >= crossnetMergeEvery
 }
 
 // crossnetSharedPath is where aMule shares a finished file of hash, or "".
@@ -541,7 +556,7 @@ func crossnetAbsorbs(cfg *Config, db *Database, engine TorrentEngine, event mode
 		return false
 	}
 	if !crossnetTorrentDone(*view) && !pair.completed {
-		crossnetMergeComplete(cfg, db, engine.(externalMerger), pair, path)
+		crossnetMergeComplete(cfg, db, engine.(externalMerger), pair, path, time.Now())
 		if !pair.completed {
 			// The torrent could not take it: import the eD2k file as usual.
 			return false
