@@ -158,6 +158,8 @@ qBittorrent-nox.
 | `rss.go` | RSS/XML feeds of the sources. |
 | `websearch.go` | web search engines and shared limiter. |
 | `ed2ksearch.go` | eD2k/Kad through aMule: settings, shared EC client, cached status, search into `models.Release` (`network`, `ed2k_link`, `sources`), gap-filling fallback. |
+| `ed2k_backend.go` | the one eD2k core contract (`ed2kBackend`): aMule's EC client satisfies it, `emuleqtBackend` maps emule-qt's REST answers onto the same types and paths of a container onto host paths; `ed2kPartFilesByHash` finds each download's part file from the `.part.met` headers. |
+| `emuleqt_managed.go` | emule-qt run by Gextto in Docker: first `preferences.yml`, `docker run` on the host network with the data under `<data>/emuleqt`, restart, daily pull with health check and rollback, stop when another core is chosen. |
 | `ed2k_downloads.go` | aMule's download queue: list for Downloads, add/pause/resume/remove, completion events fed to the torrent event loop with a copy-mode import. |
 | `uiweb_v2_ed2k.go` | the eD2k page: aMule status, servers, Kad, search, pasted links. |
 | `indexer_health.go` | indexer health (Prowlarr). |
@@ -281,7 +283,7 @@ qBittorrent-nox.
 | `internal/dht` | DHT implementation, a module of its own under the main module. |
 | `internal/ed2k` | eD2k links (`ed2k://|file|…|/`, server links) and the name filter for search results. |
 | `internal/amule` | aMule External Connections (EC) client: packet codec, login, status, servers, Kad, downloads, search, preferences; `amuletest` is a fake core for tests. |
-| `internal/emuleqt` | emule-qt REST client (`/api/v1`, API key): snapshot, connection, Kad, paged downloads, search run to its end and dropped, shared files, uploads, servers, stats, logs, preferences and limits; the alternative eD2k backend, not yet wired in. |
+| `internal/emuleqt` | emule-qt REST client (`/api/v1`, API key): snapshot, connection, Kad, paged downloads, search run to its end and dropped, shared files and folders, uploads, servers, stats, logs, preferences and limits; `emuleqttest` is a fake core for tests. |
 | `internal/gxcore` | gx-core torrent engine (the `gx-torrent` binary): our original code (early versions built on MIT/BSD bases, since rewritten). |
 | `internal/queue` | manager of the gx-torrent queue (which torrents to run). |
 | `internal/bwschedule` | weekly bandwidth scheduler (a window and limits per weekday), shared by Gextto and gx-torrent. |

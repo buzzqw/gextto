@@ -1076,8 +1076,9 @@ torrent non cambiano.
 
    `ECPassword` è l'MD5 della password: `printf '%s' 'segreta' | md5sum`.
 2. Avvia `amuled`.
-3. In **Configurazione → eD2k e Kad** accendi **eD2k e Kad tramite aMule** e
-   inserisci indirizzo, porta e password **in chiaro**.
+3. In **Configurazione → eD2k e Kad** accendi **eD2k e Kad**, lascia
+   **Programma eD2k** su **aMule** e inserisci indirizzo, porta e password
+   **in chiaro**.
 4. Apri sul router le porte TCP e UDP di aMule: avrai un **ID alto** e un Kad non
    dietro firewall, cioè più fonti.
 
@@ -1087,6 +1088,32 @@ Usa una cartella dedicata, perché aMule condivide tutto quello che contiene. Co
 aMule in **Docker** monta la cartella dei download allo stesso percorso
 dell'host, imposta lì `INCOMING_DIR` e `TEMP_DIR` e, per l'UPnP, usa
 `network_mode: host`.
+
+### emule-qt al posto di aMule
+
+Al posto di aMule Gextto può usare **emule-qt**, un client eD2k e Kad più
+recente: si sceglie in **Configurazione → eD2k e Kad → Programma eD2k**, e i due
+sono l'uno o l'altro. Ricerca, link `ed2k://`, Scarico, pagina eD2k,
+importazione, ripiego automatico e torrent ed eD2k sullo stesso file funzionano
+allo stesso modo.
+
+- **emule-qt (avviato da Gextto in Docker)**: Gextto scarica l'immagine
+  ufficiale, avvia il container e lo tiene acceso. Serve **Docker** installato e
+  usabile dall'utente di Gextto. I file stanno in `emuleqt/` nella cartella dati
+  di Gextto; le porte eD2k sono quelle di aMule (**TCP 4662, UDP 4672**), quindi
+  il router già aperto per aMule va bene così. Con **Aggiorna emule-qt ogni
+  giorno** acceso Gextto passa da solo alla nuova versione e, se questa non
+  risponde entro tre minuti, torna a quella di prima.
+- **emule-qt (già avviato)**: un emule-qt tuo; inserisci **emule-qt — indirizzo**
+  (per esempio `http://127.0.0.1:4711`) e **emule-qt — chiave API**, con la REST
+  API attiva in emule-qt. Come per aMule, Gextto deve vederne le cartelle allo
+  stesso percorso.
+
+**Spegni aMule** quando scegli emule-qt: vogliono le stesse porte, e il log lo
+ricorda una volta all'ora finché aMule risponde. Con emule-qt le pagine dicono
+*emule-qt* al posto di *aMule* e manca l'interruttore della preallocazione,
+che esiste solo in aMule. I dettagli sono in
+[amule.it.md](amule.it.md#emule-qt-al-posto-di-amule).
 
 ### La pagina eD2k
 
@@ -2220,7 +2247,11 @@ spento per default: senza il tuo consenso Gextto non contatta la rete.
 
 | Impostazione | Cosa fa |
 |---|---|
-| eD2k e Kad tramite aMule | Collega Gextto ad aMule: ricerca, link `ed2k://`, download in Scarico e pagina eD2k. Spento di default. |
+| eD2k e Kad | Collega Gextto al programma eD2k scelto (aMule o emule-qt): ricerca, link `ed2k://`, download in Scarico e pagina eD2k. Spento di default. |
+| Programma eD2k | **aMule (installato a parte)** (default), **emule-qt (avviato da Gextto in Docker)** o **emule-qt (già avviato)**. I due sono l'uno o l'altro. Vedi *emule-qt al posto di aMule*. |
+| emule-qt — indirizzo | Solo per emule-qt già avviato: il suo server web, per esempio `http://127.0.0.1:4711`, con la REST API attiva. |
+| emule-qt — chiave API | Solo per emule-qt già avviato: `webserver.apiKey` di emule-qt. Non visualizzata. |
+| Aggiorna emule-qt ogni giorno | Solo per emule-qt avviato da Gextto: una volta al giorno passa alla nuova versione e torna alla precedente se non risponde entro tre minuti. Acceso di default. |
 | aMule — indirizzo | Macchina su cui gira `amuled`, di solito `127.0.0.1`. Gextto deve vedere la cartella di arrivo di aMule allo stesso percorso. |
 | aMule — porta connessioni esterne (EC) | `ECPort` di `amule.conf`, 4712 di default. |
 | aMule — password connessioni esterne (EC) | La password in chiaro; aMule conserva il suo MD5 in `ECPassword`. Non visualizzata. |

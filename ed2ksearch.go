@@ -22,6 +22,7 @@ import (
 	"unicode"
 
 	"github.com/buzzqw/gextto/internal/amule"
+	"github.com/buzzqw/gextto/internal/emuleqt"
 	"github.com/buzzqw/gextto/internal/constants"
 	"github.com/buzzqw/gextto/internal/ed2k"
 	"github.com/buzzqw/gextto/internal/logging"
@@ -167,7 +168,7 @@ func settingIsTrue(value string) bool {
 var ed2kState struct {
 	mu       sync.Mutex
 	key      string
-	client   *amule.Client
+	client   ed2kBackend
 	status   amule.Status
 	checked  time.Time
 	err      string
@@ -194,29 +195,54 @@ var (
 )
 
 // ed2kClient returns the client for the configured core, reusing the open
-// session while the address and password stay the same.
-func ed2kClient(cfg *Config) (*amule.Client, error) {
+// session while the core and its address and credentials stay the same.
+func ed2kClient(cfg *Config) (ed2kBackend, error) {
 	if !ed2kEnabled(cfg) {
-		return nil, errors.New("eD2k/aMule is disabled")
+		return nil, errors.New("eD2k is disabled")
 	}
 	settings, err := ed2kSettingsFromConfig(cfg)
 	if err != nil {
 		return nil, err
 	}
-	key := settings.Address + "\x00" + settings.Password
+	kind := ed2kBackendKind(cfg)
+	var key string
+	var build func() ed2kBackend
+	switch kind {
+	case ed2kBackendEmuleqt:
+		address, apiKey := emuleqtExternalSettings(cfg)
+		if address == "" {
+			return nil, errors.New("the emule-qt address is not set")
+		}
+		key = kind + "\x00" + address + "\x00" + apiKey
+		build = func() ed2kBackend { return newEmuleqtBackend(address, apiKey, "", "") }
+	case ed2kBackendEmuleqtManaged:
+		managed, err := emuleqtManagedEndpoint(cfg)
+		if err != nil {
+			return nil, err
+		}
+		key = kind + "\x00" + managed.URL + "\x00" + managed.APIKey + "\x00" + managed.HostData
+		build = func() ed2kBackend {
+			return newEmuleqtBackend(managed.URL, managed.APIKey, emuleqtContainerData, managed.HostData)
+		}
+	default:
+		key = kind + "\x00" + settings.Address + "\x00" + settings.Password
+		build = func() ed2kBackend {
+			return amule.New(amule.Config{
+				Address:       settings.Address,
+				Password:      settings.Password,
+				ClientName:    "Gextto",
+				ClientVersion: constants.AppVersion(),
+				Timeout:       ed2kRequestTime,
+			})
+		}
+	}
 	ed2kState.mu.Lock()
 	defer ed2kState.mu.Unlock()
 	if ed2kState.client == nil || ed2kState.key != key {
 		if ed2kState.client != nil {
 			_ = ed2kState.client.Close()
 		}
-		ed2kState.client = amule.New(amule.Config{
-			Address:       settings.Address,
-			Password:      settings.Password,
-			ClientName:    "Gextto",
-			ClientVersion: constants.AppVersion(),
-			Timeout:       ed2kRequestTime,
-		})
+		ed2kState.client = build()
 		ed2kState.key = key
 		ed2kState.checked = time.Time{}
 		ed2kState.failedAt = time.Time{}
@@ -243,7 +269,7 @@ func ed2kRememberIncoming(dir string) {
 // ed2kPreferences reads aMule's directories and options.
 func ed2kPreferences(cfg *Config) (amule.Preferences, error) {
 	var prefs amule.Preferences
-	err := ed2kCall(cfg, func(ctx context.Context, client *amule.Client) error {
+	err := ed2kCall(cfg, func(ctx context.Context, client ed2kBackend) error {
 		value, callErr := client.Preferences(ctx)
 		prefs = value
 		return callErr
@@ -253,7 +279,7 @@ func ed2kPreferences(cfg *Config) (amule.Preferences, error) {
 
 // ed2kCall runs one request against the core. While the core is known to be
 // down it fails fast instead of waiting on a dial timeout.
-func ed2kCall(cfg *Config, call func(ctx context.Context, client *amule.Client) error) error {
+func ed2kCall(cfg *Config, call func(ctx context.Context, client ed2kBackend) error) error {
 	client, err := ed2kClient(cfg)
 	if err != nil {
 		return err
@@ -262,7 +288,7 @@ func ed2kCall(cfg *Config, call func(ctx context.Context, client *amule.Client) 
 	failedAt, lastErr := ed2kState.failedAt, ed2kState.err
 	ed2kState.mu.Unlock()
 	if !failedAt.IsZero() && time.Since(failedAt) < ed2kDownBackoff {
-		return fmt.Errorf("aMule unreachable: %s", lastErr)
+		return fmt.Errorf("%s unreachable: %s", ed2kCoreName(cfg), lastErr)
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), ed2kRequestTime)
 	defer cancel()
@@ -282,7 +308,11 @@ func ed2kCall(cfg *Config, call func(ctx context.Context, client *amule.Client) 
 // ed2kTransportError tells a dead or refusing core apart from a command the
 // core answered with an error (which says nothing about reachability).
 func ed2kTransportError(err error) bool {
-	if errors.Is(err, amule.ErrAuth) {
+	if errors.Is(err, amule.ErrAuth) || errors.Is(err, emuleqt.ErrAuth) {
+		return true
+	}
+	var transport *emuleqt.TransportError
+	if errors.As(err, &transport) {
 		return true
 	}
 	message := err.Error()
@@ -316,7 +346,7 @@ func ed2kStatus(cfg *Config) (amule.Status, error) {
 	}
 	ed2kState.mu.Unlock()
 	var status amule.Status
-	err := ed2kCall(cfg, func(ctx context.Context, client *amule.Client) error {
+	err := ed2kCall(cfg, func(ctx context.Context, client ed2kBackend) error {
 		var callErr error
 		status, callErr = client.Status(ctx)
 		return callErr
@@ -358,7 +388,7 @@ func ed2kIncomingDir(cfg *Config) string {
 		return cached
 	}
 	var prefs amule.Preferences
-	if err := ed2kCall(cfg, func(ctx context.Context, client *amule.Client) error {
+	if err := ed2kCall(cfg, func(ctx context.Context, client ed2kBackend) error {
 		var callErr error
 		prefs, callErr = client.Preferences(ctx)
 		return callErr
@@ -584,7 +614,7 @@ func mergeEd2kResults(groups ...[]amule.SearchResult) []amule.SearchResult {
 	return out
 }
 
-func searchAmuleOnce(ctx context.Context, settings ed2kSettings, client *amule.Client, query string, searchType uint8) ([]amule.SearchResult, error) {
+func searchAmuleOnce(ctx context.Context, settings ed2kSettings, client ed2kBackend, query string, searchType uint8) ([]amule.SearchResult, error) {
 	wait := settings.Timeout
 	if deadline, ok := ctx.Deadline(); ok {
 		if remaining := time.Until(deadline) - time.Second; remaining < wait {
@@ -624,9 +654,13 @@ func Ed2kRuntimeStatus(cfg *Config) map[string]any {
 	if !enabled {
 		return out
 	}
+	out["backend"] = ed2kBackendKind(cfg)
 	status, err := ed2kStatus(cfg)
 	if err != nil {
 		out["last_error"] = err.Error()
+		if problem := emuleqtManagedProblem(); problem != "" && ed2kBackendKind(cfg) == ed2kBackendEmuleqtManaged {
+			out["last_error"] = problem
+		}
 		return out
 	}
 	out["reachable"] = true

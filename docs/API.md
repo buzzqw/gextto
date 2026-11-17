@@ -47,7 +47,7 @@ change. `/ui` is not served. For operational checks use
 | POST | `/api/access/generate-key` | generate a new API access key |
 | GET | `/api/acquisitions` | acquisition history |
 | GET | `/api/archive` | archive entries (search and pages) |
-| GET | `/api/ed2k/status` | aMule integration state: enabled, reachable, download, last_error and, when aMule answers, status (version, eD2k server and High/Low ID, Kad state, speeds and limits, network size, session_sent/session_recv in bytes since amuled started, total_sent/total_recv over all its runs, shared_files) |
+| GET | `/api/ed2k/status` | eD2k integration state: enabled, backend (amule, emuleqt_managed or emuleqt), reachable, download, last_error and, when aMule answers, status (version, eD2k server and High/Low ID, Kad state, speeds and limits, network size, session_sent/session_recv in bytes since amuled started, total_sent/total_recv over all its runs, shared_files) |
 | GET | `/api/ed2k/downloads` | aMule's download queue: hash, name, size, done, progress, speed, state (queued, downloading, paused, checking, finished, error), sources and active sources, priority, ed2k link, last data received (Unix time); enabled is false while the integration is off |
 | POST | `/api/ed2k/downloads/{hash}/priority` | set a download's priority: JSON {"priority": "low", "normal", "high" or "auto"} |
 | POST | `/api/ed2k/downloads/{hash}/{action}` | pause, resume or remove an aMule download (remove cancels a download in progress and deletes its partial data; a completed file only leaves aMule's list) |

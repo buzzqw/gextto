@@ -182,8 +182,9 @@ sudo bash install.sh --uninstall --purge   # also remove the data directory
   choking, with per-feed activity and failure tracking.
 - **Archive extraction (RAR)**: Automatically unpacks uncompressed and RAR 5 compressed multi-volume
   archives directly into the library, preserving the original archive for continuous seeding.
-- **eD2k and Kad through aMule**: Drives `amuled` via the External Connections protocol. Search Kad,
-  paste `ed2k://` links, monitor downloads and share lists directly from Gextto.
+- **eD2k and Kad through aMule or emule-qt**: Drives `amuled` via the External Connections protocol,
+  or emule-qt via its REST API — one or the other; emule-qt can also be run and updated by Gextto in
+  Docker. Search Kad, paste `ed2k://` links, monitor downloads and share lists directly from Gextto.
   ([read more](docs/amule.md))
 
 → *Full documentation: [Sources and Quality in the User Manual](docs/MANUAL.en.md#finding-and-choosing-releases)*
@@ -352,7 +353,7 @@ assistive-technology testing is still required
 | Move an existing installation | [Migration guide](docs/MIGRATION.md) |
 | Terminal client | [TUI reference](docs/tui.md) |
 | gx-torrent engine and standalone client | [gx-torrent technical document](docs/gx-torrent.md) · [gx-core](docs/gx-core.md) |
-| eD2k and Kad through aMule | [aMule integration](docs/amule.md) |
+| eD2k and Kad through aMule or emule-qt | [aMule and emule-qt integration](docs/amule.md) |
 | qBittorrent-nox backend | [Setup guide](docs/qbittorrent-nox.md) |
 | Build or contribute | [Developer manual](docs/DEVELOPERS.md) |
 | Network and data safety | [Security policy](docs/SECURITY.md) |

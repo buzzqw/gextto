@@ -178,6 +178,11 @@ type Snapshot struct {
 		DownKiBps float64 `json:"downKiBps"`
 		UpKiBps   float64 `json:"upKiBps"`
 	} `json:"rates"`
+	Uploads struct {
+		Active  int64 `json:"active"`
+		Waiting int64 `json:"waiting"`
+	} `json:"uploads"`
+	SharedFiles int64 `json:"sharedFiles"`
 }
 
 // Snapshot reads the dashboard view of the core.
@@ -406,6 +411,20 @@ type SharedFile struct {
 // SharedFiles lists the shared files.
 func (c *Client) SharedFiles(ctx context.Context) ([]SharedFile, error) {
 	return list[SharedFile](ctx, c, "/api/v1/shared")
+}
+
+// Directories are the core's folders, on the machine it runs on.
+type Directories struct {
+	Shared   []string `json:"directories"`
+	Incoming string   `json:"incomingDir"`
+	Temp     []string `json:"tempDirs"`
+}
+
+// SharedDirectories reads the shared, incoming and temporary folders.
+func (c *Client) SharedDirectories(ctx context.Context) (Directories, error) {
+	var out Directories
+	err := c.do(ctx, http.MethodGet, "/api/v1/shared/directories", nil, nil, &out)
+	return out, err
 }
 
 // ReloadSharedFiles rescans the shared folders.

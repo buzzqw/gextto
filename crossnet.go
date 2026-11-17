@@ -196,7 +196,7 @@ func crossnetTempDir(cfg *Config) string {
 		return dir
 	}
 	var prefs amule.Preferences
-	if err := ed2kCall(cfg, func(ctx context.Context, client *amule.Client) error {
+	if err := ed2kCall(cfg, func(ctx context.Context, client ed2kBackend) error {
 		var callErr error
 		prefs, callErr = client.Preferences(ctx)
 		return callErr
@@ -421,7 +421,7 @@ func crossnetForget(pair *crossnetPair) {
 
 // crossnetRemoveEd2k cancels the eD2k side of a pair in aMule.
 func crossnetRemoveEd2k(cfg *Config, db *Database, pair *crossnetPair, why string) {
-	if err := ed2kCall(cfg, func(ctx context.Context, client *amule.Client) error {
+	if err := ed2kCall(cfg, func(ctx context.Context, client ed2kBackend) error {
 		return client.Delete(ctx, pair.Ed2kHash)
 	}); err != nil {
 		logging.Warn(fmt.Sprintf("%s: the eD2k copy could not be removed from aMule (%s): %v", pair.Label, why, err))
@@ -472,7 +472,7 @@ func crossnetMergeComplete(cfg *Config, db *Database, merger externalMerger, pai
 // crossnetSharedPath is where aMule shares a finished file of hash, or "".
 func crossnetSharedPath(cfg *Config, hash string) string {
 	var shared []amule.SharedFile
-	if err := ed2kCall(cfg, func(ctx context.Context, client *amule.Client) error {
+	if err := ed2kCall(cfg, func(ctx context.Context, client ed2kBackend) error {
 		var callErr error
 		shared, callErr = client.SharedFiles(ctx)
 		return callErr

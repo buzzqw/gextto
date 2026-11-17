@@ -65,6 +65,10 @@ var uiSettingDefaults = map[string]string{
 	// eD2k/Kad is off by default: it is an opt-in search provider and the
 	// automatic fallback is a second, explicit switch.
 	"ed2k_enabled":             "false",
+	"ed2k_backend":             "amule",
+	"emuleqt_url":              "",
+	"emuleqt_api_key":          "",
+	"emuleqt_auto_update":      "true",
 	"amule_host":               "127.0.0.1",
 	"amule_port":               "4712",
 	"amule_password":           "",

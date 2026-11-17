@@ -33,6 +33,7 @@ import (
 	"net/http"
 	"net/url"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -423,8 +424,32 @@ func v2Render(w http.ResponseWriter, status int, name string, data any, s *AppSt
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(status)
-	_, _ = w.Write(buffer.Bytes())
+	out := buffer.Bytes()
+	if s != nil {
+		out = v2Ed2kCoreNamed(latestConfig(s), name, data, out)
+	}
+	_, _ = w.Write(out)
 }
+
+// v2Ed2kCoreNamed names the eD2k core in use. The interface was written when
+// aMule was the only one and says "aMule" in many places; with emule-qt
+// chosen those pages say "emule-qt" instead. The settings page is left as it
+// is: there both programs are described by name.
+func v2Ed2kCoreNamed(cfg *Config, name string, data any, html []byte) []byte {
+	if cfg == nil || strings.HasPrefix(name, "v2_setting") {
+		return html
+	}
+	if page, ok := data.(v2ShellData); ok && page.Page == "settings" {
+		return html
+	}
+	if !ed2kEnabled(cfg) || !ed2kUsesEmuleqt(cfg) || !bytes.Contains(html, []byte("aMule")) {
+		return html
+	}
+	return v2AmuleWord.ReplaceAll(html, []byte("emule-qt"))
+}
+
+// v2AmuleWord is the name as a word: "aMule", not "amuled" or "aMuleWeb".
+var v2AmuleWord = regexp.MustCompile(`\baMule\b`)
 
 // v2RenderPlus writes a rendered fragment followed by extra markup: the
 // out-of-band swaps an answer carries beside its main swap.

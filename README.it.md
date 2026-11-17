@@ -182,8 +182,10 @@ sudo bash install.sh --uninstall --purge   # cancella anche la cartella dati
   con tracciamento di attività ed errori per ciascun feed.
 - **Estrazione archivi (RAR)**: estrae automaticamente nella libreria gli archivi non compressi e compressi
   in formato RAR 5 multi-volume, mantenendo i file originali per non interrompere il seed.
-- **eD2k e Kad tramite aMule**: controlla `amuled` via protocollo External Connections. Cerca su Kad,
-  incolla link `ed2k://`, monitora code e file condivisi direttamente da Gextto.
+- **eD2k e Kad tramite aMule o emule-qt**: controlla `amuled` via protocollo External Connections,
+  oppure emule-qt con la sua REST API — l'uno o l'altro; emule-qt può anche essere avviato e
+  aggiornato da Gextto in Docker. Cerca su Kad, incolla link `ed2k://`, monitora code e file
+  condivisi direttamente da Gextto.
   ([approfondisci](docs/amule.it.md))
 
 → *Documentazione completa: [Sorgenti e qualità nel manuale](docs/MANUAL.it.md#trovare-e-scegliere-le-release)*
@@ -351,7 +353,7 @@ manuali con screen reader e tecnologie assistive
 | Spostare un'installazione | [Guida alla migrazione](docs/MIGRATION.md) |
 | Client da terminale | [Riferimento TUI](docs/tui.md) |
 | Motore gx-torrent e client autonomo | [Documento tecnico di gx-torrent](docs/gx-torrent.md) · [gx-core](docs/gx-core.md) |
-| eD2k e Kad tramite aMule | [Integrazione con aMule](docs/amule.it.md) · [English](docs/amule.md) |
+| eD2k e Kad tramite aMule o emule-qt | [Integrazione con aMule ed emule-qt](docs/amule.it.md) · [English](docs/amule.md) |
 | Backend qBittorrent-nox | [Guida](docs/qbittorrent-nox.md) |
 | Compilare o contribuire | [Manuale per sviluppatori](docs/DEVELOPERS.md) |
 | Sicurezza di rete e dei dati | [Politica di sicurezza](docs/SECURITY.md) |

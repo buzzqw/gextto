@@ -70,9 +70,17 @@ var uiSettingMetaByKey = map[string]uiSettingMeta{
 	"gxtorrent_dlna_folders":           {Zero: "vuoto = automatico (archivio)", DependsOn: "gxtorrent_dlna"},
 
 	// eD2k e Kad
-	"amule_host":     {DependsOn: "ed2k_enabled"},
-	"amule_port":     {DependsOn: "ed2k_enabled"},
-	"amule_password": {DependsOn: "ed2k_enabled"},
+	"ed2k_backend": {Kind: "select", DependsOn: "ed2k_enabled", Options: []uiFormOption{
+		{Value: "amule", Label: "aMule (installato a parte)"},
+		{Value: "emuleqt_managed", Label: "emule-qt (avviato da Gextto in Docker)"},
+		{Value: "emuleqt", Label: "emule-qt (già avviato)"},
+	}},
+	"amule_host":          {DependsOn: "ed2k_backend=amule"},
+	"amule_port":          {DependsOn: "ed2k_backend=amule"},
+	"amule_password":      {DependsOn: "ed2k_backend=amule"},
+	"emuleqt_url":         {Kind: "url", DependsOn: "ed2k_backend=emuleqt"},
+	"emuleqt_api_key":     {DependsOn: "ed2k_backend=emuleqt"},
+	"emuleqt_auto_update": {DependsOn: "ed2k_backend=emuleqt_managed"},
 	"ed2k_search_network": {Kind: "select", DependsOn: "ed2k_enabled", Options: []uiFormOption{
 		{Value: "kad", Label: "Kad"},
 		{Value: "both", Label: "Kad + server eD2k"},

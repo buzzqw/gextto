@@ -78,7 +78,7 @@ nav:
       - Guida avanzata: ADVANCED.it.md
       - "Docker: stack completo": DOCKER.it.md
       - Chiavi di accesso: api-keys.it.md
-      - eD2k e aMule: amule.it.md
+      - eD2k, aMule ed emule-qt: amule.it.md
       - Changelog: https://github.com/buzzqw/gextto/blob/main/changelog.md
   - English:
       - Manual: MANUAL.en.md
@@ -87,7 +87,7 @@ nav:
       - Advanced guide: ADVANCED.en.md
       - "Docker: full stack": DOCKER.en.md
       - Access keys: api-keys.md
-      - eD2k and aMule: amule.md
+      - eD2k, aMule and emule-qt: amule.md
       - Changelog: https://github.com/buzzqw/gextto/blob/main/changelog.en.md
   - Reference:
       - HTTP API: API.md

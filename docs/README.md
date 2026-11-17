@@ -41,8 +41,8 @@ change, so this index and the site are never two different texts.
 | [Open items](todo.md) | The maintained TODO list: what is not done and the gate that unblocks it. |
 | [Measurements and benchmarks](measurements.md) | gx-torrent compared with qBittorrent, Transmission, Deluge, rain and anacrolix/torrent, how to repeat the comparison, which client fits which need, then Gextto's own footprint, and the build and test times. |
 | [gx-torrent engine](gx-torrent.md) | Technical document of the pure-Go torrent engine (gx-core, daemon, adapter). |
-| [eD2k e Kad con aMule (Italiano)](amule.it.md) | Italian version: install and configure aMule, enable it in Gextto, use eD2k/Kad, troubleshooting and settings. |
-| [eD2k and Kad through aMule](amule.md) | How to install and configure aMule, enable it in Gextto and use eD2k/Kad: search, links, aMule's queue in Downloads, completion, shared limits, troubleshooting, settings and tests. |
+| [eD2k e Kad con aMule o emule-qt (Italiano)](amule.it.md) | Italian version: install and configure aMule or emule-qt, enable it in Gextto, use eD2k/Kad, troubleshooting and settings. |
+| [eD2k and Kad through aMule or emule-qt](amule.md) | How to install and configure aMule — or let Gextto run emule-qt in Docker —, enable it in Gextto and use eD2k/Kad: search, links, aMule's queue in Downloads, completion, shared limits, troubleshooting, settings and tests. |
 | [BEP compliance](bep.md) | Which BitTorrent specifications (BEPs) the engine supports, which are missing and the roadmap. |
 | [gx-core](gx-core.md) | The standalone torrent client (the `gx-torrent` binary used without Gextto): modes, security, packaging, what is still open. |
 | [SQL maintenance scripts](https://github.com/buzzqw/gextto/blob/main/scripts/sql/README.md) | Ready-to-run queries and the Maintenance tab for the release archive: old/language-filtered releases, diagnostics and their manual deletion. |

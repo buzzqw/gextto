@@ -1,4 +1,4 @@
-# eD2k e Kad con aMule
+# eD2k e Kad con aMule o emule-qt
 
 Gextto raggiunge le reti **eD2k** e **Kad** tramite **aMule**. `amuled` fa il
 lavoro di rete — server, Kad, fonti, code, crediti, trasferimenti — e Gextto lo
@@ -15,6 +15,7 @@ indisponibili e i torrent non cambiano.
 - [Requisiti](#requisiti)
 - [Installare aMule](#installare-amule)
 - [Attivarlo in Gextto](#attivarlo-in-gextto)
+- [emule-qt al posto di aMule](#emule-qt-al-posto-di-amule)
 - [Come si usa](#come-si-usa)
 - [Problemi comuni](#problemi-comuni)
 - [Riferimento](#riferimento)
@@ -137,7 +138,7 @@ evita del tutto l'attesa.
 
 **Configurazione → eD2k e Kad**:
 
-1. accendi **eD2k e Kad tramite aMule**;
+1. accendi **eD2k e Kad** e lascia **Programma eD2k** su **aMule**;
 2. inserisci **indirizzo** (di solito `127.0.0.1`), **porta EC** (4712) e la
    **password in chiaro**;
 3. salva, poi apri la pagina **eD2k** (**Scoperta → eD2k**) e premi
@@ -170,6 +171,70 @@ Quando `amuled` gira sulla macchina di Gextto, la barra in alto mostra il badge
 **aMule** con CPU e RAM del demone, aggiornato insieme agli altri valori. Con
 aMule su un altro host il badge non c'è: quei dati non sono disponibili tramite
 il protocollo EC.
+
+## emule-qt al posto di aMule
+
+[emule-qt](https://github.com/ModderMule/emule-qt) è un client eD2k e Kad più
+recente, compatibile con la rete eMule, con IPv6, l'offuscamento del protocollo
+attivo di default e i trasferimenti tra due ID basso. Gextto può comandarlo **al
+posto di aMule**: i due sono l'uno o l'altro, scelti in **Configurazione → eD2k e
+Kad → Programma eD2k**. Tutto quello che descrive questa guida — ricerca, link
+`ed2k://`, Scarico, pagina eD2k, importazione, ripiego automatico, torrent ed
+eD2k sullo stesso file — funziona allo stesso modo con l'uno e con l'altro;
+Gextto parla con emule-qt attraverso la sua REST API invece che con EC.
+
+La scelta ha tre valori:
+
+- **aMule (installato a parte)** — il default, tutto quanto sopra.
+- **emule-qt (avviato da Gextto in Docker)** — Gextto scarica l'immagine
+  ufficiale (`ghcr.io/moddermule/emuleqt`), avvia il container e lo tiene acceso.
+  Serve Docker installato e usabile dall'utente con cui gira Gextto (su Debian e
+  Ubuntu: nel gruppo `docker`). Non c'è altro da configurare:
+  - configurazione e file stanno in `emuleqt/` dentro la cartella dati di
+    Gextto: `config/` (il `preferences.yml` di emule-qt, scritto da Gextto prima
+    del primo avvio e da lì in poi gestito da emule-qt), `data/incoming` (i file
+    completati, che Gextto importa da lì) e `data/temp` (i file parziali);
+  - il container usa la rete dell'host, con le porte eD2k che aMule usa di
+    default — **TCP 4662 e UDP 4672** — quindi un router già aperto per aMule
+    non richiede niente di nuovo; l'UPnP è attivo. La REST API (porta 4721) e il
+    collegamento della GUI (4722) ascoltano solo su `127.0.0.1`, con una chiave
+    generata da Gextto;
+  - il container si riavvia da solo e sopravvive a un riavvio di Gextto;
+  - con **Aggiorna emule-qt ogni giorno** acceso (il default) Gextto cerca una
+    nuova immagine una volta al giorno, sposta il container sulla nuova e
+    controlla che emule-qt risponda entro tre minuti; se non risponde torna
+    all'immagine di prima e riprova il giorno dopo. Il progetto pubblica spesso:
+    per questo gira in Docker, dove aggiornare è scaricare un'immagine e tornare
+    indietro è riavviare quella di prima;
+  - scegliendo di nuovo aMule il container si ferma; le sue cartelle restano;
+  - è pensato per Gextto installato sulla macchina: con Gextto in un suo
+    container, avvia l'immagine di emule-qt accanto e usa **emule-qt (già
+    avviato)**.
+- **emule-qt (già avviato)** — un emule-qt tuo (la sua immagine Docker, un NAS,
+  un'altra macchina): compila **emule-qt — indirizzo** (il suo server web, per
+  esempio `http://127.0.0.1:4711`) e **emule-qt — chiave API**. In emule-qt
+  attiva la REST API (`webserver.restApiEnabled: true` e `webserver.apiKey` in
+  `preferences.yml`, oppure *Opzioni → Interfaccia web*). Come con aMule, Gextto
+  deve vedere la cartella di arrivo di emule-qt allo stesso percorso per
+  importare i file completati, e la sua cartella temporanea per prendere i pezzi
+  per un torrent dello stesso file.
+
+**Spegni aMule** quando scegli emule-qt: i due vogliono le stesse porte eD2k.
+Finché emule-qt è scelto e aMule risponde ancora, il log lo dice una volta
+all'ora.
+
+Cosa cambia rispetto ad aMule:
+
+- la pagina eD2k e le altre pagine dicono *emule-qt* dove dicevano *aMule*;
+- non c'è l'interruttore della preallocazione dei file: è un'opzione di aMule;
+- un torrent dello stesso file prende dal file parziale di emule-qt i pezzi già
+  verificati, come con aMule: Gextto trova il file parziale di ogni download
+  dalle intestazioni dei `.part.met` nella cartella temporanea, che portano
+  l'hash del file nello stesso formato scritto da eMule, aMule ed emule-qt.
+
+emule-qt scarica da sé anche torrent, Usenet e file hoster, e unisce i propri
+torrent con la sua rete ed3k. Gextto ne usa solo la parte eD2k e Kad: i torrent
+restano a gx-torrent.
 
 ## Come si usa
 
@@ -326,6 +391,10 @@ altre righe UPnP, resta visibile.
 | Chiave | Significato |
 |---|---|
 | `ed2k_enabled` | interruttore principale (spento) |
+| `ed2k_backend` | `amule` (default), `emuleqt_managed` (emule-qt avviato da Gextto in Docker) o `emuleqt` (un emule-qt già avviato) |
+| `emuleqt_url` | server web di un emule-qt già avviato (`http://host:4711`) |
+| `emuleqt_api_key` | la sua chiave REST API (segreta) |
+| `emuleqt_auto_update` | aggiornamento giornaliero dell'emule-qt gestito, con ritorno alla versione precedente (acceso) |
 | `amule_host` | host di `amuled` (`127.0.0.1`) |
 | `amule_port` | porta EC (`4712`) |
 | `amule_password` | password EC, in chiaro (segreta) |
@@ -382,6 +451,9 @@ sono documentate in [`API.md`](API.md) (`/api/ed2k/status`,
 | `ed2ksearch.go` | impostazioni, client condiviso con backoff veloce mentre amuled è giù, stato in cache, ricerca e ripiego del gap filling, `GET /api/ed2k/status` |
 | `ed2k_downloads.go` | lista dei download, aggiunta/pausa/ripresa/rimozione, la sessione che trasforma i file completati in eventi `torrent_finished`, la configurazione dell'import in copia |
 | `uiweb_v2_ed2k.go` | la pagina eD2k (stato, server, Kad, ricerca, link incollati) |
+| `ed2k_backend.go` | il contratto unico davanti al programma eD2k (`ed2kBackend`): `*amule.Client` lo soddisfa così com'è, `emuleqtBackend` traduce le risposte REST di emule-qt negli stessi tipi; la lettura delle intestazioni `.part.met` che trova il file parziale di un download |
+| `emuleqt_managed.go` | il container di emule-qt gestito: prime preferenze, `docker run` sulla rete dell'host, riavvio se fermo, aggiornamento giornaliero con ritorno indietro, arresto quando si sceglie un altro programma |
+| `internal/emuleqt` | il client REST (`/api/v1`, chiave API); `emuleqttest` è un finto emule-qt per i test |
 | `web_background.go` | unisce gli eventi di completamento di aMule al ciclo eventi dei torrent, ognuno gestito dalla propria sessione |
 
 ### Test

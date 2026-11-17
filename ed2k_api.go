@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"sort"
@@ -66,7 +67,7 @@ func Ed2kDownloadsAPI(w http.ResponseWriter, r *http.Request, s *AppState) {
 		return
 	}
 	var downloads []amule.Download
-	if err := ed2kCall(cfg, func(ctx context.Context, client *amule.Client) error {
+	if err := ed2kCall(cfg, func(ctx context.Context, client ed2kBackend) error {
 		var callErr error
 		downloads, callErr = client.Downloads(ctx)
 		return callErr
@@ -137,7 +138,7 @@ func Ed2kSetPriority(cfg *Config, hash, name string) error {
 	if !ok {
 		return errEd2kBadInput("priority must be low, normal, high or auto")
 	}
-	return ed2kCall(cfg, func(ctx context.Context, client *amule.Client) error {
+	return ed2kCall(cfg, func(ctx context.Context, client ed2kBackend) error {
 		return client.SetPriority(ctx, hash, priority)
 	})
 }
@@ -152,7 +153,7 @@ type Ed2kLimitsInput struct {
 // Ed2kLimits returns aMule's global bandwidth limits in KiB/s.
 func Ed2kLimits(cfg *Config) (amule.Preferences, error) {
 	var prefs amule.Preferences
-	err := ed2kCall(cfg, func(ctx context.Context, client *amule.Client) error {
+	err := ed2kCall(cfg, func(ctx context.Context, client ed2kBackend) error {
 		var callErr error
 		prefs, callErr = client.Preferences(ctx)
 		return callErr
@@ -177,7 +178,7 @@ func Ed2kLimitsAPI(w http.ResponseWriter, r *http.Request, s *AppState) {
 			jsonError(w, http.StatusBadRequest, "limits must be between 0 and 10000000 KiB/s")
 			return
 		}
-		if err := ed2kCall(cfg, func(ctx context.Context, client *amule.Client) error {
+		if err := ed2kCall(cfg, func(ctx context.Context, client ed2kBackend) error {
 			return client.SetLimits(ctx, input.DownloadKib, input.UploadKib)
 		}); err != nil {
 			jsonError(w, ed2kErrorStatus(err), err.Error())
@@ -196,7 +197,7 @@ func Ed2kLimitsAPI(w http.ResponseWriter, r *http.Request, s *AppState) {
 // Ed2kLogLines returns aMule's log, newest last.
 func Ed2kLogLines(cfg *Config) ([]string, error) {
 	var lines []string
-	err := ed2kCall(cfg, func(ctx context.Context, client *amule.Client) error {
+	err := ed2kCall(cfg, func(ctx context.Context, client ed2kBackend) error {
 		var callErr error
 		lines, callErr = client.LogLines(ctx)
 		return callErr
@@ -353,7 +354,7 @@ func applyEd2kSpeedLimits(cfg *Config, downloadKib, uploadKib int64, now time.Ti
 	if unchanged {
 		return
 	}
-	if err := ed2kCall(cfg, func(ctx context.Context, client *amule.Client) error {
+	if err := ed2kCall(cfg, func(ctx context.Context, client ed2kBackend) error {
 		return client.SetLimits(ctx, downloadKib, uploadKib)
 	}); err != nil {
 		logging.Debug("cannot apply the speed limits to aMule", "error", err)
@@ -392,7 +393,7 @@ func ed2kSharedSnapshotFor(cfg *Config) (ed2kSharedSnapshot, error) {
 	if !snapshot.Enabled {
 		return snapshot, nil
 	}
-	err := ed2kCall(cfg, func(ctx context.Context, client *amule.Client) error {
+	err := ed2kCall(cfg, func(ctx context.Context, client ed2kBackend) error {
 		if status, statusErr := client.Status(ctx); statusErr == nil {
 			snapshot.UploadRate = status.UploadRate
 			snapshot.UploadQueue = status.UploadQueue
@@ -429,7 +430,7 @@ func ed2kSharedSnapshotFor(cfg *Config) (ed2kSharedSnapshot, error) {
 
 // ed2kReloadShared asks the core to rescan its shared folders.
 func ed2kReloadShared(cfg *Config) error {
-	return ed2kCall(cfg, func(ctx context.Context, client *amule.Client) error {
+	return ed2kCall(cfg, func(ctx context.Context, client ed2kBackend) error {
 		return client.ReloadSharedFiles(ctx)
 	})
 }
@@ -606,6 +607,16 @@ func v2Ed2kHealthFrom(s *AppState) *v2Ed2kHealth {
 func amuleRuntimeLabel(cfg *Config) string {
 	if cfg == nil {
 		return ""
+	}
+	switch ed2kBackendKind(cfg) {
+	case ed2kBackendEmuleqtManaged:
+		return "in Docker, avviato da Gextto"
+	case ed2kBackendEmuleqt:
+		address, _ := emuleqtExternalSettings(cfg)
+		if parsed, err := url.Parse(address); err == nil && !hostIsLocal(parsed.Hostname()) {
+			return "su un'altra macchina"
+		}
+		return "su questa macchina"
 	}
 	if !hostIsLocal(uiSettingString(cfg, "amule_host")) {
 		return "su un'altra macchina"

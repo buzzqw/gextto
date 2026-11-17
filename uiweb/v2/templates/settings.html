@@ -166,20 +166,22 @@
 
 {{define "v2_settings_ed2k"}}
 <div class="panel settings-panel" id="v2-settings-ed2k">
-  <div class="panel-head"><h3>{{tr "aMule"}}</h3><small class="muted">{{if .Reachable}}<span>{{tr "in uso"}}</span>{{if .Version}} · {{.Version}}{{end}}{{if .Address}} · {{.Address}}{{end}}{{else}}{{tr "non raggiungibile"}}{{end}}</small></div>
+  <div class="panel-head"><h3>{{if .Emuleqt}}{{tr "emule-qt"}}{{else}}{{tr "aMule"}}{{end}}</h3><small class="muted">{{if .Reachable}}<span>{{tr "in uso"}}</span>{{if .Version}} · {{.Version}}{{end}}{{if .Address}} · {{.Address}}{{end}}{{else}}{{tr "non raggiungibile"}}{{end}}</small></div>
   <div class="panel-body">
   {{if not .Enabled}}
-    <p class="muted">{{tr "L'integrazione con aMule è spenta."}}</p>
+    <p class="muted">{{if .Emuleqt}}{{tr "L'integrazione con emule-qt è spenta."}}{{else}}{{tr "L'integrazione con aMule è spenta."}}{{end}}</p>
   {{else if .Error}}
-    <p class="alert" role="alert"><span>{{tr "aMule non raggiungibile:"}}</span> {{tr .Error}}</p>
+    <p class="alert" role="alert"><span>{{if .Emuleqt}}{{tr "emule-qt non raggiungibile:"}}{{else}}{{tr "aMule non raggiungibile:"}}{{end}}</span> {{tr .Error}}</p>
   {{else}}
-    <div class="row"><span>{{tr "Client eD2k"}}</span><strong>{{tr "aMule"}} <span>{{tr .Version}}</span></strong></div>
+    <div class="row"><span>{{tr "Client eD2k"}}</span><strong>{{if .Emuleqt}}<span>{{.Version}}</span>{{else}}{{tr "aMule"}} <span>{{tr .Version}}</span>{{end}}</strong></div>
     <div class="row"><span>{{tr "Dove gira"}}</span><strong>{{tr .Runtime}}</strong></div>
-    <p class="hint">{{tr "aMule è un programma separato, avviato fuori da Gextto: Gextto non lo avvia, non lo ferma e non lo aggiorna."}}</p>
-    <p class="hint" {{trTitle "Queste cartelle appartengono ad aMule: Gextto le legge soltanto. Si cambiano da aMule/amuled; dopo la modifica riavvia Gextto (oppure riapri questa pagina) perché usi il nuovo percorso."}}>{{tr "Queste cartelle appartengono ad aMule: Gextto le legge soltanto. Si cambiano da aMule/amuled."}}</p>
-    <div class="row" {{trTitle "Cartella in cui aMule salva i file completati. Si cambia da aMule/amuled; dopo la modifica riavvia Gextto."}}><span>{{tr "Cartella download"}}</span><strong class="truncate" title="{{if .IncomingDir}}{{tr .IncomingDir}}{{else}}—{{end}}">{{if .IncomingDir}}{{tr .IncomingDir}}{{else}}—{{end}}</strong></div>
-    <div class="row" {{trTitle "Cartella in cui aMule tiene i file incompleti. Si cambia da aMule/amuled; dopo la modifica riavvia Gextto."}}><span>{{tr "Cartella temporanea"}}</span><strong class="truncate" title="{{if .TempDir}}{{tr .TempDir}}{{else}}—{{end}}">{{if .TempDir}}{{tr .TempDir}}{{else}}—{{end}}</strong></div>
-    <p class="hint">{{tr "La preallocazione completa riserva subito l'intero file: su un disco di rete può bloccare amuled per decine di secondi. Spenta è il comportamento consigliato."}}</p>
+    {{if .Managed}}<p class="hint">{{tr "emule-qt gira in Docker: Gextto lo avvia, lo ferma quando scegli un altro programma e lo aggiorna ogni giorno se lo hai chiesto. Configurazione e file stanno nella cartella emuleqt dentro la cartella dati di Gextto."}}</p>
+    {{else if .Emuleqt}}<p class="hint">{{tr "emule-qt è un programma separato, avviato fuori da Gextto: Gextto non lo avvia, non lo ferma e non lo aggiorna."}}</p>
+    {{else}}<p class="hint">{{tr "aMule è un programma separato, avviato fuori da Gextto: Gextto non lo avvia, non lo ferma e non lo aggiorna."}}</p>{{end}}
+    {{if .Emuleqt}}<p class="hint">{{tr "Queste cartelle appartengono a emule-qt: Gextto le legge soltanto."}}</p>{{else}}<p class="hint" {{trTitle "Queste cartelle appartengono ad aMule: Gextto le legge soltanto. Si cambiano da aMule/amuled; dopo la modifica riavvia Gextto (oppure riapri questa pagina) perché usi il nuovo percorso."}}>{{tr "Queste cartelle appartengono ad aMule: Gextto le legge soltanto. Si cambiano da aMule/amuled."}}</p>{{end}}
+    {{if .Emuleqt}}<div class="row" {{trTitle "Cartella in cui emule-qt salva i file completati: Gextto li importa da qui."}}><span>{{tr "Cartella download"}}</span><strong class="truncate" title="{{if .IncomingDir}}{{tr .IncomingDir}}{{else}}—{{end}}">{{if .IncomingDir}}{{tr .IncomingDir}}{{else}}—{{end}}</strong></div>{{else}}<div class="row" {{trTitle "Cartella in cui aMule salva i file completati. Si cambia da aMule/amuled; dopo la modifica riavvia Gextto."}}><span>{{tr "Cartella download"}}</span><strong class="truncate" title="{{if .IncomingDir}}{{tr .IncomingDir}}{{else}}—{{end}}">{{if .IncomingDir}}{{tr .IncomingDir}}{{else}}—{{end}}</strong></div>{{end}}
+    {{if .Emuleqt}}<div class="row" {{trTitle "Cartella in cui emule-qt tiene i file incompleti: un torrent dello stesso file ne prende i pezzi già verificati."}}><span>{{tr "Cartella temporanea"}}</span><strong class="truncate" title="{{if .TempDir}}{{tr .TempDir}}{{else}}—{{end}}">{{if .TempDir}}{{tr .TempDir}}{{else}}—{{end}}</strong></div>{{else}}<div class="row" {{trTitle "Cartella in cui aMule tiene i file incompleti. Si cambia da aMule/amuled; dopo la modifica riavvia Gextto."}}><span>{{tr "Cartella temporanea"}}</span><strong class="truncate" title="{{if .TempDir}}{{tr .TempDir}}{{else}}—{{end}}">{{if .TempDir}}{{tr .TempDir}}{{else}}—{{end}}</strong></div>{{end}}
+    {{if not .Emuleqt}}<p class="hint">{{tr "La preallocazione completa riserva subito l'intero file: su un disco di rete può bloccare amuled per decine di secondi. Spenta è il comportamento consigliato."}}</p>
     <div class="row"><span>{{tr "Preallocazione file"}}</span><strong>{{if .AllocateFull}}<span class="badge warn">{{tr "attiva"}}</span>{{else}}<span class="badge ok">{{tr "spenta"}}</span>{{end}}</strong></div>
     <form method="post" action="/settings/ed2k/preallocation" class="form-grid">
       <label class="check" {{trTitle "Attiva o disattiva la preallocazione completa dei file in aMule; il salvataggio avviene subito"}}><input type="checkbox" name="allocate" value="1"{{if .AllocateFull}} checked{{end}} /> <span>{{tr "Prealloca l'intero file in aMule"}}</span></label>
@@ -187,6 +189,7 @@
         <button class="btn primary" type="submit" {{trTitle "Applica subito la preallocazione scelta ad aMule"}}>{{tr "Salva la preallocazione"}}</button>
       </div>
     </form>
+    {{end}}
   {{end}}
   </div>
 </div>

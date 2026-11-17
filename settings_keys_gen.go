@@ -23,6 +23,10 @@ const (
 	settingStopOnOldPageThreshold           = "stop_on_old_page_threshold"
 	settingFeedAutoDisableDays              = "feed_auto_disable_days"
 	settingEd2kEnabled                      = "ed2k_enabled"
+	settingEd2kBackend                      = "ed2k_backend"
+	settingEmuleqtUrl                       = "emuleqt_url"
+	settingEmuleqtApiKey                    = "emuleqt_api_key"
+	settingEmuleqtAutoUpdate                = "emuleqt_auto_update"
 	settingAmuleHost                        = "amule_host"
 	settingAmulePort                        = "amule_port"
 	settingAmulePassword                    = "amule_password"
@@ -274,6 +278,10 @@ var settingKeyNames = []string{
 	"stop_on_old_page_threshold",
 	"feed_auto_disable_days",
 	"ed2k_enabled",
+	"ed2k_backend",
+	"emuleqt_url",
+	"emuleqt_api_key",
+	"emuleqt_auto_update",
 	"amule_host",
 	"amule_port",
 	"amule_password",

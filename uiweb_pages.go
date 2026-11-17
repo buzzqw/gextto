@@ -1118,6 +1118,21 @@ func uiHideDependentFields(fields []uiSettingField) {
 		}
 		fields[index].Hidden = !parent.BoolValue
 	}
+	// A row whose controlling row is hidden is hidden too: the emule-qt
+	// address depends on the eD2k core, which depends on eD2k being on.
+	for changed := true; changed; {
+		changed = false
+		hidden := map[string]bool{}
+		for _, field := range fields {
+			hidden[field.Key] = field.Hidden
+		}
+		for index := range fields {
+			parentKey, _, _ := strings.Cut(fields[index].DependsOn, "=")
+			if !fields[index].Hidden && parentKey != "" && hidden[parentKey] {
+				fields[index].Hidden, changed = true, true
+			}
+		}
+	}
 	// The schedule switch is set by «Come si decide la velocità»: its row
 	// stays in the page (API and older links), never shown.
 	for index := range fields {

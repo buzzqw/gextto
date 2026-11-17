@@ -73,14 +73,14 @@ func TestEd2kSettingsTabIsSeparateFromSources(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	handler.ServeHTTP(recorder, request)
 	body := recorder.Body.String()
-	if recorder.Code != http.StatusOK || !strings.Contains(body, "eD2k e Kad tramite aMule") || !strings.Contains(body, "aMule — indirizzo") {
+	if recorder.Code != http.StatusOK || !strings.Contains(body, "Programma eD2k") || !strings.Contains(body, "aMule — indirizzo") || !strings.Contains(body, "emule-qt — indirizzo") {
 		t.Fatalf("eD2k settings tab: status %d", recorder.Code)
 	}
 
 	request = httptest.NewRequest(http.MethodGet, "/?view=settings&tab=sources", nil)
 	recorder = httptest.NewRecorder()
 	handler.ServeHTTP(recorder, request)
-	if strings.Contains(recorder.Body.String(), "eD2k e Kad tramite aMule") {
+	if strings.Contains(recorder.Body.String(), "Programma eD2k") {
 		t.Fatal("the eD2k settings are still on the Sources tab")
 	}
 }

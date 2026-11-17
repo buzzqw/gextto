@@ -256,15 +256,17 @@ type v2SettingsEd2k struct {
 	// to aMule and Gextto only reads them (the import uses the incoming one).
 	IncomingDir string
 	TempDir     string
+	// Emuleqt is set when the core is emule-qt, Managed when Gextto runs it.
+	Emuleqt bool
+	Managed bool
 }
 
 // v2SettingsEd2kFrom reads aMule's file preallocation for the settings panel.
 func v2SettingsEd2kFrom(s *AppState) *v2SettingsEd2k {
 	cfg := latestConfig(s)
-	panel := &v2SettingsEd2k{Enabled: ed2kEnabled(cfg)}
-	if settings, err := ed2kSettingsFromConfig(cfg); err == nil {
-		panel.Address = settings.Address
-	}
+	panel := &v2SettingsEd2k{Enabled: ed2kEnabled(cfg), Emuleqt: ed2kUsesEmuleqt(cfg),
+		Managed: ed2kBackendKind(cfg) == ed2kBackendEmuleqtManaged}
+	panel.Address = ed2kCoreAddress(cfg)
 	panel.Runtime = amuleRuntimeLabel(cfg)
 	if !panel.Enabled {
 		return panel

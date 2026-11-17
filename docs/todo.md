@@ -23,7 +23,6 @@ still be true after the item lands does not belong here.
 
 ## Gextto, acquisition and UI
 
-- **emule-qt as the alternative eD2k backend** (one or the other with aMule, optional): the REST client is in `internal/emuleqt`. Next, in order: one eD2k backend contract in front of the aMule client, with the emule-qt adapter behind it and the backend chosen in *Configuration → eD2k e Kad* (aMule / emule-qt, address and API key for a core already running); then the managed core in Docker (`ghcr.io/moddermule/emuleqt`, host network, its config and data folders under Gextto's data folder, REST API on with a generated key, the `/data` path translated to the host one, a daily check for a new release with pull, recreate and rollback to the previous image when `/api/v1/health` or the contract version fails); then the eD2k page, manuals and the aMule guide covering both. The half-way merge of a torrent from the eD2k `.part` stays aMule-only until emule-qt reports its part files. Gate: none, in progress.
 
 ## Proposals
 

@@ -1013,6 +1013,7 @@ func (w *eventWorker) tick(now time.Time) {
 	if now.Sub(w.lastCrossnet) >= time.Minute {
 		w.lastCrossnet = now
 		crossnetTick(w.cfg, w.db, w.torrents, w.state.engine, now)
+		emuleqtManagedTick(w.cfg, now)
 	}
 	if ed2kEnabled(w.cfg) && now.Sub(w.lastEd2kStallCheck) >= 10*time.Minute {
 		w.lastEd2kStallCheck = now

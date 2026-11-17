@@ -29,7 +29,9 @@ type v2Ed2kView struct {
 	Servers []amule.Server
 	Address string
 	// Runtime says where aMule runs (this machine, in a container, elsewhere).
-	Runtime    string
+	Runtime string
+	// Emuleqt is set when the core is emule-qt: aMule-only rows are left out.
+	Emuleqt    bool
 	Network    string
 	Message    string
 	Detail     string
@@ -113,8 +115,9 @@ func v2Ed2kViewFrom(s *AppState, message, detail string, isErr bool, tab string)
 		view.Error = err.Error()
 		return view
 	}
-	view.Address = settings.Address
+	view.Address = ed2kCoreAddress(cfg)
 	view.Runtime = amuleRuntimeLabel(cfg)
+	view.Emuleqt = ed2kUsesEmuleqt(cfg)
 	view.Network = v2Ed2kNetworkName(settings.Network)
 	view.Search.Network = view.Network
 	if !view.Enabled {
@@ -144,7 +147,7 @@ func v2Ed2kViewFrom(s *AppState, message, detail string, isErr bool, tab string)
 		return view
 	}
 	view.Status = status
-	_ = ed2kCall(cfg, func(ctx context.Context, client *amule.Client) error {
+	_ = ed2kCall(cfg, func(ctx context.Context, client ed2kBackend) error {
 		if prefs, prefsErr := client.Preferences(ctx); prefsErr == nil {
 			view.Prefs = prefs
 			view.DirIssues = amuleDirectoryIssues(cfg, prefs)
@@ -208,7 +211,7 @@ func v2Ed2kCommand(cfg *Config, action, address, url string) (string, string, bo
 		return "L'integrazione con aMule è spenta.", "", true
 	}
 	var done string
-	err := ed2kCall(cfg, func(ctx context.Context, client *amule.Client) error {
+	err := ed2kCall(cfg, func(ctx context.Context, client ed2kBackend) error {
 		switch action {
 		case "connect":
 			done = "Connessione a eD2k e Kad avviata."
@@ -584,7 +587,7 @@ func V2SettingsEd2kPreallocation(w http.ResponseWriter, r *http.Request, s *AppS
 	case !ed2kEnabled(cfg):
 		code = "ed2k_off"
 	default:
-		err := ed2kCall(cfg, func(ctx context.Context, client *amule.Client) error {
+		err := ed2kCall(cfg, func(ctx context.Context, client ed2kBackend) error {
 			return client.SetFilePreallocation(ctx, allocate)
 		})
 		switch {

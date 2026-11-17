@@ -55,7 +55,7 @@ func Ed2kDownloads(cfg *Config) []amule.Download {
 	}
 	ed2kQueueCache.Unlock()
 	var downloads []amule.Download
-	if err := ed2kCall(cfg, func(ctx context.Context, client *amule.Client) error {
+	if err := ed2kCall(cfg, func(ctx context.Context, client ed2kBackend) error {
 		var callErr error
 		downloads, callErr = client.Downloads(ctx)
 		return callErr
@@ -84,7 +84,7 @@ func AddEd2kLink(cfg *Config, link string) error {
 	if err != nil {
 		return err
 	}
-	err = ed2kCall(cfg, func(ctx context.Context, client *amule.Client) error {
+	err = ed2kCall(cfg, func(ctx context.Context, client ed2kBackend) error {
 		return client.AddLink(ctx, parsed.String(), 0)
 	})
 	ed2kForgetQueue()
@@ -200,7 +200,7 @@ func Ed2kDownloadAction(cfg *Config, action, hash string) error {
 		return errors.New("invalid eD2k hash")
 	}
 	defer ed2kForgetQueue()
-	return ed2kCall(cfg, func(ctx context.Context, client *amule.Client) error {
+	return ed2kCall(cfg, func(ctx context.Context, client ed2kBackend) error {
 		switch action {
 		case "pause":
 			return client.Pause(ctx, hash)
@@ -482,7 +482,7 @@ func (s ed2kSession) PollEvents() []models.TorrentEvent {
 		return events
 	}
 	var shared []amule.SharedFile
-	if err := ed2kCall(s.cfg, func(ctx context.Context, client *amule.Client) error {
+	if err := ed2kCall(s.cfg, func(ctx context.Context, client ed2kBackend) error {
 		var callErr error
 		shared, callErr = client.SharedFiles(ctx)
 		return callErr

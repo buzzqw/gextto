@@ -1,4 +1,4 @@
-# eD2k and Kad through aMule
+# eD2k and Kad through aMule or emule-qt
 
 Gextto reaches the **eD2k** and **Kad** networks through **aMule**. `amuled`
 does the networking — servers, Kad, sources, queues, credits, transfers — and
@@ -15,6 +15,7 @@ are never affected.
 - [Requirements](#requirements)
 - [Install aMule](#install-amule)
 - [Turn it on in Gextto](#turn-it-on-in-gextto)
+- [emule-qt instead of aMule](#emule-qt-instead-of-amule)
 - [Using it](#using-it)
 - [Troubleshooting](#troubleshooting)
 - [Reference](#reference)
@@ -136,7 +137,7 @@ wait altogether.
 
 **Configuration → eD2k and Kad**:
 
-1. switch on **eD2k and Kad through aMule**;
+1. switch on **eD2k and Kad** and leave **eD2k program** on **aMule**;
 2. fill in **address** (usually `127.0.0.1`), **EC port** (4712) and the
    **password in clear**;
 3. save, then open the **eD2k** page (**Discovery → eD2k**) and press
@@ -169,6 +170,67 @@ When `amuled` runs on Gextto's machine, the header shows an **aMule** badge with
 the daemon's CPU and RAM, updated with the other metrics. With aMule on another
 host the badge is absent: those figures are not available through the EC
 protocol.
+
+## emule-qt instead of aMule
+
+[emule-qt](https://github.com/ModderMule/emule-qt) is a newer eD2k and Kad client,
+compatible with the eMule network, with IPv6, protocol obfuscation on by default
+and transfers between two Low ID peers. Gextto can drive it **instead of aMule**:
+the two are one or the other, chosen in **Configuration → eD2k and Kad → eD2k
+program**. Everything described in this guide — search, `ed2k://` links,
+Downloads, the eD2k page, the import, the automatic fallback, torrents and eD2k
+on the same file — works the same with either; Gextto speaks to emule-qt through
+its REST API instead of EC.
+
+The choice has three values:
+
+- **aMule (installed separately)** — the default, everything above.
+- **emule-qt (run by Gextto in Docker)** — Gextto downloads the official image
+  (`ghcr.io/moddermule/emuleqt`), starts the container and keeps it running.
+  Docker must be installed and usable by the user Gextto runs as (on Debian and
+  Ubuntu: in the `docker` group). Nothing else to configure:
+  - configuration and files are under `emuleqt/` in Gextto's data folder:
+    `config/` (emule-qt's own `preferences.yml`, written by Gextto before the
+    first start and owned by emule-qt from then on), `data/incoming` (finished
+    files, imported by Gextto from there) and `data/temp` (part files);
+  - the container uses the host network, with the eD2k ports aMule uses by
+    default — **TCP 4662 and UDP 4672** — so a router already forwarded for
+    aMule needs nothing new; UPnP is on. The REST API (port 4721) and the GUI
+    link (4722) listen on `127.0.0.1` only, with a key Gextto generates;
+  - the container restarts by itself and outlives a restart of Gextto;
+  - with **Update emule-qt every day** on (the default) Gextto looks for a new
+    image once a day, moves the container onto it and checks that emule-qt
+    answers within three minutes; if it does not, it goes back to the previous
+    image and tries again the next day. The project releases often: this is
+    why it runs in Docker, where an update is a pull and going back is starting
+    the previous image again;
+  - choosing aMule again stops the container; its folders stay;
+  - it is meant for Gextto installed on the machine: with Gextto in a container
+    of its own, run emule-qt's image beside it and use **emule-qt (already
+    running)**.
+- **emule-qt (already running)** — an emule-qt of your own (its Docker image, a
+  NAS, another machine): fill in **emule-qt — address** (its web server, for
+  example `http://127.0.0.1:4711`) and **emule-qt — API key**. In emule-qt turn
+  on the REST API (`webserver.restApiEnabled: true` and `webserver.apiKey` in
+  `preferences.yml`, or *Options → Web Interface*). As with aMule, Gextto must
+  see emule-qt's incoming folder at the same path to import finished files, and
+  its temporary folder to take pieces for a torrent of the same file.
+
+**Stop aMule** when you choose emule-qt: the two want the same eD2k ports.
+While emule-qt is chosen and aMule still answers, the log says so once an hour.
+
+What differs from aMule:
+
+- the eD2k page and the other pages say *emule-qt* where they said *aMule*;
+- there is no file preallocation switch: it is an aMule option;
+- a torrent of the same file takes the pieces emule-qt has already verified
+  from its part file, as with aMule: Gextto finds the part file of each
+  download from the `.part.met` headers in the temporary folder, which carry
+  the file hash in the layout eMule, aMule and emule-qt all write.
+
+emule-qt also downloads torrents, Usenet and file hosters by itself, and joins
+its own torrents with its ed3k network. Gextto uses only its eD2k and Kad side:
+torrents stay with gx-torrent.
 
 ## Using it
 
@@ -324,6 +386,10 @@ shown.
 | Key | Meaning |
 |---|---|
 | `ed2k_enabled` | master switch (off) |
+| `ed2k_backend` | `amule` (default), `emuleqt_managed` (emule-qt run by Gextto in Docker) or `emuleqt` (an emule-qt already running) |
+| `emuleqt_url` | web server of an emule-qt already running (`http://host:4711`) |
+| `emuleqt_api_key` | its REST API key (secret) |
+| `emuleqt_auto_update` | daily update of the managed emule-qt, with rollback (on) |
 | `amule_host` | host of `amuled` (`127.0.0.1`) |
 | `amule_port` | EC port (`4712`) |
 | `amule_password` | EC password, in clear (secret) |
@@ -376,6 +442,9 @@ in [`API.md`](API.md) (`/api/ed2k/status`, `/api/ed2k/downloads`,
 | `ed2ksearch.go` | settings, shared client with a fail-fast backoff while amuled is down, cached status, search and gap-filling fallback, `GET /api/ed2k/status` |
 | `ed2k_downloads.go` | download list, add/pause/resume/remove, the session that turns completed files into `torrent_finished` events, the copy-mode import configuration |
 | `uiweb_v2_ed2k.go` | the eD2k page (status, servers, Kad, search, pasted links) |
+| `ed2k_backend.go` | the one contract in front of the core (`ed2kBackend`): `*amule.Client` satisfies it, `emuleqtBackend` maps emule-qt's REST answers onto the same types; the `.part.met` header scan that finds a download's part file |
+| `emuleqt_managed.go` | the managed emule-qt container: first preferences, `docker run` on the host network, restart when stopped, the daily update with rollback, stop when another core is chosen |
+| `internal/emuleqt` | the REST client (`/api/v1`, API key); `emuleqttest` is a fake core for tests |
 | `web_background.go` | merges aMule's completion events into the torrent event loop, each handled by its own session |
 
 ### Tests

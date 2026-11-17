@@ -1380,13 +1380,24 @@
 
   // A switch shows or hides the rows that depend on it, before it is saved,
   // so the user immediately sees what turning it on means.
+  function dependentsOf(key) {
+    return document.querySelectorAll('[data-v2-depends-on="' + key + '"], [data-v2-depends-on^="' + key + '="]');
+  }
+  // A hidden row hides what depends on it too; a shown one decides again.
+  function settleDependent(child) {
+    if (!child.hidden) { applyDependents(child); return; }
+    var key = child.getAttribute("data-setting-key");
+    if (!key) return;
+    var rows = dependentsOf(key);
+    for (var i = 0; i < rows.length; i++) { rows[i].hidden = true; settleDependent(rows[i]); }
+  }
   function applyDependents(row) {
     if (!row || !row.matches || !row.matches("form.setting-row[data-setting-key]")) return;
     var key = row.getAttribute("data-setting-key");
     var toggle = row.querySelector('input[role="switch"]');
     if (toggle) {
       var children = document.querySelectorAll('[data-v2-depends-on="' + key + '"]');
-      for (var i = 0; i < children.length; i++) children[i].hidden = !toggle.checked;
+      for (var i = 0; i < children.length; i++) { children[i].hidden = !toggle.checked; settleDependent(children[i]); }
       return;
     }
     // A choice ("key=a|b"): the row shows while the choice is a or b.
@@ -1396,6 +1407,7 @@
     for (var j = 0; j < rows.length; j++) {
       var values = rows[j].getAttribute("data-v2-depends-on").split("=")[1].split("|");
       rows[j].hidden = values.indexOf(choice.value) < 0;
+      settleDependent(rows[j]);
     }
   }
 
