@@ -281,6 +281,7 @@ qBittorrent-nox.
 | `internal/dht` | DHT implementation, a module of its own under the main module. |
 | `internal/ed2k` | eD2k links (`ed2k://|file|…|/`, server links) and the name filter for search results. |
 | `internal/amule` | aMule External Connections (EC) client: packet codec, login, status, servers, Kad, downloads, search, preferences; `amuletest` is a fake core for tests. |
+| `internal/emuleqt` | emule-qt REST client (`/api/v1`, API key): snapshot, connection, Kad, paged downloads, search run to its end and dropped, shared files, uploads, servers, stats, logs, preferences and limits; the alternative eD2k backend, not yet wired in. |
 | `internal/gxcore` | gx-core torrent engine (the `gx-torrent` binary): our original code (early versions built on MIT/BSD bases, since rewritten). |
 | `internal/queue` | manager of the gx-torrent queue (which torrents to run). |
 | `internal/bwschedule` | weekly bandwidth scheduler (a window and limits per weekday), shared by Gextto and gx-torrent. |

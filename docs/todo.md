@@ -23,12 +23,13 @@ still be true after the item lands does not belong here.
 
 ## Gextto, acquisition and UI
 
+- **emule-qt as the alternative eD2k backend** (one or the other with aMule, optional): the REST client is in `internal/emuleqt`. Next, in order: one eD2k backend contract in front of the aMule client, with the emule-qt adapter behind it and the backend chosen in *Configuration → eD2k e Kad* (aMule / emule-qt, address and API key for a core already running); then the managed core in Docker (`ghcr.io/moddermule/emuleqt`, host network, its config and data folders under Gextto's data folder, REST API on with a generated key, the `/data` path translated to the host one, a daily check for a new release with pull, recreate and rollback to the previous image when `/api/v1/health` or the contract version fails); then the eD2k page, manuals and the aMule guide covering both. The half-way merge of a torrent from the eD2k `.part` stays aMule-only until emule-qt reports its part files. Gate: none, in progress.
+
 ## Proposals
 
 Each waits for the operator's choice.
 
 - **MCP endpoint**: Gextto's API exposed as tools for an assistant, with a read-only switch. Gate: the operator's choice.
-- **emule-qt as a second eD2k backend**: drive `emulecored` through its REST API (`/api/v1` with an API key, OpenAPI document, event stream) as an alternative to aMule's EC, behind one eD2k backend contract like the torrent engines' one; it brings IPv6, obfuscation on by default, transfers between two LowID peers and sources kept across restarts. Gate: the operator's choice and a stable API contract (the project is in 0.7.x, with several releases a day).
 - **Usenet as an acquisition source**: NZB search through the same indexers and an NNTP download path into the same import. Gate: the operator's choice.
 - **Series status marks and one design system**: the status badges of a series still carry an emoji in the text (`🏁 terminata`, `▶ in corso`, `⏳ rinnovo incerto`, `🕒 in arrivo`) because that same label is also a filter value, so the mark must be split from the text before it becomes an icon; then one design system (colours, spacing, type scale, radius) shared with the daemon and the two Gextto stylesheets folded into one with few breakpoints. Gate: the operator's choice; the visual review runs headless with `scripts/screenshots.sh`.
 - **Settings by level**: core options shown first, an "Show advanced options" switch, a mark on rows and tabs changed from their default. Gate: the operator's choice.
