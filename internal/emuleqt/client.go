@@ -528,6 +528,12 @@ func (c *Client) Preferences(ctx context.Context) (Preferences, error) {
 	return out, err
 }
 
+// PatchPreferences changes preferences by their schema key; one bad value
+// and nothing is changed.
+func (c *Client) PatchPreferences(ctx context.Context, values map[string]any) error {
+	return c.do(ctx, http.MethodPatch, "/api/v1/preferences", nil, values, nil)
+}
+
 // SetLimits sets the speed limits in KiB/s (0 = unlimited).
 func (c *Client) SetLimits(ctx context.Context, downloadKiB, uploadKiB int64) error {
 	return c.do(ctx, http.MethodPatch, "/api/v1/preferences", nil, map[string]any{"maxDownload": downloadKiB, "maxUpload": uploadKiB}, nil)

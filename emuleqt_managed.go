@@ -35,24 +35,47 @@ import (
 // outlives a restart of Gextto, like the managed gx-torrent.
 
 const (
-	emuleqtImage     = "ghcr.io/moddermule/emuleqt"
-	emuleqtImageTag  = emuleqtImage + ":latest"
-	emuleqtContainer = "gextto-emuleqt"
+	emuleqtImage    = "ghcr.io/moddermule/emuleqt"
+	emuleqtImageTag = emuleqtImage + ":latest"
 	// emuleqtContainerData is where the image keeps incoming and temp.
 	emuleqtContainerData = "/data"
-	// The ports of the managed core. The P2P ports are aMule's defaults (TCP
-	// 4662, UDP 4672), so a router already forwarded for aMule needs nothing
-	// new; the web server (REST API) and the GUI link sit on loopback, away
-	// from amuleweb (4711) and aMule's external connections (4712).
-	emuleqtTCPPort = 4662
-	emuleqtUDPPort = 4672
-	emuleqtWebPort = 4721
-	emuleqtIPCPort = 4722
-	// emuleqtUpdateEvery is how often a new image is looked for;
-	// emuleqtHealthWait how long a new container has to answer.
+	// emuleqtUpdateEvery is how often a new image is looked for.
 	emuleqtUpdateEvery = 24 * time.Hour
 	emuleqtStateFile   = "gextto-emuleqt.json"
+	// emuleqtPrefsVersion is emule-qt's preferences migration counter the
+	// first preferences.yml is written for (general.startVersion).
+	emuleqtPrefsVersion = 7
 )
+
+// The container's name and the ports of the managed core. The P2P ports are
+// aMule's defaults (TCP 4662, UDP 4672), so a router already forwarded for
+// aMule needs nothing new; the web server (REST API) and the GUI link sit on
+// loopback, away from amuleweb (4711) and aMule's external connections
+// (4712). Variables only so the live test can run beside a real core.
+var (
+	emuleqtContainer = "gextto-emuleqt"
+	emuleqtTCPPort   = 4662
+	emuleqtUDPPort   = 4672
+	emuleqtWebPort   = 4721
+	emuleqtIPCPort   = 4722
+)
+
+// emuleqtManagedPreferences are the choices the managed core must keep,
+// set again through the REST API after every start and update: a migration
+// of a newer emule-qt can change a default in the file, the API answers
+// with what is in force. eD2k servers and Kad on, connected at start; the
+// torrent, Usenet and file hoster engines off — Gextto keeps torrents in
+// gx-torrent and searches the indexers itself.
+var emuleqtManagedPreferences = map[string]any{
+	"networkED2K": true, "kadEnabled": true, "autoConnect": true, "reconnect": true,
+	"btEnabled": false, "usenetEnabled": false, "ed3kHosterEnabled": false,
+}
+
+// emuleqtEnforce applies emuleqtManagedPreferences; tests replace it.
+var emuleqtEnforce = func(ctx context.Context, managed emuleqtManaged) error {
+	client := emuleqt.New(emuleqt.Config{BaseURL: managed.URL, APIKey: managed.APIKey, Timeout: 20 * time.Second})
+	return client.PatchPreferences(ctx, emuleqtManagedPreferences)
+}
 
 // emuleqtManaged is how Gextto reaches the managed core.
 type emuleqtManaged struct {
@@ -111,6 +134,9 @@ var emuleqtRuntime struct {
 	problem  string
 	warnedAt time.Time
 	idleAt   time.Time
+	// enforced is the container image the managed preferences were last set
+	// on in this run of Gextto.
+	enforced string
 	// amuleWarnedAt is the last warning that aMule still runs.
 	amuleWarnedAt time.Time
 }
@@ -191,6 +217,15 @@ general:
   promptOnExit: false
   autoConnect: true
   reconnect: true
+  # The migrations emule-qt runs on an older file are not for this one: the
+  # third turns BitTorrent back on.
+  startVersion: %d
+
+# emule-qt's defaults log every Kad and debug line: its own log ring fills
+# with them and the container log grows.
+logging:
+  verbose: false
+  kadVerboseLog: false
 
 network:
   port: %d
@@ -203,7 +238,7 @@ kademlia:
   enabled: true
 
 serverConnection:
-  # No server.met ships with the image: fetch the default list at start.
+  # Refresh the server list at start (the image ships one that ages).
   autoUpdateServerList: true
 
 upnp:
@@ -244,7 +279,7 @@ webserver:
   restApiEnabled: true
   mcpEnabled: false
   apiKey: "%s"
-`, emuleqtTCPPort, emuleqtUDPPort, emuleqtContainerData, emuleqtContainerData, emuleqtUDPPort,
+`, emuleqtPrefsVersion, emuleqtTCPPort, emuleqtUDPPort, emuleqtContainerData, emuleqtContainerData, emuleqtUDPPort,
 		emuleqtIPCPort, state.IPCToken, emuleqtWebPort, state.APIKey)
 	return os.WriteFile(path, []byte(content), 0o600)
 }
@@ -308,6 +343,10 @@ func emuleqtRun(ctx context.Context, managed emuleqtManaged, image string) error
 		"--network", "host",
 		"--restart", "unless-stopped",
 		"--stop-timeout", "60",
+		// emule-qt writes its log to the console too: keep the container
+		// log bounded.
+		"--log-opt", "max-size=10m",
+		"--log-opt", "max-file=3",
 		"--label", "org.gextto.managed=true",
 		"-e", "PUID="+strconv.Itoa(os.Getuid()),
 		"-e", "PGID="+strconv.Itoa(os.Getgid()),
@@ -426,7 +465,7 @@ func emuleqtEnsure(cfg *Config, now time.Time) error {
 		_ = emuleqtSaveState(managed.Dir, state)
 		logging.Info(fmt.Sprintf("▶️ emule-qt started in Docker: eD2k on TCP %d and UDP %d", emuleqtTCPPort, emuleqtUDPPort))
 		ed2kInvalidateHealth()
-		return nil
+		return emuleqtEnforceOnce(ctx, managed, latest)
 	}
 	if !running {
 		if _, err := emuleqtDocker(ctx, "start", emuleqtContainer); err != nil {
@@ -438,10 +477,37 @@ func emuleqtEnsure(cfg *Config, now time.Time) error {
 		state.Image = image
 		_ = emuleqtSaveState(managed.Dir, state)
 	}
-	if !settingsBool(cfg, settingEmuleqtAutoUpdate, true) || now.Sub(state.CheckedAt) < emuleqtUpdateEvery {
+	if settingsBool(cfg, settingEmuleqtAutoUpdate, true) && now.Sub(state.CheckedAt) >= emuleqtUpdateEvery {
+		if err := emuleqtUpdate(ctx, managed, state, image, now); err != nil {
+			return err
+		}
+		if _, _, current, err := emuleqtContainerInfo(ctx); err == nil && current != "" {
+			image = current
+		}
+	}
+	return emuleqtEnforceOnce(ctx, managed, image)
+}
+
+// emuleqtEnforceOnce sets the managed preferences on the core running image,
+// once per image in this run of Gextto: after a start, an update or a
+// rollback, and after Gextto itself restarted.
+func emuleqtEnforceOnce(ctx context.Context, managed emuleqtManaged, image string) error {
+	emuleqtRuntime.mu.Lock()
+	done := image != "" && emuleqtRuntime.enforced == image
+	emuleqtRuntime.mu.Unlock()
+	if done {
 		return nil
 	}
-	return emuleqtUpdate(ctx, managed, state, image, now)
+	if err := emuleqtWaitHealthy(ctx, managed, emuleqtHealthWaitDuration); err != nil {
+		return fmt.Errorf("emule-qt does not answer: %w", err)
+	}
+	if err := emuleqtEnforce(ctx, managed); err != nil {
+		return fmt.Errorf("the eD2k settings of emule-qt could not be applied: %w", err)
+	}
+	emuleqtRuntime.mu.Lock()
+	emuleqtRuntime.enforced = image
+	emuleqtRuntime.mu.Unlock()
+	return nil
 }
 
 // emuleqtUpdate pulls the latest image and, when it is new, moves the

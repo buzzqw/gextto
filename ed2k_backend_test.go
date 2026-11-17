@@ -151,6 +151,8 @@ type fakeDocker struct {
 	latest   string
 	pullTo   string
 	noDocker bool
+	// enforced lists the images the managed preferences were set on.
+	enforced []string
 }
 
 func (f *fakeDocker) run(_ context.Context, args ...string) (string, error) {
@@ -204,15 +206,26 @@ func (f *fakeDocker) did(prefix string) int {
 
 func managedTestConfig(t *testing.T, docker *fakeDocker, healthy func(string) error) *Config {
 	t.Helper()
-	previousDocker, previousHealthy := emuleqtDocker, emuleqtHealthy
+	previousDocker, previousHealthy, previousEnforce := emuleqtDocker, emuleqtHealthy, emuleqtEnforce
 	emuleqtDocker = docker.run
+	emuleqtEnforce = func(context.Context, emuleqtManaged) error {
+		docker.mu.Lock()
+		docker.enforced = append(docker.enforced, docker.image)
+		docker.mu.Unlock()
+		return nil
+	}
+	emuleqtRuntime.mu.Lock()
+	emuleqtRuntime.enforced = ""
+	emuleqtRuntime.mu.Unlock()
 	emuleqtHealthy = func(context.Context, emuleqtManaged) error {
 		docker.mu.Lock()
 		image := docker.image
 		docker.mu.Unlock()
 		return healthy(image)
 	}
-	t.Cleanup(func() { emuleqtDocker, emuleqtHealthy = previousDocker, previousHealthy })
+	t.Cleanup(func() {
+		emuleqtDocker, emuleqtHealthy, emuleqtEnforce = previousDocker, previousHealthy, previousEnforce
+	})
 	cfgValue := DefaultConfig()
 	cfg := &cfgValue
 	cfg.DataDir = t.TempDir()
@@ -239,6 +252,12 @@ func TestEmuleqtManagedStartsUpdatesAndRollsBack(t *testing.T) {
 	if docker.image != "sha256:v1" || docker.did("pull") != 1 || docker.did("run -d --name gextto-emuleqt --network host") != 1 {
 		t.Fatalf("first start: %v", docker.commands)
 	}
+	if strings.Join(docker.enforced, ",") != "sha256:v1" {
+		t.Fatalf("managed preferences set on %v, want once on v1", docker.enforced)
+	}
+	if !strings.Contains(strings.Join(docker.commands, "\n"), "--log-opt max-size=10m --log-opt max-file=3") {
+		t.Fatalf("the container log is not bounded: %v", docker.commands)
+	}
 	dir := emuleqtManagedDir(cfg)
 	prefs, err := os.ReadFile(filepath.Join(dir, "config", "preferences.yml"))
 	state := emuleqtLoadState(dir)
@@ -249,8 +268,9 @@ func TestEmuleqtManagedStartsUpdatesAndRollsBack(t *testing.T) {
 	// What emule-qt needs to join eD2k and Kad by itself, and the engines
 	// Gextto does not use left off (each section as emule-qt's loader reads it).
 	for _, want := range []string{
-		"network:\n  port: 4662\n  udpPort: 4672\n", "  networkED2K: true\n", "kademlia:\n  enabled: true\n",
-		"  autoConnect: true\n", "serverConnection:\n  # No server.met ships with the image: fetch the default list at start.\n  autoUpdateServerList: true\n",
+		"network:\n  port: 4662\n  udpPort: 4672\n", "  networkED2K: true\n", "  startVersion: 7\n",
+		"logging:\n  verbose: false\n  kadVerboseLog: false\n", "kademlia:\n  enabled: true\n",
+		"  autoConnect: true\n", "  autoUpdateServerList: true\n",
 		"bittorrent:\n  enabled: false\n", "usenet:\n  enabled: false\n", "  hoster:\n    enabled: false\n",
 		"ed3k:\n  enabled: true\n  udpPort: 4672\n", `incomingDir: "/data/incoming"`, `- "/data/temp"`,
 	} {
@@ -283,6 +303,11 @@ func TestEmuleqtManagedStartsUpdatesAndRollsBack(t *testing.T) {
 	}
 	if docker.image != "sha256:v2" {
 		t.Fatalf("after a failed update the container runs %s, want v2 back", docker.image)
+	}
+	// Set once per image: v1 at the start, v2 after the update, nothing new
+	// after the rollback to v2.
+	if strings.Join(docker.enforced, ",") != "sha256:v1,sha256:v2" {
+		t.Fatalf("managed preferences set on %v", docker.enforced)
 	}
 	if raw, _ := os.ReadFile(filepath.Join(dir, "config", "preferences.yml")); string(raw) != "changed by the core\n" {
 		t.Fatal("Gextto rewrote the core's preferences")

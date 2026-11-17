@@ -202,12 +202,20 @@ La scelta ha tre valori:
     generata da Gextto;
   - il primo `preferences.yml` accende quello che serve a eD2k — i server eD2k
     (`network.networkED2K`, che emule-qt altrimenti avvia spenti quando la
-    sezione network non lo contiene), Kad, la connessione all'avvio e lo
-    scaricamento della lista server di default, perché l'immagine non ne ha —
-    ed ed3k, la rete di emule-qt, che usa la stessa porta UDP e porta più fonti
-    agli stessi download eD2k. I motori BitTorrent, Usenet e file hoster di
-    emule-qt restano spenti, e i suoi indexer non vengono configurati: Gextto
-    tiene i torrent in gx-torrent e interroga gli indexer da sé;
+    sezione network non lo contiene), Kad, la connessione all'avvio e una lista
+    server aggiornata — ed ed3k, la rete di emule-qt, che usa la stessa porta
+    UDP e porta più fonti agli stessi download eD2k. È scritto per la versione
+    attuale delle preferenze (`general.startVersion`), così emule-qt non gli
+    applica le migrazioni pensate per i file vecchi (una riaccende BitTorrent),
+    e con il log dettagliato di emule-qt spento, così il suo log tiene le righe
+    che una persona legge;
+  - i motori BitTorrent, Usenet e file hoster di emule-qt restano spenti, e i
+    suoi indexer non vengono configurati: Gextto tiene i torrent in gx-torrent
+    e interroga gli indexer da sé. Dopo ogni avvio e aggiornamento Gextto
+    reimposta queste scelte con la REST API (server eD2k, Kad e connessione
+    accesi; BitTorrent, Usenet e hoster spenti), così un default cambiato da
+    una versione nuova di emule-qt non le annulla;
+  - il log del container ruota (10 MB × 3);
   - il container si riavvia da solo e sopravvive a un riavvio di Gextto;
   - con **Aggiorna emule-qt ogni giorno** acceso (il default) Gextto cerca una
     nuova immagine una volta al giorno, sposta il container sulla nuova e
@@ -477,6 +485,16 @@ sono documentate in [`API.md`](API.md) (`/api/ed2k/status`,
 - Gextto: `ed2ksearch_test.go` (ricerca, rifiuto, gate del ripiego, password
   sbagliata, alias, aggiunta link e azioni, eventi di completamento, import in
   copia) contro il core finto.
+- emule-qt: `internal/emuleqt` (client contro un finto emule-qt rigoroso),
+  `ed2k_backend_test.go` (Gextto attraverso `emuleqttest`, la lettura dei
+  `.part.met`, il container gestito con un finto Docker: avvio, aggiornamento,
+  ritorno indietro, Docker assente, arresto). `TestEmuleqtLive` avvia
+  l'immagine vera come la modalità gestita, con nome e porte proprie (TCP
+  14662, UDP 14672, REST 14721) e UPnP spento, accanto a un aMule acceso:
+  `GEXTTO_EMULEQT_LIVE_DIR=$(scripts/test-workdir.sh new emuleqt) go test -run
+  TestEmuleqtLive -timeout 60m .` — preferenze in vigore, cartelle, server eD2k
+  e Kad, una ricerca, il log. La prima volta scarica l'immagine (circa 800 MB);
+  saltato nelle esecuzioni normali.
 
 ## Storia
 
