@@ -1099,8 +1099,8 @@ allo stesso modo.
 
 - **emule-qt (avviato da Gextto in Docker)**: Gextto scarica l'immagine
   ufficiale, avvia il container e lo tiene acceso. Serve **Docker** installato e
-  usabile dall'utente di Gextto. I file stanno in `emuleqt/` nella cartella dati
-  di Gextto; le porte eD2k sono quelle di aMule (**TCP 4662, UDP 4672**), quindi
+  usabile dall'utente di Gextto; il primo avvio scarica circa 800 MB. I file
+  stanno in `emuleqt/` nella cartella dati di Gextto; le porte eD2k sono quelle di aMule (**TCP 4662, UDP 4672**), quindi
   il router già aperto per aMule va bene così. Con **Aggiorna emule-qt ogni
   giorno** acceso Gextto passa da solo alla nuova versione e, se questa non
   risponde entro tre minuti, torna a quella di prima.

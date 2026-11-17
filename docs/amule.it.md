@@ -194,11 +194,20 @@ La scelta ha tre valori:
     Gextto: `config/` (il `preferences.yml` di emule-qt, scritto da Gextto prima
     del primo avvio e da lì in poi gestito da emule-qt), `data/incoming` (i file
     completati, che Gextto importa da lì) e `data/temp` (i file parziali);
+  - il primo avvio scarica l'immagine, circa 800 MB;
   - il container usa la rete dell'host, con le porte eD2k che aMule usa di
     default — **TCP 4662 e UDP 4672** — quindi un router già aperto per aMule
     non richiede niente di nuovo; l'UPnP è attivo. La REST API (porta 4721) e il
     collegamento della GUI (4722) ascoltano solo su `127.0.0.1`, con una chiave
     generata da Gextto;
+  - il primo `preferences.yml` accende quello che serve a eD2k — i server eD2k
+    (`network.networkED2K`, che emule-qt altrimenti avvia spenti quando la
+    sezione network non lo contiene), Kad, la connessione all'avvio e lo
+    scaricamento della lista server di default, perché l'immagine non ne ha —
+    ed ed3k, la rete di emule-qt, che usa la stessa porta UDP e porta più fonti
+    agli stessi download eD2k. I motori BitTorrent, Usenet e file hoster di
+    emule-qt restano spenti, e i suoi indexer non vengono configurati: Gextto
+    tiene i torrent in gx-torrent e interroga gli indexer da sé;
   - il container si riavvia da solo e sopravvive a un riavvio di Gextto;
   - con **Aggiorna emule-qt ogni giorno** acceso (il default) Gextto cerca una
     nuova immagine una volta al giorno, sposta il container sulla nuova e

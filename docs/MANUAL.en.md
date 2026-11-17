@@ -1079,7 +1079,8 @@ automatic fallback and torrents and eD2k on the same file work the same way.
 
 - **emule-qt (run by Gextto in Docker)**: Gextto downloads the official image,
   starts the container and keeps it running. **Docker** must be installed and
-  usable by Gextto's user. The files are in `emuleqt/` in Gextto's data folder;
+  usable by Gextto's user; the first start downloads about 800 MB. The files
+  are in `emuleqt/` in Gextto's data folder;
   the eD2k ports are aMule's (**TCP 4662, UDP 4672**), so a router already
   forwarded for aMule is fine as it is. With **Update emule-qt every day** on,
   Gextto moves to the new version by itself and, if it does not answer within

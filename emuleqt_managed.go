@@ -189,13 +189,22 @@ func emuleqtWritePreferences(path string, state emuleqtManagedState) error {
 # from its first start on.
 general:
   promptOnExit: false
+  autoConnect: true
+  reconnect: true
 
 network:
   port: %d
   udpPort: %d
+  # A network section without this key starts with the eD2k servers off
+  # (emule-qt keeps an older default: Kad only).
+  networkED2K: true
 
-ed3k:
-  udpPort: %d
+kademlia:
+  enabled: true
+
+serverConnection:
+  # No server.met ships with the image: fetch the default list at start.
+  autoUpdateServerList: true
 
 upnp:
   enableUPnP: true
@@ -204,6 +213,22 @@ directories:
   incomingDir: "%s/incoming"
   tempDirs:
     - "%s/temp"
+
+# ed3k, emule-qt's own network, shares the eD2k UDP port and brings more
+# sources to the same eD2k downloads.
+ed3k:
+  enabled: true
+  udpPort: %d
+  hoster:
+    enabled: false
+
+# Gextto keeps torrents in gx-torrent and does its own indexer search: the
+# torrent, Usenet and file hoster engines of emule-qt stay off.
+bittorrent:
+  enabled: false
+
+usenet:
+  enabled: false
 
 ipc:
   enabled: true
@@ -219,7 +244,7 @@ webserver:
   restApiEnabled: true
   mcpEnabled: false
   apiKey: "%s"
-`, emuleqtTCPPort, emuleqtUDPPort, emuleqtUDPPort, emuleqtContainerData, emuleqtContainerData,
+`, emuleqtTCPPort, emuleqtUDPPort, emuleqtContainerData, emuleqtContainerData, emuleqtUDPPort,
 		emuleqtIPCPort, state.IPCToken, emuleqtWebPort, state.APIKey)
 	return os.WriteFile(path, []byte(content), 0o600)
 }

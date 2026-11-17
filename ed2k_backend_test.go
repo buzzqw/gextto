@@ -246,6 +246,18 @@ func TestEmuleqtManagedStartsUpdatesAndRollsBack(t *testing.T) {
 		!strings.Contains(string(prefs), "restApiEnabled: true") || !strings.Contains(string(prefs), `listenAddress: "127.0.0.1"`) {
 		t.Fatalf("preferences.yml = %s (%v)", prefs, err)
 	}
+	// What emule-qt needs to join eD2k and Kad by itself, and the engines
+	// Gextto does not use left off (each section as emule-qt's loader reads it).
+	for _, want := range []string{
+		"network:\n  port: 4662\n  udpPort: 4672\n", "  networkED2K: true\n", "kademlia:\n  enabled: true\n",
+		"  autoConnect: true\n", "serverConnection:\n  # No server.met ships with the image: fetch the default list at start.\n  autoUpdateServerList: true\n",
+		"bittorrent:\n  enabled: false\n", "usenet:\n  enabled: false\n", "  hoster:\n    enabled: false\n",
+		"ed3k:\n  enabled: true\n  udpPort: 4672\n", `incomingDir: "/data/incoming"`, `- "/data/temp"`,
+	} {
+		if !strings.Contains(string(prefs), want) {
+			t.Fatalf("preferences.yml lacks %q:\n%s", want, prefs)
+		}
+	}
 	// The core owns the file from now on: Gextto does not write it again.
 	_ = os.WriteFile(filepath.Join(dir, "config", "preferences.yml"), []byte("changed by the core\n"), 0o600)
 
