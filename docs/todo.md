@@ -28,6 +28,7 @@ still be true after the item lands does not belong here.
 Each waits for the operator's choice.
 
 - **MCP endpoint**: Gextto's API exposed as tools for an assistant, with a read-only switch. Gate: the operator's choice.
+- **emule-qt as a second eD2k backend**: drive `emulecored` through its REST API (`/api/v1` with an API key, OpenAPI document, event stream) as an alternative to aMule's EC, behind one eD2k backend contract like the torrent engines' one; it brings IPv6, obfuscation on by default, transfers between two LowID peers and sources kept across restarts. Gate: the operator's choice and a stable API contract (the project is in 0.7.x, with several releases a day).
 - **Usenet as an acquisition source**: NZB search through the same indexers and an NNTP download path into the same import. Gate: the operator's choice.
 - **Series status marks and one design system**: the status badges of a series still carry an emoji in the text (`🏁 terminata`, `▶ in corso`, `⏳ rinnovo incerto`, `🕒 in arrivo`) because that same label is also a filter value, so the mark must be split from the text before it becomes an icon; then one design system (colours, spacing, type scale, radius) shared with the daemon and the two Gextto stylesheets folded into one with few breakpoints. Gate: the operator's choice; the visual review runs headless with `scripts/screenshots.sh`.
 - **Settings by level**: core options shown first, an "Show advanced options" switch, a mark on rows and tabs changed from their default. Gate: the operator's choice.
