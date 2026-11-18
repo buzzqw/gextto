@@ -290,18 +290,28 @@ func audioCleanupProcess(job audioCleanupJob, cfg *Config, db *Database) {
 		logging.Warn(fmt.Sprintf("🎧 «%s»: audio cleanup failed, the file was left untouched: %v",
 			filepath.Base(job.Path), err), "path", job.Path)
 	case report.Applied:
+		// The rename that follows needs the archive for itself, and a
+		// reservation is refused while the cleanup holds it.
+		guard.Release()
+		cleanedPath := job.Path
+		if renamed, renameErr := renameAfterAudioCleanup(cfg, db, job.Path); renameErr != nil {
+			logging.Warn(fmt.Sprintf("🎧 «%s»: the file was cleaned but its name was not updated, it keeps the old language tag",
+				filepath.Base(job.Path)), "path", job.Path, "error", renameErr)
+		} else if renamed != "" {
+			cleanedPath = renamed
+		}
 		if db != nil {
-			if err := db.UpdateArchivedSizeAfterCleanup(job.Hash, job.Path, report.NewSize); err != nil {
+			if err := db.UpdateArchivedSizeAfterCleanup(job.Hash, cleanedPath, report.NewSize); err != nil {
 				logging.Warn("audio cleanup removed the tracks but the archived size was not updated",
-					"path", job.Path, "error", err.Error())
+					"path", cleanedPath, "error", err.Error())
 			}
 		}
 		if cfg != nil {
-			notifyAudioCleanup(FromConfig(cfg), job.Path, report)
+			notifyAudioCleanup(FromConfig(cfg), cleanedPath, report)
 		}
 		logging.Info(fmt.Sprintf("🎧 «%s»: %s in another language removed, %s saved",
-			filepath.Base(job.Path), countLabel(len(report.Dropped), "audio track", "audio tracks"), logging.HumanBytesI64(report.SavedBytes)),
-			"path", job.Path, "tool", report.Backend)
+			filepath.Base(cleanedPath), countLabel(len(report.Dropped), "audio track", "audio tracks"), logging.HumanBytesI64(report.SavedBytes)),
+			"path", cleanedPath, "tool", report.Backend)
 	default:
 		logging.Debug("audio cleanup skipped", "path", job.Path, "reason", report.SkipReason)
 	}

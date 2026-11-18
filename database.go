@@ -4749,6 +4749,72 @@ func (d *Database) SetEpisodeArchivePath(cfg *Config, seriesName string, season,
 	return err
 }
 
+// ArchivedEpisodeForPath finds the archived episode a file belongs to. The
+// stored path is usually the file itself; older imports stored the series
+// folder, so a row whose path is the folder of the file counts when its season
+// and episode are the ones written in the file name. hash is the magnet hash of
+// the episode, "" when it has none.
+func (d *Database) ArchivedEpisodeForPath(path string) (series string, season, episode int64, title, hash string, ok bool, err error) {
+	if d == nil || strings.TrimSpace(path) == "" {
+		return "", 0, 0, "", "", false, nil
+	}
+	cleaned := filepath.Clean(path)
+	rows, err := d.db.Query(`SELECT s.name, e.season, e.episode, COALESCE(e.title,''), COALESCE(e.magnet_hash,''), COALESCE(e.archive_path,'')
+		FROM episodes e JOIN series s ON s.id=e.series_id
+		WHERE e.archive_path IN (?1, ?2)
+		ORDER BY (e.archive_path=?1) DESC, e.season, e.episode`, cleaned, filepath.Dir(cleaned))
+	if err != nil {
+		return "", 0, 0, "", "", false, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var stored string
+		if err := rows.Scan(&series, &season, &episode, &title, &hash, &stored); err != nil {
+			return "", 0, 0, "", "", false, err
+		}
+		if filepath.Clean(stored) == cleaned || filenameMatchesEpisode(filepath.Base(cleaned), season, episode) {
+			return series, season, episode, title, hash, true, nil
+		}
+	}
+	return "", 0, 0, "", "", false, rows.Err()
+}
+
+// ArchivedMovieForPath finds the archived movie a file belongs to: the stored
+// path of its torrent, a file usually and the movie folder when the files were
+// not flattened.
+func (d *Database) ArchivedMovieForPath(path string) (hash, name string, year int64, ok bool, err error) {
+	if d == nil || strings.TrimSpace(path) == "" {
+		return "", "", 0, false, nil
+	}
+	cleaned := filepath.Clean(path)
+	rows, err := d.db.Query(`SELECT lower(COALESCE(m.magnet_hash,'')), COALESCE(NULLIF(m.title,''), m.name, ''), COALESCE(m.year,0), COALESCE(t.processed_path,'')
+		FROM movies m JOIN torrent_meta t ON lower(t.hash)=lower(m.magnet_hash)
+		WHERE m.removed_at IS NULL AND t.processed_path IN (?1, ?2)
+		ORDER BY (t.processed_path=?1) DESC`, cleaned, filepath.Dir(cleaned))
+	if err != nil {
+		return "", "", 0, false, err
+	}
+	defer rows.Close()
+	if rows.Next() {
+		var stored string
+		if err := rows.Scan(&hash, &name, &year, &stored); err != nil {
+			return "", "", 0, false, err
+		}
+		return hash, name, year, true, nil
+	}
+	return "", "", 0, false, rows.Err()
+}
+
+// SetTorrentProcessedPath records where a torrent's file is after a rename.
+func (d *Database) SetTorrentProcessedPath(hash, path string) error {
+	if d == nil || strings.TrimSpace(hash) == "" || strings.TrimSpace(path) == "" {
+		return nil
+	}
+	_, err := d.db.Exec("UPDATE torrent_meta SET processed_path=?1, updated_at=?2 WHERE hash=?3",
+		path, nowSQLite(), strings.ToLower(hash))
+	return err
+}
+
 // RefreshEpisodeFileStats re-aligns size and quality score of an episode to the
 // file it currently points to, without touching its title.
 func (d *Database) RefreshEpisodeFileStats(cfg *Config, seriesName string, season, episode int64, path string) error {

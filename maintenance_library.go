@@ -386,7 +386,7 @@ func runLibraryAudioCleanup(ctx context.Context, state *AppState, keepGoing func
 			waiting++
 			continue
 		}
-		outcome, report := runLibraryAudioCleanupFile(ctx, state, item.candidate, opts)
+		outcome, cleanedPath, report := runLibraryAudioCleanupFile(ctx, state, item.candidate, opts)
 		if ctx.Err() != nil {
 			return
 		}
@@ -395,14 +395,14 @@ func runLibraryAudioCleanup(ctx context.Context, state *AppState, keepGoing func
 			// at again at the next pass instead of a week from now.
 			continue
 		}
-		after, err := os.Stat(item.candidate.Path)
+		after, err := os.Stat(cleanedPath)
 		if err != nil {
 			continue
 		}
-		if err := state.db.saveAudioLibraryRecord(item.candidate.Path, audioLibraryRecord{
+		if err := state.db.saveAudioLibraryRecord(cleanedPath, audioLibraryRecord{
 			Size: after.Size(), Modified: after.ModTime().UnixNano(), Outcome: outcome, CheckedAt: time.Now(),
 		}); err != nil {
-			logging.Debug("the audio cleanup progress could not be saved", "path", item.candidate.Path, "error", err.Error())
+			logging.Debug("the audio cleanup progress could not be saved", "path", cleanedPath, "error", err.Error())
 		}
 		maintenanceStatusUpdate(func(status *maintenanceStatus) {
 			status.Audio.At = time.Now()
@@ -429,11 +429,13 @@ func runLibraryAudioCleanup(ctx context.Context, state *AppState, keepGoing func
 }
 
 // runLibraryAudioCleanupFile cleans one file holding the heavy slot and the
-// import guard of its series, like a cleanup after an import.
-func runLibraryAudioCleanupFile(ctx context.Context, state *AppState, candidate audioLibraryCandidate, opts AudioCleanupOptions) (string, AudioCleanupReport) {
+// import guard of its series, like a cleanup after an import. It returns the
+// outcome, the path the file has now (the rename that follows a cleanup can
+// change it) and the report.
+func runLibraryAudioCleanupFile(ctx context.Context, state *AppState, candidate audioLibraryCandidate, opts AudioCleanupOptions) (string, string, AudioCleanupReport) {
 	release := acquireMaintenanceHeavy(ctx)
 	if release == nil {
-		return "", AudioCleanupReport{}
+		return "", candidate.Path, AudioCleanupReport{}
 	}
 	defer release()
 	maintenanceSetLive("Pulizia audio della libreria", "")
@@ -444,13 +446,16 @@ func runLibraryAudioCleanupFile(ctx context.Context, state *AppState, candidate 
 	fileCtx, cancel := context.WithTimeout(ctx, audioCleanupTimeout)
 	defer cancel()
 	report, err := RunAudioCleanup(fileCtx, candidate.Path, opts)
+	// The rename that follows a successful cleanup needs the archive for
+	// itself, and a reservation is refused while the cleanup holds it.
+	guard.Release()
 	switch {
 	case errors.Is(err, errAudioCleanupInterrupted):
 		// A stop or a restart killed the tool: the file was not judged, so no
 		// progress is recorded and the next pass looks at it again.
 		logging.Info(fmt.Sprintf("🎧 «%s»: the audio cleanup was interrupted before it could finish, the file is untouched",
 			filepath.Base(candidate.Path)), "path", candidate.Path)
-		return "interrupted", report
+		return "interrupted", candidate.Path, report
 	case err != nil:
 		if errors.Is(err, errAudioCleanupWouldDiffer) {
 			// Every tool produced a copy the checks refused: this file cannot be
@@ -458,19 +463,26 @@ func runLibraryAudioCleanupFile(ctx context.Context, state *AppState, candidate 
 			// next nights leave it alone (a new size or date probes it again).
 			logging.Info(fmt.Sprintf("🎧 «%s»: the audio cleanup would change the file%s, so it stays as it is and will not be tried again",
 				filepath.Base(candidate.Path), audioCleanupRefusedNote(err)), "path", candidate.Path)
-			return "unsupported: " + err.Error(), report
+			return "unsupported: " + err.Error(), candidate.Path, report
 		}
 		logging.Warn(fmt.Sprintf("🎧 «%s»: audio cleanup failed, the file was left untouched",
 			filepath.Base(candidate.Path)), "path", candidate.Path, "error", err)
-		return "failed: " + err.Error(), report
+		return "failed: " + err.Error(), candidate.Path, report
 	case report.Applied:
-		if err := state.db.UpdateArchivedSizeAfterCleanup("", candidate.Path, report.NewSize); err != nil {
-			logging.Debug("the archived size was not updated after the cleanup", "path", candidate.Path, "error", err.Error())
+		cleanedPath := candidate.Path
+		if renamed, renameErr := renameAfterAudioCleanup(latestConfig(state), state.db, candidate.Path); renameErr != nil {
+			logging.Warn(fmt.Sprintf("🎧 «%s»: the file was cleaned but its name was not updated, it keeps the old language tag",
+				filepath.Base(candidate.Path)), "path", candidate.Path, "error", renameErr)
+		} else if renamed != "" {
+			cleanedPath = renamed
 		}
-		logging.Debug("library file cleaned of other audio languages", "path", candidate.Path,
+		if err := state.db.UpdateArchivedSizeAfterCleanup("", cleanedPath, report.NewSize); err != nil {
+			logging.Debug("the archived size was not updated after the cleanup", "path", cleanedPath, "error", err.Error())
+		}
+		logging.Debug("library file cleaned of other audio languages", "path", cleanedPath,
 			"removed", len(report.Dropped), "saved", report.SavedBytes, "tool", report.Backend)
-		return "cleaned", report
+		return "cleaned", cleanedPath, report
 	default:
-		return "skipped: " + report.SkipReason, report
+		return "skipped: " + report.SkipReason, candidate.Path, report
 	}
 }

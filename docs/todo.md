@@ -30,7 +30,6 @@ still be true after the item lands does not belong here.
 
 Each waits for the operator's choice.
 
-- **Language tag after the audio cleanup**: the cleanup removes the foreign tracks but the name keeps `[IT+EN]`, and the periodic library check compares only the prefix of the name, so it never corrects it; either the cleanup rewrites the language tag, or the check compares it with the tracks it reads. Gate: the operator's choice.
 - **Header-only `mediainfo` read**: `readMediaTags` parses the whole file to name it, up to 20 seconds for a 4K file on NFS, while `--ParseSpeed=0` reads the container header alone; the same rename pass would drop from an hour to minutes. Gate: the naming tests and a before/after measure.
 
 - **MCP endpoint**: Gextto's API exposed as tools for an assistant, with a read-only switch. Gate: the operator's choice.
