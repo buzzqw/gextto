@@ -52,7 +52,7 @@ func (f *fakeCore) handler(t *testing.T) http.Handler {
 		case r.URL.Path == "/api/v1/health":
 			reply(map[string]any{"status": "ok"})
 		case r.URL.Path == "/api/v1/snapshot":
-			reply(map[string]any{"version": "0.7.35", "ed2k": map[string]any{"connected": true, "lowID": true, "server": "1.2.3.4:4661"},
+			reply(map[string]any{"version": "0.7.37", "ed2k": map[string]any{"connected": true, "lowID": true, "server": "1.2.3.4:4661"},
 				"kad": map[string]any{"running": true, "connected": true}, "rates": map[string]any{"downKiBps": 12.5, "upKiBps": 3}})
 		case r.URL.Path == "/api/v1/downloads" && r.Method == http.MethodGet:
 			limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
@@ -106,6 +106,9 @@ func (f *fakeCore) handler(t *testing.T) http.Handler {
 		case r.URL.Path == "/api/v1/search/8/results":
 			w.WriteHeader(http.StatusNotFound)
 			_, _ = io.WriteString(w, `{"error":{"code":404,"message":"Search not found"}}`)
+		case r.URL.Path == "/api/v1/preferences" && r.Method == http.MethodGet:
+			reply(map[string]any{"incomingDir": "/data/incoming", "maxDownload": 0, "maxUpload": 0,
+				"btEnabled": true, "disableEd2k": false})
 		case r.URL.Path == "/api/v1/preferences" && r.Method == http.MethodPatch:
 			reply(body)
 		default:
@@ -133,7 +136,7 @@ func TestHealthNeedsNoKeyAndTheRestDoes(t *testing.T) {
 		t.Fatalf("a call without key = %v, want ErrAuth", err)
 	}
 	snap, err := client.Snapshot(context.Background())
-	if err != nil || !snap.Ed2k.Connected || !snap.Ed2k.LowID || !snap.Kad.Connected || snap.Rates.DownKiBps != 12.5 || snap.Version != "0.7.35" {
+	if err != nil || !snap.Ed2k.Connected || !snap.Ed2k.LowID || !snap.Kad.Connected || snap.Rates.DownKiBps != 12.5 || snap.Version != "0.7.37" {
 		t.Fatalf("snapshot = %+v, %v", snap, err)
 	}
 	_ = core
@@ -195,6 +198,20 @@ func TestSearchRunsToTheEndKeepsEd2kFilesAndDropsTheSearch(t *testing.T) {
 	}
 	if body := core.bodies["POST /api/v1/search"]; body["type"] != "kad" {
 		t.Fatalf("search body = %v", body)
+	}
+}
+
+func TestPreferenceValuesAreReadBySchemaKey(t *testing.T) {
+	_, client := startFake(t)
+	values, err := client.PreferenceValues(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if values["incomingDir"] != "/data/incoming" || values["btEnabled"] != true || values["disableEd2k"] != false {
+		t.Fatalf("values = %v", values)
+	}
+	if _, ok := values["noSuchSetting"]; ok {
+		t.Fatal("a setting the core does not report must not appear")
 	}
 }
 

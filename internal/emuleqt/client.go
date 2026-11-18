@@ -528,6 +528,15 @@ func (c *Client) Preferences(ctx context.Context) (Preferences, error) {
 	return out, err
 }
 
+// PreferenceValues reads every preference value the core reports, by schema
+// key: the core answers one value per setting it has, which is how a caller
+// tells the settings a given version knows from the ones it dropped.
+func (c *Client) PreferenceValues(ctx context.Context) (map[string]any, error) {
+	out := map[string]any{}
+	err := c.do(ctx, http.MethodGet, "/api/v1/preferences", nil, nil, &out)
+	return out, err
+}
+
 // PatchPreferences changes preferences by their schema key; one bad value
 // and nothing is changed.
 func (c *Client) PatchPreferences(ctx context.Context, values map[string]any) error {

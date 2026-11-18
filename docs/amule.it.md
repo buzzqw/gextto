@@ -213,8 +213,12 @@ La scelta ha tre valori:
     suoi indexer non vengono configurati: Gextto tiene i torrent in gx-torrent
     e interroga gli indexer da sé. Dopo ogni avvio e aggiornamento Gextto
     reimposta queste scelte con la REST API (server eD2k, Kad e connessione
-    accesi; BitTorrent, Usenet e hoster spenti), così un default cambiato da
-    una versione nuova di emule-qt non le annulla;
+    accesi; spento l'interruttore che in emule-qt spegne del tutto eD2k e
+    lascerebbe il core a rispondere solo all'API; BitTorrent, Usenet e hoster
+    spenti), così un default cambiato da una versione nuova di emule-qt non le
+    annulla. Vengono inviate solo le impostazioni che il core dichiara, così
+    una versione di emule-qt che ne toglie o ne rinomina una non blocca tutte
+    le altre;
   - il log del container ruota (10 MB × 3);
   - il container si riavvia da solo e sopravvive a un riavvio di Gextto;
   - con **Aggiorna emule-qt ogni giorno** acceso (il default) Gextto cerca una

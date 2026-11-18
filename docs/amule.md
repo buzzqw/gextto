@@ -211,8 +211,11 @@ The choice has three values:
     indexers are not configured: Gextto keeps torrents in gx-torrent and
     searches the indexers itself. After every start and update Gextto sets
     these choices again through the REST API (eD2k servers, Kad and the
-    connection on; BitTorrent, Usenet and hosters off), so a default a newer
-    emule-qt changes does not undo them;
+    connection on; emule-qt's own hard-off switch for eD2k, which would leave
+    the core answering the API and nothing else, off; BitTorrent, Usenet and
+    hosters off), so a default a newer emule-qt changes does not undo them.
+    Only the settings the core reports are sent, so one emule-qt release
+    dropping or renaming a setting does not hold back all the others;
   - the container log is rotated (10 MB × 3);
   - the container restarts by itself and outlives a restart of Gextto;
   - with **Update emule-qt every day** on (the default) Gextto looks for a new

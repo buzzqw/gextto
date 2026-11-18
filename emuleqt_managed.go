@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -63,18 +64,56 @@ var (
 // emuleqtManagedPreferences are the choices the managed core must keep,
 // set again through the REST API after every start and update: a migration
 // of a newer emule-qt can change a default in the file, the API answers
-// with what is in force. eD2k servers and Kad on, connected at start; the
-// torrent, Usenet and file hoster engines off — Gextto keeps torrents in
+// with what is in force. eD2k servers and Kad on, connected at start, and
+// emule-qt's own eD2k hard-off switch off — the core Gextto runs exists to
+// reach eD2k, and with that switch on it answers the API and nothing else;
+// the torrent, Usenet and file hoster engines off — Gextto keeps torrents in
 // gx-torrent and searches the indexers itself.
 var emuleqtManagedPreferences = map[string]any{
 	"networkED2K": true, "kadEnabled": true, "autoConnect": true, "reconnect": true,
-	"btEnabled": false, "usenetEnabled": false, "ed3kHosterEnabled": false,
+	"disableEd2k": false,
+	"btEnabled":   false, "usenetEnabled": false, "ed3kHosterEnabled": false,
 }
 
 // emuleqtEnforce applies emuleqtManagedPreferences; tests replace it.
 var emuleqtEnforce = func(ctx context.Context, managed emuleqtManaged) error {
 	client := emuleqt.New(emuleqt.Config{BaseURL: managed.URL, APIKey: managed.APIKey, Timeout: 20 * time.Second})
-	return client.PatchPreferences(ctx, emuleqtManagedPreferences)
+	return emuleqtApplyPreferences(ctx, client)
+}
+
+// emuleqtApplyPreferences sets the managed choices on the core, the ones it
+// has: settings come and go between emule-qt releases, and one key a core
+// does not know makes the whole PATCH fail, so the engines Gextto keeps off
+// would stay on. The keys it does know are applied; the missing ones are
+// reported, so a release that renames a setting is noticed.
+func emuleqtApplyPreferences(ctx context.Context, client *emuleqt.Client) error {
+	values, err := client.PreferenceValues(ctx)
+	if err != nil {
+		return err
+	}
+	keys := make([]string, 0, len(emuleqtManagedPreferences))
+	for key := range emuleqtManagedPreferences {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	changes := make(map[string]any, len(keys))
+	var missing []string
+	for _, key := range keys {
+		if _, ok := values[key]; ok {
+			changes[key] = emuleqtManagedPreferences[key]
+		} else {
+			missing = append(missing, key)
+		}
+	}
+	if len(changes) > 0 {
+		if err := client.PatchPreferences(ctx, changes); err != nil {
+			return err
+		}
+	}
+	if len(missing) > 0 {
+		return fmt.Errorf("emule-qt does not know %s: the settings change between emule-qt releases", strings.Join(missing, ", "))
+	}
+	return nil
 }
 
 // emuleqtManaged is how Gextto reaches the managed core.

@@ -233,6 +233,56 @@ func managedTestConfig(t *testing.T, docker *fakeDocker, healthy func(string) er
 	return cfg
 }
 
+// TestEmuleqtManagedPreferencesFollowWhatTheCoreKnows: the choices Gextto
+// sets again after every start are sent to the core by the name it reports,
+// so a setting a release dropped or renamed (emule-qt's settings change
+// often) cannot make the whole change fail and leave the core with its own
+// engines on; the missing ones are reported.
+func TestEmuleqtManagedPreferencesFollowWhatTheCoreKnows(t *testing.T) {
+	core := emuleqttest.Start("secret-key")
+	t.Cleanup(core.Close)
+	managed := emuleqtManaged{URL: core.URL(), APIKey: "secret-key"}
+	// A core that knows the eD2k switches and the engines, but not yet the
+	// hard-off switch a later release adds.
+	core.SetPreferences(map[string]any{
+		"networkED2K": true, "kadEnabled": true, "autoConnect": true, "reconnect": true,
+		"btEnabled": true, "usenetEnabled": true, "ed3kHosterEnabled": true,
+	})
+	err := emuleqtEnforce(context.Background(), managed)
+	if err == nil || !strings.Contains(err.Error(), "disableEd2k") {
+		t.Fatalf("a setting this core does not have must be reported: %v", err)
+	}
+	patched := core.Patched()
+	if len(patched) != 1 {
+		t.Fatalf("patches = %v, want one", patched)
+	}
+	want := map[string]any{
+		"networkED2K": true, "kadEnabled": true, "autoConnect": true, "reconnect": true,
+		"btEnabled": false, "usenetEnabled": false, "ed3kHosterEnabled": false,
+	}
+	if len(patched[0]) != len(want) {
+		t.Fatalf("sent %v, want exactly %v", patched[0], want)
+	}
+	for key, value := range want {
+		if patched[0][key] != value {
+			t.Fatalf("%s = %v, want %v (sent %v)", key, patched[0][key], value, patched[0])
+		}
+	}
+
+	// A core with every one of them takes the whole set, hard-off switch off.
+	core.SetPreferences(map[string]any{
+		"networkED2K": true, "kadEnabled": true, "autoConnect": true, "reconnect": true,
+		"disableEd2k": true, "btEnabled": true, "usenetEnabled": true, "ed3kHosterEnabled": true,
+	})
+	if err := emuleqtEnforce(context.Background(), managed); err != nil {
+		t.Fatal(err)
+	}
+	patched = core.Patched()
+	if len(patched) != 2 || patched[1]["disableEd2k"] != false || patched[1]["btEnabled"] != false {
+		t.Fatalf("second patch = %v", patched)
+	}
+}
+
 // TestEmuleqtManagedStartsUpdatesAndRollsBack: the first start pulls the
 // image and runs it with Gextto's folders; a day later a new image that
 // answers replaces it, and one that does not is undone.

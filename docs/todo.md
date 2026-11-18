@@ -23,6 +23,8 @@ still be true after the item lands does not belong here.
 
 ## Gextto, acquisition and UI
 
+- **emule-qt's preferences version**: `emuleqtPrefsVersion` is the value of the image Gextto runs (7); emule-qt's main branch has moved to 8, whose only migration turns on a default that is already true. Gate: an image that reports it.
+
 
 ## Proposals
 

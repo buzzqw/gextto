@@ -29,12 +29,14 @@ type Core struct {
 	added     []string
 	snapshot  emuleqt.Snapshot
 	limits    [2]int64
+	prefs     map[string]any
+	patched   []map[string]any
 }
 
 // Start runs a core that wants key.
 func Start(key string) *Core {
-	core := &Core{Key: key}
-	core.snapshot.Version = "0.7.35"
+	core := &Core{Key: key, prefs: map[string]any{}}
+	core.snapshot.Version = "0.7.37"
 	core.snapshot.Ed2k.Connected = true
 	core.snapshot.Kad.Running, core.snapshot.Kad.Connected = true, true
 	core.server = httptest.NewServer(http.HandlerFunc(core.serve))
@@ -97,6 +99,22 @@ func (c *Core) Limits() (int64, int64) {
 	return c.limits[0], c.limits[1]
 }
 
+// SetPreferences makes the core report these schema keys and values: the
+// settings a given emule-qt version knows. A key that is not here is refused
+// by PATCH, as the real core does.
+func (c *Core) SetPreferences(values map[string]any) {
+	c.mu.Lock()
+	c.prefs = values
+	c.mu.Unlock()
+}
+
+// Patched are the bodies PATCHed to /preferences.
+func (c *Core) Patched() []map[string]any {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return append([]map[string]any(nil), c.patched...)
+}
+
 func page[T any](w http.ResponseWriter, r *http.Request, items []T) {
 	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
 	offset = min(max(offset, 0), len(items))
@@ -129,11 +147,33 @@ func (c *Core) serve(w http.ResponseWriter, r *http.Request) {
 	case path == "/api/v1/stats":
 		reply(map[string]any{"sessionReceivedBytes": 1000, "sessionSentBytes": 500})
 	case path == "/api/v1/preferences" && r.Method == http.MethodGet:
-		reply(map[string]any{"incomingDir": c.dirs.Incoming, "maxDownload": c.limits[0], "maxUpload": c.limits[1]})
+		values := map[string]any{"incomingDir": c.dirs.Incoming, "maxDownload": c.limits[0], "maxUpload": c.limits[1]}
+		for key, value := range c.prefs {
+			values[key] = value
+		}
+		reply(values)
 	case path == "/api/v1/preferences" && r.Method == http.MethodPatch:
-		down, _ := body["maxDownload"].(float64)
-		up, _ := body["maxUpload"].(float64)
-		c.limits = [2]int64{int64(down), int64(up)}
+		known := map[string]bool{"incomingDir": true, "maxDownload": true, "maxUpload": true}
+		for key := range c.prefs {
+			known[key] = true
+		}
+		for key := range body {
+			if !known[key] {
+				w.WriteHeader(http.StatusBadRequest)
+				reply(map[string]any{"error": map[string]any{"code": 400, "message": "Unknown preference: " + key}})
+				return
+			}
+		}
+		c.patched = append(c.patched, body)
+		if down, ok := body["maxDownload"].(float64); ok {
+			c.limits[0] = int64(down)
+		}
+		if up, ok := body["maxUpload"].(float64); ok {
+			c.limits[1] = int64(up)
+		}
+		for key, value := range body {
+			c.prefs[key] = value
+		}
 		reply(body)
 	case path == "/api/v1/shared/directories":
 		reply(c.dirs)
