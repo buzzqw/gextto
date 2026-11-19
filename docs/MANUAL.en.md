@@ -407,7 +407,7 @@ The most important fields of the page:
 | **Name** | the title shown in the library. Changing it keeps episodes, their history, the missing-episode search and the exclusions linked to the series; the archive folder is not moved, so the files stay where they are |
 | **Quality profile** | applies a profile's values to the series. The profile that matches the current values is preselected; if none matches you see **Current values**, which changes nothing when saved |
 | **Seasons** | which seasons are followed |
-| **Alias** | other names under which the series appears in releases |
+| **Alias** | other names under which the series appears in releases. Gextto searches with them too: the original title here makes it find the releases published only under that name |
 | **Exclusions** | words that reject a release |
 | **TMDB ID / TVDB ID** | identify the series in the two services; a wrong ID is fixed here. They are independent: saving one does not clear the other |
 | **Series status** | *Automatic* lets the sources decide (see below); *Ended* or *Running* beats every source, for when you know something the sources have not recorded yet |
@@ -483,6 +483,11 @@ not in the library, grouped by series and season:
   do not wait for every link, and the log names the episodes it queued;
 - **Filter by series** narrows the list while you type, without reloading the
   page.
+
+Every search starts from the series name and from all of its **aliases**: the
+same episode is asked once per name, in the local archive and to the indexers,
+because many sources publish a series only under its original title. A series
+followed under the Italian title therefore finds the English releases too.
 
 Not missing: episodes that have not aired yet, episodes that already have a
 download in progress (even added by hand or from a watched folder), the
@@ -2072,7 +2077,7 @@ upload, removal) and writes it in the log.
 
 | Term | Meaning |
 |---|---|
-| **Alias** | another name under which a series appears in releases |
+| **Alias** | another name under which a series appears in releases; Gextto uses it as a search term too |
 | **Archive** | the local catalogue of the releases seen in the feeds |
 | **Backoff** | the growing pause in requests to a failing source |
 | **Blocklist** | the releases that will not be downloaded again; the **Reason** column says why in words; a reason this version does not know stays written as a code, so it is visible instead of vanishing |

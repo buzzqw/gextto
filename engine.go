@@ -843,21 +843,27 @@ func searchProgressObserver(ctx context.Context) func(searchProgress) {
 	return report
 }
 
+// withoutSearchProgress hides the observer from a secondary fan-out, for a
+// caller that shows one counter and runs several searches at the same time: the
+// searches would each restart the count. A nil observer stored under the key
+// reads back as no observer, so this costs the extra searches nothing.
+func withoutSearchProgress(ctx context.Context) context.Context {
+	if searchProgressObserver(ctx) == nil {
+		return ctx
+	}
+	return context.WithValue(ctx, searchProgressContextKey{}, (func(searchProgress))(nil))
+}
+
 // SearchSeriesEpisode searches one known episode using its structured TV
 // identity. It is used by gap filling and episode-level manual searches: a
 // broad title search can miss older episodes even when the indexer supports an
-// exact season/episode request.
+// exact season/episode request. The query runs under the monitored name and
+// under the aliases (see searchSeriesTitles).
 func (e *Engine) SearchSeriesEpisode(ctx context.Context, cfg *Config, series *SeriesConfig, season, episode int64, manual bool) []models.Release {
 	if series == nil || season < 1 || episode < 1 {
 		return nil
 	}
-	query := fmt.Sprintf("%s S%02dE%02d", series.Name, season, episode)
-	var webTimeout *time.Duration
-	if manual {
-		timeout := manualSearchTimeout
-		webTimeout = &timeout
-	}
-	return searchOneWithDBType(ctx, cfg, query, seriesExternalIDs(series), webTimeout, e.db, false, searchTypeTV, true)
+	return e.searchSeriesTitles(ctx, cfg, series, fmt.Sprintf("S%02dE%02d", season, episode), manual)
 }
 
 // SearchSeriesSeason is the broader fallback for a known episode gap. It can
@@ -868,13 +874,64 @@ func (e *Engine) SearchSeriesSeason(ctx context.Context, cfg *Config, series *Se
 	if series == nil || season < 1 {
 		return nil
 	}
-	query := fmt.Sprintf("%s S%02d", series.Name, season)
+	return e.searchSeriesTitles(ctx, cfg, series, fmt.Sprintf("S%02d", season), manual)
+}
+
+// searchSeriesTitles runs the tvsearch fan-out for one episode or season
+// suffix under every name the series is known by: the monitored one and its
+// aliases. A series monitored under a localized title is published by most
+// sources under the original one, and a search that only carries the localized
+// words finds nothing there; the same release is invisible to an indexer that
+// matches the words of the query (indexarr, for one) but not to its archive.
+//
+// One query per title, all at the same time: searching them one after the
+// other would multiply the wait of a manual search. Only the monitored name
+// also goes to the web engines; the aliases stay on the indexers, where the
+// season/episode constraint makes them precise. The batches are merged and
+// deduplicated, so a release that a source answers under two titles counts once.
+func (e *Engine) searchSeriesTitles(ctx context.Context, cfg *Config, series *SeriesConfig, suffix string, manual bool) []models.Release {
+	ids := seriesExternalIDs(series)
 	var webTimeout *time.Duration
 	if manual {
 		timeout := manualSearchTimeout
 		webTimeout = &timeout
 	}
-	return searchOneWithDBType(ctx, cfg, query, seriesExternalIDs(series), webTimeout, e.db, false, searchTypeTV, true)
+	titles := seriesIndexerTitles(series)
+	if len(titles) == 0 {
+		titles = []string{strings.TrimSpace(series.Name)}
+	}
+	if len(titles) == 1 {
+		query := strings.TrimSpace(titles[0] + " " + suffix)
+		return searchOneWithDBType(ctx, cfg, query, ids, webTimeout, e.db, false, searchTypeTV, true)
+	}
+	results := make([][]models.Release, len(titles))
+	var group sync.WaitGroup
+	for index, title := range titles {
+		group.Add(1)
+		go func(index int, title string) {
+			defer recoverGoroutine("series title search")
+			defer group.Done()
+			// The manual panel shows how many sources answered: it counts the
+			// fan-out of the monitored name, and the alias queries stay out of
+			// it so the counter never goes backwards.
+			searchCtx := ctx
+			if index > 0 {
+				searchCtx = withoutSearchProgress(ctx)
+			}
+			query := strings.TrimSpace(title + " " + suffix)
+			results[index] = searchOneWithDBType(searchCtx, cfg, query, ids, webTimeout, e.db, false, searchTypeTV, index == 0)
+		}(index, title)
+	}
+	group.Wait()
+	total := 0
+	for _, items := range results {
+		total += len(items)
+	}
+	merged := make([]models.Release, 0, total)
+	for _, items := range results {
+		merged = append(merged, items...)
+	}
+	return mergeDuplicateReleases(merged)
 }
 
 // SearchMovie searches one configured movie using its movie mode and TMDB id

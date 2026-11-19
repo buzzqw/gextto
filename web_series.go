@@ -173,7 +173,6 @@ func gh2ReleaseMatchesSeriesEpisode(release *models.Release, series *SeriesConfi
 }
 
 func gh2StoredSeriesEpisodeSources(s *AppState, series *SeriesConfig, season, episode int64) []episodeSource {
-	query := fmt.Sprintf("%s S%02dE%02d", series.Name, season, episode)
 	results := []episodeSource{}
 	if rows, err := s.db.SeriesFeedForEpisode(season, episode, 200); err == nil {
 		for _, row := range rows {
@@ -186,14 +185,30 @@ func gh2StoredSeriesEpisodeSources(s *AppState, series *SeriesConfig, season, ep
 			}
 		}
 	}
-	if rows, err := s.archive.Search(query); err == nil {
-		for _, row := range rows {
-			release := ParseRelease(row[0], row[1], row[2])
-			if release == nil {
+	if s.archive != nil {
+		// The archive is a title search: ask it under every name the series is
+		// known by, or a copy stored under the original title stays invisible.
+		seen := map[string]struct{}{}
+		for _, title := range seriesIndexerTitles(series) {
+			query := fmt.Sprintf("%s S%02dE%02d", title, season, episode)
+			rows, err := s.archive.Search(query)
+			if err != nil {
 				continue
 			}
-			if gh2ReleaseMatchesSeriesEpisode(release, series, season, episode) {
-				results = append(results, episodeSource{Release: *release, Origin: episodeOriginArchive})
+			for _, row := range rows {
+				release := ParseRelease(row[0], row[1], row[2])
+				if release == nil {
+					continue
+				}
+				if key, ok := releaseDedupKey(release); ok {
+					if _, exists := seen[key]; exists {
+						continue
+					}
+					seen[key] = struct{}{}
+				}
+				if gh2ReleaseMatchesSeriesEpisode(release, series, season, episode) {
+					results = append(results, episodeSource{Release: *release, Origin: episodeOriginArchive})
+				}
 			}
 		}
 	}
@@ -936,9 +951,11 @@ func gh7ReleaseMatchesSeriesEpisode(release *models.Release, series SeriesConfig
 }
 
 // storedSeriesEpisodeSources collects the results already stored locally
-// (feed rows and archive) without any network traffic.
+// (feed rows and archive) without any network traffic. The archive is a title
+// search, so it runs once per name the series is known by: a copy stored under
+// the original title must be found by a search that started from the localized
+// one.
 func storedSeriesEpisodeSources(s *AppState, series SeriesConfig, season, episode int64) []gh7EpisodeResult {
-	query := fmt.Sprintf("%s S%02dE%02d", series.Name, season, episode)
 	results := []gh7EpisodeResult{}
 
 	if s.db != nil {
@@ -954,9 +971,21 @@ func storedSeriesEpisodeSources(s *AppState, series SeriesConfig, season, episod
 	}
 
 	if s.archive != nil {
-		if rows, err := s.archive.Search(query); err == nil {
+		seen := map[string]struct{}{}
+		for _, title := range seriesIndexerTitles(&series) {
+			query := fmt.Sprintf("%s S%02dE%02d", title, season, episode)
+			rows, err := s.archive.Search(query)
+			if err != nil {
+				continue
+			}
 			for _, row := range rows {
 				if release := ParseRelease(row[0], row[1], row[2]); release != nil {
+					if key, ok := releaseDedupKey(release); ok {
+						if _, exists := seen[key]; exists {
+							continue
+						}
+						seen[key] = struct{}{}
+					}
 					if gh7ReleaseMatchesSeriesEpisode(release, series, season, episode) {
 						results = append(results, gh7EpisodeResult{Release: *release, Origin: episodeOriginArchive})
 					}

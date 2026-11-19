@@ -407,7 +407,7 @@ I campi della scheda più importanti:
 | **Nome** | il titolo mostrato in libreria. Cambiandolo restano collegati episodi, storia, ricerca dei mancanti ed esclusioni della serie; la cartella dell'archivio non viene spostata, quindi i file restano dove sono |
 | **Profilo di qualità** | applica i valori di un profilo alla serie. È preselezionato il profilo che corrisponde ai valori attuali; se nessuno corrisponde compare **Valori attuali**, che salvando non cambia nulla |
 | **Stagioni** | quali stagioni sono seguite |
-| **Alias** | altri nomi con cui la serie compare nelle release |
+| **Alias** | altri nomi con cui la serie compare nelle release. Gextto li usa anche per cercare: mettere qui il titolo originale fa trovare le release pubblicate solo con quello |
 | **Esclusioni** | parole che scartano una release |
 | **ID TMDB / ID TVDB** | identificano la serie nei due servizi; un ID sbagliato si corregge qui. Sono indipendenti: salvarne uno non cancella l'altro |
 | **Stato della serie** | *Automatico* lascia decidere alle fonti (vedi sotto); *Terminata* o *In corso* vale più di qualsiasi fonte, quando sai qualcosa che le fonti non hanno ancora registrato |
@@ -486,6 +486,11 @@ onda che non sono in libreria, raggruppate per serie e per stagione:
   log dice quali puntate ha messo in scarico;
 - **Filtra per serie** restringe l'elenco mentre scrivi, senza ricaricare la
   pagina.
+
+Ogni ricerca parte dal nome della serie e da tutti i suoi **alias**: la stessa
+puntata viene chiesta una volta per ogni nome, nell'archivio locale e agli
+indexer, perché molte fonti pubblicano una serie solo con il titolo originale.
+Una serie seguita con il titolo italiano trova così anche le release in inglese.
 
 Non sono mancanti le puntate non ancora andate in onda, né quelle che hanno già
 un download in corso (anche aggiunto a mano o da una cartella osservata), né le
@@ -2095,7 +2100,7 @@ upload, rimozione) e lo scrive nel log.
 
 | Termine | Significato |
 |---|---|
-| **Alias** | un altro nome con cui una serie compare nelle release |
+| **Alias** | un altro nome con cui una serie compare nelle release; Gextto lo usa anche come termine di ricerca |
 | **Archivio** | il catalogo locale delle release viste nei feed |
 | **Backoff** | la pausa crescente delle richieste a una sorgente che fallisce |
 | **Blocklist** | le release che non verranno più scaricate; la colonna **Motivo** dice in parole perché; un motivo che questa versione non conosce resta scritto come codice, così si vede invece di sparire |

@@ -1799,6 +1799,50 @@ func movieIndexerTitles(movie *MovieConfig) []string {
 	return titles
 }
 
+// seriesIndexerAliasLimit is how many aliases of one series are sent to the
+// indexers on top of the monitored name. The eD2k search already asks every
+// alias; on the indexers each title is a separate query against a manager that
+// answers in seconds, so a series with a long alias list must not turn one
+// episode into a dozen requests.
+const seriesIndexerAliasLimit = 4
+
+// seriesIndexerTitles returns the names a series is searched under on the
+// indexers, in order: the monitored name first, then its aliases. The monitored
+// name goes first because the caller also sends it to the web engines, which is
+// the slowest and broadest source. A series with no aliases returns one title,
+// so the single-query path stays exactly as it was. Empty and repeated values
+// are dropped.
+func seriesIndexerTitles(series *SeriesConfig) []string {
+	if series == nil {
+		return nil
+	}
+	titles := make([]string, 0, 1+seriesIndexerAliasLimit)
+	add := func(value string) bool {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			return false
+		}
+		for _, existing := range titles {
+			if strings.EqualFold(existing, value) {
+				return false
+			}
+		}
+		titles = append(titles, value)
+		return true
+	}
+	add(series.Name)
+	aliases := 0
+	for _, alias := range series.Aliases {
+		if aliases >= seriesIndexerAliasLimit {
+			break
+		}
+		if add(alias) {
+			aliases++
+		}
+	}
+	return titles
+}
+
 // movieArchiveTitles returns every name the film is known by, for the local
 // archive search: the monitored name, the original title, all the alternative
 // titles and every localized title TMDB supplied. A local query is cheap, so

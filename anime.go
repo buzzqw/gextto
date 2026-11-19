@@ -9,6 +9,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/buzzqw/gextto/internal/models"
 )
@@ -180,6 +181,40 @@ func searchArchiveForEpisode(ctx context.Context, cfg *Config, archive *Archive,
 	items, err := archive.SearchEntries(query)
 	if err != nil {
 		return items, err
+	}
+	// The archive index is a title search, and most sources publish a series
+	// under the original title: a copy stored that way stays invisible to a
+	// query that carries only the localized name. Ask once per alias, with the
+	// same substitution the eD2k search does.
+	if series != nil {
+		extra := make([]ArchiveListing, 0, len(items))
+		for _, title := range seriesIndexerTitles(series) {
+			if strings.EqualFold(strings.TrimSpace(title), strings.TrimSpace(series.Name)) {
+				continue
+			}
+			aliasQuery := strings.Replace(query, series.Name, title, 1)
+			if aliasQuery == query {
+				continue
+			}
+			rows, aliasErr := archive.SearchEntries(aliasQuery)
+			if aliasErr != nil {
+				continue
+			}
+			extra = append(extra, rows...)
+		}
+		if len(extra) > 0 {
+			seen := make(map[string]struct{}, len(items)+len(extra))
+			merged := make([]ArchiveListing, 0, len(items)+len(extra))
+			for _, item := range append(items, extra...) {
+				key := item.Title + "\x00" + item.Magnet
+				if _, exists := seen[key]; exists {
+					continue
+				}
+				seen[key] = struct{}{}
+				merged = append(merged, item)
+			}
+			items = merged
+		}
 	}
 	// A row whose only source is a switched-off indexer, or that came from a
 	// feed removed from Sources, cannot be downloaded: keep it out of the gap
