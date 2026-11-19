@@ -652,3 +652,45 @@ test("il filtro per stato della vista Download mostra Tutti i torrent premuto", 
   await expect(all).toHaveAttribute("aria-pressed", "true");
   await expect(all.locator(".n")).toHaveText(/^\d+$/);
 });
+
+// The episode table of a series shows the name of the file in the library,
+// which is long. It must not widen the table and push the row actions — the
+// search button above all — beyond the right edge: the geometry is checked on
+// the real stylesheet with the real markup.
+const episodeTableHTML = `<table class="data-table series-episodes"><thead><tr>
+  <th scope="col">S</th><th scope="col">E</th><th scope="col">Titolo</th>
+  <th scope="col">Stato</th><th scope="col">Qualità</th><th scope="col">Dimensione</th>
+  <th scope="col">Azioni</th></tr></thead><tbody><tr>
+  <td class="numeric">3</td><td class="numeric">2</td>
+  <td class="truncate" title="Serie - S03E02 - Il Titolo Della Puntata - [WEB-DL][1080p][h264][Ddp 5.1][IT+EN]">Serie - S03E02 - Il Titolo Della Puntata - [WEB-DL][1080p][h264][Ddp 5.1][IT+EN]</td>
+  <td>archiviato</td><td class="numeric">90</td><td class="numeric">4.3 GB</td>
+  <td class="row-actions"><button class="btn sm icon-action primary" type="button">cerca</button><button class="btn sm icon-action" type="button">forza</button><details class="v2-menu"><summary class="btn sm icon-action">⋯</summary></details></td>
+  </tr></tbody></table>`;
+
+test("la tabella degli episodi non spinge le azioni fuori dal pannello", async ({ page }) => {
+  await page.goto("/");
+  const geometry = await page.evaluate((html) => {
+    const wrap = document.createElement("div");
+    wrap.className = "table-wrap";
+    wrap.style.width = "760px";
+    wrap.innerHTML = html;
+    document.querySelector(".content")?.append(wrap);
+    const cell = wrap.querySelector("td.truncate") as HTMLElement;
+    const actions = wrap.querySelector("td.row-actions") as HTMLElement;
+    const search = actions?.querySelector("button") as HTMLElement;
+    const result = {
+      wrapScrolls: wrap.scrollWidth - wrap.clientWidth,
+      cellClipped: cell.scrollWidth - cell.clientWidth,
+      actionsRight: actions.getBoundingClientRect().right,
+      searchRight: search.getBoundingClientRect().right,
+      wrapRight: wrap.getBoundingClientRect().right,
+    };
+    wrap.remove();
+    return result;
+  }, episodeTableHTML);
+  expect(geometry.wrapScrolls).toBeLessThanOrEqual(1);
+  // The long name is cut inside its column instead of widening the table.
+  expect(geometry.cellClipped).toBeGreaterThan(0);
+  expect(geometry.actionsRight).toBeLessThanOrEqual(geometry.wrapRight + 1);
+  expect(geometry.searchRight).toBeLessThanOrEqual(geometry.wrapRight + 1);
+});

@@ -863,6 +863,26 @@ label.field > span, .field > span, .field-label { color: var(--muted); font-size
   white-space: nowrap;
 }
 .archive-table td.row-actions .btn { margin-left: 4px; }
+/* The episodes table of a series. The title column holds the name of the file
+   in the library, which is long ("Serie - S03E02 - Titolo - [WEB-DL][1080p]…"):
+   with the automatic layout that name decided the width of the table, the
+   whole table grew past the panel and the actions of every row — «cerca»
+   first — ended up beyond the right edge, behind a sideways scroll. A fixed
+   layout gives the title what is left and keeps the buttons where the eye
+   looks for them; the full name stays in the tooltip. */
+.data-table.series-episodes { table-layout: fixed; min-width: 620px; }
+.data-table.series-episodes th:nth-child(1),
+.data-table.series-episodes td:nth-child(1),
+.data-table.series-episodes th:nth-child(2),
+.data-table.series-episodes td:nth-child(2) { width: 46px; }
+.data-table.series-episodes th:nth-child(4),
+.data-table.series-episodes td:nth-child(4) { width: 120px; }
+.data-table.series-episodes th:nth-child(5),
+.data-table.series-episodes td:nth-child(5) { width: 78px; }
+.data-table.series-episodes th:nth-child(6),
+.data-table.series-episodes td:nth-child(6) { width: 108px; }
+.data-table.series-episodes th:last-child,
+.data-table.series-episodes td:last-child { width: 148px; }
 /* Sources table (episode search, missing search, release archive): the release
    name wraps over as many lines as it needs, so the actions column and its
    «Scarica» button stay on screen instead of being pushed past the right edge. */
@@ -1737,8 +1757,12 @@ pre.log-view { margin: 0; }
   .download-temp-toolbar .input { min-width: 0; }
 
 
-  /* Episode actions also wrap instead of forcing a very wide table. */
-.data-table.series-episodes { min-width: 620px; }
+  /* Episode actions also wrap instead of forcing a very wide table. On a phone
+     a sideways scroll hides the buttons that sit at the end of every row, and
+     there is no tooltip to reveal a truncated name: the table fits the screen
+     and the title wraps over as many lines as it needs. */
+  .data-table.series-episodes { min-width: 0; }
+  .data-table.series-episodes td.truncate { white-space: normal; overflow: visible; overflow-wrap: anywhere; }
   .data-table.series-episodes th:nth-child(5),
   .data-table.series-episodes td:nth-child(5),
   .data-table.series-episodes th:nth-child(6),

@@ -86,4 +86,41 @@ test.describe("telefono", () => {
     if (!searchPanel || !calendarPanel) throw new Error("geometria non disponibile");
     expect(searchPanel.y).toBeLessThan(calendarPanel.y);
   });
+
+  // A phone has no tooltip to reveal a truncated name, and a sideways scroll
+  // inside the table hides the button that sits at the end of every row: on a
+  // narrow screen the episode table fits, the title wraps and the actions of
+  // the row stay in view.
+  test("gli episodi di una serie mostrano le azioni anche col titolo lungo", async ({ page }) => {
+    await page.goto("/?view=series");
+    await page.waitForTimeout(300);
+    const geometry = await page.evaluate(() => {
+      const wrap = document.createElement("div");
+      wrap.className = "table-wrap";
+      wrap.innerHTML = `<table class="data-table series-episodes"><thead><tr>
+        <th scope="col">S</th><th scope="col">E</th><th scope="col">Titolo</th>
+        <th scope="col">Stato</th><th scope="col">Qualità</th><th scope="col">Dimensione</th>
+        <th scope="col">Azioni</th></tr></thead><tbody><tr>
+        <td class="numeric">3</td><td class="numeric">2</td>
+        <td class="truncate">Serie - S03E02 - Il Titolo Della Puntata - [WEB-DL][1080p][h264][Ddp 5.1][IT+EN]</td>
+        <td>archiviato</td><td class="numeric">90</td><td class="numeric">4.3 GB</td>
+        <td class="row-actions"><button class="btn sm icon-action primary" type="button">cerca</button><button class="btn sm icon-action" type="button">forza</button><details class="v2-menu"><summary class="btn sm icon-action">⋯</summary></details></td>
+        </tr></tbody></table>`;
+      document.querySelector(".content")?.append(wrap);
+      const cell = wrap.querySelector("td.truncate") as HTMLElement;
+      const search = wrap.querySelector("td.row-actions button") as HTMLElement;
+      const style = getComputedStyle(cell);
+      const result = {
+        wrapScrolls: wrap.scrollWidth - wrap.clientWidth,
+        whiteSpace: style.whiteSpace,
+        searchRight: search.getBoundingClientRect().right,
+        wrapRight: wrap.getBoundingClientRect().right,
+      };
+      wrap.remove();
+      return result;
+    });
+    expect(geometry.wrapScrolls).toBeLessThanOrEqual(1);
+    expect(geometry.whiteSpace).toBe("normal");
+    expect(geometry.searchRight).toBeLessThanOrEqual(geometry.wrapRight + 1);
+  });
 });
