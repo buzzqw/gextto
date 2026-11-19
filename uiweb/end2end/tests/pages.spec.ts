@@ -686,6 +686,9 @@ test("la tabella degli episodi non spinge le azioni fuori dal pannello", async (
     const search = actions?.querySelector("button") as HTMLElement;
     const sources = wrap.querySelector(".sources-table") as HTMLTableElement;
     const sourcesTitle = sources.querySelector("thead .sources-title") as HTMLElement;
+    const sourceButtons = Array.from(sources.querySelectorAll(".sources-actions button")).map((button) =>
+      button.getBoundingClientRect(),
+    );
     const result = {
       wrapScrolls: wrap.scrollWidth - wrap.clientWidth,
       cellClipped: cell.scrollWidth - cell.clientWidth,
@@ -694,6 +697,8 @@ test("la tabella degli episodi non spinge le azioni fuori dal pannello", async (
       wrapRight: wrap.getBoundingClientRect().right,
       sourcesTitleWidth: sourcesTitle.getBoundingClientRect().width,
       sourcesWidth: sources.getBoundingClientRect().width,
+      sourcesScrolls: (sources.closest(".table-wrap") as HTMLElement).scrollWidth - (sources.closest(".table-wrap") as HTMLElement).clientWidth,
+      sourcesButtonsOnOneLine: sourceButtons.length === 2 && Math.abs(sourceButtons[0].top - sourceButtons[1].top) < 1,
     };
     wrap.remove();
     return result;
@@ -705,5 +710,9 @@ test("la tabella degli episodi non spinge le azioni fuori dal pannello", async (
   expect(geometry.searchRight).toBeLessThanOrEqual(geometry.wrapRight + 1);
   // The search opened under the row holds a second table: the widths of this
   // one must not reach it, or its title column collapses to a few characters.
-  expect(geometry.sourcesTitleWidth).toBeGreaterThan(180);
+  expect(geometry.sourcesTitleWidth).toBeGreaterThan(140);
+  // «Copia magnet» and «Scarica» sit side by side, so a result is one row tall
+  // and its two buttons do not spill over the table.
+  expect(geometry.sourcesButtonsOnOneLine).toBe(true);
+  expect(geometry.sourcesScrolls).toBeLessThanOrEqual(1);
 });
