@@ -665,7 +665,13 @@ const episodeTableHTML = `<table class="data-table series-episodes"><thead><tr>
   <td class="truncate" title="Serie - S03E02 - Il Titolo Della Puntata - [WEB-DL][1080p][h264][Ddp 5.1][IT+EN]">Serie - S03E02 - Il Titolo Della Puntata - [WEB-DL][1080p][h264][Ddp 5.1][IT+EN]</td>
   <td>archiviato</td><td class="numeric">90</td><td class="numeric">4.3 GB</td>
   <td class="row-actions"><button class="btn sm icon-action primary" type="button">cerca</button><button class="btn sm icon-action" type="button">forza</button><details class="v2-menu"><summary class="btn sm icon-action">⋯</summary></details></td>
-  </tr></tbody></table>`;
+  </tr><tr class="v2-ep-search-row"><td colspan="7"><section class="v2-ep-search">
+  <div class="v2-ep-search-body"><div class="table-wrap"><table class="data-table sources-table">
+  <thead><tr><th class="sources-title">Titolo</th><th class="sources-source">Sorgente</th><th class="sources-score">Punteggio</th><th class="sources-size">Dimensione</th><th class="sources-actions">Azioni</th></tr></thead>
+  <tbody><tr><td class="sources-title">Il Signore degli Anelli - Gli Anelli del Potere - S03E02 Il Dono degli Uomini 1080p H264 ITA ENG AAC SUB ITA NUENG.mkv</td>
+  <td class="sources-source">bt4g</td><td class="numeric sources-score">1090</td><td class="numeric sources-size">—</td>
+  <td class="row-actions sources-actions"><button class="btn sm" type="button">Copia magnet</button><button class="btn sm primary" type="button">Scarica</button></td></tr></tbody>
+  </table></div></div></section></td></tr></tbody></table>`;
 
 test("la tabella degli episodi non spinge le azioni fuori dal pannello", async ({ page }) => {
   await page.goto("/");
@@ -678,12 +684,16 @@ test("la tabella degli episodi non spinge le azioni fuori dal pannello", async (
     const cell = wrap.querySelector("td.truncate") as HTMLElement;
     const actions = wrap.querySelector("td.row-actions") as HTMLElement;
     const search = actions?.querySelector("button") as HTMLElement;
+    const sources = wrap.querySelector(".sources-table") as HTMLTableElement;
+    const sourcesTitle = sources.querySelector("thead .sources-title") as HTMLElement;
     const result = {
       wrapScrolls: wrap.scrollWidth - wrap.clientWidth,
       cellClipped: cell.scrollWidth - cell.clientWidth,
       actionsRight: actions.getBoundingClientRect().right,
       searchRight: search.getBoundingClientRect().right,
       wrapRight: wrap.getBoundingClientRect().right,
+      sourcesTitleWidth: sourcesTitle.getBoundingClientRect().width,
+      sourcesWidth: sources.getBoundingClientRect().width,
     };
     wrap.remove();
     return result;
@@ -693,4 +703,7 @@ test("la tabella degli episodi non spinge le azioni fuori dal pannello", async (
   expect(geometry.cellClipped).toBeGreaterThan(0);
   expect(geometry.actionsRight).toBeLessThanOrEqual(geometry.wrapRight + 1);
   expect(geometry.searchRight).toBeLessThanOrEqual(geometry.wrapRight + 1);
+  // The search opened under the row holds a second table: the widths of this
+  // one must not reach it, or its title column collapses to a few characters.
+  expect(geometry.sourcesTitleWidth).toBeGreaterThan(180);
 });
