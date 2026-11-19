@@ -11,7 +11,7 @@ client. Two binaries, no C dependencies, no Node.js build, six languages.
 
 [![License: EUPL-1.2](https://img.shields.io/badge/license-EUPL--1.2-blue.svg)](LICENSE)
 ![Go](https://img.shields.io/badge/Go-pure%2C%20zero%20CGO-00ADD8?logo=go)
-![Tests](https://img.shields.io/badge/tests-2%2C189%20Go%20%C2%B7%2057%20E2E%20%C2%B7%2023%20fuzz-success)
+![Tests](https://img.shields.io/badge/tests-2%2C191%20Go%20%C2%B7%20110%20E2E%20%C2%B7%2023%20fuzz-success)
 ![Platforms](https://img.shields.io/badge/platforms-Linux%20%C2%B7%20Windows%20(gx--torrent)-informational)
 ![BEPs](https://img.shields.io/badge/BitTorrent%20BEPs-34%20implemented-success)
 ![Languages](https://img.shields.io/badge/UI-IT%20%C2%B7%20EN%20%C2%B7%20DE%20%C2%B7%20FR%20%C2%B7%20ES%20%C2%B7%20PL-lightgrey)

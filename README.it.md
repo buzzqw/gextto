@@ -11,7 +11,7 @@ binari, nessuna dipendenza C, nessuna build Node.js, sei lingue.
 
 [![Licenza: EUPL-1.2](https://img.shields.io/badge/licenza-EUPL--1.2-blue.svg)](LICENSE)
 ![Go](https://img.shields.io/badge/Go-puro%2C%20zero%20CGO-00ADD8?logo=go)
-![Test](https://img.shields.io/badge/test-2.189%20Go%20%C2%B7%2057%20E2E%20%C2%B7%2023%20fuzz-success)
+![Test](https://img.shields.io/badge/test-2.191%20Go%20%C2%B7%20110%20E2E%20%C2%B7%2023%20fuzz-success)
 ![Piattaforme](https://img.shields.io/badge/piattaforme-Linux%20%C2%B7%20Windows%20(gx--torrent)-informational)
 ![BEP](https://img.shields.io/badge/BEP%20BitTorrent-34%20implementati-success)
 ![Lingue](https://img.shields.io/badge/UI-IT%20%C2%B7%20EN%20%C2%B7%20DE%20%C2%B7%20FR%20%C2%B7%20ES%20%C2%B7%20PL-lightgrey)
