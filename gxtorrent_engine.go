@@ -627,20 +627,20 @@ type gxTorrentItem struct {
 	SeedRatio      float64 `json:"seed_ratio"`
 	SeedDays       int64   `json:"seed_days"`
 	// Per-torrent speed limits in KiB/s (-1 global, 0 unlimited).
-	DownloadLimitKib int64  `json:"download_limit_kib"`
-	UploadLimitKib   int64  `json:"upload_limit_kib"`
-	HasMetadata      bool   `json:"has_metadata"`
-	AutoManaged      bool   `json:"auto_managed"`
-	Parked           bool   `json:"parked"`
-	Pinned           bool   `json:"pinned"`
+	DownloadLimitKib int64 `json:"download_limit_kib"`
+	UploadLimitKib   int64 `json:"upload_limit_kib"`
+	HasMetadata      bool  `json:"has_metadata"`
+	AutoManaged      bool  `json:"auto_managed"`
+	Parked           bool  `json:"parked"`
+	Pinned           bool  `json:"pinned"`
 	// DiskWait is set while the daemon's disk guard holds the download: the
 	// folder it writes to has no free space, and it resumes by itself.
-	DiskWait bool   `json:"disk_wait"`
-	Error    string `json:"error"`
-	CompletedAt      int64  `json:"completed_at"`
-	AddedAt          int64  `json:"added_at"`
-	CurrentTracker   string `json:"current_tracker"`
-	TorrentVersion   string `json:"torrent_version"`
+	DiskWait       bool   `json:"disk_wait"`
+	Error          string `json:"error"`
+	CompletedAt    int64  `json:"completed_at"`
+	AddedAt        int64  `json:"added_at"`
+	CurrentTracker string `json:"current_tracker"`
+	TorrentVersion string `json:"torrent_version"`
 	// SuperSeeding is BEP 16 super-seeding, a seeding strategy.
 	SuperSeeding bool `json:"super_seeding"`
 	// Per-torrent peer options (a daemon without them omits the fields).
@@ -1606,6 +1606,9 @@ func (e *gxTorrentEngine) Trackers(hash string) ([]models.TrackerView, bool, err
 		Leechers     int    `json:"leechers"`
 		Message      string `json:"message"`
 		NextAnnounce int    `json:"next_announce"`
+		Waiting      bool   `json:"waiting"`
+		LastMs       int64  `json:"last_ms"`
+		MedianMs     int64  `json:"median_ms"`
 	}
 	if err := e.do(http.MethodGet, "/api/v1/torrents/"+url.PathEscape(strings.ToLower(hash))+"/trackers", nil, "", &trackers); err != nil {
 		return nil, false, err
@@ -1619,6 +1622,9 @@ func (e *gxTorrentEngine) Trackers(hash string) ([]models.TrackerView, bool, err
 			Verified:         tracker.Status == "working",
 			ScrapeComplete:   tracker.Seeders,
 			ScrapeIncomplete: tracker.Leechers,
+			Waiting:          tracker.Waiting,
+			LastAnnounceMs:   tracker.LastMs,
+			MedianAnnounceMs: tracker.MedianMs,
 		}
 		if tracker.Status == "not_working" {
 			view.Fails = 1

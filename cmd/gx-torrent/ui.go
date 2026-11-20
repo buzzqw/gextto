@@ -270,6 +270,10 @@ type uiTrackerRow struct {
 	Seeders  int
 	Leechers int
 	Next     int64
+	// LastMs and MedianMs are how long answered announces took, so a slow
+	// tracker is told from a slow line.
+	LastMs   int64
+	MedianMs int64
 }
 
 type uiDetailData struct {
@@ -2179,6 +2183,8 @@ func (d *Daemon) uiDetailData(hash, tab, lang string) (uiDetailData, error) {
 			data.Trackers = append(data.Trackers, uiTrackerRow{
 				URL: tracker.URL, Status: status, Message: message,
 				Seeders: tracker.Seeders, Leechers: tracker.Leechers, Next: next,
+				LastMs:   int64(tracker.LastLatency / time.Millisecond),
+				MedianMs: int64(tracker.MedianLatency / time.Millisecond),
 			})
 		}
 	case "pieces":
@@ -2324,6 +2330,18 @@ func uiDuration(seconds int64) string {
 	default:
 		return fmt.Sprintf("%ds", secs)
 	}
+}
+
+// uiMsDuration prints a millisecond figure the way a person reads it: "48 ms"
+// under a second, "1.9 s" above, an em dash when there is no figure yet.
+func uiMsDuration(ms int64) string {
+	if ms <= 0 {
+		return "—"
+	}
+	if ms < 1000 {
+		return fmt.Sprintf("%d ms", ms)
+	}
+	return fmt.Sprintf("%.1f s", float64(ms)/1000)
 }
 
 func uiEncryption(level int) string {

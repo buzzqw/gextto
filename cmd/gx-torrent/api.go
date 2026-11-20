@@ -737,6 +737,11 @@ type trackerInfo struct {
 	Leechers     int    `json:"leechers"`
 	Message      string `json:"message,omitempty"`
 	NextAnnounce int64  `json:"next_announce"`
+	// Waiting is true while an announce waits for the tracker's reply;
+	// last_ms and median_ms are how long answered announces took.
+	Waiting  bool  `json:"waiting"`
+	LastMs   int64 `json:"last_ms"`
+	MedianMs int64 `json:"median_ms"`
 }
 
 // scrapeInfo is the live swarm statistic of one tracker (BEP 48).
@@ -843,6 +848,9 @@ func (d *Daemon) handleInspect(w http.ResponseWriter, r *http.Request) {
 			if !tracker.NextAnnounce.IsZero() {
 				item.NextAnnounce = int64(time.Until(tracker.NextAnnounce).Seconds())
 			}
+			item.Waiting = tracker.InFlight
+			item.LastMs = int64(tracker.LastLatency / time.Millisecond)
+			item.MedianMs = int64(tracker.MedianLatency / time.Millisecond)
 			out = append(out, item)
 		}
 		writeJSON(w, http.StatusOK, out)

@@ -81,6 +81,7 @@ func uiTemplateFuncMap() template.FuncMap {
 		"bytes":   uiBytes,
 		"rate":    uiRate,
 		"dur":     uiDuration,
+		"msdur":   uiMsDuration,
 		// stateLabel prints the human name of a state, a catalog key.
 		"stateLabel": uiStateLabel,
 		// stateIcon picks the row's state icon and its label (a catalog key).

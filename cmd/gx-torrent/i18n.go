@@ -919,10 +919,14 @@ var uiCatalog = map[string][5]string{
 	"No peers connected.": {"Nessun peer connesso.", "Keine Peers verbunden.", "Aucun pair connecté.", "Ningún par conectado.", "Brak połączonych peerów."},
 
 	// Trackers tab.
-	"URL":                         {"URL", "URL", "URL", "URL", "URL"},
-	"Message":                     {"Messaggio", "Nachricht", "Message", "Mensaje", "Komunikat"},
-	"Seeds":                       {"Seed", "Seeds", "Seeds", "Seeds", "Seedy"},
-	"Next":                        {"Prossimo", "Nächster", "Prochain", "Próximo", "Następny"},
+	"URL":        {"URL", "URL", "URL", "URL", "URL"},
+	"Message":    {"Messaggio", "Nachricht", "Message", "Mensaje", "Komunikat"},
+	"Seeds":      {"Seed", "Seeds", "Seeds", "Seeds", "Seedy"},
+	"Next":       {"Prossimo", "Nächster", "Prochain", "Próximo", "Następny"},
+	"Last reply": {"Ultima risposta", "Letzte Antwort", "Dernière réponse", "Última respuesta", "Ostatnia odpowiedź"},
+	"Median":     {"Mediana", "Median", "Médiane", "Mediana", "Mediana"},
+	"How long the last announce took to get the tracker's reply: a slow figure belongs to the tracker, not to your line.": {"Quanto ci ha messo l'ultimo annuncio a ricevere la risposta del tracker: un numero alto è del tracker, non della tua linea.", "Wie lange der letzte Announce auf die Antwort des Trackers gewartet hat: ein hoher Wert gehört zum Tracker, nicht zu deiner Leitung.", "Combien de temps le dernier announce a mis à recevoir la réponse du traqueur : une valeur élevée vient du traqueur, pas de votre ligne.", "Cuánto tardó el último announce en recibir la respuesta del tracker: una cifra alta es del tracker, no de tu línea.", "Jak długo ostatni announce czekał na odpowiedź trackera: wysoka wartość należy do trackera, nie do twojego łącza."},
+	"The median of the recent announces: it tells a tracker that is always slow from a single slow reply.":                {"La mediana degli annunci recenti: distingue un tracker sempre lento da una singola risposta lenta.", "Der Median der letzten Announces: er unterscheidet einen dauerhaft langsamen Tracker von einer einzelnen langsamen Antwort.", "La médiane des derniers announces : elle distingue un traqueur toujours lent d'une seule réponse lente.", "La mediana de los últimos announces: distingue un tracker siempre lento de una sola respuesta lenta.", "Mediana ostatnich announce'ów: odróżnia tracker zawsze wolny od jednej wolnej odpowiedzi."},
 	"Remove this tracker":         {"Rimuovi questo tracker", "Diesen Tracker entfernen", "Supprimer ce tracker", "Eliminar este tracker", "Usuń ten tracker"},
 	"No trackers.":                {"Nessun tracker.", "Keine Tracker.", "Aucun tracker.", "Ningún tracker.", "Brak trackerów."},
 	"Add trackers (one per line)": {"Aggiungi tracker (uno per riga)", "Tracker hinzufügen (einer pro Zeile)", "Ajouter des trackers (un par ligne)", "Añadir trackers (uno por línea)", "Dodaj trackery (jeden w wierszu)"},

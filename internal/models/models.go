@@ -942,6 +942,11 @@ type TrackerView struct {
 	ScrapeIncomplete int    `json:"scrape_incomplete"`
 	ScrapeComplete   int    `json:"scrape_complete"`
 	ScrapeDownloaded int    `json:"scrape_downloaded"`
+	// Waiting is true while an announce waits for the reply; the latencies are
+	// milliseconds, the median over the recent announces.
+	Waiting          bool  `json:"waiting"`
+	LastAnnounceMs   int64 `json:"last_ms"`
+	MedianAnnounceMs int64 `json:"median_ms"`
 }
 
 // FileView is one file of a torrent.

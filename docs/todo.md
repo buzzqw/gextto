@@ -32,10 +32,6 @@ still be true after the item lands does not belong here.
   (`MaxRequestsOut` 250, `DefaultRequestsOut` 50) but only the pipelining harness
   reaches those fields. Gate: a settings row on both pages, then the depth can be
   capped by the operator.
-- **Announce latency and queued announces**: the statistics carry neither how
-  long an announce takes nor how many are waiting, so a slow tracker and a slow
-  line look the same. Gate: instrument the announcer, then pick the aggregation
-  (median over a window, not one figure per announce).
 
 ## Gextto, acquisition and UI
 

@@ -254,6 +254,12 @@ type Tracker struct {
 	Warning      string
 	LastAnnounce time.Time
 	NextAnnounce time.Time
+	// InFlight is true while the announce waits for the tracker's reply;
+	// LastLatency and MedianLatency are how long answers take (the median over
+	// the last few announces, 0 before the first).
+	InFlight      bool
+	LastLatency   time.Duration
+	MedianLatency time.Duration
 }
 
 // Trackers snapshots every tracker's status.

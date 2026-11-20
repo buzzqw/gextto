@@ -2297,7 +2297,7 @@ window.gxClearFilters=function(){state.filter={status:'all',cat:null,tag:null,tr
 {{else if eq .Tab "trackers"}}
   {{if .Trackers}}
   <table class="tbl">
-    <thead><tr><th scope="col">{{tr "URL"}}</th><th scope="col">{{tr "State"}}</th><th scope="col" class="num">{{tr "Seeds"}}</th><th scope="col" class="num">{{tr "Peers"}}</th><th scope="col" class="num">{{tr "Next"}}</th><th scope="col"><span class="sr-only">{{tr "Actions"}}</span></th></tr></thead>
+    <thead><tr><th scope="col">{{tr "URL"}}</th><th scope="col">{{tr "State"}}</th><th scope="col" class="num">{{tr "Seeds"}}</th><th scope="col" class="num">{{tr "Peers"}}</th><th scope="col" class="num">{{tr "Next"}}</th><th scope="col" class="num" title="{{tr "How long the last announce took to get the tracker's reply: a slow figure belongs to the tracker, not to your line."}}">{{tr "Last reply"}}</th><th scope="col" class="num" title="{{tr "The median of the recent announces: it tells a tracker that is always slow from a single slow reply."}}">{{tr "Median"}}</th><th scope="col"><span class="sr-only">{{tr "Actions"}}</span></th></tr></thead>
     <tbody>
     {{range .Trackers}}
       <tr><td class="cell-url" title="{{.Message}}"><form method="post" action="/ui/trackers" class="trk-edit">
@@ -2307,6 +2307,8 @@ window.gxClearFilters=function(){state.filter={status:'all',cat:null,tag:null,tr
       </form></td><td>{{.Status}}</td>
       <td class="num">{{.Seeders}}</td><td class="num">{{.Leechers}}</td>
       <td class="num">{{if gt .Next 0}}{{dur .Next}}{{else}}—{{end}}</td>
+      <td class="num">{{msdur .LastMs}}</td>
+      <td class="num">{{msdur .MedianMs}}</td>
       <td><form method="post" action="/ui/trackers"><input type="hidden" name="hash" value="{{$.Hash}}"><input type="hidden" name="tab" value="trackers"><input type="hidden" name="op" value="remove"><input type="hidden" name="url" value="{{.URL}}"><button type="submit" class="ghost icon sm" aria-label="{{tr "Remove this tracker"}}" title="{{tr "Remove this tracker"}}"><svg class="i"><use href="#i-trash"/></svg></button></form></td></tr>
     {{end}}
     </tbody>

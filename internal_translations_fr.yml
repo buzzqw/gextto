@@ -6609,3 +6609,8 @@ fra:
   "Cartella in cui emule-qt salva i file completati: Gextto li importa da qui.": "Dossier où emule-qt enregistre les fichiers terminés : Gextto les importe d'ici."
   "Cartella in cui emule-qt tiene i file incompleti: un torrent dello stesso file ne prende i pezzi già verificati.": "Dossier où emule-qt garde les fichiers incomplets : un torrent du même fichier y prend les pièces déjà vérifiées."
   "emule-qt": "emule-qt"
+  "Annunci in corso": "Annonces en cours"
+  "Mediana della risposta": "Médiane de la réponse"
+  "Mediana": "Médiane"
+  "Quanto ci ha messo l'ultimo annuncio a ricevere la risposta del tracker: un numero alto è del tracker, non della tua linea.": "Combien de temps le dernier announce a mis à recevoir la réponse du traqueur : une valeur élevée vient du traqueur, pas de votre ligne."
+  "La mediana degli annunci recenti: distingue un tracker sempre lento da una singola risposta lenta.": "La médiane des derniers announces : elle distingue un traqueur toujours lent d'une seule réponse lente."

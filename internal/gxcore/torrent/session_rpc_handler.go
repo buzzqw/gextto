@@ -344,6 +344,9 @@ func trackerToRPC(t Tracker) rpctypes.Tracker {
 	if !t.NextAnnounce.IsZero() {
 		out.NextAnnounce = rpctypes.Time{Time: t.NextAnnounce}
 	}
+	out.InFlight = t.InFlight
+	out.LastAnnounceMs = int64(t.LastLatency / time.Millisecond)
+	out.MedianAnnounceMs = int64(t.MedianLatency / time.Millisecond)
 	return out
 }
 

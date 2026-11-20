@@ -6563,3 +6563,8 @@ spa:
   "Cartella in cui emule-qt salva i file completati: Gextto li importa da qui.": "Carpeta donde emule-qt guarda los archivos terminados: Gextto los importa desde aquí."
   "Cartella in cui emule-qt tiene i file incompleti: un torrent dello stesso file ne prende i pezzi già verificati.": "Carpeta donde emule-qt guarda los archivos incompletos: un torrent del mismo archivo toma de ella las piezas ya verificadas."
   "emule-qt": "emule-qt"
+  "Annunci in corso": "Anuncios en curso"
+  "Mediana della risposta": "Mediana de la respuesta"
+  "Mediana": "Mediana"
+  "Quanto ci ha messo l'ultimo annuncio a ricevere la risposta del tracker: un numero alto è del tracker, non della tua linea.": "Cuánto tardó el último announce en recibir la respuesta del tracker: una cifra alta es del tracker, no de tu línea."
+  "La mediana degli annunci recenti: distingue un tracker sempre lento da una singola risposta lenta.": "La mediana de los últimos announces: distingue un tracker siempre lento de una sola respuesta lenta."

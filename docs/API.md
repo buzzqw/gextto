@@ -593,7 +593,11 @@ torrent's share of a limited line in percent, 100 = normal) and `dht`, `pex`,
 `lsd` (`1`/`0`); a field left out keeps its value, and a private torrent keeps
 DHT, PEX and LSD off whatever is sent. The list (`GET /api/v1/torrents`) reports
 `bandwidth_weight`, `dht`, `pex` and `lsd`, and the peers (`…/peers`) a
-`country` when a country database is configured.
+`country` when a country database is configured. The trackers (`…/trackers`)
+report each tracker's `status`, `seeders`, `leechers` and `next_announce`
+(seconds), `waiting` while an announce awaits its reply, and the announce time
+in milliseconds: `last_ms` for the last answered announce and `median_ms` over
+the last twenty, so a slow tracker is told from a slow line.
 
 ### qBittorrent-compatible API (`/api/v2`)
 

@@ -141,6 +141,9 @@ func v2TemplateFuncMap() template.FuncMap {
 			return fmt.Sprintf(" · %d min", minutes)
 		},
 		"div": func(a, b int64) int64 { return a / b },
+		// msdur prints a millisecond figure as a person reads it ("48 ms",
+		// "1.9 s"), an em dash when there is none yet.
+		"msdur": v2MsDuration,
 		// tr, trTitle and trBreak are bound to a dictionary by v2TemplatesFor;
 		// these Italian-only versions let the package-level set parse.
 		"tr":      v2TranslateFunc(nil, nil),
@@ -2170,8 +2173,12 @@ type v2DetailView struct {
 	Tabs     []v2DetailTab
 	General  []v2KV
 	Trackers []models.TrackerView
-	Files    []models.FileView
-	Peers    []models.PeerView
+	// AnnounceInFlight counts the trackers of this torrent waiting for a
+	// reply; AnnounceMedianMs is the median announce time across them.
+	AnnounceInFlight int
+	AnnounceMedianMs int64
+	Files            []models.FileView
+	Peers            []models.PeerView
 	// PeerCountries: some peer carries a country, credited to DB-IP.
 	PeerCountries bool
 	// AcqID is the short acquisition ID printed in the log (`acq: 7f3a2c`).
@@ -2483,6 +2490,14 @@ func v2DetailViewFrom(s *AppState, hash, tab string) v2DetailView {
 		var trackers []models.TrackerView
 		trackers, _, tabErr = s.activeEngine().Trackers(hash)
 		view.Trackers = v2RealTrackers(trackers)
+		for _, tracker := range view.Trackers {
+			if tracker.Waiting {
+				view.AnnounceInFlight++
+			}
+			if tracker.MedianAnnounceMs > view.AnnounceMedianMs {
+				view.AnnounceMedianMs = tracker.MedianAnnounceMs
+			}
+		}
 	case "files":
 		view.Files, _, tabErr = s.activeEngine().Files(hash)
 	case "peers":
@@ -3738,4 +3753,16 @@ func V2GxLogsPartial(w http.ResponseWriter, r *http.Request, s *AppState) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte(body))
+}
+
+// v2MsDuration prints a millisecond figure the way a person reads it: "48 ms"
+// under a second, "1.9 s" above, an em dash when there is no figure yet.
+func v2MsDuration(ms int64) string {
+	if ms <= 0 {
+		return "—"
+	}
+	if ms < 1000 {
+		return fmt.Sprintf("%d ms", ms)
+	}
+	return fmt.Sprintf("%.1f s", float64(ms)/1000)
 }

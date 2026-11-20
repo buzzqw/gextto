@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/url"
 	"reflect"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -56,9 +57,16 @@ type PeriodicalAnnouncer struct {
 	getTorrent    func() tracker.Torrent
 	lastAnnounce  time.Time
 	nextAnnounce  time.Time
-	HasAnnounced  bool
-	responseC     chan *tracker.AnnounceResponse
-	errC          chan error
+	// announceStarted is when the announce in flight left; the reply or the
+	// error that arrives on the loop after it gives its duration, which feeds
+	// the latency window the statistics report.
+	announceStarted time.Time
+	// latencies keeps the last announceLatencyWindow durations, so the median
+	// tells a slow tracker from one slow announce.
+	latencies    []time.Duration
+	HasAnnounced bool
+	responseC    chan *tracker.AnnounceResponse
+	errC         chan error
 	// onResult, when set, observes every announce outcome. It runs on the
 	// announcer goroutine and must not block.
 	onResult func(*tracker.AnnounceResponse, error)
@@ -215,6 +223,7 @@ func (a *PeriodicalAnnouncer) resetTimer(timer *time.Timer, interval time.Durati
 // hook, warning, refreshed schedule (honoring the tracker's min-interval),
 // and the peer handoff to the torrent.
 func (a *PeriodicalAnnouncer) handleResponse(timer *time.Timer, resp *tracker.AnnounceResponse) {
+	a.recordAnnounceLatency()
 	a.status = Working
 	a.seeders = int(resp.Seeders)
 	a.leechers = int(resp.Leechers)
@@ -244,6 +253,7 @@ func (a *PeriodicalAnnouncer) handleResponse(timer *time.Timer, resp *tracker.An
 // handleError absorbs one announce failure: humanized error, logging by
 // severity, and reschedule on backoff (or the tracker's retry-in).
 func (a *PeriodicalAnnouncer) handleError(timer *time.Timer, err error) {
+	a.recordAnnounceLatency()
 	a.status = NotWorking
 	if a.onResult != nil {
 		a.onResult(nil, err)
@@ -275,6 +285,7 @@ func (a *PeriodicalAnnouncer) getNextIntervalFromError(err *AnnounceError) time.
 }
 
 func (a *PeriodicalAnnouncer) doAnnounce(ctx context.Context, event tracker.Event, numWant int) {
+	a.announceStarted = time.Now()
 	go a.announce(ctx, event, numWant)
 	a.status = Contacting
 	a.lastAnnounce = time.Now()
@@ -293,17 +304,67 @@ type Stats struct {
 	Leechers     int
 	LastAnnounce time.Time
 	NextAnnounce time.Time
+	// InFlight is true while an announce waits for the tracker's reply.
+	InFlight bool
+	// LastLatency is the duration of the last announce that got an answer
+	// (reply or error; 0 before the first), MedianLatency the median over the
+	// last announceLatencyWindow announces and LatencySamples how many are in
+	// that window.
+	LastLatency    time.Duration
+	MedianLatency  time.Duration
+	LatencySamples int
+}
+
+// announceLatencyWindow is how many announce durations the median is taken
+// over: long enough to smooth one slow reply, short enough to follow a tracker
+// that degrades.
+const announceLatencyWindow = 20
+
+// recordAnnounceLatency closes the announce in flight and adds its duration to
+// the window. It runs on the Run goroutine only.
+func (a *PeriodicalAnnouncer) recordAnnounceLatency() {
+	if a.announceStarted.IsZero() {
+		return
+	}
+	a.latencies = append(a.latencies, time.Since(a.announceStarted))
+	if len(a.latencies) > announceLatencyWindow {
+		a.latencies = a.latencies[len(a.latencies)-announceLatencyWindow:]
+	}
+	a.announceStarted = time.Time{}
+}
+
+// medianDuration is the median of the values (0 with none): the figure that
+// tells a slow tracker from a single slow announce.
+func medianDuration(values []time.Duration) time.Duration {
+	if len(values) == 0 {
+		return 0
+	}
+	sorted := append([]time.Duration(nil), values...)
+	sort.Slice(sorted, func(i, j int) bool { return sorted[i] < sorted[j] })
+	middle := len(sorted) / 2
+	if len(sorted)%2 == 1 {
+		return sorted[middle]
+	}
+	return (sorted[middle-1] + sorted[middle]) / 2
 }
 
 func (a *PeriodicalAnnouncer) stats() Stats {
+	var last time.Duration
+	if len(a.latencies) > 0 {
+		last = a.latencies[len(a.latencies)-1]
+	}
 	return Stats{
-		Status:       a.status,
-		Error:        a.lastError,
-		Warning:      a.warningMsg,
-		Seeders:      a.seeders,
-		Leechers:     a.leechers,
-		LastAnnounce: a.lastAnnounce,
-		NextAnnounce: a.nextAnnounce,
+		Status:         a.status,
+		Error:          a.lastError,
+		Warning:        a.warningMsg,
+		Seeders:        a.seeders,
+		Leechers:       a.leechers,
+		LastAnnounce:   a.lastAnnounce,
+		NextAnnounce:   a.nextAnnounce,
+		InFlight:       a.status == Contacting,
+		LastLatency:    last,
+		MedianLatency:  medianDuration(a.latencies),
+		LatencySamples: len(a.latencies),
 	}
 }
 

@@ -60,6 +60,11 @@ type Tracker struct {
 	ErrorInternal string
 	LastAnnounce  Time
 	NextAnnounce  Time
+	// InFlight is true while the announce waits for the reply; the latencies
+	// are milliseconds, the median over the last few announces.
+	InFlight         bool
+	LastAnnounceMs   int64
+	MedianAnnounceMs int64
 }
 
 // File is a file inside a torrent.

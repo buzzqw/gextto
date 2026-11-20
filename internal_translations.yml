@@ -5952,3 +5952,8 @@ eng:
   "Cartella in cui emule-qt salva i file completati: Gextto li importa da qui.": "Folder where emule-qt saves finished files: Gextto imports them from here."
   "Cartella in cui emule-qt tiene i file incompleti: un torrent dello stesso file ne prende i pezzi già verificati.": "Folder where emule-qt keeps unfinished files: a torrent of the same file takes the pieces already verified from it."
   "emule-qt": "emule-qt"
+  "Annunci in corso": "Announces in flight"
+  "Mediana della risposta": "Median reply time"
+  "Mediana": "Median"
+  "Quanto ci ha messo l'ultimo annuncio a ricevere la risposta del tracker: un numero alto è del tracker, non della tua linea.": "How long the last announce took to get the tracker's reply: a slow figure belongs to the tracker, not to your line."
+  "La mediana degli annunci recenti: distingue un tracker sempre lento da una singola risposta lenta.": "The median of the recent announces: it tells a tracker that is always slow from a single slow reply."
