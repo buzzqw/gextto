@@ -296,7 +296,8 @@ Every page is checked with axe-core (WCAG 2 A/AA) in both themes.
   streaming** with a labelled *Stream* button), *Peers*
   (connection flags, transport, encryption; **add peers** by `ip:port` and
   **ban** a peer's IP for 30 minutes, `POST /ui/peers`), *Trackers* (status,
-  swarm, add, **edit the URL** and remove), *Pieces* (coloured map), *Speed*
+  swarm, add, **edit the URL**, **switch one off and on without removing it**,
+  and remove), *Pieces* (coloured map), *Speed*
   (the torrent's rates over the last four minutes, sampled by the page from the
   list refresh, no server history) and *Log* (the torrent's last 50 events kept
   in memory by `torrentlog.go`: added, completed, stopped, errors, tracker
@@ -1585,6 +1586,16 @@ RPC server is disabled.
     to be entered into the routing tables (`ro`); it is activated with
     `-dht-read-only` (`GX_TORRENT_DHT_READ_ONLY`).
 - **Trackers and BEP 31** (`retry in`).
+  - **A tracker can be switched off and on again by hand.** A switched-off
+    tracker leaves the engine (it gets one last `stopped` announce, then nothing,
+    so it cannot count us in its swarm), but its URL is remembered in `state.json`: the
+    tracker stays in the tab with the state *disabled*, survives a restart, and
+    the public tracker list does not add it back. Switching it on adds it to the
+    end of the list and announces at the next round. **Removing** it, on the
+    other hand, forgets the URL. The REST action is `tracker-enabled`
+    (`url`, `enabled=1/0`) and `GET …/trackers` reports `enabled`; the
+    qBittorrent-compatible API has no field for it, as qBittorrent does not
+    either.
   - A tracker that responds with `failure reason` and `retry in: N` postpones the
     next announce by N minutes (announce and scrape, HTTP and UDP).
   - `retry in: never` **discards the tracker from the tier**: it is no longer
@@ -2831,6 +2842,8 @@ Actions available on `POST /api/v1/torrents/{hash}/{action}`:
 - `conn-limits` (`max_connections`, `max_uploads`: -1 and 0 = no per-torrent cap);
 - `trackers` (with `urls`, one per line);
 - `set-trackers` (with `urls`, one per line: **replaces** the list, an empty list clears it);
+- `tracker-enabled` (with `url` and `enabled=1/0`: switches one tracker off or
+  back on without deleting it; the URL is kept in the torrent's state);
 - `webseeds` (with `urls`, one per line, and `remove=1` to remove them);
 - `super-seeding` (with `enabled=1/0`: BEP 16 on the completed torrent);
 - `file-priorities` (with `priorities`, comma-separated; 0 = skip, 1..4 normal, 5..7 high).

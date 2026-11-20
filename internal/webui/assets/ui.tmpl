@@ -2309,7 +2309,7 @@ window.gxClearFilters=function(){state.filter={status:'all',cat:null,tag:null,tr
       <td class="num">{{if gt .Next 0}}{{dur .Next}}{{else}}—{{end}}</td>
       <td class="num">{{if .Waiting}}{{tr "waiting"}}{{else}}{{msdur .LastMs}}{{end}}</td>
       <td class="num">{{msdur .MedianMs}}</td>
-      <td><form method="post" action="/ui/trackers"><input type="hidden" name="hash" value="{{$.Hash}}"><input type="hidden" name="tab" value="trackers"><input type="hidden" name="op" value="remove"><input type="hidden" name="url" value="{{.URL}}"><button type="submit" class="ghost icon sm" aria-label="{{tr "Remove this tracker"}}" title="{{tr "Remove this tracker"}}"><svg class="i"><use href="#i-trash"/></svg></button></form></td></tr>
+      <td><form method="post" action="/ui/trackers"><input type="hidden" name="hash" value="{{$.Hash}}"><input type="hidden" name="tab" value="trackers"><input type="hidden" name="op" value="toggle"><input type="hidden" name="url" value="{{.URL}}"><input type="hidden" name="enabled" value="{{if .Enabled}}0{{else}}1{{end}}"><button type="submit" class="ghost icon sm" aria-label="{{if .Enabled}}{{tr "Switch this tracker off"}}{{else}}{{tr "Switch this tracker on"}}{{end}}" title="{{if .Enabled}}{{tr "Switch this tracker off: the torrent keeps its URL and sends no announce until you switch it back on"}}{{else}}{{tr "Switch this tracker on again: it announces at the next round"}}{{end}}"><svg class="i"><use href="#i-{{if .Enabled}}pause{{else}}play{{end}}"/></svg></button></form><form method="post" action="/ui/trackers"><input type="hidden" name="hash" value="{{$.Hash}}"><input type="hidden" name="tab" value="trackers"><input type="hidden" name="op" value="remove"><input type="hidden" name="url" value="{{.URL}}"><button type="submit" class="ghost icon sm" aria-label="{{tr "Remove this tracker"}}" title="{{tr "Remove this tracker"}}"><svg class="i"><use href="#i-trash"/></svg></button></form></td></tr>
     {{end}}
     </tbody>
   </table>
@@ -2319,6 +2319,7 @@ window.gxClearFilters=function(){state.filter={status:'all',cat:null,tag:null,tr
     <label class="wide">{{tr "Add trackers (one per line)"}}<textarea name="urls" rows="3" placeholder="https://tracker.example/announce" title="{{tr "Tracker announce URLs to add, one per line"}}"></textarea></label>
     <div><button type="submit" class="sm" title="{{tr "Add trackers to this torrent"}}">{{tr "Add trackers"}}</button></div>
   </form>
+  <p class="muted">{{tr "A tracker switched off keeps its URL in this list and receives no announce; switch it back on when you want it to answer again. Removing it, on the other hand, forgets the URL."}}</p>
 {{else if eq .Tab "speed"}}
   <div class="graph tgraph" id="tgraph" data-hash="{{.Hash}}">
     <svg viewBox="0 0 300 80" preserveAspectRatio="none" role="img" aria-labelledby="tg-cap"><path class="da" id="tg-da"/><path class="d" id="tg-d"/><path class="u" id="tg-u"/></svg>

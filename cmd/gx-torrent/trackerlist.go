@@ -237,8 +237,15 @@ func (d *Daemon) applyTrackerListLocked() {
 		if stats.Private {
 			continue
 		}
+		off := make(map[string]bool, len(meta.TrackerOff))
+		for _, url := range meta.TrackerOff {
+			off[strings.TrimSpace(url)] = true
+		}
 		added := 0
 		for _, tracker := range list {
+			if off[tracker] {
+				continue
+			}
 			if err := t.AddTracker(tracker); err == nil {
 				added++
 			}

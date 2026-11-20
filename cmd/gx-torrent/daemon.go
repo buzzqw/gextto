@@ -10,6 +10,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -151,6 +152,10 @@ type torrentMeta struct {
 	// TrackerListPending: the tracker list is still to be appended, once the
 	// metadata shows the torrent is public.
 	TrackerListPending bool `json:"tracker_list_pending,omitempty"`
+	// TrackerOff are the announce URLs switched off by hand: they keep their
+	// place in this list, receive no announce, and are not re-added by the
+	// public tracker list or a restart. Removing the tracker forgets the URL.
+	TrackerOff []string `json:"tracker_off,omitempty"`
 	// NoLSD keeps this torrent out of Local Service Discovery.
 	NoLSD bool `json:"no_lsd,omitempty"`
 	// AutoTMM: the category decides the save path (qBittorrent automatic torrent
@@ -864,6 +869,26 @@ func (d *Daemon) reconcileLocked() {
 		// Super-seeding is a per-torrent seeding strategy; keep it in sync with
 		// the daemon state (the engine persists it too).
 		_ = t.SetSuperSeeding(meta.SuperSeeding)
+		// A tracker switched off by hand is removed again when an older resume
+		// still carries it: the engine stores only the trackers that announce.
+		if len(meta.TrackerOff) > 0 {
+			off := make(map[string]bool, len(meta.TrackerOff))
+			for _, url := range meta.TrackerOff {
+				off[strings.TrimSpace(url)] = true
+			}
+			listed := t.Trackers()
+			keep := make([]string, 0, len(listed))
+			for _, tr := range listed {
+				if !off[strings.TrimSpace(tr.URL)] {
+					keep = append(keep, tr.URL)
+				}
+			}
+			if len(keep) != len(listed) {
+				if err := t.SetTrackers(keep); err != nil {
+					logfError("cannot keep the switched-off trackers off for %s: %v", meta.Hash, err)
+				}
+			}
+		}
 		// Torrents parked or paused must not run, whatever the engine restored.
 		if meta.UserPaused || meta.Parked {
 			_ = t.Stop()
@@ -2411,21 +2436,27 @@ func (d *Daemon) removeTrackers(key string, urls []string) error {
 	for _, u := range urls {
 		drop[strings.TrimSpace(u)] = true
 	}
-	return d.withTorrent(key, func(t *torrent.Torrent, _ *torrentMeta) error {
+	return d.withTorrent(key, func(t *torrent.Torrent, meta *torrentMeta) error {
 		var keep []string
 		for _, tr := range t.Trackers() {
 			if !drop[strings.TrimSpace(tr.URL)] {
 				keep = append(keep, tr.URL)
 			}
 		}
-		return t.SetTrackers(keep)
+		if err := t.SetTrackers(keep); err != nil {
+			return err
+		}
+		// Removing a tracker forgets it: it is not left in the switched-off
+		// list waiting to be re-enabled.
+		meta.TrackerOff = withoutStrings(meta.TrackerOff, urls)
+		return nil
 	})
 }
 
 // editTracker replaces one tracker URL with another.
 func (d *Daemon) editTracker(key, origURL, newURL string) error {
 	origURL = strings.TrimSpace(origURL)
-	return d.withTorrent(key, func(t *torrent.Torrent, _ *torrentMeta) error {
+	return d.withTorrent(key, func(t *torrent.Torrent, meta *torrentMeta) error {
 		var list []string
 		for _, tr := range t.Trackers() {
 			if strings.TrimSpace(tr.URL) == origURL {
@@ -2434,8 +2465,102 @@ func (d *Daemon) editTracker(key, origURL, newURL string) error {
 				list = append(list, tr.URL)
 			}
 		}
-		return t.SetTrackers(list)
+		if err := t.SetTrackers(list); err != nil {
+			return err
+		}
+		meta.TrackerOff = replaceString(meta.TrackerOff, origURL, newURL)
+		return nil
 	})
+}
+
+// setTrackerEnabled switches one tracker off or back on without losing its
+// URL: a switched-off tracker is removed from the engine (no announce is sent)
+// and remembered in the torrent's state, so it survives a restart and comes
+// back when the operator asks. The order of the other trackers is untouched;
+// one switched back on is appended, as when it is added again.
+func (d *Daemon) setTrackerEnabled(key, rawURL string, enabled bool) error {
+	rawURL = strings.TrimSpace(rawURL)
+	if rawURL == "" {
+		return errors.New("the tracker URL is required")
+	}
+	return d.withTorrent(key, func(t *torrent.Torrent, meta *torrentMeta) error {
+		present := false
+		var keep []string
+		for _, tr := range t.Trackers() {
+			if strings.TrimSpace(tr.URL) == rawURL {
+				present = true
+				continue
+			}
+			keep = append(keep, tr.URL)
+		}
+		if enabled {
+			if present {
+				return nil
+			}
+			if err := t.AddTracker(rawURL); err != nil {
+				return err
+			}
+			meta.TrackerOff = withoutStrings(meta.TrackerOff, []string{rawURL})
+			return nil
+		}
+		if !present {
+			// Already off: remember it anyway, so a restart does not bring it
+			// back from a resume written by an older version. A URL the torrent
+			// never had is a mistake, not a tracker to hide.
+			if !slices.Contains(meta.TrackerOff, rawURL) {
+				return fmt.Errorf("tracker %q is not in this torrent", rawURL)
+			}
+			meta.TrackerOff = withStrings(meta.TrackerOff, []string{rawURL})
+			return nil
+		}
+		if err := t.SetTrackers(keep); err != nil {
+			return err
+		}
+		meta.TrackerOff = withStrings(meta.TrackerOff, []string{rawURL})
+		return nil
+	})
+}
+
+// withStrings adds values to a URL list, trimmed and without duplicates.
+func withStrings(list []string, values []string) []string {
+	seen := make(map[string]bool, len(list)+len(values))
+	out := make([]string, 0, len(list)+len(values))
+	for _, value := range append(append([]string(nil), list...), values...) {
+		value = strings.TrimSpace(value)
+		if value == "" || seen[value] {
+			continue
+		}
+		seen[value] = true
+		out = append(out, value)
+	}
+	return out
+}
+
+// withoutStrings removes values from a URL list.
+func withoutStrings(list []string, values []string) []string {
+	drop := make(map[string]bool, len(values))
+	for _, value := range values {
+		drop[strings.TrimSpace(value)] = true
+	}
+	out := make([]string, 0, len(list))
+	for _, value := range list {
+		if !drop[strings.TrimSpace(value)] {
+			out = append(out, value)
+		}
+	}
+	return out
+}
+
+// replaceString renames one value in a URL list, keeping its position.
+func replaceString(list []string, old, new string) []string {
+	out := make([]string, 0, len(list))
+	for _, value := range list {
+		if strings.TrimSpace(value) == strings.TrimSpace(old) {
+			value = strings.TrimSpace(new)
+		}
+		out = append(out, value)
+	}
+	return out
 }
 
 // moveToTop puts a queued download at the head of the queue.
@@ -2504,21 +2629,28 @@ func (d *Daemon) toggleFirstLast(key string) error {
 }
 
 func (d *Daemon) addTrackers(key string, urls []string) error {
-	return d.withTorrent(key, func(t *torrent.Torrent, _ *torrentMeta) error {
+	return d.withTorrent(key, func(t *torrent.Torrent, meta *torrentMeta) error {
 		for _, url := range urls {
 			if err := t.AddTracker(url); err != nil {
 				return err
 			}
 		}
+		// Adding a URL by hand is also asking for it back on.
+		meta.TrackerOff = withoutStrings(meta.TrackerOff, urls)
 		return nil
 	})
 }
 
 // setTrackers replaces the torrent's tracker list; an empty list removes every
-// tracker. Unlike addTrackers it is not additive.
+// tracker. Unlike addTrackers it is not additive, and the new list is the whole
+// truth: a tracker switched off before and still named here is on again.
 func (d *Daemon) setTrackers(key string, urls []string) error {
-	return d.withTorrent(key, func(t *torrent.Torrent, _ *torrentMeta) error {
-		return t.SetTrackers(urls)
+	return d.withTorrent(key, func(t *torrent.Torrent, meta *torrentMeta) error {
+		if err := t.SetTrackers(urls); err != nil {
+			return err
+		}
+		meta.TrackerOff = nil
+		return nil
 	})
 }
 

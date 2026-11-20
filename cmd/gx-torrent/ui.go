@@ -267,6 +267,7 @@ type uiTrackerRow struct {
 	URL      string
 	Status   string
 	Message  string
+	Enabled  bool
 	Seeders  int
 	Leechers int
 	Next     int64
@@ -1356,20 +1357,14 @@ func (d *Daemon) handleUITrackers(w http.ResponseWriter, r *http.Request) {
 	}
 	_ = r.ParseForm()
 	hash := strings.TrimSpace(r.FormValue("hash"))
-	if r.FormValue("op") == "remove" {
+	if r.FormValue("op") == "toggle" {
 		url := strings.TrimSpace(r.FormValue("url"))
-		var remaining []string
-		d.mu.Lock()
-		t, _ := d.findLocked(hash)
-		d.mu.Unlock()
-		if t != nil {
-			for _, tr := range t.Trackers() {
-				if tr.URL != url {
-					remaining = append(remaining, tr.URL)
-				}
-			}
-		}
-		err := d.setTrackers(hash, remaining)
+		err := d.setTrackerEnabled(hash, url, formBool(r, "enabled"))
+		d.uiDoneDetail(w, r, hash, "trackers", "Tracker switched", err)
+		return
+	}
+	if r.FormValue("op") == "remove" {
+		err := d.removeTrackers(hash, []string{strings.TrimSpace(r.FormValue("url"))})
 		d.uiDoneDetail(w, r, hash, "trackers", "Tracker removed", err)
 		return
 	}
@@ -2072,8 +2067,21 @@ func (d *Daemon) uiDetailData(hash, tab, lang string) (uiDetailData, error) {
 	}
 
 	trackers := t.Trackers()
+	d.mu.Lock()
+	offTrackers := append([]string(nil), d.metaLocked(t).TrackerOff...)
+	d.mu.Unlock()
+	offSeen := make(map[string]bool, len(trackers))
+	for _, tracker := range trackers {
+		offSeen[strings.TrimSpace(tracker.URL)] = true
+	}
+	extraOff := 0
+	for _, url := range offTrackers {
+		if !offSeen[strings.TrimSpace(url)] {
+			extraOff++
+		}
+	}
 	data.PeerCount = len(t.Peers())
-	data.TrackerCount = len(trackers)
+	data.TrackerCount = len(trackers) + extraOff
 	for _, tracker := range trackers {
 		if !tracker.NextAnnounce.IsZero() {
 			if next := int64(time.Until(tracker.NextAnnounce).Seconds()); next >= 0 &&
@@ -2183,11 +2191,21 @@ func (d *Daemon) uiDetailData(hash, tab, lang string) (uiDetailData, error) {
 				next = int64(time.Until(tracker.NextAnnounce).Seconds())
 			}
 			data.Trackers = append(data.Trackers, uiTrackerRow{
-				URL: tracker.URL, Status: status, Message: message,
+				URL: tracker.URL, Status: status, Message: message, Enabled: true,
 				Seeders: tracker.Seeders, Leechers: tracker.Leechers, Next: next,
 				Waiting:  tracker.InFlight,
 				LastMs:   int64(tracker.LastLatency / time.Millisecond),
 				MedianMs: int64(tracker.MedianLatency / time.Millisecond),
+			})
+		}
+		for _, url := range offTrackers {
+			url = strings.TrimSpace(url)
+			if url == "" || offSeen[url] {
+				continue
+			}
+			offSeen[url] = true
+			data.Trackers = append(data.Trackers, uiTrackerRow{
+				URL: url, Status: uiTr(lang, "disabled"),
 			})
 		}
 	case "pieces":

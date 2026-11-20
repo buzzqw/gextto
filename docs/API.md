@@ -583,7 +583,7 @@ the fewest connected peers holding a needed piece, `-1` when nothing is needed),
 `verify`, `reannounce`, `restart`, `park`, `unpark`, `pin`, `top`, `rename`,
 `rename-file`, `rename-folder`, `move`, `associate`, `seed-limits`,
 `conn-limits`, `super-seeding`, `peer-options`, `external-merge`,
-`file-priorities`, `trackers`, `set-trackers`, `webseeds`. `external-merge` takes
+`file-priorities`, `trackers`, `set-trackers`, `tracker-enabled`, `webseeds`. `external-merge` takes
 `file_index` and an absolute `path`: a downloading torrent adopts from that file
 (another program's copy of the same file, such as aMule's `.part`) the pieces of
 that torrent file that pass its own hash check; the file must have the torrent
@@ -595,7 +595,7 @@ torrent's share of a limited line in percent, 100 = normal) and `dht`, `pex`,
 DHT, PEX and LSD off whatever is sent. The list (`GET /api/v1/torrents`) reports
 `bandwidth_weight`, `dht`, `pex` and `lsd`, and the peers (`…/peers`) a
 `country` when a country database is configured. The trackers (`…/trackers`)
-report each tracker's `status`, `seeders`, `leechers` and `next_announce`
+report each tracker's `enabled`, `status`, `seeders`, `leechers` and `next_announce`
 (seconds), `waiting` while an announce awaits its reply, and the announce time
 in milliseconds: `last_ms` for the last answered announce and `median_ms` over
 the last twenty, so a slow tracker is told from a slow line.

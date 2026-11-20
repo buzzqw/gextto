@@ -680,6 +680,8 @@ func (d *Daemon) handleAction(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		err = d.addTrackers(hash, urls)
+	case "tracker-enabled":
+		err = d.setTrackerEnabled(hash, r.FormValue("url"), formBool(r, "enabled"))
 	case "set-trackers":
 		var urls []string
 		for _, line := range strings.Split(r.FormValue("urls"), "\n") {
@@ -731,8 +733,11 @@ type peerInfo struct {
 }
 
 type trackerInfo struct {
-	URL          string `json:"url"`
-	Status       string `json:"status"`
+	URL    string `json:"url"`
+	Status string `json:"status"`
+	// Enabled is false for a tracker switched off by hand: it is listed so it
+	// can be switched back on, but it sends no announce.
+	Enabled      bool   `json:"enabled"`
 	Seeders      int    `json:"seeders"`
 	Leechers     int    `json:"leechers"`
 	Message      string `json:"message,omitempty"`
@@ -830,8 +835,10 @@ func (d *Daemon) handleInspect(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, out)
 	case "trackers":
 		out := []trackerInfo{}
+		seen := map[string]bool{}
 		for _, tracker := range t.Trackers() {
-			item := trackerInfo{URL: tracker.URL, Seeders: tracker.Seeders, Leechers: tracker.Leechers, Message: tracker.Warning}
+			item := trackerInfo{URL: tracker.URL, Enabled: true, Seeders: tracker.Seeders, Leechers: tracker.Leechers, Message: tracker.Warning}
+			seen[strings.TrimSpace(tracker.URL)] = true
 			switch tracker.Status {
 			case torrent.Working:
 				item.Status = "working"
@@ -852,6 +859,17 @@ func (d *Daemon) handleInspect(w http.ResponseWriter, r *http.Request) {
 			item.LastMs = int64(tracker.LastLatency / time.Millisecond)
 			item.MedianMs = int64(tracker.MedianLatency / time.Millisecond)
 			out = append(out, item)
+		}
+		d.mu.Lock()
+		off := append([]string(nil), d.metaLocked(t).TrackerOff...)
+		d.mu.Unlock()
+		for _, url := range off {
+			url = strings.TrimSpace(url)
+			if url == "" || seen[url] {
+				continue
+			}
+			seen[url] = true
+			out = append(out, trackerInfo{URL: url, Status: "disabled"})
 		}
 		writeJSON(w, http.StatusOK, out)
 	case "scrape":

@@ -256,6 +256,16 @@ func (t *torrent) bytesComplete() int64 {
 
 // getTrackers snapshots every announcer's status.
 func (t *torrent) getTrackers() []Tracker {
+	// A stopped torrent has no announcers but keeps its configured trackers:
+	// the list, the tracker tab and the enable/disable action must still see
+	// them, with no announce state to report.
+	if len(t.announcers) == 0 && len(t.trackers) > 0 {
+		trackers := make([]Tracker, len(t.trackers))
+		for i, tr := range t.trackers {
+			trackers[i] = Tracker{URL: tr.URL(), Status: NotContactedYet}
+		}
+		return trackers
+	}
 	trackers := make([]Tracker, len(t.announcers))
 	for i, an := range t.announcers {
 		st := an.Stats()

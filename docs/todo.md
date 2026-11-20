@@ -78,11 +78,6 @@ Each waits for the operator's choice.
   90% starts again from zero. Gate: persist a verified prefix (bitfield plus
   count) or let the check finish at low I/O priority, with a test that counts the
   pieces read after stop/start on a large torrent.
-- **Per-tracker enable/disable**: the daemon disables a tracker that never
-  answered, but cannot temporarily switch one off and back on without deleting
-  it and losing its position and passkey. Gate: a persisted `enabled` flag per
-  URL, honoured by the announcer, in `/api/v1` and in the page (rTorrent's
-  `t.is_enabled` and Flood's tracker tab are the model).
 - **A separate budget for metadata**: a magnet with no metadata occupies a
   download slot until it resolves, so with `active_downloads=3` only three
   magnets resolve at a time. Gate: a measurement of a bulk add of 50 magnets
