@@ -62,4 +62,12 @@ Each waits for the operator's choice.
 - **Faster flows**: a missing count on the Dashboard linking to the tab, undo instead of confirmation for reversible removals with a styled dialog for the rest, page navigation without full reloads (`hx-boost`). Gate: the operator's choice; `hx-boost` is done alone, with the Playwright suite green before and after.
 - **Target quality timeframe in pending queue**: releases below the preferred target quality wait in the pending queue for a configurable timeframe (e.g. 4 hours), while any release meeting the target quality bypasses the delay and downloads immediately. Gate: the operator's choice.
 - **Pre-flight swarm health probe**: a fast DHT or tracker scrape probe for releases with missing or zero seeder counts before queuing them, deferring unseeded torrents instead of occupying active slots until stalled timeouts. Gate: the operator's choice.
+- **Notification inbox**: what was sent, when, on which channel and with what
+  outcome; today a failed webhook is only a line in the log, so "the
+  notification did not arrive" cannot be diagnosed from the interface. Gate:
+  the operator's choice.
+- **Announce channels (IRC/Matrix) as an acquisition source**: every source is
+  HTTP polling today, so a release that exists only in an IRC announce is
+  invisible. Gate: the operator's choice, and an indexer with an announce
+  channel to test against.
 - **External watchlist sync**: an optional background worker importing wanted titles from public Trakt or Letterboxd watchlists directly into Gextto's wanted queue. Gate: the operator's choice.
