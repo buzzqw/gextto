@@ -27,6 +27,7 @@ func (t *torrent) handleNewConnection(conn net.Conn) {
 	ip := conn.RemoteAddr().(*net.TCPAddr).IP
 	ipstr := ip.String()
 	if t.session.config.BlocklistEnabledForIncomingConnections && t.session.blocklist != nil && t.session.blocklist.Blocked(ip) {
+		t.session.noteBlocked()
 		t.log.Debugln("peer is blocked:", remote)
 		conn.Close()
 		return

@@ -7,8 +7,10 @@ import (
 	"github.com/buzzqw/gextto/internal/gxcore/internal/tracker"
 )
 
-// maxPeers caps the combined v4+v6 entries past the first PEX message
-// (BEP 11): gossip must stay small on long-lived connections.
+// maxPeers caps the combined v4+v6 entries of one PEX message (BEP 11): gossip
+// must stay small, and there is no reason for the first message to carry more
+// than the ones after it. The peer keeps the addresses we send it and we send
+// the rest on the next flush.
 const maxPeers = 50
 
 // PEXList stages peer addresses for the next PEX message, split into added
@@ -19,7 +21,6 @@ type PEXList struct {
 	dropped  map[tracker.CompactPeer]struct{}
 	added6   map[tracker.CompactPeer6]struct{}
 	dropped6 map[tracker.CompactPeer6]struct{}
-	flushed  bool
 }
 
 // New returns an empty PEXList.
@@ -68,17 +69,12 @@ func (l *PEXList) Drop(addr *net.TCPAddr) {
 	delete(l.added, peer)
 }
 
-// Flush encodes the staged sets as compact strings and resets them. The
-// first flush is uncapped; later ones share the maxPeers budget between the
-// families, IPv4 first.
+// Flush encodes the staged sets as compact strings and resets them. Every
+// message shares the maxPeers budget between the families, IPv4 first: what
+// does not fit stays staged for the next one.
 func (l *PEXList) Flush() (added, added6, dropped, dropped6 string) {
-	limit := -1 // unlimited on the first flush
-	if l.flushed {
-		limit = maxPeers
-	}
-	added, added6 = flushFamily(l.added, l.added6, limit)
-	dropped, dropped6 = flushFamily(l.dropped, l.dropped6, limit)
-	l.flushed = true
+	added, added6 = flushFamily(l.added, l.added6, maxPeers)
+	dropped, dropped6 = flushFamily(l.dropped, l.dropped6, maxPeers)
 	return
 }
 
@@ -97,45 +93,48 @@ func flushFamily(m4 map[tracker.CompactPeer]struct{}, m6 map[tracker.CompactPeer
 }
 
 func flush4(m map[tracker.CompactPeer]struct{}, limit int) string {
-	count := len(m)
-	if limit >= 0 && count > limit {
-		count = limit
-	}
 	var s strings.Builder
-	s.Grow(count * 6)
+	if len(m) < limit {
+		limit = len(m)
+	}
+	s.Grow(limit * 6)
+	sent := 0
 	for p := range m {
-		if count == 0 {
+		if sent == limit {
 			break
 		}
-		count--
 		b, err := p.MarshalBinary()
+		delete(m, p)
 		if err != nil {
-			panic(err)
+			// A peer can hand us an address we cannot encode back (the
+			// tracker and PEX decoders accept shapes we do not send): drop
+			// it instead of panicking on our own gossip.
+			continue
 		}
 		s.Write(b)
-		delete(m, p)
+		sent++
 	}
 	return s.String()
 }
 
 func flush6(m map[tracker.CompactPeer6]struct{}, limit int) string {
-	count := len(m)
-	if limit >= 0 && count > limit {
-		count = limit
-	}
 	var s strings.Builder
-	s.Grow(count * 18)
+	if len(m) < limit {
+		limit = len(m)
+	}
+	s.Grow(limit * 18)
+	sent := 0
 	for p := range m {
-		if count == 0 {
+		if sent == limit {
 			break
 		}
-		count--
 		b, err := p.MarshalBinary()
+		delete(m, p)
 		if err != nil {
-			panic(err)
+			continue
 		}
 		s.Write(b)
-		delete(m, p)
+		sent++
 	}
 	return s.String()
 }

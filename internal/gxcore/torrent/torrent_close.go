@@ -16,11 +16,30 @@ var errClosed = errors.New("torrent is closed")
 // hide our final upload totals from the trackers), then stop the meters.
 func (t *torrent) close() {
 	t.stop(errClosed)
+	// The "stopped" announce goes out first, or the goodbye would travel on a
+	// socket already closed: these trackers are released once it is done, and a
+	// WebSocket tracker owns a socket nothing else would close before the
+	// session ends.
 	if a := t.stoppedEventAnnouncer; a != nil {
-		t.session.detachedAnnouncers.Go(func() { <-a.Done() })
+		t.session.detachedAnnouncers.Go(func() {
+			<-a.Done()
+			t.releaseTrackers()
+		})
+	} else {
+		t.releaseTrackers()
 	}
 	t.downloadSpeed.Stop()
 	t.uploadSpeed.Stop()
+}
+
+// releaseTrackers closes every tracker this torrent announced to.
+func (t *torrent) releaseTrackers() {
+	if t.session.trackerManager == nil {
+		return
+	}
+	for _, tr := range t.trackers {
+		t.session.trackerManager.Release(tr)
+	}
 }
 
 // closePeer disconnects one peer and unwinds everything attached to it:

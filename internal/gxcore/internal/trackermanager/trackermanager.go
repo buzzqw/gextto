@@ -73,6 +73,27 @@ func (m *TrackerManager) Close() {
 	m.udpTransport.Close()
 }
 
+// Release closes a WebSocket tracker the session no longer uses. A ws tracker
+// owns its socket and its registration, and nothing else would close them
+// before the whole session ends: a hot-swapped or removed tracker would keep
+// both open for the daemon's lifetime. Other schemes share a transport and
+// need no release.
+func (m *TrackerManager) Release(t tracker.Tracker) {
+	wt, ok := t.(*wstracker.Tracker)
+	if !ok || wt == nil {
+		return
+	}
+	wt.Close()
+	m.mu.Lock()
+	for i, known := range m.wsTrackers {
+		if known == wt {
+			m.wsTrackers = append(m.wsTrackers[:i], m.wsTrackers[i+1:]...)
+			break
+		}
+	}
+	m.mu.Unlock()
+}
+
 // Get builds the tracker client for a URL: HTTP(S) or UDP by scheme.
 func (m *TrackerManager) Get(s string, httpTimeout time.Duration, httpUserAgent string, httpMaxResponseLength int64) (tracker.Tracker, error) {
 	u, err := url.Parse(s)

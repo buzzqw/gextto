@@ -91,6 +91,14 @@ type Session struct {
 	// unwritable file, broken mount) since start.
 	storageErrors atomic.Int64
 
+	// blockedConnections counts the connections the IP filter dropped since
+	// start. blockedSince and lastBlockLog pace the line that reports them, so
+	// a busy swarm cannot write one line per blocked peer.
+	blockedConnections atomic.Int64
+	blockedSince       atomic.Int64
+	mBlockedLog        sync.Mutex
+	lastBlockLog       time.Time
+
 	// Event subscribers: the mutex guards the map only.
 	subMu   sync.Mutex
 	subs    map[int]chan Event

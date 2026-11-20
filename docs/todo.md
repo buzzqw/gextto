@@ -21,6 +21,22 @@ still be true after the item lands does not belong here.
 - **Memory on a shaped line**: own memory while downloading on the shaped 100 Mbit/s line is above qBittorrent, anacrolix and Transmission; close the gap on the paths a heap profile names. Gate: a heap profile of that scenario inside the comparison harness.
 - **CPU at rest with 100 torrents in the comparison**: the unchoke round now sleeps while a torrent has no peers (lower idle CPU in `TestMeasureIdleTorrents`); confirm the comparison row. Gate: the next gx-torrent round of `make measure-compare`.
 
+- **Which IPv6 address the announce publishes**: the HTTP announce carries no
+  `ipv6=`, so a tracker lists us only at the IPv4 address it sees and a v6-only
+  peer finds us through PEX and the DHT alone. Gate: a rule for choosing the
+  address (global, never a temporary/privacy one) with a test for both cases.
+- **Share limits: any condition or all of them**: Gextto and the daemon stop at
+  the first limit that fires (ratio, time, inactivity) and cannot require all
+  three together. Gate: a row on both settings pages with its translations.
+- **The per-peer request window**: the engine already sizes it adaptively
+  (`MaxRequestsOut` 250, `DefaultRequestsOut` 50) but only the pipelining harness
+  reaches those fields. Gate: a settings row on both pages, then the depth can be
+  capped by the operator.
+- **Announce latency and queued announces**: the statistics carry neither how
+  long an announce takes nor how many are waiting, so a slow tracker and a slow
+  line look the same. Gate: instrument the announcer, then pick the aggregation
+  (median over a window, not one figure per announce).
+
 ## Gextto, acquisition and UI
 
 - **emule-qt's preferences version**: `emuleqtPrefsVersion` is the value of the image Gextto runs (7); emule-qt's main branch has moved to 8, whose only migration turns on a default that is already true. Gate: an image that reports it.
@@ -30,6 +46,12 @@ still be true after the item lands does not belong here.
 Each waits for the operator's choice.
 
 - **Notebook-wide tables on a phone**: the episodes and the download history of a series are blocks on a phone now, but Archivio, Fumetti, Blocklist, Salute and Manutenzione still show tables wider than the screen behind a sideways scroll; give each one the same per-row block, or fold its secondary columns, one page at a time. Gate: the operator's choice; every page with its own check in `mobile.spec.ts`.
+
+- **A corpus of v2 and hybrid torrents with empty and pad files**: four
+  independent clients fixed bugs in exactly these shapes in 2026 (zero-length
+  files lost their progress, hybrid pads were rejected, the last piece of a
+  hybrid was hashed wrong); ours has no such corpus yet. Gate: the fixtures, and
+  a test per shape once one fails.
 
 - **Header-only `mediainfo` read**: `readMediaTags` parses the whole file to name it, up to 20 seconds for a 4K file on NFS, while `--ParseSpeed=0` reads the container header alone; the same rename pass would drop from an hour to minutes. Gate: the naming tests and a before/after measure.
 

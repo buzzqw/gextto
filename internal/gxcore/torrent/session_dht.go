@@ -71,7 +71,18 @@ func (s *Session) handleDHTtick() {
 
 // DHTScrape asks the DHT for the approximate swarm size of an info hash
 // (BEP 33): the number of seeders and peers. It needs a running DHT.
+//
+// A private torrent of this session is refused even when the operator asks: a
+// scrape puts its info hash on the DHT, which is exactly what BEP 27 forbids,
+// and the button must not be able to break the promise the torrent was added
+// under.
 func (s *Session) DHTScrape(ih [20]byte, timeout time.Duration) (seeders, peers float64, err error) {
+	if t := s.torrentByInfoHash(ih); t != nil && !t.dhtAllowed() {
+		if t.privateSwarm() {
+			return 0, 0, errors.New("this is a private torrent: its info hash is never published to the DHT")
+		}
+		return 0, 0, errors.New("this torrent has the DHT turned off")
+	}
 	if s.dht == nil {
 		return 0, 0, errors.New("dht disabled")
 	}
@@ -133,4 +144,19 @@ func parseDHTPeers(peers []string) []*net.TCPAddr {
 		}
 	}
 	return addrs
+}
+
+// torrentByInfoHash returns the torrent that owns an info hash, or nil when the
+// hash belongs to no torrent of this session.
+func (s *Session) torrentByInfoHash(ih [20]byte) *torrent {
+	s.mTorrents.RLock()
+	defer s.mTorrents.RUnlock()
+	// The public map is keyed by the rendered hash; scanning the live torrents
+	// keeps this independent of that rendering, and a scrape is rare.
+	for _, t := range s.torrents {
+		if t.torrent != nil && t.torrent.infoHash == ih {
+			return t.torrent
+		}
+	}
+	return nil
 }

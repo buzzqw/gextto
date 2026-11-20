@@ -28,8 +28,13 @@ func (t *torrent) handleSetTrackers(trackers []tracker.Tracker, raw [][]string) 
 		kept[tr.URL()] = struct{}{}
 	}
 	var leaving []tracker.Tracker
+	var departed []tracker.Tracker
 	for _, an := range t.announcers {
-		if _, ok := kept[an.Tracker.URL()]; !ok && an.HasAnnounced {
+		if _, ok := kept[an.Tracker.URL()]; ok {
+			continue
+		}
+		departed = append(departed, an.Tracker)
+		if an.HasAnnounced {
 			leaving = append(leaving, an.Tracker)
 		}
 	}
@@ -43,6 +48,25 @@ func (t *torrent) handleSetTrackers(trackers []tracker.Tracker, raw [][]string) 
 		t.startAnnouncers()
 	}
 	t.announceStoppedTo(leaving)
+	// A WebSocket tracker owns a socket and its registration, and the announcer
+	// that used it is gone: one that never announced is released here, one that
+	// did releases itself once the goodbye is out.
+	goodbye := make(map[string]struct{}, len(leaving))
+	for _, tr := range leaving {
+		goodbye[tr.URL()] = struct{}{}
+	}
+	for _, tr := range departed {
+		if _, ok := goodbye[tr.URL()]; !ok {
+			t.releaseTracker(tr)
+		}
+	}
+}
+
+// releaseTracker closes a tracker nothing will use again.
+func (t *torrent) releaseTracker(tr tracker.Tracker) {
+	if t.session.trackerManager != nil {
+		t.session.trackerManager.Release(tr)
+	}
 }
 
 // announceStoppedTo says goodbye to departed trackers, each on its own
@@ -59,6 +83,7 @@ func (t *torrent) announceStoppedTo(trackers []tracker.Tracker) {
 			ctx, cancel := context.WithTimeout(context.Background(), timeout)
 			defer cancel()
 			_, _ = tr.Announce(ctx, tracker.AnnounceRequest{Torrent: fields, Event: tracker.EventStopped})
+			t.releaseTracker(tr)
 		}(tr)
 	}
 }

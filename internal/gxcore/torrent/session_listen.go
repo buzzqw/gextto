@@ -69,7 +69,12 @@ func (s *Session) acceptUTP() {
 		conn := netx.TrackUTP(netx.NewUTPConn(raw))
 		netx.IncomingUTP.Add(1)
 		addr, ok := conn.RemoteAddr().(*net.TCPAddr)
-		if !ok || (s.config.BlocklistEnabledForIncomingConnections && s.blocklist != nil && s.blocklist.Blocked(addr.IP)) {
+		if !ok {
+			conn.Close()
+			continue
+		}
+		if s.config.BlocklistEnabledForIncomingConnections && s.blocklist != nil && s.blocklist.Blocked(addr.IP) {
+			s.noteBlocked()
 			conn.Close()
 			continue
 		}
@@ -105,6 +110,7 @@ func (s *Session) acceptShared(listener *net.TCPListener) {
 			continue
 		}
 		if s.config.BlocklistEnabledForIncomingConnections && s.blocklist != nil && s.blocklist.Blocked(addr.IP) {
+			s.noteBlocked()
 			conn.Close()
 			continue
 		}

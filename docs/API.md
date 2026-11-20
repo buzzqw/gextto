@@ -738,7 +738,9 @@ torrents in total (`gxtorrent_torrents`), by state
 (`gxtorrent_torrents_by_state{state="seeding"}`, the states are a partition)
 and the slow ones as a condition (`gxtorrent_slow_torrents`, also downloading),
 peers, queue slots, caches,
-free disk, the IP filter, every engine session counter (`gxtorrent_session_*`,
+free disk, the IP filter (rules loaded, and
+`gxtorrent_session_blocked_connections` for the connections those rules
+dropped), every engine session counter (`gxtorrent_session_*`,
 uTP and disk counters included) and the process
 (`process_resident_memory_bytes`, `process_cpu_seconds_total`,
 `process_start_time_seconds`). It is computed only when asked: one scrape costs

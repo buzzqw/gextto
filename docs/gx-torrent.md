@@ -1358,6 +1358,15 @@ next refresh and any error; **Load now** immediately applies the
 value of the field (even unsaved) without saving the rest of the page
 (`POST /ui/ipfilter` with `return=settings`).
 
+**A filter that works is visible.** Every connection the rules refuse is
+counted (`blocked_connections`, exposed as
+`gxtorrent_session_blocked_connections`), and the log says so instead of
+dropping peers in silence: the first drop after a load is reported at once,
+then at most one line every ten minutes with how many were dropped since the
+previous one — a busy swarm must not write one line per blocked peer. A list
+loaded and a list *working* are different facts, and before this only the first
+one could be seen.
+
 The **Network** box has a **Test port** button (the reachability of the saved
 peer port, from `/ui/portcheck`), and the download and temporary folders have
 a **Browse…** picker. The DLNA **Library folders** take one folder per line;
@@ -1564,6 +1573,8 @@ RPC server is disabled.
     reply carries up to eight contacts, and consecutive replies continue
     where the previous one stopped. In the UI: **DHT swarm** button in the General
     tab (`GET /ui/dhtscrape`), besides `GET /api/v1/torrents/{hash}/dhtscrape`.
+    A **private torrent** of the session is refused by that button: a scrape puts
+    its info hash on the DHT, which is exactly what BEP 27 forbids.
   - **BEP 43** (read-only): a node can not respond to queries and ask not
     to be entered into the routing tables (`ro`); it is activated with
     `-dht-read-only` (`GX_TORRENT_DHT_READ_ONLY`).
@@ -2070,6 +2081,8 @@ With gx-torrent it shows:
 - DHT (nodes), uTP (uTP and TCP connections, plus socket dials/accepts, errors, resends and dropped SYNs), LSD (peers found);
 - incoming connections and disk I/O (jobs in queue, total reads/writes);
 - encryption, proxy, IP filter rules;
+- connections the IP filter dropped, so a loaded list and a list that is
+  actually refusing peers are two different figures;
 - disk and cache, session totals.
 
 The same data are in `GET /api/v1/stats` of the daemon and in
@@ -2864,6 +2877,15 @@ Only the LSD announcement over **IPv6** is missing in networks where v6 multicas
 available: if the v6 listener does not open, the LSD stays active on IPv4. In the
 other cases the LSD also announces and listens on the group `[ff15::efc0:988f]:6771`
 (the BEP 14 multicast group).
+
+**The announce carries no `ipv6=` yet.** A tracker lists us at the address it
+sees the announce coming from, which is the IPv4 one, so a v6-only peer reaches
+us through PEX and the DHT but not through a tracker's peer list. The missing
+piece is not the parameter (BEP 7 has it) but the answer to *which* address to
+publish: a global one, chosen among the public addresses of the interfaces, and
+never a temporary/privacy address that rotates — publishing one of those would
+advertise an endpoint that is gone a day later. Until that rule exists the
+parameter is left out on purpose (see `docs/todo.md`).
 
 ## Profiling (CPU and heap)
 

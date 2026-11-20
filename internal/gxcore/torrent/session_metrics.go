@@ -19,6 +19,7 @@ type sessionMetrics struct {
 	Uptime                metrics.Gauge
 	BlockListRules        metrics.Gauge
 	BlockListRecency      metrics.Gauge
+	BlockedConnections    metrics.Gauge
 	ReadCacheObjects      metrics.Gauge
 	ReadCacheSize         metrics.Gauge
 	ReadCacheUtilization  metrics.Gauge
@@ -73,6 +74,10 @@ func (s *Session) initMetrics() {
 			return -1
 		}
 		return int64(time.Since(s.blocklistTimestamp) / time.Second)
+	})
+
+	gauge(&m.BlockedConnections, "blocked_connections", func() int64 {
+		return s.blockedConnections.Load()
 	})
 
 	gauge(&m.ReadCacheObjects, "read_cache_objects", func() int64 {

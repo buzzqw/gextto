@@ -48,3 +48,23 @@ func TestPEXListDropRoutesByFamily(t *testing.T) {
 		t.Fatalf("dropped=%q dropped6=%d", dropped, len(dropped6))
 	}
 }
+
+// TestPEXListCapsEveryFlush pins that no PEX message, the first one included,
+// carries more than the budget: the rest stays staged for the next flush.
+func TestPEXListCapsEveryFlush(t *testing.T) {
+	l := New()
+	for i := 0; i < 200; i++ {
+		l.Add(&net.TCPAddr{IP: net.IPv4(10, 0, byte(i/100), byte(i%100)), Port: 6881 + i})
+	}
+	added, added6, _, _ := l.Flush()
+	if got := len(added) / 6; got != maxPeers {
+		t.Fatalf("first flush carried %d peers, want %d", got, maxPeers)
+	}
+	if added6 != "" {
+		t.Fatalf("IPv6 entries appeared past the budget: %d bytes", len(added6))
+	}
+	added, _, _, _ = l.Flush()
+	if len(added) != maxPeers*6 {
+		t.Fatalf("second flush carried %d peers, want %d", len(added)/6, maxPeers)
+	}
+}

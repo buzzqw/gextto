@@ -13,6 +13,7 @@ import (
 	"github.com/buzzqw/gextto/internal/gxcore/internal/backoff"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/blocklist"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/ctxutil"
+	"github.com/buzzqw/gextto/internal/gxcore/internal/logger"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/netx"
 	"go.etcd.io/bbolt"
 )
@@ -217,4 +218,34 @@ func (s *Session) BlocklistRules() BlocklistRules {
 // the rule count.
 func (s *Session) SetBlocklistRules(r BlocklistRules) int {
 	return s.blocklist.SetRules(r)
+}
+
+// blockedReportEvery paces the aggregated report of connections the filter
+// dropped: the first one is reported at once (so an operator sees the filter
+// working straight after a load), the rest at most once per interval.
+const blockedReportEvery = 10 * time.Minute
+
+// noteBlocked counts one connection dropped by the IP filter. The counter is
+// what tells an operator that the list is loaded and working; the log line is
+// aggregated, because a swarm of blocked peers would otherwise write a line
+// each and drown everything else.
+func (s *Session) noteBlocked() {
+	s.blockedConnections.Add(1)
+	seen := s.blockedSince.Add(1)
+	due := false
+	s.mBlockedLog.Lock()
+	if s.lastBlockLog.IsZero() || time.Since(s.lastBlockLog) >= blockedReportEvery {
+		s.lastBlockLog = time.Now()
+		s.blockedSince.Store(0)
+		due = true
+	}
+	s.mBlockedLog.Unlock()
+	if !due {
+		return
+	}
+	if seen == 1 {
+		logger.New("session").Info("The IP filter dropped 1 connection that its rules refuse")
+		return
+	}
+	logger.New("session").Infof("The IP filter dropped %d connections that its rules refuse", seen)
 }
