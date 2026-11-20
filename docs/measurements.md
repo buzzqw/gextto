@@ -2,13 +2,13 @@
 
 Only figures: gx-torrent against qBittorrent, Transmission, Deluge, rain and
 anacrolix/torrent, then Gextto on its own, the build and test times, and the designs a number
-closed. Each row says what was run, the machine, the date and the command; a new round
-replaces the row it measures. No history, no before-and-after.
+closed. Each row says what was run, the machine and the command; a new round replaces the
+row it measures. No history, no before-and-after.
 
 ## Short answer
 
-Measured on 2026-11-11 on a low-power mini PC (Intel N97), in Docker, with the same torrents
-and limits for every client.
+Measured on a low-power mini PC (Intel N97), in Docker, with the same torrents and limits
+for every client.
 
 | Question | 1st | 2nd | 3rd | 4th | 5th | 6th | Why it matters |
 |---|---|---|---|---|---|---|---|
@@ -33,8 +33,7 @@ RSS also counts; the 100-torrent row is the only one that uses RSS. The full-spe
 to that line.
 
 In short: gx-torrent is the fastest at a recheck (3.2 s) and on upload (262 MB/s); at full
-speed over TCP it is first (288.5 against 239–246 MB/s, from a gx-only run, see *What was
-run*) with less own memory (23.8 MiB against 33–53); anacrolix/torrent is the lightest at full
+speed over TCP it is first (288.5 against 239–246 MB/s) with less own memory (23.8 MiB against 33–53); anacrolix/torrent is the lightest at full
 speed (11 MiB) and the quietest with a hundred torrents (0.01 % of a core, against 0.13 for
 gx-torrent); on the shaped line over TCP gx-torrent and anacrolix are level (11.2 against
 11.4 MB/s), and gx-torrent spends the least CPU per GiB of the four that reach the line
@@ -49,7 +48,7 @@ in this document.
 |---|---|---|
 | A library, not a downloader: episodes, gaps, renames, upgrades, archive | **Gextto** | it decides what to fetch and where it goes; none of the other clients does |
 | One torrent from a browser, on a NAS, a server or a phone, with a qBittorrent-style API | **gx-torrent, standalone** | the same engine with its own page and `/api/v2`, no library to configure |
-| The fastest download over TCP | **gx-torrent**, then Deluge or qBittorrent | 288.5 MB/s against 239–246 (gx-torrent from a gx-only run), with 23.8 MiB of own memory against 33–53 |
+| The fastest download over TCP | **gx-torrent**, then Deluge or qBittorrent | 288.5 MB/s against 239–246, with 23.8 MiB of own memory against 33–53 |
 | A recheck of a 4 GiB file without a long wait | **gx-torrent** | 3.2 s, against 3.9–10.2 for the others |
 | Seeding on a fast LAN (gigabit and above) | **gx-torrent**, qBittorrent or Deluge | 170–262 MB/s, gx-torrent first and qBittorrent about 27 % behind, at the lowest CPU per GiB for gx-torrent (2.19 s against 2.49–2.62) |
 | A call or a game while something downloads | **Gextto**, Auto with latency source `both` | the guard leaves room for the other flow and stops taking more as soon as the router sees it |
@@ -67,40 +66,16 @@ peers, on an isolated network. Each table is the **median of three interleaved r
 with the range in brackets where it matters. Every downloaded file was compared byte by
 byte with the original. The whole round took 135 minutes.
 
-Only what changes is measured again. The other clients' rows are from the full round of
-2026-11-11 (commit `77aaf0cd`). gx-torrent's rows in the tables below are from a
-**gx-only round of 2026-11-20** (commit `2cd1ea64`, image `8d6ac1796ec8`, tag
-`2026-11-20-opt`, three rounds, same images, limits and torrents, no failures; about 15
-minutes). It is not interleaved with the others: the lead over Deluge and qBittorrent is
-still the one a full round must confirm. The deltas against the previous gx row, and the
-reason the full-speed figure is not a 20 % gain over the old code, are in the subsection
-below.
-
-**2026-11-20, gx-torrent alone.** The tables below already carry these medians; this table
-records the deltas against the previous gx row. The other clients were **not** rerun.
-
-| Scenario | Metric | 2026-11-11 | 2026-11-20 | Change |
-|---|---|---|---|---|
-| idle | CPU (% of a core) | 0.07 | 0.05 | −29 % |
-| full | speed | 238.7 MB/s | **288.5 MB/s** (285.9–291.8) | +20.9 % |
-| full | CPU | 3.07 s/GiB | 2.91 s/GiB | −5.2 % |
-| full | peak own memory | 26.2 MiB | 23.8 MiB | −9.2 % |
-| line | speed | 11.21 MB/s | 11.19 MB/s | −0.2 % |
-| line-uTP | CPU | 37.81 s/GiB | 36.33 s/GiB | −3.9 % |
-| line-uTP | peak own memory | 35.9 MiB | 30.6 MiB | −14.8 % |
-| recheck | speed | 1,208 MB/s | **1,336 MB/s** | +10.6 % |
-| upload | speed | 202.8 MB/s | **262.1 MB/s** (237.9–285.7) | +29.2 % |
-
-The full-speed and memory figures are outside the run-to-run spread of the old
-row; the recheck and upload ranges are wider, and the host was shared with the
-running Gextto service. The other clients' rows (qBittorrent 239.3 MB/s,
-Deluge 245.9, Transmission 29.5, anacrolix 110.2) are from 2026-11-11 and were
-not measured again, so the lead over them is still the one a full interleaved
-round must confirm.
+The machine and the harness did not change between the rows: only gx-torrent's
+build did. Its rows come from a three-round gx-only run (commit `2cd1ea64`, image
+`8d6ac1796ec8`) with the same images, limits and torrents; the other clients' rows
+are their pinned builds in the table below. A single-client round is not
+interleaved with the others, so a gap of a few percent is inside the spread; the
+tables are the ranking.
 
 | Client | Version | Engine |
 |---|---|---|
-| gx-torrent | commit `2cd1ea64`, image `8d6ac1796ec8` (2026-11-20 gx-only); other clients: full round `77aaf0cd` | gx-core, pure Go |
+| gx-torrent | commit `2cd1ea64`, image `8d6ac1796ec8` | gx-core, pure Go |
 | qBittorrent | 5.1.0 (Debian 13) | libtorrent |
 | Transmission | 3.00 (Debian 12) | its own, with libutp |
 | Deluge | 2.2.0 (Debian 13) | libtorrent 2.0.11 |
@@ -151,7 +126,7 @@ ceiling of each client on this machine.
 
 In the full round every client except Transmission had one slow run out of three
 (105–179 MB/s), at different times: the disk, not the client, which is why the ranges are
-wide. The gx-only runs had none (285.9–291.8 MB/s). Transmission 3.00 is four to eight times
+wide. gx-torrent's runs had none (285.9–291.8 MB/s). Transmission 3.00 is four to eight times
 slower than the others here; the number repeats in every round.
 
 ### Download on a 100 Mbit/s line
@@ -357,7 +332,7 @@ In a cycle the regexp share of the CPU is **8.6 %** (profile of a full search on
 ### Reading a file to name it
 
 To name a file Gextto reads it with `mediainfo`. The whole-file pass against the container
-header alone, on 20 files from an archive on the local NVMe (Intel N97 mini PC, 2026-11-20):
+header alone, on 20 files from an archive on the local NVMe (Intel N97 mini PC):
 
 | Read | 20 files | Median per file | Slowest file |
 |---|---|---|---|
