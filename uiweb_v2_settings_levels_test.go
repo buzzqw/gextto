@@ -78,3 +78,21 @@ func TestSettingsPageCountsWhatLeftTheDefault(t *testing.T) {
 		t.Fatalf("saved refresh interval = %q", got)
 	}
 }
+
+func TestSettingsOldListSpellingIsNotAModifiedValue(t *testing.T) {
+	// An older list editor stored a single choice as ["true"] or ["ita"]: the
+	// row is at its default, and the badge must not say otherwise.
+	field := uiSettingFieldFor("active", "Attivo", `["true"]`)
+	if field.Modified {
+		t.Fatalf("active = [\"true\"] flagged as modified against the default %q", uiSettingDefault("active"))
+	}
+	field = uiSettingFieldFor("default_language", "Lingua", `["ita"]`)
+	if field.Modified {
+		t.Fatalf("default_language = [\"ita\"] flagged as modified")
+	}
+	// A real choice still counts.
+	field = uiSettingFieldFor("active", "Attivo", "false")
+	if !field.Modified {
+		t.Fatal("active = false must be marked as modified")
+	}
+}

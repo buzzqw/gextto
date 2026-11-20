@@ -445,6 +445,12 @@ func formatScaledNumber(value float64) string {
 // scaled unit (hours shown, seconds stored) is compared in the shown unit.
 func uiSettingSameValue(field uiSettingField, stored, def string) bool {
 	stored, def = strings.TrimSpace(stored), strings.TrimSpace(def)
+	// An old list editor wrote a single scalar as a one-item JSON array
+	// (["true"], ["ita"]): it is the same value, not a choice that left the
+	// default, and the row must not carry the "modified" badge for it.
+	if items, ok := uiJSONScalarList(stored); ok && len(items) == 1 {
+		stored = strings.TrimSpace(items[0])
+	}
 	if uiSettingMetaByKey[field.Key].Scale > 1 {
 		stored = uiSettingDisplayNumber(field.Key, stored)
 		def = uiSettingDisplayNumber(field.Key, def)
