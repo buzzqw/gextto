@@ -3,12 +3,39 @@ package torrent
 import (
 	"net"
 	"testing"
+	"time"
 
 	"github.com/buzzqw/gextto/internal/gxcore/internal/peerprotocol"
 )
 
 func holepunchTCPAddr(ip string, port int) *net.TCPAddr {
 	return &net.TCPAddr{IP: net.ParseIP(ip), Port: port}
+}
+
+// TestHolepunchConnectAllowance: a peer may make us dial ten endpoints at
+// once, then one more every three seconds of the connection. Without the cap a
+// single peer can keep dozens of half-open connections to endpoints of its
+// choosing.
+func TestHolepunchConnectAllowance(t *testing.T) {
+	cases := []struct {
+		acted        int
+		connectedFor time.Duration
+		want         bool
+	}{
+		{9, 0, true},
+		{10, 0, false},
+		{10, 3 * time.Second, true},
+		{11, 3 * time.Second, false},
+		{19, 30 * time.Second, true},
+		{20, 30 * time.Second, false},
+		{10, -time.Minute, false}, // a negative age behaves as zero
+	}
+	for _, c := range cases {
+		if got := holepunchConnectAllowed(c.acted, c.connectedFor); got != c.want {
+			t.Errorf("holepunchConnectAllowed(%d, %v) = %v, want %v",
+				c.acted, c.connectedFor, got, c.want)
+		}
+	}
 }
 
 // The relay sends connect to both the initiator and the target when it is

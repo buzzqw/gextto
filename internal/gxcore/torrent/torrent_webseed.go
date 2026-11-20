@@ -2,6 +2,7 @@ package torrent
 
 import (
 	"encoding/json"
+	"errors"
 	"strings"
 	"time"
 
@@ -23,7 +24,7 @@ func (t *torrent) handleWebseedPieceResult(msg *urldownloader.PieceResult) {
 	defer safego.RecoverWith(t.log, "web seed handler", nil)
 	if msg.Error != nil {
 		t.log.Debugln("webseed download error:", msg.Error)
-		t.disableSource(msg.Downloader.URL, msg.Error, true)
+		t.disableSource(msg.Downloader.URL, msg.Error, true, webseedRetryDelay(msg.Error))
 		t.startPieceDownloaders()
 		return
 	}
@@ -105,11 +106,22 @@ func (t *torrent) rotateWebseedSource(d *urldownloader.URLDownloader) {
 	}
 }
 
+// webseedRetryDelay is how long a failed source stays parked: the server's
+// Retry-After when it sent one (429 or 503), a minute otherwise. The downloader
+// already caps the header at an hour.
+func webseedRetryDelay(err error) time.Duration {
+	var statusErr *urldownloader.HTTPStatusError
+	if errors.As(err, &statusErr) && statusErr.RetryAfter > 0 {
+		return statusErr.RetryAfter
+	}
+	return time.Minute
+}
+
 // disableSource parks every copy of a failing source, optionally scheduling
-// the retry in a minute. Each copy still fetching is closed here and its
-// slot released, the one that failed included: the downloader is dropped
-// without going through the piece-result path.
-func (t *torrent) disableSource(srcurl string, err error, retry bool) {
+// the retry after retryAfter (a minute when zero). Each copy still fetching is
+// closed here and its slot released, the one that failed included: the
+// downloader is dropped without going through the piece-result path.
+func (t *torrent) disableSource(srcurl string, err error, retry bool, retryAfter time.Duration) {
 	for _, src := range t.webseedSources {
 		if src.URL != srcurl {
 			continue
@@ -123,16 +135,19 @@ func (t *torrent) disableSource(srcurl string, err error, retry bool) {
 			}
 		}
 		if retry {
-			go t.notifyWebseedRetry(src)
+			go t.notifyWebseedRetry(src, retryAfter)
 		}
 	}
 }
 
-// notifyWebseedRetry re-offers a disabled source after a minute, unless the
-// torrent closed meanwhile.
-func (t *torrent) notifyWebseedRetry(src *webseedsource.WebseedSource) {
+// notifyWebseedRetry re-offers a disabled source after wait (a minute when
+// zero), unless the torrent closed meanwhile.
+func (t *torrent) notifyWebseedRetry(src *webseedsource.WebseedSource, wait time.Duration) {
+	if wait <= 0 {
+		wait = time.Minute
+	}
 	select {
-	case <-time.After(time.Minute):
+	case <-time.After(wait):
 		select {
 		case t.webseedRetryC <- src:
 		case <-t.closeC:

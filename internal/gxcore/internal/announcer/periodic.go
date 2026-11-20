@@ -236,8 +236,9 @@ func (a *PeriodicalAnnouncer) handleResponse(timer *time.Timer, resp *tracker.An
 	}
 	a.interval = resp.Interval
 	if resp.MinInterval > 0 {
-		a.minInterval = resp.MinInterval
+		a.minInterval = tracker.ClampAnnounceInterval(resp.MinInterval)
 	}
+	a.interval = steadyAnnounceInterval(a.interval, a.minInterval)
 	a.HasAnnounced = true
 	a.lastError = nil
 	a.backoff.Reset()
@@ -279,6 +280,23 @@ func (a *PeriodicalAnnouncer) getNextInterval() time.Duration {
 		return a.minInterval
 	}
 	return a.interval
+}
+
+// steadyAnnounceInterval turns the pace a tracker asked for into the one to
+// use: a missing, zero or negative interval keeps a working default instead of
+// re-announcing as fast as the tracker replies, the minimum interval is a
+// floor (a tracker may not ask us to announce faster than it allows), and a
+// value past a week is capped. Every smart pointer in the loop needs a value
+// that cannot overflow the timer or spin it.
+func steadyAnnounceInterval(interval, minInterval time.Duration) time.Duration {
+	interval = tracker.ClampAnnounceInterval(interval)
+	if interval <= 0 {
+		interval = tracker.DefaultAnnounceInterval
+	}
+	if interval < minInterval {
+		interval = minInterval
+	}
+	return tracker.ClampAnnounceInterval(interval)
 }
 
 func (a *PeriodicalAnnouncer) getNextIntervalFromError(err *AnnounceError) time.Duration {

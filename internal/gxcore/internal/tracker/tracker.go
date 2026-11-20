@@ -32,6 +32,44 @@ type AnnounceRequest struct {
 	NumWant int
 }
 
+const (
+	// DefaultAnnounceInterval is the pace used when a tracker answers without
+	// an interval (or with a zero/negative one): announcing again immediately
+	// would hammer the tracker as fast as it replies.
+	DefaultAnnounceInterval = 30 * time.Minute
+	// MaxAnnounceInterval bounds the interval a tracker may ask for. BEP 3
+	// puts no ceiling, but a value near the type limit would silence the
+	// torrent for years (or overflow when added to the clock).
+	MaxAnnounceInterval = 7 * 24 * time.Hour
+)
+
+// AnnounceIntervalFromSeconds converts a tracker's interval, in seconds, to a
+// duration clamped to [0, MaxAnnounceInterval]. A negative value becomes zero
+// and a value too large for the duration is capped, so a hostile or broken
+// tracker can neither spin the client nor silence it forever.
+func AnnounceIntervalFromSeconds(seconds int64) time.Duration {
+	if seconds <= 0 {
+		return 0
+	}
+	maxSeconds := int64(MaxAnnounceInterval / time.Second)
+	if seconds > maxSeconds {
+		return MaxAnnounceInterval
+	}
+	return time.Duration(seconds) * time.Second
+}
+
+// ClampAnnounceInterval bounds an interval a tracker already turned into a
+// duration: negative becomes zero, anything past a week is capped.
+func ClampAnnounceInterval(d time.Duration) time.Duration {
+	if d < 0 {
+		return 0
+	}
+	if d > MaxAnnounceInterval {
+		return MaxAnnounceInterval
+	}
+	return d
+}
+
 // AnnounceResponse contains fields from a response to announce request.
 type AnnounceResponse struct {
 	Interval       time.Duration

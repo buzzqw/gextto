@@ -165,7 +165,7 @@ func NewV2Info(b []byte) (*Info, error) {
 		}
 		i.NumPieces = pieces
 		copy(i.Hash[:], i.V2Hash[:20])
-		if err := checkFileDirCollisions(i.Files); err != nil {
+		if err := i.resolveDuplicatePaths(); err != nil {
 			return nil, err
 		}
 		return i, nil

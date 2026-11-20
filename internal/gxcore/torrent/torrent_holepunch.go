@@ -14,6 +14,7 @@ package torrent
 
 import (
 	"net"
+	"time"
 
 	"github.com/buzzqw/gextto/internal/gxcore/internal/handshaker/outgoinghandshaker"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/peer"
@@ -128,9 +129,9 @@ func (t *torrent) handleHolepunchRendezvous(sender *peer.Peer, msg peerprotocol.
 	relays := make([]holepunchRelay, 0, len(t.peers))
 	for pe := range t.peers {
 		peers = append(peers, pe)
-		relays = append(relays, holepunchRelay{Addr: pe.Addr(), Supports: peerSupportsHolepunch(pe)})
+		relays = append(relays, holepunchRelay{Addr: pe.WatchAddr(), Supports: peerSupportsHolepunch(pe)})
 	}
-	for _, action := range planHolepunchRendezvous(sender.Addr(), msg, relays) {
+	for _, action := range planHolepunchRendezvous(sender.WatchAddr(), msg, relays) {
 		if action.Target < 0 {
 			t.sendHolepunch(sender, action.Msg)
 			continue
@@ -139,12 +140,43 @@ func (t *torrent) handleHolepunchRendezvous(sender *peer.Peer, msg peerprotocol.
 	}
 }
 
+// maxHolepunchDials bounds the holepunch handshakes in flight at once. The
+// normal dial budget does not cover them (a seed must still answer a
+// rendezvous), so without this a peer naming many endpoints could keep dozens
+// of connections half-open at will.
+const maxHolepunchDials = 8
+
+// holepunchConnectAllowance is how many ut_holepunch connect messages a peer
+// may make us act on: ten at once, then one more every three seconds of the
+// connection (libtorrent's allowance). A relay sends a handful; the rest is
+// abuse, and each message names the endpoint we would dial.
+func holepunchConnectAllowance(connectedFor time.Duration) int {
+	if connectedFor < 0 {
+		connectedFor = 0
+	}
+	return 10 + int(connectedFor/time.Second)/3
+}
+
+// holepunchConnectAllowed reports whether a connect message may be acted on.
+func holepunchConnectAllowed(acted int, connectedFor time.Duration) bool {
+	return acted < holepunchConnectAllowance(connectedFor)
+}
+
 // handleHolepunchConnect dials the endpoint a relay told us to reach.
 func (t *torrent) handleHolepunchConnect(sender *peer.Peer, msg peerprotocol.HolepunchMessage) {
 	endpoint := msg.AddrPort()
 	if endpoint == nil {
 		return
 	}
+	if !holepunchConnectAllowed(sender.HolepunchConnects, time.Since(sender.ConnectedAt)) {
+		t.log.Debugf("holepunch connect from %s ignored: too many connect messages", sender.Addr())
+		return
+	}
+	if t.holepunchDials >= maxHolepunchDials {
+		t.log.Debugf("holepunch connect from %s ignored: %d introductions already in flight", sender.Addr(), t.holepunchDials)
+		return
+	}
+	sender.HolepunchConnects++
 	t.log.Debugf("holepunch connect from %s: dialing %s", sender.Addr(), endpoint)
 	t.dialHolepunch(endpoint)
 }
@@ -162,6 +194,7 @@ func (t *torrent) dialHolepunch(endpoint *net.TCPAddr) {
 	}
 	h := outgoinghandshaker.New(endpoint, peersource.Holepunch)
 	t.outgoingHandshakers[h] = struct{}{}
+	t.holepunchDials++
 	t.connectedPeerIPs[ip] = struct{}{}
 	go h.Run(
 		t.session.config.PeerConnectTimeout,
@@ -190,7 +223,7 @@ func (t *torrent) tryHolepunchRendezvous(target *net.TCPAddr) {
 		if !peerSupportsHolepunch(pe) {
 			continue
 		}
-		if addr := pe.Addr(); addr != nil && addr.IP.Equal(target.IP) && addr.Port == target.Port {
+		if addr := pe.WatchAddr(); addr != nil && addr.IP.Equal(target.IP) && addr.Port == target.Port {
 			continue // the target itself is not a useful relay
 		}
 		t.sendHolepunch(pe, peerprotocol.HolepunchMessage{

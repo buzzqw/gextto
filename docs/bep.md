@@ -39,6 +39,12 @@ stay narrow and the tables remain readable.
 | 47 | Padding Files (`.pad/`) | yes |
 | 54 | The `lt_donthave` extension (a peer no longer has a piece) | partial (reception) |
 
+> **BEP 10 and the listen port.** The handshake carries the de-facto `p`
+> field used by libtorrent and qBittorrent: we send our listening port and read
+> the peer's, validated to 1-65535. PEX and BEP 55 use it, so an incoming
+> connection's ephemeral source port is never gossiped as a reachable one and a
+> rendezvous names the port the peer actually accepts on.
+>
 > **BEP 38 (`similar`/`collections`).** The hints are read from the info
 > dictionary **and** from the top level (merged, deduplicated), re-emitted in
 > the `.torrent` export and shown together with the local torrents that share a

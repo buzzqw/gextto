@@ -86,22 +86,22 @@ func TestHolepunchExtensionMessageRoundTrip(t *testing.T) {
 }
 
 func TestExtensionHandshakeAdvertisesHolepunch(t *testing.T) {
-	on := NewExtensionHandshake(0, "v", nil, 0, true, false)
+	on := NewExtensionHandshake(0, "v", nil, 0, true, false, 0)
 	if _, ok := on.M[ExtensionKeyHolepunch]; !ok {
 		t.Fatal("ut_holepunch not advertised when enabled")
 	}
-	off := NewExtensionHandshake(0, "v", nil, 0, false, false)
+	off := NewExtensionHandshake(0, "v", nil, 0, false, false, 0)
 	if _, ok := off.M[ExtensionKeyHolepunch]; ok {
 		t.Fatal("ut_holepunch advertised although disabled")
 	}
 }
 
 func TestExtensionHandshakeUploadOnly(t *testing.T) {
-	seed := NewExtensionHandshake(0, "v", nil, 0, false, true)
+	seed := NewExtensionHandshake(0, "v", nil, 0, false, true, 0)
 	if seed.UploadOnly != 1 {
 		t.Fatalf("upload_only = %d, want 1 for a seed", seed.UploadOnly)
 	}
-	leech := NewExtensionHandshake(0, "v", nil, 0, false, false)
+	leech := NewExtensionHandshake(0, "v", nil, 0, false, false, 0)
 	if leech.UploadOnly != 0 {
 		t.Fatalf("upload_only = %d, want 0 for a leecher", leech.UploadOnly)
 	}

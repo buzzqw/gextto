@@ -237,12 +237,17 @@ func NewInfo(b []byte, utf8 bool, pad bool) (*Info, error) {
 	if err := i.buildFiles(ib.Files, multiFile, pad); err != nil {
 		return nil, err
 	}
+	if err := i.resolveDuplicatePaths(); err != nil {
+		return nil, err
+	}
 	return &i, nil
 }
 
-// buildFiles maps the bencoded entries onto cleaned storage paths, rejecting
-// duplicate non-padding paths (pad files legitimately share ".pad/<length>"
-// per BEP 47) and any path that would leave the torrent storage.
+// buildFiles maps the bencoded entries onto cleaned storage paths and any path
+// that would leave the torrent storage. Duplicate names are resolved later
+// (resolveDuplicatePaths), case-insensitively too: pad files legitimately share
+// ".pad/<length>" per BEP 47, and two names that differ only in case are two
+// files on Linux but one on Windows.
 func (i *Info) buildFiles(entries []file, multiFile, pad bool) error {
 	if !multiFile {
 		name := storageSegment(i.Name)
@@ -253,7 +258,6 @@ func (i *Info) buildFiles(entries []file, multiFile, pad bool) error {
 		return nil
 	}
 	i.Files = make([]File, len(entries))
-	uniquePaths := make(map[string]any, len(entries))
 	for j, f := range entries {
 		parts := make([]string, 0, len(f.Path)+1)
 		parts = append(parts, storageSegment(i.Name))
@@ -268,20 +272,13 @@ func (i *Info) buildFiles(entries []file, multiFile, pad bool) error {
 		if !localStoragePath(joinedPath) {
 			return fmt.Errorf("unsafe file name: %q", joinedPath)
 		}
-		isPadding := pad && f.isPadding()
-		if !isPadding {
-			if _, ok := uniquePaths[joinedPath]; ok {
-				return fmt.Errorf("duplicate file name: %q", joinedPath)
-			}
-			uniquePaths[joinedPath] = nil
-		}
 		i.Files[j] = File{
 			Path:    joinedPath,
 			Length:  f.Length,
-			Padding: isPadding,
+			Padding: pad && f.isPadding(),
 		}
 	}
-	return checkFileDirCollisions(i.Files)
+	return nil
 }
 
 // checkFileDirCollisions refuses a layout where a file's path is also a

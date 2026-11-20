@@ -157,6 +157,7 @@ func (t *torrent) stopOutgoingHandshakers() {
 		oh.Close()
 	}
 	t.outgoingHandshakers = make(map[*outgoinghandshaker.OutgoingHandshaker]struct{})
+	t.holepunchDials = 0
 }
 
 func (t *torrent) stopIncomingHandshakers() {

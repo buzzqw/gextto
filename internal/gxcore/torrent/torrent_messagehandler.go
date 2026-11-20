@@ -536,6 +536,19 @@ func (t *torrent) noteExtensionHandshake(pe *peer.Peer, msg peerprotocol.Extensi
 	if len(msg.YourIP) == 4 || len(msg.YourIP) == 16 {
 		t.externalIP = net.IP(msg.YourIP)
 	}
+	// The de-facto "p" field is the port the peer listens on. The source port
+	// of an incoming connection is ephemeral: gossiping it in PEX would send
+	// the swarm to a closed door, and a rendezvous would name an endpoint
+	// nobody can reach.
+	if msg.ListenPort > 0 && msg.ListenPort <= 65535 {
+		old := pe.Addr()
+		pe.ListenPort = uint16(msg.ListenPort)
+		if old != nil && int(pe.ListenPort) != old.Port {
+			t.pexDropPeer(old)
+			t.pexAddPeer(pe.WatchAddr())
+			t.recentlySeen.Add(pe.WatchAddr())
+		}
+	}
 	if _, ok := msg.M[peerprotocol.ExtensionKeyMetadata]; ok {
 		t.startInfoDownloaders()
 	}

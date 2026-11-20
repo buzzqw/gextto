@@ -87,6 +87,7 @@ func TestTorrentPlanRenameCollisions(t *testing.T) {
 		{"Show/a.mkv", "Show/sub/c.mkv"}, // onto another file
 		{"Show/sub", "Show/a.mkv"},       // folder onto a file
 		{"Show/sub/c.mkv", "Show/a.mkv/c.mkv"},
+		{"Show/sub/c.mkv", "Show/A.MKV"}, // onto another file, by case
 	}
 	for _, c := range cases {
 		tor := renameTestTorrent()
@@ -97,6 +98,10 @@ func TestTorrentPlanRenameCollisions(t *testing.T) {
 	// Moving a file into an existing folder is fine.
 	if _, err := renameTestTorrent().planRename("Show/a.mkv", "Show/sub/a.mkv"); err != nil {
 		t.Fatalf("move into a folder: %v", err)
+	}
+	// A case-only rename of one file is fine: it is the same file.
+	if _, err := renameTestTorrent().planRename("Show/a.mkv", "Show/A.MKV"); err != nil {
+		t.Fatalf("case-only rename: %v", err)
 	}
 }
 

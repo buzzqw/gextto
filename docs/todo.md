@@ -16,6 +16,13 @@ still be true after the item lands does not belong here.
 
 ## Engine (gx-core, gx-torrent)
 
+- **Two torrents that share the files hash them twice on a recheck**: the
+  verifier is gentle by design and drops every piece from the page cache, so a
+  season pack and its single episodes read the same bytes from disk once per
+  torrent. Gate: a measurement of the second recheck with and without a
+  session-wide verified-piece cache keyed by file identity, offset, length and
+  expected hash; implement only if the second pass drops enough to pay for the
+  cache.
 - **The last second on a shaped line**: on the 100 Mbit/s scenarios gx-torrent is level with the fastest clients at half the file and loses about 1.2 s in the second half (both TCP and uTP); it is not the start (the first block arrives in 13 ms locally) nor the endgame order (block sharing between duplicates was measured: no gain). Gate: a CPU and goroutine profile of the last seconds of the transfer (`GX_COMPARE_PPROF_DIR`, `first_s`/`half_s` in the harness).
 - **Compressed RAR 4 and solid archives**: extract them too (RAR 4 needs its own LZ and PPMd decoder). Gate: a real release that arrived that way.
 - **Memory on a shaped line**: own memory while downloading on the shaped 100 Mbit/s line is above qBittorrent, anacrolix and Transmission; close the gap on the paths a heap profile names. Gate: a heap profile of that scenario inside the comparison harness.

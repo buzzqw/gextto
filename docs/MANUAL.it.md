@@ -1465,6 +1465,13 @@ separato; non c'è nulla da installare.
   download dei `.torrent`; i servizi in rete locale restano diretti.
 - Supporta streaming, DLNA, download sequenziale, torrent v2 e i magnet con
   `so=`, `ws=` e `dht=`.
+- I file sul disco tengono i nomi del torrent. Due voci che differiscono solo
+  per le maiuscole vengono rinominate sulla seconda (`film.mkv` -> `film-1.mkv`,
+  cartelle comprese), perché Windows e un disco Mac predefinito le trattano
+  come un solo file; un file che è anche cartella di un altro viene rifiutato
+  quando il torrent si aggiunge. Uno spostamento su un altro disco copia e
+  controlla la dimensione di ogni file e, se una copia esce corta, si ferma
+  senza toccare l'originale.
 - In **Configurazione → Motore torrent → gx-torrent** ci sono tre opzioni native
   di qBittorrent: **ricontrolla i dati al completamento** (verifica i file una
   volta prima di seminarli), **modalità anonima** (nasconde la versione del

@@ -76,7 +76,7 @@ func (t *torrent) closePeer(pe *peer.Peer) {
 		t.piecePicker.HandleDisconnect(pe)
 	}
 	t.unchoker.HandleDisconnect(pe)
-	t.pexDropPeer(pe.Addr())
+	t.pexDropPeer(pe.WatchAddr())
 	t.dialAddresses()
 	t.session.metrics.Peers.Dec(1)
 	if s := t.status(); s != Stopping && s != Stopped {

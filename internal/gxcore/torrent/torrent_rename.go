@@ -111,21 +111,28 @@ func (t *torrent) planRename(oldPath, newPath string) (RenamePlan, error) {
 // checkPathCollisions refuses a path list where two files would share a path,
 // or where a file would sit where another needs a folder (a/b next to a/b/c):
 // on disk the second move would overwrite or fail half-way.
+// checkPathCollisions refuses a path list where two files would share a path,
+// or where a file would sit where another needs a folder (a/b next to a/b/c):
+// on disk the second move would overwrite or fail half-way. Comparison is
+// case-insensitive: two names that differ only in case are the same file on
+// Windows and on a default macOS volume, and a rename must not create a
+// layout the download cannot keep.
 func checkPathCollisions(files []metainfo.File, paths []string) error {
-	seen := make(map[string]struct{}, len(paths))
+	seen := make(map[string]string, len(paths))
 	for i, p := range paths {
 		if files[i].Padding {
 			continue
 		}
-		if _, dup := seen[p]; dup {
-			return fmt.Errorf("%q is already used by another file of the torrent", p)
+		key := strings.ToLower(p)
+		if other, dup := seen[key]; dup {
+			return fmt.Errorf("%q is already used by another file of the torrent (%q)", p, other)
 		}
-		seen[p] = struct{}{}
+		seen[key] = p
 	}
-	for p := range seen {
+	for _, p := range seen {
 		for dir := path.Dir(p); dir != "."; dir = path.Dir(dir) {
-			if _, clash := seen[dir]; clash {
-				return fmt.Errorf("%q is a file of the torrent and cannot become a folder", dir)
+			if other, clash := seen[strings.ToLower(dir)]; clash {
+				return fmt.Errorf("%q is a file of the torrent (%q) and cannot become a folder", dir, other)
 			}
 		}
 	}

@@ -116,7 +116,7 @@ func TestDisableSourceParksEveryCopy(t *testing.T) {
 	b := &webseedsource.WebseedSource{URL: "http://b.test/f", DownloadSpeed: fixedMeter{}}
 	tr := &torrent{webseedSources: []*webseedsource.WebseedSource{a1, a2, b}, webseedActiveDownloads: 0}
 
-	tr.disableSource(a1.URL, errWebseedTest, false)
+	tr.disableSource(a1.URL, errWebseedTest, false, 0)
 	if !a1.Disabled || !a2.Disabled {
 		t.Fatalf("the copies that are not fetching must be parked too: %v %v", a1.Disabled, a2.Disabled)
 	}

@@ -274,13 +274,10 @@ func number(v any) int64 {
 	}
 }
 
-// seconds converts a JSON seconds value to a duration.
+// seconds converts a JSON seconds value to a duration, clamped like every
+// other tracker's interval.
 func seconds(v any) time.Duration {
-	n := number(v)
-	if n <= 0 {
-		return 0
-	}
-	return time.Duration(n) * time.Second
+	return tracker.AnnounceIntervalFromSeconds(number(v))
 }
 
 // ensure the interface is satisfied.

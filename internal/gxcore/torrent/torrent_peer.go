@@ -212,7 +212,6 @@ func (t *torrent) startPeer(
 		t.dialAddresses()
 		return
 	}
-	t.pexAddPeer(addr)
 	if _, ok := t.peerIDs[peerID]; ok {
 		if old := t.silentPeer(func(pe *peer.Peer) bool { return pe.ID == peerID }); old != nil {
 			// Same peer, new socket, old one silent: keep the live one.
@@ -229,7 +228,6 @@ func (t *torrent) startPeer(
 		t.log.Debugf("peer with same id already connected. addr: %s id: %s", addr, peerID)
 		conn.Close()
 		delete(t.connectedPeerIPs, addr.IP.String())
-		t.pexDropPeer(addr)
 		t.dialAddresses()
 		return
 	}
@@ -239,6 +237,7 @@ func (t *torrent) startPeer(
 	pe := peer.New(conn, &t.session.wire, source, peerID, extensions, cipher, t.session.config.PieceReadTimeout, t.session.config.RequestTimeout, t.session.config.MaxRequestsIn, int(t.session.config.MaxMetadataSize), bucketDownload, bucketUpload)
 	pe.SetUploadClasses(&t.session.uploadClasses)
 	t.peers[pe] = struct{}{}
+	t.pexAddPeer(pe.WatchAddr())
 	t.wakeUnchoke()
 	peers[pe] = struct{}{}
 	if t.info() != nil {
@@ -248,7 +247,7 @@ func (t *torrent) startPeer(
 	t.session.metrics.Peers.Inc(1)
 	t.emitPeer(EventPeerConnected, pe.Addr().String())
 	t.sendFirstMessage(pe)
-	t.recentlySeen.Add(pe.Addr())
+	t.recentlySeen.Add(pe.WatchAddr())
 	t.startV2LayerDownload()
 }
 
@@ -274,11 +273,17 @@ func (t *torrent) sendFirstMessage(p *peer.Peer) {
 }
 
 // sendExtensionHandshake sends our BEP 10 handshake, flagging upload_only
-// while a (partial) seed per BEP 21.
+// while a (partial) seed per BEP 21 and carrying the port peers can reach us
+// on: an outgoing connection's local port is ephemeral, so leaving "p" out
+// makes other clients gossip an unreachable port for us.
 func (t *torrent) sendExtensionHandshake(p *peer.Peer) {
 	var metadataSize uint32
 	if t.info() != nil {
 		metadataSize = uint32(len(t.info().Bytes))
+	}
+	listenPort := 0
+	if t.port > 0 && t.port <= 65535 {
+		listenPort = t.port
 	}
 	p.SendMessage(peerprotocol.ExtensionMessage{
 		ExtendedMessageID: peerprotocol.ExtensionIDHandshake,
@@ -289,6 +294,7 @@ func (t *torrent) sendExtensionHandshake(p *peer.Peer) {
 			t.session.config.MaxRequestsIn,
 			t.session.config.Holepunch,
 			t.uploadOnly(),
+			listenPort,
 		),
 	})
 }

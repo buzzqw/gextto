@@ -10,7 +10,6 @@ import (
 	"errors"
 	"net"
 	"net/url"
-	"time"
 
 	"github.com/buzzqw/gextto/internal/gxcore/internal/logger"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/tracker"
@@ -60,7 +59,7 @@ func (t *UDPTracker) Announce(ctx context.Context, req tracker.AnnounceRequest) 
 	t.log.Debugf("Announce response: %#v", response)
 
 	return &tracker.AnnounceResponse{
-		Interval: time.Duration(response.Interval) * time.Second,
+		Interval: tracker.AnnounceIntervalFromSeconds(int64(response.Interval)),
 		Leechers: response.Leechers,
 		Seeders:  response.Seeders,
 		Peers:    peers,

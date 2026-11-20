@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -136,7 +137,7 @@ func (d *URLDownloader) Run(client *http.Client, pieces []piece.Piece, multifile
 			return false
 		}
 		defer resp.Body.Close()
-		if err := checkStatus(resp, job.RangeBegin); err != nil {
+		if err := checkStatus(resp, job.RangeBegin, job.Length); err != nil {
 			d.sendResult(resultC, &PieceResult{Downloader: d, Error: err})
 			return false
 		}
@@ -250,20 +251,99 @@ func (d *URLDownloader) sendResult(resultC chan *PieceResult, res *PieceResult) 
 	}
 }
 
+// HTTPStatusError is a web-seed answer that cannot serve the requested piece.
+// RetryAfter carries the server's Retry-After (429 or 503) when it sent a
+// usable one, so the torrent can keep the source parked for as long as asked.
+type HTTPStatusError struct {
+	Code       int
+	RetryAfter time.Duration
+}
+
+// Error names the status the server answered with.
+func (e *HTTPStatusError) Error() string {
+	return fmt.Sprintf("unexpected status code: %d", e.Code)
+}
+
+// maxWebseedRetryAfter caps how long a server can park a source: a hostile or
+// mistaken Retry-After must not keep it disabled for days.
+const maxWebseedRetryAfter = time.Hour
+
 // checkStatus accepts full and partial content. A server that ignores the
 // Range header answers 200 with the file from byte zero: that is only valid
 // for a job starting at the beginning of the file, otherwise the bytes belong
 // to another offset and the piece would be corrupt (and blamed on the swarm).
-func checkStatus(resp *http.Response, rangeBegin int64) error {
+// A 206 must also say it starts where we asked: the same misattribution would
+// otherwise reach the hash check.
+func checkStatus(resp *http.Response, rangeBegin, length int64) error {
 	switch resp.StatusCode {
 	case http.StatusPartialContent:
-		return nil
+		return checkContentRange(resp.Header.Get("Content-Range"), rangeBegin, length)
 	case http.StatusOK:
 		if rangeBegin == 0 {
 			return nil
 		}
 		return fmt.Errorf("server ignored the range request (offset %d)", rangeBegin)
+	case http.StatusTooManyRequests, http.StatusServiceUnavailable:
+		return &HTTPStatusError{Code: resp.StatusCode, RetryAfter: parseRetryAfter(resp.Header.Get("Retry-After"))}
 	default:
 		return fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
+}
+
+// checkContentRange verifies that a partial response starts at the requested
+// offset and covers the requested length. Servers that omit the header (a
+// minority) are tolerated: the exact-length read still guards the size.
+func checkContentRange(value string, rangeBegin, length int64) error {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return nil
+	}
+	const prefix = "bytes "
+	if !strings.HasPrefix(value, prefix) {
+		return fmt.Errorf("invalid Content-Range %q", value)
+	}
+	span := strings.TrimSpace(value[len(prefix):])
+	if i := strings.IndexByte(span, '/'); i >= 0 {
+		span = span[:i]
+	}
+	startStr, endStr, ok := strings.Cut(span, "-")
+	if !ok {
+		return fmt.Errorf("invalid Content-Range %q", value)
+	}
+	start, errStart := strconv.ParseInt(strings.TrimSpace(startStr), 10, 64)
+	end, errEnd := strconv.ParseInt(strings.TrimSpace(endStr), 10, 64)
+	if errStart != nil || errEnd != nil || end < start {
+		return fmt.Errorf("invalid Content-Range %q", value)
+	}
+	if start != rangeBegin {
+		return fmt.Errorf("web seed answered from byte %d, asked from %d", start, rangeBegin)
+	}
+	if end < rangeBegin+length-1 {
+		return fmt.Errorf("web seed answered bytes %d-%d, asked for %d", start, end, length)
+	}
+	return nil
+}
+
+// parseRetryAfter reads a Retry-After header: seconds, or an HTTP date. A
+// missing or unusable value is zero, and the caller falls back to its own wait.
+func parseRetryAfter(value string) time.Duration {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return 0
+	}
+	var wait time.Duration
+	if seconds, err := strconv.Atoi(value); err == nil {
+		if seconds > 0 {
+			wait = time.Duration(seconds) * time.Second
+		}
+	} else if when, err := http.ParseTime(value); err == nil {
+		wait = time.Until(when)
+	}
+	if wait <= 0 {
+		return 0
+	}
+	if wait > maxWebseedRetryAfter {
+		return maxWebseedRetryAfter
+	}
+	return wait
 }

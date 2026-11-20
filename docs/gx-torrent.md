@@ -1585,6 +1585,12 @@ RPC server is disabled.
     contacted, but the other trackers of the same tier continue to be
     used; only if the tier is exhausted does the torrent stop announcing to that
     tier.
+  - **The announce interval is clamped.** A missing, zero or negative
+    `interval` keeps a 30-minute pace instead of re-announcing as fast as the
+    tracker answers; the tracker's `min interval` (or the configured minimum)
+    is a floor, and anything past a week is cut to a week. A broken tracker can
+    therefore neither spin the client nor silence it. HTTP, UDP and WebSocket
+    trackers all pass through the same clamp.
   - **WebSocket trackers** (`ws://`/`wss://`) are supported: the
     WebTorrent/bittorrent-tracker protocol (JSON announce/scrape on the socket),
     dialed through the same egress as the HTTP tracker and closed with the
@@ -1744,9 +1750,15 @@ libtorrent; it is not libtorrent's proprietary DHT-node relay.
   (at most 8) to act as relay for that endpoint, once only; the relay,
   if it is connected to the target and the latter supports the extension, sends a
   `connect` to both and each starts a uTP connection towards the other.
-- The target is searched among the connected peers by IP and port; protocol
-  errors (`NoSuchPeer`, `NotConnected`, `NoSupport`, `NoSelf`) are
-  reported as provided by the BEP.
+- The target is searched among the connected peers by IP and by its listening
+  port (the de-facto `p` field of the BEP 10 handshake, which we also send),
+  falling back to the observed one; protocol errors (`NoSuchPeer`,
+  `NotConnected`, `NoSupport`, `NoSelf`) are reported as provided by the BEP.
+- A peer may make us dial at most ten endpoints at once, then one more every
+  three seconds of the connection, and never more than eight introductions in
+  flight: a `connect` message names the endpoint we would open, so the
+  allowance keeps a hostile peer from turning the client into a scanner. The
+  messages past the allowance are ignored and logged at debug level.
 - Known limit: as for `ut_metadata`/`ut_pex`, the incoming message is
   recognised via the local ID of the extension; a peer that assigns to
   `ut_holepunch` an ID other than 3 is not understood (pre-existing limit
@@ -2156,6 +2168,14 @@ The copies are an implementation detail: the daemon page, the stats and the
 `.torrent` export show **one entry per URL**, with the speed of all its ranges
 summed and the first error it hit.
 
+Every answer is treated as a stranger's: response headers are capped at
+256 KiB, transparent compression is off (a compressed range is not the file),
+a `206` must start at the requested offset (`Content-Range`) and a `429` or
+`503` parks the source for the server's `Retry-After`, at most an hour,
+instead of the fixed minute. A source that ignores the range or answers from
+another offset is disabled before its bytes can fail a hash as if the peers
+were corrupt.
+
 ## HTTP streaming (HTTP Range)
 
 Besides sequential download, the daemon can serve a file to a player while
@@ -2317,6 +2337,13 @@ The engine saves every torrent in `DataDir/<id>` and at removal always runs
   is added;
 - a real folder left in place of the symlink is moved to
   `DATA/orphaned/<id>` before removal, never deleted;
+- **two names that differ only in case are deduplicated per directory** at
+  parse time, before anything is allocated: the later entry gets `-1` before
+  its extension (`readme.txt` -> `readme-1.txt`), folders included. Windows and
+  a default macOS volume treat the two as one file, so without the rename the
+  second download would overwrite the first; with it the same torrent lays out
+  the same way on every system and a resume written on one stays valid on the
+  other. A file whose path is also the folder of another file is still refused;
 - **adding a torrent never destroys what is already on disk**: an existing file
   shorter than the torrent expects is extended (the bytes past its end are
   holes, the same as preallocation leaves after a crash), while a file
@@ -2341,7 +2368,9 @@ this removes one fsync per piece write (measurements in
 1. the torrent is stopped;
 2. the daemon waits for the engine to close the files;
 3. the content is moved, with `rename` or with copy and removal if
-   the filesystem changes (via `.gxpart` files);
+   the filesystem changes (via `.gxpart` files). Each copied file must have
+   exactly the source's size: a short copy (the source shrank meanwhile) is
+   discarded and the move fails, leaving the original where it was;
 4. the symlink is re-pointed atomically;
 5. the torrent starts again.
 

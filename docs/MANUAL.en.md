@@ -1448,6 +1448,12 @@ process; there is nothing to install.
   through the tunnel too; services on the local network stay direct.
 - It supports streaming, DLNA, sequential download, v2 torrents and magnets
   with `so=`, `ws=` and `dht=`.
+- Files on disk keep the names of the torrent. Two entries that differ only in
+  case are renamed on the later one (`film.mkv` -> `film-1.mkv`, folders too),
+  because Windows and a default macOS disk treat them as one file; a file that
+  is also another file's folder is refused when the torrent is added. A move
+  to another disk copies and checks every file's size and, if a copy comes out
+  short, stops without touching the original.
 - In **Configuration → Torrent engine → gx-torrent** there are three native
   qBittorrent options: **recheck data when a download completes** (verify the
   files once before seeding them), **anonymous mode** (hide the client version

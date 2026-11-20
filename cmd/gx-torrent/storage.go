@@ -248,17 +248,36 @@ func copyFile(source, target string, perm os.FileMode) error {
 		return err
 	}
 	defer in.Close()
+	info, err := in.Stat()
+	if err != nil {
+		return err
+	}
 	out, err := os.OpenFile(target, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, perm)
 	if err != nil {
 		return err
 	}
-	if _, err := io.Copy(out, in); err != nil {
+	n, err := copyFileData(out, in, info.Size())
+	if err != nil {
 		out.Close()
-		return err
+		_ = os.Remove(target)
+		return fmt.Errorf("copy %s: %w", source, err)
+	}
+	// A file that shrinks while it is copied must not become the copy: the
+	// rename into place would publish a truncated file as if it were whole.
+	if n != info.Size() {
+		out.Close()
+		_ = os.Remove(target)
+		return fmt.Errorf("copy %s: short copy, %d of %d bytes", source, n, info.Size())
 	}
 	if err := out.Sync(); err != nil {
 		out.Close()
+		_ = os.Remove(target)
 		return err
 	}
 	return out.Close()
+}
+
+// copyFileData copies size bytes; tests replace it to inject a short copy.
+var copyFileData = func(dst io.Writer, src io.Reader, size int64) (int64, error) {
+	return io.CopyN(dst, src, size)
 }

@@ -89,8 +89,8 @@ func (t *HTTPTracker) Announce(ctx context.Context, req tracker.AnnounceRequest)
 	peers = filterExternalIP(peers, response.ExternalIP)
 
 	return &tracker.AnnounceResponse{
-		Interval:       time.Duration(response.Interval) * time.Second,
-		MinInterval:    time.Duration(response.MinInterval) * time.Second,
+		Interval:       tracker.AnnounceIntervalFromSeconds(response.Interval),
+		MinInterval:    tracker.AnnounceIntervalFromSeconds(response.MinInterval),
 		Leechers:       response.Incomplete,
 		Seeders:        response.Complete,
 		Peers:          peers,

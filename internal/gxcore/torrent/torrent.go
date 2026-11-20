@@ -320,6 +320,11 @@ type torrent struct {
 	// holepunchAttempted allows one BEP 55 rendezvous per endpoint, so dead
 	// dials cannot flood relays.
 	holepunchAttempted map[string]struct{}
+	// holepunchDials counts the holepunch handshakes in flight: they bypass
+	// the normal dial budget (a seed must still answer a rendezvous), and a
+	// peer naming new endpoints must not turn the client into a connection
+	// factory. Torrent goroutine only.
+	holepunchDials int
 
 	// announcersStoppedC fires when the stopped announcer finishes; buffered
 	// so a detached one never blocks.

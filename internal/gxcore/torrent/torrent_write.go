@@ -123,7 +123,7 @@ func (t *torrent) punishCorruptSource(pw *piecewriter.PieceWriter) {
 	case *urldownloader.URLDownloader:
 		t.log.Debugln("received corrupt piece from webseed", src.URL)
 		// disableSource closes the downloader and frees its slot.
-		t.disableSource(src.URL, errors.New("corrupt piece"), false)
+		t.disableSource(src.URL, errors.New("corrupt piece"), false, 0)
 	default:
 		t.crash("unhandled piece source")
 	}

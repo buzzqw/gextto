@@ -40,6 +40,13 @@ type Peer struct {
 	ExtensionsEnabled bool
 	FastEnabled       bool
 	DHTEnabled        bool
+	// ListenPort is the port the peer advertised in its BEP 10 "p" field
+	// (0 when it did not). The address we connected to may be an ephemeral
+	// one for an incoming connection; this is the port others can reach.
+	ListenPort uint16
+	// HolepunchConnects counts the ut_holepunch connect messages from this
+	// peer we acted on, bounded by its allowance.
+	HolepunchConnects int
 	// ProtocolV2 marks peers advertising BitTorrent v2 in the handshake
 	// reserved bits (BEP 52).
 	ProtocolV2       bool
@@ -103,6 +110,18 @@ type Peer struct {
 type Message struct {
 	*Peer
 	Message any
+}
+
+// WatchAddr is the endpoint to gossip and to look for when a rendezvous names
+// a peer: the address we observed, carrying the listen port the peer
+// advertised in its BEP 10 handshake when it is known and different. An
+// incoming connection's source port is ephemeral and must not be shared.
+func (p *Peer) WatchAddr() *net.TCPAddr {
+	addr := p.Addr()
+	if addr == nil || p.ListenPort == 0 || int(p.ListenPort) == addr.Port {
+		return addr
+	}
+	return &net.TCPAddr{IP: addr.IP, Port: int(p.ListenPort)}
 }
 
 // PieceMessage is a block payload read from a peer.
@@ -216,7 +235,7 @@ func (p *Peer) Run(messages chan Message, pieces chan PieceMessage, snubbed, dis
 // StartPEX launches the periodic PEX exchange, once.
 func (p *Peer) StartPEX(initialPeers map[*Peer]struct{}, recentlySeen *pexlist.RecentlySeen) {
 	if p.PEX == nil {
-		p.PEX = newPEX(p.Conn, p.ExtensionHandshake.M[peerprotocol.ExtensionKeyPEX], initialPeers, recentlySeen)
+		p.PEX = newPEX(p.Conn, p.WatchAddr(), p.ExtensionHandshake.M[peerprotocol.ExtensionKeyPEX], initialPeers, recentlySeen)
 		go p.PEX.run()
 	}
 }

@@ -159,6 +159,11 @@ type ExtensionHandshakeMessage struct {
 	YourIP       string           `bencode:"yourip,omitempty"`
 	MetadataSize int              `bencode:"metadata_size,omitempty"`
 	RequestQueue int              `bencode:"reqq"`
+	// ListenPort is the de-facto "p" field (as libtorrent and qBittorrent send
+	// it): the TCP port the peer accepts connections on. The address of an
+	// incoming connection is an ephemeral one, and this is what lets the swarm
+	// gossip a reachable port instead.
+	ListenPort int `bencode:"p,omitempty"`
 	// UploadOnly is the BEP 21 "upload_only" header: set when the peer wants
 	// nothing (a full or partial seed).
 	UploadOnly int `bencode:"upload_only,omitempty"`
@@ -166,8 +171,9 @@ type ExtensionHandshakeMessage struct {
 
 // NewExtensionHandshake advertises our extensions: metadata and PEX always,
 // holepunch on request, donthave for receiving; the version, observed peer
-// address, metadata size, request queue depth and seed state fill the rest.
-func NewExtensionHandshake(metadataSize uint32, version string, yourip net.IP, requestQueueLength int, holepunch bool, uploadOnly bool) ExtensionHandshakeMessage {
+// address, metadata size, request queue depth, seed state and listen port fill
+// the rest. A zero listen port leaves the field out.
+func NewExtensionHandshake(metadataSize uint32, version string, yourip net.IP, requestQueueLength int, holepunch bool, uploadOnly bool, listenPort int) ExtensionHandshakeMessage {
 	m := map[string]uint8{
 		ExtensionKeyMetadata: ExtensionIDMetadata,
 		ExtensionKeyPEX:      ExtensionIDPEX,
@@ -182,6 +188,7 @@ func NewExtensionHandshake(metadataSize uint32, version string, yourip net.IP, r
 		YourIP:       string(truncateIP(yourip)),
 		MetadataSize: int(metadataSize),
 		RequestQueue: requestQueueLength,
+		ListenPort:   listenPort,
 	}
 	if uploadOnly {
 		msg.UploadOnly = 1

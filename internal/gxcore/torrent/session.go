@@ -389,12 +389,20 @@ func assembleSession(cfg Config, l logger.Logger, db *bbolt.DB, res *boltdbresum
 // The idle pool per host follows WebseedMaxDownloads: the ranges of one source
 // are fetched in parallel, and with the net/http default (two idle connections
 // per host) the rest were reopened — a TCP and TLS handshake per range.
+//
+// The response is a stranger's: its headers are capped well below net/http's
+// 10 MiB default, and transparent compression is off because a gzipped 206 is
+// decompressed by Go and the bytes would no longer be the file's.
 func webseedHTTPClient(cfg Config, bl *blocklist.Blocklist) http.Client {
 	idlePerHost := max(cfg.WebseedMaxDownloads, 2)
 	return http.Client{
 		Transport: &http.Transport{
 			MaxIdleConns:        100,
 			MaxIdleConnsPerHost: idlePerHost,
+			DisableCompression:  true,
+			// A header larger than this is either a broken proxy or an attempt
+			// to grow the process memory one piece request at a time.
+			MaxResponseHeaderBytes: 256 << 10,
 			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
 				ip, port, err := resolver.Resolve(ctx, addr, cfg.DNSResolveTimeout, bl)
 				if err != nil {

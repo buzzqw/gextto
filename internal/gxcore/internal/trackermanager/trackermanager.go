@@ -41,6 +41,9 @@ func New(bl *blocklist.Blocklist, dnsTimeout time.Duration, tlsSkipVerify bool) 
 	m := &TrackerManager{
 		httpTransport: &http.Transport{
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: tlsSkipVerify}, // nolint: gosec
+			// A tracker answer is a stranger's: cap the headers instead of
+			// leaving net/http's 10 MiB per request to whoever answers.
+			MaxResponseHeaderBytes: 256 << 10,
 		},
 		udpTransport:  udptracker.NewTransport(bl, dnsTimeout),
 		tlsSkipVerify: tlsSkipVerify,

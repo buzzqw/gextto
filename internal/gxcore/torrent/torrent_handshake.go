@@ -38,6 +38,9 @@ func (t *torrent) handleIncomingHandshakeDone(ih *incominghandshaker.IncomingHan
 // (BEP 55) and resumes the normal dial pool.
 func (t *torrent) handleOutgoingHandshakeDone(oh *outgoinghandshaker.OutgoingHandshaker) {
 	delete(t.outgoingHandshakers, oh)
+	if oh.Source == peersource.Holepunch && t.holepunchDials > 0 {
+		t.holepunchDials--
+	}
 	if oh.Error != nil {
 		delete(t.connectedPeerIPs, oh.Addr.IP.String())
 		t.tryHolepunchRendezvous(oh.Addr)

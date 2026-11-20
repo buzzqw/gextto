@@ -26,13 +26,17 @@ type pex struct {
 }
 
 // newPEX starts an exchange on conn, announcing extID as our PEX extension
-// number and preloading everyone already connected (except conn itself).
-func newPEX(conn *peerconn.Conn, extID uint8, initialPeers map[*Peer]struct{}, recentlySeen *pexlist.RecentlySeen) *pex {
+// number and preloading everyone already connected (except conn itself, whose
+// address is self).
+func newPEX(conn *peerconn.Conn, self *net.TCPAddr, extID uint8, initialPeers map[*Peer]struct{}, recentlySeen *pexlist.RecentlySeen) *pex {
 	pl := pexlist.NewWithRecentlySeen(recentlySeen.Peers())
-	self := conn.Addr().String()
+	selfAddr := ""
+	if self != nil {
+		selfAddr = self.String()
+	}
 	for pe := range initialPeers {
-		if addr := pe.Addr().String(); addr != self {
-			pl.Add(pe.Addr())
+		if addr := pe.WatchAddr(); addr != nil && addr.String() != selfAddr {
+			pl.Add(addr)
 		}
 	}
 	return &pex{

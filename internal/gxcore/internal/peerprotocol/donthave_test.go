@@ -32,7 +32,7 @@ func TestDontHaveExtensionRoundTrip(t *testing.T) {
 }
 
 func TestExtensionHandshakeAdvertisesDontHave(t *testing.T) {
-	h := NewExtensionHandshake(0, "v", nil, 0, false, false)
+	h := NewExtensionHandshake(0, "v", nil, 0, false, false, 0)
 	if _, ok := h.M[ExtensionKeyDontHave]; !ok {
 		t.Fatal("lt_donthave not advertised in the extension handshake")
 	}

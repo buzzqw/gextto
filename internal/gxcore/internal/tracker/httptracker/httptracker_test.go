@@ -86,6 +86,43 @@ func TestHTTPScrapeFailure(t *testing.T) {
 	}
 }
 
+// TestHTTPAnnounceIntervalSanitized: the interval of an announce reply is
+// stranger data. A negative one becomes zero (the announcer then keeps its
+// default pace), a value past a week is capped, and a value larger than int32
+// no longer makes the whole reply undecodable.
+func TestHTTPAnnounceIntervalSanitized(t *testing.T) {
+	cases := []struct {
+		name string
+		body map[string]any
+		want time.Duration
+	}{
+		{"negative", map[string]any{"interval": int64(-60)}, 0},
+		{"huge", map[string]any{"interval": int64(1)<<32 + 1}, tracker.MaxAnnounceInterval},
+		{"normal", map[string]any{"interval": int64(1800)}, 30 * time.Minute},
+	}
+	for _, c := range cases {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			body, _ := bencode.EncodeBytes(c.body)
+			_, _ = w.Write(body)
+		}))
+
+		u, _ := url.Parse(srv.URL + "/announce")
+		tr := New(srv.URL+"/announce", u, 5*time.Second, &http.Transport{}, "test", 1<<20)
+
+		resp, err := tr.Announce(context.Background(), tracker.AnnounceRequest{
+			Torrent: tracker.Torrent{InfoHash: [20]byte{1}, PeerID: [20]byte{2}, Port: 6881},
+		})
+		if err != nil {
+			srv.Close()
+			t.Fatalf("%s: Announce: %v", c.name, err)
+		}
+		if resp.Interval != c.want {
+			t.Errorf("%s: interval = %v, want %v", c.name, resp.Interval, c.want)
+		}
+		srv.Close()
+	}
+}
+
 // TestHTTPAnnounceFailureRetryIn checks that the BEP 31 "retry in" value from an
 // announce failure is carried through the HTTP tracker: a number of minutes, or
 // the "never" flag.
