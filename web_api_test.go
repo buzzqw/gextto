@@ -38,6 +38,10 @@ import (
 func newTestAppState(t *testing.T) *AppState {
 	t.Helper()
 	resetV2ClientI18nMemo()
+	// The notification log sink is process-wide: a test must put back the one
+	// it found, or a later test would write into this test's closed database.
+	previousAudit := notifyAudit
+	t.Cleanup(func() { notifyAudit = previousAudit })
 	dir := t.TempDir()
 
 	db, err := OpenDatabase(filepath.Join(dir, "gextto.db"))

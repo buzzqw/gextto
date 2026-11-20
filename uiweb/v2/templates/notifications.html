@@ -1,0 +1,56 @@
+{{/* ------------------------------------------------------------------ */}}
+{{/* Notifiche                                                           */}}
+{{/* ------------------------------------------------------------------ */}}
+
+{{define "v2_notifications"}}
+<div class="view">
+  <div class="panel">
+    <div class="panel-head">
+      <h3 {{trTitle "Ogni notifica che Gextto ha provato a inviare, con i canali e l'esito: serve a capire se un avviso è partito, se è arrivato e quale canale ha fallito."}}>{{tr "Registro notifiche"}}</h3>
+      <form method="post" action="/notifications/clear">
+        <button class="btn sm danger" type="submit" {{trTitle "Toglie tutte le righe dal registro. Non cambia nulla nelle notifiche future: i canali restano configurati come sono."}}>{{tr "Svuota il registro"}}</button>
+      </form>
+    </div>
+    <div class="panel-body">
+      <p class="muted">{{tr "Nel registro"}}: {{.Total}} · <a href="/?view=notifications&outcome=sent">{{tr "inviate"}}: {{.Sent}}</a> · <a href="/?view=notifications&outcome=failed">{{tr "fallite"}}: {{.Failed}}</a> · <a href="/?view=notifications&outcome=suppressed">{{tr "non inviate"}}: {{.Suppressed}}</a></p>
+
+      <form method="get" action="/" class="form-grid">
+        <input type="hidden" name="view" value="notifications" />
+        <label class="field"><span>{{tr "Esito"}}</span>
+          <select class="input" name="outcome" {{trTitle "Mostra solo le notifiche con questo esito."}}>
+            <option value="" {{if eq .Outcome ""}}selected{{end}}>{{tr "Tutti"}}</option>
+            <option value="sent" {{if eq .Outcome "sent"}}selected{{end}}>{{tr "inviate"}}</option>
+            <option value="failed" {{if eq .Outcome "failed"}}selected{{end}}>{{tr "fallite"}}</option>
+            <option value="suppressed" {{if eq .Outcome "suppressed"}}selected{{end}}>{{tr "non inviate"}}</option>
+          </select>
+        </label>
+        <div class="form-actions"><button class="btn sm primary" type="submit">{{tr "Filtra"}}</button></div>
+      </form>
+
+      {{if .Rows}}
+      <div class="table-wrap"><table class="data-table notification-log">
+        <caption class="sr-only">{{tr "Notifiche registrate"}}</caption>
+        <thead><tr>
+          <th scope="col" {{trTitle "Data e ora dell'invio, con i secondi."}}>{{tr "Quando"}}</th>
+          <th scope="col" {{trTitle "Il titolo del messaggio, come è stato composto al momento dell'invio."}}>{{tr "Evento"}}</th>
+          <th scope="col" {{trTitle "I canali configurati in quel momento: uno che ha rifiutato il messaggio è nominato nel dettaglio."}}>{{tr "Canali"}}</th>
+          <th scope="col" {{trTitle "inviata: almeno un canale ha accettato il messaggio; fallita: nessun canale l'ha accettato; non inviata: lo switch dell'evento era spento, l'anti-spam l'ha trattenuta o non c'era nessun canale configurato."}}>{{tr "Esito"}}</th>
+          <th scope="col" {{trTitle "L'errore riportato dai canali che hanno rifiutato il messaggio."}}>{{tr "Dettaglio"}}</th>
+        </tr></thead>
+        <tbody>{{range .Rows}}<tr>
+          <td class="notif-when nowrap">{{.When}}</td>
+          <td class="notif-event">{{.Event}}</td>
+          <td class="notif-channels muted">{{.Channels}}</td>
+          <td class="notif-outcome"><span class="badge {{.OutcomeClass}}">{{tr .Outcome}}</span></td>
+          <td class="notif-detail muted">{{if .Detail}}{{.Detail}}{{else}}—{{end}}</td>
+        </tr>{{end}}</tbody>
+      </table></div>
+      {{else}}
+      <p class="muted">{{tr "Nessuna notifica registrata."}}</p>
+      {{end}}
+
+      <p class="hint">{{.RetentionNote}}</p>
+    </div>
+  </div>
+</div>
+{{end}}

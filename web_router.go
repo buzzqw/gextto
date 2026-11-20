@@ -28,6 +28,7 @@ func Router(s *AppState) *http.ServeMux {
 	handle(s, mux, "GET /api/logs", Logs)
 	handle(s, mux, "GET /api/logs/stream", LogsStream)
 	handle(s, mux, "GET /api/notifications/stream", NotificationsStream)
+	handle(s, mux, "POST /notifications/clear", V2NotificationsClear)
 	handle(s, mux, "GET /api/config", ConfigView)
 	handle(s, mux, "POST /api/config", SaveConfigRoot)
 	handle(s, mux, "GET /api/quality-profiles", QualityProfilesView)

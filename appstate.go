@@ -45,6 +45,9 @@ func NewAppState(
 		rate_history:    newRateHistory(rateHistoryLen),
 		latency_guard:   newLatencyGuard(),
 	}
+	// Every notification attempt is recorded, so the Notifications page can
+	// answer "did it arrive, and through which channel".
+	InstallNotificationLog(db)
 	// Install the configured transfer backend. A refused activation (invalid
 	// path mappings, a missing binary, a port conflict) leaves the daemon with
 	// the UI up and the transfers stopped; the engine supervisor then picks an

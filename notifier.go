@@ -495,7 +495,9 @@ func (n *Notifier) NotifyEvent(event string, data map[string]any) error {
 	return n.deliverEvent(event, data)
 }
 
-// deliverEvent sends one event to every enabled channel, synchronously.
+// deliverEvent sends one event to every enabled channel, synchronously, and
+// records the attempt in the notification log (what was sent, when, over which
+// channels and with what outcome).
 func (n *Notifier) deliverEvent(event string, data map[string]any) error {
 	// External hooks run on a detached goroutine so they never delay the
 	// notification delivery or the caller. They are chosen event by event and
@@ -504,11 +506,25 @@ func (n *Notifier) deliverEvent(event string, data map[string]any) error {
 	if len(hooks) > 0 {
 		Dispatch(hooks, event, data)
 	}
-	if !n.eventEnabled(event) || n.notifyCooldownHit(event, data) {
+	lang := n.notifyLang()
+	title := formatEmailSubjectLang(lang, event, data)
+	if !n.eventEnabled(event) {
+		auditNotification(NotificationRecord{
+			At: time.Now(), Event: event, Title: title,
+			Outcome: notificationSuppressed,
+			Detail:  "the group switch of this event is off",
+		})
 		return nil
 	}
-	lang := n.notifyLang()
-	var firstError error
+	if n.notifyCooldownHit(event, data) {
+		auditNotification(NotificationRecord{
+			At: time.Now(), Event: event, Title: title,
+			Outcome: notificationSuppressed,
+			Detail:  "the same event was sent within the anti-spam window",
+		})
+		return nil
+	}
+	results := []notify.ChannelResult{}
 	if n.telegramEnabled {
 		if n.telegramBotToken != nil && n.telegramChatID != nil {
 			n.throttleTelegram()
@@ -531,38 +547,34 @@ func (n *Notifier) deliverEvent(event string, data map[string]any) error {
 				time.Sleep(time.Duration(uint64(1)<<uint(attempt)) * notifierRetryUnit)
 				result = send()
 			}
-			if result != nil {
-				firstError = result
-			}
+			results = append(results, notify.ChannelResult{Name: "telegram", Err: result})
 		}
 	}
 	if n.webhookURL != nil {
 		target := *n.webhookURL
 		body, contentType, headers, err := n.webhookRequest(lang, event, data)
 		if err != nil {
-			return err
-		}
-		send := func() error {
-			return n.postRaw(target, contentType, headers, body)
-		}
-		result := send()
-		for attempt := 0; attempt < 2; attempt++ {
-			if result == nil {
-				break
+			results = append(results, notify.ChannelResult{Name: "webhook", Err: err})
+		} else {
+			send := func() error {
+				return n.postRaw(target, contentType, headers, body)
 			}
-			time.Sleep(time.Duration(uint64(1)<<uint(attempt)) * notifierRetryUnit)
-			result = send()
-		}
-		if result != nil && firstError == nil {
-			firstError = result
+			result := send()
+			for attempt := 0; attempt < 2; attempt++ {
+				if result == nil {
+					break
+				}
+				time.Sleep(time.Duration(uint64(1)<<uint(attempt)) * notifierRetryUnit)
+				result = send()
+			}
+			results = append(results, notify.ChannelResult{Name: "webhook", Err: result})
 		}
 	}
 	if n.emailEnabled {
-		if err := n.sendEmail(event, formatEmailSubjectLang(lang, event, data), formatEventLang(lang, event, data)); err != nil {
-			if firstError == nil {
-				firstError = err
-			}
-		}
+		results = append(results, notify.ChannelResult{
+			Name: "e-mail",
+			Err:  n.sendEmail(event, title, formatEventLang(lang, event, data)),
+		})
 	}
 	// The dedicated channels: Discord, Slack, Gotify, ntfy, Pushover, Apprise
 	// and the custom script. They are one block because they share the same
@@ -571,17 +583,37 @@ func (n *Notifier) deliverEvent(event string, data map[string]any) error {
 	if n.extra.Enabled() {
 		payload := notify.Event{
 			Name:   event,
-			Title:  formatEmailSubjectLang(lang, event, data),
+			Title:  title,
 			Text:   formatEventLang(lang, event, data),
 			Fields: data,
 		}
-		if err := notify.Send(context.Background(), n.extra, payload); err != nil {
-			if firstError == nil {
-				firstError = err
-			}
+		results = append(results, notify.SendDetailed(context.Background(), n.extra, payload)...)
+	}
+	record := NotificationRecord{At: time.Now(), Event: event, Title: title}
+	var failures []string
+	var firstError error
+	for _, result := range results {
+		record.Channels = append(record.Channels, result.Name)
+		if result.Err == nil {
+			continue
+		}
+		failures = append(failures, result.Name+": "+result.Err.Error())
+		if firstError == nil {
+			firstError = result.Err
 		}
 	}
-	if firstError == nil {
+	switch {
+	case len(results) == 0:
+		record.Outcome = notificationSuppressed
+		record.Detail = "no notification channel is enabled"
+	case len(failures) == 0:
+		record.Outcome = notificationSent
+	default:
+		record.Outcome = notificationFailed
+		record.Detail = strings.Join(failures, "; ")
+	}
+	auditNotification(record)
+	if firstError == nil && record.Outcome == notificationSent {
 		n.markNotifyCooldown(event, data)
 	}
 	return firstError

@@ -986,6 +986,11 @@ func (d *Database) migrate() error {
 	if _, err := d.db.Exec(databaseAcquisitionSchema); err != nil {
 		return err
 	}
+	// What was notified, when, on which channel and with what outcome
+	// (notification_log.go): the Notifications page reads it.
+	if _, err := d.db.Exec(notificationLogSchema); err != nil {
+		return err
+	}
 	// ui_state (acquisition.go): UI bookkeeping such as the "Da controllare"
 	// watermark.
 	if _, err := d.db.Exec(databaseUIStateSchema); err != nil {

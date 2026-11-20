@@ -207,11 +207,32 @@ func channelsFor(cfg Config, event Event) []channel {
 	return out
 }
 
+// ChannelResult is one channel's own outcome: its name and, when it failed,
+// why. The dedicated channels (Discord, Slack, Gotify, ntfy, Pushover,
+// Apprise, script, e-mail) are reported one by one, so a failing service names
+// itself instead of hiding inside a joined error.
+type ChannelResult struct {
+	Name string
+	Err  error
+}
+
 // Send delivers the event to every configured channel, concurrently, and
 // returns the errors joined (nil when every channel succeeded or none is
 // configured). Each channel has its own timeout, so one slow service never
 // holds back the others.
 func Send(ctx context.Context, cfg Config, event Event) error {
+	var errs []error
+	for _, result := range SendDetailed(ctx, cfg, event) {
+		if result.Err != nil {
+			errs = append(errs, fmt.Errorf("%s: %w", result.Name, result.Err))
+		}
+	}
+	return errors.Join(errs...)
+}
+
+// SendDetailed delivers the event like Send and returns every channel's own
+// outcome, in the order the channels were tried.
+func SendDetailed(ctx context.Context, cfg Config, event Event) []ChannelResult {
 	app := strings.TrimSpace(cfg.App)
 	if app == "" {
 		app = "gx-torrent"
@@ -228,13 +249,11 @@ func Send(ctx context.Context, cfg Config, event Event) error {
 		}(index)
 	}
 	wait.Wait()
-	var errs []error
-	for index, err := range results {
-		if err != nil {
-			errs = append(errs, fmt.Errorf("%s: %w", channels[index].name, err))
-		}
+	out := make([]ChannelResult, len(channels))
+	for index := range channels {
+		out[index] = ChannelResult{Name: channels[index].name, Err: results[index]}
 	}
-	return errors.Join(errs...)
+	return out
 }
 
 func post(ctx context.Context, rawURL, contentType string, headers map[string]string, body []byte) error {

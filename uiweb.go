@@ -417,6 +417,7 @@ var uiNavGroups = []uiNavDefinition{
 		{ID: "integrations", Label: "Integrazioni"},
 		{ID: "maintenance", Label: "Manutenzione"},
 		{ID: "health", Label: "Salute"},
+		{ID: "notifications", Label: "Registro notifiche"},
 		{ID: "blocklist", Label: "Blocklist", Optional: true},
 		{ID: "manual", Label: "Manuale", Docs: true},
 		{ID: "changelog", Label: "Changelog", Docs: true},
