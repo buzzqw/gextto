@@ -18,9 +18,6 @@ func TestStatsReportTheAnnounceLatency(t *testing.T) {
 	a.status = Working
 
 	stats := a.stats()
-	if stats.LatencySamples != 2 {
-		t.Fatalf("samples = %d, want 2", stats.LatencySamples)
-	}
 	if stats.MedianLatency < 150*time.Millisecond || stats.MedianLatency > 250*time.Millisecond {
 		t.Fatalf("median = %v, want about 200ms", stats.MedianLatency)
 	}
@@ -39,14 +36,13 @@ func TestLatencyWindowKeepsTheNewestAnnounces(t *testing.T) {
 		a.recordAnnounceLatency()
 	}
 	stats := a.stats()
-	if stats.LatencySamples != announceLatencyWindow {
-		t.Fatalf("samples = %d, want %d", stats.LatencySamples, announceLatencyWindow)
-	}
 	if stats.LastLatency < 19*time.Millisecond || stats.LastLatency > 30*time.Millisecond {
 		t.Fatalf("last = %v, want the newest sample (about 25ms)", stats.LastLatency)
 	}
-	if stats.MedianLatency <= 0 {
-		t.Fatalf("median = %v, want the window's median", stats.MedianLatency)
+	// The window holds the newest 20 samples (6..25 ms), so the median is
+	// 15.5 ms: the oldest five were dropped (they would give 13 ms).
+	if stats.MedianLatency < 14*time.Millisecond || stats.MedianLatency > 17*time.Millisecond {
+		t.Fatalf("median = %v, want about 15.5ms: the oldest samples must be dropped", stats.MedianLatency)
 	}
 }
 

@@ -512,7 +512,7 @@ func (n *Notifier) deliverEvent(event string, data map[string]any) error {
 		auditNotification(NotificationRecord{
 			At: time.Now(), Event: event, Title: title,
 			Outcome: notificationSuppressed,
-			Detail:  "the group switch of this event is off",
+			Detail:  "lo switch del gruppo di questo evento è spento",
 		})
 		return nil
 	}
@@ -520,7 +520,7 @@ func (n *Notifier) deliverEvent(event string, data map[string]any) error {
 		auditNotification(NotificationRecord{
 			At: time.Now(), Event: event, Title: title,
 			Outcome: notificationSuppressed,
-			Detail:  "the same event was sent within the anti-spam window",
+			Detail:  "lo stesso evento è stato inviato da poco (anti-spam)",
 		})
 		return nil
 	}
@@ -605,7 +605,7 @@ func (n *Notifier) deliverEvent(event string, data map[string]any) error {
 	switch {
 	case len(results) == 0:
 		record.Outcome = notificationSuppressed
-		record.Detail = "no notification channel is enabled"
+		record.Detail = "nessun canale di notifica è configurato"
 	case len(failures) == 0:
 		record.Outcome = notificationSent
 	default:

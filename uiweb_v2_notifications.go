@@ -35,9 +35,6 @@ type v2NotificationsView struct {
 	Sent       int
 	Failed     int
 	Suppressed int
-	Retention  int
-	// RetentionDays is the age limit of the log, in days.
-	RetentionDays int
 	// RetentionNote says how much is kept, as one translated sentence.
 	RetentionNote string
 }
@@ -48,8 +45,6 @@ func v2NotificationsViewFrom(s *AppState, r *http.Request) v2NotificationsView {
 	days := int(notificationLogRetention.Hours() / 24)
 	view := v2NotificationsView{
 		Outcome:       outcome,
-		Retention:     notificationLogRows,
-		RetentionDays: days,
 		RetentionNote: uiTextf(s, "Vengono conservate le ultime %d notifiche e quelle degli ultimi %d giorni.", notificationLogRows, days),
 	}
 	if s.db == nil {

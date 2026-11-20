@@ -69,13 +69,26 @@ func TestSettingsPageCountsWhatLeftTheDefault(t *testing.T) {
 	if !found {
 		t.Fatal("the daemon section is missing")
 	}
-	// A row kept at its default is not counted.
-	clear, err := LoadConfig(state.config_path)
-	if err != nil {
-		t.Fatal(err)
+	// A row kept at its default is not counted, while the one that changed is,
+	// and the section total is exactly the number of marked rows.
+	modifiedRows := 0
+	for _, field := range page.Fields {
+		if field.Modified {
+			modifiedRows++
+		}
 	}
-	if got := clear.Settings["refresh_interval"]; got != "3600" {
-		t.Fatalf("saved refresh interval = %q", got)
+	if modifiedRows < 1 {
+		t.Fatal("the changed row is not marked")
+	}
+	for _, field := range page.Fields {
+		if field.Key != "refresh_interval" && field.Modified {
+			t.Fatalf("a row left at its default is marked: %q", field.Key)
+		}
+	}
+	for _, tab := range page.Tabs {
+		if tab.ID == "daemon" && tab.Modified != modifiedRows {
+			t.Fatalf("section total = %d, marked rows = %d", tab.Modified, modifiedRows)
+		}
 	}
 }
 

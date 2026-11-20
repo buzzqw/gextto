@@ -114,7 +114,7 @@ func TestNotificationAttemptWithNoChannelIsRecorded(t *testing.T) {
 	if len(got) != 1 || got[0].Outcome != notificationSuppressed {
 		t.Fatalf("records = %+v, want one suppressed", got)
 	}
-	if !strings.Contains(got[0].Detail, "no notification channel") {
+	if !strings.Contains(got[0].Detail, "nessun canale") {
 		t.Fatalf("detail = %q", got[0].Detail)
 	}
 }

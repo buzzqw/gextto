@@ -253,7 +253,11 @@ func (a *PeriodicalAnnouncer) handleResponse(timer *time.Timer, resp *tracker.An
 // handleError absorbs one announce failure: humanized error, logging by
 // severity, and reschedule on backoff (or the tracker's retry-in).
 func (a *PeriodicalAnnouncer) handleError(timer *time.Timer, err error) {
-	a.recordAnnounceLatency()
+	// A completed event cancels the announce in flight; its "context canceled"
+	// is not a reply and must not enter the latency window as a near-zero one.
+	if !errors.Is(err, context.Canceled) {
+		a.recordAnnounceLatency()
+	}
 	a.status = NotWorking
 	if a.onResult != nil {
 		a.onResult(nil, err)
@@ -308,11 +312,9 @@ type Stats struct {
 	InFlight bool
 	// LastLatency is the duration of the last announce that got an answer
 	// (reply or error; 0 before the first), MedianLatency the median over the
-	// last announceLatencyWindow announces and LatencySamples how many are in
-	// that window.
-	LastLatency    time.Duration
-	MedianLatency  time.Duration
-	LatencySamples int
+	// last announceLatencyWindow announces.
+	LastLatency   time.Duration
+	MedianLatency time.Duration
 }
 
 // announceLatencyWindow is how many announce durations the median is taken
@@ -354,17 +356,16 @@ func (a *PeriodicalAnnouncer) stats() Stats {
 		last = a.latencies[len(a.latencies)-1]
 	}
 	return Stats{
-		Status:         a.status,
-		Error:          a.lastError,
-		Warning:        a.warningMsg,
-		Seeders:        a.seeders,
-		Leechers:       a.leechers,
-		LastAnnounce:   a.lastAnnounce,
-		NextAnnounce:   a.nextAnnounce,
-		InFlight:       a.status == Contacting,
-		LastLatency:    last,
-		MedianLatency:  medianDuration(a.latencies),
-		LatencySamples: len(a.latencies),
+		Status:        a.status,
+		Error:         a.lastError,
+		Warning:       a.warningMsg,
+		Seeders:       a.seeders,
+		Leechers:      a.leechers,
+		LastAnnounce:  a.lastAnnounce,
+		NextAnnounce:  a.nextAnnounce,
+		InFlight:      a.status == Contacting,
+		LastLatency:   last,
+		MedianLatency: medianDuration(a.latencies),
 	}
 }
 

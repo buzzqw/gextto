@@ -270,8 +270,10 @@ type uiTrackerRow struct {
 	Seeders  int
 	Leechers int
 	Next     int64
+	// Waiting is true while the announce waits for the tracker's reply;
 	// LastMs and MedianMs are how long answered announces took, so a slow
 	// tracker is told from a slow line.
+	Waiting  bool
 	LastMs   int64
 	MedianMs int64
 }
@@ -2183,6 +2185,7 @@ func (d *Daemon) uiDetailData(hash, tab, lang string) (uiDetailData, error) {
 			data.Trackers = append(data.Trackers, uiTrackerRow{
 				URL: tracker.URL, Status: status, Message: message,
 				Seeders: tracker.Seeders, Leechers: tracker.Leechers, Next: next,
+				Waiting:  tracker.InFlight,
 				LastMs:   int64(tracker.LastLatency / time.Millisecond),
 				MedianMs: int64(tracker.MedianLatency / time.Millisecond),
 			})

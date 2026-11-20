@@ -7,8 +7,8 @@
   <div class="panel">
     <div class="panel-head">
       <h3 {{trTitle "Ogni notifica che Gextto ha provato a inviare, con i canali e l'esito: serve a capire se un avviso è partito, se è arrivato e quale canale ha fallito."}}>{{tr "Registro notifiche"}}</h3>
-      <form method="post" action="/notifications/clear">
-        <button class="btn sm danger" type="submit" {{trTitle "Toglie tutte le righe dal registro. Non cambia nulla nelle notifiche future: i canali restano configurati come sono."}}>{{tr "Svuota il registro"}}</button>
+      <form method="post" action="/notifications/clear" hx-post="/notifications/clear">
+        <button class="btn sm danger" type="submit" hx-confirm="{{tr "Svuotare il registro delle notifiche? Le righe non tornano."}}" hx-disabled-elt="this" {{trTitle "Toglie tutte le righe dal registro. Non cambia nulla nelle notifiche future: i canali restano configurati come sono."}}>{{tr "Svuota il registro"}}</button>
       </form>
     </div>
     <div class="panel-body">
@@ -42,7 +42,7 @@
           <td class="notif-event">{{.Event}}</td>
           <td class="notif-channels muted">{{.Channels}}</td>
           <td class="notif-outcome"><span class="badge {{.OutcomeClass}}">{{tr .Outcome}}</span></td>
-          <td class="notif-detail muted">{{if .Detail}}{{.Detail}}{{else}}—{{end}}</td>
+          <td class="notif-detail muted">{{if .Detail}}{{tr .Detail}}{{else}}—{{end}}</td>
         </tr>{{end}}</tbody>
       </table></div>
       {{else}}

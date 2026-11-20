@@ -2176,7 +2176,8 @@ type v2DetailView struct {
 	General  []v2KV
 	Trackers []models.TrackerView
 	// AnnounceInFlight counts the trackers of this torrent waiting for a
-	// reply; AnnounceMedianMs is the median announce time across them.
+	// reply; AnnounceMedianMs is the median of their own medians, so one slow
+	// tracker does not decide the figure.
 	AnnounceInFlight int
 	AnnounceMedianMs int64
 	Files            []models.FileView
@@ -2492,14 +2493,16 @@ func v2DetailViewFrom(s *AppState, hash, tab string) v2DetailView {
 		var trackers []models.TrackerView
 		trackers, _, tabErr = s.activeEngine().Trackers(hash)
 		view.Trackers = v2RealTrackers(trackers)
+		medians := []int64{}
 		for _, tracker := range view.Trackers {
 			if tracker.Waiting {
 				view.AnnounceInFlight++
 			}
-			if tracker.MedianAnnounceMs > view.AnnounceMedianMs {
-				view.AnnounceMedianMs = tracker.MedianAnnounceMs
+			if tracker.MedianAnnounceMs > 0 {
+				medians = append(medians, tracker.MedianAnnounceMs)
 			}
 		}
+		view.AnnounceMedianMs = v2MedianInt64(medians)
 	case "files":
 		view.Files, _, tabErr = s.activeEngine().Files(hash)
 	case "peers":
@@ -3197,7 +3200,7 @@ func v2SettingsViewFrom(s *AppState, tab, highlight, mode string) v2SettingsView
 		Empty:       "Nessuna impostazione in questa sezione.",
 
 		ModifiedCount: page.ModifiedCount,
-		ModifiedNote:  uiTextf(s, "%d impostazioni sono diverse dal valore predefinito.", page.ModifiedCount),
+		ModifiedNote:  v2SettingsModifiedNote(s, page.ModifiedCount),
 	}
 	for _, area := range uiSettingsAreas {
 		converted := v2SettingsArea{Name: area.Name, Label: area.Label}
@@ -3774,4 +3777,31 @@ func v2MsDuration(ms int64) string {
 		return fmt.Sprintf("%d ms", ms)
 	}
 	return fmt.Sprintf("%.1f s", float64(ms)/1000)
+}
+
+// v2MedianInt64 is the median of the values (0 with none): the figure the
+// trackers tab reports, so one tracker does not stand for all of them.
+func v2MedianInt64(values []int64) int64 {
+	if len(values) == 0 {
+		return 0
+	}
+	sorted := append([]int64(nil), values...)
+	sort.Slice(sorted, func(i, j int) bool { return sorted[i] < sorted[j] })
+	middle := len(sorted) / 2
+	if len(sorted)%2 == 1 {
+		return sorted[middle]
+	}
+	return (sorted[middle-1] + sorted[middle]) / 2
+}
+
+// v2SettingsModifiedNote says how many settings left their default, with the
+// singular and the plural the language needs.
+func v2SettingsModifiedNote(s *AppState, count int) string {
+	switch count {
+	case 0:
+		return uiText(s, "Nessuna impostazione è diversa dal valore predefinito.")
+	case 1:
+		return uiText(s, "1 impostazione è diversa dal valore predefinito.")
+	}
+	return uiTextf(s, "%d impostazioni sono diverse dal valore predefinito.", count)
 }

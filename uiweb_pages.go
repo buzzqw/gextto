@@ -862,8 +862,6 @@ func uiSettingsPageFrom(s *AppState, activeTab, mode string) uiSettingsPage {
 	return page
 }
 
-// uiSettingsGroups splits the fields of a tab into the titled panels rextto
-// uses, keeping the original order both of the groups and of the fields.
 // uiSettingsOrderFields puts the essential rows of each panel first, keeping
 // the panels in the order the index declares: "where data goes" and "the speed
 // limit" are read before the cache sizing of a subsystem.
@@ -894,6 +892,9 @@ func uiSettingsOrderFields(tab string, fields []uiSettingField) []uiSettingField
 	return out
 }
 
+// uiSettingsGroups splits the fields of a tab into the titled panels rextto
+// uses, keeping the order the fields arrive in, both of the groups and of the
+// rows inside them.
 func uiSettingsGroups(tab string, fields []uiSettingField) []uiSettingGroup {
 	if len(fields) == 0 {
 		return nil

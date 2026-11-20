@@ -14,7 +14,7 @@
       <label class="check settings-keys-toggle"><input type="checkbox" data-v2-show-keys /> <span>{{tr "Mostra chiavi tecniche"}}</span></label>
       <label class="check settings-modified-toggle" {{trTitle "Nasconde le impostazioni rimaste al valore predefinito; restano visibili quelle modificate e quelle non ancora salvate"}}><input type="checkbox" data-v2-only-modified /> <span>{{tr "Solo modificate"}}</span></label>
     </div>
-    <p class="settings-modified-summary{{if not .ModifiedCount}} is-clean{{end}}">{{.ModifiedNote}}</p>
+    <p class="settings-modified-summary">{{.ModifiedNote}}</p>
     <div class="settings-search-row">
       <label class="settings-search-wrap">
         <span class="settings-search-icon" aria-hidden="true">⌕</span>
@@ -55,7 +55,7 @@
       <p class="settings-nav-area" id="v2-settings-area-{{.Name}}">{{tr .Label}}</p>
       <ul aria-labelledby="v2-settings-area-{{.Name}}">
         {{if eq .Name "search"}}<li><a class="settings-nav-link settings-nav-back" href="/" aria-label="{{tr "Torna al menu"}}"><span aria-hidden="true">←</span> <span>{{tr "Torna al menu"}}</span></a></li>{{end}}
-        {{range .Tabs}}<li><a class="settings-nav-link{{if .Active}} active{{end}}" href="/?view=settings&amp;tab={{.ID}}" hx-get="/settings/body?tab={{.ID}}" hx-target="#v2-settings-body" hx-swap="outerHTML"{{if .Active}} aria-current="page"{{end}}><span>{{tr .Label}}</span>{{if .Modified}}<span class="settings-nav-modified" {{trTitle "Impostazioni di questa sezione diverse dal valore predefinito."}}>{{tr .Modified}}</span>{{end}}{{if .Count}}<span class="settings-nav-count" aria-hidden="true">{{tr .Count}}</span>{{end}}</a></li>{{end}}
+        {{range .Tabs}}<li><a class="settings-nav-link{{if .Active}} active{{end}}" href="/?view=settings&amp;tab={{.ID}}" hx-get="/settings/body?tab={{.ID}}" hx-target="#v2-settings-body" hx-swap="outerHTML"{{if .Active}} aria-current="page"{{end}}><span>{{tr .Label}}</span>{{if .Modified}}<span class="settings-nav-modified" {{trTitle "Impostazioni di questa sezione diverse dal valore predefinito."}}><span aria-hidden="true">{{tr .Modified}}</span><span class="sr-only">{{tr "Impostazioni di questa sezione diverse dal valore predefinito."}}</span></span>{{end}}{{if .Count}}<span class="settings-nav-count" aria-hidden="true">{{tr .Count}}</span>{{end}}</a></li>{{end}}
       </ul>
       {{end}}
     </div>
