@@ -317,6 +317,21 @@ shapes are read without them.
 In a cycle the regexp share of the CPU is **8.6 %** (profile of a full search on 2026-11-10,
 46,306 releases, 12 minutes); `ParseQuality` itself is about 2 % of a cycle.
 
+### Reading a file to name it
+
+To name a file Gextto reads it with `mediainfo`. The whole-file pass against the container
+header alone, on 20 files from an archive on the local NVMe (Intel N97 mini PC, 2026-11-20):
+
+| Read | 20 files | Median per file | Slowest file |
+|---|---|---|---|
+| Whole file (`--Output=JSON`) | 39.6 s | 1.98 s | 19.5 s |
+| Header only (`--ParseSpeed=0`) | 1.03 s | 52 ms | 50 ms |
+
+The figures naming uses — resolution, video codec, HDR, audio codec, channels and the
+tracks' languages — were identical on every one of the 20 files. A container whose header
+lists an audio track without describing it is read whole, so the figures never go missing.
+
+
 ### Matching a release with the monitored films
 
 `BenchmarkFindMovieMatch` (35 films with 25 titles each, one release): **0.15 ms and 26

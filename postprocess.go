@@ -2341,23 +2341,30 @@ type mediaTags struct {
 	Languages  *string
 }
 
+// mediainfoHeaderOnly is the parse speed of the read that names a file: at 0
+// mediainfo stops after the container header instead of walking every frame.
+// Resolution, codecs, HDR, channels and the tracks' languages are all in the
+// header; a whole-file pass costs seconds on a 2160p release where the header
+// costs milliseconds (docs/measurements.md, *Reading a file to name it*).
+const mediainfoHeaderOnly = "0"
+
+// mediainfoRead runs the `mediainfo` binary. A variable so the tests can stand
+// in for it without the real binary and without a media file.
+var mediainfoRead = func(ctx context.Context, args ...string) ([]byte, error) {
+	return exec.CommandContext(ctx, "mediainfo", args...).Output()
+}
+
 // readMediaTags runs the `mediainfo` binary and parses its JSON output (implementation of
 // `read_media_tags`), falling back to `ffprobe` when `mediainfo` is not available or incomplete.
+//
+// The read is header-only. The whole file is parsed again only when the header
+// did not describe the audio tracks at all (a container that keeps them at the
+// end): naming would otherwise lose the codec, the channels and the languages.
 func readMediaTags(path string) mediaTags {
-	// Bounded timeout so a hung probe or a stuck file cannot pin a worker
-	// indefinitely (mirrors the ffprobe probe in mediainfo.go).
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
-	defer cancel()
-	var tags mediaTags
-	output, err := exec.CommandContext(ctx, "mediainfo", "--Output=JSON", path).Output()
-	if err == nil {
-		decoder := json.NewDecoder(bytes.NewReader(output))
-		decoder.UseNumber()
-		var value any
-		if err := decoder.Decode(&value); err == nil {
-			if object, ok := value.(map[string]any); ok {
-				tags = parseMediaTags(object)
-			}
+	tags, audioTracks, parsed := readMediaTagsAtSpeed(path, mediainfoHeaderOnly)
+	if parsed && audioTracks > 0 && tags.AudioCodec == nil && tags.Channels == nil && tags.Languages == nil {
+		if full, _, ok := readMediaTagsAtSpeed(path, ""); ok {
+			tags = full
 		}
 	}
 	// Fallback/enrichment using ffprobe via Probe (mediainfo.go)
@@ -2367,6 +2374,37 @@ func readMediaTags(path string) mediaTags {
 		}
 	}
 	return tags
+}
+
+// readMediaTagsAtSpeed runs mediainfo at the given --ParseSpeed (empty for the
+// default, whole-file read) and returns the tags, how many audio tracks the
+// output listed and whether the output could be parsed at all.
+func readMediaTagsAtSpeed(path, parseSpeed string) (mediaTags, int, bool) {
+	// Bounded timeout so a hung probe or a stuck file cannot pin a worker
+	// indefinitely (mirrors the ffprobe probe in mediainfo.go).
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	args := []string{"--Output=JSON"}
+	if parseSpeed != "" {
+		args = append(args, "--ParseSpeed="+parseSpeed)
+	}
+	args = append(args, path)
+	output, err := mediainfoRead(ctx, args...)
+	if err != nil {
+		return mediaTags{}, 0, false
+	}
+	decoder := json.NewDecoder(bytes.NewReader(output))
+	decoder.UseNumber()
+	var value any
+	if err := decoder.Decode(&value); err != nil {
+		return mediaTags{}, 0, false
+	}
+	object, ok := value.(map[string]any)
+	if !ok {
+		return mediaTags{}, 0, false
+	}
+	tags, audioTracks := parseMediaTags(object)
+	return tags, audioTracks, true
 }
 
 // enrichTagsWithProbe merges ffprobe probe results into mediaTags when fields are missing.
@@ -2751,7 +2789,7 @@ func cleanupFilename(stem string) string {
 }
 
 // parseMediaTags implements `parse_media_tags`.
-func parseMediaTags(value map[string]any) mediaTags {
+func parseMediaTags(value map[string]any) (mediaTags, int) {
 	tracks := []map[string]any{}
 	if media, ok := value["media"].(map[string]any); ok {
 		if rawTracks, ok := media["track"].([]any); ok {
@@ -2812,7 +2850,7 @@ func parseMediaTags(value map[string]any) mediaTags {
 		Channels:   mediaChannels(audio),
 		HDR:        mediaHDR(video),
 		Languages:  languagesPtr,
-	}
+	}, len(audioTracks)
 }
 
 // FindEpisodeFile returns the single video file for a season/episode inside a

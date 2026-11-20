@@ -53,8 +53,6 @@ Each waits for the operator's choice.
   hybrid was hashed wrong); ours has no such corpus yet. Gate: the fixtures, and
   a test per shape once one fails.
 
-- **Header-only `mediainfo` read**: `readMediaTags` parses the whole file to name it, up to 20 seconds for a 4K file on NFS, while `--ParseSpeed=0` reads the container header alone; the same rename pass would drop from an hour to minutes. Gate: the naming tests and a before/after measure.
-
 - **MCP endpoint**: Gextto's API exposed as tools for an assistant, with a read-only switch. Gate: the operator's choice.
 - **Usenet as an acquisition source**: NZB search through the same indexers and an NNTP download path into the same import. Gate: the operator's choice.
 - **Series status marks and one design system**: the status badges of a series still carry an emoji in the text (`🏁 terminata`, `▶ in corso`, `⏳ rinnovo incerto`, `🕒 in arrivo`) because that same label is also a filter value, so the mark must be split from the text before it becomes an icon; then one design system (colours, spacing, type scale, radius) shared with the daemon and the two Gextto stylesheets folded into one with few breakpoints. Gate: the operator's choice; the visual review runs headless with `scripts/screenshots.sh`.

@@ -56,7 +56,10 @@ func TestMediaTagsMatchExttoForms(t *testing.T) {
 		map[string]any{"@type": "Audio", "Format": "E-AC-3", "Channel_s": "6", "Language": "it", "Default": "Yes"},
 		map[string]any{"@type": "Audio", "Format": "AC-3", "Channel_s": "2", "Language": "en-US"},
 	}}}
-	tags := parseMediaTags(value)
+	tags, audioTracks := parseMediaTags(value)
+	if audioTracks != 2 {
+		t.Fatalf("audio tracks = %d, want 2", audioTracks)
+	}
 	assertStringPointer(t, tags.Resolution, "2160p")
 	assertStringPointer(t, tags.VideoCodec, "h265")
 	assertStringPointer(t, tags.HDR, "DV HDR10")
@@ -69,7 +72,7 @@ func TestMediaTagsMatchExttoForms(t *testing.T) {
 		map[string]any{"@type": "Video", "Width": "1920", "Height": "1080", "Format": "AVC"},
 		map[string]any{"@type": "Audio", "Format": "AC-3", "Channel_s": "6", "Language": "it"},
 	}}}
-	tags = parseMediaTags(ac3)
+	tags, _ = parseMediaTags(ac3)
 	assertStringPointer(t, tags.AudioCodec, "AC3")
 	assertStringPointer(t, tags.Channels, "5.1")
 	assertNilString(t, tags.HDR)
@@ -743,7 +746,7 @@ func TestParsesMediaInfoTagsForFullRename(t *testing.T) {
 		map[string]any{"@type": "Audio", "Commercial_Name": "Dolby Digital Plus", "Channel_s": "6", "Language": "it"},
 		map[string]any{"@type": "Audio", "Format": "AAC", "Channel_s": "2", "Language": "en"},
 	}}}
-	tags := parseMediaTags(value)
+	tags, _ := parseMediaTags(value)
 	assertStringPointer(t, tags.Resolution, "1080p")
 	assertStringPointer(t, tags.VideoCodec, "h265")
 	assertStringPointer(t, tags.HDR, "HDR10")
