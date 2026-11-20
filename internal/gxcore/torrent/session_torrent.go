@@ -134,6 +134,25 @@ func (t *Torrent) Sample() Sample {
 	})
 }
 
+// SampleLite is Sample without the peer slice: the tick only needs the seed
+// count, which Stats.Peers.Seeds carries. Skipping getPeers avoids one string
+// per peer, one address string and a bitfield count per peer per tick.
+type SampleLite struct {
+	Stats          Stats
+	Trackers       []Tracker
+	MaxConnections int
+}
+
+// SampleLite reads stats, trackers and the connection cap in one run-loop
+// round trip, without materializing the peers.
+func (t *Torrent) SampleLite() SampleLite {
+	tt := t.torrent
+	return query(tt, func() SampleLite {
+		tt.quietCommand = true
+		return SampleLite{Stats: tt.stats(), Trackers: tt.getTrackers(), MaxConnections: tt.maxConnections}
+	})
+}
+
 // Changes is a count that moves whenever the torrent's run loop handles
 // something other than a Sample or a liveness probe. Read without waking the
 // loop: a stopped torrent whose count has not moved since its last Sample

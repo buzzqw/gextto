@@ -99,3 +99,21 @@ func TestDiskGuardPausesAndResumesADownload(t *testing.T) {
 		return !info.DiskWait && info.State == "downloading"
 	})
 }
+
+// TestDiskGuardDue: the folder scan is skipped until the statfs interval is
+// due, which is what keeps the tick from walking the whole state four times
+// out of five.
+func TestDiskGuardDue(t *testing.T) {
+	g := &diskGuard{}
+	now := time.Now()
+	if !g.due(now) {
+		t.Fatal("a new guard is not due")
+	}
+	g.refresh(now, nil, 0, false)
+	if g.due(now.Add(diskGuardInterval / 2)) {
+		t.Fatal("due inside the interval")
+	}
+	if !g.due(now.Add(diskGuardInterval)) {
+		t.Fatal("not due after the interval")
+	}
+}

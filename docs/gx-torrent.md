@@ -2457,6 +2457,12 @@ It survives restarts together with the engine database (`DATA/session.db`).
 The engine does not have a queue: the daemon itself manages it, every 3 seconds (and immediately
 after every command), with the same policy that Gextto applies to its engines.
 
+The tick reads each torrent's stats, trackers and connection cap without
+building the peer list: the seed count is `Stats.Peers.Seeds`, counted on the
+run loop. The disk guard builds its folder set only when the 15-second statfs
+pass is due. Both changes remove work that grew with peers and torrents without
+changing a decision.
+
 - **Slots.** Active downloads (`active_downloads`) start in order of
   queue position. Seeds (`active_seeds`) have their own slots.
 - **Slow torrents** (`dont_count_slow`, active by default). A torrent that after

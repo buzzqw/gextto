@@ -31,9 +31,21 @@ type diskGuard struct {
 	checkedAt time.Time
 	low       map[string]bool
 	free      map[string]int64
+	// minFree is the threshold of the last pass: the tick reads it on the
+	// ticks that do not scan the state, to know whether the guard is on.
+	minFree int64
 	// freeFn reads the free space of a folder (diskFree when nil); tests
 	// replace it under mu.
 	freeFn func(path string) (free, total int64)
+}
+
+// due reports whether the statfs pass is due. The tick calls it before
+// building the folder set, so four ticks out of five do not even scan the
+// torrents.
+func (g *diskGuard) due(now time.Time) bool {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	return g.checkedAt.IsZero() || now.Sub(g.checkedAt) >= diskGuardInterval
 }
 
 // refresh re-reads the free space of the given folders (at most every
@@ -45,6 +57,7 @@ func (g *diskGuard) refresh(now time.Time, paths []string, minFree int64, force 
 		return
 	}
 	g.checkedAt = now
+	g.minFree = minFree
 	prevLow := g.low
 	freeFn := g.freeFn
 	g.mu.Unlock()
@@ -81,6 +94,13 @@ func (g *diskGuard) refresh(now time.Time, paths []string, minFree int64, force 
 	g.mu.Lock()
 	g.low, g.free = low, free
 	g.mu.Unlock()
+}
+
+// threshold is the last applied guard threshold (0 = guard off).
+func (g *diskGuard) threshold() int64 {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	return g.minFree
 }
 
 // isLow reports whether downloads into path must wait for space.

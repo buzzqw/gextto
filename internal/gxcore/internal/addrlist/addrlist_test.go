@@ -74,3 +74,20 @@ func TestPushTwiceRefreshes(t *testing.T) {
 		t.Fatalf("a second entry was left: %v", popped)
 	}
 }
+
+// BenchmarkAddrListPush measures a PEX-sized push into a large pool. The tree
+// degree is deliberately wide: degree 2 cloned a node at every level.
+func BenchmarkAddrListPush(b *testing.B) {
+	addrs := make([]*net.TCPAddr, 50)
+	for i := range addrs {
+		addrs[i] = &net.TCPAddr{IP: net.IPv4(10, 0, byte(i/250), byte(i)), Port: 6881 + i}
+	}
+	var clientIP net.IP
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		b.StopTimer()
+		list := New(2000, nil, 6881, &clientIP)
+		b.StartTimer()
+		list.Push(addrs, peersource.PEX)
+	}
+}

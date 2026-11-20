@@ -108,3 +108,18 @@ func TestPrefetchOff(t *testing.T) {
 		t.Fatalf("%d disk reads with prefetch off", n)
 	}
 }
+
+// cacheKeySink keeps the key result alive so the compiler cannot elide it.
+var cacheKeySink string
+
+// TestCacheKeyAllocations: the key is built in a stack array; only the string
+// map key remains, not a separate []byte copy per served block.
+func TestCacheKeyAllocations(t *testing.T) {
+	c := &CachedPiece{peerID: make([]byte, 20), pi: &piece.Piece{Index: 7}}
+	allocs := testing.AllocsPerRun(200, func() {
+		cacheKeySink = c.cacheKey(3)
+	})
+	if allocs > 1 {
+		t.Fatalf("cacheKey allocates %.2f times, want at most 1", allocs)
+	}
+}

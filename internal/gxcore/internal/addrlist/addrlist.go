@@ -32,7 +32,7 @@ type AddrList struct {
 // New builds an address list holding at most maxItems candidates.
 func New(maxItems int, blocklist *blocklist.Blocklist, listenPort int, clientIP *net.IP) *AddrList {
 	return &AddrList{
-		peerByPriority: btree.New(2),
+		peerByPriority: btree.New(32),
 
 		maxItems:      maxItems,
 		listenPort:    listenPort,

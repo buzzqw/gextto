@@ -42,8 +42,12 @@ type remoteNode struct {
 	// lastQueryID cycles 0-255 as transaction ids (two-letter by spec).
 	lastQueryID int
 	// TODO: key by infohash instead?
-	pendingQueries   map[string]*queryType // key: transaction ID
-	pastQueries      map[string]*queryType // key: transaction ID
+	pendingQueries map[string]*queryType // key: transaction ID
+	pastQueries    map[string]*queryType // key: transaction ID
+	// pastOrder bounds pastQueries to the most recent exchanges. A node stays
+	// in the table for hours, so without it the map saturates at the 256
+	// transaction ids and keeps every query struct forever (~30 KB per node).
+	pastOrder        []string
 	reachable        bool
 	lastResponseTime time.Time
 	lastSearchTime   time.Time
@@ -55,6 +59,34 @@ type remoteNode struct {
 	// insert/update/kill sync.
 	countedSubnet bool
 	log           *DebugLogger
+}
+
+// maxPastQueries is how many answered exchanges a node remembers for
+// wasContactedRecently: more than enough for one retry window, and bounded so
+// a long-lived node does not keep the whole transaction-id space.
+const maxPastQueries = 64
+
+// rememberPastQuery records one answered exchange, keeping only the most
+// recent maxPastQueries. A repeated transaction id moves to the end instead of
+// being stored twice, so eviction always removes the oldest subject.
+func (r *remoteNode) rememberPastQuery(t string, query *queryType) {
+	if r.pastQueries == nil {
+		r.pastQueries = map[string]*queryType{}
+	}
+	if _, exists := r.pastQueries[t]; exists {
+		for i, key := range r.pastOrder {
+			if key == t {
+				r.pastOrder = append(r.pastOrder[:i], r.pastOrder[i+1:]...)
+				break
+			}
+		}
+	}
+	r.pastQueries[t] = query
+	r.pastOrder = append(r.pastOrder, t)
+	for len(r.pastOrder) > maxPastQueries {
+		delete(r.pastQueries, r.pastOrder[0])
+		r.pastOrder = r.pastOrder[1:]
+	}
 }
 
 // newRemoteNode registers an address with a random first transaction id.

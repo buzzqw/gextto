@@ -205,6 +205,17 @@ anacrolix and rain hash them, but a hundred files of 2 MiB cost a second or two.
 takes a hundred seconds to verify them. rain spends 2.18 % of a core at rest with these
 torrents, sixteen times gx-torrent, and takes 2.3 s to restart.
 
+### A thousand torrents at rest
+
+The same 2 MiB files, a thousand of them, all seeding, with the production 3 s
+tick and a 30 s window after a 10 s settle (`GX_MEASURE=1
+GX_MEASURE_TORRENTS=1000 GX_TEST_TICK=3s`). After the 20/11 tick work: **0.96 %
+of a core, 77.6 MiB of heap, 2015 goroutines**. The same harness on the previous
+code measured **2.19 %** and 78.5 MiB: the tick no longer materialises the peer
+slice to count seeds and no longer scans the storage folders on four ticks out
+of five. The heap stays flat because these torrents have no peers; the
+per-connection buffers are what change there.
+
 ### Why the anacrolix row is so light
 
 The library's row is a different trade, not a better engine: it holds almost nothing, and it

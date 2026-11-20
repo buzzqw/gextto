@@ -1145,7 +1145,6 @@ func isComplete(stats torrent.Stats) bool {
 // them would freeze every API request.
 type collectedTorrent struct {
 	stats    torrent.Stats
-	peers    []torrent.Peer
 	trackers []torrent.Tracker
 	maxConns int
 }
@@ -1197,9 +1196,14 @@ func (d *Daemon) tick(now time.Time) {
 	// recomputed on its own slower clock; do its reads before taking d.mu.
 	autoLimits := d.autoConnectionsBase(now, len(torrents))
 	// The disk guard reads the free space of the storage folders, also with
-	// statfs: outside d.mu too.
-	guardPaths, guardMin := d.diskGuardPaths()
-	d.disk.refresh(now, guardPaths, guardMin, false)
+	// statfs: outside d.mu too. The folder set is built only when the 15-second
+	// pass is due; on the other ticks it was a full state scan for nothing.
+	guardMin := d.disk.threshold()
+	if d.disk.due(now) {
+		guardPaths, minFree := d.diskGuardPaths()
+		guardMin = minFree
+		d.disk.refresh(now, guardPaths, minFree, false)
+	}
 	// Drop trackers that have been failing for too long. It takes d.mu through
 	// setTrackers, so it must run outside the section below.
 	d.updateTrackerHealth(collected, now)
@@ -1387,7 +1391,7 @@ func (d *Daemon) tick(now time.Time) {
 				aggregate += int64(stats.Speed.Download)
 			}
 			sample := collected[id]
-			d.applySwarmLocked(meta, rt, now, sample.peers, sample.trackers)
+			d.applySwarmLocked(meta, rt, now, sample.stats.Peers.Seeds, sample.trackers)
 		} else {
 			rt.startedAt = time.Time{}
 			rt.lastActive = time.Time{}
@@ -1542,13 +1546,7 @@ func (d *Daemon) tick(now time.Time) {
 // the tracker scrape. The peers and trackers are collected outside d.mu (see
 // tick); the swarm size survives a stop so a parked torrent keeps its
 // diagnosis.
-func (d *Daemon) applySwarmLocked(meta *torrentMeta, rt *runtimeInfo, now time.Time, peers []torrent.Peer, trackers []torrent.Tracker) {
-	seeds := 0
-	for _, peer := range peers {
-		if peer.Seed || peer.DownloadSpeed > 0 {
-			seeds++
-		}
-	}
+func (d *Daemon) applySwarmLocked(meta *torrentMeta, rt *runtimeInfo, now time.Time, seeds int, trackers []torrent.Tracker) {
 	rt.numSeeds = seeds
 	if now.Sub(rt.lastTracker) < time.Minute {
 		return

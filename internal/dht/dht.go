@@ -763,7 +763,7 @@ func (d *DHT) absorbReply(node *remoteNode, addr string, p packetType, r respons
 		reflected = r.R.IP
 	}
 	recordReflected(reflected, p.raddr.IP)
-	node.pastQueries[r.T] = query
+	node.rememberPastQuery(r.T, query)
 	d.routingTable.neighborhoodUpkeep(node, d.config.UDPProto, d.peerStore)
 
 	// First host in the table: look ourselves up recursively to build the

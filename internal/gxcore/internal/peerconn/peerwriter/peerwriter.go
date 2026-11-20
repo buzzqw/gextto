@@ -51,9 +51,13 @@ type servedWindow struct {
 }
 
 func newServedWindow(n int) *servedWindow {
+	// A peer usually serves a handful of blocks: reserving the full window
+	// would cost 12 KB per connection before the first request. The slice
+	// grows on demand to n.
+	initial := min(n, 16)
 	return &servedWindow{
 		m:   make(map[peerprotocol.RequestMessage]struct{}),
-		q:   make([]peerprotocol.RequestMessage, 0, n),
+		q:   make([]peerprotocol.RequestMessage, 0, initial),
 		max: n,
 	}
 }
@@ -326,11 +330,6 @@ func (p *PeerWriter) messageWriter() {
 	keepAliveTicker := time.NewTicker(keepAlivePeriod / 2)
 	defer keepAliveTicker.Stop()
 
-	// Reused frame buffer, sized for a max-block piece message:
-	// 4 length + 1 id + 8 piece header + block.
-	var frame [4 + 1 + 8 + peerreader.MaxBlockSize]byte
-	p.frameBuf = *bytes.NewBuffer(frame[:0])
-
 	for {
 		select {
 		case p.readyC <- struct{}{}:
@@ -382,9 +381,22 @@ func (p *PeerWriter) appendFrame(buf *bytes.Buffer, msg peerprotocol.Message) bo
 	return true
 }
 
-// resetFrameBuf empties the reused frame buffer. It starts on the writer's
-// scratch array, so a frame that fits never allocates; an oversized one (a
-// bitfield of a huge torrent) grows it once and the larger buffer is kept.
+// maxFrameSize sizes the reusable frame for one max-block piece message:
+// 4 length + 1 id + 8 piece header + block.
+const maxFrameSize = 4 + 1 + 8 + peerreader.MaxBlockSize
+
+// ensureFrame reserves the full-piece frame only when a piece is actually
+// sent: a peer that uploads nothing (or only haves and requests) does not pay
+// 16 KB at connection time.
+func (p *PeerWriter) ensureFrame() {
+	if cap(p.frameBuf.Bytes()) < maxFrameSize {
+		p.frameBuf.Grow(maxFrameSize)
+	}
+}
+
+// resetFrameBuf empties the reused frame buffer. A small message starts from
+// whatever the buffer holds (the zero value allocates a few bytes); a piece
+// calls ensureFrame first, so its frame fits without growing mid-write.
 func (p *PeerWriter) resetFrameBuf() *bytes.Buffer {
 	p.frameBuf.Reset()
 	return &p.frameBuf
@@ -534,6 +546,9 @@ func (p *PeerWriter) waitBucket(n int64) bool {
 // the upload throttle for pieces and reporting payload bytes. False means
 // the writer loop must exit.
 func (p *PeerWriter) sendFramed(msg peerprotocol.Message) bool {
+	if _, isPiece := msg.(Piece); isPiece {
+		p.ensureFrame()
+	}
 	buf := p.resetFrameBuf()
 	if !p.appendFrame(buf, msg) {
 		return false

@@ -62,6 +62,10 @@ type Stats struct {
 		Incoming int
 		// Outgoing counts peers we dialed.
 		Outgoing int
+		// Seeds counts the peers that already hold every piece (or are
+		// downloading from us), the same predicate the daemon used to compute
+		// from the full peer list every tick.
+		Seeds int
 	}
 	Handshakes struct {
 		// Total counts pending handshakes.
@@ -151,6 +155,16 @@ func (t *torrent) stats() Stats {
 	s.Peers.Total = len(t.peers)
 	s.Peers.Incoming = len(t.incomingPeers)
 	s.Peers.Outgoing = len(t.outgoingPeers)
+	if info := t.info(); info != nil && info.NumPieces > 0 {
+		// Counting seeds here avoids building the full Peer slice (client
+		// strings, addresses, bitfield progress) only to count them.
+		for pe := range t.peers {
+			seed := pe.Bitfield != nil && pe.Bitfield.Count() == info.NumPieces
+			if seed || pe.DownloadSpeed() > 0 {
+				s.Peers.Seeds++
+			}
+		}
+	}
 	s.MetadataDownloads.Total = len(t.infoDownloaders)
 	s.MetadataDownloads.Snubbed = len(t.infoDownloadersSnubbed)
 	s.MetadataDownloads.Running = len(t.infoDownloaders) - len(t.infoDownloadersSnubbed)

@@ -33,6 +33,22 @@ func TestTorrentSampleMatchesTheSeparateReads(t *testing.T) {
 	if sample.MaxConnections != 7 || handle.MaxConnections() != 7 {
 		t.Fatalf("connection cap: sample %d, separate %d, want 7", sample.MaxConnections, handle.MaxConnections())
 	}
+	lite := handle.SampleLite()
+	if lite.Stats.Name != stats.Name || lite.Stats.Status != stats.Status || lite.Stats.Bytes.Total != stats.Bytes.Total {
+		t.Fatalf("lite stats %+v, separate %+v", lite.Stats, stats)
+	}
+	if len(lite.Trackers) != len(handle.Trackers()) || lite.MaxConnections != 7 {
+		t.Fatalf("lite trackers %d cap %d", len(lite.Trackers), lite.MaxConnections)
+	}
+	seeds := 0
+	for _, peer := range sample.Peers {
+		if peer.Seed || peer.DownloadSpeed > 0 {
+			seeds++
+		}
+	}
+	if lite.Stats.Peers.Seeds != seeds {
+		t.Fatalf("lite seeds = %d, full peer list counts %d", lite.Stats.Peers.Seeds, seeds)
+	}
 }
 
 // TestTickKeepsTheSampleOfAnUnchangedStoppedTorrent: a paused torrent is not

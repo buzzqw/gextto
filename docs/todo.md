@@ -31,9 +31,45 @@ still be true after the item lands does not belong here.
   `ipv6=`, so a tracker lists us only at the IPv4 address it sees and a v6-only
   peer finds us through PEX and the DHT alone. Gate: a rule for choosing the
   address (global, never a temporary/privacy one) with a test for both cases.
+- **State saves rewrite the whole file under the lock**: at 1000 torrents a
+  save is 5.25 ms, 1.17 MB and 3,016 allocations, and a single swarm change
+  forces one; the API pollers wait on that lock. Gate: a copy-on-write snapshot
+  or a debounced writer, measured with `BenchmarkSaveStateLocked` and a
+  saves-per-minute counter.
+- **The write-cache budget is refunded before the bytes are written**: up to
+  four piece buffers per downloading torrent are resident but unbudgeted
+  (16 MB per torrent at 4 MiB pieces). Gate: move the refund to the writer's
+  completion, with a test that checks the budget during a transfer.
+- **The DHT peer store costs three structures per contact**: 163 B/contact,
+  about 85.6 MB at the default 2048×256 cap, while its comment says ~25 MB.
+  Gate: fold the seed flag into the contact and replace the ring with a rotating
+  slice; measure live heap at the cap.
+- **Piece hashes are stored twice per torrent**: the decoded blob and the raw
+  info dict both hold them, ~20 B/piece, ~50 MB for 500 torrents × 5,000
+  pieces at rest. Gate: slice the blob out of the raw dict at parse time,
+  keeping the info hash and ut_metadata bytes identical.
 - **Share limits: any condition or all of them**: Gextto and the daemon stop at
   the first limit that fires (ratio, time, inactivity) and cannot require all
   three together. Gate: a row on both settings pages with its translations.
+
+## Gextto, acquisition and UI
+
+- **`FindSeriesMatch` is paid on every release**: 114 µs, 8.6 KB and 513
+  allocations per call, with the fingerprint over every configured name and
+  the season spec split for every series; a 47k-release cycle calls it about
+  190k times. Gate: precompute parsed seasons and the digit flag in the series
+  index, then `BenchmarkFindSeriesMatchUnmatched/Matched`.
+- **The table renderer queries SQLite once per cell**: `uiweb_v2_table.go:386`
+  goes through `v2Language` for every cell, ~800 queries per 100×8 page and per
+  HTMX fragment. Gate: resolve the dictionary once per render and memoize the
+  translated fragments; add a benchmark on the table body.
+- **`encoding/xml` copies every feed text node**: ~100–110 MB of the 275 MB
+  feed path, about 40 % of its allocations and 7 % of a cycle's CPU. Gate: a
+  byte-level scanner over the in-memory body, with the existing feed corpus
+  green.
+- **Web UI sorting calls `ReleaseScore` in the comparator**: `web_system.go:136`
+  runs `FindSeriesMatch` twice per comparison on a manual search. Gate: the
+  decorated-sort pattern already used at `web_system.go:713`.
 
 ## Proposals
 

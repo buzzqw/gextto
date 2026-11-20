@@ -95,3 +95,31 @@ func TestChokeDropsQueuedUploadsWithoutFast(t *testing.T) {
 		t.Fatalf("%d uploads counted, want 0", w.currentQueuedRequests)
 	}
 }
+
+// TestServedWindowStartsSmall: the window still caps at servedWindowSize, but
+// it does not reserve it per connection (12 KB) before the first request.
+func TestServedWindowStartsSmall(t *testing.T) {
+	w := newServedWindow(servedWindowSize)
+	if cap(w.q) > 16 {
+		t.Fatalf("served window reserves %d entries, want at most 16", cap(w.q))
+	}
+	for i := 0; i < servedWindowSize+10; i++ {
+		w.seen(peerprotocol.RequestMessage{Index: uint32(i)})
+	}
+	if len(w.q) > servedWindowSize {
+		t.Fatalf("window grew past its cap: %d", len(w.q))
+	}
+}
+
+// TestFrameIsAllocatedOnFirstPiece: a connection that never sends a piece pays
+// no 16 KB frame; the first piece reserves it once.
+func TestFrameIsAllocatedOnFirstPiece(t *testing.T) {
+	p := &PeerWriter{}
+	if cap(p.frameBuf.Bytes()) != 0 {
+		t.Fatalf("frame preallocated at %d bytes", cap(p.frameBuf.Bytes()))
+	}
+	p.ensureFrame()
+	if cap(p.frameBuf.Bytes()) < maxFrameSize {
+		t.Fatalf("frame capacity %d, want at least %d", cap(p.frameBuf.Bytes()), maxFrameSize)
+	}
+}

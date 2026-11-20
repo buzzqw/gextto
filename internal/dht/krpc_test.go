@@ -3,6 +3,7 @@ package dht
 import (
 	"bytes"
 	"net"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -325,4 +326,30 @@ func FuzzParseNodesString(f *testing.F) {
 	f.Fuzz(func(t *testing.T, nodes, proto string) {
 		_ = parseNodesString(nodes, proto, &nullLogger{})
 	})
+}
+
+// TestPastQueriesStayBounded: a long-lived node must not keep every answered
+// transaction forever; only the most recent window survives, and the oldest
+// subject is the one evicted.
+func TestPastQueriesStayBounded(t *testing.T) {
+	node := &remoteNode{pastQueries: map[string]*queryType{}}
+	for i := 0; i < maxPastQueries*3; i++ {
+		key := strconv.Itoa(i)
+		node.rememberPastQuery(key, &queryType{Type: "ping"})
+	}
+	if len(node.pastQueries) != maxPastQueries || len(node.pastOrder) != maxPastQueries {
+		t.Fatalf("past queries = %d entries / %d order, want %d", len(node.pastQueries), len(node.pastOrder), maxPastQueries)
+	}
+	if _, ok := node.pastQueries["0"]; ok {
+		t.Fatal("the oldest transaction was not evicted")
+	}
+	last := strconv.Itoa(maxPastQueries*3 - 1)
+	if _, ok := node.pastQueries[last]; !ok {
+		t.Fatal("the newest transaction is missing")
+	}
+	// A repeated id moves to the end and stays a single entry.
+	node.rememberPastQuery("1", &queryType{Type: "get_peers"})
+	if len(node.pastQueries) != maxPastQueries {
+		t.Fatalf("repeated id grew the map to %d", len(node.pastQueries))
+	}
 }

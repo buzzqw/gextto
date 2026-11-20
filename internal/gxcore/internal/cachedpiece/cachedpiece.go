@@ -26,12 +26,14 @@ func New(pi *piece.Piece, cache *piececache.Cache, readSize int64, peerID [20]by
 }
 
 // cacheKey identifies one cached block: peer + piece index + block number.
+// The array lives on the stack, so one string allocation remains (the map key)
+// instead of the slice + string pair this used to make for every block served.
 func (c *CachedPiece) cacheKey(block uint32) string {
-	key := make([]byte, 20+4+4)
-	copy(key, c.peerID)
+	var key [20 + 4 + 4]byte
+	copy(key[:20], c.peerID)
 	binary.BigEndian.PutUint32(key[20:24], c.pi.Index)
 	binary.BigEndian.PutUint32(key[24:28], block)
-	return string(key)
+	return string(key[:])
 }
 
 // ReadAt implements io.ReaderAt. Only the block containing off is loaded; the

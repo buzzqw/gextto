@@ -29,10 +29,9 @@ func (d *Daemon) sampleTorrents(torrents []*torrent.Torrent) map[string]collecte
 			collected[t.ID()] = last.sample
 			continue
 		}
-		sample := t.Sample()
+		sample := t.SampleLite()
 		read := collectedTorrent{
 			stats:    sample.Stats,
-			peers:    sample.Peers,
 			trackers: sample.Trackers,
 			maxConns: sample.MaxConnections,
 		}
