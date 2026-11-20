@@ -85,8 +85,9 @@ type SessionStats struct {
 	Peers          int
 	PortsAvailable int
 
-	BlockListRules   int
-	BlockListRecency int
+	BlockListRules     int
+	BlockListRecency   int
+	BlockedConnections int64
 
 	ReadCacheObjects     int
 	ReadCacheSize        int64

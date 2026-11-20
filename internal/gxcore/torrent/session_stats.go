@@ -52,6 +52,9 @@ type SessionStats struct {
 
 	// BlockListRules counts the filter rules.
 	BlockListRules int
+	// BlockedConnections counts the connections those rules refused since the
+	// session started.
+	BlockedConnections int64
 	// BlockListRecency is the time since the last filter update.
 	BlockListRecency time.Duration
 
@@ -169,8 +172,9 @@ func (s *Session) baseStats() SessionStats {
 		Peers:          int(m.Peers.Count()),
 		PortsAvailable: int(m.PortsAvailable.Value()),
 
-		BlockListRules:   int(m.BlockListRules.Value()),
-		BlockListRecency: time.Duration(m.BlockListRecency.Value()) * time.Second,
+		BlockListRules:     int(m.BlockListRules.Value()),
+		BlockListRecency:   time.Duration(m.BlockListRecency.Value()) * time.Second,
+		BlockedConnections: s.blockedConnections.Load(),
 
 		ReadCacheObjects:     int(m.ReadCacheObjects.Value()),
 		ReadCacheSize:        m.ReadCacheSize.Value(),

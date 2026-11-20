@@ -2874,6 +2874,7 @@ func (d *Daemon) stats() daemonStats {
 			"torrents":                 int64(s.Torrents),
 			"peers":                    int64(s.Peers),
 			"blocklist_rules":          int64(s.BlockListRules),
+			"blocked_connections":      s.BlockedConnections,
 			"read_cache_objects":       int64(s.ReadCacheObjects),
 			"read_cache_bytes":         s.ReadCacheSize,
 			"read_cache_hit_percent":   int64(s.ReadCacheUtilization),

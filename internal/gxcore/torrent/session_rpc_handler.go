@@ -158,8 +158,9 @@ func sessionStatsToRPC(s SessionStats) rpctypes.SessionStats {
 		Peers:          s.Peers,
 		PortsAvailable: s.PortsAvailable,
 
-		BlockListRules:   s.BlockListRules,
-		BlockListRecency: int(s.BlockListRecency / time.Second),
+		BlockListRules:     s.BlockListRules,
+		BlockedConnections: s.BlockedConnections,
+		BlockListRecency:   int(s.BlockListRecency / time.Second),
 
 		ReadCacheObjects:     s.ReadCacheObjects,
 		ReadCacheSize:        s.ReadCacheSize,
