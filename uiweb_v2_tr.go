@@ -70,8 +70,18 @@ func v2TemplatesFor(s *AppState) *template.Template {
 // and row actions, the OAuth hint) instead of a template: its texts and
 // tooltips cannot go through `tr`, so the fragment is translated on its own
 // before it is handed to the template as template.HTML.
+//
+// It resolves the language itself, so a caller that translates many fragments
+// in one render (the table body) must use v2RenderCache instead: here every
+// call costs a read of the ui_language setting.
 func v2TranslateFragment(s *AppState, fragment template.HTML) template.HTML {
 	dict, eng := v2Dictionaries(s)
+	if len(dict) == 0 {
+		// Italian: the interface is written in Italian, and v2TranslateHTML
+		// would return the fragment unchanged anyway. Skipping it here also
+		// spares the tokenizer and the buffer.
+		return fragment
+	}
 	return template.HTML(v2TranslateHTML(string(fragment), dict, eng))
 }
 

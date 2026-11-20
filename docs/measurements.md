@@ -209,11 +209,15 @@ torrents, sixteen times gx-torrent, and takes 2.3 s to restart.
 
 The same 2 MiB files, a thousand of them, all seeding, with the production 3 s
 tick and a 30 s window after a 10 s settle (`GX_MEASURE=1
-GX_MEASURE_TORRENTS=1000 GX_TEST_TICK=3s`). After the 20/11 tick work: **0.96 %
-of a core, 77.6 MiB of heap, 2015 goroutines**. The same harness on the previous
-code measured **2.19 %** and 78.5 MiB: the tick no longer materialises the peer
-slice to count seeds and no longer scans the storage folders on four ticks out
-of five. The heap stays flat because these torrents have no peers; the
+GX_MEASURE_TORRENTS=1000 GX_TEST_TICK=3s`). Across repeated runs on this shared
+host the total settles between **0.96 % and 2.7 % of a core**, with 76–78 MiB of
+heap and 2015–2016 goroutines; the previous code measured 2.19 % and 78.5 MiB.
+The run-to-run spread is scheduler noise (the profile is dominated by
+`selectgo`/`netpoll`, not by the daemon), but the code-level work is gone: a
+dirty tick's state save falls from ~4.5 ms under `d.mu` to ~14 ns (the marshal
+and write happen once per 10 s window), the tick no longer materialises the peer
+slice to count seeds, and the disk guard scans the folders on one tick out of
+five. The heap stays flat because these torrents have no peers;
 per-connection buffers are what change there.
 
 ### Why the anacrolix row is so light

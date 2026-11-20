@@ -63,6 +63,74 @@ func (t *torrent) cancelDuplicateDownloads(i uint32) {
 	}
 }
 
+// peerPieceWrite is the source of a piece a peer handed to the write ring. It
+// keeps the peer for reporting and carries the write-cache charge the buffer
+// still owns: the reservation its downloader took when it opened.
+//
+// The charge follows the buffer. The downloader refunds it when the buffer
+// dies with the downloader (handOffPieceDownloader is the only path that hands
+// the buffer over); from there the write owns it, because the bytes stay
+// resident until the writer releases them. A webseed piece keeps its
+// downloader as source and carries no charge: it never took one.
+type peerPieceWrite struct {
+	peer  *peer.Peer
+	units int64
+}
+
+// writeSourcePeer names the peer behind a piece write, when a peer delivered
+// it. Both forms are accepted so a hand-built writer (tests, or a caller that
+// does not own a charge) keeps working.
+func writeSourcePeer(source any) (*peer.Peer, bool) {
+	switch src := source.(type) {
+	case peerPieceWrite:
+		return src.peer, true
+	case *peer.Peer:
+		return src, true
+	}
+	return nil, false
+}
+
+// pieceRAMUnits is one piece buffer's write-cache reservation. It is always a
+// full piece length, even for the short tail piece (see
+// startPieceDownloaderFor), so every refund must use the same unit.
+func (t *torrent) pieceRAMUnits() int64 {
+	if info := t.info(); info != nil {
+		return int64(info.PieceLength)
+	}
+	return 0
+}
+
+// releaseWrittenPiece returns a finished piece buffer to the pool and refunds
+// the write-cache charge it carried. The order matters: the budget must not
+// show the bytes free while they are still resident. It is the only refund for
+// a piece that reached the write ring, so success, hash failure, write error
+// and a partial-merge retry all pass through it exactly once.
+func (t *torrent) releaseWrittenPiece(pw *piecewriter.PieceWriter) {
+	pw.Buffer.Release()
+	if t.session == nil || t.session.ram == nil {
+		return
+	}
+	if w, ok := pw.Source.(peerPieceWrite); ok && w.units > 0 {
+		t.session.ram.Release(w.units)
+	}
+}
+
+// runPieceWrite hands one finished piece to the write ring on its own
+// goroutine and forwards the outcome to the run loop. The private result
+// channel never drops a piece: when the torrent closes before the loop takes
+// it, the buffer and its charge are released here, because nothing else would.
+func (t *torrent) runPieceWrite(pw *piecewriter.PieceWriter) {
+	resultC := make(chan *piecewriter.PieceWriter, 1)
+	go func() {
+		pw.Run(resultC, nil, t.session.metrics.WritesPerSecond, t.session.metrics.SpeedWrite, t.session.semWrite)
+		select {
+		case t.pieceWriterResultC <- pw:
+		case <-t.doneC:
+			t.releaseWrittenPiece(pw)
+		}
+	}()
+}
+
 // handlePieceWriteDone settles one finished write: corrupt pieces ban or
 // disable their source and restart downloads; storage errors stop the
 // torrent with the enriched error; good pieces complete, fan out haves, and
@@ -70,11 +138,11 @@ func (t *torrent) cancelDuplicateDownloads(i uint32) {
 func (t *torrent) handlePieceWriteDone(pw *piecewriter.PieceWriter) {
 	pw.Piece.Writing = false
 	t.endPieceWrite()
-	pw.Buffer.Release()
+	t.releaseWrittenPiece(pw)
 
 	_, prefilled := t.partialBlocks[pw.Piece.Index]
 	delete(t.partialBlocks, pw.Piece.Index)
-	if _, fromPeer := pw.Source.(*peer.Peer); !pw.HashOK && prefilled && fromPeer {
+	if _, fromPeer := writeSourcePeer(pw.Source); !pw.HashOK && prefilled && fromPeer {
 		// Part of the piece came from local data (Phase 3 merge): the
 		// mismatch cannot be blamed on the peer. Drop the local blocks and
 		// download the piece whole; a corrupt peer is caught on that copy.
@@ -101,29 +169,30 @@ func (t *torrent) handlePieceWriteDone(pw *piecewriter.PieceWriter) {
 // source kind is known).
 func (t *torrent) punishCorruptSource(pw *piecewriter.PieceWriter) {
 	t.bytesWasted.Inc(int64(len(pw.Buffer.Data)))
+	pe, fromPeer := writeSourcePeer(pw.Source)
+	urlSrc, fromURL := pw.Source.(*urldownloader.URLDownloader)
 	if t.session != nil {
 		ev := t.baseEvent(EventPieceHashFailed)
 		ev.Piece = pw.Piece.Index
-		switch src := pw.Source.(type) {
-		case *peer.Peer:
-			ev.Peer = src.Addr().String()
-		case *urldownloader.URLDownloader:
-			ev.Source = src.URL
+		if fromPeer {
+			ev.Peer = pe.Addr().String()
+		} else if fromURL {
+			ev.Source = urlSrc.URL
 		}
 		t.session.emit(ev)
 	}
-	switch src := pw.Source.(type) {
-	case *peer.Peer:
-		t.log.Debugln("received corrupt piece from peer", src.String())
-		t.closePeer(src)
-		rememberPeerIP(t.bannedPeerIPs, src.IP())
+	switch {
+	case fromPeer:
+		t.log.Debugln("received corrupt piece from peer", pe.String())
+		t.closePeer(pe)
+		rememberPeerIP(t.bannedPeerIPs, pe.IP())
 		if t.session != nil {
-			t.session.BanIP(src.IP(), sessionBanTTL)
+			t.session.BanIP(pe.IP(), sessionBanTTL)
 		}
-	case *urldownloader.URLDownloader:
-		t.log.Debugln("received corrupt piece from webseed", src.URL)
+	case fromURL:
+		t.log.Debugln("received corrupt piece from webseed", urlSrc.URL)
 		// disableSource closes the downloader and frees its slot.
-		t.disableSource(src.URL, errors.New("corrupt piece"), false, 0)
+		t.disableSource(urlSrc.URL, errors.New("corrupt piece"), false, 0)
 	default:
 		t.crash("unhandled piece source")
 	}

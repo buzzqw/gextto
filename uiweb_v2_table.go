@@ -118,6 +118,89 @@ type v2TableRow struct {
 	Select string
 }
 
+// v2RenderCache is the per-render memo of one table body.
+//
+// Every cell used to resolve the active language on its own — a SQLite read of
+// the ui_language setting — and to walk its markup with a fresh HTML tokenizer;
+// a page of 100 rows by 8 columns paid that about 900 times. The cache resolves
+// the dictionary pair once and remembers the translated fragments together with
+// the value-derived labels, so the pieces that repeat (badges, actions, sources,
+// timestamps) are computed once per render.
+//
+// It is created inside v2TableDataFrom and goes away with the request: a
+// language change or a translation edit is visible on the very next render,
+// which a cache stored on AppState could delay. The nil cache is valid and means
+// "no memoization", so the value-derived helpers keep working on their own.
+type v2RenderCache struct {
+	dict, eng  map[string]string
+	fragments  map[template.HTML]template.HTML
+	sources    map[string]string
+	timestamps map[string]string
+}
+
+// v2NewRenderCache resolves the active language once for a whole table render.
+func v2NewRenderCache(s *AppState) *v2RenderCache {
+	dict, eng := v2Dictionaries(s)
+	return &v2RenderCache{dict: dict, eng: eng}
+}
+
+// fragment translates a piece of markup built by Go, once per distinct input:
+// the same badge or action HTML recurs row after row. With Italian active the
+// dictionary is nil and the markup is returned untouched, exactly like
+// v2TranslateFragment would.
+func (c *v2RenderCache) fragment(fragment template.HTML) template.HTML {
+	if c == nil || len(c.dict) == 0 {
+		return fragment
+	}
+	if cached, ok := c.fragments[fragment]; ok {
+		return cached
+	}
+	translated := template.HTML(v2TranslateHTML(string(fragment), c.dict, c.eng))
+	if c.fragments == nil {
+		c.fragments = make(map[template.HTML]template.HTML, 64)
+	}
+	c.fragments[fragment] = translated
+	return translated
+}
+
+// sourceLabel is v2SourceLabel memoized by the raw value: a page usually draws
+// the same handful of trackers over and over.
+func (c *v2RenderCache) sourceLabel(value string) string {
+	if c == nil {
+		return v2SourceLabel(value)
+	}
+	if cached, ok := c.sources[value]; ok {
+		return cached
+	}
+	label := v2SourceLabel(value)
+	if c.sources == nil {
+		c.sources = make(map[string]string, 16)
+	}
+	c.sources[value] = label
+	return label
+}
+
+// compactDateTime is v2CompactDateTime memoized by the raw value.
+func (c *v2RenderCache) compactDateTime(value string) string {
+	if c == nil {
+		return v2CompactDateTime(value)
+	}
+	if cached, ok := c.timestamps[value]; ok {
+		return cached
+	}
+	label := v2CompactDateTime(value)
+	if c.timestamps == nil {
+		c.timestamps = make(map[string]string, 16)
+	}
+	c.timestamps[value] = label
+	return label
+}
+
+// compactDate is v2CompactDate memoized through compactDateTime.
+func (c *v2RenderCache) compactDate(value string) string {
+	return v2CompactDateOf(c.compactDateTime(value))
+}
+
 type v2TableData struct {
 	View       string
 	BaseView   string
@@ -377,16 +460,22 @@ func v2TableDataFrom(s *AppState, r *http.Request, view string, spec uiTableSpec
 		v2SortItems(items, column, data.Dir)
 	}
 
+	// One dictionary resolution for the whole body: the cache below is what
+	// keeps the language read out of the per-cell work.
+	var cache *v2RenderCache
 	for _, item := range items {
+		if cache == nil {
+			cache = v2NewRenderCache(s)
+		}
 		row := v2TableRow{}
 		if data.Bulk != nil {
 			row.Select = v2SelectValue(item[spec.SelectKey])
 		}
 		for _, column := range columns {
-			row.Cells = append(row.Cells, v2Cell{HTML: v2TranslateFragment(s, v2FormatCell(item, column))})
+			row.Cells = append(row.Cells, v2Cell{HTML: cache.fragment(v2FormatCellCached(item, column, cache))})
 		}
 		if data.HasActions {
-			row.Actions = v2TranslateFragment(s, v2RenderActions(view, item, actions, spec))
+			row.Actions = cache.fragment(v2RenderActions(view, item, actions, spec))
 		}
 		data.Rows = append(data.Rows, row)
 	}
@@ -780,6 +869,13 @@ func v2CompactDateTime(value string) string {
 	if raw == "" {
 		return ""
 	}
+	// The database writes every timestamp as "YYYY-MM-DD HH:MM:SS" in UTC:
+	// slicing it avoids three time.Parse attempts per cell. Any other shape
+	// (fractional seconds, an explicit offset) keeps the layouts below, and so
+	// does an impossible date, which time.Parse would reject as well.
+	if parsed, ok := v2ParseDBDateTime(raw); ok {
+		return parsed.Local().Format("02/01/2006 15:04")
+	}
 	normalized := strings.Replace(raw, " ", "T", 1)
 	if !strings.HasSuffix(normalized, "Z") && !strings.ContainsAny(normalized, "+") {
 		if !strings.Contains(normalized, "-") || strings.Count(normalized, "-") == 2 {
@@ -795,8 +891,63 @@ func v2CompactDateTime(value string) string {
 	return raw
 }
 
+// v2ParseDBDateTime reads the database timestamp format without the layout
+// parser, rejecting exactly what time.Parse rejects: a field out of range, a
+// day the month does not have, a non-digit where a digit belongs.
+func v2ParseDBDateTime(raw string) (time.Time, bool) {
+	if len(raw) != 19 || raw[4] != '-' || raw[7] != '-' || raw[10] != ' ' || raw[13] != ':' || raw[16] != ':' {
+		return time.Time{}, false
+	}
+	year, okYear := v2ParseDigits(raw, 0, 4)
+	month, okMonth := v2ParseDigits(raw, 5, 7)
+	day, okDay := v2ParseDigits(raw, 8, 10)
+	hour, okHour := v2ParseDigits(raw, 11, 13)
+	minute, okMinute := v2ParseDigits(raw, 14, 16)
+	second, okSecond := v2ParseDigits(raw, 17, 19)
+	if !okYear || !okMonth || !okDay || !okHour || !okMinute || !okSecond {
+		return time.Time{}, false
+	}
+	if month < 1 || month > 12 || day < 1 || day > v2DaysInMonth(year, month) {
+		return time.Time{}, false
+	}
+	if hour > 23 || minute > 59 || second > 59 {
+		return time.Time{}, false
+	}
+	return time.Date(year, time.Month(month), day, hour, minute, second, 0, time.UTC), true
+}
+
+// v2ParseDigits reads an unsigned decimal field of raw[from:to].
+func v2ParseDigits(raw string, from, to int) (int, bool) {
+	value := 0
+	for index := from; index < to; index++ {
+		digit := raw[index]
+		if digit < '0' || digit > '9' {
+			return 0, false
+		}
+		value = value*10 + int(digit-'0')
+	}
+	return value, true
+}
+
+func v2DaysInMonth(year, month int) int {
+	switch month {
+	case 2:
+		if year%4 == 0 && (year%100 != 0 || year%400 == 0) {
+			return 29
+		}
+		return 28
+	case 4, 6, 9, 11:
+		return 30
+	}
+	return 31
+}
+
 func v2CompactDate(value string) string {
-	compact := v2CompactDateTime(value)
+	return v2CompactDateOf(v2CompactDateTime(value))
+}
+
+// v2CompactDateOf keeps the day of an already compacted timestamp.
+func v2CompactDateOf(compact string) string {
 	if fields := strings.Fields(compact); len(fields) > 0 {
 		return fields[0]
 	}
@@ -834,7 +985,14 @@ func v2SafeHref(value string) string {
 	return href
 }
 
+// v2FormatCell formats one cell. It stands on its own (tests and the library
+// cards call it with a single item); the table body uses v2FormatCellCached so
+// the value-derived labels are remembered for the whole render.
 func v2FormatCell(item map[string]any, column uiColumn) template.HTML {
+	return v2FormatCellCached(item, column, nil)
+}
+
+func v2FormatCellCached(item map[string]any, column uiColumn, cache *v2RenderCache) template.HTML {
 	var raw any
 	if column.Key == "" {
 		raw = item
@@ -961,9 +1119,9 @@ func v2FormatCell(item map[string]any, column uiColumn) template.HTML {
 		}
 		return template.HTML(`<span class="cell-truncate" title="` + stdhtml.EscapeString(detail) + `">` + stdhtml.EscapeString(detail) + `</span>`)
 	case "source":
-		return template.HTML(`<span class="source-label" title="` + stdhtml.EscapeString(v2String(raw)) + `">` + stdhtml.EscapeString(v2SourceLabel(v2String(raw))) + `</span>`)
+		return template.HTML(`<span class="source-label" title="` + stdhtml.EscapeString(v2String(raw)) + `">` + stdhtml.EscapeString(cache.sourceLabel(v2String(raw))) + `</span>`)
 	case "datetime":
-		return template.HTML(`<span title="` + stdhtml.EscapeString(v2String(raw)) + `">` + stdhtml.EscapeString(v2CompactDateTime(v2String(raw))) + `</span>`)
+		return template.HTML(`<span title="` + stdhtml.EscapeString(v2String(raw)) + `">` + stdhtml.EscapeString(cache.compactDateTime(v2String(raw))) + `</span>`)
 	case "truncate":
 		return template.HTML(`<span class="cell-truncate" title="` + stdhtml.EscapeString(v2String(raw)) + `">` + stdhtml.EscapeString(v2String(raw)) + `</span>`)
 	case "folder":
@@ -999,7 +1157,7 @@ func v2FormatCell(item map[string]any, column uiColumn) template.HTML {
 		}
 		return template.HTML(`<a href="` + stdhtml.EscapeString(href) + `" target="_blank" rel="noopener">apri</a>`)
 	}
-	return template.HTML(stdhtml.EscapeString(v2Fmt(raw, column.Format)))
+	return template.HTML(stdhtml.EscapeString(v2FmtCached(raw, column.Format, cache)))
 }
 
 // blocklistReasonLabel says in words why a release sits in the blocklist. The
@@ -1035,7 +1193,13 @@ func blocklistReasonLabel(code string) string {
 	}
 }
 
+// v2Fmt formats a plain value for a column. The table body goes through
+// v2FmtCached; this wrapper keeps the no-memoization behaviour in one place.
 func v2Fmt(value any, format string) string {
+	return v2FmtCached(value, format, nil)
+}
+
+func v2FmtCached(value any, format string, cache *v2RenderCache) string {
 	switch format {
 	case "bool":
 		if v2Truthy(value) {
@@ -1049,11 +1213,11 @@ func v2Fmt(value any, format string) string {
 	case "percent":
 		return strconv.FormatFloat(v2Float(value), 'f', 1, 64) + "%"
 	case "source":
-		return v2SourceLabel(v2String(value))
+		return cache.sourceLabel(v2String(value))
 	case "datetime":
-		return v2CompactDateTime(v2String(value))
+		return cache.compactDateTime(v2String(value))
 	case "date":
-		return v2CompactDate(v2String(value))
+		return cache.compactDate(v2String(value))
 	case "expiry":
 		// An empty expiry is a block that stays: the operator blocklists a
 		// release by hand, or the behaviour is set to permanent.
@@ -1061,7 +1225,7 @@ func v2Fmt(value any, format string) string {
 		if raw == "" {
 			return "per sempre"
 		}
-		return v2CompactDate(raw)
+		return cache.compactDate(raw)
 	}
 	return v2String(value)
 }

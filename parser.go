@@ -122,6 +122,23 @@ func seriesKeysMatch(left, right string) bool {
 // the configured side keeps them precomputed: the tolerant pass compares a
 // release name against every series name and alias of the library.
 func seriesKeyWordsMatch(left, right string, leftWords, rightWords []string) bool {
+	return seriesKeyWordsMatchDigits(left, right, leftWords, rightWords, hasASCIIDigit(left), hasASCIIDigit(right))
+}
+
+// seriesKeyWordsMatchDigits is seriesKeyWordsMatch with the "contains an ASCII
+// digit" flags supplied by the caller. A lookup compares one release against
+// every configured name and alias, so the configured flags come from the index
+// and the release flag is computed once per call.
+func seriesKeyWordsMatchDigits(left, right string, leftWords, rightWords []string, leftDigits, rightDigits bool) bool {
+	// All three forms below need the first configured word to equal the first
+	// release word (a trailing plural is allowed), so one comparison rejects
+	// the candidate before the forms repeat it three times. It only holds when
+	// the two sides agree on carrying a digit: otherwise only the leet fold
+	// below can match, and that compares different words.
+	if leftDigits == rightDigits && len(leftWords) > 0 && len(rightWords) > 0 &&
+		!tokenEqualsOrPlural(leftWords[0], rightWords[0]) {
+		return false
+	}
 	if tokensMatchWords(leftWords, rightWords) ||
 		tokensMatchWithReleaseSuffixWords(leftWords, rightWords) ||
 		tokensMatchWithReleaseSuffixWords(rightWords, leftWords) {
@@ -131,7 +148,7 @@ func seriesKeyWordsMatch(left, right string, leftWords, rightWords []string) boo
 	// variante con le cifre sciolte in lettere, ma solo quando una sola delle
 	// due parti contiene cifre. Così non si confondono titoli numerici come
 	// `9-1-1` e non si altera il confronto tra nomi già uguali.
-	if hasASCIIDigit(left) != hasASCIIDigit(right) {
+	if leftDigits != rightDigits {
 		foldedLeft := leetFold(left)
 		foldedRight := leetFold(right)
 		foldedLeftWords := strings.Fields(foldedLeft)
@@ -257,7 +274,18 @@ func tokensMatchPrefix(configured, candidate []string) bool {
 	return true
 }
 
+// releaseSuffixRe matches the technical tokens that may follow a configured
+// name in a release (`S01`, `E02`, `1x03`, `1080p`). It is compiled once: the
+// tolerant pass asks it for every trailing token of every candidate.
+var releaseSuffixRe = regexp.MustCompile(`(?i)^(?:s\d{1,2}|e\d{1,4}|\d{1,2}x\d{1,4}|\d{3,4}p)$`)
+
 func isReleaseSuffixToken(token string) bool {
+	return isReleaseSuffixWord(token) || releaseSuffixRe.MatchString(token)
+}
+
+// isReleaseSuffixWord is the part of isReleaseSuffixToken that does not need a
+// pattern: a year and the words releases put after a title.
+func isReleaseSuffixWord(token string) bool {
 	isDigits := token != "" && allASCIIDigits(token)
 	lower := parserASCIILower(token)
 	if isDigits && len(token) == 4 && (strings.HasPrefix(token, "19") || strings.HasPrefix(token, "20")) {
@@ -267,8 +295,7 @@ func isReleaseSuffixToken(token string) bool {
 	case "complete", "completa", "season", "tv", "web", "webdl", "webrip", "hdtv", "bluray":
 		return true
 	}
-	regex, err := utils.CachedRegex(`(?i)^(?:s\d{1,2}|e\d{1,4}|\d{1,2}x\d{1,4}|\d{3,4}p)$`)
-	return err == nil && regex.MatchString(token)
+	return false
 }
 
 // tokensMatchWords is tokensMatch on words that are already split.
@@ -285,11 +312,20 @@ func tokensMatchWords(leftWords, rightWords []string) bool {
 }
 
 // tokenEqualsOrPlural riproduce `a == b || a.strip_suffix('s') == Some(b) ||
-// b.strip_suffix('s') == Some(a)`.
+// b.strip_suffix('s') == Some(a)`. The suffix tests are written on the bytes
+// because this runs for every configured word of every candidate: two
+// strings.TrimSuffix calls showed up as a notable share of a lookup.
 func tokenEqualsOrPlural(left, right string) bool {
-	return left == right ||
-		strings.TrimSuffix(left, "s") == right ||
-		strings.TrimSuffix(right, "s") == left
+	if left == right {
+		return true
+	}
+	if len(left) == len(right)+1 && left[len(left)-1] == 's' && left[:len(left)-1] == right {
+		return true
+	}
+	if len(right) == len(left)+1 && right[len(right)-1] == 's' && right[:len(right)-1] == left {
+		return true
+	}
+	return false
 }
 
 // stripYearTokens rimuove i token che sono solo un anno racchiuso in

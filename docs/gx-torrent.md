@@ -2644,6 +2644,14 @@ write: about 100 MB per day at rest; the log rotates at
 (`osFile`/`mmapFile` track what is dirty), so a torrent that is only seeding
 costs no disk writes.
 
+`state.json` is not rewritten on every tick: a dirty tick only marks the state
+and wakes one saver goroutine, which coalesces a **10-second window**, marshals
+the snapshot under `d.mu` and writes+renames outside it. Handlers that answer
+"saved" (add, pause, limits, categories, trackers, rename, move) still call the
+synchronous save, and `close` stops the saver and writes the final state. A
+crash can lose at most ten seconds of tick bookkeeping — swarm counts,
+rotations, progress marks — never a setting or a user command.
+
 ## Bandwidth limits
 
 Global limits change on the fly (scheduling, temporary limit): the engine

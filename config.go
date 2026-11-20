@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"hash/maphash"
 	"math"
 	"net/url"
 	"os"
@@ -1452,45 +1453,38 @@ func gibSetting(settings map[string]string, key string, defaultValue float64) ui
 // enabled state, ignored seasons and the configured season ranges.
 func (c *Config) FindSeriesMatch(name string, season *int64) *SeriesConfig {
 	normalized := NormalizeSeriesName(name)
-	eligible := func(series *SeriesConfig) bool {
-		if !series.Enabled {
-			return false
-		}
-		if season != nil {
-			if containsInt64(series.IgnoredSeasons, *season) || !seasonAllowed(series.Seasons, *season) {
-				return false
-			}
-		}
-		return true
-	}
 	// The configured names are indexed once and reused while the series list
 	// does not change: without it the tolerant pass re-normalised every name and
 	// alias of the library for every release (milliseconds per release).
 	index := configuredSeriesIndex(c.Series)
-	return c.findSeriesMatchIndexed(normalized, season, eligible, index)
+	return c.findSeriesMatchIndexed(normalized, season, index)
 }
 
-// findSeriesMatchIndexed is FindSeriesMatch with the prepared index.
-func (c *Config) findSeriesMatchIndexed(normalized string, season *int64, eligible func(*SeriesConfig) bool, index *seriesNameIndex) *SeriesConfig {
+// findSeriesMatchIndexed is FindSeriesMatch with the prepared index. The
+// eligibility rule (enabled, ignored seasons, allowed seasons) is the same one
+// seasonAllowed implements, but it reads the bounds parsed when the index was
+// built instead of splitting and parsing the specification for every release.
+func (c *Config) findSeriesMatchIndexed(normalized string, season *int64, index *seriesNameIndex) *SeriesConfig {
 	// Prefer an exact normalized name over a tolerant suffix match. This keeps
 	// similarly named monitored series distinct (for example `Scrubs` and
 	// `Scrubs 2026`) while still accepting release years and technical suffixes
 	// when no exact configuration exists.
 	for _, position := range index.exact[normalized] {
 		series := &c.Series[position]
-		if eligible(series) {
+		if seriesEligible(series, &index.seasons[position], season) {
 			return series
 		}
 	}
 	rightKey := seriesNameKey(normalized)
 	rightWords := strings.Fields(rightKey)
+	rightDigits := hasASCIIDigit(rightKey)
 	for position := range c.Series {
 		series := &c.Series[position]
-		if !eligible(series) {
+		if !seriesEligible(series, &index.seasons[position], season) {
 			continue
 		}
 		for _, candidate := range index.candidates[position] {
-			if seriesKeyWordsMatch(candidate.key, rightKey, candidate.words, rightWords) {
+			if seriesKeyWordsMatchDigits(candidate.key, rightKey, candidate.words, rightWords, candidate.digits, rightDigits) {
 				return series
 			}
 		}
@@ -1498,21 +1492,39 @@ func (c *Config) findSeriesMatchIndexed(normalized string, season *int64, eligib
 	return nil
 }
 
+// seriesEligible is the FindSeriesMatch eligibility rule: the series must be
+// enabled, the season must not be ignored, and it must be inside the configured
+// season specification. `seasons` is that specification already parsed by
+// parseSeasonBounds, which accepts exactly the grammar seasonAllowed accepts.
+func seriesEligible(series *SeriesConfig, seasons *seriesSeasonBounds, season *int64) bool {
+	if !series.Enabled {
+		return false
+	}
+	if season == nil {
+		return true
+	}
+	return !containsInt64(series.IgnoredSeasons, *season) && seasons.allows(*season)
+}
+
 // seriesNameIndex is the prepared form of the configured series list: the exact
-// key of every name and alias, and the comparison key with its words for the
-// tolerant pass.
+// key of every name and alias, the comparison key with its words for the
+// tolerant pass, and the parsed season specification used for eligibility.
 type seriesNameIndex struct {
 	fingerprint uint64
 	count       int
 	exact       map[string][]int32
 	candidates  [][]seriesCandidateKey
+	seasons     []seriesSeasonBounds
 }
 
 // seriesCandidateKey is one configured name or alias, ready to be compared with
-// a release name.
+// a release name. The digit flag is what seriesKeyWordsMatch needs for the leet
+// fold; it is computed here because the tolerant pass compares one release
+// against every configured name and alias.
 type seriesCandidateKey struct {
-	key   string
-	words []string
+	key    string
+	words  []string
+	digits bool
 }
 
 var (
@@ -1543,6 +1555,7 @@ func buildSeriesNameIndex(series []SeriesConfig, fingerprint uint64) *seriesName
 		count:       len(series),
 		exact:       make(map[string][]int32, len(series)),
 		candidates:  make([][]seriesCandidateKey, len(series)),
+		seasons:     make([]seriesSeasonBounds, len(series)),
 	}
 	for position := range series {
 		values := make([]string, 0, len(series[position].Aliases)+1)
@@ -1552,16 +1565,25 @@ func buildSeriesNameIndex(series []SeriesConfig, fingerprint uint64) *seriesName
 		for _, value := range values {
 			index.exact[NormalizeSeriesName(value)] = append(index.exact[NormalizeSeriesName(value)], int32(position))
 			key := seriesNameKey(value)
-			pairs = append(pairs, seriesCandidateKey{key: key, words: strings.Fields(key)})
+			pairs = append(pairs, seriesCandidateKey{key: key, words: strings.Fields(key), digits: hasASCIIDigit(key)})
 		}
 		index.candidates[position] = pairs
+		index.seasons[position] = parseSeasonBounds(series[position].Seasons)
 	}
 	return index
 }
 
+// seriesFingerprintSeed seeds the per-string hash of the index fingerprint. One
+// seed per process is enough: the fingerprint only lives in memory, but it must
+// be stable across calls, so it cannot be re-seeded per lookup.
+var seriesFingerprintSeed = maphash.MakeSeed()
+
 // seriesFingerprint hashes the fields the match depends on: the names, the
 // aliases and the season filters that decide whether a series is eligible. It
-// costs one pass over the configured names and is paid once per lookup.
+// costs one pass over the configured names and is paid once per lookup, so each
+// string goes through maphash.String — the runtime's seeded hash, several times
+// cheaper than walking the bytes here for the short names of a library — and the
+// per-string hashes are folded in order with the FNV step.
 func seriesFingerprint(series []SeriesConfig) uint64 {
 	const (
 		offset = 14695981039346656037
@@ -1569,24 +1591,22 @@ func seriesFingerprint(series []SeriesConfig) uint64 {
 	)
 	hash := uint64(offset)
 	add := func(value string) {
-		for index := 0; index < len(value); index++ {
-			hash ^= uint64(value[index])
-			hash *= prime
-		}
-		hash ^= 0xff // separator, so ("ab","c") and ("a","bc") differ
-		hash *= prime
+		hash = (hash ^ maphash.String(seriesFingerprintSeed, value)) * prime
 	}
 	for position := range series {
 		entry := &series[position]
 		add(entry.Name)
 		add(entry.Seasons)
+		// The enabled flag and the ignored seasons are folded without a hash
+		// call: they are tiny values, and a maphash.String call for the "1"/"0"
+		// of every series was a visible share of the pass.
 		if entry.Enabled {
-			add("1")
+			hash = (hash ^ enabledFingerprintMarker) * prime
 		} else {
-			add("0")
+			hash = (hash ^ disabledFingerprintMarker) * prime
 		}
 		for _, season := range entry.IgnoredSeasons {
-			add(strconv.FormatInt(season, 10))
+			hash = (hash ^ uint64(season) ^ ignoredSeasonFingerprintMarker) * prime
 		}
 		for _, alias := range entry.Aliases {
 			add(alias)
@@ -1594,6 +1614,12 @@ func seriesFingerprint(series []SeriesConfig) uint64 {
 	}
 	return hash
 }
+
+const (
+	enabledFingerprintMarker       = 0x9e3779b97f4a7c15
+	disabledFingerprintMarker      = 0x517cc1b727220a95
+	ignoredSeasonFingerprintMarker = 0x2545f4914f6cdd1d
+)
 
 // FindSeriesByName finds a configured series by name/alias ignoring the
 // monitored season and enabled filters. Used to rename/operate on
@@ -1703,6 +1729,71 @@ func seasonAllowed(specification string, season int64) bool {
 		}
 	}
 	return false
+}
+
+// seasonRange is one inclusive span of a season specification. `to` is
+// math.MaxInt64 for the open `N+` form.
+type seasonRange struct {
+	from int64
+	to   int64
+}
+
+// seriesSeasonBounds is a season specification already parsed: the form
+// seasonAllowed evaluates for every release, prepared once when the series
+// index is built. `all` covers the empty specification and `*`.
+type seriesSeasonBounds struct {
+	all    bool
+	ranges []seasonRange
+}
+
+// allows reports whether a season is inside the specification. It is the same
+// answer seasonAllowed gives for the same text (see TestSeasonBoundsMatchSeasonAllowed).
+func (bounds seriesSeasonBounds) allows(season int64) bool {
+	if bounds.all {
+		return true
+	}
+	for _, span := range bounds.ranges {
+		if season >= span.from && season <= span.to {
+			return true
+		}
+	}
+	return false
+}
+
+// parseSeasonBounds parses a season specification with the grammar of
+// seasonAllowed: an empty specification or `*` allows everything, then any
+// number of comma-separated parts, each `N`, `N-M` or `N+`. Parts that do not
+// parse are skipped, exactly as seasonAllowed skips them.
+func parseSeasonBounds(specification string) seriesSeasonBounds {
+	specification = strings.TrimSpace(specification)
+	if specification == "" || specification == "*" {
+		return seriesSeasonBounds{all: true}
+	}
+	var bounds seriesSeasonBounds
+	for _, part := range strings.Split(specification, ",") {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		if strings.HasSuffix(part, "+") {
+			if minimum, err := strconv.ParseInt(strings.TrimSpace(strings.TrimSuffix(part, "+")), 10, 64); err == nil {
+				bounds.ranges = append(bounds.ranges, seasonRange{from: minimum, to: math.MaxInt64})
+				continue
+			}
+		}
+		if startText, endText, found := strings.Cut(part, "-"); found {
+			start, startErr := strconv.ParseInt(strings.TrimSpace(startText), 10, 64)
+			end, endErr := strconv.ParseInt(strings.TrimSpace(endText), 10, 64)
+			if startErr == nil && endErr == nil {
+				bounds.ranges = append(bounds.ranges, seasonRange{from: start, to: end})
+				continue
+			}
+		}
+		if value, err := strconv.ParseInt(part, 10, 64); err == nil {
+			bounds.ranges = append(bounds.ranges, seasonRange{from: value, to: value})
+		}
+	}
+	return bounds
 }
 
 // SeasonAllowedForScan is the static season-range check for archive scans.

@@ -91,8 +91,28 @@ func (t *torrent) closeWebseedDownloader(src *webseedsource.WebseedSource) {
 
 // closePieceDownloader retires one piece fetch: registry cleanup, download
 // flag and concurrency slot release, picker cancellation, and the RAM
-// budget refund for the piece buffer.
+// budget refund for the piece buffer. The buffer dies with the downloader
+// here (choke, cancel, peer loss, endgame duplicate), so the refund is due.
 func (t *torrent) closePieceDownloader(pd *piecedownloader.PieceDownloader) {
+	t.retirePieceDownloader(pd, true)
+}
+
+// handOffPieceDownloader retires a piece fetch whose buffer moves to the write
+// ring (completePieceDownload). The buffer is still resident, so the
+// write-cache reservation must not be refunded here: ownership follows the
+// buffer to the write, which refunds it in releaseWrittenPiece once the bytes
+// are out — or earlier, when the torrent closes before the run loop takes the
+// result. Refunding at handoff is what let maxPendingWrites piece buffers per
+// torrent sit outside the budget.
+func (t *torrent) handOffPieceDownloader(pd *piecedownloader.PieceDownloader) {
+	t.retirePieceDownloader(pd, false)
+}
+
+// retirePieceDownloader drops one downloader from the registry and releases
+// its picker and peer bookkeeping. releaseRAM is true when the buffer is
+// dying with the downloader; false only for the handoff to the write ring,
+// which inherits the reservation.
+func (t *torrent) retirePieceDownloader(pd *piecedownloader.PieceDownloader, releaseRAM bool) {
 	pe := pd.Peer.(*peer.Peer)
 	m := t.pieceDownloaders[pe]
 	if m == nil {
@@ -113,8 +133,21 @@ func (t *torrent) closePieceDownloader(pd *piecedownloader.PieceDownloader) {
 	if t.piecePicker != nil {
 		t.piecePicker.HandleCancelDownload(pe, pd.Piece.Index)
 	}
-	if t.session.ram != nil {
-		t.session.ram.Release(int64(t.info().PieceLength))
+	if releaseRAM {
+		t.releasePieceRAM()
+	}
+}
+
+// releasePieceRAM refunds one piece buffer's write-cache reservation. The
+// reservation is always a full piece length, even for the short tail piece
+// (startPieceDownloaderFor asks for t.info().PieceLength), so the refund uses
+// the same unit or the budget drifts.
+func (t *torrent) releasePieceRAM() {
+	if t.session == nil || t.session.ram == nil {
+		return
+	}
+	if units := t.pieceRAMUnits(); units > 0 {
+		t.session.ram.Release(units)
 	}
 }
 

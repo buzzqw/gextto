@@ -31,15 +31,15 @@ still be true after the item lands does not belong here.
   `ipv6=`, so a tracker lists us only at the IPv4 address it sees and a v6-only
   peer finds us through PEX and the DHT alone. Gate: a rule for choosing the
   address (global, never a temporary/privacy one) with a test for both cases.
-- **State saves rewrite the whole file under the lock**: at 1000 torrents a
-  save is 5.25 ms, 1.17 MB and 3,016 allocations, and a single swarm change
-  forces one; the API pollers wait on that lock. Gate: a copy-on-write snapshot
-  or a debounced writer, measured with `BenchmarkSaveStateLocked` and a
-  saves-per-minute counter.
-- **The write-cache budget is refunded before the bytes are written**: up to
-  four piece buffers per downloading torrent are resident but unbudgeted
-  (16 MB per torrent at 4 MiB pieces). Gate: move the refund to the writer's
-  completion, with a test that checks the budget during a transfer.
+- **The state marshal still holds `d.mu` once per coalesced save**: the tick's
+  write is now ~14 ns, but `json.MarshalIndent` is ~4 ms at 1000 torrents and
+  runs inside the lock every 10 s window. Gate: a deep-copy or copy-on-write
+  snapshot encoded outside the lock, with `BenchmarkSaveStateLocked` and a test
+  that no state is lost.
+- **Webseed piece buffers are still unbudgeted**: the peer path now holds its
+  write-cache charge until the bytes are written, but `handleWebseedPieceResult`
+  still takes buffers straight from `piecePool`. Gate: the same ownership rule
+  for the webseed path, with the budget test extended to it.
 - **The DHT peer store costs three structures per contact**: 163 B/contact,
   about 85.6 MB at the default 2048×256 cap, while its comment says ~25 MB.
   Gate: fold the seed flag into the contact and replace the ring with a rotating
@@ -54,15 +54,11 @@ still be true after the item lands does not belong here.
 
 ## Gextto, acquisition and UI
 
-- **`FindSeriesMatch` is paid on every release**: 114 µs, 8.6 KB and 513
-  allocations per call, with the fingerprint over every configured name and
-  the season spec split for every series; a 47k-release cycle calls it about
-  190k times. Gate: precompute parsed seasons and the digit flag in the series
-  index, then `BenchmarkFindSeriesMatchUnmatched/Matched`.
-- **The table renderer queries SQLite once per cell**: `uiweb_v2_table.go:386`
-  goes through `v2Language` for every cell, ~800 queries per 100×8 page and per
-  HTMX fragment. Gate: resolve the dictionary once per render and memoize the
-  translated fragments; add a benchmark on the table body.
+- **`FindSeriesMatch` recomputes its fingerprint on every call**: after the
+  index precomputation a lookup is 27–50 µs and 12–13 allocations, and the
+  fingerprint over every configured name is still about a third of it; a
+  47k-release cycle calls it about 190k times. Gate: a safe revision counter
+  for in-place series edits, then `BenchmarkFindSeriesMatchUnmatched/Matched`.
 - **`encoding/xml` copies every feed text node**: ~100–110 MB of the 275 MB
   feed path, about 40 % of its allocations and 7 % of a cycle's CPU. Gate: a
   byte-level scanner over the in-memory body, with the existing feed corpus

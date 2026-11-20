@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/buzzqw/gextto/internal/models"
+	"github.com/buzzqw/gextto/internal/utils"
 )
 
 const testMagnet = "magnet:?xt=urn:btih:0123456789012345678901234567890123456789"
@@ -691,5 +692,44 @@ func TestParsesAudioLayoutAndObjectMetadata(t *testing.T) {
 	dtsx := ParseQuality("Show.S01E01.1080p.WEB-DL.DTS-HD.MA.7.1.DTS-X.mkv")
 	if dtsx.Audio != "dts-hd" || dtsx.AudioChannels != "7.1" || !strings.Contains(dtsx.AudioObjects, "dtsx") {
 		t.Fatalf("DTS-HD DTS:X parsed as %#v", dtsx)
+	}
+}
+
+// TestTokenEqualsOrPluralMatchesTrimSuffix pins the byte-level suffix test to
+// the definition it replaced: a == b, or either side without a trailing "s"
+// equals the other.
+func TestTokenEqualsOrPluralMatchesTrimSuffix(t *testing.T) {
+	tokens := []string{"", "s", "ss", "show", "shows", "Show", "shows ", "1080p", "1080ps"}
+	for _, left := range tokens {
+		for _, right := range tokens {
+			want := left == right ||
+				strings.TrimSuffix(left, "s") == right ||
+				strings.TrimSuffix(right, "s") == left
+			if got := tokenEqualsOrPlural(left, right); got != want {
+				t.Errorf("tokenEqualsOrPlural(%q, %q) = %v, want %v", left, right, got, want)
+			}
+		}
+	}
+}
+
+// TestReleaseSuffixTokenMatchesTheCachedPattern pins the hoisted regexp to the
+// pattern the cached helper compiled: a token is a release suffix when it is a
+// season/episode marker or a resolution.
+func TestReleaseSuffixTokenMatchesTheCachedPattern(t *testing.T) {
+	pattern := utils.MustCachedRegex(`(?i)^(?:s\d{1,2}|e\d{1,4}|\d{1,2}x\d{1,4}|\d{3,4}p)$`)
+	tokens := []string{
+		"s01", "S1", "s123", "e01", "E0001", "e12345", "1x03", "01x0003",
+		"720p", "1080P", "2160p", "480", "1080", "1x3p", "s", "e", "x03",
+		"2024", "complete", "Complete", "season", "web-dl", "",
+	}
+	for _, token := range tokens {
+		want := pattern.MatchString(token)
+		// The non-regex branches are a superset: years and the fixed words.
+		if isReleaseSuffixToken(token) != (want || isReleaseSuffixWord(token)) {
+			t.Errorf("isReleaseSuffixToken(%q) disagrees with the pattern", token)
+		}
+	}
+	if !isReleaseSuffixToken("2024") || !isReleaseSuffixToken("COMPLETE") {
+		t.Fatal("year and fixed-word suffixes must still be recognised")
 	}
 }

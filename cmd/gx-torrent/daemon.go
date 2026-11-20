@@ -302,8 +302,33 @@ type Daemon struct {
 	// pendingRename, when set, is applied between closing and reopening the
 	// session: the on-disk moves and the persisted new paths of a rename.
 	pendingRename *pendingRename
-	dirty         bool
-	startedAt     time.Time
+	// dirty marks state changes not yet on disk. saveLocked writes them
+	// synchronously, for a handler that must have the change saved before it
+	// replies; scheduleSaveLocked only records them and wakes the saver
+	// goroutine, which coalesces the dirty ticks and writes outside d.mu
+	// (state_save.go).
+	dirty bool
+	// stateSeq numbers the snapshots taken under d.mu; stateWritten (guarded by
+	// saveMu) is the newest sequence already on disk, so a snapshot taken
+	// before a later change can never overwrite the later one.
+	stateSeq     uint64
+	stateWritten uint64
+	// saveMu is held while state.json (or its .tmp) is written: the temp file
+	// must never have two writers, synchronous or coalesced.
+	saveMu sync.Mutex
+	// stateWrites counts the completed writes (state_save_test.go).
+	stateWrites atomic.Int64
+	// stateWake asks the saver for a write, stateQuit ends it and stateDone
+	// closes when it has exited (state_save.go). stateWake is nil on a bare
+	// Daemon, where scheduling falls back to the synchronous save.
+	stateWake     chan struct{}
+	stateQuit     chan struct{}
+	stateDone     chan struct{}
+	stateStopOnce sync.Once
+	// stateDelay is the coalescing window (stateSaveDebounce unless a test
+	// shortens it).
+	stateDelay time.Duration
+	startedAt  time.Time
 	// lifetime are the persisted all-time transfer totals (lifetime.go) and
 	// rateHist the in-memory speed history (ratehistory.go), both for the
 	// Statistics page.
@@ -596,6 +621,9 @@ func newDaemon(opts Options) (*Daemon, error) {
 			d.lsd = lsd
 		}()
 	}
+	// The coalescing state writer starts last: every error path above must leave
+	// no goroutine behind, and the start-up save is synchronous anyway.
+	d.startStateSaver()
 	return d, nil
 }
 
@@ -633,8 +661,13 @@ func (d *Daemon) loadState() error {
 	return nil
 }
 
-// saveLocked writes the state atomically. Failures are logged: the session
-// keeps working and the next change retries.
+// saveLocked writes the state synchronously, atomically, and clears dirty.
+// Failures are logged: the session keeps working and the next change retries.
+//
+// The caller holds d.mu and the change is on disk when this returns, which is
+// what a handler that answers "saved" needs. It is not the path for the queue
+// tick or a view rebuild: those call scheduleSaveLocked, and the saver goroutine
+// coalesces them and writes outside d.mu (state_save.go).
 func (d *Daemon) saveLocked() {
 	// Without a state path there is nothing to persist (a bare Daemon built by a
 	// test). Writing would otherwise create a relative ".tmp" in the current
@@ -642,24 +675,16 @@ func (d *Daemon) saveLocked() {
 	if d.opts.StatePath == "" {
 		return
 	}
-	d.state.BadTrackers = d.trackers.disabledSnapshot()
-	data, err := json.MarshalIndent(d.state, "", "  ")
+	seq, data, err := d.snapshotStateLocked()
 	if err != nil {
-		logfError("cannot encode state: %v", err)
 		return
 	}
-	tmp := d.opts.StatePath + ".tmp"
-	if err := os.WriteFile(tmp, data, 0o600); err != nil {
-		logfError("cannot write state: %v", err)
-		return
+	if err := d.writeState(seq, data); err != nil {
+		// Keep dirty set and ask the saver to retry: a handler's save must not
+		// be the only attempt at reaching the disk.
+		d.dirty = true
+		d.signalStateSaver()
 	}
-	if err := os.Rename(tmp, d.opts.StatePath); err != nil {
-		// Never leave the temporary behind when the replace fails.
-		_ = os.Remove(tmp)
-		logfError("cannot replace state: %v", err)
-		return
-	}
-	d.dirty = false
 }
 
 func (d *Daemon) nextPosLocked() int64 {
@@ -909,8 +934,15 @@ func (d *Daemon) close() {
 	d.lsd = nil
 	d.mu.Unlock()
 	lsd.close()
+	// The saver stops before the last save: it may be holding a snapshot taken
+	// before the last change, and the write below is the authoritative one. It
+	// takes no lock of ours while stopping, so this cannot deadlock with a
+	// handler's synchronous save.
+	d.stopStateSaver()
 	d.mu.Lock()
 	defer d.mu.Unlock()
+	// Unconditional: the last state must reach the disk even when nothing
+	// marked it dirty (and even if the last coalesced write failed).
 	d.saveLocked()
 	d.closeSessionDoneLocked()
 	if d.session != nil {
@@ -1475,10 +1507,12 @@ func (d *Daemon) tick(now time.Time) {
 			meta.SeedLimitNotice = false
 		}
 	}
+	// The tick only asks the saver for a write: the whole state is marshaled
+	// and written by the saver goroutine, outside the lock, at most once per
+	// debounce window (state_save.go). A tick must never wait on the state file.
 	if d.dirty {
-		d.saveLocked()
+		d.scheduleSaveLocked()
 	}
-
 	// Publish the snapshot for the lock-free read path.
 	views := make([]torrentInfo, 0, len(handles))
 	for _, t := range torrents {
@@ -1889,7 +1923,9 @@ func (d *Daemon) list() []torrentInfo {
 	defer d.mu.Unlock()
 	views := d.buildViewsLocked()
 	if d.dirty {
-		d.saveLocked()
+		// Building the list is a read path: it asks the saver instead of
+		// holding d.mu through a full state write (state_save.go).
+		d.scheduleSaveLocked()
 	}
 	d.publishViewsLocked(views)
 	return views

@@ -47,9 +47,10 @@ func benchState(dir string, nt, nf int) *Daemon {
 	return d
 }
 
-// BenchmarkSaveStateLocked measures one state save: json.MarshalIndent of the
-// whole state plus the atomic write, the work the daemon did while holding
-// d.mu. The figures decide whether the save belongs on a writer goroutine.
+// BenchmarkSaveStateLocked measures one synchronous state save: json.MarshalIndent
+// of the whole state plus the atomic write, the work a handler did while holding
+// d.mu so it could answer "saved". It is still the "saved before reply" path
+// (saveLocked); the queue tick no longer runs it — see BenchmarkScheduleSave.
 func BenchmarkSaveStateLocked(b *testing.B) {
 	for _, tc := range []struct {
 		name            string
@@ -76,5 +77,61 @@ func BenchmarkSaveStateLocked(b *testing.B) {
 				d.saveLocked()
 			}
 		})
+	}
+}
+
+// BenchmarkScheduleSave measures what a dirty queue tick pays for persistence
+// now: the flag and one non-blocking signal to the saver goroutine, under d.mu.
+// The marshal and the file write happen once per debounce window, off the lock.
+func BenchmarkScheduleSave(b *testing.B) {
+	for _, tc := range []struct {
+		name     string
+		torrents int
+	}{
+		{"torrents=100", 100},
+		{"torrents=1000", 1000},
+		{"torrents=5000", 5000},
+	} {
+		b.Run(tc.name, func(b *testing.B) {
+			d := benchState(b.TempDir(), tc.torrents, 0)
+			// A long window keeps the saver asleep: the benchmark measures the
+			// tick, not the writer.
+			d.stateDelay = time.Hour
+			d.startStateSaver()
+			b.Cleanup(d.stopStateSaver)
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				d.mu.Lock()
+				d.dirty = true
+				d.scheduleSaveLocked()
+				d.mu.Unlock()
+			}
+		})
+	}
+}
+
+// BenchmarkStateFileWrite measures only the atomic replace (os.WriteFile plus
+// os.Rename) of an already encoded state: the part of a save the saver now does
+// outside d.mu. The marshal is measured by BenchmarkSaveStateLocked.
+func BenchmarkStateFileWrite(b *testing.B) {
+	d := benchState(b.TempDir(), 1000, 0)
+	d.mu.Lock()
+	seq, data, err := d.snapshotStateLocked()
+	d.mu.Unlock()
+	if err != nil {
+		b.Fatal(err)
+	}
+	if err := d.writeState(seq, data); err != nil {
+		b.Fatal(err)
+	}
+	b.SetBytes(int64(len(data)))
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		d.stateSeq++
+		if err := d.writeState(d.stateSeq, data); err != nil {
+			b.Fatal(err)
+		}
 	}
 }

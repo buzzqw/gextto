@@ -216,6 +216,58 @@ func TestPrefersExactSeriesNameBeforeYearSuffixMatching(t *testing.T) {
 	}
 }
 
+// TestSeasonBoundsMatchSeasonAllowed locks the parsed form the series index
+// builds to the specification parser seasonAllowed uses: the index must accept
+// and reject exactly the same seasons for every accepted grammar, including the
+// malformed parts seasonAllowed silently skips.
+func TestSeasonBoundsMatchSeasonAllowed(t *testing.T) {
+	specifications := []string{
+		"", " ", "*", "  *  ",
+		"1", " 1 ", "1,3-4,7+", "1, 3 - 4 , 7 +",
+		"0-2", "3+", "2-2", "5-3", // an inverted range never matches
+		"1-", "-5", "1-2-3", "a+", "abc", "1,,2", ",", "+", "-",
+		"7+,1", "1,1", "2026", "010",
+	}
+	seasons := []int64{-5, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 100, 2026}
+	for _, specification := range specifications {
+		bounds := parseSeasonBounds(specification)
+		for _, season := range seasons {
+			want := seasonAllowed(specification, season)
+			if got := bounds.allows(season); got != want {
+				t.Errorf("parseSeasonBounds(%q).allows(%d) = %v, seasonAllowed says %v", specification, season, got, want)
+			}
+			if got := SeasonAllowedForScan(specification, season); got != want {
+				t.Errorf("SeasonAllowedForScan(%q, %d) = %v, want %v", specification, season, got, want)
+			}
+		}
+	}
+}
+
+// TestSeriesIndexFollowsSeasonAndEnabledEdits checks the index cache is keyed by
+// the fields eligibility depends on: a season specification or the enabled flag
+// changed in place must be seen by the next lookup, not only a renamed series.
+func TestSeriesIndexFollowsSeasonAndEnabledEdits(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Series = []SeriesConfig{{Name: "Example", Seasons: "1", Enabled: true}}
+	seasonThree := int64(3)
+	if cfg.FindSeriesMatch("Example", &seasonThree) != nil {
+		t.Fatal("season 3 must not match a series limited to season 1")
+	}
+	cfg.Series[0].Seasons = "1,3"
+	if got := cfg.FindSeriesMatch("Example", &seasonThree); got == nil || got.Name != "Example" {
+		t.Fatalf("the season range edited in place was not seen: %v", got)
+	}
+	cfg.Series[0].Enabled = false
+	if got := cfg.FindSeriesMatch("Example", &seasonThree); got != nil {
+		t.Fatalf("the series disabled in place still matched: %v", got)
+	}
+	cfg.Series[0].Enabled = true
+	cfg.Series[0].IgnoredSeasons = []int64{3}
+	if got := cfg.FindSeriesMatch("Example", &seasonThree); got != nil {
+		t.Fatalf("the season ignored in place still matched: %v", got)
+	}
+}
+
 func TestContentFilterExcludesNotRequires(t *testing.T) {
 	filters := []string{"[non-latino]"}
 	if titleIsContentFiltered("Example S01E01 1080p ITA", filters) {

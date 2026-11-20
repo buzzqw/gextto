@@ -137,12 +137,14 @@ func (t *torrent) rearmSnubAfterPiece(pe *peer.Peer) {
 func (t *torrent) completePieceDownload(pe *peer.Peer, pd *piecedownloader.PieceDownloader, msg peerreader.Piece) {
 	piece := pd.Piece
 	t.log.Debugf("piece #%d downloaded from %s", msg.Index, pe.IP())
-	t.closePieceDownloader(pd)
-	t.rearmSnubAfterPiece(pe)
-
 	if piece.Writing {
 		t.crash("piece is already writing")
 	}
+	// The buffer moves to the write ring, and its write-cache charge with it:
+	// handOffPieceDownloader leaves the reservation held, the write refunds it
+	// when it releases the buffer.
+	t.handOffPieceDownloader(pd)
+	t.rearmSnubAfterPiece(pe)
 	piece.Writing = true
 	t.cancelDuplicateDownloads(piece.Index)
 	t.fillPeerDownloads(pe)
@@ -151,8 +153,8 @@ func (t *torrent) completePieceDownload(pe *peer.Peer, pd *piecedownloader.Piece
 	// A piece made of padding alone never received a block: Data takes its
 	// (zeroed) buffer now.
 	pd.Data()
-	pw := piecewriter.New(piece, pe, pd.Buffer)
-	go pw.Run(t.pieceWriterResultC, t.doneC, t.session.metrics.WritesPerSecond, t.session.metrics.SpeedWrite, t.session.semWrite)
+	pw := piecewriter.New(piece, peerPieceWrite{peer: pe, units: t.pieceRAMUnits()}, pd.Buffer)
+	t.runPieceWrite(pw)
 }
 
 // handlePeerMessage dispatches one protocol message to its handler. Unknown
