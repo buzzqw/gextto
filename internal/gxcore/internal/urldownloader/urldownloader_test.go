@@ -3,6 +3,7 @@ package urldownloader
 import (
 	"errors"
 	"net/http"
+	"path/filepath"
 	"testing"
 	"time"
 )
@@ -118,5 +119,25 @@ func TestCheckContentRange(t *testing.T) {
 		if !c.ok && err == nil {
 			t.Errorf("%q: expected an error", c.value)
 		}
+	}
+}
+
+// TestGetURLSingleAndMultiFile pins how a web seed URL is addressed: a single
+// file is the URL itself (or the file under a base ending in slash), a folder
+// always receives the relative path, even when it holds only one file.
+func TestGetURLSingleAndMultiFile(t *testing.T) {
+	d := &URLDownloader{URL: "https://host/base"}
+	if got := d.getURL("movie.mkv", false); got != "https://host/base" {
+		t.Errorf("single-file bare URL = %q", got)
+	}
+	if got := d.getURL(filepath.Join("pack", "movie.mkv"), true); got != "https://host/base/pack/movie.mkv" {
+		t.Errorf("multi-file bare URL = %q", got)
+	}
+	d.URL = "https://host/base/"
+	if got := d.getURL(filepath.Join("pack", "movie.mkv"), false); got != "https://host/base/pack/movie.mkv" {
+		t.Errorf("single-file base with slash = %q", got)
+	}
+	if got := d.getURL(filepath.Join("pack", "movie.mkv"), true); got != "https://host/base/pack/movie.mkv" {
+		t.Errorf("multi-file base with slash = %q", got)
 	}
 }

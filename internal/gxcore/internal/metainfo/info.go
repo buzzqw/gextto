@@ -70,6 +70,11 @@ type Info struct {
 	// V2 marks v2 torrents: per-file pieces with short tails, no padding,
 	// SHA-256 merkle verification.
 	V2 bool
+	// MultiFile reports the layout the info dictionary describes: a folder
+	// holding its files, even when that folder holds exactly one. A single
+	// file torrent (v1 with no "files", or a v2 tree whose only entry is the
+	// name) is not. Web seeds need it: a multi-file base URL is a folder.
+	MultiFile bool
 	// PieceHashLen is one hash's bytes (0 = 20 SHA-1; 32 = v2 SHA-256).
 	PieceHashLen uint32
 	// Collections/Similar are the BEP 38 hints, merged from info and
@@ -210,6 +215,7 @@ func NewInfo(b []byte, utf8 bool, pad bool) (*Info, error) {
 		Similar:     normalizeSimilar(ib.Similar),
 	}
 	multiFile := len(ib.Files) > 0
+	i.MultiFile = multiFile
 	if multiFile {
 		for _, f := range ib.Files {
 			i.Length += f.Length

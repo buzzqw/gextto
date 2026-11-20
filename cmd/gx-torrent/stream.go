@@ -136,6 +136,14 @@ func (d *Daemon) serveTorrentFile(w http.ResponseWriter, r *http.Request, hash s
 	file := files[fileIndex]
 	size := file.Length()
 	path := filepath.Join(meta.SavePath, file.Path())
+	if !filepath.IsLocal(file.Path()) {
+		http.Error(w, "file not readable", http.StatusForbidden)
+		return
+	}
+	if err := d.protectedTarget(path); err != nil {
+		http.Error(w, "file not readable", http.StatusForbidden)
+		return
+	}
 
 	start, length, partial, err := parseByteRange(r.Header.Get("Range"), size)
 	if err != nil {
@@ -144,7 +152,15 @@ func (d *Daemon) serveTorrentFile(w http.ResponseWriter, r *http.Request, hash s
 		return
 	}
 
-	f, err := os.Open(path)
+	// The save path is the root: even a name that changed on disk after the
+	// check cannot walk out of it.
+	root, err := os.OpenRoot(meta.SavePath)
+	if err != nil {
+		http.Error(w, "file not readable", http.StatusInternalServerError)
+		return
+	}
+	defer root.Close()
+	f, err := root.Open(file.Path())
 	if err != nil {
 		http.Error(w, "file not readable", http.StatusInternalServerError)
 		return

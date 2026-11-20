@@ -62,15 +62,22 @@ func payloadFilePath(base, rel string) (string, error) {
 	return filepath.Join(base, cleaned), nil
 }
 
-// delete removes the torrent's own data, never the save path itself.
-func (p payload) delete(savePath string) error {
+// delete removes the torrent's own data, never the save path itself. guard is
+// the daemon's check against its own state files; nil skips it (tests and
+// callers without an owner).
+func (p payload) delete(savePath string, guard func(string) error) error {
 	if p.files == nil {
-		return deletePayload(savePath, p.root)
+		return deletePayload(savePath, p.root, guard)
 	}
 	for _, rel := range p.files {
 		target, err := payloadFilePath(savePath, rel)
 		if err != nil {
 			return err
+		}
+		if guard != nil {
+			if err := guard(target); err != nil {
+				return err
+			}
 		}
 		if err := os.Remove(target); err != nil && !errors.Is(err, os.ErrNotExist) {
 			return err
@@ -162,12 +169,12 @@ func (p payload) move(savePath, dest string) error {
 
 // discard drops the files of a torrent with nothing downloaded instead of
 // moving them, and prepares the destination.
-func (p payload) discard(savePath, dest string) error {
+func (p payload) discard(savePath, dest string, guard func(string) error) error {
 	if p.files == nil {
-		return discardEmptyPayload(savePath, dest, p.root)
+		return discardEmptyPayload(savePath, dest, p.root, guard)
 	}
 	if filepath.Clean(savePath) != filepath.Clean(dest) {
-		if err := p.delete(savePath); err != nil {
+		if err := p.delete(savePath, guard); err != nil {
 			return err
 		}
 	}

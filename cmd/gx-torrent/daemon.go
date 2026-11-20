@@ -353,6 +353,10 @@ type Daemon struct {
 	// no folder is configured); watchLast is touched only by the serial tick.
 	watchLast    time.Time
 	watchRunning atomic.Bool
+	// watchWarn remembers the last reason a watch folder was skipped, so a
+	// broken folder is reported once instead of every scan.
+	watchWarnMu sync.Mutex
+	watchWarn   map[string]string
 	// secMu caches the parsed security lists (trusted-proxies, allowed-hosts).
 	// They are read on every request but only change when settings.json is
 	// rewritten, so the raw setting string is the cache key.
@@ -1880,6 +1884,9 @@ type addRequest struct {
 	Destination string
 	Paused      bool
 	QueueTop    bool
+	// Pinned bypasses the queue (qBittorrent "force start"): the torrent runs
+	// as soon as it is added, whatever the active-download limit says.
+	Pinned bool
 	// StopAtMetadata pauses the torrent as soon as its metadata arrives.
 	StopAtMetadata bool
 	// Sequential downloads pieces in order (streaming) instead of rarest-first.
@@ -2033,9 +2040,10 @@ func (d *Daemon) add(req addRequest) (string, bool, error) {
 	}
 	d.state.Torrents[id] = &torrentMeta{
 		ID: id, Hash: hash, SavePath: dest, AddedAt: time.Now(), Pos: pos,
-		UserPaused: req.Paused, StopAtMetadata: req.StopAtMetadata && !isComplete(d.statsLocked(t)),
-		Sequential: req.Sequential || d.state.Config.Sequential,
-		FirstLast:  req.FirstLast,
+		UserPaused: req.Paused, Pinned: req.Pinned,
+		StopAtMetadata: req.StopAtMetadata && !isComplete(d.statsLocked(t)),
+		Sequential:     req.Sequential || d.state.Config.Sequential,
+		FirstLast:      req.FirstLast,
 		// SuperSeeding is a per-torrent seeding strategy, not a queue default.
 		SuperSeeding:  req.SuperSeeding,
 		ContentLayout: contentLayoutMeta(layout),
@@ -2106,7 +2114,7 @@ func (d *Daemon) remove(key string, deleteFiles bool) error {
 		return err
 	}
 	if deleteFiles {
-		return data.delete(savePath)
+		return data.delete(savePath, d.protectedTarget)
 	}
 	return nil
 }
@@ -2587,7 +2595,7 @@ func (d *Daemon) finishMove(id string, t *torrent.Torrent, from, dest, name stri
 	switch {
 	case associate:
 	case empty:
-		err = data.discard(from, dest)
+		err = data.discard(from, dest, d.protectedTarget)
 	default:
 		err = data.move(from, dest)
 	}

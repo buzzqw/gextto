@@ -10,6 +10,8 @@ package main
 // next scan, because it may still be being written.
 
 import (
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -29,6 +31,9 @@ const (
 	// watchSettle is how old a dropped file must be before it is read: a
 	// younger one may still be being copied.
 	watchSettle = 5 * time.Second
+	// watchMaxPerScan bounds one scan: a folder holding a huge drop must not
+	// keep the scan goroutine busy and the rest of the folders waiting.
+	watchMaxPerScan = 256
 )
 
 // watchFolders returns the configured (folder, destination) pairs. Each line is
@@ -89,14 +94,27 @@ func (d *Daemon) scanWatchFolders(folders [][2]string) {
 		if dest == "" {
 			dest = d.downloadDir()
 		}
-		entries, err := os.ReadDir(folder)
-		if err != nil {
+		if err := d.checkWatchFolder(folder); err != nil {
+			d.noteWatchProblem(folder, err.Error())
 			continue
 		}
+		d.clearWatchProblem(folder)
+		entries, err := os.ReadDir(folder)
+		if err != nil {
+			d.noteWatchProblem(folder, err.Error())
+			continue
+		}
+		handled := 0
 		for _, entry := range entries {
-			if entry.IsDir() || !strings.HasSuffix(strings.ToLower(entry.Name()), ".torrent") {
+			// A link can point anywhere: only a real .torrent file is read.
+			if entry.IsDir() || !entry.Type().IsRegular() || !strings.HasSuffix(strings.ToLower(entry.Name()), ".torrent") {
 				continue
 			}
+			if handled >= watchMaxPerScan {
+				d.noteWatchProblem(folder, "too many .torrent files in one scan")
+				break
+			}
+			handled++
 			full := filepath.Join(folder, entry.Name())
 			if fi, err := entry.Info(); err != nil || time.Since(fi.ModTime()) < watchSettle {
 				continue
@@ -124,4 +142,51 @@ func (d *Daemon) scanWatchFolders(folders [][2]string) {
 			}
 		}
 	}
+}
+
+// checkWatchFolder keeps a drop folder from being a door to the daemon's own
+// files: it must be a real folder (not a link), not writable by others, and
+// outside the internal folders the daemon writes itself.
+func (d *Daemon) checkWatchFolder(folder string) error {
+	info, err := os.Lstat(folder)
+	if err != nil {
+		return err
+	}
+	if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+		return errors.New("not a real folder")
+	}
+	if info.Mode().Perm()&0o002 != 0 {
+		return errors.New("the folder is writable by others")
+	}
+	canonical, err := canonicalPath(folder)
+	if err != nil {
+		return err
+	}
+	for _, internal := range []string{d.opts.DataDir, d.opts.LinkDir, d.opts.PartsDir} {
+		if internal != "" && pathWithin(canonical, canonicalMust(internal)) {
+			return fmt.Errorf("the folder is inside the daemon's data (%s)", internal)
+		}
+	}
+	return nil
+}
+
+// noteWatchProblem logs a watch-folder problem on transition only: the scan
+// runs every half minute and a broken folder would otherwise fill the log.
+func (d *Daemon) noteWatchProblem(folder, reason string) {
+	d.watchWarnMu.Lock()
+	if d.watchWarn == nil {
+		d.watchWarn = map[string]string{}
+	}
+	previous := d.watchWarn[folder]
+	d.watchWarn[folder] = reason
+	d.watchWarnMu.Unlock()
+	if previous != reason {
+		logfError("watch folder %s: %s", folder, reason)
+	}
+}
+
+func (d *Daemon) clearWatchProblem(folder string) {
+	d.watchWarnMu.Lock()
+	delete(d.watchWarn, folder)
+	d.watchWarnMu.Unlock()
 }

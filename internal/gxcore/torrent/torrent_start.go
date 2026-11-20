@@ -345,7 +345,7 @@ func (t *torrent) startWebseedDownloader(sp *piecepicker.WebseedDownloadSpec) {
 		src.DownloadSpeed = metrics.NewMeter()
 		break
 	}
-	go ud.Run(t.webseedClient, t.pieces, len(t.info().Files) > 1, t.webseedPieceResultC.SendC(), t.piecePool, t.session.config.WebseedResponseBodyReadTimeout)
+	go ud.Run(t.webseedClient, t.pieces, t.info().MultiFile, t.webseedPieceResultC.SendC(), t.piecePool, t.session.config.WebseedResponseBodyReadTimeout)
 }
 
 // maxPiecesPerPeer caps one peer's concurrent pieces: past the first, a

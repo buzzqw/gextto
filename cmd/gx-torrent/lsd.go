@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -25,11 +26,13 @@ import (
 )
 
 const (
-	lsdGroup         = "239.192.152.143:6771"
-	lsdGroup6        = "[ff15::efc0:988f]:6771"
-	lsdIntervalDef   = 5 * time.Minute
-	lsdTickDefault   = 20 * time.Second
-	lsdMaxPerMessage = 10
+	lsdGroup       = "239.192.152.143:6771"
+	lsdGroup6      = "[ff15::efc0:988f]:6771"
+	lsdIntervalDef = 5 * time.Minute
+	lsdTickDefault = 20 * time.Second
+	// lsdMaxPerMessage keeps one packet under the 1400-byte limit of BEP 14:
+	// each "Infohash: " line is 52 bytes, the headers and cookie about 90 more.
+	lsdMaxPerMessage = 24
 )
 
 // lsdTick is how often due announcements are sent (tests shorten it).
@@ -39,6 +42,11 @@ var lsdTick = lsdTickDefault
 // shorten it: a peer that joins just after an announcement would otherwise wait
 // the full interval before hearing the seeder again.
 var lsdInterval = lsdIntervalDef
+
+// lsdAnnounceEvery paces the multicast packets as BEP 14 asks: at most one
+// announce per minute, however many torrents are running. Both address
+// families share the slot, so a dual-stack host sends one packet per group.
+var lsdAnnounceEvery = time.Minute
 
 // lsdPeerHost maps the sender of an announcement to the address to dial.
 // Tests on one machine remap it: the engine ignores the machine's own IPs.
@@ -136,61 +144,118 @@ func (s *lsdService) message(host string, hashes []string) []byte {
 	return b.Bytes()
 }
 
-// dueHashes lists the running public torrents to announce now. It reads the
-// lock-free snapshot: taking d.mu and calling t.Stats() here
-// would block the whole daemon on a torrent run loop stuck on storage I/O.
-func (s *lsdService) dueHashes(now time.Time) []string {
-	var running []string
+// dueHashes lists the running public torrents to announce now, at most limit
+// (0 = every due torrent), and marks the chosen ones as announced. It reads the
+// lock-free snapshot: taking d.mu and calling t.Stats() here would block the
+// whole daemon on a torrent run loop stuck on storage I/O.
+//
+// BEP 14 allows round-robin and asks for no more than one announce per minute.
+// With more due torrents than a packet holds, the ones never announced go
+// first, then the downloads, then checks and moves, then the seeds; inside a
+// class the torrent that has waited longest. A torrent not chosen stays due, so
+// the next slot takes it.
+func (s *lsdService) dueHashes(now time.Time, limit int) []string {
+	type candidate struct {
+		hash     string
+		last     time.Time
+		priority int
+	}
+	var running []candidate
 	for _, v := range s.d.snapshotViews() {
 		if v.Private || v.noLSD {
 			continue
 		}
 		switch v.State {
 		case "downloading", "downloading_metadata", "seeding", "checking_files", "moving":
-			running = append(running, v.Hash)
+			running = append(running, candidate{hash: v.Hash, priority: lsdStatePriority(v.State)})
 		}
 	}
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	live := map[string]bool{}
-	var due []string
-	for _, hash := range running {
-		live[hash] = true
-		if now.Sub(s.announced[hash]) >= lsdInterval {
-			due = append(due, hash)
-			s.announced[hash] = now
+	due := make([]candidate, 0, len(running))
+	for _, c := range running {
+		live[c.hash] = true
+		c.last = s.announced[c.hash]
+		if !c.last.IsZero() && now.Sub(c.last) < lsdInterval {
+			continue
 		}
+		due = append(due, c)
 	}
 	for hash := range s.announced {
 		if !live[hash] {
 			delete(s.announced, hash)
 		}
 	}
-	return due
+	sort.Slice(due, func(i, j int) bool {
+		if due[i].last.IsZero() != due[j].last.IsZero() {
+			return due[i].last.IsZero()
+		}
+		if due[i].priority != due[j].priority {
+			return due[i].priority < due[j].priority
+		}
+		if !due[i].last.Equal(due[j].last) {
+			return due[i].last.Before(due[j].last)
+		}
+		return due[i].hash < due[j].hash
+	})
+	if limit > 0 && len(due) > limit {
+		due = due[:limit]
+	}
+	out := make([]string, len(due))
+	for i, c := range due {
+		s.announced[c.hash] = now
+		out[i] = c.hash
+	}
+	return out
+}
+
+// lsdStatePriority ranks a running torrent for the next announce slot: a
+// download needs local peers, a check or a move is about to need them, a seed
+// can wait for the round-robin.
+func lsdStatePriority(state string) int {
+	switch state {
+	case "downloading", "downloading_metadata":
+		return 0
+	case "checking_files", "moving":
+		return 1
+	case "seeding":
+		return 2
+	default:
+		return 3
+	}
 }
 
 func (s *lsdService) announceLoop() {
 	defer s.done.Done()
 	ticker := time.NewTicker(lsdTick)
 	defer ticker.Stop()
+	var next time.Time
 	for {
-		due := s.dueHashes(time.Now())
-		for start := 0; start < len(due); start += lsdMaxPerMessage {
-			batch := due[start:min(start+lsdMaxPerMessage, len(due))]
-			if _, err := s.send4.WriteToUDP(s.message(lsdGroup, batch), s.group4); err != nil {
-				s.lastErr.Store(err.Error())
-			}
-			if s.send6 != nil {
-				if _, err := s.send6.WriteToUDP(s.message(lsdGroup6, batch), s.group6); err != nil {
-					s.lastErr.Store(err.Error())
-				}
+		now := time.Now()
+		if !next.After(now) {
+			if due := s.dueHashes(now, lsdMaxPerMessage); len(due) > 0 {
+				s.announce(due)
+				next = now.Add(lsdAnnounceEvery)
 			}
 		}
 		select {
 		case <-s.stop:
 			return
 		case <-ticker.C:
+		}
+	}
+}
+
+// announce sends one packet per address family for the same slot.
+func (s *lsdService) announce(hashes []string) {
+	if _, err := s.send4.WriteToUDP(s.message(lsdGroup, hashes), s.group4); err != nil {
+		s.lastErr.Store(err.Error())
+	}
+	if s.send6 != nil {
+		if _, err := s.send6.WriteToUDP(s.message(lsdGroup6, hashes), s.group6); err != nil {
+			s.lastErr.Store(err.Error())
 		}
 	}
 }

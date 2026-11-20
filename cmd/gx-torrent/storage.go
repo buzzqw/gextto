@@ -23,21 +23,38 @@ func (d *Daemon) linkPath(id string) string {
 }
 
 // validateDestination accepts only absolute paths, optionally restricted to
-// the configured roots.
+// the configured roots. Symlinks are resolved on the longest existing prefix,
+// so a directory link cannot make a destination look inside a root it leaves;
+// the daemon's own folders (links, parts, the data folder itself) are refused.
 func (d *Daemon) validateDestination(dest string) (string, error) {
 	dest = strings.TrimSpace(dest)
 	if dest == "" {
-		return d.opts.DownloadDir, nil
+		dest = d.opts.DownloadDir
 	}
 	if !filepath.IsAbs(dest) {
 		return "", fmt.Errorf("destination must be an absolute path: %q", dest)
 	}
 	dest = filepath.Clean(dest)
+	canonical, err := canonicalPath(dest)
+	if err != nil {
+		return "", fmt.Errorf("cannot resolve destination %q: %w", dest, err)
+	}
+	for _, internal := range []string{d.opts.LinkDir, d.opts.PartsDir} {
+		if internal != "" && pathWithin(canonical, canonicalMust(internal)) {
+			return "", fmt.Errorf("destination %q is inside the daemon's own data", dest)
+		}
+	}
+	if canonical == canonicalMust(d.opts.DataDir) {
+		return "", fmt.Errorf("destination %q is the daemon's data folder", dest)
+	}
+	if info, err := os.Stat(dest); err == nil && !info.IsDir() {
+		return "", fmt.Errorf("destination %q is not a folder", dest)
+	}
 	if len(d.opts.AllowedRoots) == 0 {
 		return dest, nil
 	}
 	for _, root := range d.opts.AllowedRoots {
-		if pathWithin(dest, root) {
+		if pathWithin(canonical, canonicalMust(root)) {
 			return dest, nil
 		}
 	}
@@ -51,6 +68,109 @@ func pathWithin(path, root string) bool {
 		return true
 	}
 	return strings.HasPrefix(path, strings.TrimRight(root, string(os.PathSeparator))+string(os.PathSeparator))
+}
+
+// canonicalPath resolves the symbolic links in the longest existing prefix of
+// path and appends the part that does not exist yet. A destination chosen in
+// the page often does not exist: comparing only the lexical path would let a
+// symlinked parent point outside the allowed roots.
+func canonicalPath(path string) (string, error) {
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		return "", err
+	}
+	abs = filepath.Clean(abs)
+	suffix := ""
+	for {
+		resolved, err := filepath.EvalSymlinks(abs)
+		if err == nil {
+			if suffix == "" {
+				return resolved, nil
+			}
+			return filepath.Join(resolved, suffix), nil
+		}
+		if !errors.Is(err, os.ErrNotExist) {
+			return "", err
+		}
+		parent := filepath.Dir(abs)
+		if parent == abs {
+			return "", err
+		}
+		suffix = filepath.Join(filepath.Base(abs), suffix)
+		abs = parent
+	}
+}
+
+// canonicalMust is canonicalPath for a configured folder whose absence is not a
+// reason to skip the check: the lexical path is the fallback.
+func canonicalMust(path string) string {
+	if path == "" {
+		return ""
+	}
+	if resolved, err := canonicalPath(path); err == nil {
+		return resolved
+	}
+	return filepath.Clean(path)
+}
+
+// protectedTarget refuses to delete or serve one of the daemon's own files and
+// folders, even when a save path overlaps the data folder or a torrent name
+// happens to match a state file. The data folder itself and every ancestor of
+// it are protected too: a payload never takes the session with it.
+func (d *Daemon) protectedTarget(target string) error {
+	target = filepath.Clean(target)
+	canonical, err := canonicalPath(target)
+	if err != nil {
+		// A path that cannot be resolved is not a payload we can delete safely.
+		return fmt.Errorf("cannot resolve %q: %w", target, err)
+	}
+	data := canonicalMust(d.opts.DataDir)
+	if data != "" && (canonical == data || pathWithin(data, canonical)) {
+		return fmt.Errorf("refusing to touch %q: it holds the daemon's data", target)
+	}
+	protected := []string{
+		d.opts.LinkDir,
+		d.opts.PartsDir,
+		d.opts.DBPath,
+		d.opts.StatePath,
+		d.lifetimePath(),
+		logFilePath,
+	}
+	if d.opts.DataDir != "" {
+		protected = append(protected,
+			filepath.Join(d.opts.DataDir, "settings.json"),
+			filepath.Join(d.opts.DataDir, "ipfilter.dat"),
+		)
+	}
+	for _, path := range protected {
+		if path == "" {
+			continue
+		}
+		guard := canonicalMust(path)
+		if guard == "" {
+			continue
+		}
+		if canonical == guard || pathWithin(canonical, guard) || pathWithin(guard, canonical) {
+			return fmt.Errorf("refusing to touch %q: the daemon keeps its state there", target)
+		}
+	}
+	// The download folder is legitimate payload content, but never the payload
+	// itself: a torrent named like the folder must not take every download.
+	if dest := d.opts.DownloadDir; dest != "" && canonical == canonicalMust(dest) {
+		return fmt.Errorf("refusing to touch %q: it is the download folder", target)
+	}
+	// Hard links and renamed aliases have different paths but the same identity.
+	if info, err := os.Lstat(target); err == nil {
+		for _, path := range protected {
+			if path == "" {
+				continue
+			}
+			if other, err := os.Stat(path); err == nil && os.SameFile(info, other) {
+				return fmt.Errorf("refusing to touch %q: it is the daemon's state", target)
+			}
+		}
+	}
+	return nil
 }
 
 // pointLink makes DataDir/<id> point at dest, replacing an older link. A real
@@ -123,14 +243,20 @@ func payloadPath(savePath, name string) (string, error) {
 }
 
 // deletePayload removes the torrent's own file or directory, never the save
-// path itself.
-func deletePayload(savePath, name string) error {
+// path itself. guard refuses the daemon's own state even when the save path
+// overlaps the data folder.
+func deletePayload(savePath, name string, guard func(string) error) error {
 	target, err := payloadPath(savePath, name)
 	if err != nil {
 		return err
 	}
 	if filepath.Clean(target) == filepath.Clean(savePath) {
 		return fmt.Errorf("refusing to delete the save path itself")
+	}
+	if guard != nil {
+		if err := guard(target); err != nil {
+			return err
+		}
 	}
 	if err := os.RemoveAll(target); err != nil && !errors.Is(err, os.ErrNotExist) {
 		return err
@@ -182,7 +308,7 @@ func movePayload(savePath, dest, name string) error {
 
 // discardEmptyPayload drops the files of a torrent with nothing downloaded
 // instead of moving them, and prepares the destination.
-func discardEmptyPayload(savePath, dest, name string) error {
+func discardEmptyPayload(savePath, dest, name string, guard func(string) error) error {
 	source, err := payloadPath(savePath, name)
 	if err != nil {
 		return err
@@ -192,6 +318,11 @@ func discardEmptyPayload(savePath, dest, name string) error {
 		return err
 	}
 	if filepath.Clean(source) != filepath.Clean(target) {
+		if guard != nil {
+			if err := guard(source); err != nil {
+				return err
+			}
+		}
 		if err := os.RemoveAll(source); err != nil {
 			return err
 		}

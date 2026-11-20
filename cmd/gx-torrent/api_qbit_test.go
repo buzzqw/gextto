@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -452,5 +454,45 @@ func TestQbitProcessInfoAndComment(t *testing.T) {
 	daemon.mu.Unlock()
 	if meta == nil || meta.Comment != "hello" {
 		t.Fatalf("comment = %+v", meta)
+	}
+}
+
+// TestQbitAddForcedPinsTheTorrent covers the force-start flag an extension
+// sends on add: the torrent must bypass the queue, not enter it.
+func TestQbitAddForcedPinsTheTorrent(t *testing.T) {
+	d := newTestDaemon(t)
+	var body bytes.Buffer
+	mw := multipart.NewWriter(&body)
+	part, err := mw.CreateFormFile("torrents", "movie.torrent")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := part.Write(makeTorrent(t, t.TempDir(), "movie.bin", 10_000)); err != nil {
+		t.Fatal(err)
+	}
+	if err := mw.WriteField("savepath", t.TempDir()); err != nil {
+		t.Fatal(err)
+	}
+	if err := mw.WriteField("forced", "true"); err != nil {
+		t.Fatal(err)
+	}
+	if err := mw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	req := httptest.NewRequest(http.MethodPost, "/api/v2/torrents/add", &body)
+	req.Header.Set("Content-Type", mw.FormDataContentType())
+	rec := httptest.NewRecorder()
+	d.handleQbitAdd(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("add = %d: %s", rec.Code, rec.Body.String())
+	}
+	d.mu.Lock()
+	pinned := false
+	for _, meta := range d.state.Torrents {
+		pinned = meta.Pinned
+	}
+	d.mu.Unlock()
+	if !pinned {
+		t.Fatal("forced=true did not pin the added torrent")
 	}
 }

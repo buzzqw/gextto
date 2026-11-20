@@ -358,7 +358,7 @@ state.
 | GET | `/api/v2/app/defaultSavePath` | download folder of the configuration |
 | GET | `/api/v2/app/version` | Gextto's version in the qBittorrent format (a v prefix) |
 | GET | `/api/v2/app/webapiVersion` | version of the Web API subset |
-| POST | `/api/v2/torrents/add` | add torrents the way the browser extensions do: the urls field (magnets and http(s) .torrent addresses, including an address that answers with a magnet, as a redirect or as the body) or the uploaded .torrent files, with stopped/paused, savepath, sequentialDownload, firstLastPiecePrio and skip_checking |
+| POST | `/api/v2/torrents/add` | add torrents the way the browser extensions do: the urls field (magnets and http(s) .torrent addresses, including an address that answers with a magnet, as a redirect or as the body) or the uploaded .torrent files, with stopped/paused, forced/forceStart (pin), savepath, sequentialDownload, firstLastPiecePrio and skip_checking |
 | POST | `/api/v2/torrents/delete` | remove torrents (hashes, deleteFiles) |
 | GET | `/api/v2/torrents/info` | torrent list in the qBittorrent shape (hashes and filter honoured) |
 | POST | `/api/v2/torrents/pause` | pause torrents (hashes, empty = all) |
@@ -667,7 +667,7 @@ flat fields and in the `torrentParams` object (where the tags are).
 | POST | `/api/v2/torrentcreator/deleteTask` | delete a creation task |
 | GET | `/api/v2/torrentcreator/status` | creation task status |
 | GET | `/api/v2/torrentcreator/torrentFile` | download the created .torrent |
-| POST | `/api/v2/torrents/add` | add torrents (contentLayout, or the older root_folder; none = the torrent_content_layout preference; skip_checking = seed mode); a body over 129 MiB (four .torrent files of the 32 MiB maximum) is refused with 413 |
+| POST | `/api/v2/torrents/add` | add torrents (contentLayout, or the older root_folder; none = the torrent_content_layout preference; skip_checking = seed mode; forced = pin); a body over 129 MiB (four .torrent files of the 32 MiB maximum) is refused with 413 |
 | POST | `/api/v2/torrents/addPeers` | add peers |
 | POST | `/api/v2/torrents/addTags` | add tags to torrents |
 | POST | `/api/v2/torrents/addTrackers` | add trackers |
@@ -792,7 +792,7 @@ off) and the web seed editing calls: `torrents/addWebSeeds` and
 `torrents/editWebSeed` takes `hash`, `origUrl` and `newUrl`. They answer 404 for
 an unknown torrent, 400 for a URL that is not http(s), 409 when `origUrl` is not
 a web seed of the torrent. `torrents/add` also accepts the 5.x `stopped` flag
-(4.x clients send `paused`), and `torrents/setShareLimits` accepts the 5.2/5.3
+(4.x clients send `paused`) and `forced`/`forceStart` (the pin action), and `torrents/setShareLimits` accepts the 5.2/5.3
 `shareLimitsMode` and `shareLimitAction` fields, which the daemon ignores because
 it has a single share-limit action.
 

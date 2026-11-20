@@ -1105,6 +1105,9 @@ func (d *Daemon) handleQbitAdd(w http.ResponseWriter, r *http.Request) {
 	}
 	// qBittorrent 4.x sends "paused", 5.x renamed the flag to "stopped".
 	paused := formBool(r, "paused") || formBool(r, "stopped")
+	// "forced" is the force-start an extension may ask for: the torrent runs
+	// outside the queue, as if the pin action were used after adding it.
+	pinned := formBool(r, "forced") || formBool(r, "forceStart")
 	sequential := formBool(r, "sequentialDownload")
 	firstLast := formBool(r, "firstLastPiecePrio")
 	// skip_checking is qBittorrent's seed mode: trust the data, check each
@@ -1129,7 +1132,7 @@ func (d *Daemon) handleQbitAdd(w http.ResponseWriter, r *http.Request) {
 			if readErr != nil || len(data) == 0 {
 				continue
 			}
-			req := addRequest{TorrentData: data, Destination: savePath, Paused: paused, Category: category, Tags: tags, Sequential: sequential, FirstLast: firstLast, SeedMode: skipChecking, AutoTMM: autoTMM, AutoTMMSet: true, ContentLayout: layout, SeedRatio: -1, SeedDays: -1}
+			req := addRequest{TorrentData: data, Destination: savePath, Paused: paused, Pinned: pinned, Category: category, Tags: tags, Sequential: sequential, FirstLast: firstLast, SeedMode: skipChecking, AutoTMM: autoTMM, AutoTMMSet: true, ContentLayout: layout, SeedRatio: -1, SeedDays: -1}
 			qbitApplyAddLimits(r, &req)
 			hash, existing, err := d.add(req)
 			if err != nil {
@@ -1147,7 +1150,7 @@ func (d *Daemon) handleQbitAdd(w http.ResponseWriter, r *http.Request) {
 		if line == "" {
 			continue
 		}
-		req := addRequest{Destination: savePath, Paused: paused, Category: category, Tags: tags, Sequential: sequential, FirstLast: firstLast, SeedMode: skipChecking, AutoTMM: autoTMM, AutoTMMSet: true, ContentLayout: layout, SeedRatio: -1, SeedDays: -1}
+		req := addRequest{Destination: savePath, Paused: paused, Pinned: pinned, Category: category, Tags: tags, Sequential: sequential, FirstLast: firstLast, SeedMode: skipChecking, AutoTMM: autoTMM, AutoTMMSet: true, ContentLayout: layout, SeedRatio: -1, SeedDays: -1}
 		qbitApplyAddLimits(r, &req)
 		switch {
 		case strings.HasPrefix(strings.ToLower(line), "magnet:"):

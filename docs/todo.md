@@ -72,3 +72,31 @@ Each waits for the operator's choice.
   invisible. Gate: the operator's choice, and an indexer with an announce
   channel to test against.
 - **External watchlist sync**: an optional background worker importing wanted titles from public Trakt or Letterboxd watchlists directly into Gextto's wanted queue. Gate: the operator's choice.
+
+- **The verification progress is lost on a pause**: `stopVerifier` closes the
+  verifier and the bitfield is `nil` during a check, so a recheck interrupted at
+  90% starts again from zero. Gate: persist a verified prefix (bitfield plus
+  count) or let the check finish at low I/O priority, with a test that counts the
+  pieces read after stop/start on a large torrent.
+- **Per-tracker enable/disable**: the daemon disables a tracker that never
+  answered, but cannot temporarily switch one off and back on without deleting
+  it and losing its position and passkey. Gate: a persisted `enabled` flag per
+  URL, honoured by the announcer, in `/api/v1` and in the page (rTorrent's
+  `t.is_enabled` and Flood's tracker tab are the model).
+- **A separate budget for metadata**: a magnet with no metadata occupies a
+  download slot until it resolves, so with `active_downloads=3` only three
+  magnets resolve at a time. Gate: a measurement of a bulk add of 50 magnets
+  with and without an independent `active_metadata` cap (cloud-torrent uses four
+  by default).
+- **Local peers are not preferred**: LSD and the LAN limits exist, but the dial
+  priority is only BEP 40, so a peer on the same network competes with a WAN one.
+  Gate: a `prefer-local-peers` setting with a priority tier above BEP 40 for
+  RFC1918/loopback addresses, and a two-client LAN measurement.
+- **Base path and folder download**: the standalone page assumes `/` and serves
+  single files, not a folder as an archive. Gate: a `base-path` setting with
+  every generated URL, and a ZIP of a folder from the files tab; both are
+  requests from the cloud-torrent issues, not observed here.
+- **Startup with a thousand torrents**: the listener opens after the engine has
+  restored the session, so the time to the first API reply is unmeasured. Gate:
+  a startup measurement with 1000 resume records; only then decide whether the
+  restore needs time slicing (rTorrent #2105).

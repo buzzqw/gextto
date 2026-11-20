@@ -826,6 +826,9 @@ renames (`rename`, `renameFile`, `renameFolder`) and `app/shutdown` (a clean
 stop, standalone only). A rename closes the session (so the files are closed),
 moves the content on disk with a rollback on failure, persists the new paths in
 the resume and reopens: the `.torrent` identity is never changed.
+`torrents/add` also honours `forced`/`forceStart`: the force-start an extension
+sends is the pin action, so the new torrent runs outside the queue instead of
+entering it.
 The **content layout** chosen when adding (`content_layout` on `/api/v1/add`,
 `contentLayout` or the older `root_folder` on `torrents/add`, the
 `torrent_content_layout` preference as default, a select in the add dialog and
@@ -1338,7 +1341,10 @@ folder) and removed after a successful add; a file that is not a valid
 and a file modified in the last 5 seconds waits for the next scan because it may
 still be being copied; a line is `folder` or
 `folder=destination`, and the qBittorrent `scan_dirs` preference maps onto the
-same list. The **DHT read-only (BEP 43)** stays off by default: a
+same list. A folder that is a symbolic link, is writable by others, or sits
+inside the daemon's data, links or parts folders is refused (once, not at every
+scan); only real `.torrent` files are read (a link is skipped), and one scan
+handles at most 256 `.torrent` files so a huge drop does not hold the rest. The **DHT read-only (BEP 43)** stays off by default: a
 read-only node does not respond to queries and asks not to be entered into
 others' tables, useful for nodes with little bandwidth or behind symmetric NAT,
 but a complete client that uses the DHT must also serve it (it is also the choice of
@@ -1728,9 +1734,17 @@ and *Incoming DHT queries* rows of the engine page (`dht_good_nodes`,
     bound to the VPN's IP.
 - **LSD**, local network discovery (BEP 14, `torrent_lsd`).
   - Multicast announcements on 239.192.152.143:6771 (IPv4) and, if available,
-    `[ff15::efc0:988f]:6771` (IPv6) every 5 minutes for every active non-private
-    torrent.
-  - LAN peers announcing the same torrents are added.
+    `[ff15::efc0:988f]:6771` (IPv6). The same torrent is re-announced no more
+    often than every 5 minutes.
+  - BEP 14 also asks for **at most one announce per minute**: one packet carries
+    up to 24 infohashes (within the 1400-byte limit) and one slot a minute is
+    shared by the two families. With more active torrents than a packet holds,
+    the slot **round-robins**: torrents never announced first, then downloads,
+    then checks and moves, then seeds, oldest first; the ones left out stay due
+    for the next slot. A torrent that has just started is therefore heard on the
+    next slot instead of waiting for every other torrent.
+  - LAN peers announcing the same torrents are added; a peer is added only to
+    the torrents it announced, never to all of them.
   - It is off with a proxy or outgoing interface, so as not to announce the torrents
     outside the tunnel.
 
@@ -2176,6 +2190,13 @@ instead of the fixed minute. A source that ignores the range or answers from
 another offset is disabled before its bytes can fail a hash as if the peers
 were corrupt.
 
+Whether the base URL names the file or a folder comes from the info dictionary,
+not from the number of files: a v1 torrent with a `files` list, or a v2 tree
+whose root is not the name, is a folder **even when it holds a single file**, and
+its URL receives the relative path (`base/name/file`). A single-file torrent
+keeps the BEP 19 form (the URL is the file, or the file appended to a base that
+ends in `/`).
+
 ## HTTP streaming (HTTP Range)
 
 Besides sequential download, the daemon can serve a file to a player while
@@ -2337,6 +2358,14 @@ The engine saves every torrent in `DataDir/<id>` and at removal always runs
   is added;
 - a real folder left in place of the symlink is moved to
   `DATA/orphaned/<id>` before removal, never deleted;
+- **the daemon's own state is not part of any payload**: a deletion or a
+  stream refuses `DATA` and its ancestors, the link and parts folders, the
+  session database, `state.json`, `lifetime.json`, the settings, the IP filter
+  and the log, by path **and** by file identity (`os.SameFile`, so a renamed or
+  hard-linked alias is caught too). A save path that overlaps the data folder,
+  or a torrent named like one of those files, can therefore never take the
+  session with it. The stream opens the save path as an `os.Root`, so even a
+  path component changed after the check cannot walk out of it;
 - **two names that differ only in case are deduplicated per directory** at
   parse time, before anything is allocated: the later entry gets `-1` before
   its extension (`readme.txt` -> `readme-1.txt`), folders included. Windows and
@@ -2353,7 +2382,10 @@ The engine saves every torrent in `DataDir/<id>` and at removal always runs
   start until the operator moves it away or picks another destination. Engines
   that used to truncate on open fixed exactly this in 2026;
 - destinations must be absolute paths; the flag `-allowed-roots`
-  (standalone use only, Gextto does not set it) can restrict them.
+  (standalone use only, Gextto does not set it) can restrict them. The check
+  resolves the symbolic links of the longest existing prefix, so a link cannot
+  make a destination look inside a root it leaves; a destination that is a
+  file, the data folder, or inside the links/parts folders is refused.
 
 **Durability.** Data files are not opened with `O_SYNC`: the engine writes
 pieces in buffered mode and flushes in batch with `storage.File.Sync()` before

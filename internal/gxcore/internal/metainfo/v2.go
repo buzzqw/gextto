@@ -153,6 +153,10 @@ func NewV2Info(b []byte) (*Info, error) {
 		// shorter than the piece length, no padding inside a piece).
 		i.V2 = true
 		i.PieceHashLen = 32
+		// A v2 single-file torrent is a tree with one entry whose key is the
+		// name; anything else (including a folder holding one file) is a
+		// multi-file layout.
+		i.MultiFile = !(len(i.V2Files) == 1 && i.V2Files[0].Path == ib.Name)
 		var pieces uint32
 		for _, f := range i.V2Files {
 			name, err := sanitizeV2Path(f.Path)
@@ -181,6 +185,7 @@ func NewV2Info(b []byte) (*Info, error) {
 	// Multi-file v1 torrents describe their files with "files"; keep them for
 	// callers that need the v1 layout of a hybrid torrent.
 	if len(ib.Files) > 0 {
+		i.MultiFile = true
 		for _, f := range ib.Files {
 			i.Files = append(i.Files, File{Path: path.Join(append([]string{ib.Name}, f.Path...)...), Length: f.Length})
 		}
