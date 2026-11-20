@@ -198,6 +198,12 @@ type uiTorrentRow struct {
 	// SeedInfinite marks a torrent configured to seed without a ratio or time
 	// limit, rendered as the "seed ∞" badge.
 	SeedInfinite bool
+	// Settled marks a torrent with nothing left to fetch: complete, seeding, or
+	// paused after the seed limit. Its row is one line — name, badges, size and
+	// the numbers that still move — because a full green bar and "100.0 %" on
+	// every finished torrent say the same thing on every row and took two lines
+	// each. A download and a file check keep the bar, because there it moves.
+	Settled bool
 	// Pinned marks the torrent forced out of the queue (the "📌 pin" badge);
 	// it is unpinned from its detail drawer.
 	Pinned bool
@@ -981,6 +987,8 @@ func uiTorrentRows(s *AppState) []uiTorrentRow {
 		if view.DiskWait && view.State == "paused" && !row.Archived {
 			row.State = "In attesa di spazio"
 		}
+		// Nothing left to fetch: the row can drop the bar and the percentage.
+		row.Settled = uiTorrentSettled(view.State, row.Progress, checking)
 		// The badge describes the seed policy of the torrent, not its current
 		// state: a torrent set to seed forever shows it from the moment the
 		// limits are saved, while it still downloads too.
@@ -1102,6 +1110,18 @@ func uiProgressClass(state string, progress float64, checking bool) string {
 		return "paused"
 	}
 	return "active"
+}
+
+// uiTorrentSettled reports whether a row has nothing left to fetch, so the
+// progress bar and the percentage would print "100 %" on every finished
+// torrent. A file check is never settled: there the bar shows the pieces
+// verified so far and the operator wants to watch it. An error keeps the bar
+// too, like its colour stays the active one.
+func uiTorrentSettled(state string, progress float64, checking bool) bool {
+	if checking || state == "error" {
+		return false
+	}
+	return progress >= 99.95
 }
 
 func uiStateClass(state string) string {

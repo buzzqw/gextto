@@ -40,9 +40,12 @@ func TestUIProgressClass(t *testing.T) {
 	}
 }
 
-// The row and the page carry the class: a finished movie paused in the list
-// shows a full green bar, not the grey one of a paused download.
-func TestDownloadsShowAGreenBarForAFinishedMovie(t *testing.T) {
+// A finished movie paused after the seed limit has nothing left to fetch: its
+// row is settled and draws no bar. What it keeps is the green class — not the
+// grey one of a paused download — so wherever the bar is drawn again (the
+// drawer, a check in progress) it is right. A paused download with data left
+// keeps the grey bar and its percentage.
+func TestDownloadsKeepTheGreenClassOfAFinishedMovie(t *testing.T) {
 	state := newTestAppState(t)
 	state.setActiveEngine(fakeProblemsEngine{list: []models.TorrentView{
 		{
@@ -62,11 +65,17 @@ func TestDownloadsShowAGreenBarForAFinishedMovie(t *testing.T) {
 	if rows[0].ProgressClass != "seed" {
 		t.Fatalf("finished movie class = %q, want seed", rows[0].ProgressClass)
 	}
+	if !rows[0].Settled {
+		t.Fatal("the finished movie is not settled: it would keep a full green bar and 100.0 %")
+	}
 	if rows[0].State != "In pausa" {
 		t.Fatalf("the badge of the finished movie is %q, want the pause to still be said", rows[0].State)
 	}
 	if rows[1].ProgressClass != "paused" {
 		t.Fatalf("paused download class = %q, want paused", rows[1].ProgressClass)
+	}
+	if rows[1].Settled {
+		t.Fatal("the paused download with data left is settled: its percentage would disappear")
 	}
 
 	server := httptest.NewServer(Router(state))
@@ -75,8 +84,11 @@ func TestDownloadsShowAGreenBarForAFinishedMovie(t *testing.T) {
 	if code != http.StatusOK {
 		t.Fatalf("downloads page -> %d", code)
 	}
-	if !strings.Contains(body, `class="progress seed"`) {
-		t.Fatal("the downloads page does not draw the finished movie with the green bar")
+	if !strings.Contains(body, `class="progress paused"`) {
+		t.Fatal("the downloads page does not draw the paused download with the grey bar")
+	}
+	if strings.Contains(body, `class="progress seed"`) {
+		t.Fatal("the downloads page still draws a bar for the finished movie")
 	}
 }
 
@@ -125,5 +137,116 @@ func TestDownloadsShowTheDiskGuardReason(t *testing.T) {
 	}
 	if !strings.Contains(body, "In attesa di spazio") {
 		t.Fatal("the downloads page does not name the disk guard pause")
+	}
+}
+
+// uiTorrentSettled decides which rows lose the bar. A finished torrent says
+// "100 %" on every row of the list, while a file check has a bar worth
+// watching and a failed torrent must not look finished.
+func TestUITorrentSettled(t *testing.T) {
+	cases := []struct {
+		name     string
+		state    string
+		progress float64
+		checking bool
+		want     bool
+	}{
+		{"a seeding torrent has nothing left to fetch", "seeding", 100, false, true},
+		{"a finished torrent too", "finished", 100, false, true},
+		{"the 99.99 % the bar already draws as full counts", "seeding", 99.99, false, true},
+		{"a completed download paused after the seed limit", "paused", 100, false, true},
+		{"a paused download with data to fetch keeps its bar", "paused", 40, false, false},
+		{"a downloading torrent keeps its bar", "downloading", 40, false, false},
+		{"a file check is never settled: there the bar moves", "checking_files", 100, true, false},
+		{"a failed torrent keeps the bar like it keeps its colour", "error", 100, false, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := uiTorrentSettled(tc.state, tc.progress, tc.checking); got != tc.want {
+				t.Fatalf("uiTorrentSettled(%q, %.2f, %v) = %v, want %v",
+					tc.state, tc.progress, tc.checking, got, tc.want)
+			}
+		})
+	}
+}
+
+// The row of a settled torrent takes one line: the class says it, the size and
+// the numbers that still move sit beside the name and the progress bar is not
+// drawn. A download keeps the bar and the metrics line, unchanged.
+func TestDownloadsPutASettledTorrentOnOneLine(t *testing.T) {
+	seeded := "ffff000000000000000000000000000000000001"
+	active := "ffff000000000000000000000000000000000002"
+	state := newTestAppState(t)
+	state.setActiveEngine(fakeProblemsEngine{list: []models.TorrentView{
+		{
+			Hash: seeded, Name: "Seeded.Movie.2026.mkv",
+			State: "seeding", Progress: 100, TotalSize: 2048, TotalDone: 2048,
+			UploadRate: 1024, NumPeers: 2, NumSeeds: 5, NumComplete: 12, NumIncomplete: 3,
+		},
+		{
+			Hash: active, Name: "Downloading.Movie.2027.mkv",
+			State: "downloading", Progress: 40, TotalSize: 100, TotalDone: 40,
+			DownloadRate: 1024,
+		},
+	}})
+
+	rows := uiTorrentRows(state)
+	if len(rows) != 2 {
+		t.Fatalf("rows = %d, want 2", len(rows))
+	}
+	for _, row := range rows {
+		switch row.Hash {
+		case seeded:
+			if !row.Settled {
+				t.Fatal("the seeded torrent is not settled: its row would keep a full green bar and 100.0 %")
+			}
+		case active:
+			if row.Settled {
+				t.Fatal("the downloading torrent is settled: its bar would disappear while it moves")
+			}
+		}
+	}
+
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+	code, body := v2Request(t, server, http.MethodGet, "/?view=downloads", nil)
+	if code != http.StatusOK {
+		t.Fatalf("downloads page -> %d", code)
+	}
+	rowMarkup := func(hash string) string {
+		start := strings.Index(body, `id="v2-torrent-`+hash+`"`)
+		if start < 0 {
+			t.Fatalf("the page does not draw the row %s", hash)
+		}
+		end := strings.Index(body[start:], "</tr>")
+		if end < 0 {
+			t.Fatalf("the row %s is not closed", hash)
+		}
+		return body[start : start+end]
+	}
+
+	settledRow := rowMarkup(seeded)
+	if !strings.Contains(settledRow, "torrent-card is-settled") {
+		t.Fatal("the settled row does not carry the is-settled class")
+	}
+	if strings.Contains(settledRow, "torrent-progress") {
+		t.Fatal("the settled row still draws the progress bar")
+	}
+	if !strings.Contains(settledRow, "torrent-facts") {
+		t.Fatal("the settled row does not carry the size and the live numbers beside the name")
+	}
+	if strings.Contains(settledRow, "100.0%") {
+		t.Fatal("the settled row still prints the percentage")
+	}
+
+	activeRow := rowMarkup(active)
+	if strings.Contains(activeRow, "is-settled") {
+		t.Fatal("the downloading row lost its bar")
+	}
+	if !strings.Contains(activeRow, "torrent-progress") || !strings.Contains(activeRow, "40.0%") {
+		t.Fatal("the downloading row no longer shows the bar and the percentage")
+	}
+	if !strings.Contains(activeRow, "torrent-metrics") {
+		t.Fatal("the downloading row no longer shows the metrics line")
 	}
 }

@@ -212,7 +212,7 @@
 {{define "v2_download_row"}}{{if eq .Kind "torrent"}}{{with .Torrent}}
           <tr id="v2-torrent-{{.Hash}}" data-hash="{{.Hash}}">
             <td class="torrent-card-cell">
-              <div class="torrent-card">
+              <div class="torrent-card{{if .Settled}} is-settled{{end}}">
                 <div class="torrent-head">
                   <span class="torrent-select"><input type="checkbox" data-v2-select name="hash" value="{{.Hash}}" aria-label="{{tr "Seleziona %s" .Name}}" {{trTitle "Seleziona questo torrent per le azioni di gruppo"}} /></span>
                   <span class="torrent-name">
@@ -223,11 +223,23 @@
                     {{if .SeedInfinite}}<span class="badge warn" {{trTitle "Seed senza limiti"}}>{{tr "seed ∞"}}</span>{{end}}
                     {{if .Pinned}}<span class="badge" {{trTitle "Forzato fuori coda: si sblocca dalla scheda del torrent"}}>{{icon "i-pin"}} {{tr "pin"}}</span>{{end}}
                     {{if .Tags}}<span class="tag-chips">{{range .Tags}}<span class="tag-chip">{{tr .}}</span>{{end}}</span>{{end}}
+                    {{/* A finished torrent has nothing left to fetch: the size and the
+                         numbers that still move sit next to the name instead of taking
+                         a bar, a percentage and a metrics line of their own. ↓ and the
+                         ETA are left out on purpose — they are zero by definition
+                         here — and the torrent drawer still shows them. */}}
+                    {{if .Settled}}<span class="torrent-facts">
+                      <span class="torrent-fact" {{trTitle "Dimensione totale del torrent"}}><span class="sr-only">{{tr "Dimensione"}}</span>{{bytes .TotalSize}}</span>
+                      <span class="torrent-fact" {{trTitle "Velocità con cui questo torrent sta inviando adesso"}}><span class="sr-only">{{tr "↑ Upload"}}</span><span aria-hidden="true">↑</span> {{rate .UploadRate}}</span>
+                      <span class="torrent-fact" {{trTitle "Peer connessi adesso / quanti hanno il file completo"}}><span class="sr-only">{{tr "Peer / Seed"}}</span><span aria-hidden="true">👥</span> {{.NumPeers}} / {{.NumSeeds}}</span>
+                      <span class="torrent-fact" {{trTitle "Sciame secondo i tracker e il DHT: seeder / leecher, non necessariamente connessi. Con 0 leecher non c'è nessuno a cui caricare."}}><span class="sr-only">{{tr "Sciame: seeder / leecher"}}</span><span aria-hidden="true">🌐</span> {{.SwarmSeeds}} / {{.SwarmLeechers}}</span>
+                      <span class="torrent-fact" {{trTitle "Caricato diviso scaricato: sopra 1 hai condiviso più di quanto hai preso"}}><span class="sr-only">{{tr "Ratio"}}</span><span aria-hidden="true">⇅</span> {{tr (printf "%.2f" .Ratio)}}</span>
+                    </span>{{end}}
                     {{if or .Reason .Source}}<small class="origin muted"><span>{{tr "Perché:"}}</span> {{if .Reason}}{{icon (reasonIcon .Reason)}} {{tr (reasonLabel .Reason)}}{{else}}—{{end}} · <span>{{tr "Fonte:"}}</span> {{if .Source}}{{tr .Source}}{{else}}—{{end}}</small>{{end}}
                   </span>
                   <span class="torrent-state badge {{.StateClass}}">{{tr .State}}</span>
                 </div>
-                <div class="torrent-body">
+                {{if not .Settled}}<div class="torrent-body">
                   <div class="torrent-progress"><div class="progress {{.ProgressClass}}"><span style="--pct:{{.ProgressPct}}%"></span></div><small class="muted">{{if .Checking}}<span>{{tr "Verifica file"}}</span> {{.ProgressPct}}% · {{.PiecesChecked}}/{{.PiecesTotal}} <span>{{tr "pezzi"}}</span>{{else}}{{.ProgressPct}}% · {{bytes .TotalDone}} / {{bytes .TotalSize}}{{end}}</small></div>
                   <div class="torrent-metrics">
                     <span class="torrent-metric" {{trTitle "Velocità con cui questo torrent sta scaricando adesso"}}><span class="sr-only">{{tr "↓ Download"}}</span><span aria-hidden="true">↓</span> {{rate .DownloadRate}}</span>
@@ -237,7 +249,7 @@
                     <span class="torrent-metric" {{trTitle "Sciame secondo i tracker e il DHT: seeder / leecher, non necessariamente connessi. Con 0 leecher non c'è nessuno a cui caricare."}}><span class="sr-only">{{tr "Sciame: seeder / leecher"}}</span><span aria-hidden="true">🌐</span> {{.SwarmSeeds}} / {{.SwarmLeechers}}</span>
                     <span class="torrent-metric" {{trTitle "Caricato diviso scaricato: sopra 1 hai condiviso più di quanto hai preso"}}><span class="sr-only">{{tr "Ratio"}}</span><span aria-hidden="true">⇅</span> {{tr (printf "%.2f" .Ratio)}}</span>
                   </div>
-                </div>
+                </div>{{end}}
                 <div class="row-actions">
                   {{if .Paused}}<button class="btn sm icon-action" type="submit" id="v2-pause-{{.Hash}}" name="row_action" value="resume:{{.Hash}}" {{trTitle "Riprende questo torrent dal punto in cui si era fermato"}} aria-label="{{tr "Riprendi"}}"><span aria-hidden="true">{{icon "i-play"}}</span></button>
                   {{else}}<button class="btn sm icon-action" type="submit" id="v2-pause-{{.Hash}}" name="row_action" value="pause:{{.Hash}}" {{trTitle "Mette in pausa questo torrent: i file restano dove sono"}} aria-label="{{tr "Pausa"}}"><span aria-hidden="true">{{icon "i-pause"}}</span></button>{{end}}

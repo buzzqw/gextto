@@ -850,6 +850,30 @@ label.field > span, .field > span, .field-label { color: var(--muted); font-size
 .torrent-metrics { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 6px; color: var(--muted); font-size: 0.82rem; font-variant-numeric: tabular-nums; }
 .torrent-metric { white-space: nowrap; }
 .torrent-card > .row-actions { grid-column: 2; grid-row: 1 / span 2; align-self: center; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; min-width: 0; white-space: normal; }
+/* Nothing left to fetch (complete, seeding, or paused after the seed limit):
+   the row is one line. A full green bar and "100.0 %" on every finished
+   torrent say what the state badge already says, and took two lines each —
+   with a list of a few dozen torrents that is most of the page. The size and
+   the numbers that still move (upload, peers, swarm, ratio) sit after the
+   name; a download and a file check keep the bar and the metrics below,
+   because there they change. ↓ and the ETA are left out on a settled row:
+   they are zero by definition, and the torrent drawer shows them. */
+.torrent-card.is-settled { row-gap: 0; }
+/* The checkbox and the state badge stay at the top of the row like every other
+   row: on a phone the name wraps over three lines and centring them would
+   leave the checkbox floating in the middle of the card. */
+.torrent-card.is-settled .torrent-name { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+/* min-width: 0 is what lets a flex item shrink: without it the name would push
+   the facts off the row instead of shortening to its ellipsis. */
+.torrent-card.is-settled .torrent-open { flex: 0 1 auto; min-width: 3rem; }
+.torrent-card.is-settled .torrent-name > .badge,
+.torrent-card.is-settled .torrent-name > .tag-chips { flex: none; }
+.torrent-card.is-settled .torrent-name .tag-chips { margin-top: 0; }
+.torrent-facts { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; color: var(--muted); font-size: 0.82rem; font-variant-numeric: tabular-nums; }
+.torrent-fact { white-space: nowrap; }
+/* The dot belongs to the value that follows it, so a line break never leaves a
+   separator hanging at the end of a line. */
+.torrent-fact + .torrent-fact::before { content: "·"; margin-right: 8px; opacity: 0.45; }
 @media (max-width: 700px) {
   .torrent-card { grid-template-columns: minmax(0, 1fr); }
   .torrent-card > .row-actions { grid-column: 1; grid-row: auto; justify-content: flex-start; padding-top: 6px; border-top: 1px solid var(--line-soft); }
@@ -859,6 +883,11 @@ label.field > span, .field > span, .field-label { color: var(--muted); font-size
      name stays readable instead of being cut to its first words. */
   .torrent-name > .truncate,
   .torrent-open .truncate { overflow: visible; white-space: normal; text-overflow: clip; overflow-wrap: anywhere; }
+  /* On a phone the facts take their own line under the name: beside it they
+     would leave the name a column three words wide. The dots go, the gap
+     alone keeps the values apart. */
+  .torrent-card.is-settled .torrent-facts { flex: 1 1 100%; gap: 2px 12px; }
+  .torrent-fact + .torrent-fact::before { content: none; }
 }
 /* A touch screen has no pointer to hover with: the tooltip that carries the
    rest of the name never opens, in landscape and on a tablet no less than on a

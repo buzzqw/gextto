@@ -790,6 +790,11 @@ soon as you come back.
 ### Reading the list
 
 Each row shows name, status, progress, speed, estimated time, peers and ratio.
+A torrent with nothing left to fetch — complete, seeding, or stopped after the
+seeding limit — takes **one line**: name, badges, size, upload, peers, swarm and
+ratio. The bar and the percentage stay with what is downloading or checking the
+files, where they do move; ↓ and the estimated time, always zero on a torrent at
+rest, are on its own page.
 The **swarm** (🌐 seeders / leechers) is the one reported by trackers and DHT:
 with **0 leechers** there is nobody to upload to. Sort with **Sort by** (for the
 whole list at once), filter by name and by tag, and pick a state with the

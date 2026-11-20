@@ -64,6 +64,41 @@ test.describe("telefono", () => {
     expect(geometry.lines).toBeGreaterThan(1);
   });
 
+  test("una riga in seed mette i numeri sotto il nome, non di fianco", async ({ page }) => {
+    await page.goto("/?view=downloads");
+    await page.waitForTimeout(400);
+    // A settled row is one line on a desktop and two on a phone: the size and
+    // the numbers that still move take their own line under the name instead
+    // of squeezing it, so a long name still wraps and nothing runs off screen.
+    const geometry = await page.evaluate(() => {
+      const table = document.createElement("table");
+      table.className = "data-table torrent-table";
+      table.innerHTML = `<tbody><tr><td class="torrent-card-cell"><div class="torrent-card is-settled">
+        <div class="torrent-head"><span class="torrent-select"><input type="checkbox"></span>
+        <span class="torrent-name"><button class="torrent-open" type="button"><span class="truncate"></span></button>
+        <span class="badge warn">seed ∞</span>
+        <span class="torrent-facts"><span class="torrent-fact">1.4 GB</span><span class="torrent-fact">↑ 0 B/s</span><span class="torrent-fact">👥 0 / 0</span><span class="torrent-fact">🌐 1 / 0</span><span class="torrent-fact">⇅ 1.00</span></span>
+        </span><span class="torrent-state badge ok">In seed</span></div>
+        <div class="row-actions"></div></div></td></tr></tbody>`;
+      const name = table.querySelector(".torrent-open .truncate") as HTMLElement;
+      name.textContent = "Serie.02x05.Il.Titolo.Della.Puntata.ITA.DLMux.x264-GRUPPO.mkv";
+      document.querySelector(".content")?.append(table);
+      const card = table.querySelector(".torrent-card") as HTMLElement;
+      const button = table.querySelector(".torrent-open") as HTMLElement;
+      const facts = table.querySelector(".torrent-facts") as HTMLElement;
+      const result = {
+        overflow: card.scrollWidth - card.clientWidth,
+        factsBelowName: facts.getBoundingClientRect().top >= button.getBoundingClientRect().bottom - 1,
+        nameShare: button.getBoundingClientRect().width / card.getBoundingClientRect().width,
+      };
+      table.remove();
+      return result;
+    });
+    expect(geometry.overflow).toBeLessThanOrEqual(1);
+    expect(geometry.factsBelowName).toBe(true);
+    expect(geometry.nameShare).toBeGreaterThan(0.6);
+  });
+
   test("Serie TV e Film mostrano l'elenco prima del modulo di aggiunta", async ({ page }) => {
     for (const [view, panel] of [
       ["series", "#v2-table-panel-series-t0"],

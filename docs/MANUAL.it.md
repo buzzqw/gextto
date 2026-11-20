@@ -806,7 +806,12 @@ l'aggiornamento si ferma, e riprende appena torni.
 ### Leggere la lista
 
 Ogni riga mostra nome, stato, progresso, velocità, tempo stimato, peer e
-rapporto. Lo **sciame** (🌐 seeder / leecher) è quello riportato da tracker e DHT:
+rapporto. Un torrent che non ha più niente da scaricare — completo, in seed, o
+fermato dopo il limite di seed — sta su **una riga sola**: nome, badge,
+dimensione, upload, peer, sciame e rapporto. La barra e la percentuale restano a
+chi sta scaricando o verificando i file, dove cambiano davvero; ↓ e il tempo
+stimato, che su un torrent fermo sono sempre zero, li trovi nella sua scheda.
+Lo **sciame** (🌐 seeder / leecher) è quello riportato da tracker e DHT:
 con **0 leecher** non c'è nessuno a cui caricare. Ordini con **Ordina per** (per
 tutta la lista insieme), filtri per nome e per tag, e scegli uno stato con i
 pulsanti sopra l'elenco (*Tutti i torrent*, *In scarico*, *In seed*, *In pausa*,
