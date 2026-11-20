@@ -497,6 +497,7 @@ var uiCatalog = map[string][5]string{
 	"I/O ops r/w":                                          {"Operazioni I/O r/w", "I/O-Vorgänge r/w", "Opérations I/O r/w", "Operaciones I/O r/w", "Operacje I/O r/w"},
 	"IP filter":                                            {"IP filter", "IP filter", "IP filter", "IP filter", "IP filter"},
 	"IP filter rules":                                      {"Regole IP filter", "IP filter Regeln", "Règles IP filter", "Reglas IP filter", "Reguły IP filter"},
+	"Connections the filter refused":                       {"Connessioni rifiutate dal filtro", "Vom Filter abgelehnte Verbindungen", "Connexions refusées par le filtre", "Conexiones rechazadas por el filtro", "Połączenia odrzucone przez filtr"},
 	"Incoming peer connections since start":                {"Connessioni peer in ingresso dall'avvio", "Eingehende peer Verbindungen seit dem Start", "Connexions peer entrantes depuis le démarrage", "Conexiones peer entrantes desde el inicio", "Połączenia peer przychodzące od uruchomienia"},
 	"Load filter":                                          {"Carica filtro", "Filter laden", "Charger le filtre", "Cargar filtro", "Wczytaj filtr"},
 	"No torrents in the session.":                          {"Nessun torrent nella sessione.", "Keine Torrents in der Sitzung.", "Aucun torrent dans la session.", "Ningún torrent en la sesión.", "Brak torrentów w sesji."},

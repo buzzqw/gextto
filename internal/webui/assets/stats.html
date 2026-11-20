@@ -127,6 +127,7 @@ main.page{max-width:1080px}
         <div class="row"><span>{{tr "Encryption"}}</span><strong id="v-crypto">—</strong></div>
         <div class="row"><span>{{tr "Proxy"}}</span><strong id="v-proxy">—</strong></div>
         <div class="row"><span>{{tr "IP filter rules"}}</span><strong id="v-ipfilter">—</strong></div>
+        <div class="row"><span>{{tr "Connections the filter refused"}}</span><strong id="v-ipfilter-blocked">—</strong></div>
       </div>
     </section>
 
@@ -241,6 +242,7 @@ main.page{max-width:1080px}
     if (s.encryption === 2) { $('v-crypto').textContent = t('Forced'); }
     $('v-proxy').textContent = onoff(s.proxy);
     $('v-ipfilter').textContent = (s.ip_filter_rules || 0).toLocaleString();
+    $('v-ipfilter-blocked').textContent = ((s.session || {}).blocked_connections || 0).toLocaleString();
 
     $('v-adl').textContent = (s.active_downloads || 0) + ' / ' + (s.active_limit || 0);
     $('v-aseed').textContent = (s.active_seeds || 0) + ' / ' + (s.active_limit || 0);

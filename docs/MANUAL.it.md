@@ -1455,7 +1455,11 @@ separato; non c'è nulla da installare.
   `127.0.0.1:8890`, solo da questo computer): magnet, pausa, verifica, coda,
   filtro IP, log. Per aprirla in rete usa `0.0.0.0:8890` **e un token**.
 - La **cache disco** si regola da sola in base alla memoria libera e al tipo di
-  disco. Il **filtro IP** da URL si aggiorna una volta al giorno.
+  disco. Il **filtro IP** da URL si aggiorna una volta al giorno, e la pagina
+  **Statistiche** del client mostra due numeri distinti: le regole caricate e le
+  connessioni che quelle regole hanno rifiutato. Il log riporta i rifiuti
+  raggruppati: il primo subito dopo un caricamento, poi al massimo una riga ogni
+  dieci minuti con quanti ne sono stati rifiutati nel frattempo.
 - Con un **proxy** configurato passano dal tunnel anche feed, indexer e
   download dei `.torrent`; i servizi in rete locale restano diretti.
 - Supporta streaming, DLNA, download sequenziale, torrent v2 e i magnet con

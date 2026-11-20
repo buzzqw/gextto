@@ -1437,7 +1437,11 @@ process; there is nothing to install.
   this computer only): magnets, pause, check, queue, IP filter, log. To open it
   on the network use `0.0.0.0:8890` **and a token**.
 - The **disk cache** sizes itself from free memory and disk type. The **IP
-  filter** from a URL is refreshed once a day.
+  filter** from a URL is refreshed once a day, and the client's **Statistics**
+  page shows two distinct figures: the rules loaded and the connections those
+  rules refused. The log reports refusals in groups: the first one right after a
+  load, then at most one line every ten minutes with how many were refused
+  since.
 - With a **proxy** configured, feeds, indexers and `.torrent` downloads go
   through the tunnel too; services on the local network stay direct.
 - It supports streaming, DLNA, sequential download, v2 torrents and magnets
