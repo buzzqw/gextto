@@ -76,6 +76,30 @@ full round tells the disk from the code. Its full-speed figure is inside the ran
 full round, but it was taken at a different moment from the others: the lead over Deluge and
 qBittorrent is confirmed only by the next full round.
 
+**2026-11-20, gx-torrent alone.** The same images, peers and limits, tag
+`2026-11-20-opt`, commit `2cd1ea64`, three rounds, no failures. The other clients
+were **not** rerun: their rows stay from 2026-11-11, so this updates one row in
+the documented way and does not replace an interleaved full round.
+
+| Scenario | Metric | 2026-11-11 | 2026-11-20 | Change |
+|---|---|---|---|---|
+| idle | CPU (% of a core) | 0.07 | 0.05 | −29 % |
+| full | speed | 238.7 MB/s | **288.5 MB/s** (285.9–291.8) | +20.9 % |
+| full | CPU | 3.07 s/GiB | 2.91 s/GiB | −5.2 % |
+| full | peak own memory | 26.2 MiB | 23.8 MiB | −9.2 % |
+| line | speed | 11.21 MB/s | 11.19 MB/s | −0.2 % |
+| line-uTP | CPU | 37.81 s/GiB | 36.33 s/GiB | −3.9 % |
+| line-uTP | peak own memory | 35.9 MiB | 30.6 MiB | −14.8 % |
+| recheck | speed | 1,208 MB/s | **1,336 MB/s** | +10.6 % |
+| upload | speed | 202.8 MB/s | **262.1 MB/s** (237.9–285.7) | +29.2 % |
+
+The full-speed and memory figures are outside the run-to-run spread of the old
+row; the recheck and upload ranges are wider, and the host was shared with the
+running Gextto service. The other clients' rows (qBittorrent 239.3 MB/s,
+Deluge 245.9, Transmission 29.5, anacrolix 110.2) are from 2026-11-11 and were
+not measured again, so the lead over them is still the one a full interleaved
+round must confirm.
+
 | Client | Version | Engine |
 |---|---|---|
 | gx-torrent | commit `702805e2`, image `8e95e9167dee`; recheck and upload: commit `77aaf0cd`, image `b4bfd04ae493` | gx-core, pure Go |
