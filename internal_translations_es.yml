@@ -4980,6 +4980,7 @@ spa:
   "Segna come visto": "Marcar como visto"
   "Spostare nel cestino le copie inferiori?": "¿Mover a la papelera las copias inferiores?"
   "Testa selezionati": "Probar seleccionados"
+  "Toglie la serie dalla libreria e smette di cercarne le puntate; i file già in archivio restano.": "Quita la serie de la biblioteca y deja de buscar sus episodios; los archivos ya archivados se quedan."
   "URL del server e API key (Jellyfin → Dashboard → API Keys).": "URL del servidor y clave API (Jellyfin → Panel → API Keys)."
   "URL del server e token X-Plex-Token.": "URL del servidor y token X-Plex-Token."
   "VACUUM avviato: compattazione di tutti i database in corso...": "VACUUM iniciado: compactando todas las bases de datos..."

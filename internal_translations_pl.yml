@@ -4973,6 +4973,7 @@ pol:
   "Segna come visto": "Oznacz jako obejrzane"
   "Spostare nel cestino le copie inferiori?": "Przenieść gorsze kopie do kosza?"
   "Testa selezionati": "Testuj zaznaczone"
+  "Toglie la serie dalla libreria e smette di cercarne le puntate; i file già in archivio restano.": "Usuwa serial z biblioteki i przestaje szukać jego odcinków; pliki już zarchiwizowane pozostają."
   "URL del server e API key (Jellyfin → Dashboard → API Keys).": "Adres URL serwera i klucz API (Jellyfin → Panel → API Keys)."
   "URL del server e token X-Plex-Token.": "Adres URL serwera i token X-Plex-Token."
   "VACUUM avviato: compattazione di tutti i database in corso...": "VACUUM uruchomione: kompaktowanie wszystkich baz danych..."

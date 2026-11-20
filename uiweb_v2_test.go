@@ -1361,6 +1361,47 @@ func TestV2SeriesPageRenamesTheSeries(t *testing.T) {
 	}
 }
 
+// TestV2SeriesPageDeletesTheSeries: the series page carries the same delete
+// action as the library list, so a series can be removed from the page opened
+// on it instead of going back to the whole list. The files already archived
+// stay; only the library entry and its state are removed.
+func TestV2SeriesPageDeletesTheSeries(t *testing.T) {
+	state := newTestAppState(t)
+	if err := SaveLibrary(state.cfg.DataDir, []SeriesConfig{{Name: "Delete Me", Seasons: "*", Quality: "1080p", Language: "ita", Enabled: true}}, nil); err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+
+	code, body := v2Request(t, server, http.MethodGet, "/?view=series&series=Delete%20Me", nil)
+	if code != http.StatusOK {
+		t.Fatalf("series page -> %d", code)
+	}
+	// The toolbar offers the delete action, pointed at the series itself.
+	if !strings.Contains(body, `value="/api/series/Delete%20Me"`) || !strings.Contains(body, `name="method" value="DELETE"`) ||
+		!strings.Contains(body, "Eliminare questa serie dalla libreria?") || !strings.Contains(body, "Eliminare la serie") {
+		t.Fatal("the series page has no delete action for the series")
+	}
+
+	code, body = v2Request(t, server, http.MethodPost, "/section/action", url.Values{
+		"view":     {"series"},
+		"path":     {"/api/series/Delete%20Me"},
+		"method":   {"DELETE"},
+		"body":     {"{}"},
+		"redirect": {"/?view=series"},
+	})
+	if code != http.StatusNoContent {
+		t.Fatalf("delete action -> %d: %s", code, body)
+	}
+	if series := latestConfig(state).Series; len(series) != 0 {
+		t.Fatalf("series still in the library after the delete: %+v", series)
+	}
+	// The page opened on it is gone: the view falls back to the list.
+	if code, body := v2Request(t, server, http.MethodGet, "/?view=series&series=Delete%20Me", nil); code != http.StatusOK || !strings.Contains(body, "Serie monitorate") {
+		t.Fatalf("deleted series page -> %d", code)
+	}
+}
+
 func TestV2SettingsStructuredEditors(t *testing.T) {
 	state := newTestAppState(t)
 	server := httptest.NewServer(Router(state))

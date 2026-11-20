@@ -317,7 +317,7 @@ Sotto i 900 pixel di larghezza l'interfaccia si compatta: menu scorrevole in
 alto, metriche su due colonne, finestre a tutta larghezza, tabelle che scorrono
 dentro il loro riquadro. Nella scheda di una serie la barra delle azioni —
 **Cerca mancanti**, **Scansiona archivio**, **Aggiorna da TMDB**, **Anteprima
-rinomina** — resta in cima ai pannelli, ogni puntata è un blocco con la sigla
+rinomina**, **Eliminare la serie** — resta in cima ai pannelli, ogni puntata è un blocco con la sigla
 della stagione e dell'episodio e lo stato in cima, il nome del file in libreria
 per intero e i pulsanti su una riga sotto, e la storia dei download si legge un
 evento per blocco. Il titolo di una locandina e i risultati di **Esplora** su
@@ -404,6 +404,7 @@ rete, stato, completezza e il percorso in libreria. Le azioni:
 | **Aggiorna da TMDB** (o TVDB) | sono usciti episodi nuovi, o titoli e date sono cambiati |
 | **Anteprima rinomina** | vedi i nomi *Vecchio → Nuovo* prima di rinominare; **Forza rinomina** ricalcola anche i file che sembrano già corretti |
 | **Modifica** | cambi nome, stagioni, cartella, alias, ID, profilo |
+| **Eliminare la serie** | togli la serie dalla libreria e smetti di cercare le sue puntate: Gextto dimentica stato, episodi e metadati, mentre i file già archiviati restano dove sono. È la stessa voce **Elimina** dell'elenco **Serie TV** |
 | **Storia dei download** | ricostruisci cosa è successo a ogni episodio |
 
 I campi della scheda più importanti:

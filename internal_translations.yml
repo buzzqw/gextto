@@ -4370,6 +4370,7 @@ eng:
   "Segna come visto": "Mark as watched"
   "Spostare nel cestino le copie inferiori?": "Move the lower copies to the trash?"
   "Testa selezionati": "Test selected"
+  "Toglie la serie dalla libreria e smette di cercarne le puntate; i file già in archivio restano.": "Removes the series from the library and stops searching for its episodes; the files already archived stay."
   "URL del server e API key (Jellyfin → Dashboard → API Keys).": "Server URL and API key (Jellyfin → Dashboard → API Keys)."
   "URL del server e token X-Plex-Token.": "Server URL and X-Plex-Token."
   "VACUUM avviato: compattazione di tutti i database in corso...": "VACUUM started: compacting all databases..."

@@ -317,7 +317,8 @@ the changelog and the licence are in the **More** panel.
 Below 900 pixels wide the interface becomes compact: scrollable menu at the
 top, metrics in two columns, full-width dialogs, tables that scroll inside
 their panel. On a series page the toolbar — **Search missing**, **Scan the
-archive**, **Refresh from TMDB**, **Rename preview** — stays above the panels,
+archive**, **Refresh from TMDB**, **Rename preview**, **Delete the series** —
+stays above the panels,
 every episode is a block with the season and episode code and the state on the
 first line, the full name of the file in the library and the buttons on a line
 of their own, and the download history reads one event per block. A poster
@@ -403,6 +404,7 @@ status, completeness and the library path. The actions:
 | **Update from TMDB** (or TVDB) | new episodes are out, or titles and dates changed |
 | **Rename preview** | see the *Old → New* names before renaming; **Force rename** also recomputes the files that look correct already |
 | **Edit** | change name, seasons, folder, aliases, IDs, profile |
+| **Delete the series** | remove the series from the library and stop searching for its episodes: Gextto forgets its state, episodes and metadata, while the files already archived stay where they are. It is the same **Delete** entry of the **TV series** list |
 | **Download history** | reconstruct what happened to each episode |
 
 The most important fields of the page:

@@ -5033,6 +5033,7 @@ deu:
   "Segna come visto": "Als gesehen markieren"
   "Spostare nel cestino le copie inferiori?": "Die schlechteren Kopien in den Papierkorb verschieben?"
   "Testa selezionati": "Ausgewählte testen"
+  "Toglie la serie dalla libreria e smette di cercarne le puntate; i file già in archivio restano.": "Entfernt die Serie aus der Bibliothek und beendet die Suche nach ihren Episoden; bereits archivierte Dateien bleiben."
   "URL del server e API key (Jellyfin → Dashboard → API Keys).": "Server-URL und API-Schlüssel (Jellyfin → Dashboard → API Keys)."
   "URL del server e token X-Plex-Token.": "Server-URL und X-Plex-Token."
   "VACUUM avviato: compattazione di tutti i database in corso...": "VACUUM gestartet: Alle Datenbanken werden komprimiert..."
