@@ -2629,16 +2629,42 @@ func (d *Daemon) toggleFirstLast(key string) error {
 }
 
 func (d *Daemon) addTrackers(key string, urls []string) error {
-	return d.withTorrent(key, func(t *torrent.Torrent, meta *torrentMeta) error {
-		for _, url := range urls {
-			if err := t.AddTracker(url); err != nil {
-				return err
+	// The add is not atomic: a bad URL among several must not leave a tracker
+	// that did join still marked as switched off in the state. Save what did
+	// succeed, then report the first failure.
+	d.mu.Lock()
+	t, meta := d.findLocked(key)
+	if t == nil {
+		d.mu.Unlock()
+		return errNotFound
+	}
+	if d.moving[t.ID()] {
+		d.mu.Unlock()
+		return errors.New("the torrent is being moved")
+	}
+	var firstErr error
+	changed := false
+	for _, url := range urls {
+		url = strings.TrimSpace(url)
+		if url == "" {
+			continue
+		}
+		if err := t.AddTracker(url); err != nil {
+			if firstErr == nil {
+				firstErr = err
 			}
+			continue
 		}
 		// Adding a URL by hand is also asking for it back on.
-		meta.TrackerOff = withoutStrings(meta.TrackerOff, urls)
-		return nil
-	})
+		meta.TrackerOff = withoutStrings(meta.TrackerOff, []string{url})
+		changed = true
+	}
+	if changed || firstErr != nil {
+		d.saveLocked()
+		d.poke()
+	}
+	d.mu.Unlock()
+	return firstErr
 }
 
 // setTrackers replaces the torrent's tracker list; an empty list removes every

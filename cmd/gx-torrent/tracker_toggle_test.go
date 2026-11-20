@@ -206,3 +206,32 @@ func TestTrackerEnabledAction(t *testing.T) {
 		t.Fatalf("tracker off list = %v, want [%s]", got, tracker)
 	}
 }
+
+// TestAddTrackersPartialFailureKeepsTheGoodOne covers a mixed add: a URL that
+// joins must not stay marked as switched off because a later one is refused.
+func TestAddTrackersPartialFailureKeepsTheGoodOne(t *testing.T) {
+	d := newTestDaemon(t)
+	hash, _, err := d.add(addRequest{
+		TorrentData: makeTorrent(t, t.TempDir(), "movie.bin", 10_000),
+		Destination: t.TempDir(), Paused: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	good := "http://127.0.0.1:1/announce"
+	if err := d.addTrackers(hash, []string{good}); err != nil {
+		t.Fatal(err)
+	}
+	if err := d.setTrackerEnabled(hash, good, false); err != nil {
+		t.Fatal(err)
+	}
+	if err := d.addTrackers(hash, []string{good, "not-a-tracker-url"}); err == nil {
+		t.Fatal("an invalid tracker URL was accepted")
+	}
+	if got := torrentTrackerURLs(t, d, hash); !slices.Equal(got, []string{good}) {
+		t.Fatalf("trackers after a mixed add = %v, want [%s]", got, good)
+	}
+	if got := trackerOff(t, d, hash); len(got) != 0 {
+		t.Fatalf("the good tracker is still switched off: %v", got)
+	}
+}
