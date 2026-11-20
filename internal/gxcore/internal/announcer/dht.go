@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/buzzqw/gextto/internal/gxcore/internal/logger"
+	"github.com/buzzqw/gextto/internal/gxcore/internal/safego"
 )
 
 // DHTAnnouncer re-announces the torrent to the DHT on a schedule: eagerly
@@ -46,6 +47,7 @@ func (a *DHTAnnouncer) NeedMorePeers(val bool) {
 // Run executes the announce loop; call it as a goroutine. The first announce
 // fires immediately, then the timer follows the current pace.
 func (a *DHTAnnouncer) Run(announceFunc func(), interval, minInterval time.Duration, l logger.Logger) {
+	defer safego.RecoverWith(l, "DHT announcer", nil)
 	defer close(a.doneC)
 
 	timer := time.NewTimer(minInterval)

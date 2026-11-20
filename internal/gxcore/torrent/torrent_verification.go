@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/buzzqw/gextto/internal/gxcore/internal/peerprotocol"
+	"github.com/buzzqw/gextto/internal/gxcore/internal/safego"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/verifier"
 )
 
@@ -32,6 +33,9 @@ func (t *torrent) handleVerifyCommand() {
 // pipeline: haves fan out to peers, downloads restart, or the torrent stops
 // when this was a manual verification or a completed stop-after-download.
 func (t *torrent) handleVerificationDone(ve *verifier.Verifier) {
+	// The data came from disk: an error must stop this verification, not the
+	// daemon (the health-check panics re-raise).
+	defer safego.RecoverWith(t.log, "verification handler", nil)
 	if t.verifier != ve {
 		t.crash("invalid verifier")
 	}

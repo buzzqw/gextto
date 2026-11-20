@@ -17,6 +17,7 @@ import (
 	"github.com/buzzqw/gextto/internal/gxcore/internal/handshaker/incominghandshaker"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/netx"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/peersource"
+	"github.com/buzzqw/gextto/internal/gxcore/internal/safego"
 )
 
 // maxRoutedHandshakes bounds concurrent incoming handshakes on the shared port.
@@ -230,6 +231,8 @@ func (s *Session) routeIncoming(conn net.Conn) {
 // as a connection accepted on the torrent's own port.
 func (t *torrent) handleRoutedConnection(h *incominghandshaker.IncomingHandshaker) {
 	conn := h.Conn
+	// A routed socket is still a stranger's socket: contain the fault here.
+	defer safego.RecoverWith(t.log, "routed connection handler", func() { conn.Close() })
 	if t.status() == Stopped || t.status() == Stopping {
 		conn.Close()
 		return

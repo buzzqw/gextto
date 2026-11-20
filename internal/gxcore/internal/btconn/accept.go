@@ -2,6 +2,7 @@ package btconn
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"net"
 	"time"
@@ -37,6 +38,14 @@ func AcceptRouted(
 	forceEncryption bool,
 	lookup func(infoHash [20]byte) (ourID [20]byte, ourExtensions [8]byte, ok bool)) (
 	encConn net.Conn, cipher mse.CryptoMethod, peerExtensions [8]byte, peerID [20]byte, infoHash [20]byte, err error) {
+	// Every byte of this exchange is a stranger's: a fault must fail this
+	// handshake (the caller closes the socket), not the daemon.
+	defer func() {
+		if value := recover(); value != nil {
+			encConn = nil
+			err = fmt.Errorf("the peer handshake stopped after an unexpected error: %v", value)
+		}
+	}()
 	log := logger.New("conn <- " + conn.RemoteAddr().String())
 
 	if forceEncryption && getSKey == nil {

@@ -160,6 +160,20 @@ opened from a PC on the LAN could add or delete torrents, so:
 In managed none of this activates: the wizard and the login stay off, Gextto is in
 charge.
 
+**A peer's fault costs one connection.** The bytes a peer, a tracker or a web seed sends
+are a stranger's, and a bug in a parser or in a handler must not take the daemon down
+with every torrent it is running: the read and write loops of a connection, the
+handshake, the tracker announcers, the listener and the torrent's message handlers run
+behind the `safego` guard (`internal/gxcore/internal/safego`), which logs the fault, runs
+the cleanup (the socket is closed, the peer dropped) and lets the session go on. The one
+thing the guard never swallows is a deliberate **health-check panic** (`safego.Invariant`):
+when the session finds state it can no longer trust, the dump and the exit are the point.
+Other engines published several remote-crash advisories in 2026 for exactly this shape —
+a peer message that reached a panicking assumption on a goroutine with no recover — and
+the tests here pin both halves: a fault is contained, an invariant still stops the
+process (`internal/gxcore/internal/safego/safego_test.go`,
+`peerreader.Run`'s panic test, `btconn`'s handshake test).
+
 ## 4. Architecture and boundaries
 
 The engine and the queue logic are internal packages; above them a single `main` chooses

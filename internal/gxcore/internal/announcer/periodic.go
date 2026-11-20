@@ -15,6 +15,7 @@ import (
 	"github.com/buzzqw/gextto/internal/gxcore/internal/backoff"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/logger"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/resolver"
+	"github.com/buzzqw/gextto/internal/gxcore/internal/safego"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/tracker"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/tracker/httptracker"
 )
@@ -145,6 +146,9 @@ func (a *PeriodicalAnnouncer) NeedMorePeers(val bool) {
 // complete torrent); then replies, errors, pace changes, the completed
 // event and stats queries drive it until Close.
 func (a *PeriodicalAnnouncer) Run() {
+	// A tracker reply is a stranger's data: a fault ends this announce, and
+	// Close still returns because doneC is closed first.
+	defer safego.Recover("tracker announcer")
 	defer close(a.doneC)
 	a.backoff.Reset()
 

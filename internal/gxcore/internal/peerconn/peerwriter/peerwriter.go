@@ -15,6 +15,7 @@ import (
 	"github.com/buzzqw/gextto/internal/gxcore/internal/logger"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/peerconn/peerreader"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/peerprotocol"
+	"github.com/buzzqw/gextto/internal/gxcore/internal/safego"
 )
 
 // keepAlivePeriod spaces the keepalive probes; the ticker runs at half that.
@@ -109,9 +110,9 @@ type PeerWriter struct {
 	// uploadWeight is this peer's own share of a limited upload in percent
 	// (0 = 100), set by the torrent from what the peer sends back.
 	uploadWeight atomic.Int32
-	log           logger.Logger
-	stopC         chan struct{}
-	doneC         chan struct{}
+	log          logger.Logger
+	stopC        chan struct{}
+	doneC        chan struct{}
 }
 
 // New stages a writer over conn.
@@ -179,9 +180,10 @@ func (p *PeerWriter) Done() chan struct{} {
 // A choke purges queued uploads; an overfull piece queue rejects (or drops)
 // the newest.
 func (p *PeerWriter) Run() {
+	defer safego.Recover("peer writer")
 	defer close(p.doneC)
 
-	go p.messageWriter()
+	safego.Go("peer writer", p.messageWriter)
 
 	for {
 		var readyC chan struct{}

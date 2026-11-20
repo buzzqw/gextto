@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"syscall"
@@ -34,6 +35,12 @@ func Dial(
 	ourID [20]byte,
 	stopC chan struct{}) (
 	conn net.Conn, cipher mse.CryptoMethod, peerExtensions [8]byte, peerID [20]byte, err error) {
+	defer func() {
+		if value := recover(); value != nil {
+			conn = nil
+			err = fmt.Errorf("the peer handshake stopped after an unexpected error: %v", value)
+		}
+	}()
 	log := logger.New("conn -> " + addr.String())
 	ctx, cancel := ctxutil.FromChan(stopC)
 	defer cancel()

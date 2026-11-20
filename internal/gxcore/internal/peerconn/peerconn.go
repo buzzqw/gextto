@@ -11,6 +11,7 @@ import (
 	"github.com/buzzqw/gextto/internal/gxcore/internal/peerconn/peerreader"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/peerconn/peerwriter"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/peerprotocol"
+	"github.com/buzzqw/gextto/internal/gxcore/internal/safego"
 )
 
 // WireStats tallies the raw peer-socket bytes below the message layer, so
@@ -166,6 +167,7 @@ func (p *Conn) CancelRequest(msg peerprotocol.CancelMessage) {
 // either side, or a peer going silent — then it stops the other side, closes
 // the socket, and returns.
 func (p *Conn) Run() {
+	defer safego.Recover("peer connection")
 	defer close(p.doneC)
 	defer close(p.messages)
 

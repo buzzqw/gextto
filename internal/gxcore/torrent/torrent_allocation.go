@@ -7,6 +7,7 @@ import (
 	"github.com/buzzqw/gextto/internal/gxcore/internal/bitfield"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/piece"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/piecepicker"
+	"github.com/buzzqw/gextto/internal/gxcore/internal/safego"
 )
 
 // handleAllocationDone turns opened files into pieces, the picker and the
@@ -15,6 +16,7 @@ import (
 // neighbors it starts with a blank bitfield; otherwise the verifier (plus
 // the off-loop swarm merge) establishes the truth first.
 func (t *torrent) handleAllocationDone(al *allocator.Allocator) {
+	defer safego.RecoverWith(t.log, "allocation handler", nil)
 	if t.allocator != al {
 		t.crash("invalid allocator")
 	}

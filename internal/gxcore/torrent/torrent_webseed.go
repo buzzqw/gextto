@@ -7,6 +7,7 @@ import (
 
 	"github.com/buzzqw/gextto/internal/gxcore/internal/piecewriter"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/resumer/boltdbresumer"
+	"github.com/buzzqw/gextto/internal/gxcore/internal/safego"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/urldownloader"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/webseedsource"
 	"github.com/rcrowley/go-metrics"
@@ -19,6 +20,7 @@ import (
 // go to the write ring like peer pieces, and a finished range rotates the
 // source to a new one.
 func (t *torrent) handleWebseedPieceResult(msg *urldownloader.PieceResult) {
+	defer safego.RecoverWith(t.log, "web seed handler", nil)
 	if msg.Error != nil {
 		t.log.Debugln("webseed download error:", msg.Error)
 		t.disableSource(msg.Downloader.URL, msg.Error, true)

@@ -17,6 +17,7 @@ import (
 	"github.com/buzzqw/gextto/internal/gxcore/internal/peersource"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/pexlist"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/piece"
+	"github.com/buzzqw/gextto/internal/gxcore/internal/safego"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/sliceset"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/stringutil"
 	"github.com/rcrowley/go-metrics"
@@ -169,8 +170,9 @@ func (p *Peer) Done() chan struct{} {
 // download), everything else — with upload completions metered — to
 // messages. A closed stream reports the disconnect instead.
 func (p *Peer) Run(messages chan Message, pieces chan PieceMessage, snubbed, disconnect chan *Peer) {
+	defer safego.Recover("peer connection")
 	defer close(p.doneC)
-	go p.Conn.Run()
+	safego.Go("peer connection", p.Conn.Run)
 
 	for {
 		select {

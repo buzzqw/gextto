@@ -738,6 +738,13 @@ the queue) and **Do not rename**. With gx-torrent there are also:
 A magnet with `so=` downloads only the listed files; with `ws=` it adds web
 seeds. An address that answers with a magnet is added as a magnet.
 
+A torrent never cuts a file it finds already in place: if the file it needs
+exists and is **longer** than the torrent expects, the add stops with a message
+naming the file and the difference, and nothing on disk changes — move that file
+away or pick another folder and try again. A shorter file is extended instead:
+that is a preallocation interrupted by a crash, and the bytes already written
+stay.
+
 You can also copy `.torrent` or `.magnet` files into a **watched folder**
 (*Configuration → Sources → Watched folders*): Gextto waits until the file stops
 changing, adds it and then removes it or renames it `.imported`.

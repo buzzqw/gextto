@@ -15,11 +15,13 @@ import (
 	"github.com/buzzqw/gextto/internal/gxcore/internal/piece"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/piecedownloader"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/piecewriter"
+	"github.com/buzzqw/gextto/internal/gxcore/internal/safego"
 )
 
 // handlePieceMessage settles one downloaded block: admission guards, block
 // accounting, adaptive queue growth, and the write pipeline on completion.
 func (t *torrent) handlePieceMessage(pm peer.PieceMessage) {
+	defer safego.RecoverWith(t.log, "piece message handler", func() { t.closePeer(pm.Peer) })
 	msg := pm.Piece
 	pe := pm.Peer
 	l := int64(len(msg.Buffer.Data))
@@ -156,6 +158,9 @@ func (t *torrent) completePieceDownload(pe *peer.Peer, pd *piecedownloader.Piece
 // handlePeerMessage dispatches one protocol message to its handler. Unknown
 // types are a bug and crash: every message the reader can emit is covered.
 func (t *torrent) handlePeerMessage(pm peer.Message) {
+	// A peer chooses what it sends: a bug in a handler must cost that peer's
+	// connection, not the daemon. Deliberate health-check panics re-raise.
+	defer safego.RecoverWith(t.log, "peer message handler", func() { t.closePeer(pm.Peer) })
 	pe := pm.Peer
 	switch msg := pm.Message.(type) {
 	case peerprotocol.HaveMessage:

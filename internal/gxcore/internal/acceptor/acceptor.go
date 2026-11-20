@@ -4,6 +4,7 @@ import (
 	"net"
 
 	"github.com/buzzqw/gextto/internal/gxcore/internal/logger"
+	"github.com/buzzqw/gextto/internal/gxcore/internal/safego"
 )
 
 // Acceptor pumps accepted sockets from a listener into newConns until
@@ -38,6 +39,7 @@ func (a *Acceptor) Close() {
 // shutdown path (the listener was closed deliberately) and stays silent;
 // any other failure is logged and still ends the loop.
 func (a *Acceptor) Run() {
+	defer safego.Recover("listener")
 	defer close(a.doneC)
 
 	relayDone := make(chan struct{})

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/buzzqw/gextto/internal/gxcore/internal/logger"
+	"github.com/buzzqw/gextto/internal/gxcore/internal/safego"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/tracker"
 )
 
@@ -50,6 +51,7 @@ func (a *StopAnnouncer) Done() <-chan struct{} {
 // Run contacts every tracker in parallel and then signals resultC, unless
 // Close wins the race first.
 func (a *StopAnnouncer) Run() {
+	defer safego.Recover("stopping announcer")
 	defer close(a.doneC)
 
 	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(a.timeout))

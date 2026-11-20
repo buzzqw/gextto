@@ -6,6 +6,7 @@ import (
 
 	"github.com/buzzqw/gextto/internal/gxcore/internal/handshaker/incominghandshaker"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/peer"
+	"github.com/buzzqw/gextto/internal/gxcore/internal/safego"
 )
 
 // handleNewConnection vets an accepted socket through the admission gates —
@@ -13,6 +14,9 @@ import (
 // survivors. Rejections close the socket immediately and say why at debug
 // level; the IP is only pinned once a handshaker owns it.
 func (t *torrent) handleNewConnection(conn net.Conn) {
+	// The socket comes from the network: a fault while vetting it closes the
+	// socket and leaves the session untouched.
+	defer safego.RecoverWith(t.log, "incoming connection handler", func() { conn.Close() })
 	remote := conn.RemoteAddr().String()
 	if len(t.incomingHandshakers)+len(t.incomingPeers) >= t.session.config.MaxPeerAccept ||
 		(t.maxConnections > 0 && len(t.peers) >= t.maxConnections) {

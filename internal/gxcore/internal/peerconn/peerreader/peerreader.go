@@ -14,6 +14,7 @@ import (
 	"github.com/buzzqw/gextto/internal/gxcore/internal/logger"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/peerprotocol"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/piece"
+	"github.com/buzzqw/gextto/internal/gxcore/internal/safego"
 )
 
 const (
@@ -155,6 +156,7 @@ func (d *deadlineReader) Read(b []byte) (int, error) {
 // an error is pending) stay quiet; block-size violations log at debug;
 // anything else logs as an error.
 func (p *PeerReader) Run() {
+	defer safego.Recover("peer reader")
 	defer close(p.doneC)
 
 	var err error

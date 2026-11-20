@@ -2304,6 +2304,14 @@ The engine saves every torrent in `DataDir/<id>` and at removal always runs
   is added;
 - a real folder left in place of the symlink is moved to
   `DATA/orphaned/<id>` before removal, never deleted;
+- **adding a torrent never destroys what is already on disk**: an existing file
+  shorter than the torrent expects is extended (the bytes past its end are
+  holes, the same as preallocation leaves after a crash), while a file
+  **longer** than expected is refused, and the error names it with both sizes.
+  Those bytes are not the torrent's, and cutting them would destroy something
+  else's data: the file is left exactly as it was and the torrent does not
+  start until the operator moves it away or picks another destination. Engines
+  that used to truncate on open fixed exactly this in 2026;
 - destinations must be absolute paths; the flag `-allowed-roots`
   (standalone use only, Gextto does not set it) can restrict them.
 

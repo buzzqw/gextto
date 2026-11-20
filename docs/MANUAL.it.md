@@ -753,6 +753,13 @@ anche:
 Un magnet con `so=` scarica solo i file indicati; con `ws=` aggiunge web seed.
 Un indirizzo che risponde con un magnet viene aggiunto come magnet.
 
+Un torrent non taglia mai un file che trova già al suo posto: se il file che gli
+serve esiste ed è **più lungo** di quanto il torrent si aspetta, l'aggiunta si
+ferma con un messaggio che dice quale file è e di quanto, e sul disco non cambia
+niente — sposta quel file o scegli un'altra cartella e riprova. Un file più
+corto, invece, viene allungato: è il caso di una preallocazione interrotta da un
+crash, e i byte già scritti restano.
+
 Puoi anche copiare file `.torrent` o `.magnet` in una **cartella osservata**
 (*Configurazione → Sorgenti → Cartelle osservate*): Gextto aspetta che il file
 smetta di cambiare, lo aggiunge e poi lo rimuove o lo rinomina `.imported`.

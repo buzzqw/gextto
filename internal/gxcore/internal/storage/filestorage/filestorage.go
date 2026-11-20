@@ -111,17 +111,30 @@ func openForWrite(name string, flags int, mode fs.FileMode) (*os.File, error) {
 	return nil, err
 }
 
-// adoptExisting resizes an existing file that drifted from the expected size.
+// adoptExisting brings an existing file to the size the torrent expects. A
+// shorter file is extended: the bytes past its end are holes, exactly what
+// preallocation writes after a crash. A longer file is refused instead of
+// truncated: those bytes are not ours, and cutting them would destroy data
+// that belonged to something else. Nothing on disk is changed before the
+// torrent is accepted, so the operator can move the file away and retry.
 func (s *FileStorage) adoptExisting(of *os.File, size int64) (*os.File, bool, error) {
 	fi, err := of.Stat()
 	if err != nil {
 		_ = of.Close()
 		return nil, false, err
 	}
-	if fi.Size() != size {
-		err = of.Truncate(size)
+	if fi.Size() > size {
+		name := of.Name()
+		_ = of.Close()
+		return nil, false, fmt.Errorf("the file %q already holds %d bytes where this torrent expects %d: nothing was changed, move it away or add the torrent somewhere else", name, fi.Size(), size)
 	}
-	return of, true, err
+	if fi.Size() < size {
+		if err = of.Truncate(size); err != nil {
+			_ = of.Close()
+			return nil, false, err
+		}
+	}
+	return of, true, nil
 }
 
 // RootDir returns the storage root.

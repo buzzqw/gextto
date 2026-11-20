@@ -152,3 +152,28 @@ func BenchmarkPeerReaderRequests(b *testing.B) {
 	b.StopTimer()
 	b.ReportMetric(float64(b.Elapsed().Nanoseconds())/float64(b.N*count), "ns/message")
 }
+
+// panickingConn is a socket whose Read panics: the shape of a bug in a parser
+// reached by a peer's bytes.
+type panickingConn struct {
+	net.Conn
+}
+
+func (panickingConn) Read([]byte) (int, error) { panic("boom") }
+
+// TestRunSurvivesAReadPanic pins the containment: a fault while parsing a
+// peer's stream ends this reader (and closes Done), and the process lives on.
+func TestRunSurvivesAReadPanic(t *testing.T) {
+	ours, theirs := net.Pipe()
+	t.Cleanup(func() {
+		_ = ours.Close()
+		_ = theirs.Close()
+	})
+	reader := New(panickingConn{ours}, logger.New("peerreader-test"), time.Minute, 30<<20, bandwidth.New(0))
+	reader.Run()
+	select {
+	case <-reader.Done():
+	default:
+		t.Fatal("the reader stopped without closing Done")
+	}
+}

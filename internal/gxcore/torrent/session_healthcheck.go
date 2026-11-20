@@ -4,6 +4,8 @@ import (
 	"os"
 	"runtime"
 	"time"
+
+	"github.com/buzzqw/gextto/internal/gxcore/internal/safego"
 )
 
 // checkTorrent watches one torrent's run loop: each interval it posts a
@@ -108,7 +110,10 @@ func (s *Session) waitRunLoop(t *torrent) bool {
 	}
 }
 
-// crash persists the goroutine stacks for post-mortem and panics.
+// crash persists the goroutine stacks for post-mortem and panics. The panic
+// carries safego.Invariant so that a contained fault (a peer connection) never
+// swallows a broken session: Recover re-raises it and the daemon exits with the
+// dump, as before.
 func crash(torrentID string, msg string) {
 	f, err := os.CreateTemp("", "gx-core-crash-dump-"+torrentID+"-*")
 	if err == nil {
@@ -118,7 +123,7 @@ func crash(torrentID string, msg string) {
 		_, _ = f.Write(b)
 		_ = f.Close()
 	}
-	panic(msg)
+	panic(safego.Invariant{Reason: msg})
 }
 
 func (t *torrent) crash(msg string) {
