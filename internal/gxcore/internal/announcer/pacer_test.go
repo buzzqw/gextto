@@ -12,8 +12,9 @@ func TestAnnounceHostKey(t *testing.T) {
 	cases := map[string]string{
 		"http://tracker.example:8080/announce": "tracker.example:8080",
 		"udp://Tracker.Example:80/announce":    "tracker.example:80",
-		"wss://tracker.example/announce":       "tracker.example",
+		"wss://tracker.example/announce":       "tracker.example:443",
 		"https://[2001:db8::1]:6969/announce":  "[2001:db8::1]:6969",
+		"http://tracker.example/announce":      "tracker.example:80",
 		"not a url":                            "not a url",
 	}
 	for raw, want := range cases {

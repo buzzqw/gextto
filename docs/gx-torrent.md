@@ -1590,7 +1590,8 @@ RPC server is disabled.
     so a client with hundreds of torrents on the same private tracker used to
     send one request per torrent when the intervals expired or after a restart.
     A session-wide token bucket now allows **four announces a second per host**
-    with a burst of eight, shared by HTTP, UDP and WebSocket URLs of that host;
+    and port (the scheme's default port when it is absent) with a burst of eight,
+    shared by HTTP, UDP and WebSocket URLs of that server;
     a tracker on another host proceeds at once. The torrent's own interval is
     untouched, and `retry in`, the failure backoff and the final `stopped`
     announces keep their timing. The values are engine defaults, not a setting.

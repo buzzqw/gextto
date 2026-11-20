@@ -11,6 +11,7 @@ package announcer
 import (
 	"context"
 	"math"
+	"net"
 	"net/url"
 	"strings"
 	"sync"
@@ -85,13 +86,28 @@ func (p *Pacer) Wait(ctx context.Context, host string) error {
 	}
 }
 
-// AnnounceHost is the pacing key of an announce URL: the host and explicit
-// port, lowercased. A URL without a host (a test's placeholder) keys on itself,
-// so it still gets a gate instead of a panic.
+// AnnounceHost is the pacing key of an announce URL: the host and port,
+// lowercased, with the scheme's default port when the URL omits it, so HTTP,
+// UDP and WebSocket trackers of the same server share a gate. A URL without a
+// host (a test's placeholder) keys on itself, so it still gets a gate instead
+// of a panic.
 func AnnounceHost(raw string) string {
 	raw = strings.TrimSpace(raw)
-	if u, err := url.Parse(raw); err == nil && u.Host != "" {
-		return strings.ToLower(u.Host)
+	u, err := url.Parse(raw)
+	if err != nil || u.Hostname() == "" {
+		return strings.ToLower(raw)
 	}
-	return strings.ToLower(raw)
+	port := u.Port()
+	if port == "" {
+		switch strings.ToLower(u.Scheme) {
+		case "http", "ws", "udp":
+			port = "80"
+		case "https", "wss":
+			port = "443"
+		}
+	}
+	if port == "" {
+		return strings.ToLower(u.Hostname())
+	}
+	return strings.ToLower(net.JoinHostPort(u.Hostname(), port))
 }
