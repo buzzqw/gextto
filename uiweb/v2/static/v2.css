@@ -1847,6 +1847,18 @@ html.settings-only-modified .settings-panel:not(:has(.setting-modified-row)):not
   font-weight: 700;
 }
 .settings-nav-count { color: var(--muted); font-size: 0.75rem; font-variant-numeric: tabular-nums; }
+/* A section where something was chosen away from its default: the count is a
+   clue in the navigation, not a filter, so it stays quiet in the accent. */
+.settings-nav-modified {
+  padding: 0 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: var(--accent);
+  font-size: 0.72rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.settings-modified-summary { margin: 6px 0 0; color: var(--muted); font-size: 0.82rem; }
 
 /* The section list is a second column while the window has room for it: with
    the main menu now always visible, two fixed columns of 250 and 230 pixels

@@ -1639,6 +1639,26 @@ channel receives the same event, and a slow one does not hold up the others.
 The **Program** receives the data in the `GEXTTO_*` variables and runs without
 a shell.
 
+### The notification log
+
+Every delivery attempt leaves a row on the **Notification log** page
+(*System* menu): date and time to the second, the message's subject, the channels
+configured at that moment, the outcome and, when something went wrong, the error
+the channel reported. It is for the case where an alert does not arrive and the
+log has already rotated: there you read whether the message left, which channel
+refused it and what it answered.
+
+| Outcome | Meaning |
+|---|---|
+| **sent** | at least one channel accepted the message |
+| **failed** | no channel accepted it: the detail says which one and why |
+| **not sent** | it never left: the event group's switch was off, the anti-spam window held the same event back, or no channel was configured |
+
+The **Outcome** filter narrows the list; the summary at the top counts sent,
+failed and not sent, and the numbers are links to the same filter. **Clear the
+log** removes the rows and leaves the channel configuration alone. The last 500
+notifications are kept, and those of the last 30 days.
+
 ## 19. Integrations with other programs
 
 No integration is needed to download and archive. Turn them on one at a time
@@ -2132,6 +2152,16 @@ tabs (*Acquisition*, *Advanced*, *Translations*) open the section that took
 over their content (*Translations* opens Diagnostics and updates). The main menu
 stays where it is: the sections sit beside it while the window is wide enough,
 and below 1160 pixels they become the *Section* list a phone uses.
+
+The same page has two levels, chosen at the top: **Guided** shows only the
+settings you must own (where to save, the limits, seeding, access and the
+metadata keys), **Expert** shows everything, internals included. The chosen
+level lasts for later visits. Inside every group the essential settings come
+before the internal ones, so a limit is read before the tuning of a subsystem.
+A section where something was changed shows **how many settings** differ from
+their default next to its name, and the total sits under the levels; the single
+changed row carries the **modified** badge. To go back to the default, use the
+row's **Default** button.
 
 When a section gathers several groups of settings (for example **Search cycle**
 and **Missing episodes** under *Automatic maintenance*), the group title stays

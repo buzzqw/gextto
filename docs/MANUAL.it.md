@@ -1656,6 +1656,26 @@ Pushover, Apprise, Programma), così più canali possono restare accesi insieme.
 Ogni canale riceve lo stesso evento, e uno lento non trattiene gli altri. Il
 **Programma** riceve i dati nelle variabili `GEXTTO_*` e gira senza shell.
 
+### Il registro delle notifiche
+
+Ogni tentativo di invio lascia una riga nella pagina **Registro notifiche**
+(menu *Sistema*): data e ora al secondo, il titolo del messaggio, i canali configurati
+in quel momento, l'esito e, se qualcosa è andato storto, l'errore riportato dal
+canale. Serve quando un avviso non arriva e il log è già girato: lì si legge se
+il messaggio è partito, da quale canale è stato rifiutato e con quale risposta.
+
+| Esito | Significato |
+|---|---|
+| **inviata** | almeno un canale ha accettato il messaggio |
+| **fallita** | nessun canale l'ha accettato: il dettaglio dice quale e perché |
+| **non inviata** | non è partita: lo switch del gruppo di eventi era spento, l'anti-spam ha trattenuto lo stesso evento, o non c'era nessun canale configurato |
+
+Il filtro **Esito** restringe l'elenco; il riepilogo in alto conta inviate,
+fallite e non inviate e i numeri sono collegamenti allo stesso filtro.
+**Svuota il registro** cancella le righe e non tocca la configurazione dei
+canali. Vengono conservate le ultime 500 notifiche e quelle degli ultimi 30
+giorni.
+
 ## 19. Integrazioni con altri programmi
 
 Nessuna integrazione è necessaria per scaricare e archiviare. Attivale una alla
@@ -2156,6 +2176,17 @@ contenuto (*Traduzioni* apre Diagnostica e aggiornamenti). Il menu principale
 resta al suo posto: le sezioni si affiancano a sinistra finché la finestra è
 larga abbastanza, e sotto i 1160 pixel diventano la tendina *Sezione* come sul
 telefono.
+
+La stessa pagina ha due livelli, scelti in alto: **Facilitata** mostra solo le
+impostazioni che devi possedere (dove salvare, i limiti, il seed, l'accesso e le
+chiavi dei metadati), **Esperto** mostra tutto, interni compresi. Il livello
+scelto resta per le visite successive. In ogni gruppo le impostazioni essenziali
+vengono prima di quelle interne, così un limite si legge prima della messa a
+punto di un sottosistema. Le sezioni dove qualcosa è stato cambiato portano
+accanto al nome **quante impostazioni** sono diverse dal valore predefinito, e
+sotto i livelli il totale; la singola riga cambiata ha l'etichetta
+**modificato**. Per tornare al valore predefinito si usa il pulsante
+**Predefinito** della riga.
 
 Quando una sezione raccoglie più gruppi di impostazioni (per esempio **Ciclo di
 ricerca** ed **Episodi mancanti** in *Manutenzione automatica*), il titolo del

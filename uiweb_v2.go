@@ -887,6 +887,8 @@ func v2Content(s *AppState, r *http.Request, view string) (string, any) {
 		return "v2_settings", settings
 	case "health":
 		return "v2_health", v2HealthViewFrom(s, r)
+	case "notifications":
+		return "v2_notifications", v2NotificationsViewFrom(s, r)
 	case "logs":
 		linesNum, _ := strconv.Atoi(r.FormValue("lines"))
 		return "v2_logs", v2LogsViewFrom(s, r.FormValue("filter"), linesNum, r.FormValue("log"), r.FormValue("level") == "problems")
@@ -3110,7 +3112,11 @@ type v2SettingsView struct {
 	Brief     bool
 	BriefURL  string
 	ExpertURL string
-	Groups    []v2SettingGroup
+	// ModifiedCount totals the rows of the page that differ from their default;
+	// ModifiedNote is that figure as a translated sentence.
+	ModifiedCount int
+	ModifiedNote  string
+	Groups        []v2SettingGroup
 	// LeadGroups are rendered before the tab tools (Qualità e upgrade: the
 	// upgrade rules come before the release test, the profiles and the
 	// weights).
@@ -3189,6 +3195,9 @@ func v2SettingsViewFrom(s *AppState, tab, highlight, mode string) v2SettingsView
 		BriefURL:    v2SettingsModeURL(page.ActiveID, v2SettingsModeBrief),
 		ExpertURL:   v2SettingsModeURL(page.ActiveID, v2SettingsModeExpert),
 		Empty:       "Nessuna impostazione in questa sezione.",
+
+		ModifiedCount: page.ModifiedCount,
+		ModifiedNote:  uiTextf(s, "%d impostazioni sono diverse dal valore predefinito.", page.ModifiedCount),
 	}
 	for _, area := range uiSettingsAreas {
 		converted := v2SettingsArea{Name: area.Name, Label: area.Label}

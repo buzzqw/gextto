@@ -52,14 +52,9 @@ Each waits for the operator's choice.
 - **MCP endpoint**: Gextto's API exposed as tools for an assistant, with a read-only switch. Gate: the operator's choice.
 - **Usenet as an acquisition source**: NZB search through the same indexers and an NNTP download path into the same import. Gate: the operator's choice.
 - **Series status marks and one design system**: the status badges of a series still carry an emoji in the text (`🏁 terminata`, `▶ in corso`, `⏳ rinnovo incerto`, `🕒 in arrivo`) because that same label is also a filter value, so the mark must be split from the text before it becomes an icon; then one design system (colours, spacing, type scale, radius) shared with the daemon and the two Gextto stylesheets folded into one with few breakpoints. Gate: the operator's choice; the visual review runs headless with `scripts/screenshots.sh`.
-- **Settings by level**: core options shown first, an "Show advanced options" switch, a mark on rows and tabs changed from their default. Gate: the operator's choice.
 - **Faster flows**: a missing count on the Dashboard linking to the tab, undo instead of confirmation for reversible removals with a styled dialog for the rest, page navigation without full reloads (`hx-boost`). Gate: the operator's choice; `hx-boost` is done alone, with the Playwright suite green before and after.
 - **Target quality timeframe in pending queue**: releases below the preferred target quality wait in the pending queue for a configurable timeframe (e.g. 4 hours), while any release meeting the target quality bypasses the delay and downloads immediately. Gate: the operator's choice.
 - **Pre-flight swarm health probe**: a fast DHT or tracker scrape probe for releases with missing or zero seeder counts before queuing them, deferring unseeded torrents instead of occupying active slots until stalled timeouts. Gate: the operator's choice.
-- **Notification inbox**: what was sent, when, on which channel and with what
-  outcome; today a failed webhook is only a line in the log, so "the
-  notification did not arrive" cannot be diagnosed from the interface. Gate:
-  the operator's choice.
 - **Announce channels (IRC/Matrix) as an acquisition source**: every source is
   HTTP polling today, so a release that exists only in an IRC announce is
   invisible. Gate: the operator's choice, and an indexer with an announce

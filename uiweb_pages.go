@@ -202,6 +202,9 @@ type uiSettingsTabRef struct {
 	Intro  string
 	Active bool
 	Count  int
+	// Modified counts the rows of the section that differ from their default:
+	// the navigation marks a section where something was chosen.
+	Modified int
 }
 
 type uiSettingsPage struct {
@@ -230,6 +233,8 @@ type uiSettingsPage struct {
 	FieldsGrid bool
 	// Rename is the rename-composition editor of the Rinomina tab.
 	Rename *uiRenameEditor
+	// ModifiedCount totals the rows of the page that differ from their default.
+	ModifiedCount int
 }
 
 // uiRenameEditor composes the file-rename format: a preset, a custom template,
@@ -670,10 +675,21 @@ func uiSettingsPageFrom(s *AppState, activeTab, mode string) uiSettingsPage {
 	special := map[string]bool{"sources": true, "scores": true, "system": true, "performance": true}
 	tabs := make([]uiSettingsTabRef, 0, len(order))
 	for _, tab := range uiSettingsTabs {
-		if len(fieldsByTab[tab.ID]) == 0 && !special[tab.ID] {
+		fields := fieldsByTab[tab.ID]
+		if len(fields) == 0 && !special[tab.ID] {
 			continue
 		}
-		tabs = append(tabs, uiSettingsTabRef{ID: tab.ID, Label: tab.Label, Area: tab.Area, Intro: tab.Intro, Count: len(fieldsByTab[tab.ID])})
+		// The essential rows of every panel come first, the internals after:
+		// a limit the user must own is read before the tuning of a subsystem.
+		fields = uiSettingsOrderFields(tab.ID, fields)
+		fieldsByTab[tab.ID] = fields
+		modified := 0
+		for _, field := range fields {
+			if field.Modified {
+				modified++
+			}
+		}
+		tabs = append(tabs, uiSettingsTabRef{ID: tab.ID, Label: tab.Label, Area: tab.Area, Intro: tab.Intro, Count: len(fields), Modified: modified})
 	}
 	if len(tabs) == 0 {
 		tabs = append(tabs, uiSettingsTabRef{ID: "daemon", Label: "Daemon"})
@@ -704,6 +720,9 @@ func uiSettingsPageFrom(s *AppState, activeTab, mode string) uiSettingsPage {
 		Tabs:     tabs,
 		ActiveID: active,
 		Fields:   fieldsByTab[active],
+	}
+	for _, ref := range tabs {
+		page.ModifiedCount += ref.Modified
 	}
 	// The peer port: on the network tab, read the engine's mapping so the panel
 	// can say whether it is open automatically, and in Facilitata drop the two
@@ -845,6 +864,36 @@ func uiSettingsPageFrom(s *AppState, activeTab, mode string) uiSettingsPage {
 
 // uiSettingsGroups splits the fields of a tab into the titled panels rextto
 // uses, keeping the original order both of the groups and of the fields.
+// uiSettingsOrderFields puts the essential rows of each panel first, keeping
+// the panels in the order the index declares: "where data goes" and "the speed
+// limit" are read before the cache sizing of a subsystem.
+func uiSettingsOrderFields(tab string, fields []uiSettingField) []uiSettingField {
+	order := []string{}
+	members := map[string][]uiSettingField{}
+	for _, field := range fields {
+		title := uiSettingGroupTitle(tab, field.Key)
+		if _, ok := members[title]; !ok {
+			order = append(order, title)
+		}
+		members[title] = append(members[title], field)
+	}
+	out := make([]uiSettingField, 0, len(fields))
+	for _, title := range order {
+		essential := make([]uiSettingField, 0, len(members[title]))
+		rest := []uiSettingField{}
+		for _, field := range members[title] {
+			if uiEssentialKeys[field.Key] {
+				essential = append(essential, field)
+				continue
+			}
+			rest = append(rest, field)
+		}
+		out = append(out, essential...)
+		out = append(out, rest...)
+	}
+	return out
+}
+
 func uiSettingsGroups(tab string, fields []uiSettingField) []uiSettingGroup {
 	if len(fields) == 0 {
 		return nil

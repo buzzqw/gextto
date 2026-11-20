@@ -206,6 +206,7 @@ change. `/ui` is not served. For operational checks use
 | POST | `/api/movies/{id}/search` | search a movie |
 | GET | `/api/network/interfaces` | network interfaces |
 | GET | `/api/notifications/stream` | live notifications (Server-Sent Events) |
+| POST | `/notifications/clear` | Notifications page: empty the record of what was sent, through which channel and with what outcome |
 | POST | `/api/plex/refresh` | refresh the Plex library |
 | POST | `/api/plex/test` | test Plex |
 | GET | `/api/process-metrics` | CPU and memory of the Gextto process |
