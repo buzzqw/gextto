@@ -12,16 +12,16 @@ and limits for every client.
 
 | Question | 1st | 2nd | 3rd | 4th | 5th | 6th | Why it matters |
 |---|---|---|---|---|---|---|---|
-| Fastest download with nothing in the way | **gx-torrent**, 290 MB/s | Deluge, 246 MB/s | qBittorrent, 239 MB/s | rain, 175 MB/s | anacrolix, 110 MB/s | Transmission, 30 MB/s | a fast disk and a fast peer |
-| Download on a 100 Mbit/s line, 4 peers, TCP | anacrolix, 11.43 MB/s | **gx-torrent**, 11.16 MB/s | Deluge, 10.80 MB/s | qBittorrent, 10.54 MB/s | Transmission, 9.05 MB/s | rain, 6.78 MB/s | the common case at home |
+| Fastest download with nothing in the way | **gx-torrent**, 288.5 MB/s | Deluge, 246 MB/s | qBittorrent, 239 MB/s | rain, 175 MB/s | anacrolix, 110 MB/s | Transmission, 30 MB/s | a fast disk and a fast peer |
+| Download on a 100 Mbit/s line, 4 peers, TCP | anacrolix, 11.43 MB/s | **gx-torrent**, 11.19 MB/s | Deluge, 10.80 MB/s | qBittorrent, 10.54 MB/s | Transmission, 9.05 MB/s | rain, 6.78 MB/s | the common case at home |
 | The same line, uTP only | Deluge, 11.80 MB/s | anacrolix, 11.53 MB/s | qBittorrent, 11.50 MB/s | **gx-torrent**, 11.15 MB/s | Transmission, 4.53 MB/s | rain, no uTP | peers that prefer uTP |
-| Smallest peak own memory while downloading at full speed | anacrolix, 11 MiB | Transmission, 14 MiB | rain, 23 MiB | **gx-torrent**, 24 MiB | qBittorrent, 33 MiB | Deluge, 53 MiB | what the client cannot give back to the system |
-| Smallest peak own memory while downloading on a 100 Mbit/s line | qBittorrent, 10 MiB | anacrolix, 12 MiB | Transmission, 13 MiB | rain, 26 MiB | **gx-torrent**, 30 MiB | Deluge, 39 MiB | the same, when the line is the limit |
-| Fastest upload | **gx-torrent**, 203 MB/s | qBittorrent, 191 MB/s | Deluge, 170 MB/s | anacrolix, 119 MB/s | rain, 115 MB/s | Transmission, 16 MB/s | only matters above a gigabit link |
-| Fastest recheck of 4 GiB | **gx-torrent**, 3.6 s | Transmission, 3.9 s | Deluge, 4.3 s | qBittorrent, 5.8 s | anacrolix, 6.6 s | rain, 10.2 s | after a move or a crash |
+| Smallest peak own memory while downloading at full speed | anacrolix, 11 MiB | Transmission, 14 MiB | rain, 23 MiB | **gx-torrent**, 23.8 MiB | qBittorrent, 33 MiB | Deluge, 53 MiB | what the client cannot give back to the system |
+| Smallest peak own memory while downloading on a 100 Mbit/s line | qBittorrent, 10 MiB | anacrolix, 12 MiB | Transmission, 13 MiB | rain, 26 MiB | **gx-torrent**, 28.3 MiB | Deluge, 39 MiB | the same, when the line is the limit |
+| Fastest upload | **gx-torrent**, 262 MB/s | qBittorrent, 191 MB/s | Deluge, 170 MB/s | anacrolix, 119 MB/s | rain, 115 MB/s | Transmission, 16 MB/s | only matters above a gigabit link |
+| Fastest recheck of 4 GiB | **gx-torrent**, 3.2 s | Transmission, 3.9 s | Deluge, 4.3 s | qBittorrent, 5.8 s | anacrolix, 6.6 s | rain, 10.2 s | after a move or a crash |
 | Lowest CPU at rest, nothing loaded | rain, 0.01 % | anacrolix, 0.01 % | Transmission, 0.03 % | qBittorrent, 0.05 % | **gx-torrent**, 0.05 % | Deluge, 0.29 % | a machine that is always on |
 | Lowest CPU at rest, 100 torrents | anacrolix, 0.01 % | qBittorrent, 0.06 % | Transmission, 0.10 % | **gx-torrent**, 0.13 % | Deluge, 0.37 % | rain, 2.18 % | the same, with a long list |
-| Lightest with 100 torrents | Transmission, 13 MB RSS | anacrolix, 24 MB RSS | rain, 24 MB RSS | **gx-torrent**, 29 MB RSS | Deluge, 68 MB RSS | qBittorrent, 119 MB RSS | a long seeding list |
+| Lightest with 100 torrents | Transmission, 13 MB RSS | anacrolix, 24 MB RSS | rain, 24 MB RSS | **gx-torrent**, 27.7 MB RSS | Deluge, 68 MB RSS | qBittorrent, 119 MB RSS | a long seeding list |
 
 The order is the order of the medians: where the ranges of two clients overlap the positions
 are a tie, and a gap of a few percent is inside the spread of the rounds. The detailed tables
@@ -32,13 +32,13 @@ RSS also counts; the 100-torrent row is the only one that uses RSS. The full-spe
 4 GiB download from one peer, the 100 Mbit/s row the 512 MiB download from four peers shaped
 to that line.
 
-In short: gx-torrent is the fastest at a recheck (3.6 s) and on upload (203 MB/s); at full
-speed over TCP it is first (290 against 239–246 MB/s, from a separate run, see *What was run*)
-with less own memory (24 MiB against 33–53); anacrolix/torrent is the lightest at full speed
-(11 MiB) and the quietest with a hundred torrents (0.01 % of a core, against 0.13 for
+In short: gx-torrent is the fastest at a recheck (3.2 s) and on upload (262 MB/s); at full
+speed over TCP it is first (288.5 against 239–246 MB/s, from a gx-only run, see *What was
+run*) with less own memory (23.8 MiB against 33–53); anacrolix/torrent is the lightest at full
+speed (11 MiB) and the quietest with a hundred torrents (0.01 % of a core, against 0.13 for
 gx-torrent); on the shaped line over TCP gx-torrent and anacrolix are level (11.2 against
 11.4 MB/s), and gx-torrent spends the least CPU per GiB of the four that reach the line
-(20.2 s against 27.6–27.8).
+(18.3 s against 27.6–27.8).
 
 ## What is best for me
 
@@ -49,9 +49,9 @@ in this document.
 |---|---|---|
 | A library, not a downloader: episodes, gaps, renames, upgrades, archive | **Gextto** | it decides what to fetch and where it goes; none of the other clients does |
 | One torrent from a browser, on a NAS, a server or a phone, with a qBittorrent-style API | **gx-torrent, standalone** | the same engine with its own page and `/api/v2`, no library to configure |
-| The fastest download over TCP | **gx-torrent**, then Deluge or qBittorrent | 290 MB/s against 239–246 (gx-torrent from a separate run), with 24 MiB of own memory against 33–53 |
-| A recheck of a 4 GiB file without a long wait | **gx-torrent** | 3.6 s, against 3.9–10.2 for the others |
-| Seeding on a fast LAN (gigabit and above) | **gx-torrent**, qBittorrent or Deluge | 170–203 MB/s, gx-torrent first and qBittorrent 6 % behind, at the lowest CPU per GiB for gx-torrent (2.24 s against 2.49–2.62) |
+| The fastest download over TCP | **gx-torrent**, then Deluge or qBittorrent | 288.5 MB/s against 239–246 (gx-torrent from a gx-only run), with 23.8 MiB of own memory against 33–53 |
+| A recheck of a 4 GiB file without a long wait | **gx-torrent** | 3.2 s, against 3.9–10.2 for the others |
+| Seeding on a fast LAN (gigabit and above) | **gx-torrent**, qBittorrent or Deluge | 170–262 MB/s, gx-torrent first and qBittorrent about 27 % behind, at the lowest CPU per GiB for gx-torrent (2.19 s against 2.49–2.62) |
 | A call or a game while something downloads | **Gextto**, Auto with latency source `both` | the guard leaves room for the other flow and stops taking more as soon as the router sees it |
 | The smallest memory at full speed | anacrolix/torrent, 11 MiB against 14–53 | the lightest client when the disk is the limit, but its own engine is not a library manager |
 | The quietest client at rest | anacrolix/torrent or rain | 0.01 % of a core against 0.03–0.29, but rain spends 2.18 % with a hundred torrents and anacrolix 0.01 |
@@ -68,18 +68,16 @@ with the range in brackets where it matters. Every downloaded file was compared 
 byte with the original. The whole round took 135 minutes.
 
 Only what changes is measured again. The other clients' rows are from the full round of
-2026-11-11 (commit `77aaf0cd`). gx-torrent's rows were measured again on their own the same
-afternoon, at commit `702805e2`, with the same images, limits and torrents. Three rounds
-took 15 minutes. The exception is its recheck and upload row, which stays from the full round:
-the separate run fell outside that round's range on a path limited by the disk, and only a
-full round tells the disk from the code. Its full-speed figure is inside the range of the
-full round, but it was taken at a different moment from the others: the lead over Deluge and
-qBittorrent is confirmed only by the next full round.
+2026-11-11 (commit `77aaf0cd`). gx-torrent's rows in the tables below are from a
+**gx-only round of 2026-11-20** (commit `2cd1ea64`, image `8d6ac1796ec8`, tag
+`2026-11-20-opt`, three rounds, same images, limits and torrents, no failures; about 15
+minutes). It is not interleaved with the others: the lead over Deluge and qBittorrent is
+still the one a full round must confirm. The deltas against the previous gx row, and the
+reason the full-speed figure is not a 20 % gain over the old code, are in the subsection
+below.
 
-**2026-11-20, gx-torrent alone.** The same images, peers and limits, tag
-`2026-11-20-opt`, commit `2cd1ea64`, three rounds, no failures. The other clients
-were **not** rerun: their rows stay from 2026-11-11, so this updates one row in
-the documented way and does not replace an interleaved full round.
+**2026-11-20, gx-torrent alone.** The tables below already carry these medians; this table
+records the deltas against the previous gx row. The other clients were **not** rerun.
 
 | Scenario | Metric | 2026-11-11 | 2026-11-20 | Change |
 |---|---|---|---|---|
@@ -102,7 +100,7 @@ round must confirm.
 
 | Client | Version | Engine |
 |---|---|---|
-| gx-torrent | commit `702805e2`, image `8e95e9167dee`; recheck and upload: commit `77aaf0cd`, image `b4bfd04ae493` | gx-core, pure Go |
+| gx-torrent | commit `2cd1ea64`, image `8d6ac1796ec8` (2026-11-20 gx-only); other clients: full round `77aaf0cd` | gx-core, pure Go |
 | qBittorrent | 5.1.0 (Debian 13) | libtorrent |
 | Transmission | 3.00 (Debian 12) | its own, with libutp |
 | Deluge | 2.2.0 (Debian 13) | libtorrent 2.0.11 |
@@ -132,7 +130,7 @@ One client, no torrents, 30 s after a 10 s settle.
 | anacrolix | 0.01 | 4.5 MiB | 19 MiB |
 | Transmission | 0.03 | 1.8 MiB | 11 MiB |
 | qBittorrent | 0.05 | 7.1 MiB | 35 MiB |
-| gx-torrent | 0.05 | 7.7 MiB | 22 MiB |
+| gx-torrent | 0.05 | 7.6 MiB | 22 MiB |
 | Deluge | 0.29 | 38 MiB | 63 MiB |
 
 qBittorrent's row has two runs: its third was disturbed by the host three times.
@@ -144,7 +142,7 @@ ceiling of each client on this machine.
 
 | Client | Speed | Time | CPU per GiB | Peak own memory | Peak RSS |
 |---|---|---|---|---|---|
-| **gx-torrent** | **290 MB/s** (285–291) | 14.8 s | 2.75 s | 24 MiB | 39 MiB |
+| **gx-torrent** | **288.5 MB/s** (285.9–291.8) | 14.9 s | 2.91 s | 23.8 MiB | 38.9 MiB |
 | Deluge | 246 MB/s (178–253) | 17.5 s | 2.90 s | 53 MiB | 3,980 MiB |
 | qBittorrent | 239 MB/s (169–243) | 18.0 s | 2.81 s | 33 MiB | 3,989 MiB |
 | rain | 175 MB/s (105–176) | 24.5 s | 4.32 s | 23 MiB | 34 MiB |
@@ -153,7 +151,7 @@ ceiling of each client on this machine.
 
 In the full round every client except Transmission had one slow run out of three
 (105–179 MB/s), at different times: the disk, not the client, which is why the ranges are
-wide. gx-torrent's separate run had none (285–291 MB/s). Transmission 3.00 is four to eight times
+wide. The gx-only runs had none (285.9–291.8 MB/s). Transmission 3.00 is four to eight times
 slower than the others here; the number repeats in every round.
 
 ### Download on a 100 Mbit/s line
@@ -164,14 +162,14 @@ before protocol overhead.
 | Client | Speed | Time | CPU (% of a core) | CPU per GiB | Peak own memory | Peak RSS |
 |---|---|---|---|---|---|---|
 | anacrolix | 11.43 MB/s | 47.0 s | 30 % | 27.8 s | 12 MiB | 533 MiB |
-| **gx-torrent** | 11.16 MB/s | 48.1 s | 21 % | 20.2 s | 30 MiB | 45 MiB |
+| **gx-torrent** | 11.19 MB/s | 48.0 s | 19 % | 18.3 s | 28.3 MiB | 43.5 MiB |
 | Deluge | 10.80 MB/s | 49.7 s | 28 % | 27.7 s | 39 MiB | 569 MiB |
 | qBittorrent | 10.54 MB/s | 50.9 s | 27 % | 27.6 s | 10 MiB | 543 MiB |
 | Transmission | 9.05 MB/s | 59.4 s | 14 % | 16.2 s | 13 MiB | 23 MiB |
 | rain | 6.78 MB/s | 79.2 s | 15 % | 23.6 s | 26 MiB | 37 MiB |
 
 The first four are within 8 % of each other, and gx-torrent spends the least CPU per GiB of
-them (20.2 s against 27.6–27.8). rain stays at 6.8 MB/s in all three rounds.
+them (18.3 s against 27.6–27.8). rain stays at 6.8 MB/s in all three rounds.
 
 ### The same line, uTP only
 
@@ -182,7 +180,7 @@ The same four peers with TCP blocked at the peer.
 | Deluge | 11.80 MB/s | 45.5 s | 43 % | 38.9 s | 39 MiB | 570 MiB |
 | anacrolix | 11.53 MB/s | 46.6 s | 69 % | 64.3 s | 12 MiB | 522 MiB |
 | qBittorrent | 11.50 MB/s | 46.7 s | 39 % | 36.8 s | 10 MiB | 544 MiB |
-| **gx-torrent** | 11.15 MB/s | 48.1 s | 37 % | 36.0 s | 34 MiB | 49 MiB |
+| **gx-torrent** | 11.15 MB/s | 48.1 s | 37.7 % | 36.3 s | 30.6 MiB | 45.8 MiB |
 | Transmission | 4.53 MB/s | 118.6 s | 10 % | 23.9 s | 10 MiB | 21 MiB |
 | rain | no uTP | — | — | — | — | — |
 
@@ -197,15 +195,15 @@ then an upload to one unshaped reference peer.
 
 | Client | Recheck | CPU | Upload speed | CPU per GiB | Peak own memory | Peak RSS |
 |---|---|---|---|---|---|---|
-| **gx-torrent** | 3.6 s (1,208 MB/s) | 3.4 s | 203 MB/s (203–207) | 2.24 s | 22 MiB | 37 MiB |
+| **gx-torrent** | 3.2 s (1,336 MB/s) | 3.3 s | 262 MB/s (238–286) | 2.19 s | 22.3 MiB | 37.5 MiB |
 | Transmission | 3.9 s (1,092 MB/s) | 2.6 s | 15.9 MB/s | 6.15 s | 18 MiB | 28 MiB |
 | Deluge | 4.3 s (995 MB/s) | 3.3 s | 170 MB/s (152–239) | 2.49 s | 44 MiB | 4,099 MiB |
 | qBittorrent | 5.8 s (739 MB/s) | 3.3 s | 191 MB/s (168–242) | 2.62 s | 13 MiB | 4,105 MiB |
 | anacrolix | 6.6 s (648 MB/s) | 9.1 s | 119 MB/s (89–125) | 5.23 s | 13 MiB | 4,072 MiB |
 | rain | 10.2 s (421 MB/s) | 4.1 s | 115 MB/s (92–124) | 4.73 s | **664 MiB** | 676 MiB |
 
-gx-torrent is the fastest at the recheck (3.6 s against 3.9 for Transmission) and on upload,
-with the narrowest range; qBittorrent is 6 % behind it and Deluge 16 %. rain and anacrolix
+gx-torrent is the fastest at the recheck (3.2 s against 3.9 for Transmission) and on upload;
+qBittorrent is about 27 % behind it and Deluge about 35 %. rain and anacrolix
 are at about 60 % of that speed, and rain pays for it with its caches: 664 MiB of own memory
 against 13–44 for the others. Transmission 3.00 sends 4 GiB in four and a half minutes.
 
@@ -221,7 +219,7 @@ a restart.
 | qBittorrent | 0.9 s | 100.7 s | 0.5 s | 0.06 % | 90 MiB | 119 MiB |
 | Transmission | 0.9 s | 11.7 s | 0.6 s | 0.10 % | 2.8 MiB | **13 MiB** |
 | Deluge | 2.8 s | 2.8 s | 1.0 s | 0.37 % | 43 MiB | 68 MiB |
-| gx-torrent | 1.6 s | 2.2 s | 0.5 s | 0.13 % | 13 MiB | 29 MiB |
+| gx-torrent | 1.5 s | 3.1 s | 0.6 s | 0.13 % | 11.8 MiB | 27.7 MiB |
 | rain | 1.5 s | 2.5 s | 2.3 s | **2.18 %** | 12 MiB | 24 MiB |
 
 Transmission reaches seeding at once because it trusts existing files until asked to recheck;
@@ -254,7 +252,7 @@ gx-torrent's 24, and the 0.01 % of a core at rest against 0.05:
   `storage/file-io-mmap.go`: a received block is copied into the shared mapping, with no
   staging buffer and no write cache. gx-core writes through a buffer taken from a pool, keeps
   a write cache (1 GiB target) and a read cache (256 MiB default, 8 MiB floor in the daemon).
-  That is more memory, and it is why gx-torrent uploads at 203 MB/s and 2.24 s of CPU per GiB
+  That is more memory, and it is why gx-torrent uploads at 262 MB/s and 2.19 s of CPU per GiB
   against 119 MB/s and 5.23.
 - **No read cache.** An upload reads back from the mapping, so the client reserves nothing for
   it; the mapped pages show in RSS (3.2 GB on a 4 GiB file) and not in own memory.
@@ -266,8 +264,8 @@ gx-torrent's 24, and the 0.01 % of a core at rest against 0.05:
 - **Fewer wakeups.** No statistics tick, no automatic speed probe, no DLNA, LSD or SSE
   keepalive.
 
-What gx-core keeps in exchange: a faster download (290 MB/s against 110, 2.75 s of CPU per
-GiB against 6.37), a faster upload (203 MB/s against 119) and the cheaper uTP path (36 s per
+What gx-core keeps in exchange: a faster download (288.5 MB/s against 110, 2.91 s of CPU per
+GiB against 6.37), a faster upload (262 MB/s against 119) and the cheaper uTP path (36.3 s per
 GiB against 64).
 
 ### What these numbers do not say

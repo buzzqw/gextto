@@ -48,7 +48,7 @@ flowchart LR
   ([approfondisci](docs/amule.it.md))
 - ⚡ **Motore BitTorrent nativo in Go puro (`gx-torrent`)**: codice originale e senza CGO,
   con supporto a BitTorrent v1, v2 e ibrido (BEP 52), DHT IPv6 e uTP. Occupa solo ~28 MB di
-  RAM a riposo e raggiunge fino a 290 MB/s di velocità — battendo i client basati su libtorrent.
+  RAM a riposo e raggiunge fino a 288,5 MB/s di velocità — battendo i client basati su libtorrent.
   Funziona anche come demone autonomo su Linux e Windows. ([misure](docs/measurements.md) · [elenco BEP](docs/bep.md))
 - 🧹 **Pulizia audio intelligente e lossless**: elimina le tracce audio straniere
   all'importazione, conservando solo le lingue scelte senza ricodificare video o audio.
@@ -64,7 +64,7 @@ flowchart LR
 
 | Area | Caratteristiche | Dettagli |
 |---|---|---|
-| **Numeri** | 290 MB/s di throughput · 28 MB RSS a riposo · 0,3–0,5% CPU | [Cifre e benchmark](#numeri) |
+| **Numeri** | 288,5 MB/s di throughput · 28 MB RSS a riposo · 0,3–0,5% CPU | [Cifre e benchmark](#numeri) |
 | **Protocollo** | BitTorrent v1, v2 e ibrido (BEP 52) · 34 BEP implementati e testati | [Conformità BEP](docs/bep.md) |
 | **Rete** | TCP + uTP su una sola porta · UPnP, NAT-PMP, PCP · holepunching BEP 55 · SOCKS5/HTTP · killswitch VPN | [Documento gx-torrent](docs/gx-torrent.md) |
 | **Automazione** | Serie TV, film, fumetti · Torznab, RSS, listing HTML · sostituzione automatica download fermi | [Manuale utente](docs/MANUAL.it.md) |
@@ -243,7 +243,7 @@ riprodurla.
 
 | Ambito | Risultato |
 |---|---|
-| **Confronto con altri client** | Stessi limiti in Docker, N97: a tutta velocità **290 MB/s**, davanti a Deluge e qBittorrent (239–246, misurati in una tornata precedente) e a rain, anacrolix/torrent e Transmission (30–175), con **24 MiB** di memoria propria contro 33–53. Su una linea limitata a 100 Mbit/s anacrolix/torrent è avanti del 2 % (**11,2 MB/s** contro 11,4, dentro la dispersione) e gx-torrent consuma meno CPU per GiB dei quattro che saturano la linea; al ricontrollo di 4 GiB gx-torrent è primo (**3,6 s** contro 3,9–10,2) e in upload è primo (**203 MB/s**, contro i 191 di qBittorrent). A riposo rain e anacrolix/torrent sono i più leggeri (0,01 % di un core contro 0,05); con cento torrent gx-torrent consuma lo 0,13 %, contro lo 0,01 di anacrolix, lo 0,37 di Deluge e il 2,18 di rain. [Tabelle complete](docs/measurements.md#compared-with-qbittorrent-transmission-deluge-rain-and-anacrolixtorrent) |
+| **Confronto con altri client** | Stessi limiti in Docker, N97: a tutta velocità **288,5 MB/s**, davanti a Deluge e qBittorrent (239–246, misurati in una tornata precedente) e a rain, anacrolix/torrent e Transmission (30–175), con **23,8 MiB** di memoria propria contro 33–53. Su una linea limitata a 100 Mbit/s anacrolix/torrent è avanti del 2 % (**11,2 MB/s** contro 11,4, dentro la dispersione) e gx-torrent consuma meno CPU per GiB dei quattro che saturano la linea; al ricontrollo di 4 GiB gx-torrent è primo (**3,2 s** contro 3,9–10,2) e in upload è primo (**262 MB/s**, contro i 191 di qBittorrent). A riposo rain e anacrolix/torrent sono i più leggeri (0,01 % di un core contro 0,05); con cento torrent gx-torrent consuma lo 0,13 %, contro lo 0,01 di anacrolix, lo 0,37 di Deluge e il 2,18 di rain. [Tabelle complete](docs/measurements.md#compared-with-qbittorrent-transmission-deluge-rain-and-anacrolixtorrent) |
 | **Swarm reale** | **9,3–9,4 MB/s** sulla ISO di Ubuntu, contro **6,3–7,1 MB/s** di libtorrent sullo stesso swarm (una campagna misurata) |
 | **Memoria del motore** | **28–30 MB RSS** a riposo (16–18 MB anonimi), DHT attiva e filtro IP completo (172.740 regole). Con 10 torrent in download su NAS: **~507 MB** fuori dalle due cache; la cache di scrittura si dimensiona dalla RAM libera |
 | **CPU del motore** | **18–37 % di un core** a 8,2–8,8 MB/s con 116–132 peer, **2,0–4.3 s di CPU per 100 MB**; **0,3–0,5 %** di un core a riposo |
