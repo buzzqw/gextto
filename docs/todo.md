@@ -56,6 +56,11 @@ Each waits for the operator's choice.
   hybrid was hashed wrong); ours has no such corpus yet. Gate: the fixtures, and
   a test per shape once one fails.
 
+- **Notification log in standalone gx-torrent**: the daemon sends notifications
+  over Telegram, the webhook and the dedicated channels, and keeps no record of
+  what went out, so "the notification did not arrive" can only be read in its
+  log; Gextto has the page. Gate: the operator's choice, then the same table and
+  page in the daemon's web UI.
 - **MCP endpoint**: Gextto's API exposed as tools for an assistant, with a read-only switch. Gate: the operator's choice.
 - **Usenet as an acquisition source**: NZB search through the same indexers and an NNTP download path into the same import. Gate: the operator's choice.
 - **Series status marks and one design system**: the status badges of a series still carry an emoji in the text (`🏁 terminata`, `▶ in corso`, `⏳ rinnovo incerto`, `🕒 in arrivo`) because that same label is also a filter value, so the mark must be split from the text before it becomes an icon; then one design system (colours, spacing, type scale, radius) shared with the daemon and the two Gextto stylesheets folded into one with few breakpoints. Gate: the operator's choice; the visual review runs headless with `scripts/screenshots.sh`.
