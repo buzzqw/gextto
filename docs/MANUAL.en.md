@@ -837,7 +837,7 @@ stays visible. The tabs:
 | Tab | What you find |
 |---|---|
 | **General** | torrent data (the magnet shows its first three lines), copy magnet, **Export .torrent**, reannounce, pin, restart, mark as failed, **Super seeding**, web seeds |
-| **Tracker** | add trackers (`tier\|url` per line) or remove one; each one shows its state, failures, seeds and peers, **how long the last announce took** to be answered and the **median** of the recent ones, so a slow tracker is told from a slow line. At the top, how many announces are in flight |
+| **Tracker** | add trackers (`tier\|url` per line) or remove one; each one shows its state, failures, seeds and peers, **how long the last announce took** to be answered and the **median** of the recent ones, so a slow tracker is told from a slow line; **waiting** marks the announce that is awaiting its reply. At the top, how many announces are in flight and the median across the trackers |
 | **Content** | the files, with **priority** (Skip, Normal, High, Maximum) and, with gx-torrent, **▶** for streaming |
 | **Peers** | the connected peers; with gx-torrent the peer's **country** sits next to its address, from the DB-IP database gx-torrent downloads by itself |
 | **Pieces** | the piece map: green downloaded, yellow in progress, grey missing. With gx-torrent, below it is the **availability among peers**: the fuller the bar, the more connected peers have the pieces you are missing; red marks pieces no connected peer has. With qBittorrent there is the map only, and the pieces of skipped files show as missing |
