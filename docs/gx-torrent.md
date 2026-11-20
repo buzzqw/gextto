@@ -1586,6 +1586,14 @@ RPC server is disabled.
     to be entered into the routing tables (`ro`); it is activated with
     `-dht-read-only` (`GX_TORRENT_DHT_READ_ONLY`).
 - **Trackers and BEP 31** (`retry in`).
+  - **Announces to one host are paced.** Every torrent has its own announcer,
+    so a client with hundreds of torrents on the same private tracker used to
+    send one request per torrent when the intervals expired or after a restart.
+    A session-wide token bucket now allows **four announces a second per host**
+    with a burst of eight, shared by HTTP, UDP and WebSocket URLs of that host;
+    a tracker on another host proceeds at once. The torrent's own interval is
+    untouched, and `retry in`, the failure backoff and the final `stopped`
+    announces keep their timing. The values are engine defaults, not a setting.
   - **A tracker can be switched off and on again by hand.** A switched-off
     tracker leaves the engine (it gets one last `stopped` announce, then nothing,
     so it cannot count us in its swarm), but its URL is remembered in `state.json`: the
@@ -1943,7 +1951,10 @@ seed already has are still servable (the same path answers a complete file
 while its block tree is still being built). The reply is byte-for-byte what
 the full block tree would return. A request that touches a missing piece,
 folds below the piece layer or asks for more than 512 hashes (the leaves are
-read on the torrent loop) is refused (`hash reject`). The v2 wire rules are in [`bep.md`](bep.md).
+read on the torrent loop) is refused (`hash reject`). The v2 wire rules are in [`bep.md`](bep.md). The shapes that broke other
+clients in 2026 — a short tail between two files, empty files after a piece,
+and a hybrid with BEP 47 padding — are in the test corpus
+(`internal/gxcore/internal/metainfo/corpus_test.go`).
 
 ## Local data reuse (Swarm Merging)
 
@@ -1987,10 +1998,14 @@ The merge matches by structure, in four ways:
 - **v1, a different piece length.** Two **v1** torrents matched by
   file **path and length** share **whole** pieces even when their piece grids
   differ: each destination piece is assembled from verified source pieces and
-  checked against its own hash before it is written. v1 has no per-block hash,
-  so a piece only partly covered by the source is **not** reused (no block-level
-  write), and a wrong metadata match is abandoned after 64 hash failures instead
-  of reading the whole source.
+  checked against its own hash before it is written. A piece only **partly**
+  covered by the source now reuses its full **16 KiB blocks** too: the source
+  pieces are verified, the rest arrives from peers, and the piece is checked as
+  a whole when complete; on a mismatch the local blocks are dropped and the
+  piece is downloaded again, without banning the peer. v1 has no per-block
+  hash, so the match remains a path-and-length heuristic: a fully covered piece
+  that fails is abandoned after 64 failures, and partial blocks are speculative
+  until their piece verifies.
 
 The session statistics report `merged_pieces`, `merged_bytes` (block-level
 bytes included) and `merged_partial_pieces` (pieces reused at block level);

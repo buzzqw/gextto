@@ -329,16 +329,16 @@ func TestPrefillV1MergesDifferentLayout(t *testing.T) {
 	}
 }
 
-// TestPrefillV1PartialSourceSkipsStraddlingPiece: v1 has no per-block hash, so
-// a destination piece that straddles verified and unverified source pieces is
-// not reused at all (no partial blocks written).
-func TestPrefillV1PartialSourceSkipsStraddlingPiece(t *testing.T) {
-	content := make([]byte, 40000)
+// TestPrefillV1PartialSourceKeepsWholeBlocks: a destination piece only
+// partly covered by verified source pieces still reuses its full 16 KiB
+// blocks; the rest arrives from peers and the piece is verified as a whole.
+func TestPrefillV1PartialSourceKeepsWholeBlocks(t *testing.T) {
+	content := make([]byte, 64000)
 	if _, err := rand.Read(content); err != nil {
 		t.Fatal(err)
 	}
-	srcInfo := testInfoBytes(t, content, 16384) // pieces at 0, 16384, 32768
-	dstInfo := testInfoBytes(t, content, 10000) // pieces at 0,10000,20000,30000
+	srcInfo := testInfoBytes(t, content, 16384) // pieces at 0, 16384, 32768, 49152
+	dstInfo := testInfoBytes(t, content, 32000) // pieces at 0, 32000
 
 	filesSrc := testFiles(t, t.TempDir(), srcInfo)
 	if _, err := filesSrc[0].Storage.WriteAt(content, 0); err != nil {
@@ -354,21 +354,21 @@ func TestPrefillV1PartialSourceSkipsStraddlingPiece(t *testing.T) {
 	dst := &torrent{pieces: piece.NewPieces(dstInfo, filesDst)}
 	dst.setInfo(dstInfo)
 
-	// Destination piece 0 ([0,10000)) is fully inside source piece 0: reused.
-	// Piece 1 ([10000,20000)) straddles verified source piece 0 and unverified
-	// source piece 1: not reused.
-	if got := dst.prefillFrom([]*Torrent{{torrent: src}}); got != 1 {
-		t.Fatalf("merged %d whole pieces, want 1", got)
+	// Destination piece 0 is covered for [0,16384), exactly one full block.
+	// It is not a whole piece, so it is reused as a block.
+	if got := dst.prefillFrom([]*Torrent{{torrent: src}}); got != 0 {
+		t.Fatalf("merged %d whole pieces, want 0", got)
 	}
-	if _, ok := dst.partialBlocks[1]; ok {
-		t.Fatal("v1 must not write partial blocks")
+	begins, ok := dst.partialBlocks[0]
+	if !ok || len(begins) != 1 || begins[0] != 0 {
+		t.Fatalf("partial blocks = %v, want [0]", begins)
 	}
-	buf := make([]byte, 10000)
+	buf := make([]byte, piece.BlockSize)
 	if _, err := dst.pieces[0].Data.ReadAt(buf, 0); err != nil {
 		t.Fatal(err)
 	}
-	if !bytes.Equal(buf, content[:10000]) {
-		t.Fatal("reused v1 piece 0 is wrong")
+	if !bytes.Equal(buf, content[:piece.BlockSize]) {
+		t.Fatal("the reused v1 block is wrong")
 	}
 }
 
@@ -409,11 +409,10 @@ func TestPrefillV1WrongMetadataMatchIsSafe(t *testing.T) {
 	if merged := dst.prefillFrom([]*Torrent{{torrent: src}}); merged != 0 {
 		t.Fatalf("merged %d pieces from a different content, want 0", merged)
 	}
-	got := make([]byte, len(b))
-	if _, err := filesDst[0].Storage.ReadAt(got, 0); err != nil {
-		t.Fatal(err)
-	}
-	if !bytes.Equal(got, b) {
-		t.Fatal("the destination storage changed")
+	// A partly covered piece may have written speculative blocks from the
+	// wrong source; no piece is marked verified, and the full piece is
+	// downloaded and checked before it is ever shared.
+	if len(dst.mergedPieces) != 0 {
+		t.Fatalf("merged pieces = %v, want none", dst.mergedPieces)
 	}
 }

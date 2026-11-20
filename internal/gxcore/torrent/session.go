@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/buzzqw/gextto/internal/dht"
+	"github.com/buzzqw/gextto/internal/gxcore/internal/announcer"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/bandwidth"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/bitfield"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/blocklist"
@@ -59,12 +60,16 @@ type Session struct {
 	dht            *dht.DHT
 	rpc            *rpcServer
 	trackerManager *trackermanager.TrackerManager
-	ram            *resourcemanager.ResourceManager[*peer.Peer]
-	pieceCache     *piececache.Cache
-	webseedClient  http.Client
-	createdAt      time.Time
-	semWrite       *semaphore.Semaphore
-	metrics        *sessionMetrics
+	// trackerPacer is the session-wide per-host announce gate: one tracker
+	// host receives a burst at a bounded pace instead of one request per
+	// torrent at the same instant.
+	trackerPacer  *announcer.Pacer
+	ram           *resourcemanager.ResourceManager[*peer.Peer]
+	pieceCache    *piececache.Cache
+	webseedClient http.Client
+	createdAt     time.Time
+	semWrite      *semaphore.Semaphore
+	metrics       *sessionMetrics
 	// wire tallies the raw peer-socket bytes of this session, so the
 	// reported protocol overhead (wire minus payload) is measured within the
 	// same scope and resets with the session.
@@ -354,6 +359,7 @@ func assembleSession(cfg Config, l logger.Logger, db *bbolt.DB, res *boltdbresum
 		resumer:            res,
 		blocklist:          bl,
 		trackerManager:     trackermanager.New(blTracker, cfg.DNSResolveTimeout, !cfg.TrackerHTTPVerifyTLS),
+		trackerPacer:       announcer.NewPacer(announcer.DefaultAnnouncesPerSecond, announcer.DefaultAnnounceBurst),
 		log:                l,
 		torrents:           make(map[string]*Torrent),
 		torrentsByInfoHash: make(map[dht.InfoHash][]*Torrent),

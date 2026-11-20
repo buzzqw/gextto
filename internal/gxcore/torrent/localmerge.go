@@ -327,7 +327,7 @@ candidates:
 	// Phase 2: the same-file-different-layout case (BitTorrent v2), matched by
 	// the per-file Merkle root instead of the piece index.
 	if !stopped(stop) {
-		merged += t.prefillV1From(candidates, mergedIdx, skip, stop)
+		merged += t.prefillV1From(candidates, mergedIdx, partial, skip, stop)
 	}
 	if !stopped(stop) {
 		merged += t.prefillV2From(candidates, mergedIdx, partial, skip, stop)
@@ -469,11 +469,13 @@ func sourceV1Segments(snap *localDataSnapshot) map[string][]srcSeg {
 
 // prefillV1From is the v1 cross-layout pass (§9.2, Phase 4): it reuses a
 // torrent whose file paths and lengths match but whose piece length differs.
-// Every destination piece is assembled from verified source pieces and checked
-// against its own hash before writing, so a wrong metadata match only wastes
-// reads and never writes. Unlike v2 there is no per-block hash to trust, so
-// only fully covered pieces are reused (no Phase 3 blocks for v1).
-func (t *torrent) prefillV1From(candidates []*Torrent, mergedIdx map[uint32]bool, skip []bool, stop <-chan struct{}) int {
+// A destination piece fully covered by verified source pieces is assembled and
+// checked against its own hash before writing. A piece only partly covered is
+// still preloaded at 16 KiB block level (Phase 3): the source pieces are
+// verified, and the piece is checked against its own hash once the remaining
+// blocks arrive; a mismatch drops the local blocks and downloads it whole, so
+// a wrong metadata match only wastes work and never writes unverified data.
+func (t *torrent) prefillV1From(candidates []*Torrent, mergedIdx map[uint32]bool, partialOut map[uint32][]uint32, skip []bool, stop <-chan struct{}) int {
 	info := t.info()
 	if info == nil || info.V2 || info.Private || len(t.pieces) == 0 {
 		return 0
@@ -500,14 +502,15 @@ func (t *torrent) prefillV1From(candidates []*Torrent, mergedIdx map[uint32]bool
 		if len(have) == 0 {
 			continue
 		}
-		merged += t.mergeV1Files(oinfo, snap, have, mergedIdx, skip, stop, &buf)
+		merged += t.mergeV1Files(oinfo, snap, have, mergedIdx, partialOut, skip, stop, &buf)
 	}
 	return merged
 }
 
-// mergeV1Files reuses the destination pieces fully covered by verified source
-// pieces whose file paths and lengths match.
-func (t *torrent) mergeV1Files(sinfo *metainfo.Info, snap *localDataSnapshot, have []byte, mergedIdx map[uint32]bool, skip []bool, stop <-chan struct{}, bufp *[]byte) int {
+// mergeV1Files reuses the destination pieces covered by verified source
+// pieces whose file paths and lengths match: whole when every byte is covered,
+// at block level when only part is.
+func (t *torrent) mergeV1Files(sinfo *metainfo.Info, snap *localDataSnapshot, have []byte, mergedIdx map[uint32]bool, partialOut map[uint32][]uint32, skip []bool, stop <-chan struct{}, bufp *[]byte) int {
 	segs := sourceV1Segments(snap)
 	if len(segs) == 0 {
 		return 0
@@ -544,7 +547,19 @@ func (t *torrent) mergeV1Files(sinfo *metainfo.Info, snap *localDataSnapshot, ha
 		}
 		buf := (*bufp)[:n]
 		clear(buf)
-		if !copyV1PieceFromSource(buf, dst, segs, snap, have, srcLen, dstLen) {
+		ok, partial, spans := copyV1PieceFromSource(buf, dst, segs, snap, have, srcLen, dstLen)
+		if partial {
+			if partialOut != nil {
+				if _, done := partialOut[dst.Index]; !done {
+					if begins := storePartialBlocks(dst, buf, spans); len(begins) > 0 {
+						partialOut[dst.Index] = begins
+						partialSourcePieces.Add(1)
+					}
+				}
+			}
+			continue
+		}
+		if !ok {
 			continue
 		}
 		if !verifyPieceBytes(dst, buf) {
@@ -565,12 +580,14 @@ func (t *torrent) mergeV1Files(sinfo *metainfo.Info, snap *localDataSnapshot, ha
 	return merged
 }
 
-// copyV1PieceFromSource fills dst from the source pieces covering each of the
-// destination piece's file sections. It reports true only when every
-// non-padding byte came from a verified source piece of a file with the same
-// path and length; otherwise dst is left untouched (v1 has no per-block hash
-// to justify a partial reuse).
-func copyV1PieceFromSource(dst []byte, dp *piece.Piece, segs map[string][]srcSeg, snap *localDataSnapshot, have []byte, srcLen, dstLen map[string]int64) bool {
+// copyV1PieceFromSource fills dst from the verified source pieces covering
+// each of the destination piece's file sections. It returns ok when every
+// non-padding byte was covered, partial when only some were, and the spans
+// copied (relative to the piece) in both cases. A file whose path or length
+// does not match is skipped, not fatal: another file of the same piece may
+// still match. v1 has no per-block hash, so a partial piece is completed from
+// peers and checked against its own hash as a whole.
+func copyV1PieceFromSource(dst []byte, dp *piece.Piece, segs map[string][]srcSeg, snap *localDataSnapshot, have []byte, srcLen, dstLen map[string]int64) (ok, partial bool, spans []span) {
 	var total, covered int64
 	var pos int64 // piece-relative offset of the current section
 	for si := range dp.Data {
@@ -581,7 +598,8 @@ func copyV1PieceFromSource(dst []byte, dp *piece.Piece, segs map[string][]srcSeg
 		}
 		total += sec.Length
 		if srcLen[sec.Name] != dstLen[sec.Name] || dstLen[sec.Name] == 0 {
-			return false // a file we cannot match: never a full piece
+			pos += sec.Length
+			continue
 		}
 		lo0, hi0 := sec.Offset, sec.Offset+sec.Length
 		for _, sg := range segs[sec.Name] {
@@ -592,17 +610,21 @@ func copyV1PieceFromSource(dst []byte, dp *piece.Piece, segs map[string][]srcSeg
 			}
 			sp := &snap.pieces[sg.piece]
 			if len(sp.Data) == 0 || sp.Length == 0 {
-				return false
+				continue
 			}
 			dstStart := pos + (lo - lo0)
 			if _, err := sp.Data.ReadAt(dst[dstStart:dstStart+(hi-lo)], sg.pieceOff+(lo-sg.fileOff)); err != nil {
-				return false
+				continue
 			}
+			spans = append(spans, span{lo: dstStart, hi: dstStart + (hi - lo)})
 			covered += hi - lo
 		}
 		pos += sec.Length
 	}
-	return total > 0 && covered == total
+	if total == 0 || covered == 0 {
+		return false, false, nil
+	}
+	return covered == total, covered < total, spans
 }
 
 // prefillV2From is the Phase 2 pass over the same candidate set (Swarm Merging,
@@ -787,27 +809,27 @@ func copyV2PieceFromSource(dst []byte, dOff int64, snap *localDataSnapshot, ssta
 // source piece.
 type span struct{ lo, hi int64 }
 
-// storePartialBlocks writes the verified spans of a destination piece to its
-// storage and returns the begin offsets of the 16 KiB blocks they fully cover.
-// The bytes are trustworthy at block level: the source and destination files
-// share the BEP 52 Merkle root, whose leaves are the file's 16 KiB blocks
-// whatever the piece length, and every span comes from a source piece the
-// source verified. The piece itself is still verified whole once its other
-// blocks arrive from the network.
+// storePartialBlocks writes to storage the 16 KiB blocks of a destination
+// piece fully covered by a verified span, and returns their begin offsets.
+// Only full blocks are written: a partial edge would save nothing, because it
+// is requested and overwritten anyway. The bytes are trustworthy at block
+// level for v2 (the source and destination files share the BEP 52 Merkle root,
+// whose leaves are the file's 16 KiB blocks whatever the piece length) and for
+// v1 come from a source piece the source verified; in both cases the piece is
+// verified whole once its other blocks arrive, and a mismatch drops the local
+// blocks and downloads it again.
 func storePartialBlocks(dst *piece.Piece, buf []byte, spans []span) []uint32 {
 	if len(spans) == 0 {
 		return nil
-	}
-	for _, s := range spans {
-		if _, err := dst.Data.WriteAt(buf[s.lo:s.hi], s.lo); err != nil {
-			return nil
-		}
 	}
 	var begins []uint32
 	for _, b := range dst.CalculateBlocks() {
 		lo, hi := int64(b.Begin), int64(b.Begin)+int64(b.Length)
 		for _, s := range spans {
 			if lo >= s.lo && hi <= s.hi {
+				if _, err := dst.Data.WriteAt(buf[lo:hi], lo); err != nil {
+					return nil
+				}
 				begins = append(begins, b.Begin)
 				break
 			}

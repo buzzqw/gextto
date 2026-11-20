@@ -76,13 +76,18 @@ type PeriodicalAnnouncer struct {
 	needMorePeers  bool
 	mNeedMorePeers sync.RWMutex
 	needMorePeersC chan struct{}
+	// pacer is the session-wide per-host announce gate; nil = no pacing.
+	pacer *Pacer
+	host  string
 }
 
 // NewPeriodicalAnnouncer prepares an announcer; run it with Run.
-func NewPeriodicalAnnouncer(trk tracker.Tracker, numWant int, minInterval time.Duration, getTorrent func() tracker.Torrent, completedC chan struct{}, newPeers chan []*net.TCPAddr, l logger.Logger) *PeriodicalAnnouncer {
+func NewPeriodicalAnnouncer(trk tracker.Tracker, numWant int, minInterval time.Duration, getTorrent func() tracker.Torrent, completedC chan struct{}, newPeers chan []*net.TCPAddr, l logger.Logger, pacer *Pacer) *PeriodicalAnnouncer {
 	return &PeriodicalAnnouncer{
 		Tracker:        trk,
 		status:         NotContactedYet,
+		pacer:          pacer,
+		host:           AnnounceHost(trk.URL()),
 		statsCommandC:  make(chan statsRequest),
 		numWant:        numWant,
 		minInterval:    minInterval,
@@ -314,6 +319,13 @@ func (a *PeriodicalAnnouncer) doAnnounce(ctx context.Context, event tracker.Even
 }
 
 func (a *PeriodicalAnnouncer) announce(ctx context.Context, event tracker.Event, numWant int) {
+	// The host gate is shared by every torrent of the session: a burst of
+	// interval expiries reaches one tracker at the bucket's pace, while a
+	// tracker on another host proceeds at once. Closing the announcer cancels
+	// the wait with the context.
+	if err := a.pacer.Wait(ctx, a.host); err != nil {
+		return
+	}
 	announce(ctx, a.Tracker, event, numWant, a.getTorrent(), a.responseC, a.errC)
 }
 

@@ -199,6 +199,7 @@ func (t *torrent) startNewAnnouncer(tr tracker.Tracker) {
 		t.completeC,
 		t.addrsFromTrackers,
 		t.log,
+		t.session.trackerPacer,
 	)
 	an.SetResultHook(func(resp *tracker.AnnounceResponse, err error) {
 		if t.session == nil {
