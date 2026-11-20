@@ -315,7 +315,13 @@ licenza sono nel menu **Altro**.
 
 Sotto i 900 pixel di larghezza l'interfaccia si compatta: menu scorrevole in
 alto, metriche su due colonne, finestre a tutta larghezza, tabelle che scorrono
-dentro il loro riquadro. Nella pagina **Scarico** il nome di un torrent va a capo
+dentro il loro riquadro. Nella scheda di una serie la barra delle azioni —
+**Cerca mancanti**, **Scansiona archivio**, **Aggiorna da TMDB**, **Anteprima
+rinomina** — resta in cima ai pannelli, ogni puntata è un blocco con la sigla
+della stagione e dell'episodio e lo stato in cima, il nome del file in libreria
+per intero e i pulsanti su una riga sotto, e la storia dei download si legge un
+evento per blocco. Il titolo di una locandina e i risultati di **Esplora** su
+TMDB vanno a capo invece di essere tagliati. Nella pagina **Scarico** il nome di un torrent va a capo
 per intero invece di fermarsi ai primi caratteri: sul telefono non c'è il
 suggerimento del mouse che mostra il resto. Ogni azione resta raggiungibile col
 tocco, e pulsanti e voci di menu arrivano a 44 pixel, la misura più piccola che

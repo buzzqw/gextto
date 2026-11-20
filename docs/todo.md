@@ -25,10 +25,11 @@ still be true after the item lands does not belong here.
 
 - **emule-qt's preferences version**: `emuleqtPrefsVersion` is the value of the image Gextto runs (7); emule-qt's main branch has moved to 8, whose only migration turns on a default that is already true. Gate: an image that reports it.
 
-
 ## Proposals
 
 Each waits for the operator's choice.
+
+- **Notebook-wide tables on a phone**: the episodes and the download history of a series are blocks on a phone now, but Archivio, Fumetti, Blocklist, Salute and Manutenzione still show tables wider than the screen behind a sideways scroll; give each one the same per-row block, or fold its secondary columns, one page at a time. Gate: the operator's choice; every page with its own check in `mobile.spec.ts`.
 
 - **Header-only `mediainfo` read**: `readMediaTags` parses the whole file to name it, up to 20 seconds for a 4K file on NFS, while `--ParseSpeed=0` reads the container header alone; the same rename pass would drop from an hour to minutes. Gate: the naming tests and a before/after measure.
 

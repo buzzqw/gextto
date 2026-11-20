@@ -190,6 +190,43 @@ func TestTraktIntegrationRoutesRemoved(t *testing.T) {
 	}
 }
 
+// The detail page carries the rename preview URL: the series name is escaped
+// once for the path, and the template must not escape it again, or the panel
+// answers "series not found" for every title with a space in it.
+func TestV2SeriesDetailRenamePreviewLinkIsEncodedOnce(t *testing.T) {
+	state := newTestAppState(t)
+	if err := SaveLibrary(state.cfg.DataDir, []SeriesConfig{{Name: "Test Show", Seasons: "*"}}, nil); err != nil {
+		t.Fatalf("SaveLibrary: %v", err)
+	}
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+
+	code, body := v2Request(t, server, http.MethodGet, "/?view=series&series=Test%20Show", nil)
+	if code != http.StatusOK {
+		t.Fatalf("series detail -> %d", code)
+	}
+	if !strings.Contains(body, `hx-get="/series/rename-preview?series=Test%20Show"`) {
+		t.Fatalf("rename preview link is not escaped once: %s", firstMatchingLine(body, "rename-preview"))
+	}
+	if strings.Contains(body, "Test%2520Show") {
+		t.Fatalf("rename preview link is escaped twice: %s", firstMatchingLine(body, "rename-preview"))
+	}
+}
+
+// firstMatchingLine returns the first line of body that holds needle, for a
+// readable failure on a page-long HTML response.
+func firstMatchingLine(body, needle string) string {
+	for _, line := range strings.Split(body, "\n") {
+		if strings.Contains(line, needle) {
+			if len(line) > 300 {
+				return line[:300] + "…"
+			}
+			return line
+		}
+	}
+	return "(not found)"
+}
+
 func TestV2SeriesRenamePreviewPanel(t *testing.T) {
 	state := newTestAppState(t)
 	if err := SaveLibrary(state.cfg.DataDir, []SeriesConfig{{Name: "Test Show", Seasons: "*"}}, nil); err != nil {

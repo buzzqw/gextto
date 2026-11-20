@@ -316,7 +316,12 @@ the changelog and the licence are in the **More** panel.
 
 Below 900 pixels wide the interface becomes compact: scrollable menu at the
 top, metrics in two columns, full-width dialogs, tables that scroll inside
-their panel. On the **Downloads** page a torrent name wraps in full instead of
+their panel. On a series page the toolbar — **Search missing**, **Scan the
+archive**, **Refresh from TMDB**, **Rename preview** — stays above the panels,
+every episode is a block with the season and episode code and the state on the
+first line, the full name of the file in the library and the buttons on a line
+of their own, and the download history reads one event per block. A poster
+title and the **Explore** results from TMDB wrap instead of being cut. On the **Downloads** page a torrent name wraps in full instead of
 stopping after the first characters: on a phone there is no mouse tooltip to
 show the rest. Every action stays reachable by touch, and buttons and menu rows
 grow to 44 pixels, the smallest size a finger hits reliably. Theme, text size,

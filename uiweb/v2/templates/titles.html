@@ -10,7 +10,7 @@
     </form>
     {{template "v2_action_btn" (dict "Redirect" (printf "/?view=series&series=%s" .PathName) "Path" (printf "/api/series/%s/scan-archive" .PathName) "Method" "POST" "Body" "{}" "Label" "Scansiona archivio" "Class" "" "Title" "Scansiona l'archivio per questa serie")}}
     {{template "v2_action_btn" (dict "Redirect" (printf "/?view=series&series=%s" .PathName) "Path" (printf "/api/series/%s/metadata" .PathName) "Method" "POST" "Body" "{}" "Label" "Aggiorna da TMDB" "Class" "" "Title" "Aggiorna i metadati TMDB")}}
-    <button class="btn sm" type="button" hx-get="/series/rename-preview?series={{.PathName | urlquery}}" hx-target="#v2-rename-preview" hx-swap="innerHTML" {{trTitle "Mostra le rinomine proposte senza toccare i file"}}>{{tr "Anteprima rinomina"}}</button>
+    <button class="btn sm" type="button" hx-get="/series/rename-preview?series={{.PathName}}" hx-target="#v2-rename-preview" hx-swap="innerHTML" {{trTitle "Mostra le rinomine proposte senza toccare i file"}}>{{tr "Anteprima rinomina"}}</button>
   </div>
   <div id="v2-gap-result-series" class="v2-gap-result" role="status" aria-live="polite"></div>
   <div id="v2-rename-preview"></div>

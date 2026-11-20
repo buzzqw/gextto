@@ -472,6 +472,10 @@ button:focus-visible, a:focus-visible { outline: 3px solid color-mix(in srgb, va
   padding: 14px 16px;
   border-bottom: 1px solid var(--line-soft);
 }
+/* The title of a panel can carry a name with no spaces (a series, a path, an
+   encoded value): as a flex item its minimum width was the whole word, which
+   pushed it past the right edge of the panel on a phone. */
+.panel-head h3 { min-width: 0; overflow-wrap: anywhere; }
 .panel-body { padding: 14px 16px; }
 
 .muted { color: var(--muted); }
@@ -655,6 +659,73 @@ label.field > span, .field > span, .field-label { color: var(--muted); font-size
 .badge.err { background: color-mix(in srgb, var(--err) 22%, transparent); color: var(--err); }
 .badge.ed2k { background: color-mix(in srgb, var(--accent-2) 22%, transparent); color: var(--accent-2); }
 .acquisition-events td.nowrap { white-space: nowrap; }
+/* The story of a download on a phone is one block per event: the moment and
+   the download on the first line, the message under them, the technical
+   details last. As a four-column table it was 4884 pixels wide — the message
+   column opened one character per line and the details pushed everything else
+   under a sideways scroll. */
+@media (max-width: 640px) {
+  .table-wrap:has(> table.acquisition-events) { overflow: visible; }
+  .data-table.acquisition-events,
+  .data-table.acquisition-events > tbody { display: block; width: 100%; min-width: 0; }
+  .data-table.acquisition-events > thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+  }
+  .data-table.acquisition-events > tbody > tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: baseline;
+    gap: 3px 10px;
+    padding: 10px 2px;
+    border-bottom: 1px solid var(--line-soft);
+  }
+  .data-table.acquisition-events > tbody > tr:last-child { border-bottom: 0; }
+  .data-table.acquisition-events > tbody > tr > td[colspan] { grid-column: 1 / -1; }
+  .data-table.acquisition-events > tbody > tr > td { display: block; min-width: 0; padding: 0; border: 0; }
+  .data-table.acquisition-events td.acq-when {
+    grid-column: 1;
+    grid-row: 1;
+    white-space: normal;
+    color: var(--muted);
+    font-size: 0.78rem;
+    font-variant-numeric: tabular-nums;
+  }
+  .data-table.acquisition-events td.acq-what {
+    grid-column: 2;
+    grid-row: 1;
+    justify-self: end;
+    max-width: 60%;
+    text-align: right;
+    white-space: normal;
+    overflow: visible;
+    overflow-wrap: anywhere;
+    color: var(--muted);
+    font-size: 0.78rem;
+  }
+  .data-table.acquisition-events td.acq-event {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .data-table.acquisition-events td.acq-details {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    white-space: normal;
+    overflow: visible;
+    overflow-wrap: anywhere;
+    color: var(--muted);
+    font-size: 0.8rem;
+  }
+}
 .dashboard-problems-table td.nowrap { white-space: nowrap; }
 /* A release name is one long word (dots, no spaces): let it wrap, so the
    Actions column stays in view instead of behind a horizontal scroll. */
@@ -1236,7 +1307,7 @@ label.field > span, .field > span, .field-label { color: var(--muted); font-size
 .tmdb-results { margin-top: 12px; }
 .tmdb-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
 .tmdb-card {
-  display: flex; gap: 10px; padding: 10px;
+  display: flex; gap: 10px; padding: 10px; min-width: 0;
   border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface);
 }
 .tmdb-poster { width: 74px; height: 111px; flex: none; border-radius: 6px; overflow: hidden; background: var(--surface-3); }
@@ -1251,7 +1322,14 @@ label.field > span, .field > span, .field-label { color: var(--muted); font-size
 @media (max-width: 1400px) { .tmdb-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 @media (max-width: 1100px) { .tmdb-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 800px) { .tmdb-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 560px) { .tmdb-grid { grid-template-columns: 1fr; } }
+/* minmax(0, 1fr), not 1fr: the implicit minimum of a grid track is the
+   min-content of what it holds, and a result name with no wrap made one card
+   612 pixels wide inside a phone 390 wide, where the page then clipped it. */
+@media (max-width: 560px) {
+  .tmdb-grid { grid-template-columns: minmax(0, 1fr); }
+  .tmdb-card .tmdb-result-title,
+  .tmdb-card-body > strong.truncate { white-space: normal; overflow: visible; overflow-wrap: anywhere; }
+}
 
 /* TMDB calendar: four columns on wide screens */
 .calendar-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
@@ -1325,7 +1403,15 @@ label.field > span, .field > span, .field-label { color: var(--muted); font-size
 .season-list { display: flex; flex-direction: column; gap: 10px; }
 .season-block > summary { cursor: pointer; padding: 6px 0; }
 .season-block > summary::marker { color: var(--muted); }
-@media (max-width: 640px) { .series-hero-main { flex-direction: column; } }
+/* On a phone the poster goes above the text, so the archive path no longer has
+   the title beside it: right-aligned it became a ragged block in the middle of
+   the card, with the path broken across two lines. Left-aligned under the
+   title it reads as one more line of the series. */
+@media (max-width: 640px) {
+  .series-hero-main { flex-direction: column; }
+  .series-archive { text-align: left; }
+  .series-archive code { overflow-wrap: anywhere; }
+}
 
 @media (max-width: 860px) {
   .setting-row { grid-template-columns: 1fr; align-items: stretch; }
@@ -1799,15 +1885,103 @@ pre.log-view { margin: 0; }
 .episode-sources-table td:nth-child(5) { width: 14%; }
 .episode-sources-table .row-actions { min-width: 0; flex-wrap: wrap; white-space: normal; gap: 4px; }
 
+/* Tablet: the table fits the panel and the name of the file wraps. Between 641
+   and 899 pixels the fixed columns took the width and the title was left with
+   about eighty pixels, where with no pointer there is no tooltip to read the
+   rest. */
+@media (max-width: 899px) {
+  .data-table.series-episodes { min-width: 0; }
+  .data-table.series-episodes > tbody > tr > td.truncate { white-space: normal; overflow: visible; overflow-wrap: anywhere; }
+  .data-table.series-episodes > thead > tr > th:nth-child(5),
+  .data-table.series-episodes > thead > tr > th:nth-child(6),
+  .data-table.series-episodes > tbody > tr > td:nth-child(5),
+  .data-table.series-episodes > tbody > tr > td:nth-child(6) { display: none; }
+  .data-table.series-episodes .row-actions { flex-wrap: wrap; white-space: normal; }
+}
+
 @media (max-width: 640px) {
-  .data-table.series-episodes { min-width: 0; table-layout: fixed; }
-  .data-table.series-episodes > thead > tr > th,
-  .data-table.series-episodes > tbody > tr > td { padding-left: 5px; padding-right: 5px; overflow-wrap: anywhere; }
-  .data-table.series-episodes > thead > tr > th:nth-child(1),
-  .data-table.series-episodes > thead > tr > th:nth-child(2) { width: 28px; }
-  .data-table.series-episodes > thead > tr > th:nth-child(3) { width: 27%; }
-  .data-table.series-episodes > thead > tr > th:nth-child(4) { width: 22%; }
-  .data-table.series-episodes > thead > tr > th:last-child { width: 142px; }
+  /* One episode, one block. The title column holds the name of the file in the
+     library ("Serie - S03E02 - Il Titolo - [WEB-DL][1080p]…"): squeezing seven
+     columns into 328 pixels left it 72, so the name went down a word per line
+     and every row grew to several hundred pixels, while the status broke in
+     the middle of a word. The block gives the name the full width, the season
+     and episode a short code above it and the buttons a line of their own. */
+  .table-wrap:has(> table.series-episodes) { overflow: visible; }
+  .data-table.series-episodes,
+  .data-table.series-episodes > tbody { display: block; width: 100%; min-width: 0; }
+  /* The headers stay in the accessibility tree: they are clipped, not removed. */
+  .data-table.series-episodes > thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+  }
+  .data-table.series-episodes > tbody > tr:not(.v2-ep-search-row):not([hidden]) {
+    display: grid;
+    grid-template-columns: auto auto minmax(0, 1fr);
+    align-items: baseline;
+    gap: 2px 6px;
+    padding: 10px 2px 12px;
+    border-bottom: 1px solid var(--line-soft);
+  }
+  .data-table.series-episodes > tbody > tr > td[colspan] { grid-column: 1 / -1; grid-row: 1; }
+  .data-table.series-episodes > tbody > tr > td { display: block; min-width: 0; padding: 0; border: 0; }
+  .data-table.series-episodes > tbody > tr > td:nth-child(1),
+  .data-table.series-episodes > tbody > tr > td:nth-child(2) {
+    grid-row: 1;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+  .data-table.series-episodes > tbody > tr > td:nth-child(1) { grid-column: 1; }
+  .data-table.series-episodes > tbody > tr > td:nth-child(2) { grid-column: 2; }
+  .data-table.series-episodes > tbody > tr > td:nth-child(1)::before { content: "S"; }
+  .data-table.series-episodes > tbody > tr > td:nth-child(2)::before { content: "E"; }
+  .data-table.series-episodes > tbody > tr > td:nth-child(1)::before,
+  .data-table.series-episodes > tbody > tr > td:nth-child(2)::before {
+    color: var(--muted);
+    font-size: 0.9em;
+    font-weight: 600;
+    margin-right: 1px;
+  }
+  .data-table.series-episodes > tbody > tr > td:nth-child(3) {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    white-space: normal;
+    overflow: visible;
+    overflow-wrap: anywhere;
+    font-size: 0.92rem;
+    line-height: 1.35;
+  }
+  .data-table.series-episodes > tbody > tr > td:nth-child(4) {
+    grid-column: 3;
+    grid-row: 1;
+    justify-self: end;
+    text-align: right;
+    font-size: 0.8rem;
+    white-space: normal;
+    overflow-wrap: break-word;
+  }
+  .data-table.series-episodes > tbody > tr > td:nth-child(5),
+  .data-table.series-episodes > tbody > tr > td:nth-child(6) { display: none; }
+  .data-table.series-episodes > tbody > tr > td.row-actions {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 6px;
+    padding-top: 6px;
+    white-space: normal;
+  }
+  /* The search of one episode opens as a row of its own under the episode. */
+  .data-table.series-episodes > tbody > tr.v2-ep-search-row { display: block; padding: 0; border-bottom: 0; }
+  .data-table.series-episodes > tbody > tr.v2-ep-search-row > td { display: block; padding: 0 0 10px; }
+
   .episode-sources-overlay { padding-left: 8px; padding-right: 8px; }
   .episode-sources-modal { width: 100%; }
   .episode-sources-table th,

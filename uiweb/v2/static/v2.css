@@ -754,6 +754,13 @@ html, body {
   flex-wrap: wrap;
   align-items: center;
 }
+/* The bundled htmx keeps an indicator merely transparent, so its text still
+   held a place in the line: in the toolbar of a series the "Avvio della
+   ricerca…" sentence made the form as wide as the phone, and the four actions
+   below it went one per line. Hidden is hidden, unless the request is running:
+   htmx marks the indicator itself (hx-indicator="#id") or one of its parents
+   with htmx-request. */
+.htmx-indicator:not(.htmx-request):not(.htmx-request *) { display: none; }
 .toolbar .input {
   min-width: 160px;
 }
@@ -2366,11 +2373,16 @@ html.settings-only-modified .settings-panel:not(:has(.setting-modified-row)):not
 }
 
 /* Phone: pages where the desktop order buried the main action.
-   - Serie TV / Film: the list first, the "add" form below it.
+   - Serie TV / Film: the list first, the "add" form below it. The rule is
+     pinned to the page that carries the list: the same data-view also serves
+     the detail of one series or film, and there the only non-panel div is the
+     toolbar with «Cerca mancanti», «Scansiona archivio» and the rest, which
+     ended up below every panel, at the bottom of a page thousands of pixels
+     tall.
    - Esplora: the two search forms first, calendar and trending after. */
 @media (max-width: 700px) {
-  #v2-page[data-view="series"] .view > div:not(.panel):not(:has([id^="v2-table-panel-"])),
-  #v2-page[data-view="movies"] .view > div:not(.panel):not(:has([id^="v2-table-panel-"])) { order: 1; }
+  #v2-page[data-view="series"]:has(#v2-table-panel-series-t0) .view > div:not(.panel):not(:has([id^="v2-table-panel-"])),
+  #v2-page[data-view="movies"]:has(#v2-table-panel-movies-t0) .view > div:not(.panel):not(:has([id^="v2-table-panel-"])) { order: 1; }
   #v2-page[data-view="search"] .view > .panel:nth-child(3) { order: 1; }
   #v2-page[data-view="search"] .view > .panel:nth-child(4) { order: 2; }
   #v2-page[data-view="search"] .view > .panel:nth-child(1) { order: 3; }
@@ -2454,6 +2466,12 @@ html.settings-only-modified .settings-panel:not(:has(.setting-modified-row)):not
 .search-row .btn { align-self: flex-start; }
 /* Compact bulletless list (aMule warnings on the Health page). */
 .plain-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+/* A line of a plain list (a warning, an error of a provider) can be long: on a
+   phone it wraps instead of ending at the panel edge, where nothing reveals
+   the rest. */
+@media (max-width: 700px) {
+  .plain-list .truncate { white-space: normal; overflow: visible; overflow-wrap: anywhere; }
+}
 
 /* Maintenance closes with the exact build identity: version, full build and
    the commit the binary was compiled from (the short hash, the full one in the
@@ -2836,6 +2854,16 @@ body.v2-drop-active main {
 }
 .library-card-title a:hover,
 .library-card-title a:focus-visible { color: var(--accent); text-decoration: underline; }
+/* On a phone and on a tablet there is no tooltip to reveal the rest of a
+   name cut after two lines: the title of a card wraps as far as it needs. */
+@media (max-width: 900px) {
+  .library-card-title a {
+    display: block;
+    -webkit-line-clamp: none;
+    overflow: visible;
+    overflow-wrap: anywhere;
+  }
+}
 .library-cards .card-meta {
   display: flex;
   flex-wrap: wrap;
