@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"net/url"
 	"runtime/debug"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -26,32 +25,6 @@ import (
 // per query only caps one query; with several scheduled queries it still permits
 // dozens of simultaneous HTML fetches and parsers.
 var webEngineLimiter = make(chan struct{}, 4)
-
-var (
-	engineFailuresMu sync.Mutex
-	engineFailures   = map[string]int{}
-)
-
-// EngineFailure is one drained per-cycle web-engine failure aggregate.
-type EngineFailure struct {
-	Engine string `json:"engine"`
-	Count  int    `json:"count"`
-}
-
-// TakeEngineFailures drains the accumulated web-engine failures
-// (`engine -> count`), most frequent first.
-func TakeEngineFailures() []EngineFailure {
-	engineFailuresMu.Lock()
-	failures := engineFailures
-	engineFailures = map[string]int{}
-	engineFailuresMu.Unlock()
-	result := make([]EngineFailure, 0, len(failures))
-	for engine, count := range failures {
-		result = append(result, EngineFailure{Engine: engine, Count: count})
-	}
-	sort.SliceStable(result, func(i, j int) bool { return result[i].Count > result[j].Count })
-	return result
-}
 
 var (
 	engineCooldownMu sync.Mutex
@@ -146,8 +119,7 @@ func searchWithTimeoutRaw(ctx context.Context, cfg *Config, query string, timeou
 		}
 	}
 	type outcome struct {
-		found   []webResult
-		failure string
+		found []webResult
 	}
 	resultsChannel := make(chan outcome, len(engines))
 	active := 0
@@ -169,7 +141,8 @@ func searchWithTimeoutRaw(ctx context.Context, cfg *Config, query string, timeou
 				if r := recover(); r != nil {
 					logging.Error("web engine search panicked; recovered",
 						"engine", engine, "panic", fmt.Sprint(r), "stack", string(debug.Stack()))
-					resultsChannel <- outcome{failure: engine}
+					logging.SourceFail("web", engine, "the search crashed")
+					resultsChannel <- outcome{}
 				}
 			}()
 			select {
@@ -203,7 +176,7 @@ func searchWithTimeoutRaw(ctx context.Context, cfg *Config, query string, timeou
 					setEngineCooldown(engine, redacted)
 				}
 				logging.Debug("web engine search failed", "engine", engine, "query", query, "error", redacted)
-				resultsChannel <- outcome{failure: engine}
+				resultsChannel <- outcome{}
 				return
 			}
 			logging.SourceOK("web", engine, len(found))
@@ -217,12 +190,6 @@ collect:
 		select {
 		case item := <-resultsChannel:
 			results = append(results, item.found...)
-			if item.failure != "" {
-				// Aggregate per cycle instead of logging once per query.
-				engineFailuresMu.Lock()
-				engineFailures[item.failure]++
-				engineFailuresMu.Unlock()
-			}
 		case <-ctx.Done():
 			// The caller gave up: return what is already here. Every engine
 			// still sends into the buffered channel, so none is left blocked.

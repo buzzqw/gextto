@@ -5,9 +5,8 @@ package gextto
 // global filters and reports the per-source outcome.
 //
 // Cross-module calls rely on the sibling implements `rss.go` (`FetchFeed`,
-// `FetchTorznabFlareSolverr`) and `websearch.go` (`SearchWithTimeout`,
-// `TakeEngineFailures`, `EngineFailure`); see the note at the bottom of this
-// file for the exact signatures.
+// `FetchTorznabFlareSolverr`) and `websearch.go` (`SearchWithTimeout`); see the
+// note at the bottom of this file for the exact signatures.
 
 import (
 	"context"
@@ -521,14 +520,6 @@ func (e *Engine) ScrapeAllDomain(ctx context.Context, cfg *Config, domain *strin
 		logging.Info(fmt.Sprintf("🔎 Found releases for %d of %s (%s in total)",
 			targetsWithHits, countLabel(int64(targetsDone), "title", "titles"),
 			countLabel(int64(step2Usable), "release", "releases")))
-		engineFailures := TakeEngineFailures()
-		if len(engineFailures) > 0 {
-			detail := make([]string, 0, len(engineFailures))
-			for _, failure := range engineFailures {
-				detail = append(detail, fmt.Sprintf("%s (%d)", failure.Engine, failure.Count))
-			}
-			logging.Warn("⚠️ Web engines unreachable in this cycle: " + strings.Join(detail, ", "))
-		}
 	}
 
 	// Filter in place: the batch is replaced by the filtered view, and a
@@ -1288,6 +1279,8 @@ func sourceFailureReason(reason string) string {
 	switch {
 	case strings.Contains(lower, "login failed") || strings.Contains(lower, "no form found"):
 		return "login failed"
+	case strings.Contains(lower, "429") || strings.Contains(lower, "too many requests"):
+		return "over its request quota"
 	case strings.Contains(lower, "deadline exceeded") || strings.Contains(lower, "timeout") || strings.Contains(lower, "timed out"):
 		return "no answer in time"
 	case strings.Contains(lower, "connection refused"):
@@ -1480,5 +1473,3 @@ func safeQueryPart(value string) string {
 // ([]models.Release, error)
 //	websearch.SearchWithTimeout(ctx, cfg *Config, query string,
 // timeout *time.Duration) []models.Release
-//	websearch.TakeEngineFailures() []EngineFailure
-// with EngineFailure{Engine string; Count int}

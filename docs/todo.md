@@ -71,6 +71,12 @@ still be true after the item lands does not belong here.
 
 Each waits for the operator's choice.
 
+- **BT4G answers about one search every ten minutes per address**: the deep gap
+  pass asks up to five episode searches in parallel, so after the first answer
+  the others get `429 Too many requests`, the engine is paused for half an hour
+  and the results it could still give are lost. Gate: the operator's choice
+  between one bt4g query per cycle (paced) and retiring the engine.
+
 - **Notebook-wide tables on a phone**: the episodes and the download history of a series are blocks on a phone now, but Archivio, Fumetti, Blocklist, Salute and Manutenzione still show tables wider than the screen behind a sideways scroll; give each one the same per-row block, or fold its secondary columns, one page at a time. Gate: the operator's choice; every page with its own check in `mobile.spec.ts`.
 
 - **Cross-seed manager**: adding a torrent whose data is already in the library

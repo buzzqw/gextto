@@ -1044,6 +1044,17 @@ func collectGapReleases(ctx context.Context, cfg *Config, engine *Engine, db *Da
 			}
 		}
 	}
+	// The web engines are asked here and nowhere else in a cycle, so this is
+	// where their outcome has to be reported: one line, with how many searches
+	// failed and why. The per-source detail used to be thrown away at the start
+	// of the scrape phase, while a separate counter carried the failures over to
+	// the next cycle, which is how a rate-limited engine came to be named
+	// "unreachable" one cycle later and without a reason.
+	if stats := logging.TakeSourceStats(); len(stats) > 0 {
+		if summary := failedSourcesSummary(stats); summary != "" {
+			logging.Warn("⚠️ Some sources could not be used while looking for the missing episodes: " + summary)
+		}
+	}
 	return releases, gapTargets, nil
 }
 

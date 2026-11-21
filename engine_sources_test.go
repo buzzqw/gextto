@@ -29,6 +29,11 @@ func TestSourceFailureReasonIsShort(t *testing.T) {
 	if got := sourceFailureReason("context deadline exceeded"); got != "no answer in time" {
 		t.Fatalf("timeout = %q", got)
 	}
+	// A search engine that answers "too many requests" is not unreachable: it
+	// has to say so, or the cycle warning blames an outage that is not there.
+	if got := sourceFailureReason("HTTP 429"); got != "over its request quota" {
+		t.Fatalf("rate limit = %q", got)
+	}
 	if got := sourceFailureReason(""); got != "" {
 		t.Fatalf("empty reason = %q", got)
 	}
