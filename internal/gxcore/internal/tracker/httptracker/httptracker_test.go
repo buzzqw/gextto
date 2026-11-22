@@ -123,6 +123,42 @@ func TestHTTPAnnounceIntervalSanitized(t *testing.T) {
 	}
 }
 
+// TestHTTPAnnouncePublishesIPv6: the BEP 7 "ipv6" parameter carries the
+// address a tracker reachable over IPv4 cannot see, and it is absent when the
+// session has none to publish.
+func TestHTTPAnnouncePublishesIPv6(t *testing.T) {
+	cases := []struct {
+		name string
+		ipv6 string
+		want string
+	}{
+		{"published", "2001:db8::10", "2001:db8::10"},
+		{"none", "", ""},
+	}
+	for _, c := range cases {
+		var got string
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			got = r.URL.Query().Get("ipv6")
+			body, _ := bencode.EncodeBytes(map[string]any{"interval": int64(1800)})
+			_, _ = w.Write(body)
+		}))
+
+		u, _ := url.Parse(srv.URL + "/announce")
+		tr := New(srv.URL+"/announce", u, 5*time.Second, &http.Transport{}, "test", 1<<20)
+		_, err := tr.Announce(context.Background(), tracker.AnnounceRequest{
+			Torrent: tracker.Torrent{InfoHash: [20]byte{1}, PeerID: [20]byte{2}, Port: 6881, IPv6: c.ipv6},
+		})
+		if err != nil {
+			srv.Close()
+			t.Fatalf("%s: Announce: %v", c.name, err)
+		}
+		if got != c.want {
+			t.Errorf("%s: ipv6 = %q, want %q", c.name, got, c.want)
+		}
+		srv.Close()
+	}
+}
+
 // TestHTTPAnnounceFailureRetryIn checks that the BEP 31 "retry in" value from an
 // announce failure is carried through the HTTP tracker: a number of minutes, or
 // the "never" flag.

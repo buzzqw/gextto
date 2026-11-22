@@ -70,6 +70,13 @@ func (t *torrent) handleNewPeers(addrs []*net.TCPAddr, source peersource.Source)
 		return
 	}
 	addrs = t.filterBannedIPs(addrs)
+	if source == peersource.PEX {
+		// PEX is the one channel where a peer names addresses for us.
+		// Tracker, DHT and manual peers keep every address: a private
+		// tracker on the LAN is legitimate, a stranger gossiping
+		// 127.0.0.1 is not.
+		addrs = filterLocalEndpoints(addrs)
+	}
 	t.addrList.Push(addrs, source)
 	t.dialAddresses()
 }
@@ -104,13 +111,42 @@ func rememberPeerIP(set map[string]struct{}, ip string) {
 	set[ip] = struct{}{}
 }
 
-// filterBannedIPs drops banned addresses in place.
+// filterBannedIPs drops the addresses banned in this torrent or in the
+// session, preserving the order and reusing the slice.
 func (t *torrent) filterBannedIPs(a []*net.TCPAddr) []*net.TCPAddr {
 	b := a[:0]
 	for _, x := range a {
 		if !t.ipBanned(x.IP.String()) {
 			b = append(b, x)
 		}
+	}
+	return b
+}
+
+// localEndpoint reports an address a remote peer must never make us dial:
+// loopback, link-local, unspecified or multicast. None of them can be a
+// BitTorrent peer reached through someone else's gossip, and dialling them on
+// request turns the client into a scanner of its own host and router
+// (libtorrent refuses them at PEX and, since 2.1.1, at the holepunch
+// rendezvous). Private LAN addresses stay: a peer on the same network
+// legitimately gossips them, and BEP 40 already ranks them.
+func localEndpoint(ip net.IP) bool {
+	if ip == nil {
+		return true
+	}
+	return ip.IsLoopback() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() ||
+		ip.IsUnspecified() || ip.IsMulticast()
+}
+
+// filterLocalEndpoints drops the addresses localEndpoint refuses, preserving
+// the order and reusing the slice.
+func filterLocalEndpoints(addrs []*net.TCPAddr) []*net.TCPAddr {
+	b := addrs[:0]
+	for _, a := range addrs {
+		if a == nil || localEndpoint(a.IP) {
+			continue
+		}
+		b = append(b, a)
 	}
 	return b
 }

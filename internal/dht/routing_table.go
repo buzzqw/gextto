@@ -8,12 +8,14 @@ import (
 )
 
 // newRoutingTable starts an empty table: tree, address book and subnet
-// counters.
-func newRoutingTable(log *DebugLogger) *routingTable {
+// counters. filter, when not nil, refuses an address before it enters the
+// table (the operator's IP filter).
+func newRoutingTable(log *DebugLogger, filter func(net.IP) bool) *routingTable {
 	return &routingTable{
 		nTree:       &nTree{},
 		addresses:   make(map[string]*remoteNode),
 		subnetNodes: make(map[string]int),
+		filter:      filter,
 		log:         log,
 	}
 }
@@ -36,6 +38,9 @@ type routingTable struct {
 	// subnetNodes counts tree occupants per subnet key, maintained
 	// incrementally so cap checks stay O(1).
 	subnetNodes map[string]int
+
+	// filter refuses an address before it enters the table.
+	filter func(net.IP) bool
 
 	log *DebugLogger
 }
@@ -160,6 +165,9 @@ func isValidAddr(addr string) bool {
 // entry id-labelled but slotless (noTree), so it is neither re-discovered
 // in a loop nor counted; others enter the tree and the counter.
 func (r *routingTable) update(node *remoteNode, proto string) error {
+	if r.filter != nil && r.filter(node.address.IP) {
+		return fmt.Errorf("routingTable.update() refused a filtered address %v", node.address.IP)
+	}
 	_, addr, existed, err := r.hostPortToNode(node.address.String(), proto)
 	if err != nil {
 		return err
@@ -197,6 +205,9 @@ func (r *routingTable) insert(node *remoteNode, proto string) error {
 	}
 	if node.address.IP.IsUnspecified() {
 		return fmt.Errorf("routingTable.insert() got a node with a non-specified IP address")
+	}
+	if r.filter != nil && r.filter(node.address.IP) {
+		return fmt.Errorf("routingTable.insert() refused a filtered address %v", node.address.IP)
 	}
 	_, addr, existed, err := r.hostPortToNode(node.address.String(), proto)
 	if err != nil {

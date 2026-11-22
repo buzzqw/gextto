@@ -27,10 +27,6 @@ still be true after the item lands does not belong here.
 - **Compressed RAR 4 and solid archives**: extract them too (RAR 4 needs its own LZ and PPMd decoder). Gate: a real release that arrived that way.
 - **Memory on a shaped line**: own memory while downloading on the shaped 100 Mbit/s line is above qBittorrent, anacrolix and Transmission; close the gap on the paths a heap profile names. Gate: a heap profile of that scenario inside the comparison harness.
 
-- **Which IPv6 address the announce publishes**: the HTTP announce carries no
-  `ipv6=`, so a tracker lists us only at the IPv4 address it sees and a v6-only
-  peer finds us through PEX and the DHT alone. Gate: a rule for choosing the
-  address (global, never a temporary/privacy one) with a test for both cases.
 - **The state marshal still holds `d.mu` once per coalesced save**: the tick's
   write is now ~14 ns, but `json.MarshalIndent` is ~4 ms at 1000 torrents and
   runs inside the lock every 10 s window. Gate: a deep-copy or copy-on-write

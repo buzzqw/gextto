@@ -249,15 +249,21 @@ type packetConn interface {
 }
 
 // sendMsg bencodes a query and datagrams it to the node, metering volume.
-// Marshal failures drop silently (nothing valid to send).
-func sendMsg(conn packetConn, raddr net.UDPAddr, query interface{}, log DebugLogger) {
+// Marshal failures drop silently (nothing valid to send). A node the IP filter
+// refuses is never written to, so a blocklist loaded after the table was built
+// still stops the traffic.
+func (d *DHT) sendMsg(raddr net.UDPAddr, query interface{}) {
+	if d.blocked(raddr.IP) {
+		totalPacketsFiltered.Add(1)
+		return
+	}
 	totalSent.Add(1)
 	var b bytes.Buffer
 	if err := bencode.Marshal(&b, query); err != nil {
 		return
 	}
-	if n, err := conn.WriteTo(b.Bytes(), &raddr); err != nil {
-		log.Debugf("DHT: node write failed to %+v, error=%s", raddr, err)
+	if n, err := d.conn.WriteTo(b.Bytes(), &raddr); err != nil {
+		d.DebugLogger.Debugf("DHT: node write failed to %+v, error=%s", raddr, err)
 	} else {
 		totalWrittenBytes.Add(int64(n))
 	}

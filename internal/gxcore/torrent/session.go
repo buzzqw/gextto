@@ -129,6 +129,11 @@ type Session struct {
 	mBlocklist         sync.RWMutex
 	blocklist          *blocklist.Blocklist
 	blocklistTimestamp time.Time
+
+	// Cached IPv6 address for the announce (announce_ipv6.go).
+	mAnnounce6  sync.Mutex
+	announce6   string
+	announce6At time.Time
 }
 
 // NewSession builds a session from cfg: validated egress, resume database,
@@ -186,9 +191,12 @@ func NewSession(cfg Config) (*Session, error) {
 			utpSocket.Close()
 		}
 	}()
+	// The blocklist exists this early because the DHT uses it too: a
+	// blocked host must not become a routing-table node.
+	bl := blocklist.NewLogger(l.Errorf)
 	var dhtNode *dht.DHT
 	if cfg.DHTEnabled {
-		if dhtNode, err = startDHTNode(cfg, utpSocket); err != nil {
+		if dhtNode, err = startDHTNode(cfg, utpSocket, bl); err != nil {
 			return nil, err
 		}
 		defer func() {
@@ -197,7 +205,7 @@ func NewSession(cfg Config) (*Session, error) {
 			}
 		}()
 	}
-	c := assembleSession(cfg, l, db, res, utpSocket, dhtNode)
+	c := assembleSession(cfg, l, db, res, utpSocket, dhtNode, bl)
 	if err = c.startBlocklistReloader(); err != nil {
 		return nil, err
 	}
@@ -313,9 +321,12 @@ func openSharedSocket(cfg Config) (*utp.Socket, error) {
 // else the configured host (blank for a self-bound dual-stack socket);
 // bootstrap routers, no routing-table persistence, no target peers; secure
 // node id from the public IP when known (BEP 42); read-only on request
-// (BEP 43).
-func startDHTNode(cfg Config, utpSocket *utp.Socket) (*dht.DHT, error) {
+// (BEP 43); the session blocklist as the node filter.
+func startDHTNode(cfg Config, utpSocket *utp.Socket, bl *blocklist.Blocklist) (*dht.DHT, error) {
 	dhtConfig := dht.NewConfig()
+	if bl != nil {
+		dhtConfig.IPFilter = bl.Blocked
+	}
 	dhtConfig.Address = cfg.DHTHost
 	dhtConfig.Port = int(cfg.DHTPort)
 	dhtConfig.UDPProto = udpProtoForHost(cfg.DHTHost)
@@ -343,12 +354,11 @@ func startDHTNode(cfg Config, utpSocket *utp.Socket) (*dht.DHT, error) {
 // assembleSession builds the Session with its transports, caches, budgets
 // and registries; the storage defaults to files, the limiters to the
 // configured KiB/s floors.
-func assembleSession(cfg Config, l logger.Logger, db *bbolt.DB, res *boltdbresumer.Resumer, utpSocket *utp.Socket, dhtNode *dht.DHT) *Session {
+func assembleSession(cfg Config, l logger.Logger, db *bbolt.DB, res *boltdbresumer.Resumer, utpSocket *utp.Socket, dhtNode *dht.DHT, bl *blocklist.Blocklist) *Session {
 	ports := make(map[int]struct{})
 	for p := cfg.PortBegin; p < cfg.PortEnd; p++ {
 		ports[int(p)] = struct{}{}
 	}
-	bl := blocklist.NewLogger(l.Errorf)
 	var blTracker *blocklist.Blocklist
 	if cfg.BlocklistEnabledForTrackers {
 		blTracker = bl

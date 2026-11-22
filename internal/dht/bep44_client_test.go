@@ -36,7 +36,7 @@ func newClientTestDHT(t *testing.T) (*DHT, *fakeConn) {
 	}
 	d.DebugLogger = &nullLogger{}
 	d.conn = &fakeConn{}
-	d.routingTable = newRoutingTable(&d.DebugLogger)
+	d.routingTable = newRoutingTable(&d.DebugLogger, nil)
 	d.config.UDPProto = "udp4"
 	return d, d.conn.(*fakeConn)
 }

@@ -226,7 +226,7 @@ func mapInt(m map[string]interface{}, key string) int64 {
 }
 
 func (d *DHT) replyError(addr net.UDPAddr, t string, code int, msg string) {
-	sendMsg(d.conn, addr, errorMessage{T: t, Y: "e", E: []interface{}{code, msg}}, d.DebugLogger)
+	d.sendMsg(addr, errorMessage{T: t, Y: "e", E: []interface{}{code, msg}})
 }
 
 // replyPut handles a BEP 44 "put": it validates the token, the salt, the size
@@ -303,7 +303,7 @@ func (d *DHT) replyPut(addr net.UDPAddr, raw []byte) {
 	}
 	d.items.put(item)
 	replyArgs := map[string]interface{}{"id": d.nodeId}
-	sendMsg(d.conn, addr, replyMessage{T: req.T, Y: "r", R: replyArgs, IP: replyIP(addr)}, d.DebugLogger)
+	d.sendMsg(addr, replyMessage{T: req.T, Y: "r", R: replyArgs, IP: replyIP(addr)})
 }
 
 // replyGet handles a BEP 44 "get": it returns the stored item (the optional seq
@@ -340,7 +340,7 @@ func (d *DHT) replyGet(addr net.UDPAddr, raw []byte) {
 			}
 		}
 	}
-	sendMsg(d.conn, addr, replyMessage{T: req.T, Y: "r", R: r0, IP: replyIP(addr)}, d.DebugLogger)
+	d.sendMsg(addr, replyMessage{T: req.T, Y: "r", R: r0, IP: replyIP(addr)})
 }
 
 // putQuery sends a BEP 44 put to a node (used to publish an item to the closest
@@ -348,7 +348,7 @@ func (d *DHT) replyGet(addr net.UDPAddr, raw []byte) {
 func (d *DHT) putQuery(r *remoteNode, args map[string]interface{}) {
 	transId := r.newQuery("put")
 	query := queryMessage{transId, "q", "put", args, d.readOnlyFlag()}
-	sendMsg(d.conn, r.address, query, d.DebugLogger)
+	d.sendMsg(r.address, query)
 }
 
 // getQuery sends a BEP 44 get to a node.
@@ -359,5 +359,5 @@ func (d *DHT) getQuery(r *remoteNode, target [20]byte, seq *int64) {
 		args["seq"] = *seq
 	}
 	query := queryMessage{transId, "q", "get", args, d.readOnlyFlag()}
-	sendMsg(d.conn, r.address, query, d.DebugLogger)
+	d.sendMsg(r.address, query)
 }

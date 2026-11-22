@@ -150,7 +150,9 @@ expiry and revocation; a new password closes the sessions.
 opened from a PC on the LAN could add or delete torrents, so:
 
 - **CSRF**: POSTs without an `Origin`/`Referer` equal to the host of the UI are refused
-  (or a form token is required);
+  (or a form token is required), and `Sec-Fetch-Site: cross-site` is refused on
+  its own: it is set by the browser and the page cannot suppress it, while
+  `Referer` disappears with `Referrer-Policy: no-referrer`;
 - **DNS rebinding**: only requests whose `Host` is a local IP or a configured name are
   accepted;
 - **what counts as LAN** is read **from the socket** (RFC 1918, link-local, loopback,
@@ -159,6 +161,17 @@ opened from a PC on the LAN could add or delete torrents, so:
 
 In managed none of this activates: the wizard and the login stay off, Gextto is in
 charge.
+
+**A peer does not choose our network.** The addresses a peer names are not
+trusted: a PEX entry or a BEP 55 `connect` that points at loopback, a link-local
+or an unspecified address is dropped, because dialling it on request would turn
+the client into a scanner of its own host and router; a private LAN address is
+kept (BEP 40 ranks it and two peers on the same network legitimately exchange
+it), and the operator's manual peers are never filtered. The operator's IP
+filter reaches the DHT too, not only the peers: a blocked host never becomes a
+routing-table node and its packets are dropped unread. Both rules follow
+libtorrent 2.1.1 (*"validate peer-supplied endpoints against local addresses"*,
+*"apply IP filter to DHT node"*).
 
 **A peer's fault costs one connection.** The bytes a peer, a tracker or a web seed sends
 are a stranger's, and a bug in a parser or in a handler must not take the daemon down

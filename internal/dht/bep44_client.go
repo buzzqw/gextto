@@ -223,7 +223,7 @@ func (d *DHT) bep44SendGet(lk *bep44Lookup, r *remoteNode) {
 		args["seq"] = *lk.req.seq
 	}
 	r.lastSearchTime = time.Now()
-	sendMsg(d.conn, r.address, queryMessage{transId, "q", "get", args, d.readOnlyFlag()}, d.DebugLogger)
+	d.sendMsg(r.address, queryMessage{transId, "q", "get", args, d.readOnlyFlag()})
 }
 
 // bep44SendPut sends a "put" to one node with the token from its get reply.
@@ -246,7 +246,7 @@ func (d *DHT) bep44SendPut(lk *bep44Lookup, r *remoteNode, token string) {
 			args["salt"] = string(lk.req.salt)
 		}
 	}
-	sendMsg(d.conn, r.address, queryMessage{transId, "q", "put", args, d.readOnlyFlag()}, d.DebugLogger)
+	d.sendMsg(r.address, queryMessage{transId, "q", "put", args, d.readOnlyFlag()})
 }
 
 // handleBep44Reply processes a get/put reply inside the run loop: it records the

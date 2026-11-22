@@ -99,6 +99,7 @@ func (t *torrent) announcerFields() tracker.Torrent {
 		Port:            t.port,
 		BytesDownloaded: t.bytesDownloaded.Count(),
 		BytesUploaded:   t.bytesUploaded.Count(),
+		IPv6:            t.session.announceIPv6Address(),
 	}
 	// t.bytesComplete() reads t.bitfield; hold the lock across both uses.
 	t.mBitfield.RLock()

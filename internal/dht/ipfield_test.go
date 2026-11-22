@@ -36,7 +36,7 @@ func TestRepliesIncludeIPField(t *testing.T) {
 		d := &DHT{nodeId: strings.Repeat("a", 20), items: newItemStore()}
 		d.DebugLogger = &nullLogger{}
 		d.conn = &fakeConn{}
-		d.routingTable = newRoutingTable(&d.DebugLogger)
+		d.routingTable = newRoutingTable(&d.DebugLogger, nil)
 		d.tokenSecrets = []string{"one", "two"}
 		return d, d.conn.(*fakeConn)
 	}
@@ -100,7 +100,7 @@ func TestAnnouncePeerImpliedPort(t *testing.T) {
 		d := &DHT{nodeId: strings.Repeat("a", 20), items: newItemStore()}
 		d.DebugLogger = &nullLogger{}
 		d.conn = &fakeConn{}
-		d.routingTable = newRoutingTable(&d.DebugLogger)
+		d.routingTable = newRoutingTable(&d.DebugLogger, nil)
 		d.tokenSecrets = []string{"one", "two"}
 		d.peerStore = newPeerStore(16, 16)
 		d.PeersRequestResults = make(chan map[InfoHash][]string, 1)
@@ -142,7 +142,7 @@ func TestAnnouncePeerRejectsInvalidPort(t *testing.T) {
 		d.DebugLogger = &nullLogger{}
 		conn := &fakeConn{}
 		d.conn = conn
-		d.routingTable = newRoutingTable(&d.DebugLogger)
+		d.routingTable = newRoutingTable(&d.DebugLogger, nil)
 		d.tokenSecrets = []string{"one", "two"}
 		d.peerStore = newPeerStore(16, 16)
 		d.PeersRequestResults = make(chan map[InfoHash][]string, 1)

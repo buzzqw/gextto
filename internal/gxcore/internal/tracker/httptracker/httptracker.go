@@ -133,6 +133,12 @@ func (t *HTTPTracker) announceQuery(req tracker.AnnounceRequest) string {
 	}
 	sb.WriteString("&key=")
 	sb.WriteString(hex.EncodeToString(req.Torrent.PeerID[16:20]))
+	if req.Torrent.IPv6 != "" {
+		// BEP 7: the address the tracker cannot see because the
+		// announce travels over IPv4. The colons are escaped.
+		sb.WriteString("&ipv6=")
+		sb.WriteString(url.QueryEscape(req.Torrent.IPv6))
+	}
 	return sb.String()
 }
 

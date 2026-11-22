@@ -83,6 +83,11 @@ type Config struct {
 	// queries and asks not to be added to other nodes' routing tables. Useful
 	// behind a restrictive NAT or to reduce traffic.
 	ReadOnly bool
+	// IPFilter, when set, is consulted for every peer address the node handles:
+	// a blocked address is never added to the routing table, never queried and
+	// its packets are dropped. It is how the client's blocklist reaches the DHT,
+	// which used to filter peers only (libtorrent 2.1.1 does the same).
+	IPFilter func(net.IP) bool
 }
 
 // Creates a *Config populated with default values.
@@ -247,7 +252,7 @@ func makeNode(cfg Config) *DHT {
 		removeInfoHash:         make(chan InfoHash),
 		clientThrottle:         newClientThrottle(cfg.ClientPerMinuteLimit, cfg.ThrottlerTrackedClients),
 	}
-	routingTable := newRoutingTable(&node.DebugLogger)
+	routingTable := newRoutingTable(&node.DebugLogger, cfg.IPFilter)
 	routingTable.maxPerSubnet = cfg.MaxNodesPerSubnet
 	node.routingTable = routingTable
 	node.tokenSecrets = []string{node.newTokenSecret(), node.newTokenSecret()}
@@ -677,8 +682,20 @@ func (d *DHT) helloFromPeer(addr string) {
 	}
 }
 
+// blocked reports whether the operator's IP filter refuses this address.
+func (d *DHT) blocked(ip net.IP) bool {
+	return d.config.IPFilter != nil && d.config.IPFilter(ip)
+}
+
 func (d *DHT) processPacket(p packetType) {
 	d.DebugLogger.Debugf("DHT processing packet from %v", p.raddr.String())
+	if d.blocked(p.raddr.IP) {
+		// The operator's blocklist covers the DHT too: a blocked host
+		// is not a node, so it is neither added, answered nor queried.
+		totalPacketsFiltered.Add(1)
+		d.DebugLogger.Debugf("DHT: packet from a filtered host dropped.")
+		return
+	}
 	if !d.clientThrottle.CheckBlock(p.raddr.IP.String()) {
 		totalPacketsFromBlockedHosts.Add(1)
 		d.DebugLogger.Debugf("Node exceeded rate limiter. Dropping packet.")
@@ -854,7 +871,7 @@ func (d *DHT) pingNode(r *remoteNode) {
 
 	queryArguments := map[string]interface{}{"id": d.nodeId}
 	query := queryMessage{t, "q", "ping", queryArguments, d.readOnlyFlag()}
-	sendMsg(d.conn, r.address, query, d.DebugLogger)
+	d.sendMsg(r.address, query)
 	totalSentPing.Add(1)
 }
 
@@ -923,7 +940,7 @@ func (d *DHT) getPeersFrom(r *remoteNode, ih InfoHash) {
 	query := queryMessage{transId, "q", ty, queryArguments, d.readOnlyFlag()}
 	d.DebugLogger.Debugf("DHT sending get_peers. nodeID: %x@%v, InfoHash: %x , distance: %x", r.id, r.address, ih, hashDistance(InfoHash(r.id), ih))
 	r.lastSearchTime = time.Now()
-	sendMsg(d.conn, r.address, query, d.DebugLogger)
+	d.sendMsg(r.address, query)
 }
 
 // findNodeFrom queries one node for id's neighborhood, tagging the exchange.
@@ -944,7 +961,7 @@ func (d *DHT) findNodeFrom(r *remoteNode, id string) {
 	query := queryMessage{transId, "q", ty, queryArguments, d.readOnlyFlag()}
 	d.DebugLogger.Debugf("DHT sending find_node. nodeID: %x@%v, target ID: %x , distance: %x", r.id, r.address, id, hashDistance(InfoHash(r.id), ih))
 	r.lastSearchTime = time.Now()
-	sendMsg(d.conn, r.address, query, d.DebugLogger)
+	d.sendMsg(r.address, query)
 }
 
 // announcePeer advertises ourselves as a peer for ih to address, token
@@ -975,7 +992,7 @@ func (d *DHT) announcePeer(address net.UDPAddr, ih InfoHash, port int, token str
 		"token":     token,
 	}
 	query := queryMessage{transId, "q", ty, queryArguments, d.readOnlyFlag()}
-	sendMsg(d.conn, address, query, d.DebugLogger)
+	d.sendMsg(address, query)
 	totalSentAnnouncePeer.Add(1)
 }
 
@@ -1038,7 +1055,7 @@ func (d *DHT) replyAnnouncePeer(addr net.UDPAddr, node *remoteNode, r responseTy
 		IP: replyIP(addr),
 		R:  map[string]interface{}{"id": d.nodeId},
 	}
-	sendMsg(d.conn, addr, reply, d.DebugLogger)
+	d.sendMsg(addr, reply)
 }
 
 // replyGetPeers answers with a token plus the BEP 33 scrape filters for a
@@ -1054,7 +1071,7 @@ func (d *DHT) replyGetPeers(addr net.UDPAddr, r responseType) {
 		d.Logger.GetPeers(addr, r.A.Id, r.A.InfoHash)
 	}
 
-	sendMsg(d.conn, addr, d.buildGetPeersReply(addr, r), d.DebugLogger)
+	d.sendMsg(addr, d.buildGetPeersReply(addr, r))
 }
 
 // buildGetPeersReply builds the reply of one get_peers query, apart from the
@@ -1169,7 +1186,7 @@ func (d *DHT) replyFindNode(addr net.UDPAddr, r responseType) {
 	if len(v6) > 0 {
 		reply.R["nodes6"] = strings.Join(v6, "")
 	}
-	sendMsg(d.conn, addr, reply, d.DebugLogger)
+	d.sendMsg(addr, reply)
 }
 
 // replyPing answers a liveness probe with our id.
@@ -1181,7 +1198,7 @@ func (d *DHT) replyPing(addr net.UDPAddr, response responseType) {
 		IP: replyIP(addr),
 		R:  map[string]interface{}{"id": d.nodeId},
 	}
-	sendMsg(d.conn, addr, reply, d.DebugLogger)
+	d.sendMsg(addr, reply)
 }
 
 // Process another node's response to a get_peers query. If the response
@@ -1353,6 +1370,7 @@ var (
 	totalGetPeersDupes           = expvar.NewInt("totalGetPeersDupes")
 	totalFindNodeDupes           = expvar.NewInt("totalFindNodeDupes")
 	totalSelfPromotions          = expvar.NewInt("totalSelfPromotions")
+	totalPacketsFiltered         = expvar.NewInt("totalPacketsFiltered")
 	totalPeers                   = expvar.NewInt("totalPeers")
 	totalSentPing                = expvar.NewInt("totalSentPing")
 	totalSentGetPeers            = expvar.NewInt("totalSentGetPeers")
@@ -1403,10 +1421,11 @@ func Stats() map[string]int64 {
 
 		// Screening and health: rejected and ignored noise, measurable across
 		// hardening changes.
-		"blocked_hosts":   totalPacketsFromBlockedHosts.Value(),
-		"self_promotions": totalSelfPromotions.Value(),
-		"dupe_references": totalGetPeersDupes.Value() + totalFindNodeDupes.Value(),
-		"nodes_killed":    totalKilledNodes.Value(),
+		"blocked_hosts":     totalPacketsFromBlockedHosts.Value(),
+		"blocked_by_filter": totalPacketsFiltered.Value(),
+		"self_promotions":   totalSelfPromotions.Value(),
+		"dupe_references":   totalGetPeersDupes.Value() + totalFindNodeDupes.Value(),
+		"nodes_killed":      totalKilledNodes.Value(),
 
 		// Token hygiene: accepted vs rejected (wrong, missing, foreign-scope).
 		"announce_ok_token":  totalAnnounceTokenOK.Value(),

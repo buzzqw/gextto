@@ -80,7 +80,7 @@ stay narrow and the tables remain readable.
 
 | BEP | Specification | Status |
 |---|---|---|
-| 7 | IPv6 Tracker Extension (`peers6`) | yes |
+| 7 | IPv6 Tracker Extension (`peers6` response, `ipv6=` announce) | yes |
 | 15 | UDP Tracker Protocol (connect/announce/scrape) | yes |
 | 31 | Tracker Failure Retry Extension | yes |
 | 41 | UDP Tracker Protocol Extensions (`URLData`, option `0x2`) | yes |
@@ -89,6 +89,13 @@ stay narrow and the tables remain readable.
 
 > **BEP 31** honours `retry in` (in minutes) and `never`; `never` drops the
 > tracker from the tier.
+>
+> **BEP 7** is complete: the announce reads `peers6` and, when there is one
+> worth publishing, sends `ipv6=`. The address is chosen as BiglyBT does:
+> global unicast of an up interface, never link-local, never a ULA, never one
+> the system marks temporary/privacy, deprecated or tentative; nothing is sent
+> when there is no global address or the listener is bound to IPv4
+> (`gx-torrent.md`, *IPv6*).
 >
 > **BEP 34 (DNS Tracker Preferences)** is not implemented: it lets a tracker
 > host advertise its endpoints as SRV records (`_udp.…`, `_http._tcp.…`) so a

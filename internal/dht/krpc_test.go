@@ -198,7 +198,7 @@ func TestReadResponseDecodesIPField(t *testing.T) {
 // pure functions under test that do not talk to the network.
 func newTestDHT() *DHT {
 	d := &DHT{DebugLogger: &nullLogger{}}
-	d.routingTable = newRoutingTable(&d.DebugLogger)
+	d.routingTable = newRoutingTable(&d.DebugLogger, nil)
 	d.peerStore = newPeerStore(10, 10)
 	return d
 }

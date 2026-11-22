@@ -227,7 +227,17 @@ func lanSource(ip net.IP) bool {
 // sameOrigin reports whether a POST comes from the page itself. A request with
 // no Origin and no Referer (a non-browser client, or a same-origin GET) is not
 // a CSRF vector and is allowed; when a header is present it must match Host.
+//
+// Sec-Fetch-Site is checked first because it is the only one the page cannot
+// suppress: a page on another site sets Referrer-Policy: no-referrer and takes
+// Referer away, and a browser that does not send Origin would leave the request
+// with no header at all (qBittorrent 5.3 moved to this header for the same
+// reason). Clients that do not send it keep the previous path.
 func sameOrigin(r *http.Request) bool {
+	if site := strings.TrimSpace(r.Header.Get("Sec-Fetch-Site")); site != "" &&
+		strings.EqualFold(site, "cross-site") {
+		return false
+	}
 	if origin := strings.TrimSpace(r.Header.Get("Origin")); origin != "" {
 		return originMatchesHost(origin, r.Host)
 	}

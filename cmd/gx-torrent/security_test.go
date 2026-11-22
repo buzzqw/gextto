@@ -19,6 +19,10 @@ func TestSameOrigin(t *testing.T) {
 		}
 		return req
 	}
+	withSite := func(req *http.Request, site string) *http.Request {
+		req.Header.Set("Sec-Fetch-Site", site)
+		return req
+	}
 	cases := []struct {
 		name string
 		req  *http.Request
@@ -30,6 +34,13 @@ func TestSameOrigin(t *testing.T) {
 		{"origin null", mk("null", "", "127.0.0.1:8890"), false},
 		{"matching referer", mk("", "http://127.0.0.1:8890/", "127.0.0.1:8890"), true},
 		{"foreign referer", mk("", "http://evil.example/x", "127.0.0.1:8890"), false},
+		// Sec-Fetch-Site cannot be suppressed by the page: it stops a
+		// cross-site POST that carries neither Origin nor Referer.
+		{"cross-site without origin or referer", withSite(mk("", "", "127.0.0.1:8890"), "cross-site"), false},
+		{"cross-site even with a matching origin", withSite(mk("http://127.0.0.1:8890", "", "127.0.0.1:8890"), "cross-site"), false},
+		{"same-origin site", withSite(mk("", "", "127.0.0.1:8890"), "same-origin"), true},
+		{"same-site still needs the origin check", withSite(mk("", "", "127.0.0.1:8890"), "same-site"), true},
+		{"none (typed address)", withSite(mk("", "", "127.0.0.1:8890"), "none"), true},
 	}
 	for _, c := range cases {
 		if got := sameOrigin(c.req); got != c.want {
@@ -57,6 +68,31 @@ func TestStandaloneGuard(t *testing.T) {
 	}
 	if rec, called := post("http://127.0.0.1:8890"); rec.Code != http.StatusOK || !*called {
 		t.Fatalf("standalone must allow a same-origin POST: status=%d called=%v", rec.Code, *called)
+	}
+}
+
+func TestStandaloneGuardRejectsCrossSiteWithoutOrigin(t *testing.T) {
+	called := false
+	next := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { called = true; w.WriteHeader(http.StatusOK) })
+	d := &Daemon{opts: Options{Mode: ModeStandalone}}
+
+	// Referrer-Policy: no-referrer takes Referer away; a browser that omits
+	// Origin would leave the request with no header at all. Sec-Fetch-Site
+	// survives both.
+	req := httptest.NewRequest(http.MethodPost, "http://127.0.0.1:8890/ui/action", nil)
+	req.Header.Set("Sec-Fetch-Site", "cross-site")
+	rec := httptest.NewRecorder()
+	d.standaloneGuard(next).ServeHTTP(rec, req)
+	if rec.Code != http.StatusForbidden || called {
+		t.Fatalf("a cross-site POST with no Origin must be rejected: status=%d called=%v", rec.Code, called)
+	}
+
+	// An API client (no Sec-Fetch-Site at all) keeps working.
+	api := httptest.NewRequest(http.MethodPost, "http://127.0.0.1:8890/api/v1/x", nil)
+	rec = httptest.NewRecorder()
+	d.standaloneGuard(next).ServeHTTP(rec, api)
+	if rec.Code != http.StatusOK || !called {
+		t.Fatalf("a client without Sec-Fetch-Site must pass: status=%d called=%v", rec.Code, called)
 	}
 }
 

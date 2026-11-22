@@ -124,5 +124,5 @@ func (d *DHT) getPeersFromScrape(r *remoteNode, ih InfoHash) {
 	}
 	query := queryMessage{transId, "q", "get_peers", queryArguments, d.readOnlyFlag()}
 	r.lastSearchTime = time.Now()
-	sendMsg(d.conn, r.address, query, d.DebugLogger)
+	d.sendMsg(r.address, query)
 }

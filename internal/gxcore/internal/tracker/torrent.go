@@ -12,4 +12,8 @@ type Torrent struct {
 	// PartialSeed marks a BEP 21 partial seed — every wanted piece present
 	// without full completion — whose announces carry event=paused.
 	PartialSeed bool
+	// IPv6 is the address the HTTP announce publishes in the BEP 7 "ipv6"
+	// parameter, so a tracker that only sees our IPv4 address can list us for
+	// v6 peers. Empty means "do not publish": there is no global address.
+	IPv6 string
 }

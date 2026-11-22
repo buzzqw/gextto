@@ -1544,10 +1544,14 @@ RPC server is disabled.
     (`name:start-end`) and eMule `ipfilter.dat`. eMule rules with level
     ≥ 128 allow traffic; IPv6 rules in CIDR form are applied
     (ranges/P2P/eMule remain IPv4 only).
-  - The filter applies to incoming and outgoing peers, and to trackers only
-    when `torrent_apply_ip_filter` is on (off by default: the bundled eMule
-    Security list carries the Cloudflare ranges, so trackers hosted there
-    would answer "tracker IP is blocked" and never work).
+  - The filter applies to incoming and outgoing peers, **to the DHT** and to
+    trackers only when `torrent_apply_ip_filter` is on (off by default: the
+    bundled eMule Security list carries the Cloudflare ranges, so trackers
+    hosted there would answer "tracker IP is blocked" and never work).
+  - On the DHT a blocked host is never added to the routing table, its packets
+    are dropped before the parser and nothing is written back to it, so a list
+    loaded while the node is running still stops the traffic; the drops are
+    counted in `dht_blocked_by_filter` (`GET /api/v1/stats`, `dht_<key>`).
   - gextto's "Update IP filter" button also works with gx-torrent:
     it downloads the list if it is a URL and reloads it in the daemon.
   - The file is **updated at the startup of the service** and then **once a
@@ -1672,6 +1676,14 @@ RPC server is disabled.
   without lookups. Peers get a `country` field in
   `GET /api/v1/torrents/{hash}/peers` and a chip on the daemon page. No
   peer address leaves the machine.
+- **PEX gossip of local endpoints.** An address gossiped through PEX that is
+  loopback, link-local, unspecified or multicast is dropped: PEX is the one
+  channel where another peer names addresses for us, and dialling them on
+  request would turn the client into a scanner of its own host and router.
+  Private LAN addresses are kept (BEP 40 ranks them, and two peers on the same
+  network legitimately exchange them); tracker, DHT and manual peers keep every
+  address they return, because a private tracker on the LAN is legitimate too.
+  libtorrent applies the same screen to `ut_pex` (`ut_pex.cpp`).
 - **Per-torrent peer sources.** `POST /api/v1/torrents/{hash}/peer-options`
   (`dht`, `pex`, `lsd`) turns the DHT announcer, the PEX exchange and LSD on or
   off for one torrent. DHT off closes its announcer at once; PEX off ends the
@@ -1793,6 +1805,19 @@ libtorrent; it is not libtorrent's proprietary DHT-node relay.
   flight: a `connect` message names the endpoint we would open, so the
   allowance keeps a hostile peer from turning the client into a scanner. The
   messages past the allowance are ignored and logged at debug level.
+- **Loopback, link-local, unspecified and multicast endpoints are never
+  dialled**, neither from a `connect` nor when we ask for a rendezvous: a
+  stranger has no business making us knock on `127.0.0.1`, on the router or on
+  a link-local service. A private LAN address stays reachable — the peer behind
+  the same NAT is what BEP 55 is for — and the operator's **manual** peers are
+  not filtered at all. libtorrent drew the same line (2.1.1, "validate
+  peer-supplied endpoints against local addresses").
+- **A peer that did not advertise the extension gets no reply.** The rendezvous
+  reply is addressed with the ID the *sender* advertised, so a peer that never
+  announced `ut_holepunch` cannot receive one: the message is dropped instead of
+  being built, the shape of GHSA-c5j3-3rp9-c4rv in anacrolix/torrent (an
+  unguarded lookup that panicked the whole process from the read loop). A test
+  pins both halves.
 - Known limit: as for `ut_metadata`/`ut_pex`, the incoming message is
   recognised via the local ID of the extension; a peer that assigns to
   `ut_holepunch` an ID other than 3 is not understood (pre-existing limit
@@ -2982,14 +3007,19 @@ available: if the v6 listener does not open, the LSD stays active on IPv4. In th
 other cases the LSD also announces and listens on the group `[ff15::efc0:988f]:6771`
 (the BEP 14 multicast group).
 
-**The announce carries no `ipv6=` yet.** A tracker lists us at the address it
-sees the announce coming from, which is the IPv4 one, so a v6-only peer reaches
-us through PEX and the DHT but not through a tracker's peer list. The missing
-piece is not the parameter (BEP 7 has it) but the answer to *which* address to
-publish: a global one, chosen among the public addresses of the interfaces, and
-never a temporary/privacy address that rotates — publishing one of those would
-advertise an endpoint that is gone a day later. Until that rule exists the
-parameter is left out on purpose (see `docs/todo.md`).
+**The announce publishes `ipv6=` (BEP 7)** when there is an address worth
+publishing. The rule answers *which* one: only a **global unicast** address of
+an interface that is up, never a link-local one (not routable) nor a ULA
+(`fc00::/7`, reachable only inside the site), and never an address the system
+itself marks as temporary/privacy, deprecated or tentative (`/proc/net/if_inet6`
+on Linux; elsewhere the address class alone). The choice is cached for five
+minutes, because a privacy address rotates and enumerating the interfaces for
+every torrent's announce would be wasted work with a thousand torrents. Nothing
+is published when there is no global address, when the listener is bound to a
+specific IPv4 address, or when no inbound port is open: an address nobody can
+connect to only costs a peer a dial. The rule is the one BiglyBT adopted in
+4.1; the parameter is only added to the HTTP/HTTPS announce (a UDP or WebSocket
+tracker sees the source address itself).
 
 ## Profiling (CPU and heap)
 

@@ -185,6 +185,13 @@ func (t *torrent) handleHolepunchConnect(sender *peer.Peer, msg peerprotocol.Hol
 // holepunch, even when the torrent is seeding (a peer behind NAT can only be
 // reached this way).
 func (t *torrent) dialHolepunch(endpoint *net.TCPAddr) {
+	if endpoint == nil || localEndpoint(endpoint.IP) {
+		// A rendezvous for our own host, the router or a link-local
+		// address is never a peer reached through a relay: it is a
+		// request to knock on someone else's service (libtorrent
+		// rejects local endpoints since 2.1.1).
+		return
+	}
 	ip := endpoint.IP.String()
 	if _, ok := t.connectedPeerIPs[ip]; ok {
 		return
@@ -211,7 +218,7 @@ func (t *torrent) dialHolepunch(endpoint *net.TCPAddr) {
 // tryHolepunchRendezvous asks connected peers to introduce us to an endpoint we
 // could not reach directly. One attempt per endpoint.
 func (t *torrent) tryHolepunchRendezvous(target *net.TCPAddr) {
-	if !t.session.config.Holepunch || target == nil {
+	if !t.session.config.Holepunch || target == nil || localEndpoint(target.IP) {
 		return
 	}
 	key := target.String()
