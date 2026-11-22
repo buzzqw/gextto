@@ -102,6 +102,13 @@ func InspectActivePacks(cfg *Config, torrents TorrentEngine, db *Database, notif
 			checked[torrent.Hash] = settled
 			continue
 		}
+		// The file-level inspection decides one season at a time: a pack
+		// spanning several seasons is downloaded whole and decided at
+		// completion instead.
+		if release.MultiSeason() {
+			checked[torrent.Hash] = settled
+			continue
+		}
 		// A pack the user started by hand is their choice, not the cycle's:
 		// it is never discarded, even when every episode is already in the
 		// library (they may want it for the seed, another language, a check).

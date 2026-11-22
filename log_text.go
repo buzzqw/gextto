@@ -202,6 +202,9 @@ func logTarget(release *models.Release) string {
 		}
 		switch {
 		case complete || (release.Episode != nil && *release.Episode == 0 && len(episodes) == 0):
+			if release.SeasonEnd > season {
+				return fmt.Sprintf("%s seasons %d–%d", name, season, release.SeasonEnd)
+			}
 			return fmt.Sprintf("%s season %d", name, season)
 		case len(episodes) > 1:
 			first, last := episodes[0], episodes[0]

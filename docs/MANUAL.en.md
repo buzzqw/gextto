@@ -537,6 +537,11 @@ and — if you enable it — asks eD2k once per season when torrents find nothin
   a bracket follows it or the title has already moved on to the quality
   ("S06E01 11 1080p"): in "S06E12 68 Seconds" that number belongs to the
   episode title, not to a range.
+- A pack can cover **several seasons** ("S01-S03 Complete", "Stagioni 1-3"): each
+  episode lands in the folder of its own season, the gaps of every covered
+  season are filled and the log and notifications name the pack as "S01–S03".
+  A title that only says "complete series", with no numbers, is not recognised:
+  without the season numbers there is no range to check.
 - An episode written with a dash instead of the episode letter ("S02-01",
   "S02 - 01") is episode 1 of season 2, not season 2 as a whole.
 - When a title declares a single episode but the downloaded folder holds a
@@ -2652,7 +2657,7 @@ files. When the memory cannot be read, only the `tmpfs` space counts, as before.
 
 | Setting | What it does |
 |---|---|
-| Inspect downloading packs and discard useless ones | On: as soon as the engine knows the file list, Gextto checks whether at least one episode is really wanted (missing from the library or a real upgrade). If none is, the torrent is removed with its partial data and blocklisted, so it is not downloaded again. Off (default): the pack is downloaded in full and decided only when the download ends. |
+| Inspect downloading packs and discard useless ones | On: as soon as the engine knows the file list, Gextto checks whether at least one episode is really wanted (missing from the library or a real upgrade). If none is, the torrent is removed with its partial data and blocklisted, so it is not downloaded again. Off (default): the pack is downloaded in full and decided only when the download ends. A pack covering several seasons is not inspected file by file: it is downloaded in full and decided when the download ends. |
 | In useful packs, download only the files that are needed | On (with inspection): when the pack holds only some useful episodes, the engine downloads only those files and skips the others (priority 0); subtitles and files without an episode number stay active. Off: the useful pack is downloaded in full. |
 
 **Stalled torrents**

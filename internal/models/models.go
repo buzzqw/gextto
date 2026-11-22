@@ -646,6 +646,11 @@ type Release struct {
 	Kind         string  `json:"kind"`
 	Series       *string `json:"series"`
 	Season       *int64  `json:"season"`
+	// SeasonEnd is the last season a pack covers when it spans more than one
+	// ("S01-S03"): 0 for a release of a single season. Season stays the first
+	// one, so every reader of a single season keeps working; the approval, the
+	// staging and the archive use the whole range.
+	SeasonEnd    int64   `json:"season_end,omitempty"`
 	Episode      *int64  `json:"episode"`
 	IsPack       bool    `json:"is_pack"`
 	EpisodeRange []int64 `json:"episode_range"`
@@ -707,6 +712,32 @@ type Release struct {
 	// saved with the download so the UI and the notifications can say so, and
 	// the normal upgrade replaces it when a copy within the profile appears.
 	LastResort bool `json:"last_resort,omitempty"`
+}
+
+// SeasonLast is the last season the release covers: SeasonEnd for a
+// multi-season pack, Season itself otherwise (0 when it has no season).
+func (r *Release) SeasonLast() int64 {
+	if r == nil || r.Season == nil {
+		return 0
+	}
+	if r.SeasonEnd > *r.Season {
+		return r.SeasonEnd
+	}
+	return *r.Season
+}
+
+// MultiSeason reports whether the release spans more than one season.
+func (r *Release) MultiSeason() bool {
+	return r != nil && r.Season != nil && r.SeasonLast() > *r.Season
+}
+
+// CoversSeason reports whether the release covers the given season: the whole
+// range for a multi-season pack, its own season otherwise.
+func (r *Release) CoversSeason(season int64) bool {
+	if r == nil || r.Season == nil {
+		return false
+	}
+	return season >= *r.Season && season <= r.SeasonLast()
 }
 
 // TorrentMeta stores the release associated with a torrent hash.

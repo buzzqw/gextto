@@ -540,6 +540,12 @@ serve solo a non aspettare il ciclo successivo.
   intervallo solo se ha lo zero davanti («02»), se lo segue una parentesi quadra
   o se il titolo è già passato alla qualità («S06E01 11 1080p»): in «S06E12 68
   Seconds» quel numero fa parte del titolo della puntata, non dell'intervallo.
+- Un pack può coprire **più stagioni** («S01-S03 Complete», «Stagioni 1-3»): ogni
+  puntata entra nella cartella della sua stagione, i buchi di tutte le stagioni
+  coperte vengono riempiti e log e notifiche indicano il pack come «S01–S03».
+  Un titolo che dice soltanto «Serie completa», senza numeri, non viene
+  riconosciuto: senza il numero delle stagioni non c'è un intervallo da
+  verificare.
 - Una puntata scritta con il trattino al posto della lettera («S02-01», «S02 -
   01») è la puntata 1 della stagione 2, non la stagione 2 intera.
 - Se il titolo dichiara una puntata sola ma la cartella scaricata contiene un
@@ -2687,7 +2693,7 @@ spazio del `tmpfs`, come prima.
 
 | Impostazione | Cosa fa |
 |---|---|
-| Ispeziona i pack in download e scarta quelli inutili | Attivo: appena il motore conosce la lista dei file, Gextto controlla se almeno un episodio serve davvero (manca dalla libreria oppure è un vero upgrade). Se nessuno serve, il torrent viene rimosso con i dati parziali e messo in blocklist, così non viene più scaricato. Spento (predefinito): il pack viene scaricato per intero e deciso solo a download finito. |
+| Ispeziona i pack in download e scarta quelli inutili | Attivo: appena il motore conosce la lista dei file, Gextto controlla se almeno un episodio serve davvero (manca dalla libreria oppure è un vero upgrade). Se nessuno serve, il torrent viene rimosso con i dati parziali e messo in blocklist, così non viene più scaricato. Spento (predefinito): il pack viene scaricato per intero e deciso solo a download finito. Un pack che copre più stagioni non viene ispezionato file per file: viene scaricato intero e deciso a fine download. |
 | Nei pack utili scarica solo i file che servono | Attivo (con l'ispezione): quando il pack contiene solo alcuni episodi utili, il motore scarica soltanto quei file e salta gli altri (priorità 0); sottotitoli e file senza numero di episodio restano attivi. Spento: il pack utile viene scaricato per intero. |
 
 **Torrent bloccati**

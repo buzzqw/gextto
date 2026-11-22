@@ -325,7 +325,7 @@ func v2GapReleaseIdentity(release *models.Release) string {
 // v2GapReleaseCovers reports whether the release holds that episode: its own
 // number, its declared range, or the whole season of a complete pack.
 func v2GapReleaseCovers(release *models.Release, season, episode int64) bool {
-	if release == nil || release.Season == nil || *release.Season != season {
+	if release == nil || !release.CoversSeason(season) {
 		return false
 	}
 	if hasCompleteRange(release) {

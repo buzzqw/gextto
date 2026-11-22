@@ -889,7 +889,7 @@ func formatEmailSubjectLang(lang, event string, data map[string]any) string {
 		return fmt.Sprintf("Gextto: %s — %s", messages.PickLang(lang, "Download completato", "Download complete"), itemLabel)
 	case "season_pack_completed":
 		if series != "" && hasSeason {
-			return fmt.Sprintf("Gextto: %s — %s S%02d", messages.PickLang(lang, "Season Pack completato", "Season pack complete"), series, season)
+			return fmt.Sprintf("Gextto: %s — %s %s", messages.PickLang(lang, "Season Pack completato", "Season pack complete"), series, notificationSeason(data, season))
 		}
 		return fmt.Sprintf("Gextto: %s — %s", messages.PickLang(lang, "Season Pack completato", "Season pack complete"), itemLabel)
 	case "backup_completed":
@@ -1172,13 +1172,13 @@ func formatEventLang(lang, event string, data map[string]any) string {
 		upgradedCount, _ := jsonInt(mapLookup(data, "upgraded_count"))
 		discardedCount, _ := jsonInt(mapLookup(data, "discarded_count"))
 		body := fmt.Sprintf(
-			"%s\n\n🎬 %s S%02d\n\n💾 %s",
+			"%s\n\n🎬 %s %s\n\n💾 %s",
 			messages.PickLang(lang,
 				"✅ DOWNLOAD COMPLETATO — SEASON PACK ARCHIVIATO",
 				"✅ DOWNLOAD COMPLETE — SEASON PACK ARCHIVED",
 			),
 			valueText(data, "series", "Release"),
-			season,
+			notificationSeason(data, season),
 			formatBytes(size),
 		)
 		if newCount > 0 {
@@ -1596,6 +1596,16 @@ func formatEpisodeRanges(values []int64) string {
 // compact list of episode numbers, collapsing consecutive episodes into ranges.
 // The full paths stay out of the message: they are noise, the series folder is
 // already shown at the bottom.
+// notificationSeason names the season of a pack, as a range when the pack
+// covers several: "S01–S03" instead of "S01".
+func notificationSeason(data map[string]any, season int64) string {
+	end, _ := jsonInt(mapLookup(data, "season_end"))
+	if season > 0 && end > season {
+		return fmt.Sprintf("S%02d–S%02d", season, end)
+	}
+	return fmt.Sprintf("S%02d", season)
+}
+
 func formatSeasonEpisodes(value any) string {
 	value = deref(value)
 	if value == nil {

@@ -1259,6 +1259,7 @@ func ReconcilePackIdentity(release *models.Release, torrentName string) *models.
 	}
 	if !sameSeries ||
 		(optionalInt64Equal(parsed.Season, release.Season) &&
+			parsed.SeasonEnd == release.SeasonEnd &&
 			int64SlicesEqual(parsed.EpisodeRange, release.EpisodeRange)) {
 		return nil
 	}
@@ -1268,6 +1269,7 @@ func ReconcilePackIdentity(release *models.Release, torrentName string) *models.
 	// alias or a translated title even when its season is the authoritative
 	// one.
 	corrected.Season = parsed.Season
+	corrected.SeasonEnd = parsed.SeasonEnd
 	corrected.Episode = parsed.Episode
 	corrected.IsPack = parsed.IsPack
 	corrected.EpisodeRange = parsed.EpisodeRange
@@ -1374,6 +1376,7 @@ func ParseReleaseSource(title, magnet string, torrentURL *string, source string,
 		Kind:               kind,
 		Series:             parsed.series,
 		Season:             parsed.season,
+		SeasonEnd:          parsed.seasonEnd,
 		Episode:            parsed.episode,
 		IsPack:             isPack,
 		EpisodeRange:       parsed.episodeRange,
@@ -1396,8 +1399,11 @@ func ParseReleaseSource(title, magnet string, torrentURL *string, source string,
 // the next one try the same title, so a title is never read as a movie only
 // because the first pattern it happened to match was the wrong one.
 type releaseMatch struct {
-	series       *string
-	season       *int64
+	series    *string
+	season    *int64
+	// seasonEnd is the last season of a multi-season pack ("S01-S03"), 0 for
+	// every other release.
+	seasonEnd    int64
 	episode      *int64
 	episodeRange []int64
 	seasonPack   bool
@@ -1454,6 +1460,13 @@ var releaseMatchers = []releaseMatcher{
 	// own brackets ("[IN CORSO][02/08]", "[IN CORSO] [05/06]"): Italian sites
 	// use both. The total may be unknown ("02/??").
 	{utils.MustCachedRegex(`(?i)^(.+?)[ ._-]+(?:stagione[ ._-]*|season[ ._-]?|s)(\d{1,2})\b.*?\b(?:in[ ._-]*(?:corso|progress)|incomplete)\b\W{0,6}0?(\d{1,3})[ ._-]*(?:/|di|of)[ ._-]*(?:0?\d{1,3}|\?{1,3})`), readInProgressPack},
+	// A pack covering several seasons: the range is written either with both
+	// markers ("S01-S03") or with the completeness word that tells it apart
+	// from an episode ("S01-03 Complete", "Stagioni 1-3"). The episode form
+	// with the same shape ("S02-01") is read below, by the dash reader.
+	{utils.MustCachedRegex(`(?i)^(.+?)[ ._-]+s(\d{1,2})[ ._-]*[-–][ ._-]*s(\d{1,2})(?:[ ._-]|$)`), readSeasonRange},
+	{utils.MustCachedRegex(`(?i)^(.+?)[ ._-]+s(\d{1,2})[ ._-]*[-–][ ._-]*(\d{1,2})[ ._-]+(?:complete|completa|integrale)(?:[ ._-]|$)`), readSeasonRange},
+	{utils.MustCachedRegex(`(?i)^(.+?)[ ._-]+(?:stagioni|stagione|seasons|season)[ ._-]*(\d{1,2})[ ._-]*(?:[-–]|a|to)[ ._-]*(\d{1,2})(?:[ ._-]|$)`), readSeasonRange},
 	// An episode whose marker is a dash instead of the episode letter
 	// ("S02-01", "S02 - 01"): the season-pack matcher below reads the season
 	// and throws the episode away, so the release became a whole-season
@@ -1481,6 +1494,7 @@ var miniseriesPackRe = utils.MustCachedRegex(`(?i)^(.+?)[ ._-]+mini[ ._-]*seri(?
 // still goes through the exact matchers. low is the lowercased title.
 func couldBeSeriesTitle(low string) bool {
 	if strings.Contains(low, "season") || strings.Contains(low, "stagione") ||
+		strings.Contains(low, "stagioni") ||
 		strings.Contains(low, "episodio") || strings.Contains(low, "puntata") ||
 		strings.Contains(low, "episode") || strings.Contains(low, "in corso") ||
 		strings.Contains(low, "incomplete") ||
@@ -1865,6 +1879,11 @@ func parseSeasonPackFast(title string) (releaseMatch, bool) {
 		if dashEpisodeFollows(title, pos) {
 			return releaseMatch{}, false
 		}
+		// "S01-S03" and "S01-03 Complete" are a range of seasons: the range
+		// matcher reads both ends, the fast path only the first one.
+		if seasonRangeFollows(title, pos) {
+			return releaseMatch{}, false
+		}
 		sepStart := i - 1
 		for sepStart > 0 && isEpisodeSeparator(title[sepStart-1]) {
 			sepStart--
@@ -1917,6 +1936,34 @@ func dashLength(text string, i int) int {
 		return 1
 	}
 	return len("–")
+}
+
+// seasonRangeFollows reports whether the season marker at pos continues into a
+// range ("S01-S03", "S01-03 Complete"). A number after the dash is a range only
+// with the completeness word: "S01-03" alone is the episode 3 of season 1.
+func seasonRangeFollows(title string, pos int) bool {
+	i := pos
+	for i < len(title) && isEpisodeSeparator(title[i]) && !isDashAt(title, i) {
+		i++
+	}
+	if i >= len(title) || !isDashAt(title, i) {
+		return false
+	}
+	i += dashLength(title, i)
+	for i < len(title) && isEpisodeSeparator(title[i]) {
+		i++
+	}
+	if i < len(title) && (title[i] == 's' || title[i] == 'S') {
+		digits, _ := parseDigitsAt(title, i+1, 2)
+		return digits != ""
+	}
+	digits, end := parseDigitsAt(title, i, 2)
+	if digits == "" || (end < len(title) && !isEpisodeSeparator(title[end])) {
+		return false
+	}
+	rest := parserASCIILower(title[end:])
+	return strings.Contains(rest, "complete") || strings.Contains(rest, "completa") ||
+		strings.Contains(rest, "integrale")
 }
 
 // isResolutionNumber reports the three-digit heights a title writes where an
@@ -2197,6 +2244,29 @@ func readInProgressPack(capture []string) (releaseMatch, matchVerdict) {
 		episode:      &first,
 		episodeRange: episodes,
 		inProgress:   available,
+	}, matchRead
+}
+
+// readSeasonRange reads a pack that covers several seasons ("S01-S03",
+// "S01-03 Complete", "Stagioni 1-3"): the first season is the release's season
+// and the last is kept beside it.
+func readSeasonRange(capture []string) (releaseMatch, matchVerdict) {
+	first, ok := captureInt(capture[2])
+	if !ok || first < 1 || first > 40 {
+		return releaseMatch{}, matchRefused
+	}
+	last, ok := captureInt(capture[3])
+	if !ok || last <= first || last > 40 {
+		return releaseMatch{}, matchRefused
+	}
+	zero := int64(0)
+	return releaseMatch{
+		series:       seriesName(capture),
+		season:       &first,
+		seasonEnd:    last,
+		episode:      &zero,
+		episodeRange: []int64{0},
+		seasonPack:   true,
 	}, matchRead
 }
 

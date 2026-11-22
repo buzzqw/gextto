@@ -147,7 +147,7 @@ func gh2ReleaseMatchesSeriesEpisode(release *models.Release, series *SeriesConfi
 	if release.Kind != "series" {
 		return false
 	}
-	if release.Season == nil || *release.Season != season {
+	if !release.CoversSeason(season) {
 		return false
 	}
 	if len(release.EpisodeRange) == 0 {
@@ -926,7 +926,7 @@ type gh7EpisodeResult struct {
 // asked for: a targeted search must also surface packs that contain the
 // episode (S01E01-08) and whole-season packs (S01).
 func gh7ReleaseMatchesSeriesEpisode(release *models.Release, series SeriesConfig, season, episode int64) bool {
-	if release.Kind != "series" || release.Season == nil || *release.Season != season {
+	if release.Kind != "series" || !release.CoversSeason(season) {
 		return false
 	}
 	if len(release.EpisodeRange) == 0 {

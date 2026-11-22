@@ -426,16 +426,31 @@ func ArchiveAndRemoveTorrent(s *AppState, cfg *Config, hash string) (bool, error
 		guard := AcquireArchiveImport(release.Series)
 		defer guard.Release()
 
-		destinationFiles, _ := VideoFiles(destination)
+		destinationFiles := map[string][]string{}
+		filesIn := func(dir string) []string {
+			if files, ok := destinationFiles[dir]; ok {
+				return files
+			}
+			files, _ := VideoFiles(dir)
+			destinationFiles[dir] = files
+			return files
+		}
 		processed := []PackFileResult{}
 		for index := range matching {
 			file := matching[index]
-			placed, ok, err := StagePackFile(&file, source, destination, destinationFiles, cfg, release.Quality)
+			fileDestination := destination
+			if release.MultiSeason() {
+				if seasonDestination, ok := ConfiguredDestinationForSeason(release, file.Season, cfg); ok {
+					fileDestination = seasonDestination
+				}
+			}
+			placed, ok, err := StagePackFile(&file, source, fileDestination, filesIn(fileDestination), cfg, release.Quality)
 			if err != nil {
 				return false, err
 			}
 			if !ok {
 				processed = append(processed, PackFileResult{
+					Season:    file.Season,
 					Episode:   file.Episode,
 					Path:      file.Path,
 					Discarded: true,
@@ -471,6 +486,7 @@ func ArchiveAndRemoveTorrent(s *AppState, cfg *Config, hash string) (bool, error
 				continue
 			}
 			entries = append(entries, PackEpisode{
+				Season:    item.Season,
 				Episode:   item.Episode,
 				Path:      item.Path,
 				SizeBytes: item.SizeBytes,
@@ -478,7 +494,7 @@ func ArchiveAndRemoveTorrent(s *AppState, cfg *Config, hash string) (bool, error
 			})
 			entry := map[string]any{
 				"series":  release.Series,
-				"season":  release.Season,
+				"season":  item.Season,
 				"episode": item.Episode,
 				"path":    item.Path,
 			}
@@ -489,8 +505,14 @@ func ArchiveAndRemoveTorrent(s *AppState, cfg *Config, hash string) (bool, error
 			newEpisodes = append(newEpisodes, entry)
 		}
 		size, _ := SizeOfPath(destination)
+		if release.MultiSeason() {
+			size = 0
+			for _, item := range entries {
+				size += item.SizeBytes
+			}
+		}
 		if s.db != nil {
-			_ = s.db.MarkPackCompleted(release, entries, destination, size)
+			_ = s.db.MarkPackCompleted(release, entries, PackArchivePath(release, cfg, destination), size)
 		}
 		archivedBytes := int64(0)
 		for _, item := range entries {

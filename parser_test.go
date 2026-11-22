@@ -76,6 +76,48 @@ func TestParsesCompleteSeasonPackVariants(t *testing.T) {
 	}
 }
 
+func TestParsesMultiSeasonPackRange(t *testing.T) {
+	cases := []struct {
+		title string
+		first int64
+		last  int64
+	}{
+		{"Example.Show.S01-S03.Complete.1080p.ITA", 1, 3},
+		{"Example.Show.S01 - S03.1080p.ITA", 1, 3},
+		{"Example.Show.S01-03.Complete.1080p.ITA", 1, 3},
+		{"Example.Show.Seasons.1-3.Complete.1080p.ITA", 1, 3},
+		{"Example.Show.Stagioni.1-2.Completa.1080p.ITA", 1, 2},
+		{"Example.Show.Stagione.2-4.Integrale.1080p.ITA", 2, 4},
+	}
+	for _, tc := range cases {
+		release := ParseRelease(tc.title, testMagnet, "test")
+		if release == nil {
+			t.Fatalf("%s: release is nil", tc.title)
+		}
+		if !release.IsPack {
+			t.Fatalf("%s: expected is_pack", tc.title)
+		}
+		if release.Season == nil || *release.Season != tc.first || release.SeasonEnd != tc.last {
+			t.Fatalf("%s: seasons = %v..%d, want %d..%d", tc.title, release.Season, release.SeasonEnd, tc.first, tc.last)
+		}
+		if want := []int64{0}; !reflect.DeepEqual(release.EpisodeRange, want) {
+			t.Fatalf("%s: episode_range = %v, want %v", tc.title, release.EpisodeRange, want)
+		}
+		if !release.CoversSeason(tc.first) || !release.CoversSeason(tc.last) || release.CoversSeason(tc.last+1) {
+			t.Fatalf("%s: CoversSeason does not follow the range", tc.title)
+		}
+	}
+	// A range of episodes stays an episode: without the completeness word the
+	// dash form is the episode number.
+	episode := ParseRelease("Example.Show.S01-03.1080p.ITA", testMagnet, "test")
+	if episode == nil || episode.IsPack || episode.Episode == nil || *episode.Episode != 3 {
+		t.Fatalf("S01-03 must stay S01E03: %#v", episode)
+	}
+	if episode.SeasonEnd != 0 {
+		t.Fatalf("S01-03 read as a range of seasons: %#v", episode)
+	}
+}
+
 func TestParsesDashEpisodeAsEpisodeNotSeasonPack(t *testing.T) {
 	for _, title := range []string{
 		"Example.Show.S02-01.1080p.ITA",

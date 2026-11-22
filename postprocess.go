@@ -94,6 +94,17 @@ func parseTagDirRules(raw string) []map[string]any {
 // destination. It deliberately does not fall back to the download directory:
 // folder-shaped downloads must stay there when no NAS/archive is configured.
 func ConfiguredDestinationFor(release *models.Release, cfg *Config) (string, bool) {
+	season := int64(0)
+	if release.Season != nil {
+		season = *release.Season
+	}
+	return ConfiguredDestinationForSeason(release, season, cfg)
+}
+
+// ConfiguredDestinationForSeason is ConfiguredDestinationFor for one season of
+// the release: a pack spanning several seasons files each one in its own
+// season subfolder, and the series must be monitored for that season.
+func ConfiguredDestinationForSeason(release *models.Release, season int64, cfg *Config) (string, bool) {
 	if raw, ok := cfg.Settings["tag_dir_rules"]; ok {
 		if rules := parseTagDirRules(raw); rules != nil {
 			for _, rule := range rules {
@@ -108,10 +119,15 @@ func ConfiguredDestinationFor(release *models.Release, cfg *Config) (string, boo
 		}
 	}
 	if release.Kind == "series" && release.Series != nil {
-		if series := cfg.FindSeriesMatch(*release.Series, release.Season); series != nil {
+		matchSeason := release.Season
+		if season > 0 {
+			value := season
+			matchSeason = &value
+		}
+		if series := cfg.FindSeriesMatch(*release.Series, matchSeason); series != nil {
 			if destination := cfg.ResolveArchivePath(series); destination != nil {
-				if series.SeasonSubfolders && release.Season != nil {
-					return filepath.Join(*destination, fmt.Sprintf("Stagione %02d", *release.Season)), true
+				if series.SeasonSubfolders && season > 0 {
+					return filepath.Join(*destination, fmt.Sprintf("Stagione %02d", season)), true
 				}
 				return *destination, true
 			}
@@ -520,6 +536,10 @@ func MatchingPackFiles(source string, release *models.Release) ([]PackSourceFile
 	if err != nil {
 		return nil, err
 	}
+	bareEpisode, err := utils.CachedRegex(`(?i)^(?:e(?:pisode)?[ ._-]?)?0*(\d{1,4})$`)
+	if err != nil {
+		return nil, err
+	}
 	matched := []PackSourceFile{}
 	for _, file := range files {
 		name := filepath.Base(file)
@@ -547,7 +567,7 @@ func MatchingPackFiles(source string, release *models.Release) ([]PackSourceFile
 			!containsInt64(release.EpisodeRange, episode) {
 			continue
 		}
-		if release.Season == nil || season != *release.Season {
+		if !release.CoversSeason(season) {
 			continue
 		}
 		matched = append(matched, PackSourceFile{Path: file, Season: season, Episode: episode})
@@ -561,6 +581,35 @@ func MatchingPackFiles(source string, release *models.Release) ([]PackSourceFile
 	// A complete pack has no trustworthy explicit episode list: import only
 	// files carrying their own season/episode identity.
 	if len(declared) == 0 || release.Season == nil {
+		if release.MultiSeason() {
+			// Files named only "01.mkv" inside "Season 2" are that episode of
+			// season 2: the folder names the season, the file the episode.
+			for _, file := range files {
+				if containsPath(matched, file) {
+					continue
+				}
+				season := packFileSeason(file, 0)
+				if season == 0 || !release.CoversSeason(season) {
+					continue
+				}
+				match := bareEpisode.FindStringSubmatch(fileStem(file))
+				if match == nil {
+					continue
+				}
+				episode, err := strconv.ParseInt(match[1], 10, 64)
+				if err != nil || episode < 1 {
+					continue
+				}
+				matched = append(matched, PackSourceFile{Path: file, Season: season, Episode: episode})
+			}
+			sort.SliceStable(matched, func(i, j int) bool {
+				if matched[i].Season != matched[j].Season {
+					return matched[i].Season < matched[j].Season
+				}
+				return matched[i].Episode < matched[j].Episode
+			})
+			matched = dedupePackFiles(matched)
+		}
 		return matched, nil
 	}
 	expected := make(map[int64]bool, len(declared))
@@ -587,10 +636,6 @@ func MatchingPackFiles(source string, release *models.Release) ([]PackSourceFile
 	for _, file := range matched {
 		found[file.Episode] = true
 	}
-	bareEpisode, err := utils.CachedRegex(`(?i)^(?:e(?:pisode)?[ ._-]?)?0*(\d{1,4})$`)
-	if err != nil {
-		return nil, err
-	}
 	for _, file := range files {
 		if containsPath(matched, file) {
 			continue
@@ -615,25 +660,17 @@ func MatchingPackFiles(source string, release *models.Release) ([]PackSourceFile
 		found[episode] = true
 		matched = append(matched, PackSourceFile{
 			Path:    file,
-			Season:  *release.Season,
+			Season:  packFileSeason(file, *release.Season),
 			Episode: episode,
 		})
 	}
-	sort.SliceStable(matched, func(i, j int) bool { return matched[i].Episode < matched[j].Episode })
-	deduped := make([]PackSourceFile, 0, len(matched))
-	for _, file := range matched {
-		if len(deduped) == 0 || deduped[len(deduped)-1].Episode != file.Episode {
-			deduped = append(deduped, file)
-			continue
+	sort.SliceStable(matched, func(i, j int) bool {
+		if matched[i].Season != matched[j].Season {
+			return matched[i].Season < matched[j].Season
 		}
-		// Two copies of the same episode (a pack that carries an AAC and a
-		// DDP track set): file the better one, not the first the walk met.
-		previous := &deduped[len(deduped)-1]
-		if packFileQuality(*previous) < packFileQuality(file) {
-			*previous = file
-		}
-	}
-	matched = deduped
+		return matched[i].Episode < matched[j].Episode
+	})
+	matched = dedupePackFiles(matched)
 	if inProgress {
 		// The declared count is a promise, not a checklist: the files the pack
 		// holds are the ones that are imported, and the episodes that are still
@@ -654,6 +691,56 @@ func MatchingPackFiles(source string, release *models.Release) ([]PackSourceFile
 		return []PackSourceFile{}, nil
 	}
 	return matched, nil
+}
+
+// PackArchivePath is the folder recorded for a completed pack: the only
+// destination of a single-season pack, the series folder for a pack spanning
+// several seasons (each season sits in its own subfolder).
+func PackArchivePath(release *models.Release, cfg *Config, destination string) string {
+	if release == nil || !release.MultiSeason() {
+		return destination
+	}
+	if seriesFolder, ok := ConfiguredDestinationForSeason(release, 0, cfg); ok {
+		return seriesFolder
+	}
+	return destination
+}
+
+// dedupePackFiles keeps one file per season/episode, the better quality when
+// the pack carries the same episode twice (an AAC and a DDP track set).
+func dedupePackFiles(files []PackSourceFile) []PackSourceFile {
+	deduped := make([]PackSourceFile, 0, len(files))
+	for _, file := range files {
+		if len(deduped) == 0 || deduped[len(deduped)-1].Episode != file.Episode ||
+			deduped[len(deduped)-1].Season != file.Season {
+			deduped = append(deduped, file)
+			continue
+		}
+		previous := &deduped[len(deduped)-1]
+		if packFileQuality(*previous) < packFileQuality(file) {
+			*previous = file
+		}
+	}
+	return deduped
+}
+
+// packFileSeason reads the season of a pack file whose own name carries only
+// the episode: the season folder it sits in ("Season 2", "Stagione 02", "S02"),
+// or fallback when the folder does not name one.
+func packFileSeason(path string, fallback int64) int64 {
+	pattern, err := utils.CachedRegex(`(?i)^(?:season|stagione|s)\s*0*(\d{1,2})$`)
+	if err != nil {
+		return fallback
+	}
+	match := pattern.FindStringSubmatch(filepath.Base(filepath.Dir(path)))
+	if match == nil {
+		return fallback
+	}
+	value, err := strconv.ParseInt(match[1], 10, 64)
+	if err != nil || value < 1 || value > 40 {
+		return fallback
+	}
+	return value
 }
 
 // packFileQuality scores a pack file from its own name, so two copies of the
@@ -685,6 +772,7 @@ func CopyMatchingPackFiles(source, destination string, release *models.Release) 
 
 // PackFileResult is the outcome of processing one staged pack episode.
 type PackFileResult struct {
+	Season       int64
 	Episode      int64
 	Path         string
 	SizeBytes    int64
@@ -972,6 +1060,9 @@ func ProcessPackFiles(
 		episode := packFile.Episode
 		episodeRelease := *release
 		episodeRelease.IsPack = false
+		seasonValue := season
+		episodeRelease.Season = &seasonValue
+		episodeRelease.SeasonEnd = 0
 		episodeValue := episode
 		episodeRelease.Episode = &episodeValue
 		episodeRelease.EpisodeRange = []int64{episodeValue}
@@ -985,6 +1076,7 @@ func ProcessPackFiles(
 		renamed, err := RenameEpisode(ctx, actual, &episodeRelease, cfg, tmdb)
 		if errors.Is(err, ErrInferiorDuplicate) {
 			results = append(results, PackFileResult{
+				Season:    season,
 				Episode:   episode,
 				Path:      actual,
 				Discarded: true,
@@ -1041,6 +1133,7 @@ func ProcessPackFiles(
 		}
 		size, _ := SizeOfPath(finalPath)
 		results = append(results, PackFileResult{
+			Season:       season,
 			Episode:      episode,
 			Path:         finalPath,
 			SizeBytes:    size,

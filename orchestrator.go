@@ -1463,7 +1463,7 @@ func releaseMatchesConfiguredEpisode(release *models.Release, series *SeriesConf
 	if release == nil || series == nil || release.Kind != "series" || release.Series == nil || release.Season == nil {
 		return false
 	}
-	if *release.Season != season || (!releaseHasEpisode(release, episode) && !hasCompleteRange(release)) {
+	if !release.CoversSeason(season) || (!releaseHasEpisode(release, episode) && !hasCompleteRange(release)) {
 		return false
 	}
 	if SeriesNamesMatch(series.Name, *release.Series) {
@@ -2032,8 +2032,16 @@ func mergeSeriesCandidate(best []models.Release, release models.Release, score i
 		season = *release.Season
 	}
 	sameSeason := func(old *models.Release) bool {
+		if old.Kind != "series" || old.Series == nil || *old.Series != seriesName || old.Season == nil {
+			return false
+		}
+		// Two releases compete when the seasons they cover overlap: a pack
+		// spanning several seasons meets the candidates of every one of them.
+		return release.CoversSeason(*old.Season) || old.CoversSeason(season)
+	}
+	sameIdentity := func(old *models.Release) bool {
 		return old.Kind == "series" && old.Series != nil && *old.Series == seriesName &&
-			old.Season != nil && *old.Season == season
+			optionalInt64Equal(old.Season, release.Season) && old.SeasonEnd == release.SeasonEnd
 	}
 	rangeSet := episodeSet(&release)
 	complete := hasCompleteRange(&release)
@@ -2067,7 +2075,7 @@ func mergeSeriesCandidate(best []models.Release, release models.Release, score i
 	best = filtered
 	for j := range best {
 		old := &best[j]
-		if sameSeason(old) && slices.Equal(old.EpisodeRange, release.EpisodeRange) {
+		if sameIdentity(old) && slices.Equal(old.EpisodeRange, release.EpisodeRange) {
 			if releaseStrictlyBetter(&release, score, old, scoreOf(old)) {
 				best[j] = release
 			}
@@ -2181,7 +2189,7 @@ func gapEpisodesForRelease(release *models.Release, gapTargets map[gapTarget]str
 	var episodes []int64
 	if hasCompleteRange(release) {
 		for target := range gapTargets {
-			if target.Series == series && target.Season == season {
+			if target.Series == series && release.CoversSeason(target.Season) {
 				episodes = append(episodes, target.Episode)
 			}
 		}

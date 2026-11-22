@@ -74,11 +74,25 @@ func tevSalvagePackEpisodes(cfg *Config, torrents TorrentSession, db *Database, 
 	guard := AcquireArchiveImport(release.Series)
 	defer guard.Release()
 	tmdb := NewTmdbClientWithLanguage(cfg.TmdbAPIKey, cfg.TmdbLanguage())
-	destinationFiles, _ := VideoFiles(destination)
+	destinationFiles := map[string][]string{}
+	filesIn := func(dir string) []string {
+		if files, ok := destinationFiles[dir]; ok {
+			return files
+		}
+		files, _ := VideoFiles(dir)
+		destinationFiles[dir] = files
+		return files
+	}
 	entries := []PackEpisode{}
 	for index := range ready {
 		file := ready[index]
-		placed, ok, err := StagePackFile(&file, source, destination, destinationFiles, cfg, release.Quality)
+		fileDestination := destination
+		if release.MultiSeason() {
+			if seasonDestination, ok := ConfiguredDestinationForSeason(&release, file.Season, cfg); ok {
+				fileDestination = seasonDestination
+			}
+		}
+		placed, ok, err := StagePackFile(&file, source, fileDestination, filesIn(fileDestination), cfg, release.Quality)
 		if err != nil {
 			logging.Warn("pack salvage: episode not imported", "hash", torrent.Hash, "file", filepath.Base(file.Path), "error", err)
 			continue
@@ -95,7 +109,7 @@ func tevSalvagePackEpisodes(cfg *Config, torrents TorrentSession, db *Database, 
 			if item.Discarded {
 				continue
 			}
-			entries = append(entries, PackEpisode{Episode: item.Episode, Path: item.Path, SizeBytes: item.SizeBytes, Score: item.QualityScore})
+			entries = append(entries, PackEpisode{Season: item.Season, Episode: item.Episode, Path: item.Path, SizeBytes: item.SizeBytes, Score: item.QualityScore})
 		}
 	}
 	if len(entries) == 0 {
@@ -131,14 +145,24 @@ func completeTorrentFiles(savePath string, files []models.FileView) map[string]s
 
 // salvagedEpisodeCodes lists the salvaged episodes as S01E03, S01E04, …
 func salvagedEpisodeCodes(season int64, entries []PackEpisode) string {
-	episodes := make([]int64, 0, len(entries))
+	type salvageCode struct{ season, episode int64 }
+	list := make([]salvageCode, 0, len(entries))
 	for _, entry := range entries {
-		episodes = append(episodes, entry.Episode)
+		entrySeason := entry.Season
+		if entrySeason == 0 {
+			entrySeason = season
+		}
+		list = append(list, salvageCode{season: entrySeason, episode: entry.Episode})
 	}
-	sort.Slice(episodes, func(i, j int) bool { return episodes[i] < episodes[j] })
-	codes := make([]string, 0, len(episodes))
-	for _, episode := range episodes {
-		codes = append(codes, fmt.Sprintf("S%02dE%02d", season, episode))
+	sort.Slice(list, func(i, j int) bool {
+		if list[i].season != list[j].season {
+			return list[i].season < list[j].season
+		}
+		return list[i].episode < list[j].episode
+	})
+	codes := make([]string, 0, len(list))
+	for _, code := range list {
+		codes = append(codes, fmt.Sprintf("S%02dE%02d", code.season, code.episode))
 	}
 	return strings.Join(codes, ", ")
 }
@@ -170,10 +194,13 @@ func (d *Database) SalvagePackEpisodes(hash string, release *models.Release, epi
 		return false, err
 	}
 	restored := false
-	season := *release.Season
-	salvaged := map[int64]struct{}{}
+	salvaged := map[[2]int64]struct{}{}
 	for _, episode := range episodes {
-		salvaged[episode.Episode] = struct{}{}
+		season := episode.Season
+		if season == 0 {
+			season = *release.Season
+		}
+		salvaged[[2]int64{season, episode.Episode}] = struct{}{}
 	}
 	var payload sql.NullString
 	backupErr := tx.QueryRow("SELECT payload_json FROM upgrade_backup WHERE new_hash=?1", normalized).Scan(&payload)
@@ -186,8 +213,8 @@ func (d *Database) SalvagePackEpisodes(hash string, release *models.Release, epi
 			return false, err
 		}
 		for _, backup := range backups {
-			if backup.Kind == "series" && backup.Season != nil && *backup.Season == season && backup.Episode != nil {
-				if _, kept := salvaged[*backup.Episode]; kept {
+			if backup.Kind == "series" && backup.Season != nil && backup.Episode != nil {
+				if _, kept := salvaged[[2]int64{*backup.Season, *backup.Episode}]; kept {
 					continue
 				}
 			}
@@ -202,6 +229,10 @@ func (d *Database) SalvagePackEpisodes(hash string, release *models.Release, epi
 	}
 	now := nowSQLite()
 	for _, episode := range episodes {
+		season := episode.Season
+		if season == 0 {
+			season = *release.Season
+		}
 		if _, err := tx.Exec(`INSERT INTO episodes(series_id,season,episode,title,quality_score,downloaded_at,archive_path,size_bytes)
 			VALUES (?1,?2,?3,?4,?5,?6,?7,?8)
 			ON CONFLICT(series_id,season,episode) DO UPDATE SET downloaded_at=excluded.downloaded_at,archive_path=excluded.archive_path,

@@ -110,6 +110,10 @@ type EpisodeAirDate struct {
 // PackEpisode is one completed episode of a season pack:
 // `(episode, path, size_bytes, quality_score)`.
 type PackEpisode struct {
+	// Season is the season the file belongs to: a pack spanning several
+	// seasons files each episode in its own. 0 falls back to the release's
+	// first season.
+	Season    int64
 	Episode   int64
 	Path      string
 	SizeBytes int64
@@ -1185,7 +1189,7 @@ func (d *Database) checkSeriesScoredInner(release *models.Release, score, minSco
 		}
 	}
 	if release.IsPack {
-		return d.checkSeriesPack(release, hash, score, minScoreDiff, context, manual)
+		return d.checkSeriesPackSeasons(release, hash, score, minScoreDiff, context, manual)
 	}
 	if release.Season == nil {
 		return false, "", fmt.Errorf("series release has no season")
@@ -1538,6 +1542,39 @@ func packHasStallTolerance(context *models.ApprovalContext, seriesName string, s
 }
 
 // checkSeriesPack implements `Database::check_series_pack`.
+// checkSeriesPackSeasons approves a pack season by season: a pack covering
+// several seasons fills the gaps of each one, and every season keeps its own
+// placeholders and upgrade backup. The pack is approved when at least one
+// season needs it.
+func (d *Database) checkSeriesPackSeasons(release *models.Release, hash string, score, minScoreDiff int64, context *models.ApprovalContext, manual bool) (bool, string, error) {
+	if release.Season == nil {
+		return false, "", fmt.Errorf("season pack has no season")
+	}
+	if !release.MultiSeason() {
+		return d.checkSeriesPack(release, hash, score, minScoreDiff, context, manual)
+	}
+	approved := false
+	reason := "duplicate"
+	for season := *release.Season; season <= release.SeasonLast(); season++ {
+		single := *release
+		value := season
+		single.Season = &value
+		single.SeasonEnd = 0
+		ok, why, err := d.checkSeriesPack(&single, hash, score, minScoreDiff, context, manual)
+		if err != nil {
+			return false, "", err
+		}
+		if !ok {
+			continue
+		}
+		approved = true
+		if why == "approved" || reason != "approved" {
+			reason = why
+		}
+	}
+	return approved, reason, nil
+}
+
 func (d *Database) checkSeriesPack(release *models.Release, hash string, score, minScoreDiff int64, context *models.ApprovalContext, manual bool) (bool, string, error) {
 	if release.Season == nil {
 		return false, "", fmt.Errorf("season pack has no season")
@@ -6107,7 +6144,6 @@ func (d *Database) MarkPackCompleted(release *models.Release, episodes []PackEpi
 	now := nowSQLite()
 	if release.Series != nil && release.Season != nil {
 		series := *release.Series
-		season := *release.Season
 		var seriesID int64
 		seriesErr := tx.QueryRow("SELECT id FROM series WHERE name=?1", series).Scan(&seriesID)
 		if seriesErr != nil && !errors.Is(seriesErr, sql.ErrNoRows) {
@@ -6115,11 +6151,17 @@ func (d *Database) MarkPackCompleted(release *models.Release, episodes []PackEpi
 		}
 		if seriesErr == nil {
 			if containsInt64(release.EpisodeRange, 0) {
-				if _, err := tx.Exec("UPDATE episodes SET downloaded_at=?1,archive_path=?2,size_bytes=?3 WHERE series_id=?4 AND season=?5 AND episode=0", now, path, sizeBytes, seriesID, season); err != nil {
-					return err
+				for season := *release.Season; season <= release.SeasonLast(); season++ {
+					if _, err := tx.Exec("UPDATE episodes SET downloaded_at=?1,archive_path=?2,size_bytes=?3 WHERE series_id=?4 AND season=?5 AND episode=0", now, path, sizeBytes, seriesID, season); err != nil {
+						return err
+					}
 				}
 			}
 			for _, episode := range episodes {
+				season := episode.Season
+				if season == 0 {
+					season = *release.Season
+				}
 				if _, err := tx.Exec("UPDATE episodes SET downloaded_at=?1,archive_path=?2,size_bytes=?3,quality_score=CASE WHEN ?4>quality_score THEN ?4 ELSE quality_score END WHERE series_id=?5 AND season=?6 AND episode=?7", now, episode.Path, episode.SizeBytes, episode.Score, seriesID, season, episode.Episode); err != nil {
 					return err
 				}

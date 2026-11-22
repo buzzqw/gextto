@@ -220,7 +220,7 @@ func releaseMatchesSeriesEpisode(release models.Release, series *SeriesConfig, s
 	if release.Kind != "series" {
 		return false
 	}
-	if release.Season == nil || *release.Season != season {
+	if !release.CoversSeason(season) {
 		return false
 	}
 	if len(release.EpisodeRange) == 0 {

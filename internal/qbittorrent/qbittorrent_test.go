@@ -473,3 +473,57 @@ func TestSetSequentialDownloadOnlyTogglesDifferences(t *testing.T) {
 		t.Fatalf("toggled hashes = %q, want bbb", fake.lastPause.Get("hashes"))
 	}
 }
+
+// A qBittorrent-compatible proxy can write the numeric fields as strings: the
+// client must read them instead of failing the whole response.
+func TestDecodeJSONAcceptsQuotedNumbers(t *testing.T) {
+	payload := []byte(`[{"hash":"aa","name":"Example Show S01E01","state":"downloading","progress":"0.5","size":"1234","total_size":"1234","downloaded":"617","ratio":"1.25","num_seeds":"3","eta":"120","seeding_time":"60"}]`)
+	var items []Torrent
+	if err := decodeJSON("/api/v2/torrents/info", payload, &items); err != nil {
+		t.Fatalf("quoted numbers: %v", err)
+	}
+	if len(items) != 1 {
+		t.Fatalf("decoded %d torrents, want one", len(items))
+	}
+	torrent := items[0]
+	if torrent.Progress != 0.5 || torrent.Size != 1234 || torrent.Downloaded != 617 ||
+		torrent.Ratio != 1.25 || torrent.NumSeeds != 3 || torrent.ETASeconds != 120 || torrent.SeedingTime != 60 {
+		t.Fatalf("decoded torrent = %+v", torrent)
+	}
+	if torrent.Name != "Example Show S01E01" {
+		t.Fatalf("name = %q, the text fields must stay as they are", torrent.Name)
+	}
+}
+
+// A numeric object key and a numeric text value are not numbers: they must not
+// be rewritten by the tolerant pass.
+func TestDecodeJSONKeepsNumericTextAndKeys(t *testing.T) {
+	var keyed map[string]string
+	if err := decodeJSON("/x", []byte(`{"12345":"value"}`), &keyed); err != nil {
+		t.Fatalf("numeric key: %v", err)
+	}
+	if keyed["12345"] != "value" {
+		t.Fatalf("numeric key = %#v", keyed)
+	}
+	var torrent Torrent
+	if err := decodeJSON("/x", []byte(`{"hash":"aa","name":"2026"}`), &torrent); err != nil {
+		t.Fatalf("numeric name: %v", err)
+	}
+	if torrent.Name != "2026" {
+		t.Fatalf("name = %q, want the text", torrent.Name)
+	}
+}
+
+// The rewriting only touches values that are JSON numbers.
+func TestUnquoteNumericValuesRewritesOnlyNumbers(t *testing.T) {
+	fixed, changed := unquoteNumericValues([]byte(`{"a":"1.5","b":"x","c":"01","d":2}`))
+	if !changed {
+		t.Fatal("no rewrite")
+	}
+	if got, want := string(fixed), `{"a":1.5,"b":"x","c":"01","d":2}`; got != want {
+		t.Fatalf("rewritten = %s, want %s", got, want)
+	}
+	if _, changed := unquoteNumericValues([]byte(`{"a":"1e3","b":"-0.5"}`)); !changed {
+		t.Fatal("exponents and negatives are numbers")
+	}
+}

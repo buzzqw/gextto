@@ -300,9 +300,123 @@ func decodeJSON(path string, payload []byte, out any) error {
 		return nil
 	}
 	if err := json.Unmarshal(payload, out); err != nil {
+		// Some qBittorrent-compatible proxies (aMuTorrent, for one) write the
+		// numeric fields as strings. A quoted number cannot be decoded into a
+		// float64 and fails the whole response, so the backend looked
+		// unreachable: retry with the quoted numbers made bare. Real
+		// qBittorrent never takes this path.
+		if fixed, changed := unquoteNumericValues(payload); changed {
+			if retry := json.Unmarshal(fixed, out); retry == nil {
+				return nil
+			}
+		}
 		return fmt.Errorf("qbittorrent: decode %s: %w", path, err)
 	}
 	return nil
+}
+
+// unquoteNumericValues turns quoted numbers into bare ones in a JSON document:
+// `"progress": "0.5"` becomes `"progress": 0.5`. Keys and strings that are not
+// numbers are left as they are. It rewrites the raw bytes so every field of
+// every structure is covered at once, and it only runs when the strict decode
+// has already failed.
+func unquoteNumericValues(payload []byte) ([]byte, bool) {
+	fixed := make([]byte, 0, len(payload))
+	changed := false
+	for i := 0; i < len(payload); i++ {
+		if payload[i] != '"' {
+			fixed = append(fixed, payload[i])
+			continue
+		}
+		end := jsonStringEnd(payload, i)
+		if end < 0 {
+			return nil, false
+		}
+		content := payload[i+1 : end]
+		if jsonValueIsKey(payload, end+1) || !isJSONNumberLiteral(content) {
+			fixed = append(fixed, payload[i:end+1]...)
+			i = end
+			continue
+		}
+		fixed = append(fixed, content...)
+		changed = true
+		i = end
+	}
+	return fixed, changed
+}
+
+// jsonStringEnd returns the index of the quote that closes the string starting
+// at start, or -1 when it is not closed.
+func jsonStringEnd(payload []byte, start int) int {
+	for i := start + 1; i < len(payload); i++ {
+		switch payload[i] {
+		case '\\':
+			i++
+		case '"':
+			return i
+		}
+	}
+	return -1
+}
+
+// jsonValueIsKey reports whether the value closed at pos belongs to an object
+// key: the string reads as a key when a colon follows it.
+func jsonValueIsKey(payload []byte, pos int) bool {
+	for pos < len(payload) && isJSONSpace(payload[pos]) {
+		pos++
+	}
+	return pos < len(payload) && payload[pos] == ':'
+}
+
+// isJSONSpace reports the four whitespace bytes JSON allows.
+func isJSONSpace(value byte) bool {
+	return value == ' ' || value == '\t' || value == '\n' || value == '\r'
+}
+
+// isJSONNumberLiteral reports whether the text is a JSON number: an optional
+// minus, digits without a leading zero, and an optional fraction and exponent.
+func isJSONNumberLiteral(text []byte) bool {
+	if len(text) == 0 {
+		return false
+	}
+	i := 0
+	if text[i] == '-' {
+		i++
+	}
+	if i >= len(text) {
+		return false
+	}
+	if text[i] == '0' {
+		i++
+	} else if text[i] >= '1' && text[i] <= '9' {
+		for i < len(text) && text[i] >= '0' && text[i] <= '9' {
+			i++
+		}
+	} else {
+		return false
+	}
+	if i < len(text) && text[i] == '.' {
+		i++
+		if i >= len(text) || text[i] < '0' || text[i] > '9' {
+			return false
+		}
+		for i < len(text) && text[i] >= '0' && text[i] <= '9' {
+			i++
+		}
+	}
+	if i < len(text) && (text[i] == 'e' || text[i] == 'E') {
+		i++
+		if i < len(text) && (text[i] == '+' || text[i] == '-') {
+			i++
+		}
+		if i >= len(text) || text[i] < '0' || text[i] > '9' {
+			return false
+		}
+		for i < len(text) && text[i] >= '0' && text[i] <= '9' {
+			i++
+		}
+	}
+	return i == len(text)
 }
 
 func (c *Client) postForm(ctx context.Context, path string, form url.Values) error {

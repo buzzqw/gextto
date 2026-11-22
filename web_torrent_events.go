@@ -296,7 +296,7 @@ func tevMismatchedPackRelease(torrents TorrentSession, db *Database, hash string
 	if corrected == nil {
 		return nil
 	}
-	if tevOptionalInt64Equal(corrected.Season, release.Season) {
+	if tevOptionalInt64Equal(corrected.Season, release.Season) && corrected.SeasonEnd == release.SeasonEnd {
 		return nil
 	}
 	result := release
@@ -2061,6 +2061,11 @@ func tevReconcilePackIdentityFromFiles(release *models.Release, source string) *
 	if release.Kind != "series" || !release.IsPack {
 		return nil
 	}
+	// A pack spanning several seasons is judged by its title: its files belong
+	// to every season of the range and cannot correct the range itself.
+	if release.MultiSeason() {
+		return nil
+	}
 	files, err := VideoFiles(source)
 	if err != nil {
 		return nil
@@ -2895,6 +2900,7 @@ func tevMarkReleaseCompleted(cfg *Config, db *Database, release *models.Release,
 			return err
 		}
 		entries = append(entries, PackEpisode{
+			Season:    file.Season,
 			Episode:   file.Episode,
 			Path:      file.Path,
 			SizeBytes: fileSize,
@@ -3469,7 +3475,8 @@ func tevMetadataReceived(cfg *Config, torrents TorrentSession, db *Database, met
 	// second line of defence.
 	if metadata.Release.IsPack {
 		corrected := ReconcilePackIdentity(&metadata.Release, event.Name)
-		if corrected != nil && !tevOptionalInt64Equal(corrected.Season, metadata.Release.Season) {
+		if corrected != nil && (!tevOptionalInt64Equal(corrected.Season, metadata.Release.Season) ||
+			corrected.SeasonEnd != metadata.Release.SeasonEnd) {
 			errorMessage := "torrent metadata season does not match declared season"
 			logging.Warn("rejecting season pack before download: metadata identity mismatch",
 				"hash", event.Hash,
@@ -3714,10 +3721,16 @@ func tevFinishedPack(cfg *Config, torrents TorrentSession, db *Database, event *
 		return false, err
 	}
 	if len(matching) == 0 {
-		errorMessage := "season pack filenames do not match declared season"
+		errorMessage := "season pack filenames do not match the declared season"
+		if release.MultiSeason() {
+			errorMessage = "season pack filenames do not match the declared seasons"
+		}
 		declaredSeason := "unknown"
 		if release.Season != nil {
 			declaredSeason = strconv.FormatInt(*release.Season, 10)
+			if release.MultiSeason() {
+				declaredSeason = fmt.Sprintf("%d-%d", *release.Season, release.SeasonLast())
+			}
 		}
 		logging.Warn("season pack rejected: files do not match the declared season",
 			"hash", event.Hash,
@@ -3745,6 +3758,7 @@ func tevFinishedPack(cfg *Config, torrents TorrentSession, db *Database, event *
 				return false, sizeErr
 			}
 			entries = append(entries, PackEpisode{
+				Season:    file.Season,
 				Episode:   file.Episode,
 				Path:      file.Path,
 				SizeBytes: fileSize,
@@ -3771,7 +3785,7 @@ func tevFinishedPack(cfg *Config, torrents TorrentSession, db *Database, event *
 		return tevRejectInferiorPack(cfg, torrents, db, event, release, processed)
 	}
 	entries, newEpisodes, upgradedList := tevPackEntries(release, processed)
-	if err := db.MarkPackCompleted(release, entries, destination, size); err != nil {
+	if err := db.MarkPackCompleted(release, entries, PackArchivePath(release, cfg, destination), size); err != nil {
 		return false, err
 	}
 	tevReportPack(cfg, db, notifier, event, release, processed, entries, newEpisodes, upgradedList, destination, size)
@@ -3783,19 +3797,35 @@ func tevFinishedPack(cfg *Config, torrents TorrentSession, db *Database, event *
 // the placed ones.
 func tevStagePackFiles(cfg *Config, release *models.Release, matching []PackSourceFile, source, destination string, tmdb *TmdbClient) ([]PackFileResult, error) {
 	processed := []PackFileResult{}
-	// Enumerate the destination once and reuse it for every episode:
-	// each episode's "is there a better existing file?" check walks the
-	// directory, and a full-season pack would otherwise re-walk it N
-	// times on the (possibly slow) archive mount.
-	destinationFiles, _ := VideoFiles(destination)
+	// Enumerate each destination once and reuse it for every episode: each
+	// episode's "is there a better existing file?" check walks the directory,
+	// and a full-season pack would otherwise re-walk it N times on the
+	// (possibly slow) archive mount. A pack spanning several seasons has one
+	// destination per season.
+	destinationFiles := map[string][]string{}
+	filesIn := func(dir string) []string {
+		if files, ok := destinationFiles[dir]; ok {
+			return files
+		}
+		files, _ := VideoFiles(dir)
+		destinationFiles[dir] = files
+		return files
+	}
 	for index := range matching {
 		file := matching[index]
-		placed, ok, err := StagePackFile(&file, source, destination, destinationFiles, cfg, release.Quality)
+		fileDestination := destination
+		if release.MultiSeason() {
+			if seasonDestination, ok := ConfiguredDestinationForSeason(release, file.Season, cfg); ok {
+				fileDestination = seasonDestination
+			}
+		}
+		placed, ok, err := StagePackFile(&file, source, fileDestination, filesIn(fileDestination), cfg, release.Quality)
 		if err != nil {
 			return nil, err
 		}
 		if !ok {
 			processed = append(processed, PackFileResult{
+				Season:    file.Season,
 				Episode:   file.Episode,
 				Path:      file.Path,
 				Discarded: true,
@@ -3850,6 +3880,7 @@ func tevPackEntries(release *models.Release, processed []PackFileResult) ([]Pack
 			continue
 		}
 		entries = append(entries, PackEpisode{
+			Season:    item.Season,
 			Episode:   item.Episode,
 			Path:      item.Path,
 			SizeBytes: item.SizeBytes,
@@ -3857,7 +3888,7 @@ func tevPackEntries(release *models.Release, processed []PackFileResult) ([]Pack
 		})
 		entry := map[string]any{
 			"series":  release.Series,
-			"season":  release.Season,
+			"season":  item.Season,
 			"episode": item.Episode,
 			"path":    item.Path,
 		}
@@ -3873,14 +3904,19 @@ func tevPackEntries(release *models.Release, processed []PackFileResult) ([]Pack
 // tevReportPack logs a completed pack, kept and discarded episodes apart, and
 // sends the season_pack_completed notification.
 func tevReportPack(cfg *Config, db *Database, notifier *Notifier, event *models.TorrentEvent, release *models.Release, processed []PackFileResult, entries []PackEpisode, newEpisodes, upgradedList []any, destination string, size int64) {
+	archivePath := PackArchivePath(release, cfg, destination)
 	logging.Info(fmt.Sprintf("🎉 %s complete: %s (%s) added to the library in %s",
-		logTarget(release), countLabel(len(entries), "episode", "episodes"), logging.HumanBytesI64(size), destination), "hash", event.Hash)
+		logTarget(release), countLabel(len(entries), "episode", "episodes"), logging.HumanBytesI64(size), archivePath), "hash", event.Hash)
 	if release.Series != nil && release.Season != nil {
 		for _, item := range processed {
 			if item.Discarded {
 				continue
 			}
-			logMediaIntegrityReplacement(db, event.Hash, "episode", *release.Series, *release.Season, item.Episode, "", 0, release.Title, item.Path)
+			season := item.Season
+			if season == 0 {
+				season = *release.Season
+			}
+			logMediaIntegrityReplacement(db, event.Hash, "episode", *release.Series, season, item.Episode, "", 0, release.Title, item.Path)
 		}
 	}
 	// Detail per file: which episodes were kept and which were discarded.
@@ -3921,8 +3957,9 @@ func tevReportPack(cfg *Config, db *Database, notifier *Notifier, event *models.
 	notificationErr := notifier.NotifyEvent("season_pack_completed", map[string]any{
 		"series":          release.Series,
 		"season":          release.Season,
+		"season_end":      release.SeasonEnd,
 		"title":           release.Title,
-		"path":            destination,
+		"path":            archivePath,
 		"size_bytes":      size,
 		"new_count":       len(newEpisodes),
 		"upgraded_count":  len(upgradedList),
@@ -3942,7 +3979,7 @@ func tevReportPack(cfg *Config, db *Database, notifier *Notifier, event *models.
 	// storage here: libtorrent must retain the exact original tree to
 	// seed and verify it.
 	logging.Debug(fmt.Sprintf("season pack copied to NAS, source kept for seeding · %s · %s",
-		logging.HumanBytesI64(size), destination))
+		logging.HumanBytesI64(size), archivePath))
 }
 
 // tevRequestLibraryMove asks the engine to move a completed download into the

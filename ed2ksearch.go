@@ -837,7 +837,7 @@ func releaseMatchesConfiguredSeason(release *models.Release, series *SeriesConfi
 	if release == nil || series == nil || release.Kind != "series" || release.Series == nil || release.Season == nil {
 		return false
 	}
-	if *release.Season != season {
+	if !release.CoversSeason(season) {
 		return false
 	}
 	if SeriesNamesMatch(series.Name, *release.Series) {

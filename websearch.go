@@ -420,7 +420,7 @@ func searchEztv(ctx context.Context, query string) ([]webResult, error) {
 			accepted := false
 			if release := ParseRelease(title, magnet, "EZTV"); release != nil {
 				accepted = release.Kind == "series" &&
-					release.Season != nil && *release.Season == expectedSeason &&
+					release.CoversSeason(expectedSeason) &&
 					webContainsInt64(release.EpisodeRange, expectedEpisode) &&
 					release.Series != nil && SeriesNamesMatch(expectedSeries, *release.Series)
 			}
