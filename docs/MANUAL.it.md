@@ -322,10 +322,12 @@ della stagione e dell'episodio e lo stato in cima, il nome del file in libreria
 per intero e i pulsanti su una riga sotto, e la storia dei download si legge un
 evento per blocco. Il titolo di una locandina e i risultati di **Esplora** su
 TMDB vanno a capo invece di essere tagliati. Nella pagina **Scarico** ogni
-download in corso occupa due o tre righe: il nome si ferma a due righe con i
-puntini — toccalo, e il dettaglio che si apre mostra il titolo per intero —, la
-barra di avanzamento e i pulsanti di pausa e menu stanno sulla stessa riga e i
-numeri che si muovono sotto. Ogni azione resta raggiungibile col
+riga occupa due o tre righe: il nome si ferma a due righe con i puntini —
+toccalo, e il dettaglio che si apre mostra il titolo per intero —, la barra di
+avanzamento e i pulsanti di pausa e menu stanno sulla stessa riga per i download
+in corso, i fatti (dimensione, upload, peer, ratio) e i pulsanti di pausa e menu
+stanno sulla stessa riga per le righe a riposo, e i numeri che si muovono sotto.
+Ogni azione resta raggiungibile col
 tocco, e pulsanti e voci di menu arrivano a 44 pixel, la misura più piccola che
 un dito colpisce senza sbagliare. Tema, dimensione del testo, carattere e lingua
 sono nel menu **Aspetto** della barra in alto, così sul telefono la barra tiene

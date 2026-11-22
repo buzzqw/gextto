@@ -322,11 +322,12 @@ stays above the panels,
 every episode is a block with the season and episode code and the state on the
 first line, the full name of the file in the library and the buttons on a line
 of their own, and the download history reads one event per block. A poster
-title and the **Explore** results from TMDB wrap instead of being cut. On the **Downloads** page every ongoing
-download takes two or three lines: the name stops at two lines with an ellipsis —
+title and the **Explore** results from TMDB wrap instead of being cut. On the **Downloads** page every
+row takes two or three lines: the name stops at two lines with an ellipsis —
 tap it, and the detail that opens shows the whole title — the progress bar and
-the pause and menu buttons share a line, and the numbers that move sit under
-them. Every action stays reachable by touch, and buttons and menu rows
+the pause and menu buttons share a line for ongoing downloads, the facts (size,
+upload, peers, ratio) and the pause and menu buttons share a line for settled
+rows, and the numbers that move sit under them. Every action stays reachable by touch, and buttons and menu rows
 grow to 44 pixels, the smallest size a finger hits reliably. Theme, text size,
 font and language are in the **Appearance** menu of the top bar, so on a phone
 the bar keeps only the title, **＋** and **Refresh**; **Donate** is in the
