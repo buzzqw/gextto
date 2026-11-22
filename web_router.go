@@ -176,6 +176,7 @@ func Router(s *AppState) *http.ServeMux {
 	handle(s, mux, "GET /api/browse_dir", BrowseDir)
 	handle(s, mux, "POST /api/mkdir", MakeDirectory)
 	handle(s, mux, "POST /api/trash/delete", DeleteTrashEntries)
+	handle(s, mux, "POST /api/trash/restore", RestoreTrashEntry)
 	handle(s, mux, "GET /api/update", UpdateStatusApi)
 	handle(s, mux, "POST /api/update/check", UpdateCheckApi)
 	handle(s, mux, "POST /api/update/apply", UpdateApplyApi)

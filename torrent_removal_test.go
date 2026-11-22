@@ -127,8 +127,14 @@ func TestSafeRemoveTorrentMovesToTrash(t *testing.T) {
 
 	// Verify file is in trash
 	entries, _ := os.ReadDir(trashDir)
-	if len(entries) != 1 {
-		t.Fatalf("expected 1 file in trash, got %d", len(entries))
+	visible := 0
+	for _, entry := range entries {
+		if entry.Name() != trashJournalFile {
+			visible++
+		}
+	}
+	if visible != 1 {
+		t.Fatalf("expected 1 file in trash, got %d", visible)
 	}
 }
 

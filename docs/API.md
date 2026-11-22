@@ -347,6 +347,7 @@ state.
 | GET | `/api/torrents/{hash}/why` | diagnose a torrent: reason and hint when it is not transferring; answers 503 when no torrent engine is active |
 | GET | `/api/trash` | recycle bin entries |
 | POST | `/api/trash/delete` | delete recycle bin entries |
+| POST | `/api/trash/restore` | put one trashed entry back where it came from (name is a single path component); needs a journal record written when the entry was trashed; 409 when there is no record or the destination already exists |
 | POST | `/api/tvdb/search` | search TheTVDB |
 | GET | `/api/tvdb/series/{id}` | TheTVDB series details |
 | GET | `/api/update` | update status |

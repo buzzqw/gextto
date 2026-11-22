@@ -336,6 +336,7 @@ func MoveToTrash(source, trash string) (string, error) {
 	renameErr := os.Rename(source, target)
 	if renameErr == nil {
 		touchTrashEntry(target)
+		recordTrashMove(trash, source, target)
 		return target, nil
 	}
 	// Only a cross-device rename needs the copy fallback. Any other failure
@@ -364,6 +365,7 @@ func MoveToTrash(source, trash string) (string, error) {
 		return "", err
 	}
 	touchTrashEntry(target)
+	recordTrashMove(trash, source, target)
 	return target, nil
 }
 

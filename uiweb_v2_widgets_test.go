@@ -333,7 +333,7 @@ func TestV2DuplicatesPreviewFeedbackAndRanks(t *testing.T) {
 	for _, want := range []string{
 		`data-v2-toast-title="Duplicati video"`,
 		`data-v2-toast-message="Analisi avviata`,
-		`data-v2-toast-message="Pulizia avviata`,
+		`data-v2-toast-message="Le copie inferiori vanno nel cestino`,
 	} {
 		if !strings.Contains(page, want) {
 			t.Fatalf("maintenance page missing %q", want)

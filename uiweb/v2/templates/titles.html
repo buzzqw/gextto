@@ -349,6 +349,10 @@
     <td class="numeric">{{bytes .SizeBytes}}</td>
     <td>{{if .IsDir}}{{tr "cartella"}}{{else}}{{tr "file"}}{{end}}</td>
     <td class="row-actions">
+      {{if .CanRestore}}<form method="post" action="/trash/restore" hx-post="/trash/restore" hx-swap="none" class="inline">
+        <input type="hidden" name="name" value="{{.Name}}" />
+        <button class="btn sm" type="submit" {{trTitle "Rimette questo elemento nella cartella da cui era stato spostato"}}>{{tr "Ripristina"}}</button>
+      </form>{{end}}
       <form method="post" action="/trash/delete" hx-post="/trash/delete" hx-swap="none" class="inline">
         <input type="hidden" name="name" value="{{.Name}}" />
         <button class="btn sm danger" type="submit" hx-confirm="{{tr "Eliminare questo elemento dal cestino?"}}">{{tr "Elimina"}}</button>

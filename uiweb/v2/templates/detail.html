@@ -164,7 +164,7 @@
         <tbody>{{range .Items}}<tr><td class="truncate" {{trTitle .Path}}>{{tr .Name}}</td><td class="numeric">{{bytes .SizeBytes}}</td><td>{{if .Episodes}}{{tr .Episodes}}{{else}}—{{end}}</td><td>{{if .Safe}}<span class="badge ok">{{tr "sicuro"}}</span>{{else}}<span class="badge warn">{{tr "saltato"}}</span> <small class="muted">{{tr .Reason}}</small>{{end}}</td></tr>{{end}}</tbody>
       </table></div>
       <p class="muted"><span>{{tr "Totale sicuro:"}}</span> {{bytes .SafeBytes}} / {{bytes .TotalBytes}}</p>
-      {{if gt .SafeBytes 0}}<button class="btn danger" hx-post="/downloads/orphans/clean" hx-target="#v2-modal" hx-swap="innerHTML" hx-disabled-elt="this" hx-confirm="{{tr "Spostare nel cestino i file orfani sicuri? Le copie in libreria restano."}}" {{trTitle "Sposta nel cestino le voci sicure"}}>{{tr "Sposta nel cestino"}} <small class="muted">— {{bytes .SafeBytes}}</small></button>{{end}}
+      {{if gt .SafeBytes 0}}<button class="btn danger" hx-post="/downloads/orphans/clean" hx-target="#v2-modal" hx-swap="innerHTML" hx-disabled-elt="this" data-v2-toast-title="{{tr "Pulizia"}}" data-v2-toast-message="{{tr "File orfani spostati nel cestino: puoi ripristinarli da Manutenzione."}}" {{trTitle "Sposta nel cestino le voci sicure"}}>{{tr "Sposta nel cestino"}} <small class="muted">— {{bytes .SafeBytes}}</small></button>{{end}}
       {{else}}<p class="muted">{{tr "Nessun file orfano trovato."}}</p>{{end}}
     </div>
   </div>

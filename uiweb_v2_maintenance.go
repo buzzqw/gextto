@@ -17,10 +17,11 @@ import (
 )
 
 type v2TrashItem struct {
-	Name      string
-	Path      string
-	SizeBytes int64
-	IsDir     bool
+	Name       string
+	Path       string
+	SizeBytes  int64
+	IsDir      bool
+	CanRestore bool
 }
 
 type v2TrashView struct {
@@ -37,13 +38,14 @@ func v2TrashViewFrom(s *AppState) v2TrashView {
 				Name      string `json:"name"`
 				Path      string `json:"path"`
 				SizeBytes int64  `json:"size_bytes"`
-				IsDir     bool   `json:"is_dir"`
+				IsDir      bool   `json:"is_dir"`
+				CanRestore bool   `json:"can_restore"`
 			} `json:"items"`
 		}
 		if json.Unmarshal(raw, &payload) == nil {
 			view.Total = payload.TotalBytes
 			for _, item := range payload.Items {
-				view.Items = append(view.Items, v2TrashItem{Name: item.Name, Path: item.Path, SizeBytes: item.SizeBytes, IsDir: item.IsDir})
+				view.Items = append(view.Items, v2TrashItem{Name: item.Name, Path: item.Path, SizeBytes: item.SizeBytes, IsDir: item.IsDir, CanRestore: item.CanRestore})
 			}
 		}
 	}
@@ -225,4 +227,35 @@ func v2UpdateErrorMessage(err error) string {
 		return "Backup prima dell'aggiornamento non riuscito: aggiornamento annullato."
 	}
 	return err.Error()
+}
+
+// V2TrashRestore puts one entry back where MoveToTrash took it from. The
+// journal is the only source of the original path, so an entry without one
+// gets no button in the list and is refused here too.
+func V2TrashRestore(w http.ResponseWriter, r *http.Request, s *AppState) {
+	name := strings.TrimSpace(r.FormValue("name"))
+	message, failed := "", false
+	if name != "" {
+		body, _ := json.Marshal(map[string]string{"name": name})
+		_, status := v2InternalJSON(s, http.MethodPost, "/api/trash/restore", nil, body)
+		if status < 400 {
+			message = fmt.Sprintf("Elemento «%s» ripristinato nella posizione originale.", name)
+		} else {
+			message = fmt.Sprintf("Impossibile ripristinare «%s».", name)
+			failed = true
+		}
+	}
+	redirect := "/?view=maintenance"
+	if message != "" {
+		redirect += "&toast=" + url.QueryEscape(message)
+		if failed {
+			redirect += "&toast_err=1"
+		}
+	}
+	if r.Header.Get("HX-Request") == "" {
+		http.Redirect(w, r, redirect, http.StatusSeeOther)
+		return
+	}
+	w.Header().Set("HX-Redirect", redirect)
+	w.WriteHeader(http.StatusNoContent)
 }

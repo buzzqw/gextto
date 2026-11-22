@@ -30,4 +30,3 @@ still be true after the item lands does not belong here.
   ratio and seed rules, instead of downloading a second copy; the archive
   already holds the same release from several trackers. Gate: the v1/v2 block
   reuse and the hardlink library, which are the building blocks.
-- **Faster flows**: undo instead of a confirmation for reversible removals, with a dialog that explains itself for the rest (the missing count on the Dashboard is there).

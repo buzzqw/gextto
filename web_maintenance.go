@@ -764,6 +764,9 @@ func DeleteTrashEntries(w http.ResponseWriter, r *http.Request, s *AppState) {
 		names = []string{}
 		if entries, err := os.ReadDir(root); err == nil {
 			for _, entry := range entries {
+				if entry.Name() == trashJournalFile || strings.HasSuffix(entry.Name(), trashJournalFile+".tmp") {
+					continue
+				}
 				names = append(names, entry.Name())
 			}
 		}
@@ -1345,6 +1348,9 @@ func TrashEntries(w http.ResponseWriter, r *http.Request, s *AppState) {
 	var totalBytes uint64
 	if entries, err := os.ReadDir(path); err == nil {
 		for _, entry := range entries {
+			if entry.Name() == trashJournalFile || strings.HasSuffix(entry.Name(), trashJournalFile+".tmp") {
+				continue // internal journal, not a trash entry
+			}
 			child := filepath.Join(path, entry.Name())
 			isDir := directoryExists(child)
 			var size uint64
@@ -1355,10 +1361,11 @@ func TrashEntries(w http.ResponseWriter, r *http.Request, s *AppState) {
 			}
 			totalBytes += size
 			items = append(items, map[string]any{
-				"name":       entry.Name(),
-				"path":       child,
-				"size_bytes": size,
-				"is_dir":     isDir,
+				"name":        entry.Name(),
+				"path":        child,
+				"size_bytes":  size,
+				"is_dir":      isDir,
+				"can_restore": trashOriginalPath(path, entry.Name()) != "",
 			})
 		}
 	}
@@ -1451,4 +1458,59 @@ func archiveFileSize(path string) int64 {
 		return info.Size()
 	}
 	return 0
+}
+
+// RestoreTrashEntry puts one trashed entry back where it came from. The
+// original path is read from the journal written by MoveToTrash: an entry
+// without one (traced before the journal existed) cannot be restored safely.
+func RestoreTrashEntry(w http.ResponseWriter, r *http.Request, s *AppState) {
+	var input struct {
+		Name string `json:"name"`
+	}
+	if err := decodeJSON(r, &input); err != nil {
+		jsonError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	name := strings.TrimSpace(input.Name)
+	if name == "" || !SingleComponent(name) || !filepath.IsLocal(name) {
+		jsonError(w, http.StatusBadRequest, "nome non valido")
+		return
+	}
+	cfg := latestConfig(s)
+	if cfg.DryRun {
+		jsonStatus(w, http.StatusConflict, map[string]any{"ok": false, "error": "dry-run does not restore trash"})
+		return
+	}
+	root := filepath.Join(cfg.DataDir, "trash")
+	if cfg.TrashPath != nil {
+		root = *cfg.TrashPath
+	}
+	if !safeTrashRoot(cfg, root) {
+		jsonError(w, http.StatusConflict, "trash_path non valido: ripristino rifiutato")
+		return
+	}
+	original := trashOriginalPath(root, name)
+	if original == "" || !filepath.IsLocal(original) {
+		jsonError(w, http.StatusConflict, "nessuna posizione originale registrata per questo elemento")
+		return
+	}
+	target := filepath.Join(root, name)
+	if _, err := os.Lstat(target); err != nil {
+		jsonError(w, http.StatusNotFound, "elemento non trovato nel cestino")
+		return
+	}
+	if _, err := os.Lstat(original); err == nil {
+		jsonError(w, http.StatusConflict, "esiste già un elemento nella posizione originale")
+		return
+	}
+	if err := os.MkdirAll(filepath.Dir(original), 0o755); err != nil {
+		jsonError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if err := os.Rename(target, original); err != nil {
+		jsonError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	forgetTrashMove(root, name)
+	jsonStatus(w, http.StatusOK, map[string]any{"ok": true, "name": name, "path": original})
 }

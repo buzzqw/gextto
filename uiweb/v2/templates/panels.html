@@ -212,7 +212,7 @@
       </form>
       <form hx-post="/maintenance/duplicates" hx-target="#v2-duplicates-panel" hx-swap="outerHTML" class="inline">
         <input type="hidden" name="execute" value="1" />
-        <button class="btn sm danger" type="submit" hx-confirm="{{tr "Spostare nel cestino le copie inferiori?"}}" data-v2-toast-title="{{tr "Duplicati video"}}" data-v2-toast-message="{{tr "Pulizia avviata: i risultati arriveranno qui tra poco."}}">{{tr "Pulisci duplicati"}}</button>
+        <button class="btn sm danger" type="submit" data-v2-toast-title="{{tr "Duplicati video"}}" data-v2-toast-message="{{tr "Le copie inferiori vanno nel cestino: puoi ripristinarle da Manutenzione."}}">{{tr "Pulisci duplicati"}}</button>
       </form>
       {{if .Message}}<small class="htx-status {{if .Error}}err{{else}}ok{{end}}">{{tr .Message}}</small>{{end}}
     </div>
