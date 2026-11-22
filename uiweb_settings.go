@@ -257,6 +257,7 @@ var uiSettingsIndex = []uiSettingDef{
 	{Key: "torrent_seed_time_days", Label: "Seed massimo", Tab: "seeding", Group: "Seed"},
 	{Key: "torrent_seed_time", Label: "Seed massimo (fallback)", Tab: "seeding", Group: "Seed"},
 	{Key: "torrent_seed_idle_minutes", Label: "Ferma il seed inattivo dopo", Tab: "seeding", Group: "Seed"},
+	{Key: "torrent_seed_limits_all", Label: "Ferma il seed solo quando tutti i limiti sono raggiunti", Tab: "seeding", Group: "Seed"},
 	{Key: "auto_remove_completed", Label: "Elimina i completati dopo il seed", Tab: "seeding", Group: "A download completato"},
 	{Key: "move_episodes", Label: "Sposta gli episodi/pack in archivio (non copiare)", Tab: "seeding", Group: "A download completato"},
 	{Key: "hardlink_seeding", Label: "Hardlink invece della copia durante il seed", Tab: "seeding", Group: "A download completato"},

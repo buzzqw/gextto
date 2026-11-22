@@ -2315,7 +2315,13 @@ func tevApplySeedLimit(cfg *Config, torrents TorrentSession, db *Database, polic
 	ratioReached := limits.ratioReached(&torrent)
 	timeReached := limits.timeReached(&torrent)
 	idleReached := policy.idleReached(&torrent, limits, now)
-	if !ratioReached && !timeReached && !idleReached {
+	if cfg != nil && cfg.Transfer.SeedLimitsAll {
+		// «All of them»: the seed ends only when every configured limit has
+		// been reached, not at the first one.
+		if !limits.allReached(&torrent, idleReached) {
+			return
+		}
+	} else if !ratioReached && !timeReached && !idleReached {
 		return
 	}
 	stopped, seedReason := tevStopAtSeedLimit(torrents, policy, limits, &torrent, ratioReached, timeReached, idleReached)

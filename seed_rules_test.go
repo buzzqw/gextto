@@ -287,3 +287,54 @@ func BenchmarkSeedPolicyPass(b *testing.B) {
 		}
 	}
 }
+
+// TestSeedLimitsAllReached: with the "all of them" mode the seed ends only when
+// every configured limit is satisfied at once; a limit that is not configured
+// does not hold the seed back.
+func TestSeedLimitsAllReached(t *testing.T) {
+	ratio, seconds, idle := 2.0, int64(3600), int64(600)
+	torrent := &models.TorrentView{AllTimeUpload: 500, AllTimeDownload: 100, SeedingSeconds: 1800}
+
+	both := seedLimits{Ratio: &ratio, Seconds: &seconds}
+	if both.allReached(torrent, false) {
+		t.Fatal("ratio reached alone must not end an all-limits seed")
+	}
+	torrent.SeedingSeconds = 3600
+	if !both.allReached(torrent, false) {
+		t.Fatal("ratio and time reached must end it")
+	}
+	torrent.AllTimeUpload = 100 // ratio 1 < 2
+	if both.allReached(torrent, false) {
+		t.Fatal("time reached alone must not end it")
+	}
+
+	// The inactivity limit joins the condition only when it is configured.
+	withIdle := seedLimits{Ratio: &ratio, Seconds: &seconds, IdleSeconds: &idle}
+	torrent.AllTimeUpload = 500
+	if withIdle.allReached(torrent, false) {
+		t.Fatal("idle not reached must hold an all-limits seed")
+	}
+	if !withIdle.allReached(torrent, true) {
+		t.Fatal("every limit reached must end it")
+	}
+
+	// No limit at all never ends.
+	if (seedLimits{}).allReached(torrent, true) {
+		t.Fatal("a torrent that seeds forever was stopped")
+	}
+}
+
+// TestSeedLimitsAllSettingIsRead: the switch reaches the typed settings the
+// engine receives.
+func TestSeedLimitsAllSettingIsRead(t *testing.T) {
+	cfg := &Config{Settings: map[string]string{"torrent_seed_limits_all": "true"}}
+	cfg.applyTransferSettings()
+	if !cfg.Transfer.SeedLimitsAll {
+		t.Fatal("torrent_seed_limits_all was not read")
+	}
+	cfg = &Config{Settings: map[string]string{}}
+	cfg.applyTransferSettings()
+	if cfg.Transfer.SeedLimitsAll {
+		t.Fatal("the default must be off")
+	}
+}

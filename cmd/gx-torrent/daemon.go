@@ -1360,11 +1360,7 @@ func (d *Daemon) tick(now time.Time) {
 		// second enforcer here fought it — a torrent paused by one side was
 		// resumed by the other every few seconds.
 		if complete && running && d.opts.Mode == ModeStandalone {
-			remove, reached := d.seedLimitReached(meta, stats)
-			idle := !reached && d.seedIdleReached(rt, meta, stats, now)
-			if idle {
-				remove, reached = d.settingInt(maxRatioActKey, 0) == 1, true
-			}
+			remove, idle, reached := d.seedLimitStop(rt, meta, stats, now)
 			if reached {
 				if !meta.SeedLimitNotice {
 					meta.SeedLimitNotice = true

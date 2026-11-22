@@ -18,30 +18,30 @@ func TestSeedLimitReached(t *testing.T) {
 	stats.SeededFor = 30 * time.Minute
 
 	// No global limit: never reached.
-	if _, reached := d.seedLimitReached(meta, stats); reached {
+	if _, reached := d.seedLimitReachedForTest(meta, stats); reached {
 		t.Fatal("no limits configured, but reached")
 	}
 
 	// Global ratio 0.4: reached at 0.5, with the removal action.
 	d.opts.Settings.Set(maxRatioEnabledKey, "true")
 	d.opts.Settings.Set(maxRatioKey, "0.4")
-	if remove, reached := d.seedLimitReached(meta, stats); !reached || remove {
+	if remove, reached := d.seedLimitReachedForTest(meta, stats); !reached || remove {
 		t.Fatalf("ratio 0.4: reached=%v remove=%v", reached, remove)
 	}
 	d.opts.Settings.Set(maxRatioActKey, "1")
-	if remove, reached := d.seedLimitReached(meta, stats); !reached || !remove {
+	if remove, reached := d.seedLimitReachedForTest(meta, stats); !reached || !remove {
 		t.Fatalf("ratio 0.4 remove action: reached=%v remove=%v", reached, remove)
 	}
 	d.opts.Settings.Set(maxRatioActKey, "0")
 	d.opts.Settings.Set(maxRatioKey, "2")
-	if _, reached := d.seedLimitReached(meta, stats); reached {
+	if _, reached := d.seedLimitReachedForTest(meta, stats); reached {
 		t.Fatal("ratio 2 must not be reached at 0.5")
 	}
 
 	// A per-torrent infinite ratio (0) wins over the global.
 	meta.SeedRatio = 0
 	d.opts.Settings.Set(maxRatioKey, "0.1")
-	if _, reached := d.seedLimitReached(meta, stats); reached {
+	if _, reached := d.seedLimitReachedForTest(meta, stats); reached {
 		t.Fatal("a per-torrent infinite ratio must win")
 	}
 
@@ -50,12 +50,12 @@ func TestSeedLimitReached(t *testing.T) {
 	d.opts.Settings.Set(maxRatioEnabledKey, "false")
 	d.opts.Settings.Set(maxSeedingTimeEnabledKey, "true")
 	d.opts.Settings.Set(maxSeedingTimeKey, "20")
-	if _, reached := d.seedLimitReached(meta, stats); !reached {
+	if _, reached := d.seedLimitReachedForTest(meta, stats); !reached {
 		t.Fatal("20 minutes must be reached at 30")
 	}
 	// Per-torrent days win over the global minutes.
 	meta.SeedDays = 2
-	if _, reached := d.seedLimitReached(meta, stats); reached {
+	if _, reached := d.seedLimitReachedForTest(meta, stats); reached {
 		t.Fatal("2 days must not be reached at 30 minutes")
 	}
 }
@@ -106,5 +106,54 @@ func TestSeedIdleReached(t *testing.T) {
 	d.opts.Settings.Set(maxInactiveSeedingTimeEnabledKey, "false")
 	if d.seedIdleReached(rt, meta, stats, start.Add(300*time.Minute)) {
 		t.Fatal("the limit is off")
+	}
+}
+
+// seedLimitReachedForTest keeps the old two-value shape of the ratio and time
+// limits for the table test above.
+func (d *Daemon) seedLimitReachedForTest(meta *torrentMeta, stats torrent.Stats) (bool, bool) {
+	remove := d.settingInt(maxRatioActKey, 0) == 1
+	_, ratioHit := d.seedRatioState(meta, stats)
+	_, timeHit := d.seedTimeState(meta, stats)
+	return remove, ratioHit || timeHit
+}
+
+// TestSeedLimitStopAll: with share-limits-all the seed ends only when every
+// configured limit has been reached, not at the first one, and a limit left off
+// is not part of the condition.
+func TestSeedLimitStopAll(t *testing.T) {
+	d := standaloneTestDaemon(t, "", true)
+	d.opts.Settings.Set(shareLimitsAllKey, "true")
+	d.opts.Settings.Set(maxRatioEnabledKey, "true")
+	d.opts.Settings.Set(maxRatioKey, "2")
+	d.opts.Settings.Set(maxSeedingTimeEnabledKey, "true")
+	d.opts.Settings.Set(maxSeedingTimeKey, "60")
+	meta := &torrentMeta{SeedRatio: -1, SeedDays: -1}
+	rt := &runtimeInfo{}
+	stats := torrent.Stats{Status: torrent.Seeding}
+	stats.Bytes.Total = 100
+	stats.Bytes.Uploaded = 500 // ratio 5 >= 2
+	stats.SeededFor = 30 * time.Minute
+	now := time.Unix(1_700_000_000, 0)
+	d.seedIdleReached(rt, meta, stats, now) // start the idle clock
+
+	// Ratio reached, time not: the seed goes on.
+	if _, _, reached := d.seedLimitStop(rt, meta, stats, now.Add(time.Minute)); reached {
+		t.Fatal("ratio alone must not end an all-limits seed")
+	}
+	// Time reached too: stop.
+	stats.SeededFor = 90 * time.Minute
+	if _, _, reached := d.seedLimitStop(rt, meta, stats, now.Add(2*time.Minute)); !reached {
+		t.Fatal("both limits reached, but the seed went on")
+	}
+	// With only the ratio configured, the ratio alone is enough.
+	d.opts.Settings.Set(maxSeedingTimeEnabledKey, "false")
+	if _, _, reached := d.seedLimitStop(rt, meta, stats, now.Add(3*time.Minute)); !reached {
+		t.Fatal("the only configured limit was reached, but the seed went on")
+	}
+	// Nothing configured: never stop.
+	d.opts.Settings.Set(maxRatioEnabledKey, "false")
+	if _, _, reached := d.seedLimitStop(rt, meta, stats, now.Add(4*time.Minute)); reached {
+		t.Fatal("no limit configured, but the seed stopped")
 	}
 }

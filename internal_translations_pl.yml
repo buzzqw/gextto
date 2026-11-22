@@ -5233,7 +5233,9 @@ pol:
 
   # Seed rules and the inactivity limit
   "Ferma il seed inattivo dopo": "Zatrzymaj nieaktywne seedowanie po"
+  "Ferma il seed solo quando tutti i limiti sono raggiunti": "Zatrzymaj seedowanie dopiero po osiągnięciu wszystkich limitów"
   "Ferma un torrent in seed che non invia dati da questo numero di minuti (conta solo il tempo in seed attivo). Come gli altri limiti: a fine seed segue l'archiviazione o la rimozione.": "Zatrzymuje seedowany torrent, który nie wysłał danych przez tyle minut (liczy się tylko czas aktywnego seedowania). Jak przy innych limitach, po zakończeniu seedowania następuje archiwizacja lub usunięcie."
+  "Con questa opzione attiva il seed non si ferma al primo limite raggiunto: continua finché ratio, tempo e inattività sono soddisfatti tutti insieme. I limiti non impostati non bloccano nulla.": "Przy tej opcji seedowanie nie kończy się na pierwszym osiągniętym limicie: trwa, dopóki współczynnik, czas i brak aktywności nie zostaną spełnione jednocześnie. Nieustawiony limit niczego nie blokuje."
   "Regole di seed": "Reguły seedowania"
   "Limiti di seed per sorgente (indexer) e categoria, come i limiti per categoria di qBittorrent: vale la prima regola che corrisponde. Un campo vuoto usa il limite globale, 0 toglie il limite.": "Limity seedowania według źródła (indeksera) i kategorii, jak limity kategorii w qBittorrent: obowiązuje pierwsza pasująca reguła. Puste pole używa limitu globalnego, 0 usuwa limit."
   "Giorni di seed": "Dni seedowania"

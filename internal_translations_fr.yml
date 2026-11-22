@@ -5286,7 +5286,9 @@ fra:
 
   # Seed rules and the inactivity limit
   "Ferma il seed inattivo dopo": "Arrêter le partage inactif après"
+  "Ferma il seed solo quando tutti i limiti sono raggiunti": "Arrêter le partage seulement quand toutes les limites sont atteintes"
   "Ferma un torrent in seed che non invia dati da questo numero di minuti (conta solo il tempo in seed attivo). Come gli altri limiti: a fine seed segue l'archiviazione o la rimozione.": "Arrête un torrent en partage qui n'a envoyé aucune donnée depuis ce nombre de minutes (seul le temps de partage actif compte). Comme pour les autres limites, la fin du partage est suivie de l'archivage ou de la suppression."
+  "Con questa opzione attiva il seed non si ferma al primo limite raggiunto: continua finché ratio, tempo e inattività sono soddisfatti tutti insieme. I limiti non impostati non bloccano nulla.": "Avec cette option active, le partage ne s'arrête pas à la première limite atteinte : il continue jusqu'à ce que le ratio, la durée et l'inactivité soient satisfaits ensemble. Une limite non définie ne bloque rien."
   "Regole di seed": "Règles de partage"
   "Limiti di seed per sorgente (indexer) e categoria, come i limiti per categoria di qBittorrent: vale la prima regola che corrisponde. Un campo vuoto usa il limite globale, 0 toglie il limite.": "Limites de partage par source (indexeur) et catégorie, comme les limites par catégorie de qBittorrent : la première règle qui correspond s'applique. Un champ vide utilise la limite globale, 0 supprime la limite."
   "Giorni di seed": "Jours de partage"

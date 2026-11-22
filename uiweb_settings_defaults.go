@@ -100,6 +100,7 @@ var uiSettingDefaults = map[string]string{
 	"torrent_seed_time":                   "0",
 	"torrent_seed_time_days":              "0",
 	"torrent_seed_idle_minutes":           "0",
+	"torrent_seed_limits_all":             "false",
 	"auto_remove_completed":               "false",
 	"torrent_max_connections_per_torrent": "-1",
 	"torrent_connections_auto":            "yes",

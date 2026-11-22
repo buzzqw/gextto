@@ -128,6 +128,7 @@ const (
 	settingTorrentSeedTimeDays              = "torrent_seed_time_days"
 	settingTorrentSeedTime                  = "torrent_seed_time"
 	settingTorrentSeedIdleMinutes           = "torrent_seed_idle_minutes"
+	settingTorrentSeedLimitsAll             = "torrent_seed_limits_all"
 	settingAutoRemoveCompleted              = "auto_remove_completed"
 	settingMoveEpisodes                     = "move_episodes"
 	settingHardlinkSeeding                  = "hardlink_seeding"
@@ -383,6 +384,7 @@ var settingKeyNames = []string{
 	"torrent_seed_time_days",
 	"torrent_seed_time",
 	"torrent_seed_idle_minutes",
+	"torrent_seed_limits_all",
 	"auto_remove_completed",
 	"move_episodes",
 	"hardlink_seeding",

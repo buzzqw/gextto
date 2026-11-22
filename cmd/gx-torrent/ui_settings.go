@@ -230,6 +230,8 @@ func (d *Daemon) handleUISettings(w http.ResponseWriter, r *http.Request) {
 		store.Set(maxSeedingTimeKey, strconv.Itoa(v))
 	}
 	store.Set(maxInactiveSeedingTimeEnabledKey, strconv.FormatBool(formBool(r, "max-inactive-seeding-time-enabled")))
+	// All three limits together instead of the first one that fires.
+	store.Set(shareLimitsAllKey, strconv.FormatBool(formBool(r, "share-limits-all")))
 	if v, err := strconv.Atoi(strings.TrimSpace(r.FormValue("max-inactive-seeding-time"))); err == nil && v >= 0 {
 		store.Set(maxInactiveSeedingTimeKey, strconv.Itoa(v))
 	}
@@ -636,6 +638,7 @@ func (d *Daemon) renderSettings(w http.ResponseWriter, r *http.Request, errKey s
 	repl("MAX_TIME", strconv.Itoa(d.settingInt(maxSeedingTimeKey, -1)))
 	repl("MAX_IDLE_ON", checkedIf(boolSetting(maxInactiveSeedingTimeEnabledKey)))
 	repl("MAX_IDLE", strconv.Itoa(d.settingInt(maxInactiveSeedingTimeKey, -1)))
+	repl("SHARE_LIMITS_ALL", checkedIf(boolSetting(shareLimitsAllKey)))
 	repl("CLIENT_IDENTITY_OPTIONS", clientIdentityOptions(store.Get(clientIdentityKey, defaultClientIdentity)))
 	repl("CLIENT_IDENTITY_VERSION", html.EscapeString(clientIdentityVersion(store.Get(clientIdentityVersionKey, ""))))
 	repl("WATCH_FOLDERS", get("watch-folders"))

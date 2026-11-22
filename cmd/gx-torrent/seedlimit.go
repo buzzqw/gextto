@@ -59,12 +59,14 @@ func (d *Daemon) settingFloat(key string, fallback float64) float64 {
 	return fallback
 }
 
-// seedLimitReached reports whether a seeding torrent passed its effective
-// limit, and whether the action is removal (max-ratio-act=1) rather than pausing.
-func (d *Daemon) seedLimitReached(meta *torrentMeta, stats torrent.Stats) (remove, reached bool) {
-	remove = d.settingInt(maxRatioActKey, 0) == 1
+// shareLimitsAllKey turns the three limits into one condition: seed until the
+// ratio, the time and the inactivity are all satisfied instead of stopping at
+// the first one that fires (qBittorrent's share_limits_mode "All").
+const shareLimitsAllKey = "share-limits-all"
 
-	// Share ratio: the per-torrent value wins; -1 = global, 0 = never stop.
+// seedRatioState reports the effective share ratio of a torrent and whether it
+// was reached. The per-torrent value wins; -1 = global, 0 = never stop.
+func (d *Daemon) seedRatioState(meta *torrentMeta, stats torrent.Stats) (set, hit bool) {
 	ratio := meta.SeedRatio
 	if ratio < 0 {
 		if d.settingBool(maxRatioEnabledKey, false) {
@@ -73,13 +75,15 @@ func (d *Daemon) seedLimitReached(meta *torrentMeta, stats torrent.Stats) (remov
 			ratio = 0
 		}
 	}
-	if ratio > 0 && stats.Bytes.Total > 0 {
-		if float64(stats.Bytes.Uploaded) >= ratio*float64(stats.Bytes.Total) {
-			return remove, true
-		}
+	if ratio <= 0 {
+		return false, false
 	}
+	return true, stats.Bytes.Total > 0 && float64(stats.Bytes.Uploaded) >= ratio*float64(stats.Bytes.Total)
+}
 
-	// Seeding time: per-torrent days; -1 = global minutes, 0 = never stop.
+// seedTimeState reports the effective seeding time of a torrent and whether it
+// elapsed. Per-torrent days; -1 = global minutes, 0 = never stop.
+func (d *Daemon) seedTimeState(meta *torrentMeta, stats torrent.Stats) (set, hit bool) {
 	var seconds int64
 	switch {
 	case meta.SeedDays > 0:
@@ -89,10 +93,47 @@ func (d *Daemon) seedLimitReached(meta *torrentMeta, stats torrent.Stats) (remov
 			seconds = int64(d.settingInt(maxSeedingTimeKey, -1)) * 60
 		}
 	}
-	if seconds > 0 && int64(stats.SeededFor.Seconds()) >= seconds {
-		return remove, true
+	if seconds <= 0 {
+		return false, false
 	}
-	return false, false
+	return true, int64(stats.SeededFor.Seconds()) >= seconds
+}
+
+// seedIdleConfigured reports whether the inactivity limit applies to a torrent:
+// it needs the setting on a positive value and a torrent that does not seed
+// forever, like seedIdleReached.
+func (d *Daemon) seedIdleConfigured(meta *torrentMeta) bool {
+	if meta.SeedRatio == 0 || meta.SeedDays == 0 || !d.settingBool(maxInactiveSeedingTimeEnabledKey, false) {
+		return false
+	}
+	return d.settingInt(maxInactiveSeedingTimeKey, -1) > 0
+}
+
+// seedLimitStop decides whether the global seeding limits stop a torrent. With
+// the default rule the first limit that fires is enough; with share-limits-all
+// every configured limit has to be reached, so the seed lasts as long as the
+// three conditions together require. idle is true only when the inactivity
+// limit alone ended the seed, which is the sentence the log writes.
+func (d *Daemon) seedLimitStop(rt *runtimeInfo, meta *torrentMeta, stats torrent.Stats, now time.Time) (remove, idle, reached bool) {
+	remove = d.settingInt(maxRatioActKey, 0) == 1
+	ratioSet, ratioHit := d.seedRatioState(meta, stats)
+	timeSet, timeHit := d.seedTimeState(meta, stats)
+	idleSet := d.seedIdleConfigured(meta)
+	idleHit := d.seedIdleReached(rt, meta, stats, now)
+
+	if d.settingBool(shareLimitsAllKey, false) {
+		if !ratioSet && !timeSet && !idleSet {
+			return remove, false, false
+		}
+		if (ratioSet && !ratioHit) || (timeSet && !timeHit) || (idleSet && !idleHit) {
+			return remove, false, false
+		}
+		return remove, false, true
+	}
+	if ratioHit || timeHit {
+		return remove, false, true
+	}
+	return remove, idleHit, idleHit
 }
 
 // seedIdleReached reports a seed that uploaded nothing for the global inactive

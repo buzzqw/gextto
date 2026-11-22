@@ -241,6 +241,7 @@ h3.sub{margin:14px 0 2px;font-size:13px;color:var(--subtle);text-transform:upper
   <label>{{tr "Seeding time (minutes)"}}<input type="number" min="-1" name="max-seeding-time" value="{{.MAX_TIME}}" title="{{tr "Global seeding time in minutes (0 = never stop)"}}"></label>
   <label class="chk"><input type="checkbox" name="max-inactive-seeding-time-enabled" value="1"{{.MAX_IDLE_ON}} title="{{tr "Stop seeding a torrent that uploaded nothing for the time below while seeding, unless the torrent is set to seed forever"}}"> {{tr "Enable the inactive-seeding limit"}}</label>
   <label>{{tr "Inactive seeding time (minutes)"}}<input type="number" min="-1" name="max-inactive-seeding-time" value="{{.MAX_IDLE}}" title="{{tr "Minutes without any upload while seeding before the torrent stops (only time spent seeding counts; 0 = never stop)"}}"></label>
+  <label class="chk"><input type="checkbox" name="share-limits-all" value="1"{{.SHARE_LIMITS_ALL}} title="{{tr "Seeding goes on until the ratio, the time and the inactivity are all satisfied, instead of stopping at the first limit that fires. A limit left at 0 is not part of the condition."}}"> {{tr "Stop seeding only when every limit is reached"}}</label>
 </fieldset>
 <fieldset>
   <legend>{{tr "Automatic speed (measures the line)"}}</legend>

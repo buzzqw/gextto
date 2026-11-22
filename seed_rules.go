@@ -283,6 +283,26 @@ func (l seedLimits) timeReached(torrent *models.TorrentView) bool {
 	return l.Seconds != nil && torrent.SeedingSeconds >= *l.Seconds
 }
 
+// allReached reports whether every limit that applies has been reached: the
+// "all of them" mode keeps a torrent seeding until the ratio, the time and the
+// inactivity limit are all satisfied, where the default stops at the first one.
+// A limit that is not configured does not hold the seed back.
+func (l seedLimits) allReached(torrent *models.TorrentView, idleReached bool) bool {
+	if l.none() {
+		return false
+	}
+	if l.Ratio != nil && !l.ratioReached(torrent) {
+		return false
+	}
+	if l.Seconds != nil && !l.timeReached(torrent) {
+		return false
+	}
+	if l.IdleSeconds != nil && !idleReached {
+		return false
+	}
+	return true
+}
+
 // seedEndReason names, in the words the log uses, the limit that ended a seed.
 // timeReached is the time limit alone; a seed stopped for inactivity is
 // reported as such only when the time limit was not reached.

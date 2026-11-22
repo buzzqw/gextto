@@ -211,6 +211,10 @@ type TransferSettings struct {
 	// SeedIdleMinutes stops a seed that uploaded nothing for that long while
 	// seeding (0 = off); see seed_rules.go.
 	SeedIdleMinutes int64 `json:"seed_idle_minutes"`
+	// SeedLimitsAll makes the three share limits work together: a torrent keeps
+	// seeding until the ratio, the time and the inactivity limit are all
+	// satisfied, instead of stopping at the first one that fires.
+	SeedLimitsAll bool `json:"seed_limits_all"`
 	ActiveDownloads int64 `json:"active_downloads"`
 	ActiveSeeds     int64 `json:"active_seeds"`
 	ActiveLimit     int64 `json:"active_limit"`
@@ -3527,6 +3531,7 @@ func (c *Config) applyTransferSettings() {
 		SeedTimeMinutes:       numberSettingInt(c.Settings, "torrent_seed_time", 0),
 		SeedTimeDays:          numberSettingInt(c.Settings, "torrent_seed_time_days", 0),
 		SeedIdleMinutes:       numberSettingInt(c.Settings, "torrent_seed_idle_minutes", 0),
+		SeedLimitsAll:         boolSettingOr(c.Settings, "torrent_seed_limits_all", false),
 		ActiveDownloads:       numberSettingInt(c.Settings, "torrent_active_downloads", 3),
 		ActiveSeeds:           numberSettingInt(c.Settings, "torrent_active_seeds", 3),
 		ActiveLimit:           numberSettingInt(c.Settings, "torrent_active_limit", 5),

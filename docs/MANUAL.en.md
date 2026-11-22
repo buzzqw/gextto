@@ -973,6 +973,11 @@ minutes. Only time actively seeding counts (not queued or paused), and the
 count restarts at every Gextto restart: a restart can only make seeding
 longer.
 
+**Stop the seed only when every limit is reached** turns the three limits into
+one condition: seeding goes on until the ratio, the time and the inactivity are
+all satisfied, instead of stopping at the first one that fires. A limit left at
+zero is not part of the condition and holds nothing back.
+
 At the end of seeding the torrent follows its path: archiving into the library
 and, if enabled, removal from the session.
 
@@ -2641,6 +2646,7 @@ files. When the memory cannot be read, only the `tmpfs` space counts, as before.
 | Maximum seeding | Primary seeding limit in days; when greater than 0 it takes precedence over the limit in minutes. With days and minutes at 0 the time is infinite. *(Unit: days; 0 = use the limit in minutes)* |
 | Maximum seeding (fallback) | Seeding limit in minutes, used only when Maximum seed (days) is 0. With days and minutes at 0 the time is infinite: the seed never ends and the file is not moved. *(Unit: minutes)* |
 | Stop an idle seed after | Stops a seeding torrent that has sent no data for this many minutes (only time spent actively seeding counts). Like the other limits, the end of the seed is followed by archiving or removal. With qBittorrent the value is also sent as `inactiveSeedingTimeLimit`. *(Unit: minutes; 0 = off)* |
+| Stop the seed only when every limit is reached | Seeds until the ratio, the time and the inactivity limit are all satisfied, instead of stopping at the first one that fires. A limit left at zero is not part of the condition. *(Off by default)* |
 
 **Editor**
 

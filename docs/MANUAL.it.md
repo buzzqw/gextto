@@ -989,6 +989,12 @@ essere entrambi maggiori di zero. Vale anche per eD2k.
 minuti. Conta solo il tempo in seed attivo (non in coda né in pausa) e riparte a
 ogni riavvio di Gextto: un riavvio può solo allungare il seed.
 
+**Ferma il seed solo quando tutti i limiti sono raggiunti** trasforma i tre
+limiti in una condizione sola: il seed continua finché ratio, tempo e
+inattività non sono soddisfatti tutti insieme, invece di fermarsi al primo che
+scatta. Un limite lasciato a zero non fa parte della condizione e non trattiene
+nulla.
+
 A fine seed il torrent segue il suo percorso: archiviazione in libreria e, se
 attiva, rimozione dalla sessione.
 
@@ -2677,6 +2683,7 @@ spazio del `tmpfs`, come prima.
 | Seed massimo | Limite principale di seeding in giorni; se maggiore di 0 prevale sul limite in minuti. Con giorni e minuti a 0 il tempo è infinito. *(Unità: giorni; 0 = usa il limite in minuti)* |
 | Seed massimo (fallback) | Limite di seeding in minuti, usato solo se Seed massimo (giorni) è 0. Con giorni e minuti a 0 il tempo è infinito: il seed non finisce mai e il file non viene spostato. *(Unità: minuti)* |
 | Ferma il seed inattivo dopo | Ferma un torrent in seed che non invia dati da questo numero di minuti (conta solo il tempo in seed attivo). Come gli altri limiti: a fine seed segue l'archiviazione o la rimozione. Con qBittorrent il valore viene inviato anche come `inactiveSeedingTimeLimit`. *(Unità: minuti; 0 = disattivato)* |
+| Ferma il seed solo quando tutti i limiti sono raggiunti | Il seed continua finché ratio, tempo e inattività sono soddisfatti tutti insieme, invece di fermarsi al primo limite raggiunto. Un limite lasciato a zero non fa parte della condizione. *(Spento per impostazione predefinita)* |
 
 **Editor**
 
