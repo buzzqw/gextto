@@ -66,6 +66,12 @@ still be true after the item lands does not belong here.
 - **Web UI sorting calls `ReleaseScore` in the comparator**: `web_system.go:136`
   runs `FindSeriesMatch` twice per comparison on a manual search. Gate: the
   decorated-sort pattern already used at `web_system.go:713`.
+- **An episode written `S02-01` is read as a season 2 pack**: the separator
+  without `E` is not an episode marker for the parser, so the release comes out
+  with episode 0 and `IsPack`, the pack check then finds one episode against the
+  whole declared season, the download is thrown away and the episode stays a
+  gap. Gate: a parser test over the alternative separators (`S02-01`,
+  `S02 - 01`), classified as S02E01 with the pack rules unchanged.
 
 ## Proposals
 
@@ -90,6 +96,14 @@ Each waits for the operator's choice.
 - **Pre-flight swarm health probe**: a fast DHT or tracker scrape probe for releases with missing or zero seeder counts before queuing them, deferring unseeded torrents instead of occupying active slots until stalled timeouts. Gate: the operator's choice.
 
 - **External watchlist sync**: an optional background worker importing wanted titles from public Trakt or Letterboxd watchlists directly into Gextto's wanted queue. Gate: the operator's choice.
+
+- **Multi-season packs**: a release covering several seasons (`S01-S03`,
+  `Stagione 1-3 Completa`) is read as its first season alone: the whole pack is
+  downloaded, only the files of that season are staged and the other seasons
+  stay gaps. The list-style titles (`Seasons 1-3 Complete`, `Serie Completa`)
+  are not classified at all. Gate: the operator's choice; `Release` needs a
+  season range, the staging a destination per season, and a real multi-season
+  pack to try.
 
 - **The verification progress is lost on a pause**: `stopVerifier` closes the
   verifier and the bitfield is `nil` during a check, so a recheck interrupted at
