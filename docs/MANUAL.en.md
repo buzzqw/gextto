@@ -2668,7 +2668,7 @@ files. When the memory cannot be read, only the `tmpfs` space counts, as before.
 
 | Setting | What it does |
 |---|---|
-| Inspect downloading packs and discard useless ones | On: as soon as the engine knows the file list, Gextto checks whether at least one episode is really wanted (missing from the library or a real upgrade). If none is, the torrent is removed with its partial data and blocklisted, so it is not downloaded again. Off (default): the pack is downloaded in full and decided only when the download ends. A pack covering several seasons is not inspected file by file: it is downloaded in full and decided when the download ends. |
+| Inspect downloading packs and discard useless ones | On: as soon as the engine knows the file list, Gextto checks whether at least one episode is really wanted (missing from the library or a real upgrade), season by season; the seasons are read from the files when the title is ambiguous. If none is, the torrent is removed with its partial data and blocklisted. A torrent you added by hand is inspected and reported, but never removed: that stays your choice. Off (default): the pack is downloaded in full and decided only when the download ends. |
 | In useful packs, download only the files that are needed | On (with inspection): when the pack holds only some useful episodes, the engine downloads only those files and skips the others (priority 0); subtitles and files without an episode number stay active. Off: the useful pack is downloaded in full. |
 
 **Stalled torrents**

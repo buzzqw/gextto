@@ -2705,7 +2705,7 @@ spazio del `tmpfs`, come prima.
 
 | Impostazione | Cosa fa |
 |---|---|
-| Ispeziona i pack in download e scarta quelli inutili | Attivo: appena il motore conosce la lista dei file, Gextto controlla se almeno un episodio serve davvero (manca dalla libreria oppure è un vero upgrade). Se nessuno serve, il torrent viene rimosso con i dati parziali e messo in blocklist, così non viene più scaricato. Spento (predefinito): il pack viene scaricato per intero e deciso solo a download finito. Un pack che copre più stagioni non viene ispezionato file per file: viene scaricato intero e deciso a fine download. |
+| Ispeziona i pack in download e scarta quelli inutili | Attivo: appena il motore conosce la lista dei file, Gextto controlla se almeno un episodio serve davvero (manca dalla libreria oppure è un vero upgrade), stagione per stagione; le stagioni si leggono dai file quando il titolo è ambiguo. Se nessuno serve, il torrent viene rimosso con i dati parziali e messo in blocklist. Un torrent aggiunto a mano viene ispezionato e segnalato, ma non rimosso: resta una scelta tua. Spento (predefinito): il pack viene scaricato per intero e deciso solo a download finito. |
 | Nei pack utili scarica solo i file che servono | Attivo (con l'ispezione): quando il pack contiene solo alcuni episodi utili, il motore scarica soltanto quei file e salta gli altri (priorità 0); sottotitoli e file senza numero di episodio restano attivi. Spento: il pack utile viene scaricato per intero. |
 
 **Torrent bloccati**

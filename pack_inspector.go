@@ -80,6 +80,7 @@ func InspectActivePacks(cfg *Config, torrents TorrentEngine, db *Database, notif
 	type candidate struct {
 		torrent models.TorrentView
 		release models.Release
+		manual  bool
 	}
 	candidates := make([]candidate, 0)
 	for _, torrent := range list {
@@ -105,11 +106,14 @@ func InspectActivePacks(cfg *Config, torrents TorrentEngine, db *Database, notif
 		// A pack the user started by hand is their choice, not the cycle's:
 		// it is never discarded, even when every episode is already in the
 		// library (they may want it for the seed, another language, a check).
+		// It is still inspected: as soon as the file list arrives the operator
+		// is told what is useful inside it, and only the useless files are
+		// left out. The verdict below never removes a manual pack.
+		manual := false
 		if reason, err := db.TorrentReason(torrent.Hash); err == nil && reasonIsManual(reason) {
-			checked[torrent.Hash] = settled
-			continue
+			manual = true
 		}
-		candidates = append(candidates, candidate{torrent: torrent, release: release})
+		candidates = append(candidates, candidate{torrent: torrent, release: release, manual: manual})
 	}
 	if len(candidates) == 0 {
 		return
@@ -140,6 +144,29 @@ func InspectActivePacks(cfg *Config, torrents TorrentEngine, db *Database, notif
 		names := make([]string, 0, len(files))
 		for _, file := range files {
 			names = append(names, file.Path)
+		}
+		// The title can be ambiguous: "S01-06" reads as season 1 episode 6,
+		// while the file list may cover seasons 1 through 6. The files are
+		// authoritative. Correct the release as soon as they are known, or
+		// every season but the first is ignored and a complete pack is thrown
+		// away as if it held a handful of already-owned episodes.
+		if first, last, ok := packSeasonSpanFromPaths(names); ok && last > first {
+			corrected := candidate.release
+			seasonFirst := first
+			corrected.Season = &seasonFirst
+			corrected.SeasonEnd = last
+			zero := int64(0)
+			corrected.Episode = &zero
+			corrected.EpisodeRange = []int64{0}
+			corrected.IsPack = true
+			if err := db.PromoteEpisodeRange(candidate.torrent.Hash, &corrected, cfg); err == nil {
+				candidate.release = corrected
+				logging.Info(fmt.Sprintf("🧩 «%s» holds seasons %d–%d: checking the pack season by season",
+					candidate.release.Title, first, last), "hash", candidate.torrent.Hash)
+			} else {
+				logging.Debug("could not record the season range read from the pack files",
+					"hash", candidate.torrent.Hash, "error", err.Error())
+			}
 		}
 		seriesName := ""
 		if candidate.release.Series != nil {
@@ -213,6 +240,24 @@ func InspectActivePacks(cfg *Config, torrents TorrentEngine, db *Database, notif
 				checked[candidate.torrent.Hash] = packInspectionCheck{until: now.Add(packInspectionMetadataWait)}
 				continue
 			}
+			checked[candidate.torrent.Hash] = packInspectionCheck{until: now.Add(packInspectionSettled)}
+			continue
+		}
+
+		if candidate.manual {
+			// Never remove a pack the operator added by hand. Still report
+			// what its files hold, so a wrong title or a stale library is
+			// visible before the whole download is spent on it.
+			held := packHeldEpisodesText(*candidate.release.Season, found)
+			score := cfg.ReleaseScore(&candidate.release)
+			var decisions []packEpisodeDecision
+			if len(verdicts) > 0 {
+				decisions = verdicts[0].decisions
+			}
+			details := packDecisionDetails(*candidate.release.Season, candidate.release.Quality, score, decisions, 12)
+			logging.Info(fmt.Sprintf("📋 «%s» was added by hand: %s. Nothing in it is needed in equal or better quality, but it is left running as you chose",
+				candidate.release.Title, packDiscardWhy(&candidate.release, held)), "hash", candidate.torrent.Hash)
+			logging.Debug("manual pack details", "hash", candidate.torrent.Hash, "episodes", details)
 			checked[candidate.torrent.Hash] = packInspectionCheck{until: now.Add(packInspectionSettled)}
 			continue
 		}

@@ -129,6 +129,35 @@ func TestInspectActivePacksLeavesAManualPackAlone(t *testing.T) {
 	}
 }
 
+// A title like "S01-06" reads as season 1 episode 6. As soon as the file list
+// arrives the pack is reclassified from its files: the inspector then checks
+// every season and keeps the manual pack instead of throwing it away.
+func TestInspectActivePacksCorrectsMultiSeasonManualPack(t *testing.T) {
+	cfg, db, engine, hash := packInspectFixture(t, []models.FileView{
+		{Path: "Show.S01E01.mkv", Size: 1000}, // already in the library
+		{Path: "Show.S02E01.mkv", Size: 2000}, // useful: not in the library
+	})
+	if err := db.SetTorrentReason(hash, "manual"); err != nil {
+		t.Fatalf("set reason: %v", err)
+	}
+	cfg.Settings[packInspectionPrioritizeSetting] = "true"
+	InspectActivePacks(cfg, engine, db, nil, map[string]packInspectionCheck{})
+	if _, removed := engine.removed[hash]; removed {
+		t.Fatal("a manual multi-season pack was removed")
+	}
+	meta, err := db.TorrentMeta(hash)
+	if err != nil || meta == nil {
+		t.Fatalf("torrent meta: %v", err)
+	}
+	if !meta.Release.MultiSeason() || meta.Release.SeasonLast() != 2 {
+		t.Fatalf("season range = %d..%d, want 1..2", *meta.Release.Season, meta.Release.SeasonLast())
+	}
+	got := engine.priorities[hash]
+	if len(got) != 2 || got[0] != 0 || got[1] != 1 {
+		t.Fatalf("priorities = %v, want [0 1]", got)
+	}
+}
+
 func TestInspectActivePacksKeepsPackWithAWantedEpisode(t *testing.T) {
 	cfg, db, engine, hash := packInspectFixture(t, []models.FileView{
 		{Path: "Show.S01E01.mkv"},

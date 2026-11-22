@@ -141,6 +141,40 @@ func packEpisodesFromPaths(names []string, season int64) (map[int64]struct{}, in
 	return found, videos, nil
 }
 
+// packSeasonSpanFromPaths returns the first and last season named explicitly
+// by the file names. A title can be ambiguous ("S01-06" reads as S01E06), but
+// the file list is not: it says which seasons the pack really covers. Files
+// carrying only an episode number ("01.mkv") are ignored — without a season
+// marker they cannot tell which season they belong to.
+func packSeasonSpanFromPaths(names []string) (int64, int64, bool) {
+	pattern, err := utils.CachedRegex(`(?i)(?:s(\d{1,2})e|(\d{1,2})x)\d{1,4}`)
+	if err != nil {
+		return 0, 0, false
+	}
+	first, last := int64(0), int64(0)
+	for _, name := range names {
+		match := pattern.FindStringSubmatch(name)
+		if match == nil {
+			continue
+		}
+		text := match[1]
+		if text == "" {
+			text = match[2]
+		}
+		value, err := strconv.ParseInt(text, 10, 64)
+		if err != nil || value < 1 || value > 40 {
+			continue
+		}
+		if first == 0 || value < first {
+			first = value
+		}
+		if value > last {
+			last = value
+		}
+	}
+	return first, last, first != 0
+}
+
 // packEpisodeDecision is the verdict for one episode inside a pack. Keeping
 // the per-episode detail (not only the boolean) is what lets the logs say why
 // a pack was kept or thrown away instead of just reporting a count.
