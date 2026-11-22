@@ -136,6 +136,7 @@ var uiSettingMetaByKey = map[string]uiSettingMeta{
 	"torrent_cache_expiry":                {Unit: "secondi"},
 
 	// Seed e completamento
+	"torrent_active_metadata":           {Zero: "0 = usa gli slot di download"},
 	"torrent_seed_ratio":                {Zero: "0 = infinito"},
 	"torrent_seed_time_days":            {Unit: "giorni", Zero: "0 = usa il limite in minuti"},
 	"torrent_seed_time":                 {Unit: "minuti"},

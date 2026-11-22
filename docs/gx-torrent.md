@@ -1683,7 +1683,11 @@ RPC server is disabled.
   Private LAN addresses are kept (BEP 40 ranks them, and two peers on the same
   network legitimately exchange them); tracker, DHT and manual peers keep every
   address they return, because a private tracker on the LAN is legitimate too.
-  libtorrent applies the same screen to `ut_pex` (`ut_pex.cpp`).
+  libtorrent applies the same screen to `ut_pex` (`ut_pex.cpp`). With
+  `PreferLocalPeers` on (`prefer_local_peers` in the queue configuration) the
+  candidates on our own networks — loopback, private IPv4, link-local and
+  unique-local — pop before every remote one, above BEP 40; the flag is read
+  when the session opens, so changing it restarts the session.
 - **Per-torrent peer sources.** `POST /api/v1/torrents/{hash}/peer-options`
   (`dht`, `pex`, `lsd`) turns the DHT announcer, the PEX exchange and LSD on or
   off for one torrent. DHT off closes its announcer at once; PEX off ends the
@@ -2615,6 +2619,17 @@ its eager interval. A peer that answers with a full bitfield is closed at once
 (`closeIfBothSeeds`) and remembered in `seedPeerIPs`, so the same seed is not
 dialed twice; a peer that shows interest stays and is served. A downloading
 torrent keeps the session's `MaxPeerDial`.
+
+## Magnets and the metadata budget
+A magnet has no file list until a peer answers it, and while it waits it is a
+downloading torrent: with the queue's download slots it occupied one of them.
+`active_metadata` (the **Metadata slots** setting on the page, `torrent_active_metadata`
+in Gextto) is a budget of its own for the torrents whose state is
+`DownloadingMetadata`: each takes one of those slots instead of a download slot,
+so a bulk add of magnets resolves several at a time, and the download slots stay
+for the torrents that can already move data. `0` leaves them on the download
+slots, as before. The daemon and Gextto both expose it; Gextto pushes it with the
+rest of the queue policy.
 
 ## Super-seeding (BEP 16)
 

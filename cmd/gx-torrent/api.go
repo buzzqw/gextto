@@ -33,6 +33,7 @@ func (d *Daemon) routes() http.Handler {
 	api.HandleFunc("GET /api/v1/dht", d.handleDHT)
 	api.HandleFunc("GET /api/v1/stats/history", d.handleStatsHistory)
 	api.HandleFunc("GET /api/v1/portcheck", d.handlePortCheck)
+	api.HandleFunc("GET /api/v1/scrape", d.handleScrapeHash)
 	api.HandleFunc("GET /api/v1/torrents", d.handleList)
 	api.HandleFunc("GET /api/v1/torrents/{hash}", d.handleGetTorrent)
 	api.HandleFunc("POST /api/v1/add", d.handleAdd)
@@ -384,6 +385,33 @@ func addRequestFromForm(r *http.Request) addRequest {
 		}
 	}
 	return req
+}
+
+// handleScrapeHash asks the DHT how many peers an info hash has, for a torrent
+// the session does not hold: Gextto uses it before a release takes a slot, so a
+// release whose seeder count the indexer left unknown starts on a real number.
+func (d *Daemon) handleScrapeHash(w http.ResponseWriter, r *http.Request) {
+	raw := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("hash")))
+	decoded, err := hex.DecodeString(raw)
+	if err != nil || len(decoded) != 20 {
+		writeError(w, http.StatusBadRequest, errors.New("hash must be a 40-character hexadecimal info hash"))
+		return
+	}
+	var ih [20]byte
+	copy(ih[:], decoded)
+	d.mu.Lock()
+	session := d.session
+	d.mu.Unlock()
+	if session == nil {
+		writeError(w, http.StatusServiceUnavailable, errors.New("the torrent session is not open"))
+		return
+	}
+	seeders, peers, err := session.DHTScrape(ih, 6*time.Second)
+	if err != nil {
+		writeError(w, http.StatusServiceUnavailable, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]int{"seeders": int(seeders), "peers": int(peers)})
 }
 
 func (d *Daemon) handleHealth(w http.ResponseWriter, _ *http.Request) {

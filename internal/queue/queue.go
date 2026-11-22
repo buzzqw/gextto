@@ -26,9 +26,14 @@ import (
 
 // Config is the queue policy, pushed by Gextto and persisted.
 type Config struct {
-	ActiveDownloads int   `json:"active_downloads"`
-	ActiveSeeds     int   `json:"active_seeds"`
-	ActiveLimit     int   `json:"active_limit"`
+	ActiveDownloads int `json:"active_downloads"`
+	ActiveSeeds     int `json:"active_seeds"`
+	ActiveLimit     int `json:"active_limit"`
+	// ActiveMetadata is a budget of its own for the torrents still fetching
+	// their info dict (a magnet): a magnet occupies one of these instead of a
+	// download slot, so a bulk add resolves several at a time. 0 = no separate
+	// budget, the download slots count them as before.
+	ActiveMetadata int `json:"active_metadata"`
 	DontCountSlow   bool  `json:"dont_count_slow"`
 	SlowRate        int64 `json:"slow_rate"`
 	SlowAfterSecs   int64 `json:"slow_after_secs"`
@@ -57,6 +62,9 @@ type Config struct {
 	CacheMB      int64 `json:"cache_mb"`
 	CacheTTLSecs int64 `json:"cache_ttl_secs"`
 	Preallocate  bool  `json:"preallocate"`
+	// PreferLocalPeers pops the addresses of our own networks before the others,
+	// above BEP 40: a peer on the LAN costs the line nothing.
+	PreferLocalPeers bool `json:"prefer_local_peers"`
 	// Sequential downloads new torrents in piece order (streaming) instead of
 	// rarest-first. The engine applies it when a torrent is added, so it affects new
 	// additions only.
@@ -189,6 +197,9 @@ type Item struct {
 	// RotatedAt: when the queue last set it aside for being slow.
 	RotatedAt time.Time
 	Pos       int64
+	// Metadata marks a torrent that has no info dict yet (a magnet resolving):
+	// it takes a metadata slot, not a download slot.
+	Metadata bool
 }
 
 // Plan is the outcome of one planning round.
@@ -203,6 +214,9 @@ type Limits struct {
 	Downloads int
 	Seeds     int
 	Limit     int
+	// Metadata is the separate budget for the torrents without an info dict;
+	// 0 means they share the download slots.
+	Metadata int
 }
 
 // PlanQueue decides which torrents run. It is a pure function: the daemon
@@ -240,22 +254,26 @@ func PlanQueue(items []Item, limits Limits, cfg Config, now time.Time) Plan {
 	}
 
 	var wanted []Item
-	fill := func(list []Item, slots int) {
-		counted := 0
+	fill := func(list []Item, slots, metadataSlots int) {
+		counted, metaCounted := 0, 0
 		for _, item := range list {
-			if counted >= slots {
+			target, capacity := &counted, slots
+			if item.Metadata && metadataSlots > 0 {
+				target, capacity = &metaCounted, metadataSlots
+			}
+			if *target >= capacity {
 				want[item.ID] = false
 				continue
 			}
 			want[item.ID] = true
 			wanted = append(wanted, item)
 			if !(cfg.DontCountSlow && item.Running && item.Slow) {
-				counted++
+				*target++
 			}
 		}
 	}
-	fill(downloads, limits.Downloads)
-	fill(seeds, limits.Seeds)
+	fill(downloads, limits.Downloads, limits.Metadata)
+	fill(seeds, limits.Seeds, 0)
 
 	// Hard cap. Eviction order: do not start a torrent that was just rotated
 	// out; then stop slow seeds, slow downloads, new starts, and finally
@@ -339,7 +357,7 @@ type rateSample struct {
 func (q *Dynamic) Limits(cfg Config, aggregateRate int64, queued int, now time.Time) Limits {
 	if !cfg.DynamicQueue {
 		*q = Dynamic{}
-		return Limits{Downloads: cfg.ActiveDownloads, Seeds: cfg.ActiveSeeds, Limit: cfg.ActiveLimit}
+		return Limits{Downloads: cfg.ActiveDownloads, Seeds: cfg.ActiveSeeds, Limit: cfg.ActiveLimit, Metadata: cfg.ActiveMetadata}
 	}
 	if q.downloads == 0 {
 		q.downloads = clampInt(cfg.ActiveDownloads, cfg.DynamicMin, cfg.DynamicMax)
@@ -406,7 +424,7 @@ func (q *Dynamic) Limits(cfg Config, aggregateRate int64, queued int, now time.T
 	if sum := q.downloads + q.seeds + 2; sum > limit {
 		limit = sum
 	}
-	return Limits{Downloads: q.downloads, Seeds: q.seeds, Limit: limit}
+	return Limits{Downloads: q.downloads, Seeds: q.seeds, Limit: limit, Metadata: cfg.ActiveMetadata}
 }
 
 func clampInt(value, minimum, maximum int) int {

@@ -91,3 +91,37 @@ func BenchmarkAddrListPush(b *testing.B) {
 		list.Push(addrs, peersource.PEX)
 	}
 }
+
+// TestPreferLocalPopsLANFirst: with the preference on, an address on our own
+// network comes out of the list before a remote one with a higher BEP 40
+// priority; with it off, BEP 40 decides.
+func TestPreferLocalPopsLANFirst(t *testing.T) {
+	remote := &net.TCPAddr{IP: net.ParseIP("203.0.113.9"), Port: 6881}
+	local := &net.TCPAddr{IP: net.ParseIP("192.168.1.50"), Port: 6881}
+	clientIP := net.ParseIP("203.0.113.1")
+
+	preferred := New(10, nil, 6881, &clientIP, true)
+	preferred.Push([]*net.TCPAddr{remote, local}, peersource.Tracker)
+	if got, _ := preferred.Pop(); got == nil || got.IP.String() != local.IP.String() {
+		t.Fatalf("popped %v, want the LAN peer first", got)
+	}
+	// The remote peer is still there: the preference moves one candidate to the
+	// front, it does not drop the others.
+	if got, _ := preferred.Pop(); got == nil || got.IP.String() != remote.IP.String() {
+		t.Fatalf("second pop %v, want the remote peer", got)
+	}
+
+	plain := New(10, nil, 6881, &clientIP)
+	plain.Push([]*net.TCPAddr{remote, local}, peersource.Tracker)
+	// BEP 40 alone: both are offered, no panic, and the local one is not forced
+	// to the front (the order only depends on the hash).
+	seen := map[string]bool{}
+	for i := 0; i < 2; i++ {
+		if got, _ := plain.Pop(); got != nil {
+			seen[got.IP.String()] = true
+		}
+	}
+	if !seen[local.IP.String()] || !seen[remote.IP.String()] {
+		t.Fatalf("without the preference the list lost a peer: %v", seen)
+	}
+}

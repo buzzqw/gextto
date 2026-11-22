@@ -93,6 +93,7 @@ const (
 	settingTorrentUpnp                      = "torrent_upnp"
 	settingTorrentNatpmp                    = "torrent_natpmp"
 	settingTorrentUtp                       = "torrent_utp"
+	settingTorrentPreferLocalPeers          = "torrent_prefer_local_peers"
 	settingTorrentHolepunch                 = "torrent_holepunch"
 	settingTorrentDhtBootstrapNodes         = "torrent_dht_bootstrap_nodes"
 	settingTorrentTrackerList               = "torrent_tracker_list"
@@ -110,6 +111,7 @@ const (
 	settingTorrentDynamicQueueMax           = "torrent_dynamic_queue_max"
 	settingTorrentDontCountSlowTorrents     = "torrent_dont_count_slow_torrents"
 	settingTorrentActiveDownloads           = "torrent_active_downloads"
+	settingTorrentActiveMetadata            = "torrent_active_metadata"
 	settingTorrentActiveSeeds               = "torrent_active_seeds"
 	settingTorrentActiveLimit               = "torrent_active_limit"
 	settingTorrentSequential                = "torrent_sequential"
@@ -349,6 +351,7 @@ var settingKeyNames = []string{
 	"torrent_upnp",
 	"torrent_natpmp",
 	"torrent_utp",
+	"torrent_prefer_local_peers",
 	"torrent_holepunch",
 	"torrent_dht_bootstrap_nodes",
 	"torrent_tracker_list",
@@ -366,6 +369,7 @@ var settingKeyNames = []string{
 	"torrent_dynamic_queue_max",
 	"torrent_dont_count_slow_torrents",
 	"torrent_active_downloads",
+	"torrent_active_metadata",
 	"torrent_active_seeds",
 	"torrent_active_limit",
 	"torrent_sequential",

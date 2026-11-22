@@ -18,6 +18,9 @@ type peerAddr struct {
 	timestamp time.Time
 	source    peersource.Source
 	priority  peerpriority.Priority
+	// local marks an address on our own network: with PreferLocalPeers it pops
+	// before every remote address, whatever BEP 40 says.
+	local bool
 
 	// index locates this entry in AddrList.peerByTime for O(1) removal.
 	index int
@@ -31,6 +34,11 @@ var _ btree.Item = (*peerAddr)(nil)
 // the same address is equal, which is what makes a repeated Push a refresh.
 func (p *peerAddr) Less(than btree.Item) bool {
 	o := than.(*peerAddr)
+	// The btree pops its maximum: a local address must compare greater than a
+	// remote one to come out first.
+	if p.local != o.local {
+		return !p.local
+	}
 	if p.priority != o.priority {
 		return p.priority < o.priority
 	}

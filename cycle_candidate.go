@@ -289,6 +289,9 @@ func (r *candidateRun) judge() (stop bool, err error) {
 		StallScoreDrop:    p.stallScoreDrop,
 		Blocklist:         p.blocklistedHashes,
 	}
+	// A release whose seeder count nobody reported gets the DHT's answer
+	// before the gate reads it (swarm_probe.go).
+	probeSwarmCounts(p.torrents, release)
 	// Decide only: the library is not written until the torrent is in the
 	// engine (see startApprovedRelease).
 	approved, approvalReason, err := evaluateReleaseApproval(p.db, release, r.releaseScore, cfg.UpgradeMinScoreDiff, approvalContext, r.forbidUpgrade, true)

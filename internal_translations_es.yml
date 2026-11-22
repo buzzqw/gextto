@@ -99,6 +99,7 @@ spa:
   Abilita: Habilitar
   Abilita Selezionate: Habilitar Seleccionadas
   Abilita il protocollo uTP (UDP) oltre a TCP.: Habilite el protocolo uTP (UDP) además de TCP.
+  "Tenta per primi i peer che stanno sulla tua rete, qualunque sia l'ordine di BEP 40: un peer in LAN non consuma la linea e di solito carica alla massima velocità.": "Prueba primero los pares de tu propia red, sea cual sea el orden BEP 40: un par en la red local no cuesta nada a la línea y suele subir a toda velocidad."
   'Apre una connessione diretta ai peer dietro NAT tramite un peer che fa da relè (BEP 55). Richiede uTP.': 'Abre una conexión directa con los pares detrás de NAT a través de un par que hace de relé (BEP 55). Requiere uTP.'
   ? Abilita la pulizia automatica dell'archivio al termine di ogni ciclo. Rimuove record più vecchi di 'Archive Max Age' mantenendo almeno 'Archive
     Keep Min' voci.
@@ -872,6 +873,7 @@ spa:
   Download Now non trovato nella pagina GetComics.: Descargar ahora no se encuentra en la página GetComics.
   Download Sequenziale: Descarga Secuencial
   Download attivi: Descargas activas
+  Slot per i metadata dei magnet: Slots de metadatos para magnets
   Download attuale.: Descarga actual.
   Download automatico: Descarga automática
   Download avviato: Descarga iniciada
@@ -2460,6 +2462,7 @@ spa:
   Registra gestore magnet nel browser: Registrar el controlador magnético en el navegador
   Registrazione gestore magnet inviata al browser: Registro del administrador Magnet enviado al navegador
   Regola automaticamente quanti torrent sono attivi in base al carico.: Ajusta automáticamente cuántos torrents están activos según la carga.
+  "I torrent che stanno ancora scaricando le informazioni da un magnet occupano uno di questi slot invece di un download attivo: con qualche slot in più un blocco di magnet si risolve in parallelo senza rubare posto ai download veri. A 0 restano sugli slot di download, come prima.": "Los torrents que aún descargan su información desde un magnet ocupan uno de estos slots en lugar de una descarga activa: con algunos slots más, un lote de magnets se resuelve en paralelo sin quitar el sitio a las descargas reales. En 0 siguen en los slots de descarga, como antes."
   Regola di cartella applicata: Regla de carpeta aplicada
   Regole per questo Torrent: Reglas para este Torrent
   Regole salvate con successo: Reglas guardadas con éxito
@@ -3797,6 +3800,7 @@ spa:
   trovati: encontrados
   trovato: encontrado
   uTP: uTP
+  Preferisci i peer sulla rete locale: Preferir los pares de la red local
   'Holepunching (BEP 55)': 'Holepunching (BEP 55)'
   'ultima sincronizzazione: {time}': 'última sincronización: {time}'
   upgrade: mejoras

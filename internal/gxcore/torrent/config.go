@@ -255,6 +255,10 @@ type Config struct {
 	EndgameMaxDuplicateDownloads int `yaml:"endgame-max-duplicate-downloads"`
 	// Max number of outgoing connections to dial
 	MaxPeerDial int `yaml:"max-peer-dial"`
+	// PreferLocalPeers pops the addresses on our own networks (loopback, the
+	// private, link-local and unique-local ranges) before every remote one,
+	// whatever BEP 40 says: a peer on the LAN costs the line nothing.
+	PreferLocalPeers bool `yaml:"prefer-local-peers"`
 	// Max number of incoming connections to accept
 	MaxPeerAccept int `yaml:"max-peer-accept"`
 	// PeerTurnover is the fraction of a downloading torrent's peers closed every

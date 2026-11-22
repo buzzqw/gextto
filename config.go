@@ -214,10 +214,13 @@ type TransferSettings struct {
 	// SeedLimitsAll makes the three share limits work together: a torrent keeps
 	// seeding until the ratio, the time and the inactivity limit are all
 	// satisfied, instead of stopping at the first one that fires.
-	SeedLimitsAll bool `json:"seed_limits_all"`
+	SeedLimitsAll   bool  `json:"seed_limits_all"`
 	ActiveDownloads int64 `json:"active_downloads"`
 	ActiveSeeds     int64 `json:"active_seeds"`
 	ActiveLimit     int64 `json:"active_limit"`
+	// ActiveMetadata is the budget for the torrents still fetching their info
+	// dict: a magnet takes one of these instead of a download slot. 0 = off.
+	ActiveMetadata  int64 `json:"active_metadata"`
 	Dht             bool  `json:"dht"`
 	Pex             bool  `json:"pex"`
 	Lsd             bool  `json:"lsd"`
@@ -3535,6 +3538,7 @@ func (c *Config) applyTransferSettings() {
 		ActiveDownloads:       numberSettingInt(c.Settings, "torrent_active_downloads", 3),
 		ActiveSeeds:           numberSettingInt(c.Settings, "torrent_active_seeds", 3),
 		ActiveLimit:           numberSettingInt(c.Settings, "torrent_active_limit", 5),
+		ActiveMetadata:        numberSettingInt(c.Settings, "torrent_active_metadata", 0),
 		Dht:                   boolSettingOr(c.Settings, "torrent_dht", true),
 		Pex:                   boolSettingOr(c.Settings, "torrent_pex", true),
 		Lsd:                   boolSettingOr(c.Settings, "torrent_lsd", true),

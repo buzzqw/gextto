@@ -43,15 +43,6 @@ still be true after the item lands does not belong here.
   90% starts again from zero. Gate: persist a verified prefix (bitfield plus
   count) or let the check finish at low I/O priority, with a test that counts the
   pieces read after stop/start on a large torrent.
-- **A separate budget for metadata**: a magnet with no metadata occupies a
-  download slot until it resolves, so with `active_downloads=3` only three
-  magnets resolve at a time. Gate: a measurement of a bulk add of 50 magnets
-  with and without an independent `active_metadata` cap (cloud-torrent uses four
-  by default).
-- **Local peers are not preferred**: LSD and the LAN limits exist, but the dial
-  priority is only BEP 40, so a peer on the same network competes with a WAN one.
-  Gate: a `prefer-local-peers` setting with a priority tier above BEP 40 for
-  RFC1918/loopback addresses, and a two-client LAN measurement.
 
 ## Gextto, acquisition and UI
 
@@ -82,9 +73,3 @@ still be true after the item lands does not belong here.
   must be split from the label before it can become an icon. Gate: the visual
   review runs headless with `scripts/screenshots.sh`.
 - **Faster flows**: undo instead of a confirmation for reversible removals, with a dialog that explains itself for the rest, and the missing count on the Dashboard linking to its tab.
-- **Pre-flight swarm health probe**: Gextto queues a release on the seeder count
-  the indexer reports and waits for the post-start stall probe to notice a dead
-  swarm, while a dead torrent holds one of the three active slots. The daemon
-  already answers a DHT scrape (`GET /ui/dhtscrape`) and nothing calls it. Gate:
-  the probe behind that endpoint, with the unseeded releases deferred instead of
-  queued.

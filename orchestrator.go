@@ -1389,6 +1389,8 @@ func prioritizeArchiveGapDownloads(
 		// copy among the hits: the decision and the stored score use the
 		// release score, like the main cycle.
 		releaseScore := cfg.ReleaseScore(&release)
+		// An unknown seeder count is asked to the DHT before the gate reads it.
+		probeSwarmCounts(torrents, &release)
 		approved, reason, err := evaluateReleaseApproval(db, &release, releaseScore, cfg.UpgradeMinScoreDiff, approvalContext, series.DisableUpgrades, true)
 		if err != nil {
 			return err

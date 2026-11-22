@@ -405,6 +405,41 @@ func (e *gxTorrentEngine) PortCheck() (map[string]any, error) {
 	return out, nil
 }
 
+// ScrapeSwarm asks the daemon's DHT how many peers an info hash has. The
+// timeout is its own and short: the answer only refines a decision the queue is
+// about to take, so a slow DHT must not hold the cycle.
+func (e *gxTorrentEngine) ScrapeSwarm(hash string) (int, int, error) {
+	hash = strings.ToLower(strings.TrimSpace(hash))
+	if len(hash) != 40 {
+		return 0, 0, fmt.Errorf("not an info hash: %q", hash)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, e.settings.BaseURL+"/api/v1/scrape?hash="+url.QueryEscape(hash), nil)
+	if err != nil {
+		return 0, 0, err
+	}
+	if e.settings.Token != "" {
+		req.Header.Set("X-Gx-Token", e.settings.Token)
+	}
+	resp, err := e.client.Do(req)
+	if err != nil {
+		return 0, 0, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return 0, 0, gxAPIError{Status: resp.StatusCode, Message: "scrape refused"}
+	}
+	var out struct {
+		Seeders int `json:"seeders"`
+		Peers   int `json:"peers"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		return 0, 0, err
+	}
+	return out.Seeders, out.Peers, nil
+}
+
 func (e *gxTorrentEngine) action(hash, action string, form url.Values) error {
 	hash = strings.ToLower(strings.TrimSpace(hash))
 	if hash == "" {
@@ -1179,6 +1214,10 @@ func gxQueuePolicy(cfg *Config) map[string]any {
 		"active_downloads": clamp(lt.ActiveDownloads),
 		"active_seeds":     clamp(lt.ActiveSeeds),
 		"active_limit":     clamp(lt.ActiveLimit),
+		// 0 keeps the magnets on the download slots, as before.
+		"active_metadata": max(lt.ActiveMetadata, 0),
+		// A LAN peer is asked first, above BEP 40.
+		"prefer_local_peers": settingsBool(cfg, settingTorrentPreferLocalPeers, false),
 		"dont_count_slow":  lt.DontCountSlowTorrents,
 		"dynamic_queue":    auto || lt.DynamicQueue,
 		"auto":             auto,

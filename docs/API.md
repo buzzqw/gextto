@@ -564,6 +564,7 @@ server-rendered UI under `/ui`; those HTML routes are not part of this table.
 | GET | `/api/v1/metrics` | Prometheus metrics |
 | POST | `/api/v1/pins/clear` | clear the pinned torrents |
 | GET | `/api/v1/portcheck` | check the peer port |
+| GET | `/api/v1/scrape` | the approximate swarm size of an info hash from the DHT, for a torrent the session does not hold: takes ?hash=<40 hex> and answers seeders and peers; 400 on a malformed hash, 503 when the session or the DHT is off |
 | GET | `/api/v1/stats` | session statistics |
 | GET | `/api/v1/dht` | DHT diagnostics: routing-table view (good and known nodes, IPv4/IPv6, nodes by shared bits, lookups in progress, node ID, last incoming query), incoming (yes, no after an hour without queries, unknown), peers refused by the client filter and the tracker-list state |
 | GET | `/api/v1/stats/history` | statistics history |

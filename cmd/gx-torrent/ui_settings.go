@@ -106,8 +106,15 @@ func (d *Daemon) handleUISettings(w http.ResponseWriter, r *http.Request) {
 	if v := formInt(r, "active-limit", int64(cfg.ActiveLimit)); v > 0 && v != int64(cfg.ActiveLimit) {
 		putInt("active_limit", v)
 	}
+	if v := formInt(r, "active-metadata", int64(cfg.ActiveMetadata)); v >= 0 && v != int64(cfg.ActiveMetadata) {
+		putInt("active_metadata", v)
+	}
 	if v := formInt(r, "max-conns-per-torrent", int64(cfg.MaxConnectionsPerTorrent)); v >= 0 && v != int64(cfg.MaxConnectionsPerTorrent) {
 		putInt("max_connections_per_torrent", v)
+	}
+	if v := formBool(r, "prefer-local-peers"); v != cfg.PreferLocalPeers {
+		raw, _ := json.Marshal(v)
+		patch["prefer_local_peers"] = raw
 	}
 	if v := formBool(r, "conn-auto"); v != queue.BoolOn(cfg.ConnAuto) {
 		raw, _ := json.Marshal(v)
@@ -685,11 +692,13 @@ func (d *Daemon) renderSettings(w http.ResponseWriter, r *http.Request, errKey s
 	repl("WEB_PRIVATE", checkedIf(boolSetting("web-sources-allow-private")))
 
 	repl("ACTIVE_DL", strconv.Itoa(cfg.ActiveDownloads))
+	repl("ACTIVE_META", strconv.Itoa(cfg.ActiveMetadata))
 	repl("ACTIVE_SEEDS", strconv.Itoa(cfg.ActiveSeeds))
 	repl("MIN_FREE_MB", strconv.FormatInt(cfg.MinFree()>>20, 10))
 	repl("ACTIVE_LIMIT", strconv.Itoa(cfg.ActiveLimit))
 	repl("MAX_CONNS_TORRENT", strconv.Itoa(cfg.MaxConnectionsPerTorrent))
 	repl("CONN_AUTO", checkedIf(queue.BoolOn(cfg.ConnAuto)))
+	repl("PREFER_LOCAL", checkedIf(cfg.PreferLocalPeers))
 	cacheMB := cfg.CacheMB
 	if cacheMB < 0 {
 		cacheMB = 0

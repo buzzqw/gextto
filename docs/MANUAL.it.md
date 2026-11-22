@@ -2571,6 +2571,7 @@ verifica.
 | UPnP | Apre le porte del router automaticamente con UPnP. |
 | NAT-PMP | Apre le porte del router automaticamente con NAT-PMP (prova anche PCP, RFC 6887). |
 | uTP | Abilita il protocollo uTP (UDP) oltre a TCP. |
+| Preferisci i peer sulla rete locale | Tenta per primi i peer che stanno sulla tua rete, qualunque sia l'ordine di BEP 40: un peer in LAN non consuma la linea e di solito carica alla massima velocità. Richiede il riavvio della sessione. |
 | Holepunching (BEP 55) | Apre una connessione diretta ai peer dietro NAT tramite un peer che fa da relè (BEP 55). Richiede uTP. |
 | Nodi bootstrap DHT | Nodi DHT iniziali (host:porta separati da virgola). |
 | Aggiungi i tracker di una lista pubblica | Attivo di default: gx-torrent aggiunge ai **nuovi** torrent **pubblici** i tracker della lista indicata sotto, al massimo 200. La lista viene scaricata all'avvio e poi ogni giorno (passando dal proxy o dall'interfaccia VPN, se configurati) e tenuta per i riavvii. Un torrent privato non la riceve mai: per un magnet si aspetta che i metadati confermino che non è privato. I torrent che c'erano già restano come sono. Solo gx-torrent. Cambiarla riavvia gx-torrent. |
@@ -2613,6 +2614,7 @@ verifica.
 | Slot download dinamici massimi | Numero massimo di download dinamici. Servono campioni consecutivi coerenti prima di aumentare la coda. Compare solo con «Auto-gestione dinamica coda e risorse» attivo. |
 | Non contare i torrent fermi negli slot attivi | I torrent che non trasferiscono dati non consumano uno slot attivo. |
 | Download attivi | Valore base dei download attivi; con la coda dinamica viene adattato a runtime. |
+| Slot per i metadata dei magnet | I torrent che stanno ancora scaricando le informazioni da un magnet occupano uno di questi slot invece di un download attivo, così un blocco di magnet si risolve in parallelo; a 0 restano sugli slot di download. *(0 = disattivato)* |
 | Seed attivi | Valore base dei seed attivi; con la coda dinamica scende a 1 quando ci sono download in coda. |
 | Limite torrent attivi | Valore base del limite di torrent attivi; con la coda dinamica diventa max(base, download + seed + 2). |
 

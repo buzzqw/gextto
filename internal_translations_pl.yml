@@ -100,6 +100,7 @@ pol:
   Abilita: Włącz
   Abilita Selezionate: Włącz Wybierz
   Abilita il protocollo uTP (UDP) oltre a TCP.: Włącz protokół uTP (UDP) oprócz TCP.
+  "Tenta per primi i peer che stanno sulla tua rete, qualunque sia l'ordine di BEP 40: un peer in LAN non consuma la linea e di solito carica alla massima velocità.": "Najpierw wypróbuj peery we własnej sieci, niezależnie od kolejności BEP 40: peer w sieci lokalnej nic nie kosztuje łącza i zwykle wysyła z pełną prędkością."
   'Apre una connessione diretta ai peer dietro NAT tramite un peer che fa da relè (BEP 55). Richiede uTP.': 'Otwiera bezpośrednie połączenie z peerami za NAT przez peera przekaźnikowego (BEP 55). Wymaga uTP.'
   ? Abilita la pulizia automatica dell'archivio al termine di ogni ciclo. Rimuove record più vecchi di 'Archive Max Age' mantenendo almeno 'Archive
     Keep Min' voci.
@@ -868,6 +869,7 @@ pol:
   Download Now non trovato nella pagina GetComics.: Pobierz teraz, nie znaleziono na stronie GetComics.
   Download Sequenziale: Pobieranie sekwencyjne
   Download attivi: Aktywne pobieranie
+  Slot per i metadata dei magnet: Sloty metadanych dla magnetów
   Download attuale.: Aktualne pobranie.
   Download automatico: Automatyczne pobieranie
   Download avviato: Pobieranie rozpoczęte
@@ -2458,6 +2460,7 @@ pol:
   Registra gestore magnet nel browser: Zarejestruj moduł obsługi linków magnet w przeglądarce
   Registrazione gestore magnet inviata al browser: Rejestracja obsługi linków magnet wysłana do przeglądarki
   Regola automaticamente quanti torrent sono attivi in base al carico.: Automatycznie dostosowuje liczbę aktywnych torrentów w zależności od obciążenia.
+  "I torrent che stanno ancora scaricando le informazioni da un magnet occupano uno di questi slot invece di un download attivo: con qualche slot in più un blocco di magnet si risolve in parallelo senza rubare posto ai download veri. A 0 restano sugli slot di download, come prima.": "Torrenty, które wciąż pobierają swoje informacje z magnetu, zajmują jeden z tych slotów zamiast slotu pobierania: kilka slotów więcej pozwala rozwiązać partię magnetów równolegle, nie zabierając miejsca prawdziwym pobraniom. Przy 0 pozostają na slotach pobierania, jak dotąd."
   Regola di cartella applicata: Zastosowano regułę folderu
   Regole per questo Torrent: Zasady tego torrenta
   Regole salvate con successo: Reguły zostały zapisane pomyślnie
@@ -3793,6 +3796,7 @@ pol:
   trovati: znaleziono
   trovato: znaleziono
   uTP: uTP
+  Preferisci i peer sulla rete locale: Preferuj peery w sieci lokalnej
   'Holepunching (BEP 55)': 'Holepunching (BEP 55)'
   'ultima sincronizzazione: {time}': 'ostatnia synchronizacja: {time}'
   upgrade: aktualizacja

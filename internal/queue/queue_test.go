@@ -224,3 +224,37 @@ func TestDynamicQueueOffUsesStaticLimits(t *testing.T) {
 		t.Fatalf("static limits expected, got %+v", got)
 	}
 }
+
+// TestPlanQueueMetadataBudget: a magnet resolving its info dict takes a metadata
+// slot instead of a download slot, so a bulk add of magnets resolves several at
+// a time; at 0 the behaviour is the one of before.
+func TestPlanQueueMetadataBudget(t *testing.T) {
+	cfg := Config{ActiveDownloads: 2, ActiveSeeds: 1, ActiveLimit: 100}
+	limits := Limits{Downloads: 2, Seeds: 1, Limit: 100, Metadata: 4}
+	var items []Item
+	for i := 0; i < 10; i++ {
+		items = append(items, Item{ID: string(rune('a' + i)), Managed: true, Metadata: i < 6, Pos: int64(i)})
+	}
+	plan := PlanQueue(items, limits, cfg, time.Now())
+	if len(plan.Start) != 6 {
+		t.Fatalf("started %d, want 4 metadata plus 2 downloads", len(plan.Start))
+	}
+	meta, plain := 0, 0
+	for _, id := range plan.Start {
+		if id < "f" {
+			meta++
+		} else {
+			plain++
+		}
+	}
+	if meta != 4 || plain != 2 {
+		t.Fatalf("metadata %d downloads %d, want 4 and 2", meta, plain)
+	}
+
+	// No metadata budget: the magnets share the download slots.
+	limits.Metadata = 0
+	plan = PlanQueue(items, limits, cfg, time.Now())
+	if len(plan.Start) != 2 {
+		t.Fatalf("started %d with no metadata budget, want 2", len(plan.Start))
+	}
+}

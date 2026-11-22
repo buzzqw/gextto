@@ -25,12 +25,14 @@ type AddrList struct {
 	listenPort int
 	clientIP   *net.IP
 	blocklist  *blocklist.Blocklist
+	// preferLocal pops the addresses of our own networks before the others.
+	preferLocal bool
 
 	countBySource map[peersource.Source]int
 }
 
 // New builds an address list holding at most maxItems candidates.
-func New(maxItems int, blocklist *blocklist.Blocklist, listenPort int, clientIP *net.IP) *AddrList {
+func New(maxItems int, blocklist *blocklist.Blocklist, listenPort int, clientIP *net.IP, preferLocal ...bool) *AddrList {
 	return &AddrList{
 		peerByPriority: btree.New(32),
 
@@ -39,7 +41,26 @@ func New(maxItems int, blocklist *blocklist.Blocklist, listenPort int, clientIP 
 		clientIP:      clientIP,
 		blocklist:     blocklist,
 		countBySource: make(map[peersource.Source]int),
+		preferLocal:   len(preferLocal) > 0 && preferLocal[0],
 	}
+}
+
+// isLocalAddress reports an address on a network we share: loopback, the
+// private IPv4 ranges, the IPv4/IPv6 link-local ranges and the IPv6 unique local
+// range. A peer there travels the LAN, not the line.
+func isLocalAddress(ip net.IP) bool {
+	if ip == nil {
+		return false
+	}
+	if ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() {
+		return true
+	}
+	if v4 := ip.To4(); v4 != nil {
+		// 169.254.0.0/16 is the IPv4 link-local range, covered above by
+		// IsLinkLocalUnicast; nothing else to add.
+		return false
+	}
+	return false
 }
 
 // Reset drops every candidate.
@@ -88,6 +109,7 @@ func (d *AddrList) Push(addrs []*net.TCPAddr, source peersource.Source) {
 			timestamp: now,
 			source:    source,
 			priority:  peerpriority.Calculate(addr, d.clientAddr()),
+			local:     d.preferLocal && isLocalAddress(addr.IP),
 		}
 		if prev := d.peerByPriority.ReplaceOrInsert(p); prev != nil {
 			old := prev.(*peerAddr)

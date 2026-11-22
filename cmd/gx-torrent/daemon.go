@@ -771,6 +771,7 @@ func (d *Daemon) sessionConfig() torrent.Config {
 	if d.state.Config.MaxPeerAccept > 0 {
 		cfg.MaxPeerAccept = d.state.Config.MaxPeerAccept
 	}
+	cfg.PreferLocalPeers = d.state.Config.PreferLocalPeers
 	d.applyClientIdentity(&cfg)
 	cfg.CustomLogHandler = engineLogHandler(d.opts.Debug)
 	// The user-managed cookies (qBittorrent API) are supplied to the .torrent
@@ -1446,6 +1447,8 @@ func (d *Daemon) tick(now time.Time) {
 			Slow:      rt.slow,
 			RotatedAt: meta.RotatedAt,
 			Pos:       meta.Pos,
+			// A magnet resolving its info dict has a budget of its own.
+			Metadata: !complete && stats.Status == torrent.DownloadingMetadata,
 		}
 		if d.moving[id] {
 			// The mover owns this torrent: the queue neither starts nor stops it.
@@ -2892,7 +2895,8 @@ func (d *Daemon) setConfig(patch map[string]json.RawMessage) (queue.Config, erro
 	// Peer limits, the cache TTL and preallocation are read by the engine only when
 	// the session opens.
 	if previous.MaxPeerDial != next.MaxPeerDial || previous.MaxPeerAccept != next.MaxPeerAccept ||
-		previous.CacheTTLSecs != next.CacheTTLSecs || previous.Preallocate != next.Preallocate {
+		previous.CacheTTLSecs != next.CacheTTLSecs || previous.Preallocate != next.Preallocate ||
+		previous.PreferLocalPeers != next.PreferLocalPeers {
 		d.restartPending = true
 	}
 	d.saveLocked()

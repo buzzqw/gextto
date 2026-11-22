@@ -2535,6 +2535,7 @@ the download stands. Season packs do not go through this check.
 | UPnP | Opens router ports automatically with UPnP. |
 | NAT-PMP | Opens router ports automatically with NAT-PMP (PCP, RFC 6887, is tried too). |
 | uTP | Enable the uTP (UDP) protocol in addition to TCP. |
+| Prefer peers on the local network | Try the peers on your own network first, whatever the BEP 40 order says: a peer on the LAN costs the line nothing and usually uploads at full speed. The session restarts to apply it. |
 | Holepunching (BEP 55) | Opens a direct connection to peers behind NAT through a relaying peer (BEP 55). Requires uTP. |
 | DHT bootstrap nodes | Initial DHT nodes (host:port separated by comma). |
 | Add the trackers of a public list | On by default: gx-torrent adds the trackers of the list below, at most 200, to **new public** torrents. The list is downloaded at start and then every day (through the proxy or the VPN interface when configured) and kept across restarts. A private torrent never gets it: for a magnet it waits until the metadata confirms it is not private. Torrents that were already there stay as they are. gx-torrent only. Changing it restarts gx-torrent. |
@@ -2577,6 +2578,7 @@ the download stands. Season packs do not go through this check.
 | Maximum dynamic download slots | Maximum number of dynamic downloads. Consecutive consistent samples are required before increasing the queue. Shown only while «Automatic queue and resource management» is on. |
 | Don't count stalled torrents in active slots | Torrents that are not transferring data do not consume an active slot. |
 | Active downloads | Base value for active downloads; with the dynamic queue it is adapted at runtime. |
+| Metadata slots for magnets | Torrents still fetching their info dict from a magnet take one of these slots instead of a download slot, so a bulk add of magnets resolves in parallel; at 0 they stay on the download slots. *(0 = off)* |
 | Active seeds | Base value for active seeds; with the dynamic queue it drops to 1 when downloads are queued. |
 | Active torrents limit | Base value for the active torrent limit; with the dynamic queue it becomes max(base, downloads + seeds + 2). |
 

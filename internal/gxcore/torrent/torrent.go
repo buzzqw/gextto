@@ -542,7 +542,7 @@ func (t *torrent) finishConstruction(s *Session, cfg Config, info *metainfo.Info
 	if cfg.BlocklistEnabledForOutgoingConnections {
 		blocklistForOutgoingConns = s.blocklist
 	}
-	t.addrList = addrlist.New(cfg.MaxPeerAddresses, blocklistForOutgoingConns, t.port, &t.externalIP)
+	t.addrList = addrlist.New(cfg.MaxPeerAddresses, blocklistForOutgoingConns, t.port, &t.externalIP, cfg.PreferLocalPeers)
 	if t.info() != nil {
 		t.piecePool = bufferpool.New(int(t.info().PieceLength))
 	}

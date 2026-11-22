@@ -75,6 +75,14 @@ type TorrentEngineIdentity interface {
 	EngineVersion() (label, version string)
 }
 
+// TorrentEngineSwarmProbe is optionally implemented by a backend that can ask a
+// DHT how many peers an info hash has without adding the torrent: only an engine
+// that runs a DHT can, so the queue uses it to replace an unknown seeder count
+// with a real number instead of guessing.
+type TorrentEngineSwarmProbe interface {
+	ScrapeSwarm(hash string) (seeders, peers int, err error)
+}
+
 // TorrentSkippedFiles is optionally implemented by a backend that can tell
 // which video files it deliberately did not download (qBittorrent's excluded
 // file names or a file left at priority 0). Gextto uses it when a completed

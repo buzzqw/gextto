@@ -9,6 +9,7 @@ import "strings"
 // uiSettingTooltipText maps a setting key to a short description.
 var uiSettingTooltipText = map[string]string{
 	"torrent_dynamic_queue":                "Regola automaticamente quanti torrent sono attivi in base al carico.",
+	"torrent_active_metadata":              "I torrent che stanno ancora scaricando le informazioni da un magnet occupano uno di questi slot invece di un download attivo: con qualche slot in più un blocco di magnet si risolve in parallelo senza rubare posto ai download veri. A 0 restano sugli slot di download, come prima.",
 	"torrent_dynamic_queue_min":            "Numero minimo di download dinamici. La coda cambia al massimo di uno per volta.",
 	"torrent_dynamic_queue_max":            "Numero massimo di download dinamici. Servono campioni consecutivi coerenti prima di aumentare la coda.",
 	"torrent_dont_count_slow_torrents":     "I torrent che non trasferiscono dati non consumano uno slot attivo.",
@@ -39,6 +40,7 @@ var uiSettingTooltipText = map[string]string{
 	"torrent_upnp":                         "Apre le porte del router automaticamente con UPnP.",
 	"torrent_natpmp":                       "Apre le porte del router automaticamente con NAT-PMP.",
 	"torrent_utp":                          "Abilita il protocollo uTP (UDP) oltre a TCP.",
+	"torrent_prefer_local_peers":           "Tenta per primi i peer che stanno sulla tua rete, qualunque sia l'ordine di BEP 40: un peer in LAN non consuma la linea e di solito carica alla massima velocità.",
 	"torrent_holepunch":                    "Apre una connessione diretta ai peer dietro NAT tramite un peer che fa da relè (BEP 55). Richiede uTP.",
 	"torrent_dht_bootstrap_nodes":          "Nodi DHT iniziali (host:porta separati da virgola).",
 	"torrent_encryption":                   "Politica di cifratura: 0 disabilitata, 1 abilitata, 2 forzata.",
