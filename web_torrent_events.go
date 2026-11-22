@@ -3995,7 +3995,19 @@ func tevStorageMoved(torrents TorrentSession, db *Database, moveRequests map[str
 	if st, _ := db.TorrentStatus(event.Hash); st != nil && *st == "completed" {
 		isCompletedDB = true
 	}
-	done := isCompletedDB || (current != nil && current.Progress >= 99.99 && current.TotalSize > 0 && current.TotalDone >= current.TotalSize)
+	// A live transfer answers for itself: while the engine still has the torrent
+	// and its payload is not complete, the move is a relocation, not the end of
+	// the download. The row of a previous attempt can still say "completed" —
+	// the same infohash added again through an add path that registers no new
+	// attempt (the qBittorrent-compatible API, a magnet added by hand, the watch
+	// folder) — and the RAM-disk admission moves the freshly preallocated,
+	// all-zero files seconds after the metadata arrives: trusting that row
+	// archived nothing over a good copy, quarantined the empty file and threw
+	// the new download away.
+	done := isCompletedDB
+	if current != nil && current.TotalSize > 0 {
+		done = current.Progress >= 99.99
+	}
 	if !done {
 		delete(moveRequests, event.Hash)
 		// libtorrent pauses a torrent while it moves its data and does not

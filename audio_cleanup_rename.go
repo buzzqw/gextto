@@ -98,6 +98,15 @@ func renameEpisodeAfterAudioCleanup(cfg *Config, db *Database, path, seriesName 
 	if err := db.SetEpisodeArchivePath(cfg, seriesName, season, episode, target); err != nil {
 		return target, err
 	}
+	// The torrent that brought this episode keeps pointing at the name it had
+	// before the cleanup: left behind, "the archived copy is gone" was answered
+	// for a file that is in the library, and the next add of the same release
+	// was taken for a download that never happened.
+	if hash != "" {
+		if err := db.SetTorrentProcessedPath(hash, target); err != nil {
+			return target, err
+		}
+	}
 	logging.Debug("the cleaned file was renamed to match its remaining audio tracks",
 		"series", seriesName, "season", season, "episode", episode, "from", path, "to", target)
 	return target, nil

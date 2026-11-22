@@ -89,6 +89,41 @@ func TestAudioCleanupRenameFollowsTheRemainingTracks(t *testing.T) {
 	}
 }
 
+// An episode renamed by the cleanup keeps its torrent pointing at the file it
+// really is: a stale path made «the archived copy is gone» the answer for a
+// file that is in the library, so the next add of the same release was taken
+// for a download that had never happened.
+func TestAudioCleanupRenameUpdatesTheEpisodeTorrentPath(t *testing.T) {
+	s, path := newAudioCleanupRenameEnv(t, []testAudioTrack{
+		{language: "ita"},
+		{language: "eng"},
+	})
+	if _, err := RunAudioCleanup(context.Background(), path, AudioCleanupOptions{Language: "ita", Policy: audioCleanupPolicyAll}); err != nil {
+		t.Fatalf("cleanup: %v", err)
+	}
+	if _, err := s.db.db.Exec(`UPDATE episodes SET magnet_hash='abc123' WHERE season=1 AND episode=1`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.db.db.Exec(`INSERT INTO torrent_meta(hash,status,processed_path,updated_at,created_at) VALUES ('abc123','completed',?1,'2026-01-01 00:00:00','2026-01-01 00:00:00')`, path); err != nil {
+		t.Fatal(err)
+	}
+
+	renamed, err := renameAfterAudioCleanup(s.cfg, s.db, path)
+	if err != nil {
+		t.Fatalf("rename after cleanup: %v", err)
+	}
+	if renamed == path || renamed == "" {
+		t.Fatalf("file not renamed: %q", renamed)
+	}
+	var stored string
+	if err := s.db.db.QueryRow("SELECT processed_path FROM torrent_meta WHERE hash='abc123'").Scan(&stored); err != nil {
+		t.Fatal(err)
+	}
+	if stored != renamed {
+		t.Fatalf("processed path = %q, want %q", stored, renamed)
+	}
+}
+
 // The files of a series that left the library keep the name they have: there
 // is no template to compute a new one from.
 func TestAudioCleanupRenameLeavesASeriesThatLeftTheLibrary(t *testing.T) {
