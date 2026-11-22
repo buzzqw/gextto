@@ -33,35 +33,55 @@ test.describe("telefono", () => {
     });
   }
 
-  test("Scarico mostra per intero il titolo di un torrent lungo", async ({ page }) => {
+  test("Scarico: il titolo lungo si ferma a due righe, con i pulsanti accanto alla barra", async ({ page }) => {
     await page.goto("/?view=downloads");
     await page.waitForTimeout(400);
-    // Same markup as the session card: a long name must wrap instead of ending
-    // in an ellipsis, because a phone has no tooltip to reveal the rest.
+    // A downloading card is two or three lines, not a tall stack of text: the
+    // name stops at two lines with an ellipsis (the whole title opens with the
+    // detail, one tap on the name) and the buttons sit beside the progress bar
+    // instead of taking a row of their own.
     const geometry = await page.evaluate(() => {
       const table = document.createElement("table");
       table.className = "data-table torrent-table";
       table.innerHTML = `<tbody><tr><td class="torrent-card-cell"><div class="torrent-card">
         <div class="torrent-head"><span class="torrent-select"></span>
-        <span class="torrent-name"><button class="torrent-open" type="button"><span class="truncate"></span></button></span>
-        <span class="torrent-state badge">In scarico</span></div>
-        <div class="torrent-body"></div><div class="row-actions"></div></div></td></tr></tbody>`;
+        <span class="torrent-name"><button class="torrent-open" type="button"><span class="truncate"></span></button>
+        <span class="badge">eD2k</span></span>
+        <span class="torrent-state badge">In coda</span></div>
+        <div class="torrent-body">
+          <div class="torrent-progress"><div class="progress"><span style="--pct:42%"></span></div><small class="muted">42% · 0 B / 1.5 GB</small></div>
+          <div class="torrent-metrics"><span class="torrent-metric">↓ 0 B/s</span><span class="torrent-metric">↑ 0 B</span></div>
+        </div>
+        <div class="row-actions"><button class="btn sm icon-action" type="button">▶</button><details class="v2-menu" data-v2-menu><summary class="btn sm icon-action">⋯</summary><div class="v2-menu-panel v2-menu-end"></div></details></div>
+        </div></td></tr></tbody>`;
+      document.querySelector(".content")?.append(table);
+      const card = table.querySelector(".torrent-card") as HTMLElement;
       const span = table.querySelector(".torrent-open .truncate") as HTMLElement;
       span.textContent = "Serie.02x05.Il.Titolo.Della.Puntata.ITA.DLMux.x264-GRUPPO.mkv";
-      document.querySelector(".content")?.append(table);
       const style = getComputedStyle(span);
       const lineHeight = parseFloat(style.lineHeight) || parseFloat(style.fontSize) * 1.2;
+      const name = span.getBoundingClientRect();
+      const progress = (table.querySelector(".torrent-progress") as HTMLElement).getBoundingClientRect();
+      const actions = (table.querySelector(".row-actions") as HTMLElement).getBoundingClientRect();
+      const metrics = (table.querySelector(".torrent-metrics") as HTMLElement).getBoundingClientRect();
       const result = {
-        whiteSpace: style.whiteSpace,
-        clipped: span.scrollWidth - span.clientWidth,
-        lines: Math.round(span.getBoundingClientRect().height / lineHeight),
+        clamp: style.webkitLineClamp,
+        lines: Math.round(name.height / lineHeight),
+        actionsBesideProgress: actions.top >= progress.top - 1 && actions.top < progress.top + 12 && actions.right > progress.right,
+        metricsBelow: metrics.top >= Math.max(progress.bottom, actions.bottom) - 1,
+        cardHeight: Math.round(card.getBoundingClientRect().height),
+        nameHeight: Math.round(name.height),
       };
       table.remove();
       return result;
     });
-    expect(geometry.whiteSpace).toBe("normal");
-    expect(geometry.clipped).toBeLessThanOrEqual(1);
-    expect(geometry.lines).toBeGreaterThan(1);
+    expect(geometry.clamp).toBe("2");
+    expect(geometry.lines).toBe(2);
+    expect(geometry.actionsBesideProgress).toBe(true);
+    expect(geometry.metricsBelow).toBe(true);
+    // The card is the two lines of the name, the row of progress and buttons,
+    // and one line of numbers: not a line for each of them.
+    expect(geometry.cardHeight).toBeLessThan(geometry.nameHeight + 120);
   });
 
   test("una riga in seed mette i numeri sotto il nome, non di fianco", async ({ page }) => {
