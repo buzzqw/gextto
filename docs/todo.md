@@ -16,7 +16,6 @@ still be true after the item lands does not belong here.
 
 ## Gextto, acquisition and UI
 
-- **`FindSeriesMatch` recomputes its fingerprint on every call**:
   `configuredSeriesIndex` hashes every configured name at each lookup instead
   of answering from a revision counter, and a 47k-release cycle calls it about
   190k times. Gate: a safe revision counter for in-place series edits, then
