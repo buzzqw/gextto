@@ -67,34 +67,38 @@ still be true after the item lands does not belong here.
 
 ## Gextto, acquisition and UI
 
-- **`FindSeriesMatch` recomputes its fingerprint on every call**: after the
-  index precomputation a lookup is 27–50 µs and 12–13 allocations, and the
-  fingerprint over every configured name is still about a third of it; a
-  47k-release cycle calls it about 190k times. Gate: a safe revision counter
-  for in-place series edits, then `BenchmarkFindSeriesMatchUnmatched/Matched`.
+- **`FindSeriesMatch` recomputes its fingerprint on every call**:
+  `configuredSeriesIndex` hashes every configured name at each lookup instead
+  of answering from a revision counter, and a 47k-release cycle calls it about
+  190k times. Gate: a safe revision counter for in-place series edits, then
+  `BenchmarkFindSeriesMatchUnmatched/Matched`.
 - **`encoding/xml` copies every feed text node**: ~100–110 MB of the 275 MB
   feed path, about 40 % of its allocations and 7 % of a cycle's CPU. Gate: a
   byte-level scanner over the in-memory body, with the existing feed corpus
   green.
-- **Web UI sorting calls `ReleaseScore` in the comparator**: `web_system.go:136`
-  runs `FindSeriesMatch` twice per comparison on a manual search. Gate: the
-  decorated-sort pattern already used at `web_system.go:713`.
-- **A multi-season pack is not inspected file by file**: the in-download
-  inspection decides one season at a time and the skipped episodes are stored
-  without their season, so a pack covering several seasons is downloaded whole
-  and decided at completion. Gate: skipped episodes kept as season/episode
-  pairs, then the per-file decision in the inspector and its tests.
+- **Three sorts call the score inside the comparator**: `web_system.go:136`,
+  `web_series.go:240` and `web_movies.go:594` call `ReleaseScore` — which runs
+  `FindSeriesMatch` — once per comparison, so a manual search with n results
+  pays it O(n log n) times. Gate: the decorated-sort pattern already used at
+  `web_system.go:722`.
+- **A multi-season pack is not inspected file by file**: the range is parsed now
+  (`SeasonEnd`/`SeasonLast`), but the inspector still decides one season at a
+  time and the skipped episodes are stored without their season, so a pack
+  covering several seasons is downloaded whole and decided at completion. Gate:
+  skipped episodes kept as season/episode pairs, then the per-file decision in
+  the inspector and its tests.
 
 ## Proposals
 
 Each waits for the operator's choice.
 
 - **BT4G answers about one search every ten minutes per address**: the deep gap
-  pass asks up to five episode searches in parallel, so after the first answer
-  the others get `429 Too many requests`, the engine is paused for half an hour
-  and the results it could still give are lost. Gate: the operator's choice
-  between one bt4g query per cycle (paced), a per-cycle rotation that uses it
-  only when the other engines came back empty, and retiring the engine.
+  pass asks up to five searches in parallel and the web engines have no per-host
+  spacing — `throttleHost`/`penalizeHost` serve only the feed fetch — so the
+  queries after the first get `429 Too many requests`, the engine is paused for
+  half an hour and the ones already in flight still go out. Gate: the same
+  per-host spacing on the web engines, then the operator's choice between using
+  bt4g once per window and retiring the engine.
 - **Notebook-wide tables on a phone**: the episodes and the download history of a series are blocks on a phone now, but Archivio, Fumetti, Blocklist, Salute and Manutenzione still show tables wider than the screen behind a sideways scroll; give each one the same per-row block, or fold its secondary columns, one page at a time. Gate: the operator's choice; every page with its own check in `mobile.spec.ts`.
 - **Cross-seed manager**: adding a torrent whose data is already in the library
   should reuse the blocks and seed it on the second tracker, with per-tracker
@@ -107,5 +111,9 @@ Each waits for the operator's choice.
   operator's choice; the visual review runs headless with
   `scripts/screenshots.sh`.
 - **Faster flows**: undo instead of a confirmation for reversible removals, with a dialog that explains itself for the rest, and the missing count on the Dashboard linking to its tab. Gate: the operator's choice.
-- **Target quality timeframe in pending queue**: releases below the preferred target quality wait in the pending queue for a configurable timeframe (e.g. 4 hours), while any release meeting the target quality bypasses the delay and downloads immediately. Gate: the operator's choice.
-- **Pre-flight swarm health probe**: a fast DHT or tracker scrape probe for releases with missing or zero seeder counts before queuing them, deferring unseeded torrents instead of occupying active slots until stalled timeouts. Gate: the operator's choice.
+- **Pre-flight swarm health probe**: Gextto queues a release on the seeder count
+  the indexer reports and waits for the post-start stall probe to notice a dead
+  swarm, while a dead torrent holds one of the three active slots. The daemon
+  already answers a DHT scrape (`GET /ui/dhtscrape`) and nothing calls it. Gate:
+  the operator's choice, then the probe behind that endpoint, with the unseeded
+  releases deferred instead of queued.
