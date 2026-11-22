@@ -5722,6 +5722,21 @@ func (d *Database) MarkEd2kAbsorbed(hash string) error {
 	return err
 }
 
+// ReactivateReAddedTorrent clears the stale refusal of a torrent that is back
+// in the session after having been removed (status error and a removed_at).
+// The detach sweep uses it so re-adding a previously refused torrent works
+// even when Gextto restarts after the re-add.
+func (d *Database) ReactivateReAddedTorrent(hash string) (bool, error) {
+	res, err := d.db.Exec(
+		"UPDATE torrent_meta SET status='queued', removed_at=NULL, error=NULL, reason='', updated_at=?2 WHERE hash=?1 AND status='error' AND removed_at IS NOT NULL",
+		strings.ToLower(hash), nowSQLite())
+	if err != nil {
+		return false, err
+	}
+	rows, err := res.RowsAffected()
+	return rows > 0, err
+}
+
 // MarkTorrentRemovedAt records that a torrent has left the session (entering
 // the download history).
 func (d *Database) MarkTorrentRemovedAt(hash string) error {

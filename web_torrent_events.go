@@ -590,6 +590,17 @@ func DetachErrorTorrents(torrents TorrentSession, db *Database, startupHashes ma
 			continue
 		}
 		delete(notError, torrent.Hash)
+		// A torrent with a removed_at that is back in the session was refused
+		// earlier and then re-added by the operator: keep it and clear the old
+		// refusal instead of detaching it again after every restart.
+		reactivated, err := db.ReactivateReAddedTorrent(torrent.Hash)
+		if err != nil {
+			logging.Warn("could not clear the old refusal of a re-added torrent",
+				"hash", torrent.Hash, "name", torrent.Name, "error", err.Error())
+		} else if reactivated {
+			logging.Info(fmt.Sprintf("♻️ «%s» was added again after a refusal: it is kept and checked as a new download", torrent.Name), "hash", torrent.Hash)
+			continue
+		}
 		_, removeErr := torrents.Remove(torrent.Hash, false)
 		if removeErr != nil {
 			logging.Warn("failed to detach leftover error torrent",

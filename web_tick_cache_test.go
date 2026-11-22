@@ -89,6 +89,37 @@ func TestDetachErrorTorrentsReusesTheNotErrorVerdict(t *testing.T) {
 	}
 }
 
+// A torrent that was refused and removed but is back in the session was
+// re-added by hand: the sweep keeps it and clears the old refusal, even after
+// a restart of Gextto.
+func TestDetachErrorTorrentsKeepsAReAddedTorrent(t *testing.T) {
+	db, err := OpenDatabase(filepath.Join(t.TempDir(), "gextto.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	hash := "abcdef0123456789abcdef0123456789abcdef01"
+	release := ParseRelease("Some.Show.S01.1080p.WEB-DL", "magnet:?xt=urn:btih:"+hash, "test")
+	if err := db.RegisterTorrentScored(release, 0); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.MarkTorrentError(hash, "old refusal"); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.MarkTorrentRemovedAt(hash); err != nil {
+		t.Fatal(err)
+	}
+	session := &stubTorrentSession{list: []models.TorrentView{{Hash: hash, Name: "Some Show"}}}
+	DetachErrorTorrents(session, db, map[string]struct{}{hash: {}}, map[string]time.Time{})
+	if len(session.removed) != 0 {
+		t.Fatalf("a re-added torrent was detached: %v", session.removed)
+	}
+	status, err := db.TorrentStatus(hash)
+	if err != nil || status == nil || *status != "queued" {
+		t.Fatalf("status = %v (err %v), want queued", status, err)
+	}
+}
+
 // TestCalendarCacheKeyFollowsTheSeries pins that the 15-minute calendar cache
 // is rebuilt at once when the enabled series change.
 func TestCalendarCacheKeyFollowsTheSeries(t *testing.T) {
