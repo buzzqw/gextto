@@ -13,18 +13,3 @@ assistant in a working session is written here in the same cycle: under the matc
 once accepted, under *Proposals* while it is still a decision. A rejected idea is not
 recorded. An idea must not stay only in the chat. Do not add a diary: a sentence that would
 still be true after the item lands does not belong here.
-
-## Gextto, acquisition and UI
-
-  `configuredSeriesIndex` hashes every configured name at each lookup instead
-  of answering from a revision counter, and a 47k-release cycle calls it about
-  190k times. Gate: a safe revision counter for in-place series edits, then
-  `BenchmarkFindSeriesMatchUnmatched/Matched`.
-- **`encoding/xml` copies every feed text node**: ~100–110 MB of the 275 MB
-  feed path, about 40 % of its allocations and 7 % of a cycle's CPU. Gate: a
-  byte-level scanner over the in-memory body, with the existing feed corpus
-  green.
-  should reuse the blocks and seed it on the second tracker, with per-tracker
-  ratio and seed rules, instead of downloading a second copy; the archive
-  already holds the same release from several trackers. Gate: the v1/v2 block
-  reuse and the hardlink library, which are the building blocks.
