@@ -2,7 +2,6 @@ package gextto
 
 import (
 	"bytes"
-	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -14,7 +13,12 @@ import (
 	"github.com/buzzqw/gextto/internal/logging"
 )
 
-func TestXFullFlowOnlyLastResort(t *testing.T) {
+// TestGapBestPicksQueuesTheOnlyLastResortCopy drives the Missing tab end to
+// end: the search finds one copy outside the profile, the best-picks action
+// queues it and the log names the episode it added. Without the last-resort
+// mark the button answers that there is nothing to download and the episode
+// stays missing although a copy exists.
+func TestGapBestPicksQueuesTheOnlyLastResortCopy(t *testing.T) {
 	state := newCycleState(t)
 	t.Cleanup(state.jobs.Close)
 	if err := CompleteSetup(state.cfg); err != nil {
@@ -40,18 +44,19 @@ func TestXFullFlowOnlyLastResort(t *testing.T) {
 	server := httptest.NewServer(Router(state))
 	t.Cleanup(server.Close)
 
-	body := url.Values{"series": {"Test Show"}, "slot": {"series"}}
-	resp, err := http.PostForm(server.URL+"/series/gaps/search", body)
+	resp, err := http.PostForm(server.URL+"/series/gaps/search", url.Values{"series": {"Test Show"}, "slot": {"series"}})
 	if err != nil {
 		t.Fatalf("post search: %v", err)
 	}
-	page, _ := io.ReadAll(resp.Body)
+	_, _ = io.Copy(io.Discard, resp.Body)
 	resp.Body.Close()
-	t.Logf("search fragment: %s", page)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("search answered %s", resp.Status)
+	}
 
 	jobs := state.jobs.List("missing-search", "")
 	if len(jobs) != 1 {
-		t.Fatalf("search jobs = %d", len(jobs))
+		t.Fatalf("search jobs = %d, want one", len(jobs))
 	}
 	waitJobState(t, state.jobs, jobs[0].ID, JobSucceeded)
 
@@ -63,21 +68,19 @@ func TestXFullFlowOnlyLastResort(t *testing.T) {
 	if err != nil {
 		t.Fatalf("post bulk: %v", err)
 	}
-	answer, _ := io.ReadAll(resp.Body)
+	_, _ = io.Copy(io.Discard, resp.Body)
 	resp.Body.Close()
-	t.Logf("bulk answer: %s", answer)
+
 	bulk := state.jobs.List("missing-download", "")
 	if len(bulk) != 1 {
-		t.Fatalf("bulk jobs = %d", len(bulk))
+		t.Fatalf("bulk jobs = %d, want one", len(bulk))
 	}
 	waitJobState(t, state.jobs, bulk[0].ID, JobSucceeded)
-	t.Logf("log: %s", captured.String())
+
 	if !strings.Contains(captured.String(), "S01E01") {
 		t.Fatalf("the bulk action did not queue the last resort: %s", captured.String())
 	}
-	meta, _ := state.db.TorrentMeta(strings.Repeat("a", 40))
-	if meta == nil {
-		t.Fatal("release not registered")
+	if meta, _ := state.db.TorrentMeta(strings.Repeat("a", 40)); meta == nil {
+		t.Fatal("the queued release was not registered")
 	}
-	_ = context.Background
 }
