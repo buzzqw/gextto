@@ -262,3 +262,21 @@ func TestGroupedAudioScoreSettings(t *testing.T) {
 		t.Fatalf("group + channels + object score = %d, want 200", got)
 	}
 }
+
+// TestUniqueSeasonEpisodePairs: skipped episodes of a multi-season pack are
+// kept as pairs, deduplicated and ordered by season and episode.
+func TestUniqueSeasonEpisodePairs(t *testing.T) {
+	got := UniqueSeasonEpisodePairs([]SeasonEpisodePair{
+		{Season: 2, Episode: 5}, {Season: 1, Episode: 2}, {Season: 2, Episode: 5},
+		{Season: 2, Episode: 1}, {Season: 0, Episode: 9},
+	})
+	want := []SeasonEpisodePair{{1, 2}, {2, 1}, {2, 5}}
+	if len(got) != len(want) {
+		t.Fatalf("pairs = %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("pairs = %v, want %v", got, want)
+		}
+	}
+}

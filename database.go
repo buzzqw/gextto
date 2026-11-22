@@ -7836,3 +7836,34 @@ func (d *Database) SeriesQualityIndex(seriesName string, season int64, cfg *Conf
 	}
 	return index
 }
+
+// SetTorrentSkippedSeasonEpisodes records the season/episode pairs the
+// in-download inspection left out of a multi-season pack, so the completion
+// check accepts the files that were actually downloaded.
+func (d *Database) SetTorrentSkippedSeasonEpisodes(hash string, pairs []models.SeasonEpisodePair) error {
+	hash = strings.ToLower(strings.TrimSpace(hash))
+	if d == nil || d.db == nil || hash == "" {
+		return nil
+	}
+	var raw string
+	if err := d.db.QueryRow("SELECT COALESCE(metadata_json,'') FROM torrent_meta WHERE lower(hash)=?1", hash).Scan(&raw); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil
+		}
+		return err
+	}
+	if strings.TrimSpace(raw) == "" {
+		return nil
+	}
+	var meta models.TorrentMeta
+	if err := json.Unmarshal([]byte(raw), &meta); err != nil {
+		return err
+	}
+	meta.Release.SkippedSeasonEpisodes = models.UniqueSeasonEpisodePairs(pairs)
+	payload, err := json.Marshal(meta)
+	if err != nil {
+		return err
+	}
+	_, err = d.db.Exec("UPDATE torrent_meta SET metadata_json=?, updated_at=? WHERE lower(hash)=?", string(payload), nowSQLite(), hash)
+	return err
+}

@@ -625,7 +625,9 @@ func MatchingPackFiles(source string, release *models.Release) ([]PackSourceFile
 	// are not inside it yet.
 	inProgress := release.InProgressEpisodes > 0
 	// Episodes left out on purpose by the in-download inspection (priority 0)
-	// are not expected on disk; the files that were kept are enough.
+	// are not expected on disk; the files that were kept are enough. For a
+	// multi-season pack the pair is needed: an episode number alone would also
+	// excuse the same episode of another season.
 	for _, skipped := range release.SkippedEpisodes {
 		delete(expected, skipped)
 	}
@@ -677,7 +679,7 @@ func MatchingPackFiles(source string, release *models.Release) ([]PackSourceFile
 		// missing stay gaps the next search can fill.
 		return matched, nil
 	}
-	if len(release.SkippedEpisodes) > 0 {
+	if len(release.SkippedEpisodes) > 0 || len(release.SkippedSeasonEpisodes) > 0 {
 		// The pack was deliberately downloaded in part: accept the files that
 		// are here as long as every one of them belongs to the declared range.
 		for episode := range found {

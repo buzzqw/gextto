@@ -2403,12 +2403,62 @@ html.settings-only-modified .settings-panel:not(:has(.setting-modified-row)):not
    (a single row grew to a page). Keep the columns readable and let the wrap
    scroll sideways, as the other tables already do. */
 @media (max-width: 700px) {
-  .data-table.archive-table { min-width: 40rem; }
-  .archive-table th:last-child, .archive-table td:last-child { width: 9rem; }
-  /* Same for the aMule table of shared files: ten fixed columns squeezed into
-     the screen put every header and value on top of the next. */
-  .data-table.ed2k-shared-table { min-width: 44rem; }
-  [data-ed2k-results] .data-table { min-width: 34rem; }
+  /* The wide lists used to keep their columns and scroll sideways inside the
+     wrapper: on a phone the sideways scroll hides most of the row. Each row is
+     now a block with its cells stacked, and a cell with a data-label carries
+     the name of the column in front of its value. */
+  #v2-page[data-view="archive"] .data-table,
+  #v2-page[data-view="comics"] .data-table,
+  #v2-page[data-view="maintenance"] .data-table,
+  #v2-page[data-view="health"] .data-table,
+  .data-table.ed2k-shared-table,
+  [data-ed2k-results] .data-table {
+    min-width: 0;
+    display: block;
+    width: 100%;
+  }
+  #v2-page[data-view="archive"] .data-table thead,
+  #v2-page[data-view="comics"] .data-table thead,
+  #v2-page[data-view="maintenance"] .data-table thead,
+  #v2-page[data-view="health"] .data-table thead,
+  .data-table.ed2k-shared-table thead,
+  [data-ed2k-results] .data-table thead { display: none; }
+  #v2-page[data-view="archive"] .data-table tbody,
+  #v2-page[data-view="comics"] .data-table tbody,
+  #v2-page[data-view="maintenance"] .data-table tbody,
+  #v2-page[data-view="health"] .data-table tbody,
+  .data-table.ed2k-shared-table tbody,
+  [data-ed2k-results] .data-table tbody { display: block; }
+  #v2-page[data-view="archive"] .data-table tr,
+  #v2-page[data-view="comics"] .data-table tr,
+  #v2-page[data-view="maintenance"] .data-table tr,
+  #v2-page[data-view="health"] .data-table tr,
+  .data-table.ed2k-shared-table tr,
+  [data-ed2k-results] .data-table tr {
+    display: block;
+    margin-bottom: 0.75rem;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--line, #444);
+  }
+  #v2-page[data-view="archive"] .data-table td,
+  #v2-page[data-view="comics"] .data-table td,
+  #v2-page[data-view="maintenance"] .data-table td,
+  #v2-page[data-view="health"] .data-table td,
+  .data-table.ed2k-shared-table td,
+  [data-ed2k-results] .data-table td {
+    display: block;
+    width: auto !important;
+    min-width: 0;
+    padding: 0.15rem 0.5rem;
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+  }
+  .data-table td[data-label]::before {
+    content: attr(data-label) ": ";
+    color: var(--muted, #888);
+    font-weight: 600;
+  }
 }
 
 /* Health → Percorsi: the path and its state are the point of the panel, so on

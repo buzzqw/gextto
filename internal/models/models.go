@@ -2,6 +2,8 @@
 package models
 
 import (
+	"cmp"
+	"slices"
 	"strings"
 	"time"
 )
@@ -618,6 +620,12 @@ func (c *ApprovalContext) StallAdjustedMinDiff(minScoreDiff int64, key LiveEpiso
 }
 
 // Release is a candidate release discovered from a source.
+// SeasonEpisodePair identifies one episode inside a multi-season pack.
+type SeasonEpisodePair struct {
+	Season  int64 `json:"season"`
+	Episode int64 `json:"episode"`
+}
+
 type Release struct {
 	Title      string  `json:"title"`
 	Magnet     string  `json:"magnet"`
@@ -641,11 +649,11 @@ type Release struct {
 	// row so the `.torrent` links of a feed removed from Sources are no longer
 	// tried: the source label is shared by several feeds and cannot identify
 	// the one a row belongs to. Empty for indexer results.
-	FeedURL      string  `json:"-"`
-	Quality      Quality `json:"quality"`
-	Kind         string  `json:"kind"`
-	Series       *string `json:"series"`
-	Season       *int64  `json:"season"`
+	FeedURL string  `json:"-"`
+	Quality Quality `json:"quality"`
+	Kind    string  `json:"kind"`
+	Series  *string `json:"series"`
+	Season  *int64  `json:"season"`
 	// SeasonEnd is the last season a pack covers when it spans more than one
 	// ("S01-S03"): 0 for a release of a single season. Season stays the first
 	// one, so every reader of a single season keeps working; the approval, the
@@ -680,6 +688,9 @@ type Release struct {
 	// by the in-download inspection (file priority 0). The pack identity check
 	// accepts the remaining files instead of demanding the whole declared range.
 	SkippedEpisodes []int64 `json:"skipped_episodes,omitempty"`
+	// SkippedSeasonEpisodes is the same record for a pack spanning several
+	// seasons: an episode number alone is ambiguous there, so the pair is kept.
+	SkippedSeasonEpisodes []SeasonEpisodePair `json:"skipped_season_episodes,omitempty"`
 	// AbsoluteEpisode/AbsoluteSeries hold an anime-style absolute number
 	// ("[Group] Title - 1071") when the title has no season. The release stays
 	// unclassified until it matches a series marked as anime, which turns the
@@ -1017,3 +1028,27 @@ type simpleErr string
 func (e simpleErr) Error() string { return string(e) }
 
 const errInvalid simpleErr = "invalid integer"
+
+// UniqueSeasonEpisodePairs returns the distinct season/episode pairs in
+// deterministic order.
+func UniqueSeasonEpisodePairs(pairs []SeasonEpisodePair) []SeasonEpisodePair {
+	seen := make(map[SeasonEpisodePair]struct{}, len(pairs))
+	out := make([]SeasonEpisodePair, 0, len(pairs))
+	for _, p := range pairs {
+		if p.Season <= 0 || p.Episode <= 0 {
+			continue
+		}
+		if _, ok := seen[p]; ok {
+			continue
+		}
+		seen[p] = struct{}{}
+		out = append(out, p)
+	}
+	slices.SortFunc(out, func(a, b SeasonEpisodePair) int {
+		if a.Season != b.Season {
+			return cmp.Compare(a.Season, b.Season)
+		}
+		return cmp.Compare(a.Episode, b.Episode)
+	})
+	return out
+}

@@ -25,16 +25,9 @@ still be true after the item lands does not belong here.
   feed path, about 40 % of its allocations and 7 % of a cycle's CPU. Gate: a
   byte-level scanner over the in-memory body, with the existing feed corpus
   green.
-- **A multi-season pack is not inspected file by file**: the range is parsed now
-  (`SeasonEnd`/`SeasonLast`), but the inspector still decides one season at a
-  time and the skipped episodes are stored without their season, so a pack
-  covering several seasons is downloaded whole and decided at completion. Gate:
-  skipped episodes kept as season/episode pairs, then the per-file decision in
-  the inspector and its tests.
-- **Notebook-wide tables on a phone**: the episodes and the download history of a series are blocks on a phone now, but Archivio, Fumetti, Blocklist, Salute and Manutenzione still show tables wider than the screen behind a sideways scroll; give each one the same per-row block, or fold its secondary columns, one page at a time, with its own check in `mobile.spec.ts`.
 - **Cross-seed manager**: adding a torrent whose data is already in the library
   should reuse the blocks and seed it on the second tracker, with per-tracker
   ratio and seed rules, instead of downloading a second copy; the archive
   already holds the same release from several trackers. Gate: the v1/v2 block
   reuse and the hardlink library, which are the building blocks.
-- **Faster flows**: undo instead of a confirmation for reversible removals, with a dialog that explains itself for the rest. The missing count on the Dashboard is already there.
+- **Faster flows**: undo instead of a confirmation for reversible removals, with a dialog that explains itself for the rest (the missing count on the Dashboard is there).

@@ -102,13 +102,6 @@ func InspectActivePacks(cfg *Config, torrents TorrentEngine, db *Database, notif
 			checked[torrent.Hash] = settled
 			continue
 		}
-		// The file-level inspection decides one season at a time: a pack
-		// spanning several seasons is downloaded whole and decided at
-		// completion instead.
-		if release.MultiSeason() {
-			checked[torrent.Hash] = settled
-			continue
-		}
 		// A pack the user started by hand is their choice, not the cycle's:
 		// it is never discarded, even when every episode is already in the
 		// library (they may want it for the seed, another language, a check).
@@ -148,8 +141,58 @@ func InspectActivePacks(cfg *Config, torrents TorrentEngine, db *Database, notif
 		for _, file := range files {
 			names = append(names, file.Path)
 		}
-		found, _, err := packEpisodesFromPaths(names, *candidate.release.Season)
-		if err != nil || len(found) == 0 {
+		seriesName := ""
+		if candidate.release.Series != nil {
+			seriesName = *candidate.release.Series
+		}
+		// A pack covering S01-S03 is decided season by season, on its files:
+		// one season worth of unwanted episodes must not make the download of
+		// the seasons that are wanted throw away.
+		seasons := make([]int64, 0, 1)
+		for season := *candidate.release.Season; season <= candidate.release.SeasonLast(); season++ {
+			seasons = append(seasons, season)
+		}
+		found := map[int64]struct{}{}
+		useful := false
+		anyFound := false
+		type seasonVerdict struct {
+			season    int64
+			decisions []packEpisodeDecision
+		}
+		var verdicts []seasonVerdict
+		for _, season := range seasons {
+			perSeason, _, err := packEpisodesFromPaths(names, season)
+			if err != nil {
+				continue
+			}
+			for episode := range perSeason {
+				found[episode] = struct{}{}
+			}
+			if len(perSeason) == 0 {
+				continue
+			}
+			anyFound = true
+			cacheKey := fmt.Sprintf("%s\x00%d", seriesName, season)
+			needed, cached := gapCache[cacheKey]
+			if !cached {
+				needed = seriesGapsForSeason(db, seriesName, season)
+				gapCache[cacheKey] = needed
+			}
+			index := db.SeriesQualityIndex(seriesName, season, cfg)
+			forbidUpgrade := false
+			if series := cfg.FindSeriesMatch(seriesName, &season); series != nil {
+				forbidUpgrade = series.DisableUpgrades
+			}
+			score := cfg.ReleaseScore(&candidate.release)
+			decisions := packEpisodeDecisions(&candidate.release, perSeason, needed, index, score, cfg.UpgradeMinScoreDiff, cfg.UpgradeUntilScore, forbidUpgrade, cfg.Settings)
+			verdicts = append(verdicts, seasonVerdict{season: season, decisions: decisions})
+			for _, decision := range decisions {
+				if decision.Keep {
+					useful = true
+				}
+			}
+		}
+		if !anyFound {
 			// No season/episode identity in the names: the post-download check
 			// is the only safe verdict.
 			if pending != nil && !packStartAfterFileCheck(torrents, db, notifier, candidate.torrent.Hash, pending, "") {
@@ -159,35 +202,9 @@ func InspectActivePacks(cfg *Config, torrents TorrentEngine, db *Database, notif
 			checked[candidate.torrent.Hash] = packInspectionCheck{until: now.Add(packInspectionSettled)}
 			continue
 		}
-		seriesName := ""
-		if candidate.release.Series != nil {
-			seriesName = *candidate.release.Series
-		}
-		cacheKey := fmt.Sprintf("%s\x00%d", seriesName, *candidate.release.Season)
-		needed, cached := gapCache[cacheKey]
-		if !cached {
-			needed = seriesGapsForSeason(db, seriesName, *candidate.release.Season)
-			gapCache[cacheKey] = needed
-		}
-		index := db.SeriesQualityIndex(seriesName, *candidate.release.Season, cfg)
-		forbidUpgrade := false
-		if series := cfg.FindSeriesMatch(seriesName, candidate.release.Season); series != nil {
-			forbidUpgrade = series.DisableUpgrades
-		}
-		score := cfg.ReleaseScore(&candidate.release)
-		decisions := packEpisodeDecisions(&candidate.release, found, needed, index, score, cfg.UpgradeMinScoreDiff, cfg.UpgradeUntilScore, forbidUpgrade, cfg.Settings)
-		useful := false
-		for _, decision := range decisions {
-			if decision.Keep {
-				useful = true
-				break
-			}
-		}
 		if useful {
 			if packInspectionPrioritizeEnabled(cfg) {
-				if !applyPackFilePriorities(cfg, db, torrents, candidate.torrent.Hash, files, &candidate.release, needed, index, score, forbidUpgrade) {
-					// Let the engine settle after the priority change before
-					// asking again: a failed call is retried on the next pass.
+				if !applyPackSeasonsPriorities(cfg, db, torrents, candidate.torrent.Hash, files, &candidate.release, seasons, gapCache, seriesName) {
 					checked[candidate.torrent.Hash] = packInspectionCheck{until: now.Add(packInspectionMetadataWait)}
 					continue
 				}
@@ -201,6 +218,11 @@ func InspectActivePacks(cfg *Config, torrents TorrentEngine, db *Database, notif
 		}
 
 		reason := fmt.Sprintf("no useful episode: it holds %d, already in the library in equal or better quality", len(found))
+		score := cfg.ReleaseScore(&candidate.release)
+		var decisions []packEpisodeDecision
+		if len(verdicts) > 0 {
+			decisions = verdicts[0].decisions
+		}
 		details := packDecisionDetails(*candidate.release.Season, candidate.release.Quality, score, decisions, 12)
 		// The pack may have replaced an existing library row when it was
 		// approved (upgrade backup). Discarding it must put that row back:
@@ -432,4 +454,110 @@ func seriesGapsForSeason(db *Database, seriesName string, season int64) map[int6
 		}
 	}
 	return needed
+}
+
+// applyPackSeasonsPriorities sets priority 0 on the files of a multi-season
+// pack that no season of the pack wants. A file is kept when any season's
+// decision says so; the skipped episodes are recorded as season/episode pairs
+// because an episode number alone is ambiguous across seasons.
+func applyPackSeasonsPriorities(
+	cfg *Config,
+	db *Database,
+	torrents TorrentEngine,
+	hash string,
+	files []models.FileView,
+	release *models.Release,
+	seasons []int64,
+	gapCache map[string]map[int64]struct{},
+	seriesName string,
+) bool {
+	if cfg == nil || release == nil || release.Season == nil || len(files) == 0 {
+		return true
+	}
+	priorities := make([]int32, len(files))
+	skippedPairs := make([]models.SeasonEpisodePair, 0)
+	skipped := 0
+	var savedBytes int64
+	for i, file := range files {
+		priorities[i] = 1
+		if !isVideoExtension(file.Path) {
+			continue
+		}
+		useful := false
+		for _, season := range seasons {
+			found, _, err := packEpisodesFromPaths([]string{file.Path}, season)
+			if err != nil || len(found) == 0 {
+				continue
+			}
+			cacheKey := fmt.Sprintf("%s\x00%d", seriesName, season)
+			needed, cached := gapCache[cacheKey]
+			if !cached {
+				needed = seriesGapsForSeason(db, seriesName, season)
+				gapCache[cacheKey] = needed
+			}
+			index := db.SeriesQualityIndex(seriesName, season, cfg)
+			score := cfg.ReleaseScore(release)
+			forbidUpgrade := false
+			if series := cfg.FindSeriesMatch(seriesName, &season); series != nil {
+				forbidUpgrade = series.DisableUpgrades
+			}
+			if packEpisodesUseful(release, found, needed, index, score, cfg.UpgradeMinScoreDiff, cfg.UpgradeUntilScore, forbidUpgrade, cfg.Settings) {
+				useful = true
+				break
+			}
+		}
+		if useful {
+			continue
+		}
+		priorities[i] = 0
+		skipped++
+		savedBytes += file.Size
+		// A file with an explicit season marker names its season; a bare
+		// number belongs to the pack's first season.
+		season := packFileSeason(file.Path, *release.Season)
+		for _, s := range seasons {
+			found, _, err := packEpisodesFromPaths([]string{file.Path}, s)
+			if err != nil {
+				continue
+			}
+			for episode := range found {
+				if s == season || len(seasons) == 1 {
+					skippedPairs = append(skippedPairs, models.SeasonEpisodePair{Season: s, Episode: episode})
+				}
+			}
+		}
+	}
+	if skipped == 0 {
+		return true
+	}
+	ok, err := torrents.SetFilePriorities(hash, priorities)
+	if err != nil || !ok {
+		if err != nil {
+			logging.Warn("could not set the multi-season pack file priorities", "hash", hash, "error", err.Error())
+		}
+		return false
+	}
+	copy := *release
+	copy.SkippedSeasonEpisodes = models.UniqueSeasonEpisodePairs(skippedPairs)
+	if len(seasons) == 1 {
+		// The single-season format stays the one the completion check and the
+		// older state files already understand.
+		plain := make([]int64, 0, len(skippedPairs))
+		for _, pair := range skippedPairs {
+			plain = append(plain, pair.Episode)
+		}
+		copy.SkippedEpisodes = uniqueSortedInt64(plain)
+	}
+	if err := db.SetTorrentSkippedSeasonEpisodes(hash, copy.SkippedSeasonEpisodes); err != nil {
+		logging.Warn("could not record the skipped episodes of a multi-season pack", "hash", hash, "error", err.Error())
+		return false
+	}
+	if len(seasons) == 1 {
+		if err := db.SetTorrentSkippedEpisodes(hash, copy.SkippedEpisodes); err != nil {
+			logging.Warn("could not record the skipped episodes", "hash", hash, "error", err.Error())
+			return false
+		}
+	}
+	logging.Info(fmt.Sprintf("📉 Only the wanted files of a multi-season pack are downloaded: %d left out, %s saved", skipped, formatBytes(savedBytes)), "hash", hash)
+	return true
 }

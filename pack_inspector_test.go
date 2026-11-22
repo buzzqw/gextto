@@ -275,3 +275,31 @@ func TestSameEpisodeSetIgnoresOrderAndDuplicates(t *testing.T) {
 		t.Fatal("two empty sets must match")
 	}
 }
+
+// TestMultiSeasonPackFilesAreRecognizedPerSeason: the in-download inspector
+// reads the file list one season at a time; a pack covering several seasons
+// must not collapse them into the first one.
+func TestMultiSeasonPackFilesAreRecognizedPerSeason(t *testing.T) {
+	names := []string{
+		"Series A S01E01.mkv", "Series A S01E02.mkv",
+		"Series A S02E01.mkv", "Series A S02E05.mkv",
+	}
+	first, _, err := packEpisodesFromPaths(names, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, _, err := packEpisodesFromPaths(names, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, first1 := first[1]
+	_, first2 := first[2]
+	if len(first) != 2 || !first1 || !first2 {
+		t.Fatalf("season 1 episodes = %v, want 1 and 2", first)
+	}
+	_, second1 := second[1]
+	_, second5 := second[5]
+	if len(second) != 2 || !second1 || !second5 {
+		t.Fatalf("season 2 episodes = %v, want 1 and 5", second)
+	}
+}
