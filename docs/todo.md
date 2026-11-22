@@ -22,10 +22,6 @@ still be true after the item lands does not belong here.
   runs inside the lock every 10 s window. Gate: a deep-copy or copy-on-write
   snapshot encoded outside the lock, with `BenchmarkSaveStateLocked` and a test
   that no state is lost.
-- **Webseed piece buffers are still unbudgeted**: the peer path now holds its
-  write-cache charge until the bytes are written, but `handleWebseedPieceResult`
-  still takes buffers straight from `piecePool`. Gate: the same ownership rule
-  for the webseed path, with the budget test extended to it.
 - **The DHT peer store costs three structures per contact**: 163 B/contact,
   about 85.6 MB at the default 2048×256 cap, while its comment says ~25 MB.
   Gate: fold the seed flag into the contact and replace the ring with a rotating

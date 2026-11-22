@@ -2343,6 +2343,15 @@ using fixed values.
   applies it immediately.
 - The cache size changes on the fly; cache expiry and
   preallocation instead reopen the daemon session.
+- **One budget for every piece buffer**: a peer's piece reserves its write-cache
+  charge when the download opens and the write refunds it when the bytes are
+  out. A web seed (`URLDownloader.Take`, `torrent_start.go`) now does the same:
+  before taking a buffer it asks the session's RAM manager for one piece's
+  units, waits while the budget is full (the range pauses instead of growing
+  beside the peers), and hands the charge to the write in
+  `webseedPieceWrite`, which refunds it in `releaseWrittenPiece`. A result for
+  a piece another copy already completed returns its charge at once
+  (`discardStaleWebseedPiece`).
 - **Idle memory release**: piece buffers are 1 MB and live in per-torrent
   `sync.Pool`s. After a burst they can stay reachable until a collection even
   when nothing is moving, because an idle daemon allocates too little to

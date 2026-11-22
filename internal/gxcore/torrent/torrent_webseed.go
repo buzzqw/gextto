@@ -59,7 +59,7 @@ func (t *torrent) handleWebseedPieceResult(msg *urldownloader.PieceResult) {
 	t.cancelDuplicateDownloads(piece.Index)
 	t.beginPieceWrite()
 
-	pw := piecewriter.New(piece, msg.Downloader, msg.Buffer)
+	pw := piecewriter.New(piece, webseedPieceWrite{downloader: msg.Downloader, units: msg.Units}, msg.Buffer)
 	go pw.Run(t.pieceWriterResultC, t.doneC, t.session.metrics.WritesPerSecond, t.session.metrics.SpeedWrite, t.session.semWrite)
 
 	if msg.Done {
@@ -75,6 +75,10 @@ func (t *torrent) handleWebseedPieceResult(msg *urldownloader.PieceResult) {
 func (t *torrent) discardStaleWebseedPiece(msg *urldownloader.PieceResult) {
 	t.log.Debugf("discarding already completed piece #%d from webseed %s", msg.Index, msg.Downloader.URL)
 	t.bytesWasted.Inc(int64(len(msg.Buffer.Data)))
+	// The bytes die here, so the budget gets their charge back now.
+	if msg.Units > 0 && t.session != nil && t.session.ram != nil {
+		t.session.ram.Release(msg.Units)
+	}
 	msg.Buffer.Release()
 	if !msg.Done {
 		return

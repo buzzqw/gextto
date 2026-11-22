@@ -6,6 +6,7 @@ import (
 
 	"github.com/buzzqw/gextto/internal/gxcore/internal/bitfield"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/bufferpool"
+	"github.com/buzzqw/gextto/internal/gxcore/internal/logger"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/metainfo"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/peer"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/piece"
@@ -196,18 +197,42 @@ func TestWriteCacheBudgetReturnedWhenTorrentClosesWithWriteInFlight(t *testing.T
 	waitedAllocated(t, sess, 0, "closed torrent with a write in flight")
 }
 
-// TestWebseedWriteOwnsNoCharge: a webseed buffer never took a write-cache
-// reservation, so settling its write must not refund one (a stray release
-// would give the budget away, and the manager panics when the total would
-// exceed the limit).
-func TestWebseedWriteOwnsNoCharge(t *testing.T) {
-	tr, sess, pool := newWriteBudgetTorrent(t, testWritePieceLength, 1)
+// TestWebseedWriteRefundsItsCharge: a web seed's buffer now takes a charge of
+// its own, and settling its write returns exactly that charge: the peer's
+// reservation stays untouched and the budget comes back whole.
+func TestWebseedWriteRefundsItsCharge(t *testing.T) {
+	tr, sess, pool := newWriteBudgetTorrent(t, 2*testWritePieceLength, 1)
 	pe := &peer.Peer{}
-	chargePiece(t, tr, pool, pe, 0) // another piece holds the whole budget
+	chargePiece(t, tr, pool, pe, 0) // one piece held by a peer
 
+	units := int64(testWritePieceLength)
+	if ok := sess.ram.Request(tr.id, nil, units, nil, nil); !ok {
+		t.Fatalf("the webseed charge was refused")
+	}
 	buf := pool.GetUncleared(testWritePieceLength)
-	tr.releaseWrittenPiece(piecewriter.New(&tr.pieces[0], &urldownloader.URLDownloader{URL: "http://seed.example/piece"}, buf))
+	tr.releaseWrittenPiece(piecewriter.New(&tr.pieces[0], webseedPieceWrite{downloader: &urldownloader.URLDownloader{URL: "http://seed.example/piece"}, units: units}, buf))
 	if got := sess.ram.Stats().AllocatedSize; got != testWritePieceLength {
-		t.Fatalf("allocated after a webseed write = %d, want the peer reservation untouched (%d)", got, testWritePieceLength)
+		t.Fatalf("allocated after a webseed write = %d, want only the peer reservation (%d)", got, testWritePieceLength)
+	}
+}
+
+// TestStaleWebseedPieceReleasesItsCharge: a webseed result for a piece another
+// copy already completed drops its buffer, and the budget with it.
+func TestStaleWebseedPieceReleasesItsCharge(t *testing.T) {
+	tr, sess, pool := newWriteBudgetTorrent(t, 2*testWritePieceLength, 1)
+	tr.log = logger.New("test")
+	tr.bytesWasted = metrics.NewCounter()
+	units := int64(testWritePieceLength)
+	if ok := sess.ram.Request(tr.id, nil, units, nil, nil); !ok {
+		t.Fatalf("the webseed charge was refused")
+	}
+	tr.pieces[0].Done = true
+	buf := pool.GetUncleared(testWritePieceLength)
+	tr.discardStaleWebseedPiece(&urldownloader.PieceResult{
+		Downloader: &urldownloader.URLDownloader{URL: "http://seed.example/piece"},
+		Buffer:     buf, Index: 0, Units: units,
+	})
+	if got := sess.ram.Stats().AllocatedSize; got != 0 {
+		t.Fatalf("allocated after a stale webseed piece = %d, want 0", got)
 	}
 }

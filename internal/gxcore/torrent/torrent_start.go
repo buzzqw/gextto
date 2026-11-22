@@ -346,6 +346,24 @@ func (t *torrent) startWebseedDownloader(sp *piecepicker.WebseedDownloadSpec) {
 		src.DownloadSpeed = metrics.NewMeter()
 		break
 	}
+	if t.session.ram != nil {
+		// The web seed's buffers live in the same budget as the peers': the
+		// downloader reserves one piece before taking it, waits while the budget
+		// is full, and hands the charge to the write with the bytes.
+		units := t.pieceRAMUnits()
+		ud.Take = func(uint32) (int64, bool) {
+			notifyC := make(chan *peer.Peer, 1)
+			cancelC := make(chan struct{})
+			ok := t.session.ram.Request(t.id, nil, units, notifyC, cancelC)
+			if !ok {
+				// Not granted: drop the queued request instead of leaving it in
+				// the manager forever; the next try asks again.
+				close(cancelC)
+			}
+			return units, ok
+		}
+		ud.Release = func(n int64) { t.session.ram.Release(n) }
+	}
 	go ud.Run(t.webseedClient, t.pieces, t.info().MultiFile, t.webseedPieceResultC.SendC(), t.piecePool, t.session.config.WebseedResponseBodyReadTimeout)
 }
 

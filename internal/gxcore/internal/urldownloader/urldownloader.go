@@ -25,6 +25,15 @@ type URLDownloader struct {
 	Begin, End, current uint32             // piece index
 	bucket              *bandwidth.Limiter // rate changes at runtime
 	closeC, doneC       chan struct{}
+	// Take, when set, rations the piece buffer: it is asked for the units of
+	// one piece before the buffer is allocated and reports whether they are
+	// available. A false leaves the range paused until the budget has room, so
+	// the bytes of a web seed stay in the same budget as the peers' instead of
+	// growing beside it.
+	Take func(index uint32) (units int64, ok bool)
+	// Release returns units the run will not hand over: an aborted range, or a
+	// buffer that ends the downloader without being written.
+	Release func(units int64)
 }
 
 // PieceResult carries one downloaded piece (or its failure) to the torrent.
@@ -35,6 +44,9 @@ type PieceResult struct {
 	Index      uint32
 	Error      error
 	Done       bool
+	// Units is the charge the buffer holds in the session budget; the caller
+	// that keeps the bytes (the write ring) refunds it when they are out.
+	Units int64
 }
 
 // New plans a fetch of [begin, end) from source, throttled by b.
@@ -90,21 +102,45 @@ func (d *URLDownloader) Run(client *http.Client, pieces []piece.Piece, multifile
 	jobs := createJobs(pieces, d.Begin, d.readEnd())
 
 	var n int // filled bytes in buf
-	buf := pool.Get(int(pieces[d.current].Length))
+
+	// take reserves the buffer of one piece, waiting for room while the budget
+	// is full; a closed downloader gives up instead of holding the run.
+	var bufUnits int64
+	take := func(index uint32) bufferpool.Buffer {
+		if d.Take != nil {
+			for {
+				units, ok := d.Take(index)
+				if ok {
+					bufUnits = units
+					break
+				}
+				select {
+				case <-time.After(200 * time.Millisecond):
+				case <-d.closeC:
+					return bufferpool.Buffer{}
+				}
+			}
+		}
+		return pool.Get(int(pieces[index].Length))
+	}
+	buf := take(d.current)
+	if buf.Data == nil {
+		return
+	}
 
 	// completePiece ships the filled buffer and opens the next piece.
 	// True means the range end was reached.
 	completePiece := func() (done bool) {
 		index := d.current
 		done = d.current >= d.readEnd()-1
-		d.sendResult(resultC, &PieceResult{Downloader: d, Buffer: buf, Index: index, Done: done})
+		d.sendResult(resultC, &PieceResult{Downloader: d, Buffer: buf, Index: index, Done: done, Units: bufUnits})
 		if done {
 			return true
 		}
 		d.incrCurrent()
 		n = 0
-		buf = pool.Get(int(pieces[d.current].Length))
-		return false
+		buf = take(d.current)
+		return buf.Data == nil
 	}
 
 	// processPadding skips padding spans: no request (padding is absent
@@ -175,6 +211,11 @@ func (d *URLDownloader) Run(client *http.Client, pieces []piece.Piece, multifile
 			ok = processJob(job)
 		}
 		if !ok {
+			// The buffer and its charge die with the run: nobody will keep
+			// these bytes, so the budget gets them back now.
+			if bufUnits > 0 && d.Release != nil {
+				d.Release(bufUnits)
+			}
 			buf.Release()
 			break
 		}

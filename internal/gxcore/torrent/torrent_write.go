@@ -63,6 +63,14 @@ func (t *torrent) cancelDuplicateDownloads(i uint32) {
 	}
 }
 
+// webseedPieceWrite is the source of a piece a web seed delivered. Like
+// peerPieceWrite it carries the write-cache charge the buffer took, so the
+// write refunds it when the bytes are out.
+type webseedPieceWrite struct {
+	downloader *urldownloader.URLDownloader
+	units      int64
+}
+
 // peerPieceWrite is the source of a piece a peer handed to the write ring. It
 // keeps the peer for reporting and carries the write-cache charge the buffer
 // still owns: the reservation its downloader took when it opened.
@@ -110,8 +118,15 @@ func (t *torrent) releaseWrittenPiece(pw *piecewriter.PieceWriter) {
 	if t.session == nil || t.session.ram == nil {
 		return
 	}
-	if w, ok := pw.Source.(peerPieceWrite); ok && w.units > 0 {
-		t.session.ram.Release(w.units)
+	switch w := pw.Source.(type) {
+	case peerPieceWrite:
+		if w.units > 0 {
+			t.session.ram.Release(w.units)
+		}
+	case webseedPieceWrite:
+		if w.units > 0 {
+			t.session.ram.Release(w.units)
+		}
 	}
 }
 
