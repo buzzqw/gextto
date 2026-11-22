@@ -13,7 +13,7 @@ import (
 
 func contactsRingSet(t *testing.T, count int) *peerContactsSet {
 	t.Helper()
-	p := &peerContactsSet{set: make(map[string]bool)}
+	p := newPeerContactsSet()
 	for i := 0; i < count; i++ {
 		contact := encodeCompactPeerAddr(fmt.Sprintf("10.0.0.%d:6881", i+1))
 		if contact == "" {
@@ -69,7 +69,7 @@ func TestNextPutsLiveContactsBeforeDeadOnes(t *testing.T) {
 	}
 	live := 0
 	for _, c := range reply {
-		if p.set[c] {
+		if p.isAlive(c) {
 			live++
 		}
 	}
@@ -87,7 +87,7 @@ func TestDropRemovesAContactAnywhereInTheRing(t *testing.T) {
 	if p.Size() != 4 {
 		t.Fatalf("size after drop = %d, want 4", p.Size())
 	}
-	if p.set[target] {
+	if _, ok := p.index[target]; ok {
 		t.Fatal("the dropped contact is still in the set")
 	}
 	for _, c := range p.next() {
@@ -140,7 +140,7 @@ func TestRemoveLeavesAnEmptySetClean(t *testing.T) {
 	if got := p.drop(only); got != only {
 		t.Fatalf("drop returned %q, want %q", got, only)
 	}
-	if p.ring != nil {
+	if !p.isEmpty() {
 		t.Fatal("the ring is not empty after removing the last contact")
 	}
 	if got := p.next(); got != nil {

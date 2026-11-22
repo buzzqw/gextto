@@ -3849,7 +3849,7 @@ pol:
   ➕ Nuovo tag…: ➕ Nowy tag…
   ⬆ Upload (KB/s) — 0 = nessun limite: ⬆ Przesyłanie (KB/s) — 0 = bez limitu
   ⬇ Download (KB/s) — 0 = nessun limite: ⬇ Pobrania (KB/s) — 0 = brak limitu
-  🏁 terminata: 🏁 koniec
+  terminata: koniec
   "Esplora release": "Przeglądaj wydania"
   Disattivata: Wyłączona
   Attivata: Włączona
@@ -6440,18 +6440,17 @@ pol:
   "Usa TVmaze per le serie": "Używaj TVmaze dla seriali"
   "Una volta al giorno chiede a TVmaze (gratuito, senza chiave) lo stato di ogni serie, come seconda opinione dopo TMDB o TVDB. Senza chiavi TMDB e TVDB diventa la fonte delle serie: stagioni, episodi, date, locandine e stato, con titoli e trame in inglese e senza film. A TVmaze vanno gli identificativi TVDB e IMDb della serie e, quando fa da fonte, il suo nome.": "Raz dziennie pyta TVmaze (bezpłatnie, bez klucza) o status każdego serialu, jako drugą opinię po TMDB lub TVDB. Bez kluczy TMDB i TVDB staje się źródłem seriali: sezony, odcinki, daty, plakaty i status, z tytułami i opisami po angielsku i bez filmów. Do TVmaze trafiają identyfikatory TVDB i IMDb serialu oraz, gdy jest źródłem, jego nazwa."
   "Nessuna puntata annunciata: TVmaze attende la decisione sul rinnovo": "Brak zapowiedzianego odcinka: TVmaze czeka na decyzję o przedłużeniu"
-  "⏳ rinnovo incerto": "⏳ przedłużenie niepewne"
+  "rinnovo incerto": "przedłużenie niepewne"
   "Segnata come terminata a mano in «Stato della serie»": "Ręcznie oznaczony jako zakończony w «Status serialu»"
   "Secondo TVmaze non usciranno altre puntate": "Według TVmaze nie będzie więcej odcinków"
   "Secondo TVDB non usciranno altre puntate": "Według TVDB nie będzie więcej odcinków"
   "Secondo TMDB non usciranno altre puntate": "Według TMDB nie będzie więcej odcinków"
-  "▶ in corso": "▶ w trakcie"
   "Segnata come in corso a mano in «Stato della serie»": "Ręcznie oznaczony jako w trakcie w «Status serialu»"
   "C'è già una data per la prossima puntata": "Następny odcinek ma już datę"
   "Secondo TVmaze la serie continua": "Według TVmaze serial jest kontynuowany"
   "Secondo TVDB la serie continua": "Według TVDB serial jest kontynuowany"
   "Secondo TMDB la serie continua": "Według TMDB serial jest kontynuowany"
-  "🕒 in arrivo": "🕒 zapowiedziany"
+  "in arrivo": "zapowiedziany"
   "Annunciata, nessuna puntata ancora uscita": "Zapowiedziany, nie wyemitowano jeszcze żadnego odcinka"
   "Le fonti non sono d'accordo su questa serie: puoi decidere tu in «Stato della serie»": "Źródła nie są zgodne co do tego serialu: możesz zdecydować w «Status serialu»"
   "fonti in disaccordo": "źródła niezgodne"

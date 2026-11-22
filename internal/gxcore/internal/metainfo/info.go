@@ -1,6 +1,7 @@
 package metainfo
 
 import (
+	"bytes"
 	"crypto/sha1"
 	"crypto/sha256"
 	"encoding/hex"
@@ -10,6 +11,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"unicode"
 
@@ -164,6 +166,36 @@ func (ib *infoType) overrideUTF8Keys() {
 	}
 }
 
+// rawPieces returns the blob of the "pieces" value inside the bencoded info
+// dict, so the decoded Info does not keep a second copy of every piece hash
+// beside the raw dict it keeps for the info hash and ut_metadata. It gives up
+// (and the caller keeps the decoded blob) if the bytes do not match: the search
+// could have found "6:pieces" inside a file name.
+func rawPieces(b, decoded []byte) []byte {
+	key := []byte("6:pieces")
+	at := bytes.Index(b, key)
+	if at < 0 || len(decoded) == 0 {
+		return nil
+	}
+	value := at + len(key)
+	digits := value
+	for digits < len(b) && b[digits] >= '0' && b[digits] <= '9' {
+		digits++
+	}
+	if digits == value || digits >= len(b) || b[digits] != ':' {
+		return nil
+	}
+	n, err := strconv.Atoi(string(b[value:digits]))
+	if err != nil || n != len(decoded) || digits+1+n > len(b) {
+		return nil
+	}
+	blob := b[digits+1 : digits+1+n]
+	if !bytes.Equal(blob, decoded) {
+		return nil
+	}
+	return blob
+}
+
 // NewInfo decodes b into an Info: v1, hybrid or (via ErrV2Only) v2-only.
 // Validation runs meta-version first, then piece data, then file names.
 func NewInfo(b []byte, utf8 bool, pad bool) (*Info, error) {
@@ -203,10 +235,16 @@ func NewInfo(b []byte, utf8 bool, pad bool) (*Info, error) {
 			}
 		}
 	}
+	// The raw dict stays in i.Bytes for the info hash and ut_metadata, so take
+	// the piece hashes out of it instead of holding a second copy.
+	pieces := rawPieces(b, ib.Pieces)
+	if pieces == nil {
+		pieces = ib.Pieces
+	}
 	i := Info{
 		PieceLength: ib.PieceLength,
 		NumPieces:   uint32(numPieces),
-		pieces:      ib.Pieces,
+		pieces:      pieces,
 		Name:        ib.Name,
 		Private:     parsePrivateField(ib.Private),
 		MetaVersion: ib.MetaVersion,

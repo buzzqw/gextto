@@ -143,28 +143,40 @@ func (d *Daemon) runStateSaver() {
 			d.mu.Unlock()
 			continue
 		}
-		seq, data, err := d.snapshotStateLocked()
+		seq, snapshot := d.prepareSnapshotLocked()
 		d.mu.Unlock()
-		if err == nil {
+		data, err := encodeSnapshot(snapshot)
+		if err != nil {
+			d.mu.Lock()
+			d.dirty = true // the failed encoding must be retried
+			d.mu.Unlock()
+		} else {
 			err = d.writeState(seq, data)
 		}
 		retry = err != nil
 	}
 }
 
-// snapshotStateLocked encodes the state and numbers the snapshot. The caller
-// holds d.mu. dirty is cleared only once the encoding succeeded: a failed
-// encoding keeps it set so the next pass tries again.
-func (d *Daemon) snapshotStateLocked() (uint64, []byte, error) {
+// prepareSnapshotLocked takes a deep, consistent copy of the state and numbers
+// the snapshot. The caller holds d.mu only for the copy: the expensive JSON
+// encoding runs on encodeSnapshot outside the lock.
+func (d *Daemon) prepareSnapshotLocked() (uint64, *persistedState) {
 	d.state.BadTrackers = d.trackers.disabledSnapshot()
-	data, err := json.MarshalIndent(d.state, "", "  ")
-	if err != nil {
-		logfError("cannot encode state: %v", err)
-		return 0, nil, err
-	}
+	snapshot := cloneState(&d.state)
 	d.stateSeq++
 	d.dirty = false
-	return d.stateSeq, data, nil
+	return d.stateSeq, snapshot
+}
+
+// encodeSnapshot marshals a snapshot taken under the daemon lock. The state
+// can keep changing while this runs without the handlers waiting for it.
+func encodeSnapshot(snapshot *persistedState) ([]byte, error) {
+	data, err := json.MarshalIndent(snapshot, "", "  ")
+	if err != nil {
+		logfError("cannot encode state: %v", err)
+		return nil, err
+	}
+	return data, nil
 }
 
 // writeState writes one snapshot atomically. saveMu is what keeps the

@@ -231,7 +231,11 @@ type torrent struct {
 	verifier           *verifier.Verifier
 	verifierProgressC  chan verifier.Progress
 	verifierResultC    chan *verifier.Verifier
-	checkedPieces      uint32
+	checkedPieces uint32
+	// verifiedPrefix is the bitfield of a check stopped before it finished:
+	// those pieces keep their verified bits when a later check resumes, so a
+	// recheck interrupted at 90% does not start again from zero.
+	verifiedPrefix []byte
 
 	// localData snapshots pieces+storage for sibling-torrent Swarm Merging
 	// reads off the run loop (phase 1). See localmerge.go.
@@ -544,7 +548,7 @@ func (t *torrent) finishConstruction(s *Session, cfg Config, info *metainfo.Info
 	}
 	t.addrList = addrlist.New(cfg.MaxPeerAddresses, blocklistForOutgoingConns, t.port, &t.externalIP, cfg.PreferLocalPeers)
 	if t.info() != nil {
-		t.piecePool = bufferpool.New(int(t.info().PieceLength))
+		t.piecePool = bufferpool.NewBounded(int(t.info().PieceLength), 8)
 	}
 }
 

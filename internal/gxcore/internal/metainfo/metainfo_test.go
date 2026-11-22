@@ -2,8 +2,10 @@ package metainfo
 
 import (
 	"bytes"
+	"crypto/sha1"
 	"errors"
 	"testing"
+	"unsafe"
 
 	"github.com/zeebo/bencode"
 )
@@ -68,5 +70,43 @@ func TestParsedPieceLengthCeiling(t *testing.T) {
 		if _, err := ParseInfo(info(size), true, true, nil); !errors.Is(err, errParsedPieceTooBig) {
 			t.Errorf("ParseInfo(piece length %d) = %v, want errParsedPieceTooBig", size, err)
 		}
+	}
+}
+
+// TestPieceHashesAreSlicedFromTheRawInfoDict: the hashes the verifier reads
+// must be the very bytes of the raw dict kept for the info hash and ut_metadata,
+// not a second copy of the same 20 bytes per piece.
+func TestPieceHashesAreSlicedFromTheRawInfoDict(t *testing.T) {
+	hashes := make([]byte, 20*4)
+	for i := range hashes {
+		hashes[i] = byte(i + 1)
+	}
+	b, err := bencode.EncodeBytes(map[string]interface{}{
+		"name":         "Series A",
+		"length":       int64(80),
+		"piece length": int64(20),
+		"pieces":       string(hashes),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	i, err := NewInfo(b, true, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	hash := i.PieceHash(2)
+	lo, hi := uintptr(unsafe.Pointer(&b[0])), uintptr(unsafe.Pointer(&b[len(b)-1]))+1
+	addr := uintptr(unsafe.Pointer(&hash[0]))
+	if addr < lo || addr > hi {
+		t.Fatal("piece hashes are a separate copy of the raw info dict")
+	}
+	if !bytes.Equal(hash, hashes[40:60]) {
+		t.Fatalf("piece hash #2 = %x, want %x", hash, hashes[40:60])
+	}
+	if i.Hash != sha1.Sum(b) {
+		t.Fatal("the info hash changed when the hashes were sliced")
+	}
+	if !bytes.Equal(i.Bytes, b) {
+		t.Fatal("the raw info dict changed")
 	}
 }

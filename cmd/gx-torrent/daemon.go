@@ -675,8 +675,10 @@ func (d *Daemon) saveLocked() {
 	if d.opts.StatePath == "" {
 		return
 	}
-	seq, data, err := d.snapshotStateLocked()
+	seq, snapshot := d.prepareSnapshotLocked()
+	data, err := encodeSnapshot(snapshot)
 	if err != nil {
+		d.dirty = true // saveLocked is called with d.mu held
 		return
 	}
 	if err := d.writeState(seq, data); err != nil {

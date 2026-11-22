@@ -119,7 +119,7 @@ func (t *torrent) installMetadata(id *infodownloader.InfoDownloader) {
 		}
 	}
 	t.setInfo(info)
-	t.piecePool = bufferpool.New(int(info.PieceLength))
+	t.piecePool = bufferpool.NewBounded(int(info.PieceLength), 8)
 	if err := t.session.resumer.WriteInfo(t.id, t.info().Bytes); err != nil {
 		t.stop(fmt.Errorf("cannot write resume info: %w", err))
 		return

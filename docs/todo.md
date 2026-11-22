@@ -14,32 +14,6 @@ once accepted, under *Proposals* while it is still a decision. A rejected idea i
 recorded. An idea must not stay only in the chat. Do not add a diary: a sentence that would
 still be true after the item lands does not belong here.
 
-## Engine (gx-core, gx-torrent)
-
-- **Memory on a shaped line**: own memory while downloading on the shaped 100 Mbit/s line is 28.3 MiB against qBittorrent's 10, anacrolix's 12 and Transmission's 13, and the profile is already there: in `gextto-data/bench/compare-pprof-2026-11-12/line.bin-tcp-line-*-heap.pprof` 13.0 of the 14.6 MiB in use sit in one place, `bufferpool.New.func1` (89 %). Gate: that pool takes its buffers back when a piece is written instead of growing with the connection count, then the scenario is measured again on both TCP and uTP.
-- **The state marshal still holds `d.mu` once per coalesced save**: the tick's
-  write is now ~14 ns, but `json.MarshalIndent` is ~4 ms at 1000 torrents and
-  runs inside the lock every 10 s window. Gate: a deep-copy or copy-on-write
-  snapshot encoded outside the lock, with `BenchmarkSaveStateLocked` and a test
-  that no state is lost.
-- **The DHT peer store costs three structures per contact**: 163 B/contact,
-  about 85.6 MB at the default 2048×256 cap, while its comment says ~25 MB.
-  Gate: fold the seed flag into the contact and replace the ring with a rotating
-  slice; measure live heap at the cap.
-- **Piece hashes are stored twice per torrent**: the decoded blob and the raw
-  info dict both hold them, ~20 B/piece, ~50 MB for 500 torrents × 5,000
-  pieces at rest. Gate: slice the blob out of the raw dict at parse time,
-  keeping the info hash and ut_metadata bytes identical.
-- **The standalone Wanted reads a multi-season pack as its first season**:
-  `FindSeason` in `internal/rss` takes one number, so a pack «S01-S03» is
-  offered only for season 1 although its files belong to both. Gate: a season
-  range in the feed rules and in the wanted match, with the feed corpus green.
-- **The verification progress is lost on a pause**: `stopVerifier` closes the
-  verifier and the bitfield is `nil` during a check, so a recheck interrupted at
-  90% starts again from zero. Gate: persist a verified prefix (bitfield plus
-  count) or let the check finish at low I/O priority, with a test that counts the
-  pieces read after stop/start on a large torrent.
-
 ## Gextto, acquisition and UI
 
 - **`FindSeriesMatch` recomputes its fingerprint on every call**:
@@ -63,9 +37,4 @@ still be true after the item lands does not belong here.
   ratio and seed rules, instead of downloading a second copy; the archive
   already holds the same release from several trackers. Gate: the v1/v2 block
   reuse and the hardlink library, which are the building blocks.
-- **The status mark is still part of the label**: the badges of a series carry
-  an emoji in the text (`🏁 terminata`, `▶ in corso`, `⏳ rinnovo incerto`,
-  `🕒 in arrivo`) because that same text is also a filter value, so the mark
-  must be split from the label before it can become an icon. Gate: the visual
-  review runs headless with `scripts/screenshots.sh`.
-- **Faster flows**: undo instead of a confirmation for reversible removals, with a dialog that explains itself for the rest, and the missing count on the Dashboard linking to its tab.
+- **Faster flows**: undo instead of a confirmation for reversible removals, with a dialog that explains itself for the rest. The missing count on the Dashboard is already there.

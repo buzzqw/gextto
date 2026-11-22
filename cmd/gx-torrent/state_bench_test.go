@@ -117,8 +117,9 @@ func BenchmarkScheduleSave(b *testing.B) {
 func BenchmarkStateFileWrite(b *testing.B) {
 	d := benchState(b.TempDir(), 1000, 0)
 	d.mu.Lock()
-	seq, data, err := d.snapshotStateLocked()
+	seq, snapshot := d.prepareSnapshotLocked()
 	d.mu.Unlock()
+	data, err := encodeSnapshot(snapshot)
 	if err != nil {
 		b.Fatal(err)
 	}

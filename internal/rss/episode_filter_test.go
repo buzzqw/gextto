@@ -191,3 +191,27 @@ func TestEvaluateIgnoreDaysWindow(t *testing.T) {
 		t.Fatal("without a last match the ignore window must be inert")
 	}
 }
+
+// TestFindSeasonRange: a pack that covers several seasons reports both ends,
+// while a normal pack still reports its single season.
+func TestFindSeasonRange(t *testing.T) {
+	cases := []struct {
+		title        string
+		first, last  int
+		ok           bool
+	}{
+		{"Show.S01-S03.COMPLETE.1080p", 1, 3, true},
+		{"Show Seasons 1-3 Complete", 1, 3, true},
+		{"Show - Stagioni 2-4", 2, 4, true},
+		{"Show S04 COMPLETE", 4, 4, true},
+		{"Show Season 2", 2, 2, true},
+		{"Show S01E05", 0, 0, false},
+		{"Show 1080p", 0, 0, false},
+	}
+	for _, tc := range cases {
+		first, last, ok := FindSeasonRange(tc.title)
+		if first != tc.first || last != tc.last || ok != tc.ok {
+			t.Errorf("%q: got (%d, %d, %v), want (%d, %d, %v)", tc.title, first, last, ok, tc.first, tc.last, tc.ok)
+		}
+	}
+}

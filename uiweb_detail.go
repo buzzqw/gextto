@@ -74,6 +74,7 @@ type uiSeriesDetail struct {
 	// badge.
 	EndLabel    string
 	EndTitle    string
+	EndIcon     string
 	EndConflict bool
 	// Profiles is the «Profilo di qualità» choice of the page.
 	Profiles        v2TitleProfiles
@@ -111,38 +112,40 @@ type uiSeasonButton struct {
 	Ignored bool
 }
 
-// uiSeriesEndBadge returns the text and the explanation of the badge of an
-// end-of-series verdict. Every string is fixed so the catalogs translate it.
-func uiSeriesEndBadge(verdict SeriesEndVerdict) (string, string) {
+// uiSeriesEndBadge returns the text, the explanation and the icon of the badge
+// of an end-of-series verdict. The mark is no longer part of the text: the
+// same text is also a filter value, so it must stay a plain word. Every string
+// is fixed so the catalogs translate it.
+func uiSeriesEndBadge(verdict SeriesEndVerdict) (string, string, string) {
 	switch verdict.State {
 	case seriesEndEnded:
 		switch verdict.Source {
 		case seriesEndSourceManual:
-			return "🏁 terminata", "Segnata come terminata a mano in «Stato della serie»"
+			return "terminata", "i-check", "Segnata come terminata a mano in «Stato della serie»"
 		case seriesEndSourceTvmaze:
-			return "🏁 terminata", "Secondo TVmaze non usciranno altre puntate"
+			return "terminata", "i-check", "Secondo TVmaze non usciranno altre puntate"
 		case "tvdb":
-			return "🏁 terminata", "Secondo TVDB non usciranno altre puntate"
+			return "terminata", "i-check", "Secondo TVDB non usciranno altre puntate"
 		}
-		return "🏁 terminata", "Secondo TMDB non usciranno altre puntate"
+		return "terminata", "i-check", "Secondo TMDB non usciranno altre puntate"
 	case seriesEndContinuing:
 		switch verdict.Source {
 		case seriesEndSourceManual:
-			return "▶ in corso", "Segnata come in corso a mano in «Stato della serie»"
+			return "in corso", "i-play", "Segnata come in corso a mano in «Stato della serie»"
 		case seriesEndSourceSchedule:
-			return "▶ in corso", "C'è già una data per la prossima puntata"
+			return "in corso", "i-play", "C'è già una data per la prossima puntata"
 		case seriesEndSourceTvmaze:
-			return "▶ in corso", "Secondo TVmaze la serie continua"
+			return "in corso", "i-play", "Secondo TVmaze la serie continua"
 		case "tvdb":
-			return "▶ in corso", "Secondo TVDB la serie continua"
+			return "in corso", "i-play", "Secondo TVDB la serie continua"
 		}
-		return "▶ in corso", "Secondo TMDB la serie continua"
+		return "in corso", "i-play", "Secondo TMDB la serie continua"
 	case seriesEndUncertain:
-		return "⏳ rinnovo incerto", "Nessuna puntata annunciata: TVmaze attende la decisione sul rinnovo"
+		return "rinnovo incerto", "i-warn", "Nessuna puntata annunciata: TVmaze attende la decisione sul rinnovo"
 	case seriesEndUpcoming:
-		return "🕒 in arrivo", "Annunciata, nessuna puntata ancora uscita"
+		return "in arrivo", "i-clock", "Annunciata, nessuna puntata ancora uscita"
 	}
-	return "", ""
+	return "", "", ""
 }
 
 // uiSeriesStatusLabel mirrors rextto's series status wording.
@@ -386,7 +389,7 @@ func uiSeriesDetailFrom(s *AppState, r *http.Request) (uiSeriesDetail, bool) {
 		record = records[series.Name]
 	}
 	verdict := seriesEndVerdictFor(cfg, series, record)
-	detail.EndLabel, detail.EndTitle = uiSeriesEndBadge(verdict)
+	detail.EndLabel, detail.EndTitle, detail.EndIcon = uiSeriesEndBadge(verdict)
 	detail.EndConflict = verdict.Disagreement && verdict.Source != seriesEndSourceManual
 	// The v2 interface is served at /. Load the metadata so the root UI
 	// renders poster, genres and cast.

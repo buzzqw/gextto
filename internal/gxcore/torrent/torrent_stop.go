@@ -128,6 +128,11 @@ func (t *torrent) stopAllocator() {
 func (t *torrent) stopVerifier() {
 	t.log.Debugln("stopping verifier")
 	if t.verifier != nil {
+		// Keep what the interrupted check already proved: on the next start
+		// those pieces are skipped instead of being read and hashed again.
+		if b := t.verifier.Bitfield; b != nil {
+			t.verifiedPrefix = append([]byte(nil), b.Bytes()...)
+		}
 		t.verifier.Close()
 		t.verifier = nil
 		t.mergeOut = nil

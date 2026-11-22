@@ -83,6 +83,10 @@ type uiDashboardData struct {
 	CycleStarted    int
 	CycleGaps       int
 	CycleErrors     int
+	// Missing is the number of episodes the library still owes: the count
+	// behind the "Mancanti" quick link, so the badge is not a separate query
+	// in the browser.
+	Missing int
 	// Parity data from the classic dashboard.
 	SeriesConfigured int
 	MoviesConfigured int
@@ -515,6 +519,12 @@ func uiDashboardDataFrom(s *AppState) uiDashboardData {
 	data.CycleStarted = cycle.DownloadsStarted
 	data.CycleGaps = cycle.GapsFilled
 	data.CycleErrors = cycle.Errors
+
+	// The missing count is the same list the Missing tab shows. It is one
+	// query, but it gives the quick link a number instead of a bare label.
+	if gaps, err := libraryGaps(s); err == nil {
+		data.Missing = len(gaps)
+	}
 
 	// Classic-dashboard data.
 	data.SeriesConfigured = len(cfg.Series)

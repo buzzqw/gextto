@@ -224,25 +224,34 @@ func (w wantedEntry) kind() string {
 	return "series"
 }
 
-// wantedPackSeason returns the season of a season-pack title: a season marker
-// without an episode marker ("Reacher S04 COMPLETE", "Reacher (2022) S04
-// 1080p"). Single episodes are not packs (FindEpisode wins).
-func wantedPackSeason(title string) (int, bool) {
+// wantedPackSeason returns the seasons a season-pack title covers: one season
+// for "Show S04 COMPLETE", both ends for "Show S01-S03". Single episodes are
+// not packs (FindEpisode wins).
+func wantedPackSeason(title string) (int, int, bool) {
 	if _, _, _, ok := rss.FindEpisode(title); ok {
-		return 0, false
+		return 0, 0, false
 	}
-	return rss.FindSeason(title)
+	return rss.FindSeasonRange(title)
 }
 
 // matchesPack reports whether a season-pack title belongs to the wanted
 // series: the name matches, the season is wanted and the language, subtitle,
 // quality and exclude terms hold. Episode 0 marks the whole season.
 func (w wantedEntry) matchesPack(title string) bool {
-	season, ok := wantedPackSeason(title)
+	first, last, ok := wantedPackSeason(title)
 	if !ok || w.kind() == "movie" {
 		return false
 	}
-	if !seasonAllowed(w.Seasons, season) && strings.TrimSpace(w.EpisodeFilter) == "" {
+	// A pack covering several seasons belongs to the wanted title when any of
+	// those seasons is wanted; the old code looked only at the first one.
+	wantedSeason := false
+	for season := first; season <= last; season++ {
+		if seasonAllowed(w.Seasons, season) {
+			wantedSeason = true
+			break
+		}
+	}
+	if !wantedSeason && strings.TrimSpace(w.EpisodeFilter) == "" {
 		return false
 	}
 	if pattern := titleMatchRegex(w.Name); pattern != "" {
@@ -258,8 +267,19 @@ func (w wantedEntry) matchesPack(title string) bool {
 			return false
 		}
 	}
-	if filter, err := rss.ParseEpisodeFilter(w.episodeFilter()); err != nil || !filter.MatchesSeason(season) {
+	if filter, err := rss.ParseEpisodeFilter(w.episodeFilter()); err != nil {
 		return false
+	} else {
+		allowed := false
+		for season := first; season <= last; season++ {
+			if filter.MatchesSeason(season) {
+				allowed = true
+				break
+			}
+		}
+		if !allowed {
+			return false
+		}
 	}
 	return wantedIncludeMatch(w, title)
 }
@@ -741,9 +761,13 @@ func (d *Daemon) wantedSessionMedia(w wantedEntry) map[wantedEpisode]torrentInfo
 			continue
 		}
 		if !ok {
-			if packSeason, ok := wantedPackSeason(view.Name); ok && seasonAllowed(w.Seasons, packSeason) {
-				ep := wantedEpisode{season: packSeason, episode: 0}
-				out[ep] = preferMedia(out[ep], view)
+			if first, last, ok := wantedPackSeason(view.Name); ok {
+				for season := first; season <= last; season++ {
+					if seasonAllowed(w.Seasons, season) {
+						ep := wantedEpisode{season: season, episode: 0}
+						out[ep] = preferMedia(out[ep], view)
+					}
+				}
 			}
 		}
 	}
@@ -1022,7 +1046,7 @@ func wantedItemEpisode(w wantedEntry, title string) (int, int) {
 	if ok {
 		return season, episode
 	}
-	if packSeason, ok := wantedPackSeason(title); ok {
+	if packSeason, _, ok := wantedPackSeason(title); ok {
 		return packSeason, 0
 	}
 	return -1, 0

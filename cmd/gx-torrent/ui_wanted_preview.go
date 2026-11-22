@@ -53,7 +53,16 @@ func wantedVerdict(w wantedEntry, re *regexp.Regexp, title string, now time.Time
 			if !seasonAllowed(w.Seasons, season) && strings.TrimSpace(w.EpisodeFilter) == "" {
 				return verdictSeason, ep
 			}
-		} else if packSeason, ok := wantedPackSeason(title); ok {
+		} else if first, last, ok := wantedPackSeason(title); ok {
+			// A multi-season pack takes the first season it covers that is
+			// wanted; the others are filled by the same pack.
+			packSeason := first
+			for season := first; season <= last; season++ {
+				if seasonAllowed(w.Seasons, season) {
+					packSeason = season
+					break
+				}
+			}
 			ep = wantedEpisode{season: packSeason, episode: 0}
 			if !seasonAllowed(w.Seasons, packSeason) && strings.TrimSpace(w.EpisodeFilter) == "" {
 				return verdictSeason, ep

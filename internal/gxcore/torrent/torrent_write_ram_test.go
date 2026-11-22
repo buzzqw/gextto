@@ -15,6 +15,7 @@ import (
 	"github.com/buzzqw/gextto/internal/gxcore/internal/resourcemanager"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/suspendchan"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/urldownloader"
+	"github.com/buzzqw/gextto/internal/gxcore/internal/verifier"
 	"github.com/rcrowley/go-metrics"
 )
 
@@ -234,5 +235,35 @@ func TestStaleWebseedPieceReleasesItsCharge(t *testing.T) {
 	})
 	if got := sess.ram.Stats().AllocatedSize; got != 0 {
 		t.Fatalf("allocated after a stale webseed piece = %d, want 0", got)
+	}
+}
+
+// TestStopVerifierKeepsVerifiedPrefix: a check stopped by a pause hands its
+// verified bits to the next run, so the pieces already read are skipped and
+// only the ones past the interruption are hashed again.
+func TestStopVerifierKeepsVerifiedPrefix(t *testing.T) {
+	tr, _, _ := newWriteBudgetTorrent(t, 2*testWritePieceLength, 8)
+	tr.log = logger.New("test")
+	v := verifier.New()
+	// Run with no pieces only to give Close a finished run to wait for; the
+	// bitfield below stands for the pieces a real check had proved so far.
+	progressC := make(chan verifier.Progress, 1)
+	resultC := make(chan *verifier.Verifier, 1)
+	v.Run(nil, progressC, resultC)
+	<-resultC
+	v.Bitfield = bitfield.New(8)
+	for i := uint32(0); i < 5; i++ {
+		v.Bitfield.Set(i)
+	}
+	tr.verifier = v
+	tr.stopVerifier()
+	if tr.verifier != nil {
+		t.Fatal("the verifier was not closed")
+	}
+	skip := verifiedPrefixSkip(tr.verifiedPrefix)
+	for i := uint32(0); i < 8; i++ {
+		if want := i < 5; skip(i) != want {
+			t.Fatalf("piece #%d skip = %v, want %v", i, skip(i), want)
+		}
 	}
 }

@@ -1080,11 +1080,11 @@ func v2FormatCellCached(item map[string]any, column uiColumn, cache *v2RenderCac
 		enabled := v2Truthy(item["enabled"])
 		switch {
 		case ended && complete:
-			return `<span class="badge ok" title="Serie terminata e completa">🏁 ✓✓</span>`
+			return template.HTML(`<span class="badge ok" title="Serie terminata e completa">` + string(v2Icon("i-check")) + ` ✓✓</span>`)
 		case ended:
-			return `<span class="badge" title="Serie terminata: mancano ancora episodi">🏁 terminata</span>`
+			return template.HTML(`<span class="badge" title="Serie terminata: mancano ancora episodi">` + string(v2Icon("i-check")) + ` terminata</span>`)
 		case state == seriesEndUncertain:
-			return `<span class="badge warn" title="Nessuna puntata annunciata: TVmaze attende la decisione sul rinnovo">⏳ rinnovo incerto</span>`
+			return template.HTML(`<span class="badge warn" title="Nessuna puntata annunciata: TVmaze attende la decisione sul rinnovo">` + string(v2Icon("i-warn")) + ` rinnovo incerto</span>`)
 		case complete:
 			return `<span class="badge" title="Al passo con gli episodi pubblicati">✓ in pari</span>`
 		}

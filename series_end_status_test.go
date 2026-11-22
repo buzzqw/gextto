@@ -145,7 +145,7 @@ func TestSeriesStatusOverrideIsSavedAndShown(t *testing.T) {
 	server := httptest.NewServer(Router(state))
 	t.Cleanup(server.Close)
 	_, body := v2Request(t, server, http.MethodGet, "/?view=series&series=Test+Show", nil)
-	for _, want := range []string{`name="status_override"`, "🏁 terminata", "Secondo TVmaze non usciranno altre puntate", "fonti in disaccordo"} {
+	for _, want := range []string{`name="status_override"`, "terminata", "Secondo TVmaze non usciranno altre puntate", "fonti in disaccordo"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("series page misses %q", want)
 		}
@@ -157,7 +157,7 @@ func TestSeriesStatusOverrideIsSavedAndShown(t *testing.T) {
 		t.Fatalf("override = %q, want continuing", got)
 	}
 	_, body = v2Request(t, server, http.MethodGet, "/?view=series&series=Test+Show", nil)
-	if !strings.Contains(body, "▶ in corso") || strings.Contains(body, "fonti in disaccordo") {
+	if !strings.Contains(body, "in corso") || strings.Contains(body, "fonti in disaccordo") {
 		t.Error("a manual choice must win and hide the disagreement")
 	}
 	// The library view carries the verdict for the series list.

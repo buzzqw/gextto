@@ -99,8 +99,9 @@ func TestStateSaverDropsStaleSnapshot(t *testing.T) {
 	d := benchState(t.TempDir(), 3, 0)
 
 	d.mu.Lock()
-	staleSeq, stale, err := d.snapshotStateLocked()
+	staleSeq, staleState := d.prepareSnapshotLocked()
 	d.mu.Unlock()
+	stale, err := encodeSnapshot(staleState)
 	if err != nil {
 		t.Fatal(err)
 	}

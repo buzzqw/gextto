@@ -7,6 +7,7 @@ package rss
 
 import (
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -101,13 +102,36 @@ var (
 	seasonPackSRegex        = regexp.MustCompile(`(?i)(?:^|[\s._\-\[\(])s(\d{1,2})(?:d\d{1,2})?(?:[\s._\-\]\)\.]|$)`)
 	seasonPackWordRegex     = regexp.MustCompile(`(?i)\bseason[\s._\-]*(\d{1,2})\b`)
 	seasonPackStagioneRegex = regexp.MustCompile(`(?i)\bstagione[\s._\-]*(\d{1,2})\b`)
+	// A multi-season pack names both ends: S01-S03, Season 1-3, Stagioni 1-3
+	// Complete. The second S/word is optional so "S01-3" reads too.
+	seasonRangeSRegex    = regexp.MustCompile(`(?i)(?:^|[\s._\-\[\(])s(\d{1,2})\s*[-–]\s*s?(\d{1,2})(?:[\s._\-\]\)\.]|$)`)
+	seasonRangeWordRegex = regexp.MustCompile(`(?i)\b(?:seasons?|stagioni?)[\s._\-]*(\d{1,2})\s*[-–]\s*(\d{1,2})\b`)
 )
+
+// FindSeasonRange returns the seasons a pack covers: one season for a normal
+// pack, both ends for a multi-season one. It returns ok=false when the title has
+// no season marker. Unlike FindEpisode it also matches titles that carry an
+// episode marker (the caller checks FindEpisode first when it needs packs only).
+func FindSeasonRange(title string) (first, last int, ok bool) {
+	for _, re := range []*regexp.Regexp{seasonRangeSRegex, seasonRangeWordRegex} {
+		if loc := re.FindStringSubmatch(title); loc != nil {
+			a, errA := strconv.Atoi(loc[1])
+			b, errB := strconv.Atoi(loc[2])
+			if errA == nil && errB == nil && a > 0 && b >= a {
+				return a, b, true
+			}
+		}
+	}
+	if season, found := FindSeason(title); found {
+		return season, season, true
+	}
+	return 0, 0, false
+}
 
 // FindSeason extracts the season number from a season-pack title like
 // "Show.S04.1080p", "Show Season 2 Complete" or "Show - S04 (2026) [COMPLETE]".
-// It returns ok=false when the title carries no season marker. Unlike
-// FindEpisode it also matches titles that carry an episode marker (the caller
-// checks FindEpisode first when it needs packs only).
+// It returns ok=false when the title carries no season marker. It keeps the old
+// one-number shape for callers that only need the first season of a pack.
 func FindSeason(title string) (season int, ok bool) {
 	if loc := seasonPackSRegex.FindStringSubmatch(title); loc != nil {
 		if season = atoiOr(loc[1], 0); season > 0 {

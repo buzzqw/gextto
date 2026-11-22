@@ -75,7 +75,7 @@ func (t *torrent) handleAllocationDone(al *allocator.Allocator) {
 		if t.session != nil && !t.wantedComplete() {
 			if candidates := t.mergeCandidates(t.session.ListTorrents()); len(candidates) > 0 {
 				resume := append([]byte(nil), t.bitfield.Bytes()...)
-				t.startMergeVerifier(candidates, false, resume)
+				t.startMergeVerifier(candidates, false, resume, nil)
 				return
 			}
 		}
@@ -109,5 +109,5 @@ func (t *torrent) handleAllocationDone(al *allocator.Allocator) {
 	// On-disk data (or mergeable neighbors) exists: verify into a correct
 	// bitfield. A storage created empty this run can only hold what the
 	// merge writes, so nothing else is hashed.
-	t.startMergeVerifier(candidates, !al.HasExisting, nil)
+	t.startMergeVerifier(candidates, !al.HasExisting, nil, nil)
 }

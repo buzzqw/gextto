@@ -565,8 +565,8 @@ func TestWantedSeasonPacksMatch(t *testing.T) {
 		"Reacher (2022) S04 1080p WEBRip 10bit EAC3 5 1 x265-iVy",
 	}
 	for _, title := range packs {
-		if season, ok := wantedPackSeason(title); !ok || season != 4 {
-			t.Fatalf("wantedPackSeason(%q) = %d,%v want 4,true", title, season, ok)
+		if first, last, ok := wantedPackSeason(title); !ok || first != 4 || last != 4 {
+			t.Fatalf("wantedPackSeason(%q) = %d,%d,%v want 4,4,true", title, first, last, ok)
 		}
 		if !w.matches(title, now) {
 			t.Fatalf("wanted Reacher S04 must match %q", title)
@@ -584,8 +584,8 @@ func TestWantedSeasonPacksMatch(t *testing.T) {
 	// belongs to the season, and is downloaded as episode 0 (the whole pack).
 	pack1 := wantedEntry{Name: "Reacher", Kind: "series", Seasons: "1"}
 	sample := "Reacher.S01.ITA.ENG.2160p.UHD.BluRay.x265-MeM.GP2160p"
-	if season, ok := wantedPackSeason(sample); !ok || season != 1 {
-		t.Fatalf("wantedPackSeason(%q) = %d,%v want 1,true", sample, season, ok)
+	if first, last, ok := wantedPackSeason(sample); !ok || first != 1 || last != 1 {
+		t.Fatalf("wantedPackSeason(%q) = %d,%d,%v want 1,1,true", sample, first, last, ok)
 	}
 	if !pack1.matches(sample, now) {
 		t.Fatalf("wanted Reacher S01 must match %q", sample)
@@ -600,5 +600,26 @@ func TestWantedSeasonPacksMatch(t *testing.T) {
 		if verdict != verdictTake || ep.season != 4 || ep.episode != 0 {
 			t.Fatalf("verdict(%q) = %q %+v, want %q S04 pack", title, verdict, ep, verdictTake)
 		}
+	}
+}
+
+// TestWantedMultiSeasonPackCoversEveryWantedSeason: a pack S01-S03 offered for
+// a wanted entry that only asks for season 2 must be taken, and every season it
+// covers is filled as episode 0. The old FindSeason read only season 1.
+func TestWantedMultiSeasonPackCoversEveryWantedSeason(t *testing.T) {
+	now := time.Now()
+	w := wantedEntry{Name: "Series A", Kind: "series", Seasons: "2"}
+	title := "Series A S01-S03 COMPLETE 1080p WEBRip"
+
+	first, last, ok := wantedPackSeason(title)
+	if !ok || first != 1 || last != 3 {
+		t.Fatalf("wantedPackSeason = %d,%d,%v want 1,3,true", first, last, ok)
+	}
+	if !w.matches(title, now) {
+		t.Fatal("a pack covering the wanted season 2 was refused because it starts at 1")
+	}
+	// A pack that covers none of the wanted seasons is still refused.
+	if w.matches("Series A S04-S06 COMPLETE 1080p", now) {
+		t.Fatal("a pack for seasons 4-6 was taken for a season 2 entry")
 	}
 }

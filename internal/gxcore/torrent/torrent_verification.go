@@ -23,6 +23,9 @@ func (t *torrent) handleVerifyCommand() {
 		t.mBitfield.Lock()
 		t.bitfield = nil
 		t.mBitfield.Unlock()
+		// A manual recheck is meant to verify everything: a prefix from an
+		// earlier interrupted check must not be carried into it.
+		t.verifiedPrefix = nil
 		t.start()
 	} else {
 		t.stop(nil)
@@ -40,6 +43,7 @@ func (t *torrent) handleVerificationDone(ve *verifier.Verifier) {
 		t.crash("invalid verifier")
 	}
 	t.verifier = nil
+	t.verifiedPrefix = nil
 	if out := t.mergeOut; out != nil {
 		t.mergeOut = nil
 		t.partialBlocks = out.partial

@@ -72,9 +72,18 @@ func (t *torrent) start() {
 	t.startPieceDownloaders()
 }
 
+// verifiedPrefixSkip is the Skip predicate of a check resumed after a pause:
+// the bits proved before the pause are set without reading their pieces again,
+// and the rest of the torrent is still checked.
+func verifiedPrefixSkip(prefix []byte) func(uint32) bool {
+	return func(i uint32) bool { return bitSet(prefix, int(i)) }
+}
+
 // startVerifier verifies with no merge.
 func (t *torrent) startVerifier() {
-	t.startMergeVerifier(nil, false, nil)
+	// A check stopped by pause keeps its verified bits; they are skipped now,
+	// while the pieces that were never reached are still checked.
+	t.startMergeVerifier(nil, false, nil, t.verifiedPrefix)
 }
 
 // startMergeVerifier runs the verifier, fronted by the swarm merge when
@@ -89,7 +98,7 @@ func (t *torrent) startVerifier() {
 // their bit (Skip) and, together with the merged ones, are the only accepted
 // pieces (Only) — so the resume path can still run the merge and re-derive the
 // Phase 3 partial blocks without hashing the whole torrent again.
-func (t *torrent) startMergeVerifier(candidates []*Torrent, onlyMerged bool, resume []byte) {
+func (t *torrent) startMergeVerifier(candidates []*Torrent, onlyMerged bool, resume, prefix []byte) {
 	if t.verifier != nil {
 		t.crash("verifier exists")
 	}
@@ -104,6 +113,10 @@ func (t *torrent) startMergeVerifier(candidates []*Torrent, onlyMerged bool, res
 	if resume != nil {
 		v.Skip = resumed
 		v.Only = resumed
+	} else if len(prefix) > 0 {
+		// The prefix of an interrupted check proves those pieces already: set
+		// their bits, but do not restrict the check — the rest still needs it.
+		v.Skip = verifiedPrefixSkip(prefix)
 	}
 	if len(t.mergedPieces) > 0 {
 		merged := t.mergedPieces

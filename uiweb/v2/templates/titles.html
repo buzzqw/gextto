@@ -34,7 +34,7 @@
           {{if .Gaps}}<span class="badge warn">{{tr .Gaps}} <span>{{tr "mancanti"}}</span></span>{{end}}
            <span class="badge {{if .Enabled}}ok{{else}}warn{{end}}">{{if .Enabled}}{{tr "attiva"}}{{else}}{{tr "in pausa"}}{{end}}</span>
            <span class="badge">{{tr .StatusLabel}}</span>
-           {{if .EndLabel}}<span class="badge" {{trTitle .EndTitle}}>{{tr .EndLabel}}<span class="sr-only">: {{tr .EndTitle}}</span></span>{{end}}
+           {{if .EndLabel}}<span class="badge" {{trTitle .EndTitle}}>{{if .EndIcon}}<span aria-hidden="true">{{icon .EndIcon}}</span> {{end}}{{tr .EndLabel}}<span class="sr-only">: {{tr .EndTitle}}</span></span>{{end}}
            {{if .EndConflict}}<span class="badge warn" {{trTitle "Le fonti non sono d'accordo su questa serie: puoi decidere tu in «Stato della serie»"}}>{{icon "i-warn"}} {{tr "fonti in disaccordo"}}<span class="sr-only">: {{tr "Le fonti non sono d'accordo su questa serie: puoi decidere tu in «Stato della serie»"}}</span></span>{{end}}
            {{if .Year}}<span class="badge">{{tr .Year}}</span>{{end}}{{if .Network}}<span class="badge">{{tr .Network}}</span>{{end}}{{if .Country}}<span class="badge">{{tr .Country}}</span>{{end}}{{if .Vote}}<span class="badge">★ {{.Vote}}</span>{{end}}{{if .LastAirDate}}<span class="badge"><span>{{tr "ultima"}}</span> {{tr .LastAirDate}}</span>{{end}}{{if .NextEpisode}}<span class="badge"><span>{{tr "Prossima:"}}</span> {{tr .NextEpisode}}</span>{{end}}
          </div>

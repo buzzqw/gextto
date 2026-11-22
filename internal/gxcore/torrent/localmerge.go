@@ -135,7 +135,7 @@ func (t *torrent) startLaterMerge(candidates []*Torrent) {
 	t.stopPiecedownloaders()
 	t.stopWebseedDownloads()
 	resume := append([]byte(nil), t.bitfield.Bytes()...)
-	t.startMergeVerifier(candidates, false, resume)
+	t.startMergeVerifier(candidates, false, resume, nil)
 }
 
 // haveBits returns a copy of the verified piece bitfield, or nil when the
