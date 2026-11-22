@@ -11,11 +11,11 @@ import (
 func TestFailedSourcesSummaryNamesTheSource(t *testing.T) {
 	stats := []logging.SourceStatEntry{
 		{Kind: "indexer", Name: "Jackett: ilcorsaronero", Stats: logging.SourceStat{OK: 103, Fail: 3, LastError: "timeout after 15s"}},
-		{Kind: "web", Name: "bt4g", Stats: logging.SourceStat{Fail: 2, LastError: "HTTP 503"}},
+		{Kind: "web", Name: "knaben", Stats: logging.SourceStat{Fail: 2, LastError: "HTTP 503"}},
 		{Kind: "feed", Name: "ok feed", Stats: logging.SourceStat{OK: 4}},
 	}
 	got := failedSourcesSummary(stats)
-	want := "indexer Jackett: ilcorsaronero: 3 of 106 searches failed — no answer in time; search engine bt4g: all 2 searches failed — HTTP 503"
+	want := "indexer Jackett: ilcorsaronero: 3 of 106 searches failed — no answer in time; search engine knaben: all 2 searches failed — HTTP 503"
 	if got != want {
 		t.Fatalf("summary =\n %q\nwant\n %q", got, want)
 	}

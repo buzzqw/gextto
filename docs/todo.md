@@ -16,15 +16,6 @@ still be true after the item lands does not belong here.
 
 ## Engine (gx-core, gx-torrent)
 
-- **Two torrents that share the files hash them twice on a recheck**: the
-  verifier is gentle by design and drops every piece from the page cache, so a
-  season pack and its single episodes read the same bytes from disk once per
-  torrent. Gate: a measurement of the second recheck with and without a
-  session-wide verified-piece cache keyed by file identity, offset, length and
-  expected hash; implement only if the second pass drops enough to pay for the
-  cache.
-- **The last second on a shaped line**: on the 100 Mbit/s scenarios gx-torrent is level with the fastest clients at half the file and loses about 1.2 s in the second half (both TCP and uTP); it is not the start (the first block arrives in 13 ms locally) nor the endgame order (block sharing between duplicates was measured: no gain). Gate: a CPU and goroutine profile of the last seconds of the transfer (`GX_COMPARE_PPROF_DIR`, `first_s`/`half_s` in the harness).
-- **Compressed RAR 4 and solid archives**: extract them too (RAR 4 needs its own LZ and PPMd decoder). Gate: a real release that arrived that way.
 - **Memory on a shaped line**: own memory while downloading on the shaped 100 Mbit/s line is 28.3 MiB against qBittorrent's 10, anacrolix's 12 and Transmission's 13, and the profile is already there: in `gextto-data/bench/compare-pprof-2026-11-12/line.bin-tcp-line-*-heap.pprof` 13.0 of the 14.6 MiB in use sit in one place, `bufferpool.New.func1` (89 %). Gate: that pool takes its buffers back when a piece is written instead of growing with the connection count, then the scenario is measured again on both TCP and uTP.
 - **The state marshal still holds `d.mu` once per coalesced save**: the tick's
   write is now ~14 ns, but `json.MarshalIndent` is ~4 ms at 1000 torrents and
@@ -43,9 +34,11 @@ still be true after the item lands does not belong here.
   info dict both hold them, ~20 B/piece, ~50 MB for 500 torrents × 5,000
   pieces at rest. Gate: slice the blob out of the raw dict at parse time,
   keeping the info hash and ut_metadata bytes identical.
-- **Share limits: any condition or all of them**: Gextto and the daemon stop at
-  the first limit that fires (ratio, time, inactivity) and cannot require all
-  three together. Gate: a row on both settings pages with its translations.
+- **Share limits: any condition or all of them**: Gextto and the daemon stop
+  seeding at the first limit that fires — ratio, time or inactivity — so whoever
+  wants to seed until the ratio is reached **and** the time has passed **and**
+  there has been no inactivity cannot say so. Gate: a row on both settings
+  pages, with its translations, that turns the three into "all of them".
 - **The standalone Wanted reads a multi-season pack as its first season**:
   `FindSeason` in `internal/rss` takes one number, so a pack «S01-S03» is
   offered only for season 1 although its files belong to both. Gate: a season
@@ -87,33 +80,21 @@ still be true after the item lands does not belong here.
   covering several seasons is downloaded whole and decided at completion. Gate:
   skipped episodes kept as season/episode pairs, then the per-file decision in
   the inspector and its tests.
-
-## Proposals
-
-Each waits for the operator's choice.
-
-- **BT4G answers about one search every ten minutes per address**: the deep gap
-  pass asks up to five searches in parallel and the web engines have no per-host
-  spacing — `throttleHost`/`penalizeHost` serve only the feed fetch — so the
-  queries after the first get `429 Too many requests`, the engine is paused for
-  half an hour and the ones already in flight still go out. Gate: the same
-  per-host spacing on the web engines, then the operator's choice between using
-  bt4g once per window and retiring the engine.
-- **Notebook-wide tables on a phone**: the episodes and the download history of a series are blocks on a phone now, but Archivio, Fumetti, Blocklist, Salute and Manutenzione still show tables wider than the screen behind a sideways scroll; give each one the same per-row block, or fold its secondary columns, one page at a time. Gate: the operator's choice; every page with its own check in `mobile.spec.ts`.
+- **Notebook-wide tables on a phone**: the episodes and the download history of a series are blocks on a phone now, but Archivio, Fumetti, Blocklist, Salute and Manutenzione still show tables wider than the screen behind a sideways scroll; give each one the same per-row block, or fold its secondary columns, one page at a time, with its own check in `mobile.spec.ts`.
 - **Cross-seed manager**: adding a torrent whose data is already in the library
   should reuse the blocks and seed it on the second tracker, with per-tracker
-  ratio and seed rules, instead of downloading a second copy. Gate: the operator's
-  choice; the v1/v2 block reuse and the hardlink library are the building blocks.
+  ratio and seed rules, instead of downloading a second copy; the archive
+  already holds the same release from several trackers. Gate: the v1/v2 block
+  reuse and the hardlink library, which are the building blocks.
 - **The status mark is still part of the label**: the badges of a series carry
   an emoji in the text (`🏁 terminata`, `▶ in corso`, `⏳ rinnovo incerto`,
   `🕒 in arrivo`) because that same text is also a filter value, so the mark
-  must be split from the label before it can become an icon. Gate: the
-  operator's choice; the visual review runs headless with
-  `scripts/screenshots.sh`.
-- **Faster flows**: undo instead of a confirmation for reversible removals, with a dialog that explains itself for the rest, and the missing count on the Dashboard linking to its tab. Gate: the operator's choice.
+  must be split from the label before it can become an icon. Gate: the visual
+  review runs headless with `scripts/screenshots.sh`.
+- **Faster flows**: undo instead of a confirmation for reversible removals, with a dialog that explains itself for the rest, and the missing count on the Dashboard linking to its tab.
 - **Pre-flight swarm health probe**: Gextto queues a release on the seeder count
   the indexer reports and waits for the post-start stall probe to notice a dead
   swarm, while a dead torrent holds one of the three active slots. The daemon
   already answers a DHT scrape (`GET /ui/dhtscrape`) and nothing calls it. Gate:
-  the operator's choice, then the probe behind that endpoint, with the unseeded
-  releases deferred instead of queued.
+  the probe behind that endpoint, with the unseeded releases deferred instead of
+  queued.

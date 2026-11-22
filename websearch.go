@@ -3,7 +3,6 @@ package gextto
 import (
 	"context"
 	"encoding/json"
-	"encoding/xml"
 	"fmt"
 	"io"
 	"net/http"
@@ -101,7 +100,7 @@ func knownWebEngines(engines []string) []string {
 func knownWebEngine(engine string) bool {
 	switch engine {
 	case "tpb", "thepiratebay", "knaben", "nyaa", "eztv", "btdig",
-		"torrentscsv", "limetorrents", "bt4g", "1337x", "1337":
+		"torrentscsv", "limetorrents", "1337x", "1337":
 		return true
 	default:
 		return false
@@ -228,8 +227,6 @@ func runWebEngine(ctx context.Context, engine, query string, flaresolverr *strin
 		return searchTorrentscsv(ctx, query)
 	case "limetorrents":
 		return searchLimetorrents(ctx, query, flaresolverr)
-	case "bt4g":
-		return searchBt4g(ctx, query, flaresolverr)
 	case "1337x", "1337":
 		return search1337x(ctx, query, flaresolverr)
 	default:
@@ -583,7 +580,7 @@ func magnetFromDetail(ctx context.Context, rawURL string, flaresolverr *string) 
 	return rawMagnet(body), nil
 }
 
-// sanitizedMagnetFromDetail fetches and sanitizes the first magnet (BT4G/1337x).
+// sanitizedMagnetFromDetail fetches and sanitizes the first magnet (1337x).
 func sanitizedMagnetFromDetail(ctx context.Context, rawURL string, flaresolverr *string) (string, error) {
 	body, err := fetchHtml(ctx, rawURL, flaresolverr)
 	if err != nil {
@@ -705,94 +702,6 @@ func searchLimetorrentsOn(ctx context.Context, mirror string, pathForm bool, que
 		}
 	}
 	return output, nil
-}
-
-// searchBt4g reads the search feed of BT4G. The results page renders its rows
-// with client-side markup and each row links a /magnet/<id> whose id is not the
-// infohash, while the same search as a feed (page=rss) carries the magnet of
-// every result in its <link>: one request, no page per result.
-func searchBt4g(ctx context.Context, query string, flaresolverr *string) ([]webResult, error) {
-	encoded := url.QueryEscape(query)
-	candidates := []string{
-		"https://bt4gprx.com/search?q=" + encoded + "&page=rss",
-		"https://bt4g.org/search?q=" + encoded + "&page=rss",
-	}
-	var lastErr error
-	for _, candidate := range candidates {
-		body, err := fetchHtmlRaw(ctx, candidate, flaresolverr)
-		if err != nil {
-			lastErr = err
-			continue
-		}
-		results := parseBt4gFeed(body)
-		if len(results) > 0 {
-			return results, nil
-		}
-	}
-	if lastErr != nil {
-		return nil, fmt.Errorf("BT4G unavailable: %w", lastErr)
-	}
-	return nil, nil
-}
-
-// bt4gViewerID marks the element the browser wraps an XML feed in: without the
-// untouched body the feed arrives as the text of this element of the viewer.
-const bt4gViewerID = `id="webkit-xml-viewer-source-xml"`
-
-// bt4gFeedXML returns the XML of a BT4G search feed from the body a fetch handed
-// back, with or without the browser's viewer around it.
-func bt4gFeedXML(body string) string {
-	if index := strings.Index(body, bt4gViewerID); index >= 0 {
-		body = body[index:]
-		if start := strings.IndexByte(body, '>'); start >= 0 {
-			body = body[start+1:]
-		}
-		if end := strings.Index(body, "</div>"); end >= 0 {
-			body = body[:end]
-		}
-		// The rendered viewer holds the feed as escaped text: unescaping it once
-		// gives the document back (its own &amp; become the XML entity the
-		// parser expects).
-		if strings.Contains(body, "&lt;") {
-			body = html.UnescapeString(body)
-		}
-	}
-	return strings.TrimSpace(body)
-}
-
-// parseBt4gFeed turns the search feed into results, keeping the magnets only.
-func parseBt4gFeed(body string) []webResult {
-	xmlBody := bt4gFeedXML(body)
-	if !strings.Contains(xmlBody, "<item") {
-		return nil
-	}
-	var feed struct {
-		Items []struct {
-			Title string `xml:"title"`
-			Link  string `xml:"link"`
-		} `xml:"channel>item"`
-	}
-	if err := xml.Unmarshal([]byte(xmlBody), &feed); err != nil {
-		logging.Debug("BT4G feed is not readable", "error", err)
-		return nil
-	}
-	output := make([]webResult, 0, len(feed.Items))
-	for _, item := range feed.Items {
-		title := strings.TrimSpace(item.Title)
-		link := strings.TrimSpace(item.Link)
-		if title == "" || !strings.HasPrefix(strings.ToLower(link), "magnet:") {
-			continue
-		}
-		magnet, ok := utils.SanitizeMagnet(link, &title)
-		if !ok || magnet == "" || title == "" {
-			continue
-		}
-		output = append(output, webResult{title: title, magnet: magnet, source: "BT4G"})
-		if len(output) >= 20 {
-			break
-		}
-	}
-	return output
 }
 
 func search1337x(ctx context.Context, query string, flaresolverr *string) ([]webResult, error) {

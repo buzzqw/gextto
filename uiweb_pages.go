@@ -312,7 +312,6 @@ type uiCheckboxGroup struct {
 var uiWebsearchEngines = []uiCheckboxOption{
 	{Value: "tpb", Label: "The Pirate Bay"},
 	{Value: "1337x", Label: "1337x"},
-	{Value: "bt4g", Label: "BT4G"},
 	{Value: "knaben", Label: "Knaben"},
 	{Value: "nyaa", Label: "Nyaa"},
 	{Value: "eztv", Label: "EZTV"},
