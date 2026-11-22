@@ -79,6 +79,8 @@ Each waits for the operator's choice.
 
 - **Notebook-wide tables on a phone**: the episodes and the download history of a series are blocks on a phone now, but Archivio, Fumetti, Blocklist, Salute and Manutenzione still show tables wider than the screen behind a sideways scroll; give each one the same per-row block, or fold its secondary columns, one page at a time. Gate: the operator's choice; every page with its own check in `mobile.spec.ts`.
 
+- **A magnet pasted into «Aggiungi torrent» is never filed into the library**: the field adds a torrent to the session and nothing more — no release, no series, no episode — so at completion the files stay in the download folder and the series never sees them, while the same release added from a search result is archived and renamed; the same is true of the qBittorrent-compatible add. Gate: the operator's choice between registering the release from the torrent's own name when the metadata arrives and leaving the field a raw session add, with the panel saying which it is.
+
 - **Cross-seed manager**: adding a torrent whose data is already in the library
   should reuse the blocks and seed it on the second tracker, with per-tracker
   ratio and seed rules, instead of downloading a second copy. Gate: the operator's
