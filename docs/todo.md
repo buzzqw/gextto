@@ -34,11 +34,6 @@ still be true after the item lands does not belong here.
   info dict both hold them, ~20 B/piece, ~50 MB for 500 torrents × 5,000
   pieces at rest. Gate: slice the blob out of the raw dict at parse time,
   keeping the info hash and ut_metadata bytes identical.
-- **Share limits: any condition or all of them**: Gextto and the daemon stop
-  seeding at the first limit that fires — ratio, time or inactivity — so whoever
-  wants to seed until the ratio is reached **and** the time has passed **and**
-  there has been no inactivity cannot say so. Gate: a row on both settings
-  pages, with its translations, that turns the three into "all of them".
 - **The standalone Wanted reads a multi-season pack as its first season**:
   `FindSeason` in `internal/rss` takes one number, so a pack «S01-S03» is
   offered only for season 1 although its files belong to both. Gate: a season
@@ -69,11 +64,6 @@ still be true after the item lands does not belong here.
   feed path, about 40 % of its allocations and 7 % of a cycle's CPU. Gate: a
   byte-level scanner over the in-memory body, with the existing feed corpus
   green.
-- **Three sorts call the score inside the comparator**: `web_system.go:136`,
-  `web_series.go:240` and `web_movies.go:594` call `ReleaseScore` — which runs
-  `FindSeriesMatch` — once per comparison, so a manual search with n results
-  pays it O(n log n) times. Gate: the decorated-sort pattern already used at
-  `web_system.go:722`.
 - **A multi-season pack is not inspected file by file**: the range is parsed now
   (`SeasonEnd`/`SeasonLast`), but the inspector still decides one season at a
   time and the skipped episodes are stored without their season, so a pack
