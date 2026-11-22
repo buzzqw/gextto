@@ -25,7 +25,7 @@ still be true after the item lands does not belong here.
   cache.
 - **The last second on a shaped line**: on the 100 Mbit/s scenarios gx-torrent is level with the fastest clients at half the file and loses about 1.2 s in the second half (both TCP and uTP); it is not the start (the first block arrives in 13 ms locally) nor the endgame order (block sharing between duplicates was measured: no gain). Gate: a CPU and goroutine profile of the last seconds of the transfer (`GX_COMPARE_PPROF_DIR`, `first_s`/`half_s` in the harness).
 - **Compressed RAR 4 and solid archives**: extract them too (RAR 4 needs its own LZ and PPMd decoder). Gate: a real release that arrived that way.
-- **Memory on a shaped line**: own memory while downloading on the shaped 100 Mbit/s line is above qBittorrent, anacrolix and Transmission; close the gap on the paths a heap profile names. Gate: a heap profile of that scenario inside the comparison harness.
+- **Memory on a shaped line**: own memory while downloading on the shaped 100 Mbit/s line is 28.3 MiB against qBittorrent's 10, anacrolix's 12 and Transmission's 13, and the profile is already there: in `gextto-data/bench/compare-pprof-2026-11-12/line.bin-tcp-line-*-heap.pprof` 13.0 of the 14.6 MiB in use sit in one place, `bufferpool.New.func1` (89 %). Gate: that pool takes its buffers back when a piece is written instead of growing with the connection count, then the scenario is measured again on both TCP and uTP.
 - **The state marshal still holds `d.mu` once per coalesced save**: the tick's
   write is now ~14 ns, but `json.MarshalIndent` is ~4 ms at 1000 torrents and
   runs inside the lock every 10 s window. Gate: a deep-copy or copy-on-write
