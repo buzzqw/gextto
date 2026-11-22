@@ -5728,7 +5728,7 @@ func (d *Database) MarkEd2kAbsorbed(hash string) error {
 // even when Gextto restarts after the re-add.
 func (d *Database) ReactivateReAddedTorrent(hash string) (bool, error) {
 	res, err := d.db.Exec(
-		"UPDATE torrent_meta SET status='queued', removed_at=NULL, error=NULL, reason='', updated_at=?2 WHERE hash=?1 AND status='error' AND removed_at IS NOT NULL",
+		"UPDATE torrent_meta SET status='queued', removed_at=NULL, error=NULL, updated_at=?2 WHERE hash=?1 AND status='error' AND removed_at IS NOT NULL",
 		strings.ToLower(hash), nowSQLite())
 	if err != nil {
 		return false, err

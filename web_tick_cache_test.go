@@ -109,6 +109,9 @@ func TestDetachErrorTorrentsKeepsAReAddedTorrent(t *testing.T) {
 	if err := db.MarkTorrentRemovedAt(hash); err != nil {
 		t.Fatal(err)
 	}
+	if err := db.SetTorrentReason(hash, "manual"); err != nil {
+		t.Fatal(err)
+	}
 	session := &stubTorrentSession{list: []models.TorrentView{{Hash: hash, Name: "Some Show"}}}
 	DetachErrorTorrents(session, db, map[string]struct{}{hash: {}}, map[string]time.Time{})
 	if len(session.removed) != 0 {
@@ -117,6 +120,10 @@ func TestDetachErrorTorrentsKeepsAReAddedTorrent(t *testing.T) {
 	status, err := db.TorrentStatus(hash)
 	if err != nil || status == nil || *status != "queued" {
 		t.Fatalf("status = %v (err %v), want queued", status, err)
+	}
+	reason, err := db.TorrentReason(hash)
+	if err != nil || reason == nil || *reason != "manual" {
+		t.Fatalf("reason = %v (err %v), want manual: a re-added manual torrent stays manual", reason, err)
 	}
 }
 
