@@ -23,6 +23,9 @@ create, the app on the phone — apply **only to the standalone version** and do
 not change Gextto's interface, where those pages do not exist. Engine fixes, on
 the other hand, apply to both.
 
+## 22 November 2026
+- **On a phone a torrent's details no longer throw the page to the bottom.** Tapping a torrent in the middle of the list opened the details at the end of the page, below every row, and the page jumped there: the row you were looking at disappeared. On a phone the details are now a sheet at the bottom of the screen, out of the page flow: it opens there, the row you touched stays where it is and the sheet scrolls inside itself. On a large screen the details are still the frame in the page above the *Download history*. **What changes for you:** nothing to configure; open the details where you are looking, without losing your place.
+
 ## 21 November 2026
 - **The warning about a web search engine says what really happened.** The line «Web engines unreachable in this cycle» appeared at every cycle, with no reason, naming an engine that had in fact answered: a cycle's web searches happen while looking for the missing episodes, but their per-source outcome was thrown away at the start of the scrape phase and the failures stayed in a counter that was read one cycle later. The warning now appears in the same cycle and in the same phase as the search, with how many searches failed and why: an engine answering «too many requests» is reported as **over its request quota** instead of unreachable. **What changes for you:** nothing to configure; a warning that used to repeat every cycle now says why, and an engine that is only limited in how often it can be asked is recognisable at once.
 

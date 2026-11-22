@@ -24,6 +24,9 @@ creazione, app sul telefono — valgono **soltanto per la versione standalone** 
 non cambiano l'interfaccia di Gextto, dove quelle pagine non esistono. Le
 correzioni al motore valgono invece per entrambi.
 
+## 22 novembre 2026
+- **Su un telefono il dettaglio di un torrent non manda più la pagina in fondo.** Toccando un torrent a metà lista il dettaglio si apriva in fondo alla pagina, sotto tutte le righe, e la pagina ci saltava sopra: la riga che stavi guardando spariva. Ora sul telefono il dettaglio è un foglio in fondo allo schermo, fuori dal flusso della pagina: si apre lì, la riga toccata resta dov'è e il foglio scorre al suo interno. Su schermo grande il dettaglio resta il riquadro in pagina sopra lo *Storico download*. **Cosa cambia per te:** niente da configurare; apri il dettaglio dove stai guardando, senza perdere il posto.
+
 ## 21 novembre 2026
 - **L'avviso su un motore di ricerca web dice cosa è successo davvero.** La riga «Web engines unreachable in this cycle» compariva a ogni ciclo, senza motivo, nominando un motore che in realtà aveva risposto: le ricerche web di un ciclo avvengono durante la ricerca degli episodi mancanti, ma il loro esito per sorgente veniva scartato all'inizio della fase di scraping e i fallimenti restavano in un contatore che veniva letto al ciclo successivo. Ora l'avviso compare nello stesso ciclo e nella stessa fase in cui la ricerca avviene, con quante ricerche sono fallite e il perché: un motore che risponde «troppe richieste» viene indicato come **fuori quota** invece che irraggiungibile. **Cosa cambia per te:** niente da configurare; un avviso che si ripete a ogni ciclo adesso dice il motivo, e se un motore è soltanto limitato nella frequenza lo si riconosce subito.
 

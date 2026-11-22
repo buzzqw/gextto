@@ -412,6 +412,61 @@ test.describe("mobile", () => {
     expect(settingsOverflow).toBeLessThanOrEqual(2);
   });
 
+  test("il dettaglio di un torrent non porta la pagina in fondo", async ({ page }) => {
+    // On a desktop the detail is a frame in the page, below the list; on a
+    // phone it is a sheet anchored to the screen. As a frame it sat below the
+    // whole list, so opening a torrent from the middle of the list threw the
+    // page to the bottom, away from the row that had been tapped.
+    await page.route("**/partial/downloads/rows", async (route) => {
+      const rows = Array.from({ length: 24 }, (_, index) => `
+        <tr id="v2-torrent-t${index}" data-hash="t${index}"><td class="torrent-card-cell"><div class="torrent-card">
+          <div class="torrent-head"><span class="torrent-name"><button class="torrent-open" type="button" hx-get="/downloads/detail?hash=t${index}&tab=general" hx-target="#v2-detail-drawer" hx-swap="innerHTML">Torrent numero ${index} con un nome abbastanza lungo da andare a capo una volta</button></span>
+          <span class="torrent-state badge">In corso</span></div>
+          <div class="torrent-body"><div class="torrent-progress"><small class="muted">10%</small></div></div>
+        </div></td></tr>`).join("");
+      await route.fulfill({
+        contentType: "text/html; charset=utf-8",
+        body: `<div id="v2-download-rows" data-v2-poll hx-post="/partial/downloads/rows" hx-target="this" hx-include="#v2-torrent-form" hx-trigger="every 5s [window.gexttoCanPoll()], v2wake" hx-swap="outerHTML">
+          <table class="data-table torrent-table"><tbody>${rows}</tbody></table></div>`,
+      });
+    });
+    await page.route("**/downloads/detail**", async (route) => {
+      await route.fulfill({
+        contentType: "text/html; charset=utf-8",
+        body: `<div class="torrent-drawer-head"><h3 id="v2-detail-title">Torrent</h3><button class="btn sm" type="button" data-v2-detail-close>Chiudi</button></div><div class="torrent-drawer-body"><p>Dettaglio</p></div>`,
+      });
+    });
+    await page.goto("/?view=downloads");
+    const row = page.locator("#v2-torrent-t8");
+    // The rows arrive with the first poll of the page.
+    await expect(row).toBeVisible({ timeout: 15000 });
+    // Put the row in the middle of the screen, far from the end of the page.
+    const placed = await page.evaluate(() => {
+      const target = document.querySelector("#v2-torrent-t8");
+      if (!target) return -1;
+      const top = Math.round(target.getBoundingClientRect().top + window.scrollY - 300);
+      window.scrollTo(0, top);
+      return window.scrollY;
+    });
+    const max = await page.evaluate(() => document.documentElement.scrollHeight - window.innerHeight);
+    expect(placed).toBeGreaterThan(0);
+    // Far from the end of the page: a jump there is what the test looks for.
+    expect(max - placed, "the row must sit far from the end of the page").toBeGreaterThan(400);
+
+    await row.locator(".torrent-open").tap();
+    const drawer = page.locator("#v2-detail-drawer");
+    await expect(drawer).toBeVisible();
+    const after = await page.evaluate(() => window.scrollY);
+    expect(Math.abs(after - placed), "the page moved when the detail opened").toBeLessThanOrEqual(2);
+    // A sheet on the screen, not a block at the end of the page.
+    expect(await drawer.evaluate((el) => getComputedStyle(el).position)).toBe("fixed");
+    const box = await drawer.boundingBox();
+    const height = await page.evaluate(() => window.innerHeight);
+    expect(box).not.toBeNull();
+    expect(box!.y).toBeGreaterThanOrEqual(0);
+    expect(box!.y + box!.height).toBeLessThanOrEqual(height + 1);
+  });
+
   test("la pagina eD2k spiega come collegare aMule quando è spento", async ({ page }) => {
     await page.goto("/?view=ed2k");
     await expect(page.locator("#v2-ed2k-state")).toContainText("L'integrazione con aMule è spenta");

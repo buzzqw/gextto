@@ -466,8 +466,13 @@
     var close = drawer.querySelector("[data-v2-detail-close]");
     if (close) { try { close.focus(); } catch (error) { /* ignore */ } }
     // The frame sits in the page above the download history: bring it into
-    // view rather than covering the content like an overlay.
-    try { drawer.scrollIntoView({ block: "nearest" }); } catch (error) { /* ignore */ }
+    // view rather than covering the content like an overlay. On a phone it is
+    // a sheet anchored to the screen (see v2.css) and there is nothing to
+    // scroll to: the row that opened it has to stay where it is, or tapping a
+    // torrent in the middle of the list throws the page to the bottom.
+    var fixed = false;
+    try { fixed = window.getComputedStyle(drawer).position === "fixed"; } catch (error) { /* ignore */ }
+    if (!fixed) { try { drawer.scrollIntoView({ block: "nearest" }); } catch (error) { /* ignore */ } }
   }
 
   function closeDetailDrawer() {

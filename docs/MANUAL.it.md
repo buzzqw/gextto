@@ -854,7 +854,9 @@ l'aggiornamento automatico.
 ### Il dettaglio di un torrent
 
 Clic sul nome: il dettaglio si apre sopra lo *Storico download*, così la lista
-resta visibile. Le schede:
+resta visibile. Sul telefono il dettaglio è un foglio in fondo allo schermo: si
+apre lì senza spostare la pagina, la riga che hai toccato resta dov'è e il
+foglio scorre al suo interno. Le schede:
 
 | Scheda | Cosa trovi |
 |---|---|

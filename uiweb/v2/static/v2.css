@@ -879,6 +879,30 @@ form.htmx-request:not([hx-trigger*="every"]):not([data-v2-no-busy]) button[type=
   white-space: nowrap;
 }
 .torrent-drawer-body { max-height: min(70vh, 640px); overflow: auto; padding: 12px 16px 18px; }
+@media (max-width: 900px) {
+  /* On a phone the detail is a sheet at the bottom of the screen, not a frame
+     in the page: below the whole list, opening a torrent from the middle of it
+     sent the page to the bottom. Out of the flow the row you touched stays
+     where it is, and the sheet scrolls inside itself. */
+  .torrent-drawer:not([hidden]) {
+    position: fixed;
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
+    /* Below the row menu sheet (z-index 20): a menu opened from a row must
+       stay above the detail, which can be open at the same time. */
+    z-index: 15;
+    max-height: min(62vh, 560px);
+    margin: 0;
+  }
+  .torrent-drawer:not([hidden]) .torrent-drawer-head { flex: 0 0 auto; }
+  .torrent-drawer:not([hidden]) .torrent-drawer-body { max-height: none; min-height: 0; }
+}
+@media (max-width: 560px) {
+  /* From here the navigation bar is fixed to the bottom edge: the sheet leaves
+     its height free instead of covering it. */
+  .torrent-drawer:not([hidden]) { bottom: calc(68px + env(safe-area-inset-bottom)); }
+}
 
 /* Stronger, always-visible keyboard focus ring. */
 :where(a, button, input, select, textarea, [tabindex]):focus-visible {

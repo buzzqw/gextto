@@ -837,7 +837,9 @@ next to **Downloads** update at once, without waiting for the automatic refresh.
 ### A torrent's details
 
 Click the name: the details open above the *Download history*, so the list
-stays visible. The tabs:
+stays visible. On a phone the details are a sheet at the bottom of the screen:
+it opens there without moving the page, the row you touched stays where it is
+and the sheet scrolls inside itself. The tabs:
 
 | Tab | What you find |
 |---|---|
