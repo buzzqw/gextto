@@ -10,7 +10,7 @@ require (
 	github.com/jackpal/go-nat-pmp v1.1.0
 	github.com/jlaffaye/ftp v0.2.4
 	github.com/mattn/go-isatty v0.0.24
-	github.com/powerman/rpc-codec v1.2.2
+	github.com/powerman/rpc-codec v1.3.0
 	github.com/rcrowley/go-metrics v0.0.0-20201227073835-cf1acfcdf475
 	github.com/zeebo/bencode v1.0.0
 	go.etcd.io/bbolt v1.5.0
