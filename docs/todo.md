@@ -24,7 +24,6 @@ still be true after the item lands does not belong here.
   feed path, about 40 % of its allocations and 7 % of a cycle's CPU. Gate: a
   byte-level scanner over the in-memory body, with the existing feed corpus
   green.
-- **Cross-seed manager**: adding a torrent whose data is already in the library
   should reuse the blocks and seed it on the second tracker, with per-tracker
   ratio and seed rules, instead of downloading a second copy; the archive
   already holds the same release from several trackers. Gate: the v1/v2 block
