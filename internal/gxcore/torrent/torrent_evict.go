@@ -1,7 +1,9 @@
 package torrent
 
 import (
+	"math"
 	"net"
+	"sort"
 	"time"
 
 	"github.com/buzzqw/gextto/internal/gxcore/internal/peer"
@@ -168,5 +170,76 @@ func (t *torrent) prunePeers() {
 	if w := t.worstPeer(); w != nil && !t.peerUseful(w) {
 		t.log.Debugf("dropping useless peer %s to try a queued address", w.Addr().String())
 		t.closePeer(w)
+		return
 	}
+	t.maybeTurnover(time.Now())
+}
+
+// turnoverMinAge keeps a connection out of the turnover until its rate means
+// something: the smoothed speed of a peer connected a minute ago is still
+// ramping up.
+const turnoverMinAge = 2 * newPeerGrace
+
+// maybeTurnover closes the slowest fraction of the peers of a downloading
+// torrent that is at its connection cap with addresses queued, at most once per
+// interval, unless the torrent already downloads near the best rate it reached.
+// It runs in the torrent goroutine.
+func (t *torrent) maybeTurnover(now time.Time) {
+	cfg := t.session.config
+	if cfg.PeerTurnover <= 0 || t.completed || t.maxConnections <= 0 {
+		return
+	}
+	rate := t.downloadSpeed.Rate1()
+	if rate > t.turnoverPeak {
+		t.turnoverPeak = rate
+	}
+	if !t.lastTurnover.IsZero() && now.Sub(t.lastTurnover) < cfg.PeerTurnoverInterval {
+		return
+	}
+	if len(t.peers) < t.maxConnections || t.addrList.Len() == 0 {
+		return
+	}
+	t.lastTurnover = now
+	if t.turnoverPeak > 0 && rate >= cfg.PeerTurnoverCutoff*t.turnoverPeak {
+		return
+	}
+	ranks := make([]peerRank, 0, len(t.peers))
+	byAddr := make(map[string]*peer.Peer, len(t.peers))
+	for pe := range t.peers {
+		r := t.rankFor(pe)
+		ranks = append(ranks, r)
+		byAddr[r.addr] = pe
+	}
+	for _, addr := range turnoverVictims(ranks, cfg.PeerTurnover, now) {
+		if pe := byAddr[addr]; pe != nil {
+			t.log.Debugf("peer turnover: closing slow peer %s to try a queued address", addr)
+			t.closePeer(pe)
+		}
+	}
+}
+
+// turnoverVictims picks the addresses the turnover closes: the worst-ranked
+// fraction (rounded up, at least one) among the peers connected for at least
+// turnoverMinAge. A peer too new to judge is never picked.
+func turnoverVictims(ranks []peerRank, fraction float64, now time.Time) []string {
+	if fraction <= 0 || len(ranks) == 0 {
+		return nil
+	}
+	eligible := make([]peerRank, 0, len(ranks))
+	for _, r := range ranks {
+		if now.Sub(r.connectedAt) >= turnoverMinAge {
+			eligible = append(eligible, r)
+		}
+	}
+	if len(eligible) == 0 {
+		return nil
+	}
+	count := int(math.Ceil(float64(len(ranks)) * fraction))
+	count = min(max(count, 1), len(eligible))
+	sort.Slice(eligible, func(i, j int) bool { return worseRank(eligible[i], eligible[j]) })
+	out := make([]string, 0, count)
+	for _, r := range eligible[:count] {
+		out = append(out, r.addr)
+	}
+	return out
 }

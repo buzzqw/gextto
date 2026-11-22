@@ -30,6 +30,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/buzzqw/gextto/internal/gxcore/torrent"
 	"github.com/buzzqw/gextto/internal/queue"
 )
 
@@ -45,6 +46,23 @@ func TestMeasureRealSwarm(t *testing.T) {
 		}
 	}
 
+	// GX_MEASURE_TURNOVER=<fraction> turns the peer turnover on (A/B of the
+	// candidate default; GX_MEASURE_TURNOVER_SECONDS sets its interval).
+	if raw := os.Getenv("GX_MEASURE_TURNOVER"); raw != "" {
+		fraction, err := strconv.ParseFloat(raw, 64)
+		if err != nil {
+			t.Fatalf("GX_MEASURE_TURNOVER: %v", err)
+		}
+		interval := 5 * time.Minute
+		if s, err := strconv.Atoi(os.Getenv("GX_MEASURE_TURNOVER_SECONDS")); err == nil && s > 0 {
+			interval = time.Duration(s) * time.Second
+		}
+		sessionConfigOverride = func(cfg *torrent.Config) {
+			cfg.PeerTurnover = fraction
+			cfg.PeerTurnoverInterval = interval
+		}
+		t.Cleanup(func() { sessionConfigOverride = nil })
+	}
 	// GX_MEASURE_TRANSPORT=tcp|utp picks one transport for the peers (the
 	// mixed-mode A/B); empty or "mixed" keeps both, the daemon's default.
 	opts := NetworkOptions{
@@ -117,8 +135,8 @@ func TestMeasureRealSwarm(t *testing.T) {
 		done += info.TotalDone
 		t.Logf("real swarm %s: state=%s progress=%.1f%% downloaded=%d B", info.Name, info.State, info.Progress, info.TotalDone)
 	}
-	t.Logf("%d torrents over %v · automatic cap: %t · max connections per torrent: %d",
-		len(hashes), window, queue.BoolOn(d.state.Config.ConnAuto), d.state.Config.MaxConnectionsPerTorrent)
+	t.Logf("%d torrents over %v · automatic cap: %t · max connections per torrent: %d · peer turnover: %q",
+		len(hashes), window, queue.BoolOn(d.state.Config.ConnAuto), d.state.Config.MaxConnectionsPerTorrent, os.Getenv("GX_MEASURE_TURNOVER"))
 	t.Logf("total: downloaded %d MB · CPU %.1f s (%.1f%% of a core) · %.2f s per 100 MB",
 		done>>20, cpu.Seconds(), 100*cpu.Seconds()/elapsed.Seconds(), cpu.Seconds()/max(float64(done)/(100<<20), 0.01))
 	t.Logf("peers: peak %d (peak uTP %d) | connections: utp outgoing %d / tcp outgoing %d, utp incoming %d",

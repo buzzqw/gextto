@@ -776,8 +776,16 @@ func (d *Daemon) sessionConfig() torrent.Config {
 	// The user-managed cookies (qBittorrent API) are supplied to the .torrent
 	// and metadata HTTP fetches.
 	cfg.CookieJar = d.cookieJar()
+	if sessionConfigOverride != nil {
+		sessionConfigOverride(&cfg)
+	}
 	return cfg
 }
+
+// sessionConfigOverride lets a measurement try an engine option the daemon
+// does not expose (the real-swarm A/B of a candidate default). Nil outside
+// tests.
+var sessionConfigOverride func(*torrent.Config)
 
 func (d *Daemon) openSessionLocked() error {
 	session, err := torrent.NewSession(d.sessionConfig())

@@ -47,6 +47,11 @@ import (
 // other goroutines reach it through commands, queries, or the documented
 // locks/atomics on individual fields.
 type torrent struct {
+	// lastTurnover and turnoverPeak drive the peer turnover (torrent_evict.go):
+	// when it last ran and the best download rate seen while downloading.
+	lastTurnover time.Time
+	turnoverPeak float64
+
 	session *Session
 	id      string
 	addedAt time.Time

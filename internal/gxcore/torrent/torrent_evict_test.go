@@ -90,3 +90,32 @@ func TestPeerWantsNothing(t *testing.T) {
 		t.Fatal("a peer without a known bitfield was judged")
 	}
 }
+
+// TestTurnoverVictims: the turnover closes the slowest fraction (rounded up)
+// of the peers old enough to judge, never a fresh connection.
+func TestTurnoverVictims(t *testing.T) {
+	now := time.Now()
+	old := now.Add(-10 * time.Minute)
+	ranks := []peerRank{
+		{useful: true, speed: 900, connectedAt: old, addr: "10.0.0.1:1"},
+		{useful: true, speed: 10, connectedAt: old, addr: "10.0.0.2:1"},
+		{useful: true, speed: 500, connectedAt: old, addr: "10.0.0.3:1"},
+		{useful: true, speed: 1, connectedAt: now.Add(-5 * time.Second), addr: "10.0.0.4:1"}, // too new
+		{useful: true, speed: 50, connectedAt: old, addr: "10.0.0.5:1"},
+	}
+	got := turnoverVictims(ranks, 0.04, now)
+	if len(got) != 1 || got[0] != "10.0.0.2:1" {
+		t.Fatalf("4%% of 5 peers = %v, want the slowest judged peer", got)
+	}
+	got = turnoverVictims(ranks, 0.5, now)
+	if len(got) != 3 || got[0] != "10.0.0.2:1" || got[1] != "10.0.0.5:1" || got[2] != "10.0.0.3:1" {
+		t.Fatalf("half of the peers = %v", got)
+	}
+	if got := turnoverVictims(ranks, 0, now); got != nil {
+		t.Fatalf("turnover off picked %v", got)
+	}
+	fresh := []peerRank{{useful: true, speed: 1, connectedAt: now, addr: "10.0.0.9:1"}}
+	if got := turnoverVictims(fresh, 1, now); got != nil {
+		t.Fatalf("a fresh connection was picked: %v", got)
+	}
+}

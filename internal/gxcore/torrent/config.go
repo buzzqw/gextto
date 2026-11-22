@@ -257,6 +257,14 @@ type Config struct {
 	MaxPeerDial int `yaml:"max-peer-dial"`
 	// Max number of incoming connections to accept
 	MaxPeerAccept int `yaml:"max-peer-accept"`
+	// PeerTurnover is the fraction of a downloading torrent's peers closed every
+	// PeerTurnoverInterval while the torrent sits at its connection cap with
+	// addresses still queued and downloads below PeerTurnoverCutoff of the
+	// best rate it reached: the slowest ones make room for untried peers, as
+	// libtorrent's peer_turnover does. 0 disables it.
+	PeerTurnover         float64       `yaml:"peer-turnover"`
+	PeerTurnoverInterval time.Duration `yaml:"peer-turnover-interval"`
+	PeerTurnoverCutoff   float64       `yaml:"peer-turnover-cutoff"`
 	// Running metadata downloads, snubbed peers don't count
 	ParallelMetadataDownloads int `yaml:"parallel-metadata-downloads"`
 	// Time to wait for TCP connection to open.
@@ -411,6 +419,9 @@ var DefaultConfig = Config{
 	EndgameMaxDuplicateDownloads: 20,
 	MaxPeerDial:                  80,
 	MaxPeerAccept:                20,
+	PeerTurnover:                 0,
+	PeerTurnoverInterval:         5 * time.Minute,
+	PeerTurnoverCutoff:           0.9,
 	ParallelMetadataDownloads:    2,
 	PeerConnectTimeout:           5 * time.Second,
 	PeerHandshakeTimeout:         10 * time.Second,
