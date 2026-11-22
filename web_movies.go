@@ -10,12 +10,12 @@ import (
 	"fmt"
 	"math"
 	"net/http"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/buzzqw/gextto/internal/logging"
+	"github.com/buzzqw/gextto/internal/models"
 )
 
 func parseIntPtr(value string) *int64 {
@@ -591,8 +591,8 @@ func MovieSearch(w http.ResponseWriter, r *http.Request, s *AppState) {
 		kept = append(kept, *release)
 	}
 	results = kept
-	sort.SliceStable(results, func(i, j int) bool {
-		return cfg.ReleaseScoreForMovie(&results[i], movie) > cfg.ReleaseScoreForMovie(&results[j], movie)
+	sortByScore(results, func(release *models.Release) int64 {
+		return cfg.ReleaseScoreForMovie(release, movie)
 	})
 	jsonStatus(w, http.StatusOK, map[string]any{"ok": true, "query": query, "results": results})
 }

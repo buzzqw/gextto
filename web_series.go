@@ -236,8 +236,8 @@ func finalizeEpisodeSearchResults(results []episodeSource, cfg *Config, series *
 		seen[key] = struct{}{}
 		deduped = append(deduped, result)
 	}
-	sort.SliceStable(deduped, func(i, j int) bool {
-		return cfg.ReleaseScore(&deduped[i].Release) > cfg.ReleaseScore(&deduped[j].Release)
+	sortByScore(deduped, func(result *episodeSource) int64 {
+		return cfg.ReleaseScore(&result.Release)
 	})
 	return deduped
 }

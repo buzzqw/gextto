@@ -719,24 +719,34 @@ func gh3ManualSearch(s *AppState, query string, kad ...bool) (int, any) {
 	// The score is a function of the release and of the settings, so it is
 	// computed once per result instead of at every comparison: the sort called
 	// ReleaseScore (series lookup + score breakdown) O(n log n) times.
-	type scoredRelease struct {
-		release models.Release
-		score   int64
-	}
-	ranked := make([]scoredRelease, len(results))
-	for i := range results {
-		ranked[i] = scoredRelease{release: results[i], score: cfg.ReleaseScore(&results[i])}
-	}
-	sort.SliceStable(ranked, func(i, j int) bool { return ranked[i].score > ranked[j].score })
-	for i := range ranked {
-		results[i] = ranked[i].release
-	}
+	sortByScore(results, cfg.ReleaseScore)
 	return http.StatusOK, map[string]any{"ok": true, "query": query, "results": results}
 }
 
 type SpeedLimitsInput struct {
 	DownloadKib int64 `json:"download_kib"`
 	UploadKib   int64 `json:"upload_kib"`
+}
+
+// scoredItem carries the score of one element, computed once: the score runs a
+// series (or movie) lookup, so calling it inside a sort comparator costs O(n log
+// n) lookups for every manual search.
+type scoredItem[T any] struct {
+	item  T
+	score int64
+}
+
+// sortByScore orders items by a score computed once per item, stable, keeping
+// the order the score could not decide.
+func sortByScore[T any](items []T, score func(*T) int64) {
+	ranked := make([]scoredItem[T], len(items))
+	for i := range items {
+		ranked[i] = scoredItem[T]{item: items[i], score: score(&items[i])}
+	}
+	sort.SliceStable(ranked, func(i, j int) bool { return ranked[i].score > ranked[j].score })
+	for i := range ranked {
+		items[i] = ranked[i].item
+	}
 }
 
 // xmlAttribute returns the value of an XML attribute of body, or nil when the
