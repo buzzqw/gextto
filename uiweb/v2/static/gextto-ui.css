@@ -481,6 +481,11 @@ button:focus-visible, a:focus-visible { outline: 3px solid color-mix(in srgb, va
 .muted { color: var(--muted); }
 .hint { color: var(--muted); font-size: 0.85rem; }
 .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* A span cannot keep that promise: an inline box does not clip, so a long name
+   ran past its cell and past the edge of the screen with no ellipsis. As an
+   inline-block capped at its container the truncation works wherever the
+   class is used on a span. */
+span.truncate { display: inline-block; max-width: 100%; vertical-align: bottom; }
 .numeric { text-align: right; font-variant-numeric: tabular-nums; }
 .row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--line-soft); }
 .row:last-child { border-bottom: 0; }
@@ -488,6 +493,10 @@ button:focus-visible, a:focus-visible { outline: 3px solid color-mix(in srgb, va
 /* An error line with a long path or hash has no space to wrap on: let it break
    anywhere instead of running past the panel and being clipped. */
 .row > .hl-err { min-width: 0; overflow-wrap: anywhere; }
+/* The label on the left of a label · value row can be one unbreakable token
+   (a mount path, a feed URL): without a shrink allowance it pushed the value
+   past the edge of a narrow screen. */
+.row > :first-child { min-width: 0; overflow-wrap: anywhere; }
 .hl-warn { color: var(--warn); }
 .hl-ok { color: var(--ok); }
 .hl-src { color: var(--accent-2); }
@@ -1193,7 +1202,7 @@ label.field > span, .field > span, .field-label { color: var(--muted); font-size
 .row-actions .btn { flex: none; }
 
 /* misc content */
-.alert { padding: 12px 14px; border-radius: var(--radius-sm); background: color-mix(in srgb, var(--err) 16%, transparent); color: var(--err); }
+.alert { padding: 12px 14px; border-radius: var(--radius-sm); background: color-mix(in srgb, var(--err) 16%, transparent); color: var(--err); overflow-wrap: anywhere; }
 .toast-host {
   position: fixed;
   right: max(16px, env(safe-area-inset-right));

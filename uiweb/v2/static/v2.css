@@ -174,7 +174,10 @@ html, body {
   .dashboard-recent-table th:nth-child(4) { width: 12%; }
   .dashboard-recent-table th:nth-child(6) { width: 36%; }
   .dashboard-recent-table td { white-space: normal; }
-  .dashboard-recent-table td.truncate { overflow: hidden; text-overflow: clip; }
+  /* A release name is one long token ("Serie.S01E02.WEB-DL..."): without a
+     break allowance the token could not wrap and left the cell cut in the
+     middle of the name. */
+  .dashboard-recent-table td.truncate { overflow: hidden; text-overflow: clip; overflow-wrap: anywhere; }
 }
 .dashboard-recent-table .dashboard-complete-cell {
   color: var(--ok);
@@ -1695,6 +1698,13 @@ details.add-torrent-panel > summary::-webkit-details-marker { display: none; }
   .logs-toolbar > button[type="submit"] { display: none; } /* it refreshes every 5 s */
   .logs-toolbar > select[name="log"] { grid-column: 1 / -1; min-width: 0; width: 100%; }
   .log-view { font-size: 0.74rem; line-height: 1.45; white-space: pre-wrap; word-break: break-word; }
+  @media (max-width: 360px) {
+    /* Level and number of rows, side by side, asked for more width than the
+       screen has: one row each. */
+    .logs-toolbar { grid-template-columns: 1fr; }
+    .logs-toolbar > .logs-level,
+    .logs-toolbar > [name="lines"] { grid-column: 1 / -1; width: 100%; }
+  }
 
   /* --- Pull to refresh (installed app) --------------------------------- */
   .ptr-hint:not([hidden]) {
@@ -1929,7 +1939,7 @@ html.settings-only-modified .settings-panel:not(:has(.setting-modified-row)):not
 }
 .setting-badge[hidden] { display: none; }
 .setting-dirty { border-color: var(--warn); color: var(--warn); }
-.setting-default { color: var(--muted); font-size: 0.75rem; }
+.setting-default { color: var(--muted); font-size: 0.75rem; overflow-wrap: anywhere; }
 .settings-view:not(.show-keys) .setting-key { display: none; }
 .setting-input { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .setting-input > .input { flex: 1 1 auto; min-width: 0; }

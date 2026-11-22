@@ -337,4 +337,112 @@ test.describe("telefono", () => {
     expect(geometry.clipped).toBeLessThanOrEqual(1);
     expect(geometry.height).toBeGreaterThan(20);
   });
+
+  // A release name is one long token ("Serie.02x05.Il.Titolo..."): in the
+  // "Scarico recente" table it wraps in its cell instead of being cut in the
+  // middle of the name with no way to read the rest.
+  test("il nome di una release recente va a capo nella cella", async ({ page }) => {
+    await page.goto("/?view=dashboard");
+    await page.waitForTimeout(300);
+    const geometry = await page.evaluate(() => {
+      const wrap = document.createElement("div");
+      wrap.className = "table-wrap";
+      const table = document.createElement("table");
+      table.className = "data-table dashboard-recent-table";
+      table.innerHTML = `<thead><tr><th>Nome</th><th>Tipo</th><th>Punteggio</th><th>Stato</th><th>Destinazione</th><th>Concluso</th></tr></thead>
+        <tbody><tr><td class="truncate">Serie.02x05.Il.Titolo.Della.Puntata.ITA.DLMux.x264-GRUPPO.mkv</td><td>Film</td><td>1364</td><td>✓</td><td>—</td><td>ieri</td></tr></tbody>`;
+      wrap.append(table);
+      document.querySelector(".content")?.append(wrap);
+      const cell = table.querySelector("td.truncate") as HTMLElement;
+      const result = { clipped: cell.scrollWidth - cell.clientWidth, wrap: getComputedStyle(cell).overflowWrap };
+      wrap.remove();
+      return result;
+    });
+    expect(geometry.wrap).toBe("anywhere");
+    expect(geometry.clipped).toBeLessThanOrEqual(1);
+  });
+
+  // The default of a setting can be a URL, one unbreakable token: it wraps
+  // instead of running past the edge of the screen.
+  test("il predefinito lungo di un'impostazione resta nello schermo", async ({ page }) => {
+    await page.goto("/?view=settings&tab=network");
+    const line = page.locator("#v2-setting-torrent_tracker_list_url .setting-default");
+    await expect(line).toBeVisible({ timeout: 20000 });
+    const box = await line.boundingBox();
+    expect(box).not.toBeNull();
+    expect(box!.x + box!.width).toBeLessThanOrEqual(391);
+  });
+
+  // A name shown through a .truncate span sits inline in a paragraph: the span
+  // must really truncate (an inline box cannot clip), not run past the edge.
+  test("uno span truncate truncia davvero, invece di uscire dal riquadro", async ({ page }) => {
+    await page.goto("/?view=health");
+    await page.waitForTimeout(300);
+    const geometry = await page.evaluate(() => {
+      const p = document.createElement("p");
+      p.className = "muted";
+      p.innerHTML = `<span>Ultimo controllo non superato:</span> <span class="truncate"></span>`;
+      const span = p.querySelector(".truncate") as HTMLElement;
+      span.textContent = "Serie 2x05 Il Titolo Della Puntata [WEB-DL 1080p] - copia in biblioteca non corrispondente.mkv";
+      document.querySelector(".content")?.append(p);
+      const result = {
+        ellipsis: getComputedStyle(span).textOverflow,
+        right: Math.round(span.getBoundingClientRect().right),
+        vw: window.innerWidth,
+      };
+      p.remove();
+      return result;
+    });
+    expect(geometry.ellipsis).toBe("ellipsis");
+    expect(geometry.right).toBeLessThanOrEqual(geometry.vw + 1);
+  });
+
+  // An alert can hold an address (a feed URL): one token, which wraps instead
+  // of opening the panel that carries it.
+  test("un indirizzo dentro un avviso va a capo", async ({ page }) => {
+    await page.goto("/?view=health");
+    await page.waitForTimeout(300);
+    const geometry = await page.evaluate(() => {
+      const alert = document.createElement("div");
+      alert.className = "alert";
+      alert.innerHTML = `<ul><li><strong>torrentgalaxy.one/get-posts/user:MIRCrew</strong></li></ul>`;
+      document.querySelector(".content")?.append(alert);
+      const item = alert.querySelector("li") as HTMLElement;
+      const result = { clipped: item.scrollWidth - item.clientWidth, wrap: getComputedStyle(item).overflowWrap };
+      alert.remove();
+      return result;
+    });
+    expect(geometry.wrap).toBe("anywhere");
+    expect(geometry.clipped).toBeLessThanOrEqual(1);
+  });
+
+  // On a 320 px phone the log toolbar stacks: the two selects side by side
+  // asked for more width than the screen has.
+  test("a 320 pixel la barra del log sta dentro lo schermo", async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 700 });
+    await page.goto("/?view=logs");
+    await page.waitForTimeout(400);
+    const geometry = await page.evaluate(() => {
+      const toolbar = document.querySelector(".logs-toolbar") as HTMLElement;
+      return { sw: toolbar.scrollWidth, cw: toolbar.clientWidth };
+    });
+    expect(geometry.sw).toBeLessThanOrEqual(geometry.cw + 1);
+  });
+
+  // The mount path of a disk is one token: it wraps instead of pushing the
+  // free-space figure past the edge of a narrow screen.
+  test("i dischi di Salute tengono lo spazio libero dentro lo schermo", async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 700 });
+    await page.goto("/?view=health");
+    await page.waitForTimeout(400);
+    const worst = await page.evaluate(() => {
+      let max = 0;
+      for (const row of document.querySelectorAll(".panel-body .row")) {
+        const el = row as HTMLElement;
+        max = Math.max(max, el.scrollWidth - el.clientWidth);
+      }
+      return max;
+    });
+    expect(worst).toBeLessThanOrEqual(1);
+  });
 });
