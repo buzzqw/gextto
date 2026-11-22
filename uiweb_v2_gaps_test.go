@@ -266,13 +266,15 @@ func TestGapBestPicksChooseScoreThenSeeders(t *testing.T) {
 		{Release: gapTestRelease("ep2 few seeds", strings.Repeat("4", 40), 4, 2, 150, 3, false), Origin: episodeOriginIndexer, Season: 4, Episode: 2},
 		{Release: gapTestRelease("ep2 many seeds", strings.Repeat("5", 40), 4, 2, 150, 40, false), Origin: episodeOriginIndexer, Season: 4, Episode: 2},
 	}
-	picks := v2BestGapPicks(results)
+	picks := v2BestGapPicks(results, [][2]int64{{4, 1}, {4, 2}})
 	if len(picks) != 2 {
 		t.Fatalf("picks = %d, want one per episode: %+v", len(picks), picks)
 	}
 	chosen := map[int64]string{}
 	for _, pick := range picks {
-		chosen[pick.Result.Episode] = pick.Result.Release.Title
+		for _, gap := range pick.Gaps {
+			chosen[gap[1]] = pick.Result.Release.Title
+		}
 	}
 	if chosen[1] != "ep1 high score" {
 		t.Fatalf("episode 1 pick = %q, want the highest score inside the profile", chosen[1])
@@ -296,7 +298,7 @@ func TestGapBestPicksQueueAPackOnce(t *testing.T) {
 		{Release: pack, Origin: episodeOriginIndexer, Season: 4, Episode: 1},
 		{Release: packB, Origin: episodeOriginIndexer, Season: 4, Episode: 2},
 		{Release: single, Origin: episodeOriginIndexer, Season: 4, Episode: 2},
-	})
+	}, [][2]int64{{4, 1}, {4, 2}})
 	if len(picks) != 2 {
 		t.Fatalf("picks = %d, want the single episode and the pack once: %+v", len(picks), picks)
 	}
@@ -304,8 +306,41 @@ func TestGapBestPicksQueueAPackOnce(t *testing.T) {
 	if titles[0] != "ep2 single" || titles[1] != "pack 01-02" {
 		t.Fatalf("pick order = %v, want the highest score first", titles)
 	}
-	if got := picks[1].Episodes; len(got) != 1 || got[0] != 1 {
+	if got := picks[1].Gaps; len(got) != 1 || got[0] != [2]int64{4, 1} {
 		t.Fatalf("pack episodes = %v, want only the one it still fills after the single", got)
+	}
+}
+
+// TestGapBestPicksFillTheGapsAPackCovers is the case the bulk action was
+// reported for: the search asks each missing episode on its own, so a season
+// pack comes back for S02E01 only, while E02, E06, E08 and E10 have no result
+// of their own (the last-resort packs answer only the episode that found them).
+// The pack is queued once and fills every gap it covers, and the log names them
+// all instead of the four the search happened to answer.
+func TestGapBestPicksFillTheGapsAPackCovers(t *testing.T) {
+	pack := gapTestRelease("pack S02E01-10", strings.Repeat("1", 40), 2, 1, 1150, 5, false)
+	pack.IsPack = true
+	pack.EpisodeRange = []int64{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
+	lastResort := func(title, hash string, first, last int64) models.Release {
+		release := gapTestRelease(title, hash, 2, first, 300, 0, true)
+		release.IsPack = true
+		release.EpisodeRange = []int64{first, last}
+		return release
+	}
+	results := []gh2EpisodeResult{
+		{Release: pack, Origin: episodeOriginIndexer, Season: 2, Episode: 1},
+		{Release: lastResort("S02E05-06", "a", 5, 6), Origin: episodeOriginIndexer, Season: 2, Episode: 5},
+		{Release: lastResort("S02E07-08", "b", 7, 8), Origin: episodeOriginIndexer, Season: 2, Episode: 7},
+		{Release: lastResort("S02E09-10", "c", 9, 10), Origin: episodeOriginIndexer, Season: 2, Episode: 9},
+		{Release: gapTestRelease("S03E06 1080p", strings.Repeat("9", 40), 3, 6, 1200, 3, false), Origin: episodeOriginIndexer, Season: 3, Episode: 6},
+	}
+	gaps := [][2]int64{{2, 1}, {2, 2}, {2, 5}, {2, 6}, {2, 7}, {2, 8}, {2, 9}, {2, 10}, {3, 6}}
+	picks := v2BestGapPicks(results, gaps)
+	if len(picks) != 2 {
+		t.Fatalf("picks = %d, want the pack and the episode of season 3: %+v", len(picks), picks)
+	}
+	if got := v2GapAddedEpisodesText(picks); got != "S02E01–S02E02, S02E05–S02E10, S03E06" {
+		t.Fatalf("episodes = %q, want every gap the pack fills", got)
 	}
 }
 
@@ -314,9 +349,9 @@ func TestGapBestPicksQueueAPackOnce(t *testing.T) {
 // range.
 func TestGapAddedEpisodesTextNamesEveryEpisode(t *testing.T) {
 	got := v2GapAddedEpisodesText([]v2GapPick{
-		{Season: 2, Episodes: []int64{4}},
-		{Season: 1, Episodes: []int64{1, 2, 3}},
-		{Season: 1, Episodes: []int64{5}},
+		{Gaps: [][2]int64{{2, 4}}},
+		{Gaps: [][2]int64{{1, 1}, {1, 2}, {1, 3}}},
+		{Gaps: [][2]int64{{1, 5}}},
 	})
 	if want := "S01E01–S01E03, S01E05, S02E04"; got != want {
 		t.Fatalf("episodes = %q, want %q", got, want)
@@ -343,7 +378,7 @@ func TestGapDownloadBestRoute(t *testing.T) {
 		state.jobs.SetResult(id, v2GapSearchResult{
 			Series: "Show", Episodes: 1, Total: 1, Results: 1,
 			Sources: v2SourcesView{Results: []v2SourceRow{{Title: release.Title, Episode: "S01E01", Key: "k"}}},
-			picks:   []v2GapPick{{Result: gh2EpisodeResult{Release: release, Origin: episodeOriginIndexer, Season: 1, Episode: 1}, Season: 1, Episodes: []int64{1}}},
+			picks:   []v2GapPick{{Result: gh2EpisodeResult{Release: release, Origin: episodeOriginIndexer, Season: 1, Episode: 1}, Gaps: [][2]int64{{1, 1}}}},
 		})
 	}); err != nil {
 		t.Fatalf("start search: %v", err)

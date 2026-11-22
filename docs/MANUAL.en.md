@@ -488,9 +488,12 @@ not in the library, grouped by series and season:
   running the search again;
 - **Add the best missing episodes** appears above the results and queues the
   best copy of every episode found: the highest score first, then the most
-  seeders. A release covering several episodes is added once, and episodes the
-  search found nothing for stay out. It keeps working in the background, so you
-  do not wait for every link, and the log names the episodes it queued;
+  seeders. A release covering several episodes (a double file or a pack) is
+  added once and fills **every** missing episode it covers, including the ones
+  the search found no individual result for: the message and the log say how
+  many episodes and which ones, season by season. Episodes with no result that
+  no release covers stay out. It keeps working in the background, so you do not
+  wait for every link;
 - **Filter by series** narrows the list while you type, without reloading the
   page.
 

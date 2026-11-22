@@ -141,16 +141,17 @@ type v2GapSearchResult struct {
 	Slot     string
 	Progress v2GapSearchProgress
 	// picks are the releases «Aggiungi le migliori puntate mancanti» queues:
-	// the best copy for each episode of the results. They are not rendered.
+	// the best copy for each missing episode, one per release. They are not
+	// rendered.
 	picks []v2GapPick
 }
 
 // v2GapPick is one release the bulk action queues and the missing episodes it
-// fills: a pack fills several at once, and the log has to name them all.
+// fills: a pack fills several at once, and the log has to name them all. The
+// gaps keep their own season, because a multi-season pack fills more than one.
 type v2GapPick struct {
-	Result   gh2EpisodeResult
-	Season   int64
-	Episodes []int64
+	Result gh2EpisodeResult
+	Gaps   [][2]int64
 }
 
 func v2GapSearchRedirect(filter string) string {
@@ -173,7 +174,7 @@ func v2GapSearchResultFromOutcome(outcome missingSearchOutcome, redirect, series
 			v2SourceRowFromRelease(&result.Release, result.Origin, result.Season, result.Episode))
 	}
 	view.Results = len(view.Sources.Results)
-	view.picks = v2BestGapPicks(outcome.Results)
+	view.picks = v2BestGapPicks(outcome.Results, outcome.Gaps)
 	return view
 }
 
@@ -182,7 +183,12 @@ func v2GapSearchResultFromOutcome(outcome missingSearchOutcome, redirect, series
 // score, then the most seeders. A release that covers several episodes (a
 // multi-episode file or a pack) is queued once: the episodes it covers are not
 // downloaded again on their own.
-func v2BestGapPicks(results []gh2EpisodeResult) []v2GapPick {
+//
+// The coverage is read against every gap of the series, not only the results:
+// the search asks each episode on its own, so a pack can answer for one of them
+// and hold the others. Those episodes are filled by the pack all the same, and
+// the bulk action has to count and name them.
+func v2BestGapPicks(results []gh2EpisodeResult, gaps [][2]int64) []v2GapPick {
 	type episodeKey struct{ season, episode int64 }
 	best := map[episodeKey]gh2EpisodeResult{}
 	for _, result := range results {
@@ -192,6 +198,20 @@ func v2BestGapPicks(results []gh2EpisodeResult) []v2GapPick {
 		key := episodeKey{season: result.Season, episode: result.Episode}
 		if current, ok := best[key]; !ok || v2GapPickPreferred(result, current) {
 			best[key] = result
+		}
+	}
+	// The gaps are the episodes there is something to fill, whether the search
+	// found a result for each of them or not.
+	targets := make(map[episodeKey]struct{}, len(gaps))
+	for _, gap := range gaps {
+		if gap[0] < 1 || gap[1] < 1 {
+			continue
+		}
+		targets[episodeKey{season: gap[0], episode: gap[1]}] = struct{}{}
+	}
+	if len(targets) == 0 {
+		for key := range best {
+			targets[key] = struct{}{}
 		}
 	}
 	// One entry per release: the same pack can be the best copy of several
@@ -213,23 +233,24 @@ func v2BestGapPicks(results []gh2EpisodeResult) []v2GapPick {
 	covered := map[episodeKey]bool{}
 	picks := make([]v2GapPick, 0, len(ordered))
 	for _, candidate := range ordered {
-		season := int64(0)
-		if candidate.Release.Season != nil {
-			season = *candidate.Release.Season
-		}
-		episodes := make([]int64, 0, 1)
-		for key := range best {
+		filled := make([][2]int64, 0, 1)
+		for key := range targets {
 			if covered[key] || !v2GapReleaseCovers(&candidate.Release, key.season, key.episode) {
 				continue
 			}
-			episodes = append(episodes, key.episode)
+			filled = append(filled, [2]int64{key.season, key.episode})
 		}
-		if len(episodes) == 0 {
+		if len(filled) == 0 {
 			continue
 		}
-		sort.Slice(episodes, func(i, j int) bool { return episodes[i] < episodes[j] })
-		picks = append(picks, v2GapPick{Result: candidate, Season: season, Episodes: episodes})
-		for key := range best {
+		sort.Slice(filled, func(i, j int) bool {
+			if filled[i][0] != filled[j][0] {
+				return filled[i][0] < filled[j][0]
+			}
+			return filled[i][1] < filled[j][1]
+		})
+		picks = append(picks, v2GapPick{Result: candidate, Gaps: filled})
+		for key := range targets {
 			if v2GapReleaseCovers(&candidate.Release, key.season, key.episode) {
 				covered[key] = true
 			}
@@ -245,10 +266,12 @@ func v2GapAddedEpisodesText(picks []v2GapPick) string {
 	bySeason := map[int64][]int64{}
 	seasons := make([]int64, 0, 1)
 	for _, pick := range picks {
-		if _, seen := bySeason[pick.Season]; !seen {
-			seasons = append(seasons, pick.Season)
+		for _, gap := range pick.Gaps {
+			if _, seen := bySeason[gap[0]]; !seen {
+				seasons = append(seasons, gap[0])
+			}
+			bySeason[gap[0]] = append(bySeason[gap[0]], gap[1])
 		}
-		bySeason[pick.Season] = append(bySeason[pick.Season], pick.Episodes...)
 	}
 	sort.Slice(seasons, func(i, j int) bool { return seasons[i] < seasons[j] })
 	parts := make([]string, 0, len(seasons))
@@ -484,16 +507,19 @@ func V2SeriesGapsSearchCancel(w http.ResponseWriter, r *http.Request, s *AppStat
 // v2GapDownloadBestResult is the answer of the bulk action: a toast, because
 // the search results must stay on the page.
 type v2GapDownloadBestResult struct {
-	Added   int
-	Error   bool
-	Message string
+	Added int
+	// Episodes names the episodes the queued releases fill, because a pack is
+	// one download for several episodes.
+	Episodes string
+	Error    bool
+	Message  string
 }
 
 // V2SeriesGapsDownloadBest is POST /series/gaps/download-best: it queues, for
-// every missing episode the search found, the best copy (the score, then the
-// seeders). It runs as a background job because a `.torrent` link has to be
-// opened first: a series with a hundred gaps would otherwise hold the request
-// for minutes.
+// every missing episode, the best copy found (within the profile before a last
+// resort, then the score, then the seeders), naming every episode a pack fills.
+// It runs as a background job because a `.torrent` link has to be opened first:
+// a series with a hundred gaps would otherwise hold the request for minutes.
 func V2SeriesGapsDownloadBest(w http.ResponseWriter, r *http.Request, s *AppState) {
 	view := v2GapDownloadBestResult{}
 	searchID := strings.TrimSpace(r.FormValue("job"))
@@ -557,6 +583,7 @@ func V2SeriesGapsDownloadBest(w http.ResponseWriter, r *http.Request, s *AppStat
 				view.Message = "Aggiunta non avviata."
 			} else {
 				view.Added = len(picks)
+				view.Episodes = v2GapAddedEpisodesText(picks)
 			}
 		}
 	}

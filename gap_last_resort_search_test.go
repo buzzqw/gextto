@@ -43,7 +43,7 @@ func TestGapSearchOffersOnlyLastResortCopies(t *testing.T) {
 			t.Fatalf("%q was offered as a normal copy, not as a last resort", r.Release.Title)
 		}
 	}
-	if picks := v2BestGapPicks(outcome.Results); len(picks) != 2 {
+	if picks := v2BestGapPicks(outcome.Results, outcome.Gaps); len(picks) != 2 {
 		t.Fatalf("want a pick for each episode, got %+v", picks)
 	}
 }

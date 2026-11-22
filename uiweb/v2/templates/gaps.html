@@ -97,7 +97,7 @@
 {{define "v2_gap_download_best_result"}}
 <div id="v2-toast-region" hx-swap-oob="innerHTML">
   <div class="v2-toast{{if .Error}} error{{end}}" role="status">
-    <strong>{{tr "Download"}}</strong><span>{{if .Error}}{{tr .Message}}{{else}}{{tr "Aggiunta delle migliori puntate mancanti avviata: %d download." .Added}}{{end}}</span>
+    <strong>{{tr "Download"}}</strong><span>{{if .Error}}{{tr .Message}}{{else if .Episodes}}{{tr "Aggiunta delle migliori puntate mancanti avviata: %d download per %s." .Added .Episodes}}{{else}}{{tr "Aggiunta delle migliori puntate mancanti avviata: %d download." .Added}}{{end}}</span>
   </div>
 </div>
 {{end}}

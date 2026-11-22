@@ -491,10 +491,13 @@ onda che non sono in libreria, raggruppate per serie e per stagione:
   dopo ogni download: puoi prenderne più di uno senza rifare la ricerca;
 - **Aggiungi le migliori puntate mancanti** compare sopra i risultati e mette in
   scarico la copia migliore di ogni puntata trovata: prima il punteggio più
-  alto, poi più seed. Una release che copre più puntate viene aggiunta una volta
-  sola, e le puntate per cui la ricerca non ha trovato nulla restano fuori. Il
-  lavoro prosegue in background, così non devi aspettare ogni collegamento, e il
-  log dice quali puntate ha messo in scarico;
+  alto, poi più seed. Una release che copre più puntate (un file doppio o un
+  pack) viene aggiunta una volta sola e riempie **tutte** le puntate mancanti
+  che copre, anche quelle per cui la ricerca non ha trovato un risultato
+  singolo: il messaggio e il log dicono quante puntate e quali, stagione per
+  stagione. Le puntate per cui non c'è nessun risultato e che nessuna release
+  copre restano fuori. Il lavoro prosegue in background, così non devi aspettare
+  ogni collegamento.
 - **Filtra per serie** restringe l'elenco mentre scrivi, senza ricaricare la
   pagina.
 
