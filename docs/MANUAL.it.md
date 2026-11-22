@@ -537,9 +537,18 @@ serve solo a non aspettare il ciclo successivo.
   stagione per intero, e una raccolta di puntate scritta con uno spazio invece
   del trattino («S01E01 02» per le prime due, «S01E01 08» per tutte e otto) vale
   per l'intervallo che dichiara. Un numero dopo la puntata è la fine di un
-  intervallo solo se ha lo zero davanti («02») o se lo segue una parentesi
-  quadra: in «S06E12 68 Seconds» quel numero fa parte del titolo della puntata,
-  non dell'intervallo.
+  intervallo solo se ha lo zero davanti («02»), se lo segue una parentesi quadra
+  o se il titolo è già passato alla qualità («S06E01 11 1080p»): in «S06E12 68
+  Seconds» quel numero fa parte del titolo della puntata, non dell'intervallo.
+- Una puntata scritta con il trattino al posto della lettera («S02-01», «S02 -
+  01») è la puntata 1 della stagione 2, non la stagione 2 intera.
+- Se il titolo dichiara una puntata sola ma la cartella scaricata contiene un
+  gruppo continuo di puntate della stessa stagione che parte da quella, a
+  download finito Gextto archivia il gruppo come pack: è il caso di un indexer
+  che riscrive «S06E01-11» come «S06E01 11» e fa perdere il trattino. Quando la
+  stessa puntata è presente in due copie (per esempio due tracce audio) vince la
+  migliore; quando la cartella non contiene la puntata dichiarata, l'errore dice
+  quale puntata manca invece di contare i file.
 - Con il **controllo dei pack** attivo (*Configurazione → Seed e completamento →
   Controllo dei pack*, spento di default) Gextto legge l'elenco dei file del
   pack appena arriva: se il pack non aggiunge nulla lo scarta, se solo alcuni

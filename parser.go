@@ -1454,6 +1454,13 @@ var releaseMatchers = []releaseMatcher{
 	// own brackets ("[IN CORSO][02/08]", "[IN CORSO] [05/06]"): Italian sites
 	// use both. The total may be unknown ("02/??").
 	{utils.MustCachedRegex(`(?i)^(.+?)[ ._-]+(?:stagione[ ._-]*|season[ ._-]?|s)(\d{1,2})\b.*?\b(?:in[ ._-]*(?:corso|progress)|incomplete)\b\W{0,6}0?(\d{1,3})[ ._-]*(?:/|di|of)[ ._-]*(?:0?\d{1,3}|\?{1,3})`), readInProgressPack},
+	// An episode whose marker is a dash instead of the episode letter
+	// ("S02-01", "S02 - 01"): the season-pack matcher below reads the season
+	// and throws the episode away, so the release became a whole-season
+	// download that the pack check then rejected and the episode stayed a gap.
+	// The reader refuses a resolution after the dash, which is a season pack
+	// with its quality written that way.
+	{utils.MustCachedRegex(`(?i)^(.+?)[ ._-]+s(\d{1,4})[ ._-]*[-–][ ._-]*(\d{1,3})(?:[ ._-]|$)`), readSeasonDashEpisode},
 	{utils.MustCachedRegex(`(?i)^(.+?)[ ._-]+(?:stagione[ ._-]*|season[ ._-]?|s)(\d{1,2})(?:[ ._-]+(?:complete|completa))?(?:[ ._-]|$)`), readSeasonPack},
 	// A miniseries has one season by definition, so the Italian sites publish
 	// the whole of it with no season marker at all ("Serie - Miniserie TV
@@ -1690,11 +1697,12 @@ func sxxexxJoinedCapture(title string, pos int, series, season string) (int, []s
 // episode as written.
 //
 // Two numbers make a range only when the last one is written with its leading
-// zero ("02"), or when a bracket follows it ("S01E01 10 [720p ita eng]").
-// Everything else stays a single episode: "… S06E12 68 Seconds" and
-// "… S01E01 13 luglio 1985" are episodes whose title starts with a number,
-// and reading them as a range would invent dozens of episodes that do not
-// exist.
+// zero ("02"), when a bracket follows it ("S01E01 10 [720p ita eng]"), or when
+// the title has already moved on to the quality ("S06E01 11 1080p ITA ENG"):
+// the dash that marked the range is often lost by the indexer. Everything else
+// stays a single episode: "… S06E12 68 Seconds" and "… S01E01 13 luglio 1985"
+// are episodes whose title starts with a number, and reading them as a range
+// would invent dozens of episodes that do not exist.
 func spaceRangeAfter(title string, pos int, series, season, first string) (int, []string) {
 	if pos >= len(title) || title[pos] != ' ' {
 		return 0, nil
@@ -1715,10 +1723,22 @@ func spaceRangeAfter(title string, pos int, series, season, first string) (int, 
 		return 0, nil
 	}
 	paddedEnd := len(last) == 2 && last[0] == '0'
-	if !paddedEnd && !opensBracket(title, end) {
+	if !paddedEnd && !opensBracket(title, end) && !startsTechnicalToken(title[end:]) {
 		return 0, nil
 	}
 	return end, []string{"", series, season, first, last}
+}
+
+// spaceRangeTechnicalRe matches the quality tokens that follow a batch number
+// when the title has already moved on to them ("S06E01 11 1080p ITA ENG"). A
+// number written without its leading zero ends a range there; a title word
+// keeps it an episode number ("… S06E12 68 Seconds").
+var spaceRangeTechnicalRe = utils.MustCachedRegex(`(?i)^[ ._-]*(?:480p|576p|720p|1080[pi]|2160p|4320p|4k|uhd|web[ .-]?dl|webrip|webmux|hdtv|bdrip|brrip|bluray|remux|dvdrip|dvdscr|h26[45]|x26[45]|hevc|avc|aac\d?|ac3|eac3|ddp\d?|dd\d?|dts|ita|eng|multi|sub|repack)(?:[ ._-]|$)`)
+
+// startsTechnicalToken says whether the text begins with a quality token,
+// after the separators that can precede it.
+func startsTechnicalToken(text string) bool {
+	return spaceRangeTechnicalRe.MatchString(text)
 }
 
 // opensBracket reports a bracket right after the range, skipping the
@@ -1840,6 +1860,11 @@ func parseSeasonPackFast(title string) (releaseMatch, bool) {
 		if season == "" || (pos < len(title) && !isEpisodeSeparator(title[pos])) {
 			continue
 		}
+		// "S02-01" is an episode whose marker is a dash, not the season:
+		// the season-pack matcher must not read it as a whole season.
+		if dashEpisodeFollows(title, pos) {
+			return releaseMatch{}, false
+		}
 		sepStart := i - 1
 		for sepStart > 0 && isEpisodeSeparator(title[sepStart-1]) {
 			sepStart--
@@ -1855,6 +1880,53 @@ func parseSeasonPackFast(title string) (releaseMatch, bool) {
 		return releaseMatch{}, false
 	}
 	return releaseMatch{}, false
+}
+
+// dashEpisodeFollows reports whether a dash and an episode number follow the
+// season marker at pos ("S02-01", "S02 - 01"): the shape the pack fast path
+// would otherwise read as a whole season. A resolution is not an episode.
+func dashEpisodeFollows(title string, pos int) bool {
+	i := pos
+	for i < len(title) && isEpisodeSeparator(title[i]) && !isDashAt(title, i) {
+		i++
+	}
+	if i >= len(title) || !isDashAt(title, i) {
+		return false
+	}
+	i += dashLength(title, i)
+	for i < len(title) && isEpisodeSeparator(title[i]) {
+		i++
+	}
+	digits, end := parseDigitsAt(title, i, 3)
+	if digits == "" || (end < len(title) && !isEpisodeSeparator(title[end])) {
+		return false
+	}
+	value, ok := captureInt(digits)
+	return ok && !isResolutionNumber(value)
+}
+
+// isDashAt reports whether a dash starts at i: the ASCII hyphen or the en dash
+// the Italian sites use in a range.
+func isDashAt(text string, i int) bool {
+	return text[i] == '-' || strings.HasPrefix(text[i:], "–")
+}
+
+// dashLength is the number of bytes of the dash at i.
+func dashLength(text string, i int) int {
+	if text[i] == '-' {
+		return 1
+	}
+	return len("–")
+}
+
+// isResolutionNumber reports the three-digit heights a title writes where an
+// episode number could sit ("S02-720"): they name the quality, not an episode.
+func isResolutionNumber(value int64) bool {
+	switch value {
+	case 480, 576, 720:
+		return true
+	}
+	return false
 }
 
 // parseMiniseriesPackFast reads the "Miniserie … [COMPLETA]" shape of the last
@@ -2128,6 +2200,22 @@ func readInProgressPack(capture []string) (releaseMatch, matchVerdict) {
 	}, matchRead
 }
 
+// readSeasonDashEpisode reads "S02-01" and "S02 - 01": an episode whose marker
+// is a dash instead of the episode letter. A leading zero is not required, but a
+// resolution after the dash is not an episode and is refused, so the season
+// pack matcher keeps reading a title such as "S02-720p".
+func readSeasonDashEpisode(capture []string) (releaseMatch, matchVerdict) {
+	season, ok := captureInt(capture[2])
+	if !ok || season < 1 || season > 40 {
+		return releaseMatch{}, matchRefused
+	}
+	episode, ok := captureInt(capture[3])
+	if !ok || episode < 1 || episode > 999 || isResolutionNumber(episode) {
+		return releaseMatch{}, matchRefused
+	}
+	return releaseMatch{series: seriesName(capture), season: &season, episode: &episode, episodeRange: []int64{episode}}, matchRead
+}
+
 // readSeasonPack reads "S01" and "Season 1 Complete": a whole season.
 func readSeasonPack(capture []string) (releaseMatch, matchVerdict) {
 	season, ok := captureInt(capture[2])
@@ -2170,7 +2258,7 @@ func readSpaceRange(capture []string) (releaseMatch, matchVerdict) {
 		return releaseMatch{}, matchRefused
 	}
 	paddedEnd := len(capture[4]) == 2 && capture[4][0] == '0'
-	if !paddedEnd && !opensBracket(tail, 0) {
+	if !paddedEnd && !opensBracket(tail, 0) && !startsTechnicalToken(tail) {
 		return releaseMatch{}, matchRefused
 	}
 	episodes := make([]int64, 0, last-first+1)

@@ -533,9 +533,19 @@ and — if you enable it — asks eD2k once per season when torrents find nothin
   miniseries [COMPLETE]") is the first season as a whole, and a batch of
   episodes written with a space instead of a dash ("S01E01 02" for the first
   two, "S01E01 08" for all eight) covers the range it declares. A number after
-  the episode is the end of a range only when it carries a leading zero ("02")
-  or a bracket follows it: in "S06E12 68 Seconds" that number belongs to the
+  the episode is the end of a range only when it carries a leading zero ("02"),
+  a bracket follows it or the title has already moved on to the quality
+  ("S06E01 11 1080p"): in "S06E12 68 Seconds" that number belongs to the
   episode title, not to a range.
+- An episode written with a dash instead of the episode letter ("S02-01",
+  "S02 - 01") is episode 1 of season 2, not season 2 as a whole.
+- When a title declares a single episode but the downloaded folder holds a
+  contiguous run of episodes of the same season that starts with it, Gextto
+  files the run as a pack once the download completes: it is what happens when
+  an indexer rewrites "S06E01-11" as "S06E01 11" and the dash is lost. When the
+  same episode is there in two copies (two audio tracks, for example) the
+  better one wins; when the folder does not hold the declared episode at all,
+  the error names the episode instead of counting files.
 - With **pack inspection** on (*Configuration → Seeding and completion → Pack
   inspection*, off by default) Gextto reads the pack's file list as soon as it
   arrives: if the pack adds nothing it is dropped, if only some files are

@@ -76,6 +76,36 @@ func TestParsesCompleteSeasonPackVariants(t *testing.T) {
 	}
 }
 
+func TestParsesDashEpisodeAsEpisodeNotSeasonPack(t *testing.T) {
+	for _, title := range []string{
+		"Example.Show.S02-01.1080p.ITA",
+		"Example.Show.S02 - 01.1080p.ITA",
+	} {
+		release := ParseRelease(title, testMagnet, "test")
+		if release == nil {
+			t.Fatalf("%s: release is nil", title)
+		}
+		if release.IsPack {
+			t.Fatalf("%s: dash episode read as a season pack: %#v", title, release)
+		}
+		if release.Season == nil || *release.Season != 2 {
+			t.Fatalf("%s: season = %v, want 2", title, release.Season)
+		}
+		if release.Episode == nil || *release.Episode != 1 {
+			t.Fatalf("%s: episode = %v, want 1", title, release.Episode)
+		}
+		if want := []int64{1}; !reflect.DeepEqual(release.EpisodeRange, want) {
+			t.Fatalf("%s: episode_range = %v, want %v", title, release.EpisodeRange, want)
+		}
+	}
+	// A resolution after the dash is a quality tag, not an episode: the title
+	// stays a season pack.
+	pack := ParseRelease("Example.Show.S02-720p.ITA", testMagnet, "test")
+	if pack == nil || !pack.IsPack || pack.Season == nil || *pack.Season != 2 {
+		t.Fatalf("S02-720p must stay a season pack: %#v", pack)
+	}
+}
+
 func TestParsesEpisodeZeroAsSpecialNotSeasonPack(t *testing.T) {
 	release := ParseRelease("Silo.S02E00.Season.1.Recap.2160p.WEB-DL.ITA", testMagnet, "test")
 	if release == nil {
@@ -557,6 +587,10 @@ func TestParsesSpaceWrittenEpisodeBatch(t *testing.T) {
 		{"Example S01E03 05 1080p DSNP WEBMux ITA ENG DDP5 1 H 264", []int64{3, 4, 5}},
 		{"Example S01E01 08 1080p DSNP WEBMux HEVC ITA ENG DDP5 1 x265", []int64{1, 2, 3, 4, 5, 6, 7, 8}},
 		{"Example S01E01 10 [720p Ita Eng Spa Subs] byGroup", []int64{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}},
+		// The dash of the range is lost when an indexer rewrites the title:
+		// "S06E01-11" becomes "S06E01 11" and the quality token that follows
+		// still says the number ends a batch.
+		{"Example S01E01 11 1080p DSNP WEB DL ITA ENG AAC 2 0", []int64{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11}},
 	}
 	for _, tc := range cases {
 		release := ParseRelease(tc.title, testMagnet, "test")

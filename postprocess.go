@@ -621,11 +621,17 @@ func MatchingPackFiles(source string, release *models.Release) ([]PackSourceFile
 	}
 	sort.SliceStable(matched, func(i, j int) bool { return matched[i].Episode < matched[j].Episode })
 	deduped := make([]PackSourceFile, 0, len(matched))
-	for index, file := range matched {
-		if index > 0 && matched[index-1].Episode == file.Episode {
+	for _, file := range matched {
+		if len(deduped) == 0 || deduped[len(deduped)-1].Episode != file.Episode {
+			deduped = append(deduped, file)
 			continue
 		}
-		deduped = append(deduped, file)
+		// Two copies of the same episode (a pack that carries an AAC and a
+		// DDP track set): file the better one, not the first the walk met.
+		previous := &deduped[len(deduped)-1]
+		if packFileQuality(*previous) < packFileQuality(file) {
+			*previous = file
+		}
 	}
 	matched = deduped
 	if inProgress {
@@ -648,6 +654,13 @@ func MatchingPackFiles(source string, release *models.Release) ([]PackSourceFile
 		return []PackSourceFile{}, nil
 	}
 	return matched, nil
+}
+
+// packFileQuality scores a pack file from its own name, so two copies of the
+// same episode keep the better one.
+func packFileQuality(file PackSourceFile) int64 {
+	quality := ParseQuality(filepath.Base(file.Path))
+	return quality.Score()
 }
 
 // CopyMatchingPackFiles copies only the pack files whose identity agrees with

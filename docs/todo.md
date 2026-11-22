@@ -66,12 +66,6 @@ still be true after the item lands does not belong here.
 - **Web UI sorting calls `ReleaseScore` in the comparator**: `web_system.go:136`
   runs `FindSeriesMatch` twice per comparison on a manual search. Gate: the
   decorated-sort pattern already used at `web_system.go:713`.
-- **An episode written `S02-01` is read as a season 2 pack**: the separator
-  without `E` is not an episode marker for the parser, so the release comes out
-  with episode 0 and `IsPack`, the pack check then finds one episode against the
-  whole declared season, the download is thrown away and the episode stays a
-  gap. Gate: a parser test over the alternative separators (`S02-01`,
-  `S02 - 01`), classified as S02E01 with the pack rules unchanged.
 
 ## Proposals
 

@@ -5544,6 +5544,25 @@ func (d *Database) ReconcilePackRelease(hash string, release *models.Release, cf
 	return nil
 }
 
+// PromoteEpisodeRange records that a release the title read as a single episode
+// is in fact the run of episodes its files hold. Only the stored identity
+// changes: the row keeps its status and its place in the queue, and the pack
+// staging that follows files each episode on its own.
+func (d *Database) PromoteEpisodeRange(hash string, release *models.Release, cfg *Config) error {
+	if release == nil || release.Kind != "series" || !release.IsPack {
+		return nil
+	}
+	score := cfg.ReleaseScore(release)
+	metadata, err := json.Marshal(models.TorrentMeta{Release: *release})
+	if err != nil {
+		return err
+	}
+	_, err = d.db.Exec("UPDATE torrent_meta SET kind=?1,title=?2,series_name=?3,season=?4,episode=?5,year=?6,quality_score=?7,source=?8,metadata_json=?9,updated_at=?10 WHERE hash=?11",
+		release.Kind, release.Title, release.Series, release.Season, release.Episode,
+		release.Year, score, release.Source, string(metadata), nowSQLite(), strings.ToLower(hash))
+	return err
+}
+
 // ReconcileMissingTorrents marks orphan active torrents as `error` and removes
 // their not-yet-downloaded placeholders.
 func (d *Database) ReconcileMissingTorrents(liveHashes map[string]struct{}) (int, error) {

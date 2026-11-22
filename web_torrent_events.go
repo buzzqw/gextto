@@ -2001,6 +2001,61 @@ func tevEnforceRamdiskCapacity(cfg *Config, torrents TorrentSession, event *mode
 	}
 }
 
+// tevPromoteEpisodeRange reads the completed files of a release that the title
+// read as one episode. An indexer that rewrites "S06E01-11" as "S06E01 11"
+// loses the dash, so the release becomes its first episode while the torrent
+// holds the whole run. When the files are a contiguous run of the declared
+// season that starts at that episode, the release is that run: the download is
+// filed as a pack instead of failing on a folder of episodes.
+func tevPromoteEpisodeRange(release *models.Release, source string) *models.Release {
+	if release == nil || release.Kind != "series" || release.IsPack ||
+		release.Series == nil || release.Season == nil || release.Episode == nil {
+		return nil
+	}
+	info, err := os.Stat(source)
+	if err != nil || !info.IsDir() {
+		return nil
+	}
+	files, err := VideoFiles(source)
+	if err != nil {
+		return nil
+	}
+	first := *release.Episode
+	episodes := make([]int64, 0, len(files))
+	seen := make(map[int64]struct{}, len(files))
+	for _, file := range files {
+		parsed := parseReleaseTitle(filepath.Base(file))
+		if parsed.series == nil || parsed.season == nil || parsed.episode == nil ||
+			parsed.seasonPack || *parsed.season != *release.Season || *parsed.episode < first {
+			continue
+		}
+		if !SeriesNamesMatch(*release.Series, *parsed.series) {
+			continue
+		}
+		if _, repeated := seen[*parsed.episode]; repeated {
+			continue
+		}
+		seen[*parsed.episode] = struct{}{}
+		episodes = append(episodes, *parsed.episode)
+	}
+	if len(episodes) < 2 {
+		return nil
+	}
+	sort.Slice(episodes, func(i, j int) bool { return episodes[i] < episodes[j] })
+	if episodes[0] != first {
+		return nil
+	}
+	for index := 1; index < len(episodes); index++ {
+		if episodes[index] != episodes[index-1]+1 {
+			return nil
+		}
+	}
+	promoted := *release
+	promoted.IsPack = true
+	promoted.EpisodeRange = episodes
+	return &promoted
+}
+
 // tev_reconcilePackIdentityFromFiles implements `reconcile_pack_identity_from_files`.
 func tevReconcilePackIdentityFromFiles(release *models.Release, source string) *models.Release {
 	if release.Kind != "series" || !release.IsPack {
@@ -2489,8 +2544,14 @@ func tevResolveEpisodeCompletedFile(path string, release *models.Release) (strin
 		if len(matches) == 1 {
 			return matches[0], nil
 		}
+		episode := fmt.Sprintf("S%02dE%02d", *release.Season, *release.Episode)
+		if len(matches) > 1 {
+			return "", fmt.Errorf("the download folder holds %d video files and %d of them are %s: Gextto cannot tell which copy to file",
+				len(files), len(matches), episode)
+		}
+		return "", fmt.Errorf("the download folder holds %d video files and none of them is %s", len(files), episode)
 	}
-	return "", fmt.Errorf("completed episode folder %s contains %d ambiguous video files", path, len(files))
+	return "", fmt.Errorf("the download folder holds %d video files and Gextto cannot tell which one is the episode", len(files))
 }
 
 // tev_completeEpisodeFolderWithArchive imports the episode video into the
@@ -3481,6 +3542,14 @@ func tevTorrentFinished(cfg *Config, torrents TorrentSession, db *Database, move
 			return false, err
 		}
 		release = *corrected
+	}
+	if promoted := tevPromoteEpisodeRange(&release, source); promoted != nil {
+		logging.Info(fmt.Sprintf("The download holds %s, not a single episode: Gextto files it as a pack — «%s»",
+			episodeRangeLabel(*promoted.Season, promoted.EpisodeRange), event.Name), "hash", event.Hash)
+		if err := db.PromoteEpisodeRange(event.Hash, promoted, cfg); err != nil {
+			return false, err
+		}
+		release = *promoted
 	}
 	normalizeReleaseSeries(cfg, &release)
 	archiveDestination, hasArchiveDestination := ConfiguredDestinationFor(&release, cfg)
