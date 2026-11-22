@@ -3229,6 +3229,16 @@ func HandleTorrentEvent(cfg *Config, torrents TorrentSession, db *Database, move
 	if err != nil {
 		return false, err
 	}
+	// A torrent added by hand — a pasted magnet, an uploaded .torrent, the
+	// qBittorrent-compatible add — carries no release, and without one a
+	// finished download could only stay in the download folder. Its own name
+	// says what it is; the identification happens at the end, when the payload
+	// is really there (a torrent added for its file list alone never gets one).
+	if event.Kind == "torrent_finished" && tevNeedsManualIdentity(metadata) {
+		if identified := tevRegisterManualRelease(cfg, torrents, db, event); identified != nil {
+			metadata = identified
+		}
+	}
 	if metadata == nil {
 		return tevUnregisteredEvent(db, notifier, event)
 	}

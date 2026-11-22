@@ -758,6 +758,18 @@ anche:
 Un magnet con `so=` scarica solo i file indicati; con `ws=` aggiunge web seed.
 Un indirizzo che risponde con un magnet viene aggiunto come magnet.
 
+Un torrent aggiunto qui **non dichiara cos'è**: non è un risultato di ricerca, e
+l'unica cosa che Gextto sa è il suo nome. Lo legge come legge le release —
+serie, stagione, puntata, anno — e, quando il nome non dice nulla (un pack che si
+chiama «S01»), guarda i nomi dei file che contiene. Se ne ricava una puntata o
+una stagione di una serie che segui, o un film con il suo anno, il download
+finisce in libreria come tutti gli altri: rinominato, registrato sulla puntata,
+visibile nella scheda della serie; la riga nel log lo dice («added by hand,
+recognised as …: it goes to the library»). Se non c'è niente da riconoscere, il
+file resta nella cartella di scarico e Gextto non tocca né la libreria né la
+serie. La stessa lettura vale per i torrent che arrivano dall'API compatibile con
+qBittorrent, quando un altro programma te li manda.
+
 Un torrent non taglia mai un file che trova già al suo posto: se il file che gli
 serve esiste ed è **più lungo** di quanto il torrent si aspetta, l'aggiunta si
 ferma con un messaggio che dice quale file è e di quanto, e sul disco non cambia

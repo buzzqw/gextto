@@ -743,6 +743,18 @@ the queue) and **Do not rename**. With gx-torrent there are also:
 A magnet with `so=` downloads only the listed files; with `ws=` it adds web
 seeds. An address that answers with a magnet is added as a magnet.
 
+A torrent added here **does not say what it is**: it is not a search result, and
+the only thing Gextto knows about it is its name. It reads that name the way it
+reads a release — series, season, episode, year — and, when the name says
+nothing (a pack called «S01»), it looks at the names of the files inside. If it
+works out an episode or a season of a series you follow, or a film with its
+year, the download reaches the library like any other: renamed, recorded on its
+episode, visible on the series page, and the log line says so («added by hand,
+recognised as …: it goes to the library»). When there is nothing to recognise,
+the file stays in the download folder and Gextto touches neither the library nor
+the series. The same reading applies to the torrents that arrive through the
+qBittorrent-compatible API, when another program sends them to you.
+
 A torrent never cuts a file it finds already in place: if the file it needs
 exists and is **longer** than the torrent expects, the add stops with a message
 naming the file and the difference, and nothing on disk changes — move that file
