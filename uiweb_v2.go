@@ -728,9 +728,9 @@ func v2HealthViewFrom(s *AppState, r *http.Request) v2HealthView {
 		DisabledFeeds: disabled,
 		FeedSummary:   summary,
 	}
-	if tab == "notifiche" {
-		view.Notifications = v2NotificationsViewFrom(s, r)
-	}
+	// The tab also carries the failed count, so a problem is visible without
+	// opening it. Reading the log here costs one query on the Health page.
+	view.Notifications = v2NotificationsViewFrom(s, r)
 	return view
 }
 

@@ -11,7 +11,7 @@
     <div class="panel-head">
       <h3 {{trTitle "Ogni tentativo di invio, con i canali e l'esito: serve a capire se un avviso è partito, se è arrivato e quale canale ha fallito."}}>{{tr "Notifiche"}}</h3>
       <form method="post" action="/notifications/clear" hx-post="/notifications/clear">
-        <button class="btn sm danger" type="submit" hx-confirm="{{tr "Svuotare il registro delle notifiche? Le righe non tornano."}}" hx-disabled-elt="this" {{trTitle "Toglie tutte le righe dal registro. Non cambia nulla nelle notifiche future: i canali restano configurati come sono."}}>{{tr "Svuota il registro"}}</button>
+        <button class="btn sm danger" type="submit" id="v2-notifications-clear" hx-confirm="{{tr "Svuotare il registro delle notifiche? Le righe non tornano."}}" hx-disabled-elt="this" {{trTitle "Toglie tutte le righe dal registro. Non cambia nulla nelle notifiche future: i canali restano configurati come sono."}}>{{tr "Svuota il registro"}}</button>
       </form>
     </div>
     <div class="panel-body">
@@ -32,7 +32,7 @@
       </form>
 
       {{if .Rows}}
-      <div class="table-wrap"><table class="data-table notification-log">
+      <div class="table-wrap" tabindex="0" role="region" aria-label="{{tr "Notifiche registrate"}}"><table class="data-table notification-log">
         <caption class="sr-only">{{tr "Notifiche registrate"}}</caption>
         <thead><tr>
           <th scope="col" {{trTitle "Data e ora dell'invio, con i secondi."}}>{{tr "Quando"}}</th>
@@ -42,7 +42,7 @@
           <th scope="col" {{trTitle "L'errore riportato dai canali che hanno rifiutato il messaggio."}}>{{tr "Dettaglio"}}</th>
         </tr></thead>
         <tbody>{{range .Rows}}<tr>
-          <td class="notif-when nowrap">{{.When}}</td>
+          <td class="notif-when">{{.When}}</td>
           <td class="notif-event">{{.Event}}</td>
           <td class="notif-channels muted">{{.Channels}}</td>
           <td class="notif-outcome"><span class="badge {{.OutcomeClass}}">{{tr .Outcome}}</span></td>

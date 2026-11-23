@@ -45,7 +45,7 @@
         <textarea class="input" name="ed2k_link" rows="2" aria-label="{{tr "Link eD2k, uno per riga"}}" placeholder="{{tr "ed2k://|file|…"}}" {{trTitle "Incolla uno o più link eD2k, uno per riga (o separati da spazi)."}}></textarea>
         <button class="btn" type="submit" {{trTitle "Controlla i link eD2k e mostrali come risultati"}}>{{tr "Apri link eD2k"}}</button>
       </form>
-       <div id="v2-search-results">{{template "v2_search_results" .}}</div>
+       <div id="v2-search-results" role="status" aria-live="polite">{{template "v2_search_results" .}}</div>
     </div>
   </div>
   </div>
@@ -58,7 +58,7 @@
 {{if .Links}}<form method="post" action="/search/add-all" hx-post="/search/add-all" hx-swap="none" class="inline">
   <textarea hidden name="ed2k_links">{{.Links}}</textarea>
   <input type="hidden" name="redirect" value="{{$.Redirect}}" />
-  <button class="btn primary sm" type="submit" {{trTitle "Accoda tutti i link eD2k elencati"}}><span>{{tr "Aggiungi tutti"}}</span> ({{len .Results}})</button>
+  <button class="btn primary sm" type="submit" id="v2-search-add-all" hx-confirm="{{tr "Accodare tutti i link eD2k elencati?"}}" {{trTitle "Accoda tutti i link eD2k elencati"}}><span>{{tr "Aggiungi tutti"}}</span> ({{len .Results}})</button>
 </form>{{end}}
 <div class="table-wrap"><table class="data-table">
   <thead><tr><th scope="col">{{tr "Titolo"}}</th><th scope="col">{{tr "Sorgente"}}</th><th scope="col">{{tr "Punteggio"}}</th><th scope="col">{{tr "Dimensione"}}</th><th scope="col">{{tr "Seed"}}</th><th scope="col">{{tr "Azioni"}}</th></tr></thead>

@@ -28,8 +28,8 @@
   --btn-text: #dbe7fb;
   --btn-line: #2b3f61;
   --shadow: 0 12px 34px rgba(2, 8, 23, 0.45);
-  --radius: 14px;
-  --radius-sm: 10px;
+  --radius: 12px;
+  --radius-sm: 8px;
   --topbar: rgba(11, 17, 32, 0.86);
   /* Ink that sits on the accent fill: the accent is a bright green, so the
      text on it is dark; the light and cream themes use white where their
@@ -309,10 +309,23 @@ button:focus-visible, a:focus-visible { outline: 3px solid color-mix(in srgb, va
 .nav-group.system-group.open .nav-item { display: inline-flex; }
 
 .sidebar-foot { display: none; }
+/* The dot tells the state at a glance: green only when the service is ok,
+   amber when it is degraded, red when it is offline. The word stays in the
+   pill, so the meaning is still there without colour. */
 .pulse {
   width: 8px; height: 8px; flex: none; border-radius: 50%;
-  background: var(--accent);
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 14%, transparent);
+  background: var(--ok);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--ok) 14%, transparent);
+}
+.system-pill.warn .pulse,
+.ms-state.warn .pulse {
+  background: var(--warn);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--warn) 18%, transparent);
+}
+.system-pill.err .pulse,
+.ms-state.err .pulse {
+  background: var(--err);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--err) 18%, transparent);
 }
 
 .main-shell { flex: 1; min-width: 0; display: flex; flex-direction: column; }
@@ -803,7 +816,11 @@ label.field > span, .field > span, .field-label { color: var(--muted); font-size
    to show the whole date, instead of letting the other columns squeeze it. */
 @media (min-width: 641px) {
   .data-table.notification-log th:first-child,
-  .data-table.notification-log td.notif-when { width: 12rem; min-width: 12rem; }
+  .data-table.notification-log td.notif-when {
+    width: 12rem;
+    min-width: 8rem;
+    white-space: normal;
+  }
 }
 .dashboard-problems-table td.nowrap { white-space: nowrap; }
 /* A release name is one long word (dots, no spaces): let it wrap, so the

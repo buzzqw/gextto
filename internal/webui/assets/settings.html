@@ -689,8 +689,12 @@ if (document.querySelector('[data-update-applying]')) {
   out.textContent = location.origin + '/api/v2';
   var copy = document.getElementById('qbit-api-copy');
   if (copy) copy.addEventListener('click', function () {
-    if (navigator.clipboard) navigator.clipboard.writeText(out.textContent).catch(function () {});
-    if (window.gx && window.gx.toast) window.gx.toast(out.textContent, false);
+    if (!navigator.clipboard) { if (window.gx && window.gx.toast) window.gx.toast(t('The address could not be copied'), true); return; }
+    navigator.clipboard.writeText(out.textContent).then(function () {
+      if (window.gx && window.gx.toast) window.gx.toast(t('Address copied'), false);
+    }).catch(function () {
+      if (window.gx && window.gx.toast) window.gx.toast(t('The address could not be copied'), true);
+    });
   });
 })();
 document.addEventListener('DOMContentLoaded', function () { ensureTooltips(document); syncSchedModes(); });

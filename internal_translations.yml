@@ -6004,3 +6004,5 @@ eng:
   "Sezioni salute": "Health sections"
   "Gli esiti delle notifiche che Gextto ha cercato di inviare": "The outcomes of the notifications Gextto tried to send"
   "Ogni tentativo di invio, con i canali e l'esito: serve a capire se un avviso è partito, se è arrivato e quale canale ha fallito.": "Every delivery attempt, with the channels and the outcome: it shows whether a notice was sent, whether it arrived and which channel failed."
+  "Accodare tutti i link eD2k elencati?": "Queue all the eD2k links listed?"
+  "Invii falliti": "Failed sends"

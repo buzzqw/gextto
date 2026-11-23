@@ -388,17 +388,21 @@
       tabs[i].setAttribute("aria-selected", active ? "true" : "false");
       tabs[i].setAttribute("tabindex", active ? "0" : "-1");
     }
+    var panel = document.getElementById("v2-detail-panel");
+    if (panel) panel.setAttribute("aria-labelledby", tab.id);
   });
 
   // A tablist is one tab stop: the arrow keys move between tabs and activate
   // them, as a screen reader expects. Clicking still works for mouse users.
   document.addEventListener("keydown", function (event) {
     if (["ArrowLeft", "ArrowRight", "Home", "End"].indexOf(event.key) < 0) return;
-    var tab = event.target.closest && event.target.closest("[data-v2-detail-tab]");
+    // Every tablist follows the same pattern: one tab stop, arrows move and
+    // activate. This covers the detail drawer and the page tabs (Health too).
+    var tab = event.target.closest && event.target.closest('[role="tab"]');
     if (!tab) return;
     var tablist = tab.closest('[role="tablist"]');
     if (!tablist) return;
-    var tabs = Array.prototype.slice.call(tablist.querySelectorAll("[data-v2-detail-tab]"));
+    var tabs = Array.prototype.slice.call(tablist.querySelectorAll('[role="tab"]'));
     var i = tabs.indexOf(tab);
     if (i < 0) return;
     var next = i;
@@ -1245,17 +1249,24 @@
   // if the focused control had an id and the refresh replaced its node, focus
   // the new node with the same id instead of falling back to <body>. Controls
   // that survive the swap are left alone.
-  var focusedBeforeRequest = null;
-  document.addEventListener("htmx:beforeRequest", function () {
+  // One slot per swap target: a page can have several polls running at once,
+  // and a global slot let the first (unrelated) swap consume the focus of
+  // another request before the panel that really replaced the control arrived.
+  var focusByTarget = {};
+  document.addEventListener("htmx:beforeRequest", function (event) {
+    var detail = event.detail || {};
+    var target = detail.target;
     var active = document.activeElement;
-    focusedBeforeRequest = active && active.id ? active : null;
+    if (!target || !target.id || !active || !active.id || !target.contains(active)) return;
+    focusByTarget[target.id] = active.id;
   });
-  document.addEventListener("htmx:afterSwap", function () {
-    if (!focusedBeforeRequest) return;
-    var previous = focusedBeforeRequest;
-    focusedBeforeRequest = null;
-    if (document.contains(previous)) return;
-    var next = document.getElementById(previous.id);
+  document.addEventListener("htmx:afterSwap", function (event) {
+    var target = (event.detail || {}).target;
+    if (!target || !target.id) return;
+    var id = focusByTarget[target.id];
+    if (!id) return;
+    delete focusByTarget[target.id];
+    var next = document.getElementById(id);
     if (next && !next.disabled) { try { next.focus(); } catch (error) { /* ignore */ } }
   });
 
@@ -1933,7 +1944,7 @@
       '<p class="setting-hint">' + th("Scegli un font predisposto o rileva quelli installati. La scelta vale solo in questo browser.") + '</p>' +
       '<label class="field"><span>' + th("Font dell’interfaccia") + '</span><select class="input" data-font-family></select></label>' +
       '<div class="toolbar" style="margin-top:10px"><button class="btn" type="button" data-font-detect>' + th("Rileva font installati") + '</button>' +
-      '<span class="font-detect-status muted" data-font-status></span></div>' +
+      '<span class="font-detect-status muted" data-font-status role="status" aria-live="polite"></span></div>' +
       '<div class="toolbar" style="margin-top:10px"><input class="input" type="text" data-font-custom maxlength="160" placeholder="' + th("es. Noto Sans") + '" />' +
       '<button class="btn" type="button" data-font-apply-custom>' + th("Applica") + '</button></div>' +
       '</div></div>';

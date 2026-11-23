@@ -92,7 +92,7 @@
 {{end}}
 
 {{define "v2_action_notice"}}
-<div class="v2-toast{{if .Error}} error{{end}}" role="{{if .Error}}alert{{else}}status{{end}}"{{if .Error}} data-v2-toast-sticky="1"{{end}}>
+<div class="v2-toast{{if .Error}} error{{end}}" role="{{if .Error}}alert{{else}}status{{end}}"{{if not .Error}} data-v2-toast-ok="1"{{end}}{{if .Error}} data-v2-toast-sticky="1"{{end}}>
   <strong>{{tr .Title}}</strong><span>{{tr .Message}}</span>
   <button class="v2-toast-close" type="button" data-v2-toast-close aria-label="{{tr "Chiudi il messaggio"}}" title="{{tr "Chiudi il messaggio"}}">✕</button>
 </div>

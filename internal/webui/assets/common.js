@@ -61,7 +61,12 @@
     close.setAttribute("aria-label", tr("Close"));
     close.addEventListener("click", function () { el.remove(); });
     el.appendChild(close);
-    region().appendChild(el);
+    var box = region();
+    if (isError) {
+      var older = box.querySelectorAll('.toast.err');
+      for (var i = 0; i < older.length - 2; i++) older[i].remove();
+    }
+    box.appendChild(el);
     if (!isError) {
       setTimeout(function () {
         el.classList.add("hide");

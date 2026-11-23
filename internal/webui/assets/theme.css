@@ -30,6 +30,7 @@
   --warn-soft: #fdf1dc;
   --err: #c02626;
   --err-soft: #fde8e8;
+  --on-danger: #ffffff;
   --info: #1d6fb8;
   --info-soft: #e2f0fc;
   --violet: #6d3fc8;
@@ -64,7 +65,6 @@
     --accent-hover: #7aa1ff;
     --accent-fg: #0b1020;
   /* Ink on a solid danger fill, and the veil behind a dialog. */
-  --on-danger: #fff;
   --backdrop: rgba(8, 12, 20, .55);
     --accent-soft: #1b2744;
     --accent-soft-fg: #a9c2ff;
@@ -74,7 +74,7 @@
     --warn-soft: #2e2410;
     --err: #f87171;
     --err-soft: #331618;
-    --info: #60a5fa;
+    --on-danger: #2a0b0e;
     --info-soft: #132538;
     --violet: #b794f6;
     --violet-soft: #251d3a;
@@ -111,6 +111,7 @@
   --warn-soft: #2e2410;
   --err: #f87171;
   --err-soft: #331618;
+  --on-danger: #2a0b0e;
   --info: #60a5fa;
   --info-soft: #132538;
   --violet: #b794f6;
@@ -420,7 +421,7 @@ dialog.picker { width: min(640px, calc(100vw - 32px)); padding: 16px; gap: 10px;
 }
 
 /* ---------- toasts ---------- */
-.toasts { position: fixed; right: 16px; bottom: 16px; z-index: 90; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+.toasts { position: fixed; right: 16px; bottom: 16px; z-index: 90; display: flex; flex-direction: column; gap: 8px; pointer-events: none; max-height: calc(100vh - 32px); overflow-y: auto; }
 .toast {
   pointer-events: auto; max-width: min(420px, calc(100vw - 32px));
   padding: 10px 14px; border-radius: var(--radius);

@@ -115,7 +115,7 @@
              screen does not go blank, the scroll and the open panels stay, and
              the live figures keep their own rhythm. Without HTMX the button
              falls back to a normal reload. */}}
-        <button class="btn btn-refresh" type="button" hx-get="{{.SelfURL}}" hx-target="#v2-page" hx-select="#v2-page" hx-swap="outerHTML" hx-disabled-elt="this" onclick="if(!window.htmx)window.location.reload()" {{trTitle "Rilegge lo stato dal daemon e sostituisce solo il contenuto: la posizione e i pannelli aperti restano"}} aria-label="{{tr "Ricarica i dati mostrati"}}"><span class="btn-refresh-icon" aria-hidden="true">{{icon "i-reload"}}</span><span class="btn-refresh-label">{{tr "Aggiorna"}}</span></button>
+        <button class="btn btn-refresh" type="button" id="v2-refresh-button" hx-get="{{.SelfURL}}" hx-target="#v2-page" hx-select="#v2-page" hx-swap="outerHTML" hx-disabled-elt="this" onclick="if(!window.htmx)window.location.reload()" {{trTitle "Rilegge lo stato dal daemon e sostituisce solo il contenuto: la posizione e i pannelli aperti restano"}} aria-label="{{tr "Ricarica i dati mostrati"}}"><span class="btn-refresh-icon" aria-hidden="true">{{icon "i-reload"}}</span><span class="btn-refresh-label">{{tr "Aggiorna"}}</span></button>
         {{template "v2_live_status" .Chrome}}
       </div>
       <div class="top-controls">
@@ -239,14 +239,14 @@
 
 {{define "v2_live_status"}}
 <div id="v2-live-status" class="top-live-status">
-  <span class="system-pill" {{if eq .Status "ok"}}{{trTitle "Stato del servizio: ok, Gextto risponde e il ciclo è regolare"}}{{else if eq .Status "degraded"}}{{trTitle "Stato del servizio: degraded, Gextto risponde ma qualcosa non va (cartelle, motore o disco)"}}{{else}}{{trTitle "Stato del servizio: offline, Gextto non risponde"}}{{end}}><span class="pulse"></span>{{tr .Status}}</span>
+  <span class="system-pill {{if eq .Status "ok"}}ok{{else if eq .Status "degraded"}}warn{{else}}err{{end}}" {{if eq .Status "ok"}}{{trTitle "Stato del servizio: ok, Gextto risponde e il ciclo è regolare"}}{{else if eq .Status "degraded"}}{{trTitle "Stato del servizio: degraded, Gextto risponde ma qualcosa non va (cartelle, motore o disco)"}}{{else}}{{trTitle "Stato del servizio: offline, Gextto non risponde"}}{{end}}><span class="pulse"></span>{{tr .Status}}</span>
   <time class="current-time" datetime="{{.CurrentTime}}" aria-label="{{tr "Ora attuale"}}" {{trTitle "Ora attuale"}}>{{tr .CurrentTime}}</time>
 </div>
 {{end}}
 
 {{define "v2_live_mobile_metrics"}}
 <div id="v2-live-mobile-metrics" class="mobile-status-strip" data-problems="{{.Problems}}" data-active-downloads="{{.ActiveDownloads}}">
-  <a class="ms-chip ms-state" href="/?view=health" {{trTitle "Stato del servizio"}}><span class="pulse"></span>{{tr .Status}}</a>
+  <a class="ms-chip ms-state {{if eq .Status "ok"}}ok{{else if eq .Status "degraded"}}warn{{else}}err{{end}}" href="/?view=health" {{trTitle "Stato del servizio"}}><span class="pulse"></span>{{tr .Status}}</a>
   {{if .DryRun}}<a class="ms-chip warn" href="/?view=settings" {{trTitle "Modalità prova: non viene scaricato nulla"}}>{{tr "DRY-RUN"}}</a>{{end}}
   <a class="ms-chip" href="/?view=downloads" {{trTitle "Velocità di download e upload"}}>↓ {{.Download}} · ↑ {{.Upload}}</a>
   {{if .Transferring}}<a class="ms-chip" href="/?view=downloads">⬇ {{.Transferring}} <span>{{tr "in download"}}</span></a>{{end}}

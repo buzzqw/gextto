@@ -17,10 +17,18 @@ still be true after the item lands does not belong here.
 ## Proposals
 
 - **Focus and clicks still lost across some HTMX swaps**: the torrent list now restores
-  focus by id after a refresh and the drawer opener is looked up again, but polling still
+  focus by id per swap target, and the drawer opener is looked up again, but polling still
   replaces whole panels (integrity, maintenance, update, jobs) where a click can land on a
   detached node. Gate: decide whether to give those controls stable ids too or to update
   only the changed cell contents.
+- **Search filters still reload the page**: the notification filter and the bulk eD2k add
+  still use a full redirect, so a keyboard user starts again from the top; the clear and
+  add-all buttons now have ids but a redirect cannot be caught by the focus restore.
+  Gate: convert those endpoints to in-place HTMX swaps or restore focus from the URL.
+- **Visual consistency of status colours and progress bars**: `--ok` still equals
+  `--accent` in all four themes and three different progress bar grammars remain between
+  Gextto and the daemon. Gate: an accessibility check of the new hues in every theme
+  before separating the success colour from the selection colour.
 - **Mobile search missing on the daemon page**: below 760 px the search field is hidden,
   the `/` shortcut focuses an invisible input, and the name filter only sees the first 300
   loaded rows, so a torrent further down is reported as absent. Gate: decide between loading

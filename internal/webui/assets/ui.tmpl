@@ -448,7 +448,7 @@ body{display:flex;flex-direction:column;overflow:hidden}
           <label class="chk"><input type="checkbox" id="log-error" checked title="{{tr "Show errors"}}"> {{tr "ERROR"}}</label>
         </span>
         <button type="button" class="sm" id="log-reload" title="{{tr "Reload latest logs from server"}}">{{tr "Reload"}}</button>
-        <span class="muted" id="log-info"></span>
+        <span class="muted" id="log-status"></span>
       </div>
       <pre class="logview" id="log-view" tabindex="0" role="region" aria-label="{{tr "Log"}}">{{tr "Loading…"}}</pre>
     </div>
@@ -1431,7 +1431,7 @@ function act(op,hashes){
         return r.blob();
       }).then(function(b){
         var url=URL.createObjectURL(b),a=document.createElement('a'),row=dataByHash(hashes[0]);
-        a.href=url;a.download=(row?row.Name:hashes[0])+'.torrent';
+        a.href=url;a.download=(row?String(row.Name||'').replace(/\.torrent$/i,''):hashes[0]||'torrent')+'.torrent';
         document.body.appendChild(a);a.click();a.remove();
         setTimeout(function(){URL.revokeObjectURL(url);},1000);
       }).catch(function(){toast(t('Export failed: the torrent metadata is not available yet'),true);});
@@ -1616,7 +1616,7 @@ function showLog(on){
   var btn=$('#btn-log');if(!btn)return;btn.setAttribute('aria-pressed',on?'true':'false');
   $('#pane-torrents').hidden=on;$('#pane-log').hidden=!on;if(on)loadLog();
 }
-function loadLog(){var n=$('#log-lines').value,url=($('#btn-log')&&$('#btn-log').getAttribute('data-log-url'))||'/ui/gextto-log';$('#log-info').textContent=t('loading…');fetch(url+'?lines='+encodeURIComponent(n),{cache:'no-store'}).then(function(r){return r.ok?r.json():r.text().then(function(x){throw new Error(x);});}).then(function(d){window.__log=d.lines||[];$('#log-info').textContent=(d.path?d.path+' · ':'')+(d.lines||[]).length+' '+t('lines')+' · '+new Date().toLocaleTimeString();renderLog(true);}).catch(function(e){$('#log-view').textContent=t('Cannot read the log:')+' '+e.message;$('#log-info').textContent='';});}
+function loadLog(){var n=$('#log-lines').value,url=($('#btn-log')&&$('#btn-log').getAttribute('data-log-url'))||'/ui/gextto-log';$('#log-status').textContent=t('loading…');fetch(url+'?lines='+encodeURIComponent(n),{cache:'no-store'}).then(function(r){return r.ok?r.json():r.text().then(function(x){throw new Error(x);});}).then(function(d){window.__log=d.lines||[];$('#log-status').textContent=(d.path?d.path+' · ':'')+(d.lines||[]).length+' '+t('lines')+' · '+new Date().toLocaleTimeString();renderLog(true);}).catch(function(e){$('#log-view').textContent=t('Cannot read the log:')+' '+e.message;$('#log-status').textContent='';});}
 function logLevel(line){if(/\sDEBUG\s/.test(line))return 'debug';if(/\s(ERROR|FATAL)\s/.test(line))return 'error';if(/\sWARN(ING)?\s/.test(line))return 'warn';return 'info';}
 function renderLog(scroll){var view=$('#log-view'),q=($('#log-filter').value||'').toLowerCase(),show={debug:$('#log-debug').checked,info:$('#log-info').checked,warn:$('#log-warn').checked,error:$('#log-error').checked},frag=document.createDocumentFragment();(window.__log||[]).forEach(function(line){var lv=logLevel(line);if(!show[lv])return;if(q&&line.toLowerCase().indexOf(q)<0)return;var row=document.createElement('div');if(lv==='error')row.className='error';else if(lv==='warn')row.className='warn';else if(lv==='debug')row.className='debug';row.textContent=line;frag.appendChild(row);});view.textContent='';view.appendChild(frag);if(scroll!==false)view.scrollTop=view.scrollHeight;}
 
@@ -1764,8 +1764,8 @@ document.addEventListener('click',function(e){
   if(el.closest('#sb-more-btn')){state.sbmore=!state.sbmore;$('#sb-more').hidden=!state.sbmore;afterRender();return;}
   var sec=el.closest('#side [data-sec]');if(sec){state.collapsed[sec.dataset.sec]=sec.getAttribute('aria-expanded')==='true';store.set('collapsed',state.collapsed);applyCollapsed();return;}
   var rf=el.closest('[data-rename-file]');if(rf){var frf=$('#dlg-rename-file');$('input[name=hash]',frf).value=rf.dataset.hash;$('input[name=old]',frf).value=rf.dataset.renameFile;$('input[name=new]',frf).value=rf.dataset.renameFile;openDialog(frf);return;}
-  var st=el.closest('#side [data-status]');if(st){state.filter.status=st.dataset.status;store.set('filter',state.filter);applyFilters();closeSide();return;}
-  function pick(attr,key,btn){state.filter[key]=btn.hasAttribute('data-all')?null:btn.getAttribute(attr);store.set('filter',state.filter);applyFilters();closeSide();}
+  var st=el.closest('#side [data-status]');if(st){state.filter.status=st.dataset.status;store.set('filter',state.filter);applyFilters();closeSide(true);return;}
+  function pick(attr,key,btn){state.filter[key]=btn.hasAttribute('data-all')?null:btn.getAttribute(attr);store.set('filter',state.filter);applyFilters();closeSide(true);}
   var cb=el.closest('#side [data-catbtn]');if(cb){pick('data-cat','cat',cb);return;}
   var tg=el.closest('#side [data-tagbtn]');if(tg){pick('data-tag','tag',tg);return;}
   var tk=el.closest('#side [data-trkbtn]');if(tk){pick('data-tracker','tracker',tk);return;}
@@ -1787,7 +1787,7 @@ document.addEventListener('click',function(e){
   var navBtn=el.closest('#nav-more');if(navBtn){var navMenu=$('#nav-menu');if(topMenu()===navMenu)closeMenus();else{var rcN=navBtn.getBoundingClientRect();openMenu(navMenu,rcN.left,rcN.bottom+4,navBtn);}return;}
   var navItem=el.closest('#nav-menu [data-navshow]');if(navItem){closeMenus();navShow(navItem.dataset.navshow);return;}
   var cbtn=el.closest('#btn-cols');if(cbtn){var rc3=cbtn.getBoundingClientRect();if(topMenu()===$('#cols-menu'))closeMenus();else{renderColsMenu();openMenu($('#cols-menu'),rc3.right-220,rc3.bottom+4,cbtn);}return;}
-  if(el.closest('#side-toggle')){var s=$('#side'),open=!s.classList.contains('open');s.classList.toggle('open',open);$('#side-toggle').setAttribute('aria-expanded',open?'true':'false');return;}
+  if(el.closest('#side-toggle')){var s=$('#side'),open=!s.classList.contains('open');s.classList.toggle('open',open);$('#side-toggle').setAttribute('aria-expanded',open?'true':'false');if(open){var first=s.querySelector('button,input,select');if(first)first.focus();}return;}
   var row=rowOf(el);
   if(row&&!el.closest('a,button,input,label')){row.tabIndex=0;select(row.dataset.hash,e.shiftKey?'range':(e.ctrlKey||e.metaKey)?'toggle':'only');if(state.drawer&&state.selected.size===1)openDetail(row.dataset.hash);}
   if(row&&el.closest('a.open')){e.preventDefault();select(row.dataset.hash,'only');openDetail(row.dataset.hash);}

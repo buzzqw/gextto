@@ -1879,6 +1879,8 @@ var uiCatalog = map[string][5]string{
 	"Export failed: the torrent metadata is not available yet": {"Esportazione non riuscita: i metadati del torrent non sono ancora disponibili", "Export fehlgeschlagen: Die Torrent-Metadaten sind noch nicht verfügbar", "Échec de l’export : les métadonnées du torrent ne sont pas encore disponibles", "Error al exportar: los metadatos del torrent aún no están disponibles", "Eksport nie powiódł się: metadane torrenta nie są jeszcze dostępne"},
 	"qBittorrent-compatible API address":                       {"Indirizzo API compatibile con qBittorrent", "qBittorrent-kompatible API-Adresse", "Adresse de l’API compatible qBittorrent", "Dirección de la API compatible con qBittorrent", "Adres API zgodnej z qBittorrent"},
 	"Copy the API address to the clipboard":                    {"Copia l’indirizzo dell’API negli appunti", "API-Adresse in die Zwischenablage kopieren", "Copier l’adresse de l’API dans le presse-papiers", "Copiar la dirección de la API al portapapeles", "Kopiuj adres API do schowka"},
+	"Address copied":                                           {"Indirizzo copiato", "Adresse kopiert", "Adresse copiée", "Dirección copiada", "Adres skopiowany"},
+	"The address could not be copied":                          {"L’indirizzo non è stato copiato", "Die Adresse konnte nicht kopiert werden", "L’adresse n’a pas pu être copiée", "No se pudo copiar la dirección", "Nie udało się skopiować adresu"},
 }
 
 // uiClientKeys are the catalog keys the page's JavaScript looks up at runtime
@@ -1886,6 +1888,9 @@ var uiCatalog = map[string][5]string{
 // one must be a uiCatalog key (checked by the coverage test) or the client
 // would silently fall back to English.
 var uiClientKeys = []string{
+	"Close",
+	"Address copied",
+	"The address could not be copied",
 	"Export failed: the torrent metadata is not available yet",
 	"Highest",
 	"No transfer seen yet: the graph fills while the torrent moves data.",
