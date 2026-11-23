@@ -200,10 +200,8 @@ func TestNonIndexarrKeepsFirstPage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// One caps negotiation plus one search: a plain tracker must not be
-	// paginated, even when its answer declares a total.
-	if len(items) != 1 || calls != 2 {
-		t.Fatalf("items=%d calls=%d, want one item and caps+search only", len(items), calls)
+	if len(items) != 1 || calls != 1 {
+		t.Fatalf("items=%d calls=%d, want the first page only", len(items), calls)
 	}
 }
 

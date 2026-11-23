@@ -178,13 +178,7 @@ func TestUIRssSuggest(t *testing.T) {
 // queried together: with a sequential round the page waits for the sum of
 // their times, and a slow indexer makes the search look stuck.
 func TestUISearchQueriesIndexersInParallel(t *testing.T) {
-	feed := func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Query().Get("t") == "caps" {
-			// Capabilities are metadata, read once when the indexer is added;
-			// the 300 ms delay below belongs to the actual search.
-			_, _ = w.Write([]byte(`<?xml version="1.0"?><caps><limits max="100"/><searching><search available="yes" supportedParams="q"/></searching></caps>`))
-			return
-		}
+	feed := func(w http.ResponseWriter, _ *http.Request) {
 		time.Sleep(300 * time.Millisecond)
 		w.Header().Set("Content-Type", "application/xml")
 		_, _ = w.Write([]byte(searchFeed))

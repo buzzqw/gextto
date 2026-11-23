@@ -26,10 +26,6 @@ const searchFeedXML = `<?xml version="1.0" encoding="UTF-8"?>
 
 func TestSearchIndexersMapsResults(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Query().Get("t") == "caps" {
-			_, _ = w.Write([]byte(`<?xml version="1.0"?><caps><limits max="100"/><searching><search available="yes" supportedParams="q"/></searching></caps>`))
-			return
-		}
 		if r.URL.Path != "/api" || r.URL.Query().Get("q") != "movie 2024" {
 			t.Errorf("unexpected request %s q=%q", r.URL.Path, r.URL.Query().Get("q"))
 		}
