@@ -208,7 +208,7 @@
 </div>
 {{end}}
 
-{{define "v2_state_chips_inner"}}{{range .StateChips}}<button class="state-chip{{if .On}} on{{end}}" type="submit" name="state_pick" value="{{.Key}}" aria-pressed="{{if .On}}true{{else}}false{{end}}" {{trTitle "Mostra solo i torrent in questo stato"}}><span>{{tr .Label}}</span> <span class="n">{{.Count}}</span></button>{{end}}{{end}}
+{{define "v2_state_chips_inner"}}{{range .StateChips}}<button class="state-chip{{if .On}} on{{end}}" type="submit" id="v2-state-chip-{{.Key}}" name="state_pick" value="{{.Key}}" aria-pressed="{{if .On}}true{{else}}false{{end}}" {{trTitle "Mostra solo i torrent in questo stato"}}><span>{{tr .Label}}</span> <span class="n">{{.Count}}</span></button>{{end}}{{end}}
 
 {{define "v2_download_row"}}{{if eq .Kind "torrent"}}{{with .Torrent}}
           <tr id="v2-torrent-{{.Hash}}" data-hash="{{.Hash}}">

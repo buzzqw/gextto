@@ -16,12 +16,11 @@ still be true after the item lands does not belong here.
 
 ## Proposals
 
-- **Focus and clicks still lost across HTMX swaps**: polling still replaces whole panels
-  (integrity, maintenance, update, jobs) and the click can land on a detached node while
-  the keyboard focus falls back to `<body>`. The detail tabs now use the ARIA pattern, but
-  the drawer opener is still held as a DOM reference and breaks after a five-second
-  refresh. Gate: decide between `hx-preserve`, stable ids and restoring the opener by id,
-  or updating only the changed cell contents.
+- **Focus and clicks still lost across some HTMX swaps**: the torrent list now restores
+  focus by id after a refresh and the drawer opener is looked up again, but polling still
+  replaces whole panels (integrity, maintenance, update, jobs) where a click can land on a
+  detached node. Gate: decide whether to give those controls stable ids too or to update
+  only the changed cell contents.
 - **Mobile search missing on the daemon page**: below 760 px the search field is hidden,
   the `/` shortcut focuses an invisible input, and the name filter only sees the first 300
   loaded rows, so a torrent further down is reported as absent. Gate: decide between loading

@@ -479,7 +479,10 @@
   // The torrent detail opens as a bottom drawer (like gx-core) instead of a
   // centered modal, so the list stays visible while it is open. It is not
   // modal: focus moves in and is restored on close, but is not trapped.
-  var detailDrawerOpener = null;
+  // The row that opened the drawer is replaced by the five-second refresh.
+  // Keep its id, not the node: after the swap the old element is detached and
+  // focusing it would leave the focus on <body> when the drawer is closed.
+  var detailDrawerOpenerId = null;
 
   function openDetailDrawer() {
     var drawer = document.getElementById("v2-detail-drawer");
@@ -502,10 +505,11 @@
     if (!drawer || drawer.hidden) return;
     drawer.hidden = true;
     drawer.innerHTML = "";
-    if (detailDrawerOpener && document.contains(detailDrawerOpener) && !detailDrawerOpener.disabled) {
-      try { detailDrawerOpener.focus(); } catch (error) { /* ignore */ }
+    var opener = detailDrawerOpenerId ? document.getElementById(detailDrawerOpenerId) : null;
+    if (opener && !opener.disabled) {
+      try { opener.focus(); } catch (error) { /* ignore */ }
     }
-    detailDrawerOpener = null;
+    detailDrawerOpenerId = null;
   }
   window.gexttoCloseDetailDrawer = closeDetailDrawer;
 
@@ -525,7 +529,7 @@
     // The torrent name button and the row itself open the same drawer: keep the
     // opener so focus returns to where the user was.
     var openBtn = event.target.closest("button[hx-get*='/downloads/detail']");
-    if (openBtn) { detailDrawerOpener = openBtn; return; }
+    if (openBtn) { detailDrawerOpenerId = openBtn.id || null; return; }
     // Anything interactive keeps its own meaning: the row opens the drawer only
     // from a "dead" area. <summary> matters as much as <button>: the row menu
     // is a <details> whose head is a summary, and the icon inside it is a plain
@@ -535,7 +539,7 @@
     if (!row) return;
     var open = row.querySelector("button[hx-get*='/downloads/detail']");
     if (!open) return;
-    detailDrawerOpener = open;
+    detailDrawerOpenerId = open.id || null;
     open.click();
   });
 
@@ -1235,6 +1239,24 @@
     for (var i = 0; i < boxes.length; i++) if (keptSelection[boxes[i].value]) boxes[i].checked = true;
     keptSelection = null;
     updateTorrentSelection();
+  });
+
+  // Automatic refreshes replace whole panels. Keep the keyboard where it was:
+  // if the focused control had an id and the refresh replaced its node, focus
+  // the new node with the same id instead of falling back to <body>. Controls
+  // that survive the swap are left alone.
+  var focusedBeforeRequest = null;
+  document.addEventListener("htmx:beforeRequest", function () {
+    var active = document.activeElement;
+    focusedBeforeRequest = active && active.id ? active : null;
+  });
+  document.addEventListener("htmx:afterSwap", function () {
+    if (!focusedBeforeRequest) return;
+    var previous = focusedBeforeRequest;
+    focusedBeforeRequest = null;
+    if (document.contains(previous)) return;
+    var next = document.getElementById(previous.id);
+    if (next && !next.disabled) { try { next.focus(); } catch (error) { /* ignore */ } }
   });
 
   // ------------------------------------------------------------- menus --
