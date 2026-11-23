@@ -203,8 +203,13 @@ func TestPayloadGoneFollowsRenamedRoot(t *testing.T) {
 	})
 	d.mu.Lock()
 	tor, meta := d.findLocked(hash)
+	// Copy while the lock is held: the tick updates meta.DoneBytes and the
+	// completion fields under d.mu, so reading *meta after unlocking races.
+	var done torrentMeta
+	if meta != nil {
+		done = *meta
+	}
 	d.mu.Unlock()
-	done := *meta
 	done.CompletedAt = time.Now()
 	done.SavePath = src
 	if err := errPayloadGone(tor, &done); err != nil {

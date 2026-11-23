@@ -12,6 +12,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/buzzqw/gextto/internal/settings"
 )
 
 // TestDaemonPeerOptionsActionAndPage sets the bandwidth share and the peer
@@ -91,7 +93,15 @@ func TestGeoDBReadsBothFormats(t *testing.T) {
 // TestPeerCountryUsesTheConfiguredFile loads the operator's file in the
 // background on the first lookup and answers once it is ready.
 func TestPeerCountryUsesTheConfiguredFile(t *testing.T) {
-	d := newTestDaemon(t)
+	// The country column and the file are settings of a running daemon: change
+	// them through the store, not by writing d.opts while the GeoIP goroutine
+	// reads it (that was a real data race under -race).
+	store, err := settings.Load(filepath.Join(t.TempDir(), "settings.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	store.Set(peerCountryKey, "false")
+	d := newTestDaemonFull(t, NetworkOptions{PortBegin: 42500, PortEnd: 42600, Encryption: 1, PEX: true}, store)
 	path := filepath.Join(t.TempDir(), "geo.csv")
 	if err := os.WriteFile(path, []byte("1.0.0.0,1.0.0.255,AU\n"), 0o644); err != nil {
 		t.Fatal(err)
@@ -99,8 +109,8 @@ func TestPeerCountryUsesTheConfiguredFile(t *testing.T) {
 	if got := d.peerCountry("1.0.0.9:6881"); got != "" {
 		t.Fatalf("with the column off: %q", got)
 	}
-	d.opts.Network.PeerCountry = true
-	d.opts.Network.GeoIPFile = path
+	store.Set(peerCountryKey, "true")
+	store.Set(geoIPFileKey, path)
 	waitFor(t, "country loaded", func() bool { return d.peerCountry("1.0.0.9:6881") == "AU" })
 	if d.geoAutomatic() {
 		t.Fatal("an operator file is not the automatic database")

@@ -1,7 +1,6 @@
 package gextto
 
 import (
-	"bytes"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -10,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/buzzqw/gextto/internal/logging"
 	"github.com/buzzqw/gextto/internal/models"
 )
 
@@ -534,9 +532,7 @@ func TestRemoveSeededCompletedToTrashExplainsWhy(t *testing.T) {
 		SeedingSeconds:  60,
 	}
 
-	var captured bytes.Buffer
-	logging.SetOutput(&captured)
-	defer logging.SetOutput(os.Stdout)
+	captured := captureLog(t)
 
 	session := &stubTorrentSession{list: []models.TorrentView{view}}
 	RemoveSeededCompleted(&cfg, session, db, map[string]struct{}{})

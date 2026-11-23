@@ -24,6 +24,8 @@ not change Gextto's interface, where those pages do not exist. Engine fixes, on
 the other hand, apply to both.
 
 ## 23 November 2026
+- **The manual search counter no longer goes backwards.** When several sources answered at the same moment, the manual episode search panel could show «1 of 2 sources» after it had already shown «2 of 2»: the number was updated and read at different times. Each answer is now numbered and shown in order, whenever it arrives. **What changes for you:** nothing to configure; while you look for an episode you always see how many sources really answered.
+- **A badly formed title no longer stops the search.** A release title with thousands of identical characters, of the kind that can arrive from a feed, made the tag reader work forever and froze the program. That reader now stays fast whatever arrives, and the torrent client shows consistent trackers and HTTP sources even while they are changing under your eyes. **What changes for you:** nothing to configure; a malformed feed no longer freezes Gextto and pages do not mix old and new data.
 - **The log now says what is happening in plain words.** When the torrent engine restarted, the log repeated the same technical warning with the connection error for every download and showed the internal names of commands and cleanups. One warning now says that the engine is not answering and that Gextto will try again as soon as it is back; when a download leaves the list because its file is already in the library, the line says so. Commands sent to aMule and archive cleanups are described by what they do too. **What changes for you:** nothing to configure; the log reads as an account of what the program did, instead of dozens of identical lines during a restart.
 
 ## 22 November 2026

@@ -11,7 +11,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/buzzqw/gextto/internal/logging"
 	"github.com/buzzqw/gextto/internal/models"
 )
 
@@ -390,9 +389,7 @@ func TestGapDownloadBestRoute(t *testing.T) {
 		t.Fatalf("result fragment has no bulk button -> %d: %s", code, body)
 	}
 
-	var captured bytes.Buffer
-	logging.SetOutput(&captured)
-	defer logging.SetOutput(os.Stdout)
+	captured := captureLog(t)
 
 	response, err := http.PostForm(server.URL+"/series/gaps/download-best", url.Values{"job": {search.ID}})
 	if err != nil {

@@ -2,6 +2,7 @@ package gextto
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -254,5 +255,43 @@ func TestEpisodeSearchReportsWhatItDoes(t *testing.T) {
 	stagesMu.Unlock()
 	if joined != "sources,ed2k" {
 		t.Fatalf("stages = %v, want sources then ed2k", stages)
+	}
+}
+
+// TestSearchProgressIsOrdered locks the counter against a regression the
+// atomic increment alone could not fix: two sources answering together could
+// publish "2 of 2" before "1 of 2", so the panel showed the count going
+// backwards. Numbering and publishing must happen under the same lock.
+func TestSearchProgressIsOrdered(t *testing.T) {
+	indexer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.WriteString(w, "<rss><channel></channel></rss>")
+	}))
+	t.Cleanup(indexer.Close)
+
+	const sources = 8
+	cfg := DefaultConfig()
+	cfg.WebsearchEngines = nil
+	for i := 0; i < sources; i++ {
+		cfg.Indexers = append(cfg.Indexers, IndexerConfig{
+			Name: fmt.Sprintf("Indexer %d", i), URL: indexer.URL, Enabled: true,
+		})
+	}
+	var mu sync.Mutex
+	var counts []searchProgress
+	ctx := withSearchProgress(context.Background(), func(progress searchProgress) {
+		mu.Lock()
+		counts = append(counts, progress)
+		mu.Unlock()
+	})
+	NewEngine().SearchSeriesEpisode(ctx, &cfg, &SeriesConfig{Name: "Example Show", Enabled: true}, 1, 1, true)
+	mu.Lock()
+	defer mu.Unlock()
+	if len(counts) != sources {
+		t.Fatalf("progress reports = %d, want %d", len(counts), sources)
+	}
+	for i, got := range counts {
+		if want := i + 1; got.Done != want || got.Total != sources {
+			t.Fatalf("progress %d = %+v, want %d of %d (all: %+v)", i, got, want, sources, counts)
+		}
 	}
 }

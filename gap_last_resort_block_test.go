@@ -1,14 +1,11 @@
 package gextto
 
 import (
-	"bytes"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/buzzqw/gextto/internal/logging"
 	"github.com/buzzqw/gextto/internal/models"
 )
 
@@ -58,9 +55,7 @@ func TestSplitLastResortsKeepsABlockedCopyOutOfTheCycle(t *testing.T) {
 // because the same copy was on the blocklist. The line must say what happened
 // and what to do.
 func TestBlockedLastResortIsNotAnnouncedAsTaken(t *testing.T) {
-	var captured bytes.Buffer
-	logging.SetOutput(&captured)
-	defer logging.SetOutput(os.Stdout)
+	captured := captureLog(t)
 
 	until := time.Now().Add(7 * 24 * time.Hour).UTC().Format("2006-01-02 15:04:05")
 	logBlockedLastResorts("Series A", 6, 8, []blockedLastResort{
@@ -80,9 +75,7 @@ func TestBlockedLastResortIsNotAnnouncedAsTaken(t *testing.T) {
 // TestBlockedLastResortSaysHowToUnblockIt: a block that stays has no date, so
 // the line has to name the way out instead of promising a retry.
 func TestBlockedLastResortSaysHowToUnblockIt(t *testing.T) {
-	var captured bytes.Buffer
-	logging.SetOutput(&captured)
-	defer logging.SetOutput(os.Stdout)
+	captured := captureLog(t)
 
 	logBlockedLastResorts("Series A", 6, 8, []blockedLastResort{
 		{reason: blocklistReasonText("manual")},

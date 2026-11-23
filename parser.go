@@ -643,9 +643,10 @@ func stripSubtitleTags(text string) string {
 func removeSubtitleTags(text string) string {
 	var out strings.Builder
 	out.Grow(len(text))
+	memo := make(subtitleTailMemo)
 	last := 0
 	for i := 0; i < len(text); {
-		end := subtitleMatchEnd(text, i)
+		end := subtitleMatchEnd(text, i, memo)
 		if end <= i {
 			i++
 			continue
@@ -660,7 +661,7 @@ func removeSubtitleTags(text string) string {
 }
 
 // subtitleMatchEnd returns the end of a subtitle tag starting at start, or 0.
-func subtitleMatchEnd(text string, start int) int {
+func subtitleMatchEnd(text string, start int, memo subtitleTailMemo) int {
 	if start >= len(text) || !isWordByte(text[start]) {
 		return 0
 	}
@@ -668,7 +669,7 @@ func subtitleMatchEnd(text string, start int) int {
 		return 0
 	}
 	// The regex tries \bMARKER ... ITALIAN\b first, then the reverse.
-	if end := subtitleMarkerFirstEnd(text, start); end > 0 {
+	if end := subtitleMarkerFirstEnd(text, start, memo); end > 0 {
 		return end
 	}
 	return subtitleItalianFirstEnd(text, start)
@@ -756,28 +757,41 @@ func subtitleItalianPrefixes(text string, pos int) []int {
 }
 
 // subtitleMarkerFirstEnd matches MARKER SEP* (LANG SEP*)* ITALIAN\b.
-func subtitleMarkerFirstEnd(text string, start int) int {
+func subtitleMarkerFirstEnd(text string, start int, memo subtitleTailMemo) int {
 	for _, markerEnd := range subtitleMarkerEnds(text, start) {
-		if end := subtitleTailEnd(text, markerEnd); end > 0 {
+		if end := subtitleTailEnd(text, markerEnd, memo); end > 0 {
 			return end
 		}
 	}
 	return 0
 }
 
+// subtitleTailMemo caches the answer for each position of the language run.
+// A run of lowercase letters can be split into two- and three-letter language
+// tokens in exponentially many ways; the answer at a position however does
+// not depend on the path used to reach it. Without the cache a title with a
+// few thousand letters (a fuzz finding) never finishes.
+type subtitleTailMemo map[int]int
+
 // subtitleTailEnd is the greedy language run followed by the Italian token.
-func subtitleTailEnd(text string, pos int) int {
+func subtitleTailEnd(text string, pos int, memo subtitleTailMemo) int {
 	pos = skipSubtitleSeparators(text, pos)
+	if end, seen := memo[pos]; seen {
+		return end
+	}
+	memo[pos] = 0
 	// The regex's (LANG SEP*)* is greedy: try to consume a language first and
 	// only fall back to ending the run here.
 	for _, languageEnd := range subtitleLanguageEnds(text, pos) {
 		next := skipSubtitleSeparators(text, languageEnd)
-		if end := subtitleTailEnd(text, next); end > 0 {
+		if end := subtitleTailEnd(text, next, memo); end > 0 {
+			memo[pos] = end
 			return end
 		}
 	}
 	for _, italianEnd := range subtitleItalianPrefixes(text, pos) {
 		if italianEnd == len(text) || !isWordByte(text[italianEnd]) {
+			memo[pos] = italianEnd
 			return italianEnd
 		}
 	}

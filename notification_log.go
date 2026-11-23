@@ -8,6 +8,7 @@ package gextto
 import (
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/buzzqw/gextto/internal/logging"
@@ -55,13 +56,30 @@ type NotificationRecord struct {
 }
 
 // notifyAudit receives every attempt. The daemon installs its database sink at
-// startup; without one the record is simply not kept.
-var notifyAudit func(NotificationRecord)
+// startup; without one the record is simply not kept. Notifications are
+// delivered in the background even while a test swaps the sink, so the pointer
+// itself needs a lock (the sink called through it must be safe on its own).
+var (
+	notifyAuditMu sync.RWMutex
+	notifyAudit   func(NotificationRecord)
+)
+
+// setNotifyAudit swaps the sink and returns the one it replaced.
+func setNotifyAudit(sink func(NotificationRecord)) func(NotificationRecord) {
+	notifyAuditMu.Lock()
+	defer notifyAuditMu.Unlock()
+	previous := notifyAudit
+	notifyAudit = sink
+	return previous
+}
 
 // auditNotification hands one attempt to the installed sink.
 func auditNotification(record NotificationRecord) {
-	if notifyAudit != nil {
-		notifyAudit(record)
+	notifyAuditMu.RLock()
+	sink := notifyAudit
+	notifyAuditMu.RUnlock()
+	if sink != nil {
+		sink(record)
 	}
 }
 
@@ -69,7 +87,7 @@ func auditNotification(record NotificationRecord) {
 // once when the daemon state is built.
 func InstallNotificationLog(db *Database) {
 	if db == nil {
-		notifyAudit = nil
+		setNotifyAudit(nil)
 		return
 	}
 	// The insert trims the log to its newest rows; this drops the attempts
@@ -79,11 +97,11 @@ func InstallNotificationLog(db *Database) {
 	} else if removed > 0 {
 		logging.Debug("notification log pruned", "removed", removed)
 	}
-	notifyAudit = func(record NotificationRecord) {
+	setNotifyAudit(func(record NotificationRecord) {
 		if err := db.RecordNotification(record); err != nil {
 			logging.Warn("the notification log could not be written", "error", err)
 		}
-	}
+	})
 }
 
 // RecordNotification appends one attempt and trims the log to its newest rows.

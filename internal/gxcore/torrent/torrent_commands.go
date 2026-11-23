@@ -109,9 +109,31 @@ func (t *torrent) NotifyListen() <-chan int {
 // Data access
 // ---------------------------------------------------------------------------
 
+// magnetSnapshot carries the result of the run-loop read out of query, which
+// takes a function with a single return value.
+type magnetSnapshot struct {
+	link string
+	err  error
+}
+
+// torrentSnapshot does the same for the .torrent bytes.
+type torrentSnapshot struct {
+	data []byte
+	err  error
+}
+
 // Magnet exports the magnet link. Private torrents refuse (they must not
-// leak into the DHT swarm).
+// leak into the DHT swarm). The tracker list is owned by the run loop, so the
+// whole read runs there: a tracker hot-swap must not race this snapshot.
 func (t *torrent) Magnet() (string, error) {
+	got := query(t, func() magnetSnapshot {
+		link, err := t.magnet()
+		return magnetSnapshot{link: link, err: err}
+	})
+	return got.link, got.err
+}
+
+func (t *torrent) magnet() (string, error) {
 	if t.info() != nil && t.info().Private {
 		return "", errors.New("torrent is private")
 	}
@@ -124,8 +146,18 @@ func (t *torrent) Magnet() (string, error) {
 	return m.String(), nil
 }
 
-// Torrent exports the .torrent, preserving layers and BEP 38 hints.
+// Torrent exports the .torrent, preserving layers and BEP 38 hints. Trackers
+// and web seeds are run-loop state: build the export there so a live update
+// cannot change the list halfway through this snapshot.
 func (t *torrent) Torrent() ([]byte, error) {
+	got := query(t, func() torrentSnapshot {
+		data, err := t.torrentBytes()
+		return torrentSnapshot{data: data, err: err}
+	})
+	return got.data, got.err
+}
+
+func (t *torrent) torrentBytes() ([]byte, error) {
 	if t.info() == nil {
 		return nil, errors.New("torrent metadata not ready")
 	}

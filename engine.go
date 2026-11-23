@@ -1053,12 +1053,19 @@ func searchOneWithDBType(
 		answeredTotal++
 	}
 	progress := searchProgressObserver(ctx)
-	var answered atomic.Int64
+	var progressMu sync.Mutex
+	answered := 0
 	noteAnswer := func() {
 		if progress == nil || answeredTotal == 0 {
 			return
 		}
-		progress(searchProgress{Done: int(answered.Add(1)), Total: answeredTotal})
+		// Count and report under one lock: an atomic counter alone let a
+		// goroutine that got Done=2 publish it before the one that got Done=1,
+		// so the panel could show the progress going backwards.
+		progressMu.Lock()
+		answered++
+		progress(searchProgress{Done: answered, Total: answeredTotal})
+		progressMu.Unlock()
 	}
 	// An interactive search does not queue behind the cycle's: it skips the
 	// lane slots (the manager still serves it in its own order).

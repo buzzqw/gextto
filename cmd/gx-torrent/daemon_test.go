@@ -180,6 +180,27 @@ func removeTestDir(path string) {
 	}
 }
 
+// fastLSD shortens all three LSD intervals for a local-swarm test and maps
+// announcements to loopback. lsdAnnounceEvery is the one that was missed: the
+// seeder sends one announce, then paces the next a minute away, so a leecher
+// added just after the first packet could wait past the 20-second waitFor
+// deadline. The knobs are restored after the daemons have closed.
+func fastLSD(t *testing.T) {
+	t.Helper()
+	prevTick, prevInterval := lsdTick, lsdInterval
+	prevEvery, prevHost := lsdAnnounceEvery, lsdPeerHost
+	lsdTick = 200 * time.Millisecond
+	lsdInterval = 200 * time.Millisecond
+	lsdAnnounceEvery = 200 * time.Millisecond
+	lsdPeerHost = func(net.IP) string { return "127.0.0.1" }
+	t.Cleanup(func() {
+		lsdTick = prevTick
+		lsdInterval = prevInterval
+		lsdAnnounceEvery = prevEvery
+		lsdPeerHost = prevHost
+	})
+}
+
 func waitFor(t *testing.T, what string, check func() bool) {
 	t.Helper()
 	deadline := time.Now().Add(20 * time.Second)
@@ -1117,23 +1138,7 @@ func TestParseLSD(t *testing.T) {
 
 // The leecher finds the seeder only through LSD multicast announcements.
 func TestLSDDiscovery(t *testing.T) {
-	lsdTick = 200 * time.Millisecond
-	// Re-announce just as often: the leecher is created only after the seeder is
-	// already seeding, so without this it could miss the seeder's announcement
-	// and wait the full production interval (5 minutes) for the next one.
-	lsdInterval = 200 * time.Millisecond
-	// On one machine the sender is this host's own address, which the engine
-	// ignores as itself: dial loopback instead.
-	lsdPeerHost = func(net.IP) string { return "127.0.0.1" }
-	// Restore the knobs with t.Cleanup, not defer: cleanups run LIFO, so
-	// registering this before the daemons makes it run after their Close (which
-	// stops the LSD goroutines). A defer would rewrite the package variables
-	// while the running daemons are still reading them, a data race under -race.
-	t.Cleanup(func() {
-		lsdTick = lsdTickDefault
-		lsdInterval = lsdIntervalDef
-		lsdPeerHost = func(ip net.IP) string { return ip.String() }
-	})
+	fastLSD(t)
 	seeder := newTestDaemonWith(t, NetworkOptions{PortBegin: 43300, PortEnd: 43399, Encryption: 1, LSD: true})
 	leecher := newTestDaemonWith(t, NetworkOptions{PortBegin: 43400, PortEnd: 43499, Encryption: 1, LSD: true})
 	waitFor(t, "LSD started", func() bool {
@@ -1970,21 +1975,7 @@ func TestDaemonSuperSeedingOptionAndAction(t *testing.T) {
 // super-seeding mode: the seed advertises a couple of pieces at a time and only
 // serves those, so completing proves the advertised pieces cycle correctly.
 func TestSuperSeedingTransfer(t *testing.T) {
-	lsdTick = 200 * time.Millisecond
-	// Re-announce just as often: the leecher is created only after the seeder is
-	// already seeding, so without this it could miss the seeder's announcement
-	// and wait the full production interval (5 minutes) for the next one.
-	lsdInterval = 200 * time.Millisecond
-	// On one machine the sender is this host's own address, which the engine ignores
-	// as itself: dial loopback instead.
-	lsdPeerHost = func(net.IP) string { return "127.0.0.1" }
-	// As in TestLSDDiscovery: reset via t.Cleanup so it runs after the daemons
-	// close and the LSD goroutines stop, avoiding a data race on the knobs.
-	t.Cleanup(func() {
-		lsdTick = lsdTickDefault
-		lsdInterval = lsdIntervalDef
-		lsdPeerHost = func(ip net.IP) string { return ip.String() }
-	})
+	fastLSD(t)
 	seeder := newTestDaemonWith(t, NetworkOptions{PortBegin: 43500, PortEnd: 43599, Encryption: 1, LSD: true})
 	leecher := newTestDaemonWith(t, NetworkOptions{PortBegin: 43600, PortEnd: 43699, Encryption: 1, LSD: true})
 	waitFor(t, "LSD started", func() bool {

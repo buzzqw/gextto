@@ -1,14 +1,12 @@
 package gextto
 
 import (
-	"bytes"
 	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
-	"github.com/buzzqw/gextto/internal/logging"
 	"github.com/buzzqw/gextto/internal/models"
 )
 
@@ -49,9 +47,7 @@ func (m *mockTorrentEngine) Pause(hash string) (bool, error) {
 // A removal the engine refuses says so in the log: the interface shows a short
 // notice, the reason has to stay somewhere.
 func TestFailedRemovalIsLogged(t *testing.T) {
-	var captured bytes.Buffer
-	logging.SetOutput(&captured)
-	defer logging.SetOutput(os.Stdout)
+	captured := captureLog(t)
 
 	engine := &failingRemoveEngine{mockTorrentEngine{torrents: []models.TorrentView{
 		{Hash: "aa", Name: "Series A S01E01", State: "downloading"},

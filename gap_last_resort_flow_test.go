@@ -1,16 +1,12 @@
 package gextto
 
 import (
-	"bytes"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"os"
 	"strings"
 	"testing"
-
-	"github.com/buzzqw/gextto/internal/logging"
 )
 
 // TestGapBestPicksQueuesTheOnlyLastResortCopy drives the Missing tab end to
@@ -60,9 +56,7 @@ func TestGapBestPicksQueuesTheOnlyLastResortCopy(t *testing.T) {
 	}
 	waitJobState(t, state.jobs, jobs[0].ID, JobSucceeded)
 
-	var captured bytes.Buffer
-	logging.SetOutput(&captured)
-	defer logging.SetOutput(os.Stdout)
+	captured := captureLog(t)
 
 	resp, err = http.PostForm(server.URL+"/series/gaps/download-best", url.Values{"job": {jobs[0].ID}})
 	if err != nil {

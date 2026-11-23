@@ -8,20 +8,28 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 )
 
 // captureNotifications installs a sink in place of the database and returns the
-// records it receives.
+// records it receives. The notifier calls the sink from its own goroutine, so
+// both the append and the read need a lock under -race.
 func captureNotifications(t *testing.T) func() []NotificationRecord {
 	t.Helper()
-	previous := notifyAudit
+	var mu sync.Mutex
 	records := []NotificationRecord{}
-	notifyAudit = func(record NotificationRecord) {
+	previous := setNotifyAudit(func(record NotificationRecord) {
+		mu.Lock()
 		records = append(records, record)
+		mu.Unlock()
+	})
+	t.Cleanup(func() { setNotifyAudit(previous) })
+	return func() []NotificationRecord {
+		mu.Lock()
+		defer mu.Unlock()
+		return append([]NotificationRecord(nil), records...)
 	}
-	t.Cleanup(func() { notifyAudit = previous })
-	return func() []NotificationRecord { return records }
 }
 
 func TestNotificationAttemptIsRecordedWhenItSucceeds(t *testing.T) {

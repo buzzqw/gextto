@@ -16,7 +16,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/buzzqw/gextto/internal/logging"
 	"github.com/buzzqw/gextto/internal/models"
 )
 
@@ -163,10 +162,8 @@ func TestCancellingADownloadRemovesItAndDeletesFilesWhenAsked(t *testing.T) {
 	control.destination = &destination
 	control.temporary = &temporary
 	control.pathsMu.Unlock()
-	var captured bytes.Buffer
-	logging.SetOutput(&captured)
+	captured := captureLog(t)
 	ok := CancelHTTPDownload(id, true)
-	logging.SetOutput(os.Stdout)
 	if !ok {
 		t.Fatal("cancel should return true")
 	}
@@ -631,9 +628,7 @@ func TestWeeklyLinksReportsTheLinksAlreadyRecorded(t *testing.T) {
 }
 
 func TestComicsCycleLogLinesAreReadable(t *testing.T) {
-	var captured bytes.Buffer
-	logging.SetOutput(&captured)
-	defer logging.SetOutput(os.Stdout)
+	captured := captureLog(t)
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {

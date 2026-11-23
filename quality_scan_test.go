@@ -5,6 +5,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 )
 
 // The scans in ParseQuality replaced a set of regexes. These tests keep the
@@ -267,5 +268,24 @@ func TestQualityScansMatchTheReferenceRegexes(t *testing.T) {
 		if got := findResolutionIndex(norm); got != wantIndex {
 			t.Fatalf("%q: resolution index = %d, want %d", title, got, wantIndex)
 		}
+	}
+}
+
+// TestSubtitleScanStaysLinearOnLongLetterRuns locks the fuzz finding
+// e379482fb558a8e5: after the "cc" marker a long run of lowercase letters can
+// be split into two- and three-letter languages in exponentially many ways.
+// The greedy scan must memoize the answer for each position so the work stays
+// linear in the length of the title.
+func TestSubtitleScanStaysLinearOnLongLetterRuns(t *testing.T) {
+	title := strings.Repeat("c", 4000)
+	done := make(chan struct{})
+	go func() {
+		ParseQuality(title)
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("ParseQuality did not finish on a long run of letters")
 	}
 }
