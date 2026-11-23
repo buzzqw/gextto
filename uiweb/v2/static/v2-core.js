@@ -386,7 +386,29 @@
       var active = tabs[i] === tab;
       tabs[i].classList.toggle("primary", active);
       tabs[i].setAttribute("aria-selected", active ? "true" : "false");
+      tabs[i].setAttribute("tabindex", active ? "0" : "-1");
     }
+  });
+
+  // A tablist is one tab stop: the arrow keys move between tabs and activate
+  // them, as a screen reader expects. Clicking still works for mouse users.
+  document.addEventListener("keydown", function (event) {
+    if (["ArrowLeft", "ArrowRight", "Home", "End"].indexOf(event.key) < 0) return;
+    var tab = event.target.closest && event.target.closest("[data-v2-detail-tab]");
+    if (!tab) return;
+    var tablist = tab.closest('[role="tablist"]');
+    if (!tablist) return;
+    var tabs = Array.prototype.slice.call(tablist.querySelectorAll("[data-v2-detail-tab]"));
+    var i = tabs.indexOf(tab);
+    if (i < 0) return;
+    var next = i;
+    if (event.key === "ArrowRight") next = (i + 1) % tabs.length;
+    else if (event.key === "ArrowLeft") next = (i - 1 + tabs.length) % tabs.length;
+    else if (event.key === "Home") next = 0;
+    else next = tabs.length - 1;
+    event.preventDefault();
+    tabs[next].focus();
+    tabs[next].click();
   });
 
   document.addEventListener("keydown", function (event) {
@@ -1934,7 +1956,7 @@
       var status = fontOverlay.querySelector("[data-font-status]");
       if (!window.queryLocalFonts) { if (status) status.textContent = t("Rilevamento non supportato dal browser."); return; }
       event.currentTarget.disabled = true;
-      if (status) status.textContent = "Richiesta autorizzazione\u2026";
+      if (status) status.textContent = t("Richiesta autorizzazione…");
       window.queryLocalFonts().then(function (fonts) {
         var families = {};
         (fonts || []).forEach(function (font) {

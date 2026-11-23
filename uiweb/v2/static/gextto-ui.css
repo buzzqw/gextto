@@ -941,7 +941,7 @@ label.field > span, .field > span, .field-label { color: var(--muted); font-size
 }
 .origin { display: block; margin-top: 2px; font-size: 0.72rem; }
 .th-sort { cursor: pointer; user-select: none; }
-.th-sort::after { content: "↕"; margin-left: 4px; opacity: 0.35; font-size: 0.7em; }
+.th-sort::after { content: "↕"; margin-left: 4px; opacity: 0.7; font-size: 0.7em; }
 .th-sort[data-sort-dir="asc"]::after { content: "↑"; opacity: 0.9; }
 .th-sort[data-sort-dir="desc"]::after { content: "↓"; opacity: 0.9; }
 .input.compact { width: 96px; min-width: 76px; }

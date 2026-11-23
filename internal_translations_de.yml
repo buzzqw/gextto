@@ -6663,3 +6663,5 @@ deu:
   "Nessuna impostazione è diversa dal valore predefinito.": "Keine Einstellung weicht vom Standardwert ab."
   "1 impostazione è diversa dal valore predefinito.": "1 Einstellung weicht vom Standardwert ab."
   "Svuotare il registro delle notifiche? Le righe non tornano.": "Das Benachrichtigungsprotokoll leeren? Die Zeilen kommen nicht zurück."
+  "Rimuovere il download HTTP e cancellare il file parziale?": "HTTP-Download entfernen und die teilweise heruntergeladene Datei löschen?"
+  "Aggiornamento automatico disattivato": "Automatische Aktualisierung aus"

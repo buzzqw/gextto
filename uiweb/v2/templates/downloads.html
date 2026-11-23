@@ -140,6 +140,7 @@
       <select id="v2-tag-filter" class="input" name="tag_filter" aria-label="{{tr "Filtra per tag"}}" {{trTitle "Mostra solo i torrent associati al tag selezionato"}}><option value="">{{tr "Tutti i tag"}}</option><option value="__none__"{{if eq .TagFilter "__none__"}} selected{{end}}>{{tr "Senza tag"}}</option>{{range .TagOptions}}<option value="{{.}}"{{if eq $.TagFilter .}} selected{{end}}>{{tr .}}</option>{{end}}</select>
       <span class="torrent-sort"><label for="v2-sort">{{tr "Ordina per"}}</label><select id="v2-sort" class="input compact" name="sort" onchange="this.form.requestSubmit()">{{range .Columns}}<option value="{{.Key}}"{{if eq $.Sort .Key}} selected{{end}}>{{tr .Label}}</option>{{end}}</select><button class="btn sm" type="submit" name="sort_click" value="{{.Sort}}" aria-label="{{tr "Inverti la direzione dell'ordinamento"}}" {{trTitle "Inverti la direzione dell'ordinamento"}}>{{if eq .Dir "desc"}}↓{{else}}↑{{end}}</button></span>
       <span class="download-view-tools">
+        {{if not .Auto}}<span class="badge warn">{{tr "Aggiornamento automatico disattivato"}}</span>{{end}}
         <button class="btn sm" type="submit" name="refresh" value="1" aria-label="{{tr "Aggiorna"}}" {{trTitle "Ricarica l'elenco dei torrent e lo stato dei download"}}><span aria-hidden="true">{{icon "i-reload"}}</span></button>
         <details class="v2-menu" data-v2-menu>
           <summary class="btn sm" {{trTitle "Pulizia della sessione e aggiornamento dell'elenco"}}>{{tr "Strumenti"}} <span aria-hidden="true">▾</span></summary>
@@ -291,7 +292,7 @@
                     <div class="v2-menu-panel v2-menu-end">
                       <button class="v2-menu-item" type="button" hx-get="/downloads/http-detail?id={{.ID}}" hx-target="#v2-modal" hx-swap="innerHTML">{{tr "Dettagli…"}}</button>
                       <hr />
-                      <button class="v2-menu-item danger" type="submit" name="http_action" value="remove:{{.ID}}" hx-disabled-elt="this" hx-on::before-request="document.getElementById('v2-http-download-{{.ID}}')?.remove()">{{tr "Rimuovi il download"}}</button>
+                      <button class="v2-menu-item danger" type="submit" name="http_action" value="remove:{{.ID}}" hx-disabled-elt="this" hx-confirm="{{tr "Rimuovere il download HTTP e cancellare il file parziale?"}}">{{tr "Rimuovi il download"}}</button>
                     </div>
                   </details>
                 </div>

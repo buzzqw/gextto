@@ -6604,3 +6604,5 @@ pol:
   "Nessuna impostazione è diversa dal valore predefinito.": "Żadne ustawienie nie różni się od wartości domyślnej."
   "1 impostazione è diversa dal valore predefinito.": "1 ustawienie różni się od wartości domyślnej."
   "Svuotare il registro delle notifiche? Le righe non tornano.": "Wyczyścić rejestr powiadomień? Wiersze nie wrócą."
+  "Rimuovere il download HTTP e cancellare il file parziale?": "Usunąć pobieranie HTTP i skasować częściowy plik?"
+  "Aggiornamento automatico disattivato": "Automatyczne odświeżanie wyłączone"

@@ -35,10 +35,11 @@
   <div class="panel">
     <div class="panel-head"><h3>{{tr "Ricerca release"}}</h3><small class="muted">{{tr "Feed, indexer e motori web (fino a 90 s)"}}</small></div>
     <div class="panel-body">
-      <form class="search-row" method="post" action="/search" hx-post="/search" hx-target="#v2-search-results" hx-swap="innerHTML">
+      <form class="search-row" method="post" action="/search" hx-post="/search" hx-target="#v2-search-results" hx-swap="innerHTML" hx-disabled-elt="find button[type=submit]" hx-indicator="#v2-search-busy">
         <input type="search" name="q" value="{{.Query}}" aria-label="{{tr "Cerca una release"}}" placeholder="{{tr "Cerca una release…"}}" />
         <label class="chk"><input type="checkbox" name="kad" value="1" {{trTitle "Cerca anche su eD2k (Kad, server o entrambi, secondo Configurazione → eD2k e Kad), se l'integrazione è attiva"}}>{{tr "eD2k"}}</label>
         <button class="btn primary" type="submit">{{tr "Cerca"}}</button>
+        <span id="v2-search-busy" class="htmx-indicator muted" role="status" aria-live="polite"><span class="v2-spinner" aria-hidden="true"></span> {{tr "Ricerca in corso, può richiedere un minuto…"}}</span>
       </form>
       <form class="search-row" method="post" action="/search/link" hx-post="/search/link" hx-target="#v2-search-results" hx-swap="innerHTML">
         <textarea class="input" name="ed2k_link" rows="2" aria-label="{{tr "Link eD2k, uno per riga"}}" placeholder="{{tr "ed2k://|file|…"}}" {{trTitle "Incolla uno o più link eD2k, uno per riga (o separati da spazi)."}}></textarea>

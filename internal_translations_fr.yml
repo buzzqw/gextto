@@ -6656,3 +6656,5 @@ fra:
   "Nessuna impostazione è diversa dal valore predefinito.": "Aucun réglage ne diffère de sa valeur par défaut."
   "1 impostazione è diversa dal valore predefinito.": "1 réglage diffère de sa valeur par défaut."
   "Svuotare il registro delle notifiche? Le righe non tornano.": "Vider le journal des notifications ? Les lignes ne reviennent pas."
+  "Rimuovere il download HTTP e cancellare il file parziale?": "Supprimer le téléchargement HTTP et effacer le fichier partiel ?"
+  "Aggiornamento automatico disattivato": "Actualisation automatique désactivée"
