@@ -752,7 +752,7 @@ label.field > span, .field > span, .field-label { color: var(--muted); font-size
    outcome on the first line, the message under them, channels and error last.
    As a five-column table the error column opened one word per line and pushed
    the outcome out of the screen. */
-@media (max-width: 640px) {
+@media (max-width: 900px) {
   .table-wrap:has(> table.notification-log) { overflow: visible; }
   .data-table.notification-log,
   .data-table.notification-log > tbody { display: block; width: 100%; min-width: 0; }
@@ -814,12 +814,12 @@ label.field > span, .field > span, .field-label { color: var(--muted); font-size
 }
 /* The timestamp is a fixed 19 characters: give the first column enough room
    to show the whole date, instead of letting the other columns squeeze it. */
-@media (min-width: 641px) {
+@media (min-width: 901px) {
   .data-table.notification-log th:first-child,
   .data-table.notification-log td.notif-when {
-    width: 12rem;
-    min-width: 8rem;
-    white-space: normal;
+    width: 14rem;
+    min-width: 14rem;
+    white-space: nowrap;
   }
 }
 .dashboard-problems-table td.nowrap { white-space: nowrap; }
