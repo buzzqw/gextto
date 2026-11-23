@@ -150,20 +150,23 @@ func (idx Indexer) IsIndexarr() bool {
 // indexarrMorePages reads the pages after the first of an indexarr search,
 // using the total the response declares. A page that fails ends the reading:
 // the results already read are kept.
-func (idx Indexer) indexarrMorePages(ctx context.Context, endpoint *url.URL, firstBody []byte) []Item {
+func (idx Indexer) indexarrMorePages(ctx context.Context, endpoint *url.URL, firstBody []byte, pageSize int) []Item {
+	if pageSize <= 0 {
+		pageSize = searchPageSize
+	}
 	match := torznabResponseTotal.FindSubmatch(firstBody)
 	if match == nil {
 		return nil
 	}
 	total, err := strconv.Atoi(string(match[1]))
-	if err != nil || total <= searchPageSize {
+	if err != nil || total <= pageSize {
 		return nil
 	}
 	if total > indexarrMaxResults {
 		total = indexarrMaxResults
 	}
 	var out []Item
-	for offset := searchPageSize; offset < total && ctx.Err() == nil; offset += searchPageSize {
+	for offset := pageSize; offset < total && ctx.Err() == nil; offset += pageSize {
 		pageURL := *endpoint
 		params := pageURL.Query()
 		params.Set("offset", strconv.Itoa(offset))
@@ -181,18 +184,34 @@ func (idx Indexer) indexarrMorePages(ctx context.Context, endpoint *url.URL, fir
 	return out
 }
 
-// Search queries one indexer and returns its results.
+// SearchQuery is a Torznab search request. Text is the free-text part; IDs are
+// optional external identifiers (tvdbid, tmdbid, imdbid, …) sent only when the
+// indexer declares them in its caps. Type is "", "tvsearch", "movie" or
+// "search"; an empty type is inferred from a season/episode in Text.
+type SearchQuery struct {
+	Text string
+	Type string
+	IDs  [][2]string
+}
+
+// Search queries one indexer with a free-text query. It keeps the historical
+// signature; callers that know a title's external ids should use SearchWith.
 func (idx Indexer) Search(ctx context.Context, query string) ([]Item, error) {
+	return idx.SearchWith(ctx, SearchQuery{Text: query})
+}
+
+// SearchWith queries one indexer with a caps-aware request.
+func (idx Indexer) SearchWith(ctx context.Context, q SearchQuery) ([]Item, error) {
 	ep := idx.Endpoint()
 	if ep == "" {
 		return nil, fmt.Errorf("torznab: empty indexer URL")
 	}
-	items, err := idx.searchEndpoint(ctx, ep, query)
+	items, err := idx.searchEndpoint(ctx, ep, q)
 	if err != nil {
 		base := strings.TrimRight(strings.TrimSpace(idx.URL), "/")
 		jackettURL := base + "/api/v2.0/indexers/all/results/torznab/api"
 		if strings.Contains(err.Error(), "HTTP 404") && ep != jackettURL {
-			if fbItems, fbErr := idx.searchEndpoint(ctx, jackettURL, query); fbErr == nil {
+			if fbItems, fbErr := idx.searchEndpoint(ctx, jackettURL, q); fbErr == nil {
 				return fbItems, nil
 			}
 		}
@@ -201,25 +220,72 @@ func (idx Indexer) Search(ctx context.Context, query string) ([]Item, error) {
 	return items, nil
 }
 
-func (idx Indexer) searchEndpoint(ctx context.Context, endpointStr, query string) ([]Item, error) {
+func (idx Indexer) searchEndpoint(ctx context.Context, endpointStr string, q SearchQuery) ([]Item, error) {
+	caps := idx.ensureCaps(ctx, endpointStr)
+	items, err := idx.searchOnce(ctx, endpointStr, q, caps, false)
+	if err != nil && torznabUnsupportedParam(err.Error()) {
+		// Jackett's aggregate can reject extended/id parameters with Torznab
+		// 201/203 even when its caps look permissive: repeat without them.
+		return idx.searchOnce(ctx, endpointStr, q, caps, true)
+	}
+	return items, err
+}
+
+// searchOnce builds and runs one request. It parses a fresh URL on every call
+// so the retry after an unsupported parameter cannot inherit the first
+// request's optional fields.
+func (idx Indexer) searchOnce(ctx context.Context, endpointStr string, q SearchQuery, caps *searchCaps, minimal bool) ([]Item, error) {
 	endpoint, err := url.Parse(endpointStr)
 	if err != nil {
 		return nil, fmt.Errorf("torznab: invalid indexer URL: %w", err)
 	}
 	prowlarr := isProwlarrSearch(endpoint.Path)
 	params := endpoint.Query()
+	searchType := normalizeSearchType(q.Type, q.Text)
+	if !caps.functionAvailable(searchType) {
+		searchType = "search"
+	}
+	var ids [][2]string
+	if !minimal {
+		for _, pair := range q.IDs {
+			key := strings.ToLower(strings.TrimSpace(pair[0]))
+			value := strings.TrimSpace(pair[1])
+			if value == "" || !caps.supports(searchType, key) {
+				continue
+			}
+			ids = append(ids, [2]string{key, value})
+		}
+	}
+	pageSize := caps.pageSize()
 	if prowlarr {
-		params.Set("query", query)
-		params.Set("type", "search")
-		// Ask for a full page, as Gextto does; the default is much smaller.
+		params.Set("query", prowlarrQuery(q.Text, searchType, ids))
+		params.Set("type", searchType)
 		params.Set("limit", "100")
 	} else {
-		params.Set("t", "search")
-		params.Set("q", query)
-		// Ask for a full page: the Torznab default is smaller (indexarr
-		// answers 50), and a wanted title has to see the releases on the
-		// following pages too, not only the most seeded ones.
-		params.Set("limit", strconv.Itoa(searchPageSize))
+		params.Set("t", searchType)
+		params.Set("q", q.Text)
+		if !minimal {
+			params.Set("extended", "1")
+		}
+		// Ask for the largest page the indexer declares: a wanted title has to
+		// see releases beyond the default page (indexarr answers 50).
+		params.Set("limit", strconv.Itoa(pageSize))
+		if !minimal && searchType == "tvsearch" && caps.supports(searchType, "season") {
+			if season, ok := seasonFromQuery(q.Text); ok {
+				params.Set("season", strconv.Itoa(season))
+				if _, episode, ok := episodeFromQuery(q.Text); ok && caps.supports(searchType, "ep") {
+					params.Set("ep", strconv.Itoa(episode))
+				}
+			}
+		}
+		for _, pair := range ids {
+			params.Set(pair[0], pair[1])
+		}
+		// indexarr merges eD2k and forum sources: their first answer needs a
+		// longer window than the 5 s default, as Gextto already does.
+		if idx.IsIndexarr() {
+			params.Set("live_wait", "45")
+		}
 	}
 	if key := strings.TrimSpace(idx.APIKey); key != "" {
 		params.Set("apikey", key)
@@ -240,10 +306,13 @@ func (idx Indexer) searchEndpoint(ctx context.Context, endpointStr, query string
 	if err != nil {
 		return nil, err
 	}
-	if !idx.IsIndexarr() {
-		return first, nil
+	// indexarr keeps the merged snapshot for two minutes, so its next pages are
+	// cheap. Other indexers are paginated only when they declare offset support:
+	// re-searching a single tracker for every page would be too expensive.
+	if idx.IsIndexarr() || (caps != nil && caps.supports("search", "offset")) {
+		return append(first, idx.indexarrMorePages(ctx, endpoint, data, pageSize)...), nil
 	}
-	return append(first, idx.indexarrMorePages(ctx, endpoint, data)...), nil
+	return first, nil
 }
 
 // getBody fetches rawURL with the indexer's Get hook (FlareSolverr) or with the
@@ -419,6 +488,9 @@ func (idx Indexer) pingEndpoint(ctx context.Context, endpointStr string) error {
 	if !bytes.Contains(data, []byte("<caps")) {
 		return fmt.Errorf("torznab: %s answered without a caps document (check URL and API key)", idx.Name)
 	}
+	// The body is already here: warm the parsed caps cache so the first search
+	// after configuring the indexer does not pay another round trip.
+	idx.storeCaps(endpointStr, data, false)
 	return nil
 }
 
@@ -448,6 +520,9 @@ func (idx Indexer) pingProwlarr(ctx context.Context, search *url.URL) error {
 	if json.Unmarshal(data, &probe) != nil || probe.Version == "" {
 		return fmt.Errorf("torznab: %s answered without a Prowlarr status (check URL and API key)", idx.Name)
 	}
+	// Warm the Prowlarr capability cache from its indexer list; the aggregate
+	// search has no Torznab caps document.
+	idx.ensureCaps(ctx, search.String())
 	return nil
 }
 

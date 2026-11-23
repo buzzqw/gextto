@@ -51,6 +51,8 @@ func (m *Model) Render(width, height int) Screen {
 			m.HelpScroll = limit
 		}
 		content = content[m.HelpScroll:]
+	case m.Overlay == OverlayCommands:
+		content = m.renderCommands(width, contentHeight)
 	case m.Overlay == OverlaySearch:
 		content = m.renderSearch(width, contentHeight)
 	case m.Overlay == OverlayEvents:
@@ -259,6 +261,8 @@ func (m *Model) hints() string {
 	// of this line is cut, and the global keys are also listed in the help.
 	hints := ""
 	switch {
+	case m.Overlay == OverlayCommands:
+		hints = m.Tr.T("hint.commands")
 	case m.Overlay == OverlayHelp:
 		hints = m.Tr.T("hint.help")
 	case m.Overlay == OverlayEvents:
@@ -1818,6 +1822,28 @@ func (m *Model) priorityLabel(priority int) string {
 	default:
 		return m.Tr.T("priority.top")
 	}
+}
+
+func (m *Model) renderCommands(width, height int) []Line {
+	lines := []Line{{Text: m.Tr.T("cmd.title"), Style: StyleHeader}}
+	visible := visibleCommands(m.Tr, m.PromptText())
+	if len(visible) == 0 {
+		return append(lines, Line{Text: m.Tr.T("msg.nocommand"), Style: StyleWarn})
+	}
+	start := 0
+	if m.CommandSelected >= height-2 {
+		start = m.CommandSelected - height + 2
+	}
+	start = max(0, start)
+	for index := start; index < len(visible) && index < start+max(1, height-1); index++ {
+		text := fmt.Sprintf(" %2d  %s", index+1, m.Tr.T(visible[index].labelKey))
+		style := StyleNormal
+		if index == m.CommandSelected {
+			style = StyleSelected
+		}
+		lines = append(lines, Line{Text: m.truncate(text, width), Style: style})
+	}
+	return lines
 }
 
 func (m *Model) renderHelp(width int) []Line {

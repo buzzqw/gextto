@@ -73,6 +73,7 @@ const (
 	OverlaySettings
 	OverlayHistory
 	OverlayMaintenance
+	OverlayCommands
 )
 
 // PromptKind identifies the active single-line input.
@@ -101,6 +102,7 @@ const (
 	PromptHistoryFilter
 	PromptFolderRename
 	PromptRamdisk
+	PromptCommand
 )
 
 // ActionKind identifies a side effect the runner must perform.
@@ -224,10 +226,13 @@ type prompt struct {
 	Kind   PromptKind
 	Buffer string
 	Cursor int
+	// HistoryIndex is 0 for the newest remembered value, positive for older
+	// ones, and -1 while editing a fresh value.
+	HistoryIndex int
 }
 
 func newPrompt(kind PromptKind, buffer string) *prompt {
-	return &prompt{Kind: kind, Buffer: buffer, Cursor: len([]rune(buffer))}
+	return &prompt{Kind: kind, Buffer: buffer, Cursor: len([]rune(buffer)), HistoryIndex: -1}
 }
 
 // confirm holds a pending yes/no question.
@@ -415,9 +420,11 @@ type Model struct {
 	// Bandwidth is the footer meter of the TUI's own traffic.
 	Bandwidth string
 
-	Prompt  *prompt
-	Confirm *confirm
-	Form    *Form
+	Prompt          *prompt
+	Confirm         *confirm
+	Form            *Form
+	PromptHistory   map[PromptKind][]string
+	CommandSelected int
 
 	Maintenance   *MaintenanceData
 	MaintSelected int
@@ -438,6 +445,7 @@ func NewModel(tr *Translator) *Model {
 		ArchivePage:   1,
 		ColorsEnabled: true,
 		HTTPStates:    make(map[string]string),
+		PromptHistory: make(map[PromptKind][]string),
 	}
 }
 

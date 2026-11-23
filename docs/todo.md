@@ -16,14 +16,6 @@ still be true after the item lands does not belong here.
 
 ## Proposals
 
-- **TUI preferences are lost on restart**: language, colours, contrast and filters live only
-  in memory and in environment variables (`run.go`), so changes made with `g`, `c` and `h`
-  do not survive a new session. Gate: choose where to persist them (daemon data directory or
-  local config) and whether the daemon's active language should still take precedence.
-- **The TUI keyboard map is dense and context-dependent**: the same letters mean different
-  things in different views and `?` opens one flat help list. Gate: decide between a
-  searchable contextual help and a command palette before touching `update.go` and
-  `render.go`.
 - **Focus and clicks still lost across some HTMX swaps**: the torrent list now restores
   focus by id per swap target, and the drawer opener is looked up again, but polling still
   replaces whole panels (integrity, maintenance, update, jobs) where a click can land on a

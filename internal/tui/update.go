@@ -82,6 +82,11 @@ func (m *Model) Update(k Key) Action {
 		m.Overlay = OverlayHelp
 		m.HelpScroll = 0
 		return Action{}
+	case k.Kind == KeyRune && k.Rune == ':':
+		m.Overlay = OverlayCommands
+		m.CommandSelected = 0
+		m.Prompt = newPrompt(PromptCommand, "")
+		return Action{}
 	case k.Kind == KeyRune && k.Rune == 'q':
 		return Action{Kind: ActionQuit}
 	}
@@ -180,6 +185,31 @@ func (m *Model) setTab(tab Tab) {
 	}
 }
 
+// recallPrompt walks the previously submitted values of this prompt kind:
+// Up takes older values, Down returns toward the draft the user was editing.
+func (m *Model) recallPrompt(direction int) {
+	if m.Prompt == nil || m.Prompt.Kind == PromptCommand {
+		return
+	}
+	history := m.PromptHistory[m.Prompt.Kind]
+	if len(history) == 0 {
+		return
+	}
+	index := m.Prompt.HistoryIndex + direction
+	if direction > 0 {
+		index = min(index, len(history)-1)
+	} else {
+		index = max(index, -1)
+	}
+	m.Prompt.HistoryIndex = index
+	if index < 0 {
+		m.Prompt.Buffer = ""
+	} else {
+		m.Prompt.Buffer = history[len(history)-1-index]
+	}
+	m.Prompt.Cursor = len([]rune(m.Prompt.Buffer))
+}
+
 func (m *Model) updatePrompt(k Key) Action {
 	// The cycle prompt is a quick choice: one letter starts the cycle at once,
 	// Enter starts a full one. Any other text is validated on Enter.
@@ -195,11 +225,28 @@ func (m *Model) updatePrompt(k Key) Action {
 	}
 	switch k.Kind {
 	case KeyEsc:
+		if m.Prompt.Kind == PromptCommand && m.Overlay == OverlayCommands {
+			m.Overlay = OverlayNone
+		}
 		m.Prompt = nil
 		m.Message = m.Tr.T("msg.cancelled")
 		return Action{}
 	case KeyEnter:
 		return m.submitPrompt()
+	case KeyUp:
+		if m.Prompt.Kind == PromptCommand {
+			m.moveCommandSelection(-1)
+		} else {
+			m.recallPrompt(1)
+		}
+		return Action{}
+	case KeyDown:
+		if m.Prompt.Kind == PromptCommand {
+			m.moveCommandSelection(1)
+		} else {
+			m.recallPrompt(-1)
+		}
+		return Action{}
 	case KeyBackspace:
 		if m.Prompt.Cursor > 0 {
 			buffer = append(buffer[:m.Prompt.Cursor-1], buffer[m.Prompt.Cursor:]...)
@@ -241,6 +288,9 @@ func (m *Model) updatePrompt(k Key) Action {
 		}
 	}
 	m.Prompt.Buffer = string(buffer)
+	if m.Prompt.Kind == PromptCommand {
+		m.CommandSelected = 0
+	}
 	return Action{}
 }
 
@@ -248,7 +298,29 @@ func (m *Model) submitPrompt() Action {
 	active := m.Prompt
 	m.Prompt = nil
 	value := strings.TrimSpace(active.Buffer)
+	if value != "" && active.Kind != PromptCommand {
+		history := m.PromptHistory[active.Kind]
+		if len(history) == 0 || history[len(history)-1] != value {
+			history = append(history, value)
+			if len(history) > 50 {
+				history = history[len(history)-50:]
+			}
+			m.PromptHistory[active.Kind] = history
+		}
+	}
 	switch active.Kind {
+	case PromptCommand:
+		m.Overlay = OverlayNone
+		visible := visibleCommands(m.Tr, value)
+		if len(visible) == 0 {
+			m.Message = m.Tr.T("msg.nocommand")
+			return Action{}
+		}
+		index := m.CommandSelected
+		if index < 0 || index >= len(visible) {
+			index = 0
+		}
+		return visible[index].run(m)
 	case PromptMagnet:
 		if value == "" {
 			return Action{}

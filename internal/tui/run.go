@@ -70,8 +70,20 @@ func Run(ctx context.Context, opts Options) error {
 	}
 	cancelProbe()
 	model := NewModel(NewTranslator(ResolveLang(opts.Lang, os.Getenv("GEXTTO_LANG"), daemonLang)))
-	model.ColorsEnabled = os.Getenv("NO_COLOR") == "" && os.Getenv("TERM") != "dumb"
-	model.HighContrast = strings.EqualFold(strings.TrimSpace(os.Getenv("GEXTTO_TUI_THEME")), "high-contrast")
+	stored := loadPrefs(os.Getenv)
+	// Explicit environment settings win over saved preferences; otherwise the
+	// display choices made in the settings panel survive the next start.
+	noColor := os.Getenv("NO_COLOR") != "" || os.Getenv("TERM") == "dumb"
+	theme := strings.EqualFold(strings.TrimSpace(os.Getenv("GEXTTO_TUI_THEME")), "high-contrast")
+	model.ColorsEnabled = !noColor
+	if !noColor && stored.ColorsEnabled != nil {
+		model.ColorsEnabled = *stored.ColorsEnabled
+	}
+	model.HighContrast = theme
+	if !theme && stored.HighContrast != nil {
+		model.HighContrast = *stored.HighContrast
+	}
+	savedPrefs := prefs{ColorsEnabled: boolPtr(model.ColorsEnabled), HighContrast: boolPtr(model.HighContrast)}
 	ascii := asciiMode(os.Getenv)
 	escDelay := escapeDelay(os.Getenv("GEXTTO_TUI_ESCDELAY"))
 
@@ -205,16 +217,23 @@ func Run(ctx context.Context, opts Options) error {
 	}
 	updateMeter()
 	handleKeys := func(keys []Key) bool {
+		quitting := false
 		for _, key := range keys {
 			if key.Kind == KeyCtrlL {
 				screen.invalidate()
 				continue
 			}
 			if startAction(model.Update(key)) {
-				return true
+				quitting = true
+				break
 			}
 		}
-		return false
+		if now := (prefs{ColorsEnabled: boolPtr(model.ColorsEnabled), HighContrast: boolPtr(model.HighContrast)}); !now.same(savedPrefs) {
+			if err := now.save(os.Getenv); err == nil {
+				savedPrefs = now
+			}
+		}
+		return quitting
 	}
 
 	ticker := time.NewTicker(refresh)

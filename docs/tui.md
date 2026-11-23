@@ -108,13 +108,21 @@ view.
 
 The **settings panel** (`g`) changes the interface language, the time between
 searches, the download/upload limits and test mode (dry-run); `c` turns colours
-on or off and `h` switches the high-contrast theme.
+on or off and `h` switches the high-contrast theme. The two display choices are
+saved locally in `<user config dir>/gextto/tui.json` (override the path with
+`GEXTTO_TUI_CONFIG`) and restored on the next start, unless `NO_COLOR`,
+`TERM=dumb` or `GEXTTO_TUI_THEME` forces them.
+
+`:` opens the **command palette**: type part of a command name — in any language,
+or its English id — use `↑↓` and press `Enter`. Commands cover the common jumps
+between tabs, adding torrents, running a cycle, opening events and settings,
+refreshing and quitting, so the letter keys stay optional.
 
 ## Keyboard shortcuts
 
 | Scope | Keys |
 | --- | --- |
-| Global | `1`-`9`/`Tab` tabs · `l` Library · `g` settings · `r` refresh · `?` help · `q` quit |
+| Global | `1`-`9`/`Tab` tabs · `l` Library · `g` settings · `r` refresh · `?` help · `:` command palette · `q` quit |
 | Adding | `a` magnet/URL · `t` `.torrent` file · `c` cycle · `s` search · `e` events |
 | Torrents | `↑↓`/`PgUp`/`PgDn`/`Home`/`End` · `Enter` torrent details · `p` pause/resume · `b` restart · `d`/`D` remove (torrent without or with files; HTTP from the list) · `X` clean completed · `k` recheck · `R` reannounce · `n` no-rename · `i`/`u` pin/unpin · `L` global limits · `T` temporary limit · `Space` mark · `*` mark all/none · `#` tag · `A` auto-remove · `H` history · `o`/`O` sort · `/` or `F` filter |
 | Details | `1` general · `2` trackers · `3` files · `4` peers · `↑↓` scroll · `F` discard and find another version · `Esc`/`Enter` back; files: `Space` skip/download, `+`/`-` priority; trackers: `a` add, `d` remove |
@@ -192,6 +200,10 @@ Other variables: `NO_COLOR` (or `TERM=dumb`) turns colours off,
 - `text.go` — column width, removal of control characters, wrapping, ASCII
   fallback.
 - `bandwidth.go` — measurement of the bandwidth the TUI uses (footer).
+- `commands.go` — named commands of the `:` palette and their filtering.
+- `prefs.go` — local display preferences, saved atomically under the user
+  config directory.
+- `input_unix.go` / `input_windows.go` — per-platform input and signal watching.
 - `model.go` / `update.go` / `render.go` (with `render_library.go`,
   `library.go`, `downloads.go`, `maintenance.go`) — pure state, transitions
   from keys and rendering into lines with semantic style (testable without a
@@ -206,8 +218,9 @@ The TUI talks **only** to the daemon's HTTP API and never touches the
 databases.
 
 Text prompts also support `←→`, `Home`/`End`, `Delete`, `Ctrl-A`/`Ctrl-E`
-(start/end), `Ctrl-U` (clear), `Ctrl-K` (delete to the end) and `Ctrl-W`
-(delete the previous word).
+(start/end), `Ctrl-U` (clear), `Ctrl-K` (delete to the end), `Ctrl-W`
+(delete the previous word) and `↑↓` to recall the last values typed in the same
+kind of prompt.
 
 ## Tests
 
