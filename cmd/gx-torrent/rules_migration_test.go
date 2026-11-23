@@ -109,5 +109,14 @@ func TestRuleEditorMovedToWantedPage(t *testing.T) {
 		if (path == "/ui/rss" && has) || (path == "/ui/wanted" && !has) {
 			t.Fatalf("%s: rules section presence = %v, want marker %q", path, has, want)
 		}
+		if path == "/ui/wanted" {
+			// A series or a movie is wanted in one way only: as a title. The
+			// rule editor must not offer to follow one.
+			for _, preset := range []string{`data-preset="series"`, `data-preset="movie"`} {
+				if strings.Contains(string(body), preset) {
+					t.Fatalf("the rule editor still offers %s", preset)
+				}
+			}
+		}
 	}
 }

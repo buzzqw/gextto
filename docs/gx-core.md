@@ -260,6 +260,9 @@ tag, pause, sequential, first/last, top), the persisted history and the live pre
 They are now edited in the *Advanced: feed rules* section at the bottom of
 `/ui/wanted`, not in a tab of `/ui/rss`, and a rule is off until the operator enables
 it. Titles are decided first: a release a title claims is never also taken by a rule.
+The rule editor no longer offers series or movie presets, and a release in a feed offers
+*Add to Series & movies*, which opens the title dialog with the name already filled:
+there is one way to say that a title is wanted.
 At the one-time move, enabled rules were switched off and the page reported the count;
 the rules themselves were kept so they can be inspected, deleted or deliberately
 re-enabled. The qBittorrent-compatible RSS API still exposes rules for existing clients.

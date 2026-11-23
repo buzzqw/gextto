@@ -295,13 +295,9 @@ $$('[data-feed-items]').forEach(function(btn){btn.addEventListener('click',funct
       var b=document.createElement('button');b.type='button';b.className='sm';b.textContent=t('Add');b.title=t('Add this torrent to the download queue');
       b.onclick=function(){var f=new URLSearchParams();f.set('source',it.download);fetch('/ui/add',{method:'POST',body:f,headers:{'Content-Type':'application/x-www-form-urlencoded','X-GX-Fetch':'1'}}).then(function(r){return r.json();}).then(function(res){toast(res.msg,!res.ok);if(res.ok)b.disabled=true;});};
       r.appendChild(b);
-      // "Add to my rules" from the article (qBittorrent): the rule editor opens
-      // with this title as its term, named after the release, on this feed.
-      var rb=document.createElement('button');rb.type='button';rb.className='sm';rb.textContent=t('Add to my rules');rb.title=t('Create a rule from this item, watching this feed');
-      rb.onclick=function(){
-        closeDialog($('#dlg-items'));showTab('rules');
-        editRule({name:it.base||it.title,enabled:true,feeds:[name],match:{include:[it.title]}});
-      };
+      // One way to say "I want this": follow it as a title. The rule editor is
+      // not a second way to choose series or films, so it is not offered here.
+      var rb=document.createElement('a');rb.className='btn sm';rb.href='/ui/wanted?add='+encodeURIComponent(it.base||it.title);rb.textContent=t('Add to Series & movies');rb.title=t('Follow this title in Series & movies, with its quality and episode list');
       r.appendChild(rb);box.appendChild(r);
     });
   }).catch(function(){info.textContent=t('Error');});

@@ -255,8 +255,6 @@ details.hint summary{cursor:pointer}
       <div class="fsec" id="rule-presets">
         <h3>{{tr "Presets"}}</h3>
         <div class="actions m-0">
-          <button type="button" class="sm" data-preset="series" title="{{tr "Fill the rule for TV series: Italian 1080p episodes, each taken once"}}">{{tr "TV series"}}</button>
-          <button type="button" class="sm" data-preset="movie" title="{{tr "Fill the rule for movies: 1080p or 2160p, no CAM or TS"}}">{{tr "Movie"}}</button>
           <button type="button" class="sm" data-preset="all" title="{{tr "Fill the rule to take everything except CAM and TS releases"}}">{{tr "Take all"}}</button>
         </div>
       </div>
@@ -435,6 +433,15 @@ function openEditor(data,index){
 }
 $('#add-wanted').addEventListener('click',function(){openEditor(null);});
 $$('[data-wanted-edit]').forEach(function(btn){btn.addEventListener('click',function(){var d={};['name','kind','seasons','language','subtitles','quality','profile','exclude','episode','category','savepath','paused'].forEach(function(k){d[k]=btn.getAttribute('data-'+k)||'';});openEditor(d,btn.getAttribute('data-index'));});});
+// A release on the RSS page offers to follow it: the title dialog opens already
+// filled, so "I want this series or film" is said in one place only.
+var addName=new URLSearchParams(location.search).get('add');
+if(addName&&addName.trim().length>=2){
+  openEditor(null);
+  form.elements.name.value=addName.trim();
+  previewWanted();
+  search();
+}
 
 // Episode grid: what is present, what is downloading, what is missing. The same
 // renderer feeds the edit dialog and the inline grid of each row.
@@ -698,8 +705,6 @@ $$('#rule-presets [data-preset]').forEach(function(btn){btn.addEventListener('cl
   var p=btn.dataset.preset;
   function set(n,v){var el=ruleForm.elements[n];if(!el)return;if(el.type==='checkbox')el.checked=!!v;else el.value=v||'';}
   ruleForm.reset();setKind(false);
-  if(p==='series'){set('include','1080p, ITA');set('exclude','cam, ts');set('require_episode',true);set('smart_episode',true);}
-  if(p==='movie'){set('include','1080p, 2160p');set('exclude','cam, ts, CAMRip');set('min_seeders','3');}
   if(p==='all'){set('exclude','cam, ts');}
   clearTimeout(rulePreviewTimer);rulePreviewTimer=setTimeout(previewRule,150);
 });});
