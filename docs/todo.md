@@ -16,11 +16,6 @@ still be true after the item lands does not belong here.
 
 ## Proposals
 
-- **The TUI is Linux-only although it is a pure HTTP client**: `internal/tui/term.go` and
-  `run.go` use Linux-only `unix.TCGETS`/`TCSETS`, `unix.Poll` and `syscall.SIGWINCH`, so the
-  TUI does not build for macOS or Windows even though it only talks to the daemon API.
-  Gate: decide whether to keep it Linux-only or move the terminal layer to
-  `golang.org/x/term` with per-OS files, leaving the model and renderer unchanged.
 - **TUI preferences are lost on restart**: language, colours, contrast and filters live only
   in memory and in environment variables (`run.go`), so changes made with `g`, `c` and `h`
   do not survive a new session. Gate: choose where to persist them (daemon data directory or

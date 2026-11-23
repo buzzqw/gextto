@@ -20,6 +20,18 @@ GEXTTO_URL=http://host:5000 GEXTTO_LANG=it /opt/gextto/gexttod tui
 With an installation other than the standard one, replace `/opt/gextto` with
 the directory that contains `gexttod`.
 
+The daemon is Unix-only, but the TUI itself needs only a terminal and the HTTP
+API: the `gextto-tui` client builds on **Linux, macOS and Windows** from the
+checkout, so you can keep a terminal client on the computer you connect from:
+
+```bash
+go build -o gextto-tui ./cmd/gextto-tui/   # or GOOS=windows go build -o gextto-tui.exe ./cmd/gextto-tui/
+./gextto-tui --url http://host:5000 --lang en
+```
+
+It accepts the same `--url`/`--lang` options and environment variables as
+`gexttod tui`; the daemon keeps running on its own machine.
+
 The language is chosen in this order: `--lang`, `GEXTTO_LANG`, the daemon's
 active language (`/api/i18n/active`), otherwise Italian. It can also be changed
 from the settings panel (`g`).

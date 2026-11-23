@@ -5,15 +5,13 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/signal"
 	"runtime/debug"
 	"strconv"
 	"strings"
 	"sync/atomic"
-	"syscall"
 	"time"
 
-	"golang.org/x/sys/unix"
+	"golang.org/x/term"
 )
 
 // Options configures the terminal interface.
@@ -77,7 +75,7 @@ func Run(ctx context.Context, opts Options) error {
 	ascii := asciiMode(os.Getenv)
 	escDelay := escapeDelay(os.Getenv("GEXTTO_TUI_ESCDELAY"))
 
-	if _, err := unix.IoctlGetTermios(int(in.Fd()), unix.TCGETS); err != nil {
+	if !term.IsTerminal(int(in.Fd())) {
 		return fmt.Errorf("%s", model.Tr.T("msg.notty"))
 	}
 	term := newTerminal(in, out)
@@ -90,12 +88,11 @@ func Run(ctx context.Context, opts Options) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	// SIGHUP arrives when the SSH connection drops: leave cleanly instead of
-	// lingering as an orphan that keeps polling the daemon.
-	signalCtx, stopSignals := signal.NotifyContext(ctx, syscall.SIGTERM, syscall.SIGINT, syscall.SIGHUP)
-	defer stopSignals()
-	resizeCh := make(chan os.Signal, 1)
-	signal.Notify(resizeCh, syscall.SIGWINCH)
-	defer signal.Stop(resizeCh)
+	// lingering as an orphan that keeps polling the daemon. The watcher also
+	// reports terminal resizes on the platforms that signal them.
+	signals := watchSignals(ctx)
+	defer signals.cleanup()
+	defer signals.stop()
 
 	// A panic in a background goroutine would kill the process with the
 	// terminal still in raw mode on the alternate screen, which over SSH
@@ -184,8 +181,15 @@ func Run(ctx context.Context, opts Options) error {
 		}
 		return startActionAsync(ctx, client, model, action, requestRefresh, actionCh, &acting)
 	}
+	var lastWidth, lastHeight int
 	draw := func() {
 		width, height := term.size()
+		// Also covers platforms without SIGWINCH (Windows) and terminals whose
+		// resize signal is lost on a slow SSH link.
+		if width != lastWidth || height != lastHeight {
+			screen.invalidate()
+			lastWidth, lastHeight = width, height
+		}
 		termOut += int64(screen.draw(model.Render(width, height), width, height))
 	}
 	meter := &bandwidthMeter{}
@@ -235,9 +239,9 @@ func Run(ctx context.Context, opts Options) error {
 	draw()
 	for !quit {
 		select {
-		case <-signalCtx.Done():
+		case <-signals.ctx.Done():
 			quit = true
-		case <-resizeCh:
+		case <-signals.resize:
 			screen.invalidate()
 			draw()
 			dirty = false
@@ -323,53 +327,6 @@ func escapeDelay(value string) time.Duration {
 		return fallback
 	}
 	return time.Duration(millis) * time.Millisecond
-}
-
-// readInput forwards terminal input and closes ch when the terminal is gone,
-// so the main loop can quit instead of spinning on a dead descriptor.
-func readInput(ctx context.Context, in *os.File, ch chan<- []byte) {
-	defer close(ch)
-	fd := int(in.Fd())
-	buffer := make([]byte, 4096)
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		default:
-		}
-		// Poll with a short timeout instead of trusting VMIN/VTIME: a blocking
-		// terminal read can hang forever (and ignore keys) on some setups.
-		pollFDs := []unix.PollFd{{Fd: int32(fd), Events: unix.POLLIN}}
-		ready, err := unix.Poll(pollFDs, 100)
-		if err != nil {
-			if err == unix.EINTR {
-				continue
-			}
-			return
-		}
-		if ready == 0 {
-			continue
-		}
-		if pollFDs[0].Revents&(unix.POLLHUP|unix.POLLERR|unix.POLLNVAL) != 0 && pollFDs[0].Revents&unix.POLLIN == 0 {
-			return
-		}
-		count, readErr := unix.Read(fd, buffer)
-		if count > 0 {
-			data := make([]byte, count)
-			copy(data, buffer[:count])
-			select {
-			case ch <- data:
-			case <-ctx.Done():
-				return
-			}
-			continue
-		}
-		if readErr == unix.EAGAIN || readErr == unix.EINTR {
-			continue
-		}
-		// count == 0 without error is end of file; anything else is fatal.
-		return
-	}
 }
 
 func readStream(ctx context.Context, client *Client, ch chan<- streamEvent) {

@@ -70,7 +70,7 @@ flowchart LR
 | **Automazione** | Serie TV, film, fumetti · Torznab, RSS, listing HTML · sostituzione automatica download fermi | [Manuale utente](docs/MANUAL.it.md) |
 | **Due reti** | Download simultaneo Torrent + eD2k sullo stesso file · pezzi verificati dal `.part` di aMule | [Integrazione aMule](docs/amule.it.md) |
 | **Integrazioni** | Jellyfin, Plex, Jellyseerr (API v3), aMule (eD2k/Kad), Telegram, Discord, Slack, ntfy, Pushover, iCal | [Manuale utente](docs/MANUAL.it.md) |
-| **Interfacce** | Web UI responsive (SSR + HTMX, PWA installabile, 20+ temi) · TUI da terminale via SSH · API JSON | [Riferimento TUI](docs/tui.md) · [API](docs/API.md) |
+| **Interfacce** | Web UI responsive (SSR + HTMX, PWA installabile, 20+ temi) · TUI da terminale via SSH (client anche su macOS e Windows) · API JSON | [Riferimento TUI](docs/tui.md) · [API](docs/API.md) |
 | **Build** | Go puro (`CGO_ENABLED=0`) · Linux x86_64/aarch64 · gx-torrent anche nativo su Windows | [Guida sviluppatori](docs/DEVELOPERS.md) |
 
 ## Uno sguardo

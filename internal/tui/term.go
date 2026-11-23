@@ -8,14 +8,16 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"golang.org/x/sys/unix"
+	"golang.org/x/term"
 )
 
-// terminal owns the raw-mode state and the alternate screen buffer.
+// terminal owns the raw-mode state and the alternate screen buffer. The x/term
+// layer keeps this client usable on Linux, macOS and Windows: the TUI only
+// needs a terminal and the daemon's HTTP API, not a Unix daemon.
 type terminal struct {
 	in       *os.File
 	out      io.Writer
-	original *unix.Termios
+	original *term.State
 	active   bool
 }
 
@@ -25,19 +27,8 @@ func newTerminal(in *os.File, out io.Writer) *terminal {
 
 func (t *terminal) enter() error {
 	fd := int(t.in.Fd())
-	original, err := unix.IoctlGetTermios(fd, unix.TCGETS)
+	original, err := term.MakeRaw(fd)
 	if err != nil {
-		return err
-	}
-	raw := *original
-	raw.Iflag &^= unix.IGNBRK | unix.BRKINT | unix.PARMRK | unix.ISTRIP | unix.INLCR | unix.IGNCR | unix.ICRNL | unix.IXON
-	raw.Oflag &^= unix.OPOST
-	raw.Lflag &^= unix.ECHO | unix.ECHONL | unix.ICANON | unix.ISIG | unix.IEXTEN
-	raw.Cflag &^= unix.CSIZE | unix.PARENB
-	raw.Cflag |= unix.CS8
-	raw.Cc[unix.VMIN] = 0
-	raw.Cc[unix.VTIME] = 1
-	if err := unix.IoctlSetTermios(fd, unix.TCSETS, &raw); err != nil {
 		return err
 	}
 	t.original = original
@@ -57,17 +48,17 @@ func (t *terminal) leave() {
 	}
 	_, _ = io.WriteString(t.out, "\x1b[?7h\x1b[?2004l\x1b[0m\x1b[?25h\x1b[?1049l")
 	if t.original != nil {
-		_ = unix.IoctlSetTermios(int(t.in.Fd()), unix.TCSETS, t.original)
+		_ = term.Restore(int(t.in.Fd()), t.original)
 	}
 	t.active = false
 }
 
 func (t *terminal) size() (width, height int) {
-	ws, err := unix.IoctlGetWinsize(int(t.in.Fd()), unix.TIOCGWINSZ)
-	if err != nil || ws.Col == 0 || ws.Row == 0 {
+	width, height, err := term.GetSize(int(t.in.Fd()))
+	if err != nil || width <= 0 || height <= 0 {
 		return 80, 24
 	}
-	return int(ws.Col), int(ws.Row)
+	return width, height
 }
 
 // frameRenderer writes frames incrementally, because over SSH every byte
