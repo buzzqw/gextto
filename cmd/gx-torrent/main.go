@@ -364,6 +364,9 @@ func main() {
 		} else {
 			settingsStore = store
 			seedDefaultIPFilter(store, *ipFilter)
+			// One-time: rules moved into the advanced section of Series & movies.
+			// Old enabled rules are switched off and reported on that page.
+			migrateLegacyRules(store)
 		}
 	}
 	// In standalone settings.json is authoritative: a value there wins over the

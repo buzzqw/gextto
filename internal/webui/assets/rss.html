@@ -14,15 +14,9 @@
 .optgrid .panel{padding:16px;display:flex;flex-direction:column;gap:10px}
 .optgrid .panel h3{margin:0;font-size:14px}
 .optgrid .panel p{margin:0;color:var(--muted);font-size:13px}
-.rule-layout{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:18px}
-@media (max-width:820px){.rule-layout{grid-template-columns:1fr}}
-.rule-side{display:flex;flex-direction:column;gap:8px}
-.rule-side h3{margin:0;font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--subtle)}
-.rules-help{margin:0 0 12px}.rules-help p,.rules-help ul{margin:0 0 10px;font-size:13.5px}
 .itemsview .r .seed{font-size:12px;color:var(--subtle);white-space:nowrap}
 .itemsview .r .take{font-size:12px;white-space:nowrap}
 textarea.json{width:100%;font:12.5px/1.45 var(--mono)}
-#rule-preview-warn .hint{color:var(--subtle)}
 #feed-fallback.unused .fgrid,#feed-fallback.unused .checks{border-left:3px solid var(--warn);padding-left:10px}
 /* A sentence, not a one-line label: it wraps as text instead of ending in an
    ellipsis (and the icon stays on the first line). */
@@ -64,7 +58,7 @@ textarea.json{width:100%;font:12.5px/1.45 var(--mono)}
 <div class="page-head">
   <div class="grow">
     <h1>{{tr "RSS & indexers"}}</h1>
-    <p>{{tr "Feeds fill the archive; rules decide what to download, in order: the first match wins. Indexers answer searches and wanted titles."}}</p>
+    <p>{{tr "Feeds fill the archive; indexers answer searches. What gets downloaded is decided in one place:"}} <a href="/ui/wanted">{{tr "Series & movies"}}</a>.</p>
   </div>
   <div class="actions">
     <span class="muted fs-13"><svg class="i"><use href="/assets/icons.svg#i-clock"/></svg> <span>{{tr "Next automatic check"}}</span>: <b>{{.NEXTPOLL}}</b></span>
@@ -74,7 +68,6 @@ textarea.json{width:100%;font:12.5px/1.45 var(--mono)}
 
 <div class="tabbar" role="tablist" aria-label="{{tr "RSS sections"}}">
   <button type="button" role="tab" id="tab-feeds" aria-controls="p-feeds" aria-selected="true" data-tab="feeds" title="{{tr "RSS feeds and listing pages"}}"><svg class="i"><use href="/assets/icons.svg#i-rss"/></svg> {{tr "Feeds"}}<span class="cnt">{{.FEEDCOUNT}}</span></button>
-  <button type="button" role="tab" id="tab-rules" aria-controls="p-rules" aria-selected="false" data-tab="rules" title="{{tr "Download rules, evaluated in order"}}"><svg class="i"><use href="/assets/icons.svg#i-filter"/></svg> {{tr "Rules"}}<span class="cnt">{{.RULECOUNT}}</span></button>
   <button type="button" role="tab" id="tab-indexers" aria-controls="p-indexers" aria-selected="false" data-tab="indexers" title="{{tr "Torznab indexers (Prowlarr, Jackett)"}}"><svg class="i"><use href="/assets/icons.svg#i-server"/></svg> {{tr "Indexers"}}<span class="cnt">{{.INDEXERCOUNT}}</span></button>
   <button type="button" role="tab" id="tab-options" aria-controls="p-options" aria-selected="false" data-tab="options" title="{{tr "Check interval, archive retention, FlareSolverr"}}"><svg class="i"><use href="/assets/icons.svg#i-gear"/></svg> {{tr "Options"}}</button>
 </div>
@@ -91,29 +84,9 @@ textarea.json{width:100%;font:12.5px/1.45 var(--mono)}
     <p class="muted m-0 mb-10 fs-13">{{tr "Feeds fill the archive with releases; rules and wanted titles decide what gets downloaded. Without a feed nothing can arrive on its own."}}</p>
     <div class="actions m-0">
       <button type="button" class="primary sm" id="guide-new-feed" title="{{tr "Add an RSS feed"}}">{{tr "New feed"}}</button>
-      <button type="button" class="sm" id="guide-new-rule" title="{{tr "Add a download rule"}}">{{tr "New rule"}}</button>
       <a class="btn sm" href="#options" id="guide-import" title="{{tr "Check interval, archive retention, FlareSolverr"}}">{{tr "Import a setup"}}</a>
     </div>
   </div>
-</section>
-
-<section class="tabpanel" id="p-rules" role="tabpanel" aria-labelledby="tab-rules" hidden>
-  <div class="panel-head">
-    <h2>{{tr "Rules"}}</h2>
-    <button type="button" class="primary" id="new-rule" title="{{tr "Add a download rule"}}"><svg class="i"><use href="/assets/icons.svg#i-plus"/></svg>{{tr "New rule"}}</button>
-    <p class="hint">{{tr "With at least one rule, only items matching a rule are added: a Skip rule rejects, an Add rule accepts with its save path, category, tags and flags. Rules are evaluated top to bottom."}}</p>
-  </div>
-  <details class="more rules-help">
-    <summary>{{tr "What are rules for?"}}</summary>
-    <p>{{tr "A rule downloads by itself what your feeds publish: think of it as a more powerful \"add a series to Wanted\". You choose which feeds it watches, which titles it takes and where it saves them."}}</p>
-    <ul>
-      <li>{{tr "Follow a series only in the quality you want: Include \"1080p\", Episode filter or Smart episode, so every episode is taken once."}}</li>
-      <li>{{tr "Take everything a feed publishes into one folder, with its category and tags."}}</li>
-      <li>{{tr "Reject what you never want (cam, a language, too small or too big) with a Skip rule placed above the others."}}</li>
-    </ul>
-    <p>{{tr "Before saving, Preview matches in the editor shows what the rule would take from the archive. Without rules a feed only fills the archive, unless its own Include/Exclude select something."}}</p>
-  </details>
-  <ul class="items" id="rule-list">{{.RULEROWS}}</ul>
 </section>
 
 <section class="tabpanel" id="p-indexers" role="tabpanel" aria-labelledby="tab-indexers" hidden>
@@ -189,101 +162,6 @@ textarea.json{width:100%;font:12.5px/1.45 var(--mono)}
   </form>
 </dialog>
 
-<!-- Rule editor -->
-<dialog id="dlg-rule" class="wide" aria-labelledby="dlg-rule-title">
-  <form method="post" action="/ui/rss-rule" id="rule-form">
-    <input type="hidden" name="op" value="add"><input type="hidden" name="index" id="rule-index">
-    <div class="dlg-head"><h2 id="dlg-rule-title">{{tr "New rule"}}</h2><button type="button" class="ghost icon" data-close aria-label="{{tr "Close"}}"><svg class="i"><use href="/assets/icons.svg#i-x"/></svg></button></div>
-    <div class="dlg-body">
-      <div class="fsec" id="rule-presets">
-        <h3>{{tr "Presets"}}</h3>
-        <div class="actions m-0">
-          <button type="button" class="sm" data-preset="series" title="{{tr "Fill the rule for TV series: Italian 1080p episodes, each taken once"}}">{{tr "TV series"}}</button>
-          <button type="button" class="sm" data-preset="movie" title="{{tr "Fill the rule for movies: 1080p or 2160p, no CAM or TS"}}">{{tr "Movie"}}</button>
-          <button type="button" class="sm" data-preset="all" title="{{tr "Fill the rule to take everything except CAM and TS releases"}}">{{tr "Take all"}}</button>
-        </div>
-      </div>
-      <div class="rule-layout">
-        <div>
-          <div class="fsec">
-            <div class="fgrid">
-              <label class="field span2">{{tr "Rule name"}}<input type="text" name="name" placeholder="shows" autocomplete="off" required title="{{tr "Rule name"}}"></label>
-              <div class="field"><span>{{tr "Kind"}}</span>
-                <div class="seg" role="radiogroup" aria-label="{{tr "Kind"}}">
-                  <label title="{{tr "Items matching the rule are downloaded"}}"><input type="radio" name="kind" value="add" checked> {{tr "Add"}}</label>
-                  <label title="{{tr "Skip and reject matching releases"}}"><input type="radio" name="kind" value="skip"> {{tr "Skip"}}</label>
-                </div>
-              </div>
-            </div>
-            <input type="checkbox" name="fail" value="1" hidden aria-hidden="true" tabindex="-1" title="{{tr "Skip and reject matching releases"}}">
-            <div class="checks"><label class="chk"><input type="checkbox" name="enabled" value="1" checked title="{{tr "Enable this rule"}}"> {{tr "Enabled"}}</label></div>
-          </div>
-          <div class="fsec">
-            <h3>{{tr "Which items"}}</h3>
-            <div class="fgrid">
-              <fieldset class="feedpick">
-                <legend>{{tr "Apply this rule to these feeds"}}</legend>
-                <p class="hint">{{tr "No feed checked = every feed."}}</p>
-                <div class="feedpick-list">{{.RULEFEEDS}}</div>
-              </fieldset>
-              <label class="field full">{{tr "Contains all of"}}<input type="text" name="require" placeholder="{{tr "the office, 1080p"}}" autocomplete="off" title="{{tr "Every one of these terms must be in the title (comma separated): use it for the series name and what you always want"}}"></label>
-              <label class="field">{{tr "Contains one of"}}<input type="text" name="include" placeholder="1080p, 2160p" autocomplete="off" title="{{tr "At least one of these terms must be in the title (comma separated): use it for alternatives"}}"></label>
-              <label class="field">{{tr "Contains none of"}}<input type="text" name="exclude" placeholder="{{tr "cam, ts"}}" autocomplete="off" title="{{tr "A title with any of these terms is not taken (comma separated)"}}"></label>
-              <label class="field">{{tr "Episode filter"}}<input type="text" name="episode_filter" placeholder="1x01-05, 1x07" autocomplete="off" title="{{tr "Episode pattern (e.g. 1x01-05)"}}"></label>
-            </div>
-            <p class="hint">{{tr "Terms are separated by commas. Dots, dashes and spaces in release names count the same, and a term matches from the start of a word: \"the office\" finds The.Office.US, \"ita\" finds ITA but not Capitan."}}</p>
-            <div class="checks">
-              <label class="chk"><input type="checkbox" name="require_episode" value="1" title="{{tr "Take only titles with an episode number (S01E02 or 1x02): no movies and no season packs"}}"> {{tr "Episodes only"}}</label>
-              <label class="chk"><input type="checkbox" name="smart_episode" value="1" title="{{tr "Download each episode only once, even when several releases of it appear"}}"> {{tr "Each episode once"}}</label>
-              <label class="chk"><input type="checkbox" name="only_freeleech" value="1" title="{{tr "Take only releases the indexer marks as freeleech: the download does not count toward the tracker ratio"}}"> {{tr "Freeleech only"}}</label>
-            </div>
-            <details class="more">
-              <summary>{{tr "Advanced filters"}}</summary>
-              <div class="fgrid">
-                <label class="field">{{tr "Regex"}}<input type="text" name="regex" placeholder="S0E0" autocomplete="off" title="{{tr "Regular expression that release title must match"}}"></label>
-                <label class="field">{{tr "Not regex"}}<input type="text" name="not_regex" placeholder="cam" autocomplete="off" title="{{tr "Regular expression that release title must not match"}}"></label>
-                <label class="field">{{tr "Min size (MiB)"}}<input type="number" step="1" min="0" name="min_size" title="{{tr "Minimum release size in MiB"}}"></label>
-                <label class="field">{{tr "Max size (MiB)"}}<input type="number" step="1" min="0" name="max_size" title="{{tr "Maximum release size in MiB"}}"></label>
-                <label class="field">{{tr "Min seeders"}}<input type="number" name="min_seeders" title="{{tr "Minimum seeders required on release"}}"></label>
-                <label class="field">{{tr "Max seeders"}}<input type="number" name="max_seeders" title="{{tr "Maximum seeders allowed on release"}}"></label>
-                <label class="field">{{tr "Min peers"}}<input type="number" name="min_peers" title="{{tr "Minimum peers required on release"}}"></label>
-                <label class="field">{{tr "Max age (days)"}}<input type="number" name="max_age_days" title="{{tr "Maximum age of release in days"}}"></label>
-                <label class="field">{{tr "Cooldown between matches (days)"}}<input type="number" name="ignore_days" title="{{tr "Days to wait before matching the same title again"}}"></label>
-              </div>
-            </details>
-          </div>
-          <div class="fsec" id="rule-action">
-            <h3>{{tr "What to do"}}</h3>
-            <div class="fgrid">
-              <label class="field span2">{{tr "Save path"}}<input type="text" name="savepath" placeholder="/srv/tv" autocomplete="off" title="{{tr "Folder on disk where files will be saved"}}"></label>
-              <label class="field">{{tr "Category"}}<input type="text" name="category" placeholder="tv" autocomplete="off" title="{{tr "Category assigned to added torrents"}}"></label>
-              <label class="field">{{tr "Tags"}}<input type="text" name="tags" placeholder="{{tr "tag, tag"}}" autocomplete="off" title="{{tr "Tags assigned to added torrents"}}"></label>
-            </div>
-            <div class="checks">
-              <label class="chk"><input type="checkbox" name="paused" value="1" title="{{tr "Add matched torrents in paused state"}}"> {{tr "Paused"}}</label>
-              <label class="chk"><input type="checkbox" name="top" value="1" title="{{tr "Place matched torrents at top of queue"}}"> {{tr "top"}}</label>
-              <label class="chk"><input type="checkbox" name="sequential" value="1" title="{{tr "Download pieces in sequential order"}}"> {{tr "sequential"}}</label>
-              <label class="chk"><input type="checkbox" name="first_last" value="1" title="{{tr "Download start and end pieces of files first"}}"> {{tr "first/last"}}</label>
-              <label class="chk"><input type="checkbox" name="once" value="1" title="{{tr "Disable the rule after it adds its first torrent"}}"> {{tr "Download once"}}</label>
-            </div>
-          </div>
-        </div>
-        <aside class="rule-side" aria-labelledby="pv-title">
-          <h3 id="pv-title">{{tr "Preview"}}</h3>
-          <p class="muted m-0 fs-12">{{tr "Which archived items this rule would take. It updates as you type."}}</p>
-          <button type="button" class="sm" id="rule-preview" title="{{tr "Show which archived items this rule would match"}}">{{tr "Refresh preview"}}</button>
-          <div id="rule-preview-warn" aria-live="polite"></div>
-          <div class="preview" id="rule-preview-box" aria-live="polite" tabindex="0" role="region" aria-label="{{tr "Preview"}}"><span class="subtle">—</span></div>
-        </aside>
-      </div>
-    </div>
-    <div class="dlg-foot">
-      <button type="button" data-close title="{{tr "Close without saving"}}">{{tr "Cancel"}}</button>
-      <button type="submit" class="primary" id="rule-submit" title="{{tr "Save filter rule"}}">{{tr "Add rule"}}</button>
-    </div>
-  </form>
-</dialog>
-
 <!-- Indexer editor -->
 <dialog id="dlg-indexer" aria-labelledby="dlg-indexer-title">
   <form method="post" action="/ui/rss-indexer" id="indexer-form">
@@ -330,7 +208,7 @@ function openDialog(d){d.showModal?d.showModal():d.setAttribute('open','');var f
 function closeDialog(d){d.close?d.close():d.removeAttribute('open');}
 
 // ---------- tabs (URL hash keeps the tab across saves) ----------
-var TABS=['feeds','rules','indexers','options'];
+var TABS=['feeds','indexers','options'];
 function showTab(name,focus){
   if(TABS.indexOf(name)<0)name='feeds';
   TABS.forEach(function(n){var on=n===name;$('#tab-'+n).setAttribute('aria-selected',on?'true':'false');$('#tab-'+n).tabIndex=on?0:-1;$('#p-'+n).hidden=!on;});
@@ -377,7 +255,6 @@ var feedForm=$('#feed-form');
   var guide=$('#feed-guide');if(guide)guide.hidden=!empty;
   if(!empty)return;
   $('#guide-new-feed').addEventListener('click',function(){editFeed({});});
-  $('#guide-new-rule').addEventListener('click',function(){showTab('rules');editRule({enabled:true});});
   $('#guide-import').addEventListener('click',function(){showTab('options');});
 })();
 function editFeed(feed,index,covered){
@@ -437,77 +314,6 @@ $('#poll-all').addEventListener('click',function(){
   }).catch(function(e){toast(t('Error')+': '+(e.message||''),true);}).then(function(){btn.disabled=false;});
 });
 
-// ---------- rules ----------
-var ruleForm=$('#rule-form');
-// One-click presets fill the editor; the preview (live) shows at once what
-// they would take, before anything is saved.
-$$('#rule-presets [data-preset]').forEach(function(btn){btn.addEventListener('click',function(){
-  var p=btn.dataset.preset;
-  function set(n,v){var el=ruleForm.elements[n];if(!el)return;if(el.type==='checkbox')el.checked=!!v;else el.value=v||'';}
-  ruleForm.reset();setKind(false);
-  if(p==='series'){set('include','1080p, ITA');set('exclude','cam, ts');set('require_episode',true);set('smart_episode',true);}
-  if(p==='movie'){set('include','1080p, 2160p');set('exclude','cam, ts, CAMRip');set('min_seeders','3');}
-  if(p==='all'){set('exclude','cam, ts');}
-  clearTimeout(previewTimer);previewTimer=setTimeout(previewRule,150);
-});});
-function setKind(skip){ruleForm.elements.fail.checked=skip;$$('input[name=kind]',ruleForm).forEach(function(r){r.checked=(r.value==='skip')===skip;});$('#rule-action').hidden=skip;}
-$$('input[name=kind]',ruleForm).forEach(function(r){r.addEventListener('change',function(){setKind(r.value==='skip');});});
-function editRule(rule,index){
-  ruleForm.reset();$('#rule-index').value=index===undefined?'':index;
-  var m=rule.match||{},a=rule.action||{};
-  function set(n,v){var el=ruleForm.elements[n];if(!el)return;if(el.type==='checkbox')el.checked=!!v;else el.value=(v===undefined||v===null||v===0)?'':v;}
-  function mib(b){return b?Math.round(b/1048576):'';}
-  set('name',rule.name);$$('input[name=feeds]',ruleForm).forEach(function(cb){cb.checked=(rule.feeds||[]).indexOf(cb.value)>=0;});set('enabled',rule.enabled!==false);
-  set('include',(m.include||[]).join(', '));set('require',(m.require||[]).join(', '));set('exclude',(m.exclude||[]).join(', '));set('episode_filter',m.episode_filter);set('require_episode',m.require_episode);set('smart_episode',m.smart_episode);set('only_freeleech',m.only_freeleech);
-  set('paused',a.paused);set('sequential',a.sequential);set('first_last',a.first_last);set('top',a.top);set('once',a.once);set('savepath',a.savepath);set('category',a.category);set('tags',(a.tags||[]).join(', '));
-  set('regex',m.regex);set('not_regex',m.not_regex);set('min_size',mib(m.min_size));set('max_size',mib(m.max_size));set('min_seeders',m.min_seeders);set('max_seeders',m.max_seeders);set('min_peers',m.min_peers);set('max_age_days',m.max_age_days);set('ignore_days',rule.ignore_days);
-  if(m.regex||m.not_regex||m.min_size||m.max_size||m.min_seeders||m.max_seeders||m.min_peers||m.max_age_days||rule.ignore_days)$('details.more',ruleForm).open=true;
-  setKind(!!rule.fail);
-  var editing=index!==undefined;
-  $('#dlg-rule-title').textContent=editing?t('Edit rule'):t('New rule');$('#rule-submit').textContent=editing?t('Save rule'):t('Add rule');
-  $('#rule-preview-box').innerHTML='<span class="subtle">—</span>';$('#rule-preview-warn').textContent='';
-  openDialog($('#dlg-rule'));
-  if(editing)previewRule();
-}
-$('#new-rule').addEventListener('click',function(){editRule({enabled:true});});
-$$('[data-open-rule]').forEach(function(btn){btn.addEventListener('click',function(){
-  showTab('rules');
-  var ed=document.querySelector('[data-rule-edit][data-index="'+btn.getAttribute('data-open-rule')+'"]');
-  if(ed)ed.click();
-});});
-$$('[data-rule-edit]').forEach(function(b){b.addEventListener('click',function(){var r={};try{r=JSON.parse(b.getAttribute('data-rule')||'{}');}catch(_){}editRule(r,b.getAttribute('data-index'));});});
-// The preview runs by itself while the rule is edited (debounced), and warns
-// about what surprises: a rule that takes several titles, or none at all.
-var previewTimer=null,previewSeq=0;
-function previewRule(){
-  var box=$('#rule-preview-box'),warn=$('#rule-preview-warn'),seq=++previewSeq;box.setAttribute('aria-busy','true');
-  fetch('/ui/rss-rule-preview',{method:'POST',body:new URLSearchParams(new FormData(ruleForm)),headers:{'Content-Type':'application/x-www-form-urlencoded'}}).then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error(j.error||r.status);return j;});}).then(function(res){
-    if(seq!==previewSeq)return;
-    box.innerHTML='';warn.textContent='';
-    var head=document.createElement('p');head.className='muted';head.style.margin='0 0 6px';head.textContent=(res.total||0)+' '+t('matches among the last')+' '+res.scanned+' '+t('archived items');box.appendChild(head);
-    var leftout=res.rejected||[];
-    if(leftout.length){var w2=note('hint',t('Why the others stay out:')+' '+leftout.map(function(g){return g.name+' ('+g.count+')';}).join(', '));warn.appendChild(w2);}
-    var titles=res.titles||[];
-    if(!res.total){warn.appendChild(note('hint',t('Nothing in the archive matches yet: the rule waits for new items.')));}
-    else if(titles.length>1){
-      var w=note('notice warn',(res.skip?t('This rule skips releases of several titles:'):t('This rule takes releases of several titles:'))+' '+titles.slice(0,6).map(function(g){return g.name+' ('+g.count+')';}).join(', ')+(titles.length>6?' …':''));
-      if(!res.skip)w.appendChild(document.createTextNode(' '+t('If it is meant for one series, put its name in Contains all of.')));
-      warn.appendChild(w);
-    }
-    (res.matches||[]).forEach(function(m){var r=document.createElement('div');r.className='r';var ti=document.createElement('span');ti.className='t';ti.textContent=m.title;r.appendChild(ti);if(m.added){var f=document.createElement('span');f.className='badge b-seeding';f.textContent=t('downloaded');r.appendChild(f);}box.appendChild(r);});
-  }).catch(function(e){if(seq===previewSeq)box.textContent=t('Error')+': '+e.message;}).then(function(){if(seq===previewSeq)box.removeAttribute('aria-busy');});
-}
-function note(cls,text){var p=document.createElement('p');p.className=cls;p.style.margin='0 0 6px';p.style.fontSize='12.5px';p.setAttribute('role','status');p.textContent=text;return p;}
-$('#rule-preview').addEventListener('click',previewRule);
-ruleForm.addEventListener('input',function(){clearTimeout(previewTimer);previewTimer=setTimeout(previewRule,450);});
-ruleForm.addEventListener('change',function(){clearTimeout(previewTimer);previewTimer=setTimeout(previewRule,150);});
-// A "download once" rule turns itself off after the first hit: confirm it, so
-// a series rule with the flag ticked by mistake does not stop after one episode.
-ruleForm.addEventListener('submit',function(e){
-  var skip=ruleForm.elements.fail&&ruleForm.elements.fail.checked;
-  var once=ruleForm.elements.once&&ruleForm.elements.once.checked;
-  if(!skip&&once&&!window.confirm(t('This rule stops after its first download. Save it?')))e.preventDefault();
-});
 // "Take everything" downloads whatever the feed publishes: confirm it, so a
 // feed meant as archive-only does not fill the client.
 feedForm.addEventListener('submit',function(e){

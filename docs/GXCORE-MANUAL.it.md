@@ -133,17 +133,24 @@ scaricare il `.torrent`.
 
 ## 4. Serie e film: cosa manca davvero
 
-**Serie e film** è la pagina che trasforma il client in un acquisitore. Ogni
-titolo dice in parole cosa hai: *Scaricato*, *In download*, *Trovato, non
-scaricato*. La barra di avanzamento è calcolata sugli episodi **trovati
-finora**; se attivi l’elenco episodi reale, il denominatore diventa la serie
-vera.
+**Serie e film** è l'unica pagina che decide cosa scaricare. Ogni titolo dice in
+parole cosa hai: *Scaricato*, *In download*, *Mancante* (una release è stata vista
+da un feed o da un indexer ma non presa) e *Aggiornato* (non manca niente tra
+ciò che è stato visto, non una promessa sulla serie intera). *In pausa* dice che
+quel titolo non viene cercato. La barra di avanzamento è calcolata sugli episodi
+**visti finora**; se attivi l’elenco episodi reale, il denominatore diventa la
+serie vera.
 
 ![Serie e film](screenshots/gx-core/it/wanted.png)
 
-- Filtri per stato: tutti, con mancanti, in download, completi, non monitorati.
+- Filtri per stato: tutti, con mancanti, in download, aggiornati, in pausa.
 - Una sola azione principale per riga; tutto il resto è nel menu **Altro**.
 - **Perché no?** apre le release trovate e il verdetto di ciascuna.
+- Le regole RSS non sono più una pagina a parte: stanno in **Avanzate: regole
+  dei feed**, in fondo a questa pagina, e sono disattivate finché non le attivi.
+  I titoli qui sopra decidono per primi; una regola prende solo ciò che nessun
+  titolo rivendica. Le regole già salvate sono state disattivate una volta e la
+  pagina lo dice, così puoi ricrearle come titoli o riattivarle.
 - **Episodi** apre la griglia per stagione, con lo stato di ogni episodio.
 - **Cerca**, nella finestra *Aggiungi titolo*, elenca sotto ogni nome le puntate
   già in archivio con risoluzione e lingua: sceglierne una compila titolo e
@@ -175,10 +182,14 @@ indexer e lo dice sulla riga.
 
 ## 5. RSS, archivio e ricerca
 
-**RSS e indexer** gestisce feed, regole ordinate PASS/FAIL, indexer Torznab e
-l’archivio locale. Un indexer si può provare con **Prova** già nella finestra in
-cui lo si aggiunge o modifica, prima di salvarlo. Le regole hanno anteprima live, test dei feed, import/export
-e azioni (cartella, categoria, tag, pausa, sequenziale, primo/ultimo, top).
+**RSS e indexer** gestisce i feed, gli indexer Torznab e l’archivio locale:
+riempie l’archivio e risponde alle ricerche, ma non decide da solo cosa
+scaricare. Un indexer si può provare con **Prova** già nella finestra in cui lo
+si aggiunge o modifica, prima di salvarlo. I feed si possono raggruppare in
+cartelle, provare prima del salvataggio e importare o esportare in un file. Le
+regole ordinate PASS/FAIL, con anteprima live e azioni (cartella, categoria, tag,
+pausa, sequenziale, primo/ultimo, top), si gestiscono nella sezione avanzata di
+**Serie e film**: servono solo per ciò che nessun titolo copre.
 **Archivio** rende ricercabile tutto ciò che i feed hanno restituito, anche
 quando non è stato scaricato. **Cerca** interroga gli indexer in parallelo e
 mostra dimensione, seed, peer, età e indexer; ogni risultato si aggiunge subito

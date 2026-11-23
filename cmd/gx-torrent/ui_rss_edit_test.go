@@ -239,7 +239,7 @@ func TestUIRssRuleTakesSeveralFeedsAndThePicker(t *testing.T) {
 	srv := httptest.NewServer(d.routes())
 	defer srv.Close()
 
-	page, err := http.Get(srv.URL + "/ui/rss")
+	page, err := http.Get(srv.URL + "/ui/wanted")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -247,7 +247,7 @@ func TestUIRssRuleTakesSeveralFeedsAndThePicker(t *testing.T) {
 	page.Body.Close()
 	for _, name := range []string{"serie", "film"} {
 		if !strings.Contains(string(body), `name="feeds" value="`+name+`"`) {
-			t.Fatalf("the rule editor does not offer the feed %q as a checkbox", name)
+			t.Fatalf("the rule editor on the Series & movies page does not offer the feed %q as a checkbox", name)
 		}
 	}
 
@@ -464,15 +464,15 @@ func TestUIRssRuleEditor(t *testing.T) {
 		t.Fatalf("after up the first rule = %q, want shows", got)
 	}
 
-	// The page lists both rules.
-	page, err := http.Get(srv.URL + "/ui/rss")
+	// The advanced section of Series & movies lists both rules.
+	page, err := http.Get(srv.URL + "/ui/wanted")
 	if err != nil {
 		t.Fatal(err)
 	}
 	body, _ := io.ReadAll(page.Body)
 	page.Body.Close()
 	if !strings.Contains(string(body), "no-cam") || !strings.Contains(string(body), "shows") {
-		t.Fatalf("the RSS page does not list the rules")
+		t.Fatalf("the Series & movies page does not list the rules")
 	}
 
 	// An invalid regex is refused and stored nowhere.

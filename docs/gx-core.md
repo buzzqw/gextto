@@ -222,44 +222,51 @@ all of Gextto along. The
 **engine** is our own code and stays so: what it still needs is written here, not
 copied.
 
-## 5. The RSS manager and Wanted
+## 5. The RSS manager and the single acquisition page
 
-The RSS manager is meant to be complete in one place rather than split across a feed
-reader and a separate rule engine: **ordered PASS/FAIL rules** (first match wins) with
-regex, include/exclude filters, size, seeds/peers, age, `require_episode`,
-**smart-episode** (never twice, REPACK/PROPER aware), actions (folder, category, tag,
-pause, sequential, first/last, top), a persisted history, a worker, notifications on
-match and error, and feeds also built from search results.
+**One place decides what to download.** In standalone the page `/ui/wanted`
+(*Series & movies*) is that place: a title is added there, with its type, seasons,
+language, quality profile, category and save path, and the daemon searches feeds and
+indexers for what is missing. The series name is suggested from indexer results and from
+what the feeds and the archive contain (episodes, season packs, complete packs), with
+the archived episodes of that name underneath, each with resolution and language;
+choosing one fills the name and the language from a release that exists. When nothing
+looks like a series the clean name of the matching releases is proposed, cut at year,
+resolution and source/codec tags, never a raw release title. A season pack counts as
+its whole season. Even with no feed configured the page drives the indexers, records in
+`state.json` what appeared and what was taken, and runs a throttled **gap search** for
+missing episodes; **Search all now** forces a check.
 
-In place: RSS/Atom/Torznab parsing, the ordered rules (including a freeleech-only
-filter and the per-release download factor), the filters above, the actions,
-the persisted history, the management page `/ui/rss` with the articles matching per rule
-and a manual Add, and the **Wanted** page `/ui/wanted`. Editing is guided: a dropdown of
-indexer types with preset URLs, an essential feed form (name and URL), an editor of the
-rules with move up/down and disable, `episode_filter` and an `ignore_days` cooldown.
+The states are deliberately plain: **Downloaded**, **Downloading**, **Missing** (a
+release was seen by a feed or an indexer but was not taken) and **Up to date** (nothing
+missing among what has been seen, which is not a claim about the whole series unless the
+real episode list is enabled). A **Paused** title is not searched. The row counts
+episodes, shows a chip per season and offers the per-episode grid inline; an episode in
+the session links to its torrent. The legend says what "Missing" means, so the page does
+not guess a season is complete.
 
-**Wanted** holds the titles to search for (quality dropdown, series/movie type, optional
-folder and category): the series name is suggested from the indexer results and from what
-the feeds and the archive contain (episode names, season packs, "complete" packs), and
-under every name come the **episodes of it already in the archive**, each with
-its resolution and language: choosing one fills the title, the quality and the
-language from that release (the one already taken wins, then the best
-resolution) and everything stays editable. When nothing looks like a series — a
-movie, a special — the **clean name** of the
-matching releases is proposed, cut at year, resolution and source/codec tags, never a raw
-release title. A season pack (`S04`, `Season 4`, `COMPLETE`) counts as its whole
-season and is downloaded when the season is wanted. The engine searches the indexers and the feeds for every title even with
-no feed configured, records in `state.json` what appeared and what was taken, and runs a
-throttled **gap search** for the missing episodes; **Check feeds** forces a check at
-once.
+**Feeds and indexers feed that decision.** `/ui/rss` keeps the feed manager (RSS,
+Atom, Torznab, HTML listings and BEP 46 DHT feeds), the Torznab indexers with a
+connection test, and the options (check interval, archive retention, FlareSolverr,
+setup import/export). Feeds fill the archive and answer searches; they do not decide on
+their own. The indexer types have preset URLs and the feed form is essential by design:
+a name and a URL, with an optional folder and bulk paste.
 
-Each wanted row says honestly what the operator has, never guessing a season is
-complete: it counts the episodes **downloaded**, the ones **downloading** in the session
-and the ones **seen but not downloaded**, with a chip per season (a season only partly
-seen is not collapsed to a bare `S01`). The **Episodes** button opens the per-episode
-grid inline, and an episode already in the session links to its torrent; a movie shows
-its single release with the same states. This is why the row needs no "Missing" claim:
-the state vocabulary is explained by a legend on the page.
+**Rules are the advanced remainder.** Ordered **PASS/FAIL rules** (first match wins)
+still exist for the cases a title does not cover: take everything a feed publishes, or
+reject a term. They keep regex, include/exclude filters, size, seeds/peers, age,
+`require_episode`, **smart-episode** (REPACK/PROPER aware), actions (folder, category,
+tag, pause, sequential, first/last, top), the persisted history and the live preview.
+They are now edited in the *Advanced: feed rules* section at the bottom of
+`/ui/wanted`, not in a tab of `/ui/rss`, and a rule is off until the operator enables
+it. Titles are decided first: a release a title claims is never also taken by a rule.
+At the one-time move, enabled rules were switched off and the page reported the count;
+the rules themselves were kept so they can be inspected, deleted or deliberately
+re-enabled. The qBittorrent-compatible RSS API still exposes rules for existing clients.
+
+A feed with no rule and no filter of its own only grows the archive: that is the
+intended default, not a missing setting. Links on a feed that name a covering rule open
+that rule in the advanced section of the titles page.
 
 ## 6. What is missing and what is decided
 

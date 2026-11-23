@@ -1054,8 +1054,8 @@ func wantedItemEpisode(w wantedEntry, title string) (int, int) {
 
 // applyWanted evaluates the items of one feed against the wanted list: it records
 // what appeared and downloads the episodes (or movie) not taken yet. It runs
-// after the rules loop, so items already added there are only recorded, not
-// added again.
+// before the rules loop: a release a title claims is decided here, with its
+// quality profile and episode list, and the rules only see what is left.
 func (d *Daemon) applyWanted(now time.Time, feedName string, items []rss.Item) (int, []string) {
 	wanteds := d.wantedList()
 	if len(wanteds) == 0 {

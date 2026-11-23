@@ -946,7 +946,7 @@ func feedCoveringRules(rules []rss.Rule, feedName string) []string {
 // uiFeedGovernanceHTML says, on the feed row, what decides what the feed
 // downloads: the rules that watch it, its own filter, everything, or nothing
 // (archive only), and whether the wanted titles also take from it. Watching
-// rules are buttons: one click opens the rule editor for that rule.
+// rules are links to that rule in the advanced section of the titles page.
 func uiFeedGovernanceHTML(lang string, rules []rss.Rule, feed feedConfig, key string, covering []string, wantedOn bool) string {
 	tr := func(phrase string) string { return uiTr(lang, phrase) }
 	var b strings.Builder
@@ -965,7 +965,7 @@ func uiFeedGovernanceHTML(lang string, rules []rss.Rule, feed feedConfig, key st
 				b.WriteString(`<span>, </span>`)
 			}
 			if index, ok := indexByName[name]; ok {
-				b.WriteString(`<button type="button" class="linklike" data-open-rule="` + strconv.Itoa(index) + `" title="` + tr("Open this rule to change it") + `"><b>` + html.EscapeString(name) + `</b></button>`)
+				b.WriteString(`<a class="linklike" href="/ui/wanted?rule=` + strconv.Itoa(index) + `#advanced-rules" title="` + tr("Open this rule to change it") + `"><b>` + html.EscapeString(name) + `</b></a>`)
 			} else {
 				b.WriteString(`<b>` + html.EscapeString(name) + `</b>`)
 			}

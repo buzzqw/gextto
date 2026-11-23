@@ -16,6 +16,9 @@ still be true after the item lands does not belong here.
 
 ## Proposals
 
+- **Rules in the qBittorrent-compatible API**: the native page now keeps rules only as an advanced fallback, but `/api/v2/rss/rules/*` still exposes them to external clients, and the one-time migration switches stored rules off for those clients too. Gate: decide whether external clients still need that surface or the API should report no rules and the compatibility note in `gx-core.md` be updated.
+- **gx-core screenshots after the merge**: the manuals describe the single acquisition page, but the Series & movies screenshots still show the old state labels and the rules tab on the RSS page. Gate: regenerate `docs/screenshots/gx-core/{it,en}` from a running standalone daemon.
+
 - **Focus and clicks still lost across some HTMX swaps**: the torrent list now restores
   focus by id per swap target, and the drawer opener is looked up again, but polling still
   replaces whole panels (integrity, maintenance, update, jobs) where a click can land on a

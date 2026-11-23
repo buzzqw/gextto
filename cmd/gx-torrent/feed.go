@@ -298,8 +298,13 @@ func (d *Daemon) pollFeedsOnlyDetailed(only string) feedPollResult {
 			status.New = newItems
 			totalNew += newItems
 		}
-		added := 0
-		var addedTitles []string
+		// Wanted titles decide first. An item a title takes is marked as seen,
+		// so the rules below only see what no title claimed: one release, one
+		// decision, with the title's quality profile and episode list in charge.
+		now := time.Now()
+		wantedAdded, wantedTitles := d.applyWanted(now, name, items)
+		added := wantedAdded
+		addedTitles := append([]string(nil), wantedTitles...)
 		rules := d.rules()
 		if feedTakesEverything(rules, feed, name) {
 			archiveOnly = append(archiveOnly, name)
@@ -308,7 +313,7 @@ func (d *Daemon) pollFeedsOnlyDetailed(only string) feedPollResult {
 			if added >= feedMaxAddsPerPoll {
 				break
 			}
-			rule, smart, ok := filterFeedItem(rules, feed, name, item, time.Now(), d.ruleLastMatch)
+			rule, smart, ok := filterFeedItem(rules, feed, name, item, now, d.ruleLastMatch)
 			if !ok {
 				continue
 			}
@@ -350,7 +355,7 @@ func (d *Daemon) pollFeedsOnlyDetailed(only string) feedPollResult {
 				d.markRuleEpisodes(rule.Name, smartSeason, smartTokens)
 			}
 			if rule.IgnoreDays > 0 {
-				d.markRuleMatch(rule.Name, time.Now())
+				d.markRuleMatch(rule.Name, now)
 			}
 			if newlyAdded {
 				added++
@@ -361,11 +366,6 @@ func (d *Daemon) pollFeedsOnlyDetailed(only string) feedPollResult {
 				}
 			}
 		}
-		// Wanted titles: record what appeared and take the missing episodes (or
-		// the movie) from the same items, after the rules path.
-		wantedAdded, wantedTitles := d.applyWanted(time.Now(), name, items)
-		added += wantedAdded
-		addedTitles = append(addedTitles, wantedTitles...)
 		totalAdded += added
 		status.Added = added
 		if added > 0 {

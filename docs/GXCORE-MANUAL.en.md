@@ -131,16 +131,24 @@ the `.torrent`.
 
 ## 4. Series & movies: what is really missing
 
-**Series & movies** turns the client into an acquisition tool. Every title says
-in words what you have: *Downloaded*, *Downloading*, *Found, not downloaded*.
-The progress bar is over the episodes **found so far**; enable the real episode
-list and the denominator becomes the actual series.
+**Series & movies** is the one page that decides what to download. Every title
+says in words what you have: *Downloaded*, *Downloading*, *Missing* (a release was
+seen by a feed or an indexer but was not taken) and *Up to date* (nothing missing
+among what has been seen, not a claim about the whole series). *Paused* means
+that title is not being searched. The progress bar is over the episodes **seen
+so far**; enable the real episode list and the denominator becomes the actual
+series.
 
 ![Series & movies](screenshots/gx-core/en/wanted.png)
 
-- State filters: all, with missing, downloading, complete, not monitored.
+- State filters: all, with missing, downloading, up to date, paused.
 - One primary action per row; everything else is in the **More** menu.
 - **Why not?** opens the releases found and each verdict.
+- RSS rules are no longer a separate page: they live in **Advanced: feed rules**
+  at the bottom of this page and are off until you turn them on. Titles above
+  decide first; a rule only takes what no title claims. Rules already saved were
+  switched off once and the page says so, so you can recreate them as titles or
+  re-enable them.
 - **Episodes** opens the per-season grid with the state of every episode.
 - **Search**, in the *Add title* dialog, lists under every name the episodes
   already in the archive with their resolution and language: picking one fills
@@ -172,11 +180,14 @@ row.
 
 ## 5. RSS, archive and search
 
-**RSS & indexers** manages feeds, ordered PASS/FAIL rules, Torznab indexers and
-the local archive. An indexer can be checked with **Test** already in the
-window where you add or edit it, before saving. Rules have a live preview, feed
-tests, import/export and actions (folder, category, tags, pause, sequential,
-first/last, top).
+**RSS & indexers** manages feeds, Torznab indexers and the local archive: it
+fills the archive and answers searches, but does not decide on its own what to
+download. An indexer can be checked with **Test** already in the window where
+you add or edit it, before saving. Feeds can be grouped in folders, tested
+before saving and imported or exported as a file. Ordered PASS/FAIL rules, with
+a live preview and actions (folder, category, tags, pause, sequential,
+first/last, top), are managed in the advanced section of **Series & movies**:
+they are only for what no title covers.
 **Archive** makes everything the feeds returned searchable, even when it was not
 downloaded. **Search** queries the indexers in parallel and shows size, seeds,
 peers, age and indexer; each result is added at once or with the options

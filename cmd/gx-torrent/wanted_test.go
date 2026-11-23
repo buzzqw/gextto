@@ -181,7 +181,7 @@ func TestWantedRowShowsCounts(t *testing.T) {
 	// A seen-but-not-taken episode shows as such.
 	d.recordWantedSeen(w, 1, 5)
 	row = d.uiWantedRowsHTML("")
-	if !strings.Contains(row, "Found, not downloaded") {
+	if !strings.Contains(row, "Missing") {
 		t.Fatalf("a known missing episode must be flagged: %s", row)
 	}
 	if !strings.Contains(row, `data-wanted-state="missing"`) || !strings.Contains(row, "Search missing") {
@@ -495,7 +495,7 @@ func TestUIWantedPageAndPollEndpoints(t *testing.T) {
 	if !strings.Contains(string(raw), "Series &amp; movies list") {
 		t.Fatalf("page missing the series & movies list: %s", string(raw))
 	}
-	for _, want := range []string{`data-wanted-state="missing"`, `id="wanted-sort"`, "With missing episodes", "Not monitored"} {
+	for _, want := range []string{`data-wanted-state="missing"`, `id="wanted-sort"`, "With missing episodes", "Paused"} {
 		if !strings.Contains(string(raw), want) {
 			t.Fatalf("page missing %q: %s", want, string(raw))
 		}

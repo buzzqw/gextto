@@ -374,7 +374,16 @@ func (d *Daemon) renderWanted(w http.ResponseWriter, r *http.Request, errKey str
 	if errKey != "" {
 		errorHTML = template.HTML(`<div class="notice err" role="alert">` + html.EscapeString(uiTr(lang, errKey)) + `</div>`)
 	}
+	noticeHTML := template.HTML("")
+	if n := d.rulesNoticeCount(); n > 0 {
+		noticeHTML = template.HTML(`<div class="notice warn" role="status"><b>` + strconv.Itoa(n) + `</b> ` +
+			html.EscapeString(uiTr(lang, "rules were switched off when they moved into this page. Recreate what you need as a title above, or remove them below.")) +
+			`<form method="post" action="/ui/rules-notice"><button type="submit" class="sm">` + html.EscapeString(uiTr(lang, "Dismiss")) + `</button></form></div>`)
+	}
 	d.uiWritePage(w, r, "wanted", map[string]any{
+		"RULESNOTICE":       noticeHTML,
+		"RULEROWS":          template.HTML(d.uiRuleRowsHTML(lang)),
+		"RULEFEEDS":         template.HTML(d.uiRuleFeedsHTML(lang)),
 		"WANTEDCOUNT":       strconv.Itoa(len(wanteds)),
 		"WANTEDMISSING":     strconv.Itoa(missingCount),
 		"WANTEDDOWNLOADING": strconv.Itoa(downloadingCount),
@@ -1089,13 +1098,13 @@ func wantedBadge(lang, state string) (class, label string) {
 	tr := func(phrase string) string { return uiTr(lang, phrase) }
 	switch state {
 	case "paused":
-		return "b-paused", tr("Not monitored")
+		return "b-paused", tr("Paused")
 	case "downloading":
 		return "b-downloading", tr("Downloading")
 	case "missing":
-		return "b-missing", tr("Episodes missing")
+		return "b-missing", tr("Missing")
 	case "uptodate":
-		return "b-seeding", tr("Complete")
+		return "b-seeding", tr("Up to date")
 	default:
 		return "b-paused", tr("No episodes yet")
 	}
@@ -1117,7 +1126,7 @@ func (d *Daemon) uiWantedStatusHTML(w wantedEntry, stats wantedStats, lang strin
 		parts = append(parts, `<span class="warn" title="`+tr("Episodes still downloading")+`">◐</span> <b>`+strconv.Itoa(stats.Downloading)+`</b> <span>`+tr("Downloading")+`</span>`)
 	}
 	if stats.Missing > 0 {
-		parts = append(parts, `<span class="warn" title="`+tr("Episodes found in the feeds or indexers and not downloaded yet")+`">○</span> <b>`+strconv.Itoa(stats.Missing)+`</b> <span>`+tr("Found, not downloaded")+`</span>`)
+		parts = append(parts, `<span class="warn" title="`+tr("Seen by feeds or indexers, not downloaded yet")+`">○</span> <b>`+strconv.Itoa(stats.Missing)+`</b> <span>`+tr("Missing")+`</span>`)
 	}
 	if len(parts) == 0 {
 		return `<span class="muted">` + tr("No episodes found yet") + `</span>`

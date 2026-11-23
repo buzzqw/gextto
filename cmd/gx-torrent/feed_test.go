@@ -289,6 +289,39 @@ func TestPollFeedsOrderedRulesAndSmartEpisode(t *testing.T) {
 	}
 }
 
+// TestWantedTakesPrecedenceOverRules checks that one release is decided once:
+// when a title in Series & movies claims it, the title's category and episode
+// ledger win and a covering rule is left with nothing to do (so "download once"
+// does not fire on a release the title took).
+func TestWantedTakesPrecedenceOverRules(t *testing.T) {
+	feed := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/xml")
+		_, _ = w.Write([]byte(episodesFeed))
+	}))
+	defer feed.Close()
+
+	d := feedDaemon(t, `[{"name":"f","url":"`+feed.URL+`"}]`)
+	d.opts.Settings.Set(rulesSettingKey,
+		`[{"name":"catch-all","match":{"require_episode":true},"action":{"category":"rule-cat","once":true}}]`)
+	if err := d.saveWanted([]wantedEntry{{Name: "Show", Kind: "series", Seasons: "1+", Category: "wanted-cat"}}); err != nil {
+		t.Fatal(err)
+	}
+
+	d.pollFeeds()
+	waitFor(t, "wanted episodes", func() bool { return len(d.snapshotViews()) >= 2 })
+	byHash := map[string]string{}
+	for _, view := range d.snapshotViews() {
+		byHash[view.Hash] = view.Category
+	}
+	if byHash["1111111111111111111111111111111111111111"] != "wanted-cat" ||
+		byHash["2222222222222222222222222222222222222222"] != "wanted-cat" {
+		t.Fatalf("the rule decided before the title: %v", byHash)
+	}
+	if got := d.rules(); len(got) != 1 || !rss.RuleEnabled(got[0]) {
+		t.Fatalf("a rule that took nothing must not be disabled by once: %+v", got)
+	}
+}
+
 // TestSmartEpisodeKeepsOlderEpisodeAfterNewer is the regression the maximum-only
 // memory caused: a later poll that lists an older episode must still add it,
 // because the newer one was taken earlier.
