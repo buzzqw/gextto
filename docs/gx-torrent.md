@@ -793,7 +793,10 @@ the 5.x `stopped` flag on `torrents/add`, accepted next to `paused`),
 `torrents/toggleSequentialDownload|setSuperSeeding|addTrackers|removeTrackers|editTracker|filePrio|export|setForceStart|setAutoManagement|setDownloadLimit|setUploadLimit|setShareLimits`,
 `transfer/downloadLimit|uploadLimit|setDownloadLimit|setUploadLimit`, `sync/maindata` (with incremental `rid`) and
 `sync/torrentPeers` (which reports `rid: 0`), and `content_path` in
-`torrents/info`, as Sonarr and Radarr read).
+`torrents/info`, as Sonarr and Radarr read). The complete download-client
+sequence is covered by an end-to-end test: login, version probe, category
+creation, magnet add with category and save path, status read through
+`torrents/info`, incremental sync and removal.
 
 The **read side** also covers what the WebUI alternatives and the mobile apps
 need: `torrents/info` accepts the `filter`, `category`, `tag`, `sort`,
@@ -987,6 +990,20 @@ is reported as an **error**, not mistaken for an empty feed: a wrong key no
 longer passes silently.
 Automatic searches in a search feed wait for each indexer **up to 45
 seconds**, because MIRCrew may search the forum before responding.
+
+Before the first search, and again when the connection is tested, the daemon
+reads the indexer's declared capabilities and caches them for six hours: the
+page size is capped at the declared maximum, a season/episode query is sent as
+a structured TV search when the source supports it, and external ids are sent
+only when that source declares them — a Jackett aggregate rejects an unknown
+id, and a Prowlarr aggregate returns nothing for one of its indexers that does
+not support it. Prowlarr's capability list is intersected across its enabled
+indexers for the same reason. If an indexer still answers that a parameter is
+not supported (Torznab error 201/203), the search is repeated once without the
+optional fields. indexarr searches carry its `live_wait` so its slower merged
+sources are included in the first answer, and the pages after the first are
+read from its merged snapshot. No setting changes: the address typed for
+Jackett, Prowlarr, indexarr or a direct Torznab service stays the same.
 
 **RSS** (standalone) uses the `feeds` key: a JSON array of feeds with the
 rules, for example

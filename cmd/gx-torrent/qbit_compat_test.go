@@ -8,10 +8,93 @@ package main
 import (
 	"context"
 	"net/http/httptest"
+	"path/filepath"
 	"testing"
+	"time"
 
+	"github.com/buzzqw/gextto/internal/auth"
 	"github.com/buzzqw/gextto/internal/qbittorrent"
+	"github.com/buzzqw/gextto/internal/settings"
 )
+
+// TestQbitSonarrDownloadClientFlow pins the exact sequence Sonarr uses when
+// gx-torrent is configured as a qBittorrent download client: version probe,
+// category creation, magnet add with category and save path, then status read.
+func TestQbitSonarrDownloadClientFlow(t *testing.T) {
+	store, err := settings.Load(filepath.Join(t.TempDir(), "settings.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	passwordHash, err := auth.HashPassword("s3cret")
+	if err != nil {
+		t.Fatal(err)
+	}
+	d := newTestDaemonFull(t, NetworkOptions{}, store)
+	d.opts.Mode = ModeStandalone
+	// Set the credentials after newDaemon: it reloads the settings file, which
+	// would otherwise discard the in-memory values.
+	d.opts.Settings.Set(standalonePasswordKey, passwordHash)
+	d.opts.Settings.Set(standaloneBypassKey, "true")
+	// newDaemon creates sessions only in standalone mode, which is set above.
+	d.sessions = auth.NewSessions(time.Hour)
+	srv := httptest.NewServer(d.routes())
+	defer srv.Close()
+
+	client, err := qbittorrent.New(qbittorrent.Config{BaseURL: srv.URL, Username: "admin", Password: "s3cret"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	if err := client.Login(ctx); err != nil {
+		t.Fatalf("login: %v", err)
+	}
+	if version, err := client.AppVersion(ctx); err != nil || version == "" {
+		t.Fatalf("app version = %q, err = %v", version, err)
+	}
+	if api, err := client.WebAPIVersion(ctx); err != nil || api == "" {
+		t.Fatalf("webapi version = %q, err = %v", api, err)
+	}
+	savePath := t.TempDir()
+	if err := client.CreateCategory(ctx, "sonarr-tv", savePath); err != nil {
+		t.Fatalf("create category: %v", err)
+	}
+	magnet := "magnet:?xt=urn:btih:ABCDEF0123456789ABCDEF0123456789ABCDEF01&dn=release"
+	hash, err := client.AddMagnet(ctx, magnet, qbittorrent.AddOptions{
+		Category: "sonarr-tv",
+		SavePath: savePath,
+		Tags:     "sonarr",
+		Paused:   true,
+	})
+	if err != nil {
+		t.Fatalf("add magnet: %v", err)
+	}
+	if hash == "" {
+		t.Fatal("add magnet returned no hash")
+	}
+	list, err := client.Torrents(ctx)
+	if err != nil {
+		t.Fatalf("torrents: %v", err)
+	}
+	var found qbittorrent.Torrent
+	for _, item := range list {
+		if item.Hash == hash {
+			found = item
+			break
+		}
+	}
+	if found.Hash == "" {
+		t.Fatalf("torrent %s not found in torrents/info: %+v", hash, list)
+	}
+	if found.Category != "sonarr-tv" || found.SavePath != savePath {
+		t.Fatalf("category/save path = %q/%q, want sonarr-tv/%s", found.Category, found.SavePath, savePath)
+	}
+	if _, err := client.Sync(ctx, 0); err != nil {
+		t.Fatalf("sync/maindata: %v", err)
+	}
+	if err := client.Delete(ctx, false, hash); err != nil {
+		t.Fatalf("delete: %v", err)
+	}
+}
 
 func TestQbitCompatibleWithGexttoClient(t *testing.T) {
 	d := standaloneTestDaemon(t, "s3cret", true)
