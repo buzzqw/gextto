@@ -3,19 +3,23 @@
 {{/* ------------------------------------------------------------------ */}}
 
 {{define "v2_notifications"}}
-<div class="view">
+<div class="view">{{template "v2_notifications_panel" .}}</div>
+{{end}}
+
+{{define "v2_notifications_panel"}}
   <div class="panel">
     <div class="panel-head">
-      <h3 {{trTitle "Ogni notifica che Gextto ha provato a inviare, con i canali e l'esito: serve a capire se un avviso è partito, se è arrivato e quale canale ha fallito."}}>{{tr "Registro notifiche"}}</h3>
+      <h3 {{trTitle "Ogni tentativo di invio, con i canali e l'esito: serve a capire se un avviso è partito, se è arrivato e quale canale ha fallito."}}>{{tr "Notifiche"}}</h3>
       <form method="post" action="/notifications/clear" hx-post="/notifications/clear">
         <button class="btn sm danger" type="submit" hx-confirm="{{tr "Svuotare il registro delle notifiche? Le righe non tornano."}}" hx-disabled-elt="this" {{trTitle "Toglie tutte le righe dal registro. Non cambia nulla nelle notifiche future: i canali restano configurati come sono."}}>{{tr "Svuota il registro"}}</button>
       </form>
     </div>
     <div class="panel-body">
-      <p class="muted">{{tr "Nel registro"}}: {{.Total}} · <a href="/?view=notifications&outcome=sent">{{tr "inviate"}}: {{.Sent}}</a> · <a href="/?view=notifications&outcome=failed">{{tr "fallite"}}: {{.Failed}}</a> · <a href="/?view=notifications&outcome=suppressed">{{tr "non inviate"}}: {{.Suppressed}}</a></p>
+      <p class="muted">{{tr "Nel registro"}}: {{.Total}} · <a href="/?view=health&amp;tab=notifiche&amp;outcome=sent">{{tr "inviate"}}: {{.Sent}}</a> · <a href="/?view=health&amp;tab=notifiche&amp;outcome=failed">{{tr "fallite"}}: {{.Failed}}</a> · <a href="/?view=health&amp;tab=notifiche&amp;outcome=suppressed">{{tr "non inviate"}}: {{.Suppressed}}</a></p>
 
       <form method="get" action="/" class="form-grid">
-        <input type="hidden" name="view" value="notifications" />
+        <input type="hidden" name="view" value="health" />
+        <input type="hidden" name="tab" value="notifiche" />
         <label class="field"><span>{{tr "Esito"}}</span>
           <select class="input" name="outcome" {{trTitle "Mostra solo le notifiche con questo esito."}}>
             <option value="" {{if eq .Outcome ""}}selected{{end}}>{{tr "Tutti"}}</option>
@@ -52,5 +56,4 @@
       <p class="hint">{{.RetentionNote}}</p>
     </div>
   </div>
-</div>
 {{end}}

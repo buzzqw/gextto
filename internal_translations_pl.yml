@@ -6606,3 +6606,6 @@ pol:
   "Svuotare il registro delle notifiche? Le righe non tornano.": "Wyczyścić rejestr powiadomień? Wiersze nie wrócą."
   "Rimuovere il download HTTP e cancellare il file parziale?": "Usunąć pobieranie HTTP i skasować częściowy plik?"
   "Aggiornamento automatico disattivato": "Automatyczne odświeżanie wyłączone"
+  "Sezioni salute": "Sekcje kondycji"
+  "Gli esiti delle notifiche che Gextto ha cercato di inviare": "Wyniki powiadomień, które Gextto próbowało wysłać"
+  "Ogni tentativo di invio, con i canali e l'esito: serve a capire se un avviso è partito, se è arrivato e quale canale ha fallito.": "Każda próba wysłania z kanałami i wynikiem: pokazuje, czy powiadomienie wysłano, czy dotarło i który kanał zawiódł."

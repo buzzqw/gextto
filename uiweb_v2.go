@@ -654,8 +654,13 @@ func v2DashboardCalendarFrom(s *AppState) []v2DashboardCalendarItem {
 
 type v2HealthView struct {
 	uiHealthData
-	PanelTables []v2TableData
-	Engine      uiEngineStats
+	// Tab is "notifiche" when the notification log is shown, empty for the
+	// health overview. The log lives here instead of in the side menu: it is
+	// diagnostic information, like the other panels of this page.
+	Tab           string
+	Notifications v2NotificationsView
+	PanelTables   []v2TableData
+	Engine        uiEngineStats
 	// Ed2k is the aMule card: state, session totals and recent log warnings.
 	Ed2k *v2Ed2kHealth
 	// Feeds is the per-feed activity table and its summary; DisabledFeeds is
@@ -709,8 +714,13 @@ func v2DashboardViewFrom(s *AppState, r *http.Request) v2DashboardView {
 func v2HealthViewFrom(s *AppState, r *http.Request) v2HealthView {
 	base := uiHealthDataFrom(s)
 	feeds, disabled, summary := v2FeedStatsFrom(s)
-	return v2HealthView{
+	tab := ""
+	if strings.TrimSpace(r.FormValue("tab")) == "notifiche" {
+		tab = "notifiche"
+	}
+	view := v2HealthView{
 		uiHealthData:  base,
+		Tab:           tab,
 		PanelTables:   v2SectionTables(s, r, base.Panels, []string{"health-sources", "health-providers"}),
 		Engine:        uiEngineStatsFrom(s),
 		Ed2k:          v2Ed2kHealthFrom(s),
@@ -718,6 +728,10 @@ func v2HealthViewFrom(s *AppState, r *http.Request) v2HealthView {
 		DisabledFeeds: disabled,
 		FeedSummary:   summary,
 	}
+	if tab == "notifiche" {
+		view.Notifications = v2NotificationsViewFrom(s, r)
+	}
+	return view
 }
 
 type v2ComicsView struct {
@@ -889,7 +903,11 @@ func v2Content(s *AppState, r *http.Request, view string) (string, any) {
 	case "health":
 		return "v2_health", v2HealthViewFrom(s, r)
 	case "notifications":
-		return "v2_notifications", v2NotificationsViewFrom(s, r)
+		// Old links and bookmarks still work: the log is now a tab of Salute.
+		view := v2HealthViewFrom(s, r)
+		view.Tab = "notifiche"
+		view.Notifications = v2NotificationsViewFrom(s, r)
+		return "v2_health", view
 	case "logs":
 		linesNum, _ := strconv.Atoi(r.FormValue("lines"))
 		return "v2_logs", v2LogsViewFrom(s, r.FormValue("filter"), linesNum, r.FormValue("log"), r.FormValue("level") == "problems")

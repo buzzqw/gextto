@@ -46,6 +46,13 @@
 
 {{define "v2_health"}}
 <div class="view">
+  <nav class="toolbar" role="tablist" aria-label="{{tr "Sezioni salute"}}">
+    <a class="chip{{if ne .Tab "notifiche"}} active{{end}}" role="tab" aria-selected="{{if ne .Tab "notifiche"}}true{{else}}false{{end}}" href="/?view=health">{{tr "Panoramica"}}</a>
+    <a class="chip{{if eq .Tab "notifiche"}} active{{end}}" role="tab" aria-selected="{{if eq .Tab "notifiche"}}true{{else}}false{{end}}" href="/?view=health&amp;tab=notifiche" {{trTitle "Gli esiti delle notifiche che Gextto ha cercato di inviare"}}>{{tr "Notifiche"}}</a>
+  </nav>
+  {{if eq .Tab "notifiche"}}
+    {{with .Notifications}}{{template "v2_notifications_panel" .}}{{end}}
+  {{else}}
   <div class="grid-4">
     {{template "v2_health_fast_tiles" .}}
     {{template "v2_health_tile_disk" .}}
@@ -95,6 +102,7 @@
   {{template "v2_health_queue" .}}
   {{if .Health.LastErrors}}
   <div class="panel"><div class="panel-head"><h3>{{tr "Ultimi errori"}}</h3></div><div class="panel-body">{{range .Health.LastErrors}}<div class="row"><span class="hl-err">{{tr .}}</span></div>{{end}}</div></div>
+  {{end}}
   {{end}}
 </div>
 {{end}}

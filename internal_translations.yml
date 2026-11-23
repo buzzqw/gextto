@@ -6001,3 +6001,6 @@ eng:
   "Svuotare il registro delle notifiche? Le righe non tornano.": "Empty the notification log? The rows do not come back."
   "Rimuovere il download HTTP e cancellare il file parziale?": "Remove the HTTP download and delete the partial file?"
   "Aggiornamento automatico disattivato": "Automatic refresh off"
+  "Sezioni salute": "Health sections"
+  "Gli esiti delle notifiche che Gextto ha cercato di inviare": "The outcomes of the notifications Gextto tried to send"
+  "Ogni tentativo di invio, con i canali e l'esito: serve a capire se un avviso è partito, se è arrivato e quale canale ha fallito.": "Every delivery attempt, with the channels and the outcome: it shows whether a notice was sent, whether it arrived and which channel failed."

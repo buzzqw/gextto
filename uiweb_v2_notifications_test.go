@@ -76,3 +76,42 @@ func TestV2NotificationsClearEmptiesTheLog(t *testing.T) {
 		t.Fatalf("records after clear = %+v", records)
 	}
 }
+
+// TestV2NotificationsLiveInHealthTab locks the new home of the log: the side
+// menu is shorter, «Notifiche» is a tab of Salute, and the old address still
+// opens the same tab so existing links keep working.
+func TestV2NotificationsLiveInHealthTab(t *testing.T) {
+	state := newTestAppState(t)
+	if err := state.db.RecordNotification(NotificationRecord{
+		At: time.Now(), Event: "torrent_completed", Title: "Notifica di prova",
+		Channels: []string{"telegram"}, Outcome: notificationSent,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(Router(state))
+	defer server.Close()
+
+	for _, path := range []string{
+		"/?view=health&tab=notifiche",
+		"/?view=notifications",
+	} {
+		code, page := v2Request(t, server, http.MethodGet, path, nil)
+		if code != http.StatusOK {
+			t.Fatalf("%s: status = %d", path, code)
+		}
+		if !strings.Contains(page, "Notifica di prova") {
+			t.Fatalf("%s: the notification log is not shown", path)
+		}
+		if !strings.Contains(page, `href="/?view=health&amp;tab=notifiche&amp;outcome=failed"`) {
+			t.Fatalf("%s: the filter does not stay in the tab", path)
+		}
+		if strings.Contains(page, "Registro notifiche") {
+			t.Fatalf("%s: the old label is still shown", path)
+		}
+	}
+
+	code, page := v2Request(t, server, http.MethodGet, "/?view=health", nil)
+	if code != http.StatusOK || strings.Contains(page, "Notifica di prova") {
+		t.Fatal("the health overview must not show the notification log")
+	}
+}

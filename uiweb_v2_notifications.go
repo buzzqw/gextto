@@ -102,7 +102,7 @@ func V2NotificationsClear(w http.ResponseWriter, r *http.Request, s *AppState) {
 		message = "Il registro delle notifiche non è stato svuotato."
 		failed = true
 	}
-	redirect := "/?view=notifications&toast=" + url.QueryEscape(message)
+	redirect := "/?view=health&tab=notifiche&toast=" + url.QueryEscape(message)
 	if failed {
 		redirect += "&toast_err=1"
 	}

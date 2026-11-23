@@ -1690,10 +1690,10 @@ channel receives the same event, and a slow one does not hold up the others.
 The **Program** receives the data in the `GEXTTO_*` variables and runs without
 a shell.
 
-### The notification log
+### Notifications
 
-Every delivery attempt leaves a row on the **Notification log** page
-(*System* menu): date and time to the second, the message's subject, the channels
+Every delivery attempt leaves a row in the **Notifications** tab of
+*Health*: the date and time to the second, the message's subject, the channels
 configured at that moment, the outcome and, when something went wrong, the error
 the channel reported. It is for the case where an alert does not arrive and the
 log has already rotated: there you read whether the message left, which channel

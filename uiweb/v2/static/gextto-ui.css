@@ -799,6 +799,12 @@ label.field > span, .field > span, .field-label { color: var(--muted); font-size
     font-size: 0.8rem;
   }
 }
+/* The timestamp is a fixed 19 characters: give the first column enough room
+   to show the whole date, instead of letting the other columns squeeze it. */
+@media (min-width: 641px) {
+  .data-table.notification-log th:first-child,
+  .data-table.notification-log td.notif-when { width: 12rem; min-width: 12rem; }
+}
 .dashboard-problems-table td.nowrap { white-space: nowrap; }
 /* A release name is one long word (dots, no spaces): let it wrap, so the
    Actions column stays in view instead of behind a horizontal scroll. */

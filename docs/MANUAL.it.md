@@ -1710,10 +1710,10 @@ Pushover, Apprise, Programma), così più canali possono restare accesi insieme.
 Ogni canale riceve lo stesso evento, e uno lento non trattiene gli altri. Il
 **Programma** riceve i dati nelle variabili `GEXTTO_*` e gira senza shell.
 
-### Il registro delle notifiche
+### Le notifiche
 
-Ogni tentativo di invio lascia una riga nella pagina **Registro notifiche**
-(menu *Sistema*): data e ora al secondo, il titolo del messaggio, i canali configurati
+Ogni tentativo di invio lascia una riga nella scheda **Notifiche** di
+*Salute*: data e ora al secondo, il titolo del messaggio, i canali configurati
 in quel momento, l'esito e, se qualcosa è andato storto, l'errore riportato dal
 canale. Serve quando un avviso non arriva e il log è già girato: lì si legge se
 il messaggio è partito, da quale canale è stato rifiutato e con quale risposta.
