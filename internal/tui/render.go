@@ -19,6 +19,12 @@ const compactWidth = 60
 // Render produces a frame for the given terminal size. It is pure: the same
 // state always renders the same lines, which makes the layout testable.
 func (m *Model) Render(width, height int) Screen {
+	// Scroll windows are clamped against the current content while drawing.
+	// Those clamps are a rendering detail, not a model transition: work on a
+	// copy so drawing a frame cannot change the state it draws (and rendering
+	// twice for a snapshot yields the same result).
+	view := *m
+	m = &view
 	if width < 12 || height < 6 {
 		return Screen{Lines: []Line{{Text: m.Tr.T("msg.termtoolsmall"), Style: StyleHeader}}, ColorsEnabled: m.ColorsEnabled, HighContrast: m.HighContrast}
 	}
@@ -122,6 +128,14 @@ func (m *Model) Render(width, height int) Screen {
 			message += m.Tr.Format("msg.offline", m.Err)
 			footerStyle = StyleErr
 		}
+		if len(m.FetchErrors) > 0 {
+			first := m.FetchErrors[0]
+			if message != "" {
+				message += " · "
+			}
+			message += m.Tr.Format("alert.staledata", len(m.FetchErrors), m.Tr.T("errsrc."+first.Source), first.Message)
+			footerStyle = StyleErr
+		}
 		if m.Loading {
 			if message != "" {
 				message += " · "
@@ -179,9 +193,7 @@ func (m *Model) headerLine(width int) string {
 		}
 	}
 	next = " · " + connection + next
-	if m.Tab == TabLogs {
-		m.UnseenProblems = 0
-	} else if m.UnseenProblems > 0 {
+	if m.Tab != TabLogs && m.UnseenProblems > 0 {
 		next += " · " + m.Tr.Format("label.unseenproblems", m.UnseenProblems)
 	}
 	if !m.LogStreamConnected && m.StreamReconnect > 0 {
@@ -654,6 +666,10 @@ func (m *Model) statusProblems(diskUsed float64) ([]string, Style) {
 		if count := len(health.LastErrors); count > 0 {
 			problems = append(problems, tr.Format("status.lasterror", health.LastErrors[count-1]))
 		}
+	}
+	if count := len(m.FetchErrors); count > 0 {
+		problems = append(problems, tr.Format("status.staledata", count))
+		severity = StyleErr
 	}
 	return problems, severity
 }

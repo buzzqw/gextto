@@ -7,26 +7,46 @@ import (
 
 // fetchMaintenance loads the Maintenance tab: the jobs at every poll, the
 // rest with the slow data.
-func fetchMaintenance(ctx context.Context, client *Client, slow bool, previous *MaintenanceData) *MaintenanceData {
+func fetchMaintenance(ctx context.Context, client *Client, slow bool, previous *MaintenanceData) (*MaintenanceData, []FetchError) {
 	data := &MaintenanceData{}
 	if previous != nil {
 		*data = *previous
 	}
+	var failures []FetchError
+	record := func(err error) {
+		message := ""
+		if err != nil && ctx.Err() == nil {
+			message = err.Error()
+		}
+		failures = append(failures, FetchError{Source: "maintenance", Message: message})
+	}
 	if jobs, err := client.Jobs(ctx); err == nil {
 		data.Jobs = jobs
+		record(nil)
+	} else {
+		record(err)
 	}
 	if slow || previous == nil {
 		if backups, err := client.Backups(ctx); err == nil {
 			data.Backups = backups
+			record(nil)
+		} else {
+			record(err)
 		}
 		if files, err := client.DBInfo(ctx); err == nil {
 			data.DBFiles = files
+			record(nil)
+		} else {
+			record(err)
 		}
 		if info, err := client.Ramdisk(ctx); err == nil {
 			data.Ramdisk = &info
+			record(nil)
+		} else {
+			record(err)
 		}
 	}
-	return data
+	return data, failures
 }
 
 // performMaintenanceAction runs the Maintenance tab operations. It reports

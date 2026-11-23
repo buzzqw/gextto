@@ -36,6 +36,7 @@ func (m *Model) pruneMarks() {
 
 // SetTorrentTags replaces the hash → tag map and the tag catalog.
 func (m *Model) SetTorrentTags(tags map[string]string, catalog []string) {
+	m.invalidateDownloads()
 	m.TorrentTags = tags
 	if catalog != nil {
 		m.TagCatalog = catalog

@@ -87,6 +87,13 @@ Completions, errors, stalls and archivings arrive as a temporary message in the
 bottom bar. The TUI also shows the same state changes for the HTTP comic
 downloads.
 
+When an endpoint stops answering, the bottom bar and the **Attention** line of
+the Status tab name the sources whose data is no longer fresh — for example
+`1 stale source: archive (timeout)`. The warning disappears on the next
+successful poll of that source. A reply that arrives late, after you have
+changed view or archive page, is discarded instead of overwriting the current
+view.
+
 The **settings panel** (`g`) changes the interface language, the time between
 searches, the download/upload limits and test mode (dry-run); `c` turns colours
 on or off and `h` switches the high-contrast theme.

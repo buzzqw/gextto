@@ -1,6 +1,10 @@
 package tui
 
-import "testing"
+import (
+	"fmt"
+	"strings"
+	"testing"
+)
 
 // TestCatalogIsComplete fails when a string is missing in any language.
 func TestCatalogIsComplete(t *testing.T) {
@@ -10,6 +14,36 @@ func TestCatalogIsComplete(t *testing.T) {
 		for i, name := range names {
 			if entry[i] == "" {
 				t.Errorf("missing %s translation for %q", name, key)
+			}
+		}
+	}
+}
+
+// TestCatalogPlaceholdersAgreeAcrossLanguages catches a translation whose
+// %d/%s verbs do not match the others: fmt.Sprintf would print a
+// "%!d(MISSING)" in the middle of the interface.
+func TestCatalogPlaceholdersAgreeAcrossLanguages(t *testing.T) {
+	verbs := func(text string) string {
+		var out strings.Builder
+		for index := 0; index < len(text); index++ {
+			if text[index] != '%' || index+1 >= len(text) {
+				continue
+			}
+			if text[index+1] == '%' {
+				index++
+				continue
+			}
+			fmt.Fprintf(&out, "%c", text[index+1])
+			index++
+		}
+		return out.String()
+	}
+	for _, key := range CatalogKeys() {
+		entry := catalog[key]
+		want := verbs(entry[0])
+		for index, text := range entry {
+			if got := verbs(text); got != want {
+				t.Errorf("key %q, language %d: placeholders %q, want %q", key, index, got, want)
 			}
 		}
 	}

@@ -121,6 +121,7 @@ func Run(ctx context.Context, opts Options) error {
 	actionCh := make(chan actionResult, 4)
 	var fetching int32
 	var acting int32
+	var fetchSeq uint64
 	var lastSlow time.Time
 	requestRefresh := func() {
 		if !atomic.CompareAndSwapInt32(&fetching, 0, 1) {
@@ -135,7 +136,9 @@ func Run(ctx context.Context, opts Options) error {
 		if slow {
 			lastSlow = time.Now()
 		}
+		fetchSeq++
 		request := fetchRequest{
+			seq:          fetchSeq,
 			includeSlow:  slow,
 			includeLogs:  (model.Tab == TabLogs || model.Tab == TabStatus) && !model.LogStreamConnected,
 			tab:          model.Tab,
@@ -457,6 +460,11 @@ func applyStream(model *Model, event streamEvent) {
 
 // refreshResult carries one background poll of the daemon.
 type refreshResult struct {
+	// seq is the request number, assigned on the main goroutine. A late answer
+	// to an older request is discarded so it cannot rewind a view the user has
+	// since changed (the archive page, for instance).
+	seq           uint64
+	fetchErrors   []FetchError
 	status        *Status
 	statusErr     string
 	metrics       *DashboardStats
@@ -501,6 +509,7 @@ const slowRefresh = 10 * time.Second
 
 // fetchRequest is a snapshot of the model fields a background poll needs.
 type fetchRequest struct {
+	seq          uint64
 	includeSlow  bool
 	seriesName   string
 	maintenance  *MaintenanceData
@@ -517,47 +526,86 @@ func fetchModel(ctx context.Context, client *Client, request fetchRequest) refre
 	defer cancel()
 
 	var result refreshResult
+	result.seq = request.seq
+	// Every endpoint reports its own outcome: an empty message clears a
+	// previous failure, so a failed endpoint is never silently replaced by
+	// stale data with no indication in the interface.
+	record := func(source string, err error) {
+		message := ""
+		if err != nil && ctx.Err() == nil {
+			message = err.Error()
+		}
+		result.fetchErrors = append(result.fetchErrors, FetchError{Source: source, Message: message})
+	}
 	if status, err := client.Status(callCtx); err == nil {
 		result.status = &status
-	} else if ctx.Err() == nil {
-		result.statusErr = err.Error()
+		record("status", nil)
+	} else {
+		record("status", err)
+		if ctx.Err() == nil {
+			result.statusErr = err.Error()
+		}
 	}
 	if tab == TabStatus && request.includeSlow {
 		if stats, err := client.Stats(callCtx); err == nil {
 			result.metrics = &stats
 			result.hasMetrics = true
+			record("status", nil)
+		} else {
+			record("status", err)
 		}
 		if health, err := client.Health(callCtx); err == nil {
 			result.health = &health
+			record("health", nil)
+		} else {
+			record("health", err)
 		}
 	}
 	if tab == TabTorrents || tab == TabStatus {
 		if torrents, err := client.Torrents(callCtx); err == nil {
 			result.torrents = torrents
 			result.hasTorrents = true
+			record("torrents", nil)
+		} else {
+			record("torrents", err)
 		}
 		if downloads, rows, err := client.ComicDownloadsWithEd2k(callCtx); err == nil {
 			result.httpDownloads = downloads
 			result.ed2kRows = rows
 			result.hasHTTP = true
+			record("torrents", nil)
+		} else {
+			record("torrents", err)
 		}
 		if status, err := client.Ed2kStatus(callCtx); err == nil {
 			result.ed2k = &status
+			record("torrents", nil)
+		} else {
+			record("torrents", err)
 		}
 	}
 	if tab == TabTorrents && request.includeSlow {
 		if policy, err := client.SpeedPolicy(callCtx); err == nil {
 			result.speedPolicy = &policy
+			record("torrents", nil)
+		} else {
+			record("torrents", err)
 		}
 		if tags, err := client.TorrentTags(callCtx); err == nil {
-			catalog, _ := client.DownloadTags(callCtx)
+			catalog, catalogErr := client.DownloadTags(callCtx)
 			result.torrentTags, result.tagCatalog = tags, catalog
+			record("torrents", catalogErr)
+		} else {
+			record("torrents", err)
 		}
 	}
 	if includeLogs {
 		if logs, err := client.Logs(callCtx, logLimit); err == nil {
 			result.logs = logs
 			result.hasLogs = true
+			record("logs", nil)
+		} else {
+			record("logs", err)
 		}
 	}
 	switch tab {
@@ -568,16 +616,25 @@ func fetchModel(ctx context.Context, client *Client, request fetchRequest) refre
 			result.archivePages = pages
 			result.archivePage = archivePage
 			result.hasArchive = true
+			record("archive", nil)
+		} else {
+			record("archive", err)
 		}
 	case TabMissing:
 		if items, err := client.Gaps(callCtx); err == nil {
 			result.missing = items
 			result.hasMissing = true
+			record("missing", nil)
+		} else {
+			record("missing", err)
 		}
 	case TabBlocklist:
 		if items, err := client.Blocklist(callCtx); err == nil {
 			result.blocklist = items
 			result.hasBlocklist = true
+			record("blocklist", nil)
+		} else {
+			record("blocklist", err)
 		}
 	case TabLibrary:
 		// The library (with per-series episode counts) changes slowly and is
@@ -587,25 +644,36 @@ func fetchModel(ctx context.Context, client *Client, request fetchRequest) refre
 			if series, movies, err := client.Library(callCtx); err == nil {
 				result.series, result.hasSeries = series, true
 				result.movies, result.hasMovies = movies, true
+				record("library", nil)
+			} else {
+				record("library", err)
 			}
 			if comics, err := client.Comics(callCtx); err == nil {
 				result.comics, result.hasComics = comics, true
+			} else {
+				record("library", err)
 			}
 			if request.seriesName != "" {
 				if detail, err := client.SeriesDetail(callCtx, request.seriesName); err == nil {
 					result.seriesDetail = &detail
+				} else {
+					record("library", err)
 				}
 			}
 		}
 	}
 	if tab == TabMaintenance {
-		result.maintenance = fetchMaintenance(callCtx, client, request.includeSlow, request.maintenance)
+		var failures []FetchError
+		result.maintenance, failures = fetchMaintenance(callCtx, client, request.includeSlow, request.maintenance)
+		result.fetchErrors = append(result.fetchErrors, failures...)
 	}
 	if tab == TabHealth {
 		if health, err := client.Health(callCtx); err == nil {
 			result.health = &health
+			record("health", nil)
 		} else {
 			result.healthErr = err.Error()
+			record("health", err)
 		}
 	}
 	return result
@@ -624,6 +692,15 @@ func logLimitForHeight(height int) int {
 
 // applyRefresh merges a poll result into the model on the main goroutine.
 func (m *Model) applyRefresh(result refreshResult) {
+	if result.seq != 0 {
+		if result.seq <= m.lastRefreshSeq {
+			return
+		}
+		m.lastRefreshSeq = result.seq
+	}
+	for _, failure := range result.fetchErrors {
+		m.SetFetchError(failure.Source, failure.Message)
+	}
 	if result.status != nil {
 		m.SetStatus(*result.status)
 		m.SetDaemonState(true, "")

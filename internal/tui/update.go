@@ -129,19 +129,16 @@ func (m *Model) Update(k Key) Action {
 		}
 		return Action{}
 	case k.Kind == KeyRune && k.Rune == 'l':
-		m.Tab = TabLibrary
+		m.setTab(TabLibrary)
 		return m.loadTabAction()
 	case k.Kind == KeyTab:
-		m.Tab = Tab((int(m.Tab) + 1) % tabCount)
-		m.Ed2kDetail = nil
+		m.setTab(Tab((int(m.Tab) + 1) % tabCount))
 		return m.loadTabAction()
 	case k.Kind == KeyBackTab:
-		m.Tab = Tab((int(m.Tab) + tabCount - 1) % tabCount)
-		m.Ed2kDetail = nil
+		m.setTab(Tab((int(m.Tab) + tabCount - 1) % tabCount))
 		return m.loadTabAction()
 	case k.Kind == KeyRune && k.Rune >= '1' && k.Rune <= '9':
-		m.Tab = Tab(k.Rune - '1')
-		m.Ed2kDetail = nil
+		m.setTab(Tab(k.Rune - '1'))
 		return m.loadTabAction()
 	}
 
@@ -169,6 +166,18 @@ func (m *Model) Update(k Key) Action {
 		return m.updateMaintenance(k)
 	}
 	return Action{}
+}
+
+// setTab changes the active tab and clears the "unseen problems" marker when
+// the log is opened. This used to happen as a side effect of rendering the
+// header, which made Render mutate the model.
+func (m *Model) setTab(tab Tab) {
+	m.Tab = tab
+	m.Ed2kDetail = nil
+	m.ClearFetchErrors()
+	if tab == TabLogs {
+		m.UnseenProblems = 0
+	}
 }
 
 func (m *Model) updatePrompt(k Key) Action {

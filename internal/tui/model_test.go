@@ -880,8 +880,7 @@ func TestUnseenProblemsUntilTheLogIsViewed(t *testing.T) {
 	if header := m.headerLine(200); !strings.Contains(header, "2 nuovi avvisi") {
 		t.Fatalf("header = %q", header)
 	}
-	m.Tab = TabLogs
-	m.headerLine(200)
+	m.setTab(TabLogs)
 	if m.UnseenProblems != 0 {
 		t.Fatalf("viewing the log must clear the counter, got %d", m.UnseenProblems)
 	}

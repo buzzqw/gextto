@@ -272,6 +272,14 @@ type Screen struct {
 
 // Event is one torrent event (alias kept for readability in the model).
 
+// FetchError records the last failure of one independent daemon endpoint.
+// An empty Message is never stored: it means the endpoint answered and a
+// previous failure was cleared.
+type FetchError struct {
+	Source  string
+	Message string
+}
+
 // Model is the pure TUI state. It has no terminal or network dependencies, so
 // every transition can be tested deterministically.
 type Model struct {
@@ -388,9 +396,22 @@ type Model struct {
 	SearchSelected int
 	SearchScroll   int
 
-	Message string
-	Err     string
-	Loading bool
+	Message     string
+	Err         string
+	Loading     bool
+	FetchErrors []FetchError
+	// lastRefreshSeq is the newest poll already merged; older answers are
+	// dropped so a slow request cannot rewind a view changed in the meantime.
+	lastRefreshSeq uint64
+	// The derived download/log views are cached: they are read several times
+	// per frame (and per keystroke) and sorting a large session each time is
+	// expensive. Setters bump the generation to invalidate the cache.
+	downloadGeneration uint64
+	downloadCacheKey   downloadViewKey
+	downloadCache      []DownloadRow
+	logGeneration      uint64
+	logCacheKey        logViewKey
+	logCache           []string
 	// Bandwidth is the footer meter of the TUI's own traffic.
 	Bandwidth string
 
@@ -425,8 +446,12 @@ func NewModel(tr *Translator) *Model {
 // SetStatus replaces the daemon summary.
 func (m *Model) SetStatus(status Status) { m.Status = &status }
 
+func (m *Model) invalidateDownloads() { m.downloadGeneration++ }
+func (m *Model) invalidateLogs()      { m.logGeneration++ }
+
 // SetTorrents replaces the torrent list.
 func (m *Model) SetTorrents(torrents []Torrent) {
+	m.invalidateDownloads()
 	selectedHash := ""
 	if selected := m.SelectedDownload(); selected.Torrent != nil {
 		selectedHash = selected.Torrent.Hash
@@ -451,6 +476,7 @@ func (m *Model) SetTorrents(torrents []Torrent) {
 // only for transitions observed after the first snapshot.
 // SetEd2k stores aMule's state and the raw eD2k rows.
 func (m *Model) SetEd2k(status *Ed2kStatus, rows []Ed2kDownload) {
+	m.invalidateDownloads()
 	m.Ed2k = status
 	m.Ed2kRows = rows
 	if m.Ed2kDetail != nil {
@@ -485,6 +511,7 @@ func (m *Model) SelectedEd2k() *Ed2kDownload {
 }
 
 func (m *Model) SetHTTPDownloads(downloads []ComicDownload) {
+	m.invalidateDownloads()
 	selectedID := ""
 	if selected := m.SelectedDownload(); selected.HTTP != nil {
 		selectedID = selected.HTTP.ID
@@ -664,6 +691,7 @@ func (m *Model) SetDaemonState(connected bool, message string) {
 
 // SetLogs replaces the whole log buffer (SSE snapshot fallback).
 func (m *Model) SetLogs(lines []string) {
+	m.invalidateLogs()
 	previous := m.Logs
 	m.Logs = append([]string(nil), lines...)
 	delta := logAppendDelta(previous, m.Logs)
@@ -721,6 +749,7 @@ func logAppendDelta(previous, current []string) int {
 
 // AppendLog appends a single log line, keeping the last 500.
 func (m *Model) AppendLog(line string) {
+	m.invalidateLogs()
 	m.Logs = append(m.Logs, line)
 	m.noteProblem(line)
 	if !m.LogFollow {
@@ -784,6 +813,29 @@ func (m *Model) SetPickerResults(kind SearchKind, query string, results []map[st
 
 // SetError records a transport error.
 func (m *Model) SetError(message string) { m.Err = message }
+
+// SetFetchError records (or clears) the failure of one endpoint. An empty
+// message removes the source from the list.
+func (m *Model) SetFetchError(source, message string) {
+	for index := range m.FetchErrors {
+		if m.FetchErrors[index].Source != source {
+			continue
+		}
+		if message == "" {
+			m.FetchErrors = append(m.FetchErrors[:index], m.FetchErrors[index+1:]...)
+		} else {
+			m.FetchErrors[index].Message = message
+		}
+		return
+	}
+	if message != "" {
+		m.FetchErrors = append(m.FetchErrors, FetchError{Source: source, Message: message})
+	}
+}
+
+// ClearFetchErrors forgets endpoint failures, for instance when the user
+// changes tab and those endpoints are no longer being polled.
+func (m *Model) ClearFetchErrors() { m.FetchErrors = nil }
 
 // SetMessage records a status message.
 func (m *Model) SetMessage(message string) { m.Message = message }
@@ -872,7 +924,29 @@ type DownloadRow struct {
 	HTTP    *ComicDownload
 }
 
+type downloadViewKey struct {
+	generation uint64
+	filter     string
+	sort       SortMode
+	desc       bool
+	torrents   int
+	http       int
+	tags       int
+}
+
 func (m *Model) VisibleDownloads() []DownloadRow {
+	key := downloadViewKey{
+		generation: m.downloadGeneration,
+		filter:     m.Filter,
+		sort:       m.Sort,
+		desc:       m.SortDesc,
+		torrents:   len(m.Torrents),
+		http:       len(m.HTTPDownloads),
+		tags:       len(m.TorrentTags),
+	}
+	if m.downloadCache != nil && m.downloadCacheKey == key {
+		return m.downloadCache
+	}
 	rows := make([]DownloadRow, 0, len(m.Torrents)+len(m.HTTPDownloads))
 	for index := range m.Torrents {
 		item := m.Torrents[index]
@@ -918,6 +992,8 @@ func (m *Model) VisibleDownloads() []DownloadRow {
 		}
 		return less
 	})
+	m.downloadCache = rows
+	m.downloadCacheKey = key
 	return rows
 }
 
@@ -1020,9 +1096,25 @@ func joinNonEmpty(values ...string) string {
 }
 
 // FilteredLogs returns the log lines matching the active filter.
+type logViewKey struct {
+	generation uint64
+	filter     string
+	problems   bool
+	lines      int
+}
+
 func (m *Model) FilteredLogs() []string {
 	if m.LogFilter == "" && !m.LogProblemsOnly {
 		return m.Logs
+	}
+	key := logViewKey{
+		generation: m.logGeneration,
+		filter:     m.LogFilter,
+		problems:   m.LogProblemsOnly,
+		lines:      len(m.Logs),
+	}
+	if m.logCache != nil && m.logCacheKey == key {
+		return m.logCache
 	}
 	needle := strings.ToLower(m.LogFilter)
 	filtered := make([]string, 0, len(m.Logs))
@@ -1034,6 +1126,8 @@ func (m *Model) FilteredLogs() []string {
 			filtered = append(filtered, line)
 		}
 	}
+	m.logCache = filtered
+	m.logCacheKey = key
 	return filtered
 }
 
