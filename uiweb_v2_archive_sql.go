@@ -231,11 +231,12 @@ func V2ArchiveSQLDelete(w http.ResponseWriter, r *http.Request, s *AppState) {
 	defer cancel()
 	removed, err := s.archive.DeleteArchiveSQL(ctx, operation, language)
 	if err != nil {
-		logging.Error("archive sql deletion failed", "operation", operation.ID, "language", language, "error", err)
+		logging.Error("Archive cleanup did not complete", "operation", operation.ID, "language", language, "error", err)
 		result.Error = "Eliminazione non riuscita."
 		v2Render(w, http.StatusOK, "v2_archive_sql_result", result, s)
 		return
 	}
+	logging.Info("🧹 Archive cleanup removed " + countLabel(removed, "row", "rows"))
 	// Show the archive after the deletion: usually the same rows are gone, and
 	// the counter proves that the operation touched what the preview showed.
 	result = v2ArchiveSQLPreviewResult(r.Context(), s, operation, language)

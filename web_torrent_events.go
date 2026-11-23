@@ -595,16 +595,17 @@ func DetachErrorTorrents(torrents TorrentSession, db *Database, startupHashes ma
 		// refusal instead of detaching it again after every restart.
 		reactivated, err := db.ReactivateReAddedTorrent(torrent.Hash)
 		if err != nil {
-			logging.Warn("could not clear the old refusal of a re-added torrent",
-				"hash", torrent.Hash, "name", torrent.Name, "error", err.Error())
+			logging.Warn(fmt.Sprintf("⏳ I could not clear the old refusal of «%s», which was added again; I will try again",
+				shortTorrentName(torrent.Name)), "hash", torrent.Hash)
+			logging.Debug("could not clear the old refusal of a re-added torrent", "hash", torrent.Hash, "error", err.Error())
 		} else if reactivated {
 			logging.Info(fmt.Sprintf("♻️ «%s» was added again after a refusal: it is kept and checked as a new download", torrent.Name), "hash", torrent.Hash)
 			continue
 		}
 		_, removeErr := torrents.Remove(torrent.Hash, false)
 		if removeErr != nil {
-			logging.Warn("failed to detach leftover error torrent",
-				"hash", torrent.Hash, "name", torrent.Name, "error", removeErr.Error())
+			logging.Warn(detachErrorText(torrent.Name), "hash", torrent.Hash)
+			logging.Debug("could not clear a failed download from the session", "hash", torrent.Hash, "error", removeErr.Error())
 			continue
 		}
 		_ = db.MarkTorrentRemovedAt(torrent.Hash)
@@ -641,6 +642,8 @@ func DetachCompletedArchivedSingles(cfg *Config, torrents TorrentSession, db *Da
 			notDetachable[hash] = now.Add(notDetachableRecheckInterval)
 		}
 	}
+	failed := 0
+	var firstErr error
 	for _, torrent := range list {
 		if until, ok := notDetachable[torrent.Hash]; ok && now.Before(until) {
 			continue
@@ -674,13 +677,22 @@ func DetachCompletedArchivedSingles(cfg *Config, torrents TorrentSession, db *Da
 		delete(notDetachable, torrent.Hash)
 		_, err := torrents.Remove(torrent.Hash, false)
 		if err != nil {
-			logging.Warn("failed to detach completed single after recovery",
-				"hash", torrent.Hash, "name", torrent.Name, "error", err.Error())
+			failed++
+			if firstErr == nil {
+				firstErr = err
+			}
 			continue
 		}
 		_ = db.MarkTorrentRemovedAt(torrent.Hash)
-		logging.Info("detached completed single whose archived source is already gone",
-			"hash", torrent.Hash, "name", torrent.Name)
+		logging.Info(detachArchivedText(torrent.Name), "hash", torrent.Hash)
+	}
+	if failed > 0 {
+		if firstErr != nil {
+			logging.Debug("gx-torrent did not remove a finished download", "error", firstErr.Error())
+		}
+		if detachRetryNoticeDue(now) {
+			logging.Warn(detachRecoveryText(failed))
+		}
 	}
 }
 
@@ -3249,8 +3261,8 @@ func tevDiscardInferiorRelease(cfg *Config, db *Database, torrents TorrentSessio
 func tevRemoveRenamedTorrent(db *Database, torrents TorrentSession, event *models.TorrentEvent) {
 	removed, err := torrents.Remove(event.Hash, false)
 	if err != nil {
-		logging.Warn("renamed torrent removal failed",
-			"hash", event.Hash, "name", event.Name, "error", err.Error())
+		logging.Warn(renamedTorrentRemovalText(event.Name), "hash", event.Hash)
+		logging.Debug("renamed torrent could not be removed from the session", "hash", event.Hash, "error", err.Error())
 	} else if removed {
 		_ = db.MarkTorrentRemovedAt(event.Hash)
 		logging.Debug("torrent removed after rename: archived under a different path",

@@ -454,6 +454,80 @@ func TestRoutineSkipReasonKeepsBlocklistedCandidatesQuiet(t *testing.T) {
 	}
 }
 
+func TestDetachRecoveryTextSaysWhatIsPendingAndWhatHappensNext(t *testing.T) {
+	want := "⏳ 1 finished download could not be removed from the download list because gx-torrent did not answer; I will try again when it is back"
+	if got := detachRecoveryText(1); got != want {
+		t.Fatalf("single = %q, want %q", got, want)
+	}
+	if got := detachRecoveryText(5); !strings.Contains(got, "5 finished downloads") {
+		t.Fatalf("plural = %q", got)
+	}
+	for _, got := range []string{detachRecoveryText(1), detachRecoveryText(5)} {
+		if strings.Contains(got, "connection refused") || strings.Contains(got, " · ") {
+			t.Fatalf("the line still carries the engine's technical detail: %q", got)
+		}
+	}
+}
+
+func TestDetachNoticeIsThrottledAcrossTicks(t *testing.T) {
+	now := time.Now()
+	detachRetryNotice.Lock()
+	detachRetryNotice.last = time.Time{}
+	detachRetryNotice.Unlock()
+	if !detachRetryNoticeDue(now) {
+		t.Fatal("the first failure must be reported")
+	}
+	for _, later := range []time.Time{now.Add(time.Second), now.Add(30 * time.Second), now.Add(4 * time.Minute)} {
+		if detachRetryNoticeDue(later) {
+			t.Fatalf("the same burst must stay quiet at %v", later)
+		}
+	}
+	if !detachRetryNoticeDue(now.Add(detachRetryNoticeCooldown + time.Second)) {
+		t.Fatal("a failure after the cooldown must be reported again")
+	}
+}
+
+func TestDetachTextsNameTheFileAndExplainTheAction(t *testing.T) {
+	name := "Series S01E01.mkv"
+	cases := []struct {
+		got  string
+		want string
+	}{
+		{detachArchivedText(name), "✅ «Series S01E01.mkv» was removed from the download list: its file is already in the library and the download copy is gone"},
+		{detachErrorText(name), "⏳ «Series S01E01.mkv» could not be removed from the download list after the restart; I will try again"},
+		{renamedTorrentRemovalText(name), "⏳ «Series S01E01.mkv» is still in the download list after being renamed in the library; I will try again"},
+	}
+	for _, tc := range cases {
+		if tc.got != tc.want {
+			t.Fatalf("got %q, want %q", tc.got, tc.want)
+		}
+		if strings.Contains(tc.got, " · ") || strings.Contains(tc.got, "error:") {
+			t.Fatalf("the line still carries internal fields: %q", tc.got)
+		}
+	}
+}
+
+func TestAmuleActionTextIsASentence(t *testing.T) {
+	cases := map[string]string{
+		"connect":           "aMule is connecting to eD2k and Kad",
+		"disconnect":        "aMule is disconnecting from eD2k and Kad",
+		"kad_start":         "aMule is starting Kad",
+		"kad_stop":          "aMule is stopping Kad",
+		"server_connect":    "aMule is connecting to an eD2k server",
+		"server_disconnect": "aMule is disconnecting from the eD2k server",
+		"servers_update":    "aMule is downloading the server list",
+		"nodes_update":      "aMule is downloading the Kad nodes",
+	}
+	for action, want := range cases {
+		if got := ed2kActionText(action); got != want {
+			t.Errorf("ed2kActionText(%q) = %q, want %q", action, got, want)
+		}
+	}
+	if got := ed2kActionText("something_else"); strings.Contains(got, "_") {
+		t.Fatalf("an unknown command must not leak its internal name: %q", got)
+	}
+}
+
 func TestCutAtRuneKeepsWholeCharacters(t *testing.T) {
 	name := strings.Repeat("a", 38) + "èè"
 	got := shortTorrentName(name + " altro")

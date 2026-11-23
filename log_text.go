@@ -752,6 +752,81 @@ func recordTorrentErrorNotice(hash, kind string, now time.Time) bool {
 	return true
 }
 
+// detachRetryNoticeCooldown keeps the recovery pass from repeating the same
+// "gx-torrent did not answer" warning on its 750 ms tick while the engine is
+// restarting. One line per burst is enough to say what is pending.
+const detachRetryNoticeCooldown = 5 * time.Minute
+
+var detachRetryNotice struct {
+	sync.Mutex
+	last time.Time
+}
+
+// detachRetryNoticeDue reports whether the throttled warning is due now.
+func detachRetryNoticeDue(now time.Time) bool {
+	detachRetryNotice.Lock()
+	defer detachRetryNotice.Unlock()
+	if !detachRetryNotice.last.IsZero() && now.Sub(detachRetryNotice.last) < detachRetryNoticeCooldown {
+		return false
+	}
+	detachRetryNotice.last = now
+	return true
+}
+
+// detachRecoveryText is the throttled warning of the completed-download
+// recovery pass: it says what is still pending and what Gextto will do, rather
+// than showing a raw HTTP error for every torrent on every tick.
+func detachRecoveryText(failed int) string {
+	return fmt.Sprintf("⏳ %s could not be removed from the download list because gx-torrent did not answer; I will try again when it is back",
+		countLabel(int64(failed), "finished download", "finished downloads"))
+}
+
+// detachArchivedText is the successful counterpart: the download copy is gone
+// and the file is already in the library, so the torrent can leave the session.
+func detachArchivedText(name string) string {
+	return fmt.Sprintf("✅ «%s» was removed from the download list: its file is already in the library and the download copy is gone",
+		shortTorrentName(name))
+}
+
+// detachErrorText reports a failed download that could not be cleared after a
+// restart, without showing the engine's technical error.
+func detachErrorText(name string) string {
+	return fmt.Sprintf("⏳ «%s» could not be removed from the download list after the restart; I will try again",
+		shortTorrentName(name))
+}
+
+// renamedTorrentRemovalText explains why a download still appears in the list
+// after its file was filed under a different name in the library.
+func renamedTorrentRemovalText(name string) string {
+	return fmt.Sprintf("⏳ «%s» is still in the download list after being renamed in the library; I will try again",
+		shortTorrentName(name))
+}
+
+// ed2kActionText turns an internal aMule command into the sentence shown in
+// the log: «server_connect» is not a name the person running Gextto reads.
+func ed2kActionText(action string) string {
+	switch action {
+	case "connect":
+		return "aMule is connecting to eD2k and Kad"
+	case "disconnect":
+		return "aMule is disconnecting from eD2k and Kad"
+	case "kad_start":
+		return "aMule is starting Kad"
+	case "kad_stop":
+		return "aMule is stopping Kad"
+	case "server_connect":
+		return "aMule is connecting to an eD2k server"
+	case "server_disconnect":
+		return "aMule is disconnecting from the eD2k server"
+	case "servers_update":
+		return "aMule is downloading the server list"
+	case "nodes_update":
+		return "aMule is downloading the Kad nodes"
+	default:
+		return "aMule received a command"
+	}
+}
+
 // indexerTestText is the user-facing line of the indexer test button: a
 // sentence with the indexer's name, where it is and what it answered, instead
 // of a trail of internal fields.

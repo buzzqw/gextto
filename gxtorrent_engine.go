@@ -830,7 +830,8 @@ func (e *gxTorrentEngine) sync() error {
 		e.lastErr = err.Error()
 		e.mu.Unlock()
 		if wasConnected {
-			logging.Warn(fmt.Sprintf("⚠️ gx-torrent does not answer at %s: %v", e.settings.BaseURL, err))
+			logging.Warn("⚠️ gx-torrent stopped answering; Gextto will reconnect as soon as it is available again")
+			logging.Debug("gx-torrent sync failed", "url", e.settings.BaseURL, "error", err.Error())
 		}
 		return err
 	}
@@ -880,7 +881,7 @@ func (e *gxTorrentEngine) sync() error {
 	}
 	e.mu.Unlock()
 	if reconnected {
-		logging.Debug("gx-torrent connesso", "url", e.settings.BaseURL)
+		logging.Debug("gx-torrent reconnected", "url", e.settings.BaseURL)
 		e.mu.Lock()
 		// Re-push the queue policy: a restarted daemon must not run with a
 		// stale value. The speed limits are re-asserted every minute by the
