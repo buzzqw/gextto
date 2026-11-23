@@ -100,8 +100,8 @@ h3.sub{margin:14px 0 2px;font-size:13px;color:var(--subtle);text-transform:upper
     <label>{{tr "Incoming interface (IP or name)"}}<input type="text" name="listen-interface" value="{{.LISTEN_IFACE}}" autocomplete="off" title="{{tr "Network interface or IP address for incoming connections"}}"></label>
     <label>{{tr "Outgoing interface (VPN killswitch)"}}<input type="text" name="outgoing-interface" value="{{.OUT_IFACE}}" autocomplete="off" title="{{tr "Network interface for outgoing traffic (VPN killswitch)"}}"></label>
     <label>{{tr "Proxy (socks5:// or http://)"}}<input type="text" name="proxy" value="{{.PROXY}}" autocomplete="off" title="{{tr "SOCKS5 or HTTP proxy URL for peer traffic"}}"></label>
-    <label>{{tr "API token"}}<input type="text" name="token" value="{{.TOKEN}}" autocomplete="off" title="{{tr "Authentication token for API requests"}}"></label>
-    <label>{{tr "qBittorrent API key"}}<input type="text" name="qbit-api-key" value="{{.QBIT_API_KEY}}" autocomplete="off" title="{{tr "API key accepted by the qBittorrent-compatible API (X-Api-Key or Bearer); empty disables this way of signing in"}}"></label>
+    <label>{{tr "API token"}}<input type="password" name="token" value="{{.TOKEN}}" autocomplete="off" title="{{tr "Authentication token for API requests"}}"></label>
+    <label>{{tr "qBittorrent API key"}}<input type="password" name="qbit-api-key" value="{{.QBIT_API_KEY}}" autocomplete="off" title="{{tr "API key accepted by the qBittorrent-compatible API (X-Api-Key or Bearer); empty disables this way of signing in"}}"></label>
     <label>{{tr "qBittorrent version reported"}}<input type="text" name="qbit-version" value="{{.QBIT_VERSION}}" autocomplete="off" placeholder="4.6.7" title="{{tr "Version string returned to qBittorrent clients by app/version; keep 4.6.7 unless a client requires another version"}}"></label>
     <label>{{tr "Client identity"}}<select name="client-identity" title="{{tr "What peers and trackers see: gx-core with its real version by default, or a compatibility preset. Some private trackers only accept whitelisted clients; check their rules before using a preset."}}">{{.CLIENT_IDENTITY_OPTIONS}}</select></label>
     <label>{{tr "Client version (empty = preset)"}}<input type="text" name="client-identity-version" value="{{.CLIENT_IDENTITY_VERSION}}" autocomplete="off" placeholder="5.2.3" title="{{tr "Version announced with the preset; empty uses the preset version"}}"></label>
@@ -267,6 +267,7 @@ h3.sub{margin:14px 0 2px;font-size:13px;color:var(--subtle);text-transform:upper
     <button type="button" class="secondary sm" data-formaction="/ui/webui-install" title="{{tr "Download the latest VueTorrent release and install (or update) it here"}}">{{tr "Install or update VueTorrent"}}</button>
   </div>
   <p class="muted m-0 fs-12">{{tr "The standard interface is always available at"}} <a href="/ui">/ui</a>.</p>
+  <p class="muted m-0 fs-12"><span>{{tr "qBittorrent-compatible API address"}}</span>: <code id="qbit-api-url"></code> <button type="button" class="secondary sm" id="qbit-api-copy" title="{{tr "Copy the API address to the clipboard"}}">{{tr "Copy"}}</button></p>
   {{.LOGOUT_FORM}}
 </fieldset>
 <fieldset>
@@ -680,6 +681,18 @@ if (document.querySelector('[data-update-applying]')) {
     }).catch(function () {});
   }, 3000);
 }
+// The API address depends on how the page was reached, not on the listen
+// address saved in the settings (which may be 0.0.0.0).
+(function () {
+  var out = document.getElementById('qbit-api-url');
+  if (!out) return;
+  out.textContent = location.origin + '/api/v2';
+  var copy = document.getElementById('qbit-api-copy');
+  if (copy) copy.addEventListener('click', function () {
+    if (navigator.clipboard) navigator.clipboard.writeText(out.textContent).catch(function () {});
+    if (window.gx && window.gx.toast) window.gx.toast(out.textContent, false);
+  });
+})();
 document.addEventListener('DOMContentLoaded', function () { ensureTooltips(document); syncSchedModes(); });
 ensureTooltips(document);
 syncSchedModes();

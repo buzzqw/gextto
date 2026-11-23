@@ -1422,7 +1422,20 @@ function act(op,hashes){
     case 'magnet':copyMagnet(hashes[0]);break;
     case 'copy-name':copyText(hashes.map(function(h){var r=dataByHash(h);return r?r.Name:h;}).join('\n'),t('Copied'));break;
     case 'copy-hash':copyText(hashes.join('\n'),t('Copied'));break;
-    case 'export':window.location.href='/ui/torrent-file?hash='+encodeURIComponent(hashes[0]);break;
+    case 'export':
+      // A magnet without metadata answers 404 as plain text: navigating there
+      // would throw away the list, the filters and the selection. Download the
+      // bytes in place and explain the failure instead.
+      fetch('/ui/torrent-file?hash='+encodeURIComponent(hashes[0]),{cache:'no-store'}).then(function(r){
+        if(!r.ok)throw new Error('metadata not available');
+        return r.blob();
+      }).then(function(b){
+        var url=URL.createObjectURL(b),a=document.createElement('a'),row=dataByHash(hashes[0]);
+        a.href=url;a.download=(row?row.Name:hashes[0])+'.torrent';
+        document.body.appendChild(a);a.click();a.remove();
+        setTimeout(function(){URL.revokeObjectURL(url);},1000);
+      }).catch(function(){toast(t('Export failed: the torrent metadata is not available yet'),true);});
+      break;
     case 'category':editCategory(hashes);break;
     case 'rename':renameTorrentDialog(hashes);break;
     case 'location':locationDialog(hashes);break;
@@ -1722,10 +1735,20 @@ document.addEventListener('click',function(e){
   $$('input[data-file-index]',tree).forEach(function(b){b.checked=!!all;});
 });
 
+// The filter drawer on a narrow screen covers the list: after choosing a
+// filter it has to get out of the way, and Escape has to close it like a menu.
+function closeSide(focusToggle){
+  var s=$('#side');if(!s||!s.classList.contains('open'))return false;
+  s.classList.remove('open');
+  var b=$('#side-toggle');if(b){b.setAttribute('aria-expanded','false');if(focusToggle)b.focus();}
+  return true;
+}
+
 // ---------- wiring ----------
 document.addEventListener('click',function(e){
   var el=e.target;
   if(menus.length&&!menus.some(function(m){return m.el.contains(el);})&&!el.closest('[aria-haspopup=menu]'))closeMenus();
+  if(!el.closest('#side')&&!el.closest('#side-toggle'))closeSide(false);
   if(state.sbmore&&!el.closest('#sb-more')&&!el.closest('#sb-more-btn')){state.sbmore=false;$('#sb-more').hidden=true;afterRender();}
   var c=el.closest('[data-close]');if(c){closeDialog(c.closest('dialog'));return;}
   if(el.closest('[data-close-drawer]')){closeDetail();return;}
@@ -1741,8 +1764,8 @@ document.addEventListener('click',function(e){
   if(el.closest('#sb-more-btn')){state.sbmore=!state.sbmore;$('#sb-more').hidden=!state.sbmore;afterRender();return;}
   var sec=el.closest('#side [data-sec]');if(sec){state.collapsed[sec.dataset.sec]=sec.getAttribute('aria-expanded')==='true';store.set('collapsed',state.collapsed);applyCollapsed();return;}
   var rf=el.closest('[data-rename-file]');if(rf){var frf=$('#dlg-rename-file');$('input[name=hash]',frf).value=rf.dataset.hash;$('input[name=old]',frf).value=rf.dataset.renameFile;$('input[name=new]',frf).value=rf.dataset.renameFile;openDialog(frf);return;}
-  var st=el.closest('#side [data-status]');if(st){state.filter.status=st.dataset.status;store.set('filter',state.filter);applyFilters();return;}
-  function pick(attr,key,btn){state.filter[key]=btn.hasAttribute('data-all')?null:btn.getAttribute(attr);store.set('filter',state.filter);applyFilters();}
+  var st=el.closest('#side [data-status]');if(st){state.filter.status=st.dataset.status;store.set('filter',state.filter);applyFilters();closeSide();return;}
+  function pick(attr,key,btn){state.filter[key]=btn.hasAttribute('data-all')?null:btn.getAttribute(attr);store.set('filter',state.filter);applyFilters();closeSide();}
   var cb=el.closest('#side [data-catbtn]');if(cb){pick('data-cat','cat',cb);return;}
   var tg=el.closest('#side [data-tagbtn]');if(tg){pick('data-tag','tag',tg);return;}
   var tk=el.closest('#side [data-trkbtn]');if(tk){pick('data-tracker','tracker',tk);return;}
@@ -1838,7 +1861,7 @@ document.addEventListener('keydown',function(e){
     return;
   }
   if($('dialog[open]'))return;
-  if(e.key==='Escape'){if(state.sbmore){state.sbmore=false;$('#sb-more').hidden=true;afterRender();var sb=$('#sb-more-btn');if(sb)sb.focus();return;}if(!$('#drawer').hidden){closeDetail();return;}if(state.selected.size){state.selected.clear();renderSelection();}return;}
+  if(e.key==='Escape'){if(closeSide(true))return;if(state.sbmore){state.sbmore=false;$('#sb-more').hidden=true;afterRender();var sb=$('#sb-more-btn');if(sb)sb.focus();return;}if(!$('#drawer').hidden){closeDetail();return;}if(state.selected.size){state.selected.clear();renderSelection();}return;}
   if(typing)return;
   if(e.key==='/'){e.preventDefault();$('#filter').focus();return;}
   if(e.key==='?'){e.preventDefault();openDialog($('#dlg-shortcuts'));return;}

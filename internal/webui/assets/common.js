@@ -29,15 +29,20 @@
     apply(next);
   }
 
-  // Toasts are announced politely to screen readers (role=status region).
+  // The page dictionary is installed before this script; a missing key simply
+  // falls back to the English source string.
+  function tr(s) { return (window.__uiI18n && window.__uiI18n[s]) || s; }
+
+  // Each toast carries its own announcement and close button. An error stays
+  // until the person dismisses it: it is often the only explanation of an
+  // action that did not happen, and a screen reader must get the chance to
+  // hear it. Success messages go away on their own.
   function region() {
     var r = document.getElementById("toasts");
     if (!r) {
       r = document.createElement("div");
       r.id = "toasts";
       r.className = "toasts";
-      r.setAttribute("role", "status");
-      r.setAttribute("aria-live", "polite");
       document.body.appendChild(r);
     }
     return r;
@@ -45,12 +50,24 @@
   function toast(message, isError) {
     var el = document.createElement("div");
     el.className = "toast" + (isError ? " err" : "");
-    el.textContent = message;
+    el.setAttribute("role", isError ? "alert" : "status");
+    var text = document.createElement("span");
+    text.textContent = message;
+    el.appendChild(text);
+    var close = document.createElement("button");
+    close.type = "button";
+    close.className = "toast-close";
+    close.textContent = "×";
+    close.setAttribute("aria-label", tr("Close"));
+    close.addEventListener("click", function () { el.remove(); });
+    el.appendChild(close);
     region().appendChild(el);
-    setTimeout(function () {
-      el.classList.add("hide");
-      setTimeout(function () { el.remove(); }, 400);
-    }, isError ? 6500 : 3500);
+    if (!isError) {
+      setTimeout(function () {
+        el.classList.add("hide");
+        setTimeout(function () { el.remove(); }, 400);
+      }, 3500);
+    }
   }
 
   window.gx = window.gx || {};

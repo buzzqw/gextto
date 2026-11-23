@@ -1870,12 +1870,15 @@ var uiCatalog = map[string][5]string{
 	"VueTorrent %s installed": {"VueTorrent %s installato", "VueTorrent %s installiert", "VueTorrent %s installé", "VueTorrent %s instalado", "VueTorrent %s zainstalowany"},
 	"This instance requires the token configured in Gextto.": {"Questa istanza richiede il token configurato in Gextto.", "Diese Instanz verlangt das in Gextto konfigurierte Token.", "Cette instance exige le jeton configuré dans Gextto.", "Esta instancia requiere el token configurado en Gextto.", "Ta instancja wymaga tokenu skonfigurowanego w Gextto."},
 	"Cookies: %s": {"Cookie: %s", "Cookies: %s", "Cookies : %s", "Cookies: %s", "Pliki cookie: %s"},
-	"The queue settings could not be applied: %s": {"Non è stato possibile applicare le impostazioni della coda: %s", "Die Einstellungen der Warteschlange konnten nicht angewendet werden: %s", "Les réglages de la file n'ont pas pu être appliqués : %s", "No se pudo aplicar la configuración de la cola: %s", "Nie udało się zastosować ustawień kolejki: %s"},
-	"Cannot save the settings: %s":                {"Impossibile salvare le impostazioni: %s", "Die Einstellungen konnten nicht gespeichert werden: %s", "Impossible d'enregistrer les réglages : %s", "No se puede guardar la configuración: %s", "Nie można zapisać ustawień: %s"},
-	"TVmaze: error":                               {"TVmaze: errore", "TVmaze: Fehler", "TVmaze : erreur", "TVmaze: error", "TVmaze: błąd"},
-	"Showing %s of %s":                            {"Mostrati %s di %s", "%s von %s angezeigt", "%s sur %s affichés", "Mostrando %s de %s", "Pokazano %s z %s"},
-	"empty = no program":                          {"vuoto = nessun programma", "leer = kein Programm", "vide = aucun programme", "vacío = ningún programa", "puste = żaden program"},
-	"empty = stay in the download folder":         {"vuoto = resta nella cartella di download", "leer = bleibt im Download-Ordner", "vide = reste dans le dossier de téléchargement", "vacío = se queda en la carpeta de descargas", "puste = zostaje w folderze pobrania"},
+	"The queue settings could not be applied: %s":              {"Non è stato possibile applicare le impostazioni della coda: %s", "Die Einstellungen der Warteschlange konnten nicht angewendet werden: %s", "Les réglages de la file n'ont pas pu être appliqués : %s", "No se pudo aplicar la configuración de la cola: %s", "Nie udało się zastosować ustawień kolejki: %s"},
+	"Cannot save the settings: %s":                             {"Impossibile salvare le impostazioni: %s", "Die Einstellungen konnten nicht gespeichert werden: %s", "Impossible d'enregistrer les réglages : %s", "No se puede guardar la configuración: %s", "Nie można zapisać ustawień: %s"},
+	"TVmaze: error":                                            {"TVmaze: errore", "TVmaze: Fehler", "TVmaze : erreur", "TVmaze: error", "TVmaze: błąd"},
+	"Showing %s of %s":                                         {"Mostrati %s di %s", "%s von %s angezeigt", "%s sur %s affichés", "Mostrando %s de %s", "Pokazano %s z %s"},
+	"empty = no program":                                       {"vuoto = nessun programma", "leer = kein Programm", "vide = aucun programme", "vacío = ningún programa", "puste = żaden program"},
+	"empty = stay in the download folder":                      {"vuoto = resta nella cartella di download", "leer = bleibt im Download-Ordner", "vide = reste dans le dossier de téléchargement", "vacío = se queda en la carpeta de descargas", "puste = zostaje w folderze pobrania"},
+	"Export failed: the torrent metadata is not available yet": {"Esportazione non riuscita: i metadati del torrent non sono ancora disponibili", "Export fehlgeschlagen: Die Torrent-Metadaten sind noch nicht verfügbar", "Échec de l’export : les métadonnées du torrent ne sont pas encore disponibles", "Error al exportar: los metadatos del torrent aún no están disponibles", "Eksport nie powiódł się: metadane torrenta nie są jeszcze dostępne"},
+	"qBittorrent-compatible API address":                       {"Indirizzo API compatibile con qBittorrent", "qBittorrent-kompatible API-Adresse", "Adresse de l’API compatible qBittorrent", "Dirección de la API compatible con qBittorrent", "Adres API zgodnej z qBittorrent"},
+	"Copy the API address to the clipboard":                    {"Copia l’indirizzo dell’API negli appunti", "API-Adresse in die Zwischenablage kopieren", "Copier l’adresse de l’API dans le presse-papiers", "Copiar la dirección de la API al portapapeles", "Kopiuj adres API do schowka"},
 }
 
 // uiClientKeys are the catalog keys the page's JavaScript looks up at runtime
@@ -1883,6 +1886,7 @@ var uiCatalog = map[string][5]string{
 // one must be a uiCatalog key (checked by the coverage test) or the client
 // would silently fall back to English.
 var uiClientKeys = []string{
+	"Export failed: the torrent metadata is not available yet",
 	"Highest",
 	"No transfer seen yet: the graph fills while the torrent moves data.",
 	"Completed",
