@@ -144,16 +144,45 @@ func qualityListFromLegacy(quality string) []string {
 	return out
 }
 
+// expandQualityToken reads one value of the accepted-qualities field. Besides
+// a plain resolution it understands the expressions of the old quality field:
+// "720p+" (a minimum), "480p-1080p" (a range) and "<1080p" (a maximum). "any"
+// means no resolution requirement and clears the list. The boolean is false
+// only for a value the release filter could not interpret.
+func expandQualityToken(token string) ([]string, bool) {
+	value := strings.ToLower(strings.TrimSpace(token))
+	if value == "" || value == "any" || value == "*" {
+		return nil, true
+	}
+	if rank := profileQualityRank(value); rank > 0 {
+		return []string{profileQualityLabels[rank-1]}, true
+	}
+	if !profileQualityRe.MatchString(value) {
+		return nil, false
+	}
+	return qualityListFromLegacy(value), true
+}
+
 func normalizeQualityList(values []string) []string {
 	seen := map[string]bool{}
 	out := make([]string, 0, len(values))
 	for _, value := range values {
-		rank := profileQualityRank(value)
-		if rank == 0 || seen[profileQualityLabels[rank-1]] {
+		token := strings.ToLower(strings.TrimSpace(value))
+		if token == "any" || token == "*" || token == "" {
+			out, seen = out[:0], map[string]bool{}
 			continue
 		}
-		seen[profileQualityLabels[rank-1]] = true
-		out = append(out, profileQualityLabels[rank-1])
+		expanded, ok := expandQualityToken(value)
+		if !ok {
+			continue
+		}
+		for _, label := range expanded {
+			if seen[label] {
+				continue
+			}
+			seen[label] = true
+			out = append(out, label)
+		}
 	}
 	sort.Slice(out, func(i, j int) bool {
 		return profileQualityRank(out[i]) < profileQualityRank(out[j])
@@ -674,7 +703,7 @@ func SaveQualityProfiles(w http.ResponseWriter, r *http.Request, s *AppState) {
 		}
 		seen[key] = true
 		for _, quality := range profile.Qualities {
-			if profileQualityRank(quality) == 0 {
+			if _, ok := expandQualityToken(quality); !ok {
 				jsonError(w, http.StatusBadRequest, fmt.Sprintf("invalid quality profile %q: invalid quality %q", profile.Name, quality))
 				return
 			}

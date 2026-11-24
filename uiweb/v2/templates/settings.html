@@ -459,7 +459,7 @@
   {{range .Row.Fields}}
   {{$value := .Value}}{{$name := .Name}}{{$index := $.Row.Index}}
    {{if eq .Kind "id"}}<input type="hidden" name="{{$name}}__{{$index}}" value="{{$value}}" />{{else}}
-   <label class="field{{if .Wide}} wide{{end}}"><span>{{tr .Label}}</span>
+   <label class="field{{if .Wide}} wide{{end}}"{{if .Tooltip}} {{trTitle .Tooltip}}{{end}}><span>{{tr .Label}}</span>
     {{if eq .Kind "bool"}}<select class="input" name="{{$name}}__{{$index}}"><option value="true"{{if eq $value "true"}} selected{{end}}>{{tr "Sì"}}</option><option value="false"{{if eq $value "false"}} selected{{end}}>{{tr "No"}}</option></select>
     {{else if eq .Kind "number"}}<input class="input" type="number" name="{{$name}}__{{$index}}" value="{{$value}}" />
     {{else if eq .Kind "select"}}<select class="input" name="{{$name}}__{{$index}}">{{range .Options}}<option value="{{.Value}}"{{if eq $value .Value}} selected{{end}}>{{tr .Label}}</option>{{end}}</select>

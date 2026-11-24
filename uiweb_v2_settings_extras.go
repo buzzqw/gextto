@@ -178,10 +178,10 @@ func V2SettingsCheckbox(w http.ResponseWriter, r *http.Request, s *AppState) {
 // --- list editors -----------------------------------------------------------
 
 type v2ListFieldValue struct {
-	Name, Label, Kind, Placeholder, Value string
-	Options                               []uiListFieldOption
-	Wide                                  bool
-	Browse                                bool
+	Name, Label, Kind, Placeholder, Value, Tooltip string
+	Options                                        []uiListFieldOption
+	Wide                                           bool
+	Browse                                         bool
 }
 
 type v2ListRow struct {
@@ -290,7 +290,7 @@ func v2ListRowFrom(fields []uiListField, item map[string]any, index int) v2ListR
 			options = append(append([]uiListFieldOption{}, options...), uiListFieldOption{Value: value, Label: value})
 		}
 		row.Fields = append(row.Fields, v2ListFieldValue{
-			Name: field.Name, Label: field.Label, Kind: field.Kind,
+			Name: field.Name, Label: field.Label, Kind: field.Kind, Tooltip: field.Tooltip,
 			Placeholder: field.Placeholder, Options: options, Wide: field.Wide, Browse: field.Browse,
 			Value: value,
 		})

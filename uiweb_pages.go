@@ -343,6 +343,10 @@ type uiListField struct {
 	Label       string
 	Kind        string // text | number | bool | tags | secret | select | combo (suggestions + free text) | id (hidden record id)
 	Placeholder string
+	// Tooltip explains what the field does; it is rendered as a title on the
+	// label and translated in every catalog. It must say something the label
+	// does not already say.
+	Tooltip string
 	// Options are the choices of a select field.
 	Options []uiListFieldOption
 	// Wide gives the field two grid tracks on wide screens (URLs, API keys).
@@ -448,13 +452,20 @@ var uiAdvancedEditors = []uiListEditor{
 			// The id travels with the row: renaming a profile keeps its number,
 			// which is what a request manager (Jellyseerr) remembers.
 			{Name: "id", Kind: "id"},
-			{Name: "name", Label: "Nome", Kind: "text", Wide: true},
-			{Name: "qualities", Label: "Qualità accettate", Kind: "text", Placeholder: "es. 720p, 1080p, 2160p", Wide: true},
-			{Name: "upgrade", Label: "Upgrade", Kind: "select", Options: uiProfileUpgradeOptions},
-			{Name: "audio", Label: "Audio minimo", Kind: "select", Options: uiAudioPresetOptions},
-			{Name: "language", Label: "Lingua", Kind: "combo", Placeholder: "es. ita", Options: uiLanguagePresetOptions},
-			{Name: "subtitle", Label: "Sottotitoli", Kind: "combo", Placeholder: "vuoto = nessuno", Options: uiLanguagePresetOptions},
-			{Name: "exclude", Label: "Esclusioni", Kind: "text", Wide: true},
+			{Name: "name", Label: "Nome", Kind: "text", Wide: true,
+				Tooltip: "Compare nei menu delle serie e dei film e nella lista che Jellyseerr legge. Cambiando il nome il numero del profilo resta lo stesso."},
+			{Name: "qualities", Label: "Qualità accettate", Kind: "text", Placeholder: "es. 720p, 1080p, 2160p", Wide: true,
+				Tooltip: "Scrivi le risoluzioni accettate separate da virgola (720p, 1080p, 2160p). Vanno bene anche 720p+ per «da 720p in su», 480p-1080p per un intervallo, o vuoto per accettare tutto. Una release fuori dall'elenco non viene presa, e l'elenco è anche il tetto degli upgrade."},
+			{Name: "upgrade", Label: "Upgrade", Kind: "select", Options: uiProfileUpgradeOptions,
+				Tooltip: "Con «Migliora» una copia migliore sostituisce quella in archivio entro le qualità accettate, inclusi REPACK, PROPER e sorgente, codec, HDR o audio superiori. Con «Non sostituire mai» nessun file archiviato viene toccato; la soglia globale di stop resta attiva in entrambi i casi."},
+			{Name: "audio", Label: "Audio minimo", Kind: "select", Options: uiAudioPresetOptions,
+				Tooltip: "Una release con una traccia audio di livello inferiore al preset viene scartata. «Qualsiasi» non pone alcun limite."},
+			{Name: "language", Label: "Lingua", Kind: "combo", Placeholder: "es. ita", Options: uiLanguagePresetOptions,
+				Tooltip: "Lingua dell'audio richiesta, per esempio ita o ita,eng. Scrivi any per non porre limiti: se lasci vuoto vale invece la lingua predefinita di Gextto."},
+			{Name: "subtitle", Label: "Sottotitoli", Kind: "combo", Placeholder: "vuoto = nessuno", Options: uiLanguagePresetOptions,
+				Tooltip: "Sottotitoli preferiti della release, per esempio ita. Vuoto non impone nulla e any ha lo stesso effetto."},
+			{Name: "exclude", Label: "Esclusioni", Kind: "text", Wide: true,
+				Tooltip: "Parole che fanno scartare una release, separate da virgola (per esempio cam, ts). Si aggiungono a quelle già impostate sul singolo titolo."},
 		},
 	},
 	{

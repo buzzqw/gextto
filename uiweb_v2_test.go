@@ -3026,6 +3026,15 @@ func TestV2QualityProfileEditorOffersTheResolutions(t *testing.T) {
 	if !strings.Contains(body, `name="upgrade__0"`) || !strings.Contains(body, `>Non sostituire mai</option>`) {
 		t.Fatal("the profile must offer the single upgrade choice")
 	}
+	for _, tooltip := range []string{
+		`title="Scrivi le risoluzioni accettate`,
+		`title="Con «Migliora» una copia migliore`,
+		`title="Lingua dell&#39;audio richiesta`,
+	} {
+		if !strings.Contains(body, tooltip) {
+			t.Fatalf("the profile editor is missing a tooltip: %s", tooltip)
+		}
+	}
 }
 
 func TestV2QualityProfileLanguagesAreChooseOrType(t *testing.T) {

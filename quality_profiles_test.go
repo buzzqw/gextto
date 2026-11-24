@@ -298,6 +298,27 @@ func TestQualityProfileQualitiesMigration(t *testing.T) {
 	}
 }
 
+// The accepted-qualities field must understand the same expressions as the
+// old quality field: a minimum, a range or a maximum expand into the list.
+func TestSaveQualityProfilesExpandsExpressionsInTheList(t *testing.T) {
+	state := newTestAppState(t)
+	body := `[{"name":"Min","qualities":"720p+"},{"name":"Range","qualities":"480p-1080p"},{"name":"Max","qualities":"<1080p"}]`
+	rec := httptest.NewRecorder()
+	SaveQualityProfiles(rec, httptest.NewRequest(http.MethodPost, "/api/quality-profiles", strings.NewReader(body)), state)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("save -> %d %s", rec.Code, rec.Body.String())
+	}
+	profiles := qualityProfilesFromConfig(latestConfig(state))
+	if len(profiles) != 3 {
+		t.Fatalf("profiles = %+v", profiles)
+	}
+	for index, want := range []string{"720p,1080p,2160p", "480p,576p,720p,1080p", "360p,480p,576p,720p,1080p"} {
+		if got := strings.Join(profiles[index].Qualities, ","); got != want {
+			t.Fatalf("%s -> %q, want %q", profiles[index].Name, got, want)
+		}
+	}
+}
+
 func TestResolutionInList(t *testing.T) {
 	list := []string{"720p", "2160p"}
 	if !resolutionInList(&models.Quality{Resolution: "720p"}, list, "") ||
