@@ -81,7 +81,7 @@ func UpgradeImpact(cfg *Config, db *Database, archive *Archive) (upgradeImpactRe
 			context := &models.ApprovalContext{
 				Archive:           archiveIndex,
 				Live:              &models.LiveDownloads{Hashes: map[string]struct{}{}, Episodes: map[models.LiveEpisodeKey]struct{}{}},
-				UpgradeUntilScore: cfg.UpgradeUntilScore,
+				UpgradeUntilScore: upgradeUntilForTitle(cfg, series, nil),
 				ScoreSettings:     cfg.Settings,
 				DryRun:            true,
 			}

@@ -1378,7 +1378,7 @@ func prioritizeArchiveGapDownloads(
 			Archive:           &models.ArchiveQualityIndex{},
 			Live:              live,
 			ForbidUpgrade:     series.DisableUpgrades,
-			UpgradeUntilScore: cfg.UpgradeUntilScore,
+			UpgradeUntilScore: upgradeUntilForRelease(cfg, &release),
 			ScoreSettings:     cfg.Settings,
 			GapEpisode:        true,
 			StallAlternatives: stallAlternatives,

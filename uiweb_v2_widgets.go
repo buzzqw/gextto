@@ -1296,10 +1296,15 @@ func v2EditorAudioLabel(value string) string {
 func v2ProfileSummary(s *AppState, profile QualityProfile) string {
 	tr := func(italian string) string { return uiText(s, italian) }
 	parts := []string{}
-	if quality := strings.TrimSpace(profile.Quality); quality != "" && !strings.EqualFold(quality, "any") {
+	if len(profile.Qualities) > 0 {
+		parts = append(parts, tr("Qualità")+": "+strings.Join(profile.Qualities, "/"))
+	} else if quality := strings.TrimSpace(profile.Quality); quality != "" && !strings.EqualFold(quality, "any") {
 		parts = append(parts, quality)
 	} else {
 		parts = append(parts, tr("qualsiasi qualità"))
+	}
+	if profile.Cutoff != "" {
+		parts = append(parts, tr("Ferma upgrade a")+" "+profile.Cutoff)
 	}
 	if profile.Audio != "" {
 		parts = append(parts, tr("audio")+" "+tr(v2EditorAudioLabel(profile.Audio)))
@@ -1338,7 +1343,8 @@ func v2TitleProfilesFor(s *AppState, values profileTitleValues) v2TitleProfiles 
 	for _, profile := range profiles {
 		view.Choices = append(view.Choices, v2ProfileChoice{ID: profile.ID, Name: profile.Name, Summary: v2ProfileSummary(s, profile), Selected: profile.ID == match})
 	}
-	view.CurrentSummary = v2ProfileSummary(s, QualityProfile{Quality: values.Quality, Audio: values.Audio, Language: values.Language, Subtitle: values.Subtitle, Exclude: values.Exclude, DisableUpgrades: values.DisableUpgrades})
+	view.CurrentSummary = v2ProfileSummary(s, QualityProfile{Quality: values.Quality, Qualities: values.Qualities, Cutoff: values.Cutoff,
+		Audio: values.Audio, Language: values.Language, Subtitle: values.Subtitle, Exclude: values.Exclude, DisableUpgrades: values.DisableUpgrades})
 	return view
 }
 

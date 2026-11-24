@@ -449,7 +449,8 @@ var uiAdvancedEditors = []uiListEditor{
 			// which is what a request manager (Jellyseerr) remembers.
 			{Name: "id", Kind: "id"},
 			{Name: "name", Label: "Nome", Kind: "text", Wide: true},
-			{Name: "quality", Label: "Qualità", Kind: "select", Options: uiQualityPresetOptions},
+			{Name: "qualities", Label: "Qualità accettate", Kind: "text", Placeholder: "es. 720p, 1080p, 2160p", Wide: true},
+			{Name: "cutoff", Label: "Ferma upgrade a", Kind: "select", Options: uiQualityCutoffOptions},
 			{Name: "audio", Label: "Audio minimo", Kind: "select", Options: uiAudioPresetOptions},
 			{Name: "language", Label: "Lingua", Kind: "combo", Placeholder: "es. ita", Options: uiLanguagePresetOptions},
 			{Name: "subtitle", Label: "Sottotitoli", Kind: "combo", Placeholder: "vuoto = nessuno", Options: uiLanguagePresetOptions},
@@ -487,6 +488,16 @@ var uiQualityPresetOptions = []uiListFieldOption{
 	{Value: "2160p", Label: "2160p 4K"},
 	{Value: "2160p+", Label: "2160p+ 4K+"},
 }
+
+// uiQualityCutoffOptions is the per-profile upgrade ceiling. The first choice
+// keeps the global "stop improving" score in charge.
+var uiQualityCutoffOptions = append([]uiListFieldOption{{Value: "", Label: "Nessun upgrade"}}, func() []uiListFieldOption {
+	out := make([]uiListFieldOption, 0, len(profileQualityLabels))
+	for _, label := range profileQualityLabels {
+		out = append(out, uiListFieldOption{Value: label, Label: label})
+	}
+	return out
+}()...)
 
 // uiLanguagePresetOptions are the usual audio/subtitle language choices of the
 // profile editor: suggestions of a field that also takes any other code (fre,

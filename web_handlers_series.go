@@ -206,6 +206,7 @@ func UpdateSeries(w http.ResponseWriter, r *http.Request, s *AppState) {
 			return
 		}
 		series.Quality, series.Language, series.Subtitle = profile.Quality, profile.Language, profile.Subtitle
+		series.Qualities, series.Cutoff = append([]string(nil), profile.Qualities...), profile.Cutoff
 		series.Audio, series.AudioChannels = profile.Audio, ""
 		series.DisableUpgrades = profile.DisableUpgrades
 		series.Exclude = mergeExclusions(profile.Exclude, series.Exclude)

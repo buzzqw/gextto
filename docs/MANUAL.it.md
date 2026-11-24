@@ -1414,24 +1414,37 @@ scarti si vedono nel log a livello `DEBUG`.
 
 ### Profili di qualità
 
-Un profilo è un **modello con un nome**: qualità, audio minimo, lingua,
-sottotitoli, esclusioni e «Permetti upgrade». Si gestiscono in *Configurazione
-→ Qualità e upgrade → Profili di qualità*.
+Un profilo è un **modello con un nome**: qualità accettate, soglia di upgrade,
+audio minimo, lingua, sottotitoli, esclusioni e «Permetti upgrade». Si gestiscono
+in *Configurazione → Qualità e upgrade → Profili di qualità*.
 
-- **Qualità** si sceglie da un elenco (360p … 2160p, un minimo con «+»,
-  l'intervallo `720p-1080p`, oppure *Qualsiasi*).
+- **Qualità accettate** sono le risoluzioni che il titolo accetta, separate da
+  virgola (`720p, 1080p, 2160p`). Una release con un'altra risoluzione viene
+  scartata; vuoto vale *qualsiasi*. Puoi indicare anche solo la risoluzione
+  minima (`1080p+`) o un intervallo (`720p-1080p`): all'atto del salvataggio
+  vengono trasformati nelle risoluzioni corrispondenti. Un valore non riconosciuto
+  viene segnalato e non viene salvato: prima poteva diventare silenziosamente
+  «nessun limite».
+- **Ferma upgrade a** è la risoluzione a cui smetti di sostituire una copia già
+  in libreria. «Nessun upgrade» lascia comandare la soglia globale *Smetti di
+  migliorare oltre questo punteggio*. La soglia del profilo vale solo per i
+  titoli a cui lo applichi; il confronto resta quello descritto sotto, in
+  *Quando un file viene sostituito*.
 - **Lingua** e **Sottotitoli** propongono le scelte comuni (`ita`, `eng`,
   `ita,eng`, `any`) ma accettano anche altri codici (`fre`,
   `ita,eng,fre`). Vuota vale la lingua predefinita di Gextto.
 - Finché non salvi la lista, Gextto genera da sé un profilo per ogni
   combinazione già presente in libreria; il primo è **Default**. Due profili non
-  possono avere lo stesso nome.
+  possono avere lo stesso nome. I profili generati dalla libreria non hanno una
+  soglia propria: seguono ancora quella globale.
 
 **I profili sono modelli, non regole.** Quando scegli un profilo per un titolo,
-i suoi valori vengono **copiati** nel titolo. Cambiare il profilo dopo non
-cambia i titoli già creati: per aggiornarne molti insieme usa [Modifica
-selezionati](#modificare-più-titoli-insieme). La lista dei profili è anche
-quella che vede Jellyseerr; ogni profilo conserva il suo numero anche se lo
+i suoi valori — comprese le qualità accettate e la soglia di upgrade — vengono
+**copiati** nel titolo. Cambiare il profilo dopo non cambia i titoli già creati:
+per aggiornarne molti insieme usa [Modifica selezionati](#modificare-più-titoli-insieme),
+che ora sa scrivere anche qualità accettate e soglia. La lista dei profili è anche
+quella che vede Jellyseerr: ora espone le risoluzioni accettate e la soglia
+reali, invece di un elenco vuoto. Ogni profilo conserva il suo numero anche se lo
 rinomini, perché Jellyseerr ricorda il numero.
 
 ### Provare prima di cambiare

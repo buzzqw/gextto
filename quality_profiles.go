@@ -13,10 +13,12 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
 	"sort"
 	"strings"
 
 	"github.com/buzzqw/gextto/internal/logging"
+	"github.com/buzzqw/gextto/internal/models"
 )
 
 const (
@@ -36,15 +38,226 @@ const (
 // upgrade: No». Upgrades is the same switch as the profile editor writes it
 // ("allow"/"deny"): normalizeProfileUpgrades keeps the two in step.
 type QualityProfile struct {
-	ID              int    `json:"id"`
-	Name            string `json:"name"`
-	Quality         string `json:"quality"`
-	Audio           string `json:"audio,omitempty"`
-	Language        string `json:"language"`
-	Subtitle        string `json:"subtitle"`
-	Exclude         string `json:"exclude"`
+	ID       int    `json:"id"`
+	Name     string `json:"name"`
+	Quality  string `json:"quality"`
+	Audio    string `json:"audio,omitempty"`
+	Language string `json:"language"`
+	Subtitle string `json:"subtitle"`
+	Exclude  string `json:"exclude"`
+	// Qualities are the accepted resolutions, lowest first. It is the explicit
+	// form of Quality: a list can express a non-contiguous set ("720p, 2160p")
+	// that a single minimum or range cannot. Empty means any resolution.
+	// Cutoff is the resolution at which upgrades stop (empty = no cutoff).
+	Qualities []string `json:"qualities,omitempty"`
+	Cutoff    string   `json:"cutoff,omitempty"`
+
 	DisableUpgrades bool   `json:"disable_upgrades,omitempty"`
 	Upgrades        string `json:"upgrades,omitempty"`
+}
+
+// profileQualityLabels are the resolutions a profile can accept, lowest first.
+// The index (plus one) is the stable id used by the v3 API.
+var profileQualityLabels = []string{"360p", "480p", "576p", "720p", "1080p", "2160p"}
+
+// UnmarshalJSON accepts both a JSON array and the comma-separated string the
+// settings editor posts for "qualities". Every other field keeps its default
+// decoding.
+func (profile *QualityProfile) UnmarshalJSON(data []byte) error {
+	type plain QualityProfile
+	var raw struct {
+		plain
+		Qualities json.RawMessage `json:"qualities"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	*profile = QualityProfile(raw.plain)
+	if len(raw.Qualities) == 0 || string(raw.Qualities) == "null" {
+		return nil
+	}
+	switch raw.Qualities[0] {
+	case '[':
+		return json.Unmarshal(raw.Qualities, &profile.Qualities)
+	case '"':
+		var text string
+		if err := json.Unmarshal(raw.Qualities, &text); err != nil {
+			return err
+		}
+		profile.Qualities = splitProfileQualityList(text)
+		return nil
+	default:
+		return fmt.Errorf("qualities must be a list or a comma-separated string")
+	}
+}
+
+func profileQualityLabel(rank int) string {
+	if rank <= 0 || rank > len(profileQualityLabels) {
+		return ""
+	}
+	return profileQualityLabels[rank-1]
+}
+
+func splitProfileQualityList(raw string) []string {
+	return strings.FieldsFunc(raw, func(r rune) bool {
+		return r == ',' || r == ';' || r == ' ' || r == '\t' || r == '\n'
+	})
+}
+
+func profileQualityRank(value string) int {
+	value = strings.ToLower(strings.TrimSpace(value))
+	if strings.HasSuffix(value, "p") {
+		value = strings.TrimSuffix(value, "p")
+	}
+	for index, label := range profileQualityLabels {
+		if strings.TrimSuffix(label, "p") == value {
+			return index + 1
+		}
+	}
+	return 0
+}
+
+// qualityListFromLegacy expands the old single quality expression using the
+// same filter the release check uses, so "1080p+" becomes 1080p and 2160p and
+// "720p-1080p" becomes the two resolutions in between.
+func qualityListFromLegacy(quality string) []string {
+	quality = strings.ToLower(strings.TrimSpace(quality))
+	if quality == "" || quality == "any" {
+		return nil
+	}
+	out := []string{}
+	for _, label := range profileQualityLabels {
+		if resolutionAllowed(&models.Quality{Resolution: label}, quality) {
+			out = append(out, label)
+		}
+	}
+	return out
+}
+
+func normalizeQualityList(values []string) []string {
+	seen := map[string]bool{}
+	out := make([]string, 0, len(values))
+	for _, value := range values {
+		rank := profileQualityRank(value)
+		if rank == 0 || seen[profileQualityLabels[rank-1]] {
+			continue
+		}
+		seen[profileQualityLabels[rank-1]] = true
+		out = append(out, profileQualityLabels[rank-1])
+	}
+	sort.Slice(out, func(i, j int) bool {
+		return profileQualityRank(out[i]) < profileQualityRank(out[j])
+	})
+	return out
+}
+
+// legacyQualityFromList keeps the single-value field meaningful for API
+// clients that still read it: a contiguous set folds into a minimum, a range
+// or a single resolution; a non-contiguous one is described by its minimum
+// (the explicit qualities list stays authoritative for the release filter).
+func legacyQualityFromList(list []string) string {
+	if len(list) == 0 {
+		return ""
+	}
+	if len(list) == 1 {
+		return list[0]
+	}
+	first, last := profileQualityRank(list[0]), profileQualityRank(list[len(list)-1])
+	contiguous := last-first+1 == len(list)
+	if !contiguous {
+		return list[0] + "+"
+	}
+	if last == len(profileQualityLabels) {
+		return list[0] + "+"
+	}
+	if len(list) == 2 {
+		return list[0] + "-" + list[1]
+	}
+	return list[0] + "-" + list[len(list)-1]
+}
+
+// normalizeProfileQualities fills the explicit list from the legacy field when
+// absent and keeps the cutoff inside the accepted set. It never rewrites the
+// legacy expression: a read must not change what is stored (an expression such
+// as "<1080p" stays as the operator wrote it). The save handler derives the
+// expression from a list the editor actually submitted.
+func normalizeProfileQualities(profile *QualityProfile) {
+	explicit := len(profile.Qualities) > 0
+	profile.Qualities = normalizeQualityList(profile.Qualities)
+	if !explicit {
+		profile.Qualities = qualityListFromLegacy(profile.Quality)
+	}
+	profile.Cutoff = strings.ToLower(strings.TrimSpace(profile.Cutoff))
+	found := false
+	for _, quality := range profile.Qualities {
+		if quality == profile.Cutoff {
+			found = true
+		}
+	}
+	if !found {
+		profile.Cutoff = ""
+	}
+}
+
+// resolutionInList decides whether a parsed resolution satisfies a title's
+// accepted qualities. An empty list keeps the legacy single-value expression.
+func resolutionInList(quality *models.Quality, list []string, legacy string) bool {
+	if len(list) > 0 {
+		rank := profileQualityRank(quality.Resolution)
+		for _, allowed := range list {
+			if rank != 0 && rank == profileQualityRank(allowed) {
+				return true
+			}
+		}
+		return false
+	}
+	return resolutionAllowed(quality, legacy)
+}
+
+// cutoffScore turns a resolution cutoff into the equivalent quality score the
+// upgrade gate compares. The configured weights decide the absolute points, so
+// changing them changes what "1080p" is worth, as it already does for the
+// global "stop improving" score.
+func (c *Config) cutoffScore(cutoff string) int64 {
+	rank := profileQualityRank(cutoff)
+	if rank == 0 || c == nil {
+		return 0
+	}
+	return c.QualityScore(&models.Quality{Resolution: profileQualityLabels[rank-1]})
+}
+
+// upgradeUntilForTitle is the effective "stop improving" score of a title:
+// its profile's resolution cutoff when set, the global setting otherwise.
+func upgradeUntilForTitle(cfg *Config, series *SeriesConfig, movie *MovieConfig) int64 {
+	if cfg == nil {
+		return 0
+	}
+	cutoff := ""
+	if series != nil {
+		cutoff = series.Cutoff
+	} else if movie != nil {
+		cutoff = movie.Cutoff
+	}
+	if score := cfg.cutoffScore(cutoff); score > 0 {
+		return score
+	}
+	return cfg.UpgradeUntilScore
+}
+
+// upgradeUntilForRelease finds the monitored title of a release and returns
+// its effective upgrade ceiling. It is used wherever an approval decision is
+// built, so the profile's cutoff and the global score cannot disagree.
+func upgradeUntilForRelease(cfg *Config, release *models.Release) int64 {
+	if cfg == nil || release == nil {
+		return 0
+	}
+	if release.Kind == "series" {
+		if release.Series == nil {
+			return cfg.UpgradeUntilScore
+		}
+		return upgradeUntilForTitle(cfg, cfg.FindSeriesMatch(*release.Series, release.Season), nil)
+	}
+	return upgradeUntilForTitle(cfg, nil, cfg.FindMovieMatchForRelease(release, false))
 }
 
 // normalizeProfileUpgrades reads the editor's "upgrades" choice when present
@@ -80,6 +293,7 @@ func decodeQualityProfiles(raw string) []QualityProfile {
 		}
 		profile.Quality = strings.TrimSpace(profile.Quality)
 		profile.Audio = normalizeAudioRequirement(profile.Audio)
+		normalizeProfileQualities(&profile)
 		normalizeProfileUpgrades(&profile)
 		profile.Language = strings.TrimSpace(profile.Language)
 		profile.Subtitle = strings.TrimSpace(profile.Subtitle)
@@ -178,6 +392,7 @@ func ensureQualityProfiles(s *AppState) []QualityProfile {
 	}
 	for _, profile := range v3Profiles(cfg) {
 		seeded := QualityProfile{ID: profile.ID, Name: profile.Name, Quality: profile.Quality,
+			Qualities: qualityListFromLegacy(profile.Quality), Cutoff: profileQualityLabel(profile.Cutoff),
 			Audio: profile.Audio, Language: profile.Language, Subtitle: profile.Subtitle,
 			Exclude: profile.Exclude, DisableUpgrades: profile.DisableUpgrades}
 		// Both spellings travel to the editor, which writes «upgrades».
@@ -199,6 +414,8 @@ func ensureQualityProfiles(s *AppState) []QualityProfile {
 // the title's own exclusions are added to the profile's ones.
 func applyQualityProfileToAdd(input *TmdbAddInput, profile QualityProfile) {
 	input.Quality = profile.Quality
+	input.Qualities = append([]string(nil), profile.Qualities...)
+	input.Cutoff = profile.Cutoff
 	input.Audio = profile.Audio
 	input.AudioChannels = ""
 	input.Language = profile.Language
@@ -210,6 +427,8 @@ func applyQualityProfileToAdd(input *TmdbAddInput, profile QualityProfile) {
 // profileTitleValues are the values a profile gives a title.
 type profileTitleValues struct {
 	Quality, Audio, Language, Subtitle, Exclude string
+	Qualities                                   []string
+	Cutoff                                      string
 	DisableUpgrades                             bool
 }
 
@@ -268,6 +487,13 @@ func matchingQualityProfile(profiles []QualityProfile, title profileTitleValues,
 			values.Language = "ita"
 		}
 		values.Quality = normalizeQualityValue(values.Quality)
+		// A title saved before the explicit list existed has only the legacy
+		// expression: derive the same list the profile's migration derives, so
+		// it still matches the profile it was created from.
+		if len(values.Qualities) == 0 {
+			values.Qualities = qualityListFromLegacy(values.Quality)
+		}
+		values.Qualities = normalizeQualityList(values.Qualities)
 		values.Language = normalizeLanguageList(values.Language)
 		values.Subtitle = normalizeLanguageList(values.Subtitle)
 		values.Audio = normalizeAudioRequirement(values.Audio)
@@ -277,10 +503,13 @@ func matchingQualityProfile(profiles []QualityProfile, title profileTitleValues,
 	for _, profile := range profiles {
 		candidate := norm(profileTitleValues{Quality: profile.Quality, Audio: profile.Audio,
 			Language: profile.Language, Subtitle: profile.Subtitle,
+			Qualities: profile.Qualities, Cutoff: profile.Cutoff,
 			DisableUpgrades: profile.DisableUpgrades})
 		if candidate.Quality == want.Quality && candidate.Audio == want.Audio &&
 			candidate.Language == want.Language && candidate.Subtitle == want.Subtitle &&
 			candidate.DisableUpgrades == want.DisableUpgrades &&
+			strings.Join(normalizeQualityList(candidate.Qualities), ",") == strings.Join(normalizeQualityList(want.Qualities), ",") &&
+			strings.EqualFold(candidate.Cutoff, want.Cutoff) &&
 			sameExclusions(profile.Exclude, title.Exclude) {
 			return profile.ID
 		}
@@ -335,6 +564,47 @@ func mergeExclusions(lists ...string) string {
 	return strings.Join(out, ", ")
 }
 
+var (
+	// profileQualityRe accepts every quality expression the release filter
+	// understands: a resolution, a minimum ("1080p+"), a range
+	// ("720p-1080p") and the legacy maximum-only form ("<1080p"). A typo such
+	// as "1080pp" used to be stored as "no limit", silently widening the
+	// profile: it is refused on save now.
+	profileQualityRe = regexp.MustCompile(`^<?(360p|480p|576p|720p|1080p|2160p)(\+|-((360p|480p|576p|720p|1080p|2160p)))?$`)
+	// A language code is two or three letters after canonicalisation ("it"
+	// becomes "ita", "english" becomes "eng"); "any" is the UI sentinel.
+	profileLanguageCodeRe = regexp.MustCompile(`^[a-z]{2,3}$`)
+)
+
+// validateQualityProfileFields checks the values the release filters read.
+// Names, the list size and duplicate names are checked by the caller; this is
+// about a value that would otherwise be read as "no requirement" and let in
+// everything. Empty values stay legal and mean "any".
+func validateQualityProfileFields(profile QualityProfile) error {
+	if value := strings.TrimSpace(profile.Quality); value != "" && !strings.EqualFold(value, "any") {
+		if !profileQualityRe.MatchString(strings.ToLower(value)) {
+			return fmt.Errorf("invalid quality %q", profile.Quality)
+		}
+	}
+	if value := strings.TrimSpace(profile.Audio); value != "" && normalizeAudioRequirement(value) == "" {
+		return fmt.Errorf("invalid minimum audio %q", profile.Audio)
+	}
+	for _, field := range []struct{ label, value string }{
+		{"language", profile.Language}, {"subtitle", profile.Subtitle},
+	} {
+		for _, entry := range strings.Split(field.value, ",") {
+			code := strings.ToLower(strings.TrimSpace(entry))
+			if code == "" || code == "any" || code == "*" {
+				continue
+			}
+			if !profileLanguageCodeRe.MatchString(normalizeLanguageCode(code)) {
+				return fmt.Errorf("invalid %s %q", field.label, strings.TrimSpace(entry))
+			}
+		}
+	}
+	return nil
+}
+
 // QualityProfilesView is GET /api/quality-profiles.
 func QualityProfilesView(w http.ResponseWriter, r *http.Request, s *AppState) {
 	profiles := ensureQualityProfiles(s)
@@ -387,11 +657,31 @@ func SaveQualityProfiles(w http.ResponseWriter, r *http.Request, s *AppState) {
 			return
 		}
 		seen[key] = true
+		for _, quality := range profile.Qualities {
+			if profileQualityRank(quality) == 0 {
+				jsonError(w, http.StatusBadRequest, fmt.Sprintf("invalid quality profile %q: invalid quality %q", profile.Name, quality))
+				return
+			}
+		}
+		if strings.TrimSpace(profile.Cutoff) != "" && profileQualityRank(profile.Cutoff) == 0 {
+			jsonError(w, http.StatusBadRequest, fmt.Sprintf("invalid quality profile %q: invalid cutoff %q", profile.Name, profile.Cutoff))
+			return
+		}
+		explicitList := len(profile.Qualities) > 0
+		normalizeProfileQualities(&profile)
+		if explicitList && len(profile.Qualities) > 0 {
+			profile.Quality = legacyQualityFromList(profile.Qualities)
+		}
 		normalizeProfileUpgrades(&profile)
+		if err := validateQualityProfileFields(profile); err != nil {
+			jsonError(w, http.StatusBadRequest, fmt.Sprintf("invalid quality profile %q: %v", profile.Name, err))
+			return
+		}
 		cleaned = append(cleaned, QualityProfile{
 			ID: profile.ID, Name: profile.Name, Quality: strings.TrimSpace(profile.Quality),
 			Language: qualityProfileLanguage(cfg, profile.Language), Subtitle: strings.TrimSpace(profile.Subtitle),
 			Exclude: mergeExclusions(profile.Exclude), Audio: normalizeAudioRequirement(profile.Audio),
+			Qualities: profile.Qualities, Cutoff: profile.Cutoff,
 			DisableUpgrades: profile.DisableUpgrades, Upgrades: profile.Upgrades,
 		})
 	}

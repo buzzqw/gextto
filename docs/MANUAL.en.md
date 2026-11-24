@@ -1395,25 +1395,37 @@ rejections are visible in the log at `DEBUG` level.
 
 ### Quality profiles
 
-A profile is a **named template**: quality, minimum audio, language, subtitles,
-exclusions and «Allow upgrades». They are managed in *Configuration → Quality
-and upgrades → Quality profiles*.
+A profile is a **named template**: accepted qualities, upgrade cutoff, minimum
+audio, language, subtitles, exclusions and «Allow upgrades». They are managed in
+*Configuration → Quality and upgrades → Quality profiles*.
 
-- **Quality** is picked from a list (360p … 2160p, a minimum with «+», the
-  `720p-1080p` range, or *Any*).
+- **Accepted qualities** are the resolutions the title accepts, separated by
+  commas (`720p, 1080p, 2160p`). A release at another resolution is rejected;
+  empty means *any*. You can also give just a minimum (`1080p+`) or a range
+  (`720p-1080p`): on save they are expanded into the matching resolutions. An
+  unrecognised value is reported and refused: it used to be stored silently as
+  "no limit".
+- **Stop upgrades at** is the resolution at which you stop replacing a copy
+  already in the library. «No upgrade» leaves the global *Stop improving above
+  this score* threshold in charge. The profile's cutoff applies only to the
+  titles you give it to; the comparison stays the one described below in *When
+  a file is replaced*.
 - **Language** and **Subtitles** offer the common choices (`ita`, `eng`,
   `ita,eng`, `any`) but also take other codes (`fre`, `ita,eng,fre`).
   Empty means Gextto's default language.
 - Until you save the list, Gextto generates a profile for each combination
   already in the library; the first is **Default**. Two profiles cannot share a
-  name.
+  name. Profiles generated from the library have no cutoff of their own: they
+  still follow the global score.
 
 **Profiles are templates, not rules.** When you pick a profile for a title, its
-values are **copied** into the title. Changing the profile later does not
-change the titles already created: to update many at once use [Edit
-selected](#editing-several-titles-at-once). The profile list is also what
-Jellyseerr sees; each profile keeps its number even if you rename it, because
-Jellyseerr remembers the number.
+values — accepted qualities and cutoff included — are **copied** into the title.
+Changing the profile later does not change the titles already created: to update
+many at once use [Edit selected](#editing-several-titles-at-once), which can now
+write accepted qualities and the cutoff too. The profile list is also what
+Jellyseerr sees: it now exposes the accepted resolutions and the real cutoff
+instead of an empty list. Each profile keeps its number even if you rename it,
+because Jellyseerr remembers the number.
 
 ### Trying before changing
 

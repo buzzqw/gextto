@@ -122,6 +122,7 @@ func v2TemplateFuncMap() template.FuncMap {
 			return value / 1024
 		},
 		"dict":    v2Dict,
+		"join":    strings.Join,
 		"kibRate": v2KibRate,
 		// badgeLimits and minutesLeft print the badge values with no words to
 		// translate: "↓ 1 MB/s ↑ ∞" and " · 42 min".

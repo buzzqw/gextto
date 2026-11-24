@@ -169,8 +169,8 @@ sudo bash install.sh --uninstall --purge   # also remove the data directory
   (4K, Full HD, HD, SD, codec) and audio cards (lossless, DTS/DD+, AC3/5.1, AAC/Opus, MP3),
   plus 5.1/7.1 and Atmos/DTS:X. Higher-grade library files are protected from downgrade,
   and dead swarms cannot win over active ones.
-- **Named quality profiles**: Create reusable profiles (resolution, audio presets, language,
-  subtitles, upgrade cutoffs). The profile list is served directly to **Jellyseerr** through the
+- **Named quality profiles**: Create reusable profiles (accepted resolutions, an upgrade cutoff,
+  audio presets, language, subtitles). The profile list is served directly to **Jellyseerr** through the
   `/api/v3` subset (`system/status`, `qualityprofile`, `rootfolder`, `series`/`movie` lookup, `queue`).
 - **Season pack intelligence**: Packs are downloaded only when they fill real missing gaps;
   unneeded episodes are excluded before downloading, and airing packs (*IN CORSO n/m*) are safely

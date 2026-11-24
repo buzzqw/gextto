@@ -18,19 +18,22 @@ import (
 // LibraryBulkEdit is one bulk change. A nil pointer leaves the field as it is;
 // a pointer to "" clears it.
 type LibraryBulkEdit struct {
-	Series   []string
-	Movies   []int64
-	Quality  *string
-	Audio    *string
-	Language *string
-	Subtitle *string
-	Exclude  *string
-	Upgrades *bool
-	Enabled  *bool
+	Series    []string
+	Movies    []int64
+	Quality   *string
+	Qualities *[]string
+	Cutoff    *string
+	Audio     *string
+	Language  *string
+	Subtitle  *string
+	Exclude   *string
+	Upgrades  *bool
+	Enabled   *bool
 }
 
 func (e LibraryBulkEdit) changesSomething() bool {
-	return e.Quality != nil || e.Audio != nil || e.Language != nil || e.Subtitle != nil || e.Exclude != nil ||
+	return e.Quality != nil || e.Qualities != nil || e.Cutoff != nil || e.Audio != nil ||
+		e.Language != nil || e.Subtitle != nil || e.Exclude != nil ||
 		e.Upgrades != nil || e.Enabled != nil
 }
 
@@ -65,6 +68,15 @@ func ApplyLibraryBulkEdit(series []SeriesConfig, movies []MovieConfig, edit Libr
 			continue
 		}
 		set(&item.Quality, edit.Quality)
+		if edit.Qualities != nil {
+			item.Qualities = normalizeQualityList(*edit.Qualities)
+		}
+		if edit.Cutoff != nil {
+			item.Cutoff = strings.ToLower(strings.TrimSpace(*edit.Cutoff))
+			if profileQualityRank(item.Cutoff) == 0 {
+				item.Cutoff = ""
+			}
+		}
 		if edit.Audio != nil {
 			item.Audio, item.AudioChannels = normalizeAudioRequirement(*edit.Audio), ""
 		}
@@ -86,6 +98,15 @@ func ApplyLibraryBulkEdit(series []SeriesConfig, movies []MovieConfig, edit Libr
 			continue
 		}
 		set(&item.Quality, edit.Quality)
+		if edit.Qualities != nil {
+			item.Qualities = normalizeQualityList(*edit.Qualities)
+		}
+		if edit.Cutoff != nil {
+			item.Cutoff = strings.ToLower(strings.TrimSpace(*edit.Cutoff))
+			if profileQualityRank(item.Cutoff) == 0 {
+				item.Cutoff = ""
+			}
+		}
 		if edit.Audio != nil {
 			item.Audio, item.AudioChannels = normalizeAudioRequirement(*edit.Audio), ""
 		}
@@ -192,6 +213,14 @@ func V2LibraryBulkApply(w http.ResponseWriter, r *http.Request, s *AppState) {
 	}
 	edit.Quality, edit.Audio, edit.Language = text("quality"), text("audio"), text("language")
 	edit.Subtitle, edit.Exclude = text("subtitle"), text("exclude")
+	if r.FormValue("set_qualities") != "" {
+		list := splitProfileQualityList(r.FormValue("qualities"))
+		edit.Qualities = &list
+	}
+	if r.FormValue("set_cutoff") != "" {
+		cutoff := strings.ToLower(strings.TrimSpace(r.FormValue("cutoff")))
+		edit.Cutoff = &cutoff
+	}
 	edit.Upgrades = choice("upgrades", "allow", "deny")
 	edit.Enabled = choice("state", "active", "paused")
 	view := v2BulkPanel{}

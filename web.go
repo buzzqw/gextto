@@ -1091,20 +1091,22 @@ type TmdbQuery struct {
 
 // TmdbAddInput is the input of `tmdb_add`.
 type TmdbAddInput struct {
-	Kind          string `json:"kind"`
-	Name          string `json:"name"`
-	Year          string `json:"year"`
-	TmdbId        string `json:"tmdb_id"`
-	TvdbId        string `json:"tvdb_id"`
-	Quality       string `json:"quality"`
-	Audio         string `json:"audio"`
-	AudioChannels string `json:"audio_channels"`
-	Language      string `json:"language"`
-	Seasons       string `json:"seasons"`
-	ArchivePath   string `json:"archive_path"`
-	Exclude       string `json:"exclude"`
-	Subtitle      string `json:"subtitle"`
-	Aliases       string `json:"aliases"`
+	Kind          string   `json:"kind"`
+	Name          string   `json:"name"`
+	Year          string   `json:"year"`
+	TmdbId        string   `json:"tmdb_id"`
+	TvdbId        string   `json:"tvdb_id"`
+	Quality       string   `json:"quality"`
+	Qualities     []string `json:"qualities,omitempty"`
+	Cutoff        string   `json:"cutoff,omitempty"`
+	Audio         string   `json:"audio"`
+	AudioChannels string   `json:"audio_channels"`
+	Language      string   `json:"language"`
+	Seasons       string   `json:"seasons"`
+	ArchivePath   string   `json:"archive_path"`
+	Exclude       string   `json:"exclude"`
+	Subtitle      string   `json:"subtitle"`
+	Aliases       string   `json:"aliases"`
 	// CreateFolder makes the series' archive folder (ArchivePath, or
 	// <archive_root>/<name> when empty) before adding the series.
 	CreateFolder bool `json:"create_folder"`

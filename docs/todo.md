@@ -16,6 +16,8 @@ still be true after the item lands does not belong here.
 
 ## Proposals
 
+- **Quality profiles: movie and series scope**: the same profile serves both libraries and the request-manager picker cannot filter by type. Gate: decide whether to add a `kind` field (movie/series/both, default both) and filter the pickers.
+- **Quality profiles: linked titles**: a profile is copied into a title at save time and titles do not store its id, so editing a profile never reaches existing titles. Gate: decide whether to keep copy-only semantics or add a "re-apply to linked titles" action with a preview of the affected titles.
 - **Rules in the qBittorrent-compatible API**: the native page now keeps rules only as an advanced fallback, but `/api/v2/rss/rules/*` still exposes them to external clients, and the one-time migration switches stored rules off for those clients too. Gate: decide whether external clients still need that surface or the API should report no rules and the compatibility note in `gx-core.md` be updated.
 - **gx-core screenshots after the merge**: the manuals describe the single acquisition page, but the Series & movies screenshots still show the old state labels and the rules tab on the RSS page. Gate: regenerate `docs/screenshots/gx-core/{it,en}` from a running standalone daemon.
 

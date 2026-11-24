@@ -169,8 +169,8 @@ sudo bash install.sh --uninstall --purge   # cancella anche la cartella dati
   (4K, Full HD, HD, SD, codec) e audio (lossless, DTS/DD+, AC3/5.1, AAC/Opus, MP3),
   più canali 5.1/7.1 e formati immersivi Atmos/DTS:X. I file di qualità superiore già archiviati
   sono protetti da downgrade, e uno swarm senza fonti non supera un'alternativa attiva.
-- **Profili di qualità con nome**: crea modelli riutilizzabili (risoluzione, audio minimo, lingua,
-  sottotitoli, soglie di upgrade). La lista dei profili è esposta direttamente a **Jellyseerr**
+- **Profili di qualità con nome**: crea modelli riutilizzabili (risoluzioni accettate, soglia di
+  upgrade, audio minimo, lingua, sottotitoli). La lista dei profili è esposta direttamente a **Jellyseerr**
   tramite il sottoinsieme `/api/v3` (`system/status`, `qualityprofile`, `rootfolder`, ricerca titoli, `queue`).
 - **Gestione intelligente dei pack di stagione**: un pack viene scaricato solo se colma un buco reale;
   gli episodi non necessari vengono esclusi prima del download e i pack di stagioni ancora in corso

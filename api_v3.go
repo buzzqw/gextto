@@ -159,10 +159,15 @@ func v3Profiles(cfg *Config) []v3QualityProfile {
 			name += " 2"
 		}
 		usedNames[strings.ToLower(name)] = true
+		qualities := qualityListFromLegacy(quality)
 		out = append(out, v3QualityProfile{
 			ID: len(out) + 1, Name: name, Quality: quality, Audio: audio, Language: language,
 			Subtitle: subtitle, Exclude: exclude, DisableUpgrades: disableUpgrades,
-			Items: []any{},
+			// A profile migrated from a legacy expression has no cutoff: the
+			// global "stop improving" score keeps governing its upgrades until
+			// the operator chooses one explicitly.
+			Cutoff: 0,
+			Items:  v3QualityItems(qualities),
 		})
 	}
 	// The named profiles come first, in their saved order; the first one is the
@@ -270,6 +275,34 @@ func V3SystemStatus(w http.ResponseWriter, r *http.Request, s *AppState) {
 	})
 }
 
+// v3QualityItems exposes the accepted resolutions as real v3 profile items,
+// with stable ids (the resolution rank) so a request manager can show and
+// choose a cutoff instead of an empty list.
+func v3QualityItems(qualities []string) []any {
+	items := make([]any, 0, len(profileQualityLabels))
+	for rank, label := range profileQualityLabels {
+		allowed := len(qualities) == 0
+		for _, quality := range qualities {
+			if quality == label {
+				allowed = true
+			}
+		}
+		resolution, _ := resolutionPixels(label)
+		items = append(items, map[string]any{
+			"quality": map[string]any{
+				"id":         rank + 1,
+				"name":       label,
+				"source":     "web",
+				"resolution": resolution,
+				"modifier":   "none",
+			},
+			"allowed": allowed,
+			"items":   []any{},
+		})
+	}
+	return items
+}
+
 func V3QualityProfiles(w http.ResponseWriter, r *http.Request, s *AppState) {
 	profiles := ensureQualityProfiles(s)
 	out := make([]v3QualityProfile, 0, len(profiles))
@@ -277,7 +310,9 @@ func V3QualityProfiles(w http.ResponseWriter, r *http.Request, s *AppState) {
 		out = append(out, v3QualityProfile{ID: profile.ID, Name: profile.Name, Quality: profile.Quality,
 			Audio: profile.Audio, Language: profile.Language, Subtitle: profile.Subtitle,
 			Exclude: profile.Exclude, DisableUpgrades: profile.DisableUpgrades,
-			UpgradeAllowed: !profile.DisableUpgrades, Items: []any{}})
+			UpgradeAllowed: !profile.DisableUpgrades,
+			Cutoff:         profileQualityRank(profile.Cutoff),
+			Items:          v3QualityItems(profile.Qualities)})
 	}
 	v3JSON(w, http.StatusOK, out)
 }
@@ -606,7 +641,9 @@ func V3SeriesAdd(w http.ResponseWriter, r *http.Request, s *AppState) {
 		return
 	}
 	added := SeriesConfig{
-		Name: title, Seasons: v3SeasonSpec(body.Seasons), Quality: profile.Quality, Language: profile.Language,
+		Name: title, Seasons: v3SeasonSpec(body.Seasons), Quality: profile.Quality,
+		Qualities: append([]string(nil), profile.Qualities...), Cutoff: profile.Cutoff,
+		Language:    profile.Language,
 		ArchivePath: strings.TrimSpace(body.RootFolderPath), TmdbID: v3ID(body.TmdbID), TvdbID: v3ID(body.TvdbID),
 		Subtitle: profile.Subtitle, Exclude: profile.Exclude, Enabled: true,
 		SeasonSubfolders: body.SeasonFolder, Audio: profile.Audio, DisableUpgrades: profile.DisableUpgrades,
@@ -837,7 +874,8 @@ func V3MovieAdd(w http.ResponseWriter, r *http.Request, s *AppState) {
 		year = strconv.Itoa(body.Year)
 	}
 	added := MovieConfig{Name: title, Year: year, TmdbID: v3ID(body.TmdbID),
-		Quality: profile.Quality, Language: profile.Language, Subtitle: profile.Subtitle,
+		Quality: profile.Quality, Qualities: append([]string(nil), profile.Qualities...), Cutoff: profile.Cutoff,
+		Language: profile.Language, Subtitle: profile.Subtitle,
 		Exclude: profile.Exclude, Enabled: true, Audio: profile.Audio, DisableUpgrades: profile.DisableUpgrades}
 	// The cached configuration is shared: build a new slice, never append to it.
 	movies := append(append([]MovieConfig{}, cfg.Movies...), added)

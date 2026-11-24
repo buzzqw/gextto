@@ -1,11 +1,15 @@
 package gextto
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
+
+	"github.com/buzzqw/gextto/internal/models"
 )
 
 // A profile matches a title only when the exclusions agree as a set: applying
@@ -160,6 +164,205 @@ func TestMatchingQualityProfileFoldsCaseAndLanguageCodes(t *testing.T) {
 
 // The exclusions of a profile are stored as a canonical list, so saving the
 // editor twice does not grow the value with duplicates and spaces.
+// A value the release filters cannot understand is a widened profile, not a
+// harmless typo: "1080pp" used to be stored and then read as "any resolution".
+func TestSaveQualityProfilesRefusesInvalidValues(t *testing.T) {
+	for name, body := range map[string]string{
+		"quality":  `[{"name":"P","quality":"1080pp"}]`,
+		"audio":    `[{"name":"P","audio":"loud"}]`,
+		"language": `[{"name":"P","language":"italianoo"}]`,
+		"subtitle": `[{"name":"P","subtitle":"ita,italianoo"}]`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			state := newTestAppState(t)
+			rec := httptest.NewRecorder()
+			SaveQualityProfiles(rec, httptest.NewRequest(http.MethodPost, "/api/quality-profiles", strings.NewReader(body)), state)
+			if rec.Code != http.StatusBadRequest || !strings.Contains(rec.Body.String(), "invalid quality profile") {
+				t.Fatalf("save -> %d %s, want a 400 with the reason", rec.Code, rec.Body.String())
+			}
+			for _, profile := range ensureQualityProfiles(state) {
+				if profile.Name == "P" {
+					t.Fatalf("a refused save stored the profile: %+v", profile)
+				}
+			}
+		})
+	}
+}
+
+func TestSaveQualityProfilesAcceptsLegacySpellings(t *testing.T) {
+	state := newTestAppState(t)
+	body := `[{"name":"P","quality":"<1080p","audio":"lossless","language":"english","subtitle":"any"}]`
+	rec := httptest.NewRecorder()
+	SaveQualityProfiles(rec, httptest.NewRequest(http.MethodPost, "/api/quality-profiles", strings.NewReader(body)), state)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("save -> %d %s", rec.Code, rec.Body.String())
+	}
+	profiles := ensureQualityProfiles(state)
+	if len(profiles) != 1 || profiles[0].Quality != "<1080p" || profiles[0].Audio != "lossless" || profiles[0].Language != "english" || profiles[0].Subtitle != "any" {
+		t.Fatalf("legacy values were changed: %+v", profiles)
+	}
+}
+
+// Applying a profile to an already monitored film must clear the old hard
+// subtitle requirement too, as the add form does: otherwise the film keeps
+// asking for the previous language while the profile says another one.
+func TestMovieProfileClearsSubtitleRequirements(t *testing.T) {
+	state := newTestAppState(t)
+	if err := SaveSetting(state.cfg.DataDir, qualityProfilesKey,
+		`[{"id":7,"name":"HD","quality":"1080p","language":"eng","subtitle":"eng"}]`); err != nil {
+		t.Fatal(err)
+	}
+	if err := SaveLibrary(state.cfg.DataDir, nil, []MovieConfig{{
+		ID: 3, Name: "Example Movie", Year: "2020", Quality: "720p", Language: "ita",
+		Subtitle: "ita", SubtitleRequirements: "ita", Enabled: true,
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+	form := url.Values{"view": {"movies"}, "path": {"/api/movies/3"}, "name": {"Example Movie"}, "year": {"2020"},
+		"subtitle": {"ita"}, "quality_profile_id": {"7"}, "_v2_kind_quality_profile_id": {"number"}}
+	code, body := v2Request(t, server, http.MethodPost, "/section/form", form)
+	if code >= 400 {
+		t.Fatalf("movie apply -> %d %s", code, body)
+	}
+	movie := latestConfig(state).Movies[0]
+	if movie.Language != "eng" || movie.Subtitle != "eng" || movie.SubtitleRequirements != "" {
+		t.Fatalf("movie after profile = %+v, want the old mandatory subtitle cleared", movie)
+	}
+}
+
+// The explicit qualities list is the migration of the old single expression:
+// read from an existing saved profile, written by the editor as a string.
+func TestQualityProfileQualitiesMigration(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Settings = map[string]string{
+		qualityProfilesKey: `[{"id":1,"name":"Min","quality":"1080p+"},{"id":2,"name":"Range","quality":"720p-1080p"}]`,
+	}
+	profiles := qualityProfilesFromConfig(&cfg)
+	if len(profiles) != 2 {
+		t.Fatalf("profiles = %+v", profiles)
+	}
+	if got := strings.Join(profiles[0].Qualities, ","); got != "1080p,2160p" {
+		t.Fatalf("minimum -> %q, want 1080p,2160p", got)
+	}
+	if got := strings.Join(profiles[1].Qualities, ","); got != "720p,1080p" {
+		t.Fatalf("range -> %q, want 720p,1080p", got)
+	}
+
+	state := newTestAppState(t)
+	rec := httptest.NewRecorder()
+	body := `[{"name":"HD","qualities":"720p, 1080p, 2160p","cutoff":"1080p","language":"ita"},{"name":"4K","qualities":["2160p"],"cutoff":"720p","language":"ita"}]`
+	SaveQualityProfiles(rec, httptest.NewRequest(http.MethodPost, "/api/quality-profiles", strings.NewReader(body)), state)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("save -> %d %s", rec.Code, rec.Body.String())
+	}
+	saved := qualityProfilesFromConfig(latestConfig(state))
+	if len(saved) != 2 {
+		t.Fatalf("saved = %+v", saved)
+	}
+	if got := strings.Join(saved[0].Qualities, ","); got != "720p,1080p,2160p" || saved[0].Cutoff != "1080p" || saved[0].Quality != "720p+" {
+		t.Fatalf("saved HD = %+v", saved[0])
+	}
+	// A cutoff outside the accepted list cannot stop an upgrade that never
+	// happens: it is cleared instead of being stored as a dead rule.
+	if saved[1].Cutoff != "" {
+		t.Fatalf("cutoff outside the list was kept: %+v", saved[1])
+	}
+}
+
+func TestResolutionInList(t *testing.T) {
+	list := []string{"720p", "2160p"}
+	if !resolutionInList(&models.Quality{Resolution: "720p"}, list, "") ||
+		!resolutionInList(&models.Quality{Resolution: "2160p"}, list, "") {
+		t.Fatal("a listed resolution must be accepted")
+	}
+	if resolutionInList(&models.Quality{Resolution: "1080p"}, list, "") ||
+		resolutionInList(&models.Quality{Resolution: "unknown"}, list, "") {
+		t.Fatal("a resolution outside the list must be refused")
+	}
+	if !resolutionInList(&models.Quality{Resolution: "1080p"}, nil, "1080p+") ||
+		resolutionInList(&models.Quality{Resolution: "720p"}, nil, "1080p+") {
+		t.Fatal("without a list the legacy expression still decides")
+	}
+}
+
+// The list on a title is a filter, not a preference: a release outside it is
+// refused even when the legacy single-value field would have accepted it.
+func TestTitleQualitiesFilterReleases(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Series = []SeriesConfig{{Name: "Show", Seasons: "1+", Quality: "720p+",
+		Qualities: []string{"720p", "2160p"}, Enabled: true}}
+	cfg.Movies = []MovieConfig{{Name: "Example Movie", Year: "2020", Quality: "720p+",
+		Qualities: []string{"720p", "2160p"}, Enabled: true}}
+	for name, quality := range map[string]string{"720p": "720p", "2160p": "2160p"} {
+		if !cfg.SeriesReleaseAllowed(&cfg.Series[0], &models.Quality{Resolution: quality}, "release") {
+			t.Fatalf("series refused %s", name)
+		}
+		if !cfg.MovieReleaseAllowed(&cfg.Movies[0], &models.Quality{Resolution: quality}) {
+			t.Fatalf("movie refused %s", name)
+		}
+	}
+	if cfg.SeriesReleaseAllowed(&cfg.Series[0], &models.Quality{Resolution: "1080p"}, "release") ||
+		cfg.MovieReleaseAllowed(&cfg.Movies[0], &models.Quality{Resolution: "1080p"}) {
+		t.Fatal("a resolution outside the accepted list was admitted")
+	}
+}
+
+// A profile's cutoff becomes that title's "stop improving" score, so the
+// global setting is only the fallback for titles without one.
+func TestTitleCutoffStopsUpgrades(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Series = []SeriesConfig{{Name: "Show", Seasons: "1+", Cutoff: "1080p", Enabled: true}}
+	release := testRelease()
+	release.Kind, release.Series, release.Season = "series", stringPtr("Show"), int64Ptr(1)
+	until := upgradeUntilForRelease(&cfg, &release)
+	if until <= 0 || !upgradeCutoffReached(1200, until) {
+		t.Fatalf("cutoff score = %d, a 1080p copy must have reached it", until)
+	}
+	cfg.Series[0].Cutoff = ""
+	if got := upgradeUntilForRelease(&cfg, &release); got != 0 {
+		t.Fatalf("without a cutoff the global score must apply, got %d", got)
+	}
+}
+
+// The v3 profile list now carries real items and a cutoff, so a request
+// manager can show what a profile accepts instead of an empty list.
+func TestV3QualityProfilesExposeItemsAndCutoff(t *testing.T) {
+	state := newTestAppState(t)
+	if err := SaveSetting(state.cfg.DataDir, qualityProfilesKey,
+		`[{"id":1,"name":"HD","qualities":"720p,1080p,2160p","cutoff":"1080p","language":"ita"}]`); err != nil {
+		t.Fatal(err)
+	}
+	rec := httptest.NewRecorder()
+	V3QualityProfiles(rec, httptest.NewRequest(http.MethodGet, "/api/v3/qualityprofile", nil), state)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("v3 profiles -> %d %s", rec.Code, rec.Body.String())
+	}
+	var profiles []map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &profiles); err != nil {
+		t.Fatal(err)
+	}
+	if len(profiles) != 1 {
+		t.Fatalf("profiles = %+v", profiles)
+	}
+	if cutoff, _ := profiles[0]["cutoff"].(float64); cutoff != 5 {
+		t.Fatalf("cutoff = %v, want the id of 1080p (5)", profiles[0]["cutoff"])
+	}
+	items, _ := profiles[0]["items"].([]any)
+	if len(items) != len(profileQualityLabels) {
+		t.Fatalf("items = %d, want %d", len(items), len(profileQualityLabels))
+	}
+	first := items[0].(map[string]any)
+	if first["allowed"] != false || first["quality"].(map[string]any)["name"] != "360p" {
+		t.Fatalf("first item = %+v", first)
+	}
+	last := items[len(items)-1].(map[string]any)
+	if last["allowed"] != true {
+		t.Fatalf("last item = %+v", last)
+	}
+}
+
 func TestSaveQualityProfilesNormalizesExclusions(t *testing.T) {
 	state := newTestAppState(t)
 	rec := httptest.NewRecorder()

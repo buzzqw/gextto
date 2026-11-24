@@ -3012,18 +3012,19 @@ func TestV2QualityProfileEditorOffersTheResolutions(t *testing.T) {
 	server := httptest.NewServer(Router(state))
 	t.Cleanup(server.Close)
 	code, body := v2Request(t, server, http.MethodGet, "/?view=settings&tab=scores", nil)
-	if code != http.StatusOK || !strings.Contains(body, `<select class="input" name="quality__0">`) {
-		t.Fatalf("the profile quality must be a list: %d", code)
+	if code != http.StatusOK || !strings.Contains(body, `name="qualities__0"`) {
+		t.Fatalf("the profile must offer the accepted resolutions: %d", code)
 	}
-	if !strings.Contains(body, `<option value="1080p&#43;" selected>`) && !strings.Contains(body, `<option value="1080p+" selected>`) {
-		t.Fatal("the stored resolution is not selected")
+	if !strings.Contains(body, `value="1080p,2160p"`) {
+		t.Fatal("a stored minimum was not expanded into the accepted resolutions")
 	}
-	if !strings.Contains(body, `<option value="2160p">2160p 4K</option>`) {
-		t.Fatal("the supported resolutions are not offered")
+	// A maximum saved before the list existed is migrated to the same set of
+	// resolutions the release filter already accepted.
+	if !strings.Contains(body, `value="360p,480p,576p,720p,1080p"`) {
+		t.Fatal("a stored free-text quality was not migrated")
 	}
-	// A value saved before the list existed stays, selected.
-	if !strings.Contains(body, `<option value="&lt;1080p" selected>`) {
-		t.Fatal("a stored free-text quality was dropped from the list")
+	if !strings.Contains(body, `name="cutoff__0"`) {
+		t.Fatal("the profile must offer a cutoff")
 	}
 }
 
@@ -3071,7 +3072,7 @@ func TestV2SeriesSaveWithoutAudioKeepsTheMinimum(t *testing.T) {
 
 func TestV2TitlePagesApplyAQualityProfile(t *testing.T) {
 	state := newTestAppState(t)
-	if err := SaveSetting(state.cfg.DataDir, qualityProfilesKey, `[{"id":1,"name":"Default","language":"ita"},{"id":7,"name":"Full HD eng","quality":"1080p+","audio":"high-5.1","language":"eng","subtitle":"ita","exclude":"cam","disable_upgrades":true}]`); err != nil {
+	if err := SaveSetting(state.cfg.DataDir, qualityProfilesKey, `[{"id":1,"name":"Default","language":"ita"},{"id":7,"name":"Full HD eng","quality":"1080p+","qualities":"1080p,2160p","cutoff":"1080p","audio":"high-5.1","language":"eng","subtitle":"ita","exclude":"cam","disable_upgrades":true}]`); err != nil {
 		t.Fatal(err)
 	}
 	if err := SaveLibrary(state.cfg.DataDir,
@@ -3105,7 +3106,8 @@ func TestV2TitlePagesApplyAQualityProfile(t *testing.T) {
 	if code, body := v2Request(t, server, http.MethodPost, "/series/save", url.Values{"name": {"Show"}, "seasons": {"1+"}, "exclude": {"spinoff"}, "quality_profile_id": {"7"}, "flags": {"1"}, "anime": {"false"}}); code >= 400 {
 		t.Fatalf("apply -> %d %s", code, body)
 	}
-	if got := latestConfig(state).Series[0]; got.Quality != "1080p+" || got.Audio != "high-5.1" || got.Language != "eng" || got.Subtitle != "ita" || !got.DisableUpgrades || got.Exclude != "cam, spinoff" {
+	if got := latestConfig(state).Series[0]; got.Quality != "1080p+" || got.Audio != "high-5.1" || got.Language != "eng" || got.Subtitle != "ita" || !got.DisableUpgrades || got.Exclude != "cam, spinoff" ||
+		strings.Join(got.Qualities, ",") != "1080p,2160p" || got.Cutoff != "1080p" {
 		t.Fatalf("series after profile = %+v", got)
 	}
 	form := url.Values{"view": {"movies"}, "path": {"/api/movies/3"}, "name": {"Film"}, "year": {"2020"}, "quality": {""}, "language": {"ita"}, "subtitle": {""},
@@ -3113,7 +3115,8 @@ func TestV2TitlePagesApplyAQualityProfile(t *testing.T) {
 	if code, body := v2Request(t, server, http.MethodPost, "/section/form", form); code >= 400 {
 		t.Fatalf("movie apply -> %d %s", code, body)
 	}
-	if got := latestConfig(state).Movies[0]; got.Quality != "1080p+" || got.Language != "eng" || got.Subtitle != "ita" || !got.DisableUpgrades || got.Exclude != "cam" {
+	if got := latestConfig(state).Movies[0]; got.Quality != "1080p+" || got.Language != "eng" || got.Subtitle != "ita" || !got.DisableUpgrades || got.Exclude != "cam" ||
+		strings.Join(got.Qualities, ",") != "1080p,2160p" || got.Cutoff != "1080p" {
 		t.Fatalf("movie after profile = %+v", got)
 	}
 }

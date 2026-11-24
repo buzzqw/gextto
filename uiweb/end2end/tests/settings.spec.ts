@@ -239,7 +239,8 @@ test("i profili di qualità si aggiungono e si rimuovono", async ({ page }) => {
   await editor.getByRole("button", { name: "Aggiungi riga" }).click();
   await expect(names).toHaveCount(before + 1);
   await names.last().fill("E2E 1080p");
-  await editor.locator('select[name^="quality__"]').last().selectOption("1080p");
+  await editor.locator('input[name^="qualities__"]').last().fill("1080p");
+  await editor.locator('select[name^="cutoff__"]').last().selectOption("1080p");
   await editor.getByRole("button", { name: "Salva", exact: true }).click();
   await expect(page.locator('input[name^="name__"][value="E2E 1080p"]')).toHaveCount(1);
 

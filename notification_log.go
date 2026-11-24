@@ -113,9 +113,11 @@ func (d *Database) RecordNotification(record NotificationRecord) error {
 	if at.IsZero() {
 		at = time.Now()
 	}
+	// Store the instant in UTC: local wall-clock strings compare wrongly across
+	// the daylight-saving change, so an old row could survive the retention cut.
 	_, err := d.db.Exec(`INSERT INTO notification_log(at, event, title, channels, outcome, detail)
 		VALUES(?1, ?2, ?3, ?4, ?5, ?6)`,
-		at.Format(notificationTimeLayout), strings.TrimSpace(record.Event), record.Title,
+		at.UTC().Format(notificationTimeLayout), strings.TrimSpace(record.Event), record.Title,
 		strings.Join(record.Channels, ", "), record.Outcome, record.Detail)
 	if err != nil {
 		return err
@@ -152,8 +154,8 @@ func (d *Database) NotificationLog(limit int, outcome string) ([]NotificationRec
 		if err := rows.Scan(&at, &record.Event, &record.Title, &channels, &record.Outcome, &record.Detail); err != nil {
 			return nil, err
 		}
-		if parsed, err := time.ParseInLocation(notificationTimeLayout, at, time.Local); err == nil {
-			record.At = parsed
+		if parsed, err := time.ParseInLocation(notificationTimeLayout, at, time.UTC); err == nil {
+			record.At = parsed.Local()
 		}
 		if strings.TrimSpace(channels) != "" {
 			record.Channels = strings.Split(channels, ", ")
@@ -177,7 +179,7 @@ func (d *Database) PruneNotificationLog(now time.Time) (int64, error) {
 	if d == nil || d.db == nil {
 		return 0, nil
 	}
-	cutoff := now.Add(-notificationLogRetention).Format(notificationTimeLayout)
+	cutoff := now.UTC().Add(-notificationLogRetention).Format(notificationTimeLayout)
 	result, err := d.db.Exec(`DELETE FROM notification_log WHERE at < ?1`, cutoff)
 	if err != nil {
 		return 0, err

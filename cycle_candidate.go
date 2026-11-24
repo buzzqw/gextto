@@ -281,7 +281,7 @@ func (r *candidateRun) judge() (stop bool, err error) {
 		MovieArchive:      r.movieArchive,
 		Live:              p.liveDownloads,
 		ForbidUpgrade:     r.forbidUpgrade,
-		UpgradeUntilScore: cfg.UpgradeUntilScore,
+		UpgradeUntilScore: upgradeUntilForRelease(cfg, release),
 		ScoreSettings:     cfg.Settings,
 		GapEpisode:        isGap,
 		DryRun:            cfg.DryRun,
@@ -357,7 +357,7 @@ func (r *candidateRun) staleInProgressPack() bool {
 	}
 	reason, checkErr := incompletePackReason(
 		*r.torrentFile, release, r.gapEpisodes, r.archiveIndex,
-		r.releaseScore, cfg.UpgradeMinScoreDiff, cfg.UpgradeUntilScore, r.forbidUpgrade, cfg.Settings,
+		r.releaseScore, cfg.UpgradeMinScoreDiff, upgradeUntilForRelease(cfg, release), r.forbidUpgrade, cfg.Settings,
 	)
 	if checkErr != nil {
 		logging.Debug("could not read the pack torrent contents",
