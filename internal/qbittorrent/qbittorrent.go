@@ -156,6 +156,7 @@ type Torrent struct {
 	MaxSeedingTime int64   `json:"max_seeding_time"`
 	RatioLimit     float64 `json:"ratio_limit"`
 	SeedingLimit   int64   `json:"seeding_time_limit"`
+	InactiveLimit  int64   `json:"inactive_seeding_time_limit"`
 	Magnet         string  `json:"magnet_uri"`
 	Tracker        string  `json:"tracker"`
 	InfohashV1     string  `json:"infohash_v1"`

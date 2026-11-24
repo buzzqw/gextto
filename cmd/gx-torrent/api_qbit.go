@@ -561,10 +561,10 @@ func qbitView(v torrentInfo) qbitTorrent {
 		MagnetURI:         magnetLink(strings.ToLower(v.Hash), v.Name, nil),
 		LastActivity:      v.LastActive,
 		MaxRatio:          qbitRatioLimitOut(v.SeedRatio),
-		MaxSeedingTime:    qbitSeedingTimeOut(v.SeedDays),
+		MaxSeedingTime:    qbitSeedingTimeLimitOut(v.SeedDays, v.seedMinutes),
 		RatioLimit:        qbitRatioLimitOut(v.SeedRatio),
-		SeedingTimeLimit:  qbitSeedingTimeOut(v.SeedDays),
-		InactiveTimeLimit: -2,
+		SeedingTimeLimit:  qbitSeedingTimeLimitOut(v.SeedDays, v.seedMinutes),
+		InactiveTimeLimit: qbitInactiveLimitOut(v.inactiveMinutes),
 		SeenComplete:      v.CompletedAt,
 		SuperSeeding:      v.SuperSeeding,
 		TrackersCount:     v.TrackersCount,
@@ -600,6 +600,24 @@ func qbitSeedingTimeOut(days int64) int64 {
 		return -1
 	}
 	return days * 24 * 60
+}
+
+// qbitSeedingTimeLimitOut prefers the exact minutes stored by the compatible
+// API; older state has no minutes, so it keeps the legacy days conversion.
+func qbitSeedingTimeLimitOut(days int64, minutes *int64) int64 {
+	if minutes != nil {
+		return *minutes
+	}
+	return qbitSeedingTimeOut(days)
+}
+
+// qbitInactiveLimitOut maps the per-torrent inactive limit back to qBittorrent:
+// -2 global, -1 disabled, or the exact number of minutes.
+func qbitInactiveLimitOut(minutes *int64) int64 {
+	if minutes == nil {
+		return -2
+	}
+	return *minutes
 }
 
 // qbitTorrentLimitOut renders a per-torrent limit for torrents/info: bytes per
@@ -1056,11 +1074,30 @@ func qbitApplyAddLimits(r *http.Request, req *addRequest) {
 		if v, err := strconv.ParseInt(raw, 10, 64); err == nil {
 			switch {
 			case v == -2:
+				// Global: keep the legacy days value and no minute override.
 				req.SeedDays = -1
+				req.SeedMinutes = nil
 			case v == -1:
+				infinite := int64(-1)
 				req.SeedDays = 0
+				req.SeedMinutes = &infinite
 			case v >= 0:
+				minutes := v
+				req.SeedMinutes = &minutes
+				// Keep SeedDays meaningful for the v1 view and the Gextto
+				// adapter, which still speak whole days.
 				req.SeedDays = (v + 24*60 - 1) / (24 * 60)
+			}
+		}
+	}
+	if raw := strings.TrimSpace(r.FormValue("inactiveSeedingTimeLimit")); raw != "" {
+		if v, err := strconv.ParseInt(raw, 10, 64); err == nil {
+			switch {
+			case v == -2:
+				req.InactiveMinutes = nil
+			case v == -1, v >= 0:
+				minutes := v
+				req.InactiveMinutes = &minutes
 			}
 		}
 	}
@@ -1890,13 +1927,45 @@ func (d *Daemon) handleQbitSetPreferences(w http.ResponseWriter, r *http.Request
 	w.WriteHeader(http.StatusOK)
 }
 
-// handleQbitSetShareLimits maps qBittorrent share limits onto the daemon's seed
-// policy. ratioLimit: -2 keep the global, -1 infinite, >=0 explicit.
-// seedingTimeLimit is in minutes (-2 global, -1 infinite, >=0 minutes); the
-// daemon stores days, so a positive value is rounded up to the next day.
+// setQbitShareLimits stores qBittorrent's seed limits without losing their
+// minute precision. SeedDays stays in days for the frozen v1 contract and the
+// Gextto adapter; SeedMinutes is the authoritative value for the compatible
+// API and for the standalone seed policy.
+func (d *Daemon) setQbitShareLimits(hash string, ratioPtr *float64, minutesPtr, inactivePtr *int64, clearInactive bool) error {
+	return d.withTorrent(hash, func(t *torrent.Torrent, meta *torrentMeta) error {
+		if ratioPtr != nil {
+			meta.SeedRatio = *ratioPtr
+		}
+		if minutesPtr != nil {
+			minutes := *minutesPtr
+			meta.SeedMinutes = &minutes
+			switch {
+			case minutes < 0:
+				meta.SeedDays = 0
+			case minutes == 0:
+				meta.SeedDays = 0
+			default:
+				days := (minutes + 1439) / 1440
+				meta.SeedDays = days
+			}
+		}
+		if clearInactive {
+			meta.InactiveMinutes = nil
+		} else if inactivePtr != nil {
+			minutes := *inactivePtr
+			meta.InactiveMinutes = &minutes
+		}
+		return nil
+	})
+}
+
+// handleQbitSetShareLimits accepts qBittorrent's ratio, seeding-time and
+// inactive-seeding limits. -2 means "use the global setting", -1 "infinite"
+// (or disabled for the inactive limit), >=0 is an exact number of minutes.
 func (d *Daemon) handleQbitSetShareLimits(w http.ResponseWriter, r *http.Request) {
 	ratio, rerr := strconv.ParseFloat(strings.TrimSpace(r.FormValue("ratioLimit")), 64)
 	minutes, merr := strconv.ParseInt(strings.TrimSpace(r.FormValue("seedingTimeLimit")), 10, 64)
+	inactive, ierr := strconv.ParseInt(strings.TrimSpace(r.FormValue("inactiveSeedingTimeLimit")), 10, 64)
 	d.applyQbitTorrentAction(w, r, "setShareLimits", func(hash string) error {
 		var ratioPtr *float64
 		if rerr == nil {
@@ -1908,24 +1977,38 @@ func (d *Daemon) handleQbitSetShareLimits(w http.ResponseWriter, r *http.Request
 				ratioPtr = &zero
 			}
 		}
-		var daysPtr *int64
-		if merr == nil {
-			switch {
-			case minutes >= 0:
-				days := (minutes + 1439) / 1440
-				if days < 1 {
-					days = 1
-				}
-				daysPtr = &days
-			case minutes == -1:
-				zero := int64(0)
-				daysPtr = &zero
-			}
+		var inactivePtr *int64
+		clearInactive := ierr == nil && inactive == -2
+		if ierr == nil && (inactive == -1 || inactive >= 0) {
+			value := inactive
+			inactivePtr = &value
 		}
-		if ratioPtr == nil && daysPtr == nil {
+		if merr == nil && minutes == -2 {
+			// A nil minute override restores the legacy global days semantics.
+			return d.withTorrent(hash, func(t *torrent.Torrent, meta *torrentMeta) error {
+				if ratioPtr != nil {
+					meta.SeedRatio = *ratioPtr
+				}
+				if clearInactive {
+					meta.InactiveMinutes = nil
+				} else if inactivePtr != nil {
+					v := *inactivePtr
+					meta.InactiveMinutes = &v
+				}
+				meta.SeedDays = -1
+				meta.SeedMinutes = nil
+				return nil
+			})
+		}
+		var minutesPtr *int64
+		if merr == nil && minutes >= -1 {
+			value := minutes
+			minutesPtr = &value
+		}
+		if ratioPtr == nil && minutesPtr == nil && inactivePtr == nil {
 			return nil
 		}
-		return d.setLimits(hash, nil, nil, ratioPtr, daysPtr)
+		return d.setQbitShareLimits(hash, ratioPtr, minutesPtr, inactivePtr, clearInactive)
 	})
 }
 

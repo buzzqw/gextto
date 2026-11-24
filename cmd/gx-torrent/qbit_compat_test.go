@@ -17,85 +17,110 @@ import (
 	"github.com/buzzqw/gextto/internal/settings"
 )
 
-// TestQbitSonarrDownloadClientFlow pins the exact sequence Sonarr uses when
-// gx-torrent is configured as a qBittorrent download client: version probe,
-// category creation, magnet add with category and save path, then status read.
-func TestQbitSonarrDownloadClientFlow(t *testing.T) {
-	store, err := settings.Load(filepath.Join(t.TempDir(), "settings.json"))
-	if err != nil {
-		t.Fatal(err)
+// TestQbitArrDownloadClientSequences pins the sequence the *arr download
+// clients use when gx-torrent is configured as a qBittorrent download client.
+// All of them are API-v2 clients: Readarr versions that only speak the legacy
+// qBittorrent v1 API are not supported because /api/v1 is gx-torrent's native,
+// frozen API and cannot be reused without two masters on the same queue.
+func TestQbitArrDownloadClientSequences(t *testing.T) {
+	cases := []struct {
+		name     string
+		category string
+		tag      string
+		hash     string
+	}{
+		{"sonarr", "sonarr-tv", "sonarr", "ABCDEF0123456789ABCDEF0123456789ABCDEF01"},
+		{"radarr", "radarr-movies", "radarr", "ABCDEF0123456789ABCDEF0123456789ABCDEF02"},
+		{"lidarr", "lidarr-music", "lidarr", "ABCDEF0123456789ABCDEF0123456789ABCDEF03"},
+		{"readarr", "readarr-books", "readarr", "ABCDEF0123456789ABCDEF0123456789ABCDEF04"},
 	}
-	passwordHash, err := auth.HashPassword("s3cret")
-	if err != nil {
-		t.Fatal(err)
-	}
-	// The mode is part of the Options passed to newDaemon: the background loops
-	// started by d.run read opts.Mode for their whole life, so setting it here
-	// (after construction) would race with them.
-	d := newTestDaemonFullMode(t, NetworkOptions{}, store, ModeStandalone)
-	// Set the credentials after newDaemon: it reloads the settings file, which
-	// would otherwise discard the in-memory values.
-	d.opts.Settings.Set(standalonePasswordKey, passwordHash)
-	d.opts.Settings.Set(standaloneBypassKey, "true")
-	// Use a short session lifetime; newDaemon already created sessions because
-	// the standalone mode was set in the Options above.
-	d.sessions = auth.NewSessions(time.Hour)
-	srv := httptest.NewServer(d.routes())
-	defer srv.Close()
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			store, err := settings.Load(filepath.Join(t.TempDir(), "settings.json"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			passwordHash, err := auth.HashPassword("s3cret")
+			if err != nil {
+				t.Fatal(err)
+			}
+			// The mode belongs in the Options: the background loops read it for
+			// their whole life and must never see a standalone daemon in managed.
+			d := newTestDaemonFullMode(t, NetworkOptions{}, store, ModeStandalone)
+			d.opts.Settings.Set(standalonePasswordKey, passwordHash)
+			d.opts.Settings.Set(standaloneBypassKey, "true")
+			d.sessions = auth.NewSessions(time.Hour)
+			srv := httptest.NewServer(d.routes())
+			defer srv.Close()
 
-	client, err := qbittorrent.New(qbittorrent.Config{BaseURL: srv.URL, Username: "admin", Password: "s3cret"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	ctx := context.Background()
-	if err := client.Login(ctx); err != nil {
-		t.Fatalf("login: %v", err)
-	}
-	if version, err := client.AppVersion(ctx); err != nil || version == "" {
-		t.Fatalf("app version = %q, err = %v", version, err)
-	}
-	if api, err := client.WebAPIVersion(ctx); err != nil || api == "" {
-		t.Fatalf("webapi version = %q, err = %v", api, err)
-	}
-	savePath := t.TempDir()
-	if err := client.CreateCategory(ctx, "sonarr-tv", savePath); err != nil {
-		t.Fatalf("create category: %v", err)
-	}
-	magnet := "magnet:?xt=urn:btih:ABCDEF0123456789ABCDEF0123456789ABCDEF01&dn=release"
-	hash, err := client.AddMagnet(ctx, magnet, qbittorrent.AddOptions{
-		Category: "sonarr-tv",
-		SavePath: savePath,
-		Tags:     "sonarr",
-		Paused:   true,
-	})
-	if err != nil {
-		t.Fatalf("add magnet: %v", err)
-	}
-	if hash == "" {
-		t.Fatal("add magnet returned no hash")
-	}
-	list, err := client.Torrents(ctx)
-	if err != nil {
-		t.Fatalf("torrents: %v", err)
-	}
-	var found qbittorrent.Torrent
-	for _, item := range list {
-		if item.Hash == hash {
-			found = item
-			break
-		}
-	}
-	if found.Hash == "" {
-		t.Fatalf("torrent %s not found in torrents/info: %+v", hash, list)
-	}
-	if found.Category != "sonarr-tv" || found.SavePath != savePath {
-		t.Fatalf("category/save path = %q/%q, want sonarr-tv/%s", found.Category, found.SavePath, savePath)
-	}
-	if _, err := client.Sync(ctx, 0); err != nil {
-		t.Fatalf("sync/maindata: %v", err)
-	}
-	if err := client.Delete(ctx, false, hash); err != nil {
-		t.Fatalf("delete: %v", err)
+			client, err := qbittorrent.New(qbittorrent.Config{BaseURL: srv.URL, Username: "admin", Password: "s3cret"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			ctx := context.Background()
+			if err := client.Login(ctx); err != nil {
+				t.Fatalf("login: %v", err)
+			}
+			version, err := client.AppVersion(ctx)
+			if err != nil || version == "" {
+				t.Fatalf("app version = %q, err = %v", version, err)
+			}
+			api, err := client.WebAPIVersion(ctx)
+			if err != nil || api == "" {
+				t.Fatalf("webapi version = %q, err = %v", api, err)
+			}
+			savePath := t.TempDir()
+			if err := client.CreateCategory(ctx, tc.category, savePath); err != nil {
+				t.Fatalf("create category: %v", err)
+			}
+			magnet := "magnet:?xt=urn:btih:" + tc.hash + "&dn=release"
+			hash, err := client.AddMagnet(ctx, magnet, qbittorrent.AddOptions{
+				Category: tc.category,
+				SavePath: savePath,
+				Tags:     tc.tag,
+				Paused:   true,
+				// Add-time limits keep their minute precision too.
+				SeedingTimeLimit:         int64Ptr(45),
+				InactiveSeedingTimeLimit: int64Ptr(15),
+			})
+			if err != nil {
+				t.Fatalf("add magnet: %v", err)
+			}
+			if hash == "" {
+				t.Fatal("add magnet returned no hash")
+			}
+			// The client then sets share limits when its quality profile asks
+			// for them; the round trip must not round minutes up to days.
+			if err := client.SetShareLimits(ctx, 1.25, 30, 20, hash); err != nil {
+				t.Fatalf("set share limits: %v", err)
+			}
+			list, err := client.Torrents(ctx)
+			if err != nil {
+				t.Fatalf("torrents: %v", err)
+			}
+			var found qbittorrent.Torrent
+			for _, item := range list {
+				if item.Hash == hash {
+					found = item
+					break
+				}
+			}
+			if found.Hash == "" {
+				t.Fatalf("torrent %s not found in torrents/info: %+v", hash, list)
+			}
+			if found.Category != tc.category || found.SavePath != savePath {
+				t.Fatalf("category/save path = %q/%q, want %q/%s", found.Category, found.SavePath, tc.category, savePath)
+			}
+			if found.SeedingLimit != 30 || found.InactiveLimit != 20 {
+				t.Fatalf("seed limits = %d/%d, want 30/20", found.SeedingLimit, found.InactiveLimit)
+			}
+			if _, err := client.Sync(ctx, 0); err != nil {
+				t.Fatalf("sync/maindata: %v", err)
+			}
+			if err := client.Delete(ctx, false, hash); err != nil {
+				t.Fatalf("delete: %v", err)
+			}
+		})
 	}
 }
 

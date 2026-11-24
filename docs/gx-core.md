@@ -295,15 +295,34 @@ is non-destructive: the old torrent leaves the session, its files stay on disk.
 
 **Open.**
 
-- **qBittorrent API completeness**: the layer already speaks the 4.6 level, the
-  qBittorrent 5 API key, `app/processInfo` and `torrents/setComment`, and fills
-  the fields the clients read. In the RSS corner the feed `uid` follows the feed
-  through a rename, a move and an address change, `lastMatch` and
-  `previouslyMatchedEpisodes` carry the daemon's own record, and a rule action
-  round-trips through `torrentParams` with its tags. A 100% clone would still
-  need the full preferences round-trip, the remaining 5.x fields, the exact
-  status codes, the per-feed refresh interval and the search plugins; the target
-  version must be chosen before claiming it.
+- **qBittorrent API completeness**: the layer speaks the 4.6 level (Web API
+  2.9.3), the qBittorrent 5 API key, `app/processInfo` and `torrents/setComment`,
+  and fills the fields the clients read. Seeding time and inactive seeding time
+  round-trip in exact minutes, both when the torrent is added and when
+  `torrents/setShareLimits` is called; the frozen `/api/v1` still reports
+  `seed_days` in days, so Gextto and the adapter are unaffected. In the RSS
+  corner the feed `uid` follows the feed through a rename, a move and an address
+  change, `lastMatch` and `previouslyMatchedEpisodes` carry the daemon's own
+  record, and a rule action round-trips through `torrentParams` with its tags.
+  A 100% clone would still need the full preferences round-trip, the remaining
+  5.x fields, the exact status codes, the per-feed refresh interval and the
+  search plugins.
+
+**Download-client compatibility matrix.** All four request managers are tested
+against the standalone daemon with Gextto's own qBittorrent client, which replays
+the sequence each of them uses. The matrix is versioned by the API level, not by
+an unverified application build.
+
+| Client | API used | Sequence covered | Notes |
+| --- | --- | --- | --- |
+| Sonarr | qBittorrent API v2, 4.6 / Web API 2.9.3 | version probe, category, magnet add with category and save path, `torrents/info`, sync, share limits, delete | The original end-to-end sequence, still pinned. |
+| Radarr | qBittorrent API v2, 4.6 / Web API 2.9.3 | same sequence with a movie category | `content_path` and category paths are read from `torrents/info`. |
+| Lidarr | qBittorrent API v2, 4.6 / Web API 2.9.3 | same sequence with a music category | Uses the same version probe and add flow. |
+| Readarr | qBittorrent API v2, 4.6 / Web API 2.9.3 | same sequence with a book category | **API v2 only.** Readarr builds that speak only the legacy qBittorrent API v1 are not supported: `/api/v1` is gx-torrent's native, frozen API and cannot be reused without putting two masters on the same queue. |
+
+The same tests assert that `seeding_time_limit` and
+`inactive_seeding_time_limit` return the exact minutes sent by the client, and
+that `-2` (global) and `-1` (infinite or disabled) round-trip as sentinels.
 - **Rate-based choking and anti-leech**: to be validated with the deterministic harness
   and the real-swarm campaign before touching the algorithm
   ([`measurements.md`](measurements.md#real-swarms-and-the-home-line)).

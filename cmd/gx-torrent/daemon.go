@@ -122,6 +122,13 @@ type torrentMeta struct {
 	RotatedAt     time.Time `json:"rotated_at,omitzero"`
 	SeedRatio     float64   `json:"seed_ratio"`
 	SeedDays      int64     `json:"seed_days"`
+	// SeedMinutes is the qBittorrent-compatible seeding limit in minutes.
+	// A nil value means "use SeedDays" (the frozen v1 contract and the
+	// Gextto adapter); 0 is infinite, a positive value is exact minutes.
+	SeedMinutes *int64 `json:"seed_minutes,omitempty"`
+	// InactiveMinutes is the qBittorrent-compatible per-torrent inactive
+	// seeding limit. Nil = use the global setting, -1 = disabled, >0 minutes.
+	InactiveMinutes *int64 `json:"inactive_minutes,omitempty"`
 	// Per-torrent speed limits in KiB/s: nil = inherit the global
 	// limit, 0 = unlimited, >0 = explicit. Pointers so a state file written
 	// before these existed still means "inherit".
@@ -1653,6 +1660,10 @@ type torrentInfo struct {
 	NumIncomplete  int     `json:"num_incomplete"`
 	SeedRatio      float64 `json:"seed_ratio"`
 	SeedDays       int64   `json:"seed_days"`
+	// Unexported on purpose: these keep the qBittorrent minute precision out
+	// of the frozen /api/v1 shape while qbitView still sees them.
+	seedMinutes     *int64
+	inactiveMinutes *int64
 	// Per-torrent speed limits in KiB/s: -1 global, 0 unlimited.
 	DownloadLimitKib int64 `json:"download_limit_kib"`
 	UploadLimitKib   int64 `json:"upload_limit_kib"`
@@ -1796,6 +1807,8 @@ func (d *Daemon) infoLocked(t *torrent.Torrent, stats torrent.Stats, trackers in
 		NumIncomplete:    meta.SwarmPeers,
 		SeedRatio:        meta.SeedRatio,
 		SeedDays:         meta.SeedDays,
+		seedMinutes:      meta.SeedMinutes,
+		inactiveMinutes:  meta.InactiveMinutes,
 		DownloadLimitKib: kibOrInherit(meta.DownloadLimitKib),
 		UploadLimitKib:   kibOrInherit(meta.UploadLimitKib),
 		HasMetadata:      stats.Status != torrent.DownloadingMetadata && stats.Bytes.Total > 0,
@@ -1971,6 +1984,10 @@ type addRequest struct {
 	ContentLayout string
 	SeedRatio     float64
 	SeedDays      int64
+	// SeedMinutes/InactiveMinutes carry the qBittorrent minute precision.
+	// They are pointers because nil means "use SeedDays"/"use global".
+	SeedMinutes     *int64
+	InactiveMinutes *int64
 	// DownloadLimitKib/UploadLimitKib are per-torrent speed limits in KiB/s
 	// for a new torrent: nil = inherit the global limit, 0 = unlimited.
 	DownloadLimitKib *int64
@@ -2122,6 +2139,8 @@ func (d *Daemon) add(req addRequest) (string, bool, error) {
 		// torrent, so the engine reads the selection on its first run.
 		FilePriorities: append([]int(nil), req.FilePriorities...),
 		SeedRatio:      req.SeedRatio, SeedDays: req.SeedDays, SwarmSeeds: -1, SwarmPeers: -1,
+		SeedMinutes:     req.SeedMinutes,
+		InactiveMinutes: req.InactiveMinutes,
 		// Per-torrent limits chosen in the add dialog (nil = global).
 		DownloadLimitKib: req.DownloadLimitKib, UploadLimitKib: req.UploadLimitKib,
 		Category: req.Category,

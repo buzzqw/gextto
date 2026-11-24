@@ -781,7 +781,7 @@ answers its own subset of it on the address of its interface (`/api/v2`, see
 torrents into its queue, and the daemon below stays driven by Gextto only.
 
 In standalone the daemon also exposes a **qBittorrent-compatible API**
-(`/api/v2`) for Sonarr, Radarr and mobile apps: `auth/login` and `auth/logout`
+(`/api/v2`) for Sonarr, Radarr, Lidarr, Readarr and mobile apps: `auth/login` and `auth/logout`
 (`SID` cookie, the same login password), `app/version`,
 `app/webapiVersion`, `app/preferences|setPreferences`, `transfer/info` and
 `torrents/info|add|delete|pause|resume|recheck`, plus categories and tags
@@ -793,10 +793,11 @@ the 5.x `stopped` flag on `torrents/add`, accepted next to `paused`),
 `torrents/toggleSequentialDownload|setSuperSeeding|addTrackers|removeTrackers|editTracker|filePrio|export|setForceStart|setAutoManagement|setDownloadLimit|setUploadLimit|setShareLimits`,
 `transfer/downloadLimit|uploadLimit|setDownloadLimit|setUploadLimit`, `sync/maindata` (with incremental `rid`) and
 `sync/torrentPeers` (which reports `rid: 0`), and `content_path` in
-`torrents/info`, as Sonarr and Radarr read). The complete download-client
-sequence is covered by an end-to-end test: login, version probe, category
-creation, magnet add with category and save path, status read through
-`torrents/info`, incremental sync and removal. A duplicate-only add returns
+`torrents/info`, as the request managers read). The complete download-client
+sequence is covered by end-to-end tests for Sonarr, Radarr, Lidarr and Readarr:
+login, version probe, category creation, magnet add with category and save path,
+share limits in exact minutes, status read through `torrents/info`, incremental
+sync and removal. The versioned matrix is in `gx-core.md` §6. A duplicate-only add returns
 `409 Conflict`, and operational failures in pause, resume, recheck, move, delete
 and share-limit operations return an error instead of a false `200`. Gextto
 carries the engine's `content_path` through its completion event, so imports use

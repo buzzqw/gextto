@@ -60,6 +60,28 @@ func TestSeedLimitReached(t *testing.T) {
 	}
 }
 
+// TestSeedTimeMinutesOverride pins the exact qBittorrent minute limit, which
+// must not be rounded up to a whole day by the seed policy.
+func TestSeedTimeMinutesOverride(t *testing.T) {
+	d := standaloneTestDaemon(t, "", true)
+	stats := torrent.Stats{}
+	stats.Bytes.Total = 1000
+	stats.SeededFor = 30 * time.Minute
+
+	meta := &torrentMeta{SeedRatio: -1, SeedDays: -1, SeedMinutes: int64Ptr(45)}
+	if set, reached := d.seedTimeState(meta, stats); !set || reached {
+		t.Fatalf("45 minutes at 30: set=%v reached=%v", set, reached)
+	}
+	meta.SeedMinutes = int64Ptr(20)
+	if set, reached := d.seedTimeState(meta, stats); !set || !reached {
+		t.Fatalf("20 minutes at 30: set=%v reached=%v", set, reached)
+	}
+	meta.SeedMinutes = int64Ptr(-1)
+	if set, reached := d.seedTimeState(meta, stats); set || reached {
+		t.Fatalf("infinite minutes must disable the time limit: set=%v reached=%v", set, reached)
+	}
+}
+
 // TestSeedIdleReached covers the inactive-seeding limit: it counts only the
 // time spent seeding without uploads and spares a torrent set to seed forever.
 func TestSeedIdleReached(t *testing.T) {
@@ -106,6 +128,21 @@ func TestSeedIdleReached(t *testing.T) {
 	d.opts.Settings.Set(maxInactiveSeedingTimeEnabledKey, "false")
 	if d.seedIdleReached(rt, meta, stats, start.Add(300*time.Minute)) {
 		t.Fatal("the limit is off")
+	}
+
+	// A per-torrent inactive limit wins and works even when the global one is
+	// off; -1 disables it for that torrent only.
+	perTorrent := &torrentMeta{SeedRatio: -1, SeedDays: -1, InactiveMinutes: int64Ptr(10)}
+	rt2 := &runtimeInfo{}
+	d.seedIdleReached(rt2, perTorrent, stats, start)
+	if !d.seedIdleReached(rt2, perTorrent, stats, start.Add(11*time.Minute)) {
+		t.Fatal("a 10-minute per-torrent limit must be reached")
+	}
+	perTorrent.InactiveMinutes = int64Ptr(-1)
+	rt3 := &runtimeInfo{}
+	d.seedIdleReached(rt3, perTorrent, stats, start)
+	if d.seedIdleReached(rt3, perTorrent, stats, start.Add(300*time.Minute)) {
+		t.Fatal("a per-torrent disabled limit must never be reached")
 	}
 }
 

@@ -15,6 +15,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/buzzqw/gextto/internal/gxcore/torrent"
 	"github.com/buzzqw/gextto/internal/settings"
 )
 
@@ -279,32 +280,57 @@ func TestQbitSetShareLimits(t *testing.T) {
 	defer srv.Close()
 
 	resp, err := http.PostForm(srv.URL+"/api/v2/torrents/setShareLimits",
-		url.Values{"hash": {hash}, "ratioLimit": {"1.5"}, "seedingTimeLimit": {"1440"}})
+		url.Values{
+			"hash":                     {hash},
+			"ratioLimit":               {"1.5"},
+			"seedingTimeLimit":         {"30"},
+			"inactiveSeedingTimeLimit": {"15"},
+		})
 	if err != nil {
 		t.Fatal(err)
 	}
 	resp.Body.Close()
-	d.mu.Lock()
-	_, meta := d.findLocked(hash)
-	ratio, days := meta.SeedRatio, meta.SeedDays
-	d.mu.Unlock()
-	if ratio != 1.5 || days != 1 {
-		t.Fatalf("share limits = %v/%d, want 1.5/1", ratio, days)
+	var view qbitTorrent
+	if err := d.withTorrent(hash, func(t *torrent.Torrent, meta *torrentMeta) error {
+		minutes, inactive := meta.SeedMinutes, meta.InactiveMinutes
+		view = qbitView(torrentInfo{
+			SeedRatio: meta.SeedRatio, SeedDays: meta.SeedDays,
+			seedMinutes: minutes, inactiveMinutes: inactive,
+		})
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if view.RatioLimit != 1.5 || view.SeedingTimeLimit != 30 || view.InactiveTimeLimit != 15 {
+		t.Fatalf("share limits = %v/%d/%d, want 1.5/30/15",
+			view.RatioLimit, view.SeedingTimeLimit, view.InactiveTimeLimit)
 	}
 
-	// -1 means infinite: the daemon stores 0 (unlimited).
+	// -1 means infinite/disabled; -2 restores the global setting.
 	resp2, err := http.PostForm(srv.URL+"/api/v2/torrents/setShareLimits",
-		url.Values{"hash": {hash}, "ratioLimit": {"-1"}, "seedingTimeLimit": {"-1"}})
+		url.Values{
+			"hash":                     {hash},
+			"ratioLimit":               {"-1"},
+			"seedingTimeLimit":         {"-1"},
+			"inactiveSeedingTimeLimit": {"-2"},
+		})
 	if err != nil {
 		t.Fatal(err)
 	}
 	resp2.Body.Close()
-	d.mu.Lock()
-	_, meta2 := d.findLocked(hash)
-	ratio2, days2 := meta2.SeedRatio, meta2.SeedDays
-	d.mu.Unlock()
-	if ratio2 != 0 || days2 != 0 {
-		t.Fatalf("infinite share limits = %v/%d, want 0/0", ratio2, days2)
+	var view2 qbitTorrent
+	if err := d.withTorrent(hash, func(t *torrent.Torrent, meta *torrentMeta) error {
+		view2 = qbitView(torrentInfo{
+			SeedRatio: meta.SeedRatio, SeedDays: meta.SeedDays,
+			seedMinutes: meta.SeedMinutes, inactiveMinutes: meta.InactiveMinutes,
+		})
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if view2.RatioLimit != -1 || view2.SeedingTimeLimit != -1 || view2.InactiveTimeLimit != -2 {
+		t.Fatalf("infinite share limits = %v/%d/%d, want -1/-1/-2",
+			view2.RatioLimit, view2.SeedingTimeLimit, view2.InactiveTimeLimit)
 	}
 }
 

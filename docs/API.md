@@ -632,6 +632,12 @@ client that checks the version can be pointed at a compatible string without a
 rebuild. This is a broad compatibility layer, not a claim that every route,
 field and status code of every qBittorrent release is implemented: the gaps are
 tracked in `gx-core.md` §6 and the fields are covered by the qBittorrent tests.
+Share limits use qBittorrent's exact units: `ratioLimit` is a ratio,
+`seedingTimeLimit` and `inactiveSeedingTimeLimit` are minutes, and `-2` means
+"use the global setting" while `-1` means infinite (or disabled for the inactive
+limit). The values round-trip through `torrents/info` and `sync/maindata`; the
+native `/api/v1` still reports `seed_days` in whole days for Gextto. The
+versioned matrix of the four request managers is in `gx-core.md` §6.
 In the RSS API a feed's `uid` stays the same when the feed is renamed, moved or
 given a new address, `lastMatch` and `previouslyMatchedEpisodes` are filled from
 the daemon's record, and a rule action is read and written both in the legacy

@@ -82,10 +82,15 @@ func (d *Daemon) seedRatioState(meta *torrentMeta, stats torrent.Stats) (set, hi
 }
 
 // seedTimeState reports the effective seeding time of a torrent and whether it
-// elapsed. Per-torrent days; -1 = global minutes, 0 = never stop.
+// elapsed. The qBittorrent-compatible minutes win; older state still uses the
+// frozen days field (-1 = global minutes, 0 = never stop).
 func (d *Daemon) seedTimeState(meta *torrentMeta, stats torrent.Stats) (set, hit bool) {
 	var seconds int64
 	switch {
+	case meta.SeedMinutes != nil:
+		if *meta.SeedMinutes > 0 {
+			seconds = *meta.SeedMinutes * 60
+		}
 	case meta.SeedDays > 0:
 		seconds = meta.SeedDays * 86400
 	case meta.SeedDays < 0:
@@ -99,14 +104,40 @@ func (d *Daemon) seedTimeState(meta *torrentMeta, stats torrent.Stats) (set, hit
 	return true, int64(stats.SeededFor.Seconds()) >= seconds
 }
 
+// seedTimeForever reports whether a torrent has no seeding-time limit. An
+// infinite qBittorrent limit (-1 minutes) is different from a global one (-2,
+// stored as a nil override) because the latter still reads the setting.
+func seedTimeForever(meta *torrentMeta) bool {
+	if meta.SeedMinutes != nil {
+		return *meta.SeedMinutes <= 0
+	}
+	return meta.SeedDays == 0
+}
+
+// effectiveInactiveMinutes resolves the per-torrent inactive limit: a nil
+// override follows the global setting, -1 disables it, a positive value is
+// an exact number of minutes.
+func (d *Daemon) effectiveInactiveMinutes(meta *torrentMeta) int64 {
+	if meta.InactiveMinutes != nil {
+		if *meta.InactiveMinutes < 0 {
+			return -1
+		}
+		return *meta.InactiveMinutes
+	}
+	if !d.settingBool(maxInactiveSeedingTimeEnabledKey, false) {
+		return -1
+	}
+	return int64(d.settingInt(maxInactiveSeedingTimeKey, -1))
+}
+
 // seedIdleConfigured reports whether the inactivity limit applies to a torrent:
 // it needs the setting on a positive value and a torrent that does not seed
 // forever, like seedIdleReached.
 func (d *Daemon) seedIdleConfigured(meta *torrentMeta) bool {
-	if meta.SeedRatio == 0 || meta.SeedDays == 0 || !d.settingBool(maxInactiveSeedingTimeEnabledKey, false) {
+	if meta.SeedRatio == 0 || seedTimeForever(meta) {
 		return false
 	}
-	return d.settingInt(maxInactiveSeedingTimeKey, -1) > 0
+	return d.effectiveInactiveMinutes(meta) > 0
 }
 
 // seedLimitStop decides whether the global seeding limits stop a torrent. With
@@ -152,10 +183,10 @@ func (d *Daemon) seedIdleReached(rt *runtimeInfo, meta *torrentMeta, stats torre
 		rt.seedIdleSince = now
 		return false
 	}
-	if meta.SeedRatio == 0 || meta.SeedDays == 0 || !d.settingBool(maxInactiveSeedingTimeEnabledKey, false) {
+	if meta.SeedRatio == 0 || seedTimeForever(meta) {
 		return false
 	}
-	minutes := d.settingInt(maxInactiveSeedingTimeKey, -1)
+	minutes := d.effectiveInactiveMinutes(meta)
 	return minutes > 0 && now.Sub(rt.seedIdleSince) >= time.Duration(minutes)*time.Minute
 }
 
