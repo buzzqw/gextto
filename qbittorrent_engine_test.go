@@ -12,30 +12,33 @@ import (
 	"strings"
 	"sync"
 	"testing"
-	"time"
 
+	"github.com/buzzqw/gextto/internal/models"
 	"github.com/buzzqw/gextto/internal/qbittorrent"
+	"github.com/buzzqw/gextto/internal/utils"
 )
 
 // fakeQB is an in-memory qBittorrent-nox Web API used to exercise the adapter
 // without a real daemon.
 type fakeQB struct {
-	mu        sync.Mutex
-	token     string
-	fail      bool
-	torrents  []qbittorrent.Torrent
-	files     []qbittorrent.File
-	calls     map[string]int
-	forms     map[string]url.Values
-	locations map[string]string
-	exports   int
+	mu          sync.Mutex
+	token       string
+	fail        bool
+	failActions map[string]bool
+	torrents    []qbittorrent.Torrent
+	files       []qbittorrent.File
+	calls       map[string]int
+	forms       map[string]url.Values
+	locations   map[string]string
+	exports     int
 }
 
 func newFakeQB() *fakeQB {
 	return &fakeQB{
-		calls:     map[string]int{},
-		forms:     map[string]url.Values{},
-		locations: map[string]string{},
+		calls:       map[string]int{},
+		forms:       map[string]url.Values{},
+		locations:   map[string]string{},
+		failActions: map[string]bool{},
 	}
 }
 
@@ -76,6 +79,10 @@ func (f *fakeQB) serveHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_ = r.ParseForm()
+	if f.failActions[r.URL.Path] {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
 	switch r.URL.Path {
 	case "/api/v2/app/version":
 		_, _ = w.Write([]byte("v5.0.0"))
@@ -84,7 +91,21 @@ func (f *fakeQB) serveHTTP(w http.ResponseWriter, r *http.Request) {
 	case "/api/v2/app/defaultSavePath":
 		_, _ = w.Write([]byte("/data/downloads"))
 	case "/api/v2/torrents/info":
-		_ = json.NewEncoder(w).Encode(f.torrents)
+		items := f.torrents
+		if raw := strings.TrimSpace(r.URL.Query().Get("hashes")); raw != "" && !strings.EqualFold(raw, "all") {
+			wanted := map[string]bool{}
+			for _, hash := range strings.FieldsFunc(raw, func(r rune) bool { return r == '|' || r == ',' || r == ' ' }) {
+				wanted[strings.ToLower(strings.TrimSpace(hash))] = true
+			}
+			filtered := make([]qbittorrent.Torrent, 0, len(items))
+			for _, torrent := range items {
+				if wanted[strings.ToLower(torrent.Hash)] {
+					filtered = append(filtered, torrent)
+				}
+			}
+			items = filtered
+		}
+		_ = json.NewEncoder(w).Encode(items)
 	case "/api/v2/torrents/add":
 		_ = r.ParseMultipartForm(1 << 20)
 		if r.MultipartForm != nil {
@@ -126,6 +147,7 @@ func (f *fakeQB) serveHTTP(w http.ResponseWriter, r *http.Request) {
 		for index := range f.torrents {
 			if strings.EqualFold(f.torrents[index].Hash, r.PostForm.Get("hashes")) {
 				f.torrents[index].SavePath = location
+				f.torrents[index].ContentPath = filepath.Join(location, "x")
 				f.locations[strings.ToLower(f.torrents[index].Hash)] = location
 			}
 		}
@@ -231,6 +253,18 @@ func TestQbittorrentEngineListMapping(t *testing.T) {
 	}
 }
 
+func TestQbittorrentEngineMapsContentPath(t *testing.T) {
+	_, engine, _ := newFakeQBEngine(t)
+	engine.settings.Mappings = []PathMapping{{Gextto: "/gextto/downloads", Backend: "/data/downloads"}}
+	view := engine.toView(qbittorrent.Torrent{
+		Hash: "abc", Name: "x", State: "uploading", Progress: 1, Size: 100,
+		SavePath: "/data/downloads", ContentPath: "/data/downloads/x",
+	})
+	if view.SavePath != "/gextto/downloads" || view.ContentPath != "/gextto/downloads/x" {
+		t.Fatalf("mapped paths = %q / %q", view.SavePath, view.ContentPath)
+	}
+}
+
 // TestQbittorrentEngineQueueManagement maps qBittorrent onto Gextto's meaning
 // of AutoManaged (owned by the queue): `auto_tmm` manages save paths, not the
 // queue, so it must not decide it. A force start is pinned, a stop is not managed.
@@ -283,10 +317,45 @@ func TestQbittorrentEnginePauseResumeIdempotent(t *testing.T) {
 	}
 }
 
+func TestQbittorrentEnginePropagatesOperationalErrors(t *testing.T) {
+	fake, engine, downloads := newFakeQBEngine(t)
+	fake.setTorrents([]qbittorrent.Torrent{{Hash: "abc", Name: "x", State: "downloading", Progress: 0.1, Size: 100, SavePath: downloads}})
+	engine.List()
+	fake.mu.Lock()
+	for _, path := range []string{
+		"/api/v2/torrents/stop", "/api/v2/torrents/start", "/api/v2/torrents/recheck",
+		"/api/v2/torrents/delete", "/api/v2/torrents/setLocation", "/api/v2/torrents/setShareLimits",
+	} {
+		fake.failActions[path] = true
+	}
+	fake.mu.Unlock()
+
+	if ok, err := engine.Pause("abc"); err == nil || ok {
+		t.Fatalf("Pause = %v, %v, want operational error", ok, err)
+	}
+	fake.setTorrents([]qbittorrent.Torrent{{Hash: "abc", Name: "x", State: "stoppedDL", Progress: 0.1, Size: 100, SavePath: downloads}})
+	engine.List()
+	if ok, err := engine.Resume("abc"); err == nil || ok {
+		t.Fatalf("Resume = %v, %v, want operational error", ok, err)
+	}
+	if ok, err := engine.ForceRecheck("abc"); err == nil || ok {
+		t.Fatalf("ForceRecheck = %v, %v, want operational error", ok, err)
+	}
+	if ok, err := engine.Remove("abc", false); err == nil || ok {
+		t.Fatalf("Remove = %v, %v, want operational error", ok, err)
+	}
+	if ok, err := engine.MoveStorage("abc", filepath.Join(filepath.Dir(downloads), "moved")); err == nil || ok {
+		t.Fatalf("MoveStorage = %v, %v, want operational error", ok, err)
+	}
+	if ok, err := engine.SetLimits("abc", nil, nil, floatPtr(1.5), nil); err == nil || ok {
+		t.Fatalf("SetLimits = %v, %v, want operational error", ok, err)
+	}
+}
+
 func TestQbittorrentEngineMoveEmitsEvent(t *testing.T) {
 	fake, engine, downloads := newFakeQBEngine(t)
 	target := filepath.Join(filepath.Dir(downloads), "moved")
-	fake.setTorrents([]qbittorrent.Torrent{{Hash: "abc", Name: "x", State: "uploading", Progress: 1, Size: 100, SavePath: downloads}})
+	fake.setTorrents([]qbittorrent.Torrent{{Hash: "abc", Name: "x", State: "uploading", Progress: 1, Size: 100, SavePath: downloads, ContentPath: filepath.Join(downloads, "x")}})
 	engine.List()
 
 	if ok, err := engine.MoveStorage("abc", target); err != nil || !ok {
@@ -297,7 +366,7 @@ func TestQbittorrentEngineMoveEmitsEvent(t *testing.T) {
 	found := false
 	for _, event := range events {
 		if event.Kind == "storage_moved" && event.Hash == "abc" {
-			found = true
+			found = event.ContentPath == filepath.Join(target, "x")
 		}
 	}
 	if !found {
@@ -305,24 +374,69 @@ func TestQbittorrentEngineMoveEmitsEvent(t *testing.T) {
 	}
 }
 
+func TestQbitCompletionVerifiedRequiresCompletedState(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		view models.TorrentView
+		want bool
+	}{
+		{"uploading", models.TorrentView{State: "seeding", Progress: 100, TotalSize: 10, CompletedAt: 1}, true},
+		{"stalled upload", models.TorrentView{State: "stalled", Progress: 100, TotalSize: 10, CompletedAt: 1}, true},
+		{"paused upload", models.TorrentView{State: "paused", Progress: 100, TotalSize: 10, CompletedAt: 1}, true},
+		{"queued upload", models.TorrentView{State: "queued", Progress: 100, TotalSize: 10, CompletedAt: 1}, true},
+		{"checking", models.TorrentView{State: "checking_files", Progress: 100, TotalSize: 10}, false},
+		{"moving", models.TorrentView{State: "moving", Progress: 100, TotalSize: 10}, false},
+		{"error", models.TorrentView{State: "error", Progress: 100, TotalSize: 10}, false},
+		{"downloading", models.TorrentView{State: "downloading", Progress: 100, TotalSize: 10}, false},
+		{"incomplete", models.TorrentView{State: "seeding", Progress: 99, TotalSize: 10}, false},
+		{"empty", models.TorrentView{State: "seeding", Progress: 100}, false},
+		{"reported error", models.TorrentView{State: "seeding", Progress: 100, TotalSize: 10, Error: "failed"}, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := qbitCompletionVerified(tc.view); got != tc.want {
+				t.Fatalf("qbitCompletionVerified(%+v) = %v, want %v", tc.view, got, tc.want)
+			}
+		})
+	}
+}
+
 func TestQbittorrentEngineCompletionAndMetadataEvents(t *testing.T) {
 	fake, engine, downloads := newFakeQBEngine(t)
+	contentPath := filepath.Join(downloads, "x")
 	fake.setTorrents([]qbittorrent.Torrent{{Hash: "abc", Name: "x", State: "metaDL", Progress: 0, Size: 0, SavePath: downloads}})
 	engine.List()
 
-	fake.setTorrents([]qbittorrent.Torrent{{Hash: "abc", Name: "x", State: "downloading", Progress: 0.5, Size: 100, SavePath: downloads}})
+	fake.setTorrents([]qbittorrent.Torrent{{Hash: "abc", Name: "x", State: "downloading", Progress: 0.5, Size: 100, SavePath: downloads, ContentPath: contentPath}})
 	engine.List()
+	if events := engine.PollEvents(); len(events) != 1 || events[0].Kind != "metadata_received" {
+		t.Fatalf("metadata events = %+v", events)
+	}
 
-	fake.setTorrents([]qbittorrent.Torrent{{Hash: "abc", Name: "x", State: "uploading", Progress: 1, Size: 100, SavePath: downloads}})
+	// qBittorrent can report 100% during checkingUP. That is not a completed
+	// state yet and must not reach post-processing.
+	fake.setTorrents([]qbittorrent.Torrent{{Hash: "abc", Name: "x", State: "checkingUP", Progress: 1, Size: 100, SavePath: downloads, ContentPath: contentPath}})
+	engine.List()
+	if events := engine.PollEvents(); len(events) != 0 {
+		t.Fatalf("unverified completion emitted events: %+v", events)
+	}
+
+	fake.setTorrents([]qbittorrent.Torrent{{Hash: "abc", Name: "x", State: "uploading", Progress: 1, Size: 100, SavePath: downloads, ContentPath: contentPath, CompletedOn: 1}})
 	engine.List()
 
 	events := engine.PollEvents()
 	kinds := map[string]bool{}
-	for _, event := range events {
-		kinds[event.Kind] = true
+	var finished *models.TorrentEvent
+	for index := range events {
+		kinds[events[index].Kind] = true
+		if events[index].Kind == "torrent_finished" {
+			finished = &events[index]
+		}
 	}
-	if !kinds["metadata_received"] || !kinds["torrent_finished"] {
-		t.Fatalf("events = %+v, want metadata_received + torrent_finished", events)
+	if !kinds["torrent_checked"] || finished == nil {
+		t.Fatalf("events = %+v, want torrent_checked + torrent_finished", events)
+	}
+	if finished.ContentPath != contentPath || finished.SavePath != downloads {
+		t.Fatalf("completion paths = %+v", finished)
 	}
 }
 
@@ -381,6 +495,18 @@ func TestQbittorrentEngineInspection(t *testing.T) {
 	trackers, ok, err := engine.Trackers("abc")
 	if err != nil || !ok || len(trackers) != 1 || !trackers[0].Verified {
 		t.Fatalf("Trackers = %+v, %v, %v", trackers, ok, err)
+	}
+}
+
+func TestQbittorrentEngineAddMagnetDetectsDuplicate(t *testing.T) {
+	fake, engine, _ := newFakeQBEngine(t)
+	magnet := "magnet:?xt=urn:btih:ABCDEF0123456789ABCDEF0123456789ABCDEF01&dn=x"
+	fake.setTorrents([]qbittorrent.Torrent{{Hash: "abcdef0123456789abcdef0123456789abcdef01", Name: "x", Size: 10}})
+	if ok, err := engine.Add(magnet, nil); err != nil || ok {
+		t.Fatalf("duplicate Add = %v, %v", ok, err)
+	}
+	if fake.calls["/api/v2/torrents/add"] != 0 {
+		t.Fatal("duplicate magnet reached qBittorrent")
 	}
 }
 
@@ -463,23 +589,53 @@ func TestQbittorrentEngineReportsSkippedVideoFiles(t *testing.T) {
 	}
 }
 
-func TestQbittorrentEngineAddTorrentFileFindsHash(t *testing.T) {
+func TestQbittorrentEngineAddTorrentFileUsesMetadataHashBeforeDiff(t *testing.T) {
 	fake, engine, _ := newFakeQBEngine(t)
 	torrentPath := filepath.Join(t.TempDir(), "sample.torrent")
-	if err := os.WriteFile(torrentPath, []byte("d4:infod4:name1:ae"), 0o644); err != nil {
+	payload := []byte("d4:infod4:name8:meta.bin12:piece lengthi1048576e6:lengthi10ee")
+	if err := os.WriteFile(torrentPath, payload, 0o644); err != nil {
 		t.Fatalf("write torrent: %v", err)
 	}
-	// qBittorrent reports the new torrent after the upload.
-	go func() {
-		time.Sleep(100 * time.Millisecond)
-		fake.setTorrents([]qbittorrent.Torrent{{Hash: "NEWHASH", Name: "sample", Size: 10}})
-	}()
+	want, ok := utils.TorrentInfoHash(payload)
+	if !ok {
+		t.Fatal("test torrent has no info hash")
+	}
+	// An unrelated torrent in the snapshot must not be returned as the hash of
+	// the file being added.
+	fake.setTorrents([]qbittorrent.Torrent{{Hash: "OTHERHASH", Name: "other", Size: 10}})
 	hash, err := engine.AddTorrentFileEx(torrentPath, "/tmp", AddOptions{Sequential: true})
 	if err != nil {
 		t.Fatalf("AddTorrentFileEx: %v", err)
 	}
-	if hash == nil || *hash != "newhash" {
-		t.Fatalf("hash = %v, want newhash", hash)
+	if hash == nil || *hash != want {
+		t.Fatalf("hash = %v, want %q", hash, want)
+	}
+	if fake.calls["/api/v2/torrents/add"] != 1 {
+		t.Fatalf("add calls = %d, want 1", fake.calls["/api/v2/torrents/add"])
+	}
+
+	// The same file is a duplicate: no second add, and no phantom new hash.
+	fake.setTorrents([]qbittorrent.Torrent{{Hash: want, Name: "meta.bin", Size: 10}})
+	duplicate, err := engine.AddTorrentFileEx(torrentPath, "/tmp", AddOptions{})
+	if err != nil || duplicate != nil {
+		t.Fatalf("duplicate AddTorrentFileEx = %v, %v", duplicate, err)
+	}
+	if fake.calls["/api/v2/torrents/add"] != 1 {
+		t.Fatalf("duplicate reached qBittorrent: add calls = %d", fake.calls["/api/v2/torrents/add"])
+	}
+}
+
+func TestQbittorrentEngineAddTorrentFileRejectsMissingInfoHash(t *testing.T) {
+	fake, engine, _ := newFakeQBEngine(t)
+	torrentPath := filepath.Join(t.TempDir(), "invalid.torrent")
+	if err := os.WriteFile(torrentPath, []byte("not a torrent"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if hash, err := engine.AddTorrentFileEx(torrentPath, "/tmp", AddOptions{}); err == nil || hash != nil {
+		t.Fatalf("invalid torrent = %v, %v", hash, err)
+	}
+	if fake.calls["/api/v2/torrents/add"] != 0 {
+		t.Fatal("invalid torrent reached qBittorrent")
 	}
 }
 

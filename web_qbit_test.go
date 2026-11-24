@@ -3,6 +3,7 @@ package gextto
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
@@ -20,15 +21,17 @@ import (
 type qbitRecordingEngine struct {
 	nullEngine
 
-	mu        sync.Mutex
-	adds      []string
-	files     [][]byte
-	paused    []string
-	resumed   []string
-	rechecked []string
-	removed   []string
-	listed    []models.TorrentView
-	accept    bool
+	mu           sync.Mutex
+	adds         []string
+	files        [][]byte
+	paused       []string
+	resumed      []string
+	rechecked    []string
+	removed      []string
+	listed       []models.TorrentView
+	accept       bool
+	actionErr    error
+	removeErrors map[string]error
 }
 
 func (e *qbitRecordingEngine) Name() string { return "test" }
@@ -65,28 +68,31 @@ func (e *qbitRecordingEngine) Pause(hash string) (bool, error) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	e.paused = append(e.paused, hash)
-	return true, nil
+	return e.actionErr == nil, e.actionErr
 }
 
 func (e *qbitRecordingEngine) Resume(hash string) (bool, error) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	e.resumed = append(e.resumed, hash)
-	return true, nil
+	return e.actionErr == nil, e.actionErr
 }
 
 func (e *qbitRecordingEngine) ForceRecheck(hash string) (bool, error) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	e.rechecked = append(e.rechecked, hash)
-	return true, nil
+	return e.actionErr == nil, e.actionErr
 }
 
 func (e *qbitRecordingEngine) Remove(hash string, _ bool) (bool, error) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	e.removed = append(e.removed, hash)
-	return true, nil
+	if err := e.removeErrors[hash]; err != nil {
+		return false, err
+	}
+	return e.actionErr == nil, e.actionErr
 }
 
 // newQbitState returns a state with the recording engine and a completed setup,
@@ -264,8 +270,8 @@ func TestQbitCompatTorrentsInfoMapsTheStates(t *testing.T) {
 	state, engine := newQbitState(t)
 	engine.listed = []models.TorrentView{
 		// Gextto reports the completion in percent; qBittorrent wants 0..1.
-		{Hash: "AA", Name: "downloading", State: "downloading", Progress: 50, TotalSize: 100, TotalDone: 50, DownloadRate: 10, NumSeeds: 3, NumPeers: 4},
-		{Hash: "BB", Name: "seeding", State: "seeding", Progress: 100, IsSeeding: true, TotalSize: 100, TotalDone: 100, UploadRate: 5},
+		{Hash: "AA", Name: "downloading", State: "downloading", Progress: 50, TotalSize: 100, TotalDone: 50, DownloadRate: 10, NumSeeds: 3, NumPeers: 4, SavePath: "/downloads"},
+		{Hash: "BB", Name: "seeding", State: "seeding", Progress: 100, IsSeeding: true, TotalSize: 100, TotalDone: 100, UploadRate: 5, SavePath: "/downloads", ContentPath: "/downloads/actual"},
 		{Hash: "CC", Name: "stopped", State: "paused", Progress: 25},
 	}
 	handler := Router(state)
@@ -285,8 +291,14 @@ func TestQbitCompatTorrentsInfoMapsTheStates(t *testing.T) {
 	if first["amount_left"] != float64(50) || first["dlspeed"] != float64(10) {
 		t.Fatalf("first torrent sizes = %v", first)
 	}
-	if torrents[1]["state"] != "seeding" || torrents[2]["state"] != "pausedDL" {
+	if first["content_path"] != "/downloads/downloading" {
+		t.Fatalf("fallback content_path = %v", first["content_path"])
+	}
+	if torrents[1]["state"] != "uploading" || torrents[2]["state"] != "pausedDL" {
 		t.Fatalf("states = %v %v", torrents[1]["state"], torrents[2]["state"])
+	}
+	if torrents[1]["content_path"] != "/downloads/actual" {
+		t.Fatalf("content_path = %v", torrents[1]["content_path"])
 	}
 
 	filtered := qbitCall(t, handler, http.MethodGet, "/api/v2/torrents/info?hashes=bb", "", nil)
@@ -332,6 +344,49 @@ func TestQbitCompatTorrentActions(t *testing.T) {
 	}
 	if len(engine.removed) != 1 || engine.removed[0] != "aa" {
 		t.Fatalf("removed = %v", engine.removed)
+	}
+}
+
+func TestQbitCompatTorrentActionsPropagateOperationalErrors(t *testing.T) {
+	state, engine := newQbitState(t)
+	engine.listed = []models.TorrentView{{Hash: "aa"}}
+	engine.actionErr = errors.New("backend refused the operation")
+	handler := Router(state)
+
+	for _, action := range []string{"pause", "resume", "recheck", "delete"} {
+		recorder := qbitFormCall(t, handler, "/api/v2/torrents/"+action, url.Values{"hashes": {"aa"}})
+		if recorder.Code != http.StatusBadRequest || recorder.Body.String() != qbitFailBody {
+			t.Fatalf("%s failure = %d %q", action, recorder.Code, recorder.Body.String())
+		}
+	}
+}
+
+func TestQbitCompatDeleteReportsPartialFailure(t *testing.T) {
+	state, engine := newQbitState(t)
+	engine.listed = []models.TorrentView{{Hash: "aa"}, {Hash: "bb"}}
+	engine.removeErrors = map[string]error{"bb": errors.New("backend refused the removal")}
+	handler := Router(state)
+
+	recorder := qbitFormCall(t, handler, "/api/v2/torrents/delete", url.Values{"hashes": {"aa|bb"}})
+	if recorder.Code != http.StatusBadRequest || recorder.Body.String() != qbitFailBody {
+		t.Fatalf("partial delete failure = %d %q", recorder.Code, recorder.Body.String())
+	}
+	if len(engine.removed) != 2 {
+		t.Fatalf("delete attempts = %v, want both hashes", engine.removed)
+	}
+}
+
+func TestQbitCompatTorrentActionsTreatMissingHashAsNoop(t *testing.T) {
+	state, engine := newQbitState(t)
+	engine.listed = []models.TorrentView{{Hash: "aa"}}
+	engine.actionErr = errors.New("gx-torrent: torrent not found")
+	handler := Router(state)
+
+	for _, action := range []string{"pause", "resume", "recheck", "delete"} {
+		recorder := qbitFormCall(t, handler, "/api/v2/torrents/"+action, url.Values{"hashes": {"aa"}})
+		if recorder.Code != http.StatusOK || recorder.Body.String() != qbitOKBody {
+			t.Fatalf("%s missing hash = %d %q", action, recorder.Code, recorder.Body.String())
+		}
 	}
 }
 

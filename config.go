@@ -3968,6 +3968,23 @@ func SaveMovieTitleTranslations(dataDir string, id int64, titles map[string]stri
 
 // SaveLibrary persists the monitored series and movies into `gextto_config.db`.
 func SaveLibrary(dataDir string, series []SeriesConfig, movies []MovieConfig) error {
+	return saveLibrary(dataDir, series, movies, true, true)
+}
+
+// SaveSeriesLibrary replaces only the monitored series. The movies table is not
+// read or rewritten, so a concurrent movie save cannot be overwritten by a
+// stale series-list snapshot.
+func SaveSeriesLibrary(dataDir string, series []SeriesConfig) error {
+	return saveLibrary(dataDir, series, nil, true, false)
+}
+
+// SaveMoviesLibrary replaces only the monitored movies, without touching the
+// series list. Movie ids and all existing compatibility migrations are preserved.
+func SaveMoviesLibrary(dataDir string, movies []MovieConfig) error {
+	return saveLibrary(dataDir, nil, movies, false, true)
+}
+
+func saveLibrary(dataDir string, series []SeriesConfig, movies []MovieConfig, updateSeries, updateMovies bool) error {
 	if series == nil {
 		series = []SeriesConfig{}
 	}
@@ -3979,90 +3996,111 @@ func SaveLibrary(dataDir string, series []SeriesConfig, movies []MovieConfig) er
 		return err
 	}
 	defer conn.Close()
-	if err := sqlExec(conn, "CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL); CREATE TABLE IF NOT EXISTS movies_config (id INTEGER PRIMARY KEY, name TEXT NOT NULL, year TEXT DEFAULT '', quality TEXT DEFAULT '', language TEXT DEFAULT '', enabled INTEGER DEFAULT 1, subtitle TEXT DEFAULT '', exclude TEXT DEFAULT '', language_requirements TEXT DEFAULT '', subtitle_requirements TEXT DEFAULT '', tmdb_id TEXT DEFAULT '', tvdb_id TEXT DEFAULT '', original_title TEXT DEFAULT '', overview TEXT DEFAULT '', poster_path TEXT DEFAULT '', disable_upgrades INTEGER NOT NULL DEFAULT 0, audio TEXT NOT NULL DEFAULT '', audio_channels TEXT NOT NULL DEFAULT '', aliases TEXT NOT NULL DEFAULT '', title_translations TEXT NOT NULL DEFAULT '', qualities TEXT NOT NULL DEFAULT '[]', cutoff TEXT NOT NULL DEFAULT '');"); err != nil {
+	if err := sqlExec(conn, "CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);"); err != nil {
 		return err
 	}
-	_ = sqlExec(conn, "ALTER TABLE movies_config ADD COLUMN exclude TEXT NOT NULL DEFAULT ''")
-	_ = sqlExec(conn, "ALTER TABLE movies_config ADD COLUMN language_requirements TEXT NOT NULL DEFAULT ''")
-	_ = sqlExec(conn, "ALTER TABLE movies_config ADD COLUMN subtitle_requirements TEXT NOT NULL DEFAULT ''")
-	for _, column := range []string{
-		"tmdb_id TEXT NOT NULL DEFAULT ''",
-		"tvdb_id TEXT NOT NULL DEFAULT ''",
-		"original_title TEXT NOT NULL DEFAULT ''",
-		"overview TEXT NOT NULL DEFAULT ''",
-		"poster_path TEXT NOT NULL DEFAULT ''",
-		"disable_upgrades INTEGER NOT NULL DEFAULT 0",
-		"audio TEXT NOT NULL DEFAULT ''",
-		"audio_channels TEXT NOT NULL DEFAULT ''",
-		"aliases TEXT NOT NULL DEFAULT ''",
-		"title_translations TEXT NOT NULL DEFAULT ''",
-		"qualities TEXT NOT NULL DEFAULT '[]'",
-		"cutoff TEXT NOT NULL DEFAULT ''",
-	} {
-		_ = sqlExec(conn, fmt.Sprintf("ALTER TABLE movies_config ADD COLUMN %s", column))
-	}
-	// Conserva gli id esistenti anche quando il client invia `id: 0` (film
-	// aggiunti di recente), abbinando per nome+anno. Evita di riassegnare un id
-	// nuovo ad ogni salvataggio e i conseguenti dettagli film vuoti quando si
-	// clicca una voce appena aggiunta.
-	existingIDs := map[[2]string]int64{}
-	if rows, err := conn.Query("SELECT id,name,year FROM movies_config"); err == nil {
-		for rows.Next() {
-			var id int64
-			var name, year string
-			if err := rows.Scan(&id, &name, &year); err != nil {
-				continue
-			}
-			existingIDs[[2]string{strings.ToLower(name), year}] = id
+	if updateMovies {
+		if err := sqlExec(conn, "CREATE TABLE IF NOT EXISTS movies_config (id INTEGER PRIMARY KEY, name TEXT NOT NULL, year TEXT DEFAULT '', quality TEXT DEFAULT '', language TEXT DEFAULT '', enabled INTEGER DEFAULT 1, subtitle TEXT DEFAULT '', exclude TEXT DEFAULT '', language_requirements TEXT DEFAULT '', subtitle_requirements TEXT DEFAULT '', tmdb_id TEXT DEFAULT '', tvdb_id TEXT DEFAULT '', original_title TEXT DEFAULT '', overview TEXT DEFAULT '', poster_path TEXT DEFAULT '', disable_upgrades INTEGER NOT NULL DEFAULT 0, audio TEXT NOT NULL DEFAULT '', audio_channels TEXT NOT NULL DEFAULT '', aliases TEXT NOT NULL DEFAULT '', title_translations TEXT NOT NULL DEFAULT '', qualities TEXT NOT NULL DEFAULT '[]', cutoff TEXT NOT NULL DEFAULT '');"); err != nil {
+			return err
 		}
-		rows.Close()
+		_ = sqlExec(conn, "ALTER TABLE movies_config ADD COLUMN exclude TEXT NOT NULL DEFAULT ''")
+		_ = sqlExec(conn, "ALTER TABLE movies_config ADD COLUMN language_requirements TEXT NOT NULL DEFAULT ''")
+		_ = sqlExec(conn, "ALTER TABLE movies_config ADD COLUMN subtitle_requirements TEXT NOT NULL DEFAULT ''")
+		for _, column := range []string{
+			"tmdb_id TEXT NOT NULL DEFAULT ''",
+			"tvdb_id TEXT NOT NULL DEFAULT ''",
+			"original_title TEXT NOT NULL DEFAULT ''",
+			"overview TEXT NOT NULL DEFAULT ''",
+			"poster_path TEXT NOT NULL DEFAULT ''",
+			"disable_upgrades INTEGER NOT NULL DEFAULT 0",
+			"audio TEXT NOT NULL DEFAULT ''",
+			"audio_channels TEXT NOT NULL DEFAULT ''",
+			"aliases TEXT NOT NULL DEFAULT ''",
+			"title_translations TEXT NOT NULL DEFAULT ''",
+			"qualities TEXT NOT NULL DEFAULT '[]'",
+			"cutoff TEXT NOT NULL DEFAULT ''",
+		} {
+			_ = sqlExec(conn, fmt.Sprintf("ALTER TABLE movies_config ADD COLUMN %s", column))
+		}
 	}
 	tx, err := conn.Begin()
 	if err != nil {
 		return err
 	}
-	encodedSeries, err := json.Marshal(series)
-	if err != nil {
-		tx.Rollback()
-		return err
-	}
-	if _, err := tx.Exec("INSERT INTO settings(key,value) VALUES ('_migrated_series',?1) ON CONFLICT(key) DO UPDATE SET value=excluded.value", string(encodedSeries)); err != nil {
-		tx.Rollback()
-		return err
-	}
-	if _, err := tx.Exec("DELETE FROM movies_config"); err != nil {
-		tx.Rollback()
-		return err
-	}
-	for _, movie := range movies {
-		id := movie.ID
-		if id <= 0 {
-			id = existingIDs[[2]string{strings.ToLower(movie.Name), movie.Year}]
+	if updateSeries {
+		encodedSeries, err := json.Marshal(series)
+		if err != nil {
+			_ = tx.Rollback()
+			return err
 		}
-		aliases := encodeMovieAliases(movie.Aliases)
-		titleTranslations := encodeTitleTranslations(movie.TitleTranslations)
-		qualities := encodeMovieQualities(movie.Qualities)
-		if id > 0 {
-			if _, err := tx.Exec(
-				"INSERT INTO movies_config(id,name,year,quality,language,enabled,subtitle,exclude,language_requirements,subtitle_requirements,tmdb_id,tvdb_id,original_title,overview,poster_path,disable_upgrades,audio,audio_channels,aliases,title_translations,qualities,cutoff) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22)",
-				id, movie.Name, movie.Year, movie.Quality, movie.Language, boolToInt(movie.Enabled), movie.Subtitle, movie.Exclude,
-				movie.LanguageRequirements, movie.SubtitleRequirements, movie.TmdbID, movie.TvdbID, movie.OriginalTitle,
-				movie.Overview, movie.PosterPath, boolToInt(movie.DisableUpgrades), movie.Audio, movie.AudioChannels, aliases,
-				titleTranslations, qualities, movie.Cutoff,
-			); err != nil {
-				tx.Rollback()
+		if _, err := tx.Exec("INSERT INTO settings(key,value) VALUES ('_migrated_series',?1) ON CONFLICT(key) DO UPDATE SET value=excluded.value", string(encodedSeries)); err != nil {
+			_ = tx.Rollback()
+			return err
+		}
+	}
+	if updateMovies {
+		// Preserve existing ids when the client sends id: 0 (a recently added
+		// movie), matching by name and year. The lookup is inside the write
+		// transaction so another movie save cannot change the ids underneath it.
+		existingIDs := map[[2]string]int64{}
+		rows, err := tx.Query("SELECT id,name,year FROM movies_config")
+		if err != nil {
+			_ = tx.Rollback()
+			return err
+		}
+		for rows.Next() {
+			var id int64
+			var name, year string
+			if err := rows.Scan(&id, &name, &year); err != nil {
+				_ = rows.Close()
+				_ = tx.Rollback()
 				return err
 			}
-		} else {
-			if _, err := tx.Exec(
-				"INSERT INTO movies_config(name,year,quality,language,enabled,subtitle,exclude,language_requirements,subtitle_requirements,tmdb_id,tvdb_id,original_title,overview,poster_path,disable_upgrades,audio,audio_channels,aliases,title_translations,qualities,cutoff) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21)",
-				movie.Name, movie.Year, movie.Quality, movie.Language, boolToInt(movie.Enabled), movie.Subtitle, movie.Exclude,
-				movie.LanguageRequirements, movie.SubtitleRequirements, movie.TmdbID, movie.TvdbID, movie.OriginalTitle,
-				movie.Overview, movie.PosterPath, boolToInt(movie.DisableUpgrades), movie.Audio, movie.AudioChannels, aliases,
-				titleTranslations, qualities, movie.Cutoff,
-			); err != nil {
-				tx.Rollback()
-				return err
+			existingIDs[[2]string{strings.ToLower(name), year}] = id
+		}
+		if err := rows.Err(); err != nil {
+			_ = rows.Close()
+			_ = tx.Rollback()
+			return err
+		}
+		if err := rows.Close(); err != nil {
+			_ = tx.Rollback()
+			return err
+		}
+		if _, err := tx.Exec("DELETE FROM movies_config"); err != nil {
+			_ = tx.Rollback()
+			return err
+		}
+		for _, movie := range movies {
+			id := movie.ID
+			if id <= 0 {
+				id = existingIDs[[2]string{strings.ToLower(movie.Name), movie.Year}]
+			}
+			aliases := encodeMovieAliases(movie.Aliases)
+			titleTranslations := encodeTitleTranslations(movie.TitleTranslations)
+			qualities := encodeMovieQualities(movie.Qualities)
+			if id > 0 {
+				if _, err := tx.Exec(
+					"INSERT INTO movies_config(id,name,year,quality,language,enabled,subtitle,exclude,language_requirements,subtitle_requirements,tmdb_id,tvdb_id,original_title,overview,poster_path,disable_upgrades,audio,audio_channels,aliases,title_translations,qualities,cutoff) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22)",
+					id, movie.Name, movie.Year, movie.Quality, movie.Language, boolToInt(movie.Enabled), movie.Subtitle, movie.Exclude,
+					movie.LanguageRequirements, movie.SubtitleRequirements, movie.TmdbID, movie.TvdbID, movie.OriginalTitle,
+					movie.Overview, movie.PosterPath, boolToInt(movie.DisableUpgrades), movie.Audio, movie.AudioChannels, aliases,
+					titleTranslations, qualities, movie.Cutoff,
+				); err != nil {
+					_ = tx.Rollback()
+					return err
+				}
+			} else {
+				if _, err := tx.Exec(
+					"INSERT INTO movies_config(name,year,quality,language,enabled,subtitle,exclude,language_requirements,subtitle_requirements,tmdb_id,tvdb_id,original_title,overview,poster_path,disable_upgrades,audio,audio_channels,aliases,title_translations,qualities,cutoff) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21)",
+					movie.Name, movie.Year, movie.Quality, movie.Language, boolToInt(movie.Enabled), movie.Subtitle, movie.Exclude,
+					movie.LanguageRequirements, movie.SubtitleRequirements, movie.TmdbID, movie.TvdbID, movie.OriginalTitle,
+					movie.Overview, movie.PosterPath, boolToInt(movie.DisableUpgrades), movie.Audio, movie.AudioChannels, aliases,
+					titleTranslations, qualities, movie.Cutoff,
+				); err != nil {
+					_ = tx.Rollback()
+					return err
+				}
 			}
 		}
 	}

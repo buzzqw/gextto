@@ -18,13 +18,14 @@ qBittorrent-compatible `/api/v2` (see *gx-torrent daemon routes* at the end).
   without credentials the `/api/…` routes answer `401`. For access from the
   Internet use HTTPS anyway (a reverse proxy with a certificate, or a VPN).
 - `/login` and `/logout` exist only when protected access is enabled.
-- Routes that change configuration, files, torrents or databases normally use
-  `POST`/`DELETE`; treat them as administrative actions and keep backups. A
-  browser request that declares itself cross-site (an `Origin`/`Referer` from
-  another site, or `Sec-Fetch-Site: cross-site`) is refused with `403`: this
-  stops a page on another origin from driving the API through the browser of a
-  user on the LAN. Same-origin calls and non-browser clients (curl, the TUI,
-  scripts) are unaffected.
+- Routes that change configuration, files, torrents or databases use
+  `POST`/`DELETE`; they are not exposed through safe methods such as `GET`.
+  Treat them as administrative actions and keep backups. A browser request that
+  declares itself cross-site (an `Origin`/`Referer` from another site, or
+  `Sec-Fetch-Site: cross-site`) is refused with `403`: this stops a page on
+  another origin from driving the API through the browser of a user on the LAN.
+  Same-origin calls and non-browser clients (curl, the TUI, scripts) are
+  unaffected.
 - Placeholders in curly braces, for example `{hash}`, are part of the path and
   must be encoded correctly by the client.
 - Some routes are historical aliases (`run_now`/`run-now`, for example). New
@@ -220,8 +221,7 @@ change. `/ui` is not served. For operational checks use
 | POST | `/api/rename-all` | rename the whole library |
 | GET | `/api/rename-progress` | rename progress |
 | POST | `/api/run-now` | start an acquisition cycle now |
-| GET | `/api/run_now` | start a cycle now (alias) |
-| POST | `/api/run_now` | start a cycle (alias) |
+| POST | `/api/run_now` | start a cycle now (alias) |
 | POST | `/api/scan-all-archives` | scan every series archive |
 | POST | `/api/score/preview` | score a release with the current weights |
 | POST | `/api/search` | manual search |
@@ -573,7 +573,6 @@ server-rendered UI under `/ui`; those HTML routes are not part of this table.
 | POST | `/api/v1/config` | change the daemon configuration |
 | POST | `/api/v1/create-torrent` | create a .torrent from a folder; JSON fields include format (v1, v2 or hybrid) and source |
 | GET | `/api/v1/dht-feed` | recent DHT discovery feed |
-| GET | `/api/v1/dht-feed/publish` | sign and publish a BEP 46 feed (?name=…&hash=…), returns the dht:// URL |
 | POST | `/api/v1/dht-feed/publish` | sign and publish a BEP 46 feed (JSON name/hashes), returns the dht:// URL |
 | GET | `/api/v1/events` | engine events (Server-Sent Events) |
 | GET | `/api/v1/health` | health, version, build and fingerprint |
@@ -622,9 +621,12 @@ the last twenty, so a slow tracker is told from a slow line.
 
 The daemon speaks the qBittorrent Web API at the **4.6 / API 2.9.3 level**, with
 the most-used 5.x additions (`getFreeSpace`, `getDirectoryContent`,
-`processInfo`, `setComment`, the 5.x `stopped` flag). Authentication accepts the
-`SID` login, the page session, or the **API key** configured in *Settings →
-Network* (`X-Api-Key` or `Authorization: Bearer`). `app/version` reports the
+`processInfo`, `setComment`, the 5.x `stopped` flag). A duplicate-only add
+returns `409 Conflict`; operational failures in pause, resume, recheck, move,
+delete and share-limit operations return an error instead of a false `200`.
+Authentication accepts the `SID` login, the page session, or the **API key**
+configured in *Settings → Network* (`X-Api-Key` or `Authorization: Bearer`).
+`app/version` reports the
 version in *Settings → qBittorrent version reported* (default `4.6.7`), so a
 client that checks the version can be pointed at a compatible string without a
 rebuild. This is a broad compatibility layer, not a claim that every route,

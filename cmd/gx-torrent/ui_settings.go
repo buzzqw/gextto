@@ -547,7 +547,7 @@ func (d *Daemon) categoryRows(lang string) string {
 		fmt.Fprintf(&b, `<tr><td><strong>%s</strong></td><td>`+
 			`<form method="post" action="/ui/category-manage" class="cat-edit">`+
 			`<input type="hidden" name="op" value="edit"><input type="hidden" name="name" value="%s">`+
-			`<input type="text" name="savepath" value="%s" placeholder="download folder" autocomplete="off" aria-label="`+uiTr(lang, "Save path of %s", name)+`" title="`+uiTr(lang, "Folder where the torrents of this category are saved (empty = the main download folder)")+`">`+
+			`<input type="text" name="savepath" value="%s" placeholder="download folder" autocomplete="off" aria-label="`+html.EscapeString(uiTr(lang, "Save path of %s", name))+`" title="`+uiTr(lang, "Folder where the torrents of this category are saved (empty = the main download folder)")+`">`+
 			`<button type="submit" class="sm" title="`+uiTr(lang, "Save the save path of this category")+`">`+uiTr(lang, "Save")+`</button>`+
 			`</form></td><td>`+
 			`<form method="post" action="/ui/category-manage" data-confirm="`+uiTr(lang, "Remove this category? Its torrents keep their files and lose the category.")+`">`+

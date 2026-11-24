@@ -133,8 +133,8 @@ func (d *Daemon) publishDHTFeed(name string, hashes []string) (string, int64, er
 }
 
 // dhtFeedPublishParams reads the feed name and the optional hash list from a
-// JSON body (the API and the page use it) or from a form/query. Empty hashes
-// mean every torrent of the session.
+// JSON body or a form on POST. Query parameters are still parsed with the form
+// for compatibility. Empty hashes mean every torrent of the session.
 func dhtFeedPublishParams(w http.ResponseWriter, r *http.Request) (string, []string, error) {
 	var name string
 	var hashes []string
@@ -161,8 +161,8 @@ func dhtFeedPublishParams(w http.ResponseWriter, r *http.Request) (string, []str
 	return name, hashes, nil
 }
 
-// handlePublishDHTFeed serves GET /api/v1/dht-feed/publish?name=…[&hash=…] and
-// POST /api/v1/dht-feed/publish with {"name":"…","hashes":["…"]}.
+// handlePublishDHTFeed serves POST /api/v1/dht-feed/publish with
+// {"name":"…","hashes":["…"]} (or the equivalent form fields).
 func (d *Daemon) handlePublishDHTFeed(w http.ResponseWriter, r *http.Request) {
 	name, hashes, err := dhtFeedPublishParams(w, r)
 	if err != nil {

@@ -316,7 +316,6 @@ func Router(s *AppState) *http.ServeMux {
 	handle(s, mux, "GET /api/torrents/{hash}", TorrentDetails)
 	handle(s, mux, "DELETE /api/torrents/{hash}", RemoveTorrent)
 	handle(s, mux, "POST /api/torrents/{hash}/remove", RemoveTorrentWithOptions)
-	handle(s, mux, "GET /api/run_now", RunNow)
 	handle(s, mux, "POST /api/run_now", RunNow)
 	handle(s, mux, "POST /api/run-now", RunNow)
 	// The qBittorrent-compatible subset the browser extensions speak.

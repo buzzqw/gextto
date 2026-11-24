@@ -29,7 +29,10 @@ var (
 	// errParsedPieceTooBig refuses a torrent whose pieces are larger than any
 	// real client creates: the piece buffers are sized from this number, so a
 	// hostile .torrent or magnet could otherwise ask for gigabytes of memory.
-	errParsedPieceTooBig = fmt.Errorf("piece length is larger than %d MiB", maxParsedPieceLength>>20)
+	errParsedPieceTooBig  = fmt.Errorf("piece length is larger than %d MiB", maxParsedPieceLength>>20)
+	errNegativeFileLength = errors.New("torrent file length is negative")
+	errFileLengthOverflow = errors.New("torrent file length sum overflows")
+	errPieceCountOverflow = errors.New("torrent piece count overflows")
 	// ErrV2Only marks a v2-only torrent (BEP 52): meta version 2 with a file
 	// tree but no v1 pieces.
 	ErrV2Only = errors.New("torrent is BitTorrent v2 only")
@@ -47,6 +50,11 @@ const maxPieceLength = 16 << 20
 // automatic sizing makes for multi-terabyte torrents, and far below the size
 // at which a piece buffer alone would exhaust the memory of a small host.
 const maxParsedPieceLength = 256 << 20
+
+const (
+	maxInt64      = int64(1<<63 - 1)
+	maxPieceCount = uint64(1<<32 - 1)
+)
 
 // Info is the decoded info dictionary: piece layout, files, hashes and the
 // v2/BEP 38 extensions.
@@ -152,6 +160,108 @@ type infoType struct {
 	// BEP 38 hints inside the info dict.
 	Collections []string `bencode:"collections"`
 	Similar     []string `bencode:"similar"`
+}
+
+// UnmarshalBencode validates the shared info dictionary as it is decoded. Both
+// NewInfo and NewV2Info use this type, so negative lengths, overflowing sums and
+// piece/file mismatches fail before either parser builds a piece mapping.
+func (ib *infoType) UnmarshalBencode(b []byte) error {
+	type plainInfo infoType
+	var decoded plainInfo
+	if err := bencode.DecodeBytes(b, &decoded); err != nil {
+		return err
+	}
+	if err := validateInfoLengths(infoType(decoded)); err != nil {
+		return err
+	}
+	*ib = infoType(decoded)
+	return nil
+}
+
+func validateInfoLengths(ib infoType) error {
+	if ib.MetaVersion > 2 {
+		return ErrUnknownMetaVersion
+	}
+	if ib.Length < 0 {
+		return fmt.Errorf("%w: single-file length %d", errNegativeFileLength, ib.Length)
+	}
+	var total int64
+	if len(ib.Files) > 0 {
+		for _, f := range ib.Files {
+			if err := addFileLength(&total, f.Length); err != nil {
+				return fmt.Errorf("file %q: %w", filepath.Join(f.Path...), err)
+			}
+		}
+	} else {
+		total = ib.Length
+	}
+	if len(ib.Pieces) > 0 {
+		if ib.PieceLength == 0 {
+			return errZeroPieceLength
+		}
+		if len(ib.Pieces)%sha1.Size != 0 {
+			return errInvalidPieceData
+		}
+		numPieces := uint64(len(ib.Pieces) / sha1.Size)
+		if numPieces > maxPieceCount {
+			return errPieceCountOverflow
+		}
+		want := piecesForLength(total, ib.PieceLength)
+		if numPieces != want {
+			return fmt.Errorf("%w: got %d piece hashes for %d bytes, want %d", errInvalidPieceData, numPieces, total, want)
+		}
+	}
+	if len(ib.FileTree) > 0 {
+		files, err := ParseFileTree(ib.FileTree)
+		if err != nil {
+			return err
+		}
+		if err := validateV2FileLengths(files, ib.PieceLength); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func validateV2FileLengths(files []V2File, pieceLength uint32) error {
+	var total int64
+	for _, f := range files {
+		if err := addFileLength(&total, f.Length); err != nil {
+			return fmt.Errorf("v2 file %q: %w", f.Path, err)
+		}
+	}
+	if pieceLength == 0 {
+		return nil
+	}
+	var pieces uint64
+	for _, f := range files {
+		n := piecesForLength(f.Length, pieceLength)
+		if n > maxPieceCount-pieces {
+			return fmt.Errorf("%w: v2 file %q needs %d pieces", errPieceCountOverflow, f.Path, n)
+		}
+		pieces += n
+	}
+	return nil
+}
+
+func addFileLength(total *int64, length int64) error {
+	if length < 0 {
+		return errNegativeFileLength
+	}
+	if length > maxInt64-*total {
+		return errFileLengthOverflow
+	}
+	*total += length
+	return nil
+}
+
+// piecesForLength counts pieces without adding pieceLength-1 to a potentially
+// huge file length. pieceLength must be nonzero.
+func piecesForLength(length int64, pieceLength uint32) uint64 {
+	if length == 0 {
+		return 0
+	}
+	return uint64(length-1)/uint64(pieceLength) + 1
 }
 
 // overrideUTF8Keys prefers the utf-8 path spellings when present.
@@ -576,7 +686,9 @@ func findTotalLength(paths []string) (n int64, err error) {
 			if fi.IsDir() {
 				return nil
 			}
-			n += fi.Size()
+			if err := addFileLength(&n, fi.Size()); err != nil {
+				return err
+			}
 			return nil
 		})
 		if err != nil {

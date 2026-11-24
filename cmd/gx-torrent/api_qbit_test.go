@@ -190,6 +190,103 @@ func TestQbitMutatingEndpoints(t *testing.T) {
 	}
 }
 
+func TestQbitAddDuplicateOnlyReturnsConflict(t *testing.T) {
+	d := newTestDaemon(t)
+	payload := makeTorrent(t, t.TempDir(), "movie.bin", 10_000)
+	add := func() int {
+		var body bytes.Buffer
+		writer := multipart.NewWriter(&body)
+		part, err := writer.CreateFormFile("torrents", "movie.torrent")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := part.Write(payload); err != nil {
+			t.Fatal(err)
+		}
+		if err := writer.WriteField("savepath", t.TempDir()); err != nil {
+			t.Fatal(err)
+		}
+		if err := writer.Close(); err != nil {
+			t.Fatal(err)
+		}
+		req := httptest.NewRequest(http.MethodPost, "/api/v2/torrents/add", &body)
+		req.Header.Set("Content-Type", writer.FormDataContentType())
+		rec := httptest.NewRecorder()
+		d.handleQbitAdd(rec, req)
+		return rec.Code
+	}
+	if code := add(); code != http.StatusOK {
+		t.Fatalf("first add = %d, want 200", code)
+	}
+	if code := add(); code != http.StatusConflict {
+		t.Fatalf("duplicate-only add = %d, want 409", code)
+	}
+}
+
+func TestQbitOperationalActionsReportFailuresAndIgnoreMissingHashes(t *testing.T) {
+	d := newTestDaemon(t)
+	src := t.TempDir()
+	hash, _, err := d.add(addRequest{TorrentData: makeTorrent(t, src, "movie.bin", 10_000), Destination: src})
+	if err != nil {
+		t.Fatal(err)
+	}
+	d.mu.Lock()
+	torrent, _ := d.findLocked(hash)
+	if torrent == nil {
+		d.mu.Unlock()
+		t.Fatal("torrent not found")
+	}
+	id := torrent.ID()
+	d.moving[id] = true
+	d.mu.Unlock()
+	srv := httptest.NewServer(d.routesQbit())
+	defer srv.Close()
+
+	post := func(path string, form url.Values) int {
+		t.Helper()
+		resp, err := http.PostForm(srv.URL+path, form)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		return resp.StatusCode
+	}
+	for _, tc := range []struct {
+		path string
+		form url.Values
+	}{
+		{"/api/v2/torrents/pause", url.Values{"hashes": {hash}}},
+		{"/api/v2/torrents/resume", url.Values{"hashes": {hash}}},
+		{"/api/v2/torrents/recheck", url.Values{"hashes": {hash}}},
+		{"/api/v2/torrents/delete", url.Values{"hashes": {hash}}},
+		{"/api/v2/torrents/setLocation", url.Values{"hashes": {hash}, "location": {src}}},
+		{"/api/v2/torrents/setShareLimits", url.Values{"hashes": {hash}, "ratioLimit": {"1.5"}}},
+	} {
+		if code := post(tc.path, tc.form); code != http.StatusConflict {
+			t.Fatalf("%s failure = %d, want 409", tc.path, code)
+		}
+	}
+
+	d.mu.Lock()
+	delete(d.moving, id)
+	d.mu.Unlock()
+	for _, tc := range []struct {
+		path string
+		form url.Values
+	}{
+		{"/api/v2/torrents/pause", url.Values{"hashes": {"deadbeef"}}},
+		{"/api/v2/torrents/resume", url.Values{"hashes": {"deadbeef"}}},
+		{"/api/v2/torrents/recheck", url.Values{"hashes": {"deadbeef"}}},
+		{"/api/v2/torrents/delete", url.Values{"hashes": {"deadbeef"}}},
+		{"/api/v2/torrents/setLocation", url.Values{"hashes": {"deadbeef"}, "location": {src}}},
+		{"/api/v2/torrents/setShareLimits", url.Values{"hashes": {"deadbeef"}, "ratioLimit": {"1.5"}}},
+	} {
+		if code := post(tc.path, tc.form); code != http.StatusOK {
+			t.Fatalf("%s missing hash = %d, want idempotent 200", tc.path, code)
+		}
+	}
+}
+
 func TestQbitCategoriesAndTags(t *testing.T) {
 	d := standaloneTestDaemon(t, "", true)
 	srv := httptest.NewServer(d.routes())

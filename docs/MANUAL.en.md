@@ -1567,6 +1567,11 @@ In **managed mode** Gextto downloads qBittorrent-nox, installs it next to
 itself, starts and stops it with the service, updates it and restarts it if it
 crashes. The full steps are in [qbittorrent-nox.md](qbittorrent-nox.md).
 
+When an external client adds the same torrent again, it receives a conflict
+instead of a false success. Completion is recognised only after the file check,
+and import uses the real payload path reported by the engine, including
+no-subfolder and added-subfolder layouts.
+
 ### Switching engine
 
 A torrent belongs to one engine at a time: switching is a migration, not two
@@ -1962,7 +1967,9 @@ A `gextto-backup-<date>_<time>.zip` file in `<data>/backups` with:
 
 It does **not** contain the videos, the torrent session, the IP filter, the
 caches, the logs, the trash or `/etc/gextto/gextto.env`: keep a copy of that
-yourself.
+yourself. During a data migration an existing database is replaced only after
+the copy has been verified; the series and movie lists are saved independently,
+so one cannot discard the other's changes.
 
 ### Scheduling backups
 

@@ -303,8 +303,9 @@ restarts: Gextto re-attaches when binary and options match.
 `gx-torrent` can also be used as a lightweight, full-featured standalone client without Gextto,
 serving as a pure-Go alternative to `qbittorrent-nox` or `transmission-daemon`:
 
-- **qBittorrent Web API v2** (`/api/v2/...`): Fully compatible with Sonarr, Radarr, Lidarr,
-  Readarr, and mobile managers.
+- **qBittorrent Web API v2** (`/api/v2/...`): broad compatibility with Sonarr,
+  Radarr, Lidarr and mobile managers; Readarr requires an API-v2 build. Gextto's
+  own `/api/v2` remains the smaller browser-extension subset.
 - **Rich Web UI**: Dark and light themes, 24 customizable columns, category manager, tag filters,
   detail drawer (peers, piece map, files), magnet preview, drag-and-drop, and mobile-friendly cards.
 - **Automation & RSS**: Dedicated *Series & movies* status page, rule-based RSS engine with PASS/FAIL

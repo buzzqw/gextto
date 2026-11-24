@@ -228,12 +228,12 @@ func QbitCompatAdd(w http.ResponseWriter, r *http.Request, s *AppState) {
 	switch {
 	case added > 0:
 		qbitText(w, http.StatusOK, qbitOKBody)
-	case duplicates > 0:
-		// Torrent Control reads 409 as "this torrent is already there".
-		qbitText(w, http.StatusConflict, qbitFailBody)
 	case firstErr != nil:
 		logging.Warn("a torrent sent by a qBittorrent client could not be added", "error", firstErr.Error())
 		qbitText(w, http.StatusBadRequest, qbitFailBody)
+	case duplicates > 0:
+		// Torrent Control reads 409 as "this torrent is already there".
+		qbitText(w, http.StatusConflict, qbitFailBody)
 	default:
 		qbitText(w, http.StatusBadRequest, qbitFailBody)
 	}
@@ -247,20 +247,17 @@ func QbitCompatDelete(w http.ResponseWriter, r *http.Request, s *AppState) {
 	}
 	cfg := latestConfig(s)
 	deleteFiles := qbitFormBool(r, "deleteFiles")
-	removed, firstErr := 0, error(nil)
+	var firstErr error
 	for _, hash := range qbitRequestedHashes(r, s) {
-		ok, err := SafeRemoveTorrent(s, cfg, hash, deleteFiles)
+		_, err := SafeRemoveTorrent(s, cfg, hash, deleteFiles)
 		if err != nil {
-			if firstErr == nil {
+			if firstErr == nil && !torrentNotFoundError(err) {
 				firstErr = err
 			}
 			continue
 		}
-		if ok {
-			removed++
-		}
 	}
-	if removed == 0 && firstErr != nil {
+	if firstErr != nil {
 		logging.Warn("a qBittorrent client asked to remove a torrent that could not be removed", "error", firstErr.Error())
 		qbitText(w, http.StatusBadRequest, qbitFailBody)
 		return
@@ -312,7 +309,7 @@ func qbitTorrentAction(w http.ResponseWriter, r *http.Request, s *AppState, acti
 		default:
 			_, err = s.activeEngine().ForceRecheck(hash)
 		}
-		if err != nil && failed == nil {
+		if err != nil && !torrentNotFoundError(err) && failed == nil {
 			failed = err
 		}
 	}
@@ -559,6 +556,12 @@ func qbitTorrentPayload(torrent models.TorrentView) map[string]any {
 		ratio = float64(torrent.AllTimeUpload) / float64(torrent.AllTimeDownload)
 	}
 	progress := qbitProgress(torrent)
+	contentPath := torrent.ContentPath
+	if contentPath == "" {
+		contentPath = CompletionPath(&models.TorrentEvent{
+			Hash: torrent.Hash, Name: torrent.Name, SavePath: torrent.SavePath,
+		})
+	}
 	return map[string]any{
 		"hash":           strings.ToLower(torrent.Hash),
 		"name":           torrent.Name,
@@ -569,6 +572,7 @@ func qbitTorrentPayload(torrent models.TorrentView) map[string]any {
 		"upspeed":        torrent.UploadRate,
 		"state":          qbitState(torrent),
 		"save_path":      torrent.SavePath,
+		"content_path":   contentPath,
 		"amount_left":    left,
 		"downloaded":     torrent.TotalDone,
 		"uploaded":       torrent.AllTimeUpload,
@@ -599,7 +603,7 @@ func qbitState(torrent models.TorrentView) string {
 	complete := qbitProgress(torrent) >= 0.9999 || torrent.IsSeeding
 	switch torrent.State {
 	case "seeding":
-		return "seeding"
+		return "uploading"
 	case "downloading":
 		return "downloading"
 	case "downloading_metadata":

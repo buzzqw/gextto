@@ -645,6 +645,7 @@ type gxTorrentItem struct {
 	Name           string  `json:"name"`
 	State          string  `json:"state"`
 	SavePath       string  `json:"save_path"`
+	ContentPath    string  `json:"content_path"`
 	Progress       float64 `json:"progress"`
 	TotalSize      int64   `json:"total_size"`
 	TotalDone      int64   `json:"total_done"`
@@ -705,6 +706,7 @@ func (e *gxTorrentEngine) toView(item gxTorrentItem, now time.Time) models.Torre
 		Hash:              strings.ToLower(item.Hash),
 		Name:              item.Name,
 		SavePath:          item.SavePath,
+		ContentPath:       item.ContentPath,
 		Progress:          progress,
 		State:             item.State,
 		DownloadRate:      uint64(maxInt64(0, item.DownloadRate)),
@@ -862,12 +864,12 @@ func (e *gxTorrentEngine) sync() error {
 		case view.State == "moving":
 		case SamePath(view.SavePath, destination):
 			e.events = append(e.events, models.TorrentEvent{
-				Kind: "storage_moved", Hash: hash, Name: view.Name, SavePath: view.SavePath,
+				Kind: "storage_moved", Hash: hash, Name: view.Name, SavePath: view.SavePath, ContentPath: view.ContentPath,
 			})
 			delete(e.pendingMoves, hash)
 		case strings.HasPrefix(view.Error, "move failed"):
 			e.events = append(e.events, models.TorrentEvent{
-				Kind: "storage_move_failed", Hash: hash, Name: view.Name, SavePath: view.SavePath, Message: view.Error,
+				Kind: "storage_move_failed", Hash: hash, Name: view.Name, SavePath: view.SavePath, ContentPath: view.ContentPath, Message: view.Error,
 			})
 			delete(e.pendingMoves, hash)
 		}
@@ -935,23 +937,25 @@ func (e *gxTorrentEngine) missingTorrentFilesLocked(next map[string]models.Torre
 func (e *gxTorrentEngine) diffLocked(previous, current models.TorrentView) {
 	if !previous.HasMetadata && current.HasMetadata {
 		e.events = append(e.events, models.TorrentEvent{
-			Kind: "metadata_received", Hash: current.Hash, Name: current.Name, SavePath: current.SavePath,
+			Kind: "metadata_received", Hash: current.Hash, Name: current.Name, SavePath: current.SavePath, ContentPath: current.ContentPath,
 		})
 	}
-	if previous.Progress < 99.99 && current.Progress >= 99.99 && current.TotalSize > 0 {
+	// The daemon stamps CompletedAt only after the completion check. Progress
+	// alone can reach 100 while pieces are still being verified.
+	if previous.CompletedAt <= 0 && current.CompletedAt > 0 {
 		e.events = append(e.events, models.TorrentEvent{
-			Kind: "torrent_finished", Hash: current.Hash, Name: current.Name, SavePath: current.SavePath,
+			Kind: "torrent_finished", Hash: current.Hash, Name: current.Name, SavePath: current.SavePath, ContentPath: current.ContentPath,
 		})
 	}
 	if previous.State == "checking_files" && current.State != "checking_files" {
 		e.events = append(e.events, models.TorrentEvent{
-			Kind: "torrent_checked", Hash: current.Hash, Name: current.Name, SavePath: current.SavePath,
+			Kind: "torrent_checked", Hash: current.Hash, Name: current.Name, SavePath: current.SavePath, ContentPath: current.ContentPath,
 		})
 	}
 	if previous.State != "error" && current.State == "error" {
 		e.events = append(e.events, models.TorrentEvent{
 			Kind: "torrent_error", Hash: current.Hash, Name: current.Name,
-			SavePath: current.SavePath, Message: current.Error,
+			SavePath: current.SavePath, ContentPath: current.ContentPath, Message: current.Error,
 		})
 	}
 }
@@ -1219,14 +1223,14 @@ func gxQueuePolicy(cfg *Config) map[string]any {
 		"active_metadata": max(lt.ActiveMetadata, 0),
 		// A LAN peer is asked first, above BEP 40.
 		"prefer_local_peers": settingsBool(cfg, settingTorrentPreferLocalPeers, false),
-		"dont_count_slow":  lt.DontCountSlowTorrents,
-		"dynamic_queue":    auto || lt.DynamicQueue,
-		"auto":             auto,
-		"dynamic_min":      clamp(lt.DynamicQueueMin),
-		"dynamic_max":      clamp(lt.DynamicQueueMax),
-		"cache_mb":         gxCacheMB(lt.CacheSize),
-		"cache_ttl_secs":   max(lt.CacheExpiry, 10),
-		"preallocate":      cfg.TorrentPreallocate(),
+		"dont_count_slow":    lt.DontCountSlowTorrents,
+		"dynamic_queue":      auto || lt.DynamicQueue,
+		"auto":               auto,
+		"dynamic_min":        clamp(lt.DynamicQueueMin),
+		"dynamic_max":        clamp(lt.DynamicQueueMax),
+		"cache_mb":           gxCacheMB(lt.CacheSize),
+		"cache_ttl_secs":     max(lt.CacheExpiry, 10),
+		"preallocate":        cfg.TorrentPreallocate(),
 		// Default peer cap of every torrent without one of its own (-1 in the
 		// settings page = no cap, 0 for the daemon). With conn_auto the daemon
 		// sizes the cap from the machine and this value is only the ceiling.

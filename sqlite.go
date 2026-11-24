@@ -3,6 +3,8 @@ package gextto
 import (
 	"database/sql"
 	"fmt"
+	"net/url"
+	"path/filepath"
 
 	_ "modernc.org/sqlite"
 )
@@ -22,11 +24,32 @@ const sqliteCacheSizeKiB = "-2000"
 // value without anyone noticing.
 const sqliteSynchronous = "FULL"
 
+// sqliteDSN builds a SQLite connection string without treating characters in
+// the database path as URI query parameters. Each pragma is a separate
+// _pragma value, as required by modernc.org/sqlite.
+func sqliteDSN(path string, readOnly bool, pragmas ...string) string {
+	dsn := &url.URL{Scheme: "file", Path: filepath.ToSlash(path)}
+	query := url.Values{}
+	if readOnly {
+		query.Set("mode", "ro")
+	}
+	for _, pragma := range pragmas {
+		query.Add("_pragma", pragma)
+	}
+	dsn.RawQuery = query.Encode()
+	return dsn.String()
+}
+
 // OpenSQLite opens a SQLite database with conservative pragmas
 // (`busy_timeout`, WAL, foreign keys, synchronous FULL). A single connection
 // is kept so concurrent goroutines never race on write locks.
 func OpenSQLite(path string) (*sql.DB, error) {
-	dsn := "file:" + path + "?_pragma=busy_timeout(10000)&_pragma=foreign_keys(1)&_pragma=synchronous(" + sqliteSynchronous + ")&_pragma=cache_size(" + sqliteCacheSizeKiB + ")"
+	dsn := sqliteDSN(path, false,
+		"busy_timeout(10000)",
+		"foreign_keys(1)",
+		"synchronous("+sqliteSynchronous+")",
+		"cache_size("+sqliteCacheSizeKiB+")",
+	)
 	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("open %s: %w", path, err)

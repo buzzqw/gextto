@@ -1075,3 +1075,18 @@ func TestOldArchiveLearnsTheFeedColumn(t *testing.T) {
 		t.Fatalf("listings = %+v, want the old row with an empty feed", listings)
 	}
 }
+
+func TestArchiveReadHandleUsesAnEscapedSQLitePath(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "archive ?#% ' ü.db")
+	archive, err := OpenArchive(path)
+	if err != nil {
+		t.Fatalf("OpenArchive: %v", err)
+	}
+	defer archive.Close()
+	if archive.readDB == nil {
+		t.Fatal("the archive read handle was not opened")
+	}
+	if count, err := archive.Count(); err != nil || count != 0 {
+		t.Fatalf("Count = %d, err=%v; want an empty archive", count, err)
+	}
+}

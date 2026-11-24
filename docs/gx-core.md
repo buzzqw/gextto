@@ -121,9 +121,11 @@ API: authentication, `app`, `transfer`, and for torrents `info`, `add`, `delete`
 RSS, search, sync and torrent-creator surfaces. The add call accepts both the
 4.x `paused` flag and the 5.x `stopped` one, and `torrents/setShareLimits`
 accepts the extra `shareLimitsMode` and `shareLimitAction` fields of 5.2/5.3
-without rejecting older clients. It is verified against Gextto's own
-qBittorrent client (`internal/qbittorrent`), which acts as an automatic test bench, and
-it is what lets existing clients of that protocol use gx-core without patches. In
+without rejecting older clients. A duplicate-only add returns `409 Conflict`,
+and operational mutation errors are reported instead of a false `200`. It is
+verified against Gextto's own qBittorrent client (`internal/qbittorrent`), which
+acts as an automatic test bench, and it is what lets existing clients of that
+protocol use gx-core without patches. In
 managed the whole `/api/v2` is not mounted: Gextto is the single master. The
 layer advertises the **4.6 / API 2.9.3** level (configurable `app/version`), accepts
 the **qBittorrent 5 API key** (`X-Api-Key` or `Authorization: Bearer`) from

@@ -1588,6 +1588,11 @@ In **modalità gestita** Gextto scarica qBittorrent-nox, lo installa accanto a
 sé, lo avvia e lo ferma col servizio, lo aggiorna e lo riavvia se cade. I passi
 completi sono in [qbittorrent-nox.md](qbittorrent-nox.md).
 
+Quando un client esterno aggiunge di nuovo lo stesso torrent riceve un conflitto
+invece di un falso successo. Il completamento viene riconosciuto solo dopo il
+controllo dei file e l'import usa il percorso reale comunicato dal motore, anche
+con layout senza cartella o con una cartella aggiunta.
+
 ### Cambiare motore
 
 Un torrent appartiene a un solo motore alla volta: il passaggio è una
@@ -1988,7 +1993,10 @@ Uno ZIP `gextto-backup-<data>_<ora>.zip` in `<dati>/backups` con:
 - le cartelle esterne che elenchi in *File e cartelle da includere*.
 
 **Non** contiene i video, la sessione torrent, il filtro IP, le cache, i log, il
-cestino né `/etc/gextto/gextto.env`: tienine una copia tu.
+cestino né `/etc/gextto/gextto.env`: tienine una copia tu. Durante una migrazione
+il database già presente viene sostituito solo dopo che la copia è stata
+verificata; le liste serie e film vengono salvate separatamente, così una non
+scarta le modifiche dell'altra.
 
 ### Programmare i backup
 

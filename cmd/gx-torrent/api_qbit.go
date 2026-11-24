@@ -711,25 +711,35 @@ func (d *Daemon) qbitHashes(value string) []string {
 	return out
 }
 
-func (d *Daemon) handleQbitPause(w http.ResponseWriter, r *http.Request) {
-	for _, hash := range d.qbitHashes(r.FormValue("hashes")) {
-		_ = d.pause(hash)
+// applyQbitTorrentAction applies one operational action to the requested
+// torrents. A hash that has already disappeared is an idempotent no-op, like
+// qBittorrent; every other failure is returned to the client instead of being
+// reported as success.
+func (d *Daemon) applyQbitTorrentAction(w http.ResponseWriter, r *http.Request, action string, apply func(string) error) {
+	var firstErr error
+	for _, hash := range d.qbitHashParam(r) {
+		if err := apply(hash); err != nil && !errors.Is(err, errNotFound) && firstErr == nil {
+			firstErr = err
+		}
+	}
+	if firstErr != nil {
+		logfWarn("qBittorrent %s failed: %v", action, firstErr)
+		qbitText(w, http.StatusConflict, qbitInvalidCode)
+		return
 	}
 	w.WriteHeader(http.StatusOK)
+}
+
+func (d *Daemon) handleQbitPause(w http.ResponseWriter, r *http.Request) {
+	d.applyQbitTorrentAction(w, r, "pause", d.pause)
 }
 
 func (d *Daemon) handleQbitResume(w http.ResponseWriter, r *http.Request) {
-	for _, hash := range d.qbitHashes(r.FormValue("hashes")) {
-		_ = d.resume(hash)
-	}
-	w.WriteHeader(http.StatusOK)
+	d.applyQbitTorrentAction(w, r, "resume", d.resume)
 }
 
 func (d *Daemon) handleQbitRecheck(w http.ResponseWriter, r *http.Request) {
-	for _, hash := range d.qbitHashes(r.FormValue("hashes")) {
-		_ = d.verify(hash)
-	}
-	w.WriteHeader(http.StatusOK)
+	d.applyQbitTorrentAction(w, r, "recheck", d.verify)
 }
 
 func (d *Daemon) handleQbitReannounce(w http.ResponseWriter, r *http.Request) {
@@ -741,10 +751,9 @@ func (d *Daemon) handleQbitReannounce(w http.ResponseWriter, r *http.Request) {
 
 func (d *Daemon) handleQbitSetLocation(w http.ResponseWriter, r *http.Request) {
 	location := strings.TrimSpace(r.FormValue("location"))
-	for _, hash := range d.qbitHashes(r.FormValue("hashes")) {
-		_ = d.move(hash, location, false)
-	}
-	w.WriteHeader(http.StatusOK)
+	d.applyQbitTorrentAction(w, r, "setLocation", func(hash string) error {
+		return d.move(hash, location, false)
+	})
 }
 
 // qbitTracker is the qBittorrent tracker object (status: 0 disabled, 1 not
@@ -1010,10 +1019,9 @@ func (d *Daemon) applyQbitTorrentLimit(w http.ResponseWriter, r *http.Request, d
 
 func (d *Daemon) handleQbitDelete(w http.ResponseWriter, r *http.Request) {
 	deleteFiles := formBool(r, "deleteFiles")
-	for _, hash := range d.qbitHashes(r.FormValue("hashes")) {
-		_ = d.remove(hash, deleteFiles)
-	}
-	w.WriteHeader(http.StatusOK)
+	d.applyQbitTorrentAction(w, r, "delete", func(hash string) error {
+		return d.remove(hash, deleteFiles)
+	})
 }
 
 // qbitApplyAddLimits maps the optional qBittorrent add fields onto the add
@@ -1118,7 +1126,7 @@ func (d *Daemon) handleQbitAdd(w http.ResponseWriter, r *http.Request) {
 		qbitText(w, http.StatusBadRequest, "unknown contentLayout")
 		return
 	}
-	added := false
+	added, duplicates := 0, 0
 
 	// Uploaded .torrent files (multipart field "torrents").
 	if err := r.ParseMultipartForm(maxTorrentFile); err == nil && r.MultipartForm != nil {
@@ -1140,7 +1148,11 @@ func (d *Daemon) handleQbitAdd(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			qbitRenameAfterAdd(d, hash, existing, r.FormValue("rename"))
-			added = true
+			if existing {
+				duplicates++
+			} else {
+				added++
+			}
 		}
 	}
 
@@ -1175,13 +1187,21 @@ func (d *Daemon) handleQbitAdd(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		qbitRenameAfterAdd(d, hash, existing, r.FormValue("rename"))
-		added = true
+		if existing {
+			duplicates++
+		} else {
+			added++
+		}
 	}
-	if !added {
+	switch {
+	case added > 0:
+		qbitText(w, http.StatusOK, qbitOKCode)
+	case duplicates > 0:
+		// Sonarr, Radarr and Torrent Control read 409 as "already present".
+		qbitText(w, http.StatusConflict, qbitInvalidCode)
+	default:
 		qbitText(w, http.StatusUnsupportedMediaType, qbitInvalidCode)
-		return
 	}
-	qbitText(w, http.StatusOK, qbitOKCode)
 }
 
 // addRequestFromForm builds the options shared by the add endpoints (API and
@@ -1877,7 +1897,7 @@ func (d *Daemon) handleQbitSetPreferences(w http.ResponseWriter, r *http.Request
 func (d *Daemon) handleQbitSetShareLimits(w http.ResponseWriter, r *http.Request) {
 	ratio, rerr := strconv.ParseFloat(strings.TrimSpace(r.FormValue("ratioLimit")), 64)
 	minutes, merr := strconv.ParseInt(strings.TrimSpace(r.FormValue("seedingTimeLimit")), 10, 64)
-	for _, hash := range d.qbitHashParam(r) {
+	d.applyQbitTorrentAction(w, r, "setShareLimits", func(hash string) error {
 		var ratioPtr *float64
 		if rerr == nil {
 			switch {
@@ -1902,11 +1922,11 @@ func (d *Daemon) handleQbitSetShareLimits(w http.ResponseWriter, r *http.Request
 				daysPtr = &zero
 			}
 		}
-		if ratioPtr != nil || daysPtr != nil {
-			_ = d.setLimits(hash, nil, nil, ratioPtr, daysPtr)
+		if ratioPtr == nil && daysPtr == nil {
+			return nil
 		}
-	}
-	w.WriteHeader(http.StatusOK)
+		return d.setLimits(hash, nil, nil, ratioPtr, daysPtr)
+	})
 }
 
 // qbitSyncState is the last full snapshot sent through sync/maindata; the next

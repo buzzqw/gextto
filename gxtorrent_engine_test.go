@@ -139,23 +139,43 @@ func TestGxEngineMapsStatesAndEmitsEvents(t *testing.T) {
 		t.Fatalf("unexpected view %+v", views)
 	}
 
-	fake.set(gxTorrentItem{Hash: "aa", Name: "Show", State: "downloading", SavePath: "/dl", Progress: 40,
+	fake.set(gxTorrentItem{Hash: "aa", Name: "Show", State: "downloading", SavePath: "/dl", ContentPath: "/dl/Show", Progress: 40,
 		TotalSize: 100, TotalDone: 40, HasMetadata: true, AutoManaged: true})
-	fake.set(gxTorrentItem{Hash: "aa", Name: "Show", State: "seeding", SavePath: "/dl", Progress: 100,
+	engine.List()
+	if events := engine.PollEvents(); len(events) != 1 || events[0].Kind != "metadata_received" {
+		t.Fatalf("metadata events = %+v", events)
+	}
+
+	// Every piece can be present while the completion check is still running.
+	// Without CompletedAt this must not start post-processing.
+	fake.set(gxTorrentItem{Hash: "aa", Name: "Show", State: "checking_files", SavePath: "/dl", ContentPath: "/dl/Show", Progress: 100,
 		TotalSize: 100, TotalDone: 100, HasMetadata: true, AutoManaged: true})
+	engine.List()
+	if events := engine.PollEvents(); len(events) != 0 {
+		t.Fatalf("unverified completion emitted events: %+v", events)
+	}
+
+	completedAt := time.Now().Unix()
+	fake.set(gxTorrentItem{Hash: "aa", Name: "Show", State: "seeding", SavePath: "/dl", ContentPath: "/dl/Show", Progress: 100,
+		TotalSize: 100, TotalDone: 100, HasMetadata: true, AutoManaged: true, CompletedAt: completedAt})
+	engine.List()
 	events := engine.PollEvents()
 	kinds := map[string]bool{}
-	for _, event := range events {
-		kinds[event.Kind] = true
-		if event.SavePath != "/dl" || event.Hash != "aa" {
-			t.Fatalf("event without save path/hash: %+v", event)
+	var finished *models.TorrentEvent
+	for index := range events {
+		kinds[events[index].Kind] = true
+		if events[index].Kind == "torrent_finished" {
+			finished = &events[index]
 		}
 	}
-	if !kinds["metadata_received"] || !kinds["torrent_finished"] {
-		t.Fatalf("missing lifecycle events: %+v", events)
+	if !kinds["torrent_checked"] || finished == nil {
+		t.Fatalf("completion events = %+v, want torrent_checked + torrent_finished", events)
+	}
+	if event := *finished; event.SavePath != "/dl" || event.ContentPath != "/dl/Show" || event.Hash != "aa" {
+		t.Fatalf("event without save path/content path/hash: %+v", event)
 	}
 	view := engine.List()[0]
-	if !view.IsSeeding || view.Progress != 100 || view.Diagnosis != "seeding" {
+	if !view.IsSeeding || view.Progress != 100 || view.Diagnosis != "seeding" || view.ContentPath != "/dl/Show" {
 		t.Fatalf("unexpected seeding view %+v", view)
 	}
 }
@@ -354,18 +374,18 @@ func TestGxEngineSetLimitsSendsOnlyTheNamedFields(t *testing.T) {
 
 func TestGxEngineMoveEmitsStorageMoved(t *testing.T) {
 	engine, fake := newTestGxEngine(t, "")
-	fake.set(gxTorrentItem{Hash: "aa", Name: "Show", State: "seeding", SavePath: "/dl", Progress: 100, TotalSize: 10, TotalDone: 10, HasMetadata: true})
+	fake.set(gxTorrentItem{Hash: "aa", Name: "Show", State: "seeding", SavePath: "/dl", ContentPath: "/dl/Show", Progress: 100, TotalSize: 10, TotalDone: 10, HasMetadata: true})
 	engine.List()
 	if ok, err := engine.MoveStorage("aa", "/library"); err != nil || !ok {
 		t.Fatalf("move: %v %v", ok, err)
 	}
-	fake.set(gxTorrentItem{Hash: "aa", Name: "Show", State: "moving", SavePath: "/dl", Progress: 100, TotalSize: 10, TotalDone: 10, HasMetadata: true})
+	fake.set(gxTorrentItem{Hash: "aa", Name: "Show", State: "moving", SavePath: "/dl", ContentPath: "/dl/Show", Progress: 100, TotalSize: 10, TotalDone: 10, HasMetadata: true})
 	if events := engine.PollEvents(); len(events) != 0 {
 		t.Fatalf("no event while moving: %+v", events)
 	}
-	fake.set(gxTorrentItem{Hash: "aa", Name: "Show", State: "seeding", SavePath: "/library", Progress: 100, TotalSize: 10, TotalDone: 10, HasMetadata: true})
+	fake.set(gxTorrentItem{Hash: "aa", Name: "Show", State: "seeding", SavePath: "/library", ContentPath: "/library/Show", Progress: 100, TotalSize: 10, TotalDone: 10, HasMetadata: true})
 	events := engine.PollEvents()
-	if len(events) != 1 || events[0].Kind != "storage_moved" || events[0].SavePath != "/library" {
+	if len(events) != 1 || events[0].Kind != "storage_moved" || events[0].SavePath != "/library" || events[0].ContentPath != "/library/Show" {
 		t.Fatalf("expected storage_moved, got %+v", events)
 	}
 	if ok, _ := engine.MoveStorage("aa", "/library"); ok {

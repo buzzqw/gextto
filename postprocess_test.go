@@ -872,6 +872,28 @@ func TestCompletionPathNeverEscapesSavePath(t *testing.T) {
 	}
 }
 
+func TestCompletionPathPrefersVerifiedContentPathInsideSavePath(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		contentPath string
+		want        string
+	}{
+		{"nested content root", "/downloads/pack/actual.mkv", "/downloads/pack/actual.mkv"},
+		{"no-subfolder layout", "/downloads", "/downloads"},
+		{"outside save path", "/etc/passwd", "/downloads/untrusted.mkv"},
+		{"traversal outside save path", "/downloads/../etc/passwd", "/downloads/untrusted.mkv"},
+		{"relative backend path", "pack/actual.mkv", "/downloads/untrusted.mkv"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			event := ppEvent("untrusted.mkv")
+			event.ContentPath = tc.contentPath
+			if got := CompletionPath(&event); got != tc.want {
+				t.Fatalf("CompletionPath = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
 func TestCompletionPathReturnsNamedPathEvenWhenMissing(t *testing.T) {
 	event := ppEvent("not-here.mkv")
 	missing := CompletionPath(&event)

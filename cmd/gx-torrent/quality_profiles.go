@@ -275,8 +275,8 @@ func (d *Daemon) qualityProfileRows(lang string) string {
 		b.WriteString(`<tr><td><strong>` + name + `</strong></td><td>` +
 			`<form method="post" action="/ui/quality-profile" class="cat-edit">` +
 			`<input type="hidden" name="op" value="edit"><input type="hidden" name="name" value="` + name + `">` +
-			`<input type="text" name="qualities" value="` + html.EscapeString(strings.Join(profile.Qualities, ", ")) + `" autocomplete="off" aria-label="` + uiTr(lang, "Qualities of %s", profile.Name) + `" title="` + uiTr(lang, "Accepted resolutions, separated by commas (360p, 480p, 576p, 720p, 1080p, 2160p)") + `">` +
-			`<select name="cutoff" aria-label="` + uiTr(lang, "Cutoff of %s", profile.Name) + `" title="` + uiTr(lang, "Stop upgrading when this quality is downloaded (empty = no upgrades)") + `">` + qualityCutoffOptions(lang, profile.Cutoff) + `</select>` +
+			`<input type="text" name="qualities" value="` + html.EscapeString(strings.Join(profile.Qualities, ", ")) + `" autocomplete="off" aria-label="` + html.EscapeString(uiTr(lang, "Qualities of %s", profile.Name)) + `" title="` + uiTr(lang, "Accepted resolutions, separated by commas (360p, 480p, 576p, 720p, 1080p, 2160p)") + `">` +
+			`<select name="cutoff" aria-label="` + html.EscapeString(uiTr(lang, "Cutoff of %s", profile.Name)) + `" title="` + uiTr(lang, "Stop upgrading when this quality is downloaded (empty = no upgrades)") + `">` + qualityCutoffOptions(lang, profile.Cutoff) + `</select>` +
 			`<button type="submit" class="sm" title="` + uiTr(lang, "Save this quality profile") + `">` + uiTr(lang, "Save") + `</button>` +
 			`</form></td><td>` + cutoffLabel(lang, profile) + `</td><td>` +
 			`<form method="post" action="/ui/quality-profile" data-confirm="` + uiTr(lang, "Remove this quality profile? Titles that use it fall back to their quality field.") + `">` +

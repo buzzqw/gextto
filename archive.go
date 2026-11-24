@@ -362,7 +362,11 @@ func OpenArchive(path string) (*Archive, error) {
 // and immediately restricted with query_only, so it behaves as a reader while
 // SQLite keeps its normal WAL bookkeeping.
 func openArchiveReader(path string) *sql.DB {
-	dsn := "file:" + path + "?_pragma=busy_timeout(10000)&_pragma=query_only(1)&_pragma=cache_size(" + sqliteCacheSizeKiB + ")"
+	dsn := sqliteDSN(path, false,
+		"busy_timeout(10000)",
+		"query_only(1)",
+		"cache_size("+sqliteCacheSizeKiB+")",
+	)
 	reader, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		logging.Debug("the archive will be read on the main connection: the second handle is not available", "error", err)

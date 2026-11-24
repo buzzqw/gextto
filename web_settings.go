@@ -642,7 +642,7 @@ func SaveMoviesConfig(w http.ResponseWriter, r *http.Request, s *AppState) {
 		return
 	}
 	cfg := latestConfig(s)
-	if err := SaveLibrary(s.cfg.DataDir, cfg.Series, movies); err != nil {
+	if err := SaveMoviesLibrary(s.cfg.DataDir, movies); err != nil {
 		jsonError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -662,7 +662,7 @@ func SaveSeriesConfig(w http.ResponseWriter, r *http.Request, s *AppState) {
 		return
 	}
 	cfg := latestConfig(s)
-	if err := SaveLibrary(s.cfg.DataDir, series, cfg.Movies); err != nil {
+	if err := SaveSeriesLibrary(s.cfg.DataDir, series); err != nil {
 		jsonError(w, http.StatusInternalServerError, err.Error())
 		return
 	}

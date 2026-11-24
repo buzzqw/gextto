@@ -41,10 +41,19 @@ func MigrateDataDir(from, to string) (MigrateReport, error) {
 	if err != nil || !info.IsDir() {
 		return report, fmt.Errorf("migrate: source directory %q is not readable", from)
 	}
-	absFrom, _ := filepath.Abs(from)
-	absTo, _ := filepath.Abs(to)
+	absFrom, err := filepath.Abs(from)
+	if err != nil {
+		return report, fmt.Errorf("migrate: resolve source directory: %w", err)
+	}
+	absTo, err := filepath.Abs(to)
+	if err != nil {
+		return report, fmt.Errorf("migrate: resolve destination directory: %w", err)
+	}
 	if absFrom == absTo {
 		return report, fmt.Errorf("migrate: source and destination are the same directory")
+	}
+	if pathWithin(absTo, absFrom) {
+		return report, fmt.Errorf("migrate: destination directory must not be inside the source directory")
 	}
 	if err := os.MkdirAll(to, 0o755); err != nil {
 		return report, fmt.Errorf("migrate: create destination: %w", err)
@@ -182,48 +191,154 @@ func singleJSONConfig(dir string) string {
 }
 
 // copyDatabase produces a consistent, self-contained copy of a SQLite database.
+// The destination is only replaced by the final rename: every failure before
+// that point leaves the existing database untouched.
 func copyDatabase(source, destination string) error {
-	_ = os.Remove(destination)
-	if err := vacuumInto(source, destination); err == nil {
-		return nil
+	if err := validateDatabaseCopyPaths(source, destination); err != nil {
+		return err
 	}
-	// Fallback: byte copy including a live WAL/SHM, then checkpoint.
+	if err := os.MkdirAll(filepath.Dir(destination), 0o755); err != nil {
+		return fmt.Errorf("create the destination directory: %w", err)
+	}
+	// A stale WAL beside the destination could otherwise be replayed over the
+	// renamed database. Refuse an active destination instead of removing files
+	// from underneath its owner.
+	for _, suffix := range []string{"-wal", "-shm", "-journal"} {
+		if _, err := os.Stat(destination + suffix); err == nil {
+			return fmt.Errorf("destination database has an active %s journal; close it before migrating", suffix)
+		} else if !os.IsNotExist(err) {
+			return fmt.Errorf("inspect the destination %s journal: %w", suffix, err)
+		}
+	}
+
+	// The exclusive directory is created beside the destination, so the final
+	// rename stays on one filesystem. VACUUM INTO needs a path that does not yet
+	// exist; the private directory provides that without a create/remove race.
+	stageDir, err := os.MkdirTemp(filepath.Dir(destination), "."+filepath.Base(destination)+".migrate-*")
+	if err != nil {
+		return fmt.Errorf("create the migration staging directory: %w", err)
+	}
+	defer func() { _ = os.RemoveAll(stageDir) }()
+
+	staging := filepath.Join(stageDir, "database")
+	if vacuumErr := vacuumInto(source, staging); vacuumErr != nil {
+		fallback := filepath.Join(stageDir, "fallback.db")
+		if err := copyDatabaseBytes(source, fallback); err != nil {
+			return fmt.Errorf("VACUUM copy failed (%v); byte copy failed: %w", vacuumErr, err)
+		}
+		staging = fallback
+	}
+	if err := sealSQLiteCopy(staging); err != nil {
+		return fmt.Errorf("verify the copied database: %w", err)
+	}
+	if err := syncFile(staging); err != nil {
+		return fmt.Errorf("sync the copied database: %w", err)
+	}
+	if err := os.Rename(staging, destination); err != nil {
+		return fmt.Errorf("replace the destination database: %w", err)
+	}
+	return nil
+}
+
+func validateDatabaseCopyPaths(source, destination string) error {
+	absSource, err := filepath.Abs(source)
+	if err != nil {
+		return fmt.Errorf("resolve source database: %w", err)
+	}
+	absDestination, err := filepath.Abs(destination)
+	if err != nil {
+		return fmt.Errorf("resolve destination database: %w", err)
+	}
+	if absSource == absDestination {
+		return fmt.Errorf("source and destination databases are the same file")
+	}
+	sourceInfo, err := os.Stat(source)
+	if err != nil {
+		return fmt.Errorf("read source database: %w", err)
+	}
+	if sourceInfo.IsDir() && pathWithin(absDestination, absSource) {
+		return fmt.Errorf("destination database must not be inside the source directory")
+	}
+	if !sourceInfo.Mode().IsRegular() {
+		return fmt.Errorf("source database %q is not a regular file", source)
+	}
+	if destinationInfo, err := os.Stat(destination); err == nil && os.SameFile(sourceInfo, destinationInfo) {
+		return fmt.Errorf("source and destination databases are the same file")
+	}
+	return nil
+}
+
+func copyDatabaseBytes(source, destination string) error {
 	if err := migrateCopyFile(source, destination); err != nil {
 		return err
 	}
-	for _, suffix := range []string{"-wal", "-shm"} {
-		if _, err := os.Stat(source + suffix); err == nil {
-			if err := migrateCopyFile(source+suffix, destination+suffix); err != nil {
-				return fmt.Errorf("copy the SQLite %s journal of %s: %w", suffix, source, err)
+	for _, suffix := range []string{"-wal", "-shm", "-journal"} {
+		if _, err := os.Stat(source + suffix); err != nil {
+			if os.IsNotExist(err) {
+				continue
 			}
+			return fmt.Errorf("inspect the SQLite %s journal of %s: %w", suffix, source, err)
 		}
-	}
-	db, err := sql.Open("sqlite", destination)
-	if err != nil {
-		return err
-	}
-	defer db.Close()
-	// The checkpoint folds the copied journal into the database file. Removing
-	// the journal before a successful checkpoint would drop every transaction
-	// it still holds, which is exactly the data a live database has not written
-	// yet: the copy must be complete before the old files go away.
-	if _, err := db.Exec("PRAGMA wal_checkpoint(TRUNCATE)"); err != nil {
-		return fmt.Errorf("checkpoint the copy of %s: %w", source, err)
-	}
-	for _, suffix := range []string{"-wal", "-shm"} {
-		if err := os.Remove(destination + suffix); err != nil && !os.IsNotExist(err) {
-			return fmt.Errorf("remove the copied %s journal of %s: %w", suffix, destination, err)
+		if err := migrateCopyFile(source+suffix, destination+suffix); err != nil {
+			return fmt.Errorf("copy the SQLite %s journal of %s: %w", suffix, source, err)
 		}
 	}
 	return nil
 }
 
-func vacuumInto(source, destination string) error {
-	db, err := sql.Open("sqlite", "file:"+source+"?mode=ro&_pragma=busy_timeout(10000)")
+// sealSQLiteCopy checkpoints a copied WAL, checks every page and leaves the
+// staging file in rollback-journal mode so it is self-contained at rename time.
+func sealSQLiteCopy(path string) error {
+	db, err := sql.Open("sqlite", sqliteDSN(path, false, "busy_timeout(10000)"))
 	if err != nil {
 		return err
 	}
 	defer db.Close()
+	db.SetMaxOpenConns(1)
+	var busy, logFrames, checkpointed int
+	if err := db.QueryRow("PRAGMA wal_checkpoint(TRUNCATE)").Scan(&busy, &logFrames, &checkpointed); err != nil {
+		return fmt.Errorf("checkpoint the copy: %w", err)
+	}
+	if busy != 0 {
+		return fmt.Errorf("checkpoint the copy: SQLite is still busy")
+	}
+	checks, err := QuickCheck(db)
+	if err != nil {
+		return err
+	}
+	if len(checks) != 1 || checks[0] != "ok" {
+		return fmt.Errorf("quick_check failed: %s", strings.Join(checks, "; "))
+	}
+	if _, err := db.Exec("PRAGMA journal_mode=DELETE"); err != nil {
+		return fmt.Errorf("make the copy self-contained: %w", err)
+	}
+	if err := db.Close(); err != nil {
+		return err
+	}
+	for _, suffix := range []string{"-wal", "-shm", "-journal"} {
+		if err := os.Remove(path + suffix); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("remove the copied %s journal: %w", suffix, err)
+		}
+	}
+	return nil
+}
+
+func syncFile(path string) error {
+	file, err := os.OpenFile(path, os.O_RDWR, 0)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	return file.Sync()
+}
+
+func vacuumInto(source, destination string) error {
+	db, err := sql.Open("sqlite", sqliteDSN(source, true, "busy_timeout(10000)"))
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+	db.SetMaxOpenConns(1)
 	literal := strings.ReplaceAll(destination, "'", "''")
 	_, err = db.Exec("VACUUM INTO '" + literal + "'")
 	return err

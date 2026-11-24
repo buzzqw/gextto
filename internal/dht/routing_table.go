@@ -1,6 +1,7 @@
 package dht
 
 import (
+	"errors"
 	"expvar"
 	"fmt"
 	"net"
@@ -33,6 +34,8 @@ type routingTable struct {
 	// proximity counts the prefix bits shared by boundaryNode and nodeId.
 	proximity int
 
+	// maxNodes caps address-book entries; zero or negative disables the cap.
+	maxNodes int
 	// maxPerSubnet caps tree nodes per /24 (v4) or /48 (v6); 0 disables.
 	maxPerSubnet int
 	// subnetNodes counts tree occupants per subnet key, maintained
@@ -196,9 +199,9 @@ func (r *routingTable) update(node *remoteNode, proto string) error {
 }
 
 // insert admits a node: port-less and unspecified addresses refuse, known
-// addresses report success without duplicating, capped subnets stay
-// slotless in the book, and identified, uncapped nodes join the tree and
-// the counters.
+// addresses report success without duplicating, a full table refuses new
+// entries, capped subnets stay slotless in the book, and identified, uncapped
+// nodes join the tree and the counters.
 func (r *routingTable) insert(node *remoteNode, proto string) error {
 	if node.address.Port == 0 {
 		return fmt.Errorf("routingTable.insert() got a node with Port=0")
@@ -219,6 +222,9 @@ func (r *routingTable) insert(node *remoteNode, proto string) error {
 	}
 	if existed {
 		return nil
+	}
+	if r.maxNodes > 0 && len(r.addresses) >= r.maxNodes {
+		return fmt.Errorf("%w: %d nodes", errRoutingTableFull, r.maxNodes)
 	}
 	if !bogusId(node.id) && r.subnetAtCap(node.address.IP, node.countedSubnet) {
 		totalNodesCapped.Add(1)
@@ -382,6 +388,9 @@ func pingSlowly(pingRequest chan *remoteNode, needPing []*remoteNode, cleanupPer
 }
 
 var (
+	// errRoutingTableFull refuses a new address-book entry without evicting an
+	// existing node, keeping admission deterministic and the memory hard cap.
+	errRoutingTableFull = errors.New("routing table is full")
 	// totalKilledNodes counts routing-table kills, repeats included.
 	totalKilledNodes = expvar.NewInt("totalKilledNodes")
 	// totalNodes counts routing-table admissions, repeats included.

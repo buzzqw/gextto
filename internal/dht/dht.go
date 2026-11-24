@@ -253,6 +253,7 @@ func makeNode(cfg Config) *DHT {
 		clientThrottle:         newClientThrottle(cfg.ClientPerMinuteLimit, cfg.ThrottlerTrackedClients),
 	}
 	routingTable := newRoutingTable(&node.DebugLogger, cfg.IPFilter)
+	routingTable.maxNodes = cfg.MaxNodes
 	routingTable.maxPerSubnet = cfg.MaxNodesPerSubnet
 	node.routingTable = routingTable
 	node.tokenSecrets = []string{node.newTokenSecret(), node.newTokenSecret()}

@@ -30,5 +30,12 @@ func crossOriginGuard(next http.Handler) http.Handler {
 		}
 		http.Error(w, "cross-origin request refused", http.StatusForbidden)
 	}))
-	return protection.Handler(next)
+	guarded := protection.Handler(next)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// This is the outermost web guard: pages, fragments, API responses and
+		// refusals must all refuse to be embedded by another site.
+		w.Header().Set("X-Frame-Options", "DENY")
+		w.Header().Set("Content-Security-Policy", "frame-ancestors 'none'")
+		guarded.ServeHTTP(w, r)
+	})
 }

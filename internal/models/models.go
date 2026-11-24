@@ -816,25 +816,28 @@ type TorrentView struct {
 	DownloadRate uint64 `json:"download_rate"`
 	UploadRate   uint64 `json:"upload_rate"`
 	// Total rates include protocol overhead; the fields above are payload-only.
-	DownloadRateTotal uint64  `json:"download_rate_total"`
-	UploadRateTotal   uint64  `json:"upload_rate_total"`
-	SavePath          string  `json:"save_path"`
-	DownloadLimit     int64   `json:"download_limit"`
-	UploadLimit       int64   `json:"upload_limit"`
-	AllTimeUpload     int64   `json:"all_time_upload"`
-	AllTimeDownload   int64   `json:"all_time_download"`
-	SeedingSeconds    int64   `json:"seeding_seconds"`
-	QueuePosition     int     `json:"queue_position"`
-	NumPeers          int     `json:"num_peers"`
-	NumSeeds          int     `json:"num_seeds"`
-	SeedRatio         float64 `json:"seed_ratio"`
-	SeedDays          int64   `json:"seed_days"`
-	HasMetadata       bool    `json:"has_metadata"`
-	AutoManaged       bool    `json:"auto_managed"`
-	TorrentVersion    string  `json:"torrent_version"`
-	TotalSize         int64   `json:"total_size"`
-	TotalDone         int64   `json:"total_done"`
-	Stalled           bool    `json:"stalled"`
+	DownloadRateTotal uint64 `json:"download_rate_total"`
+	UploadRateTotal   uint64 `json:"upload_rate_total"`
+	SavePath          string `json:"save_path"`
+	// ContentPath is the torrent's content root as the engine reports it. It can
+	// differ from SavePath/Name when the backend uses a different content layout.
+	ContentPath     string  `json:"content_path,omitempty"`
+	DownloadLimit   int64   `json:"download_limit"`
+	UploadLimit     int64   `json:"upload_limit"`
+	AllTimeUpload   int64   `json:"all_time_upload"`
+	AllTimeDownload int64   `json:"all_time_download"`
+	SeedingSeconds  int64   `json:"seeding_seconds"`
+	QueuePosition   int     `json:"queue_position"`
+	NumPeers        int     `json:"num_peers"`
+	NumSeeds        int     `json:"num_seeds"`
+	SeedRatio       float64 `json:"seed_ratio"`
+	SeedDays        int64   `json:"seed_days"`
+	HasMetadata     bool    `json:"has_metadata"`
+	AutoManaged     bool    `json:"auto_managed"`
+	TorrentVersion  string  `json:"torrent_version"`
+	TotalSize       int64   `json:"total_size"`
+	TotalDone       int64   `json:"total_done"`
+	Stalled         bool    `json:"stalled"`
 	// DiskWait marks a download the engine's disk guard paused because its
 	// folder ran out of free space; it resumes by itself when space returns.
 	DiskWait bool `json:"disk_wait,omitempty"`
@@ -951,7 +954,10 @@ type TorrentEvent struct {
 	Hash     string `json:"hash"`
 	Name     string `json:"name"`
 	SavePath string `json:"save_path"`
-	Message  string `json:"message,omitempty"`
+	// ContentPath is the content root reported by the engine. Empty keeps
+	// CompletionPath on its SavePath/Name fallback.
+	ContentPath string `json:"content_path,omitempty"`
+	Message     string `json:"message,omitempty"`
 }
 
 // PeerView is one peer of a torrent.

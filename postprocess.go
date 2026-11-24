@@ -351,12 +351,20 @@ func completionComponent(name string) (string, bool) {
 	return component, true
 }
 
-// CompletionPath is the path of the completed download inside the torrent's
-// `save_path` (implementation of `completion_path`). `event.name` is untrusted: only its
-// final component is kept, and a missing name never falls back to the shared
-// root.
+// CompletionPath is the path of the completed download (implementation of
+// `completion_path`). An engine-reported ContentPath is authoritative only when
+// it is absolute and stays inside SavePath; this also permits the save path
+// itself for a backend's no-subfolder layout. Otherwise `event.name` is
+// untrusted: only its final component is kept, and a missing name never falls
+// back to the shared root.
 func CompletionPath(event *models.TorrentEvent) string {
-	root := event.SavePath
+	root := filepath.Clean(event.SavePath)
+	if event.ContentPath != "" && filepath.IsAbs(event.ContentPath) {
+		content := filepath.Clean(event.ContentPath)
+		if pathWithin(content, root) {
+			return content
+		}
+	}
 	if name, ok := completionComponent(event.Name); ok {
 		return filepath.Join(root, name)
 	}

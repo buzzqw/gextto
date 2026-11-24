@@ -73,6 +73,10 @@ interface.
   executable you configure, so editing hooks is equivalent to granting command
   execution as the service user. Only define hooks you trust, and treat the
   ability to change them as root-equivalent.
+- **Browser framing is refused.** Both web interfaces send
+  `Content-Security-Policy: frame-ancestors 'none'` and `X-Frame-Options: DENY`,
+  so another site cannot embed them for clickjacking. State-changing HTTP
+  operations use `POST`/`DELETE`, never `GET`.
 - **Parameterised SQL.** Every user value is bound as a query parameter; dynamic
   SQL is limited to internal literals and clamped integers.
 - **No unverified TLS skipping.** The daemon never sets

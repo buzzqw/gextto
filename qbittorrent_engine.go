@@ -399,6 +399,12 @@ func (e *qbittorrentEngine) toView(t qbittorrent.Torrent) models.TorrentView {
 	if translated, ok := TranslateBackendToGextto(savePath, e.settings.Mappings); ok {
 		savePath = translated
 	}
+	contentPath := t.ContentPath
+	if contentPath != "" {
+		if translated, ok := TranslateBackendToGextto(contentPath, e.settings.Mappings); ok {
+			contentPath = translated
+		}
+	}
 	hasMetadata := t.State != "metaDL" && t.State != "forcedMetaDL" && totalSize > 0
 	numPeers := t.Peers
 	if numPeers == 0 {
@@ -425,6 +431,7 @@ func (e *qbittorrentEngine) toView(t qbittorrent.Torrent) models.TorrentView {
 		Hash:              strings.ToLower(t.Hash),
 		Name:              t.Name,
 		SavePath:          savePath,
+		ContentPath:       contentPath,
 		Progress:          progress * 100.0,
 		State:             state,
 		DownloadRate:      uint64(maxInt64(0, t.DownloadRate)),
@@ -555,10 +562,11 @@ func (e *qbittorrentEngine) sync() error {
 		}
 		if SamePath(view.SavePath, destination) {
 			e.events = append(e.events, models.TorrentEvent{
-				Kind:     "storage_moved",
-				Hash:     hash,
-				Name:     view.Name,
-				SavePath: view.SavePath,
+				Kind:        "storage_moved",
+				Hash:        hash,
+				Name:        view.Name,
+				SavePath:    view.SavePath,
+				ContentPath: view.ContentPath,
 			})
 			delete(e.pendingMoves, hash)
 		}
@@ -769,27 +777,42 @@ func (e *qbittorrentEngine) AdjustQueue(cfg *Config, _ int64) {
 	}
 }
 
+// qbitCompletionVerified reports whether qBittorrent has reached a completed
+// state. A full progress bar alone is not enough: checking, moving and failed
+// torrents can still report every piece present.
+func qbitCompletionVerified(torrent models.TorrentView) bool {
+	if torrent.Progress < 99.99 || torrent.TotalSize <= 0 || torrent.CompletedAt <= 0 || strings.TrimSpace(torrent.Error) != "" {
+		return false
+	}
+	switch torrent.State {
+	case "seeding", "stalled", "paused", "queued":
+		return true
+	default:
+		return false
+	}
+}
+
 // diffLocked compares two snapshots and queues the normalized events.
 func (e *qbittorrentEngine) diffLocked(previous, current models.TorrentView) {
 	if !previous.HasMetadata && current.HasMetadata {
 		e.events = append(e.events, models.TorrentEvent{
-			Kind: "metadata_received", Hash: current.Hash, Name: current.Name, SavePath: current.SavePath,
+			Kind: "metadata_received", Hash: current.Hash, Name: current.Name, SavePath: current.SavePath, ContentPath: current.ContentPath,
 		})
 	}
-	if previous.Progress < 99.99 && current.Progress >= 99.99 {
+	if !qbitCompletionVerified(previous) && qbitCompletionVerified(current) {
 		e.events = append(e.events, models.TorrentEvent{
-			Kind: "torrent_finished", Hash: current.Hash, Name: current.Name, SavePath: current.SavePath,
+			Kind: "torrent_finished", Hash: current.Hash, Name: current.Name, SavePath: current.SavePath, ContentPath: current.ContentPath,
 		})
 	}
 	if previous.State == "checking_files" && current.State != "checking_files" {
 		e.events = append(e.events, models.TorrentEvent{
-			Kind: "torrent_checked", Hash: current.Hash, Name: current.Name, SavePath: current.SavePath,
+			Kind: "torrent_checked", Hash: current.Hash, Name: current.Name, SavePath: current.SavePath, ContentPath: current.ContentPath,
 		})
 	}
 	if previous.State != "error" && current.State == "error" {
 		e.events = append(e.events, models.TorrentEvent{
 			Kind: "torrent_error", Hash: current.Hash, Name: current.Name,
-			SavePath: current.SavePath, Message: current.Error,
+			SavePath: current.SavePath, ContentPath: current.ContentPath, Message: current.Error,
 		})
 	}
 }
@@ -1713,17 +1736,26 @@ func (e *qbittorrentEngine) AddWithOptions(magnet string, cfg *Config, preferred
 	// Do not report a phantom start when the torrent is already in the session:
 	// the engine returns false in the same case, and the caller uses that to
 	// avoid registering a download that never started.
-	if known, ok := utils.MagnetHash(magnet); ok {
-		for _, existing := range e.List() {
-			if strings.EqualFold(existing.Hash, known) {
-				return false, nil
-			}
+	known := ""
+	if hash, ok := utils.MagnetHash(magnet); ok {
+		known = hash
+		if _, err := e.client.TorrentInfo(ctx, known); err == nil {
+			return false, nil
+		} else if !errors.Is(err, qbittorrent.ErrNotFound) {
+			return false, err
 		}
 	}
 	addOpts := e.addOptions(options, cfg)
 	addOpts.SavePath = savePath
 	hash, err := e.client.AddMagnet(ctx, magnet, addOpts)
 	if err != nil {
+		// A concurrent add can win after the duplicate check. qBittorrent then
+		// refuses the second request, but the requested torrent is present.
+		if known != "" {
+			if _, infoErr := e.client.TorrentInfo(ctx, known); infoErr == nil {
+				return false, nil
+			}
+		}
 		return false, err
 	}
 	if hash == "" {
@@ -1755,6 +1787,15 @@ func (e *qbittorrentEngine) AddTorrentFileWithOptions(torrentPath string, cfg *C
 	if !fileExists(torrentPath) {
 		return nil, fmt.Errorf("torrent file not found: %s", torrentPath)
 	}
+	data, err := os.ReadFile(torrentPath)
+	if err != nil {
+		return nil, fmt.Errorf("cannot read torrent file %s: %w", torrentPath, err)
+	}
+	hash, ok := utils.TorrentInfoHash(data)
+	if !ok {
+		return nil, fmt.Errorf("torrent file has no valid info hash: %s", torrentPath)
+	}
+	hash = strings.ToLower(hash)
 	savePath, err := e.resolveSavePath(preferredPath, cfg)
 	if err != nil {
 		return nil, err
@@ -1763,54 +1804,28 @@ func (e *qbittorrentEngine) AddTorrentFileWithOptions(torrentPath string, cfg *C
 	defer cancel()
 	e.ensureCategory(ctx)
 
-	before := e.currentHashSet()
+	// qBittorrent does not return the infohash. Read it from the .torrent before
+	// looking at the session, so an unrelated torrent appearing in a snapshot
+	// diff can never be mistaken for the file just added.
+	if _, err := e.client.TorrentInfo(ctx, hash); err == nil {
+		e.persistTorrentCopy(hash, torrentPath)
+		return nil, nil
+	} else if !errors.Is(err, qbittorrent.ErrNotFound) {
+		return nil, err
+	}
 	addOpts := e.addOptions(options, cfg)
 	addOpts.SavePath = savePath
 	if err := e.client.AddTorrentFile(ctx, torrentPath, addOpts); err != nil {
+		// A concurrent add can win after the duplicate check. In that case the
+		// rejected request still means "already present", not an add failure.
+		if _, infoErr := e.client.TorrentInfo(ctx, hash); infoErr == nil {
+			e.persistTorrentCopy(hash, torrentPath)
+			return nil, nil
+		}
 		return nil, err
 	}
-	// qBittorrent does not return the infohash: find the newly added torrent.
-	for attempt := 0; attempt < 4; attempt++ {
-		if attempt > 0 {
-			select {
-			case <-ctx.Done():
-				return nil, ctx.Err()
-			case <-time.After(150 * time.Millisecond):
-			}
-		}
-		torrents, listErr := e.client.Torrents(ctx)
-		if listErr != nil {
-			continue
-		}
-		for _, torrent := range torrents {
-			hash := strings.ToLower(torrent.Hash)
-			if _, existed := before[hash]; !existed {
-				e.persistTorrentCopy(hash, torrentPath)
-				return &hash, nil
-			}
-		}
-	}
-	// Fallback: if qBittorrent didn't return a new hash (e.g. already added, or slow
-	// indexing), extract the infohash directly from the .torrent file metadata.
-	if data, readErr := os.ReadFile(torrentPath); readErr == nil {
-		if hash, ok := utils.TorrentInfoHash(data); ok {
-			hash = strings.ToLower(hash)
-			e.persistTorrentCopy(hash, torrentPath)
-			return &hash, nil
-		}
-	}
-	return nil, nil
-}
-
-func (e *qbittorrentEngine) currentHashSet() map[string]struct{} {
-	_ = e.sync()
-	e.mu.Lock()
-	defer e.mu.Unlock()
-	out := make(map[string]struct{}, len(e.cache))
-	for hash := range e.cache {
-		out[hash] = struct{}{}
-	}
-	return out
+	e.persistTorrentCopy(hash, torrentPath)
+	return &hash, nil
 }
 
 // persistTorrentCopy keeps a Gextto-owned `.torrent` so the hash can be

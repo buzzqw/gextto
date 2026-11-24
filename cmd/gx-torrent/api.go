@@ -47,7 +47,6 @@ func (d *Daemon) routes() http.Handler {
 	api.HandleFunc("POST /api/v1/config", d.handleSetConfig)
 	api.HandleFunc("POST /api/v1/create-torrent", d.handleCreateTorrent)
 	api.HandleFunc("GET /api/v1/dht-feed", d.handleDHTFeed)
-	api.HandleFunc("GET /api/v1/dht-feed/publish", d.handlePublishDHTFeed)
 	api.HandleFunc("POST /api/v1/dht-feed/publish", d.handlePublishDHTFeed)
 	api.HandleFunc("GET /api/v1/metrics", d.handleMetrics)
 	api.HandleFunc("GET /api/v1/events", d.handleAPIEvents)
@@ -157,7 +156,18 @@ func (d *Daemon) routes() http.Handler {
 		// the standalone daemon; managed mode is driven by Gextto only.
 		root.Handle("/api/v2/", d.routesQbit())
 	}
-	return d.standaloneGuard(d.altWebUIFallback(root))
+	return denyFraming(d.standaloneGuard(d.altWebUIFallback(root)))
+}
+
+// denyFraming wraps the whole daemon handler, outside the standalone checks and
+// the alternative interface fallback, so every response carries the policy:
+// HTML, fragments, API errors, redirects and static assets included.
+func denyFraming(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Frame-Options", "DENY")
+		w.Header().Set("Content-Security-Policy", "frame-ancestors 'none'")
+		next.ServeHTTP(w, r)
+	})
 }
 
 // authenticate requires the shared token on every request when one is set. In

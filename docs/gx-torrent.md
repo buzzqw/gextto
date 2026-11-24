@@ -796,7 +796,11 @@ the 5.x `stopped` flag on `torrents/add`, accepted next to `paused`),
 `torrents/info`, as Sonarr and Radarr read). The complete download-client
 sequence is covered by an end-to-end test: login, version probe, category
 creation, magnet add with category and save path, status read through
-`torrents/info`, incremental sync and removal.
+`torrents/info`, incremental sync and removal. A duplicate-only add returns
+`409 Conflict`, and operational failures in pause, resume, recheck, move, delete
+and share-limit operations return an error instead of a false `200`. Gextto
+carries the engine's `content_path` through its completion event, so imports use
+the actual payload path for Original, Subfolder and NoSubfolder layouts.
 
 The **read side** also covers what the WebUI alternatives and the mobile apps
 need: `torrents/info` accepts the `filter`, `category`, `tag`, `sort`,
@@ -1574,8 +1578,11 @@ RPC server is disabled.
   - The file is **updated at the startup of the service** and then **once a
     week** while the service stays active (besides the manual button).
 - **DHT** (BEP 5), shared on the same UDP port as the uTP peers.
-  - **IPv6 discovery BEP 32** dual-stack: v4 and v6 nodes kept separate
-    (`nodes`/`nodes6`, `want: n4/n6`).
+   - **IPv6 discovery BEP 32** dual-stack: v4 and v6 nodes kept separate
+     (`nodes`/`nodes6`, `want: n4/n6`).
+   - **Bounded routing table**: `MaxNodes` is enforced when a discovered node
+     enters the table, so a flood of fresh contacts cannot grow memory without
+     limit.
   - **Security extension BEP 42**: the node ID is derived from the external IP when it is
     known (the routable listen address from `-listen-interface`, or the IP
     of the outgoing interface), so no one can
@@ -2433,11 +2440,12 @@ The engine saves every torrent in `DataDir/<id>` and at removal always runs
   whole destination or other files;
 - the paths come from the metainfo, which is untrusted: the engine refuses a
   name or a file path that would leave the storage root (`filepath.IsLocal` in
-  `metainfo.buildFiles`), the storage refuses it again before opening the file
-  (`filestorage.Open`) and the daemon accepts only a single, local component as
-  the top entry (`payloadPath`), so a crafted torrent cannot write, move or
-  delete anything above its own folder. A torrent that tries is refused when it
-  is added;
+  `metainfo.buildFiles`), negative file lengths, overflowing totals and piece
+  counts that do not match the file layout. The storage refuses an escaping path
+  again before opening the file (`filestorage.Open`) and the daemon accepts only
+  a single, local component as the top entry (`payloadPath`), so a crafted
+  torrent cannot write, move or delete anything above its own folder. A torrent
+  that tries is refused when it is added;
 - a real folder left in place of the symlink is moved to
   `DATA/orphaned/<id>` before removal, never deleted;
 - **the daemon's own state is not part of any payload**: a deletion or a

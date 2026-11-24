@@ -303,8 +303,9 @@ Gextto vi si ricollega se binario e opzioni coincidono.
 `gx-torrent` può essere usato anche come client autonomo completo senza Gextto,
 un'alternativa in Go puro a `qbittorrent-nox` o `transmission-daemon`:
 
-- **Web API v2 di qBittorrent** (`/api/v2/...`): compatibile con Sonarr, Radarr, Lidarr,
-  Readarr e le app mobili per smartphone.
+- **Web API v2 di qBittorrent** (`/api/v2/...`): compatibilità ampia con Sonarr,
+  Radarr, Lidarr e le app mobili; Readarr richiede una build API-v2. Il `/api/v2`
+  di Gextto resta il sottoinsieme più piccolo per le estensioni del browser.
 - **Web UI completa**: temi chiaro e scuro, 24 colonne personalizzabili, gestione categorie,
   filtri tag, cassetto dei dettagli (peer, mappa pezzi, file), anteprima magnet, drag-and-drop e schede per mobile.
 - **Automazione e RSS**: pagina dedicata *Serie e film*, motore di regole RSS con filtri PASS/FAIL
