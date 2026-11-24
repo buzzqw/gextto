@@ -481,28 +481,34 @@ into `language`, which it overrode.
 of that title. `POST /api/series/{name}` already accepted it.
 
 The items of `GET`/`POST /api/quality-profiles` carry `id`, `name`, `quality`,
-`qualities`, `cutoff`, `audio` (one of the presets above, empty = any), `language`, `subtitle`,
-`exclude`, `disable_upgrades` and `upgrades` (`allow`/`deny`, the same switch as the profile editor writes it).
-`qualities` is the list of accepted resolutions (`360p`, `480p`, `576p`, `720p`, `1080p`, `2160p`),
-lowest first; empty means any resolution. `POST` accepts either a JSON array or a comma-separated
-string for it, so the settings editor can post a text field. When a list is given, `quality` is
-derived from it for clients that still read the single value; when it is absent, the list is
-derived from `quality`, so a saved `1080p+` or `720p-1080p` migrates automatically. `cutoff` is a
-resolution in that list at which upgrades stop (empty = the global `upgrade_until_score` keeps
-governing). A cutoff outside the list is cleared. Quality, audio, language and subtitle values
-are validated on save: an unrecognised value answers 400 instead of being stored as "no limit".
+`qualities`, `upgrade`, `audio` (one of the presets above, empty = any), `language`, `subtitle`
+and `exclude`. `qualities` is the list of accepted resolutions (`360p`, `480p`, `576p`,
+`720p`, `1080p`, `2160p`), lowest first; empty means any resolution. `POST` accepts either a
+JSON array or a comma-separated string for it, so the settings editor can post a text field.
+When a list is given, `quality` is derived from it for clients that still read the single
+value; when it is absent, the list is derived from `quality`, so a saved `1080p+` or
+`720p-1080p` migrates automatically. `upgrade` has two values: `improve` (the default,
+upgrades stay inside the accepted qualities, with REPACK, PROPER and better source, codec,
+HDR or audio still allowed) and `freeze` (no archived file is ever replaced).
+`cutoff`, `disable_upgrades` and `upgrades` are legacy fields: they are still accepted and
+still written for older clients, but always derived from `qualities` and `upgrade`. A saved
+cutoff is migrated on read by dropping the accepted resolutions above it, and is then
+cleared. Titles saved with a cutoff are migrated the same way when the library loads.
+Quality, audio, language, subtitle and upgrade values are validated on save: an
+unrecognised value answers 400 instead of being stored as "no limit".
 A profile is a template: the add form and the
 v3 endpoints (`POST /api/v3/series`, `POST /api/v3/movie`) copy its values,
-`qualities`, `cutoff`, `audio` and `disable_upgrades` included, into the new title. An empty
+`qualities` and `upgrade` included, into the new title. An empty
 `language` means the configured default language; `POST` stores the default of
 that moment, so a later change of the default does not move the profiles. Names
 must be unique (a repeated name answers 400, naming it), at most 120 characters;
-the list holds at most 200 profiles. The v3 list reports
-`upgradeAllowed` as the opposite of `disable_upgrades`, a real `cutoff` id and `items` with one
-entry per recognised resolution and its `allowed` flag; profiles generated from the library
-(until the list is saved for the first time) carry the quality, minimum audio, language,
-subtitles and upgrade switch of the titles they come from—never a single title's exclusions,
-and no cutoff, so their upgrades keep following the global score. The v3 lookup records report the first
+the list holds at most 200 profiles. The v3 list keeps its *arr shape:
+`upgradeAllowed` is false only for `freeze`, `items` has one entry per recognised
+resolution with its `allowed` flag, and `cutoff` is the id of the highest accepted
+resolution (or the top of the ladder when any resolution is accepted) so request
+managers always see a valid id. Profiles generated from the library
+(until the list is saved for the first time) carry the quality, minimum audio, language
+and subtitles of the titles they come from—never a single title's exclusions. The v3 lookup records report the first
 profile of the saved list as their `qualityProfileId` (the profile the add form
 preselects), and `POST /api/v3/series`/`POST /api/v3/movie` answer 400 for a
 `qualityProfileId` that does not exist while 0 or absent means that default.

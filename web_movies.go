@@ -366,7 +366,8 @@ func UpdateMovie(w http.ResponseWriter, r *http.Request, s *AppState) {
 			return
 		}
 		movie.Quality, movie.Language, movie.Subtitle = profile.Quality, profile.Language, profile.Subtitle
-		movie.Qualities, movie.Cutoff = append([]string(nil), profile.Qualities...), profile.Cutoff
+		movie.Qualities = append([]string(nil), profile.Qualities...)
+		movie.Cutoff = ""
 		movie.Audio, movie.AudioChannels = profile.Audio, ""
 		// Both legacy requirement fields must go: a film added through the
 		// discovery page clears them, and a saved profile has to give the same

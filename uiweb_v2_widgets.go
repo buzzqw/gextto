@@ -1303,9 +1303,6 @@ func v2ProfileSummary(s *AppState, profile QualityProfile) string {
 	} else {
 		parts = append(parts, tr("qualsiasi qualità"))
 	}
-	if profile.Cutoff != "" {
-		parts = append(parts, tr("Ferma upgrade a")+" "+profile.Cutoff)
-	}
 	if profile.Audio != "" {
 		parts = append(parts, tr("audio")+" "+tr(v2EditorAudioLabel(profile.Audio)))
 	}
@@ -1317,8 +1314,8 @@ func v2ProfileSummary(s *AppState, profile QualityProfile) string {
 	if profile.Exclude != "" {
 		parts = append(parts, tr("escludi")+" "+profile.Exclude)
 	}
-	if profile.DisableUpgrades {
-		parts = append(parts, tr("upgrade: no"))
+	if profile.DisableUpgrades || profile.Upgrade == profileUpgradeFreeze {
+		parts = append(parts, tr("Non sostituire mai"))
 	}
 	return strings.Join(parts, " · ")
 }
@@ -1343,7 +1340,7 @@ func v2TitleProfilesFor(s *AppState, values profileTitleValues) v2TitleProfiles 
 	for _, profile := range profiles {
 		view.Choices = append(view.Choices, v2ProfileChoice{ID: profile.ID, Name: profile.Name, Summary: v2ProfileSummary(s, profile), Selected: profile.ID == match})
 	}
-	view.CurrentSummary = v2ProfileSummary(s, QualityProfile{Quality: values.Quality, Qualities: values.Qualities, Cutoff: values.Cutoff,
+	view.CurrentSummary = v2ProfileSummary(s, QualityProfile{Quality: values.Quality, Qualities: values.Qualities,
 		Audio: values.Audio, Language: values.Language, Subtitle: values.Subtitle, Exclude: values.Exclude, DisableUpgrades: values.DisableUpgrades})
 	return view
 }

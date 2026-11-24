@@ -3023,8 +3023,8 @@ func TestV2QualityProfileEditorOffersTheResolutions(t *testing.T) {
 	if !strings.Contains(body, `value="360p,480p,576p,720p,1080p"`) {
 		t.Fatal("a stored free-text quality was not migrated")
 	}
-	if !strings.Contains(body, `name="cutoff__0"`) {
-		t.Fatal("the profile must offer a cutoff")
+	if !strings.Contains(body, `name="upgrade__0"`) || !strings.Contains(body, `>Non sostituire mai</option>`) {
+		t.Fatal("the profile must offer the single upgrade choice")
 	}
 }
 
@@ -3107,7 +3107,7 @@ func TestV2TitlePagesApplyAQualityProfile(t *testing.T) {
 		t.Fatalf("apply -> %d %s", code, body)
 	}
 	if got := latestConfig(state).Series[0]; got.Quality != "1080p+" || got.Audio != "high-5.1" || got.Language != "eng" || got.Subtitle != "ita" || !got.DisableUpgrades || got.Exclude != "cam, spinoff" ||
-		strings.Join(got.Qualities, ",") != "1080p,2160p" || got.Cutoff != "1080p" {
+		strings.Join(got.Qualities, ",") != "1080p,2160p" || got.Cutoff != "" {
 		t.Fatalf("series after profile = %+v", got)
 	}
 	form := url.Values{"view": {"movies"}, "path": {"/api/movies/3"}, "name": {"Film"}, "year": {"2020"}, "quality": {""}, "language": {"ita"}, "subtitle": {""},
@@ -3116,7 +3116,7 @@ func TestV2TitlePagesApplyAQualityProfile(t *testing.T) {
 		t.Fatalf("movie apply -> %d %s", code, body)
 	}
 	if got := latestConfig(state).Movies[0]; got.Quality != "1080p+" || got.Language != "eng" || got.Subtitle != "ita" || !got.DisableUpgrades || got.Exclude != "cam" ||
-		strings.Join(got.Qualities, ",") != "1080p,2160p" || got.Cutoff != "1080p" {
+		strings.Join(got.Qualities, ",") != "1080p,2160p" || got.Cutoff != "" {
 		t.Fatalf("movie after profile = %+v", got)
 	}
 }

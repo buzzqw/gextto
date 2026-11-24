@@ -1395,8 +1395,8 @@ rejections are visible in the log at `DEBUG` level.
 
 ### Quality profiles
 
-A profile is a **named template**: accepted qualities, upgrade cutoff, minimum
-audio, language, subtitles, exclusions and «Allow upgrades». They are managed in
+A profile is a **named template**: accepted qualities, upgrade mode, minimum
+audio, language, subtitles and exclusions. They are managed in
 *Configuration → Quality and upgrades → Quality profiles*.
 
 - **Accepted qualities** are the resolutions the title accepts, separated by
@@ -1404,27 +1404,31 @@ audio, language, subtitles, exclusions and «Allow upgrades». They are managed 
   empty means *any*. You can also give just a minimum (`1080p+`) or a range
   (`720p-1080p`): on save they are expanded into the matching resolutions. An
   unrecognised value is reported and refused: it used to be stored silently as
-  "no limit".
-- **Stop upgrades at** is the resolution at which you stop replacing a copy
-  already in the library. «No upgrade» leaves the global *Stop improving above
-  this score* threshold in charge. The profile's cutoff applies only to the
-  titles you give it to; the comparison stays the one described below in *When
-  a file is replaced*.
+  "no limit". **Accepted qualities are also the upgrade ceiling**: no second
+  field is needed to say how far to improve.
+- **Upgrade** has two choices. *Improve within the accepted qualities* takes a
+  higher resolution up to the highest accepted one and, even at the same
+  resolution, REPACK, PROPER and better source, codec, HDR or audio; the global
+  *Stop improving above this score* threshold remains the final brake.
+  *Never replace* blocks every substitution of an archived file, REPACK and
+  PROPER included.
 - **Language** and **Subtitles** offer the common choices (`ita`, `eng`,
   `ita,eng`, `any`) but also take other codes (`fre`, `ita,eng,fre`).
   Empty means Gextto's default language.
 - Until you save the list, Gextto generates a profile for each combination
   already in the library; the first is **Default**. Two profiles cannot share a
-  name. Profiles generated from the library have no cutoff of their own: they
-  still follow the global score.
+  name. If you had set an old "Stop upgrades at", the resolutions above it are
+  removed from the accepted qualities when the list is read and the old setting
+  disappears: the result is the same, with one rule fewer. Titles already in the
+  library are migrated the same way.
 
 **Profiles are templates, not rules.** When you pick a profile for a title, its
-values — accepted qualities and cutoff included — are **copied** into the title.
-Changing the profile later does not change the titles already created: to update
-many at once use [Edit selected](#editing-several-titles-at-once), which can now
-write accepted qualities and the cutoff too. The profile list is also what
-Jellyseerr sees: it now exposes the accepted resolutions and the real cutoff
-instead of an empty list. Each profile keeps its number even if you rename it,
+values — accepted qualities and upgrade mode included — are **copied** into the
+title. Changing the profile later does not change the titles already created: to
+update many at once use [Edit selected](#editing-several-titles-at-once).
+The profile list is also what Jellyseerr sees: it keeps receiving
+`upgradeAllowed`, a valid `cutoff` (the highest accepted quality) and the list of
+accepted resolutions. Each profile keeps its number even if you rename it,
 because Jellyseerr remembers the number.
 
 ### Trying before changing

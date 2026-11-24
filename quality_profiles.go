@@ -34,9 +34,16 @@ const (
 )
 
 // QualityProfile is one named combination of selection overrides. Audio is
-// the minimum audio preset (empty = any); DisableUpgrades is «Permetti
-// upgrade: No». Upgrades is the same switch as the profile editor writes it
-// ("allow"/"deny"): normalizeProfileUpgrades keeps the two in step.
+// the minimum audio preset (empty = any). Qualities are the accepted
+// resolutions, lowest first: they are both the filter on incoming releases
+// and the ceiling of the upgrade. Upgrade has two values: "improve" (stay
+// inside the accepted qualities, with REPACK/PROPER and better source, codec,
+// HDR or audio still allowed) and "freeze" (never replace an archived file).
+//
+// Cutoff, DisableUpgrades and Upgrades are the pre-simplification fields. They
+// are still decoded so an existing configuration migrates on read, and still
+// written so older API clients keep working, but they are always derived from
+// Qualities and Upgrade: the editor no longer offers them.
 type QualityProfile struct {
 	ID       int    `json:"id"`
 	Name     string `json:"name"`
@@ -45,16 +52,19 @@ type QualityProfile struct {
 	Language string `json:"language"`
 	Subtitle string `json:"subtitle"`
 	Exclude  string `json:"exclude"`
-	// Qualities are the accepted resolutions, lowest first. It is the explicit
-	// form of Quality: a list can express a non-contiguous set ("720p, 2160p")
-	// that a single minimum or range cannot. Empty means any resolution.
-	// Cutoff is the resolution at which upgrades stop (empty = no cutoff).
-	Qualities []string `json:"qualities,omitempty"`
-	Cutoff    string   `json:"cutoff,omitempty"`
 
+	Qualities []string `json:"qualities,omitempty"`
+	Upgrade   string   `json:"upgrade,omitempty"`
+
+	Cutoff          string `json:"cutoff,omitempty"`
 	DisableUpgrades bool   `json:"disable_upgrades,omitempty"`
 	Upgrades        string `json:"upgrades,omitempty"`
 }
+
+const (
+	profileUpgradeImprove = "improve"
+	profileUpgradeFreeze  = "freeze"
+)
 
 // profileQualityLabels are the resolutions a profile can accept, lowest first.
 // The index (plus one) is the stable id used by the v3 API.
@@ -187,16 +197,8 @@ func normalizeProfileQualities(profile *QualityProfile) {
 	if !explicit {
 		profile.Qualities = qualityListFromLegacy(profile.Quality)
 	}
-	profile.Cutoff = strings.ToLower(strings.TrimSpace(profile.Cutoff))
-	found := false
-	for _, quality := range profile.Qualities {
-		if quality == profile.Cutoff {
-			found = true
-		}
-	}
-	if !found {
-		profile.Cutoff = ""
-	}
+	// Cutoff is left untouched here: normalizeProfileUpgrade still has to read
+	// it to migrate profiles saved before the single "Upgrade" choice existed.
 }
 
 // resolutionInList decides whether a parsed resolution satisfies a title's
@@ -214,61 +216,76 @@ func resolutionInList(quality *models.Quality, list []string, legacy string) boo
 	return resolutionAllowed(quality, legacy)
 }
 
-// cutoffScore turns a resolution cutoff into the equivalent quality score the
-// upgrade gate compares. The configured weights decide the absolute points, so
-// changing them changes what "1080p" is worth, as it already does for the
-// global "stop improving" score.
-func (c *Config) cutoffScore(cutoff string) int64 {
+// migrateTitleCutoff folds a cutoff saved on a title before the single
+// "Upgrade" choice existed into the accepted qualities: the resolutions above
+// the old ceiling are dropped. Called when the library is loaded, so no rule
+// is left behind the scenes.
+func migrateTitleCutoff(qualities []string, legacyQuality, cutoff string) []string {
 	rank := profileQualityRank(cutoff)
-	if rank == 0 || c == nil {
-		return 0
+	if rank == 0 {
+		return qualities
 	}
-	return c.QualityScore(&models.Quality{Resolution: profileQualityLabels[rank-1]})
-}
-
-// upgradeUntilForTitle is the effective "stop improving" score of a title:
-// its profile's resolution cutoff when set, the global setting otherwise.
-func upgradeUntilForTitle(cfg *Config, series *SeriesConfig, movie *MovieConfig) int64 {
-	if cfg == nil {
-		return 0
+	if len(qualities) == 0 {
+		qualities = qualityListFromLegacy(legacyQuality)
 	}
-	cutoff := ""
-	if series != nil {
-		cutoff = series.Cutoff
-	} else if movie != nil {
-		cutoff = movie.Cutoff
-	}
-	if score := cfg.cutoffScore(cutoff); score > 0 {
-		return score
-	}
-	return cfg.UpgradeUntilScore
-}
-
-// upgradeUntilForRelease finds the monitored title of a release and returns
-// its effective upgrade ceiling. It is used wherever an approval decision is
-// built, so the profile's cutoff and the global score cannot disagree.
-func upgradeUntilForRelease(cfg *Config, release *models.Release) int64 {
-	if cfg == nil || release == nil {
-		return 0
-	}
-	if release.Kind == "series" {
-		if release.Series == nil {
-			return cfg.UpgradeUntilScore
+	narrowed := make([]string, 0, len(qualities))
+	for _, quality := range qualities {
+		if profileQualityRank(quality) <= rank {
+			narrowed = append(narrowed, quality)
 		}
-		return upgradeUntilForTitle(cfg, cfg.FindSeriesMatch(*release.Series, release.Season), nil)
 	}
-	return upgradeUntilForTitle(cfg, nil, cfg.FindMovieMatchForRelease(release, false))
+	if len(narrowed) == 0 && len(qualities) > 0 {
+		narrowed = []string{qualities[0]}
+	}
+	return narrowed
 }
 
-// normalizeProfileUpgrades reads the editor's "upgrades" choice when present
-// and then writes it back from DisableUpgrades, so both spellings agree.
-func normalizeProfileUpgrades(profile *QualityProfile) {
+// normalizeProfileUpgrade folds the old "allow upgrades" switch and the old
+// cutoff into the single choice the editor now offers:
+//
+//   - freeze: nothing already archived is ever replaced, REPACK/PROPER included;
+//   - improve: upgrades stay inside the accepted qualities, whose highest
+//     resolution is the ceiling. A cutoff saved before the change is migrated
+//     by dropping the accepted resolutions above it, so the old ceiling keeps
+//     its meaning without a second, invisible rule.
+//
+// The legacy fields are then written back for API compatibility.
+func normalizeProfileUpgrade(profile *QualityProfile) {
+	mode := strings.ToLower(strings.TrimSpace(profile.Upgrade))
+	// The old editor wrote both spellings; "upgrades" wins when present, as it
+	// did before the simplification, so a saved choice is not silently changed.
 	switch strings.ToLower(strings.TrimSpace(profile.Upgrades)) {
 	case "deny":
-		profile.DisableUpgrades = true
+		mode = profileUpgradeFreeze
 	case "allow":
-		profile.DisableUpgrades = false
+		mode = profileUpgradeImprove
+	default:
+		if profile.DisableUpgrades {
+			mode = profileUpgradeFreeze
+		} else if mode != profileUpgradeFreeze {
+			mode = profileUpgradeImprove
+		}
 	}
+	cutoff := strings.ToLower(strings.TrimSpace(profile.Cutoff))
+	if mode == profileUpgradeImprove && profileQualityRank(cutoff) > 0 {
+		ceiling := profileQualityRank(cutoff)
+		narrowed := make([]string, 0, len(profile.Qualities))
+		for _, quality := range profile.Qualities {
+			if profileQualityRank(quality) <= ceiling {
+				narrowed = append(narrowed, quality)
+			}
+		}
+		if len(narrowed) == 0 && len(profile.Qualities) > 0 {
+			// The cutoff was below everything accepted: keep the lowest
+			// resolution so the list stays a usable filter.
+			narrowed = []string{profile.Qualities[0]}
+		}
+		profile.Qualities = narrowed
+		profile.Quality = legacyQualityFromList(narrowed)
+	}
+	profile.Cutoff = ""
+	profile.Upgrade = mode
+	profile.DisableUpgrades = mode == profileUpgradeFreeze
 	profile.Upgrades = "allow"
 	if profile.DisableUpgrades {
 		profile.Upgrades = "deny"
@@ -294,7 +311,7 @@ func decodeQualityProfiles(raw string) []QualityProfile {
 		profile.Quality = strings.TrimSpace(profile.Quality)
 		profile.Audio = normalizeAudioRequirement(profile.Audio)
 		normalizeProfileQualities(&profile)
-		normalizeProfileUpgrades(&profile)
+		normalizeProfileUpgrade(&profile)
 		profile.Language = strings.TrimSpace(profile.Language)
 		profile.Subtitle = strings.TrimSpace(profile.Subtitle)
 		profile.Exclude = strings.TrimSpace(profile.Exclude)
@@ -392,11 +409,12 @@ func ensureQualityProfiles(s *AppState) []QualityProfile {
 	}
 	for _, profile := range v3Profiles(cfg) {
 		seeded := QualityProfile{ID: profile.ID, Name: profile.Name, Quality: profile.Quality,
-			Qualities: qualityListFromLegacy(profile.Quality), Cutoff: profileQualityLabel(profile.Cutoff),
-			Audio: profile.Audio, Language: profile.Language, Subtitle: profile.Subtitle,
-			Exclude: profile.Exclude, DisableUpgrades: profile.DisableUpgrades}
+			Qualities: qualityListFromLegacy(profile.Quality),
+			Upgrade:   ternaryString(profile.DisableUpgrades, profileUpgradeFreeze, profileUpgradeImprove),
+			Audio:     profile.Audio, Language: profile.Language, Subtitle: profile.Subtitle,
+			Exclude: profile.Exclude}
 		// Both spellings travel to the editor, which writes «upgrades».
-		normalizeProfileUpgrades(&seeded)
+		normalizeProfileUpgrade(&seeded)
 		profiles = append(profiles, seeded)
 	}
 	if raw, err := json.Marshal(profiles); err == nil && cfg != nil {
@@ -415,7 +433,6 @@ func ensureQualityProfiles(s *AppState) []QualityProfile {
 func applyQualityProfileToAdd(input *TmdbAddInput, profile QualityProfile) {
 	input.Quality = profile.Quality
 	input.Qualities = append([]string(nil), profile.Qualities...)
-	input.Cutoff = profile.Cutoff
 	input.Audio = profile.Audio
 	input.AudioChannels = ""
 	input.Language = profile.Language
@@ -428,7 +445,7 @@ func applyQualityProfileToAdd(input *TmdbAddInput, profile QualityProfile) {
 type profileTitleValues struct {
 	Quality, Audio, Language, Subtitle, Exclude string
 	Qualities                                   []string
-	Cutoff                                      string
+	Upgrade                                     string
 	DisableUpgrades                             bool
 }
 
@@ -503,13 +520,12 @@ func matchingQualityProfile(profiles []QualityProfile, title profileTitleValues,
 	for _, profile := range profiles {
 		candidate := norm(profileTitleValues{Quality: profile.Quality, Audio: profile.Audio,
 			Language: profile.Language, Subtitle: profile.Subtitle,
-			Qualities: profile.Qualities, Cutoff: profile.Cutoff,
+			Qualities: profile.Qualities, Upgrade: profile.Upgrade,
 			DisableUpgrades: profile.DisableUpgrades})
 		if candidate.Quality == want.Quality && candidate.Audio == want.Audio &&
 			candidate.Language == want.Language && candidate.Subtitle == want.Subtitle &&
 			candidate.DisableUpgrades == want.DisableUpgrades &&
 			strings.Join(normalizeQualityList(candidate.Qualities), ",") == strings.Join(normalizeQualityList(want.Qualities), ",") &&
-			strings.EqualFold(candidate.Cutoff, want.Cutoff) &&
 			sameExclusions(profile.Exclude, title.Exclude) {
 			return profile.ID
 		}
@@ -663,8 +679,8 @@ func SaveQualityProfiles(w http.ResponseWriter, r *http.Request, s *AppState) {
 				return
 			}
 		}
-		if strings.TrimSpace(profile.Cutoff) != "" && profileQualityRank(profile.Cutoff) == 0 {
-			jsonError(w, http.StatusBadRequest, fmt.Sprintf("invalid quality profile %q: invalid cutoff %q", profile.Name, profile.Cutoff))
+		if mode := strings.ToLower(strings.TrimSpace(profile.Upgrade)); mode != "" && mode != profileUpgradeImprove && mode != profileUpgradeFreeze {
+			jsonError(w, http.StatusBadRequest, fmt.Sprintf("invalid quality profile %q: invalid upgrade %q", profile.Name, profile.Upgrade))
 			return
 		}
 		explicitList := len(profile.Qualities) > 0
@@ -672,7 +688,7 @@ func SaveQualityProfiles(w http.ResponseWriter, r *http.Request, s *AppState) {
 		if explicitList && len(profile.Qualities) > 0 {
 			profile.Quality = legacyQualityFromList(profile.Qualities)
 		}
-		normalizeProfileUpgrades(&profile)
+		normalizeProfileUpgrade(&profile)
 		if err := validateQualityProfileFields(profile); err != nil {
 			jsonError(w, http.StatusBadRequest, fmt.Sprintf("invalid quality profile %q: %v", profile.Name, err))
 			return
@@ -681,7 +697,7 @@ func SaveQualityProfiles(w http.ResponseWriter, r *http.Request, s *AppState) {
 			ID: profile.ID, Name: profile.Name, Quality: strings.TrimSpace(profile.Quality),
 			Language: qualityProfileLanguage(cfg, profile.Language), Subtitle: strings.TrimSpace(profile.Subtitle),
 			Exclude: mergeExclusions(profile.Exclude), Audio: normalizeAudioRequirement(profile.Audio),
-			Qualities: profile.Qualities, Cutoff: profile.Cutoff,
+			Qualities: profile.Qualities, Upgrade: profile.Upgrade,
 			DisableUpgrades: profile.DisableUpgrades, Upgrades: profile.Upgrades,
 		})
 	}

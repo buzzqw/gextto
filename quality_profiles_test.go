@@ -261,13 +261,13 @@ func TestQualityProfileQualitiesMigration(t *testing.T) {
 	if len(saved) != 2 {
 		t.Fatalf("saved = %+v", saved)
 	}
-	if got := strings.Join(saved[0].Qualities, ","); got != "720p,1080p,2160p" || saved[0].Cutoff != "1080p" || saved[0].Quality != "720p+" {
+	// An old cutoff becomes the accepted ceiling: the resolutions above it
+	// are dropped and the separate rule disappears.
+	if got := strings.Join(saved[0].Qualities, ","); got != "720p,1080p" || saved[0].Cutoff != "" || saved[0].Quality != "720p-1080p" || saved[0].Upgrade != profileUpgradeImprove {
 		t.Fatalf("saved HD = %+v", saved[0])
 	}
-	// A cutoff outside the accepted list cannot stop an upgrade that never
-	// happens: it is cleared instead of being stored as a dead rule.
-	if saved[1].Cutoff != "" {
-		t.Fatalf("cutoff outside the list was kept: %+v", saved[1])
+	if got := strings.Join(saved[1].Qualities, ","); got != "2160p" || saved[1].Cutoff != "" {
+		t.Fatalf("cutoff below the whole list was not migrated: %+v", saved[1])
 	}
 }
 
@@ -309,20 +309,20 @@ func TestTitleQualitiesFilterReleases(t *testing.T) {
 	}
 }
 
-// A profile's cutoff becomes that title's "stop improving" score, so the
-// global setting is only the fallback for titles without one.
-func TestTitleCutoffStopsUpgrades(t *testing.T) {
-	cfg := DefaultConfig()
-	cfg.Series = []SeriesConfig{{Name: "Show", Seasons: "1+", Cutoff: "1080p", Enabled: true}}
-	release := testRelease()
-	release.Kind, release.Series, release.Season = "series", stringPtr("Show"), int64Ptr(1)
-	until := upgradeUntilForRelease(&cfg, &release)
-	if until <= 0 || !upgradeCutoffReached(1200, until) {
-		t.Fatalf("cutoff score = %d, a 1080p copy must have reached it", until)
+// Titles saved with a cutoff are migrated on load: the old ceiling becomes a
+// narrower accepted list, so no invisible rule is left behind.
+func TestOldTitleCutoffMigratesToNarrowedQualities(t *testing.T) {
+	got := migrateTitleCutoff([]string{"720p", "1080p", "2160p"}, "720p+", "1080p")
+	if joined := strings.Join(got, ","); joined != "720p,1080p" {
+		t.Fatalf("qualities = %q, want 720p,1080p", joined)
 	}
-	cfg.Series[0].Cutoff = ""
-	if got := upgradeUntilForRelease(&cfg, &release); got != 0 {
-		t.Fatalf("without a cutoff the global score must apply, got %d", got)
+	got = migrateTitleCutoff(nil, "1080p+", "1080p")
+	if joined := strings.Join(got, ","); joined != "1080p" {
+		t.Fatalf("legacy expression = %q, want 1080p", joined)
+	}
+	got = migrateTitleCutoff([]string{"2160p"}, "2160p", "720p")
+	if joined := strings.Join(got, ","); joined != "2160p" {
+		t.Fatalf("cutoff below the list = %q, want 2160p", joined)
 	}
 }
 
@@ -331,7 +331,7 @@ func TestTitleCutoffStopsUpgrades(t *testing.T) {
 func TestV3QualityProfilesExposeItemsAndCutoff(t *testing.T) {
 	state := newTestAppState(t)
 	if err := SaveSetting(state.cfg.DataDir, qualityProfilesKey,
-		`[{"id":1,"name":"HD","qualities":"720p,1080p,2160p","cutoff":"1080p","language":"ita"}]`); err != nil {
+		`[{"id":1,"name":"HD","qualities":"720p,1080p,2160p","upgrade":"improve","language":"ita"}]`); err != nil {
 		t.Fatal(err)
 	}
 	rec := httptest.NewRecorder()
@@ -346,8 +346,10 @@ func TestV3QualityProfilesExposeItemsAndCutoff(t *testing.T) {
 	if len(profiles) != 1 {
 		t.Fatalf("profiles = %+v", profiles)
 	}
-	if cutoff, _ := profiles[0]["cutoff"].(float64); cutoff != 5 {
-		t.Fatalf("cutoff = %v, want the id of 1080p (5)", profiles[0]["cutoff"])
+	// A *arr client reads a real cutoff id even though the profile no longer
+	// stores one: it is the highest accepted resolution.
+	if cutoff, _ := profiles[0]["cutoff"].(float64); cutoff != 6 {
+		t.Fatalf("cutoff = %v, want the id of 2160p (6)", profiles[0]["cutoff"])
 	}
 	items, _ := profiles[0]["items"].([]any)
 	if len(items) != len(profileQualityLabels) {

@@ -3147,6 +3147,10 @@ func (c *Config) loadStoredSeries() error {
 		if err := json.Unmarshal([]byte(value), &series); err == nil {
 			for i := range series {
 				series[i].Audio = normalizeAudioRequirement(audioPreferenceDisplay(series[i].Audio, series[i].AudioChannels))
+				if series[i].Cutoff != "" {
+					series[i].Qualities = migrateTitleCutoff(series[i].Qualities, series[i].Quality, series[i].Cutoff)
+					series[i].Cutoff = ""
+				}
 			}
 			c.Series = series
 		} else {
@@ -3274,13 +3278,16 @@ func (c *Config) loadStoredMovies(conn *sql.DB, path string) error {
 				rows.Close()
 				return fmt.Errorf("read the movies of %s: %w", path, err)
 			}
+			qualities := decodeMovieQualities(qualitiesRaw)
+			if cutoff != "" {
+				qualities = migrateTitleCutoff(qualities, quality, cutoff)
+			}
 			movies = append(movies, MovieConfig{
 				ID:                   id,
 				Name:                 name,
 				Year:                 year,
 				Quality:              quality,
-				Qualities:            decodeMovieQualities(qualitiesRaw),
-				Cutoff:               strings.ToLower(strings.TrimSpace(cutoff)),
+				Qualities:            qualities,
 				Language:             language,
 				Enabled:              enabled != 0,
 				Subtitle:             subtitle,

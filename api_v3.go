@@ -163,10 +163,7 @@ func v3Profiles(cfg *Config) []v3QualityProfile {
 		out = append(out, v3QualityProfile{
 			ID: len(out) + 1, Name: name, Quality: quality, Audio: audio, Language: language,
 			Subtitle: subtitle, Exclude: exclude, DisableUpgrades: disableUpgrades,
-			// A profile migrated from a legacy expression has no cutoff: the
-			// global "stop improving" score keeps governing its upgrades until
-			// the operator chooses one explicitly.
-			Cutoff: 0,
+			Cutoff: v3ProfileCeiling(qualities),
 			Items:  v3QualityItems(qualities),
 		})
 	}
@@ -303,6 +300,22 @@ func v3QualityItems(qualities []string) []any {
 	return items
 }
 
+// v3ProfileCeiling returns the id of the highest accepted resolution, which
+// is what a *arr client reads as the cutoff. With no explicit list, every
+// resolution is accepted and the top one is the answer.
+func v3ProfileCeiling(qualities []string) int {
+	ceiling := 0
+	for _, quality := range qualities {
+		if rank := profileQualityRank(quality); rank > ceiling {
+			ceiling = rank
+		}
+	}
+	if ceiling == 0 {
+		return len(profileQualityLabels)
+	}
+	return ceiling
+}
+
 func V3QualityProfiles(w http.ResponseWriter, r *http.Request, s *AppState) {
 	profiles := ensureQualityProfiles(s)
 	out := make([]v3QualityProfile, 0, len(profiles))
@@ -311,8 +324,12 @@ func V3QualityProfiles(w http.ResponseWriter, r *http.Request, s *AppState) {
 			Audio: profile.Audio, Language: profile.Language, Subtitle: profile.Subtitle,
 			Exclude: profile.Exclude, DisableUpgrades: profile.DisableUpgrades,
 			UpgradeAllowed: !profile.DisableUpgrades,
-			Cutoff:         profileQualityRank(profile.Cutoff),
-			Items:          v3QualityItems(profile.Qualities)})
+			// *arr clients expect a valid cutoff id inside the allowed items.
+			// The highest accepted resolution is the ceiling now, so report
+			// that: the meaning is unchanged for them and Jellyseerr can show
+			// something sensible instead of a missing cutoff.
+			Cutoff: v3ProfileCeiling(profile.Qualities),
+			Items:  v3QualityItems(profile.Qualities)})
 	}
 	v3JSON(w, http.StatusOK, out)
 }
@@ -642,7 +659,7 @@ func V3SeriesAdd(w http.ResponseWriter, r *http.Request, s *AppState) {
 	}
 	added := SeriesConfig{
 		Name: title, Seasons: v3SeasonSpec(body.Seasons), Quality: profile.Quality,
-		Qualities: append([]string(nil), profile.Qualities...), Cutoff: profile.Cutoff,
+		Qualities:   append([]string(nil), profile.Qualities...),
 		Language:    profile.Language,
 		ArchivePath: strings.TrimSpace(body.RootFolderPath), TmdbID: v3ID(body.TmdbID), TvdbID: v3ID(body.TvdbID),
 		Subtitle: profile.Subtitle, Exclude: profile.Exclude, Enabled: true,
@@ -874,7 +891,7 @@ func V3MovieAdd(w http.ResponseWriter, r *http.Request, s *AppState) {
 		year = strconv.Itoa(body.Year)
 	}
 	added := MovieConfig{Name: title, Year: year, TmdbID: v3ID(body.TmdbID),
-		Quality: profile.Quality, Qualities: append([]string(nil), profile.Qualities...), Cutoff: profile.Cutoff,
+		Quality: profile.Quality, Qualities: append([]string(nil), profile.Qualities...),
 		Language: profile.Language, Subtitle: profile.Subtitle,
 		Exclude: profile.Exclude, Enabled: true, Audio: profile.Audio, DisableUpgrades: profile.DisableUpgrades}
 	// The cached configuration is shared: build a new slice, never append to it.

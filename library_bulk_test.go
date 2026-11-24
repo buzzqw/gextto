@@ -17,9 +17,9 @@ func TestLibraryBulkEditChangesOnlyTheMarkedFields(t *testing.T) {
 		{Name: "C", Quality: "720p", Language: "ita", Enabled: true},
 	}
 	movies := []MovieConfig{{ID: 7, Name: "Film", Quality: "720p", Language: "ita", Enabled: true}}
-	quality, exclude, upgrades, enabled := "1080p", "", false, false
+	quality, exclude, upgrade, enabled := "1080p", "", profileUpgradeFreeze, false
 	edit := LibraryBulkEdit{Series: []string{"a", "B"}, Movies: []int64{7},
-		Quality: &quality, Exclude: &exclude, Upgrades: &upgrades, Enabled: &enabled}
+		Quality: &quality, Exclude: &exclude, Upgrade: &upgrade, Enabled: &enabled}
 	outSeries, outMovies, changed, err := ApplyLibraryBulkEdit(series, movies, edit)
 	if err != nil || changed != 3 {
 		t.Fatalf("changed = %d, err = %v", changed, err)
@@ -145,21 +145,23 @@ func TestBulkProfileFillsAudioAndUpgrades(t *testing.T) {
 	server := httptest.NewServer(Router(state))
 	t.Cleanup(server.Close)
 	code, page := v2Request(t, server, http.MethodGet, "/library/bulk/profile?view=series&profile="+strconv.Itoa(profiles[0].ID), nil)
-	if code != http.StatusOK || !strings.Contains(page, `<option value="lossless-5.1" selected>`) || !strings.Contains(page, `<option value="deny" selected>`) {
+	if code != http.StatusOK || !strings.Contains(page, `<option value="lossless-5.1" selected>`) || !strings.Contains(page, `<option value="freeze" selected>`) {
 		t.Fatalf("bulk profile values -> %d: %s", code, page)
 	}
 }
 
 func TestQualityProfileUpgradesChoiceMapsToDisableUpgrades(t *testing.T) {
 	state := v3TestState(t)
-	body := `{"items":[{"name":"Fermo","upgrades":"deny"},{"name":"Libero","upgrades":"allow","disable_upgrades":true}]}`
+	body := `{"items":[{"name":"Fermo","upgrades":"deny"},{"name":"Libero","upgrades":"allow","disable_upgrades":true},{"name":"Nuovo","upgrade":"freeze"}]}`
 	rec := httptest.NewRecorder()
 	SaveQualityProfiles(rec, httptest.NewRequest("POST", "/api/quality-profiles", strings.NewReader(body)), state)
 	if rec.Code != 200 {
 		t.Fatalf("save -> %d %s", rec.Code, rec.Body.String())
 	}
 	profiles := ensureQualityProfiles(state)
-	if len(profiles) != 2 || !profiles[0].DisableUpgrades || profiles[0].Upgrades != "deny" || profiles[1].DisableUpgrades || profiles[1].Upgrades != "allow" {
+	if len(profiles) != 3 || !profiles[0].DisableUpgrades || profiles[0].Upgrade != profileUpgradeFreeze ||
+		profiles[1].DisableUpgrades || profiles[1].Upgrade != profileUpgradeImprove ||
+		!profiles[2].DisableUpgrades || profiles[2].Upgrade != profileUpgradeFreeze {
 		t.Fatalf("profiles = %+v", profiles)
 	}
 }

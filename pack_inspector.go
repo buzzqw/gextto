@@ -211,7 +211,7 @@ func InspectActivePacks(cfg *Config, torrents TorrentEngine, db *Database, notif
 				forbidUpgrade = series.DisableUpgrades
 			}
 			score := cfg.ReleaseScore(&candidate.release)
-			decisions := packEpisodeDecisions(&candidate.release, perSeason, needed, index, score, cfg.UpgradeMinScoreDiff, upgradeUntilForTitle(cfg, cfg.FindSeriesMatch(seriesName, &season), nil), forbidUpgrade, cfg.Settings)
+			decisions := packEpisodeDecisions(&candidate.release, perSeason, needed, index, score, cfg.UpgradeMinScoreDiff, cfg.UpgradeUntilScore, forbidUpgrade, cfg.Settings)
 			verdicts = append(verdicts, seasonVerdict{season: season, decisions: decisions})
 			for _, decision := range decisions {
 				if decision.Keep {
@@ -419,7 +419,7 @@ func applyPackFilePriorities(
 		if err != nil || len(found) == 0 {
 			continue
 		}
-		if packEpisodesUseful(release, found, needed, index, score, cfg.UpgradeMinScoreDiff, upgradeUntilForRelease(cfg, release), forbidUpgrade, cfg.Settings) {
+		if packEpisodesUseful(release, found, needed, index, score, cfg.UpgradeMinScoreDiff, cfg.UpgradeUntilScore, forbidUpgrade, cfg.Settings) {
 			for episode := range found {
 				keptEpisodes = append(keptEpisodes, episode)
 			}
@@ -546,7 +546,7 @@ func applyPackSeasonsPriorities(
 			if series := cfg.FindSeriesMatch(seriesName, &season); series != nil {
 				forbidUpgrade = series.DisableUpgrades
 			}
-			if packEpisodesUseful(release, found, needed, index, score, cfg.UpgradeMinScoreDiff, upgradeUntilForRelease(cfg, release), forbidUpgrade, cfg.Settings) {
+			if packEpisodesUseful(release, found, needed, index, score, cfg.UpgradeMinScoreDiff, cfg.UpgradeUntilScore, forbidUpgrade, cfg.Settings) {
 				useful = true
 				break
 			}
