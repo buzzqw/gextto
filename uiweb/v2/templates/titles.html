@@ -51,7 +51,7 @@
                <input type="hidden" name="redirect" value="/?view=series&amp;series={{$.PathName}}" />
                <input type="hidden" name="path" value="/api/series/{{$.PathName}}/toggle-season" />
                <input type="hidden" name="method" value="POST" />
-               <input type="hidden" name="body" value='{"season":{{.Season}},"ignored":{{if .Ignored}}false{{else}}true{{end}}}' />
+               <input type="hidden" name="body" value='{"season":{{.Season}},"enabled":{{if .Ignored}}true{{else}}false{{end}}}' />
                <button class="btn sm {{if .Ignored}}warn{{else}}primary{{end}}" type="submit" {{trTitle "Attiva o disattiva la stagione %v" .Season}}>S{{.Season}}</button>
              </form>
              {{end}}

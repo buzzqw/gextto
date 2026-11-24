@@ -399,7 +399,11 @@ così leggibile da qualunque computer.
 ### La scheda della serie
 
 In testa trovi locandina, trama, cast (collegato alle schede TMDB o TVDB), anno,
-rete, stato, completezza e il percorso in libreria. Le azioni:
+rete, stato, completezza e il percorso in libreria. Accanto al cast ci sono i
+pulsanti delle stagioni (**S1**, **S2**, …): clicca una stagione per smettere di
+cercarne le puntate, di nuovo per rimetterla in funzione. Una stagione fuori
+dall'intervallo indicato in *Stagioni* non si attiva da qui: per seguirla devi
+allargare l'intervallo con **Modifica**. Le azioni:
 
 | Azione | Quando usarla |
 |---|---|

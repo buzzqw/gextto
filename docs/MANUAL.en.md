@@ -398,7 +398,11 @@ computer.
 ### The series page
 
 At the top you find poster, plot, cast (linked to TMDB or TVDB), year, network,
-status, completeness and the library path. The actions:
+status, completeness and the library path. Next to the cast there are the season
+buttons (**S1**, **S2**, …): click a season to stop searching for its episodes,
+click it again to bring it back. A season outside the range written in *Seasons*
+cannot be switched on here: you have to widen the range with **Edit**. The
+actions:
 
 | Action | When to use it |
 |---|---|

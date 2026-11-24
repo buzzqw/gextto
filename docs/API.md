@@ -258,7 +258,7 @@ state.
 | POST | `/api/series/{name}/rename-preview` | preview a series rename |
 | POST | `/api/series/{name}/scan-archive` | scan the series archive |
 | POST | `/api/series/{name}/search-missing` | search the missing episodes of a series; the call stops at 90 s and answers with the episodes searched so far (the field "complete" says whether it reached the end), and the UI runs the full search through /series/gaps/search |
-| POST | `/api/series/{name}/toggle-season` | enable or disable a season |
+| POST | `/api/series/{name}/toggle-season` | enable or disable a season; the JSON body carries season and enabled, with enabled false to switch it off |
 | POST | `/api/service/restart` | restart the Gextto service |
 | GET | `/api/services` | status of the external services |
 | POST | `/api/set-speed-limits` | set the global speed limits |
