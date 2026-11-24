@@ -33,7 +33,7 @@ func tooltipElementText(text string, start int) string {
 	if bodyEnd < 0 {
 		return ""
 	}
-	label := regexp.MustCompile(`\{\{tr "([^"]+)"`).FindStringSubmatch(text[bodyStart : bodyStart+bodyEnd])
+	label := regexp.MustCompile(`\{\{(?:tr|ed2kTr) "([^"]+)"`).FindStringSubmatch(text[bodyStart : bodyStart+bodyEnd])
 	if label == nil {
 		return ""
 	}
@@ -49,7 +49,7 @@ func tooltipPhrase(value string) string {
 }
 
 func TestV2TooltipsDoNotRepeatTheirLabel(t *testing.T) {
-	tooltip := regexp.MustCompile(`\{\{trTitle "([^"]+)"`)
+	tooltip := regexp.MustCompile(`\{\{(?:trTitle|ed2kTitle) "([^"]+)"`)
 	pages := 0
 	err := fs.WalkDir(v2TemplatesFS, "uiweb/v2/templates", func(path string, entry fs.DirEntry, err error) error {
 		if err != nil || entry.IsDir() || !strings.HasSuffix(path, ".html") {

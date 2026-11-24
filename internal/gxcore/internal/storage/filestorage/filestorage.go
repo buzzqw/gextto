@@ -46,10 +46,7 @@ func (s *FileStorage) Open(name string, size int64) (f storage.File, exists bool
 	if !filepath.IsLocal(name) {
 		return nil, false, fmt.Errorf("file path %q escapes the storage root", name)
 	}
-	name = filepath.Join(s.dest, filepath.Clean(name))
-	if err = os.MkdirAll(filepath.Dir(name), os.ModeDir|s.perm); err != nil {
-		return nil, false, err
-	}
+	name = filepath.Clean(name)
 	flags := applyNoAtimeFlag(os.O_RDWR)
 	of, opened, err := s.openFile(name, size, flags)
 	if err != nil {
@@ -69,14 +66,14 @@ func (s *FileStorage) Open(name string, size int64) (f storage.File, exists bool
 // openFile opens the OS file, creating and sizing it on first sight.
 func (s *FileStorage) openFile(name string, size int64, flags int) (*os.File, bool, error) {
 	mode := s.perm &^ 0111
-	of, err := openForWrite(name, flags, mode)
+	of, err := s.openForWrite(name, flags, mode)
 	if err == nil {
 		return s.adoptExisting(of, size)
 	}
 	if !os.IsNotExist(err) {
 		return nil, false, err
 	}
-	of, err = openForWrite(name, flags|os.O_CREATE, mode)
+	of, err = s.openForWrite(name, flags|os.O_CREATE, mode)
 	if err != nil {
 		return nil, false, err
 	}
@@ -92,12 +89,33 @@ func (s *FileStorage) openFile(name string, size int64, flags int) (*os.File, bo
 	return of, false, nil
 }
 
-// openForWrite opens the file read-write, dropping O_NOATIME when the kernel
-// refuses it. O_NOATIME is allowed only to the file's owner or with CAP_FOWNER:
-// torrent data restored from a backup, or written by another account, would
-// otherwise fail with EPERM and the torrent could never start.
-func openForWrite(name string, flags int, mode fs.FileMode) (*os.File, error) {
-	of, err := os.OpenFile(name, flags, mode)
+// openForWrite creates parents and opens name through one os.Root. Root walks
+// every intermediate component without allowing a symlink or Windows junction
+// to leave the storage directory; a path-only Lstat check would race with a
+// directory being replaced between the check and the open.
+func (s *FileStorage) openForWrite(name string, flags int, mode fs.FileMode) (*os.File, error) {
+	if err := os.MkdirAll(s.dest, os.ModeDir|s.perm.Perm()); err != nil {
+		return nil, err
+	}
+	root, err := os.OpenRoot(s.dest)
+	if err != nil {
+		return nil, err
+	}
+	defer root.Close()
+	if dir := filepath.Dir(name); dir != "." {
+		if err := root.MkdirAll(dir, s.perm.Perm()); err != nil {
+			return nil, fmt.Errorf("cannot create torrent directory %q: %w", dir, err)
+		}
+	}
+	return openForWrite(root, name, flags, mode)
+}
+
+// openForWrite opens the file read-write relative to root, dropping O_NOATIME
+// when the kernel refuses it. O_NOATIME is allowed only to the file's owner or
+// with CAP_FOWNER: torrent data restored from a backup, or written by another
+// account, would otherwise fail with EPERM and the torrent could never start.
+func openForWrite(root *os.Root, name string, flags int, mode fs.FileMode) (*os.File, error) {
+	of, err := root.OpenFile(name, flags, mode)
 	if err == nil || !errors.Is(err, fs.ErrPermission) {
 		return of, err
 	}
@@ -105,7 +123,7 @@ func openForWrite(name string, flags int, mode fs.FileMode) (*os.File, error) {
 	if !ok {
 		return nil, err
 	}
-	if of, plainErr := os.OpenFile(name, plain, mode); plainErr == nil {
+	if of, plainErr := root.OpenFile(name, plain, mode); plainErr == nil {
 		return of, nil
 	}
 	return nil, err
@@ -151,7 +169,13 @@ func (s *FileStorage) wrap(of *os.File, size int64, flags int) storage.File {
 			return &mmapFile{f: of, data: data}
 		}
 	}
-	return newOSFile(of, flags)
+	root, relative := s.dest, ""
+	if root != "" {
+		if rel, err := filepath.Rel(root, of.Name()); err == nil && filepath.IsLocal(rel) {
+			relative = rel
+		}
+	}
+	return newOSFile(of, flags, root, relative)
 }
 
 func maxInt() int { return int(^uint(0) >> 1) }

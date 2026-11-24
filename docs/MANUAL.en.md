@@ -1520,9 +1520,15 @@ process; there is nothing to install.
 - Files on disk keep the names of the torrent. Two entries that differ only in
   case are renamed on the later one (`film.mkv` -> `film-1.mkv`, folders too),
   because Windows and a default macOS disk treat them as one file; a file that
-  is also another file's folder is refused when the torrent is added. A move
-  to another disk copies and checks every file's size and, if a copy comes out
+  is also another file's folder is refused when the torrent is added. A symlink
+  or Windows junction cannot lead files outside the download folder. A move to
+  another disk copies and checks every file's size and, if a copy comes out
   short, stops without touching the original.
+- Web seeds, magnet `xs=`/`as=` sources and trackers contained in a torrent
+  cannot reach LAN, loopback or link-local addresses by default. In the
+  gx-torrent daemon settings, **Allow web seeds and magnet sources on the local
+  network** enables this only when it is really needed; trackers added by hand
+  by the operator remain trusted.
 - In **Configuration → Torrent engine → gx-torrent** there are three native
   qBittorrent options: **recheck data when a download completes** (verify the
   files once before seeding them), **anonymous mode** (hide the client version
@@ -1969,7 +1975,8 @@ It does **not** contain the videos, the torrent session, the IP filter, the
 caches, the logs, the trash or `/etc/gextto/gextto.env`: keep a copy of that
 yourself. During a data migration an existing database is replaced only after
 the copy has been verified; the series and movie lists are saved independently,
-so one cannot discard the other's changes.
+so one cannot discard the other's changes. Backup folders and archives are
+created readable only by the service owner, regardless of the system umask.
 
 ### Scheduling backups
 

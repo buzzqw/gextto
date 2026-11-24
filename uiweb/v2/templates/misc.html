@@ -29,7 +29,7 @@
 </div>
 <form class="form-grid" method="post" action="/downloads/ed2k-priority" hx-post="/downloads/ed2k-priority" hx-target="#v2-ed2k-detail-body" hx-swap="innerHTML">
   <input type="hidden" name="hash" value="{{.Hash}}">
-  <label class="field"><span>{{tr "Priorità in aMule"}}</span><select class="input" name="priority" {{trTitle "Priorità con cui aMule chiede le parti di questo file rispetto agli altri download"}}>
+  <label class="field"><span>{{ed2kTr "Priorità in aMule"}}</span><select class="input" name="priority" {{ed2kTitle "Priorità con cui aMule chiede le parti di questo file rispetto agli altri download"}}>
     <option value="low"{{if eq .Priority "low"}} selected{{end}}>{{tr "Bassa"}}</option>
     <option value="normal"{{if eq .Priority "normal"}} selected{{end}}>{{tr "Normale"}}</option>
     <option value="high"{{if eq .Priority "high"}} selected{{end}}>{{tr "Alta"}}</option>
@@ -38,16 +38,16 @@
   <div class="form-actions"><button class="btn sm primary" type="submit">{{tr "Salva la priorità"}}</button></div>
 </form>
 <p class="muted"><span>{{tr "Link eD2k"}}</span>: <code class="truncate" {{trTitle .Link}}>{{tr .Link}}</code> <button class="btn sm" type="button" data-v2-copy="{{.Link}}" {{trTitle "Copia il link eD2k negli appunti"}}>{{tr "Copia"}}</button></p>
-{{else}}<p class="muted">{{tr "Il file non è più nella coda di aMule: se è completato lo trovi nella cartella di arrivo."}}</p>{{end}}
+{{else}}<p class="muted">{{ed2kTr "Il file non è più nella coda di aMule: se è completato lo trovi nella cartella di arrivo."}}</p>{{end}}
 {{end}}
 
 {{define "v2_ed2k_shared"}}
-{{if not .Enabled}}<p class="muted">{{tr "L'integrazione con aMule è spenta."}}</p>
+{{if not .Enabled}}<p class="muted">{{ed2kTr "L'integrazione con aMule è spenta."}}</p>
 {{else if .Error}}<p class="alert" role="alert"><span>{{tr "File condivisi non disponibili:"}}</span> {{tr .Error}}</p>
 {{else}}
 <div class="toolbar">
   <form method="post" action="/ed2k/shared/reload" class="inline">
-    <button class="btn sm" type="submit" {{trTitle "Chiede ad aMule di rileggere le cartelle condivise: i file aggiunti o tolti compaiono qui"}}>{{tr "Ricarica file condivisi"}}</button>
+    <button class="btn sm" type="submit" {{ed2kTitle "Chiede ad aMule di rileggere le cartelle condivise: i file aggiunti o tolti compaiono qui"}}>{{tr "Ricarica file condivisi"}}</button>
   </form>
 </div>
 {{if .Message}}<p class="{{if .MessageErr}}alert{{else}}muted{{end}}" role="{{if .MessageErr}}alert{{else}}status{{end}}"><span>{{tr .Message}}</span>{{if .Detail}} {{tr .Detail}}{{end}}</p>{{end}}
@@ -59,8 +59,8 @@
 <p class="muted"><span>{{tr "Cartelle condivise"}}</span>: <code>{{tr .Incoming}}</code> <span>{{tr "cartella di arrivo"}}</span>{{range .Dirs}} · <code>{{tr .}}</code>{{end}}</p>
 {{if .Files}}
 <div class="table-wrap"><table class="data-table ed2k-shared-table">
-  <caption class="sr-only">{{tr "File condivisi con quanto aMule ha caricato"}}</caption>
-  <thead><tr><th scope="col">{{tr "File"}}</th><th scope="col" class="numeric">{{tr "Dimensione"}}</th><th scope="col" class="numeric" {{trTitle "Byte caricati dall'inizio"}}>{{tr "Caricato (totale)"}}</th><th scope="col" class="numeric" {{trTitle "Richieste ricevute: in questa sessione (dall'inizio)"}}>{{tr "Richieste"}}</th><th scope="col" class="numeric" {{trTitle "Richieste accettate: in questa sessione (dall'inizio)"}}>{{tr "Accettate"}}</th><th scope="col" class="numeric">{{tr "In coda"}}</th><th scope="col" class="numeric" {{trTitle "Byte al secondo che aMule sta caricando per questo file"}}>{{tr "Velocità"}}</th><th scope="col" {{trTitle "Ultimo caricamento di questo file; — se aMule non l'ha mai caricato"}}>{{tr "Ultimo caricamento"}}</th><th scope="col">{{tr "Priorità"}}</th><th scope="col">{{tr "Link"}}</th></tr></thead>
+  <caption class="sr-only">{{ed2kTr "File condivisi con quanto aMule ha caricato"}}</caption>
+  <thead><tr><th scope="col">{{tr "File"}}</th><th scope="col" class="numeric">{{tr "Dimensione"}}</th><th scope="col" class="numeric" {{trTitle "Byte caricati dall'inizio"}}>{{tr "Caricato (totale)"}}</th><th scope="col" class="numeric" {{trTitle "Richieste ricevute: in questa sessione (dall'inizio)"}}>{{tr "Richieste"}}</th><th scope="col" class="numeric" {{trTitle "Richieste accettate: in questa sessione (dall'inizio)"}}>{{tr "Accettate"}}</th><th scope="col" class="numeric">{{tr "In coda"}}</th><th scope="col" class="numeric" {{ed2kTitle "Byte al secondo che aMule sta caricando per questo file"}}>{{tr "Velocità"}}</th><th scope="col" {{ed2kTitle "Ultimo caricamento di questo file; — se aMule non l'ha mai caricato"}}>{{tr "Ultimo caricamento"}}</th><th scope="col">{{tr "Priorità"}}</th><th scope="col">{{tr "Link"}}</th></tr></thead>
   <tbody>{{range .Files}}<tr>
     <td><span class="ed2k-file-name" {{trTitle .Name}}>{{tr .Name}}</span></td>
     <td class="numeric">{{bytes .Size}}</td>
@@ -74,7 +74,7 @@
     <td><button class="btn sm" type="button" data-v2-copy="{{.Link}}" {{trTitle "Copia il link eD2k negli appunti"}}>{{tr "Copia"}}</button></td>
   </tr>{{end}}</tbody>
 </table></div>
-{{else}}<p class="muted">{{tr "aMule non sta condividendo file."}}</p>{{end}}
+{{else}}<p class="muted">{{ed2kTr "aMule non sta condividendo file."}}</p>{{end}}
 {{if .Uploads}}
 <h4>{{tr "Chi sta scaricando da te"}}</h4>
 <div class="table-wrap"><table class="data-table ed2k-uploads-table">
@@ -86,9 +86,9 @@
 {{end}}
 
 {{define "v2_ed2k_log"}}
-{{if .Error}}<p class="alert" role="alert"><span>{{tr "Log di aMule non disponibile:"}}</span> {{tr .Error}}</p>
-{{else if .Lines}}<pre class="log-view" tabindex="0" role="region" aria-label="{{tr "Log di aMule"}}">{{range .Lines}}<span class="log-line">{{tr .}}</span>{{end}}</pre>
-{{else}}<p class="muted">{{tr "Il log di aMule è vuoto."}}</p>{{end}}
+{{if .Error}}<p class="alert" role="alert"><span>{{ed2kTr "Log di aMule non disponibile:"}}</span> {{tr .Error}}</p>
+{{else if .Lines}}<pre class="log-view" tabindex="0" role="region" aria-label="{{ed2kTr "Log di aMule"}}">{{range .Lines}}<span class="log-line">{{tr .}}</span>{{end}}</pre>
+{{else}}<p class="muted">{{ed2kTr "Il log di aMule è vuoto."}}</p>{{end}}
 {{end}}
 
 {{define "v2_tmdb_calendar"}}

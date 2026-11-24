@@ -60,7 +60,7 @@ func (t *torrent) handleWebseedPieceResult(msg *urldownloader.PieceResult) {
 	t.beginPieceWrite()
 
 	pw := piecewriter.New(piece, webseedPieceWrite{downloader: msg.Downloader, units: msg.Units}, msg.Buffer)
-	go pw.Run(t.pieceWriterResultC, t.doneC, t.session.metrics.WritesPerSecond, t.session.metrics.SpeedWrite, t.session.semWrite)
+	t.runPieceWrite(pw)
 
 	if msg.Done {
 		t.rotateWebseedSource(msg.Downloader)

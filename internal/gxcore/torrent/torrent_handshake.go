@@ -28,6 +28,7 @@ func (t *torrent) handleIncomingHandshakeDone(ih *incominghandshaker.IncomingHan
 	delete(t.incomingHandshakers, ih)
 	if ih.Error != nil {
 		delete(t.connectedPeerIPs, ih.Conn.RemoteAddr().(*net.TCPAddr).IP.String())
+		_ = ih.Conn.Close()
 		return
 	}
 	t.startPeer(ih.Conn, peersource.Incoming, t.incomingPeers, ih.PeerID, ih.Extensions, ih.Cipher)

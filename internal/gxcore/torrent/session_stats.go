@@ -223,6 +223,7 @@ func (s *Session) updateStatsLoop() {
 type statsSnapshot struct {
 	id              []byte
 	bitfield        []byte
+	bitfieldSynced  bool
 	bytesDownloaded int64
 	bytesUploaded   int64
 	bytesWasted     int64
@@ -233,7 +234,8 @@ type statsSnapshot struct {
 // sample the bitfield and fsync the data on each run loop (no race with
 // writers or closeData, no open Bolt transaction during fsyncs), then write
 // all snapshots in one durable transaction. A persisted bit always describes
-// already-synced data.
+// already-synced data. A failed flush withholds only that torrent's bitfield;
+// its counters and the other torrents' snapshots are still saved.
 func (s *Session) updateStats() {
 	s.mTorrents.RLock()
 	torrents := make([]*Torrent, 0, len(s.torrents))
@@ -251,13 +253,18 @@ func (s *Session) updateStats() {
 				bits = append([]byte(nil), t.torrent.bitfield.Bytes()...)
 			}
 			t.torrent.mBitfield.RUnlock()
-			t.torrent.syncPieces()
+			bitfieldSynced := true
+			if err := t.torrent.syncPieces(); err != nil {
+				bitfieldSynced = false
+				t.torrent.log.Errorf("cannot save bitfield for torrent %s because its data could not be synced: %s", t.torrent.id, err)
+			}
 			// Close the seeding interval here too: without the old one-second
 			// ticker this is the last moment the counter is read for a while.
 			t.torrent.updateSeedDuration(time.Now())
 			return statsSnapshot{
 				id:              []byte(t.torrent.id),
 				bitfield:        bits,
+				bitfieldSynced:  bitfieldSynced,
 				bytesDownloaded: t.torrent.bytesDownloaded.Count(),
 				bytesUploaded:   t.torrent.bytesUploaded.Count(),
 				bytesWasted:     t.torrent.bytesWasted.Count(),
@@ -281,7 +288,7 @@ func (s *Session) updateStats() {
 			_ = b.Put(boltdbresumer.Keys.BytesUploaded, []byte(strconv.FormatInt(snap.bytesUploaded, 10)))
 			_ = b.Put(boltdbresumer.Keys.BytesWasted, []byte(strconv.FormatInt(snap.bytesWasted, 10)))
 			_ = b.Put(boltdbresumer.Keys.SeededFor, []byte(snap.seededFor.String()))
-			if snap.bitfield != nil {
+			if snap.bitfieldSynced && snap.bitfield != nil {
 				_ = b.Put(boltdbresumer.Keys.Bitfield, snap.bitfield)
 			}
 		}

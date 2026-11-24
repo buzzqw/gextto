@@ -107,6 +107,10 @@ func newTestDaemonWith(t *testing.T, network NetworkOptions) *Daemon {
 
 // newTestDaemonFull is newTestDaemonWith with a standalone settings store, set
 // before the run loop starts (so no goroutine reads the field concurrently).
+// The mode is managed: callers that need standalone behaviour must use
+// newTestDaemonFullMode, which fixes the mode before the background loops
+// start — opts.Mode is read for the daemon's whole lifetime and must never be
+// written after newDaemon returns.
 // testDaemonTick is the queue tick of the test daemons: 50 ms keeps the tests
 // fast, GX_TEST_TICK (a Go duration, e.g. 3s as in production) lets a
 // measurement profile the engine with the real sampling load.
@@ -119,6 +123,15 @@ func testDaemonTick() time.Duration {
 
 func newTestDaemonFull(t testing.TB, network NetworkOptions, store *settings.Store) *Daemon {
 	t.Helper()
+	return newTestDaemonFullMode(t, network, store, ModeManaged)
+}
+
+// newTestDaemonFullMode is newTestDaemonFull with an explicit mode. The mode
+// goes into Options before newDaemon starts any goroutine: runFeeds,
+// runIPFilterRefresh and the other background loops read opts.Mode throughout
+// the daemon's life, so writing it afterwards is a data race.
+func newTestDaemonFullMode(t testing.TB, network NetworkOptions, store *settings.Store, mode Mode) *Daemon {
+	t.Helper()
 	// Touch t.TempDir first: its cleanup (removing the whole per-test temp tree)
 	// is registered on the first call, so registering the daemon close after it
 	// makes the close run first (cleanups run LIFO). The daemon's own data lives
@@ -129,6 +142,7 @@ func newTestDaemonFull(t testing.TB, network NetworkOptions, store *settings.Sto
 		t.Fatal(err)
 	}
 	opts := Options{
+		Mode:        mode,
 		Listen:      "127.0.0.1:0",
 		DataDir:     data,
 		LinkDir:     filepath.Join(data, "links"),

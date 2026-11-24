@@ -232,19 +232,54 @@ func subnetCapHint(maxShare, maxPerSubnet int) int {
 	return maxShare
 }
 
-// noteExternalIP adopts the external IP a remote node reports for us (BEP 42
-// "ip" field, 4/16 bytes plus a 2-byte port) and, once, regenerates a node ID
-// secure for it. Only used when the external IP was not configured at startup.
-// It runs in the DHT run loop.
-func (d *DHT) noteExternalIP(raw string) {
-	if d.config.PublicIP != nil {
+// externalIPConfirmations is the number of independent observers required
+// before a reflected public address can replace our DHT identity. Two distinct
+// /24 (IPv4) or /48 (IPv6) subnets make a single malicious routing-table entry
+// insufficient, while still allowing normal bootstrap replies to confirm it.
+const externalIPConfirmations = 2
+
+// noteExternalIP considers the external IP a remote node reports for us (BEP 42
+// "ip" field, 4/16 bytes plus a 2-byte port). It is called only for a response
+// matched to one of our pending queries. The first public candidate is held
+// until another subnet confirms it; adoption happens at most once and never
+// when the operator configured an external IP at startup. It runs in the DHT
+// run loop.
+func (d *DHT) noteExternalIP(raw string, observerIP net.IP) {
+	if d.config.PublicIP != nil || d.publicIP != nil {
 		return
 	}
 	ip, _, ok := parseReflected(raw)
-	if !ok || isLocalNetworkIP(ip) {
+	if !ok || !isPublicExternalIP(ip) {
 		return
 	}
-	d.publicIP = ip
+	observer := subnetKey(observerIP)
+	if observer == "" {
+		return
+	}
+	if d.externalIPCandidate == nil {
+		d.externalIPCandidate = append(net.IP(nil), ip...)
+		d.externalIPObservers = map[string]struct{}{observer: {}}
+		return
+	}
+	// Lock the first candidate: a stream of differing reports must not keep
+	// replacing it and prevent a legitimate confirmation from ever arriving.
+	if !d.externalIPCandidate.Equal(ip) {
+		return
+	}
+	if d.externalIPObservers == nil {
+		d.externalIPObservers = make(map[string]struct{})
+	}
+	if _, seen := d.externalIPObservers[observer]; seen {
+		return
+	}
+	d.externalIPObservers[observer] = struct{}{}
+	if len(d.externalIPObservers) < externalIPConfirmations {
+		return
+	}
+
+	d.publicIP = append(net.IP(nil), ip...)
+	d.externalIPCandidate = nil
+	d.externalIPObservers = nil
 	var cur [20]byte
 	copy(cur[:], d.nodeId)
 	if NodeIDSecure(cur, ip) {
@@ -260,4 +295,20 @@ func (d *DHT) noteExternalIP(raw string) {
 		saveStore(*d.store)
 	}
 	d.DebugLogger.Infof("DHT: adopted a BEP 42 secure node ID for external IP %s", ip)
+}
+
+// isPublicExternalIP rejects local and other non-unicast destinations. Go's
+// IsPrivate does not include carrier-grade NAT, so that range is checked
+// explicitly as well.
+func isPublicExternalIP(ip net.IP) bool {
+	if ip == nil || !ip.IsGlobalUnicast() || isLocalNetworkIP(ip) {
+		return false
+	}
+	if v4 := ip.To4(); v4 != nil {
+		if v4[0] == 0 || v4[0] >= 224 {
+			return false
+		}
+		return !(v4[0] == 100 && v4[1] >= 64 && v4[1] <= 127)
+	}
+	return true
 }

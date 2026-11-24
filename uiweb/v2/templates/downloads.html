@@ -114,7 +114,7 @@
 </details>
 <hr />
 <a class="v2-menu-item" href="/?view=settings&amp;tab=network&amp;highlight=torrent_speed_mode#v2-setting-torrent_speed_mode" {{trTitle "La regola (Auto, limiti fissi o programmazione oraria) si sceglie in Configurazione → Velocità e rete"}}><span class="v2-menu-mark" aria-hidden="true"></span><span>{{tr "Cambia la regola"}}</span> <span aria-hidden="true">→</span></a>
-{{if .Ed2kEnabled}}<p class="muted v2-menu-note">{{tr "Gli stessi limiti valgono anche per aMule (eD2k)."}}</p>{{end}}
+{{if .Ed2kEnabled}}<p class="muted v2-menu-note">{{ed2kTr "Gli stessi limiti valgono anche per aMule (eD2k)."}}</p>{{end}}
 {{end}}
 
 {{define "v2_temp_badge"}}{{$s := .Speed}}{{if $s.ExceptionAuto}}<span class="badge warn" {{trTitle "Eccezione attiva: Auto"}}>{{icon "i-bolt"}} <span>{{tr "Auto"}}</span>{{minutesLeft $s.ExceptionMinutes}}</span>{{else if $s.ExceptionLimit}}<span class="badge warn" {{trTitle "Eccezione attiva: limite di velocità"}}>{{icon "i-bolt"}} {{badgeLimits $s.ExceptionDL $s.ExceptionUL}}{{minutesLeft $s.ExceptionMinutes}}</span>{{else if $s.RuleAuto}}<span class="badge{{if eq $s.Mode "schedule"}} ok{{end}}" {{if $s.InWindow}}{{trTitle "Dalla programmazione oraria"}}{{else}}{{trTitle "Regola della configurazione"}}{{end}}>{{if $s.InWindow}}{{icon "i-clock"}} {{end}}<span>{{tr "Auto"}}</span></span>{{else}}<span class="badge{{if $s.InWindow}} ok{{end}}" {{if $s.InWindow}}{{trTitle "Dalla programmazione oraria"}}{{else}}{{trTitle "Regola della configurazione"}}{{end}}>{{if $s.InWindow}}{{icon "i-clock"}} {{end}}{{badgeLimits $s.RuleDL $s.RuleUL}}</span>{{end}}{{if and (not $s.Guard.Active) (gt $s.Guard.LatencyMs 0) (or $s.ExceptionAuto (and (not $s.Exception) $s.RuleAuto))}} <span class="badge" role="status" {{trTitle "Ping misurato da Auto verso Google/Cloudflare; se sale, Auto riduce la velocità"}}>{{icon "i-signal"}} {{$s.Guard.LatencyMs}} ms</span>{{end}}{{if $s.Guard.Active}} <span class="badge" role="status" {{trTitle "Auto riduce la velocità per mantenere basso il ping verso Google/Cloudflare"}}>{{icon "i-turtle"}} <span>{{tr "Latenza"}}</span> {{$s.Guard.LatencyMs}}/{{$s.Guard.BaselineMs}} ms{{if $s.Guard.DownloadKib}} · DL {{$s.Guard.DownloadKib}} KiB/s{{end}}{{if $s.Guard.UploadKib}} · UL {{$s.Guard.UploadKib}} KiB/s{{end}}</span>{{end}}{{end}}
@@ -305,7 +305,7 @@
               <div class="torrent-card">
                 <div class="torrent-head">
                   <span class="torrent-select"></span>
-                  <span class="torrent-name"><span class="truncate" {{trTitle .Name}}>{{tr .Name}}</span> <span class="badge ed2k" {{trTitle "Rete eD2k/Kad tramite aMule"}}>{{tr "eD2k"}}</span> {{if .LastResort}}<span class="badge warn" {{trTitle "Ultima risorsa: episodio mancante preso fuori dalla risoluzione del profilo perché era l'unica copia nella lingua richiesta. L'upgrade lo sostituisce appena esce una copia nel profilo."}}>{{icon "i-sos"}} {{tr "ultima risorsa"}}</span>{{end}}</span>
+                  <span class="torrent-name"><span class="truncate" {{trTitle .Name}}>{{tr .Name}}</span> <span class="badge ed2k" {{ed2kTitle "Rete eD2k/Kad tramite aMule"}}>{{tr "eD2k"}}</span> {{if .LastResort}}<span class="badge warn" {{trTitle "Ultima risorsa: episodio mancante preso fuori dalla risoluzione del profilo perché era l'unica copia nella lingua richiesta. L'upgrade lo sostituisce appena esce una copia nel profilo."}}>{{icon "i-sos"}} {{tr "ultima risorsa"}}</span>{{end}}</span>
                   <span class="torrent-state badge {{.StateClass}}">{{tr .State}}</span>
                 </div>
                 <div class="torrent-body">
@@ -320,13 +320,13 @@
                 </div>
                 <div class="row-actions">
                   {{if not .Complete}}{{if .Paused}}<button class="btn sm icon-action" type="submit" id="v2-ed2k-pause-{{.Hash}}" name="ed2k_action" value="resume:{{.Hash}}" {{trTitle "Riprende il download eD2k dal punto in cui si era fermato"}} aria-label="{{tr "Riprendi il download eD2k"}}"><span aria-hidden="true">{{icon "i-play"}}</span></button>
-                  {{else}}<button class="btn sm icon-action" type="submit" id="v2-ed2k-pause-{{.Hash}}" name="ed2k_action" value="pause:{{.Hash}}" {{trTitle "Sospende il download eD2k; aMule conserva la parte già presa"}} aria-label="{{tr "Metti in pausa il download eD2k"}}"><span aria-hidden="true">{{icon "i-pause"}}</span></button>{{end}}{{end}}
+                  {{else}}<button class="btn sm icon-action" type="submit" id="v2-ed2k-pause-{{.Hash}}" name="ed2k_action" value="pause:{{.Hash}}" {{ed2kTitle "Sospende il download eD2k; aMule conserva la parte già presa"}} aria-label="{{tr "Metti in pausa il download eD2k"}}"><span aria-hidden="true">{{icon "i-pause"}}</span></button>{{end}}{{end}}
                   <details class="v2-menu" data-v2-menu>
                     <summary class="btn sm icon-action" id="v2-ed2k-actions-{{.Hash}}" aria-label="{{tr "Altre azioni"}}" {{trTitle "Dettagli e rimozione del download eD2k"}}><span aria-hidden="true">{{icon "i-dots"}}</span></summary>
                     <div class="v2-menu-panel v2-menu-end">
                       <button class="v2-menu-item" type="button" hx-get="/downloads/ed2k-detail?hash={{.Hash}}" hx-target="#v2-modal" hx-swap="innerHTML">{{tr "Dettagli…"}}</button>
                       <hr />
-                      <button class="v2-menu-item danger" type="submit" name="ed2k_action" value="remove:{{.Hash}}" hx-disabled-elt="this" hx-confirm="{{if .Complete}}{{tr "Togliere il file completato dall'elenco di aMule? Il file resta nella cartella di arrivo."}}{{else}}{{tr "Annullare il download eD2k e cancellare la parte già scaricata?"}}{{end}}">{{if .Complete}}{{tr "Togli dall'elenco di aMule"}}{{else}}{{tr "Annulla il download eD2k"}}{{end}}</button>
+                      <button class="v2-menu-item danger" type="submit" name="ed2k_action" value="remove:{{.Hash}}" hx-disabled-elt="this" hx-confirm="{{if .Complete}}{{ed2kTr "Togliere il file completato dall'elenco di aMule? Il file resta nella cartella di arrivo."}}{{else}}{{tr "Annullare il download eD2k e cancellare la parte già scaricata?"}}{{end}}">{{if .Complete}}{{ed2kTr "Togli dall'elenco di aMule"}}{{else}}{{tr "Annulla il download eD2k"}}{{end}}</button>
                     </div>
                   </details>
                 </div>

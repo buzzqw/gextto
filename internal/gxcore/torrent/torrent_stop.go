@@ -1,6 +1,8 @@
 package torrent
 
 import (
+	"context"
+
 	"github.com/buzzqw/gextto/internal/gxcore/internal/announcer"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/handshaker/incominghandshaker"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/handshaker/outgoinghandshaker"
@@ -55,13 +57,16 @@ func (t *torrent) stopAndSetStoppedOnMetadata() {
 	t.stop(nil)
 }
 
-// stop unwinds a running torrent in dependency order: acceptor, peers,
-// downloaders, webseeds, then the bitfield persist; periodical announcers
-// before data files (an announcing goroutine touching pieces during close
-// is a data race); data before allocator and verifier (their IO must be
-// already cancelled); handshakers; meters; and finally the stopped-event
-// announcer over the trackers that actually heard from us, which drives the
-// Stopping state. Already stopping or stopped torrents ignore the call.
+// stop unwinds a running torrent in dependency order: reject and cancel
+// off-loop data work, then drain it; acceptor, peers, downloaders, webseeds;
+// the verifier (its check and any merge Prepare read pieces and files, so it
+// must be cancelled and joined before anything snapshots its bitfield or drops
+// that data); the bitfield persist; periodical announcers before data files (an
+// announcing goroutine touching pieces during close is a data race); data
+// before the allocator (its IO must be already cancelled); handshakers; meters;
+// and finally the stopped-event announcer over the trackers that actually heard
+// from us, which drives the Stopping state. Already stopping or stopped
+// torrents ignore the call.
 func (t *torrent) stop(err error) {
 	if s := t.status(); s == Stopping || s == Stopped {
 		return
@@ -73,11 +78,22 @@ func (t *torrent) stop(err error) {
 	}
 
 	t.markStopped()
+	// No run-loop work can start while stop runs. Cancel queued hashes, tree
+	// builds and write-semaphore waits immediately, and do not touch storage
+	// until every worker that already touched it has finished.
+	t.stopWorkers()
+	t.resetStoppedDataWork()
 	t.stopAcceptor()
 	t.stopPeers()
 	t.stopPiecedownloaders()
 	t.stopInfoDownloaders()
 	t.stopWebseedDownloads()
+
+	// The verifier's Prepare runs the swarm merge off loop: it reads t.pieces
+	// and writes through their file sections. Close cancels it and joins both
+	// it and the check/reader goroutines, so the bitfield below is stable and
+	// closeData cannot drop storage under them.
+	t.stopVerifier()
 
 	if t.bitfield != nil {
 		_ = t.writeBitfield()
@@ -88,7 +104,6 @@ func (t *torrent) stop(err error) {
 
 	t.closeData()
 	t.stopAllocator()
-	t.stopVerifier()
 
 	t.stopOutgoingHandshakers()
 	t.stopIncomingHandshakers()
@@ -117,6 +132,82 @@ func (t *torrent) stop(err error) {
 	}
 }
 
+// torrentDataWork is a comparable registration for one off-loop operation. A
+// context.CancelFunc itself is a function and cannot be used as a map key.
+type torrentDataWork struct {
+	ctx    context.Context
+	cancel context.CancelFunc
+}
+
+// beginDataWork registers one off-loop operation before its goroutine starts.
+// The per-operation context is what a stop cancels; keeping the registration
+// and the stopping flag under one lock makes WaitGroup.Add safe against a
+// concurrent drain.
+func (t *torrent) beginDataWork() (*torrentDataWork, bool) {
+	t.workMu.Lock()
+	defer t.workMu.Unlock()
+	if t.workStopping {
+		return nil, false
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	work := &torrentDataWork{ctx: ctx, cancel: cancel}
+	if t.workCancels == nil {
+		t.workCancels = make(map[*torrentDataWork]struct{})
+	}
+	t.workCancels[work] = struct{}{}
+	t.workWG.Add(1)
+	return work, true
+}
+
+// endDataWork retires a worker only after its storage access is over. Cancelling
+// here also releases a context that finished before the torrent stopped.
+func (t *torrent) endDataWork(work *torrentDataWork) {
+	work.cancel()
+	t.workMu.Lock()
+	delete(t.workCancels, work)
+	t.workMu.Unlock()
+	t.workWG.Done()
+}
+
+// stopWorkers refuses new workers, cancels the registered ones and drains
+// them. PieceWriter and the lazy hash/tree loops check their contexts between
+// blocking operations; an IO already in progress is allowed to finish before
+// closeData can unmap or close its file.
+func (t *torrent) stopWorkers() {
+	t.workMu.Lock()
+	t.workStopping = true
+	cancels := make([]*torrentDataWork, 0, len(t.workCancels))
+	for work := range t.workCancels {
+		cancels = append(cancels, work)
+	}
+	t.workMu.Unlock()
+
+	for _, work := range cancels {
+		work.cancel()
+	}
+	t.workWG.Wait()
+
+	t.workMu.Lock()
+	t.workCancels = nil
+	t.workStopping = false
+	t.workMu.Unlock()
+}
+
+// resetStoppedDataWork clears run-loop bookkeeping for writes and seed hashes
+// whose workers were cancelled instead of delivering a result. The next start
+// begins with an empty ring and cannot inherit a parked request from a peer
+// that is gone.
+func (t *torrent) resetStoppedDataWork() {
+	t.pendingWrites = 0
+	if t.pieceMessagesC != nil {
+		t.pieceMessagesC.Resume()
+	}
+	if t.webseedPieceResultC != nil {
+		t.webseedPieceResultC.Resume()
+	}
+	t.resetSeedHashWork()
+}
+
 func (t *torrent) stopAllocator() {
 	t.log.Debugln("stopping allocator")
 	if t.allocator != nil {
@@ -127,16 +218,22 @@ func (t *torrent) stopAllocator() {
 
 func (t *torrent) stopVerifier() {
 	t.log.Debugln("stopping verifier")
-	if t.verifier != nil {
-		// Keep what the interrupted check already proved: on the next start
-		// those pieces are skipped instead of being read and hashed again.
-		if b := t.verifier.Bitfield; b != nil {
-			t.verifiedPrefix = append([]byte(nil), b.Bytes()...)
-		}
-		t.verifier.Close()
-		t.verifier = nil
-		t.mergeOut = nil
+	if t.verifier == nil {
+		return
 	}
+	v := t.verifier
+	// Close cancels the check and the merge Prepare (which reads and writes
+	// t.pieces off loop) and waits for the whole run to unwind. Reading the
+	// bitfield or dropping the files before that join races with the verifier
+	// goroutine, so the snapshot must come after it.
+	v.Close()
+	// Keep what the interrupted check already proved: on the next start
+	// those pieces are skipped instead of being read and hashed again.
+	if b := v.Bitfield; b != nil {
+		t.verifiedPrefix = append([]byte(nil), b.Bytes()...)
+	}
+	t.verifier = nil
+	t.mergeOut = nil
 }
 
 // stopWebseedDownloads closes every webseed downloader and zeroes the

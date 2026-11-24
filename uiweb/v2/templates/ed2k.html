@@ -6,21 +6,21 @@
 <div class="view ed2k-view">
   {{if .Enabled}}
   <nav class="toolbar" role="tablist" aria-label="{{tr "Sezioni eD2k"}}">
-    <a class="chip{{if eq .Tab "status"}} active{{end}}" role="tab" aria-selected="{{if eq .Tab "status"}}true{{else}}false{{end}}" href="/?view=ed2k">{{tr "aMule e ricerca"}}</a>
+    <a class="chip{{if eq .Tab "status"}} active{{end}}" role="tab" aria-selected="{{if eq .Tab "status"}}true{{else}}false{{end}}" href="/?view=ed2k">{{ed2kTr "aMule e ricerca"}}</a>
     <a class="chip{{if eq .Tab "shared"}} active{{end}}" role="tab" aria-selected="{{if eq .Tab "shared"}}true{{else}}false{{end}}" href="/?view=ed2k&amp;tab=shared">{{tr "File condivisi"}}</a>
-    <a class="chip{{if eq .Tab "log"}} active{{end}}" role="tab" aria-selected="{{if eq .Tab "log"}}true{{else}}false{{end}}" href="/?view=ed2k&amp;tab=log">{{tr "Log di aMule"}}</a>
+    <a class="chip{{if eq .Tab "log"}} active{{end}}" role="tab" aria-selected="{{if eq .Tab "log"}}true{{else}}false{{end}}" href="/?view=ed2k&amp;tab=log">{{ed2kTr "Log di aMule"}}</a>
   </nav>
   {{end}}
   {{if and .Enabled (eq .Tab "shared")}}
   <div class="panel">
-    <div class="panel-head"><h3>{{tr "File condivisi"}}</h3><small class="muted">{{tr "Cosa aMule sta caricando e le cartelle che condivide"}}</small></div>
+    <div class="panel-head"><h3>{{tr "File condivisi"}}</h3><small class="muted">{{ed2kTr "Cosa aMule sta caricando e le cartelle che condivide"}}</small></div>
     <div class="panel-body">{{template "v2_ed2k_shared" .Shared}}</div>
   </div>
   {{else if and .Enabled (eq .Tab "log")}}
   <div class="panel">
-    <div class="panel-head"><h3>{{tr "Log di aMule"}}</h3><small class="muted">{{tr "Le ultime righe del log di amuled"}}</small></div>
+    <div class="panel-head"><h3>{{ed2kTr "Log di aMule"}}</h3><small class="muted">{{tr "Le ultime righe del log di amuled"}}</small></div>
     <div class="panel-body">
-      <a class="btn sm" href="/?view=ed2k&amp;tab=log" {{trTitle "Rilegge il log da aMule"}}>{{tr "Aggiorna"}}</a>
+      <a class="btn sm" href="/?view=ed2k&amp;tab=log" {{ed2kTitle "Rilegge il log da aMule"}}>{{tr "Aggiorna"}}</a>
       {{template "v2_ed2k_log" .Log}}
     </div>
   </div>
@@ -28,10 +28,10 @@
   <div id="v2-ed2k-state">{{template "v2_ed2k_state" .}}</div>
   {{if .Enabled}}
   <div class="panel">
-    <div class="panel-head"><h3>{{tr "Cerca su eD2k e Kad"}}</h3><small class="muted">{{tr "La ricerca la esegue aMule; i risultati restano finché non ne avvii un'altra"}}</small></div>
+    <div class="panel-head"><h3>{{tr "Cerca su eD2k e Kad"}}</h3><small class="muted">{{ed2kTr "La ricerca la esegue aMule; i risultati restano finché non ne avvii un'altra"}}</small></div>
     <div class="panel-body">
       <form class="search-row" method="post" action="/ed2k/search" hx-post="/ed2k/search" hx-target="#v2-ed2k-results" hx-swap="innerHTML" hx-indicator="#v2-ed2k-searching" hx-disabled-elt="find button">
-        <input type="search" name="query" aria-label="{{tr "Cosa cercare su eD2k e Kad"}}" placeholder="{{tr "Serie S01E02, titolo del film…"}}" {{trTitle "Parole da cercare: aMule restituisce i file che le contengono tutte"}} required />
+        <input type="search" name="query" aria-label="{{tr "Cosa cercare su eD2k e Kad"}}" placeholder="{{tr "Serie S01E02, titolo del film…"}}" {{ed2kTitle "Parole da cercare: aMule restituisce i file che le contengono tutte"}} required />
         <label class="field compact"><span class="sr-only">{{tr "Rete di ricerca"}}</span><select class="input" name="network" aria-label="{{tr "Rete di ricerca"}}" {{trTitle "Kad cerca nella rete distribuita; Kad + server fa entrambe le ricerche e unisce i risultati; Globale interroga tutti i server eD2k; Server solo quello a cui sei connesso"}}>
           <option value="kad"{{if eq .Network "kad"}} selected{{end}}>{{tr "Kad"}}</option>
           <option value="both"{{if eq .Network "both"}} selected{{end}}>{{tr "Kad + server eD2k"}}</option>
@@ -40,7 +40,7 @@
         </select></label>
         <button class="btn primary" type="submit">{{tr "Cerca"}}</button>
       </form>
-      <p id="v2-ed2k-searching" class="htmx-indicator muted" role="status" aria-live="polite">{{tr "Ricerca in corso: aMule raccoglie i risultati per qualche secondo…"}}</p>
+      <p id="v2-ed2k-searching" class="htmx-indicator muted" role="status" aria-live="polite">{{ed2kTr "Ricerca in corso: aMule raccoglie i risultati per qualche secondo…"}}</p>
       <div id="v2-ed2k-results" aria-live="polite"></div>
     </div>
   </div>
@@ -48,8 +48,8 @@
     <div class="panel-head"><h3>{{tr "Incolla link eD2k"}}</h3><small class="muted">{{tr "Uno o più link ed2k://, anche mescolati a testo"}}</small></div>
     <div class="panel-body">
       <form method="post" action="/ed2k/add" hx-post="/ed2k/add" hx-target="#v2-ed2k-links-result" hx-swap="innerHTML" hx-disabled-elt="find button">
-        <label class="field span-full"><span>{{tr "Link eD2k"}}</span><textarea class="input" name="links" rows="4" placeholder="{{tr "ed2k://|file|nome.mkv|123456789|0123456789ABCDEF0123456789ABCDEF|/"}}" {{trTitle "Incolla uno o più link eD2k, uno per riga (o separati da spazi): vengono aggiunti ad aMule"}} required></textarea></label>
-        <div class="form-actions"><button class="btn primary" type="submit">{{tr "Scarica con aMule"}}</button></div>
+        <label class="field span-full"><span>{{tr "Link eD2k"}}</span><textarea class="input" name="links" rows="4" placeholder="{{tr "ed2k://|file|nome.mkv|123456789|0123456789ABCDEF0123456789ABCDEF|/"}}" {{ed2kTitle "Incolla uno o più link eD2k, uno per riga (o separati da spazi): vengono aggiunti ad aMule"}} required></textarea></label>
+        <div class="form-actions"><button class="btn primary" type="submit">{{ed2kTr "Scarica con aMule"}}</button></div>
       </form>
       <div id="v2-ed2k-links-result" aria-live="polite"></div>
     </div>
@@ -64,35 +64,35 @@
 {{define "v2_ed2k_state"}}
 {{if .Message}}<p class="{{if .MessageErr}}alert{{else}}muted{{end}}" role="{{if .MessageErr}}alert{{else}}status{{end}}"><span>{{tr .Message}}</span>{{if .Detail}} {{tr .Detail}}{{end}}</p>{{end}}
 <div class="panel">
-  <div class="panel-head"><h3>{{tr "aMule"}}</h3><small class="muted">{{if .Address}}{{tr .Address}}{{end}}</small></div>
+  <div class="panel-head"><h3>{{ed2kTr "aMule"}}</h3><small class="muted">{{if .Address}}{{tr .Address}}{{end}}</small></div>
   <div class="panel-body">
   {{if .DirIssues}}
-  <p class="alert" role="alert"><span>{{tr "Cartelle di aMule non utilizzabili:"}}</span> {{range .DirIssues}}<code {{trTitle .Path}}>{{tr .Path}}</code> {{end}}<span>{{tr "aMule registra «Failed to get file system statistics» a ogni controllo."}}</span></p>
-  {{if .DirContainer}}<p class="muted">{{tr "aMule gira in un container: crea le cartelle indicate nel container (o correggi il mount). Gextto non può crearle da qui."}}</p>{{end}}
+  <p class="alert" role="alert"><span>{{ed2kTr "Cartelle di aMule non utilizzabili:"}}</span> {{range .DirIssues}}<code {{trTitle .Path}}>{{tr .Path}}</code> {{end}}<span>{{ed2kTr "aMule registra «Failed to get file system statistics» a ogni controllo."}}</span></p>
+  {{if .DirContainer}}<p class="muted">{{ed2kTr "aMule gira in un container: crea le cartelle indicate nel container (o correggi il mount). Gextto non può crearle da qui."}}</p>{{end}}
   {{if .DirUnmapped}}<p class="muted">{{tr "La cartella esiste nel container ma non allo stesso percorso su questa macchina: l'import non può funzionare. Montala allo stesso percorso in Docker."}}</p>{{end}}
-  {{if .DirHostMissing}}<form method="post" action="/ed2k/directories/create" hx-post="/ed2k/directories/create" hx-target="#v2-ed2k-state" hx-swap="innerHTML" hx-disabled-elt="find button"><button class="btn" type="submit" {{trTitle "Crea su questa macchina le cartelle di aMule che mancano (arrivo e temporanea)"}}>{{tr "Crea le cartelle"}}</button></form>{{end}}
+  {{if .DirHostMissing}}<form method="post" action="/ed2k/directories/create" hx-post="/ed2k/directories/create" hx-target="#v2-ed2k-state" hx-swap="innerHTML" hx-disabled-elt="find button"><button class="btn" type="submit" {{ed2kTitle "Crea su questa macchina le cartelle di aMule che mancano (arrivo e temporanea)"}}>{{tr "Crea le cartelle"}}</button></form>{{end}}
   {{end}}
   {{if not .Enabled}}
-    <p class="muted">{{tr "L'integrazione con aMule è spenta. Avvia amuled con le connessioni esterne (EC) attive, poi accendila e inserisci indirizzo e password in Configurazione → eD2k e Kad."}}</p>
+    <p class="muted">{{ed2kTr "L'integrazione con aMule è spenta. Avvia amuled con le connessioni esterne (EC) attive, poi accendila e inserisci indirizzo e password in Configurazione → eD2k e Kad."}}</p>
     <p><a class="btn" href="/?view=settings&amp;tab=ed2k&amp;highlight=ed2k_enabled">{{tr "Apri la configurazione"}}</a></p>
   {{else if .Error}}
-    <p class="alert" role="alert"><span>{{tr "aMule non raggiungibile:"}}</span> {{tr .Error}}</p>
+    <p class="alert" role="alert"><span>{{ed2kTr "aMule non raggiungibile:"}}</span> {{tr .Error}}</p>
     <p class="muted">{{tr "Controlla che amuled sia in esecuzione, che le connessioni esterne (EC) siano abilitate e che porta e password coincidano con quelle in Configurazione → eD2k e Kad."}}</p>
-    <form method="post" action="/ed2k/action" hx-post="/ed2k/action" hx-target="#v2-ed2k-state" hx-swap="innerHTML"><input type="hidden" name="action" value="connect"><button class="btn" type="submit" {{trTitle "Riprova a contattare aMule e a connettere le reti"}}>{{tr "Riprova"}}</button></form>
+    <form method="post" action="/ed2k/action" hx-post="/ed2k/action" hx-target="#v2-ed2k-state" hx-swap="innerHTML"><input type="hidden" name="action" value="connect"><button class="btn" type="submit" {{ed2kTitle "Riprova a contattare aMule e a connettere le reti"}}>{{tr "Riprova"}}</button></form>
   {{else}}
     <div class="stat-grid">
-      <div class="row"><span>{{tr "Versione di aMule"}}</span><strong>{{tr .Status.Version}}</strong></div>
+      <div class="row"><span>{{ed2kTr "Versione di aMule"}}</span><strong>{{tr .Status.Version}}</strong></div>
       <div class="row"><span>{{tr "Dove gira"}}</span><strong>{{tr .Runtime}}</strong></div>
-      <div class="row"><span>{{tr "eD2k"}}</span><strong>{{if .Status.Ed2kConnected}}<span>{{tr "Connesso a"}}</span> {{if .Status.ServerName}}{{tr .Status.ServerName}}{{else}}{{tr .Status.ServerAddress}}{{end}} · {{if .Status.HighID}}<span class="badge ok" {{trTitle "Gli altri client possono contattarti direttamente"}}>{{tr "ID alto"}}</span>{{else}}<span class="badge warn" {{trTitle "Porta TCP non raggiungibile da fuori: meno fonti. Apri la porta TCP di aMule sul router"}}>{{tr "ID basso"}}</span>{{end}}{{else if .Status.Ed2kConnecting}}<span>{{tr "In connessione…"}}</span>{{else}}<span>{{tr "Non connesso"}}</span>{{end}}</strong></div>
-      <div class="row"><span>{{tr "Kad"}}</span><strong>{{if .Status.KadConnected}}{{if .Status.KadFirewalled}}<span class="badge warn" {{trTitle "Porta UDP non raggiungibile da fuori: Kad funziona ma con meno fonti. Apri la porta UDP di aMule sul router"}}>{{tr "Connesso, dietro firewall"}}</span>{{else}}<span class="badge ok">{{tr "Connesso"}}</span>{{end}}{{else if .Status.KadRunning}}<span>{{tr "In connessione…"}}</span>{{else}}<span>{{tr "Fermo"}}</span>{{end}}</strong></div>
+      <div class="row"><span>{{tr "eD2k"}}</span><strong>{{if .Status.Ed2kConnected}}<span>{{tr "Connesso a"}}</span> {{if .Status.ServerName}}{{tr .Status.ServerName}}{{else}}{{tr .Status.ServerAddress}}{{end}} · {{if .Status.HighID}}<span class="badge ok" {{trTitle "Gli altri client possono contattarti direttamente"}}>{{tr "ID alto"}}</span>{{else}}<span class="badge warn" {{ed2kTitle "Porta TCP non raggiungibile da fuori: meno fonti. Apri la porta TCP di aMule sul router"}}>{{tr "ID basso"}}</span>{{end}}{{else if .Status.Ed2kConnecting}}<span>{{tr "In connessione…"}}</span>{{else}}<span>{{tr "Non connesso"}}</span>{{end}}</strong></div>
+      <div class="row"><span>{{tr "Kad"}}</span><strong>{{if .Status.KadConnected}}{{if .Status.KadFirewalled}}<span class="badge warn" {{ed2kTitle "Porta UDP non raggiungibile da fuori: Kad funziona ma con meno fonti. Apri la porta UDP di aMule sul router"}}>{{tr "Connesso, dietro firewall"}}</span>{{else}}<span class="badge ok">{{tr "Connesso"}}</span>{{end}}{{else if .Status.KadRunning}}<span>{{tr "In connessione…"}}</span>{{else}}<span>{{tr "Fermo"}}</span>{{end}}</strong></div>
       <div class="row"><span>{{tr "Velocità"}}</span><strong>↓ {{rateI .Status.DownloadRate}} · ↑ {{rateI .Status.UploadRate}}</strong></div>
       <div class="row"><span>{{tr "Limiti"}}</span><strong>↓ {{if .Status.DownloadLimit}}{{rateI .Status.DownloadLimit}}{{else}}{{tr "nessuno"}}{{end}} · ↑ {{if .Status.UploadLimit}}{{rateI .Status.UploadLimit}}{{else}}{{tr "nessuno"}}{{end}}</strong></div>
       <div class="row"><span>{{tr "Rete eD2k"}}</span><strong>{{tr .Status.Ed2kUsers}} <span>{{tr "utenti"}}</span> · {{.Status.Ed2kFiles}} <span>{{tr "file"}}</span></strong></div>
       <div class="row"><span>{{tr "Rete Kad"}}</span><strong>{{tr .Status.KadUsers}} <span>{{tr "utenti"}}</span> · {{.Status.KadNodes}} <span>{{tr "nodi"}}</span></strong></div>
       <div class="row"><span>{{tr "Coda di upload"}}</span><strong>{{tr .Status.UploadQueue}}</strong></div>
-      <div class="row"><span>{{tr "Sessione"}}</span><strong {{trTitle "Byte scambiati da aMule da quando è stato avviato"}}>↓ {{bytes .Status.SessionRecv}} · ↑ {{bytes .Status.SessionSent}}</strong></div>
-      <div class="row"><span>{{tr "Totale"}}</span><strong {{trTitle "Byte scambiati da aMule dall'inizio, somma di tutte le sessioni"}}>↓ {{bytes .Status.TotalRecv}} · ↑ {{bytes .Status.TotalSent}}</strong></div>
-      {{if not .Emuleqt}}<div class="row"><span>{{tr "Preallocazione file"}}</span><strong>{{if .Prefs.AllocateFull}}<span class="badge warn" {{trTitle "aMule alloca l'intero file prima di scaricarlo: su un disco di rete può bloccare la coda per decine di secondi"}}>{{tr "attiva"}}</span>{{else}}<span class="badge ok" {{trTitle "aMule non prealloca l'intero file: sui dischi di rete è il comportamento consigliato"}}>{{tr "spenta"}}</span>{{end}}</strong></div>{{end}}
+      <div class="row"><span>{{tr "Sessione"}}</span><strong {{ed2kTitle "Byte scambiati da aMule da quando è stato avviato"}}>↓ {{bytes .Status.SessionRecv}} · ↑ {{bytes .Status.SessionSent}}</strong></div>
+      <div class="row"><span>{{tr "Totale"}}</span><strong {{ed2kTitle "Byte scambiati da aMule dall'inizio, somma di tutte le sessioni"}}>↓ {{bytes .Status.TotalRecv}} · ↑ {{bytes .Status.TotalSent}}</strong></div>
+      {{if not .Emuleqt}}<div class="row"><span>{{tr "Preallocazione file"}}</span><strong>{{if .Prefs.AllocateFull}}<span class="badge warn" {{ed2kTitle "aMule alloca l'intero file prima di scaricarlo: su un disco di rete può bloccare la coda per decine di secondi"}}>{{tr "attiva"}}</span>{{else}}<span class="badge ok" {{ed2kTitle "aMule non prealloca l'intero file: sui dischi di rete è il comportamento consigliato"}}>{{tr "spenta"}}</span>{{end}}</strong></div>{{end}}
     </div>
     <div class="toolbar">
       <form method="post" action="/ed2k/action" hx-post="/ed2k/action" hx-target="#v2-ed2k-state" hx-swap="innerHTML" class="inline"><input type="hidden" name="action" value="connect"><button class="btn primary" type="submit" {{trTitle "Connette eD2k a un server e avvia Kad"}}>{{tr "Connetti"}}</button></form>
@@ -100,18 +100,18 @@
       {{if .Status.KadRunning}}<form method="post" action="/ed2k/action" hx-post="/ed2k/action" hx-target="#v2-ed2k-state" hx-swap="innerHTML" class="inline"><input type="hidden" name="action" value="kad_stop"><button class="btn" type="submit" >{{tr "Ferma Kad"}}</button></form>
       {{else}}<form method="post" action="/ed2k/action" hx-post="/ed2k/action" hx-target="#v2-ed2k-state" hx-swap="innerHTML" class="inline"><input type="hidden" name="action" value="kad_start"><button class="btn" type="submit" >{{tr "Avvia Kad"}}</button></form>{{end}}
       {{if .Status.Ed2kConnected}}<form method="post" action="/ed2k/action" hx-post="/ed2k/action" hx-target="#v2-ed2k-state" hx-swap="innerHTML" class="inline"><input type="hidden" name="action" value="server_disconnect"><button class="btn" type="submit" {{trTitle "Lascia il server eD2k attuale; Kad resta attivo"}}>{{tr "Lascia il server"}}</button></form>{{end}}
-      <button class="btn" type="button" hx-get="/?view=ed2k" hx-select="#v2-ed2k-state" hx-target="#v2-ed2k-state" hx-swap="outerHTML" {{trTitle "Rilegge lo stato da aMule"}}>{{tr "Aggiorna"}}</button>
+      <button class="btn" type="button" hx-get="/?view=ed2k" hx-select="#v2-ed2k-state" hx-target="#v2-ed2k-state" hx-swap="outerHTML" {{ed2kTitle "Rilegge lo stato da aMule"}}>{{tr "Aggiorna"}}</button>
     </div>
   {{end}}
   </div>
 </div>
 {{if and .Enabled (not .Error)}}
 <div class="panel">
-  <div class="panel-head"><h3>{{tr "Server eD2k"}}</h3><small class="muted">{{len .Servers}} <span>{{tr "server nella lista di aMule"}}</span></small></div>
+  <div class="panel-head"><h3>{{tr "Server eD2k"}}</h3><small class="muted">{{len .Servers}} <span>{{ed2kTr "server nella lista di aMule"}}</span></small></div>
   <div class="panel-body">
     {{if .Servers}}
     <div class="table-wrap" role="region" aria-label="{{tr "Server eD2k"}}"><table class="data-table">
-      <caption class="sr-only">{{tr "Server eD2k conosciuti da aMule"}}</caption>
+      <caption class="sr-only">{{ed2kTr "Server eD2k conosciuti da aMule"}}</caption>
       <thead><tr><th scope="col">{{tr "Server"}}</th><th scope="col">{{tr "Indirizzo"}}</th><th scope="col" class="numeric">{{tr "Utenti"}}</th><th scope="col" class="numeric">{{tr "File"}}</th><th scope="col" class="numeric">{{tr "Ping"}}</th><th scope="col">{{tr "Azioni"}}</th></tr></thead>
       <tbody>{{range .Servers}}<tr>
         <td><span class="truncate" {{trTitle .Description}}>{{if .Name}}{{tr .Name}}{{else}}{{tr .Address}}{{end}}</span>{{if .Connected}} <span class="badge ok">{{tr "connesso"}}</span>{{end}}{{if .Static}} <span class="badge">{{tr "statico"}}</span>{{end}}</td>
@@ -119,13 +119,13 @@
         <td class="numeric">{{tr .Users}}</td>
         <td class="numeric">{{tr .Files}}</td>
         <td class="numeric">{{if .Ping}}{{.Ping}} ms{{else}}—{{end}}</td>
-        <td class="row-actions">{{if not .Connected}}<form method="post" action="/ed2k/action" hx-post="/ed2k/action" hx-target="#v2-ed2k-state" hx-swap="innerHTML" class="inline"><input type="hidden" name="action" value="server_connect"><input type="hidden" name="address" value="{{.Address}}"><button class="btn sm" type="submit" {{trTitle "Connetti aMule a questo server"}} aria-label="{{tr "Connetti a %s" .Address}}">{{tr "Connetti"}}</button></form>{{end}}</td>
+        <td class="row-actions">{{if not .Connected}}<form method="post" action="/ed2k/action" hx-post="/ed2k/action" hx-target="#v2-ed2k-state" hx-swap="innerHTML" class="inline"><input type="hidden" name="action" value="server_connect"><input type="hidden" name="address" value="{{.Address}}"><button class="btn sm" type="submit" {{ed2kTitle "Connetti aMule a questo server"}} aria-label="{{tr "Connetti a %s" .Address}}">{{tr "Connetti"}}</button></form>{{end}}</td>
       </tr>{{end}}</tbody>
     </table></div>
     {{else}}<p class="muted">{{tr "La lista dei server è vuota: scaricane una qui sotto."}}</p>{{end}}
     <form class="form-grid" method="post" action="/ed2k/action" hx-post="/ed2k/action" hx-target="#v2-ed2k-state" hx-swap="innerHTML">
       <input type="hidden" name="action" value="servers_update">
-      <label class="field span-full"><span>{{tr "Aggiorna la lista dei server da un indirizzo (server.met)"}}</span><input class="input" type="url" name="url" value="{{.ServersURL}}" required {{trTitle "Indirizzo di un file server.met: aMule lo scarica e aggiunge i server alla sua lista"}} /></label>
+      <label class="field span-full"><span>{{tr "Aggiorna la lista dei server da un indirizzo (server.met)"}}</span><input class="input" type="url" name="url" value="{{.ServersURL}}" required {{ed2kTitle "Indirizzo di un file server.met: aMule lo scarica e aggiunge i server alla sua lista"}} /></label>
       <div class="form-actions"><button class="btn" type="submit">{{tr "Scarica server.met"}}</button></div>
     </form>
     <form class="form-grid" method="post" action="/ed2k/action" hx-post="/ed2k/action" hx-target="#v2-ed2k-state" hx-swap="innerHTML">
@@ -156,10 +156,10 @@
   <caption class="sr-only">{{tr "Risultati della ricerca eD2k"}}</caption>
   <thead><tr><th scope="col">{{tr "Nome"}}</th><th scope="col" class="numeric">{{tr "Dimensione"}}</th><th scope="col" class="numeric">{{tr "Fonti"}}</th><th scope="col">{{tr "Azioni"}}</th></tr></thead>
   <tbody>{{range .Results}}<tr{{if .Known}} data-ed2k-known="1"{{end}} data-ed2k-name="{{.Name}}" data-ed2k-size="{{.Size}}" data-ed2k-sources="{{.Sources}}">
-    <td><span class="truncate" {{trTitle .Name}}>{{tr .Name}}</span>{{if .Known}} <span class="badge" {{trTitle "aMule conosce già questo file: è in coda, scaricato o condiviso"}}>{{tr "già noto"}}</span>{{end}}{{template "v2_ed2k_trust" .}}</td>
+    <td><span class="truncate" {{trTitle .Name}}>{{tr .Name}}</span>{{if .Known}} <span class="badge" {{ed2kTitle "aMule conosce già questo file: è in coda, scaricato o condiviso"}}>{{tr "già noto"}}</span>{{end}}{{template "v2_ed2k_trust" .}}</td>
     <td class="numeric">{{bytes .Size}}</td>
     <td class="numeric" {{trTitle "Fonti totali / complete"}}>{{.Sources}} / {{.Complete}}</td>
-    <td class="row-actions"><form method="post" action="/ed2k/add" hx-post="/ed2k/add" hx-target="this" hx-swap="outerHTML" class="inline"><input type="hidden" name="links" value="{{.Link}}"><button class="btn sm primary" type="submit" {{trTitle "Aggiungi questo file ai download di aMule"}} aria-label="{{tr "Scarica %s" .Name}}">{{tr "Scarica"}}</button></form></td>
+    <td class="row-actions"><form method="post" action="/ed2k/add" hx-post="/ed2k/add" hx-target="this" hx-swap="outerHTML" class="inline"><input type="hidden" name="links" value="{{.Link}}"><button class="btn sm primary" type="submit" {{ed2kTitle "Aggiungi questo file ai download di aMule"}} aria-label="{{tr "Scarica %s" .Name}}">{{tr "Scarica"}}</button></form></td>
   </tr>{{end}}</tbody>
 </table></div>
 </div>

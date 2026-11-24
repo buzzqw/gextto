@@ -1,6 +1,8 @@
 package piecewriter
 
 import (
+	"context"
+
 	"github.com/buzzqw/gextto/internal/gxcore/internal/bufferpool"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/piece"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/semaphore"
@@ -32,16 +34,46 @@ func New(p *piece.Piece, source any, buf bufferpool.Buffer) *PieceWriter {
 // writes it to storage under the write-slot semaphore. Meters and result
 // delivery mirror the surrounding pipeline's accounting.
 func (w *PieceWriter) Run(resultC chan *PieceWriter, closeC chan struct{}, writesPerSecond, writeBytesPerSecond metrics.Meter, sem *semaphore.Semaphore) {
-	w.HashOK = w.Piece.Verify(w.Buffer.Data)
-	if w.HashOK {
-		writesPerSecond.Mark(1)
-		writeBytesPerSecond.Mark(int64(len(w.Buffer.Data)))
-		sem.Wait()
-		_, w.Error = w.Piece.Data.Write(w.Buffer.Data)
-		sem.Signal()
-	}
+	w.run(context.Background(), writesPerSecond, writeBytesPerSecond, sem)
 	select {
 	case resultC <- w:
 	case <-closeC:
+	}
+}
+
+// RunContext performs the hash and write without delivering a result. The
+// torrent owns delivery so it can release the buffer itself when a stop wins.
+// Cancellation prevents queued writes from starting; a write already handed
+// to storage is allowed to finish before its file is closed.
+func (w *PieceWriter) RunContext(ctx context.Context, writesPerSecond, writeBytesPerSecond metrics.Meter, sem *semaphore.Semaphore) {
+	w.run(ctx, writesPerSecond, writeBytesPerSecond, sem)
+}
+
+func (w *PieceWriter) run(ctx context.Context, writesPerSecond, writeBytesPerSecond metrics.Meter, sem *semaphore.Semaphore) {
+	if ctx.Err() != nil {
+		w.Error = ctx.Err()
+		return
+	}
+	w.HashOK = w.Piece.Verify(w.Buffer.Data)
+	if ctx.Err() != nil {
+		w.Error = ctx.Err()
+		return
+	}
+	if w.HashOK {
+		writesPerSecond.Mark(1)
+		writeBytesPerSecond.Mark(int64(len(w.Buffer.Data)))
+		if sem != nil {
+			if err := sem.WaitContext(ctx); err != nil {
+				w.Error = err
+				return
+			}
+			defer sem.Signal()
+		}
+		// The slot may have been granted at the same instant as the stop.
+		if err := ctx.Err(); err != nil {
+			w.Error = err
+			return
+		}
+		_, w.Error = w.Piece.Data.Write(w.Buffer.Data)
 	}
 }

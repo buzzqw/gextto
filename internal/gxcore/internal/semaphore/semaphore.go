@@ -32,13 +32,21 @@ func (s *Semaphore) Len() int {
 }
 
 // Wait blocks until a slot is free, then holds it.
-// The background context means a waiter is never cancelled: slots are always
-// eventually released by the piece pipeline completing or failing.
 func (s *Semaphore) Wait() {
+	_ = s.WaitContext(context.Background())
+}
+
+// WaitContext blocks until a slot is free or ctx is cancelled. A cancelled
+// waiter holds no slot and must not be paired with Signal.
+func (s *Semaphore) WaitContext(ctx context.Context) error {
 	s.waiting.Add(1)
-	_ = s.sem.Acquire(context.Background(), 1)
+	err := s.sem.Acquire(ctx, 1)
 	s.waiting.Add(-1)
+	if err != nil {
+		return err
+	}
 	s.active.Add(1)
+	return nil
 }
 
 // Signal frees one held slot, waking a random waiter.

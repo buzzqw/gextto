@@ -33,7 +33,6 @@ import (
 	"net/http"
 	"net/url"
 	"path/filepath"
-	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -150,6 +149,13 @@ func v2TemplateFuncMap() template.FuncMap {
 		"tr":      v2TranslateFunc(nil, nil),
 		"trTitle": v2TitleFunc(nil, nil),
 		"trBreak": v2BreakFunc(nil, nil),
+		// ed2kTr and ed2kTitle name the backend in interface labels. At init
+		// there is no AppState, so the core name is the default ("aMule") and
+		// the substitution is a no-op; v2TemplatesFor rebinds them to the
+		// active config for real requests. The helpers touch only translated
+		// labels, never rendered user data.
+		"ed2kTr":    v2Ed2kTrFunc(v2TranslateFunc(nil, nil), func() string { return v2Ed2kCoreName(nil) }),
+		"ed2kTitle": v2Ed2kTitleFunc(v2TitleFunc(nil, nil), func() string { return v2Ed2kCoreName(nil) }),
 	}
 }
 
@@ -413,6 +419,9 @@ type v2ShellData struct {
 	// ClientI18n is the JSON dictionary window.__v2i18n for the strings the
 	// client script renders at runtime (see uiweb_v2_client_i18n.go).
 	ClientI18n template.JS
+	// Ed2kCore is the active eD2k backend name. Templates use it only in
+	// interface labels; user data is never rewritten to match the backend.
+	Ed2kCore string
 	// Dashboard, only on the dashboard page, carries the summary badges
 	// (series/movies, free space, archived magnets, engine) shown in the top
 	// bar: keeping them in the header saves the row they used to occupy in the
@@ -429,32 +438,17 @@ func v2Render(w http.ResponseWriter, status int, name string, data any, s *AppSt
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(status)
-	out := buffer.Bytes()
-	if s != nil {
-		out = v2Ed2kCoreNamed(latestConfig(s), name, data, out)
-	}
-	_, _ = w.Write(out)
+	_, _ = w.Write(buffer.Bytes())
 }
 
-// v2Ed2kCoreNamed names the eD2k core in use. The interface was written when
-// aMule was the only one and says "aMule" in many places; with emule-qt
-// chosen those pages say "emule-qt" instead. The settings page is left as it
-// is: there both programs are described by name.
-func v2Ed2kCoreNamed(cfg *Config, name string, data any, html []byte) []byte {
-	if cfg == nil || strings.HasPrefix(name, "v2_setting") {
-		return html
+// v2Ed2kCoreName is used only for interface labels. It never rewrites rendered
+// HTML, so titles, paths, form values and other user data keep their exact text.
+func v2Ed2kCoreName(cfg *Config) string {
+	if cfg != nil && ed2kEnabled(cfg) && ed2kUsesEmuleqt(cfg) {
+		return "emule-qt"
 	}
-	if page, ok := data.(v2ShellData); ok && page.Page == "settings" {
-		return html
-	}
-	if !ed2kEnabled(cfg) || !ed2kUsesEmuleqt(cfg) || !bytes.Contains(html, []byte("aMule")) {
-		return html
-	}
-	return v2AmuleWord.ReplaceAll(html, []byte("emule-qt"))
+	return "aMule"
 }
-
-// v2AmuleWord is the name as a word: "aMule", not "amuled" or "aMuleWeb".
-var v2AmuleWord = regexp.MustCompile(`\baMule\b`)
 
 // v2RenderPlus writes a rendered fragment followed by extra markup: the
 // out-of-band swaps an answer carries beside its main swap.
@@ -975,6 +969,7 @@ func V2Page(w http.ResponseWriter, r *http.Request, s *AppState) {
 		Update:   updates.Status(cfg),
 
 		ClientI18n: v2ClientI18nJSON(s),
+		Ed2kCore:   v2Ed2kCoreName(cfg),
 	}
 	if dashboard, ok := content.(v2DashboardView); ok {
 		page.Dashboard = &dashboard

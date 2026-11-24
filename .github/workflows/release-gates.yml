@@ -1,0 +1,176 @@
+name: Release quality gates
+
+on:
+  workflow_call:
+    inputs:
+      fuzz-time:
+        description: Go fuzzing time per target
+        type: string
+        required: false
+        default: 30s
+      codeql:
+        description: Run CodeQL as a blocking release gate
+        type: boolean
+        required: false
+        default: true
+      fuzz:
+        description: Run the fuzz smoke pass as a blocking gate
+        type: boolean
+        required: false
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: vet and test (x86_64)
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Install Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: UI settings index
+        run: make check-ui
+
+      - name: Installer self-test
+        run: make installer-test
+
+      - name: Vet
+        run: make vet
+
+      - name: Test
+        run: make test
+
+      - name: Test engine
+        run: make test-engine
+
+  ui-e2e:
+    name: UI end2end (Playwright)
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Install Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Install Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: uiweb/end2end/package-lock.json
+
+      - name: Install the end2end dependencies
+        working-directory: uiweb/end2end
+        run: npm ci --no-audit --no-fund
+
+      - name: Install the browser
+        working-directory: uiweb/end2end
+        run: |
+          if command -v google-chrome >/dev/null 2>&1; then
+            echo "Using the runner's $(google-chrome --version)"
+            exit 0
+          fi
+          for attempt in 1 2 3; do
+            npx playwright install --with-deps chrome && exit 0
+            echo "Browser install failed (attempt $attempt of 3), retrying in 30 seconds"
+            sleep 30
+          done
+          exit 1
+
+      - name: Build the daemon
+        run: scripts/build-daemon.sh
+
+      - name: Run the end2end suite
+        working-directory: uiweb/end2end
+        run: npx playwright test
+
+  race:
+    name: race detector (x86_64)
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Install Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Race test
+        run: make test-race
+
+      - name: Race test (DHT module)
+        working-directory: internal/dht
+        run: CGO_ENABLED=1 go test -race ./...
+
+  fuzz:
+    name: fuzz-smoke (x86_64)
+    if: inputs.fuzz
+    runs-on: ubuntu-24.04
+    env:
+      CGO_ENABLED: "0"
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Install Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Fuzz every network-facing parser
+        run: make fuzz-smoke FUZZ_TIME=${{ inputs.fuzz-time }}
+
+      - name: Upload the failing inputs
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: fuzz-crashers-${{ github.run_attempt }}
+          path: "**/testdata/fuzz/**"
+          if-no-files-found: ignore
+          retention-days: 30
+
+  codeql:
+    name: CodeQL (go)
+    if: inputs.codeql
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Install Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: go
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v4
+
+      - name: Analyze
+        uses: github/codeql-action/analyze@v4
+        env:
+          CODEQL_ACTION_EXTRA_OPTIONS: '{"database":{"run-queries":["--additional-packs=${{ github.workspace }}/.github/codeql/extensions","--model-packs=buzzqw/gextto-models"]}}'

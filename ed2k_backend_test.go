@@ -1,6 +1,7 @@
 package gextto
 
 import (
+	"bytes"
 	"context"
 	"encoding/hex"
 	"errors"
@@ -400,22 +401,40 @@ func TestEmuleqtManagedStopsWhenAnotherCoreIsChosen(t *testing.T) {
 	}
 }
 
-// TestPagesNameTheEd2kCoreInUse: with emule-qt chosen the pages say
-// emule-qt where they said aMule; the settings page, where both programs
-// are described, and aMule's own words (amuled) are left alone.
+// TestPagesNameTheEd2kCoreInUse: interface labels follow the active backend,
+// while user data containing the other backend's name is never rewritten.
 func TestPagesNameTheEd2kCoreInUse(t *testing.T) {
-	cfgValue := DefaultConfig()
-	cfg := &cfgValue
-	cfg.Settings = map[string]string{"ed2k_enabled": "true", "ed2k_backend": "emuleqt_managed"}
-	page := []byte("<p>Scarica con aMule</p><p>amuled</p>")
-	if got := string(v2Ed2kCoreNamed(cfg, "v2_ed2k", nil, page)); got != "<p>Scarica con emule-qt</p><p>amuled</p>" {
-		t.Fatalf("eD2k page = %q", got)
+	state := newTestAppState(t)
+	state.cfg.Settings = map[string]string{"ed2k_enabled": "true", "ed2k_backend": "emuleqt_managed"}
+	state.config_cache = &ConfigCache{generation: ConfigGeneration(), cfg: state.cfg, valid: true}
+	view := v2Ed2kView{
+		Enabled: true,
+		Emuleqt: true,
+		Search:  v2Ed2kSearchView{Results: []v2Ed2kResult{{Name: "aMule Session"}}},
 	}
-	if got := string(v2Ed2kCoreNamed(cfg, "v2_shell", v2ShellData{Page: "settings"}, page)); got != string(page) {
-		t.Fatalf("the settings page was rewritten: %q", got)
+	var rendered bytes.Buffer
+	if err := v2TemplatesFor(state).ExecuteTemplate(&rendered, "v2_ed2k", view); err != nil {
+		t.Fatal(err)
 	}
-	cfg.Settings["ed2k_backend"] = "amule"
-	if got := string(v2Ed2kCoreNamed(cfg, "v2_ed2k", nil, page)); got != string(page) {
-		t.Fatalf("with aMule the page changed: %q", got)
+	body := rendered.String()
+	if !strings.Contains(body, "Scarica con emule-qt") {
+		t.Fatalf("the interface label did not follow emule-qt: %q", body)
+	}
+
+	// Search results are rendered by their own fragment, not by v2_ed2k: a
+	// result name that happens to contain the other backend's name must keep
+	// its exact text.
+	var results bytes.Buffer
+	if err := v2TemplatesFor(state).ExecuteTemplate(&results, "v2_ed2k_results", view.Search); err != nil {
+		t.Fatal(err)
+	}
+	resultBody := results.String()
+	if !strings.Contains(resultBody, "aMule Session") || strings.Contains(resultBody, "emule-qt Session") {
+		t.Fatalf("user data was rewritten with the backend name: %q", resultBody)
+	}
+
+	state.cfg.Settings["ed2k_backend"] = "amule"
+	if got := v2Ed2kCoreName(state.cfg); got != "aMule" {
+		t.Fatalf("with aMule selected the core name = %q", got)
 	}
 }

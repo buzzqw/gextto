@@ -236,9 +236,10 @@ func (t *torrent) startNewAnnouncer(tr tracker.Tracker) {
 // (announcing it without blocking), else one socket per torrent.
 func (t *torrent) startAcceptor() {
 	if t.session.sharedPort() {
-		t.port = int(t.session.config.ListenPort)
+		p := int(t.session.config.ListenPort)
+		t.setPort(p)
 		select {
-		case t.portC <- t.port:
+		case t.portC <- p:
 		default:
 		}
 		return
@@ -246,13 +247,14 @@ func (t *torrent) startAcceptor() {
 	if t.acceptor != nil {
 		return
 	}
-	listener, err := listenTCPOn(t.session.config.Host, t.port)
+	listener, err := listenTCPOn(t.session.config.Host, t.getPort())
 	if err != nil {
-		t.log.Warningf("cannot listen port %d: %s", t.port, err)
+		t.log.Warningf("cannot listen port %d: %s", t.getPort(), err)
 	} else {
 		t.log.Info("Listening peers on tcp://" + listener.Addr().String())
-		t.port = listener.Addr().(*net.TCPAddr).Port
-		t.portC <- t.port
+		p := listener.Addr().(*net.TCPAddr).Port
+		t.setPort(p)
+		t.portC <- p
 		t.acceptor = acceptor.New(listener, t.incomingConnC, t.log)
 		go t.acceptor.Run()
 	}

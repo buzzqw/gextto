@@ -276,6 +276,23 @@ check_package_script
 check_launcher "gextto" "$ROOT/scripts/package-linux.sh" "gexttod"
 check_launcher "gx-torrent" "$ROOT/scripts/package-gx-torrent.sh" "gx-torrent"
 
+capture bash -n "$ROOT/scripts/verify-release-assets.sh"
+expect "verify-release-assets.sh: syntax" 0
+capture bash -n "$ROOT/scripts/publish-github-release.sh"
+expect "publish-github-release.sh: syntax" 0
+capture bash -n "$ROOT/scripts/installer-transaction-selftest.sh"
+expect "installer-transaction-selftest.sh: syntax" 0
+capture bash -n "$ROOT/scripts/release-assets-selftest.sh"
+expect "release-assets-selftest.sh: syntax" 0
+capture bash -n "$ROOT/scripts/publish-github-release-selftest.sh"
+expect "publish-github-release-selftest.sh: syntax" 0
+capture bash "$ROOT/scripts/installer-transaction-selftest.sh"
+expect "installer transaction: stages, commits and rolls back the whole payload" 0 "transaction checks passed"
+capture bash "$ROOT/scripts/release-assets-selftest.sh"
+expect "release assets: complete set and checksums are enforced" 0 "verification checks passed"
+capture bash "$ROOT/scripts/publish-github-release-selftest.sh"
+expect "publish flow: existing and missing releases are published without retries" 0 "publish flow checks passed"
+
 if (( failures > 0 )); then
   printf '\n%d check(s) failed\n' "$failures" >&2
   exit 1

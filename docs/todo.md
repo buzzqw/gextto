@@ -21,16 +21,8 @@ still be true after the item lands does not belong here.
 - **Rules in the qBittorrent-compatible API**: the native page now keeps rules only as an advanced fallback, but `/api/v2/rss/rules/*` still exposes them to external clients, and the one-time migration switches stored rules off for those clients too. Gate: decide whether external clients still need that surface or the API should report no rules and the compatibility note in `gx-core.md` be updated.
 - **gx-core screenshots after the merge**: the manuals describe the single acquisition page, but the Series & movies screenshots still show the old state labels and the rules tab on the RSS page. Gate: regenerate `docs/screenshots/gx-core/{it,en}` from a running standalone daemon.
 
-- **Engine data durability**: propagate storage sync errors and refuse to persist or trust bitfields whose data was not made durable. Gate: fault-injection tests for `Sync`, periodic snapshots and restart recovery.
-- **Torrent shutdown lifecycle**: cancel and drain piece writers, seed hashing and v2 tree builds before closing storage, and synchronize mmap operations with `Close`. Gate: blocked-writer stop tests and race/stress runs with mmap.
-- **Network trust and storage confinement**: apply a public-only policy to trackers supplied by torrent metadata unless explicitly allowlisted, and prevent storage paths from following symlinks or junctions outside the root. Gate: local tracker/redirect tests and symlink escape tests on Linux and Windows.
-- **DHT identity and failed-handshake cleanup**: adopt BEP 42 external IPs only from correlated, corroborated responses and close sockets after failed per-torrent handshakes. Gate: unsolicited-response and descriptor-leak tests.
 - **qBittorrent and *arr contract**: preserve seeding-time precision and per-torrent inactive limits, decide the Readarr API-v1 policy, and add contract tests replaying Sonarr, Radarr, Lidarr and Readarr request sequences. Gate: round-trip seed-limit tests and the versioned client matrix.
-- **UI data integrity**: replace post-render `aMule` renaming with view-model labels and translate runtime Dashboard result counts in every language. Gate: full-versus-partial render tests with user data containing the backend name and i18n checks for zero, one and many results.
-- **Persistence transactions**: replace the remaining whole-library read-modify-write paths with patch transactions or revisions, and keep movie upgrade read/backup/update in one transaction. Gate: concurrent save and movie-completion tests beyond the series/movie endpoints.
-- **Unified shutdown and bounded I/O**: drain HTTP handlers before closing databases, register every goroutine/job under one cancellable lifecycle, cancel jobs independently of worker completion, and cap remote JSON/HTML/probe bodies. Gate: blocked-handler, crossnet, job and oversized-response tests.
-- **Release and update integrity**: make UI, race, fuzz and CodeQL required release gates; keep continuous releases draft until every expected asset is verified; stage and roll back the complete update payload; validate health responses and propagate restart failures. Gate: fault-injected release and update drills.
-- **Backup confidentiality**: create backup directories and archives with owner-only permissions regardless of umask. Gate: permission tests with a permissive umask.
+- **Persistence transactions**: replace the remaining whole-library read-modify-write paths with patch transactions or revisions. Gate: concurrent save tests beyond the series/movie endpoints.
 - **Resume journal evolution**: associate layout generation and checksums with persisted piece state, and rehash selectively after unclean shutdown or sync failure. Gate: crash-consistency and resume-performance tests.
 - **Lifecycle and persistence boundary evolution**: consolidate task/process supervision and repository transactions behind explicit unit-of-work and shutdown phases. Gate: lifecycle tests covering HTTP, jobs, watchdog, crossnet and managed processes.
 - **Release provenance evolution**: publish signed, immutable build-once artifacts and promote the same verified bytes to stable. Gate: signature verification and promotion tests.
@@ -48,10 +40,6 @@ still be true after the item lands does not belong here.
   `--accent` in all four themes and three different progress bar grammars remain between
   Gextto and the daemon. Gate: an accessibility check of the new hues in every theme
   before separating the success colour from the selection colour.
-- **Mobile search missing on the daemon page**: below 760 px the search field is hidden,
-  the `/` shortcut focuses an invisible input, and the name filter only sees the first 300
-  loaded rows, so a torrent further down is reported as absent. Gate: decide between loading
-  all rows when a search term is present and counting matches on the server.
 - **Accessibility audit beyond the automatic guards**: sorted headers, row checkboxes,
   placeholder posters and the detail tabs are now labelled correctly, but axe still skips
   several pages and `docs/ACCESSIBILITY.md` asks for a manual screen-reader pass. Gate: an

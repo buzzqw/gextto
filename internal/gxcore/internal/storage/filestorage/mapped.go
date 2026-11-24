@@ -32,7 +32,12 @@ type osFile struct {
 	file  *os.File
 	name  string
 	flags int
-	dirty atomic.Bool
+	// root and relative bind a transient-error reopen to the same storage
+	// root. Reopening name as an absolute path would follow a replaced
+	// intermediate symlink or junction outside that root.
+	root     string
+	relative string
+	dirty    atomic.Bool
 }
 
 var _ storage.File = (*osFile)(nil)
@@ -41,14 +46,14 @@ var _ storage.File = (*osFile)(nil)
 // failed with a transient error: about a second in all.
 var readRetryDelays = []time.Duration{100 * time.Millisecond, 300 * time.Millisecond, 600 * time.Millisecond}
 
-func newOSFile(of *os.File, flags int) *osFile {
-	return &osFile{file: of, name: of.Name(), flags: flags}
+func newOSFile(of *os.File, flags int, root, relative string) *osFile {
+	return &osFile{file: of, name: of.Name(), flags: flags, root: root, relative: relative}
 }
 
 // ReadAt reads from the file, reopening it after a transient error.
 func (f *osFile) ReadAt(p []byte, off int64) (int, error) {
 	n, err := f.readAt(p, off)
-	if err == nil || !isTransientReadError(err) || f.name == "" {
+	if err == nil || !isTransientReadError(err) || f.root == "" || f.relative == "" {
 		return n, err
 	}
 	for _, delay := range readRetryDelays {
@@ -85,7 +90,12 @@ var readFileAt = func(file *os.File, p []byte, off int64) (int, error) {
 // reopen replaces the handle with a fresh open of the same path. Unflushed
 // writes are flushed first, so swapping the handle loses nothing.
 func (f *osFile) reopen() error {
-	fresh, err := openForWrite(f.name, f.flags, 0)
+	root, err := os.OpenRoot(f.root)
+	if err != nil {
+		return err
+	}
+	defer root.Close()
+	fresh, err := openForWrite(root, f.relative, f.flags, 0)
 	if err != nil {
 		return err
 	}
@@ -156,11 +166,16 @@ const maxDirtyRanges = 64
 type mmapFile struct {
 	f    *os.File
 	data []byte
+	// ioMu keeps the mapping alive for the whole of every ReadAt, WriteAt and
+	// Sync. Close takes it exclusively, so an unmap can never race a copy or
+	// msync on another goroutine.
+	ioMu sync.RWMutex
 	// dirty holds the ranges written since the last Sync, in write order and
 	// non-overlapping. A piece writer goroutine appends to it while the torrent
 	// run loop calls Sync, so it is guarded by mu.
-	mu    sync.Mutex
-	dirty []dirtyRange
+	mu     sync.Mutex
+	dirty  []dirtyRange
+	closed bool
 }
 
 var _ storage.File = (*mmapFile)(nil)
@@ -187,6 +202,11 @@ func recoverFault(old bool, err *error) {
 }
 
 func (m *mmapFile) ReadAt(p []byte, off int64) (n int, err error) {
+	m.ioMu.RLock()
+	defer m.ioMu.RUnlock()
+	if m.closed {
+		return 0, os.ErrClosed
+	}
 	if off < 0 || off > int64(len(m.data)) {
 		return 0, io.EOF
 	}
@@ -199,6 +219,11 @@ func (m *mmapFile) ReadAt(p []byte, off int64) (n int, err error) {
 }
 
 func (m *mmapFile) WriteAt(p []byte, off int64) (n int, err error) {
+	m.ioMu.RLock()
+	defer m.ioMu.RUnlock()
+	if m.closed {
+		return 0, os.ErrClosed
+	}
 	if off < 0 || off+int64(len(p)) > int64(len(m.data)) {
 		return 0, os.ErrInvalid
 	}
@@ -247,6 +272,11 @@ func (m *mmapFile) markDirty(begin, end int64) {
 }
 
 func (m *mmapFile) Sync() error {
+	m.ioMu.RLock()
+	defer m.ioMu.RUnlock()
+	if m.closed {
+		return os.ErrClosed
+	}
 	// Take ownership of the pending ranges so a concurrent write marks its own
 	// range independently while the flush runs.
 	m.mu.Lock()
@@ -266,9 +296,22 @@ func (m *mmapFile) Sync() error {
 }
 
 func (m *mmapFile) Close() error {
+	m.ioMu.Lock()
+	defer m.ioMu.Unlock()
+	if m.closed {
+		return nil
+	}
+	m.closed = true
 	err := unmapFile(m.data)
-	if e := m.f.Close(); err == nil {
-		err = e
+	m.data = nil
+	m.mu.Lock()
+	m.dirty = nil
+	m.mu.Unlock()
+	if m.f != nil {
+		if e := m.f.Close(); err == nil {
+			err = e
+		}
+		m.f = nil
 	}
 	return err
 }

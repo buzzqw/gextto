@@ -96,7 +96,7 @@ func (t *torrent) announcerFields() tracker.Torrent {
 	tr := tracker.Torrent{
 		InfoHash:        t.infoHash,
 		PeerID:          t.peerID,
-		Port:            t.port,
+		Port:            t.getPort(),
 		BytesDownloaded: t.bytesDownloaded.Count(),
 		BytesUploaded:   t.bytesUploaded.Count(),
 		IPv6:            t.session.announceIPv6Address(),

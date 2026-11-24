@@ -131,15 +131,24 @@ func (t *torrent) releaseWrittenPiece(pw *piecewriter.PieceWriter) {
 }
 
 // runPieceWrite hands one finished piece to the write ring on its own
-// goroutine and forwards the outcome to the run loop. The private result
-// channel never drops a piece: when the torrent closes before the loop takes
-// it, the buffer and its charge are released here, because nothing else would.
+// goroutine and forwards the outcome to the run loop. If the torrent stops
+// before the loop takes it, the buffer and its charge are released here,
+// because nothing else would. The worker is registered before it starts, so
+// stop can cancel a queued write and wait for an in-flight one before closing
+// storage.
 func (t *torrent) runPieceWrite(pw *piecewriter.PieceWriter) {
-	resultC := make(chan *piecewriter.PieceWriter, 1)
+	work, ok := t.beginDataWork()
+	if !ok {
+		t.releaseWrittenPiece(pw)
+		return
+	}
 	go func() {
-		pw.Run(resultC, nil, t.session.metrics.WritesPerSecond, t.session.metrics.SpeedWrite, t.session.semWrite)
+		defer t.endDataWork(work)
+		pw.RunContext(work.ctx, t.session.metrics.WritesPerSecond, t.session.metrics.SpeedWrite, t.session.semWrite)
 		select {
 		case t.pieceWriterResultC <- pw:
+		case <-work.ctx.Done():
+			t.releaseWrittenPiece(pw)
 		case <-t.doneC:
 			t.releaseWrittenPiece(pw)
 		}

@@ -1,6 +1,7 @@
 package torrent
 
 import (
+	"context"
 	"crypto/sha1"
 	"crypto/sha256"
 	"errors"
@@ -10,6 +11,7 @@ import (
 	"github.com/buzzqw/gextto/internal/gxcore/internal/metainfo"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/peer"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/peerprotocol"
+	"github.com/buzzqw/gextto/internal/gxcore/internal/piece"
 )
 
 // BEP 52 "hash request"/"hashes"/"hash reject". A v2 magnet resolves its info
@@ -351,7 +353,8 @@ type v2BlockTreeEntry struct {
 // torrent loop. A file that is not fully present, or whose data no longer
 // matches its pieces root, is not served.
 func (t *torrent) v2BlockTree(fi int) *merkle.LayerTree {
-	f := t.info().V2Files[fi]
+	info := t.info()
+	f := info.V2Files[fi]
 	key := string(f.PiecesRoot[:])
 	now := time.Now()
 	t.v2BlockMu.Lock()
@@ -386,8 +389,24 @@ func (t *torrent) v2BlockTree(fi int) *merkle.LayerTree {
 	// in-flight reads count against the cache budget too.
 	reserved := expectedV2BlockTreeBytes(f.Length)
 	t.v2BlockBytes += reserved
+	start, count := t.v2FilePieceRange(fi)
+	// Keep a local reference to the piece slice. closeData clears t.pieces,
+	// but a cancelled build must be able to unwind without dereferencing nil;
+	// the stop drain also guarantees these file handles stay open meanwhile.
+	pieces := t.pieces
+	work, ok := t.beginDataWork()
+	if !ok {
+		delete(t.v2BlockBusy, key)
+		t.v2BlockBuilds--
+		t.v2BlockBytes -= reserved
+		t.v2BlockMu.Unlock()
+		return nil
+	}
 	t.v2BlockMu.Unlock()
-	go t.buildV2BlockTree(fi, key, reserved)
+	go func() {
+		defer t.endDataWork(work)
+		t.buildV2BlockTree(work.ctx, info, pieces, fi, start, count, key, reserved)
+	}()
 	return nil
 }
 
@@ -419,17 +438,21 @@ func (t *torrent) v2FileComplete(fi int) bool {
 // its block-layer tree, verifies it against the file's pieces root and caches
 // it. On any failure the file is put on a short cooldown so another request
 // does not immediately retry.
-func (t *torrent) buildV2BlockTree(fi int, key string, reserved int64) {
-	tree := t.buildV2BlockTreeData(fi)
+func (t *torrent) buildV2BlockTree(ctx context.Context, info *metainfo.Info, pieces []piece.Piece, fi, start, count int, key string, reserved int64) {
+	tree := t.buildV2BlockTreeData(ctx, info, pieces, fi, start, count)
 	t.v2BlockMu.Lock()
 	delete(t.v2BlockBusy, key)
 	t.v2BlockBuilds--
 	t.v2BlockBytes -= reserved
 	if tree == nil {
-		if t.v2BlockFailed == nil {
-			t.v2BlockFailed = map[string]time.Time{}
+		// Cancellation is a lifecycle event, not a bad file: do not remember a
+		// cooldown that would delay the first request after a restart.
+		if ctx.Err() == nil {
+			if t.v2BlockFailed == nil {
+				t.v2BlockFailed = map[string]time.Time{}
+			}
+			t.v2BlockFailed[key] = time.Now().Add(v2BlockRetryAfter)
 		}
-		t.v2BlockFailed[key] = time.Now().Add(v2BlockRetryAfter)
 		t.v2BlockMu.Unlock()
 		return
 	}
@@ -446,14 +469,14 @@ func (t *torrent) buildV2BlockTree(fi int, key string, reserved int64) {
 
 // buildV2BlockTreeData does the disk read and the root check. The read buffer is
 // reused across a file's pieces: allocating p.Length bytes per piece would be
-// wasteful for large pieces.
-func (t *torrent) buildV2BlockTreeData(fi int) *merkle.LayerTree {
-	f := t.info().V2Files[fi]
-	if !t.v2FileComplete(fi) {
+// wasteful for large pieces. pieces is captured when the build starts, so this
+// goroutine never follows t.pieces while closeData clears it.
+func (t *torrent) buildV2BlockTreeData(ctx context.Context, info *metainfo.Info, pieces []piece.Piece, fi, start, count int) *merkle.LayerTree {
+	if pieces == nil || start < 0 || count <= 0 || start+count > len(pieces) {
 		return nil
 	}
-	start, count := t.v2FilePieceRange(fi)
-	buf := make([]byte, int(t.info().PieceLength))
+	f := info.V2Files[fi]
+	buf := make([]byte, int(info.PieceLength))
 	// The leaves of the base-0 tree are 16 KiB blocks, not pieces: seed the
 	// capacity with the block count so large files do not reallocate the slice
 	// dozens of times while appending.
@@ -462,12 +485,10 @@ func (t *torrent) buildV2BlockTreeData(fi int) *merkle.LayerTree {
 	for i := start; i < start+count; i++ {
 		// A torrent removed while the tree is building (a multi-GB read) must not
 		// keep reading the disk to the end for a peer that is no longer there.
-		select {
-		case <-t.closeC:
+		if ctx.Err() != nil {
 			return nil
-		default:
 		}
-		p := t.pieces[i]
+		p := &pieces[i]
 		if int(p.Length) > len(buf) {
 			buf = make([]byte, p.Length)
 		}
@@ -475,9 +496,18 @@ func (t *torrent) buildV2BlockTreeData(fi int) *merkle.LayerTree {
 		if _, err := p.Data.ReadAt(data, 0); err != nil {
 			return nil
 		}
+		if ctx.Err() != nil {
+			return nil
+		}
 		leaves = appendBlockLeaves(leaves, data)
 	}
+	if ctx.Err() != nil {
+		return nil
+	}
 	tree := merkle.NewLayerTree(0, leaves)
+	if ctx.Err() != nil {
+		return nil
+	}
 	if tree == nil || tree.Root() != f.PiecesRoot {
 		// The data on disk does not anchor to the file's root (changed since it
 		// was verified): never serve hashes that would fail another peer's

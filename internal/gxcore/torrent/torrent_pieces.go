@@ -1,6 +1,7 @@
 package torrent
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/buzzqw/gextto/internal/gxcore/internal/handshaker/outgoinghandshaker"
@@ -9,17 +10,22 @@ import (
 // syncPieces flushes every open data file. It must run on the run loop —
 // t.files belongs to it — and it precedes every resume-bitfield write, so a
 // persisted bit always describes bytes already durable (no O_SYNC writes).
-func (t *torrent) syncPieces() {
+// Every file is attempted; any failure makes the caller withhold its bitfield.
+func (t *torrent) syncPieces() error {
 	t.syncingSince.Store(time.Now().UnixNano())
 	defer t.syncingSince.Store(0)
+	var firstErr error
 	for _, f := range t.files {
 		if f.Storage == nil {
 			continue
 		}
 		if err := f.Storage.Sync(); err != nil {
-			t.log.Errorf("cannot sync %q: %s", f.Name, err)
+			if firstErr == nil {
+				firstErr = fmt.Errorf("cannot sync %q: %w", f.Name, err)
+			}
 		}
 	}
+	return firstErr
 }
 
 // writeBitfield persists a snapshot of the verified bitfield. The order is
@@ -32,7 +38,11 @@ func (t *torrent) writeBitfield() error {
 		snapshot = append([]byte(nil), t.bitfield.Bytes()...)
 	}
 	t.mBitfield.RUnlock()
-	t.syncPieces()
+	if err := t.syncPieces(); err != nil {
+		err = fmt.Errorf("cannot write bitfield to resume db because torrent data could not be synced: %w", err)
+		t.log.Error(err)
+		return err
+	}
 	if snapshot == nil {
 		return nil
 	}

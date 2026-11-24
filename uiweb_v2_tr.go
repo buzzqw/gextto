@@ -53,9 +53,20 @@ func v2TemplatesFor(s *AppState) *template.Template {
 	}
 	dict, eng := v2Dictionaries(s)
 	funcs := v2TemplateFuncMap()
-	funcs["tr"] = v2TranslateFunc(dict, eng)
-	funcs["trTitle"] = v2TitleFunc(dict, eng)
+	tr := v2TranslateFunc(dict, eng)
+	title := v2TitleFunc(dict, eng)
+	funcs["tr"] = tr
+	funcs["trTitle"] = title
 	funcs["trBreak"] = v2BreakFunc(dict, eng)
+	coreName := func() string {
+		var cfg *Config
+		if s != nil {
+			cfg = latestConfig(s)
+		}
+		return v2Ed2kCoreName(cfg)
+	}
+	funcs["ed2kTr"] = v2Ed2kTrFunc(tr, coreName)
+	funcs["ed2kTitle"] = v2Ed2kTitleFunc(title, coreName)
 	set, err := template.New("v2").Funcs(funcs).ParseFS(v2TemplatesFS, "uiweb/v2/templates/*.html")
 	if err != nil {
 		// The templates are embedded, so a parse error is a build-time defect:
@@ -144,6 +155,28 @@ func v2BreakFunc(dict, eng map[string]string) func(value any) template.HTML {
 			return template.HTML(text)
 		}
 		return template.HTML(before + "<br>" + after)
+	}
+}
+
+// v2Ed2kTrFunc and v2Ed2kTitleFunc wrap a translation helper so an interface
+// label naming the backend follows the configured core name. The substitution
+// runs only on the translated label passed by the template (a catalog key),
+// never on rendered user data: templates call these helpers with literal
+// strings, while titles, paths, form values and release names go through `tr`
+// or are printed directly.
+//
+// coreName is supplied by the caller so the same helper serves both the
+// per-request sets (the name comes from the active config) and the package-level
+// set parsed at init (no AppState is available, so it returns the default name).
+func v2Ed2kTrFunc(tr func(value any, args ...any) any, coreName func() string) func(value any, args ...any) any {
+	return func(value any, args ...any) any {
+		return strings.ReplaceAll(fmt.Sprint(tr(value, args...)), "aMule", coreName())
+	}
+}
+
+func v2Ed2kTitleFunc(title func(value any, args ...any) template.HTMLAttr, coreName func() string) func(value any, args ...any) template.HTMLAttr {
+	return func(value any, args ...any) template.HTMLAttr {
+		return template.HTMLAttr(strings.ReplaceAll(string(title(value, args...)), "aMule", coreName()))
 	}
 }
 

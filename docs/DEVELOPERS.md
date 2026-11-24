@@ -486,6 +486,15 @@ and by the advanced self-update command.
 The same release build also produces the **standalone gx-torrent** packages,
 published next to Gextto's:
 
+Stable and continuous releases share the blocking quality gates in
+`.github/workflows/release-gates.yml`: unit tests, engine tests, Playwright UI,
+race detector, fuzz smoke pass and CodeQL. `scripts/verify-release-assets.sh`
+then checks the complete six-package set, its local SHA-256 checksums and the
+expected archive contents before `scripts/publish-github-release.sh` uploads
+everything, verifies the downloaded copies and only then moves the rolling tag
+and publishes `release.json`. CI (`ci.yml`) reuses the same gates for UI and
+race, leaving fuzz and CodeQL to their dedicated workflows.
+
 | Script | Output | Contents |
 |---|---|---|
 | `scripts/package-gx-torrent.sh` | `gx-torrent-linux-<arch>.tar.gz` | binary, `run.sh`, systemd unit, README, `VERSION` |

@@ -183,6 +183,11 @@ type DHT struct {
 
 	// publicIP is the external IP we are reached at (BEP 42), once known.
 	publicIP net.IP
+	// externalIPCandidate is the first public address reported by a matched
+	// reply. It is adopted only after a second observer in another subnet
+	// confirms it. These fields are owned by the DHT run loop.
+	externalIPCandidate net.IP
+	externalIPObservers map[string]struct{}
 	// items holds the BEP 44 items this node stores.
 	items *itemStore
 	// BEP 33 scrape client state (run-loop owned).
@@ -736,9 +741,9 @@ func (d *DHT) handleResponsePacket(p packetType, r responseType) {
 		d.DebugLogger.Debugf("DHT received reply from self, id %x", r.A.Id)
 		return
 	}
-	// BEP 42: the responder tells us our external IP; adopt a secure node
-	// ID for it once, if the external IP was not configured at startup.
-	d.noteExternalIP(r.R.IP)
+	// BEP 42: the responder tells us our external IP. Adoption is handled in
+	// absorbReply, after the transaction id has been matched to a pending
+	// query; an unsolicited reply must not influence our node identity.
 	node, addr, existed, err := d.routingTable.hostPortToNode(p.raddr.String(), d.config.UDPProto)
 	if err != nil {
 		d.DebugLogger.Debugf("DHT readResponse error processing response: %v", err)
@@ -780,6 +785,7 @@ func (d *DHT) absorbReply(node *remoteNode, addr string, p packetType, r respons
 	if reflected == "" {
 		reflected = r.R.IP
 	}
+	d.noteExternalIP(reflected, p.raddr.IP)
 	recordReflected(reflected, p.raddr.IP)
 	node.rememberPastQuery(r.T, query)
 	d.routingTable.neighborhoodUpkeep(node, d.config.UDPProto, d.peerStore)

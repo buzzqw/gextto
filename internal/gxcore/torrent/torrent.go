@@ -79,9 +79,11 @@ type torrent struct {
 	selectOnlyMu sync.Mutex
 
 	// Storage, port and metadata. infoPtr is atomic: published once by the
-	// run loop, read lock-free from anywhere — never touch the field.
+	// run loop, read lock-free from anywhere — never touch the field. port is
+	// atomic because announcer goroutines read it while the run loop rebinds
+	// it; use getPort/setPort instead of touching the field.
 	storage storage.Storage
-	port    int
+	port    atomic.Int64
 	infoPtr atomic.Pointer[metainfo.Info]
 
 	// pieceLayers carries the v2 top-level layers for export and serving.
@@ -231,7 +233,7 @@ type torrent struct {
 	verifier           *verifier.Verifier
 	verifierProgressC  chan verifier.Progress
 	verifierResultC    chan *verifier.Verifier
-	checkedPieces uint32
+	checkedPieces      uint32
 	// verifiedPrefix is the bitfield of a check stopped before it finished:
 	// those pieces keep their verified bits when a later check resumes, so a
 	// recheck interrupted at 90% does not start again from zero.
@@ -304,6 +306,15 @@ type torrent struct {
 	// pendingWrites bounds the write ring (maxPendingWrites): the network
 	// flows during writes instead of stopping the world. Run loop only.
 	pendingWrites int
+
+	// Off-loop data work (piece writes, lazy seed hashes and v2 block-tree
+	// builds) is registered here before it starts. A stop cancels every
+	// registered context and waits for the workers before files are closed;
+	// workMu also prevents a new worker from joining while that drain runs.
+	workMu       sync.Mutex
+	workWG       sync.WaitGroup
+	workCancels  map[*torrentDataWork]struct{}
+	workStopping bool
 
 	// Meters and counters.
 	downloadSpeed   metrics.Meter
@@ -451,7 +462,6 @@ func newTorrent(
 		fixedPeers:                fixedPeers,
 		name:                      name,
 		storage:                   sto,
-		port:                      port,
 		bitfield:                  bf,
 		log:                       logger.New("torrent " + id),
 		peerDisconnectedC:         make(chan *peer.Peer),
@@ -512,6 +522,7 @@ func newTorrent(
 		superSeeding:              superSeeding,
 		superSeedPeers:            make(map[*peer.Peer]*superSeedPeer),
 	}
+	t.setPort(port)
 	t.finishConstruction(s, cfg, info, stats)
 	n := t.copyPeerIDPrefix()
 	if _, err := rand.Read(t.peerID[n:]); err != nil {
@@ -546,11 +557,18 @@ func (t *torrent) finishConstruction(s *Session, cfg Config, info *metainfo.Info
 	if cfg.BlocklistEnabledForOutgoingConnections {
 		blocklistForOutgoingConns = s.blocklist
 	}
-	t.addrList = addrlist.New(cfg.MaxPeerAddresses, blocklistForOutgoingConns, t.port, &t.externalIP, cfg.PreferLocalPeers)
+	t.addrList = addrlist.New(cfg.MaxPeerAddresses, blocklistForOutgoingConns, t.getPort(), &t.externalIP, cfg.PreferLocalPeers)
 	if t.info() != nil {
 		t.piecePool = bufferpool.NewBounded(int(t.info().PieceLength), 8)
 	}
 }
+
+// getPort returns the listening port. Announcer goroutines and stats readers
+// call it while the run loop may be rebinding the socket.
+func (t *torrent) getPort() int { return int(t.port.Load()) }
+
+// setPort publishes a new listening port on the run loop.
+func (t *torrent) setPort(p int) { t.port.Store(int64(p)) }
 
 // copyPeerIDPrefix stamps the peer id prefix (masked on private torrents),
 // returning the random tail's offset. Anonymous mode removes the version from
@@ -720,7 +738,7 @@ func (f File) Length() int64 {
 // announceDHT registers the torrent for DHT peer duty.
 func (t *torrent) announceDHT() {
 	t.session.mPeerRequests.Lock()
-	t.session.dhtPeerRequests[t] = t.port
+	t.session.dhtPeerRequests[t] = t.getPort()
 	t.session.mPeerRequests.Unlock()
 }
 

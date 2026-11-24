@@ -13,7 +13,7 @@ ENGINE_PORT="${GEXTTO_ENGINE_PORT:-8899}"
 LOG="$DATA/daemon.out"
 PID=""
 
-# shellcheck disable=SC2317  # cleanup is invoked indirectly by the EXIT trap
+# shellcheck disable=SC2317,SC2329  # cleanup is invoked indirectly by the EXIT trap
 cleanup() {
   if [[ -n "$PID" ]]; then
     kill "$PID" 2>/dev/null || true

@@ -318,8 +318,8 @@ func (t *torrent) sendExtensionHandshake(p *peer.Peer) {
 		metadataSize = uint32(len(t.info().Bytes))
 	}
 	listenPort := 0
-	if t.port > 0 && t.port <= 65535 {
-		listenPort = t.port
+	if p := t.getPort(); p > 0 && p <= 65535 {
+		listenPort = p
 	}
 	p.SendMessage(peerprotocol.ExtensionMessage{
 		ExtendedMessageID: peerprotocol.ExtensionIDHandshake,

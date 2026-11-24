@@ -561,7 +561,7 @@ func (d *Daemon) handleUI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	lang := d.uiLang(r)
-	page, err := d.uiPageData(d.uiRowLimit(r), lang)
+	page, err := d.uiPageDataQuery(d.uiRowLimit(r), lang, r.URL.Query().Get("q"))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -590,7 +590,7 @@ func (d *Daemon) handleUILive(w http.ResponseWriter, r *http.Request) {
 		// speeds, status) still travels as HTML, translated by the server.
 		name = "fragments-notable"
 	}
-	page, err := d.uiPageData(d.uiRowLimit(r), d.uiLang(r))
+	page, err := d.uiPageDataQuery(d.uiRowLimit(r), d.uiLang(r), r.URL.Query().Get("q"))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -607,7 +607,7 @@ func (d *Daemon) handleUIRows(w http.ResponseWriter, r *http.Request) {
 	if !d.uiAuthorized(w, r) {
 		return
 	}
-	page, err := d.uiPageData(d.uiRowLimit(r), d.uiLang(r))
+	page, err := d.uiPageDataQuery(d.uiRowLimit(r), d.uiLang(r), r.URL.Query().Get("q"))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -1668,6 +1668,12 @@ func (d *Daemon) uiAuthorized(w http.ResponseWriter, r *http.Request) bool {
 }
 
 func (d *Daemon) uiPageData(limit int, lang string) (uiPageData, error) {
+	return d.uiPageDataQuery(limit, lang, "")
+}
+
+// uiPageDataQuery applies the free-text torrent filter before the row limit, so
+// a match beyond the first 300 rows is still found on mobile and through /ui/rows.
+func (d *Daemon) uiPageDataQuery(limit int, lang, query string) (uiPageData, error) {
 	stats := d.stats()
 	views := d.snapshotViews()
 	page := uiPageData{
@@ -1850,6 +1856,16 @@ func (d *Daemon) uiPageData(limit int, lang string) (uiPageData, error) {
 	})
 	cfg, _, _ := d.config()
 	page.GlobalDownKib, page.GlobalUpKib = cfg.SpeedLimitDownload, cfg.SpeedLimitUpload
+	if query = strings.TrimSpace(query); query != "" {
+		query = strings.ToLower(query)
+		filtered := make([]uiTorrentRow, 0, len(page.Rows))
+		for _, row := range page.Rows {
+			if uiTorrentRowMatchesQuery(row, query) {
+				filtered = append(filtered, row)
+			}
+		}
+		page.Rows = filtered
+	}
 	page.RowsTotal = len(page.Rows)
 	if limit > 0 && len(page.Rows) > limit {
 		page.Rows = page.Rows[:limit]
@@ -1857,6 +1873,12 @@ func (d *Daemon) uiPageData(limit int, lang string) (uiPageData, error) {
 		page.RowsShown = limit
 	}
 	return page, nil
+}
+
+// uiTorrentRowMatchesQuery mirrors the browser's free-text filter.
+func uiTorrentRowMatchesQuery(row uiTorrentRow, query string) bool {
+	text := strings.ToLower(strings.Join([]string{row.Name, row.Hash, row.Tracker, row.Category, row.Tags}, " "))
+	return strings.Contains(text, query)
 }
 
 // uiFillOptionalColumns fills the columns a user can add with the column

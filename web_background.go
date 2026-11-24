@@ -18,6 +18,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -123,9 +124,30 @@ func bgProtectedTorrentPaths(torrents TorrentEngine) map[string]struct{} {
 
 // seriesRenameApply is the full faithful implementation of `series_rename_apply`: it
 // previews (execute=false) or performs (execute=true) the archive rename of one
-// series and also repairs files the DB does not track yet.
+// series and also repairs files the DB does not track yet. The operation is
+// registered before it starts, so shutdown cannot tear down the databases while
+// a handler or rename job is still using them.
 func seriesRenameApply(s *AppState, name string, execute, force, sourceOnly bool) (int, any) {
-	ctx := context.Background()
+	ctx, cancel := s.BackgroundContext()
+	defer cancel()
+	done := s.trackOperation()
+	defer done()
+	return seriesRenameApplyContext(ctx, s, name, execute, force, sourceOnly)
+}
+
+// seriesRenameApplyContext is seriesRenameApply with an explicit root context.
+// HTTP handlers can pass r.Context(); background callers use the registered
+// daemon context. Cancellation is observed between files and by TMDB requests.
+func seriesRenameApplyContext(ctx context.Context, s *AppState, name string, execute, force, sourceOnly bool) (int, any) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if err := ctx.Err(); err != nil {
+		return http.StatusServiceUnavailable, map[string]any{"ok": false, "error": "shutdown in progress"}
+	}
+	if s == nil || s.stopping() {
+		return http.StatusServiceUnavailable, map[string]any{"ok": false, "error": "shutdown in progress"}
+	}
 	cfg := latestConfig(s)
 	series := cfg.FindSeriesByName(name)
 	if series == nil {
@@ -169,6 +191,9 @@ func seriesRenameApply(s *AppState, name string, execute, force, sourceOnly bool
 		sourceOnly: sourceOnly, episodes: episodes, items: []any{}, alreadyOk: []string{}, trackedPaths: map[string]bool{}}
 	r.trackKnownFiles()
 	for _, episode := range episodes {
+		if r.ctx.Err() != nil {
+			break
+		}
 		r.renameTracked(episode)
 	}
 
@@ -189,6 +214,9 @@ func seriesRenameApply(s *AppState, name string, execute, force, sourceOnly bool
 	if !sourceOnly {
 		if files, err := VideoFiles(resolvedArchive); err == nil {
 			for _, file := range files {
+				if r.ctx.Err() != nil {
+					break
+				}
 				r.renameUntracked(file, resolvedArchive)
 			}
 		}
@@ -197,7 +225,7 @@ func seriesRenameApply(s *AppState, name string, execute, force, sourceOnly bool
 	// folder. Covers inherited libraries where the old 480p/720p stayed next to
 	// the 1080p. Execute only.
 	duplicatesRemoved := 0
-	if execute && cfg.CleanupUpgrades && !sourceOnly {
+	if execute && cfg.CleanupUpgrades && !sourceOnly && r.ctx.Err() == nil {
 		duplicatesRemoved = r.cleanupDuplicates(resolvedArchive)
 	}
 	return r.report(duplicatesRemoved)
@@ -232,6 +260,9 @@ type seriesRenamePass struct {
 // trackKnownFiles records the files the database knows, before any rename.
 func (r *seriesRenamePass) trackKnownFiles() {
 	for _, episode := range r.episodes {
+		if r.ctx.Err() != nil {
+			return
+		}
 		if episode.ArchivePath == nil {
 			continue
 		}
@@ -245,6 +276,9 @@ func (r *seriesRenamePass) trackKnownFiles() {
 // renameTracked renames one episode the database knows, or counts it as
 // already right.
 func (r *seriesRenamePass) renameTracked(episode EpisodeView) {
+	if r.ctx.Err() != nil {
+		return
+	}
 	r.considered++
 	if episode.ArchivePath == nil || strings.TrimSpace(*episode.ArchivePath) == "" {
 		return
@@ -327,6 +361,9 @@ func (r *seriesRenamePass) renameTracked(episode EpisodeView) {
 
 	var target string
 	var renameErr error
+	if r.ctx.Err() != nil {
+		return
+	}
 	if r.execute {
 		target, renameErr = RenameEpisode(r.ctx, path, &release, r.cfg, r.tmdb)
 	} else {
@@ -390,6 +427,9 @@ func (r *seriesRenamePass) renameTracked(episode EpisodeView) {
 // renameUntracked renames, links or discards a video of the series folder the
 // database does not know: a file copied by hand or by an older import.
 func (r *seriesRenamePass) renameUntracked(file, resolvedArchive string) {
+	if r.ctx.Err() != nil {
+		return
+	}
 	nameIndex := bgArchiveEpisodePattern.SubexpIndex("name")
 	seasonIndex := bgArchiveEpisodePattern.SubexpIndex("s")
 	nsIndex := bgArchiveEpisodePattern.SubexpIndex("ns")
@@ -504,6 +544,9 @@ func (r *seriesRenamePass) renameUntracked(file, resolvedArchive string) {
 				"executed": false,
 			})
 		}
+		return
+	}
+	if r.ctx.Err() != nil {
 		return
 	}
 	target, err := RenameEpisode(r.ctx, file, &release, r.cfg, r.tmdb)
@@ -1012,7 +1055,10 @@ func (w *eventWorker) tick(now time.Time) {
 	MonitorStalled(w.cfg, w.torrents, w.db, w.notifier, w.stallWaitStart)
 	if now.Sub(w.lastCrossnet) >= time.Minute {
 		w.lastCrossnet = now
-		crossnetTick(w.cfg, w.db, w.torrents, w.state.engine, now)
+		// Searches outlive this tick. Give them the registered daemon root,
+		// not a child cancelled when tick returns, and track the goroutine in
+		// bgWG until the search has stopped using the engine and databases.
+		crossnetTickContext(w.state.backgroundRootContext(), w.state, w.cfg, w.db, w.torrents, w.state.engine, now)
 		emuleqtManagedTick(w.cfg, now)
 	}
 	if ed2kEnabled(w.cfg) && now.Sub(w.lastEd2kStallCheck) >= 10*time.Minute {

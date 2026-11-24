@@ -12,6 +12,8 @@
 
   // t() reads the server-injected dictionary (window.__v2i18n); unknown keys fall back to Italian.
   function t(key) { var d = window.__v2i18n; return (d && d[key]) || key; }
+  function ed2kCoreName() { return document.documentElement.getAttribute("data-ed2k-core") || "aMule"; }
+  function ed2kLabel(key) { return t(key).replace(/aMule/g, ed2kCoreName()); }
   // th() is t() escaped for markup built with innerHTML: a translation is data
   // and must never become HTML.
   function th(key) {
@@ -738,7 +740,8 @@
       var text = (String(release.title || "") + " " + String(release.source || "") + " " + String(quality.resolution || "") + " " + String(quality.codec || "")).toLowerCase();
       return terms.every(function (term) { return term.charAt(0) === "-" ? text.indexOf(term.slice(1)) < 0 : text.indexOf(term) >= 0; });
     }) : panel._searchItems;
-    count.textContent = terms.length ? visible.length + "/" + panel._searchItems.length + " risultati" : panel._searchItems.length + " risultati";
+    var resultWord = panel._searchItems.length === 1 ? t("1 risultato trovato") : t("risultati trovati");
+    count.textContent = (terms.length ? visible.length + "/" + panel._searchItems.length : panel._searchItems.length) + " " + resultWord;
     root.textContent = "";
     if (!releases.length) {
       var emptyRow = document.createElement("tr");
@@ -787,7 +790,7 @@
       add.className = "btn sm primary";
       add.type = "button";
       add.textContent = t("Aggiungi");
-      add.title = isEd2k ? t("Scarica con aMule") : t("Accoda questa release");
+      add.title = isEd2k ? ed2kLabel("Scarica con aMule") : t("Accoda questa release");
       add.addEventListener("click", function () {
         add.disabled = true;
         var form = new URLSearchParams();

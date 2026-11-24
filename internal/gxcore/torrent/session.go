@@ -368,7 +368,7 @@ func assembleSession(cfg Config, l logger.Logger, db *bbolt.DB, res *boltdbresum
 		db:                 db,
 		resumer:            res,
 		blocklist:          bl,
-		trackerManager:     trackermanager.New(blTracker, cfg.DNSResolveTimeout, !cfg.TrackerHTTPVerifyTLS),
+		trackerManager:     trackermanager.NewWithPolicy(blTracker, cfg.DNSResolveTimeout, !cfg.TrackerHTTPVerifyTLS, cfg.WebSourcesAllowPrivate),
 		trackerPacer:       announcer.NewPacer(announcer.DefaultAnnouncesPerSecond, announcer.DefaultAnnounceBurst),
 		log:                l,
 		torrents:           make(map[string]*Torrent),
@@ -458,13 +458,16 @@ func (c *Session) advertiseExtensions() {
 }
 
 // parseTrackers builds the tracker clients tier by tier, skipping
-// unparsable URLs.
+// unparsable URLs. These lists come from metainfo, magnets or resume data, so
+// they are untrusted: private destinations require the operator's explicit
+// WebSourcesAllowPrivate opt-in. Trackers added through the operator API use
+// TrackerManager.Get instead and are trusted by that explicit action.
 func (s *Session) parseTrackers(tiers [][]string, private bool) []tracker.Tracker {
 	ret := make([]tracker.Tracker, 0, len(tiers))
 	for _, tier := range tiers {
 		trackers := make([]tracker.Tracker, 0, len(tier))
 		for _, tr := range tier {
-			t, err := s.trackerManager.Get(tr, s.config.TrackerHTTPTimeout, s.getTrackerUserAgent(private), int64(s.config.TrackerHTTPMaxResponseSize))
+			t, err := s.trackerManager.GetUntrusted(tr, s.config.TrackerHTTPTimeout, s.getTrackerUserAgent(private), int64(s.config.TrackerHTTPMaxResponseSize))
 			if err != nil {
 				continue
 			}
@@ -666,7 +669,7 @@ func (s *Session) removeTorrentFromClient(id string) (*Torrent, error) {
 // otherwise).
 func (s *Session) stopAndRemoveData(t *Torrent, keepData bool) error {
 	t.torrent.Close()
-	s.releasePort(t.torrent.port)
+	s.releasePort(t.torrent.getPort())
 	if keepData {
 		return nil
 	}

@@ -1541,9 +1541,15 @@ separato; non c'è nulla da installare.
   per le maiuscole vengono rinominate sulla seconda (`film.mkv` -> `film-1.mkv`,
   cartelle comprese), perché Windows e un disco Mac predefinito le trattano
   come un solo file; un file che è anche cartella di un altro viene rifiutato
-  quando il torrent si aggiunge. Uno spostamento su un altro disco copia e
-  controlla la dimensione di ogni file e, se una copia esce corta, si ferma
-  senza toccare l'originale.
+  quando il torrent si aggiunge. Un collegamento simbolico o una junction non
+  può portare i file fuori dalla cartella di download. Uno spostamento su un
+  altro disco copia e controlla la dimensione di ogni file e, se una copia esce
+  corta, si ferma senza toccare l'originale.
+- I web seed, le sorgenti `xs=`/`as=` dei magnet e i tracker contenuti nel
+  torrent non possono raggiungere indirizzi LAN, loopback o link-local per
+  default. Nelle impostazioni del demone gx-torrent, **Consenti web seed e
+  sorgenti magnet sulla rete locale** abilita questo solo quando serve davvero;
+  i tracker aggiunti a mano dall'operatore restano invece considerati fidati.
 - In **Configurazione → Motore torrent → gx-torrent** ci sono tre opzioni native
   di qBittorrent: **ricontrolla i dati al completamento** (verifica i file una
   volta prima di seminarli), **modalità anonima** (nasconde la versione del
@@ -1996,7 +2002,8 @@ Uno ZIP `gextto-backup-<data>_<ora>.zip` in `<dati>/backups` con:
 cestino né `/etc/gextto/gextto.env`: tienine una copia tu. Durante una migrazione
 il database già presente viene sostituito solo dopo che la copia è stata
 verificata; le liste serie e film vengono salvate separatamente, così una non
-scarta le modifiche dell'altra.
+scarta le modifiche dell'altra. Cartelle e archivi di backup sono creati leggibili
+solo dal proprietario del servizio, indipendentemente dalle impostazioni di sistema.
 
 ### Programmare i backup
 

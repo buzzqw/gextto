@@ -55,9 +55,9 @@ type NetworkOptions struct {
 	IPFilter string
 	// IPFilterTrackers applies the filter to trackers too.
 	IPFilterTrackers bool
-	// WebSourcesAllowPrivate lets web seeds and magnet xs=/as= sources reach
-	// private/LAN addresses (off by default, against SSRF from untrusted
-	// torrents and feeds).
+	// WebSourcesAllowPrivate lets web seeds, magnet xs=/as= sources and
+	// torrent-supplied trackers reach private/LAN addresses (off by default,
+	// against SSRF from untrusted torrents and feeds).
 	WebSourcesAllowPrivate bool
 	// LimitLANPeers applies the speed limits to peers on the local network
 	// too; off (the default) they transfer at full speed. The settings key

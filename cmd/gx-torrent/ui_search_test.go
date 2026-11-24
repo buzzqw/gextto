@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -219,5 +220,81 @@ func TestUISearchQueriesIndexersInParallel(t *testing.T) {
 	}
 	if elapsed > 550*time.Millisecond {
 		t.Fatalf("search took %v: the indexers were queried sequentially", elapsed)
+	}
+}
+
+func TestUITorrentRowMatchesQueryAcrossSearchFields(t *testing.T) {
+	row := uiTorrentRow{
+		Name:     "Example release",
+		Hash:     "ABCDEF0123456789",
+		Tracker:  "tracker.example",
+		Category: "series",
+		Tags:     "keep, archive",
+	}
+	for _, query := range []string{"example", "abcdef", "tracker.example", "series", "archive"} {
+		if !uiTorrentRowMatchesQuery(row, query) {
+			t.Fatalf("row did not match %q", query)
+		}
+	}
+	for _, query := range []string{"missing", "movie", "other.example"} {
+		if uiTorrentRowMatchesQuery(row, query) {
+			t.Fatalf("row unexpectedly matched %q", query)
+		}
+	}
+}
+
+// TestUIRowsServerSideQuery checks the mobile path: the top-bar filter sends
+// `rows=all&q=…` to /ui/rows, so a match past the desktop's 300-row window is
+// still found and the count describes the filtered result, not the whole set.
+func TestUIRowsServerSideQuery(t *testing.T) {
+	d := newTestDaemon(t)
+	server := httptest.NewServer(d.routes())
+	t.Cleanup(server.Close)
+
+	src := filepath.Join(t.TempDir(), "src")
+	for _, name := range []string{"Alpha.Release.bin", "Beta.Release.bin"} {
+		if _, _, err := d.add(addRequest{
+			TorrentData: makeTorrent(t, src, name, 80_000),
+			Destination: src, SeedRatio: -1, SeedDays: -1,
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	d.list() // publish the snapshot now, so the assertion is not a ticker race.
+
+	fetch := func(query string) struct {
+		Rows       []struct{ Name string }
+		RowsTotal  int
+	} {
+		t.Helper()
+		resp, err := http.Get(server.URL + "/ui/rows?rows=all" + query)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("GET /ui/rows%s -> %d", query, resp.StatusCode)
+		}
+		var page struct {
+			Rows      []struct{ Name string }
+			RowsTotal int
+		}
+		if err := json.NewDecoder(resp.Body).Decode(&page); err != nil {
+			t.Fatal(err)
+		}
+		return page
+	}
+
+	if page := fetch(""); len(page.Rows) != 2 || page.RowsTotal != 2 {
+		t.Fatalf("without a query: rows=%d total=%d, want 2 and 2", len(page.Rows), page.RowsTotal)
+	}
+	if page := fetch("&q=alpha"); len(page.Rows) != 1 || page.RowsTotal != 1 || page.Rows[0].Name != "Alpha.Release.bin" {
+		t.Fatalf("q=alpha: rows=%+v total=%d", page.Rows, page.RowsTotal)
+	}
+	if page := fetch("&q=ALPHA"); len(page.Rows) != 1 || page.RowsTotal != 1 {
+		t.Fatalf("the query must be case-insensitive: rows=%+v", page.Rows)
+	}
+	if page := fetch("&q=missing"); len(page.Rows) != 0 || page.RowsTotal != 0 {
+		t.Fatalf("q=missing: rows=%+v total=%d", page.Rows, page.RowsTotal)
 	}
 }

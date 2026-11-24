@@ -10,38 +10,29 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
+  actions: read
   contents: write
+  security-events: write
 
 jobs:
-  test:
-    name: test
-    runs-on: ubuntu-24.04
-    steps:
-      - name: Check out source
-        uses: actions/checkout@v7
-
-      - name: Install Go
-        uses: actions/setup-go@v7
-        with:
-          go-version-file: go.mod
-          cache: true
-
-      - name: Test
-        run: make test
-
-      - name: Test engine
-        run: make test-engine
+  quality:
+    name: release quality gates
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    uses: ./.github/workflows/release-gates.yml
+    with:
+      fuzz-time: 30s
+      codeql: true
 
   # The archive is built on the oldest supported baseline (Ubuntu 22.04,
   # glibc 2.35): a binary linked on a newer system does not start on Debian 12
   # or Ubuntu 22.04. See scripts/build-release.sh.
-  # The build number is not taken from github.run_number: build-daemon.sh reads
-  # the committed build_number file, so the installed version shows the same
-  # 1.1.<n> as the checkout.
   # Each architecture ships one pure Go archive (gx-torrent engine).
   package:
     name: package (${{ matrix.arch }})
-    needs: test
+    needs: quality
     strategy:
       matrix:
         arch: [x86_64, aarch64]
@@ -56,9 +47,9 @@ jobs:
       run:
         shell: bash
     steps:
-      # The runner's DNS sometimes fails for a few minutes: apt-get update then
-      # only warns and the install finds no package. Retry the pair instead of
-      # turning the build red with nothing wrong in the code.
+      # The runner's DNS sometimes fails for a few minutes: retry the package
+      # installation instead of turning a transient mirror failure into a
+      # broken release build.
       - name: Install git
         run: |
           for attempt in 1 2 3 4 5; do
@@ -102,7 +93,7 @@ jobs:
 
   publish:
     name: publish continuous
-    needs: package
+    needs: [quality, package]
     runs-on: ubuntu-24.04
     steps:
       - name: Check out source
@@ -117,68 +108,14 @@ jobs:
           path: dist
           merge-multiple: true
 
-      - name: Write release manifest
-        run: |
-          scripts/release-manifest.sh --channel continuous --label "continuous-${GITHUB_SHA::12}" \
-            --output dist/release.json
-
-      - name: Publish continuous release
+      - name: Verify and publish the complete draft
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # The GitHub API answers 502 on the release endpoints now and then,
-          # and a single failed call must not cost the whole build: every asset
-          # is retried on its own, and release.json — the file the in-app
-          # updater reads — goes last so it is the least likely to be missing.
-          upload() {
-            local file="$1" attempt
-            for attempt in 1 2 3 4 5; do
-              if gh release upload continuous --repo "$GITHUB_REPOSITORY" --clobber "$file"; then
-                return 0
-              fi
-              echo "upload of $file failed (attempt $attempt), retrying" >&2
-              sleep $((attempt * 10))
-            done
-            return 1
-          }
-
-          files=(
-            dist/gextto-linux-*.tar.gz
-            dist/gextto-linux-*.tar.gz.sha256
-            dist/gx-torrent-linux-*.tar.gz
-            dist/gx-torrent-linux-*.tar.gz.sha256
-            dist/gx-torrent-windows-*.zip
-            dist/gx-torrent-windows-*.zip.sha256
-          )
-          # Update the rolling release in place. Deleting it first left the
-          # releases page empty whenever the create call failed (a transient
-          # GitHub 502 did exactly that): the assets of the existing release
-          # are replaced, and the tag is moved to this build.
-          if ! gh release view continuous --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            # A draft is not visible on the releases page: it becomes public
-            # only after the assets are in place.
-            gh release create continuous \
-              --repo "$GITHUB_REPOSITORY" \
-              --target "$GITHUB_SHA" \
-              --title "Gextto continuous build" \
-              --notes "Automatic build from commit $GITHUB_SHA on main (build $(cat build_number))." \
-              --draft --prerelease
-          fi
-          gh api -X PATCH "repos/$GITHUB_REPOSITORY/git/refs/tags/continuous" \
-            -f sha="$GITHUB_SHA" -F force=true >/dev/null || true
-          failed=()
-          for file in "${files[@]}"; do
-            upload "$file" || failed+=("$file")
-          done
-          # The updater reads release.json: it is replaced after the archives
-          # it describes, so a partial upload never advertises missing files.
-          upload dist/release.json || failed+=("dist/release.json")
-          gh release edit continuous --repo "$GITHUB_REPOSITORY" \
-            --draft=false \
-            --title "Gextto continuous build" \
-            --notes "Automatic build from commit $GITHUB_SHA on main (build $(cat build_number))." \
-            --prerelease
-          if [ "${#failed[@]}" -gt 0 ]; then
-            echo "Assets not uploaded: ${failed[*]}" >&2
-            exit 1
-          fi
+          scripts/publish-github-release.sh \
+            --channel continuous \
+            --tag continuous \
+            --label "continuous-${GITHUB_SHA::12}" \
+            --dist dist \
+            --repo "$GITHUB_REPOSITORY" \
+            --commit "$GITHUB_SHA"

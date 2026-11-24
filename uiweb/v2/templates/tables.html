@@ -17,7 +17,7 @@
         {{if .DayFilter}}<label class="check" {{trTitle "Mostra solo i download conclusi oggi"}}><input type="checkbox" name="today" value="1"{{if .Today}} checked{{end}} /> <span>{{tr "Oggi"}}</span></label>{{end}}
         {{if eq .BaseView "archive"}}
         <label class="check archive-web-check" {{trTitle "Cerca anche nei motori web e indexer online"}}><input type="checkbox" name="web" value="1"{{if .WebSearch}} checked{{end}} /> <span>{{tr "Cerca anche nel web"}}</span></label>
-        {{if .Ed2kAvailable}}<label class="check archive-web-check" {{trTitle "Cerca anche su eD2k e Kad tramite aMule (sulla rete scelta in Configurazione); i risultati compaiono sotto l'archivio"}}><input type="checkbox" name="ed2k" value="1"{{if .Ed2kSearch}} checked{{end}} /> <span>{{tr "Cerca anche su eD2k"}}</span></label>{{end}}
+        {{if .Ed2kAvailable}}<label class="check archive-web-check" {{ed2kTitle "Cerca anche su eD2k e Kad tramite aMule (sulla rete scelta in Configurazione); i risultati compaiono sotto l'archivio"}}><input type="checkbox" name="ed2k" value="1"{{if .Ed2kSearch}} checked{{end}} /> <span>{{tr "Cerca anche su eD2k"}}</span></label>{{end}}
         <button class="btn sm primary" type="submit">{{tr "Cerca"}}</button>
         <span class="htmx-indicator muted archive-indicator">{{tr "Ricerca online in corso…"}}</span>
         {{else}}
@@ -84,7 +84,7 @@
     <button class="btn sm" type="button"{{if ge .Page .Pages}} disabled{{end}} hx-get="/table?view={{.View}}&amp;page={{.Next}}&amp;q={{.Query}}&amp;f={{.FilterQuery}}&amp;sort={{.Sort}}&amp;dir={{.Dir}}{{if .WebSearch}}&amp;web=1{{end}}{{if .Ed2kSearch}}&amp;ed2k=1{{end}}{{if .Today}}&amp;today=1{{end}}" hx-target="#v2-table-body-{{.View}}" hx-swap="outerHTML">{{tr "Successiva ›"}}</button>
   </div>
   {{end}}
-  {{if .Ed2k}}<div class="archive-ed2k-results"><h4>{{tr "eD2k e Kad (aMule)"}}</h4>{{template "v2_ed2k_results" .Ed2k}}</div>{{end}}
+  {{if .Ed2k}}<div class="archive-ed2k-results"><h4>{{ed2kTr "eD2k e Kad (aMule)"}}</h4>{{template "v2_ed2k_results" .Ed2k}}</div>{{end}}
 </div>
 {{if .Notice}}<div id="v2-toast-region" hx-swap-oob="innerHTML">{{template "v2_action_notice" .Notice}}</div>{{end}}
 {{end}}

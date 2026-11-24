@@ -108,7 +108,7 @@ fuzz-smoke:
 # Race detector run (technical review, phase 0). Kept separate from `test` so it
 # can stay non-blocking until the shared state has been audited.
 test-race:
-	CGO_ENABLED=1 go test -race ./...
+	CGO_ENABLED=1 go test -race -timeout 20m ./...
 
 # End-to-end UI tests (Playwright + Node, in uiweb/end2end). They build the
 # daemon, start it in dry-run on their own port and drive the real UI in a

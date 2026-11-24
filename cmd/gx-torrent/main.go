@@ -294,7 +294,7 @@ func main() {
 	lang := flag.String("lang", envOr("GX_TORRENT_LANG", ""), "web page language (it, en, de, fr, es, pl; empty = English)")
 	ipFilterTrackers := flag.Bool("ipfilter-trackers", envBool("GX_TORRENT_IPFILTER_TRACKERS", false), "apply the IP filter to trackers too")
 	dhtBootstrap := flag.String("dht-bootstrap", envOr("GX_TORRENT_DHT_BOOTSTRAP", ""), "comma-separated DHT router addresses (empty = built-in bootstrap nodes)")
-	webSourcesAllowPrivate := flag.Bool("web-sources-allow-private", envBool("GX_TORRENT_WEB_SOURCES_ALLOW_PRIVATE", false), "let web seeds and magnet xs=/as= sources reach private/LAN addresses (off: protects the LAN from URLs in untrusted torrents)")
+	webSourcesAllowPrivate := flag.Bool("web-sources-allow-private", envBool("GX_TORRENT_WEB_SOURCES_ALLOW_PRIVATE", false), "let web seeds, magnet xs=/as= sources and torrent-supplied trackers reach private/LAN addresses (off: protects the LAN from URLs in untrusted torrents)")
 	limitLANPeers := flag.Bool("limit-lan-peers", envBool("GX_TORRENT_LIMIT_LAN_PEERS", false), "apply the speed limits to peers on the local network too (default: LAN peers transfer at full speed)")
 	uploadTradingShare := flag.Int("upload-trading-share", envIntVal("GX_TORRENT_UPLOAD_TRADING_SHARE", 0, 0, 99), "percent of a limited upload that goes first to peers sending data back to a torrent still downloading (0 = automatic: each such peer weighs more the more it gives back)")
 	clientFilter := flag.Bool("client-filter", envBool("GX_TORRENT_CLIENT_FILTER", true), "refuse the peers whose client is on the client filter list (default on)")

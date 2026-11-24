@@ -116,6 +116,13 @@ interface.
   Telegram message or a hook script contains titles, paths and hashes. Review
   the destinations you configure.
 - **Backups contain configuration and databases**, including stored tokens for
-  the integrations you enabled. Store backup archives accordingly.
+  the integrations you enabled. Store backup archives accordingly. Gextto
+  creates backup folders, temporary snapshots, archives and cloud copies with
+  owner-only permissions (`0700`/`0600`) regardless of the system umask.
+- **Release packages are checked before publication.** Stable and continuous
+  builds run unit, engine, UI, race, fuzz and CodeQL gates, then verify the
+  complete asset set and its SHA-256 checksums before making a release public.
+  The checksum still protects against corruption, not against a compromised
+  release account: signatures are not published.
 - **`ffprobe` is optional**; when present it runs as the daemon user on local
   media files only.

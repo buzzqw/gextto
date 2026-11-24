@@ -65,6 +65,11 @@ const DefaultUpgradeMinScoreDiff int64 = 200
 // maxDatabaseInt64 is `i64::MAX`.
 const maxDatabaseInt64 = int64(^uint64(0) >> 1)
 
+// errMovieUpgradeConflict means the movie row changed after the upgrade was
+// evaluated but before its backup/update transaction acquired its snapshot. The
+// caller must retry the decision against the new row instead of overwriting it.
+var errMovieUpgradeConflict = errors.New("movie changed while the upgrade was being prepared; retry")
+
 // ReadyPending implements the `ReadyPending` tuple:
 // `(series name, title, magnet, season, episode)`.
 type ReadyPending struct {
@@ -1507,11 +1512,11 @@ func (d *Database) loadSeriesUpgradeBackup(reader sqlQueryRower, id int64, serie
 
 // loadMovieUpgradeBackup reads the previous movie row used to build an
 // `UpgradeBackup`.
-func (d *Database) loadMovieUpgradeBackup(id int64) (upgradeBackup, error) {
+func (d *Database) loadMovieUpgradeBackup(reader sqlQueryRower, id int64) (upgradeBackup, error) {
 	var backup upgradeBackup
 	var name, title, magnetHash, magnetLink, downloadedAt sql.NullString
 	var year sql.NullInt64
-	err := d.db.QueryRow("SELECT id,name,year,title,quality_score,magnet_hash,magnet_link,downloaded_at,size_bytes FROM movies WHERE id=?1", id).Scan(
+	err := reader.QueryRow("SELECT id,name,year,title,quality_score,magnet_hash,magnet_link,downloaded_at,size_bytes FROM movies WHERE id=?1 AND removed_at IS NULL", id).Scan(
 		&backup.RowID, &name, &year, &title, &backup.QualityScore, &magnetHash, &magnetLink, &downloadedAt, &backup.SizeBytes,
 	)
 	if err != nil {
@@ -1527,6 +1532,60 @@ func (d *Database) loadMovieUpgradeBackup(id int64) (upgradeBackup, error) {
 	backup.MagnetLink = nullStringPtr(magnetLink)
 	backup.DownloadedAt = nullStringPtr(downloadedAt)
 	return backup, nil
+}
+
+func sameUpgradePointer[T comparable](left, right *T) bool {
+	if left == nil || right == nil {
+		return left == nil && right == nil
+	}
+	return *left == *right
+}
+
+func sameMovieUpgradeRevision(left, right upgradeBackup) bool {
+	return left.RowID == right.RowID &&
+		left.Kind == right.Kind &&
+		left.Title == right.Title &&
+		left.QualityScore == right.QualityScore &&
+		left.SizeBytes == right.SizeBytes &&
+		sameUpgradePointer(left.Name, right.Name) &&
+		sameUpgradePointer(left.Year, right.Year) &&
+		sameUpgradePointer(left.MagnetHash, right.MagnetHash) &&
+		sameUpgradePointer(left.MagnetLink, right.MagnetLink) &&
+		sameUpgradePointer(left.DownloadedAt, right.DownloadedAt)
+}
+
+// applyMovieUpgradeTx re-reads the movie inside the write transaction and
+// applies the backup/update only if it still has the revision which was
+// evaluated. The conditional UPDATE is a second guard for another connection;
+// a lost race rolls back the backup as well as the row change.
+func (d *Database) applyMovieUpgradeTx(tx *sql.Tx, hash, title string, score int64, magnet string, expected upgradeBackup) error {
+	current, err := d.loadMovieUpgradeBackup(tx, expected.RowID)
+	if err != nil {
+		return err
+	}
+	if !sameMovieUpgradeRevision(expected, current) {
+		return errMovieUpgradeConflict
+	}
+	if err := d.saveUpgradeBackup(tx, hash, current); err != nil {
+		return err
+	}
+	expectedHash := ""
+	if expected.MagnetHash != nil {
+		expectedHash = *expected.MagnetHash
+	}
+	result, err := tx.Exec("UPDATE movies SET title=?1,quality_score=?2,magnet_hash=?3,magnet_link=?4,downloaded_at=NULL,media_info_json='' WHERE id=?5 AND quality_score=?6 AND COALESCE(magnet_hash,'')=?7",
+		title, score, hash, magnet, expected.RowID, expected.QualityScore, expectedHash)
+	if err != nil {
+		return err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected != 1 {
+		return errMovieUpgradeConflict
+	}
+	return nil
 }
 
 // packHasStallTolerance reports whether any episode of the pack may accept an
@@ -2058,11 +2117,12 @@ func (d *Database) checkMovieScoredWithDisk(release *models.Release, score, minS
 		if dryRun {
 			return true, "upgrade", nil
 		}
-		previous, err := d.loadMovieUpgradeBackup(id)
+		previous, err := d.loadMovieUpgradeBackup(d.db, id)
 		if err != nil {
 			return false, "", err
 		}
-		// Atomic backup + update: see the series upgrade path for rationale.
+		// The decision above may race another approval. Re-read the row inside
+		// the transaction, verify its revision, and keep backup + update atomic.
 		tx, err := d.db.Begin()
 		if err != nil {
 			return false, "", err
@@ -2073,10 +2133,7 @@ func (d *Database) checkMovieScoredWithDisk(release *models.Release, score, minS
 				_ = tx.Rollback()
 			}
 		}()
-		if err := d.saveUpgradeBackup(tx, hash, previous); err != nil {
-			return false, "", err
-		}
-		if _, err := tx.Exec("UPDATE movies SET title=?1,quality_score=?2,magnet_hash=?3,magnet_link=?4,downloaded_at=NULL,media_info_json='' WHERE id=?5", release.Title, score, hash, release.Magnet, id); err != nil {
+		if err := d.applyMovieUpgradeTx(tx, hash, release.Title, score, release.Magnet, previous); err != nil {
 			return false, "", err
 		}
 		if err := tx.Commit(); err != nil {

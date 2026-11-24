@@ -168,7 +168,7 @@ func (t *Torrent) Webseeds() []Webseed {
 
 // Port is the listening peer port.
 func (t *Torrent) Port() int {
-	return t.torrent.port
+	return t.torrent.getPort()
 }
 
 // NotifyClose fires on RemoveTorrent.

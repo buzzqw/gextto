@@ -72,7 +72,7 @@
       {{if .Addable}}
       {{template "v2_action_btn" (dict "Redirect" $.Redirect "Path" "/api/search/add" "Method" "POST" "Body" .AddBody "Label" (ternary (eq .Network "ed2k") "Scarica" "Aggiungi") "Class" "primary" "Title" "Aggiungi questa release ai download" "Stay" true "StayTitle" "Download")}}
       {{else}}
-      <span class="badge" {{trTitle "aMule non è attivo o non è raggiungibile."}}>{{tr "Solo ricerca"}}</span>
+      <span class="badge" {{ed2kTitle "aMule non è attivo o non è raggiungibile."}}>{{tr "Solo ricerca"}}</span>
       {{end}}
       <form method="post" action="/search/explain" hx-post="/search/explain" hx-target="#v2-modal" hx-swap="innerHTML" class="inline">
         <input type="hidden" name="release" value="{{.ExplainJSON}}" />

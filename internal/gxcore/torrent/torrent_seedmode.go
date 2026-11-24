@@ -1,6 +1,7 @@
 package torrent
 
 import (
+	"context"
 	"errors"
 
 	"github.com/buzzqw/gextto/internal/gxcore/internal/allocator"
@@ -137,28 +138,70 @@ func (t *torrent) wantSeedHash(i uint32) {
 	}
 }
 
-// startSeedHash reads and hashes one piece off the run loop.
+// startSeedHash reads and hashes one piece off the run loop. The worker is
+// registered before the map entry is published, so stop can refuse new hashes
+// and drain this one before the piece storage is closed.
 func (t *torrent) startSeedHash(i uint32) {
+	if t.pieces == nil || i >= uint32(len(t.pieces)) {
+		return
+	}
+	work, ok := t.beginDataWork()
+	if !ok {
+		return
+	}
 	t.seedHashing[i] = struct{}{}
 	pi := &t.pieces[i]
 	gen := t.seedGen
 	resultC, closeC := t.seedHashC, t.closeC
 	go func() {
+		defer t.endDataWork(work)
 		r := seedHashResult{gen: gen, index: i}
-		r.ok, r.err = hashStoredPiece(pi)
+		r.ok, r.err = hashStoredPieceContext(work.ctx, pi)
+		// The read is allowed to finish after a stop, but its result must not
+		// reach the run loop: by then the piece slice is dropped and the next
+		// start uses a new generation. Without this check a buffered resultC
+		// stays a ready select case even when the context is already cancelled,
+		// so the cancelled worker could still publish its result.
+		if work.ctx.Err() != nil {
+			return
+		}
 		select {
 		case resultC <- r:
+		case <-work.ctx.Done():
 		case <-closeC:
 		}
 	}()
+}
+
+// resetSeedHashWork discards requests and generation state left behind by a
+// stop. Workers have already drained, and seedGen also invalidates any result
+// that had been delivered just before cancellation.
+func (t *torrent) resetSeedHashWork() {
+	if !t.seedMode {
+		return
+	}
+	t.seedGen++
+	t.seedPending = make(map[uint32][]seedModeRequest)
+	t.seedParked = make(map[*peer.Peer]int)
+	t.seedHashing = make(map[uint32]struct{})
 }
 
 // hashStoredPiece reads a piece back from storage and checks it against the
 // torrent's hashes (SHA-1 for v1, the Merkle root for v2), like a downloaded
 // piece before it is written.
 func hashStoredPiece(pi *piece.Piece) (bool, error) {
+	return hashStoredPieceContext(context.Background(), pi)
+}
+
+func hashStoredPieceContext(ctx context.Context, pi *piece.Piece) (bool, error) {
+	if err := ctx.Err(); err != nil {
+		return false, err
+	}
 	buf := make([]byte, pi.Length)
 	if _, err := pi.Data.ReadAt(buf, 0); err != nil {
+		return false, err
+	}
+	if err := ctx.Err(); err != nil {
 		return false, err
 	}
 	ok := pi.Verify(buf)

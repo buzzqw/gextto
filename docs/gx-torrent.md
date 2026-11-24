@@ -1462,11 +1462,12 @@ example:
 - `GX_TORRENT_IPFILTER`, `GX_TORRENT_IPFILTER_TRACKERS`;
 - `GX_TORRENT_WEB_SOURCES_ALLOW_PRIVATE` (flag `-web-sources-allow-private`,
   key `web-sources-allow-private`, checkbox in *Settings → Network*): allows
-  web seeds and magnet sources `xs=`/`as=` to reach private LAN addresses.
-  Off by default, also in managed mode: those URLs come from the torrent's
-  data (even from an untrusted feed) and without this limit they could make
-  the client contact the router, the NAS or other internal services (SSRF). See
-  `docs/bep.md`;
+  web seeds, magnet sources `xs=`/`as=` and trackers supplied by torrent data
+  to reach private LAN addresses. Off by default, also in managed mode: those
+  URLs come from the torrent's data (even from an untrusted feed) and without
+  this limit they could make the client contact the router, the NAS or other
+  internal services (SSRF). Trackers added explicitly by the operator remain
+  trusted. See `docs/bep.md`;
 - `GX_TORRENT_LANG`, `GX_TORRENT_MODE`, `GX_TORRENT_LOG_FILE`, `GX_TORRENT_DEBUG`,
   `GX_TORRENT_NOTIFY_URL` (webhook for feed notifications);
 - `GX_TORRENT_MMAP` (opt-in mmap storage, Linux: flag `-mmap`).
@@ -1587,7 +1588,9 @@ RPC server is disabled.
     known (the routable listen address from `-listen-interface`, or the IP
     of the outgoing interface), so no one can
     choose one close to a target info-hash; if the IP is not known at startup
-    it is adopted from the `ip` field of DHT responses and the new ID is persisted.
+    it is adopted from the `ip` field of DHT responses only after two
+    independent subnets confirm the same public address, and the new ID is
+    persisted once. Unsolicited replies and local addresses never change it.
     Local network addresses are exempt. The `ip` field is also **sent**
     in every response (ping, find_node, get_peers, announce_peer and the
     BEP 44 responses), so a peer behind NAT discovers its own reflected address;
@@ -2441,11 +2444,11 @@ The engine saves every torrent in `DataDir/<id>` and at removal always runs
 - the paths come from the metainfo, which is untrusted: the engine refuses a
   name or a file path that would leave the storage root (`filepath.IsLocal` in
   `metainfo.buildFiles`), negative file lengths, overflowing totals and piece
-  counts that do not match the file layout. The storage refuses an escaping path
-  again before opening the file (`filestorage.Open`) and the daemon accepts only
-  a single, local component as the top entry (`payloadPath`), so a crafted
-  torrent cannot write, move or delete anything above its own folder. A torrent
-  that tries is refused when it is added;
+  counts that do not match the file layout. The storage opens every path through
+  an `os.Root`, so a symlink or Windows junction in an intermediate directory
+  cannot escape the download folder; the daemon accepts only a single, local
+  component as the top entry (`payloadPath`). A torrent that tries is refused
+  when it is added;
 - a real folder left in place of the symlink is moved to
   `DATA/orphaned/<id>` before removal, never deleted;
 - **the daemon's own state is not part of any payload**: a deletion or a

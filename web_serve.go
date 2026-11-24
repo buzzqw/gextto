@@ -86,15 +86,37 @@ func (s *AppState) BackgroundContext() (context.Context, context.CancelFunc) {
 	return context.WithCancel(s.bgContext)
 }
 
+// operationStartMu orders trackOperation against the start of bgWG.Wait. A
+// WaitGroup must not gain counters while Wait is running: handlers are drained
+// first, but a job or a worker can begin one last operation as shutdown starts.
+var operationStartMu sync.Mutex
+
 // trackOperation registers a long-lived operation that may touch the torrent
-// engine, so stopBackgroundWorkers waits for it before the native session is
-// destroyed. Callers must invoke the returned function exactly once when the
-// operation completes. The Add happens synchronously in the caller (a handler
-// or an already-tracked worker), which is always before bgWG.Wait starts, so it
-// cannot race the shutdown wait.
+// engine or the databases, so stopBackgroundWorkers waits for it before they are
+// torn down. Callers must invoke the returned function exactly once when the
+// operation completes. Once shutdown has begun no new operation is registered;
+// callers must observe their cancelled context and return without starting work.
 func (s *AppState) trackOperation() func() {
+	if s == nil {
+		return func() {}
+	}
+	operationStartMu.Lock()
+	defer operationStartMu.Unlock()
+	if s.stopping() {
+		return func() {}
+	}
 	s.bgWG.Add(1)
 	return s.bgWG.Done
+}
+
+// backgroundRootContext is the long-lived root shared by operations which
+// outlive the worker tick that starts them. Unlike BackgroundContext it has no
+// per-caller cancel function: the root is cancelled once by shutdown.
+func (s *AppState) backgroundRootContext() context.Context {
+	if s == nil || s.bgContext == nil {
+		return context.Background()
+	}
+	return s.bgContext
 }
 
 // stopping reports whether a shutdown has been requested.
@@ -139,31 +161,56 @@ var shutdownNoticeInterval = time.Minute
 // file registry is closed, so a worker cannot start a new copy that the exit
 // would cut halfway.
 func stopBackgroundWorkers(state *AppState) {
+	if state == nil {
+		return
+	}
 	state.bgStopOnce.Do(func() {
 		if state.bgCancel != nil {
 			state.bgCancel()
 		}
-		close(state.bgStop)
+		if state.bgStop != nil {
+			close(state.bgStop)
+		}
 	})
-	done := make(chan struct{})
+	// No operation may Add to bgWG after this point. trackOperation checks
+	// bgStop under the same mutex and refuses new work once shutdown began.
+	operationStartMu.Lock()
+	operationStartMu.Unlock()
+
+	// Jobs are not members of bgWG. Cancel them immediately and in parallel
+	// with the workers: waiting for workers first let a queued/running job keep
+	// using the engine and databases throughout the whole worker drain.
+	jobsDone := make(chan struct{})
 	go func() {
-		state.bgWG.Wait()
 		if state.jobs != nil {
-			// Cancel and wait for any operation still tracked by the job manager.
 			state.jobs.Close()
 		}
-		close(done)
+		close(jobsDone)
 	}()
+	workersDone := make(chan struct{})
+	go func() {
+		state.bgWG.Wait()
+		close(workersDone)
+	}()
+
 	started := time.Now()
 	var lastNotice time.Time
+	jobsStopped, workersStopped := false, false
 	ticker := time.NewTicker(250 * time.Millisecond)
 	defer ticker.Stop()
 	for {
 		select {
-		case <-done:
+		case <-jobsDone:
+			jobsStopped = true
+			jobsDone = nil
+		case <-workersDone:
+			workersStopped = true
+			workersDone = nil
+		case <-ticker.C:
+		}
+		if jobsStopped && workersStopped {
 			mediaFileOps.closeIfIdle()
 			return
-		case <-ticker.C:
 		}
 		if operations := mediaFileOps.running(); len(operations) > 0 {
 			if time.Since(lastNotice) >= shutdownNoticeInterval {
@@ -204,6 +251,12 @@ func stopBackgroundWorkers(state *AppState) {
 			} else {
 				logging.Warn(fmt.Sprintf("⚠️ The file copies are finished, but this work was still running after %s: %s. Gextto stops anyway",
 					logDuration(workerStopTimeout), remaining))
+			}
+			// Jobs obey the JobManager cancellation contract. Their Close was
+			// started immediately, but never close the databases while a job is
+			// still returning from one.
+			if !jobsStopped {
+				<-jobsDone
 			}
 			return
 		}
@@ -263,20 +316,109 @@ func pluralWord(count int, singular, plural string) string {
 	return plural
 }
 
-func shutdownServers(servers ...*http.Server) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+// serverShutdownTimeout bounds the graceful HTTP drain. After it the listeners
+// and active connections are closed forcibly; handler completion is still
+// awaited before Serve returns and the caller may close its databases.
+var serverShutdownTimeout = 10 * time.Second
+
+// httpHandlerTracker is the barrier between the HTTP servers and resource
+// teardown. Server.Shutdown waits for connections, not for handlers which ignore
+// their request context, and Server.Close does not wait for handlers at all.
+// Closing the gate rejects new handlers before Shutdown starts, so Wait cannot
+// race with a late Add.
+type httpHandlerTracker struct {
+	mu     sync.Mutex
+	closed bool
+	active int
+	done   chan struct{}
+}
+
+func newHTTPHandlerTracker() *httpHandlerTracker {
+	return &httpHandlerTracker{done: make(chan struct{})}
+}
+
+func (t *httpHandlerTracker) wrap(next http.Handler) http.Handler {
+	if t == nil {
+		return next
+	}
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.mu.Lock()
+		if t.closed {
+			t.mu.Unlock()
+			http.Error(w, "server is shutting down", http.StatusServiceUnavailable)
+			return
+		}
+		t.active++
+		t.mu.Unlock()
+		defer func() {
+			t.mu.Lock()
+			t.active--
+			if t.closed && t.active == 0 {
+				close(t.done)
+			}
+			t.mu.Unlock()
+		}()
+		next.ServeHTTP(w, r)
+	})
+}
+
+func (t *httpHandlerTracker) stopAccepting() {
+	if t == nil {
+		return
+	}
+	t.mu.Lock()
+	if !t.closed {
+		t.closed = true
+		if t.active == 0 {
+			close(t.done)
+		}
+	}
+	t.mu.Unlock()
+}
+
+func (t *httpHandlerTracker) wait() {
+	if t != nil {
+		<-t.done
+	}
+}
+
+// shutdownServers drains every server under one shared deadline and force-closes
+// it afterwards. Errors from both Shutdown and Close are returned to the caller.
+func shutdownServers(servers ...*http.Server) error {
+	return shutdownServersWithHandlers(nil, servers...)
+}
+
+// shutdownServersWithHandlers is shutdownServers with the database-safety
+// barrier used by Serve. The final handler wait is deliberately unbounded:
+// returning while a handler still uses SQLite would let the caller close the
+// database underneath it. Cancelling request contexts and closing connections
+// first lets ordinary handlers finish promptly.
+func shutdownServersWithHandlers(handlers *httpHandlerTracker, servers ...*http.Server) error {
+	if handlers != nil {
+		handlers.stopAccepting()
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), serverShutdownTimeout)
 	defer cancel()
-	// The servers drain at the same time, under one shared deadline: in turn,
-	// a slow first one (an open event stream) used up the time of the next.
 	var wg sync.WaitGroup
-	for _, server := range servers {
+	errs := make([]error, len(servers))
+	for index, server := range servers {
+		if server == nil {
+			continue
+		}
 		wg.Add(1)
-		go func(server *http.Server) {
+		go func(index int, server *http.Server) {
 			defer wg.Done()
-			_ = server.Shutdown(ctx)
-		}(server)
+			errs[index] = server.Shutdown(ctx)
+			// Shutdown returning (successfully or with the deadline error) does
+			// not close connections which are still executing a handler.
+			if closeErr := server.Close(); closeErr != nil {
+				errs[index] = errors.Join(errs[index], closeErr)
+			}
+		}(index, server)
 	}
 	wg.Wait()
+	handlers.wait()
+	return errors.Join(errs...)
 }
 
 // ListenConflicts reports the configured listen addresses that are already in
@@ -375,7 +517,8 @@ func Serve(state *AppState) error {
 	// The cross-origin guard runs outermost so a cross-site write is refused
 	// before it can reach the (often login-free from the LAN) API. Compression
 	// sits above everything: the interface is often used over a weak link.
-	app := compressResponses(crossOriginGuard(AuthMiddleware(state, Router(state))))
+	handlers := newHTTPHandlerTracker()
+	app := handlers.wrap(compressResponses(crossOriginGuard(AuthMiddleware(state, Router(state)))))
 	// Timeouts defend against slowloris and idle-connection exhaustion. Write is
 	// intentionally unlimited: the log/notification SSE streams and long
 	// downloads must be able to stay open.
@@ -413,15 +556,24 @@ func Serve(state *AppState) error {
 	select {
 	case err := <-errCh:
 		cancelRequests()
-		shutdownServers(webServer, engineServer)
+		shutdownErr := shutdownServersWithHandlers(handlers, webServer, engineServer)
 		stopBackgroundWorkers(state)
+		if shutdownErr != nil {
+			logging.Warn(fmt.Sprintf("HTTP servers did not shut down cleanly: %v", shutdownErr))
+			err = errors.Join(err, shutdownErr)
+		}
 		recordShutdown(state.cfg.DataDir, "fatal error: "+err.Error())
 		notifyDaemonError(state, err)
 		return err
 	case <-ctx.Done():
 		cancelRequests()
-		shutdownServers(webServer, engineServer)
+		shutdownErr := shutdownServersWithHandlers(handlers, webServer, engineServer)
 		stopBackgroundWorkers(state)
+		if shutdownErr != nil {
+			logging.Warn(fmt.Sprintf("HTTP servers did not shut down cleanly: %v", shutdownErr))
+			recordShutdown(state.cfg.DataDir, "shutdown error: "+shutdownErr.Error())
+			return shutdownErr
+		}
 		recordShutdown(state.cfg.DataDir, "")
 		return nil
 	}

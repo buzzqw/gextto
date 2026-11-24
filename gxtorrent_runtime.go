@@ -11,6 +11,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -21,6 +22,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -38,6 +40,13 @@ type gxManagedProcess struct {
 	mu     sync.Mutex
 	closed bool
 	done   chan error
+	// startTime is the procfs identity of the signalled PID. A watchdog never
+	// signals a PID whose start time changed, because that PID now belongs to
+	// another process. pid stays immutable because the adapter reads it without
+	// this mutex; signalPID may move from a systemd-run launcher to the daemon.
+	startTime   uint64
+	signalPID   int
+	fingerprint string
 	// crashLog and crashOffset point at the file the Go runtime writes a panic
 	// to, and at the size it had when this process started. An exit Gextto
 	// treats as deliberate (a swap to a new binary, its own shutdown) would
@@ -112,36 +121,270 @@ func gxUnresponsive(lastOK, now time.Time) bool {
 	return now.Sub(lastOK) >= gxUnresponsiveLimit
 }
 
+// gxProcessStartTime returns procfs field 22 (start ticks), the identity which
+// distinguishes two processes that reused the same PID. The command name is
+// read after the final ')' because it may itself contain spaces or parentheses.
+func gxProcessStartTime(pid int) (uint64, bool) {
+	if pid <= 0 {
+		return 0, false
+	}
+	data, err := os.ReadFile(fmt.Sprintf("/proc/%d/stat", pid))
+	if err != nil {
+		return 0, false
+	}
+	text := string(data)
+	commandEnd := strings.LastIndex(text, ")")
+	if commandEnd < 0 || commandEnd+2 > len(text) {
+		return 0, false
+	}
+	fields := strings.Fields(text[commandEnd+2:])
+	if len(fields) < 20 {
+		return 0, false
+	}
+	ticks, err := strconv.ParseUint(fields[19], 10, 64)
+	return ticks, err == nil
+}
+
+func gxProcessMatches(pid int, startTime uint64) (alive, same bool) {
+	if pid <= 0 {
+		return false, false
+	}
+	current, ok := gxProcessStartTime(pid)
+	if !ok {
+		return gxPidAlive(pid), false
+	}
+	return true, startTime != 0 && current == startTime
+}
+
+var errGxProcessIdentityChanged = errors.New("gx-torrent process identity changed; not signalling the reused PID")
+
+func (p *gxManagedProcess) pidLocked() int {
+	if p.signalPID > 0 {
+		return p.signalPID
+	}
+	return p.pid
+}
+
+func (p *gxManagedProcess) identity() (int, uint64, bool) {
+	if p == nil {
+		return 0, 0, false
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.pidLocked(), p.startTime, !p.closed
+}
+
+func (p *gxManagedProcess) ensureIdentity() bool {
+	pid, startTime, open := p.identity()
+	if !open {
+		return false
+	}
+	if startTime != 0 {
+		return true
+	}
+	current, ok := gxProcessStartTime(pid)
+	if !ok {
+		return false
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.closed || p.pidLocked() != pid {
+		return false
+	}
+	p.startTime = current
+	return true
+}
+
+func (p *gxManagedProcess) identityMatches() bool {
+	if !p.ensureIdentity() {
+		return false
+	}
+	pid, startTime, open := p.identity()
+	if !open {
+		return false
+	}
+	alive, same := gxProcessMatches(pid, startTime)
+	return alive && same
+}
+
+func (p *gxManagedProcess) signal(sig syscall.Signal) error {
+	p.mu.Lock()
+	pid, startTime := p.pidLocked(), p.startTime
+	p.mu.Unlock()
+	if pid <= 0 {
+		return nil
+	}
+	if startTime == 0 {
+		current, ok := gxProcessStartTime(pid)
+		if !ok {
+			return nil
+		}
+		p.mu.Lock()
+		if p.pidLocked() != pid {
+			p.mu.Unlock()
+			return nil
+		}
+		p.startTime = current
+		p.mu.Unlock()
+		startTime = current
+	}
+	alive, same := gxProcessMatches(pid, startTime)
+	if !alive {
+		return nil
+	}
+	if !same {
+		return errGxProcessIdentityChanged
+	}
+	return syscall.Kill(pid, sig)
+}
+
+// acceptHealth verifies that an answer belongs to this managed daemon before it
+// can refresh the watchdog or rebind the PID. With systemd-run the child PID is
+// the scope launcher; the daemon's own PID arrives in its first health answer.
+func (p *gxManagedProcess) acceptHealth(cfg *Config, health gxHealth) bool {
+	if p == nil || !health.OK || health.Pid <= 0 {
+		return false
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.closed {
+		return false
+	}
+	if p.fingerprint != "" && health.Fingerprint != p.fingerprint {
+		return false
+	}
+	if cfg != nil && !health.ownedBy(cfg) {
+		return false
+	}
+	if health.Pid != p.pidLocked() && p.fingerprint == "" {
+		// An adopted process is never rebound to a different PID.
+		return false
+	}
+	startTime, ok := gxProcessStartTime(health.Pid)
+	if !ok {
+		return false
+	}
+	if health.Pid == p.pidLocked() && p.startTime != 0 && startTime != p.startTime {
+		return false
+	}
+	p.signalPID, p.startTime = health.Pid, startTime
+	return true
+}
+
+// gxWatchdogInterval and gxWatchdogPingTimeout are variables so lifecycle tests
+// can exercise cancellation without waiting half a minute.
+var (
+	gxWatchdogInterval    = 30 * time.Second
+	gxWatchdogPingTimeout = 5 * time.Second
+)
+
+// pingContext is the cancellable health probe used by the watchdog. The regular
+// adapter ping deliberately keeps its existing request timeout; shutdown must
+// not wait for that longer timeout before the supervisor can restart or exit.
+func (e *gxTorrentEngine) pingContext(ctx context.Context) (gxHealth, bool) {
+	var health gxHealth
+	if e == nil {
+		return health, false
+	}
+	timeout := gxWatchdogPingTimeout
+	if e.settings.Timeout > 0 && e.settings.Timeout < timeout {
+		timeout = e.settings.Timeout
+	}
+	requestCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	request, err := http.NewRequestWithContext(requestCtx, http.MethodGet, e.settings.BaseURL+"/api/v1/health", nil)
+	if err != nil {
+		return health, false
+	}
+	if e.settings.Token != "" {
+		request.Header.Set("X-Gx-Token", e.settings.Token)
+	}
+	client := e.client
+	if client == nil {
+		client = http.DefaultClient
+	}
+	response, err := client.Do(request)
+	if err != nil {
+		return health, false
+	}
+	defer response.Body.Close()
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		return health, false
+	}
+	const healthLimit = 64 << 10
+	payload, err := readLimitedBody(io.LimitReader(response.Body, healthLimit+1), healthLimit)
+	if err != nil || json.Unmarshal(payload, &health) != nil {
+		return gxHealth{}, false
+	}
+	return health, health.OK && health.Version != ""
+}
+
 // watchManagedHealth kills the managed daemon when it stops answering its own
 // health endpoint for longer than gxUnresponsiveLimit, so the supervisor sees an
 // exit and counts it as a failure. It stops when the caller closes stop, which
 // the supervisor does right after the process is reaped; it must not read
 // process.done, which belongs to the supervisor's wait.
 func (e *gxTorrentEngine) watchManagedHealth(process *gxManagedProcess, stop <-chan struct{}) {
-	const interval = 30 * time.Second
-	ticker := time.NewTicker(interval)
+	e.watchManagedHealthSince(process, stop, time.Now())
+}
+
+func (e *gxTorrentEngine) watchManagedHealthSince(process *gxManagedProcess, stop <-chan struct{}, lastOK time.Time) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() {
+		select {
+		case <-stop:
+			cancel()
+		case <-ctx.Done():
+		}
+	}()
+	ticker := time.NewTicker(gxWatchdogInterval)
 	defer ticker.Stop()
-	lastOK := time.Now()
 	for {
 		select {
 		case <-stop:
 			return
 		case <-ticker.C:
-			if e.ping() {
-				lastOK = time.Now()
-				continue
-			}
-			if !gxUnresponsive(lastOK, time.Now()) {
-				continue
-			}
-			logging.Error("gx-torrent is not answering the API although it is up: restarting it",
-				"unresponsive_for", time.Since(lastOK).Round(time.Second).String())
-			e.notifyEvent("engine_unresponsive", map[string]any{
-				"unresponsive_seconds": int(time.Since(lastOK).Seconds()),
-			})
-			_ = process.Stop()
+		}
+		select {
+		case <-stop:
+			return
+		default:
+		}
+		health, ok := e.pingContext(ctx)
+		if ok && process.acceptHealth(e.cfg, health) {
+			lastOK = time.Now()
+			continue
+		}
+		if !gxUnresponsive(lastOK, time.Now()) {
+			continue
+		}
+		// Stop may have closed while the network probe was in flight. Never
+		// turn a deliberate shutdown into a kill, and never signal a PID which
+		// was reused after this process exited.
+		select {
+		case <-stop:
+			return
+		default:
+		}
+		if !process.identityMatches() {
 			return
 		}
+		logging.Error(fmt.Sprintf("gx-torrent is not answering the API although it is up: restarting it after %s without an answer",
+			logDuration(time.Since(lastOK))))
+		e.notifyEvent("engine_unresponsive", map[string]any{
+			"unresponsive_seconds": int(time.Since(lastOK).Seconds()),
+		})
+		select {
+		case <-stop:
+			return
+		default:
+		}
+		if !process.identityMatches() {
+			return
+		}
+		_ = process.Stop()
+		return
 	}
 }
 
@@ -398,9 +641,10 @@ func startManagedGxTorrent(cfg *Config, settings gxTorrentSettings) (*gxManagedP
 	}
 	logging.Debug("gx-torrent avviato da Gextto", "binary", spec.binary, "listen", spec.listen, "data", spec.dataDir, "scope", gxCanUseScope())
 	process := &gxManagedProcess{
-		cmd: command, pid: command.Process.Pid, done: make(chan error, 1),
-		crashLog: crashPath, crashOffset: crashOffset,
+		cmd: command, pid: command.Process.Pid, signalPID: command.Process.Pid, done: make(chan error, 1),
+		crashLog: crashPath, crashOffset: crashOffset, fingerprint: spec.fingerprint,
 	}
+	process.startTime, _ = gxProcessStartTime(process.pid)
 	go func() {
 		defer recoverGoroutine("gx-torrent process wait")
 		err := command.Wait()
@@ -417,10 +661,26 @@ var gxAdoptedPollInterval = 2 * time.Second
 // adoptGxProcess follows a daemon started by a previous Gextto run: it is not
 // a child of this process, so its exit is detected by polling the pid.
 func adoptGxProcess(pid int) *gxManagedProcess {
-	process := &gxManagedProcess{pid: pid, done: make(chan error, 1)}
+	process := &gxManagedProcess{pid: pid, signalPID: pid, done: make(chan error, 1)}
+	process.startTime, _ = gxProcessStartTime(pid)
+	startTime := process.startTime
 	go func() {
 		defer recoverGoroutine("gx-torrent adopted process watch")
-		for gxPidAlive(pid) {
+		for {
+			if startTime == 0 {
+				if !gxPidAlive(pid) {
+					break
+				}
+				if current, ok := gxProcessStartTime(pid); ok {
+					startTime = current
+				}
+				time.Sleep(gxAdoptedPollInterval)
+				continue
+			}
+			alive, same := gxProcessMatches(pid, startTime)
+			if !alive || !same {
+				break
+			}
 			time.Sleep(gxAdoptedPollInterval)
 		}
 		process.done <- errors.New("exited")
@@ -512,14 +772,22 @@ func (p *gxManagedProcess) Stop() error {
 	}
 	p.closed = true
 	p.mu.Unlock()
-	if err := syscall.Kill(p.pid, syscall.SIGTERM); err != nil {
-		_ = syscall.Kill(p.pid, syscall.SIGKILL)
+	if err := p.signal(syscall.SIGTERM); err != nil {
+		if errors.Is(err, syscall.ESRCH) || errors.Is(err, errGxProcessIdentityChanged) {
+			return nil
+		}
 		return err
 	}
+	timer := time.NewTimer(managedShutdownGrace)
+	defer timer.Stop()
 	select {
 	case <-p.done:
-	case <-time.After(managedShutdownGrace):
-		_ = syscall.Kill(p.pid, syscall.SIGKILL)
+		return nil
+	case <-timer.C:
+	}
+	// The PID may have exited and been reused during the grace period.
+	if err := p.signal(syscall.SIGKILL); err != nil && !errors.Is(err, syscall.ESRCH) && !errors.Is(err, errGxProcessIdentityChanged) {
+		return err
 	}
 	return nil
 }
@@ -554,20 +822,30 @@ func gxStopLeftoverDaemon(cfg *Config) {
 	gxStopPid(health.Pid)
 }
 
-// gxStopPid stops a daemon known only by its pid and waits for it to exit.
+// gxStopPid stops a daemon known only by its pid and waits for it to exit. The
+// start time is captured once and checked before every signal, so a PID reused
+// during the grace period is never killed by this stop.
 func gxStopPid(pid int) {
-	if !gxPidAlive(pid) {
+	startTime, ok := gxProcessStartTime(pid)
+	if !ok || !gxPidAlive(pid) {
 		return
 	}
-	_ = syscall.Kill(pid, syscall.SIGTERM)
+	signal := func(sig syscall.Signal) bool {
+		alive, same := gxProcessMatches(pid, startTime)
+		return alive && same && syscall.Kill(pid, sig) == nil
+	}
+	if !signal(syscall.SIGTERM) {
+		return
+	}
 	deadline := time.Now().Add(managedShutdownGrace)
 	for time.Now().Before(deadline) {
-		if !gxPidAlive(pid) {
+		alive, same := gxProcessMatches(pid, startTime)
+		if !alive || !same {
 			return
 		}
 		time.Sleep(250 * time.Millisecond)
 	}
-	_ = syscall.Kill(pid, syscall.SIGKILL)
+	_ = signal(syscall.SIGKILL)
 }
 
 // gxCrashBudget records the failed life cycles of the managed daemon and
@@ -712,9 +990,16 @@ func (e *gxTorrentEngine) superviseManagedProcess() {
 		// its health endpoint is killed and counts as a failure, instead of
 		// keeping the transfers frozen forever.
 		watchStop := make(chan struct{})
-		go e.watchManagedHealth(process, watchStop)
+		watchDone := make(chan struct{})
+		go func() {
+			defer close(watchDone)
+			e.watchManagedHealth(process, watchStop)
+		}()
 		err := process.wait()
 		close(watchStop)
+		// A ping may still be in flight. Wait for its cancellation before any
+		// restart so the old watchdog can never stop the new process.
+		<-watchDone
 		logGxCrashReport(process)
 		e.processMu.Lock()
 		closed = e.closed

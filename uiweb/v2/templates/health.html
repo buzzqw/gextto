@@ -146,23 +146,23 @@
      tutti i riquadri sono resi freschi dal render completo. */}}
 {{define "v2_health_ed2k"}}
 <div class="panel">
-  <div class="panel-head"><h3>{{tr "eD2k e Kad (aMule)"}}</h3><small class="muted">{{if .Reachable}}<span>{{tr "in uso"}}</span>{{if .Version}} · {{.Version}}{{end}}{{if .Address}} · {{.Address}}{{end}}{{else}}{{tr "non raggiungibile"}}{{end}}</small></div>
+  <div class="panel-head"><h3>{{ed2kTr "eD2k e Kad (aMule)"}}</h3><small class="muted">{{if .Reachable}}<span>{{tr "in uso"}}</span>{{if .Version}} · {{.Version}}{{end}}{{if .Address}} · {{.Address}}{{end}}{{else}}{{tr "non raggiungibile"}}{{end}}</small></div>
   <div class="panel-body">
   {{if .Error}}
-    <p class="alert" role="alert"><span>{{tr "aMule non raggiungibile:"}}</span> {{tr .Error}}</p>
+    <p class="alert" role="alert"><span>{{ed2kTr "aMule non raggiungibile:"}}</span> {{tr .Error}}</p>
   {{else}}
     <div class="stat-grid">
-      <div class="row"><span>{{tr "Client eD2k"}}</span><strong>{{tr "aMule"}} <span>{{tr .Version}}</span></strong></div>
+      <div class="row"><span>{{tr "Client eD2k"}}</span><strong>{{ed2kTr "aMule"}} <span>{{tr .Version}}</span></strong></div>
       <div class="row"><span>{{tr "Dove gira"}}</span><strong>{{tr .Runtime}}</strong></div>
       <div class="row"><span>{{tr "eD2k"}}</span><strong>{{if .Connected}}<span>{{tr "Connesso a"}}</span> {{.Server}} · {{if .HighID}}<span class="badge ok">{{tr "ID alto"}}</span>{{else}}<span class="badge warn">{{tr "ID basso"}}</span>{{end}}{{else}}<span>{{tr "Non connesso"}}</span>{{end}}</strong></div>
       <div class="row"><span>{{tr "Kad"}}</span><strong>{{if eq .Kad "connected"}}<span class="badge ok">{{tr "Connesso"}}</span>{{else if eq .Kad "firewalled"}}<span class="badge warn">{{tr "Connesso, dietro firewall"}}</span>{{else if eq .Kad "connecting"}}<span>{{tr "In connessione…"}}</span>{{else}}<span>{{tr "Fermo"}}</span>{{end}}</strong></div>
       <div class="row"><span>{{tr "Velocità"}}</span><strong>↓ {{rateI .DownloadRate}} · ↑ {{rateI .UploadRate}}</strong></div>
-      <div class="row"><span>{{tr "Sessione"}}</span><strong {{trTitle "Byte scambiati da aMule da quando è stato avviato"}}>↓ {{bytes .SessionDown}} · ↑ {{bytes .SessionUp}}</strong></div>
-      <div class="row"><span>{{tr "Totale"}}</span><strong {{trTitle "Byte scambiati da aMule dall'inizio, somma di tutte le sessioni"}}>↓ {{bytes .TotalDown}} · ↑ {{bytes .TotalUp}}</strong></div>
+      <div class="row"><span>{{tr "Sessione"}}</span><strong {{ed2kTitle "Byte scambiati da aMule da quando è stato avviato"}}>↓ {{bytes .SessionDown}} · ↑ {{bytes .SessionUp}}</strong></div>
+      <div class="row"><span>{{tr "Totale"}}</span><strong {{ed2kTitle "Byte scambiati da aMule dall'inizio, somma di tutte le sessioni"}}>↓ {{bytes .TotalDown}} · ↑ {{bytes .TotalUp}}</strong></div>
       <div class="row"><span>{{tr "Coda di upload"}}</span><strong>{{tr .UploadQueue}}</strong></div>
     </div>
-    {{if .DirIssues}}<p class="alert" role="alert"><span>{{tr "Cartelle di aMule non utilizzabili:"}}</span> {{range .DirIssues}}<code {{trTitle .Path}}>{{tr .Path}}</code> {{end}}<a href="/?view=ed2k">{{tr "apri la pagina eD2k"}}</a>.</p>{{end}}
-    <h4>{{tr "Avvisi recenti dal log di aMule"}}</h4>
+    {{if .DirIssues}}<p class="alert" role="alert"><span>{{ed2kTr "Cartelle di aMule non utilizzabili:"}}</span> {{range .DirIssues}}<code {{trTitle .Path}}>{{tr .Path}}</code> {{end}}<a href="/?view=ed2k">{{tr "apri la pagina eD2k"}}</a>.</p>{{end}}
+    <h4>{{ed2kTr "Avvisi recenti dal log di aMule"}}</h4>
     {{if .Warnings}}
     <ul class="plain-list">{{range .Warnings}}<li class="truncate" {{trTitle .}}>{{tr .}}</li>{{end}}</ul>
     {{else}}<p class="muted">{{tr "Nessun avviso recente."}}</p>{{end}}

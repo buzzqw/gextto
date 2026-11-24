@@ -137,7 +137,7 @@ func (t *torrent) stats() Stats {
 
 	var s Stats
 	s.InfoHash = t.infoHash
-	s.Port = t.port
+	s.Port = t.getPort()
 	s.Status = t.status()
 	s.Error = t.lastError
 	s.BandwidthWeight = t.bandwidthWeight

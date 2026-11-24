@@ -61,6 +61,7 @@ func (h *IncomingHandshaker) Run(peerID [20]byte, getSKeyFunc func([20]byte) []b
 			log.Debugln("cannot complete incoming handshake:", err)
 		}
 		h.Error = err
+		_ = h.Conn.Close()
 		return
 	}
 	log.Debugf("Connection accepted. (cipher=%s extensions=%x client=%q)", cipher, peerExtensions, remoteID[:8])

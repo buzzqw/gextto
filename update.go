@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -183,7 +184,7 @@ func Run(ctx context.Context, opts UpdateOptions) error {
 	}
 
 	extractDir := filepath.Join(work.Path(), "payload")
-	if err := os.MkdirAll(extractDir, 0o755); err != nil {
+	if err := os.MkdirAll(extractDir, 0o700); err != nil {
 		return err
 	}
 	if err := updateExtract(archive, extractDir); err != nil {
@@ -198,25 +199,15 @@ func Run(ctx context.Context, opts UpdateOptions) error {
 		return err
 	}
 
-	if err := updateInstallRelease(root, installDir); err != nil {
+	transaction, err := updateInstallReleaseTransaction(root, installDir)
+	if err != nil {
 		return err
 	}
-	// The payload's own marker ("continuous-<sha>", "v1.2.3") says exactly
-	// what is installed; the release name is only a fallback.
-	marker := []byte(release + "\n")
-	if payload, err := os.ReadFile(filepath.Join(root, "VERSION")); err == nil && strings.TrimSpace(string(payload)) != "" {
-		marker = payload
-	}
-	// The previous marker goes back in place if the new version is rolled back.
-	if previous, err := os.ReadFile(filepath.Join(installDir, "VERSION")); err == nil {
-		_ = os.WriteFile(filepath.Join(installDir, "VERSION.prev"), previous, 0o644)
-	}
-	if err := os.WriteFile(filepath.Join(installDir, "VERSION"), marker, 0o644); err != nil {
+	if err := updateRestartServiceWithTransaction(opts, transaction); err != nil {
 		return err
 	}
 	fmt.Printf("Gextto updated to %s in %s\n", release, installDir)
-
-	return updateRestartService(opts)
+	return nil
 }
 
 func updateResolveInstallDir(opts UpdateOptions) (string, error) {
@@ -255,7 +246,7 @@ func updateDownload(ctx context.Context, url, destination string) error {
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
 		return fmt.Errorf("download failed for %s: HTTP %s", url, response.Status)
 	}
-	file, err := os.Create(destination)
+	file, err := os.OpenFile(destination, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
 	if err != nil {
 		return fmt.Errorf("cannot write %s: %w", destination, err)
 	}
@@ -395,201 +386,343 @@ func updateFindReleaseRoot(directory string) (string, bool) {
 }
 
 func updateValidateRelease(root string) error {
-	binary := filepath.Join(root, constants.AppName)
-	if !updateIsFile(binary) {
-		return fmt.Errorf("release is missing the %s executable", binary)
+	for _, name := range []string{constants.AppName, "gx-torrent", "run.sh", "VERSION"} {
+		if !updateIsFile(filepath.Join(root, name)) {
+			return fmt.Errorf("release is missing %s", name)
+		}
 	}
 	return nil
 }
 
-// updateInstallRelease installs the staged payload. Everything is copied next to the
-// final destination first; the live installation is only touched once every
-// piece is staged, and any failure during the swap restores the previous binary
-// and directories.
+// updateInstallRelease installs a complete payload and keeps the previous
+// binaries for the engine supervisor. Run uses updateInstallReleaseTransaction
+// directly so a failed health check can restore every installed component.
 func updateInstallRelease(root, installDir string) error {
-	if err := os.MkdirAll(installDir, 0o755); err != nil {
-		return fmt.Errorf("cannot create %s: %w", installDir, err)
-	}
-	suffix := fmt.Sprintf(".%d.new", os.Getpid())
-
-	// Stage the executable and the directories before touching what is live.
-	binary := filepath.Join(installDir, constants.AppName)
-	newBinary := filepath.Join(installDir, constants.AppName+suffix)
-	if err := updateCopyFileMode(filepath.Join(root, constants.AppName), newBinary); err != nil {
-		return fmt.Errorf("cannot stage the new executable: %w", err)
-	}
-	if err := updateSetExecutable(newBinary); err != nil {
+	transaction, err := updateInstallReleaseTransaction(root, installDir)
+	if err != nil {
 		return err
 	}
+	transaction.finish()
+	return nil
+}
 
-	type stagedDir struct {
-		name        string
-		staged      string
-		previous    string
-		destination string
+var updatePayloadFiles = []string{
+	constants.AppName, "gx-torrent", "run.sh", "VERSION",
+	"README.md", "README.it.md", "LICENSE", "THIRD-PARTY-NOTICES",
+	"install-service.sh", "uninstall-service.sh", "gextto.service",
+}
+
+var updatePayloadDirs = []string{"ui", "lib"}
+
+type updateInstallEntry struct {
+	name        string
+	staged      string
+	destination string
+	previous    string
+	removeOnly  bool
+	touched     bool
+	installed   bool
+}
+
+// updateInstallTransaction owns the snapshots taken while replacing the live
+// payload. They stay beside the installation (same filesystem) until the new
+// service has answered its expected health response.
+type updateInstallTransaction struct {
+	installDir  string
+	staging     string
+	rollbackDir string
+	entries     []updateInstallEntry
+	finished    bool
+}
+
+func updateInstallReleaseTransaction(root, installDir string) (*updateInstallTransaction, error) {
+	return updateInstallReleaseWithCheckpoint(root, installDir, nil)
+}
+
+// updateInstallReleaseWithCheckpoint is the transaction boundary used by the
+// focused rollback tests. A non-nil checkpoint runs after each live entry has
+// been committed; its error rolls the whole payload back.
+func updateInstallReleaseWithCheckpoint(root, installDir string, checkpoint func(int) error) (*updateInstallTransaction, error) {
+	if err := updateValidateRelease(root); err != nil {
+		return nil, err
 	}
-	var stagedDirs []stagedDir
-	for _, directory := range []string{"ui", "lib"} {
-		source := filepath.Join(root, directory)
-		if !updateIsDir(source) {
+	if err := os.MkdirAll(installDir, 0o755); err != nil {
+		return nil, fmt.Errorf("cannot create %s: %w", installDir, err)
+	}
+	staging, err := os.MkdirTemp(installDir, ".gextto-update-stage-")
+	if err != nil {
+		return nil, fmt.Errorf("cannot create the update staging directory: %w", err)
+	}
+	rollback, err := os.MkdirTemp(installDir, ".gextto-update-rollback-")
+	if err != nil {
+		updateRemovePath(staging)
+		return nil, fmt.Errorf("cannot create the update rollback directory: %w", err)
+	}
+	transaction := &updateInstallTransaction{installDir: installDir, staging: staging, rollbackDir: rollback}
+	ready := false
+	defer func() {
+		if !ready {
+			updateRemovePath(staging)
+			// A failed rollback keeps its snapshots for manual recovery.
+			if !updatePathExists(rollback) || updateDirEmpty(rollback) {
+				updateRemovePath(rollback)
+			}
+		}
+	}()
+
+	// Stage every component, including the previous binaries, before the first
+	// live path is moved. Missing optional files are removal entries so stale
+	// payload files cannot survive an update.
+	for _, name := range updatePayloadFiles {
+		staged := filepath.Join(staging, name)
+		source := filepath.Join(root, name)
+		if !updatePathExists(source) {
+			transaction.entries = append(transaction.entries, updateInstallEntry{
+				name: name, destination: filepath.Join(installDir, name), previous: filepath.Join(rollback, name), removeOnly: true,
+			})
 			continue
 		}
-		staged := filepath.Join(installDir, "."+directory+suffix)
-		updateRemovePath(staged)
-		if err := updateCopyDir(source, staged); err != nil {
-			return fmt.Errorf("cannot stage the %s directory: %w", directory, err)
+		if !updateIsFile(source) {
+			updateRemovePath(rollback)
+			return nil, fmt.Errorf("release entry %s is not a regular file", name)
 		}
-		previous := filepath.Join(installDir, fmt.Sprintf(".%s.old%d", directory, os.Getpid()))
-		updateRemovePath(previous)
-		stagedDirs = append(stagedDirs, stagedDir{name: directory, staged: staged, previous: previous})
-	}
-
-	// Snapshot the current executable so the whole swap can be undone.
-	backup := filepath.Join(installDir, constants.AppName+".bak")
-	hadBinary := updateIsFile(binary)
-	if hadBinary {
-		if err := updateCopyFileMode(binary, backup); err != nil {
-			return fmt.Errorf("cannot back up the current executable: %w", err)
-		}
-	}
-	rollback := func(committed []stagedDir) {
-		for index := len(committed) - 1; index >= 0; index-- {
-			item := committed[index]
-			if updatePathExists(item.previous) {
-				updateRemovePath(item.destination)
-				_ = os.Rename(item.previous, item.destination)
-			}
-		}
-		if hadBinary {
-			_ = updateCopyFileMode(backup, binary)
-		}
-		updateRemovePath(backup)
-	}
-
-	if err := os.Rename(newBinary, binary); err != nil {
-		updateRemovePath(newBinary)
-		rollback(nil)
-		return fmt.Errorf("cannot replace the executable: %w", err)
-	}
-
-	var committed []stagedDir
-	for _, item := range stagedDirs {
-		destination := filepath.Join(installDir, item.name)
-		if updatePathExists(destination) {
-			if err := os.Rename(destination, item.previous); err != nil {
-				updateRemovePath(item.staged)
-				rollback(committed)
-				return fmt.Errorf("cannot move the current %s aside: %w", item.name, err)
-			}
-		}
-		if err := os.Rename(item.staged, destination); err != nil {
-			if updatePathExists(item.previous) {
-				_ = os.Rename(item.previous, destination)
-			}
-			updateRemovePath(item.staged)
-			rollback(committed)
-			return fmt.Errorf("cannot install the %s directory: %w", item.name, err)
-		}
-		item.destination = destination
-		committed = append(committed, item)
-	}
-
-	// Success: the previous directories are no longer needed. The previous
-	// executable is kept as gexttod.prev (as the installer does): if the new
-	// version does not start, updateRestartService puts it back.
-	for _, item := range committed {
-		updateRemovePath(item.previous)
-	}
-	if hadBinary {
-		if err := os.Rename(backup, filepath.Join(installDir, constants.AppName+".prev")); err != nil {
-			updateRemovePath(backup)
-		}
-	}
-
-	// The gx-torrent daemon may be running (managed mode): install it
-	// through a rename so the running executable is never overwritten in place.
-	if source := filepath.Join(root, "gx-torrent"); updateIsFile(source) {
-		destination := filepath.Join(installDir, "gx-torrent")
-		staged := destination + ".new"
 		if err := updateCopyFileMode(source, staged); err != nil {
-			return fmt.Errorf("cannot install gx-torrent: %w", err)
+			return nil, fmt.Errorf("cannot stage %s: %w", name, err)
 		}
-		if err := updateSetExecutable(staged); err != nil {
-			return err
+		if err := updateChmodPayloadFile(staged, name); err != nil {
+			return nil, err
 		}
-		// Keep the previous daemon for a rollback: a crash loop after an update
-		// restores it before handing the transfers to another engine.
-		if updateIsFile(destination) {
-			previous := destination + ".prev"
-			_ = os.Remove(previous)
-			if err := os.Rename(destination, previous); err != nil {
-				return fmt.Errorf("cannot keep the previous gx-torrent: %w", err)
-			}
-		}
-		if err := os.Rename(staged, destination); err != nil {
-			return fmt.Errorf("cannot install gx-torrent: %w", err)
-		}
-	} else {
-		logging.Warn("gx-torrent is missing from the update payload: Gextto will use the configured alternative engine")
+		transaction.entries = append(transaction.entries, updateInstallEntry{
+			name: name, staged: staged, destination: filepath.Join(installDir, name), previous: filepath.Join(rollback, name),
+		})
 	}
-	// gx-ed2k was retired in favour of aMule: drop the binary an older release
-	// installed.
-	for _, name := range []string{"gx-ed2k", "gx-ed2k.prev"} {
-		updateRemovePath(filepath.Join(installDir, name))
+	for _, name := range updatePayloadDirs {
+		staged := filepath.Join(staging, name)
+		source := filepath.Join(root, name)
+		if updatePathExists(source) {
+			if !updateIsDir(source) {
+				updateRemovePath(rollback)
+				return nil, fmt.Errorf("release entry %s is not a directory", name)
+			}
+			if err := updateCopyDir(source, staged); err != nil {
+				return nil, fmt.Errorf("cannot stage the %s directory: %w", name, err)
+			}
+		} else if err := os.MkdirAll(staged, 0o755); err != nil {
+			return nil, fmt.Errorf("cannot stage an empty %s directory: %w", name, err)
+		}
+		if err := os.Chmod(staged, 0o755); err != nil {
+			return nil, err
+		}
+		transaction.entries = append(transaction.entries, updateInstallEntry{
+			name: name, staged: staged, destination: filepath.Join(installDir, name), previous: filepath.Join(rollback, name),
+		})
 	}
 
-	// Keep the launcher, the release notes and the licence notices alongside
-	// the payload when shipped.
-	for _, file := range []string{"run.sh", "README.md", "LICENSE", "THIRD-PARTY-NOTICES"} {
-		source := filepath.Join(root, file)
+	// The running engine supervisor recognises .prev. Stage those copies before
+	// committing and include them in the transaction, so a health-check rollback
+	// restores the previous rollback point as well as the live payload.
+	for _, name := range []string{constants.AppName, "gx-torrent"} {
+		previousName := name + ".prev"
+		source := filepath.Join(installDir, name)
+		entry := updateInstallEntry{
+			name: previousName, destination: filepath.Join(installDir, previousName),
+			previous: filepath.Join(rollback, previousName), removeOnly: true,
+		}
 		if updateIsFile(source) {
-			destination := filepath.Join(installDir, file)
-			if err := updateCopyFileMode(source, destination); err != nil {
-				return fmt.Errorf("cannot install %s: %w", file, err)
+			staged := filepath.Join(staging, previousName)
+			if err := updateCopyFileMode(source, staged); err != nil {
+				return nil, fmt.Errorf("cannot stage %s: %w", previousName, err)
 			}
-			if file == "run.sh" {
-				if err := updateSetExecutable(destination); err != nil {
-					return err
-				}
+			if err := updateSetExecutable(staged); err != nil {
+				return nil, err
+			}
+			entry.staged, entry.removeOnly = staged, false
+		}
+		transaction.entries = append(transaction.entries, entry)
+	}
+	versionPrev := "VERSION.prev"
+	versionEntry := updateInstallEntry{
+		name: versionPrev, destination: filepath.Join(installDir, versionPrev),
+		previous: filepath.Join(rollback, versionPrev), removeOnly: true,
+	}
+	if updateIsFile(filepath.Join(installDir, "VERSION")) {
+		staged := filepath.Join(staging, versionPrev)
+		if err := updateCopyFileMode(filepath.Join(installDir, "VERSION"), staged); err != nil {
+			return nil, fmt.Errorf("cannot stage %s: %w", versionPrev, err)
+		}
+		if err := os.Chmod(staged, 0o644); err != nil {
+			return nil, err
+		}
+		versionEntry.staged, versionEntry.removeOnly = staged, false
+	}
+	transaction.entries = append(transaction.entries, versionEntry)
+	for _, name := range []string{"gx-ed2k", "gx-ed2k.prev"} {
+		transaction.entries = append(transaction.entries, updateInstallEntry{
+			name: name, destination: filepath.Join(installDir, name), previous: filepath.Join(rollback, name), removeOnly: true,
+		})
+	}
+
+	committed := 0
+	for index := range transaction.entries {
+		entry := &transaction.entries[index]
+		if updatePathExists(entry.destination) {
+			if err := os.Rename(entry.destination, entry.previous); err != nil {
+				rollbackErr := transaction.rollback()
+				return nil, errors.Join(fmt.Errorf("cannot move the current %s aside: %w", entry.name, err), rollbackErr)
+			}
+		}
+		entry.touched = true
+		if !entry.removeOnly {
+			if err := os.Rename(entry.staged, entry.destination); err != nil {
+				rollbackErr := transaction.rollback()
+				return nil, errors.Join(fmt.Errorf("cannot install %s: %w", entry.name, err), rollbackErr)
+			}
+			entry.installed = true
+		}
+		committed++
+		if checkpoint != nil {
+			if err := checkpoint(committed); err != nil {
+				rollbackErr := transaction.rollback()
+				return nil, errors.Join(err, rollbackErr)
 			}
 		}
 	}
-	return nil
+	if err := os.RemoveAll(staging); err != nil {
+		rollbackErr := transaction.rollback()
+		return nil, errors.Join(fmt.Errorf("cannot remove the update staging directory: %w", err), rollbackErr)
+	}
+	ready = true
+	return transaction, nil
+}
+
+func updateChmodPayloadFile(path, name string) error {
+	switch name {
+	case constants.AppName, "gx-torrent", "run.sh", "install-service.sh", "uninstall-service.sh":
+		return updateSetExecutable(path)
+	default:
+		return os.Chmod(path, 0o644)
+	}
+}
+
+func (transaction *updateInstallTransaction) rollback() error {
+	if transaction == nil || transaction.finished {
+		return nil
+	}
+	var rollbackErrors []error
+	for index := len(transaction.entries) - 1; index >= 0; index-- {
+		entry := &transaction.entries[index]
+		if !entry.touched {
+			continue
+		}
+		if entry.installed {
+			if err := os.RemoveAll(entry.destination); err != nil {
+				rollbackErrors = append(rollbackErrors, fmt.Errorf("cannot remove the new %s during rollback: %w", entry.name, err))
+				continue
+			}
+		}
+		if updatePathExists(entry.previous) {
+			if err := os.Rename(entry.previous, entry.destination); err != nil {
+				rollbackErrors = append(rollbackErrors, fmt.Errorf("cannot restore %s during rollback: %w", entry.name, err))
+			}
+		}
+	}
+	updateRemovePath(transaction.staging)
+	if len(rollbackErrors) == 0 {
+		updateRemovePath(transaction.rollbackDir)
+		transaction.finished = true
+		return nil
+	}
+	return fmt.Errorf("the previous payload is only partially restored; snapshots remain in %s: %w", transaction.rollbackDir, errors.Join(rollbackErrors...))
+}
+
+func (transaction *updateInstallTransaction) finish() {
+	if transaction == nil || transaction.finished {
+		return
+	}
+	if err := os.RemoveAll(transaction.staging); err != nil {
+		logging.Warn("Could not remove the update staging directory", "path", transaction.staging, "error", err)
+	}
+	if err := os.RemoveAll(transaction.rollbackDir); err != nil {
+		logging.Warn("Could not remove the update rollback snapshots", "path", transaction.rollbackDir, "error", err)
+	}
+	transaction.finished = true
+}
+
+func updateDirEmpty(path string) bool {
+	entries, err := os.ReadDir(path)
+	return err == nil && len(entries) == 0
 }
 
 func updateRestartService(opts UpdateOptions) error {
+	return updateRestartServiceWithTransaction(opts, nil)
+}
+
+func updateRestartServiceWithTransaction(opts UpdateOptions, transaction *updateInstallTransaction) error {
+	return updateRestartServiceWithHooks(opts, transaction, updateHealthLimit,
+		func() bool { return syscall.Geteuid() == 0 },
+		updateSystemctl,
+		updateWaitHealthy,
+	)
+}
+
+// updateRestartServiceWithHooks takes the health limit explicitly so focused
+// tests can pass a millisecond deadline instead of the production three
+// minutes. Nothing here starts a timer of its own: the limit only reaches the
+// injected `healthy` hook (and the error text describing it).
+func updateRestartServiceWithHooks(opts UpdateOptions, transaction *updateInstallTransaction, limit time.Duration, privileged func() bool, systemctl func(...string) error, healthy func(time.Duration) updateHealth) error {
 	if !opts.Restart {
+		transaction.finish()
 		fmt.Println("Service not restarted (--no-restart).")
 		return nil
 	}
-	if syscall.Geteuid() != 0 {
+	if !privileged() {
+		transaction.finish()
 		fmt.Printf("Run `sudo systemctl restart %s` to start the new version.\n", ServiceName)
 		return nil
 	}
-	if err := updateSystemctl("restart", ServiceName); err != nil {
-		fmt.Fprintf(os.Stderr, "Could not restart %s; run `systemctl restart %s` manually.\n", ServiceName, ServiceName)
-		return nil
+	if err := systemctl("restart", ServiceName); err != nil {
+		return updateRollbackFailedUpdate(opts, transaction, fmt.Errorf("could not restart %s: %w", ServiceName, err), limit, systemctl, healthy)
 	}
-	switch updateWaitHealthy(updateHealthLimit) {
-	case updateHealthy:
+	if healthy(limit) == updateHealthy {
+		transaction.finish()
 		fmt.Printf("Service %s restarted and answering.\n", ServiceName)
 		return nil
-	case updateSlow:
-		// Alive but not answering yet (a long database migration): a
-		// rollback would interrupt it, so it is only reported.
-		fmt.Fprintf(os.Stderr, "Service %s is running but its web interface did not answer within %s; inspect: journalctl -u %s -n 100\n", ServiceName, updateHealthLimit, ServiceName)
-		return nil
 	}
-	// The new version does not start: put the previous executable back.
+	return updateRollbackFailedUpdate(opts, transaction, fmt.Errorf("%s did not return the expected status response within %s", ServiceName, limit), limit, systemctl, healthy)
+}
+
+func updateRollbackFailedUpdate(opts UpdateOptions, transaction *updateInstallTransaction, cause error, limit time.Duration, systemctl func(...string) error, healthy func(time.Duration) updateHealth) error {
+	fmt.Fprintf(os.Stderr, "%v: restoring the previous version.\n", cause)
+	var rollbackErr error
+	if transaction != nil {
+		rollbackErr = transaction.rollback()
+	} else {
+		rollbackErr = updateRollbackLegacyBinary(opts)
+	}
+	if rollbackErr != nil {
+		return errors.Join(cause, rollbackErr)
+	}
+	if err := systemctl("restart", ServiceName); err != nil {
+		return errors.Join(cause, fmt.Errorf("the previous version could not be restarted: %w", err))
+	}
+	if healthy(limit) != updateHealthy {
+		return errors.Join(cause, fmt.Errorf("the previous version did not return the expected status response either; inspect: journalctl -u %s -n 100", ServiceName))
+	}
+	return fmt.Errorf("%w; the previous version was restored and is running", cause)
+}
+
+// updateRollbackLegacyBinary keeps the standalone helper usable for callers
+// that do not have an updateInstallTransaction. The normal updater always has
+// one and restores the complete payload, not only the executable.
+func updateRollbackLegacyBinary(opts UpdateOptions) error {
 	installDir, err := updateResolveInstallDir(opts)
 	if err != nil {
-		return fmt.Errorf("%s did not start after the update: %w", ServiceName, err)
+		return err
 	}
 	previous := filepath.Join(installDir, constants.AppName+".prev")
 	if !updateIsFile(previous) {
-		return fmt.Errorf("%s did not start after the update and no previous version is available; inspect: journalctl -u %s -n 100", ServiceName, ServiceName)
+		return fmt.Errorf("no previous version is available in %s", installDir)
 	}
-	fmt.Fprintf(os.Stderr, "%s did not start after the update: restoring the previous version.\n", ServiceName)
 	binary := filepath.Join(installDir, constants.AppName)
 	staged := binary + ".rollback"
 	if err := updateCopyFileMode(previous, staged); err != nil {
@@ -600,14 +733,11 @@ func updateRestartService(opts UpdateOptions) error {
 		return fmt.Errorf("rollback failed: %w", err)
 	}
 	if previousMarker, err := os.ReadFile(filepath.Join(installDir, "VERSION.prev")); err == nil {
-		_ = os.WriteFile(filepath.Join(installDir, "VERSION"), previousMarker, 0o644)
-	} else {
-		_ = os.WriteFile(filepath.Join(installDir, "VERSION"), []byte("rollback\n"), 0o644)
+		if err := os.WriteFile(filepath.Join(installDir, "VERSION"), previousMarker, 0o644); err != nil {
+			return fmt.Errorf("rollback failed to restore VERSION: %w", err)
+		}
 	}
-	if err := updateSystemctl("restart", ServiceName); err != nil || updateWaitHealthy(updateHealthLimit) == updateCrashed {
-		return fmt.Errorf("the update failed and the previous version did not start either; inspect: journalctl -u %s -n 100", ServiceName)
-	}
-	return fmt.Errorf("the new version did not start: the previous one was restored and is running")
+	return nil
 }
 
 func updateSystemctl(args ...string) error {
@@ -629,28 +759,56 @@ const (
 	updateSlow                        // still active, not answering yet
 )
 
-// updateWaitHealthy watches the service after a restart. Only an HTTP answer
-// proves the new version works: "active" alone is what a simple unit reports
-// the moment its process starts, so a version crashing a few seconds later
-// (during start-up or a migration) looked like a success. Any moment outside
-// "active" — Restart=on-failure turns a crash into "activating" — is a crash.
+// updateWaitHealthy watches the service after a restart. The expected
+// /api/status JSON proves the new version works; a 401/403 proves the protected
+// daemon is answering when the operator disabled the local login bypass. Any
+// other HTTP answer (including a login page or a reverse-proxy error) is not.
 func updateWaitHealthy(limit time.Duration) updateHealth {
-	statusURL := updateServiceStatusURL()
+	return updateWaitHealthyWith(limit, updateServiceStatusURL(), func() bool {
+		return exec.Command("systemctl", "is-active", "--quiet", ServiceName).Run() == nil
+	})
+}
+
+func updateWaitHealthyWith(limit time.Duration, statusURL string, active func() bool) updateHealth {
 	client := &http.Client{Timeout: 3 * time.Second}
 	deadline := time.Now().Add(limit)
 	for time.Now().Before(deadline) {
-		if exec.Command("systemctl", "is-active", "--quiet", ServiceName).Run() != nil {
+		if active == nil || !active() {
 			return updateCrashed
 		}
-		if response, err := client.Get(statusURL); err == nil {
-			response.Body.Close()
-			if response.StatusCode < 500 {
+		response, err := client.Get(statusURL)
+		if err == nil {
+			body, readErr := io.ReadAll(io.LimitReader(response.Body, 64<<10))
+			closeErr := response.Body.Close()
+			if readErr == nil && closeErr == nil && (updateExpectedStatusResponse(body) && response.StatusCode == http.StatusOK ||
+				response.StatusCode == http.StatusUnauthorized || response.StatusCode == http.StatusForbidden) {
 				return updateHealthy
 			}
 		}
-		time.Sleep(2 * time.Second)
+		remaining := time.Until(deadline)
+		if remaining <= 0 {
+			break
+		}
+		delay := 2 * time.Second
+		if remaining < delay {
+			delay = remaining
+		}
+		if delay > 0 {
+			time.Sleep(delay)
+		}
 	}
 	return updateSlow
+}
+
+func updateExpectedStatusResponse(body []byte) bool {
+	var status struct {
+		Name    string `json:"name"`
+		Version string `json:"version"`
+	}
+	if err := json.Unmarshal(body, &status); err != nil {
+		return false
+	}
+	return status.Name == "gextto" && strings.TrimSpace(status.Version) != ""
 }
 
 // updateServiceStatusURL is /api/status on the address the unit listens on
@@ -686,6 +844,9 @@ func updateSetExecutable(path string) error {
 
 func updateCopyDir(from, to string) error {
 	if err := os.MkdirAll(to, 0o755); err != nil {
+		return err
+	}
+	if err := os.Chmod(to, 0o755); err != nil {
 		return err
 	}
 	entries, err := os.ReadDir(from)
@@ -738,11 +899,15 @@ func updateCopyFileMode(source, destination string) error {
 		_ = out.Close()
 		return err
 	}
+	if err := out.Chmod(info.Mode().Perm()); err != nil {
+		_ = out.Close()
+		return err
+	}
 	return out.Close()
 }
 
 func updateRemovePath(path string) {
-	info, err := os.Stat(path)
+	info, err := os.Lstat(path)
 	if err != nil {
 		return
 	}
@@ -764,7 +929,7 @@ func updateIsDir(path string) bool {
 }
 
 func updatePathExists(path string) bool {
-	_, err := os.Stat(path)
+	_, err := os.Lstat(path)
 	return err == nil
 }
 
@@ -775,9 +940,12 @@ type WorkDir struct {
 
 // NewWorkDir creates a fresh temporary working directory.
 func NewWorkDir() (*WorkDir, error) {
-	stamp := time.Now().UnixMilli()
-	dir := filepath.Join(os.TempDir(), fmt.Sprintf("gextto-update-%d-%d", os.Getpid(), stamp))
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	dir, err := os.MkdirTemp(os.TempDir(), "gextto-update-")
+	if err != nil {
+		return nil, err
+	}
+	if err := os.Chmod(dir, 0o700); err != nil {
+		updateRemovePath(dir)
 		return nil, err
 	}
 	return &WorkDir{path: dir}, nil

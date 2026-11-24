@@ -136,7 +136,7 @@ func TestUIIsTranslatable(t *testing.T) {
 	// default text is checked as a branch body.
 	valueOnlyBranch := regexp.MustCompile(`(\{\{-?\s*(?:if|else)[^}]*\}\})\{\{[^}]*\}\}(\{\{-?\s*(?:else|end)[^}]*\}\})`)
 	mixed := map[string]string{}
-	templateTrPhrase := regexp.MustCompile("\\b(?:tr|trTitle)\\s+(\"(?:[^\"\\\\]|\\\\.)*\"|`[^`]*`)")
+	templateTrPhrase := regexp.MustCompile("\\b(?:tr|trTitle|ed2kTr|ed2kTitle)\\s+(\"(?:[^\"\\\\]|\\\\.)*\"|`[^`]*`)")
 	// uiText localizes a string at runtime; its argument must be a catalog key
 	// too, otherwise the localized message would stay Italian.
 	// Assignments (data.Empty = "...") and the field helpers that take the
@@ -310,10 +310,11 @@ func TestClientI18nKeysTranslated(t *testing.T) {
 	}
 }
 
-// TestClientScriptKeysAreSent checks every t()/th() literal in the client
-// script is in v2ClientKeys: only those keys reach window.__v2i18n, any other
-// one would silently stay Italian. The lookup trims spaces like
-// v2TranslateText does, so the trimmed key must be in the catalog.
+// TestClientScriptKeysAreSent checks every t()/th()/ed2kLabel() literal in the
+// client script is in v2ClientKeys: only those keys reach window.__v2i18n, any
+// other one would silently stay Italian. ed2kLabel is the backend-aware t(),
+// so its keys must be sent too. The lookup trims spaces like v2TranslateText
+// does, so the trimmed key must be in the catalog.
 func TestClientScriptKeysAreSent(t *testing.T) {
 	raw, err := os.ReadFile("uiweb/v2/static/v2-core.js")
 	if err != nil {
@@ -325,7 +326,7 @@ func TestClientScriptKeysAreSent(t *testing.T) {
 	}
 	keys := i18nCatalogKeys(t)
 	var problems []string
-	for _, m := range regexp.MustCompile(`\bth?\("((?:[^"\\]|\\.)*)"\)`).FindAllStringSubmatch(string(raw), -1) {
+	for _, m := range regexp.MustCompile(`\b(?:th?|ed2kLabel)\("((?:[^"\\]|\\.)*)"\)`).FindAllStringSubmatch(string(raw), -1) {
 		key := m[1]
 		if !sent[key] {
 			problems = append(problems, "not in v2ClientKeys: "+key)

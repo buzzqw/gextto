@@ -63,10 +63,27 @@ func (s *Session) parseInfo(b []byte, version int, layers map[string][]byte) (*m
 	return i, nil
 }
 
+// loadResumeBitfield adopts a correctly sized resume bitfield. A malformed
+// length is not enough to condemn the whole torrent: drop it and let startup
+// verify the data from scratch. A correctly sized bitfield cannot prove that
+// its bytes survived a crash, so it remains trusted under the normal
+// snapshot → sync → persist ordering.
+func (s *Session) loadResumeBitfield(id string, raw []byte, numPieces uint32) *bitfield.Bitfield {
+	if len(raw) == 0 {
+		return nil
+	}
+	bf, err := bitfield.NewBytes(raw, numPieces)
+	if err != nil {
+		s.log.Warningf("ignoring invalid resume bitfield for torrent %s: %s", id, err)
+		return nil
+	}
+	return bf
+}
+
 // loadExistingTorrent rebuilds one torrent from its resume spec: info dict
 // plus piece layers, saved bitfield, storage, trackers, stats and flags. A
-// corrupt leg aborts the torrent but keeps its started flag, so the caller
-// still knows it wanted to run.
+// corrupt leg other than a malformed bitfield aborts the torrent but keeps its
+// started flag, so the caller still knows it wanted to run.
 func (s *Session) loadExistingTorrent(id string) (tt *Torrent, hasStarted bool, err error) {
 	spec, err := s.resumer.Read(id)
 	if err != nil {
@@ -88,13 +105,7 @@ func (s *Session) loadExistingTorrent(id string) (tt *Torrent, hasStarted bool, 
 		// A persisted rename (qBittorrent renameFile/renameFolder) overrides the
 		// storage paths before allocation.
 		info.SetFilePaths(spec.FilePaths)
-		if len(spec.Bitfield) > 0 {
-			bf3, err3 := bitfield.NewBytes(spec.Bitfield, info.NumPieces)
-			if err3 != nil {
-				return nil, spec.Started, err3
-			}
-			bf = bf3
-		}
+		bf = s.loadResumeBitfield(id, spec.Bitfield, info.NumPieces)
 	}
 	sto, err := s.storage.GetStorage(id)
 	if err != nil {
@@ -193,7 +204,7 @@ func (s *Session) CompactDatabase(output string) error {
 		}
 		spec := &boltdbresumer.Spec{
 			InfoHash:          t.torrent.InfoHash(),
-			Port:              t.torrent.port,
+			Port:              t.torrent.getPort(),
 			Name:              t.torrent.name,
 			DisplayName:       t.torrent.renamedName(),
 			Trackers:          t.torrent.rawTrackers,

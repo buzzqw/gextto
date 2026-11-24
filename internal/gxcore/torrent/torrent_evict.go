@@ -122,7 +122,7 @@ func (t *torrent) peerPriority(pe *peer.Peer) peerpriority.Priority {
 	if addr == nil || t.externalIP == nil || !t.externalIP.IsGlobalUnicast() {
 		return 0
 	}
-	return peerpriority.Calculate(&net.TCPAddr{IP: t.externalIP, Port: t.port}, addr)
+	return peerpriority.Calculate(&net.TCPAddr{IP: t.externalIP, Port: t.getPort()}, addr)
 }
 
 // worstPeer returns the peer that should be dropped first, or nil if there is

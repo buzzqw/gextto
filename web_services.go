@@ -20,6 +20,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/buzzqw/gextto/internal/logging"
 	"github.com/buzzqw/gextto/internal/models"
 	"github.com/buzzqw/gextto/internal/utils"
 )
@@ -479,6 +480,10 @@ func serviceScope(unit string) ([]string, string) {
 	return nil, "system"
 }
 
+// servicesProbeResponseLimit bounds diagnostic HTML/XML as well as JSON. It is
+// a variable so the exact limit/limit+1 boundary can be tested cheaply.
+var servicesProbeResponseLimit int64 = maxFeedResponseBytes
+
 func servicesProbe(rawURL string, timeout time.Duration) (int, bool, string) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
@@ -487,6 +492,13 @@ func servicesProbe(rawURL string, timeout time.Duration) (int, bool, string) {
 		return 0, false, ""
 	}
 	defer response.Body.Close()
-	body, _ := io.ReadAll(response.Body)
+	body, readErr := readLimitedBody(io.LimitReader(response.Body, servicesProbeResponseLimit+1), servicesProbeResponseLimit)
+	if readErr != nil {
+		// Keep the legacy three-result signature: an oversized body is not a
+		// healthy service, and its explicit reason is returned in the body slot
+		// for callers which log or display probe details.
+		logging.Warn(fmt.Sprintf("Could not read the service response from %s: %v", utils.RedactURLSecrets(rawURL), readErr))
+		return response.StatusCode, false, readErr.Error()
+	}
 	return response.StatusCode, true, string(body)
 }

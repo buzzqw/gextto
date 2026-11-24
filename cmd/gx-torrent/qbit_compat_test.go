@@ -29,13 +29,16 @@ func TestQbitSonarrDownloadClientFlow(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	d := newTestDaemonFull(t, NetworkOptions{}, store)
-	d.opts.Mode = ModeStandalone
+	// The mode is part of the Options passed to newDaemon: the background loops
+	// started by d.run read opts.Mode for their whole life, so setting it here
+	// (after construction) would race with them.
+	d := newTestDaemonFullMode(t, NetworkOptions{}, store, ModeStandalone)
 	// Set the credentials after newDaemon: it reloads the settings file, which
 	// would otherwise discard the in-memory values.
 	d.opts.Settings.Set(standalonePasswordKey, passwordHash)
 	d.opts.Settings.Set(standaloneBypassKey, "true")
-	// newDaemon creates sessions only in standalone mode, which is set above.
+	// Use a short session lifetime; newDaemon already created sessions because
+	// the standalone mode was set in the Options above.
 	d.sessions = auth.NewSessions(time.Hour)
 	srv := httptest.NewServer(d.routes())
 	defer srv.Close()

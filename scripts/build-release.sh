@@ -60,6 +60,7 @@ if command -v apt-get >/dev/null 2>&1; then
   [[ "$(id -u)" == "0" ]] || SUDO="sudo"
   $SUDO apt-get update -qq
   packages="ca-certificates curl git binutils zip unzip"
+  # shellcheck disable=SC2086  # the package list is an intentional argument list
   $SUDO apt-get install -y -qq --no-install-recommends $packages >/dev/null
 fi
 

@@ -70,6 +70,7 @@ var v2ClientKeys = []string{
 	"↓ Rilascia per aggiornare",
 	"selezionati",
 	"risultati trovati",
+	"1 risultato trovato",
 	"ricerca RSS, indexer e web in corso…",
 	"Impossibile accodare la release",
 	"Impossibile leggere le cartelle",

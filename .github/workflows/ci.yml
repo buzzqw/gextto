@@ -14,8 +14,24 @@ permissions:
   contents: read
 
 jobs:
+  quality:
+    name: quality gates (UI, race)
+    permissions:
+      actions: read
+      contents: read
+    uses: ./.github/workflows/release-gates.yml
+    with:
+      fuzz-time: 30s
+      # The dedicated CodeQL workflow covers pull requests, including forks
+      # whose token cannot upload security events. Releases and continuous
+      # builds run CodeQL and fuzzing here as blocking gates; CI leaves the
+      # fuzz pass to the dedicated path-triggered workflow.
+      codeql: false
+      fuzz: false
+
   build-test:
-    name: vet and test (x86_64)
+    name: build and cross-build (x86_64)
+    needs: quality
     runs-on: ubuntu-24.04
     steps:
       - name: Check out source
@@ -26,21 +42,6 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
-
-      - name: UI settings index
-        run: make check-ui
-
-      - name: Installer self-test
-        run: make installer-test
-
-      - name: Vet
-        run: make vet
-
-      - name: Test
-        run: make test
-
-      - name: Test engine
-        run: make test-engine
 
       - name: Build
         run: scripts/build-daemon.sh
@@ -69,59 +70,6 @@ jobs:
         run: |
           scripts/package-gx-torrent-windows.sh --arch amd64 --output /tmp/gx-torrent-windows-amd64.zip
           scripts/package-gx-torrent-windows.sh --arch arm64 --output /tmp/gx-torrent-windows-arm64.zip
-
-  # The end-to-end UI suite (Playwright) drives the real SSR interface in a
-  # browser: pages, mobile layout, i18n and the axe accessibility checks. Kept
-  # separate from build-test because it needs Node and a browser.
-  ui-e2e:
-    name: UI end2end (Playwright)
-    runs-on: ubuntu-24.04
-    steps:
-      - name: Check out source
-        uses: actions/checkout@v7
-
-      - name: Install Go
-        uses: actions/setup-go@v7
-        with:
-          go-version-file: go.mod
-          cache: true
-
-      - name: Install Node
-        uses: actions/setup-node@v7
-        with:
-          node-version: "22"
-          cache: npm
-          cache-dependency-path: uiweb/end2end/package-lock.json
-
-      - name: Install the end2end dependencies
-        working-directory: uiweb/end2end
-        run: npm ci --no-audit --no-fund
-
-      # The suite drives the Chrome channel, which the ubuntu-24.04 runner
-      # image already ships: using it skips the apt downloads of
-      # `--with-deps`, whose mirrors failed to resolve and turned the job red
-      # with nothing wrong in the code. Without a preinstalled Chrome the
-      # install runs, with retries.
-      - name: Install the browser
-        working-directory: uiweb/end2end
-        run: |
-          if command -v google-chrome >/dev/null 2>&1; then
-            echo "Using the runner's $(google-chrome --version)"
-            exit 0
-          fi
-          for attempt in 1 2 3; do
-            npx playwright install --with-deps chrome && exit 0
-            echo "Browser install failed (attempt $attempt of 3), retrying in 30 seconds"
-            sleep 30
-          done
-          exit 1
-
-      - name: Build the daemon
-        run: scripts/build-daemon.sh
-
-      - name: Run the end2end suite
-        working-directory: uiweb/end2end
-        run: npx playwright test
 
   # The Win32 layer of the daemon (junctions, memory, gateway, storage class)
   # only cross-compiles on Linux; this job runs its tests on real Windows. The
@@ -169,28 +117,6 @@ jobs:
       - name: Service install/start/stop selftest
         shell: pwsh
         run: ./scripts/gx-torrent-service-selftest.ps1 -ExePath ./gx-torrent.exe
-
-  # Phase 0 of the technical review: run the race detector as a separate,
-  # non-blocking job. Its result is collected before it becomes required.
-  race:
-    name: race detector (x86_64, non-blocking)
-    runs-on: ubuntu-24.04
-    continue-on-error: true
-    steps:
-      - name: Check out source
-        uses: actions/checkout@v7
-
-      - name: Install Go
-        uses: actions/setup-go@v7
-        with:
-          go-version-file: go.mod
-          cache: true
-
-      - name: Race test
-        run: make test-race
-
-      - name: Race test (DHT module)
-        run: cd internal/dht && CGO_ENABLED=1 go test -race ./...
 
   # Build the standalone container image and smoke-test it, so the Dockerfile
   # keeps working. Publishing is not done here (release.yml owns releases).

@@ -93,13 +93,23 @@ func backupExcludedPath(dataDir, path string) bool {
 	return backupExcludedRelative(relative)
 }
 
+// backupPrivateDir creates a directory that only its owner can enter. Chmod is
+// deliberate: MkdirAll honours the process umask, and an existing backup/cloud
+// folder may have been created by an older version with wider permissions.
+func backupPrivateDir(path string) error {
+	if err := os.MkdirAll(path, 0o700); err != nil {
+		return err
+	}
+	return os.Chmod(path, 0o700)
+}
+
 // snapshotDatabase produces a consistent copy of a live database with the
 // online backup API. Copying the file while the daemon writes can capture a
 // torn or stale state (commits still only in the -wal); the backup API
 // guarantees a transactionally consistent snapshot.
 func snapshotDatabase(source, destination string) error {
 	if parent := filepath.Dir(destination); parent != "" {
-		if err := os.MkdirAll(parent, 0o755); err != nil {
+		if err := backupPrivateDir(parent); err != nil {
 			return err
 		}
 	}
@@ -112,6 +122,9 @@ func snapshotDatabase(source, destination string) error {
 	// transactionally consistent copy. Non bloccare il daemon: attendi i lock
 	// invece di fallire (OpenSQLite sets a busy timeout).
 	if _, err := src.Exec("VACUUM INTO ?", destination); err != nil {
+		return err
+	}
+	if err := os.Chmod(destination, 0o600); err != nil {
 		return err
 	}
 	// The destination file must be self-contained (no -wal).
@@ -193,7 +206,7 @@ func createSnapshot(dataDir, backupRoot string, retain int, extras []string) (st
 	}
 	defer backupMu.Unlock()
 
-	if err := os.MkdirAll(backupRoot, 0o755); err != nil {
+	if err := backupPrivateDir(backupRoot); err != nil {
 		return "", err
 	}
 	// Readable, chronologically sortable name (server local time). A numeric
@@ -209,7 +222,15 @@ func createSnapshot(dataDir, backupRoot string, retain int, extras []string) (st
 	}
 	// Write to a sibling temporary file on the same filesystem, then rename:
 	// the published archive is always complete or absent, never truncated.
-	tmpZip := destination + ".tmp"
+	// CreateTemp uses 0600 regardless of umask and avoids collisions between
+	// processes; the enclosing backup directory is private as well.
+	tmpFile, err := os.CreateTemp(backupRoot, ".gextto-backup-*.tmp")
+	if err != nil {
+		return "", err
+	}
+	tmpZip := tmpFile.Name()
+	defer func() { _ = os.Remove(tmpZip) }()
+	defer tmpFile.Close()
 
 	// Unique temporary folder so two backups starting together (e.g. a manual
 	// and a scheduled one) do not collide.
@@ -217,7 +238,7 @@ func createSnapshot(dataDir, backupRoot string, retain int, extras []string) (st
 	if info, err := os.Stat(temp); err == nil && info.IsDir() {
 		_ = os.RemoveAll(temp)
 	}
-	if err := os.MkdirAll(temp, 0o755); err != nil {
+	if err := backupPrivateDir(temp); err != nil {
 		return "", err
 	}
 	// Always clean the scratch folder, including on every early return.
@@ -251,8 +272,8 @@ func createSnapshot(dataDir, backupRoot string, retain int, extras []string) (st
 	}
 
 	// 2) Zip the non-DB files plus the consistent DB snapshots.
-	file, err := os.Create(tmpZip)
-	if err != nil {
+	file := tmpFile
+	if err := file.Chmod(0o600); err != nil {
 		return "", err
 	}
 	archive := zip.NewWriter(file)
@@ -294,7 +315,9 @@ func createSnapshot(dataDir, backupRoot string, retain int, extras []string) (st
 		return "", fmt.Errorf("archive verification failed: %w", err)
 	}
 	if err := os.Rename(tmpZip, destination); err != nil {
-		_ = os.Remove(tmpZip)
+		return "", err
+	}
+	if err := os.Chmod(destination, 0o600); err != nil {
 		return "", err
 	}
 
@@ -314,6 +337,11 @@ func createSnapshot(dataDir, backupRoot string, retain int, extras []string) (st
 		}
 		if !info.Mode().IsRegular() || filepath.Ext(entry.Name()) != ".zip" {
 			continue
+		}
+		// Bring archives created by older versions up to the same privacy
+		// level; retention must not leave readable copies behind.
+		if err := os.Chmod(filepath.Join(backupRoot, entry.Name()), 0o600); err != nil {
+			return "", err
 		}
 		backups = append(backups, backupFile{
 			path:    filepath.Join(backupRoot, entry.Name()),
@@ -345,15 +373,18 @@ func createSnapshot(dataDir, backupRoot string, retain int, extras []string) (st
 // folder or a mounted remote), creating the destination if needed. It returns
 // the copy path.
 func CopySnapshot(archive, targetDir string) (string, error) {
-	if err := os.MkdirAll(targetDir, 0o755); err != nil {
-		return "", err
-	}
 	name := filepath.Base(archive)
 	if archive == "" || name == "." || name == ".." || name == string(filepath.Separator) {
 		return "", fmt.Errorf("invalid backup filename")
 	}
+	if err := backupPrivateDir(targetDir); err != nil {
+		return "", err
+	}
 	destination := filepath.Join(targetDir, name)
 	if err := copyFile(archive, destination); err != nil {
+		return "", err
+	}
+	if err := os.Chmod(destination, 0o600); err != nil {
 		return "", err
 	}
 	return destination, nil
@@ -365,29 +396,31 @@ func copyFile(source, destination string) error {
 		return err
 	}
 	defer in.Close()
-	// Write a sibling .partial file and rename it into place: the destination is
-	// always a complete copy or absent, never truncated by an interruption.
-	tmp := destination + ".partial"
-	out, err := os.Create(tmp)
+	// Write a unique sibling .partial file and rename it into place: the
+	// destination is always a complete copy or absent, never truncated by an
+	// interruption. CreateTemp enforces 0600 regardless of the caller's umask.
+	out, err := os.CreateTemp(filepath.Dir(destination), "."+filepath.Base(destination)+".partial-*")
 	if err != nil {
 		return err
 	}
+	tmp := out.Name()
+	defer func() { _ = os.Remove(tmp) }()
 	if _, err := io.Copy(out, in); err != nil {
 		_ = out.Close()
-		_ = os.Remove(tmp)
 		return err
 	}
 	if err := out.Sync(); err != nil {
 		_ = out.Close()
-		_ = os.Remove(tmp)
+		return err
+	}
+	if err := out.Chmod(0o600); err != nil {
+		_ = out.Close()
 		return err
 	}
 	if err := out.Close(); err != nil {
-		_ = os.Remove(tmp)
 		return err
 	}
 	if err := os.Rename(tmp, destination); err != nil {
-		_ = os.Remove(tmp)
 		return err
 	}
 	return nil

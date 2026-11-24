@@ -62,6 +62,13 @@ DRY_RUN=0
 PURGE=0
 ACTION="install"
 WORK_DIR=""
+PAYLOAD_DIR=""
+INSTALL_STAGE=""
+INSTALL_ROLLBACK_DIR=""
+INSTALL_ROLLBACK_ACTIVE=0
+INSTALL_COMMITTED_NAMES=()
+INSTALL_PAYLOAD_NAMES=()
+declare -A INSTALL_MANAGED_SEEN=()
 
 SERVICE_NAME="gextto.service"
 UNIT_PATH="/etc/systemd/system/gextto.service"
@@ -381,9 +388,13 @@ obtain_payload() {
 
   # --no-same-owner: the archive is checksum-verified, but extracting as root
   # must never hand files the numeric owner stored at build time.
-  tar --no-same-owner -xzf "$work/$asset" -C "$work"
-  [[ -x "$work/gexttod" ]] || die "published payload does not contain an executable gexttod"
-  check_payload_runs "$work"
+  mkdir -p "$work/payload"
+  tar --no-same-owner -xzf "$work/$asset" -C "$work/payload"
+  [[ -x "$work/payload/gexttod" ]] || die "published payload does not contain an executable gexttod"
+  [[ -x "$work/payload/gx-torrent" ]] || die "published payload does not contain an executable gx-torrent"
+  [[ -x "$work/payload/run.sh" ]] || die "published payload does not contain an executable run.sh"
+  [[ -s "$work/payload/VERSION" ]] || die "published payload does not contain VERSION"
+  check_payload_runs "$work/payload"
 }
 
 # check_payload_runs starts the downloaded binary once (--version only) before
@@ -469,12 +480,151 @@ resolve_service_identity() {
   fi
 }
 
+install_managed_add() {
+  local name="$1"
+  [[ -n "$name" ]] || return 0
+  if [[ -z "${INSTALL_MANAGED_SEEN[$name]:-}" ]]; then
+    INSTALL_MANAGED_SEEN[$name]=1
+    INSTALL_PAYLOAD_NAMES+=("$name")
+  fi
+}
+
+# stage_install_payload copies the whole extracted release beside the live
+# installation before anything there is moved. The sibling location guarantees
+# every rename stays on one filesystem.
+stage_install_payload() {
+  local work="$1" name path
+  PAYLOAD_DIR="$work/payload"
+  INSTALL_STAGE="$(mktemp -d "$INSTALL_DIR/.gextto-install-stage-XXXXXX")"
+  chmod 0700 "$INSTALL_STAGE"
+  cp -a "$PAYLOAD_DIR/." "$INSTALL_STAGE/"
+  chmod 0700 "$INSTALL_STAGE"
+
+  for name in gexttod gx-torrent run.sh; do
+    [[ -x "$INSTALL_STAGE/$name" ]] || die "published payload does not contain an executable $name"
+    chmod 0755 "$INSTALL_STAGE/$name"
+    install_managed_add "$name"
+  done
+  [[ -s "$INSTALL_STAGE/VERSION" ]] || die "published payload does not contain VERSION"
+  chmod 0644 "$INSTALL_STAGE/VERSION"
+  install_managed_add VERSION
+  for name in install-service.sh uninstall-service.sh; do
+    if [[ -f "$INSTALL_STAGE/$name" ]]; then
+      chmod 0755 "$INSTALL_STAGE/$name"
+      install_managed_add "$name"
+    fi
+  done
+
+  while IFS= read -r -d '' path; do
+    install_managed_add "${path##*/}"
+  done < <(find "$INSTALL_STAGE" -mindepth 1 -maxdepth 1 -print0)
+
+  # Known payload entries absent from this release are removed transactionally,
+  # so an old library or UI tree cannot shadow the new program.
+  for name in ui lib README.md README.it.md LICENSE THIRD-PARTY-NOTICES install-service.sh uninstall-service.sh gextto.service; do
+    install_managed_add "$name"
+  done
+
+  # Keep the previous binaries for the engine supervisor, and include these
+  # copies in the same transaction as the live payload.
+  for name in gexttod gx-torrent; do
+    if [[ -f "$INSTALL_DIR/$name" ]]; then
+      cp -a "$INSTALL_DIR/$name" "$INSTALL_STAGE/$name.prev"
+      chmod 0755 "$INSTALL_STAGE/$name.prev"
+    fi
+    install_managed_add "$name.prev"
+  done
+  if [[ -f "$INSTALL_DIR/VERSION" ]]; then
+    cp -a "$INSTALL_DIR/VERSION" "$INSTALL_STAGE/VERSION.prev"
+    chmod 0644 "$INSTALL_STAGE/VERSION.prev"
+  fi
+  install_managed_add VERSION.prev
+  # gx-ed2k was retired in favour of aMule.
+  install_managed_add gx-ed2k
+  install_managed_add gx-ed2k.prev
+}
+
+# rollback_install_payload restores every live entry touched by this installer.
+# Snapshots are deliberately retained if any restore fails.
+rollback_install_payload() {
+  [[ "$INSTALL_ROLLBACK_ACTIVE" == "1" ]] || return 0
+  local failed=0 index name destination previous
+  for ((index=${#INSTALL_COMMITTED_NAMES[@]}-1; index>=0; index--)); do
+    name="${INSTALL_COMMITTED_NAMES[index]}"
+    destination="$INSTALL_DIR/$name"
+    previous="$INSTALL_ROLLBACK_DIR/$name"
+    if ! rm -rf -- "$destination"; then
+      warn "could not remove the new $name during rollback"
+      failed=1
+      continue
+    fi
+    if [[ -e "$previous" || -L "$previous" ]]; then
+      if ! mv -T -- "$previous" "$destination"; then
+        warn "could not restore $name from $previous"
+        failed=1
+      fi
+    fi
+  done
+  if ! rm -rf -- "$INSTALL_STAGE"; then
+    warn "could not remove the installer staging directory"
+    failed=1
+  fi
+  if [[ "$failed" == "0" ]]; then
+    if ! rm -rf -- "$INSTALL_ROLLBACK_DIR"; then
+      warn "could not remove the installer rollback snapshots"
+      failed=1
+    else
+      INSTALL_ROLLBACK_ACTIVE=0
+    fi
+  fi
+  return "$failed"
+}
+
+finish_install_payload() {
+  [[ "$INSTALL_ROLLBACK_ACTIVE" == "1" ]] || return 0
+  rm -rf -- "$INSTALL_STAGE" "$INSTALL_ROLLBACK_DIR" || warn "could not remove installer transaction leftovers"
+  INSTALL_ROLLBACK_ACTIVE=0
+}
+
+commit_install_payload() {
+  local name destination previous
+  INSTALL_ROLLBACK_DIR="$(mktemp -d "$INSTALL_DIR/.gextto-install-rollback-XXXXXX")"
+  chmod 0700 "$INSTALL_ROLLBACK_DIR"
+  INSTALL_ROLLBACK_ACTIVE=1
+  for name in "${INSTALL_PAYLOAD_NAMES[@]}"; do
+    destination="$INSTALL_DIR/$name"
+    previous="$INSTALL_ROLLBACK_DIR/$name"
+    # Record the entry before moving the old path so a failure halfway through
+    # this entry is rolled back as well.
+    INSTALL_COMMITTED_NAMES+=("$name")
+    if [[ -e "$destination" || -L "$destination" ]]; then
+      if ! mv -T -- "$destination" "$previous"; then
+        warn "could not move the current $name aside"
+        if ! rollback_install_payload; then
+          warn "rollback failed; snapshots remain in $INSTALL_ROLLBACK_DIR"
+          return 2
+        fi
+        return 1
+      fi
+    fi
+    if [[ -e "$INSTALL_STAGE/$name" || -L "$INSTALL_STAGE/$name" ]]; then
+      if ! mv -T -- "$INSTALL_STAGE/$name" "$destination"; then
+        warn "could not install $name"
+        if ! rollback_install_payload; then
+          warn "rollback failed; snapshots remain in $INSTALL_ROLLBACK_DIR"
+          return 2
+        fi
+        return 1
+      fi
+    fi
+  done
+}
+
 install_files() {
-  local work="$1"
+  local work="$1" status
   run install -d -o "$SERVICE_USER" -g "$SERVICE_GROUP" "$DATA_DIR"
-  # Switching service user (e.g. from the isolated "gextto" account to the
-  # local user) must leave the existing data writable: re-own it when the
-  # owner differs, so databases and state keep working after the switch.
+  # Switching service user must leave the existing data writable: re-own it
+  # when the owner differs, so databases and state keep working after the switch.
   if [[ "$DRY_RUN" != "1" && -d "$DATA_DIR" ]]; then
     local data_owner
     data_owner="$(stat -c '%U' "$DATA_DIR" 2>/dev/null || true)"
@@ -483,49 +633,28 @@ install_files() {
       run chown -R "$SERVICE_USER:$SERVICE_GROUP" "$DATA_DIR"
     fi
   fi
-  run install -d "$INSTALL_DIR"
+  run install -d -m 0755 "$INSTALL_DIR"
 
-  # Keep the previous binaries so a failed upgrade can be rolled back: the
-  # engine supervisor restores gx-torrent.prev before switching engines, as
-  # after `gexttod --update`.
-  if [[ "$DRY_RUN" != "1" && -f "$INSTALL_DIR/gexttod" ]]; then
-    cp -a "$INSTALL_DIR/gexttod" "$INSTALL_DIR/gexttod.prev"
-  fi
-  if [[ "$DRY_RUN" != "1" && -f "$INSTALL_DIR/gx-torrent" ]]; then
-    cp -a "$INSTALL_DIR/gx-torrent" "$INSTALL_DIR/gx-torrent.prev"
+  if [[ "$DRY_RUN" == "1" ]]; then
+    log "[dry-run] stage and atomically replace the complete payload in $INSTALL_DIR"
+    run rm -f "$INSTALL_DIR/gx-ed2k" "$INSTALL_DIR/gx-ed2k.prev"
+    return 0
   fi
 
-  run install -m 0755 "$work/gexttod" "$INSTALL_DIR/gexttod"
-  # gx-torrent is the torrent engine: Gextto starts it from here in managed
-  # mode. Its absence makes Gextto report the engine unavailable and run its
-  # fallback chain instead.
-  if [[ -f "$work/gx-torrent" ]]; then
-    run install -m 0755 "$work/gx-torrent" "$INSTALL_DIR/gx-torrent"
+  stage_install_payload "$work"
+  if commit_install_payload; then
+    :
   else
-    warn "gx-torrent is missing from the payload: Gextto will use its fallback engine"
-  fi
-  # gx-ed2k was retired in favour of aMule: drop the binary an older
-  # release installed.
-  run rm -f "$INSTALL_DIR/gx-ed2k" "$INSTALL_DIR/gx-ed2k.prev"
-  [[ -f "$work/run.sh" ]] && run install -m 0755 "$work/run.sh" "$INSTALL_DIR/run.sh"
-  [[ -f "$work/VERSION" ]] && run install -m 0644 "$work/VERSION" "$INSTALL_DIR/VERSION"
-  # Licence and third-party notices of the shipped binaries.
-  [[ -f "$work/LICENSE" ]] && run install -m 0644 "$work/LICENSE" "$INSTALL_DIR/LICENSE"
-  [[ -f "$work/THIRD-PARTY-NOTICES" ]] && run install -m 0644 "$work/THIRD-PARTY-NOTICES" "$INSTALL_DIR/THIRD-PARTY-NOTICES"
-
-  # Replace the bundled libraries cleanly: leftovers from a previous version
-  # must not shadow the new ones.
-  if [[ "$DRY_RUN" != "1" ]]; then
-    rm -rf "${INSTALL_DIR:?}/lib"
-  fi
-  run install -d "$INSTALL_DIR/lib"
-  if [[ -d "$work/lib" ]]; then
-    run cp -a "$work/lib/." "$INSTALL_DIR/lib/"
+    status=$?
+    if [[ "$status" == "2" ]]; then
+      die "payload installation and rollback both failed; snapshots remain in $INSTALL_ROLLBACK_DIR"
+    fi
+    die "payload installation failed; the previous files were restored"
   fi
 
   # Remove the legacy daemon API token from previous installations. Other
   # variables in the file, if an operator added any, are left untouched.
-  if [[ "$DRY_RUN" != "1" && -f /etc/gextto/gextto.env ]]; then
+  if [[ -f /etc/gextto/gextto.env ]]; then
     sed -i '/^GEXTTO_API_TOKEN=/d' /etc/gextto/gextto.env
   fi
 }
@@ -620,69 +749,92 @@ UNIT
   chmod 0644 "$UPDATE_LOG"
 }
 
-# service_health watches the service after a restart. Only an HTTP answer
-# proves the new version works: a simple unit is "active" the moment its
-# process starts, so a version crashing a few seconds later looked fine. Any
-# moment outside "active" (Restart=on-failure turns a crash into
-# "activating") is a crash. Prints healthy, crashed or slow.
+service_health_url() {
+  local host port
+  host="${LISTEN%:*}"
+  port="${LISTEN##*:}"
+  host="${host#[}"
+  host="${host%]}"
+  case "$host" in
+    ""|0.0.0.0|::) host=127.0.0.1 ;;
+  esac
+  if [[ "$host" == *:* ]]; then
+    host="[$host]"
+  fi
+  printf 'http://%s:%s/api/status' "$host" "$port"
+}
+
+# service_health accepts HTTP 200 with Gextto's own status JSON, or 401/403 when
+# access control requires a login even from this probe. A login page, proxy error
+# or any other non-empty HTTP response is not proof that the daemon started.
 service_health() {
-  local waited=0 state code
-  while (( waited < HTTP_TIMEOUT )); do
+  local deadline=$((SECONDS + HTTP_TIMEOUT)) state code body
+  body="$WORK_DIR/gextto-health-body"
+  while (( SECONDS < deadline )); do
     state="$(systemctl is-active "$SERVICE_NAME" 2>/dev/null || true)"
     if [[ "$state" != "active" ]]; then
       echo crashed
       return 0
     fi
-    # Any answer below 500 counts: with the login on, /api/status may be 401.
-    code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 3 "http://127.0.0.1:$PORT/api/status" || true)"
-    if [[ "$code" =~ ^[1-4][0-9][0-9]$ ]]; then
+    code="$(curl -sS -o "$body" -w '%{http_code}' --max-time 3 "$(service_health_url)" 2>/dev/null || true)"
+    if [[ "$code" == "401" || "$code" == "403" ]]; then
+      echo healthy
+      return 0
+    fi
+    if [[ "$code" == "200" && -f "$body" ]] &&
+      grep -Eq '"name"[[:space:]]*:[[:space:]]*"gextto"' "$body" &&
+      grep -Eq '"version"[[:space:]]*:[[:space:]]*"[^"]+"' "$body"; then
       echo healthy
       return 0
     fi
     sleep 2
-    waited=$((waited + 2))
   done
-  echo slow
+  echo unhealthy
 }
 
-# restart_and_verify restarts the service and checks that it answers; when the
-# new binary crashes it rolls back to the previous one.
+# restart_and_verify restarts the service and accepts only the expected status
+# response. A restart error or unhealthy response rolls back the complete
+# payload, then tries the previous service once; every failure is propagated.
 restart_and_verify() {
   run systemctl daemon-reload
   run systemctl enable "$SERVICE_NAME"
   run systemctl enable --now gextto-update.path || warn "could not enable in-app updates (gextto-update.path)"
   if [[ "$NO_START" == "1" ]]; then
+    finish_install_payload
     log "service installed but not started (--no-start)"
     return 0
   fi
-  run systemctl restart "$SERVICE_NAME"
+  if ! run systemctl restart "$SERVICE_NAME"; then
+    [[ "$DRY_RUN" == "1" ]] && return 0
+    warn "could not restart $SERVICE_NAME; rolling back the complete payload"
+    rollback_install_payload || die "rollback failed; snapshots remain in $INSTALL_ROLLBACK_DIR"
+    systemctl daemon-reload || die "rollback restored the files but systemd could not reload them"
+    if ! systemctl restart "$SERVICE_NAME"; then
+      die "the update restart failed and the previous service could not be restarted"
+    fi
+    if [[ "$(service_health)" != "healthy" ]]; then
+      die "the update restart failed and the previous service is not healthy"
+    fi
+    die "the update restart failed; the previous payload was restored and is running"
+  fi
   [[ "$DRY_RUN" == "1" ]] && return 0
 
-  case "$(service_health)" in
-    healthy)
-      log "gextto is running and the web UI answers on port $PORT"
-      return 0
-      ;;
-    slow)
-      # Alive but not answering yet (a long database migration): a rollback
-      # would interrupt it.
-      warn "gextto is running but the web UI did not answer within ${HTTP_TIMEOUT}s; inspect: journalctl -u $SERVICE_NAME -n 100"
-      return 0
-      ;;
-  esac
-
-  if [[ -f "$INSTALL_DIR/gexttod.prev" ]]; then
-    warn "gextto did not start; rolling back to the previous binary"
-    install -m 0755 "$INSTALL_DIR/gexttod.prev" "$INSTALL_DIR/gexttod"
-    systemctl daemon-reload
-    systemctl restart "$SERVICE_NAME" || true
-    if [[ "$(service_health)" == "crashed" ]]; then
-      warn "rollback did not restore a running service"
-    else
-      warn "rollback successful: the previous version is running again"
-    fi
+  if [[ "$(service_health)" == "healthy" ]]; then
+    finish_install_payload
+    log "gextto is running and returned the expected status response"
+    return 0
   fi
-  die "gextto failed to start; inspect: journalctl -u $SERVICE_NAME -n 100"
+
+  warn "gextto did not return the expected status response; rolling back the complete payload"
+  rollback_install_payload || die "rollback failed; snapshots remain in $INSTALL_ROLLBACK_DIR"
+  systemctl daemon-reload || die "rollback restored the files but systemd could not reload them"
+  if ! systemctl restart "$SERVICE_NAME"; then
+    die "the update failed and the previous service could not be restarted"
+  fi
+  if [[ "$(service_health)" != "healthy" ]]; then
+    die "the update failed and the previous service is not healthy"
+  fi
+  die "the update failed; the previous payload was restored and is running"
 }
 
 uninstall() {
@@ -736,6 +888,20 @@ print_summary() {
   esac
 }
 
+cleanup_install() {
+  local status=$?
+  trap - EXIT
+  if [[ "$status" != "0" && "$INSTALL_ROLLBACK_ACTIVE" == "1" ]]; then
+    rollback_install_payload || true
+  fi
+  if [[ "$INSTALL_ROLLBACK_ACTIVE" == "0" && -n "$INSTALL_ROLLBACK_DIR" ]]; then
+    rm -rf -- "$INSTALL_ROLLBACK_DIR"
+  fi
+  [[ -n "$INSTALL_STAGE" ]] && rm -rf -- "$INSTALL_STAGE"
+  [[ -n "$WORK_DIR" ]] && rm -rf -- "$WORK_DIR"
+  exit "$status"
+}
+
 main() {
   parse_args "$@"
   resolve_service_identity
@@ -766,7 +932,7 @@ main() {
   log "build: gx-torrent (pure Go)"
 
   WORK_DIR="$(mktemp -d)"
-  trap 'rm -rf "$WORK_DIR"' EXIT
+  trap cleanup_install EXIT
   obtain_payload "$WORK_DIR"
 
   create_service_user

@@ -6,34 +6,28 @@ on:
       - 'v*'
 
 permissions:
+  actions: read
   contents: write
+  security-events: write
 
 jobs:
-  test:
-    name: test
-    runs-on: ubuntu-24.04
-    steps:
-      - name: Check out source
-        uses: actions/checkout@v7
-
-      - name: Install Go
-        uses: actions/setup-go@v7
-        with:
-          go-version-file: go.mod
-          cache: true
-
-      - name: Test
-        run: make test
-
-      - name: Test engine
-        run: make test-engine
+  quality:
+    name: release quality gates
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    uses: ./.github/workflows/release-gates.yml
+    with:
+      fuzz-time: 30s
+      codeql: true
 
   # Built on Ubuntu 22.04 (glibc 2.35) so the archive runs on every supported
   # distribution. See scripts/build-release.sh. The release is pure Go
   # (gx-torrent engine).
   package:
     name: package (${{ matrix.arch }})
-    needs: test
+    needs: quality
     strategy:
       matrix:
         arch: [x86_64, aarch64]
@@ -48,9 +42,9 @@ jobs:
       run:
         shell: bash
     steps:
-      # The runner's DNS sometimes fails for a few minutes: apt-get update then
-      # only warns and the install finds no package. Retry the pair instead of
-      # turning the build red with nothing wrong in the code.
+      # The runner's DNS sometimes fails for a few minutes: retry the package
+      # installation instead of turning a transient mirror failure into a
+      # broken release build.
       - name: Install git
         run: |
           for attempt in 1 2 3 4 5; do
@@ -94,7 +88,7 @@ jobs:
 
   publish:
     name: publish release
-    needs: package
+    needs: [quality, package]
     runs-on: ubuntu-24.04
     steps:
       - name: Check out source
@@ -108,19 +102,14 @@ jobs:
           path: dist
           merge-multiple: true
 
-      - name: Write release manifest
+      - name: Verify and publish the complete draft
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          scripts/release-manifest.sh --channel stable --label "${GITHUB_REF_NAME}" \
-            --output dist/release.json
-
-      - name: Publish GitHub release
-        uses: softprops/action-gh-release@v3
-        with:
-          files: |
-            dist/gextto-linux-*.tar.gz
-            dist/gextto-linux-*.tar.gz.sha256
-            dist/gx-torrent-linux-*.tar.gz
-            dist/gx-torrent-linux-*.tar.gz.sha256
-            dist/gx-torrent-windows-*.zip
-            dist/gx-torrent-windows-*.zip.sha256
-            dist/release.json
+          scripts/publish-github-release.sh \
+            --channel stable \
+            --tag "$GITHUB_REF_NAME" \
+            --label "$GITHUB_REF_NAME" \
+            --dist dist \
+            --repo "$GITHUB_REPOSITORY" \
+            --commit "$GITHUB_SHA"

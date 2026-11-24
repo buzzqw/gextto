@@ -264,7 +264,7 @@ body{display:flex;flex-direction:column;overflow:hidden}
   .menu-side{display:inline-flex!important}
 }
 @media (max-width:760px){
-  .topbar .search{display:none}.speeds{display:none}.brand small{display:none}
+  .topbar .search{display:flex;flex:1;min-width:0;width:auto}.topbar .search kbd{display:none}.speeds{display:none}.brand small{display:none}
   .tbl.t{min-width:0;table-layout:auto}
   .tbl.t thead{display:none}
   .tbl.t,.tbl.t tbody{display:block}
@@ -1191,7 +1191,7 @@ function updateTable(data){
   applyDataView(true);
   return Promise.resolve();
 }
-var refreshing=false,lastSide='',pointerDown=false;
+var refreshing=false,lastSide='',pointerDown=false,searchRefreshTimer=null;
 document.addEventListener('mousedown',function(){pointerDown=true;});
 document.addEventListener('mouseup',function(){pointerDown=false;});
 window.addEventListener('blur',function(){pointerDown=false;});
@@ -1216,7 +1216,7 @@ function refresh(){
   // Desktop asks for the whole session and virtualises it; the mobile layout
   // keeps the old paged window (300 rows + Show more), because a CSS-grid card
   // cannot use the spacer rows the windowing relies on.
-  var rowsParam=virtualAllowed()?'?rows=all':(state.rows?('?rows='+state.rows):'');
+  var rowsParam=state.q?'?rows=all&q='+encodeURIComponent(state.q):(virtualAllowed()?'?rows=all':(state.rows?('?rows='+state.rows):''));
   // The rows travel as JSON (small, no chrome rebuild); the filters, speeds
   // and status travel as HTML (server-translated). Both derive from the same
   // snapshot, so they never disagree.
@@ -1812,7 +1812,7 @@ document.addEventListener('change',function(e){
   var f=e.target.closest('#drawer form');if(f)f.classList.add('dirty');
 });
 document.addEventListener('input',function(e){
-  if(e.target.id==='filter'){state.q=e.target.value;applyFilters();}
+  if(e.target.id==='filter'){state.q=e.target.value;applyFilters();if(!virtualAllowed()){if(searchRefreshTimer)clearTimeout(searchRefreshTimer);searchRefreshTimer=setTimeout(refresh,150);}}
   if(e.target.id==='log-filter')renderLog();
   if(e.target.id==='add-source')updateAddPreview();
   var f=e.target.closest&&e.target.closest('#drawer form');if(f)f.classList.add('dirty');
@@ -1974,7 +1974,7 @@ document.addEventListener('visibilitychange',function(){if(!document.hidden)refr
 // waiting for the next poll. Piece events are too frequent to refresh on.
 try{var es=new EventSource('/ui/events');es.onmessage=function(m){try{var ev=JSON.parse(m.data);if(ev.type!=='torrent_piece')refresh();}catch(_){}};}catch(_){}
 window.gxShowMore=function(){if(virtualAllowed()){state.rows=0;state.virtual=false;}else{state.rows=(state.rows||300)*2;}refresh();};
-window.gxClearFilters=function(){state.filter={status:'all',cat:null,tag:null,tracker:null};state.q='';var f=$('#filter');if(f)f.value='';store.set('filter',state.filter);applyFilters();};
+window.gxClearFilters=function(){state.filter={status:'all',cat:null,tag:null,tracker:null};state.q='';var f=$('#filter');if(f)f.value='';store.set('filter',state.filter);applyFilters();if(!virtualAllowed())refresh();};
 })();
 </script>
 <a class="donate" href="https://www.paypal.com/cgi-bin/webscr?cmd=_donations&amp;business=azanzani@gmail.com&amp;item_name=Support+gx-torrent+Project" target="_blank" rel="noopener noreferrer" title="{{tr "Support gx-torrent with a PayPal donation"}}" aria-label="{{tr "Support gx-torrent with a PayPal donation"}}"><span class="donate-icon" aria-hidden="true">❤️</span><span class="donate-label">{{tr "Donate"}}</span></a>

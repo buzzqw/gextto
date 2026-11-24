@@ -1,6 +1,7 @@
 package gextto
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -234,6 +235,14 @@ func runWebEngine(ctx context.Context, engine, query string, flaresolverr *strin
 	}
 }
 
+// Web response limits are variables so focused tests can exercise the exact
+// boundary without allocating tens of megabytes. Production uses the shared
+// API/feed limits from httpx.go.
+var (
+	webJSONResponseLimit int64 = maxAPIResponseBytes
+	webHTMLResponseLimit int64 = maxFeedResponseBytes
+)
+
 // fetchJSON performs a GET and decodes a JSON body (numbers preserved).
 func fetchJSON(ctx context.Context, rawURL string) (any, error) {
 	response, err := httpDo(ctx, defaultHTTPClient, http.MethodGet, rawURL, nil, nil, "")
@@ -244,13 +253,7 @@ func fetchJSON(ctx context.Context, rawURL string) (any, error) {
 	if response.StatusCode >= 400 {
 		return nil, fmt.Errorf("HTTP %d", response.StatusCode)
 	}
-	decoder := json.NewDecoder(response.Body)
-	decoder.UseNumber()
-	var value any
-	if err := decoder.Decode(&value); err != nil {
-		return nil, err
-	}
-	return value, nil
+	return decodeLimitedWebJSON(response.Body)
 }
 
 // fetchJSONPost performs a POST with a JSON body and decodes the response.
@@ -263,7 +266,15 @@ func fetchJSONPost(ctx context.Context, rawURL string, payload []byte) (any, err
 	if response.StatusCode >= 400 {
 		return nil, fmt.Errorf("HTTP %d", response.StatusCode)
 	}
-	decoder := json.NewDecoder(response.Body)
+	return decodeLimitedWebJSON(response.Body)
+}
+
+func decodeLimitedWebJSON(body io.Reader) (any, error) {
+	payload, err := readLimitedBody(io.LimitReader(body, webJSONResponseLimit+1), webJSONResponseLimit)
+	if err != nil {
+		return nil, fmt.Errorf("read JSON response: %w", err)
+	}
+	decoder := json.NewDecoder(bytes.NewReader(payload))
 	decoder.UseNumber()
 	var value any
 	if err := decoder.Decode(&value); err != nil {
@@ -474,15 +485,31 @@ func fetchHtmlRaw(ctx context.Context, rawURL string, flaresolverr *string) (str
 	return fetchPage(ctx, rawURL, flaresolverr, true)
 }
 
+func webResponseTooLarge(err error) bool {
+	return err != nil && strings.Contains(err.Error(), "byte limit")
+}
+
 func fetchPage(ctx context.Context, rawURL string, flaresolverr *string, rawBody bool) (string, error) {
 	useFlareSolverr := flaresolverr != nil && strings.TrimSpace(*flaresolverr) != ""
 	flareTried := false
+	fetchFlare := func() (string, error) {
+		body, err := fetchWithFlaresolverrMode(ctx, defaultHTTPClient, *flaresolverr, rawURL, rawBody)
+		if err != nil {
+			return "", err
+		}
+		if int64(len(body)) > webHTMLResponseLimit {
+			return "", fmt.Errorf("HTML response body exceeds the %d byte limit", webHTMLResponseLimit)
+		}
+		return body, nil
+	}
 	if useFlareSolverr && cfDomainNeedsFlareSolverr(rawURL) {
 		_, hasSession := sessionFor(rawURL)
 		if !hasSession {
 			flareTried = true
-			if body, err := fetchWithFlaresolverrMode(ctx, defaultHTTPClient, *flaresolverr, rawURL, rawBody); err == nil {
+			if body, err := fetchFlare(); err == nil {
 				return body, nil
+			} else if webResponseTooLarge(err) {
+				return "", err
 			}
 		}
 	}
@@ -502,22 +529,26 @@ func fetchPage(ctx context.Context, rawURL string, flaresolverr *string, rawBody
 		cancel()
 		if useFlareSolverr && !flareTried {
 			flareTried = true
-			if body, flareErr := fetchWithFlaresolverrMode(ctx, defaultHTTPClient, *flaresolverr, rawURL, rawBody); flareErr == nil {
+			if body, flareErr := fetchFlare(); flareErr == nil {
 				return body, nil
+			} else if webResponseTooLarge(flareErr) {
+				return "", flareErr
 			}
 		}
 		return "", err
 	}
 
 	status := response.StatusCode
-	payload, readErr := io.ReadAll(response.Body)
+	payload, readErr := readLimitedBody(io.LimitReader(response.Body, webHTMLResponseLimit+1), webHTMLResponseLimit)
 	response.Body.Close()
 	cancel()
 	if readErr != nil {
 		if useFlareSolverr && !flareTried {
 			flareTried = true
-			if body, flareErr := fetchWithFlaresolverrMode(ctx, defaultHTTPClient, *flaresolverr, rawURL, rawBody); flareErr == nil {
+			if body, flareErr := fetchFlare(); flareErr == nil {
 				return body, nil
+			} else if webResponseTooLarge(flareErr) {
+				return "", flareErr
 			}
 		}
 		return "", readErr
@@ -538,7 +569,7 @@ func fetchPage(ctx context.Context, rawURL string, flaresolverr *string, rawBody
 		}
 		return "", directErr
 	}
-	return fetchWithFlaresolverrMode(ctx, defaultHTTPClient, *flaresolverr, rawURL, rawBody)
+	return fetchFlare()
 }
 
 func searchTorrentscsv(ctx context.Context, query string) ([]webResult, error) {

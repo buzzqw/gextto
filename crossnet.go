@@ -337,8 +337,20 @@ func crossnetPairs(cfg *Config, db *Database, engine TorrentEngine, downloads []
 }
 
 // crossnetTick is one round of the cooperation, every minute from the event
-// worker.
+// worker. The context-free entry point is kept for callers without a daemon
+// lifecycle; the worker uses crossnetTickContext so its searches are cancelled
+// and awaited on shutdown.
 func crossnetTick(cfg *Config, db *Database, engine TorrentEngine, searcher *Engine, now time.Time) {
+	crossnetTickContext(context.Background(), nil, cfg, db, engine, searcher, now)
+}
+
+func crossnetTickContext(ctx context.Context, state *AppState, cfg *Config, db *Database, engine TorrentEngine, searcher *Engine, now time.Time) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if ctx.Err() != nil {
+		return
+	}
 	if !crossnetEnabled(cfg, engine) {
 		return
 	}
@@ -409,7 +421,7 @@ func crossnetTick(cfg *Config, db *Database, engine TorrentEngine, searcher *Eng
 		crossnetSaveLocked(cfg)
 		crossnet.mu.Unlock()
 	}
-	crossnetFindStuck(cfg, db, engine, searcher, torrents, now)
+	crossnetFindStuckContext(ctx, state, cfg, db, engine, searcher, torrents, now)
 }
 
 func crossnetForget(pair *crossnetPair) {
@@ -588,8 +600,11 @@ func crossnetPaused(view models.TorrentView) bool {
 // and starts a result of exactly the size of the torrent's video file beside
 // it. A torrent the indexer listed with few seeders is searched as soon as it
 // is seen; any other one after crossnetStuckAfter without progress.
-func crossnetFindStuck(cfg *Config, db *Database, engine TorrentEngine, searcher *Engine, torrents map[string]models.TorrentView, now time.Time) {
-	if searcher == nil || !ed2kFallbackEligible(cfg) {
+func crossnetFindStuckContext(ctx context.Context, state *AppState, cfg *Config, db *Database, engine TorrentEngine, searcher *Engine, torrents map[string]models.TorrentView, now time.Time) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if ctx.Err() != nil || searcher == nil || !ed2kFallbackEligible(cfg) {
 		return
 	}
 	paired := map[string]bool{}
@@ -682,20 +697,44 @@ func crossnetFindStuck(cfg *Config, db *Database, engine TorrentEngine, searcher
 	crossnet.searching = true
 	crossnet.searchedAt[candidate] = now
 	crossnet.mu.Unlock()
+
+	// The event worker is already counted, so registering here happens before
+	// bgWG.Wait. Once shutdown begins trackOperation refuses the launch and the
+	// cancelled root makes an in-flight search return promptly.
+	done := func() {}
+	if state != nil {
+		done = state.trackOperation()
+	}
+	if ctx.Err() != nil {
+		done()
+		crossnet.mu.Lock()
+		crossnet.searching = false
+		crossnet.mu.Unlock()
+		return
+	}
 	go func() {
 		defer func() {
+			done()
 			crossnet.mu.Lock()
 			crossnet.searching = false
 			crossnet.mu.Unlock()
 		}()
-		crossnetSearchFor(cfg, db, engine, searcher, candidate, reason)
+		crossnetSearchFor(ctx, cfg, db, engine, searcher, candidate, reason)
 	}()
 }
 
 // crossnetSearchFor searches eD2k for the episode or movie of a torrent and
 // starts the result whose size is exactly that of one of the torrent's files.
-// reason completes the log sentence ("has only 2 seeders").
-func crossnetSearchFor(cfg *Config, db *Database, engine TorrentEngine, searcher *Engine, hash, reason string) {
+// reason completes the log sentence ("has only 2 seeders"). ctx must be the
+// registered daemon root, so shutdown cancels the search instead of leaving a
+// background goroutine using a torn-down engine.
+func crossnetSearchFor(ctx context.Context, cfg *Config, db *Database, engine TorrentEngine, searcher *Engine, hash, reason string) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if ctx.Err() != nil {
+		return
+	}
 	meta, err := db.TorrentMeta(hash)
 	if err != nil || meta == nil {
 		return
@@ -705,10 +744,10 @@ func crossnetSearchFor(cfg *Config, db *Database, engine TorrentEngine, searcher
 		return
 	}
 	files := crossnetFiles(engine, hash)
-	if len(files) == 0 {
+	if len(files) == 0 || ctx.Err() != nil {
 		return
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
 	var results []models.Release
 	switch release.Kind {
@@ -728,6 +767,9 @@ func crossnetSearchFor(cfg *Config, db *Database, engine TorrentEngine, searcher
 		return
 	}
 	for i := range results {
+		if ctx.Err() != nil {
+			return
+		}
 		link, err := ed2k.ParseFileLink(results[i].Ed2kLink)
 		if err != nil {
 			continue
@@ -735,6 +777,9 @@ func crossnetSearchFor(cfg *Config, db *Database, engine TorrentEngine, searcher
 		index := crossnetFileIndex(files, link.Size)
 		if index < 0 {
 			continue
+		}
+		if ctx.Err() != nil {
+			return
 		}
 		added, err := addEd2kRelease(cfg, &results[i])
 		if err != nil {

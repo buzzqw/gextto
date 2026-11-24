@@ -3463,7 +3463,7 @@ func TestTooltipsExplainAndNeverRepeatTheLabel(t *testing.T) {
 	if err != nil {
 		t.Fatalf("glob templates: %v", err)
 	}
-	mute := regexp.MustCompile(`trTitle \.Label`)
+	mute := regexp.MustCompile(`(?:trTitle|ed2kTitle) \.Label`)
 	for _, path := range paths {
 		raw, err := os.ReadFile(path)
 		if err != nil {

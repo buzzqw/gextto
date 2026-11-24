@@ -72,20 +72,33 @@ func TestFindReleaseRootHandlesNestedArchives(t *testing.T) {
 }
 
 func TestUpdateValidateRelease(t *testing.T) {
-	// A payload with only the executable is valid: the web UI is embedded.
-	embedded := t.TempDir()
-	if err := os.WriteFile(filepath.Join(embedded, "gexttod"), []byte("binary"), 0o755); err != nil {
-		t.Fatal(err)
+	// A complete payload carries both executables, the launcher and the marker.
+	complete := t.TempDir()
+	for _, name := range []string{"gexttod", "gx-torrent", "run.sh", "VERSION"} {
+		if err := os.WriteFile(filepath.Join(complete, name), []byte(name), 0o755); err != nil {
+			t.Fatal(err)
+		}
 	}
-	if err := updateValidateRelease(embedded); err != nil {
-		t.Fatalf("binary-only payload rejected: %v", err)
-	}
-
-	// Without the executable it must be rejected.
-	if err := updateValidateRelease(t.TempDir()); err == nil {
-		t.Fatal("payload without the executable was accepted")
+	if err := updateValidateRelease(complete); err != nil {
+		t.Fatalf("complete payload rejected: %v", err)
 	}
 
+	// Every essential component is required: installing only the daemon would
+	// leave an update that cannot launch its default engine or identify itself.
+	for _, missing := range []string{"gexttod", "gx-torrent", "run.sh", "VERSION"} {
+		payload := t.TempDir()
+		for _, name := range []string{"gexttod", "gx-torrent", "run.sh", "VERSION"} {
+			if name == missing {
+				continue
+			}
+			if err := os.WriteFile(filepath.Join(payload, name), []byte(name), 0o755); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if err := updateValidateRelease(payload); err == nil {
+			t.Fatalf("payload without %s was accepted", missing)
+		}
+	}
 }
 
 func TestSha256FileMatchesTheKnownDigest(t *testing.T) {

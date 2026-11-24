@@ -135,8 +135,8 @@
 {{define "v2_live_traffic"}}
 <div id="v2-live-traffic" class="traffic">
   <div class="traffic-legend">
-    <span class="traffic-stat down" {{trTitle "Velocità di download totale: torrent e aMule"}}><span aria-hidden="true">↓</span> {{tr .CurrentDown}}</span>
-    <span class="traffic-stat up" {{trTitle "Velocità di upload totale: torrent e aMule"}}><span aria-hidden="true">↑</span> {{tr .CurrentUp}}</span>
+    <span class="traffic-stat down" {{ed2kTitle "Velocità di download totale: torrent e aMule"}}><span aria-hidden="true">↓</span> {{tr .CurrentDown}}</span>
+    <span class="traffic-stat up" {{ed2kTitle "Velocità di upload totale: torrent e aMule"}}><span aria-hidden="true">↑</span> {{tr .CurrentUp}}</span>
     {{if .HasEd2k}}<span class="muted traffic-breakdown" {{trTitle "Ripartizione della velocità totale"}}><span>{{tr "Torrent"}}</span> ↓ {{.TorrentDown}} ↑ {{.TorrentUp}} <span class="traffic-breakdown-sep" aria-hidden="true">·</span> <span>{{tr "eD2k"}}</span> <span class="traffic-ed2k-figure">↓ {{.CurrentEd2kDown}} ↑ {{.CurrentEd2kUp}}</span></span>{{end}}
     {{if and .HasData (not .Idle)}}<span class="muted traffic-peak"><span class="traffic-peak-figure" {{trTitle "Picco di download nel periodo"}}><span class="traffic-peak-label">{{tr "Picco download"}}</span> {{tr .PeakDown}}</span>
     <span class="traffic-peak-figure" {{trTitle "Picco di upload nel periodo"}}><span class="traffic-peak-label">{{tr "Picco upload"}}</span> {{tr .PeakUp}}</span></span>{{end}}
