@@ -1415,9 +1415,13 @@ audio, language, subtitles and exclusions. They are managed in
 - **Language** and **Subtitles** offer the common choices (`ita`, `eng`,
   `ita,eng`, `any`) but also take other codes (`fre`, `ita,eng,fre`).
   Empty means Gextto's default language.
-- Until you save the list, Gextto generates a profile for each combination
-  already in the library; the first is **Default**. Two profiles cannot share a
-  name. If you had set an old "Stop upgrades at", the resolutions above it are
+- Until you save the list, Gextto offers five standard profiles with names that
+  explain what they do: **Default** (any resolution, improve), **HD** (720p and
+  1080p), **Full HD** (1080p and 2160p), **4K** (2160p only) and **Archive** (any
+  resolution, never replace). It then adds a profile for each library
+  combination they do not already cover, so nothing is lost on migration. Two
+  profiles cannot share a name. If you had set an old "Stop upgrades at", the
+  resolutions above it are
   removed from the accepted qualities when the list is read and the old setting
   disappears: the result is the same, with one rule fewer. Titles already in the
   library are migrated the same way.

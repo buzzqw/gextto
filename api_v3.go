@@ -123,6 +123,28 @@ type v3QueueItem struct {
 // the title's own and never make a profile. It seeds the saved list once
 // (ensureQualityProfiles); afterwards the saved list, with its stable ids, is
 // the only source.
+// standardQualityProfile is one profile offered on a fresh installation. The
+// legacy quality expression is enough to describe it: the list of accepted
+// resolutions is derived from it on save, so the standard set and the saved
+// profiles go through exactly the same normalization.
+type standardQualityProfile struct {
+	Name, Quality string
+	Freeze        bool
+}
+
+// standardQualityProfiles covers the common policies with names that say what
+// they do. A fresh installation gets these first; any library combination they
+// do not cover is still added below, so nothing is lost on migration.
+func standardQualityProfiles() []standardQualityProfile {
+	return []standardQualityProfile{
+		{Name: "Default", Quality: ""},                // any resolution, improve
+		{Name: "HD", Quality: "720p-1080p"},           // up to Full HD
+		{Name: "Full HD", Quality: "1080p+"},          // Full HD and 4K
+		{Name: "4K", Quality: "2160p"},                // 4K only
+		{Name: "Archivio", Quality: "", Freeze: true}, // any resolution, never replace
+	}
+}
+
 func v3Profiles(cfg *Config) []v3QualityProfile {
 	defaultLanguage := ""
 	if cfg != nil {
@@ -167,17 +189,24 @@ func v3Profiles(cfg *Config) []v3QualityProfile {
 			Items:  v3QualityItems(qualities),
 		})
 	}
-	// The named profiles come first, in their saved order; the first one is the
-	// default policy. A saved "Default" wins over the generated one.
+	// With no saved list yet, start from the standard set so a new installation
+	// has profiles with meaningful names. Once a list has been saved, it is the
+	// only source of names and ids, with "Default" first as before.
 	stored := qualityProfilesFromConfig(cfg)
-	hasDefault := false
-	for _, profile := range stored {
-		if strings.EqualFold(profile.Name, "Default") {
-			hasDefault = true
+	if len(stored) == 0 {
+		for _, standard := range standardQualityProfiles() {
+			add(standard.Name, standard.Quality, "", defaultLanguage, "", "", standard.Freeze)
 		}
-	}
-	if !hasDefault {
-		add("Default", "", "", defaultLanguage, "", "", false)
+	} else {
+		hasDefault := false
+		for _, profile := range stored {
+			if strings.EqualFold(profile.Name, "Default") {
+				hasDefault = true
+			}
+		}
+		if !hasDefault {
+			add("Default", "", "", defaultLanguage, "", "", false)
+		}
 	}
 	for _, profile := range stored {
 		add(profile.Name, profile.Quality, profile.Audio, profile.Language, profile.Subtitle,

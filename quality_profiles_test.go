@@ -74,7 +74,7 @@ func TestSeededProfilesKeepAudioAndUpgrades(t *testing.T) {
 	profiles := ensureQualityProfiles(state)
 	found := false
 	for _, profile := range profiles {
-		if profile.Quality == "2160p" {
+		if profile.Quality == "2160p" && profile.Audio == "lossless-5.1" {
 			found = true
 			if profile.Audio != "lossless-5.1" || !profile.DisableUpgrades || profile.Language != "eng" || profile.Upgrades != "deny" {
 				t.Fatalf("seeded profile = %+v", profile)
@@ -83,6 +83,33 @@ func TestSeededProfilesKeepAudioAndUpgrades(t *testing.T) {
 	}
 	if !found {
 		t.Fatalf("no profile was derived from the library: %+v", profiles)
+	}
+}
+
+// A fresh installation starts with profiles whose names explain their policy;
+// any library combination not covered by them is still added afterwards.
+func TestFreshInstallationGetsStandardProfiles(t *testing.T) {
+	state := newTestAppState(t)
+	profiles := ensureQualityProfiles(state)
+	if len(profiles) < len(standardQualityProfiles()) {
+		t.Fatalf("profiles = %+v", profiles)
+	}
+	want := standardQualityProfiles()
+	for index, standard := range want {
+		got := profiles[index]
+		if got.ID != index+1 || got.Name != standard.Name {
+			t.Fatalf("profile %d = %+v, want %s with id %d", index, got, standard.Name, index+1)
+		}
+		if strings.Join(got.Qualities, ",") != strings.Join(qualityListFromLegacy(standard.Quality), ",") {
+			t.Fatalf("%s qualities = %v, want %q", got.Name, got.Qualities, standard.Quality)
+		}
+	}
+	last := profiles[len(want)-1]
+	if last.Name != "Archivio" || !last.DisableUpgrades || last.Upgrade != profileUpgradeFreeze {
+		t.Fatalf("Archivio must freeze upgrades: %+v", last)
+	}
+	if profiles[3].Name != "4K" || strings.Join(profiles[3].Qualities, ",") != "2160p" {
+		t.Fatalf("4K profile = %+v", profiles[3])
 	}
 }
 

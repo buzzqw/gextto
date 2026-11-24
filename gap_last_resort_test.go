@@ -40,6 +40,54 @@ func TestSeriesLastResortAcceptsOnlyAResolutionOutsideTheProfile(t *testing.T) {
 	}
 }
 
+// The last resort bypasses only the resolution filter, now expressed as the
+// explicit accepted list. Language, subtitles, audio and exclusions still hold.
+func TestLastResortUsesTheExplicitAcceptedQualities(t *testing.T) {
+	cfg := DefaultConfig()
+	series := SeriesConfig{Name: "Show", Seasons: "1+", Quality: "720p+",
+		Qualities: []string{"720p", "1080p", "2160p"}, Language: "ita", Enabled: true}
+	italianSD := models.Quality{Resolution: "480p", Language: "ita", Languages: []string{"ita"}}
+	italianHD := models.Quality{Resolution: "720p", Language: "ita", Languages: []string{"ita"}}
+	if cfg.SeriesReleaseAllowed(&series, &italianSD, "Show S01E01 480p") ||
+		!cfg.SeriesLastResortAllowed(&series, &italianSD, "Show S01E01 480p") {
+		t.Fatal("a 480p copy outside the accepted list must be a last resort")
+	}
+	if !cfg.SeriesReleaseAllowed(&series, &italianHD, "Show S01E01 720p") ||
+		cfg.SeriesLastResortAllowed(&series, &italianHD, "Show S01E01 720p") {
+		t.Fatal("a copy inside the accepted list stays a normal candidate")
+	}
+}
+
+// With no copy inside the profile, the only candidate is taken even though
+// its resolution is far below the accepted qualities: the gate sees a missing
+// episode, so there is no archived copy to compare it with.
+func TestLastResortForMissingEpisodeIsApproved(t *testing.T) {
+	db := newTestDB(t)
+	if _, err := db.db.Exec("INSERT INTO series(name) VALUES ('Show')"); err != nil {
+		t.Fatal(err)
+	}
+	cfg := DefaultConfig()
+	series := SeriesConfig{Name: "Show", Seasons: "1+", Quality: "720p+",
+		Qualities: []string{"720p", "1080p", "2160p"}, Language: "ita", Enabled: true}
+	cfg.Series = []SeriesConfig{series}
+	release := testRelease()
+	release.Kind = "series"
+	release.Series, release.Season, release.Episode = stringPtr("Show"), int64Ptr(1), int64Ptr(1)
+	release.Quality = models.Quality{Resolution: "480p", Source: "hdtv", Language: "ita", Languages: []string{"ita"}}
+	release.LastResort = true
+
+	if !releaseAllowedByTitleProfile(&cfg, &release) {
+		t.Fatal("a last resort outside the accepted qualities must pass the title filter")
+	}
+	context := &models.ApprovalContext{
+		Archive: &models.ArchiveQualityIndex{}, Live: &models.LiveDownloads{}, DryRun: true,
+	}
+	approved, reason, err := db.CheckSeriesScored(&release, cfg.ReleaseScore(&release), cfg.UpgradeMinScoreDiff, context)
+	if err != nil || !approved {
+		t.Fatalf("last resort -> approved=%v reason=%q err=%v", approved, reason, err)
+	}
+}
+
 func TestEd2kRowsCarryTheLastResortBadge(t *testing.T) {
 	db := newTestDB(t)
 	now := time.Now().UTC().Format(time.RFC3339)

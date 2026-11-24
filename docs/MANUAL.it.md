@@ -1435,9 +1435,13 @@ upgrade → Profili di qualità*.
 - **Lingua** e **Sottotitoli** propongono le scelte comuni (`ita`, `eng`,
   `ita,eng`, `any`) ma accettano anche altri codici (`fre`,
   `ita,eng,fre`). Vuota vale la lingua predefinita di Gextto.
-- Finché non salvi la lista, Gextto genera da sé un profilo per ogni
-  combinazione già presente in libreria; il primo è **Default**. Due profili non
-  possono avere lo stesso nome. Se avevi impostato un vecchio «Ferma upgrade a»,
+- Finché non salvi la lista, Gextto propone cinque profili standard con nomi
+  che spiegano cosa fanno: **Default** (qualsiasi qualità, migliora), **HD**
+  (720p e 1080p), **Full HD** (1080p e 2160p), **4K** (solo 2160p) e **Archivio**
+  (qualsiasi qualità, non sostituire mai). Aggiunge poi un profilo per ogni
+  combinazione già presente in libreria che non sia già coperta, così nulla va
+  perso. Due profili non possono avere lo stesso nome. Se avevi impostato un
+  vecchio «Ferma upgrade a»,
   alla lettura le risoluzioni superiori vengono tolte dalle qualità accettate e
   la vecchia impostazione sparisce: il risultato è lo stesso, con una regola in
   meno. Lo stesso vale per i titoli già in libreria.
