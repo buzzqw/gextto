@@ -3031,8 +3031,10 @@ func TestV2QualityProfileEditorOffersTheResolutions(t *testing.T) {
 		`title="Con «Migliora» una copia migliore`,
 		`title="Lingua dell&#39;audio richiesta`,
 	} {
-		if !strings.Contains(body, tooltip) {
-			t.Fatalf("the profile editor is missing a tooltip: %s", tooltip)
+		// Once on the label, once on the control: hovering the field must show
+		// the explanation, not the bare label text the JS would put there.
+		if count := strings.Count(body, tooltip); count < 2 {
+			t.Fatalf("tooltip on the field control is missing (%d): %s", count, tooltip)
 		}
 	}
 }
