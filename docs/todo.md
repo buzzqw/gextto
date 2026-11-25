@@ -52,3 +52,32 @@ still be true after the item lands does not belong here.
   expires, and the two log viewers refresh differently. The automatic-refresh badge and the
   masked API keys of the daemon are already in place. Gate: the operator picks which of the
   two remaining indicators to land first.
+- **Automatic cross-seeding**: once a library file is complete, search configured private
+  trackers for the same piece hashes and size, add matching metadata only, verify the local
+  bitfield and seed without downloading the payload again. Gate: an opt-in policy per
+  tracker, respect for its rules, and tests proving that no payload is downloaded or
+  duplicated and that HnR risk is visible before seeding.
+- **Automatic subtitles**: match a movie or episode by hash, duration and filename to a
+  subtitle provider, honour language, forced and hearing-impaired preferences, keep sidecars
+  aligned through upgrades and show a preview before writing them. Gate: provider support,
+  matching tests and a policy for replacing or keeping existing subtitles.
+- **Queue priorities and deadlines**: give new episodes, backfills and upgrades separate
+  priority classes, allow a finish-by time, preempt lower-priority work when a deadline is at
+  risk and protect active streaming. Gate: scheduler tests for preemption, starvation and
+  deadline safety.
+- **Season acquisition strategy**: choose per series between singles, a pack, or waiting for
+  a completion threshold; cap the cost of upgrading a season episode by episode and prefer a
+  full-season replacement when enough episodes would change. Gate: a policy model and
+  coverage tests for partial, complete and in-progress packs.
+- **Source trust and HnR awareness**: keep per-tracker download/upload statistics, show the
+  seeding time or ratio needed to avoid a hit-and-run, and temporarily lower the trust of a
+  release group or source after repeated fake, corrupt or dead-swarm results. Gate:
+  accounting tests, an operator-visible reason and a way to undo every automatic penalty.
+- **Movie editions**: model director's cuts, extended editions and different-language cuts
+  as distinct versions of the same movie instead of forcing them into one upgrade ladder.
+  Gate: metadata and database migration, library naming rules and a decision on whether to
+  keep multiple editions side by side.
+- **List imports and watched-state sync**: import IMDb, Trakt and MDbList lists and use the
+  watched state from Plex or Jellyfin so already-watched items are not acquired again. Gate:
+  the import/OAuth model, a preview of affected titles and an explicit policy for watched
+  and partially watched seasons.
