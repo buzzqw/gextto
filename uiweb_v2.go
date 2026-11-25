@@ -663,6 +663,7 @@ type v2HealthView struct {
 	Feeds         []v2FeedStat
 	DisabledFeeds []v2DisabledFeed
 	FeedSummary   v2FeedSummary
+	Trust         *v2SourceTrustView
 }
 
 type v2DownloadsView struct {
@@ -710,8 +711,11 @@ func v2HealthViewFrom(s *AppState, r *http.Request) v2HealthView {
 	base := uiHealthDataFrom(s)
 	feeds, disabled, summary := v2FeedStatsFrom(s)
 	tab := ""
-	if strings.TrimSpace(r.FormValue("tab")) == "notifiche" {
+	switch strings.TrimSpace(r.FormValue("tab")) {
+	case "notifiche":
 		tab = "notifiche"
+	case "trust":
+		tab = "trust"
 	}
 	view := v2HealthView{
 		uiHealthData:  base,
@@ -726,6 +730,14 @@ func v2HealthViewFrom(s *AppState, r *http.Request) v2HealthView {
 	// The tab also carries the failed count, so a problem is visible without
 	// opening it. Reading the log here costs one query on the Health page.
 	view.Notifications = v2NotificationsViewFrom(s, r)
+	if tab == "trust" {
+		days := 30
+		if parsed, err := strconv.Atoi(strings.TrimSpace(r.FormValue("days"))); err == nil && parsed >= 1 && parsed <= 90 {
+			days = parsed
+		}
+		trust := v2SourceTrustViewFrom(s, days)
+		view.Trust = &trust
+	}
 	return view
 }
 

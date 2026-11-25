@@ -171,6 +171,7 @@ func safeRemoveTorrent(s *AppState, cfg *Config, hash string, requestedDeleteFil
 			logManualTorrentRemoval(hash, files, removalName, removalState, removalHasMetadata)
 		}
 		if s.db != nil {
+			captureTorrentTransferFinal(cfg, s.db, targetTorrent, "removed by the operator", "operator")
 			_ = s.db.MarkTorrentRemoved(hash)
 			_ = s.db.ForgetRemovedTorrent(hash)
 		}

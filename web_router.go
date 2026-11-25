@@ -83,6 +83,7 @@ func Router(s *AppState) *http.ServeMux {
 	handle(s, mux, "GET /api/event-hooks", EventHooksView)
 	handle(s, mux, "POST /api/event-hooks", SaveEventHooks)
 	handle(s, mux, "GET /api/providers/status", ProvidersStatusView)
+	handle(s, mux, "GET /api/source-trust", SourceTrustAPI)
 	handle(s, mux, "GET /api/ed2k/status", Ed2kStatus)
 	handle(s, mux, "GET /api/ed2k/downloads", Ed2kDownloadsAPI)
 	handle(s, mux, "POST /api/ed2k/downloads/{hash}/priority", Ed2kPriorityAPI)

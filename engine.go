@@ -1384,6 +1384,7 @@ func recordFeedAccepted(db *Database, cfg *Config, release *models.Release) {
 	if provider, ok := feedProviderForSource(cfg, release.Source); ok {
 		_ = db.RecordSourceAccepted("feed", provider)
 	}
+	_ = db.RecordSourceTrustAccepted(cfg, release)
 }
 
 // feedLabel is the short human label (host + path + a readable query) shown in

@@ -1902,6 +1902,14 @@ Il badge **DRY-RUN** o **ATTIVO** in alto dice se Gextto scarica davvero.
   cresce indica un disco o un NAS che rifiuta gli spostamenti);
 - **Motore torrent** e, con eD2k attivo, **eD2k e Kad (aMule)**.
 
+La scheda **Affidabilità e HnR** raccoglie i fatti delle sorgenti e dei
+trasferimenti: tentativi, successi, fallimenti, release accettate, download
+completati e snapshot finali con ratio e tempo di seed. Un **possibile HnR**
+compare solo per un torrent privato con policy finita quando la rimozione
+manuale o la pulizia dei completati avviene prima dei target; le statistiche
+mancanti non producono avvisi. È un report in sola lettura: non cambia backoff,
+blocklist, punteggi o code.
+
 ### Il log
 
 **Log** mostra il log in diretta, con filtro, numero di righe e segui/pausa. Le

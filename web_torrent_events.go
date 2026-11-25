@@ -2376,6 +2376,7 @@ func tevApplySeedLimit(cfg *Config, torrents TorrentSession, db *Database, polic
 			logging.Warn("failed to remove torrent at seed limit",
 				"hash", torrent.Hash, "name", torrent.Name, "error", err.Error())
 		} else if removed {
+			captureTorrentTransferFinal(cfg, db, &torrent, "seed limit reached", "policy")
 			_ = db.MarkTorrentRemovedAt(torrent.Hash)
 		}
 	}

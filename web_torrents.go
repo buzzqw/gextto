@@ -1164,6 +1164,7 @@ func RemoveCompletedTorrents(w http.ResponseWriter, r *http.Request, s *AppState
 			continue
 		}
 		if ok {
+			captureTorrentTransferFinal(cfg, s.db, &torrent, "completed torrent cleanup", "cleanup")
 			_ = s.db.MarkTorrentRemoved(torrent.Hash)
 			removed = append(removed, torrent.Hash)
 			removedNames = append(removedNames, label)

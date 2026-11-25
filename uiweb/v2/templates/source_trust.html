@@ -1,0 +1,43 @@
+{{define "v2_source_trust_panel"}}
+<div class="view">
+  <div class="toolbar" aria-label="{{tr "Periodo delle statistiche"}}">
+    {{range .DaysOptions}}<a class="chip{{if eq . $.Days}} active{{end}}" href="/?view=health&amp;tab=trust&amp;days={{.}}">{{tr .}} {{if eq . 1}}{{tr "giorno"}}{{else}}{{tr "giorni"}}{{end}}</a>{{end}}
+  </div>
+  <div class="notice" role="status">{{tr "Queste statistiche sono fattuali e in sola lettura: non cambiano backoff, blocklist, punteggi o code. Un avviso HnR non è un'accusa."}}</div>
+  {{if .Error}}<div class="notice err" role="alert">{{tr .Error}}</div>{{end}}
+  <div class="panel">
+    <div class="panel-head"><h3>{{tr "Sorgenti"}}</h3><small class="muted">{{tr "Tentativi, esiti e trasferimenti nel periodo scelto"}}</small></div>
+    <div class="panel-body">
+      {{if .Sources}}
+      <div class="table-wrap"><table class="data-table">
+        <caption class="sr-only">{{tr "Statistiche delle sorgenti"}}</caption>
+        <thead><tr><th scope="col">{{tr "Sorgente"}}</th><th scope="col">{{tr "Tentativi"}}</th><th scope="col">{{tr "Successi"}}</th><th scope="col">{{tr "Fallimenti"}}</th><th scope="col">{{tr "Risultati"}}</th><th scope="col">{{tr "Accettate"}}</th><th scope="col">{{tr "Completate"}}</th><th scope="col">{{tr "Possibili HnR"}}</th></tr></thead>
+        <tbody>{{range .Sources}}<tr>
+          <td><strong>{{tr .Label}}</strong><br /><small class="muted">{{tr .Kind}}</small>{{if .LastError}}<br /><small class="hl-err" {{trTitle .LastError}}>{{tr .LastError}}</small>{{end}}</td>
+          <td class="numeric">{{tr .Attempts}}</td><td class="numeric">{{tr .Successes}}</td><td class="numeric">{{if .Failures}}<span class="hl-err">{{tr .Failures}}</span>{{else}}0{{end}}</td>
+          <td class="numeric">{{tr .Results}}</td><td class="numeric">{{tr .Accepted}}</td><td class="numeric">{{tr .Completed}}</td><td class="numeric">{{if .HNRWarnings}}<span class="badge warn">{{tr .HNRWarnings}}</span>{{else}}0{{end}}</td>
+        </tr>{{end}}</tbody>
+      </table></div>
+      {{else}}<p class="muted">{{tr "Nessuna osservazione registrata nel periodo scelto."}}</p>{{end}}
+    </div>
+  </div>
+  <div class="panel">
+    <div class="panel-head"><h3>{{tr "Finali di trasferimento e HnR"}}</h3><small class="muted">{{tr "Ultimi 100 snapshot; le statistiche mancanti non generano avvisi"}}</small></div>
+    <div class="panel-body">
+      {{if .Finals}}
+      <div class="table-wrap"><table class="data-table">
+        <caption class="sr-only">{{tr "Finali di trasferimento"}}</caption>
+        <thead><tr><th scope="col">{{tr "Quando"}}</th><th scope="col">{{tr "Titolo"}}</th><th scope="col">{{tr "Sorgente"}}</th><th scope="col">{{tr "Ratio"}}</th><th scope="col">{{tr "Seed"}}</th><th scope="col">{{tr "Stato"}}</th><th scope="col">{{tr "Dettaglio"}}</th></tr></thead>
+        <tbody>{{range .Finals}}<tr>
+          <td class="nowrap">{{tr .FinalizedAt}}</td><td class="truncate" {{trTitle .Title}}>{{tr .Title}}</td><td>{{tr .SourceLabel}}</td>
+          <td class="numeric">{{printf "%.2f" .ShareRatio}}{{if gt .TargetRatio 0.0}} / {{printf "%.2f" .TargetRatio}}{{end}}</td>
+          <td class="numeric">{{tr .SeedingSeconds}}s{{if gt .TargetSeconds 0}} / {{tr .TargetSeconds}}s{{end}}</td>
+          <td>{{if eq .HNRState "possible_shortfall"}}<span class="badge warn">{{tr "Possibile HnR"}}</span>{{else if eq .HNRState "met"}}<span class="badge ok">{{tr "Target raggiunto"}}</span>{{else if eq .HNRState "not_applicable"}}<span class="badge">{{tr "Non applicabile"}}</span>{{else}}<span class="badge">{{tr "Non verificato"}}</span>{{end}}</td>
+          <td class="truncate" {{trTitle .HNRDetail}}>{{tr .HNRDetail}}</td>
+        </tr>{{end}}</tbody>
+      </table></div>
+      {{else}}<p class="muted">{{tr "Nessun finale di trasferimento registrato nel periodo scelto."}}</p>{{end}}
+    </div>
+  </div>
+</div>
+{{end}}

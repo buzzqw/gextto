@@ -47,12 +47,15 @@
 {{define "v2_health"}}
 <div class="view">
   <nav class="toolbar" role="tablist" aria-label="{{tr "Sezioni salute"}}">
-    <a class="chip{{if ne .Tab "notifiche"}} active{{end}}" role="tab" id="v2-health-tab-overview" aria-controls="v2-health-panel" aria-selected="{{if ne .Tab "notifiche"}}true{{else}}false{{end}}" {{if eq .Tab "notifiche"}}tabindex="-1"{{else}}tabindex="0"{{end}} href="/?view=health">{{tr "Panoramica"}}</a>
+    <a class="chip{{if and (ne .Tab "notifiche") (ne .Tab "trust")}} active{{end}}" role="tab" id="v2-health-tab-overview" aria-controls="v2-health-panel" aria-selected="{{if and (ne .Tab "notifiche") (ne .Tab "trust")}}true{{else}}false{{end}}" {{if or (eq .Tab "notifiche") (eq .Tab "trust")}}tabindex="-1"{{else}}tabindex="0"{{end}} href="/?view=health">{{tr "Panoramica"}}</a>
     <a class="chip{{if eq .Tab "notifiche"}} active{{end}}" role="tab" id="v2-health-tab-notifiche" aria-controls="v2-health-panel" aria-selected="{{if eq .Tab "notifiche"}}true{{else}}false{{end}}" {{if eq .Tab "notifiche"}}tabindex="0"{{else}}tabindex="-1"{{end}} href="/?view=health&amp;tab=notifiche" {{trTitle "Gli esiti delle notifiche che Gextto ha cercato di inviare"}}>{{tr "Notifiche"}}{{if .Notifications.Failed}} <span class="badge err" {{trTitle "Invii falliti"}}>{{.Notifications.Failed}}</span>{{end}}</a>
+    <a class="chip{{if eq .Tab "trust"}} active{{end}}" role="tab" id="v2-health-tab-trust" aria-controls="v2-health-panel" aria-selected="{{if eq .Tab "trust"}}true{{else}}false{{end}}" {{if eq .Tab "trust"}}tabindex="0"{{else}}tabindex="-1"{{end}} href="/?view=health&amp;tab=trust" {{trTitle "Statistiche fattuali delle sorgenti e avvisi possibili HnR: nessuna penalità automatica"}}>{{tr "Affidabilità e HnR"}}</a>
   </nav>
-  <div id="v2-health-panel" role="tabpanel" aria-labelledby="{{if eq .Tab "notifiche"}}v2-health-tab-notifiche{{else}}v2-health-tab-overview{{end}}">
+  <div id="v2-health-panel" role="tabpanel" aria-labelledby="{{if eq .Tab "notifiche"}}v2-health-tab-notifiche{{else if eq .Tab "trust"}}v2-health-tab-trust{{else}}v2-health-tab-overview{{end}}">
   {{if eq .Tab "notifiche"}}
     {{with .Notifications}}{{template "v2_notifications_panel" .}}{{end}}
+  {{else if eq .Tab "trust"}}
+    {{with .Trust}}{{template "v2_source_trust_panel" .}}{{end}}
   {{else}}
   <div class="grid-4">
     {{template "v2_health_fast_tiles" .}}

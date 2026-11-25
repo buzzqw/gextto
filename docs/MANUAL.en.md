@@ -1878,6 +1878,13 @@ downloads.
   points to a disk or NAS refusing the moves);
 - **Torrent engine** and, with eD2k on, **eD2k and Kad (aMule)**.
 
+The **Reliability and HnR** tab records source and transfer facts: attempts,
+successes, failures, accepted releases, completed downloads and final snapshots
+with ratio and seeding time. A **possible HnR** appears only for a private
+torrent with a finite policy when manual removal or completed-torrent cleanup
+stops it before its targets; missing statistics never produce a warning. It is
+a read-only report: it does not change backoff, blocklists, scores or queues.
+
 ### The log
 
 **Log** shows the live log, with filter, number of lines and follow/pause. The

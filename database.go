@@ -980,6 +980,11 @@ func (d *Database) migrate() error {
 	if _, err := d.db.Exec(databaseSourceStatsSchema); err != nil {
 		return err
 	}
+	// Factual source-trust counters and final transfer snapshots. These do not
+	// feed backoff, blocklists or acquisition scores.
+	if _, err := d.db.Exec(sourceTrustSchema); err != nil {
+		return err
+	}
 	if _, err := d.db.Exec(databaseStallWatchSchema); err != nil {
 		return err
 	}
@@ -6501,7 +6506,13 @@ func (d *Database) SaveCycle(value *models.CycleStats) error {
 		return err
 	}
 	_, err = d.db.Exec("INSERT INTO cycle_history(at,payload_json) VALUES (?1,?2)", nowSQLite(), string(payload))
-	return err
+	if err != nil {
+		return err
+	}
+	if trustErr := d.RecordSourceTrustCycle(value.Sources); trustErr != nil {
+		logging.Warn("could not update source trust history", "error", trustErr.Error())
+	}
+	return nil
 }
 
 // RecentCycles returns the most recent cycle history entries with an `at`

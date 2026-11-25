@@ -214,6 +214,7 @@ change. `/ui` is not served. For operational checks use
 | POST | `/api/plex/test` | test Plex |
 | GET | `/api/process-metrics` | CPU and memory of the Gextto process |
 | GET | `/api/providers/status` | status of the providers |
+| GET | `/api/source-trust` | factual per-source counters and recent transfer-final/HnR snapshots (?days=1..90); read-only and never changes backoff, blocklists, scores or queues |
 | POST | `/api/providers/status` | clear the provider status |
 | GET | `/api/ramdisk` | RAM disk state |
 | POST | `/api/ramdisk/create` | create the RAM disk |
