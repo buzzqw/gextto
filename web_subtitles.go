@@ -14,7 +14,7 @@ import (
 )
 
 type subtitleSettingsInput struct {
-	Enabled     string `json:"enabled"`
+	Enabled     any    `json:"enabled"`
 	ProviderURL string `json:"provider_url"`
 	APIKey      string `json:"api_key"`
 	Username    string `json:"username"`
@@ -27,7 +27,7 @@ type subtitleSettingsInput struct {
 
 func saveSubtitleSettings(cfg *Config, input subtitleSettingsInput) error {
 	values := map[string]string{
-		subtitleSettingEnabled:     strconv.FormatBool(settingTruthy(input.Enabled)),
+		subtitleSettingEnabled:     strconv.FormatBool(settingTruthy(fmt.Sprint(input.Enabled))),
 		subtitleSettingProviderURL: strings.TrimSpace(input.ProviderURL),
 		subtitleSettingUsername:    strings.TrimSpace(input.Username),
 		subtitleSettingLanguages:   strings.TrimSpace(input.Languages),

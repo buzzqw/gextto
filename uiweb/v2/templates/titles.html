@@ -372,13 +372,14 @@
 
 {{define "v2_form_field"}}
 {{if eq .Kind "hidden"}}<input type="hidden" name="{{.Name}}" value="{{.Value}}" />
-{{else}}<label class="field{{if eq .Kind "area"}} span-full{{end}}" {{if .Hint}} {{trTitle .Hint}}{{end}}>
+{{else}}<label class="field{{if eq .Kind "area"}} span-full{{end}}" {{if .Hint}}{{trTitle .Hint}}{{end}}>
   <input type="hidden" name="_v2_kind_{{.Name}}" value="{{.Kind}}" />
   <span>{{tr .Label}}</span>
-  {{if eq .Kind "select"}}<select class="input" name="{{.Name}}">{{range .Options}}<option value="{{.Value}}"{{if .Selected}} selected{{end}}>{{tr .Label}}</option>{{end}}</select>
+  {{if eq .Kind "select"}}{{$field := .}}<select class="input" name="{{.Name}}">{{range .Options}}<option value="{{.Value}}"{{if or .Selected (eq .Value $field.Value)}} selected{{end}}>{{tr .Label}}</option>{{end}}</select>
   {{else if eq .Kind "area"}}<textarea class="input" name="{{.Name}}" rows="3" placeholder="{{tr .Placeholder}}">{{.Value}}</textarea>
   {{else if eq .Kind "number"}}<input class="input" type="number" name="{{.Name}}" value="{{.Value}}" placeholder="{{tr .Placeholder}}" />
-  {{else if eq .Kind "password"}}<input class="input" type="password" name="{{.Name}}" value="" placeholder="{{tr "non visualizzata"}}" autocomplete="new-password" />
+  {{else if or (eq .Kind "password") (eq .Kind "secret")}}<input class="input" type="password" name="{{.Name}}" value="" placeholder="{{tr "non visualizzata"}}" autocomplete="new-password" />
   {{else}}<input class="input" name="{{.Name}}" value="{{.Value}}" placeholder="{{tr .Placeholder}}" />{{end}}
+  {{if .Hint}}<small class="hint">{{tr .Hint}}</small>{{end}}
 </label>{{end}}
 {{end}}

@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -113,6 +114,41 @@ func TestSubtitleSettingsKeepBlankSecretsAndValidatePair(t *testing.T) {
 	cfg.Settings[subtitleSettingPassword] = ""
 	if err := saveSubtitleSettings(cfg, subtitleSettingsInput{Enabled: "true", ProviderURL: "http://127.0.0.1:1", APIKey: "key", Username: "user", Forced: "any", SDH: "any", Collision: "keep"}); err == nil {
 		t.Fatal("username without password must be rejected")
+	}
+}
+
+func TestV2SubtitleSettingsUseSelectAndVisibleHelp(t *testing.T) {
+	state := newTestAppState(t)
+	if err := SaveSetting(state.cfg.DataDir, "dry_run", "no"); err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(Router(state))
+	defer server.Close()
+	code, page := v2Request(t, server, http.MethodGet, "/?view=integrations", nil)
+	if code != http.StatusOK {
+		t.Fatalf("integrations -> %d", code)
+	}
+	if !strings.Contains(page, `<select class="input" name="enabled">`) {
+		t.Fatalf("enabled is not a select")
+	}
+	if !strings.Contains(page, `Mostra il pulsante di ricerca sulle schede di episodi e film.`) {
+		t.Fatalf("field help is not visible")
+	}
+	code, _ = v2Request(t, server, http.MethodPost, "/section/form", url.Values{
+		"view": {"integrations"}, "path": {"/api/subtitles/settings"},
+		"enabled": {"true"}, "_v2_kind_enabled": {"select"},
+		"provider_url": {"https://api.opensubtitles.com/api/v1"}, "api_key": {"key"},
+		"forced": {"yes"}, "sdh": {"no"}, "collision_policy": {"replace"},
+	})
+	if code != http.StatusNoContent {
+		t.Fatalf("settings form -> %d", code)
+	}
+	if got := latestConfig(state).Settings[subtitleSettingEnabled]; got != "true" {
+		t.Fatalf("enabled = %q, want true", got)
+	}
+	_, page = v2Request(t, server, http.MethodGet, "/?view=integrations", nil)
+	if !strings.Contains(page, `<option value="yes" selected>`) || !strings.Contains(page, `<option value="replace" selected>`) {
+		t.Fatalf("stored select values are not selected")
 	}
 }
 
