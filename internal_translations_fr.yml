@@ -6712,3 +6712,5 @@ fra:
   "Infohash non valido.": "Infohash invalide."
   "Nessun indexer abilitato configurato.": "Aucun indexeur activé n'est configuré."
   "Ricerca cross-seed non riuscita.": "La recherche de cross-seed a échoué."
+  "Priorità download": "Priorité de téléchargement"
+  "Decide solo l'ordine di ricerca e di accodamento: alta parte prima, bassa dopo. Non cambia qualità, filtri o upgrade.": "Détermine uniquement l'ordre de recherche et de mise en file : haute en premier, basse en dernier. Cela ne change ni la qualité, ni les filtres, ni les mises à niveau."

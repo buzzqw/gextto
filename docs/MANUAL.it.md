@@ -2667,6 +2667,11 @@ verifica.
 
 **Coda e slot**
 
+Nella scheda di una serie o di un film, **Priorità download** decide solo l'ordine
+con cui i titoli approvati vengono cercati e accodati: *Alta* passa prima,
+*Normale* è il default, *Bassa* passa dopo. Non cambia qualità, filtri, upgrade né
+la possibilità di usare **Sposta in cima** su un singolo torrent.
+
 | Impostazione | Cosa fa |
 |---|---|
 | Auto-gestione dinamica coda e risorse | Regola automaticamente quanti torrent sono attivi in base al carico. |

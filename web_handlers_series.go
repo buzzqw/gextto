@@ -34,6 +34,8 @@ type SeriesUpdateInput struct {
 	// StatusOverride is «Serie terminata?»: "" or "auto" (the sources
 	// decide), "ended" or "continuing".
 	StatusOverride *string `json:"status_override"`
+	// Priority is the automatic acquisition/queue order: high, normal or low.
+	Priority *string `json:"priority"`
 	// QualityProfileID, when above 0, copies that profile's quality, audio,
 	// language, subtitles and upgrade switch into the series and adds its
 	// exclusions to the series' own (the profile is a template).
@@ -198,6 +200,14 @@ func UpdateSeries(w http.ResponseWriter, r *http.Request, s *AppState) {
 			return
 		}
 		series.StatusOverride = override
+	}
+	if input.Priority != nil {
+		priority, ok := normalizeTitlePriority(*input.Priority)
+		if !ok {
+			jsonError(w, http.StatusBadRequest, "priority must be high, normal or low")
+			return
+		}
+		series.Priority = priority
 	}
 	if input.QualityProfileID != nil && *input.QualityProfileID > 0 {
 		profile, ok := qualityProfileExact(ensureQualityProfiles(s), *input.QualityProfileID)

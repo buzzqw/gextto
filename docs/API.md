@@ -202,7 +202,7 @@ change. `/ui` is not served. For operational checks use
 | GET | `/api/movies/seen/grouped` | seen movies, grouped |
 | DELETE | `/api/movies/{id}` | remove a movie |
 | GET | `/api/movies/{id}` | movie details |
-| POST | `/api/movies/{id}` | update a movie |
+| POST | `/api/movies/{id}` | update a movie; optional priority is high, normal or low and only orders acquisition/queueing |
 | POST | `/api/movies/{id}/metadata` | apply metadata to a movie |
 | POST | `/api/movies/{id}/metadata/search` | search movie metadata |
 | POST | `/api/movies/{id}/redownload` | redownload a movie |
@@ -261,7 +261,7 @@ state.
 | GET | `/api/series/seen` | seen episodes |
 | GET | `/api/series/seen/grouped` | seen episodes, grouped |
 | GET | `/api/series/{name}` | series details |
-| POST | `/api/series/{name}` | update a series (the name field renames it) |
+| POST | `/api/series/{name}` | update a series (the name field renames it); optional priority is high, normal or low and only orders acquisition/queueing |
 | DELETE | `/api/series/{name}` | remove a series |
 | GET | `/api/series/{name}/episodes` | episodes of a series |
 | GET | `/api/series/{name}/info` | metadata from the provider |

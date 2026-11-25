@@ -138,6 +138,7 @@
         <input type="hidden" name="flags" value="1" />
         <label class="field" {{trTitle "Le release degli anime numerano gli episodi dall'inizio senza stagioni («Titolo - 1071»): Gextto converte il numero in stagione ed episodio con i dati TMDB e cerca anche il numero assoluto."}}><span>{{tr "Anime (numerazione assoluta)"}}</span><select class="input" name="anime"><option value="false"{{if not .Anime}} selected{{end}}>{{tr "No"}}</option><option value="true"{{if .Anime}} selected{{end}}>{{tr "Sì"}}</option></select></label>
         <label class="field" {{trTitle "Automatico: decidono TMDB (o TVDB), la data della prossima puntata e TVmaze. Terminata o In corso: la tua scelta vale più delle fonti. È solo un'etichetta: per smettere di cercare la serie mettila in pausa."}}><span>{{tr "Stato della serie"}}</span><select class="input" name="status_override"><option value="auto"{{if eq .StatusOverride ""}} selected{{end}}>{{tr "Automatico (decidono le fonti)"}}</option><option value="ended"{{if eq .StatusOverride "ended"}} selected{{end}}>{{tr "Terminata"}}</option><option value="continuing"{{if eq .StatusOverride "continuing"}} selected{{end}}>{{tr "In corso"}}</option></select></label>
+         <label class="field" {{trTitle "Decide solo l'ordine di ricerca e di accodamento: alta parte prima, bassa dopo. Non cambia qualità, filtri o upgrade."}}><span>{{tr "Priorità download"}}</span><select class="input" name="priority"><option value="high"{{if eq .Priority "high"}} selected{{end}}>{{tr "Alta"}}</option><option value="normal"{{if and (ne .Priority "high") (ne .Priority "low")}} selected{{end}}>{{tr "Normale"}}</option><option value="low"{{if eq .Priority "low"}} selected{{end}}>{{tr "Bassa"}}</option></select></label>
         <div class="form-actions"><button class="btn primary" type="submit">{{tr "Salva serie"}}</button></div>
       </form>
     </div>
@@ -190,6 +191,7 @@
         <input type="hidden" name="path" value="/api/movies/{{.ID}}" />
         <label class="field"><span>{{tr "Nome"}}</span><input class="input" name="name" value="{{.Name}}" /></label>
         <label class="field"><span>{{tr "Anno"}}</span><input class="input" name="year" value="{{.Year}}" /></label>
+         <label class="field" {{trTitle "Decide solo l'ordine di ricerca e di accodamento: alta parte prima, bassa dopo. Non cambia qualità, filtri o upgrade."}}><span>{{tr "Priorità download"}}</span><select class="input" name="priority"><option value="high"{{if eq .Priority "high"}} selected{{end}}>{{tr "Alta"}}</option><option value="normal"{{if and (ne .Priority "high") (ne .Priority "low")}} selected{{end}}>{{tr "Normale"}}</option><option value="low"{{if eq .Priority "low"}} selected{{end}}>{{tr "Bassa"}}</option></select></label>
         {{template "v2_title_profile" .Profiles}}
         <input type="hidden" name="_v2_kind_quality_profile_id" value="number" />
         <input type="hidden" name="quality" value="{{.Quality}}" /><input type="hidden" name="language" value="{{.Language}}" /><input type="hidden" name="subtitle" value="{{.Subtitle}}" />

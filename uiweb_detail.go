@@ -70,6 +70,7 @@ type uiSeriesDetail struct {
 	// StatusOverride is the «Stato della serie» choice: "" (automatic),
 	// "ended" or "continuing".
 	StatusOverride string
+	Priority       string
 	// EndLabel and EndTitle are the badge of the end-of-series verdict
 	// (empty when nothing is known); EndConflict adds the "sources disagree"
 	// badge.
@@ -218,6 +219,7 @@ type uiMovieDetail struct {
 	Exclude          string
 	SubtitleRequired bool
 	DisableUpgrades  bool
+	Priority         string
 	// Aliases are the other titles TMDB knows for the film: they are used to
 	// recognise releases and to search the archive, and the page lists them so
 	// the reader can see with which names the film is followed.
@@ -392,6 +394,7 @@ func uiSeriesDetailFrom(s *AppState, r *http.Request) (uiSeriesDetail, bool) {
 		TvdbURL:         tvdbURL(series.TvdbID, "series"),
 	}
 	detail.StatusOverride = series.StatusOverride
+	detail.Priority = storedTitlePriority(series.Priority)
 	record := SeriesEndRecord{}
 	if records, err := s.db.SeriesEndRecords(); err == nil {
 		record = records[series.Name]
@@ -506,6 +509,7 @@ func uiMovieDetailFrom(s *AppState, r *http.Request) (uiMovieDetail, bool) {
 		Exclude:          movie.Exclude,
 		SubtitleRequired: strings.TrimSpace(movie.SubtitleRequirements) != "",
 		DisableUpgrades:  movie.DisableUpgrades,
+		Priority:         storedTitlePriority(movie.Priority),
 		Aliases:          cleanMovieAliases(movie.Aliases),
 		AliasesChecked:   movie.Aliases != nil,
 		Profiles: v2TitleProfilesFor(s, profileTitleValues{Quality: movie.Quality, Qualities: movie.Qualities,

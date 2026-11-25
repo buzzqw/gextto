@@ -6660,3 +6660,5 @@ pol:
   "Infohash non valido.": "Nieprawidłowy infohash."
   "Nessun indexer abilitato configurato.": "Nie skonfigurowano żadnego włączonego indeksera."
   "Ricerca cross-seed non riuscita.": "Wyszukiwanie cross-seed nie powiodło się."
+  "Priorità download": "Priorytet pobierania"
+  "Decide solo l'ordine di ricerca e di accodamento: alta parte prima, bassa dopo. Non cambia qualità, filtri o upgrade.": "Określa tylko kolejność wyszukiwania i kolejki: wysoki pierwszy, niski ostatni. Nie zmienia jakości, filtrów ani aktualizacji."

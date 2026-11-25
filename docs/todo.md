@@ -63,10 +63,10 @@ still be true after the item lands does not belong here.
   preferences and show a preview before writing sidecars. Local sidecar transfer,
   rename and upgrade alignment are already handled. Gate: provider support,
   matching tests and a policy for replacing or keeping existing subtitles.
-- **Queue priorities and deadlines**: give new episodes, backfills and upgrades separate
-  priority classes, allow a finish-by time, preempt lower-priority work when a deadline is at
-  risk and protect active streaming. Gate: scheduler tests for preemption, starvation and
-  deadline safety.
+- **Queue deadlines and preemption**: per-title high/normal/low priority is
+  available; the remaining work is a finish-by time, preemption of lower-priority
+  work when a deadline is at risk and protection of active streaming. Gate:
+  scheduler tests for preemption, starvation and deadline safety.
 - **Season acquisition strategy**: choose per series between singles, a pack, or waiting for
   a completion threshold; cap the cost of upgrading a season episode by episode and prefer a
   full-season replacement when enough episodes would change. Gate: a policy model and

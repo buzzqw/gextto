@@ -359,6 +359,14 @@ func UpdateMovie(w http.ResponseWriter, r *http.Request, s *AppState) {
 	if input.DisableUpgrades != nil {
 		movie.DisableUpgrades = *input.DisableUpgrades
 	}
+	if input.Priority != nil {
+		priority, ok := normalizeTitlePriority(*input.Priority)
+		if !ok {
+			jsonError(w, http.StatusBadRequest, "priority must be high, normal or low")
+			return
+		}
+		movie.Priority = priority
+	}
 	if input.QualityProfileID != nil && *input.QualityProfileID > 0 {
 		profile, ok := qualityProfileExact(ensureQualityProfiles(s), *input.QualityProfileID)
 		if !ok {

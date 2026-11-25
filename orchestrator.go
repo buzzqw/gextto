@@ -578,6 +578,9 @@ func RunCycleDomain(
 		}
 	}
 	stats.Candidates = len(best)
+	// The quality choice is already made. Priority only decides which approved
+	// title reaches the engine first when slots or the cycle budget are limited.
+	sortReleasesByTitlePriority(cfg, best, gapTargets)
 	logging.Info(fmt.Sprintf("🎯 %s match your titles and filters; choosing what to download", countLabel(int64(len(best)), "release", "releases")))
 	if logging.Enabled(logging.LevelDebug) {
 		for i := range best {
@@ -717,6 +720,7 @@ func collectGapReleases(ctx context.Context, cfg *Config, engine *Engine, db *Da
 				archiveGaps = append(archiveGaps, gaps[i])
 			}
 		}
+		sortSeriesGapsByTitlePriority(cfg, archiveGaps)
 	}
 
 	type seriesSeason struct {
@@ -1276,6 +1280,17 @@ func prioritizeArchiveGapDownloads(
 		}
 		group.gaps = append(group.gaps, gap)
 	}
+	sort.SliceStable(groups, func(i, j int) bool {
+		leftRank := titlePriorityRank(groups[i].series.Priority)
+		rightRank := titlePriorityRank(groups[j].series.Priority)
+		if leftRank != rightRank {
+			return leftRank < rightRank
+		}
+		if groups[i].series.Name != groups[j].series.Name {
+			return groups[i].series.Name < groups[j].series.Name
+		}
+		return groups[i].season < groups[j].season
+	})
 
 	processGap := func(gap SeriesGap, series *SeriesConfig, items []ArchiveListing) {
 		for _, item := range items {
@@ -1365,11 +1380,34 @@ func prioritizeArchiveGapDownloads(
 	logging.Info(fmt.Sprintf("🧩 %s can be downloaded right away from the local release archive",
 		countLabel(int64(len(candidates)), "missing episode", "missing episodes")))
 	started := 0
-	for hash, candidate := range candidates {
+	ordered := make([]*priorityCandidate, 0, len(candidates))
+	for _, candidate := range candidates {
+		ordered = append(ordered, candidate)
+	}
+	sort.SliceStable(ordered, func(i, j int) bool {
+		left, right := ordered[i], ordered[j]
+		leftRank := titlePriorityRank(releaseTitlePriority(cfg, &left.release))
+		rightRank := titlePriorityRank(releaseTitlePriority(cfg, &right.release))
+		if leftRank != rightRank {
+			return leftRank < rightRank
+		}
+		if len(left.gaps) != len(right.gaps) {
+			return len(left.gaps) > len(right.gaps)
+		}
+		if left.score != right.score {
+			return left.score > right.score
+		}
+		if left.release.Title != right.release.Title {
+			return left.release.Title < right.release.Title
+		}
+		return releaseInfoHash(&left.release) < releaseInfoHash(&right.release)
+	})
+	for _, candidate := range ordered {
 		if cycleCancelled(ctx) {
 			return nil
 		}
 		release := candidate.release
+		hash := releaseInfoHash(&release)
 		series := cfg.FindSeriesMatch(*release.Series, release.Season)
 		if series == nil {
 			continue

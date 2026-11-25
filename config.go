@@ -76,6 +76,9 @@ type SeriesConfig struct {
 	// leaves it to the sources (series_end_status.go), "ended" or
 	// "continuing" beats them.
 	StatusOverride string `json:"status_override,omitempty"`
+	// Priority orders automatic acquisition and the download queue for this
+	// title: high, normal (the default) or low.
+	Priority string `json:"priority,omitempty"`
 }
 
 // UpgradesAllowed reports whether a better release may replace an archived
@@ -118,6 +121,9 @@ type MovieConfig struct {
 	// When true, a better release never replaces an archived file for this
 	// movie. Default false (= upgrades allowed).
 	DisableUpgrades bool `json:"disable_upgrades"`
+	// Priority orders automatic acquisition and the download queue for this
+	// movie: high, normal (the default) or low.
+	Priority string `json:"priority,omitempty"`
 }
 
 // UpgradesAllowed reports whether a better release may replace an archived
@@ -3156,6 +3162,7 @@ func (c *Config) loadStoredSeries() error {
 		if err := json.Unmarshal([]byte(value), &series); err == nil {
 			for i := range series {
 				series[i].Audio = normalizeAudioRequirement(audioPreferenceDisplay(series[i].Audio, series[i].AudioChannels))
+				series[i].Priority = storedTitlePriority(series[i].Priority)
 				if series[i].Cutoff != "" {
 					series[i].Qualities = migrateTitleCutoff(series[i].Qualities, series[i].Quality, series[i].Cutoff)
 					series[i].Cutoff = ""
@@ -3250,6 +3257,11 @@ func (c *Config) loadStoredMovies(conn *sql.DB, path string) error {
 	} else {
 		selectColumns = append(selectColumns, "''")
 	}
+	if columns["priority"] {
+		selectColumns = append(selectColumns, "COALESCE(priority,'')")
+	} else {
+		selectColumns = append(selectColumns, "''")
+	}
 	movieQuery := "SELECT " + strings.Join(selectColumns, ",") + " FROM movies_config"
 	// Keep the library presentation stable when a newly added movie is saved:
 	// SQLite otherwise returns rows in insertion/rowid order.
@@ -3276,13 +3288,13 @@ func (c *Config) loadStoredMovies(conn *sql.DB, path string) error {
 				disable                                     int64
 				audio, audioChannels, aliases               string
 				titleTranslations                           string
-				qualitiesRaw, cutoff                        string
+				qualitiesRaw, cutoff, priority              string
 			)
 			if err := rows.Scan(
 				&id, &name, &year, &quality, &language, &enabled, &subtitle, &exclude,
 				&languageReq, &subtitleReq, &tmdbID, &tvdbID, &originalTitle, &overview,
 				&posterPath, &disable, &audio, &audioChannels, &aliases, &titleTranslations,
-				&qualitiesRaw, &cutoff,
+				&qualitiesRaw, &cutoff, &priority,
 			); err != nil {
 				rows.Close()
 				return fmt.Errorf("read the movies of %s: %w", path, err)
@@ -3313,6 +3325,7 @@ func (c *Config) loadStoredMovies(conn *sql.DB, path string) error {
 				Audio:                normalizeAudioRequirement(audioPreferenceDisplay(audio, audioChannels)),
 				AudioChannels:        normalizeAudioChannels(audioChannels),
 				DisableUpgrades:      disable != 0,
+				Priority:             storedTitlePriority(priority),
 			})
 		}
 		// An interrupted read (busy or damaged database) would otherwise
@@ -4000,6 +4013,12 @@ func saveLibrary(dataDir string, series []SeriesConfig, movies []MovieConfig, up
 	if movies == nil {
 		movies = []MovieConfig{}
 	}
+	for i := range series {
+		series[i].Priority = storedTitlePriority(series[i].Priority)
+	}
+	for i := range movies {
+		movies[i].Priority = storedTitlePriority(movies[i].Priority)
+	}
 	conn, err := OpenConfigDBWritable(filepath.Join(dataDir, "gextto_config.db"))
 	if err != nil {
 		return err
@@ -4009,7 +4028,7 @@ func saveLibrary(dataDir string, series []SeriesConfig, movies []MovieConfig, up
 		return err
 	}
 	if updateMovies {
-		if err := sqlExec(conn, "CREATE TABLE IF NOT EXISTS movies_config (id INTEGER PRIMARY KEY, name TEXT NOT NULL, year TEXT DEFAULT '', quality TEXT DEFAULT '', language TEXT DEFAULT '', enabled INTEGER DEFAULT 1, subtitle TEXT DEFAULT '', exclude TEXT DEFAULT '', language_requirements TEXT DEFAULT '', subtitle_requirements TEXT DEFAULT '', tmdb_id TEXT DEFAULT '', tvdb_id TEXT DEFAULT '', original_title TEXT DEFAULT '', overview TEXT DEFAULT '', poster_path TEXT DEFAULT '', disable_upgrades INTEGER NOT NULL DEFAULT 0, audio TEXT NOT NULL DEFAULT '', audio_channels TEXT NOT NULL DEFAULT '', aliases TEXT NOT NULL DEFAULT '', title_translations TEXT NOT NULL DEFAULT '', qualities TEXT NOT NULL DEFAULT '[]', cutoff TEXT NOT NULL DEFAULT '');"); err != nil {
+		if err := sqlExec(conn, "CREATE TABLE IF NOT EXISTS movies_config (id INTEGER PRIMARY KEY, name TEXT NOT NULL, year TEXT DEFAULT '', quality TEXT DEFAULT '', language TEXT DEFAULT '', enabled INTEGER DEFAULT 1, subtitle TEXT DEFAULT '', exclude TEXT DEFAULT '', language_requirements TEXT DEFAULT '', subtitle_requirements TEXT DEFAULT '', tmdb_id TEXT DEFAULT '', tvdb_id TEXT DEFAULT '', original_title TEXT DEFAULT '', overview TEXT DEFAULT '', poster_path TEXT DEFAULT '', disable_upgrades INTEGER NOT NULL DEFAULT 0, audio TEXT NOT NULL DEFAULT '', audio_channels TEXT NOT NULL DEFAULT '', aliases TEXT NOT NULL DEFAULT '', title_translations TEXT NOT NULL DEFAULT '', qualities TEXT NOT NULL DEFAULT '[]', cutoff TEXT NOT NULL DEFAULT '', priority TEXT NOT NULL DEFAULT 'normal');"); err != nil {
 			return err
 		}
 		_ = sqlExec(conn, "ALTER TABLE movies_config ADD COLUMN exclude TEXT NOT NULL DEFAULT ''")
@@ -4028,6 +4047,7 @@ func saveLibrary(dataDir string, series []SeriesConfig, movies []MovieConfig, up
 			"title_translations TEXT NOT NULL DEFAULT ''",
 			"qualities TEXT NOT NULL DEFAULT '[]'",
 			"cutoff TEXT NOT NULL DEFAULT ''",
+			"priority TEXT NOT NULL DEFAULT 'normal'",
 		} {
 			_ = sqlExec(conn, fmt.Sprintf("ALTER TABLE movies_config ADD COLUMN %s", column))
 		}
@@ -4090,22 +4110,22 @@ func saveLibrary(dataDir string, series []SeriesConfig, movies []MovieConfig, up
 			qualities := encodeMovieQualities(movie.Qualities)
 			if id > 0 {
 				if _, err := tx.Exec(
-					"INSERT INTO movies_config(id,name,year,quality,language,enabled,subtitle,exclude,language_requirements,subtitle_requirements,tmdb_id,tvdb_id,original_title,overview,poster_path,disable_upgrades,audio,audio_channels,aliases,title_translations,qualities,cutoff) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22)",
+					"INSERT INTO movies_config(id,name,year,quality,language,enabled,subtitle,exclude,language_requirements,subtitle_requirements,tmdb_id,tvdb_id,original_title,overview,poster_path,disable_upgrades,audio,audio_channels,aliases,title_translations,qualities,cutoff,priority) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23)",
 					id, movie.Name, movie.Year, movie.Quality, movie.Language, boolToInt(movie.Enabled), movie.Subtitle, movie.Exclude,
 					movie.LanguageRequirements, movie.SubtitleRequirements, movie.TmdbID, movie.TvdbID, movie.OriginalTitle,
 					movie.Overview, movie.PosterPath, boolToInt(movie.DisableUpgrades), movie.Audio, movie.AudioChannels, aliases,
-					titleTranslations, qualities, movie.Cutoff,
+					titleTranslations, qualities, movie.Cutoff, movie.Priority,
 				); err != nil {
 					_ = tx.Rollback()
 					return err
 				}
 			} else {
 				if _, err := tx.Exec(
-					"INSERT INTO movies_config(name,year,quality,language,enabled,subtitle,exclude,language_requirements,subtitle_requirements,tmdb_id,tvdb_id,original_title,overview,poster_path,disable_upgrades,audio,audio_channels,aliases,title_translations,qualities,cutoff) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21)",
+					"INSERT INTO movies_config(name,year,quality,language,enabled,subtitle,exclude,language_requirements,subtitle_requirements,tmdb_id,tvdb_id,original_title,overview,poster_path,disable_upgrades,audio,audio_channels,aliases,title_translations,qualities,cutoff,priority) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22)",
 					movie.Name, movie.Year, movie.Quality, movie.Language, boolToInt(movie.Enabled), movie.Subtitle, movie.Exclude,
 					movie.LanguageRequirements, movie.SubtitleRequirements, movie.TmdbID, movie.TvdbID, movie.OriginalTitle,
 					movie.Overview, movie.PosterPath, boolToInt(movie.DisableUpgrades), movie.Audio, movie.AudioChannels, aliases,
-					titleTranslations, qualities, movie.Cutoff,
+					titleTranslations, qualities, movie.Cutoff, movie.Priority,
 				); err != nil {
 					_ = tx.Rollback()
 					return err

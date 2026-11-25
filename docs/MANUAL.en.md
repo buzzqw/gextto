@@ -2629,6 +2629,11 @@ the download stands. Season packs do not go through this check.
 
 **Queue and slots**
 
+In a series or movie detail page, **Download priority** only decides the order
+in which approved titles are searched and queued: *High* goes first, *Normal* is
+the default and *Low* goes last. It does not change quality, filters or upgrades,
+and **Move to top** still overrides the order for one torrent.
+
 | Setting | What it does |
 |---|---|
 | Automatic queue and resource management | Automatically adjusts how many torrents are active based on load. |

@@ -1180,6 +1180,8 @@ type MovieUpdateInput struct {
 	TmdbId               string  `json:"tmdb_id"`
 	TvdbId               string  `json:"tvdb_id"`
 	DisableUpgrades      *bool   `json:"disable_upgrades"`
+	// Priority is the automatic acquisition/queue order: high, normal or low.
+	Priority *string `json:"priority"`
 	// SubtitleRequired is «Sottotitoli obbligatori»: when set it makes the
 	// subtitle language a requirement (true) or only a preference (false),
 	// replacing SubtitleRequirements.

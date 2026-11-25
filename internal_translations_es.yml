@@ -6666,3 +6666,5 @@ spa:
   "Infohash non valido.": "Infohash no válido."
   "Nessun indexer abilitato configurato.": "No hay ningún indexador habilitado configurado."
   "Ricerca cross-seed non riuscita.": "La búsqueda de cross-seed falló."
+  "Priorità download": "Prioridad de descarga"
+  "Decide solo l'ordine di ricerca e di accodamento: alta parte prima, bassa dopo. Non cambia qualità, filtri o upgrade.": "Solo decide el orden de búsqueda y de cola: alta primero, baja al final. No cambia calidad, filtros ni actualizaciones."
