@@ -138,7 +138,15 @@ if gh api "$ref" --jq '.object.sha' >/dev/null 2>&1; then
 else
   retry "creation of tag $TAG" gh api -X POST "repos/$REPO/git/refs" -f ref="refs/tags/$TAG" -f sha="$COMMIT" >/dev/null
 fi
-actual_commit="$(gh api "$ref" --jq '.object.sha')"
+actual_commit=""
+# The Git ref API can acknowledge a PATCH and still serve the previous object
+# for a moment. Retry the comparison: a single stale read used to leave a fully
+# verified continuous release in draft and fail the workflow.
+for attempt in 1 2 3 4 5; do
+  actual_commit="$(gh api "$ref" --jq '.object.sha' 2>/dev/null || true)"
+  [[ "$actual_commit" == "$COMMIT" ]] && break
+  sleep "$attempt"
+done
 [[ "$actual_commit" == "$COMMIT" ]] || { echo "tag $TAG points at $actual_commit, expected $COMMIT" >&2; exit 1; }
 
 edit=(gh release edit "$TAG" --repo "$REPO" --draft=false --title "$TITLE" --notes "$NOTES")
