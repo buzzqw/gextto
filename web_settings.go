@@ -429,6 +429,7 @@ func LibraryView(w http.ResponseWriter, r *http.Request, s *AppState) {
 		verdict := seriesEndVerdict(series.StatusOverride, records[series.Name], provider, now)
 		seriesItems = append(seriesItems, map[string]any{
 			"name":                series.Name,
+			"year":                series.Year,
 			"seasons":             series.Seasons,
 			"quality":             series.Quality,
 			"language":            series.Language,
@@ -436,6 +437,10 @@ func LibraryView(w http.ResponseWriter, r *http.Request, s *AppState) {
 			"enabled":             series.Enabled,
 			"aliases":             series.Aliases,
 			"tmdb_id":             series.TmdbID,
+			"tvdb_id":             series.TvdbID,
+			"external_ids":        series.ExternalIDs,
+			"priority":            series.Priority,
+			"season_strategy":     series.SeasonStrategy,
 			"subtitle":            series.Subtitle,
 			"exclude":             series.Exclude,
 			"ignored_seasons":     ignoredSeasons,

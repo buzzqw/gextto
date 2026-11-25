@@ -475,31 +475,30 @@ func SimklAuthPoll(w http.ResponseWriter, r *http.Request, s *AppState) {
 	jsonResponse(w, map[string]any{"ok": true, "authenticated": true})
 }
 
-// SimklWatchlistImport handles POST /api/simkl/watchlist/import.
+// SimklWatchlistImport keeps the old one-shot endpoint for compatibility, but
+// routes it through the same transactional, idempotent importer as the preview.
 func SimklWatchlistImport(w http.ResponseWriter, r *http.Request, s *AppState) {
-	live := latestConfig(s)
-	cfg := *live
-	cfg.Series = append([]SeriesConfig(nil), live.Series...)
-	cfg.Movies = append([]MovieConfig(nil), live.Movies...)
-
-	client := (&SimklClient{}).FromSettings(cfg.Settings)
-	value, err := client.Watchlist(r.Context())
-	if err != nil {
-		jsonError(w, http.StatusBadGateway, err.Error())
+	if s.dryRun() {
+		jsonError(w, http.StatusConflict, "dry-run does not modify the library")
 		return
 	}
-	entries := [][3]string{}
-	collectWatchlist(value, &entries)
-	report := applyWatchlistImport(&cfg, entries)
-	if err := SaveLibrary(s.cfg.DataDir, cfg.Series, cfg.Movies); err != nil {
+	cfg := latestConfig(s)
+	items, err := simklListImportItems(r, cfg)
+	if err != nil {
+		status := http.StatusBadGateway
+		if err == errSimklNotConfigured {
+			status = http.StatusConflict
+		}
+		jsonError(w, status, err.Error())
+		return
+	}
+	report, err := ApplyListImport(cfg, items, ListImportOptions{})
+	if err != nil {
 		jsonError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 	jsonResponse(w, map[string]any{
-		"ok":     true,
-		"source": "simkl",
-		"found":  len(entries),
-		"report": report,
+		"ok": true, "source": "simkl", "found": len(items), "report": report,
 	})
 }
 

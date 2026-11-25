@@ -111,6 +111,10 @@ change. `/ui` is not served. For operational checks use
 | GET | `/api/v3/queue` | v3 queue (the torrent session) |
 | GET | `/api/import/preview` | manual import: the video files of a path with their match and destination (?path=) |
 | POST | `/api/import` | manual import: rename, move and register one file |
+| GET | `/api/list-import/preview` | read-only Simkl list preview with duplicate status, external ids, quality profiles and archive choices (?source=simkl) |
+| POST | `/api/list-import/apply` | transactionally import selected list items; body carries source, items and options (quality_profile_id, series_root, season_subfolders, dry_run) |
+| POST | `/list-import/preview` | SSR/HTMX fragment for the Simkl list preview |
+| POST | `/list-import/apply` | SSR/HTMX fragment that applies the selected preview rows |
 | POST | `/series/gaps/search` | Series → Missing tab: start the background search of every missing episode of one series (form field series) |
 | GET | `/series/gaps/search/status` | Series → Missing tab: progress or result of that search (form field job) |
 | POST | `/series/gaps/search/cancel` | Series → Missing tab: cancel that search (form field job) |

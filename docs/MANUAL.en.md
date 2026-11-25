@@ -3132,8 +3132,13 @@ browser handlers) — with the group title stuck to the top while you scroll.
 | Mark as watched | Marks downloaded episodes as watched on Simkl. |
 | Start access / Confirm | Starts the PIN flow and confirms the code shown by Simkl. |
 | Revoke | Revokes access and removes the stored token. |
-| Import watchlist | Imports the series from the Simkl watchlist into the library. |
+| Import watchlist | Opens the selective Simkl watchlist preview: it shows new titles, duplicates and external ids before changing the library. |
 | Watchlist / Calendar | Read-only tables with the watchlist and the upcoming releases. |
+
+The preview writes nothing. You can select only new titles, apply a quality
+profile and a series root folder, enable season folders, or run a dry-run
+simulation. Duplicates are never replaced; only missing external ids are filled.
+Movies keep using the global archive folder.
 
 ### Jellyfin
 

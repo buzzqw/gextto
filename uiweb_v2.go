@@ -909,6 +909,8 @@ func v2Content(s *AppState, r *http.Request, view string) (string, any) {
 		return "v2_settings", settings
 	case "health":
 		return "v2_health", v2HealthViewFrom(s, r)
+	case "list-import":
+		return "v2_list_import", v2ListImportPageFrom(s)
 	case "notifications":
 		// Old links and bookmarks still work: the log is now a tab of Salute.
 		view := v2HealthViewFrom(s, r)

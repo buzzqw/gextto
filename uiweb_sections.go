@@ -492,8 +492,8 @@ func uiIntegrationSections(s *AppState, cfg *Config) []uiPageSection {
 			Children: []uiPageSection{
 				sectionOAuth(uiOAuthSection{Name: "Accesso", StartPath: "/api/simkl/auth/start", PollPath: "/api/simkl/auth/poll", Buttons: []uiActionButton{
 					{Label: "Revoca", Class: "danger", Method: "POST", Path: "/api/simkl/auth/revoke", Body: "{}", Hint: "Revoca l'accesso e rimuove il token salvato."},
-					{Label: "Importa watchlist", Method: "POST", Path: "/api/simkl/watchlist/import", Body: "{}", Hint: "Importa le serie della watchlist Simkl nella libreria."},
 				}}),
+				sectionLinks(uiLinksSection{Title: "Importa lista", Hint: "Controlla i duplicati e scegli i titoli prima di modificare la libreria.", Links: []uiLinkItem{{Label: "Anteprima importa watchlist", Href: "/?view=list-import", Hint: "Apre l'anteprima selettiva della watchlist Simkl."}}}),
 				sectionForm(uiFormSection{
 					Title: "Impostazioni", Hint: "Usa il PIN dell'app Simkl per collegare l'account.", Path: "/api/simkl/settings", Submit: "Salva Simkl",
 					Fields: []uiFormField{

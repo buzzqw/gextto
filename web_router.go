@@ -35,6 +35,8 @@ func Router(s *AppState) *http.ServeMux {
 	handle(s, mux, "POST /api/quality-profiles", SaveQualityProfiles)
 	handle(s, mux, "GET /api/import/preview", ManualImportPreviewAPI)
 	handle(s, mux, "POST /api/import", ManualImportAPI)
+	handle(s, mux, "GET /api/list-import/preview", ListImportPreview)
+	handle(s, mux, "POST /api/list-import/apply", ListImportApply)
 	handle(s, mux, "GET /import/preview", V2ImportPreview)
 	handle(s, mux, "POST /import/apply", V2ImportApply)
 	handle(s, mux, "POST /series/gaps/search", V2SeriesGapsSearch)
@@ -43,6 +45,8 @@ func Router(s *AppState) *http.ServeMux {
 	handle(s, mux, "POST /series/gaps/download-best", V2SeriesGapsDownloadBest)
 	handle(s, mux, "GET /library/bulk/profile", V2LibraryBulkProfile)
 	handle(s, mux, "POST /library/bulk", V2LibraryBulkApply)
+	handle(s, mux, "POST /list-import/preview", V2ListImportPreview)
+	handle(s, mux, "POST /list-import/apply", V2ListImportApply)
 	handle(s, mux, "POST /library/cross-seed", V2CrossSeedDiscover)
 	handle(s, mux, "POST /api/library/cross-seed/discover", CrossSeedDiscover)
 	// The Sonarr/Radarr v3 subset a request manager (Jellyseerr) speaks.

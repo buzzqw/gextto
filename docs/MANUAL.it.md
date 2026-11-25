@@ -3170,8 +3170,14 @@ gruppo agganciato in alto mentre scorri.
 | Segna come visto | Segna come visti su Simkl gli episodi scaricati. |
 | Avvia accesso / Conferma | Avvia il flusso PIN e conferma il codice mostrato da Simkl. |
 | Revoca | Revoca l'accesso e rimuove il token salvato. |
-| Importa watchlist | Importa le serie della watchlist Simkl nella libreria. |
+| Importa watchlist | Apre l'anteprima selettiva della watchlist Simkl: mostra nuovi, duplicati e ID esterni prima di modificare la libreria. |
 | Watchlist / Calendario | Tabelle di sola lettura con la watchlist e le prossime uscite. |
+
+L'anteprima non scrive nulla. Puoi scegliere solo i titoli nuovi, applicare un
+profilo di qualità e una cartella radice per le serie, attivare le cartelle per
+stagione oppure eseguire una simulazione dry-run. I duplicati non vengono
+sostituiti; vengono riempiti solo gli ID esterni mancanti. I film continuano a
+usare la cartella archivio globale.
 
 ### Jellyfin
 

@@ -80,7 +80,8 @@ still be true after the item lands does not belong here.
   as distinct versions of the same movie instead of forcing them into one upgrade ladder.
   Gate: metadata and database migration, library naming rules and a decision on whether to
   keep multiple editions side by side.
-- **List imports and watched-state sync**: import IMDb, Trakt and MDbList lists and use the
-  watched state from Plex or Jellyfin so already-watched items are not acquired again. Gate:
-  the import/OAuth model, a preview of affected titles and an explicit policy for watched
-  and partially watched seasons.
+- **Additional list providers and watched-state sync**: Simkl now has a
+  transactional selectable preview with external-id/title-year matching; IMDb,
+  Trakt and MDbList imports plus Plex/Jellyfin watched-state suppression remain
+  open. Gate: the provider/OAuth model and an explicit policy for watched and
+  partially watched seasons.

@@ -1,0 +1,57 @@
+{{define "v2_list_import"}}
+<div class="view">
+  <div class="toolbar"><a class="btn sm" href="/?view=integrations">{{tr "← Integrazioni"}}</a></div>
+  <div class="panel">
+    <div class="panel-head"><h3>{{tr "Importa una lista"}}</h3></div>
+    <div class="panel-body">
+      <p>{{tr "L'anteprima legge la watchlist Simkl e mostra cosa manca in libreria. Non aggiunge nulla finché non scegli i titoli e confermi."}}</p>
+      <form hx-post="/list-import/preview" hx-target="#v2-list-import-panel" hx-swap="innerHTML" hx-disabled-elt="find button">
+        <button class="btn primary" type="submit">{{tr "Carica anteprima"}}</button>
+      </form>
+    </div>
+  </div>
+  <div id="v2-list-import-panel">{{template "v2_list_import_panel" .}}</div>
+</div>
+{{end}}
+
+{{define "v2_list_import_panel"}}
+{{if .Error}}<div class="notice err" role="alert">{{tr .Message}}</div>{{end}}
+{{if .Report}}
+<div class="notice ok" role="status">{{tr .Message}}</div>
+<div class="toolbar"><form hx-post="/list-import/preview" hx-target="#v2-list-import-panel" hx-swap="innerHTML"><button class="btn sm" type="submit">{{tr "Nuova anteprima"}}</button></form></div>
+{{else if .Scanned}}
+<form hx-post="/list-import/apply" hx-target="#v2-list-import-panel" hx-swap="innerHTML">
+  <input type="hidden" name="items" value="{{.ItemsJSON}}" />
+  <div class="panel">
+    <div class="panel-head"><h3>{{tr "Titoli trovati"}}</h3><small class="muted">{{tr "Solo i nuovi sono selezionati; i duplicati restano invariati"}}</small></div>
+    <div class="panel-body">
+      {{if .Items}}
+      <div class="table-wrap"><table class="data-table">
+        <caption class="sr-only">{{tr "Anteprima import lista"}}</caption>
+        <thead><tr><th scope="col">{{tr "Importa"}}</th><th scope="col">{{tr "Tipo"}}</th><th scope="col">{{tr "Titolo"}}</th><th scope="col">{{tr "Anno"}}</th><th scope="col">{{tr "ID esterni"}}</th><th scope="col">{{tr "Stato"}}</th></tr></thead>
+        <tbody>{{range $index, $item := .Items}}<tr>
+          <td><input type="checkbox" name="accept__{{$index}}" value="1" data-v2-check-member {{if eq $item.Status "new"}}checked{{else}}disabled{{end}} aria-label="{{tr "Importa %s" $item.Title}}" /></td>
+          <td>{{if eq $item.Kind "series"}}{{tr "Serie"}}{{else}}{{tr "Film"}}{{end}}</td>
+          <td class="truncate" {{trTitle $item.Title}}>{{tr $item.Title}}</td>
+          <td>{{tr $item.Year}}</td>
+          <td>{{range $provider, $id := $item.ExternalIDs}}<code>{{tr $provider}}={{tr $id}}</code> {{end}}</td>
+          <td>{{if eq $item.Status "new"}}<span class="badge ok">{{tr "Nuovo"}}</span>{{else if eq $item.Status "duplicate_id"}}<span class="badge">{{tr "Già presente (ID)"}}</span>{{else if eq $item.Status "duplicate_title_year"}}<span class="badge">{{tr "Già presente"}}</span>{{else if eq $item.Status "duplicate_title"}}<span class="badge">{{tr "Già presente"}}</span>{{else}}<span class="badge warn">{{tr "Da verificare"}}</span>{{end}}{{if $item.MatchedName}}<br /><small class="muted">{{tr $item.MatchedName}}</small>{{end}}</td>
+        </tr>{{end}}</tbody>
+      </table></div>
+      {{else}}<p class="muted">{{tr "Nessun titolo trovato nella lista."}}</p>{{end}}
+    </div>
+  </div>
+  <div class="panel">
+    <div class="panel-head"><h3>{{tr "Impostazioni per i nuovi titoli"}}</h3></div>
+    <div class="panel-body form-grid">
+      <label class="field"><span>{{tr "Profilo di qualità"}}</span><select class="input" name="quality_profile_id"><option value="0">{{tr "Valori predefiniti"}}</option>{{range .Profiles}}<option value="{{.ID}}">{{tr .Name}} — {{tr .Summary}}</option>{{end}}</select></label>
+      <label class="field"><span>{{tr "Cartella radice delle serie"}}</span><input class="input" name="series_root" value="{{.SeriesRoot}}" placeholder="{{tr "Vuoto: percorso automatico"}}" /></label>
+      <label class="field"><span>{{tr "Cartelle per stagione"}}</span><select class="input" name="season_subfolders"><option value="false">{{tr "No"}}</option><option value="true">{{tr "Sì"}}</option></select></label>
+      <label class="field"><span>{{tr "Simula senza scrivere"}}</span><select class="input" name="dry_run"><option value="false">{{tr "No"}}</option><option value="true"{{if .DryRun}} selected{{end}}>{{tr "Sì"}}</option></select></label>
+      <p class="hint span-full">{{tr "I film continuano a usare la cartella archivio globale. L'anteprima non crea cartelle e non avvia download."}}</p>
+      <div class="form-actions span-full"><button class="btn primary" type="submit" {{if not .Items}}disabled{{end}}>{{tr "Importa selezionati"}}</button></div>
+    </div>
+  </div>
+</form>
+{{end}}
+{{end}}
