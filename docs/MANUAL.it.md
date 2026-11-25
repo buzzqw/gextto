@@ -1727,11 +1727,17 @@ Gextto non cancella mai file sorgente da solo.
 ### Sottotitoli esterni
 
 In *Integrazioni → Sottotitoli* puoi configurare un provider OpenSubtitles-
-compatibile con API key; account e password sono facoltativi. La lingua può
-essere lasciata vuota per usare quella del titolo, mentre forced e SDH hanno
-filtri separati. **Test connessione** verifica API key e accesso al provider
-con i valori scritti nel modulo, senza salvarli: la ricerca di prova non
-scarica sottotitoli.
+compatibile con API key; account e password sono facoltativi, e forced e SDH
+hanno filtri separati. **Test connessione** verifica API key e accesso al
+provider con i valori scritti nel modulo, senza salvarli: la ricerca di prova
+non scarica sottotitoli.
+
+Le lingue si scelgono su ogni serie o film, nel campo *Sottotitoli*: se lo
+compili, Gextto cerca quei sottotitoli a ogni ciclo e scrive un `.srt` accanto
+al video quando trova una corrispondenza sicura per hash o dimensione del file.
+Un sottotitolo già presente non viene mai toccato e un titolo senza risultati
+viene lasciato in pace per un po' prima di riprovare. Se indichi più lingue,
+per esempio `ita,eng`, ne cerca una per ciascuna.
 
 Su una puntata archiviata o un film scaricato, **Cerca sottotitoli** apre
 un'anteprima con lingua, release, motivo della corrispondenza e nome del file

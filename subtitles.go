@@ -22,7 +22,6 @@ const (
 	subtitleSettingAPIKey      = "subtitles_provider_api_key"
 	subtitleSettingUsername    = "subtitles_provider_username"
 	subtitleSettingPassword    = "subtitles_provider_password"
-	subtitleSettingLanguages   = "subtitles_languages"
 	subtitleSettingForced      = "subtitles_forced"
 	subtitleSettingSDH         = "subtitles_sdh"
 	subtitleSettingCollision   = "subtitles_collision_policy"
@@ -33,7 +32,6 @@ var errSubtitleCollision = errors.New("subtitle already exists")
 type subtitlePreferences struct {
 	Enabled                                 bool
 	ProviderURL, APIKey, Username, Password string
-	Languages                               []string
 	Forced, SDH, Collision                  string
 }
 
@@ -60,12 +58,30 @@ func subtitlePreferencesFrom(cfg *Config) subtitlePreferences {
 	if prefs.Collision != "replace" {
 		prefs.Collision = "keep"
 	}
-	for _, language := range strings.Split(settingsOr(cfg, subtitleSettingLanguages, ""), ",") {
-		if code := subtitleProviderLanguage(language); code != "" {
-			prefs.Languages = append(prefs.Languages, code)
+	return prefs
+}
+
+// subtitleLanguagesFor returns the provider codes requested by the title. The
+// choice belongs to the series/movie configuration: Integrations only sets up
+// the provider and never overrides the languages.
+func subtitleLanguagesFor(cfg *Config, target subtitleTarget) []string {
+	preferred := strings.TrimSpace(target.SubtitlePreference)
+	if preferred == "" || strings.EqualFold(preferred, "any") {
+		preferred = cfg.DefaultLanguage()
+	}
+	languages := []string{}
+	seen := map[string]bool{}
+	for _, raw := range strings.Split(preferred, ",") {
+		code := subtitleProviderLanguage(raw)
+		if code != "" && !seen[code] {
+			seen[code] = true
+			languages = append(languages, code)
 		}
 	}
-	return prefs
+	if len(languages) == 0 {
+		languages = []string{"en"}
+	}
+	return languages
 }
 
 func subtitleProviderClient(cfg *Config) (*subtitleprovider.Client, subtitlePreferences, error) {
@@ -259,21 +275,7 @@ func searchSubtitleCandidates(ctx context.Context, cfg *Config, db *Database, ta
 	if err != nil {
 		return nil, err
 	}
-	languages := prefs.Languages
-	if len(languages) == 0 {
-		preferred := target.SubtitlePreference
-		if preferred == "" || strings.EqualFold(preferred, "any") {
-			preferred = cfg.DefaultLanguage()
-		}
-		for _, language := range strings.Split(preferred, ",") {
-			if code := subtitleProviderLanguage(language); code != "" {
-				languages = append(languages, code)
-			}
-		}
-	}
-	if len(languages) == 0 {
-		languages = []string{"en"}
-	}
+	languages := subtitleLanguagesFor(cfg, target)
 	kind := "episode"
 	if target.Kind == "movie" {
 		kind = "movie"

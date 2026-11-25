@@ -691,6 +691,9 @@ type AppState struct {
 	// latency_guard keeps the line usable while the speed is on Auto
 	// (latency_guard.go); latencyGuardWorker drives it.
 	latency_guard *latencyGuard
+	// subtitle_auto throttles the unattended subtitle downloads and keeps one
+	// pass per cycle at a time (subtitles_auto.go).
+	subtitle_auto *subtitleAutoState
 }
 
 // ---------------------------------------------------------------------------

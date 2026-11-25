@@ -1705,11 +1705,17 @@ Without a trash configured Gextto never deletes source files by itself.
 ### External subtitles
 
 In *Integrations → Subtitles* you can configure an OpenSubtitles-compatible
-provider with an API key; account and password are optional. Leave the language
-empty to use the title's language, and filter forced and SDH independently.
-**Test connection** checks the API key and provider access with the values
-currently written in the form, without saving them: the test search downloads
-no subtitles.
+provider with an API key; account and password are optional, and forced and SDH
+are filtered independently. **Test connection** checks the API key and provider
+access with the values currently written in the form, without saving them: the
+test search downloads no subtitles.
+
+Languages are chosen on each series or movie, in the *Subtitles* field: when you
+fill it, Gextto looks for those subtitles on every cycle and writes an `.srt`
+next to the video as soon as it finds a reliable match by hash or file size. An
+existing subtitle is never touched, and a title with no result is left alone for
+a while before it is tried again. If you list more than one language, for
+example `ita,eng`, it looks for one of each.
 
 On an archived episode or downloaded movie, **Find subtitles** opens a preview
 with language, release, match reason and proposed filename. Preview downloads

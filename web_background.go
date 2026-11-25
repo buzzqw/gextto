@@ -2919,6 +2919,24 @@ func cycleWorker(state *AppState) {
 				// heap pages resident; return them before the long idle window.
 				TrimMemory()
 			}
+			// Subtitles asked for on series and movies are fetched in a detached
+			// pass: a slow provider must not hold the cycle worker.
+			if state.subtitle_auto != nil && state.subtitle_auto.begin() {
+				done := state.trackOperation()
+				go func(current Config) {
+					defer recoverGoroutine("automatic subtitles")
+					defer done()
+					defer state.subtitle_auto.end()
+					added, err := runAutomaticSubtitles(ctx, &current, state.db, state.subtitle_auto, time.Now())
+					if err != nil {
+						logging.Debug("Automatic subtitles could not run", "error", err.Error())
+						return
+					}
+					if added > 0 {
+						logging.Info(fmt.Sprintf("Added %d subtitle files", added))
+					}
+				}(cfg)
+			}
 			renameHours := uint64(6)
 			if value, ok := cfg.Settings[settingRenameVerifyInterval]; ok {
 				if parsed, err := strconv.ParseUint(strings.TrimSpace(value), 10, 64); err == nil {

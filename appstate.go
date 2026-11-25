@@ -44,6 +44,7 @@ func NewAppState(
 		bgCancel:        stopBackgroundContext,
 		rate_history:    newRateHistory(rateHistoryLen),
 		latency_guard:   newLatencyGuard(),
+		subtitle_auto:   newSubtitleAutoState(),
 	}
 	// Every notification attempt is recorded, so the Notifications page can
 	// answer "did it arrive, and through which channel".

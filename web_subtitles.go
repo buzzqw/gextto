@@ -19,7 +19,6 @@ type subtitleSettingsInput struct {
 	APIKey      string `json:"api_key"`
 	Username    string `json:"username"`
 	Password    string `json:"password"`
-	Languages   string `json:"languages"`
 	Forced      string `json:"forced"`
 	SDH         string `json:"sdh"`
 	Collision   string `json:"collision_policy"`
@@ -30,7 +29,6 @@ func subtitleSettingsValues(cfg *Config, input subtitleSettingsInput) (map[strin
 		subtitleSettingEnabled:     strconv.FormatBool(settingTruthy(fmt.Sprint(input.Enabled))),
 		subtitleSettingProviderURL: strings.TrimSpace(input.ProviderURL),
 		subtitleSettingUsername:    strings.TrimSpace(input.Username),
-		subtitleSettingLanguages:   strings.TrimSpace(input.Languages),
 		subtitleSettingForced:      strings.ToLower(strings.TrimSpace(input.Forced)),
 		subtitleSettingSDH:         strings.ToLower(strings.TrimSpace(input.SDH)),
 		subtitleSettingCollision:   strings.ToLower(strings.TrimSpace(input.Collision)),
@@ -58,11 +56,6 @@ func subtitleSettingsValues(cfg *Config, input subtitleSettingsInput) (map[strin
 	}
 	if values[subtitleSettingCollision] != "keep" && values[subtitleSettingCollision] != "replace" {
 		return nil, errors.New("collision policy must be keep or replace")
-	}
-	for _, language := range strings.Split(values[subtitleSettingLanguages], ",") {
-		if strings.TrimSpace(language) != "" && subtitleProviderLanguage(language) == "" {
-			return nil, fmt.Errorf("unsupported subtitle language %q", strings.TrimSpace(language))
-		}
 	}
 	apiKey := strings.TrimSpace(input.APIKey)
 	if apiKey == "" {
@@ -144,7 +137,7 @@ func SubtitleSettingsView(w http.ResponseWriter, r *http.Request, s *AppState) {
 	prefs := subtitlePreferencesFrom(latestConfig(s))
 	jsonResponse(w, map[string]any{
 		"enabled": prefs.Enabled, "provider_url": prefs.ProviderURL,
-		"username": prefs.Username, "languages": strings.Join(prefs.Languages, ","),
+		"username": prefs.Username,
 		"forced": prefs.Forced, "sdh": prefs.SDH, "collision_policy": prefs.Collision,
 		"api_key_configured": prefs.APIKey != "", "password_configured": prefs.Password != "",
 	})
