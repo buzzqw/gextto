@@ -495,6 +495,12 @@ everything, verifies the downloaded copies and only then moves the rolling tag
 and publishes `release.json`. CI (`ci.yml`) reuses the same gates for UI and
 race, leaving fuzz and CodeQL to their dedicated workflows.
 
+A workflow that calls `release-gates.yml` must grant, **on the calling job**, every
+permission the reusable workflow declares — `security-events: write` included for
+the CodeQL job. GitHub validates this statically, before creating any job: a
+missing grant ends the run in `startup_failure` with no job and no log, even when
+the call passes `codeql: false` and that job would be skipped.
+
 | Script | Output | Contents |
 |---|---|---|
 | `scripts/package-gx-torrent.sh` | `gx-torrent-linux-<arch>.tar.gz` | binary, `run.sh`, systemd unit, README, `VERSION` |

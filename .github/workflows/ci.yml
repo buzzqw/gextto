@@ -16,9 +16,14 @@ permissions:
 jobs:
   quality:
     name: quality gates (UI, race)
+    # A job that calls a reusable workflow must grant every permission the
+    # called workflow declares, and GitHub checks this before creating any job:
+    # without `security-events: write` the whole run ends in startup_failure,
+    # even though `codeql: false` below turns that job off.
     permissions:
       actions: read
       contents: read
+      security-events: write
     uses: ./.github/workflows/release-gates.yml
     with:
       fuzz-time: 30s
