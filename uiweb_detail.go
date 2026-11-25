@@ -35,6 +35,7 @@ type uiEpisodeRow struct {
 	SearchPath   string
 	SourcesPath  string
 	DeletePath   string
+	MagnetHash   string
 }
 
 // uiSeasonGroup groups the episode rows of one season for the collapsible
@@ -225,15 +226,16 @@ type uiMovieDetail struct {
 	// one that was never looked up, so the page can say which it is.
 	AliasesChecked bool
 	// Profiles is the «Profilo di qualità» choice of the page.
-	Profiles    v2TitleProfiles
-	Enabled     bool
-	History     []MovieHistory
-	Matches     []uiMovieMatch
-	Poster      string
-	ReleaseDate string
-	Cast        []uiDetailPerson
-	TmdbURL     string
-	TvdbURL     string
+	Profiles      v2TitleProfiles
+	Enabled       bool
+	History       []MovieHistory
+	CrossSeedHash string
+	Matches       []uiMovieMatch
+	Poster        string
+	ReleaseDate   string
+	Cast          []uiDetailPerson
+	TmdbURL       string
+	TvdbURL       string
 }
 
 // uiMagnetURL only trusts links with a safe scheme so the archive match links
@@ -289,6 +291,10 @@ func uiSeriesDetailFrom(s *AppState, r *http.Request) (uiSeriesDetail, bool) {
 			ignoreValue = "false"
 		}
 		base := "/api/episodes/" + escaped + "/" + strconv.FormatInt(episode.Season, 10) + "/" + strconv.FormatInt(episode.Episode, 10)
+		magnetHash := ""
+		if episode.MagnetHash != nil {
+			magnetHash = strings.TrimSpace(*episode.MagnetHash)
+		}
 		rows = append(rows, uiEpisodeRow{
 			Series:       series.Name,
 			Season:       episode.Season,
@@ -307,6 +313,7 @@ func uiSeriesDetailFrom(s *AppState, r *http.Request) (uiSeriesDetail, bool) {
 			SearchPath:   base + "/search",
 			SourcesPath:  base + "/sources",
 			DeletePath:   base,
+			MagnetHash:   magnetHash,
 		})
 	}
 	gaps := 0
@@ -536,6 +543,9 @@ func uiMovieDetailFrom(s *AppState, r *http.Request) (uiMovieDetail, bool) {
 		for _, item := range all {
 			if item.Name == movie.Name {
 				detail.History = append(detail.History, item)
+				if detail.CrossSeedHash == "" && item.MagnetHash != nil {
+					detail.CrossSeedHash = strings.TrimSpace(*item.MagnetHash)
+				}
 			}
 		}
 	}

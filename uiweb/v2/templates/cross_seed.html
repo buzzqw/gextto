@@ -1,0 +1,33 @@
+{{define "v2_cross_seed_modal"}}
+<div class="modal-head">
+  <h3 id="v2-cross-seed-title">{{tr "Cross-seed"}}{{if .Result.Target.Title}} — {{tr .Result.Target.Title}}{{end}}</h3>
+  <button class="btn sm" type="button" hx-get="/empty" hx-target="#v2-modal" hx-swap="innerHTML" {{trTitle "Chiudi i risultati del cross-seed"}}>{{tr "Chiudi"}}</button>
+</div>
+{{if .Error}}
+<div class="notice err" role="alert">{{tr .Error}}</div>
+{{else}}
+<p class="muted">{{tr "Ricerca in sola lettura: mostra le sorgenti che dichiarano lo stesso infohash. Non aggiunge torrent e non scarica dati."}}</p>
+{{if .Result.Partial}}<div class="notice warn" role="status">{{tr "Alcune sorgenti non hanno risposto: i risultati sono parziali."}}</div>{{end}}
+{{if .Result.Matches}}
+<div class="table-wrap"><table class="data-table">
+  <caption class="sr-only">{{tr "Sorgenti con lo stesso infohash"}}</caption>
+  <thead><tr><th scope="col">{{tr "Sorgente"}}</th><th scope="col">{{tr "Release"}}</th><th scope="col">{{tr "Swarm"}}</th><th scope="col">{{tr "Seed / peer"}}</th><th scope="col">{{tr "Dimensione"}}</th><th scope="col">{{tr "Tracker"}}</th></tr></thead>
+  <tbody>{{range .Result.Matches}}<tr>
+    <td>{{tr (sourceLabel .Source)}}</td>
+    <td class="truncate" {{trTitle .Title}}>{{tr .Title}}{{if .Freeleech}} <span class="badge ok">{{tr "Freeleech"}}</span>{{end}}</td>
+    <td>{{if eq .Swarm "healthy"}}{{tr "Seed disponibili"}}{{else if eq .Swarm "leechers-only"}}{{tr "Solo leecher"}}{{else if eq .Swarm "empty"}}{{tr "Nessun seed"}}{{else}}{{tr "Sconosciuto"}}{{end}}</td>
+    <td class="numeric">{{if ge .Seeders 0}}{{tr .Seeders}}{{else}}?{{end}} / {{if ge .Peers 0}}{{tr .Peers}}{{else}}?{{end}}</td>
+    <td class="numeric">{{bytes .SizeBytes}}</td>
+    <td>{{if .TrackerHosts}}{{range $i, $host := .TrackerHosts}}{{if $i}}, {{end}}<code>{{tr $host}}</code>{{end}}{{else}}<span class="muted">—</span>{{end}}</td>
+  </tr>{{end}}</tbody>
+</table></div>
+{{else}}
+<p class="muted">{{tr "Nessuna sorgente configurata ha dichiarato lo stesso infohash."}}</p>
+{{end}}
+{{if .Result.Checked}}
+<details class="detail-aliases"><summary><small>{{tr "Sorgenti controllate"}} ({{len .Result.Checked}})</small></summary>
+  <ul>{{range .Result.Checked}}<li>{{tr (sourceLabel .Source)}} — {{if eq .Status "ok"}}{{tr "risposta ricevuta"}}{{else if eq .Status "skipped"}}{{tr "non controllata"}}{{else}}{{tr "errore"}}{{if .Error}}: {{tr .Error}}{{end}}{{end}}</li>{{end}}</ul>
+</details>
+{{end}}
+{{end}}
+{{end}}

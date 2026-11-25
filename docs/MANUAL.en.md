@@ -714,6 +714,18 @@ release, or download something you do not follow.
 A manual search also shows releases the cycle would **not** pick, precisely so
 you can inspect them: seeing one does not mean it would be downloaded.
 
+### Read-only cross-seed check
+
+For an archived episode that keeps its infohash, **More actions** includes
+**Find cross-seed**; a downloaded movie has the same button in its detail toolbar.
+Gextto queries the enabled indexers and shows only releases that declare
+**exactly the same infohash**, with source, seed/peer counts and trackers.
+
+It is a check, not a download: it adds no torrent, fetches no `.torrent` file
+without a declared hash and changes neither library nor queue. Magnet links,
+passkeys and API keys are not returned in the window; if a source does not
+answer, the result is marked as partial.
+
 ### Where a download added by hand ends
 
 | Where you add it from | Where it ends |

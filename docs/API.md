@@ -117,6 +117,8 @@ change. `/ui` is not served. For operational checks use
 | POST | `/series/gaps/download-best` | Series → Missing tab: queue the best copy of every missing episode the search found, as a background job (form field job) |
 | GET | `/library/bulk/profile` | Series/Movies "Edit selected" panel: the value fields filled from a quality profile (?profile=ID&view=) |
 | POST | `/library/bulk` | Series/Movies "Edit selected" panel: apply the ticked values to the ticked rows |
+| POST | `/library/cross-seed` | read-only cross-seed result fragment for the modal (form field hash) |
+| POST | `/api/library/cross-seed/discover` | read-only cross-seed discovery for one completed torrent (JSON body {"hash":"…"}): exact infohash matches from enabled indexers, source health and redacted tracker hosts; never adds or downloads anything |
 | GET | `/import/preview` | manual import page: preview fragment |
 | POST | `/import/apply` | manual import page: confirm one file |
 | GET | `/api/config` | read the configuration |
@@ -229,6 +231,17 @@ change. `/ui` is not served. For operational checks use
 | POST | `/api/search/add` | add a search result: it stays in the download folder (reason manual_transfer) |
 | POST | `/api/search/archive` | search the archive |
 | POST | `/api/search/explain` | explain a release decision |
+
+`POST /api/library/cross-seed/discover` accepts `{"hash":"<infohash>"}` for a
+completed torrent that has an archived/processed path. It queries the enabled
+indexers by the stored title and keeps only results whose canonical infohash is
+identical. The answer carries the target, one status per checked source, the
+matching releases with source-reported swarm counts, and tracker **hostnames**
+only: magnets, `.torrent` URLs, passkeys and API keys are never returned. A link
+without a declared hash is not fetched. The operation does not add a torrent,
+write the archive, mark a gap as searched or change the queue. A missing target
+is `404`; no enabled indexer is `409`; source failures stay visible and set
+`partial: true`.
 
 With the aMule integration enabled (`ed2k_enabled`), manual search results can
 carry `network: "ed2k"`, `ed2k_link` and `sources` next to the torrent fields.

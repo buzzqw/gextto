@@ -52,11 +52,12 @@ still be true after the item lands does not belong here.
   expires, and the two log viewers refresh differently. The automatic-refresh badge and the
   masked API keys of the daemon are already in place. Gate: the operator picks which of the
   two remaining indicators to land first.
-- **Automatic cross-seeding**: once a library file is complete, search configured private
-  trackers for the same piece hashes and size, add matching metadata only, verify the local
-  bitfield and seed without downloading the payload again. Gate: an opt-in policy per
-  tracker, respect for its rules, and tests proving that no payload is downloaded or
-  duplicated and that HnR risk is visible before seeding.
+- **Automatic cross-seed adding**: read-only discovery of the same infohash is
+  available from the episode and movie pages; the remaining work is to add a
+  matching torrent as metadata only, verify the local bitfield and seed without
+  downloading the payload again. Gate: an opt-in policy per tracker, respect for
+  its rules, and tests proving that no payload is downloaded or duplicated and
+  that HnR risk is visible before seeding.
 - **Automatic subtitle provider**: match a movie or episode by hash, duration and
   filename to a subtitle provider, honour language, forced and hearing-impaired
   preferences and show a preview before writing sidecars. Local sidecar transfer,

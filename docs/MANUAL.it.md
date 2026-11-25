@@ -726,6 +726,18 @@ La ricerca manuale mostra anche release che il ciclo **non** sceglierebbe,
 proprio per permetterti di ispezionarle: vederla non significa che verrebbe
 scaricata.
 
+### Cross-seed in sola lettura
+
+Su un episodio archiviato che conserva l'infohash, il menu **Altre azioni** include
+**Cerca cross-seed**; su un film scaricato lo stesso pulsante è nella barra della
+scheda. Gextto interroga gli indexer abilitati e mostra solo le release che
+dichiarano **esattamente lo stesso infohash**, con sorgente, seed/peer e tracker.
+
+È una verifica, non un download: non aggiunge torrent, non prende file `.torrent`
+senza hash dichiarato e non cambia libreria o coda. I link magnet, le passkey e le
+chiavi API non vengono restituiti nella finestra; se una sorgente non risponde,
+il risultato è marcato come parziale.
+
 ### Dove finisce un download aggiunto a mano
 
 | Da dove lo aggiungi | Dove finisce |
