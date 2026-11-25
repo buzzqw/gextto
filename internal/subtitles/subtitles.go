@@ -41,6 +41,28 @@ type Client struct {
 	baseURL string
 }
 
+// flexibleString accepts the values the provider uses for an IMDb id: a
+// number on OpenSubtitles, a string on compatible providers, or null.
+type flexibleString string
+
+func (s *flexibleString) UnmarshalJSON(data []byte) error {
+	value := strings.TrimSpace(string(data))
+	if value == "" || value == "null" {
+		*s = ""
+		return nil
+	}
+	if strings.HasPrefix(value, "\"") {
+		var text string
+		if err := json.Unmarshal(data, &text); err != nil {
+			return err
+		}
+		*s = flexibleString(text)
+		return nil
+	}
+	*s = flexibleString(value)
+	return nil
+}
+
 type flexibleID int64
 
 func (id *flexibleID) UnmarshalJSON(data []byte) error {
@@ -100,7 +122,7 @@ type Subtitle struct {
 		Title     string `json:"title"`
 		MovieName string `json:"movie_name"`
 		Year      int    `json:"year"`
-		IMDbID    string `json:"imdb_id"`
+		IMDbID    flexibleString `json:"imdb_id"`
 		Season    int    `json:"season_number"`
 		Episode   int    `json:"episode_number"`
 	} `json:"feature_details"`

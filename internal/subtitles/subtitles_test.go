@@ -171,6 +171,29 @@ func TestSearchLogsInAgainAfterUnauthorized(t *testing.T) {
 	}
 }
 
+// OpenSubtitles sends feature_details.imdb_id as a number, compatible
+// providers may send it as a string, and some send null. All three must decode.
+func TestSearchAcceptsNumericIMDbID(t *testing.T) {
+	for _, raw := range []string{`2188721`, `"tt2188721"`, `null`} {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			_, _ = io.WriteString(w, `{"data":[{"id":"10","attributes":{"language":"en","feature_details":{"imdb_id":`+raw+`},"files":[{"file_id":20}]}}]}`)
+		}))
+		client, err := New(Config{BaseURL: server.URL, APIKey: "key", Client: server.Client()})
+		if err != nil {
+			server.Close()
+			t.Fatal(err)
+		}
+		results, err := client.Search(context.Background(), SearchQuery{Title: "Example"})
+		server.Close()
+		if err != nil {
+			t.Fatalf("imdb_id %s: %v", raw, err)
+		}
+		if len(results) != 1 {
+			t.Fatalf("imdb_id %s: results = %+v", raw, results)
+		}
+	}
+}
+
 func TestHashFileUsesOSHashAndReadsOnlyTheEdges(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "video.mkv")
 	data := make([]byte, 1<<20)
