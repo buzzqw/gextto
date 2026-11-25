@@ -111,6 +111,35 @@ func TestLoginUsesProviderBaseURL(t *testing.T) {
 	}
 }
 
+// The real OpenSubtitles login answer reports a bare hostname in "base_url".
+// It must not replace the configured base: the API version path would be lost
+// and the search would land on a different endpoint returning HTTP 503.
+func TestLoginBareHostnameKeepsConfiguredBaseURL(t *testing.T) {
+	var searches atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/v1/login":
+			_, _ = io.WriteString(w, `{"token":"token","base_url":"`+strings.TrimPrefix(r.Host, "http://")+`"}`)
+		case "/api/v1/subtitles":
+			searches.Add(1)
+			_, _ = io.WriteString(w, `{"data":[]}`)
+		default:
+			w.WriteHeader(http.StatusServiceUnavailable)
+		}
+	}))
+	defer server.Close()
+	client, err := New(Config{BaseURL: server.URL + "/api/v1", APIKey: "key", Username: "user", Password: "pass", Client: server.Client()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := client.Search(context.Background(), SearchQuery{Title: "Example"}); err != nil {
+		t.Fatal(err)
+	}
+	if searches.Load() != 1 {
+		t.Fatalf("searches = %d, want the configured /api/v1 endpoint to be used", searches.Load())
+	}
+}
+
 func TestSearchLogsInAgainAfterUnauthorized(t *testing.T) {
 	var logins atomic.Int32
 	var searches atomic.Int32
@@ -180,6 +209,28 @@ func TestHashFileUsesOSHashAndReadsOnlyTheEdges(t *testing.T) {
 	}
 	if _, _, err := HashFile(small); err == nil {
 		t.Fatal("a file below 128 KiB must be rejected")
+	}
+}
+
+func TestSearchRetriesTemporaryProviderFailure(t *testing.T) {
+	var calls atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if calls.Add(1) == 1 {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
+		_, _ = io.WriteString(w, `{"data":[]}`)
+	}))
+	defer server.Close()
+	client, err := New(Config{BaseURL: server.URL, APIKey: "key", Client: server.Client()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := client.Search(context.Background(), SearchQuery{Title: "Example"}); err != nil {
+		t.Fatal(err)
+	}
+	if calls.Load() != 2 {
+		t.Fatalf("calls = %d, want one retry", calls.Load())
 	}
 }
 

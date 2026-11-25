@@ -1,3 +1,5 @@
+{{define "v2_subtitle_test_result"}}<small class="{{if .OK}}ok{{else}}hl-err{{end}}" role="status">{{if .OK}}{{tr "Connessione riuscita."}}{{else}}{{tr "Connessione non riuscita."}} {{tr .Message}}{{end}}</small>{{end}}
+
 {{define "v2_subtitles_modal"}}
 <div class="block overlay">
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="v2-subtitles-title">

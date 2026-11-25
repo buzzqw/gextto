@@ -261,13 +261,18 @@ func (c *Client) login(ctx context.Context) error {
 	return nil
 }
 
+// normalizeBaseURL accepts only an absolute http(s) URL. A bare hostname is
+// not a base URL: OpenSubtitles' login answer reports "api.opensubtitles.com",
+// and adopting it would drop the configured /api/v1 path, sending every later
+// request to the wrong endpoint (HTTP 503).
 func normalizeBaseURL(raw string) string {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
 		return ""
 	}
-	if !strings.Contains(raw, "://") {
-		raw = "https://" + raw
+	parsed, err := url.Parse(raw)
+	if err != nil || parsed.Host == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {
+		return ""
 	}
 	return strings.TrimRight(raw, "/")
 }
@@ -280,6 +285,32 @@ func (c *Client) authorized(ctx context.Context) error {
 		return nil
 	}
 	return c.login(ctx)
+}
+
+func providerRetryableStatus(code int) bool {
+	return code == http.StatusTooManyRequests || code == http.StatusBadGateway || code == http.StatusServiceUnavailable || code == http.StatusGatewayTimeout
+}
+
+func retryAfterDelay(header string) time.Duration {
+	seconds, err := strconv.Atoi(strings.TrimSpace(header))
+	if err != nil || seconds < 1 {
+		return time.Second
+	}
+	if seconds > 5 {
+		return 5 * time.Second
+	}
+	return time.Duration(seconds) * time.Second
+}
+
+func waitForRetry(ctx context.Context, delay time.Duration) error {
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+	select {
+	case <-timer.C:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
 
 func (c *Client) Search(ctx context.Context, query SearchQuery) ([]Subtitle, error) {
@@ -319,26 +350,41 @@ func (c *Client) Search(ctx context.Context, query SearchQuery) ([]Subtitle, err
 	}
 	values.Set("page", "1")
 	path := "/subtitles?" + values.Encode()
-	response, err := c.request(ctx, http.MethodGet, path, nil, true)
-	if err != nil {
-		return nil, err
-	}
-	defer response.Body.Close()
-	if response.StatusCode == http.StatusUnauthorized {
-		c.mu.Lock()
-		c.token = ""
-		c.mu.Unlock()
-		if err := c.login(ctx); err != nil {
-			return nil, err
-		}
+	var response *http.Response
+	var err error
+	for attempt := 0; attempt < 3; attempt++ {
 		response, err = c.request(ctx, http.MethodGet, path, nil, true)
 		if err != nil {
 			return nil, err
 		}
-		defer response.Body.Close()
+		if response.StatusCode == http.StatusUnauthorized && attempt < 2 {
+			_ = response.Body.Close()
+			response = nil
+			c.mu.Lock()
+			c.token = ""
+			c.mu.Unlock()
+			if err := c.login(ctx); err != nil {
+				return nil, err
+			}
+			continue
+		}
+		if providerRetryableStatus(response.StatusCode) && attempt < 2 {
+			delay := retryAfterDelay(response.Header.Get("Retry-After"))
+			_ = response.Body.Close()
+			response = nil
+			if err := waitForRetry(ctx, delay); err != nil {
+				return nil, err
+			}
+			continue
+		}
+		break
 	}
+	if response == nil {
+		return nil, errors.New("subtitle provider did not answer")
+	}
+	defer response.Body.Close()
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return nil, fmt.Errorf("subtitle provider search returned HTTP %d", response.StatusCode)
+		return nil, fmt.Errorf("subtitle provider search returned HTTP %d after %d attempts", response.StatusCode, 3)
 	}
 	var payload searchResponse
 	if err := json.NewDecoder(io.LimitReader(response.Body, 8<<20)).Decode(&payload); err != nil {
@@ -383,22 +429,38 @@ func (c *Client) Download(ctx context.Context, fileID int64, format string) (Dow
 	if err := c.authorized(ctx); err != nil {
 		return Download{}, err
 	}
-	response, err := c.request(ctx, http.MethodPost, "/download", map[string]any{"file_id": fileID, "sub_format": strings.ToLower(strings.TrimSpace(format))}, true)
-	if err != nil {
-		return Download{}, err
-	}
-	if response.StatusCode == http.StatusUnauthorized {
-		response.Body.Close()
-		c.mu.Lock()
-		c.token = ""
-		c.mu.Unlock()
-		if err := c.login(ctx); err != nil {
-			return Download{}, err
-		}
-		response, err = c.request(ctx, http.MethodPost, "/download", map[string]any{"file_id": fileID, "sub_format": strings.ToLower(strings.TrimSpace(format))}, true)
+	body := map[string]any{"file_id": fileID, "sub_format": strings.ToLower(strings.TrimSpace(format))}
+	var response *http.Response
+	var err error
+	for attempt := 0; attempt < 3; attempt++ {
+		response, err = c.request(ctx, http.MethodPost, "/download", body, true)
 		if err != nil {
 			return Download{}, err
 		}
+		if response.StatusCode == http.StatusUnauthorized && attempt < 2 {
+			_ = response.Body.Close()
+			response = nil
+			c.mu.Lock()
+			c.token = ""
+			c.mu.Unlock()
+			if err := c.login(ctx); err != nil {
+				return Download{}, err
+			}
+			continue
+		}
+		if providerRetryableStatus(response.StatusCode) && attempt < 2 {
+			delay := retryAfterDelay(response.Header.Get("Retry-After"))
+			_ = response.Body.Close()
+			response = nil
+			if err := waitForRetry(ctx, delay); err != nil {
+				return Download{}, err
+			}
+			continue
+		}
+		break
+	}
+	if response == nil {
+		return Download{}, errors.New("subtitle provider did not answer")
 	}
 	defer response.Body.Close()
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
@@ -431,9 +493,25 @@ func (c *Client) Download(ctx context.Context, fileID int64, format string) (Dow
 		return Download{}, err
 	}
 	req.Header.Set("User-Agent", c.cfg.UserAgent)
-	fileResponse, err := c.cfg.Client.Do(req)
-	if err != nil {
-		return Download{}, err
+	var fileResponse *http.Response
+	for attempt := 0; attempt < 2; attempt++ {
+		fileResponse, err = c.cfg.Client.Do(req)
+		if err != nil {
+			return Download{}, err
+		}
+		if providerRetryableStatus(fileResponse.StatusCode) && attempt == 0 {
+			delay := retryAfterDelay(fileResponse.Header.Get("Retry-After"))
+			_ = fileResponse.Body.Close()
+			fileResponse = nil
+			if err := waitForRetry(ctx, delay); err != nil {
+				return Download{}, err
+			}
+			continue
+		}
+		break
+	}
+	if fileResponse == nil {
+		return Download{}, errors.New("subtitle file did not download")
 	}
 	defer fileResponse.Body.Close()
 	if fileResponse.StatusCode < 200 || fileResponse.StatusCode >= 300 {

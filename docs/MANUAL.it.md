@@ -1729,7 +1729,9 @@ Gextto non cancella mai file sorgente da solo.
 In *Integrazioni → Sottotitoli* puoi configurare un provider OpenSubtitles-
 compatibile con API key; account e password sono facoltativi. La lingua può
 essere lasciata vuota per usare quella del titolo, mentre forced e SDH hanno
-filtri separati.
+filtri separati. **Test connessione** verifica API key e accesso al provider
+con i valori scritti nel modulo, senza salvarli: la ricerca di prova non
+scarica sottotitoli.
 
 Su una puntata archiviata o un film scaricato, **Cerca sottotitoli** apre
 un'anteprima con lingua, release, motivo della corrispondenza e nome del file

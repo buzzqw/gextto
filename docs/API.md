@@ -122,6 +122,8 @@ change. `/ui` is not served. For operational checks use
 | POST | `/api/subtitles/apply` | download and atomically write one confirmed subtitle; dry-run and collisions are refused |
 | POST | `/subtitles/search` | SSR/HTMX subtitle preview modal |
 | POST | `/subtitles/apply` | SSR/HTMX confirmed subtitle apply |
+| POST | `/subtitles/test` | SSR/HTMX provider check using the values currently in the settings form, without saving |
+| POST | `/subtitles/test` | SSR/HTMX provider connection check using the values in the settings form, without saving them |
 | POST | `/series/gaps/search` | Series → Missing tab: start the background search of every missing episode of one series (form field series) |
 | GET | `/series/gaps/search/status` | Series → Missing tab: progress or result of that search (form field job) |
 | POST | `/series/gaps/search/cancel` | Series → Missing tab: cancel that search (form field job) |

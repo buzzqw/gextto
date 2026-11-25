@@ -54,6 +54,7 @@ func Router(s *AppState) *http.ServeMux {
 	handle(s, mux, "POST /list-import/apply", V2ListImportApply)
 	handle(s, mux, "POST /subtitles/search", V2SubtitleSearch)
 	handle(s, mux, "POST /subtitles/apply", V2SubtitleApply)
+	handle(s, mux, "POST /subtitles/test", V2SubtitleProviderTest)
 	handle(s, mux, "POST /library/cross-seed", V2CrossSeedDiscover)
 	handle(s, mux, "POST /api/library/cross-seed/discover", CrossSeedDiscover)
 	// The Sonarr/Radarr v3 subset a request manager (Jellyseerr) speaks.

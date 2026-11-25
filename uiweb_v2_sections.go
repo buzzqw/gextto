@@ -51,6 +51,9 @@ type v2Section struct {
 	FormRender    string
 	ManualAdd     string
 	TestFTP       bool
+	FormTestPath  string
+	FormTestLabel string
+	FormTestHint  string
 	ListEditor    *v2ListEditorView
 	// Integration cards (Simkl) carry their child sections inline.
 	Children    []v2Section
@@ -110,6 +113,9 @@ func v2ConvertSection(s *AppState, r *http.Request, view string, section uiPageS
 		item.FormRender = section.Form.Render
 		item.ManualAdd = section.Form.ManualAdd
 		item.TestFTP = section.Form.TestFTP
+		item.FormTestPath = section.Form.TestPath
+		item.FormTestLabel = section.Form.TestLabel
+		item.FormTestHint = section.Form.TestHint
 		if item.FormSubmit == "" {
 			item.FormSubmit = "Salva"
 		}

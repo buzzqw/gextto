@@ -1707,6 +1707,9 @@ Without a trash configured Gextto never deletes source files by itself.
 In *Integrations → Subtitles* you can configure an OpenSubtitles-compatible
 provider with an API key; account and password are optional. Leave the language
 empty to use the title's language, and filter forced and SDH independently.
+**Test connection** checks the API key and provider access with the values
+currently written in the form, without saving them: the test search downloads
+no subtitles.
 
 On an archived episode or downloaded movie, **Find subtitles** opens a preview
 with language, release, match reason and proposed filename. Preview downloads

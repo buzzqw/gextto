@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 )
 
@@ -149,6 +150,46 @@ func TestV2SubtitleSettingsUseSelectAndVisibleHelp(t *testing.T) {
 	_, page = v2Request(t, server, http.MethodGet, "/?view=integrations", nil)
 	if !strings.Contains(page, `<option value="yes" selected>`) || !strings.Contains(page, `<option value="replace" selected>`) {
 		t.Fatalf("stored select values are not selected")
+	}
+}
+
+func TestV2SubtitleProviderTestUsesFormValues(t *testing.T) {
+	provider := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.WriteString(w, `{"data":[]}`)
+	}))
+	defer provider.Close()
+	state := newTestAppState(t)
+	server := httptest.NewServer(Router(state))
+	defer server.Close()
+	code, body := v2Request(t, server, http.MethodPost, "/subtitles/test", url.Values{
+		"enabled": {"false"}, "provider_url": {provider.URL}, "api_key": {"key"}, "forced": {"any"}, "sdh": {"any"}, "collision_policy": {"keep"},
+	})
+	if code != http.StatusOK || !strings.Contains(body, "Connessione riuscita.") {
+		t.Fatalf("test -> %d: %s", code, body)
+	}
+	if stored := latestConfig(state).Settings[subtitleSettingAPIKey]; stored != "" {
+		t.Fatalf("testing saved the API key: %q", stored)
+	}
+}
+
+func TestV2SubtitleProviderTestExplainsServiceUnavailable(t *testing.T) {
+	var calls atomic.Int32
+	provider := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}))
+	defer provider.Close()
+	state := newTestAppState(t)
+	server := httptest.NewServer(Router(state))
+	defer server.Close()
+	code, body := v2Request(t, server, http.MethodPost, "/subtitles/test", url.Values{
+		"enabled": {"false"}, "provider_url": {provider.URL}, "api_key": {"key"},
+	})
+	if code != http.StatusOK || !strings.Contains(body, "Provider temporaneamente non disponibile") {
+		t.Fatalf("test -> %d: %s", code, body)
+	}
+	if calls.Load() != 3 {
+		t.Fatalf("provider calls = %d, want initial request and two retries", calls.Load())
 	}
 }
 

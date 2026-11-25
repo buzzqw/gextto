@@ -182,6 +182,11 @@ type uiFormSection struct {
 	Submit  string
 	Render  string // optional result renderer: tmdb | releases
 	TestFTP bool   // renders the backup FTP connection/transfer test action
+	// TestPath renders a secondary button that posts the current form to an
+	// in-page check endpoint without saving it.
+	TestPath  string
+	TestLabel string
+	TestHint  string
 	// ManualAdd, when set, adds a secondary "Aggiungi manualmente" button that
 	// opens the requirements completion modal for that kind.
 	ManualAdd string
@@ -491,6 +496,7 @@ func uiIntegrationSections(s *AppState, cfg *Config) []uiPageSection {
 	return []uiPageSection{
 		group("Servizi", sectionForm(uiFormSection{
 			Title: "Sottotitoli", Hint: "Provider OpenSubtitles-compatibile. La ricerca mostra un'anteprima; il file viene scritto solo quando confermi.", Path: "/api/subtitles/settings", Submit: "Salva sottotitoli",
+			TestPath: "/subtitles/test", TestLabel: "Test connessione", TestHint: "Verifica API key e accesso al provider senza salvare le modifiche.",
 			Fields: []uiFormField{
 				boolFieldHint("enabled", "Abilita sottotitoli", "Mostra il pulsante di ricerca sulle schede di episodi e film.", settingsBool(cfg, subtitleSettingEnabled, false)),
 				{Name: "provider_url", Label: "URL provider", Value: settingsOr(cfg, subtitleSettingProviderURL, subtitleprovider.DefaultBaseURL), Hint: "Indirizzo API compatibile con OpenSubtitles REST."},
@@ -503,7 +509,6 @@ func uiIntegrationSections(s *AppState, cfg *Config) []uiPageSection {
 				{Name: "collision_policy", Label: "Se il file esiste", Kind: "select", Value: settingsOr(cfg, subtitleSettingCollision, "keep"), Hint: "keep non sostituisce nulla; replace richiede conferma e salva il vecchio file nel cestino.", Options: []uiFormOption{{Value: "keep", Label: "Mantieni"}, {Value: "replace", Label: "Sostituisci"}}},
 			},
 		})),
-		group("Servizi", sectionActions(uiActionSection{Label: "Verifica provider", Hint: "Esegue una ricerca di prova senza scaricare sottotitoli.", Buttons: []uiActionButton{{Label: "Test connessione", Method: "POST", Path: "/api/subtitles/test", Body: "{}", Hint: "Verifica API key e accesso al provider."}}})),
 		group("Servizi", sectionIntegration(uiIntegrationCardSection{
 			Title: "Simkl", Status: simklStatus, StatusClass: simklStatusClass,
 			Children: []uiPageSection{

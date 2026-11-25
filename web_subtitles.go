@@ -25,7 +25,7 @@ type subtitleSettingsInput struct {
 	Collision   string `json:"collision_policy"`
 }
 
-func saveSubtitleSettings(cfg *Config, input subtitleSettingsInput) error {
+func subtitleSettingsValues(cfg *Config, input subtitleSettingsInput) (map[string]string, error) {
 	values := map[string]string{
 		subtitleSettingEnabled:     strconv.FormatBool(settingTruthy(fmt.Sprint(input.Enabled))),
 		subtitleSettingProviderURL: strings.TrimSpace(input.ProviderURL),
@@ -48,20 +48,20 @@ func saveSubtitleSettings(cfg *Config, input subtitleSettingsInput) error {
 		values[subtitleSettingCollision] = "keep"
 	}
 	if parsed, err := url.Parse(values[subtitleSettingProviderURL]); err != nil || parsed.Host == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {
-		return errors.New("subtitle provider URL must be http:// or https://")
+		return nil, errors.New("subtitle provider URL must be http:// or https://")
 	}
 	if values[subtitleSettingForced] != "any" && values[subtitleSettingForced] != "yes" && values[subtitleSettingForced] != "no" {
-		return errors.New("forced must be any, yes or no")
+		return nil, errors.New("forced must be any, yes or no")
 	}
 	if values[subtitleSettingSDH] != "any" && values[subtitleSettingSDH] != "yes" && values[subtitleSettingSDH] != "no" {
-		return errors.New("sdh must be any, yes or no")
+		return nil, errors.New("sdh must be any, yes or no")
 	}
 	if values[subtitleSettingCollision] != "keep" && values[subtitleSettingCollision] != "replace" {
-		return errors.New("collision policy must be keep or replace")
+		return nil, errors.New("collision policy must be keep or replace")
 	}
 	for _, language := range strings.Split(values[subtitleSettingLanguages], ",") {
 		if strings.TrimSpace(language) != "" && subtitleProviderLanguage(language) == "" {
-			return fmt.Errorf("unsupported subtitle language %q", strings.TrimSpace(language))
+			return nil, fmt.Errorf("unsupported subtitle language %q", strings.TrimSpace(language))
 		}
 	}
 	apiKey := strings.TrimSpace(input.APIKey)
@@ -78,13 +78,21 @@ func saveSubtitleSettings(cfg *Config, input subtitleSettingsInput) error {
 		password = cfg.Settings[subtitleSettingPassword]
 	}
 	if settingTruthy(values[subtitleSettingEnabled]) && apiKey == "" {
-		return errors.New("subtitle provider API key is required when subtitles are enabled")
+		return nil, errors.New("subtitle provider API key is required when subtitles are enabled")
 	}
 	if (values[subtitleSettingUsername] == "") != (strings.TrimSpace(password) == "") {
-		return errors.New("subtitle provider username and password must be supplied together")
+		return nil, errors.New("subtitle provider username and password must be supplied together")
 	}
 	values[subtitleSettingAPIKey] = apiKey
 	values[subtitleSettingPassword] = password
+	return values, nil
+}
+
+func saveSubtitleSettings(cfg *Config, input subtitleSettingsInput) error {
+	values, err := subtitleSettingsValues(cfg, input)
+	if err != nil {
+		return err
+	}
 	keys := make([]string, 0, len(values))
 	for key := range values {
 		keys = append(keys, key)

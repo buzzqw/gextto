@@ -6,6 +6,8 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+
+	subtitleprovider "github.com/buzzqw/gextto/internal/subtitles"
 )
 
 type v2SubtitlesView struct {
@@ -14,6 +16,68 @@ type v2SubtitlesView struct {
 	AppliedPath string
 	Message     string
 	Error       bool
+}
+
+type v2SubtitleTestView struct {
+	OK      bool
+	Message string
+}
+
+func subtitleSettingsInputFromForm(r *http.Request) subtitleSettingsInput {
+	return subtitleSettingsInput{
+		Enabled: r.FormValue("enabled"), ProviderURL: r.FormValue("provider_url"),
+		APIKey: r.FormValue("api_key"), Username: r.FormValue("username"), Password: r.FormValue("password"),
+		Languages: r.FormValue("languages"), Forced: r.FormValue("forced"), SDH: r.FormValue("sdh"),
+		Collision: r.FormValue("collision_policy"),
+	}
+}
+
+func subtitleFriendlyError(err error) string {
+	if err == nil {
+		return ""
+	}
+	message := err.Error()
+	switch {
+	case strings.Contains(message, "HTTP 401"), strings.Contains(message, "HTTP 403"), strings.Contains(message, "API key is required"):
+		return "API key o credenziali non valide."
+	case strings.Contains(message, "HTTP 429"), strings.Contains(message, "HTTP 503"), strings.Contains(message, "HTTP 502"), strings.Contains(message, "HTTP 504"):
+		return "Provider temporaneamente non disponibile o limite di richieste raggiunto. Riprova tra poco."
+	case strings.Contains(message, "no such host"), strings.Contains(message, "connection refused"), strings.Contains(message, "timeout"):
+		return "Provider non raggiungibile. Controlla URL e rete."
+	default:
+		return message
+	}
+}
+
+// V2SubtitleProviderTest checks the values currently in the form without
+// saving them, so a typo is caught before the operator presses Save.
+func V2SubtitleProviderTest(w http.ResponseWriter, r *http.Request, s *AppState) {
+	view := v2SubtitleTestView{}
+	cfg := latestConfig(s)
+	values, err := subtitleSettingsValues(cfg, subtitleSettingsInputFromForm(r))
+	if err != nil {
+		view.Message = subtitleFriendlyError(err)
+		v2Render(w, http.StatusOK, "v2_subtitle_test_result", view, s)
+		return
+	}
+	temporary := *cfg
+	temporary.Settings = copyStringMap(cfg.Settings)
+	for key, value := range values {
+		temporary.Settings[key] = value
+	}
+	// Testing is allowed before the master switch is turned on.
+	temporary.Settings[subtitleSettingEnabled] = "true"
+	client, _, err := subtitleProviderClient(&temporary)
+	if err == nil {
+		_, err = client.Search(r.Context(), subtitleprovider.SearchQuery{Language: "en", Kind: "movie", Title: "test"})
+	}
+	if err != nil {
+		view.Message = subtitleFriendlyError(err)
+		v2Render(w, http.StatusOK, "v2_subtitle_test_result", view, s)
+		return
+	}
+	view.OK = true
+	v2Render(w, http.StatusOK, "v2_subtitle_test_result", view, s)
 }
 
 func V2SubtitleSearch(w http.ResponseWriter, r *http.Request, s *AppState) {
