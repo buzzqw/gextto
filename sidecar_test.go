@@ -108,6 +108,60 @@ func TestRenameMovieBringsItsSidecars(t *testing.T) {
 	}
 }
 
+func TestFlattenMovieFolderPreservesCompleteSubtitleSuffix(t *testing.T) {
+	root := t.TempDir()
+	folder := filepath.Join(root, "raw")
+	if err := os.MkdirAll(folder, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	video := filepath.Join(folder, "Example.Movie.2024.1080p.mkv")
+	for name, data := range map[string]string{
+		filepath.Base(video):                          "video",
+		"Example.Movie.2024.1080p.ita.forced.sdh.srt": "sub",
+		"Other.Movie.ita.srt":                         "unrelated",
+	} {
+		if err := os.WriteFile(filepath.Join(folder, name), []byte(data), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	cfg := DefaultConfig()
+	cfg.ArchiveRoot = &root
+	cfg.Settings = map[string]string{"movies_flat_files": "yes"}
+	year := int64(2024)
+	release := &models.Release{Title: "Example Movie", Year: &year, Kind: "movie"}
+	flat, err := flattenMovieFolder(&cfg, release, video)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stem := strings.TrimSuffix(filepath.Base(flat), filepath.Ext(flat))
+	if _, err := os.Stat(filepath.Join(root, stem+".ita.forced.sdh.srt")); err != nil {
+		t.Fatalf("complete subtitle suffix was lost: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(root, "Other.Movie.ita.srt")); !os.IsNotExist(err) {
+		t.Fatalf("unrelated subtitle was moved: %v", err)
+	}
+}
+
+func TestRenameSidecarsOldNamePreservesLanguageAndFlags(t *testing.T) {
+	root := t.TempDir()
+	source := filepath.Join(root, "Show.S01E01.1080p.mkv")
+	if err := os.WriteFile(source, []byte("video"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "Old.Show.S01E01.ita.forced.sdh.srt"), []byte("sub"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	target := filepath.Join(root, "Show - S01E01 - Titolo.mkv")
+	cfg := DefaultConfig()
+	cfg.CleanupAction = "delete"
+	if _, err := RenameSidecars(source, target, &cfg); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(root, "Show - S01E01 - Titolo.ita.forced.sdh.srt")); err != nil {
+		t.Fatalf("old-name sidecar suffix was lost: %v", err)
+	}
+}
+
 func TestDiscardSidecarsDoesNotTouchSimilarlyNamedFiles(t *testing.T) {
 	root := t.TempDir()
 	video := filepath.Join(root, "Example Movie.mkv")

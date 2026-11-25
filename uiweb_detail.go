@@ -18,24 +18,25 @@ import (
 // the same data as the JSON API (SeriesDetail / MovieDetail) so nothing differs.
 
 type uiEpisodeRow struct {
-	Series       string
-	Season       int64
-	Episode      int64
-	Title        string
-	Status       string
-	AirDate      string
-	Ignored      bool
-	Archived     bool
-	QualityScore int64
-	SizeBytes    int64
-	IgnorePath   string
-	IgnoreBody   string
-	ForcePath    string
-	Redownload   string
-	SearchPath   string
-	SourcesPath  string
-	DeletePath   string
-	MagnetHash   string
+	Series             string
+	Season             int64
+	Episode            int64
+	Title              string
+	Status             string
+	AirDate            string
+	Ignored            bool
+	Archived           bool
+	QualityScore       int64
+	SizeBytes          int64
+	IgnorePath         string
+	IgnoreBody         string
+	ForcePath          string
+	Redownload         string
+	SearchPath         string
+	SourcesPath        string
+	DeletePath         string
+	MagnetHash         string
+	SubtitlesAvailable bool
 }
 
 // uiSeasonGroup groups the episode rows of one season for the collapsible
@@ -229,16 +230,17 @@ type uiMovieDetail struct {
 	// one that was never looked up, so the page can say which it is.
 	AliasesChecked bool
 	// Profiles is the «Profilo di qualità» choice of the page.
-	Profiles      v2TitleProfiles
-	Enabled       bool
-	History       []MovieHistory
-	CrossSeedHash string
-	Matches       []uiMovieMatch
-	Poster        string
-	ReleaseDate   string
-	Cast          []uiDetailPerson
-	TmdbURL       string
-	TvdbURL       string
+	Profiles           v2TitleProfiles
+	Enabled            bool
+	History            []MovieHistory
+	CrossSeedHash      string
+	SubtitlesAvailable bool
+	Matches            []uiMovieMatch
+	Poster             string
+	ReleaseDate        string
+	Cast               []uiDetailPerson
+	TmdbURL            string
+	TvdbURL            string
 }
 
 // uiMagnetURL only trusts links with a safe scheme so the archive match links
@@ -281,6 +283,7 @@ func uiSeriesDetailFrom(s *AppState, r *http.Request) (uiSeriesDetail, bool) {
 	escaped := url.PathEscape(series.Name)
 	rows := make([]uiEpisodeRow, 0, len(episodes))
 	downloadedCount := 0
+	subtitlesAvailable := settingTruthy(cfg.Settings[subtitleSettingEnabled])
 	for _, episode := range episodes {
 		if episode.ArchivePath != nil && strings.TrimSpace(*episode.ArchivePath) != "" {
 			downloadedCount++
@@ -299,24 +302,25 @@ func uiSeriesDetailFrom(s *AppState, r *http.Request) (uiSeriesDetail, bool) {
 			magnetHash = strings.TrimSpace(*episode.MagnetHash)
 		}
 		rows = append(rows, uiEpisodeRow{
-			Series:       series.Name,
-			Season:       episode.Season,
-			Episode:      episode.Episode,
-			Title:        title,
-			Status:       episode.Status,
-			AirDate:      episode.AirDate,
-			Ignored:      episode.Ignored,
-			Archived:     episode.ArchivePath != nil && strings.TrimSpace(*episode.ArchivePath) != "",
-			QualityScore: episode.QualityScore,
-			SizeBytes:    episode.SizeBytes,
-			IgnorePath:   base + "/ignore",
-			IgnoreBody:   `{"ignored":` + ignoreValue + `}`,
-			ForcePath:    base + "/force",
-			Redownload:   base + "/redownload",
-			SearchPath:   base + "/search",
-			SourcesPath:  base + "/sources",
-			DeletePath:   base,
-			MagnetHash:   magnetHash,
+			Series:             series.Name,
+			Season:             episode.Season,
+			Episode:            episode.Episode,
+			Title:              title,
+			Status:             episode.Status,
+			AirDate:            episode.AirDate,
+			Ignored:            episode.Ignored,
+			Archived:           episode.ArchivePath != nil && strings.TrimSpace(*episode.ArchivePath) != "",
+			QualityScore:       episode.QualityScore,
+			SizeBytes:          episode.SizeBytes,
+			IgnorePath:         base + "/ignore",
+			IgnoreBody:         `{"ignored":` + ignoreValue + `}`,
+			ForcePath:          base + "/force",
+			Redownload:         base + "/redownload",
+			SearchPath:         base + "/search",
+			SourcesPath:        base + "/sources",
+			DeletePath:         base,
+			MagnetHash:         magnetHash,
+			SubtitlesAvailable: subtitlesAvailable && episode.ArchivePath != nil && strings.TrimSpace(*episode.ArchivePath) != "",
 		})
 	}
 	gaps := 0
@@ -555,6 +559,7 @@ func uiMovieDetailFrom(s *AppState, r *http.Request) (uiMovieDetail, bool) {
 			}
 		}
 	}
+	detail.SubtitlesAvailable = settingTruthy(cfg.Settings[subtitleSettingEnabled]) && len(detail.History) > 0
 	// The film may be monitored under one title and released under another
 	// (the international one). Search every known title, not only the
 	// configured name.

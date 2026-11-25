@@ -1,0 +1,37 @@
+{{define "v2_subtitles_modal"}}
+<div class="block overlay">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="v2-subtitles-title">
+    <div class="modal-head">
+      <h3 id="v2-subtitles-title">{{tr "Sottotitoli"}}{{if .Target.Label}} — {{tr .Target.Label}}{{end}}</h3>
+      <button class="btn sm" type="button" hx-get="/empty" hx-target="#v2-modal" hx-swap="innerHTML" {{trTitle "Chiudi la ricerca dei sottotitoli"}}>{{tr "Chiudi"}}</button>
+    </div>
+    {{if .Error}}<div class="notice err" role="alert">{{tr .Message}}</div>{{end}}
+    {{if .AppliedPath}}
+      <div class="notice ok" role="status">{{tr .Message}} <code>{{tr .AppliedPath}}</code></div>
+    {{else}}
+      {{if .Target.Label}}<p class="muted">{{tr "Durata video"}}: {{tr .Target.RuntimeSeconds}}s · {{tr "Dimensione"}}: {{bytes .Target.SizeBytes}}</p>{{end}}
+      {{if .Candidates}}
+      <div class="table-wrap"><table class="data-table">
+        <caption class="sr-only">{{tr "Sottotitoli trovati"}}</caption>
+        <thead><tr><th scope="col">{{tr "Lingua"}}</th><th scope="col">{{tr "Release"}}</th><th scope="col">{{tr "Corrispondenza"}}</th><th scope="col">{{tr "File"}}</th><th scope="col">{{tr "Azione"}}</th></tr></thead>
+        <tbody>{{range .Candidates}}<tr>
+          <td>{{tr .Language}}{{if .IsForced}} <span class="badge">{{tr "Forced"}}</span>{{end}}{{if .IsSDH}} <span class="badge">{{tr "SDH"}}</span>{{end}}</td>
+          <td class="truncate" {{trTitle .Release}}>{{tr .Release}}</td>
+          <td>{{range .Reasons}}<span class="badge">{{tr .}}</span> {{end}}</td>
+          <td class="truncate" {{trTitle .ProposedName}}><code>{{tr .ProposedName}}</code></td>
+          <td>
+            <form method="post" action="/subtitles/apply" hx-post="/subtitles/apply" hx-target="#v2-modal" hx-swap="innerHTML" hx-disabled-elt="find button">
+              <input type="hidden" name="series" value="{{$.Target.Series}}" /><input type="hidden" name="season" value="{{$.Target.Season}}" /><input type="hidden" name="episode" value="{{$.Target.Episode}}" /><input type="hidden" name="movie_id" value="{{$.Target.MovieID}}" />
+              <input type="hidden" name="file_id" value="{{.FileID}}" /><input type="hidden" name="language" value="{{.Language}}" /><input type="hidden" name="forced" value="{{if .IsForced}}true{{else}}false{{end}}" /><input type="hidden" name="sdh" value="{{if .IsSDH}}true{{else}}false{{end}}" />
+              <label class="field"><input type="checkbox" name="replace" value="true" /> {{tr "Sostituisci se esiste"}}</label>
+              <button class="btn sm primary" type="submit" {{trTitle "Scarica e scrive questo sottotitolo accanto al video"}}>{{tr "Applica"}}</button>
+            </form>
+          </td>
+        </tr>{{end}}</tbody>
+      </table></div>
+      {{else if .Target.Label}}<p class="muted">{{tr "Nessun sottotitolo trovato con questi filtri."}}</p>{{end}}
+      <p class="hint">{{tr "L'anteprima non scarica file. Applica conferma il download e la scrittura; il video non viene modificato."}}</p>
+    {{end}}
+  </div>
+</div>
+{{end}}

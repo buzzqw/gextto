@@ -1885,7 +1885,7 @@ func flattenMovieFolder(cfg *Config, release *models.Release, videoPath string) 
 	if err := moveAcrossDevices(videoPath, target); err != nil {
 		return videoPath, err
 	}
-	moveMovieCompanions(dir, root, filepath.Base(target))
+	moveMovieCompanions(dir, root, filepath.Base(videoPath), filepath.Base(target))
 	removeEmptyDirsUpTo(dir, root)
 	renameLeftoverMovieFolder(dir, root, strings.TrimSuffix(filepath.Base(target), filepath.Ext(target)))
 	return target, nil
@@ -1923,13 +1923,14 @@ func renameLeftoverMovieFolder(dir, root, stem string) {
 
 // moveMovieCompanions relocates the subtitles and artwork of a flattened movie
 // next to the video, renaming them so media servers still associate them.
-func moveMovieCompanions(oldDir, root, videoBase string) {
+func moveMovieCompanions(oldDir, root, sourceBase, targetBase string) {
 	oldDir = filepath.Clean(oldDir)
 	root = filepath.Clean(root)
 	if hasParentComponent(oldDir) || hasParentComponent(root) {
 		return
 	}
-	stem := strings.TrimSuffix(filepath.Base(videoBase), filepath.Ext(videoBase))
+	stem := strings.TrimSuffix(filepath.Base(targetBase), filepath.Ext(targetBase))
+	sourcePath := filepath.Join(oldDir, sourceBase)
 	entries, err := os.ReadDir(oldDir)
 	if err != nil {
 		return
@@ -1944,15 +1945,12 @@ func moveMovieCompanions(oldDir, root, videoBase string) {
 		var targetName string
 		switch {
 		case movieSubtitleExtensions[ext]:
-			base := strings.TrimSuffix(name, filepath.Ext(name))
-			lang := ""
-			if dot := strings.LastIndex(base, "."); dot >= 0 {
-				lang = strings.TrimSpace(base[dot+1:])
-			}
-			if lang != "" && len(lang) <= 8 {
-				targetName = stem + "." + lang + filepath.Ext(name)
+			if remainder, ok := associatedSidecarRemainder(sourcePath, name); ok {
+				targetName = stem + remainder
 			} else {
-				targetName = stem + filepath.Ext(name)
+				// A subtitle with a different stem is not proven to belong to
+				// this movie; leave it in place instead of guessing a language.
+				continue
 			}
 		case ext == ".nfo":
 			targetName = stem + ".nfo"
@@ -2112,6 +2110,20 @@ func EpisodeNameConforms(path string, release *models.Release, cfg *Config) bool
 	return true
 }
 
+// sidecarSuffixAfterEpisode keeps language and flag suffixes when a sidecar
+// with an older filename is adopted by episode identity (SxxEyy/NxNN).
+func sidecarSuffixAfterEpisode(name, extension string) string {
+	pattern, err := utils.CachedRegex(`(?i)(?:s\d{1,2}e|\d{1,2}x)\d{1,4}`)
+	if err == nil {
+		if match := pattern.FindStringIndex(name); match != nil {
+			if remainder := strings.TrimLeft(name[match[1]:], " ._-"); remainder != "" {
+				return remainder
+			}
+		}
+	}
+	return extension
+}
+
 // RenameSidecars renames the files associated with a video (thumbnail,
 // subtitles, nfo, …) so they follow the new base name (implementation of
 // `rename_sidecars`). The second element of each pair is empty when the sidecar
@@ -2217,9 +2229,9 @@ func RenameSidecars(source, target string, cfg *Config) ([][2]string, error) {
 			moved = append(moved, [2]string{path, ""})
 			continue
 		}
-		expected := fmt.Sprintf("%s.%s", targetStem, extension)
+		expected := fmt.Sprintf("%s.%s", targetStem, sidecarSuffixAfterEpisode(name, extension))
 		if strings.Contains(lower, "-thumb") {
-			expected = fmt.Sprintf("%s-thumb.%s", targetStem, extension)
+			expected = fmt.Sprintf("%s-thumb.%s", targetStem, sidecarSuffixAfterEpisode(name, extension))
 		}
 		newPath := filepath.Join(parent, expected)
 		if newPath != path {

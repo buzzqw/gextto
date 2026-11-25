@@ -1702,6 +1702,19 @@ Without a trash configured Gextto never deletes source files by itself.
   that said `[IT+EN]` becomes `[IT]`. It needs `ffprobe`, `ffmpeg` and
   `mkvmerge`.
 
+### External subtitles
+
+In *Integrations → Subtitles* you can configure an OpenSubtitles-compatible
+provider with an API key; account and password are optional. Leave the language
+empty to use the title's language, and filter forced and SDH independently.
+
+On an archived episode or downloaded movie, **Find subtitles** opens a preview
+with language, release, match reason and proposed filename. Preview downloads
+nothing. **Apply** confirms the download and writes an `.srt` next to the video,
+with suffixes such as `.ita.forced.sdh.srt`; if the file exists you must
+explicitly tick **Replace if it exists**. The subtitle then follows the normal
+video rename and upgrade paths.
+
 ## 18. Notifications
 
 Gextto can notify you through **Telegram**, **e-mail**, **webhook**,

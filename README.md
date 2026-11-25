@@ -69,7 +69,7 @@ flowchart LR
 | **Network** | TCP + uTP on one port · UPnP, NAT-PMP, PCP · BEP 55 holepunching · SOCKS5/HTTP · VPN killswitch | [gx-torrent doc](docs/gx-torrent.md) |
 | **Automation** | TV series, movies, comics · Torznab, RSS, HTML listings · stuck-download replacement | [User manual](docs/MANUAL.en.md) |
 | **Two networks** | Simultaneous Torrent + eD2k downloads on matching files · verified pieces from aMule `.part` | [aMule integration](docs/amule.md) |
-| **Integrations** | Jellyfin, Plex, Jellyseerr (v3 API), aMule (eD2k/Kad), Telegram, Discord, Slack, ntfy, Pushover, iCal | [User manual](docs/MANUAL.en.md) |
+| **Integrations** | Jellyfin, Plex, Jellyseerr (v3 API), Simkl list import, OpenSubtitles-compatible subtitles, aMule (eD2k/Kad), Telegram, Discord, Slack, ntfy, Pushover, iCal | [User manual](docs/MANUAL.en.md) |
 | **Interfaces** | Responsive web UI (SSR + HTMX, installable PWA, 20+ themes) · terminal TUI over SSH (client also on macOS and Windows) · JSON API | [TUI reference](docs/tui.md) · [API](docs/API.md) |
 | **Build** | Pure Go (`CGO_ENABLED=0`) · Linux x86_64/aarch64 · gx-torrent also native on Windows | [Developer manual](docs/DEVELOPERS.md) |
 

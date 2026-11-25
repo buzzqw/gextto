@@ -1724,6 +1724,21 @@ Gextto non cancella mai file sorgente da solo.
   di sostituire il file. Il nome segue la lingua rimasta: un file che diceva
   `[IT+EN]` diventa `[IT]`. Servono `ffprobe`, `ffmpeg` e `mkvmerge`.
 
+### Sottotitoli esterni
+
+In *Integrazioni → Sottotitoli* puoi configurare un provider OpenSubtitles-
+compatibile con API key; account e password sono facoltativi. La lingua può
+essere lasciata vuota per usare quella del titolo, mentre forced e SDH hanno
+filtri separati.
+
+Su una puntata archiviata o un film scaricato, **Cerca sottotitoli** apre
+un'anteprima con lingua, release, motivo della corrispondenza e nome del file
+che verrebbe creato. L'anteprima non scarica nulla. **Applica** conferma il
+download e scrive un `.srt` accanto al video, con suffissi come
+`.ita.forced.sdh.srt`; se il file esiste, devi spuntare esplicitamente
+**Sostituisci se esiste**. I sottotitoli seguono poi le normali rinomine e gli
+upgrade del video.
+
 ## 18. Notifiche
 
 Gextto può avvisarti su **Telegram**, **e-mail**, **webhook**, **Discord**,

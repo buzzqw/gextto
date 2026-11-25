@@ -9,6 +9,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	subtitleprovider "github.com/buzzqw/gextto/internal/subtitles"
 )
 
 // uiPageSection is one block of a panel page.
@@ -487,6 +489,21 @@ func uiIntegrationSections(s *AppState, cfg *Config) []uiPageSection {
 		return section
 	}
 	return []uiPageSection{
+		group("Servizi", sectionForm(uiFormSection{
+			Title: "Sottotitoli", Hint: "Provider OpenSubtitles-compatibile. La ricerca mostra un'anteprima; il file viene scritto solo quando confermi.", Path: "/api/subtitles/settings", Submit: "Salva sottotitoli",
+			Fields: []uiFormField{
+				{Name: "enabled", Label: "Abilita sottotitoli", Kind: "bool", Value: strconv.FormatBool(settingsBool(cfg, subtitleSettingEnabled, false)), Hint: "Mostra il pulsante di ricerca sulle schede di episodi e film."},
+				{Name: "provider_url", Label: "URL provider", Value: settingsOr(cfg, subtitleSettingProviderURL, subtitleprovider.DefaultBaseURL), Hint: "Indirizzo API compatibile con OpenSubtitles REST."},
+				{Name: "api_key", Label: "API key", Kind: "secret", Hint: "Lascia vuoto per mantenere la chiave salvata."},
+				{Name: "username", Label: "Utente", Value: settingsOr(cfg, subtitleSettingUsername, ""), Hint: "Facoltativo: senza account si usa l'accesso anonimo con API key."},
+				{Name: "password", Label: "Password", Kind: "secret", Hint: "Lascia vuoto per mantenere la password salvata."},
+				{Name: "languages", Label: "Lingue", Value: settingsOr(cfg, subtitleSettingLanguages, ""), Hint: "Codici separati da virgola, per esempio ita,eng. Vuoto usa la lingua del titolo."},
+				{Name: "forced", Label: "Forced", Kind: "select", Value: settingsOr(cfg, subtitleSettingForced, "any"), Hint: "any accetta entrambi, yes richiede sottotitoli forzati, no li esclude.", Options: []uiFormOption{{Value: "any", Label: " qualsiasi"}, {Value: "yes", Label: "Sì"}, {Value: "no", Label: "No"}}},
+				{Name: "sdh", Label: "SDH / non udenti", Kind: "select", Value: settingsOr(cfg, subtitleSettingSDH, "any"), Hint: "Filtra i sottotitoli per non udenti; è distinto da forced.", Options: []uiFormOption{{Value: "any", Label: " qualsiasi"}, {Value: "yes", Label: "Sì"}, {Value: "no", Label: "No"}}},
+				{Name: "collision_policy", Label: "Se il file esiste", Kind: "select", Value: settingsOr(cfg, subtitleSettingCollision, "keep"), Hint: "keep non sostituisce nulla; replace richiede conferma e salva il vecchio file nel cestino.", Options: []uiFormOption{{Value: "keep", Label: "Mantieni"}, {Value: "replace", Label: "Sostituisci"}}},
+			},
+		})),
+		group("Servizi", sectionActions(uiActionSection{Label: "Verifica provider", Hint: "Esegue una ricerca di prova senza scaricare sottotitoli.", Buttons: []uiActionButton{{Label: "Test connessione", Method: "POST", Path: "/api/subtitles/test", Body: "{}", Hint: "Verifica API key e accesso al provider."}}})),
 		group("Servizi", sectionIntegration(uiIntegrationCardSection{
 			Title: "Simkl", Status: simklStatus, StatusClass: simklStatusClass,
 			Children: []uiPageSection{

@@ -58,11 +58,11 @@ still be true after the item lands does not belong here.
   downloading the payload again. Gate: an opt-in policy per tracker, respect for
   its rules, and tests proving that no payload is downloaded or duplicated and
   that HnR risk is visible before seeding.
-- **Automatic subtitle provider**: match a movie or episode by hash, duration and
-  filename to a subtitle provider, honour language, forced and hearing-impaired
-  preferences and show a preview before writing sidecars. Local sidecar transfer,
-  rename and upgrade alignment are already handled. Gate: provider support,
-  matching tests and a policy for replacing or keeping existing subtitles.
+- **Automatic unattended subtitles**: manual OpenSubtitles-compatible search,
+  preview and explicit apply are available, including forced/SDH filters and
+  sidecar alignment. Gate for unattended use: a provider confidence policy,
+  collision decisions, quota/rate-limit handling and tests proving that no file
+  is written without the configured thresholds.
 - **Queue deadlines and preemption**: per-title high/normal/low priority is
   available; the remaining work is a finish-by time, preemption of lower-priority
   work when a deadline is at risk and protection of active streaming. Gate:
