@@ -404,12 +404,15 @@ func manualImportPlace(source, targetName, destination string, replace bool, cfg
 		if err := trashOrRemove(final, cfg); err != nil {
 			return "", fmt.Errorf("cannot move the existing file to the trash: %w", err)
 		}
+		if _, err := DiscardSidecars(final, cfg); err != nil {
+			return "", fmt.Errorf("cannot move the existing sidecars to the trash: %w", err)
+		}
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return "", err
 	}
 	if err := moveAcrossDevices(source, final); err != nil {
 		return "", err
 	}
-	MoveSidecarsToTarget(source, final, cfg)
+	ApplySidecarsTo(source, final, cfg)
 	return final, nil
 }

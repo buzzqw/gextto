@@ -1046,12 +1046,20 @@ modificano i video **sul posto** (alcuni tagger, `mkvpropedit`), spegni l'opzion
 *Configurazione → Seed e completamento → Hardlink invece della copia durante il
 seed*: cambierebbero anche il file in seed.
 
+Per un episodio o un film singolo, i sottotitoli esterni associati al video
+entrano in libreria con lui: vengono **copiati** quando il download resta in
+seed e **spostati** quando si sposta la sorgente. Suffissi come `.ita.forced.srt`
+restano intatti, e un file con nome simile ma diverso non viene raccolto. La
+rinomina del film porta con sé anche i sottotitoli.
+
 ### Upgrade
 
 Quando arriva una versione migliore di un file che hai già, la nuova entra in
 libreria e la vecchia va nel **cestino**. Una versione uguale o peggiore viene
 scartata (nel log: `discarded as inferior`). Per congelare un titolo imposta
-**Permetti upgrade** su *No* con *Modifica selezionati*.
+**Permetti upgrade** su *No* con *Modifica selezionati*. I sottotitoli esterni
+seguono la stessa sorte: quelli della vecchia copia vanno nel cestino e quelli
+della nuova restano accanto al video.
 
 ### Il nome dei file
 

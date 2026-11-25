@@ -25,6 +25,7 @@ the other hand, apply to both.
 
 ## 25 November 2026
 - **Saving the series list and the movie list at the same time no longer answers "database is locked".** The two lists live in the same file and are saved independently, so a save could catch the other one mid-write, give up immediately and report a lock error instead of waiting its turn. It now waits, so the change you asked for is written. **What changes for you:** no more failed saves when the movies page and the series page write at the same moment.
+- **Subtitles now follow the video through imports, renames and upgrades.** When a single episode or movie enters the library, its external subtitles are copied if the download keeps seeding and moved if the source moves; movie renames keep them beside the video. During an upgrade the new subtitles replace the old ones instead of being discarded. **What changes for you:** no more archived videos with missing or stale subtitles.
 - **A client that changes something and then reads the list again finds its own change.** Sonarr, Radarr, Lidarr and Readarr set an option and immediately ask for the torrent list: until the queue refreshed itself — a fraction of a second, but right in that gap — the answer was the state before the change, so the request looked ignored. Adding, modifying and removing a torrent now refresh the list at once. **What changes for you:** external clients and phone apps show what you have just done, with no before-and-after.
 
 ## 24 November 2026

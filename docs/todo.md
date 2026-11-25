@@ -57,9 +57,10 @@ still be true after the item lands does not belong here.
   bitfield and seed without downloading the payload again. Gate: an opt-in policy per
   tracker, respect for its rules, and tests proving that no payload is downloaded or
   duplicated and that HnR risk is visible before seeding.
-- **Automatic subtitles**: match a movie or episode by hash, duration and filename to a
-  subtitle provider, honour language, forced and hearing-impaired preferences, keep sidecars
-  aligned through upgrades and show a preview before writing them. Gate: provider support,
+- **Automatic subtitle provider**: match a movie or episode by hash, duration and
+  filename to a subtitle provider, honour language, forced and hearing-impaired
+  preferences and show a preview before writing sidecars. Local sidecar transfer,
+  rename and upgrade alignment are already handled. Gate: provider support,
   matching tests and a policy for replacing or keeping existing subtitles.
 - **Queue priorities and deadlines**: give new episodes, backfills and upgrades separate
   priority classes, allow a finish-by time, preempt lower-priority work when a deadline is at

@@ -1029,12 +1029,20 @@ place** (some taggers, `mkvpropedit`), turn off *Configuration → Seeding and
 completion → Hardlink instead of copy while seeding*: they would change the
 seeding file too.
 
+For a single episode or movie, the external subtitles associated with the video
+enter the library with it: they are **copied** while the download keeps seeding
+and **moved** when the source moves. Suffixes such as `.ita.forced.srt` are kept,
+and a similarly named but different file is not collected. Renaming a movie
+brings its subtitles with it.
+
 ### Upgrades
 
 When a better version of a file you have arrives, the new one enters the
 library and the old one goes to the **trash**. An equal or worse version is
 dropped (in the log: `discarded as inferior`). To freeze a title set **Allow
-upgrades** to *No* with *Edit selected*.
+upgrades** to *No* with *Edit selected*. External subtitles follow the same
+rule: the old copy's subtitles go to the trash and the new ones stay beside the
+video.
 
 ### File names
 

@@ -261,11 +261,19 @@ func handleDuplicate(file string, cfg *Config) error {
 		return fmt.Errorf("invalid path: %s", file)
 	}
 	if cfg.CleanupAction == "delete" {
-		return os.Remove(file)
+		if err := os.Remove(file); err != nil {
+			return err
+		}
+	} else {
+		// ResolveTrashPath always yields a usable directory (configured trash_path
+		// or <data>/trash); MoveToTrash creates it when missing.
+		if _, err := MoveToTrash(file, cfg.ResolveTrashPath()); err != nil {
+			return err
+		}
 	}
-	// ResolveTrashPath always yields a usable directory (configured trash_path
-	// or <data>/trash); MoveToTrash creates it when missing.
-	_, err := MoveToTrash(file, cfg.ResolveTrashPath())
+	// A replacement or an inferior copy takes its companions with it. Leaving
+	// them behind makes an upgrade keep the old subtitles beside the new video.
+	_, err := DiscardSidecars(file, cfg)
 	return err
 }
 

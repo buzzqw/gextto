@@ -2599,6 +2599,7 @@ func tevCompleteEpisodeFolderWithArchive(cfg *Config, db *Database, torrents Tor
 	if err != nil {
 		return false, err
 	}
+	sidecarSource := video
 	if err := ValidateDestinationFrom(video, destination); err != nil {
 		return false, err
 	}
@@ -2659,6 +2660,11 @@ func tevCompleteEpisodeFolderWithArchive(cfg *Config, db *Database, torrents Tor
 			linked = value
 			sourcePreserved = true
 		}
+	}
+	if sourcePreserved {
+		ApplyCopySidecarsTo(sidecarSource, target, cfg)
+	} else {
+		ApplySidecarsTo(sidecarSource, target, cfg)
 	}
 	processedEvent := *event
 	processedEvent.SavePath = destination
@@ -2766,6 +2772,7 @@ func tevCompleteMovieWithArchive(cfg *Config, db *Database, torrents TorrentSess
 	if err != nil {
 		return false, err
 	}
+	sidecarSource := video
 	if err := ValidateDestinationFrom(video, destination); err != nil {
 		return false, err
 	}
@@ -2818,6 +2825,11 @@ func tevCompleteMovieWithArchive(cfg *Config, db *Database, torrents TorrentSess
 			return false, err
 		}
 		linked = value
+	}
+	if moveSource {
+		ApplySidecarsTo(sidecarSource, target, cfg)
+	} else {
+		ApplyCopySidecarsTo(sidecarSource, target, cfg)
 	}
 	processedEvent := *event
 	processedEvent.SavePath = destination

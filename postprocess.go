@@ -1805,6 +1805,7 @@ func RenameMovie(
 	if err := moveAcrossDevices(source, target); err != nil {
 		return "", err
 	}
+	ApplySidecars(source, target, cfg)
 	return target, nil
 }
 
@@ -2127,11 +2128,6 @@ func RenameSidecars(source, target string, cfg *Config) ([][2]string, error) {
 	videoExts := map[string]bool{
 		"mkv": true, "mp4": true, "avi": true, "m4v": true, "mov": true, "ts": true,
 	}
-	sidecarExts := map[string]bool{
-		"jpg": true, "jpeg": true, "png": true, "webp": true, "srt": true, "sub": true,
-		"ass": true, "ssa": true, "vtt": true, "idx": true, "sup": true, "smi": true,
-		"nfo": true, "txt": true,
-	}
 	existing := sidecarNames(parent)
 	moved := [][2]string{}
 	entries, err := os.ReadDir(parent)
@@ -2152,7 +2148,7 @@ func RenameSidecars(source, target string, cfg *Config) ([][2]string, error) {
 		}
 		name := entry.Name()
 		extension := strings.ToLower(strings.TrimPrefix(filepath.Ext(name), "."))
-		if videoExts[extension] || !sidecarExts[extension] {
+		if videoExts[extension] || !sidecarExtensions["."+extension] {
 			continue
 		}
 		lower := strings.ToLower(name)
@@ -2173,10 +2169,16 @@ func RenameSidecars(source, target string, cfg *Config) ([][2]string, error) {
 				continue
 			}
 			if _, err := os.Stat(newPath); err == nil {
-				if err := trashOrRemove(path, cfg); err != nil {
+				// The target companion belongs to the copy being replaced. Keep
+				// the incoming one, otherwise an upgrade silently retains the old
+				// subtitles and throws away the new ones.
+				if err := trashOrRemove(newPath, cfg); err != nil {
 					return nil, err
 				}
-			} else if err := moveAcrossDevices(path, newPath); err != nil {
+			} else if !os.IsNotExist(err) {
+				return nil, err
+			}
+			if err := moveAcrossDevices(path, newPath); err != nil {
 				return nil, err
 			}
 			moved = append(moved, [2]string{path, newPath})
@@ -2314,66 +2316,31 @@ func ApplySidecarsTo(source, target string, cfg *Config) {
 	}
 }
 
-// MoveSidecarsToTarget moves the sidecar files sitting next to source into the
-// directory of target, renamed after the target stem.
-func MoveSidecarsToTarget(source, target string, cfg *Config) ([][2]string, error) {
-	sourceDir := filepath.Dir(source)
-	targetDir := filepath.Dir(target)
-	sourceStem := fileStem(source)
-	targetStem := fileStem(target)
-	if sourceStem == "" || targetStem == "" {
-		return [][2]string{}, nil
-	}
-	sidecarExts := map[string]bool{
-		"jpg": true, "jpeg": true, "png": true, "webp": true, "srt": true, "sub": true,
-		"ass": true, "ssa": true, "vtt": true, "idx": true, "sup": true, "smi": true,
-		"nfo": true, "txt": true,
-	}
-	entries, err := os.ReadDir(sourceDir)
+// ApplyCopySidecarsTo is ApplySidecarsTo for a video that keeps seeding in its
+// download folder: the library gets a copy of each companion.
+func ApplyCopySidecarsTo(source, target string, cfg *Config) {
+	sidecars, err := CopySidecarsToTarget(source, target, cfg)
 	if err != nil {
-		return [][2]string{}, nil
+		logging.Warn("copy sidecar failed", "error", err)
+		return
 	}
-	moved := [][2]string{}
-	for _, entry := range entries {
-		if entry.Type()&os.ModeSymlink != 0 {
-			continue
-		}
-		path := filepath.Join(sourceDir, entry.Name())
-		if SamePath(path, source) {
-			continue
-		}
-		info, err := entry.Info()
-		if err != nil || !info.Mode().IsRegular() {
-			continue
-		}
-		name := entry.Name()
-		extension := strings.ToLower(strings.TrimPrefix(filepath.Ext(name), "."))
-		if !sidecarExts[extension] {
-			continue
-		}
-		remainder, ok := strings.CutPrefix(name, sourceStem)
-		if !ok {
-			// A sidecar named only by the episode marker (e.g. "Show.S01E01.ita.srt"):
-			// keep its extension and let the target name lead.
-			remainder = "." + extension
-		}
-		newPath := filepath.Join(targetDir, targetStem+remainder)
-		if SamePath(path, newPath) {
-			continue
-		}
-		if _, statErr := os.Stat(newPath); statErr == nil {
-			if err := trashOrRemove(path, cfg); err != nil {
-				return moved, err
-			}
-			moved = append(moved, [2]string{path, ""})
-			continue
-		}
-		if err := moveAcrossDevices(path, newPath); err != nil {
-			return moved, err
-		}
-		moved = append(moved, [2]string{path, newPath})
+	for _, pair := range sidecars {
+		logging.Debug("copy sidecar", "from", pair[0], "to", pair[1])
 	}
-	return moved, nil
+}
+
+// MoveSidecarsToTarget moves the sidecar files sitting next to source into the
+// directory of target, renamed after the target stem. Only companions whose
+// name starts with the complete source stem are moved.
+func MoveSidecarsToTarget(source, target string, cfg *Config) ([][2]string, error) {
+	return transferSidecarsToTarget(source, target, cfg, false)
+}
+
+// CopySidecarsToTarget is MoveSidecarsToTarget for a video that stays in the
+// download folder to keep seeding: the library receives its own companion
+// files without taking them away from the torrent.
+func CopySidecarsToTarget(source, target string, cfg *Config) ([][2]string, error) {
+	return transferSidecarsToTarget(source, target, cfg, true)
 }
 
 // DiscardSidecars moves the sidecars of a discarded duplicate video to the
@@ -2383,33 +2350,10 @@ func DiscardSidecars(source string, cfg *Config) (int, error) {
 	if stem == "" {
 		return 0, nil
 	}
-	parent := filepath.Dir(source)
-	sidecarExts := map[string]bool{
-		"jpg": true, "jpeg": true, "png": true, "webp": true, "srt": true, "sub": true,
-		"ass": true, "ssa": true, "vtt": true, "idx": true, "sup": true, "smi": true,
-		"nfo": true, "xml": true,
-	}
 	moved := 0
-	entries, err := os.ReadDir(parent)
-	if err != nil {
-		return 0, err
-	}
-	for _, entry := range entries {
-		path := filepath.Join(parent, entry.Name())
-		if path == source {
-			continue
-		}
-		info, err := entry.Info()
-		if err != nil || !info.Mode().IsRegular() {
-			continue
-		}
-		name := entry.Name()
-		extension := strings.ToLower(strings.TrimPrefix(filepath.Ext(name), "."))
-		if !strings.HasPrefix(name, stem) || !sidecarExts[extension] {
-			continue
-		}
+	for _, path := range sidecarPathsForVideo(source) {
 		if err := trashOrRemove(path, cfg); err != nil {
-			return 0, err
+			return moved, err
 		}
 		moved++
 	}
