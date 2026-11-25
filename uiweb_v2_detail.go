@@ -94,6 +94,9 @@ func V2SeriesSave(w http.ResponseWriter, r *http.Request, s *AppState) {
 		if _, ok := r.Form["priority"]; ok {
 			fields["priority"] = r.FormValue("priority")
 		}
+		if _, ok := r.Form["season_strategy"]; ok {
+			fields["season_strategy"] = r.FormValue("season_strategy")
+		}
 		if id, err := strconv.Atoi(strings.TrimSpace(r.FormValue("quality_profile_id"))); err == nil && id > 0 {
 			fields["quality_profile_id"] = id
 		}

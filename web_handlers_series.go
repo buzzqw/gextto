@@ -36,6 +36,8 @@ type SeriesUpdateInput struct {
 	StatusOverride *string `json:"status_override"`
 	// Priority is the automatic acquisition/queue order: high, normal or low.
 	Priority *string `json:"priority"`
+	// SeasonStrategy is auto, singles or wait-for-pack.
+	SeasonStrategy *string `json:"season_strategy"`
 	// QualityProfileID, when above 0, copies that profile's quality, audio,
 	// language, subtitles and upgrade switch into the series and adds its
 	// exclusions to the series' own (the profile is a template).
@@ -208,6 +210,14 @@ func UpdateSeries(w http.ResponseWriter, r *http.Request, s *AppState) {
 			return
 		}
 		series.Priority = priority
+	}
+	if input.SeasonStrategy != nil {
+		strategy, ok := normalizeSeasonStrategy(*input.SeasonStrategy)
+		if !ok {
+			jsonError(w, http.StatusBadRequest, "season_strategy must be auto, singles or wait-for-pack")
+			return
+		}
+		series.SeasonStrategy = strategy
 	}
 	if input.QualityProfileID != nil && *input.QualityProfileID > 0 {
 		profile, ok := qualityProfileExact(ensureQualityProfiles(s), *input.QualityProfileID)

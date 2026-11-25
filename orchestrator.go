@@ -510,6 +510,12 @@ func RunCycleDomain(
 				// Not monitored: never log these, they are pure noise.
 				continue
 			}
+			if !seasonStrategyAllowsRelease(series, &release) {
+				logging.Debug("release skipped by the season strategy",
+					"target", releaseTarget(&release),
+					"strategy", seriesSeasonStrategy(series))
+				continue
+			}
 			if !cfg.SeriesReleaseAllowed(series, &release.Quality, release.Title) &&
 				!(release.LastResort && cfg.SeriesLastResortAllowed(series, &release.Quality, release.Title)) {
 				logCandidateRejected(&release, "excluded by the series quality/language/exclude rules")
@@ -794,7 +800,8 @@ func collectGapReleases(ctx context.Context, cfg *Config, engine *Engine, db *Da
 					continue
 				}
 				release := parseArchiveRelease(ctx, cfg, series, item)
-				if !releaseMatchesConfiguredEpisode(release, series, gap.Season, gap.Episode) {
+				if !releaseMatchesConfiguredEpisode(release, series, gap.Season, gap.Episode) ||
+					!seasonStrategyAllowsRelease(series, release) {
 					continue
 				}
 				if reason := cfg.AllReleaseDeniedReason(release); reason != "" {
@@ -894,6 +901,7 @@ func collectGapReleases(ctx context.Context, cfg *Config, engine *Engine, db *Da
 					for i := range found {
 						release := found[i]
 						if !releaseMatchesConfiguredEpisode(&release, candidate.Series, candidate.Season, candidate.Episode) ||
+							!seasonStrategyAllowsRelease(candidate.Series, &release) ||
 							cfg.AllReleaseDeniedReason(&release) != "" {
 							continue
 						}
@@ -909,15 +917,21 @@ func collectGapReleases(ctx context.Context, cfg *Config, engine *Engine, db *Da
 						foundResults[index] = append(foundResults[index], release)
 					}
 				}
-				appendValid(engine.SearchSeriesEpisode(ctx, cfg, candidate.Series, candidate.Season, candidate.Episode, false))
-				if len(foundResults[index]) == 0 {
-					seasonQuery := fmt.Sprintf("%s S%02d", candidate.Series.Name, candidate.Season)
-					logging.Debug("gap-fill season fallback started",
-						"series", candidate.Series.Name,
-						"season", candidate.Season,
-						"episode", candidate.Episode,
-						"query", seasonQuery)
+				if seriesSeasonStrategy(candidate.Series) == seasonStrategyWaitForPack {
+					// An episode query cannot reliably find a complete season pack.
+					// Ask for the season directly for this policy.
 					appendValid(engine.SearchSeriesSeason(ctx, cfg, candidate.Series, candidate.Season, false))
+				} else {
+					appendValid(engine.SearchSeriesEpisode(ctx, cfg, candidate.Series, candidate.Season, candidate.Episode, false))
+					if len(foundResults[index]) == 0 {
+						seasonQuery := fmt.Sprintf("%s S%02d", candidate.Series.Name, candidate.Season)
+						logging.Debug("gap-fill season fallback started",
+							"series", candidate.Series.Name,
+							"season", candidate.Season,
+							"episode", candidate.Episode,
+							"query", seasonQuery)
+						appendValid(engine.SearchSeriesSeason(ctx, cfg, candidate.Series, candidate.Season, false))
+					}
 				}
 				// eD2k is asked once for the whole season after every budget
 				// gap has been searched: see the phase after gapWG.Wait().
@@ -955,6 +969,9 @@ func collectGapReleases(ctx context.Context, cfg *Config, engine *Engine, db *Da
 			for i := range liveCandidates {
 				candidate := liveCandidates[i]
 				if len(foundResults[i]) > 0 {
+					continue
+				}
+				if seriesSeasonStrategy(candidate.Series) == seasonStrategyWaitForPack {
 					continue
 				}
 				key := seriesSeason{Series: candidate.Series.Name, Season: candidate.Season}
@@ -1306,6 +1323,9 @@ func prioritizeArchiveGapDownloads(
 				continue
 			}
 			if cfg.AllReleaseDeniedReason(release) != "" || !cfg.SeriesReleaseAllowed(series, &release.Quality, release.Title) {
+				continue
+			}
+			if !seasonStrategyAllowsRelease(series, release) {
 				continue
 			}
 			// Keep the configured spelling so the database, archive index and

@@ -67,10 +67,11 @@ still be true after the item lands does not belong here.
   available; the remaining work is a finish-by time, preemption of lower-priority
   work when a deadline is at risk and protection of active streaming. Gate:
   scheduler tests for preemption, starvation and deadline safety.
-- **Season acquisition strategy**: choose per series between singles, a pack, or waiting for
-  a completion threshold; cap the cost of upgrading a season episode by episode and prefer a
-  full-season replacement when enough episodes would change. Gate: a policy model and
-  coverage tests for partial, complete and in-progress packs.
+- **Season upgrade budget and pack preference**: per-series auto/singles/wait-for-pack
+  strategies are available; the remaining work is to cap episode-by-episode upgrade
+  cost, prefer a full-season replacement when enough episodes would change, and
+  optionally accept a partial pack only when it covers every known gap. Gate: a
+  coverage model shared by approval, inspection, staging and upgrade preview.
 - **Source trust and HnR awareness**: keep per-tracker download/upload statistics, show the
   seeding time or ratio needed to avoid a hit-and-run, and temporarily lower the trust of a
   release group or source after repeated fake, corrupt or dead-swarm results. Gate:

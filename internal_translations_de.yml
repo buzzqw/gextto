@@ -6721,3 +6721,7 @@ deu:
   "Ricerca cross-seed non riuscita.": "Die Cross-Seed-Suche ist fehlgeschlagen."
   "Priorità download": "Download-Priorität"
   "Decide solo l'ordine di ricerca e di accodamento: alta parte prima, bassa dopo. Non cambia qualità, filtri o upgrade.": "Bestimmt nur die Reihenfolge von Suche und Warteschlange: hoch zuerst, niedrig zuletzt. Qualität, Filter und Upgrades bleiben unverändert."
+  "Strategia stagione": "Staffelstrategie"
+  "Automatica usa il confronto normale fra singoli e pack. «Solo episodi singoli» rifiuta tutti i pack. «Aspetta il pack completo» accetta solo una stagione intera.": "Automatisch verwendet den normalen Vergleich zwischen Einzelepisoden und Packs. Nur Einzelepisoden lehnt jedes Pack ab. Auf vollständiges Pack warten akzeptiert nur eine ganze Staffel."
+  "Solo episodi singoli": "Nur Einzelepisoden"
+  "Aspetta il pack completo": "Auf das vollständige Pack warten"

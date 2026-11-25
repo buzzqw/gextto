@@ -71,6 +71,7 @@ type uiSeriesDetail struct {
 	// "ended" or "continuing".
 	StatusOverride string
 	Priority       string
+	SeasonStrategy string
 	// EndLabel and EndTitle are the badge of the end-of-series verdict
 	// (empty when nothing is known); EndConflict adds the "sources disagree"
 	// badge.
@@ -395,6 +396,7 @@ func uiSeriesDetailFrom(s *AppState, r *http.Request) (uiSeriesDetail, bool) {
 	}
 	detail.StatusOverride = series.StatusOverride
 	detail.Priority = storedTitlePriority(series.Priority)
+	detail.SeasonStrategy = storedSeasonStrategy(series.SeasonStrategy)
 	record := SeriesEndRecord{}
 	if records, err := s.db.SeriesEndRecords(); err == nil {
 		record = records[series.Name]

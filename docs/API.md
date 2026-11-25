@@ -261,7 +261,7 @@ state.
 | GET | `/api/series/seen` | seen episodes |
 | GET | `/api/series/seen/grouped` | seen episodes, grouped |
 | GET | `/api/series/{name}` | series details |
-| POST | `/api/series/{name}` | update a series (the name field renames it); optional priority is high, normal or low and only orders acquisition/queueing |
+| POST | `/api/series/{name}` | update a series (the name field renames it); optional priority is high, normal or low and season_strategy is auto, singles or wait-for-pack |
 | DELETE | `/api/series/{name}` | remove a series |
 | GET | `/api/series/{name}/episodes` | episodes of a series |
 | GET | `/api/series/{name}/info` | metadata from the provider |

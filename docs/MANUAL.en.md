@@ -526,6 +526,17 @@ and — if you enable it — asks eD2k once per season when torrents find nothin
 
 ### Season packs and single episodes
 
+The series edit form's **Season strategy** controls only what the automatic cycle
+accepts:
+
+- **Automatic** uses the normal comparison between singles and packs;
+- **Singles only** rejects every pack, including partial packs;
+- **Wait for the complete pack** accepts only a pack that declares the whole
+  season and keeps looking for missing singles until it arrives.
+
+A download started by hand is always available and is not blocked by this
+choice.
+
 - A **season pack** can fill many episodes, but the comparison with the library
   stays episode by episode: a pack does not replace an episode you already
   have in equal or better quality.

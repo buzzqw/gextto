@@ -530,6 +530,17 @@ serve solo a non aspettare il ciclo successivo.
 
 ### Season pack ed episodi singoli
 
+Nel modulo di modifica della serie, **Strategia stagione** controlla solo cosa
+accetta il ciclo automatico:
+
+- **Automatica** usa il confronto normale tra singoli e pack;
+- **Solo episodi singoli** rifiuta tutti i pack, anche quelli parziali;
+- **Aspetta il pack completo** accetta solo un pack che dichiara l'intera
+  stagione e continua a cercare i singoli mancanti finché non arriva.
+
+Un download avviato a mano resta sempre possibile e non viene bloccato da questa
+scelta.
+
 - Un **season pack** può riempire molti episodi, ma il confronto con la
   libreria resta episodio per episodio: un pack non sostituisce un episodio che
   hai già in qualità uguale o migliore.

@@ -79,6 +79,9 @@ type SeriesConfig struct {
 	// Priority orders automatic acquisition and the download queue for this
 	// title: high, normal (the default) or low.
 	Priority string `json:"priority,omitempty"`
+	// SeasonStrategy chooses how automatic acquisition treats season packs:
+	// auto, singles or wait-for-pack.
+	SeasonStrategy string `json:"season_strategy,omitempty"`
 }
 
 // UpgradesAllowed reports whether a better release may replace an archived
@@ -3163,6 +3166,7 @@ func (c *Config) loadStoredSeries() error {
 			for i := range series {
 				series[i].Audio = normalizeAudioRequirement(audioPreferenceDisplay(series[i].Audio, series[i].AudioChannels))
 				series[i].Priority = storedTitlePriority(series[i].Priority)
+				series[i].SeasonStrategy = storedSeasonStrategy(series[i].SeasonStrategy)
 				if series[i].Cutoff != "" {
 					series[i].Qualities = migrateTitleCutoff(series[i].Qualities, series[i].Quality, series[i].Cutoff)
 					series[i].Cutoff = ""
@@ -4015,6 +4019,7 @@ func saveLibrary(dataDir string, series []SeriesConfig, movies []MovieConfig, up
 	}
 	for i := range series {
 		series[i].Priority = storedTitlePriority(series[i].Priority)
+		series[i].SeasonStrategy = storedSeasonStrategy(series[i].SeasonStrategy)
 	}
 	for i := range movies {
 		movies[i].Priority = storedTitlePriority(movies[i].Priority)

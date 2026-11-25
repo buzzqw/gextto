@@ -6057,3 +6057,7 @@ eng:
   "Ricerca cross-seed non riuscita.": "The cross-seed search failed."
   "Priorità download": "Download priority"
   "Decide solo l'ordine di ricerca e di accodamento: alta parte prima, bassa dopo. Non cambia qualità, filtri o upgrade.": "Only decides search and queue order: high goes first, low last. It does not change quality, filters or upgrades."
+  "Strategia stagione": "Season strategy"
+  "Automatica usa il confronto normale fra singoli e pack. «Solo episodi singoli» rifiuta tutti i pack. «Aspetta il pack completo» accetta solo una stagione intera.": "Automatic uses the normal comparison between singles and packs. Singles only rejects every pack. Wait for the complete pack accepts only a whole season."
+  "Solo episodi singoli": "Singles only"
+  "Aspetta il pack completo": "Wait for the complete pack"
