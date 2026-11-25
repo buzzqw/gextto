@@ -868,6 +868,15 @@ func OpenConfigDB(path string) (*sql.DB, error) {
 	return OpenSQLite(path)
 }
 
+// OpenConfigDBWritable opens `gextto_config.db` for a save that may run next to
+// another one (the series list and the movie list are saved independently): its
+// transactions take the write lock at BEGIN, so the loser of the race waits for
+// the busy timeout instead of failing at once when it upgrades a transaction it
+// has already read in. See OpenSQLiteWritable.
+func OpenConfigDBWritable(path string) (*sql.DB, error) {
+	return OpenSQLiteWritable(path)
+}
+
 // loadConfigSetting reads one value from gextto_config.db. A missing key is an
 // empty value, not an error: the caller may be reading a setting that has never
 // been saved.
@@ -3991,7 +4000,7 @@ func saveLibrary(dataDir string, series []SeriesConfig, movies []MovieConfig, up
 	if movies == nil {
 		movies = []MovieConfig{}
 	}
-	conn, err := OpenConfigDB(filepath.Join(dataDir, "gextto_config.db"))
+	conn, err := OpenConfigDBWritable(filepath.Join(dataDir, "gextto_config.db"))
 	if err != nil {
 		return err
 	}

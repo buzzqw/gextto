@@ -793,7 +793,10 @@ the 5.x `stopped` flag on `torrents/add`, accepted next to `paused`),
 `torrents/toggleSequentialDownload|setSuperSeeding|addTrackers|removeTrackers|editTracker|filePrio|export|setForceStart|setAutoManagement|setDownloadLimit|setUploadLimit|setShareLimits`,
 `transfer/downloadLimit|uploadLimit|setDownloadLimit|setUploadLimit`, `sync/maindata` (with incremental `rid`) and
 `sync/torrentPeers` (which reports `rid: 0`), and `content_path` in
-`torrents/info`, as the request managers read). The complete download-client
+`torrents/info`, as the request managers read). A change made through the API
+is visible to the next read: adding, modifying or removing a torrent republishes
+the list at once instead of waiting for the queue tick, because the request
+managers write and read back in the same breath. The complete download-client
 sequence is covered by end-to-end tests for Sonarr, Radarr, Lidarr and Readarr:
 login, version probe, category creation, magnet add with category and save path,
 share limits in exact minutes, status read through `torrents/info`, incremental

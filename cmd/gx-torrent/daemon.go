@@ -2167,6 +2167,10 @@ func (d *Daemon) add(req addRequest) (string, bool, error) {
 	d.state.Tags = mergeTagNames(d.state.Tags, req.Tags)
 	d.indexTorrentLocked(t)
 	d.saveLocked()
+	// Publish the list right away: the client that just added the torrent asks
+	// for it in the same breath, and the queue loop's poke below is
+	// asynchronous.
+	d.publishViewsLocked(d.buildViewsLocked())
 	d.poke()
 	return hash, false, nil
 }
@@ -2195,6 +2199,9 @@ func (d *Daemon) remove(key string, deleteFiles bool) error {
 	d.setSelection(id, nil)
 	_ = os.RemoveAll(filepath.Join(d.opts.PartsDir, id))
 	d.saveLocked()
+	// A client that deletes and then lists must not see the torrent again: the
+	// list is republished here, not only on the next tick.
+	d.publishViewsLocked(d.buildViewsLocked())
 	d.mu.Unlock()
 	d.poke()
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
@@ -2221,6 +2228,12 @@ func (d *Daemon) withTorrent(key string, fn func(t *torrent.Torrent, meta *torre
 		return err
 	}
 	d.saveLocked()
+	// Publish the new state before the caller can read it back: a client that
+	// writes and then reads — Sonarr sets the share limits and asks for the
+	// list — must see the change it just made, not the snapshot of the
+	// previous tick. The list is only republished by the queue loop, and the
+	// poke below is asynchronous.
+	d.publishViewsLocked(d.buildViewsLocked())
 	d.poke()
 	return nil
 }

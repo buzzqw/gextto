@@ -543,3 +543,46 @@ func TestQbitAddRejectsAnOversizedBody(t *testing.T) {
 		t.Fatalf("oversized add status = %d, want 413", resp.StatusCode)
 	}
 }
+
+// A qBittorrent-compatible client writes and then reads back in the same
+// breath: Sonarr sets the share limits and immediately asks for the list. The
+// published snapshot used to carry the change only after the next queue tick,
+// so the answer was the previous state.
+func TestQbitWriteIsVisibleToTheNextRead(t *testing.T) {
+	d := newTestDaemon(t)
+	src := t.TempDir()
+	hash, _, err := d.add(addRequest{TorrentData: makeTorrent(t, src, "movie.bin", 10_000), Destination: src})
+	if err != nil {
+		t.Fatal(err)
+	}
+	published := func() (torrentInfo, bool) {
+		for _, view := range d.snapshotViews() {
+			if strings.EqualFold(view.Hash, hash) {
+				return view, true
+			}
+		}
+		return torrentInfo{}, false
+	}
+	if _, ok := published(); !ok {
+		t.Fatalf("torrent %s missing from the list read right after the add", hash)
+	}
+	for i := range int64(50) {
+		limit := 10 + i
+		if err := d.setQbitShareLimits(hash, nil, &limit, nil, false); err != nil {
+			t.Fatal(err)
+		}
+		view, ok := published()
+		if !ok {
+			t.Fatalf("torrent %s missing from the published list", hash)
+		}
+		if got := qbitSeedingTimeLimitOut(view.SeedDays, view.seedMinutes); got != limit {
+			t.Fatalf("read back %d minutes right after writing %d", got, limit)
+		}
+	}
+	if err := d.remove(hash, false); err != nil {
+		t.Fatal(err)
+	}
+	if view, ok := published(); ok {
+		t.Fatalf("torrent %s still in the list read right after the removal: %+v", hash, view)
+	}
+}

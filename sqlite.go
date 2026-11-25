@@ -28,10 +28,21 @@ const sqliteSynchronous = "FULL"
 // the database path as URI query parameters. Each pragma is a separate
 // _pragma value, as required by modernc.org/sqlite.
 func sqliteDSN(path string, readOnly bool, pragmas ...string) string {
+	return sqliteDSNExtra(path, readOnly, nil, pragmas...)
+}
+
+// sqliteDSNExtra is sqliteDSN with extra connection parameters, such as the
+// _txlock that makes every transaction take the write lock at BEGIN.
+func sqliteDSNExtra(path string, readOnly bool, extra url.Values, pragmas ...string) string {
 	dsn := &url.URL{Scheme: "file", Path: filepath.ToSlash(path)}
 	query := url.Values{}
 	if readOnly {
 		query.Set("mode", "ro")
+	}
+	for key, values := range extra {
+		for _, value := range values {
+			query.Add(key, value)
+		}
 	}
 	for _, pragma := range pragmas {
 		query.Add("_pragma", pragma)
@@ -40,11 +51,29 @@ func sqliteDSN(path string, readOnly bool, pragmas ...string) string {
 	return dsn.String()
 }
 
+// sqliteTxImmediate is the _txlock value that turns every transaction of a
+// connection into BEGIN IMMEDIATE.
+var sqliteTxImmediate = url.Values{"_txlock": {"immediate"}}
+
 // OpenSQLite opens a SQLite database with conservative pragmas
 // (`busy_timeout`, WAL, foreign keys, synchronous FULL). A single connection
 // is kept so concurrent goroutines never race on write locks.
 func OpenSQLite(path string) (*sql.DB, error) {
-	dsn := sqliteDSN(path, false,
+	return openSQLite(path, nil)
+}
+
+// OpenSQLiteWritable is OpenSQLite for a database that two connections may
+// write at the same time. Its transactions take the write lock at BEGIN, so a
+// save that loses the race waits for the busy timeout: SQLite does not consult
+// it when a deferred transaction that has already read tries to upgrade to a
+// write after another connection committed, and answers SQLITE_BUSY_SNAPSHOT at
+// once instead.
+func OpenSQLiteWritable(path string) (*sql.DB, error) {
+	return openSQLite(path, sqliteTxImmediate)
+}
+
+func openSQLite(path string, extra url.Values) (*sql.DB, error) {
+	dsn := sqliteDSNExtra(path, false, extra,
 		"busy_timeout(10000)",
 		"foreign_keys(1)",
 		"synchronous("+sqliteSynchronous+")",
