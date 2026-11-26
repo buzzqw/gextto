@@ -19,6 +19,7 @@ func Router(s *AppState) *http.ServeMux {
 	handle(s, mux, "GET /api/i18n/active", I18nActive)
 	handle(s, mux, "POST /api/i18n/active", I18nLanguage)
 	handle(s, mux, "GET /api/health", HealthApi)
+	handle(s, mux, "GET /api/health/dependencies", DependenciesAPI)
 	handle(s, mux, "GET /api/process-metrics", ProcessMetricsApi)
 	handle(s, mux, "GET /api/status", Status)
 	handle(s, mux, "GET /api/jobs", JobsList)

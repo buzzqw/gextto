@@ -36,7 +36,7 @@ var configTransferSecretKeys = map[string]bool{
 	"notify_ntfy_token": true, "notify_pushover_token": true, "notify_apprise_key": true,
 	"email_password": true, "jellyfin_api_key": true, "plex_token": true,
 	"simkl_client_id": true, "simkl_access_token": true, "gxtorrent_proxy": true,
-	"flaresolverr_url": true, "subtitles_api_key": true, "subtitles_password": true,
+	"flaresolverr_url": true, subtitleSettingAPIKey: true, subtitleSettingPassword: true,
 }
 
 // configTransferSections are stored as JSON strings in the settings table but

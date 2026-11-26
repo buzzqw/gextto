@@ -189,6 +189,7 @@ and the engine addresses are never exported or changed.
 | POST | `/api/flaresolverr/test` | test FlareSolverr |
 | GET | `/api/gaps` | missing episodes |
 | GET | `/api/health` | health check |
+| GET | `/api/health/dependencies` | declared external metadata and challenge services, with only a configured/not-configured flag — no keys, tokens or full URLs |
 | GET | `/api/i18n/active` | active language and catalogue |
 | POST | `/api/i18n/active` | set the active language |
 | POST | `/api/i18n/language` | set the interface language |

@@ -344,6 +344,38 @@ and on demand from the Actions tab, uploading the failing inputs as an artifact.
 Each target is retried once, so a spurious `context deadline exceeded` from the
 Go fuzzer shutting down under load does not fail the run (a real crash repeats).
 
+## Proof of process
+
+A claim about this project is reproducible or it is not a claim. A proof
+package has four parts: the pinned commit, the exact command, the machine and
+date, and the saved output. Publish the number and the method together in
+`docs/measurements.md`; keep the raw output under the work area described below.
+"Faster" without a command and a result is not evidence.
+
+The standard local proof of a change cycle is:
+
+```bash
+git rev-parse --short HEAD          # pinned commit
+make test                           # sharded Go suite, UI guards, scripts, DHT, installer
+make test-engine                    # engine packages only
+make vet
+go test ./internal/tui/
+go test . -run TestTUILibraryClientAgainstTheRouter -count=1
+make test-ui                        # Playwright, when the UI changed
+```
+
+For performance claims add the benchmark command, `-benchmem`, the profile
+command and the footprint of both binaries, and say which machine ran it.
+For a release claim add `scripts/build-release.sh`, the artifact checksums and
+the signed provenance described in `AGENTS.md`.
+
+`GET /api/health/dependencies` declares which external metadata and challenge
+services the current configuration can contact. It reports only a configured
+flag per provider: it performs no network call and returns no key, token or
+full URL. Use it with the pinned commit when comparing results from different
+machines, so a difference in metadata providers is visible instead of being
+mistaken for a code change.
+
 ## Temporary space (/tmp)
 
 `/tmp` here is a **tmpfs** (RAM), so everything left there costs memory and, once
