@@ -325,53 +325,6 @@ func readOptionalBody(r *http.Request) ([]byte, error) {
 	return io.ReadAll(r.Body)
 }
 
-func gh6PurgeRemovedLibrary(
-	db *Database,
-	previousSeries []SeriesConfig,
-	previousMovies []MovieConfig,
-	series []SeriesConfig,
-	movies []MovieConfig,
-) {
-	for _, old := range previousSeries {
-		present := false
-		for _, item := range series {
-			if strings.EqualFold(strings.TrimSpace(item.Name), strings.TrimSpace(old.Name)) {
-				present = true
-				break
-			}
-		}
-		if !present {
-			if _, err := db.PurgeSeries(old.Name); err != nil {
-				logging.Warn("cannot remove the state of the deleted series", "error", err, "series", old.Name)
-			}
-		}
-	}
-	for _, old := range previousMovies {
-		stillPresent := false
-		if old.ID > 0 {
-			for _, item := range movies {
-				if item.ID == old.ID {
-					stillPresent = true
-					break
-				}
-			}
-		} else {
-			for _, item := range movies {
-				if strings.EqualFold(strings.TrimSpace(item.Name), strings.TrimSpace(old.Name)) &&
-					strings.TrimSpace(item.Year) == strings.TrimSpace(old.Year) {
-					stillPresent = true
-					break
-				}
-			}
-		}
-		if !stillPresent {
-			if _, err := db.PurgeMovie(old.Name); err != nil {
-				logging.Warn("cannot remove the state of the deleted movie", "error", err, "movie", old.Name)
-			}
-		}
-	}
-}
-
 // Speed policy sources. The exception set in Downloads ("temp*") comes first;
 // then the rule chosen in Configuration (see speed_mode.go): a schedule window,
 // Auto, or the fixed limits.

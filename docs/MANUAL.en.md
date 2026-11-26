@@ -414,6 +414,8 @@ actions:
 | **Delete the series** | remove the series from the library and stop searching for its episodes: Gextto forgets its state, episodes and metadata, while the files already archived stay where they are. It is the same **Delete** entry of the **TV series** list |
 | **Download history** | reconstruct what happened to each episode |
 
+Every removal from a list — TV series or movie, from the page, the TUI or an external client — appears in the log with the title's name and, for movies, its year. The line also says that files already archived stay where they are.
+
 The most important fields of the page:
 
 | Field | Effect |

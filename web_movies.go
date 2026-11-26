@@ -224,7 +224,9 @@ func metadataSource(tvdbID string) string {
 }
 
 // purgeRemovedLibrary drops the stored state of the series and movies that
-// are no longer in the library.
+// are no longer in the library. Every save of a library list ends here, so a
+// removal from an API call, the web table, the TUI or a whole-list save is
+// recorded in the log in the same words.
 func purgeRemovedLibrary(db *Database, previousSeries []SeriesConfig, previousMovies []MovieConfig, series []SeriesConfig, movies []MovieConfig) {
 	for _, old := range previousSeries {
 		present := false
@@ -235,6 +237,7 @@ func purgeRemovedLibrary(db *Database, previousSeries []SeriesConfig, previousMo
 			}
 		}
 		if !present {
+			logRemovedSeries(old.Name)
 			if _, err := db.PurgeSeries(old.Name); err != nil {
 				logging.Warn("cannot remove the state of the deleted series", "error", err.Error(), "series", old.Name)
 			}
@@ -259,11 +262,28 @@ func purgeRemovedLibrary(db *Database, previousSeries []SeriesConfig, previousMo
 			}
 		}
 		if !present {
+			logRemovedMovie(old.Name, old.Year)
 			if _, err := db.PurgeMovie(old.Name); err != nil {
 				logging.Warn("cannot remove the state of the deleted movie", "error", err.Error(), "movie", old.Name)
 			}
 		}
 	}
+}
+
+// logRemovedSeries and logRemovedMovie say what the user did and what it
+// means, without internal names. The files in the library are never touched
+// by a removal from the list, and saying so here avoids a worried look at the
+// archive afterwards.
+func logRemovedSeries(name string) {
+	logging.Info(fmt.Sprintf("🗑️ You removed «%s» from the series list: Gextto stops looking for its episodes and forgets what it had recorded; files already in the library are left untouched", strings.TrimSpace(name)))
+}
+
+func logRemovedMovie(name, year string) {
+	name = strings.TrimSpace(name)
+	if y := strings.TrimSpace(year); y != "" {
+		name += " (" + y + ")"
+	}
+	logging.Info(fmt.Sprintf("🗑️ You removed «%s» from the movie list: Gextto stops looking for it and forgets what it had recorded; files already in the library are left untouched", name))
 }
 
 func DeleteMovie(w http.ResponseWriter, r *http.Request, s *AppState) {

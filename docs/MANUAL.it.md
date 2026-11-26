@@ -415,6 +415,8 @@ allargare l'intervallo con **Modifica**. Le azioni:
 | **Eliminare la serie** | togli la serie dalla libreria e smetti di cercare le sue puntate: Gextto dimentica stato, episodi e metadati, mentre i file già archiviati restano dove sono. È la stessa voce **Elimina** dell'elenco **Serie TV** |
 | **Storia dei download** | ricostruisci cosa è successo a ogni episodio |
 
+Ogni rimozione da un elenco — serie TV o film, dalla pagina, dalla TUI o da un client esterno — compare nel log con il nome del titolo e, per i film, con l'anno. La riga ricorda anche che i file già archiviati restano dove sono.
+
 I campi della scheda più importanti:
 
 | Campo | Effetto |
