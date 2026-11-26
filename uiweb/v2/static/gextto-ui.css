@@ -1028,6 +1028,14 @@ label.field > span, .field > span, .field-label { color: var(--muted); font-size
 .data-table th, .data-table td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--line-soft); }
 .data-table thead th { color: var(--muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; white-space: nowrap; }
 .data-table tbody tr:hover { background: var(--surface-2); }
+/* The trash holds long release names: keep the name column inside the panel
+   and leave the size, type and action columns visible instead of pushing them
+   off screen. */
+.data-table.trash-table { table-layout: fixed; }
+.data-table.trash-table > thead > tr > th:nth-child(2) { width: 110px; }
+.data-table.trash-table > thead > tr > th:nth-child(3) { width: 96px; }
+.data-table.trash-table > thead > tr > th:last-child { width: 190px; }
+.data-table.trash-table > tbody > tr > td.truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .table-sort-button {
   display: inline-flex;
   align-items: center;
