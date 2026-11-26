@@ -240,3 +240,33 @@ func TestDaemonExternalMergeCompletesATorrent(t *testing.T) {
 		return info.Progress >= 100
 	})
 }
+
+// A gzip that expands past the bound is refused, not read until memory runs
+// out, and a database cut at the bound is refused, not installed as whole.
+func TestGeoDBRefusesAnOversizedExpansion(t *testing.T) {
+	previous := maxGeoDecompressed
+	maxGeoDecompressed = 1 << 10
+	t.Cleanup(func() { maxGeoDecompressed = previous })
+
+	var buf bytes.Buffer
+	gz := gzip.NewWriter(&buf)
+	line := []byte("1.0.0.0,1.0.0.255,AU\n")
+	for written := 0; written < 4<<10; written += len(line) {
+		_, _ = gz.Write(line)
+	}
+	_ = gz.Close()
+	if _, err := loadGeoDB(bytes.NewReader(buf.Bytes())); err == nil {
+		t.Fatal("a database expanding past the limit was accepted")
+	}
+}
+
+func TestGeoDownloadPastTheLimitIsRefused(t *testing.T) {
+	big := bytes.Repeat([]byte("x"), maxGeoDownload+1)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write(big)
+	}))
+	defer srv.Close()
+	if _, err := fetchGeoFile(srv.URL); err == nil || !strings.Contains(err.Error(), "larger than") {
+		t.Fatalf("an oversized download = %v, want a size error instead of a silent cut", err)
+	}
+}

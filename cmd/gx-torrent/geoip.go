@@ -6,6 +6,7 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"math/big"
@@ -146,7 +147,9 @@ func loadGeoDB(r io.Reader) (*geoDB, error) {
 			return nil, err
 		}
 		defer gz.Close()
-		buffered = bufio.NewReaderSize(gz, 1<<16)
+		// A small gzip can expand without end: the decompressed stream is
+		// bounded too, and going past the bound is an error, not a silent cut.
+		buffered = bufio.NewReaderSize(&cappedReader{r: gz, left: maxGeoDecompressed}, 1<<16)
 	}
 	db := &geoDB{}
 	var rows4 []geoRow4
@@ -505,7 +508,50 @@ func fetchGeoFile(rawURL string) ([]byte, error) {
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return nil, fmt.Errorf("HTTP %d", resp.StatusCode)
 	}
-	return io.ReadAll(io.LimitReader(resp.Body, 64<<20))
+	// One byte past the limit tells a larger body from one of exactly the
+	// limit: a plain LimitReader cut it silently, and the CSV parser then
+	// accepted the complete lines read so far as a whole database.
+	data, err := io.ReadAll(io.LimitReader(resp.Body, maxGeoDownload+1))
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(data)) > maxGeoDownload {
+		return nil, fmt.Errorf("the country database is larger than %d MiB", maxGeoDownload>>20)
+	}
+	return data, nil
+}
+
+// Size bounds of the country database: the download (gzip) and what it may
+// expand to. Both are far above DB-IP's real edition.
+const maxGeoDownload = 64 << 20
+
+// maxGeoDecompressed is a variable so a test can expand past it cheaply.
+var maxGeoDecompressed int64 = 512 << 20
+
+// errGeoTooLarge is a decompressed database past maxGeoDecompressed.
+var errGeoTooLarge = errors.New("the country database expands past its size limit")
+
+// cappedReader reads at most left bytes and fails, instead of stopping
+// quietly, when the source has more.
+type cappedReader struct {
+	r    io.Reader
+	left int64
+}
+
+func (c *cappedReader) Read(p []byte) (int, error) {
+	if c.left <= 0 {
+		var one [1]byte
+		if n, _ := c.r.Read(one[:]); n > 0 {
+			return 0, errGeoTooLarge
+		}
+		return 0, io.EOF
+	}
+	if int64(len(p)) > c.left {
+		p = p[:c.left]
+	}
+	n, err := c.r.Read(p)
+	c.left -= int64(n)
+	return n, err
 }
 
 // geoStatus describes the database for the settings page and the API.

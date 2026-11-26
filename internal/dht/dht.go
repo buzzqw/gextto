@@ -349,6 +349,12 @@ func (d *DHT) RemoveInfoHash(ih string) {
 func (d *DHT) Stop() {
 	close(d.stop)
 	d.wg.Wait()
+	// The throttle's cleanup goroutine starts with the node, not with the run
+	// loop: a node whose Start failed never ran the loop that stops it, so
+	// Stop ends it here too (Stop on the throttle is idempotent).
+	if d.clientThrottle != nil {
+		d.clientThrottle.Stop()
+	}
 }
 
 // Port reports the bound port (handy with port 0 auto-assignment).

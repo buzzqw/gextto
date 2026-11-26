@@ -65,8 +65,10 @@ func openStore(port int, enabled bool) (cfg *dhtStore) {
 }
 
 // saveStore atomically replaces the state file via temp-file rename (atomic
-// on Linux; best-effort remove-and-retry on Windows). Disabled stores are a
-// no-op.
+// on Linux). On Windows, where replacing an existing file can fail, the old
+// file is set aside first and put back if the new one cannot take its place,
+// so a failed save never loses the previous state. The temporary file never
+// outlives a failed save. Disabled stores are a no-op.
 func saveStore(s dhtStore) {
 	if s.path == "" {
 		return
@@ -76,25 +78,40 @@ func saveStore(s dhtStore) {
 		log.Println("saveStore tempfile:", err)
 		return
 	}
+	installed := false
+	defer func() {
+		if !installed {
+			_ = os.Remove(tmp.Name())
+		}
+	}()
 	err = json.NewEncoder(tmp).Encode(s)
 	// Closed before rename: Windows cannot rename open files.
-	tmp.Close()
+	if closeErr := tmp.Close(); err == nil {
+		err = closeErr
+	}
 	if err != nil {
 		log.Println("saveStore json encoding:", err)
 		return
 	}
 
 	p := fmt.Sprintf("%v-%v", s.path+"/dht", s.Port)
-	if err := os.Rename(tmp.Name(), p); err != nil {
-		// Non-atomic fallback (see the Windows note above): unlink, retry,
-		// and accept the crash window between the two.
-		if err := os.Remove(p); err != nil {
-			log.Println("saveStore failed to remove the existing config:", err)
-			return
-		}
-		if err := os.Rename(tmp.Name(), p); err != nil {
-			log.Println("saveStore failed to rename file after deleting the original config:", err)
-			return
-		}
+	if err := os.Rename(tmp.Name(), p); err == nil {
+		installed = true
+		return
 	}
+	// Fallback for a platform that refuses to replace: move the old state
+	// aside, install the new one, and restore the old one on failure.
+	aside := p + ".old"
+	_ = os.Remove(aside)
+	if err := os.Rename(p, aside); err != nil {
+		log.Println("saveStore failed to set the existing state aside:", err)
+		return
+	}
+	if err := os.Rename(tmp.Name(), p); err != nil {
+		log.Println("saveStore failed to install the new state, the previous one is kept:", err)
+		_ = os.Rename(aside, p)
+		return
+	}
+	installed = true
+	_ = os.Remove(aside)
 }

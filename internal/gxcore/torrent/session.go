@@ -350,6 +350,9 @@ func startDHTNode(cfg Config, utpSocket *utp.Socket, bl *blocklist.Blocklist) (*
 		return nil, err
 	}
 	if err := dhtNode.Start(); err != nil {
+		// The node already runs its throttle cleanup: stop it, or every failed
+		// start (a busy port retried) leaks a goroutine and its tables.
+		dhtNode.Stop()
 		return nil, err
 	}
 	return dhtNode, nil
