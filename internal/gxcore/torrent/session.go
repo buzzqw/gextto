@@ -91,6 +91,10 @@ type Session struct {
 	// (libtorrent-style smart ban), consulted by every torrent.
 	mBannedIPs sync.Mutex
 	bannedIPs  map[string]time.Time
+	// bannedSweepAt is the size at which BanIP next drops the expired bans:
+	// IsBannedIP only expires the address it is asked about, so bans of
+	// peers never seen again would otherwise stay for the whole session.
+	bannedSweepAt int
 
 	// storageErrors counts storage-layer piece-write failures (full disk,
 	// unwritable file, broken mount) since start.
@@ -561,6 +565,9 @@ func (s *Session) ListTorrents() []*Torrent {
 	return torrents
 }
 
+// minBannedSweep is the smallest ban list worth sweeping.
+const minBannedSweep = 1024
+
 // BanIP quarantines a peer IP session-wide for ttl.
 func (s *Session) BanIP(ip string, ttl time.Duration) {
 	if ip == "" {
@@ -570,7 +577,18 @@ func (s *Session) BanIP(ip string, ttl time.Duration) {
 	if s.bannedIPs == nil {
 		s.bannedIPs = make(map[string]time.Time)
 	}
-	s.bannedIPs[ip] = time.Now().Add(ttl)
+	now := time.Now()
+	s.bannedIPs[ip] = now.Add(ttl)
+	if len(s.bannedIPs) >= max(s.bannedSweepAt, minBannedSweep) {
+		for addr, expiry := range s.bannedIPs {
+			if now.After(expiry) {
+				delete(s.bannedIPs, addr)
+			}
+		}
+		// Sweep again when the live set doubles: amortised O(1) per ban, and
+		// the map never holds more than twice the bans still in force.
+		s.bannedSweepAt = 2 * len(s.bannedIPs)
+	}
 	s.mBannedIPs.Unlock()
 }
 

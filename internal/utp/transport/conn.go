@@ -718,6 +718,32 @@ func (c *Conn) destroy(reason error) {
 		c.err = reason
 	}
 	c.detach()
+	c.stopTimers()
+}
+
+// stopTimers disarms every timer of a destroyed connection. A pending timer
+// keeps its callback, and the callback keeps the Conn with its read buffer and
+// unacknowledged sends: without this a closed connection stayed in memory for
+// up to packetReadTimeout (two minutes). A callback already running takes mu,
+// sees destroyed and returns. The caller holds mu.
+func (c *Conn) stopTimers() {
+	if c.resendTimer != nil {
+		c.resendTimer.Stop()
+		c.resendTimer = nil
+		c.resendTimerDue = time.Time{}
+	}
+	if c.packetReadTimeoutTimer != nil {
+		c.packetReadTimeoutTimer.Stop()
+	}
+	if c.sendPendingSendSendStateTimer != nil {
+		c.sendPendingSendSendStateTimer.Stop()
+		c.sendPendingSendStateTimerActive = false
+	}
+	for _, d := range []*deadline{&c.connDeadlines.read, &c.connDeadlines.write} {
+		if d.timer != nil {
+			d.timer.Stop()
+		}
+	}
 }
 
 // closeNow closes the connection immediately, without waiting for the peer.

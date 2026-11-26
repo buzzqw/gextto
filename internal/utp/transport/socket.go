@@ -80,6 +80,8 @@ type Socket struct {
 	timeoutResends atomic.Int64
 	fastResends    atomic.Int64
 	synDrops       atomic.Int64
+	// resetsInFlight counts the reset writes still running (see reset).
+	resetsInFlight atomic.Int32
 
 	// GEXTTO: optional per-remote RTT estimate (for example from recent dial
 	// races) seeding the initial RTO of fresh connections. Nil uses the fixed
@@ -130,6 +132,12 @@ func NewSocketFromPacketConnNoClose(pc net.PacketConn) (*Socket, error) {
 // reading (the shared socket is best-effort).
 func (s *Socket) unusedRead(r read) {
 	unusedReads.Add(1)
+	// Drop before copying when the queue is already full: a flood of foreign
+	// datagrams must not cost an allocation each just to be thrown away.
+	if len(s.unusedReads) == cap(s.unusedReads) {
+		unusedReadsDropped.Add(1)
+		return
+	}
 	r.data = append([]byte(nil), r.data...)
 	select {
 	case s.unusedReads <- r:
@@ -266,12 +274,26 @@ func (s *Socket) handleReceivedPacket(p read) {
 	s.unusedRead(p)
 }
 
+// maxResetsInFlight bounds the reset writes of one socket. Every unknown
+// packet asks for three resets; a flood of them with a slow or blocked
+// WriteTo used to leave three goroutines per packet waiting. A reset is a
+// courtesy to the remote, so one past the bound is simply not sent.
+const maxResetsInFlight = 64
+
 // reset sends a reset packet to addr, acknowledging ackNr under connID.
 func (s *Socket) reset(addr net.Addr, ackNr, connId uint16) {
+	if s.resetsInFlight.Add(1) > maxResetsInFlight {
+		s.resetsInFlight.Add(-1)
+		resetsDropped.Add(1)
+		return
+	}
 	b := make([]byte, 0, maxHeaderSize)
 	h := header{Type: stReset, Version: 1, ConnID: connId, AckNr: ackNr}
 	b = b[:h.Marshal(b)]
-	go s.writeTo(b, addr)
+	go func() {
+		defer s.resetsInFlight.Add(-1)
+		_, _ = s.writeTo(b, addr)
+	}()
 }
 
 // connIDFree reports whether id is usable as a recv_id for remoteAddr: it must
