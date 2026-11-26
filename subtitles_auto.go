@@ -206,7 +206,11 @@ func runAutomaticSubtitles(ctx context.Context, cfg *Config, db *Database, state
 	if !prefs.Enabled {
 		return 0, nil
 	}
-	if _, _, err := subtitleProviderClient(cfg); err != nil {
+	// One client for the whole pass: with an account configured every new
+	// client logs in again, so a pass of 40 titles cost about 80 logins
+	// against the provider's quota. The client keeps its token.
+	client, _, err := subtitleProviderClient(cfg)
+	if err != nil {
 		return 0, err
 	}
 	targets, err := subtitleAutoTargets(cfg, db)
@@ -233,13 +237,13 @@ func runAutomaticSubtitles(ctx context.Context, cfg *Config, db *Database, state
 			if err == nil {
 				search.OSHash, search.SizeBytes = hash, size
 			}
-			candidates, err := searchSubtitleCandidates(ctx, cfg, db, search)
+			candidates, err := searchSubtitleCandidatesWith(ctx, client, prefs, cfg, db, search)
 			if err == nil && len(candidates) > 0 {
 				best := candidates[0]
 				// Unattended writes need a strong match: a plain title hit is
 				// left to the preview, where the operator decides.
 				if best.HashMatch {
-					_, err = applySubtitle(ctx, cfg, db, target, best.FileID, language, best.IsForced(), best.IsSDH(), false)
+					_, err = applySubtitleWith(ctx, client, cfg, target, best.FileID, language, best.IsForced(), best.IsSDH(), false)
 					if err == nil {
 						added++
 						logging.Info("Added a subtitle next to a video", "title", target.Label, "language", language)

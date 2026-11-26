@@ -222,3 +222,42 @@ func TestAutomaticSubtitlesRespectDryRunAndDisabledSwitch(t *testing.T) {
 		t.Fatalf("searches = %d, want none in dry-run or with the switch off", calls.Load())
 	}
 }
+
+// One automatic pass logs in to the provider once: every new client used to
+// log in again, about two logins per title against the provider's quota.
+func TestAutomaticSubtitlesLogInOncePerPass(t *testing.T) {
+	state, _ := automaticSubtitleState(t, "ita,eng")
+	var logins, searches atomic.Int32
+	provider := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/login":
+			logins.Add(1)
+			_, _ = io.WriteString(w, `{"token":"token"}`)
+		case "/subtitles":
+			searches.Add(1)
+			language := r.URL.Query().Get("languages")
+			_, _ = io.WriteString(w, `{"data":[{"id":"10","attributes":{"language":"`+language+`","release":"Show.S01E01","files":[{"file_id":20,"file_name":"sub.srt"}],"moviehash_match":true,"moviebytesize_match":true,"foreign_parts_only":false,"hearing_impaired":false}}]}`)
+		case "/download":
+			_, _ = io.WriteString(w, `{"link":"http://`+r.Host+`/sub.srt","file_name":"sub.srt"}`)
+		case "/sub.srt":
+			_, _ = io.WriteString(w, "1\n00:00:00,000 --> 00:00:01,000\nCiao\n")
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer provider.Close()
+	cfg := automaticSubtitleConfig(state, provider.URL)
+	cfg.Settings[subtitleSettingUsername] = "user"
+	cfg.Settings[subtitleSettingPassword] = "pass"
+
+	added, err := runAutomaticSubtitles(context.Background(), cfg, state.db, newSubtitleAutoState(), time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if added != 2 || searches.Load() != 2 {
+		t.Fatalf("added %d after %d searches, want 2 and 2", added, searches.Load())
+	}
+	if logins.Load() != 1 {
+		t.Fatalf("%d logins for one pass, want 1", logins.Load())
+	}
+}

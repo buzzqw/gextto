@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"sort"
@@ -281,6 +282,23 @@ func searchSubtitleCandidates(ctx context.Context, cfg *Config, db *Database, ta
 	if err != nil {
 		return nil, err
 	}
+	return searchSubtitleCandidatesWith(ctx, client, prefs, cfg, db, target)
+}
+
+// subtitleEpisodeNumber narrows a season or episode number for the provider
+// query: a value outside a sane range is sent as "unknown" (0) rather than
+// converted blindly.
+func subtitleEpisodeNumber(value int64) int {
+	if value < 0 || value > math.MaxInt32 {
+		return 0
+	}
+	return int(value)
+}
+
+// searchSubtitleCandidatesWith is searchSubtitleCandidates with a client the
+// caller already holds: the automatic pass shares one client, and so one
+// provider login, across all its searches and downloads.
+func searchSubtitleCandidatesWith(ctx context.Context, client *subtitleprovider.Client, prefs subtitlePreferences, cfg *Config, db *Database, target subtitleTarget) ([]subtitleCandidate, error) {
 	languages := subtitleLanguagesFor(cfg, target)
 	kind := "episode"
 	if target.Kind == "movie" {
@@ -288,7 +306,7 @@ func searchSubtitleCandidates(ctx context.Context, cfg *Config, db *Database, ta
 	}
 	results, err := client.Search(ctx, subtitleprovider.SearchQuery{
 		Language: strings.Join(languages, ","), Kind: kind, Title: target.Title, Year: target.Year,
-		TMDBID: target.TMDBID, Season: int(target.Season), Episode: int(target.Episode),
+		TMDBID: target.TMDBID, Season: subtitleEpisodeNumber(target.Season), Episode: subtitleEpisodeNumber(target.Episode),
 		MovieHash: target.OSHash, MovieSize: target.SizeBytes,
 	})
 	if err != nil {
@@ -378,6 +396,11 @@ func applySubtitle(ctx context.Context, cfg *Config, db *Database, target subtit
 	if err != nil {
 		return "", err
 	}
+	return applySubtitleWith(ctx, client, cfg, target, fileID, language, forced, sdh, replace)
+}
+
+// applySubtitleWith is applySubtitle with a client the caller already holds.
+func applySubtitleWith(ctx context.Context, client *subtitleprovider.Client, cfg *Config, target subtitleTarget, fileID int64, language string, forced, sdh, replace bool) (string, error) {
 	download, err := client.Download(ctx, fileID, "srt")
 	if err != nil {
 		return "", err
