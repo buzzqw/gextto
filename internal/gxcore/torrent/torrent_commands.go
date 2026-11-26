@@ -49,6 +49,32 @@ func query[T any](t *torrent, f func() T) T {
 	}
 }
 
+// queryWithin is query with a deadline. It is for callers that must keep a
+// timeout even when the run loop is blocked: a command that cannot be queued,
+// or an answer that does not arrive, returns ok=false instead of waiting
+// forever. A command already queued may still run later; its buffered reply
+// does not block the run loop.
+func queryWithin[T any](t *torrent, timeout time.Duration, f func() T) (value T, ok bool) {
+	resp := make(chan T, 1)
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+	select {
+	case t.commandC <- func() { resp <- f() }:
+	case <-t.closeC:
+		return value, false
+	case <-timer.C:
+		return value, false
+	}
+	select {
+	case value = <-resp:
+		return value, true
+	case <-t.closeC:
+		return value, false
+	case <-timer.C:
+		return value, false
+	}
+}
+
 // ---------------------------------------------------------------------------
 // Lifecycle
 // ---------------------------------------------------------------------------

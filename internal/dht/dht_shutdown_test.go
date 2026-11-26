@@ -24,6 +24,28 @@ func TestPublishPeerResultStopsWhenConsumerIsGone(t *testing.T) {
 	}
 }
 
+func TestPublishPeerResultNeverBlocksOnFullLookupQueue(t *testing.T) {
+	d := newTestDHT()
+	d.stop = make(chan bool)
+	d.PeersRequestResults = make(chan map[InfoHash][]string, 1)
+	d.PeersRequestResults <- map[InfoHash][]string{}
+	before := totalPeerNoticeDropped.Value()
+
+	done := make(chan struct{})
+	go func() {
+		d.publishPeerResult(map[InfoHash][]string{InfoHash("01234567890123456789"): {"192.0.2.1:6881"}})
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("a get_peers result blocked the packet loop on a full channel")
+	}
+	if got := totalPeerNoticeDropped.Value() - before; got != 1 {
+		t.Fatalf("dropped peer notices = %d, want 1", got)
+	}
+}
+
 func TestOfferAnnouncedPeerNeverBlocksTheConsumer(t *testing.T) {
 	d := newTestDHT()
 	d.stop = make(chan bool)

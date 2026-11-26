@@ -1263,23 +1263,29 @@ func (d *DHT) publishPeers(ih InfoHash, node *remoteNode, values []string) {
 	d.publishPeerResult(result)
 }
 
-// publishPeerResult hands a lookup result to the consumer, waiting for it
-// (the lookup is what the consumer asked for), but never past shutdown: the
-// consumer may already be gone, so stopping wins over delivery.
+// publishPeerResult hands a peer result to the consumer without ever stalling
+// the packet loop. Lookup results and announces are both notices: the peer is
+// already in the peer store, so a full consumer queue only delays delivery to
+// the next lookup. Stopping wins over delivery.
 func (d *DHT) publishPeerResult(result map[InfoHash][]string) {
 	select {
-	case d.PeersRequestResults <- result:
 	case <-d.stop:
+		return
+	case d.PeersRequestResults <- result:
+		return
+	default:
+		totalPeerNoticeDropped.Add(1)
 	}
 }
 
-// offerAnnouncedPeer tells the consumer about a peer that announced itself,
-// without waiting: an announce is unsolicited, any remote node can send one,
-// and a busy consumer must not stall the packet loop. The peer is already in
-// the peer store, so a dropped notice only delays it to the next lookup.
+// offerAnnouncedPeer is the announce-specific name for the same non-blocking
+// delivery. Kept separate so the counters and call sites remain readable.
 func (d *DHT) offerAnnouncedPeer(result map[InfoHash][]string) {
 	select {
+	case <-d.stop:
+		return
 	case d.PeersRequestResults <- result:
+		return
 	default:
 		totalAnnounceNoticeDropped.Add(1)
 	}
@@ -1417,6 +1423,7 @@ var (
 	totalSentAnnouncePeer        = expvar.NewInt("totalSentAnnouncePeer")
 	totalAnnounceTokenOK         = expvar.NewInt("totalAnnounceTokenOK")
 	totalAnnounceNoticeDropped   = expvar.NewInt("totalAnnounceNoticeDropped")
+	totalPeerNoticeDropped       = expvar.NewInt("totalPeerNoticeDropped")
 	totalAnnounceTokenBad        = expvar.NewInt("totalAnnounceTokenBad")
 	totalPacketsFromBlockedHosts = expvar.NewInt("totalPacketsFromBlockedHosts")
 	totalDroppedPackets          = expvar.NewInt("totalDroppedPackets")

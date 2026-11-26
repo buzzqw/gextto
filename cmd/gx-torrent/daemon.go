@@ -2836,16 +2836,20 @@ var stopWaitLimit = 30 * time.Second
 var errStopTimeout = errors.New("the torrent did not stop in time, its files may still be in use: nothing was moved, try again")
 
 // waitStopped waits until the engine reports the torrent stopped, polling
-// every step, for at most stopWaitLimit.
+// every step, for at most stopWaitLimit. The status query has its own deadline:
+// a run loop blocked on storage must not make this wait unbounded.
 func waitStopped(t *torrent.Torrent, step time.Duration) bool {
 	deadline := time.Now().Add(stopWaitLimit)
-	for t.Stats().Status != torrent.Stopped {
+	for {
+		status, ok := t.StatusWithin(step)
+		if ok && status == torrent.Stopped {
+			return true
+		}
 		if !time.Now().Before(deadline) {
 			return false
 		}
 		time.Sleep(step)
 	}
-	return true
 }
 
 func (d *Daemon) finishMove(id string, t *torrent.Torrent, from, dest, name string, data payload, wasRunning, associate, empty bool) {

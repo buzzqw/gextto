@@ -108,6 +108,15 @@ func (t *Torrent) Stats() Stats {
 	return t.torrent.Stats()
 }
 
+// StatusWithin returns the lifecycle status, or ok=false when the run loop did
+// not answer within timeout. It lets a caller enforce its own deadline even
+// while a storage operation is holding the run loop.
+func (t *Torrent) StatusWithin(timeout time.Duration) (Status, bool) {
+	return queryWithin(t.torrent, timeout, func() Status {
+		return t.torrent.status()
+	})
+}
+
 // Magnet exports the link; private torrents refuse.
 func (t *Torrent) Magnet() (string, error) {
 	return t.torrent.Magnet()

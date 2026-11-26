@@ -53,6 +53,7 @@ still be true after the item lands does not belong here.
 
 ## Proposals
 
+- **Subtitle CDN downloads and proxy/VPN**: the public transport used for provider download links deliberately ignores the configured proxy and outgoing interface so the destination address can be checked at dial time; an installation that requires a proxy or VPN therefore fetches those files directly. Gate: decide whether to keep the direct, address-checked path and document it, or validate the destination through the proxy without losing the private-address guard.
 - **qBittorrent per-torrent limit `0`**: the compatible API maps `0` to "inherit the global limit", which an audit called a bug; in qBittorrent a per-torrent `0` means no limit of its own while the global one still applies, which is what gx-torrent does now, and the audit's fix would bypass the global limit. Gate: check the behaviour against a real qBittorrent before changing anything.
 - **Quality profiles: movie and series scope**: the same profile serves both libraries and the request-manager picker cannot filter by type. Gate: decide whether to add a `kind` field (movie/series/both, default both) and filter the pickers.
 - **Quality profiles: linked titles**: a profile is copied into a title at save time and titles do not store its id, so editing a profile never reaches existing titles. Gate: decide whether to keep copy-only semantics or add a "re-apply to linked titles" action with a preview of the affected titles.

@@ -7,6 +7,7 @@ package boltdbresumer
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"runtime/debug"
 	"strconv"
@@ -177,6 +178,23 @@ func (r *Resumer) update(torrentID string, fn func(b *bbolt.Bucket) error) error
 	})
 }
 
+// errTorrentRecordMissing is returned by operations that must not pretend to
+// have persisted a change when the torrent has no resume record.
+var errTorrentRecordMissing = errors.New("torrent resume record not found")
+
+// updateExisting is update for a change that is only valid on an existing
+// torrent: a missing record is an error, so the caller can undo its filesystem
+// work instead of leaving storage and resume data disagreeing.
+func (r *Resumer) updateExisting(torrentID string, fn func(b *bbolt.Bucket) error) error {
+	return r.db.Update(func(tx *bbolt.Tx) error {
+		b := tx.Bucket(r.bucket).Bucket([]byte(torrentID))
+		if b == nil {
+			return fmt.Errorf("%w: %s", errTorrentRecordMissing, torrentID)
+		}
+		return fn(b)
+	})
+}
+
 // WriteInfo replaces only the info dict.
 func (r *Resumer) WriteInfo(torrentID string, value []byte) error {
 	return r.update(torrentID, func(b *bbolt.Bucket) error {
@@ -225,7 +243,7 @@ func (r *Resumer) WriteRename(torrentID string, paths []string, name string) err
 	if err != nil {
 		return err
 	}
-	return r.update(torrentID, func(b *bbolt.Bucket) error {
+	return r.updateExisting(torrentID, func(b *bbolt.Bucket) error {
 		if err := b.Put(Keys.FilePaths, raw); err != nil {
 			return err
 		}

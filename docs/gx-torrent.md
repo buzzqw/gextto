@@ -841,7 +841,9 @@ priorities (`increasePrio`, `decreasePrio`, `topPrio`, `bottomPrio`), the
 renames (`rename`, `renameFile`, `renameFolder`) and `app/shutdown` (a clean
 stop, standalone only). A rename closes the session (so the files are closed),
 moves the content on disk with a rollback on failure, persists the new paths in
-the resume and reopens: the `.torrent` identity is never changed.
+the resume and reopens: the `.torrent` identity is never changed. If the resume
+record is missing or cannot be written, the moves are undone and the torrent
+keeps the old paths.
 `torrents/add` also honours `forced`/`forceStart`: the force-start an extension
 sends is the pin action, so the new torrent runs outside the queue instead of
 entering it.
@@ -1597,6 +1599,10 @@ RPC server is disabled.
    - **Bounded routing table**: `MaxNodes` is enforced when a discovered node
      enters the table, so a flood of fresh contacts cannot grow memory without
      limit.
+   - **Non-blocking peer notices**: lookup results and announce notices are
+     handed to the consumer without waiting for it; a full queue drops the
+     notice and counts it, while the peer stays in the peer store for the next
+     lookup. A slow consumer cannot stall the packet loop or shutdown.
   - **Security extension BEP 42**: the node ID is derived from the external IP when it is
     known (the routable listen address from `-listen-interface`, or the IP
     of the outgoing interface), so no one can
