@@ -64,6 +64,11 @@ if [[ "${1:-}" == "release" ]]; then
 fi
 if [[ "${1:-}" == "api" && " $* " == *" --jq "* ]]; then
   if [[ " $* " == *"/releases/tags/"* ]]; then
+    # Faithful to GitHub: a draft release is not returned by this endpoint.
+    printf '{"message":"Not Found","status":"404"}\n'
+    exit 1
+  fi
+  if [[ " $* " == *"releases?per_page="* ]]; then
     printf '123\n'
   else
     printf '%s\n' "$PUBLISH_COMMIT"
@@ -107,8 +112,13 @@ publish > "$TMP/out" 2>&1
 grep -qF 'release view continuous' "$MOCK_LOG" || { echo "the live release was never inspected" >&2; exit 1; }
 grep -qF 'release create continuous-candidate-' "$MOCK_LOG" || { echo "no candidate draft was created" >&2; exit 1; }
 grep -qE '^release delete continuous --repo' "$MOCK_LOG" || { echo "the old release was not removed at promotion" >&2; exit 1; }
-grep -qF 'release edit continuous --repo owner/repo --draft=false' "$MOCK_LOG" || { echo "the candidate was not published" >&2; exit 1; }
+grep -qF 'api --paginate repos/owner/repo/releases?per_page=100' "$MOCK_LOG" || { echo "the candidate was not looked up among the releases" >&2; exit 1; }
+if grep -qF '/releases/tags/' "$MOCK_LOG"; then
+  echo "a draft was looked up by tag: GitHub answers 404 there" >&2
+  exit 1
+fi
 grep -qF 'api -X PATCH repos/owner/repo/releases/123 -f tag_name=continuous' "$MOCK_LOG" || { echo "the candidate did not take the live tag" >&2; exit 1; }
+grep -qF 'release edit continuous --repo owner/repo --draft=false' "$MOCK_LOG" || { echo "the candidate was not published" >&2; exit 1; }
 grep -qF 'published continuous' "$TMP/out" || { echo "publication did not complete" >&2; exit 1; }
 check_no_retry
 

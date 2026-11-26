@@ -530,7 +530,10 @@ expected archive contents. `scripts/publish-github-release.sh` uploads them to a
 **candidate draft with its own temporary tag**, downloads them again and
 verifies the copies there; only when the candidate is complete does it move the
 rolling tag, delete the previous release, give the candidate the live tag and
-publish it with `release.json`. A failure before that point leaves the live
+publish it with `release.json`. A draft is not returned by
+`/releases/tags/{tag}` (that endpoint answers 404 to a token with push access
+too), so the script finds the candidate in the release list; the tag lookup
+would fail on every publication. A failure before that point leaves the live
 release untouched; a failure after the old release is gone keeps the verified
 draft for a retry. CI (`ci.yml`) reuses the same gates for UI and race, leaving
 fuzz and CodeQL to their dedicated workflows.

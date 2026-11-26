@@ -162,7 +162,13 @@ if [[ "$CHANNEL" == continuous ]]; then
   [[ "$actual_commit" == "$COMMIT" ]] || { echo "tag $TAG points at $actual_commit, expected $COMMIT" >&2; exit 1; }
 fi
 
-candidate_id="$(retry "lookup of candidate $CANDIDATE_TAG" gh api "repos/$REPO/releases/tags/$CANDIDATE_TAG" --jq '.id')"
+# A draft release is not returned by /releases/tags/{tag} (it answers 404 even
+# to a token with push access): only the list endpoint returns drafts. The
+# candidate is found there, and from here on it is addressed by its ID, because
+# a rename followed by a lookup by tag would fail while it is still a draft.
+candidate_id="$(retry "lookup of candidate $CANDIDATE_TAG" \
+  gh api --paginate "repos/$REPO/releases?per_page=100" \
+    --jq "first(.[] | select(.draft and .tag_name == \"$CANDIDATE_TAG\") | .id)")"
 [[ -n "$candidate_id" ]] || { echo "cannot find the candidate release $CANDIDATE_TAG" >&2; exit 1; }
 
 # The old release goes only now, with a complete verified candidate waiting.
