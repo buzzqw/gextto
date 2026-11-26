@@ -11,7 +11,7 @@ client. Two binaries, no C dependencies, no Node.js build, six languages.
 
 [![License: EUPL-1.2](https://img.shields.io/badge/license-EUPL--1.2-blue.svg)](LICENSE)
 ![Go](https://img.shields.io/badge/Go-pure%2C%20zero%20CGO-00ADD8?logo=go)
-![Tests](https://img.shields.io/badge/tests-2%2C191%20Go%20%C2%B7%20110%20E2E%20%C2%B7%2023%20fuzz-success)
+![Tests](https://img.shields.io/badge/tests-3%2C807%20Go%20%C2%B7%20118%20E2E%20%C2%B7%2026%20fuzz-success)
 ![Platforms](https://img.shields.io/badge/platforms-Linux%20%C2%B7%20Windows%20(gx--torrent)-informational)
 ![BEPs](https://img.shields.io/badge/BitTorrent%20BEPs-34%20implemented-success)
 ![Languages](https://img.shields.io/badge/UI-IT%20%C2%B7%20EN%20%C2%B7%20DE%20%C2%B7%20FR%20%C2%B7%20ES%20%C2%B7%20PL-lightgrey)
@@ -329,13 +329,13 @@ What runs on every push (`make test`, `make test-ui`, `make fuzz-smoke` and CI):
 
 | Layer | What runs |
 |---|---|
-| **Unit and integration** | 2,191 Go test functions in 426 files: engine, DHT, uTP, storage, scoring, post-processing, API, UI rendering. The TUI is driven against the real router |
-| **End-to-end** | 110 Playwright tests drive the real daemon in a browser — pages, mobile, six languages, security, settings — including 20 accessibility tests, 12 of them axe-core WCAG audits |
-| **Fuzzing** | 23 network-facing parsers (DHT, bencode, magnet, BEP 10/52, trackers, Torznab, RSS, MSE) fuzzed in CI; every crash found becomes a committed seed |
+| **Unit and integration** | 3,807 Go test functions in 732 files: engine, DHT, uTP, storage, scoring, post-processing, API, UI rendering. The TUI is driven against the real router |
+| **End-to-end** | 118 Playwright tests drive the real daemon in a browser — pages, mobile, six languages, security, settings — including 20 accessibility tests, 12 of them axe-core WCAG audits |
+| **Fuzzing** | 26 network-facing parsers (DHT, bencode, magnet, BEP 10/52, trackers, Torznab, RSS, MSE) fuzzed in CI; every crash found becomes a committed seed |
 | **Real-world harnesses** | 14 opt-in measurements: real public swarms, the public DHT, a real libtorrent peer, local merge on real ISOs, choking and pipelining, the live Jackett/Prowlarr, the latency of the home line |
 | **Static guards** | Every UI button points at a registered route, every internal call resolves on the real router, every setting is writable, translated in six languages and has its tooltip, every API route is documented |
 | **Platforms and packaging** | CI cross-compiles engine and daemon for Windows and runs the Windows platform tests and a real service install; the installers are self-tested (every flag, a dry-run that changes nothing) and the standalone and full Docker images are built and smoke-tested; CodeQL scans every push |
-| **Benchmarks** | 45 Go benchmarks on the hot paths (picker, storage, uTP, archive, merge, logging), run before and after every data-path change |
+| **Benchmarks** | 107 Go benchmarks on the hot paths (picker, storage, uTP, archive, merge, logging), run before and after every data-path change |
 
 ## Accessibility
 

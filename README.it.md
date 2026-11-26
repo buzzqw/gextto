@@ -11,7 +11,7 @@ binari, nessuna dipendenza C, nessuna build Node.js, sei lingue.
 
 [![Licenza: EUPL-1.2](https://img.shields.io/badge/licenza-EUPL--1.2-blue.svg)](LICENSE)
 ![Go](https://img.shields.io/badge/Go-puro%2C%20zero%20CGO-00ADD8?logo=go)
-![Test](https://img.shields.io/badge/test-2.191%20Go%20%C2%B7%20110%20E2E%20%C2%B7%2023%20fuzz-success)
+![Test](https://img.shields.io/badge/test-3.807%20Go%20%C2%B7%20118%20E2E%20%C2%B7%2026%20fuzz-success)
 ![Piattaforme](https://img.shields.io/badge/piattaforme-Linux%20%C2%B7%20Windows%20(gx--torrent)-informational)
 ![BEP](https://img.shields.io/badge/BEP%20BitTorrent-34%20implementati-success)
 ![Lingue](https://img.shields.io/badge/UI-IT%20%C2%B7%20EN%20%C2%B7%20DE%20%C2%B7%20FR%20%C2%B7%20ES%20%C2%B7%20PL-lightgrey)
@@ -329,13 +329,13 @@ Cosa gira a ogni push (`make test`, `make test-ui`, `make fuzz-smoke` e CI):
 
 | Livello | Cosa gira |
 |---|---|
-| **Unitari e integrazione** | 2.191 funzioni di test Go in 426 file: motore, DHT, uTP, storage, punteggi, post-elaborazione, API, rendering della UI. La TUI viene pilotata contro il router reale |
-| **End-to-end** | 110 test Playwright pilotano il demone reale in un browser — pagine, mobile, sei lingue, sicurezza, impostazioni — compresi 20 test di accessibilità, 12 con audit WCAG axe-core |
-| **Fuzzing** | 23 parser esposti alla rete (DHT, bencode, magnet, BEP 10/52, tracker, Torznab, RSS, MSE) sotto fuzzing in CI; ogni crash trovato diventa un seed committato |
+| **Unitari e integrazione** | 3.807 funzioni di test Go in 732 file: motore, DHT, uTP, storage, punteggi, post-elaborazione, API, rendering della UI. La TUI viene pilotata contro il router reale |
+| **End-to-end** | 118 test Playwright pilotano il demone reale in un browser — pagine, mobile, sei lingue, sicurezza, impostazioni — compresi 20 test di accessibilità, 12 con audit WCAG axe-core |
+| **Fuzzing** | 26 parser esposti alla rete (DHT, bencode, magnet, BEP 10/52, tracker, Torznab, RSS, MSE) sotto fuzzing in CI; ogni crash trovato diventa un seed committato |
 | **Misure sul mondo reale** | 14 misure opzionali: swarm pubblici reali, la DHT pubblica, un peer libtorrent reale, riuso locale su ISO reali, choking e pipelining, i Jackett/Prowlarr in uso, la latenza della linea di casa |
 | **Guardie statiche** | Ogni bottone della UI punta a una rotta registrata, ogni chiamata interna si risolve sul router reale, ogni impostazione è salvabile, tradotta in sei lingue e ha il suo tooltip, ogni rotta API è documentata |
 | **Piattaforme e pacchetti** | La CI cross-compila motore e demone per Windows ed esegue i test di piattaforma Windows e un'installazione reale del servizio; gli installer hanno auto-test (ogni opzione, un dry-run che non cambia nulla) e le immagini Docker standalone e completa vengono costruite e provate; CodeQL analizza ogni push |
-| **Benchmark** | 45 benchmark Go sui percorsi caldi (picker, storage, uTP, archivio, riuso, logging), lanciati prima e dopo ogni modifica a un percorso dati |
+| **Benchmark** | 107 benchmark Go sui percorsi caldi (picker, storage, uTP, archivio, riuso, logging), lanciati prima e dopo ogni modifica a un percorso dati |
 
 ## Accessibilità
 
