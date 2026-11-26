@@ -470,6 +470,10 @@ func uiMaintenanceSections(s *AppState, cfg *Config) []uiPageSection {
 				{Name: "backup_send_telegram", Kind: "select", Label: "Invia su Telegram", Hint: "Invia una copia su Telegram usando il bot configurato nelle notifiche. Oltre 45 MB viene divisa in parti (.001, .002…): ricomponila con cat nome.zip.0* > nome.zip. Lascia No per non inviarla.", Options: []uiFormOption{{Value: "true", Label: "Sì", Selected: settingsBool(cfg, "backup_send_telegram", false)}, {Value: "false", Label: "No", Selected: !settingsBool(cfg, "backup_send_telegram", false)}}},
 			},
 		})),
+		group("Prove", sectionLinks(uiLinksSection{
+			Title: "Dipendenze", Hint: "Elenca i servizi esterni che la configurazione può contattare e dice solo quali sono configurati, senza mostrare chiavi o indirizzi completi.",
+			Links: []uiLinkItem{{Label: "Apri il rapporto Dipendenze", Href: "/api/health/dependencies", Hint: "Rapporto JSON, leggibile anche da script."}},
+		})),
 		group("Configurazione portabile", uiPageSection{
 			Title: "Configurazione portabile",
 			Hint:  "Scarica profili, regole, filtri, liste e titoli in un documento leggibile. I segreti non sono inclusi: riconfigurali dopo l'import. L'import mostra prima un'anteprima e applica solo le sezioni presenti.",

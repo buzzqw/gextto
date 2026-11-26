@@ -73,6 +73,7 @@
     </nav>{{end}}
     {{if .Note}}<p class="hint">{{tr .Note}}</p>{{end}}
     {{if .Sources}}{{template "v2_sources_index" .Sources}}{{end}}
+    {{if .SourcePenalties}}{{template "v2_source_penalties" .SourcePenalties}}{{end}}
     {{if .Ed2k}}{{template "v2_settings_ed2k" .Ed2k}}{{end}}
     {{range .LeadGroups}}{{template "v2_setting_group" .}}{{end}}
     {{if .ScoreExamples}}{{template "v2_score_examples" .ScoreExamples}}{{end}}
@@ -210,6 +211,32 @@
       </li>
       {{end}}
     </ul>
+  </div>
+</div>
+{{end}}
+
+{{define "v2_source_penalties"}}
+<div class="panel settings-panel" id="v2-source-penalties">
+  <div class="panel-head"><h3>{{tr "Penalità sorgente"}}</h3></div>
+  <div class="panel-body">
+    <p class="hint">{{tr "Un motivo e un numero di punti tolti dal punteggio delle release di quella sorgente. Ogni penalità resta visibile e si può rimuovere quando non serve più."}}</p>
+    <form class="form-grid" method="post" action="/settings/source-penalty" hx-post="/settings/source-penalty" hx-target="#v2-source-penalties" hx-swap="outerHTML">
+      <label class="field"><span>{{tr "Sorgente"}}</span><input class="input" name="source" placeholder="{{tr "nome dell'indexer,oppure *"}}" required /></label>
+      <label class="field"><span>{{tr "Motivo"}}</span><input class="input" name="reason" required /></label>
+      <label class="field"><span>{{tr "Punti"}}</span><input class="input" type="number" name="points" min="1" max="1000" value="10" required /></label>
+      <label class="field"><span>{{tr "Scadenza"}}</span><input class="input" name="expires_at" placeholder="{{tr "2026-12-31T00:00:00Z"}}" /></label>
+      <div class="form-actions span-full"><button class="btn primary" type="submit">{{tr "Aggiungi penalità"}}</button></div>
+    </form>
+    {{if .Items}}
+    <div class="table-wrap"><table class="data-table">
+      <caption class="sr-only">{{tr "Penalità attive"}}</caption>
+      <thead><tr><th scope="col">{{tr "Sorgente"}}</th><th scope="col">{{tr "Motivo"}}</th><th scope="col">{{tr "Punti"}}</th><th scope="col">{{tr "Aggiunta"}}</th><th scope="col"><span class="sr-only">{{tr "Azioni"}}</span></th></tr></thead>
+      <tbody>{{range .Items}}<tr>
+        <td>{{.Source}}</td><td>{{tr .Reason}}</td><td>{{.Points}}</td><td>{{.CreatedAt}}</td>
+        <td class="row-actions"><form method="post" action="/settings/source-penalty/remove" hx-post="/settings/source-penalty/remove" hx-target="#v2-source-penalties" hx-swap="outerHTML" class="inline"><input type="hidden" name="id" value="{{.ID}}" /><button class="btn sm danger" type="submit" hx-confirm="{{tr "Rimuovere questa penalità?"}}">{{tr "Rimuovi"}}</button></form></td>
+      </tr>{{end}}</tbody>
+    </table></div>
+    {{else}}<p class="muted">{{tr "Nessuna penalità configurata."}}{{end}}
   </div>
 </div>
 {{end}}

@@ -6222,3 +6222,9 @@ eng:
   "Penalità": "Penalty"
   "Rimozione della penalità...": "Removing the penalty..."
   "Aggiunta": "Added"
+
+  # dependencies report
+  "Dipendenze": "Dependencies"
+  "Elenca i servizi esterni che la configurazione può contattare e dice solo quali sono configurati, senza mostrare chiavi o indirizzi completi.": "Lists the external services the configuration can contact and says only which ones are configured, without showing keys or full addresses."
+  "Apri il rapporto Dipendenze": "Open the Dependencies report"
+  "Rapporto JSON, leggibile anche da script.": "JSON report, readable by scripts too."

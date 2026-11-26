@@ -248,6 +248,8 @@ func registerV2Routes(s *AppState, mux *http.ServeMux) {
 	v2Handle(s, mux, "POST /settings/upgrade-impact", V2SettingsUpgradeImpact)
 	v2Handle(s, mux, "POST /settings/tuning/apply", V2SettingsTuningApply)
 	v2Handle(s, mux, "POST /settings/feed", V2SettingsFeed)
+	v2Handle(s, mux, "POST /settings/source-penalty", V2SettingsSourcePenalty)
+	v2Handle(s, mux, "POST /settings/source-penalty/remove", V2SettingsSourcePenaltyRemove)
 	v2Handle(s, mux, "POST /settings/checkbox", V2SettingsCheckbox)
 	v2Handle(s, mux, "GET /settings/editor-row", V2SettingsEditorRow)
 	v2Handle(s, mux, "POST /settings/editor-save", V2SettingsEditorSave)
@@ -3166,6 +3168,8 @@ type v2SettingsView struct {
 	ScoreExamples []string
 	// Sources is the entry point of the Sorgenti tab (deep links + status).
 	Sources *v2SourcesIndex
+	// SourcePenalties is the operator's explicit, reversible source policy.
+	SourcePenalties *v2SourcePenaltiesView
 	// Tuning is the guided optimization panel of the performance tab.
 	Tuning *v2TuningPanel
 	// Ed2k is the aMule panel of the eD2k tab (preallocation is aMule's own
@@ -3370,6 +3374,12 @@ func v2SettingsViewFrom(s *AppState, tab, highlight, mode string) v2SettingsView
 		view.ScoreExamples = scoreExampleLines(s, cfg)
 	case "sources":
 		view.Sources = v2SourcesIndexFrom(s, cfg)
+		if s.db != nil {
+			items, err := SourcePenalties(s.db)
+			if err == nil {
+				view.SourcePenalties = &v2SourcePenaltiesView{Items: items}
+			}
+		}
 	case "performance":
 		view.Tuning = v2TuningPanelFrom(s, cfg, brief)
 	case "network":

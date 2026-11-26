@@ -6884,3 +6884,9 @@ deu:
   "Penalità": "Strafe"
   "Rimozione della penalità...": "Strafe wird entfernt..."
   "Aggiunta": "Hinzugefügt"
+
+  # dependencies report
+  "Dipendenze": "Abhängigkeiten"
+  "Elenca i servizi esterni che la configurazione può contattare e dice solo quali sono configurati, senza mostrare chiavi o indirizzi completi.": "Listet die externen Dienste auf, die die Konfiguration kontaktieren kann, und sagt nur, welche konfiguriert sind, ohne Schlüssel oder vollständige Adressen zu zeigen."
+  "Apri il rapporto Dipendenze": "Abhängigkeitsbericht öffnen"
+  "Rapporto JSON, leggibile anche da script.": "JSON-Bericht, auch für Skripte lesbar."

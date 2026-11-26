@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -107,6 +108,42 @@ func SourcePenaltyPoints(db *Database, source string, now time.Time) (int64, str
 		reasons = append(reasons, item.Reason)
 	}
 	return points, strings.Join(reasons, "; ")
+}
+
+type v2SourcePenaltiesView struct {
+	Items   []SourcePenalty
+	Message string
+	Error   bool
+}
+
+// V2SettingsSourcePenalty adds a penalty from the Configurazione → Sorgenti
+// page and returns to the same tab with a short confirmation.
+func V2SettingsSourcePenalty(w http.ResponseWriter, r *http.Request, s *AppState) {
+	points, err := strconv.ParseInt(strings.TrimSpace(r.FormValue("points")), 10, 64)
+	if err != nil {
+		v2SettingsRedirectError(w, r, "sources", "I punti della penalità devono essere un numero tra 1 e 1000")
+		return
+	}
+	if err := AddSourcePenalty(s.db, r.FormValue("source"), r.FormValue("reason"), points, strings.TrimSpace(r.FormValue("expires_at"))); err != nil {
+		v2SettingsRedirectError(w, r, "sources", err.Error())
+		return
+	}
+	v2SettingsRedirect(w, r, "sources")
+}
+
+// V2SettingsSourcePenaltyRemove deletes one row: the operator sees the reason
+// disappear and the score go back to what it was.
+func V2SettingsSourcePenaltyRemove(w http.ResponseWriter, r *http.Request, s *AppState) {
+	id, err := strconv.ParseInt(strings.TrimSpace(r.FormValue("id")), 10, 64)
+	if err != nil {
+		v2SettingsRedirectError(w, r, "sources", "Identificativo della penalità non valido")
+		return
+	}
+	if _, err := RemoveSourcePenalty(s.db, id); err != nil {
+		v2SettingsRedirectError(w, r, "sources", err.Error())
+		return
+	}
+	v2SettingsRedirect(w, r, "sources")
 }
 
 // SourcePenaltiesAPI implements GET and POST /api/source-penalties.

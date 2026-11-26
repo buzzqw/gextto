@@ -6877,3 +6877,9 @@ fra:
   "Penalità": "Pénalité"
   "Rimozione della penalità...": "Suppression de la pénalité..."
   "Aggiunta": "Ajoutée"
+
+  # dependencies report
+  "Dipendenze": "Dépendances"
+  "Elenca i servizi esterni che la configurazione può contattare e dice solo quali sono configurati, senza mostrare chiavi o indirizzi completi.": "Liste les services externes que la configuration peut contacter et indique seulement lesquels sont configurés, sans afficher de clés ni d'adresses complètes."
+  "Apri il rapporto Dipendenze": "Ouvrir le rapport Dépendances"
+  "Rapporto JSON, leggibile anche da script.": "Rapport JSON, également lisible par des scripts."

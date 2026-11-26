@@ -6825,3 +6825,9 @@ pol:
   "Penalità": "Kara"
   "Rimozione della penalità...": "Usuwanie kary..."
   "Aggiunta": "Dodana"
+
+  # dependencies report
+  "Dipendenze": "Zależności"
+  "Elenca i servizi esterni che la configurazione può contattare e dice solo quali sono configurati, senza mostrare chiavi o indirizzi completi.": "Wyświetla zewnętrzne usługi, z którymi konfiguracja może się kontaktować, i podaje tylko, które są skonfigurowane, bez pokazywania kluczy ani pełnych adresów."
+  "Apri il rapporto Dipendenze": "Otwórz raport Zależności"
+  "Rapporto JSON, leggibile anche da script.": "Raport JSON, czytelny także dla skryptów."

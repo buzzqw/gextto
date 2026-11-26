@@ -6831,3 +6831,9 @@ spa:
   "Penalità": "Penalización"
   "Rimozione della penalità...": "Eliminando la penalización..."
   "Aggiunta": "Añadida"
+
+  # dependencies report
+  "Dipendenze": "Dependencias"
+  "Elenca i servizi esterni che la configurazione può contattare e dice solo quali sono configurati, senza mostrare chiavi o indirizzi completi.": "Enumera los servicios externos que la configuración puede contactar e indica solo cuáles están configurados, sin mostrar claves ni direcciones completas."
+  "Apri il rapporto Dipendenze": "Abrir el informe Dependencias"
+  "Rapporto JSON, leggibile anche da script.": "Informe JSON, legible también por scripts."
