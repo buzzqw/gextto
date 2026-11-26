@@ -2,6 +2,7 @@ package peerwriter
 
 import (
 	"bytes"
+	"net"
 	"strconv"
 	"strings"
 	"testing"
@@ -121,5 +122,48 @@ func TestFrameIsAllocatedOnFirstPiece(t *testing.T) {
 	p.ensureFrame()
 	if cap(p.frameBuf.Bytes()) < maxFrameSize {
 		t.Fatalf("frame capacity %d, want at least %d", cap(p.frameBuf.Bytes()), maxFrameSize)
+	}
+}
+
+// closeCountingConn records Close: the writer closes the connection of a
+// peer whose control queue overflowed.
+type closeCountingConn struct {
+	net.Conn
+	closed int
+}
+
+func (c *closeCountingConn) Close() error { c.closed++; return nil }
+
+// A peer flooding requests past the upload bound makes us answer with
+// rejects: without a bound on control messages the queue grew for ever (the
+// report measured 10,001 entries from 10,000 rejects with a cap of one).
+func TestControlQueueIsBounded(t *testing.T) {
+	conn := &closeCountingConn{}
+	w := New(conn, logger.New("test"), 1, true, nil)
+	src := bytes.NewReader(make([]byte, 16384))
+	w.queueMessage(Piece{Data: src, RequestMessage: peerprotocol.RequestMessage{Index: 1, Length: 16384}})
+	for i := 0; i < maxQueuedControl+10000; i++ {
+		w.queueMessage(Piece{Data: src, RequestMessage: peerprotocol.RequestMessage{Index: uint32(i + 2), Length: 16384}})
+	}
+	if n := w.writeQueue.Len(); n > maxQueuedControl+1 {
+		t.Fatalf("queue length %d, want at most %d", n, maxQueuedControl+1)
+	}
+	if conn.closed != 1 || !w.overflowed {
+		t.Fatalf("connection closed %d times, overflowed=%v: a peer that reads nothing must be dropped", conn.closed, w.overflowed)
+	}
+}
+
+// The control counter follows the queue through batches.
+func TestControlCounterFollowsTheQueue(t *testing.T) {
+	w := New(nil, logger.New("test"), 250, true, nil)
+	for i := 0; i < 10; i++ {
+		w.queueMessage(peerprotocol.HaveMessage{Index: uint32(i)})
+	}
+	if w.queuedControl != 10 {
+		t.Fatalf("queuedControl = %d, want 10", w.queuedControl)
+	}
+	_ = w.takeBatch()
+	if w.queuedControl != 0 || w.writeQueue.Len() != 0 {
+		t.Fatalf("after a batch: queuedControl = %d, queue = %d, want 0 and 0", w.queuedControl, w.writeQueue.Len())
 	}
 }

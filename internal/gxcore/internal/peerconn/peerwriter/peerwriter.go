@@ -42,6 +42,14 @@ var pieceBatchBufs = sync.Pool{New: func() any {
 // transfer) for the rest of the connection.
 const servedWindowSize = 1024
 
+// maxQueuedControl bounds the small messages staged for one peer. A peer that
+// stops reading, or floods requests to make us answer with rejects, would
+// otherwise grow the queue (and every cancel's scan) without limit. The bound
+// is far above a healthy backlog — tens of thousands of HAVEs is minutes of a
+// fast download to a peer that reads nothing — so reaching it means the peer
+// is not keeping up at all, and the connection is closed.
+const maxQueuedControl = 16384
+
 // servedWindow remembers the most recent served requests for duplicate
 // suppression, evicting oldest-first past capacity.
 type servedWindow struct {
@@ -96,6 +104,12 @@ type PeerWriter struct {
 	// queued uploads survive a choke.
 	allowedFast           map[uint32]struct{}
 	currentQueuedRequests int
+	// queuedControl counts the staged messages that are not uploads (have,
+	// reject, choke, extension...). maxQueuedRequests bounds only uploads.
+	queuedControl int
+	// overflowed is set once the control queue went past its bound and the
+	// connection was closed: nothing more is staged.
+	overflowed bool
 	readyC                chan struct{}
 	batchC                chan []peerprotocol.Message
 	// batches are the two hand-off slices, used in turn: the writer asks for
@@ -223,6 +237,7 @@ func (p *PeerWriter) takeBatch() []peerprotocol.Message {
 			return p.finishBatch(p.takePieces(batch))
 		}
 		p.writeQueue.Remove(e)
+		p.queuedControl--
 		batch = append(batch, msg)
 	}
 	return p.finishBatch(batch)
@@ -256,14 +271,19 @@ func (p *PeerWriter) takePieces(batch []peerprotocol.Message) []peerprotocol.Mes
 // queueMessage stages msg, enforcing the piece-queue bound: silent drop by
 // default, reject message when the fast extension is on.
 func (p *PeerWriter) queueMessage(msg peerprotocol.Message) {
+	if p.overflowed {
+		return
+	}
 	if req, ok := msg.(Piece); ok {
 		if p.currentQueuedRequests >= p.maxQueuedRequests {
 			if p.fastEnabled {
-				p.writeQueue.PushBack(peerprotocol.RejectMessage{RequestMessage: req.RequestMessage})
+				p.pushControl(peerprotocol.RejectMessage{RequestMessage: req.RequestMessage}, nil)
 			}
 			return
 		}
 		p.currentQueuedRequests++
+		p.writeQueue.PushBack(msg)
+		return
 	} else if af, ok := msg.(peerprotocol.AllowedFastMessage); ok {
 		if p.allowedFast == nil {
 			p.allowedFast = make(map[uint32]struct{})
@@ -272,7 +292,29 @@ func (p *PeerWriter) queueMessage(msg peerprotocol.Message) {
 	} else if _, ok := msg.(peerprotocol.ChokeMessage); ok {
 		p.cancelQueuedPieceMessages()
 	}
-	p.writeQueue.PushBack(msg)
+	p.pushControl(msg, nil)
+}
+
+// pushControl stages a non-upload message, at the back or before mark. Past
+// maxQueuedControl the peer is not reading: the connection is closed (its
+// reader and writer then fail and the torrent drops the peer) and nothing
+// more is staged.
+func (p *PeerWriter) pushControl(msg peerprotocol.Message, mark *list.Element) {
+	if p.overflowed {
+		return
+	}
+	if p.queuedControl >= maxQueuedControl {
+		p.overflowed = true
+		p.log.Debugf("peer is not reading: %d control messages queued, closing the connection", p.queuedControl)
+		_ = p.conn.Close()
+		return
+	}
+	if mark != nil {
+		p.writeQueue.InsertBefore(msg, mark)
+	} else {
+		p.writeQueue.PushBack(msg)
+	}
+	p.queuedControl++
 }
 
 // cancelQueuedPieceMessages withdraws the staged uploads on a choke. Without
@@ -292,7 +334,7 @@ func (p *PeerWriter) cancelQueuedPieceMessages() {
 			if _, keep := p.allowedFast[pi.Index]; keep {
 				continue
 			}
-			p.writeQueue.InsertBefore(peerprotocol.RejectMessage{RequestMessage: pi.RequestMessage}, e)
+			p.pushControl(peerprotocol.RejectMessage{RequestMessage: pi.RequestMessage}, e)
 		}
 		p.writeQueue.Remove(e)
 		p.currentQueuedRequests--
