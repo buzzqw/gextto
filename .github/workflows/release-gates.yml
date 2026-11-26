@@ -75,6 +75,11 @@ jobs:
         working-directory: uiweb/end2end
         run: npm ci --no-audit --no-fund
 
+      # The audio-cleanup settings render their switch blocked (and disabled)
+      # while the tools are missing, and one spec drives that switch.
+      - name: Install the media tools the settings page checks
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg mkvtoolnix
+
       - name: Install the browser
         working-directory: uiweb/end2end
         run: |

@@ -295,8 +295,11 @@ test("Salva tutto segnala la riga che non è arrivata al server", async ({ page 
 
 test("Annulla modifiche ripristina il campo lingua personalizzato", async ({ page }) => {
   await page.goto("/?view=settings&tab=rename");
-  // The language row only shows when the cleanup switch is on.
+  // The language row only shows when the cleanup switch is on. The switch stays
+  // blocked (and disabled) while ffprobe, ffmpeg and mkvmerge are missing, so
+  // the row cannot be reached on a machine without them.
   const toggle = page.locator("#input-audio_cleanup");
+  test.skip(await toggle.isDisabled(), "audio cleanup needs ffprobe, ffmpeg and mkvmerge on PATH");
   if (!(await toggle.isChecked())) await toggle.check();
   const row = page.locator("#v2-setting-audio_cleanup_language");
   const select = row.locator("select[data-v2-lang-combo]");
