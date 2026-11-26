@@ -1092,13 +1092,19 @@ func RemoveCompletedTorrents(w http.ResponseWriter, r *http.Request, s *AppState
 			download := effectiveDownloadForRatio(torrent)
 			ratioReached = download > 0.0 && float64(torrent.AllTimeUpload)/download >= *limits.Ratio
 		}
-		timeReached := limits.timeReached(&torrent) || (limits.IdleSeconds != nil && seedIdle.reached(torrent.Hash))
+		idleReached := limits.IdleSeconds != nil && seedIdle.reached(torrent.Hash)
+		timeReached := limits.timeReached(&torrent) || idleReached
+		// The manual cleanup obeys the same contract as automatic removal:
+		// with every limit on, reaching the ratio alone is not enough.
 		canRemove := false
-		if ratioReached || timeReached {
+		if cfg.Transfer.SeedLimitsAll && !limits.none() {
+			canRemove = limits.allReached(&torrent, idleReached)
+		} else {
+			canRemove = ratioReached || timeReached
+		}
+		if !canRemove && isArchived && torrent.State == "paused" {
 			canRemove = true
-		} else if isArchived && torrent.State == "paused" {
-			canRemove = true
-		} else if limits.none() && (torrent.State == "paused" || torrent.State == "finished" || isArchived) {
+		} else if !canRemove && limits.none() && (torrent.State == "paused" || torrent.State == "finished" || isArchived) {
 			canRemove = true
 		}
 		if !canRemove {

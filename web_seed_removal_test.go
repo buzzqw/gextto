@@ -274,6 +274,7 @@ func TestDetachCompletedArchivedSinglesRechecksAfterTheInterval(t *testing.T) {
 // the end of the seed (not at completion).
 func TestEnforceSeedPolicyArchivesAtSeedEnd(t *testing.T) {
 	db, cfg, view, source, _ := seedTestSetup(t)
+	cfg.Transfer.SeedLimitsAll = false // this test exercises the legacy OR rule
 	// Deferred state: the release is marked completed at completion time but the
 	// processed path is still the download source (inside the download folder).
 	if err := db.MarkTorrentCompleted(seedTestHash, source, 5); err != nil {
@@ -295,6 +296,7 @@ func TestEnforceSeedPolicyArchivesAtSeedEnd(t *testing.T) {
 // and is not the release's configured archive destination.
 func TestEnforceSeedPolicyMovesRamdiskSourceDirectlyToArchive(t *testing.T) {
 	db, cfg, view, source, processed := seedTestSetup(t)
+	cfg.Transfer.SeedLimitsAll = false // this test exercises the legacy OR rule
 	cfg.Settings["torrent_ramdisk_enabled"] = "yes"
 	cfg.Settings["torrent_ramdisk_dir"] = filepath.Dir(source)
 	cfg.DownloadDir = filepath.Join(t.TempDir(), "downloads")
@@ -317,6 +319,7 @@ func TestEnforceSeedPolicyMovesRamdiskSourceDirectlyToArchive(t *testing.T) {
 // not be moved into the archive as a second copy in a subfolder.
 func TestEnforceSeedPolicyRamdiskSkipsArchiveWhenAlreadyCopied(t *testing.T) {
 	db, cfg, view, source, processed := seedTestSetup(t)
+	cfg.Transfer.SeedLimitsAll = false // this test exercises the legacy OR rule
 	cfg.Settings["torrent_ramdisk_enabled"] = "yes"
 	cfg.Settings["torrent_ramdisk_dir"] = filepath.Dir(source)
 	downloads := filepath.Join(t.TempDir(), "downloads")
@@ -335,6 +338,7 @@ func TestEnforceSeedPolicyRamdiskSkipsArchiveWhenAlreadyCopied(t *testing.T) {
 // was populated before a restart interrupted the storage_moved event.
 func TestEnforceSeedPolicyAssociatesExistingArchive(t *testing.T) {
 	db, cfg, view, source, processed := seedTestSetup(t)
+	cfg.Transfer.SeedLimitsAll = false // this test exercises the legacy OR rule
 	cfg.Settings["torrent_ramdisk_enabled"] = "yes"
 	cfg.Settings["torrent_ramdisk_dir"] = filepath.Dir(source)
 	cfg.DownloadDir = filepath.Join(t.TempDir(), "downloads")
@@ -512,6 +516,7 @@ func TestRemoveSeededCompletedToTrashExplainsWhy(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.Transfer.SeedRatio = 0.5
 	cfg.Transfer.SeedTimeDays = 365
+	cfg.Transfer.SeedLimitsAll = false // this test exercises the legacy OR rule
 	cfg.Transfer.AutoRemoveCompleted = true
 	cfg.CleanupAction = "move"
 	cfg.TrashPath = &trash
@@ -614,6 +619,31 @@ func TestRemoveCompletedKeepsInfiniteSeeds(t *testing.T) {
 	}
 }
 
+// Manual cleanup obeys the declared contract too: reaching the ratio alone
+// cannot drop a torrent while the time limit is still running.
+func TestRemoveCompletedWaitsForEveryLimit(t *testing.T) {
+	db, cfg, view, _, _ := seedTestSetup(t)
+	cfg.Transfer.SeedLimitsAll = true
+	view.State = "seeding"
+
+	engine := &mockTorrentEngine{torrents: []models.TorrentView{view}, removed: map[string]bool{}}
+	s := &AppState{torrent_engine: engine, db: db, cfg: cfg, config_path: filepath.Join(t.TempDir(), "missing.toml")}
+	req := httptest.NewRequest(http.MethodPost, "/api/torrents/remove_completed", strings.NewReader(`{"delete_files":false}`))
+	RemoveCompletedTorrents(httptest.NewRecorder(), req, s)
+	if _, got := engine.removed[seedTestHash]; got {
+		t.Fatal("manual cleanup removed a seed whose time limit was not reached")
+	}
+
+	view.SeedingSeconds = 365 * 86_400
+	engine = &mockTorrentEngine{torrents: []models.TorrentView{view}, removed: map[string]bool{}}
+	s = &AppState{torrent_engine: engine, db: db, cfg: cfg, config_path: filepath.Join(t.TempDir(), "missing.toml")}
+	req = httptest.NewRequest(http.MethodPost, "/api/torrents/remove_completed", strings.NewReader(`{"delete_files":false}`))
+	RemoveCompletedTorrents(httptest.NewRecorder(), req, s)
+	if _, got := engine.removed[seedTestHash]; !got {
+		t.Fatal("manual cleanup did not remove a seed whose limits are all reached")
+	}
+}
+
 // TestRemoveCompletedDropsSupersededArchive pins the reported bug: a torrent
 // archived into the library whose copy was later replaced by a better release
 // (sent to the trash) has neither the archived file nor its source. "Pulisci
@@ -652,6 +682,7 @@ func (s *pauseCountingSession) Pause(hash string) (bool, error) {
 // its download copy.
 func TestEnforceSeedPolicyStopsASeedAtItsRatio(t *testing.T) {
 	db, cfg, view, _, _ := seedTestSetup(t)
+	cfg.Transfer.SeedLimitsAll = false // this test exercises the legacy OR rule
 	view.State = "seeding"
 	view.AutoManaged = true
 	cfg.Transfer.AutoRemoveCompleted = true
@@ -664,6 +695,52 @@ func TestEnforceSeedPolicyStopsASeedAtItsRatio(t *testing.T) {
 	}
 	if len(session.removed) != 1 || !session.deleteFlags[0] {
 		t.Fatalf("removed %v (delete %v), want the torrent removed with its download copy", session.removed, session.deleteFlags)
+	}
+}
+
+// The declared seeding contract: with every limit on, reaching the ratio
+// alone does not stop the seed or remove the torrent. Once the time is served
+// too, the same pass ends the seed and removes it.
+func TestEnforceSeedPolicyWaitsForEveryLimit(t *testing.T) {
+	db, cfg, view, _, _ := seedTestSetup(t)
+	cfg.Transfer.SeedLimitsAll = true
+	cfg.Transfer.AutoRemoveCompleted = true
+	view.State = "seeding"
+	view.AutoManaged = true
+	session := &pauseCountingSession{stubTorrentSession: stubTorrentSession{list: []models.TorrentView{view}}}
+
+	EnforceSeedPolicy(cfg, session, db, map[string]struct{}{}, map[string]StorageMoveRetry{}, map[string]time.Time{})
+	if len(session.paused) != 0 || len(session.removed) != 0 {
+		t.Fatalf("paused %v removed %v, want the seed to continue until its time is served", session.paused, session.removed)
+	}
+
+	view.SeedingSeconds = 365 * 86_400
+	session = &pauseCountingSession{stubTorrentSession: stubTorrentSession{list: []models.TorrentView{view}}}
+	EnforceSeedPolicy(cfg, session, db, map[string]struct{}{}, map[string]StorageMoveRetry{}, map[string]time.Time{})
+	if len(session.paused) != 1 || len(session.removed) != 1 {
+		t.Fatalf("paused %v removed %v, want the finished seed to be stopped and removed", session.paused, session.removed)
+	}
+}
+
+// The automatic removal must obey the same contract as the pause policy:
+// a ratio reached in a few seconds is not enough when the time limit is on.
+func TestRemoveSeededCompletedWaitsForEveryLimit(t *testing.T) {
+	db, cfg, view, _, _ := seedTestSetup(t)
+	cfg.Transfer.SeedLimitsAll = true
+	cfg.Transfer.AutoRemoveCompleted = true
+	view.State = "seeding"
+
+	session := &stubTorrentSession{list: []models.TorrentView{view}}
+	RemoveSeededCompleted(cfg, session, db, map[string]struct{}{})
+	if len(session.removed) != 0 {
+		t.Fatalf("removed %v at the ratio only, want the torrent kept", session.removed)
+	}
+
+	view.SeedingSeconds = 365 * 86_400
+	session = &stubTorrentSession{list: []models.TorrentView{view}}
+	RemoveSeededCompleted(cfg, session, db, map[string]struct{}{})
+	if len(session.removed) != 1 || session.removed[0] != seedTestHash {
+		t.Fatalf("removed %v, want the torrent removed once every limit is reached", session.removed)
 	}
 }
 

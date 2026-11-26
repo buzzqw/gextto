@@ -98,6 +98,7 @@ func TestFreeSearchDownloadStaysInTransfer(t *testing.T) {
 	view.SeedRatio, view.SeedDays = -1, -1
 	p.cfg.Transfer.SeedRatio = 0.5
 	p.cfg.Transfer.SeedTimeDays = 365
+	p.cfg.Transfer.SeedLimitsAll = false // this test exercises the legacy OR rule
 	seeding := &pauseCountingSession{stubTorrentSession: stubTorrentSession{list: []models.TorrentView{view}}}
 	EnforceSeedPolicy(p.cfg, seeding, p.db, map[string]struct{}{}, map[string]StorageMoveRetry{}, map[string]time.Time{})
 	if len(seeding.paused) != 1 {

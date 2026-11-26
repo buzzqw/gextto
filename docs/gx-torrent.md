@@ -2645,11 +2645,12 @@ global one, and `0` means infinite. These are the qBittorrent `max_ratio` /
 stops a seed whose uploaded bytes have not grown for that long while it was
 seeding: the clock runs only in the seeding state and restarts with the daemon,
 a torrent set to seed forever is exempt, and the action is the same pause or
-removal as the other limits. The three limits stop the torrent at the first that
-fires; the **Stop seeding only when every limit is reached** switch
-(`share-limits-all`, qBittorrent's `share_limits_mode` *All*) makes them one
-condition, so the seed goes on until the ratio, the time and the inactivity are
-all satisfied, and a limit left off is not part of the condition.
+removal as the other limits. By default the three limits are one
+condition: the seed goes on until the ratio, the time and the inactivity are
+all satisfied, and a limit left off is not part of the condition. The
+**Stop seeding only when every limit is reached** switch
+(`share-limits-all`, qBittorrent's `share_limits_mode` *All*) carries that rule
+and is on by default; switch it off to stop at the first limit that fires.
 
 While seeding the engine still opens a few outgoing connections. A leecher
 behind a NAT cannot reach a seed, so the only way to find someone to upload to is

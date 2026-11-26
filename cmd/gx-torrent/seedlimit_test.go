@@ -155,6 +155,32 @@ func (d *Daemon) seedLimitReachedForTest(meta *torrentMeta, stats torrent.Stats)
 	return remove, ratioHit || timeHit
 }
 
+// The all-limits rule is the declared default: a torrent that reached its
+// ratio keeps seeding until its time limit is served, with no switch to set.
+func TestSeedLimitStopAllIsTheDefault(t *testing.T) {
+	d := standaloneTestDaemon(t, "", true)
+	d.opts.Settings.Set(maxRatioEnabledKey, "true")
+	d.opts.Settings.Set(maxRatioKey, "2")
+	d.opts.Settings.Set(maxSeedingTimeEnabledKey, "true")
+	d.opts.Settings.Set(maxSeedingTimeKey, "60")
+	meta := &torrentMeta{SeedRatio: -1, SeedDays: -1}
+	rt := &runtimeInfo{}
+	stats := torrent.Stats{Status: torrent.Seeding}
+	stats.Bytes.Total = 100
+	stats.Bytes.Uploaded = 500
+	stats.SeededFor = 30 * time.Minute
+	now := time.Unix(1_700_000_000, 0)
+	d.seedIdleReached(rt, meta, stats, now)
+
+	if _, _, reached := d.seedLimitStop(rt, meta, stats, now.Add(time.Minute)); reached {
+		t.Fatal("ratio alone must not end a seed with the default rule")
+	}
+	stats.SeededFor = 90 * time.Minute
+	if _, _, reached := d.seedLimitStop(rt, meta, stats, now.Add(2*time.Minute)); !reached {
+		t.Fatal("both limits reached, but the seed went on")
+	}
+}
+
 // TestSeedLimitStopAll: with share-limits-all the seed ends only when every
 // configured limit has been reached, not at the first one, and a limit left off
 // is not part of the condition.

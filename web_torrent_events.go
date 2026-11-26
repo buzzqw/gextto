@@ -1548,7 +1548,14 @@ func tevRemoveIfSeeded(cfg *Config, torrents TorrentSession, db *Database, polic
 	// its time limit.
 	idleReached := limits.IdleSeconds != nil && seedIdle.reached(torrent.Hash)
 	timeReached := timeLimitReached || idleReached
-	if !ratioReached && !timeReached && torrent.State != "paused" {
+	reached := ratioReached || timeReached
+	if cfg != nil && cfg.Transfer.SeedLimitsAll {
+		// The same contract as the pause policy: with every limit on, the
+		// torrent leaves the session only when all configured limits are
+		// satisfied, not at the first one that fired.
+		reached = limits.allReached(&torrent, idleReached)
+	}
+	if !reached && torrent.State != "paused" {
 		return
 	}
 	// Real completeness, not just a momentary libtorrent state: a torrent
@@ -2366,8 +2373,8 @@ func tevApplySeedLimit(cfg *Config, torrents TorrentSession, db *Database, polic
 	if cfg.Transfer.AutoRemoveCompleted {
 		if !tevCompletedSourceDisposable(db, torrent.Hash, torrent.SavePath) {
 			if tevSeedCopyWarningDue(seedCopyWarnings, torrent.Hash) {
-				logging.Debug("seed limit reached but archived copy is not verified; keeping torrent files",
-					"hash", torrent.Hash, "name", torrent.Name)
+				logging.Warn(fmt.Sprintf("⏸️ «%s» reached its seeding limit, but its library copy is not verified: the torrent and its files are kept", torrent.Name),
+					"hash", torrent.Hash)
 			}
 			return
 		}

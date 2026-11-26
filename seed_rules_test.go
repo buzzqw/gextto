@@ -334,7 +334,12 @@ func TestSeedLimitsAllSettingIsRead(t *testing.T) {
 	}
 	cfg = &Config{Settings: map[string]string{}}
 	cfg.applyTransferSettings()
+	if !cfg.Transfer.SeedLimitsAll {
+		t.Fatal("the declared default must be on")
+	}
+	cfg = &Config{Settings: map[string]string{"torrent_seed_limits_all": "false"}}
+	cfg.applyTransferSettings()
 	if cfg.Transfer.SeedLimitsAll {
-		t.Fatal("the default must be off")
+		t.Fatal("an explicit off must be honoured")
 	}
 }

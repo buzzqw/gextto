@@ -152,7 +152,7 @@ func (d *Daemon) seedLimitStop(rt *runtimeInfo, meta *torrentMeta, stats torrent
 	idleSet := d.seedIdleConfigured(meta)
 	idleHit := d.seedIdleReached(rt, meta, stats, now)
 
-	if d.settingBool(shareLimitsAllKey, false) {
+	if d.settingBool(shareLimitsAllKey, true) {
 		if !ratioSet && !timeSet && !idleSet {
 			return remove, false, false
 		}
