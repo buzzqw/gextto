@@ -54,7 +54,15 @@ CREATE TABLE IF NOT EXISTS torrent_transfer_finals (
 );
 CREATE INDEX IF NOT EXISTS idx_transfer_finals_hash ON torrent_transfer_finals(hash, finalized_at);
 CREATE INDEX IF NOT EXISTS idx_transfer_finals_hnr ON torrent_transfer_finals(hnr_state, finalized_at);
-CREATE INDEX IF NOT EXISTS idx_transfer_finals_source ON torrent_transfer_finals(source_key, finalized_at);`
+CREATE INDEX IF NOT EXISTS idx_transfer_finals_source ON torrent_transfer_finals(source_key, finalized_at);
+CREATE TABLE IF NOT EXISTS source_penalties (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	source TEXT NOT NULL,
+	reason TEXT NOT NULL,
+	points INTEGER NOT NULL,
+	created_at TEXT NOT NULL,
+	expires_at TEXT NOT NULL DEFAULT ''
+);`
 
 type SourceTrustStat struct {
 	Kind        string `json:"kind"`

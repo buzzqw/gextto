@@ -307,6 +307,13 @@ func (r *candidateRun) judge() (stop bool, err error) {
 	// stored score must use ReleaseScore, so a swarm-health bonus can never
 	// masquerade as an upgrade of a file already in the library.
 	r.releaseScore = cfg.ReleaseScore(release)
+	if penalty, reason := SourcePenaltyPoints(r.p.db, release.Source, time.Now()); penalty > 0 {
+		r.releaseScore -= penalty
+		if r.releaseScore < 0 {
+			r.releaseScore = 0
+		}
+		logging.Debug("source penalty applied to a candidate", "source", release.Source, "points", penalty, "reason", reason)
+	}
 	// A candidate that fills a known archive gap, or that scores above the
 	// bypass threshold, is never held by a delay profile.
 	r.gapEpisodes = gapEpisodesForRelease(release, p.gapTargets)

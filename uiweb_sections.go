@@ -586,6 +586,26 @@ func uiIntegrationSections(s *AppState, cfg *Config) []uiPageSection {
 				boolFieldHint(watchedSuppressionKey, "Salta ciò che è già visto", "Usa lo stato di visione dei media server prima di avviare una ricerca. Disattivo di default.", settingsBool(cfg, watchedSuppressionKey, false)),
 			},
 		})),
+		group("Sorgenti", sectionForm(uiFormSection{
+			Title: "Penalità sorgente", Hint: "Un motivo e un numero di punti tolti dal punteggio delle release di quella sorgente. Ogni penalità resta visibile e si può rimuovere quando non serve più.",
+			Path: "/api/source-penalties", Submit: "Aggiungi penalità",
+			Fields: []uiFormField{
+				{Name: "source", Label: "Sorgente", Placeholder: "nome dell'indexer,oppure *", Hint: "Nome dell'indexer o della sorgente come compare nelle release; * vale per tutte."},
+				{Name: "reason", Label: "Motivo", Hint: "Perché la sorgente viene penalizzata: compare nel log e nella tabella, ed è la ragione che giustifica la penalità."},
+				{Name: "points", Label: "Punti", Kind: "number", Placeholder: "1-1000", Hint: "Quanti punti togliere dal punteggio di ogni release di questa sorgente."},
+				{Name: "expires_at", Label: "Scadenza", Placeholder: "2026-12-31T00:00:00Z", Hint: "Opzionale: data e ora in formato RFC3339 dopo cui la penalità non si applica più, ma resta nella storia."},
+			},
+		})),
+		group("Sorgenti", sectionTable(uiTableSpec{
+			Title:       "Penalità attive",
+			Endpoint:    "/api/source-penalties",
+			ItemsKey:    "items",
+			ColumnsJSON: uiJSON([]uiColumn{{Key: "source", Label: "Sorgente"}, {Key: "reason", Label: "Motivo"}, {Key: "points", Label: "Punti"}, {Key: "created_at", Label: "Aggiunta"}}),
+			Empty:       "Nessuna penalità configurata.",
+			ActionsJSON: uiJSON([]uiAction{
+				{Label: "Rimuovi", Class: "danger", Method: "DELETE", Path: "/api/source-penalties/{id}", Confirm: "Rimuovere questa penalità?", ToastTitle: "Penalità", ToastMessage: "Rimozione della penalità..."},
+			}),
+		})),
 		group("Sorgenti", sectionEditor(uiIndexerEditor)),
 		group("Sorgenti", sectionSettingsActions("FlareSolverr", "Proxy usato per superare Cloudflare sui siti di ricerca.", uiSettingFields(cfg, "flaresolverr_url"), []uiActionButton{
 			{Label: "Test FlareSolverr", Method: "POST", Path: "/api/flaresolverr/test", Body: "{}", Hint: "Verifica che FlareSolverr risponda."},

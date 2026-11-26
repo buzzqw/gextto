@@ -2463,6 +2463,7 @@ salvata** finché non li salvi.
 | Impostazione | Cosa fa |
 |---|---|
 | Contenuti non sicuri | Cosa succede se un download contiene un programma o un file che non dovrebbe esserci: *Blocca e rimuovi* (predefinito) toglie il torrent e i file parziali; *Quarantena i file sospetti* sposta solo i file pericolosi e conserva il video buono; *Solo avviso* non tocca nulla. |
+| Penalità sorgente | Aggiungi una penalità con sorgente, motivo e punti da togliere al punteggio delle sue release; la scadenza opzionale la disattiva senza cancellarla. La tabella *Penalità attive* mostra ogni motivo e permette di rimuoverla. |
 
 **Editor**
 

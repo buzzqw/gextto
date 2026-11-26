@@ -2428,6 +2428,7 @@ them.
 | Setting | What it does |
 |---|---|
 | Unsafe content | What happens when a download contains a program or a file that should not be there: *Block and remove* (default) drops the torrent and its partial files; *Quarantine suspicious files* moves only the dangerous files and keeps the good video; *Report only* changes nothing. |
+| Source penalty | Add a penalty with a source, a reason and the points to subtract from its releases' score; an optional expiry disables it without erasing it. The *Active penalties* table shows every reason and lets you remove it. |
 
 **Editors**
 

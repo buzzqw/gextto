@@ -339,6 +339,9 @@ state.
 | POST | `/api/mdblist/test` | check the saved key by reading the available lists |
 | GET | `/api/watched/settings` | whether already-watched suppression is enabled |
 | POST | `/api/watched/settings` | enable or disable already-watched suppression |
+| GET | `/api/source-penalties` | list the operator's source penalties, each with its reason |
+| POST | `/api/source-penalties` | add a source penalty (source, reason, points, optional expires_at) |
+| DELETE | `/api/source-penalties/{id}` | remove a penalty; the removal is a real undo |
 | GET | `/api/sources/health` | health of the sources |
 | GET | `/api/stats` | library statistics |
 | GET | `/api/status` | daemon status, version and build |

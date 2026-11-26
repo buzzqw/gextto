@@ -61,10 +61,6 @@ still be true after the item lands does not belong here.
   cost, prefer a full-season replacement when enough episodes would change, and
   optionally accept a partial pack only when it covers every known gap. Gate: a
   coverage model shared by approval, inspection, staging and upgrade preview.
-- **Operator-configured source penalties**: the factual reliability report and
-  possible-HnR warnings are available; optional, transparent and reversible
-  penalties for a source or release group remain open. Gate: an explicit policy
-  chosen by the operator, append-only reasons and an undo path; no opaque score.
 - **Movie editions**: model director's cuts, extended editions and different-language cuts
   as distinct versions of the same movie instead of forcing them into one upgrade ladder.
   Gate: metadata and database migration, library naming rules and a decision on whether to
