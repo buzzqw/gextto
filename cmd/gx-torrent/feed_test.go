@@ -743,3 +743,33 @@ func TestUIFeedPollReturnsJSON(t *testing.T) {
 		t.Fatalf("res not OK: %+v", res)
 	}
 }
+
+// A .torrent link chosen by a remote feed may reach a private address only on
+// the host of a configured feed or indexer (a LAN Jackett or Prowlarr linking
+// to itself); any other private target is refused unless the operator allowed
+// private web sources.
+func TestFeedTorrentLinksStayOffPrivateHostsTheyWereNotGiven(t *testing.T) {
+	var hits atomic.Int32
+	internal := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		hits.Add(1)
+		_, _ = w.Write([]byte("d4:infod4:name1:xee"))
+	}))
+	defer internal.Close()
+
+	d := feedDaemon(t, "")
+	if _, _, err := d.fetchFeedTorrentSource(internal.URL + "/x.torrent"); err == nil {
+		t.Fatal("a feed link to a private host no feed or indexer points at was fetched")
+	}
+	if hits.Load() != 0 {
+		t.Fatalf("the private host received %d requests", hits.Load())
+	}
+
+	// The same host configured as a feed: its own links are trusted.
+	d.opts.Settings.Set(feedsSettingKey, `[{"name":"lan","url":"`+internal.URL+`/rss"}]`)
+	if _, _, err := d.fetchFeedTorrentSource(internal.URL + "/x.torrent"); err != nil {
+		t.Fatalf("a link to the configured feed's own host was refused: %v", err)
+	}
+	if hits.Load() != 1 {
+		t.Fatalf("the configured host received %d requests, want 1", hits.Load())
+	}
+}

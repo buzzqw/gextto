@@ -515,7 +515,7 @@ func (d *Daemon) addFeedItemHash(item rss.Item, action rss.Action) (bool, string
 	if item.Magnet != "" {
 		req.Magnet = item.Magnet
 	} else {
-		data, magnet, err := d.fetchTorrentSource(item.Link)
+		data, magnet, err := d.fetchFeedTorrentSource(item.Link)
 		if err != nil {
 			return false, "", err
 		}

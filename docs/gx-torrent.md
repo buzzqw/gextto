@@ -1475,7 +1475,12 @@ example:
   URLs come from the torrent's data (even from an untrusted feed) and without
   this limit they could make the client contact the router, the NAS or other
   internal services (SSRF). Trackers added explicitly by the operator remain
-  trusted. See `docs/bep.md`;
+  trusted. The `.torrent` links of feed items, indexer searches and the feed
+  archive follow the same rule (standalone only): a link on the host of a
+  configured feed or indexer is trusted (a Jackett or Prowlarr on the LAN links
+  to itself), any other link may reach only public addresses, checked on the
+  address actually dialled, redirects included. A link pasted by the operator
+  is always fetched as it is. See `docs/bep.md`;
 - `GX_TORRENT_LANG`, `GX_TORRENT_MODE`, `GX_TORRENT_LOG_FILE`, `GX_TORRENT_DEBUG`,
   `GX_TORRENT_NOTIFY_URL` (webhook for feed notifications);
 - `GX_TORRENT_MMAP` (opt-in mmap storage, Linux: flag `-mmap`).

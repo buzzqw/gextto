@@ -24,3 +24,10 @@ func ProxyEnabled() bool {
 func HTTPTransport() *http.Transport {
 	return netx.HTTPTransport()
 }
+
+// PublicHTTPTransport is HTTPTransport restricted to public addresses: the
+// address each connection actually dials is checked, so a name resolving to
+// loopback, the LAN or link-local is refused, redirects included.
+func PublicHTTPTransport() *http.Transport {
+	return netx.PublicHTTPTransport()
+}

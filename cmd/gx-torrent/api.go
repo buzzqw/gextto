@@ -303,7 +303,50 @@ func urlScheme(raw string) string {
 // API and the page all come through this one function, so they cannot disagree
 // about which shapes are understood.
 func (d *Daemon) fetchTorrentSource(rawURL string) (data []byte, magnet string, err error) {
+	return d.fetchTorrentSourceVia(rawURL, torrent.HTTPTransport())
+}
+
+// fetchFeedTorrentSource downloads a .torrent link that came from a feed, an
+// indexer search or the feed archive. Unlike a link the operator pasted, its
+// target is chosen by a remote server: it may reach a private address only
+// when its host is one of the configured feeds or indexers (a Jackett or
+// Prowlarr on the LAN hands out links to itself) or when the operator allowed
+// private web sources. Any other link is fetched through a transport that
+// refuses non-public addresses at dial time.
+func (d *Daemon) fetchFeedTorrentSource(rawURL string) (data []byte, magnet string, err error) {
+	if d.opts.Network.WebSourcesAllowPrivate || d.trustedSourceHost(rawURL) {
+		return d.fetchTorrentSource(rawURL)
+	}
+	return d.fetchTorrentSourceVia(rawURL, torrent.PublicHTTPTransport())
+}
+
+// trustedSourceHost reports whether rawURL is on the host (and port) of a
+// configured feed or indexer.
+func (d *Daemon) trustedSourceHost(rawURL string) bool {
+	target, err := url.Parse(strings.TrimSpace(rawURL))
+	if err != nil || target.Host == "" {
+		return false
+	}
+	same := func(raw string) bool {
+		u, err := url.Parse(strings.TrimSpace(raw))
+		return err == nil && u.Host != "" && strings.EqualFold(u.Host, target.Host)
+	}
+	for _, f := range d.feeds() {
+		if same(f.URL) {
+			return true
+		}
+	}
+	for _, ix := range d.indexers() {
+		if same(ix.URL) {
+			return true
+		}
+	}
+	return false
+}
+
+func (d *Daemon) fetchTorrentSourceVia(rawURL string, transport http.RoundTripper) (data []byte, magnet string, err error) {
 	client := outboundClientWithJar(60*time.Second, d.cookieJar())
+	client.Transport = transport
 	var redirectedTo string
 	client.CheckRedirect = func(req *http.Request, via []*http.Request) error {
 		if scheme := strings.ToLower(req.URL.Scheme); scheme != "http" && scheme != "https" {
