@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -78,5 +79,54 @@ func TestApplyMovieMetadataResolvesTMDBIDAndAliases(t *testing.T) {
 	code, page := v2Request(t, server, http.MethodGet, "/?view=movies&movie=9", nil)
 	if code != http.StatusOK || !strings.Contains(page, "Titoli alternativi (TMDB)") || !strings.Contains(page, "Foreign Name") {
 		t.Fatalf("movie page does not show the titles: %d", code)
+	}
+}
+
+// TestMovieSearchLeavesTheSharedConfigAlone covers the first search of a film
+// whose alternative titles were never read: the handler fills them from TMDB,
+// but on its own copy. The cached configuration is shared with every other
+// request and must not be written from a handler (it was a data race).
+func TestMovieSearchLeavesTheSharedConfigAlone(t *testing.T) {
+	tmdbTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.HasSuffix(r.URL.Path, "/alternative_titles"):
+			tmdbWriteJSON(t, w, `{"titles":[{"title":"Foreign Name","iso_3166_1":"US"}]}`)
+		case strings.HasSuffix(r.URL.Path, "/translations"):
+			tmdbWriteJSON(t, w, `{"translations":[{"iso_639_1":"en","data":{"title":"Foreign Name"}}]}`)
+		default:
+			tmdbWriteJSON(t, w, `{"id":424242,"title":"Foreign Name"}`)
+		}
+	})
+
+	state := newTestAppState(t)
+	key := "test-key"
+	cfg := *state.cfg
+	cfg.TmdbAPIKey = &key
+	cfg.WebsearchEngines = nil
+	cfg.Indexers = nil
+	cfg.Movies = []MovieConfig{{ID: 9, Name: "Hand Added", Year: "2026", TmdbID: "424242", Enabled: true}}
+	// The film must exist in the configuration database, or saving the names
+	// read from TMDB fails before the handler would touch the struct at all.
+	if err := SaveMoviesLibrary(cfg.DataDir, cfg.Movies); err != nil {
+		t.Fatalf("SaveMoviesLibrary: %v", err)
+	}
+	stored, err := LoadConfig(state.config_path)
+	if err != nil {
+		t.Fatalf("LoadConfig: %v", err)
+	}
+	cfg.Movies = stored.Movies
+	if len(cfg.Movies) != 1 || cfg.Movies[0].Aliases != nil {
+		t.Fatalf("stored movies = %+v, want one film with no alternative titles read yet", cfg.Movies)
+	}
+	state.config_cache = &ConfigCache{generation: ConfigGeneration(), cfg: &cfg, valid: true}
+
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+	if status, body := webPostJSON(t, server, "/api/movies/"+strconv.FormatInt(cfg.Movies[0].ID, 10)+"/search", `{}`); status != http.StatusOK {
+		t.Fatalf("search -> %d %s", status, body)
+	}
+	if cfg.Movies[0].Aliases != nil || cfg.Movies[0].TitleTranslations != nil {
+		t.Fatalf("the shared configuration was written by the handler: aliases=%v translations=%v",
+			cfg.Movies[0].Aliases, cfg.Movies[0].TitleTranslations)
 	}
 }

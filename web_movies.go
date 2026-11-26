@@ -547,10 +547,15 @@ func MovieSearch(w http.ResponseWriter, r *http.Request, s *AppState) {
 		return
 	}
 	cfg := latestConfig(s)
+	// The configuration is the cached one, shared with every other request:
+	// the names filled in below go on a copy of the film, never into the
+	// shared struct. They are saved to the database, which makes the next
+	// read of the configuration carry them for everyone.
 	var movie *MovieConfig
 	for index := range cfg.Movies {
 		if cfg.Movies[index].ID == id {
-			movie = &cfg.Movies[index]
+			local := cfg.Movies[index]
+			movie = &local
 			break
 		}
 	}
