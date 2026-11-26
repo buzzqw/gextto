@@ -100,6 +100,7 @@ func (d *Daemon) setFilePriorities(key string, priorities []int) error {
 		d.mu.Unlock()
 		return errors.New("at least one file must be wanted")
 	}
+	previous := meta.FilePriorities
 	oldMask := skipMask(meta.FilePriorities)
 	newMask := skipMask(priorities)
 	stored := priorities
@@ -142,14 +143,26 @@ func (d *Daemon) setFilePriorities(key string, priorities []int) error {
 	d.saveLocked()
 	d.mu.Unlock()
 
-	go d.finishSelection(id, t, paths, oldMask, newMask, stored, savePath, wasRunning, empty)
+	go d.finishSelection(id, t, paths, oldMask, newMask, stored, previous, savePath, wasRunning, empty)
 	return nil
 }
 
-func (d *Daemon) finishSelection(id string, t *torrent.Torrent, paths []string, oldMask, newMask []bool, priorities []int, savePath string, wasRunning, empty bool) {
-	deadline := time.Now().Add(30 * time.Second)
-	for time.Now().Before(deadline) && t.Stats().Status != torrent.Stopped {
-		time.Sleep(100 * time.Millisecond)
+func (d *Daemon) finishSelection(id string, t *torrent.Torrent, paths []string, oldMask, newMask []bool, priorities, previous []int, savePath string, wasRunning, empty bool) {
+	// Same rule as a move: files of a torrent still stopping are not moved
+	// between the save path and the parts folder, and the selection goes back
+	// to what it was, so state and files keep agreeing.
+	if !waitStopped(t, 100*time.Millisecond) {
+		d.mu.Lock()
+		defer d.mu.Unlock()
+		delete(d.moving, id)
+		if meta, ok := d.state.Torrents[id]; ok {
+			meta.FilePriorities = previous
+			meta.Error = "file selection failed: " + errStopTimeout.Error()
+		}
+		logf("file selection of %s: %v", id, errStopTimeout)
+		d.saveLocked()
+		d.poke()
+		return
 	}
 	skipped := func(mask []bool, i int) bool { return i < len(mask) && mask[i] }
 	var moveErr error

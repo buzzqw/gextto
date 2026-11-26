@@ -155,12 +155,21 @@ func (d *Daemon) applyPendingRename() {
 		logf("rename %s: %v", pr.id, err)
 		return
 	}
-	if err := torrent.PersistRename(pr.dbPath, pr.id, pr.paths, pr.name); err != nil {
-		logfError("rename %s: cannot persist the new paths: %v", pr.id, err)
+	if err := persistRename(pr.dbPath, pr.id, pr.paths, pr.name); err != nil {
+		// The files are at their new paths but the resume data still names
+		// the old ones: reopening like this would recreate empty files at the
+		// old paths and download again, leaving the real data orphaned. Put
+		// the files back, so storage and resume data agree again.
+		rollbackRename(pr.moves)
+		logfError("rename %s: the new paths could not be saved, so the files were put back where they were: %v", pr.id, err)
 		return
 	}
 	logf("renamed %s", pr.id)
 }
+
+// persistRename is torrent.PersistRename; a test swaps it to make the save
+// fail after the files moved.
+var persistRename = torrent.PersistRename
 
 // checkRenameTargets refuses moves whose target already exists on disk (a file
 // that is not part of the torrent): it is never overwritten.

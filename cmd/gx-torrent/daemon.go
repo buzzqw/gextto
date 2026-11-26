@@ -2827,14 +2827,38 @@ func (d *Daemon) move(key, destination string, associate bool) error {
 	return nil
 }
 
-func (d *Daemon) finishMove(id string, t *torrent.Torrent, from, dest, name string, data payload, wasRunning, associate, empty bool) {
-	// The engine stops asynchronously: wait until the files are closed.
-	deadline := time.Now().Add(30 * time.Second)
-	for time.Now().Before(deadline) && t.Stats().Status != torrent.Stopped {
-		time.Sleep(200 * time.Millisecond)
+// stopWaitLimit is how long a move or a selection change waits for the engine
+// to close the torrent's files.
+var stopWaitLimit = 30 * time.Second
+
+// errStopTimeout is the move that did not start because the torrent was
+// still stopping: its files could still be written.
+var errStopTimeout = errors.New("the torrent did not stop in time, its files may still be in use: nothing was moved, try again")
+
+// waitStopped waits until the engine reports the torrent stopped, polling
+// every step, for at most stopWaitLimit.
+func waitStopped(t *torrent.Torrent, step time.Duration) bool {
+	deadline := time.Now().Add(stopWaitLimit)
+	for t.Stats().Status != torrent.Stopped {
+		if !time.Now().Before(deadline) {
+			return false
+		}
+		time.Sleep(step)
 	}
+	return true
+}
+
+func (d *Daemon) finishMove(id string, t *torrent.Torrent, from, dest, name string, data payload, wasRunning, associate, empty bool) {
+	// The engine stops asynchronously: wait until the files are closed. A
+	// torrent still stopping after the wait may still be writing (a slow or
+	// stuck disk): copying or removing its files now would move data that is
+	// still changing, so the move fails instead and can be retried.
 	var err error
+	if !waitStopped(t, 200*time.Millisecond) {
+		err = errStopTimeout
+	}
 	switch {
+	case err != nil:
 	case associate:
 	case empty:
 		err = data.discard(from, dest, d.protectedTarget)

@@ -177,13 +177,7 @@ func PersistRename(dbPath, torrentID string, paths []string, name string) error 
 	if err != nil {
 		return err
 	}
-	if err := res.WriteFilePaths(torrentID, paths); err != nil {
-		return err
-	}
-	if name != "" {
-		return res.WriteDisplayName(torrentID, name)
-	}
-	return nil
+	return res.WriteRename(torrentID, paths, name)
 }
 
 // normalizeRelPath cleans a torrent-relative path (backslashes become slashes).

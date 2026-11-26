@@ -217,6 +217,25 @@ func (r *Resumer) WriteFilePaths(torrentID string, paths []string) error {
 	})
 }
 
+// WriteRename stores the file-path override and, when name is not empty, the
+// display name in one transaction: a rename is either recorded whole or not
+// at all, so the caller can put the files back on failure.
+func (r *Resumer) WriteRename(torrentID string, paths []string, name string) error {
+	raw, err := json.Marshal(paths)
+	if err != nil {
+		return err
+	}
+	return r.update(torrentID, func(b *bbolt.Bucket) error {
+		if err := b.Put(Keys.FilePaths, raw); err != nil {
+			return err
+		}
+		if name != "" {
+			return b.Put(Keys.DisplayName, []byte(name))
+		}
+		return nil
+	})
+}
+
 // WriteDisplayName replaces only the display-name override (a qBittorrent
 // torrent rename). The original name stays under Keys.Name.
 func (r *Resumer) WriteDisplayName(torrentID, name string) error {
