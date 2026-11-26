@@ -367,9 +367,32 @@ func (p *seedPolicy) limitsFor(torrent *models.TorrentView) seedLimits {
 	return resolveSeedLimits(p.cfg, rule, torrent.SeedRatio, torrent.SeedDays)
 }
 
+// originsTTL bounds how long a cached origin map is trusted without a write
+// that would have invalidated it.
+const originsTTL = time.Minute
+
+// originsChanged invalidates the cached TorrentOrigins.
+func (d *Database) originsChanged() { d.originsGen.Add(1) }
+
 // TorrentOrigins returns the source and category of every recorded torrent,
-// keyed by lowercase hash.
+// keyed by lowercase hash. The map is shared between callers and must be
+// treated as read-only.
 func (d *Database) TorrentOrigins() (map[string]seedOrigin, error) {
+	gen := d.originsGen.Load()
+	d.originsMu.Lock()
+	defer d.originsMu.Unlock()
+	if d.originsMap != nil && d.originsFor == gen && time.Since(d.originsAt) < originsTTL {
+		return d.originsMap, nil
+	}
+	origins, err := d.loadTorrentOrigins()
+	if err != nil {
+		return nil, err
+	}
+	d.originsMap, d.originsFor, d.originsAt = origins, gen, time.Now()
+	return origins, nil
+}
+
+func (d *Database) loadTorrentOrigins() (map[string]seedOrigin, error) {
 	rows, err := d.db.Query("SELECT lower(hash), COALESCE(source,''), COALESCE(kind,''), COALESCE(tag,'') FROM torrent_meta")
 	if err != nil {
 		return nil, err

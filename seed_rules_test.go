@@ -2,6 +2,8 @@ package gextto
 
 import (
 	"encoding/json"
+	"fmt"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -341,5 +343,44 @@ func TestSeedLimitsAllSettingIsRead(t *testing.T) {
 	cfg.applyTransferSettings()
 	if cfg.Transfer.SeedLimitsAll {
 		t.Fatal("an explicit off must be honoured")
+	}
+}
+
+// The seed policy is rebuilt on every queue tick: the origins come from a
+// cache, and every write that can change a torrent's origin refreshes it.
+func TestTorrentOriginsCacheFollowsWrites(t *testing.T) {
+	db, err := OpenDatabase(filepath.Join(t.TempDir(), "gextto.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	hash := "0123456789abcdef0123456789abcdef01234567"
+	acquisitionTestRelease(t, db, hash, 1, 1)
+
+	first, err := db.TorrentOrigins()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first[hash].Category != "series" {
+		t.Fatalf("origin = %+v, want the series category", first[hash])
+	}
+	again, _ := db.TorrentOrigins()
+	if fmt.Sprintf("%p", again) != fmt.Sprintf("%p", first) {
+		t.Fatal("a second read without writes rescanned the table instead of using the cache")
+	}
+
+	// A torrent known only by its tag (no kind): the tag decides the category.
+	tagged := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	if err := db.SetTorrentTag(tagged, "comic"); err != nil {
+		t.Fatal(err)
+	}
+	if after, _ := db.TorrentOrigins(); after[tagged].Category != "comic" {
+		t.Fatalf("origin after a tag write = %+v: the cache was not refreshed", after[tagged])
+	}
+
+	other := "fedcba9876543210fedcba9876543210fedcba98"
+	acquisitionTestRelease(t, db, other, 1, 2)
+	if latest, _ := db.TorrentOrigins(); latest[other].Category == "" {
+		t.Fatal("a newly registered torrent is missing from the cached origins")
 	}
 }

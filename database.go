@@ -17,6 +17,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/buzzqw/gextto/internal/backoff"
@@ -876,6 +877,17 @@ type Database struct {
 	// seenCounts caches SeenCounts for seenCountsTTL: the dashboard and the
 	// status API (polled by the TUI) ask for it often, and the counts only
 	// move when a cycle reads the feeds.
+	// origins caches TorrentOrigins: the seed policy is built on every queue
+	// tick (750 ms), and each build scanned the whole torrent_meta table on
+	// the single SQLite connection, blocking every other query meanwhile.
+	// originsGen is bumped by every write that inserts a row or changes its
+	// source, kind or tag; originsTTL is only a safety net.
+	originsMu  sync.Mutex
+	originsGen atomic.Uint64
+	originsAt  time.Time
+	originsFor uint64
+	originsMap map[string]seedOrigin
+
 	seenCountsMu sync.Mutex
 	seenCountsAt time.Time
 	seenMovies   int64
@@ -2179,6 +2191,7 @@ func (d *Database) RegisterTorrent(release *models.Release) error {
 // the release is proposed once more after the last attempt failed — so a row
 // that still says "completed" is cleared first: see beginNewDownloadAttempt.
 func (d *Database) RegisterTorrentScored(release *models.Release, qualityScore int64) error {
+	defer d.originsChanged()
 	hash, err := releaseIdentityHash(release)
 	if err != nil {
 		return err
@@ -2308,6 +2321,7 @@ func uniqueSortedInt64(values []int64) []int64 {
 // SetTorrentNoRename sets the "do not rename" flag for a torrent (creating the
 // row when missing).
 func (d *Database) SetTorrentNoRename(hash string, value bool) error {
+	defer d.originsChanged()
 	_, err := d.db.Exec(
 		"INSERT INTO torrent_meta(hash,no_rename,status,created_at,updated_at) VALUES (?1,?2,'queued',datetime('now'),datetime('now')) ON CONFLICT(hash) DO UPDATE SET no_rename=excluded.no_rename, updated_at=excluded.updated_at",
 		strings.ToLower(hash), boolToInt(value),
@@ -5007,6 +5021,7 @@ func (d *Database) ClearGapSearched(seriesName string, season, episode int64) er
 // SetTorrentTag sets the tag of a torrent, creating the row when it is a
 // manually added torrent.
 func (d *Database) SetTorrentTag(hash, tag string) error {
+	defer d.originsChanged()
 	result, err := d.db.Exec("UPDATE torrent_meta SET tag=?1, updated_at=datetime('now') WHERE lower(hash)=lower(?2)", tag, hash)
 	if err != nil {
 		return err
@@ -5523,6 +5538,7 @@ func (d *Database) PendingEd2kHashes() ([]string, error) {
 // ReconcilePackRelease persists the identity found in the actual torrent name
 // when an indexer advertised a different season.
 func (d *Database) ReconcilePackRelease(hash string, release *models.Release, cfg *Config) error {
+	defer d.originsChanged()
 	score := cfg.ReleaseScore(release)
 	normalized := strings.ToLower(hash)
 	old, err := d.TorrentMeta(normalized)
@@ -5648,6 +5664,7 @@ func (d *Database) ReconcilePackRelease(hash string, release *models.Release, cf
 // changes: the row keeps its status and its place in the queue, and the pack
 // staging that follows files each episode on its own.
 func (d *Database) PromoteEpisodeRange(hash string, release *models.Release, cfg *Config) error {
+	defer d.originsChanged()
 	if release == nil || release.Kind != "series" || !release.IsPack {
 		return nil
 	}
@@ -6012,6 +6029,7 @@ func (d *Database) MarkTorrentCompleted(hash, path string, sizeBytes int64) erro
 // downloaded files are never treated as a disposable archived copy. The bool
 // is false for duplicate completion events, allowing callers to notify once.
 func (d *Database) MarkTorrentCompletedUnarchived(hash, name string) (bool, error) {
+	defer d.originsChanged()
 	now := nowSQLite()
 	result, err := d.db.Exec(
 		`INSERT INTO torrent_meta(hash,name,status,completed_at,created_at,updated_at)
