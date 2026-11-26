@@ -54,12 +54,6 @@ still be true after the item lands does not belong here.
   expires, and the two log viewers refresh differently. The automatic-refresh badge and the
   masked API keys of the daemon are already in place. Gate: the operator picks which of the
   two remaining indicators to land first.
-- **Automatic cross-seed adding**: read-only discovery of the same infohash is
-  available from the episode and movie pages; the remaining work is to add a
-  matching torrent as metadata only, verify the local bitfield and seed without
-  downloading the payload again. Gate: an opt-in policy per tracker, respect for
-  its rules, and tests proving that no payload is downloaded or duplicated and
-  that HnR risk is visible before seeding.
 - **Queue deadlines and preemption**: per-title high/normal/low priority is
   available; the remaining work is a finish-by time, preemption of lower-priority
   work when a deadline is at risk and protection of active streaming. Gate:

@@ -6818,3 +6818,12 @@ deu:
   "API key o credenziali non valide.": "Ungültiger API-Schlüssel oder ungültige Zugangsdaten."
   "Provider temporaneamente non disponibile o limite di richieste raggiunto. Riprova tra poco.": "Anbieter vorübergehend nicht verfügbar oder Anfragelimit erreicht. Versuche es in Kürze erneut."
   "Provider non raggiungibile. Controlla URL e rete.": "Anbieter nicht erreichbar. Prüfe URL und Netzwerk."
+
+  # cross-seed action
+  "Confermo il rischio di hit-and-run": "Ich bestätige das Hit-and-Run-Risiko"
+  "La ricerca è in sola lettura; seminare una copia è un'azione esplicita e non scarica di nuovo i dati.": "Die Suche ist schreibgeschützt; das Seeden einer Kopie ist eine ausdrückliche Aktion und lädt die Daten nicht erneut herunter."
+  "Semi questa copia": "Diese Kopie seeden"
+  "Sorgente non abilitata al cross-seed": "Quelle nicht für Cross-Seed aktiviert"
+  "Conferma il rischio di hit-and-run per seminare questa copia.": "Bestätige das Hit-and-Run-Risiko, bevor du diese Kopie seedest."
+  "Impossibile seminare questa copia:": "Diese Kopie konnte nicht geseet werden:"
+  "Il seeding di questa copia può finire prima dei limiti impostati; verifica le regole del tracker.": "Das Seeden dieser Kopie kann vor den eingestellten Zielen enden; prüfe die Tracker-Regeln."

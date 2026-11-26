@@ -6759,3 +6759,12 @@ pol:
   "API key o credenziali non valide.": "Nieprawidłowy klucz API lub dane logowania."
   "Provider temporaneamente non disponibile o limite di richieste raggiunto. Riprova tra poco.": "Dostawca tymczasowo niedostępny lub osiągnięto limit żądań. Spróbuj ponownie za chwilę."
   "Provider non raggiungibile. Controlla URL e rete.": "Dostawca nieosiągalny. Sprawdź adres URL i sieć."
+
+  # cross-seed action
+  "Confermo il rischio di hit-and-run": "Potwierdzam ryzyko hit-and-run"
+  "La ricerca è in sola lettura; seminare una copia è un'azione esplicita e non scarica di nuovo i dati.": "Wyszukiwanie jest tylko do odczytu; udostępnianie kopii to wyraźna akcja i nie pobiera ponownie danych."
+  "Semi questa copia": "Udostępnij tę kopię"
+  "Sorgente non abilitata al cross-seed": "Źródło nie jest włączone dla cross-seed"
+  "Conferma il rischio di hit-and-run per seminare questa copia.": "Potwierdź ryzyko hit-and-run przed udostępnieniem tej kopii."
+  "Impossibile seminare questa copia:": "Nie udało się udostępnić tej kopii:"
+  "Il seeding di questa copia può finire prima dei limiti impostati; verifica le regole del tracker.": "Udostępnianie tej kopii może zakończyć się przed ustawionymi celami; sprawdź zasady trackera."

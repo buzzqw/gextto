@@ -131,7 +131,9 @@ change. `/ui` is not served. For operational checks use
 | GET | `/library/bulk/profile` | Series/Movies "Edit selected" panel: the value fields filled from a quality profile (?profile=ID&view=) |
 | POST | `/library/bulk` | Series/Movies "Edit selected" panel: apply the ticked values to the ticked rows |
 | POST | `/library/cross-seed` | read-only cross-seed result fragment for the modal (form field hash) |
+| POST | `/library/cross-seed/seed` | seed one allowed copy from the copy already in the library (form fields hash, source, title and optional confirmed) |
 | POST | `/api/library/cross-seed/discover` | read-only cross-seed discovery for one completed torrent (JSON body {"hash":"…"}): exact infohash matches from enabled indexers, source health and redacted tracker hosts; never adds or downloads anything |
+| POST | `/api/library/cross-seed/seed` | seed one allowed copy without downloading it again (JSON body {"hash":"…","source":"…","title":"…","confirmed":false}) |
 | GET | `/import/preview` | manual import page: preview fragment |
 | POST | `/import/apply` | manual import page: confirm one file |
 | GET | `/api/config` | read the configuration |
@@ -257,6 +259,20 @@ write the archive, mark a gap as searched or change the queue. A missing target
 is `404`; no enabled indexer is `409`; source failures stay visible and set
 `partial: true`.
 
+Each match in the discovery answer carries `allowed` and, when relevant,
+`hnr_risk` and `hnr_note`. `allowed` is true only when a seed rule with
+`cross_seed: true` matches that source or one of its tracker hostnames (and the
+rule's category, when set). The explicit seeding endpoints accept one of those
+matches by `source` and `title`: they add the torrent paused at metadata, point
+it at the verified library copy, check every piece against the torrent and
+resume only when the local data is complete. No payload is downloaded again and
+no second copy is created. A finite seed target requires `confirmed: true` when
+the match reports `hnr_risk`. Backends without storage association and piece
+checks refuse the operation instead of simulating a safe seed. The answer is
+`{"status":"seeding"|"kept_paused"|"already_seeding","hash":"…"}`; a source
+that is not opted in, a missing copy or a changed search is `409`, and an
+unknown infohash is `404`. Links and passkeys never appear in either answer.
+
 With the aMule integration enabled (`ed2k_enabled`), manual search results can
 carry `network: "ed2k"`, `ed2k_link` and `sources` next to the torrent fields.
 eD2k is searched only when the request asks for it: send
@@ -267,7 +283,7 @@ answers `409` when the integration is off or aMule already has the file, and
 `502` when aMule cannot be reached. Use `GET /api/ed2k/status` for the live
 state.
 | GET | `/api/seed-rules` | seed rules: per-source/category seeding limits |
-| POST | `/api/seed-rules` | save the seed rules (list of name, source, category, ratio, seed_days, idle_minutes; null = global, 0 = no limit) |
+| POST | `/api/seed-rules` | save the seed rules (list of name, source, category, cross_seed, ratio, seed_days, idle_minutes; null = global, 0 = no limit) |
 | POST | `/api/send-magnet` | send a magnet to the engine |
 | GET | `/api/series` | list series |
 | GET | `/api/series/all-missing` | missing episodes (alias of gaps) |

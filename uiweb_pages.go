@@ -433,6 +433,7 @@ var uiAdvancedEditors = []uiListEditor{
 		Fields: []uiListField{
 			{Name: "name", Label: "Nome", Kind: "text"},
 			{Name: "source", Label: "Sorgente", Kind: "text", Placeholder: "es. mircrew (vuoto = tutte)"},
+			{Name: "cross_seed", Label: "Cross-seed", Kind: "bool", Tooltip: "Consenti di seminare una copia identica già in libreria, senza scaricarla di nuovo"},
 			{Name: "category", Label: "Categoria", Kind: "select", Options: []uiListFieldOption{
 				{Value: "", Label: "Tutte"},
 				{Value: "series", Label: "Serie TV"},

@@ -6811,3 +6811,12 @@ fra:
   "API key o credenziali non valide.": "Clé API ou identifiants non valides."
   "Provider temporaneamente non disponibile o limite di richieste raggiunto. Riprova tra poco.": "Fournisseur temporairement indisponible ou limite de requêtes atteinte. Réessayez dans un instant."
   "Provider non raggiungibile. Controlla URL e rete.": "Fournisseur inaccessible. Vérifiez l'URL et le réseau."
+
+  # cross-seed action
+  "Confermo il rischio di hit-and-run": "Je confirme le risque de hit-and-run"
+  "La ricerca è in sola lettura; seminare una copia è un'azione esplicita e non scarica di nuovo i dati.": "La recherche est en lecture seule; ensemencer une copie est une action explicite et ne télécharge pas à nouveau les données."
+  "Semi questa copia": "Ensemencer cette copie"
+  "Sorgente non abilitata al cross-seed": "Source non activée pour le cross-seed"
+  "Conferma il rischio di hit-and-run per seminare questa copia.": "Confirmez le risque de hit-and-run avant d'ensemencer cette copie."
+  "Impossibile seminare questa copia:": "Impossible d'ensemencer cette copie :"
+  "Il seeding di questa copia può finire prima dei limiti impostati; verifica le regole del tracker.": "L'ensemencement de cette copie peut s'arrêter avant les objectifs définis ; vérifiez les règles du tracker."

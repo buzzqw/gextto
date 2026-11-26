@@ -54,7 +54,10 @@ type SeedRule struct {
 	// a case-insensitive substring. Empty matches any source.
 	Source string `json:"source"`
 	// Category is series, movie, comic or other; empty matches any category.
-	Category    string   `json:"category"`
+	Category string `json:"category"`
+	// CrossSeed opts this source/tracker in to seeding an identical copy that
+	// is already in the library, without downloading the payload again.
+	CrossSeed   bool     `json:"cross_seed"`
 	Ratio       *float64 `json:"ratio"`
 	SeedDays    *float64 `json:"seed_days"`
 	IdleMinutes *float64 `json:"idle_minutes"`

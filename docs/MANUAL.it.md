@@ -746,10 +746,20 @@ Su un episodio archiviato che conserva l'infohash, il menu **Altre azioni** incl
 scheda. Gextto interroga gli indexer abilitati e mostra solo le release che
 dichiarano **esattamente lo stesso infohash**, con sorgente, seed/peer e tracker.
 
-È una verifica, non un download: non aggiunge torrent, non prende file `.torrent`
-senza hash dichiarato e non cambia libreria o coda. I link magnet, le passkey e le
-chiavi API non vengono restituiti nella finestra; se una sorgente non risponde,
-il risultato è marcato come parziale.
+La ricerca resta in sola lettura: non prende file `.torrent` senza hash
+dichiarato e non cambia libreria o coda. I link magnet, le passkey e le chiavi API
+non vengono restituiti nella finestra; se una sorgente non risponde, il risultato
+è marcato come parziale.
+
+Accanto a ogni sorgente c'è il pulsante **Semi questa copia**, ma solo se
+hai attivato **Cross-seed** in una regola di seed per quella sorgente o per quel
+tracker: di default nessuna sorgente è abilitata, così rispetti le regole di chi
+gestisce il tracker. L'azione aggiunge il torrent in pausa appena arrivano i
+metadati, lo punta alla copia già verificata in libreria e controlla ogni pezzo:
+se i dati locali corrispondono riprende il seeding, altrimenti lascia tutto in
+pausa. Non scarica nulla due volte e non crea una seconda copia. Se hai limiti di
+seed finiti e il tracker può considerare hit-and-run un'uscita anticipata, devi
+confermare il rischio prima di avviare.
 
 ### Dove finisce un download aggiunto a mano
 
@@ -2803,7 +2813,7 @@ spazio del `tmpfs`, come prima.
 
 | Impostazione | Cosa fa |
 |---|---|
-| Regole di seed | Limiti di seed (ratio, giorni, inattività) per sorgente/indexer e categoria; vale la prima regola che corrisponde, un campo vuoto usa il globale, 0 toglie il limite. |
+| Regole di seed | Limiti di seed (ratio, giorni, inattività) per sorgente/indexer e categoria; vale la prima regola che corrisponde, un campo vuoto usa il globale, 0 toglie il limite. Il campo **Cross-seed** abilita quella sorgente o quel tracker a seminare una copia identica già in libreria senza scaricarla di nuovo. |
 
 **A download completato**
 

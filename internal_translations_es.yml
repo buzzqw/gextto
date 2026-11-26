@@ -6765,3 +6765,12 @@ spa:
   "API key o credenziali non valide.": "Clave API o credenciales no válidas."
   "Provider temporaneamente non disponibile o limite di richieste raggiunto. Riprova tra poco.": "Proveedor temporalmente no disponible o límite de solicitudes alcanzado. Vuelve a intentarlo enseguida."
   "Provider non raggiungibile. Controlla URL e rete.": "Proveedor inaccesible. Comprueba la URL y la red."
+
+  # cross-seed action
+  "Confermo il rischio di hit-and-run": "Confirmo el riesgo de hit-and-run"
+  "La ricerca è in sola lettura; seminare una copia è un'azione esplicita e non scarica di nuovo i dati.": "La búsqueda es de solo lectura; sembrar una copia es una acción explícita y no vuelve a descargar los datos."
+  "Semi questa copia": "Sembrar esta copia"
+  "Sorgente non abilitata al cross-seed": "Fuente no habilitada para cross-seed"
+  "Conferma il rischio di hit-and-run per seminare questa copia.": "Confirma el riesgo de hit-and-run antes de sembrar esta copia."
+  "Impossibile seminare questa copia:": "No se pudo sembrar esta copia:"
+  "Il seeding di questa copia può finire prima dei limiti impostati; verifica le regole del tracker.": "El seeding de esta copia puede terminar antes de los objetivos configurados; revisa las reglas del tracker."

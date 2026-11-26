@@ -6,12 +6,13 @@
 {{if .Error}}
 <div class="notice err" role="alert">{{tr .Error}}</div>
 {{else}}
-<p class="muted">{{tr "Ricerca in sola lettura: mostra le sorgenti che dichiarano lo stesso infohash. Non aggiunge torrent e non scarica dati."}}</p>
+{{if .Status}}<div class="notice ok" role="status">{{tr .Status}}</div>{{end}}
+<p class="muted">{{tr "La ricerca è in sola lettura; seminare una copia è un'azione esplicita e non scarica di nuovo i dati."}}</p>
 {{if .Result.Partial}}<div class="notice warn" role="status">{{tr "Alcune sorgenti non hanno risposto: i risultati sono parziali."}}</div>{{end}}
 {{if .Result.Matches}}
 <div class="table-wrap"><table class="data-table">
   <caption class="sr-only">{{tr "Sorgenti con lo stesso infohash"}}</caption>
-  <thead><tr><th scope="col">{{tr "Sorgente"}}</th><th scope="col">{{tr "Release"}}</th><th scope="col">{{tr "Swarm"}}</th><th scope="col">{{tr "Seed / peer"}}</th><th scope="col">{{tr "Dimensione"}}</th><th scope="col">{{tr "Tracker"}}</th></tr></thead>
+  <thead><tr><th scope="col">{{tr "Sorgente"}}</th><th scope="col">{{tr "Release"}}</th><th scope="col">{{tr "Swarm"}}</th><th scope="col">{{tr "Seed / peer"}}</th><th scope="col">{{tr "Dimensione"}}</th><th scope="col">{{tr "Tracker"}}</th><th scope="col">{{tr "Azione"}}</th></tr></thead>
   <tbody>{{range .Result.Matches}}<tr>
     <td>{{tr (sourceLabel .Source)}}</td>
     <td class="truncate" {{trTitle .Title}}>{{tr .Title}}{{if .Freeleech}} <span class="badge ok">{{tr "Freeleech"}}</span>{{end}}</td>
@@ -19,6 +20,14 @@
     <td class="numeric">{{if ge .Seeders 0}}{{tr .Seeders}}{{else}}?{{end}} / {{if ge .Peers 0}}{{tr .Peers}}{{else}}?{{end}}</td>
     <td class="numeric">{{bytes .SizeBytes}}</td>
     <td>{{if .TrackerHosts}}{{range $i, $host := .TrackerHosts}}{{if $i}}, {{end}}<code>{{tr $host}}</code>{{end}}{{else}}<span class="muted">—</span>{{end}}</td>
+    <td>{{if .Allowed}}<form hx-post="/library/cross-seed/seed" hx-target="#v2-modal" hx-swap="innerHTML">
+      <input type="hidden" name="hash" value="{{$.Result.Target.Hash}}">
+      <input type="hidden" name="source" value="{{.Source}}">
+      <input type="hidden" name="title" value="{{.Title}}">
+      {{if .HnRRisk}}<p class="muted"><small>{{tr "Il seeding di questa copia può finire prima dei limiti impostati; verifica le regole del tracker."}}</small></p>
+      <label><input type="checkbox" name="confirmed"> {{tr "Confermo il rischio di hit-and-run"}}</label>{{end}}
+      <button class="btn sm" type="submit">{{tr "Semi questa copia"}}</button>
+    </form>{{else}}<span class="muted">{{tr "Sorgente non abilitata al cross-seed"}}</span>{{end}}</td>
   </tr>{{end}}</tbody>
 </table></div>
 {{else}}

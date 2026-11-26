@@ -734,10 +734,19 @@ For an archived episode that keeps its infohash, **More actions** includes
 Gextto queries the enabled indexers and shows only releases that declare
 **exactly the same infohash**, with source, seed/peer counts and trackers.
 
-It is a check, not a download: it adds no torrent, fetches no `.torrent` file
-without a declared hash and changes neither library nor queue. Magnet links,
-passkeys and API keys are not returned in the window; if a source does not
-answer, the result is marked as partial.
+The search stays read-only: it fetches no `.torrent` file without a declared
+hash and changes neither library nor queue. Magnet links, passkeys and API keys
+are not returned in the window; if a source does not answer, the result is marked
+as partial.
+
+Next to each source there is a **Seed this copy** button, but only if you turned
+on **Cross-seed** in a seed rule for that source or tracker: no source is enabled
+by default, so the tracker's rules stay yours to respect. The action adds the
+torrent paused at metadata, points it at the copy already verified in the
+library and checks every piece: when the local data matches it resumes seeding,
+otherwise it leaves everything paused. Nothing is downloaded twice and no second
+copy is created. With finite seed targets and a tracker that treats an early stop
+as hit-and-run, you must confirm the risk before starting.
 
 ### Where a download added by hand ends
 
@@ -2763,7 +2772,7 @@ files. When the memory cannot be read, only the `tmpfs` space counts, as before.
 
 | Setting | What it does |
 |---|---|
-| Seed rules | Seeding limits (ratio, days, inactivity) by source/indexer and category; the first matching rule applies, an empty field uses the global limit, 0 removes the limit. |
+| Seed rules | Seeding limits (ratio, days, inactivity) by source/indexer and category; the first matching rule applies, an empty field uses the global limit, 0 removes the limit. **Cross-seed** lets that source or tracker seed an identical copy already in the library without downloading it again. |
 
 **When a download completes**
 

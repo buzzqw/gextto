@@ -6154,3 +6154,12 @@ eng:
   "API key o credenziali non valide.": "Invalid API key or credentials."
   "Provider temporaneamente non disponibile o limite di richieste raggiunto. Riprova tra poco.": "Provider temporarily unavailable or request limit reached. Try again shortly."
   "Provider non raggiungibile. Controlla URL e rete.": "Provider unreachable. Check URL and network."
+
+  # cross-seed action
+  "Confermo il rischio di hit-and-run": "I confirm the hit-and-run risk"
+  "La ricerca è in sola lettura; seminare una copia è un'azione esplicita e non scarica di nuovo i dati.": "The search is read-only; seeding a copy is an explicit action and does not download the data again."
+  "Semi questa copia": "Seed this copy"
+  "Sorgente non abilitata al cross-seed": "Source not enabled for cross-seed"
+  "Conferma il rischio di hit-and-run per seminare questa copia.": "Confirm the hit-and-run risk before seeding this copy."
+  "Impossibile seminare questa copia:": "Could not seed this copy:"
+  "Il seeding di questa copia può finire prima dei limiti impostati; verifica le regole del tracker.": "Seeding this copy can end before the configured targets; check the tracker rules."
