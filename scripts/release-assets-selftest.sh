@@ -54,4 +54,25 @@ if "$VERIFY" "$DIST" >/dev/null 2>&1; then
   exit 1
 fi
 
+mockbin="$TMP/mock-bin"
+mkdir -p "$mockbin"
+cat > "$mockbin/docker" <<'SH'
+#!/usr/bin/env bash
+set -euo pipefail
+printf '%s\n' "$@" > "$MOCK_ARGS"
+printf '%s' "${@: -1}" > "$MOCK_SCRIPT"
+SH
+chmod +x "$mockbin/docker"
+MOCK_ARGS="$TMP/docker.args" MOCK_SCRIPT="$TMP/container.sh" \
+  PATH="$mockbin:$PATH" GEXTTO_BASE_IMAGE=ubuntu:22.04 \
+  bash "$ROOT/scripts/build-release.sh" --label 'x; printf INJECTED' --output-dir "$TMP/out"
+if grep -q 'INJECTED' "$TMP/container.sh"; then
+  echo "build label was interpolated into the container shell command" >&2
+  exit 1
+fi
+if ! grep -Fxq 'GEXTTO_LABEL=x; printf INJECTED' "$TMP/docker.args"; then
+  echo "build label was not passed as a literal environment value" >&2
+  exit 1
+fi
+
 echo "release asset verification checks passed"

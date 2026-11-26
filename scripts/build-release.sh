@@ -45,12 +45,16 @@ if [[ "$IN_CONTAINER" != "1" ]]; then
   # build never writes build numbers or binaries into the working tree.
   exec "$engine" run --rm \
     -v "$ROOT:/src:ro" -v "$OUTPUT_DIR:/out" \
-    -e GEXTTO_BUILD="${GEXTTO_BUILD:-}" -e GEXTTO_COMMIT="$commit" \
+    -e GEXTTO_BUILD="${GEXTTO_BUILD:-}" -e GEXTTO_COMMIT="$commit" -e GEXTTO_LABEL="$LABEL" \
     "$BASE_IMAGE" bash -c '
       set -euo pipefail
       mkdir -p /build
       tar -C /src --exclude=./bin --exclude=./dist --exclude=./data --exclude=./gextto-data --exclude=./.git -cf - . | tar -C /build -xf -
-      /build/scripts/build-release.sh --in-container --output-dir /out '"${LABEL:+--label "$LABEL"}"'
+      if [[ -n "${GEXTTO_LABEL:-}" ]]; then
+        /build/scripts/build-release.sh --in-container --output-dir /out --label "$GEXTTO_LABEL"
+      else
+        /build/scripts/build-release.sh --in-container --output-dir /out
+      fi
       chown -R '"$(id -u):$(id -g)"' /out'
 fi
 

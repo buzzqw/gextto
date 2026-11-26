@@ -47,6 +47,8 @@ set -euo pipefail
 # Resolve a symlink (e.g. ~/gx-core-test.sh) to find the checkout.
 SCRIPT="$(readlink -f "$0")"
 ROOT="$(cd "$(dirname "$SCRIPT")/.." && pwd)"
+# shellcheck source=scripts/safe-clean-path.sh
+. "$ROOT/scripts/safe-clean-path.sh"
 # shellcheck source=scripts/version.sh
 . "$ROOT/scripts/version.sh"
 DIR="${GX_TEST_DIR:-${GEXTTO_TEST_ROOT:-${XDG_CACHE_HOME:-$HOME/.cache}/gextto-tests}/gx-core-test}"
@@ -355,14 +357,13 @@ status() {
 # clean stops the test daemon and removes its directory: the try-out is over and
 # the test work area must not fill up.
 clean() {
-  case "$DIR" in
-    "" | / | "$HOME" | "$HOME/" | /home | /home/"$(id -un)" | /tmp | /var | /usr | /etc)
-      echo "refusing to remove '$DIR'" >&2
-      exit 1
-      ;;
-  esac
+  if ! gextto_safe_clean_path "$DIR" "$ROOT"; then
+    echo "refusing to remove '$DIR'" >&2
+    exit 1
+  fi
+  DIR="$SAFE_CLEAN_PATH"
   stop
-  rm -rf "$DIR"
+  rm -rf -- "$DIR"
   echo "removed the test directory $DIR"
 }
 

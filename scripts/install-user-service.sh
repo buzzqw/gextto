@@ -48,10 +48,12 @@ validate_data_purge_target() {
   [[ -n "$DATA_DIR" ]] || die "data directory must not be empty"
   resolved="$(realpath -m -- "$DATA_DIR")" || die "cannot resolve data directory: $DATA_DIR"
   case "$resolved" in
-    /|/bin|/boot|/dev|/etc|/home|/lib|/lib64|/media|/mnt|/opt|/proc|/root|/run|/sbin|/srv|/sys|/tmp|/usr|/usr/local|/var|"$ROOT"|"$HOME")
+    /|/bin|/boot|/dev|/etc|/home|/lib|/lib64|/media|/mnt|/opt|/proc|/root|/run|/sbin|/srv|/sys|/tmp|/usr|/usr/local|/var|/var/lib|/var/log|/var/cache|/var/spool|\
+    "$ROOT"|"$HOME"|"$HOME/.ssh"|"$HOME/.config"|"$HOME/.local"|"$HOME/.gnupg")
       die "refusing unsafe data purge target: $DATA_DIR (resolves to $resolved)"
       ;;
   esac
+  DATA_DIR="$resolved"
 }
 
 # run executes a mutating command, or prints it when --dry-run is set.

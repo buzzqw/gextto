@@ -45,6 +45,23 @@ TEST_ROOT = Path(
 WORK = Path(os.environ.get("GX_COMPARE_DIR", TEST_ROOT / "compare"))
 RESULTS = Path(os.environ.get("GX_COMPARE_OUT", ROOT / "gextto-data" / "bench" / "compare.jsonl"))
 
+
+def safe_work_dir(path):
+    resolved = Path(path).resolve()
+    home = Path.home().resolve()
+    sensitive = {
+        Path("/"), Path("/home"), Path("/root"), Path("/etc"), Path("/usr"),
+        Path("/var"), Path("/var/lib"), Path("/var/log"), Path("/var/cache"),
+        Path("/var/spool"), Path("/usr/local"), home, ROOT.resolve(),
+        home / ".ssh", home / ".config", home / ".local", home / ".gnupg",
+    }
+    if resolved in sensitive or resolved in home.parents or resolved in ROOT.resolve().parents:
+        raise SystemExit(f"refusing unsafe work directory: {path} (resolves to {resolved})")
+    return resolved
+
+
+WORK = safe_work_dir(WORK)
+
 CLIENTS = ["gx-torrent", "qbittorrent", "transmission", "deluge", "rain", "anacrolix"]
 SCENARIOS = ["idle", "full", "line", "line-utp", "check-upload", "many"]
 

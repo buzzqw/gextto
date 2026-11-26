@@ -19,7 +19,15 @@
 # residue; `--all` removes those too (stop the instance first).
 set -euo pipefail
 
+CHECKOUT="$(cd "$(dirname "$0")/.." && pwd)"
+# shellcheck source=scripts/safe-clean-path.sh
+. "$CHECKOUT/scripts/safe-clean-path.sh"
 ROOT="${GEXTTO_TEST_ROOT:-${XDG_CACHE_HOME:-$HOME/.cache}/gextto-tests}"
+if ! gextto_safe_clean_path "$ROOT" "$CHECKOUT"; then
+  echo "test-workdir: refusing to use '$ROOT' as the work area" >&2
+  exit 1
+fi
+ROOT="$SAFE_CLEAN_PATH"
 
 # A wrong or empty GEXTTO_TEST_ROOT must never turn `clean` into something that
 # removes the home or the checkout.

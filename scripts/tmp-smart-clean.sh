@@ -30,6 +30,10 @@
 # summary goes to the journal (`journalctl --user -u tmp-clean`).
 set -euo pipefail
 
+CHECKOUT="$(cd "$(dirname "$0")/.." && pwd)"
+# shellcheck source=scripts/safe-clean-path.sh
+. "$CHECKOUT/scripts/safe-clean-path.sh"
+
 DRY_RUN=0
 VERBOSE=0
 OLDER_HOURS=24
@@ -57,6 +61,15 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 [[ ${#PATHS[@]} -gt 0 ]] || PATHS=(/tmp)
+safe_paths=()
+for root in "${PATHS[@]}"; do
+  if ! gextto_safe_clean_path "$root" "$CHECKOUT"; then
+    echo "tmp-smart-clean: refusing unsafe cleanup root '$root'" >&2
+    exit 1
+  fi
+  safe_paths+=("$SAFE_CLEAN_PATH")
+done
+PATHS=("${safe_paths[@]}")
 
 UID_NOW="$(id -u)"
 NOW="$(date +%s)"

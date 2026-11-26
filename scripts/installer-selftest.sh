@@ -267,11 +267,26 @@ check_launcher() {
   expect "$label run.sh: option 2 without the installer fails" 1 "not next to this script"
 }
 
+check_safe_cleanup() {
+  mkdir -p "$TMP/safe-home"
+  capture env HOME="$TMP/safe-home" GEXTTO_TEST_ROOT="$TMP/safe-home/.." bash "$ROOT/scripts/test-workdir.sh" clean
+  expect "test-workdir.sh: canonical unsafe root is refused" 1 "refusing"
+  capture env HOME="$TMP/safe-home" GX_TEST_DIR="$TMP/safe-home/.." bash "$ROOT/scripts/gx-core-test.sh" clean
+  expect "gx-core-test.sh: canonical unsafe directory is refused" 1 "refusing"
+  capture env HOME="$TMP/safe-home" GEXTTO_SHOTS_WORK="$TMP/safe-home/.." bash "$ROOT/scripts/screenshots.sh"
+  expect "screenshots.sh: canonical unsafe directory is refused" 1 "refusing"
+  capture env HOME="$TMP/safe-home" bash "$ROOT/scripts/tmp-smart-clean.sh" --dry-run --paths "$TMP/safe-home"
+  expect "tmp-smart-clean.sh: home is refused" 1 "refusing"
+  capture env HOME="$TMP/safe-home" GX_COMPARE_DIR="$TMP/safe-home/.." python3 "$ROOT/scripts/compare/run.py" clean
+  expect "compare/run.py: canonical unsafe directory is refused" 1 "refusing"
+}
+
 printf 'installer self-test\n'
 check_common "install.sh" "$INSTALL"
 check_common "install-user-service.sh" "$USER_INSTALL"
 check_install
 check_user_install
+check_safe_cleanup
 check_package_script
 check_launcher "gextto" "$ROOT/scripts/package-linux.sh" "gexttod"
 check_launcher "gx-torrent" "$ROOT/scripts/package-gx-torrent.sh" "gx-torrent"
