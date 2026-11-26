@@ -74,7 +74,21 @@ func (t *Torrent) Files() ([]File, error) {
 
 // FileStats reports per-file completion; it fails while stopped.
 func (t *Torrent) FileStats() ([]FileStats, error) {
-	return t.torrent.FileStats()
+	// The live pieces belong to the run loop: read them there, like Stats and
+	// PieceStates, never from the caller's goroutine.
+	type result struct {
+		stats    []FileStats
+		err      error
+		answered bool
+	}
+	r := query(t.torrent, func() result {
+		stats, err := t.torrent.FileStats()
+		return result{stats: stats, err: err, answered: true}
+	})
+	if !r.answered {
+		return nil, errClosed
+	}
+	return r.stats, r.err
 }
 
 // InfoHash identifies the torrent's files (shared across duplicate adds).

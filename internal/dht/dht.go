@@ -1050,7 +1050,7 @@ func (d *DHT) replyAnnouncePeer(addr net.UDPAddr, node *remoteNode, r responseTy
 		node.lastResponseTime = time.Now().Add(-searchRetryPeriod())
 		localPort := d.peerStore.hasLocalDownload(ih)
 		if localPort != 0 {
-			d.PeersRequestResults <- map[InfoHash][]string{ih: {encodeCompactPeerAddr(peerAddr.String())}}
+			d.offerAnnouncedPeer(map[InfoHash][]string{ih: {encodeCompactPeerAddr(peerAddr.String())}})
 		}
 	} else {
 		// Wrong, missing or mismatched-query token: not stored.
@@ -1254,9 +1254,28 @@ func (d *DHT) publishPeers(ih InfoHash, node *remoteNode, values []string) {
 	result := map[InfoHash][]string{ih: peers}
 	totalPeers.Add(int64(len(peers)))
 	d.DebugLogger.Debugf("DHT: processGetPeerResults, totalPeers: %v", totalPeers.String())
+	d.publishPeerResult(result)
+}
+
+// publishPeerResult hands a lookup result to the consumer, waiting for it
+// (the lookup is what the consumer asked for), but never past shutdown: the
+// consumer may already be gone, so stopping wins over delivery.
+func (d *DHT) publishPeerResult(result map[InfoHash][]string) {
 	select {
 	case d.PeersRequestResults <- result:
 	case <-d.stop:
+	}
+}
+
+// offerAnnouncedPeer tells the consumer about a peer that announced itself,
+// without waiting: an announce is unsolicited, any remote node can send one,
+// and a busy consumer must not stall the packet loop. The peer is already in
+// the peer store, so a dropped notice only delays it to the next lookup.
+func (d *DHT) offerAnnouncedPeer(result map[InfoHash][]string) {
+	select {
+	case d.PeersRequestResults <- result:
+	default:
+		totalAnnounceNoticeDropped.Add(1)
 	}
 }
 
@@ -1391,6 +1410,7 @@ var (
 	totalRecvAnnouncePeer        = expvar.NewInt("totalRecvAnnouncePeer")
 	totalSentAnnouncePeer        = expvar.NewInt("totalSentAnnouncePeer")
 	totalAnnounceTokenOK         = expvar.NewInt("totalAnnounceTokenOK")
+	totalAnnounceNoticeDropped   = expvar.NewInt("totalAnnounceNoticeDropped")
 	totalAnnounceTokenBad        = expvar.NewInt("totalAnnounceTokenBad")
 	totalPacketsFromBlockedHosts = expvar.NewInt("totalPacketsFromBlockedHosts")
 	totalDroppedPackets          = expvar.NewInt("totalDroppedPackets")

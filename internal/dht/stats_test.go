@@ -12,7 +12,7 @@ func TestStatsExposesDiagnostics(t *testing.T) {
 		"nodes", "nodes_reached", "peers_found",
 		"packets_in", "packets_out", "bytes_in", "bytes_out", "dropped",
 		"queries_in", "queries_out", "replies_in",
-		"blocked_hosts", "blocked_by_filter", "self_promotions", "dupe_references", "nodes_killed",		"announce_ok_token", "announce_bad_token",
+		"blocked_hosts", "blocked_by_filter", "self_promotions", "dupe_references", "nodes_killed", "announce_ok_token", "announce_bad_token",
 		"reflected_port",
 		"reflected_observations", "nat_mapping",
 		"nodes_capped",

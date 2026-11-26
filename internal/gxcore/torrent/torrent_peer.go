@@ -56,7 +56,9 @@ func (t *torrent) resolveAndAddPeer(host string, port int) {
 	if err != nil {
 		return
 	}
-	t.handleNewPeers([]*net.TCPAddr{{IP: ip, Port: resolvedPort}}, peersource.Manual)
+	t.sendCommand(func() {
+		t.handleNewPeers([]*net.TCPAddr{{IP: ip, Port: resolvedPort}}, peersource.Manual)
+	})
 }
 
 // handleNewPeers absorbs discovered addresses: eagerness off (we have

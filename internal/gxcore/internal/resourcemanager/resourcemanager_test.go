@@ -68,3 +68,21 @@ func TestOverLimitThenQueuedIsServed(t *testing.T) {
 	}
 	m.Release(5)
 }
+
+// TestGrantableSkipsOverBudgetRequests locks the starvation case: a large
+// request ahead of a smaller one must not hide the request that still fits.
+func TestGrantableSkipsOverBudgetRequests(t *testing.T) {
+	m := &ResourceManager[int64]{
+		available: 5,
+		objects:   1,
+		requests: map[string][]request[int64]{
+			"queued": {{key: "queued", n: 6}, {key: "queued", n: 5}},
+		},
+	}
+	for trial := 0; trial < 100; trial++ {
+		got, index := m.grantable()
+		if got.n != 5 || index != 1 {
+			t.Fatalf("trial %d: granted %d bytes at index %d, want the fitting 5-byte request", trial, got.n, index)
+		}
+	}
+}

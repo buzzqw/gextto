@@ -177,12 +177,17 @@ func (m *ResourceManager[T]) deleteRequest(key string, i int) {
 // While anything is outstanding, only fitting requests are granted.
 func (m *ResourceManager[T]) grantable() (request[T], int) {
 	for _, rs := range m.requests {
-		i := rand.IntN(len(rs)) // nolint: gosec
-		r := rs[i]
-		if r.n > m.available && m.objects != 0 {
-			break
+		// Start at a random position, but inspect the whole queue. Stopping at
+		// the first over-budget request can starve a smaller request behind it
+		// forever when no further release or limit change wakes the manager.
+		start := rand.IntN(len(rs)) // nolint: gosec
+		for offset := 0; offset < len(rs); offset++ {
+			i := (start + offset) % len(rs)
+			r := rs[i]
+			if r.n <= m.available || m.objects == 0 {
+				return r, i
+			}
 		}
-		return r, i
 	}
 	return request[T]{}, -1
 }
